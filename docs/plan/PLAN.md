@@ -299,7 +299,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 1. 排查 Pi 1.5.2 各工厂的 Operations 覆盖与 Operations 之外的 fs/child_process 访问
 - [x] 2. 协议：`fs/read|stat|write|mkdir|grep|glob|list`、`exec/run` 与输出通知、取消方式；生成 TS 类型；golden 样本与反例（A09）
 - [x] 3. `piarc-fs`：路径限定（规范化 + 符号链接 + 工作区根）、读（偏移与长度）、stat、写、mkdir、glob、grep、list；越界结构化错误（A07）
-- [ ] 4. `piarc-exec`：经用户 shell 在会话 cwd 执行、流式通知、退出码、取消终止直接子进程、环境不含凭据（A08）
+- [x] 4. `piarc-exec`：经用户 shell 在会话 cwd 执行、流式通知、退出码、取消终止直接子进程、环境不含凭据（A08）
 - [ ] 5. `piarc-core` 分派 `fs/*`、`exec/*`，按会话解析工作区根与 cwd；依赖规则不变
 - [ ] 6. Agent Host 工具层 `agent-host/src/tools/`：六个规范名工具、默认 Tool Profile、名称映射表、停用 Pi 原生工具（A04、A05）
 - [ ] 7. ESLint `no-restricted-imports` 禁止 tools/harness 引入 fs 与 child_process（A03）
