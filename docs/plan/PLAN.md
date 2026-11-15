@@ -305,7 +305,7 @@ T06（开工 2026-11-15，基线 `npm run verify` 13/13 通过；T04 的遗留�
 - [x] C7 `piarc-host`：启动、握手、有界写队列与背压、心跳、退避重启、调用对账、stderr 日志
 - [x] C8 S9 故障注入测试（可控的假 Agent Host、可注入时钟）（A03、A06–A09）
 - [x] C9 S3 场景测试：真实 Agent Host 双会话、中断、压缩、MCP，RSS（A04、A05、A10）
-- [ ] C10 报告 `S03-multi-session.md`、`S09-ahp-resilience.md`，更新 spikes README（A11）
+- [x] C10 报告 `S03-multi-session.md`、`S09-ahp-resilience.md`，更新 spikes README（A11）
 - [ ] C11 收尾：两份 CLAUDE.md、架构与工程文档、acceptance、`npm run verify`（A12）
 
 ## 登记事项

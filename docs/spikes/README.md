@@ -15,13 +15,13 @@ M0 用代码验证架构中依赖运行时行为、读文档无法确认的假�
 |---|---|---|---|---|
 | S1 | 渲染进程 transcript 与 composer：流式、滚动、选择、输入法 | 未开始（T09） | 未开始（W0） | — |
 | S2 | NAPI-RS Core 接入主进程：事件吞吐、事件循环延迟、四个目标 | 通过（T04：吞吐、延迟、同步调用、大批次、darwin 两个目标加载通过；大批次按 ADR-0019 复制转发；空闲内存预算待 R1 校准，I12） | 待 CI 结果与 W0（`core-load` 作业已配置；实机基准与 win32-arm64 实机加载留给 W0） | [S02-napi-event-channel.md](S02-napi-event-channel.md) |
-| S3 | Agent Host 同进程多会话互不串扰 | 未开始（T06） | 未开始（CI） | — |
+| S3 | Agent Host 同进程多会话互不串扰 | 通过（T06：工具副作用、中断、压缩、MCP 均按会话隔离；中断后的对话形态待 T14（I18），MCP 共享池待 T36） | 待 CI 结果（同一组测试在 `verify` 中运行） | [S03-multi-session.md](S03-multi-session.md) |
 | S4 | Operations 委托与规范名工具 | 未开始（T07） | 未开始（CI） | — |
 | S5 | 凭据保险箱与 Pi 凭据接口适配 | 未开始（T08） | 未开始（W0） | — |
 | S6 | 未签名打包、首次运行、内置 Node 与发布清单 | 未开始（T12） | 未开始（W0） | — |
 | S7 | 终端：libghostty-vt、PTY、帧协议、渲染器 | 未开始（T10） | 未开始（W0） | — |
 | S8 | 沙箱：Seatbelt 与网络代理；Job Object | 未开始（T11） | 未开始（W0） | — |
-| S9 | AHP 握手、背压、崩溃重启与对账 | 未开始（T06） | 未开始（CI） | — |
+| S9 | AHP 握手、背压、崩溃重启与对账 | 通过（T06：六类故障注入全部通过；写队列满时返回可重试的 `busy`；进程树清理待 T17（I17）） | 待 CI 结果（同一组测试在 `verify` 中运行） | [S09-ahp-resilience.md](S09-ahp-resilience.md) |
 | S10 | Electron 安全基线 | 部分完成（T03：CSP、导航、IPC、fuses 通过；XSS 载荷集待 T09） | 待 CI 结果（T03 已配置 `desktop` 作业） | [S10-electron-security.md](S10-electron-security.md) |
 
 M0 的汇总结论与进入 M1 的前提由 R1 写入 `M0-summary.md`。
