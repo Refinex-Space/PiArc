@@ -15,7 +15,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use piarc_host::{HostConfig, HostDeps, HostEvent, HostEvents, InboundHandler, NoInbound};
+use piarc_host::{HostConfig, HostDeps, HostEvent, HostEvents, InboundHandler, NoInbound, Peer};
 use piarc_ports::{
     BoxFuture, Clock, ExitStatus, ProcessControl, ProcessSpawner, SpawnSpec, SpawnedProcess,
 };
@@ -303,6 +303,7 @@ impl InboundHandler for TrustTable {
         &self,
         method: String,
         params: Map<String, Value>,
+        peer: Peer,
     ) -> BoxFuture<'static, Result<Value, ErrorObject>> {
         let trusted = self.trusted;
         if let Some(path) = params.get("path").and_then(Value::as_str) {
@@ -312,7 +313,7 @@ impl InboundHandler for TrustTable {
             if method == "trust/get" {
                 Ok(json!({ "trusted": trusted }))
             } else {
-                NoInbound.handle(method, Map::new()).await
+                NoInbound.handle(method, Map::new(), peer).await
             }
         })
     }

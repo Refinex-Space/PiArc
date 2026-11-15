@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use piarc_core::agent_host::{
-    self, HostConfig, HostEvent, HostEvents, HostSupervisor, InboundHandler,
+    self, HostConfig, HostEvent, HostEvents, HostSupervisor, InboundHandler, Peer,
 };
 use piarc_ports::BoxFuture;
 use piarc_protocol::session::{ModelRef, SessionEventNotification, SessionId};
@@ -90,6 +90,7 @@ impl InboundHandler for Trust {
         &self,
         method: String,
         params: Map<String, Value>,
+        _peer: Peer,
     ) -> BoxFuture<'static, Result<Value, ErrorObject>> {
         let path = params
             .get("path")

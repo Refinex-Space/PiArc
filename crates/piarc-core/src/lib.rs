@@ -40,6 +40,11 @@
 //! `piarc-exec` process spawner and the system clock. Session orchestration on top of it
 //! (routing its notifications into the event path, answering `trust/get` from the trust
 //! store) arrives with T13 and T14.
+//!
+//! # Delegated tool I/O (T07)
+//!
+//! [`tool_io::ToolIo`] answers the Agent Host's `fs/*` requests with `piarc-fs` and its
+//! `exec/*` requests with `piarc-exec`, per registered session scope (ADR-0004).
 
 pub mod agent_host;
 pub mod demo;
@@ -47,6 +52,7 @@ mod error;
 pub mod events;
 pub mod route;
 mod runtime;
+pub mod tool_io;
 
 pub use demo::{DemoReport, DemoSourceConfig};
 pub use error::{Error, Result};

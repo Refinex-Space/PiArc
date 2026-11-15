@@ -12,8 +12,9 @@
 //!   `piarc-core`.
 //! - Sandbox profile generation (`piarc-sandbox`).
 //! - Pi integration logic, which lives in the TypeScript Agent Host (`agent-host/`).
-//! - Answering the Agent Host's requests (`trust/get`, ...): an injected [`InboundHandler`]
-//!   does.
+//! - Answering the Agent Host's requests (`trust/get`, `fs/*`, `exec/*`, ...): an injected
+//!   [`InboundHandler`] does. It gets a [`Peer`] to send notifications on the same connection
+//!   before its response (`exec/output`).
 //!
 //! # Allowed workspace dependencies
 //!
@@ -66,7 +67,7 @@ mod supervisor;
 pub use config::{DEFAULT_ENV_PASSTHROUGH, HostConfig};
 pub use error::{Error, Result};
 pub use events::{ExitReason, HostEvent, HostEvents};
-pub use inbound::{InboundHandler, NoInbound, SharedInbound};
+pub use inbound::{InboundHandler, NoInbound, Peer, PeerClosed, SharedInbound};
 pub use ledger::{CallRecord, CallState, Ledger};
 pub use restart::{RestartConfig, RestartDecision, RestartPolicy};
 pub use supervisor::{HostDeps, HostSupervisor, SupervisorState};

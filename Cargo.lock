@@ -951,6 +951,7 @@ name = "piarc-core"
 version = "0.0.0"
 dependencies = [
  "piarc-exec",
+ "piarc-fs",
  "piarc-host",
  "piarc-ports",
  "piarc-protocol",

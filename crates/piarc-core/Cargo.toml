@@ -9,6 +9,7 @@ publish.workspace = true
 
 [dependencies]
 piarc-exec.workspace = true
+piarc-fs.workspace = true
 piarc-host.workspace = true
 piarc-ports.workspace = true
 piarc-protocol.workspace = true

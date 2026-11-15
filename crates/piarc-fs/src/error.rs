@@ -51,8 +51,10 @@ pub enum Error {
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 impl Error {
-    /// The error of `source` while operating on `path`.
-    pub(crate) fn io(path: &Path, source: io::Error) -> Self {
+    /// The error of `source` while operating on `path`: [`Error::NotFound`] for a missing
+    /// path, [`Error::Io`] with the POSIX-style code otherwise.
+    #[must_use]
+    pub fn io(path: &Path, source: io::Error) -> Self {
         let path = display(path);
         if source.kind() == io::ErrorKind::NotFound {
             Self::NotFound { path }

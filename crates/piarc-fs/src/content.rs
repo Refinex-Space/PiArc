@@ -5,6 +5,7 @@ use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 use piarc_protocol::fs::{BlobRef, FsMkdirResult, FsReadResult, FsWriteResult, MAX_READ_CHUNK};
+use piarc_protocol::text::incomplete_utf8_suffix;
 use sha2::{Digest, Sha256};
 
 use crate::error::{Error, Result};
@@ -152,25 +153,10 @@ fn open_file(path: &Path) -> Result<File> {
 /// buffer holding only the start of one sequence is kept whole, so a caller reading tiny
 /// ranges still makes progress.
 fn complete_utf8_prefix(bytes: &[u8]) -> usize {
-    for back in 1..=bytes.len().min(3) {
-        let index = bytes.len() - back;
-        let byte = bytes[index];
-        if byte & 0b1100_0000 == 0b1000_0000 {
-            continue; // a continuation byte: keep looking for its lead byte
-        }
-        let needed = match byte {
-            0xF0..=0xF7 => 4,
-            0xE0..=0xEF => 3,
-            0xC0..=0xDF => 2,
-            _ => 1,
-        };
-        return if needed > back && index > 0 {
-            index
-        } else {
-            bytes.len()
-        };
+    match bytes.len() - incomplete_utf8_suffix(bytes) {
+        0 => bytes.len(),
+        keep => keep,
     }
-    bytes.len()
 }
 
 fn hex(bytes: &[u8]) -> String {

@@ -12,8 +12,8 @@ use piarc_ports::{BoxFuture, Clock};
 
 pub use piarc_host::{
     CallRecord, CallState, DEFAULT_ENV_PASSTHROUGH, Error, ExitReason, HostConfig, HostDeps,
-    HostEvent, HostEvents, HostSupervisor, InboundHandler, NoInbound, RestartConfig, SharedInbound,
-    SupervisorState,
+    HostEvent, HostEvents, HostSupervisor, InboundHandler, NoInbound, Peer, PeerClosed,
+    RestartConfig, SharedInbound, SupervisorState,
 };
 
 /// The operating system's monotonic clock; sleeps on the tokio timer.

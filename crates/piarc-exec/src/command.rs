@@ -31,7 +31,7 @@ pub const EXIT_GRACE: Duration = Duration::from_millis(100);
 const READ_CHUNK: usize = 64 * 1024;
 
 /// Which pipe a chunk came from.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Stream {
     /// Standard output.
     Stdout,

@@ -8,7 +8,8 @@
 //!   its TypeScript types from it, so this crate is the single source of those types
 //!   (ADR-0009 rule 7, ADR-0014 rule 6).
 //! - Registers every wire message for L1 contract tests ([`CONTRACTS`]).
-//! - Provides the LF frame codec over byte buffers ([`FrameDecoder`], [`encode_frame`]).
+//! - Provides the LF frame codec over byte buffers ([`FrameDecoder`], [`encode_frame`]), and
+//!   the rule for cutting UTF-8 text sent in pieces ([`text`]).
 //!
 //! # Not responsible for
 //!
@@ -63,6 +64,7 @@ pub mod method;
 pub mod rpc_error;
 mod schema;
 pub mod session;
+pub mod text;
 pub mod tool_call;
 pub mod trust;
 pub mod turn;

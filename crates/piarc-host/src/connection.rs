@@ -5,7 +5,8 @@
 //! - process: waits for the exit, or kills on request;
 //! - writer: writes queued frames to stdin; closing the queue closes stdin;
 //! - reader: decodes stdout continuously, answers responses directly, hands the Agent Host's
-//!   requests to the [`InboundHandler`](crate::InboundHandler) and session notifications to the
+//!   requests to the [`InboundHandler`](crate::InboundHandler) (with a [`Peer`] for
+//!   notifications back) and session notifications to the
 //!   event queue (where a slow consumer makes it wait: that is the backpressure on the Agent
 //!   Host);
 //! - stderr: forwards each line to `tracing` with workspace and session fields.
@@ -29,7 +30,7 @@ use tokio::sync::{Notify, mpsc, oneshot};
 
 use crate::config::HostConfig;
 use crate::events::{EventSender, HostEvent};
-use crate::inbound::SharedInbound;
+use crate::inbound::{Peer, SharedInbound};
 use crate::ledger::Ledger;
 
 /// Longest stderr line forwarded to the log; longer lines are cut.
@@ -445,10 +446,11 @@ impl Reader {
         }
         let inbound = Arc::clone(&self.shared.inbound);
         let writer = self.link.writer.clone();
+        let peer = Peer::new(writer.clone(), self.link.epoch);
         tokio::spawn(async move {
             let id = request.id;
             let frame = match inbound
-                .handle(request.method, request.params.unwrap_or_default())
+                .handle(request.method, request.params.unwrap_or_default(), peer)
                 .await
             {
                 Ok(result) => {
