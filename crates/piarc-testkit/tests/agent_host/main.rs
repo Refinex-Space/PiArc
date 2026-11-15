@@ -39,6 +39,7 @@ async fn two_sessions_run_tool_calls_concurrently_and_only_touch_their_own_works
     events
         .until(|e| matches!(e, HostEvent::Connected { .. }))
         .await;
+    let rss_none = ping(&supervisor).await.rss_bytes;
     let a = open(&supervisor, &env.cwd(0), "mock-large").await;
     let rss_one = ping(&supervisor).await.rss_bytes;
     let b = open(&supervisor, &env.cwd(1), "mock-large").await;
@@ -63,6 +64,7 @@ async fn two_sessions_run_tool_calls_concurrently_and_only_touch_their_own_works
         (Some("completed"), Some("completed"))
     );
 
+    let rss_after = ping(&supervisor).await.rss_bytes;
     check_own_notes(&env, &events, &a, &b);
     check_overlap(&events, &a);
     let (na, nb) = (
@@ -70,7 +72,8 @@ async fn two_sessions_run_tool_calls_concurrently_and_only_touch_their_own_works
         assert_contiguous_seq(&events, &b.0),
     );
     println!(
-        "seq 1..={na} for A, 1..={nb} for B; RSS with one session {rss_one} bytes, with two {rss_two} bytes"
+        "seq 1..={na} for A, 1..={nb} for B; RSS (bytes): no session {rss_none}, one {rss_one}, \
+         two {rss_two}, after both turns {rss_after}"
     );
     assert_eq!(*trust.asked.lock().expect("lock"), [env.cwd(0), env.cwd(1)]);
     supervisor.shutdown().await;
