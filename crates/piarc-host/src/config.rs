@@ -11,7 +11,7 @@ use crate::restart::RestartConfig;
 
 /// Environment variables copied from Core's own environment into the Agent Host's, when set.
 /// Only what Node, Pi's tools and the OS need; never credentials (architecture section 5.4).
-pub const DEFAULT_ENV_PASSTHROUGH: [&str; 12] = [
+pub const DEFAULT_ENV_PASSTHROUGH: [&str; 15] = [
     "PATH",
     "HOME",
     "USERPROFILE",
@@ -24,6 +24,10 @@ pub const DEFAULT_ENV_PASSTHROUGH: [&str; 12] = [
     "LC_ALL",
     "APPDATA",
     "LOCALAPPDATA",
+    // Windows: resolving executables (cross-spawn, shells) needs these.
+    "PATHEXT",
+    "COMSPEC",
+    "WINDIR",
 ];
 
 /// Variables Core always sets: Pi must not check for updates or attribute requests to its own
