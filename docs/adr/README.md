@@ -34,3 +34,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0016](0016-packaging-signing-updates.md) | 打包、签名与更新：Electron Forge；macOS Developer ID + 公证 + 内置更新；Windows 签名安装包；不上应用商店 | 已取代 → 0018 |
 | [0017](0017-terminal-libghostty-vt.md) | 内置终端：终端状态由 Core 中的 libghostty-vt 持有，渲染层可替换 | 已接受 |
 | [0018](0018-unsigned-distribution.md) | 不做平台代码签名：macOS 只做 ad-hoc 签名，Windows 不签名，更新与凭据存储随之调整 | 已接受 |
+| [0019](0019-event-batches-copied-not-transferred.md) | 事件批次经主进程转发时复制，不转移 ArrayBuffer（修订 ADR-0014 第 4 条） | 提议 |
