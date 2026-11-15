@@ -17,3 +17,14 @@
 //!
 //! The authoritative rules are in `crates/deps-rules.json`, enforced by
 //! `scripts/ci/check-crate-deps.mjs` (architecture section 7.1).
+
+mod error;
+pub mod frame;
+pub mod keymap;
+#[allow(
+    unsafe_code,
+    reason = "the safe wrapper over the libghostty-vt bindings (ADR-0017); unsafe stays inside it"
+)]
+pub mod vt;
+
+pub use error::{Error, Result};

@@ -10,6 +10,8 @@
 //! - Registers every wire message for L1 contract tests ([`CONTRACTS`]).
 //! - Provides the LF frame codec over byte buffers ([`FrameDecoder`], [`encode_frame`]), and
 //!   the rule for cutting UTF-8 text sent in pieces ([`text`]).
+//! - Defines the binary terminal frame format, a draft that T33 finalizes ([`term_frame`]):
+//!   codec and the viewer model that the renderer mirrors in TypeScript.
 //!
 //! # Not responsible for
 //!
@@ -65,6 +67,7 @@ pub mod rpc_error;
 mod schema;
 pub mod secrets;
 pub mod session;
+pub mod term_frame;
 pub mod text;
 pub mod tool_call;
 pub mod trust;
