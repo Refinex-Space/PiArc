@@ -14,8 +14,10 @@ import {
   parseWelcome,
   stringField,
 } from './protocol/params.js';
-import { SessionRegistry } from './runtime/session-registry.js';
+import { blobReader } from './runtime/blobs.js';
+import { SessionRegistry, type ToolBackend } from './runtime/session-registry.js';
 import { agentDirOf, openWorkspace } from './runtime/workspace.js';
+import { CoreIo, DEFAULT_PROFILE, ExecOutputRouter, type ToolProfile } from './tools/index.js';
 
 /** Capabilities this Agent Host announces in `host/hello`. None of the optional features exist yet. */
 export const HOST_CAPABILITIES: readonly string[] = [];
@@ -35,6 +37,10 @@ export interface HostOptions {
   readonly piVersion: string;
   /** Timeout of requests to Core that do not wait for a person. */
   readonly bridgeTimeoutMs?: number;
+  /** The Tool Profile of every session; the default profile when absent. */
+  readonly toolProfile?: ToolProfile;
+  /** Give sessions Pi's own tools with local I/O instead (behavior comparison test only). */
+  readonly piNativeTools?: boolean;
   /** Writes one log line to stderr. */
   readonly log: (line: string) => void;
   /** Ends the process once stdout is flushed. */
@@ -68,6 +74,20 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     log,
     ...(options.bridgeTimeoutMs === undefined ? {} : { bridgeTimeoutMs: options.bridgeTimeoutMs }),
   });
+
+  // Tools delegate their I/O to Core; command output comes back as `exec/output`.
+  const execOutput = new ExecOutputRouter();
+  connection.onNotification('exec/output', (params) => execOutput.deliver(params));
+  const readBlob = blobReader(options.dataDir);
+  const tools: ToolBackend =
+    options.piNativeTools === true
+      ? { kind: 'pi-native' }
+      : {
+          kind: 'core',
+          profile: options.toolProfile ?? DEFAULT_PROFILE,
+          ioFor: (sessionId) =>
+            new CoreIo({ bridge: connection.bridge, sessionId, execOutput, readBlob }),
+        };
 
   const shutdown = (reason: string, code: number): Promise<void> => {
     shuttingDown ??= (async () => {
@@ -183,6 +203,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
       const workspace = await openWorkspace(welcome.workspace, agentDirOf(options.dataDir));
       registry = new SessionRegistry({
         workspace,
+        tools,
         log,
         sinkFor: (sessionId) => ({
           event: (method, payload) => {

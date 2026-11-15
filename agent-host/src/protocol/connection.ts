@@ -17,6 +17,9 @@ import type { OutboundQueue } from './outbound.js';
 /** A request handler: receives unvalidated `params` and returns the result object. */
 export type RequestHandler = (params: unknown) => Promise<object>;
 
+/** A notification handler: receives unvalidated `params`; returns false when it ignored them. */
+export type NotificationHandler = (params: unknown) => boolean;
+
 /** Byte source with the parts of a Readable the connection uses. */
 export interface FrameSource {
   on(event: 'data', listener: (chunk: Buffer) => void): unknown;
@@ -28,6 +31,7 @@ export class Connection {
   readonly #outbound: OutboundQueue;
   readonly #decoder: FrameDecoder;
   readonly #handlers = new Map<string, RequestHandler>();
+  readonly #notificationHandlers = new Map<string, NotificationHandler>();
   readonly #log: (line: string) => void;
   #onEnd: () => void = () => undefined;
 
@@ -53,6 +57,11 @@ export class Connection {
   /** Registers the handler for one Core → Agent Host method. */
   handle(method: string, handler: RequestHandler): void {
     this.#handlers.set(method, handler);
+  }
+
+  /** Registers the handler for one Core → Agent Host notification (`exec/output`). */
+  onNotification(method: string, handler: NotificationHandler): void {
+    this.#notificationHandlers.set(method, handler);
   }
 
   /** Starts reading `source`; `onEnd` runs once it ends (Core closed our stdin). */
@@ -83,7 +92,10 @@ export class Connection {
     const id = isRequestId(value.id) ? value.id : undefined;
     if (typeof value.method === 'string') {
       if (id === undefined) {
-        this.#log(`ignored notification ${value.method} from Core`);
+        const handler = this.#notificationHandlers.get(value.method);
+        if (handler?.(value.params) !== true) {
+          this.#log(`ignored notification ${value.method} from Core`);
+        }
         return;
       }
       void this.#runHandler(id, value.method, value.params ?? {});

@@ -4,7 +4,8 @@
 // - the first `agent_start` of a prompt → `turn/started`;
 // - assistant text: `text_start` → `item/started`, `text_delta` → `item/agentMessage/delta`,
 //   `text_end` → `item/completed`, with itemId `<messageId>#<contentIndex>`;
-// - tool execution start and end → `item/started` / `item/completed` (`dynamicToolCall`);
+// - tool execution start and end → `item/started` / `item/completed` (`dynamicToolCall`), with
+//   the canonical tool name;
 // - `agent_settled` → `turn/completed`.
 //
 // `messageId` is generated here when an assistant message starts streaming: Pi assigns the
@@ -49,10 +50,14 @@ interface Turn {
 
 export class Projector {
   readonly #sink: ProjectionSink;
+  readonly #toCanonical: (tool: string) => string;
   #turn: Turn | undefined;
 
-  constructor(sink: ProjectionSink) {
+  /** `toCanonical` maps the model-visible tool names of the session's Tool Profile to canonical
+   * names: Core sees canonical names only (architecture section 6.1.1). */
+  constructor(sink: ProjectionSink, toCanonical: (tool: string) => string = (tool) => tool) {
     this.#sink = sink;
+    this.#toCanonical = toCanonical;
   }
 
   /** The turn accepted for the current prompt, until it completes. */
@@ -113,7 +118,7 @@ export class Projector {
         }
         break;
       case 'tool_execution_start':
-        this.#onToolStart(turn, event.toolCallId, event.toolName, event.args);
+        this.#onToolStart(turn, event.toolCallId, this.#toCanonical(event.toolName), event.args);
         break;
       case 'tool_execution_end':
         this.#onToolEnd(turn, event.toolCallId, event.result, event.isError);

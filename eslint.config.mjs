@@ -56,9 +56,40 @@ export default defineConfig(
     },
   },
   ...desktopProcessBoundaries(),
+  agentHostIoBoundary(),
   piPublicImports(),
   prettier,
 );
+
+/**
+ * The Agent Host's tool layer and Harness Kit delegate all file and process I/O to Core
+ * (ADR-0004, architecture section 6.1.3): `agent-host/src/tools/` and `agent-host/src/harness/`
+ * may not import `fs` or `child_process`, statically or dynamically.
+ * @returns {import('eslint').Linter.Config}
+ */
+function agentHostIoBoundary() {
+  const message =
+    'Tools and the Harness Kit delegate file and process I/O to Core (ADR-0004): use CoreIo.';
+  const modules = ['fs', 'fs/promises', 'child_process'];
+  const names = modules.flatMap((name) => [name, `node:${name}`]);
+  return {
+    files: ['agent-host/src/tools/**/*.ts', 'agent-host/src/harness/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { paths: names.map((name) => ({ name, message })) }],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: `ImportExpression[source.value=/^(node:)?(fs|fs\\/promises|child_process)$/]`,
+          message,
+        },
+        {
+          selector: `CallExpression[callee.name='require'][arguments.0.value=/^(node:)?(fs|fs\\/promises|child_process)$/]`,
+          message,
+        },
+      ],
+    },
+  };
+}
 
 /**
  * Pi packages may only be imported through their public entry points (architecture section

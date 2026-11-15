@@ -23,14 +23,32 @@ import {
 import type { ModelRef, PromptAccepted, SessionOpened, SessionStopped } from '@piarc/protocol';
 
 import { AhpError, describeError } from '../protocol/errors.js';
+import { ToolNameMap, toolOptions, type CoreIo, type ToolProfile } from '../tools/index.js';
 import { Projector, type ProjectionSink } from './projector.js';
 import type { Workspace } from './workspace.js';
 
 /** Emits the projected notifications of one session. */
 export type SessionSinkFactory = (sessionId: string) => ProjectionSink;
 
+/**
+ * Which tools sessions get. `core`: the canonical tools of `profile` with their I/O delegated to
+ * Core (the only mode Core starts the Agent Host in). `pi-native`: Pi's own tools with local I/O,
+ * under their own names; only the behavior comparison test uses it (`--pi-native-tools`).
+ */
+export type ToolBackend =
+  | {
+      readonly kind: 'core';
+      readonly profile: ToolProfile;
+      readonly ioFor: (sessionId: string) => CoreIo;
+    }
+  | { readonly kind: 'pi-native' };
+
+/** Pi's tools the `pi-native` backend activates: the counterparts of the canonical six. */
+const PI_NATIVE_TOOLS = ['read', 'write', 'edit', 'bash', 'find', 'grep'];
+
 export interface RegistryOptions {
   readonly workspace: Workspace;
+  readonly tools: ToolBackend;
   readonly sinkFor: SessionSinkFactory;
   /** Asks Core whether `cwd` is a trusted project; must resolve `false` on any failure. */
   readonly isTrusted: (cwd: string) => Promise<boolean>;
@@ -162,7 +180,13 @@ export class SessionRegistry {
         details: model,
       });
     }
+    const { tools } = this.#options;
+    const names = tools.kind === 'core' ? new ToolNameMap(tools.profile) : undefined;
     const factory: CreateAgentSessionRuntimeFactory = async (target) => {
+      const sessionTools =
+        tools.kind === 'core'
+          ? toolOptions(tools.ioFor(target.sessionManager.getSessionId()), tools.profile)
+          : { tools: PI_NATIVE_TOOLS };
       const services = await createAgentSessionServices({
         cwd: target.cwd,
         agentDir: target.agentDir,
@@ -181,6 +205,7 @@ export class SessionRegistry {
       const result = await createAgentSessionFromServices({
         services,
         sessionManager: target.sessionManager,
+        ...sessionTools,
         ...(target.sessionStartEvent === undefined
           ? {}
           : { sessionStartEvent: target.sessionStartEvent }),
@@ -204,7 +229,10 @@ export class SessionRegistry {
     if (runtime.modelFallbackMessage !== undefined) {
       log(runtime.modelFallbackMessage);
     }
-    const projector = new Projector(this.#options.sinkFor(sessionId));
+    const projector = new Projector(
+      this.#options.sinkFor(sessionId),
+      names === undefined ? undefined : (tool) => names.toCanonical(tool),
+    );
     const unsubscribe = session.subscribe((event) => {
       projector.handle(event);
     });
