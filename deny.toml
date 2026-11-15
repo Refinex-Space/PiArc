@@ -37,7 +37,13 @@ allow = [
 confidence-threshold = 0.93
 # The allowlist is policy, not an inventory: unused entries are expected.
 unused-allowed-license = "allow"
-exceptions = []
+# Per-crate exceptions keep the global allowlist narrow.
+exceptions = [
+    # MIT-0 is MIT without the attribution clause (OSI approved, permissive).
+    # borrow-or-share reaches the tree only through jsonschema (via fluent-uri)
+    # in piarc-testkit, a test-only crate that is never shipped (T05).
+    { allow = ["MIT-0"], crate = "borrow-or-share" },
+]
 
 [licenses.private]
 # Workspace crates are checked too (they are MIT).

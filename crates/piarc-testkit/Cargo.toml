@@ -7,5 +7,23 @@ license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[[bin]]
+name = "piarc-mock-provider"
+path = "src/bin/mock_provider.rs"
+
+[dependencies]
+http-body-util.workspace = true
+hyper.workspace = true
+hyper-util.workspace = true
+jsonschema.workspace = true
+serde.workspace = true
+serde-saphyr.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["net", "io-util", "io-std"] }
+
+[dev-dependencies]
+hyper = { workspace = true, features = ["client"] }
+
 [lints]
 workspace = true

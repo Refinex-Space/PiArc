@@ -296,9 +296,9 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 T05 严格校验的 mock provider（2026-11-15 开工，基线 `npm run verify` 13 步全部通过）
 
-- [ ] 1. 选型：HTTP 服务、YAML、JSON Schema 校验库，cargo-deny 通过
-- [ ] 2. 场景脚本格式（serde，JSON 与 YAML 加载）与场景库
-- [ ] 3. 线格式编码：Anthropic Messages SSE、OpenAI Chat Completions 分块（A01）；工具参数至少 3 段增量（A04）
+- [x] 1. 选型：HTTP 服务、YAML、JSON Schema 校验库，cargo-deny 通过
+- [x] 2. 场景脚本格式（serde，JSON 与 YAML 加载）与场景库
+- [x] 3. 线格式编码：Anthropic Messages SSE、OpenAI Chat Completions 分块（A01）；工具参数至少 3 段增量（A04）
 - [ ] 4. 请求解析与校验器：配对、角色顺序、工具 schema、system 必要段落、缓存断点数量与位置（A02、A03）
 - [ ] 5. HTTP 服务（库形态）：场景选择、错误注入、请求记录与查询（A05、A06、A07）
 - [ ] 6. 独立进程 bin：`--port 0`、stdout 首行端口、stdin 关闭退出、HTTP 查询端点（A07、A08）
