@@ -400,3 +400,35 @@ body,
 .mention-path {
   color: color-mix(in srgb, canvastext 55%, canvas);
 }
+
+/* Terminal prototype page (T10, #/terminal-lab). */
+.terminal-lab {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100vh;
+  padding: 8px;
+  box-sizing: border-box;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font:
+    13px system-ui,
+    sans-serif;
+}
+
+.terminal-lab-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.terminal-lab-stats {
+  margin-left: auto;
+  opacity: 0.7;
+}
+
+.terminal-lab-host {
+  flex: none;
+  align-self: flex-start;
+  cursor: text;
+}

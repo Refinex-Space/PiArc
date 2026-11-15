@@ -301,9 +301,9 @@ T10（2026-11-15 开工；基线 verify 13 步通过；依赖 T04 为"部分完�
 - [x] 3 `piarc-term`：safe 封装（Terminal、RenderState、KeyEncoder、Formatter）、PTY 与 IO 线程、effects（A04）
 - [x] 4 帧格式草案进 `piarc-protocol`：格式说明、Rust 编解码器、往返测试；render state 增量帧编码与行 id 复用（A05）
 - [x] 5 Core 与 NAPI 导出、主进程转发、preload API（拉取式帧）
-- [ ] 6 渲染原型：fork `CanvasRenderer`（vendor 目录与来源说明）、`RemoteRenderable`、TS 解码器、键盘与输入法、开发页面（A12）
+- [x] 6 渲染原型：fork `CanvasRenderer`（vendor 目录与来源说明）、`RemoteRenderable`、TS 解码器、键盘与输入法、开发页面（A12）
 - [x] 7 一致性测试：formatter 与帧逐格比较（普通屏幕、alt screen、CJK、emoji、ZWJ），Rust 与 TS 解码器同一组样本（A08）
-- [ ] 8 L4：rAF 拉取与隐藏终端 0 帧、输入法预编辑与 textarea 跟随（A06、A11）
+- [x] 8 L4：rAF 拉取与隐藏终端 0 帧、输入法预编辑与 textarea 跟随（A06、A11；真实拼音候选框待用户核对）
 - [ ] 9 测量：`cat` 100 MB、键入回显额外延迟；vim 与 top 截图对照（A07、A09、A10）
 - [ ] 10 wterm 评估、S7 报告、spikes README、许可证来源登记、CLAUDE.md、复用表、架构与 ADR 同步（A13）
 - [ ] 11 收尾：verify、验收记录、PLAN 收尾（A14）

@@ -1,0 +1,41 @@
+{
+  "$comment": [
+    "Third-party code and binaries that reach PiArc's release artefacts without a package manager, so Cargo and npm metadata cannot list them (architecture section 10.4).",
+    "T50's scripts/release/gen-notices.mjs reads this file, together with the Cargo and npm dependency trees, to generate THIRD_PARTY_NOTICES. Every entry names its license text in this repository.",
+    "Add an entry in the same change that vendors code or links a prebuilt binary."
+  ],
+  "components": [
+    {
+      "id": "libghostty-vt",
+      "name": "libghostty-vt",
+      "version": "1.0.1",
+      "license": "MIT",
+      "licenseFile": "third-party/licenses/libghostty-vt-1.0.1.LICENSE",
+      "copyright": "Copyright (c) 2024 Mitchell Hashimoto, Ghostty contributors",
+      "source": {
+        "repository": "https://github.com/ghostty-org/ghostty",
+        "tag": "vt-1.0.1",
+        "commit": "108cacb17ed8990840cd14abfce43d8ed8503ca1",
+        "artefacts": "https://release.files.ghostty.org/libghostty-vt/1.0.1/ (locked in crates/piarc-ghostty-sys/ghostty-vt.lock.json)"
+      },
+      "usedBy": "crates/piarc-ghostty-sys: linked statically into the macOS Core module; ghostty-vt.dll ships next to the Windows Core module",
+      "addedBy": "T10",
+      "notes": "The library bundles simdutf, Highway and Wuffs (permissive licenses, no copyleft; docs/research/terminal-libghostty.md section 1.1). T50 checks their license texts against the release's source tarball when generating the notices."
+    },
+    {
+      "id": "ghostty-web-canvas-renderer",
+      "name": "ghostty-web CanvasRenderer (fork)",
+      "version": "0.4.0-21-g640db46",
+      "license": "MIT",
+      "licenseFile": "apps/desktop/src/renderer/terminal/vendor/ghostty-web/LICENSE",
+      "copyright": "Copyright (c) 2025 Coder",
+      "source": {
+        "repository": "https://github.com/coder/ghostty-web",
+        "path": "lib/renderer.ts",
+        "commit": "640db4617c69a73ccebce437cebc598c7f73cdb7"
+      },
+      "usedBy": "apps/desktop/src/renderer/terminal/vendor/ghostty-web/renderer.ts (modified; changes listed in README.md next to it)",
+      "addedBy": "T10"
+    }
+  ]
+}
