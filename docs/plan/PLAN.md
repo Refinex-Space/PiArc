@@ -110,7 +110,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 |---|---|---|---|---|---|---|---|---|---|
 | T01 | [仓库脚手架、工程规范与质量门禁](tasks/T01-scaffold-and-quality-gates.md) | 0 | 无 | macOS | high | 大 | 无 | 已完成 | 47fb1e9 |
 | T02 | [协议单一来源与契约测试基座](tasks/T02-protocol-and-contract-tests.md) | 0 | T01 | macOS | high | 中 | 无 | 已完成 | ce41191 |
-| T03 | [Electron 应用骨架与安全基线](tasks/T03-electron-shell-and-security-baseline.md) | 1 | T02 | macOS | xhigh | 大 | S10 | 进行中 | — |
+| T03 | [Electron 应用骨架与安全基线](tasks/T03-electron-shell-and-security-baseline.md) | 1 | T02 | macOS | xhigh | 大 | S10 | 部分完成 | 63eabea |
 | T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 未开始 | — |
 | T05 | [严格校验的 mock provider](tasks/T05-strict-mock-provider.md) | 1 | T02 | macOS | high | 中 | 无 | 未开始 | — |
 | T06 | [Agent Host 骨架：Pi SDK 多会话与 AHP](tasks/T06-agent-host-skeleton.md) | 1 | T04、T05 | macOS | xhigh | 大 | S3、S9 | 未开始 | — |
@@ -294,19 +294,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-### T03 Electron 应用骨架与安全基线
-
-开工：2026-11-14，基线 `npm run verify` 12 项通过；无前序 `blocked` 项；本机 `gh` 未登录。
-
-- [x] 1 工程：版本核对与精确锁定（Electron 45.3.2 内置 Node 24.22.2 = `.nvmrc`；Forge 8.0.1、Vite 8.3.8、React 19.3.1）（A01）
-- [x] 2 工程：`src/main`、`src/preload`、`src/renderer`（+ `src/shared`）TS 工程，Forge + Vite 构建，React 三栏占位，窗口工厂 + ESLint 进程边界规则
-- [x] 3 安全基线：自定义协议、CSP 响应头、webPreferences、导航、新窗口与外链确认、权限默认拒绝、`web-contents-created` 兜底、单实例锁
-- [x] 4 preload 与 IPC：`window.piarc` 白名单、统一注册函数与来源校验纯函数 + 单元测试（A08 单元部分）
-- [x] 5 fuses：开发与发布配置分开（`apps/desktop/fuses.mjs`）、`scripts/ci/check-fuses.mjs`、`npm run check:fuses`；改一项配置后脚本失败并指出该项（A12）
-- [x] 6 L4 基座：Playwright 开发模式与 `package` 产物两种形态，冒烟与安全用例（本机 58 项通过），证据约定写进 testing.md 第 9 节（A02、A04–A11）
-- [x] 7 CI：`desktop` 作业在 macOS 与 Windows 跑冒烟、安全用例与 fuse 校验，actionlint 1.7.12 通过；Windows 实际结果待推送（A03）
-- [x] 8 S10 报告与 `docs/spikes/README.md`（A13）
-- [ ] 9 收尾：`apps/desktop/CLAUDE.md`、coding-standards 复用表、根 CLAUDE.md 命令、架构 2.5（已提交）；`npm run verify`（A14）、acceptance.json、看板与会话日志（待做）
+（当前没有进行中的任务）
 
 ## 登记事项
 
@@ -323,6 +311,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I07 | T01 | TypeScript 7.0 已发布，typescript-eslint 8.72 只支持 `<6.1`，仓库锁在 TypeScript 6.0.3 | 各评审任务按月复查 typescript-eslint 的支持范围，支持后再升级 |
 | I08 | T02 | Node 的 `JSON.stringify` 把孤立代理项写成 `\udXXX` 转义，serde_json 拒绝这种帧；TS 的 `encodeFrame` 因此直接抛 `TypeError`。模型 SDK 按 UTF-16 切分的流式文本增量可能在代理对中间断开 | T06 在发送 `item/agentMessage/delta` 等文本前处理（例如把末尾的高代理项留到下一个增量），并加测试 |
 | I09 | T02 | 帧解码按 serde_json 的递归上限拒绝嵌套超过 127 层的 JSON（TS 实现同样执行）。工具参数等任意 JSON 若更深会被整帧拒绝 | T07 实现工具调用转发时确认可接受；需要更深时评估在 Core 侧放宽并补栈深度保护 |
+| I10 | T03 | 发布构建仍接受 Chromium 的 `--remote-debugging-port`（没有对应 fuse，运行时探测 `/json/version` 返回 200）：能以该参数启动 PiArc 的本机进程可经 CDP 在页面中执行脚本并调用 `window.piarc`。威胁等级与 ADR-0018 已接受的本机篡改相同，详见 `docs/spikes/S10-electron-security.md` 第 6 节 | T45 评估在发布构建启动时拒绝或移除该开关（先验证可行性），补回归用例 |
+| I11 | T03 | 应用仍使用 Electron 默认菜单，发布构建中也有"Toggle Developer Tools"与"Reload" | T18 替换原生菜单时决定发布构建是否保留开发者工具入口 |
 
 ## 技术债
 
@@ -353,6 +343,12 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 验收：11 项通过，0 项阻塞（A10 的 Windows runner 实际运行待推送后观察）
 - 决策：未写 ADR；架构 v2.4（帧编解码器放在 `piarc-protocol`，7.4 增加消息约定）；TS 解码器对齐 serde_json 的嵌套与孤立代理项规则
 - 遗留：I08（流式文本的孤立代理项，T06）、I09（嵌套上限，T07）
+
+### 2026-11-14 T03 部分完成（提交 63eabea）
+- 交付：`apps/desktop` 三部分工程（Electron 45.3.2、Forge 8.0.1、Vite 8.3.8、React 19.3.1，精确锁定；main/preload/renderer/shared 四个 TS 工程）；`app://piarc` 自定义协议 + CSP 响应头、固定 webPreferences 的窗口工厂、全局导航/重定向/新窗口/webview 守卫、权限默认拒绝、IPC 统一注册与来源校验、外链确认、单实例锁；ESLint 进程边界规则；`apps/desktop/fuses.mjs`（发布/开发两套）、`scripts/ci/check-fuses.mjs`（`npm run check:fuses`）、`scripts/dev/package-desktop.mjs`；L4 基座（Playwright 开发形态与打包形态，29 个用例 × 2）；CI `desktop` 作业；S10 报告、testing.md 第 9 节、`apps/desktop/CLAUDE.md`
+- 验收：13 项通过，1 项阻塞（A03：Windows CI 实际结果待推送后核对）
+- 决策：未写 ADR；架构 v2.5（3.4 增加 `src/shared/`，10.3 写明协议名、权限检查处理器、开发/发布构建 fuse 差异与 L4 打包形态）；L4 打包形态用开发构建（Playwright 需要 `--inspect`）；开发服务器放宽经 `import.meta.env.DEV` 在打包时删除；主进程 origin 比较经 `originOf`（Node 的 URL 不认识 Chromium 标准协议）
+- 遗留：I10（发布构建接受 `--remote-debugging-port`，T45）、I11（默认菜单，T18）；本机 `gh` 未登录，未查前序 CI
 
 ## 计划变更记录
 
