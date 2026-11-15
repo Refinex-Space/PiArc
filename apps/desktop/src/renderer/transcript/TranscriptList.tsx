@@ -1,6 +1,7 @@
-// Transcript list on @tanstack/react-virtual: rows absolutely positioned in a sizer, measured with
-// ResizeObserver, heights remembered per row id and width (RowHeights), about one viewport of
-// rows rendered beyond each edge, and the list anchored to its end.
+// The transcript's virtual list on @tanstack/react-virtual (ADR-0022): rows absolutely positioned
+// in a sizer, measured with ResizeObserver, heights remembered per row id and width (RowHeights),
+// about one viewport of rows rendered beyond each edge, and the list anchored to its end. The
+// sizer is the content element scroll following observes.
 import {
   measureElement as measureWithObserver,
   useVirtualizer,
@@ -9,10 +10,9 @@ import {
 } from '@tanstack/react-virtual';
 import { useLayoutEffect, useRef, useState } from 'react';
 
-import { VIRTUAL_LIST } from '../constants.js';
-import { RowView } from '../Rows.js';
-import { useTranscriptServices } from '../services.js';
-import type { ListProps } from './list-props.js';
+import { VIRTUAL_LIST } from './constants.js';
+import { RowView } from './Rows.js';
+import { useTranscriptServices } from './services.js';
 
 type RowVirtualizer = Virtualizer<HTMLDivElement, HTMLDivElement>;
 
@@ -37,11 +37,17 @@ function pixelOverscan(range: Range, instance: RowVirtualizer | null): number[] 
   return indexes;
 }
 
-export function TanstackList({
+export function TranscriptList({
   ids,
   onScroller,
   onContent,
-}: Omit<ListProps, 'follow' | 'onPinner'>) {
+}: {
+  ids: readonly string[];
+  /** Receives the scroll element. */
+  onScroller: (element: HTMLElement | null) => void;
+  /** Receives the element whose size changes when rows change size. */
+  onContent: (element: HTMLElement | null) => void;
+}) {
   const { store, heights } = useTranscriptServices();
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(0);
@@ -96,7 +102,6 @@ export function TanstackList({
       }}
       className="transcript-scroller"
       data-testid="transcript-scroller"
-      data-list="tanstack"
       tabIndex={0}
       role="log"
       aria-label="Transcript"

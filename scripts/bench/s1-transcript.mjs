@@ -1,10 +1,11 @@
 // S1 benchmark (T09): the transcript prototype in the running Electron app.
 //
-//   npm run bench:s1 -- [--form packaged|dev] [--lists tanstack,virtuoso] [--seconds 60]
-//                       [--tps 100] [--scroll-seconds 10] [--cold-runs 5] [--out <file.json>]
+//   npm run bench:s1 -- [--form packaged|dev] [--seconds 60] [--tps 100] [--scroll-seconds 10]
+//                       [--cold-runs 5] [--out <file.json>]
 //
-// Needs `npm run package:desktop -- --flavor development` first. For each virtual list it opens
-// `#/transcript-lab?list=<name>` and measures, against architecture chapter 11:
+// Needs `npm run package:desktop -- --flavor development` first. It opens `#/transcript-lab` and
+// measures, against architecture chapter 11 (T09 ran the same set on both virtual-list
+// candidates, commit 0387545; ADR-0022):
 //
 // 1. streaming: `--tps` token/s for `--seconds` after 100 history items. A Chrome trace of the
 //    window's renderer gives the main thread's frame times (`AnimationFrame`, the same span as a
@@ -37,7 +38,6 @@ import { percentile } from './s2-event-channel.mjs';
  * @typedef {import('@playwright/test').Page} Page
  * @typedef {import('@playwright/test').CDPSession} CDPSession
  * @typedef {import('../../apps/desktop/src/shared/transcript-lab.js').FrameRecording} FrameRecording
- * @typedef {import('../../apps/desktop/src/shared/transcript-lab.js').LabListKind} LabListKind
  */
 
 const desktopDir = path.join(repoRoot, 'apps', 'desktop');
@@ -223,13 +223,12 @@ async function appCommand(form, args) {
 }
 
 /**
- * Loads the prototype page with `list`, freshly (a reload drops the workers and their caches).
+ * Loads the prototype page freshly (a reload drops the workers and their caches).
  * @param {Page} page
- * @param {LabListKind} list
  */
-async function openLab(page, list) {
+async function openLab(page) {
   const base = page.url().split('#')[0] ?? page.url();
-  await page.goto(`${base}${LAB_HASH}?list=${list}`);
+  await page.goto(`${base}${LAB_HASH}`);
   await page.reload();
   await page.getByTestId('transcript-lab').waitFor();
   await page.waitForFunction(() => globalThis.__piarcTranscriptLab !== undefined);
@@ -322,10 +321,10 @@ async function framesDuring(page, body) {
 }
 
 /**
- * @param {{ form: 'dev' | 'packaged', list: LabListKind, seconds: number, tps: number,
- *   scrollSeconds: number, coldRuns: number }} options
+ * @param {{ form: 'dev' | 'packaged', seconds: number, tps: number, scrollSeconds: number,
+ *   coldRuns: number }} options
  */
-async function measureList(options) {
+async function measureTiming(options) {
   const userDataDir = await mkdtemp(path.join(os.tmpdir(), 'piarc-s1-'));
   const { command, args } = await appCommand(options.form, [`--user-data-dir=${userDataDir}`]);
   const app = await electron.launch({ executablePath: command, args });
@@ -350,8 +349,8 @@ async function measureList(options) {
     const pid = await app.evaluate(
       ({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.webContents.getOSProcessId() ?? -1,
     );
-    await openLab(page, options.list);
-    console.log(`[${options.list}] warming up`);
+    await openLab(page);
+    console.log(`warming up`);
     await page.evaluate(async () => {
       const api = globalThis.__piarcTranscriptLab;
       if (api === undefined) {
@@ -365,9 +364,7 @@ async function measureList(options) {
       api.clear();
     });
 
-    console.log(
-      `[${options.list}] streaming ${String(options.tps)} token/s for ${String(options.seconds)} s`,
-    );
+    console.log(`streaming ${String(options.tps)} token/s for ${String(options.seconds)} s`);
     await page.evaluate(async () => {
       await globalThis.__piarcTranscriptLab?.loadHistory(100);
     });
@@ -382,7 +379,7 @@ async function measureList(options) {
       }),
     );
 
-    console.log(`[${options.list}] scrolling 10,000 items for ${String(options.scrollSeconds)} s`);
+    console.log(`scrolling 10,000 items for ${String(options.scrollSeconds)} s`);
     await page.evaluate(async () => {
       const api = globalThis.__piarcTranscriptLab;
       api?.clear();
@@ -403,11 +400,11 @@ async function measureList(options) {
       }),
     );
 
-    console.log(`[${options.list}] cold loads of 1,000 items`);
+    console.log(`cold loads of 1,000 items`);
     /** @type {number[]} */
     const coldMs = [];
     for (let run = 0; run < options.coldRuns; run += 1) {
-      await openLab(page, options.list);
+      await openLab(page);
       const load = await page.evaluate(async () =>
         globalThis.__piarcTranscriptLab?.loadHistory(1_000),
       );
@@ -416,7 +413,7 @@ async function measureList(options) {
       }
       coldMs.push(load.readyToVisibleMs);
     }
-    return { list: options.list, window, streaming, scrolling, scrolledPx, coldMs };
+    return { window, streaming, scrolling, scrolledPx, coldMs };
   } finally {
     await app.close();
     await rm(userDataDir, { recursive: true, force: true });
@@ -427,10 +424,9 @@ async function measureList(options) {
  * Renderer memory of a fresh app with the prototype page holding `items` items, after a
  * garbage collection.
  * @param {'dev' | 'packaged'} form
- * @param {LabListKind} list
  * @param {number} items
  */
-async function measureMemory(form, list, items) {
+async function measureMemory(form, items) {
   const userDataDir = await mkdtemp(path.join(os.tmpdir(), 'piarc-s1-'));
   const { command, args } = await appCommand(form, [`--user-data-dir=${userDataDir}`]);
   const app = await electron.launch({ executablePath: command, args });
@@ -440,7 +436,7 @@ async function measureMemory(form, list, items) {
     await app.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows()[0]?.setContentSize(1280, 800);
     });
-    await openLab(page, list);
+    await openLab(page);
     if (items > 0) {
       await page.evaluate(async (count) => {
         await globalThis.__piarcTranscriptLab?.loadHistory(count);
@@ -467,16 +463,15 @@ async function measureMemory(form, list, items) {
 }
 
 /**
- * @param {{ form: 'dev' | 'packaged', list: LabListKind, seconds: number, tps: number,
- *   scrollSeconds: number, coldRuns: number }} options
+ * @param {{ form: 'dev' | 'packaged', seconds: number, tps: number, scrollSeconds: number,
+ *   coldRuns: number }} options
  */
 async function measureAll(options) {
-  const timing = await measureList(options);
-  console.log(`[${options.list}] memory: empty page, then 1,000 items`);
-  const empty = await measureMemory(options.form, options.list, 0);
-  const with1000 = await measureMemory(options.form, options.list, 1_000);
+  const timing = await measureTiming(options);
+  console.log('memory: empty page, then 1,000 items');
+  const empty = await measureMemory(options.form, 0);
+  const with1000 = await measureMemory(options.form, 1_000);
   return {
-    list: options.list,
     window: timing.window,
     streaming: { frames: timing.streaming.result, trace: timing.streaming.trace },
     scrolling: {
@@ -499,7 +494,6 @@ async function main() {
   const { values } = parseArgs({
     options: {
       form: { type: 'string', default: 'packaged' },
-      lists: { type: 'string', default: 'tanstack,virtuoso' },
       seconds: { type: 'string', default: '60' },
       tps: { type: 'string', default: '100' },
       'scroll-seconds': { type: 'string', default: '10' },
@@ -508,24 +502,13 @@ async function main() {
     },
   });
   const form = values.form === 'dev' ? 'dev' : 'packaged';
-  /** @type {LabListKind[]} */
-  const lists = values.lists
-    .split(',')
-    .map((name) => name.trim())
-    .filter((name) => name === 'tanstack' || name === 'virtuoso');
-  const results = [];
-  for (const list of lists) {
-    results.push(
-      await measureAll({
-        form,
-        list,
-        seconds: Number(values.seconds),
-        tps: Number(values.tps),
-        scrollSeconds: Number(values['scroll-seconds']),
-        coldRuns: Number(values['cold-runs']),
-      }),
-    );
-  }
+  const result = await measureAll({
+    form,
+    seconds: Number(values.seconds),
+    tps: Number(values.tps),
+    scrollSeconds: Number(values['scroll-seconds']),
+    coldRuns: Number(values['cold-runs']),
+  });
   const report = {
     date: new Date().toISOString(),
     machine: {
@@ -538,7 +521,7 @@ async function main() {
     },
     form,
     settings: values,
-    results,
+    result,
   };
   const out =
     values.out ??
@@ -547,24 +530,21 @@ async function main() {
   await writeFile(out, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 
   console.log(`\nS1 transcript benchmark (${form}, ${report.machine.cpu}, ${os.release()})`);
-  for (const result of results) {
-    const { streaming, scrolling } = result;
-    console.log(`\n${result.list}`);
-    console.log(
-      `  streaming: frame work p50 ${ms(streaming.trace.frameWorkMs.p50)}, p99 ${ms(streaming.trace.frameWorkMs.p99)}, max ${ms(streaming.trace.frameWorkMs.max)}; ` +
-        `tasks > 50 ms: ${String(streaming.trace.longTasksMs.length)}; frame interval p99 ${ms(streaming.frames.intervalMs.p99)}, missed ${String(streaming.frames.missedFrames)}`,
-    );
-    console.log(
-      `  scrolling: ${scrolling.frames.fps.toFixed(1)} fps over ${String(Math.round(scrolling.scrolledPx))} px; frame work p99 ${ms(scrolling.trace.frameWorkMs.p99)}; ` +
-        `tasks > 50 ms: ${String(scrolling.trace.longTasksMs.length)}; missed ${String(scrolling.frames.missedFrames)}`,
-    );
-    console.log(
-      `  cold load 1,000: median ${ms(result.coldLoad1000Ms.p50)}, max ${ms(result.coldLoad1000Ms.max)}`,
-    );
-    console.log(
-      `  renderer memory: ${result.memoryWith1000Items.rendererWorkingSetMiB.toFixed(0)} MiB with 1,000 items, ${result.memoryEmptyPage.rendererWorkingSetMiB.toFixed(0)} MiB empty (all processes ${result.memoryWith1000Items.allProcessesMiB.toFixed(0)} MiB)`,
-    );
-  }
+  const { streaming, scrolling } = result;
+  console.log(
+    `  streaming: frame work p50 ${ms(streaming.trace.frameWorkMs.p50)}, p99 ${ms(streaming.trace.frameWorkMs.p99)}, max ${ms(streaming.trace.frameWorkMs.max)}; ` +
+      `tasks > 50 ms: ${String(streaming.trace.longTasksMs.length)}; frame interval p99 ${ms(streaming.frames.intervalMs.p99)}, missed ${String(streaming.frames.missedFrames)}`,
+  );
+  console.log(
+    `  scrolling: ${scrolling.frames.fps.toFixed(1)} fps over ${String(Math.round(scrolling.scrolledPx))} px; frame work p99 ${ms(scrolling.trace.frameWorkMs.p99)}; ` +
+      `tasks > 50 ms: ${String(scrolling.trace.longTasksMs.length)}; missed ${String(scrolling.frames.missedFrames)}`,
+  );
+  console.log(
+    `  cold load 1,000: median ${ms(result.coldLoad1000Ms.p50)}, max ${ms(result.coldLoad1000Ms.max)}`,
+  );
+  console.log(
+    `  renderer memory: ${result.memoryWith1000Items.rendererWorkingSetMiB.toFixed(0)} MiB with 1,000 items, ${result.memoryEmptyPage.rendererWorkingSetMiB.toFixed(0)} MiB empty (all processes ${result.memoryWith1000Items.allProcessesMiB.toFixed(0)} MiB)`,
+  );
   console.log(`\nWrote ${out}`);
 }
 

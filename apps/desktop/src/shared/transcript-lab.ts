@@ -1,10 +1,8 @@
 // The transcript prototype page (renderer, `#/transcript-lab`) and what it exposes to L4 tests
 // and the S1 benchmark as `window.__piarcTranscriptLab`. Test-only: no product feature uses it.
 
-/** Hash that opens the prototype page; `?list=virtuoso` picks the other virtual list. */
+/** Hash that opens the prototype page. */
 export const TRANSCRIPT_LAB_HASH = '#/transcript-lab';
-
-export type LabListKind = 'tanstack' | 'virtuoso';
 
 /** A business action the composer triggered. */
 export type ComposerActionRecord =
@@ -45,7 +43,6 @@ export interface ScrollThresholds {
 }
 
 export interface TranscriptLabApi {
-  readonly list: LabListKind;
   /** Removes every row. */
   clear(): void;
   /**

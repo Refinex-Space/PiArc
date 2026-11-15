@@ -1,15 +1,12 @@
 // The transcript prototype page (`#/transcript-lab`, T09): the transcript and the composer driven
 // by synthetic protocol events instead of Core. L4 tests and the S1 benchmark drive it through
-// `window.__piarcTranscriptLab`; the toolbar does the same by hand. `?list=virtuoso` switches
-// the virtual list for the comparison.
+// `window.__piarcTranscriptLab`; the toolbar does the same by hand.
 import { useCallback, useMemo, useRef, useState } from 'react';
 
-import {
-  TRANSCRIPT_LAB_HASH,
-  type ComposerActionRecord,
-  type FrameRecording,
-  type LabListKind,
-  type TranscriptLabApi,
+import type {
+  ComposerActionRecord,
+  FrameRecording,
+  TranscriptLabApi,
 } from '../../shared/transcript-lab.js';
 import { Composer, type ComposerHandlers } from '../composer/Composer.js';
 import { SCROLL_FOLLOW } from '../transcript/constants.js';
@@ -32,12 +29,6 @@ import {
   planTurn,
 } from './fixtures/synthesizer.js';
 import { xssMessage } from '../../shared/xss-payloads.js';
-
-/** The virtual list named in the hash (`#/transcript-lab?list=virtuoso`). */
-export function labListKind(hash: string): LabListKind {
-  const query = hash.slice(TRANSCRIPT_LAB_HASH.length).replace(/^\?/u, '');
-  return new URLSearchParams(query).get('list') === 'virtuoso' ? 'virtuoso' : 'tanstack';
-}
 
 function nextFrame(): Promise<number> {
   return new Promise((resolve) => requestAnimationFrame(resolve));
@@ -149,7 +140,6 @@ function codeSettled(itemId: string): boolean {
 }
 
 function createLabApi(
-  list: LabListKind,
   services: TranscriptServices,
   counts: Map<string, number>,
   actions: ComposerActionRecord[],
@@ -190,7 +180,6 @@ function createLabApi(
   };
 
   return {
-    list,
     clear() {
       replayer.stop();
       services.driver.reset();
@@ -328,7 +317,6 @@ function createLabApi(
 }
 
 export function TranscriptLab() {
-  const list = labListKind(window.location.hash);
   const counts = useRef(new Map<string, number>()).current;
   const actions = useRef<ComposerActionRecord[]>([]).current;
   const scrollRef = useRef<{ follow: ScrollFollow | null; scroller: HTMLElement | null }>({
@@ -343,10 +331,10 @@ export function TranscriptLab() {
     }),
   );
   const api = useMemo(() => {
-    const created = createLabApi(list, services, counts, actions, scrollRef);
+    const created = createLabApi(services, counts, actions, scrollRef);
     globalThis.__piarcTranscriptLab = created;
     return created;
-  }, [list, services, counts, actions, scrollRef]);
+  }, [services, counts, actions, scrollRef]);
   const running = useRunning(services.store);
   const onFollow = useCallback(
     (follow: ScrollFollow, scroller: HTMLElement | null) => {
@@ -389,9 +377,9 @@ export function TranscriptLab() {
   };
   return (
     <TranscriptContext.Provider value={services}>
-      <div className="lab" data-testid="transcript-lab" data-list={list}>
+      <div className="lab" data-testid="transcript-lab">
         <header className="lab-toolbar">
-          <span className="lab-title">Transcript prototype · {list}</span>
+          <span className="lab-title">Transcript prototype</span>
           <button
             type="button"
             onClick={() => {
@@ -441,7 +429,7 @@ export function TranscriptLab() {
             Clear
           </button>
         </header>
-        <Transcript list={list} onFollow={onFollow} />
+        <Transcript onFollow={onFollow} />
         <Composer running={running} candidates={MENTION_CANDIDATES} handlers={handlers} />
       </div>
     </TranscriptContext.Provider>

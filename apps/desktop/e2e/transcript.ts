@@ -5,20 +5,16 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import {
   TRANSCRIPT_LAB_HASH,
   type ComposerActionRecord,
-  type LabListKind,
   type ScrollSnapshot,
   type ScrollThresholds,
 } from '../src/shared/transcript-lab.js';
 
-/** Reloads the window on the prototype page with the given virtual list. */
-export async function openLab(page: Page, list: LabListKind = 'tanstack'): Promise<void> {
-  await page.evaluate(
-    ({ hash, kind }) => {
-      window.location.hash = `${hash}?list=${kind}`;
-      window.location.reload();
-    },
-    { hash: TRANSCRIPT_LAB_HASH, kind: list },
-  );
+/** Reloads the window on the prototype page. */
+export async function openLab(page: Page): Promise<void> {
+  await page.evaluate((hash) => {
+    window.location.hash = hash;
+    window.location.reload();
+  }, TRANSCRIPT_LAB_HASH);
   await page.getByTestId('transcript-lab').waitFor();
   await page.waitForFunction(() => globalThis.__piarcTranscriptLab !== undefined);
 }

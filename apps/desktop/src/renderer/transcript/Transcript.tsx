@@ -3,25 +3,14 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { useRowIds } from './item-store.js';
-import { TanstackList } from './lists/TanstackList.js';
-import { VirtuosoList } from './lists/VirtuosoList.js';
 import { ScrollFollow } from './scroll-follow.js';
 import { useTranscriptServices } from './services.js';
-import {
-  pinToBottom,
-  scrollTopPinner,
-  useFollowView,
-  useScrollFollow,
-  type Pinner,
-} from './use-scroll-follow.js';
-
-export type VirtualListKind = 'tanstack' | 'virtuoso';
+import { TranscriptList } from './TranscriptList.js';
+import { pinToBottom, useFollowView, useScrollFollow } from './use-scroll-follow.js';
 
 export function Transcript({
-  list,
   onFollow,
 }: {
-  list: VirtualListKind;
   /** Receives the scroll-follow state machine and scroll element (prototype page, tests). */
   onFollow?: (follow: ScrollFollow, scroller: HTMLElement | null) => void;
 }) {
@@ -30,24 +19,14 @@ export function Transcript({
   const follow = useMemo(() => new ScrollFollow(), []);
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
   const [content, setContent] = useState<HTMLElement | null>(null);
-  const [pinner, setPinner] = useState<Pinner>(() => scrollTopPinner);
-  useScrollFollow(follow, scroller, content, pinner);
+  useScrollFollow(follow, scroller, content);
   const view = useFollowView(follow);
   useEffect(() => {
     onFollow?.(follow, scroller);
   }, [onFollow, follow, scroller]);
-  const List = list === 'tanstack' ? TanstackList : VirtuosoList;
   return (
     <div className="transcript" data-testid="transcript" data-following={view.following}>
-      <List
-        ids={ids}
-        follow={follow}
-        onScroller={setScroller}
-        onContent={setContent}
-        onPinner={(next) => {
-          setPinner(() => next ?? scrollTopPinner);
-        }}
-      />
+      <TranscriptList ids={ids} onScroller={setScroller} onContent={setContent} />
       {view.showButton ? (
         <button
           type="button"
@@ -56,7 +35,7 @@ export function Transcript({
           onClick={() => {
             follow.jumpToBottom();
             if (scroller !== null) {
-              pinToBottom(scroller, follow, pinner);
+              pinToBottom(scroller, follow);
               scroller.focus();
             }
           }}
