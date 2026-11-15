@@ -1077,99 +1077,99 @@
       "id": "T08-A01",
       "task": "T08",
       "description": "加解密往返正确；篡改保险箱头部、nonce、密文或标签中任一字节后读取失败，返回完整性错误且不返回任何凭据。验证：单元测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-secrets（tests/vault.rs）：round_trips_entries_through_the_encrypted_file 往返正确、磁盘上无值与键名；any_modified_byte_fails_with_an_integrity_error 逐字节翻转 271 字节的保险箱（38 字节头部含 12 字节 nonce、217 字节密文、16 字节标签）：269 次 vaultIntegrity、版本字段 2 字节为 vaultVersion、0 次打开成功，截断与另一把主密钥同样失败（keyIdMatches: false）；输出 tmp/evidence/T08/piarc-secrets-tests.txt"
     },
     {
       "id": "T08-A02",
       "task": "T08",
       "description": "格式版本未知的保险箱返回版本错误。验证：单元测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "tests/vault.rs an_unknown_format_version_is_a_version_error：版本 2 的文件返回 UnsupportedVersion，线上 kind vaultVersion、details { version: 2 }、retryable false"
     },
     {
       "id": "T08-A03",
       "task": "T08",
       "description": "首次运行创建主密钥与空保险箱；保险箱存在而主密钥缺失时返回\"主密钥丢失\"错误，不新建主密钥，保险箱文件哈希不变。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "tests/vault.rs first_run_creates_the_key_and_a_missing_key_is_reported_without_touching_the_vault：首次运行 OpenOutcome::Created{new_key:true}，凭据库 1 次写入、数据目录只有 secrets.vault；删除主密钥后返回 masterKeyMissing，凭据库写入次数仍为 1、无新主密钥，保险箱 SHA-256 前后一致"
     },
     {
       "id": "T08-A04",
       "task": "T08",
       "description": "主密钥访问被拒绝、凭据库锁定或不可用时返回带 `retryable` 的结构化错误，数据目录中不出现任何明文文件。验证：替身注入测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "tests/vault.rs an_unusable_credential_store_is_a_retryable_error_without_plaintext：MemorySecretStore 注入 AccessDenied/Unavailable/Failed，均返回 credentialStoreUnavailable、retryable true、details.reason 对应；首次运行时数据目录为空，已有保险箱时只有密文文件且哈希不变、不含测试值；恢复后可打开。Core 侧 crates/piarc-core/tests/secrets.rs vault_failures_are_structured_and_the_next_request_retries 同样通过"
     },
     {
       "id": "T08-A05",
       "task": "T08",
       "description": "写入过程中模拟失败，旧保险箱保持完整且可读。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "src/vault.rs 单元测试 a_failed_write_keeps_the_previous_vault：写入一半后失败、fsync 失败、rename 失败三种注入下 set/delete 返回 Io 错误，内存与磁盘仍为旧值（文件字节相同），无临时文件残留，重新打开可读；leftovers_of_a_crashed_write_are_removed_on_open 清理崩溃遗留临时文件"
     },
     {
       "id": "T08-A06",
       "task": "T08",
       "description": "`secrets/*` 消息有 schema 与 golden 样本；Core 侧失败时 Agent Host 报会话错误，不回退明文。验证：契约测试与集成测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "契约：tests/contracts/secrets/ 13 个契约（6 个请求、6 个响应、secrets/changed）均有合法样本与反例，cargo test -p piarc-protocol 与 npx vitest run packages/protocol 通过，verify 的 protocol drift 与 contract samples 通过；集成：cargo test -p piarc-testkit --test agent_host credentials 的 a_refusing_credential_store_fails_the_turn_and_recovers，凭据库拒绝时回合 failed、errorMessage \"Credential store read failed for piarc-mock: secrets/getAll failed: access to the credential store was denied…\"，mock 无请求、无 secrets.vault 与 auth.json，恢复后下一回合 completed；适配层单测 reports an unavailable vault and never falls back to the environment（tmp/evidence/T08/s5-e2e.txt、adapter-tests.txt）"
     },
     {
       "id": "T08-A07",
       "task": "T08",
       "description": "适配层满足 Pi 凭据接口的契约：同步读、同一 provider 的修改串行、写入异步回写 Core。验证：针对 Pi 接口契约的测试（Pi 锁定版本有现成测试时复用）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "agent-host/src/runtime/credentials.test.ts（npx vitest run，20 项通过，tmp/evidence/T08/adapter-tests.txt）：复用 Pi v1.5.2 models-runtime.test.ts 的 6 个 CredentialStore 契约用例（登录登出、5 分钟内刷新、并发刷新只一次、刷新失败保留、取消排队修改、存储凭据优先于环境），对 InMemoryCredentialStore 与 CoreCredentialStore 各跑一遍全部通过；另测 100 次读不访问 Core（同步读）、写回确认前内存已更新且 modify 未完成（异步回写）、写回失败时请求失败"
     },
     {
       "id": "T08-A08",
       "task": "T08",
       "description": "模拟登录写入凭据；token 临近过期时触发刷新，新 token 回写 Core 后，保险箱与各会话读到的值一致。验证：mock 测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test agent_host credentials 的 login_and_one_refresh_reach_the_vault_and_every_session：Agent Host A 经 ModelRuntime.login 写入 oauth/piarc-test-oauth；第一代 token 有效期 120 s（低于 5 分钟阈值），A 的两个会话与 B 的一个会话同时提问后 token 端点调用为 [authorization_code 接受, refresh_token 接受]，三个请求的 x-piarc-test-token 均为 gen-2，保险箱中 access/refresh/label 为第二代（tmp/evidence/T08/s5-e2e.txt）"
     },
     {
       "id": "T08-A09",
       "task": "T08",
       "description": "同一 Agent Host 的多个会话并发读写、两个 Agent Host 同时写同一凭据，结束后保险箱内容一致，没有丢失的更新。验证：并发测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "端到端：同一测试中两个 Agent Host 共三个会话并发，只刷新一次、无被拒的二次刷新，保险箱与各会话一致；Core：crates/piarc-core/tests/secrets.rs concurrent_locked_updates_lose_nothing 两个连接各 25 次加锁读改写结果为 50；适配层：两个 Agent Host 各 20 次并发 modify 结果为 40、两边缓存一致（credentials.test.ts）"
     },
     {
       "id": "T08-A10",
       "task": "T08",
       "description": "数据目录、日志、临时目录中搜不到测试凭据的明文；`pi/` 下没有 `auth.json`、`mcp-auth.json`；Agent Host 及其子进程的环境变量中没有凭据。验证：扫描测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "login_and_one_refresh_reach_the_vault_and_every_session 末尾：以全部签发的 access/refresh token 逐字节扫描测试根目录（数据目录、pi/、sessions/、工作区）12 个文件约 50 KB、Core 日志（含两个 Agent Host 的 stderr）约 7.9 KB、系统临时目录中测试开始后写入的 12 个文件，0 处命中；对照文件可被找到；pi/auth.json、pi/mcp-auth.json 不存在；ps -E 读取两个 Agent Host 与 MCP server 子进程的环境、Bash 工具 env 输出（12 个变量）均无 token（tmp/evidence/T08/s5-e2e.txt）"
     },
     {
       "id": "T08-A11",
       "task": "T08",
       "description": "macOS 钥匙串集成测试在测试服务名下创建、读取、删除主密钥，结束后无残留条目。验证：本机测试输出与条目存在性查询结果。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PIARC_REQUIRE_KEYCHAIN=1 cargo test -p piarc-secrets --test system_store -- --nocapture：在登录钥匙串服务名 piarc-test.a11.<pid>.<随机>.credential-vault、账户 master-key 下创建主密钥、读回 32 字节并解密保险箱、删除；security find-generic-password（不带 -g/-w）创建后存在、删除后不存在，第二次删除报告无条目，无授权提示（tmp/evidence/T08/keychain-a11.txt）"
     },
     {
       "id": "T08-A12",
       "task": "T08",
       "description": "正式构建的凭据库服务名以 D2 的应用标识为前缀。验证：代码检查与测试；D2 未落实时标 `blocked`。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "D2 未落实（docs/product/REQUIREMENTS.md 第 7 节\"仍待产品负责人提供\"）。实现已就位：服务名由 piarc-core::identity::APP_IDENTIFIER 生成（<应用标识>.credential-vault），单测 the_credential_service_is_prefixed_with_the_application_identifier 通过；当前为占位值 PiArc.pending-D2，D2 给出后改常量并复验（PLAN.md I22）"
     },
     {
       "id": "T08-A13",
       "task": "T08",
       "description": "S5 报告（macOS 部分）已写入，列出待 W0 与待 T12 的项，`docs/spikes/README.md` 已更新。验证：文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/spikes/S05-credential-vault.md（格式、密钥管理、适配层与缓存一致方案、测试结果、结论；第 11 节列出待 W0 的凭据管理器实机与 Windows 数据目录/进程环境扫描、待 T12 的弹窗次数）；docs/spikes/README.md S5 行已更新"
     },
     {
       "id": "T08-A14",
       "task": "T08",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify：13 步全部 PASS（tmp/evidence/T08/verify.log）"
     },
     {
       "id": "T09-A01",
