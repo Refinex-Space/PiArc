@@ -1545,6 +1545,13 @@
     {
       "id": "T12-A14",
       "task": "T12",
+      "description": "安装包与应用使用 `design/brand/` 的图标（macOS `icon.icns`、Windows `icon.ico`），`apps/desktop` 中没有另存图标副本。验证：Forge 配置与两个平台产物的图标截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T12-A15",
+      "task": "T12",
       "description": "`npm run verify` 通过。验证：命令输出。",
       "status": "not_started",
       "evidence": ""

@@ -53,6 +53,7 @@ crates/           Rust workspace for PiArc Core, incl. the NAPI-RS binding (plan
 agent-host/       TypeScript Agent Host and Harness Kit on the Pi SDK (planned)
 packages/         Shared TypeScript packages, e.g. generated protocol types (planned)
 design/tokens/    Design tokens, generated into CSS variables (planned)
+design/brand/     App icon and mark (single source for packaging, tray and in-app logo)
 docs/             Architecture, ADRs, requirements, research
 reference/        Local read-only clones of reference repositories (git-ignored)
 ```

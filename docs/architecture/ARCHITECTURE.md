@@ -213,6 +213,7 @@ PiArc/
 ├── packages/
 │   └── protocol/              # 由 piarc-protocol 的 JSON Schema 生成的 TS 类型，Agent Host 与客户端共用
 ├── design/tokens/             # 设计令牌单一来源（JSON），生成 CSS 变量与 TS 常量
+├── design/brand/              # 应用图标与标记的单一来源（.svg/.icns/.ico/.png），来源与许可证见其 README
 ├── docs/
 │   ├── architecture/          # 本文
 │   ├── adr/                   # 架构决策记录
@@ -903,7 +904,7 @@ Core 事件批次 ──► 主进程（只转发）──MessagePort──► �
 
 ### 8.6 设计语言
 
-- PiArc 使用**自有视觉品牌**（ADR-0006）：主色避开橙色 / 陶土色系；不用"暖奶油底 + 衬线大标题"组合；图标、插画、提示音自行设计。
+- PiArc 使用**自有视觉品牌**（ADR-0006）：主色避开橙色 / 陶土色系；不用"暖奶油底 + 衬线大标题"组合；插画、提示音自行设计。应用图标与标记用 `design/brand/` 中的黑白 Pi 字形（来源与许可证见该目录 README）；公开发布前要确认 Pi logo 的使用许可（需求 D3）。
 - **字体**：使用系统字体，不打包专有字体。界面字体 macOS 为 SF Pro、Windows 为 Segoe UI Variable，中文回退 PingFang SC / Microsoft YaHei UI；等宽字体 macOS 为 SF Mono、Windows 为 Cascadia Mono。
 - **令牌分层**：原始色板 → 明暗阶梯 → 语义层（surface / text / border / accent / state / agent-status / diff / code）→ 组件层；四种模式（明、暗，各自含高对比度）× 两档密度。跟随 `prefers-color-scheme`、`prefers-contrast` 与 Windows 的 `forced-colors`。
 - **单一来源**：`design/tokens/*.json`，由脚本生成 CSS 自定义属性和 TypeScript 常量；CI 检查文本对比度（WCAG AA）。组件只读语义层。

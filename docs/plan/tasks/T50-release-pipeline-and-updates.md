@@ -90,7 +90,7 @@ PiArc 不做平台签名（ADR-0018），发布完整性靠项目自己的发布
 
 ### 5. `THIRD_PARTY_NOTICES` 与"关于"页
 
-- `scripts/release/gen-notices.mjs`：覆盖发布产物中实际包含的组件：Rust crates、打进主进程、渲染进程与 Agent Host bundle 的 npm 依赖（按构建的 metafile 统计，不按整个 `node_modules`）、Pi、libghostty-vt、fork 的 ghostty-web 渲染器代码、内置 Node、rg、fd；随包附带 Electron 与 Chromium 的许可证文件。选用的生成工具按补充型决策处理并通过 cargo-deny。
+- `scripts/release/gen-notices.mjs`：覆盖发布产物中实际包含的组件：Rust crates、打进主进程、渲染进程与 Agent Host bundle 的 npm 依赖（按构建的 metafile 统计，不按整个 `node_modules`）、Pi、libghostty-vt、fork 的 ghostty-web 渲染器代码、内置 Node、rg、fd、应用图标中 Pi 字形的来源（`design/brand/mark.LICENSE`）；随包附带 Electron 与 Chromium 的许可证文件。选用的生成工具按补充型决策处理并通过 cargo-deny。
 - 检查脚本：发布产物中有组件缺少许可证条目或许可证文本即失败。
 - "关于"页：应用、AHP 协议、Electron、Pi、内置 Node、libghostty-vt 的版本与构建提交，数值由构建时生成的元数据提供；可查看第三方许可证全文（按纯文本渲染）。
 

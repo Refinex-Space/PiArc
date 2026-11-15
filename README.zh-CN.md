@@ -53,6 +53,7 @@ crates/           PiArc Core 的 Rust workspace，含 NAPI-RS 绑定（规划中
 agent-host/       基于 Pi SDK 的 TypeScript Agent Host 与 Harness Kit（规划中）
 packages/         共享的 TypeScript 包，例如生成的协议类型（规划中）
 design/tokens/    设计令牌，生成 CSS 变量（规划中）
+design/brand/     应用图标与标记（打包、托盘、界面 logo 的单一来源）
 docs/             架构、ADR、需求、调研
 reference/        参考仓库的本地只读副本（已加入 gitignore）
 ```

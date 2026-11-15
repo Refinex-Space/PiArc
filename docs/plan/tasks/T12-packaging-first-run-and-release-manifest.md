@@ -67,6 +67,7 @@ S6 的通过标准（架构第 16 章）：macOS 15 与 26 上能按指引完成
 - 签名分层：内置 node 保留 Node.js 官方签名，不重签；rg、fd、`.node` 用 ad-hoc 签名；整体签名不能覆盖 node 的签名（例如对整个 bundle `--deep` 重签）。签名后用 `codesign --verify --deep --strict` 与 `spctl --assess` 检查并记录结果。
 - hardened runtime：验证 ad-hoc 签名下能否启用（库验证可能要求同一 Team ID）；不能启用就不启用，结论写入报告与架构第 10.1、10.3 节。
 - Windows：按 Velopack 官方 Electron 指南，由 CI 产出 x64 与 arm64 安装包（按用户安装、不签名），同时产出版本号相邻的两个版本供 W0 验证更新机制。Velopack 与 Forge/Vite 集成问题过多时，按 ADR-0018 第 3 条退回 electron-builder NSIS，并写 ADR（补充）说明。
+- 图标：Forge 的 `packagerConfig.icon` 与安装包图标直接引用 `design/brand/`（macOS `icon.icns`、Windows `icon.ico`，来源见该目录 README），不在 `apps/desktop` 中另存副本。
 - 应用标识（bundle id、AppUserModelID）取自集中定义的应用标识（D2）。D2 未落实时用临时标识完成测量，并在报告中注明。
 
 ### 2. 内置运行时与 Agent Host 启动
@@ -124,7 +125,8 @@ S6 的通过标准（架构第 16 章）：macOS 15 与 26 上能按指引完成
 - [T12-A11] 两次构建之间的钥匙串授权弹窗次数已记录，并与 ADR-0018 的预期对照。验证：检查清单（用户操作）。
 - [T12-A12] macOS arm64 DMG ≤ 200 MB，安装后体积 ≤ 450 MB；Windows x64 安装包体积在 CI 产物取得后补记。验证：体积测量输出。
 - [T12-A13] S6 报告（macOS 部分）含各项结论与待 W0 的项，`docs/spikes/README.md` 已更新。验证：文件内容。
-- [T12-A14] `npm run verify` 通过。验证：命令输出。
+- [T12-A14] 安装包与应用使用 `design/brand/` 的图标（macOS `icon.icns`、Windows `icon.ico`），`apps/desktop` 中没有另存图标副本。验证：Forge 配置与两个平台产物的图标截图。
+- [T12-A15] `npm run verify` 通过。验证：命令输出。
 
 ## 收尾
 
