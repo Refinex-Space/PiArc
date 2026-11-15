@@ -111,7 +111,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T01 | [仓库脚手架、工程规范与质量门禁](tasks/T01-scaffold-and-quality-gates.md) | 0 | 无 | macOS | high | 大 | 无 | 已完成 | 47fb1e9 |
 | T02 | [协议单一来源与契约测试基座](tasks/T02-protocol-and-contract-tests.md) | 0 | T01 | macOS | high | 中 | 无 | 已完成 | ce41191 |
 | T03 | [Electron 应用骨架与安全基线](tasks/T03-electron-shell-and-security-baseline.md) | 1 | T02 | macOS | xhigh | 大 | S10 | 部分完成 | 63eabea |
-| T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 未开始 | — |
+| T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 进行中 | — |
 | T05 | [严格校验的 mock provider](tasks/T05-strict-mock-provider.md) | 1 | T02 | macOS | high | 中 | 无 | 未开始 | — |
 | T06 | [Agent Host 骨架：Pi SDK 多会话与 AHP](tasks/T06-agent-host-skeleton.md) | 1 | T04、T05 | macOS | xhigh | 大 | S3、S9 | 未开始 | — |
 | T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 未开始 | — |
@@ -294,7 +294,19 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（当前没有进行中的任务）
+T04 Core NAPI 绑定与事件通道（开工 2026-11-14；基线 verify 12 项通过；T03 遗留 A03 仍待 Windows CI，分支未推送，不影响本任务）
+
+- [ ] 1. `piarc-core`：tokio 运行时、有序关闭、`CancellationToken`、事件合并器（有界通道、默认 16 ms、满时策略不丢事件）、演示事件源；Rust 测试（A01、A02）
+- [ ] 2. `piarc-napi`：`CoreRuntime.create/shutdown`、演示源启停、同步轻量方法、测试构建的 panic 导出；错误映射与 panic 边界、任务 panic 转错误事件（A08）
+- [ ] 3. `@napi-rs/cli` 构建脚本、`.d.ts` 生成与 L1 快照并入 verify（A11）
+- [ ] 4. 主进程：`.node` 路径解析（开发 / `app.asar.unpacked`）、按窗口 `MessageChannelMain`、路由表、结构化克隆 / `ArrayBuffer` 转移（A06）
+- [ ] 5. preload 事件订阅 API、IPC 命令、白名单快照；渲染进程测试页与统计
+- [ ] 6. L4：退出不挂起、双窗口路由、panic 后存活、ArrayBuffer、打包产物从 unpacked 加载（A01、A06、A07、A08、A10）
+- [ ] 7. CI：四个目标预编译与加载测试；本机 darwin-x64 经 Rosetta 加载（A09）
+- [ ] 8. `scripts/bench/` 基准（吞吐、事件循环延迟、同步调用、大批次、空闲 RSS），≤ 30 s 正确性版本进 verify
+- [ ] 9. 完整基准与 S2 报告、`docs/spikes/README.md`（A03、A04、A05、A12）
+- [ ] 10. 文档：两个 crate 的 CLAUDE.md、`apps/desktop/CLAUDE.md`、复用表、架构同步
+- [ ] 11. 收尾：verify（A13）、acceptance、PLAN、会话日志
 
 ## 登记事项
 
