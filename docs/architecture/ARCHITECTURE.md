@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.11（2026-11-15） |
+| 版本 | 2.12（2026-11-15） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -236,6 +236,7 @@ PiArc/
 | [0004](../adr/0004-harness-control-plane-in-core.md) | 策略在 Core、循环在 Pi、I/O 下沉 Core | 安全边界不能落在无隔离的扩展上；快照与沙箱需要统一入口 |
 | [0020](../adr/0020-tool-layer-composition.md) | 工具层：Pi 的工具代码加 Core 的 I/O（read/write/edit 用替身路径，bash/find 用 Operations，grep 自写） | Pi 1.5.2 的 Operations 不覆盖路径探测与 ripgrep；保留 Pi 的工具逻辑又做到零绕过 |
 | [0021](../adr/0021-credential-vault-and-pi-adapter.md) | 凭据保险箱 v1 格式；Core 是唯一写入方，变更推送给所有 Agent Host，读改写在 Core 的键锁内进行；Agent Host 以 pi-ai 的 `CredentialStore` 适配 | 磁盘无明文；两个 Agent Host 同时刷新同一 token 只刷新一次 |
+| [0022](../adr/0022-transcript-rendering-libraries.md) | transcript 用 @tanstack/react-virtual、marked 词法器、shiki JavaScript 正则引擎 | 同组测量下流式不掉帧、冷加载快一倍；解析器输出语法树且快；高亮不放宽 CSP |
 | [0005](../adr/0005-claude-code-config-compatibility.md) | 只读兼容 Claude Code 配置 | 用户零成本迁移，又不污染其 Claude Code 配置 |
 | [0006](../adr/0006-compliance-and-clean-room.md) | 禁用 Claude 订阅登录、clean-room、自有品牌 | 不把商业模式建在违反条款的基础上 |
 | [0009](../adr/0009-agent-host-protocol.md) | 自有协议 AHP | 双向请求、版本握手、事件回放、调用对账 |
@@ -939,15 +940,17 @@ Core 事件批次 ──► 主进程（只转发）──MessagePort──► �
 
 ### 8.4 Transcript 渲染管线
 
-- **容器**：虚拟化列表，只挂载可见区及上下各约一屏的行；行高按 `itemId + 宽度` 缓存，用 `ResizeObserver` 测量；列表底部锚定，新内容追加时视口保持贴底。
-- **不可变行**：已完成的 item 渲染结果不再变化，组件做记忆化；流式中只有最后一个 item 重新渲染。
-- **Markdown**：在 Web Worker 中增量解析，只重新解析最后一个未完成的块；流式中自动闭合未完成的标记（代码围栏、强调），避免闪烁。Worker 输出安全的中间结构（块与 span），由 React 组件渲染，**不使用 `innerHTML` / `dangerouslySetInnerHTML`**；模型输出里的原始 HTML 一律当文本显示（第 10.3 节）。
-- **代码高亮**：在 Worker 中运行（候选 shiki，TextMate 语法，语言按需加载）；流式代码块先显示纯文本，块完成后换成高亮结果。
+库选型见 ADR-0022；常量集中在 `apps/desktop/src/renderer/transcript/constants.ts`，取值由 T09 校准（`docs/spikes/S01-transcript-composer.md`）。
+
+- **容器**：虚拟化列表（@tanstack/react-virtual，`anchorTo: 'end'`），只挂载可见区及上下各约一屏的行（按像素计算范围）；行高按 `itemId + 宽度` 缓存，用 `ResizeObserver` 测量，宽度变化时重新测量；列表底部锚定，新内容追加时视口保持贴底。
+- **不可变行**：store 按会话和 item 订阅，行组件只订阅自己的 item 与解析结果；Markdown 块按对象身份记忆化，已完成的块对象不再变化。流式中只有最后一个 item 重新渲染（T09 用渲染计数验证）。
+- **Markdown**：marked 的词法器在 Web Worker 中运行，输出转换为块与 span 的中间结构，由 React 组件渲染，**不使用 `innerHTML` / `dangerouslySetInnerHTML`**（ESLint 禁止渲染进程使用 HTML 字符串入口）；模型输出里的原始 HTML 一律当文本显示（第 10.3 节）。增量解析：最后一个已开始且首行完整的顶层块之前的部分是稳定前缀，只重新词法分析其后的尾部；流式中先闭合尾部未完成的代码围栏、行内代码、强调与链接目标，避免闪烁；消息里出现过链接引用定义时，结束时整体重解析一次，保证结果与一次性解析相同。链接只保留 `https:`、`http:`、`mailto:`（解码字符引用之后再判断）。
+- **代码高亮**：shiki 在 Worker 中运行，TextMate 语法按需加载，使用 JavaScript 正则引擎（不需要 `wasm-unsafe-eval`，CSP 不放宽），以 token 级 API 输出每行的 token 与明暗两套颜色；流式代码块先显示纯文本，围栏闭合（或消息结束）后换成高亮结果；超过 100,000 字符的代码与未收录的语言保持纯文本。
 - **重型内容**：公式、Mermaid 等按需懒加载（P1），同样走安全渲染路径。
 - **diff**：Core 给出结构化 hunk（第 7.7 节），渲染进程只负责显示；大 diff 虚拟化。
-- **流式节奏**：Core 合并 delta（约 16 ms）；渲染进程在 `requestAnimationFrame` 中以平滑节奏输出字符，保持打字感，但不落后实际进度太多。参数在 M0 调校。
-- **滚动跟随**：在底部时内容增长自动贴底（无动画）；用户主动向上滚动（滚轮、触控板、拖动滚动条、键盘）即解除跟随；回到距底很小的范围内恢复；离底超过一屏显示"回到底部"按钮。阈值作为常量集中定义，M0 调校（参考实现中的取值：解除 2 px、恢复 1–40 px、按钮 120–200 px）。
-- **选择与复制**：Web 天然支持跨块连续选择；另提供"复制本条消息（Markdown / 纯文本）"。
+- **流式节奏**：Core 合并 delta（约 16 ms）；渲染进程在一个 `requestAnimationFrame` 循环中平滑输出字符：每帧显示尚未显示部分的 `1 − e^(−Δt/50 ms)`，最慢 120 字符/秒，显示落后于已收到的文本不超过 400 字符（`STREAMING`）。100 token/s 时显示约落后 3 帧；追上之后循环停止，不空转。
+- **滚动跟随**：在底部时内容增长自动贴底，贴底在列表尺寸容器的 `ResizeObserver` 回调中完成（布局后、绘制前，无动画）。只有用户输入（滚轮、触控板、拖动滚动条、键盘）之后 150 ms 内的滚动算用户滚动，这段时间内也不贴底；用户向上滚动、距底超过 2 px 即解除跟随；用户向下滚动、停在距底 40 px 以内即恢复；距底超过 200 px 显示"回到底部"（`SCROLL_FOLLOW`）。取值以参考实现为起点（解除 2 px、恢复 1–40 px、按钮 120–200 px），由 T09 的 L4 用例验证。
+- **选择与复制**：Web 天然支持跨块连续选择，复制得到 Chromium 的纯文本序列化（段落之间空一行，其他块之间换行，界面上的标签和按钮设为不可选，不进入复制内容）；另提供"复制本条消息（Markdown / 纯文本）"，剪贴板写入权限 `clipboard-sanitized-write` 在放行清单中，读取仍拒绝。
 
 ### 8.5 交互规范
 
@@ -1089,7 +1092,7 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 - CSP 由主进程以响应头下发：`default-src 'self'`，`script-src 'self'`（不允许内联脚本与 `eval`），`connect-src` 只允许应用自身协议，图片只允许应用自身协议与 `data:`。渲染进程不直接访问网络，模型请求都在 Agent Host 中发出。
 - 模型输出与仓库内容一律当作不可信数据：Markdown 渲染不使用 `innerHTML` / `dangerouslySetInnerHTML`，原始 HTML 当文本显示；代码高亮与公式渲染只输出受控的元素和样式。
 - 导航与新窗口：`will-navigate` 中用 `new URL()` 比较 origin，只允许应用自身协议；`setWindowOpenHandler` 一律返回 `deny`，外部链接由主进程在用户确认后用 `shell.openExternal` 打开，并只放行 `https:`、`http:`、`mailto:`。
-- 权限请求：`setPermissionRequestHandler` 与 `setPermissionCheckHandler` 默认拒绝，设备权限一律拒绝；只放行剪贴板写入等明确需要的权限，放行清单集中定义并逐条写理由。
+- 权限请求：`setPermissionRequestHandler` 与 `setPermissionCheckHandler` 默认拒绝，设备权限一律拒绝；只放行剪贴板写入等明确需要的权限，放行清单集中定义并逐条写理由（当前只有 `clipboard-sanitized-write`，供复制按钮使用，T09）。
 
 **preload 与 IPC**：
 
@@ -1398,6 +1401,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 |---|---|---|
 | 1.0 | 2026-11-14 | 首版：基于对 Claude 官方文档、Pi v1.4.0 源码、claude-code / claw-code / OpenClaudeDesktop / open-claude-ui 参考实现与原生技术栈的调研 |
 | 2.8 | 2026-11-15 | T05 补充：12.2 写明严格 mock provider 的实现位置、运行形态、场景选择与 400 错误体约定，细节指向 `testing.md` 第 10 节 |
+| 2.12 | 2026-11-15 | T09 补充（ADR-0022）：第 4 章加入 ADR-0022；8.4 写明选定的库、增量解析的稳定前缀规则与自动闭合、高亮的 JavaScript 引擎与限制、校准后的流式节奏与滚动跟随常量、复制的行为与剪贴板权限；10.3 权限放行清单加入 `clipboard-sanitized-write` |
 | 2.11 | 2026-11-15 | T08 补充（ADR-0021）：第 4 章加入 ADR-0021；5.4 写明 Pi 1.5.2 的凭据注入点是异步的 `CredentialStore`（R11 在此不出现）与适配层的读写、加锁和失败方式；5.5 删去内存凭据一句；7.1 `piarc-ports` 定义 `SecretStore`；7.4 加入 `secrets/*` 六个方法、`secrets/changed` 通知、键的命名与五个新错误类别；9.1 写明保险箱文件格式 v1、主密钥位置与服务名；第 14 章 R11 记录 M0 结论 |
 | 2.10 | 2026-11-15 | T07 补充（ADR-0020）：第 4 章加入 ADR-0020；6.1.1 写明工具层位置、默认 Profile、名称映射与 Pi 原生工具的排除；6.1.2"并发"一行改为由 Harness Kit 的队列串行写入；6.1.3 写明 Pi 1.5.2 的 Operations 覆盖实测与六个工具的实现方式（替身路径、Operations、自写 Grep）；7.4 写明 `fs/*`、`exec/*` 与 `exec/output` 的约定、路径限定规则、内容传输方式与三个新错误类别 |
 | 2.9 | 2026-11-15 | T06 补充：Pi 锁定 1.5.2；5.2 写明 Agent Host 的实际文件结构；5.3 写明会话注册表、最小投影、代理项处理、出站队列与 `seq` 的分配；5.5 写明信任经 `trust/get`、`PI_CODING_AGENT_DIR` 的固定、内存凭据与关闭上下文文件；5.6 写明 bundle 产物与外部依赖；7.1 `piarc-ports` 定义 `ProcessSpawner`、`Clock`；7.4 写明已实现的方法、`session/resume` 的 `lastSeq`、新增错误类别与响应契约命名；7.5 写明监管器的启动环境、背压方式（写队列满返回 `busy`）、心跳判定、重启与对账细节 |
