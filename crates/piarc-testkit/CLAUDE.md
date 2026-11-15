@@ -1,6 +1,6 @@
 # piarc-testkit
 
-仅测试用的支持 crate：目前是严格校验请求的 mock provider（架构第 12.2 节）；T15 在这里加 L2 场景运行器与事件断言。发布的 crate 不得依赖它（`crates/deps-rules.json` 的 testsupport 层）。完整说明（端点、场景选择、脚本格式、规则表、记录字段）在 `docs/engineering/testing.md` 第 10 节，crate 文档（`src/lib.rs`）有同一份脚本格式。
+仅测试用的支持 crate：严格校验请求的 mock provider（架构第 12.2 节），以及 Agent Host 的端到端测试（`tests/agent_host/`，T06）；T15 在这里加 L2 场景运行器与事件断言。发布的 crate 不得依赖它（`crates/deps-rules.json` 的 testsupport 层）。完整说明（端点、场景选择、脚本格式、规则表、记录字段）在 `docs/engineering/testing.md` 第 10 节，crate 文档（`src/lib.rs`）有同一份脚本格式。
 
 ## 命令
 
@@ -10,6 +10,7 @@
 | `cargo test -p piarc-testkit --test validation -- --nocapture` | 打印每条规则的 400 说明（验收证据用） |
 | `cargo run -q -p piarc-testkit --bin piarc-mock-provider -- --port 0 --scenarios packages/testkit/scenarios` | 手动起一个独立进程：第一行打印端口，回车或关闭 stdin 后退出 |
 | `npx vitest run packages/testkit` | pi-ai 对 mock 的两种线格式往返（会先 `cargo build` 这个 bin） |
+| `cargo test -p piarc-testkit --test agent_host -- --nocapture` | S3 与进程级 S9：`piarc-core::agent_host` 监管真实 Agent Host bundle（测试先运行 `node scripts/dev/build-agent-host.mjs`），mock 库形态应答；需要 PATH 上的 node（或 `PIARC_TEST_NODE`） |
 
 ## 两种运行形态
 
@@ -34,6 +35,12 @@
 - 被校验拒绝的请求不消耗步数；注入错误、断流（`disconnect_after_events`）与挂起（`stall_after_events`）消耗步数（模拟客户端重试时下一步应答）。
 - 只绑定 `127.0.0.1`；记录里凭据头的值一律 `<redacted>`。
 - 对客户端发来的未知字段宽容，对规则覆盖的结构严格。新增对某个客户端（pi-ai 等）的兼容前，先在其锁定版本源码里确认它实际发出的形状。
+
+## Agent Host 端到端测试
+
+- `tests/agent_host/harness.rs`：每个测试一个临时根目录（含空格与中文），`data/pi/models.json` 定义 provider `piarc-mock` 与 `mock-large`（200k）、`mock-small`（32k）两个模型。`mock-small` 的请求一律以请求头选择场景 `small-window`：压缩会替换首条 user 消息，消息里的场景标记随之消失。
+- 等待一律等事件或条件（`Recorder::until`、`turn_completed`），超时只作安全网。
+- 中断或杀进程的时点靠场景步骤的 `stall_after_events`；这类场景关闭 `role_order`（`docs/plan/PLAN.md` I18）。
 
 ## 易错点
 

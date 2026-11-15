@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.8（2026-11-15） |
+| 版本 | 2.9（2026-11-15） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -266,8 +266,9 @@ Agent Host（`agent-host/`，包名 `@piarc/agent-host`）是一个 Node 程序�
 ```
 agent-host/
 ├── src/
-│   ├── main.ts                # 入口：stdio 接管、握手、信号处理
-│   ├── protocol/              # AHP 编解码；类型由 piarc-protocol 的 JSON Schema 生成，不手写
+│   ├── main.ts                # 入口：stdio 接管、固定 Pi 的 agent 目录、信号处理
+│   ├── host.ts                # 握手、请求分派、有序退出（与进程无关，测试可直接运行）
+│   ├── protocol/              # AHP 连接、出站队列（背压与增量合并）、错误与参数校验；类型来自 piarc-protocol 生成的 @piarc/protocol，不手写
 │   ├── runtime/
 │   │   ├── workspace.ts       # 工作区级共享：ModelRuntime、凭据存储、MCP 连接池、资源加载
 │   │   ├── session-registry.ts# sessionId → AgentSession；创建/恢复/fork/回收
@@ -298,6 +299,12 @@ agent-host/
 | `entry_appended`（Harness Kit 写入的自定义 entry） | 对应的 Harness 事件 | 例如 todo 更新、plan 提交 |
 
 - 所有 item 的状态统一为 `inProgress / completed / failed / declined / interrupted`。成败由 Agent Host 按语义判断（例如 `grep` 无匹配、`diff` 有差异时退出码为 1，仍算成功），UI 不自行推断。
+- T06 已实现的部分（T14 补全其余行）：
+  - 会话注册表每个会话持有一个 `AgentSessionRuntime`（关闭时它发出 `session_shutdown`，扩展据此断开 MCP 等资源），会话间共享工作区的 `ModelRuntime`；创建会话前经 `trust/get` 询问 Core，结果作为 Pi 的 `projectTrusted`。
+  - 投影：一次提示词的首个 `agent_start` → `turn/started`；`text_start/delta/end` → `item/started`、`item/agentMessage/delta`、`item/completed`；`tool_execution_start/end` → `dynamicToolCall` 条目；`agent_settled` → `turn/completed`（被中断为 `interrupted`，最后一条 assistant 消息出错为 `failed` 并带 `errorMessage`）。`messageId` 由投影器在 assistant 消息开始流式时生成：Pi 的 entry id 要等消息落盘才有。
+  - 文本增量末尾的高代理项留到下一个增量再发，无法配对的代理项替换为 U+FFFD：发往 Core 的字符串都是合法 UTF-16。
+  - 所有帧经出站队列写 stdout：`write()` 返回 false 后等 `drain`；等待中同一条目的文本增量合并成一帧；`seq` 在写出时按会话分配，合并不产生缺口；积压超过 64 MiB 时以退出码 70 退出，由 Core 重启。
+  - `session/prompt` 先回复 `turnId` 再开始回合，Core 总是先知道 `turnId`，再收到该回合的通知。
 
 ### 5.4 凭据与登录
 
@@ -310,13 +317,15 @@ agent-host/
 
 - Pi 的 agent 目录指向 PiArc 数据目录下的 `pi/`（经 SDK `agentDir`，目录位置见第 9.1 节），与用户本机 `~/.pi/agent` 隔离；设置界面提供一次性导入（模型配置、skills、prompts）。
 - 关闭 Pi 的版本检查与自更新；`PI_OFFLINE` 只在需要时开启（它也会关闭模型目录刷新）。模型目录刷新是否走网络由 PiArc 设置控制。
-- Pi 的项目信任（`project_trust`）由 Harness Kit 接管：信任决定来自 Core（第 10.2 节），不使用 Pi 的 `trust.json`。
+- Pi 的项目信任（`project_trust`）由 Harness Kit 接管：信任决定来自 Core（第 10.2 节），不使用 Pi 的 `trust.json`。T06 起 Agent Host 创建会话前经 `trust/get` 询问 Core，失败按不信任处理。
+- Pi 的部分默认路径（MCP 扩展的 `mcp.json`、`mcp.log`、`mcp-auth.json`，默认会话目录）读进程级的 `getAgentDir()`，不看 SDK 的 `agentDir`。Agent Host 启动时把 `PI_CODING_AGENT_DIR` 设为 PiArc 的 `pi/` 目录，会话注册表校验两者一致。
+- 凭据在 T08 接入保险箱之前只放在内存（`InMemoryCredentialStore`）；关闭 Pi 自带的上下文文件加载（`noContextFiles`），项目上下文由 PiArc 组装（第 6.6 节）。
 
 ### 5.6 运行时与打包
 
 运行时决策见 ADR-0015：Agent Host 用单独内置的 Node LTS，由 Core 直接启动，不经过 Electron。
 
-- 构建：esbuild 把 Agent Host 打成单个 bundle（目标与 Pi 一致：node22.19+），外部依赖只保留 Pi 要求的原生/wasm 资源（photon、quickjs wasm 等）。
+- 构建：esbuild 把 Agent Host 打成单个 bundle（目标与 Pi 一致：node22.19+），外部依赖只保留 Pi 要求的原生/wasm 资源（photon、quickjs wasm 等）。T06 的 `npm run build:agent-host` 输出 `agent-host/dist/bundle/agent-host.mjs` 与 `pi-assets/package.json`（Pi 从中读版本与配置目录名，经 `PI_PACKAGE_DIR` 指定）；外部依赖为 `@silvia-odwyer/photon-node`（wasm）与四个可选原生加速包，清单见 `agent-host/CLAUDE.md`。codemode worker、图片缩放 worker、OAuth 与 Bedrock 的懒加载模块尚未打包，接入对应功能时补上。
 - 应用内布局（macOS；Windows 在安装目录的 `resources\` 下是同样的结构）：
 
 ```
@@ -679,7 +688,7 @@ crates/
 ├── piarc-config       # 设置分层加载与合并（PiArc + Claude Code 兼容）、项目信任、配置诊断
 ├── piarc-fs           # 文件读写、文件状态表、glob/grep（ignore、grep-searcher）、文件监听（notify）
 ├── piarc-checkpoint   # 内容寻址快照存储、检查点索引、回退与冲突检测
-├── piarc-ports        # 跨 crate 共享的窄 trait（ProcessSpawner、FileSystem、Clock、SecretStore、AgentHostTransport），只有定义，没有实现
+├── piarc-ports        # 跨 crate 共享的窄 trait（ProcessSpawner、FileSystem、Clock、SecretStore、AgentHostTransport），只有定义，没有实现；T06 定义了 ProcessSpawner 与 Clock
 ├── piarc-exec         # 进程管理（进程组 / Job Object，实现 ProcessSpawner）、输出落盘、超时转后台
 ├── piarc-term         # 终端会话：PTY（portable-pty）+ libghostty-vt 终端状态、屏幕快照（ADR-0017）
 ├── piarc-ghostty-sys  # libghostty-vt 的 -sys 层：提交入库的 bindgen 绑定、官方预编译产物的下载与校验（ADR-0017）
@@ -766,7 +775,9 @@ crates/
 
 `turn/started`、`turn/retrying`、`turn/completed`、`item/started`、`item/delta`、`item/updated`、`item/completed`、`session/queueChanged`、`session/usage`、`session/stateChanged`、`harness/todo`、`harness/plan`、`subagent/*`、`mcp/statusChanged`、`log`。
 
-每条会话通知带 `{sessionId, seq, ts}`；Core 发现 `seq` 缺口时用 `session/getEntries(since)` 补齐。
+每条会话通知带 `{sessionId, seq, ts}`；Core 发现 `seq` 缺口时用 `session/getEntries(since)` 补齐。Agent Host 重启后，Core 在 `session/resume` 中带上它收到的最大 `seq`（`lastSeq`），新进程从下一个数继续编号，同一会话的 `seq` 跨重启保持递增。
+
+T06 已实现的方法：Core → Agent Host 的 `host/ping`（结果附带 Agent Host 的 RSS 与出站队列计数）、`host/shutdown`、`session/create`、`session/resume`、`session/prompt`（结果只确认回合已开始，回合结束以 `turn/completed` 为准；`requestId` 是幂等键）、`session/abort`、`session/close`；Agent Host → Core 的 `trust/get`；通知 `turn/started`、`turn/completed`、`item/started`、`item/completed`、`item/agentMessage/delta`。新增的错误类别：`timeout`、`uncertain`、`hostUnavailable`（后两者只用于 Core API）、`sessionNotFound`、`sessionBusy`。请求方法的成功响应契约名为 `<方法>/result`。
 
 **消息约定**（细则以 `piarc-protocol` 的 crate 文档为准，新增消息的流程见 `docs/engineering/testing.md` 第 7 节）
 
@@ -783,6 +794,15 @@ crates/
 - 健康：`host/ping` 心跳（30 秒）；stdout 读取持续进行，背压时暂停写入新请求。
 - 重启：异常退出后指数退避重启（最多 5 次/10 分钟），重启后恢复打开中的会话；进行中的 `prompt` 等请求标记为 `uncertain`，客户端显示"连接中断，回合状态未知"并提供重试。
 - 日志：Agent Host 的 stderr 进入 Core 的日志系统，按会话打标签。
+- T06 落地（`piarc-host`，经 `piarc-core::agent_host::start` 注入 `piarc-exec` 的进程启动器与系统时钟）：
+  - 启动：node 与 bundle 路径由配置给出；工作目录为工作区根；环境变量只从 Core 环境中复制白名单（`PATH`、`HOME`、临时目录、语言、Windows 查找可执行文件所需的变量），另设 `PI_SKIP_VERSION_CHECK=1`、`PI_TELEMETRY=0` 与 `PI_PACKAGE_DIR`，不传凭据。
+  - 握手：10 秒内没有 `host/hello` 按崩溃处理；主版本不同回 `protocolVersionMismatch`，不重启。
+  - 写入：请求经有界队列写 stdin，队列满时新请求立即返回可重试的 `busy`，不等待。
+  - 读取：响应直接交给调用方；会话通知与帧错误各占一个许可（默认 1,024），消费者取走后释放，许可用完时停止读取 stdout，把压力传给 Agent Host。监管器自己的生命周期事件不占许可，消费者停住时重启与关闭照常进行。非法 JSON、超长帧、批量请求报告后丢弃，连接继续。
+  - 心跳：超时只在期间没有收到任何帧、且读取没有停在投递上时计为失败，连续 2 次视为挂死并杀进程。
+  - 重启：退避 1、2、4、8、16 秒（上限 30 秒），10 分钟窗口内最多 5 次，下一次失败停止并上报；重启时间与退避经 `Clock` 注入。重启后对经监管器打开的会话依次 `session/resume`。
+  - 对账：调用状态为已发送 → （`session/prompt` 的已确认 →）终态；连接结束时未到终态的调用标为 `uncertain` 上报，不重放。进程退出后先等读取把 stdout 读完再判定，避免把已经回复的调用误标。
+  - 尚未实现：Agent Host 的整棵进程树清理（进程组 / Job Object，T17），见 `docs/plan/PLAN.md` I17。
 
 ### 7.6 Core API（NAPI-RS 导出面）
 
@@ -1354,6 +1374,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 |---|---|---|
 | 1.0 | 2026-11-14 | 首版：基于对 Claude 官方文档、Pi v1.4.0 源码、claude-code / claw-code / OpenClaudeDesktop / open-claude-ui 参考实现与原生技术栈的调研 |
 | 2.8 | 2026-11-15 | T05 补充：12.2 写明严格 mock provider 的实现位置、运行形态、场景选择与 400 错误体约定，细节指向 `testing.md` 第 10 节 |
+| 2.9 | 2026-11-15 | T06 补充：Pi 锁定 1.5.2；5.2 写明 Agent Host 的实际文件结构；5.3 写明会话注册表、最小投影、代理项处理、出站队列与 `seq` 的分配；5.5 写明信任经 `trust/get`、`PI_CODING_AGENT_DIR` 的固定、内存凭据与关闭上下文文件；5.6 写明 bundle 产物与外部依赖；7.1 `piarc-ports` 定义 `ProcessSpawner`、`Clock`；7.4 写明已实现的方法、`session/resume` 的 `lastSeq`、新增错误类别与响应契约命名；7.5 写明监管器的启动环境、背压方式（写队列满返回 `busy`）、心跳判定、重启与对账细节 |
 | 2.7 | 2026-11-15 | ADR-0019 接受：8.3 第 5 条改为事件批次一律以二进制载荷复制转发（Electron 主进程不能转移 `ArrayBuffer`），7.6 与第 14 章 R6 同步；第 4 章加入 ADR-0019 |
 | 2.6 | 2026-11-14 | T04 补充：7.2 写明 Core 的有序关闭顺序、任务 panic 转错误事件、事件合并的刷出规则与背压策略（不丢事件）；7.6 写明已实现的导出面、批次形状与路由键语法、跨 NAPI 的错误形状与 `shuttingDown`、`busy` 两个错误类别、Promise 的结算方式与 `.d.ts` 快照位置；13.2 写明 `.node` 的命名与打包位置 |
 | 2.5 | 2026-11-14 | T03 补充：3.4 增加 `apps/desktop/src/shared/`（IPC 契约）；10.3 写明应用协议当前为 `app://piarc`、权限检查处理器与设备权限默认拒绝、开发构建与发布构建只差 `NodeCliInspect` 一个 fuse 以及 L4 打包形态使用开发构建 |

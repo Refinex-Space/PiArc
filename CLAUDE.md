@@ -20,6 +20,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `node scripts/dev/install-tools.mjs` | 把锁定版本的 cargo-deny 装进 `.tools/`（不做全局安装）；verify 第 11 步需要它 |
 | `npm run verify` | 全部 13 项检查，结束时打印汇总表；开工与收尾各跑一次 |
 | `npm run gen:protocol` | 由 `piarc-protocol` 重新生成 `packages/protocol/schema/` 与 `src/generated/`；改了协议类型后运行并提交 |
+| `npm run build:agent-host` | esbuild 把 Agent Host 打成 `agent-host/dist/bundle/agent-host.mjs`（另写 `pi-assets/package.json`，运行时以 `PI_PACKAGE_DIR` 指向它） |
 | `npm run build:core` | 用 `@napi-rs/cli` 构建本机的 Core 开发版 `.node`（`target/piarc-core/development/`）并更新 `.d.ts` 快照；`-- --flavor all` 两种构建都出 |
 | `npm run format` | Prettier 写入格式（不处理 Markdown） |
 | `npm run lint` | ESLint（类型感知） |
@@ -69,4 +70,6 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - 改了 `piarc-napi` 的导出却没运行 `npm run build:core -- --flavor all`，verify 的"Core module + API snapshot"会失败。源码树运行应用、L4 的 `dev` 形态、Vitest 的 Core 集成测试都加载 `target/piarc-core/development/` 下的模块，缺了会直接报错（`package:desktop` 会先构建它）。
 - 需要保留 CRLF 的测试夹具放在 `fixtures/crlf/` 目录下，其余文本文件都会被 `.gitattributes` 规范为 LF。
 - Vitest 中的 `packages/testkit` 测试会先 `cargo build` mock provider 的 bin，所以 `npm test` 需要 Rust 工具链；L0–L2 测试不访问真实服务商，模型侧一律用 mock provider。
+- 反过来，`cargo test`（`piarc-testkit` 的 `agent_host` 测试）会用 PATH 上的 node 运行 `scripts/dev/build-agent-host.mjs` 打包 Agent Host，需要先 `npm ci --ignore-scripts`。
+- Pi 锁定 1.5.2（`@earendil-works/*` 全部同版本，`agent-host` 与 `packages/testkit` 一起升级）；Pi 的 API 以 `node_modules` 中的类型声明或 `reference/pi` 的同一 tag 为准，基线差异见 `docs/research/pi-v1.4.0-baseline.md` 文末。
 - L4 的 `dev` 形态跑上次打包生成的 `apps/desktop/.vite/`：改了 `apps/desktop/src/` 后先重新 `npm run package:desktop -- --flavor development`。

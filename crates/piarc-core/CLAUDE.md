@@ -1,6 +1,6 @@
 # piarc-core
 
-Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、有序关闭、任务监督。T04 起只有事件通道；工作区与会话编排由 T13、T14 加入。不负责 JavaScript 绑定（`piarc-napi`）。
+Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、有序关闭、任务监督；`agent_host` 模块把 `piarc-host` 的监管器与生产 I/O（`piarc-exec` 的进程启动器、`SystemClock`）装配起来，是 Agent Host 测试的无头入口（T06）。工作区与会话编排由 T13、T14 加入。不负责 JavaScript 绑定（`piarc-napi`）。
 
 ## 命令
 

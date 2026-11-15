@@ -192,3 +192,9 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | mock provider（库与独立进程） | `piarc_testkit::{MockProvider, ScenarioLibrary, Scenario, Script}`；bin `piarc-mock-provider`；TS 侧 `packages/testkit/src/mock-provider.ts`（`buildMockProvider`、`startMockProvider`） | 模拟 Anthropic Messages 与 OpenAI 兼容 Chat Completions 两种流式线格式，按场景脚本逐步应答，可注入 429/529/500/503 与断流；只绑定 `127.0.0.1`；脚本格式见 `testing.md` 第 10 节 | T05 |
 | 请求校验器 | `piarc_testkit::{parse_request, validate, Rule, Violation}` | 把两种线格式的请求体解析成中立的 `Request`，按六条规则（配对、角色顺序、工具 schema、system 必要段落、缓存断点数量与位置）给出带规则 ID 与位置的违规；可单独用于断言任意请求体 | T05 |
 | 请求记录查询 | `MockProvider::records()`、`RequestLog::snapshot()`；HTTP `GET /_piarc/requests` | 按到达顺序记录原始请求体、线格式、场景选择器、步序号、校验结果与结果类型，凭据头脱敏 | T05 |
+| 进程启动与时钟端口 | `piarc_ports::{ProcessSpawner, SpawnSpec, SpawnedProcess, ProcessControl, Clock}`；实现 `piarc_exec::TokioProcessSpawner`、`piarc_core::agent_host::SystemClock` | 功能 crate 启动进程、按时间做决定都经这两个 trait；测试注入内存实现（例如只在 sleep 时前进的时钟）。当前启动器只终止直接子进程（I17） | T06 |
+| Agent Host 监管器 | `piarc_core::agent_host::start`（`piarc_host::HostSupervisor`、`HostEvents`、`HostConfig`） | 启动 Agent Host、握手、背压、心跳、退避重启、会话恢复、调用对账；Agent Host 的请求经注入的 `InboundHandler` 回答。T14 的会话层在它之上编排 | T06 |
+| 脚本化的假 Agent Host | `crates/piarc-host/tests/support`（`FakeSpawner`、`FakeHost`、`TestClock`、`until`） | 内存管道上的确定性故障注入：半帧、非法 JSON、超长帧、崩溃、停读；新增 AHP 行为的监管测试优先用它 | T06 |
+| Agent Host 端到端夹具 | `crates/piarc-testkit/tests/agent_host/harness.rs`（`Env`、`Recorder`、`bundle()`） | 打包并启动真实 Agent Host、临时工作区、mock 模型配置、事件记录与 `seq` 断言；T07、T14 的会话场景复用 | T06 |
+| Agent Host 出站与 Core 桥接 | `agent-host/src/protocol/outbound.ts`（`OutboundQueue`）、`agent-host/src/runtime/core-bridge.ts`（`CoreBridge`） | Agent Host 写 stdout 只经出站队列（背压、增量合并、写出时分配 `seq`）；向 Core 发请求只经桥接（统一超时、失败即拒绝） | T06 |
+| stdio MCP 测试夹具 | `packages/testkit/src/mcp-echo-server.ts` | 一个 `echo` 工具，结果带 server 名、工作目录与 pid，用来证明 MCP 调用到了哪个实例 | T06 |

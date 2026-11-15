@@ -14,6 +14,7 @@
 - 只用自建的 pi-ai provider（`createProvider`），auth 只返回常量测试 key；不用内置 anthropic provider，也不碰任何 OAuth 登录（ADR-0006）。测试 key 不得包含 `sk-ant-oat`：pi-ai 见到它会切到 OAuth 路径。
 - API 实现从 pi-ai 的公开子路径导出 `@earendil-works/pi-ai/api/<api>.lazy` 取得（主入口不导出它们），不深度导入 `dist/`。
 - 场景文件在 `scenarios/`，一个文件一个场景，格式见 testing.md 第 10.3 节。
+- `src/mcp-echo-server.ts` 是 stdio MCP 测试夹具（S3 用），由 Node 直接运行（类型剥离，只能用可擦除的 TS 语法，只导入 Node 内置模块）：`node src/mcp-echo-server.ts <server 名>`。
 
 ## 易错点
 

@@ -1,0 +1,49 @@
+# piarc-host
+
+Core 侧的 Agent Host 监管：启动、握手、stdio 读写、背压、心跳、重启、调用对账、stderr 日志（架构第 7.5 节、ADR-0009）。只依赖 `piarc-protocol` 与 `piarc-ports`；进程经注入的 `ProcessSpawner` 启动，时间经注入的 `Clock`。生产装配在 `piarc-core::agent_host::start`（`piarc-exec` 的启动器 + 系统时钟）。不负责回答 Agent Host 的请求（注入的 `InboundHandler`），也不负责会话编排（T14）。
+
+## 命令
+
+| 命令 | 用途 |
+|---|---|
+| `cargo test -p piarc-host` | 单元测试 + `tests/resilience.rs`（S9 故障注入）+ `tests/logging.rs` |
+| `cargo test -p piarc-host --test resilience -- --nocapture --test-threads 1` | 打印 S9 报告引用的观察值 |
+| `cargo clippy -p piarc-host --all-targets -- -D warnings` | lint |
+
+真实进程的测试在 `crates/piarc-testkit/tests/agent_host/`（需要 node，测试会先打包 Agent Host）。
+
+## 重启策略
+
+- 任何非 `shutdown` 的结束（崩溃、启动失败、握手超时、心跳判定挂死、`kill()`）都计入 `RestartPolicy`：退避 1、2、4、8、16 s（上限 30 s），10 分钟滑动窗口内最多 5 次重启，下一次失败发 `GaveUp` 并停止。
+- 握手被拒（主版本不同、`host/hello` 格式错误）不重启，直接 `Stopped`。
+- 重启后对经 `create_session` 打开的会话依次 `session/resume`（带 `lastSeq`），失败的会话从跟踪表移除并发 `SessionRestoreFailed`。
+
+## 背压
+
+- 写：请求经有界队列（`write_queue_frames`，默认 256）写 stdin；满时 `call` 立即返回可重试的 `Error::Busy`，请求不进账本。
+- 读：stdout 持续解帧。响应直接交给调用方；会话通知与 `FrameError` 各占一个许可（`event_queue`，默认 1,024），`HostEvents::recv` 取走后释放；许可用完时读取停住，压力传给 Agent Host。生命周期事件不占许可，所以重启、关闭不等消费者。
+- 心跳超时只在"没有新帧且读取没有停在投递上"时计为失败，连续 `heartbeat_failures`（2）次判为挂死。
+
+## 调用对账
+
+- `CallState`：`Sent` → `Terminal`；`session/prompt` 为 `Sent` → `Acknowledged`（回复带 `turnId`）→ `Terminal`（收到同一 `turnId` 的 `turn/completed`）。终态立即移出账本，账本只含在途调用。
+- 连接结束时该 epoch 的在途调用变为 `Uncertain`，经 `HostEvent::Uncertain` 上报一次，从不重放；等待中的调用返回 `Error::Uncertain`（不可重试）。
+- 状态转换都在读取任务上按帧顺序发生；进程退出后先等读取读完 stdout（最多 2 s）再判定，已回复的调用不会被误标。
+- 超时（`Error::Timeout`）不改账本：迟到的回复照样记为终态。
+
+## 不变量
+
+- 功能 crate 不直接启动进程、不读系统时钟做判断：经 `ProcessSpawner` 与 `Clock`。超时与心跳间隔用 tokio 计时器。
+- 启动环境只含 `DEFAULT_ENV_PASSTHROUGH` 中存在的变量、`PI_SKIP_VERSION_CHECK=1`、`PI_TELEMETRY=0`、`PI_PACKAGE_DIR` 与配置的 `extra_env`；不传凭据。
+- 帧错误（非法 JSON、超长帧、批量请求、缺会话头的通知）只报告并丢弃，不断开连接（架构第 7.4 节）。
+- stderr 每行一个 `tracing` 事件，target `piarc_host::agent_host`，字段 `workspace`、`session`、`epoch`；行长超过 16 KiB 截断。
+
+## 易错点
+
+- 不要在等待 `HostEvents` 之外阻塞消费者却又期待通知继续流动：通知受许可数约束。生命周期事件不受影响。
+- 测试用 `tests/support` 的 `FakeSpawner`（脚本化的假 Agent Host，duplex 管道）与 `TestClock`（只在 sleep 时前进）。假 Agent Host 空闲时用 `until_stdin_closes`，它会回答心跳与 `host/shutdown`；否则 `shutdown()` 要等 `shutdown_timeout`。
+- `Link` 的克隆不控制 stdin 的关闭：关闭靠 `close_stdin`（`request_shutdown` 中触发）。
+
+## 参考
+
+- 架构第 7.4、7.5 节；ADR-0009、ADR-0010；`docs/spikes/S09-ahp-resilience.md`。

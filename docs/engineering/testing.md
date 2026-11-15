@@ -233,3 +233,17 @@ steps:
 ### 10.5 请求记录
 
 每个请求按到达顺序记录：`seq`、`method`、`path`（含查询串）、`format`、`scenario`（选择器）、`step_index`（从 0 开始，未消耗步数时为空）、`headers`（小写名；`authorization`、`x-api-key` 等凭据头的值记为 `<redacted>`）、原始请求体 `body`、校验结果 `violations`（空表示通过）、`outcome`（`streamed`、`disconnected`、`stalled`、`injected_error`、`rejected`）。
+
+## 11. Agent Host 测试
+
+Agent Host 有三层测试（T06 建立）：
+
+| 层 | 位置 | 命令 | 内容 |
+|---|---|---|---|
+| TS 单元 | `agent-host/src/**/*.test.ts` | `npx vitest run agent-host` | 出站队列（背压、增量合并、`seq`）、投影（含代理项处理）、Core 桥接（超时、断开、错误响应） |
+| 监管器故障注入 | `crates/piarc-host/tests/` | `cargo test -p piarc-host` | 脚本化的假 Agent Host 经内存管道运行（`tests/support`），时钟只在 sleep 时前进；覆盖握手、帧错误、挂死、背压、写队列满、连续崩溃、对账、日志 |
+| 端到端 | `crates/piarc-testkit/tests/agent_host/` | `cargo test -p piarc-testkit --test agent_host -- --nocapture` | `piarc-core::agent_host` 监管真实 bundle，mock provider 应答；多会话隔离、中断、压缩、MCP、杀进程恢复、慢读者 |
+
+- 端到端测试先用 PATH 上的 node（或 `PIARC_TEST_NODE`）运行 `scripts/dev/build-agent-host.mjs`，再启动 bundle；环境只给 `PI_OFFLINE=1` 等测试需要的变量，不访问网络。
+- 需要在模型流的确定位置中断或杀进程时，用场景步骤的 `stall_after_events`（第 10.3 节），等对应的 `item/agentMessage/delta` 到达后再动作。
+- 等待一律等事件或条件，超时只作安全网（`harness::WAIT`、`support::EVENT_WAIT`）。
