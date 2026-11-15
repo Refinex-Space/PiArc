@@ -116,7 +116,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T06 | [Agent Host 骨架：Pi SDK 多会话与 AHP](tasks/T06-agent-host-skeleton.md) | 1 | T04、T05 | macOS | xhigh | 大 | S3、S9 | 已完成 | 2214b08 |
 | T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 已完成 | 3a8744f |
 | T08 | [凭据保险箱](tasks/T08-credential-vault.md) | 1 | T06；D2 | macOS | high | 中 | S5 | 已完成 | 83dc25b |
-| T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 未开始 | — |
+| T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 进行中 | — |
 | T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 未开始 | — |
 | T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 未开始 | — |
 | T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 未开始 | — |
@@ -294,7 +294,18 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（当前没有进行中的任务）
+T09 Transcript 渲染与 composer 原型（S1），2026-11-15 开工。T03 为"部分完成"（A03 等 Windows CI），不影响本任务；分支未推送，无法核对前序 Windows CI。
+
+- [ ] 1. 事件流夹具：协议 item 事件、按 token/s 回放的合成器、内容覆盖（段落、列表、表格、多语言、超长代码、未闭合标记、XSS）、1 万条历史
+- [ ] 2. 增量 Markdown：Worker 解析、只重解析最后一个未完成块、自动闭合、块与 span 中间结构、单元测试（A05）
+- [ ] 3. 代码高亮：Worker 中 shiki token 级 API、JS 正则引擎（不放宽 CSP）、流式先纯文本（A06）
+- [ ] 4. 安全渲染：禁止 innerHTML 的 ESLint 规则、原始 HTML 当文本、外链确认、远程图片显示为链接、XSS 载荷集（A06、A07）
+- [ ] 5. transcript：最小 store（按 item 订阅）、虚拟列表两候选、流式节奏、滚动跟随与"回到底部"、选择与复制、剪贴板权限放行（A10、A11）
+- [ ] 6. composer：ProseMirror、@ 胶囊、键盘语义、输入法守卫（A08、A09）
+- [ ] 7. L4 用例：XSS、输入法（CDP 合成）、键盘语义、复制、滚动跟随
+- [ ] 8. 性能测量：两个候选的流式 60 s、万条滚动、千条冷加载、渲染进程内存（A01–A04）
+- [ ] 9. 库选型 ADR、架构 8.4 同步、S1 报告与 spikes README（A01、A12）
+- [ ] 10. 收尾：CLAUDE.md、复用表、verify（A13）、验收记录、看板与会话日志
 
 ## 登记事项
 
