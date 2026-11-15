@@ -1,0 +1,5410 @@
+{
+  "_说明": "全部验收项。只允许修改本任务验收项的 status 与 evidence；status 取 not_started、passing、failing、blocked。禁止删除或改写验收项描述。规则见 docs/plan/protocol.md「验收记录」。",
+  "version": 1,
+  "items": [
+    {
+      "id": "R1-A01",
+      "task": "R1",
+      "description": "`docs/spikes/M0-summary.md` 列出 S1–S10 在 macOS 与 Windows 上的结论、关键数据与报告链接，有条件通过与未验证项写明条件与跟进任务。验证：文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R1-A02",
+      "task": "R1",
+      "description": "ADR 触发条件检查表覆盖 ADR-0013–0018 的全部触发条件，以及 ADR-0004、0009、0010 中与 S4、S9、S3 相关的条件，每条有证据与\"是否触发\"；已触发的条件有 ADR 提议。验证：检查表与 ADR 文件。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R1-A03",
+      "task": "R1",
+      "description": "ADR-0015 与 ADR-0018 中留给 M0 的事项逐项有结论，或有负责任务。验证：检查表。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R1-A04",
+      "task": "R1",
+      "description": "四个只读审查子代理按维度表并行完成，原始发现全部记录在 `docs/reviews/R1-findings.md`。验证：文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R1-A05",
+      "task": "R1",
+      "description": "每条发现都有核实结论（确认 / 不同意及理由）与处理（修复提交 / 登记事项编号 / ADR），没有未处理的项。验证：发现记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R1-A06",
+      "task": "R1",
+      "description": "每个确认并修复的缺陷都有先失败、后通过的测试。验证：测试输出与提交记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R1-A07",
+      "task": "R1",
+      "description": "第 11 章每一行都对照了两个平台的实测值；改动只收紧，放宽的行（如有）在修订记录中写明原因。验证：架构文档 diff 与修订记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R1-A08",
+      "task": "R1",
+      "description": "架构文档中与 M0 结论不一致的章节已同步，版本号已递增，修订记录已追加。验证：架构文档 diff。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R1-A09",
+      "task": "R1",
+      "description": "根目录与各模块 CLAUDE.md 中的命令都实际执行成功，长度符合 `docs/engineering/claude-md.md` 的上限。验证：命令输出与行数统计。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R1-A10",
+      "task": "R1",
+      "description": "`acceptance.json` 中 T02–T12 与 W0 的验收项都是 `passing` 或带原因的 `blocked`，`blocked` 项在结论中有处理；M0 登记事项逐条有归属。验证：`acceptance.json` 与 `PLAN.md`。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R1-A11",
+      "task": "R1",
+      "description": "结论明确为\"进入 M1\"\"有条件进入\"\"不进入\"之一，前提条件或阻塞项各有负责任务，已写入 `M0-summary.md`、`docs/reviews/README.md` 与 `PLAN.md`。验证：文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R1-A12",
+      "task": "R1",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R2-A01",
+      "task": "R2",
+      "description": "两种线格式的服务商在应用界面中各完成一次\"读代码 → 改代码 → 跑测试\"，夹具测试由失败变为通过，过程中至少一次 Bash 与一次 Edit 经审批卡批准。验证：Playwright 流程、测试输出与截图（`tmp/evidence/R2/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R2-A02",
+      "task": "R2",
+      "description": "真实服务商的完整任务在用户同意后执行并记录调用次数与费用；未执行时评审文件写明原因，结论中列为前提条件或风险。验证：评审文件内容与会话记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R2-A03",
+      "task": "R2",
+      "description": "L2 场景通过数不少于 20，`docs/product/capabilities.md` 重新生成且没有 MISSING，`--milestone M1` 不列出 `planned` 能力。验证：L2 运行输出与两条命令的输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R2-A04",
+      "task": "R2",
+      "description": "第 16 章 M1 目标中的每一项都有能力 ID 或 L4 用例作为证据，缺口已补齐。验证：评审文件中的映射表。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R2-A05",
+      "task": "R2",
+      "description": "T13–T22 的验收项全部为 `passing`，或为 `blocked` 且原因在评审文件中被接受。验证：`acceptance.json` 检查输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R2-A06",
+      "task": "R2",
+      "description": "四个审查子代理并行运行且相互独立，各自的范围与输入记录在评审文件中。验证：评审文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R2-A07",
+      "task": "R2",
+      "description": "每条审查发现都有核实结论与处理（修复、不同意并给理由、登记到具体任务）。验证：`docs/reviews/R2-findings.md`。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R2-A08",
+      "task": "R2",
+      "description": "每个修复都附带先失败后通过的回归测试。验证：提交记录与测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R2-A09",
+      "task": "R2",
+      "description": "W1 检查清单覆盖交付物 5 的五类内容，并逐条列出 Windows 相关的 `blocked` 验收项编号。验证：评审文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R2-A10",
+      "task": "R2",
+      "description": "架构第 16 章与第 6.0 节已按实际更新，版本号递增并有修订记录；评审文件开头给出明确结论与进入 M2 的前提条件。验证：文档 diff 与评审文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R2-A11",
+      "task": "R2",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R3-A01",
+      "task": "R3",
+      "description": "M2 能力映射表覆盖交付物 1 列出的全部能力，每项都有能力 ID 与场景；`docs/product/capabilities.md` 重新生成且没有 MISSING，`--milestone M2` 不列出 `planned` 能力。验证：映射表与两条命令的输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R3-A02",
+      "task": "R3",
+      "description": "L3 命令运行结果中权限与 hooks 场景没有未解释的差异，allowlist 每条理由经复核成立。验证：L3 报告与评审文件中的复核记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R3-A03",
+      "task": "R3",
+      "description": "T23–T30 与 W1 的验收项全部为 `passing`，或为 `blocked` 且原因在评审文件中被接受。验证：`acceptance.json` 检查输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R3-A04",
+      "task": "R3",
+      "description": "四个审查子代理并行运行且相互独立，各自的范围与输入记录在评审文件中。验证：评审文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R3-A05",
+      "task": "R3",
+      "description": "每条审查发现都有核实结果与处理方式（修复、不同意并给理由、登记到具体任务）。验证：`docs/reviews/R3-findings.md`。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R3-A06",
+      "task": "R3",
+      "description": "每个修复都附带先失败后通过的回归测试。验证：提交记录与测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R3-A07",
+      "task": "R3",
+      "description": "W1 状态为\"已完成\"，其报告逐条覆盖 M1 退出标准；需要用户更新的 T13–T22 验收项已汇总。验证：`PLAN.md`、W1 报告与评审文件。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R3-A08",
+      "task": "R3",
+      "description": "`PLAN.md`\"登记事项\"中每一条都已关闭或指定了处理任务。验证：`PLAN.md` 内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R3-A09",
+      "task": "R3",
+      "description": "架构文档第 16 章、第 6.0 节、第 6.15 节已按实际更新，版本号递增并有修订记录。验证：文档 diff。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R3-A10",
+      "task": "R3",
+      "description": "评审文件开头给出明确结论：M2（macOS）是否达标、进入 M3 的前提条件、W2 重点核对项。验证：评审文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R3-A11",
+      "task": "R3",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R4-A01",
+      "task": "R4",
+      "description": "当前主线上，同一工作区 3 个并行会话加 1 个子 agent（共享 1 个 stdio MCP server、已加载 skills 索引）的稳态内存满足第 11 章预算。验证：测量脚本输出与 `docs/reviews/R4-findings.md` 中的数据。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R4-A02",
+      "task": "R4",
+      "description": "`docs/product/capabilities.md` 重新生成且没有 MISSING，`--milestone M3` 不列出 `planned` 能力。验证：两条命令的输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R4-A03",
+      "task": "R4",
+      "description": "T31–T38 与 W2 的验收项全部为 `passing`，或为 `blocked` 且原因在评审文件中被接受。验证：`acceptance.json` 检查输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R4-A04",
+      "task": "R4",
+      "description": "子 agent 与并发、MCP 与终端安全、扩展加载与信任、工程质量四个审查子代理并行运行且相互独立，各自的范围与输入记录在评审文件中。验证：评审文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R4-A05",
+      "task": "R4",
+      "description": "每条审查发现都有核实结果与处理方式（修复、不同意并给理由、登记到具体任务），每个修复都附带先失败后通过的回归测试。验证：`docs/reviews/R4-findings.md`、提交记录与测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R4-A06",
+      "task": "R4",
+      "description": "W2 状态为\"已完成\"，其报告逐条覆盖 M2 退出标准与 R3 重点核对项；需要用户更新的 T23–T30 验收项已汇总。验证：`PLAN.md`、W2 报告与评审文件。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R4-A07",
+      "task": "R4",
+      "description": "ADR-0010 与 ADR-0017 的重新评估触发条件逐条检查并有结论。验证：评审文件中的检查表。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R4-A08",
+      "task": "R4",
+      "description": "`PLAN.md`\"登记事项\"中每一条都已关闭或指定了处理任务。验证：`PLAN.md` 内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R4-A09",
+      "task": "R4",
+      "description": "架构文档第 16 章、第 6.0 节、第 6.15 节已按实际更新，版本号递增并有修订记录。验证：文档 diff。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R4-A10",
+      "task": "R4",
+      "description": "评审文件开头给出明确结论：M3（macOS）是否达标、进入 M4 的前提条件、W3 重点核对项。验证：评审文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R4-A11",
+      "task": "R4",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R5-A01",
+      "task": "R5",
+      "description": "威胁检查在两个平台 CI 上通过，第 10.1 节每条威胁至少抽查一个测试并确认其断言对应对策，抽查记录写入发现文件。验证：检查输出与 `docs/reviews/R5-findings.md` 中的抽查记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R5-A02",
+      "task": "R5",
+      "description": "macOS 上第 11 章全部预算达标、最近一次 Nightly 完整测量通过；W3 的 Windows 数据逐项列出，未达标项已归入 W4。验证：`docs/engineering/performance.md`、Nightly 输出与发现文件。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R5-A03",
+      "task": "R5",
+      "description": "第 16 章 M4 行每一项都对应到任务与验收证据；T39–T45、W3 的验收项全部为 `passing` 或理由成立的 `blocked`；`capabilities.md` 无 MISSING，`check-capabilities.mjs --milestone M4` 不列出 `planned` 能力。验证：`acceptance.json` 摘要与两条命令的输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R5-A04",
+      "task": "R5",
+      "description": "安全、性能、无障碍、工程质量四个只读审查并行完成，每个审查的范围与输入记录在发现文件中。验证：`docs/reviews/R5-findings.md` 的审查说明。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R5-A05",
+      "task": "R5",
+      "description": "每条审查发现都有处理：确认（附修复提交与复现测试）、不同意（附理由）或登记（附登记编号）。验证：`docs/reviews/R5-findings.md`。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R5-A06",
+      "task": "R5",
+      "description": "W3 结论已确认：Windows 的 M3 退出标准逐条有证据，遗留问题有归属。验证：`PLAN.md` 中的 W3 记录与发现文件中的确认段落。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R5-A07",
+      "task": "R5",
+      "description": "T39 的 Windows 隔离 ADR 状态已核对；为\"已接受\"时架构相关章节已同步，为\"提议\"时列为进入 M5 前的待决事项。验证：ADR 文件与结论段落。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R5-A08",
+      "task": "R5",
+      "description": "架构第 16 章状态与第 6.0 节能力矩阵已更新，版本号递增并写修订记录；`docs/reviews/README.md` 中 R5 的结论已填写。验证：文档 diff。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R5-A09",
+      "task": "R5",
+      "description": "结论明确写出 M4（macOS）是否达标、进入 M5 的前提条件，以及 W4 的 M4 验收清单。验证：`docs/reviews/R5-findings.md` 的结论段。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R5-A10",
+      "task": "R5",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R6-A01",
+      "task": "R6",
+      "description": "`R6-findings.md` 的里程碑汇总覆盖 M0–M5，每个退出标准在两个平台上都有证据链接或明确写明缺失。验证：文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R6-A02",
+      "task": "R6",
+      "description": "`acceptance.json` 中所有状态不是 `passing` 的项都被列出，并写明原因、是否阻塞 Beta、后续去向。验证：用脚本列出非 `passing` 项并与文件比对。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R6-A03",
+      "task": "R6",
+      "description": "第 14 章 R1–R18 逐条有当前状态、证据、是否触发与处理。验证：文件中的风险表。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R6-A04",
+      "task": "R6",
+      "description": "每份\"已接受\"的 ADR 的重新评估触发条件逐条检查，已触发的有 ADR 提议或记录的决定。验证：文件中按 ADR 编号的检查表。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R6-A05",
+      "task": "R6",
+      "description": "技术债清单按写明的排序标准排列，每条有来源与建议的处理时间点。验证：文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R6-A06",
+      "task": "R6",
+      "description": "至少五个独立只读审查并行完成，每条发现都有处理：已修复（提交）、不同意（理由）或已登记（编号）。验证：审查发现表。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R6-A07",
+      "task": "R6",
+      "description": "阻塞 Beta 的确认问题全部修复，每个修复有先失败后通过的回归测试。验证：测试输出与提交。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R6-A08",
+      "task": "R6",
+      "description": "合规复核三项全部有结论：订阅 OAuth 屏蔽测试通过、提示词原创性自查记录齐全、品牌资产与第三方许可证检查通过。验证：测试输出与检查记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R6-A09",
+      "task": "R6",
+      "description": "已实现的设计增补已并入架构正文，第 16 章与第 6.0 节已更新，架构版本号已递增并有修订记录。验证：文档改动。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R6-A10",
+      "task": "R6",
+      "description": "结论明确为\"可以公开 Beta\"或\"不可以\"，附前提条件或必须先解决的问题，并列出需要用户执行的事项；`docs/reviews/README.md` 已更新。验证：文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "R6-A11",
+      "task": "R6",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T01-A01",
+      "task": "T01",
+      "description": "干净检出上执行 `npm ci --ignore-scripts` 与 `npm run verify` 通过，汇总表列出 10 个检查步骤全部成功。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T01-A02",
+      "task": "T01",
+      "description": "格式检查生效：故意破坏一个 `.rs` 文件与一个 `.ts` 文件的格式，`npm run verify` 分别在 `cargo fmt --check` 与 Prettier 步骤失败并指出文件；恢复后通过。验证：两次运行的关键输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T01-A03",
+      "task": "T01",
+      "description": "lint 与类型检查生效：临时引入一个 clippy 警告、一个 ESLint 违规、一个 TS 类型错误，verify 分别在对应步骤失败；撤销后通过。验证：关键输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T01-A04",
+      "task": "T01",
+      "description": "80 行函数规则生效：临时写一个超过 80 行的 Rust 函数，clippy 报 `too_many_lines`；加上不带 `reason` 的 `#[allow]` 仍然失败；加上带 `reason` 的 `#[allow]` 后通过。验证：三次运行的关键输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T01-A05",
+      "task": "T01",
+      "description": "crate 依赖检查生效：临时让 `piarc-policy` 依赖 `piarc-hooks`，`check-crate-deps.mjs` 失败并指出这条依赖；撤销后通过。验证：关键输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T01-A06",
+      "task": "T01",
+      "description": "许可证检查生效：临时引入一个 GPL 许可证的 crate（只为演示，不提交），cargo-deny 失败并指出许可证；撤销后通过。验证：关键输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T01-A07",
+      "task": "T01",
+      "description": "验收清单检查生效：临时改动 `acceptance.json` 中一条描述、再临时删除一条，`check-acceptance.mjs` 分别报告\"描述不一致\"\"缺失\"；恢复后通过。验证：关键输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T01-A08",
+      "task": "T01",
+      "description": "每个 crate 都有 crate 级文档，写明职责、不负责什么、允许依赖的 crate，与架构第 7.1 节一致；`crates/deps-rules.json` 与架构一致。验证：列出 crate 清单与 `deps-rules.json` 内容摘要。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T01-A09",
+      "task": "T01",
+      "description": "`ci.yml` 语法有效，且矩阵包含 macOS 与 Windows（有 actionlint 就用 actionlint，否则用 YAML 解析器校验）。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T01-A10",
+      "task": "T01",
+      "description": "三份工程规范存在，内容覆盖\"交付物 5\"列出的要点，且与架构设计不冲突。验证：列出各文档的章节标题。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T01-A11",
+      "task": "T01",
+      "description": "根 `CLAUDE.md` 有\"交付流程\"与\"命令\"两节，\"命令\"中每条命令都实际执行成功过。验证：在报告中列出命令与结果。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T01-A12",
+      "task": "T01",
+      "description": "所有 TS 依赖精确锁定（`package.json` 中没有 `^`、`~`），Cargo 依赖都经 `[workspace.dependencies]` 声明。验证：检查命令输出（例如 grep 结果为空）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T02-A01",
+      "task": "T02",
+      "description": "连续两次运行 `npm run gen:protocol`，`packages/protocol/schema/` 与 `packages/protocol/src/generated/` 字节一致，`git status` 无变化。验证：两次运行后的 `git status` 与文件哈希比较输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T02-A02",
+      "task": "T02",
+      "description": "临时给一个 Rust 协议类型加字段而不重新生成，`npm run verify` 在漂移检查步骤失败并列出不一致的文件；重新生成后通过。验证：两次运行的关键输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T02-A03",
+      "task": "T02",
+      "description": "JSON-RPC 请求、响应、错误、通知，握手两条消息，会话事件信封，`turn/*` 与 `item/*` 骨架消息都有合法 golden 样本，Rust serde 往返与 TS ajv 校验加往返全部通过。验证：样本清单与两侧测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T02-A04",
+      "task": "T02",
+      "description": "反例样本（缺必填字段、非法枚举、类型错误）在 Rust 反序列化与 ajv 校验中都被拒绝。验证：两侧测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T02-A05",
+      "task": "T02",
+      "description": "临时新增一个没有样本的消息类型，样本完整性检查失败并指出缺样本的类型；撤销后通过。验证：关键输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T02-A06",
+      "task": "T02",
+      "description": "Rust 与 TS 两份帧编解码器在半包、粘包、超长帧（超限后后续帧仍能解析）、非法 UTF-8、非法 JSON 五类用例上全部通过，用例数据两侧共用。验证：两侧测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T02-A07",
+      "task": "T02",
+      "description": "JSON 字符串中含 U+2028、U+2029 时不被当作帧分隔符，解码结果与原文一致。验证：两侧测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T02-A08",
+      "task": "T02",
+      "description": "主版本不同的握手被 `negotiate` 拒绝，返回 `kind` 明确的结构化错误；次版本不同时握手成功，`enabled` 为双方能力交集。验证：单元测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T02-A09",
+      "task": "T02",
+      "description": "结构化错误序列化后符合 JSON-RPC 2.0 error 对象，`data.kind` 与 `data.retryable` 缺失时反序列化失败。验证：样本与测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T02-A10",
+      "task": "T02",
+      "description": "生成、漂移检查、样本完整性检查都是 Node 脚本，不写死路径分隔符，并由 verify 调用，CI 的 macOS 与 Windows 两个 runner 都会执行。验证：脚本代码与 CI 配置检查。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T02-A11",
+      "task": "T02",
+      "description": "`npm run verify` 通过，汇总表包含漂移检查与样本完整性检查两个新步骤。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T03-A01",
+      "task": "T03",
+      "description": "Electron、Forge 及其插件、Vite、React 精确锁定，Electron 大版本在官方支持的最新 3 个大版本之内。验证：`package.json` 与 `npm view electron` 输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T03-A02",
+      "task": "T03",
+      "description": "开发模式与 `electron-forge package` 产物都能启动并通过 Playwright 冒烟用例。验证：macOS 本机测试输出与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T03-A03",
+      "task": "T03",
+      "description": "CI 配置在 macOS 与 Windows runner 上运行冒烟用例、安全用例与 fuse 校验，配置语法有效。验证：actionlint（或 YAML 解析）输出；Windows 实际运行结果未取得时标 `blocked`，由 W0 核对。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T03-A04",
+      "task": "T03",
+      "description": "页面中注入的内联脚本、内联事件属性与 `eval` 都不执行，访问外部地址的 `fetch` 与外部图片被 CSP 阻止。验证：Playwright 安全用例。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T03-A05",
+      "task": "T03",
+      "description": "页面导航到外部地址（修改 `location`、点击链接、重定向）被拦截，窗口仍停留在应用协议页面。验证：Playwright 安全用例。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T03-A06",
+      "task": "T03",
+      "description": "`window.open` 被拒绝；外链经确认后才调用 `shell.openExternal`，`javascript:`、`file:` 及其他非白名单协议被拒绝。验证：Playwright 用例（确认框与 `openExternal` 用替身断言）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T03-A07",
+      "task": "T03",
+      "description": "`window.piarc` 的键集合与白名单快照完全一致，页面中拿不到 `ipcRenderer`。验证：Playwright 枚举测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T03-A08",
+      "task": "T03",
+      "description": "IPC 来源校验拒绝 frame 为空、origin 不同、origin 前缀相似三种情况，合法调用通过。验证：单元测试与端到端测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T03-A09",
+      "task": "T03",
+      "description": "渲染进程中 `require`、`process`、`module`、`Buffer` 均不可用。验证：Playwright 用例。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T03-A10",
+      "task": "T03",
+      "description": "未放行的权限请求（通知、摄像头、地理位置）被拒绝。验证：Playwright 用例。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T03-A11",
+      "task": "T03",
+      "description": "页面经自定义协议加载（`location.protocol` 不是 `file:`）；第二个应用实例启动后立即退出并聚焦已有窗口。验证：Playwright 用例。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T03-A12",
+      "task": "T03",
+      "description": "发布配置 `package` 产物的 fuse 状态与配置一致；临时改动一项配置后 `check-fuses.mjs` 失败并指出该项。验证：脚本输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T03-A13",
+      "task": "T03",
+      "description": "S10 报告覆盖官方安全清单 20 条，每条有落实方式与对应测试或检查，`docs/spikes/README.md` 已更新。验证：文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T03-A14",
+      "task": "T03",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T04-A01",
+      "task": "T04",
+      "description": "`CoreRuntime` 有序关闭后不再触发事件回调，加载 `.node` 的 Electron 应用能正常退出不挂起。验证：Rust 集成测试与 Playwright 测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T04-A02",
+      "task": "T04",
+      "description": "持续事件源下每秒回调次数不超过 `1000 / 合并间隔（ms）` 的 110%，且批次平均包含多于 1 个事件。验证：测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T04-A03",
+      "task": "T04",
+      "description": "10 万事件/分钟持续 5 分钟，渲染进程收到的事件数等于发出数，每个流的序号严格递增、无缺口。验证：基准输出中的计数与序号校验。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T04-A04",
+      "task": "T04",
+      "description": "上述基准期间主进程事件循环延迟 p99 ≤ 16 ms。验证：`monitorEventLoopDelay` 输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T04-A05",
+      "task": "T04",
+      "description": "同步 NAPI 调用 p99 ≤ 1 ms（≥ 10,000 次调用）。验证：基准输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T04-A06",
+      "task": "T04",
+      "description": "超过阈值的批次以 `ArrayBuffer` 转移：转发后主进程侧缓冲区已分离（`byteLength` 为 0），渲染进程收到的数据完整。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T04-A07",
+      "task": "T04",
+      "description": "两个窗口订阅不同路由键时，各自只收到自己的批次。验证：Playwright 测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T04-A08",
+      "task": "T04",
+      "description": "调用测试导出触发 panic 后，调用方收到内部错误类别的结构化错误，主进程存活，后续调用正常。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T04-A09",
+      "task": "T04",
+      "description": "四个目标都构建成功；darwin-arm64 与 win32-x64 在对应平台加载通过，darwin-x64 与 win32-arm64 的加载结果或替代方式记录在报告中。验证：本机输出、CI 配置与报告；Windows 运行结果未取得时标 `blocked`，由 W0 核对。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T04-A10",
+      "task": "T04",
+      "description": "`package` 产物从 `app.asar.unpacked` 加载 `.node`，事件通道工作。验证：针对打包产物的 Playwright 测试（断言实际加载路径）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T04-A11",
+      "task": "T04",
+      "description": "NAPI-RS 生成的 `.d.ts` 纳入 L1 快照：临时改动一个导出签名而不更新快照，verify 失败；更新快照后通过。验证：关键输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T04-A12",
+      "task": "T04",
+      "description": "S2 报告含吞吐、延迟分位数、同步调用、四个目标构建与加载结果和结论，`docs/spikes/README.md` 已更新。验证：文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T04-A13",
+      "task": "T04",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T05-A01",
+      "task": "T05",
+      "description": "两种线格式的流式输出按官方事件顺序与字段编码，文本与工具调用两类内容都有测试。验证：单元测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T05-A02",
+      "task": "T05",
+      "description": "配对、角色顺序、工具 schema、system 必要段落、缓存断点数量、缓存断点位置六条规则各有一个触发 400 的测试，错误体带对应规则 ID 与说明。验证：测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T05-A03",
+      "task": "T05",
+      "description": "合规请求（包括 pi-ai 发出的正常请求）通过全部规则，不误报。验证：测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T05-A04",
+      "task": "T05",
+      "description": "脚本中的工具参数在客户端收到时至少分成 3 段增量，拼接后与原 JSON 一致。验证：测试断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T05-A05",
+      "task": "T05",
+      "description": "429、529、500、503 与流中途断开五种错误注入都生效，客户端收到对应的状态或断流。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T05-A06",
+      "task": "T05",
+      "description": "按请求头与按首条消息标记两种方式都能选中场景；未指定或不存在的场景返回 400。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T05-A07",
+      "task": "T05",
+      "description": "请求记录按顺序保存每轮请求，库 API 与独立进程的 HTTP 端点都能查询。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T05-A08",
+      "task": "T05",
+      "description": "独立进程以 `--port 0` 启动后在 stdout 第一行打印端口并提供服务，stdin 关闭后退出。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T05-A09",
+      "task": "T05",
+      "description": "pi-ai 经 Anthropic Messages 线格式对 mock 完成一次含工具调用的完整往返，两次请求都通过校验。验证：测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T05-A10",
+      "task": "T05",
+      "description": "pi-ai 经 OpenAI 兼容线格式对 mock 完成一次含工具调用的完整往返，两次请求都通过校验。验证：测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T05-A11",
+      "task": "T05",
+      "description": "`@earendil-works/pi-ai` 精确锁定版本，测试中没有使用任何 OAuth 登录方式。验证：`package.json` 与测试代码检查。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T05-A12",
+      "task": "T05",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T06-A01",
+      "task": "T06",
+      "description": "Pi 版本已精确锁定，`@earendil-works/*` 全部同一版本；与 v1.4.0 的差异已写入基线文档；`reference/pi` 已检出同一 tag，且 `REFERENCES.md` 已更新。验证：`package.json`、文档改动与 `git -C reference/pi describe --tags` 输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T06-A02",
+      "task": "T06",
+      "description": "深度 import Pi 内部路径被 ESLint 拦截。验证：临时违规时 `npm run lint` 失败的输出，撤销后通过。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T06-A03",
+      "task": "T06",
+      "description": "握手成功时双方交换协议版本与能力；主版本不匹配时握手被拒绝且错误可读。验证：两个测试的输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T06-A04",
+      "task": "T06",
+      "description": "同进程两个不同 cwd 的会话并发运行工具调用，文件副作用与工具结果只出现在各自的工作区。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T06-A05",
+      "task": "T06",
+      "description": "一个会话被中断、另一个会话正常完成；一个会话压缩后，另一个会话的历史不变。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T06-A06",
+      "task": "T06",
+      "description": "进行中的 prompt 期间杀掉 Agent Host：Core 自动重启并恢复会话，进行中的请求被标为 `uncertain`。验证：故障注入测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T06-A07",
+      "task": "T06",
+      "description": "半帧挂起、非法 JSON、超长帧都不会让 Core 崩溃，行为符合 ADR-0009。验证：故障注入测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T06-A08",
+      "task": "T06",
+      "description": "Core 读取变慢时背压生效，Agent Host 与 Core 的内存有界。验证：测试中记录的内存峰值与队列长度。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T06-A09",
+      "task": "T06",
+      "description": "10 分钟内连续崩溃超过 5 次后停止重启并上报。验证：故障注入测试（时钟可注入，不真实等待 10 分钟）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T06-A10",
+      "task": "T06",
+      "description": "每条会话通知带 `{sessionId, seq, ts}`，同一会话的 `seq` 连续递增。验证：测试断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T06-A11",
+      "task": "T06",
+      "description": "S3、S9 两份报告已写入 `docs/spikes/`，`docs/spikes/README.md` 已更新状态。验证：文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T06-A12",
+      "task": "T06",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T07-A01",
+      "task": "T07",
+      "description": "六个工具的每次调用都在 Core 收到对应的 AHP 请求（Read→`fs/read`、Write→`fs/write`、Edit→`fs/read` 与 `fs/write`、Bash→`exec/run`、Glob→`fs/glob`、Grep→`fs/grep`）。验证：场景测试中对 Core 侧调用记录的断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T07-A02",
+      "task": "T07",
+      "description": "场景运行期间，Agent Host 进程内对工作区路径的 fs 调用为 0，`child_process` 调用为 0。验证：运行时 spy 测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T07-A03",
+      "task": "T07",
+      "description": "在 `agent-host/src/tools/` 或 `agent-host/src/harness/` 中引入 `fs` 或 `child_process` 被 ESLint 拦截。验证：临时违规时 `npm run lint` 失败的输出，撤销后通过。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T07-A04",
+      "task": "T07",
+      "description": "模型收到的工具列表恰好是 Read、Write、Edit、Bash、Glob、Grep 六个规范名，描述为默认 Profile 的文本，不含 Pi 原生工具名。验证：mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T07-A05",
+      "task": "T07",
+      "description": "名称映射表双向正确；用测试 Profile 改名后模型看到新名称，事件与 Core 侧仍得到规范名。验证：单元测试与场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T07-A06",
+      "task": "T07",
+      "description": "行为对照场景全部运行，结果一致，或差异已逐条列出原因与处理。验证：对照测试输出与 S4 报告中的对照表。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T07-A07",
+      "task": "T07",
+      "description": "绝对路径越界、`..` 越界、指向工作区外的符号链接三种情况，`fs/*` 都返回结构化错误且不触碰目标文件。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T07-A08",
+      "task": "T07",
+      "description": "`exec/run` 在命令结束前就经通知送出输出，结束时返回退出码；取消后子进程被终止。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T07-A09",
+      "task": "T07",
+      "description": "新增的 `fs/*`、`exec/*` 消息都有 schema 与 golden 样本，样本完整性检查通过。验证：verify 中对应步骤的输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T07-A10",
+      "task": "T07",
+      "description": "小文件 `fs/read` 的 AHP 往返 p95 ≤ 5 ms（≥ 1,000 次）。验证：契约测试中的计时输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T07-A11",
+      "task": "T07",
+      "description": "T06 的 S3 双会话场景改用委托工具后仍然通过，两个会话的路径各自解析到自己的工作区。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T07-A12",
+      "task": "T07",
+      "description": "S4 报告已写入，`docs/spikes/README.md` 已更新。验证：文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T07-A13",
+      "task": "T07",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T08-A01",
+      "task": "T08",
+      "description": "加解密往返正确；篡改保险箱头部、nonce、密文或标签中任一字节后读取失败，返回完整性错误且不返回任何凭据。验证：单元测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T08-A02",
+      "task": "T08",
+      "description": "格式版本未知的保险箱返回版本错误。验证：单元测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T08-A03",
+      "task": "T08",
+      "description": "首次运行创建主密钥与空保险箱；保险箱存在而主密钥缺失时返回\"主密钥丢失\"错误，不新建主密钥，保险箱文件哈希不变。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T08-A04",
+      "task": "T08",
+      "description": "主密钥访问被拒绝、凭据库锁定或不可用时返回带 `retryable` 的结构化错误，数据目录中不出现任何明文文件。验证：替身注入测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T08-A05",
+      "task": "T08",
+      "description": "写入过程中模拟失败，旧保险箱保持完整且可读。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T08-A06",
+      "task": "T08",
+      "description": "`secrets/*` 消息有 schema 与 golden 样本；Core 侧失败时 Agent Host 报会话错误，不回退明文。验证：契约测试与集成测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T08-A07",
+      "task": "T08",
+      "description": "适配层满足 Pi 凭据接口的契约：同步读、同一 provider 的修改串行、写入异步回写 Core。验证：针对 Pi 接口契约的测试（Pi 锁定版本有现成测试时复用）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T08-A08",
+      "task": "T08",
+      "description": "模拟登录写入凭据；token 临近过期时触发刷新，新 token 回写 Core 后，保险箱与各会话读到的值一致。验证：mock 测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T08-A09",
+      "task": "T08",
+      "description": "同一 Agent Host 的多个会话并发读写、两个 Agent Host 同时写同一凭据，结束后保险箱内容一致，没有丢失的更新。验证：并发测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T08-A10",
+      "task": "T08",
+      "description": "数据目录、日志、临时目录中搜不到测试凭据的明文；`pi/` 下没有 `auth.json`、`mcp-auth.json`；Agent Host 及其子进程的环境变量中没有凭据。验证：扫描测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T08-A11",
+      "task": "T08",
+      "description": "macOS 钥匙串集成测试在测试服务名下创建、读取、删除主密钥，结束后无残留条目。验证：本机测试输出与条目存在性查询结果。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T08-A12",
+      "task": "T08",
+      "description": "正式构建的凭据库服务名以 D2 的应用标识为前缀。验证：代码检查与测试；D2 未落实时标 `blocked`。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T08-A13",
+      "task": "T08",
+      "description": "S5 报告（macOS 部分）已写入，列出待 W0 与待 T12 的项，`docs/spikes/README.md` 已更新。验证：文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T08-A14",
+      "task": "T08",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T09-A01",
+      "task": "T09",
+      "description": "两个虚拟列表候选在同一组流式与滚动测量下都有数据，选定结果与理由写入库选型 ADR，架构第 8.4 节已同步。验证：测量输出、ADR 与架构文档的改动。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T09-A02",
+      "task": "T09",
+      "description": "100 token/s 流式 60 秒期间，渲染进程主线程没有超过 50 ms 的长任务，帧时间 p99 ≤ 16 ms。验证：测量输出（含机型）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T09-A03",
+      "task": "T09",
+      "description": "1 万条 item 自动滚动期间帧率 ≥ 60 fps。验证：测量输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T09-A04",
+      "task": "T09",
+      "description": "1,000 条 item 冷加载 ≤ 300 ms。验证：测量输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T09-A05",
+      "task": "T09",
+      "description": "流式中只重解析最后一个未完成的块；未闭合的代码围栏与强调被自动闭合；流结束后的渲染结果与一次性完整解析的结果一致。验证：单元测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T09-A06",
+      "task": "T09",
+      "description": "代码高亮在 Worker 中完成，流式代码块先显示纯文本、完成后显示高亮；渲染进程代码中引入 `innerHTML` 或 `dangerouslySetInnerHTML` 被 ESLint 拦截。验证：组件测试与临时违规时的 lint 输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T09-A07",
+      "task": "T09",
+      "description": "XSS 载荷集（`<script>`、内联事件属性、`javascript:` 链接、带脚本的 SVG、`<iframe>`、`<style>`）全部以文本呈现，测试中的哨兵变量未被改动，CSP 与 T03 相同。验证：Playwright 测试与 CSP 对比。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T09-A08",
+      "task": "T09",
+      "description": "输入法合成期间按 Enter、Esc、`/`、`@` 不触发发送、停止、命令或提及；合成结束后行为恢复。验证：基于 CDP 合成的测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T09-A09",
+      "task": "T09",
+      "description": "composer 的 Enter、Shift+Enter、Mod+Enter、Esc 在空闲与运行中两种状态下符合交付物 3；@ 胶囊的存储数据、显示形态与发送文本三者分开。验证：组件测试与 Playwright 测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T09-A10",
+      "task": "T09",
+      "description": "跨段落与代码块的选择复制得到正确文本；\"复制本条消息\"的 Markdown 与纯文本两种格式正确。验证：Playwright 测试（读取剪贴板）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T09-A11",
+      "task": "T09",
+      "description": "在底部时内容增长自动贴底；向上滚动超过解除阈值后不再跟随；回到恢复阈值内重新跟随；离底超过按钮阈值时显示\"回到底部\"。验证：Playwright 测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T09-A12",
+      "task": "T09",
+      "description": "S1 报告（macOS 部分）含测量数据、调校参数、真实输入法核对结果（或\"待用户核对\"清单）与待 W0 的项，`docs/spikes/README.md` 已更新。验证：文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T09-A13",
+      "task": "T09",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T10-A01",
+      "task": "T10",
+      "description": "darwin-arm64、darwin-x64、win32-x64、win32-arm64 四个目标链接成功，Windows 的链接方式及理由写入报告。验证：本机构建输出与 CI 配置；Windows 运行结果未取得时标 `blocked`，由 W0 核对。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T10-A02",
+      "task": "T10",
+      "description": "预编译产物的 SHA256 或 minisign 签名任一不匹配时构建失败并给出原因。验证：临时篡改缓存产物与签名后的构建输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T10-A03",
+      "task": "T10",
+      "description": "重新生成脚本产出的绑定与入库版本一致。验证：运行脚本后 `git diff` 为空。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T10-A04",
+      "task": "T10",
+      "description": "PTY 中的 shell 可以输入输出、调整尺寸、检测退出；终端查询（例如设备属性查询）经 `WRITE_PTY` 得到应答。验证：集成测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T10-A05",
+      "task": "T10",
+      "description": "帧只包含脏行；滚动输出时已有行按行 id 复用，帧中只出现新行；编解码往返一致。验证：单元测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T10-A06",
+      "task": "T10",
+      "description": "渲染进程按 rAF 拉取帧，隐藏的终端在测试期间产生 0 帧。验证：Playwright 测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T10-A07",
+      "task": "T10",
+      "description": "vim 与 htop（或注明的替代 `top`）渲染正确。验证：`tmp/evidence/T10/` 中的截图与同一时刻 formatter 输出的对照。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T10-A08",
+      "task": "T10",
+      "description": "formatter 纯文本与解码后的帧逐格一致，覆盖普通屏幕、alt screen、CJK 全角、emoji 与 ZWJ 字素；Rust 与 TS 解码器结果相同。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T10-A09",
+      "task": "T10",
+      "description": "`cat` 100 MB 期间主进程事件循环延迟 p99 ≤ 16 ms，渲染进程没有超过 50 ms 的长任务。验证：测量输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T10-A10",
+      "task": "T10",
+      "description": "键入回显额外延迟 p95 ≤ 5 ms（≥ 200 个样本）。验证：测量输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T10-A11",
+      "task": "T10",
+      "description": "隐藏 textarea 跟随光标，预编辑文本绘制在光标处；macOS 拼音的候选框位置有核对结论。验证：基于 CDP 合成的测试、截图与报告。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T10-A12",
+      "task": "T10",
+      "description": "fork 的渲染器代码保留 MIT 许可证与版权声明，来源（仓库、路径、提交）与改动清单齐全，并已登记到第三方许可证清单的来源文件。验证：文件检查。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T10-A13",
+      "task": "T10",
+      "description": "S7 报告含链接方式、测量数据、一致性结果、wterm 评估、路线结论与待 W0 的项，`docs/spikes/README.md` 已更新。验证：文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T10-A14",
+      "task": "T10",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T11-A01",
+      "task": "T11",
+      "description": "沙箱内命令写入工作区、会话临时目录、附加目录成功；写入这些目录以外的位置（用户主目录、系统临时目录中的其他路径）被拒绝。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T11-A02",
+      "task": "T11",
+      "description": "工作区内受保护路径清单中的每一项写入都被拒绝。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T11-A03",
+      "task": "T11",
+      "description": "`denyRead` 中的路径不可读，其余路径可读。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T11-A04",
+      "task": "T11",
+      "description": "经代理访问白名单内域名成功，白名单外域名被拒绝并返回明确原因；精确与通配匹配、HTTP 与 `CONNECT` 都有用例。验证：代理测试（可注入解析器与本地上游）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T11-A05",
+      "task": "T11",
+      "description": "沙箱内绕过代理直连（不设代理环境变量、直接连 IP）失败。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T11-A06",
+      "task": "T11",
+      "description": "解析到回环或云元数据地址的目标被代理拒绝。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T11-A07",
+      "task": "T11",
+      "description": "git（status、add、commit）、npm install（白名单含 registry）、cargo build、python 脚本在沙箱内成功。验证：集成测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T11-A08",
+      "task": "T11",
+      "description": "沙箱内命令经 Core 的 exec 路径执行，流式输出、退出码与取消语义与 `exec/run` 一致；停止后没有残留进程。验证：测试（检查进程列表）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T11-A09",
+      "task": "T11",
+      "description": "含空格与中文的工作区路径下，配置生成与写入限制正确。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T11-A10",
+      "task": "T11",
+      "description": "Job Object 关闭后，父、子、孙三级进程全部退出。验证：Windows CI 测试输出；未取得时标 `blocked`，由 W0 核对。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T11-A11",
+      "task": "T11",
+      "description": "`sandbox-exec` 的每条命令额外耗时与代理额外延迟已测量。验证：报告中的数据。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T11-A12",
+      "task": "T11",
+      "description": "S8 报告（macOS 部分）含受保护路径清单、缓存目录方案、结论与待 W0 的项；架构第 6.10 节已同步沙箱受保护路径清单；`docs/spikes/README.md` 已更新。验证：文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T11-A13",
+      "task": "T11",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T12-A01",
+      "task": "T12",
+      "description": "本机产出 arm64 与 x64 的 DMG 与 ZIP；最终产物为 ad-hoc 签名，`codesign --verify --deep --strict` 通过，`check-fuses.mjs` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T12-A02",
+      "task": "T12",
+      "description": "hardened runtime 在 ad-hoc 签名下能否启用有结论与证据，已写入报告与架构第 10.1、10.3 节。验证：`codesign -dv` 输出与文档改动。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T12-A03",
+      "task": "T12",
+      "description": "产物布局符合第 5.6 节：内置 node 保留 Node.js 官方签名，rg、fd 与 `.node` 为 ad-hoc 签名，Agent Host 资源在 asar 之外；运行中 Pi 经 `PI_PACKAGE_DIR` 找到资源，不在运行时下载 rg、fd。验证：布局检查脚本、`codesign -dv` 输出与运行日志。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T12-A04",
+      "task": "T12",
+      "description": "CI 配置产出 Windows x64 与 arm64 Velopack 安装包（含版本相邻的两个版本）与 macOS 产物，配置语法有效。验证：actionlint 输出；实际产物需要用户推送后由 CI 产出，未取得时标 `blocked`，由 W0 核对。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T12-A05",
+      "task": "T12",
+      "description": "打包后的应用经 `sandbox-exec` 宽松配置启动内置 node 运行 Agent Host，并完成一轮 mock 对话。验证：针对打包产物的 Playwright 测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T12-A06",
+      "task": "T12",
+      "description": "宽松配置下 Pi 的 bash、grep、find、git、`worker_threads` 正常，写入允许范围以外的位置失败。验证：测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T12-A07",
+      "task": "T12",
+      "description": "内置 npx 拉起本地夹具 MCP stdio server，server 进程使用的是内置 node；含原生模块的 npx 包的加载结果已记录。验证：测试输出与报告。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T12-A08",
+      "task": "T12",
+      "description": "清单签名校验通过；篡改清单内容、篡改文件哈希、换用其他密钥签名三种情况都返回结构化错误并拒绝。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T12-A09",
+      "task": "T12",
+      "description": "首次运行检查清单各项有结论，macOS 15 与 26 分别记录，用户确认的项注明，未验证的项写明原因。验证：检查清单文件（实机关口）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T12-A10",
+      "task": "T12",
+      "description": "ad-hoc 签名下系统通知的可用性有结论，包括程序侧事件与用户目视确认。验证：测试输出与检查清单。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T12-A11",
+      "task": "T12",
+      "description": "两次构建之间的钥匙串授权弹窗次数已记录，并与 ADR-0018 的预期对照。验证：检查清单（用户操作）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T12-A12",
+      "task": "T12",
+      "description": "macOS arm64 DMG ≤ 200 MB，安装后体积 ≤ 450 MB；Windows x64 安装包体积在 CI 产物取得后补记。验证：体积测量输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T12-A13",
+      "task": "T12",
+      "description": "S6 报告（macOS 部分）含各项结论与待 W0 的项，`docs/spikes/README.md` 已更新。验证：文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T12-A14",
+      "task": "T12",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T13-A01",
+      "task": "T13",
+      "description": "迁移在空库与已迁移库上各执行两次，结果一致且 `schema_migrations` 记录正确；注入失败的迁移整体回滚，数据库停留在上一版本。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T13-A02",
+      "task": "T13",
+      "description": "数据目录与缓存目录在 macOS 与 Windows 上解析为第 9.1 节的位置，主进程在 `ready` 前设置 `userData`。验证：单测（Windows 部分由 CI 输出证明）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T13-A03",
+      "task": "T13",
+      "description": "对同一组会话文件，随机追加 entry 后做增量同步，与全量重建索引得到的 `sessions` 表内容完全相同；末行写到一半时不报错，补全后被同步。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T13-A04",
+      "task": "T13",
+      "description": "100 MB 的合成会话文件建立索引期间，Core 内存增量不超过 32 MB。验证：测试中记录的内存数据。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T13-A05",
+      "task": "T13",
+      "description": "未知会话格式版本与损坏行不会让 Core 失败：前者标为索引不可用，后者跳过并记录。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T13-A06",
+      "task": "T13",
+      "description": "日志按天轮转，超过 7 天的日志被清理。验证：测试（时钟可注入）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T13-A07",
+      "task": "T13",
+      "description": "四个层级的设置按优先级合并；无效文件被跳过且错误报告含文件路径与 JSON Pointer，其余层照常生效。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T13-A08",
+      "task": "T13",
+      "description": "运行中修改设置文件后发出带变化键的事件；改成无效内容时保留上一份有效配置并报告错误。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T13-A09",
+      "task": "T13",
+      "description": "信任按主 checkout 解析：同一仓库的 linked worktree 共享信任，submodule 与非 git 目录各自独立。验证：测试（用真实 git 夹具）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T13-A10",
+      "task": "T13",
+      "description": "信任决定在 Core 重启后保留；撤销后 `trust/get` 返回不信任，且该工作区的 Agent Host 重启后不再加载项目级 Pi 扩展。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T13-A11",
+      "task": "T13",
+      "description": "`trust/get` 在超时、Core 返回错误、响应无法解析三种情况下，Agent Host 都按不信任处理。验证：故障注入测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T13-A12",
+      "task": "T13",
+      "description": "未信任工作区中，夹具 `.pi/extensions/` 注册的工具不出现在模型请求的工具列表中；信任后出现。验证：mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T13-A13",
+      "task": "T13",
+      "description": "可执行配置枚举对夹具工作区按类别列出全部条目与来源文件；在 `.piarc/settings.json` 中新增一个 allow 规则后，新增项检测只返回这一条。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T13-A14",
+      "task": "T13",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T14-A01",
+      "task": "T14",
+      "description": "投影 golden 测试覆盖第 5.3 节投影表的每一行、六种工具 item 类型与五种 item 状态，全部通过。验证：L1 测试输出（列出覆盖矩阵）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T14-A02",
+      "task": "T14",
+      "description": "Grep 无匹配等语义成功的工具调用投影为 `completed`，工具抛出错误投影为 `failed`。验证：golden 测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T14-A03",
+      "task": "T14",
+      "description": "排队项可编辑、删除、重排，`session/queueChanged` 反映新顺序，回合结束后按新顺序执行且不丢项、不重复。验证：场景测试（mock provider 请求断言）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T14-A04",
+      "task": "T14",
+      "description": "运行中 steer 的内容在当前步骤后进入模型请求；followUp 在回合结束后作为新输入执行。验证：场景测试（mock provider 请求断言）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T14-A05",
+      "task": "T14",
+      "description": "工具执行中 abort：每个未完成的工具调用都补齐\"已中断\"结果，下一次请求通过 mock provider 的配对校验，相关 item 状态为 `interrupted`。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T14-A06",
+      "task": "T14",
+      "description": "一条助手消息含 12 个只读调用、1 个写调用、2 个只读调用时，执行批次为 10、2、写、2，任一时刻并行数不超过 10，写调用单独执行。验证：测试（Core 侧并发计数断言）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T14-A07",
+      "task": "T14",
+      "description": "mock provider 注入 529 与 429 后恢复：客户端收到带 attempt、maxAttempts、delayMs 的 `turn/retrying`，后续发给模型的请求中不含这些错误。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T14-A08",
+      "task": "T14",
+      "description": "故障注入丢弃一条会话通知后，Core 用 `session/getEntries(since)` 补齐，客户端收到的事件完整且有序。验证：故障注入测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T14-A09",
+      "task": "T14",
+      "description": "打开工作区即启动 Agent Host，release 构建下到就绪的时间 10 次测量的最大值不超过 1.0 s；全部会话空闲达到配置阈值后进程被回收，再次 prompt 时自动恢复。验证：测量输出与测试（时钟可注入）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T14-A10",
+      "task": "T14",
+      "description": "工作区列表与会话列表快照的 `revision` 单调递增；同一实体的旧 revision 快照不会覆盖新快照。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T14-A11",
+      "task": "T14",
+      "description": "重启 Core 后会话列表从索引恢复，resume 后发出的下一个请求带有完整历史，`transcript_window` 返回的条目与重启前一致。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T14-A12",
+      "task": "T14",
+      "description": "会话 create、resume、fork、close 可经 NAPI 调用，`.d.ts` L1 快照已更新。验证：测试与快照文件。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T14-A13",
+      "task": "T14",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T15-A01",
+      "task": "T15",
+      "description": "场景格式有 JSON Schema 与 `testing.md` 中的字段说明；字段缺失或类型错误的场景文件被拒绝，错误指出文件与字段。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T15-A02",
+      "task": "T15",
+      "description": "`piarc-devcli` 不经 UI 运行单个场景与整个目录，并输出 JSON 结果；打包产物检查确认发布产物中没有 devcli。验证：命令输出与检查脚本输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T15-A03",
+      "task": "T15",
+      "description": "首批不少于 10 个场景全部通过，覆盖交付物 5 列出的行为；每个场景作为独立测试出现在测试报告中。验证：测试输出（列出场景名）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T15-A04",
+      "task": "T15",
+      "description": "分别故意改坏一个场景的期望事件、期望文件、期望请求，运行器失败并给出可读差异；恢复后通过。验证：三次运行的关键输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T15-A05",
+      "task": "T15",
+      "description": "声明了审批应答但没有收到审批请求的场景判为失败。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T15-A06",
+      "task": "T15",
+      "description": "同一场景连续运行两次结果一致；场景在含空格与中文的临时路径中运行，结束后临时目录被清理。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T15-A07",
+      "task": "T15",
+      "description": "`active` 能力的全部覆盖场景被删掉时输出 MISSING 并失败；`planned` 能力没有场景时不失败；`blocked` 能力缺少 `reason` 或 `link` 时失败；场景引用不存在的能力 ID 时失败。验证：四次运行的关键输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T15-A08",
+      "task": "T15",
+      "description": "`docs/product/capabilities.md` 由命令生成且与测试结果一致；手工改动它后 verify 失败。验证：生成命令与 verify 的关键输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T15-A09",
+      "task": "T15",
+      "description": "Windows CI 上 L2 步骤运行并通过。验证：CI 日志。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T15-A10",
+      "task": "T15",
+      "description": "`tests/capabilities.yaml` 已登记 M1–M5 的完整能力清单，每项都能对应到需求编号或架构章节；`--milestone M1` 列出的未完成能力与 M1 剩余任务一致。验证：清单统计输出与抽查记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T15-A11",
+      "task": "T15",
+      "description": "`npm run verify` 通过，输出中包含 L2 场景数与能力覆盖结果。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T16-A01",
+      "task": "T16",
+      "description": "架构第 6.1.2 节表中的每条不变量都有对应的 L2 场景且全部通过，能力 ID 登记在 `tests/capabilities.yaml`。验证：场景运行输出与能力清单（无 MISSING）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T16-A02",
+      "task": "T16",
+      "description": "未读先改、读后被外部修改、多处匹配、零匹配四种情况都返回明确错误，文件内容不变。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T16-A03",
+      "task": "T16",
+      "description": "CRLF、带 BOM、非 UTF-8 编码的文件经 Edit 后，换行风格、BOM 与编码保持不变，且只有目标文本被修改。验证：macOS 与 Windows CI 上的测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T16-A04",
+      "task": "T16",
+      "description": "写入中途失败（模拟磁盘错误）时原文件保持完整。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T16-A05",
+      "task": "T16",
+      "description": "超过 50K 字符的工具结果落盘，模型收到预览与路径；单条消息合计超过 200K 字符时按规则截断。验证：mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T16-A06",
+      "task": "T16",
+      "description": "未变化文件的重复读取返回存根；文件变化或读取范围不同时返回完整内容。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T16-A07",
+      "task": "T16",
+      "description": "工作区外路径与受保护路径的写入返回\"需要询问\"；在 T20 之前按拒绝处理并给出理由。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T16-A08",
+      "task": "T16",
+      "description": "Read 正确处理行号分页、图片（视觉与非视觉模型两种情况）、PDF 页码范围、ipynb。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T16-A09",
+      "task": "T16",
+      "description": "Grep 与 Glob 遵守 `.gitignore`，跳过二进制文件，结果超限时截断并说明。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T16-A10",
+      "task": "T16",
+      "description": "每次文件变更的 `fileChange` item 带结构化 diff，hunk 与实际改动一致。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T16-A11",
+      "task": "T16",
+      "description": "`npm run verify` 通过（含 Windows CI 上的 L2 场景）。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T17-A01",
+      "task": "T17",
+      "description": "命令超时后整棵进程树（含孙进程）被终止，结果包含已有输出与超时说明（T32 之后超时改为转后台，届时由 T32 更新场景期望，进程树终止能力仍用于 abort 与 KillShell）。验证：macOS 与 Windows CI 上的测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T17-A02",
+      "task": "T17",
+      "description": "会话 abort 时正在执行的命令及其子进程全部被终止，对应 item 状态为 `interrupted`。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T17-A03",
+      "task": "T17",
+      "description": "`cd` 到工作区内子目录后，下一条命令在该目录执行；`cd` 到工作区外后，下一条命令回到工作区根，结果中说明了重置原因。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T17-A04",
+      "task": "T17",
+      "description": "默认超时为 2 分钟；传入超过 10 分钟的超时按 10 分钟执行并说明。验证：单测（时钟可注入）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T17-A05",
+      "task": "T17",
+      "description": "超过 30,000 字符的成功输出落盘，模型收到约 2,000 字符预览与路径；失败输出给出头部与尾部。验证：场景测试中的 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T17-A06",
+      "task": "T17",
+      "description": "stdout 与 stderr 各输出 50 MB 的命令正常结束，不死锁。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T17-A07",
+      "task": "T17",
+      "description": "`grep` 无匹配与 `diff` 有差异时退出码为 1，语义状态与 item 状态为成功；同一命令真正出错（退出码 2）时为失败。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T17-A08",
+      "task": "T17",
+      "description": "命令环境中没有 PiArc、Electron、Node 的内部变量，也没有任何凭据；登录 shell 中配置的 PATH 生效。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T17-A09",
+      "task": "T17",
+      "description": "输出在命令结束前就以增量到达 Agent Host 与客户端事件流。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T17-A10",
+      "task": "T17",
+      "description": "`commandExecution` item 带命令、cwd、退出码、语义状态、耗时、超时与截断标记。验证：golden 测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T17-A11",
+      "task": "T17",
+      "description": "Windows 上找到 Git Bash 时 `Bash` 经它执行；找不到时模型请求的工具列表中没有 `Bash`、有 `PowerShell`，并产生安装提示事件；macOS 上工具列表中没有 `PowerShell`。验证：mock provider 请求断言（Windows 部分由 CI 证明）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T17-A12",
+      "task": "T17",
+      "description": "Windows 上 PowerShell 与 Git Bash 的中文输出不乱码，Git Bash 的 `cd` 路径转换后边界判断正确。验证：Windows CI 上的测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T17-A13",
+      "task": "T17",
+      "description": "`npm run verify` 通过（含 Windows CI 上的 L2 场景）。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T18-A01",
+      "task": "T18",
+      "description": "令牌生成 CSS 自定义属性与 TS 常量，四种模式 × 两档密度齐全；故意把一对前景 / 背景改到 AA 以下时 verify 失败，恢复后通过。验证：生成产物与两次 verify 的关键输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T18-A02",
+      "task": "T18",
+      "description": "品牌检查生效：故意把主色改为橙色色相时检查失败；界面不含 Anthropic 的字体、图标与提示音。验证：检查脚本输出与资源清单。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T18-A03",
+      "task": "T18",
+      "description": "用户已确认视觉方向。验证：亮暗评审截图（`tmp/evidence/T18/`）与用户在会话中的确认。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T18-A04",
+      "task": "T18",
+      "description": "macOS 上隐藏式标题栏与侧栏 vibrancy 生效；Windows 上应用能启动并加载 Mica 配置。验证：macOS 截图与 Windows CI 冒烟输出（实机外观在 W1）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T18-A05",
+      "task": "T18",
+      "description": "侧栏徽标按\"错误 > 等待审批 > 运行中 > 未读 > 空闲\"取最高优先级。验证：单测与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T18-A06",
+      "task": "T18",
+      "description": "过滤、置顶、归档、重命名、删除会话可用；删除后 Pi JSONL 与会话临时目录被移除，重启应用后结果保持。验证：Playwright 流程与文件检查。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T18-A07",
+      "task": "T18",
+      "description": "新建会话时乐观消息立即出现；注入创建失败后消息回滚，输入框保留原内容。验证：Playwright 流程（故障注入）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T18-A08",
+      "task": "T18",
+      "description": "信任对话框按类别列出夹具工作区的全部可执行项；选择暂不信任后，夹具 `.pi/extensions/` 注册的工具不出现在模型请求中；信任后出现；新增一个可执行项后再次打开只列出该项。验证：Playwright 端到端与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T18-A09",
+      "task": "T18",
+      "description": "流式增量只触发最后一个 item 订阅者的渲染；旧 revision 快照被丢弃；乐观回显被 Core 确认替换且不重复。验证：store 单测（含渲染计数）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T18-A10",
+      "task": "T18",
+      "description": "在设置中修改 Mod+N 后新按键立即生效、旧按键失效，主进程菜单显示新按键；与已有快捷键冲突时提示。验证：Playwright 流程。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T18-A11",
+      "task": "T18",
+      "description": "窗口不在前台时，会话完成触发系统通知（不可用时为应用内提醒与 Dock 弹跳），Dock 角标数字正确。验证：macOS 实测记录与截图（Windows 在 W1）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T18-A12",
+      "task": "T18",
+      "description": "中英文切换后界面文字与主进程菜单立即更新。验证：Playwright 流程与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T18-A13",
+      "task": "T18",
+      "description": "打包产物冷启动到侧栏（100 个会话）就绪不超过 1.0 s。验证：10 次测量的最大值。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T18-A14",
+      "task": "T18",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T19-A01",
+      "task": "T19",
+      "description": "九种 P0 行类型各有组件测试，亮暗两套截图存于 `tmp/evidence/T19/`。验证：测试输出与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T19-A02",
+      "task": "T19",
+      "description": "思考块在生成中保持展开且折叠操作无效，结束后折叠为\"思考了 N 秒\"。验证：组件测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T19-A03",
+      "task": "T19",
+      "description": "working 行在 mock 脚本运行中依次显示当前工具、计时、token 数、重试次数（n / max）与压缩状态。验证：Playwright 流程与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T19-A04",
+      "task": "T19",
+      "description": "`@` 提及的模糊匹配遵守 `.gitignore`、结果数不超过上限；选中后显示为胶囊，发送给模型的文本与胶囊存储数据分开且内容正确。验证：Core 单测、Playwright 流程与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T19-A05",
+      "task": "T19",
+      "description": "`/` 命令面板列出内置命令并支持模糊过滤；输入法合成期间输入 `/`、`@`、Enter、Esc 不触发面板、提及、发送或停止。验证：单测与 Playwright 流程。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T19-A06",
+      "task": "T19",
+      "description": "拖放与粘贴图片、PDF 后附件出现在消息中，模型请求中带有对应内容（图片为图像内容，PDF 按交付物 2 的方式）；超过大小上限或类型不支持时给出提示且不发送。验证：Playwright 流程与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T19-A07",
+      "task": "T19",
+      "description": "运行中 Enter 发送的内容作为 steer 进入当前回合，Mod+Enter 进入排队并可编辑、删除，Esc 停止回合。验证：Playwright 端到端与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T19-A08",
+      "task": "T19",
+      "description": "注入认证失败、限流用尽、Agent Host 中断三类错误时，错误卡分类正确，重试按钮与 `uncertain` 提示可用；未送达消息重发后只出现一次。验证：Playwright 流程（故障注入）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T19-A09",
+      "task": "T19",
+      "description": "复制本条消息的 Markdown 与纯文本两种结果正确；\"选中本回合\"选中范围正确。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T19-A10",
+      "task": "T19",
+      "description": "XSS 载荷出现在回复正文、工具输出、bash 输出、文件路径中时都以文本呈现。验证：安全回归测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T19-A11",
+      "task": "T19",
+      "description": "真实事件流 100 token/s 输出时，渲染进程主线程无超过 50 ms 的长任务，帧时间 p99 ≤ 16 ms。验证：Performance API 测量输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T19-A12",
+      "task": "T19",
+      "description": "1 万条 item 的会话滚动 60 fps；会话切换已缓存 ≤ 100 ms，冷加载 1,000 条 item ≤ 300 ms。验证：测量输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T19-A13",
+      "task": "T19",
+      "description": "滚动跟随的解除、恢复与\"回到底部\"按钮按定稿常量工作。验证：单测与 Playwright 流程。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T19-A14",
+      "task": "T19",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T20-A01",
+      "task": "T20",
+      "description": "交付物 1 表中的每个单元格都有对应场景，两种模式下的结论与表一致。验证：L2 场景输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T20-A02",
+      "task": "T20",
+      "description": "含 shell 元字符的 `mkdir`/`cp` 命令在自动接受编辑模式下询问；参数指向工作区外时询问。验证：单测与场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T20-A03",
+      "task": "T20",
+      "description": "Core 返回错误、`policy/evaluate` 超时、响应无法解析时，工具调用都被拒绝且模型收到拒绝理由。验证：故障注入测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T20-A04",
+      "task": "T20",
+      "description": "两个窗口同时答复同一请求时只有第一个生效，第二个收到\"已处理\"；`revision` 不匹配的答复被拒绝。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T20-A05",
+      "task": "T20",
+      "description": "Agent Host 重连后，重连前未答复的审批请求全部作废并按拒绝回给模型，界面上的旧卡片消失。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T20-A06",
+      "task": "T20",
+      "description": "本会话允许只在本会话内对同一调用免审批，新会话中仍询问；拒绝附带的反馈出现在下一次模型请求的工具结果中，item 状态为 `declined`。验证：场景测试与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T20-A07",
+      "task": "T20",
+      "description": "总是允许的规则可在卡片中编辑，经主进程原生确认后写入 `.piarc/settings.local.json`；之后同一调用不再询问；受保护路径的卡片上没有\"总是允许\"。验证：Playwright 流程、文件内容与场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T20-A08",
+      "task": "T20",
+      "description": "起始模式按\"会话 → 设置 → default\"解析；项目级配置把 `defaultMode` 设为 `bypassPermissions` 或 `auto` 时不生效。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T20-A09",
+      "task": "T20",
+      "description": "切换模式后 transcript 中出现模式切换行，重启应用并恢复会话后模式保持。验证：场景测试与 Playwright 流程。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T20-A10",
+      "task": "T20",
+      "description": "每次裁决都写入审计表，可按会话查询到工具、模式、命中步骤与结论。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T20-A11",
+      "task": "T20",
+      "description": "四类审批卡按类型渲染，提问表单类型显示不支持提示并按拒绝回复。验证：组件测试与截图（`tmp/evidence/T20/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T20-A12",
+      "task": "T20",
+      "description": "新卡 400 ms 内热键无效；多张卡时只有第一张响应；composer 非空且焦点不在卡片上时 Esc 不拒绝；输入法合成期间热键无效；长参数未展开时\"总是允许\"不可用。验证：单测与 Playwright 流程。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T20-A13",
+      "task": "T20",
+      "description": "无需用户参与的裁决 p95 ≤ 2 ms。验证：Core 基准测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T20-A14",
+      "task": "T20",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T21-A01",
+      "task": "T21",
+      "description": "经设置页配置两个服务商（Anthropic Messages 形态与 OpenAI 兼容端点的 mock）后，各完成一轮带工具调用的对话；真实服务商在用户同意后补测，未同意时注明。验证：Playwright 流程与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T21-A02",
+      "task": "T21",
+      "description": "API key、云厂商凭证、OpenAI 兼容端点、本地模型四种配置都能保存、编辑、删除，非法配置给出字段级错误。验证：测试与截图（`tmp/evidence/T21/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T21-A03",
+      "task": "T21",
+      "description": "用已知假凭据配置后扫描数据目录、日志、`pi/` 与 Agent Host 进程环境，只在保险箱密文中找到它（明文零命中）；删除服务商后保险箱条目同时删除。验证：扫描测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T21-A04",
+      "task": "T21",
+      "description": "能力表由 pi-ai 目录与 PiArc 覆盖合并而成，覆盖项生效。验证：单测。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T21-A05",
+      "task": "T21",
+      "description": "effort 菜单只显示当前模型支持的档位，各档位映射到正确的 Pi thinking level。验证：单测与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T21-A06",
+      "task": "T21",
+      "description": "切换模型前的代价提示中，上下文 token 数、缓存写入成本估算、thinking 块丢弃标记与夹具数据计算结果一致；没有价格时显示\"未知\"。验证：单测。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T21-A07",
+      "task": "T21",
+      "description": "确认切换后，下一次请求使用新模型与新 effort 参数，切换记录在会话 entry 中，恢复会话后保持。验证：场景测试与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T21-A08",
+      "task": "T21",
+      "description": "可用登录方式列表不含 Anthropic 订阅 OAuth，直接调用返回结构化错误；订阅类凭据被设置页与 Agent Host 拒绝（若 pi-ai 存在该路径）。验证：CI 中运行的测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T21-A09",
+      "task": "T21",
+      "description": "当前模型不支持视觉时，图片附件被拒绝并显示原因，模型请求中没有图片内容。验证：测试与 Playwright 流程。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T21-A10",
+      "task": "T21",
+      "description": "关闭\"联网刷新模型目录\"后，启动与切换模型都不发出目录刷新请求，模型列表来自本地缓存；重新打开后恢复刷新。验证：测试（拦截网络请求并断言）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T21-A11",
+      "task": "T21",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T22-A01",
+      "task": "T22",
+      "description": "模型请求中的 system prompt 按第 6.6.1 节顺序包含第 1、2、4、7 段，第 3、5、6 段在 M1 省略；不含 Pi 默认 preamble 与 Pi 文档路径。验证：场景测试中的 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T22-A02",
+      "task": "T22",
+      "description": "同一会话的多个回合，以及回合之间 memory 文件被修改时，发送的 system 字节完全相同。验证：场景测试（逐字节比较）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T22-A03",
+      "task": "T22",
+      "description": "多级目录的 `CLAUDE.md`、`.claude/CLAUDE.md`、`CLAUDE.local.md` 与用户级 memory 按规定顺序拼接；`CLAUDE.md` 与 `AGENTS.md` 并存时默认只取前者，改设置后两者都取。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T22-A04",
+      "task": "T22",
+      "description": "块级 HTML 注释被去掉；超过 4 MiB 的 memory 文件被跳过并记录。验证：单测。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T22-A05",
+      "task": "T22",
+      "description": "`@path` 导入按相对路径解析，第 5 层不再展开，代码块与行内代码中的 `@` 不解析，循环导入只展开一次。验证：单测。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T22-A06",
+      "task": "T22",
+      "description": "工作区外的导入首次出现\"权限扩展\"审批卡；允许后展开并在之后的会话中不再询问；拒绝时不展开并留下说明。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T22-A07",
+      "task": "T22",
+      "description": "首次读取子目录中的文件后，该子目录的 `CLAUDE.md` 以带标记的消息注入一次；再次读写同一子目录不重复注入。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T22-A08",
+      "task": "T22",
+      "description": "会话中途修改 `CLAUDE.md` 后，下一回合的请求中出现包含新内容的追加消息。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T22-A09",
+      "task": "T22",
+      "description": "同一个 `CLAUDE.md` 的内容在请求中只出现一次（Pi 自带加载保持关闭）；未信任工作区的 memory 照常出现。验证：mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T22-A10",
+      "task": "T22",
+      "description": "提示词原创性自查脚本在本机运行，连续 10 词以上相同片段为零，结果记录在 `docs/engineering/prompt-originality.md`。验证：脚本输出与记录文件。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T22-A11",
+      "task": "T22",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T23-A01",
+      "task": "T23",
+      "description": "每种 specifier（Bash、PowerShell、Read 与 Edit 路径 glob、WebFetch domain、Agent、Skill、`mcp__` 及 server 通配）和工具名通配都有匹配与不匹配的单测，且全部通过。验证：测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T23-A02",
+      "task": "T23",
+      "description": "求值顺序为 deny → ask → allow、首个命中即决定，allow 不能覆盖 deny；裸工具名 deny 后该工具不出现在模型请求的工具列表中。验证：单测与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T23-A03",
+      "task": "T23",
+      "description": "Bash 拆分用例集不少于 40 条、覆盖交付物 3 的全部类别并通过；任一子命令命中 deny 或 ask 即生效，allow 要求全部子命令被允许。验证：测试输出（列出条数与类别）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T23-A04",
+      "task": "T23",
+      "description": "解析失败或无法静态判定的命令按询问处理；随机输入测试中解析器不 panic。验证：单测与随机输入测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T23-A05",
+      "task": "T23",
+      "description": "只读白名单命令在 Manual 下免审批、白名单外命令询问；PowerShell 命令不拆分，只有整条被规则允许时免审批。验证：场景测试（PowerShell 场景在 Windows CI 上运行）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T23-A06",
+      "task": "T23",
+      "description": "关键路径删除在所有模式下都询问，包括 `bypassPermissions` 与存在匹配 allow 规则的情况。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T23-A07",
+      "task": "T23",
+      "description": "规则来源按 ADR-0005 的顺序合并，列表类键合并、deny 优先；项目级 allow 规则在项目信任前不生效。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T23-A08",
+      "task": "T23",
+      "description": "`bypassPermissions` 需在设置中开启并二次确认后才能选用；项目级配置中的 `bypassPermissions` 与 `auto` 不生效且写入审计。验证：测试与 Playwright 流程。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T23-A09",
+      "task": "T23",
+      "description": "plan 模式下写工具与非只读 Bash 命令在裁决第 5 步被拒绝，模型收到\"先提交计划\"的拒绝理由。验证：场景测试中的 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T23-A10",
+      "task": "T23",
+      "description": "所选模式按工作区记忆，重启应用后恢复。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T23-A11",
+      "task": "T23",
+      "description": "\"总是允许\"按子命令前缀生成规则：复合命令生成多条、已允许的子命令不重复、关键路径删除不提供该选项；保存前可编辑，写入 `.piarc/settings.local.json`。验证：单测与 Playwright 流程。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T23-A12",
+      "task": "T23",
+      "description": "权限设置页可增删改可写来源的规则，新增或修改 allow 类规则时出现主进程原生确认；审计页可按会话、工具、结论筛选。验证：Playwright 流程与截图（`tmp/evidence/T23/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T23-A13",
+      "task": "T23",
+      "description": "无需用户参与的裁决（含 Bash 分析）p95 ≤ 2 ms。验证：Core 基准测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T23-A14",
+      "task": "T23",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T24-A01",
+      "task": "T24",
+      "description": "四个 Claude Code 配置文件与 PiArc 配置按 ADR-0005 的顺序合并，列表类键合并、deny 优先。验证：用真实文件夹具的集成测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T24-A02",
+      "task": "T24",
+      "description": "项目级 `.claude/settings*.json` 的 allow 规则与 `additionalDirectories` 在信任前不生效，deny 与 ask 照常生效。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T24-A03",
+      "task": "T24",
+      "description": "项目级 `.claude/settings*.json` 中 `defaultMode` 为 `bypassPermissions` 或 `auto` 时不生效，诊断注明原因。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T24-A04",
+      "task": "T24",
+      "description": "键映射表之外的键与标为\"已忽略\"的键逐个出现在诊断的忽略列表中。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T24-A05",
+      "task": "T24",
+      "description": "一个配置文件 JSON 损坏时其他文件照常加载，诊断给出文件、行列与错误信息。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T24-A06",
+      "task": "T24",
+      "description": "测试全程使用注入的临时家目录，不读取本机 `~/.claude`。验证：测试代码审阅与家目录注入的单测。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T24-A07",
+      "task": "T24",
+      "description": "无 `paths:` 的 rules 进入项目上下文段；有 `paths:` 的 rules 在首次读写匹配文件时以 system-reminder 注入、每会话一次，读写不匹配的文件时不注入，system prompt 字节不变。验证：场景测试中的 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T24-A08",
+      "task": "T24",
+      "description": "跑完全部 L2 场景后，各工作区与临时家目录中的 `.claude/` 没有任何新增或修改；piarc-config 写接口拒绝 `.claude/` 路径。验证：测试（目录快照比对与写接口单测）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T24-A09",
+      "task": "T24",
+      "description": "运行中修改 `.claude/settings.json` 后配置重新加载，诊断随之更新。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T24-A10",
+      "task": "T24",
+      "description": "配置诊断页按文件显示加载状态、生效键、被覆盖键（含覆盖来源）、忽略键与解析错误。验证：Playwright 流程与截图（`tmp/evidence/T24/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T24-A11",
+      "task": "T24",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T25-A01",
+      "task": "T25",
+      "description": "交付物 1 表中 11 个事件各有至少一个 L2 场景且通过，能力 ID 已登记，无 MISSING。验证：场景运行输出与能力清单。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T25-A02",
+      "task": "T25",
+      "description": "每个事件的 hook 收到的输入 JSON 含通用字段与该事件的特有字段。验证：场景中对夹具记录的 stdin 断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T25-A03",
+      "task": "T25",
+      "description": "exit 2 阻断动作，stderr 作为理由出现在下一次模型请求中；其他非 0 退出码不阻断，并向用户提示错误。验证：场景测试与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T25-A04",
+      "task": "T25",
+      "description": "PreToolUse 的 deny、ask、allow 与 `updatedInput` 生效；多个 handler 冲突时按 deny > ask > allow 合并。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T25-A05",
+      "task": "T25",
+      "description": "PreToolUse 返回 allow 时，后续 deny 规则、ask 规则与 plan 模式的拒绝仍然生效。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T25-A06",
+      "task": "T25",
+      "description": "PostToolUse 的 `updatedToolOutput` 替换模型看到的工具结果、`additionalContext` 被追加；PostToolUseFailure 不能改写失败输出。验证：mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T25-A07",
+      "task": "T25",
+      "description": "Stop 返回 block 时以 reason 续跑一轮；连续阻断达到上限后停止续跑并提示用户。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T25-A08",
+      "task": "T25",
+      "description": "PreCompact 可以阻断压缩，exit 0 的 stdout 作为摘要指令出现在摘要请求中；PostCompact 收到摘要。验证：场景测试与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T25-A09",
+      "task": "T25",
+      "description": "handler 超时或会话取消时整棵进程树被终止，默认超时为 600 秒、UserPromptSubmit 为 30 秒（测试中时长可注入）。验证：macOS 本机测试与 Windows CI 测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T25-A10",
+      "task": "T25",
+      "description": "同一事件的多个 handler 并行执行；同一 handler 定义在多个文件中时只执行一次。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T25-A11",
+      "task": "T25",
+      "description": "未信任项目的项目级 hooks 不执行，用户级 hooks 照常执行，信任后项目级 hooks 生效。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T25-A12",
+      "task": "T25",
+      "description": "每次 hook 执行都写入审计记录（事件、来源、exit code、耗时、决策）；超过 10,000 字符的上下文输出落盘并只送预览。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T25-A13",
+      "task": "T25",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T26-A01",
+      "task": "T26",
+      "description": "plan 模式下写工具调用与非只读 Bash 命令都在裁决处被拒绝，拒绝理由提示先提交计划；进入与退出 plan 模式前后请求中的 system 与工具定义逐字节不变。验证：场景测试中的 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T26-A02",
+      "task": "T26",
+      "description": "模型调用 `EnterPlanMode` 后进入 plan 模式且不需审批；`ExitPlanMode` 生成计划卡并等待用户决定。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T26-A03",
+      "task": "T26",
+      "description": "计划卡的\"批准并自动接受编辑\"\"批准并手动审批\"切换到对应模式并在转录中留下模式切换记录；\"继续规划\"保持 plan 模式。验证：Playwright 流程与截图（`tmp/evidence/T26/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T26-A04",
+      "task": "T26",
+      "description": "计划面板中的行内评论随\"继续规划\"送达模型，内容与锚点正确。验证：Playwright 流程与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T26-A05",
+      "task": "T26",
+      "description": "计划文本保存为会话 entry，应用重启后可读回，注入接口返回同一内容。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T26-A06",
+      "task": "T26",
+      "description": "任务清单状态随分支回溯：在较早的 entry 处 fork 后，当前清单等于该处的状态。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T26-A07",
+      "task": "T26",
+      "description": "任务卡与右栏任务卡片随 `TodoWrite` 调用更新，进行中项与完成计数显示正确。验证：Playwright 截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T26-A08",
+      "task": "T26",
+      "description": "存在未完成项且连续达到阈值轮数未更新清单时，下一次模型请求中出现提醒消息，system prompt 字节不变。验证：场景测试中的 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T26-A09",
+      "task": "T26",
+      "description": "AskUserQuestion 的单选、多选、自由输入三种题型都能作答并以结构化结果返回模型；超时后按默认选项继续，无默认选项时返回\"用户未作答\"。验证：测试（时钟可注入）与 Playwright 流程。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T26-A10",
+      "task": "T26",
+      "description": "下一步建议的\"在此执行\"把建议作为本会话下一条输入发送，\"开始新会话\"新建会话并以建议为首条输入。验证：Playwright 流程与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T26-A11",
+      "task": "T26",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T27-A01",
+      "task": "T27",
+      "description": "上下文达到 W − min(O, 20K) − 13K 时触发自动压缩，少 1 token 时不触发；设置自动压缩窗口上限后 W 取较小值。验证：阈值函数单测与小窗口场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T27-A02",
+      "task": "T27",
+      "description": "摘要请求使用 PiArc 自写的分节摘要提示；`/compact 重点` 的重点说明出现在摘要请求中。验证：mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T27-A03",
+      "task": "T27",
+      "description": "PreCompact 返回 block 时不压缩；其 stdout 摘要指令出现在摘要请求中；PostCompact 收到摘要。验证：场景测试与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T27-A04",
+      "task": "T27",
+      "description": "连续 3 次自动压缩失败或无效后停止自动压缩并向用户显示原因，手动 `/compact` 仍可执行。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T27-A05",
+      "task": "T27",
+      "description": "压缩后的请求中重注入了 memory、当前计划、任务清单、skill 正文（单个 ≤ 5K、合计 ≤ 25K token）和最多 5 个最近文件（合计 ≤ 50K token），超出上限的部分被截断或只给路径。验证：mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T27-A06",
+      "task": "T27",
+      "description": "七类 reminder（`backgroundTask` 经测试入口触发）都以追加消息送达，注入前后 system prompt 字节一致；T22、T24、T25 的旧注入代码已删除。验证：mock provider 请求断言与代码检索（旧注入入口无引用）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T27-A07",
+      "task": "T27",
+      "description": "本会话读过的文件被外部修改后，下一次模型请求中出现修改提醒。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T27-A08",
+      "task": "T27",
+      "description": "mock provider 下各类别用量合计等于请求的输入 token；真实服务商口径下差额计入\"未分类\"。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T27-A09",
+      "task": "T27",
+      "description": "用量环在 75% 与 90% 显示两级提示，上下文卡片显示分类明细，压缩按钮触发压缩。验证：Playwright 流程与截图（`tmp/evidence/T27/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T27-A10",
+      "task": "T27",
+      "description": "Anthropic 请求的缓存断点位置与数量符合交付物 4，在 reminder 追加与压缩前后都成立。验证：mock provider 缓存断点断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T27-A11",
+      "task": "T27",
+      "description": "摘要提示与 reminder 文案的原创性自查已完成并记录在报告中。验证：报告内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T27-A12",
+      "task": "T27",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T28-A01",
+      "task": "T28",
+      "description": "每个用户回合建立检查点，写前保存原文件；内容相同的文件在对象存储中只有一份。验证：测试（对象计数）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T28-A02",
+      "task": "T28",
+      "description": "回合内新建的文件在恢复代码时被删除。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T28-A03",
+      "task": "T28",
+      "description": "Rewind 四个选项各有场景：文件副作用符合交付物 2 的表，对话分支与摘要内容由 mock provider 请求断言确认。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T28-A04",
+      "task": "T28",
+      "description": "恢复对话后原分支仍在，可以切换回去且内容完整。验证：场景测试与 Playwright 流程。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T28-A05",
+      "task": "T28",
+      "description": "文件在快照后被外部或 Bash 修改时，回退前列出冲突，用户的逐文件选择被正确执行，取消时没有文件改动。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T28-A06",
+      "task": "T28",
+      "description": "恢复中途某个文件失败时，回退停止并报告逐文件结果，已恢复的部分可以撤销。验证：测试（注入写入失败）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T28-A07",
+      "task": "T28",
+      "description": "只被 Bash 改动的文件不出现在快照中，回退界面与 Changes 面板显示相应说明。验证：场景测试与截图（`tmp/evidence/T28/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T28-A08",
+      "task": "T28",
+      "description": "Changes 面板按文件显示统一 diff、增删行数与语法高亮，超过阈值时降级为纯文本。验证：Playwright 流程与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T28-A09",
+      "task": "T28",
+      "description": "按文件与按 hunk 丢弃后文件内容正确，CRLF、BOM 文件保真，文件状态表要求 agent 重新读取。验证：单测与 Playwright 流程。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T28-A10",
+      "task": "T28",
+      "description": "每会话超过 100 个检查点时删除最旧的，30 天未访问的会话快照被清理，无引用对象被回收。验证：测试（时钟可注入）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T28-A11",
+      "task": "T28",
+      "description": "从某条消息创建分支、在分支之间切换，transcript 与任务清单随之变化。验证：Playwright 流程与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T28-A12",
+      "task": "T28",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T29-A01",
+      "task": "T29",
+      "description": "WebFetch 端到端：抓取本地测试页面、转换为 Markdown、经辅助模型提取后作为工具结果返回模型。验证：场景测试与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T29-A02",
+      "task": "T29",
+      "description": "`WebFetch(domain:…)` 的 allow、ask、deny 规则生效，Manual 下无规则时询问，\"总是允许\"按域名生成规则。验证：场景测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T29-A03",
+      "task": "T29",
+      "description": "回环、私有网段、链路本地、IPv6 等价地址、解析到内网的域名、重定向到内网的地址全部被拒绝；允许列表中的地址放行。验证：SSRF 表驱动单测与集成测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T29-A04",
+      "task": "T29",
+      "description": "跨域重定向不被跟随，目标地址返回给模型；超出大小或超时上限时截断或中止并给出明确错误。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T29-A05",
+      "task": "T29",
+      "description": "辅助模型可在设置中指定，未设置时使用会话模型；辅助调用的用量计入会话。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T29-A06",
+      "task": "T29",
+      "description": "OAuth 授权码流程与设备码流程在 mock 授权服务器上端到端完成，token 只写入保险箱；取消、拒绝、过期都有明确提示。验证：集成测试、磁盘明文扫描与 Playwright 流程。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T29-A07",
+      "task": "T29",
+      "description": "新增登录界面后，可用登录方式中仍不含 Anthropic 订阅 OAuth。验证：CI 测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T29-A08",
+      "task": "T29",
+      "description": "每模型设置的显示名、上下文窗口、图片输入、默认 effort 都生效：窗口改变压缩阈值与用量环，关闭图片输入后图片附件被拒绝并提示。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T29-A09",
+      "task": "T29",
+      "description": "三档视图分别按交付物 5 显示内容，详细档能看到 reminder item。验证：Playwright 流程与三档截图（`tmp/evidence/T29/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T29-A10",
+      "task": "T29",
+      "description": "可靠性等级为\"低\"的模型收到保守 Profile 的工具子集与描述，权限规则仍按规范名生效；每模型设置改回默认 Profile 后恢复完整工具集。验证：场景测试与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T29-A11",
+      "task": "T29",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T30-A01",
+      "task": "T30",
+      "description": "本机 `claude` 可用时版本写入报告；PATH 中没有 `claude` 时 L3 命令给出明确提示并以非 0 退出。验证：两次运行的命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T30-A02",
+      "task": "T30",
+      "description": "一条命令完成两侧运行、剥离检查、归一化、比对并生成报告。验证：命令输出与 `tmp/l3/` 下的报告。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T30-A03",
+      "task": "T30",
+      "description": "Claude Code 运行使用临时配置目录、假 API key 与指向 mock 的 base URL；运行前后本机 `~/.claude` 的文件清单与修改时间不变。验证：命令输出与前后比对结果。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T30-A04",
+      "task": "T30",
+      "description": "录制产物只含白名单结构，system 文本、工具描述与参数描述只以长度与 hash 出现。验证：检查脚本对本次录制的输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T30-A05",
+      "task": "T30",
+      "description": "检查脚本对带提示词正文的夹具失败、对正常录制通过，其单测已并入 verify。验证：测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T30-A06",
+      "task": "T30",
+      "description": "同一侧重复运行两次，归一化后的轨迹完全一致。验证：两次运行的 diff 为空。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T30-A07",
+      "task": "T30",
+      "description": "hooks 场景的比对覆盖触发事件的顺序、输入字段名集合与决策结果。验证：报告中的 hooks 部分。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T30-A08",
+      "task": "T30",
+      "description": "权限与 hooks 场景没有未解释的差异：每个差异已修正或写入 allowlist 并附理由；缺理由或不再匹配的 allowlist 条目会让命令失败。验证：L3 报告与 allowlist 校验输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T30-A09",
+      "task": "T30",
+      "description": "Nightly workflow 语法有效，安装锁定版本的 Claude Code，不依赖任何密钥，并上传报告。验证：actionlint 或 YAML 解析输出与 workflow 内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T30-A10",
+      "task": "T30",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T31-A01",
+      "task": "T31",
+      "description": "定义文件的 frontmatter 字段全部正确解析，同名定义按来源优先级取整条；不支持的字段与解析错误（含文件与行号）在设置页和子 agent 卡上提示。验证：单元测试与 Playwright 截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T31-A02",
+      "task": "T31",
+      "description": "Explore 与 Plan 只有只读工具，首个请求不含 memory 文件与 git 状态；general-purpose 拥有除移除项之外的全部工具。验证：L2 场景的 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T31-A03",
+      "task": "T31",
+      "description": "子 agent 的首个模型请求只含任务描述，不含父会话历史；子会话压缩后父会话历史不变。验证：L2 场景（mock 请求断言）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T31-A04",
+      "task": "T31",
+      "description": "`tools` 与 `disallowedTools` 生效且 disallowed 优先；`AskUserQuestion`、`EnterPlanMode`、`ExitPlanMode` 被移除；模型调用被移除的工具时在闸门处被拒绝。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T31-A05",
+      "task": "T31",
+      "description": "第 3 层子 agent 没有 `Agent` 工具；并发达到上限（测试中调小）时 `Agent` 立即返回说明上限的错误结果。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T31-A06",
+      "task": "T31",
+      "description": "`fast`/`balanced`/`strong`、`haiku`/`sonnet`/`opus`、`provider/model`、`inherit` 各自解析到正确的模型，未配置的别名回退为 `inherit` 并提示。验证：单元测试与 L2 场景中 mock 收到的模型 ID。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T31-A07",
+      "task": "T31",
+      "description": "子 agent 需要审批时，审批卡出现在主会话并标明子 agent 名称与类型，拒绝只影响该次调用。验证：Playwright（截图存 `tmp/evidence/T31/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T31-A08",
+      "task": "T31",
+      "description": "前台子 agent 的最终报告作为 `Agent` 工具结果返回；后台子 agent 完成后，摘要在主会话下一回合以 system reminder 注入。验证：L2 场景（mock 请求断言）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T31-A09",
+      "task": "T31",
+      "description": "子会话转录写入独立 JSONL，`sessions` 表记录父子关系，重建索引后父子关系不变。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T31-A10",
+      "task": "T31",
+      "description": "子 agent 改动的文件进入主会话检查点，回退到该回合之前时恢复原样。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T31-A11",
+      "task": "T31",
+      "description": "项目级定义中的 `bypassPermissions`、`auto` 不生效，子 agent 的模式不比主会话宽松；定义中的 `hooks` 只在该子 agent 运行期间生效，项目级定义的 hooks 在信任前不执行。验证：测试与 L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T31-A12",
+      "task": "T31",
+      "description": "中断主会话时进行中的子 agent 一并中止，未完成的工具调用都补齐\"已中断\"结果。验证：L2 场景（mock provider 配对校验通过）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T31-A13",
+      "task": "T31",
+      "description": "子 agent 卡显示类型、模型、状态、耗时与工具调用数，可展开查看子会话转录、可停止。验证：组件测试与 Playwright 截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T31-A14",
+      "task": "T31",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T32-A01",
+      "task": "T32",
+      "description": "`run_in_background` 启动的命令立即返回任务 ID 与输出路径，模型随后用 Read 读到输出。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T32-A02",
+      "task": "T32",
+      "description": "前台命令超时后转为后台任务，进程未被终止（PID 不变），工具结果说明已转后台。验证：L2 场景（超时调小）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T32-A03",
+      "task": "T32",
+      "description": "后台任务完成后，退出码、语义状态与输出路径在该会话下一回合以 system reminder 注入。验证：L2 场景（mock provider 请求断言）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T32-A04",
+      "task": "T32",
+      "description": "KillShell 终止整棵进程树（含孙进程），状态为 `killed`，输出文件保留。验证：macOS 与 Windows CI 上的测试（进程表断言无残留）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T32-A05",
+      "task": "T32",
+      "description": "KillShell 无法停止其他会话启动的任务。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T32-A06",
+      "task": "T32",
+      "description": "Monitor 把新增输出按行回灌给模型，超过单次限速或总量上限时截断并说明省略行数与文件路径。验证：L2 场景（mock provider 请求断言）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T32-A07",
+      "task": "T32",
+      "description": "Monitor 的命令受 Bash 规则、Bash 分析与 `Bash` matcher 的 PreToolUse hooks 约束，Manual 模式下需要审批。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T32-A08",
+      "task": "T32",
+      "description": "会话空闲时 Monitor 的新增输出唤醒会话，唤醒频率受限速约束。验证：L2 场景（时钟可注入）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T32-A09",
+      "task": "T32",
+      "description": "Agent Host 被杀并重启后，运行中的后台命令继续运行，完成通知照常送达。验证：故障注入测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T32-A10",
+      "task": "T32",
+      "description": "应用退出时全部后台进程树被终止，重启后这些任务显示为已中断。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T32-A11",
+      "task": "T32",
+      "description": "T31 的后台子 agent 出现在任务管理器中，可从面板停止。验证：L2 场景与 Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T32-A12",
+      "task": "T32",
+      "description": "后台任务面板与右栏卡片显示状态、耗时与最新输出，停止按钮生效。验证：Playwright（截图存 `tmp/evidence/T32/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T32-A13",
+      "task": "T32",
+      "description": "`npm run verify` 通过（含 Windows CI 上的进程树测试）。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T33-A01",
+      "task": "T33",
+      "description": "读屏 API 返回的纯文本与终端状态逐格一致，覆盖宽字符、折行与 alt screen。验证：Rust 测试（与 render state 逐格比较）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T33-A02",
+      "task": "T33",
+      "description": "OSC 133 正确识别命令的开始、结束与退出码：macOS 上 zsh 与 bash，Windows CI 上 Git Bash 与 PowerShell。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T33-A03",
+      "task": "T33",
+      "description": "查询应答（设备属性、光标位置报告）经 `WRITE_PTY` 写回 PTY；标题、工作目录、铃声进入 Core 事件流；`CLIPBOARD_READ` 默认被拒绝。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T33-A04",
+      "task": "T33",
+      "description": "`RENDER_HOLD` 期间不产生新帧，超时后 Core 主动结束 hold。验证：测试（时钟可注入）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T33-A05",
+      "task": "T33",
+      "description": "在 1 万行 scrollback 中搜索返回正确位置，搜索期间 IO 线程写入不被阻塞。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T33-A06",
+      "task": "T33",
+      "description": "snapshot 恢复后的屏幕与 scrollback 与保存前一致；版本头不一致时降级为 VT 重放，重放失败时恢复纯文本。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T33-A07",
+      "task": "T33",
+      "description": "帧协议有 schema 与 L1 golden 样本；帧只含脏行；隐藏的终端不产生帧。验证：L1 契约测试与单元测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T33-A08",
+      "task": "T33",
+      "description": "键盘、鼠标、粘贴、焦点事件按当前终端模式编码，覆盖 legacy 与 Kitty 键盘协议、SGR 鼠标、bracketed paste。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T33-A09",
+      "task": "T33",
+      "description": "新终端以会话 cwd（含 worktree）启动，环境变量来自 T17 的构造逻辑且不含凭据。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T33-A10",
+      "task": "T33",
+      "description": "agent 接口的补充 ADR 已写；界面未打开时，agent 读到终端承载任务的屏幕内容与最近一条命令的退出码，内容与 formatter 输出一致。验证：ADR 文件与 L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T33-A11",
+      "task": "T33",
+      "description": "agent 无法读取未被用户共享的终端。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T33-A12",
+      "task": "T33",
+      "description": "关闭终端或应用退出时 shell 进程树被终止。验证：macOS 与 Windows CI 上的测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T33-A13",
+      "task": "T33",
+      "description": "无头状态下 `cat` 100 MB 期间主进程事件循环延迟 p99 ≤ 16 ms。验证：测量输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T33-A14",
+      "task": "T33",
+      "description": "`npm run verify` 通过（含 Windows CI 上的 piarc-term 测试）。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T34-A01",
+      "task": "T34",
+      "description": "vim、htop、less 在面板中渲染正确，覆盖颜色、光标、alt screen 切换与窗口缩放后的重排。验证：Playwright 截图（存 `tmp/evidence/T34/`）与 Core formatter 输出对照。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T34-A02",
+      "task": "T34",
+      "description": "面板隐藏或窗口最小化时渲染进程不接收终端数据（主路线：拉帧次数为 0；退路：暂停字节流投递），恢复显示后内容完整。验证：测试（计数）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T34-A03",
+      "task": "T34",
+      "description": "中文输入法的预编辑文本绘制在光标处，候选框跟随光标，上屏文本只写入 PTY 一次。验证：macOS 实测截图与组件测试（模拟 composition 事件）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T34-A04",
+      "task": "T34",
+      "description": "键盘、鼠标、粘贴经 Core 编码：vim 中方向键、鼠标点击与 bracketed paste 生效。验证：Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T34-A05",
+      "task": "T34",
+      "description": "拖选、双击选词、三击选行后复制，剪贴板内容与屏幕文本一致。验证：Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T34-A06",
+      "task": "T34",
+      "description": "查找栏高亮全部匹配并可上下跳转，显示匹配数。验证：Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T34-A07",
+      "task": "T34",
+      "description": "OSC 8 链接与普通 URL 点击后先显示目标地址，确认后才调用 `shell.openExternal`，取消则不打开。验证：Playwright（拦截主进程调用）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T34-A08",
+      "task": "T34",
+      "description": "面板支持多标签，新标签以会话 cwd 启动，关闭标签终止 shell 进程树，Ctrl+反引号切换面板；选中内容可附加到对话。验证：Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T34-A09",
+      "task": "T34",
+      "description": "\"共享给 agent\"开关默认关闭，打开后 agent 才能读取该终端。验证：Playwright 与 L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T34-A10",
+      "task": "T34",
+      "description": "渲染进程重载后终端内容恢复、shell 进程不受影响（主路线：一次拉帧；退路：VT 重放，且渲染端产生的查询应答被丢弃）。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T34-A11",
+      "task": "T34",
+      "description": "`cat` 100 MB 期间主进程事件循环延迟 p99 ≤ 16 ms，键入回显额外延迟 p95 ≤ 5 ms，并记录帧率与 IPC 字节数。验证：测量输出（与 S7 数据对照）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T34-A12",
+      "task": "T34",
+      "description": "终端区域可聚焦、有可读标签，\"以文本查看屏幕\"的内容与读屏 API 一致。验证：axe 检查与 Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T34-A13",
+      "task": "T34",
+      "description": "fork 代码保留 MIT 版权声明与许可证文件，来源与改动已记录，并登记到第三方许可证清单（退路时为 xterm.js）。验证：文件检查。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T34-A14",
+      "task": "T34",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T35-A01",
+      "task": "T35",
+      "description": "新建会话可选独立 worktree：在 `.piarc/worktrees/<name>/` 创建 worktree 与分支，可选基础分支，`.worktreeinclude` 列出的被忽略文件被复制。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T35-A02",
+      "task": "T35",
+      "description": "worktree 会话使用主 checkout 的项目信任与\"总是允许\"规则，新写入的规则落在主 checkout。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T35-A03",
+      "task": "T35",
+      "description": "归档有未提交改动的 worktree 会话时先询问；到期清理删除 worktree 目录并保留分支，清理时有未提交改动先询问。验证：场景测试（时钟可注入）与 Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T35-A04",
+      "task": "T35",
+      "description": "`isolation: worktree` 的子 agent 在临时 worktree 中运行，无改动时结束后自动清理，有改动时保留并在结果中给出路径与分支。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T35-A05",
+      "task": "T35",
+      "description": "全文搜索能查到中文、英文与混排的用户消息和助手正文；JSONL 新增内容增量进入索引；重建索引后结果一致。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T35-A06",
+      "task": "T35",
+      "description": "点击搜索结果打开对应会话并定位到该条目。验证：Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T35-A07",
+      "task": "T35",
+      "description": "两个窗口同时显示同一审批时只有先到的答复生效，另一个窗口的卡片随之消失。验证：Playwright（截图存 `tmp/evidence/T35/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T35-A08",
+      "task": "T35",
+      "description": "关闭最后一个窗口后会话继续运行，菜单栏图标显示运行中与等待审批的计数；有运行中的会话时退出需确认。验证：Playwright 与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T35-A09",
+      "task": "T35",
+      "description": "`piarc://` 链接与从 Finder 拖入的文件夹在已运行实例中打开对应工作区或会话；链接参数不触发任何自动执行，未信任的文件夹照常显示信任对话框。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T35-A10",
+      "task": "T35",
+      "description": "Windows 托盘、`piarc://` 注册与资源管理器右键菜单的注册与参数解析有单元测试并在 Windows CI 上通过。验证：Windows CI 输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T35-A11",
+      "task": "T35",
+      "description": "同一工作区 3 个并行会话（至少 1 个在独立 worktree）加 1 个子 agent 的稳态内存满足第 11 章预算（Agent Host 按活动会话数计算的上限、应用其余进程合计上限）。验证：测量脚本输出与 `docs/perf/M3-memory.md`。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T35-A12",
+      "task": "T35",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T36-A01",
+      "task": "T36",
+      "description": "Pi 内置 MCP 扩展与 codemode 均未加载，MCP 工具以 `mcp__<server>__<tool>` 直接或延迟暴露给模型。验证：测试与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T36-A02",
+      "task": "T36",
+      "description": "同一工作区两个会话使用同一个 stdio server 时只有一个 server 进程，两个会话的调用结果各自正确返回。验证：测试（进程计数与 PID 断言）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T36-A03",
+      "task": "T36",
+      "description": "所有会话停止使用超过空闲阈值后连接断开、stdio 进程退出，之后有会话需要时自动重连。验证：测试（时钟可注入）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T36-A04",
+      "task": "T36",
+      "description": "未信任项目的 `.mcp.json` server 不连接、不启动进程；信任后才连接；`.mcp.json` 新增 server 时需要再次确认。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T36-A05",
+      "task": "T36",
+      "description": "同名 server 按\"企业 > 本地 > 项目 > 用户 > 插件\"取整条定义；SSE 与 WebSocket 配置被标为不支持并在界面提示。验证：单元测试与 Playwright 截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T36-A06",
+      "task": "T36",
+      "description": "`npx` 启动的 stdio server 使用内置 Node，系统 PATH 中没有 node 时也能启动。验证：测试（从 PATH 中移除系统 node 后运行）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T36-A07",
+      "task": "T36",
+      "description": "经 mock 授权服务器完成浏览器授权、token 刷新与重新认证；token 只存在保险箱中，数据目录下没有 `mcp-auth.json` 或明文 token。验证：端到端测试与磁盘扫描。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T36-A08",
+      "task": "T36",
+      "description": "MCP 工具总数超过阈值（默认 30）时改为延迟加载，模型经 `ToolSearch` 检索到目标工具并成功调用。验证：L2 场景（mock 请求断言工具列表与调用顺序）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T36-A09",
+      "task": "T36",
+      "description": "`mcp__server__tool` 与 `mcp__server__*` 规则生效，带 `requiresUserInteraction` 标记的工具在任何模式下都询问。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T36-A10",
+      "task": "T36",
+      "description": "工具集因 `list_changed` 或连接变化而改变时，变化以追加消息送达，已发送的 system prompt 字节不变。验证：mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T36-A11",
+      "task": "T36",
+      "description": "Agent Host 正常退出或被杀后没有遗留的 MCP server 进程。验证：macOS 与 Windows CI 上的测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T36-A12",
+      "task": "T36",
+      "description": "MCP 设置页显示每个 server 的来源、传输、状态与工具数，重连、启用、停用操作生效。验证：Playwright（截图存 `tmp/evidence/T36/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T36-A13",
+      "task": "T36",
+      "description": "子 agent 定义中按名称引用的 server 复用连接池，项目级内联 server 在信任前不启动。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T36-A14",
+      "task": "T36",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T37-A01",
+      "task": "T37",
+      "description": "skills 发现覆盖 Pi 默认路径、`.claude/skills`、`~/.claude/skills`、`.piarc/skills` 与 PiArc 用户目录，同名按优先级取舍并在诊断中列出。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T37-A02",
+      "task": "T37",
+      "description": "system prompt 只含 skills 索引（名称与截断后的描述），`disable-model-invocation` 的 skill 不在索引中。验证：mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T37-A03",
+      "task": "T37",
+      "description": "`Skill` 工具加载正文并完成参数替换；已调用的 skill 在压缩后按上限重新注入；skill frontmatter 中的 `hooks` 在调用后开始生效。验证：L2 场景（mock 请求断言）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T37-A04",
+      "task": "T37",
+      "description": "`allowed-tools` 列出的工具在调用 skill 的当前回合免审批，下一回合恢复询问，deny 与 ask 规则仍然优先。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T37-A05",
+      "task": "T37",
+      "description": "未信任项目中 skill 与命令的 `allowed-tools` 不产生免审批效果，skill frontmatter 中的 `hooks` 不执行。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T37-A06",
+      "task": "T37",
+      "description": "带 `paths` 的 skill 在处理匹配文件后才进入索引，以追加消息送达。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T37-A07",
+      "task": "T37",
+      "description": "斜杠命令列表合并内置命令、`.claude/commands`、Pi prompt templates 与可由用户调用的 skills，同名冲突按规则取舍；`$ARGUMENTS`、位置参数与命名参数替换正确。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T37-A08",
+      "task": "T37",
+      "description": "`/compact`、`/clear`、`/model`、`/rewind`、`/context`、`/output-style` 执行对应功能。验证：L2 场景与 Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T37-A09",
+      "task": "T37",
+      "description": "composer 命令面板按来源分组、模糊搜索并显示参数提示，输入法合成期间 `/` 不打开面板。验证：Playwright（截图存 `tmp/evidence/T37/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T37-A10",
+      "task": "T37",
+      "description": "Mod+K 命令面板可模糊搜索并执行应用操作与会话切换，快捷键修改后立即生效。验证：Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T37-A11",
+      "task": "T37",
+      "description": "内置与自定义输出风格可选；会话中途切换以追加消息送达，已发送的 system prompt 字节不变。验证：mock provider 请求断言与 Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T37-A12",
+      "task": "T37",
+      "description": "skill 正文中的 `` !`command` `` 不被执行，按原文传递，诊断中标为不支持。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T37-A13",
+      "task": "T37",
+      "description": "内置风格、内置命令描述与 `Skill` 工具描述完成原创性自查。验证：报告中的自查记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T37-A14",
+      "task": "T37",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T38-A01",
+      "task": "T38",
+      "description": "WebSearch 经原生后端（mock provider 模拟服务端搜索）返回带来源的结果。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T38-A02",
+      "task": "T38",
+      "description": "当前模型不支持原生搜索时使用配置的第三方后端（本地 mock 搜索服务），API key 只存在保险箱中。验证：L2 场景与磁盘扫描。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T38-A03",
+      "task": "T38",
+      "description": "没有可用后端时 `WebSearch` 不在模型的工具集中，设置页说明原因。验证：mock provider 请求断言与 Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T38-A04",
+      "task": "T38",
+      "description": "WebSearch 在 Manual 模式下需要审批，原生后端与第三方后端都经过 `WebSearch` 规则与 PreToolUse hooks。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T38-A05",
+      "task": "T38",
+      "description": "transcript 中的搜索结果显示来源链接，点击后先确认再打开。验证：Playwright（截图存 `tmp/evidence/T38/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T38-A06",
+      "task": "T38",
+      "description": "`http` handler：响应体 JSON 的决策字段生效；非 2xx、超时与连接失败按非阻断错误处理；白名单外的 URL 不发请求；header 只插值白名单内的环境变量。验证：测试（本地 mock HTTP 服务）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T38-A07",
+      "task": "T38",
+      "description": "`prompt` handler：辅助模型返回 `ok: false` 时在可阻断事件上阻断并把理由回给模型；超时与解析失败按非阻断错误处理。验证：测试（mock provider）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T38-A08",
+      "task": "T38",
+      "description": "SubagentStart 按 agent 类型匹配，`additionalContext` 出现在子 agent 的首个请求中。验证：L2 场景（mock 请求断言）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T38-A09",
+      "task": "T38",
+      "description": "SubagentStop 返回 block 时子 agent 带理由续跑一轮，防循环计数生效。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T38-A10",
+      "task": "T38",
+      "description": "PostToolBatch 在一批工具调用完成后、下一次模型请求前触发，block 时停止循环并带理由。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T38-A11",
+      "task": "T38",
+      "description": "子 agent 内触发的 hooks（含 PreToolUse、PostToolUse 与子 agent frontmatter 中的 hooks）输入都带 `agent_id` 与 `agent_type`。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T38-A12",
+      "task": "T38",
+      "description": "未信任项目中的 `http` 与 `prompt` hooks 不执行。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T38-A13",
+      "task": "T38",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T39-A01",
+      "task": "T39",
+      "description": "沙箱开启且为\"沙箱内仍审批\"模式时，Bash 命令照常进入审批，获批后在 Seatbelt 中执行：写工作区成功，写工作区外、受保护路径与 `denyRead` 路径失败。验证：L2 场景（能力 ID 已登记）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T39-A02",
+      "task": "T39",
+      "description": "\"沙箱内自动批准\"模式下沙箱内的 Bash 命令不弹审批，deny 规则、ask 规则、关键路径删除与 plan 模式的拦截仍然生效。验证：L2 场景，每种情况一个。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T39-A03",
+      "task": "T39",
+      "description": "前台命令、`run_in_background` 后台命令与 Monitor 命令都在沙箱内执行，agent 启动进程的路径清单中每条路径各有测试。验证：L2 场景（三条路径各尝试写工作区外文件，均失败）与路径清单。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T39-A04",
+      "task": "T39",
+      "description": "模型请求沙箱外重试时，所有模式（含 `bypassPermissions` 与自动批准）都弹出审批，卡片只提供\"仅本次允许\"与\"拒绝\"，PermissionRequest hooks 不能代答，拒绝理由回到模型。验证：L2 场景与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T39-A05",
+      "task": "T39",
+      "description": "白名单内域名经代理可达，白名单外域名被拒，绕过代理的直连失败；修改白名单后下一条命令按新白名单执行，Agent Host 进程 id 不变。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T39-A06",
+      "task": "T39",
+      "description": "网络白名单按用户与企业来源合并；项目级配置中的白名单域名与自动批准设置不生效，并在配置诊断中标为\"项目级不生效\"。验证：测试（企业来源用测试替身）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T39-A07",
+      "task": "T39",
+      "description": "Seatbelt 拒绝与代理拒绝写入 `audit_events`，审计页可按\"沙箱拒绝\"筛选查看。验证：测试与 Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T39-A08",
+      "task": "T39",
+      "description": "沙箱设置页可开关沙箱、切换模式、编辑白名单与 `denyRead`，改动对下一条命令生效，企业来源条目不可编辑。验证：Playwright 用例与亮/暗截图（`tmp/evidence/T39/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T39-A09",
+      "task": "T39",
+      "description": "Agent Host 在定稿的 Seatbelt 配置下：写工作区、数据目录、会话临时目录成功，测试扩展向用户主目录写文件失败，经内置 npx 启动的 MCP stdio server 可以完成一次工具调用。验证：macOS 集成测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T39-A10",
+      "task": "T39",
+      "description": "全部 L2 场景在 Agent Host 定稿配置下通过，配置生成结果有 golden 测试。验证：macOS CI 输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T39-A11",
+      "task": "T39",
+      "description": "git、npm install（白名单含 registry）、cargo build、python 脚本经 Bash 工具在沙箱内执行成功。验证：集成测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T39-A12",
+      "task": "T39",
+      "description": "Windows 上设置页与沙箱开关显示\"沙箱不可用\"提示；配置开启沙箱或自动批准时，命令仍按权限规则审批，不会被自动批准。验证：Windows CI 上的 Playwright 断言与截图、L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T39-A13",
+      "task": "T39",
+      "description": "Windows 隔离方案评估 ADR 已写入 `docs/adr/`，状态\"提议\"，比较表覆盖 AppContainer、MXC、Win32 app isolation、Windows Sandbox、受限令牌或独立账户方案、WSL2 与维持现状，事实注明来源与日期；`docs/adr/README.md` 索引已更新。验证：文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T39-A14",
+      "task": "T39",
+      "description": "沙箱内命令访问白名单外域名时出现\"权限扩展（网络域名）\"审批卡：仅本次允许后本次连接成功、下次再问；加入白名单后不再询问；拒绝或超时后连接失败且命令得到明确错误。验证：场景测试与 Playwright 流程。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T39-A15",
+      "task": "T39",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T40-A01",
+      "task": "T40",
+      "description": "一个包含 commands、agents、skills、hooks、`.mcp.json` 的插件夹具启用后，五类组件分别生效：命令出现在命令面板并能展开，子 agent 可调用，skill 进入索引并可加载，hook 在对应事件执行，MCP server 连接并暴露工具。验证：L2 场景（每类一个，能力 ID 已登记）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T40-A02",
+      "task": "T40",
+      "description": "启用含可执行项的扩展包时，主进程确认框列出来源与每个可执行项；取消后没有任何可执行项运行，确认后生效；测试应答钩子在打包产物中不存在。验证：Playwright（经测试构建的应答钩子）与截图、打包产物测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T40-A03",
+      "task": "T40",
+      "description": "扩展包更新后新增的 hook、MCP server 或 Pi 扩展在再次确认前不运行。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T40-A04",
+      "task": "T40",
+      "description": "项目未信任时，项目作用域的插件与 Pi 包不加载（无 hook 执行、无 MCP 连接、无扩展加载）；信任后加载。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T40-A05",
+      "task": "T40",
+      "description": "Pi 包从 npm 来源安装时由 Core 调用内置 npm，参数含 `--ignore-scripts`，夹具包的 postinstall 脚本没有执行。验证：测试（断言进程路径与参数，标记文件不存在）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T40-A06",
+      "task": "T40",
+      "description": "Pi 包从 git 来源安装并确认后，`pi` 字段声明的扩展、skills、prompt templates 加载生效，themes 列为不支持。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T40-A07",
+      "task": "T40",
+      "description": "含 mods 的插件显示\"不支持\"提示，其余组件照常加载。验证：测试与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T40-A08",
+      "task": "T40",
+      "description": "声明 prompts 能力的 MCP server 的每个 prompt 出现在斜杠命令列表的 MCP 分组中，带参数调用后 `prompts/get` 的结果作为输入发送；server 发出 prompt 列表变化通知后命令列表更新。验证：L2 场景（mock MCP server）与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T40-A09",
+      "task": "T40",
+      "description": "用户作用域的扩展包在所有工作区可用，项目作用域的只在声明它的工作区可用；停用与卸载后组件立即消失，不需要重启应用。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T40-A10",
+      "task": "T40",
+      "description": "安装、启用、停用、卸载与确认结果写入审计表。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T40-A11",
+      "task": "T40",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T41-A01",
+      "task": "T41",
+      "description": "配置诊断列出交付物 1 中的全部来源，每个来源显示加载状态、生效键、被覆盖键（标明覆盖来源）、忽略键（附原因）与解析错误位置。验证：测试（每类来源一个夹具）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T41-A02",
+      "task": "T41",
+      "description": "未信任项目的可执行配置在诊断中标为\"未信任，未生效\"；企业来源显示为预留且\"未配置\"。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T41-A03",
+      "task": "T41",
+      "description": "配置文件在会话中变化后，诊断结果自动刷新，不需要重开设置窗口。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T41-A04",
+      "task": "T41",
+      "description": "诊断页展示上述信息，中英文文案完整。验证：Playwright 与亮/暗截图（`tmp/evidence/T41/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T41-A05",
+      "task": "T41",
+      "description": "六个 M4 事件各有一个场景，覆盖 matcher、该事件的输入字段与 JSON 输出字段。验证：L2 场景（能力 ID 已登记）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T41-A06",
+      "task": "T41",
+      "description": "UserPromptExpansion 以 exit 2 或 `decision: \"block\"` 阻止展开且理由显示给用户；ConfigChange 阻断后该变更不在当前会话生效，企业来源的变更不可阻断。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T41-A07",
+      "task": "T41",
+      "description": "FileChanged 按 SessionStart 与 CwdChanged 返回的 `watchPaths` 监视文件，文件变化后 hook 执行且 `systemMessage` 送达；超出监视上限的路径被丢弃并记录。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T41-A08",
+      "task": "T41",
+      "description": "mock provider 注入 429、529、5xx、鉴权失败且重试用尽后触发 StopFailure，错误类型映射正确，hook 输出不改变回合结果。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T41-A09",
+      "task": "T41",
+      "description": "`mcp_tool` handler 调用已连接 MCP server 的工具，`input` 模板替换正确，返回文本按决策协议解析；server 未连接或超时按非阻断错误处理。验证：L2 场景（mock MCP server）与新增 AHP 请求的 L1 样本。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T41-A10",
+      "task": "T41",
+      "description": "会话与模型的成本等于各请求 token 数乘以价格表单价之和（含缓存读写），对目录价与 pi-ai `calculateCost` 的结果一致；子 agent 用量计入父会话并单独列出。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T41-A11",
+      "task": "T41",
+      "description": "用户覆盖价格后成本按新价格计算；价格未知的模型显示\"未知\"而不是 0。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T41-A12",
+      "task": "T41",
+      "description": "会话右栏与\"用量\"页按会话、按模型显示 token 与成本。验证：Playwright 与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T41-A13",
+      "task": "T41",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T42-A01",
+      "task": "T42",
+      "description": "NotebookEdit 的插入、替换、删除各有一个场景，结果与期望 notebook 一致，未改动的 cell、元数据、缩进与换行风格逐字节不变。验证：L2 场景（能力 ID 已登记）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T42-A02",
+      "task": "T42",
+      "description": "未先 Read、读取后被外部修改、cell id 不存在时返回明确错误且文件不变；没有 cell id 的旧版 notebook 按序号定位。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T42-A03",
+      "task": "T42",
+      "description": "NotebookEdit 的写入进入检查点并可回退，受 `Edit(...)` 规则、受保护路径与模式默认约束，并产生 `fileChange` diff。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T42-A04",
+      "task": "T42",
+      "description": "从通知作出的答复经审批账本处理：与审批卡同时答复时只接受第一个有效答复，过期请求被拒绝并在应用内提示，审计记录来源为\"通知\"。验证：测试（通知层测试替身，断言 `requestId`、`revision`、`connectionEpoch`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T42-A05",
+      "task": "T42",
+      "description": "关键路径删除、沙箱外重试以及参数超出通知可显示长度的请求，通知只提供\"打开\"，不提供\"允许\"。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T42-A06",
+      "task": "T42",
+      "description": "macOS 按 S6 结论走带操作或降级的路径，实际可用的路径有实测截图，另一条路径有测试；降级时设置页说明原因。验证：截图（`tmp/evidence/T42/`）与测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T42-A07",
+      "task": "T42",
+      "description": "Windows Toast 按钮的生成与激活回调路径有测试，实机验证已登记到 W4。验证：Windows CI 测试输出与 `PLAN.md` 登记事项。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T42-A08",
+      "task": "T42",
+      "description": "Changes 面板中可在多个文件的 diff 行上添加、编辑、删除评论，Mod+Enter 一次发送全部评论。验证：Playwright 与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T42-A09",
+      "task": "T42",
+      "description": "批量发送的消息包含每条评论的文件路径、行号范围、所在侧与代码摘录。验证：mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T42-A10",
+      "task": "T42",
+      "description": "会话运行中发送的评论作为排队消息，在当前回合结束后送达。验证：Playwright 与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T42-A11",
+      "task": "T42",
+      "description": "diff 更新后未发送的评论重新定位，定位失败的评论标为\"已失效\"并保留文本。验证：组件测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T42-A12",
+      "task": "T42",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T43-A01",
+      "task": "T43",
+      "description": "axe 在状态清单的全部条目上零违规，亮色与暗色各跑一遍；清单覆盖每个设置页、每种 transcript 行类型、四类审批卡与交付物 1 列出的对话框和面板。验证：Playwright + axe 报告（`tmp/evidence/T43/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T43-A02",
+      "task": "T43",
+      "description": "新增页面未登记到状态清单时覆盖检查失败。验证：临时新增一个未登记页面时的失败输出，撤销后通过。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T43-A03",
+      "task": "T43",
+      "description": "transcript 每种行类型都有可访问名称，中英文各自正确。验证：组件测试断言可访问名称。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T43-A04",
+      "task": "T43",
+      "description": "100 token/s 流式输出期间 live region 按节流间隔更新、不逐字更新，回合结束时播报一次结果。验证：测试（假时钟统计更新次数）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T43-A05",
+      "task": "T43",
+      "description": "审批卡出现时焦点移到卡片容器并播报；输入法合成期间推迟移动焦点；卡片出现后 400 ms 内键盘激活无效。验证：Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T43-A06",
+      "task": "T43",
+      "description": "只用键盘完成新建会话、发送消息、处理四类审批卡、打开 Changes 并发表评论、修改一项设置、进入与离开终端面板；焦点顺序符合设计，焦点环始终可见，对话框关闭后焦点回到触发元素。验证：Playwright 键盘流程用例与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T43-A07",
+      "task": "T43",
+      "description": "`prefers-reduced-motion` 与应用内开关关闭动效；`prefers-contrast: more` 使用高对比度令牌；`forced-colors: active` 下使用系统颜色，状态信息不只靠颜色表达。验证：Playwright 媒体模拟用例与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T43-A08",
+      "task": "T43",
+      "description": "两种语言键集合不一致、代码引用不存在的键、占位符不一致或出现硬编码的用户可见字符串时 verify 失败。验证：临时删除一个英文键、临时写入一个硬编码字符串时的失败输出，撤销后通过。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T43-A09",
+      "task": "T43",
+      "description": "主要页面在中文与英文下无截断与溢出。验证：两种语言的截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T43-A10",
+      "task": "T43",
+      "description": "`docs/engineering/accessibility.md` 包含读屏核对清单，VoiceOver 一列逐项有结论，需要用户操作的项注明。验证：文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T43-A11",
+      "task": "T43",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T44-A01",
+      "task": "T44",
+      "description": "第 11 章除 Beta 期崩溃率外的每项指标都有自动化测量与阈值配置；第 11 章新增一行而没有对应测量时覆盖检查失败。验证：`docs/engineering/performance.md` 的对照表，以及临时在第 11 章加一行时检查失败的输出，撤销后通过。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T44-A02",
+      "task": "T44",
+      "description": "PR 流水线运行性能冒烟，Nightly 在 macOS 与 Windows 运行完整测量与缩短版长跑，工作流文件语法有效。验证：工作流文件与 actionlint（或 YAML 解析）输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T44-A03",
+      "task": "T44",
+      "description": "指标超出绝对预算或相对基线回归超过 10% 时，性能检查失败并给出指标、预算、基线值与当前值。验证：临时在事件转发路径加入延迟时的失败输出，撤销后通过。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T44-A04",
+      "task": "T44",
+      "description": "在同一提交上连续运行 PR 性能冒烟 5 次全部通过。验证：5 次运行的输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T44-A05",
+      "task": "T44",
+      "description": "本机（记录机型与系统版本，与基准机型不同时注明）全部可测指标的实测值写入性能文档，逐项标明是否达到第 11 章预算。验证：`docs/engineering/performance.md`。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T44-A06",
+      "task": "T44",
+      "description": "8 小时长跑在稳态后主进程、渲染进程、Agent Host 的内存增长都 ≤ 10%。验证：长跑报告与采样数据。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T44-A07",
+      "task": "T44",
+      "description": "空闲 CPU 已定成具体阈值并写入第 11 章；窗口隐藏时渲染进程无 rAF 回调、终端不产生帧。验证：测试输出与文档改动。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T44-A08",
+      "task": "T44",
+      "description": "收紧的预算已更新第 11 章、递增架构版本号并写修订记录；未达标项已登记到 PLAN。验证：文档 diff 与 `PLAN.md` 登记事项。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T44-A09",
+      "task": "T44",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T45-A01",
+      "task": "T45",
+      "description": "`tests/security/threats.yaml` 为第 10.1 节 13 行威胁各分配编号，每条可自动化对策至少映射一个测试 ID，每条威胁至少一个测试；删除一条映射或引用不存在的测试时 verify 失败。验证：临时删除一条映射时的失败输出，撤销后通过。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T45-A02",
+      "task": "T45",
+      "description": "映射引用的全部测试在 macOS 与 Windows CI 上通过，`docs/security/threat-coverage.md` 由脚本生成且与测试结果一致。验证：CI 输出与生成命令。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T45-A03",
+      "task": "T45",
+      "description": "仓库文件、WebFetch 内容、MCP 返回内容诱导执行破坏性命令时，命令进入审批且审批卡显示完整命令；关键路径删除在沙箱自动批准与 `bypassPermissions` 模式下仍询问。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T45-A04",
+      "task": "T45",
+      "description": "\"全量恶意仓库\"夹具在信任前零执行（无 hook、无 MCP 连接、无插件与扩展加载、项目 allow 规则不生效）；信任后新增的可执行项在再次确认前不运行。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T45-A05",
+      "task": "T45",
+      "description": "Electron 安全清单按锁定版本的官方文档逐条复核，每条有落实方式与测试 ID。验证：`docs/security/electron-checklist.md`。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T45-A06",
+      "task": "T45",
+      "description": "cargo-audit、npm audit 与许可证检查没有未处理的高危与严重问题，例外项写明理由与复查日期。验证：命令输出与例外清单。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T45-A07",
+      "task": "T45",
+      "description": "已知凭据值、常见密钥格式与 Bearer token 写入日志时被替换为占位符；Agent Host 与 Bash 子进程的环境变量中没有凭据。验证：测试（注入已知密钥后扫描日志文件与子进程环境）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T45-A08",
+      "task": "T45",
+      "description": "诊断包导出前展示文件清单与脱敏摘要，用户确认后才写出；导出包中没有凭据、保险箱文件与会话内容，主目录路径替换为 `~`。验证：测试（扫描导出包）与 Playwright 截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T45-A09",
+      "task": "T45",
+      "description": "全新配置下遥测关闭；一次完整 mock 会话中，应用只向 mock provider 与测试配置的 MCP server 发起连接，其余外连已关闭或在报告中逐项说明。验证：测试（连接记录断言）与报告。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T45-A10",
+      "task": "T45",
+      "description": "扩充后的 XSS 载荷集在交付物 5 列出的全部渲染面上以文本呈现，无脚本执行、无导航。验证：安全回归测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T45-A11",
+      "task": "T45",
+      "description": "preload 的每个命令以畸形参数调用时返回结构化错误且主进程存活；\"总是允许\"类规则的修改只能经主进程原生确认框完成。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T45-A12",
+      "task": "T45",
+      "description": "打包产物上 `ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`--inspect` 不生效。验证：打包产物测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T45-A13",
+      "task": "T45",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T46-A01",
+      "task": "T46",
+      "description": "设计增补 `docs/architecture/addenda/T46-auto-mode.md` 覆盖输入与输出、审查策略、失败处理、审计、成本、与规则和模式的关系、启用与作用域七节，并列出需要确认的要点；用户已确认。验证：增补文件与用户确认记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T46-A02",
+      "task": "T46",
+      "description": "Auto 模式下，审查模型返回允许、拒绝、不确定时，分别执行工具调用、拒绝并把理由回给模型、转为人工审批卡。验证：L2 场景与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T46-A03",
+      "task": "T46",
+      "description": "审查超时、服务商返回错误、输出无法解析、结论不在枚举内四种情况都转为人工审批，工具调用不执行。验证：L2 场景（故障注入）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T46-A04",
+      "task": "T46",
+      "description": "命中 deny 规则时直接拒绝、命中 ask 规则时转人工审批，两种情况下 mock provider 都没有收到审查请求；增补列为\"始终询问\"的类别同样不发审查请求。验证：L2 场景与请求记录断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T46-A05",
+      "task": "T46",
+      "description": "项目级 `.piarc/settings*.json` 与 `.claude/settings*.json` 不能开启 Auto 模式，也不能设置审查模型、审查策略与可信基础设施；这些键在配置诊断中标为\"已忽略\"。验证：测试与配置诊断输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T46-A06",
+      "task": "T46",
+      "description": "审查请求的结构符合增补的输入规格：必含段落与排除内容各至少一条断言通过。验证：mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T46-A07",
+      "task": "T46",
+      "description": "连续拒绝达到增补规定的阈值后回退为人工审批，并在界面提示。验证：L2 场景与 Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T46-A08",
+      "task": "T46",
+      "description": "每次审查写入审计表，字段与增补一致；设置中的审计页可筛选\"审查模型决定\"。验证：测试与 Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T46-A09",
+      "task": "T46",
+      "description": "审查调用的 token 与成本计入用量统计，并单列为\"审查\"一类。验证：测试（价格表注入）与 Playwright 截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T46-A10",
+      "task": "T46",
+      "description": "子 agent 的工具调用按增补规定处理；适用时审计记录标明来源子 agent。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T46-A11",
+      "task": "T46",
+      "description": "模式菜单在未开启时不可选并说明原因；开启后可选\"自动审查\"；transcript 中放行与拒绝的调用带标识和可展开的理由；审查模型不可用时环境栏显示状态。验证：Playwright 与截图（`tmp/evidence/T46/`，亮/暗）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T46-A12",
+      "task": "T46",
+      "description": "审查提示词位于单一文件且为原创，报告附逐段的原创性自查记录。验证：文件与自查记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T46-A13",
+      "task": "T46",
+      "description": "`npm run verify` 通过（含 Windows CI 上的 L2 场景）。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T47-A01",
+      "task": "T47",
+      "description": "设计增补覆盖记忆存储、记忆写入、记忆注入、用户可见性、托管格式、交付方式、Claude Code 兼容、异常与变更八部分，并列出需要确认的要点；用户已确认。验证：增补文件与用户确认记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T47-A02",
+      "task": "T47",
+      "description": "agent 写入记忆后，索引与主题文件出现在增补规定的位置，审计记录写入会话，transcript 显示\"已保存记忆\"。验证：L2 场景与 Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T47-A03",
+      "task": "T47",
+      "description": "新会话的 system prompt 第 4 段包含索引且遵守长度上限，主题文件只在读取后进入上下文；压缩后的请求重新包含索引。验证：mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T47-A04",
+      "task": "T47",
+      "description": "同一仓库的不同 worktree 共享记忆，不同仓库互相隔离。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T47-A05",
+      "task": "T47",
+      "description": "用户可在设置中浏览、编辑、删除记忆；关闭自动记忆后，请求中不含记忆，写入工具不出现在工具列表中。验证：Playwright 与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T47-A06",
+      "task": "T47",
+      "description": "记忆的读写与导入过程中，`.claude/` 与 `~/.claude/` 下没有任何写入。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T47-A07",
+      "task": "T47",
+      "description": "托管层的值在会话、项目、用户各层同时设置同一键时胜出；列表键合并且托管 deny 生效。验证：测试矩阵。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T47-A08",
+      "task": "T47",
+      "description": "开启\"只允许托管 hooks\"后，用户、项目与插件的 hooks 不执行且写入审计，托管 hooks 照常执行。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T47-A09",
+      "task": "T47",
+      "description": "增补定义为\"非管理员来源\"的位置中的配置不获得托管优先级。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T47-A10",
+      "task": "T47",
+      "description": "Claude Code 托管文件（macOS 与 Windows 两套路径布局的夹具）被读取，支持的键生效，其余键在配置诊断中列为\"已忽略\"。验证：测试与 Playwright 截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T47-A11",
+      "task": "T47",
+      "description": "托管文件格式错误时按增补规定处理；托管配置变化后在增补规定的时间内生效，且 `ConfigChange` hook 不能阻断托管来源的变化。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T47-A12",
+      "task": "T47",
+      "description": "设置界面中被托管锁定的项显示锁定标识且不可编辑。验证：Playwright 与截图（`tmp/evidence/T47/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T47-A13",
+      "task": "T47",
+      "description": "`npm run verify` 通过（含 Windows CI 上的注册表读取测试）。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T48-A01",
+      "task": "T48",
+      "description": "对支持的 Anthropic 模型开启服务端策略后，请求带上配置的 context editing 或 compaction 参数，客户端压缩不触发；关闭时或非 Anthropic 模型沿用客户端压缩。验证：mock provider 请求断言（两种线格式各一个场景）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T48-A02",
+      "task": "T48",
+      "description": "服务端策略返回错误或模型不支持时退回客户端压缩并提示用户。验证：L2 场景（故障注入）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T48-A03",
+      "task": "T48",
+      "description": "服务端压缩后的会话重启恢复，恢复后的请求前缀与历史一致，本地 JSONL 未被改写。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T48-A04",
+      "task": "T48",
+      "description": "fork 子 agent 首个请求的 system 与工具定义和父会话最近一次请求逐字节一致，消息前缀等于父会话截至 fork 点的历史，缓存断点符合第 6.15 节。验证：mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T48-A05",
+      "task": "T48",
+      "description": "fork 子 agent 不能再 fork；其编辑可回退；其审批在主会话显示并标明来源。验证：L2 场景与 Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T48-A06",
+      "task": "T48",
+      "description": "`context: fork` 的 skill 在子 agent 中运行，`agent` 与 `background` 字段生效，主会话请求中不含 skill 正文。验证：L2 场景与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T48-A07",
+      "task": "T48",
+      "description": "配置 WorktreeCreate/WorktreeRemove hook 后，worktree 路径取自 hook 输出，非 0 退出使创建或移除失败并显示原因。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T48-A08",
+      "task": "T48",
+      "description": "PreModelSwitch 的输入含原模型、目标模型、上下文 token、缓存状态与估算成本，拒绝时切换取消、询问时显示确认；PostModelSwitch 的 `additionalContext` 出现在下一个请求中。验证：L2 场景与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T48-A09",
+      "task": "T48",
+      "description": "审查模型拒绝时触发 PermissionDenied；hook 返回 `retry: true` 时，给模型的工具结果说明可以重试。验证：L2 场景与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T48-A10",
+      "task": "T48",
+      "description": "MCP elicitation 表单与 URL 两种模式可完成接受、拒绝、取消，Elicitation hook 可代答或阻断，ElicitationResult 可修改回答；pi-mcp 锁定版本不支持时，上游 issue 已按规则处理、`PLAN.md` 已登记、MCP 设置页显示\"暂不支持\"，本项标 `blocked` 并写明原因。验证：L2 场景与 Playwright，或登记记录与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T48-A11",
+      "task": "T48",
+      "description": "本任务新增的能力全部登记在 `tests/capabilities.yaml`，生成的 `capabilities.md` 中除已登记的上游阻塞项外没有 MISSING。验证：生成命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T48-A12",
+      "task": "T48",
+      "description": "`npm run verify` 通过（含 Windows CI 上的 L2 场景）。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T49-A01",
+      "task": "T49",
+      "description": "侧边对话的请求包含主会话当前已完成的历史。验证：mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T49-A02",
+      "task": "T49",
+      "description": "一次侧边对话问答前后，主会话的 JSONL 字节不变，主会话下一个请求中不含侧边对话的任何内容。验证：文件比对与 mock provider 请求断言。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T49-A03",
+      "task": "T49",
+      "description": "侧边对话中模型发出工具调用时，工具不执行，Core 没有收到 fs、exec 或审批请求。验证：L2 场景。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T49-A04",
+      "task": "T49",
+      "description": "主会话运行中打开侧边对话并完成问答，主会话的回合事件与排队项不受影响。验证：Playwright 与 mock provider。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T49-A05",
+      "task": "T49",
+      "description": "快捷键与 `/btw` 都能打开侧边对话，快捷键可自定义，关闭后内容丢弃。验证：Playwright 与截图（`tmp/evidence/T49/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T49-A06",
+      "task": "T49",
+      "description": "侧边对话的 token 用量计入统计并单独列出。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T49-A07",
+      "task": "T49",
+      "description": "App Intents 可行性结论已写入 `docs/engineering/app-intents.md`；不可行时 ADR 提议已写。验证：文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T49-A08",
+      "task": "T49",
+      "description": "App Intents 原生模块在 macOS CI 上构建并打入应用包，ad-hoc 重签后应用正常启动，fuse 检查通过。验证：CI 输出与 `check-fuses.mjs` 输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T49-A09",
+      "task": "T49",
+      "description": "用户在\"快捷指令\"中能看到 PiArc 的动作，运行\"新建会话\"后 PiArc 打开对应工作区并预填文字，未自动发送。验证：用户实机操作记录与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T49-A10",
+      "task": "T49",
+      "description": "App Intents 与跳转列表触发的启动只预填输入，不发送消息。验证：测试。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T49-A11",
+      "task": "T49",
+      "description": "跳转列表条目的生成与启动参数路由有单元测试，并在 Windows CI 上通过；实机显示与点击由 W4 验证。验证：Windows CI 测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T49-A12",
+      "task": "T49",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T50-A01",
+      "task": "T50",
+      "description": "发布流水线包含四个目标的构建、ad-hoc 重签、Velopack 打包、fuse 检查、Defender 扫描、清单、受保护环境中的签名与草稿发布；actionlint 通过，第三方 action 全部按提交 SHA 固定。验证：actionlint 输出与检查结果。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T50-A02",
+      "task": "T50",
+      "description": "签名私钥只在需要维护者审批的受保护环境中的签名作业里引用，其他作业与 PR 流水线引用时 `check-workflow-secrets.mjs` 失败。验证：脚本输出（含一次临时违规演示）与 `gh api` 读取的环境保护设置。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T50-A03",
+      "task": "T50",
+      "description": "一次完整的草稿发布已产生且未公开：四个目标的产物、清单、签名、`THIRD_PARTY_NOTICES` 齐全，`verify-release.mjs` 对下载的文件校验签名与哈希全部通过。验证：`gh release view --json isDraft,assets` 输出与脚本输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T50-A04",
+      "task": "T50",
+      "description": "macOS 在启动时与每 24 小时检查一次更新；有新版本时显示版本号与说明，安全更新单独标明，点击后打开下载页。验证：测试（时钟注入）与 Playwright 截图（`tmp/evidence/T50/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T50-A05",
+      "task": "T50",
+      "description": "清单签名错误、文件哈希不符、清单版本不高于当前版本三种情况下，macOS 不提示新版本，Windows 不应用更新，签名失败被记录。验证：两个平台的测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T50-A06",
+      "task": "T50",
+      "description": "Windows 更新路径在应用前验证清单签名与更新包哈希，失败时中止并删除已下载的包。验证：Windows CI 测试输出（本地更新源夹具）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T50-A07",
+      "task": "T50",
+      "description": "`THIRD_PARTY_NOTICES` 覆盖交付物 5 列出的全部组件；临时移除一个组件的许可证条目时检查脚本失败。验证：脚本输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T50-A08",
+      "task": "T50",
+      "description": "\"关于\"页显示的六项版本与构建提交和锁文件、`package.json`、`Cargo.toml` 中的值一致，可查看第三方许可证全文。验证：测试与 Playwright 截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T50-A09",
+      "task": "T50",
+      "description": "README 与发布说明模板包含两个平台的首次运行指引、公钥与手动校验步骤；按 README 的步骤手动校验一次草稿发布中的产物成功。验证：文件内容与命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T50-A10",
+      "task": "T50",
+      "description": "`release.md` 与 `electron-upgrade.md` 覆盖交付物 6 列出的要点。验证：两份文档的章节标题。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T50-A11",
+      "task": "T50",
+      "description": "草稿发布的流水线中 Defender 扫描无检出；有检出时已按 `release.md` 提交误报样本并记录。验证：作业日志。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T50-A12",
+      "task": "T50",
+      "description": "`npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T51-A01",
+      "task": "T51",
+      "description": "S1–S9 各有一个驱动打包应用的端到端用例，在 macOS 上全部通过。验证：Playwright 报告与截图（`tmp/evidence/T51/macos/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T51-A02",
+      "task": "T51",
+      "description": "同一套用例在 Windows 上全部通过。验证：Playwright 报告与截图（`tmp/evidence/T51/windows/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T51-A03",
+      "task": "T51",
+      "description": "每个场景的手工步骤在两个平台各执行一次，结果记入验收报告。验证：报告中的记录（日期、平台、结果）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T51-A04",
+      "task": "T51",
+      "description": "两个平台的干净环境中，用户按 README 完成首次安装与打开，结果记入验收报告。验证：用户实机操作记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T51-A05",
+      "task": "T51",
+      "description": "两个平台 CI 生成的 `capabilities.md` 中没有 MISSING，`--milestone M5` 不列出任何 `planned` 能力；`blocked` 能力逐条列在已知问题列表中并注明登记事项编号。验证：生成命令与检查命令的输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T51-A06",
+      "task": "T51",
+      "description": "发布候选提交在 macOS 基准机上满足第 11 章全部预算。验证：测量输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T51-A07",
+      "task": "T51",
+      "description": "发布候选提交在 Windows 基准机上满足第 11 章全部预算。验证：测量输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T51-A08",
+      "task": "T51",
+      "description": "发布候选产物的 fuse 检查、清单签名与哈希校验、Electron 安全清单复核、威胁表测试全部通过，依赖审计无未处理高危。验证：各脚本与测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T51-A09",
+      "task": "T51",
+      "description": "阻塞 Beta 的缺陷全部修复，每个修复有先失败后通过的回归测试。验证：缺陷清单、提交与测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T51-A10",
+      "task": "T51",
+      "description": "`docs/beta/known-issues.md` 中每条问题都有平台、严重度、影响、规避方法、跟踪位置，发布说明模板已链接。验证：文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T51-A11",
+      "task": "T51",
+      "description": "`docs/beta/T51-acceptance-report.md` 的\"场景 × 平台\"矩阵每格都有结果与证据位置，两个平台使用同一个提交。验证：文件内容与提交哈希。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "T51-A12",
+      "task": "T51",
+      "description": "macOS 与 Windows 上 `npm run verify` 都通过。验证：两个平台的命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W0-A01",
+      "task": "W0",
+      "description": "机器信息（CPU、内存、Windows 版本与构建号、架构）已记录在各报告的 Windows 部分，并与第 11 章基准机型对照。验证：报告内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W0-A02",
+      "task": "W0",
+      "description": "S1：T09 的自动化测试在 Windows 上通过；流式、滚动、冷加载、内存的测量数据已记录并与第 11 章预算对照。验证：测试与测量输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W0-A03",
+      "task": "W0",
+      "description": "S1：微软拼音合成期间 Enter、Esc、`/`、`@` 不触发业务；日文输入法已验证，或注明\"未验证\"及原因。验证：用户核对记录与截图（实机关口）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W0-A04",
+      "task": "W0",
+      "description": "S2：win32-x64 在开发模式与打包产物中加载 `.node`；完整基准无丢失无乱序，主进程事件循环延迟 p99 ≤ 16 ms，同步调用 p99 ≤ 1 ms。验证：基准输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W0-A05",
+      "task": "W0",
+      "description": "S5：凭据管理器中主密钥的创建、读取、删除与错误路径通过，测试条目已清理；Windows 数据目录的无明文扫描通过。验证：测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W0-A06",
+      "task": "W0",
+      "description": "S6：Velopack 安装包按用户安装、不弹 UAC，启动后经 Job Object 运行 Agent Host 并完成一轮 mock 对话，卸载后无残留；体积与 Defender 表现已记录。验证：测试输出、截图与报告。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W0-A07",
+      "task": "W0",
+      "description": "S6：SmartScreen 放行流程的每一步与结果已记录；智能应用控制的当前状态与表现已记录，用户的安全设置未被更改。验证：用户操作记录（实机关口）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W0-A08",
+      "task": "W0",
+      "description": "S6：相邻两个版本之间的 Velopack 更新机制可行性有结论。验证：操作记录与报告。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W0-A09",
+      "task": "W0",
+      "description": "S7：选定的 MSVC 链接方式在打包产物中可用；ConPTY 下启动、调整尺寸、Ctrl+C、终止进程正常；TUI 截图正确；formatter 与帧逐格一致的测试通过。验证：测试输出与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W0-A10",
+      "task": "W0",
+      "description": "S7：键入回显额外延迟 p95 ≤ 5 ms；输出 100 MB 期间主进程事件循环延迟 p99 ≤ 16 ms；微软拼音的候选框与预编辑位置有结论。验证：测量输出与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W0-A11",
+      "task": "W0",
+      "description": "win32-arm64：`.node` 与 libghostty-vt 在 arm64 实机上加载运行，或注明\"未验证\"并列为 R1 跟进项。验证：测试输出或报告。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W0-A12",
+      "task": "W0",
+      "description": "S8：Job Object 终止多级进程树后无残留；结束主进程后 Agent Host 及其子进程全部退出。验证：测试输出与进程列表。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W0-A13",
+      "task": "W0",
+      "description": "T02–T12 中因\"需要 Windows\"而 `blocked` 的验收项都已在 Windows 上验证并按协议关闭，或写明仍无法关闭的原因。验证：`acceptance.json` 中的 `evidence` 与看板状态。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W0-A14",
+      "task": "W0",
+      "description": "发现的平台问题都已修复（附失败测试）、提出 ADR 或登记到 `PLAN.md`；S1、S2、S5、S6、S7、S8 报告的 Windows 部分与 `docs/spikes/README.md` 已更新。验证：提交记录与文件内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W0-A15",
+      "task": "W0",
+      "description": "Windows 上 `npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W1-A01",
+      "task": "W1",
+      "description": "报告记录了平台（`win32`）、Windows 版本、架构与验收时的提交号。验证：报告内容与命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W1-A02",
+      "task": "W1",
+      "description": "与 R2 相同的服务商组合在 Windows 上完成\"读代码 → 改代码 → 跑测试\"完整任务，工作区路径含空格与中文。验证：会话记录、测试通过输出与截图（`tmp/evidence/W1/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W1-A03",
+      "task": "W1",
+      "description": "本机运行的 L2 场景不少于 20 个且全部通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W1-A04",
+      "task": "W1",
+      "description": "Git Bash 被探测并用于 `Bash` 工具；隐藏 Git Bash 后出现安装提示且只提供 `PowerShell`；`PowerShell` 工具可执行且 Manual 下询问。验证：测试输出与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W1-A05",
+      "task": "W1",
+      "description": "盘符、UNC、含空格与中文、超过 260 字符的路径和保留文件名在文件工具中行为正确；CRLF 文件经 Edit 后换行风格不变；命令输出中的中文不乱码。验证：测试输出与核对记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W1-A06",
+      "task": "W1",
+      "description": "命令超时与停止时整棵进程树被终止，无残留进程。验证：测试输出与 `tasklist` 核对结果。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W1-A07",
+      "task": "W1",
+      "description": "主密钥存于凭据管理器，重启应用后凭据可读；数据目录位于 `%LOCALAPPDATA%\\PiArc\\`；数据目录与日志中无明文凭据。验证：测试、目录检查与明文扫描输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W1-A08",
+      "task": "W1",
+      "description": "微软拼音输入法合成期间 Enter、Esc、`/`、`@` 不触发业务，候选上屏正确。验证：CDP 合成事件的自动化测试与用户实机操作记录（截图）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W1-A09",
+      "task": "W1",
+      "description": "窗口不在前台时回合完成与等待审批都弹出系统通知，任务栏覆盖图标显示计数。验证：截图与用户确认记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W1-A10",
+      "task": "W1",
+      "description": "Mica 背景与标题栏覆盖层在亮色与暗色下显示正确。验证：截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W1-A11",
+      "task": "W1",
+      "description": "Electron 应用的 Playwright 流程用例在 Windows 本机全部通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W1-A12",
+      "task": "W1",
+      "description": "发现的平台问题已修复并带回归测试，或已登记；`docs/reviews/W1-windows-m1-parity.md` 逐条给出 M1 退出标准的 Windows 证据与结论。验证：报告与登记事项内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W1-A13",
+      "task": "W1",
+      "description": "Windows 上 `npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W2-A01",
+      "task": "W2",
+      "description": "本机运行 L2 场景全部通过（含 T23–T30 新增的场景），能力清单中 M2 能力无 MISSING。验证：命令输出与 `docs/product/capabilities.md`。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W2-A02",
+      "task": "W2",
+      "description": "Git Bash 下的 Bash 规则与复合命令分析端到端符合预期：deny/ask/allow 用例、包装命令剥离、盘符根与用户目录的关键路径删除总是询问。验证：场景输出与 Playwright 截图（存 `tmp/evidence/W2/`）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W2-A03",
+      "task": "W2",
+      "description": "`PowerShell(…)` 规则精确匹配生效，未被精确允许的命令在 Manual 模式下询问，\"总是允许\"写入的规则能再次命中。验证：Playwright 与场景输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W2-A04",
+      "task": "W2",
+      "description": "hooks 超时与取消时整棵进程树被终止（含 hook 启动的孙进程），exit 2 阻断且理由回到模型。验证：实机测试输出（进程表前后对比）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W2-A05",
+      "task": "W2",
+      "description": "回退四个选项、冲突检测与按 hunk 丢弃在 CRLF 文件、含空格与中文的路径、超过 260 字符的路径上结果正确；目标文件被占用时给出明确提示且文件不损坏。验证：场景测试与 Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W2-A06",
+      "task": "W2",
+      "description": "阈值触发压缩、`/compact` 重点、熔断与重注入在本机通过，用量环显示正确。验证：L2 场景输出与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W2-A07",
+      "task": "W2",
+      "description": "配置兼容层读取 `%USERPROFILE%\\.claude\\settings.json` 与 `%USERPROFILE%\\.claude.json`，`.claude/rules` 的 `paths:` 条件在 Windows 路径上生效，诊断页显示正确。验证：测试与 Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W2-A08",
+      "task": "W2",
+      "description": "计划模式、任务清单、AskUserQuestion、下一步建议与三档视图的界面流程在 Windows 上通过。验证：Playwright（Windows）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W2-A09",
+      "task": "W2",
+      "description": "WebFetch 在 Windows 上拒绝回环、内网与 IPv6 本地地址；OAuth 与设备码登录经回环端口完成（mock 授权服务器）；外部修改检测经文件监听生效。验证：测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W2-A10",
+      "task": "W2",
+      "description": "权限与 hooks 场景的 L3 比对在 Windows 上无未解释差异；未安装 Claude Code CLI 且用户不同意安装时，`PLAN.md` 中记录为未验证及原因。验证：L3 命令输出或 `PLAN.md` 记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W2-A11",
+      "task": "W2",
+      "description": "发现的平台问题都已修复（附复现的失败测试）或登记到 `PLAN.md`\"登记事项\"；`docs/reviews/W2-windows-m2-parity.md` 逐条给出 M2 退出标准与 R3 重点核对项的 Windows 证据与结论，并列出 T23–T30 中等待 Windows 的验收项的结论。验证：报告、提交记录与登记事项内容。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W2-A12",
+      "task": "W2",
+      "description": "Windows 上 `npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W3-A01",
+      "task": "W3",
+      "description": "3 个并行会话 + 子 agent 场景下，各进程内存满足第 11 章预算（M3 退出标准）。验证：测量输出（含机器配置）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W3-A02",
+      "task": "W3",
+      "description": "ConPTY 下 PowerShell、Git Bash 及其中的交互程序渲染正确，窗口缩放后重排正确，Ctrl+C 有选区时复制、无选区时发给终端，snapshot 在重启后恢复。验证：截图与测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W3-A03",
+      "task": "W3",
+      "description": "微软拼音在终端与 composer 中的预编辑文本和候选框位置正确，合成期间 Enter、Esc 不触发业务。验证：截图与操作记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W3-A04",
+      "task": "W3",
+      "description": "终端键入回显额外延迟 p95 ≤ 5 ms，大量输出期间主进程事件循环延迟 p99 ≤ 16 ms。验证：测量输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W3-A05",
+      "task": "W3",
+      "description": "没有系统 Node 时，npx 类 MCP server 由内置 Node 启动，两个会话共享同一 server 进程。验证：进程路径与测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W3-A06",
+      "task": "W3",
+      "description": "worktree 在含空格与中文的路径、超过 260 字符的路径下创建、使用与清理成功，盘符大小写不同的同一仓库共享信任与规则。验证：场景测试与操作记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W3-A07",
+      "task": "W3",
+      "description": "关闭窗口后应用在托盘常驻，图标计数与运行中、等待审批的会话数一致，可从托盘恢复窗口。验证：截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W3-A08",
+      "task": "W3",
+      "description": "两个窗口同时显示同一审批时只接受第一个答复且另一窗口同步更新；`piarc://` 链接与资源管理器右键菜单打开文件夹可用。验证：Windows 上的 Playwright 输出与操作记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W3-A09",
+      "task": "W3",
+      "description": "第 11 章全部可自动测量的指标已在 Windows 实机测量并写入 `docs/engineering/performance.md`，未达标项已登记。验证：性能文档的 Windows 一节。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W3-A10",
+      "task": "W3",
+      "description": "Narrator 与 NVDA 按读屏核对清单逐项有结论，高对比度主题下界面可用。验证：`docs/engineering/accessibility.md` 的 Windows 结论与截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W3-A11",
+      "task": "W3",
+      "description": "发现的平台问题都有处理：已修复（附复现测试或复现步骤）或已登记（附建议归属）。验证：问题清单与 `PLAN.md` 登记事项。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W3-A12",
+      "task": "W3",
+      "description": "Windows 上 `npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W4-A01",
+      "task": "W4",
+      "description": "T45 威胁表映射的测试在 Windows 实机上全部通过，诊断包脱敏覆盖 Windows 用户目录路径。验证：测试输出（列出测试 ID）。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W4-A02",
+      "task": "W4",
+      "description": "第 11 章全部指标在 Windows 基准机上达标，8 小时长跑稳态后内存增长不超过 10%，数据写入性能报告。验证：测量输出与报告。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W4-A03",
+      "task": "W4",
+      "description": "沙箱\"不可用\"提示在设置页与开关处显示；超时、停止、KillShell 后无残留进程。验证：截图与测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W4-A04",
+      "task": "W4",
+      "description": "插件与 Pi 包在含空格与中文的路径下安装并加载，`--ignore-scripts` 生效，配置诊断显示 Windows 路径。验证：L2 场景与 Playwright。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W4-A05",
+      "task": "W4",
+      "description": "CwdChanged、FileChanged 场景通过；Toast 中的允许与拒绝经审批账本生效，多窗口下只接受第一个答复。验证：测试输出与实机截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W4-A06",
+      "task": "W4",
+      "description": "axe 零违规（亮/暗），键盘全流程通过，强制颜色模式下界面可用；Narrator 与 NVDA 核对清单逐项有结论。验证：Playwright 输出、截图与用户实机操作记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W4-A07",
+      "task": "W4",
+      "description": "Auto 模式、自动记忆、托管配置（`HKLM` 与兼容文件）在 Windows 上行为与 macOS 一致，测试写入的系统位置已删除。验证：L2 场景输出与实机记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W4-A08",
+      "task": "W4",
+      "description": "T48 的场景在 Windows 实机上通过（阻塞项状态与 T48 一致），WorktreeCreate 使用 Windows 路径。验证：测试输出。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W4-A09",
+      "task": "W4",
+      "description": "侧边对话在 Windows 上通过 Playwright 用例；跳转列表显示最近工作区与任务，点击后在已运行实例中打开且只预填输入。验证：Playwright 输出与实机截图。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W4-A10",
+      "task": "W4",
+      "description": "Velopack 从 N 更新到 N+1 前验证签名与哈希，更新后会话、设置与凭据完好；篡改清单与篡改更新包都被拒绝。验证：实机记录与日志。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W4-A11",
+      "task": "W4",
+      "description": "安装与更新过程中 SmartScreen 与 Defender 的表现已记录，用户的安全设置未被改动。验证：实机记录。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W4-A12",
+      "task": "W4",
+      "description": "发现的平台问题已修复（附复现测试）或登记到 `PLAN.md`，给 T51 的已知问题候选列表已写入会话日志。验证：问题清单与提交。",
+      "status": "not_started",
+      "evidence": ""
+    },
+    {
+      "id": "W4-A13",
+      "task": "W4",
+      "description": "Windows 上 `npm run verify` 通过。验证：命令输出。",
+      "status": "not_started",
+      "evidence": ""
+    }
+  ]
+}

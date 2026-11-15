@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.1（2026-11-14） |
+| 版本 | 2.2（2026-11-14） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -361,7 +361,7 @@ PiArc.app/Contents/
 | 权限 | 6 种模式中的 5 种（dontAsk 仅无头）；deny → ask → allow 规则；复合命令感知；结构化审批 | C + K + U | `tool_call` 闸门 | M1 基础、M2 完整 |
 | Hooks | Claude Code 兼容的事件、配置格式、exit code 与 JSON 协议 | C + K | 各生命周期事件 | M2 |
 | 子 agent | `.claude/agents` 定义；进程内子会话；工具子集；任意服务商模型；后台运行；最多 3 层 | K + C + U | SDK 子会话 | M3 |
-| Plan 模式 | 只读探索 → 提交计划 → 用户批准并选择后续模式 | K + C + U | `setActiveTools`、`tool_call` | M2 |
+| Plan 模式 | 只读探索 → 提交计划 → 用户批准并选择后续模式 | K + C + U | `tool_call` 闸门、追加消息 | M2 |
 | 任务清单 / 下一步 | 宿主工具驱动，UI 结构化渲染，压缩后重新注入 | K + U | `registerTool`、工具 details | M2 |
 | 上下文工程 | 分段 system prompt；memory 层级与 `@import`；system-reminder；压缩；缓存友好布局 | K | `before_agent_start`、`context`、`session_before_compact` | M1–M3 |
 | Skills / 命令 | Agent Skills 标准；`.claude/skills`、`.claude/commands`；渐进加载 | K | Pi skills、prompt templates、`resources_discover` | M3 |
@@ -513,7 +513,7 @@ handler 类型：`command`（M2）→ `http`、`prompt`（M3）→ `mcp_tool`（
 
 ### 6.5 Plan 模式、任务清单、下一步、提问
 
-- **Plan 模式**：进入后 Harness Kit 用 `setActiveTools` 收起写工具，`tool_call` 闸门拦截非只读命令；模型用 `ExitPlanMode` 提交计划（Markdown）。客户端显示计划卡与计划面板，用户可行内评论；批准时选择后续模式（自动接受编辑 / 手动审批 / 继续规划）。计划文本保存为会话 entry，压缩后重新注入。
+- **Plan 模式**：进入后**不改动工具列表**：工具定义变化会让 prompt cache 整体失效，并可能让服务商丢弃历史 thinking 块，违反第 6.6.1 节"system 与工具定义保持稳定"的原则。约束靠两层实现：`tool_call` 闸门拒绝写工具与非只读命令，拒绝理由告诉模型当前处于计划模式；进入与退出计划模式各以一条追加消息告知模型。模型用 `ExitPlanMode` 提交计划（Markdown）。客户端显示计划卡与计划面板，用户可行内评论；批准时选择后续模式（自动接受编辑 / 手动审批 / 继续规划）。计划文本保存为会话 entry，压缩后重新注入。
 - **任务清单**：`TodoWrite` 工具的状态存在工具结果的 `details` 中（随分支正确回溯，参照 Pi 官方 `todo.ts` 示例）；Core 从 `item/completed` 中取出状态，客户端渲染任务卡和侧栏任务面板。长时间未更新时，Harness Kit 以 system-reminder 形式提醒模型。
 - **下一步框**：Harness Kit 注册宿主工具（例如 `SuggestNextSteps`），模型在回合结束时调用，客户端渲染为可点击的建议（开始新会话 / 在此执行）。这类"宿主注入的工具"对所有服务商一致生效，借鉴自 OpenClaudeDesktop 的做法。
 - **AskUserQuestion**：结构化问题（单选、多选、自由输入）经 AHP 到客户端表单；可设置超时后按默认继续。
@@ -529,7 +529,7 @@ Harness Kit 在 `before_agent_start` 中通过 Pi 的结构化 prompt 段（`sys
 | 1 | 身份与基础准则 | PiArc 自写的编码 agent 行为准则（按 Tool Profile 可有变体） | 随版本 |
 | 2 | 工具使用准则 | 各工具的使用约束 | 随工具集 |
 | 3 | 输出风格 | 当前 output style 的指令 | 用户切换时 |
-| 4 | 项目上下文 | memory 文件（6.6.2）、rules 索引 | 会话内基本不变 |
+| 4 | 项目上下文 | memory 文件（6.6.2）；没有 `paths:` 条件的 `.claude/rules` 全文（有条件的在处理匹配文件时以 system-reminder 注入） | 会话内基本不变 |
 | 5 | skills 索引 | 名称 + 描述（截断到固定长度） | 会话内基本不变 |
 | 6 | MCP server 说明 | 已连接 server 的 instructions | 连接变化时 |
 | 7 | 环境 | 工作目录、平台、日期、git 状态快照（会话开始时） | 会话开始时 |
@@ -554,7 +554,7 @@ Harness Kit 以带标记的自定义消息（Pi `sendMessage` 的 custom message
 - 使用 Pi 的压缩机制（manual / threshold / overflow 三种触发），通过 `session_before_compact` 替换为 PiArc 自写的摘要提示，并支持用户在 `/compact` 时附加重点说明。
 - 阈值按模型上下文窗口计算，默认在剩余空间低于"预留输出 + 安全余量"时触发（初始公式见 6.15）；用户可设置自动压缩窗口上限（例如对 1M 窗口的模型限定在 300K 以控制成本）。
 - PreCompact hook 可阻断压缩或提供摘要指令；PostCompact 通知。
-- 压缩后重新注入：memory 文件、当前计划、任务清单状态、最近调用的 skill 正文（单个与合计都有 token 上限）、最近读写过的少量文件路径提示。
+- 压缩后重新注入：memory 文件、当前计划、任务清单状态、最近调用的 skill 正文、最近读写过的文件内容。各项上限见第 6.15 节"压缩后恢复"；超出文件上限的部分只给路径提示。
 - 连续多次压缩后上下文立即又满（例如单个超大工具输出）时停止自动压缩并报告，避免空转。
 - 对 Anthropic 模型，服务端 context editing / compaction 作为可选策略（M5），与客户端压缩统一抽象。
 
@@ -658,7 +658,7 @@ Agent Host 按类别统计上下文构成（system prompt、工具定义、MCP �
 | 重复读取 | 文件自上次读取后未变化时，`Read` 返回简短存根而非全文 |
 | 缓存断点 | system prompt 分为静态段与动态段并分别缓存；动态信息走 system-reminder；每个请求只放一个消息级缓存断点（Anthropic）；其他服务商按 pi-ai 的缓存策略 |
 | 子 agent 隔离 | 默认不继承父会话对话历史，只接收任务描述；fork 模式（继承历史、共享缓存）列为 M5 |
-| plan 模式 | 硬拦截：写工具不可见、非只读命令在闸门处拒绝；不能只靠提示词约束 |
+| plan 模式 | 硬拦截：写工具与非只读命令在 `tool_call` 闸门处拒绝；工具列表保持不变以免缓存失效；不能只靠提示词约束 |
 
 ---
 
@@ -676,9 +676,11 @@ crates/
 ├── piarc-config       # 设置分层加载与合并（PiArc + Claude Code 兼容）、项目信任、配置诊断
 ├── piarc-fs           # 文件读写、文件状态表、glob/grep（ignore、grep-searcher）、文件监听（notify）
 ├── piarc-checkpoint   # 内容寻址快照存储、检查点索引、回退与冲突检测
-├── piarc-exec         # 进程管理（进程组 / Job Object）、输出落盘、超时转后台
+├── piarc-ports        # 跨 crate 共享的窄 trait（ProcessSpawner、FileSystem、Clock、SecretStore、AgentHostTransport），只有定义，没有实现
+├── piarc-exec         # 进程管理（进程组 / Job Object，实现 ProcessSpawner）、输出落盘、超时转后台
 ├── piarc-term         # 终端会话：PTY（portable-pty）+ libghostty-vt 终端状态、屏幕快照（ADR-0017）
-├── piarc-sandbox      # macOS Seatbelt 配置生成、本地网络代理；Windows 进程树限制（第 6.10 节）
+├── piarc-ghostty-sys  # libghostty-vt 的 -sys 层：提交入库的 bindgen 绑定、官方预编译产物的下载与校验（ADR-0017）
+├── piarc-sandbox      # macOS Seatbelt 配置生成、本地网络代理；Windows 隔离方案（M4 评估，第 6.10 节）
 ├── piarc-store        # SQLite（rusqlite）：索引、FTS5、审计；Pi JSONL 流式只读解析
 ├── piarc-diff         # diff 计算（similar）、hunk 结构、大 diff 降级、UTF-16 偏移
 ├── piarc-git          # 状态、diff、worktree、分支
@@ -691,7 +693,8 @@ crates/
 
 依赖规则：
 
-- 有向无环：`piarc-napi → piarc-core → {host, policy, hooks, config, fs, checkpoint, exec, term, sandbox, store, diff, git, secrets, telemetry} → piarc-protocol`。功能 crate 之间需要协作时经 `piarc-core` 编排，不互相依赖（`fs → checkpoint` 这类明确的单向依赖除外，需在 crate README 中说明）。
+- 有向无环：`piarc-napi → piarc-core → {host, policy, hooks, config, fs, checkpoint, exec, term, sandbox, store, diff, git, secrets, telemetry} → {piarc-protocol, piarc-ports}`。功能 crate 之间需要协作时经 `piarc-core` 编排，不互相依赖。明确的单向例外逐条登记在 `crates/deps-rules.json` 并附理由，例如 `fs → checkpoint`、`term → ghostty-sys`。
+- 进程启动统一经 `ProcessSpawner`：`piarc-exec` 提供实现（进程组 / Job Object），`piarc-core` 把它注入 `piarc-host`（启动 Agent Host）、`piarc-hooks`（hooks 命令）与沙箱包装后的命令执行，避免各处各写一套进程树管理。
 - 平台相关代码收敛在 trait 后面，按 `cfg(target_os)` 提供实现；新增平台假设必须经 CI 的 Windows 构建检查。
 - I/O 边界用窄 trait 隔离（`ProcessSpawner`、`FileSystem`、`Clock`、`SecretStore`、`AgentHostTransport`），测试用内存实现驱动。
 - 错误类型化：每个 crate 定义 `thiserror` 枚举，带可机读的 `kind` 与 `retryable`；跨 NAPI 和 AHP 时映射为结构化错误，不传裸字符串。
@@ -1267,7 +1270,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 
 ## 16. 路线图与里程碑
 
-退出标准先在 macOS 上验收；Windows 按第 15.1 节的节奏，最迟在下一个里程碑结束前达到同样标准。
+退出标准先在 macOS 上验收；Windows 按第 15.1 节的节奏，最迟在下一个里程碑结束前达到同样标准。里程碑拆分成的任务、依赖、验收项与执行协议见 [`docs/plan/PLAN.md`](../plan/PLAN.md)。
 
 | 里程碑 | 目标 | 退出标准 |
 |---|---|---|
@@ -1278,7 +1281,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | **M4 安全与打磨** | macOS 沙箱；Windows 隔离方案评估；插件；NotebookEdit；可操作的系统通知；配置诊断；无障碍；本地化；性能预算全部进 CI | 安全威胁表逐条有测试；性能预算全部达标 |
 | **M5 Beta** | Auto 模式（可配置审查模型）；自动记忆；企业托管配置；Anthropic 服务端压缩；fork 子 agent；平台快捷操作（App Intents / 跳转列表）；完整发布流水线 | macOS 与 Windows 同时公开 Beta |
 
-终端（ADR-0017）是 M3 中工作量最大的单项，估计 1 人 5.5–7 周。Core 侧的无头终端先做，因为后台任务与 Monitor 依赖它；渲染器与 M3 其他项并行；M0 的 S7 是开工前的闸门，不通过就直接启用 xterm.js 退路。
+终端（ADR-0017）是 M3 中工作量最大的单项，估计 1 人 5.5–7 周。后台任务与 Monitor（T32）先用管道与输出文件实现，无头终端（T33）再加入"终端承载"的任务类型，渲染器（T34）最后接上；M0 的 S7 是开工前的闸门，不通过就直接启用 xterm.js 退路。
 
 **M0 spike 清单**（每项在 macOS 与 Windows 上分别给结论）
 
@@ -1330,5 +1333,6 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | 版本 | 日期 | 说明 |
 |---|---|---|
 | 1.0 | 2026-11-14 | 首版：基于对 Claude 官方文档、Pi v1.4.0 源码、claude-code / claw-code / OpenClaudeDesktop / open-claude-ui 参考实现与原生技术栈的调研 |
+| 2.2 | 2026-11-14 | 制定交付计划时发现并修正的不一致：新增 `piarc-ports`（共享窄 trait）与 `piarc-ghostty-sys` 两个 crate，Job Object 归 `piarc-exec` 并经 `ProcessSpawner` 注入；plan 模式不再用 `setActiveTools` 收起写工具，改为闸门拒绝加追加消息（避免缓存失效，与 6.6.1 一致）；6.6.1 第 4 段明确 rules 的加载方式；6.6.4 的压缩后重注入与 6.15 的上限对齐；第 16 章链接交付计划 |
 | 2.1 | 2026-11-14 | 不做平台代码签名（ADR-0018 取代 ADR-0016，修订 ADR-0015 第 5 条）：macOS 只做 ad-hoc 签名、更新改为提示后手动下载；Windows 不签名、用 Velopack；新增发布清单签名与凭据保险箱；同步更新威胁模型、构建流水线、风险与 M0 S5/S6 |
 | 2.0 | 2026-11-14 | 客户端改为 Electron + React，macOS 与 Windows 同一代码库推进（ADR-0013 取代 ADR-0001、ADR-0007）；Core 改为 NAPI-RS 原生模块（ADR-0014 取代 ADR-0008）；Agent Host 运行时、分发与更新、内置终端分别由 ADR-0015、ADR-0016、ADR-0017 决定；Markdown 与高亮移到渲染进程；Windows 路线并入主线里程碑；新增 Electron 安全加固与对应风险 |

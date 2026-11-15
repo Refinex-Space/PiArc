@@ -43,6 +43,7 @@ Read more:
 - [Requirements](docs/product/REQUIREMENTS.md) (Chinese)
 - [Architecture decision records](docs/adr/README.md) (Chinese)
 - [Research notes and reference sources](docs/research/) (Chinese)
+- [Delivery plan: task board, execution protocol and task prompts](docs/plan/PLAN.md) (Chinese)
 
 ## Repository layout
 

@@ -43,6 +43,7 @@ Agent Host（每个工作区一个 Node 进程）
 - [需求规格](docs/product/REQUIREMENTS.md)
 - [架构决策记录（ADR）](docs/adr/README.md)
 - [调研资料与参考源清单](docs/research/)
+- [交付计划：任务看板、执行协议与任务提示词](docs/plan/PLAN.md)
 
 ## 仓库结构
 
