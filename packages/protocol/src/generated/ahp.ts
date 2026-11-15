@@ -34,7 +34,9 @@ export type ErrorKind =
   | 'invalidParams'
   | 'internalError'
   | 'protocolVersionMismatch'
-  | 'frameTooLarge';
+  | 'frameTooLarge'
+  | 'shuttingDown'
+  | 'busy';
 /**
  * Session identifier.
  */

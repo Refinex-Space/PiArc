@@ -122,6 +122,16 @@
           "const": "frameTooLarge",
           "description": "A frame exceeded the receiver's size limit.",
           "type": "string"
+        },
+        {
+          "const": "shuttingDown",
+          "description": "The receiver is shutting down and no longer accepts requests. Core API only: not\nsent over AHP until a capability introduces it.",
+          "type": "string"
+        },
+        {
+          "const": "busy",
+          "description": "The receiver's queue is full; retrying later can succeed. Core API only: not sent\nover AHP until a capability introduces it.",
+          "type": "string"
         }
       ]
     },

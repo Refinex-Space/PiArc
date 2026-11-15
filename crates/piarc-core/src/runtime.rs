@@ -1,0 +1,474 @@
+//! The Core runtime: a tokio multi-thread runtime started with [`CoreRuntime::start`], the
+//! event path to the client and an ordered shutdown.
+//!
+//! # Shutdown order
+//!
+//! [`CoreRuntime::shutdown`] runs these steps on a dedicated thread, then calls back:
+//!
+//! 1. Stop accepting requests: the state becomes [`RuntimeState::ShuttingDown`] and every
+//!    request fails with [`Error::ShuttingDown`].
+//! 2. Stop the event sources: cancel the root [`CancellationToken`] (long tasks take child
+//!    tokens of it) and wait for the demo sources to end.
+//! 3. Flush the last batch: close the event queue, let the coalescer drain it, deliver the
+//!    rest and wait for the client to finish with it (at most
+//!    [`FINAL_DELIVERY_TIMEOUT`](crate::events::FINAL_DELIVERY_TIMEOUT)).
+//! 4. Release the callback: the coalescer drops the [`EventSink`]. For the NAPI sink this
+//!    releases the `ThreadsafeFunction`, which would otherwise keep Node's event loop alive.
+//! 5. Shut the tokio runtime down and report [`RuntimeState::Stopped`].
+//!
+//! After step 4 the sink is never called again. Dropping a running `CoreRuntime` without
+//! shutting it down cancels everything and stops the runtime in the background, without
+//! the final flush.
+//!
+//! # Panics in tasks
+//!
+//! Tasks are spawned under a supervisor. A panic is not swallowed: it is printed to stderr
+//! and reported as a structured error event on [`ERROR_ROUTE`](crate::route::ERROR_ROUTE).
+
+use std::collections::HashMap;
+use std::future::Future;
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::time::Duration;
+
+use tokio::runtime::{Handle, Runtime};
+use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
+
+use crate::demo::{self, DemoReport, DemoSource, DemoSourceConfig};
+use crate::error::{Error, Result};
+use crate::events::{
+    self, DEFAULT_COALESCE_INTERVAL, DeliveryDone, Event, EventBatch, EventCounters, EventSender,
+    EventSink, EventStats,
+};
+use crate::route::RouteKey;
+
+/// Shortest accepted coalescing interval.
+pub const MIN_COALESCE_INTERVAL: Duration = Duration::from_millis(1);
+
+/// Longest accepted coalescing interval.
+pub const MAX_COALESCE_INTERVAL: Duration = Duration::from_secs(1);
+
+/// Longest payload accepted by [`CoreRuntime::echo`], in bytes.
+pub const MAX_ECHO_BYTES: usize = 64 * 1024;
+
+/// How long the runtime waits for tasks that ignore cancellation before it detaches them.
+const RUNTIME_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(2);
+
+const RUNNING: u8 = 0;
+const SHUTTING_DOWN: u8 = 1;
+const STOPPED: u8 = 2;
+
+/// Settings of the runtime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CoreConfig {
+    /// How often the coalescer may deliver a batch.
+    pub coalesce_interval: Duration,
+}
+
+impl Default for CoreConfig {
+    fn default() -> Self {
+        Self {
+            coalesce_interval: DEFAULT_COALESCE_INTERVAL,
+        }
+    }
+}
+
+impl CoreConfig {
+    /// Checks the limits.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::InvalidArgument`] when the interval is outside
+    /// [`MIN_COALESCE_INTERVAL`]..=[`MAX_COALESCE_INTERVAL`].
+    pub fn validate(&self) -> Result<()> {
+        if (MIN_COALESCE_INTERVAL..=MAX_COALESCE_INTERVAL).contains(&self.coalesce_interval) {
+            Ok(())
+        } else {
+            Err(Error::InvalidArgument {
+                field: "coalesceIntervalMs",
+                reason: format!(
+                    "must be between {} and {} ms",
+                    MIN_COALESCE_INTERVAL.as_millis(),
+                    MAX_COALESCE_INTERVAL.as_millis()
+                ),
+            })
+        }
+    }
+}
+
+/// Lifecycle state of a [`CoreRuntime`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuntimeState {
+    /// Accepting requests.
+    Running,
+    /// [`CoreRuntime::shutdown`] was called; requests are refused.
+    ShuttingDown,
+    /// Shutdown finished: the sink is released and the runtime threads are gone.
+    Stopped,
+}
+
+/// The Core runtime. See the module documentation for the lifecycle.
+pub struct CoreRuntime {
+    shared: Arc<Shared>,
+}
+
+struct Shared {
+    state: AtomicU8,
+    handle: Handle,
+    runtime: Mutex<Option<Runtime>>,
+    events: EventSender,
+    counters: Arc<EventCounters>,
+    cancel: CancellationToken,
+    close_events: CancellationToken,
+    coalescer: Mutex<Option<JoinHandle<()>>>,
+    demo: Mutex<DemoRegistry>,
+    waiters: Mutex<Vec<Box<dyn FnOnce() + Send>>>,
+}
+
+#[derive(Default)]
+struct DemoRegistry {
+    next_id: u32,
+    sources: HashMap<u32, DemoSource>,
+}
+
+/// Locks `mutex`, recovering the data if a panicking thread poisoned it. Every critical
+/// section here leaves the data consistent, so a poisoned lock carries no broken state.
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+impl CoreRuntime {
+    /// Starts the tokio runtime and the event coalescer that delivers batches to `sink`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::InvalidArgument`] for an invalid `config`; [`Error::RuntimeStart`] when the
+    /// tokio runtime cannot be created.
+    pub fn start(config: CoreConfig, sink: Arc<dyn EventSink>) -> Result<Self> {
+        config.validate()?;
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .thread_name("piarc-core")
+            .enable_time()
+            .build()
+            .map_err(|error| Error::RuntimeStart {
+                reason: error.to_string(),
+            })?;
+        let handle = runtime.handle().clone();
+        let close_events = CancellationToken::new();
+        let (events, coalescer, counters) = events::channel(
+            config.coalesce_interval,
+            Arc::clone(&sink),
+            close_events.clone(),
+        );
+        let coalescer_task = handle.spawn(coalescer.run());
+        let supervisor = handle.spawn(async move {
+            if let Err(error) = coalescer_task.await
+                && error.is_panic()
+            {
+                report_coalescer_panic(sink.as_ref(), &*error.into_panic());
+            }
+        });
+        Ok(Self {
+            shared: Arc::new(Shared {
+                state: AtomicU8::new(RUNNING),
+                handle,
+                runtime: Mutex::new(Some(runtime)),
+                events,
+                counters,
+                cancel: CancellationToken::new(),
+                close_events,
+                coalescer: Mutex::new(Some(supervisor)),
+                demo: Mutex::new(DemoRegistry::default()),
+                waiters: Mutex::new(Vec::new()),
+            }),
+        })
+    }
+
+    /// The current lifecycle state.
+    #[must_use]
+    pub fn state(&self) -> RuntimeState {
+        match self.shared.state.load(Ordering::Acquire) {
+            RUNNING => RuntimeState::Running,
+            SHUTTING_DOWN => RuntimeState::ShuttingDown,
+            _ => RuntimeState::Stopped,
+        }
+    }
+
+    /// Counters of the event path.
+    #[must_use]
+    pub fn event_stats(&self) -> EventStats {
+        self.shared.counters.snapshot()
+    }
+
+    /// Validates `route` and `payload` and queues the event `{"echo": payload}` without
+    /// waiting: the lightweight synchronous call used to measure the NAPI call cost. No
+    /// I/O, no lock that is held for long.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::InvalidArgument`] for an invalid route or a payload over
+    /// [`MAX_ECHO_BYTES`]; [`Error::QueueFull`] when the queue is full;
+    /// [`Error::ShuttingDown`] after shutdown started.
+    pub fn echo(&self, route: &str, payload: &str) -> Result<()> {
+        self.ensure_running()?;
+        let route = RouteKey::parse(route)?;
+        if payload.len() > MAX_ECHO_BYTES {
+            return Err(Error::InvalidArgument {
+                field: "payload",
+                reason: format!("must be at most {MAX_ECHO_BYTES} bytes"),
+            });
+        }
+        #[derive(serde::Serialize)]
+        struct Echo<'a> {
+            echo: &'a str,
+        }
+        let event = Event::from_json(route, &Echo { echo: payload })?;
+        self.shared.events.try_send(event)
+    }
+
+    /// Starts a demo event source and returns its id.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::InvalidArgument`] for an invalid config; [`Error::ShuttingDown`] after
+    /// shutdown started.
+    pub fn start_demo_source(&self, config: DemoSourceConfig) -> Result<u32> {
+        config.validate()?;
+        self.ensure_running()?;
+        let mut registry = lock(&self.shared.demo);
+        registry.next_id += 1;
+        let id = registry.next_id;
+        let cancel = self.shared.cancel.child_token();
+        let task = spawn_supervised(
+            &self.shared.handle,
+            &self.shared.events,
+            "demo event source",
+            demo::run(id, config, self.shared.events.clone(), cancel.clone()),
+        );
+        registry.sources.insert(id, DemoSource { cancel, task });
+        Ok(id)
+    }
+
+    /// Stops demo source `id` (or collects it after it reached its event limit) and calls
+    /// `on_stopped` with its report from a runtime thread once it has ended.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::UnknownDemoSource`] when no running or finished source has that id;
+    /// [`Error::ShuttingDown`] after shutdown started (shutdown stops every source).
+    pub fn stop_demo_source(
+        &self,
+        id: u32,
+        on_stopped: impl FnOnce(Result<DemoReport>) + Send + 'static,
+    ) -> Result<()> {
+        self.ensure_running()?;
+        let source = lock(&self.shared.demo)
+            .sources
+            .remove(&id)
+            .ok_or(Error::UnknownDemoSource { id })?;
+        source.cancel.cancel();
+        self.shared.handle.spawn(async move {
+            let report = match source.task.await {
+                Ok(Some(report)) => Ok(report),
+                Ok(None) => Err(Error::Internal {
+                    reason: format!("demo event source {id} panicked"),
+                }),
+                Err(error) => Err(Error::Internal {
+                    reason: format!("demo event source {id} did not finish: {error}"),
+                }),
+            };
+            on_stopped(report);
+        });
+        Ok(())
+    }
+
+    /// Spawns a supervised task that panics, to test that task panics become error events.
+    /// Only the `testing` build of piarc-napi exports it.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::ShuttingDown`] after shutdown started.
+    pub fn spawn_panicking_task(&self) -> Result<()> {
+        self.ensure_running()?;
+        spawn_supervised(
+            &self.shared.handle,
+            &self.shared.events,
+            "test task",
+            async { panic!("panic requested by a test") },
+        );
+        Ok(())
+    }
+
+    /// Starts the ordered shutdown described in the module documentation on a dedicated
+    /// thread and returns at once. `on_stopped` runs once the runtime has stopped; it runs
+    /// immediately when that already happened, and every caller's callback runs when
+    /// several calls overlap.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Internal`] when the shutdown thread cannot be spawned; the runtime is then
+    /// left shutting down and `on_stopped` is dropped without running.
+    pub fn shutdown(&self, on_stopped: impl FnOnce() + Send + 'static) -> Result<()> {
+        let first = self
+            .shared
+            .state
+            .compare_exchange(RUNNING, SHUTTING_DOWN, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok();
+        {
+            let mut waiters = lock(&self.shared.waiters);
+            if self.shared.state.load(Ordering::Acquire) != STOPPED {
+                waiters.push(Box::new(on_stopped));
+                if !first {
+                    return Ok(());
+                }
+            } else {
+                drop(waiters);
+                on_stopped();
+                return Ok(());
+            }
+        }
+        let shared = Arc::clone(&self.shared);
+        std::thread::Builder::new()
+            .name("piarc-core-shutdown".to_owned())
+            .spawn(move || shared.run_shutdown())
+            .map(|_| ())
+            .map_err(|error| Error::Internal {
+                reason: format!("failed to spawn the shutdown thread: {error}"),
+            })
+    }
+
+    /// [`shutdown`](Self::shutdown) and wait for it. Must not be called from a runtime
+    /// thread or from the thread the sink delivers on (the final delivery would wait for
+    /// it).
+    ///
+    /// # Errors
+    ///
+    /// As [`shutdown`](Self::shutdown).
+    pub fn shutdown_blocking(&self) -> Result<()> {
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.shutdown(move || {
+            // The receiver below is alive until the message arrives.
+            let _ = tx.send(());
+        })?;
+        rx.recv().map_err(|_| Error::Internal {
+            reason: "the shutdown thread ended without reporting".to_owned(),
+        })
+    }
+
+    fn ensure_running(&self) -> Result<()> {
+        if self.shared.state.load(Ordering::Acquire) == RUNNING {
+            Ok(())
+        } else {
+            Err(Error::ShuttingDown)
+        }
+    }
+}
+
+impl Shared {
+    fn run_shutdown(&self) {
+        let sources: Vec<DemoSource> = lock(&self.demo).sources.drain().map(|(_, s)| s).collect();
+        let coalescer = lock(&self.coalescer).take();
+        self.handle.block_on(async {
+            self.cancel.cancel();
+            for source in sources {
+                // A source that panicked was already reported by its supervisor.
+                let _ = source.task.await;
+            }
+            self.close_events.cancel();
+            if let Some(coalescer) = coalescer {
+                // The supervisor reports a coalescer panic itself and never panics.
+                let _ = coalescer.await;
+            }
+        });
+        if let Some(runtime) = lock(&self.runtime).take() {
+            runtime.shutdown_timeout(RUNTIME_SHUTDOWN_TIMEOUT);
+        }
+        let waiters = {
+            let mut waiters = lock(&self.waiters);
+            self.state.store(STOPPED, Ordering::Release);
+            std::mem::take(&mut *waiters)
+        };
+        for waiter in waiters {
+            waiter();
+        }
+    }
+}
+
+impl Drop for Shared {
+    fn drop(&mut self) {
+        // Only reached without a completed shutdown: the shutdown thread holds a reference
+        // until it is done.
+        let runtime = self
+            .runtime
+            .get_mut()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take();
+        if let Some(runtime) = runtime {
+            self.cancel.cancel();
+            self.close_events.cancel();
+            runtime.shutdown_background();
+        }
+    }
+}
+
+/// Spawns `future` and a supervisor that reports a panic as an error event. The returned
+/// handle yields `None` when the task panicked or was cancelled.
+fn spawn_supervised<F>(
+    handle: &Handle,
+    events: &EventSender,
+    name: &'static str,
+    future: F,
+) -> JoinHandle<Option<F::Output>>
+where
+    F: Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    let task = handle.spawn(future);
+    let events = events.clone();
+    handle.spawn(async move {
+        match task.await {
+            Ok(value) => Some(value),
+            Err(error) => {
+                if error.is_panic() {
+                    let error = Error::from_panic(name, &*error.into_panic());
+                    report_task_panic(&events, error).await;
+                }
+                None
+            }
+        }
+    })
+}
+
+async fn report_task_panic(events: &EventSender, error: Error) {
+    eprintln!("[piarc-core] {error}");
+    let sent = match Event::from_json(RouteKey::errors(), &error.to_error_object()) {
+        Ok(event) => events.send(event).await,
+        Err(serialize) => Err(serialize),
+    };
+    if let Err(not_sent) = sent {
+        eprintln!("[piarc-core] could not queue the error event: {not_sent}");
+    }
+}
+
+/// The coalescer cannot report its own panic through itself: deliver one out-of-band batch
+/// (sequence 0) straight to the sink.
+fn report_coalescer_panic(sink: &dyn EventSink, payload: &(dyn std::any::Any + Send)) {
+    let error = Error::from_panic("event coalescer", payload);
+    eprintln!("[piarc-core] {error}; no further events will be delivered");
+    let Ok(json) = serde_json::to_vec(&error.to_error_object()) else {
+        return;
+    };
+    let mut payload = Vec::with_capacity(json.len() + 2);
+    payload.push(b'[');
+    payload.extend_from_slice(&json);
+    payload.push(b']');
+    let batch = EventBatch {
+        route: RouteKey::errors(),
+        seq: 0,
+        payload,
+    };
+    if sink.deliver(vec![batch], DeliveryDone::detached()).is_err() {
+        eprintln!("[piarc-core] the event sink is closed; the coalescer panic was not delivered");
+    }
+}

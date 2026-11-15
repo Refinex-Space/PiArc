@@ -40,6 +40,10 @@ pub mod code {
     pub const PROTOCOL_VERSION_MISMATCH: i64 = -32000;
     /// A frame exceeded the receiver's size limit.
     pub const FRAME_TOO_LARGE: i64 = -32001;
+    /// The receiver is shutting down and no longer accepts requests.
+    pub const SHUTTING_DOWN: i64 = -32002;
+    /// The receiver's queue is full; the same request can succeed later.
+    pub const BUSY: i64 = -32003;
 }
 
 /// JSON-RPC 2.0 error object with PiArc's mandatory structured `data`.
@@ -88,6 +92,12 @@ pub enum ErrorKind {
     ProtocolVersionMismatch,
     /// A frame exceeded the receiver's size limit.
     FrameTooLarge,
+    /// The receiver is shutting down and no longer accepts requests. Core API only: not
+    /// sent over AHP until a capability introduces it.
+    ShuttingDown,
+    /// The receiver's queue is full; retrying later can succeed. Core API only: not sent
+    /// over AHP until a capability introduces it.
+    Busy,
 }
 
 impl ErrorKind {
@@ -102,6 +112,8 @@ impl ErrorKind {
             Self::InternalError => code::INTERNAL_ERROR,
             Self::ProtocolVersionMismatch => code::PROTOCOL_VERSION_MISMATCH,
             Self::FrameTooLarge => code::FRAME_TOO_LARGE,
+            Self::ShuttingDown => code::SHUTTING_DOWN,
+            Self::Busy => code::BUSY,
         }
     }
 }
@@ -126,7 +138,7 @@ impl ErrorObject {
 mod tests {
     use super::*;
 
-    const ALL_KINDS: [ErrorKind; 7] = [
+    const ALL_KINDS: [ErrorKind; 9] = [
         ErrorKind::ParseError,
         ErrorKind::InvalidRequest,
         ErrorKind::MethodNotFound,
@@ -134,6 +146,8 @@ mod tests {
         ErrorKind::InternalError,
         ErrorKind::ProtocolVersionMismatch,
         ErrorKind::FrameTooLarge,
+        ErrorKind::ShuttingDown,
+        ErrorKind::Busy,
     ];
 
     #[test]
