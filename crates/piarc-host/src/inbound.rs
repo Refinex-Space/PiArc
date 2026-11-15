@@ -70,6 +70,18 @@ impl Peer {
     pub async fn closed(&self) {
         self.writer.closed().await;
     }
+
+    /// Whether the connection ended.
+    #[must_use]
+    pub fn is_closed(&self) -> bool {
+        self.writer.is_closed()
+    }
+
+    /// Whether `other` belongs to the same connection.
+    #[must_use]
+    pub fn same_connection(&self, other: &Peer) -> bool {
+        self.writer.same_channel(&other.writer)
+    }
 }
 
 /// A handler that knows no method: every request gets `methodNotFound`, which the Agent Host

@@ -45,13 +45,22 @@
 //!
 //! [`tool_io::ToolIo`] answers the Agent Host's `fs/*` requests with `piarc-fs` and its
 //! `exec/*` requests with `piarc-exec`, per registered session scope (ADR-0004).
+//!
+//! # Credentials (T08)
+//!
+//! [`secrets::SecretsService`] serves the `piarc-secrets` vault to every Agent Host
+//! (`secrets/*`): lazy open with structured errors, change push (`secrets/changed`) and key
+//! locks that serialize concurrent OAuth refreshes across Agent Hosts. The master key's
+//! service name comes from the application identifier in [`identity`].
 
 pub mod agent_host;
 pub mod demo;
 mod error;
 pub mod events;
+pub mod identity;
 pub mod route;
 mod runtime;
+pub mod secrets;
 pub mod tool_io;
 
 pub use demo::{DemoReport, DemoSourceConfig};

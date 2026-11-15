@@ -1100,11 +1100,13 @@ version = "0.0.0"
 name = "piarc-core"
 version = "0.0.0"
 dependencies = [
+ "getrandom 0.4.3",
  "piarc-exec",
  "piarc-fs",
  "piarc-host",
  "piarc-ports",
  "piarc-protocol",
+ "piarc-secrets",
  "serde",
  "serde_json",
  "thiserror",

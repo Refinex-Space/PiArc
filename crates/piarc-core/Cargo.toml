@@ -8,11 +8,13 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+getrandom.workspace = true
 piarc-exec.workspace = true
 piarc-fs.workspace = true
 piarc-host.workspace = true
 piarc-ports.workspace = true
 piarc-protocol.workspace = true
+piarc-secrets.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
