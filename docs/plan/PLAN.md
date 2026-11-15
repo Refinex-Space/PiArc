@@ -117,7 +117,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 已完成 | 3a8744f |
 | T08 | [凭据保险箱](tasks/T08-credential-vault.md) | 1 | T06；D2 | macOS | high | 中 | S5 | 已完成 | 83dc25b |
 | T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 已完成 | 9c0738d |
-| T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 进行中 | — |
+| T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 部分完成 | ff591d6 |
 | T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 未开始 | — |
 | T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 未开始 | — |
 | W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 未开始 | — |
@@ -294,27 +294,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-T10（2026-11-15 开工；基线 verify 13 步通过；依赖 T04 为"部分完成"，遗留的 A09 只涉及 Windows CI，不影响本任务；分支未推送，前序 Windows CI 无法核对）：
-
-- [x] 1 `piarc-ghostty-sys`：产物锁定文件、下载与 SHA256 + minisign 校验、离线缓存、bindgen 绑定入库与重新生成脚本、macOS 静态链接（A02、A03）
-- [x] 2 Windows 链接方式选定与 CI 四目标链接配置（A01；选定官方 DLL 放在 `.node` 旁边，CI 结果待推送）
-- [x] 3 `piarc-term`：safe 封装（Terminal、RenderState、KeyEncoder、Formatter）、PTY 与 IO 线程、effects（A04）
-- [x] 4 帧格式草案进 `piarc-protocol`：格式说明、Rust 编解码器、往返测试；render state 增量帧编码与行 id 复用（A05）
-- [x] 5 Core 与 NAPI 导出、主进程转发、preload API（拉取式帧）
-- [x] 6 渲染原型：fork `CanvasRenderer`（vendor 目录与来源说明）、`RemoteRenderable`、TS 解码器、键盘与输入法、开发页面（A12）
-- [x] 7 一致性测试：formatter 与帧逐格比较（普通屏幕、alt screen、CJK、emoji、ZWJ），Rust 与 TS 解码器同一组样本（A08）
-- [x] 8 L4：rAF 拉取与隐藏终端 0 帧、输入法预编辑与 textarea 跟随（A06、A11；真实拼音候选框待用户核对）
-- [x] 9 测量：`cat` 100 MB、键入回显额外延迟；vim 与 top 截图对照（A07、A09、A10；回显经 MessagePort 超出预算，写 ADR-0023 提议）
-- [x] 10 wterm 评估、S7 报告、spikes README、许可证来源登记、CLAUDE.md、复用表、架构与 ADR 同步（A13）
-- [x] 11 收尾：verify 13 步通过、L4 两种形态 136 项通过、验收记录（A02–A09、A12–A14 通过；A01、A10、A11 阻塞）、登记事项与会话日志（A14）
-
-ADR-0023 已由用户在 2026-11-15 采纳（变更型：按 ADR-0017 原文经事件 MessagePort 送帧时回显额外延迟 p95 16.2 ms），续做：
-
-- [x] 12 ADR-0023 改为"已接受"，ADR-0017 注明第 3 条被修订，架构 6.11、8.3 同步并写修订记录
-- [x] 13 实现：`terminal-ipc.ts` 的 `requestFrame` 返回 Core 的帧，preload 的 `requestTerminalFrame` 解析为帧、去掉 `onTerminalFrame`，`ipc.ts`、控制器、`terminal-ipc.test.ts`、`preload.e2e.ts` 键快照、S10 报告第 20 行同步
-- [ ] 14 重新打包、L4 两种形态、`npm run bench:s7`，更新 T10-A10、S7 报告第 1、5.2 节与 spikes README；verify；看板改为"部分完成"（A01 待 Windows CI/W0，A11 待 R1 实机核对）
-
-否决时：A10 记为失败，S7 结论改为"不通过"并按 ADR-0017 第 7 条评估退路（退路同样经 MessagePort，需另行解决回显）。
+（当前没有进行中的任务）
 
 ## 登记事项
 
@@ -353,6 +333,7 @@ ADR-0023 已由用户在 2026-11-15 采纳（变更型：按 ADR-0017 原文经�
 | I29 | T10 | `cat` 以约 190 MB/s 输出时主进程 CPU（含 Core 全部线程）约为一个核的 74%，主要是 IO 线程读 PTY 与解析；第 11 章没有对应预算 | T44 把终端吞吐纳入性能回归时评估（例如增大读块、合并读） |
 | I30 | T10 | `#/terminal-lab` 原型页随发布构建的渲染包分发；发布构建的 `window.piarc` 也有七个终端函数（`createTerminal` 只能启动登录 shell），与 I13、I24 同类 | T34 接入正式终端面板时收口；T45 与 I13、I24 一起评估剔除原型页 |
 | I31 | T10 | 真实拼音输入法的候选框位置未核对，清单见 `docs/spikes/S07-terminal.md` 第 8 节（T1–T4） | 用户核对后把结果告诉智能体补记到 S7 报告；R1 汇总 S7 时检查（同 I25） |
+| I32 | T10 | T09 的 L4 `transcript-scroll.e2e.ts` 中 "the wheel releases and resumes following" 在一次全量运行中失败（dev 形态，内容增长时离底 31 px，期望 ≤ 1 px），单独重跑 10 次（两种形态各 5 次）都通过；本机此时的主屏是 120 Hz | T19 接手 transcript 时检查贴底在高刷新率下的时序；T44 把 L4 的偶发失败纳入统计 |
 
 ## 技术债
 
@@ -442,6 +423,12 @@ ADR-0023 已由用户在 2026-11-15 采纳（变更型：按 ADR-0017 原文经�
 - 验收：11 项通过，3 项阻塞（A01：Windows CI 待推送、win32-arm64 实机待 W0；A10：回显经 MessagePort p95 16.2 ms，待 ADR-0023；A11：真实拼音候选框待 R1）
 - 决策：ADR-0023（提议，变更型）：终端帧作为拉取请求的返回值送达，实测 p95 0.77 ms；未写 ADR 的取舍：portable-pty 用发布版 0.9.0（kill 返回值以 `wait` 兜底）、Windows 选 DLL 而非 lld + 静态库、绑定按 C23 生成、`unsafe` 放开到 `piarc-term` 的 `vt` 模块（编码规范 2.8）、htop 未安装以 top 代替、wterm 只评估不采用
 - 遗留：I27（终端测试只在 Unix）、I28（PTY 子进程不经 `ProcessSpawner`）、I29（高吞吐时主进程 CPU）、I30（原型页与终端 IPC 随发布构建）、I31（真实拼音核对）；T03-A03、T04-A09、T10-A01 的 Windows CI 仍待推送后核对
+
+### 2026-11-15 T10 部分完成（提交 ff591d6）
+- 交付：用户采纳 ADR-0023：ADR-0023 改"已接受"，ADR-0017 注明第 3 条被修订，架构 v2.14（第 4 章、6.11、7.6，8.3 新增第 6 条）；终端帧改为 `requestTerminalFrame` 的返回值（主进程处理函数返回 Core 的帧，preload 校验后返回，去掉 `onTerminalFrame` 与路由器的 `postToWindow`），单元、L4 键快照、S10 报告与 CLAUDE.md 同步；重打包后 L4 两种形态 136 项通过，`npm run bench:s7` 重测，S7 报告与 spikes README 更新为通过
+- 验收：12 项通过，2 项阻塞（A01：Windows CI 待推送、win32-arm64 实机待 W0；A11：真实拼音候选框待 R1）
+- 决策：ADR-0023 已接受（终端帧作为拉取请求的返回值，回显额外延迟 p95 0.79 ms）；8.3 的新规则追加为第 6 条，不顺延第 5 条（ADR-0014、ADR-0019 引用它）
+- 遗留：I27–I31 见上一条记录；新增 I32（T09 滚动用例偶发失败）；T03-A03、T04-A09、T10-A01 的 Windows CI 仍待推送后核对
 
 ## 计划变更记录
 
