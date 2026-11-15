@@ -141,13 +141,7 @@ function start(): void {
     registerIpcHandlers(registerHandler);
     registerEventHandlers(registerHandler, eventRouter);
     const terminalOwners = new TerminalOwners(core.runtime);
-    registerTerminalHandlers(
-      registerHandler,
-      core.runtime,
-      eventRouter,
-      terminalOwners,
-      terminalStats,
-    );
+    registerTerminalHandlers(registerHandler, core.runtime, terminalOwners, terminalStats);
     startTestHooks(core, terminalOwners);
     openMainWindow();
   });

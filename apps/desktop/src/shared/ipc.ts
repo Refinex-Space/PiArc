@@ -36,24 +36,10 @@ export interface EventBatch {
   readonly payload: Uint8Array;
 }
 
-/** What the main process posts on a window's event port: the batches of one Core delivery,
- * or one pulled terminal frame. */
-export type EventPortMessage =
-  | {
-      /** The batches of the delivery whose route this window subscribed to. */
-      readonly batches: readonly EventBatch[];
-    }
-  | { readonly terminalFrame: TerminalFrameMessage };
-
-/**
- * The answer to `requestTerminalFrame` (ADR-0017): the frame bytes in the draft format of
- * `piarc_protocol::term_frame`, or why Core could not produce one. The main process forwards
- * it unread.
- */
-export interface TerminalFrameMessage {
-  readonly terminalId: number;
-  readonly frame?: Uint8Array;
-  readonly error?: string;
+/** What the main process posts on a window's event port for one Core delivery. */
+export interface EventPortMessage {
+  /** The batches of the delivery whose route this window subscribed to. */
+  readonly batches: readonly EventBatch[];
 }
 
 /** Grid size and the cell size in CSS pixels (for pixel size reports). */
@@ -76,9 +62,6 @@ export interface TerminalKeyMessage {
   /** Part of an input-method composition. */
   readonly composing: boolean;
 }
-
-/** Receives the frames of one terminal. */
-export type TerminalFrameListener = (message: TerminalFrameMessage) => void;
 
 /** Largest grid side Core accepts. */
 export const MAX_TERMINAL_SIDE = 1000;
@@ -179,15 +162,11 @@ export interface PiarcApi {
   /** Resizes the terminal and its PTY. */
   terminalResize(id: number, size: TerminalSize): Promise<void>;
   /**
-   * Asks Core for the terminal's next frame; `full` asks for a RESET frame (after a reload or
-   * a decode error). Resolves once the request is on its way; the frame arrives at the
-   * listener set with `onTerminalFrame`. Pull one frame per animation frame, never for a
-   * hidden terminal.
+   * Resolves with the terminal's next frame (the draft format of `piarc_protocol::term_frame`;
+   * 14 bytes when nothing changed); `full` asks for a RESET frame (after a reload or a decode
+   * error). The frame is the reply to this request, not a message on the event port: after a
+   * key, Chromium handles event-port messages only after the next rendered frame (ADR-0023).
+   * Pull one frame per animation frame, never for a hidden terminal.
    */
-  requestTerminalFrame(id: number, full: boolean): Promise<void>;
-  /**
-   * Receives the frames of terminal `id` (one listener per terminal; setting another
-   * replaces it, `undefined` removes it). Resolves once this window's event port is open.
-   */
-  onTerminalFrame(id: number, listener: TerminalFrameListener | undefined): Promise<void>;
+  requestTerminalFrame(id: number, full: boolean): Promise<Uint8Array>;
 }

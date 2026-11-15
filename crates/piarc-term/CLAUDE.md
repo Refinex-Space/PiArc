@@ -35,4 +35,4 @@
 
 ## 参考
 
-- ADR-0017、ADR-0023（提议）；架构第 6.11、7.1 节；`docs/spikes/S07-terminal.md`；`docs/research/terminal-libghostty.md`。
+- ADR-0017、ADR-0023；架构第 6.11、7.1 节；`docs/spikes/S07-terminal.md`；`docs/research/terminal-libghostty.md`。

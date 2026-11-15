@@ -121,24 +121,6 @@ export class EventRouter {
     }
   }
 
-  /**
-   * Posts `message` on window `windowId`'s port (a pulled terminal frame). False when the
-   * window has no port (it reloaded or closed meanwhile).
-   */
-  postToWindow(windowId: number, message: EventPortMessage): boolean {
-    const channel = this.#windows.get(windowId);
-    if (channel === undefined) {
-      return false;
-    }
-    try {
-      channel.port.postMessage(message);
-      return true;
-    } catch (error) {
-      console.error(`[core] failed to post to window ${String(windowId)}`, error);
-      return false;
-    }
-  }
-
   /** Routes window `windowId` currently receives, sorted. */
   routesOf(windowId: number): string[] {
     return [...(this.#windows.get(windowId)?.routes ?? [])].sort();

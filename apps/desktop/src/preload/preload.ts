@@ -10,8 +10,6 @@ import {
   type EventBatch,
   type EventListener,
   type PiarcApi,
-  type TerminalFrameListener,
-  type TerminalFrameMessage,
 } from '../shared/ipc.js';
 
 function expectString(value: unknown): string {
@@ -50,8 +48,6 @@ function isIncomingPort(value: unknown): value is IncomingPort {
 
 /** One listener per route key, called for each batch the main process posts. */
 const listeners = new Map<string, EventListener>();
-/** One listener per terminal id, called for each pulled frame. */
-const frameListeners = new Map<number, TerminalFrameListener>();
 let connection: Promise<void> | undefined;
 
 function isEventBatch(value: unknown): value is EventBatch {
@@ -67,38 +63,7 @@ function isEventBatch(value: unknown): value is EventBatch {
   );
 }
 
-function isTerminalFrameMessage(value: unknown): value is TerminalFrameMessage {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'terminalId' in value &&
-    typeof value.terminalId === 'number' &&
-    (!('frame' in value) || value.frame instanceof Uint8Array) &&
-    (!('error' in value) || typeof value.error === 'string')
-  );
-}
-
-function dispatchFrame(message: unknown): void {
-  if (!isTerminalFrameMessage(message)) {
-    console.error('[piarc] ignored a malformed terminal frame');
-    return;
-  }
-  const listener = frameListeners.get(message.terminalId);
-  if (listener === undefined) {
-    return;
-  }
-  try {
-    listener(message);
-  } catch (error) {
-    console.error(`[piarc] frame listener of terminal ${String(message.terminalId)} threw`, error);
-  }
-}
-
 function dispatch(message: unknown): void {
-  if (typeof message === 'object' && message !== null && 'terminalFrame' in message) {
-    dispatchFrame(message.terminalFrame);
-    return;
-  }
   const batches: unknown =
     typeof message === 'object' && message !== null && 'batches' in message
       ? message.batches
@@ -188,7 +153,6 @@ const api: PiarcApi = {
       return value;
     }),
   closeTerminal: async (id) => {
-    frameListeners.delete(id);
     await ipcRenderer.invoke(IPC_CHANNELS.terminalClose, id);
   },
   terminalInput: async (id, text) => {
@@ -200,20 +164,13 @@ const api: PiarcApi = {
   terminalResize: async (id, size) => {
     await ipcRenderer.invoke(IPC_CHANNELS.terminalResize, id, size);
   },
-  requestTerminalFrame: async (id, full) => {
-    await ipcRenderer.invoke(IPC_CHANNELS.terminalRequestFrame, id, full);
-  },
-  onTerminalFrame: async (id, listener) => {
-    if (listener === undefined) {
-      frameListeners.delete(id);
-      return;
-    }
-    if (typeof listener !== 'function') {
-      throw new TypeError('listener must be a function');
-    }
-    await connectEvents();
-    frameListeners.set(id, listener);
-  },
+  requestTerminalFrame: (id, full) =>
+    ipcRenderer.invoke(IPC_CHANNELS.terminalRequestFrame, id, full).then((value: unknown) => {
+      if (!(value instanceof Uint8Array)) {
+        throw new TypeError('Unexpected IPC result: expected the frame bytes');
+      }
+      return value;
+    }),
 };
 
 contextBridge.exposeInMainWorld('piarc', api);

@@ -311,7 +311,7 @@ T10（2026-11-15 开工；基线 verify 13 步通过；依赖 T04 为"部分完�
 ADR-0023 已由用户在 2026-11-15 采纳（变更型：按 ADR-0017 原文经事件 MessagePort 送帧时回显额外延迟 p95 16.2 ms），续做：
 
 - [x] 12 ADR-0023 改为"已接受"，ADR-0017 注明第 3 条被修订，架构 6.11、8.3 同步并写修订记录
-- [ ] 13 实现：`terminal-ipc.ts` 的 `requestFrame` 返回 Core 的帧，preload 的 `requestTerminalFrame` 解析为帧、去掉 `onTerminalFrame`，`ipc.ts`、控制器、`terminal-ipc.test.ts`、`preload.e2e.ts` 键快照、S10 报告第 20 行同步
+- [x] 13 实现：`terminal-ipc.ts` 的 `requestFrame` 返回 Core 的帧，preload 的 `requestTerminalFrame` 解析为帧、去掉 `onTerminalFrame`，`ipc.ts`、控制器、`terminal-ipc.test.ts`、`preload.e2e.ts` 键快照、S10 报告第 20 行同步
 - [ ] 14 重新打包、L4 两种形态、`npm run bench:s7`，更新 T10-A10、S7 报告第 1、5.2 节与 spikes README；verify；看板改为"部分完成"（A01 待 Windows CI/W0，A11 待 R1 实机核对）
 
 否决时：A10 记为失败，S7 结论改为"不通过"并按 ADR-0017 第 7 条评估退路（退路同样经 MessagePort，需另行解决回显）。

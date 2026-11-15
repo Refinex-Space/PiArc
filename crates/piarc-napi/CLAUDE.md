@@ -15,7 +15,7 @@ NAPI-RS 导出层（薄）：把 `piarc_core::CoreRuntime` 暴露为主进程里
 
 ## 不变量
 
-- 终端导出（T10）：`createTerminal`、`terminalInput`、`terminalKey`、`terminalResize`、`terminalFrame`（`JsDeferred` 解析为帧字节）、`closeTerminal` 在两种构建里都有；`terminalText`、`terminalStats`、`terminalProbeEcho` 只在 `testing`。Windows 的 `.node` 依赖同目录的 `ghostty-vt.dll`（`crates/piarc-term/CLAUDE.md`）。
+- 终端导出（T10）：`createTerminal`、`terminalInput`、`terminalKey`、`terminalResize`、`terminalFrame`（`JsDeferred` 解析为帧字节，主进程把它作为拉取请求的返回值交给窗口，ADR-0023）、`closeTerminal` 在两种构建里都有；`terminalText`、`terminalStats`、`terminalProbeEcho` 只在 `testing`。Windows 的 `.node` 依赖同目录的 `ghostty-vt.dll`（`crates/piarc-term/CLAUDE.md`）。
 
 - 每个导出都带 `#[napi(catch_unwind)]`，函数体经 `boundary::call`：Core 错误与 panic 都变成抛出的 `Error`，带 `code` 与 `data: { kind, retryable, details? }`（`piarc_protocol::ErrorObject` 形状）。panic 的 kind 是 `internalError`。
 - `onEvents` 是强引用的 `ThreadsafeFunction`（`CalleeHandled = false`），会让 Node 事件循环保持存活；只有 Core 的有序关闭（合并器丢弃 sink）释放它。主进程必须在退出前 `await shutdown()`（`apps/desktop/src/main/core/core-host.ts`）。

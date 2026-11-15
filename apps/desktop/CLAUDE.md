@@ -47,7 +47,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
   - `markdown.worker.ts`：请求 `append`（流式文档追加，`final` 结束）、`parse`（成批解析已完成的文档）、`drop`；响应 `updates`，每个文档给 `keep`（保留前几个块，同一对象）与之后的 `blocks`。类型与守卫在 `transcript/markdown/protocol.ts`；
   - `highlight.worker.ts`：shiki core + JavaScript 正则引擎，请求 `highlight`（`id`、语言 id、代码），响应 `highlighted`（每行的 token：文本、明暗两套颜色、字形位）或 `failed`。类型在 `transcript/highlight/protocol.ts`；
 - composer（T09）在 `src/renderer/composer/`：`schema.ts`（段落与 mention 节点）、`mention-plugin.ts`、`serialize.ts`（发送文本、mention 数据、显示片段三者分开）、`intents.ts`（键位语义）、`ime-guard.ts`、`Composer.tsx`。
-- 终端（T10，ADR-0017）：主进程 `src/main/core/terminal-ipc.ts`（六个命令、终端归属、帧原样投到发起窗口的事件端口）；渲染进程 `src/renderer/terminal/`：`frame/`（帧解码器与 `Screen`，共享样本 `frame-samples.json` 由 Rust 生成）、`remote-renderable.ts`、`controller.ts`（rAF 拉取、隐藏不拉取、输入后连续拉取、键盘与输入法）、`keys.ts`、`TerminalLab.tsx`（`#/terminal-lab`，`?manual` 不自带 shell，`globalThis.__piarcTerminalLab`，类型在 `src/shared/terminal-lab.ts`）；`vendor/ghostty-web/` 是 fork 的 `CanvasRenderer`（MIT，来源与改动见其 README）。
+- 终端（T10，ADR-0017）：主进程 `src/main/core/terminal-ipc.ts`（六个命令、终端归属，帧原样作为拉取请求的返回值交回，ADR-0023）；渲染进程 `src/renderer/terminal/`：`frame/`（帧解码器与 `Screen`，共享样本 `frame-samples.json` 由 Rust 生成）、`remote-renderable.ts`、`controller.ts`（rAF 拉取、隐藏不拉取、输入后连续拉取、键盘与输入法）、`keys.ts`、`TerminalLab.tsx`（`#/terminal-lab`，`?manual` 不自带 shell，`globalThis.__piarcTerminalLab`，类型在 `src/shared/terminal-lab.ts`）；`vendor/ghostty-web/` 是 fork 的 `CanvasRenderer`（MIT，来源与改动见其 README）。
 - `src/renderer/lab/`：`#/transcript-lab` 原型页，用 `fixtures/` 的合成事件驱动 transcript 与 composer，经 `globalThis.__piarcTranscriptLab` 给 L4 与 S1 基准用（类型在 `src/shared/transcript-lab.ts`）。XSS 载荷集在 `src/shared/xss-payloads.ts`。
 
 ## 不变量
@@ -86,10 +86,10 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 帧时间的口径：rAF 间隔与 `AnimationFrame`（LoAF 口径）在 60 Hz 屏上空闲时也约 16.7 ms，不能拿来和"p99 ≤ 16 ms"比；S1 基准用两次 `BeginMainThreadFrame` 之间主线程任务的总耗时（每帧工作量）。
 - 复制相关的 L4 会写系统剪贴板：用例经 `withSavedClipboard` 读出原内容、结束后写回（只恢复文本）。
 - ProseMirror 自己在合成期间不分发按键，所以只测合成中的按键测不出守卫是否生效；`composer.e2e.ts` 另有"合成开始前到达的 229 按键"和"合成文本恰为 `@`、`/`"两类用例，去掉守卫时它们会失败。
-- 页面处理按键之后，经事件 MessagePort 投来的消息要到下一帧的 rAF 之后才被处理（`invoke` 的回复不受影响）：终端帧走 MessagePort 时回显因此慢一帧，见 ADR-0023（提议）与 S7 报告第 5.2 节。
+- 页面处理按键之后，经事件 MessagePort 投来的消息要到下一帧的 rAF 之后才被处理（`invoke` 的回复不受影响）：所以终端帧作为 `requestTerminalFrame` 的返回值送达，不要改回事件端口（ADR-0023，S7 报告第 5.2 节）。
 - 终端 L4（`terminal.e2e.ts`、`terminal-tui.e2e.ts`）用 `/bin/sh`、`cat`、`vim`、`top`，在 Windows 上跳过，由 W0 换成 Windows 程序。
 - 贴底依赖 ResizeObserver 观察列表的尺寸容器（`TranscriptList` 的 sizer）：换虚拟列表实现时要保证内容增长能在同一帧报告尺寸变化，react-virtuoso 做不到（ADR-0022）。
 
 ## 参考
 
-- 架构第 3.4、6.11、7.6、8.1–8.5、10.3、11 章；ADR-0013、ADR-0014、ADR-0017、ADR-0018 第 1 条、ADR-0022、ADR-0023（提议）；`docs/spikes/S10-electron-security.md`、`S02-napi-event-channel.md`、`S01-transcript-composer.md`、`S07-terminal.md`；`docs/engineering/testing.md` 第 9 节。
+- 架构第 3.4、6.11、7.6、8.1–8.5、10.3、11 章；ADR-0013、ADR-0014、ADR-0017、ADR-0018 第 1 条、ADR-0022、ADR-0023；`docs/spikes/S10-electron-security.md`、`S02-napi-event-channel.md`、`S01-transcript-composer.md`、`S07-terminal.md`；`docs/engineering/testing.md` 第 9 节。

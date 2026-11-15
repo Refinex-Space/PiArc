@@ -9,7 +9,6 @@ const PIARC_API_SNAPSHOT = [
   'closeTerminal',
   'createTerminal',
   'getAppVersion',
-  'onTerminalFrame',
   'openExternal',
   'requestTerminalFrame',
   'subscribeEvents',

@@ -1,7 +1,7 @@
 // The terminal commands of `window.piarc` (ADR-0017, T10). The main process only checks
-// arguments and ownership and forwards: Core encodes keys and produces frames, and each
-// frame goes back unread on the requesting window's event port (the T04 channel, copied by
-// structured clone per ADR-0019).
+// arguments and ownership and forwards: Core encodes keys and produces frames, and each frame
+// goes back unread as the reply to the window's pull request (ADR-0023), copied by structured
+// clone like event batches (ADR-0019).
 import {
   IPC_CHANNELS,
   isTerminalKeyMessage,
@@ -10,7 +10,6 @@ import {
 } from '../../shared/ipc.js';
 import type { TerminalForwardStats } from '../../shared/test-hooks.js';
 import type { CoreRuntime } from './native/piarc-core.js';
-import type { EventRouter } from './router.js';
 
 /** Longest text one `terminalInput` call may write (characters). */
 export const MAX_TERMINAL_INPUT = 64 * 1024;
@@ -98,11 +97,10 @@ function size(value: unknown): TerminalSize {
   return value;
 }
 
-/** Registers the six terminal commands. `stats` counts forwarded frames for the test hooks. */
+/** Registers the six terminal commands. `stats` counts returned frames for the test hooks. */
 export function registerTerminalHandlers(
   registerHandler: TerminalRegistrar,
   core: TerminalCore,
-  router: EventRouter,
   owners: TerminalOwners,
   stats: TerminalForwardStats,
 ): void {
@@ -143,16 +141,16 @@ export function registerTerminalHandlers(
       throw new TypeError('full must be a boolean');
     }
     stats.requests += 1;
-    core.terminalFrame(terminalId, windowId, full).then(
+    // The frame is the reply (ADR-0023); a Core error rejects the window's request.
+    return core.terminalFrame(terminalId, windowId, full).then(
       (frame) => {
         stats.frames += 1;
         stats.bytes += frame.byteLength;
-        router.postToWindow(windowId, { terminalFrame: { terminalId, frame } });
+        return frame;
       },
       (error: unknown) => {
         stats.errors += 1;
-        const message = error instanceof Error ? error.message : String(error);
-        router.postToWindow(windowId, { terminalFrame: { terminalId, error: message } });
+        throw error;
       },
     );
   });

@@ -3,10 +3,11 @@
 // input-method text.
 //
 // Frame loop: each animation frame, a visible terminal with no request in flight asks Core for
-// one frame; a hidden terminal (`display: none`, off screen, or a hidden page) asks for
-// nothing. After the person types, the view pulls back to back until the echo arrives (at most
-// EAGER_MS), so echo latency is not quantized to the display's frame interval.
-import type { PiarcApi, TerminalFrameMessage } from '../../shared/ipc.js';
+// one frame, which comes back as the reply to the request (ADR-0023); a hidden terminal
+// (`display: none`, off screen, or a hidden page) asks for nothing. After the person types,
+// the view pulls back to back until the echo arrives (at most EAGER_MS), so echo latency is not
+// quantized to the display's frame interval.
+import type { PiarcApi } from '../../shared/ipc.js';
 import type { CellRect, TerminalLabStats } from '../../shared/terminal-lab.js';
 import { isImeComposing } from '../composer/ime-guard.js';
 import { decodeFrame } from './frame/decoder.js';
@@ -25,7 +26,7 @@ export const TERMINAL_FONT = {
 
 export type TerminalViewApi = Pick<
   PiarcApi,
-  'requestTerminalFrame' | 'onTerminalFrame' | 'terminalKey' | 'terminalInput' | 'terminalResize'
+  'requestTerminalFrame' | 'terminalKey' | 'terminalInput' | 'terminalResize'
 >;
 
 type MutableStats = { -readonly [K in keyof TerminalLabStats]: TerminalLabStats[K] };
@@ -160,17 +161,11 @@ export class TerminalController {
 
   /** Shows terminal `id`; the first frame resets the screen. */
   attach(id: number): void {
-    if (this.#id !== null) {
-      void this.#api.onTerminalFrame(this.#id, undefined);
-    }
     this.#id = id;
     this.#screen = new Screen();
     this.#remote = new RemoteRenderable(this.#screen);
     this.#needFull = true;
     this.#inFlight = false;
-    this.#api.onTerminalFrame(id, this.#onFrame).catch((error: unknown) => {
-      console.error('[terminal] cannot receive frames', error);
-    });
   }
 
   get terminalId(): number | null {
@@ -244,9 +239,7 @@ export class TerminalController {
     for (const [target, type, listener] of this.#listeners) {
       target.removeEventListener(type, listener);
     }
-    if (this.#id !== null) {
-      void this.#api.onTerminalFrame(this.#id, undefined);
-    }
+    this.#id = null;
     this.#canvas.remove();
     this.#textarea.remove();
   }
@@ -268,39 +261,43 @@ export class TerminalController {
     this.#inFlight = true;
     this.#requestedAt = performance.now();
     this.#stats.framesRequested += 1;
-    this.#api.requestTerminalFrame(id, this.#needFull).catch((error: unknown) => {
-      this.#inFlight = false;
-      this.#needFull = true;
-      this.#stats.errors += 1;
-      console.error('[terminal] frame request failed', error);
-    });
+    this.#api.requestTerminalFrame(id, this.#needFull).then(
+      (frame) => {
+        this.#onFrame(id, frame);
+      },
+      (error: unknown) => {
+        if (id !== this.#id) {
+          return;
+        }
+        this.#inFlight = false;
+        this.#needFull = true;
+        this.#stats.errors += 1;
+        console.error('[terminal] frame request failed', error);
+      },
+    );
   }
 
-  readonly #onFrame = (message: TerminalFrameMessage): void => {
-    if (message.terminalId !== this.#id) {
+  #onFrame(id: number, frame: Uint8Array): void {
+    if (id !== this.#id) {
+      // The view switched terminals while the request was in flight.
       return;
     }
     this.#inFlight = false;
     const roundTrip = performance.now() - this.#requestedAt;
     this.#stats.pullRoundTripMs += roundTrip;
     this.#stats.maxPullRoundTripMs = Math.max(this.#stats.maxPullRoundTripMs, roundTrip);
-    if (message.frame === undefined) {
-      this.#stats.errors += 1;
-      this.#needFull = true;
-      return;
-    }
     const started = performance.now();
     let empty: boolean;
     try {
-      const frame = decodeFrame(message.frame);
-      const change = this.#screen.apply(frame);
-      if (frame.reset) {
+      const decoded = decodeFrame(frame);
+      const change = this.#screen.apply(decoded);
+      if (decoded.reset) {
         this.#needFull = false;
         this.#stats.resets += 1;
       }
-      empty = frame.body === null;
+      empty = decoded.body === null;
       this.#stats.framesReceived += 1;
-      this.#stats.bytes += message.frame.byteLength;
+      this.#stats.bytes += frame.byteLength;
       if (empty) {
         this.#stats.emptyFrames += 1;
       } else {
@@ -326,7 +323,7 @@ export class TerminalController {
     if (finished < this.#eagerUntil) {
       this.#request();
     }
-  };
+  }
 
   #checkEcho(at: number): void {
     const probe = this.#echo;

@@ -55,9 +55,6 @@ class Receiver {
 
   constructor(port: MessagePort) {
     port.on('message', (message: EventPortMessage) => {
-      if (!('batches' in message)) {
-        return;
-      }
       for (const batch of message.batches) {
         const events: unknown = JSON.parse(Buffer.from(batch.payload).toString('utf8'));
         if (!Array.isArray(events)) {

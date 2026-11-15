@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { IPC_CHANNELS, type EventPortMessage } from '../../shared/ipc.js';
-import { EventRouter, type EventPort } from './router.js';
+import { IPC_CHANNELS } from '../../shared/ipc.js';
 import {
   registerTerminalHandlers,
   TerminalOwners,
@@ -19,17 +18,6 @@ class FakeContents implements OwnerContents {
     for (const listener of this.#destroyed) {
       listener();
     }
-  }
-}
-
-class RecordingPort implements EventPort {
-  readonly messages: EventPortMessage[] = [];
-  closed = false;
-  postMessage(message: EventPortMessage): void {
-    this.messages.push(message);
-  }
-  close(): void {
-    this.closed = true;
   }
 }
 
@@ -55,13 +43,11 @@ function setup(frame: () => Promise<Uint8Array>) {
     string,
     (event: { readonly sender: OwnerContents }, args: readonly unknown[]) => unknown
   >();
-  const router = new EventRouter();
   const owners = new TerminalOwners(core);
   const stats = { requests: 0, frames: 0, bytes: 0, errors: 0 };
   registerTerminalHandlers(
     (channel, handler) => handlers.set(channel, handler),
     core,
-    router,
     owners,
     stats,
   );
@@ -72,11 +58,10 @@ function setup(frame: () => Promise<Uint8Array>) {
     }
     return handler({ sender: contents }, args);
   };
-  return { calls, router, stats, invoke };
+  return { calls, stats, invoke };
 }
 
 const size = { cols: 80, rows: 24, cellWidth: 8, cellHeight: 16 };
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('terminal IPC', () => {
   it('creates terminals for the calling window and checks sizes', () => {
@@ -130,34 +115,25 @@ describe('terminal IPC', () => {
     expect(calls).toEqual(['create 80x24', 'key 1 KeyA', 'resize 1 100x24']);
   });
 
-  it('forwards each frame unread to the requesting window', async () => {
+  it('returns each frame unread as the reply to the request', async () => {
     const frame = new Uint8Array([0x50, 0x54, 0x46, 1]);
-    const { calls, router, stats, invoke } = setup(() => Promise.resolve(frame));
+    const { calls, stats, invoke } = setup(() => Promise.resolve(frame));
     const window = new FakeContents(7);
-    const port = new RecordingPort();
-    router.connect(7, port);
     const id = invoke(window, IPC_CHANNELS.terminalCreate, size);
-    invoke(window, IPC_CHANNELS.terminalRequestFrame, id, true);
-    await flush();
+    const reply = invoke(window, IPC_CHANNELS.terminalRequestFrame, id, true);
+    await expect(reply).resolves.toBe(frame);
     expect(calls).toContain('frame 1 viewer 7 full true');
-    expect(port.messages).toEqual([{ terminalFrame: { terminalId: 1, frame } }]);
-    expect(
-      port.messages[0] !== undefined && 'terminalFrame' in port.messages[0]
-        ? port.messages[0].terminalFrame.frame
-        : undefined,
-    ).toBe(frame);
     expect(stats).toEqual({ requests: 1, frames: 1, bytes: 4, errors: 0 });
+    expect(() => invoke(window, IPC_CHANNELS.terminalRequestFrame, id, 'yes')).toThrow(TypeError);
   });
 
-  it('reports a failed frame to the window', async () => {
-    const { router, stats, invoke } = setup(() => Promise.reject(new Error('vt failed')));
+  it('rejects the request when Core cannot produce a frame', async () => {
+    const { stats, invoke } = setup(() => Promise.reject(new Error('vt failed')));
     const window = new FakeContents(3);
-    const port = new RecordingPort();
-    router.connect(3, port);
     const id = invoke(window, IPC_CHANNELS.terminalCreate, size);
-    invoke(window, IPC_CHANNELS.terminalRequestFrame, id, false);
-    await flush();
-    expect(port.messages).toEqual([{ terminalFrame: { terminalId: 1, error: 'vt failed' } }]);
+    await expect(invoke(window, IPC_CHANNELS.terminalRequestFrame, id, false)).rejects.toThrow(
+      'vt failed',
+    );
     expect(stats.errors).toBe(1);
   });
 

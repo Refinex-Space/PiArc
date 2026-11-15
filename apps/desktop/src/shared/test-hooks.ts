@@ -38,11 +38,11 @@ export interface RouterStats {
   readonly windows: number;
 }
 
-/** Terminal frames the main process forwarded (T10). Mutable counters owned by main. */
+/** Terminal frames the main process returned to windows (T10). Mutable counters owned by main. */
 export interface TerminalForwardStats {
   /** `requestTerminalFrame` calls. */
   requests: number;
-  /** Frames posted to windows. */
+  /** Frames returned to windows. */
   frames: number;
   /** Bytes of those frames. */
   bytes: number;
@@ -130,7 +130,7 @@ export interface PiarcTestHooks {
    * program, arguments and environment are the test's choice.
    */
   createTerminal(webContentsId: number, options: TestTerminalOptions): number;
-  /** Counters of the frames the main process forwarded. */
+  /** Counters of the frames the main process returned. */
   terminalForwardStats(): TerminalForwardStats;
 }
 

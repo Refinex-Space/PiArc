@@ -14,9 +14,7 @@ class RecordingPort implements EventPort {
     this.closed = true;
   }
   routes(): string[] {
-    return this.messages.flatMap((m) =>
-      'batches' in m ? m.batches.map((b) => `${b.route}#${String(b.seq)}`) : [],
-    );
+    return this.messages.flatMap((m) => m.batches.map((b) => `${b.route}#${String(b.seq)}`));
   }
 }
 
@@ -51,10 +49,7 @@ describe('EventRouter', () => {
     router.subscribe(1, 'alpha');
     const sent = batch('alpha', 7, 3);
     router.forward([sent]);
-    const message = port.messages[0];
-    expect(message !== undefined && 'batches' in message ? message.batches[0] : undefined).toBe(
-      sent,
-    );
+    expect(port.messages[0]?.batches[0]).toBe(sent);
   });
 
   it('sends nothing to a window without subscriptions', () => {
@@ -157,20 +152,5 @@ describe('EventRouter', () => {
     expect(seen).toHaveLength(1);
     expect(seen[0]).toMatchObject({ batches: 2, bytes: 40, largestBatchBytes: 30, windows: 1 });
     expect(seen[0]?.durationMs).toBeGreaterThanOrEqual(0);
-  });
-});
-
-describe('EventRouter.postToWindow', () => {
-  it('posts a message on the port of that window only', () => {
-    const router = new EventRouter();
-    const first = new RecordingPort();
-    const second = new RecordingPort();
-    router.connect(1, first);
-    router.connect(2, second);
-    const frame = new Uint8Array([1, 2, 3]);
-    expect(router.postToWindow(2, { terminalFrame: { terminalId: 5, frame } })).toBe(true);
-    expect(first.messages).toEqual([]);
-    expect(second.messages).toEqual([{ terminalFrame: { terminalId: 5, frame } }]);
-    expect(router.postToWindow(3, { terminalFrame: { terminalId: 5, frame } })).toBe(false);
   });
 });
