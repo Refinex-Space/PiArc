@@ -193,7 +193,7 @@ export function summarizeFrames(recording) {
  * @param {'dev' | 'packaged'} form
  * @param {string[]} args
  */
-async function appCommand(form, args) {
+export async function appCommand(form, args) {
   if (form === 'dev') {
     /** @type {unknown} */
     const binary = createRequire(path.join(desktopDir, 'package.json'))('electron');
@@ -241,7 +241,7 @@ async function openLab(page) {
  * @param {number} pid
  * @param {() => Promise<T>} body
  */
-async function traced(page, pid, body) {
+export async function traced(page, pid, body) {
   const cdp = await page.context().newCDPSession(page);
   /** @type {Promise<unknown>} */
   const complete = new Promise((resolve) => {

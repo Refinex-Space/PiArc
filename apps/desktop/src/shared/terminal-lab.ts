@@ -19,6 +19,9 @@ export interface TerminalLabStats {
   readonly renderMs: number;
   /** Longest decode + draw of one frame (ms). */
   readonly maxFrameWorkMs: number;
+  /** Request-to-arrival time of each pulled frame (ms): total and longest. */
+  readonly pullRoundTripMs: number;
+  readonly maxPullRoundTripMs: number;
   /** Frames Core failed or the page could not apply. */
   readonly errors: number;
   /** RESET frames applied. */
@@ -43,6 +46,8 @@ export interface TerminalLabApi {
   resetStats(): void;
   /** The screen rebuilt from frames, as plain text (formatter rules). */
   screenText(): string;
+  /** The cursor position in cells (column, row) of the screen rebuilt from frames. */
+  cursorCell(): { readonly x: number; readonly y: number };
   /** The cursor cell in viewport coordinates of the page (CSS pixels). */
   cursorRect(): CellRect;
   /** The hidden textarea that receives keys and input-method text, in page coordinates. */
@@ -55,10 +60,12 @@ export interface TerminalLabApi {
   resize(cols: number, rows: number): void;
   /**
    * Arms an echo measurement: the next `keydown` of `char` starts the clock (its event
-   * timestamp) and the promise resolves with the milliseconds until a frame showing `char` in
-   * the cursor cell of arming time has been decoded and applied.
+   * timestamp), which stops when a frame showing `char` in the cursor cell of arming time has
+   * been decoded and applied. Read the result with `echoResult`.
    */
-  armEcho(char: string): Promise<number>;
+  armEcho(char: string): void;
+  /** Milliseconds of the armed echo measurement, once the echo arrived. */
+  echoResult(): Promise<number>;
 }
 
 declare global {

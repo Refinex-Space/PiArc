@@ -23,6 +23,7 @@ export function TerminalLab() {
     }
     const controller = new TerminalController(host, window.piarc);
     let subscribed: number | null = null;
+    let echo: Promise<number> | undefined;
     const attach = (id: number) => {
       controller.attach(id);
       if (subscribed !== null) {
@@ -53,6 +54,7 @@ export function TerminalLab() {
         controller.resetStats();
       },
       screenText: () => controller.screen.plainText(),
+      cursorCell: () => ({ x: controller.screen.cursor.x, y: controller.screen.cursor.y }),
       cursorRect: () => controller.cursorRect(),
       textareaRect: () => controller.textareaRect(),
       preedit: () => controller.preedit,
@@ -62,7 +64,10 @@ export function TerminalLab() {
       resize: (cols, rows) => {
         controller.resize(cols, rows);
       },
-      armEcho: (char) => controller.armEcho(char),
+      armEcho: (char) => {
+        echo = controller.armEcho(char);
+      },
+      echoResult: () => echo ?? Promise.reject(new Error('armEcho was not called')),
     };
     globalThis.__piarcTerminalLab = api;
     if (!window.location.hash.includes('?manual')) {

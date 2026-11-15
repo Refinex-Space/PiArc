@@ -39,6 +39,8 @@ function emptyStats(): MutableStats {
     decodeMs: 0,
     renderMs: 0,
     maxFrameWorkMs: 0,
+    pullRoundTripMs: 0,
+    maxPullRoundTripMs: 0,
     errors: 0,
     resets: 0,
   };
@@ -62,6 +64,7 @@ export class TerminalController {
   #id: number | null = null;
   #raf = 0;
   #inFlight = false;
+  #requestedAt = 0;
   #needFull = true;
   #onScreen = false;
   #eagerUntil = 0;
@@ -263,6 +266,7 @@ export class TerminalController {
       return;
     }
     this.#inFlight = true;
+    this.#requestedAt = performance.now();
     this.#stats.framesRequested += 1;
     this.#api.requestTerminalFrame(id, this.#needFull).catch((error: unknown) => {
       this.#inFlight = false;
@@ -277,6 +281,9 @@ export class TerminalController {
       return;
     }
     this.#inFlight = false;
+    const roundTrip = performance.now() - this.#requestedAt;
+    this.#stats.pullRoundTripMs += roundTrip;
+    this.#stats.maxPullRoundTripMs = Math.max(this.#stats.maxPullRoundTripMs, roundTrip);
     if (message.frame === undefined) {
       this.#stats.errors += 1;
       this.#needFull = true;
