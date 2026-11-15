@@ -143,7 +143,7 @@ Markdown 不进 Prettier：文档中的宽表格每次编辑都会被重新填�
 ### 3.4 Pi 依赖
 
 - `@earendil-works/*` 全部锁定同一精确版本（架构第 5.7 节）。
-- 只使用包入口公开导出的 SDK、ExtensionAPI 与类型，禁止深度导入（例如 `@earendil-works/pi-ai/dist/...`）。T06 用 ESLint 规则落地这条禁令。
+- 只使用包入口公开导出的 SDK、ExtensionAPI 与类型，以及包的 `package.json` `exports` 声明的子路径（例如 `@earendil-works/pi-ai/api/anthropic-messages.lazy`），禁止其他深度导入（例如 `@earendil-works/pi-ai/dist/...`）。`eslint.config.mjs` 的 `piPublicImports` 按已安装包的 `exports` 生成放行清单，以 `@typescript-eslint/no-restricted-imports` 检查（verify 第 2 步）。
 
 ### 3.5 lint
 

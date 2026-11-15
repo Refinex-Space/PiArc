@@ -297,7 +297,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 T06（开工 2026-11-15，基线 `npm run verify` 13/13 通过；T04 的遗留项 A09 只涉及 Windows 构建，不影响本任务；分支未推送，T03-A03、T04-A09 仍待 Windows CI）
 
 - [x] C1 锁定 Pi 1.5.2：`agent-host` 与 `packages/testkit` 统一版本，基线文档写版本差异，`reference/pi` 检出 v1.5.2，更新 `REFERENCES.md`（A01，I14）
-- [ ] C2 ESLint 禁止深度导入 `@earendil-works/*`，放行 `exports` 子路径（A02，I15）
+- [x] C2 ESLint 禁止深度导入 `@earendil-works/*`，放行 `exports` 子路径（A02，I15）
 - [ ] C3 协议：`host/ping`、`host/shutdown`、`session/*` 最小方法集、工具 item 类型，样本与反例
 - [ ] C4 agent-host：stdio 接管、帧收发、握手、SIGTERM 有序退出、Core 桥接（统一超时）
 - [ ] C5 agent-host：会话注册表（`createAgentSession`、文件型 `SessionManager`、`agentDir`）、最小投影与 `seq`（A10，I08）
@@ -328,7 +328,7 @@ T06（开工 2026-11-15，基线 `npm run verify` 13/13 通过；T04 的遗留�
 | I12 | T04 | 架构第 11 章"主进程内存（含 Core，空闲）≤ 120 MB"低于 Electron 自身基线：macOS arm64 上裸 Electron 45.3.2 开一个空窗口主进程 RSS 约 155 MB，PiArc 含 Core 160–164 MB（Core 与应用代码约 5–8 MB），数据见 `docs/spikes/S02-napi-event-channel.md` 第 4.4 节 | R1 按 M0 实测校准该预算（放宽要在第 18 章写明原因），可改为"相对裸 Electron 的增量"；W0 补 Windows 数据 |
 | I13 | T04 | 渲染进程的 `#/event-probe` 测试页随发布构建的渲染包分发（发布版 Core 没有演示事件源与测试钩子，页面只能订阅、计数） | T45 评估是否在发布构建中剔除测试页 |
 | I14 | T05 | `packages/testkit` 把 `@earendil-works/pi-ai` 精确锁定为 1.5.2（任务开工时 npm 上的最新稳定版），尚未与 Agent Host 统一 | 已落地（T06）：Pi 锁定 1.5.2，`agent-host` 与 `packages/testkit` 的 `@earendil-works/*` 同为 1.5.2，lockfile 中无第二个版本 |
-| I15 | T05 | pi-ai 的 API 实现（`anthropicMessagesApi`、`openAICompletionsApi`）只经公开子路径 `@earendil-works/pi-ai/api/<api>.lazy` 导出，主入口不导出；`packages/testkit` 使用了它们 | T06 落地"禁止深度导入"的 ESLint 规则时放行 `package.json` `exports` 中声明的子路径（只禁 `dist/` 等未导出路径） |
+| I15 | T05 | pi-ai 的 API 实现（`anthropicMessagesApi`、`openAICompletionsApi`）只经公开子路径 `@earendil-works/pi-ai/api/<api>.lazy` 导出，主入口不导出；`packages/testkit` 使用了它们 | 已落地（T06）：`eslint.config.mjs` 的 `piPublicImports` 按各包 `exports` 放行子路径，只禁未导出的路径 |
 | I16 | T06 | Pi 1.5.1 起 `cacheWarming` 默认为 `"idle"`：会话空闲时最多 30 分钟内自动发请求保温提示缓存（模型配置了 `promptCache` 才会触发），会产生模型费用；Agent Host 目前沿用 Pi 默认值 | T21 生成 `pi/settings.json` 时显式设定，T27 的用量与成本界面说明这类请求；默认值请用户在 R2 确认 |
 
 ## 技术债
