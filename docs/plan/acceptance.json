@@ -986,92 +986,92 @@
       "id": "T07-A01",
       "task": "T07",
       "description": "六个工具的每次调用都在 Core 收到对应的 AHP 请求（Read→`fs/read`、Write→`fs/write`、Edit→`fs/read` 与 `fs/write`、Bash→`exec/run`、Glob→`fs/glob`、Grep→`fs/grep`）。验证：场景测试中对 Core 侧调用记录的断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test agent_host（tools::the_six_canonical_tools_delegate_every_operation_to_core）：一个回合依次调用六个工具，harness 记录的 Core 侧调用按 origin.tool 分组为 Read→{fs/stat, fs/read}、Write→{fs/mkdir, fs/write}、Edit→{fs/stat, fs/read, fs/write}、Bash→{exec/run}、Glob→{fs/stat, fs/glob}、Grep→{fs/grep}，全部成功，断言通过；见 tmp/evidence/T07/s4-agent-host-e2e.txt"
     },
     {
       "id": "T07-A02",
       "task": "T07",
       "description": "场景运行期间，Agent Host 进程内对工作区路径的 fs 调用为 0，`child_process` 调用为 0。验证：运行时 spy 测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "同一测试经 NODE_OPTIONS=--import 预加载 packages/testkit/src/io-spy.ts：场景期间（提示词发出到回合结束）Agent Host 对工作区路径的 fs 调用 0、child_process 调用 0；会话创建时 Pi 的 assertSessionCwdExists 有 1 次 existsSync(cwd)，测试单独断言且登记 I20；输出“I/O spy: 0 fs calls on workspace paths or child_process calls during the scenario, 1 while the session opened”，见 tmp/evidence/T07/s4-agent-host-e2e.txt"
     },
     {
       "id": "T07-A03",
       "task": "T07",
       "description": "在 `agent-host/src/tools/` 或 `agent-host/src/harness/` 中引入 `fs` 或 `child_process` 被 ESLint 拦截。验证：临时违规时 `npm run lint` 失败的输出，撤销后通过。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "在 agent-host/src/tools/ 与 agent-host/src/harness/ 临时加入 node:fs、child_process、fs/promises 静态导入、node:fs/promises 动态导入与 node:child_process 导入后 npm run lint 报 5 个 no-restricted-imports/no-restricted-syntax 错误、exit 1；撤销后 exit 0；见 tmp/evidence/T07/a03-npm-run-lint-violation.txt、a03-npm-run-lint-clean.txt"
     },
     {
       "id": "T07-A04",
       "task": "T07",
       "description": "模型收到的工具列表恰好是 Read、Write、Edit、Bash、Glob、Grep 六个规范名，描述为默认 Profile 的文本，不含 Pi 原生工具名。验证：mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "tools::the_six_canonical_tools_delegate_every_operation_to_core：mock 记录的 7 个请求的 tools 均恰为 Read、Write、Edit、Bash、Glob、Grep，描述以默认 Profile 文本开头，不含 read/write/edit/bash/grep/find/ls/powershell；单元测试 agent-host/src/tools/profile.test.ts 检查默认 Profile；见 tmp/evidence/T07/s4-agent-host-e2e.txt"
     },
     {
       "id": "T07-A05",
       "task": "T07",
       "description": "名称映射表双向正确；用测试 Profile 改名后模型看到新名称，事件与 Core 侧仍得到规范名。验证：单元测试与场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "单元：npx vitest run agent-host（profile.test.ts：ToolNameMap 双向映射、改名、拒绝重名/非法名/Pi 原生名）；场景：tools::a_tool_profile_renames_tools_for_the_model_only 以 --tool-profile 改名为 read_file 等，模型看到新名与测试描述，tool_use 为 write_file/read_file/run_shell，item/* 事件为 Write/Read/Bash，Core 收到的 origin.tool 为 {Bash, Read, Write}；见 tmp/evidence/T07/s4-agent-host-e2e.txt、vitest-agent-host-protocol.txt"
     },
     {
       "id": "T07-A06",
       "task": "T07",
       "description": "行为对照场景全部运行，结果一致，或差异已逐条列出原因与处理。验证：对照测试输出与 S4 报告中的对照表。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "parity::delegated_tools_behave_like_pi_native_tools：17 个场景（Read 全文/分页/不存在/图片、Write 新建/覆盖、Edit 唯一替换/CRLF/找不到、Bash 成功/失败/仅 stderr、Grep 有匹配/glob/无匹配、Glob 匹配/.gitignore 过滤）中 16 个与 Pi 原生一致，1 个有意差异（Glob 不列 node_modules，Pi 的 find 在自定义 glob 时自行排除），运行后工作区 11 个文件逐字节相同；对照表见 docs/spikes/S04-operations-delegation.md 第 7 节与 tmp/evidence/T07/s4-agent-host-e2e.txt"
     },
     {
       "id": "T07-A07",
       "task": "T07",
       "description": "绝对路径越界、`..` 越界、指向工作区外的符号链接三种情况，`fs/*` 都返回结构化错误且不触碰目标文件。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --test tool_io（every_fs_method_refuses_paths_outside_the_workspace）：绝对路径、..、指向外部的符号链接文件与目录，对 fs/stat、fs/read（文本与 blob）、fs/write（覆盖与追加）、fs/mkdir、fs/list、fs/glob、fs/grep 均返回 outsideWorkspace（不可重试，带 path/resolved/root），外部文件内容与修改时间不变、未建目录、未复制 blob；exec/run 的 cwd 同样受限；piarc-fs 单元测试另覆盖悬空链接与环；见 tmp/evidence/T07/a07-a08-tool-io.txt、crates-unit.txt"
     },
     {
       "id": "T07-A08",
       "task": "T07",
       "description": "`exec/run` 在命令结束前就经通知送出输出，结束时返回退出码；取消后子进程被终止。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --test tool_io：exec_run_streams_output_before_the_command_ends 中第一条 exec/output（seq 1）在 2 s 命令开始后 1.5 s 内到达且命令仍在运行，结束时响应 {exitCode: 4, killed: false}；exec_kill_terminates_the_command 中 exec/kill 返回 killed: true、exec/run 以 killed 结束、kill -0 确认进程已退出；连接关闭也终止命令；piarc-exec 单元测试覆盖流式与取消；见 tmp/evidence/T07/a07-a08-tool-io.txt"
     },
     {
       "id": "T07-A09",
       "task": "T07",
       "description": "新增的 `fs/*`、`exec/*` 消息都有 schema 与 golden 样本，样本完整性检查通过。验证：verify 中对应步骤的输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify 第 9 步 protocol drift 通过、第 10 步“Contract sample check passed: 47 contracts have samples.”（新增 fs/stat、fs/read、fs/write、fs/mkdir、fs/list、fs/glob、fs/grep、exec/run、exec/kill 的请求与 result 契约及 exec/output 通知共 20 个，各有样本与反例）；cargo test -p piarc-protocol 与 npx vitest run packages/protocol 的契约往返通过；见 tmp/evidence/T07/a13-verify.txt"
     },
     {
       "id": "T07-A10",
       "task": "T07",
       "description": "小文件 `fs/read` 的 AHP 往返 p95 ≤ 5 ms（≥ 1,000 次）。验证：契约测试中的计时输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test ahp_round_trip -- --nocapture：Node 客户端代替 Agent Host 经真实 stdio 发 2,200 次小文件 fs/read（预热 200），计 2,000 次：p50 0.133 ms、p95 0.189 ms、p99 0.257 ms、max 1.788 ms，断言 p95 ≤ 5 ms 通过；见 tmp/evidence/T07/a10-round-trip.txt"
     },
     {
       "id": "T07-A11",
       "task": "T07",
       "description": "T06 的 S3 双会话场景改用委托工具后仍然通过，两个会话的路径各自解析到自己的工作区。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "two_sessions_run_tool_calls_concurrently_and_only_touch_their_own_workspace 改用 Write/Edit/Read 委托工具后通过：两个会话各自写入自己的 notes/note.txt，check_own_core_calls 断言每个会话的 7 个 Core 调用依次为 fs/mkdir、fs/write、fs/stat、fs/read、fs/write、fs/stat、fs/read，请求路径在本会话 cwd 下、解析后路径在本会话工作区内；见 tmp/evidence/T07/s4-agent-host-e2e.txt"
     },
     {
       "id": "T07-A12",
       "task": "T07",
       "description": "S4 报告已写入，`docs/spikes/README.md` 已更新。验证：文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/spikes/S04-operations-delegation.md 已写入（Operations 覆盖、替身路径、改名与零直接调用、AHP 方法与内容传输、路径限定、对照表、往返耗时、流式与取消、结论，Windows 待 CI/W0）；docs/spikes/README.md 的 S4 行已更新"
     },
     {
       "id": "T07-A13",
       "task": "T07",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify：All 13 steps passed（Prettier、ESLint、tsc、Core 模块与快照、Vitest、cargo fmt、clippy、cargo test、protocol drift、contract samples、cargo-deny、crate 依赖、验收清单），见 tmp/evidence/T07/a13-verify.txt"
     },
     {
       "id": "T08-A01",

@@ -110,7 +110,7 @@ read、write、edit 的探测只依赖传给工具的 `path` 字符串。PiArc �
 | 15 | 有匹配 | Glob | **有意差异**，见下 |
 | 16 | 只有被 `.gitignore` 忽略的文件 | Glob | 一致（`No files found matching pattern`） |
 
-运行后两个工作区的 10 个文件逐字节相同。
+运行后两个工作区的 11 个文件逐字节相同。
 
 有意差异：
 
