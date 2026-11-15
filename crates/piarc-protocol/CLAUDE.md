@@ -1,6 +1,6 @@
 # piarc-protocol
 
-AHP 与 Core API 数据类型的唯一来源：Rust 类型 → JSON Schema → `@piarc/protocol` 的 TS 类型（ADR-0009 第 7 条、ADR-0014 第 6 条）。另含版本协商 `negotiate` 与只处理字节缓冲的 LF 帧编解码器。不负责 I/O、进程监管、心跳与背压（`piarc-host`）。
+AHP 与 Core API 数据类型的唯一来源：Rust 类型 → JSON Schema → `@piarc/protocol` 的 TS 类型（ADR-0009 第 7 条、ADR-0014 第 6 条）。另含版本协商 `negotiate`、只处理字节缓冲的 LF 帧编解码器，以及终端帧格式草案 `term_frame`（二进制，不导出 JSON Schema，T33 定稿；改动要同步渲染进程的 TS 解码器并重写共享样本，见 `crates/piarc-term/CLAUDE.md`）。不负责 I/O、进程监管、心跳与背压（`piarc-host`）。
 
 ## 命令
 

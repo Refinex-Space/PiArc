@@ -161,6 +161,15 @@ Playwright 配置在 `apps/desktop/playwright.config.ts`，两个 project 跑同
 - 安全用例针对渲染不可信内容的界面，用 `src/shared/xss-payloads.ts` 的载荷集：哨兵变量未变、无 CSP 违规、界面内没有载荷要的元素和 `on*` 属性、链接只有 `https:`/`http:`/`mailto:`、没有对外请求、载荷原文以文本出现（`e2e/transcript-security.e2e.ts`）。
 - 性能不在 L4 中断言：`npm run bench:s1` 测量并输出 JSON（`tmp/evidence/T09/bench/`），数字写进 S1 报告；T44 把预算接入 CI。
 
+### 9.6 终端（T10）
+
+- 用例经 `e2e/terminal.ts` 的 `openTerminal(app, page, options)` 把窗口重载到 `#/terminal-lab?manual`，经主进程测试钩子 `createTerminal` 启动指定程序（`/bin/sh`、`cat`、`vim`、`top`）并交给页面；断言用页面从帧重建的屏幕（`screenText`）、Core 的 formatter 文本（`coreText`）与双方计数（`labStats`、`coreStats`）。截图前用 `settledScreen` 等页面与 formatter 一致并保持 300 ms。
+- 隐藏不拉帧：比较隐藏期间 Core 的帧计数与页面的请求数（都应不变），同时 Core 读到的字节数增加，证明程序一直在输出。
+- 等待程序状态时先让程序打印标记（例如 `printf '\033[?1hready\n'`），再按键：Core 按按键到达时的终端模式编码。
+- 帧编解码的一致性在 L0：`cargo test -p piarc-term --test consistency` 把帧与 formatter 逐格比较，并生成 TS 共享样本；`npx vitest run apps/desktop/src/renderer/terminal` 用同一样本检查 TS 解码器。
+- 性能不在 L4 中断言：`npm run bench:s7` 输出 JSON（`tmp/evidence/T10/bench/`），数字写进 S7 报告。
+- 这些 L4 用例与 `crates/piarc-term/tests/pty.rs` 用 Unix 程序，在 Windows 上不运行；ConPTY 与 Windows 程序的版本由 W0 补上。
+
 ## 10. 严格 mock provider
 
 L0–L2 的模型侧一律接 `piarc-testkit` 的严格 mock provider（架构第 12.2 节）。它模拟两种流式线格式，先校验每个请求，不合规就返回 400 并写明违反的规则；合规才按场景脚本返回下一步。

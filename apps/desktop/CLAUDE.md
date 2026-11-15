@@ -17,6 +17,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 | `npx vitest run apps/desktop` | 主进程纯函数的单元测试，以及 `core.integration.test.ts`（真实 Core 在 Node 中跑事件通道，需先 `npm run build:core`） |
 | `npm run bench:s2 -- --form packaged` | S2 基准（默认 10 万事件/分钟 × 5 分钟），JSON 写到 `tmp/evidence/T04/bench/`；`--minutes 0.5` 快速版 |
 | `npm run bench:s1 -- --form packaged` | S1 基准（transcript）：100 token/s 流式 60 s、1 万条滚动、1,000 条冷加载、渲染进程内存；帧数据来自 CDP 追踪，JSON 写到 `tmp/evidence/T09/bench/`；`--seconds`、`--scroll-seconds`、`--cold-runs` 可调 |
+| `npm run bench:s7 -- --form packaged` | S7 基准（终端）：`cat` 大文件与键入回显，JSON 写到 `tmp/evidence/T10/bench/` |
 | `npx vitest run apps/desktop/src/renderer` | 渲染进程纯逻辑的单元测试：增量 Markdown、自动闭合、转换与链接净化、滚动跟随、流式节奏、store、复制、composer |
 
 ## 结构
@@ -46,6 +47,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
   - `markdown.worker.ts`：请求 `append`（流式文档追加，`final` 结束）、`parse`（成批解析已完成的文档）、`drop`；响应 `updates`，每个文档给 `keep`（保留前几个块，同一对象）与之后的 `blocks`。类型与守卫在 `transcript/markdown/protocol.ts`；
   - `highlight.worker.ts`：shiki core + JavaScript 正则引擎，请求 `highlight`（`id`、语言 id、代码），响应 `highlighted`（每行的 token：文本、明暗两套颜色、字形位）或 `failed`。类型在 `transcript/highlight/protocol.ts`；
 - composer（T09）在 `src/renderer/composer/`：`schema.ts`（段落与 mention 节点）、`mention-plugin.ts`、`serialize.ts`（发送文本、mention 数据、显示片段三者分开）、`intents.ts`（键位语义）、`ime-guard.ts`、`Composer.tsx`。
+- 终端（T10，ADR-0017）：主进程 `src/main/core/terminal-ipc.ts`（六个命令、终端归属、帧原样投到发起窗口的事件端口）；渲染进程 `src/renderer/terminal/`：`frame/`（帧解码器与 `Screen`，共享样本 `frame-samples.json` 由 Rust 生成）、`remote-renderable.ts`、`controller.ts`（rAF 拉取、隐藏不拉取、输入后连续拉取、键盘与输入法）、`keys.ts`、`TerminalLab.tsx`（`#/terminal-lab`，`?manual` 不自带 shell，`globalThis.__piarcTerminalLab`，类型在 `src/shared/terminal-lab.ts`）；`vendor/ghostty-web/` 是 fork 的 `CanvasRenderer`（MIT，来源与改动见其 README）。
 - `src/renderer/lab/`：`#/transcript-lab` 原型页，用 `fixtures/` 的合成事件驱动 transcript 与 composer，经 `globalThis.__piarcTranscriptLab` 给 L4 与 S1 基准用（类型在 `src/shared/transcript-lab.ts`）。XSS 载荷集在 `src/shared/xss-payloads.ts`。
 
 ## 不变量
@@ -58,6 +60,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 外链只放行 `https:`、`http:`、`mailto:`，必须先经原生确认框。
 - 主进程比较 origin 用 `originOf`，不用前缀匹配，也不直接用 `new URL(x).origin`。
 - 主进程只按路由键转发事件批次，不解析载荷；批次一律经结构化克隆复制（Electron 45 的 `MessagePortMain` 只能转移端口，ADR-0019）；不要尝试转移 `ArrayBuffer`。
+- 终端：窗口只能用自己创建的终端（`TerminalOwners`），窗口销毁时关闭它的终端；主进程不解析拉取请求与帧。改 `vendor/ghostty-web/` 下的代码要同步其 README 的改动清单，保留 MIT 声明。
 - 渲染进程不加载原生模块；Core 只经主进程（`window.piarc.subscribeEvents` 等）。页面回调只收到批次，没有 Electron 的 event 对象。
 - 安全渲染（架构第 10.3 节）：渲染进程不从 HTML 字符串建 DOM，ESLint 禁止 `innerHTML`、`outerHTML`、`dangerouslySetInnerHTML`、`insertAdjacentHTML`、`createContextualFragment`、`setHTMLUnsafe`、`document.write`；模型输出里的原始 HTML 作为 `html` 节点按文本显示；链接只保留 `safeHref` 通过的 `https:`、`http:`、`mailto:`，点击经 `window.piarc.openExternal`（主进程确认框）；图片不加载，显示为链接；代码高亮只输出 token 与颜色。
 - 高亮不放宽 CSP：shiki 用 `@shikijs/engine-javascript`，不用需要 `wasm-unsafe-eval` 的 Oniguruma 引擎；语法按需加载，每种一个 chunk，`GRAMMARS` 与 `languages.ts` 的别名表一起改。
@@ -83,8 +86,10 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 帧时间的口径：rAF 间隔与 `AnimationFrame`（LoAF 口径）在 60 Hz 屏上空闲时也约 16.7 ms，不能拿来和"p99 ≤ 16 ms"比；S1 基准用两次 `BeginMainThreadFrame` 之间主线程任务的总耗时（每帧工作量）。
 - 复制相关的 L4 会写系统剪贴板：用例经 `withSavedClipboard` 读出原内容、结束后写回（只恢复文本）。
 - ProseMirror 自己在合成期间不分发按键，所以只测合成中的按键测不出守卫是否生效；`composer.e2e.ts` 另有"合成开始前到达的 229 按键"和"合成文本恰为 `@`、`/`"两类用例，去掉守卫时它们会失败。
+- 页面处理按键之后，经事件 MessagePort 投来的消息要到下一帧的 rAF 之后才被处理（`invoke` 的回复不受影响）：终端帧走 MessagePort 时回显因此慢一帧，见 ADR-0023（提议）与 S7 报告第 5.2 节。
+- 终端 L4（`terminal.e2e.ts`、`terminal-tui.e2e.ts`）用 `/bin/sh`、`cat`、`vim`、`top`，在 Windows 上跳过，由 W0 换成 Windows 程序。
 - 贴底依赖 ResizeObserver 观察列表的尺寸容器（`TranscriptList` 的 sizer）：换虚拟列表实现时要保证内容增长能在同一帧报告尺寸变化，react-virtuoso 做不到（ADR-0022）。
 
 ## 参考
 
-- 架构第 3.4、7.6、8.1–8.5、10.3、11 章；ADR-0013、ADR-0014、ADR-0018 第 1 条、ADR-0022；`docs/spikes/S10-electron-security.md`、`S02-napi-event-channel.md`、`S01-transcript-composer.md`；`docs/engineering/testing.md` 第 9 节。
+- 架构第 3.4、6.11、7.6、8.1–8.5、10.3、11 章；ADR-0013、ADR-0014、ADR-0017、ADR-0018 第 1 条、ADR-0022、ADR-0023（提议）；`docs/spikes/S10-electron-security.md`、`S02-napi-event-channel.md`、`S01-transcript-composer.md`、`S07-terminal.md`；`docs/engineering/testing.md` 第 9 节。

@@ -90,8 +90,9 @@ windows-native-keyring-store = { version = "=1.1.0", default-features = false }
 zeroize     = { version = "=1.9.1", features = ["serde", "std"] }
 
 [workspace.lints.rust]
-# `unsafe` is allowed only in -sys crates and at the NAPI boundary; those crates
-# opt out at the crate root with `#![allow(unsafe_code, reason = "...")]`.
+# `unsafe` is allowed only in -sys crates, at the NAPI boundary and in the safe
+# wrapper module of a -sys crate (piarc-term's `vt`); the crates opt out at the
+# crate root, the wrapper on its module declaration, each with a reason.
 unsafe_code = "deny"
 
 [workspace.lints.clippy]

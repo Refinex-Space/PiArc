@@ -103,7 +103,8 @@ Markdown 不进 Prettier：文档中的宽表格每次编辑都会被重新填�
 
 ### 2.8 unsafe
 
-- `unsafe` 只允许出现在 `-sys` crate（`piarc-ghostty-sys`）与 NAPI 边界（`piarc-napi`）。workspace lints 对 `unsafe_code` 设为 deny；这两个 crate 在 crate 根写 `#![allow(unsafe_code, reason = "...")]` 放开。
+- `unsafe` 只允许出现在 `-sys` crate（`piarc-ghostty-sys`）、NAPI 边界（`piarc-napi`）与 `-sys` 层的 safe 封装模块（`piarc-term` 的 `vt` 模块，T10）。workspace lints 对 `unsafe_code` 设为 deny；前两个 crate 在 crate 根写 `#![allow(unsafe_code, reason = "...")]` 放开，safe 封装只在模块声明上放开（`#[allow(unsafe_code, reason = "...")] mod vt;`），crate 的其余部分仍然禁止。
+- 按输出类型读值的 FFI 辅助函数（传入数据键与输出指针）写成 `unsafe fn`，在 `# Safety` 中写明"类型必须与数据键对应"，调用处的 `// SAFETY:` 写出具体的对应关系。
 - 每个 `unsafe` 块前写 `// SAFETY:` 注释，说明满足了哪些前置条件（clippy `undocumented_unsafe_blocks`，verify 第 7 步）。
 - `unsafe fn` 内部的不安全操作也要包在 `unsafe {}` 块中（edition 2024 默认的 `unsafe_op_in_unsafe_fn`）。
 
@@ -214,6 +215,14 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | XSS 载荷集 | `apps/desktop/src/shared/xss-payloads.ts`（`XSS_PAYLOADS`、`xssMessage`、`FORBIDDEN_TAGS`、哨兵 `__piarcXssSentinel`） | `<script>`、内联事件属性、`javascript:` 链接（含字符引用编码）、带脚本的 SVG、`<iframe>`、`<style>`、`<object>`/`<embed>`、`<meta>` 刷新、远程与 `data:` 图片、`<form>`；新的渲染不可信内容的界面（diff、工具输出、MCP 结果）用它写安全用例（参照 `e2e/transcript-security.e2e.ts`） | T09 |
 | 代码高亮 | `apps/desktop/src/renderer/workers/highlight.worker.ts`、`transcript/highlight/`（`HighlightClient`、`languages.ts`、`CodeBlock.tsx`） | shiki 在 Worker 中用 JavaScript 正则引擎产出结构化 token（不需要放宽 CSP），语法按需加载；结果缓存，超过 `HIGHLIGHT_MAX_CHARS` 的代码不高亮。diff 与文件预览的高亮复用它 | T09 |
 | 渲染性能测量 | `scripts/bench/s1-transcript.mjs`（`npm run bench:s1`，`analyzeTrace`、`summarizeFrames`） | 经 CDP 追踪渲染进程：每帧主线程工作量、超过 50 ms 的任务、合成器帧状态；页面的 rAF 间隔与帧率；冷加载与 `app.getAppMetrics()` 内存。T44 的性能预算进 CI 复用 | T09 |
+| 终端帧编解码器 | Rust：`piarc_protocol::term_frame::{encode, decode, Screen}`；TS：`apps/desktop/src/renderer/terminal/frame/`（`decodeFrame`、`Screen`） | 草案格式（T33 定稿）的唯一实现：Core 编码、渲染进程解码与重建屏幕；两份实现跑同一组共享样本 `frame-samples.json`（由 `piarc-term` 的一致性测试生成并检查） | T10 |
+| 终端会话 | `piarc_term::{Session, SessionConfig, Event}`、`piarc_term::frame::FrameEncoder`；Core 注册表 `piarc_core::terminal`（`CoreRuntime::create_terminal` 等） | PTY + libghostty-vt + IO/写线程 + effects + 按 viewer 的增量帧；读屏用 `Session::viewport_text`（formatter）。T33 的无头终端、T32 的终端承载任务在它之上扩展 | T10 |
+| 浏览器按键到终端输入 | 渲染进程 `terminal/keys.ts`（`keyMessage`）；Core `piarc_term::keymap::{key_for_code, key_input}` | 按键事件原样（`code`、字素文本、修饰键）交给 Core，由 libghostty-vt 按终端模式编码；W3C `code` → `GhosttyKey` 映射表 | T10 |
+| 预编译产物下载与校验 | `crates/piarc-ghostty-sys/build.rs` + `build/artifact.rs`（`Lock`、`verify`、`sha256_hex`）；锁定文件 `ghostty-vt.lock.json`；脚本侧定位产物 `scripts/lib/ghostty-vt.mjs`（`ghosttyArtifact`） | 锁定文件集中 URL、版本、SHA-256 与公钥；缓存 + 离线开关；SHA-256 与 minisign 任一不符即构建失败并说明。新的预编译二进制按同样方式接入 | T10 |
+| minisign 校验 | workspace 依赖 `minisign-verify`（0.3.0，零依赖）；用法 `piarc-ghostty-sys/build/artifact.rs` 的 `verify_minisign` | 只接受预哈希（`ED`）签名，校验受信注释；单元测试用官方真实签名做篡改用例。T12、T50 校验发布清单签名时复用 | T10 |
+| 第三方许可证来源登记 | `third-party/sources.json`、`third-party/licenses/` | 不经包管理器进入产物的代码与二进制（预编译库、vendor 的源码）在这里登记版本、来源与许可证文本；T50 生成 `THIRD_PARTY_NOTICES` 时读取 | T10 |
+| 终端渲染器（Canvas） | `apps/desktop/src/renderer/terminal/vendor/ghostty-web/renderer.ts`（fork，来源与改动见同目录 README）、`remote-renderable.ts`、`controller.ts`（`TerminalController`） | 帧驱动的 Canvas 绘制、按 rAF 拉取与隐藏不拉取、输入后连续拉取、隐藏 textarea 跟随光标与预编辑绘制；T34 的终端面板从这里开始 | T10 |
+| 终端性能测量 | `scripts/bench/s7-terminal.mjs`（`npm run bench:s7`，`writeLogFile`）；页面计数 `__piarcTerminalLab.stats()`；Core 计数 `terminalStats` | `cat` 大文件期间的主进程事件循环、渲染追踪、帧与 IPC 字节、Core 解析与编码耗时；键入回显的配对测量（Core 直写 PTY 的基线 `terminalProbeEcho`）。T44 复用 | T10 |
 | 工具名映射 | `agent-host/src/tools/profile.ts`（`ToolNameMap`、`DEFAULT_PROFILE`、`profileWithOverrides`） | 模型可见名 ↔ 规范名双向查询；规则、hooks、事件、Core 一律用规范名，按模型家族调整的 Profile 在这里扩展 | T07 |
 | 在 Pi 工具代码上换掉路径 | `agent-host/src/tools/stand-in.ts`（`StandIn`、`serialized`） | 让 Pi 的工具定义在替身路径上运行、Operations 指向真实路径、结果换回原路径；同一文件的写入串行（ADR-0020） | T07 |
 | 行为对照与 I/O spy | `crates/piarc-testkit/tests/agent_host/parity.rs`；`harness.rs` 的 `with_io_spy`、`spy_report`、`offered_tools`、`tool_results_in`、`Core::calls_of`；`packages/testkit/src/io-spy.ts` | 同一脚本对比 Pi 原生工具与委托工具（结果与工作区快照，预期差异登记原因）；证明 Agent Host 不绕过 Core；读取 mock 请求中的工具列表与工具结果（含图片块） | T07 |

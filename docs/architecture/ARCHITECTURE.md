@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.12（2026-11-15） |
+| 版本 | 2.13（2026-11-15） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -636,6 +636,8 @@ Agent Host 按类别统计上下文构成（system prompt、工具定义、MCP �
   - agent 用 formatter 读取屏幕与 scrollback 的纯文本，用 OSC 133 判断命令边界和退出状态，与用户看到的是同一个终端实例。
   - 与会话共享工作目录与环境；支持 OSC 133 shell integration；退出时保存 snapshot 以便重启后恢复。终端内容不自动进入模型上下文，用户可以把选中内容附加到对话。
   - 自研渲染器不达标时，渲染端退回 xterm.js 6 + WebGL 的字节流副本模式，Core 仍是唯一权威。
+  - T10 原型的实现（`docs/spikes/S07-terminal.md`）：每个终端一个 IO 线程（读 PTY、`vt_write`）与一个写线程（输入、按终端模式编码按键、调整尺寸、查询应答）；注册 `WRITE_PTY`、`TITLE_CHANGED`、`BELL`、`RENDER_HOLD` 四个 effects，同步输出 hold 开始时捕获当时的屏幕，超过 1 秒由 Core 结束；帧格式草案在 `piarc_protocol::term_frame`（T33 定稿），脏行与 viewer 已有的内容逐格比较后才发送；每个终端当前只有一个 viewer，换 viewer 时发 RESET 帧；标题、响铃、退出事件发到路由 `term/<id>`；页面每个动画帧最多一个在途拉取，输入后连续拉取直到回显到达（最多 50 ms）。帧的送达方式见 ADR-0023（提议）：按本节原文经事件 MessagePort 时，键入回显额外延迟 p95 16 ms，超出第 11 章预算。
+  - PTY 子进程由 portable-pty 启动（ADR-0017），不经 `ProcessSpawner`；终端承载的后台任务（T32、T33）接入时再决定进程树清理的方式。
 
 ### 6.12 Worktree 与并行会话
 
@@ -729,6 +731,7 @@ crates/
 - I/O 边界用窄 trait 隔离（`ProcessSpawner`、`FileSystem`、`Clock`、`SecretStore`、`AgentHostTransport`），测试用内存实现驱动。
 - 错误类型化：每个 crate 定义 `thiserror` 枚举，带可机读的 `kind` 与 `retryable`；跨 NAPI 和 AHP 时映射为结构化错误，不传裸字符串。
 - panic 不得穿过 NAPI 边界：导出函数在边界处捕获 panic 并转成结构化错误，Core 内部错误不能让主进程崩溃。
+- `unsafe` 只出现在 `-sys` crate、`piarc-napi` 与 `piarc-term` 的 `vt` 模块（libghostty-vt 的 safe 封装，T10）；规则与写法见 `docs/engineering/coding-standards.md` 第 2.8 节。
 - 单文件超过 1,000 行、单函数超过 80 行需要在评审中说明理由（规避 claw-code 的上帝文件问题）。
 
 ### 7.2 运行时与并发
@@ -862,6 +865,7 @@ impl Session {
 - 渲染进程能调用的命令是上面接口的子集，在 preload 中逐个列出；主进程校验调用来源（发起请求的窗口和页面地址）后才转给 Core。
 - NAPI-RS 生成的 TypeScript 声明与 `packages/protocol` 的类型都纳入 L1 快照测试，接口变化必须同时更新快照。
 - 已实现的导出面（T04）：`CoreRuntime.create(options, onEvents)`、`shutdown(): Promise<void>`、`state`。`onEvents` 每次收到一组批次 `{ route, seq, payload }`：`route` 是路由键（1–128 个 `[A-Za-z0-9._:/-]`，`core/` 前缀保留给 Core 自己的事件，例如 `core/errors`），`seq` 是每个路由从 1 起连续的批次序号，`payload` 是该路由事件的 UTF-8 JSON 数组（`Uint8Array`），主进程不解析，以结构化克隆转发（ADR-0019）。开发构建另有 `testing` 导出（演示事件源、同步轻量方法 `echo`、计数、panic 触发），发布构建不含。
+- 终端导出（T10）：`createTerminal`、`terminalInput`、`terminalKey`、`terminalResize`、`terminalFrame(id, viewer, full): Promise<Uint8Array>`、`closeTerminal`；开发构建另有 `terminalText`、`terminalStats`、`terminalProbeEcho`。主进程校验终端归属（窗口只能用自己创建的终端，窗口销毁时关闭它们），帧不解析、原样转给发起请求的窗口。
 - 错误跨 NAPI 时是抛出的 `Error`，带 `code` 与 `data: { kind, retryable, details? }`（`piarc_protocol::ErrorObject` 的形状）；导出函数在边界捕获 panic，kind 为 `internalError`。Core API 专用的错误类别有 `shuttingDown`（关闭后的请求）与 `busy`（队列满，可重试）。
 - Promise 由 Core 自己的运行时经 NAPI-RS 的 `JsDeferred` 结算，不用 `#[napi] async fn`（它会另起 NAPI-RS 的全局 tokio 运行时）。
 - 声明快照在 `apps/desktop/src/main/core/native/`（`piarc-core.d.ts` 为发布构建，`piarc-core.testing.d.ts` 为开发构建），由 `npm run build:core` 生成，verify 比对。
@@ -1229,7 +1233,7 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 | 前端 | React、TypeScript、Vite，精确锁定 |
 | 打包 | Electron Forge（ADR-0018），精确锁定 |
 | Rust | `rust-toolchain.toml` 锁定 stable 版本；NAPI-RS 精确锁定（ADR-0014） |
-| libghostty-vt | 精确锁定官方预编译产物，校验 SHA256 与 minisign 签名（ADR-0017） |
+| libghostty-vt | 精确锁定官方预编译产物，校验 SHA256 与 minisign 签名（ADR-0017）；锁定文件 `crates/piarc-ghostty-sys/ghostty-vt.lock.json`，产物缓存在 `.tools/cache/ghostty-vt/`；macOS 静态链接，Windows MSVC 链接官方 DLL 的导入库、DLL 随 `.node` 放在同一目录（T10） |
 | Pi | `@earendil-works/*` 精确版本锁定（第 5.7 节） |
 | 测试 | Vitest（TS）、cargo test / nextest（Rust）、Playwright（Electron UI） |
 | 脚本 | Node 或 Python，跨平台，不写死路径分隔符 |
@@ -1249,7 +1253,7 @@ crates/*  ──cargo + @napi-rs/cli──► piarc-core.<platform>-<arch>[-msvc
 agent-host ──esbuild──► agent-host.mjs
 design/tokens ──脚本──► CSS 自定义属性 + TS 常量
 apps/desktop ──Forge（plugin-vite）──► 主进程 / preload / 渲染进程产物 ──► app.asar
-Forge 打包 ──► 放入 .node（app.asar.unpacked/native/）、内置 Node、rg、fd、agent-host ──► 写入 fuses
+Forge 打包 ──► 放入 .node 与 Windows 的 ghostty-vt.dll（app.asar.unpacked/native/）、内置 Node、rg、fd、agent-host ──► 写入 fuses
   macOS：ad-hoc 重签 ──► DMG + ZIP
   Windows：Velopack 安装包与更新包（不签名）
 全部产物 ──► 发布清单（文件名 + SHA-256）──► 项目 Ed25519 密钥签名（minisign）──► GitHub Releases
@@ -1400,6 +1404,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | 版本 | 日期 | 说明 |
 |---|---|---|
 | 1.0 | 2026-11-14 | 首版：基于对 Claude 官方文档、Pi v1.4.0 源码、claude-code / claw-code / OpenClaudeDesktop / open-claude-ui 参考实现与原生技术栈的调研 |
+| 2.13 | 2026-11-15 | T10 补充：6.11 写明终端原型的线程、effects、同步输出处理、帧格式草案位置、viewer 与 RESET、事件路由、拉取节奏与 PTY 子进程的启动方式，并指出按原文经 MessagePort 送帧时回显超出预算（ADR-0023 提议，未改 ADR-0017 原文）；7.1 写明 `unsafe` 也可出现在 `piarc-term` 的 `vt` 模块；7.6 加入终端导出与主进程的归属校验；13.1、13.2 写明 libghostty-vt 的锁定文件、缓存与 Windows DLL 的随附方式 |
 | 2.8 | 2026-11-15 | T05 补充：12.2 写明严格 mock provider 的实现位置、运行形态、场景选择与 400 错误体约定，细节指向 `testing.md` 第 10 节 |
 | 2.12 | 2026-11-15 | T09 补充（ADR-0022）：第 4 章加入 ADR-0022；8.4 写明选定的库、增量解析的稳定前缀规则与自动闭合、高亮的 JavaScript 引擎与限制、校准后的流式节奏与滚动跟随常量、复制的行为与剪贴板权限；10.3 权限放行清单加入 `clipboard-sanitized-write` |
 | 2.11 | 2026-11-15 | T08 补充（ADR-0021）：第 4 章加入 ADR-0021；5.4 写明 Pi 1.5.2 的凭据注入点是异步的 `CredentialStore`（R11 在此不出现）与适配层的读写、加锁和失败方式；5.5 删去内存凭据一句；7.1 `piarc-ports` 定义 `SecretStore`；7.4 加入 `secrets/*` 六个方法、`secrets/changed` 通知、键的命名与五个新错误类别；9.1 写明保险箱文件格式 v1、主密钥位置与服务名；第 14 章 R11 记录 M0 结论 |

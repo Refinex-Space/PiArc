@@ -17,7 +17,8 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | 命令 | 用途 |
 |---|---|
 | `npm ci --ignore-scripts` | 按 lockfile 安装 npm 依赖（CI 同款） |
-| `node scripts/dev/install-tools.mjs` | 把锁定版本的 cargo-deny、ripgrep、fd 装进 `.tools/`（不做全局安装）；verify 第 11 步需要 cargo-deny，Agent Host 行为对照测试（Pi 原生 grep/find）需要 ripgrep 与 fd |
+| `node scripts/dev/install-tools.mjs` | 把锁定版本的 cargo-deny、ripgrep、fd、bindgen-cli 装进 `.tools/`（不做全局安装）；verify 第 11 步需要 cargo-deny，Agent Host 行为对照测试（Pi 原生 grep/find）需要 ripgrep 与 fd，重新生成 libghostty-vt 绑定需要 bindgen |
+| `node scripts/dev/gen-ghostty-bindings.mjs [--check]` | 重新生成（或比对）`crates/piarc-ghostty-sys/src/bindings.rs`；只在升级 libghostty-vt 时需要 |
 | `npm run verify` | 全部 13 项检查，结束时打印汇总表；开工与收尾各跑一次 |
 | `npm run gen:protocol` | 由 `piarc-protocol` 重新生成 `packages/protocol/schema/` 与 `src/generated/`；改了协议类型后运行并提交 |
 | `npm run build:agent-host` | esbuild 把 Agent Host 打成 `agent-host/dist/bundle/agent-host.mjs`（另写 `pi-assets/package.json`，运行时以 `PI_PACKAGE_DIR` 指向它） |
@@ -39,6 +40,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `npm run test:e2e -w @piarc/desktop` | L4：Playwright 驱动开发形态与打包产物（先打开发构建） |
 | `npm run check:fuses` | 发布构建产物的 fuse 与 `apps/desktop/fuses.mjs` 比对 |
 | `npm run bench:s2 -- --form packaged` | S2 基准：事件吞吐、主进程事件循环延迟、同步调用、大批次、空闲内存（先打开发构建） |
+| `npm run bench:s7 -- --form packaged` | S7 基准：终端中 `cat` 大文件（`--megabytes`、`--repeat`）与键入回显配对测量（先打开发构建） |
 | `npm run bench:s1 -- --form packaged` | S1 基准：transcript 流式 60 s、万条滚动、千条冷加载、渲染进程内存（CDP 追踪，先打开发构建） |
 | `node scripts/ci/load-core.mjs --module <file.node>` | 在 Node 与 Electron 中加载一个 Core 模块并跑一次事件通道 |
 | `cargo run -q -p piarc-testkit --bin piarc-mock-provider -- --port 0 --scenarios <文件或目录>` | 启动严格 mock provider 独立进程：stdout 第一行是端口，stdin 关闭后退出（`testing.md` 第 10 节） |
@@ -69,6 +71,9 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - 在 `.mjs` 脚本里，JSDoc 类型断言对 ESLint 不可见，`JSON.parse` 的结果会触发 `no-unsafe-*`。用 `scripts/lib/repo.mjs` 的 `readJsonFile` 与 `isRecord` 收窄。
 - Windows 上不要用 shell 调 npm 命令：用 `resolveBin` 解析入口后以 `node` 运行。
 - 改了 `piarc-protocol` 的类型却没运行 `npm run gen:protocol`，verify 的"protocol drift"会失败；新增契约没有样本与反例，"contract samples"会失败。
+- 第一次构建 `piarc-ghostty-sys`（任何依赖 `piarc-core` 的构建）会联网下载 libghostty-vt 预编译产物到 `.tools/cache/ghostty-vt/`，并校验 SHA-256 与 minisign 签名；校验失败直接报错，不会重下。离线时设 `PIARC_GHOSTTY_VT_OFFLINE=1` 并预先填好缓存（`PIARC_GHOSTTY_VT_CACHE` 可换目录），详见 `crates/piarc-term/CLAUDE.md`。
+- Windows 的 Core 模块依赖同目录下的 `ghostty-vt.dll`：手工拷 `.node` 时要一起拷（`build:core` 与打包会处理）。
+- 改了终端帧的编码或格式，要用 `PIARC_UPDATE_FRAME_SAMPLES=1 cargo test -p piarc-term --test consistency` 重写 TS 共享样本，否则 Rust 与 TS 两侧的样本检查都会失败。
 - 改了 `piarc-napi` 的导出却没运行 `npm run build:core -- --flavor all`，verify 的"Core module + API snapshot"会失败。源码树运行应用、L4 的 `dev` 形态、Vitest 的 Core 集成测试都加载 `target/piarc-core/development/` 下的模块，缺了会直接报错（`package:desktop` 会先构建它）。
 - 需要保留 CRLF 的测试夹具放在 `fixtures/crlf/` 目录下，其余文本文件都会被 `.gitattributes` 规范为 LF。
 - Vitest 中的 `packages/testkit` 测试会先 `cargo build` mock provider 的 bin，所以 `npm test` 需要 Rust 工具链；L0–L2 测试不访问真实服务商，模型侧一律用 mock provider。
