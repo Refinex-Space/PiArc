@@ -299,7 +299,7 @@ T01 仓库脚手架、工程规范与质量门禁（开工 2026-11-14，macOS）
 - [x] 1 npm workspaces 与 TypeScript 工具链（tsconfig、ESLint、Prettier、Vitest、`.nvmrc`、精确锁定）
 - [x] 2 Cargo workspace 与 21 个 crate 骨架（`rust-toolchain.toml`、`rustfmt.toml`、clippy、`deny.toml`）
 - [x] 3 检查脚本：`check-crate-deps.mjs` + `crates/deps-rules.json`、`check-acceptance.mjs`、`verify.mjs`、根 `scripts`
-- [ ] 4 `.editorconfig`、`.gitattributes`、`.github/workflows/ci.yml`、`.claude/settings.json`
+- [x] 4 `.editorconfig`、`.gitattributes`、`.github/workflows/ci.yml`、`.claude/settings.json`
 - [ ] 5 工程规范：`coding-standards.md`、`testing.md`、`claude-md.md`
 - [ ] 6 `.claude/rules/rust.md`、`.claude/rules/typescript.md`、根 `CLAUDE.md`
 - [ ] 7 门禁有效性验证（A02–A07 临时违规，验证后撤销）

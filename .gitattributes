@@ -1,0 +1,15 @@
+# Normalise every text file to LF in the repository and the working tree, on
+# macOS and Windows alike. Prettier, rustfmt and the checks assume LF.
+* text=auto eol=lf
+
+# Binary assets.
+*.png binary
+*.jpg binary
+*.icns binary
+*.ico binary
+*.node binary
+
+# CRLF test fixtures: stored and checked out byte-for-byte, never normalised.
+# Put files that must keep CRLF line endings under any `fixtures/crlf/`
+# directory, e.g. tests/fixtures/crlf/ (see docs/engineering/testing.md).
+**/fixtures/crlf/** -text

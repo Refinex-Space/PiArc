@@ -21,7 +21,9 @@
       "Bash(git rm *)",
       "Bash(git describe *)",
       "Bash(git -C reference/* *)",
-      "Bash(jq *)"
+      "Bash(jq *)",
+      "Bash(.tools/bin/cargo-deny check *)",
+      "Bash(npm view *)"
     ],
     "deny": [
       "Bash(git push *)",
