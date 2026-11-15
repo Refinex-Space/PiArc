@@ -296,10 +296,10 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 **T08 凭据保险箱**（开工 2026-11-15，基线 verify 13 步全绿；D2 尚未落实，A12 依赖它，其余先做；分支未推送，T03-A03、T04-A09 的 Windows CI 仍待核对）
 
-- [ ] 1. 查锁定版本：Pi 1.5.2 的 `CredentialStore`、`ModelRuntime.create({ credentials })`、刷新阈值；keyring-core 与 store crate、AES-GCM 实现选型（cargo-deny）
-- [ ] 2. `piarc-ports`：`SecretStore` 窄 trait；`piarc-secrets`：保险箱格式、主密钥状态表、原子写入、清零、错误类型；内存与可注入错误的替身（A01–A05）
-- [ ] 3. 集中定义的应用标识与凭据库服务名；macOS 登录钥匙串集成测试（测试服务名，结束清理）（A11、A12）
-- [ ] 4. 协议：`secrets/*` 请求与变更通知，生成 TS 类型，golden 样本与反例（A06）
+- [x] 1. 查锁定版本：Pi 1.5.2 的 `CredentialStore`、`ModelRuntime.create({ credentials })`、刷新阈值；keyring-core 与 store crate、AES-GCM 实现选型（cargo-deny）
+- [x] 2. `piarc-ports`：`SecretStore` 窄 trait；`piarc-secrets`：保险箱格式、主密钥状态表、原子写入、清零、错误类型；内存与可注入错误的替身（A01–A05）
+- [ ] 3. 集中定义的应用标识与凭据库服务名（A12）；macOS 登录钥匙串集成测试（测试服务名，结束清理）（A11，已完成：`piarc-secrets/tests/system_store.rs`）
+- [x] 4. 协议：`secrets/*` 请求与变更通知，生成 TS 类型，golden 样本与反例（A06）
 - [ ] 5. `piarc-core` 分派 `secrets/*`：多个 Agent Host 共享的凭据服务、变更推送、并发刷新的互斥
 - [ ] 6. Agent Host 凭据适配层（`agent-host/src/runtime/`）：启动取回、同步读、按 provider 串行、异步回写、失败上报会话错误（A06、A07）
 - [ ] 7. 端到端：mock 登录与 token 刷新（A08）、多会话与两个 Agent Host 并发（A09）、无明文扫描与环境变量检查（A10）
