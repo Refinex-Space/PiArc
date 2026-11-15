@@ -303,7 +303,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 5. `piarc-core` 分派 `secrets/*`：多个 Agent Host 共享的凭据服务、变更推送、并发刷新的互斥
 - [x] 6. Agent Host 凭据适配层（`agent-host/src/runtime/`）：启动取回、同步读、按 provider 串行、异步回写、失败上报会话错误（A06、A07）
 - [x] 7. 端到端：mock 登录与 token 刷新（A08）、多会话与两个 Agent Host 并发（A09）、无明文扫描与环境变量检查（A10）
-- [ ] 8. S5 报告与 `docs/spikes/README.md`（A13）；CLAUDE.md（piarc-secrets、agent-host）、coding-standards 复用表、架构同步
+- [x] 8. S5 报告与 `docs/spikes/README.md`（A13）；CLAUDE.md（piarc-secrets、agent-host）、coding-standards 复用表、架构同步
 - [ ] 9. 收尾：`npm run verify`（A14）、acceptance.json、PLAN.md、最终报告
 
 ## 登记事项
