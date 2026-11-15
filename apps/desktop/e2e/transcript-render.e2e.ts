@@ -61,6 +61,13 @@ test('a streaming code block is plain text until its fence closes, then highligh
   const block = page.locator(`[data-row-id="${id}"] [data-testid="code-block"]`);
   await expect(block).toHaveAttribute('data-highlight', 'highlighted');
   await expect(block.locator('code span[style*="color"]').first()).toBeVisible();
+  // Let the recorder's animation frame see the final state.
+  await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+      }),
+  );
   const states = await page.evaluate(() => [
     ...((globalThis as { __codeStates?: Set<string> }).__codeStates ?? []),
   ]);

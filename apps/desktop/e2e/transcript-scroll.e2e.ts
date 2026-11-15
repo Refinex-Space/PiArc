@@ -124,7 +124,7 @@ test('dragging the scrollbar releases following', async ({ page }) => {
       scrollbar: scroller.offsetWidth - scroller.clientWidth,
     };
   });
-  // A classic scrollbar (overlay scrollbars hide until scrolled, and are not draggable here).
+  // The transcript styles its scrollbar, so it is never a hidden overlay scrollbar.
   expect(geometry.scrollbar).toBeGreaterThan(0);
   await page.mouse.move(geometry.x, geometry.y);
   await page.mouse.down();

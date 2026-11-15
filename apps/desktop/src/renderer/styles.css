@@ -112,6 +112,22 @@ body,
   outline: none;
 }
 
+/* A styled scrollbar is never an overlay scrollbar, so it stays visible and draggable on every
+   platform (macOS without a mouse and Windows 11 default to hidden overlay scrollbars). */
+.transcript-scroller::-webkit-scrollbar {
+  width: 12px;
+}
+
+.transcript-scroller::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 6px;
+  background: color-mix(in srgb, canvastext 30%, transparent) padding-box;
+}
+
+.transcript-scroller::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, canvastext 45%, transparent);
+}
+
 .transcript-sizer {
   position: relative;
   width: 100%;
