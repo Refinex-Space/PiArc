@@ -818,85 +818,85 @@
       "id": "T05-A01",
       "task": "T05",
       "description": "两种线格式的流式输出按官方事件顺序与字段编码，文本与工具调用两类内容都有测试。验证：单元测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test wire_format：6 passed。anthropic_stream_follows_the_official_event_order（message_start→ping→每块 content_block_start/delta/stop→message_delta→message_stop，text_delta 与 input_json_delta、tool_use id/name/input、stop_reason 与用量）、anthropic_text_only_step_ends_the_turn、openai_stream_follows_the_official_chunk_shape（delta.role、delta.content、delta.tool_calls[index] 先 id/type/name 后分片 arguments、finish_reason、include_usage 用量块、data: [DONE]）、openai_stream_omits_usage_unless_requested"
     },
     {
       "id": "T05-A02",
       "task": "T05",
       "description": "配对、角色顺序、工具 schema、system 必要段落、缓存断点数量、缓存断点位置六条规则各有一个触发 400 的测试，错误体带对应规则 ID 与说明。验证：测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test validation：16 passed，六条规则各有经 HTTP 触发 400 的测试，断言 error.code=规则 ID、message 以规则 ID 开头、violations 含 location：tool_pairing（3 个）、role_order（3 个）、tool_schema（2 个）、system_sections、cache_breakpoint_count（6 个断点超限 4）、cache_breakpoint_position（2 个）。说明文本见 tmp/evidence/T05/validation-400.txt"
     },
     {
       "id": "T05-A03",
       "task": "T05",
       "description": "合规请求（包括 pi-ai 发出的正常请求）通过全部规则，不误报。验证：测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "validation.rs 的 compliant_requests_pass_every_rule 与 compliant_requests_are_served_over_http（按 pi-ai 线格式构造的请求，规则全开、last_message_only）无违规；npx vitest run packages/testkit 中 pi-ai 1.5.2 发出的 4 个请求 violations 全为空（tmp/evidence/T05/pi-ai-requests.json）"
     },
     {
       "id": "T05-A04",
       "task": "T05",
       "description": "脚本中的工具参数在客户端收到时至少分成 3 段增量，拼接后与原 JSON 一致。验证：测试断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "wire_format.rs 的 tool_arguments_arrive_in_at_least_three_fragments_that_rebuild_the_json（两种线格式 ≥3 段，拼接等于原 JSON，fragments: 5 生效）与 split_at_cuts_inside_a_string_value_and_an_escape_sequence；pi-ai 测试断言客户端收到 ≥3 个 toolcall_delta 且拼接为 {\"encoding\":\"utf-8\",\"path\":\"dir with space/中文.txt\"}"
     },
     {
       "id": "T05-A05",
       "task": "T05",
       "description": "429、529、500、503 与流中途断开五种错误注入都生效，客户端收到对应的状态或断流。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test server_behavior：injected_errors_use_the_anthropic_status_and_error_shape（429+retry-after: 7/rate_limit_error、529/overloaded_error、500/api_error、503/api_error）、injected_errors_use_the_openai_status_and_error_shape、disconnect_sends_partial_events_then_breaks_the_stream（客户端收到 4 个事件后 body 报错，下一步正常应答）、openai_disconnect_breaks_the_stream_before_done；断流用例连跑 30 次 0 失败"
     },
     {
       "id": "T05-A06",
       "task": "T05",
       "description": "按请求头与按首条消息标记两种方式都能选中场景；未指定或不存在的场景返回 400。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "server_behavior.rs：header_selects_the_scenario_and_steps_advance_per_request、first_user_message_marker_selects_the_scenario_on_both_formats、the_header_wins_over_the_marker、missing_or_unknown_scenarios_are_rejected（400 scenario_not_selected / scenario_not_found）、instances_and_providers_count_steps_independently"
     },
     {
       "id": "T05-A07",
       "task": "T05",
       "description": "请求记录按顺序保存每轮请求，库 API 与独立进程的 HTTP 端点都能查询。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "库：server_behavior.rs 的 records_keep_every_request_in_order（seq 顺序、原始 body、格式、场景、step_index、凭据头 <redacted>、校验结果）与 the_http_endpoint_returns_the_same_records（GET /_piarc/requests 与 records() 相同）；独立进程：process.rs 的 prints_the_port_serves_and_exits_when_stdin_closes 经 HTTP 端点查询记录"
     },
     {
       "id": "T05-A08",
       "task": "T05",
       "description": "独立进程以 `--port 0` 启动后在 stdout 第一行打印端口并提供服务，stdin 关闭后退出。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test process：3 passed。prints_the_port_serves_and_exits_when_stdin_closes（--port 0，stdout 首行端口，服务请求，关闭 stdin 后退出码 0、端口释放）、rejects_bad_arguments_with_exit_code_2、fails_on_an_invalid_scenario_file"
     },
     {
       "id": "T05-A09",
       "task": "T05",
       "description": "pi-ai 经 Anthropic Messages 线格式对 mock 完成一次含工具调用的完整往返，两次请求都通过校验。验证：测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npx vitest run packages/testkit：pi-ai over anthropic-messages 通过——用户消息→tool_use（4 段 input_json_delta）→提交 tool_result→最终文本；记录的两次请求 step 0/1、outcome streamed、violations []，第二次请求的 user 消息含 tool_use_id=toolu_pi_ai_1 的 tool_result；请求见 tmp/evidence/T05/pi-ai-requests.json（3 个断点，1 个消息级在末条消息）"
     },
     {
       "id": "T05-A10",
       "task": "T05",
       "description": "pi-ai 经 OpenAI 兼容线格式对 mock 完成一次含工具调用的完整往返，两次请求都通过校验。验证：测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npx vitest run packages/testkit：pi-ai over openai-completions 通过（场景经首条消息标记选择）——tool_calls 分 4 段 arguments→tool 消息 tool_call_id=call_pi_ai_1→最终文本；两次请求 violations []、outcome streamed"
     },
     {
       "id": "T05-A11",
       "task": "T05",
       "description": "`@earendil-works/pi-ai` 精确锁定版本，测试中没有使用任何 OAuth 登录方式。验证：`package.json` 与测试代码检查。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "packages/testkit/package.json devDependencies \"@earendil-works/pi-ai\": \"1.5.2\"（无 ^/~，npm 最新稳定版，package-lock 锁定）；测试只用 createProvider 自建 provider，auth.apiKey.resolve 返回常量测试 key（不含 sk-ant-oat），未调用任何 OAuth/login API；记录断言 Anthropic 请求只有 x-api-key、无 authorization"
     },
     {
       "id": "T05-A12",
       "task": "T05",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify：All 13 steps passed（Vitest 214 passed | 1 skipped，skip 为基线既有；cargo test、clippy、cargo-deny 均 PASS），日志 tmp/evidence/T05/verify.log"
     },
     {
       "id": "T06-A01",
