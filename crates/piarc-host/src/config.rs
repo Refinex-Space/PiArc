@@ -68,8 +68,8 @@ pub struct HostConfig {
     /// Frames waiting to be written to the Agent Host's stdin; a full queue refuses calls with
     /// a retryable `busy` error.
     pub write_queue_frames: usize,
-    /// Events waiting for the consumer; a full queue stops reading stdout, which pushes back on
-    /// the Agent Host.
+    /// Session notifications waiting for the consumer; a full queue stops reading stdout, which
+    /// pushes back on the Agent Host. Lifecycle events are not counted.
     pub event_queue: usize,
     /// Largest frame accepted from the Agent Host.
     pub max_frame_bytes: usize,

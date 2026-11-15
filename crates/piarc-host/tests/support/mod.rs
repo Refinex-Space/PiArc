@@ -15,14 +15,14 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use piarc_host::{HostConfig, HostDeps, HostEvent, InboundHandler, NoInbound};
+use piarc_host::{HostConfig, HostDeps, HostEvent, HostEvents, InboundHandler, NoInbound};
 use piarc_ports::{
     BoxFuture, Clock, ExitStatus, ProcessControl, ProcessSpawner, SpawnSpec, SpawnedProcess,
 };
 use piarc_protocol::ErrorObject;
 use serde_json::{Map, Value, json};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, DuplexStream};
-use tokio::sync::{mpsc, oneshot, watch};
+use tokio::sync::{oneshot, watch};
 
 /// Upper bound for waiting on an event. Only a safety net against hanging tests: assertions
 /// never depend on timing.
@@ -340,7 +340,7 @@ pub fn deps(spawner: Arc<FakeSpawner>, clock: Arc<TestClock>) -> HostDeps {
 
 /// Waits for the first event matching `pred`, returning it with every event seen before.
 pub async fn until(
-    events: &mut mpsc::Receiver<HostEvent>,
+    events: &mut HostEvents,
     pred: impl Fn(&HostEvent) -> bool,
 ) -> (HostEvent, Vec<HostEvent>) {
     let mut seen = Vec::new();

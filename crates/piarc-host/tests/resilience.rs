@@ -7,12 +7,14 @@ mod support;
 use std::sync::Arc;
 use std::time::Duration;
 
-use piarc_host::{CallState, Error, ExitReason, HostEvent, HostSupervisor, SupervisorState};
+use piarc_host::{
+    CallState, Error, ExitReason, HostEvent, HostEvents, HostSupervisor, SupervisorState,
+};
 use piarc_protocol::session::{SessionId, SessionStopped};
 use piarc_protocol::{Capability, ErrorKind};
 use serde_json::json;
 use support::{FakeSpawner, Script, TestClock, config, deps, script, until};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
 fn caps(names: &[&str]) -> Vec<Capability> {
@@ -129,7 +131,7 @@ fn resuming(seen: oneshot::Sender<serde_json::Value>) -> Script {
 /// Opens a session, starts a turn and sends an abort that stays unanswered.
 async fn turn_with_pending_abort(
     supervisor: &HostSupervisor,
-    events: &mut mpsc::Receiver<HostEvent>,
+    events: &mut HostEvents,
 ) -> JoinHandle<piarc_host::Result<SessionStopped>> {
     until(events, |e| {
         matches!(e, HostEvent::Connected { epoch: 1, .. })
@@ -567,4 +569,46 @@ async fn calls_before_the_first_connection_fail_as_host_unavailable() {
         matches!(e, HostEvent::GaveUp { restarts: 0 })
     })
     .await;
+}
+
+#[tokio::test]
+async fn shutdown_and_restarts_never_wait_for_a_consumer_that_stopped_reading() {
+    let spawner = FakeSpawner::new(vec![script(|mut host| async move {
+        host.hello("1.0", &[]).await;
+        for seq in 1..=5 {
+            host.notify(
+                "turn/started",
+                "s1",
+                seq,
+                json!({ "turnId": format!("t{seq}") }),
+            )
+            .await;
+        }
+        host.until_stdin_closes().await;
+        0
+    })]);
+    let mut config = config();
+    config.event_queue = 1;
+    // host/shutdown's answer is stuck behind the held-back notifications: close stdin soon.
+    config.shutdown_timeout = Duration::from_millis(100);
+    let (supervisor, mut events) = HostSupervisor::start(config, deps(spawner, TestClock::new()));
+    until(&mut events, |e| matches!(e, HostEvent::Connected { .. })).await;
+    // The reader now holds back notifications 2..5; nobody reads events any more.
+    tokio::time::timeout(support::EVENT_WAIT, supervisor.shutdown())
+        .await
+        .expect("shutdown completed without the consumer");
+    assert_eq!(supervisor.state(), SupervisorState::Stopped);
+    let (_, seen) = until(&mut events, |e| matches!(e, HostEvent::Stopped)).await;
+    let notifications = seen
+        .iter()
+        .filter(|e| matches!(e, HostEvent::Notification { .. }))
+        .count();
+    assert!(notifications >= 1, "{seen:#?}");
+    assert!(seen.iter().any(|e| matches!(
+        e,
+        HostEvent::Exited {
+            reason: ExitReason::Shutdown,
+            ..
+        }
+    )));
 }

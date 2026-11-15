@@ -28,7 +28,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::{Notify, mpsc, oneshot};
 
 use crate::config::HostConfig;
-use crate::events::HostEvent;
+use crate::events::{EventSender, HostEvent};
 use crate::inbound::SharedInbound;
 use crate::ledger::Ledger;
 
@@ -44,7 +44,7 @@ pub(crate) fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 /// State shared by the supervisor and every connection.
 pub(crate) struct Shared {
     pub ledger: Mutex<Ledger>,
-    pub events: mpsc::Sender<HostEvent>,
+    pub events: EventSender,
     pub inbound: SharedInbound,
     pub workspace: String,
     /// Sessions opened through the supervisor, reopened after a restart.
@@ -480,11 +480,9 @@ impl Reader {
             );
         }
         self.link.activity.delivering.store(true, Ordering::Release);
-        // A closed event queue means the supervisor is gone; there is nobody to deliver to.
-        let _ = self
-            .shared
+        self.shared
             .events
-            .send(HostEvent::Notification {
+            .bounded(HostEvent::Notification {
                 epoch: self.link.epoch,
                 notification: event,
             })
@@ -528,11 +526,9 @@ impl Reader {
     async fn frame_error(&self, error: ErrorObject) {
         tracing::warn!(target: "piarc_host", workspace = %self.shared.workspace, epoch = self.link.epoch,
             kind = ?error.data.kind, "dropped an invalid frame from the Agent Host: {}", error.message);
-        // A closed event queue means the supervisor is gone.
-        let _ = self
-            .shared
+        self.shared
             .events
-            .send(HostEvent::FrameError {
+            .bounded(HostEvent::FrameError {
                 epoch: self.link.epoch,
                 error,
             })

@@ -1,5 +1,14 @@
-//! What the supervisor reports to its owner (Core's session layer).
+//! What the supervisor reports to its owner (Core's session layer), and the channel it
+//! reports on.
+//!
+//! One ordered channel carries every event. Session notifications and frame errors (the
+//! high-volume events the Agent Host produces) each hold one of `event_queue` permits until
+//! the consumer receives them: a slow consumer stops the reader, which stops reading stdout
+//! and pushes back on the Agent Host. The supervisor's own lifecycle events (connected,
+//! exited, uncertain calls, restarts) take no permit, so restarts and shutdown never wait for
+//! the consumer; there are only a handful of them per connection.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use piarc_ports::ExitStatus;
@@ -7,6 +16,7 @@ use piarc_protocol::session::SessionEventNotification;
 use piarc_protocol::{Capability, ErrorObject};
 
 use crate::ledger::CallRecord;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc};
 
 /// Why a connection ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -110,4 +120,55 @@ pub enum HostEvent {
     },
     /// The supervisor stopped (after `shutdown`, a rejected handshake or giving up).
     Stopped,
+}
+
+type Delivery = (HostEvent, Option<OwnedSemaphorePermit>);
+
+/// The receiving end of a supervisor's events.
+#[derive(Debug)]
+pub struct HostEvents {
+    rx: mpsc::UnboundedReceiver<Delivery>,
+}
+
+impl HostEvents {
+    /// The next event, in the order it happened; `None` once the supervisor is gone.
+    pub async fn recv(&mut self) -> Option<HostEvent> {
+        // Dropping the permit lets the reader deliver the next notification.
+        self.rx.recv().await.map(|(event, _permit)| event)
+    }
+}
+
+/// The sending end, shared by the supervisor and its connections.
+pub(crate) struct EventSender {
+    tx: mpsc::UnboundedSender<Delivery>,
+    permits: Arc<Semaphore>,
+}
+
+impl EventSender {
+    /// A channel admitting at most `queue` undelivered notifications.
+    pub fn channel(queue: usize) -> (Self, HostEvents) {
+        let (tx, rx) = mpsc::unbounded_channel();
+        (
+            Self {
+                tx,
+                permits: Arc::new(Semaphore::new(queue.max(1))),
+            },
+            HostEvents { rx },
+        )
+    }
+
+    /// Sends a high-volume event, waiting while `queue` of them are undelivered.
+    pub async fn bounded(&self, event: HostEvent) {
+        let Ok(permit) = Arc::clone(&self.permits).acquire_owned().await else {
+            return; // the semaphore is never closed
+        };
+        // A dropped receiver means nobody listens any more.
+        let _ = self.tx.send((event, Some(permit)));
+    }
+
+    /// Sends a lifecycle event without waiting.
+    pub fn lifecycle(&self, event: HostEvent) {
+        // A dropped receiver means nobody listens any more.
+        let _ = self.tx.send((event, None));
+    }
 }

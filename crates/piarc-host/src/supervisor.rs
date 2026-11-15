@@ -27,7 +27,7 @@ use crate::connection::{self, Connection, Link, Reply, Shared, StartError, Track
 /// How long to wait for the reader to drain stdout after the process exited.
 const DRAIN_TIMEOUT: Duration = Duration::from_secs(2);
 use crate::error::{Error, Result};
-use crate::events::{ExitReason, HostEvent};
+use crate::events::{EventSender, ExitReason, HostEvent, HostEvents};
 use crate::inbound::SharedInbound;
 use crate::ledger::{CallRecord, CallState, Ledger};
 use crate::restart::{RestartDecision, RestartPolicy};
@@ -91,10 +91,11 @@ pub struct HostSupervisor {
 
 impl HostSupervisor {
     /// Starts supervising: launches the Agent Host on the current tokio runtime. Events arrive
-    /// on the returned receiver; reading it slowly slows down reading the Agent Host's stdout.
+    /// on the returned receiver; reading notifications slowly slows down reading the Agent
+    /// Host's stdout, never the supervisor's restarts or shutdown.
     #[must_use]
-    pub fn start(config: HostConfig, deps: HostDeps) -> (Self, mpsc::Receiver<HostEvent>) {
-        let (events, receiver) = mpsc::channel(config.event_queue);
+    pub fn start(config: HostConfig, deps: HostDeps) -> (Self, HostEvents) {
+        let (events, receiver) = EventSender::channel(config.event_queue);
         let (commands, command_rx) = mpsc::channel(8);
         let shared = Arc::new(Shared {
             ledger: Mutex::new(Ledger::default()),
@@ -302,8 +303,7 @@ impl Tracking {
 
 impl Inner {
     async fn emit(&self, event: HostEvent) {
-        // A dropped receiver means nobody listens any more.
-        let _ = self.shared.events.send(event).await;
+        self.shared.events.lifecycle(event);
     }
 
     fn set_state(&self, state: SupervisorState) {

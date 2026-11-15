@@ -9,11 +9,10 @@ use std::time::{Duration, Instant};
 
 use piarc_exec::TokioProcessSpawner;
 use piarc_ports::{BoxFuture, Clock};
-use tokio::sync::mpsc;
 
 pub use piarc_host::{
     CallRecord, CallState, DEFAULT_ENV_PASSTHROUGH, Error, ExitReason, HostConfig, HostDeps,
-    HostEvent, HostSupervisor, InboundHandler, NoInbound, RestartConfig, SharedInbound,
+    HostEvent, HostEvents, HostSupervisor, InboundHandler, NoInbound, RestartConfig, SharedInbound,
     SupervisorState,
 };
 
@@ -34,10 +33,7 @@ impl Clock for SystemClock {
 /// Starts supervising the Agent Host described by `config` on the current tokio runtime.
 /// `inbound` answers the Agent Host's requests (`trust/get`, ...).
 #[must_use]
-pub fn start(
-    config: HostConfig,
-    inbound: SharedInbound,
-) -> (HostSupervisor, mpsc::Receiver<HostEvent>) {
+pub fn start(config: HostConfig, inbound: SharedInbound) -> (HostSupervisor, HostEvents) {
     HostSupervisor::start(
         config,
         HostDeps {

@@ -303,8 +303,8 @@ T06（开工 2026-11-15，基线 `npm run verify` 13/13 通过；T04 的遗留�
 - [x] C5 agent-host：会话注册表（`createAgentSession`、文件型 `SessionManager`、`agentDir`）、最小投影与 `seq`（A10，I08）
 - [x] C6 agent-host：esbuild 单文件 bundle（node22.19）与外部依赖清单
 - [x] C7 `piarc-host`：启动、握手、有界写队列与背压、心跳、退避重启、调用对账、stderr 日志
-- [ ] C8 S9 故障注入测试（可控的假 Agent Host、可注入时钟）（A03、A06–A09）
-- [ ] C9 S3 场景测试：真实 Agent Host 双会话、中断、压缩、MCP，RSS（A04、A05、A10）
+- [x] C8 S9 故障注入测试（可控的假 Agent Host、可注入时钟）（A03、A06–A09）
+- [x] C9 S3 场景测试：真实 Agent Host 双会话、中断、压缩、MCP，RSS（A04、A05、A10）
 - [ ] C10 报告 `S03-multi-session.md`、`S09-ahp-resilience.md`，更新 spikes README（A11）
 - [ ] C11 收尾：两份 CLAUDE.md、架构与工程文档、acceptance、`npm run verify`（A12）
 
@@ -330,6 +330,8 @@ T06（开工 2026-11-15，基线 `npm run verify` 13/13 通过；T04 的遗留�
 | I14 | T05 | `packages/testkit` 把 `@earendil-works/pi-ai` 精确锁定为 1.5.2（任务开工时 npm 上的最新稳定版），尚未与 Agent Host 统一 | 已落地（T06）：Pi 锁定 1.5.2，`agent-host` 与 `packages/testkit` 的 `@earendil-works/*` 同为 1.5.2，lockfile 中无第二个版本 |
 | I15 | T05 | pi-ai 的 API 实现（`anthropicMessagesApi`、`openAICompletionsApi`）只经公开子路径 `@earendil-works/pi-ai/api/<api>.lazy` 导出，主入口不导出；`packages/testkit` 使用了它们 | 已落地（T06）：`eslint.config.mjs` 的 `piPublicImports` 按各包 `exports` 放行子路径，只禁未导出的路径 |
 | I16 | T06 | Pi 1.5.1 起 `cacheWarming` 默认为 `"idle"`：会话空闲时最多 30 分钟内自动发请求保温提示缓存（模型配置了 `promptCache` 才会触发），会产生模型费用；Agent Host 目前沿用 Pi 默认值 | T21 生成 `pi/settings.json` 时显式设定，T27 的用量与成本界面说明这类请求；默认值请用户在 R2 确认 |
+| I17 | T06 | `piarc-exec` 的 `TokioProcessSpawner` 只终止直接子进程：Agent Host 被杀时，它启动的子进程（bash 命令、MCP server）不随之结束；架构第 5.6 节要求的进程组（macOS）与 Job Object（`KILL_ON_JOB_CLOSE`，Windows）尚未实现。需要 `killpg` 或 Win32 API，而 `unsafe` 只允许在 sys 与 NAPI crate | T17 实现进程组与 Job Object（评估 `nix` 等安全封装或新增 -sys 例外），T12 打包 Agent Host 时接入 |
+| I18 | T06 | Pi 1.5.2 中断一个回合后，下一次请求丢弃被中断的 assistant 消息，出现两条相邻的 user 消息（Anthropic API 会合并它们，严格 mock 的 `role_order` 拒绝）。PiArc 需要决定中断后的对话形态（例如像 Claude Code 那样补一条中断标记），S3/S9 的中断场景暂时关闭了 `role_order` | T14 定义中断后的 transcript 形态并恢复 `role_order`；T27 对齐压缩与中断标记 |
 
 ## 技术债
 

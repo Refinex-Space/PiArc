@@ -65,7 +65,7 @@ mod supervisor;
 
 pub use config::{DEFAULT_ENV_PASSTHROUGH, HostConfig};
 pub use error::{Error, Result};
-pub use events::{ExitReason, HostEvent};
+pub use events::{ExitReason, HostEvent, HostEvents};
 pub use inbound::{InboundHandler, NoInbound, SharedInbound};
 pub use ledger::{CallRecord, CallState, Ledger};
 pub use restart::{RestartConfig, RestartDecision, RestartPolicy};
