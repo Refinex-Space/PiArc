@@ -297,8 +297,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 T04 Core NAPI 绑定与事件通道（开工 2026-11-14；基线 verify 12 项通过；T03 遗留 A03 仍待 Windows CI，分支未推送，不影响本任务）
 
 - [x] 1. `piarc-core`：tokio 运行时、有序关闭、`CancellationToken`、事件合并器（有界通道、默认 16 ms、满时策略不丢事件）、演示事件源；Rust 测试（A01、A02）
-- [ ] 2. `piarc-napi`：`CoreRuntime.create/shutdown`、演示源启停、同步轻量方法、测试构建的 panic 导出；错误映射与 panic 边界、任务 panic 转错误事件（A08）
-- [ ] 3. `@napi-rs/cli` 构建脚本、`.d.ts` 生成与 L1 快照并入 verify（A11）
+- [x] 2. `piarc-napi`：`CoreRuntime.create/shutdown`、演示源启停、同步轻量方法、测试构建的 panic 导出；错误映射与 panic 边界、任务 panic 转错误事件（A08）
+- [x] 3. `@napi-rs/cli` 构建脚本、`.d.ts` 生成与 L1 快照并入 verify（A11）
 - [ ] 4. 主进程：`.node` 路径解析（开发 / `app.asar.unpacked`）、按窗口 `MessageChannelMain`、路由表、结构化克隆 / `ArrayBuffer` 转移（A06）
 - [ ] 5. preload 事件订阅 API、IPC 命令、白名单快照；渲染进程测试页与统计
 - [ ] 6. L4：退出不挂起、双窗口路由、panic 后存活、ArrayBuffer、打包产物从 unpacked 加载（A01、A06、A07、A08、A10）

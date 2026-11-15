@@ -12,6 +12,7 @@
   "scripts": {
     "verify": "node scripts/dev/verify.mjs",
     "gen:protocol": "node scripts/dev/gen-protocol.mjs",
+    "build:core": "node scripts/dev/build-core.mjs",
     "format": "prettier --write .",
     "lint": "eslint .",
     "typecheck": "tsc --build",

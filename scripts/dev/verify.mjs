@@ -48,6 +48,8 @@ export const STEPS = [
   { name: 'Prettier --check', command: nodeBin('prettier', ['--check', '.']) },
   { name: 'ESLint', command: nodeBin('eslint', ['.']) },
   { name: 'tsc --build', command: nodeBin('typescript', ['--build'], 'tsc') },
+  // Builds the Core module the Vitest integration tests load, and checks its .d.ts snapshot.
+  { name: 'Core module + API snapshot', command: nodeScript('scripts/ci/check-core-types.mjs') },
   { name: 'Vitest', command: nodeBin('vitest', ['run']) },
   { name: 'cargo fmt --check', command: cargo(['fmt', '--all', '--check']) },
   {

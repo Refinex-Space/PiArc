@@ -180,6 +180,8 @@ dependencies = [
  "napi-sys",
  "nohash-hasher",
  "rustc-hash",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -289,6 +291,8 @@ dependencies = [
  "napi",
  "napi-build",
  "napi-derive",
+ "piarc-core",
+ "piarc-protocol",
 ]
 
 [[package]]

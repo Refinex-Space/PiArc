@@ -10,9 +10,17 @@ publish.workspace = true
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+# Exports for tests and benchmarks only: demo event sources, the synchronous echo call,
+# event counters and panic triggers. Development builds of the desktop app enable it;
+# shipping builds do not (scripts/dev/build-core.mjs).
+testing = []
+
 [dependencies]
 napi.workspace = true
 napi-derive.workspace = true
+piarc-core.workspace = true
+piarc-protocol.workspace = true
 
 [build-dependencies]
 napi-build.workspace = true

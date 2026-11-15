@@ -14,5 +14,11 @@
     "tsBuildInfoFile": "dist/config/.tsbuildinfo",
     "types": ["node"]
   },
-  "include": ["forge.config.ts", "vite.*.config.ts", "playwright.config.ts", "fuses.mjs"]
+  "include": [
+    "forge.config.ts",
+    "vite.*.config.ts",
+    "playwright.config.ts",
+    "fuses.mjs",
+    "core-binary.mjs"
+  ]
 }

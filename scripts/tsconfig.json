@@ -12,5 +12,10 @@
     "tsBuildInfoFile": "../node_modules/.cache/tsc/scripts/.tsbuildinfo",
     "types": ["node"]
   },
-  "include": ["**/*.mjs", "../*.mjs", "../apps/desktop/fuses.mjs"]
+  "include": [
+    "**/*.mjs",
+    "../*.mjs",
+    "../apps/desktop/fuses.mjs",
+    "../apps/desktop/core-binary.mjs"
+  ]
 }
