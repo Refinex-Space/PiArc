@@ -2,12 +2,12 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 1.0（首版，2026-11-14） |
+| 版本 | 2.0（2026-11-14） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
-| 适用范围 | macOS 第一版全量设计；Windows 第二阶段的约束与路线 |
+| 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
 
-PiArc 是一个专业的 AI 编码 Agent 桌面应用：以 [Pi](https://github.com/earendil-works/pi) 为 Agent 底座，提供 Claude Code 级别的 Harness 编排能力，客户端用各平台原生技术实现。第一版只做 macOS，Windows 在 macOS 落地后基于同一套核心实现。
+PiArc 是一个专业的 AI 编码 Agent 桌面应用：以 [Pi](https://github.com/earendil-works/pi) 为 Agent 底座，提供 Claude Code 级别的 Harness 编排能力。客户端用 Electron + React 实现，macOS 与 Windows 共用一套代码；业务逻辑在 Rust 编写的 PiArc Core 与基于 Pi SDK 的 Agent Host 中（ADR-0013）。
 
 本文是 PiArc 的设计北极星。任何与本文冲突的实现，要么修正实现，要么先通过 ADR 修改本文。
 
@@ -17,14 +17,14 @@ PiArc 是一个专业的 AI 编码 Agent 桌面应用：以 [Pi](https://github.
 
 ### 1.1 产品定位
 
-一句话：**Claude Code 的 Harness 专业度 + Pi 的多模型能力 + 原生桌面体验。**
+一句话：**Claude Code 的 Harness 专业度 + Pi 的多模型能力 + 流畅稳定的桌面体验（macOS 与 Windows）。**
 
 | 维度 | Claude Desktop（Code 标签页） | PiArc |
 |---|---|---|
 | 模型 | Anthropic 模型（可经云厂商或网关） | Pi 支持的全部服务商：Anthropic、OpenAI、Google、DeepSeek、Kimi、Qwen、GLM、OpenRouter、本地模型等 |
 | Harness | Claude Code 引擎 | 在 Pi 之上实现同等能力，并兼容 Claude Code 配置格式 |
-| 客户端技术 | Electron（官方未明说，见 `docs/research/claude-official-capabilities.md` B1） | macOS：SwiftUI + AppKit；Windows：第二阶段选定的原生框架 |
-| 资源占用 | 社区大量报告内存增长、流式卡顿、每会话复制 MCP 进程 | 以可量化的性能预算作为发布门槛（第 11 章） |
+| 客户端技术 | Electron + React + 原生模块（本机实测 5.1231.2：Electron 45.2.1） | 同类：Electron + React，Rust Core 以原生模块加载。客户端技术不是差异点 |
+| 资源占用 | 社区大量报告内存增长、流式卡顿、每会话复制 MCP 进程 | 每工作区一个 Agent Host、MCP 按工作区共享；以可量化的性能预算作为发布门槛（第 11 章） |
 
 ### 1.2 设计目标
 
@@ -32,17 +32,17 @@ PiArc 是一个专业的 AI 编码 Agent 桌面应用：以 [Pi](https://github.
 |---|---|---|
 | G1 | Harness 能力对标 Claude Code：工具、权限、hooks、子 agent、plan、todo、上下文工程、checkpoint、skills、MCP、沙箱 | 第 6 章能力矩阵逐项达标；L3 行为对齐测试（第 12 章） |
 | G2 | 多模型一等公民：Harness 能力不绑定某一家服务商，按模型能力自动降级 | 同一组场景测试在至少 3 家服务商上通过 |
-| G3 | 原生体验：启动快、内存稳、长会话流畅、系统集成完整 | 第 11 章性能预算进入 CI |
-| G4 | 安全默认：默认询问、项目信任、可选 OS 沙箱、凭据只进钥匙串 | 第 10 章威胁模型逐条有对策和测试 |
-| G5 | 平台可移植：Windows 阶段只重写客户端层 | Core 与 Agent Host 在 CI 中同时构建 macOS 和 Windows 目标 |
+| G3 | 流畅稳定：启动快、长会话流畅、内存可控、系统集成完整 | 第 11 章性能预算进入 CI |
+| G4 | 安全默认：默认询问、项目信任、可选 OS 沙箱、凭据只进系统凭据库、渲染进程隔离 | 第 10 章威胁模型逐条有对策和测试 |
+| G5 | 双平台同步：一套代码覆盖 macOS 与 Windows，平台差异收敛在 Core 的平台适配层和主进程的系统集成层 | 两个平台的 CI 都跑 L0–L2 与 L4；里程碑退出标准按平台分别验收 |
 | G6 | 跟随上游：Pi 升级成本可控 | 每次 Pi 升级的改动量与回归结果有记录（第 5.7 节） |
 
 ### 1.3 架构原则
 
 这些原则用于裁决设计分歧。排在前面的优先。
 
-1. **合规与安全优先于功能。** 不做 Claude 订阅登录，不复制专有代码与提示词，权限检查失败即拒绝（ADR-0006、ADR-0004）。
-2. **厚核心、薄客户端。** Windows 也需要的逻辑一律放进 Rust Core 或 Agent Host；Swift 只做呈现和输入（ADR-0001）。
+1. **合规与安全优先于功能。** 不做 Claude 订阅登录，不复制专有代码与提示词，权限检查失败即拒绝（ADR-0006、ADR-0004）。渲染进程显示模型输出和仓库内容，按不受信任对待（第 10.3 节）。
+2. **厚核心、薄客户端。** 业务逻辑一律放进 Rust Core 或 Agent Host；Electron 主进程只做系统集成与转发，渲染进程只做呈现和输入（ADR-0013）。
 3. **控制面与执行面分离。** 权限、hooks、沙箱、快照、凭据由 Core 裁决；agent 循环、模型调用、上下文组装在 Pi（ADR-0004）。
 4. **不 fork Pi。** 通过 SDK 和扩展集成，只依赖公开导出；必须修改时先找上游（ADR-0002）。
 5. **兼容优先于发明。** 能沿用 Claude Code 配置格式、Agent Skills 标准、MCP 规范的地方不自造格式（ADR-0005）。
@@ -56,8 +56,8 @@ PiArc 是一个专业的 AI 编码 Agent 桌面应用：以 [Pi](https://github.
 - 不做云端托管会话、Remote Control、手机端；
 - 不做 IDE 插件与行内代码补全；
 - 不做插件市场的托管服务（支持安装已有的 Claude Code 插件和 Pi 包，不自建市场后端）；
-- 不上 Mac App Store（ADR-0012）；
-- 不在第一版支持 Windows，但 Core 与 Agent Host 从第一天起保持可移植。
+- 不上 Mac App Store 和 Microsoft Store（ADR-0016）；
+- 不做 Linux 版。Electron 与 Core 在架构上不排除 Linux，第一版不投入。
 
 ---
 
@@ -94,14 +94,18 @@ PiArc 是一个专业的 AI 编码 Agent 桌面应用：以 [Pi](https://github.
 - **OpenClaudeDesktop**（Claude Desktop 界面复刻）：UI 与内核之间用 Codex app-server v2 风格的 thread/turn/item 协议；主进程维护带 epoch/revision 的审批账本；任务清单和"下一步"框由宿主注入的工具驱动，而不是内核原生能力；按能力声明降级而不是按内核名字分支。
 - **open-claude-ui**（设计系统还原）：六层令牌模型；流式贴底、拖拽死区、输入法守卫、思考块在生成中强制展开等交互阈值可以迁移；品牌视觉不能迁移。
 
-### 2.4 原生技术栈
+### 2.4 客户端技术栈
 
-- macOS 27 已发布且只支持 Apple silicon；Liquid Glass API 要求 macOS 26+。
-- SwiftUI 长列表 + 流式文本有已知问题，业界做法是 AppKit `NSTableView` + TextKit 2。
-- Rust ⇄ Swift 用 UniFFI 0.32.x（生产案例多，但 Swift 6 支持不完整，需要隔离层）；第二阶段 C# 用 uniffi-bindgen-cs。
-- 终端：libghostty-vt 1.0（MIT，2026-11-06）+ portable-pty。
-- Mac App Store 与 Agent 能力冲突，只能 Developer ID 直发。
-- 同类产品（Raycast v2、Codex App）多已转向 Web UI，原生路线是少数派选择，最大技术风险是原生流式长文本渲染。
+详见 `docs/research/electron-stack.md` 与 `docs/research/terminal-libghostty.md`。原生方案的调研（`native-stack.md`）作为决策背景保留。
+
+- **同类产品**：Claude Desktop 5.1231.2 是 Electron 45.2.1（内置 Node v24.22.1，整包 621 MB），关闭了 `RunAsNode` fuse、开启了 ASAR 完整性校验，用 Electron 内置的更新器，原生能力走 NAPI-RS 模块，自家 helper 用 `sandbox-exec` 包装启动（本机实测与推断）。Codex App、Cursor 也是 Electron；Cursor 另外单独带了一份 Node 给 MCP 子进程用。Raycast v2 改为原生壳 + 系统 WebView + React。
+- **Electron**：当前稳定版 45（45.3.x，Chromium 156，Node 24.22.x）；官方只支持最新 3 个大版本，8 周一个大版本；最低 macOS 13、Windows 10；没有 Liquid Glass API，只有 vibrancy。
+- **Agent Host 运行时**：`utilityProcess` 不能套沙箱、不支持 stdin；用 `ELECTRON_RUN_AS_NODE` 必须保留高风险 fuse；Electron 不带 npm/npx。因此继续单独内置 Node（ADR-0015）。
+- **Core 绑定**：NAPI-RS 3.x，Node-API ABI 稳定，升级 Electron 一般不用重编（ADR-0014）。
+- **终端**：libghostty-vt 1.0.1（MIT）提供终端状态、render state、编码、选区、搜索、formatter、snapshot，不做渲染；ghostty-web 尚未迁到 1.0，输入法与 CSP 问题未解决（ADR-0017）。
+- **Windows**：Claude Code 在原生 Windows 上不提供沙箱；EV 证书已不能直接消除 SmartScreen 警告；Azure Artifact Signing 的主体资格有地域限制（ADR-0016）。
+- **前端**：React 19.3、Vite 8.3；`@tanstack/react-virtual` 有面向聊天的底部锚定与"在底部时跟随"能力。
+- Mac App Store 与 Microsoft Store 都与 Agent 能力冲突，两个平台都直接分发。
 
 ---
 
@@ -111,13 +115,14 @@ PiArc 是一个专业的 AI 编码 Agent 桌面应用：以 [Pi](https://github.
 
 ```mermaid
 flowchart TB
-    subgraph App["PiArc.app（一个 macOS 进程）"]
-        UI["客户端层 Swift 6<br/>SwiftUI 外壳 + AppKit 高性能视图"]
-        FFI["UniFFI 绑定（Swift 5 模式隔离）"]
-        Core["PiArc Core（Rust 静态库）<br/>会话编排 · 权限裁决 · hooks · 工具 I/O · 快照 · 沙箱<br/>配置 · 凭据 · 索引 · 渲染预处理 · PTY · git"]
-        UI <--> FFI <--> Core
+    subgraph App["PiArc 应用（Electron）"]
+        UI["渲染进程（每窗口一个）<br/>React + TypeScript：界面 · transcript · composer · 终端视图"]
+        Main["主进程（TypeScript）<br/>窗口 · 菜单 · 通知 · 更新 · 事件转发"]
+        Core["PiArc Core（Rust，NAPI-RS 原生模块，加载在主进程）<br/>会话编排 · 权限裁决 · hooks · 工具 I/O · 快照 · 沙箱<br/>配置 · 凭据 · 索引 · diff · 终端（libghostty-vt）· git"]
+        UI <-->|"preload 白名单 API<br/>MessagePort 事件流"| Main
+        Main <-->|"NAPI-RS"| Core
     end
-    subgraph Host["Agent Host 进程（每工作区一个，内置 Node）"]
+    subgraph Host["Agent Host 进程（每工作区一个，单独内置的 Node LTS，ADR-0015）"]
         HK["Harness Kit（PiArc 的 Pi 扩展）<br/>权限闸门 · hooks 桥 · 子 agent · plan · todo · 工具配置"]
         Pi["Pi SDK<br/>pi-coding-agent · pi-agent-core · pi-ai · pi-mcp"]
         HK --- Pi
@@ -126,20 +131,21 @@ flowchart TB
     Pi -->|HTTPS| LLM["模型服务商"]
     Pi -->|"stdio / HTTP"| MCP["MCP servers（工作区内共享）"]
     Core -->|"沙箱内执行"| Proc["Shell / PTY / 子进程"]
-    Core --> FS["文件系统 · 钥匙串 · git"]
+    Core --> FS["文件系统 · 系统凭据库 · git"]
 ```
 
 | 层 | 进程 | 语言 | 状态归属 |
 |---|---|---|---|
-| 客户端 | App 主进程 | Swift 6 | 只持有呈现状态（窗口布局、滚动位置、展开/折叠）。业务状态都是 Core 推送来的快照或增量。 |
-| Core | App 主进程（静态库） | Rust | 应用级事实来源：工作区、会话索引、审批账本、权限规则、hooks 配置、后台任务、快照、凭据。 |
+| 客户端：渲染进程 | 每窗口一个 | TypeScript（React） | 只持有呈现状态（面板布局、滚动位置、展开/折叠）。业务状态都是 Core 推送来的快照或增量。 |
+| 客户端：主进程 | 应用主进程 | TypeScript | 窗口与系统集成状态；不持有业务状态，只转发 Core 事件。 |
+| Core | 应用主进程内（原生模块，自有线程池） | Rust | 应用级事实来源：工作区、会话索引、审批账本、权限规则、hooks 配置、后台任务、终端、快照、凭据。 |
 | Agent Host | 子进程，每工作区一个 | TypeScript（Node） | 运行中会话的内存状态（Pi `AgentSession`）。持久化由 Pi 写 JSONL。 |
 
 ### 3.2 一次用户输入的完整流程
 
 ```mermaid
 sequenceDiagram
-    participant U as 客户端
+    participant U as 客户端（渲染进程，经主进程转发）
     participant C as Core
     participant H as Agent Host / Harness Kit
     participant P as Pi
@@ -182,10 +188,12 @@ sequenceDiagram
 
 | 进程 | 数量 | 生命周期 | 说明 |
 |---|---|---|---|
-| PiArc.app | 1 | 用户启动/退出 | 关闭最后一个窗口时应用不退出（菜单栏常驻），后台会话继续运行。 |
+| 主进程（含 Core） | 1 | 用户启动/退出 | 关闭最后一个窗口时应用不退出（macOS 菜单栏 / Windows 托盘常驻），后台会话继续运行。单实例：再次启动时把参数（文件夹、`piarc://` 链接）交给已运行的实例。 |
+| 渲染进程 | 每窗口 1 个 | 窗口打开/关闭 | 崩溃或重载不影响会话：重新订阅后由 Core 补发快照。 |
+| Chromium 辅助进程 | GPU、网络服务等 | Electron 管理 | 计入内存预算（第 11 章）。 |
 | Agent Host | 每个已打开工作区 1 个 | Core 按需启动与预热；工作区内全部会话空闲超过阈值（默认 30 分钟）后回收；崩溃自动重启并恢复会话 | 一个进程承载该工作区的所有会话；子 agent 在进程内运行（ADR-0010）。 |
 | MCP server | 每工作区每 server 1 个 | Agent Host 中的共享连接池按需启动、空闲回收 | 不随会话数复制。 |
-| Shell / PTY | 按需 | Core 的任务管理器负责，进程组/Job Object 级别终止 | 前台命令、后台命令、终端面板都由 Core 统一管理。 |
+| Shell / PTY | 按需 | Core 的任务管理器负责，进程组（macOS）/ Job Object（Windows）级别终止 | 前台命令、后台命令、终端面板都由 Core 统一管理。 |
 | hooks 命令 | 按需 | Core 执行，带超时，杀整棵进程树 | 在沙箱外运行（与 Claude Code 一致），受项目信任约束。 |
 
 AHP 从第一天起按会话多路复用，退回"每会话一个进程"不需要改协议。
@@ -195,11 +203,16 @@ AHP 从第一天起按会话多路复用，退回"每会话一个进程"不需�
 ```
 PiArc/
 ├── apps/
-│   ├── macos/                 # Xcode 工程 + SwiftPM 包（PiArc.app）
-│   └── windows/               # 第二阶段
-├── crates/                    # Rust workspace（第 7 章）
+│   └── desktop/               # Electron 应用（第 8 章）
+│       ├── src/main/          # 主进程：窗口、菜单、托盘、通知、更新、Core 加载与事件转发
+│       ├── src/preload/       # contextBridge 白名单 API
+│       ├── src/renderer/      # React 界面与 Web Worker
+│       └── native/            # 平台专属原生模块（按需）
+├── crates/                    # Rust workspace（第 7 章），含 NAPI-RS 绑定 piarc-napi
 ├── agent-host/                # TypeScript：Agent Host 与 Harness Kit（第 5、6 章）
-├── design/tokens/             # 设计令牌单一来源（JSON），生成各平台资源
+├── packages/
+│   └── protocol/              # 由 piarc-protocol 的 JSON Schema 生成的 TS 类型，Agent Host 与客户端共用
+├── design/tokens/             # 设计令牌单一来源（JSON），生成 CSS 变量与 TS 常量
 ├── docs/
 │   ├── architecture/          # 本文
 │   ├── adr/                   # 架构决策记录
@@ -216,18 +229,20 @@ PiArc/
 
 | ADR | 决策 | 一句话理由 |
 |---|---|---|
-| [0001](../adr/0001-three-tier-native-architecture.md) | 原生客户端 + Rust Core + Pi Agent Host 三层 | Pi 只能跑在 JS 运行时里；厚核心让 Windows 只重写客户端 |
+| [0013](../adr/0013-electron-desktop-client.md) | Electron + React 客户端，三层结构不变，macOS 与 Windows 同一代码库 | 双平台同步推进；Pi 本来就要带 JS 运行时；消除原生富文本渲染风险 |
 | [0002](../adr/0002-pi-integration-via-sdk-host.md) | 基于 Pi SDK 自研 Agent Host | 官方 RPC 缺多会话、版本握手、结构化审批；SDK 让上游不兼容变更在编译期暴露 |
-| [0003](../adr/0003-embedded-node-runtime.md) | 内置 Node LTS | MCP 的 npx 与 Pi 插件包依赖 Node；Bun 作为对照备选 |
 | [0004](../adr/0004-harness-control-plane-in-core.md) | 策略在 Core、循环在 Pi、I/O 下沉 Core | 安全边界不能落在无隔离的扩展上；快照与沙箱需要统一入口 |
 | [0005](../adr/0005-claude-code-config-compatibility.md) | 只读兼容 Claude Code 配置 | 用户零成本迁移，又不污染其 Claude Code 配置 |
 | [0006](../adr/0006-compliance-and-clean-room.md) | 禁用 Claude 订阅登录、clean-room、自有品牌 | 不把商业模式建在违反条款的基础上 |
-| [0007](../adr/0007-macos-ui-swiftui-appkit.md) | SwiftUI 外壳 + AppKit 高性能视图，最低 macOS 26 | 兼顾开发效率与长会话性能 |
-| [0008](../adr/0008-ffi-uniffi.md) | UniFFI | 一份接口定义服务 Swift 与 C# |
 | [0009](../adr/0009-agent-host-protocol.md) | 自有协议 AHP | 双向请求、版本握手、事件回放、调用对账 |
 | [0010](../adr/0010-process-model.md) | 每工作区一个 Agent Host | 控制多会话内存，MCP 按工作区共享 |
 | [0011](../adr/0011-session-storage.md) | Pi JSONL 为事实来源 + SQLite 索引 + 内容寻址快照 | 跟随上游格式，索引可重建 |
-| [0012](../adr/0012-distribution-developer-id.md) | Developer ID + 公证 + Sparkle | App Store 沙盒与 Agent 能力冲突 |
+| [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
+| [0015](../adr/0015-agent-host-runtime-bundled-node.md) | Agent Host 继续单独内置 Node LTS | 要套 Seatbelt、走 stdio、给 npx 用，Electron 自带的 Node 都做不到 |
+| [0016](../adr/0016-packaging-signing-updates.md) | Electron Forge；macOS 签名公证 + 内置更新；Windows 签名安装包；不上应用商店 | 官方工具链；应用商店的沙盒与 Agent 能力冲突 |
+| [0017](../adr/0017-terminal-libghostty-vt.md) | 终端状态由 Core 中的 libghostty-vt 持有，渲染层可替换 | agent 读屏与用户所见一致；IPC 流量与输出量无关 |
+
+已被取代的决策（原文保留在 `docs/adr/`）：0001、0007 → 0013；0008 → 0014；0003 → 0015；0012 → 0016。
 
 ---
 
@@ -283,37 +298,42 @@ agent-host/
 
 ### 5.4 凭据与登录
 
-- `ModelRuntime.create({ credentials })` 注入 PiArc 的 `CredentialStore`：读取来自 Core（钥匙串），写入经 AHP 交给 Core 持久化。Pi 的 `AuthStorageBackend.withLock` 是同步接口，Agent Host 启动时向 Core 一次性取回凭据放在内存中，写操作异步回写 Core。这个方案在 M0 验证；若 Pi 的接口无法满足，补丁或上游 issue 处理。
+- `ModelRuntime.create({ credentials })` 注入 PiArc 的 `CredentialStore`：读取来自 Core（系统凭据库），写入经 AHP 交给 Core 持久化。Pi 的 `AuthStorageBackend.withLock` 是同步接口，Agent Host 启动时向 Core 一次性取回凭据放在内存中，写操作异步回写 Core。这个方案在 M0 验证；若 Pi 的接口无法满足，补丁或上游 issue 处理。
 - 凭据只经 AHP 传递，不放进环境变量（Agent Host 启动的子进程会继承环境变量）。
-- OAuth 与设备码登录调用 `ModelRuntime.login(provider, type, interaction)`，`interaction` 的回调（授权 URL、设备码、输入提示）转成 AHP 请求，由客户端用原生界面呈现（`ASWebAuthenticationSession` 或系统浏览器）。
+- OAuth 与设备码登录调用 `ModelRuntime.login(provider, type, interaction)`，`interaction` 的回调（授权 URL、设备码、输入提示）转成 AHP 请求，由客户端呈现：授权页在系统浏览器中打开，回调经本地回环端口或 `piarc://` 深链接返回，不在应用窗口内加载第三方登录页。
 - **Anthropic 的订阅 OAuth 登录方式在 Agent Host 中被屏蔽**（ADR-0006）；CI 中有测试断言可用登录方式列表不包含它。
 
 ### 5.5 Pi 配置隔离
 
-- Pi 的 agent 目录指向 `~/Library/Application Support/PiArc/pi/`（经 SDK `agentDir`），与用户本机 `~/.pi/agent` 隔离；设置界面提供一次性导入（模型配置、skills、prompts）。
+- Pi 的 agent 目录指向 PiArc 数据目录下的 `pi/`（经 SDK `agentDir`，目录位置见第 9.1 节），与用户本机 `~/.pi/agent` 隔离；设置界面提供一次性导入（模型配置、skills、prompts）。
 - 关闭 Pi 的版本检查与自更新；`PI_OFFLINE` 只在需要时开启（它也会关闭模型目录刷新）。模型目录刷新是否走网络由 PiArc 设置控制。
 - Pi 的项目信任（`project_trust`）由 Harness Kit 接管：信任决定来自 Core（第 10.2 节），不使用 Pi 的 `trust.json`。
 
 ### 5.6 运行时与打包
 
+运行时决策见 ADR-0015：Agent Host 用单独内置的 Node LTS，由 Core 直接启动，不经过 Electron。
+
 - 构建：esbuild 把 Agent Host 打成单个 bundle（目标与 Pi 一致：node22.19+），外部依赖只保留 Pi 要求的原生/wasm 资源（photon、quickjs wasm 等）。
-- 应用内布局：
+- 应用内布局（macOS；Windows 在安装目录的 `resources\` 下是同样的结构）：
 
 ```
 PiArc.app/Contents/
-├── MacOS/PiArc
-├── Frameworks/                 # Rust Core 已静态链接；Sparkle.framework
+├── MacOS/PiArc                 # Electron 主程序（发布构建已写入 fuses，ADR-0016）
+├── Frameworks/                 # Electron Framework、Squirrel、各 Helper
 └── Resources/
-    ├── agent-host/
-    │   ├── node                # 重签的 Node LTS
-    │   ├── npm/ npx            # 供 MCP 与插件包安装使用
-    │   ├── agent-host.mjs      # bundle
-    │   ├── pi-assets/          # Pi 运行时需要的资源（经 PI_PACKAGE_DIR 指定）
-    │   └── bin/ rg fd          # 预置，避免 Pi 运行时下载
-    └── …
+    ├── app.asar                # 主进程、preload、渲染进程代码（ASAR 完整性校验）
+    ├── app.asar.unpacked/      # piarc-core 的 .node 原生模块
+    └── agent-host/             # 不进 asar：独立的 node 读不了 asar，完整性靠代码签名
+        ├── node/               # Node LTS 发行包：bin/node、bin/npm、bin/npx（重签）
+        ├── agent-host.mjs      # bundle
+        ├── pi-assets/          # Pi 运行时需要的资源（经 PI_PACKAGE_DIR 指定）
+        └── bin/ rg fd          # 预置，避免 Pi 运行时下载
 ```
 
-- 启动：Core 用固定参数启动 `node agent-host.mjs`，设置最小化的环境变量（PATH 前置内置 Node 目录；`PI_PACKAGE_DIR`；关闭遥测与更新），工作目录为工作区根。
+- 启动：
+  - macOS：Core 执行 `/usr/bin/sandbox-exec -f <profile> -D …参数… <内置 node> agent-host.mjs`（Seatbelt 配置见第 10.3 节）；
+  - Windows：Core 用 `CreateProcess` 启动，把进程挂进 Job Object（`KILL_ON_JOB_CLOSE`），宿主退出时整棵进程树被清理；
+  - 两个平台都由 Core 持有 stdio 管道；环境变量最小化（PATH 前置内置 Node 的 `bin` 目录、`PI_PACKAGE_DIR`、关闭遥测与更新），工作目录为工作区根。
 
 ### 5.7 跟随上游
 
@@ -342,13 +362,13 @@ PiArc.app/Contents/
 | Hooks | Claude Code 兼容的事件、配置格式、exit code 与 JSON 协议 | C + K | 各生命周期事件 | M2 |
 | 子 agent | `.claude/agents` 定义；进程内子会话；工具子集；任意服务商模型；后台运行；最多 3 层 | K + C + U | SDK 子会话 | M3 |
 | Plan 模式 | 只读探索 → 提交计划 → 用户批准并选择后续模式 | K + C + U | `setActiveTools`、`tool_call` | M2 |
-| 任务清单 / 下一步 | 宿主工具驱动，UI 原生渲染，压缩后重新注入 | K + U | `registerTool`、工具 details | M2 |
+| 任务清单 / 下一步 | 宿主工具驱动，UI 结构化渲染，压缩后重新注入 | K + U | `registerTool`、工具 details | M2 |
 | 上下文工程 | 分段 system prompt；memory 层级与 `@import`；system-reminder；压缩；缓存友好布局 | K | `before_agent_start`、`context`、`session_before_compact` | M1–M3 |
 | Skills / 命令 | Agent Skills 标准；`.claude/skills`、`.claude/commands`；渐进加载 | K | Pi skills、prompt templates、`resources_discover` | M3 |
 | 插件 | 加载 Claude Code 插件目录与 Pi 包 | C + K | packages、扩展 | M4 |
 | MCP | stdio / Streamable HTTP；OAuth；工作区共享连接池；延迟加载 | K + C + U | pi-mcp、`tool_search` | M3 |
 | Checkpoint / Rewind | 写前快照；回退代码 / 对话 / 两者 | C + K | 会话树 fork/leaf | M2 |
-| 沙箱 | Bash 在 Seatbelt 中执行；文件与网络白名单 | C | BashOperations 委托 | M4 |
+| 沙箱 | macOS：Bash 在 Seatbelt 中执行，文件与网络白名单；Windows：第一版只做进程树管理（需求 D7） | C | BashOperations 委托 | M4 |
 | 后台任务 / 终端 | 后台命令、超时转后台、Monitor、终端面板 | C + K + U | BashOperations、`registerTool` | M3 |
 | Worktree | 每会话可选独立 worktree；子 agent 隔离 | C + K | cwd 按会话 | M3 |
 | 多模型适配 | 模型能力表；effort 映射；切换代价提示；按能力降级 | K + C | pi-ai 模型目录 | M1–M3 |
@@ -358,7 +378,7 @@ PiArc.app/Contents/
 
 #### 6.1.1 规范名与 Tool Profile
 
-- **规范名采用 Claude Code 的工具名**：`Read`、`Write`、`Edit`、`Bash`、`Glob`、`Grep`、`WebFetch`、`WebSearch`、`Agent`、`TodoWrite`、`AskUserQuestion`、`EnterPlanMode`、`ExitPlanMode`、`Skill`、`ToolSearch`、`NotebookEdit`、`KillShell`、`Monitor`，MCP 工具为 `mcp__<server>__<tool>`。权限规则、hooks matcher、子 agent 的 `tools` 列表一律使用规范名，这样用户现有的 Claude Code 配置可以直接生效。
+- **规范名采用 Claude Code 的工具名**：`Read`、`Write`、`Edit`、`Bash`、`PowerShell`（仅 Windows）、`Glob`、`Grep`、`WebFetch`、`WebSearch`、`Agent`、`TodoWrite`、`AskUserQuestion`、`EnterPlanMode`、`ExitPlanMode`、`Skill`、`ToolSearch`、`NotebookEdit`、`KillShell`、`Monitor`，MCP 工具为 `mcp__<server>__<tool>`。权限规则、hooks matcher、子 agent 的 `tools` 列表一律使用规范名，这样用户现有的 Claude Code 配置可以直接生效。
 - **Tool Profile** 决定某个模型看到的工具名、描述和参数风格。默认 Profile 直接使用规范名；针对特定模型家族可以调整描述文字或参数命名，但规则与 hooks 始终按规范名匹配。Agent Host 维护"模型可见名 ↔ 规范名"映射表。
 - 实现方式：用 Pi 的 `createReadTool/createEditTool/createWriteTool/createBashTool/...` 加 Operations 委托（6.1.3）创建内置工具，再包装成规范名与 PiArc 自写的描述。Pi 内置工具重命名的可行性在 M0 验证。
 
@@ -394,12 +414,13 @@ PiArc.app/Contents/
 |---|---|---|---|
 | Read | 文本带行号分页；图片；PDF 分页；ipynb | 否 | M1 |
 | Write / Edit | 见不变量 | 是 | M1 |
-| Bash | 见 6.11 | 是（只读命令白名单除外） | M1 |
+| Bash | 见 6.11；Windows 上经 Git Bash 执行 | 是（只读命令白名单除外） | M1 |
+| PowerShell | 仅 Windows；见 6.2.2 | 是 | M1（Windows） |
 | Glob / Grep | Core 实现 | 否 | M1 |
 | WebFetch | 本地抓取 → Markdown → 辅助模型按提示提取；域名规则 | 是 | M2 |
 | WebSearch | 可配置后端（服务商原生搜索工具优先，其次第三方搜索 API） | 是 | M3 |
 | TodoWrite | 任务清单（6.5） | 否 | M2 |
-| AskUserQuestion | 结构化多选/输入，UI 原生表单 | 否 | M2 |
+| AskUserQuestion | 结构化多选/输入，UI 表单 | 否 | M2 |
 | EnterPlanMode / ExitPlanMode | 6.5 | 否 / 是 | M2 |
 | Agent | 子 agent（6.4） | 否 | M3 |
 | Skill | 6.7 | 视 skill | M3 |
@@ -430,6 +451,7 @@ PiArc.app/Contents/
 - 规则来源与优先级见 ADR-0005：企业策略 > 会话 > `.piarc/settings.local.json` > `.piarc/settings.json` > `.claude/settings.local.json` > `.claude/settings.json` > 用户级 PiArc 设置 > `~/.claude/settings.json`；列表合并。
 - **Bash 命令分析在 Core 中完成**：用 tree-sitter-bash 解析，拆分 `&& || ; | |& &` 与换行、子 shell、命令替换；剥离 `timeout`、`time`、`nice`、`nohup`、`env` 赋值等包装；逐个子命令匹配。deny/ask 只要任一子命令命中即生效，allow 要求所有子命令都被允许。解析失败按"需要询问"处理。
 - 内置只读命令白名单（如 `ls`、`cat`、`git status`、`git diff`、`rg`）在 Manual 模式下免审批；白名单维护在 Core，带测试。
+- **Windows 上的命令**：`Bash` 工具在 Windows 上通过 Git Bash 执行（Pi 的默认行为），分析方式同上；另提供 `PowerShell` 工具，规则写作 `PowerShell(命令模式)`（与 Claude Code 一致）。第一版不对 PowerShell 做语法级拆分，也不设只读白名单：除非整条命令被规则精确允许，否则在 Manual 模式下一律询问。PowerShell 的语法级分析在 M4 评估。
 - 关键路径删除（`rm -rf` 指向工作区根、家目录、`/` 等）与 `requiresUserInteraction` 类工具在任何模式下都询问。
 
 #### 6.2.3 裁决流程
@@ -494,7 +516,7 @@ handler 类型：`command`（M2）→ `http`、`prompt`（M3）→ `mcp_tool`（
 - **Plan 模式**：进入后 Harness Kit 用 `setActiveTools` 收起写工具，`tool_call` 闸门拦截非只读命令；模型用 `ExitPlanMode` 提交计划（Markdown）。客户端显示计划卡与计划面板，用户可行内评论；批准时选择后续模式（自动接受编辑 / 手动审批 / 继续规划）。计划文本保存为会话 entry，压缩后重新注入。
 - **任务清单**：`TodoWrite` 工具的状态存在工具结果的 `details` 中（随分支正确回溯，参照 Pi 官方 `todo.ts` 示例）；Core 从 `item/completed` 中取出状态，客户端渲染任务卡和侧栏任务面板。长时间未更新时，Harness Kit 以 system-reminder 形式提醒模型。
 - **下一步框**：Harness Kit 注册宿主工具（例如 `SuggestNextSteps`），模型在回合结束时调用，客户端渲染为可点击的建议（开始新会话 / 在此执行）。这类"宿主注入的工具"对所有服务商一致生效，借鉴自 OpenClaudeDesktop 的做法。
-- **AskUserQuestion**：结构化问题（单选、多选、自由输入）经 AHP 到客户端原生表单；可设置超时后按默认继续。
+- **AskUserQuestion**：结构化问题（单选、多选、自由输入）经 AHP 到客户端表单；可设置超时后按默认继续。
 
 ### 6.6 上下文工程
 
@@ -552,7 +574,7 @@ Agent Host 按类别统计上下文构成（system prompt、工具定义、MCP �
 - 配置来源：`.mcp.json`（项目，需信任）、`~/.claude.json` 中的 user/local 级 server、PiArc 自己的配置、插件、企业策略；同名按"企业 > 本地 > 项目 > 用户 > 插件"取整条定义。
 - 传输：stdio、Streamable HTTP（pi-mcp 支持）；旧 SSE 传输不支持（pi-mcp 不支持，Claude Code 也已标记弃用），UI 中明确提示。
 - **连接池**：PiArc 的 MCP 扩展替换 Pi 内置 MCP 扩展，在 Agent Host 内按工作区维护共享连接池，同一 server 只启动一份，按需连接、空闲断开（ADR-0010）。stdio server 的进程由 Agent Host 启动，PATH 中前置内置 Node，使 `npx` 类 server 开箱即用。
-- OAuth：使用 pi-mcp 的 OAuth 流程；浏览器授权由客户端发起；token 存钥匙串（经 Core），不写明文文件。
+- OAuth：使用 pi-mcp 的 OAuth 流程；浏览器授权由客户端发起；token 存系统凭据库（经 Core），不写明文文件。
 - 工具暴露：工具总数较少时直接暴露；超过阈值（默认 30 个）时改为延迟加载，经 `ToolSearch` 检索。
 - 缺口：elicitation、sampling、prompts、resources/subscribe（pi-mcp 不支持）。prompts 可以在扩展层基于通用请求实现为斜杠命令（M4）；elicitation 需要扩展 pi-mcp 的 handler，先提上游 issue（M5）。
 
@@ -570,15 +592,20 @@ Agent Host 按类别统计上下文构成（system prompt、工具定义、MCP �
 - macOS：Core 为每次命令生成 Seatbelt 配置（参照 `@anthropic-ai/sandbox-runtime` 的模型，Rust 自行实现），默认写入限于工作区、会话临时目录和附加目录，受保护路径禁写；读取默认放开，可配置 `denyRead`（如 `~/.ssh`、`~/.aws`）。
 - 网络：沙箱内无直连，经 Core 内置的本地代理按域名白名单放行；白名单初始为空，由用户或企业策略配置。
 - 两种模式：沙箱内命令自动批准 / 沙箱内仍走正常审批（默认）。命令因沙箱失败时，模型可请求在沙箱外重试，这一请求总是需要审批。
-- Agent Host 进程本身也运行在一个较宽松的 Seatbelt 配置中，作为第二道防线（ADR-0004）。
-- Windows：Job Object 管理进程树；隔离方案在第二阶段评估（候选：AppContainer、MXC），另写 ADR。
+- Agent Host 进程本身也运行在一个较宽松的 Seatbelt 配置中，作为第二道防线（ADR-0004、ADR-0015）。
+- Windows：第一版不提供 OS 级沙箱（与 Claude Code 在原生 Windows 上的现状一致，需求 D7）。Core 用 Job Object 管理进程树，保证超时与停止时整棵进程树被终止；权限规则照常生效。设置页与沙箱开关处明确提示"Windows 上沙箱不可用"，不静默降级。隔离方案（AppContainer 等）在 M4 评估，结论另写 ADR。
 
 ### 6.11 后台任务、终端、Monitor
 
 - **Bash 行为**：每条命令独立进程；`cd` 在工作区内跨命令保留（越界则重置并提示）；默认超时 2 分钟、上限 10 分钟；前台命令超时后转为后台任务而不是直接杀掉；成功输出内联约 30,000 字符，超出则写文件并给出约 2,000 字符预览；失败输出给出头尾。数值可配置。
 - **后台任务**：`run_in_background` 启动；输出写入会话目录下的文件，模型用 `Read` 查看；`KillShell` 停止；任务完成以通知注入下一回合。Core 的任务管理器统一管理后台命令、后台子 agent、Monitor，客户端的后台任务面板展示与控制它们。
 - **Monitor**：后台运行命令并把新增输出逐行回灌给模型（日志跟踪、CI 轮询）。
-- **终端面板**：Core 用 portable-pty 创建 PTY，客户端用 libghostty-vt 渲染；与会话共享工作目录与环境；支持 OSC 133 shell integration。终端内容不自动进入模型上下文，用户可以把选中内容附加到对话。
+- **终端面板**（ADR-0017）：
+  - Core 的 `piarc-term` 用 portable-pty 创建 PTY（Windows 为 ConPTY），用 libghostty-vt 持有终端状态。终端状态只此一份，界面关着也照常维护。
+  - 渲染进程不解析 VT：Core 把 render state 编成增量帧（只含脏行，按行 id 复用），渲染进程按 `requestAnimationFrame` 节奏拉取并用 Canvas 绘制；隐藏的终端不产生帧。键盘、鼠标、粘贴事件发回 Core，由 libghostty-vt 按当前终端模式编码后写入 PTY。
+  - agent 用 formatter 读取屏幕与 scrollback 的纯文本，用 OSC 133 判断命令边界和退出状态，与用户看到的是同一个终端实例。
+  - 与会话共享工作目录与环境；支持 OSC 133 shell integration；退出时保存 snapshot 以便重启后恢复。终端内容不自动进入模型上下文，用户可以把选中内容附加到对话。
+  - 自研渲染器不达标时，渲染端退回 xterm.js 6 + WebGL 的字节流副本模式，Core 仍是唯一权威。
 
 ### 6.12 Worktree 与并行会话
 
@@ -613,7 +640,6 @@ Agent Host 按类别统计上下文构成（system prompt、工具定义、MCP �
 | 企业托管配置（`managed-settings.json`） | M5 | PiArc 自有托管配置格式另行设计，兼容读取 Claude Code 的托管文件 |
 
 设置界面提供"配置诊断"：列出每个配置文件的加载状态、生效的键、被覆盖的键、被忽略的键（借鉴 claw-code 的 ConfigInspection）。
-
 
 ### 6.15 工程不变量与初始校准值
 
@@ -650,24 +676,26 @@ crates/
 ├── piarc-config       # 设置分层加载与合并（PiArc + Claude Code 兼容）、项目信任、配置诊断
 ├── piarc-fs           # 文件读写、文件状态表、glob/grep（ignore、grep-searcher）、文件监听（notify）
 ├── piarc-checkpoint   # 内容寻址快照存储、检查点索引、回退与冲突检测
-├── piarc-exec         # 进程管理（进程组 / Job Object）、PTY（portable-pty）、输出落盘、超时转后台
-├── piarc-sandbox      # Seatbelt 配置生成、本地网络代理；Windows 实现第二阶段
+├── piarc-exec         # 进程管理（进程组 / Job Object）、输出落盘、超时转后台
+├── piarc-term         # 终端会话：PTY（portable-pty）+ libghostty-vt 终端状态、屏幕快照（ADR-0017）
+├── piarc-sandbox      # macOS Seatbelt 配置生成、本地网络代理；Windows 进程树限制（第 6.10 节）
 ├── piarc-store        # SQLite（rusqlite）：索引、FTS5、审计；Pi JSONL 流式只读解析
-├── piarc-render       # Markdown 块解析（pulldown-cmark）、高亮（tree-sitter-highlight）、diff（similar）、UTF-16 偏移
+├── piarc-diff         # diff 计算（similar）、hunk 结构、大 diff 降级、UTF-16 偏移
 ├── piarc-git          # 状态、diff、worktree、分支
-├── piarc-secrets      # 凭据存取（keyring-core + 平台 store）
+├── piarc-secrets      # 凭据存取（keyring-core + 平台 store：钥匙串 / 凭据管理器）
 ├── piarc-telemetry    # tracing、日志轮转、本地指标、诊断包导出
-├── piarc-ffi          # UniFFI 导出层（薄），产出 staticlib / XCFramework
+├── piarc-napi         # NAPI-RS 导出层（薄），产出各平台 .node 原生模块（ADR-0014）
 ├── piarc-testkit      # 严格校验的 mock provider、场景运行器、事件断言（仅测试）
 └── piarc-devcli       # 开发用无头驱动：不经 UI 运行 Core + Agent Host（不随应用发布）
 ```
 
 依赖规则：
 
-- 有向无环：`piarc-ffi → piarc-core → {host, policy, hooks, config, fs, checkpoint, exec, sandbox, store, render, git, secrets, telemetry} → piarc-protocol`。功能 crate 之间需要协作时经 `piarc-core` 编排，不互相依赖（`fs → checkpoint` 这类明确的单向依赖除外，需在 crate README 中说明）。
+- 有向无环：`piarc-napi → piarc-core → {host, policy, hooks, config, fs, checkpoint, exec, term, sandbox, store, diff, git, secrets, telemetry} → piarc-protocol`。功能 crate 之间需要协作时经 `piarc-core` 编排，不互相依赖（`fs → checkpoint` 这类明确的单向依赖除外，需在 crate README 中说明）。
 - 平台相关代码收敛在 trait 后面，按 `cfg(target_os)` 提供实现；新增平台假设必须经 CI 的 Windows 构建检查。
 - I/O 边界用窄 trait 隔离（`ProcessSpawner`、`FileSystem`、`Clock`、`SecretStore`、`AgentHostTransport`），测试用内存实现驱动。
-- 错误类型化：每个 crate 定义 `thiserror` 枚举，带可机读的 `kind` 与 `retryable`；跨 FFI 和 AHP 时映射为结构化错误，不传裸字符串。
+- 错误类型化：每个 crate 定义 `thiserror` 枚举，带可机读的 `kind` 与 `retryable`；跨 NAPI 和 AHP 时映射为结构化错误，不传裸字符串。
+- panic 不得穿过 NAPI 边界：导出函数在边界处捕获 panic 并转成结构化错误，Core 内部错误不能让主进程崩溃。
 - 单文件超过 1,000 行、单函数超过 80 行需要在评审中说明理由（规避 claw-code 的上帝文件问题）。
 
 ### 7.2 运行时与并发
@@ -675,7 +703,7 @@ crates/
 - Core 内部运行一个 tokio 多线程运行时，`CoreRuntime` 创建时启动、应用退出时有序关闭（先停止接受新请求，再通知 Agent Host 退出，等待写入完成）。
 - 每个工作区一个 actor（`WorkspaceActor`），每个会话一个 actor（`SessionActor`），通过消息通道交互，避免共享可变状态加锁。
 - 所有长任务可取消（`CancellationToken`），取消沿会话 → 回合 → 工具调用 → 子进程传播。
-- FFI 调用不阻塞调用线程：同步方法只做参数校验与入队，结果经事件或 async 返回。
+- NAPI 调用不阻塞主进程的事件循环：同步方法只做参数校验与入队，结果经事件或 async（Promise）返回。主进程的事件循环同时负责窗口与菜单响应，单次 NAPI 同步调用的耗时预算为 1 ms。
 
 ### 7.3 状态归属
 
@@ -686,9 +714,10 @@ crates/
 | 审批账本（进行中的审批） | Core | 内存；结果写审计表 |
 | 权限规则、hooks 配置、设置 | 配置文件 | 文件（Core 读写 `.piarc/` 与用户目录，只读 `.claude/`） |
 | 文件快照 | Core | 内容寻址目录 + SQLite 索引 |
-| 后台任务、PTY | Core | 内存；输出文件在会话目录 |
-| 凭据 | Core | 钥匙串 |
-| 窗口布局、滚动位置、展开状态 | 客户端 | `UserDefaults` / 场景恢复 |
+| 后台任务、PTY、终端屏幕状态 | Core | 内存；输出文件在会话目录 |
+| 凭据 | Core | 系统凭据库（钥匙串 / 凭据管理器） |
+| 窗口位置与大小 | 主进程 | 应用数据目录下的窗口状态文件 |
+| 面板布局、滚动位置、展开状态 | 渲染进程 | `localStorage`（可丢失，丢失时用默认值） |
 
 ### 7.4 Agent Host Protocol（AHP）
 
@@ -738,65 +767,69 @@ crates/
 - 重启：异常退出后指数退避重启（最多 5 次/10 分钟），重启后恢复打开中的会话；进行中的 `prompt` 等请求标记为 `uncertain`，客户端显示"连接中断，回合状态未知"并提供重试。
 - 日志：Agent Host 的 stderr 进入 Core 的日志系统，按会话打标签。
 
-### 7.6 Core API（UniFFI 导出面）
+### 7.6 Core API（NAPI-RS 导出面）
 
-保持粗粒度（ADR-0008）：
+保持粗粒度（ADR-0014）。Core 只被主进程加载，渲染进程经 preload 间接调用：
 
 ```rust
-// 示意，非最终签名
-#[uniffi::export]
+// 示意，非最终签名；异步方法的具体写法以锁定的 NAPI-RS 版本为准
+#[napi]
+pub struct CoreRuntime { /* Arc<core::Runtime> */ }
+
+#[napi]
 impl CoreRuntime {
-    #[uniffi::constructor] fn new(config: CoreConfig) -> Result<Arc<Self>, CoreError>;
-    fn set_listener(&self, listener: Arc<dyn CoreEventListener>);
-    async fn open_workspace(&self, path: String) -> Result<Arc<Workspace>, CoreError>;
-    fn settings(&self) -> Arc<SettingsStore>;
+    #[napi(factory)]
+    pub fn create(config: CoreConfig, on_events: ThreadsafeFunction<EventBatch>) -> napi::Result<Self>;
+    #[napi]
+    pub async fn open_workspace(&self, path: String) -> napi::Result<Workspace>;
+    #[napi]
+    pub fn settings(&self) -> SettingsStore;
 }
 
-#[uniffi::export]
+#[napi]
 impl Session {
-    async fn prompt(&self, input: UserInput) -> Result<TurnHandle, CoreError>;
-    fn steer(&self, input: UserInput) -> Result<(), CoreError>;
-    fn abort(&self) -> Result<(), CoreError>;
-    fn respond_approval(&self, request_id: String, revision: u64, decision: ApprovalDecision) -> Result<(), CoreError>;
-    async fn rewind(&self, target: RewindTarget, scope: RewindScope) -> Result<RewindReport, CoreError>;
-    fn transcript_window(&self, range: ItemRange) -> Result<TranscriptWindow, CoreError>;
-}
-
-#[uniffi::export(with_foreign)]
-pub trait CoreEventListener: Send + Sync {
-    fn on_events(&self, batch: EventBatch);   // Core 侧约 16 ms 合并一批
+    #[napi] pub async fn prompt(&self, input: UserInput) -> napi::Result<TurnHandle>;
+    #[napi] pub fn steer(&self, input: UserInput) -> napi::Result<()>;
+    #[napi] pub fn abort(&self) -> napi::Result<()>;
+    #[napi] pub fn respond_approval(&self, request_id: String, revision: u32, decision: ApprovalDecision) -> napi::Result<()>;
+    #[napi] pub async fn rewind(&self, target: RewindTarget, scope: RewindScope) -> napi::Result<RewindReport>;
+    #[napi] pub fn transcript_window(&self, range: ItemRange) -> napi::Result<TranscriptWindow>;
 }
 ```
+
+- `on_events` 由 Core 约每 16 ms 调用一次，传入合并后的事件批次。主进程不解析批次内容，按 `sessionId` 转发给订阅了该会话的窗口（每个窗口一个 MessagePort）。
+- 渲染进程能调用的命令是上面接口的子集，在 preload 中逐个列出；主进程校验调用来源（发起请求的窗口和页面地址）后才转给 Core。
+- NAPI-RS 生成的 TypeScript 声明与 `packages/protocol` 的类型都纳入 L1 快照测试，接口变化必须同时更新快照。
 
 事件分两类：
 
 1. **实体快照**（带 `revision`）：工作区列表、会话列表、审批账本、后台任务、会话侧栏元数据。客户端丢弃旧 revision。
 2. **条目增量**：transcript 的 `item started → delta* → completed`，身份为 `sessionId / turnId / itemId`，子 agent 附带 `parentSessionId`。
 
-渲染数据（Markdown 块、高亮 span、diff hunk）以扁平 buffer 形式随条目增量下发，客户端不重复解析。
+diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高亮在渲染进程的 Web Worker 中完成（第 8.4 节）。
 
-### 7.7 渲染预处理
+### 7.7 diff 与预处理
 
-- Markdown：pulldown-cmark 增量解析，只重排最后一个未完成的块；流式中自动闭合未完成的标记（代码围栏、强调）以免闪烁。
-- 代码高亮：tree-sitter-highlight，语法包按需加载；流式代码块先输出纯文本 span，块完成后补高亮。
-- Diff：similar 计算行级与词级 diff；超过阈值（例如 5,000 行或 300 个文件）时降级为折叠与纯文本。
-- 所有偏移在 Core 中转换为 UTF-16，直接对应 `NSString` / `NSTextStorage` 的索引。
+- **diff**：similar 计算行级与词级 diff，输出 hunk 结构；Changes 面板、审批卡、快照回退用同一份结构。超过阈值（例如 5,000 行或 300 个文件）时降级为折叠与纯文本。
+- **文件预览分类**：二进制、图片、超大文件在 Core 中识别，渲染进程按类型选择展示方式，不读原始字节。
+- **偏移**：Core 对外给出的文本偏移统一为 UTF-16 码元，与 JavaScript 字符串索引一致。
+- **为什么 Markdown 与高亮不放在 Core**：原生方案中 Core 做 Markdown 块解析和高亮，是为了给 AppKit 直接提供 span。改用 Web 界面后，渲染进程的生态（Markdown、shiki、公式、Mermaid）更完整；放在 Core 只会多一层序列化和一套重复实现。重活放在 Web Worker 里，不占用界面线程。
 
 ---
 
-## 8. macOS 客户端设计
+## 8. 桌面客户端设计（Electron）
 
-### 8.1 技术与模块
+客户端技术决策见 ADR-0013。本章的交互规则用平台中立的方式描述，macOS 与 Windows 只在第 8.8 节列出的地方有差异。快捷键中的 `Mod` 在 macOS 上是 ⌘，在 Windows 上是 Ctrl。
 
-| 模块（SwiftPM target） | 语言模式 | 职责 |
-|---|---|---|
-| `PiArcCoreBindings` | Swift 5 | UniFFI 生成代码，不手改 |
-| `PiArcKit` | Swift 6 | Core 适配层：把事件批次归约成 `@Observable` 存储（会话列表、transcript、审批、任务、设置）；`@MainActor` 隔离 |
-| `PiArcAppKit` | Swift 6 | AppKit 高性能视图：transcript 表格、TextKit 2 文本、diff、文件查看器、终端、composer |
-| `PiArcUI` | Swift 6 | SwiftUI 视图：窗口骨架、侧栏、会话右栏、设置、表单、命令面板 |
-| `PiArc`（App target） | Swift 6 | 场景、菜单、快捷键、通知、Sparkle、URL scheme、菜单栏常驻 |
+### 8.1 进程与模块
 
-最低系统 macOS 26，arm64 为主（ADR-0007）。
+| 部分 | 目录 | 职责 | 不做什么 |
+|---|---|---|---|
+| 主进程 | `apps/desktop/src/main/` | 应用生命周期、多窗口、原生菜单、菜单栏图标 / 系统托盘、通知、Dock 角标 / 任务栏进度、`piarc://` 深链接、文件关联、自动更新；加载 Core（ADR-0014），把事件批次经 MessagePort 转给订阅的窗口；系统对话框（选择文件夹等） | 不做业务决策，不解析模型输出，不直接读写工作区文件（一律经 Core） |
+| preload | `apps/desktop/src/preload/` | 用 `contextBridge` 暴露 `window.piarc`：命令调用、事件端口、少量系统能力（打开外部链接前确认、选择文件夹）。API 类型来自 `packages/protocol` | 不暴露 `ipcRenderer`、Node 模块或任意通道名 |
+| 渲染进程 | `apps/desktop/src/renderer/` | React 界面，按功能分模块：`shell`（窗口骨架、侧栏、面板布局）、`transcript`、`composer`、`approvals`、`changes`（diff 审阅）、`terminal`、`settings`、`store`（事件归约）、`workers`（Markdown 解析、代码高亮） | 不持有业务事实；不直接访问网络（由 CSP 禁止） |
+
+每个窗口一个渲染进程。所有窗口共用主进程里的同一个 Core 实例，所以多窗口看到的审批和会话状态天然一致。
 
 ### 8.2 信息架构
 
@@ -814,69 +847,93 @@ pub trait CoreEventListener: Send + Sync {
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-- **侧栏**：按工作区分组；会话状态徽标优先级：错误 > 等待审批 > 运行中 > 未读 > 空闲；支持过滤、置顶、归档、重命名；宽度 200–420 pt，可折叠。
+- **侧栏**：按工作区分组；会话状态徽标优先级：错误 > 等待审批 > 运行中 > 未读 > 空闲；支持过滤、置顶、归档、重命名；宽度 200–420 px，可折叠。
 - **新建会话**：选择工作区与分支（可选独立 worktree）→ 先显示乐观的用户消息 → 创建会话 → 发送首条输入；首条消息失败时回滚并保留输入内容。
-- **composer**：多行输入；`@` 文件提及（Core 提供模糊匹配）；`/` 命令面板；图片与 PDF 拖放/粘贴；运行中 Enter 为 steer、⌘↩ 为排队、Esc 停止；排队项可编辑、删除。
-- **环境栏**：权限模式菜单（⌘⇧M，数字键快选）、模型菜单与 effort 子菜单、上下文用量环（75%、90% 两级提示）。
+- **composer**：基于 ProseMirror。多行输入；`@` 文件提及（Core 提供模糊匹配，提及以胶囊显示）；`/` 命令面板；图片与 PDF 拖放 / 粘贴；运行中 Enter 为 steer、Mod+Enter 为排队、Esc 停止；排队项可编辑、删除。胶囊的存储数据、显示形态和发送时拼接的文本三者分开。
+- **环境栏**：权限模式菜单（Mod+Shift+M，数字键快选）、模型菜单与 effort 子菜单、上下文用量环（75%、90% 两级提示）。
 - **transcript 行类型**：用户消息、回复正文（Markdown）、思考块（生成中强制展开，结束后折叠为"思考了 N 秒"）、工具组摘要（动词 + 对象 + 增删计数）、bash 卡（语义状态，超过 10 秒显示计时）、文件改动卡、审批卡、子 agent 卡、压缩提示、错误卡（分类 + 重试）、计划卡、任务卡、下一步建议。三档视图：普通（工具折叠为摘要）/ 思考（加思考摘要）/ 详细（全部展开）。
 - **审批卡**：四类——命令、文件改动（带 diff 预览）、权限扩展（越界目录、网络域名）、提问表单。按钮：拒绝（可附反馈）、仅本次允许、本会话允许、总是允许（可编辑规则）。
 - **右栏卡片**：运行环境、上下文（百分比 + 分类明细 + 压缩按钮）、改动、任务、后台任务；空间不足时变为浮层。
-- **设置**（`Settings` 场景）：通用、模型与服务商（每模型显示名、上下文窗口、图片输入、默认 effort；密钥存钥匙串）、权限（规则可视化管理、审计记录）、hooks、MCP、skills 与插件、memory 文件、沙箱、外观、快捷键、配置诊断、关于与更新。
-- **系统集成**：菜单栏常驻图标（运行中/等待审批计数）；会话完成或等待审批且窗口不在前台时发系统通知（可直接在通知中允许/拒绝，M4）；Dock 角标；`piarc://` URL scheme；从 Finder 打开文件夹；多窗口与原生标签页；App Intents / 快捷指令（M5）。
+- **设置**（独立窗口）：通用、模型与服务商（每模型显示名、上下文窗口、图片输入、默认 effort；密钥存系统凭据库）、权限（规则可视化管理、审计记录）、hooks、MCP、skills 与插件、memory 文件、沙箱、外观、快捷键、配置诊断、关于与更新。
+- **系统集成**：见第 8.8 节。
 
 ### 8.3 状态与数据流
 
 ```
-Core 事件批次 ──► PiArcKit 归约器（MainActor）──► @Observable 存储 ──► SwiftUI / AppKit 视图
-                                                         ▲
-用户操作 ──► 视图 ──► PiArcKit 命令 ──► Core API ─────────┘（结果以事件回来）
+Core 事件批次 ──► 主进程（只转发）──MessagePort──► 渲染进程 store 归约器 ──► React 组件（按会话 / item 订阅）
+                                                                  ▲
+用户操作 ──► 组件 ──► window.piarc 命令 ──► 主进程 ──► Core API ───┘（结果以事件回来）
 ```
 
 规则：
 
-1. 业务状态只来自 Core 事件。视图不在本地修改业务状态；唯一例外是乐观回显（带 `clientId`，收到 Core 确认后对账替换）。
-2. 呈现状态（展开、滚动、选择、面板布局）由客户端持有，不回传 Core。
-3. 存储按粒度拆分（每个会话、每个 item 独立可观察），流式增量只使最后一行失效，不触发整棵视图树刷新。
+1. 业务状态只来自 Core 事件。组件不在本地修改业务状态；唯一例外是乐观回显（带 `clientId`，收到 Core 确认后对账替换）。
+2. 呈现状态（展开、滚动、选择、面板布局）由渲染进程持有，不回传 Core。
+3. store 自己实现，基于 React 的 `useSyncExternalStore`，按会话和 item 粒度订阅。流式增量只让最后一个 item 的订阅者重新渲染，不触发整棵组件树刷新。
 4. 实体快照按 `revision` 门控，旧数据丢弃。
+5. 大块数据（transcript 窗口、长 diff）走结构化克隆；单批超过阈值时用 `ArrayBuffer` 转移所有权，不复制。
 
 ### 8.4 Transcript 渲染管线
 
-- 容器：view-based `NSTableView`，行高按 `itemId + 宽度` 缓存；已完成的行作为不可变快照；更新按回合分段做差量应用。
-- 正文：只读 `NSTextView`（TextKit 2），从 Core 下发的块与 span 直接构建 `NSAttributedString`；已完成的块缓存。
-- 流式节奏：Core 合并 delta（约 16 ms）；客户端在 `CADisplayLink`（macOS 14+ 的 `NSView.displayLink`）驱动下以平滑节奏输出字符，保持"打字感"但不落后实际进度太多。参数在 M0 调校。
-- 滚动跟随：在底部时内容增长自动贴底（无动画）；用户主动向上滚动即解除跟随；回到距底很小的范围内恢复；离底超过一屏显示"回到底部"按钮。阈值作为常量集中定义，M0 调校（参考实现中的取值：解除 2 px、恢复 1–40 px、按钮 120–200 px）。
-- 跨块选择与复制：提供"复制本条消息（Markdown / 纯文本）"与"选中本回合"操作，弥补表格行之间无法连续选择的问题。
+- **容器**：虚拟化列表，只挂载可见区及上下各约一屏的行；行高按 `itemId + 宽度` 缓存，用 `ResizeObserver` 测量；列表底部锚定，新内容追加时视口保持贴底。
+- **不可变行**：已完成的 item 渲染结果不再变化，组件做记忆化；流式中只有最后一个 item 重新渲染。
+- **Markdown**：在 Web Worker 中增量解析，只重新解析最后一个未完成的块；流式中自动闭合未完成的标记（代码围栏、强调），避免闪烁。Worker 输出安全的中间结构（块与 span），由 React 组件渲染，**不使用 `innerHTML` / `dangerouslySetInnerHTML`**；模型输出里的原始 HTML 一律当文本显示（第 10.3 节）。
+- **代码高亮**：在 Worker 中运行（候选 shiki，TextMate 语法，语言按需加载）；流式代码块先显示纯文本，块完成后换成高亮结果。
+- **重型内容**：公式、Mermaid 等按需懒加载（P1），同样走安全渲染路径。
+- **diff**：Core 给出结构化 hunk（第 7.7 节），渲染进程只负责显示；大 diff 虚拟化。
+- **流式节奏**：Core 合并 delta（约 16 ms）；渲染进程在 `requestAnimationFrame` 中以平滑节奏输出字符，保持打字感，但不落后实际进度太多。参数在 M0 调校。
+- **滚动跟随**：在底部时内容增长自动贴底（无动画）；用户主动向上滚动（滚轮、触控板、拖动滚动条、键盘）即解除跟随；回到距底很小的范围内恢复；离底超过一屏显示"回到底部"按钮。阈值作为常量集中定义，M0 调校（参考实现中的取值：解除 2 px、恢复 1–40 px、按钮 120–200 px）。
+- **选择与复制**：Web 天然支持跨块连续选择；另提供"复制本条消息（Markdown / 纯文本）"。
 
 ### 8.5 交互规范
 
 | 规范 | 规则 |
 |---|---|
-| 输入法守卫 | composer 与所有快捷键处理先检查 `hasMarkedText()`；输入法合成期间 Enter、Esc、`/`、`@` 都不触发业务 |
-| 审批热键 | ⌘↩ 允许、⇧⌘↩ 本会话允许、Esc 拒绝（仅当 composer 为空或焦点在卡片上）；新卡出现后 400 ms 内不响应热键，防误触；多张卡时只有第一张可见卡响应 |
+| 输入法守卫 | 所有键盘处理先检查 `event.isComposing`（兼容 `keyCode === 229`）；`compositionstart` 到 `compositionend` 期间 Enter、Esc、`/`、`@` 都不触发业务。M0 在两个平台上用中文、日文输入法实测 composer |
+| 审批热键 | Mod+Enter 允许、Mod+Shift+Enter 本会话允许、Esc 拒绝（仅当 composer 为空或焦点在卡片上）；新卡出现后 400 ms 内不响应热键，防误触；多张卡时只有第一张可见卡响应 |
 | 长参数阅读闸门 | 审批卡中被折叠的长命令或长 diff，未展开查看时"总是允许"按钮不可用 |
-| 拖拽 | 4 pt 死区后才开始拖拽 |
-| 动效 | 弹簧参数集中定义；遵循系统"减少动态效果"设置并提供应用内开关 |
+| 拖拽 | 移动 4 px 后才开始拖拽 |
+| 动效 | 弹簧参数集中定义；遵循 `prefers-reduced-motion` 并提供应用内开关 |
 | 重试 | 自动重试显示次数（n / max），用尽后转为手动重试按钮 |
-| 快捷键 | ⌘N 新会话、⌘W 关闭、⌃Tab 切换、⌘K 命令面板、⌘/ 快捷键列表、⌘⇧D Changes、⌃` 终端、⌘⇧M 权限模式、⌘⇧I 模型、⌘⇧E effort；全部可在设置中修改 |
+| 快捷键 | Mod+N 新会话、Mod+W 关闭、Ctrl+Tab 切换、Mod+K 命令面板、Mod+/ 快捷键列表、Mod+Shift+D Changes、Ctrl+\` 终端、Mod+Shift+M 权限模式、Mod+Shift+I 模型、Mod+Shift+E effort；全部可在设置中修改。终端获得焦点时，除少数全局快捷键外按键都交给终端 |
+| 外部链接 | 模型输出与仓库内容中的链接点击后先显示目标地址，确认后用系统浏览器打开；应用窗口内不导航到外部页面 |
 
 ### 8.6 设计语言
 
-- PiArc 使用**自有视觉品牌**（ADR-0006）：主色避开橙色/陶土色系；不用"暖奶油底 + 衬线大标题"组合；字体使用系统 SF Pro / SF Mono；图标、插画、提示音自行设计。
-- **令牌分层**：原始色板 → 明暗阶梯 → 语义层（surface / text / border / accent / state / agent-status / diff / code）→ 组件层；四种模式（明、暗，各自含高对比度）× 两档密度。
-- **单一来源**：`design/tokens/*.json`，由脚本生成 macOS Asset Catalog 与动态 `NSColor`、Windows XAML 资源字典；CI 检查文本对比度（WCAG AA）。
-- 平台惯例：侧栏、工具栏、菜单交给系统控件（macOS 26 自动获得 Liquid Glass 材质）；正文、代码、diff 使用不透明背景保证可读性。
+- PiArc 使用**自有视觉品牌**（ADR-0006）：主色避开橙色 / 陶土色系；不用"暖奶油底 + 衬线大标题"组合；图标、插画、提示音自行设计。
+- **字体**：使用系统字体，不打包专有字体。界面字体 macOS 为 SF Pro、Windows 为 Segoe UI Variable，中文回退 PingFang SC / Microsoft YaHei UI；等宽字体 macOS 为 SF Mono、Windows 为 Cascadia Mono。
+- **令牌分层**：原始色板 → 明暗阶梯 → 语义层（surface / text / border / accent / state / agent-status / diff / code）→ 组件层；四种模式（明、暗，各自含高对比度）× 两档密度。跟随 `prefers-color-scheme`、`prefers-contrast` 与 Windows 的 `forced-colors`。
+- **单一来源**：`design/tokens/*.json`，由脚本生成 CSS 自定义属性和 TypeScript 常量；CI 检查文本对比度（WCAG AA）。组件只读语义层。
+- **平台外观**：macOS 用隐藏式标题栏保留红绿灯、侧栏使用系统 vibrancy；Windows 11 使用 Mica 背景与标题栏覆盖层（窗口控件在右上）。Electron 45 没有 Liquid Glass API（相关 PR 已关闭未合并），第一版只用 vibrancy；系统绘制的标题栏、菜单和对话框会随系统外观变化。正文、代码、diff 使用不透明背景，保证可读性。
 
 ### 8.7 无障碍与本地化
 
-- VoiceOver：transcript 每行提供语义化描述（"工具调用：编辑 3 个文件，成功"）；审批卡的按钮有明确标签。
-- 键盘：所有功能可以只用键盘完成；焦点顺序经过设计和测试。
-- 本地化：第一版提供简体中文与英文；字符串集中管理（String Catalog），不在代码中硬编码。
+- 语义化 HTML + ARIA：transcript 每行提供可读描述（"工具调用：编辑 3 个文件，成功"）；流式输出不逐字播报，用节流后的 `aria-live="polite"` 摘要；审批卡出现时移动焦点并播报。
+- 屏幕阅读器在 macOS VoiceOver 与 Windows Narrator / NVDA 上验证。
+- 键盘：所有功能可以只用键盘完成；焦点顺序经过设计和测试；焦点环始终可见。
+- 本地化：第一版提供简体中文与英文；字符串集中管理（ICU MessageFormat），主进程菜单与渲染进程共用同一份资源，不在代码中硬编码。
+
+### 8.8 平台集成
+
+| 能力 | macOS | Windows | 里程碑 |
+|---|---|---|---|
+| 关闭窗口后后台运行 | 菜单栏图标（运行中 / 等待审批计数） | 系统托盘图标 | M3 |
+| 系统通知 | 会话完成或等待审批且窗口不在前台时通知；通知内直接允许 / 拒绝在 M4 | 同左（Toast） | M1 / M4 |
+| 计数提示 | Dock 角标 | 任务栏覆盖图标 | M1 |
+| URL scheme | `piarc://` | `piarc://` | M3 |
+| 打开文件夹 | 从 Finder 拖入、Dock 图标拖放 | 资源管理器右键菜单（实现方式随安装包形式确定，ADR-0016） | M3 |
+| 凭据 | 钥匙串 | 凭据管理器 | M1 |
+| 系统快捷操作 | App Intents（原生模块） | 跳转列表 | M5 |
+
+平台差异集中在主进程的 `platform/` 模块和渲染进程的少量样式里，业务代码不出现平台分支。
 
 ---
 
 ## 9. 数据与存储
 
 ### 9.1 目录布局
+
+PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 为 `%LOCALAPPDATA%\PiArc\`（不用 Electron 默认的 `%APPDATA%`，因为它属于漫游配置，体积很大的会话与快照数据不应随之同步）。主进程启动时通过 `app.setPath('userData', …)` 固定该位置。下面以 macOS 为例：
 
 ```
 ~/Library/Application Support/PiArc/
@@ -891,7 +948,7 @@ Core 事件批次 ──► PiArcKit 归约器（MainActor）──► @Observab
 ├── sessions/<sessionId>/      # 工具输出落盘、后台任务输出、会话临时目录
 └── logs/                      # Core 与 Agent Host 日志（按天轮转，默认保留 7 天）
 
-~/Library/Caches/PiArc/        # 可丢弃：渲染缓存、模型目录缓存
+~/Library/Caches/PiArc/        # 可丢弃：模型目录缓存、Chromium 缓存（Windows：%LOCALAPPDATA%\PiArc\Cache\）
 
 <工作区>/.piarc/
 ├── settings.json              # 项目共享设置（建议入库）
@@ -900,7 +957,7 @@ Core 事件批次 ──► PiArcKit 归约器（MainActor）──► @Observab
 └── worktrees/                 # 会话 worktree（应加入 .gitignore）
 ```
 
-- 凭据只存钥匙串（服务名使用应用 bundle id 前缀），`pi/` 下不出现 `auth.json`、`mcp-auth.json`。
+- 凭据只存系统凭据库：macOS 钥匙串、Windows 凭据管理器（服务名使用应用标识前缀；凭据管理器单条上限 2,560 字节，大凭据拆分存储）。`pi/` 下不出现 `auth.json`、`mcp-auth.json`。
 - 首次在某个工作区创建 `.piarc/` 时，提示把 `settings.local.json` 与 `worktrees/` 加入该仓库的 `.gitignore`。
 
 ### 9.2 SQLite 模型（概要）
@@ -940,13 +997,16 @@ Core 事件批次 ──► PiArcKit 归约器（MainActor）──► @Observab
 | 提示注入导致破坏性操作 | 仓库文件、网页、MCP 返回内容诱导 agent 执行 `rm -rf`、泄露密钥 | 默认询问；deny 规则；Bash 子命令分析；关键路径删除总是询问；沙箱；审批卡展示完整命令 |
 | 恶意项目配置 | 克隆的仓库带 hooks、MCP、allow 规则、插件，打开即执行 | 项目信任闸门（10.2）：信任前不执行任何项目级可执行配置 |
 | 恶意插件 / MCP server / Pi 包 | 安装后获得进程权限 | 安装前展示来源与能力；启用需确认；Agent Host 的 Seatbelt 配置限制进程级写入范围 |
-| 凭据泄露 | 明文文件、环境变量继承、日志 | 只存钥匙串；不经环境变量传递；日志与诊断包自动脱敏 |
+| 凭据泄露 | 明文文件、环境变量继承、日志 | 只存系统凭据库；不经环境变量传递；日志与诊断包自动脱敏 |
 | 沙箱逃逸 | 命令通过未代理的网络通道外传 | 沙箱默认无直连网络；沙箱外重试必须审批 |
 | 审批疲劳与误点 | 连续弹窗导致误允许 | 400 ms 防误触；长参数阅读闸门；"总是允许"规则可预览、可编辑、可撤销；审计可查 |
 | 多窗口审批错乱 | 两个窗口回答同一请求或过期请求 | 审批账本的 revision 与 connectionEpoch 校验 |
 | 供应链 | npm / crates 依赖被投毒 | 精确版本锁定；`npm ci --ignore-scripts`；`cargo-deny`、`cargo-audit`、`npm audit`；新增依赖需评审 |
-| 更新通道被劫持 | 恶意更新包 | Sparkle EdDSA 签名 + Developer ID 签名校验 |
-| Agent Host 被篡改 | 替换应用内的 bundle 或 node | 启动前校验内嵌可执行文件的代码签名 |
+| 更新通道被劫持 | 恶意更新包 | HTTPS；更新条目带 `sha256`；macOS 由 Squirrel.Mac 校验更新包的代码签名与当前应用一致；Windows 校验安装包签名（ADR-0016） |
+| Agent Host 被篡改 | 替换应用内的 bundle 或 node | 启动前校验内嵌可执行文件的代码签名；app.asar 开启完整性校验与 `OnlyLoadAppFromAsar`；asar 外的 Agent Host 资源由代码签名覆盖 |
+| 渲染进程注入（XSS） | 模型输出、仓库文件、MCP 返回内容中嵌入 HTML、脚本或恶意链接，在渲染进程中执行，进而调用 preload 暴露的能力 | 渲染进程 sandbox + contextIsolation、无 Node；严格 CSP；Markdown 不走 `innerHTML`，原始 HTML 当文本；preload 白名单 + 主进程校验来源；有副作用的命令仍经 Core 的权限裁决；XSS 载荷回归测试（第 10.3 节） |
+| 应用被当作通用运行时滥用 | 攻击者借 PiArc 的签名身份执行任意脚本（`ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`--inspect`） | 发布构建关闭对应 fuses（ADR-0016）；Agent Host 用独立的 node，不依赖这些开关 |
+| 恶意链接与导航 | 诱导用户点击链接，或让应用窗口导航到外部页面 | 窗口禁止导航到应用自身协议以外的地址；新窗口一律拒绝；外部链接确认后交给系统浏览器，且只放行 `https:`、`http:`、`mailto:` |
 
 ### 10.2 项目信任
 
@@ -956,14 +1016,36 @@ Core 事件批次 ──► PiArcKit 归约器（MainActor）──► @Observab
 
 ### 10.3 进程加固
 
-- Hardened runtime；entitlements 最小化，每项在 `apps/macos/Entitlements.md` 中写明用途。
-- 内嵌的 node、rg、fd 与原生 addon 用 PiArc 的 Developer ID 重签。
-- Agent Host 运行在 Seatbelt 配置下：允许读取广泛路径；写入限于工作区、PiArc 数据目录、会话临时目录；网络允许（模型请求需要）。具体配置在 M4 确定并写入测试。
+**渲染进程**（按 Electron 官方安全清单逐项落实，清单原文见 `docs/research/electron-stack.md` 第 3 节）：
+
+- 所有窗口开启 `sandbox` 与 `contextIsolation`，关闭 `nodeIntegration`；不使用 `<webview>`；不开启实验特性与 `enableBlinkFeatures`；不关闭 `webSecurity`。
+- 界面通过自定义协议（`app://` 一类，具体名称随应用标识确定）从 app.asar 提供，不使用 `file://`，并关闭 `GrantFileProtocolExtraPrivileges` fuse。
+- CSP 由主进程以响应头下发：`default-src 'self'`，`script-src 'self'`（不允许内联脚本与 `eval`），`connect-src` 只允许应用自身协议，图片只允许应用自身协议与 `data:`。渲染进程不直接访问网络，模型请求都在 Agent Host 中发出。
+- 模型输出与仓库内容一律当作不可信数据：Markdown 渲染不使用 `innerHTML` / `dangerouslySetInnerHTML`，原始 HTML 当文本显示；代码高亮与公式渲染只输出受控的元素和样式。
+- 导航与新窗口：`will-navigate` 中用 `new URL()` 比较 origin，只允许应用自身协议；`setWindowOpenHandler` 一律返回 `deny`，外部链接由主进程在用户确认后用 `shell.openExternal` 打开，并只放行 `https:`、`http:`、`mailto:`。
+- 权限请求：`setPermissionRequestHandler` 默认拒绝，只放行剪贴板写入等明确需要的权限。
+
+**preload 与 IPC**：
+
+- preload 只暴露窄接口，不直接暴露 `ipcRenderer`；事件回调剥掉 Electron 的 event 对象后再交给页面。
+- 主进程对每个 IPC 请求校验 `senderFrame` 的 origin（用 origin，不用 URL 前缀匹配；frame 可能为空，此时拒绝）。
+- 即使渲染进程被攻破，它能调用的也只是 preload 白名单中的命令；有副作用的操作（执行命令、写文件、改权限规则）仍要经 Core 的权限裁决，"总是允许"类规则的修改需要在主进程弹出的原生确认框中确认。
+
+**应用二进制**：
+
+- 发布构建写入 fuses（配置见 ADR-0016）：关闭 `RunAsNode`、`NodeOptions`、`NodeCliInspect`、`GrantFileProtocolExtraPrivileges`，开启 ASAR 完整性校验、`OnlyLoadAppFromAsar` 与 cookie 加密。CI 读取产物的 fuse 状态并与配置比对。
+- macOS：hardened runtime；主应用 entitlements 只有 `allow-jit`，每项在 `apps/desktop/build/entitlements.md` 中写明用途；内嵌的 node、rg、fd 与 `.node` 原生模块用 PiArc 的签名身份重签。
+- Windows：主程序、内置 node、原生模块与安装包都做代码签名（ADR-0016）。
+
+**Agent Host**：
+
+- macOS：运行在 Seatbelt 配置下（ADR-0015）。允许读取广泛路径；写入限于工作区、PiArc 数据目录、会话临时目录；网络允许（模型请求需要）。具体配置在 M4 确定并写入测试。
+- Windows：第一版没有等价的进程级隔离，只用 Job Object 管理进程树（第 6.10 节、需求 D7）。
 
 ### 10.4 合规
 
 - 遵守 ADR-0006：不提供 Claude 订阅登录；clean-room；自有品牌。
-- 第三方许可证：构建时生成 `THIRD_PARTY_NOTICES`（Rust crates、npm 依赖、Pi、libghostty 等），在"关于"中可查看。
+- 第三方许可证：构建时生成 `THIRD_PARTY_NOTICES`（Rust crates、npm 依赖、Pi、libghostty-vt、fork 的 ghostty-web 渲染器代码、Node 等），并随包附带 Electron / Chromium 的许可证文件，在"关于"中可查看。
 - PR 模板包含"来源与许可证"检查项：新增代码若参考了外部项目，写明来源与许可证。
 
 ### 10.5 隐私与遥测
@@ -975,27 +1057,37 @@ Core 事件批次 ──► PiArcKit 归约器（MainActor）──► @Observab
 
 ## 11. 性能预算与非功能需求
 
-基准机型：Apple silicon（M1 Pro / 16 GB）与 macOS 26。预算进入 CI，回归超过 10% 视为失败。
+基准机型：macOS 为 Apple silicon M1 Pro / 16 GB、当前正式版 macOS；Windows 为 x64 8 核 / 16 GB / NVMe SSD、当前正式版 Windows 11。两个平台都进 CI，回归超过 10% 视为失败。
+
+下表是 Electron 方案的初始预算。Electron 官方没有发布启动与内存的基线数字，M0 用 `--cpu-prof` 与 `app.getAppMetrics()` 实测后校准；校准只能收紧，放宽必须在第 18 章修订记录中写明原因。
 
 | 指标 | 预算 | 测量方式 |
 |---|---|---|
-| 冷启动到可交互窗口（侧栏已加载） | ≤ 400 ms | 启动到首帧 + 侧栏数据就绪的打点 |
+| 冷启动到可交互窗口（侧栏已加载） | ≤ 1.0 s | 启动到首帧 + 侧栏数据就绪的打点 |
 | 打开工作区到 Agent Host 就绪 | ≤ 1.0 s | 预热计时（含 Pi 会话恢复） |
 | PiArc 引入的首 token 额外延迟 | ≤ 50 ms | 与直接调用 Pi SDK 对比 |
-| 客户端 + Core 空闲内存（1 窗口、侧栏 100 个会话） | ≤ 150 MB | RSS |
+| 主进程内存（含 Core，空闲） | ≤ 120 MB | RSS |
+| 渲染进程内存（1 窗口、侧栏 100 个会话、打开 1 个含 1,000 条 item 的会话） | ≤ 220 MB | `app.getAppMetrics()` |
+| 应用全部进程合计（不含 Agent Host，1 窗口） | ≤ 450 MB | 主进程 + 渲染进程 + GPU 等辅助进程 |
 | Agent Host 内存（1 个活动会话） | ≤ 150 MB | RSS |
 | 每增加一个活动会话的 Agent Host 内存增量 | ≤ 40 MB | M0 实测后校准 |
 | 8 小时长会话内存增长（稳态后） | ≤ 10% | 长跑测试 |
-| 流式渲染（100 token/s） | 主线程帧时间 p99 ≤ 16 ms | Instruments / signpost |
+| 流式渲染（100 token/s） | 渲染进程主线程无超过 50 ms 的长任务；帧时间 p99 ≤ 16 ms | Chrome tracing / Performance API |
 | 万条 item 的 transcript 滚动 | 60 fps | 自动化滚动测试 |
 | 会话切换 | 已缓存 ≤ 100 ms；冷加载 1,000 条 item ≤ 300 ms | 打点 |
+| 主进程事件循环延迟 | p99 ≤ 16 ms | `monitorEventLoopDelay` |
+| Core 事件到渲染进程（主进程转发） | p95 ≤ 5 ms | 打点 |
 | AHP 往返（小文件 fs 操作） | p95 ≤ 5 ms | 契约测试中计时 |
 | 无需用户参与的权限裁决 | p95 ≤ 2 ms | Core 基准测试 |
-| arm64 DMG 体积 | ≤ 80 MB（估算 40–60 MB） | 构建产物 |
-| 安装后体积 | ≤ 250 MB | 构建产物 |
-| 空闲 CPU | 接近 0%，无轮询；支持 App Nap | Activity Monitor / powermetrics |
+| 终端键入回显的额外延迟（相对直接写 PTY） | p95 ≤ 5 ms | S7 测量 |
+| 安装包体积（macOS arm64 DMG / Windows x64 安装包） | ≤ 200 MB | 构建产物 |
+| 安装后体积 | ≤ 450 MB | 构建产物 |
+| 空闲 CPU | 接近 0%，无轮询；窗口隐藏时停止动画与终端帧 | Activity Monitor / 任务管理器 |
 | Agent Host 崩溃后恢复 | ≤ 3 s | 故障注入测试 |
+| 渲染进程崩溃或重载后恢复 | ≤ 2 s，会话不中断 | 故障注入测试 |
 | Beta 期无崩溃会话率 | ≥ 99.5% | 崩溃统计（用户同意后） |
+
+体积估算依据：Electron 45 的 darwin-arm64 发行包压缩后约 121 MB，内置 Node 压缩后约 28–38 MB，再加应用代码、Core、rg、fd。作为对照，Claude Desktop 5.1231.2 安装后 621 MB（本机实测）。
 
 ---
 
@@ -1005,12 +1097,13 @@ Core 事件批次 ──► PiArcKit 归约器（MainActor）──► @Observab
 
 | 层 | 内容 | 运行时机 |
 |---|---|---|
-| L0 单元 | Rust（权限、Bash 分析、hooks 决策、快照、渲染）、TS（投影、工具包装、Harness Kit）、Swift（归约器、交互规则纯函数，如热键判定与滚动跟随） | 每次提交 |
-| L1 契约 | AHP schema 往返；录制的事件样本反序列化 → 再序列化一致；Pi 事件 → AHP 投影的 golden 测试；UniFFI 接口快照 | 每次提交 |
+| L0 单元 | Rust（权限、Bash 分析、hooks 决策、快照、diff、终端状态）、TS（投影、工具包装、Harness Kit）、渲染进程（store 归约器、Markdown 增量解析、交互规则纯函数，如热键判定、输入法守卫与滚动跟随）；TS 用 Vitest | 每次提交 |
+| L1 契约 | AHP schema 往返；录制的事件样本反序列化 → 再序列化一致；Pi 事件 → AHP 投影的 golden 测试；NAPI 导出声明与 preload API 快照 | 每次提交 |
 | L2 场景回放 | 无头运行 Core + 真实 Agent Host（`piarc-devcli`），模型侧接**严格校验请求的 mock provider**，按场景数据文件驱动 | 每次提交 |
 | L3 行为对齐 | 对真实 Claude Code 录制同一批场景的请求结构与事件序列，与 PiArc 做结构化 diff | 每晚 / 手动 |
-| L4 客户端 | XCTest 单元与 UI 流程测试；关键视图快照测试；用录制事件流驱动客户端（假 Core）做回归 | 每次提交（快照）/ 每晚（UI 流程） |
-| 性能 | 第 11 章预算 | 每次提交（冒烟）/ 每晚（完整） |
+| L4 客户端 | 用 Playwright 驱动打包后的 Electron 应用跑 UI 流程；关键组件视觉快照；用录制事件流驱动渲染进程（假 Core）做回归；macOS 与 Windows 都跑 | 每次提交（快照）/ 每晚（UI 流程） |
+| 安全回归 | Markdown 与链接渲染的 XSS 载荷集、preload API 越权调用、外部导航拦截（第 10.3 节） | 每次提交 |
+| 性能 | 第 11 章预算，两个平台分别测量 | 每次提交（冒烟）/ 每晚（完整） |
 | 多服务商 | 部分 L2 场景对真实服务商运行（需密钥与预算） | 每晚，可选 |
 
 ### 12.2 严格 mock provider
@@ -1054,40 +1147,58 @@ Core 事件批次 ──► PiArcKit 归约器（MainActor）──► @Observab
 
 ## 13. 工程结构、构建与发布
 
-### 13.1 工具链
+### 13.1 工具链与平台基线
 
 | 组件 | 版本策略 |
 |---|---|
-| Rust | `rust-toolchain.toml` 锁定 stable 版本 |
-| Node（构建 Agent Host 用） | 与内置运行时同一 LTS 版本，`.nvmrc` 锁定 |
-| Xcode / Swift | Xcode 26.x，Swift 6.x；生成的绑定代码以 Swift 5 模式编译 |
-| UniFFI | 精确版本锁定（ADR-0008） |
+| Electron | 只用官方仍在支持期内的大版本（最新 3 个），精确锁定；至少每季度升级一个大版本（第 13.4 节） |
+| Node（构建用） | 与内置运行时同一 LTS 版本，`.nvmrc` 锁定 |
+| 内置 Node（Agent Host） | 与当时 Electron 内置 Node 同一大版本的最新 LTS 补丁（ADR-0015） |
+| 包管理 | npm workspaces（与 Pi 一致），lockfile 入库；CI 用 `npm ci --ignore-scripts`，确需安装脚本的包逐个列入白名单 |
+| 前端 | React、TypeScript、Vite，精确锁定 |
+| 打包 | Electron Forge（ADR-0016），精确锁定 |
+| Rust | `rust-toolchain.toml` 锁定 stable 版本；NAPI-RS 精确锁定（ADR-0014） |
+| libghostty-vt | 精确锁定官方预编译产物，校验 SHA256 与 minisign 签名（ADR-0017） |
 | Pi | `@earendil-works/*` 精确版本锁定（第 5.7 节） |
+| 测试 | Vitest（TS）、cargo test / nextest（Rust）、Playwright（Electron UI） |
 | 脚本 | Node 或 Python，跨平台，不写死路径分隔符 |
+
+平台基线：
+
+| 平台 | 支持范围 | 测试矩阵 |
+|---|---|---|
+| macOS | 最低版本跟随所用 Electron 的下限（Electron 45 为 macOS 13）；arm64 为主，x64 见需求 D6 | 最低支持版本 + 最新两个大版本 |
+| Windows | Windows 11 x64 与 arm64；Windows 10 可以安装运行，但不在测试矩阵中 | Windows 11 当前版本（x64 实机、arm64 实机或云主机） |
 
 ### 13.2 构建流水线
 
 ```
-piarc-protocol ──► JSON Schema ──► agent-host/src/protocol（生成 TS 类型，CI 检查无漂移）
-crates/*  ──cargo──► staticlib ──uniffi-bindgen──► Swift 绑定 ──xcodebuild──► XCFramework
+piarc-protocol ──► JSON Schema ──► packages/protocol（生成 TS 类型，CI 检查无漂移）
+crates/*  ──cargo + @napi-rs/cli──► piarc-core.<target>.node（四个目标）+ index.d.ts
 agent-host ──esbuild──► agent-host.mjs
-design/tokens ──脚本──► Asset Catalog / NSColor 扩展（Windows：XAML 资源字典）
-Xcode 构建 PiArc.app ──► 嵌入 Node、rg、fd、agent-host ──► 重签 ──► 公证 ──► DMG（ULMO）──► Sparkle appcast
+design/tokens ──脚本──► CSS 自定义属性 + TS 常量
+apps/desktop ──Forge（plugin-vite）──► 主进程 / preload / 渲染进程产物 ──► app.asar
+Forge 打包 ──► 放入 .node（unpacked）、内置 Node、rg、fd、agent-host ──► 写入 fuses ──► 签名
+  macOS：签名 ──► 公证 ──► staple ──► DMG + ZIP ──► 更新 JSON feed
+  Windows：签名 ──► 安装包（Velopack 或 MSIX，M0 定）──► 更新元数据
 ```
 
 ### 13.3 CI
 
 | 流水线 | 内容 |
 |---|---|
-| PR | rustfmt、clippy（`-D warnings`）、TS lint 与 `tsc`、Swift lint；L0–L2、L4 快照；schema 漂移检查；Rust crates 在 Windows runner 上构建；性能冒烟 |
-| Nightly | L3 对齐、完整性能测试、长跑内存测试、多服务商场景（有密钥时） |
-| Release | 构建、签名、公证、DMG、appcast、发布说明；签名凭据只存在于 CI 密钥管理中 |
+| PR | rustfmt、clippy（`-D warnings`）、ESLint 与 `tsc`；L0–L2、L4 快照、安全回归；schema 与 `.d.ts` 漂移检查；**macOS 与 Windows runner 都完整运行**；性能冒烟 |
+| Nightly | L3 对齐；两个平台的完整性能测试与长跑内存测试；Playwright UI 流程；多服务商场景（有密钥时）；四个目标的打包冒烟 |
+| Release | 构建、签名、公证、安装包、更新元数据、发布说明；检查产物的 fuse 状态与签名；签名凭据只存在于 CI 密钥管理中 |
+| 依赖安全 | `cargo-deny`、`cargo-audit`、`npm audit`；订阅 Electron、Node、Chromium 的安全公告 |
 
-### 13.4 版本与提交
+### 13.4 版本、提交与升级节奏
 
-- 应用版本 SemVer；AHP 协议版本独立维护；"关于"页显示应用、协议、Pi、Node 版本。
+- 应用版本 SemVer；AHP 协议版本独立维护；"关于"页显示应用、协议、Electron、Pi、Node、libghostty-vt 版本。
 - 提交信息遵循 Conventional Commits。
 - `main` 始终可构建；功能分支短生命周期；发布打 tag。
+- **Electron 升级**：每个 Electron 大版本支持期约 24 周。新大版本发布后 8 周内完成升级评估，至少每季度升级一次；升级时在四个目标上跑全套 L1/L2/L4 与性能测试，重点回归 NAPI 加载、fuses、更新流程。
+- **Node 与 Chromium 安全版本**：在野利用的高危漏洞立即发补丁版本；其他安全更新随下一个补丁版本发布。
 
 ---
 
@@ -1095,66 +1206,91 @@ Xcode 构建 PiArc.app ──► 嵌入 Node、rg、fd、agent-host ──► �
 
 | 编号 | 风险 | 等级 | 对策 | 触发后的决策 |
 |---|---|---|---|---|
-| R1 | 原生流式长文本渲染达不到性能预算 | 高 | M0 用 1–2 周 spike：10 万 token 流式、万条消息滚动、跨块选择、中文输入法 | 退路是只把消息区换成 WKWebView。这触碰"不用 Web 技术"的产品前提，**必须由产品负责人决定**，不由工程团队自行切换 |
+| R1 | Electron 的内存或启动时间超出第 11 章预算 | 中 | 预算在两个平台的 CI 中把关；主进程保持轻量；渲染进程虚拟化列表、重活放 Worker；V8 代码缓存与懒加载 | 超出 30% 且无法优化时，按 ADR-0013 的触发条件复审 |
 | R2 | Pi 接口变化快 | 高 | 精确版本锁定；SDK 让不兼容变更在编译期暴露；L1/L2 回归；按月升级 | 连续两次升级成本超过 3 人日，复审升级节奏 |
 | R3 | 上游贡献门槛高，补丁积累 | 中 | 补丁登记与移除条件；优先用扩展点绕开 | 补丁超过 10 个时复审 ADR-0002 |
-| R4 | 内置 Node 抵消部分"原生轻量"优势 | 中 | 如实定位：优势在 UI 进程、启动、多会话增量与 MCP 共享；Bun 作对照 | 见 ADR-0003 触发条件 |
+| R4 | 失去"原生、轻量"卖点，差异化不足 | 中 | 差异化放在 Harness 深度、多模型、工作区共享 MCP、确定性回退；对外如实表述，不宣称"原生"或"比 Electron 轻" | 每个里程碑评审时复核产品定位 |
 | R5 | 同进程多会话存在串扰 | 中 | M0 验证；协议按会话多路复用 | 退回每会话一个进程 |
-| R6 | UniFFI 的 Swift 6 支持不完整 | 中 | 生成代码隔离为 Swift 5 模式；锁版本 | 见 ADR-0008 触发条件 |
+| R6 | NAPI 边界的事件吞吐不足，或 Core 与窗口逻辑争用主进程事件循环 | 中 | 事件约 16 ms 合并一批；大块数据用 `ArrayBuffer` 转移；M0 压测 | 把 Core 移到 utilityProcess，渲染进程经 MessagePort 直连（ADR-0014） |
 | R7 | Claude Code 迭代极快，对标目标持续移动 | 中 | 以能力清单定义范围，按用户价值排序，不追求全量 | 每个里程碑评审时更新能力清单 |
-| R8 | 合规风险（服务商条款、clean-room、品牌） | 高 | ADR-0006；PR 检查项；P2 外部内核需法务评审 | 条款变化时复审 |
+| R8 | 合规风险（服务商条款、clean-room、品牌） | 高 | ADR-0006；PR 检查项；P2 外部内核需法务评审；参考实现的界面组件一律不复用 | 条款变化时复审 |
 | R9 | 不同服务商的工具调用质量差异大 | 中 | Tool Profile；模型能力表；多服务商场景矩阵 | 对低可靠性模型默认收紧工具集 |
 | R10 | Seatbelt 接口被 Apple 标记为废弃 | 低 | 抽象沙箱层；跟踪 Codex、Claude Code 的做法 | 不可用时降级为"仅权限控制"模式并明确提示 |
-| R11 | Pi 凭据存储的同步接口与 Keychain 异步访问不匹配 | 中 | M0 验证内存缓存 + 异步回写方案 | 补丁或上游 issue |
+| R11 | Pi 凭据存储的同步接口与系统凭据库的异步访问不匹配 | 中 | M0 验证内存缓存 + 异步回写方案 | 补丁或上游 issue |
 | R12 | 项目 hooks 执行任意命令 | 高 | 项目信任闸门；hooks 执行审计 | — |
+| R13 | 渲染进程被注入（XSS）后越权 | 高 | 第 10.3 节的 Electron 加固；Markdown 不走 `innerHTML`；preload 白名单与来源校验；安全回归测试 | 发现绕过时按安全事件处理，补回归用例后发布修复 |
+| R14 | 双平台同步拖慢整体节奏 | 中 | Windows 最多滞后一个里程碑；两个平台 CI 全量运行；平台差异集中在适配层 | macOS 里程碑连续两次延期时，Windows 改为固定滞后一个里程碑（ADR-0013） |
+| R15 | libghostty-vt 刚发布 1.0，绑定与周边生态不成熟 | 中 | 直接对 C ABI 生成绑定；精确锁版本；保留 ADR-0017 中的退路 | M0 S7 不通过时启用退路 |
+| R16 | Windows 第一版没有 OS 级沙箱 | 中 | 权限规则 + Job Object 进程树管理；界面明确提示（需求 D7） | M4 评估 AppContainer 等方案 |
+| R17 | Chromium 安全更新跟进不及时 | 中 | 只使用 Electron 仍在支持期内的大版本，按第 13.4 节的节奏升级 | 出现在野利用的高危漏洞时立即发版 |
 
 ---
 
-## 15. Windows 落地路线
+## 15. Windows 平台适配
 
-### 15.1 现在就要遵守的约束
+Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节奏，并列出平台差异。
 
-- Core 与 Agent Host 不引入 macOS 专属假设：路径用 `std::path` / Node `path`，不拼接分隔符；shell 抽象同时支持 zsh/bash 与 PowerShell / Git Bash（Pi 已有 PowerShell 工具）；进程管理抽象覆盖进程组与 Job Object；PTY 抽象覆盖 ConPTY；凭据抽象覆盖 Credential Manager（单条上限 2,560 字节，大凭据需拆分）。
-- CI 从 M1 开始在 Windows runner 上构建并运行 Rust 单元测试。
-- 设计令牌单一来源，同时生成 XAML 资源字典。
-- 客户端交互规范（第 8 章）用平台中立的语言描述，Windows 版按 Fluent 惯例映射。
+### 15.1 节奏
 
-### 15.2 阶段
+- 每个里程碑由 macOS 先达到退出标准；Windows 最迟在下一个里程碑结束前达到同样标准。例如 M2 的 Windows 验收最晚在 M3 结束时完成。
+- Beta（M5）要求两个平台同时达标。
+- 两个平台的 CI 从 M0 起都完整运行。功能验收可以滞后，代码不能坏：Windows 构建或测试失败与 macOS 一样阻断合并。
 
-| 阶段 | 内容 | 产出 |
-|---|---|---|
-| W0 | UI 框架 PoC：WinUI 3（Windows App SDK）、WPF、GPUI 三选一；用 uniffi-bindgen-cs 接同一个 Core；验证流式 transcript 性能与输入法 | ADR：Windows UI 框架 |
-| W1 | 窗口骨架、侧栏、transcript、composer、审批卡 | 可行走骨架 |
-| W2 | Harness 对齐：PowerShell 工具、ConPTY 终端、Job Object、Credential Manager、沙箱方案（AppContainer / MXC 评估） | ADR：Windows 沙箱 |
-| W3 | 分发：Velopack + WinGet；代码签名（Azure Artifact Signing 不覆盖中国大陆主体时改用 OV 证书） | 公测 |
+### 15.2 平台差异
+
+| 方面 | macOS | Windows | 位置 | 里程碑 |
+|---|---|---|---|---|
+| Shell | zsh / bash | `Bash` 工具经 Git Bash 执行，另有 `PowerShell` 工具（第 6.2.2 节）；未安装 Git Bash 时提示安装，期间只提供 `PowerShell` | piarc-exec、Harness Kit | M1 |
+| 进程树 | 进程组 + 信号 | Job Object | piarc-exec | M1 |
+| PTY | Unix PTY | ConPTY | piarc-term | M3 |
+| 凭据 | 钥匙串 | 凭据管理器（单条 2,560 字节上限，大凭据拆分） | piarc-secrets | M1 |
+| 沙箱 | Seatbelt + 网络代理 | 第一版不提供（需求 D7） | piarc-sandbox | M4 |
+| 路径 | `/`；默认卷大小写不敏感 | `\` 与盘符、UNC、超过 260 字符的长路径、保留文件名（`CON`、`NUL` 等）；大小写不敏感 | piarc-fs | M1 |
+| 换行与编码 | LF 为主 | CRLF 常见（保真写入已覆盖）；子进程控制台使用 UTF-8 | piarc-fs、piarc-exec | M1 |
+| 文件监听 | FSEvents | ReadDirectoryChangesW（经 notify 封装） | piarc-fs | M2 |
+| 数据目录 | `~/Library/Application Support/PiArc/` | `%LOCALAPPDATA%\PiArc\`（第 9.1 节） | 主进程、Core | M1 |
+| 签名与安装 | Developer ID + 公证 | 代码签名 + 安装包（ADR-0016） | 构建 | M0 验证，M5 发布 |
+| 系统集成 | 第 8.8 节 | 第 8.8 节 | 主进程 | 随功能 |
+| 杀毒软件 | — | Defender 扫描大量小文件（`node_modules`、快照目录）的开销；签名可减少误报 | 构建与文档 | M1 起观察 |
+
+### 15.3 现在就要遵守的约束
+
+- 路径一律用 `std::path` / Node `path`，不拼接分隔符；比较路径前先规范化（大小写、符号链接、`\\?\` 前缀）。
+- 业务代码里不出现平台分支。平台差异放在 Core 的 trait 实现和主进程的 `platform/` 模块里。
+- 测试 fixture 同时覆盖 LF 与 CRLF、含空格与中文的路径。
+- 脚本写成跨平台的 Node 或 Python。
 
 ---
 
 ## 16. 路线图与里程碑
 
+退出标准先在 macOS 上验收；Windows 按第 15.1 节的节奏，最迟在下一个里程碑结束前达到同样标准。
+
 | 里程碑 | 目标 | 退出标准 |
 |---|---|---|
-| **M0 技术验证**（2–4 周） | 验证高风险假设 | 每个 spike 的结论（通过 / 失败 / 有条件通过）记录在 `docs/spikes/`；失败项触发对应 ADR 复审 |
-| **M1 可行走骨架** | 单工作区、多会话列表、流式对话；Read/Write/Edit/Bash/Glob/Grep 经 Core 执行；Manual 与 Accept edits 模式的基础审批；模型与凭据设置（钥匙串）；会话持久化与恢复；transcript P0 行类型 | 能用至少 2 家服务商完成"读代码 → 改代码 → 跑测试"的完整任务；L2 场景 ≥ 20 个通过 |
+| **M0 技术验证**（3–5 周） | 在两个平台上验证高风险假设 | 每个 spike 的结论（通过 / 失败 / 有条件通过）记录在 `docs/spikes/`，两个平台分别给结论；失败项触发对应 ADR 复审 |
+| **M1 可行走骨架** | 单工作区、多会话列表、流式对话；Read/Write/Edit/Bash（Windows 另有 PowerShell）/Glob/Grep 经 Core 执行；Manual 与 Accept edits 模式的基础审批；模型与凭据设置（系统凭据库）；会话持久化与恢复；transcript P0 行类型 | 能用至少 2 家服务商完成"读代码 → 改代码 → 跑测试"的完整任务；L2 场景 ≥ 20 个通过 |
 | **M2 Harness 核心** | 完整权限规则与 Bash 分析；plan 模式；任务清单；AskUserQuestion；hooks（M2 事件集，command 类型）；checkpoint 与 rewind；压缩与上下文用量；WebFetch；Changes 面板；memory 文件兼容 | 第 6 章 M2 能力全部有场景覆盖；L3 对齐在权限与 hooks 上无未解释差异 |
-| **M3 多会话与生态** | 子 agent；后台任务与 Monitor；终端面板；worktree；MCP 共享连接池；skills 与命令；WebSearch；ToolSearch；hooks 的 http/prompt 类型 | 3 个并行会话 + 子 agent 场景满足第 11 章内存预算 |
-| **M4 安全与打磨** | 沙箱；插件；NotebookEdit；可操作的系统通知；配置诊断；无障碍；本地化；性能预算全部进 CI | 安全威胁表逐条有测试；性能预算全部达标 |
-| **M5 Beta** | Auto 模式（可配置审查模型）；自动记忆；企业托管配置；Anthropic 服务端压缩；fork 子 agent；App Intents；完整发布流水线 | 公开 Beta |
-| W0–W3 | Windows（第 15 章） | — |
+| **M3 多会话与生态** | 子 agent；后台任务与 Monitor；终端面板（libghostty-vt）；worktree；MCP 共享连接池；skills 与命令；WebSearch；ToolSearch；hooks 的 http/prompt 类型 | 3 个并行会话 + 子 agent 场景满足第 11 章内存预算 |
+| **M4 安全与打磨** | macOS 沙箱；Windows 隔离方案评估；插件；NotebookEdit；可操作的系统通知；配置诊断；无障碍；本地化；性能预算全部进 CI | 安全威胁表逐条有测试；性能预算全部达标 |
+| **M5 Beta** | Auto 模式（可配置审查模型）；自动记忆；企业托管配置；Anthropic 服务端压缩；fork 子 agent；平台快捷操作（App Intents / 跳转列表）；完整发布流水线 | macOS 与 Windows 同时公开 Beta |
 
-**M0 spike 清单**
+终端（ADR-0017）是 M3 中工作量最大的单项，估计 1 人 5.5–7 周。Core 侧的无头终端先做，因为后台任务与 Monitor 依赖它；渲染器与 M3 其他项并行；M0 的 S7 是开工前的闸门，不通过就直接启用 xterm.js 退路。
+
+**M0 spike 清单**（每项在 macOS 与 Windows 上分别给结论）
 
 | # | 验证项 | 通过标准 |
 |---|---|---|
-| S1 | 原生 transcript 渲染（R1） | 第 11 章流式与滚动预算；跨块复制；中文输入法正常 |
-| S2 | UniFFI async + 事件回调 + XCFramework + Xcode 26 默认 MainActor 隔离 | 编译通过；10 万事件/分钟下无丢失、无卡顿 |
+| S1 | 渲染进程 transcript：虚拟化列表 + Worker 增量 Markdown + 流式输出；ProseMirror composer | 第 11 章流式与滚动预算；跨块选择复制；中文、日文输入法在两个平台正常 |
+| S2 | NAPI-RS Core 接入主进程：async 方法、ThreadsafeFunction 事件、MessagePort 转发到渲染进程 | 10 万事件/分钟下无丢失；主进程事件循环延迟 p99 ≤ 16 ms；四个目标（darwin-arm64、darwin-x64、win32-x64、win32-arm64）的预编译产物可加载 |
 | S3 | 基于 Pi SDK 的 Agent Host：同进程两个不同 cwd 的会话并发 | 工具、压缩、中断、MCP 互不串扰 |
 | S4 | Operations 委托 + 内置工具重命名为规范名 | Read/Edit/Write/Bash 全部经 Core；行为与 Pi 原生一致 |
-| S5 | 凭据存储：钥匙串 + Pi `CredentialStore` 适配 | 登录、刷新 token、多会话读取正常；磁盘上无明文 |
-| S6 | 内嵌 Node 重签与公证 | 公证通过；V8 JIT 正常；entitlements 最小集确定 |
-| S7 | libghostty-vt 嵌入 + portable-pty | 常见 TUI 程序（vim、htop）渲染正确 |
-| S8 | Seatbelt 执行 + 网络代理 | 写入与网络限制生效；常见构建命令可运行 |
+| S5 | 凭据：钥匙串、凭据管理器与 Pi `CredentialStore` 适配 | 登录、刷新 token、多会话读取正常；磁盘上无明文 |
+| S6 | 打包与签名：macOS 签名公证、Windows 代码签名；Agent Host 运行时方案（ADR-0015）；MCP 的 `npx` 可用 | 公证通过；Windows 安装包签名有效；fuses 与 entitlements 最小集确定 |
+| S7 | 终端：libghostty-vt + portable-pty（含 ConPTY）+ 帧协议 + fork 的 Canvas 渲染器（ADR-0017） | vim、htop 等 TUI 渲染正确；`cat` 100 MB 时界面帧率稳定、主进程事件循环延迟 p99 ≤ 16 ms；键入回显的额外延迟满足第 11 章预算；中文输入法候选框与预编辑文本位置正确；formatter 输出与渲染帧逐格一致；四个目标都能链接，win32-arm64 在实机上运行 |
+| S8 | macOS：Seatbelt 执行 + 网络代理；Windows：Job Object 终止进程树 | 写入与网络限制生效，常见构建命令可运行；超时与停止时无残留进程 |
 | S9 | AHP 握手、背压、崩溃重启与对账 | 故障注入下行为符合 ADR-0009 |
+| S10 | Electron 安全基线：fuses、CSP、渲染进程沙箱、preload 白名单、外部导航拦截 | XSS 载荷集全部被拦截；Electron 官方安全清单逐项通过 |
 
 ---
 
@@ -1163,7 +1299,8 @@ Xcode 构建 PiArc.app ──► 嵌入 Node、rg、fd、agent-host ──► �
 | 术语 | 含义 |
 |---|---|
 | Harness | 包裹模型的运行框架：工具、权限、hooks、上下文管理、子 agent 等，决定 agent 的行为质量 |
-| Core / PiArc Core | Rust 编写、链接进应用的平台无关核心 |
+| Core / PiArc Core | Rust 编写的平台无关核心，以 NAPI-RS 原生模块加载在 Electron 主进程 |
+| 主进程 / 渲染进程 / preload | Electron 的进程角色：主进程负责窗口与系统集成；渲染进程（每窗口一个）运行 React 界面；preload 在两者之间暴露白名单 API |
 | Agent Host | 基于 Pi SDK 的 Node 子进程，每个工作区一个 |
 | Harness Kit | Agent Host 中 PiArc 编写的一组 Pi 扩展 |
 | AHP | Agent Host Protocol，Core 与 Agent Host 之间的协议 |
@@ -1190,3 +1327,4 @@ Xcode 构建 PiArc.app ──► 嵌入 Node、rg、fd、agent-host ──► �
 | 版本 | 日期 | 说明 |
 |---|---|---|
 | 1.0 | 2026-11-14 | 首版：基于对 Claude 官方文档、Pi v1.4.0 源码、claude-code / claw-code / OpenClaudeDesktop / open-claude-ui 参考实现与原生技术栈的调研 |
+| 2.0 | 2026-11-14 | 客户端改为 Electron + React，macOS 与 Windows 同一代码库推进（ADR-0013 取代 ADR-0001、ADR-0007）；Core 改为 NAPI-RS 原生模块（ADR-0014 取代 ADR-0008）；Agent Host 运行时、分发与更新、内置终端分别由 ADR-0015、ADR-0016、ADR-0017 决定；Markdown 与高亮移到渲染进程；Windows 路线并入主线里程碑；新增 Electron 安全加固与对应风险 |

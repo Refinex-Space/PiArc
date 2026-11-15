@@ -1,6 +1,6 @@
 # 0008. Swift ⇄ Rust 绑定使用 UniFFI
 
-- 状态：已接受
+- 状态：已取代（2026-11-14 被 [ADR-0014](0014-core-binding-napi-rs.md) 取代）
 - 日期：2026-11-14
 - 相关：架构文档第 7.6 节；`docs/research/native-stack.md` 第 2 章
 

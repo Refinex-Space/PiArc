@@ -1,6 +1,6 @@
 # 0012. 分发走 Developer ID + 公证 + Sparkle，不上 Mac App Store
 
-- 状态：已接受
+- 状态：已取代（2026-11-14 被 [ADR-0016](0016-packaging-signing-updates.md) 取代）
 - 日期：2026-11-14
 - 相关：架构文档第 13 章；`docs/research/native-stack.md` 第 7、9 章
 

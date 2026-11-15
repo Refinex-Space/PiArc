@@ -1,4 +1,6 @@
 > 本文是 2026-11-14 的调研快照，由调研过程整理而成，引用时注意时效。版本号与生态现状变化很快。重要事实在用于设计或实现前，请回到原始来源重新核对。
+>
+> **适用范围变更（2026-11-14）**：客户端已改为 Electron + React（ADR-0013），本文中 macOS / Windows 原生 UI、UniFFI、Sparkle 相关的推荐不再采用，保留作为决策背景。终端（第 6 章）、Node sidecar（第 8 章）、沙箱、同类应用（第 10 章）等部分仍然有效。Electron 技术栈的调研见 [electron-stack.md](electron-stack.md)。
 
 # PiArc 原生技术选型调研报告
 

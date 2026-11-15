@@ -2,13 +2,13 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 1.0（2026-11-14） |
+| 版本 | 2.0（2026-11-14，客户端改为 Electron，macOS 与 Windows 同步推进） |
 | 状态 | 已确认，作为 M0–M5 的范围基线 |
 | 配套 | [架构设计文档](../architecture/ARCHITECTURE.md)、[ADR](../adr/README.md) |
 
 ## 1. 产品愿景
 
-PiArc 是面向专业开发者的 AI 编码 Agent 桌面应用：**Claude Code 的 Harness 专业度 + Pi 的多模型能力 + 原生桌面体验**。用户可以用任意主流模型服务商，在一个响应迅速、资源占用稳定的原生应用里，完成"理解代码 → 规划 → 修改 → 验证 → 审阅 → 回退"的完整开发循环；已有的 Claude Code 配置（memory、权限、hooks、agents、skills、MCP）可以直接带过来使用。
+PiArc 是面向专业开发者的 AI 编码 Agent 桌面应用：**Claude Code 的 Harness 专业度 + Pi 的多模型能力 + 流畅稳定的桌面体验**。用户可以用任意主流模型服务商，在一个响应迅速、资源占用稳定的桌面应用里（macOS 与 Windows），完成"理解代码 → 规划 → 修改 → 验证 → 审阅 → 回退"的完整开发循环；已有的 Claude Code 配置（memory、权限、hooks、agents、skills、MCP）可以直接带过来使用。
 
 ## 2. 目标用户
 
@@ -45,7 +45,7 @@ PiArc 是面向专业开发者的 AI 编码 Agent 桌面应用：**Claude Code �
 | FR-WS-02 | 侧栏按工作区分组列出会话，显示状态徽标（错误 > 等待审批 > 运行中 > 未读 > 空闲） | P0 | M1 |
 | FR-WS-03 | 新建、重命名、置顶、归档、删除会话；会话持久化，重启应用后可恢复 | P0 | M1 |
 | FR-WS-04 | 会话全文搜索 | P1 | M3 |
-| FR-WS-05 | 多个会话并行运行；多窗口与原生标签页 | P1 | M3 |
+| FR-WS-05 | 多个会话并行运行；多窗口 | P1 | M3 |
 | FR-WS-06 | 新建会话时可选在独立 git worktree 中运行；归档时处理未提交改动 | P1 | M3 |
 | FR-WS-07 | 会话分支（从某条消息 fork）与分支切换 | P1 | M2 |
 
@@ -66,7 +66,7 @@ PiArc 是面向专业开发者的 AI 编码 Agent 桌面应用：**Claude Code �
 
 | 编号 | 需求 | 优先级 | 里程碑 |
 |---|---|---|---|
-| FR-MD-01 | 配置 Pi 支持的服务商：API key、云厂商凭证、OpenAI 兼容端点、本地模型；凭据存钥匙串 | P0 | M1 |
+| FR-MD-01 | 配置 Pi 支持的服务商：API key、云厂商凭证、OpenAI 兼容端点、本地模型；凭据存系统凭据库（macOS 钥匙串、Windows 凭据管理器） | P0 | M1 |
 | FR-MD-02 | 支持服务商提供的 OAuth / 设备码登录（**Anthropic 订阅登录除外**，见 ADR-0006） | P1 | M2 |
 | FR-MD-03 | 会话内切换模型与 effort；显示切换代价 | P0 | M1 |
 | FR-MD-04 | 每个模型可设显示名、上下文窗口、图片输入、默认 effort | P1 | M2 |
@@ -81,9 +81,9 @@ PiArc 是面向专业开发者的 AI 编码 Agent 桌面应用：**Claude Code �
 | FR-TL-02 | 工具输出超长时落盘并给模型预览；bash 卡显示语义成败 | P0 | M1 |
 | FR-TL-03 | WebFetch（域名规则）、WebSearch（可配置后端） | P1 | M2 / M3 |
 | FR-TL-04 | 后台命令、超时转后台、KillShell、Monitor；后台任务面板 | P1 | M3 |
-| FR-TL-05 | 集成终端（PTY，与会话共享目录和环境） | P1 | M3 |
+| FR-TL-05 | 集成终端（PTY + libghostty-vt，与会话共享目录和环境；agent 可读取后台终端的屏幕内容） | P1 | M3 |
 | FR-TL-06 | NotebookEdit | P2 | M4 |
-| FR-TL-07 | Bash 沙箱（文件写入与网络白名单），可选开启 | P1 | M4 |
+| FR-TL-07 | Bash 沙箱（文件写入与网络白名单），可选开启；第一版仅 macOS，Windows 见 D7 | P1 | M4 |
 
 ### 4.5 权限与审批
 
@@ -101,7 +101,7 @@ PiArc 是面向专业开发者的 AI 编码 Agent 桌面应用：**Claude Code �
 | 编号 | 需求 | 优先级 | 里程碑 |
 |---|---|---|---|
 | FR-HN-01 | 计划模式：只读探索、提交计划、评论、批准时选择后续模式 | P0 | M2 |
-| FR-HN-02 | 任务清单（模型维护，UI 原生渲染，压缩后保留） | P0 | M2 |
+| FR-HN-02 | 任务清单（模型维护，UI 结构化渲染，压缩后保留） | P0 | M2 |
 | FR-HN-03 | AskUserQuestion 结构化提问 | P1 | M2 |
 | FR-HN-04 | 子 agent：读取 `.claude/agents` 与 `.piarc/agents`；内置 general-purpose / Explore / Plan；可指定任意服务商模型；后台运行；最多 3 层 | P1 | M3 |
 | FR-HN-05 | Hooks：兼容 Claude Code 的配置格式与决策协议，事件按架构文档 6.3.2 分期 | P1 | M2–M5 |
@@ -141,13 +141,13 @@ PiArc 是面向专业开发者的 AI 编码 Agent 桌面应用：**Claude Code �
 
 | 编号 | 需求 | 优先级 | 里程碑 |
 |---|---|---|---|
-| FR-SY-01 | 会话完成或等待审批时发系统通知；Dock 角标 | P0 | M1 |
-| FR-SY-02 | 关闭窗口后后台继续运行；菜单栏常驻状态 | P1 | M3 |
+| FR-SY-01 | 会话完成或等待审批时发系统通知；Dock 角标 / 任务栏覆盖图标 | P0 | M1 |
+| FR-SY-02 | 关闭窗口后后台继续运行；macOS 菜单栏 / Windows 系统托盘常驻状态 | P1 | M3 |
 | FR-SY-03 | 通知中直接允许 / 拒绝 | P2 | M4 |
-| FR-SY-04 | `piarc://` URL scheme；从 Finder 打开文件夹 | P1 | M3 |
+| FR-SY-04 | `piarc://` URL scheme；从 Finder / 资源管理器打开文件夹 | P1 | M3 |
 | FR-SY-05 | 快捷键全部可自定义；命令面板 | P0 / P1 | M1 / M3 |
-| FR-SY-06 | 自动更新（Sparkle） | P0 | M5 |
-| FR-SY-07 | App Intents / 快捷指令 | P2 | M5 |
+| FR-SY-06 | 自动更新，两个平台都校验更新包签名（ADR-0016） | P0 | M5 |
+| FR-SY-07 | macOS App Intents / 快捷指令；Windows 跳转列表 | P2 | M5 |
 
 ## 5. 非功能需求
 
@@ -155,13 +155,13 @@ PiArc 是面向专业开发者的 AI 编码 Agent 桌面应用：**Claude Code �
 |---|---|---|
 | NFR-01 | 性能 | 满足架构文档第 11 章的全部预算，作为发布门槛 |
 | NFR-02 | 可靠性 | Agent Host 崩溃后 3 秒内自动恢复会话；进行中请求标记为状态未知，不静默丢失 |
-| NFR-03 | 安全 | 默认手动审批；项目信任闸门；凭据只存钥匙串；威胁模型（架构文档 10.1）逐条有对策与测试 |
+| NFR-03 | 安全 | 默认手动审批；项目信任闸门；凭据只存系统凭据库；渲染进程按不受信任对待并完成 Electron 安全加固（架构文档 10.3）；威胁模型（架构文档 10.1）逐条有对策与测试 |
 | NFR-04 | 隐私 | 会话数据只在本机；遥测默认关闭且不含内容 |
 | NFR-05 | 合规 | 不提供 Claude 订阅登录；clean-room；自有品牌（ADR-0006） |
-| NFR-06 | 无障碍 | VoiceOver 可用；全部功能可只用键盘完成；遵循减少动态效果与高对比度设置 |
+| NFR-06 | 无障碍 | macOS VoiceOver 与 Windows Narrator / NVDA 可用；全部功能可只用键盘完成；遵循减少动态效果、高对比度与 Windows 强制颜色设置 |
 | NFR-07 | 本地化 | 简体中文与英文 |
-| NFR-08 | 平台 | macOS 26+，Apple silicon 为主，Intel 单独提供；Windows 见架构文档第 15 章 |
-| NFR-09 | 可移植性 | Core 与 Agent Host 不含 macOS 专属假设，CI 在 Windows 上构建 Core |
+| NFR-08 | 平台 | macOS 与 Windows 同一代码库。macOS：Apple silicon 为主，Intel 见 D6；Windows：Windows 11 x64 与 arm64。最低系统版本见架构文档第 13.1 节。每个里程碑 Windows 最多滞后一个，Beta 要求两个平台同时达标 |
+| NFR-09 | 可移植性 | 平台差异只出现在 Core 的平台适配层和主进程的系统集成层；两个平台的 CI 都完整运行 L0–L2 与 L4 |
 | NFR-10 | 可维护性 | 跨进程接口有 schema 与契约测试；Pi 升级流程可重复（架构文档 5.7） |
 
 ## 6. 范围外
@@ -170,22 +170,23 @@ PiArc 是面向专业开发者的 AI 编码 Agent 桌面应用：**Claude Code �
 - 云端托管会话、Remote Control、手机端；
 - IDE 插件与行内代码补全；
 - 插件市场托管服务；
-- Mac App Store 版本；
-- 第一版的 Windows 客户端。
+- Mac App Store 与 Microsoft Store 版本；
+- Linux 版本。
 
 ## 7. 待决事项（需要产品负责人决定）
 
 | 编号 | 事项 | 背景 | 建议 |
 |---|---|---|---|
-| D1 | 若原生 transcript 渲染在 M0 未达标，是否允许消息区改用 WKWebView | 触碰"不用 Web 技术"的产品前提（架构文档 R1） | 先完成 M0 spike 再决定 |
-| D2 | Bundle ID、产品域名、签名主体 | 影响钥匙串服务名、URL scheme、公证、更新源 | 尽早确定，M0 签名验证前需要 |
+| D1 | ~~若原生 transcript 渲染在 M0 未达标，是否允许消息区改用 WKWebView~~ | **已关闭**（2026-11-14）：客户端整体改为 Electron + React（ADR-0013），该问题不再存在 | — |
+| D2 | 应用标识（macOS bundle id、Windows AppUserModelID）、产品域名、签名主体 | 影响凭据服务名、URL scheme、macOS 公证、Windows 代码签名、更新源 | **签名策略已定**（2026-11-14，ADR-0016）：主体在 Azure Artifact Signing 可用地区时用它，否则用 OV 证书 + 云 HSM，不买 EV。**仍待产品负责人提供**：应用标识、产品域名与签名主体本身（标识需要和自有域名对应，不能代为选定），M0 S6 之前需要 |
 | D3 | 视觉品牌（主色、图标、名称字标） | 必须与 Claude 品牌明确区分（ADR-0006） | M1 前完成品牌基础 |
 | D4 | 是否推进"驱动未修改的 Claude Code 二进制作为外部内核" | 让有 Claude 订阅的用户合规使用 PiArc UI，但需法务评审 | 列为 P2，M5 后评估 |
 | D5 | 商业模式 | 免费 / 买断 / 订阅，影响更新与授权设计 | M4 前确定 |
-| D6 | Intel 版本是否长期维护 | macOS 27 已不支持 Intel | 首发提供，按升级统计决定是否继续 |
+| D6 | Intel 版本是否长期维护 | macOS 27 已不支持 Intel；Electron 下多构建一个 x64 目标成本低，但测试矩阵变大 | 首发提供，按升级统计决定是否继续 |
+| D7 | Windows 第一版是否提供 OS 级沙箱 | Claude Code 在原生 Windows 上也不提供沙箱（要求在 WSL2 中运行）；Windows 的隔离方案（AppContainer、MXC 等）工作量大，MXC 还要求 Win11 24H2 的较新版本并带有不可关闭的遥测 | **已决定**（2026-11-14）：第一版不提供，只靠权限规则与 Job Object 进程树管理，设置页与沙箱开关处明确提示；M4 评估隔离方案，结论另写 ADR |
 
 ## 8. 验收方式
 
 - 每条功能需求在实现时登记到能力清单（`tests/capabilities.yaml`），至少有一个 L2 场景覆盖；完成状态由测试结果自动生成。
-- 涉及 UI 的需求另有 XCUITest 流程测试或快照测试，并在本地以测试账号实际操作验证。
+- 涉及 UI 的需求另有 Playwright（Electron）流程测试或视觉快照测试，并在两个平台上以测试账号实际操作验证。
 - 非功能需求按架构文档第 11 章的测量方式进入 CI。

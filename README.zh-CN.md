@@ -2,13 +2,13 @@
 
 [English](README.md) · **简体中文**
 
-基于 [Pi](https://github.com/earendil-works/pi) 构建的原生专业 AI 编码 Agent 桌面应用。
+基于 [Pi](https://github.com/earendil-works/pi) 构建的专业 AI 编码 Agent 桌面应用，支持 macOS 与 Windows。
 
 PiArc 想把三件事放在一起：
 
 - **对标 Claude Code 的 Harness 专业度**：带严格编辑不变量的工具体系、权限模式与规则、hooks、子 agent、计划模式、任务清单、上下文工程、检查点与回退、skills、MCP、沙箱。
 - **Pi 的多服务商模型层**：Anthropic、OpenAI、Google、DeepSeek、Kimi、Qwen、GLM、OpenRouter、本地模型等，换服务商不换 Harness 行为。
-- **真正的原生桌面应用**：先做 macOS（SwiftUI + AppKit），之后做 Windows 原生客户端。不用 Electron，不用 Web UI 外壳。
+- **一套代码覆盖 macOS 与 Windows**：界面用 Electron + React，Agent 控制面在 Rust 编写的 Core 中。Windows 与 macOS 共用代码，最多晚一个里程碑。
 
 > **当前状态：设计阶段。** 需求和架构已经确定，实现从 M0 技术验证开始，仓库里还没有可运行的代码。
 
@@ -19,15 +19,17 @@ PiArc 想把三件事放在一起：
 - 结构化审批：带 diff 预览，支持本会话允许与持久规则，全部有审计记录。
 - 基于写前文件快照的确定性回退，支持按文件、按 hunk 丢弃改动。
 - 多会话并行，可选 git worktree 隔离；MCP server 按工作区共享，不随会话数复制。
-- 启动时间、内存、流式渲染帧时间等性能预算进入 CI。
+- 内置终端基于 libghostty，agent 也能读取后台终端的屏幕内容。
+- 启动时间、内存、流式渲染帧时间等性能预算在两个平台的 CI 中把关。
 
 ## 架构概览
 
 ```
-PiArc.app（一个进程）
-├── 客户端：Swift 6，SwiftUI 外壳 + AppKit/TextKit 2 承载对话流、diff、终端
-└── PiArc Core：Rust 静态库（经 UniFFI 调用）
-      权限与审批 · hooks · 工具 I/O · 文件快照 · 沙箱 · 配置 · 钥匙串 · 索引 · 渲染预处理
+PiArc（Electron）
+├── 渲染进程：React + TypeScript（界面、对话流、输入框、终端视图），沙箱隔离
+├── 主进程：TypeScript（窗口、菜单、通知、更新、事件转发）
+└── PiArc Core：Rust 原生模块（经 NAPI-RS），加载在主进程
+      权限与审批 · hooks · 工具 I/O · 文件快照 · 沙箱 · 配置 · 凭据 · 索引 · diff · 终端
           │  AHP：版本化的 JSON-RPC，走 stdio
           ▼
 Agent Host（每个工作区一个 Node 进程）
@@ -45,11 +47,11 @@ Agent Host（每个工作区一个 Node 进程）
 ## 仓库结构
 
 ```
-apps/macos/       macOS 客户端（规划中）
-apps/windows/     Windows 客户端（第二阶段）
-crates/           PiArc Core 的 Rust workspace（规划中）
+apps/desktop/     Electron 应用：主进程、preload、React 渲染进程（规划中）
+crates/           PiArc Core 的 Rust workspace，含 NAPI-RS 绑定（规划中）
 agent-host/       基于 Pi SDK 的 TypeScript Agent Host 与 Harness Kit（规划中）
-design/tokens/    设计令牌，各平台的单一来源（规划中）
+packages/         共享的 TypeScript 包，例如生成的协议类型（规划中）
+design/tokens/    设计令牌，生成 CSS 变量（规划中）
 docs/             架构、ADR、需求、调研
 reference/        参考仓库的本地只读副本（已加入 gitignore）
 ```
@@ -58,13 +60,14 @@ reference/        参考仓库的本地只读副本（已加入 gitignore）
 
 | 里程碑 | 范围 |
 |---|---|
-| M0 | 技术验证：原生对话流渲染、UniFFI、多会话 Agent Host、钥匙串凭据、Node 签名公证、终端、沙箱 |
+| M0 | 两个平台上的技术验证：Rust Core 经 NAPI-RS 接入 Electron、流式对话渲染、多会话 Agent Host、凭据、签名与打包、libghostty 终端、沙箱、Electron 安全基线 |
 | M1 | 可行走骨架：会话、流式对话、经 Rust Core 执行的核心工具、基础审批、模型设置 |
 | M2 | Harness 核心：权限规则、计划模式、任务清单、hooks、检查点与回退、压缩、Changes 面板 |
 | M3 | 多会话并行、子 agent、后台任务、终端、worktree、MCP、skills 与命令 |
 | M4 | 沙箱、插件、无障碍、本地化、性能预算进入 CI |
-| M5 | Beta：自动审查模式、自动记忆、企业托管配置、发布流水线 |
-| W0–W3 | 基于同一个 Core 的 Windows 原生客户端 |
+| M5 | macOS 与 Windows 同时 Beta：自动审查模式、自动记忆、企业托管配置、发布流水线 |
+
+每个里程碑由 macOS 先达标，Windows 最迟在下一个里程碑结束前达到同样的退出标准。
 
 ## 合规说明
 

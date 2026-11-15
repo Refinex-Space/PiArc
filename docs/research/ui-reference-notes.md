@@ -52,6 +52,8 @@
 
 ## 8. 原生翻译要点
 
+> 本节写于原生客户端方案期间。客户端改为 Electron + React 后（ADR-0013），参考实现的 Web 做法可以直接对照，本节只有弹簧参数换算和"正文用不透明背景"两条仍然适用；Web 端的对应规则见架构文档第 8.4–8.6 节。
+
 - 弹簧参数换算（Apple SDK 定义）：`response = 2π·√(m/k)`，`dampingFraction = c / (2·√(mk))`；过阻尼参数需要使用允许过阻尼的弹簧构造方式，否则会被当作临界阻尼处理（需单测确认）。
 - 滚动跟随：`NSScrollView` + TextKit 2，用滚轮事件与 live scroll 通知判断"用户正在滚动"，内容增长时无动画贴底。
 - 输入法守卫：在 `textView(_:doCommandBy:)` 中处理换行，先检查 `hasMarkedText()`；Escape 与 `/`、`@` 触发符同样先检查。

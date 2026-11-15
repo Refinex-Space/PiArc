@@ -15,15 +15,20 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 
 | 编号 | 标题 | 状态 |
 |---|---|---|
-| [0001](0001-three-tier-native-architecture.md) | 原生客户端 + Rust 核心 + Pi Agent Host 三层架构 | 已接受 |
+| [0001](0001-three-tier-native-architecture.md) | 原生客户端 + Rust 核心 + Pi Agent Host 三层架构 | 已取代 → 0013 |
 | [0002](0002-pi-integration-via-sdk-host.md) | 基于 Pi SDK 自研 Agent Host，不 fork Pi、不以官方 RPC 为主协议 | 已接受 |
-| [0003](0003-embedded-node-runtime.md) | Agent Host 运行时使用内置 Node LTS | 已接受 |
+| [0003](0003-embedded-node-runtime.md) | Agent Host 运行时使用内置 Node LTS | 已取代 → 0015 |
 | [0004](0004-harness-control-plane-in-core.md) | Harness 分工：策略在 Core 裁决，Agent 循环在 Pi，工具 I/O 下沉 Core | 已接受 |
 | [0005](0005-claude-code-config-compatibility.md) | 兼容 Claude Code 配置生态，PiArc 自有配置独立 | 已接受 |
 | [0006](0006-compliance-and-clean-room.md) | 合规红线：禁用 Claude 订阅登录、clean-room、自有品牌 | 已接受 |
-| [0007](0007-macos-ui-swiftui-appkit.md) | macOS 客户端：SwiftUI 外壳 + AppKit/TextKit 2 承载高性能视图 | 已接受 |
-| [0008](0008-ffi-uniffi.md) | Swift ⇄ Rust 绑定使用 UniFFI | 已接受 |
+| [0007](0007-macos-ui-swiftui-appkit.md) | macOS 客户端：SwiftUI 外壳 + AppKit/TextKit 2 承载高性能视图 | 已取代 → 0013 |
+| [0008](0008-ffi-uniffi.md) | Swift ⇄ Rust 绑定使用 UniFFI | 已取代 → 0014 |
 | [0009](0009-agent-host-protocol.md) | Core ⇄ Agent Host 使用自有版本化协议 AHP | 已接受 |
 | [0010](0010-process-model.md) | 进程模型：每个工作区一个 Agent Host，子 agent 在进程内 | 已接受 |
 | [0011](0011-session-storage.md) | 会话以 Pi JSONL 为事实来源，Core 维护 SQLite 索引与文件快照 | 已接受 |
-| [0012](0012-distribution-developer-id.md) | 分发走 Developer ID + 公证 + Sparkle，不上 Mac App Store | 已接受 |
+| [0012](0012-distribution-developer-id.md) | 分发走 Developer ID + 公证 + Sparkle，不上 Mac App Store | 已取代 → 0016 |
+| [0013](0013-electron-desktop-client.md) | 桌面客户端改用 Electron + React，macOS 与 Windows 同一代码库推进 | 已接受 |
+| [0014](0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在 Electron 主进程 | 已接受 |
+| [0015](0015-agent-host-runtime-bundled-node.md) | Agent Host 继续使用单独内置的 Node LTS，不复用 Electron 自带的 Node | 已接受 |
+| [0016](0016-packaging-signing-updates.md) | 打包、签名与更新：Electron Forge；macOS Developer ID + 公证 + 内置更新；Windows 签名安装包；不上应用商店 | 已接受 |
+| [0017](0017-terminal-libghostty-vt.md) | 内置终端：终端状态由 Core 中的 libghostty-vt 持有，渲染层可替换 | 已接受 |

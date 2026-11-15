@@ -1,6 +1,6 @@
 # 0007. macOS 客户端：SwiftUI 外壳 + AppKit/TextKit 2 承载高性能视图
 
-- 状态：已接受
+- 状态：已取代（2026-11-14 被 [ADR-0013](0013-electron-desktop-client.md) 取代）
 - 日期：2026-11-14
 - 相关：架构文档第 8 章；`docs/research/native-stack.md` 第 1、5、6 章
 

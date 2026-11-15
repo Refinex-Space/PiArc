@@ -1,6 +1,6 @@
 # 0003. Agent Host 运行时使用内置 Node LTS
 
-- 状态：已接受
+- 状态：已取代（2026-11-14 被 [ADR-0015](0015-agent-host-runtime-bundled-node.md) 取代）
 - 日期：2026-11-14
 - 相关：架构文档第 5.6、13 章
 

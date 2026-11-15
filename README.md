@@ -2,13 +2,13 @@
 
 **English** · [简体中文](README.zh-CN.md)
 
-A native, professional AI coding agent workbench built on [Pi](https://github.com/earendil-works/pi).
+A professional AI coding agent workbench for macOS and Windows, built on [Pi](https://github.com/earendil-works/pi).
 
 PiArc aims to combine three things:
 
 - **Harness depth on par with Claude Code**: tools with strict editing invariants, permission modes and rules, hooks, subagents, plan mode, task lists, context engineering, checkpoints and rewind, skills, MCP, and sandboxing.
 - **Pi's multi-provider model layer**: Anthropic, OpenAI, Google, DeepSeek, Kimi, Qwen, GLM, OpenRouter, local models, and more, with the same harness behavior across providers.
-- **A truly native desktop app**: SwiftUI + AppKit on macOS first, a native Windows client later. No Electron, no web UI shell.
+- **One desktop app for macOS and Windows**: a single Electron + React codebase for the UI, with the agent control plane in a Rust core. Windows ships from the same code, at most one milestone behind macOS.
 
 > **Status: design phase.** The requirements and architecture are defined; implementation starts with the M0 technical spikes. There is no runnable code yet.
 
@@ -19,15 +19,17 @@ PiArc aims to combine three things:
 - Structured approvals with diff previews, per-session and persistent rules, and an audit trail.
 - Deterministic rewind backed by pre-write file snapshots, with per-file and per-hunk discard.
 - Parallel sessions with optional git worktree isolation; MCP servers are shared per workspace instead of being duplicated per session.
-- Performance budgets (startup, memory, streaming frame time) enforced in CI.
+- A built-in terminal powered by libghostty, whose screen the agent can also read for background tasks.
+- Performance budgets (startup, memory, streaming frame time) enforced in CI on both platforms.
 
 ## Architecture at a glance
 
 ```
-PiArc.app (one process)
-├── Client: Swift 6, SwiftUI shell + AppKit/TextKit 2 for transcript, diff, terminal
-└── PiArc Core: Rust static library (via UniFFI)
-      policy & approvals · hooks · tool I/O · snapshots · sandbox · config · keychain · index · rendering
+PiArc (Electron)
+├── Renderer: React + TypeScript (UI, transcript, composer, terminal view), sandboxed
+├── Main process: TypeScript (windows, menus, notifications, updates, event relay)
+└── PiArc Core: Rust native module (via NAPI-RS), loaded in the main process
+      policy & approvals · hooks · tool I/O · snapshots · sandbox · config · credentials · index · diff · terminal
           │  AHP: versioned JSON-RPC over stdio
           ▼
 Agent Host (one Node process per workspace)
@@ -45,11 +47,11 @@ Read more:
 ## Repository layout
 
 ```
-apps/macos/       macOS client (planned)
-apps/windows/     Windows client (phase 2)
-crates/           Rust workspace for PiArc Core (planned)
+apps/desktop/     Electron app: main process, preload, React renderer (planned)
+crates/           Rust workspace for PiArc Core, incl. the NAPI-RS binding (planned)
 agent-host/       TypeScript Agent Host and Harness Kit on the Pi SDK (planned)
-design/tokens/    Design tokens, single source for all platforms (planned)
+packages/         Shared TypeScript packages, e.g. generated protocol types (planned)
+design/tokens/    Design tokens, generated into CSS variables (planned)
 docs/             Architecture, ADRs, requirements, research
 reference/        Local read-only clones of reference repositories (git-ignored)
 ```
@@ -58,13 +60,14 @@ reference/        Local read-only clones of reference repositories (git-ignored)
 
 | Milestone | Scope |
 |---|---|
-| M0 | Technical spikes: native transcript rendering, UniFFI, multi-session Agent Host, keychain credentials, Node signing, terminal, sandbox |
+| M0 | Technical spikes on both platforms: Rust Core in Electron via NAPI-RS, streaming transcript, multi-session Agent Host, credentials, signing and packaging, libghostty terminal, sandbox, Electron security baseline |
 | M1 | Walking skeleton: sessions, streaming, core tools via Rust Core, basic approvals, model settings |
 | M2 | Harness core: permission rules, plan mode, task list, hooks, checkpoints and rewind, compaction, Changes panel |
 | M3 | Parallel sessions, subagents, background tasks, terminal, worktrees, MCP, skills and commands |
 | M4 | Sandbox, plugins, accessibility, localization, performance budgets in CI |
-| M5 | Beta: auto-review mode, auto memory, managed settings, release pipeline |
-| W0–W3 | Native Windows client on the same Core |
+| M5 | Beta on macOS and Windows: auto-review mode, auto memory, managed settings, release pipeline |
+
+Each milestone is reached on macOS first; Windows meets the same exit criteria no later than the end of the next milestone.
 
 ## Compliance
 

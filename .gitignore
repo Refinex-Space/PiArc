@@ -1,6 +1,6 @@
 # PiArc .gitignore
-# Monorepo: macOS app (Swift/Xcode), Rust core (cargo), agent host (TypeScript/Node),
-# future Windows app (C#/WinUI). Keep rules grouped by toolchain.
+# Monorepo: Electron desktop app (apps/desktop), Rust core (cargo + NAPI-RS),
+# agent host (TypeScript/Node). Keep rules grouped by toolchain.
 
 # ---------------------------------------------------------------------------
 # Local read-only reference repositories (see docs/research/REFERENCES.md).
@@ -52,32 +52,30 @@ AuthKey_*.p8
 .pi/settings.local.json
 
 # ---------------------------------------------------------------------------
-# Swift / Xcode (apps/macos)
+# Electron desktop app (apps/desktop)
+# Note: apps/desktop/build/ holds icons and entitlements and IS committed.
 # ---------------------------------------------------------------------------
-xcuserdata/
-*.xcuserstate
-*.xcscmblueprint
-*.xccheckout
-DerivedData/
-*.hmap
-*.ipa
-*.dSYM
-*.dSYM.zip
-*.xcarchive
-timeline.xctimeline
-playground.xcworkspace
-.build/
-.swiftpm/
-# Generated UniFFI Swift bindings and the packaged Rust xcframework
-apps/macos/**/Generated/
-*.xcframework
+# Forge / Vite build and packaging output
+.vite/
+apps/desktop/out/
+apps/desktop/release/
+# Compiled NAPI-RS native modules (built per target in CI)
+*.node
 # Release packaging output
 *.dmg
 *.pkg
-build/
-# Sparkle / notarization scratch
-*.zip.sig
+*.blockmap
+*.nupkg
+# Notarization scratch
 notarization-*.json
+
+# Platform-specific native helpers (apps/desktop/native), if any are written in Swift
+xcuserdata/
+DerivedData/
+.build/
+.swiftpm/
+*.dSYM
+*.dSYM.zip
 
 # ---------------------------------------------------------------------------
 # Rust (crates/)
@@ -107,20 +105,12 @@ agent-host/runtime/
 agent-host/bin/
 
 # ---------------------------------------------------------------------------
-# Windows (apps/windows, phase 2)
+# Windows packaging output and tooling
 # ---------------------------------------------------------------------------
-# Scoped to apps/windows so Rust `src/bin/` directories stay tracked.
-apps/windows/**/[Bb]in/
-apps/windows/**/[Oo]bj/
 .vs/
-*.user
-*.suo
-*.userprefs
 *.msix
 *.msixbundle
 *.appx
-AppPackages/
-BundleArtifacts/
 
 # ---------------------------------------------------------------------------
 # Logs, test and profiling output
