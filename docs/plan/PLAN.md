@@ -113,7 +113,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T03 | [Electron 应用骨架与安全基线](tasks/T03-electron-shell-and-security-baseline.md) | 1 | T02 | macOS | xhigh | 大 | S10 | 部分完成 | 63eabea |
 | T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 部分完成 | aa2817f |
 | T05 | [严格校验的 mock provider](tasks/T05-strict-mock-provider.md) | 1 | T02 | macOS | high | 中 | 无 | 已完成 | 1487154 |
-| T06 | [Agent Host 骨架：Pi SDK 多会话与 AHP](tasks/T06-agent-host-skeleton.md) | 1 | T04、T05 | macOS | xhigh | 大 | S3、S9 | 未开始 | — |
+| T06 | [Agent Host 骨架：Pi SDK 多会话与 AHP](tasks/T06-agent-host-skeleton.md) | 1 | T04、T05 | macOS | xhigh | 大 | S3、S9 | 进行中 | — |
 | T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 未开始 | — |
 | T08 | [凭据保险箱](tasks/T08-credential-vault.md) | 1 | T06；D2 | macOS | high | 中 | S5 | 未开始 | — |
 | T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 未开始 | — |
@@ -294,7 +294,19 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（当前没有进行中的任务）
+T06（开工 2026-11-15，基线 `npm run verify` 13/13 通过；T04 的遗留项 A09 只涉及 Windows 构建，不影响本任务；分支未推送，T03-A03、T04-A09 仍待 Windows CI）
+
+- [ ] C1 锁定 Pi 1.5.2：`agent-host` 与 `packages/testkit` 统一版本，基线文档写版本差异，`reference/pi` 检出 v1.5.2，更新 `REFERENCES.md`（A01，I14）
+- [ ] C2 ESLint 禁止深度导入 `@earendil-works/*`，放行 `exports` 子路径（A02，I15）
+- [ ] C3 协议：`host/ping`、`host/shutdown`、`session/*` 最小方法集、工具 item 类型，样本与反例
+- [ ] C4 agent-host：stdio 接管、帧收发、握手、SIGTERM 有序退出、Core 桥接（统一超时）
+- [ ] C5 agent-host：会话注册表（`createAgentSession`、文件型 `SessionManager`、`agentDir`）、最小投影与 `seq`（A10，I08）
+- [ ] C6 agent-host：esbuild 单文件 bundle（node22.19）与外部依赖清单
+- [ ] C7 `piarc-host`：启动、握手、有界写队列与背压、心跳、退避重启、调用对账、stderr 日志
+- [ ] C8 S9 故障注入测试（可控的假 Agent Host、可注入时钟）（A03、A06–A09）
+- [ ] C9 S3 场景测试：真实 Agent Host 双会话、中断、压缩、MCP，RSS（A04、A05、A10）
+- [ ] C10 报告 `S03-multi-session.md`、`S09-ahp-resilience.md`，更新 spikes README（A11）
+- [ ] C11 收尾：两份 CLAUDE.md、架构与工程文档、acceptance、`npm run verify`（A12）
 
 ## 登记事项
 
