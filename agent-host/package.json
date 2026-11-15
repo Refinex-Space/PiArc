@@ -9,6 +9,10 @@
     "@earendil-works/pi-agent-core": "1.5.2",
     "@earendil-works/pi-ai": "1.5.2",
     "@earendil-works/pi-coding-agent": "1.5.2",
-    "@earendil-works/pi-mcp": "1.5.2"
+    "@earendil-works/pi-mcp": "1.5.2",
+    "@piarc/protocol": "0.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
   }
 }
