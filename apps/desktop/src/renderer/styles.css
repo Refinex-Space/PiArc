@@ -55,3 +55,25 @@ body,
   font-size: 12px;
   color: color-mix(in srgb, canvastext 60%, canvas);
 }
+
+/* Event probe test page (T04). */
+.probe {
+  padding: 12px 24px;
+}
+
+.probe-table {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.probe-table th,
+.probe-table td {
+  padding: 4px 12px;
+  text-align: right;
+  border-bottom: 1px solid color-mix(in srgb, canvas 80%, canvastext);
+}
+
+.probe-table th:first-child,
+.probe-table td:first-child {
+  text-align: left;
+}
