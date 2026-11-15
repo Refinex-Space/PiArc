@@ -33,6 +33,10 @@ test('does not run an injected inline script', async ({ page }) => {
       document.addEventListener('securitypolicyviolation', (event) => {
         resolve(event.effectiveDirective);
       });
+      // Upper bound so a missing violation fails with a clear value instead of a test timeout.
+      setTimeout(() => {
+        resolve('no violation');
+      }, 5_000);
     });
     const script = document.createElement('script');
     script.textContent = 'window.__inlineScriptRan = true;';
@@ -48,6 +52,10 @@ test('does not run an injected inline event handler', async ({ page }) => {
       document.addEventListener('securitypolicyviolation', (event) => {
         resolve(event.effectiveDirective);
       });
+      // Upper bound so a missing violation fails with a clear value instead of a test timeout.
+      setTimeout(() => {
+        resolve('no violation');
+      }, 5_000);
     });
     const target = document.createElement('button');
     target.setAttribute('onclick', 'window.__inlineHandlerRan = true;');
@@ -91,6 +99,9 @@ test('blocks fetch to an external address', async ({ page }) => {
       document.addEventListener('securitypolicyviolation', (event) => {
         resolve(`${event.effectiveDirective} ${event.blockedURI}`);
       });
+      setTimeout(() => {
+        resolve('no violation');
+      }, 5_000);
     });
     let outcome: string;
     try {
@@ -113,9 +124,15 @@ test('blocks an external image', async ({ page }) => {
       document.addEventListener('securitypolicyviolation', (event) => {
         resolve(`${event.effectiveDirective} ${event.blockedURI}`);
       });
+      setTimeout(() => {
+        resolve('no violation');
+      }, 5_000);
     });
     const image = document.createElement('img');
     const loaded = new Promise<string>((resolve) => {
+      setTimeout(() => {
+        resolve('neither load nor error');
+      }, 5_000);
       image.addEventListener('load', () => {
         resolve('load');
       });
