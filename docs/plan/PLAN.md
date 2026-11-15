@@ -113,7 +113,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T03 | [Electron 应用骨架与安全基线](tasks/T03-electron-shell-and-security-baseline.md) | 1 | T02 | macOS | xhigh | 大 | S10 | 部分完成 | 63eabea |
 | T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 部分完成 | aa2817f |
 | T05 | [严格校验的 mock provider](tasks/T05-strict-mock-provider.md) | 1 | T02 | macOS | high | 中 | 无 | 已完成 | 1487154 |
-| T06 | [Agent Host 骨架：Pi SDK 多会话与 AHP](tasks/T06-agent-host-skeleton.md) | 1 | T04、T05 | macOS | xhigh | 大 | S3、S9 | 进行中 | — |
+| T06 | [Agent Host 骨架：Pi SDK 多会话与 AHP](tasks/T06-agent-host-skeleton.md) | 1 | T04、T05 | macOS | xhigh | 大 | S3、S9 | 已完成 | 2214b08 |
 | T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 未开始 | — |
 | T08 | [凭据保险箱](tasks/T08-credential-vault.md) | 1 | T06；D2 | macOS | high | 中 | S5 | 未开始 | — |
 | T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 未开始 | — |
@@ -294,19 +294,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-T06（开工 2026-11-15，基线 `npm run verify` 13/13 通过；T04 的遗留项 A09 只涉及 Windows 构建，不影响本任务；分支未推送，T03-A03、T04-A09 仍待 Windows CI）
-
-- [x] C1 锁定 Pi 1.5.2：`agent-host` 与 `packages/testkit` 统一版本，基线文档写版本差异，`reference/pi` 检出 v1.5.2，更新 `REFERENCES.md`（A01，I14）
-- [x] C2 ESLint 禁止深度导入 `@earendil-works/*`，放行 `exports` 子路径（A02，I15）
-- [x] C3 协议：`host/ping`、`host/shutdown`、`session/*` 最小方法集、工具 item 类型，样本与反例
-- [x] C4 agent-host：stdio 接管、帧收发、握手、SIGTERM 有序退出、Core 桥接（统一超时）
-- [x] C5 agent-host：会话注册表（`createAgentSession`、文件型 `SessionManager`、`agentDir`）、最小投影与 `seq`（A10，I08）
-- [x] C6 agent-host：esbuild 单文件 bundle（node22.19）与外部依赖清单
-- [x] C7 `piarc-host`：启动、握手、有界写队列与背压、心跳、退避重启、调用对账、stderr 日志
-- [x] C8 S9 故障注入测试（可控的假 Agent Host、可注入时钟）（A03、A06–A09）
-- [x] C9 S3 场景测试：真实 Agent Host 双会话、中断、压缩、MCP，RSS（A04、A05、A10）
-- [x] C10 报告 `S03-multi-session.md`、`S09-ahp-resilience.md`，更新 spikes README（A11）
-- [ ] C11 收尾：两份 CLAUDE.md、架构与工程文档、acceptance、`npm run verify`（A12）
+（当前没有进行中的任务）
 
 ## 登记事项
 
@@ -321,7 +309,7 @@ T06（开工 2026-11-15，基线 `npm run verify` 13/13 通过；T04 的遗留�
 | I05 | 制定计划 | 架构第 6.10 节说 MCP server 在沙箱外，但 stdio MCP server 由 Agent Host 启动，会继承 Agent Host 的 Seatbelt 写入限制（第 10.3 节） | T39 定稿 Agent Host 配置时澄清并更新架构；放宽写入范围属于变更型 |
 | I06 | T01 | `npm audit` 报告 8 个 moderate（GHSA-g3hv-75wg-m249，minimatch 经 eslint 10.14 与 typescript-eslint 8.72 引入，仅开发工具链，不进安装包）；架构第 13.3 节要求的 `npm audit`、`cargo-audit` 尚未接入 CI（cargo-deny 的 advisories 已覆盖 RustSec 数据库） | 上游修复后升级 eslint 与 typescript-eslint；T45 或 T50 把 `npm audit --omit=dev` 接入 CI |
 | I07 | T01 | TypeScript 7.0 已发布，typescript-eslint 8.72 只支持 `<6.1`，仓库锁在 TypeScript 6.0.3 | 各评审任务按月复查 typescript-eslint 的支持范围，支持后再升级 |
-| I08 | T02 | Node 的 `JSON.stringify` 把孤立代理项写成 `\udXXX` 转义，serde_json 拒绝这种帧；TS 的 `encodeFrame` 因此直接抛 `TypeError`。模型 SDK 按 UTF-16 切分的流式文本增量可能在代理对中间断开 | T06 在发送 `item/agentMessage/delta` 等文本前处理（例如把末尾的高代理项留到下一个增量），并加测试 |
+| I08 | T02 | Node 的 `JSON.stringify` 把孤立代理项写成 `\udXXX` 转义，serde_json 拒绝这种帧；TS 的 `encodeFrame` 因此直接抛 `TypeError`。模型 SDK 按 UTF-16 切分的流式文本增量可能在代理对中间断开 | 已落地（T06）：`agent-host/src/runtime/projector.ts` 把增量末尾的高代理项留到下一个增量，无法配对的代理项替换为 U+FFFD，其余发往 Core 的字符串用 `toWellFormed()`；测试 `projector.test.ts` |
 | I09 | T02 | 帧解码按 serde_json 的递归上限拒绝嵌套超过 127 层的 JSON（TS 实现同样执行）。工具参数等任意 JSON 若更深会被整帧拒绝 | T07 实现工具调用转发时确认可接受；需要更深时评估在 Core 侧放宽并补栈深度保护 |
 | I10 | T03 | 发布构建仍接受 Chromium 的 `--remote-debugging-port`（没有对应 fuse，运行时探测 `/json/version` 返回 200）：能以该参数启动 PiArc 的本机进程可经 CDP 在页面中执行脚本并调用 `window.piarc`。威胁等级与 ADR-0018 已接受的本机篡改相同，详见 `docs/spikes/S10-electron-security.md` 第 6 节 | T45 评估在发布构建启动时拒绝或移除该开关（先验证可行性），补回归用例 |
 | I11 | T03 | 应用仍使用 Electron 默认菜单，发布构建中也有"Toggle Developer Tools"与"Reload" | T18 替换原生菜单时决定发布构建是否保留开发者工具入口 |
@@ -386,6 +374,12 @@ T06（开工 2026-11-15，基线 `npm run verify` 13/13 通过；T04 的遗留�
 - 验收：12 项通过，0 项阻塞
 - 决策：未写 ADR；HTTP 用 hyper 1.12 + hyper-util + http-body-util（自定义响应体以控制断流），YAML 用 serde-saphyr 2.1.1，元 schema 校验用 jsonschema 0.61.2；`deny.toml` 为 MIT-0 的 `borrow-or-share` 加单 crate 许可证例外；场景选择器支持 `<id>#<实例>` 独立计数
 - 遗留：I14（T06 统一 pi-ai 版本）、I15（T06 的深度导入规则放行 `exports` 子路径）；本机 `gh` 已登录但分支未推送，T03-A03、T04-A09 的 Windows CI 仍待推送后核对
+
+### 2026-11-15 T06 已完成（提交 2214b08）
+- 交付：Pi 锁定 1.5.2（`agent-host` 与 `packages/testkit` 统一，基线文档追加"版本差异"，`reference/pi` 检出 v1.5.2）；ESLint 按 `exports` 禁止深度导入；协议新增 `host/ping`、`host/shutdown`、`session/create|resume|prompt|abort|close`、`trust/get`、`dynamicToolCall` 条目、`turn/completed.errorMessage`、5 个错误类别，响应契约名 `<方法>/result`，`session/resume` 带 `lastSeq`；`agent-host`（stdio 接管、握手、会话注册表、最小投影、出站队列、Core 桥接、esbuild 单文件 bundle `npm run build:agent-host`）；`piarc-ports` 的 `ProcessSpawner`/`Clock`、`piarc-exec` 的 tokio 启动器、`piarc-host` 监管器（握手、有界写队列与 `busy`、按许可的读背压、心跳、退避重启、会话恢复、调用对账、stderr→tracing）、`piarc-core::agent_host`；mock 新增 `stall_after_events`；stdio MCP 夹具；S3/S9 测试与两份报告；两份新 CLAUDE.md、架构 v2.9
+- 验收：12 项通过，0 项阻塞（S3、S9 的 Windows 结果由 CI 的 `verify` 作业给出，待推送后核对）
+- 决策：未写 ADR；架构 v2.9 补充；写入背压选"写队列满立即返回可重试 `busy`"；生命周期事件不占读背压许可；`seq` 写出时分配、跨重启以 `lastSeq` 续编；信任经 `trust/get`；`PI_CODING_AGENT_DIR` 固定到 PiArc 目录；凭据只在内存
+- 遗留：I16（`cacheWarming` 默认值）、I17（进程树清理，T17）、I18（中断后相邻 user 消息，T14）；本机 node 24.14.1 与 `.nvmrc` 24.22.2 不一致；分支未推送，T03-A03、T04-A09 的 Windows CI 仍待核对
 
 ## 计划变更记录
 
