@@ -1,6 +1,6 @@
 # 0016. 打包、签名与更新：Electron Forge；macOS Developer ID + 公证 + 内置更新；Windows 签名安装包；不上应用商店
 
-- 状态：已接受
+- 状态：已取代（2026-11-14 被 [ADR-0018](0018-unsigned-distribution.md) 取代）
 - 日期：2026-11-14
 - 取代：[ADR-0012](0012-distribution-developer-id.md)
 - 相关：架构文档第 10.3、13 章；`docs/research/electron-stack.md` 第 2.2、3、5 节；`docs/research/native-stack.md` 第 7、9 章

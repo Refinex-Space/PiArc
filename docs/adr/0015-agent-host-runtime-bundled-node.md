@@ -1,6 +1,6 @@
 # 0015. Agent Host 继续使用单独内置的 Node LTS，不复用 Electron 自带的 Node
 
-- 状态：已接受
+- 状态：已接受（第 5 条"签名"已被 [ADR-0018](0018-unsigned-distribution.md) 修订：内置 node 保留 Node.js 官方签名，不重签）
 - 日期：2026-11-14
 - 取代：[ADR-0003](0003-embedded-node-runtime.md)
 - 相关：架构文档第 5.6、6.10、10.3、13 章；`docs/research/electron-stack.md` 第 2 节、`docs/research/pi-v1.4.0-baseline.md`
@@ -32,7 +32,7 @@ Agent Host 的硬性要求：
    - macOS：`/usr/bin/sandbox-exec -f <profile> -D …参数… <内置 node> agent-host.mjs`；
    - Windows：`CreateProcess` 启动，把进程挂进 Job Object（设置 `KILL_ON_JOB_CLOSE`）；
    - Core 自己持有 stdio 管道。
-3. **Electron 应用自身关闭 `RunAsNode`、`EnableNodeOptionsEnvironmentVariable`、`EnableNodeCliInspectArguments` 三个 fuse**（完整 fuse 配置见 ADR-0016）。Agent Host 不依赖 Electron 二进制，这些 fuse 可以放心关闭。
+3. **Electron 应用自身关闭 `RunAsNode`、`EnableNodeOptionsEnvironmentVariable`、`EnableNodeCliInspectArguments` 三个 fuse**（完整 fuse 配置见 ADR-0016，现由 ADR-0018 沿用）。Agent Host 不依赖 Electron 二进制，这些 fuse 可以放心关闭。
 4. **Agent Host 的 JS bundle 和 Pi 运行时资源放在 asar 之外**（`Resources/agent-host/`），因为独立的 node 读不了 asar。这些文件的完整性由代码签名保证；Seatbelt 配置放行对它们的读取。
 5. **签名**：内置 node 用 PiArc 的签名身份重签，开启 hardened runtime，entitlements 从 `com.apple.security.cs.allow-jit` 开始，按 M0 结果逐项增加并写明原因。只有确认需要加载第三方原生模块时，才给这个 node 单独加 `disable-library-validation`，不影响主应用。
 6. **内置的 node/npx 提供给 MCP stdio server 和 Pi 插件包安装使用**：Core 启动这些子进程时把内置 Node 的 `bin` 目录放在 PATH 最前面。

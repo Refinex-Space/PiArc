@@ -69,6 +69,15 @@ reference/        参考仓库的本地只读副本（已加入 gitignore）
 
 每个里程碑由 macOS 先达标，Windows 最迟在下一个里程碑结束前达到同样的退出标准。
 
+## 未签名构建
+
+PiArc 免费开源，发布包不做平台代码签名和公证（[ADR-0018](docs/adr/0018-unsigned-distribution.md)），第一次打开需要你手动放行：
+
+- **macOS**：把 PiArc 拖到"应用程序"文件夹，先打开一次，再到"系统设置 → 隐私与安全性"点**仍要打开**。没有这个按钮时，执行 `xattr -dr com.apple.quarantine /Applications/PiArc.app`，它只对 PiArc 跳过系统的来源检查。新版本会在应用内提示，需要手动下载替换；更新后系统可能再次请求钥匙串访问授权。
+- **Windows**：出现 SmartScreen 提示时选**更多信息 → 仍要运行**。之后的更新会自动安装。开启了"智能应用控制"的电脑会拦截未签名程序。
+
+每个版本都会发布一份 SHA-256 校验清单，并用项目自己的密钥签名，应用在更新前会先校验它。
+
 ## 合规说明
 
 PiArc 是独立项目，与 Anthropic 无关联，也未获其认可。"Claude" 与 "Claude Code" 是 Anthropic 的商标。

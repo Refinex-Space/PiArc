@@ -10,6 +10,7 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 2. 新 ADR 编号顺延，文件名 `NNNN-短标题.md`。模板见 [0000-template.md](0000-template.md)。
 3. 每份 ADR 必须写"重新评估的触发条件"。触发条件出现时，在对应里程碑的评审中复核。
 4. 状态取值：`提议` / `已接受` / `已取代` / `已废弃`。
+5. 新 ADR 只改动旧 ADR 中的个别条款时，在新 ADR 头部写"修订：ADR-XXXX 第 N 条"；旧 ADR 保持"已接受"，并在状态后注明哪一条被哪份 ADR 修订。
 
 ## 索引
 
@@ -29,6 +30,7 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0012](0012-distribution-developer-id.md) | 分发走 Developer ID + 公证 + Sparkle，不上 Mac App Store | 已取代 → 0016 |
 | [0013](0013-electron-desktop-client.md) | 桌面客户端改用 Electron + React，macOS 与 Windows 同一代码库推进 | 已接受 |
 | [0014](0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在 Electron 主进程 | 已接受 |
-| [0015](0015-agent-host-runtime-bundled-node.md) | Agent Host 继续使用单独内置的 Node LTS，不复用 Electron 自带的 Node | 已接受 |
-| [0016](0016-packaging-signing-updates.md) | 打包、签名与更新：Electron Forge；macOS Developer ID + 公证 + 内置更新；Windows 签名安装包；不上应用商店 | 已接受 |
+| [0015](0015-agent-host-runtime-bundled-node.md) | Agent Host 继续使用单独内置的 Node LTS，不复用 Electron 自带的 Node | 已接受（第 5 条被 0018 修订） |
+| [0016](0016-packaging-signing-updates.md) | 打包、签名与更新：Electron Forge；macOS Developer ID + 公证 + 内置更新；Windows 签名安装包；不上应用商店 | 已取代 → 0018 |
 | [0017](0017-terminal-libghostty-vt.md) | 内置终端：终端状态由 Core 中的 libghostty-vt 持有，渲染层可替换 | 已接受 |
+| [0018](0018-unsigned-distribution.md) | 不做平台代码签名：macOS 只做 ad-hoc 签名，Windows 不签名，更新与凭据存储随之调整 | 已接受 |

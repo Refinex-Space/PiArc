@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.0（2026-11-14） |
+| 版本 | 2.1（2026-11-14） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -33,7 +33,7 @@ PiArc 是一个专业的 AI 编码 Agent 桌面应用：以 [Pi](https://github.
 | G1 | Harness 能力对标 Claude Code：工具、权限、hooks、子 agent、plan、todo、上下文工程、checkpoint、skills、MCP、沙箱 | 第 6 章能力矩阵逐项达标；L3 行为对齐测试（第 12 章） |
 | G2 | 多模型一等公民：Harness 能力不绑定某一家服务商，按模型能力自动降级 | 同一组场景测试在至少 3 家服务商上通过 |
 | G3 | 流畅稳定：启动快、长会话流畅、内存可控、系统集成完整 | 第 11 章性能预算进入 CI |
-| G4 | 安全默认：默认询问、项目信任、可选 OS 沙箱、凭据只进系统凭据库、渲染进程隔离 | 第 10 章威胁模型逐条有对策和测试 |
+| G4 | 安全默认：默认询问、项目信任、可选 OS 沙箱、凭据加密存储（主密钥在系统凭据库）、渲染进程隔离 | 第 10 章威胁模型逐条有对策和测试 |
 | G5 | 双平台同步：一套代码覆盖 macOS 与 Windows，平台差异收敛在 Core 的平台适配层和主进程的系统集成层 | 两个平台的 CI 都跑 L0–L2 与 L4；里程碑退出标准按平台分别验收 |
 | G6 | 跟随上游：Pi 升级成本可控 | 每次 Pi 升级的改动量与回归结果有记录（第 5.7 节） |
 
@@ -56,7 +56,7 @@ PiArc 是一个专业的 AI 编码 Agent 桌面应用：以 [Pi](https://github.
 - 不做云端托管会话、Remote Control、手机端；
 - 不做 IDE 插件与行内代码补全；
 - 不做插件市场的托管服务（支持安装已有的 Claude Code 插件和 Pi 包，不自建市场后端）；
-- 不上 Mac App Store 和 Microsoft Store（ADR-0016）；
+- 不上 Mac App Store 和 Microsoft Store，不做平台代码签名与公证（ADR-0018）；
 - 不做 Linux 版。Electron 与 Core 在架构上不排除 Linux，第一版不投入。
 
 ---
@@ -103,7 +103,7 @@ PiArc 是一个专业的 AI 编码 Agent 桌面应用：以 [Pi](https://github.
 - **Agent Host 运行时**：`utilityProcess` 不能套沙箱、不支持 stdin；用 `ELECTRON_RUN_AS_NODE` 必须保留高风险 fuse；Electron 不带 npm/npx。因此继续单独内置 Node（ADR-0015）。
 - **Core 绑定**：NAPI-RS 3.x，Node-API ABI 稳定，升级 Electron 一般不用重编（ADR-0014）。
 - **终端**：libghostty-vt 1.0.1（MIT）提供终端状态、render state、编码、选区、搜索、formatter、snapshot，不做渲染；ghostty-web 尚未迁到 1.0，输入法与 CSP 问题未解决（ADR-0017）。
-- **Windows**：Claude Code 在原生 Windows 上不提供沙箱；EV 证书已不能直接消除 SmartScreen 警告；Azure Artifact Signing 的主体资格有地域限制（ADR-0016）。
+- **Windows**：Claude Code 在原生 Windows 上不提供沙箱；EV 证书已不能直接消除 SmartScreen 警告；Azure Artifact Signing 的主体资格有地域限制。PiArc 最终选择不做平台代码签名（ADR-0018）。
 - **前端**：React 19.3、Vite 8.3；`@tanstack/react-virtual` 有面向聊天的底部锚定与"在底部时跟随"能力。
 - Mac App Store 与 Microsoft Store 都与 Agent 能力冲突，两个平台都直接分发。
 
@@ -239,10 +239,10 @@ PiArc/
 | [0011](../adr/0011-session-storage.md) | Pi JSONL 为事实来源 + SQLite 索引 + 内容寻址快照 | 跟随上游格式，索引可重建 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
 | [0015](../adr/0015-agent-host-runtime-bundled-node.md) | Agent Host 继续单独内置 Node LTS | 要套 Seatbelt、走 stdio、给 npx 用，Electron 自带的 Node 都做不到 |
-| [0016](../adr/0016-packaging-signing-updates.md) | Electron Forge；macOS 签名公证 + 内置更新；Windows 签名安装包；不上应用商店 | 官方工具链；应用商店的沙盒与 Agent 能力冲突 |
+| [0018](../adr/0018-unsigned-distribution.md) | Electron Forge 打包；macOS 只做 ad-hoc 签名、Windows 不签名；发布清单用项目密钥签名；不上应用商店 | 免费开源、零成本；用发布清单签名保住更新的完整性 |
 | [0017](../adr/0017-terminal-libghostty-vt.md) | 终端状态由 Core 中的 libghostty-vt 持有，渲染层可替换 | agent 读屏与用户所见一致；IPC 流量与输出量无关 |
 
-已被取代的决策（原文保留在 `docs/adr/`）：0001、0007 → 0013；0008 → 0014；0003 → 0015；0012 → 0016。
+已被取代的决策（原文保留在 `docs/adr/`）：0001、0007 → 0013；0008 → 0014；0003 → 0015；0012 → 0016 → 0018。ADR-0015 第 5 条（签名）被 ADR-0018 修订。
 
 ---
 
@@ -298,7 +298,7 @@ agent-host/
 
 ### 5.4 凭据与登录
 
-- `ModelRuntime.create({ credentials })` 注入 PiArc 的 `CredentialStore`：读取来自 Core（系统凭据库），写入经 AHP 交给 Core 持久化。Pi 的 `AuthStorageBackend.withLock` 是同步接口，Agent Host 启动时向 Core 一次性取回凭据放在内存中，写操作异步回写 Core。这个方案在 M0 验证；若 Pi 的接口无法满足，补丁或上游 issue 处理。
+- `ModelRuntime.create({ credentials })` 注入 PiArc 的 `CredentialStore`：读取来自 Core（凭据保险箱，第 9.1 节），写入经 AHP 交给 Core 持久化。Pi 的 `AuthStorageBackend.withLock` 是同步接口，Agent Host 启动时向 Core 一次性取回凭据放在内存中，写操作异步回写 Core。这个方案在 M0 验证；若 Pi 的接口无法满足，补丁或上游 issue 处理。
 - 凭据只经 AHP 传递，不放进环境变量（Agent Host 启动的子进程会继承环境变量）。
 - OAuth 与设备码登录调用 `ModelRuntime.login(provider, type, interaction)`，`interaction` 的回调（授权 URL、设备码、输入提示）转成 AHP 请求，由客户端呈现：授权页在系统浏览器中打开，回调经本地回环端口或 `piarc://` 深链接返回，不在应用窗口内加载第三方登录页。
 - **Anthropic 的订阅 OAuth 登录方式在 Agent Host 中被屏蔽**（ADR-0006）；CI 中有测试断言可用登录方式列表不包含它。
@@ -318,13 +318,13 @@ agent-host/
 
 ```
 PiArc.app/Contents/
-├── MacOS/PiArc                 # Electron 主程序（发布构建已写入 fuses，ADR-0016）
-├── Frameworks/                 # Electron Framework、Squirrel、各 Helper
+├── MacOS/PiArc                 # Electron 主程序（发布构建已写入 fuses，ad-hoc 签名，ADR-0018）
+├── Frameworks/                 # Electron Framework 与各 Helper
 └── Resources/
     ├── app.asar                # 主进程、preload、渲染进程代码（ASAR 完整性校验）
     ├── app.asar.unpacked/      # piarc-core 的 .node 原生模块
-    └── agent-host/             # 不进 asar：独立的 node 读不了 asar，完整性靠代码签名
-        ├── node/               # Node LTS 发行包：bin/node、bin/npm、bin/npx（重签）
+    └── agent-host/             # 不进 asar：独立的 node 读不了 asar
+        ├── node/               # Node LTS 发行包：bin/node、bin/npm、bin/npx（保留 Node.js 官方签名）
         ├── agent-host.mjs      # bundle
         ├── pi-assets/          # Pi 运行时需要的资源（经 PI_PACKAGE_DIR 指定）
         └── bin/ rg fd          # 预置，避免 Pi 运行时下载
@@ -574,7 +574,7 @@ Agent Host 按类别统计上下文构成（system prompt、工具定义、MCP �
 - 配置来源：`.mcp.json`（项目，需信任）、`~/.claude.json` 中的 user/local 级 server、PiArc 自己的配置、插件、企业策略；同名按"企业 > 本地 > 项目 > 用户 > 插件"取整条定义。
 - 传输：stdio、Streamable HTTP（pi-mcp 支持）；旧 SSE 传输不支持（pi-mcp 不支持，Claude Code 也已标记弃用），UI 中明确提示。
 - **连接池**：PiArc 的 MCP 扩展替换 Pi 内置 MCP 扩展，在 Agent Host 内按工作区维护共享连接池，同一 server 只启动一份，按需连接、空闲断开（ADR-0010）。stdio server 的进程由 Agent Host 启动，PATH 中前置内置 Node，使 `npx` 类 server 开箱即用。
-- OAuth：使用 pi-mcp 的 OAuth 流程；浏览器授权由客户端发起；token 存系统凭据库（经 Core），不写明文文件。
+- OAuth：使用 pi-mcp 的 OAuth 流程；浏览器授权由客户端发起；token 存凭据保险箱（经 Core），不写明文文件。
 - 工具暴露：工具总数较少时直接暴露；超过阈值（默认 30 个）时改为延迟加载，经 `ToolSearch` 检索。
 - 缺口：elicitation、sampling、prompts、resources/subscribe（pi-mcp 不支持）。prompts 可以在扩展层基于通用请求实现为斜杠命令（M4）；elicitation 需要扩展 pi-mcp 的 handler，先提上游 issue（M5）。
 
@@ -682,7 +682,7 @@ crates/
 ├── piarc-store        # SQLite（rusqlite）：索引、FTS5、审计；Pi JSONL 流式只读解析
 ├── piarc-diff         # diff 计算（similar）、hunk 结构、大 diff 降级、UTF-16 偏移
 ├── piarc-git          # 状态、diff、worktree、分支
-├── piarc-secrets      # 凭据存取（keyring-core + 平台 store：钥匙串 / 凭据管理器）
+├── piarc-secrets      # 凭据保险箱：加密文件 + 系统凭据库中的主密钥（keyring-core：钥匙串 / 凭据管理器）
 ├── piarc-telemetry    # tracing、日志轮转、本地指标、诊断包导出
 ├── piarc-napi         # NAPI-RS 导出层（薄），产出各平台 .node 原生模块（ADR-0014）
 ├── piarc-testkit      # 严格校验的 mock provider、场景运行器、事件断言（仅测试）
@@ -715,7 +715,7 @@ crates/
 | 权限规则、hooks 配置、设置 | 配置文件 | 文件（Core 读写 `.piarc/` 与用户目录，只读 `.claude/`） |
 | 文件快照 | Core | 内容寻址目录 + SQLite 索引 |
 | 后台任务、PTY、终端屏幕状态 | Core | 内存；输出文件在会话目录 |
-| 凭据 | Core | 系统凭据库（钥匙串 / 凭据管理器） |
+| 凭据 | Core | 加密的保险箱文件；主密钥在系统凭据库（钥匙串 / 凭据管理器） |
 | 窗口位置与大小 | 主进程 | 应用数据目录下的窗口状态文件 |
 | 面板布局、滚动位置、展开状态 | 渲染进程 | `localStorage`（可丢失，丢失时用默认值） |
 
@@ -825,7 +825,7 @@ diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高�
 
 | 部分 | 目录 | 职责 | 不做什么 |
 |---|---|---|---|
-| 主进程 | `apps/desktop/src/main/` | 应用生命周期、多窗口、原生菜单、菜单栏图标 / 系统托盘、通知、Dock 角标 / 任务栏进度、`piarc://` 深链接、文件关联、自动更新；加载 Core（ADR-0014），把事件批次经 MessagePort 转给订阅的窗口；系统对话框（选择文件夹等） | 不做业务决策，不解析模型输出，不直接读写工作区文件（一律经 Core） |
+| 主进程 | `apps/desktop/src/main/` | 应用生命周期、多窗口、原生菜单、菜单栏图标 / 系统托盘、通知、Dock 角标 / 任务栏进度、`piarc://` 深链接、文件关联、检查更新（ADR-0018）；加载 Core（ADR-0014），把事件批次经 MessagePort 转给订阅的窗口；系统对话框（选择文件夹等） | 不做业务决策，不解析模型输出，不直接读写工作区文件（一律经 Core） |
 | preload | `apps/desktop/src/preload/` | 用 `contextBridge` 暴露 `window.piarc`：命令调用、事件端口、少量系统能力（打开外部链接前确认、选择文件夹）。API 类型来自 `packages/protocol` | 不暴露 `ipcRenderer`、Node 模块或任意通道名 |
 | 渲染进程 | `apps/desktop/src/renderer/` | React 界面，按功能分模块：`shell`（窗口骨架、侧栏、面板布局）、`transcript`、`composer`、`approvals`、`changes`（diff 审阅）、`terminal`、`settings`、`store`（事件归约）、`workers`（Markdown 解析、代码高亮） | 不持有业务事实；不直接访问网络（由 CSP 禁止） |
 
@@ -854,7 +854,7 @@ diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高�
 - **transcript 行类型**：用户消息、回复正文（Markdown）、思考块（生成中强制展开，结束后折叠为"思考了 N 秒"）、工具组摘要（动词 + 对象 + 增删计数）、bash 卡（语义状态，超过 10 秒显示计时）、文件改动卡、审批卡、子 agent 卡、压缩提示、错误卡（分类 + 重试）、计划卡、任务卡、下一步建议。三档视图：普通（工具折叠为摘要）/ 思考（加思考摘要）/ 详细（全部展开）。
 - **审批卡**：四类——命令、文件改动（带 diff 预览）、权限扩展（越界目录、网络域名）、提问表单。按钮：拒绝（可附反馈）、仅本次允许、本会话允许、总是允许（可编辑规则）。
 - **右栏卡片**：运行环境、上下文（百分比 + 分类明细 + 压缩按钮）、改动、任务、后台任务；空间不足时变为浮层。
-- **设置**（独立窗口）：通用、模型与服务商（每模型显示名、上下文窗口、图片输入、默认 effort；密钥存系统凭据库）、权限（规则可视化管理、审计记录）、hooks、MCP、skills 与插件、memory 文件、沙箱、外观、快捷键、配置诊断、关于与更新。
+- **设置**（独立窗口）：通用、模型与服务商（每模型显示名、上下文窗口、图片输入、默认 effort；密钥加密存储）、权限（规则可视化管理、审计记录）、hooks、MCP、skills 与插件、memory 文件、沙箱、外观、快捷键、配置诊断、关于与更新。
 - **系统集成**：见第 8.8 节。
 
 ### 8.3 状态与数据流
@@ -918,11 +918,12 @@ Core 事件批次 ──► 主进程（只转发）──MessagePort──► �
 | 能力 | macOS | Windows | 里程碑 |
 |---|---|---|---|
 | 关闭窗口后后台运行 | 菜单栏图标（运行中 / 等待审批计数） | 系统托盘图标 | M3 |
-| 系统通知 | 会话完成或等待审批且窗口不在前台时通知；通知内直接允许 / 拒绝在 M4 | 同左（Toast） | M1 / M4 |
+| 系统通知 | 会话完成或等待审批且窗口不在前台时通知；通知内直接允许 / 拒绝在 M4。未签名构建下能否使用待 M0 验证，不能用时退回应用内提醒 + Dock 角标与弹跳（ADR-0018） | 同左（Toast） | M1 / M4 |
 | 计数提示 | Dock 角标 | 任务栏覆盖图标 | M1 |
 | URL scheme | `piarc://` | `piarc://` | M3 |
-| 打开文件夹 | 从 Finder 拖入、Dock 图标拖放 | 资源管理器右键菜单（实现方式随安装包形式确定，ADR-0016） | M3 |
-| 凭据 | 钥匙串 | 凭据管理器 | M1 |
+| 打开文件夹 | 从 Finder 拖入、Dock 图标拖放 | 资源管理器右键菜单（实现方式随安装包形式确定，ADR-0018） | M3 |
+| 凭据主密钥 | 钥匙串 | 凭据管理器 | M1 |
+| 更新 | 应用内提示新版本，用户手动下载替换 | Velopack 自动更新 | M5 |
 | 系统快捷操作 | App Intents（原生模块） | 跳转列表 | M5 |
 
 平台差异集中在主进程的 `platform/` 模块和渲染进程的少量样式里，业务代码不出现平台分支。
@@ -957,7 +958,7 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 └── worktrees/                 # 会话 worktree（应加入 .gitignore）
 ```
 
-- 凭据只存系统凭据库：macOS 钥匙串、Windows 凭据管理器（服务名使用应用标识前缀；凭据管理器单条上限 2,560 字节，大凭据拆分存储）。`pi/` 下不出现 `auth.json`、`mcp-auth.json`。
+- 凭据保险箱（ADR-0018）：服务商 API key、OAuth token、MCP token 加密（AES-256-GCM）存放在数据目录下的 `secrets.vault`；系统凭据库（macOS 钥匙串、Windows 凭据管理器，服务名使用应用标识前缀）只存一个主密钥。未签名构建每次更新后，macOS 最多弹一次钥匙串授权。主密钥不可用时凭据不可读，提示重新授权，不回退到明文。`pi/` 下不出现 `auth.json`、`mcp-auth.json`。
 - 首次在某个工作区创建 `.piarc/` 时，提示把 `settings.local.json` 与 `worktrees/` 加入该仓库的 `.gitignore`。
 
 ### 9.2 SQLite 模型（概要）
@@ -997,15 +998,15 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 | 提示注入导致破坏性操作 | 仓库文件、网页、MCP 返回内容诱导 agent 执行 `rm -rf`、泄露密钥 | 默认询问；deny 规则；Bash 子命令分析；关键路径删除总是询问；沙箱；审批卡展示完整命令 |
 | 恶意项目配置 | 克隆的仓库带 hooks、MCP、allow 规则、插件，打开即执行 | 项目信任闸门（10.2）：信任前不执行任何项目级可执行配置 |
 | 恶意插件 / MCP server / Pi 包 | 安装后获得进程权限 | 安装前展示来源与能力；启用需确认；Agent Host 的 Seatbelt 配置限制进程级写入范围 |
-| 凭据泄露 | 明文文件、环境变量继承、日志 | 只存系统凭据库；不经环境变量传递；日志与诊断包自动脱敏 |
+| 凭据泄露 | 明文文件、环境变量继承、日志 | 加密保险箱，主密钥只在系统凭据库；不经环境变量传递；日志与诊断包自动脱敏 |
 | 沙箱逃逸 | 命令通过未代理的网络通道外传 | 沙箱默认无直连网络；沙箱外重试必须审批 |
 | 审批疲劳与误点 | 连续弹窗导致误允许 | 400 ms 防误触；长参数阅读闸门；"总是允许"规则可预览、可编辑、可撤销；审计可查 |
 | 多窗口审批错乱 | 两个窗口回答同一请求或过期请求 | 审批账本的 revision 与 connectionEpoch 校验 |
 | 供应链 | npm / crates 依赖被投毒 | 精确版本锁定；`npm ci --ignore-scripts`；`cargo-deny`、`cargo-audit`、`npm audit`；新增依赖需评审 |
-| 更新通道被劫持 | 恶意更新包 | HTTPS；更新条目带 `sha256`；macOS 由 Squirrel.Mac 校验更新包的代码签名与当前应用一致；Windows 校验安装包签名（ADR-0016） |
-| Agent Host 被篡改 | 替换应用内的 bundle 或 node | 启动前校验内嵌可执行文件的代码签名；app.asar 开启完整性校验与 `OnlyLoadAppFromAsar`；asar 外的 Agent Host 资源由代码签名覆盖 |
+| 更新通道被劫持 | 恶意更新包 | 没有平台签名可依赖（ADR-0018）：HTTPS；每个版本的发布清单（文件名 + SHA-256）用项目自有 Ed25519 密钥签名，应用内置公钥，验证失败拒绝更新；私钥只在需要维护者审批的发布环境中使用。不防发布账号本身被攻破 |
+| 应用文件被篡改 | 替换应用内的 asar、bundle 或 node | app.asar 开启完整性校验与 `OnlyLoadAppFromAsar`，但没有平台签名时完整性信息本身不受保护，只能防意外损坏。对安装目录有写权限的本机攻击者可以篡改应用而不被发现，作为已接受的风险（ADR-0018）；安装位置使用系统默认目录，依靠文件系统权限 |
 | 渲染进程注入（XSS） | 模型输出、仓库文件、MCP 返回内容中嵌入 HTML、脚本或恶意链接，在渲染进程中执行，进而调用 preload 暴露的能力 | 渲染进程 sandbox + contextIsolation、无 Node；严格 CSP；Markdown 不走 `innerHTML`，原始 HTML 当文本；preload 白名单 + 主进程校验来源；有副作用的命令仍经 Core 的权限裁决；XSS 载荷回归测试（第 10.3 节） |
-| 应用被当作通用运行时滥用 | 攻击者借 PiArc 的签名身份执行任意脚本（`ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`--inspect`） | 发布构建关闭对应 fuses（ADR-0016）；Agent Host 用独立的 node，不依赖这些开关 |
+| 应用被当作通用运行时滥用 | 攻击者借 PiArc 的可执行文件执行任意脚本（`ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`--inspect`） | 发布构建关闭对应 fuses（ADR-0018）；Agent Host 用独立的 node，不依赖这些开关 |
 | 恶意链接与导航 | 诱导用户点击链接，或让应用窗口导航到外部页面 | 窗口禁止导航到应用自身协议以外的地址；新窗口一律拒绝；外部链接确认后交给系统浏览器，且只放行 `https:`、`http:`、`mailto:` |
 
 ### 10.2 项目信任
@@ -1033,9 +1034,9 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 
 **应用二进制**：
 
-- 发布构建写入 fuses（配置见 ADR-0016）：关闭 `RunAsNode`、`NodeOptions`、`NodeCliInspect`、`GrantFileProtocolExtraPrivileges`，开启 ASAR 完整性校验、`OnlyLoadAppFromAsar` 与 cookie 加密。CI 读取产物的 fuse 状态并与配置比对。
-- macOS：hardened runtime；主应用 entitlements 只有 `allow-jit`，每项在 `apps/desktop/build/entitlements.md` 中写明用途；内嵌的 node、rg、fd 与 `.node` 原生模块用 PiArc 的签名身份重签。
-- Windows：主程序、内置 node、原生模块与安装包都做代码签名（ADR-0016）。
+- 发布构建写入 fuses（配置见 ADR-0018）：关闭 `RunAsNode`、`NodeOptions`、`NodeCliInspect`、`GrantFileProtocolExtraPrivileges`，开启 ASAR 完整性校验、`OnlyLoadAppFromAsar` 与 cookie 加密。CI 读取产物的 fuse 状态并与配置比对。
+- 平台代码签名不做（ADR-0018）。macOS：ad-hoc 签名，写入 fuses 后重新签名；hardened runtime 能否在 ad-hoc 签名下启用由 M0 验证，不能启用时如实记录；内置 node 保留 Node.js 官方签名，rg、fd 与 `.node` 原生模块用 ad-hoc 签名。Windows：不签名。
+- 没有平台签名，ASAR 完整性校验只防意外损坏；fuses 仍然写入，代价很低。
 
 **Agent Host**：
 
@@ -1156,7 +1157,7 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 | 内置 Node（Agent Host） | 与当时 Electron 内置 Node 同一大版本的最新 LTS 补丁（ADR-0015） |
 | 包管理 | npm workspaces（与 Pi 一致），lockfile 入库；CI 用 `npm ci --ignore-scripts`，确需安装脚本的包逐个列入白名单 |
 | 前端 | React、TypeScript、Vite，精确锁定 |
-| 打包 | Electron Forge（ADR-0016），精确锁定 |
+| 打包 | Electron Forge（ADR-0018），精确锁定 |
 | Rust | `rust-toolchain.toml` 锁定 stable 版本；NAPI-RS 精确锁定（ADR-0014） |
 | libghostty-vt | 精确锁定官方预编译产物，校验 SHA256 与 minisign 签名（ADR-0017） |
 | Pi | `@earendil-works/*` 精确版本锁定（第 5.7 节） |
@@ -1178,9 +1179,10 @@ crates/*  ──cargo + @napi-rs/cli──► piarc-core.<target>.node（四个�
 agent-host ──esbuild──► agent-host.mjs
 design/tokens ──脚本──► CSS 自定义属性 + TS 常量
 apps/desktop ──Forge（plugin-vite）──► 主进程 / preload / 渲染进程产物 ──► app.asar
-Forge 打包 ──► 放入 .node（unpacked）、内置 Node、rg、fd、agent-host ──► 写入 fuses ──► 签名
-  macOS：签名 ──► 公证 ──► staple ──► DMG + ZIP ──► 更新 JSON feed
-  Windows：签名 ──► 安装包（Velopack 或 MSIX，M0 定）──► 更新元数据
+Forge 打包 ──► 放入 .node（unpacked）、内置 Node、rg、fd、agent-host ──► 写入 fuses
+  macOS：ad-hoc 重签 ──► DMG + ZIP
+  Windows：Velopack 安装包与更新包（不签名）
+全部产物 ──► 发布清单（文件名 + SHA-256）──► 项目 Ed25519 密钥签名（minisign）──► GitHub Releases
 ```
 
 ### 13.3 CI
@@ -1189,7 +1191,7 @@ Forge 打包 ──► 放入 .node（unpacked）、内置 Node、rg、fd、agen
 |---|---|
 | PR | rustfmt、clippy（`-D warnings`）、ESLint 与 `tsc`；L0–L2、L4 快照、安全回归；schema 与 `.d.ts` 漂移检查；**macOS 与 Windows runner 都完整运行**；性能冒烟 |
 | Nightly | L3 对齐；两个平台的完整性能测试与长跑内存测试；Playwright UI 流程；多服务商场景（有密钥时）；四个目标的打包冒烟 |
-| Release | 构建、签名、公证、安装包、更新元数据、发布说明；检查产物的 fuse 状态与签名；签名凭据只存在于 CI 密钥管理中 |
+| Release | 构建、ad-hoc 签名（macOS）、安装包、发布清单与清单签名、发布说明；检查产物的 fuse 状态；Defender 扫描 Windows 产物；清单签名私钥只在需要维护者审批的发布环境中使用 |
 | 依赖安全 | `cargo-deny`、`cargo-audit`、`npm audit`；订阅 Electron、Node、Chromium 的安全公告 |
 
 ### 13.4 版本、提交与升级节奏
@@ -1222,7 +1224,8 @@ Forge 打包 ──► 放入 .node（unpacked）、内置 Node、rg、fd、agen
 | R14 | 双平台同步拖慢整体节奏 | 中 | Windows 最多滞后一个里程碑；两个平台 CI 全量运行；平台差异集中在适配层 | macOS 里程碑连续两次延期时，Windows 改为固定滞后一个里程碑（ADR-0013） |
 | R15 | libghostty-vt 刚发布 1.0，绑定与周边生态不成熟 | 中 | 直接对 C ABI 生成绑定；精确锁版本；保留 ADR-0017 中的退路 | M0 S7 不通过时启用退路 |
 | R16 | Windows 第一版没有 OS 级沙箱 | 中 | 权限规则 + Job Object 进程树管理；界面明确提示（需求 D7） | M4 评估 AppContainer 等方案 |
-| R17 | Chromium 安全更新跟进不及时 | 中 | 只使用 Electron 仍在支持期内的大版本，按第 13.4 节的节奏升级 | 出现在野利用的高危漏洞时立即发版 |
+| R17 | Chromium 安全更新跟进不及时 | 中 | 只使用 Electron 仍在支持期内的大版本，按第 13.4 节的节奏升级；macOS 没有自动更新，应用内提示标明"安全更新" | 出现在野利用的高危漏洞时立即发版 |
+| R18 | 不做平台签名带来的安装摩擦、更新滞后与安全软件拦截 | 中 | 首次运行指引；发布清单签名；Defender 扫描与误报申诉；凭据保险箱把授权弹窗降到每次更新最多一次（ADR-0018） | 安装受阻或用户停留旧版本成为主要反馈时，先申请 SignPath 免费签名（Windows），再评估 Apple 开发者计划 |
 
 ---
 
@@ -1243,15 +1246,15 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | Shell | zsh / bash | `Bash` 工具经 Git Bash 执行，另有 `PowerShell` 工具（第 6.2.2 节）；未安装 Git Bash 时提示安装，期间只提供 `PowerShell` | piarc-exec、Harness Kit | M1 |
 | 进程树 | 进程组 + 信号 | Job Object | piarc-exec | M1 |
 | PTY | Unix PTY | ConPTY | piarc-term | M3 |
-| 凭据 | 钥匙串 | 凭据管理器（单条 2,560 字节上限，大凭据拆分） | piarc-secrets | M1 |
+| 凭据主密钥 | 钥匙串 | 凭据管理器（保险箱方案避开了单条 2,560 字节上限） | piarc-secrets | M1 |
 | 沙箱 | Seatbelt + 网络代理 | 第一版不提供（需求 D7） | piarc-sandbox | M4 |
 | 路径 | `/`；默认卷大小写不敏感 | `\` 与盘符、UNC、超过 260 字符的长路径、保留文件名（`CON`、`NUL` 等）；大小写不敏感 | piarc-fs | M1 |
 | 换行与编码 | LF 为主 | CRLF 常见（保真写入已覆盖）；子进程控制台使用 UTF-8 | piarc-fs、piarc-exec | M1 |
 | 文件监听 | FSEvents | ReadDirectoryChangesW（经 notify 封装） | piarc-fs | M2 |
 | 数据目录 | `~/Library/Application Support/PiArc/` | `%LOCALAPPDATA%\PiArc\`（第 9.1 节） | 主进程、Core | M1 |
-| 签名与安装 | Developer ID + 公证 | 代码签名 + 安装包（ADR-0016） | 构建 | M0 验证，M5 发布 |
+| 签名与安装 | ad-hoc 签名，不公证；首次运行需在系统设置中放行 | 不签名，Velopack 安装包；SmartScreen 需手动放行，开启智能应用控制的电脑无法运行（ADR-0018） | 构建与文档 | M0 验证，M5 发布 |
 | 系统集成 | 第 8.8 节 | 第 8.8 节 | 主进程 | 随功能 |
-| 杀毒软件 | — | Defender 扫描大量小文件（`node_modules`、快照目录）的开销；签名可减少误报 | 构建与文档 | M1 起观察 |
+| 杀毒软件 | — | Defender 扫描大量小文件（`node_modules`、快照目录）的开销；未签名产物误报风险更高，发布前扫描，误报时向微软提交样本 | 构建与文档 | M1 起观察 |
 
 ### 15.3 现在就要遵守的约束
 
@@ -1269,7 +1272,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | 里程碑 | 目标 | 退出标准 |
 |---|---|---|
 | **M0 技术验证**（3–5 周） | 在两个平台上验证高风险假设 | 每个 spike 的结论（通过 / 失败 / 有条件通过）记录在 `docs/spikes/`，两个平台分别给结论；失败项触发对应 ADR 复审 |
-| **M1 可行走骨架** | 单工作区、多会话列表、流式对话；Read/Write/Edit/Bash（Windows 另有 PowerShell）/Glob/Grep 经 Core 执行；Manual 与 Accept edits 模式的基础审批；模型与凭据设置（系统凭据库）；会话持久化与恢复；transcript P0 行类型 | 能用至少 2 家服务商完成"读代码 → 改代码 → 跑测试"的完整任务；L2 场景 ≥ 20 个通过 |
+| **M1 可行走骨架** | 单工作区、多会话列表、流式对话；Read/Write/Edit/Bash（Windows 另有 PowerShell）/Glob/Grep 经 Core 执行；Manual 与 Accept edits 模式的基础审批；模型与凭据设置（凭据保险箱）；会话持久化与恢复；transcript P0 行类型 | 能用至少 2 家服务商完成"读代码 → 改代码 → 跑测试"的完整任务；L2 场景 ≥ 20 个通过 |
 | **M2 Harness 核心** | 完整权限规则与 Bash 分析；plan 模式；任务清单；AskUserQuestion；hooks（M2 事件集，command 类型）；checkpoint 与 rewind；压缩与上下文用量；WebFetch；Changes 面板；memory 文件兼容 | 第 6 章 M2 能力全部有场景覆盖；L3 对齐在权限与 hooks 上无未解释差异 |
 | **M3 多会话与生态** | 子 agent；后台任务与 Monitor；终端面板（libghostty-vt）；worktree；MCP 共享连接池；skills 与命令；WebSearch；ToolSearch；hooks 的 http/prompt 类型 | 3 个并行会话 + 子 agent 场景满足第 11 章内存预算 |
 | **M4 安全与打磨** | macOS 沙箱；Windows 隔离方案评估；插件；NotebookEdit；可操作的系统通知；配置诊断；无障碍；本地化；性能预算全部进 CI | 安全威胁表逐条有测试；性能预算全部达标 |
@@ -1285,8 +1288,8 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | S2 | NAPI-RS Core 接入主进程：async 方法、ThreadsafeFunction 事件、MessagePort 转发到渲染进程 | 10 万事件/分钟下无丢失；主进程事件循环延迟 p99 ≤ 16 ms；四个目标（darwin-arm64、darwin-x64、win32-x64、win32-arm64）的预编译产物可加载 |
 | S3 | 基于 Pi SDK 的 Agent Host：同进程两个不同 cwd 的会话并发 | 工具、压缩、中断、MCP 互不串扰 |
 | S4 | Operations 委托 + 内置工具重命名为规范名 | Read/Edit/Write/Bash 全部经 Core；行为与 Pi 原生一致 |
-| S5 | 凭据：钥匙串、凭据管理器与 Pi `CredentialStore` 适配 | 登录、刷新 token、多会话读取正常；磁盘上无明文 |
-| S6 | 打包与签名：macOS 签名公证、Windows 代码签名；Agent Host 运行时方案（ADR-0015）；MCP 的 `npx` 可用 | 公证通过；Windows 安装包签名有效；fuses 与 entitlements 最小集确定 |
+| S5 | 凭据保险箱：加密文件 + 钥匙串 / 凭据管理器中的主密钥，与 Pi `CredentialStore` 适配 | 登录、刷新 token、多会话读取正常；磁盘上无明文；macOS 未签名构建更新后最多弹一次钥匙串授权 |
+| S6 | 未签名打包与首次运行（ADR-0018）：macOS ad-hoc 签名、Windows Velopack；Agent Host 运行时方案（ADR-0015）；MCP 的 `npx` 可用；发布清单签名校验 | macOS 15 与 26 上能按指引完成首次打开；Gatekeeper 不单独拦截 Core 启动的内置 node；系统通知可用性有结论；Velopack 未签名安装与更新可用；清单签名校验失败时拒绝更新；fuses 配置确定 |
 | S7 | 终端：libghostty-vt + portable-pty（含 ConPTY）+ 帧协议 + fork 的 Canvas 渲染器（ADR-0017） | vim、htop 等 TUI 渲染正确；`cat` 100 MB 时界面帧率稳定、主进程事件循环延迟 p99 ≤ 16 ms；键入回显的额外延迟满足第 11 章预算；中文输入法候选框与预编辑文本位置正确；formatter 输出与渲染帧逐格一致；四个目标都能链接，win32-arm64 在实机上运行 |
 | S8 | macOS：Seatbelt 执行 + 网络代理；Windows：Job Object 终止进程树 | 写入与网络限制生效，常见构建命令可运行；超时与停止时无残留进程 |
 | S9 | AHP 握手、背压、崩溃重启与对账 | 故障注入下行为符合 ADR-0009 |
@@ -1327,4 +1330,5 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | 版本 | 日期 | 说明 |
 |---|---|---|
 | 1.0 | 2026-11-14 | 首版：基于对 Claude 官方文档、Pi v1.4.0 源码、claude-code / claw-code / OpenClaudeDesktop / open-claude-ui 参考实现与原生技术栈的调研 |
+| 2.1 | 2026-11-14 | 不做平台代码签名（ADR-0018 取代 ADR-0016，修订 ADR-0015 第 5 条）：macOS 只做 ad-hoc 签名、更新改为提示后手动下载；Windows 不签名、用 Velopack；新增发布清单签名与凭据保险箱；同步更新威胁模型、构建流水线、风险与 M0 S5/S6 |
 | 2.0 | 2026-11-14 | 客户端改为 Electron + React，macOS 与 Windows 同一代码库推进（ADR-0013 取代 ADR-0001、ADR-0007）；Core 改为 NAPI-RS 原生模块（ADR-0014 取代 ADR-0008）；Agent Host 运行时、分发与更新、内置终端分别由 ADR-0015、ADR-0016、ADR-0017 决定；Markdown 与高亮移到渲染进程；Windows 路线并入主线里程碑；新增 Electron 安全加固与对应风险 |

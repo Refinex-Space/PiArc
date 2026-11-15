@@ -69,6 +69,15 @@ reference/        Local read-only clones of reference repositories (git-ignored)
 
 Each milestone is reached on macOS first; Windows meets the same exit criteria no later than the end of the next milestone.
 
+## Unsigned builds
+
+PiArc is free and open source, and releases will ship without platform code signing or notarization ([ADR-0018](docs/adr/0018-unsigned-distribution.md)). Expect to approve the app yourself the first time:
+
+- **macOS**: move PiArc to Applications, open it once, then go to System Settings → Privacy & Security and choose **Open Anyway**. If the button does not appear, run `xattr -dr com.apple.quarantine /Applications/PiArc.app`; this skips macOS's origin check for PiArc only. New versions are announced inside the app and installed manually, and macOS may ask you to allow keychain access again after an update.
+- **Windows**: when SmartScreen appears, choose **More info → Run anyway**. Updates install automatically. PCs with Smart App Control turned on block unsigned apps.
+
+Each release publishes a manifest of SHA-256 checksums signed with the project's own key; the app checks it before updating.
+
 ## Compliance
 
 PiArc is an independent project. It is not affiliated with or endorsed by Anthropic. "Claude" and "Claude Code" are trademarks of Anthropic.
