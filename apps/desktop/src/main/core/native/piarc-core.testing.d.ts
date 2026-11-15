@@ -83,7 +83,7 @@ export type CoreState = 'running' | 'shuttingDown' | 'stopped';
 export interface DemoSourceOptions {
   /** Route key of every event. */
   route: string;
-  /** Target rate (1 to 1,000,000). */
+  /** Target rate in events per second, fractions allowed (above 0, at most 1,000,000). */
   eventsPerSecond: number;
   /** Length of each event's `pad` string, to control the payload size. Default 0. */
   padBytes?: number;

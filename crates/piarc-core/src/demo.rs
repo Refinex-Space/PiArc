@@ -16,7 +16,7 @@ use crate::events::{Event, EventSender};
 use crate::route::RouteKey;
 
 /// Upper bound of [`DemoSourceConfig::events_per_second`].
-pub const MAX_DEMO_RATE: u32 = 1_000_000;
+pub const MAX_DEMO_RATE: f64 = 1_000_000.0;
 
 /// Upper bound of [`DemoSourceConfig::pad_bytes`] (8 MiB, enough for batches far above the
 /// size where large payloads matter).
@@ -26,13 +26,13 @@ pub const MAX_DEMO_PAD_BYTES: u32 = 8 * 1024 * 1024;
 const TICK: Duration = Duration::from_millis(5);
 
 /// What a demo source emits.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DemoSourceConfig {
     /// Route key of every event.
     pub route: RouteKey,
-    /// Target rate. Events due at each tick are emitted together; the long-run rate is
-    /// exact.
-    pub events_per_second: u32,
+    /// Target rate in events per second; fractions allowed (100,000 a minute is 1666.67).
+    /// Events due at each tick are emitted together; the long-run rate is exact.
+    pub events_per_second: f64,
     /// Length of the `pad` string of each event, to control the payload size.
     pub pad_bytes: u32,
     /// Stop after this many events. `None` runs until stopped.
@@ -44,13 +44,14 @@ impl DemoSourceConfig {
     ///
     /// # Errors
     ///
-    /// [`Error::InvalidArgument`] when the rate is 0 or above [`MAX_DEMO_RATE`], the pad
+    /// [`Error::InvalidArgument`] when the rate is not above 0 or is above [`MAX_DEMO_RATE`]
+    /// (or not a number), the pad
     /// is above [`MAX_DEMO_PAD_BYTES`] or `max_events` is 0.
     pub fn validate(&self) -> Result<()> {
-        if self.events_per_second == 0 || self.events_per_second > MAX_DEMO_RATE {
+        if !(self.events_per_second > 0.0 && self.events_per_second <= MAX_DEMO_RATE) {
             return Err(Error::InvalidArgument {
                 field: "eventsPerSecond",
-                reason: format!("must be between 1 and {MAX_DEMO_RATE}"),
+                reason: format!("must be above 0 and at most {MAX_DEMO_RATE}"),
             });
         }
         if self.pad_bytes > MAX_DEMO_PAD_BYTES {
@@ -92,7 +93,7 @@ pub(crate) async fn run(
     cancel: CancellationToken,
 ) -> DemoReport {
     let pad = "x".repeat(config.pad_bytes as usize);
-    let rate = f64::from(config.events_per_second);
+    let rate = config.events_per_second;
     let limit = config.max_events.unwrap_or(u64::MAX);
     let start = Instant::now();
     let mut ticker = interval(TICK);
@@ -152,7 +153,7 @@ mod tests {
     fn config() -> DemoSourceConfig {
         DemoSourceConfig {
             route: RouteKey::parse("demo").expect("valid route"),
-            events_per_second: 100,
+            events_per_second: 100.0,
             pad_bytes: 0,
             max_events: None,
         }
@@ -184,14 +185,21 @@ mod tests {
         for (bad, field) in [
             (
                 DemoSourceConfig {
-                    events_per_second: 0,
+                    events_per_second: 0.0,
                     ..config()
                 },
                 "eventsPerSecond",
             ),
             (
                 DemoSourceConfig {
-                    events_per_second: MAX_DEMO_RATE + 1,
+                    events_per_second: MAX_DEMO_RATE + 1.0,
+                    ..config()
+                },
+                "eventsPerSecond",
+            ),
+            (
+                DemoSourceConfig {
+                    events_per_second: f64::NAN,
                     ..config()
                 },
                 "eventsPerSecond",

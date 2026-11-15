@@ -24,7 +24,7 @@
 | 文件 | 工具 | 检查 |
 |---|---|---|
 | TS、JS、JSON、YAML | Prettier（`.prettierrc.json`：单引号、行宽 100、尾逗号） | verify 第 1 步 |
-| Rust | rustfmt（`rustfmt.toml`：style edition 2024、LF） | verify 第 5 步 |
+| Rust | rustfmt（`rustfmt.toml`：style edition 2024、LF） | verify 第 6 步 |
 | Markdown | 不经 Prettier | — |
 
 Markdown 不进 Prettier：文档中的宽表格每次编辑都会被重新填充空格，产生与内容无关的大段差异。排除清单见 `.prettierignore`。
@@ -35,7 +35,7 @@ Markdown 不进 Prettier：文档中的宽表格每次编辑都会被重新填�
 
 - npm 依赖精确锁定，`package.json` 中不出现 `^`、`~`；`package-lock.json` 入库。安装用 `npm install --save-exact`。
 - Cargo 依赖只在根 `Cargo.toml` 的 `[workspace.dependencies]` 中声明版本，crate 中一律写 `<name>.workspace = true`（或 `{ workspace = true, features = [...] }`）。`Cargo.lock` 入库，verify 以 `--locked` 运行。
-- 新依赖的许可证必须在 `deny.toml` 白名单内（verify 第 10 步）；GPL、AGPL、LGPL 不得进入依赖树。
+- 新依赖的许可证必须在 `deny.toml` 白名单内（verify 第 11 步）；GPL、AGPL、LGPL 不得进入依赖树。
 - 引入依赖前确认没有已有依赖或标准库能满足需求。
 
 ### 1.5 平台与路径
@@ -55,7 +55,7 @@ Markdown 不进 Prettier：文档中的宽表格每次编辑都会被重新填�
 ### 2.1 crate 与模块组织
 
 - 一个 crate 一个职责，划分见架构第 7.1 节。crate 根文件以 `//!` 文档开头，写三段：职责（Responsibilities）、不负责什么（Not responsible for）、允许依赖的 workspace crate（Allowed workspace dependencies）。
-- crate 之间的依赖方向由 `crates/deps-rules.json` 规定、`scripts/ci/check-crate-deps.mjs` 检查（verify 第 11 步）。功能 crate 之间需要协作时经 `piarc-core` 编排。新增不改变方向的单向例外属于补充型决策，在 `deps-rules.json` 中登记并写明理由；反转或绕过依赖链属于变更型决策，先写 ADR。
+- crate 之间的依赖方向由 `crates/deps-rules.json` 规定、`scripts/ci/check-crate-deps.mjs` 检查（verify 第 12 步）。功能 crate 之间需要协作时经 `piarc-core` 编排。新增不改变方向的单向例外属于补充型决策，在 `deps-rules.json` 中登记并写明理由；反转或绕过依赖链属于变更型决策，先写 ADR。
 - `lib.rs` 只做模块声明与公开项的 re-export；实现放在按领域命名的模块中（例如 `rules.rs`、`ledger.rs`），不按技术层命名（不用 `utils.rs`、`helpers.rs`、`types.rs` 收纳杂项）。
 - 公开面最小化：默认私有，crate 内共享用 `pub(crate)`，只有其他 crate 需要的项才 `pub`。
 
@@ -80,7 +80,7 @@ Markdown 不进 Prettier：文档中的宽表格每次编辑都会被重新填�
 ### 2.4 panic
 
 - 非测试代码不用 `unwrap()`；`expect("...")` 只用于可以证明不会失败的不变量，消息写明这个不变量。
-- `todo!()`、`unimplemented!()`、`dbg!()` 不得提交（workspace lints，verify 第 6 步）。
+- `todo!()`、`unimplemented!()`、`dbg!()` 不得提交（workspace lints，verify 第 7 步）。
 - panic 不得穿过 NAPI 边界：`piarc-napi` 的每个导出函数在边界处捕获 panic，转成结构化错误；Core 内部错误不能让 Electron 主进程崩溃（ADR-0014）。
 
 ### 2.5 I/O 边界与平台代码
@@ -98,13 +98,13 @@ Markdown 不进 Prettier：文档中的宽表格每次编辑都会被重新填�
 
 ### 2.7 规模
 
-- 单函数不超过 80 行。clippy 的 `too_many_lines` 以 80 为阈值（`clippy.toml`），以 deny 级别检查（verify 第 6 步）。确需超过时写 `#[expect(clippy::too_many_lines, reason = "...")]`，理由要说明为什么拆分反而更差（例如一张平铺的匹配表）。
+- 单函数不超过 80 行。clippy 的 `too_many_lines` 以 80 为阈值（`clippy.toml`），以 deny 级别检查（verify 第 7 步）。确需超过时写 `#[expect(clippy::too_many_lines, reason = "...")]`，理由要说明为什么拆分反而更差（例如一张平铺的匹配表）。
 - 单文件不超过 1,000 行。超过时在评审中说明理由，或按领域拆分模块。
 
 ### 2.8 unsafe
 
 - `unsafe` 只允许出现在 `-sys` crate（`piarc-ghostty-sys`）与 NAPI 边界（`piarc-napi`）。workspace lints 对 `unsafe_code` 设为 deny；这两个 crate 在 crate 根写 `#![allow(unsafe_code, reason = "...")]` 放开。
-- 每个 `unsafe` 块前写 `// SAFETY:` 注释，说明满足了哪些前置条件（clippy `undocumented_unsafe_blocks`，verify 第 6 步）。
+- 每个 `unsafe` 块前写 `// SAFETY:` 注释，说明满足了哪些前置条件（clippy `undocumented_unsafe_blocks`，verify 第 7 步）。
 - `unsafe fn` 内部的不安全操作也要包在 `unsafe {}` 块中（edition 2024 默认的 `unsafe_op_in_unsafe_fn`）。
 
 ### 2.9 lint
@@ -168,7 +168,7 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 
 | 能力 | 位置 | 说明 | 登记任务 |
 |---|---|---|---|
-| 统一检查入口 | `scripts/dev/verify.mjs`（`npm run verify`） | 按顺序运行 12 个检查步骤，失败后继续，最后打印汇总表；新增检查在 `STEPS` 中追加 | T01 |
+| 统一检查入口 | `scripts/dev/verify.mjs`（`npm run verify`） | 按顺序运行 13 个检查步骤，失败后继续，最后打印汇总表；新增检查在 `STEPS` 中追加 | T01 |
 | crate 依赖方向检查 | `scripts/ci/check-crate-deps.mjs` + `crates/deps-rules.json` | 读取 `cargo metadata`，按层与例外校验 workspace crate 之间的依赖 | T01 |
 | 验收清单一致性检查 | `scripts/plan/check-acceptance.mjs` | 比对任务文件中的 `- [Txx-Ayy]` 验收项与 `docs/plan/acceptance.json` | T01 |
 | 仓库内工具安装 | `scripts/dev/install-tools.mjs` | 把锁定版本的 Rust 工具（当前为 cargo-deny）装进 `.tools/`，不做全局安装；`localToolPath()` 给出可执行文件路径 | T01 |
@@ -184,3 +184,8 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | 桌面应用打包 | `scripts/dev/package-desktop.mjs`（`npm run package:desktop -- --flavor <release\|development>`） | 以指定构建类型运行 `electron-forge package`，输出到 `apps/desktop/out/<flavor>/`；fuse 配置的单一来源是 `apps/desktop/fuses.mjs` | T03 |
 | fuse 校验 | `scripts/ci/check-fuses.mjs`（`npm run check:fuses`） | 用 `@electron/fuses` 读打包产物的实际 fuse，与 `apps/desktop/fuses.mjs` 的配置逐项比对，列出不一致与未配置的 fuse；T12、T50 的流水线调用它 | T03 |
 | L4 夹具 | `apps/desktop/e2e/fixtures.ts`、`e2e/app.ts` | 每个用例独立启动应用与 user-data 目录、收集应用日志；两种形态的可执行文件按平台解析 | T03 |
+| 事件合并器 | `piarc_core::events`（`EventSink`、`DeliveryDone`、`EventBatch`）；`CoreRuntime::start`、`spawn_supervised` | Core 发往客户端的事件一律经它：按路由键合并、每间隔最多一次投递、最多 1 个在途、超过上限对上游背压，不丢事件；任务 panic 转成 `core/errors` 上的错误事件 | T04 |
+| NAPI 错误映射与 panic 边界 | `crates/piarc-napi/src/boundary.rs`（`call`、`js_error`） | 每个导出加 `#[napi(catch_unwind)]` 并把函数体放进 `boundary::call`：Core 错误与 panic 都变成带 `code`、`data.kind`、`data.retryable` 的 `Error`；Promise 用 `JsDeferred` 由 Core 运行时结算 | T04 |
+| `.node` 构建与路径解析 | `scripts/dev/build-core.mjs`（`npm run build:core`）、`apps/desktop/core-binary.mjs`；运行时 `apps/desktop/src/main/core/native-path.ts`（`resolveCoreModulePath`）与 `load.ts` | 构建、打包、加载 Core 的唯一入口：文件名按 `@napi-rs/cli --platform` 规则，开发构建在 `target/piarc-core/<flavor>/`，打包后从 `app.asar.unpacked/native/` 加载 | T04 |
+| 主进程事件路由 | `apps/desktop/src/main/core/router.ts`（`EventRouter`）、`event-ipc.ts` | 路由键 → 窗口表，每窗口一个 `MessageChannelMain`，只按路由键转发；T14 的会话事件、T10 的终端帧走同一条通道 | T04 |
+| Core 加载检查与基准 | `scripts/ci/load-core.mjs`（`core-load-check.mjs`）、`scripts/bench/s2-event-channel.mjs`（`npm run bench:s2`） | 在 Node 与 Electron 中加载指定 `.node` 跑一次事件通道；S2 基准测吞吐、事件循环延迟、同步调用、大批次与空闲内存，输出 JSON 与摘要 | T04 |

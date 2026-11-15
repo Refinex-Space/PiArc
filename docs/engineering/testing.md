@@ -8,36 +8,37 @@
 |---|---|---|---|---|---|
 | L0 单元（Rust） | 权限、Bash 分析、hooks 决策、快照、diff、终端状态等纯逻辑 | 同文件 `#[cfg(test)] mod tests`；跨模块的放 `crates/<crate>/tests/*.rs` | `cargo test -p <crate>`；全部：`cargo test --workspace` | 每次提交 | T01 |
 | L0 单元（TS） | 投影、工具包装、Harness Kit；渲染进程的 store 归约器、Markdown 增量解析、交互规则纯函数；仓库脚本 | 与源文件同目录：`foo.ts` ↔ `foo.test.ts`，脚本为 `foo.test.mjs` | `npm test`；单个文件：`npx vitest run <路径>` | 每次提交 | T01 |
-| L1 契约 | AHP schema 往返、录制事件样本的反序列化与再序列化、Pi 事件到 AHP 投影的 golden、NAPI 导出声明与 preload API 快照 | 样本：`tests/contracts/<契约名>/*.json`，反例在其下的 `invalid/`；Rust：`crates/piarc-protocol/tests/*.rs`；TS：`packages/protocol/src/*.test.ts`；见第 7 节 | `cargo test -p piarc-protocol`、`npx vitest run packages/protocol`；全部由 `npm run verify` 运行 | 每次提交 | T02 |
+| L1 契约 | AHP schema 往返、录制事件样本的反序列化与再序列化、Pi 事件到 AHP 投影的 golden、NAPI 导出声明与 preload API 快照 | 样本：`tests/contracts/<契约名>/*.json`，反例在其下的 `invalid/`；Rust：`crates/piarc-protocol/tests/*.rs`；TS：`packages/protocol/src/*.test.ts`；NAPI 声明快照：`apps/desktop/src/main/core/native/*.d.ts`；见第 7 节 | `cargo test -p piarc-protocol`、`npx vitest run packages/protocol`、`node scripts/ci/check-core-types.mjs`；全部由 `npm run verify` 运行 | 每次提交 | T02、T04 |
 | L2 场景回放 | 无头运行 Core + 真实 Agent Host，模型侧接严格校验请求的 mock provider，按场景数据文件驱动 | `tests/scenarios/<场景 id>.yaml`，文件名与 `id` 一致；运行器在 `piarc-testkit`，驱动在 `piarc-devcli` | T15 补充 | 每次提交 | T05、T15 |
 | L3 行为对齐 | 对真实 Claude Code 录制同一批场景，与 PiArc 做结构化 diff | 有意偏离写在 `tests/l3-allowlist.yaml` | T30 补充 | 每晚 / 手动 | T30 |
 | L4 客户端 | Playwright 驱动 Electron 应用（开发形态与打包产物）；关键组件视觉快照；录制事件流驱动渲染进程（假 Core） | `apps/desktop/e2e/*.e2e.ts`；见第 9 节 | 先 `npm run package:desktop -- --flavor development`，再 `npm run test:e2e -w @piarc/desktop` | 每次提交（CI `desktop` 作业）/ 每晚（UI 流程） | T03、T19 |
 | 安全回归 | Markdown 与链接渲染的 XSS 载荷集、preload API 越权调用、外部导航拦截（架构第 10.3 节） | Electron 层：L4 的 `csp`、`navigation`、`external-links`、`preload`、`permissions`、`app-instance` 用例；纯函数（来源校验、外链白名单、CSP、资源路径）：`apps/desktop/src/main/**/*.test.ts`；XSS 载荷集由 T09 加入 | 纯函数部分由 `npm run verify` 运行；Electron 层同 L4 | 每次提交 | T03 起 |
-| 性能 | 架构第 11 章的预算，两个平台分别测量 | T44 补充 | T44 补充 | 每次提交（冒烟）/ 每晚（完整） | T04、T09、T10、T44 |
+| 性能 | 架构第 11 章的预算，两个平台分别测量 | S2：`scripts/bench/s2-event-channel.mjs`；其余 T44 补充 | `npm run bench:s2`（本机，数字不在 verify 中断言）；其余 T44 补充 | 每次提交（冒烟）/ 每晚（完整） | T04、T09、T10、T44 |
 | 多服务商 | 部分 L2 场景对真实服务商运行 | 与 L2 场景共用，按标记筛选 | 手动或每晚，需要密钥与预算（第 8 节） | 每晚，可选 | R2 起 |
 
 ## 2. 质量门禁
 
-`npm run verify`（`scripts/dev/verify.mjs`）按顺序执行全部 12 项检查，一步失败后继续执行后续步骤，最后打印汇总表，任一步失败则退出码非 0：
+`npm run verify`（`scripts/dev/verify.mjs`）按顺序执行全部 13 项检查，一步失败后继续执行后续步骤，最后打印汇总表，任一步失败则退出码非 0：
 
 | # | 步骤 | 单独运行 |
 |---|---|---|
 | 1 | Prettier `--check` | `npx prettier --check .`（写入：`npm run format`） |
 | 2 | ESLint | `npm run lint` |
 | 3 | `tsc --build` | `npm run typecheck` |
-| 4 | Vitest | `npm test` |
-| 5 | `cargo fmt --check` | `cargo fmt --all --check` |
-| 6 | `cargo clippy` | `cargo clippy --workspace --all-targets --locked -- -D warnings` |
-| 7 | `cargo test` | `cargo test --workspace --locked` |
-| 8 | 协议漂移 | `node scripts/ci/check-protocol-drift.mjs` |
-| 9 | 契约样本完整性 | `node scripts/ci/check-contract-samples.mjs` |
-| 10 | cargo-deny | `.tools/bin/cargo-deny check`（先运行 `node scripts/dev/install-tools.mjs`） |
-| 11 | crate 依赖规则 | `node scripts/ci/check-crate-deps.mjs` |
-| 12 | 验收清单一致性 | `node scripts/plan/check-acceptance.mjs` |
+| 4 | Core 模块与 API 快照 | `node scripts/ci/check-core-types.mjs`（构建两种 Core 并比对 `.d.ts` 快照，留下第 5 步要加载的开发构建） |
+| 5 | Vitest | `npm test`（含 `core.integration.test.ts`：真实 Core 在 Node 中跑事件通道的短时正确性版本） |
+| 6 | `cargo fmt --check` | `cargo fmt --all --check` |
+| 7 | `cargo clippy` | `cargo clippy --workspace --all-targets --locked -- -D warnings` |
+| 8 | `cargo test` | `cargo test --workspace --locked` |
+| 9 | 协议漂移 | `node scripts/ci/check-protocol-drift.mjs` |
+| 10 | 契约样本完整性 | `node scripts/ci/check-contract-samples.mjs` |
+| 11 | cargo-deny | `.tools/bin/cargo-deny check`（先运行 `node scripts/dev/install-tools.mjs`） |
+| 12 | crate 依赖规则 | `node scripts/ci/check-crate-deps.mjs` |
+| 13 | 验收清单一致性 | `node scripts/plan/check-acceptance.mjs` |
 
 CI（`.github/workflows/ci.yml`）在 `macos-latest`（arm64）与 `windows-latest`（x64）上执行 `npm ci --ignore-scripts` 与 `npm run verify`。后续任务新增的检查（L1 契约、L2 场景、schema 漂移等）都接进 verify，使本地与 CI 运行同一套检查。
 
-需要打包产物的检查不进 verify，由同一工作流的 `desktop` 作业在两个平台上运行：下载 Electron 二进制、打开发构建、跑 L4（第 9 节）、打发布构建、`npm run check:fuses`，证据作为 artifact 上传。
+需要打包产物的检查不进 verify，由同一工作流的 `desktop` 作业在两个平台上运行：下载 Electron 二进制、打开发构建（先构建 Core）、跑 L4（第 9 节）、打发布构建、`npm run check:fuses`，证据作为 artifact 上传。四个目标的 Core 预编译由 `core-build` 作业完成，`core-load` 作业在各自架构的 runner（`macos-latest`、`macos-15-intel`、`windows-latest`、`windows-11-arm`）上用 `scripts/ci/load-core.mjs` 在 Node 与 Electron 中加载并跑一次事件通道。
 
 执行协议要求的检查点提交只需受影响的包或 crate 通过，例如 `cargo test -p <crate>`、`npx vitest run <路径>`；全量 verify 在开工与收尾时各跑一次。
 
@@ -94,8 +95,8 @@ CI（`.github/workflows/ci.yml`）在 `macos-latest`（arm64）与 `windows-late
 | Rust 往返 | `crates/piarc-protocol/tests/contracts.rs` | 合法样本反序列化为契约的 Rust 类型再序列化，按 JSON 语义与原样本相等；反例反序列化失败 |
 | TS 校验与往返 | `packages/protocol/src/contracts.test.ts` | ajv（draft 2020-12，strict）按导出的 schema 校验：合法样本通过并经 `JSON.parse` → `JSON.stringify` 往返不变，反例失败 |
 | 帧编解码 | `crates/piarc-protocol/tests/framing.rs`、`packages/protocol/src/framing.test.ts` | 两份实现跑同一份 `tests/contracts/framing/` 用例 |
-| 漂移 | `scripts/ci/check-protocol-drift.mjs`（verify 第 8 步） | 在临时目录重新生成，与仓库中的 schema 与生成类型逐字节比较，列出变化、缺失与多余的文件 |
-| 样本完整性 | `scripts/ci/check-contract-samples.mjs`（verify 第 9 步） | `contracts.json` 中每个契约至少有一个合法样本和一个反例；不属于任何契约的样本目录也报错 |
+| 漂移 | `scripts/ci/check-protocol-drift.mjs`（verify 第 9 步） | 在临时目录重新生成，与仓库中的 schema 与生成类型逐字节比较，列出变化、缺失与多余的文件 |
+| 样本完整性 | `scripts/ci/check-contract-samples.mjs`（verify 第 10 步） | `contracts.json` 中每个契约至少有一个合法样本和一个反例；不属于任何契约的样本目录也报错 |
 
 ### 7.3 新增协议消息的步骤
 

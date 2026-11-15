@@ -78,12 +78,21 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
+      - name: Install Rust toolchain from rust-toolchain.toml
+        run: |
+          rustup toolchain install
+          rustup show
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
       - name: Install npm dependencies
         run: npm ci --ignore-scripts
 
       - name: Download the Electron binary (skipped by --ignore-scripts)
         run: node node_modules/electron/install.js
 
+      # package:desktop builds the Core module of the flavor before packaging.
       - name: Package the development flavor
         run: npm run package:desktop -- --flavor development
 
@@ -103,3 +112,104 @@ jobs:
           name: l4-evidence-${{ matrix.os }}
           path: tmp/evidence/ci
           if-no-files-found: ignore
+
+  core-build:
+    # The four prebuilt Core modules (ADR-0014). Both macOS targets build on Apple silicon,
+    # both Windows targets on x64 with MSVC (docs/research/electron-stack.md section 4).
+    name: core build (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: aarch64-apple-darwin, os: macos-latest }
+          - { target: x86_64-apple-darwin, os: macos-latest }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest }
+          - { target: aarch64-pc-windows-msvc, os: windows-latest }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install Rust toolchain and the ${{ matrix.target }} target
+        run: |
+          rustup toolchain install
+          rustup target add ${{ matrix.target }}
+          rustup show
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Install npm dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build both flavors for ${{ matrix.target }}
+        run: node scripts/dev/build-core.mjs --flavor all --target ${{ matrix.target }}
+
+      - name: Upload the modules
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: core-${{ matrix.target }}
+          path: target/piarc-core/*/*.node
+          if-no-files-found: error
+
+  core-load:
+    # Loads each prebuilt module on a runner of its own architecture, in Node and in Electron,
+    # and runs the event channel once (scripts/ci/load-core.mjs).
+    name: core load (${{ matrix.target }})
+    needs: core-build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: aarch64-apple-darwin, os: macos-latest, module: piarc-core.darwin-arm64.node }
+          - { target: x86_64-apple-darwin, os: macos-15-intel, module: piarc-core.darwin-x64.node }
+          - {
+              target: x86_64-pc-windows-msvc,
+              os: windows-latest,
+              module: piarc-core.win32-x64-msvc.node,
+            }
+          - {
+              target: aarch64-pc-windows-msvc,
+              os: windows-11-arm,
+              module: piarc-core.win32-arm64-msvc.node,
+            }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Download the Electron binary for this runner
+        run: node node_modules/electron/install.js
+
+      - name: Download the modules
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: core-${{ matrix.target }}
+          path: core-modules
+
+      - name: Load and run the development and release builds
+        run: >-
+          node scripts/ci/load-core.mjs
+          --module core-modules/development/${{ matrix.module }}
+          --module core-modules/release/${{ matrix.module }}

@@ -2,8 +2,13 @@
 // benchmark see them through Playwright's `electronApp.evaluate`. They exist only when the
 // loaded Core is a development build. Test-only: no product feature uses them.
 
-/** Event-loop delay percentiles of the main process, in milliseconds. */
+/**
+ * Event-loop delay percentiles of the main process, in milliseconds, as
+ * `monitorEventLoopDelay` reports them: each value is the interval between two samples, so it
+ * includes `resolutionMs` on top of the delay itself.
+ */
 export interface LoopDelaySummary {
+  readonly resolutionMs: number;
   readonly p50: number;
   readonly p99: number;
   readonly max: number;

@@ -1,6 +1,6 @@
 # @piarc/desktop
 
-Electron 客户端：主进程只做平台集成与转发，渲染进程只做呈现，业务逻辑在 Core 与 Agent Host（ADR-0013）。Core 加载与事件通道见 T04，Markdown 渲染见 T09。
+Electron 客户端：主进程只做平台集成与转发，渲染进程只做呈现，业务逻辑在 Core 与 Agent Host（ADR-0013）。Markdown 渲染见 T09。
 
 ## 命令
 
@@ -8,12 +8,14 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 
 | 命令 | 用途 |
 |---|---|
+| `npm run build:core` | 构建 Core 的开发版 `.node`（`target/piarc-core/development/`）；源码树运行、`dev` 形态与 Vitest 集成测试都加载它 |
 | `npm run start -w @piarc/desktop` | 开发服务器模式（`electron-forge start`，HMR，放宽的开发 CSP） |
 | `npm run package:desktop` | 发布构建打包到 `apps/desktop/out/release/`（发布 fuses） |
-| `npm run package:desktop -- --flavor development` | 开发构建打包到 `out/development/`，同时生成 `.vite/` 生产构建；L4 前必须运行 |
+| `npm run package:desktop -- --flavor development` | 先构建该类型的 Core，再打包到 `out/development/`，同时生成 `.vite/` 生产构建；L4 前必须运行 |
 | `npm run test:e2e -w @piarc/desktop` | L4：两种形态（`dev`、`packaged`）的冒烟与安全用例；`PIARC_EVIDENCE_TASK=Txx` 把证据写到 `tmp/evidence/Txx/l4/` |
 | `npm run check:fuses` | 读 `out/release/` 产物的 fuse 与 `fuses.mjs` 比对；`-- --flavor development` 查开发构建 |
-| `npx vitest run apps/desktop` | 主进程纯函数的单元测试 |
+| `npx vitest run apps/desktop` | 主进程纯函数的单元测试，以及 `core.integration.test.ts`（真实 Core 在 Node 中跑事件通道，需先 `npm run build:core`） |
+| `npm run bench:s2 -- --form packaged` | S2 基准（默认 10 万事件/分钟 × 5 分钟），JSON 写到 `tmp/evidence/T04/bench/`；`--minutes 0.5` 快速版 |
 
 ## 结构
 
@@ -25,6 +27,13 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
   - `security/navigation.ts`：导航、重定向、新窗口、`<webview>` 守卫；`security/permissions.ts`：权限默认拒绝与放行清单；`security/origin.ts`：origin 计算；
   - `ipc/register.ts`、`ipc/sender.ts`：IPC 注册与来源校验；`external-links.ts`：外链确认；
   - `window.ts`、`web-preferences.ts`：窗口工厂与固定的 webPreferences。
+- Core（T04，ADR-0014）在 `src/main/core/`：
+  - `native-path.ts`：`.node` 路径的唯一解析处。源码树指向 `target/piarc-core/development/`，打包后是 `app.asar.unpacked/native/<名>`（`forge.config.ts` 的 `packageAfterCopy` 拷入，`plugin-auto-unpack-natives` 移出 asar）；`load.ts` 用 `process.dlopen` 加载并校验导出；
+  - `core-host.ts`：窗口打开前启动 Core，`will-quit` 时先 `await shutdown()` 再退出；
+  - `router.ts`：路由键 → 窗口表，每次 Core 投递给每个订阅窗口发一条消息，不读载荷；`event-ipc.ts`：每次页面加载一个 `MessageChannelMain`（`port2` 经 `EVENTS_PORT_CHANNEL` 交给 preload），`subscribe`/`unsubscribe` 两个命令；
+  - `test-hooks.ts`：加载的是开发版 Core 时才装 `globalThis.__piarcTestHooks`（类型在 `src/shared/test-hooks.ts`），L4 与基准经 `app.evaluate` 使用；
+  - `native/*.d.ts`：NAPI-RS 生成的 L1 快照，不手改。
+- `src/renderer/probe/`：`#/event-probe` 测试页，订阅、计数、校验序号，经 `globalThis.__piarcEventProbe` 暴露统计（类型在 `src/shared/event-probe.ts`）。
 
 ## 不变量
 
@@ -35,6 +44,8 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 窗口只经 `createMainWindow` 创建（ESLint 禁止别处 `new BrowserWindow`）；导航与新窗口守卫由 `app.on('web-contents-created')` 装到所有 webContents。
 - 外链只放行 `https:`、`http:`、`mailto:`，必须先经原生确认框。
 - 主进程比较 origin 用 `originOf`，不用前缀匹配，也不直接用 `new URL(x).origin`。
+- 主进程只按路由键转发事件批次，不解析载荷；批次经结构化克隆复制（Electron 45 的 `MessagePortMain` 不能转移 `ArrayBuffer`，见 ADR-0019 提议）。
+- 渲染进程不加载原生模块；Core 只经主进程（`window.piarc.subscribeEvents` 等）。页面回调只收到批次，没有 Electron 的 event 对象。
 
 ## 开发构建与发布构建
 
@@ -47,7 +58,10 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - Node 的 `URL` 不认识 Chromium 注册的标准协议：`new URL('app://piarc/').origin` 是 `'null'`。
 - 导航被取消后 Playwright 定位器会一直等导航完成：拦截之后用 `page.evaluate` 检查，会触发导航的点击用 `page.mouse.click`。
 - 发布构建仍接受 Chromium 的 `--remote-debugging-port`（没有对应 fuse），登记为 I10。
+- 应用启动早期打印的日志行，L4 夹具接上 stdout 之前就被读走了；要断言启动状态，用测试钩子读主进程状态，不等日志。
+- `monitorEventLoopDelay` 记录的是两次采样之间的完整间隔，每个值都含采样间隔（钩子用 1 ms）；比较预算时按原始值算偏保守。
+- 基准与 L4 都要开发版 Core：发布版没有测试钩子，`expectTestHooks` 会直接报错提示重新打开发构建。
 
 ## 参考
 
-- 架构第 3.4、8.1、10.3 节；ADR-0013、ADR-0018 第 1 条；`docs/spikes/S10-electron-security.md`；`docs/engineering/testing.md` 第 9 节。
+- 架构第 3.4、7.6、8.1、8.3、10.3 节；ADR-0013、ADR-0014、ADR-0018 第 1 条；`docs/spikes/S10-electron-security.md`、`S02-napi-event-channel.md`；`docs/engineering/testing.md` 第 9 节。

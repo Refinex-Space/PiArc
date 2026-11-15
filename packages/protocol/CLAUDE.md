@@ -7,8 +7,8 @@ AHP 的 TypeScript 类型（由 `piarc-protocol` 生成）、`PROTOCOL_VERSION` 
 | 命令 | 用途 |
 |---|---|
 | `npm run gen:protocol` | 重新生成 `schema/` 与 `src/generated/`（先跑 Rust 导出，再用 json-schema-to-typescript 生成，最后按仓库 Prettier 配置格式化） |
-| `node scripts/ci/check-protocol-drift.mjs` | 在临时目录重新生成并逐字节比较；verify 第 8 步 |
-| `node scripts/ci/check-contract-samples.mjs` | 每个契约要有合法样本与反例；verify 第 9 步 |
+| `node scripts/ci/check-protocol-drift.mjs` | 在临时目录重新生成并逐字节比较；verify 第 9 步 |
+| `node scripts/ci/check-contract-samples.mjs` | 每个契约要有合法样本与反例；verify 第 10 步 |
 | `npx vitest run packages/protocol` | ajv 契约校验（`src/contracts.test.ts`）与共享帧用例（`src/framing.test.ts`） |
 
 ## 不变量

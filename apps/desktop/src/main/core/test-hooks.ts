@@ -8,6 +8,12 @@ import type { ForwardObservation } from '../../shared/test-hooks.js';
 import type { TestingCore } from './load.js';
 import type { EventRouter } from './router.js';
 
+/**
+ * Sampling interval of the event-loop delay monitor. The histogram records the whole
+ * interval between two samples, so every value includes this much on top of the delay.
+ */
+export const LOOP_DELAY_RESOLUTION_MS = 1;
+
 export function installTestHooks(options: {
   readonly modulePath: string;
   readonly core: TestingCore;
@@ -34,7 +40,7 @@ export function installTestHooks(options: {
     },
     startLoopDelay: () => {
       histogram?.disable();
-      histogram = monitorEventLoopDelay({ resolution: 10 });
+      histogram = monitorEventLoopDelay({ resolution: LOOP_DELAY_RESOLUTION_MS });
       histogram.enable();
     },
     stopLoopDelay: () => {
@@ -45,6 +51,7 @@ export function installTestHooks(options: {
       const ns = histogram;
       histogram = undefined;
       return {
+        resolutionMs: LOOP_DELAY_RESOLUTION_MS,
         p50: ns.percentile(50) / 1e6,
         p99: ns.percentile(99) / 1e6,
         max: ns.max / 1e6,

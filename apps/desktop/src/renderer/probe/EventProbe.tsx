@@ -3,20 +3,14 @@
 // the counters for screenshots.
 import { useEffect, useState } from 'react';
 
-import type { EventProbeApi, ProbeSnapshot } from '../../shared/event-probe.js';
+import type { ProbeSnapshot } from '../../shared/event-probe.js';
 import { ProbeCounter } from './probe-counter.js';
-
-declare global {
-  interface Window {
-    __piarcEventProbe?: EventProbeApi;
-  }
-}
 
 const counter = new ProbeCounter();
 
 /** Installs `window.__piarcEventProbe`. Called once, when the probe page is chosen. */
 export function installEventProbe(): void {
-  window.__piarcEventProbe = {
+  globalThis.__piarcEventProbe = {
     subscribe: async (routes) => {
       for (const route of routes) {
         await window.piarc.subscribeEvents(route, (batch) => {

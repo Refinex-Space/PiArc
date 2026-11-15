@@ -302,10 +302,10 @@ T04 Core NAPI 绑定与事件通道（开工 2026-11-14；基线 verify 12 项�
 - [x] 4. 主进程：`.node` 路径解析（开发 / `app.asar.unpacked`）、按窗口 `MessageChannelMain`、路由表、结构化克隆 / `ArrayBuffer` 转移（A06）
 - [x] 5. preload 事件订阅 API、IPC 命令、白名单快照；渲染进程测试页与统计
 - [x] 6. L4：退出不挂起、双窗口路由、panic 后存活、ArrayBuffer、打包产物从 unpacked 加载（A01、A06、A07、A08、A10）——A06 只做了完整性部分：Electron 45 的 `MessagePortMain` 不能转移 `ArrayBuffer`，转移部分待 ADR-0019
-- [ ] 7. CI：四个目标预编译与加载测试；本机 darwin-x64 经 Rosetta 加载（A09）
-- [ ] 8. `scripts/bench/` 基准（吞吐、事件循环延迟、同步调用、大批次、空闲 RSS），≤ 30 s 正确性版本进 verify
+- [x] 7. CI：四个目标预编译与加载测试（`core-build`、`core-load`，Windows 结果待推送）；本机 darwin-x64 经 Rosetta 2 加载通过（A09）
+- [x] 8. `scripts/bench/` 基准（吞吐、事件循环延迟、同步调用、大批次、空闲 RSS），≤ 30 s 正确性版本进 verify
 - [ ] 9. 完整基准与 S2 报告、`docs/spikes/README.md`（A03、A04、A05、A12）
-- [ ] 10. 文档：两个 crate 的 CLAUDE.md、`apps/desktop/CLAUDE.md`、复用表、架构同步
+- [x] 10. 文档：两个 crate 的 CLAUDE.md、`apps/desktop/CLAUDE.md`、复用表、架构同步
 - [ ] 11. 收尾：verify（A13）、acceptance、PLAN、会话日志
 
 ## 登记事项

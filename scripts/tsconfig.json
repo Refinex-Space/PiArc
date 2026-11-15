@@ -12,6 +12,8 @@
     "tsBuildInfoFile": "../node_modules/.cache/tsc/scripts/.tsbuildinfo",
     "types": ["node"]
   },
+  // The benchmarks use the test-hook and probe types of the desktop app.
+  "references": [{ "path": "../apps/desktop/src/shared" }],
   "include": [
     "**/*.mjs",
     "../*.mjs",

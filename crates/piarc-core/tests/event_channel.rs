@@ -63,7 +63,7 @@ fn start(interval_ms: u64) -> (CoreRuntime, Receiver<Message>) {
 fn demo(route: &str, events_per_second: u32, max_events: u64) -> DemoSourceConfig {
     DemoSourceConfig {
         route: RouteKey::parse(route).expect("valid route"),
-        events_per_second,
+        events_per_second: f64::from(events_per_second),
         pad_bytes: 16,
         max_events: Some(max_events),
     }

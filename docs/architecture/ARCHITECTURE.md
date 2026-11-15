@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.5（2026-11-14） |
+| 版本 | 2.6（2026-11-14） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -709,6 +709,8 @@ crates/
 - 每个工作区一个 actor（`WorkspaceActor`），每个会话一个 actor（`SessionActor`），通过消息通道交互，避免共享可变状态加锁。
 - 所有长任务可取消（`CancellationToken`），取消沿会话 → 回合 → 工具调用 → 子进程传播。
 - NAPI 调用不阻塞主进程的事件循环：同步方法只做参数校验与入队，结果经事件或 async（Promise）返回。主进程的事件循环同时负责窗口与菜单响应，单次 NAPI 同步调用的耗时预算为 1 ms。
+- 有序关闭：停止接受新请求 → 取消根 `CancellationToken` 并等事件源结束 → 关闭事件队列、投递最后一批并等客户端处理完 → 释放事件回调 → 停止运行时。任务经监督者启动，panic 不被吞掉，转成 `core/errors` 路由上的结构化错误事件（`piarc-core` crate 文档）。
+- 事件合并与背压：上游事件进入有界队列（65,536 个事件），合并器按路由键合并，刷出时机不早于首个待发事件到达且距上次刷出至少一个间隔，因此回调频率不超过 `1000 / 间隔（ms）`；最多 1 个在途投递，客户端未处理完时继续累积；待发超过 64 MiB 时停止读队列，由队列向生产者施加背压（异步生产者等待，同步调用返回可重试的 `busy`）。任何情况下都不丢事件，只有客户端环境已销毁时才丢弃并计数。
 
 ### 7.3 状态归属
 
@@ -814,6 +816,10 @@ impl Session {
 - `on_events` 由 Core 约每 16 ms 调用一次，传入合并后的事件批次。主进程不解析批次内容，按 `sessionId` 转发给订阅了该会话的窗口（每个窗口一个 MessagePort）。
 - 渲染进程能调用的命令是上面接口的子集，在 preload 中逐个列出；主进程校验调用来源（发起请求的窗口和页面地址）后才转给 Core。
 - NAPI-RS 生成的 TypeScript 声明与 `packages/protocol` 的类型都纳入 L1 快照测试，接口变化必须同时更新快照。
+- 已实现的导出面（T04）：`CoreRuntime.create(options, onEvents)`、`shutdown(): Promise<void>`、`state`。`onEvents` 每次收到一组批次 `{ route, seq, payload }`：`route` 是路由键（1–128 个 `[A-Za-z0-9._:/-]`，`core/` 前缀保留给 Core 自己的事件，例如 `core/errors`），`seq` 是每个路由从 1 起连续的批次序号，`payload` 是该路由事件的 UTF-8 JSON 数组（`Uint8Array`），主进程不解析。开发构建另有 `testing` 导出（演示事件源、同步轻量方法 `echo`、计数、panic 触发），发布构建不含。
+- 错误跨 NAPI 时是抛出的 `Error`，带 `code` 与 `data: { kind, retryable, details? }`（`piarc_protocol::ErrorObject` 的形状）；导出函数在边界捕获 panic，kind 为 `internalError`。Core API 专用的错误类别有 `shuttingDown`（关闭后的请求）与 `busy`（队列满，可重试）。
+- Promise 由 Core 自己的运行时经 NAPI-RS 的 `JsDeferred` 结算，不用 `#[napi] async fn`（它会另起 NAPI-RS 的全局 tokio 运行时）。
+- 声明快照在 `apps/desktop/src/main/core/native/`（`piarc-core.d.ts` 为发布构建，`piarc-core.testing.d.ts` 为开发构建），由 `npm run build:core` 生成，verify 比对。
 
 事件分两类：
 
@@ -1189,11 +1195,11 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 
 ```
 piarc-protocol ──► JSON Schema ──► packages/protocol（生成 TS 类型，CI 检查无漂移）
-crates/*  ──cargo + @napi-rs/cli──► piarc-core.<target>.node（四个目标）+ index.d.ts
+crates/*  ──cargo + @napi-rs/cli──► piarc-core.<platform>-<arch>[-msvc].node（四个目标，开发与发布两种）+ .d.ts 快照
 agent-host ──esbuild──► agent-host.mjs
 design/tokens ──脚本──► CSS 自定义属性 + TS 常量
 apps/desktop ──Forge（plugin-vite）──► 主进程 / preload / 渲染进程产物 ──► app.asar
-Forge 打包 ──► 放入 .node（unpacked）、内置 Node、rg、fd、agent-host ──► 写入 fuses
+Forge 打包 ──► 放入 .node（app.asar.unpacked/native/）、内置 Node、rg、fd、agent-host ──► 写入 fuses
   macOS：ad-hoc 重签 ──► DMG + ZIP
   Windows：Velopack 安装包与更新包（不签名）
 全部产物 ──► 发布清单（文件名 + SHA-256）──► 项目 Ed25519 密钥签名（minisign）──► GitHub Releases
@@ -1344,6 +1350,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | 版本 | 日期 | 说明 |
 |---|---|---|
 | 1.0 | 2026-11-14 | 首版：基于对 Claude 官方文档、Pi v1.4.0 源码、claude-code / claw-code / OpenClaudeDesktop / open-claude-ui 参考实现与原生技术栈的调研 |
+| 2.6 | 2026-11-14 | T04 补充：7.2 写明 Core 的有序关闭顺序、任务 panic 转错误事件、事件合并的刷出规则与背压策略（不丢事件）；7.6 写明已实现的导出面、批次形状与路由键语法、跨 NAPI 的错误形状与 `shuttingDown`、`busy` 两个错误类别、Promise 的结算方式与 `.d.ts` 快照位置；13.2 写明 `.node` 的命名与打包位置 |
 | 2.5 | 2026-11-14 | T03 补充：3.4 增加 `apps/desktop/src/shared/`（IPC 契约）；10.3 写明应用协议当前为 `app://piarc`、权限检查处理器与设备权限默认拒绝、开发构建与发布构建只差 `NodeCliInspect` 一个 fuse 以及 L4 打包形态使用开发构建 |
 | 2.4 | 2026-11-14 | T02 补充：LF 帧编解码器放在 `piarc-protocol`（只处理字节缓冲，Rust 与 TS 各一份），`piarc-host` 负责 stdio 读写；7.4 增加"消息约定"：握手响应、错误对象与错误码段、不支持批量、会话事件信封与 `method` 的映射、兼容规则、分帧限制 |
 | 2.3 | 2026-11-14 | T01 补充（不改变依赖方向）：7.1 写明链外 crate（`piarc-napi` 对基础 crate 的直接使用、`piarc-testkit`、`piarc-devcli`、`piarc-ghostty-sys`）在 `crates/deps-rules.json` 中的位置，以及依赖规则的检查方式 |

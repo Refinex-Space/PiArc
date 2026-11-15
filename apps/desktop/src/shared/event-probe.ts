@@ -42,3 +42,8 @@ export interface EventProbeApi {
   snapshot(): ProbeSnapshot;
   reset(): void;
 }
+
+declare global {
+  /** Present on the probe page only (set by src/renderer/probe/EventProbe.tsx). */
+  var __piarcEventProbe: EventProbeApi | undefined;
+}

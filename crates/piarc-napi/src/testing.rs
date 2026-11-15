@@ -13,8 +13,8 @@ use crate::runtime::CoreRuntime;
 pub struct DemoSourceOptions {
     /// Route key of every event.
     pub route: String,
-    /// Target rate (1 to 1,000,000).
-    pub events_per_second: u32,
+    /// Target rate in events per second, fractions allowed (above 0, at most 1,000,000).
+    pub events_per_second: f64,
     /// Length of each event's `pad` string, to control the payload size. Default 0.
     pub pad_bytes: Option<u32>,
     /// Stop after this many events. Default: run until stopped.
