@@ -1154,8 +1154,8 @@
       "id": "T08-A12",
       "task": "T08",
       "description": "正式构建的凭据库服务名以 D2 的应用标识为前缀。验证：代码检查与测试；D2 未落实时标 `blocked`。",
-      "status": "blocked",
-      "evidence": "D2 未落实（docs/product/REQUIREMENTS.md 第 7 节\"仍待产品负责人提供\"）。实现已就位：服务名由 piarc-core::identity::APP_IDENTIFIER 生成（<应用标识>.credential-vault），单测 the_credential_service_is_prefixed_with_the_application_identifier 通过；当前为占位值 PiArc.pending-D2，D2 给出后改常量并复验（PLAN.md I22）"
+      "status": "passing",
+      "evidence": "D2 已于 2026-11-15 决定（docs/product/REQUIREMENTS.md 第 7 节：域名 piarc.cn，应用标识 cn.piarc.desktop）。代码检查：唯一定义 crates/piarc-core/src/identity.rs 的 APP_IDENTIFIER = \"cn.piarc.desktop\"，master_key_name() 经 piarc_secrets::master_key_name 生成服务名，全仓库无其他正式服务名定义；测试 cargo test -p piarc-core --lib identity（the_credential_service_is_prefixed_with_the_application_identifier）断言服务名为 cn.piarc.desktop.credential-vault 且不带 piarc-test. 前缀，通过；npm run verify 13 步全部 PASS（tmp/evidence/T08/verify.log）"
     },
     {
       "id": "T08-A13",
@@ -1169,7 +1169,7 @@
       "task": "T08",
       "description": "`npm run verify` 通过。验证：命令输出。",
       "status": "passing",
-      "evidence": "npm run verify：13 步全部 PASS（tmp/evidence/T08/verify.log）"
+      "evidence": "npm run verify：13 步全部 PASS（D2 落实后重跑，tmp/evidence/T08/verify.log）"
     },
     {
       "id": "T09-A01",
