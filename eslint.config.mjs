@@ -190,10 +190,10 @@ function desktopProcessBoundaries() {
         message: htmlSinkMessage,
       }),
     ),
-    {
-      selector: "CallExpression[callee.object.name='document'][callee.property.name=/^writeln?$/]",
+    ...['write', 'writeln'].map((method) => ({
+      selector: `CallExpression[callee.object.name='document'][callee.property.name='${method}']`,
       message: htmlSinkMessage,
-    },
+    })),
   ];
   return [
     {
