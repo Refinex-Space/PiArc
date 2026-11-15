@@ -137,8 +137,15 @@ export function Composer({
         view.updateState(next);
         setMention(mentionKey.getState(next) ?? CLOSED_MENTION);
       },
+      handleDOMEvents: {
+        // Input method guard, ahead of everything ProseMirror does with a key: returning true
+        // skips its keydown handling (key bindings, base keymap, plugins) without
+        // preventDefault, so the key goes to the input method untouched. This also covers
+        // keyCode 229 keys that arrive before compositionstart, when ProseMirror itself does
+        // not consider the editor composing yet.
+        keydown: (editor, event) => isImeComposing(event, editor.composing),
+      },
       handleKeyDown(editor, event) {
-        // Input method guard first: nothing below may act on a composition's keys.
         if (isImeComposing(event, editor.composing)) {
           return false;
         }

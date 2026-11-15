@@ -6,8 +6,14 @@ import { isPermissionAllowed, PERMISSION_ALLOWLIST } from './permissions.js';
 describe('isPermissionAllowed', () => {
   const trusted = [APP_ORIGIN];
 
-  it('grants nothing while the allowlist is empty', () => {
-    expect(PERMISSION_ALLOWLIST).toEqual([]);
+  it('allows only sanitized clipboard writes, each entry with a reason', () => {
+    expect(PERMISSION_ALLOWLIST.map((grant) => grant.permission)).toEqual([
+      'clipboard-sanitized-write',
+    ]);
+    for (const grant of PERMISSION_ALLOWLIST) {
+      expect(grant.reason.length, grant.permission).toBeGreaterThan(20);
+    }
+    expect(isPermissionAllowed('clipboard-sanitized-write', APP_ORIGIN, trusted)).toBe(true);
     for (const permission of ['notifications', 'media', 'geolocation', 'clipboard-read']) {
       expect(isPermissionAllowed(permission, APP_ORIGIN, trusted), permission).toBe(false);
     }

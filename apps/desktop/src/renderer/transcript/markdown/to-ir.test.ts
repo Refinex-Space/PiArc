@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { XSS_PAYLOADS } from '../../lab/fixtures/xss-payloads.js';
+import { XSS_PAYLOADS } from '../../../shared/xss-payloads.js';
 import { parseMarkdown } from './incremental.js';
 import type { Block, Span } from './ir.js';
 import { decodeCharacterReferences, safeHref } from './text.js';

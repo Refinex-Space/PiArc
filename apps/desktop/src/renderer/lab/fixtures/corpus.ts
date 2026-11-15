@@ -1,7 +1,7 @@
 // Markdown a model produces, used by the stream synthesizer, the history generator and the
 // parser tests: paragraphs, lists, tables, code in several languages, a very long code block,
 // unclosed markup, Chinese and Japanese text, and the XSS payloads.
-import { xssMessage } from './xss-payloads.js';
+import { xssMessage } from '../../../shared/xss-payloads.js';
 
 /** One fixture document. */
 export interface CorpusDocument {

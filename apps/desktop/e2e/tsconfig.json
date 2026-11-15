@@ -11,5 +11,5 @@
     "types": ["node"]
   },
   "include": ["**/*.ts"],
-  "references": [{ "path": "../src/shared" }]
+  "references": [{ "path": "../src/shared" }, { "path": "../src/main" }]
 }

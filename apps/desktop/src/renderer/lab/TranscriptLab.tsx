@@ -30,7 +30,7 @@ import {
   messagesForTokens,
   planTurn,
 } from './fixtures/synthesizer.js';
-import { xssMessage } from './fixtures/xss-payloads.js';
+import { xssMessage } from '../../shared/xss-payloads.js';
 
 /** The virtual list named in the hash (`#/transcript-lab?list=virtuoso`). */
 export function labListKind(hash: string): LabListKind {

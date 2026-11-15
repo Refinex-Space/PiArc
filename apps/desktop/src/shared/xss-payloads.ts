@@ -1,4 +1,5 @@
-// XSS payloads for the transcript (architecture section 10.3: model output is untrusted). Each
+// XSS payloads for the transcript (architecture section 10.3: model output is untrusted), shared
+// by the renderer's parser tests, the prototype page and the L4 tests. Each
 // payload, if it ever ran, would overwrite `window.__piarcXssSentinel` with its id; tests set the
 // sentinel first and check that it is unchanged, that no element the payload asks for exists in
 // the rendered transcript, and that the payload's text is shown literally.

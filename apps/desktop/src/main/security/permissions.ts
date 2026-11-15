@@ -12,11 +12,18 @@ export interface PermissionGrant {
 }
 
 /**
- * Permissions granted to pages of a trusted origin. Empty on purpose: a later task that needs
- * one (for example `clipboard-sanitized-write` for a copy button) adds an entry with a
- * `reason` and a test, and lists it in docs/spikes/S10-electron-security.md.
+ * Permissions granted to pages of a trusted origin. Each entry has a `reason` and a test, and
+ * is listed in docs/spikes/S10-electron-security.md. Everything else stays denied, reading the
+ * clipboard included.
  */
-export const PERMISSION_ALLOWLIST: readonly PermissionGrant[] = [];
+export const PERMISSION_ALLOWLIST: readonly PermissionGrant[] = [
+  {
+    permission: 'clipboard-sanitized-write',
+    reason:
+      'Copy buttons ("copy this message" as Markdown or plain text, T09) write text with ' +
+      'navigator.clipboard.writeText. Write-only and sanitized by Chromium; reading stays denied.',
+  },
+];
 
 /** True when `permission` is on the allowlist and requested by a trusted origin. */
 export function isPermissionAllowed(
