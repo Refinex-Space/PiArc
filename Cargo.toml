@@ -57,9 +57,14 @@ piarc-napi        = { path = "crates/piarc-napi" }
 piarc-testkit     = { path = "crates/piarc-testkit" }
 
 # Third-party dependencies (alphabetical).
+globset     = "=0.4.21"
+grep-matcher = "=0.1.9"
+grep-regex  = "=0.1.14"
+grep-searcher = "=0.1.17"
 http-body-util = "=0.1.5"
 hyper       = { version = "=1.12.0", features = ["http1", "server"] }
 hyper-util  = { version = "=0.1.21", features = ["tokio"] }
+ignore      = "=0.4.34"
 jsonschema  = { version = "=0.61.2", default-features = false }
 napi        = { version = "=3.16.2", features = ["napi6", "serde-json"] }
 napi-build  = "=2.6.0"
@@ -68,6 +73,7 @@ schemars    = { version = "=1.2.3", default-features = false, features = ["deriv
 serde       = { version = "=1.0.229", features = ["derive"] }
 serde-saphyr = { version = "=2.1.1", default-features = false, features = ["deserialize"] }
 serde_json  = "=1.0.154"
+sha2        = "=0.11.1"
 thiserror   = "=2.0.21"
 tokio       = { version = "=1.54.1", default-features = false, features = ["rt-multi-thread", "sync", "time", "macros"] }
 tokio-util  = { version = "=0.7.20", default-features = false }
