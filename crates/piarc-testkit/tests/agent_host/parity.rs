@@ -27,7 +27,7 @@ const NATIVE_NAMES: [(&str, &str); 6] = [
 ];
 
 /// One call per step: (what it shows, canonical tool, input as YAML flow mapping).
-const STEPS: [(&str, &str, &str); 16] = [
+const STEPS: [(&str, &str, &str); 17] = [
     ("Read a whole file", "Read", r#"{ path: "README.md" }"#),
     (
         "Read with offset and limit",
@@ -35,6 +35,7 @@ const STEPS: [(&str, &str, &str); 16] = [
         r#"{ path: "notes/日志 1.txt", offset: 10, limit: 5 }"#,
     ),
     ("Read a missing file", "Read", r#"{ path: "missing.txt" }"#),
+    ("Read an image", "Read", r#"{ path: "pixel 图.png" }"#),
     (
         "Write a new file in a new directory",
         "Write",
@@ -100,14 +101,25 @@ const STEPS: [(&str, &str, &str); 16] = [
 
 /// Differences that are intended, by step index: (what differs, why).
 const EXPECTED_DIFFERENCES: [(usize, &str); 1] = [(
-    14,
+    15,
     "node_modules/dep/readme.md is listed only by Pi's native find: given FindOperations.glob, \
      Pi itself passes exclude patterns for **/node_modules/** and **/.git/** (find.ts), which fd \
      does not apply",
 )];
 
+/// A 1x1 PNG.
+const PIXEL_PNG: [u8; 70] = [
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+    0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0xda, 0x63, 0x64, 0x60, 0xf8, 0x5f,
+    0x0f, 0x00, 0x02, 0x87, 0x01, 0x80, 0xeb, 0x47, 0xba, 0x92, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
+    0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+];
+
 /// The workspace both runs start from.
 fn populate(ws: &Path) {
+    std::fs::create_dir_all(ws).expect("ws exists");
+    std::fs::write(ws.join("pixel 图.png"), PIXEL_PNG).expect("image written");
     let lines: String = (1..=30).map(|n| format!("line {n}\n")).collect();
     let files: [(&str, &str); 9] = [
         ("README.md", "# Parity\n"),
@@ -159,7 +171,7 @@ async fn run(env: &Env, config: HostConfig, index: usize, id: &str) -> Vec<(Stri
     events
         .until(|e| matches!(e, HostEvent::Connected { .. }))
         .await;
-    let session = open(&supervisor, &core, &env.cwd(index), "mock-large").await;
+    let session = open(&supervisor, &core, &env.cwd(index), "mock-vision").await;
     let turn = supervisor
         .prompt(&session, "req", &prompt_text("Compare.", id))
         .await

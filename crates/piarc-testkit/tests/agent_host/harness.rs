@@ -210,9 +210,12 @@ impl Env {
         // request of `mock-small` selects its scenario by header.
         let mut small = model("mock-small", 32_000);
         small["headers"] = json!({ "x-piarc-scenario": SMALL_WINDOW_SCENARIO });
+        // Reads images (T07: the image path of Read is compared with Pi's own).
+        let mut vision = model("mock-vision", 200_000);
+        vision["input"] = json!(["text", "image"]);
         let models = json!({ "providers": { "piarc-mock": {
             "baseUrl": mock.anthropic_base_url(), "api": "anthropic-messages", "apiKey": "piarc-mock-test-key",
-            "models": [model("mock-large", 200_000), small]
+            "models": [model("mock-large", 200_000), small, vision]
         }}});
         write_json(&data_dir.join("pi").join("models.json"), &models);
         write_json(&data_dir.join("pi").join("settings.json"), &settings);
@@ -555,11 +558,19 @@ pub fn tool_results_in(body: &str) -> Vec<(String, String, bool)> {
                     );
                 }
                 Some("tool_result") => {
+                    // Images appear as `[image <media type> <base64 data>]`.
                     let text = match &block["content"] {
                         Value::String(text) => text.clone(),
                         Value::Array(parts) => parts
                             .iter()
-                            .filter_map(|p| p["text"].as_str())
+                            .map(|p| match p["type"].as_str() {
+                                Some("image") => format!(
+                                    "[image {} {}]",
+                                    p["source"]["media_type"].as_str().unwrap_or_default(),
+                                    p["source"]["data"].as_str().unwrap_or_default()
+                                ),
+                                _ => p["text"].as_str().unwrap_or_default().to_owned(),
+                            })
                             .collect::<Vec<_>>()
                             .join("\n"),
                         _ => String::new(),
