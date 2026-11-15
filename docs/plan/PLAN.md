@@ -108,7 +108,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 | 编号 | 任务 | 阶段 | 依赖 | 平台 | effort | 规模 | 验证项 | 状态 | 完成提交 |
 |---|---|---|---|---|---|---|---|---|---|
-| T01 | [仓库脚手架、工程规范与质量门禁](tasks/T01-scaffold-and-quality-gates.md) | 0 | 无 | macOS | high | 大 | 无 | 进行中 | — |
+| T01 | [仓库脚手架、工程规范与质量门禁](tasks/T01-scaffold-and-quality-gates.md) | 0 | 无 | macOS | high | 大 | 无 | 已完成 | 47fb1e9 |
 | T02 | [协议单一来源与契约测试基座](tasks/T02-protocol-and-contract-tests.md) | 0 | T01 | macOS | high | 中 | 无 | 未开始 | — |
 | T03 | [Electron 应用骨架与安全基线](tasks/T03-electron-shell-and-security-baseline.md) | 1 | T02 | macOS | xhigh | 大 | S10 | 未开始 | — |
 | T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 未开始 | — |
@@ -294,16 +294,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-T01 仓库脚手架、工程规范与质量门禁（开工 2026-11-14，macOS）
-
-- [x] 1 npm workspaces 与 TypeScript 工具链（tsconfig、ESLint、Prettier、Vitest、`.nvmrc`、精确锁定）
-- [x] 2 Cargo workspace 与 21 个 crate 骨架（`rust-toolchain.toml`、`rustfmt.toml`、clippy、`deny.toml`）
-- [x] 3 检查脚本：`check-crate-deps.mjs` + `crates/deps-rules.json`、`check-acceptance.mjs`、`verify.mjs`、根 `scripts`
-- [x] 4 `.editorconfig`、`.gitattributes`、`.github/workflows/ci.yml`、`.claude/settings.json`
-- [x] 5 工程规范：`coding-standards.md`、`testing.md`、`claude-md.md`
-- [x] 6 `.claude/rules/rust.md`、`.claude/rules/typescript.md`、根 `CLAUDE.md`
-- [x] 7 门禁有效性验证（A02–A07 临时违规，验证后撤销）
-- [ ] 8 收尾：verify 全绿、acceptance.json、PLAN.md、会话日志
+（当前没有进行中的任务）
 
 ## 登记事项
 
@@ -316,6 +307,8 @@ T01 仓库脚手架、工程规范与质量门禁（开工 2026-11-14，macOS）
 | I03 | 制定计划 | Monitor 在会话空闲时唤醒会话（按 Claude Code 官方行为）会自动产生模型费用 | T32 实现时提供开关与限速，R4 请用户确认默认值 |
 | I04 | 制定计划 | macOS App Intents 在 ad-hoc 签名下能否工作，M0 没有验证（需要 Xcode 生成的元数据随包分发） | T49 先做可行性原型；不可行时写 ADR 提议。若想提前知道结论，可在 R1 时追加一次快速验证 |
 | I05 | 制定计划 | 架构第 6.10 节说 MCP server 在沙箱外，但 stdio MCP server 由 Agent Host 启动，会继承 Agent Host 的 Seatbelt 写入限制（第 10.3 节） | T39 定稿 Agent Host 配置时澄清并更新架构；放宽写入范围属于变更型 |
+| I06 | T01 | `npm audit` 报告 8 个 moderate（GHSA-g3hv-75wg-m249，minimatch 经 eslint 10.14 与 typescript-eslint 8.72 引入，仅开发工具链，不进安装包）；架构第 13.3 节要求的 `npm audit`、`cargo-audit` 尚未接入 CI（cargo-deny 的 advisories 已覆盖 RustSec 数据库） | 上游修复后升级 eslint 与 typescript-eslint；T45 或 T50 把 `npm audit --omit=dev` 接入 CI |
+| I07 | T01 | TypeScript 7.0 已发布，typescript-eslint 8.72 只支持 `<6.1`，仓库锁在 TypeScript 6.0.3 | 各评审任务按月复查 typescript-eslint 的支持范围，支持后再升级 |
 
 ## 技术债
 
@@ -334,6 +327,12 @@ T01 仓库脚手架、工程规范与质量门禁（开工 2026-11-14，macOS）
 - 决策：ADR-00xx ……
 - 遗留：……
 ```
+
+### 2026-11-14 T01 已完成（提交 47fb1e9）
+- 交付：npm workspaces（apps/desktop、agent-host、packages/protocol）与 TS 工具链（TypeScript 6.0.3、ESLint 10 类型感知、Prettier、Vitest 5）；Cargo workspace 21 个 crate 骨架、workspace lints、rustfmt/clippy/deny 配置、toolchain 1.99.1；`npm run verify`（10 步）、`check-crate-deps.mjs` + `crates/deps-rules.json`、`check-acceptance.mjs`、`install-tools.mjs`（cargo-deny 0.20.2 装进 `.tools/`）；`.editorconfig`、`.gitattributes`、CI（macOS + Windows）；三份工程规范、两份 `.claude/rules`、根 `CLAUDE.md`
+- 验收：12 项通过，0 项阻塞（Windows CI 待首次推送后观察）
+- 决策：未写 ADR；架构 7.1 补充链外 crate 的层位置（v2.3）；cargo-deny 仓库内安装而非全局安装；TypeScript 锁 6.0.x；`.nvmrc` 按"满两周"取 24.22.2
+- 遗留：I06（npm audit 与开发依赖公告）、I07（TypeScript 7）
 
 ## 计划变更记录
 
