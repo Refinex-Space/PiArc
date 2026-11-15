@@ -55,11 +55,13 @@ pub mod contract;
 mod error;
 pub mod framing;
 pub mod handshake;
+pub mod host;
 pub mod jsonrpc;
 pub mod method;
 pub mod rpc_error;
 mod schema;
 pub mod session;
+pub mod trust;
 pub mod turn;
 mod version;
 

@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "host/ping",
+  "params": {
+    "sentAt": 1763200000000
+  }
+}

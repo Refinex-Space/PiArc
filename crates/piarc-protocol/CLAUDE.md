@@ -13,7 +13,7 @@ AHP 与 Core API 数据类型的唯一来源：Rust 类型 → JSON Schema → `
 ## 新增协议消息
 
 1. 定义参数与结果类型（`#[serde(rename_all = "camelCase")]`，派生 `Serialize`、`Deserialize`、`JsonSchema`）和方法标记（实现 `Method` 加 `RequestMethod` 或 `NotificationMethod`）。
-2. 在 `src/contract.rs` 的 `CONTRACTS` 中登记：请求方法登记请求与成功响应两个契约，通知登记一个。
+2. 在 `src/contract.rs` 的 `CONTRACTS` 中登记：请求方法登记请求与成功响应两个契约，通知登记一个。成功响应的契约名是 `<方法>/result`（样本在请求目录下的 `result/`）；`host/hello` 的 `core/welcome` 是 T02 留下的唯一例外。
 3. `npm run gen:protocol`，再在 `tests/contracts/<契约名>/` 加合法样本、在 `invalid/` 加反例。
 4. 完整步骤与检查见 `docs/engineering/testing.md` 第 7 节。
 

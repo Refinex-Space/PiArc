@@ -44,6 +44,102 @@
       "schema": "HostHelloResponse"
     },
     {
+      "kind": "request",
+      "method": "host/ping",
+      "name": "host/ping",
+      "schema": "HostPingRequest"
+    },
+    {
+      "kind": "response",
+      "method": "host/ping",
+      "name": "host/ping/result",
+      "schema": "HostPingResponse"
+    },
+    {
+      "kind": "request",
+      "method": "host/shutdown",
+      "name": "host/shutdown",
+      "schema": "HostShutdownRequest"
+    },
+    {
+      "kind": "response",
+      "method": "host/shutdown",
+      "name": "host/shutdown/result",
+      "schema": "HostShutdownResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/create",
+      "name": "session/create",
+      "schema": "SessionCreateRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/create",
+      "name": "session/create/result",
+      "schema": "SessionCreateResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/resume",
+      "name": "session/resume",
+      "schema": "SessionResumeRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/resume",
+      "name": "session/resume/result",
+      "schema": "SessionResumeResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/close",
+      "name": "session/close",
+      "schema": "SessionCloseRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/close",
+      "name": "session/close/result",
+      "schema": "SessionCloseResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/abort",
+      "name": "session/abort",
+      "schema": "SessionAbortRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/abort",
+      "name": "session/abort/result",
+      "schema": "SessionAbortResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/prompt",
+      "name": "session/prompt",
+      "schema": "SessionPromptRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/prompt",
+      "name": "session/prompt/result",
+      "schema": "SessionPromptResponse"
+    },
+    {
+      "kind": "request",
+      "method": "trust/get",
+      "name": "trust/get",
+      "schema": "TrustGetRequest"
+    },
+    {
+      "kind": "response",
+      "method": "trust/get",
+      "name": "trust/get/result",
+      "schema": "TrustGetResponse"
+    },
+    {
       "kind": "notification",
       "method": "turn/started",
       "name": "turn/started",

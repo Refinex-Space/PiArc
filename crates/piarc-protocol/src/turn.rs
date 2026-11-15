@@ -2,11 +2,13 @@
 //!
 //! A session runs turns; a turn produces items (agent messages, tool calls, ...). Each item
 //! goes `item/started` → optional deltas → `item/completed`, identified by
-//! `sessionId / turnId / itemId`. This module defines the skeleton; item types beyond
-//! `agentMessage` are added by the tasks that need them.
+//! `sessionId / turnId / itemId`. This module defines the skeleton: `agentMessage` and the
+//! generic `dynamicToolCall`; the specialised tool items (`commandExecution`, `fileChange`,
+//! ...) are added by the tasks that need them.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 
 use crate::method::{Method, NotificationMethod};
 use crate::session::SessionEventHeader;
@@ -67,6 +69,20 @@ pub enum Item {
         /// The message text accumulated so far (complete in `item/completed`).
         text: String,
     },
+    /// A tool call without a specialised item type.
+    DynamicToolCall {
+        /// The item's identifier: the tool call id.
+        item_id: ItemId,
+        /// Lifecycle state.
+        status: ItemStatus,
+        /// The tool's name.
+        tool: String,
+        /// The arguments the tool was called with.
+        arguments: Map<String, Value>,
+        /// The text the tool returned, in `item/completed`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        output: Option<String>,
+    },
 }
 
 impl Item {
@@ -74,7 +90,7 @@ impl Item {
     #[must_use]
     pub fn item_id(&self) -> &ItemId {
         match self {
-            Self::AgentMessage { item_id, .. } => item_id,
+            Self::AgentMessage { item_id, .. } | Self::DynamicToolCall { item_id, .. } => item_id,
         }
     }
 
@@ -82,7 +98,7 @@ impl Item {
     #[must_use]
     pub fn status(&self) -> ItemStatus {
         match self {
-            Self::AgentMessage { status, .. } => *status,
+            Self::AgentMessage { status, .. } | Self::DynamicToolCall { status, .. } => *status,
         }
     }
 }
@@ -109,6 +125,9 @@ pub struct TurnCompletedParams {
     pub turn_id: TurnId,
     /// How it ended.
     pub status: TurnStatus,
+    /// What went wrong, when `status` is `failed`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
 }
 
 /// Parameters of `item/started` and `item/completed`.

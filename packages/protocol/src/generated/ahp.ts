@@ -11,6 +11,22 @@ export type AhpMessage =
   | SessionEventNotification
   | HostHelloRequest
   | HostHelloResponse
+  | HostPingRequest
+  | HostPingResponse
+  | HostShutdownRequest
+  | HostShutdownResponse
+  | SessionCreateRequest
+  | SessionCreateResponse
+  | SessionResumeRequest
+  | SessionResumeResponse
+  | SessionCloseRequest
+  | SessionCloseResponse
+  | SessionAbortRequest
+  | SessionAbortResponse
+  | SessionPromptRequest
+  | SessionPromptResponse
+  | TrustGetRequest
+  | TrustGetResponse
   | TurnStartedNotification
   | TurnCompletedNotification
   | ItemStartedNotification
@@ -36,7 +52,12 @@ export type ErrorKind =
   | 'protocolVersionMismatch'
   | 'frameTooLarge'
   | 'shuttingDown'
-  | 'busy';
+  | 'busy'
+  | 'timeout'
+  | 'uncertain'
+  | 'hostUnavailable'
+  | 'sessionNotFound'
+  | 'sessionBusy';
 /**
  * Session identifier.
  */
@@ -64,21 +85,47 @@ export type TurnStatus = 'completed' | 'failed' | 'interrupted';
  * An item in its current state, discriminated by the `type` member. Every variant
  * carries `itemId` and `status`.
  */
-export type Item = {
-  /**
-   * The item's identifier.
-   */
-  itemId: ItemId;
-  /**
-   * Lifecycle state.
-   */
-  status: ItemStatus;
-  /**
-   * The message text accumulated so far (complete in `item/completed`).
-   */
-  text: string;
-  type: 'agentMessage';
-};
+export type Item =
+  | {
+      /**
+       * The item's identifier.
+       */
+      itemId: ItemId;
+      /**
+       * Lifecycle state.
+       */
+      status: ItemStatus;
+      /**
+       * The message text accumulated so far (complete in `item/completed`).
+       */
+      text: string;
+      type: 'agentMessage';
+    }
+  | {
+      /**
+       * The arguments the tool was called with.
+       */
+      arguments: {
+        [k: string]: unknown;
+      };
+      /**
+       * The item's identifier: the tool call id.
+       */
+      itemId: ItemId;
+      /**
+       * The text the tool returned, in `item/completed`.
+       */
+      output?: string | null;
+      /**
+       * Lifecycle state.
+       */
+      status: ItemStatus;
+      /**
+       * The tool's name.
+       */
+      tool: string;
+      type: 'dynamicToolCall';
+    };
 /**
  * Item identifier, unique within a session.
  */
@@ -295,6 +342,326 @@ export interface CoreWelcome {
   workspace: string;
 }
 /**
+ * Request for `host/ping`.
+ */
+export interface HostPingRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'host/ping';
+  params: HostPingParams;
+}
+/**
+ * Parameters of `host/ping`.
+ */
+export interface HostPingParams {
+  /**
+   * Core's send time in milliseconds since the Unix epoch, echoed in the result.
+   */
+  sentAt: number;
+}
+/**
+ * Successful response to `host/ping`.
+ */
+export interface HostPingResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: HostStatus;
+}
+/**
+ * Result of `host/ping`: liveness plus resource counters of the Agent Host.
+ */
+export interface HostStatus {
+  /**
+   * Highest `outboundQueuedBytes` since the process started.
+   */
+  outboundPeakBytes: number;
+  /**
+   * Bytes of those frames.
+   */
+  outboundQueuedBytes: number;
+  /**
+   * Frames waiting to be written to stdout right now.
+   */
+  outboundQueuedFrames: number;
+  /**
+   * Resident set size of the Agent Host process, in bytes.
+   */
+  rssBytes: number;
+  /**
+   * `sentAt` of the ping being answered.
+   */
+  sentAt: number;
+  /**
+   * Number of open sessions.
+   */
+  sessions: number;
+}
+/**
+ * Request for `host/shutdown`.
+ */
+export interface HostShutdownRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'host/shutdown';
+  params: HostShutdownParams;
+}
+/**
+ * Parameters of `host/shutdown`.
+ */
+export interface HostShutdownParams {
+  /**
+   * Why Core asks the Agent Host to exit, for its log (for example `idle` or `appQuit`).
+   */
+  reason: string;
+}
+/**
+ * Successful response to `host/shutdown`.
+ */
+export interface HostShutdownResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: HostShutdownResult;
+}
+/**
+ * Result of `host/shutdown`, sent once every session is closed and before the process
+ * exits.
+ */
+export interface HostShutdownResult {
+  /**
+   * Number of sessions that were closed.
+   */
+  closedSessions: number;
+}
+/**
+ * Request for `session/create`.
+ */
+export interface SessionCreateRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/create';
+  params: SessionCreateParams;
+}
+/**
+ * Parameters of `session/create`.
+ */
+export interface SessionCreateParams {
+  /**
+   * Absolute working directory of the session: tools resolve relative paths against it.
+   */
+  cwd: string;
+  /**
+   * Model to start with; the Agent Host's configured default when absent.
+   */
+  model?: ModelRef | null;
+}
+/**
+ * Selects a model by provider id and model id, for example `anthropic` / `claude-opus-5-5`.
+ */
+export interface ModelRef {
+  /**
+   * Model id within the provider.
+   */
+  id: string;
+  /**
+   * Provider id.
+   */
+  provider: string;
+}
+/**
+ * Successful response to `session/create`.
+ */
+export interface SessionCreateResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SessionOpened;
+}
+/**
+ * Result of `session/create` and `session/resume`.
+ */
+export interface SessionOpened {
+  /**
+   * Number of conversation messages restored from the session file (0 for a new session).
+   */
+  restoredMessages: number;
+  /**
+   * The session's id: new for `session/create`, the requested one for `session/resume`.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Request for `session/resume`.
+ */
+export interface SessionResumeRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/resume';
+  params: SessionResumeParams;
+}
+/**
+ * Parameters of `session/resume`.
+ */
+export interface SessionResumeParams {
+  /**
+   * Its working directory, as given to `session/create`.
+   */
+  cwd: string;
+  /**
+   * The session to reopen.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `session/resume`.
+ */
+export interface SessionResumeResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SessionOpened;
+}
+/**
+ * Request for `session/close`.
+ */
+export interface SessionCloseRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/close';
+  params: SessionTarget;
+}
+/**
+ * Parameters of `session/close` and `session/abort`.
+ */
+export interface SessionTarget {
+  /**
+   * The session to act on.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `session/close`.
+ */
+export interface SessionCloseResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SessionStopped;
+}
+/**
+ * Result of `session/close` and `session/abort`.
+ */
+export interface SessionStopped {
+  /**
+   * The turn that was running and got interrupted, if any.
+   */
+  interruptedTurnId?: TurnId | null;
+  /**
+   * The session acted on.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Request for `session/abort`.
+ */
+export interface SessionAbortRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/abort';
+  params: SessionTarget;
+}
+/**
+ * Successful response to `session/abort`.
+ */
+export interface SessionAbortResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SessionStopped;
+}
+/**
+ * Request for `session/prompt`.
+ */
+export interface SessionPromptRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/prompt';
+  params: SessionPromptParams;
+}
+/**
+ * Parameters of `session/prompt`.
+ */
+export interface SessionPromptParams {
+  /**
+   * Idempotency key chosen by Core; repeating it returns the turn already started.
+   */
+  requestId: string;
+  /**
+   * The session to prompt.
+   */
+  sessionId: SessionId;
+  /**
+   * The user's input.
+   */
+  text: string;
+}
+/**
+ * Successful response to `session/prompt`.
+ */
+export interface SessionPromptResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: PromptAccepted;
+}
+/**
+ * Result of `session/prompt`: the turn was accepted and will report `turn/started` and
+ * `turn/completed` with this id.
+ */
+export interface PromptAccepted {
+  /**
+   * The turn running the prompt.
+   */
+  turnId: TurnId;
+}
+/**
+ * Request for `trust/get`.
+ */
+export interface TrustGetRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'trust/get';
+  params: TrustGetParams;
+}
+/**
+ * Parameters of `trust/get`.
+ */
+export interface TrustGetParams {
+  /**
+   * Absolute path of the directory, normally a session's working directory.
+   */
+  path: string;
+}
+/**
+ * Successful response to `trust/get`.
+ */
+export interface TrustGetResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: TrustStatus;
+}
+/**
+ * Result of `trust/get`.
+ */
+export interface TrustStatus {
+  /**
+   * Whether project-level resources in that directory may be loaded.
+   */
+  trusted: boolean;
+}
+/**
  * Notification `turn/started`.
  */
 export interface TurnStartedNotification {
@@ -335,6 +702,10 @@ export interface TurnCompletedNotification {
  * Parameters of `turn/completed`.
  */
 export interface TurnCompletedParams {
+  /**
+   * What went wrong, when `status` is `failed`.
+   */
+  errorMessage?: string | null;
   /**
    * Sequence number, monotonically increasing within the session.
    */

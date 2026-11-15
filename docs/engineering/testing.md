@@ -100,7 +100,7 @@ CI（`.github/workflows/ci.yml`）在 `macos-latest`（arm64）与 `windows-late
 
 ### 7.3 新增协议消息的步骤
 
-1. 改 Rust 类型：在 `piarc-protocol` 中定义参数与结果类型和方法标记（实现 `RequestMethod` 或 `NotificationMethod`），并在 `contract.rs` 的 `CONTRACTS` 中登记。请求方法登记两个契约：请求（契约名即方法名）和成功响应（自定名称，例如 `host/hello` 的响应是 `core/welcome`）。
+1. 改 Rust 类型：在 `piarc-protocol` 中定义参数与结果类型和方法标记（实现 `RequestMethod` 或 `NotificationMethod`），并在 `contract.rs` 的 `CONTRACTS` 中登记。请求方法登记两个契约：请求（契约名即方法名）和成功响应（契约名 `<方法>/result`，例如 `session/create/result`；`host/hello` 的响应沿用 `core/welcome`）。
 2. 运行 `npm run gen:protocol`，提交 `packages/protocol/schema/` 与 `packages/protocol/src/generated/` 的变化。
 3. 在 `tests/contracts/<契约名>/` 下加合法样本，在 `invalid/` 下加反例。
 4. 跑两侧测试：`cargo test -p piarc-protocol` 与 `npx vitest run packages/protocol`；再跑 `node scripts/ci/check-protocol-drift.mjs` 与 `node scripts/ci/check-contract-samples.mjs`。

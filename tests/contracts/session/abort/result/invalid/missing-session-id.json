@@ -1,0 +1,7 @@
+{
+  "jsonrpc": "2.0",
+  "id": 13,
+  "result": {
+    "interruptedTurnId": "turn-7c1f"
+  }
+}

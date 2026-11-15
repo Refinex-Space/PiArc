@@ -132,6 +132,31 @@
           "const": "busy",
           "description": "The receiver's queue is full; retrying later can succeed. Core API only: not sent\nover AHP until a capability introduces it.",
           "type": "string"
+        },
+        {
+          "const": "timeout",
+          "description": "No response arrived within the request's timeout; whether the request took effect is\nunknown.",
+          "type": "string"
+        },
+        {
+          "const": "uncertain",
+          "description": "The connection to the Agent Host ended before the request reached a final state; it\nmay or may not have taken effect, and it is not replayed. Core API only.",
+          "type": "string"
+        },
+        {
+          "const": "hostUnavailable",
+          "description": "The Agent Host is not connected: it is starting, restarting or stopped. Core API only.",
+          "type": "string"
+        },
+        {
+          "const": "sessionNotFound",
+          "description": "No open session has the given id.",
+          "type": "string"
+        },
+        {
+          "const": "sessionBusy",
+          "description": "The session is running a turn and cannot start another one yet.",
+          "type": "string"
         }
       ]
     },
@@ -241,6 +266,167 @@
       "required": ["jsonrpc", "id", "result"],
       "type": "object"
     },
+    "HostPingParams": {
+      "description": "Parameters of `host/ping`.",
+      "properties": {
+        "sentAt": {
+          "description": "Core's send time in milliseconds since the Unix epoch, echoed in the result.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["sentAt"],
+      "type": "object"
+    },
+    "HostPingRequest": {
+      "description": "Request for `host/ping`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "host/ping",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/HostPingParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "HostPingResponse": {
+      "description": "Successful response to `host/ping`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/HostStatus"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "HostShutdownParams": {
+      "description": "Parameters of `host/shutdown`.",
+      "properties": {
+        "reason": {
+          "description": "Why Core asks the Agent Host to exit, for its log (for example `idle` or `appQuit`).",
+          "type": "string"
+        }
+      },
+      "required": ["reason"],
+      "type": "object"
+    },
+    "HostShutdownRequest": {
+      "description": "Request for `host/shutdown`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "host/shutdown",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/HostShutdownParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "HostShutdownResponse": {
+      "description": "Successful response to `host/shutdown`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/HostShutdownResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "HostShutdownResult": {
+      "description": "Result of `host/shutdown`, sent once every session is closed and before the process\nexits.",
+      "properties": {
+        "closedSessions": {
+          "description": "Number of sessions that were closed.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["closedSessions"],
+      "type": "object"
+    },
+    "HostStatus": {
+      "description": "Result of `host/ping`: liveness plus resource counters of the Agent Host.",
+      "properties": {
+        "outboundPeakBytes": {
+          "description": "Highest `outboundQueuedBytes` since the process started.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outboundQueuedBytes": {
+          "description": "Bytes of those frames.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outboundQueuedFrames": {
+          "description": "Frames waiting to be written to stdout right now.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rssBytes": {
+          "description": "Resident set size of the Agent Host process, in bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sentAt": {
+          "description": "`sentAt` of the ping being answered.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessions": {
+          "description": "Number of open sessions.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "sentAt",
+        "rssBytes",
+        "outboundQueuedFrames",
+        "outboundQueuedBytes",
+        "outboundPeakBytes",
+        "sessions"
+      ],
+      "type": "object"
+    },
     "Item": {
       "description": "An item in its current state, discriminated by the `type` member. Every variant\ncarries `itemId` and `status`.",
       "oneOf": [
@@ -265,6 +451,38 @@
             }
           },
           "required": ["type", "itemId", "status", "text"],
+          "type": "object"
+        },
+        {
+          "description": "A tool call without a specialised item type.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "description": "The arguments the tool was called with.",
+              "type": "object"
+            },
+            "itemId": {
+              "$ref": "#/$defs/ItemId",
+              "description": "The item's identifier: the tool call id."
+            },
+            "output": {
+              "description": "The text the tool returned, in `item/completed`.",
+              "type": ["string", "null"]
+            },
+            "status": {
+              "$ref": "#/$defs/ItemStatus",
+              "description": "Lifecycle state."
+            },
+            "tool": {
+              "description": "The tool's name.",
+              "type": "string"
+            },
+            "type": {
+              "const": "dynamicToolCall",
+              "type": "string"
+            }
+          },
+          "required": ["type", "itemId", "status", "tool", "arguments"],
           "type": "object"
         }
       ]
@@ -389,6 +607,21 @@
       "const": "2.0",
       "type": "string"
     },
+    "ModelRef": {
+      "description": "Selects a model by provider id and model id, for example `anthropic` / `claude-opus-5-5`.",
+      "properties": {
+        "id": {
+          "description": "Model id within the provider.",
+          "type": "string"
+        },
+        "provider": {
+          "description": "Provider id.",
+          "type": "string"
+        }
+      },
+      "required": ["provider", "id"],
+      "type": "object"
+    },
     "Notification": {
       "description": "A notification (no `id`, no response) whose method is not interpreted.",
       "properties": {
@@ -407,6 +640,17 @@
         }
       },
       "required": ["jsonrpc", "method"],
+      "type": "object"
+    },
+    "PromptAccepted": {
+      "description": "Result of `session/prompt`: the turn was accepted and will report `turn/started` and\n`turn/completed` with this id.",
+      "properties": {
+        "turnId": {
+          "$ref": "#/$defs/TurnId",
+          "description": "The turn running the prompt."
+        }
+      },
+      "required": ["turnId"],
       "type": "object"
     },
     "ProtocolVersion": {
@@ -451,6 +695,139 @@
         }
       ],
       "description": "A request id: an integer or a string. `null` and fractional numbers are not accepted."
+    },
+    "SessionAbortRequest": {
+      "description": "Request for `session/abort`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/abort",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SessionTarget"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionAbortResponse": {
+      "description": "Successful response to `session/abort`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SessionStopped"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SessionCloseRequest": {
+      "description": "Request for `session/close`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/close",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SessionTarget"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionCloseResponse": {
+      "description": "Successful response to `session/close`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SessionStopped"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SessionCreateParams": {
+      "description": "Parameters of `session/create`.",
+      "properties": {
+        "cwd": {
+          "description": "Absolute working directory of the session: tools resolve relative paths against it.",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Model to start with; the Agent Host's configured default when absent."
+        }
+      },
+      "required": ["cwd"],
+      "type": "object"
+    },
+    "SessionCreateRequest": {
+      "description": "Request for `session/create`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/create",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SessionCreateParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionCreateResponse": {
+      "description": "Successful response to `session/create`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SessionOpened"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
     },
     "SessionEventNotification": {
       "description": "Any session notification, read without interpreting its method: header plus payload.\nCore uses it to track `seq` for every session event.",
@@ -499,6 +876,164 @@
       "description": "Session identifier.",
       "type": "string"
     },
+    "SessionOpened": {
+      "description": "Result of `session/create` and `session/resume`.",
+      "properties": {
+        "restoredMessages": {
+          "description": "Number of conversation messages restored from the session file (0 for a new session).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session's id: new for `session/create`, the requested one for `session/resume`."
+        }
+      },
+      "required": ["sessionId", "restoredMessages"],
+      "type": "object"
+    },
+    "SessionPromptParams": {
+      "description": "Parameters of `session/prompt`.",
+      "properties": {
+        "requestId": {
+          "description": "Idempotency key chosen by Core; repeating it returns the turn already started.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session to prompt."
+        },
+        "text": {
+          "description": "The user's input.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "requestId", "text"],
+      "type": "object"
+    },
+    "SessionPromptRequest": {
+      "description": "Request for `session/prompt`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/prompt",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SessionPromptParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionPromptResponse": {
+      "description": "Successful response to `session/prompt`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/PromptAccepted"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SessionResumeParams": {
+      "description": "Parameters of `session/resume`.",
+      "properties": {
+        "cwd": {
+          "description": "Its working directory, as given to `session/create`.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session to reopen."
+        }
+      },
+      "required": ["sessionId", "cwd"],
+      "type": "object"
+    },
+    "SessionResumeRequest": {
+      "description": "Request for `session/resume`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/resume",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SessionResumeParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionResumeResponse": {
+      "description": "Successful response to `session/resume`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SessionOpened"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SessionStopped": {
+      "description": "Result of `session/close` and `session/abort`.",
+      "properties": {
+        "interruptedTurnId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The turn that was running and got interrupted, if any."
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session acted on."
+        }
+      },
+      "required": ["sessionId"],
+      "type": "object"
+    },
+    "SessionTarget": {
+      "description": "Parameters of `session/close` and `session/abort`.",
+      "properties": {
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session to act on."
+        }
+      },
+      "required": ["sessionId"],
+      "type": "object"
+    },
     "SuccessResponse": {
       "description": "A successful response. It has `result` and must not have `error`.",
       "properties": {
@@ -516,6 +1051,65 @@
         }
       },
       "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "TrustGetParams": {
+      "description": "Parameters of `trust/get`.",
+      "properties": {
+        "path": {
+          "description": "Absolute path of the directory, normally a session's working directory.",
+          "type": "string"
+        }
+      },
+      "required": ["path"],
+      "type": "object"
+    },
+    "TrustGetRequest": {
+      "description": "Request for `trust/get`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "trust/get",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/TrustGetParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "TrustGetResponse": {
+      "description": "Successful response to `trust/get`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/TrustStatus"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "TrustStatus": {
+      "description": "Result of `trust/get`.",
+      "properties": {
+        "trusted": {
+          "description": "Whether project-level resources in that directory may be loaded.",
+          "type": "boolean"
+        }
+      },
+      "required": ["trusted"],
       "type": "object"
     },
     "TurnCompletedNotification": {
@@ -538,6 +1132,10 @@
     "TurnCompletedParams": {
       "description": "Parameters of `turn/completed`.",
       "properties": {
+        "errorMessage": {
+          "description": "What went wrong, when `status` is `failed`.",
+          "type": ["string", "null"]
+        },
         "seq": {
           "description": "Sequence number, monotonically increasing within the session.",
           "format": "uint64",
@@ -657,6 +1255,54 @@
     },
     {
       "$ref": "#/$defs/HostHelloResponse"
+    },
+    {
+      "$ref": "#/$defs/HostPingRequest"
+    },
+    {
+      "$ref": "#/$defs/HostPingResponse"
+    },
+    {
+      "$ref": "#/$defs/HostShutdownRequest"
+    },
+    {
+      "$ref": "#/$defs/HostShutdownResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionCreateRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionCreateResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionResumeRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionResumeResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionCloseRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionCloseResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionAbortRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionAbortResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionPromptRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionPromptResponse"
+    },
+    {
+      "$ref": "#/$defs/TrustGetRequest"
+    },
+    {
+      "$ref": "#/$defs/TrustGetResponse"
     },
     {
       "$ref": "#/$defs/TurnStartedNotification"

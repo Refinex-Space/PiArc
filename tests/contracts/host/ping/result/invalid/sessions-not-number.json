@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "result": {
+    "sentAt": 1763200000000,
+    "rssBytes": 125829120,
+    "outboundQueuedFrames": 0,
+    "outboundQueuedBytes": 0,
+    "outboundPeakBytes": 65536,
+    "sessions": "2"
+  }
+}

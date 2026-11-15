@@ -16,9 +16,14 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::handshake::HostHello;
+use crate::host::{HostPing, HostShutdown};
 use crate::jsonrpc::{ErrorResponse, Notification, Request, SuccessResponse};
 use crate::method::{Method, NotificationMessage, RequestMessage, ResultMessage};
-use crate::session::SessionEventNotification;
+use crate::session::{
+    SessionAbort, SessionClose, SessionCreate, SessionEventNotification, SessionPrompt,
+    SessionResume,
+};
+use crate::trust::TrustGet;
 use crate::turn::{ItemAgentMessageDelta, ItemCompleted, ItemStarted, TurnCompleted, TurnStarted};
 
 /// What a contract describes.
@@ -120,8 +125,9 @@ const fn notification<M: crate::method::NotificationMethod>() -> Contract {
 
 /// Every contract, in export order.
 ///
-/// Method contracts are named after their method. A response contract has its own name
-/// (`core/welcome` for `host/hello`). Top-level message types use the reserved families
+/// Method contracts are named after their method. A response contract has its own name:
+/// `core/welcome` for `host/hello`, `<method>/result` for later request methods. Top-level
+/// message types use the reserved families
 /// `jsonrpc/` and `envelope/`, which no method may use; `framing/` holds the frame codec
 /// cases and is not a contract either.
 pub static CONTRACTS: &[Contract] = &[
@@ -132,6 +138,22 @@ pub static CONTRACTS: &[Contract] = &[
     entry::<SessionEventNotification>("envelope/sessionEvent", ContractKind::Message, None),
     request::<HostHello>(HostHello::NAME),
     response::<HostHello>("core/welcome"),
+    request::<HostPing>(HostPing::NAME),
+    response::<HostPing>("host/ping/result"),
+    request::<HostShutdown>(HostShutdown::NAME),
+    response::<HostShutdown>("host/shutdown/result"),
+    request::<SessionCreate>(SessionCreate::NAME),
+    response::<SessionCreate>("session/create/result"),
+    request::<SessionResume>(SessionResume::NAME),
+    response::<SessionResume>("session/resume/result"),
+    request::<SessionClose>(SessionClose::NAME),
+    response::<SessionClose>("session/close/result"),
+    request::<SessionAbort>(SessionAbort::NAME),
+    response::<SessionAbort>("session/abort/result"),
+    request::<SessionPrompt>(SessionPrompt::NAME),
+    response::<SessionPrompt>("session/prompt/result"),
+    request::<TrustGet>(TrustGet::NAME),
+    response::<TrustGet>("trust/get/result"),
     notification::<TurnStarted>(),
     notification::<TurnCompleted>(),
     notification::<ItemStarted>(),

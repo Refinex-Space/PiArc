@@ -298,7 +298,7 @@ T06（开工 2026-11-15，基线 `npm run verify` 13/13 通过；T04 的遗留�
 
 - [x] C1 锁定 Pi 1.5.2：`agent-host` 与 `packages/testkit` 统一版本，基线文档写版本差异，`reference/pi` 检出 v1.5.2，更新 `REFERENCES.md`（A01，I14）
 - [x] C2 ESLint 禁止深度导入 `@earendil-works/*`，放行 `exports` 子路径（A02，I15）
-- [ ] C3 协议：`host/ping`、`host/shutdown`、`session/*` 最小方法集、工具 item 类型，样本与反例
+- [x] C3 协议：`host/ping`、`host/shutdown`、`session/*` 最小方法集、工具 item 类型，样本与反例
 - [ ] C4 agent-host：stdio 接管、帧收发、握手、SIGTERM 有序退出、Core 桥接（统一超时）
 - [ ] C5 agent-host：会话注册表（`createAgentSession`、文件型 `SessionManager`、`agentDir`）、最小投影与 `seq`（A10，I08）
 - [ ] C6 agent-host：esbuild 单文件 bundle（node22.19）与外部依赖清单

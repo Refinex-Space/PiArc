@@ -44,6 +44,17 @@ pub mod code {
     pub const SHUTTING_DOWN: i64 = -32002;
     /// The receiver's queue is full; the same request can succeed later.
     pub const BUSY: i64 = -32003;
+    /// No response arrived within the request's timeout.
+    pub const TIMEOUT: i64 = -32004;
+    /// The connection ended before the request reached a final state; it may or may not have
+    /// taken effect.
+    pub const UNCERTAIN: i64 = -32005;
+    /// The Agent Host is not connected (starting, restarting or stopped).
+    pub const HOST_UNAVAILABLE: i64 = -32006;
+    /// No open session has the given id.
+    pub const SESSION_NOT_FOUND: i64 = -32007;
+    /// The session is running a turn and cannot start another.
+    pub const SESSION_BUSY: i64 = -32008;
 }
 
 /// JSON-RPC 2.0 error object with PiArc's mandatory structured `data`.
@@ -98,6 +109,18 @@ pub enum ErrorKind {
     /// The receiver's queue is full; retrying later can succeed. Core API only: not sent
     /// over AHP until a capability introduces it.
     Busy,
+    /// No response arrived within the request's timeout; whether the request took effect is
+    /// unknown.
+    Timeout,
+    /// The connection to the Agent Host ended before the request reached a final state; it
+    /// may or may not have taken effect, and it is not replayed. Core API only.
+    Uncertain,
+    /// The Agent Host is not connected: it is starting, restarting or stopped. Core API only.
+    HostUnavailable,
+    /// No open session has the given id.
+    SessionNotFound,
+    /// The session is running a turn and cannot start another one yet.
+    SessionBusy,
 }
 
 impl ErrorKind {
@@ -114,6 +137,11 @@ impl ErrorKind {
             Self::FrameTooLarge => code::FRAME_TOO_LARGE,
             Self::ShuttingDown => code::SHUTTING_DOWN,
             Self::Busy => code::BUSY,
+            Self::Timeout => code::TIMEOUT,
+            Self::Uncertain => code::UNCERTAIN,
+            Self::HostUnavailable => code::HOST_UNAVAILABLE,
+            Self::SessionNotFound => code::SESSION_NOT_FOUND,
+            Self::SessionBusy => code::SESSION_BUSY,
         }
     }
 }
@@ -138,7 +166,7 @@ impl ErrorObject {
 mod tests {
     use super::*;
 
-    const ALL_KINDS: [ErrorKind; 9] = [
+    const ALL_KINDS: [ErrorKind; 14] = [
         ErrorKind::ParseError,
         ErrorKind::InvalidRequest,
         ErrorKind::MethodNotFound,
@@ -148,6 +176,11 @@ mod tests {
         ErrorKind::FrameTooLarge,
         ErrorKind::ShuttingDown,
         ErrorKind::Busy,
+        ErrorKind::Timeout,
+        ErrorKind::Uncertain,
+        ErrorKind::HostUnavailable,
+        ErrorKind::SessionNotFound,
+        ErrorKind::SessionBusy,
     ];
 
     #[test]
