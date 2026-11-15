@@ -1,0 +1,11 @@
+{
+  "name": "@piarc/testkit",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Test-only checks that drive the strict mock provider (piarc-testkit) with real model clients.",
+  "license": "MIT",
+  "type": "module",
+  "devDependencies": {
+    "@earendil-works/pi-ai": "1.5.2"
+  }
+}

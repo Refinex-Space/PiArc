@@ -7,7 +7,8 @@
   "workspaces": [
     "apps/desktop",
     "agent-host",
-    "packages/protocol"
+    "packages/protocol",
+    "packages/testkit"
   ],
   "scripts": {
     "verify": "node scripts/dev/verify.mjs",

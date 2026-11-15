@@ -2,9 +2,20 @@
   "$schema": "https://json.schemastore.org/tsconfig",
   "files": [],
   "references": [
-    { "path": "packages/protocol" },
-    { "path": "agent-host" },
-    { "path": "apps/desktop" },
-    { "path": "scripts" }
+    {
+      "path": "packages/protocol"
+    },
+    {
+      "path": "packages/testkit"
+    },
+    {
+      "path": "agent-host"
+    },
+    {
+      "path": "apps/desktop"
+    },
+    {
+      "path": "scripts"
+    }
   ]
 }
