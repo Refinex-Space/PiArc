@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "id": 17,
+  "method": "fs/write",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": "notes/日志 1.txt",
+    "content": "第一行\n",
+    "origin": {
+      "tool": "Write",
+      "toolCallId": "toolu_02"
+    }
+  }
+}

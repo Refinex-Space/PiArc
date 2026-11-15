@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 21,
+  "method": "fs/glob",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": ".",
+    "pattern": "*",
+    "exclude": "**/.git/**"
+  }
+}

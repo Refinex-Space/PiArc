@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 16,
+  "result": {
+    "path": "/Users/dev/work space/项目/logo.png",
+    "size": 5120,
+    "offset": 0,
+    "bytesRead": 5120,
+    "eof": true,
+    "blob": {
+      "path": "/Users/dev/Library/Application Support/PiArc/sessions/sess-7f3a/blobs/9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "size": 5120
+    }
+  }
+}

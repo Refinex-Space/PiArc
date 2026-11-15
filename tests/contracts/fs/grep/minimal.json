@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 24,
+  "method": "fs/grep",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": "src/main 主.ts",
+    "pattern": "待办"
+  }
+}

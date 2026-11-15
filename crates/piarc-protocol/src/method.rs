@@ -110,6 +110,27 @@ impl<M: Method> JsonSchema for MethodName<M> {
     }
 }
 
+/// Defines the marker type of a request method: `request!(/// docs Marker, "name", Params,
+/// Result);`. The marker's `TYPE_NAME` is its own name.
+macro_rules! request {
+    ($(#[$doc:meta])* $marker:ident, $name:literal, $params:ty, $result:ty) => {
+        $(#[$doc])*
+        #[derive(Debug, Clone, Copy)]
+        pub struct $marker;
+
+        impl $crate::method::Method for $marker {
+            const NAME: &'static str = $name;
+            const TYPE_NAME: &'static str = stringify!($marker);
+        }
+
+        impl $crate::method::RequestMethod for $marker {
+            type Params = $params;
+            type Result = $result;
+        }
+    };
+}
+pub(crate) use request;
+
 /// A request for method `M`.
 #[derive(Serialize, Deserialize)]
 #[serde(bound(serialize = "", deserialize = ""))]

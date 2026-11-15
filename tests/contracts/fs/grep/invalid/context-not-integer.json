@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 23,
+  "method": "fs/grep",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": ".",
+    "pattern": "x",
+    "context": "2"
+  }
+}

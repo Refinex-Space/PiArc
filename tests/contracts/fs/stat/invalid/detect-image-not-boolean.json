@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 11,
+  "method": "fs/stat",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": "a.png",
+    "detectImage": "yes"
+  }
+}

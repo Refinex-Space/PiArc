@@ -20,7 +20,7 @@ AHP 的 TypeScript 类型（由 `piarc-protocol` 生成）、`PROTOCOL_VERSION` 
 
 ## 易错点
 
-- ajv 要用 `ajv/dist/2020.js` 的 `Ajv2020`（schema 是 draft 2020-12），并为 schemars 输出的 `int64`、`uint64` 注册格式，否则 strict 模式报错。
+- ajv 要用 `ajv/dist/2020.js` 的 `Ajv2020`（schema 是 draft 2020-12），并为 schemars 输出的 `int32`、`int64`、`uint64` 注册格式，否则 strict 模式报错。
 - `JSON.stringify` 会把孤立代理项写成 `\udXXX` 转义，Rust 端无法解码；`encodeFrame` 遇到这种字符串直接抛 `TypeError`。流式文本按 UTF-16 切分时可能产生孤立代理项，发送前要先处理。
 - 解码器拒绝嵌套超过 `MAX_NESTING`（127）层的 JSON，与 serde_json 一致。
 

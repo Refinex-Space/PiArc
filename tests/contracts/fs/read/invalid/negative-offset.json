@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 14,
+  "method": "fs/read",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": "a.txt",
+    "offset": -1
+  }
+}

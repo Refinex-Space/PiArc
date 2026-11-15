@@ -55,6 +55,7 @@ const ajv = new Ajv2020({
   allErrors: true,
   // Integer formats emitted by schemars; `minimum` carries the sign constraint too.
   formats: {
+    int32: { type: 'number', validate: (n: number) => integer(-(2 ** 31))(n) && n < 2 ** 31 },
     int64: { type: 'number', validate: integer(Number.MIN_SAFE_INTEGER) },
     uint64: { type: 'number', validate: integer(0) },
   },

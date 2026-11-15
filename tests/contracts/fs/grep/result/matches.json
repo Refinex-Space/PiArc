@@ -1,0 +1,30 @@
+{
+  "jsonrpc": "2.0",
+  "id": 23,
+  "result": {
+    "path": "/Users/dev/work space/项目",
+    "isDirectory": true,
+    "lines": [
+      {
+        "path": "src/main.rs",
+        "lineNumber": 3,
+        "text": "// entry",
+        "isMatch": false
+      },
+      {
+        "path": "src/main.rs",
+        "lineNumber": 4,
+        "text": "fn main() {",
+        "isMatch": true
+      },
+      {
+        "path": "src/main.rs",
+        "lineNumber": 5,
+        "text": "    run();",
+        "isMatch": false
+      }
+    ],
+    "matchCount": 1,
+    "limitReached": false
+  }
+}

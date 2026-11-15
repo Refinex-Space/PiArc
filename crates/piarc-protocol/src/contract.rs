@@ -15,6 +15,8 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
+use crate::exec::{ExecKill, ExecOutput, ExecRun};
+use crate::fs::{FsGlob, FsGrep, FsList, FsMkdir, FsRead, FsStat, FsWrite};
 use crate::handshake::HostHello;
 use crate::host::{HostPing, HostShutdown};
 use crate::jsonrpc::{ErrorResponse, Notification, Request, SuccessResponse};
@@ -154,6 +156,25 @@ pub static CONTRACTS: &[Contract] = &[
     response::<SessionPrompt>("session/prompt/result"),
     request::<TrustGet>(TrustGet::NAME),
     response::<TrustGet>("trust/get/result"),
+    request::<FsStat>(FsStat::NAME),
+    response::<FsStat>("fs/stat/result"),
+    request::<FsRead>(FsRead::NAME),
+    response::<FsRead>("fs/read/result"),
+    request::<FsWrite>(FsWrite::NAME),
+    response::<FsWrite>("fs/write/result"),
+    request::<FsMkdir>(FsMkdir::NAME),
+    response::<FsMkdir>("fs/mkdir/result"),
+    request::<FsList>(FsList::NAME),
+    response::<FsList>("fs/list/result"),
+    request::<FsGlob>(FsGlob::NAME),
+    response::<FsGlob>("fs/glob/result"),
+    request::<FsGrep>(FsGrep::NAME),
+    response::<FsGrep>("fs/grep/result"),
+    request::<ExecRun>(ExecRun::NAME),
+    response::<ExecRun>("exec/run/result"),
+    request::<ExecKill>(ExecKill::NAME),
+    response::<ExecKill>("exec/kill/result"),
+    notification::<ExecOutput>(),
     notification::<TurnStarted>(),
     notification::<TurnCompleted>(),
     notification::<ItemStarted>(),

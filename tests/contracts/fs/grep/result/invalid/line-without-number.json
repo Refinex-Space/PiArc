@@ -1,0 +1,17 @@
+{
+  "jsonrpc": "2.0",
+  "id": 23,
+  "result": {
+    "path": "/Users/dev/work space/项目",
+    "isDirectory": true,
+    "lines": [
+      {
+        "path": "a.rs",
+        "text": "x",
+        "isMatch": true
+      }
+    ],
+    "matchCount": 1,
+    "limitReached": false
+  }
+}

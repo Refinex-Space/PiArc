@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 28,
+  "method": "exec/kill",
+  "params": {
+    "sessionId": "sess-7f3a"
+  }
+}

@@ -53,7 +53,9 @@
 
 pub mod contract;
 mod error;
+pub mod exec;
 pub mod framing;
+pub mod fs;
 pub mod handshake;
 pub mod host;
 pub mod jsonrpc;
@@ -61,6 +63,7 @@ pub mod method;
 pub mod rpc_error;
 mod schema;
 pub mod session;
+pub mod tool_call;
 pub mod trust;
 pub mod turn;
 mod version;

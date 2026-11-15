@@ -1,0 +1,22 @@
+{
+  "jsonrpc": "2.0",
+  "id": 20,
+  "result": {
+    "path": "/Users/dev/work space/项目",
+    "entries": [
+      {
+        "name": ".gitignore",
+        "kind": "file"
+      },
+      {
+        "name": "src",
+        "kind": "directory"
+      },
+      {
+        "name": "说明.md",
+        "kind": "file"
+      }
+    ],
+    "truncated": false
+  }
+}

@@ -27,6 +27,25 @@ export type AhpMessage =
   | SessionPromptResponse
   | TrustGetRequest
   | TrustGetResponse
+  | FsStatRequest
+  | FsStatResponse
+  | FsReadRequest
+  | FsReadResponse
+  | FsWriteRequest
+  | FsWriteResponse
+  | FsMkdirRequest
+  | FsMkdirResponse
+  | FsListRequest
+  | FsListResponse
+  | FsGlobRequest
+  | FsGlobResponse
+  | FsGrepRequest
+  | FsGrepResponse
+  | ExecRunRequest
+  | ExecRunResponse
+  | ExecKillRequest
+  | ExecKillResponse
+  | ExecOutputNotification
   | TurnStartedNotification
   | TurnCompletedNotification
   | ItemStartedNotification
@@ -57,7 +76,10 @@ export type ErrorKind =
   | 'uncertain'
   | 'hostUnavailable'
   | 'sessionNotFound'
-  | 'sessionBusy';
+  | 'sessionBusy'
+  | 'notFound'
+  | 'outsideWorkspace'
+  | 'ioError';
 /**
  * Session identifier.
  */
@@ -77,6 +99,18 @@ export type ProtocolVersion = string;
  * Turn identifier, unique within a session.
  */
 export type TurnId = string;
+/**
+ * What a path names.
+ */
+export type FileKind = 'file' | 'directory' | 'other';
+/**
+ * How `fs/read` returns the content.
+ */
+export type ReadMode = 'text' | 'blob';
+/**
+ * Which output stream a chunk came from.
+ */
+export type OutputStream = 'stdout' | 'stderr';
 /**
  * How a turn ended.
  */
@@ -665,6 +699,670 @@ export interface TrustStatus {
    * Whether project-level resources in that directory may be loaded.
    */
   trusted: boolean;
+}
+/**
+ * Request for `fs/stat`.
+ */
+export interface FsStatRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'fs/stat';
+  params: FsStatParams;
+}
+/**
+ * Parameters of `fs/stat`.
+ */
+export interface FsStatParams {
+  /**
+   * Also sniff the first bytes of a regular file for a supported image type.
+   */
+  detectImage?: boolean | null;
+  /**
+   * The tool call this request serves.
+   */
+  origin?: ToolOrigin | null;
+  /**
+   * The path to inspect; symlinks are followed.
+   */
+  path: string;
+  /**
+   * The session whose workspace and working directory apply.
+   */
+  sessionId: SessionId;
+}
+/**
+ * The tool call a delegated request serves.
+ */
+export interface ToolOrigin {
+  /**
+   * Canonical tool name, for example `Read`; never the model-visible name of a Tool Profile.
+   */
+  tool: string;
+  /**
+   * Pi's id of the tool call.
+   */
+  toolCallId: string;
+}
+/**
+ * Successful response to `fs/stat`.
+ */
+export interface FsStatResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: FileStat;
+}
+/**
+ * Result of `fs/stat`.
+ */
+export interface FileStat {
+  /**
+   * `image/png`, `image/jpeg`, `image/gif`, `image/webp` or `image/bmp` when
+   * `detectImage` was set and the content is such an image.
+   */
+  imageMimeType?: string | null;
+  /**
+   * What the path names.
+   */
+  kind: FileKind;
+  /**
+   * Last modification, in milliseconds since the Unix epoch, when the platform reports it.
+   */
+  modifiedMs?: number | null;
+  /**
+   * The resolved path.
+   */
+  path: string;
+  /**
+   * Whether the file has no write permission at all.
+   */
+  readonly: boolean;
+  /**
+   * Size in bytes (0 for directories on some platforms).
+   */
+  size: number;
+}
+/**
+ * Request for `fs/read`.
+ */
+export interface FsReadRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'fs/read';
+  params: FsReadParams;
+}
+/**
+ * Parameters of `fs/read`.
+ */
+export interface FsReadParams {
+  /**
+   * Bytes to read at most (text mode); [`MAX_READ_CHUNK`] when absent or larger.
+   */
+  length?: number | null;
+  /**
+   * Text when absent.
+   */
+  mode?: ReadMode | null;
+  /**
+   * First byte to read (text mode); 0 when absent.
+   */
+  offset?: number | null;
+  /**
+   * The tool call this request serves.
+   */
+  origin?: ToolOrigin | null;
+  /**
+   * The file to read.
+   */
+  path: string;
+  /**
+   * The session whose workspace and working directory apply.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `fs/read`.
+ */
+export interface FsReadResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: FsReadResult;
+}
+/**
+ * Result of `fs/read`.
+ */
+export interface FsReadResult {
+  /**
+   * The content's copy, in blob mode.
+   */
+  blob?: BlobRef | null;
+  /**
+   * Number of file bytes the content covers; the next range starts at `offset +
+   * bytesRead`.
+   */
+  bytesRead: number;
+  /**
+   * Whether the content reaches the end of the file.
+   */
+  eof: boolean;
+  /**
+   * The offset the content starts at.
+   */
+  offset: number;
+  /**
+   * The resolved path.
+   */
+  path: string;
+  /**
+   * Size of the file in bytes when it was opened.
+   */
+  size: number;
+  /**
+   * The content, in text mode.
+   */
+  text?: string | null;
+}
+/**
+ * A copy of a file's content kept by Core (ADR-0009 rule 8).
+ */
+export interface BlobRef {
+  /**
+   * Absolute path of the copy, under Core's data directory.
+   */
+  path: string;
+  /**
+   * SHA-256 of the content, lowercase hex.
+   */
+  sha256: string;
+  /**
+   * Size in bytes.
+   */
+  size: number;
+}
+/**
+ * Request for `fs/write`.
+ */
+export interface FsWriteRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'fs/write';
+  params: FsWriteParams;
+}
+/**
+ * Parameters of `fs/write`.
+ */
+export interface FsWriteParams {
+  /**
+   * Append to the file instead of replacing it; false when absent.
+   */
+  append?: boolean | null;
+  /**
+   * Text to write, encoded as UTF-8.
+   */
+  content: string;
+  /**
+   * The tool call this request serves.
+   */
+  origin?: ToolOrigin | null;
+  /**
+   * The file to write; its parent directory must exist.
+   */
+  path: string;
+  /**
+   * The session whose workspace and working directory apply.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `fs/write`.
+ */
+export interface FsWriteResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: FsWriteResult;
+}
+/**
+ * Result of `fs/write`.
+ */
+export interface FsWriteResult {
+  /**
+   * Bytes written by this request.
+   */
+  bytesWritten: number;
+  /**
+   * The resolved path.
+   */
+  path: string;
+}
+/**
+ * Request for `fs/mkdir`.
+ */
+export interface FsMkdirRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'fs/mkdir';
+  params: FsMkdirParams;
+}
+/**
+ * Parameters of `fs/mkdir`.
+ */
+export interface FsMkdirParams {
+  /**
+   * The tool call this request serves.
+   */
+  origin?: ToolOrigin | null;
+  /**
+   * The directory to create, with any missing parents.
+   */
+  path: string;
+  /**
+   * The session whose workspace and working directory apply.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `fs/mkdir`.
+ */
+export interface FsMkdirResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: FsMkdirResult;
+}
+/**
+ * Result of `fs/mkdir`.
+ */
+export interface FsMkdirResult {
+  /**
+   * False when the directory already existed.
+   */
+  created: boolean;
+  /**
+   * The resolved path.
+   */
+  path: string;
+}
+/**
+ * Request for `fs/list`.
+ */
+export interface FsListRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'fs/list';
+  params: FsListParams;
+}
+/**
+ * Parameters of `fs/list`.
+ */
+export interface FsListParams {
+  /**
+   * Entries to return at most; Core caps it at 10,000.
+   */
+  limit?: number | null;
+  /**
+   * The tool call this request serves.
+   */
+  origin?: ToolOrigin | null;
+  /**
+   * The directory to list.
+   */
+  path: string;
+  /**
+   * The session whose workspace and working directory apply.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `fs/list`.
+ */
+export interface FsListResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: FsListResult;
+}
+/**
+ * Result of `fs/list`.
+ */
+export interface FsListResult {
+  /**
+   * Entries in file name order, dotfiles included.
+   */
+  entries: DirEntry[];
+  /**
+   * The resolved path of the directory.
+   */
+  path: string;
+  /**
+   * Whether the limit cut the listing short.
+   */
+  truncated: boolean;
+}
+/**
+ * One directory entry.
+ */
+export interface DirEntry {
+  /**
+   * What it names; symlinks are followed (a dangling one is `other`).
+   */
+  kind: FileKind;
+  /**
+   * The entry's file name.
+   */
+  name: string;
+}
+/**
+ * Request for `fs/glob`.
+ */
+export interface FsGlobRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'fs/glob';
+  params: FsGlobParams;
+}
+/**
+ * Parameters of `fs/glob`.
+ */
+export interface FsGlobParams {
+  /**
+   * Glob patterns of paths to leave out, relative to the searched directory, for example
+   * `** /node_modules/**`.
+   */
+  exclude?: string[] | null;
+  /**
+   * Matches to return at most; Core caps it at 100,000.
+   */
+  limit?: number | null;
+  /**
+   * The tool call this request serves.
+   */
+  origin?: ToolOrigin | null;
+  /**
+   * The directory to search.
+   */
+  path: string;
+  /**
+   * Glob pattern. Without `/` it matches the file name at any depth; with `/` it matches
+   * the path relative to the searched directory, as if prefixed with `** /`.
+   */
+  pattern: string;
+  /**
+   * The session whose workspace and working directory apply.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `fs/glob`.
+ */
+export interface FsGlobResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: FsGlobResult;
+}
+/**
+ * Result of `fs/glob`.
+ */
+export interface FsGlobResult {
+  /**
+   * Matching files and directories relative to the searched directory, `/`-separated,
+   * directories with a trailing `/`, in path order. Hidden entries are included; entries
+   * ignored by `.gitignore`, `.ignore` or `exclude` are not.
+   */
+  matches: string[];
+  /**
+   * The resolved path of the searched directory.
+   */
+  path: string;
+  /**
+   * Whether the limit cut the matches short.
+   */
+  truncated: boolean;
+}
+/**
+ * Request for `fs/grep`.
+ */
+export interface FsGrepRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'fs/grep';
+  params: FsGrepParams;
+}
+/**
+ * Parameters of `fs/grep`.
+ */
+export interface FsGrepParams {
+  /**
+   * Lines of context before and after each match; 0 when absent.
+   */
+  context?: number | null;
+  /**
+   * Only search files matching this glob, relative to the searched directory.
+   */
+  glob?: string | null;
+  /**
+   * Match case-insensitively.
+   */
+  ignoreCase?: boolean | null;
+  /**
+   * Matches to return at most; 100 when absent.
+   */
+  limit?: number | null;
+  /**
+   * Treat `pattern` as a literal string.
+   */
+  literal?: boolean | null;
+  /**
+   * The tool call this request serves.
+   */
+  origin?: ToolOrigin | null;
+  /**
+   * The directory or file to search.
+   */
+  path: string;
+  /**
+   * Regular expression (ripgrep syntax), or a literal string with `literal`.
+   */
+  pattern: string;
+  /**
+   * The session whose workspace and working directory apply.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `fs/grep`.
+ */
+export interface FsGrepResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: FsGrepResult;
+}
+/**
+ * Result of `fs/grep`.
+ */
+export interface FsGrepResult {
+  /**
+   * Whether a directory was searched.
+   */
+  isDirectory: boolean;
+  /**
+   * Whether more matches exist beyond the limit.
+   */
+  limitReached: boolean;
+  /**
+   * Matches and context lines, by file in path order, then by line.
+   */
+  lines: GrepLine[];
+  /**
+   * Number of matching lines returned.
+   */
+  matchCount: number;
+  /**
+   * The resolved path of the searched directory or file.
+   */
+  path: string;
+}
+/**
+ * One line of grep output: a match or a context line.
+ */
+export interface GrepLine {
+  /**
+   * Whether the line matches (false for context lines).
+   */
+  isMatch: boolean;
+  /**
+   * 1-based line number.
+   */
+  lineNumber: number;
+  /**
+   * The file: relative to the searched directory and `/`-separated, or the file name when
+   * a single file was searched.
+   */
+  path: string;
+  /**
+   * The line without its terminator; lines over 4,096 characters are cut there.
+   */
+  text: string;
+}
+/**
+ * Request for `exec/run`.
+ */
+export interface ExecRunRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'exec/run';
+  params: ExecRunParams;
+}
+/**
+ * Parameters of `exec/run`.
+ */
+export interface ExecRunParams {
+  /**
+   * The shell command line.
+   */
+  command: string;
+  /**
+   * Working directory, absolute or relative to the session's; the session's when absent.
+   * It must lie inside the workspace root.
+   */
+  cwd?: string | null;
+  /**
+   * Variables set on top of Core's environment for this command.
+   */
+  env?: {
+    [k: string]: string;
+  } | null;
+  /**
+   * The tool call this request serves.
+   */
+  origin?: ToolOrigin | null;
+  /**
+   * Chosen by the Agent Host, unique among its running commands; `exec/output` and
+   * `exec/kill` refer to the command by it.
+   */
+  requestId: string;
+  /**
+   * The session whose workspace and working directory apply.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `exec/run`.
+ */
+export interface ExecRunResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: ExecRunResult;
+}
+/**
+ * Result of `exec/run`.
+ */
+export interface ExecRunResult {
+  /**
+   * The exit code, when the command exited normally.
+   */
+  exitCode?: number | null;
+  /**
+   * Whether `exec/kill` terminated the command.
+   */
+  killed: boolean;
+  /**
+   * The terminating signal number on Unix, when a signal ended the command.
+   */
+  signal?: number | null;
+}
+/**
+ * Request for `exec/kill`.
+ */
+export interface ExecKillRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'exec/kill';
+  params: ExecKillParams;
+}
+/**
+ * Parameters of `exec/kill`.
+ */
+export interface ExecKillParams {
+  /**
+   * The `requestId` of the command's `exec/run`.
+   */
+  requestId: string;
+  /**
+   * The session that started the command.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `exec/kill`.
+ */
+export interface ExecKillResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: ExecKillResult;
+}
+/**
+ * Result of `exec/kill`.
+ */
+export interface ExecKillResult {
+  /**
+   * False when no such command was running (it already ended, or never started).
+   */
+  killed: boolean;
+}
+/**
+ * Notification `exec/output`.
+ */
+export interface ExecOutputNotification {
+  jsonrpc: JsonRpcVersion;
+  method: 'exec/output';
+  params: ExecOutputParams;
+}
+/**
+ * Parameters of `exec/output` (Core → Agent Host): one chunk of a running command's output.
+ */
+export interface ExecOutputParams {
+  /**
+   * The chunk, decoded as UTF-8.
+   */
+  data: string;
+  /**
+   * The `requestId` of the `exec/run` that started the command.
+   */
+  requestId: string;
+  /**
+   * 1, 2, 3, ... across both streams of the command, in the order Core read them.
+   */
+  seq: number;
+  /**
+   * The stream the chunk came from.
+   */
+  stream: OutputStream;
 }
 /**
  * Notification `turn/started`.

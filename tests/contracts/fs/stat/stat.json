@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 11,
+  "method": "fs/stat",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": "src/main 主.ts",
+    "origin": {
+      "tool": "Read",
+      "toolCallId": "toolu_01"
+    }
+  }
+}

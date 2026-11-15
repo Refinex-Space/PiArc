@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 13,
+  "result": {
+    "path": "/Users/dev/work space/项目/src",
+    "kind": "directory",
+    "size": 0,
+    "readonly": false
+  }
+}

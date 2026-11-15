@@ -140,6 +140,120 @@
       "schema": "TrustGetResponse"
     },
     {
+      "kind": "request",
+      "method": "fs/stat",
+      "name": "fs/stat",
+      "schema": "FsStatRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/stat",
+      "name": "fs/stat/result",
+      "schema": "FsStatResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/read",
+      "name": "fs/read",
+      "schema": "FsReadRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/read",
+      "name": "fs/read/result",
+      "schema": "FsReadResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/write",
+      "name": "fs/write",
+      "schema": "FsWriteRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/write",
+      "name": "fs/write/result",
+      "schema": "FsWriteResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/mkdir",
+      "name": "fs/mkdir",
+      "schema": "FsMkdirRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/mkdir",
+      "name": "fs/mkdir/result",
+      "schema": "FsMkdirResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/list",
+      "name": "fs/list",
+      "schema": "FsListRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/list",
+      "name": "fs/list/result",
+      "schema": "FsListResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/glob",
+      "name": "fs/glob",
+      "schema": "FsGlobRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/glob",
+      "name": "fs/glob/result",
+      "schema": "FsGlobResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/grep",
+      "name": "fs/grep",
+      "schema": "FsGrepRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/grep",
+      "name": "fs/grep/result",
+      "schema": "FsGrepResponse"
+    },
+    {
+      "kind": "request",
+      "method": "exec/run",
+      "name": "exec/run",
+      "schema": "ExecRunRequest"
+    },
+    {
+      "kind": "response",
+      "method": "exec/run",
+      "name": "exec/run/result",
+      "schema": "ExecRunResponse"
+    },
+    {
+      "kind": "request",
+      "method": "exec/kill",
+      "name": "exec/kill",
+      "schema": "ExecKillRequest"
+    },
+    {
+      "kind": "response",
+      "method": "exec/kill",
+      "name": "exec/kill/result",
+      "schema": "ExecKillResponse"
+    },
+    {
+      "kind": "notification",
+      "method": "exec/output",
+      "name": "exec/output",
+      "schema": "ExecOutputNotification"
+    },
+    {
       "kind": "notification",
       "method": "turn/started",
       "name": "turn/started",

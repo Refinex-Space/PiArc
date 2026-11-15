@@ -35,6 +35,27 @@
       "required": ["sessionId", "seq", "ts", "turnId", "itemId", "delta"],
       "type": "object"
     },
+    "BlobRef": {
+      "description": "A copy of a file's content kept by Core (ADR-0009 rule 8).",
+      "properties": {
+        "path": {
+          "description": "Absolute path of the copy, under Core's data directory.",
+          "type": "string"
+        },
+        "sha256": {
+          "description": "SHA-256 of the content, lowercase hex.",
+          "type": "string"
+        },
+        "size": {
+          "description": "Size in bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["path", "sha256", "size"],
+      "type": "object"
+    },
     "Capability": {
       "description": "A named optional protocol feature, for example `planMode`.\n\nCapabilities are open strings rather than an enum: a peer must accept capability names\nit does not know, because that is how newer minor versions announce additions.",
       "type": "string"
@@ -65,6 +86,21 @@
         }
       },
       "required": ["protocol", "enabled", "workspace", "connectionEpoch"],
+      "type": "object"
+    },
+    "DirEntry": {
+      "description": "One directory entry.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/FileKind",
+          "description": "What it names; symlinks are followed (a dangling one is `other`)."
+        },
+        "name": {
+          "description": "The entry's file name.",
+          "type": "string"
+        }
+      },
+      "required": ["name", "kind"],
       "type": "object"
     },
     "ErrorData": {
@@ -157,6 +193,21 @@
           "const": "sessionBusy",
           "description": "The session is running a turn and cannot start another one yet.",
           "type": "string"
+        },
+        {
+          "const": "notFound",
+          "description": "The path named by a file operation does not exist. `details`: `{ code: \"ENOENT\",\npath }`.",
+          "type": "string"
+        },
+        {
+          "const": "outsideWorkspace",
+          "description": "The path of a file or command operation resolves, after normalization and symlink\nresolution, to a location outside the session's workspace root. `details`:\n`{ path, resolved, root }`.",
+          "type": "string"
+        },
+        {
+          "const": "ioError",
+          "description": "The operating system refused a file or process operation. `details`: `{ code, path }`\nwith a POSIX-style error code such as `EACCES`, `EISDIR` or `ENOTDIR`.",
+          "type": "string"
         }
       ]
     },
@@ -205,6 +256,973 @@
         "result": false
       },
       "required": ["jsonrpc", "id", "error"],
+      "type": "object"
+    },
+    "ExecKillParams": {
+      "description": "Parameters of `exec/kill`.",
+      "properties": {
+        "requestId": {
+          "description": "The `requestId` of the command's `exec/run`.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session that started the command."
+        }
+      },
+      "required": ["sessionId", "requestId"],
+      "type": "object"
+    },
+    "ExecKillRequest": {
+      "description": "Request for `exec/kill`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "exec/kill",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ExecKillParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "ExecKillResponse": {
+      "description": "Successful response to `exec/kill`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/ExecKillResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "ExecKillResult": {
+      "description": "Result of `exec/kill`.",
+      "properties": {
+        "killed": {
+          "description": "False when no such command was running (it already ended, or never started).",
+          "type": "boolean"
+        }
+      },
+      "required": ["killed"],
+      "type": "object"
+    },
+    "ExecOutputNotification": {
+      "description": "Notification `exec/output`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "exec/output",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ExecOutputParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "ExecOutputParams": {
+      "description": "Parameters of `exec/output` (Core → Agent Host): one chunk of a running command's output.",
+      "properties": {
+        "data": {
+          "description": "The chunk, decoded as UTF-8.",
+          "type": "string"
+        },
+        "requestId": {
+          "description": "The `requestId` of the `exec/run` that started the command.",
+          "type": "string"
+        },
+        "seq": {
+          "description": "1, 2, 3, ... across both streams of the command, in the order Core read them.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "stream": {
+          "$ref": "#/$defs/OutputStream",
+          "description": "The stream the chunk came from."
+        }
+      },
+      "required": ["requestId", "stream", "seq", "data"],
+      "type": "object"
+    },
+    "ExecRunParams": {
+      "description": "Parameters of `exec/run`.",
+      "properties": {
+        "command": {
+          "description": "The shell command line.",
+          "type": "string"
+        },
+        "cwd": {
+          "description": "Working directory, absolute or relative to the session's; the session's when absent.\nIt must lie inside the workspace root.",
+          "type": ["string", "null"]
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Variables set on top of Core's environment for this command.",
+          "type": ["object", "null"]
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolOrigin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The tool call this request serves."
+        },
+        "requestId": {
+          "description": "Chosen by the Agent Host, unique among its running commands; `exec/output` and\n`exec/kill` refer to the command by it.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session whose workspace and working directory apply."
+        }
+      },
+      "required": ["sessionId", "requestId", "command"],
+      "type": "object"
+    },
+    "ExecRunRequest": {
+      "description": "Request for `exec/run`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "exec/run",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ExecRunParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "ExecRunResponse": {
+      "description": "Successful response to `exec/run`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/ExecRunResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "ExecRunResult": {
+      "description": "Result of `exec/run`.",
+      "properties": {
+        "exitCode": {
+          "description": "The exit code, when the command exited normally.",
+          "format": "int32",
+          "type": ["integer", "null"]
+        },
+        "killed": {
+          "description": "Whether `exec/kill` terminated the command.",
+          "type": "boolean"
+        },
+        "signal": {
+          "description": "The terminating signal number on Unix, when a signal ended the command.",
+          "format": "int32",
+          "type": ["integer", "null"]
+        }
+      },
+      "required": ["killed"],
+      "type": "object"
+    },
+    "FileKind": {
+      "description": "What a path names.",
+      "oneOf": [
+        {
+          "const": "file",
+          "description": "A regular file.",
+          "type": "string"
+        },
+        {
+          "const": "directory",
+          "description": "A directory.",
+          "type": "string"
+        },
+        {
+          "const": "other",
+          "description": "Anything else: a device, socket or pipe.",
+          "type": "string"
+        }
+      ]
+    },
+    "FileStat": {
+      "description": "Result of `fs/stat`.",
+      "properties": {
+        "imageMimeType": {
+          "description": "`image/png`, `image/jpeg`, `image/gif`, `image/webp` or `image/bmp` when\n`detectImage` was set and the content is such an image.",
+          "type": ["string", "null"]
+        },
+        "kind": {
+          "$ref": "#/$defs/FileKind",
+          "description": "What the path names."
+        },
+        "modifiedMs": {
+          "description": "Last modification, in milliseconds since the Unix epoch, when the platform reports it.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "path": {
+          "description": "The resolved path.",
+          "type": "string"
+        },
+        "readonly": {
+          "description": "Whether the file has no write permission at all.",
+          "type": "boolean"
+        },
+        "size": {
+          "description": "Size in bytes (0 for directories on some platforms).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["path", "kind", "size", "readonly"],
+      "type": "object"
+    },
+    "FsGlobParams": {
+      "description": "Parameters of `fs/glob`.",
+      "properties": {
+        "exclude": {
+          "description": "Glob patterns of paths to leave out, relative to the searched directory, for example\n`**/node_modules/**`.",
+          "items": {
+            "type": "string"
+          },
+          "type": ["array", "null"]
+        },
+        "limit": {
+          "description": "Matches to return at most; Core caps it at 100,000.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolOrigin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The tool call this request serves."
+        },
+        "path": {
+          "description": "The directory to search.",
+          "type": "string"
+        },
+        "pattern": {
+          "description": "Glob pattern. Without `/` it matches the file name at any depth; with `/` it matches\nthe path relative to the searched directory, as if prefixed with `**/`.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session whose workspace and working directory apply."
+        }
+      },
+      "required": ["sessionId", "path", "pattern"],
+      "type": "object"
+    },
+    "FsGlobRequest": {
+      "description": "Request for `fs/glob`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "fs/glob",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/FsGlobParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "FsGlobResponse": {
+      "description": "Successful response to `fs/glob`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/FsGlobResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "FsGlobResult": {
+      "description": "Result of `fs/glob`.",
+      "properties": {
+        "matches": {
+          "description": "Matching files and directories relative to the searched directory, `/`-separated,\ndirectories with a trailing `/`, in path order. Hidden entries are included; entries\nignored by `.gitignore`, `.ignore` or `exclude` are not.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "path": {
+          "description": "The resolved path of the searched directory.",
+          "type": "string"
+        },
+        "truncated": {
+          "description": "Whether the limit cut the matches short.",
+          "type": "boolean"
+        }
+      },
+      "required": ["path", "matches", "truncated"],
+      "type": "object"
+    },
+    "FsGrepParams": {
+      "description": "Parameters of `fs/grep`.",
+      "properties": {
+        "context": {
+          "description": "Lines of context before and after each match; 0 when absent.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "glob": {
+          "description": "Only search files matching this glob, relative to the searched directory.",
+          "type": ["string", "null"]
+        },
+        "ignoreCase": {
+          "description": "Match case-insensitively.",
+          "type": ["boolean", "null"]
+        },
+        "limit": {
+          "description": "Matches to return at most; 100 when absent.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "literal": {
+          "description": "Treat `pattern` as a literal string.",
+          "type": ["boolean", "null"]
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolOrigin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The tool call this request serves."
+        },
+        "path": {
+          "description": "The directory or file to search.",
+          "type": "string"
+        },
+        "pattern": {
+          "description": "Regular expression (ripgrep syntax), or a literal string with `literal`.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session whose workspace and working directory apply."
+        }
+      },
+      "required": ["sessionId", "path", "pattern"],
+      "type": "object"
+    },
+    "FsGrepRequest": {
+      "description": "Request for `fs/grep`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "fs/grep",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/FsGrepParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "FsGrepResponse": {
+      "description": "Successful response to `fs/grep`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/FsGrepResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "FsGrepResult": {
+      "description": "Result of `fs/grep`.",
+      "properties": {
+        "isDirectory": {
+          "description": "Whether a directory was searched.",
+          "type": "boolean"
+        },
+        "limitReached": {
+          "description": "Whether more matches exist beyond the limit.",
+          "type": "boolean"
+        },
+        "lines": {
+          "description": "Matches and context lines, by file in path order, then by line.",
+          "items": {
+            "$ref": "#/$defs/GrepLine"
+          },
+          "type": "array"
+        },
+        "matchCount": {
+          "description": "Number of matching lines returned.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "description": "The resolved path of the searched directory or file.",
+          "type": "string"
+        }
+      },
+      "required": ["path", "isDirectory", "lines", "matchCount", "limitReached"],
+      "type": "object"
+    },
+    "FsListParams": {
+      "description": "Parameters of `fs/list`.",
+      "properties": {
+        "limit": {
+          "description": "Entries to return at most; Core caps it at 10,000.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolOrigin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The tool call this request serves."
+        },
+        "path": {
+          "description": "The directory to list.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session whose workspace and working directory apply."
+        }
+      },
+      "required": ["sessionId", "path"],
+      "type": "object"
+    },
+    "FsListRequest": {
+      "description": "Request for `fs/list`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "fs/list",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/FsListParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "FsListResponse": {
+      "description": "Successful response to `fs/list`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/FsListResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "FsListResult": {
+      "description": "Result of `fs/list`.",
+      "properties": {
+        "entries": {
+          "description": "Entries in file name order, dotfiles included.",
+          "items": {
+            "$ref": "#/$defs/DirEntry"
+          },
+          "type": "array"
+        },
+        "path": {
+          "description": "The resolved path of the directory.",
+          "type": "string"
+        },
+        "truncated": {
+          "description": "Whether the limit cut the listing short.",
+          "type": "boolean"
+        }
+      },
+      "required": ["path", "entries", "truncated"],
+      "type": "object"
+    },
+    "FsMkdirParams": {
+      "description": "Parameters of `fs/mkdir`.",
+      "properties": {
+        "origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolOrigin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The tool call this request serves."
+        },
+        "path": {
+          "description": "The directory to create, with any missing parents.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session whose workspace and working directory apply."
+        }
+      },
+      "required": ["sessionId", "path"],
+      "type": "object"
+    },
+    "FsMkdirRequest": {
+      "description": "Request for `fs/mkdir`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "fs/mkdir",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/FsMkdirParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "FsMkdirResponse": {
+      "description": "Successful response to `fs/mkdir`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/FsMkdirResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "FsMkdirResult": {
+      "description": "Result of `fs/mkdir`.",
+      "properties": {
+        "created": {
+          "description": "False when the directory already existed.",
+          "type": "boolean"
+        },
+        "path": {
+          "description": "The resolved path.",
+          "type": "string"
+        }
+      },
+      "required": ["path", "created"],
+      "type": "object"
+    },
+    "FsReadParams": {
+      "description": "Parameters of `fs/read`.",
+      "properties": {
+        "length": {
+          "description": "Bytes to read at most (text mode); [`MAX_READ_CHUNK`] when absent or larger.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReadMode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Text when absent."
+        },
+        "offset": {
+          "description": "First byte to read (text mode); 0 when absent.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolOrigin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The tool call this request serves."
+        },
+        "path": {
+          "description": "The file to read.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session whose workspace and working directory apply."
+        }
+      },
+      "required": ["sessionId", "path"],
+      "type": "object"
+    },
+    "FsReadRequest": {
+      "description": "Request for `fs/read`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "fs/read",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/FsReadParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "FsReadResponse": {
+      "description": "Successful response to `fs/read`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/FsReadResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "FsReadResult": {
+      "description": "Result of `fs/read`.",
+      "properties": {
+        "blob": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BlobRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The content's copy, in blob mode."
+        },
+        "bytesRead": {
+          "description": "Number of file bytes the content covers; the next range starts at `offset +\nbytesRead`.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "eof": {
+          "description": "Whether the content reaches the end of the file.",
+          "type": "boolean"
+        },
+        "offset": {
+          "description": "The offset the content starts at.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "description": "The resolved path.",
+          "type": "string"
+        },
+        "size": {
+          "description": "Size of the file in bytes when it was opened.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "text": {
+          "description": "The content, in text mode.",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["path", "size", "offset", "bytesRead", "eof"],
+      "type": "object"
+    },
+    "FsStatParams": {
+      "description": "Parameters of `fs/stat`.",
+      "properties": {
+        "detectImage": {
+          "description": "Also sniff the first bytes of a regular file for a supported image type.",
+          "type": ["boolean", "null"]
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolOrigin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The tool call this request serves."
+        },
+        "path": {
+          "description": "The path to inspect; symlinks are followed.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session whose workspace and working directory apply."
+        }
+      },
+      "required": ["sessionId", "path"],
+      "type": "object"
+    },
+    "FsStatRequest": {
+      "description": "Request for `fs/stat`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "fs/stat",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/FsStatParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "FsStatResponse": {
+      "description": "Successful response to `fs/stat`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/FileStat"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "FsWriteParams": {
+      "description": "Parameters of `fs/write`.",
+      "properties": {
+        "append": {
+          "description": "Append to the file instead of replacing it; false when absent.",
+          "type": ["boolean", "null"]
+        },
+        "content": {
+          "description": "Text to write, encoded as UTF-8.",
+          "type": "string"
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolOrigin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The tool call this request serves."
+        },
+        "path": {
+          "description": "The file to write; its parent directory must exist.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session whose workspace and working directory apply."
+        }
+      },
+      "required": ["sessionId", "path", "content"],
+      "type": "object"
+    },
+    "FsWriteRequest": {
+      "description": "Request for `fs/write`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "fs/write",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/FsWriteParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "FsWriteResponse": {
+      "description": "Successful response to `fs/write`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/FsWriteResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "FsWriteResult": {
+      "description": "Result of `fs/write`.",
+      "properties": {
+        "bytesWritten": {
+          "description": "Bytes written by this request.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "description": "The resolved path.",
+          "type": "string"
+        }
+      },
+      "required": ["path", "bytesWritten"],
+      "type": "object"
+    },
+    "GrepLine": {
+      "description": "One line of grep output: a match or a context line.",
+      "properties": {
+        "isMatch": {
+          "description": "Whether the line matches (false for context lines).",
+          "type": "boolean"
+        },
+        "lineNumber": {
+          "description": "1-based line number.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "description": "The file: relative to the searched directory and `/`-separated, or the file name when\na single file was searched.",
+          "type": "string"
+        },
+        "text": {
+          "description": "The line without its terminator; lines over 4,096 characters are cut there.",
+          "type": "string"
+        }
+      },
+      "required": ["path", "lineNumber", "text", "isMatch"],
       "type": "object"
     },
     "HostHelloParams": {
@@ -642,6 +1660,21 @@
       "required": ["jsonrpc", "method"],
       "type": "object"
     },
+    "OutputStream": {
+      "description": "Which output stream a chunk came from.",
+      "oneOf": [
+        {
+          "const": "stdout",
+          "description": "Standard output.",
+          "type": "string"
+        },
+        {
+          "const": "stderr",
+          "description": "Standard error.",
+          "type": "string"
+        }
+      ]
+    },
     "PromptAccepted": {
       "description": "Result of `session/prompt`: the turn was accepted and will report `turn/started` and\n`turn/completed` with this id.",
       "properties": {
@@ -657,6 +1690,21 @@
       "description": "Protocol version as \"major.minor\", for example \"1.0\".",
       "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
       "type": "string"
+    },
+    "ReadMode": {
+      "description": "How `fs/read` returns the content.",
+      "oneOf": [
+        {
+          "const": "text",
+          "description": "Inline UTF-8 text, at most [`MAX_READ_CHUNK`] bytes per request.",
+          "type": "string"
+        },
+        {
+          "const": "blob",
+          "description": "The whole file by reference ([`BlobRef`]); `offset` and `length` do not apply.",
+          "type": "string"
+        }
+      ]
     },
     "Request": {
       "description": "A request whose method is not interpreted.",
@@ -1059,6 +2107,21 @@
       "required": ["jsonrpc", "id", "result"],
       "type": "object"
     },
+    "ToolOrigin": {
+      "description": "The tool call a delegated request serves.",
+      "properties": {
+        "tool": {
+          "description": "Canonical tool name, for example `Read`; never the model-visible name of a Tool Profile.",
+          "type": "string"
+        },
+        "toolCallId": {
+          "description": "Pi's id of the tool call.",
+          "type": "string"
+        }
+      },
+      "required": ["tool", "toolCallId"],
+      "type": "object"
+    },
     "TrustGetParams": {
       "description": "Parameters of `trust/get`.",
       "properties": {
@@ -1309,6 +2372,63 @@
     },
     {
       "$ref": "#/$defs/TrustGetResponse"
+    },
+    {
+      "$ref": "#/$defs/FsStatRequest"
+    },
+    {
+      "$ref": "#/$defs/FsStatResponse"
+    },
+    {
+      "$ref": "#/$defs/FsReadRequest"
+    },
+    {
+      "$ref": "#/$defs/FsReadResponse"
+    },
+    {
+      "$ref": "#/$defs/FsWriteRequest"
+    },
+    {
+      "$ref": "#/$defs/FsWriteResponse"
+    },
+    {
+      "$ref": "#/$defs/FsMkdirRequest"
+    },
+    {
+      "$ref": "#/$defs/FsMkdirResponse"
+    },
+    {
+      "$ref": "#/$defs/FsListRequest"
+    },
+    {
+      "$ref": "#/$defs/FsListResponse"
+    },
+    {
+      "$ref": "#/$defs/FsGlobRequest"
+    },
+    {
+      "$ref": "#/$defs/FsGlobResponse"
+    },
+    {
+      "$ref": "#/$defs/FsGrepRequest"
+    },
+    {
+      "$ref": "#/$defs/FsGrepResponse"
+    },
+    {
+      "$ref": "#/$defs/ExecRunRequest"
+    },
+    {
+      "$ref": "#/$defs/ExecRunResponse"
+    },
+    {
+      "$ref": "#/$defs/ExecKillRequest"
+    },
+    {
+      "$ref": "#/$defs/ExecKillResponse"
+    },
+    {
+      "$ref": "#/$defs/ExecOutputNotification"
     },
     {
       "$ref": "#/$defs/TurnStartedNotification"

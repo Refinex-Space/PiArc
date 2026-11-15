@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::jsonrpc::Version;
-use crate::method::{Method, RequestMethod};
+use crate::method::request;
 use crate::turn::TurnId;
 
 /// Session identifier.
@@ -154,24 +154,6 @@ pub struct SessionPromptParams {
 pub struct PromptAccepted {
     /// The turn running the prompt.
     pub turn_id: TurnId,
-}
-
-macro_rules! request {
-    ($(#[$doc:meta])* $marker:ident, $name:literal, $params:ty, $result:ty) => {
-        $(#[$doc])*
-        #[derive(Debug, Clone, Copy)]
-        pub struct $marker;
-
-        impl Method for $marker {
-            const NAME: &'static str = $name;
-            const TYPE_NAME: &'static str = stringify!($marker);
-        }
-
-        impl RequestMethod for $marker {
-            type Params = $params;
-            type Result = $result;
-        }
-    };
 }
 
 request!(

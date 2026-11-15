@@ -19,6 +19,9 @@ const CODES: Record<ErrorKind, number> = {
   hostUnavailable: -32006,
   sessionNotFound: -32007,
   sessionBusy: -32008,
+  notFound: -32009,
+  outsideWorkspace: -32010,
+  ioError: -32011,
 };
 
 /** An error with an AHP kind; thrown by request handlers and the Core bridge. */

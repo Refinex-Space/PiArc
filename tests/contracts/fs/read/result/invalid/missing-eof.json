@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 14,
+  "result": {
+    "path": "/Users/dev/work space/项目/a.txt",
+    "size": 1,
+    "offset": 0,
+    "bytesRead": 1,
+    "text": "a"
+  }
+}

@@ -55,6 +55,12 @@ pub mod code {
     pub const SESSION_NOT_FOUND: i64 = -32007;
     /// The session is running a turn and cannot start another.
     pub const SESSION_BUSY: i64 = -32008;
+    /// The path named by a file operation does not exist.
+    pub const NOT_FOUND: i64 = -32009;
+    /// The path of a file or command operation lies outside the session's workspace.
+    pub const OUTSIDE_WORKSPACE: i64 = -32010;
+    /// The operating system refused a file or process operation.
+    pub const IO_ERROR: i64 = -32011;
 }
 
 /// JSON-RPC 2.0 error object with PiArc's mandatory structured `data`.
@@ -121,6 +127,16 @@ pub enum ErrorKind {
     SessionNotFound,
     /// The session is running a turn and cannot start another one yet.
     SessionBusy,
+    /// The path named by a file operation does not exist. `details`: `{ code: "ENOENT",
+    /// path }`.
+    NotFound,
+    /// The path of a file or command operation resolves, after normalization and symlink
+    /// resolution, to a location outside the session's workspace root. `details`:
+    /// `{ path, resolved, root }`.
+    OutsideWorkspace,
+    /// The operating system refused a file or process operation. `details`: `{ code, path }`
+    /// with a POSIX-style error code such as `EACCES`, `EISDIR` or `ENOTDIR`.
+    IoError,
 }
 
 impl ErrorKind {
@@ -142,6 +158,9 @@ impl ErrorKind {
             Self::HostUnavailable => code::HOST_UNAVAILABLE,
             Self::SessionNotFound => code::SESSION_NOT_FOUND,
             Self::SessionBusy => code::SESSION_BUSY,
+            Self::NotFound => code::NOT_FOUND,
+            Self::OutsideWorkspace => code::OUTSIDE_WORKSPACE,
+            Self::IoError => code::IO_ERROR,
         }
     }
 }
@@ -166,7 +185,7 @@ impl ErrorObject {
 mod tests {
     use super::*;
 
-    const ALL_KINDS: [ErrorKind; 14] = [
+    const ALL_KINDS: [ErrorKind; 17] = [
         ErrorKind::ParseError,
         ErrorKind::InvalidRequest,
         ErrorKind::MethodNotFound,
@@ -181,6 +200,9 @@ mod tests {
         ErrorKind::HostUnavailable,
         ErrorKind::SessionNotFound,
         ErrorKind::SessionBusy,
+        ErrorKind::NotFound,
+        ErrorKind::OutsideWorkspace,
+        ErrorKind::IoError,
     ];
 
     #[test]
