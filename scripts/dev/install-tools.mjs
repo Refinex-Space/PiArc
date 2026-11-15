@@ -6,8 +6,16 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { capture, isMain, repoRoot, run } from '../lib/repo.mjs';
 
-/** Pinned tool versions. CI caches `.tools` keyed on this file. */
-export const TOOLS = [{ crate: 'cargo-deny', version: '0.20.2', bin: 'cargo-deny' }];
+/**
+ * Pinned tool versions. CI caches `.tools` keyed on this file. ripgrep and fd serve Pi's native
+ * grep and find tools in the behavior comparison test (T07, `crates/piarc-testkit/tests/
+ * agent_host/parity.rs`); PiArc's own Grep and Glob run in Core and need neither.
+ */
+export const TOOLS = [
+  { crate: 'cargo-deny', version: '0.20.2', bin: 'cargo-deny' },
+  { crate: 'ripgrep', version: '15.2.0', bin: 'rg' },
+  { crate: 'fd-find', version: '10.5.0', bin: 'fd' },
+];
 
 export const toolsRoot = path.join(repoRoot, '.tools');
 

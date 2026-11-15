@@ -4,6 +4,7 @@
 //! and `docs/spikes/S09-ahp-resilience.md`.
 
 mod harness;
+mod parity;
 mod tools;
 
 use harness::{Env, assert_contiguous_seq, notification, open, payload, ping, prompt_text};
