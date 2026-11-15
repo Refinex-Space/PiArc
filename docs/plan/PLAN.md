@@ -117,7 +117,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 已完成 | 3a8744f |
 | T08 | [凭据保险箱](tasks/T08-credential-vault.md) | 1 | T06；D2 | macOS | high | 中 | S5 | 已完成 | 83dc25b |
 | T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 已完成 | 9c0738d |
-| T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 未开始 | — |
+| T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 进行中 | — |
 | T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 未开始 | — |
 | T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 未开始 | — |
 | W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 未开始 | — |
@@ -294,7 +294,19 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（当前没有进行中的任务）
+T10（2026-11-15 开工；基线 verify 13 步通过；依赖 T04 为"部分完成"，遗留的 A09 只涉及 Windows CI，不影响本任务；分支未推送，前序 Windows CI 无法核对）：
+
+- [ ] 1 `piarc-ghostty-sys`：产物锁定文件、下载与 SHA256 + minisign 校验、离线缓存、bindgen 绑定入库与重新生成脚本、macOS 静态链接（A02、A03）
+- [ ] 2 Windows 链接方式选定与 CI 四目标链接配置（A01）
+- [ ] 3 `piarc-term`：safe 封装（Terminal、RenderState、KeyEncoder、Formatter）、PTY 与 IO 线程、effects（A04）
+- [ ] 4 帧格式草案进 `piarc-protocol`：格式说明、Rust 编解码器、往返测试；render state 增量帧编码与行 id 复用（A05）
+- [ ] 5 Core 与 NAPI 导出、主进程转发、preload API（拉取式帧）
+- [ ] 6 渲染原型：fork `CanvasRenderer`（vendor 目录与来源说明）、`RemoteRenderable`、TS 解码器、键盘与输入法、开发页面（A12）
+- [ ] 7 一致性测试：formatter 与帧逐格比较（普通屏幕、alt screen、CJK、emoji、ZWJ），Rust 与 TS 解码器同一组样本（A08）
+- [ ] 8 L4：rAF 拉取与隐藏终端 0 帧、输入法预编辑与 textarea 跟随（A06、A11）
+- [ ] 9 测量：`cat` 100 MB、键入回显额外延迟；vim 与 top 截图对照（A07、A09、A10）
+- [ ] 10 wterm 评估、S7 报告、spikes README、许可证来源登记、CLAUDE.md、复用表、架构与 ADR 同步（A13）
+- [ ] 11 收尾：verify、验收记录、PLAN 收尾（A14）
 
 ## 登记事项
 
