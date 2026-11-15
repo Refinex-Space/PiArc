@@ -120,6 +120,37 @@ async fn reads_writes_and_pushes_changes_to_subscribed_connections() {
             .expect("second delete"),
         json!({})
     );
+    // `prefixes` narrows what getAll returns.
+    f.call(
+        &host_a,
+        "secrets/set",
+        json!({ "key": "mcp/s", "value": { "token": "t" } }),
+    )
+    .await
+    .expect("set");
+    let _ = next_change(&mut frames_a).await;
+    let _ = next_change(&mut frames_b).await;
+    let only_mcp = f
+        .call(
+            &bystander,
+            "secrets/getAll",
+            json!({ "prefixes": ["mcp/"] }),
+        )
+        .await
+        .expect("getAll with prefixes");
+    assert_eq!(only_mcp["entries"].as_array().map(Vec::len), Some(1));
+    assert_eq!(only_mcp["entries"][0]["key"], "mcp/s");
+    let models = f
+        .call(
+            &host_a,
+            "secrets/getAll",
+            json!({ "prefixes": ["provider/", "oauth/"] }),
+        )
+        .await
+        .expect("getAll with prefixes");
+    assert_eq!(models, json!({ "entries": [] }));
+    drop(frames_c);
+    let (bystander, mut frames_c) = Peer::channel(16);
     // `bystander` never called getAll: nothing was pushed to it.
     assert!(frames_c.try_recv().is_err());
     // A closed connection is dropped from the subscribers without affecting writes.

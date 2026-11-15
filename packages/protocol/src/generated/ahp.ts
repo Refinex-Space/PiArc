@@ -1392,9 +1392,15 @@ export interface SecretsGetAllRequest {
   params: SecretsGetAllParams;
 }
 /**
- * Parameters of `secrets/getAll` (none).
+ * Parameters of `secrets/getAll`.
  */
-export interface SecretsGetAllParams {}
+export interface SecretsGetAllParams {
+  /**
+   * Only keys starting with one of these prefixes (for example `provider/` and `oauth/`);
+   * every key when absent. `secrets/changed` is pushed for every key regardless.
+   */
+  prefixes?: string[] | null;
+}
 /**
  * Successful response to `secrets/getAll`.
  */

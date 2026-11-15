@@ -29,8 +29,9 @@ use piarc_host::{InboundHandler, Peer};
 use piarc_ports::{BoxFuture, SecretName, SecretStore};
 use piarc_protocol::secrets::{
     SecretEntry, SecretsChanged, SecretsChangedParams, SecretsDeleteParams, SecretsDeleteResult,
-    SecretsGetAllResult, SecretsGetParams, SecretsGetResult, SecretsLockParams, SecretsLockResult,
-    SecretsSetParams, SecretsSetResult, SecretsUnlockParams, SecretsUnlockResult,
+    SecretsGetAllParams, SecretsGetAllResult, SecretsGetParams, SecretsGetResult,
+    SecretsLockParams, SecretsLockResult, SecretsSetParams, SecretsSetResult, SecretsUnlockParams,
+    SecretsUnlockResult,
 };
 use piarc_protocol::{ErrorKind, ErrorObject};
 use piarc_secrets::EntryView;
@@ -159,8 +160,16 @@ impl SecretsService {
     ) -> Result<Value, ErrorObject> {
         match method {
             "secrets/getAll" => {
+                let p: SecretsGetAllParams = parse(method, params)?;
+                let wanted = move |key: &str| {
+                    p.prefixes
+                        .as_ref()
+                        .is_none_or(|prefixes| prefixes.iter().any(|x| key.starts_with(x.as_str())))
+                };
                 let entries: Vec<Result<SecretEntry, ErrorObject>> = self
-                    .with_vault(|v| Ok(v.entries().map(entry).collect()))
+                    .with_vault(move |v| {
+                        Ok(v.entries().filter(|e| wanted(e.key)).map(entry).collect())
+                    })
                     .await?;
                 let entries = entries.into_iter().collect::<Result<Vec<_>, _>>()?;
                 self.subscribe(peer);

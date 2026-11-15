@@ -46,10 +46,15 @@ pub struct SecretEntry {
     pub value: Map<String, Value>,
 }
 
-/// Parameters of `secrets/getAll` (none).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+/// Parameters of `secrets/getAll`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct SecretsGetAllParams {}
+pub struct SecretsGetAllParams {
+    /// Only keys starting with one of these prefixes (for example `provider/` and `oauth/`);
+    /// every key when absent. `secrets/changed` is pushed for every key regardless.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prefixes: Option<Vec<String>>,
+}
 
 /// Result of `secrets/getAll`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]

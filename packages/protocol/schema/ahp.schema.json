@@ -1895,7 +1895,16 @@
       "type": "object"
     },
     "SecretsGetAllParams": {
-      "description": "Parameters of `secrets/getAll` (none).",
+      "description": "Parameters of `secrets/getAll`.",
+      "properties": {
+        "prefixes": {
+          "description": "Only keys starting with one of these prefixes (for example `provider/` and `oauth/`);\nevery key when absent. `secrets/changed` is pushed for every key regardless.",
+          "items": {
+            "type": "string"
+          },
+          "type": ["array", "null"]
+        }
+      },
       "type": "object"
     },
     "SecretsGetAllRequest": {

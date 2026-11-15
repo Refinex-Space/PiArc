@@ -3,7 +3,8 @@
 // `ModelRuntime.create({ credentials })` takes pi-ai's `CredentialStore`. This one keeps every
 // credential of the vault in memory and talks to Core over AHP (`secrets/*`):
 //
-// - Startup: `load()` fetches everything once (`secrets/getAll`). If that fails (the vault's
+// - Startup: `load()` fetches every model credential once (`secrets/getAll` with the
+//   `provider/` and `oauth/` prefixes). If that fails (the vault's
 //   master key is missing, Keychain access was denied, ...), every operation retries the load
 //   once and then rejects with Core's structured error; pi-ai turns the rejection into a
 //   failed model request, which the session reports. Nothing falls back to plaintext or to
@@ -156,7 +157,10 @@ export class CoreCredentialStore implements CredentialStore {
   load(): Promise<void> {
     this.#loading ??= (async () => {
       try {
-        const entries = entriesOf('secrets/getAll', await this.#core.request('secrets/getAll', {}));
+        const entries = entriesOf(
+          'secrets/getAll',
+          await this.#core.request('secrets/getAll', { prefixes: [API_KEY_PREFIX, OAUTH_PREFIX] }),
+        );
         for (const entry of entries) {
           this.#apply(entry.key, entry.revision, entry.value);
         }

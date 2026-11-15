@@ -71,7 +71,7 @@ Core 在第一次 `secrets/*` 请求时打开保险箱；打开失败只让这�
 
 | 方法 | 方向 | 作用 |
 |---|---|---|
-| `secrets/getAll` | Agent Host → Core | 启动时取回全部凭据；该连接登记为变更订阅者 |
+| `secrets/getAll` | Agent Host → Core | 启动时取回凭据（`prefixes` 可只取某几类键，Agent Host 取 `provider/` 与 `oauth/`）；该连接登记为变更订阅者 |
 | `secrets/get` | Agent Host → Core | 读一条 |
 | `secrets/set`、`secrets/delete` | Agent Host → Core | 写或删一条，可带 `lockId`；返回 `revision` |
 | `secrets/lock` | Agent Host → Core | 一组键一起加锁，返回它们的当前值与 `expiresInMs` |
@@ -88,7 +88,7 @@ Core 侧测试（`crates/piarc-core/tests/secrets.rs`）：推送只发给订阅
 
 `agent-host/src/runtime/credentials.ts` 的 `CoreCredentialStore` 实现 pi-ai 的 `CredentialStore`：
 
-- **启动**：`load()` 调 `secrets/getAll`，失败时记下错误，不让 Agent Host 退出；之后每个需要凭据的操作先重试一次，仍失败就以 Core 的结构化错误拒绝。
+- **启动**：`load()` 调 `secrets/getAll`（只取 `provider/`、`oauth/` 两类键），失败时记下错误，不让 Agent Host 退出；之后每个需要凭据的操作先重试一次，仍失败就以 Core 的结构化错误拒绝。
 - **读**：`read`、`list` 从内存返回，不访问 Core（测试：100 次读不产生请求）。
 - **写**：`modify`、`delete` 按 provider 串行（promise 链，`signal` 只取消排队）；每次先 `secrets/lock` 锁住 `provider/<id>` 与 `oauth/<id>`，用锁返回的当前值更新内存，再运行 `fn`；有新值时先更新内存（其他会话立刻读到），再 `secrets/set`，Core 存好后 `modify` 才完成；最后 `secrets/unlock`。API key 与 OAuth 互相切换时删除另一个键。
 - **写回失败**：`modify` 拒绝。pi-ai 把它包成 `ModelsError("auth")`，该次模型请求失败，会话以 `turn/completed` 的 `failed` 带 `errorMessage` 报出。新值留在内存：轮换后的 refresh token 只存在于那里，丢掉它会迫使用户重新登录。
