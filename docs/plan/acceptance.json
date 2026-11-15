@@ -902,85 +902,85 @@
       "id": "T06-A01",
       "task": "T06",
       "description": "Pi 版本已精确锁定，`@earendil-works/*` 全部同一版本；与 v1.4.0 的差异已写入基线文档；`reference/pi` 已检出同一 tag，且 `REFERENCES.md` 已更新。验证：`package.json`、文档改动与 `git -C reference/pi describe --tags` 输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "agent-host/package.json：@earendil-works/pi-coding-agent、pi-ai、pi-agent-core、pi-mcp 均为 1.5.2（npm latest，2026-11-10）；packages/testkit 的 pi-ai 为 1.5.2；npm ls --all 中 @earendil-works/* 只有 1.5.2（含传递依赖 pi-tui、pi-codemode、pi-schema、pi-telemetry）。差异写在 docs/research/pi-v1.4.0-baseline.md 文末“版本差异：v1.5.2”（Breaking Changes 影响表与按 1.5.2 源码复核的事实）。git -C reference/pi describe --tags → v1.5.2（b4afdddf44e0），docs/research/REFERENCES.md 已更新固定版本与检出命令（tmp/evidence/T06/a01-reference-pi.txt）"
     },
     {
       "id": "T06-A02",
       "task": "T06",
       "description": "深度 import Pi 内部路径被 ESLint 拦截。验证：临时违规时 `npm run lint` 失败的输出，撤销后通过。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "eslint.config.mjs 的 piPublicImports 按已安装包的 exports 放行子路径。临时文件 agent-host/src/deep-import-probe.ts 引入 @earendil-works/pi-coding-agent/dist/core/sdk.js 与 @earendil-works/pi-ai/dist/types.js：npm run lint 退出码 1，两处 @typescript-eslint/no-restricted-imports 报错；同文件中的 @earendil-works/pi-ai/api/anthropic-messages.lazy（exports 声明的子路径）与包入口不报错。删除后 npm run lint 退出码 0（tmp/evidence/T06/a02-npm-run-lint-violation.txt、a02-npm-run-lint-clean.txt）"
     },
     {
       "id": "T06-A03",
       "task": "T06",
       "description": "握手成功时双方交换协议版本与能力；主版本不匹配时握手被拒绝且错误可读。验证：两个测试的输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-host --test resilience：handshake_exchanges_versions_and_enables_shared_capabilities（host/hello 1.0、pi 1.5.2、[todo, planMode] → core/welcome {protocol 1.0, enabled [planMode], workspace, connectionEpoch 1}）；refuses_a_different_major_version_with_a_readable_error_and_does_not_restart（-32000 protocolVersionMismatch，details {local 1.0, remote 2.0}，消息 “protocol major version mismatch: local speaks 1.0, remote speaks 2.0; update the older side…”，不重启）。真实 Agent Host：cargo test -p piarc-testkit --test agent_host the_real_agent_host_exits_readably_… → HandshakeRejected 后以退出码 3 退出（tmp/evidence/T06/s9-resilience.txt、s3-s9-e2e.txt）"
     },
     {
       "id": "T06-A04",
       "task": "T06",
       "description": "同进程两个不同 cwd 的会话并发运行工具调用，文件副作用与工具结果只出现在各自的工作区。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test agent_host two_sessions_run_tool_calls_concurrently_and_only_touch_their_own_workspace：同一 Agent Host 中两个会话（cwd 为 ws a 甲、ws b 乙）同时执行 write→edit→read 相对路径 notes/note.txt，两个回合交错；各自文件内容为 “written by session A/B, edited”，read 结果只含本会话文本（tmp/evidence/T06/s3-s9-e2e.txt，docs/spikes/S03-multi-session.md 3.1）"
     },
     {
       "id": "T06-A05",
       "task": "T06",
       "description": "一个会话被中断、另一个会话正常完成；一个会话压缩后，另一个会话的历史不变。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test agent_host：interrupting_one_session_leaves_the_other_running_to_completion（A 在模型流挂起时被中断，turn/completed interrupted；B 的回合 completed、文件写入；A 之后仍可继续）；compacting_one_session_leaves_the_history_of_the_other_untouched（A 用 32k 模型越过阈值自动压缩，会话文件有 compaction 条目、后续请求从摘要开始；B 无 compaction，第二个请求完整保留第一轮问答，不含 A 的内容）。附带发现 I18（中断后相邻 user 消息）登记给 T14"
     },
     {
       "id": "T06-A06",
       "task": "T06",
       "description": "进行中的 prompt 期间杀掉 Agent Host：Core 自动重启并恢复会话，进行中的请求被标为 `uncertain`。验证：故障注入测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "故障注入：cargo test -p piarc-host --test resilience killing_the_host_mid_prompt_marks_open_calls_uncertain_restarts_it_and_restores_the_session（已确认的 session/prompt 与未回复的 session/abort 都报为 uncertain，abort 调用返回 Uncertain；1 s 后重启 epoch 2，session/resume 带 lastSeq 恢复，不重放）。真实进程：cargo test -p piarc-testkit --test agent_host killing_the_agent_host_mid_prompt_restarts_it_and_restores_the_session（SIGKILL → Exited Killed → Uncertain 该提示词 → Restarting 1s → Connected epoch 2 → SessionRestored restored_messages 2，恢复后继续对话）"
     },
     {
       "id": "T06-A07",
       "task": "T06",
       "description": "半帧挂起、非法 JSON、超长帧都不会让 Core 崩溃，行为符合 ADR-0009。验证：故障注入测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-host --test resilience：a_half_frame_followed_by_silence_is_treated_as_hung_and_core_keeps_running（半帧后静默，连续两次心跳无响应判为 Hung 并杀进程，重启后调用正常）；invalid_json_oversized_frames_and_batches_are_dropped_without_ending_the_connection（FrameError [parseError, frameTooLarge, invalidRequest, invalidRequest]，超长帧丢弃到下一个 LF，连接不断开，后续通知与调用照常）——按架构 7.4 与 ADR-0009"
     },
     {
       "id": "T06-A08",
       "task": "T06",
       "description": "Core 读取变慢时背压生效，Agent Host 与 Core 的内存有界。验证：测试中记录的内存峰值与队列长度。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Core 侧：a_slow_event_consumer_pushes_back_on_the_host_without_buffering_or_killing_it（事件队列 8、管道 4 KiB，消费者不读时假 Agent Host 写到 5,000 条中的第 51 条被阻塞，恢复后全部按序到达，心跳未误杀）；a_full_write_queue_refuses_new_calls_with_a_retryable_busy_error（写队列 4 满后第 6 个调用返回可重试 busy）。Agent Host 侧：a_slow_core_reader_makes_the_agent_host_queue_with_bounded_memory（Core 事件队列 1，回合产生 205 条通知、891,419 字节，Agent Host 出站队列峰值 757,949 字节，低于产生总量，结束时队列 0 帧 0 字节，进程未被杀）；agent-host 单元测试中 10,000 个增量合并为 1 帧（outbound.test.ts）。Agent Host 积压上限 64 MiB（超限以退出码 70 退出）"
     },
     {
       "id": "T06-A09",
       "task": "T06",
       "description": "10 分钟内连续崩溃超过 5 次后停止重启并上报。验证：故障注入测试（时钟可注入，不真实等待 10 分钟）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-host --test resilience gives_up_after_the_sixth_crash_within_ten_minutes：注入测试时钟，6 次崩溃、5 次重启（退避 1、2、4、8、16 s，测试时钟共前进 31 s），第 6 次后 GaveUp{restarts: 5} 与 Stopped，之后调用返回 shuttingDown；restart.rs 单元测试验证 10 分钟窗口滑动"
     },
     {
       "id": "T06-A10",
       "task": "T06",
       "description": "每条会话通知带 `{sessionId, seq, ts}`，同一会话的 `seq` 连续递增。验证：测试断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "assert_contiguous_seq（crates/piarc-testkit/tests/agent_host/harness.rs）在 6 个端到端测试中断言每个会话的 seq 为 1..=n：双会话各 1..=18；杀进程重启后同一会话跨两个连接 1..=10（session/resume 的 lastSeq）；慢读者 1..=205。每条通知含 sessionId、seq、ts（SessionEventNotification 反序列化成功）。agent-host outbound.test.ts 断言合并与 continueSeq 后 seq 无缺口"
     },
     {
       "id": "T06-A11",
       "task": "T06",
       "description": "S3、S9 两份报告已写入 `docs/spikes/`，`docs/spikes/README.md` 已更新状态。验证：文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/spikes/S03-multi-session.md（结论：macOS 通过；RSS：无会话 157–158 MB、一个 165–168 MB、两个 167–169 MB）与 docs/spikes/S09-ahp-resilience.md（结论：macOS 通过；背压方式选“写队列满返回可重试 busy”）已写入；docs/spikes/README.md 的 S3、S9 行已改为通过并链接报告，Windows 列为待 CI 结果"
     },
     {
       "id": "T06-A12",
       "task": "T06",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify：All 13 steps passed（Prettier、ESLint、tsc、Core 模块与快照、Vitest、cargo fmt、clippy、cargo test、protocol drift、contract samples、cargo-deny、crate 依赖、验收清单），见 tmp/evidence/T06/a12-verify.txt"
     },
     {
       "id": "T07-A01",
