@@ -117,7 +117,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 已完成 | 3a8744f |
 | T08 | [凭据保险箱](tasks/T08-credential-vault.md) | 1 | T06；D2 | macOS | high | 中 | S5 | 已完成 | 83dc25b |
 | T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 已完成 | 9c0738d |
-| T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 进行中 | — |
+| T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 阻塞（等待用户确认 ADR-0023） | — |
 | T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 未开始 | — |
 | T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 未开始 | — |
 | W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 未开始 | — |
@@ -306,7 +306,15 @@ T10（2026-11-15 开工；基线 verify 13 步通过；依赖 T04 为"部分完�
 - [x] 8 L4：rAF 拉取与隐藏终端 0 帧、输入法预编辑与 textarea 跟随（A06、A11；真实拼音候选框待用户核对）
 - [x] 9 测量：`cat` 100 MB、键入回显额外延迟；vim 与 top 截图对照（A07、A09、A10；回显经 MessagePort 超出预算，写 ADR-0023 提议）
 - [x] 10 wterm 评估、S7 报告、spikes README、许可证来源登记、CLAUDE.md、复用表、架构与 ADR 同步（A13）
-- [ ] 11 收尾：verify、验收记录、PLAN 收尾（A14）
+- [x] 11 收尾：verify 13 步通过、L4 两种形态 136 项通过、验收记录（A02–A09、A12–A14 通过；A01、A10、A11 阻塞）、登记事项与会话日志（A14）
+
+等待 ADR-0023 的决定（变更型：按 ADR-0017 原文经事件 MessagePort 送帧时回显额外延迟 p95 16.2 ms）。用户采纳后续做：
+
+- [ ] 12 ADR-0023 改为"已接受"，ADR-0017 注明第 3 条被修订，架构 6.11、8.3 同步并写修订记录
+- [ ] 13 实现：`terminal-ipc.ts` 的 `requestFrame` 返回 Core 的帧，preload 的 `requestTerminalFrame` 解析为帧、去掉 `onTerminalFrame`，`ipc.ts`、控制器、`terminal-ipc.test.ts`、`preload.e2e.ts` 键快照、S10 报告第 20 行同步
+- [ ] 14 重新打包、L4 两种形态、`npm run bench:s7`，更新 T10-A10、S7 报告第 1、5.2 节与 spikes README；verify；看板改为"部分完成"（A01 待 Windows CI/W0，A11 待 R1 实机核对）
+
+否决时：A10 记为失败，S7 结论改为"不通过"并按 ADR-0017 第 7 条评估退路（退路同样经 MessagePort，需另行解决回显）。
 
 ## 登记事项
 
@@ -340,6 +348,11 @@ T10（2026-11-15 开工；基线 verify 13 步通过；依赖 T04 为"部分完�
 | I24 | T09 | transcript 原型页 `#/transcript-lab` 与合成夹具（`src/renderer/lab/`）随发布构建的渲染包分发，与 I13 的 `#/event-probe` 同类 | T45 与 I13 一起评估在发布构建中剔除测试页 |
 | I25 | T09 | 真实输入法（macOS 简体拼音、日文）与触控板滚动手感需要人工核对，清单见 `docs/spikes/S01-transcript-composer.md` 第 7 节（M1–M10）；自动化部分已用 CDP 合成通过 | 用户核对后把结果告诉智能体补记到 S1 报告；R1 汇总 S1 时检查 |
 | I26 | T09 | S1 基准中应用全部进程合计 489 MiB，超出第 11 章"不含 Agent Host 的全部进程 ≤ 450 MB"；渲染进程 179 MiB 在预算内，超出主要来自主进程（179 MiB，含 Core 与测试驱动） | R1 与 I12 一起按 M0 实测校准；W0 补 Windows 数据 |
+| I27 | T10 | 终端的 L4（`terminal.e2e.ts`、`terminal-tui.e2e.ts`）与 `crates/piarc-term/tests/pty.rs`、`crates/piarc-core/tests/terminal.rs` 使用 `/bin/sh`、`cat`、`vim`、`top`，在 Windows 上不运行；ConPTY 的 resize、Ctrl+C、kill（portable-pty 0.9.0 的 kill 返回值问题由 `wait` 兜底）与是否随附 `conpty.dll`/OpenConsole.exe 未验证 | W0 补 Windows 程序版本的用例并实测 ConPTY；S7 报告第 10 节 |
+| I28 | T10 | PTY 子进程由 portable-pty 启动，不经 `ProcessSpawner`，没有进程组或 Job Object：终端里的程序再起的子进程不随终端关闭而结束 | T33 引入终端承载的任务时决定（与 I17 一起，在 `piarc-exec` 的进程树管理落地后接入） |
+| I29 | T10 | `cat` 以约 190 MB/s 输出时主进程 CPU（含 Core 全部线程）约为一个核的 74%，主要是 IO 线程读 PTY 与解析；第 11 章没有对应预算 | T44 把终端吞吐纳入性能回归时评估（例如增大读块、合并读） |
+| I30 | T10 | `#/terminal-lab` 原型页随发布构建的渲染包分发；发布构建的 `window.piarc` 也有七个终端函数（`createTerminal` 只能启动登录 shell），与 I13、I24 同类 | T34 接入正式终端面板时收口；T45 与 I13、I24 一起评估剔除原型页 |
+| I31 | T10 | 真实拼音输入法的候选框位置未核对，清单见 `docs/spikes/S07-terminal.md` 第 8 节（T1–T4） | 用户核对后把结果告诉智能体补记到 S7 报告；R1 汇总 S7 时检查（同 I25） |
 
 ## 技术债
 
@@ -423,6 +436,12 @@ T10（2026-11-15 开工；基线 verify 13 步通过；依赖 T04 为"部分完�
 - 验收：13 项通过，0 项阻塞
 - 决策：ADR-0022（补充，已接受）：@tanstack/react-virtual（virtuoso 同组测量下流式掉帧、冷加载慢一倍、增长时贴底晚一帧）、marked 词法器（比 mdast 快 17–50 倍）、shiki JavaScript 引擎（不放宽 CSP）；帧时间按每帧主线程工作量计（60 Hz 屏上 rAF 间隔不能对照 16 ms）；滚动阈值取 2/40/200 px 与 150 ms 输入窗口；transcript 滚动条改为自绘（覆盖式滚动条不可拖动）
 - 遗留：I24（原型页随发布包分发，T45）、I25（真实输入法与触控板待用户核对，S1 报告第 7 节）、I26（全部进程内存 489 MiB，R1）；T03-A03、T04-A09 的 Windows CI 仍待推送后核对（分支未推送）
+
+### 2026-11-15 T10 阻塞（等待用户确认 ADR-0023）
+- 交付：`piarc-ghostty-sys`（锁定文件、`build.rs` 下载与 SHA-256 + minisign 校验、离线缓存、bindgen 绑定入库与 `gen-ghostty-bindings.mjs`、macOS 静态链接、Windows 官方 DLL 随 `.node`）；`piarc-term`（`vt` safe 封装：Terminal + 四个 effects、RenderState、KeyEncoder、formatter；PTY 会话的 IO 与写线程、同步输出 hold、按 viewer 的增量帧编码与行 id 复用、W3C 键位表）；`piarc_protocol::term_frame` 帧格式草案、编解码与 `Screen`；Core 终端注册表与 `term/<id>` 事件；NAPI 终端导出；主进程终端 IPC（归属校验）与 preload API；渲染原型 `#/terminal-lab`（fork 的 ghostty-web `CanvasRenderer`、TS 解码器、rAF 拉取、隐藏不拉取、键盘与输入法）；`third-party/sources.json`；`npm run bench:s7`；S7 报告、ADR-0023（提议）、架构 v2.13、testing.md 9.6、复用表八行、`crates/piarc-term/CLAUDE.md` 与五份 CLAUDE.md 更新
+- 验收：11 项通过，3 项阻塞（A01：Windows CI 待推送、win32-arm64 实机待 W0；A10：回显经 MessagePort p95 16.2 ms，待 ADR-0023；A11：真实拼音候选框待 R1）
+- 决策：ADR-0023（提议，变更型）：终端帧作为拉取请求的返回值送达，实测 p95 0.77 ms；未写 ADR 的取舍：portable-pty 用发布版 0.9.0（kill 返回值以 `wait` 兜底）、Windows 选 DLL 而非 lld + 静态库、绑定按 C23 生成、`unsafe` 放开到 `piarc-term` 的 `vt` 模块（编码规范 2.8）、htop 未安装以 top 代替、wterm 只评估不采用
+- 遗留：I27（终端测试只在 Unix）、I28（PTY 子进程不经 `ProcessSpawner`）、I29（高吞吐时主进程 CPU）、I30（原型页与终端 IPC 随发布构建）、I31（真实拼音核对）；T03-A03、T04-A09、T10-A01 的 Windows CI 仍待推送后核对
 
 ## 计划变更记录
 

@@ -1266,99 +1266,99 @@
       "id": "T10-A01",
       "task": "T10",
       "description": "darwin-arm64、darwin-x64、win32-x64、win32-arm64 四个目标链接成功，Windows 的链接方式及理由写入报告。验证：本机构建输出与 CI 配置；Windows 运行结果未取得时标 `blocked`，由 W0 核对。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "本机：darwin-arm64 构建与链接通过（npm run build:core -- --flavor all；cargo test -p piarc-ghostty-sys 链接冒烟 2 项通过）；darwin-x64 交叉构建两种构建通过（node scripts/dev/build-core.mjs --flavor all --target x86_64-apple-darwin，exit 0，产物为 Mach-O x86_64，tmp/evidence/T10/a01/darwin-x64-build.txt）。Windows 选定\"官方 ghostty-vt.dll 放在 .node 旁边\"并写入 S7 报告第 3.3 节（官方文档：MSVC link.exe 不能用静态库；DLL 只依赖 KERNEL32/ntdll/UCRT；libuv uv_dlopen 用 LOAD_WITH_ALTERED_SEARCH_PATH）；CI core-build 上传 .node 与 .dll、core-load 同目录加载已配置（.github/workflows/ci.yml）。阻塞原因：分支未推送，Windows 两个目标的 CI 链接与加载结果待推送后核对；win32-arm64 实机运行由 W0 核对。"
     },
     {
       "id": "T10-A02",
       "task": "T10",
       "description": "预编译产物的 SHA256 或 minisign 签名任一不匹配时构建失败并给出原因。验证：临时篡改缓存产物与签名后的构建输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "篡改缓存产物与签名后 cargo build -p piarc-ghostty-sys 均失败并给出原因（tmp/evidence/T10/a02/）：改产物一个字节 → \"SHA-256 mismatch: ghostty-vt.lock.json expects c0f96312…, the file has d919ea49…\"；交换 .minisig 两个字符 → \"minisign signature check failed: The signature verification failed\"；改锁定摘要 → SHA-256 不符；还原后构建通过。另 cargo test -p piarc-ghostty-sys 的 9 个校验单元测试（官方 SHA256SUMS 及其真实签名：摘要不符、签名篡改、受信注释篡改、换公钥、锁定摘要都在签名过的 SHA256SUMS 中）全部通过。"
     },
     {
       "id": "T10-A03",
       "task": "T10",
       "description": "重新生成脚本产出的绑定与入库版本一致。验证：运行脚本后 `git diff` 为空。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "node scripts/dev/gen-ghostty-bindings.mjs（.tools/bin/bindgen 0.73.2，C23）重写 crates/piarc-ghostty-sys/src/bindings.rs 后 git diff --exit-code 为空；--check 模式输出 \"matches the generated bindings\"。"
     },
     {
       "id": "T10-A04",
       "task": "T10",
       "description": "PTY 中的 shell 可以输入输出、调整尺寸、检测退出；终端查询（例如设备属性查询）经 `WRITE_PTY` 得到应答。验证：集成测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-term --test pty：10 项通过（连续 6 次稳定）——sh 输入输出（echo piarc-$((40+2)) → piarc-42）、按键经 Core 编码写入（echo k）、resize 后 stty size 为 \"30 100\" 且帧尺寸 100×30、exit 7 报告退出码 7、close 杀掉程序并拒绝后续输入、程序发 DA1（CSI c）后经 WRITE_PTY 收到 CSI ? 62 ; 22 c 并打印 DA-OK、标题与响铃事件、帧重建屏幕等于 formatter、直写 PTY 回显探针、真实 vim。另 vt 单元测试 device_attribute_queries_are_answered_through_write_pty（DA1、DSR 应答）通过。"
     },
     {
       "id": "T10-A05",
       "task": "T10",
       "description": "帧只包含脏行；滚动输出时已有行按行 id 复用，帧中只出现新行；编解码往返一致。验证：单元测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-term：frame 单元测试 5 项（首帧 RESET、无变化为 14 字节空帧、编辑只发该行、滚动每输出一行只发新的底行且其余 4 行按行 id 引用、上移的行保留原 id、样式只发一次）；consistency 测试的滚动样本 rowsWithCells 为 [3] 与 [2,3]；cargo test -p piarc-protocol term_frame 7 项（完整帧往返、空帧、引用行 5 字节、畸形帧拒绝、字素截断、Screen 按 id 复用与淘汰、乱序拒绝）通过。"
     },
     {
       "id": "T10-A06",
       "task": "T10",
       "description": "渲染进程按 rAF 拉取帧，隐藏的终端在测试期间产生 0 帧。验证：Playwright 测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 terminal.e2e.ts（dev 与 packaged 均通过，npm run test:e2e -w @piarc/desktop 136 passed）：\"output appears in frames pulled per animation frame\"（空闲 500 ms 内页面收到 >10 帧且每帧约 14 字节）；\"a hidden terminal produces no frames\"：程序每 20 ms 输出一行，隐藏 1.5 s 期间 Core 读取字节数增加，而 Core 帧计数增量为 0、页面 requestTerminalFrame 次数增量为 0，显示后恢复拉取。"
     },
     {
       "id": "T10-A07",
       "task": "T10",
       "description": "vim 与 htop（或注明的替代 `top`）渲染正确。验证：`tmp/evidence/T10/` 中的截图与同一时刻 formatter 输出的对照。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 terminal-tui.e2e.ts（dev 与 packaged 均通过）：页面从帧重建的屏幕与 Core formatter 输出相同并保持 300 ms 后截图：tmp/evidence/T10/l4/terminal-tui.e2e.ts-vim-renders-on-the-alternate-screen-*/vim.png 与 vim.formatter.txt（vim -u NONE，syntax on、行号、中文注释、emoji、~ 行）；…-top-redraws-the-whole-screen-*/top.png 与 top.formatter.txt。htop 未安装，按任务说明以 top 代替（S7 报告第 7 节）。"
     },
     {
       "id": "T10-A08",
       "task": "T10",
       "description": "formatter 纯文本与解码后的帧逐格一致，覆盖普通屏幕、alt screen、CJK 全角、emoji 与 ZWJ 字素；Rust 与 TS 解码器结果相同。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-term --test consistency：五组样本（带样式普通屏幕、备用屏幕进入/改动/退出、CJK 全角与宽字符换行、emoji/ZWJ/国旗/组合字符、滚动）每一步帧重建屏幕与 formatter 逐行逐格一致，并检查共享样本 frame-samples.json 为最新；tests/pty.rs 真实 vim 三个时刻一致；npx vitest run apps/desktop/src/renderer/terminal：decoder.test.ts 用同一组帧由 TS 解码器重建的每一格（文字、宽度类别、解析后样式）、光标与纯文本均与 Rust 结果相同（8 项通过）。"
     },
     {
       "id": "T10-A09",
       "task": "T10",
       "description": "`cat` 100 MB 期间主进程事件循环延迟 p99 ≤ 16 ms，渲染进程没有超过 50 ms 的长任务。验证：测量输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run bench:s7 -- --form packaged（tmp/evidence/T10/bench/s7-packaged.json，M1 Max、macOS 26.5.2）：cat 100 MB 期间主进程事件循环延迟 p50 1.17 / p99 1.85 / 最大 12.4 ms（monitorEventLoopDelay 原始值，含 1 ms 采样）；CDP 追踪中渲染进程超过 50 ms 的任务 0 个，每帧主线程工作 p99 6.87 ms。持续 1 GB（--repeat 10，s7-packaged-sustained.json）：p99 1.88 ms，长任务 0，58.9 帧/s，每帧工作 p99 5.14 ms；帧流量 6.7 MiB / 输出 1011 MiB。"
     },
     {
       "id": "T10-A10",
       "task": "T10",
       "description": "键入回显额外延迟 p95 ≤ 5 ms（≥ 200 个样本）。验证：测量输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "npm run bench:s7（200 个配对样本，tmp/evidence/T10/bench/s7-packaged.json）：按 ADR-0017 原文帧经事件 MessagePort 时，键入回显额外延迟 p50 12.68 / p95 16.18 ms，不达标；原因是页面处理按键后 MessagePort 消息被推迟到下一帧之后处理（invoke 回复不受影响，S7 报告第 5.2 节）。同一构建临时改为帧作为 invoke 返回值（未提交，s7-experiment-invoke-reply.json）：p50 0.49 / p95 0.77 ms。阻塞原因：已写 ADR-0023（提议，修订 ADR-0017 第 3 条），等待用户确认后实现并重测。"
     },
     {
       "id": "T10-A11",
       "task": "T10",
       "description": "隐藏 textarea 跟随光标，预编辑文本绘制在光标处；macOS 拼音的候选框位置有核对结论。验证：基于 CDP 合成的测试、截图与报告。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "已验证：L4 terminal.e2e.ts \"the input method composes at the cursor and commits through Core\"（dev 与 packaged）——隐藏 textarea 与光标格左上角重合，CDP Input.imeSetComposition 的预编辑 \"你好\" 绘制在光标处（截图区域变化，ime-preedit.png），提交前 PTY 未收到字节，Input.insertText 提交后经 Core 回显，光标与 textarea 一起右移 4 格。阻塞原因：系统拼音候选框的位置需要真实输入法核对，清单见 S7 报告第 8 节 T1–T4，交 R1 由用户实机核对。"
     },
     {
       "id": "T10-A12",
       "task": "T10",
       "description": "fork 的渲染器代码保留 MIT 许可证与版权声明，来源（仓库、路径、提交）与改动清单齐全，并已登记到第三方许可证清单的来源文件。验证：文件检查。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "apps/desktop/src/renderer/terminal/vendor/ghostty-web/：LICENSE（上游 MIT 原文，Copyright (c) 2025 Coder）、renderer.ts 文件头保留上游标题与版权声明并写明来源仓库、路径、提交 640db461…与改动说明、README.md（来源仓库 coder/ghostty-web、路径 lib/renderer.ts、提交、9 条改动清单）；third-party/sources.json 登记 ghostty-web-canvas-renderer 与 libghostty-vt（许可证文本 third-party/licenses/libghostty-vt-1.0.1.LICENSE）。"
     },
     {
       "id": "T10-A13",
       "task": "T10",
       "description": "S7 报告含链接方式、测量数据、一致性结果、wterm 评估、路线结论与待 W0 的项，`docs/spikes/README.md` 已更新。验证：文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/spikes/S07-terminal.md：链接方式（第 3 节，含 Windows 选定理由）、测量数据（第 5 节）、一致性结果（第 6 节）、TUI 截图（第 7 节）、输入法与待核对清单（第 8 节）、wterm 评估（第 9 节）、路线结论（第 1 节：正式路线，不启用退路）与待 W0 的项（第 10 节）；docs/spikes/README.md 的 S7 行已更新。"
     },
     {
       "id": "T10-A14",
       "task": "T10",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify：13 步全部 PASS（Prettier、ESLint、tsc、Core 模块与 API 快照、Vitest、cargo fmt、clippy、cargo test、协议漂移、契约样本、cargo-deny、crate 依赖、验收清单），All 13 steps passed。另 npm run test:e2e -w @piarc/desktop：dev 与 packaged 两种形态 136 passed。"
     },
     {
       "id": "T11-A01",
