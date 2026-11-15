@@ -46,6 +46,9 @@
 - `tools.rs`（A01、A02、A04、A05）、`parity.rs`（A06，Pi 原生工具 vs 委托工具）与 `with_io_spy`（`NODE_OPTIONS` 预加载 `packages/testkit/src/io-spy.ts`）是 S4 的证据。spy 记录带时间戳，按场景窗口判定；会话创建时 Pi 的 `existsSync(cwd)` 是已知的唯一一次（I20）。
 - 工具的 I/O 要 Core 读 stdout 才能进行：让 Core 停读的测试（背压）不能等真实工具完成，用不存在的工具名制造通知。
 - `mock-vision` 模型接受图片输入，`tool_results_in` 把图片块写成 `[image <类型> <base64>]`。
+- Core 侧的 `secrets/*` 由 `Env.secrets`（真实 `SecretsService`，保险箱在测试数据目录，主密钥在 `Env.key_store` 这个内存替身里）回答；同一个 `Env` 的所有 Agent Host 共用它，就像一个 Core。要注入凭据库失败，对 `env.key_store` 调 `fail_with`。
+- `credentials.rs`（S5）：`--test-oauth-provider` 与 `token_server.rs`（refresh token 用过即失效）验证登录、只刷新一次、无明文与进程环境；`capture_logs()` 把 Core 的 tracing（含 Agent Host 的 stderr）写到一个文件供扫描，整个测试二进制只装一次。
+- 无明文扫描用库里的 `piarc_testkit::plaintext::scan`：逐字节、不跟随符号链接、读不了的文件单独列出；先放一个对照文件证明扫描路径有效。
 
 ## 易错点
 

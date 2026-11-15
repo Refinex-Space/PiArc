@@ -7,9 +7,9 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 | 命令 | 用途 |
 |---|---|
 | `npm run build:agent-host` | esbuild 打包到 `agent-host/dist/bundle/agent-host.mjs`，并写 `pi-assets/package.json`；`@piarc/protocol` 从源码打包，不依赖 `tsc` 产物 |
-| `npx vitest run agent-host` | 单元测试：出站队列、投影、Core 桥接、工具层（名称映射、路径、替身、Core I/O） |
-| `cargo test -p piarc-testkit --test agent_host -- --nocapture` | 端到端：Core 监管真实 bundle、mock provider 应答（S3、S4 与进程级 S9）；测试会先自己打包 |
-| `node agent-host/dist/bundle/agent-host.mjs --data-dir <dir>` | 手动运行；需设 `PI_PACKAGE_DIR=<bundle>/pi-assets`，stdout 只走 AHP 帧。`--tool-profile <json>` 覆盖默认 Profile 的名称与描述、`--pi-native-tools` 换回 Pi 原生工具，都只给测试用，Core 不传 |
+| `npx vitest run agent-host` | 单元测试：出站队列、投影、Core 桥接、工具层（名称映射、路径、替身、Core I/O）、凭据存储（Pi 接口契约与假 Core） |
+| `cargo test -p piarc-testkit --test agent_host -- --nocapture` | 端到端：Core 监管真实 bundle、mock provider 应答（S3、S4、S5 与进程级 S9）；测试会先自己打包 |
+| `node agent-host/dist/bundle/agent-host.mjs --data-dir <dir>` | 手动运行；需设 `PI_PACKAGE_DIR=<bundle>/pi-assets`，stdout 只走 AHP 帧。`--tool-profile <json>` 覆盖默认 Profile 的名称与描述、`--pi-native-tools` 换回 Pi 原生工具、`--test-oauth-provider <json>` 注册接本地 token 端点的 OAuth provider，都只给测试用，Core 不传 |
 
 ## 入口与结构
 
@@ -21,6 +21,8 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - `src/protocol/outbound.ts`：写 stdout 的唯一路径：等 `drain`、合并增量、写出时分配 `seq`。
 - `src/tools/`：工具层（架构第 6.1 节、ADR-0020）。`profile.ts` 规范名、默认 Profile（描述原创，ADR-0006）与 `ToolNameMap`；`core-io.ts` 经 Core 桥接发 `fs/*`、`exec/*`（结果在此校验，错误重建为 Node 风格）；`read.ts`、`write.ts`、`edit.ts` 在替身路径（`stand-in.ts`）上运行 Pi 的工具定义；`bash.ts`、`glob.ts` 用 Pi 工厂加 Operations；`grep.ts` 自写；`ls.ts` 只提供 `LsOperations`，不暴露。
 - `src/runtime/blobs.ts`：读取 Core 交出的 blob（图片），只接受数据目录 `sessions/` 下的路径。
+- `src/runtime/credentials.ts`：`CoreCredentialStore`，pi-ai 的 `CredentialStore`，经 `secrets/*` 由 Core 的保险箱支撑（ADR-0021）；`host.ts` 在握手后 `load()`，再交给 `ModelRuntime.create({ credentials })`。
+- `src/runtime/test-oauth-provider.ts`：`--test-oauth-provider` 的测试 provider（OpenAI 线格式、本地 token 端点、请求头 `x-piarc-test-token` 带 token 的非机密标签）。
 
 ## 打包的外部依赖
 
@@ -37,7 +39,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - 发往 Core 的字符串必须是合法 UTF-16（Rust 端拒绝孤立代理项）：增量走投影器的代理项处理，其他字符串用 `toWellFormed()`。
 - `session/prompt` 先回复再开始回合（`setImmediate`），Core 总是先拿到 `turnId`。`requestId` 是幂等键。
 - 只从 `@earendil-works/*` 的包入口或 `exports` 声明的子路径导入（ESLint 检查）；Pi 的 API 以锁定版本的类型声明为准。
-- 凭据只在内存（`InMemoryCredentialStore`），`pi/` 下不写 `auth.json`；T08 接入保险箱。
+- 凭据只来自 Core 的保险箱（`CoreCredentialStore`），`pi/` 下不写 `auth.json`；不从环境变量读凭据，也不把凭据放进 `process.env`。日志与错误只写键名（`provider/<id>`），不写值。
 - `src/tools/`、`src/harness/` 不导入 `fs`、`fs/promises`、`child_process`（ESLint，含动态导入与 `require`）：文件与命令只经 `CoreIo`。新工具的 I/O 加在 `CoreIo` 上，不在工具里绕开。
 - 模型可见名只出现在发给模型的工具定义里；投影的 `item/*`、发往 Core 的 `origin.tool`、规则与 hooks 都用规范名（`ToolNameMap`）。Profile 不能用 Pi 原生工具名（会话把它们排除了）。
 - Read、Write、Edit 交给 Pi 的 `path` 是替身：结果与错误里的替身必须换回模型写的路径（`StandIn.restore`/`restoreError`）；Pi 新增对传入路径的 Operation 时，`StandIn.resolve` 抛出"unexpected path"。
@@ -53,6 +55,15 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - MCP 扩展按会话实例化：同一个 server 被两个会话配置时会起两份进程（共享池是 T36）。
 - 扩展加载器的模块级缓存按 cwd 失效，不同 cwd 的会话交替加载文件型扩展会互相清空它；Harness Kit 用内联工厂不受影响。
 - 中断后的下一次请求里 Pi 丢弃被中断的 assistant 消息，出现相邻的 user 消息（`docs/plan/PLAN.md` I18）。
+
+## 凭据适配层
+
+- 启动：`load()` 调 `secrets/getAll`；失败只记日志，之后每个需要凭据的操作重试一次，仍失败就以 Core 的结构化错误拒绝，pi-ai 让该次模型请求失败（会话报错）。不要在失败时回退到 `InMemoryCredentialStore` 或环境变量。
+- 读：`read`、`list` 从内存返回，不访问 Core。
+- 写：`modify`、`delete` 按 provider 串行，在 Core 的锁（`secrets/lock`，锁 `provider/<id>` 与 `oauth/<id>`）内运行：用锁结果更新内存 → `fn` → 先改内存 → `secrets/set`/`secrets/delete` → `secrets/unlock`。`modify` 等 Core 存好才完成；写回失败时拒绝，但新值留在内存（轮换后的 refresh token 只在那里）。
+- 缓存更新：Core 把每次写入推给所有调用过 `secrets/getAll` 的 Agent Host（`secrets/changed`）；`applyChange` 只接受比已知更大的 `revision`。别的 Agent Host 刷新过的 token 在下一次加锁时一定能看到（锁结果带当前值），不依赖推送先到。
+- 键：API key 在 `provider/<id>`，OAuth 在 `oauth/<id>`，写一个就删另一个；`mcp/*` 不进 Pi 的凭据视图。
+- 退出前 `flush()` 等待进行中的写入（`host.ts` 的 `shutdown` 与 `host/shutdown`）。
 
 ## 工具层的易错点
 

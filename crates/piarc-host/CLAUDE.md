@@ -33,7 +33,7 @@ Core 侧的 Agent Host 监管：启动、握手、stdio 读写、背压、心跳
 
 ## 入站请求
 
-- 每个入站请求在独立任务里交给 `InboundHandler::handle(method, params, peer)`；`Peer` 绑定该连接的写队列，`notify::<M>()` 发出的通知与随后的响应同序写出（`exec/output` 先于 `exec/run` 的响应）。写队列满时 `notify` 等待，连接结束时返回 `PeerClosed`；`Peer::closed()` 在连接结束时完成。
+- 每个入站请求在独立任务里交给 `InboundHandler::handle(method, params, peer)`；`Peer` 绑定该连接的写队列，`notify::<M>()` 发出的通知与随后的响应同序写出（`exec/output` 先于 `exec/run` 的响应）。写队列满时 `notify` 等待，连接结束时返回 `PeerClosed`；`Peer::closed()` 在连接结束时完成，`is_closed()` 查询是否已结束，`same_connection()` 判断两个 `Peer` 是否同一连接（凭据变更订阅去重）。
 - Agent Host 的请求与会话通知共用 stdout：读取停在投递上时（许可用完），后面的请求也读不到，工具 I/O 随之等待（S4 第 10 节，I19）。
 
 ## 不变量

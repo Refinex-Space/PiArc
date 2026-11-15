@@ -1,12 +1,12 @@
 # piarc-core
 
-Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、有序关闭、任务监督；`agent_host` 模块把 `piarc-host` 的监管器与生产 I/O（`piarc-exec` 的进程启动器、`SystemClock`）装配起来，是 Agent Host 测试的无头入口（T06）；`tool_io` 应答 Agent Host 委托的 `fs/*`、`exec/*`（T07）。工作区与会话编排由 T13、T14 加入。不负责 JavaScript 绑定（`piarc-napi`）。
+Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、有序关闭、任务监督；`agent_host` 模块把 `piarc-host` 的监管器与生产 I/O（`piarc-exec` 的进程启动器、`SystemClock`）装配起来，是 Agent Host 测试的无头入口（T06）；`tool_io` 应答 Agent Host 委托的 `fs/*`、`exec/*`（T07）；`secrets` 把凭据保险箱提供给所有 Agent Host（`secrets/*`，T08），`identity` 是应用标识的唯一定义。工作区与会话编排由 T13、T14 加入。不负责 JavaScript 绑定（`piarc-napi`）。
 
 ## 命令
 
 | 命令 | 用途 |
 |---|---|
-| `cargo test -p piarc-core` | 单元测试 + `tests/event_channel.rs`（回调频率、无丢失与顺序、背压、有序关闭、任务 panic、未关闭直接丢弃）+ `tests/tool_io.rs`（越界、流式输出、取消、会话隔离） |
+| `cargo test -p piarc-core` | 单元测试 + `tests/event_channel.rs`（回调频率、无丢失与顺序、背压、有序关闭、任务 panic、未关闭直接丢弃）+ `tests/tool_io.rs`（越界、流式输出、取消、会话隔离）+ `tests/secrets.rs`（推送、保险箱错误、锁与租约、并发读改写） |
 | `cargo clippy -p piarc-core --all-targets -- -D warnings` | lint |
 
 ## 运行时与关闭顺序
@@ -27,6 +27,15 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - `exec/run` 的输出经入站请求带来的 `Peer` 以 `exec/output` 发回，`forward_output` 先发完再回响应；连接断开（`Peer::closed`）或 `exec/kill` 终止命令。
 - 命令环境 = `piarc_host::DEFAULT_ENV_PASSTHROUGH` 中 Core 自己有的变量 + 请求的 `env` 叠加（同名覆盖，Windows 不区分大小写）；凭据不在白名单里。
 - blob 放在 `<数据目录>/sessions/<会话 id>/blobs/`；会话 id 只允许 `[A-Za-z0-9._-]`，不能是 `.`、`..`。
+
+## 凭据（`secrets`）
+
+- 一个 Core 只建一个 `SecretsService`，所有 Agent Host 的 `InboundHandler` 共用它（Core 是保险箱唯一写入方）。保险箱在第一次请求时打开，失败只让这次请求失败，下一次重新打开（用户授权钥匙串后不用重启）。保险箱操作放在阻塞线程池。
+- 订阅：调用过 `secrets/getAll` 的连接收到每次写入的 `secrets/changed`；每个连接一个推送任务，关闭的连接在下一次推送时移除。
+- 锁：`secrets/lock` 一组键一起锁，任一被占就等待；未带 `lockId` 的写入临时锁该键；`unlock`、租约（`DEFAULT_LOCK_LEASE` 30 s）、持有者连接结束都会释放；失效的 `lockId` 写入返回 `secretLockLost`。
+- 参数错误不带 serde 的原文（它会引用出错的值，可能是凭据）。不要在日志里写值。
+- 测试与 `piarc-testkit` 经本模块的再导出使用 `MemorySecretStore`、`test_master_key_name`（testkit 不能直接依赖 `piarc-secrets`）。
+- `identity::APP_IDENTIFIER` 是 D2 落实前的占位值；改它会让已有保险箱找不到主密钥（`PLAN.md` I22）。
 
 ## 不变量
 
