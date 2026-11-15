@@ -111,7 +111,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T01 | [仓库脚手架、工程规范与质量门禁](tasks/T01-scaffold-and-quality-gates.md) | 0 | 无 | macOS | high | 大 | 无 | 已完成 | 47fb1e9 |
 | T02 | [协议单一来源与契约测试基座](tasks/T02-protocol-and-contract-tests.md) | 0 | T01 | macOS | high | 中 | 无 | 已完成 | ce41191 |
 | T03 | [Electron 应用骨架与安全基线](tasks/T03-electron-shell-and-security-baseline.md) | 1 | T02 | macOS | xhigh | 大 | S10 | 部分完成 | 63eabea |
-| T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 阻塞（等待用户确认 ADR-0019） | — |
+| T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 部分完成 | aa2817f |
 | T05 | [严格校验的 mock provider](tasks/T05-strict-mock-provider.md) | 1 | T02 | macOS | high | 中 | 无 | 未开始 | — |
 | T06 | [Agent Host 骨架：Pi SDK 多会话与 AHP](tasks/T06-agent-host-skeleton.md) | 1 | T04、T05 | macOS | xhigh | 大 | S3、S9 | 未开始 | — |
 | T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 未开始 | — |
@@ -294,15 +294,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-T04 Core NAPI 绑定与事件通道（开工 2026-11-14；状态：阻塞，等待用户确认 ADR-0019）
-
-已完成：1–10 全部交付；收尾的 verify（13 步通过）、验收记录、S2 报告、文档已做。11 项验收通过，A06、A09 为 `blocked`。
-
-用户确认后续做：
-
-- [ ] 12. ADR-0019 被采纳：ADR 状态改"已接受"，ADR-0014 第 4 条注明被修订，架构第 7.6、8.3 节（第 5 条）改为"复制转发"，修订记录加一行；请用户按 ADR 第 5 条改写 T04-A06 后，按新描述验证并更新 A06（现有证据：L4 与 Vitest 的大批次完整性用例、S2 报告第 4.3 节）。ADR-0019 被否决：按用户给的方案实现转移部分，再验证 A06
-- [ ] 13. A09：用户推送后用 `gh run list` 查 `core-build` 与 `core-load` 四个目标（以及 `desktop` 作业的 Windows L4）的结果，通过则 A09 改 `passing`（evidence 写 run 链接）；win32-arm64 实机加载与 win32-x64 实机基准仍由 W0 做
-- [ ] 14. 两项都关闭后：看板改"已完成"（或仍有 Windows 待核对时"部分完成"），填完成提交，清空本节，会话日志补一条
+（当前没有进行中的任务）
 
 ## 登记事项
 
@@ -366,9 +358,16 @@ T04 Core NAPI 绑定与事件通道（开工 2026-11-14；状态：阻塞，等�
 - 决策：ADR-0019（提议，变更型）；架构 v2.6 补充 7.2、7.6、13.2；Promise 用 `JsDeferred` 不用 `#[napi] async fn`；演示事件源等测试导出只在开发构建；verify 的短时正确性版本在 Node 宿主中跑（CI verify 作业没有 Electron）；基准的事件循环延迟按 1 ms 采样、报告原始值
 - 遗留：I12（主进程内存预算校准，R1）、I13（发布构建剔除测试页，T45）；T03-A03 与本任务 A09 的 Windows 结果都需推送后核对
 
+### 2026-11-15 T04 部分完成（提交 aa2817f）
+- 交付：用户授权由智能体决定 ADR-0019，决定采纳：ADR-0019 改"已接受"，ADR-0014 注明第 4 条被修订，架构 v2.7（8.3 第 5 条、7.6、R6、第 4 章）；T04-A06 按 ADR 改写并以现有 L4、Vitest 与基准证据通过；S2 报告 macOS 结论改为通过
+- 验收：12 项通过，1 项阻塞（A09：Windows 两个目标的 `core-build`/`core-load` 结果待推送后核对，实机部分由 W0 做）
+- 决策：ADR-0019 已接受（批次一律复制转发）；A06 描述按用户授权改写，见计划变更记录 v1.2
+- 遗留：I12、I13；T03-A03 与 T04-A09 待 Windows CI
+
 ## 计划变更记录
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
 | 2026-11-14 | v1.0 | 初版：62 个任务（T01–T51、W0–W4、R1–R6），772 个验收项 |
 | 2026-11-14 | v1.1 | 应用图标资产放入 `design/brand/`（取自 PiDeck）；T12 新增图标验收项 T12-A14，T35、T50 补充托盘图标与许可证条目；共 773 个验收项 |
+| 2026-11-15 | v1.2 | 用户授权在 T04 中决定 ADR-0019，决定采纳；T04-A06 由"超过阈值的批次以 `ArrayBuffer` 转移、主进程侧缓冲区已分离"改为"1 MiB 以上的批次完整到达渲染进程，基准记录主进程转发耗时，同期事件循环延迟 p99 ≤ 16 ms"（任务文件与 `acceptance.json` 同步修改）；验收项总数不变 |
