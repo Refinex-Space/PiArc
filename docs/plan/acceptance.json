@@ -727,92 +727,92 @@
       "id": "T04-A01",
       "task": "T04",
       "description": "`CoreRuntime` 有序关闭后不再触发事件回调，加载 `.node` 的 Electron 应用能正常退出不挂起。验证：Rust 集成测试与 Playwright 测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core（tests/event_channel.rs）ordered_shutdown_flushes_the_last_batch_then_never_delivers_again：关闭后 sink 被释放、queued=delivered、lost=0，之后 200 ms 内无投递、再次 shutdown 立即返回；Vitest core.integration.test.ts：shutdown 后不再调用 onEvents、加载 Core 的 Node 子进程 shutdown 后自行退出（退出码 0），不 shutdown 则 2 s 内不退出；L4 core-events.e2e.ts『the app quits normally while Core is streaming events』dev 与 packaged 两种形态通过（退出码 0，日志 [core] shutting down → [core] stopped）；tmp/evidence/T04/l4-run.log（70 passed）"
     },
     {
       "id": "T04-A02",
       "task": "T04",
       "description": "持续事件源下每秒回调次数不超过 `1000 / 合并间隔（ms）` 的 110%，且批次平均包含多于 1 个事件。验证：测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "间隔 16 ms、上限 68.75 次/秒：cargo test -p piarc-core 输出『deliveries 87, 56.8/s (allowed 68.8/s), 34.5 events per batch』，且任意 1 秒窗口不超限（tmp/evidence/T04/core-event-channel-tests.log）；Vitest 短时版本『40000 events, 142 callbacks (56.3/s), 140.8 events per batch』（tmp/evidence/T04/core-integration-vitest.log）；5 分钟基准 56.6 次/秒、每批 29.4 个事件"
     },
     {
       "id": "T04-A03",
       "task": "T04",
       "description": "10 万事件/分钟持续 5 分钟，渲染进程收到的事件数等于发出数，每个流的序号严格递增、无缺口。验证：基准输出中的计数与序号校验。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run bench:s2 -- --form packaged --minutes 5（100,000/60 个/秒）：emitted 500000、received 500000、batchSeqErrors 0、eventSeqErrors 0、Core lost 0（tmp/evidence/T04/bench/s2-packaged-2026-11-15T07-56-50-894Z.json）；10 倍速率 1 分钟压测 1,000,000/1,000,000、序号错误 0"
     },
     {
       "id": "T04-A04",
       "task": "T04",
       "description": "上述基准期间主进程事件循环延迟 p99 ≤ 16 ms。验证：`monitorEventLoopDelay` 输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "同一基准中主进程 monitorEventLoopDelay（resolution 1 ms，值含采样间隔）p50 1.23 ms、p99 3.58 ms、max 38.0 ms，224,504 个样本；压测 p99 4.10 ms"
     },
     {
       "id": "T04-A05",
       "task": "T04",
       "description": "同步 NAPI 调用 p99 ≤ 1 ms（≥ 10,000 次调用）。验证：基准输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "基准中主进程连续调用 echo 10,000 次（预热 1,000 次）：p50 0.001 ms、p95 0.002 ms、p99 0.005 ms、max 0.086 ms"
     },
     {
       "id": "T04-A06",
       "task": "T04",
       "description": "超过阈值的批次以 `ArrayBuffer` 转移：转发后主进程侧缓冲区已分离（`byteLength` 为 0），渲染进程收到的数据完整。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "转移部分不可实现：Electron 45.3.2 的 MessagePortMain.postMessage 只能转移 MessagePortMain（源码 message_port.cc 的 DisentanglePorts；实测转移 ArrayBuffer 抛『Port at index 0 is not a valid port』），已写 ADR-0019（提议）改为复制转发，等待用户确认并改写本项。完整性部分已验证：L4『a batch above 1 MiB reaches the window complete』两种形态通过、Vitest『forwards a batch above 1 MiB intact』通过；1/4/8 MiB 批次转发 p50 0.67/1.68/1.96 ms（S2 报告第 4.3 节）"
     },
     {
       "id": "T04-A07",
       "task": "T04",
       "description": "两个窗口订阅不同路由键时，各自只收到自己的批次。验证：Playwright 测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4『two windows subscribed to different routes each get only their own batches』dev 与 packaged 两种形态通过：窗口 A 只收到 alpha（3,000 个事件）、窗口 B 只收到 beta（2,500 个），序号错误 0，主进程路由表为 [[alpha],[beta]]；tmp/evidence/T04/l4-run.log"
     },
     {
       "id": "T04-A08",
       "task": "T04",
       "description": "调用测试导出触发 panic 后，调用方收到内部错误类别的结构化错误，主进程存活，后续调用正常。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4『a panic in Core becomes an internalError…』两种形态通过：triggerPanic 抛 Error，code -32603，data {kind: internalError, retryable: false}，之后 state 为 running、echo 到达、getAppVersion 正常；spawnPanickingTask 的 panic 以错误事件到达 core/errors；Vitest 与 scripts/ci/load-core.mjs（Node 与 Electron）同样通过"
     },
     {
       "id": "T04-A09",
       "task": "T04",
       "description": "四个目标都构建成功；darwin-arm64 与 win32-x64 在对应平台加载通过，darwin-x64 与 win32-arm64 的加载结果或替代方式记录在报告中。验证：本机输出、CI 配置与报告；Windows 运行结果未取得时标 `blocked`，由 W0 核对。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "darwin-arm64：本机构建，Node 24.14.1 与 Electron 45.3.2 中开发版、发布版加载并跑通事件通道（tmp/evidence/T04/load-darwin-arm64.log），L4 两种形态通过；darwin-x64：本机交叉构建，Rosetta 2 下 x64 Electron 45.3.2（官方发布包，SHA-256 已核对）中两种构建都通过（tmp/evidence/T04/load-darwin-x64-rosetta.log）；win32-x64、win32-arm64：CI core-build（windows-latest，MSVC）与 core-load（windows-latest、windows-11-arm；macOS 两项另在 macos-latest、macos-15-intel）已配置，actionlint 1.7.12 退出码 0（tmp/evidence/T04/actionlint.log）。Windows 结果需推送后取得，由下一任务开工检查或 W0 核对"
     },
     {
       "id": "T04-A10",
       "task": "T04",
       "description": "`package` 产物从 `app.asar.unpacked` 加载 `.node`，事件通道工作。验证：针对打包产物的 Playwright 测试（断言实际加载路径）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 packaged 形态『loads Core from the expected file…』通过：测试钩子给出的路径末三段为 app.asar.unpacked/native/piarc-core.darwin-arm64.node，且 process.report 的 sharedObjects 含该文件，事件通道 2,000 个事件完整有序；发布构建直接启动日志『[core] loaded …/app.asar.unpacked/native/piarc-core.darwin-arm64.node』（tmp/evidence/T04/release-launch.log）"
     },
     {
       "id": "T04-A11",
       "task": "T04",
       "description": "NAPI-RS 生成的 `.d.ts` 纳入 L1 快照：临时改动一个导出签名而不更新快照，verify 失败；更新快照后通过。验证：关键输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "临时把 CoreRuntime.create 的参数名 options 改为 settings、不更新快照：npm run verify 第 4 步『Core module + API snapshot』FAIL，输出『Core API drift… changed: apps/desktop/src/main/core/native/piarc-core.d.ts / piarc-core.testing.d.ts』，其余 12 步通过（tmp/evidence/T04/verify-a11-mutated.log）；npm run build:core -- --flavor all 更新快照后 node scripts/ci/check-core-types.mjs 通过（tmp/evidence/T04/core-types-after-update.log）；随后还原"
     },
     {
       "id": "T04-A12",
       "task": "T04",
       "description": "S2 报告含吞吐、延迟分位数、同步调用、四个目标构建与加载结果和结论，`docs/spikes/README.md` 已更新。验证：文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/spikes/S02-napi-event-channel.md：环境与版本、方法、吞吐与序号校验、事件循环延迟分位数、同步调用、大批次（含 ArrayBuffer 转移不可行的结论）、主进程内存、四个目标的构建与加载表、发现与结论（macOS 有条件通过）；docs/spikes/README.md 的 S2 行已更新"
     },
     {
       "id": "T04-A13",
       "task": "T04",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify：13 步全部 PASS，『All 13 steps passed.』（tmp/evidence/T04/verify-final.log）"
     },
     {
       "id": "T05-A01",

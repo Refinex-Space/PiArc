@@ -111,7 +111,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T01 | [仓库脚手架、工程规范与质量门禁](tasks/T01-scaffold-and-quality-gates.md) | 0 | 无 | macOS | high | 大 | 无 | 已完成 | 47fb1e9 |
 | T02 | [协议单一来源与契约测试基座](tasks/T02-protocol-and-contract-tests.md) | 0 | T01 | macOS | high | 中 | 无 | 已完成 | ce41191 |
 | T03 | [Electron 应用骨架与安全基线](tasks/T03-electron-shell-and-security-baseline.md) | 1 | T02 | macOS | xhigh | 大 | S10 | 部分完成 | 63eabea |
-| T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 进行中 | — |
+| T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 阻塞（等待用户确认 ADR-0019） | — |
 | T05 | [严格校验的 mock provider](tasks/T05-strict-mock-provider.md) | 1 | T02 | macOS | high | 中 | 无 | 未开始 | — |
 | T06 | [Agent Host 骨架：Pi SDK 多会话与 AHP](tasks/T06-agent-host-skeleton.md) | 1 | T04、T05 | macOS | xhigh | 大 | S3、S9 | 未开始 | — |
 | T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 未开始 | — |
@@ -294,19 +294,15 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-T04 Core NAPI 绑定与事件通道（开工 2026-11-14；基线 verify 12 项通过；T03 遗留 A03 仍待 Windows CI，分支未推送，不影响本任务）
+T04 Core NAPI 绑定与事件通道（开工 2026-11-14；状态：阻塞，等待用户确认 ADR-0019）
 
-- [x] 1. `piarc-core`：tokio 运行时、有序关闭、`CancellationToken`、事件合并器（有界通道、默认 16 ms、满时策略不丢事件）、演示事件源；Rust 测试（A01、A02）
-- [x] 2. `piarc-napi`：`CoreRuntime.create/shutdown`、演示源启停、同步轻量方法、测试构建的 panic 导出；错误映射与 panic 边界、任务 panic 转错误事件（A08）
-- [x] 3. `@napi-rs/cli` 构建脚本、`.d.ts` 生成与 L1 快照并入 verify（A11）
-- [x] 4. 主进程：`.node` 路径解析（开发 / `app.asar.unpacked`）、按窗口 `MessageChannelMain`、路由表、结构化克隆 / `ArrayBuffer` 转移（A06）
-- [x] 5. preload 事件订阅 API、IPC 命令、白名单快照；渲染进程测试页与统计
-- [x] 6. L4：退出不挂起、双窗口路由、panic 后存活、ArrayBuffer、打包产物从 unpacked 加载（A01、A06、A07、A08、A10）——A06 只做了完整性部分：Electron 45 的 `MessagePortMain` 不能转移 `ArrayBuffer`，转移部分待 ADR-0019
-- [x] 7. CI：四个目标预编译与加载测试（`core-build`、`core-load`，Windows 结果待推送）；本机 darwin-x64 经 Rosetta 2 加载通过（A09）
-- [x] 8. `scripts/bench/` 基准（吞吐、事件循环延迟、同步调用、大批次、空闲 RSS），≤ 30 s 正确性版本进 verify
-- [ ] 9. 完整基准与 S2 报告、`docs/spikes/README.md`（A03、A04、A05、A12）
-- [x] 10. 文档：两个 crate 的 CLAUDE.md、`apps/desktop/CLAUDE.md`、复用表、架构同步
-- [ ] 11. 收尾：verify（A13）、acceptance、PLAN、会话日志
+已完成：1–10 全部交付；收尾的 verify（13 步通过）、验收记录、S2 报告、文档已做。11 项验收通过，A06、A09 为 `blocked`。
+
+用户确认后续做：
+
+- [ ] 12. ADR-0019 被采纳：ADR 状态改"已接受"，ADR-0014 第 4 条注明被修订，架构第 7.6、8.3 节（第 5 条）改为"复制转发"，修订记录加一行；请用户按 ADR 第 5 条改写 T04-A06 后，按新描述验证并更新 A06（现有证据：L4 与 Vitest 的大批次完整性用例、S2 报告第 4.3 节）。ADR-0019 被否决：按用户给的方案实现转移部分，再验证 A06
+- [ ] 13. A09：用户推送后用 `gh run list` 查 `core-build` 与 `core-load` 四个目标（以及 `desktop` 作业的 Windows L4）的结果，通过则 A09 改 `passing`（evidence 写 run 链接）；win32-arm64 实机加载与 win32-x64 实机基准仍由 W0 做
+- [ ] 14. 两项都关闭后：看板改"已完成"（或仍有 Windows 待核对时"部分完成"），填完成提交，清空本节，会话日志补一条
 
 ## 登记事项
 
@@ -325,6 +321,8 @@ T04 Core NAPI 绑定与事件通道（开工 2026-11-14；基线 verify 12 项�
 | I09 | T02 | 帧解码按 serde_json 的递归上限拒绝嵌套超过 127 层的 JSON（TS 实现同样执行）。工具参数等任意 JSON 若更深会被整帧拒绝 | T07 实现工具调用转发时确认可接受；需要更深时评估在 Core 侧放宽并补栈深度保护 |
 | I10 | T03 | 发布构建仍接受 Chromium 的 `--remote-debugging-port`（没有对应 fuse，运行时探测 `/json/version` 返回 200）：能以该参数启动 PiArc 的本机进程可经 CDP 在页面中执行脚本并调用 `window.piarc`。威胁等级与 ADR-0018 已接受的本机篡改相同，详见 `docs/spikes/S10-electron-security.md` 第 6 节 | T45 评估在发布构建启动时拒绝或移除该开关（先验证可行性），补回归用例 |
 | I11 | T03 | 应用仍使用 Electron 默认菜单，发布构建中也有"Toggle Developer Tools"与"Reload" | T18 替换原生菜单时决定发布构建是否保留开发者工具入口 |
+| I12 | T04 | 架构第 11 章"主进程内存（含 Core，空闲）≤ 120 MB"低于 Electron 自身基线：macOS arm64 上裸 Electron 45.3.2 开一个空窗口主进程 RSS 约 155 MB，PiArc 含 Core 160–164 MB（Core 与应用代码约 5–8 MB），数据见 `docs/spikes/S02-napi-event-channel.md` 第 4.4 节 | R1 按 M0 实测校准该预算（放宽要在第 18 章写明原因），可改为"相对裸 Electron 的增量"；W0 补 Windows 数据 |
+| I13 | T04 | 渲染进程的 `#/event-probe` 测试页随发布构建的渲染包分发（发布版 Core 没有演示事件源与测试钩子，页面只能订阅、计数） | T45 评估是否在发布构建中剔除测试页 |
 
 ## 技术债
 
@@ -361,6 +359,12 @@ T04 Core NAPI 绑定与事件通道（开工 2026-11-14；基线 verify 12 项�
 - 验收：13 项通过，1 项阻塞（A03：Windows CI 实际结果待推送后核对）
 - 决策：未写 ADR；架构 v2.5（3.4 增加 `src/shared/`，10.3 写明协议名、权限检查处理器、开发/发布构建 fuse 差异与 L4 打包形态）；L4 打包形态用开发构建（Playwright 需要 `--inspect`）；开发服务器放宽经 `import.meta.env.DEV` 在打包时删除；主进程 origin 比较经 `originOf`（Node 的 URL 不认识 Chromium 标准协议）
 - 遗留：I10（发布构建接受 `--remote-debugging-port`，T45）、I11（默认菜单，T18）；本机 `gh` 未登录，未查前序 CI
+
+### 2026-11-15 T04 阻塞（等待用户确认 ADR-0019）
+- 交付：`piarc-core` 运行时（tokio 多线程、事件合并器与背压、有序关闭、任务监督、演示事件源）；`piarc-napi`（`CoreRuntime.create/shutdown/state`、`ThreadsafeFunction` 事件回调、panic 边界与结构化错误、`testing` feature）；协议新增 `shuttingDown`、`busy`；`npm run build:core`（`@napi-rs/cli` 3.10.12）与 `.d.ts` L1 快照（verify 第 4 步，verify 共 13 步）；主进程 `.node` 路径解析、`EventRouter` 与每页面一个 `MessageChannelMain`、退出前关闭 Core；preload `subscribeEvents`/`unsubscribeEvents`；`#/event-probe` 测试页与主进程测试钩子；Forge 拷入 Core + `plugin-auto-unpack-natives`；Vitest 集成测试、L4 `core-events` 6 个用例 × 2；CI `core-build`/`core-load` 四目标；`npm run bench:s2`、`scripts/ci/load-core.mjs`；S2 报告、ADR-0019（提议）、三份 CLAUDE.md、架构 v2.6
+- 验收：11 项通过，2 项阻塞（A06：Electron 45 不能转移 `ArrayBuffer`，待 ADR-0019；A09：Windows 两个目标待 CI/W0）
+- 决策：ADR-0019（提议，变更型）；架构 v2.6 补充 7.2、7.6、13.2；Promise 用 `JsDeferred` 不用 `#[napi] async fn`；演示事件源等测试导出只在开发构建；verify 的短时正确性版本在 Node 宿主中跑（CI verify 作业没有 Electron）；基准的事件循环延迟按 1 ms 采样、报告原始值
+- 遗留：I12（主进程内存预算校准，R1）、I13（发布构建剔除测试页，T45）；T03-A03 与本任务 A09 的 Windows 结果都需推送后核对
 
 ## 计划变更记录
 
