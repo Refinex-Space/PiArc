@@ -38,3 +38,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0020](0020-tool-layer-composition.md) | 工具层的组成：Pi 的工具代码加 Core 的 I/O（补充 ADR-0004 第 3 条） | 已接受 |
 | [0021](0021-credential-vault-and-pi-adapter.md) | 凭据保险箱的格式、并发与 Pi 凭据接口适配（补充 ADR-0018 第 5 条） | 已接受 |
 | [0022](0022-transcript-rendering-libraries.md) | Transcript 渲染的库选型：@tanstack/react-virtual、marked 词法器、shiki JavaScript 引擎（补充 ADR-0013 第 5 条） | 已接受 |
+| [0023](0023-terminal-frames-as-pull-replies.md) | 终端帧作为拉取请求的返回值送达渲染进程，不经事件 MessagePort（修订 ADR-0017 第 3 条） | 提议 |
