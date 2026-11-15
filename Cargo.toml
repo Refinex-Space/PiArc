@@ -57,6 +57,9 @@ piarc-napi        = { path = "crates/piarc-napi" }
 piarc-testkit     = { path = "crates/piarc-testkit" }
 
 # Third-party dependencies (alphabetical).
+aes-gcm     = { version = "=0.11.1", default-features = false, features = ["aes", "zeroize"] }
+apple-native-keyring-store = { version = "=1.0.2", default-features = false, features = ["keychain"] }
+getrandom   = { version = "=0.4.3", default-features = false }
 globset     = "=0.4.21"
 grep-matcher = "=0.1.9"
 grep-regex  = "=0.1.14"
@@ -65,6 +68,7 @@ http-body-util = "=0.1.5"
 hyper       = { version = "=1.12.0", features = ["http1", "server"] }
 hyper-util  = { version = "=0.1.21", features = ["tokio"] }
 ignore      = "=0.4.34"
+keyring-core = "=1.0.1"
 jsonschema  = { version = "=0.61.2", default-features = false }
 napi        = { version = "=3.16.2", features = ["napi6", "serde-json"] }
 napi-build  = "=2.6.0"
@@ -72,6 +76,7 @@ napi-derive = "=3.7.1"
 schemars    = { version = "=1.2.3", default-features = false, features = ["derive", "std"] }
 serde       = { version = "=1.0.229", features = ["derive"] }
 serde-saphyr = { version = "=2.1.1", default-features = false, features = ["deserialize"] }
+security-framework = { version = "=3.7.0", default-features = false }
 serde_json  = "=1.0.154"
 sha2        = "=0.11.1"
 thiserror   = "=2.0.21"
@@ -79,6 +84,8 @@ tokio       = { version = "=1.54.1", default-features = false, features = ["rt-m
 tokio-util  = { version = "=0.7.20", default-features = false }
 tracing     = { version = "=0.1.44", default-features = false, features = ["std"] }
 tracing-subscriber = { version = "=0.3.23", default-features = false, features = ["fmt", "std"] }
+windows-native-keyring-store = { version = "=1.1.0", default-features = false }
+zeroize     = { version = "=1.9.1", features = ["serde", "std"] }
 
 [workspace.lints.rust]
 # `unsafe` is allowed only in -sys crates and at the NAPI boundary; those crates

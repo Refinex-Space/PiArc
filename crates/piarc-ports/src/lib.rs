@@ -24,13 +24,17 @@
 //!   and wait for its exit (T06; `piarc-exec` implements it).
 //! - [`Clock`]: monotonic time and sleeping, so restart windows and backoff can run on a test
 //!   clock (T06).
+//! - [`SecretStore`]: one secret per [`SecretName`] in the system credential store, used for
+//!   the credential vault's master key (T08; `piarc-secrets` implements it over `keyring-core`).
 //!
-//! `FileSystem`, `SecretStore` and `AgentHostTransport` arrive with the tasks that need them.
+//! `FileSystem` and `AgentHostTransport` arrive with the tasks that need them.
 
 mod clock;
 mod process;
+mod secret;
 
 pub use clock::Clock;
 pub use process::{
     BoxFuture, ExitStatus, ProcessControl, ProcessSpawner, SpawnSpec, SpawnedProcess,
 };
+pub use secret::{SecretName, SecretStore, SecretStoreError};

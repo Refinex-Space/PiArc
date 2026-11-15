@@ -79,7 +79,12 @@ export type ErrorKind =
   | 'sessionBusy'
   | 'notFound'
   | 'outsideWorkspace'
-  | 'ioError';
+  | 'ioError'
+  | 'masterKeyMissing'
+  | 'credentialStoreUnavailable'
+  | 'vaultIntegrity'
+  | 'vaultVersion'
+  | 'secretLockLost';
 /**
  * Session identifier.
  */

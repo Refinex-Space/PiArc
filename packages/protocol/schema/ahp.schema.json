@@ -208,6 +208,31 @@
           "const": "ioError",
           "description": "The operating system refused a file or process operation. `details`: `{ code, path }`\nwith a POSIX-style error code such as `EACCES`, `EISDIR` or `ENOTDIR`.",
           "type": "string"
+        },
+        {
+          "const": "masterKeyMissing",
+          "description": "The credential vault exists but its master key is gone from the system credential\nstore. Nothing is created or overwritten; the user decides how to recover.",
+          "type": "string"
+        },
+        {
+          "const": "credentialStoreUnavailable",
+          "description": "The system credential store refused access to the master key, is locked or cannot be\nreached. Retryable once the user grants access. `details`: `{ reason }` with\n`accessDenied`, `unavailable` or `failed`.",
+          "type": "string"
+        },
+        {
+          "const": "vaultIntegrity",
+          "description": "The credential vault failed authentication (modified or damaged); no entry is returned.",
+          "type": "string"
+        },
+        {
+          "const": "vaultVersion",
+          "description": "The credential vault has a format version this build does not know. `details`:\n`{ version }`.",
+          "type": "string"
+        },
+        {
+          "const": "secretLockLost",
+          "description": "A `secrets/*` request named a lock that is no longer held (expired or released).",
+          "type": "string"
         }
       ]
     },

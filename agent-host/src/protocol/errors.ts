@@ -22,6 +22,11 @@ const CODES: Record<ErrorKind, number> = {
   notFound: -32009,
   outsideWorkspace: -32010,
   ioError: -32011,
+  masterKeyMissing: -32012,
+  credentialStoreUnavailable: -32013,
+  vaultIntegrity: -32014,
+  vaultVersion: -32015,
+  secretLockLost: -32016,
 };
 
 /** An error with an AHP kind; thrown by request handlers and the Core bridge. */

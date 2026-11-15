@@ -61,6 +61,16 @@ pub mod code {
     pub const OUTSIDE_WORKSPACE: i64 = -32010;
     /// The operating system refused a file or process operation.
     pub const IO_ERROR: i64 = -32011;
+    /// The credential vault exists but its master key is gone from the system credential store.
+    pub const MASTER_KEY_MISSING: i64 = -32012;
+    /// The system credential store refused access, is locked or cannot be reached.
+    pub const CREDENTIAL_STORE_UNAVAILABLE: i64 = -32013;
+    /// The credential vault failed authentication: it was modified or damaged.
+    pub const VAULT_INTEGRITY: i64 = -32014;
+    /// The credential vault has a format version this build does not know.
+    pub const VAULT_VERSION: i64 = -32015;
+    /// A credential lock is no longer held: it expired or was released.
+    pub const SECRET_LOCK_LOST: i64 = -32016;
 }
 
 /// JSON-RPC 2.0 error object with PiArc's mandatory structured `data`.
@@ -137,6 +147,20 @@ pub enum ErrorKind {
     /// The operating system refused a file or process operation. `details`: `{ code, path }`
     /// with a POSIX-style error code such as `EACCES`, `EISDIR` or `ENOTDIR`.
     IoError,
+    /// The credential vault exists but its master key is gone from the system credential
+    /// store. Nothing is created or overwritten; the user decides how to recover.
+    MasterKeyMissing,
+    /// The system credential store refused access to the master key, is locked or cannot be
+    /// reached. Retryable once the user grants access. `details`: `{ reason }` with
+    /// `accessDenied`, `unavailable` or `failed`.
+    CredentialStoreUnavailable,
+    /// The credential vault failed authentication (modified or damaged); no entry is returned.
+    VaultIntegrity,
+    /// The credential vault has a format version this build does not know. `details`:
+    /// `{ version }`.
+    VaultVersion,
+    /// A `secrets/*` request named a lock that is no longer held (expired or released).
+    SecretLockLost,
 }
 
 impl ErrorKind {
@@ -161,6 +185,11 @@ impl ErrorKind {
             Self::NotFound => code::NOT_FOUND,
             Self::OutsideWorkspace => code::OUTSIDE_WORKSPACE,
             Self::IoError => code::IO_ERROR,
+            Self::MasterKeyMissing => code::MASTER_KEY_MISSING,
+            Self::CredentialStoreUnavailable => code::CREDENTIAL_STORE_UNAVAILABLE,
+            Self::VaultIntegrity => code::VAULT_INTEGRITY,
+            Self::VaultVersion => code::VAULT_VERSION,
+            Self::SecretLockLost => code::SECRET_LOCK_LOST,
         }
     }
 }
@@ -185,7 +214,7 @@ impl ErrorObject {
 mod tests {
     use super::*;
 
-    const ALL_KINDS: [ErrorKind; 17] = [
+    const ALL_KINDS: [ErrorKind; 22] = [
         ErrorKind::ParseError,
         ErrorKind::InvalidRequest,
         ErrorKind::MethodNotFound,
@@ -203,6 +232,11 @@ mod tests {
         ErrorKind::NotFound,
         ErrorKind::OutsideWorkspace,
         ErrorKind::IoError,
+        ErrorKind::MasterKeyMissing,
+        ErrorKind::CredentialStoreUnavailable,
+        ErrorKind::VaultIntegrity,
+        ErrorKind::VaultVersion,
+        ErrorKind::SecretLockLost,
     ];
 
     #[test]
