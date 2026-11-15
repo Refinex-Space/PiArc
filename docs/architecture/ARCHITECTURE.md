@@ -1023,7 +1023,7 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 ```
 
 - 凭据保险箱（ADR-0018）：服务商 API key、OAuth token、MCP token 加密（AES-256-GCM）存放在数据目录下的 `secrets.vault`；系统凭据库（macOS 钥匙串、Windows 凭据管理器，服务名使用应用标识前缀）只存一个主密钥。未签名构建每次更新后，macOS 最多弹一次钥匙串授权。主密钥不可用时凭据不可读，提示重新授权，不回退到明文。`pi/` 下不出现 `auth.json`、`mcp-auth.json`。
-  - T08 落地（ADR-0021）：文件格式 v1 为魔数 `PIARCVLT`、2 字节版本、16 字节主密钥标识、12 字节 nonce、密文、16 字节标签，前 38 字节头部作为附加数据参与认证，每次写入换新 nonce，经同目录临时文件与 rename 原子替换（文件权限 0600）。主密钥在 macOS 登录钥匙串（不用 data protection keychain）与 Windows 凭据管理器中，服务名 `<应用标识>.credential-vault`、账户 `master-key`；应用标识定义在 `piarc-core::identity`，D2 落实前为占位值。
+  - T08 落地（ADR-0021）：文件格式 v1 为魔数 `PIARCVLT`、2 字节版本、16 字节主密钥标识、12 字节 nonce、密文、16 字节标签，前 38 字节头部作为附加数据参与认证，每次写入换新 nonce，经同目录临时文件与 rename 原子替换（文件权限 0600）。主密钥在 macOS 登录钥匙串（不用 data protection keychain）与 Windows 凭据管理器中，服务名 `<应用标识>.credential-vault`、账户 `master-key`；应用标识为 `cn.piarc.desktop`（D2），定义在 `piarc-core::identity`。
 - 首次在某个工作区创建 `.piarc/` 时，提示把 `settings.local.json` 与 `worktrees/` 加入该仓库的 `.gitignore`。
 
 ### 9.2 SQLite 模型（概要）

@@ -38,7 +38,7 @@ T08 核对 Pi 1.5.2 的锁定版本得到两条事实：
 
 - 正面：磁盘上只有密文；一次更新最多一次钥匙串授权（只有主密钥一个条目，T12 实测）；两个 Agent Host 同时刷新同一个 token 只刷新一次；凭据库拒绝或主密钥丢失时有可区分的结构化错误，界面可以给出对应提示。
 - 负面与代价：`modify` 多两次 AHP 往返（加锁、解锁）；持锁的 Agent Host 卡住时，其他 Agent Host 最多等一个租约（30 秒）；适配层不能清零 JavaScript 字符串，内存中的凭据只在 Core 侧清零。
-- 需要配套做的事：D2 落实后把 `piarc-core::identity::APP_IDENTIFIER` 改为正式应用标识，并为已用占位标识存过凭据的开发构建提供迁移或重新登录提示（登记事项 I22）；T12 实测两次构建之间的钥匙串弹窗次数；W0 在 Windows 实机验证凭据管理器与数据目录扫描；T21 的设置界面与 T29 的登录流程经 `ModelRuntime` 写入，不直接调用 `secrets/*`；T36 接入 `mcp/<server>`。
+- 需要配套做的事：应用标识按 D2 定为 `cn.piarc.desktop`（`piarc-core::identity::APP_IDENTIFIER`），发布后不能再改；T12 实测两次构建之间的钥匙串弹窗次数；W0 在 Windows 实机验证凭据管理器与数据目录扫描；T21 的设置界面与 T29 的登录流程经 `ModelRuntime` 写入，不直接调用 `secrets/*`；T36 接入 `mcp/<server>`。
 
 ## 重新评估的触发条件
 

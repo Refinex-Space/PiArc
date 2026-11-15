@@ -49,7 +49,7 @@ offset  size  field
 
 ## 4. 主密钥与状态表
 
-主密钥是 32 字节随机数，存在系统凭据库：服务名 `<应用标识>.credential-vault`，账户 `master-key`。应用标识集中定义在 `piarc-core::identity::APP_IDENTIFIER`。D2（应用标识与产品域名）尚未落实，当前是明显不像反向域名的占位值 `PiArc.pending-D2`。
+主密钥是 32 字节随机数，存在系统凭据库：服务名 `<应用标识>.credential-vault`，账户 `master-key`。应用标识集中定义在 `piarc-core::identity::APP_IDENTIFIER`，取值 `cn.piarc.desktop`（D2 于 2026-11-15 决定，产品域名 `piarc.cn`），所以正式服务名是 `cn.piarc.desktop.credential-vault`。
 
 macOS 用**登录钥匙串**（`apple-native-keyring-store` 的 `keychain` 模块），不用 data protection keychain：后者的 access group 来自签名 entitlement，需要 provisioning profile 授权，ad-hoc 签名的构建没有（`docs/research/native-stack.md` 第 8.4 节，Apple TN3137）。代价是登录钥匙串条目的访问控制绑定应用的代码身份，ad-hoc 签名每次更新身份都变，所以每次更新后会弹一次授权；只有一个条目，所以最多一次（T12 实测）。
 
@@ -154,6 +154,6 @@ Core 侧测试（`crates/piarc-core/tests/secrets.rs`）：推送只发给订阅
 
 其他：
 
-- 服务名前缀依赖 D2。D2 落实后修改 `APP_IDENTIFIER`；用占位标识存过凭据的构建届时找不到主密钥，会得到 `masterKeyMissing`（`docs/plan/PLAN.md` I22）。
+- D2 已在本任务收尾后决定（`cn.piarc.desktop`），替换了开发期的占位标识 `PiArc.pending-D2`。占位标识只在未发布的开发构建中用过；如果本机开发构建在占位标识下存过凭据，新构建会得到 `masterKeyMissing`，删除数据目录下的 `secrets.vault` 后重新登录即可。
 - JavaScript 无法清零字符串，Agent Host 内存中的凭据在进程结束前一直存在；这与架构第 5.4 节"凭据只经 AHP 传给 Agent Host"一致，Seatbelt（T39）限制 Agent Host 的其他出口。
 - 日志与诊断包的自动脱敏（架构第 10.1 节）属于 `piarc-telemetry`，本任务只保证凭据值不进日志与错误信息。

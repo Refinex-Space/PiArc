@@ -179,7 +179,7 @@ PiArc 是面向专业开发者的 AI 编码 Agent 桌面应用：**Claude Code �
 | 编号 | 事项 | 背景 | 建议 |
 |---|---|---|---|
 | D1 | ~~若原生 transcript 渲染在 M0 未达标，是否允许消息区改用 WKWebView~~ | **已关闭**（2026-11-14）：客户端整体改为 Electron + React（ADR-0013），该问题不再存在 | — |
-| D2 | 应用标识（macOS bundle id、Windows AppUserModelID）与产品域名 | 影响钥匙串服务名、URL scheme、更新源与发布清单地址 | 签名主体不再需要（D8）。**仍待产品负责人提供**：应用标识与产品域名（标识需要和自有域名对应，不能代为选定），T08（凭据保险箱）开工前需要 |
+| D2 | 应用标识（macOS bundle id、Windows AppUserModelID）与产品域名 | 影响钥匙串服务名、URL scheme、更新源与发布清单地址 | **已决定**（2026-11-15）：产品域名 `piarc.cn`；应用标识 `cn.piarc.desktop`，同时用作 macOS bundle id 与 Windows AppUserModelID。代码中唯一的定义是 `piarc-core::identity::APP_IDENTIFIER`；钥匙串服务名为 `cn.piarc.desktop.credential-vault`。签名主体不再需要（D8） |
 | D3 | 视觉品牌（主色、图标、名称字标） | 必须与 Claude 品牌明确区分（ADR-0006） | **图标已定**（2026-11-14）：沿用 PiDeck 的黑白 Pi 字形图标，资产在 `design/brand/`。仍待定：主色与名称字标（T18 前）；公开发布前确认 Pi logo 的使用许可，或改用派生标记（R6 前） |
 | D4 | 是否推进"驱动未修改的 Claude Code 二进制作为外部内核" | 让有 Claude 订阅的用户合规使用 PiArc UI，但需法务评审 | 列为 P2，M5 后评估 |
 | D5 | 商业模式 | 免费 / 买断 / 订阅，影响更新与授权设计 | **已决定**（2026-11-14）：免费开源（MIT），不做授权与付费功能 |

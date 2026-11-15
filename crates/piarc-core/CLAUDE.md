@@ -35,7 +35,7 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 锁：`secrets/lock` 一组键一起锁，任一被占就等待；未带 `lockId` 的写入临时锁该键；`unlock`、租约（`DEFAULT_LOCK_LEASE` 30 s）、持有者连接结束都会释放；失效的 `lockId` 写入返回 `secretLockLost`。
 - 参数错误不带 serde 的原文（它会引用出错的值，可能是凭据）。不要在日志里写值。
 - 测试与 `piarc-testkit` 经本模块的再导出使用 `MemorySecretStore`、`test_master_key_name`（testkit 不能直接依赖 `piarc-secrets`）。
-- `identity::APP_IDENTIFIER` 是 D2 落实前的占位值；改它会让已有保险箱找不到主密钥（`PLAN.md` I22）。
+- `identity::APP_IDENTIFIER` 是 D2 决定的应用标识 `cn.piarc.desktop`（bundle id 与 AppUserModelID 也取它）。发布后不能再改：改了保险箱找不到主密钥，系统授权也要重给。
 
 ## 不变量
 

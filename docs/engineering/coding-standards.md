@@ -206,7 +206,7 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | 系统凭据库端口 | `piarc_ports::{SecretStore, SecretName, SecretStoreError}`；实现 `piarc_secrets::SystemSecretStore`（keyring-core），替身 `piarc_secrets::MemorySecretStore`（`fail_with` 注入拒绝、锁定、失败） | 系统凭据库只经这个窄 trait 访问，调用会阻塞（可能弹授权），异步代码放到阻塞线程池；测试条目一律用 `test_master_key_name`（`piarc-test.` 前缀） | T08 |
 | 凭据保险箱读写 | Core：`piarc_secrets::Vault`（`open`、`get`、`entries`、`set`、`delete`）、`piarc_core::secrets::SecretsService`（`secrets/*`、锁、`secrets/changed` 推送）；Agent Host：`agent-host/src/runtime/credentials.ts`（`CoreCredentialStore`） | 凭据只经它们读写：密文落盘、明文清零、结构化错误（ADR-0021）；Agent Host 里需要凭据的代码经 `ModelRuntime`，不直接调 `secrets/*` | T08 |
 | 原子写入 | `piarc_secrets::atomic::{replace, remove_leftovers}` | 同目录临时文件（0600）、`fsync`、rename 覆盖；任一步失败时原文件不变、临时文件删除；打开时清掉崩溃遗留的临时文件 | T08 |
-| 应用标识 | `piarc_core::identity::{APP_IDENTIFIER, master_key_name}` | 应用标识的唯一定义（D2 落实前为占位值）；凭据库服务名、以后的 bundle id 与 AppUserModelID 都从这里取 | T08 |
+| 应用标识 | `piarc_core::identity::{APP_IDENTIFIER, master_key_name}` | 应用标识的唯一定义（D2：`cn.piarc.desktop`）；凭据库服务名、以后的 bundle id 与 AppUserModelID 都从这里取 | T08 |
 | 无明文扫描 | `piarc_testkit::plaintext::{scan, contains}` | 在目录树中逐字节搜索测试埋下的秘密值，可只看某时刻后修改的文件；不跟随符号链接，读不了的文件单独列出；配一个对照文件证明扫描有效 | T08 |
 | 工具名映射 | `agent-host/src/tools/profile.ts`（`ToolNameMap`、`DEFAULT_PROFILE`、`profileWithOverrides`） | 模型可见名 ↔ 规范名双向查询；规则、hooks、事件、Core 一律用规范名，按模型家族调整的 Profile 在这里扩展 | T07 |
 | 在 Pi 工具代码上换掉路径 | `agent-host/src/tools/stand-in.ts`（`StandIn`、`serialized`） | 让 Pi 的工具定义在替身路径上运行、Operations 指向真实路径、结果换回原路径；同一文件的写入串行（ADR-0020） | T07 |
