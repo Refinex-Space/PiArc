@@ -6,9 +6,16 @@ import { expect, test } from './fixtures.js';
 
 /** The `window.piarc` allowlist. Changing it is a security review item (apps/desktop/CLAUDE.md). */
 const PIARC_API_SNAPSHOT = [
+  'closeTerminal',
+  'createTerminal',
   'getAppVersion',
+  'onTerminalFrame',
   'openExternal',
+  'requestTerminalFrame',
   'subscribeEvents',
+  'terminalInput',
+  'terminalKey',
+  'terminalResize',
   'unsubscribeEvents',
 ];
 

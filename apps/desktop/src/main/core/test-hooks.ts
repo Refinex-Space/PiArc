@@ -4,9 +4,12 @@
 // Core without them, so the hooks never exist there.
 import { monitorEventLoopDelay, performance, type ELDHistogram } from 'node:perf_hooks';
 
-import type { ForwardObservation } from '../../shared/test-hooks.js';
+import { webContents } from 'electron';
+
+import type { ForwardObservation, TerminalForwardStats } from '../../shared/test-hooks.js';
 import type { TestingCore } from './load.js';
 import type { EventRouter } from './router.js';
+import type { TerminalOwners } from './terminal-ipc.js';
 
 /**
  * Sampling interval of the event-loop delay monitor. The histogram records the whole
@@ -19,6 +22,8 @@ export function installTestHooks(options: {
   readonly core: TestingCore;
   readonly router: EventRouter;
   readonly openWindow: (hash: string) => Promise<number>;
+  readonly terminalOwners: TerminalOwners;
+  readonly terminalStats: TerminalForwardStats;
 }): void {
   const { router } = options;
   let histogram: ELDHistogram | undefined;
@@ -69,6 +74,16 @@ export function installTestHooks(options: {
       timings = [];
       return recorded;
     },
+    createTerminal: (webContentsId, terminal) => {
+      const owner = webContents.fromId(webContentsId);
+      if (owner === undefined) {
+        throw new Error(`No window has webContents id ${String(webContentsId)}`);
+      }
+      const id = options.core.createTerminal({ ...terminal });
+      options.terminalOwners.assign(id, owner);
+      return id;
+    },
+    terminalForwardStats: () => ({ ...options.terminalStats }),
   };
   console.info('[core] test hooks installed (development build of Core)');
 }

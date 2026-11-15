@@ -300,7 +300,7 @@ T10（2026-11-15 开工；基线 verify 13 步通过；依赖 T04 为"部分完�
 - [x] 2 Windows 链接方式选定与 CI 四目标链接配置（A01；选定官方 DLL 放在 `.node` 旁边，CI 结果待推送）
 - [x] 3 `piarc-term`：safe 封装（Terminal、RenderState、KeyEncoder、Formatter）、PTY 与 IO 线程、effects（A04）
 - [x] 4 帧格式草案进 `piarc-protocol`：格式说明、Rust 编解码器、往返测试；render state 增量帧编码与行 id 复用（A05）
-- [ ] 5 Core 与 NAPI 导出、主进程转发、preload API（拉取式帧）
+- [x] 5 Core 与 NAPI 导出、主进程转发、preload API（拉取式帧）
 - [ ] 6 渲染原型：fork `CanvasRenderer`（vendor 目录与来源说明）、`RemoteRenderable`、TS 解码器、键盘与输入法、开发页面（A12）
 - [ ] 7 一致性测试：formatter 与帧逐格比较（普通屏幕、alt screen、CJK、emoji、ZWJ），Rust 与 TS 解码器同一组样本（A08）
 - [ ] 8 L4：rAF 拉取与隐藏终端 0 帧、输入法预编辑与 textarea 跟随（A06、A11）

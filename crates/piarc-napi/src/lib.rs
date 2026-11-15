@@ -26,6 +26,9 @@
 //! - `CoreRuntime.create(options, onEvents)`, `shutdown()`, `state`: see [`runtime`]. The
 //!   `onEvents` listener is a `ThreadsafeFunction` ([`sink`]); the ordered shutdown releases
 //!   it.
+//! - Terminals (T10, ADR-0017): `createTerminal`, `terminalInput`, `terminalKey`,
+//!   `terminalResize`, `terminalFrame` (a Promise of the frame bytes) and `closeTerminal`
+//!   ([`terminal`]).
 //! - With the `testing` feature only: demo event sources, `echo`, `eventStats` and two panic
 //!   triggers ([`testing`]).
 //!
@@ -40,5 +43,6 @@
 mod boundary;
 pub mod runtime;
 pub mod sink;
+pub mod terminal;
 #[cfg(feature = "testing")]
 pub mod testing;

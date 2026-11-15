@@ -17,6 +17,31 @@ export declare class CoreRuntime {
    * that `onEvents` is never called again. Safe to call more than once.
    */
   shutdown(): Promise<void>;
+  /**
+   * Starts a terminal and returns its id. Its title, bell and exit events arrive on the
+   * route `term/<id>`; frames are pulled with `terminalFrame`.
+   */
+  createTerminal(options: TerminalCreateOptions): number;
+  /** Writes `text` to the terminal as UTF-8 (committed input-method text). Never blocks. */
+  terminalInput(id: number, text: string): void;
+  /** Encodes a key event with the terminal's current modes and writes it. Never blocks. */
+  terminalKey(id: number, event: TerminalKeyEvent): void;
+  /** Resizes the terminal and its PTY. Never blocks. */
+  terminalResize(
+    id: number,
+    cols: number,
+    rows: number,
+    cellWidth: number,
+    cellHeight: number,
+  ): void;
+  /**
+   * Resolves with the next frame of the terminal for `viewer` (the draft binary format of
+   * `piarc_protocol::term_frame`); `full` asks for a RESET frame. An unchanged terminal
+   * gives a 14-byte empty frame.
+   */
+  terminalFrame(id: number, viewer: number, full: boolean): Promise<Uint8Array>;
+  /** Kills the terminal's program and forgets the terminal. */
+  closeTerminal(id: number): void;
 }
 
 /** One batch as JavaScript receives it. */
@@ -37,3 +62,37 @@ export interface CoreOptions {
 
 /** Lifecycle state of a runtime. */
 export type CoreState = 'running' | 'shuttingDown' | 'stopped';
+
+/** Options of `createTerminal`. */
+export interface TerminalCreateOptions {
+  /** Columns (1 to 1000). */
+  cols: number;
+  /** Rows (1 to 1000). */
+  rows: number;
+  /** Cell width in device-independent pixels, for pixel size reports. Default 8. */
+  cellWidth?: number;
+  /** Cell height. Default 16. */
+  cellHeight?: number;
+  /** Program to run instead of the user's login shell. */
+  program?: string;
+  /** Arguments of `program`. */
+  args?: string[];
+  /** Absolute working directory; the home directory when unset. */
+  cwd?: string;
+  /** Extra environment variables. */
+  env?: Record<string, string>;
+}
+
+/** A key event as the renderer saw it. */
+export interface TerminalKeyEvent {
+  /** `press`, `repeat` or `release`. */
+  action: string;
+  /** `KeyboardEvent.code`. */
+  code: string;
+  /** The character the key produced; empty for named keys (Enter, arrows, F-keys). */
+  text: string;
+  /** Bits: 1 Shift, 2 Ctrl, 4 Alt/Option, 8 Meta/Command. */
+  mods: number;
+  /** The event belongs to an input-method composition. */
+  composing: boolean;
+}

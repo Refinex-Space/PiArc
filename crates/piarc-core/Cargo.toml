@@ -15,6 +15,7 @@ piarc-host.workspace = true
 piarc-ports.workspace = true
 piarc-protocol.workspace = true
 piarc-secrets.workspace = true
+piarc-term.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

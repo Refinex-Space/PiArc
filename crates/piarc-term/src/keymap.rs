@@ -5,6 +5,83 @@
 
 use piarc_ghostty_sys as sys;
 
+use crate::vt::{KeyAction, KeyInput};
+
+/// `GHOSTTY_MODS_SHIFT`.
+pub const MOD_SHIFT: u16 = 1;
+/// `GHOSTTY_MODS_CTRL`.
+pub const MOD_CTRL: u16 = 1 << 1;
+/// `GHOSTTY_MODS_ALT` (Option on macOS).
+pub const MOD_ALT: u16 = 1 << 2;
+/// `GHOSTTY_MODS_SUPER` (Command on macOS, Windows key).
+pub const MOD_SUPER: u16 = 1 << 3;
+/// The modifier bits a browser `KeyboardEvent` can report.
+pub const MODS_MASK: u16 = MOD_SHIFT | MOD_CTRL | MOD_ALT | MOD_SUPER;
+
+/// Builds the encoder input for a browser key event: `code` is `KeyboardEvent.code`, `text`
+/// the character the key produced (`KeyboardEvent.key` when it is one grapheme, empty for
+/// named keys), `mods` the `MOD_*` bits.
+///
+/// The unshifted character comes from the physical key for letters, digits and space (the
+/// browser does not report it), otherwise from `text` when Shift is not held. Shift and Alt
+/// count as consumed when they produced `text` (a capital letter, a macOS Option character).
+/// Control characters are dropped from `text`: the encoder derives Ctrl sequences from the
+/// key and the modifiers.
+#[must_use]
+pub fn key_input(
+    action: KeyAction,
+    code: &str,
+    text: &str,
+    mods: u16,
+    composing: bool,
+) -> KeyInput {
+    let mods = mods & MODS_MASK;
+    let text: String = if text.chars().any(char::is_control) {
+        String::new()
+    } else {
+        text.to_owned()
+    };
+    let unshifted = unshifted_for_code(code)
+        .or_else(|| {
+            let mut chars = text.chars();
+            match (chars.next(), chars.next()) {
+                (Some(c), None) if mods & MOD_SHIFT == 0 => Some(c),
+                _ => None,
+            }
+        })
+        .map_or(0, u32::from);
+    let mut consumed = 0;
+    if !text.is_empty() {
+        consumed |= mods & MOD_SHIFT;
+        if mods & MOD_ALT != 0 && u32::from(text.chars().next().unwrap_or('\0')) != unshifted {
+            consumed |= MOD_ALT;
+        }
+    }
+    KeyInput {
+        action,
+        key: key_for_code(code),
+        mods,
+        consumed_mods: consumed,
+        composing,
+        text,
+        unshifted,
+    }
+}
+
+fn unshifted_for_code(code: &str) -> Option<char> {
+    if code == "Space" {
+        return Some(' ');
+    }
+    let rest = code
+        .strip_prefix("Key")
+        .or_else(|| code.strip_prefix("Digit"))?;
+    let mut chars = rest.chars();
+    match (chars.next(), chars.next()) {
+        (Some(c), None) if c.is_ascii_alphanumeric() => Some(c.to_ascii_lowercase()),
+        _ => None,
+    }
+}
+
 /// The `GhosttyKey` for a W3C `code`, or `GHOSTTY_KEY_UNIDENTIFIED`.
 #[must_use]
 #[expect(
@@ -207,5 +284,26 @@ mod tests {
         assert_eq!(key_for_code("MetaLeft"), sys::GHOSTTY_KEY_META_LEFT);
         assert_eq!(key_for_code("LaunchApp1"), sys::GHOSTTY_KEY_LAUNCH_APP_1);
         assert_eq!(key_for_code("Unknown"), sys::GHOSTTY_KEY_UNIDENTIFIED);
+    }
+
+    #[test]
+    fn builds_encoder_input_from_browser_events() {
+        let a = key_input(KeyAction::Press, "KeyA", "A", MOD_SHIFT, false);
+        assert_eq!(
+            (a.key, a.unshifted, a.consumed_mods),
+            (sys::GHOSTTY_KEY_A, u32::from('a'), MOD_SHIFT)
+        );
+        let ctrl_c = key_input(KeyAction::Press, "KeyC", "c", MOD_CTRL, false);
+        assert_eq!((ctrl_c.consumed_mods, ctrl_c.text.as_str()), (0, "c"));
+        let option_a = key_input(KeyAction::Press, "KeyA", "å", MOD_ALT, false);
+        assert_eq!(option_a.consumed_mods, MOD_ALT);
+        let enter = key_input(KeyAction::Press, "Enter", "\r", 0, false);
+        assert_eq!((enter.text.as_str(), enter.unshifted), ("", 0));
+        let slash = key_input(KeyAction::Press, "Slash", "/", 0, false);
+        assert_eq!(slash.unshifted, u32::from('/'));
+        assert_eq!(
+            key_input(KeyAction::Press, "KeyA", "a", 0xffff, false).mods,
+            MODS_MASK
+        );
     }
 }

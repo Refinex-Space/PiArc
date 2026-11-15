@@ -7,8 +7,8 @@
 //!
 //! 1. Stop accepting requests: the state becomes [`RuntimeState::ShuttingDown`] and every
 //!    request fails with [`Error::ShuttingDown`].
-//! 2. Stop the event sources: cancel the root [`CancellationToken`] (long tasks take child
-//!    tokens of it) and wait for the demo sources to end.
+//! 2. Stop the event sources: close every terminal, cancel the root [`CancellationToken`]
+//!    (long tasks take child tokens of it) and wait for the demo sources to end.
 //! 3. Flush the last batch: close the event queue, let the coalescer drain it, deliver the
 //!    rest and wait for the client to finish with it (at most
 //!    [`FINAL_DELIVERY_TIMEOUT`](crate::events::FINAL_DELIVERY_TIMEOUT)).
@@ -42,6 +42,7 @@ use crate::events::{
     EventSink, EventStats,
 };
 use crate::route::RouteKey;
+use crate::terminal::{KeyEvent, TerminalOptions, Terminals};
 
 /// Shortest accepted coalescing interval.
 pub const MIN_COALESCE_INTERVAL: Duration = Duration::from_millis(1);
@@ -123,6 +124,7 @@ struct Shared {
     close_events: CancellationToken,
     coalescer: Mutex<Option<JoinHandle<()>>>,
     demo: Mutex<DemoRegistry>,
+    terminals: Terminals,
     waiters: Mutex<Vec<Box<dyn FnOnce() + Send>>>,
 }
 
@@ -169,6 +171,7 @@ impl CoreRuntime {
                 report_coalescer_panic(sink.as_ref(), &*error.into_panic());
             }
         });
+        let terminals = Terminals::new(handle.clone(), events.clone());
         Ok(Self {
             shared: Arc::new(Shared {
                 state: AtomicU8::new(RUNNING),
@@ -180,6 +183,7 @@ impl CoreRuntime {
                 close_events,
                 coalescer: Mutex::new(Some(supervisor)),
                 demo: Mutex::new(DemoRegistry::default()),
+                terminals,
                 waiters: Mutex::new(Vec::new()),
             }),
         })
@@ -283,6 +287,119 @@ impl CoreRuntime {
         Ok(())
     }
 
+    /// Starts a terminal (ADR-0017) and returns its id. Its title, bell and exit events
+    /// arrive on the route `term/<id>`; frames are pulled with
+    /// [`terminal_frame`](Self::terminal_frame).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::InvalidArgument`] for a bad size or a relative working directory;
+    /// [`Error::Terminal`] when the program cannot start; [`Error::ShuttingDown`].
+    pub fn create_terminal(&self, options: TerminalOptions) -> Result<u32> {
+        self.ensure_running()?;
+        self.shared.terminals.create(options)
+    }
+
+    /// Writes `bytes` to terminal `id` as they are (committed input-method text). Never
+    /// blocks.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::UnknownTerminal`], [`Error::Terminal`] once it is closed,
+    /// [`Error::ShuttingDown`].
+    pub fn terminal_write(&self, id: u32, bytes: Vec<u8>) -> Result<()> {
+        self.ensure_running()?;
+        self.shared.terminals.write(id, bytes)
+    }
+
+    /// Encodes `key` with the terminal's current modes and writes it. Never blocks.
+    ///
+    /// # Errors
+    ///
+    /// As [`terminal_write`](Self::terminal_write).
+    pub fn terminal_key(&self, id: u32, key: &KeyEvent) -> Result<()> {
+        self.ensure_running()?;
+        self.shared.terminals.key(id, key)
+    }
+
+    /// Resizes terminal `id`. Never blocks.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::InvalidArgument`] for a bad size, otherwise as
+    /// [`terminal_write`](Self::terminal_write).
+    pub fn terminal_resize(&self, id: u32, cols: u16, rows: u16, cell: (u32, u32)) -> Result<()> {
+        self.ensure_running()?;
+        self.shared.terminals.resize(id, cols, rows, cell)
+    }
+
+    /// Encodes the next frame of terminal `id` for `viewer` (`full` asks for a RESET frame)
+    /// on the blocking pool and calls `on_done` there with the bytes.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::UnknownTerminal`], [`Error::ShuttingDown`]; encoding errors go to `on_done`.
+    pub fn terminal_frame(
+        &self,
+        id: u32,
+        viewer: u32,
+        full: bool,
+        on_done: impl FnOnce(Result<Vec<u8>>) + Send + 'static,
+    ) -> Result<()> {
+        self.ensure_running()?;
+        self.shared.terminals.frame(id, viewer, full, on_done)
+    }
+
+    /// Closes terminal `id`: kills its program and forgets it.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::UnknownTerminal`], [`Error::ShuttingDown`].
+    pub fn close_terminal(&self, id: u32) -> Result<()> {
+        self.ensure_running()?;
+        self.shared.terminals.close(id)
+    }
+
+    /// The visible screen of terminal `id` as plain text (libghostty-vt's formatter), on the
+    /// blocking pool. Only the `testing` build of piarc-napi exports it (T10 measurements).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::UnknownTerminal`], [`Error::ShuttingDown`].
+    pub fn terminal_text(
+        &self,
+        id: u32,
+        on_done: impl FnOnce(Result<String>) + Send + 'static,
+    ) -> Result<()> {
+        self.ensure_running()?;
+        self.shared.terminals.text(id, on_done)
+    }
+
+    /// Counters of terminal `id`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::UnknownTerminal`].
+    pub fn terminal_stats(&self, id: u32) -> Result<piarc_term::SessionStats> {
+        self.shared.terminals.stats(id)
+    }
+
+    /// Measures the PTY's own echo time for `byte` (the baseline of the S7 echo budget), on
+    /// the blocking pool. Only the `testing` build of piarc-napi exports it.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::UnknownTerminal`], [`Error::ShuttingDown`].
+    pub fn terminal_probe_echo(
+        &self,
+        id: u32,
+        byte: u8,
+        on_done: impl FnOnce(Result<Duration>) + Send + 'static,
+    ) -> Result<()> {
+        self.ensure_running()?;
+        self.shared.terminals.probe_echo(id, byte, on_done)
+    }
+
     /// Spawns a supervised task that panics, to test that task panics become error events.
     /// Only the `testing` build of piarc-napi exports it.
     ///
@@ -369,6 +486,7 @@ impl Shared {
     fn run_shutdown(&self) {
         let sources: Vec<DemoSource> = lock(&self.demo).sources.drain().map(|(_, s)| s).collect();
         let coalescer = lock(&self.coalescer).take();
+        self.terminals.close_all();
         self.handle.block_on(async {
             self.cancel.cancel();
             for source in sources {

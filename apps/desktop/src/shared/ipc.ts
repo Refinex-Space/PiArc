@@ -9,6 +9,12 @@ export const IPC_CHANNELS = {
   eventsConnect: 'piarc:events.connect',
   eventsSubscribe: 'piarc:events.subscribe',
   eventsUnsubscribe: 'piarc:events.unsubscribe',
+  terminalCreate: 'piarc:terminal.create',
+  terminalClose: 'piarc:terminal.close',
+  terminalInput: 'piarc:terminal.input',
+  terminalKey: 'piarc:terminal.key',
+  terminalResize: 'piarc:terminal.resize',
+  terminalRequestFrame: 'piarc:terminal.requestFrame',
 } as const;
 
 /**
@@ -30,10 +36,94 @@ export interface EventBatch {
   readonly payload: Uint8Array;
 }
 
-/** What the main process posts on a window's event port for one Core delivery. */
-export interface EventPortMessage {
-  /** The batches of the delivery whose route this window subscribed to. */
-  readonly batches: readonly EventBatch[];
+/** What the main process posts on a window's event port: the batches of one Core delivery,
+ * or one pulled terminal frame. */
+export type EventPortMessage =
+  | {
+      /** The batches of the delivery whose route this window subscribed to. */
+      readonly batches: readonly EventBatch[];
+    }
+  | { readonly terminalFrame: TerminalFrameMessage };
+
+/**
+ * The answer to `requestTerminalFrame` (ADR-0017): the frame bytes in the draft format of
+ * `piarc_protocol::term_frame`, or why Core could not produce one. The main process forwards
+ * it unread.
+ */
+export interface TerminalFrameMessage {
+  readonly terminalId: number;
+  readonly frame?: Uint8Array;
+  readonly error?: string;
+}
+
+/** Grid size and the cell size in CSS pixels (for pixel size reports). */
+export interface TerminalSize {
+  readonly cols: number;
+  readonly rows: number;
+  readonly cellWidth: number;
+  readonly cellHeight: number;
+}
+
+/** A `KeyboardEvent` as the terminal needs it; Core encodes it with the terminal's modes. */
+export interface TerminalKeyMessage {
+  readonly action: 'press' | 'repeat' | 'release';
+  /** `KeyboardEvent.code`. */
+  readonly code: string;
+  /** The character the key produced (`KeyboardEvent.key` when it is one grapheme), else ''. */
+  readonly text: string;
+  /** Bits: 1 Shift, 2 Ctrl, 4 Alt/Option, 8 Meta/Command. */
+  readonly mods: number;
+  /** Part of an input-method composition. */
+  readonly composing: boolean;
+}
+
+/** Receives the frames of one terminal. */
+export type TerminalFrameListener = (message: TerminalFrameMessage) => void;
+
+/** Largest grid side Core accepts. */
+export const MAX_TERMINAL_SIDE = 1000;
+
+/** Validates a terminal size received over IPC. */
+export function isTerminalSize(value: unknown): value is TerminalSize {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const side = (v: unknown) =>
+    typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= MAX_TERMINAL_SIDE;
+  const cell = (v: unknown) => typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 256;
+  return (
+    'cols' in value &&
+    side(value.cols) &&
+    'rows' in value &&
+    side(value.rows) &&
+    'cellWidth' in value &&
+    cell(value.cellWidth) &&
+    'cellHeight' in value &&
+    cell(value.cellHeight)
+  );
+}
+
+/** Validates a key message received over IPC. */
+export function isTerminalKeyMessage(value: unknown): value is TerminalKeyMessage {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'action' in value &&
+    (value.action === 'press' || value.action === 'repeat' || value.action === 'release') &&
+    'code' in value &&
+    typeof value.code === 'string' &&
+    value.code.length <= 64 &&
+    'text' in value &&
+    typeof value.text === 'string' &&
+    value.text.length <= 64 &&
+    'mods' in value &&
+    typeof value.mods === 'number' &&
+    Number.isInteger(value.mods) &&
+    value.mods >= 0 &&
+    value.mods <= 15 &&
+    'composing' in value &&
+    typeof value.composing === 'boolean'
+  );
 }
 
 /** Receives the batches of one route. */
@@ -74,4 +164,30 @@ export interface PiarcApi {
   subscribeEvents(route: string, listener: EventListener): Promise<void>;
   /** Stops the batches of `route`. Resolves once the main process stopped routing them. */
   unsubscribeEvents(route: string): Promise<void>;
+  /**
+   * Starts a terminal running the user's login shell in the home directory and resolves its
+   * id. Its title, bell and exit events arrive on the event route `term/<id>`. The terminal
+   * belongs to this window: other windows cannot use it, and it is closed with the window.
+   */
+  createTerminal(size: TerminalSize): Promise<number>;
+  /** Kills the terminal's program and forgets the terminal. */
+  closeTerminal(id: number): Promise<void>;
+  /** Writes text to the terminal as typed (committed input-method text). */
+  terminalInput(id: number, text: string): Promise<void>;
+  /** Sends a key event; Core encodes it with the terminal's current modes. */
+  terminalKey(id: number, key: TerminalKeyMessage): Promise<void>;
+  /** Resizes the terminal and its PTY. */
+  terminalResize(id: number, size: TerminalSize): Promise<void>;
+  /**
+   * Asks Core for the terminal's next frame; `full` asks for a RESET frame (after a reload or
+   * a decode error). Resolves once the request is on its way; the frame arrives at the
+   * listener set with `onTerminalFrame`. Pull one frame per animation frame, never for a
+   * hidden terminal.
+   */
+  requestTerminalFrame(id: number, full: boolean): Promise<void>;
+  /**
+   * Receives the frames of terminal `id` (one listener per terminal; setting another
+   * replaces it, `undefined` removes it). Resolves once this window's event port is open.
+   */
+  onTerminalFrame(id: number, listener: TerminalFrameListener | undefined): Promise<void>;
 }

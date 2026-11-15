@@ -3,7 +3,7 @@
 use piarc_protocol::{ErrorData, ErrorKind, ErrorObject};
 
 /// Errors of terminal sessions.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum Error {
     /// A libghostty-vt call returned an error result.
     #[error("libghostty-vt {call} failed with result {code}")]

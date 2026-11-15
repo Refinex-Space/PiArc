@@ -38,6 +38,45 @@ export interface RouterStats {
   readonly windows: number;
 }
 
+/** Terminal frames the main process forwarded (T10). Mutable counters owned by main. */
+export interface TerminalForwardStats {
+  /** `requestTerminalFrame` calls. */
+  requests: number;
+  /** Frames posted to windows. */
+  frames: number;
+  /** Bytes of those frames. */
+  bytes: number;
+  /** Requests Core failed. */
+  errors: number;
+}
+
+/** Counters of one terminal in Core (T10 measurements). */
+export interface TerminalCoreStats {
+  readonly bytesRead: number;
+  readonly reads: number;
+  readonly vtWriteMicros: number;
+  readonly frames: number;
+  readonly emptyFrames: number;
+  readonly frameBytes: number;
+  readonly frameMicros: number;
+  readonly rowsWithCells: number;
+  readonly rowsReused: number;
+}
+
+/** What a test runs in a terminal it creates through the hooks. */
+export interface TestTerminalOptions {
+  readonly cols: number;
+  readonly rows: number;
+  readonly cellWidth?: number;
+  readonly cellHeight?: number;
+  /** Program instead of the login shell, for example `cat` or `sh`. */
+  readonly program?: string;
+  readonly args?: string[];
+  /** Absolute working directory. */
+  readonly cwd?: string;
+  readonly env?: Record<string, string>;
+}
+
 /**
  * The testing exports of Core the hooks hand out. A subset of the generated
  * src/main/core/native/piarc-core.testing.d.ts; the main process assigns the real runtime
@@ -62,6 +101,11 @@ export interface TestCoreApi {
   };
   triggerPanic(): void;
   spawnPanickingTask(): void;
+  /** The visible screen of a terminal from libghostty-vt's formatter. */
+  terminalText(id: number): Promise<string>;
+  terminalStats(id: number): TerminalCoreStats;
+  /** Microseconds from writing `byte` straight to the PTY until its echo was read back. */
+  terminalProbeEcho(id: number, byte: number): Promise<number>;
 }
 
 export interface PiarcTestHooks {
@@ -80,6 +124,14 @@ export interface PiarcTestHooks {
   /** Records every forwarded delivery until `stopForwardTimings`. */
   startForwardTimings(): void;
   stopForwardTimings(): ForwardObservation[];
+  /**
+   * Starts a terminal owned by the window with this `webContents.id` (so its page can use it
+   * through `window.piarc`) and resolves its id. Unlike `window.piarc.createTerminal`, the
+   * program, arguments and environment are the test's choice.
+   */
+  createTerminal(webContentsId: number, options: TestTerminalOptions): number;
+  /** Counters of the frames the main process forwarded. */
+  terminalForwardStats(): TerminalForwardStats;
 }
 
 declare global {

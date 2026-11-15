@@ -52,6 +52,12 @@
 //! (`secrets/*`): lazy open with structured errors, change push (`secrets/changed`) and key
 //! locks that serialize concurrent OAuth refreshes across Agent Hosts. The master key's
 //! service name comes from the application identifier in [`identity`].
+//!
+//! # Terminals (T10)
+//!
+//! [`CoreRuntime::create_terminal`] and its siblings run `piarc-term` sessions (ADR-0017):
+//! lifecycle events on the route `term/<id>`, frames pulled with
+//! [`CoreRuntime::terminal_frame`] ([`terminal`]).
 
 pub mod agent_host;
 pub mod demo;
@@ -61,13 +67,17 @@ pub mod identity;
 pub mod route;
 mod runtime;
 pub mod secrets;
+pub mod terminal;
 pub mod tool_io;
 
 pub use demo::{DemoReport, DemoSourceConfig};
 pub use error::{Error, Result};
 pub use events::{DeliveryDone, EventBatch, EventSink, EventStats, SinkClosed};
+pub use piarc_term::SessionStats as TerminalStats;
+pub use piarc_term::vt::KeyAction;
 pub use route::RouteKey;
 pub use runtime::{
     CoreConfig, CoreRuntime, MAX_COALESCE_INTERVAL, MAX_ECHO_BYTES, MIN_COALESCE_INTERVAL,
     RuntimeState,
 };
+pub use terminal::{KeyEvent, TerminalOptions};

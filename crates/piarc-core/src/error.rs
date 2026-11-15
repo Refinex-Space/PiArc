@@ -26,6 +26,15 @@ pub enum Error {
         /// The id the caller passed.
         id: u32,
     },
+    /// No terminal has this id (it was never created or is closed).
+    #[error("no terminal has id {id}")]
+    UnknownTerminal {
+        /// The id the caller passed.
+        id: u32,
+    },
+    /// A terminal session failed.
+    #[error(transparent)]
+    Terminal(#[from] piarc_term::Error),
     /// The tokio runtime could not be started.
     #[error("failed to start the Core runtime: {reason}")]
     RuntimeStart {
@@ -53,6 +62,8 @@ impl Error {
             }
             Self::ShuttingDown => ErrorKind::ShuttingDown,
             Self::QueueFull => ErrorKind::Busy,
+            Self::UnknownTerminal { .. } => ErrorKind::NotFound,
+            Self::Terminal(error) => error.kind(),
             Self::RuntimeStart { .. } | Self::Internal { .. } => ErrorKind::InternalError,
         }
     }
@@ -70,8 +81,11 @@ impl Error {
     pub fn to_error_object(&self) -> ErrorObject {
         let details = match self {
             Self::InvalidArgument { field, .. } => Some(serde_json::json!({ "field": field })),
-            Self::UnknownDemoSource { id } => Some(serde_json::json!({ "id": id })),
-            Self::ShuttingDown
+            Self::UnknownDemoSource { id } | Self::UnknownTerminal { id } => {
+                Some(serde_json::json!({ "id": id }))
+            }
+            Self::Terminal(_)
+            | Self::ShuttingDown
             | Self::QueueFull
             | Self::RuntimeStart { .. }
             | Self::Internal { .. } => None,

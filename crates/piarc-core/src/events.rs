@@ -196,6 +196,16 @@ impl EventSender {
         Ok(())
     }
 
+    /// Queues `event` from a thread outside the runtime (a terminal's IO thread), waiting
+    /// while the queue is full. Must not be called from a runtime thread.
+    pub(crate) fn blocking_send(&self, event: Event) -> Result<()> {
+        self.tx
+            .blocking_send(event)
+            .map_err(|_| Error::ShuttingDown)?;
+        self.counters.queued.fetch_add(1, Ordering::Relaxed);
+        Ok(())
+    }
+
     /// Queues `event` without waiting.
     pub(crate) fn try_send(&self, event: Event) -> Result<()> {
         self.tx.try_send(event).map_err(|error| match error {

@@ -128,3 +128,92 @@ impl CoreRuntime {
         })
     }
 }
+
+/// Counters of one terminal (T10 measurements).
+#[napi(object, object_from_js = false)]
+pub struct TerminalStats {
+    /// Bytes read from the PTY.
+    pub bytes_read: i64,
+    /// Reads from the PTY.
+    pub reads: i64,
+    /// Time spent parsing output (`vt_write`), in microseconds.
+    pub vt_write_micros: i64,
+    /// Frames produced, empty ones included.
+    pub frames: i64,
+    /// Empty frames.
+    pub empty_frames: i64,
+    /// Bytes of all frames.
+    pub frame_bytes: i64,
+    /// Time spent producing frames, in microseconds.
+    pub frame_micros: i64,
+    /// Rows sent with cells.
+    pub rows_with_cells: i64,
+    /// Rows sent as references.
+    pub rows_reused: i64,
+}
+
+#[napi]
+impl CoreRuntime {
+    /// The visible screen of a terminal as plain text, from libghostty-vt's formatter.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn terminal_text<'env>(&self, env: &'env Env, id: u32) -> napi::Result<Object<'env>> {
+        type Settle = Box<dyn FnOnce(Env) -> napi::Result<String> + Send>;
+        let (deferred, promise) = env.create_deferred::<String, Settle>()?;
+        boundary::call(env, "CoreRuntime.terminalText", || {
+            self.core.terminal_text(id, move |text| {
+                deferred.resolve(Box::new(move |env| {
+                    text.map_err(|error| boundary::js_error(&env, &error.to_error_object()))
+                }));
+            })
+        })?;
+        Ok(promise)
+    }
+
+    /// Counters of a terminal.
+    #[napi(catch_unwind)]
+    pub fn terminal_stats(&self, env: Env, id: u32) -> napi::Result<TerminalStats> {
+        boundary::call(&env, "CoreRuntime.terminalStats", || {
+            let s = self.core.terminal_stats(id)?;
+            Ok(TerminalStats {
+                bytes_read: to_i64(s.bytes_read),
+                reads: to_i64(s.reads),
+                vt_write_micros: to_i64(s.vt_write_nanos / 1000),
+                frames: to_i64(s.frames),
+                empty_frames: to_i64(s.empty_frames),
+                frame_bytes: to_i64(s.frame_bytes),
+                frame_micros: to_i64(s.frame_nanos / 1000),
+                rows_with_cells: to_i64(s.rows_with_cells),
+                rows_reused: to_i64(s.rows_reused),
+            })
+        })
+    }
+
+    /// Writes the ASCII byte `byte` straight to the terminal's PTY and resolves with the time
+    /// until the PTY echoed it back, in microseconds: the baseline of the echo budget.
+    #[napi(ts_return_type = "Promise<number>", catch_unwind)]
+    pub fn terminal_probe_echo<'env>(
+        &self,
+        env: &'env Env,
+        id: u32,
+        byte: u32,
+    ) -> napi::Result<Object<'env>> {
+        type Settle = Box<dyn FnOnce(Env) -> napi::Result<f64> + Send>;
+        let (deferred, promise) = env.create_deferred::<f64, Settle>()?;
+        boundary::call(env, "CoreRuntime.terminalProbeEcho", || {
+            let byte = u8::try_from(byte)
+                .ok()
+                .filter(u8::is_ascii_graphic)
+                .ok_or_else(|| piarc_core::Error::InvalidArgument {
+                    field: "byte",
+                    reason: "must be a printable ASCII character code".into(),
+                })?;
+            self.core.terminal_probe_echo(id, byte, move |elapsed| {
+                deferred.resolve(Box::new(move |env| match elapsed {
+                    Ok(elapsed) => Ok(elapsed.as_secs_f64() * 1e6),
+                    Err(error) => Err(boundary::js_error(&env, &error.to_error_object())),
+                }));
+            })
+        })?;
+        Ok(promise)
+    }
+}

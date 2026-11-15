@@ -10,6 +10,7 @@ import { shutdownCoreBeforeQuit, startCore, type CoreHost } from './core/core-ho
 import { registerEventHandlers } from './core/event-ipc.js';
 import { hasTestingExports } from './core/load.js';
 import { EventRouter } from './core/router.js';
+import { registerTerminalHandlers, TerminalOwners } from './core/terminal-ipc.js';
 import { installTestHooks } from './core/test-hooks.js';
 import { applyDevServerCsp, resolveDevServer } from './dev-server.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
@@ -30,6 +31,7 @@ const trustedOrigins: readonly string[] =
 
 let mainWindow: BrowserWindow | null = null;
 const eventRouter = new EventRouter();
+const terminalStats = { requests: 0, frames: 0, bytes: 0, errors: 0 };
 
 function bundlePath(...segments: string[]): string {
   return path.join(app.getAppPath(), '.vite', ...segments);
@@ -72,7 +74,7 @@ function startCoreOrExit(): CoreHost | undefined {
   }
 }
 
-function startTestHooks(core: CoreHost): void {
+function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners): void {
   if (!hasTestingExports(core.runtime)) {
     return;
   }
@@ -80,6 +82,8 @@ function startTestHooks(core: CoreHost): void {
     modulePath: core.modulePath,
     core: core.runtime,
     router: eventRouter,
+    terminalOwners,
+    terminalStats,
     openWindow: async (hash) => {
       const window = openWindow(hash);
       await new Promise<void>((resolve) => window.webContents.once('did-finish-load', resolve));
@@ -136,7 +140,15 @@ function start(): void {
     const registerHandler = createIpcRegistrar(trustedOrigins);
     registerIpcHandlers(registerHandler);
     registerEventHandlers(registerHandler, eventRouter);
-    startTestHooks(core);
+    const terminalOwners = new TerminalOwners(core.runtime);
+    registerTerminalHandlers(
+      registerHandler,
+      core.runtime,
+      eventRouter,
+      terminalOwners,
+      terminalStats,
+    );
+    startTestHooks(core, terminalOwners);
     openMainWindow();
   });
 }
