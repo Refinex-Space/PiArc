@@ -15,7 +15,9 @@
     "format": "prettier --write .",
     "lint": "eslint .",
     "typecheck": "tsc --build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "package:desktop": "node scripts/dev/package-desktop.mjs",
+    "check:fuses": "node scripts/ci/check-fuses.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -1,8 +1,31 @@
 {
   "name": "@piarc/desktop",
+  "productName": "PiArc",
   "version": "0.0.0",
   "private": true,
   "description": "PiArc Electron desktop client (main, preload and renderer processes).",
   "license": "MIT",
-  "type": "module"
+  "type": "module",
+  "main": ".vite/build/main.cjs",
+  "scripts": {
+    "start": "electron-forge start",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "8.0.1",
+    "@electron-forge/plugin-fuses": "8.0.1",
+    "@electron-forge/plugin-vite": "8.0.1",
+    "@electron-forge/shared-types": "8.0.1",
+    "@electron/fuses": "2.1.3",
+    "@playwright/test": "1.65.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "electron": "45.3.2",
+    "vite": "8.3.8"
+  }
 }

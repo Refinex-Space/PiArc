@@ -1,0 +1,98 @@
+// Main-process entry: app lifecycle and the security baseline of architecture section 10.3.
+// Business logic does not belong here (ADR-0013); this file only wires modules together.
+import path from 'node:path';
+
+import { app, BrowserWindow, protocol, session } from 'electron';
+
+import { APP_ENTRY_URL, APP_ORIGIN } from './app-scheme.js';
+import { APP_SCHEME_REGISTRATION, registerAppProtocol } from './app-protocol.js';
+import { applyDevServerCsp, resolveDevServer } from './dev-server.js';
+import { registerIpcHandlers } from './ipc/handlers.js';
+import { createIpcRegistrar } from './ipc/register.js';
+import { quitsWhenAllWindowsClosed } from './platform/index.js';
+import { PRODUCTION_CSP } from './security/csp.js';
+import { guardWebContents } from './security/navigation.js';
+import { applyPermissionPolicy } from './security/permissions.js';
+import { createMainWindow } from './window.js';
+
+// `import.meta.env.DEV` is a build-time constant: false in packaged builds, so the bundler
+// drops every dev-server branch and the relaxed CSP never ships.
+const devServer = import.meta.env.DEV
+  ? resolveDevServer(MAIN_WINDOW_VITE_DEV_SERVER_URL)
+  : undefined;
+const trustedOrigins: readonly string[] =
+  devServer === undefined ? [APP_ORIGIN] : [APP_ORIGIN, devServer.origin];
+
+let mainWindow: BrowserWindow | null = null;
+
+function bundlePath(...segments: string[]): string {
+  return path.join(app.getAppPath(), '.vite', ...segments);
+}
+
+function openMainWindow(): void {
+  const window = createMainWindow(bundlePath('build', 'preload.cjs'));
+  mainWindow = window;
+  window.on('closed', () => {
+    if (mainWindow === window) {
+      mainWindow = null;
+    }
+  });
+  void window.loadURL(devServer?.url ?? APP_ENTRY_URL);
+}
+
+function focusMainWindow(): void {
+  if (mainWindow === null) {
+    openMainWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function start(): void {
+  app.on('session-created', (created) => {
+    applyPermissionPolicy(created, trustedOrigins);
+  });
+  app.on('web-contents-created', (_event, contents) => {
+    guardWebContents(contents, trustedOrigins);
+  });
+  app.on('second-instance', () => {
+    console.info('[app] second instance started; focusing the existing window');
+    focusMainWindow();
+  });
+  app.on('window-all-closed', () => {
+    if (quitsWhenAllWindowsClosed) {
+      app.quit();
+    }
+  });
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      openMainWindow();
+    }
+  });
+
+  void app.whenReady().then(() => {
+    applyPermissionPolicy(session.defaultSession, trustedOrigins);
+    registerAppProtocol(bundlePath('renderer', MAIN_WINDOW_VITE_NAME), PRODUCTION_CSP);
+    if (import.meta.env.DEV && devServer !== undefined) {
+      applyDevServerCsp(session.defaultSession, devServer);
+    }
+    registerIpcHandlers(createIpcRegistrar(trustedOrigins));
+    openMainWindow();
+  });
+}
+
+// Must run before `ready`: force the sandbox for every renderer and give the app scheme its
+// privileges.
+app.enableSandbox();
+protocol.registerSchemesAsPrivileged([APP_SCHEME_REGISTRATION]);
+
+if (app.requestSingleInstanceLock()) {
+  start();
+} else {
+  console.info('[app] another instance is running; exiting');
+  app.quit();
+}

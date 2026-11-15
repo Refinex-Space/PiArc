@@ -1,0 +1,15 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  // Main process: Node and Electron, no DOM types.
+  "compilerOptions": {
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "rootDir": ".",
+    "outDir": "../../dist/main",
+    "tsBuildInfoFile": "../../dist/main/.tsbuildinfo",
+    "lib": ["ES2024"],
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"],
+  "references": [{ "path": "../shared" }]
+}

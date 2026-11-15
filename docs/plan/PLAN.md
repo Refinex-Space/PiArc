@@ -298,10 +298,10 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 开工：2026-11-14，基线 `npm run verify` 12 项通过；无前序 `blocked` 项；本机 `gh` 未登录。
 
-- [ ] 1 工程：版本核对与精确锁定（Electron、Forge 及插件、Vite、React），`.nvmrc` 与 Electron 内置 Node 核对（A01）
-- [ ] 2 工程：`src/main`、`src/preload`、`src/renderer` 三个 TS 工程，Forge + Vite 构建，React 三栏占位，窗口工厂 + ESLint 禁止他处 `new BrowserWindow`
-- [ ] 3 安全基线：自定义协议、CSP 响应头、webPreferences、导航、新窗口与外链确认、权限默认拒绝、`web-contents-created` 兜底、单实例锁
-- [ ] 4 preload 与 IPC：`window.piarc` 白名单、统一注册函数与来源校验纯函数 + 单元测试（A08 单元部分）
+- [x] 1 工程：版本核对与精确锁定（Electron 45.3.2 内置 Node 24.22.2 = `.nvmrc`；Forge 8.0.1、Vite 8.3.8、React 19.3.1）（A01）
+- [x] 2 工程：`src/main`、`src/preload`、`src/renderer`（+ `src/shared`）TS 工程，Forge + Vite 构建，React 三栏占位，窗口工厂 + ESLint 进程边界规则
+- [ ] 3 安全基线（代码与单元测试已提交，E2E 待做）：自定义协议、CSP 响应头、webPreferences、导航、新窗口与外链确认、权限默认拒绝、`web-contents-created` 兜底、单实例锁
+- [ ] 4 preload 与 IPC（代码与单元测试已提交，E2E 待做）：`window.piarc` 白名单、统一注册函数与来源校验纯函数 + 单元测试（A08 单元部分）
 - [ ] 5 fuses：开发与发布配置分开、`scripts/ci/check-fuses.mjs`、`npm run check:fuses`（A12）
 - [ ] 6 L4 基座：Playwright 开发模式与 `package` 产物两种形态，冒烟与安全用例，证据约定写进 testing.md（A02、A04–A11）
 - [ ] 7 CI：macOS 与 Windows 跑冒烟、安全用例与 fuse 校验，actionlint / YAML 校验（A03）

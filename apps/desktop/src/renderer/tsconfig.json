@@ -1,0 +1,17 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  // Renderer: DOM and React, no Node types. It reaches the main process only through
+  // `window.piarc` (src/preload).
+  "compilerOptions": {
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "rootDir": ".",
+    "outDir": "../../dist/renderer",
+    "tsBuildInfoFile": "../../dist/renderer/.tsbuildinfo",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "types": [],
+    "jsx": "react-jsx"
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "references": [{ "path": "../shared" }]
+}

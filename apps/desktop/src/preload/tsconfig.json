@@ -1,0 +1,17 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  // Sandboxed preload: only `require('electron')` is available at runtime, so neither DOM
+  // nor Node types are listed. (electron.d.ts still pulls in Node types by reference;
+  // ESLint forbids importing Node built-ins here.)
+  "compilerOptions": {
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "rootDir": ".",
+    "outDir": "../../dist/preload",
+    "tsBuildInfoFile": "../../dist/preload/.tsbuildinfo",
+    "lib": ["ES2024"],
+    "types": []
+  },
+  "include": ["**/*.ts"],
+  "references": [{ "path": "../shared" }]
+}
