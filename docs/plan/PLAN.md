@@ -109,7 +109,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | 编号 | 任务 | 阶段 | 依赖 | 平台 | effort | 规模 | 验证项 | 状态 | 完成提交 |
 |---|---|---|---|---|---|---|---|---|---|
 | T01 | [仓库脚手架、工程规范与质量门禁](tasks/T01-scaffold-and-quality-gates.md) | 0 | 无 | macOS | high | 大 | 无 | 已完成 | 47fb1e9 |
-| T02 | [协议单一来源与契约测试基座](tasks/T02-protocol-and-contract-tests.md) | 0 | T01 | macOS | high | 中 | 无 | 未开始 | — |
+| T02 | [协议单一来源与契约测试基座](tasks/T02-protocol-and-contract-tests.md) | 0 | T01 | macOS | high | 中 | 无 | 进行中 | — |
 | T03 | [Electron 应用骨架与安全基线](tasks/T03-electron-shell-and-security-baseline.md) | 1 | T02 | macOS | xhigh | 大 | S10 | 未开始 | — |
 | T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 未开始 | — |
 | T05 | [严格校验的 mock provider](tasks/T05-strict-mock-provider.md) | 1 | T02 | macOS | high | 中 | 无 | 未开始 | — |
@@ -294,7 +294,14 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（当前没有进行中的任务）
+T02 协议单一来源与契约测试基座（开工 2026-11-14，基线 `npm run verify` 10/10 通过）
+
+- [ ] 1. 最小链路：一个类型 → schema → TS → 样本 → 两侧测试 → 漂移检查
+- [ ] 2. `piarc-protocol` 骨架类型：JSON-RPC 消息、结构化错误、握手与 `negotiate`、会话事件信封、turn/item（A08、A09）
+- [ ] 3. Schema 导出与 TS 生成：`npm run gen:protocol`、`check-protocol-drift.mjs` 并入 verify（A01、A02、A10）
+- [ ] 4. L1 契约基座：golden 样本与反例、Rust 往返、TS ajv 校验与往返、`check-contract-samples.mjs` 并入 verify、testing.md L1 一节（A03、A04、A05）
+- [ ] 5. LF 分帧编解码器 Rust 与 TS，共用 `tests/contracts/framing/` 用例（A06、A07）
+- [ ] 6. 收尾：两份 CLAUDE.md、复用表、根 CLAUDE.md 命令、架构与文档同步、验收记录、全量 verify（A11）
 
 ## 登记事项
 
