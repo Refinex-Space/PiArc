@@ -59,7 +59,11 @@ const ajv = new Ajv2020({
     uint64: { type: 'number', validate: integer(0) },
   },
 });
-ajv.addSchema(readJson(path.join(schemaDir, 'ahp.schema.json')) as object, 'ahp');
+const rootSchema = readJson(path.join(schemaDir, 'ahp.schema.json'));
+if (!isRecord(rootSchema)) {
+  throw new Error('ahp.schema.json is not a JSON object');
+}
+ajv.addSchema(rootSchema, 'ahp');
 
 function validatorFor(contract: ContractEntry) {
   const validate = ajv.getSchema(`ahp#/$defs/${contract.schema}`);

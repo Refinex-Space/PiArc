@@ -101,7 +101,9 @@ function main() {
   if (problems.length > 0) {
     console.error('Contract sample check failed:');
     console.error(problems.map((p) => `  ${p}`).join('\n'));
-    console.error('See docs/engineering/testing.md (L1) for how to add a protocol message.');
+    console.error(
+      'See docs/engineering/testing.md section 7 (L1) for how to add a protocol message.',
+    );
     process.exitCode = 1;
     return;
   }

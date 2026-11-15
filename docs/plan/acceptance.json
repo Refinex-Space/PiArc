@@ -552,78 +552,78 @@
       "id": "T02-A01",
       "task": "T02",
       "description": "连续两次运行 `npm run gen:protocol`，`packages/protocol/schema/` 与 `packages/protocol/src/generated/` 字节一致，`git status` 无变化。验证：两次运行后的 `git status` 与文件哈希比较输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "连续两次 `npm run gen:protocol` 后 4 个生成文件 SHA-256 一致（ahp.schema.json 10007a1b…、contracts.json 82264f75…、generated/ahp.ts 1025ca79…、generated/version.ts ff140e4c…），`diff` 输出 IDENTICAL，`git status --short` 为空。证据：tmp/evidence/T02/a01-run1.txt、a01-run2.txt。"
     },
     {
       "id": "T02-A02",
       "task": "T02",
       "description": "临时给一个 Rust 协议类型加字段而不重新生成，`npm run verify` 在漂移检查步骤失败并列出不一致的文件；重新生成后通过。验证：两次运行的关键输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "给 `CoreWelcome` 临时加字段 `drift_probe` 不重新生成：`npm run verify` 退出 1，`[8/12] protocol drift` FAIL，列出 `changed: packages/protocol/schema/ahp.schema.json` 与 `changed: packages/protocol/src/generated/ahp.ts`，其余 11 步通过；运行 `npm run gen:protocol` 后 verify 12/12 通过；随后撤销字段并重新生成，漂移检查通过、工作区干净。证据：tmp/evidence/T02/a02-verify-drift.txt、a02-verify-regenerated.txt。"
     },
     {
       "id": "T02-A03",
       "task": "T02",
       "description": "JSON-RPC 请求、响应、错误、通知，握手两条消息，会话事件信封，`turn/*` 与 `item/*` 骨架消息都有合法 golden 样本，Rust serde 往返与 TS ajv 校验加往返全部通过。验证：样本清单与两侧测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`packages/protocol/schema/contracts.json` 共 12 个契约：jsonrpc/request、jsonrpc/response、jsonrpc/errorResponse、jsonrpc/notification、envelope/sessionEvent、host/hello、core/welcome、turn/started、turn/completed、item/started、item/completed、item/agentMessage/delta，各有合法样本（共 22 个）。`cargo test -p piarc-protocol --test contracts`：22 valid samples round-tripped；`npx vitest run packages/protocol`：每个合法样本 ajv 校验通过且 parse→stringify 往返不变，113 个测试全部通过。证据：tmp/evidence/T02/rust-tests.txt、ts-tests.txt。"
     },
     {
       "id": "T02-A04",
       "task": "T02",
       "description": "反例样本（缺必填字段、非法枚举、类型错误）在 Rust 反序列化与 ajv 校验中都被拒绝。验证：两侧测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "41 个反例（缺必填字段如 missing-protocol/missing-seq/missing-delta，非法枚举如 unknown-status/unknown-kind/unknown-item-type，类型错误如 fractional-id/ts-not-integer/delta-not-string，另有 result 与 error 并存、batch、wrong-method 等）在 Rust 中全部反序列化失败（41 invalid samples rejected），在 ajv 中全部校验失败（contracts.test.ts 的 rejects 用例全部通过）。证据：tmp/evidence/T02/rust-tests.txt、ts-tests.txt。"
     },
     {
       "id": "T02-A05",
       "task": "T02",
       "description": "临时新增一个没有样本的消息类型，样本完整性检查失败并指出缺样本的类型；撤销后通过。验证：关键输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "临时新增通知 `turn/probe` 并登记到 CONTRACTS、重新生成：`node scripts/ci/check-contract-samples.mjs` 退出 1，输出 `turn/probe: no valid sample in tests/contracts/turn/probe/` 与 `no counter-example ...`；撤销并重新生成后输出 `Contract sample check passed: 12 contracts have samples.` 退出 0。证据：tmp/evidence/T02/a05-missing.txt、a05-restored.txt。"
     },
     {
       "id": "T02-A06",
       "task": "T02",
       "description": "Rust 与 TS 两份帧编解码器在半包、粘包、超长帧（超限后后续帧仍能解析）、非法 UTF-8、非法 JSON 五类用例上全部通过，用例数据两侧共用。验证：两侧测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "共享用例 tests/contracts/framing/decode.json（27 个）与 encode.json（3 个），覆盖 partial、coalesced、oversized（超限后后续帧仍解析）、invalidUtf8、invalidJson 及 surrogates、nesting、emptyFrames。Rust `tests/framing.rs` 两个测试通过；TS `src/framing.test.ts` 全部通过，且两侧都断言六个必需类别存在。证据：tmp/evidence/T02/rust-tests.txt、ts-tests.txt。"
     },
     {
       "id": "T02-A07",
       "task": "T02",
       "description": "JSON 字符串中含 U+2028、U+2029 时不被当作帧分隔符，解码结果与原文一致。验证：两侧测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "共享用例 lineSeparators 类：原始 U+2028/U+2029 字节（e2 80 a8 / e2 80 a9）在字符串内、以及跨输入拆开时均不分帧，解码值与原文一致；encode 用例确认两侧都原样写出 U+2028/U+2029 且帧内只有末尾一个 LF；契约样本 item/agentMessage/delta/line-separators.json 两侧往返通过。证据：tmp/evidence/T02/rust-tests.txt、ts-tests.txt。"
     },
     {
       "id": "T02-A08",
       "task": "T02",
       "description": "主版本不同的握手被 `negotiate` 拒绝，返回 `kind` 明确的结构化错误；次版本不同时握手成功，`enabled` 为双方能力交集。验证：单元测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-protocol`：version::tests::rejects_a_different_major_version_with_a_structured_error（1.0 对 2.0 返回 kind protocolVersionMismatch、retryable false、code -32000、details {local,remote}）与 accepts_a_different_minor_version_and_enables_the_intersection（1.3 对 1.1，enabled 为 [planMode, todo]）通过。证据：tmp/evidence/T02/rust-tests.txt。"
     },
     {
       "id": "T02-A09",
       "task": "T02",
       "description": "结构化错误序列化后符合 JSON-RPC 2.0 error 对象，`data.kind` 与 `data.retryable` 缺失时反序列化失败。验证：样本与测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "rpc_error::tests::serializes_as_a_json_rpc_error_object 与 rejects_error_data_without_kind_or_retryable 通过；样本 jsonrpc/errorResponse 的 3 个合法样本两侧通过，反例 missing-data-kind、missing-data-retryable、missing-data 在 Rust（missing field `kind`/`retryable`/`data`）与 ajv 中都被拒绝。证据：tmp/evidence/T02/rust-tests.txt、ts-tests.txt。"
     },
     {
       "id": "T02-A10",
       "task": "T02",
       "description": "生成、漂移检查、样本完整性检查都是 Node 脚本，不写死路径分隔符，并由 verify 调用，CI 的 macOS 与 Windows 两个 runner 都会执行。验证：脚本代码与 CI 配置检查。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "检查脚本代码与 CI 配置：gen-protocol.mjs、check-protocol-drift.mjs、check-contract-samples.mjs 均为 Node ESM，路径一律 `path.join`/`path.relative`，契约名按 `/` 拆分后再 join，外部命令用 spawn 参数数组；verify.mjs 的 STEPS 第 8、9 步调用后两者（漂移检查内部调用生成器）；.github/workflows/ci.yml 在 macos-latest 与 windows-latest 上运行 `npm run verify`。生成文件按 `.prettierrc.json` 的 endOfLine lf 写出，`.gitattributes` 为 eol=lf。Windows runner 的实际运行待用户推送后观察。"
     },
     {
       "id": "T02-A11",
       "task": "T02",
       "description": "`npm run verify` 通过，汇总表包含漂移检查与样本完整性检查两个新步骤。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run verify` 退出 0，汇总表 12 步全部 PASS，其中新增 `8 protocol drift` 与 `9 contract samples`。证据：tmp/evidence/T02/a11-verify.txt。"
     },
     {
       "id": "T03-A01",
