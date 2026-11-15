@@ -94,7 +94,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 | 阶段 | 内容 | 任务 | 阶段门 | 状态 |
 |---|---|---|---|---|
-| 0 工程基座 | 脚手架、质量门禁、工程规范、协议与契约测试 | T01–T02 | — | 未开始 |
+| 0 工程基座 | 脚手架、质量门禁、工程规范、协议与契约测试 | T01–T02 | — | 进行中 |
 | 1 M0 技术验证 | Electron 安全基线、NAPI 事件通道、mock provider、Agent Host 多会话与 AHP、Operations 委托、凭据保险箱、transcript 渲染、终端、沙箱、打包与首次运行；S1–S10 两个平台的结论 | T03–T12、W0 | R1 | 未开始 |
 | 2 M1 可行走骨架 | 存储与信任、会话编排与投影、L2 场景、文件工具与 Bash、客户端外壳、transcript 与 composer、基础审批、模型与凭据、system prompt 与 memory | T13–T22 | R2 | 未开始 |
 | 3 M2 Harness 核心 | 权限规则与 Bash 分析、配置兼容层、hooks、计划模式与任务清单、压缩与用量、检查点与回退、WebFetch 与登录、L3 对齐；Windows 达到 M1 | W1、T23–T30 | R3 | 未开始 |
@@ -108,7 +108,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 | 编号 | 任务 | 阶段 | 依赖 | 平台 | effort | 规模 | 验证项 | 状态 | 完成提交 |
 |---|---|---|---|---|---|---|---|---|---|
-| T01 | [仓库脚手架、工程规范与质量门禁](tasks/T01-scaffold-and-quality-gates.md) | 0 | 无 | macOS | high | 大 | 无 | 未开始 | — |
+| T01 | [仓库脚手架、工程规范与质量门禁](tasks/T01-scaffold-and-quality-gates.md) | 0 | 无 | macOS | high | 大 | 无 | 进行中 | — |
 | T02 | [协议单一来源与契约测试基座](tasks/T02-protocol-and-contract-tests.md) | 0 | T01 | macOS | high | 中 | 无 | 未开始 | — |
 | T03 | [Electron 应用骨架与安全基线](tasks/T03-electron-shell-and-security-baseline.md) | 1 | T02 | macOS | xhigh | 大 | S10 | 未开始 | — |
 | T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 未开始 | — |
@@ -294,7 +294,16 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（当前没有进行中的任务）
+T01 仓库脚手架、工程规范与质量门禁（开工 2026-11-14，macOS）
+
+- [ ] 1 npm workspaces 与 TypeScript 工具链（tsconfig、ESLint、Prettier、Vitest、`.nvmrc`、精确锁定）
+- [ ] 2 Cargo workspace 与 21 个 crate 骨架（`rust-toolchain.toml`、`rustfmt.toml`、clippy、`deny.toml`）
+- [ ] 3 检查脚本：`check-crate-deps.mjs` + `crates/deps-rules.json`、`check-acceptance.mjs`、`verify.mjs`、根 `scripts`
+- [ ] 4 `.editorconfig`、`.gitattributes`、`.github/workflows/ci.yml`、`.claude/settings.json`
+- [ ] 5 工程规范：`coding-standards.md`、`testing.md`、`claude-md.md`
+- [ ] 6 `.claude/rules/rust.md`、`.claude/rules/typescript.md`、根 `CLAUDE.md`
+- [ ] 7 门禁有效性验证（A02–A07 临时违规，验证后撤销）
+- [ ] 8 收尾：verify 全绿、acceptance.json、PLAN.md、会话日志
 
 ## 登记事项
 
