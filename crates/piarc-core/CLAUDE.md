@@ -1,12 +1,12 @@
 # piarc-core
 
-Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、有序关闭、任务监督；`agent_host` 模块把 `piarc-host` 的监管器与生产 I/O（`piarc-exec` 的进程启动器、`SystemClock`）装配起来，是 Agent Host 测试的无头入口（T06）。工作区与会话编排由 T13、T14 加入。不负责 JavaScript 绑定（`piarc-napi`）。
+Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、有序关闭、任务监督；`agent_host` 模块把 `piarc-host` 的监管器与生产 I/O（`piarc-exec` 的进程启动器、`SystemClock`）装配起来，是 Agent Host 测试的无头入口（T06）；`tool_io` 应答 Agent Host 委托的 `fs/*`、`exec/*`（T07）。工作区与会话编排由 T13、T14 加入。不负责 JavaScript 绑定（`piarc-napi`）。
 
 ## 命令
 
 | 命令 | 用途 |
 |---|---|
-| `cargo test -p piarc-core` | 单元测试 + `tests/event_channel.rs`（回调频率、无丢失与顺序、背压、有序关闭、任务 panic、未关闭直接丢弃） |
+| `cargo test -p piarc-core` | 单元测试 + `tests/event_channel.rs`（回调频率、无丢失与顺序、背压、有序关闭、任务 panic、未关闭直接丢弃）+ `tests/tool_io.rs`（越界、流式输出、取消、会话隔离） |
 | `cargo clippy -p piarc-core --all-targets -- -D warnings` | lint |
 
 ## 运行时与关闭顺序
@@ -20,6 +20,13 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 批次 = 路由键 + 每路由从 1 起连续的批次序号 + 载荷（该路由事件的 UTF-8 JSON 数组）。主进程只看路由键。
 - 刷出时机：不早于首个待发事件到达，且距上次刷出至少一个间隔（默认 16 ms，1–1000 ms 可配）。无待发事件时不跑定时器。
 - 满时策略，任何情况都不丢事件：最多 1 个在途投递（sink 丢弃 `DeliveryDone` 才算完成），期间继续在待发批次里累积；待发超过 64 MiB 停止读队列，队列（65,536 个事件）满后异步生产者等待，同步调用（`echo`）返回可重试的 `QueueFull`（kind `busy`）。只有 sink 报告 `SinkClosed`（JS 环境已销毁）时才丢弃并计入 `lost`。
+
+## 委托的工具 I/O（`tool_io`）
+
+- `ToolIo` 按会话登记的 `Scope`（工作区根 + cwd）应答 `fs/*`（`piarc-fs`，放在阻塞线程池）与 `exec/*`（`piarc-exec`）；未登记的会话返回 `sessionNotFound`。登记现由测试做（`open_session`），T14 的会话层接手。
+- `exec/run` 的输出经入站请求带来的 `Peer` 以 `exec/output` 发回，`forward_output` 先发完再回响应；连接断开（`Peer::closed`）或 `exec/kill` 终止命令。
+- 命令环境 = `piarc_host::DEFAULT_ENV_PASSTHROUGH` 中 Core 自己有的变量 + 请求的 `env` 叠加（同名覆盖，Windows 不区分大小写）；凭据不在白名单里。
+- blob 放在 `<数据目录>/sessions/<会话 id>/blobs/`；会话 id 只允许 `[A-Za-z0-9._-]`，不能是 `.`、`..`。
 
 ## 不变量
 

@@ -1,6 +1,6 @@
 # piarc-host
 
-Core 侧的 Agent Host 监管：启动、握手、stdio 读写、背压、心跳、重启、调用对账、stderr 日志（架构第 7.5 节、ADR-0009）。只依赖 `piarc-protocol` 与 `piarc-ports`；进程经注入的 `ProcessSpawner` 启动，时间经注入的 `Clock`。生产装配在 `piarc-core::agent_host::start`（`piarc-exec` 的启动器 + 系统时钟）。不负责回答 Agent Host 的请求（注入的 `InboundHandler`），也不负责会话编排（T14）。
+Core 侧的 Agent Host 监管：启动、握手、stdio 读写、背压、心跳、重启、调用对账、stderr 日志（架构第 7.5 节、ADR-0009）。只依赖 `piarc-protocol` 与 `piarc-ports`；进程经注入的 `ProcessSpawner` 启动，时间经注入的 `Clock`。生产装配在 `piarc-core::agent_host::start`（`piarc-exec` 的启动器 + 系统时钟）。不负责回答 Agent Host 的请求（注入的 `InboundHandler`，T07 起由 `piarc-core::tool_io` 回答 `fs/*`、`exec/*`），也不负责会话编排（T14）。
 
 ## 命令
 
@@ -30,6 +30,11 @@ Core 侧的 Agent Host 监管：启动、握手、stdio 读写、背压、心跳
 - 连接结束时该 epoch 的在途调用变为 `Uncertain`，经 `HostEvent::Uncertain` 上报一次，从不重放；等待中的调用返回 `Error::Uncertain`（不可重试）。
 - 状态转换都在读取任务上按帧顺序发生；进程退出后先等读取读完 stdout（最多 2 s）再判定，已回复的调用不会被误标。
 - 超时（`Error::Timeout`）不改账本：迟到的回复照样记为终态。
+
+## 入站请求
+
+- 每个入站请求在独立任务里交给 `InboundHandler::handle(method, params, peer)`；`Peer` 绑定该连接的写队列，`notify::<M>()` 发出的通知与随后的响应同序写出（`exec/output` 先于 `exec/run` 的响应）。写队列满时 `notify` 等待，连接结束时返回 `PeerClosed`；`Peer::closed()` 在连接结束时完成。
+- Agent Host 的请求与会话通知共用 stdout：读取停在投递上时（许可用完），后面的请求也读不到，工具 I/O 随之等待（S4 第 10 节，I19）。
 
 ## 不变量
 

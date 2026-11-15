@@ -10,7 +10,8 @@
 | `cargo test -p piarc-testkit --test validation -- --nocapture` | 打印每条规则的 400 说明（验收证据用） |
 | `cargo run -q -p piarc-testkit --bin piarc-mock-provider -- --port 0 --scenarios packages/testkit/scenarios` | 手动起一个独立进程：第一行打印端口，回车或关闭 stdin 后退出 |
 | `npx vitest run packages/testkit` | pi-ai 对 mock 的两种线格式往返（会先 `cargo build` 这个 bin） |
-| `cargo test -p piarc-testkit --test agent_host -- --nocapture` | S3 与进程级 S9：`piarc-core::agent_host` 监管真实 Agent Host bundle（测试先运行 `node scripts/dev/build-agent-host.mjs`），mock 库形态应答；需要 PATH 上的 node（或 `PIARC_TEST_NODE`） |
+| `cargo test -p piarc-testkit --test agent_host -- --nocapture` | S3、S4 与进程级 S9：`piarc-core::agent_host` 监管真实 Agent Host bundle（测试先运行 `node scripts/dev/build-agent-host.mjs`），mock 库形态应答，Core 侧用真实 `ToolIo`；需要 PATH 上的 node（或 `PIARC_TEST_NODE`）。`parity.rs` 还需要 ripgrep 与 fd（`.tools/bin` 或 PATH） |
+| `cargo test -p piarc-testkit --test ahp_round_trip -- --nocapture` | T07-A10：`fs/read` 的 AHP 往返计时（独立测试二进制，计时期间不跑别的测试） |
 
 ## 两种运行形态
 
@@ -41,6 +42,10 @@
 - `tests/agent_host/harness.rs`：每个测试一个临时根目录（含空格与中文），`data/pi/models.json` 定义 provider `piarc-mock` 与 `mock-large`（200k）、`mock-small`（32k）两个模型。`mock-small` 的请求一律以请求头选择场景 `small-window`：压缩会替换首条 user 消息，消息里的场景标记随之消失。
 - 等待一律等事件或条件（`Recorder::until`、`turn_completed`），超时只作安全网。
 - 中断或杀进程的时点靠场景步骤的 `stall_after_events`；这类场景关闭 `role_order`（`docs/plan/PLAN.md` I18）。
+- Core 侧的 `Core` 处理者回答 `trust/get`，并把 `fs/*`、`exec/*` 交给真实的 `ToolIo`、记录每次调用（`calls_of`）。会话一律经 `open()` 打开：它在 `session/create` 之后把 cwd 登记为该会话的工作区根，否则工具请求会得到 `sessionNotFound`。
+- `tools.rs`（A01、A02、A04、A05）、`parity.rs`（A06，Pi 原生工具 vs 委托工具）与 `with_io_spy`（`NODE_OPTIONS` 预加载 `packages/testkit/src/io-spy.ts`）是 S4 的证据。spy 记录带时间戳，按场景窗口判定；会话创建时 Pi 的 `existsSync(cwd)` 是已知的唯一一次（I20）。
+- 工具的 I/O 要 Core 读 stdout 才能进行：让 Core 停读的测试（背压）不能等真实工具完成，用不存在的工具名制造通知。
+- `mock-vision` 模型接受图片输入，`tool_results_in` 把图片块写成 `[image <类型> <base64>]`。
 
 ## 易错点
 

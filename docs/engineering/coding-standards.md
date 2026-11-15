@@ -198,3 +198,11 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | Agent Host 端到端夹具 | `crates/piarc-testkit/tests/agent_host/harness.rs`（`Env`、`Recorder`、`bundle()`） | 打包并启动真实 Agent Host、临时工作区、mock 模型配置、事件记录与 `seq` 断言；T07、T14 的会话场景复用 | T06 |
 | Agent Host 出站与 Core 桥接 | `agent-host/src/protocol/outbound.ts`（`OutboundQueue`）、`agent-host/src/runtime/core-bridge.ts`（`CoreBridge`） | Agent Host 写 stdout 只经出站队列（背压、增量合并、写出时分配 `seq`）；向 Core 发请求只经桥接（统一超时、失败即拒绝） | T06 |
 | stdio MCP 测试夹具 | `packages/testkit/src/mcp-echo-server.ts` | 一个 `echo` 工具，结果带 server 名、工作目录与 pid，用来证明 MCP 调用到了哪个实例 | T06 |
+| 路径限定检查 | `piarc_fs::Scope`（`resolve`、`display`） | 会话的工作区根与 cwd；请求路径接到 cwd、按词法去掉 `.`/`..`、解析符号链接（含悬空链接）后必须在根内，否则 `OutsideWorkspace` 且不触碰目标；结果路径去掉 `\\?\` 前缀。所有按路径操作文件的 Core 代码先经它 | T07 |
+| 委托的工具 I/O | Core：`piarc_core::tool_io::ToolIo`（`open_session`、`dispatch`，实现 `InboundHandler`）；Agent Host：`agent-host/src/tools/core-io.ts`（`CoreIo`、`ExecOutputRouter`、`asFileError`） | Agent Host 的文件与命令 I/O 只经它们：`fs/*`、`exec/*` 的类型化请求、结果校验、Node 风格错误重建、`exec/output` 路由；新工具的 I/O 在这里加方法 | T07 |
+| 命令执行 | `piarc_exec::CommandRunner`（`CommandSpec`、`OutputChunk`、`CommandExit`） | bash 执行、stdout/stderr 流式读取（有界通道背压）、退出后的静默宽限、取消终止直接子进程；进程经注入的 `ProcessSpawner` 启动 | T07 |
+| 入站请求的通知回传 | `piarc_host::Peer`（`notify`、`closed`） | 入站处理者在回复前向 Agent Host 发通知，与响应同序；连接结束可感知 | T07 |
+| UTF-8 分段 | `piarc_protocol::text::incomplete_utf8_suffix` | 分段传输文本时不切断 UTF-8 序列（`fs/read` 的范围、`exec/output` 的流） | T07 |
+| 工具名映射 | `agent-host/src/tools/profile.ts`（`ToolNameMap`、`DEFAULT_PROFILE`、`profileWithOverrides`） | 模型可见名 ↔ 规范名双向查询；规则、hooks、事件、Core 一律用规范名，按模型家族调整的 Profile 在这里扩展 | T07 |
+| 在 Pi 工具代码上换掉路径 | `agent-host/src/tools/stand-in.ts`（`StandIn`、`serialized`） | 让 Pi 的工具定义在替身路径上运行、Operations 指向真实路径、结果换回原路径；同一文件的写入串行（ADR-0020） | T07 |
+| 行为对照与 I/O spy | `crates/piarc-testkit/tests/agent_host/parity.rs`；`harness.rs` 的 `with_io_spy`、`spy_report`、`offered_tools`、`tool_results_in`、`Core::calls_of`；`packages/testkit/src/io-spy.ts` | 同一脚本对比 Pi 原生工具与委托工具（结果与工作区快照，预期差异登记原因）；证明 Agent Host 不绕过 Core；读取 mock 请求中的工具列表与工具结果（含图片块） | T07 |

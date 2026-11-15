@@ -17,7 +17,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | 命令 | 用途 |
 |---|---|
 | `npm ci --ignore-scripts` | 按 lockfile 安装 npm 依赖（CI 同款） |
-| `node scripts/dev/install-tools.mjs` | 把锁定版本的 cargo-deny 装进 `.tools/`（不做全局安装）；verify 第 11 步需要它 |
+| `node scripts/dev/install-tools.mjs` | 把锁定版本的 cargo-deny、ripgrep、fd 装进 `.tools/`（不做全局安装）；verify 第 11 步需要 cargo-deny，Agent Host 行为对照测试（Pi 原生 grep/find）需要 ripgrep 与 fd |
 | `npm run verify` | 全部 13 项检查，结束时打印汇总表；开工与收尾各跑一次 |
 | `npm run gen:protocol` | 由 `piarc-protocol` 重新生成 `packages/protocol/schema/` 与 `src/generated/`；改了协议类型后运行并提交 |
 | `npm run build:agent-host` | esbuild 把 Agent Host 打成 `agent-host/dist/bundle/agent-host.mjs`（另写 `pi-assets/package.json`，运行时以 `PI_PACKAGE_DIR` 指向它） |
@@ -62,7 +62,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 ## 易错点
 
 - TypeScript 锁在 6.0.x：typescript-eslint 8.x 只支持 `<6.1`，升级 TypeScript 前先确认它的支持范围。
-- cargo-deny 在 `.tools/bin/`，不在 PATH；`npm run verify` 会先找这里。新机器先运行 `node scripts/dev/install-tools.mjs`。
+- cargo-deny 在 `.tools/bin/`，不在 PATH；`npm run verify` 会先找这里。新机器先运行 `node scripts/dev/install-tools.mjs`（首次要编译 ripgrep 与 fd，几分钟）。
 - `rust-toolchain.toml` 锁定 1.99.1；cargo 命令会自动使用它。
 - 在 `.mjs` 脚本里，JSDoc 类型断言对 ESLint 不可见，`JSON.parse` 的结果会触发 `no-unsafe-*`。用 `scripts/lib/repo.mjs` 的 `readJsonFile` 与 `isRecord` 收窄。
 - Windows 上不要用 shell 调 npm 命令：用 `resolveBin` 解析入口后以 `node` 运行。
@@ -73,3 +73,4 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - 反过来，`cargo test`（`piarc-testkit` 的 `agent_host` 测试）会用 PATH 上的 node 运行 `scripts/dev/build-agent-host.mjs` 打包 Agent Host，需要先 `npm ci --ignore-scripts`。
 - Pi 锁定 1.5.2（`@earendil-works/*` 全部同版本，`agent-host` 与 `packages/testkit` 一起升级）；Pi 的 API 以 `node_modules` 中的类型声明或 `reference/pi` 的同一 tag 为准，基线差异见 `docs/research/pi-v1.4.0-baseline.md` 文末。
 - L4 的 `dev` 形态跑上次打包生成的 `apps/desktop/.vite/`：改了 `apps/desktop/src/` 后先重新 `npm run package:desktop -- --flavor development`。
+- Agent Host 的工具不碰文件系统与子进程：`agent-host/src/tools/`、`src/harness/` 禁止导入 `fs`、`child_process`，I/O 一律经 AHP `fs/*`、`exec/*` 由 Core 执行（ADR-0004、ADR-0020）；端到端测试的 I/O spy 会抓到绕过。

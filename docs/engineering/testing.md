@@ -242,8 +242,15 @@ Agent Host 有三层测试（T06 建立）：
 |---|---|---|---|
 | TS 单元 | `agent-host/src/**/*.test.ts` | `npx vitest run agent-host` | 出站队列（背压、增量合并、`seq`）、投影（含代理项处理）、Core 桥接（超时、断开、错误响应） |
 | 监管器故障注入 | `crates/piarc-host/tests/` | `cargo test -p piarc-host` | 脚本化的假 Agent Host 经内存管道运行（`tests/support`），时钟只在 sleep 时前进；覆盖握手、帧错误、挂死、背压、写队列满、连续崩溃、对账、日志 |
-| 端到端 | `crates/piarc-testkit/tests/agent_host/` | `cargo test -p piarc-testkit --test agent_host -- --nocapture` | `piarc-core::agent_host` 监管真实 bundle，mock provider 应答；多会话隔离、中断、压缩、MCP、杀进程恢复、慢读者 |
+| 端到端 | `crates/piarc-testkit/tests/agent_host/` | `cargo test -p piarc-testkit --test agent_host -- --nocapture` | `piarc-core::agent_host` 监管真实 bundle，mock provider 应答，Core 侧用真实 `ToolIo`；多会话隔离、中断、压缩、MCP、杀进程恢复、慢读者；规范名工具、Tool Profile 改名、I/O spy、与 Pi 原生工具的行为对照（T07） |
+| AHP 往返计时 | `crates/piarc-testkit/tests/ahp_round_trip.rs` | `cargo test -p piarc-testkit --test ahp_round_trip -- --nocapture` | 最小 Node 客户端代替 Agent Host，计时 2,000 次小文件 `fs/read`（架构第 11 章预算 p95 ≤ 5 ms）；独立测试二进制，计时期间不跑别的测试 |
 
 - 端到端测试先用 PATH 上的 node（或 `PIARC_TEST_NODE`）运行 `scripts/dev/build-agent-host.mjs`，再启动 bundle；环境只给 `PI_OFFLINE=1` 等测试需要的变量，不访问网络。
 - 需要在模型流的确定位置中断或杀进程时，用场景步骤的 `stall_after_events`（第 10.3 节），等对应的 `item/agentMessage/delta` 到达后再动作。
 - 等待一律等事件或条件，超时只作安全网（`harness::WAIT`、`support::EVENT_WAIT`）。
+
+### 11.1 委托工具的证据（T07）
+
+- **零直接调用**：`harness::with_io_spy` 经 `NODE_OPTIONS=--import` 把 `packages/testkit/src/io-spy.ts` 预加载进 Agent Host，包装 `fs`、`fs/promises`、`child_process` 的全部函数；记录带时间戳，测试按场景窗口（提示词发出到回合结束）断言对工作区路径的 `fs` 调用与 `child_process` 调用为 0。新增工具或升级 Pi 时，把它们加进 `tools.rs` 的全工具场景。
+- **行为对照**：`parity.rs` 用同一份脚本在 `--pi-native-tools` 的 Agent Host 与委托工具的 Agent Host 中各跑一遍，比较模型收到的工具结果（`harness::tool_results_in`，工作区路径替换为 `<WS>`）与运行后的工作区快照。有意差异登记在 `EXPECTED_DIFFERENCES` 并写明原因，差异消失或出现新差异都会失败。Pi 原生 grep、find 需要 ripgrep 与 fd：`node scripts/dev/install-tools.mjs` 装进 `.tools/bin`，测试优先用那里的。
+- **Core 侧记录**：harness 的 `Core` 处理者记录每个 `fs/*`、`exec/*` 请求的方法、`origin.tool`、请求路径与解析后的路径（`calls_of`），用于断言工具到 AHP 方法的对应与会话隔离。

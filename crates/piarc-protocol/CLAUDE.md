@@ -12,7 +12,7 @@ AHP 与 Core API 数据类型的唯一来源：Rust 类型 → JSON Schema → `
 
 ## 新增协议消息
 
-1. 定义参数与结果类型（`#[serde(rename_all = "camelCase")]`，派生 `Serialize`、`Deserialize`、`JsonSchema`）和方法标记（实现 `Method` 加 `RequestMethod` 或 `NotificationMethod`）。
+1. 定义参数与结果类型（`#[serde(rename_all = "camelCase")]`，派生 `Serialize`、`Deserialize`、`JsonSchema`）和方法标记（请求方法用 `method::request!`，通知实现 `Method` 加 `NotificationMethod`）。可选成员用 `Option` 加 `skip_serializing_if`，布尔与数组也一样：`default` 加省略 `false`/`[]` 会让样本往返不等。
 2. 在 `src/contract.rs` 的 `CONTRACTS` 中登记：请求方法登记请求与成功响应两个契约，通知登记一个。成功响应的契约名是 `<方法>/result`（样本在请求目录下的 `result/`）；`host/hello` 的 `core/welcome` 是 T02 留下的唯一例外。
 3. `npm run gen:protocol`，再在 `tests/contracts/<契约名>/` 加合法样本、在 `invalid/` 加反例。
 4. 完整步骤与检查见 `docs/engineering/testing.md` 第 7 节。
@@ -31,6 +31,7 @@ AHP 与 Core API 数据类型的唯一来源：Rust 类型 → JSON Schema → `
 
 - `Option` 字段在 serde 中缺失即 `None`、在 schemars 中非必填；"必须出现但可为 null" 要 `#[serde(deserialize_with = "Option::deserialize")]` 加自定义 schema（见 `ErrorResponse::id`）。`Value` 字段缺失会被当成 `null`，必填时同样加 `deserialize_with`。
 - `result` 与 `error` 互斥：响应类型手写 `Deserialize` 先检查成员，schema 用 `"error": false` 表示禁止出现（不用 `not.required`，ajv strict 模式会拒绝）。
+- schemars 给 `i32` 输出 `format: "int32"`：TS 契约测试的 ajv 要注册它（`packages/protocol/src/contracts.test.ts`）。
 - 帧解码按 serde_json 的规则：嵌套超过 `MAX_NESTING`（127）层、孤立代理项转义（`"\ud800"`）、UTF-8 BOM 都是非法 JSON。TS 解码器做了同样的检查；改这里的行为要同步 `packages/protocol/src/framing.ts` 与 `tests/contracts/framing/` 的共享用例。
 
 ## 参考

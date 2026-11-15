@@ -16,7 +16,7 @@ M0 用代码验证架构中依赖运行时行为、读文档无法确认的假�
 | S1 | 渲染进程 transcript 与 composer：流式、滚动、选择、输入法 | 未开始（T09） | 未开始（W0） | — |
 | S2 | NAPI-RS Core 接入主进程：事件吞吐、事件循环延迟、四个目标 | 通过（T04：吞吐、延迟、同步调用、大批次、darwin 两个目标加载通过；大批次按 ADR-0019 复制转发；空闲内存预算待 R1 校准，I12） | 待 CI 结果与 W0（`core-load` 作业已配置；实机基准与 win32-arm64 实机加载留给 W0） | [S02-napi-event-channel.md](S02-napi-event-channel.md) |
 | S3 | Agent Host 同进程多会话互不串扰 | 通过（T06：工具副作用、中断、压缩、MCP 均按会话隔离；中断后的对话形态待 T14（I18），MCP 共享池待 T36） | 待 CI 结果（同一组测试在 `verify` 中运行） | [S03-multi-session.md](S03-multi-session.md) |
-| S4 | Operations 委托与规范名工具 | 未开始（T07） | 未开始（CI） | — |
+| S4 | Operations 委托与规范名工具 | 通过（T07：六个规范名工具的 I/O 全部经 Core，场景期间 Agent Host 零直接调用，17 个对照场景 16 个一致、1 个有意差异，`fs/read` 往返 p95 约 0.2 ms；read/write/edit 用替身路径、grep 自写，见 ADR-0020） | 待 CI 结果（同一组测试在 `verify` 中运行，未取得时由 W0 核对） | [S04-operations-delegation.md](S04-operations-delegation.md) |
 | S5 | 凭据保险箱与 Pi 凭据接口适配 | 未开始（T08） | 未开始（W0） | — |
 | S6 | 未签名打包、首次运行、内置 Node 与发布清单 | 未开始（T12） | 未开始（W0） | — |
 | S7 | 终端：libghostty-vt、PTY、帧协议、渲染器 | 未开始（T10） | 未开始（W0） | — |

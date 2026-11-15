@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.9（2026-11-15） |
+| 版本 | 2.10（2026-11-15） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -234,6 +234,7 @@ PiArc/
 | [0013](../adr/0013-electron-desktop-client.md) | Electron + React 客户端，三层结构不变，macOS 与 Windows 同一代码库 | 双平台同步推进；Pi 本来就要带 JS 运行时；消除原生富文本渲染风险 |
 | [0002](../adr/0002-pi-integration-via-sdk-host.md) | 基于 Pi SDK 自研 Agent Host | 官方 RPC 缺多会话、版本握手、结构化审批；SDK 让上游不兼容变更在编译期暴露 |
 | [0004](../adr/0004-harness-control-plane-in-core.md) | 策略在 Core、循环在 Pi、I/O 下沉 Core | 安全边界不能落在无隔离的扩展上；快照与沙箱需要统一入口 |
+| [0020](../adr/0020-tool-layer-composition.md) | 工具层：Pi 的工具代码加 Core 的 I/O（read/write/edit 用替身路径，bash/find 用 Operations，grep 自写） | Pi 1.5.2 的 Operations 不覆盖路径探测与 ripgrep；保留 Pi 的工具逻辑又做到零绕过 |
 | [0005](../adr/0005-claude-code-config-compatibility.md) | 只读兼容 Claude Code 配置 | 用户零成本迁移，又不污染其 Claude Code 配置 |
 | [0006](../adr/0006-compliance-and-clean-room.md) | 禁用 Claude 订阅登录、clean-room、自有品牌 | 不把商业模式建在违反条款的基础上 |
 | [0009](../adr/0009-agent-host-protocol.md) | 自有协议 AHP | 双向请求、版本握手、事件回放、调用对账 |
@@ -393,6 +394,7 @@ PiArc.app/Contents/
 - **规范名采用 Claude Code 的工具名**：`Read`、`Write`、`Edit`、`Bash`、`PowerShell`（仅 Windows）、`Glob`、`Grep`、`WebFetch`、`WebSearch`、`Agent`、`TodoWrite`、`AskUserQuestion`、`EnterPlanMode`、`ExitPlanMode`、`Skill`、`ToolSearch`、`NotebookEdit`、`KillShell`、`Monitor`，MCP 工具为 `mcp__<server>__<tool>`。权限规则、hooks matcher、子 agent 的 `tools` 列表一律使用规范名，这样用户现有的 Claude Code 配置可以直接生效。
 - **Tool Profile** 决定某个模型看到的工具名、描述和参数风格。默认 Profile 直接使用规范名；针对特定模型家族可以调整描述文字或参数命名，但规则与 hooks 始终按规范名匹配。Agent Host 维护"模型可见名 ↔ 规范名"映射表。
 - 实现方式：用 Pi 的 `createReadTool/createEditTool/createWriteTool/createBashTool/...` 加 Operations 委托（6.1.3）创建内置工具，再包装成规范名与 PiArc 自写的描述。Pi 内置工具重命名的可行性在 M0 验证。
+- T07 落地（S4，ADR-0020）：工具层在 `agent-host/src/tools/`。六个规范名工具 Read、Write、Edit、Bash、Glob、Grep 以 `customTools` 注册，会话以 `noTools: "builtin"` 加 `excludeTools` 排除 Pi 的 read、bash、powershell、edit、write、grep、find、ls；参数 schema 沿用 Pi 的。默认 Profile（`profile.ts`）给出名称、描述与 system prompt 中的工具摘要与指引；`ToolNameMap` 双向映射模型可见名与规范名（未知名原样返回，拒绝重名与 Pi 原生名），投影器发出的 `item/*` 与发往 Core 的 `origin.tool` 都用规范名。`--tool-profile <json>` 只供测试覆盖名称与描述，按模型家族选择 Profile 留待 T21、T29。
 
 #### 6.1.2 工具语义不变量
 
@@ -407,7 +409,7 @@ PiArc.app/Contents/
 | 结构化 diff | 每次文件变更产生真实的 unified diff 和 hunk 结构，供 UI 审阅和快照索引。 |
 | 输出截断 | 超长输出写入会话临时目录，模型收到头尾预览和文件路径（阈值见 6.11）。 |
 | 路径边界 | 默认只允许读写工作区与已添加目录；越界访问走权限询问。受保护路径（`.git/`、`.piarc/`、`.claude/`、`.pi/`、shell 配置文件）的写入在 Manual 与 Accept edits 模式下始终询问。 |
-| 并发 | 只读工具可以并发；写同一文件的操作经 Pi 的 `withFileMutationQueue` 串行；预检（含审批）串行。 |
+| 并发 | 只读工具可以并发；写同一文件的操作串行（Write 与 Edit 用 Harness Kit 的队列，键为词法绝对路径、Windows 不区分大小写；Pi 的 `withFileMutationQueue` 在替身路径上排队，不再承担这项职责，ADR-0020）；预检（含审批）串行。 |
 | 中断 | 中断时为所有未完成的工具调用补齐"已中断"结果，保证 tool_use / tool_result 配对完整。 |
 
 #### 6.1.3 Operations 委托
@@ -419,6 +421,19 @@ PiArc.app/Contents/
 | `EditOperations` | `fs/read` + `fs/write` | 同上，并校验先读后改 |
 | `BashOperations.exec` | `exec/run`（流式输出经通知回传） | 沙箱、进程组管理、超时转后台、语义退出码、审计 |
 | `GrepOperations` / `FindOperations` / `LsOperations` | `fs/grep`、`fs/glob`、`fs/list` | 在 Core 中用 ripgrep 的 Rust 库（`grep-searcher`、`ignore`）实现，遵守 .gitignore |
+
+T07 实测（S4，ADR-0020）：Pi 1.5.2 的 Operations 覆盖 bash、find（给了自定义 `glob`）与 ls 的全部 I/O；read 在 Operations 之外用 `fs.access` 探测路径及其 macOS 拼写变体，write、edit 用 `realpath` 求变更队列的键，grep 总是直接运行 ripgrep。因此：
+
+| 规范名 | 实现 | AHP 方法 |
+|---|---|---|
+| Read | Pi 的 read 定义运行在**替身路径**上（系统临时目录下从不创建的路径，Pi 的探测落在那里），每个 Operation 由 Core 对真实路径执行；拼写变体由 `fs/stat` 逐个确认 | `fs/stat`（带图片嗅探）、`fs/read` |
+| Write | Pi 的 write 定义，替身路径 | `fs/mkdir`、`fs/write` |
+| Edit | Pi 的 edit 定义，替身路径 | `fs/stat`、`fs/read`、`fs/write` |
+| Bash | Pi 的 bash 工厂 + `BashOperations` | `exec/run`、`exec/output`、`exec/kill` |
+| Glob | Pi 的 find 工厂 + `FindOperations` | `fs/stat`、`fs/glob` |
+| Grep | PiArc 自写，沿用 Pi 的参数与输出格式 | `fs/grep` |
+
+结果与错误中的替身路径换回模型写的路径，Core 的错误码重建为 Node 风格的错误，模型看到的文字与 Pi 原生相同（行为对照见 S4 第 7 节）。`agent-host/src/tools/` 与 `agent-host/src/harness/` 禁止导入 `fs`、`child_process`（ESLint）；图片等二进制内容按 ADR-0009 第 8 条由 Core 复制为会话 blob、AHP 只传路径与哈希，这是 Agent Host 用自己的 `fs` 读取的唯一文件（`runtime/blobs.ts`，限定在数据目录的 `sessions/` 下）。路径限定见 7.4 的 T07 一段。
 
 #### 6.1.4 第一版工具清单
 
@@ -776,6 +791,8 @@ crates/
 `turn/started`、`turn/retrying`、`turn/completed`、`item/started`、`item/delta`、`item/updated`、`item/completed`、`session/queueChanged`、`session/usage`、`session/stateChanged`、`harness/todo`、`harness/plan`、`subagent/*`、`mcp/statusChanged`、`log`。
 
 每条会话通知带 `{sessionId, seq, ts}`；Core 发现 `seq` 缺口时用 `session/getEntries(since)` 补齐。Agent Host 重启后，Core 在 `session/resume` 中带上它收到的最大 `seq`（`lastSeq`），新进程从下一个数继续编号，同一会话的 `seq` 跨重启保持递增。
+
+T07 已实现的方法（Agent Host → Core，`piarc-core::tool_io::ToolIo` 应答）：`fs/stat`、`fs/read`、`fs/write`、`fs/mkdir`、`fs/list`、`fs/glob`、`fs/grep`、`exec/run`、`exec/kill`，以及 Core → Agent Host 的通知 `exec/output`（`{ requestId, stream, seq, data }`，按流解 UTF-8、不切断序列，全部写在 `exec/run` 的响应之前）。每个请求带 `sessionId` 与可选的 `origin { tool, toolCallId }`（规范名）；Core 按该会话登记的工作区根与 cwd 解析路径：接到 cwd 上、按词法去掉 `.` 与 `..`、解析存在部分的符号链接（悬空链接按目标继续），结果不在根内时返回 `outsideWorkspace`，不触碰目标（T16 改为询问）。文本以 ≤ 1 MiB 的范围内联（`fs/read` 的 `offset`/`length`，`fs/write` 的 `append`），二进制以 blob 引用（`<数据目录>/sessions/<会话 id>/blobs/<sha256>`）。`exec/run` 用 bash（Unix `/bin/bash`，Windows Git Bash）在会话 cwd 执行，环境为 Core 的白名单环境加请求的 `env` 叠加；`exec/kill` 按 `requestId` 终止直接子进程，连接断开时同样终止（进程树、超时与转后台为 T17）。新增错误类别：`notFound`、`outsideWorkspace`、`ioError`（`details.code` 为 POSIX 风格的错误码）。入站处理者经 `piarc-host` 的 `Peer` 在同一连接上发通知。
 
 T06 已实现的方法：Core → Agent Host 的 `host/ping`（结果附带 Agent Host 的 RSS 与出站队列计数）、`host/shutdown`、`session/create`、`session/resume`、`session/prompt`（结果只确认回合已开始，回合结束以 `turn/completed` 为准；`requestId` 是幂等键）、`session/abort`、`session/close`；Agent Host → Core 的 `trust/get`；通知 `turn/started`、`turn/completed`、`item/started`、`item/completed`、`item/agentMessage/delta`。新增的错误类别：`timeout`、`uncertain`、`hostUnavailable`（后两者只用于 Core API）、`sessionNotFound`、`sessionBusy`。请求方法的成功响应契约名为 `<方法>/result`。
 
@@ -1374,6 +1391,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 |---|---|---|
 | 1.0 | 2026-11-14 | 首版：基于对 Claude 官方文档、Pi v1.4.0 源码、claude-code / claw-code / OpenClaudeDesktop / open-claude-ui 参考实现与原生技术栈的调研 |
 | 2.8 | 2026-11-15 | T05 补充：12.2 写明严格 mock provider 的实现位置、运行形态、场景选择与 400 错误体约定，细节指向 `testing.md` 第 10 节 |
+| 2.10 | 2026-11-15 | T07 补充（ADR-0020）：第 4 章加入 ADR-0020；6.1.1 写明工具层位置、默认 Profile、名称映射与 Pi 原生工具的排除；6.1.2"并发"一行改为由 Harness Kit 的队列串行写入；6.1.3 写明 Pi 1.5.2 的 Operations 覆盖实测与六个工具的实现方式（替身路径、Operations、自写 Grep）；7.4 写明 `fs/*`、`exec/*` 与 `exec/output` 的约定、路径限定规则、内容传输方式与三个新错误类别 |
 | 2.9 | 2026-11-15 | T06 补充：Pi 锁定 1.5.2；5.2 写明 Agent Host 的实际文件结构；5.3 写明会话注册表、最小投影、代理项处理、出站队列与 `seq` 的分配；5.5 写明信任经 `trust/get`、`PI_CODING_AGENT_DIR` 的固定、内存凭据与关闭上下文文件；5.6 写明 bundle 产物与外部依赖；7.1 `piarc-ports` 定义 `ProcessSpawner`、`Clock`；7.4 写明已实现的方法、`session/resume` 的 `lastSeq`、新增错误类别与响应契约命名；7.5 写明监管器的启动环境、背压方式（写队列满返回 `busy`）、心跳判定、重启与对账细节 |
 | 2.7 | 2026-11-15 | ADR-0019 接受：8.3 第 5 条改为事件批次一律以二进制载荷复制转发（Electron 主进程不能转移 `ArrayBuffer`），7.6 与第 14 章 R6 同步；第 4 章加入 ADR-0019 |
 | 2.6 | 2026-11-14 | T04 补充：7.2 写明 Core 的有序关闭顺序、任务 panic 转错误事件、事件合并的刷出规则与背压策略（不丢事件）；7.6 写明已实现的导出面、批次形状与路由键语法、跨 NAPI 的错误形状与 `shuttingDown`、`busy` 两个错误类别、Promise 的结算方式与 `.d.ts` 快照位置；13.2 写明 `.node` 的命名与打包位置 |

@@ -15,6 +15,7 @@
 - API 实现从 pi-ai 的公开子路径导出 `@earendil-works/pi-ai/api/<api>.lazy` 取得（主入口不导出它们），不深度导入 `dist/`。
 - 场景文件在 `scenarios/`，一个文件一个场景，格式见 testing.md 第 10.3 节。
 - `src/mcp-echo-server.ts` 是 stdio MCP 测试夹具（S3 用），由 Node 直接运行（类型剥离，只能用可擦除的 TS 语法，只导入 Node 内置模块）：`node src/mcp-echo-server.ts <server 名>`。
+- 同样由 Node 直接运行的还有：`src/io-spy.ts`（T07-A02：经 `NODE_OPTIONS=--import=<file URL>` 预加载，记录对 `PIARC_IO_SPY_ROOTS` 下路径的 `fs` 调用与全部 `child_process` 调用，退出时写 `PIARC_IO_SPY_REPORT`）与 `src/ahp-fs-read-client.ts`（T07-A10：代替 Agent Host 计时 `fs/read` 往返）。Rust 端测试在 `crates/piarc-testkit/tests/` 中使用它们。
 
 ## 易错点
 

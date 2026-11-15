@@ -1,15 +1,15 @@
 # @piarc/agent-host
 
-Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会话，经 stdin/stdout 上的 AHP 与 Core 通信（架构第 5 章、ADR-0002、ADR-0010）。不负责权限裁决、hooks 执行、快照、沙箱、凭据持久化（都在 Core）；监管它的是 `crates/piarc-host`。
+Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会话，经 stdin/stdout 上的 AHP 与 Core 通信（架构第 5 章、ADR-0002、ADR-0010）。工具的文件与命令 I/O 全部委托给 Core（ADR-0004、ADR-0020）。不负责权限裁决、hooks 执行、快照、沙箱、凭据持久化（都在 Core）；监管它的是 `crates/piarc-host`。
 
 ## 命令
 
 | 命令 | 用途 |
 |---|---|
 | `npm run build:agent-host` | esbuild 打包到 `agent-host/dist/bundle/agent-host.mjs`，并写 `pi-assets/package.json`；`@piarc/protocol` 从源码打包，不依赖 `tsc` 产物 |
-| `npx vitest run agent-host` | 单元测试：出站队列、投影、Core 桥接 |
-| `cargo test -p piarc-testkit --test agent_host -- --nocapture` | 端到端：Core 监管真实 bundle、mock provider 应答（S3 与进程级 S9）；测试会先自己打包 |
-| `node agent-host/dist/bundle/agent-host.mjs --data-dir <dir>` | 手动运行；需设 `PI_PACKAGE_DIR=<bundle>/pi-assets`，stdout 只走 AHP 帧 |
+| `npx vitest run agent-host` | 单元测试：出站队列、投影、Core 桥接、工具层（名称映射、路径、替身、Core I/O） |
+| `cargo test -p piarc-testkit --test agent_host -- --nocapture` | 端到端：Core 监管真实 bundle、mock provider 应答（S3、S4 与进程级 S9）；测试会先自己打包 |
+| `node agent-host/dist/bundle/agent-host.mjs --data-dir <dir>` | 手动运行；需设 `PI_PACKAGE_DIR=<bundle>/pi-assets`，stdout 只走 AHP 帧。`--tool-profile <json>` 覆盖默认 Profile 的名称与描述、`--pi-native-tools` 换回 Pi 原生工具，都只给测试用，Core 不传 |
 
 ## 入口与结构
 
@@ -19,6 +19,8 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - `src/runtime/projector.ts`：投影入口，Pi 的 `AgentSessionEvent` → `turn/*`、`item/*`。
 - `src/runtime/core-bridge.ts`：向 Core 发请求的唯一入口（统一超时，默认 30 s；`timeoutMs: null` 给等待用户的请求，靠 `signal` 取消）。
 - `src/protocol/outbound.ts`：写 stdout 的唯一路径：等 `drain`、合并增量、写出时分配 `seq`。
+- `src/tools/`：工具层（架构第 6.1 节、ADR-0020）。`profile.ts` 规范名、默认 Profile（描述原创，ADR-0006）与 `ToolNameMap`；`core-io.ts` 经 Core 桥接发 `fs/*`、`exec/*`（结果在此校验，错误重建为 Node 风格）；`read.ts`、`write.ts`、`edit.ts` 在替身路径（`stand-in.ts`）上运行 Pi 的工具定义；`bash.ts`、`glob.ts` 用 Pi 工厂加 Operations；`grep.ts` 自写；`ls.ts` 只提供 `LsOperations`，不暴露。
+- `src/runtime/blobs.ts`：读取 Core 交出的 blob（图片），只接受数据目录 `sessions/` 下的路径。
 
 ## 打包的外部依赖
 
@@ -36,6 +38,9 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - `session/prompt` 先回复再开始回合（`setImmediate`），Core 总是先拿到 `turnId`。`requestId` 是幂等键。
 - 只从 `@earendil-works/*` 的包入口或 `exports` 声明的子路径导入（ESLint 检查）；Pi 的 API 以锁定版本的类型声明为准。
 - 凭据只在内存（`InMemoryCredentialStore`），`pi/` 下不写 `auth.json`；T08 接入保险箱。
+- `src/tools/`、`src/harness/` 不导入 `fs`、`fs/promises`、`child_process`（ESLint，含动态导入与 `require`）：文件与命令只经 `CoreIo`。新工具的 I/O 加在 `CoreIo` 上，不在工具里绕开。
+- 模型可见名只出现在发给模型的工具定义里；投影的 `item/*`、发往 Core 的 `origin.tool`、规则与 hooks 都用规范名（`ToolNameMap`）。Profile 不能用 Pi 原生工具名（会话把它们排除了）。
+- Read、Write、Edit 交给 Pi 的 `path` 是替身：结果与错误里的替身必须换回模型写的路径（`StandIn.restore`/`restoreError`）；Pi 新增对传入路径的 Operation 时，`StandIn.resolve` 抛出"unexpected path"。
 
 ## 多会话的易错点
 
@@ -49,7 +54,15 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - 扩展加载器的模块级缓存按 cwd 失效，不同 cwd 的会话交替加载文件型扩展会互相清空它；Harness Kit 用内联工厂不受影响。
 - 中断后的下一次请求里 Pi 丢弃被中断的 assistant 消息，出现相邻的 user 消息（`docs/plan/PLAN.md` I18）。
 
+## 工具层的易错点
+
+- Pi 1.5.2 的 read 在 Operations 之外 `access` 路径、write 与 edit 对路径 `realpath`、grep 自己跑 ripgrep（S4 第 2 节）。升级 Pi 后先跑端到端测试：I/O spy（场景期间对工作区路径零 `fs`、零 `child_process`）与行为对照会发现新的绕过与行为变化。
+- Pi 的 `withFileMutationQueue` 按替身排队，不起串行作用；Write、Edit 用 `stand-in.ts` 的 `serialized`。
+- 工具 I/O 与会话通知走同一个 stdout：Core 停止读取（事件消费者停住）时工具也等着，这是背压，不是死锁（I19）。
+- 文本写入按 256 Ki 个 UTF-16 码元分段（`fs/write` 的 `append`），不能在代理对中间切；读取按 Core 返回的 `bytesRead` 续读。
+- 委托的 Bash 不读 Pi 设置的 `shellPath`、`shellCommandPrefix`，Read 不读 `images.autoResize`（I21）；命令环境是 Core 的白名单环境加 Pi 的会话变量，看不到 Agent Host 自己的 `PI_*` 内部变量。
+
 ## 参考
 
 - 架构第 5 章、第 7.4–7.5 节；ADR-0002、ADR-0009、ADR-0010、ADR-0015。
-- `docs/research/pi-v1.4.0-baseline.md` 文末"版本差异：v1.5.2"；`docs/spikes/S03-multi-session.md`、`S09-ahp-resilience.md`。
+- `docs/research/pi-v1.4.0-baseline.md` 文末"版本差异：v1.5.2"；`docs/spikes/S03-multi-session.md`、`S04-operations-delegation.md`、`S09-ahp-resilience.md`；ADR-0020。
