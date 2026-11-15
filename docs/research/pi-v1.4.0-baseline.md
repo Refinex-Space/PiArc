@@ -1,4 +1,6 @@
 > 本文是 2026-11-14 的调研快照，由调研过程整理而成，引用时注意时效。内容基于 Pi v1.4.0（commit 4a080252f06c）源码，文件:行号均指向该版本，升级 Pi 后需要复核。重要事实在用于设计或实现前，请回到原始来源重新核对。
+>
+> **PiArc 锁定的版本是 v1.5.2**（T06，2026-11-15）。第 0–11 节保留 v1.4.0 的原文与行号；v1.5.2 与它的差异、以及 T06 按 v1.5.2 源码复核的事实，见文末"版本差异：v1.5.2"一节，两者冲突时以该节为准。
 
 # Pi v1.4.0 底座调研报告（PiArc）
 
@@ -624,3 +626,48 @@ PiArc 如果把"Claude Pro/Max 订阅登录"做成卖点，直接依赖的就是
 - 第 2 节（pi-ai）、第 5 节（chord）、第 6–7 节（durable、env、mcp、codemode）的行号证据来自子代理读码。
 - 我逐项复核过的：Anthropic OAuth 伪装、MCP 协议版本、`autoEnableCodemode`、codemode `defaultActive:false`、pi.dev catalog URL 和刷新间隔、chord `PROTOCOL_VERSION=4`、coding-agent 删除 chord 依赖、durable 的 Experimental 标注。
 - 其余行号没有逐条复核，可能有 ±几行的偏差。
+
+---
+
+## 版本差异：v1.5.2
+
+T06 锁定 Pi v1.5.2（npm 2026-11-10 发布，`latest` 标签，`reference/pi` 检出 tag `v1.5.2`，commit `b4afdddf44e0`）。差异写在本文末尾，而不是另起 `pi-v1.5.2-baseline.md`：架构第 5.7 节的升级流程以本文为基线文档，v1.4.0 → v1.5.2 只有两个次版本，第 0–11 节的结构与结论仍然成立，单独成文会让两份文档长期重复。本节的 `文件:行号` 指向 v1.5.2，路径相对 `reference/pi/packages/`。
+
+### 锁定方式
+
+- `agent-host/package.json` 精确锁定 `@earendil-works/pi-coding-agent`、`pi-ai`、`pi-agent-core`、`pi-mcp` 为 `1.5.2`；`packages/testkit` 的 `pi-ai` 已是 `1.5.2`（T05）。传递依赖 `pi-tui`、`pi-codemode`、`pi-schema`、`pi-telemetry` 由 coding-agent 精确依赖，lockfile 中全部为 `1.5.2`（`npm ls --all` 核对，无第二个版本）。
+- `pi-schema` 是 v1.5.0 起的新包：pi-ai 与 agent-core 用它校验工具参数。
+
+### 各包 Breaking Changes 对 PiArc 的影响
+
+| 版本 | 包 | 变化 | 对 PiArc 的影响 |
+|---|---|---|---|
+| 1.5.0 | pi-ai、agent-core | 主入口不再导出 TypeBox（`Type`、`Static`、`TSchema`），`typebox` 不再是依赖；`Tool.parameters`、`AgentTool.parameters` 接受任意 JSON Schema；工具参数统一由 pi-schema 校验并做类型强制转换（MCP 工具也一样），校验失败的文字改为 pi-schema 的格式（`- path: missing`） | Harness Kit 与 T07 的规范名工具用 pi-schema 的构造器或直接从 `typebox` 导入定义参数；L3 对齐（T30）比较工具错误文本时要按新格式；`Type.Refine()`、codec 等 TypeBox 专有特性不再生效，不能依赖它们做参数约束 |
+| 1.5.0 | coding-agent | 工具参数校验改用 pi-schema（同上）；"Tightened system prompt" | PiArc 自写 preamble（第 4.2 节），只影响 L3 抽样基线 |
+| 1.5.1 | coding-agent | 自定义 `GrepOperations.readFile` 不再用于上下文行：grep 直接取 ripgrep 的上下文输出，不再自己读文件 | T07 的 Operations 委托不能只替换 `readFile`：grep 要整体委托（覆盖工具的 `execute()`，或注册同名工具），否则上下文行绕过 Core |
+| 1.5.1 | pi-ai、coding-agent | `openai-completions` 在没有工具但历史中有工具调用时省略 `"tools": []` | mock provider 不要求 `tools` 字段，无影响；对接要求该字段的旧代理时用 `compat.requiresToolsWithToolHistory` |
+| 1.5.0 | pi-ai | `appendGrammarToolInputJsonDelta()` 签名变化 | PiArc 不使用，无影响 |
+
+agent-core 1.5.1–1.5.2、pi-mcp 1.5.0–1.5.2 没有 Breaking Changes。
+
+### 非破坏性但需要注意的变化
+
+- **Anthropic message threads**（pi-ai 1.5.1）：带 `sessionId` 的请求只发新增消息、由服务端接续上文。默认只对 `api.anthropic.com` 上的 `anthropic` provider 开启，自定义端点不受影响；会话结束要调用 `cleanupSessionResources(sessionId)`，`AgentSession.dispose()` 已经调用（`coding-agent/src/core/agent-session.ts:1477-1498`）。
+- **`cacheWarming` 默认改为 `"idle"`**（coding-agent 1.5.1）：会话空闲时最多 30 分钟内自动发请求保温提示缓存，会产生费用。模型配置了 `promptCache` 才会保温。PiArc 生成 `pi/settings.json` 时要显式决定该值（登记事项 I16）。
+- **pi-mcp 新增可复用部件**（1.5.1）：`createMcpToolName()`、`validateMcpServerConfig()`、`limitMcpContent()`、OAuth 两段式登录（`@earendil-works/pi-mcp/oauth`）与 `PipeTransport`。T36 的共享连接池可以直接用它们。
+- **pi-ai 新增 `lazy-oauth`、`lazy-bedrock-provider` 子路径导出**（1.5.1）：给按动态 import 拆分的 Node bundle 用。PiArc 的 Agent Host 打成单文件 bundle，不调用 OAuth 登录与 Bedrock，暂不需要；T08/T21 接入登录时再评估。
+- MCP stdio 子进程在 server 主进程已退出时残留的问题已修复（pi-mcp 1.5.1）。
+
+### T06 按 v1.5.2 源码复核的事实
+
+| 事实 | 证据 | PiArc 的做法 |
+|---|---|---|
+| `createAgentSession()` 的 `cwd`、`agentDir`、`modelRuntime`、`settingsManager`、`sessionManager` 都可以按会话传入；没传 `sessionManager` 时用 `<agentDir>/sessions/--<cwd>--/` | `coding-agent/src/core/sdk.ts:191-207` | 每个会话自己的 cwd 与文件型 `SessionManager`（`getDefaultSessionDir(cwd, agentDir)`），工作区共享一个 `ModelRuntime` |
+| `AgentSessionRuntime.dispose()` 依次 abort、发 `session_shutdown`、`session.dispose()`；单独调 `session.dispose()` 不发 `session_shutdown`，MCP 扩展不会断开 server | `coding-agent/src/core/agent-session-runtime.ts:415-424`、`agent-session.ts:1477-1498` | 会话注册表持有 `AgentSessionRuntime`，关闭会话调它的 `dispose()` |
+| SDK 会话不加载内置的 codemode、tool_search、MCP 扩展，要自己放进 `DefaultResourceLoader` 的 `extensionFactories`，并调用 `session.bindExtensions()` 触发 `session_start` | `coding-agent/docs/sdk.md:116` | Agent Host 只加 `createMcpExtension()`，创建会话后调用 `bindExtensions` |
+| MCP 扩展默认的配置读取、日志与 OAuth 凭据路径用进程级的 `getAgentDir()`（`PI_CODING_AGENT_DIR` 或 `~/.pi/agent`），**不用** SDK 传入的 `agentDir` | `coding-agent/src/extensions/mcp/index.ts:371,1344-1346`、`extensions/mcp/oauth.ts:72-73`、`src/config.ts:609-636` | Agent Host 启动时把 `PI_CODING_AGENT_DIR` 设为 PiArc 的 `pi/` 目录，所有走 `getAgentDir()` 的默认路径都落在 PiArc 目录内，不读用户的 `~/.pi/agent` |
+| `SettingsManager.create()` 默认 `projectTrusted: true`，会读项目 `.pi/settings.json`；MCP 扩展只在项目受信任时读 `.pi/mcp.json` | `coding-agent/src/core/settings-manager.ts:310-337`、`extensions/mcp/config.ts:137-148` | 信任状态由 Core 决定（架构第 5.5 节）：Agent Host 创建会话前经 `trust/get` 询问 Core，失败按不信任，再传 `projectTrusted` |
+| `DefaultResourceLoader` 的 `noContextFiles: true` 关闭 AGENTS.md/CLAUDE.md 加载 | `coding-agent/src/core/resource-loader.ts:304-341,680-688` | Agent Host 一律关闭；T22 自己组装上下文 |
+| 版本检查与安装上报只在交互模式中调用；SDK 路径不联网检查版本，也没有自更新 | `coding-agent/src/modes/interactive/interactive-mode.ts:1200,1481` | Core 仍以最小环境变量启动 Agent Host，并设 `PI_SKIP_VERSION_CHECK=1`、`PI_TELEMETRY=0` 作为兜底 |
+| `ModelRuntime.create()` 默认不联网刷新模型目录（`allowModelNetwork` 默认 false）；不传 `credentials` 时读写 `<authPath>`，默认 `~/.pi/agent/auth.json` | `coding-agent/src/core/model-runtime.ts:110-126,218-266` | Agent Host 传入 pi-ai 的 `InMemoryCredentialStore` 与 `<agentDir>/models.json`，`pi/` 下不出现 `auth.json`；凭据保险箱由 T08 接入 |
+| 扩展加载器有模块级缓存 `extensionCache`，按 cwd 失效：两个不同 cwd 的会话交替加载文件型扩展会互相清空缓存 | `coding-agent/src/core/extensions/loader.ts:136-157`、`resource-loader.ts:545` | 只影响 jiti 加载的文件型扩展的加载耗时，不影响正确性；Harness Kit 用内联工厂，不经过它 |

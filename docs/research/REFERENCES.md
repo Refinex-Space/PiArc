@@ -6,7 +6,7 @@ PiArc 在设计阶段研读了以下开源仓库。为了随时查阅和核对�
 
 | 目录 | 上游 | 固定版本 | 许可证 | 用途 |
 |---|---|---|---|---|
-| `reference/pi` | https://github.com/earendil-works/pi | `4a080252f06c`（v1.4.0） | MIT | Agent 底座。SDK、扩展 API、RPC、会话格式、多服务商层。PiArc 以 npm 依赖方式使用，不 fork。 |
+| `reference/pi` | https://github.com/earendil-works/pi | `b4afdddf44e0`（v1.5.2，与 `agent-host` 锁定的 npm 版本一致；设计阶段调研用的是 v1.4.0 `4a080252f06c`） | MIT | Agent 底座。SDK、扩展 API、RPC、会话格式、多服务商层。PiArc 以 npm 依赖方式使用，不 fork。 |
 | `reference/claude-code` | https://github.com/claude-code-best/claude-code | `963e0013184e` | 仓库无 LICENSE 文件；原作为 Anthropic 专有软件，见下文"使用边界" | 社区复原的 Claude Code 工程。用于理解 Harness 设计思路：主循环、工具、权限、hooks、子 agent、上下文工程。 |
 | `reference/claw-code` | https://github.com/ultraworkers/claw-code | `508b4d862d42` | MIT | 用 Rust 复刻 Claude Code Harness 的实验项目。参考 crate 划分、mock 服务与行为对齐测试方法。 |
 | `reference/OpenClaudeDesktop` | https://github.com/oleyyu/OpenClaudeDesktop | `62f08512e012` | 仓库声明 MIT，但含官方应用切出的组件，见下文 | Claude Desktop Code 界面复刻（Electron 44.4.3 + React 19.3 + Vite 8.3）。参考信息架构、交互流程、Electron 宿主层结构，以及 UI 与内核之间的协议（Codex app-server v2）。 |
@@ -28,7 +28,7 @@ PiArc 在设计阶段研读了以下开源仓库。为了随时查阅和核对�
 
 ```bash
 git clone https://github.com/earendil-works/pi.git reference/pi
-git -C reference/pi checkout 4a080252f06caf63a525d7873c5d94d3c23887e0
+git -C reference/pi checkout b4afdddf44e059c67ccf5097e5317d913521b470   # tag v1.5.2
 
 git clone https://github.com/claude-code-best/claude-code.git reference/claude-code
 git -C reference/claude-code checkout 963e0013184ecc1521289a0fc7d5da4bb6e45356

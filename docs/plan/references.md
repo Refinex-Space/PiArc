@@ -32,13 +32,13 @@
 
 ## 读 Pi 的锁定版本
 
-`reference/pi` 的初始检出是 v1.4.0（`4a08025`）。T06 会锁定 PiArc 实际依赖的 Pi 版本，之后：
+PiArc 锁定的 Pi 版本是 v1.5.2（T06，`agent-host/package.json`），`reference/pi` 检出同一 tag（`b4afddd`）。读 Pi 时：
 
 1. **首选**已安装的包：`node_modules/@earendil-works/<包名>/` 下的 `dist/` 与类型声明，这就是实际运行的代码。
 2. **其次**参考仓库的对应 tag：先 `git -C reference/pi fetch --tags`，再用 `git -C reference/pi show <tag>:<路径>` 读文件、`git -C reference/pi grep <模式> <tag> -- <目录>` 搜索。
 3. **不要**直接读 `reference/pi` 工作区的文件，除非已经确认它检出的就是锁定版本。
 
-`docs/research/pi-v1.4.0-baseline.md` 中的文件:行号证据针对 v1.4.0。版本不同时，以锁定版本的源码为准，并按执行协议的"决策分级"处理差异。
+`docs/research/pi-v1.4.0-baseline.md` 第 0–11 节的文件:行号针对 v1.4.0，文末"版本差异：v1.5.2"一节针对锁定版本。两者不同时，以锁定版本的源码为准，并按执行协议的"决策分级"处理差异。
 
 ## 按主题的查阅指引
 

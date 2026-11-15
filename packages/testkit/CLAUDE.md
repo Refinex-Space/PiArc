@@ -10,7 +10,7 @@
 
 ## 不变量
 
-- `@earendil-works/pi-ai` 精确锁定（当前 1.5.2）；T06 锁定 Pi 版本时与 `agent-host` 统一到同一版本（`PLAN.md` 登记事项 I14）。
+- `@earendil-works/pi-ai` 精确锁定，与 `agent-host` 的 `@earendil-works/*` 保持同一版本（当前 1.5.2）；升级 Pi 时两处一起改。
 - 只用自建的 pi-ai provider（`createProvider`），auth 只返回常量测试 key；不用内置 anthropic provider，也不碰任何 OAuth 登录（ADR-0006）。测试 key 不得包含 `sk-ant-oat`：pi-ai 见到它会切到 OAuth 路径。
 - API 实现从 pi-ai 的公开子路径导出 `@earendil-works/pi-ai/api/<api>.lazy` 取得（主入口不导出它们），不深度导入 `dist/`。
 - 场景文件在 `scenarios/`，一个文件一个场景，格式见 testing.md 第 10.3 节。
