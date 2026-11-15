@@ -30,10 +30,15 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `.tools/bin/cargo-deny check` | 许可证、安全公告、来源检查 |
 | `node scripts/ci/check-crate-deps.mjs` | crate 依赖方向检查（规则在 `crates/deps-rules.json`） |
 | `node scripts/plan/check-acceptance.mjs` | 验收清单与任务文件一致性检查 |
+| `node node_modules/electron/install.js` | 下载 Electron 二进制（`--ignore-scripts` 不会下载）；启动、打包、L4 之前需要 |
+| `npm run start -w @piarc/desktop` | 桌面应用开发服务器模式（`electron-forge start`） |
+| `npm run package:desktop -- --flavor development` | 开发构建打包到 `apps/desktop/out/development/`，并生成 L4 用的 `.vite/` 生产构建；不带参数为发布构建 |
+| `npm run test:e2e -w @piarc/desktop` | L4：Playwright 驱动开发形态与打包产物（先打开发构建） |
+| `npm run check:fuses` | 发布构建产物的 fuse 与 `apps/desktop/fuses.mjs` 比对 |
 
 ## 仓库结构
 
-- `apps/desktop/`：Electron 应用；`agent-host/`：Agent Host；`packages/protocol/`：由 `piarc-protocol` 生成的 TS 类型。三者是 npm workspaces。
+- `apps/desktop/`：Electron 应用（主进程、preload、渲染进程，安全基线与 L4 见其 `CLAUDE.md`）；`agent-host/`：Agent Host；`packages/protocol/`：由 `piarc-protocol` 生成的 TS 类型。三者是 npm workspaces。
 - `crates/`：Rust workspace，21 个 crate，职责见各 crate 的 `src/lib.rs` 顶部文档与架构第 7.1 节。
 - `tests/contracts/`：L1 契约样本（`<契约名>/` 与 `invalid/`）和帧编解码共享用例（`framing/`），流程见 `docs/engineering/testing.md` 第 7 节。
 - `scripts/`：跨平台 Node 脚本（`dev/` 本地入口、`ci/` 检查、`plan/` 计划文件检查、`lib/` 公共函数）。
@@ -58,3 +63,4 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - Windows 上不要用 shell 调 npm 命令：用 `resolveBin` 解析入口后以 `node` 运行。
 - 改了 `piarc-protocol` 的类型却没运行 `npm run gen:protocol`，verify 的"protocol drift"会失败；新增契约没有样本与反例，"contract samples"会失败。
 - 需要保留 CRLF 的测试夹具放在 `fixtures/crlf/` 目录下，其余文本文件都会被 `.gitattributes` 规范为 LF。
+- L4 的 `dev` 形态跑上次打包生成的 `apps/desktop/.vite/`：改了 `apps/desktop/src/` 后先重新 `npm run package:desktop -- --flavor development`。

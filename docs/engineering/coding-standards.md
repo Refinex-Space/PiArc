@@ -136,7 +136,7 @@ Markdown 不进 Prettier：文档中的宽表格每次编辑都会被重新填�
 - 只用 ESM（`"type": "module"`）；相对导入写 `.js` 扩展名（NodeNext 要求）。
 - 每个工作区经 `src/index.ts` 暴露公开 API；跨工作区只按包名导入（例如 `@piarc/protocol`），不导入另一个工作区的内部文件。
 - 进程边界（ADR-0013）：
-  - 渲染进程不导入 Node 内置模块、主进程代码或原生模块，只能调用 preload 暴露的白名单 API；
+  - 渲染进程不导入 Node 内置模块、Electron、主进程代码或原生模块，只能调用 preload 暴露的白名单 API；preload 只能导入 `electron`；`new BrowserWindow` 只在窗口工厂、`ipcMain.handle` 只在 IPC 注册函数中出现（`eslint.config.mjs` 的 `desktopProcessBoundaries`，verify 第 2 步）；
   - 主进程只做平台集成与转发，不承载业务逻辑；两个平台都需要的逻辑放进 Core 或 Agent Host。
 - `packages/protocol/src/generated/` 由 `piarc-protocol` 的 JSON Schema 生成，不手工编辑（T02）。
 
@@ -177,3 +177,10 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | 协议版本协商 | `piarc_protocol::negotiate`、`PROTOCOL_VERSION`（TS 为生成的 `PROTOCOL_VERSION`） | 主版本不同返回 `protocolVersionMismatch`；次版本不同取双方能力交集 | T02 |
 | 结构化错误 | `piarc_protocol::{ErrorObject, ErrorData, ErrorKind}`、`rpc_error::code` | JSON-RPC error 对象，`data.kind`、`data.retryable` 必填；跨 AHP 与 NAPI 的错误都用它；crate 错误经 `to_error_object()` 映射 | T02 |
 | 协议生成与检查 | `npm run gen:protocol`（`scripts/dev/gen-protocol.mjs`）、`scripts/ci/check-protocol-drift.mjs`、`scripts/ci/check-contract-samples.mjs` | Rust 类型 → JSON Schema → TS 类型；漂移与样本完整性检查在 verify 中运行；新增协议消息的步骤见 `testing.md` 第 7 节 | T02 |
+| IPC 注册与来源校验 | `apps/desktop/src/main/ipc/register.ts`（`createIpcRegistrar`）、`ipc/sender.ts`（`isTrustedSender`） | 主进程唯一调用 `ipcMain.handle` 的地方（ESLint 强制）：先校验 `senderFrame` 非空且 origin 与可信 origin 整串相等，不通过就拒绝并记日志；参数作为 `unknown[]` 交给处理函数校验 | T03 |
+| origin 计算 | `apps/desktop/src/main/security/origin.ts`（`originOf`） | 主进程中比较 URL 的 origin 一律用它：Node 的 `URL` 把 `app://` 当作不透明 origin，它按 Chromium 的规则还原应用协议的元组 origin | T03 |
+| 外链确认 | `apps/desktop/src/main/external-links.ts`（`openExternalLink`、`parseExternalUrl`、`ExternalLinkPort`）、`external-link-port.ts` | 只放行 `https:`、`http:`、`mailto:`；原生确认框显示规范化后的完整地址，确认后才 `shell.openExternal`；测试替换 `ExternalLinkPort` | T03 |
+| 窗口工厂 | `apps/desktop/src/main/window.ts`（`createMainWindow`）、`web-preferences.ts`（`secureWebPreferences`） | 唯一允许 `new BrowserWindow` 的地方（ESLint 强制），`webPreferences` 取值固定，只有 preload 路径可变 | T03 |
+| 桌面应用打包 | `scripts/dev/package-desktop.mjs`（`npm run package:desktop -- --flavor <release\|development>`） | 以指定构建类型运行 `electron-forge package`，输出到 `apps/desktop/out/<flavor>/`；fuse 配置的单一来源是 `apps/desktop/fuses.mjs` | T03 |
+| fuse 校验 | `scripts/ci/check-fuses.mjs`（`npm run check:fuses`） | 用 `@electron/fuses` 读打包产物的实际 fuse，与 `apps/desktop/fuses.mjs` 的配置逐项比对，列出不一致与未配置的 fuse；T12、T50 的流水线调用它 | T03 |
+| L4 夹具 | `apps/desktop/e2e/fixtures.ts`、`e2e/app.ts` | 每个用例独立启动应用与 user-data 目录、收集应用日志；两种形态的可执行文件按平台解析 | T03 |

@@ -11,8 +11,8 @@
 | L1 契约 | AHP schema 往返、录制事件样本的反序列化与再序列化、Pi 事件到 AHP 投影的 golden、NAPI 导出声明与 preload API 快照 | 样本：`tests/contracts/<契约名>/*.json`，反例在其下的 `invalid/`；Rust：`crates/piarc-protocol/tests/*.rs`；TS：`packages/protocol/src/*.test.ts`；见第 7 节 | `cargo test -p piarc-protocol`、`npx vitest run packages/protocol`；全部由 `npm run verify` 运行 | 每次提交 | T02 |
 | L2 场景回放 | 无头运行 Core + 真实 Agent Host，模型侧接严格校验请求的 mock provider，按场景数据文件驱动 | `tests/scenarios/<场景 id>.yaml`，文件名与 `id` 一致；运行器在 `piarc-testkit`，驱动在 `piarc-devcli` | T15 补充 | 每次提交 | T05、T15 |
 | L3 行为对齐 | 对真实 Claude Code 录制同一批场景，与 PiArc 做结构化 diff | 有意偏离写在 `tests/l3-allowlist.yaml` | T30 补充 | 每晚 / 手动 | T30 |
-| L4 客户端 | Playwright 驱动打包后的 Electron 应用；关键组件视觉快照；录制事件流驱动渲染进程（假 Core） | T03 补充 | T03 补充 | 每次提交（快照）/ 每晚（UI 流程） | T03、T19 |
-| 安全回归 | Markdown 与链接渲染的 XSS 载荷集、preload API 越权调用、外部导航拦截（架构第 10.3 节） | T03 建立并补充本节 | 由 `npm run verify` 运行 | 每次提交 | T03 起 |
+| L4 客户端 | Playwright 驱动 Electron 应用（开发形态与打包产物）；关键组件视觉快照；录制事件流驱动渲染进程（假 Core） | `apps/desktop/e2e/*.e2e.ts`；见第 9 节 | 先 `npm run package:desktop -- --flavor development`，再 `npm run test:e2e -w @piarc/desktop` | 每次提交（CI `desktop` 作业）/ 每晚（UI 流程） | T03、T19 |
+| 安全回归 | Markdown 与链接渲染的 XSS 载荷集、preload API 越权调用、外部导航拦截（架构第 10.3 节） | Electron 层：L4 的 `csp`、`navigation`、`external-links`、`preload`、`permissions`、`app-instance` 用例；纯函数（来源校验、外链白名单、CSP、资源路径）：`apps/desktop/src/main/**/*.test.ts`；XSS 载荷集由 T09 加入 | 纯函数部分由 `npm run verify` 运行；Electron 层同 L4 | 每次提交 | T03 起 |
 | 性能 | 架构第 11 章的预算，两个平台分别测量 | T44 补充 | T44 补充 | 每次提交（冒烟）/ 每晚（完整） | T04、T09、T10、T44 |
 | 多服务商 | 部分 L2 场景对真实服务商运行 | 与 L2 场景共用，按标记筛选 | 手动或每晚，需要密钥与预算（第 8 节） | 每晚，可选 | R2 起 |
 
@@ -36,6 +36,8 @@
 | 12 | 验收清单一致性 | `node scripts/plan/check-acceptance.mjs` |
 
 CI（`.github/workflows/ci.yml`）在 `macos-latest`（arm64）与 `windows-latest`（x64）上执行 `npm ci --ignore-scripts` 与 `npm run verify`。后续任务新增的检查（L1 契约、L2 场景、schema 漂移等）都接进 verify，使本地与 CI 运行同一套检查。
+
+需要打包产物的检查不进 verify，由同一工作流的 `desktop` 作业在两个平台上运行：下载 Electron 二进制、打开发构建、跑 L4（第 9 节）、打发布构建、`npm run check:fuses`，证据作为 artifact 上传。
 
 执行协议要求的检查点提交只需受影响的包或 crate 通过，例如 `cargo test -p <crate>`、`npx vitest run <路径>`；全量 verify 在开工与收尾时各跑一次。
 
@@ -70,7 +72,7 @@ CI（`.github/workflows/ci.yml`）在 `macos-latest`（arm64）与 `windows-late
 
 ## 6. 测试证据
 
-- 验收证据（命令输出、截图、录屏、性能数据）放在 `tmp/evidence/<任务编号>/`，例如 `tmp/evidence/T09/`。`tmp/` 已被 `.gitignore` 排除，证据不入库。
+- 验收证据（命令输出、截图、录屏、性能数据）放在 `tmp/evidence/<任务编号>/`，例如 `tmp/evidence/T09/`。`tmp/` 已被 `.gitignore` 排除，证据不入库。L4 的截图与日志在其下的 `l4/` 子目录（第 9.4 节）。
 - `docs/plan/acceptance.json` 的 `evidence` 字段写验证命令与关键输出，或证据文件路径。
 - 证据中不得出现凭据、个人信息与用户的真实会话内容。
 
@@ -110,3 +112,42 @@ CI（`.github/workflows/ci.yml`）在 `macos-latest`（arm64）与 `windows-late
 - 调用会产生费用的服务前先征得用户同意，并说明预计调用次数；测试只用最便宜够用的模型。
 - 密钥只从环境变量或凭据库读取，不写入仓库、日志与测试证据；输出中遮蔽密钥。
 - 每晚的多服务商场景只在配置了密钥时运行，没有密钥时整体跳过并在输出中注明，不算通过。
+
+## 9. L4 客户端（Electron）
+
+### 9.1 两种形态
+
+Playwright 配置在 `apps/desktop/playwright.config.ts`，两个 project 跑同一批用例：
+
+| project | 启动的程序 | 加载的代码 |
+|---|---|---|
+| `dev` | node_modules 中的 Electron，应用目录为 `apps/desktop` | `.vite/` 中的生产构建，界面经 `app://piarc` 加载 |
+| `packaged` | `apps/desktop/out/development/` 中的开发构建打包产物 | app.asar 中的同一份生产构建 |
+
+两种形态都要先运行 `npm run package:desktop -- --flavor development`：打包会在 `apps/desktop/.vite/` 生成生产构建，并在 `out/development/` 生成产物。改了 `apps/desktop/src/` 的代码后要重新打包，否则 L4 跑的是旧代码。`electron-forge start` 会清掉 `.vite/` 并换成开发服务器构建，之后 `dev` 形态会报"Production bundle not found"，重新打包即可。
+
+打包形态用开发构建，是因为 Playwright 要用 `--inspect` 连接主进程，而发布构建关闭了 `EnableNodeCliInspectArguments`。两者只差这一个 fuse（`apps/desktop/fuses.mjs`），发布构建的 fuse 由 `npm run check:fuses` 校验。
+
+### 9.2 夹具
+
+`apps/desktop/e2e/fixtures.ts` 为每个用例：
+
+- 在系统临时目录建独立的 user-data 目录（路径含空格与中文），以 `--user-data-dir` 传给应用，用例结束后删除；单实例锁也绑定这个目录，所以用例之间、用例与本机已运行的 PiArc 之间互不影响；
+- 启动应用（`app`），等第一个窗口渲染出骨架（`page`）；
+- 收集应用的 stdout 与 stderr（`appLog`），`appLog.waitFor(/…/)` 等待某行日志出现，用例结束时写入证据目录；
+- `test.use({ appArgs: [...] })` 为整个文件追加命令行参数。
+
+可执行文件的位置按平台解析，集中在 `apps/desktop/e2e/app.ts` 的 `appCommand` 与 `packagedExecutable`；用例需要自己启动进程（例如第二个实例）时也用 `appCommand`。
+
+### 9.3 写用例的要点
+
+- 安全用例一律针对生产渲染产物运行，不在开发服务器模式下运行。
+- 页面中的检查用 `page.evaluate`；主进程中的检查与替身用 `app.evaluate`。对话框、`shell.openExternal` 等会产生外部效果的调用，在主进程中替换为记录调用的替身，不真的打开浏览器（见 `external-links.e2e.ts`）。
+- 导航被主进程取消后，Playwright 的定位器会一直等待导航结束：拦截之后改在 `page.evaluate` 中检查 DOM；会触发导航的点击用 `page.mouse.click`，不用 `locator.click`。
+- 等待 CSP 违规事件等异步结果时设上限，让缺失的事件以明确的值失败，而不是等到用例超时。
+- 用例超时 60 s，单 worker 串行运行（每个用例都会打开真实窗口）。
+
+### 9.4 证据
+
+设置 `PIARC_EVIDENCE_TASK=<任务编号>` 后，输出写到 `tmp/evidence/<任务编号>/l4/<用例>/`：`app.log`（应用日志）、用例自己保存的截图（例如冒烟用例的 `window.png`），失败时还有 `trace.zip`（`npx playwright show-trace <路径>` 查看）。不设置时目录名为 `L4`；CI 用 `ci` 并上传为 artifact。Playwright 每次运行前会清空这个 `l4/` 目录。
+

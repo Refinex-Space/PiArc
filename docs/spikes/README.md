@@ -22,6 +22,6 @@ M0 用代码验证架构中依赖运行时行为、读文档无法确认的假�
 | S7 | 终端：libghostty-vt、PTY、帧协议、渲染器 | 未开始（T10） | 未开始（W0） | — |
 | S8 | 沙箱：Seatbelt 与网络代理；Job Object | 未开始（T11） | 未开始（W0） | — |
 | S9 | AHP 握手、背压、崩溃重启与对账 | 未开始（T06） | 未开始（CI） | — |
-| S10 | Electron 安全基线 | 未开始（T03） | 未开始（CI） | — |
+| S10 | Electron 安全基线 | 部分完成（T03：CSP、导航、IPC、fuses 通过；XSS 载荷集待 T09） | 待 CI 结果（T03 已配置 `desktop` 作业） | [S10-electron-security.md](S10-electron-security.md) |
 
 M0 的汇总结论与进入 M1 的前提由 R1 写入 `M0-summary.md`。

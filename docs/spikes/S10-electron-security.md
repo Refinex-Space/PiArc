@@ -1,0 +1,116 @@
+# S10 Electron 安全基线
+
+- 任务：T03（2026-11-14）
+- 范围：S10 中 CSP、导航、IPC、fuses 这一层。Markdown 渲染路径上的 XSS 载荷集由 T09 完成，S10 的整体结论由 R1 汇总。
+- 结论：macOS 上 T03 负责的部分**通过**；Windows **未验证**，CI 的 `desktop` 作业已配置，结果待首次推送后由下一个任务或 W0 核对。
+
+## 1. 验证环境
+
+| 项 | 版本 |
+|---|---|
+| 系统 | macOS 26.5.2（25F84），arm64 |
+| Electron | 45.3.2（npm `latest`；受支持大版本 45、44、43），Chromium 156.0.8078.100，内置 Node 24.22.2（与 `.nvmrc` 一致） |
+| Electron Forge | 8.0.1（`plugin-vite`、`plugin-fuses`），`@electron/fuses` 2.1.3 |
+| Vite / React | 8.3.8 / 19.3.1，`@vitejs/plugin-react` 6.3.0 |
+| Playwright | `@playwright/test` 1.65.1（Electron 支持，不下载浏览器） |
+| 本机 Node | 24.14.1（运行脚本与测试；CI 用 `.nvmrc` 的 24.22.2） |
+
+## 2. 做了什么
+
+- `apps/desktop` 三部分工程：主进程、sandboxed preload、React 渲染进程，外加只含 IPC 契约的 `src/shared`。四个 TS 工程分开配置：主进程与 preload 不含 DOM 类型，渲染进程不含 Node 类型。
+- 按架构第 10.3 节落实渲染进程加固、preload 白名单、IPC 来源校验、单实例锁与 fuses，位置见第 3 节清单。
+- L4 基座：Playwright 驱动两种形态，开发形态（node_modules 中的 Electron + `.vite/` 生产构建，经 `app://` 加载）与开发构建的打包产物；每个用例独立启动、独立 user-data 目录。
+- `scripts/ci/check-fuses.mjs`：读打包产物的实际 fuse，与 `apps/desktop/fuses.mjs` 的发布配置逐项比对。
+- 变异对照：临时放开 CSP、导航守卫、权限、IPC 来源校验与外链协议白名单，重新打包后运行安全用例，确认用例能发现回退；之后还原。
+- 对发布构建做运行时探测：`ELECTRON_RUN_AS_NODE`、`--inspect`、`NODE_OPTIONS`、`--remote-debugging-port`。
+
+## 3. Electron 官方安全清单逐条
+
+清单原文见 `docs/research/electron-stack.md` 第 3 节。"L4"指 `apps/desktop/e2e/` 下的 Playwright 用例，两种形态都运行；"单元"指与源文件同目录的 Vitest 用例。
+
+| # | 清单项 | 落实方式 | 测试或检查 |
+|---|---|---|---|
+| 1 | 只加载安全内容 | 界面只从 `app://piarc` 加载（注册为 `secure`）；CSP 禁止加载任何远程资源；应用不加载远程页面 | L4 `csp.e2e.ts`（外部 fetch、外部图片被拦）、`app-instance.e2e.ts`（`isSecureContext` 为 true） |
+| 2 | 不对远程内容开启 Node 集成 | `nodeIntegration`、`nodeIntegrationInWorker`、`nodeIntegrationInSubFrames` 固定为 false | 单元 `web-preferences.test.ts`；L4 `preload.e2e.ts`（`require`、`process`、`module`、`Buffer` 均为 `undefined`） |
+| 3 | 所有渲染进程开启上下文隔离 | `contextIsolation: true` 固定在窗口工厂 | 单元 `web-preferences.test.ts`；L4 `preload.e2e.ts`（页面只看到 `window.piarc`，扫描不到 `ipcRenderer`） |
+| 4 | 开启进程沙箱 | `sandbox: true`，并在 `ready` 前调用 `app.enableSandbox()` 全局强制 | 单元 `web-preferences.test.ts`；L4 `preload.e2e.ts`（`app.getAppMetrics()` 报告窗口渲染进程 `sandboxed: true`） |
+| 5 | 所有会话设置权限处理器 | `setPermissionRequestHandler`、`setPermissionCheckHandler` 默认拒绝，`setDevicePermissionHandler` 返回 false；放行清单 `PERMISSION_ALLOWLIST` 集中定义，本任务为空；`session-created` 时对新会话同样安装 | 单元 `permissions.test.ts`；L4 `permissions.e2e.ts`（通知、摄像头、地理位置被拒，权限查询为 `denied`） |
+| 6 | 不关闭 `webSecurity` | 固定为 true；`new BrowserWindow` 只允许出现在窗口工厂（ESLint） | 单元 `web-preferences.test.ts`；ESLint `no-restricted-syntax` |
+| 7 | 定义 CSP | 主进程在 `protocol.handle` 的每个响应上发送 `Content-Security-Policy` 响应头：`default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`，另加 `X-Content-Type-Options: nosniff` | 单元 `csp.test.ts`；L4 `csp.e2e.ts`（响应头存在；注入的内联脚本、内联事件属性、`eval`、`new Function` 都不执行；外部 fetch 与图片触发 `connect-src`、`img-src` 违规） |
+| 8 | 不开启 `allowRunningInsecureContent` | 固定为 false | 单元 `web-preferences.test.ts` |
+| 9 | 不开启实验特性 | `experimentalFeatures: false` | 单元 `web-preferences.test.ts` |
+| 10 | 不使用 `enableBlinkFeatures` | 不设置该项 | 单元 `web-preferences.test.ts`（断言不存在该键） |
+| 11 | `<webview>` 不用 `allowpopups` | 不适用：不使用 `<webview>`。`webviewTag: false`，且全局 `will-attach-webview` 一律 `preventDefault` | 单元 `web-preferences.test.ts`；代码 `security/navigation.ts` |
+| 12 | `<webview>` 校验选项与参数 | 不适用：同上，任何 `<webview>` 都不允许挂载 | 同上 |
+| 13 | 禁止或限制导航 | `will-navigate` 与 `will-redirect` 中解析 origin 后与可信 origin 整串比较，不用前缀；在 `app.on('web-contents-created')` 中给所有 webContents 安装 | 单元 `navigation.test.ts`、`origin.test.ts`；L4 `navigation.e2e.ts`（改 `location`、点击链接、重定向都被拦，窗口留在 `app://piarc/index.html`；同源导航放行） |
+| 14 | 禁止或限制新窗口 | `setWindowOpenHandler` 一律返回 `deny`，同样经全局钩子安装 | L4 `external-links.e2e.ts`（`window.open` 与 `target=_blank` 链接被拒，窗口数仍为 1） |
+| 15 | 不对不可信内容调用 `shell.openExternal` | 只经 `window.piarc.openExternal`：只放行 `https:`、`http:`、`mailto:`，长度上限 8192；主进程弹原生确认框显示规范化后的完整地址（国际化域名显示为 punycode），确认后才打开；对话框与 `shell.openExternal` 经 `ExternalLinkPort` 调用 | 单元 `external-links.test.ts`（端口替身）；L4 `external-links.e2e.ts`（主进程中替换为记录替身：确认后才打开、取消不打开、`javascript:`、`file:`、`data:` 等不弹框直接拒绝） |
+| 16 | 使用当前版本的 Electron | 锁定 45.3.2（最新稳定版）；升级节奏按 ADR-0018 第 8 条 | `apps/desktop/package.json` 与 `npm view electron dist-tags` |
+| 17 | 校验所有 IPC 消息的发送方 | 所有 `ipcMain.handle` 经 `createIpcRegistrar` 注册（ESLint 禁止直接调用）；先校验 `senderFrame` 非空且 `origin` 与可信 origin 整串相等，否则拒绝并记录日志 | 单元 `sender.test.ts`（空 frame、其他 origin、`app://piarcx` 等前缀相似 origin）；L4 `preload.e2e.ts`（合法调用通过；`data:` 页面与 `app://piarcx` 页面加载同一 preload 后调用被拒） |
+| 18 | 不用 `file://`，改用自定义协议 | `protocol.registerSchemesAsPrivileged`（`standard`、`secure`、`supportFetchAPI`，不 `bypassCSP`、不允许 service worker）+ `protocol.handle` 从 `.vite/renderer/main_window`（打包后在 app.asar 内）提供文件，拒绝越出目录的路径；`GrantFileProtocolExtraPrivileges` fuse 关闭 | 单元 `asset-path.test.ts`（路径穿越、编码绕过、错误 host）；L4 `app-instance.e2e.ts`（`location.protocol` 为 `app:`）；`npm run check:fuses` |
+| 19 | 检查可修改的 fuses | 发布配置见第 4 节；`strictlyRequireAllFuses: true`；`check-fuses.mjs` 读产物比对 | 单元 `check-fuses.test.mjs`；`npm run check:fuses`；第 5.4 节的运行时探测 |
+| 20 | 不向不可信页面暴露 Electron API | preload 经 `contextBridge` 只暴露 `getAppVersion`、`openExternal` 两个函数，不暴露 `ipcRenderer`；返回值在 preload 中校验类型；本任务没有事件 API，以后新增时必须剥掉 Electron 的 event 对象（`apps/desktop/CLAUDE.md`）；preload 只能 `require('electron')`（ESLint 禁止导入 Node 内置模块） | L4 `preload.e2e.ts`（键集合与快照一致、扫描不到 Electron 对象）；ESLint `no-restricted-imports` |
+
+## 4. 开发构建与发布构建的差异
+
+| 项 | 发布构建 | 开发构建（`--flavor development` 打包） | 开发服务器模式（`electron-forge start`） |
+|---|---|---|---|
+| `EnableNodeCliInspectArguments` | 关 | 开（调试打包产物；Playwright 依赖它连接主进程） | 不写 fuse（node_modules 中的 Electron） |
+| 其余 8 个 fuse | `RunAsNode` 关、`EnableCookieEncryption` 开、`EnableNodeOptionsEnvironmentVariable` 关、`EnableEmbeddedAsarIntegrityValidation` 开、`OnlyLoadAppFromAsar` 开、`LoadBrowserProcessSpecificV8Snapshot` 关、`GrantFileProtocolExtraPrivileges` 关、`WasmTrapHandlers` 开 | 与发布构建相同 | 不写 fuse |
+| 界面来源 | `app://piarc` | `app://piarc` | Vite 开发服务器 `http://localhost:<端口>` |
+| CSP | 生产策略 | 生产策略 | 放宽三项：`script-src` 加 `'unsafe-inline'`（React Refresh 预加载脚本）、`style-src` 加 `'unsafe-inline'`（Vite 注入 `<style>`）、`connect-src` 加 `ws://<开发服务器 host>`（HMR） |
+| 可信 origin（导航、IPC） | `app://piarc` | `app://piarc` | `app://piarc` 与开发服务器 origin |
+
+- 开发服务器模式的放宽全部在 `apps/desktop/src/main/dev-server.ts`，主进程只在 `import.meta.env.DEV` 为真时调用。打包时它是常量 false，打包工具删掉这些分支：发布构建的 `.vite/build/main.cjs` 中 `unsafe-inline` 出现 0 次（改用编译期常量之前是 1 次，代码不可达但字符串仍在包里）。
+- L4 安全用例一律针对生产渲染产物运行，不在开发服务器模式下运行。
+- 开发构建与发布构建只差一个 fuse，由单元测试 `check-fuses.test.mjs` 断言，打包后由 `check-fuses.mjs` 分别比对。
+
+## 5. 实测数据
+
+### 5.1 测试
+
+| 检查 | 结果 |
+|---|---|
+| L4（`npm run test:e2e -w @piarc/desktop`） | 58 项通过：29 个用例 × 开发形态与打包形态，约 50 s |
+| 单元（`apps/desktop/src/main/**/*.test.ts`、`scripts/ci/check-fuses.test.mjs`） | 42 项通过，1 项按平台跳过（Windows 反斜杠穿越用例，只在 Windows 运行） |
+| ESLint 进程边界规则 | 临时违规文件触发全部 8 条预期错误：两种 `new BrowserWindow`、`ipcMain.handle`、`ipcMain.on`、preload 导入 `node:fs` 与 `path`、渲染进程导入 `electron` 与 `../main/` |
+| CI 工作流 | actionlint 1.7.12 无发现 |
+
+### 5.2 变异对照
+
+同时放开五处控制后重新打包，开发形态的 25 个安全用例中 17 个失败：
+
+- 失败（17）：CSP 6 项、导航拦截 3 项、新窗口与非白名单协议 2 项、权限 4 项、外来 origin 与前缀相似 origin 的 IPC 2 项；
+- 通过（8）：确认后打开、取消不打开、同源导航、`window.piarc` 键集合、扫描 Electron 对象、Node 全局不可用、OS 沙箱、合法 IPC。这些用例对应的控制没有被放开。
+
+### 5.3 fuses
+
+`npm run check:fuses` 读取 `out/release/PiArc-darwin-arm64/PiArc.app`，9 个 fuse 全部与发布配置一致。临时把配置中的 `EnableCookieEncryption` 改为 false 后重跑，脚本退出码 1，并输出 `EnableCookieEncryption: expected disabled, found enabled`；还原后退出码 0。开发构建产物与开发配置比对同样 9 项一致。打包后 macOS 产物为 ad-hoc 签名（`Signature=adhoc`），`resetAdHocDarwinSignature` 生效。
+
+### 5.4 发布构建的运行时探测
+
+| 探测 | 结果 |
+|---|---|
+| `ELECTRON_RUN_AS_NODE=1 PiArc -e '…'` | 没有以 Node 运行（未输出标记），正常启动应用 |
+| `PiArc --inspect=0` | 没有 `Debugger listening` 输出 |
+| `NODE_OPTIONS='--require <不存在的文件>'` | 被忽略，没有模块加载错误 |
+| `PiArc --remote-debugging-port=9333` | **生效**：`/json/version` 返回 HTTP 200，见第 6 节第 2 条 |
+
+## 6. 发现
+
+1. **Node 的 URL 解析器不认识 Chromium 的标准协议。** 主进程中 `new URL('app://piarc/index.html').origin` 是 `'null'`，而 Chromium 给页面的 origin 是 `app://piarc`。直接用 `URL.origin` 会让导航守卫拦掉应用内导航。已在 `security/origin.ts` 中对应用协议按 Chromium 的元组 origin 计算，导航与权限判断都经它；IPC 校验用的 `senderFrame.origin` 来自 Chromium，不受影响。
+2. **发布构建仍接受 Chromium 的 `--remote-debugging-port`。** 这个开关不受任何 fuse 控制。能以这个参数启动 PiArc 的本机进程可以通过 CDP 在页面中执行脚本，进而调用 `window.piarc`。前提是攻击者已经能以当前用户身份运行程序，与 ADR-0018 已接受的"本机攻击者可篡改应用"属同一威胁等级；有副作用的操作仍要经 Core 的权限裁决。缓解方向是发布构建在启动时拒绝或移除该开关，可行性待验证。登记为 I10，建议 T45 处理。
+3. **Playwright 驱动 Electron 依赖 `--inspect`。** 它等待 `Debugger listening` 输出后连接主进程，所以发布构建（`EnableNodeCliInspectArguments` 关闭）无法用 Playwright 驱动。L4 的打包形态因此运行开发构建，它与发布构建只差这一个 fuse；发布构建的 fuse 由 `check:fuses` 与第 5.4 节的探测覆盖。
+4. **被拦截的导航会让 Playwright 的定位器一直等待"导航完成"。** L4 用例在拦截之后改为在页面内检查 DOM，可能触发导航的点击用 `page.mouse.click`。写法已记入 `docs/engineering/testing.md` 第 9 节。
+
+## 7. ADR 触发条件
+
+ADR-0013 的触发条件"威胁模型中的某项对策必须放松 Electron 安全基线才能实现"：未触发。开发服务器模式的 CSP 放宽只存在于开发构建，发布构建不含相关代码。
+
+## 8. 后续
+
+- Windows：CI `desktop` 作业（冒烟、安全用例、fuse 校验）的结果在推送后核对；W0 只补测 CI 覆盖不到的部分。
+- T09：Markdown 渲染路径的 XSS 载荷集。
+- T12：应用标识（D2）确定后，协议名 `app` 与 bundle id（当前为打包工具默认的 `com.github.Electron`）随之确定；签名与安装包。
+- T18：替换 Electron 默认菜单；权限放行清单按功能需要增加时，在 `PERMISSION_ALLOWLIST` 中写理由并补用例。
+- T45：第 6 节第 2 条（I10）。

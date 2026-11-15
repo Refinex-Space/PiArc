@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.4（2026-11-14） |
+| 版本 | 2.5（2026-11-14） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -207,6 +207,7 @@ PiArc/
 │       ├── src/main/          # 主进程：窗口、菜单、托盘、通知、更新、Core 加载与事件转发
 │       ├── src/preload/       # contextBridge 白名单 API
 │       ├── src/renderer/      # React 界面与 Web Worker
+│       ├── src/shared/        # 三方共用的 IPC 契约（通道名与 window.piarc 类型），不含 DOM 与 Node
 │       └── native/            # 平台专属原生模块（按需）
 ├── crates/                    # Rust workspace（第 7 章），含 NAPI-RS 绑定 piarc-napi
 ├── agent-host/                # TypeScript：Agent Host 与 Harness Kit（第 5、6 章）
@@ -1033,11 +1034,11 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 **渲染进程**（按 Electron 官方安全清单逐项落实，清单原文见 `docs/research/electron-stack.md` 第 3 节）：
 
 - 所有窗口开启 `sandbox` 与 `contextIsolation`，关闭 `nodeIntegration`；不使用 `<webview>`；不开启实验特性与 `enableBlinkFeatures`；不关闭 `webSecurity`。
-- 界面通过自定义协议（`app://` 一类，具体名称随应用标识确定）从 app.asar 提供，不使用 `file://`，并关闭 `GrantFileProtocolExtraPrivileges` fuse。
+- 界面通过自定义协议（`app://` 一类，具体名称随应用标识确定；当前为 `app://piarc`，以 `standard`、`secure` 注册）从 app.asar 提供，不使用 `file://`，并关闭 `GrantFileProtocolExtraPrivileges` fuse。
 - CSP 由主进程以响应头下发：`default-src 'self'`，`script-src 'self'`（不允许内联脚本与 `eval`），`connect-src` 只允许应用自身协议，图片只允许应用自身协议与 `data:`。渲染进程不直接访问网络，模型请求都在 Agent Host 中发出。
 - 模型输出与仓库内容一律当作不可信数据：Markdown 渲染不使用 `innerHTML` / `dangerouslySetInnerHTML`，原始 HTML 当文本显示；代码高亮与公式渲染只输出受控的元素和样式。
 - 导航与新窗口：`will-navigate` 中用 `new URL()` 比较 origin，只允许应用自身协议；`setWindowOpenHandler` 一律返回 `deny`，外部链接由主进程在用户确认后用 `shell.openExternal` 打开，并只放行 `https:`、`http:`、`mailto:`。
-- 权限请求：`setPermissionRequestHandler` 默认拒绝，只放行剪贴板写入等明确需要的权限。
+- 权限请求：`setPermissionRequestHandler` 与 `setPermissionCheckHandler` 默认拒绝，设备权限一律拒绝；只放行剪贴板写入等明确需要的权限，放行清单集中定义并逐条写理由。
 
 **preload 与 IPC**：
 
@@ -1047,7 +1048,7 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 
 **应用二进制**：
 
-- 发布构建写入 fuses（配置见 ADR-0018）：关闭 `RunAsNode`、`NodeOptions`、`NodeCliInspect`、`GrantFileProtocolExtraPrivileges`，开启 ASAR 完整性校验、`OnlyLoadAppFromAsar` 与 cookie 加密。CI 读取产物的 fuse 状态并与配置比对。
+- 发布构建写入 fuses（配置见 ADR-0018）：关闭 `RunAsNode`、`NodeOptions`、`NodeCliInspect`、`GrantFileProtocolExtraPrivileges`，开启 ASAR 完整性校验、`OnlyLoadAppFromAsar` 与 cookie 加密。CI 读取产物的 fuse 状态并与配置比对。开发构建只多开 `NodeCliInspect`，便于调试打包产物；L4 的打包形态用它驱动（Playwright 经 `--inspect` 连接主进程），发布构建由 fuse 比对覆盖。
 - 平台代码签名不做（ADR-0018）。macOS：ad-hoc 签名，写入 fuses 后重新签名；hardened runtime 能否在 ad-hoc 签名下启用由 M0 验证，不能启用时如实记录；内置 node 保留 Node.js 官方签名，rg、fd 与 `.node` 原生模块用 ad-hoc 签名。Windows：不签名。
 - 没有平台签名，ASAR 完整性校验只防意外损坏；fuses 仍然写入，代价很低。
 
@@ -1343,6 +1344,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | 版本 | 日期 | 说明 |
 |---|---|---|
 | 1.0 | 2026-11-14 | 首版：基于对 Claude 官方文档、Pi v1.4.0 源码、claude-code / claw-code / OpenClaudeDesktop / open-claude-ui 参考实现与原生技术栈的调研 |
+| 2.5 | 2026-11-14 | T03 补充：3.4 增加 `apps/desktop/src/shared/`（IPC 契约）；10.3 写明应用协议当前为 `app://piarc`、权限检查处理器与设备权限默认拒绝、开发构建与发布构建只差 `NodeCliInspect` 一个 fuse 以及 L4 打包形态使用开发构建 |
 | 2.4 | 2026-11-14 | T02 补充：LF 帧编解码器放在 `piarc-protocol`（只处理字节缓冲，Rust 与 TS 各一份），`piarc-host` 负责 stdio 读写；7.4 增加"消息约定"：握手响应、错误对象与错误码段、不支持批量、会话事件信封与 `method` 的映射、兼容规则、分帧限制 |
 | 2.3 | 2026-11-14 | T01 补充（不改变依赖方向）：7.1 写明链外 crate（`piarc-napi` 对基础 crate 的直接使用、`piarc-testkit`、`piarc-devcli`、`piarc-ghostty-sys`）在 `crates/deps-rules.json` 中的位置，以及依赖规则的检查方式 |
 | 2.2 | 2026-11-14 | 制定交付计划时发现并修正的不一致：新增 `piarc-ports`（共享窄 trait）与 `piarc-ghostty-sys` 两个 crate，Job Object 归 `piarc-exec` 并经 `ProcessSpawner` 注入；plan 模式不再用 `setActiveTools` 收起写工具，改为闸门拒绝加追加消息（避免缓存失效，与 6.6.1 一致）；6.6.1 第 4 段明确 rules 的加载方式；6.6.4 的压缩后重注入与 6.15 的上限对齐；第 16 章链接交付计划 |
