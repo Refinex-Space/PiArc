@@ -21,6 +21,7 @@
 mod error;
 pub mod frame;
 pub mod keymap;
+pub mod session;
 #[allow(
     unsafe_code,
     reason = "the safe wrapper over the libghostty-vt bindings (ADR-0017); unsafe stays inside it"
@@ -28,3 +29,4 @@ pub mod keymap;
 pub mod vt;
 
 pub use error::{Error, Result};
+pub use session::{Event, EventHandler, Program, Session, SessionConfig, SessionStats};
