@@ -1175,92 +1175,92 @@
       "id": "T09-A01",
       "task": "T09",
       "description": "两个虚拟列表候选在同一组流式与滚动测量下都有数据，选定结果与理由写入库选型 ADR，架构第 8.4 节已同步。验证：测量输出、ADR 与架构文档的改动。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run bench:s1 -- --lists tanstack,virtuoso（提交 0387545，两个候选同一组测量，tmp/evidence/T09/bench/s1-packaged-full.json）：流式 60 s 每帧主线程工作 p99 tanstack 6.0 ms / virtuoso 5.5 ms，错过帧 0 / 8、合成器丢帧 0 / 13（virtuoso 另有 108 ms 长动画帧）；万条滚动 60.0 / 60.0 fps；千条冷加载中位 50.6 / 99.6 ms；内存 180 / 179 MiB；L4 滚动跟随 5/5 与 3/5（tmp/evidence/T09/compare/scroll-l4-both-lists.txt）。选定 @tanstack/react-virtual，理由与放弃方案写入 docs/adr/0022-transcript-rendering-libraries.md（补充，已接受）；架构 v2.12 第 8.4 节与第 4 章已同步。"
     },
     {
       "id": "T09-A02",
       "task": "T09",
       "description": "100 token/s 流式 60 秒期间，渲染进程主线程没有超过 50 ms 的长任务，帧时间 p99 ≤ 16 ms。验证：测量输出（含机型）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run bench:s1 -- --form packaged（最终构建，tmp/evidence/T09/bench/s1-packaged-final.json；Apple M1 Max 32 GB、macOS 26.5.2、60 Hz 外接屏，非基准机型 M1 Pro）：100 token/s 流式 60 s，CDP 追踪中渲染主线程超过 50 ms 的任务 0 个（页面 longtask、LoAF 也为 0）；每帧主线程工作 p50 2.7 / p95 4.8 / p99 5.7 / 最大 15.3 ms（3,607 帧无一超过 16 ms）；页面 60.0 fps、错过 0 帧，合成器 3,564 帧全部呈现、丢帧 0。口径见 S01 报告第 2 节。"
     },
     {
       "id": "T09-A03",
       "task": "T09",
       "description": "1 万条 item 自动滚动期间帧率 ≥ 60 fps。验证：测量输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "同上 s1-packaged-final.json：1 万条 item，3,000 px/s 自动滚动 10 s（30,002 px）60.1 fps，错过 0 帧，合成器丢帧 0，每帧主线程工作 p99 2.2 ms（60 Hz 屏，帧率上限 60）。"
     },
     {
       "id": "T09-A04",
       "task": "T09",
       "description": "1,000 条 item 冷加载 ≤ 300 ms。验证：测量输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "同上 s1-packaged-final.json：1,000 条 item 冷加载 5 次（每次重新加载页面），从数据进入 store 到可见行全部显示解析后的 Markdown 并绘制一帧：59.8、48.5、51.7、51.0、51.8 ms，中位 51.7 ms ≤ 300 ms。"
     },
     {
       "id": "T09-A05",
       "task": "T09",
       "description": "流式中只重解析最后一个未完成的块；未闭合的代码围栏与强调被自动闭合；流结束后的渲染结果与一次性完整解析的结果一致。验证：单元测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npx vitest run apps/desktop/src/renderer/transcript/markdown：incremental.test.ts（语料与边界用例在逐字符、7、64 字符、近似 token、随机切分下，结束结果 toEqual 一次性 parseMarkdown；每次更新重新词法分析的尾部最多含 2 个块且起点逼近末尾；稳定块对象跨更新保持同一引用；未闭合的 ** 与 ` 渲染为 strong/code，未闭合围栏为 complete:false 的代码块，消息结束后 complete:true）、autoclose.test.ts（26 个闭合/不闭合用例）全部通过；L4 transcript-render.e2e.ts 的“open emphasis renders as emphasis while streaming”通过。"
     },
     {
       "id": "T09-A06",
       "task": "T09",
       "description": "代码高亮在 Worker 中完成，流式代码块先显示纯文本、完成后显示高亮；渲染进程代码中引入 `innerHTML` 或 `dangerouslySetInnerHTML` 被 ESLint 拦截。验证：组件测试与临时违规时的 lint 输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4（dev 与 packaged）transcript-render.e2e.ts：流式代码块记录到 complete=false/plain，结束后 complete=true/highlighted 且有带颜色的 token，未出现流式中高亮；页面自身的资源记录中没有 rust/github-light/github-dark 语法与主题 chunk（由 highlight.worker 加载）；未知语言与缩进代码保持纯文本。ESLint：临时文件写入 innerHTML、outerHTML、insertAdjacentHTML、createContextualFragment、document.write、dangerouslySetInnerHTML，npx eslint 报 no-restricted-syntax 6 处（共 7 个错误，exit 1），输出见 tmp/evidence/T09/lint/innerhtml-violation.txt，文件已删除。"
     },
     {
       "id": "T09-A07",
       "task": "T09",
       "description": "XSS 载荷集（`<script>`、内联事件属性、`javascript:` 链接、带脚本的 SVG、`<iframe>`、`<style>`）全部以文本呈现，测试中的哨兵变量未被改动，CSP 与 T03 相同。验证：Playwright 测试与 CSP 对比。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4（dev 与 packaged）transcript-security.e2e.ts 5 个用例通过：18 个载荷（<script>、onerror/onmouseover、javascript: 链接含 &#106; 编码与自动链接、带 script/onload 的 SVG、<iframe src/srcdoc>、<style>、<object>/<embed>、<meta> 刷新、data: 与远程图片、<form>）逐条与合并后各渲染一次，并流式渲染一次：哨兵 __piarcXssSentinel 未变，CSP 违规 0，transcript 内无 script/iframe/style/svg/object/embed/meta/form/img/link/base，无 on* 属性，链接只有 https/http/mailto，对外请求 0，载荷原文以文本出现；页面与两个 Worker 脚本的 CSP 响应头等于 PRODUCTION_CSP（csp.ts 未改动）。截图 tmp/evidence/T09/l4/transcript-security*/xss.png。"
     },
     {
       "id": "T09-A08",
       "task": "T09",
       "description": "输入法合成期间按 Enter、Esc、`/`、`@` 不触发发送、停止、命令或提及；合成结束后行为恢复。验证：基于 CDP 合成的测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4（dev 与 packaged）composer.e2e.ts：CDP Input.imeSetComposition 合成中（空闲与运行中各一次）按 229 的 Enter/Esc/'/'/'@'、带自身键码的 Enter/Esc、合成文本含 '@/'，actions 为空、无提及弹窗，合成中 keydown 全部带 isComposing 或 229；合成开始前到达的 229 Enter/Esc 不发送、不停止、不换行；合成文本恰为 '@' 或 '/' 不触发；Input.insertText 提交后 '@' 打开候选、Enter 发送、'/' 触发命令。变异对照：去掉守卫后后两类用例失败，恢复后通过。真实拼音/日文输入法核对清单见 S01 报告第 7 节（待用户）。"
     },
     {
       "id": "T09-A09",
       "task": "T09",
       "description": "composer 的 Enter、Shift+Enter、Mod+Enter、Esc 在空闲与运行中两种状态下符合交付物 3；@ 胶囊的存储数据、显示形态与发送文本三者分开。验证：组件测试与 Playwright 测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "单元 composer.test.ts（intentFor：Enter send/steer、Shift-Enter newline、Mod-Enter send/queue、Escape null/stop；mention 的数据 {id,label,path}、chip 显示、发送文本 '@path' 三者分开）与 L4 composer.e2e.ts（空闲：Enter 发送、Shift+Enter 换行、Mod+Enter 发送、Esc 无动作、空白不发送；运行中：Enter steer、Mod+Enter queue、Esc stop；@main 选择后 chip 显示 '@main.ts'、发送 'look at @apps/desktop/src/main/main.ts please'、mentions 为路径、transcript 回显 chip；Esc 先关闭候选再停止）在 dev 与 packaged 两种形态通过。"
     },
     {
       "id": "T09-A10",
       "task": "T09",
       "description": "跨段落与代码块的选择复制得到正确文本；\"复制本条消息\"的 Markdown 与纯文本两种格式正确。验证：Playwright 测试（读取剪贴板）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4（dev 与 packaged）transcript-copy.e2e.ts 通过（主进程 clipboard.readText 读取，用例前后保存并恢复剪贴板）：跨段落、列表与已高亮代码块的选择 ⌘C 得到 'paragraph with bold text.\\n\\nitem one\\nitem two\\nconst a = 1;\\n  const b = 2;\\nAfter the code'；跨两条消息的选择不含按钮文字；“Copy Markdown”得到原文，“Copy text”得到纯文本（列表 •、代码保留缩进、链接 'docs (https://example.com/docs)'）。剪贴板写入权限 clipboard-sanitized-write 加入 PERMISSION_ALLOWLIST（带理由，permissions.test.ts 断言放行清单只有这一项、clipboard-read 仍拒绝）。"
     },
     {
       "id": "T09-A11",
       "task": "T09",
       "description": "在底部时内容增长自动贴底；向上滚动超过解除阈值后不再跟随；回到恢复阈值内重新跟随；离底超过按钮阈值时显示\"回到底部\"。验证：Playwright 测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4（dev 与 packaged）transcript-scroll.e2e.ts 5 个用例通过：200 条历史后 200 token/s 流式，逐帧（绘制后）采样离底距离最大 ≤ 1 px；滚轮上滚后 following=false、内容继续增长时 scrollTop 不变、显示“Back to bottom”，滚回底部恢复跟随；PageUp 解除、按钮恢复并贴底；拖动（自绘）滚动条解除；边界：离底 2 px 仍跟随、3 px 解除，200 px 不显示按钮、201 px 显示，41 px 不恢复、40 px 恢复（阈值读自 SCROLL_FOLLOW）。单元 scroll-follow.test.ts 7 个用例通过。"
     },
     {
       "id": "T09-A12",
       "task": "T09",
       "description": "S1 报告（macOS 部分）含测量数据、调校参数、真实输入法核对结果（或\"待用户核对\"清单）与待 W0 的项，`docs/spikes/README.md` 已更新。验证：文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/spikes/S01-transcript-composer.md：验证环境与机型（M1 Max，与基准机型不同已注明）、测量数据与口径、调校参数表、XSS 结果、CDP 输入法结果、待用户核对清单（M1–M10：拼音、日文、触控板、滚动条、复制）、待 W0 的项（微软拼音、Windows 性能测量）；docs/spikes/README.md 的 S1 行与 S10 行已更新。"
     },
     {
       "id": "T09-A13",
       "task": "T09",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify：13 步全部 PASS（Prettier、ESLint、tsc、Core 快照、Vitest、cargo fmt/clippy/test、协议漂移、契约样本、cargo-deny、crate 依赖、验收清单），All 13 steps passed。另 npm run test:e2e -w @piarc/desktop：dev 与 packaged 两种形态 124 passed。"
     },
     {
       "id": "T10-A01",

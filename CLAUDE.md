@@ -39,6 +39,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `npm run test:e2e -w @piarc/desktop` | L4：Playwright 驱动开发形态与打包产物（先打开发构建） |
 | `npm run check:fuses` | 发布构建产物的 fuse 与 `apps/desktop/fuses.mjs` 比对 |
 | `npm run bench:s2 -- --form packaged` | S2 基准：事件吞吐、主进程事件循环延迟、同步调用、大批次、空闲内存（先打开发构建） |
+| `npm run bench:s1 -- --form packaged` | S1 基准：transcript 流式 60 s、万条滚动、千条冷加载、渲染进程内存（CDP 追踪，先打开发构建） |
 | `node scripts/ci/load-core.mjs --module <file.node>` | 在 Node 与 Electron 中加载一个 Core 模块并跑一次事件通道 |
 | `cargo run -q -p piarc-testkit --bin piarc-mock-provider -- --port 0 --scenarios <文件或目录>` | 启动严格 mock provider 独立进程：stdout 第一行是端口，stdin 关闭后退出（`testing.md` 第 10 节） |
 
@@ -74,5 +75,6 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - 反过来，`cargo test`（`piarc-testkit` 的 `agent_host` 测试）会用 PATH 上的 node 运行 `scripts/dev/build-agent-host.mjs` 打包 Agent Host，需要先 `npm ci --ignore-scripts`。
 - Pi 锁定 1.5.2（`@earendil-works/*` 全部同版本，`agent-host` 与 `packages/testkit` 一起升级）；Pi 的 API 以 `node_modules` 中的类型声明或 `reference/pi` 的同一 tag 为准，基线差异见 `docs/research/pi-v1.4.0-baseline.md` 文末。
 - L4 的 `dev` 形态跑上次打包生成的 `apps/desktop/.vite/`：改了 `apps/desktop/src/` 后先重新 `npm run package:desktop -- --flavor development`。
+- 渲染进程不从 HTML 字符串建 DOM（ESLint 禁止 `innerHTML`、`dangerouslySetInnerHTML` 等）；模型输出经 `transcript/markdown/` 的增量解析与 `MarkdownView` 渲染，代码高亮只用 shiki 的 JavaScript 正则引擎，CSP 不放宽（ADR-0022）。复制相关的 L4 会写系统剪贴板（用例结束后恢复文本）。
 - `cargo test`（含 `npm run verify`）会在登录钥匙串中以 `piarc-test.` 开头的服务名创建并删除测试条目；测试代码只用 `test_master_key_name` 命名条目，不碰 `piarc-core::identity` 的正式服务名。
 - Agent Host 的工具不碰文件系统与子进程：`agent-host/src/tools/`、`src/harness/` 禁止导入 `fs`、`child_process`，I/O 一律经 AHP `fs/*`、`exec/*` 由 Core 执行（ADR-0004、ADR-0020）；端到端测试的 I/O spy 会抓到绕过。
