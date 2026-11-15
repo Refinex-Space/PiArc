@@ -117,7 +117,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 已完成 | 3a8744f |
 | T08 | [凭据保险箱](tasks/T08-credential-vault.md) | 1 | T06；D2 | macOS | high | 中 | S5 | 已完成 | 83dc25b |
 | T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 已完成 | 9c0738d |
-| T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 阻塞（等待用户确认 ADR-0023） | — |
+| T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 进行中 | — |
 | T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 未开始 | — |
 | T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 未开始 | — |
 | W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 未开始 | — |
@@ -308,9 +308,9 @@ T10（2026-11-15 开工；基线 verify 13 步通过；依赖 T04 为"部分完�
 - [x] 10 wterm 评估、S7 报告、spikes README、许可证来源登记、CLAUDE.md、复用表、架构与 ADR 同步（A13）
 - [x] 11 收尾：verify 13 步通过、L4 两种形态 136 项通过、验收记录（A02–A09、A12–A14 通过；A01、A10、A11 阻塞）、登记事项与会话日志（A14）
 
-等待 ADR-0023 的决定（变更型：按 ADR-0017 原文经事件 MessagePort 送帧时回显额外延迟 p95 16.2 ms）。用户采纳后续做：
+ADR-0023 已由用户在 2026-11-15 采纳（变更型：按 ADR-0017 原文经事件 MessagePort 送帧时回显额外延迟 p95 16.2 ms），续做：
 
-- [ ] 12 ADR-0023 改为"已接受"，ADR-0017 注明第 3 条被修订，架构 6.11、8.3 同步并写修订记录
+- [x] 12 ADR-0023 改为"已接受"，ADR-0017 注明第 3 条被修订，架构 6.11、8.3 同步并写修订记录
 - [ ] 13 实现：`terminal-ipc.ts` 的 `requestFrame` 返回 Core 的帧，preload 的 `requestTerminalFrame` 解析为帧、去掉 `onTerminalFrame`，`ipc.ts`、控制器、`terminal-ipc.test.ts`、`preload.e2e.ts` 键快照、S10 报告第 20 行同步
 - [ ] 14 重新打包、L4 两种形态、`npm run bench:s7`，更新 T10-A10、S7 报告第 1、5.2 节与 spikes README；verify；看板改为"部分完成"（A01 待 Windows CI/W0，A11 待 R1 实机核对）
 

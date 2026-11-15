@@ -32,10 +32,10 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0014](0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在 Electron 主进程 | 已接受（第 4 条被 0019 修订） |
 | [0015](0015-agent-host-runtime-bundled-node.md) | Agent Host 继续使用单独内置的 Node LTS，不复用 Electron 自带的 Node | 已接受（第 5 条被 0018 修订） |
 | [0016](0016-packaging-signing-updates.md) | 打包、签名与更新：Electron Forge；macOS Developer ID + 公证 + 内置更新；Windows 签名安装包；不上应用商店 | 已取代 → 0018 |
-| [0017](0017-terminal-libghostty-vt.md) | 内置终端：终端状态由 Core 中的 libghostty-vt 持有，渲染层可替换 | 已接受 |
+| [0017](0017-terminal-libghostty-vt.md) | 内置终端：终端状态由 Core 中的 libghostty-vt 持有，渲染层可替换 | 已接受（第 3 条被 0023 修订） |
 | [0018](0018-unsigned-distribution.md) | 不做平台代码签名：macOS 只做 ad-hoc 签名，Windows 不签名，更新与凭据存储随之调整 | 已接受 |
 | [0019](0019-event-batches-copied-not-transferred.md) | 事件批次经主进程转发时复制，不转移 ArrayBuffer（修订 ADR-0014 第 4 条） | 已接受 |
 | [0020](0020-tool-layer-composition.md) | 工具层的组成：Pi 的工具代码加 Core 的 I/O（补充 ADR-0004 第 3 条） | 已接受 |
 | [0021](0021-credential-vault-and-pi-adapter.md) | 凭据保险箱的格式、并发与 Pi 凭据接口适配（补充 ADR-0018 第 5 条） | 已接受 |
 | [0022](0022-transcript-rendering-libraries.md) | Transcript 渲染的库选型：@tanstack/react-virtual、marked 词法器、shiki JavaScript 引擎（补充 ADR-0013 第 5 条） | 已接受 |
-| [0023](0023-terminal-frames-as-pull-replies.md) | 终端帧作为拉取请求的返回值送达渲染进程，不经事件 MessagePort（修订 ADR-0017 第 3 条） | 提议 |
+| [0023](0023-terminal-frames-as-pull-replies.md) | 终端帧作为拉取请求的返回值送达渲染进程，不经事件 MessagePort（修订 ADR-0017 第 3 条） | 已接受 |

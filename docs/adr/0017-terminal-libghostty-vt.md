@@ -1,6 +1,6 @@
 # 0017. 内置终端：终端状态由 Core 中的 libghostty-vt 持有，渲染层可替换
 
-- 状态：已接受
+- 状态：已接受（第 3 条中帧的送达方式被 ADR-0023 修订：帧作为拉取请求的返回值送达，不经 MessagePort）
 - 日期：2026-11-14
 - 取代：无
 - 相关：架构文档第 6.11、7.1、16 章；`docs/research/terminal-libghostty.md`

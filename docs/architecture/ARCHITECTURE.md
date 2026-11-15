@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.13（2026-11-15） |
+| 版本 | 2.14（2026-11-15） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -247,8 +247,9 @@ PiArc/
 | [0015](../adr/0015-agent-host-runtime-bundled-node.md) | Agent Host 继续单独内置 Node LTS | 要套 Seatbelt、走 stdio、给 npx 用，Electron 自带的 Node 都做不到 |
 | [0018](../adr/0018-unsigned-distribution.md) | Electron Forge 打包；macOS 只做 ad-hoc 签名、Windows 不签名；发布清单用项目密钥签名；不上应用商店 | 免费开源、零成本；用发布清单签名保住更新的完整性 |
 | [0017](../adr/0017-terminal-libghostty-vt.md) | 终端状态由 Core 中的 libghostty-vt 持有，渲染层可替换 | agent 读屏与用户所见一致；IPC 流量与输出量无关 |
+| [0023](../adr/0023-terminal-frames-as-pull-replies.md) | 终端帧作为拉取请求的返回值送达渲染进程，不经事件 MessagePort | 按键之后 MessagePort 消息被推迟到下一帧之后处理；改为回复后回显额外延迟 p95 从 16.2 ms 降到 0.77 ms |
 
-已被取代的决策（原文保留在 `docs/adr/`）：0001、0007 → 0013；0008 → 0014；0003 → 0015；0012 → 0016 → 0018。ADR-0015 第 5 条（签名）被 ADR-0018 修订；ADR-0014 第 4 条（大块数据转移）被 ADR-0019 修订。
+已被取代的决策（原文保留在 `docs/adr/`）：0001、0007 → 0013；0008 → 0014；0003 → 0015；0012 → 0016 → 0018。ADR-0015 第 5 条（签名）被 ADR-0018 修订；ADR-0014 第 4 条（大块数据转移）被 ADR-0019 修订；ADR-0017 第 3 条中帧的送达方式（经 MessagePort）被 ADR-0023 修订。
 
 ---
 
@@ -632,11 +633,11 @@ Agent Host 按类别统计上下文构成（system prompt、工具定义、MCP �
 - **Monitor**：后台运行命令并把新增输出逐行回灌给模型（日志跟踪、CI 轮询）。
 - **终端面板**（ADR-0017）：
   - Core 的 `piarc-term` 用 portable-pty 创建 PTY（Windows 为 ConPTY），用 libghostty-vt 持有终端状态。终端状态只此一份，界面关着也照常维护。
-  - 渲染进程不解析 VT：Core 把 render state 编成增量帧（只含脏行，按行 id 复用），渲染进程按 `requestAnimationFrame` 节奏拉取并用 Canvas 绘制；隐藏的终端不产生帧。键盘、鼠标、粘贴事件发回 Core，由 libghostty-vt 按当前终端模式编码后写入 PTY。
+  - 渲染进程不解析 VT：Core 把 render state 编成增量帧（只含脏行，按行 id 复用），渲染进程按 `requestAnimationFrame` 节奏拉取并用 Canvas 绘制，帧作为拉取请求的返回值送达，不经事件 MessagePort（ADR-0023）；隐藏的终端不产生帧。键盘、鼠标、粘贴事件发回 Core，由 libghostty-vt 按当前终端模式编码后写入 PTY。
   - agent 用 formatter 读取屏幕与 scrollback 的纯文本，用 OSC 133 判断命令边界和退出状态，与用户看到的是同一个终端实例。
   - 与会话共享工作目录与环境；支持 OSC 133 shell integration；退出时保存 snapshot 以便重启后恢复。终端内容不自动进入模型上下文，用户可以把选中内容附加到对话。
   - 自研渲染器不达标时，渲染端退回 xterm.js 6 + WebGL 的字节流副本模式，Core 仍是唯一权威。
-  - T10 原型的实现（`docs/spikes/S07-terminal.md`）：每个终端一个 IO 线程（读 PTY、`vt_write`）与一个写线程（输入、按终端模式编码按键、调整尺寸、查询应答）；注册 `WRITE_PTY`、`TITLE_CHANGED`、`BELL`、`RENDER_HOLD` 四个 effects，同步输出 hold 开始时捕获当时的屏幕，超过 1 秒由 Core 结束；帧格式草案在 `piarc_protocol::term_frame`（T33 定稿），脏行与 viewer 已有的内容逐格比较后才发送；每个终端当前只有一个 viewer，换 viewer 时发 RESET 帧；标题、响铃、退出事件发到路由 `term/<id>`；页面每个动画帧最多一个在途拉取，输入后连续拉取直到回显到达（最多 50 ms）。帧的送达方式见 ADR-0023（提议）：按本节原文经事件 MessagePort 时，键入回显额外延迟 p95 16 ms，超出第 11 章预算。
+  - T10 原型的实现（`docs/spikes/S07-terminal.md`）：每个终端一个 IO 线程（读 PTY、`vt_write`）与一个写线程（输入、按终端模式编码按键、调整尺寸、查询应答）；注册 `WRITE_PTY`、`TITLE_CHANGED`、`BELL`、`RENDER_HOLD` 四个 effects，同步输出 hold 开始时捕获当时的屏幕，超过 1 秒由 Core 结束；帧格式草案在 `piarc_protocol::term_frame`（T33 定稿），脏行与 viewer 已有的内容逐格比较后才发送；每个终端当前只有一个 viewer，换 viewer 时发 RESET 帧；标题、响铃、退出事件发到路由 `term/<id>`；页面每个动画帧最多一个在途拉取，输入后连续拉取直到回显到达（最多 50 ms）。帧经事件 MessagePort 送达时，按键之后的帧要等下一帧之后才被处理，回显额外延迟 p95 16 ms；改为拉取请求的返回值后 p95 0.77 ms（ADR-0023）。
   - PTY 子进程由 portable-pty 启动（ADR-0017），不经 `ProcessSpawner`；终端承载的后台任务（T32、T33）接入时再决定进程树清理的方式。
 
 ### 6.12 Worktree 与并行会话
@@ -865,7 +866,7 @@ impl Session {
 - 渲染进程能调用的命令是上面接口的子集，在 preload 中逐个列出；主进程校验调用来源（发起请求的窗口和页面地址）后才转给 Core。
 - NAPI-RS 生成的 TypeScript 声明与 `packages/protocol` 的类型都纳入 L1 快照测试，接口变化必须同时更新快照。
 - 已实现的导出面（T04）：`CoreRuntime.create(options, onEvents)`、`shutdown(): Promise<void>`、`state`。`onEvents` 每次收到一组批次 `{ route, seq, payload }`：`route` 是路由键（1–128 个 `[A-Za-z0-9._:/-]`，`core/` 前缀保留给 Core 自己的事件，例如 `core/errors`），`seq` 是每个路由从 1 起连续的批次序号，`payload` 是该路由事件的 UTF-8 JSON 数组（`Uint8Array`），主进程不解析，以结构化克隆转发（ADR-0019）。开发构建另有 `testing` 导出（演示事件源、同步轻量方法 `echo`、计数、panic 触发），发布构建不含。
-- 终端导出（T10）：`createTerminal`、`terminalInput`、`terminalKey`、`terminalResize`、`terminalFrame(id, viewer, full): Promise<Uint8Array>`、`closeTerminal`；开发构建另有 `terminalText`、`terminalStats`、`terminalProbeEcho`。主进程校验终端归属（窗口只能用自己创建的终端，窗口销毁时关闭它们），帧不解析、原样转给发起请求的窗口。
+- 终端导出（T10）：`createTerminal`、`terminalInput`、`terminalKey`、`terminalResize`、`terminalFrame(id, viewer, full): Promise<Uint8Array>`、`closeTerminal`；开发构建另有 `terminalText`、`terminalStats`、`terminalProbeEcho`。主进程校验终端归属（窗口只能用自己创建的终端，窗口销毁时关闭它们），帧不解析，作为拉取请求的返回值交给发起的窗口（ADR-0023）。
 - 错误跨 NAPI 时是抛出的 `Error`，带 `code` 与 `data: { kind, retryable, details? }`（`piarc_protocol::ErrorObject` 的形状）；导出函数在边界捕获 panic，kind 为 `internalError`。Core API 专用的错误类别有 `shuttingDown`（关闭后的请求）与 `busy`（队列满，可重试）。
 - Promise 由 Core 自己的运行时经 NAPI-RS 的 `JsDeferred` 结算，不用 `#[napi] async fn`（它会另起 NAPI-RS 的全局 tokio 运行时）。
 - 声明快照在 `apps/desktop/src/main/core/native/`（`piarc-core.d.ts` 为发布构建，`piarc-core.testing.d.ts` 为开发构建），由 `npm run build:core` 生成，verify 比对。
@@ -941,6 +942,7 @@ Core 事件批次 ──► 主进程（只转发）──MessagePort──► �
 3. store 自己实现，基于 React 的 `useSyncExternalStore`，按会话和 item 粒度订阅。流式增量只让最后一个 item 的订阅者重新渲染，不触发整棵组件树刷新。
 4. 实体快照按 `revision` 门控，旧数据丢弃。
 5. 事件批次（包括 transcript 窗口、长 diff 等大块数据）以二进制载荷经结构化克隆复制转发：Electron 主进程的 `MessagePortMain` 只能转移端口，不能转移 `ArrayBuffer`（ADR-0019）。单批转发耗时计入第 11 章"Core 事件到渲染进程"的预算；大块内容的体量从源头控制，例如按需拉取 transcript 窗口。
+6. 终端帧不走事件通道：渲染进程按动画帧拉取，帧作为拉取请求（`ipcRenderer.invoke`）的返回值送达；事件 MessagePort 上的消息在按键之后会被推迟到下一帧之后处理（ADR-0023）。终端的标题、响铃、退出事件仍经事件通道（路由 `term/<id>`）。
 
 ### 8.4 Transcript 渲染管线
 
@@ -1404,6 +1406,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | 版本 | 日期 | 说明 |
 |---|---|---|
 | 1.0 | 2026-11-14 | 首版：基于对 Claude 官方文档、Pi v1.4.0 源码、claude-code / claw-code / OpenClaudeDesktop / open-claude-ui 参考实现与原生技术栈的调研 |
+| 2.14 | 2026-11-15 | ADR-0023 接受：第 4 章加入 ADR-0023 并注明 ADR-0017 第 3 条被修订；6.11 写明帧作为拉取请求的返回值送达及实测依据；8.3 新增第 6 条（终端帧不走事件通道）；7.6 的终端导出同步 |
 | 2.13 | 2026-11-15 | T10 补充：6.11 写明终端原型的线程、effects、同步输出处理、帧格式草案位置、viewer 与 RESET、事件路由、拉取节奏与 PTY 子进程的启动方式，并指出按原文经 MessagePort 送帧时回显超出预算（ADR-0023 提议，未改 ADR-0017 原文）；7.1 写明 `unsafe` 也可出现在 `piarc-term` 的 `vt` 模块；7.6 加入终端导出与主进程的归属校验；13.1、13.2 写明 libghostty-vt 的锁定文件、缓存与 Windows DLL 的随附方式 |
 | 2.8 | 2026-11-15 | T05 补充：12.2 写明严格 mock provider 的实现位置、运行形态、场景选择与 400 错误体约定，细节指向 `testing.md` 第 10 节 |
 | 2.12 | 2026-11-15 | T09 补充（ADR-0022）：第 4 章加入 ADR-0022；8.4 写明选定的库、增量解析的稳定前缀规则与自动闭合、高亮的 JavaScript 引擎与限制、校准后的流式节奏与滚动跟随常量、复制的行为与剪贴板权限；10.3 权限放行清单加入 `clipboard-sanitized-write` |
