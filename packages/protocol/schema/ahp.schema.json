@@ -1,0 +1,669 @@
+{
+  "$defs": {
+    "AgentMessageDeltaParams": {
+      "description": "Parameters of `item/agentMessage/delta`.",
+      "properties": {
+        "delta": {
+          "description": "Text to append.",
+          "type": "string"
+        },
+        "itemId": {
+          "$ref": "#/$defs/ItemId",
+          "description": "The `agentMessage` item being extended."
+        },
+        "seq": {
+          "description": "Sequence number, monotonically increasing within the session.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session the event belongs to."
+        },
+        "ts": {
+          "description": "Time the event was produced, in milliseconds since the Unix epoch (UTC).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "turnId": {
+          "$ref": "#/$defs/TurnId",
+          "description": "The turn the item belongs to."
+        }
+      },
+      "required": ["sessionId", "seq", "ts", "turnId", "itemId", "delta"],
+      "type": "object"
+    },
+    "Capability": {
+      "description": "A named optional protocol feature, for example `planMode`.\n\nCapabilities are open strings rather than an enum: a peer must accept capability names\nit does not know, because that is how newer minor versions announce additions.",
+      "type": "string"
+    },
+    "CoreWelcome": {
+      "description": "Result of `host/hello` (`core/welcome`).",
+      "properties": {
+        "connectionEpoch": {
+          "description": "Incremented every time Core (re)starts an Agent Host for the workspace; lets both\nsides tell connections apart after a restart.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "enabled": {
+          "description": "Capabilities enabled for this connection: the intersection of both sides.",
+          "items": {
+            "$ref": "#/$defs/Capability"
+          },
+          "type": "array"
+        },
+        "protocol": {
+          "$ref": "#/$defs/ProtocolVersion",
+          "description": "Protocol version spoken by Core."
+        },
+        "workspace": {
+          "description": "Absolute path of the workspace this Agent Host serves.",
+          "type": "string"
+        }
+      },
+      "required": ["protocol", "enabled", "workspace", "connectionEpoch"],
+      "type": "object"
+    },
+    "ErrorData": {
+      "description": "Structured part of an [`ErrorObject`].",
+      "properties": {
+        "details": {
+          "description": "Optional kind-specific details."
+        },
+        "kind": {
+          "$ref": "#/$defs/ErrorKind",
+          "description": "Machine-readable error category."
+        },
+        "retryable": {
+          "description": "Whether repeating the same request could succeed.",
+          "type": "boolean"
+        }
+      },
+      "required": ["kind", "retryable"],
+      "type": "object"
+    },
+    "ErrorKind": {
+      "description": "Machine-readable error categories.\n\nAdding a variant is not backward compatible for receivers on an older minor version;\nsee the crate documentation on compatibility.",
+      "oneOf": [
+        {
+          "const": "parseError",
+          "description": "Invalid JSON or invalid UTF-8 was received.",
+          "type": "string"
+        },
+        {
+          "const": "invalidRequest",
+          "description": "The message is not a valid AHP JSON-RPC message (including batches).",
+          "type": "string"
+        },
+        {
+          "const": "methodNotFound",
+          "description": "The method does not exist or is not available.",
+          "type": "string"
+        },
+        {
+          "const": "invalidParams",
+          "description": "The method parameters are invalid.",
+          "type": "string"
+        },
+        {
+          "const": "internalError",
+          "description": "An unexpected internal failure.",
+          "type": "string"
+        },
+        {
+          "const": "protocolVersionMismatch",
+          "description": "The peers' major protocol versions differ.",
+          "type": "string"
+        },
+        {
+          "const": "frameTooLarge",
+          "description": "A frame exceeded the receiver's size limit.",
+          "type": "string"
+        }
+      ]
+    },
+    "ErrorObject": {
+      "description": "JSON-RPC 2.0 error object with PiArc's mandatory structured `data`.",
+      "properties": {
+        "code": {
+          "description": "Error code; see [`code`] for the standard and application ranges.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "data": {
+          "$ref": "#/$defs/ErrorData",
+          "description": "Structured, machine-readable error data."
+        },
+        "message": {
+          "description": "Human-readable description. Not meant for branching.",
+          "type": "string"
+        }
+      },
+      "required": ["code", "message", "data"],
+      "type": "object"
+    },
+    "ErrorResponse": {
+      "description": "An error response. It has `error` and must not have `result`.",
+      "properties": {
+        "error": {
+          "$ref": "#/$defs/ErrorObject",
+          "description": "The structured error."
+        },
+        "id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RequestId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The id of the request being answered; `null` when it could not be determined (for\nexample a parse error). The member itself is required."
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion",
+          "description": "Always `\"2.0\"`."
+        },
+        "result": false
+      },
+      "required": ["jsonrpc", "id", "error"],
+      "type": "object"
+    },
+    "HostHelloParams": {
+      "description": "Parameters of `host/hello`.",
+      "properties": {
+        "capabilities": {
+          "description": "Capabilities the Agent Host supports.",
+          "items": {
+            "$ref": "#/$defs/Capability"
+          },
+          "type": "array"
+        },
+        "pi": {
+          "description": "Version of the Pi SDK the Agent Host runs.",
+          "type": "string"
+        },
+        "protocol": {
+          "$ref": "#/$defs/ProtocolVersion",
+          "description": "Protocol version spoken by the Agent Host."
+        }
+      },
+      "required": ["protocol", "pi", "capabilities"],
+      "type": "object"
+    },
+    "HostHelloRequest": {
+      "description": "Request for `host/hello`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "host/hello",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/HostHelloParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "HostHelloResponse": {
+      "description": "Successful response to `host/hello`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/CoreWelcome"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "Item": {
+      "description": "An item in its current state, discriminated by the `type` member. Every variant\ncarries `itemId` and `status`.",
+      "oneOf": [
+        {
+          "description": "Text produced by the agent.",
+          "properties": {
+            "itemId": {
+              "$ref": "#/$defs/ItemId",
+              "description": "The item's identifier."
+            },
+            "status": {
+              "$ref": "#/$defs/ItemStatus",
+              "description": "Lifecycle state."
+            },
+            "text": {
+              "description": "The message text accumulated so far (complete in `item/completed`).",
+              "type": "string"
+            },
+            "type": {
+              "const": "agentMessage",
+              "type": "string"
+            }
+          },
+          "required": ["type", "itemId", "status", "text"],
+          "type": "object"
+        }
+      ]
+    },
+    "ItemAgentMessageDeltaNotification": {
+      "description": "Notification `item/agentMessage/delta`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "item/agentMessage/delta",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/AgentMessageDeltaParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "ItemCompletedNotification": {
+      "description": "Notification `item/completed`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "item/completed",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ItemEventParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "ItemEventParams": {
+      "description": "Parameters of `item/started` and `item/completed`.",
+      "properties": {
+        "item": {
+          "$ref": "#/$defs/Item",
+          "description": "The item's state: `inProgress` when started, final when completed."
+        },
+        "seq": {
+          "description": "Sequence number, monotonically increasing within the session.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session the event belongs to."
+        },
+        "ts": {
+          "description": "Time the event was produced, in milliseconds since the Unix epoch (UTC).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "turnId": {
+          "$ref": "#/$defs/TurnId",
+          "description": "The turn the item belongs to."
+        }
+      },
+      "required": ["sessionId", "seq", "ts", "turnId", "item"],
+      "type": "object"
+    },
+    "ItemId": {
+      "description": "Item identifier, unique within a session.",
+      "type": "string"
+    },
+    "ItemStartedNotification": {
+      "description": "Notification `item/started`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "item/started",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ItemEventParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "ItemStatus": {
+      "description": "Lifecycle state of an item.",
+      "oneOf": [
+        {
+          "const": "inProgress",
+          "description": "Started and not finished yet.",
+          "type": "string"
+        },
+        {
+          "const": "completed",
+          "description": "Finished successfully.",
+          "type": "string"
+        },
+        {
+          "const": "failed",
+          "description": "Finished with an error.",
+          "type": "string"
+        },
+        {
+          "const": "declined",
+          "description": "Rejected by the user or by policy before it ran.",
+          "type": "string"
+        },
+        {
+          "const": "interrupted",
+          "description": "Stopped because the turn was aborted.",
+          "type": "string"
+        }
+      ]
+    },
+    "JsonRpcVersion": {
+      "const": "2.0",
+      "type": "string"
+    },
+    "Notification": {
+      "description": "A notification (no `id`, no response) whose method is not interpreted.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion",
+          "description": "Always `\"2.0\"`."
+        },
+        "method": {
+          "description": "Method name, for example `turn/started`.",
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": true,
+          "description": "Named parameters. When present it must be an object (`null` is rejected).",
+          "type": "object"
+        }
+      },
+      "required": ["jsonrpc", "method"],
+      "type": "object"
+    },
+    "ProtocolVersion": {
+      "description": "Protocol version as \"major.minor\", for example \"1.0\".",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+      "type": "string"
+    },
+    "Request": {
+      "description": "A request whose method is not interpreted.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId",
+          "description": "Correlates the response with this request."
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion",
+          "description": "Always `\"2.0\"`."
+        },
+        "method": {
+          "description": "Method name, for example `host/hello`.",
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": true,
+          "description": "Named parameters. When present it must be an object (`null` is rejected).",
+          "type": "object"
+        }
+      },
+      "required": ["jsonrpc", "id", "method"],
+      "type": "object"
+    },
+    "RequestId": {
+      "anyOf": [
+        {
+          "description": "Integer id.",
+          "format": "int64",
+          "type": "integer"
+        },
+        {
+          "description": "String id.",
+          "type": "string"
+        }
+      ],
+      "description": "A request id: an integer or a string. `null` and fractional numbers are not accepted."
+    },
+    "SessionEventNotification": {
+      "description": "Any session notification, read without interpreting its method: header plus payload.\nCore uses it to track `seq` for every session event.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion",
+          "description": "Always `\"2.0\"`."
+        },
+        "method": {
+          "description": "The event type, for example `item/completed`.",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SessionEventParams",
+          "description": "Header and payload."
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "SessionEventParams": {
+      "additionalProperties": true,
+      "description": "`params` of a session notification: the header plus the method-specific payload.",
+      "properties": {
+        "seq": {
+          "description": "Sequence number, monotonically increasing within the session.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session the event belongs to."
+        },
+        "ts": {
+          "description": "Time the event was produced, in milliseconds since the Unix epoch (UTC).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["sessionId", "seq", "ts"],
+      "type": "object"
+    },
+    "SessionId": {
+      "description": "Session identifier.",
+      "type": "string"
+    },
+    "SuccessResponse": {
+      "description": "A successful response. It has `result` and must not have `error`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId",
+          "description": "The id of the request being answered."
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion",
+          "description": "Always `\"2.0\"`."
+        },
+        "result": {
+          "description": "The method's result; any JSON value, including `null`."
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "TurnCompletedNotification": {
+      "description": "Notification `turn/completed`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "turn/completed",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/TurnCompletedParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "TurnCompletedParams": {
+      "description": "Parameters of `turn/completed`.",
+      "properties": {
+        "seq": {
+          "description": "Sequence number, monotonically increasing within the session.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session the event belongs to."
+        },
+        "status": {
+          "$ref": "#/$defs/TurnStatus",
+          "description": "How it ended."
+        },
+        "ts": {
+          "description": "Time the event was produced, in milliseconds since the Unix epoch (UTC).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "turnId": {
+          "$ref": "#/$defs/TurnId",
+          "description": "The turn that ended."
+        }
+      },
+      "required": ["sessionId", "seq", "ts", "turnId", "status"],
+      "type": "object"
+    },
+    "TurnId": {
+      "description": "Turn identifier, unique within a session.",
+      "type": "string"
+    },
+    "TurnStartedNotification": {
+      "description": "Notification `turn/started`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "turn/started",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/TurnStartedParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "TurnStartedParams": {
+      "description": "Parameters of `turn/started`.",
+      "properties": {
+        "seq": {
+          "description": "Sequence number, monotonically increasing within the session.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session the event belongs to."
+        },
+        "ts": {
+          "description": "Time the event was produced, in milliseconds since the Unix epoch (UTC).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "turnId": {
+          "$ref": "#/$defs/TurnId",
+          "description": "The turn that started."
+        }
+      },
+      "required": ["sessionId", "seq", "ts", "turnId"],
+      "type": "object"
+    },
+    "TurnStatus": {
+      "description": "How a turn ended.",
+      "oneOf": [
+        {
+          "const": "completed",
+          "description": "The turn ran to completion.",
+          "type": "string"
+        },
+        {
+          "const": "failed",
+          "description": "The turn ended with an error.",
+          "type": "string"
+        },
+        {
+          "const": "interrupted",
+          "description": "The turn was aborted.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/Request"
+    },
+    {
+      "$ref": "#/$defs/SuccessResponse"
+    },
+    {
+      "$ref": "#/$defs/ErrorResponse"
+    },
+    {
+      "$ref": "#/$defs/Notification"
+    },
+    {
+      "$ref": "#/$defs/SessionEventNotification"
+    },
+    {
+      "$ref": "#/$defs/HostHelloRequest"
+    },
+    {
+      "$ref": "#/$defs/HostHelloResponse"
+    },
+    {
+      "$ref": "#/$defs/TurnStartedNotification"
+    },
+    {
+      "$ref": "#/$defs/TurnCompletedNotification"
+    },
+    {
+      "$ref": "#/$defs/ItemStartedNotification"
+    },
+    {
+      "$ref": "#/$defs/ItemCompletedNotification"
+    },
+    {
+      "$ref": "#/$defs/ItemAgentMessageDeltaNotification"
+    }
+  ],
+  "description": "Any message covered by the Agent Host Protocol 1.0 contracts. Generated from the piarc-protocol crate by `npm run gen:protocol`; do not edit.",
+  "title": "AhpMessage"
+}

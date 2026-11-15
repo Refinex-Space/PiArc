@@ -1,0 +1,78 @@
+{
+  "$comment": "Generated from the piarc-protocol crate by `npm run gen:protocol`; do not edit.",
+  "contracts": [
+    {
+      "kind": "message",
+      "method": null,
+      "name": "jsonrpc/request",
+      "schema": "Request"
+    },
+    {
+      "kind": "message",
+      "method": null,
+      "name": "jsonrpc/response",
+      "schema": "SuccessResponse"
+    },
+    {
+      "kind": "message",
+      "method": null,
+      "name": "jsonrpc/errorResponse",
+      "schema": "ErrorResponse"
+    },
+    {
+      "kind": "message",
+      "method": null,
+      "name": "jsonrpc/notification",
+      "schema": "Notification"
+    },
+    {
+      "kind": "message",
+      "method": null,
+      "name": "envelope/sessionEvent",
+      "schema": "SessionEventNotification"
+    },
+    {
+      "kind": "request",
+      "method": "host/hello",
+      "name": "host/hello",
+      "schema": "HostHelloRequest"
+    },
+    {
+      "kind": "response",
+      "method": "host/hello",
+      "name": "core/welcome",
+      "schema": "HostHelloResponse"
+    },
+    {
+      "kind": "notification",
+      "method": "turn/started",
+      "name": "turn/started",
+      "schema": "TurnStartedNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "turn/completed",
+      "name": "turn/completed",
+      "schema": "TurnCompletedNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "item/started",
+      "name": "item/started",
+      "schema": "ItemStartedNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "item/completed",
+      "name": "item/completed",
+      "schema": "ItemCompletedNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "item/agentMessage/delta",
+      "name": "item/agentMessage/delta",
+      "schema": "ItemAgentMessageDeltaNotification"
+    }
+  ],
+  "protocolVersion": "1.0"
+}

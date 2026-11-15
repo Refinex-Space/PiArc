@@ -55,6 +55,8 @@ export const STEPS = [
     command: cargo(['clippy', '--workspace', '--all-targets', '--locked', '--', '-D', 'warnings']),
   },
   { name: 'cargo test', command: cargo(['test', '--workspace', '--locked']) },
+  { name: 'protocol drift', command: nodeScript('scripts/ci/check-protocol-drift.mjs') },
+  { name: 'contract samples', command: nodeScript('scripts/ci/check-contract-samples.mjs') },
   { name: 'cargo-deny', command: cargoDeny },
   { name: 'crate dependency rules', command: nodeScript('scripts/ci/check-crate-deps.mjs') },
   { name: 'acceptance list', command: nodeScript('scripts/plan/check-acceptance.mjs') },

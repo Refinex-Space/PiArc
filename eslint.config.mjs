@@ -40,5 +40,15 @@ export default defineConfig(
       '@typescript-eslint/no-import-type-side-effects': 'error',
     },
   },
+  {
+    // Generated from the protocol schema (`npm run gen:protocol`). Only the two stylistic
+    // rules about the shape json-schema-to-typescript emits are off; every correctness
+    // rule still applies.
+    files: ['packages/protocol/src/generated/**'],
+    rules: {
+      '@typescript-eslint/consistent-type-definitions': 'off',
+      '@typescript-eslint/consistent-indexed-object-style': 'off',
+    },
+  },
   prettier,
 );

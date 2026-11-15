@@ -4,5 +4,11 @@
   "private": true,
   "description": "TypeScript types for AHP and Core API, generated from piarc-protocol JSON Schema.",
   "license": "MIT",
-  "type": "module"
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  }
 }
