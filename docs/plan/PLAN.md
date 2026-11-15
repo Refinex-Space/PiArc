@@ -301,7 +301,7 @@ T05 严格校验的 mock provider（2026-11-15 开工，基线 `npm run verify` 
 - [x] 3. 线格式编码：Anthropic Messages SSE、OpenAI Chat Completions 分块（A01）；工具参数至少 3 段增量（A04）
 - [x] 4. 请求解析与校验器：配对、角色顺序、工具 schema、system 必要段落、缓存断点数量与位置（A02、A03）
 - [x] 5. HTTP 服务（库形态）：场景选择、错误注入、请求记录与查询（A05、A06、A07）
-- [ ] 6. 独立进程 bin：`--port 0`、stdout 首行端口、stdin 关闭退出、HTTP 查询端点（A07、A08）
+- [x] 6. 独立进程 bin：`--port 0`、stdout 首行端口、stdin 关闭退出、HTTP 查询端点（A07、A08）
 - [ ] 7. `packages/testkit` 工作区：pi-ai 精确锁定，两种线格式的工具调用往返（A09、A10、A11）
 - [ ] 8. 文档：crate 文档与 `CLAUDE.md`、`testing.md`、`coding-standards.md` 复用表、架构同步、登记事项
 - [ ] 9. 收尾：`npm run verify`（A12）、`acceptance.json`、看板与会话日志
