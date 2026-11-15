@@ -114,7 +114,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 部分完成 | aa2817f |
 | T05 | [严格校验的 mock provider](tasks/T05-strict-mock-provider.md) | 1 | T02 | macOS | high | 中 | 无 | 已完成 | 1487154 |
 | T06 | [Agent Host 骨架：Pi SDK 多会话与 AHP](tasks/T06-agent-host-skeleton.md) | 1 | T04、T05 | macOS | xhigh | 大 | S3、S9 | 已完成 | 2214b08 |
-| T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 未开始 | — |
+| T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 进行中 | — |
 | T08 | [凭据保险箱](tasks/T08-credential-vault.md) | 1 | T06；D2 | macOS | high | 中 | S5 | 未开始 | — |
 | T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 未开始 | — |
 | T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 未开始 | — |
@@ -294,7 +294,20 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（当前没有进行中的任务）
+**T07 Operations 委托与规范名工具**（开工 2026-11-15，基线 verify 13 步全绿；T03-A03、T04-A09 的 Windows CI 仍待推送后核对）
+
+- [ ] 1. 排查 Pi 1.5.2 各工厂的 Operations 覆盖与 Operations 之外的 fs/child_process 访问
+- [ ] 2. 协议：`fs/read|stat|write|mkdir|grep|glob|list`、`exec/run` 与输出通知、取消方式；生成 TS 类型；golden 样本与反例（A09）
+- [ ] 3. `piarc-fs`：路径限定（规范化 + 符号链接 + 工作区根）、读（偏移与长度）、stat、写、mkdir、glob、grep、list；越界结构化错误（A07）
+- [ ] 4. `piarc-exec`：经用户 shell 在会话 cwd 执行、流式通知、退出码、取消终止直接子进程、环境不含凭据（A08）
+- [ ] 5. `piarc-core` 分派 `fs/*`、`exec/*`，按会话解析工作区根与 cwd；依赖规则不变
+- [ ] 6. Agent Host 工具层 `agent-host/src/tools/`：六个规范名工具、默认 Tool Profile、名称映射表、停用 Pi 原生工具（A04、A05）
+- [ ] 7. ESLint `no-restricted-imports` 禁止 tools/harness 引入 fs 与 child_process（A03）
+- [ ] 8. 场景测试：Core 侧调用记录（A01）、运行时 spy（A02）、测试 Profile 改名（A05）、S3 双会话改用委托工具（A11）
+- [ ] 9. 行为对照：Pi 原生 vs 委托，mock 请求记录 + 工作区快照（A06）
+- [ ] 10. `fs/read` AHP 往返 p95 计时 ≥ 1,000 次（A10）
+- [ ] 11. S4 报告与 `docs/spikes/README.md`（A12）；CLAUDE.md（agent-host、piarc-fs、piarc-exec）、coding-standards 复用表、架构同步
+- [ ] 12. 收尾：`npm run verify`（A13）、acceptance.json、PLAN.md、最终报告
 
 ## 登记事项
 
