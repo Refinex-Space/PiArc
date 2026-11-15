@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "method": "session/usage",
+  "params": {
+    "sessionId": "ses_01",
+    "seq": 42,
+    "ts": 1794643200042,
+    "inputTokens": 1200,
+    "outputTokens": 300
+  }
+}

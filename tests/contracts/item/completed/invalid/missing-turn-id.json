@@ -1,0 +1,15 @@
+{
+  "jsonrpc": "2.0",
+  "method": "item/completed",
+  "params": {
+    "sessionId": "ses_01",
+    "seq": 8,
+    "ts": 1794643200008,
+    "item": {
+      "type": "agentMessage",
+      "itemId": "item_01",
+      "status": "completed",
+      "text": "Hello"
+    }
+  }
+}

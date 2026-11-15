@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "error": {
+    "code": -32601,
+    "message": "method session/unknown does not exist",
+    "data": {
+      "kind": "methodNotFound",
+      "retryable": false
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "method": "item/started",
+  "params": {
+    "sessionId": "ses_01",
+    "seq": 2,
+    "ts": 1794643200002,
+    "turnId": "turn_01",
+    "item": {
+      "type": "agentMessage",
+      "itemId": "item_01",
+      "status": "pending",
+      "text": ""
+    }
+  }
+}
