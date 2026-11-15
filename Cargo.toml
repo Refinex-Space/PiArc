@@ -66,6 +66,8 @@ all = { level = "deny", priority = -1 }
 # Functions over 80 lines (clippy.toml) need `#[allow(clippy::too_many_lines, reason = "...")]`.
 too_many_lines = "deny"
 allow_attributes_without_reason = "deny"
+# Every `unsafe` block needs a `// SAFETY:` comment.
+undocumented_unsafe_blocks = "deny"
 # No stubs or debugging leftovers in committed code.
 todo = "deny"
 unimplemented = "deny"
