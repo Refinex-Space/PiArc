@@ -100,7 +100,10 @@ test('the input method composes at the cursor and commits through Core', async (
   await openTerminal(app, page, { cols: 40, rows: 6, ...PLAIN_SHELL });
   await waitForScreen(page, (text) => text.startsWith('$'));
   await page.keyboard.type('echo ');
-  await waitForScreen(page, (text) => text.startsWith('$ echo'));
+  // The screen text drops trailing spaces, so wait for the cursor: "$ echo " ends at column 7.
+  await expect
+    .poll(() => page.evaluate(() => globalThis.__piarcTerminalLab?.cursorCell().x))
+    .toBe(7);
   const lab = () =>
     page.evaluate(() => {
       const api = globalThis.__piarcTerminalLab;
