@@ -46,6 +46,19 @@ export type AhpMessage =
   | ExecKillRequest
   | ExecKillResponse
   | ExecOutputNotification
+  | SecretsGetAllRequest
+  | SecretsGetAllResponse
+  | SecretsGetRequest
+  | SecretsGetResponse
+  | SecretsSetRequest
+  | SecretsSetResponse
+  | SecretsDeleteRequest
+  | SecretsDeleteResponse
+  | SecretsLockRequest
+  | SecretsLockResponse
+  | SecretsUnlockRequest
+  | SecretsUnlockResponse
+  | SecretsChangedNotification
   | TurnStartedNotification
   | TurnCompletedNotification
   | ItemStartedNotification
@@ -1368,6 +1381,286 @@ export interface ExecOutputParams {
    * The stream the chunk came from.
    */
   stream: OutputStream;
+}
+/**
+ * Request for `secrets/getAll`.
+ */
+export interface SecretsGetAllRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'secrets/getAll';
+  params: SecretsGetAllParams;
+}
+/**
+ * Parameters of `secrets/getAll` (none).
+ */
+export interface SecretsGetAllParams {}
+/**
+ * Successful response to `secrets/getAll`.
+ */
+export interface SecretsGetAllResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SecretsGetAllResult;
+}
+/**
+ * Result of `secrets/getAll`.
+ */
+export interface SecretsGetAllResult {
+  /**
+   * Every stored credential, ordered by key.
+   */
+  entries: SecretEntry[];
+}
+/**
+ * One stored credential.
+ */
+export interface SecretEntry {
+  /**
+   * The credential key, such as `oauth/example`.
+   */
+  key: string;
+  /**
+   * The vault revision of the entry's last write; grows across all keys.
+   */
+  revision: number;
+  /**
+   * The credential.
+   */
+  value: {
+    [k: string]: unknown;
+  };
+}
+/**
+ * Request for `secrets/get`.
+ */
+export interface SecretsGetRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'secrets/get';
+  params: SecretsGetParams;
+}
+/**
+ * Parameters of `secrets/get`.
+ */
+export interface SecretsGetParams {
+  /**
+   * The credential key.
+   */
+  key: string;
+}
+/**
+ * Successful response to `secrets/get`.
+ */
+export interface SecretsGetResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SecretsGetResult;
+}
+/**
+ * Result of `secrets/get`.
+ */
+export interface SecretsGetResult {
+  /**
+   * The entry; absent when nothing is stored under the key.
+   */
+  entry?: SecretEntry | null;
+}
+/**
+ * Request for `secrets/set`.
+ */
+export interface SecretsSetRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'secrets/set';
+  params: SecretsSetParams;
+}
+/**
+ * Parameters of `secrets/set`.
+ */
+export interface SecretsSetParams {
+  /**
+   * The credential key.
+   */
+  key: string;
+  /**
+   * The lock covering `key`, when the write belongs to a locked read-modify-write.
+   */
+  lockId?: string | null;
+  /**
+   * The new credential.
+   */
+  value: {
+    [k: string]: unknown;
+  };
+}
+/**
+ * Successful response to `secrets/set`.
+ */
+export interface SecretsSetResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SecretsSetResult;
+}
+/**
+ * Result of `secrets/set`.
+ */
+export interface SecretsSetResult {
+  /**
+   * The entry's new revision.
+   */
+  revision: number;
+}
+/**
+ * Request for `secrets/delete`.
+ */
+export interface SecretsDeleteRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'secrets/delete';
+  params: SecretsDeleteParams;
+}
+/**
+ * Parameters of `secrets/delete`.
+ */
+export interface SecretsDeleteParams {
+  /**
+   * The credential key.
+   */
+  key: string;
+  /**
+   * The lock covering `key`, when the delete belongs to a locked read-modify-write.
+   */
+  lockId?: string | null;
+}
+/**
+ * Successful response to `secrets/delete`.
+ */
+export interface SecretsDeleteResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SecretsDeleteResult;
+}
+/**
+ * Result of `secrets/delete`.
+ */
+export interface SecretsDeleteResult {
+  /**
+   * The revision of the removal; absent when nothing was stored under the key.
+   */
+  revision?: number | null;
+}
+/**
+ * Request for `secrets/lock`.
+ */
+export interface SecretsLockRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'secrets/lock';
+  params: SecretsLockParams;
+}
+/**
+ * Parameters of `secrets/lock`.
+ */
+export interface SecretsLockParams {
+  /**
+   * The keys the holder may write, for example `provider/<id>` and `oauth/<id>` of one
+   * model provider. Taken together; the request waits while any of them is locked.
+   */
+  keys: string[];
+}
+/**
+ * Successful response to `secrets/lock`.
+ */
+export interface SecretsLockResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SecretsLockResult;
+}
+/**
+ * Result of `secrets/lock`.
+ */
+export interface SecretsLockResult {
+  /**
+   * The current entries of the locked keys that exist.
+   */
+  entries: SecretEntry[];
+  /**
+   * Core releases the lock on its own after this many milliseconds.
+   */
+  expiresInMs: number;
+  /**
+   * Passed to `secrets/set`, `secrets/delete` and `secrets/unlock`.
+   */
+  lockId: string;
+}
+/**
+ * Request for `secrets/unlock`.
+ */
+export interface SecretsUnlockRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'secrets/unlock';
+  params: SecretsUnlockParams;
+}
+/**
+ * Parameters of `secrets/unlock`.
+ */
+export interface SecretsUnlockParams {
+  /**
+   * The lock to release.
+   */
+  lockId: string;
+}
+/**
+ * Successful response to `secrets/unlock`.
+ */
+export interface SecretsUnlockResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SecretsUnlockResult;
+}
+/**
+ * Result of `secrets/unlock`.
+ */
+export interface SecretsUnlockResult {
+  /**
+   * False when the lock was no longer held (expired or already released).
+   */
+  released: boolean;
+}
+/**
+ * Notification `secrets/changed`.
+ */
+export interface SecretsChangedNotification {
+  jsonrpc: JsonRpcVersion;
+  method: 'secrets/changed';
+  params: SecretsChangedParams;
+}
+/**
+ * Parameters of `secrets/changed` (Core → Agent Host): one key changed in the vault.
+ */
+export interface SecretsChangedParams {
+  /**
+   * The credential key.
+   */
+  key: string;
+  /**
+   * The revision of the change.
+   */
+  revision: number;
+  /**
+   * The new credential; absent when the key was deleted.
+   */
+  value?: {
+    [k: string]: unknown;
+  } | null;
 }
 /**
  * Notification `turn/started`.

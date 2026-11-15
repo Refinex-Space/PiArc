@@ -254,6 +254,84 @@
       "schema": "ExecOutputNotification"
     },
     {
+      "kind": "request",
+      "method": "secrets/getAll",
+      "name": "secrets/getAll",
+      "schema": "SecretsGetAllRequest"
+    },
+    {
+      "kind": "response",
+      "method": "secrets/getAll",
+      "name": "secrets/getAll/result",
+      "schema": "SecretsGetAllResponse"
+    },
+    {
+      "kind": "request",
+      "method": "secrets/get",
+      "name": "secrets/get",
+      "schema": "SecretsGetRequest"
+    },
+    {
+      "kind": "response",
+      "method": "secrets/get",
+      "name": "secrets/get/result",
+      "schema": "SecretsGetResponse"
+    },
+    {
+      "kind": "request",
+      "method": "secrets/set",
+      "name": "secrets/set",
+      "schema": "SecretsSetRequest"
+    },
+    {
+      "kind": "response",
+      "method": "secrets/set",
+      "name": "secrets/set/result",
+      "schema": "SecretsSetResponse"
+    },
+    {
+      "kind": "request",
+      "method": "secrets/delete",
+      "name": "secrets/delete",
+      "schema": "SecretsDeleteRequest"
+    },
+    {
+      "kind": "response",
+      "method": "secrets/delete",
+      "name": "secrets/delete/result",
+      "schema": "SecretsDeleteResponse"
+    },
+    {
+      "kind": "request",
+      "method": "secrets/lock",
+      "name": "secrets/lock",
+      "schema": "SecretsLockRequest"
+    },
+    {
+      "kind": "response",
+      "method": "secrets/lock",
+      "name": "secrets/lock/result",
+      "schema": "SecretsLockResponse"
+    },
+    {
+      "kind": "request",
+      "method": "secrets/unlock",
+      "name": "secrets/unlock",
+      "schema": "SecretsUnlockRequest"
+    },
+    {
+      "kind": "response",
+      "method": "secrets/unlock",
+      "name": "secrets/unlock/result",
+      "schema": "SecretsUnlockResponse"
+    },
+    {
+      "kind": "notification",
+      "method": "secrets/changed",
+      "name": "secrets/changed",
+      "schema": "SecretsChangedNotification"
+    },
+    {
       "kind": "notification",
       "method": "turn/started",
       "name": "turn/started",

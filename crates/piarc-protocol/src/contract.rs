@@ -21,6 +21,10 @@ use crate::handshake::HostHello;
 use crate::host::{HostPing, HostShutdown};
 use crate::jsonrpc::{ErrorResponse, Notification, Request, SuccessResponse};
 use crate::method::{Method, NotificationMessage, RequestMessage, ResultMessage};
+use crate::secrets::{
+    SecretsChanged, SecretsDelete, SecretsGet, SecretsGetAll, SecretsLock, SecretsSet,
+    SecretsUnlock,
+};
 use crate::session::{
     SessionAbort, SessionClose, SessionCreate, SessionEventNotification, SessionPrompt,
     SessionResume,
@@ -175,6 +179,19 @@ pub static CONTRACTS: &[Contract] = &[
     request::<ExecKill>(ExecKill::NAME),
     response::<ExecKill>("exec/kill/result"),
     notification::<ExecOutput>(),
+    request::<SecretsGetAll>(SecretsGetAll::NAME),
+    response::<SecretsGetAll>("secrets/getAll/result"),
+    request::<SecretsGet>(SecretsGet::NAME),
+    response::<SecretsGet>("secrets/get/result"),
+    request::<SecretsSet>(SecretsSet::NAME),
+    response::<SecretsSet>("secrets/set/result"),
+    request::<SecretsDelete>(SecretsDelete::NAME),
+    response::<SecretsDelete>("secrets/delete/result"),
+    request::<SecretsLock>(SecretsLock::NAME),
+    response::<SecretsLock>("secrets/lock/result"),
+    request::<SecretsUnlock>(SecretsUnlock::NAME),
+    response::<SecretsUnlock>("secrets/unlock/result"),
+    notification::<SecretsChanged>(),
     notification::<TurnStarted>(),
     notification::<TurnCompleted>(),
     notification::<ItemStarted>(),

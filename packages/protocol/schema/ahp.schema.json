@@ -1769,6 +1769,455 @@
       ],
       "description": "A request id: an integer or a string. `null` and fractional numbers are not accepted."
     },
+    "SecretEntry": {
+      "description": "One stored credential.",
+      "properties": {
+        "key": {
+          "description": "The credential key, such as `oauth/example`.",
+          "type": "string"
+        },
+        "revision": {
+          "description": "The vault revision of the entry's last write; grows across all keys.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "value": {
+          "additionalProperties": true,
+          "description": "The credential.",
+          "type": "object"
+        }
+      },
+      "required": ["key", "revision", "value"],
+      "type": "object"
+    },
+    "SecretsChangedNotification": {
+      "description": "Notification `secrets/changed`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "secrets/changed",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SecretsChangedParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "SecretsChangedParams": {
+      "description": "Parameters of `secrets/changed` (Core → Agent Host): one key changed in the vault.",
+      "properties": {
+        "key": {
+          "description": "The credential key.",
+          "type": "string"
+        },
+        "revision": {
+          "description": "The revision of the change.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "value": {
+          "additionalProperties": true,
+          "description": "The new credential; absent when the key was deleted.",
+          "type": ["object", "null"]
+        }
+      },
+      "required": ["key", "revision"],
+      "type": "object"
+    },
+    "SecretsDeleteParams": {
+      "description": "Parameters of `secrets/delete`.",
+      "properties": {
+        "key": {
+          "description": "The credential key.",
+          "type": "string"
+        },
+        "lockId": {
+          "description": "The lock covering `key`, when the delete belongs to a locked read-modify-write.",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["key"],
+      "type": "object"
+    },
+    "SecretsDeleteRequest": {
+      "description": "Request for `secrets/delete`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "secrets/delete",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SecretsDeleteParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SecretsDeleteResponse": {
+      "description": "Successful response to `secrets/delete`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SecretsDeleteResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SecretsDeleteResult": {
+      "description": "Result of `secrets/delete`.",
+      "properties": {
+        "revision": {
+          "description": "The revision of the removal; absent when nothing was stored under the key.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        }
+      },
+      "type": "object"
+    },
+    "SecretsGetAllParams": {
+      "description": "Parameters of `secrets/getAll` (none).",
+      "type": "object"
+    },
+    "SecretsGetAllRequest": {
+      "description": "Request for `secrets/getAll`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "secrets/getAll",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SecretsGetAllParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SecretsGetAllResponse": {
+      "description": "Successful response to `secrets/getAll`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SecretsGetAllResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SecretsGetAllResult": {
+      "description": "Result of `secrets/getAll`.",
+      "properties": {
+        "entries": {
+          "description": "Every stored credential, ordered by key.",
+          "items": {
+            "$ref": "#/$defs/SecretEntry"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["entries"],
+      "type": "object"
+    },
+    "SecretsGetParams": {
+      "description": "Parameters of `secrets/get`.",
+      "properties": {
+        "key": {
+          "description": "The credential key.",
+          "type": "string"
+        }
+      },
+      "required": ["key"],
+      "type": "object"
+    },
+    "SecretsGetRequest": {
+      "description": "Request for `secrets/get`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "secrets/get",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SecretsGetParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SecretsGetResponse": {
+      "description": "Successful response to `secrets/get`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SecretsGetResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SecretsGetResult": {
+      "description": "Result of `secrets/get`.",
+      "properties": {
+        "entry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SecretEntry"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The entry; absent when nothing is stored under the key."
+        }
+      },
+      "type": "object"
+    },
+    "SecretsLockParams": {
+      "description": "Parameters of `secrets/lock`.",
+      "properties": {
+        "keys": {
+          "description": "The keys the holder may write, for example `provider/<id>` and `oauth/<id>` of one\nmodel provider. Taken together; the request waits while any of them is locked.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["keys"],
+      "type": "object"
+    },
+    "SecretsLockRequest": {
+      "description": "Request for `secrets/lock`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "secrets/lock",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SecretsLockParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SecretsLockResponse": {
+      "description": "Successful response to `secrets/lock`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SecretsLockResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SecretsLockResult": {
+      "description": "Result of `secrets/lock`.",
+      "properties": {
+        "entries": {
+          "description": "The current entries of the locked keys that exist.",
+          "items": {
+            "$ref": "#/$defs/SecretEntry"
+          },
+          "type": "array"
+        },
+        "expiresInMs": {
+          "description": "Core releases the lock on its own after this many milliseconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "lockId": {
+          "description": "Passed to `secrets/set`, `secrets/delete` and `secrets/unlock`.",
+          "type": "string"
+        }
+      },
+      "required": ["lockId", "entries", "expiresInMs"],
+      "type": "object"
+    },
+    "SecretsSetParams": {
+      "description": "Parameters of `secrets/set`.",
+      "properties": {
+        "key": {
+          "description": "The credential key.",
+          "type": "string"
+        },
+        "lockId": {
+          "description": "The lock covering `key`, when the write belongs to a locked read-modify-write.",
+          "type": ["string", "null"]
+        },
+        "value": {
+          "additionalProperties": true,
+          "description": "The new credential.",
+          "type": "object"
+        }
+      },
+      "required": ["key", "value"],
+      "type": "object"
+    },
+    "SecretsSetRequest": {
+      "description": "Request for `secrets/set`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "secrets/set",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SecretsSetParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SecretsSetResponse": {
+      "description": "Successful response to `secrets/set`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SecretsSetResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SecretsSetResult": {
+      "description": "Result of `secrets/set`.",
+      "properties": {
+        "revision": {
+          "description": "The entry's new revision.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["revision"],
+      "type": "object"
+    },
+    "SecretsUnlockParams": {
+      "description": "Parameters of `secrets/unlock`.",
+      "properties": {
+        "lockId": {
+          "description": "The lock to release.",
+          "type": "string"
+        }
+      },
+      "required": ["lockId"],
+      "type": "object"
+    },
+    "SecretsUnlockRequest": {
+      "description": "Request for `secrets/unlock`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "secrets/unlock",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SecretsUnlockParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SecretsUnlockResponse": {
+      "description": "Successful response to `secrets/unlock`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SecretsUnlockResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SecretsUnlockResult": {
+      "description": "Result of `secrets/unlock`.",
+      "properties": {
+        "released": {
+          "description": "False when the lock was no longer held (expired or already released).",
+          "type": "boolean"
+        }
+      },
+      "required": ["released"],
+      "type": "object"
+    },
     "SessionAbortRequest": {
       "description": "Request for `session/abort`.",
       "properties": {
@@ -2454,6 +2903,45 @@
     },
     {
       "$ref": "#/$defs/ExecOutputNotification"
+    },
+    {
+      "$ref": "#/$defs/SecretsGetAllRequest"
+    },
+    {
+      "$ref": "#/$defs/SecretsGetAllResponse"
+    },
+    {
+      "$ref": "#/$defs/SecretsGetRequest"
+    },
+    {
+      "$ref": "#/$defs/SecretsGetResponse"
+    },
+    {
+      "$ref": "#/$defs/SecretsSetRequest"
+    },
+    {
+      "$ref": "#/$defs/SecretsSetResponse"
+    },
+    {
+      "$ref": "#/$defs/SecretsDeleteRequest"
+    },
+    {
+      "$ref": "#/$defs/SecretsDeleteResponse"
+    },
+    {
+      "$ref": "#/$defs/SecretsLockRequest"
+    },
+    {
+      "$ref": "#/$defs/SecretsLockResponse"
+    },
+    {
+      "$ref": "#/$defs/SecretsUnlockRequest"
+    },
+    {
+      "$ref": "#/$defs/SecretsUnlockResponse"
+    },
+    {
+      "$ref": "#/$defs/SecretsChangedNotification"
     },
     {
       "$ref": "#/$defs/TurnStartedNotification"
