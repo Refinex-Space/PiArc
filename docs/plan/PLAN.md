@@ -301,7 +301,7 @@ T04 Core NAPI 绑定与事件通道（开工 2026-11-14；基线 verify 12 项�
 - [x] 3. `@napi-rs/cli` 构建脚本、`.d.ts` 生成与 L1 快照并入 verify（A11）
 - [x] 4. 主进程：`.node` 路径解析（开发 / `app.asar.unpacked`）、按窗口 `MessageChannelMain`、路由表、结构化克隆 / `ArrayBuffer` 转移（A06）
 - [x] 5. preload 事件订阅 API、IPC 命令、白名单快照；渲染进程测试页与统计
-- [ ] 6. L4：退出不挂起、双窗口路由、panic 后存活、ArrayBuffer、打包产物从 unpacked 加载（A01、A06、A07、A08、A10）
+- [x] 6. L4：退出不挂起、双窗口路由、panic 后存活、ArrayBuffer、打包产物从 unpacked 加载（A01、A06、A07、A08、A10）——A06 只做了完整性部分：Electron 45 的 `MessagePortMain` 不能转移 `ArrayBuffer`，转移部分待 ADR-0019
 - [ ] 7. CI：四个目标预编译与加载测试；本机 darwin-x64 经 Rosetta 加载（A09）
 - [ ] 8. `scripts/bench/` 基准（吞吐、事件循环延迟、同步调用、大批次、空闲 RSS），≤ 30 s 正确性版本进 verify
 - [ ] 9. 完整基准与 S2 报告、`docs/spikes/README.md`（A03、A04、A05、A12）

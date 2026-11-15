@@ -5,7 +5,12 @@ import type { ElectronApplication } from '@playwright/test';
 import { expect, test } from './fixtures.js';
 
 /** The `window.piarc` allowlist. Changing it is a security review item (apps/desktop/CLAUDE.md). */
-const PIARC_API_SNAPSHOT = ['getAppVersion', 'openExternal'];
+const PIARC_API_SNAPSHOT = [
+  'getAppVersion',
+  'openExternal',
+  'subscribeEvents',
+  'unsubscribeEvents',
+];
 
 test('window.piarc exposes exactly the allowlisted functions', async ({ page }) => {
   const shape = await page.evaluate(() =>
