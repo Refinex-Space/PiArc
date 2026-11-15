@@ -15,7 +15,13 @@ import {
   stringField,
 } from './protocol/params.js';
 import { blobReader } from './runtime/blobs.js';
+import { CoreCredentialStore } from './runtime/credentials.js';
 import { SessionRegistry, type ToolBackend } from './runtime/session-registry.js';
+import {
+  registerTestOAuthProvider,
+  testLogin,
+  type TestOAuthProviderConfig,
+} from './runtime/test-oauth-provider.js';
 import { agentDirOf, openWorkspace } from './runtime/workspace.js';
 import { CoreIo, DEFAULT_PROFILE, ExecOutputRouter, type ToolProfile } from './tools/index.js';
 
@@ -41,6 +47,8 @@ export interface HostOptions {
   readonly toolProfile?: ToolProfile;
   /** Give sessions Pi's own tools with local I/O instead (behavior comparison test only). */
   readonly piNativeTools?: boolean;
+  /** Register the OAuth test provider (credential tests only). */
+  readonly testOAuthProvider?: TestOAuthProviderConfig;
   /** Writes one log line to stderr. */
   readonly log: (line: string) => void;
   /** Ends the process once stdout is flushed. */
@@ -75,6 +83,10 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     ...(options.bridgeTimeoutMs === undefined ? {} : { bridgeTimeoutMs: options.bridgeTimeoutMs }),
   });
 
+  // Credentials live in Core's vault; Core pushes changes made elsewhere.
+  const credentials = new CoreCredentialStore({ core: connection.bridge, log });
+  connection.onNotification('secrets/changed', (params) => credentials.applyChange(params));
+
   // Tools delegate their I/O to Core; command output comes back as `exec/output`.
   const execOutput = new ExecOutputRouter();
   connection.onNotification('exec/output', (params) => execOutput.deliver(params));
@@ -92,6 +104,8 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
   const shutdown = (reason: string, code: number): Promise<void> => {
     shuttingDown ??= (async () => {
       log(`shutting down: ${reason}`);
+      // A credential write in progress may carry a rotated refresh token: let it reach Core.
+      await credentials.flush();
       connection.bridge.close(`the Agent Host is shutting down (${reason})`);
       await registry?.closeAll();
       await outbound.flushed();
@@ -122,6 +136,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
   connection.handle('host/shutdown', async (params): Promise<HostShutdownResult> => {
     const reason = paramsObject('host/shutdown', params).reason;
     const closedSessions = (await registry?.closeAll()) ?? 0;
+    await credentials.flush();
     // Exit after the response is on its way.
     setImmediate(() => {
       void shutdown(
@@ -200,7 +215,17 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
       `connected: AHP ${welcome.protocol}, epoch ${String(welcome.connectionEpoch)}, workspace ${welcome.workspace}, enabled [${welcome.enabled.join(', ')}]`,
     );
     try {
-      const workspace = await openWorkspace(welcome.workspace, agentDirOf(options.dataDir));
+      // A failed load is logged and retried by the first operation that needs credentials.
+      await credentials.load();
+      const workspace = await openWorkspace(
+        welcome.workspace,
+        agentDirOf(options.dataDir),
+        credentials,
+      );
+      if (options.testOAuthProvider !== undefined) {
+        registerTestOAuthProvider(workspace.modelRuntime, options.testOAuthProvider);
+        await testLogin(workspace.modelRuntime, options.testOAuthProvider, log);
+      }
       registry = new SessionRegistry({
         workspace,
         tools,

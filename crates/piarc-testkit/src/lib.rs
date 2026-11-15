@@ -2,8 +2,9 @@
 //!
 //! # Responsibilities
 //!
-//! - Test-only support. Today: the strict mock provider (architecture section 12.2). The
-//!   L2 scenario runner and event assertions arrive with T15.
+//! - Test-only support. Today: the strict mock provider (architecture section 12.2) and the
+//!   plaintext scan ([`plaintext`], T08). The L2 scenario runner and event assertions arrive
+//!   with T15.
 //!
 //! # Not responsible for
 //!
@@ -99,6 +100,7 @@ mod body;
 mod error;
 mod fragment;
 mod openai;
+pub mod plaintext;
 mod record;
 mod request;
 mod rules;

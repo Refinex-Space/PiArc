@@ -33,7 +33,10 @@ use piarc_protocol::secrets::{
     SecretsSetParams, SecretsSetResult, SecretsUnlockParams, SecretsUnlockResult,
 };
 use piarc_protocol::{ErrorKind, ErrorObject};
-use piarc_secrets::{EntryView, Vault, VaultConfig};
+use piarc_secrets::EntryView;
+pub use piarc_secrets::{
+    MemorySecretStore, OpenOutcome, SystemSecretStore, Vault, VaultConfig, test_master_key_name,
+};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};

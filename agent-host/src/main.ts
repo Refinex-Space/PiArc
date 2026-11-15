@@ -2,11 +2,12 @@
 // Pi's process-global agent directory to PiArc's, runs the host and handles signals.
 //
 // Usage: node agent-host.mjs --data-dir <PiArc data dir> [--bridge-timeout-ms <ms>]
-//          [--tool-profile <json file>] [--pi-native-tools]
+//          [--tool-profile <json file>] [--pi-native-tools] [--test-oauth-provider <json file>]
 //
 // `--tool-profile` overrides names and descriptions of the default Tool Profile (tests of the
 // name map); `--pi-native-tools` gives sessions Pi's own tools with local I/O (the behavior
-// comparison test). Core passes neither.
+// comparison test); `--test-oauth-provider` registers an OAuth provider backed by a local test
+// token endpoint (the credential tests). Core passes none of them.
 //
 // stdout carries AHP frames only. Anything else that writes to it (a library's console.log)
 // is redirected to stderr, which is the log channel Core reads line by line.
@@ -16,6 +17,10 @@ import { parseArgs } from 'node:util';
 import { VERSION } from '@earendil-works/pi-coding-agent';
 
 import { runHost } from './host.js';
+import {
+  parseTestOAuthProvider,
+  type TestOAuthProviderConfig,
+} from './runtime/test-oauth-provider.js';
 import { agentDirOf } from './runtime/workspace.js';
 import { profileWithOverrides, type ToolProfile } from './tools/index.js';
 
@@ -25,6 +30,7 @@ const { values } = parseArgs({
     'bridge-timeout-ms': { type: 'string' },
     'tool-profile': { type: 'string' },
     'pi-native-tools': { type: 'boolean' },
+    'test-oauth-provider': { type: 'string' },
   },
   strict: true,
 });
@@ -42,6 +48,21 @@ if (profileFile !== undefined) {
     process.stderr.write(`invalid --tool-profile ${profileFile}: ${String(error)}\n`);
     process.exit(64);
   }
+}
+const oauthFile = values['test-oauth-provider'];
+let testOAuthProvider: TestOAuthProviderConfig | undefined;
+if (oauthFile !== undefined) {
+  let parsed: TestOAuthProviderConfig | string;
+  try {
+    parsed = parseTestOAuthProvider(JSON.parse(readFileSync(oauthFile, 'utf8')));
+  } catch (error) {
+    parsed = String(error);
+  }
+  if (typeof parsed === 'string') {
+    process.stderr.write(`invalid --test-oauth-provider ${oauthFile}: ${parsed}\n`);
+    process.exit(64);
+  }
+  testOAuthProvider = parsed;
 }
 const bridgeTimeout = values['bridge-timeout-ms'];
 const bridgeTimeoutMs =
@@ -76,6 +97,7 @@ const host = runHost(
     ...(bridgeTimeoutMs === undefined || Number.isNaN(bridgeTimeoutMs) ? {} : { bridgeTimeoutMs }),
     ...(toolProfile === undefined ? {} : { toolProfile }),
     ...(values['pi-native-tools'] === true ? { piNativeTools: true } : {}),
+    ...(testOAuthProvider === undefined ? {} : { testOAuthProvider }),
     log,
     exit,
   },

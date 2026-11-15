@@ -3,8 +3,10 @@
 //! `--nocapture` to print the observations recorded in `docs/spikes/S03-multi-session.md`
 //! and `docs/spikes/S09-ahp-resilience.md`.
 
+mod credentials;
 mod harness;
 mod parity;
+mod token_server;
 mod tools;
 
 use harness::{Env, assert_contiguous_seq, notification, open, payload, ping, prompt_text};

@@ -11,6 +11,7 @@ use std::time::Duration;
 use piarc_core::agent_host::{
     self, HostConfig, HostEvent, HostEvents, HostSupervisor, InboundHandler, Peer,
 };
+use piarc_core::secrets::{MemorySecretStore, SecretsConfig, SecretsService, test_master_key_name};
 use piarc_core::tool_io::{ToolIo, ToolIoConfig};
 use piarc_ports::BoxFuture;
 use piarc_protocol::session::{ModelRef, SessionEventNotification, SessionId};
@@ -80,11 +81,14 @@ pub fn mcp_fixture() -> PathBuf {
 }
 
 /// Core's side of the connection: answers `trust/get` from a fixed set of trusted directories,
-/// delegated tool I/O (`fs/*`, `exec/*`) with the real `ToolIo`, and records both.
+/// delegated tool I/O (`fs/*`, `exec/*`) with the real `ToolIo`, and records both; credentials
+/// (`secrets/*`) with the real `SecretsService` over the data directory's vault, its master key
+/// in an in-memory credential store.
 pub struct Core {
     trusted: Vec<String>,
     pub asked: Mutex<Vec<String>>,
     pub io: ToolIo,
+    pub secrets: SecretsService,
     pub calls: Arc<Mutex<Vec<Call>>>,
 }
 
@@ -133,6 +137,10 @@ impl InboundHandler for Core {
             let trusted = self.trusted.contains(&path);
             return Box::pin(async move { Ok(json!({ "trusted": trusted })) });
         }
+        if SecretsService::handles(&method) {
+            let secrets = self.secrets.clone();
+            return Box::pin(async move { secrets.dispatch(&method, params, peer).await });
+        }
         if !ToolIo::handles(&method) {
             return Box::pin(async move {
                 Err(ErrorObject::new(
@@ -175,6 +183,9 @@ impl InboundHandler for Core {
 pub struct Env {
     pub root: PathBuf,
     pub data_dir: PathBuf,
+    /// Core's vault service: the data directory's vault, its master key in an in-memory store.
+    pub secrets: SecretsService,
+    pub key_store: Arc<MemorySecretStore>,
     /// Two session working directories.
     pub ws: [PathBuf; 2],
     pub mock: MockProvider,
@@ -219,9 +230,16 @@ impl Env {
         }}});
         write_json(&data_dir.join("pi").join("models.json"), &models);
         write_json(&data_dir.join("pi").join("settings.json"), &settings);
+        let key_store = Arc::new(MemorySecretStore::new());
+        let secrets = SecretsService::new(
+            SecretsConfig::with_master_key(&data_dir, test_master_key_name("e2e")),
+            Arc::clone(&key_store) as _,
+        );
         Self {
             root,
             data_dir,
+            secrets,
+            key_store,
             ws,
             mock,
         }
@@ -247,12 +265,14 @@ impl Env {
         self.start_with(self.config(), trusted)
     }
 
-    /// As [`Env::start`] with adjusted supervisor settings.
+    /// As [`Env::start`] with adjusted supervisor settings. Every Agent Host of one `Env` gets
+    /// the same `SecretsService`, as every Agent Host of one Core does.
     pub fn start_with(
         &self,
         config: HostConfig,
         trusted: &[&Path],
     ) -> (HostSupervisor, Recorder, Arc<Core>) {
+        let secrets = self.secrets.clone();
         let core = Arc::new(Core {
             trusted: trusted
                 .iter()
@@ -260,6 +280,7 @@ impl Env {
                 .collect(),
             asked: Mutex::default(),
             io: ToolIo::new(ToolIoConfig::new(self.data_dir.clone())),
+            secrets,
             calls: Arc::default(),
         });
         let (supervisor, events) =
@@ -587,4 +608,21 @@ pub fn tool_results_in(body: &str) -> Vec<(String, String, bool)> {
         }
     }
     results
+}
+
+/// Routes Core's tracing output, which carries every Agent Host stderr line, to a log file for
+/// this test binary and returns its path. Installed once; later calls return the same file.
+pub fn capture_logs() -> &'static Path {
+    static LOG: OnceLock<PathBuf> = OnceLock::new();
+    LOG.get_or_init(|| {
+        let path =
+            std::env::temp_dir().join(format!("piarc e2e core log {}.log", std::process::id()));
+        let file = std::fs::File::create(&path).expect("log file");
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(Mutex::new(file))
+            .with_ansi(false)
+            .finish();
+        tracing::subscriber::set_global_default(subscriber).expect("first subscriber");
+        path
+    })
 }
