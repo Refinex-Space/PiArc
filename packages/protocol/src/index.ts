@@ -5,6 +5,7 @@ export { PROTOCOL_VERSION } from './generated/version.js';
 export {
   DEFAULT_MAX_FRAME_BYTES,
   FrameDecoder,
+  MAX_NESTING,
   encodeFrame,
   type FrameError,
   type FrameResult,

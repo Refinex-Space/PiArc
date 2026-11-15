@@ -10,12 +10,18 @@
 //   discarded up to the next LF; later frames decode normally. The buffer never grows
 //   beyond the limit.
 // - Invalid UTF-8 and invalid JSON are reported per frame as `parseError`; decoding never
-//   throws. A UTF-8 byte order mark is not stripped (it is invalid JSON, as in Rust).
-// - Encoding writes compact JSON, which never contains a raw LF, and appends one LF.
+//   throws. To accept exactly what the Rust decoder (serde_json) accepts, these are invalid
+//   JSON too: a UTF-8 byte order mark, a string or key with a lone surrogate escape
+//   (`"\ud800"`), and arrays or objects nested deeper than MAX_NESTING levels.
+// - Encoding writes compact JSON, which never contains a raw LF, and appends one LF. It
+//   refuses strings with lone surrogates, which the Rust side cannot decode.
 import type { ErrorKind } from './generated/ahp.js';
 
 /** Default limit for the content of one frame (excluding the LF): 8 MiB. */
 export const DEFAULT_MAX_FRAME_BYTES = 8 * 1024 * 1024;
+
+/** Deepest array/object nesting the decoder accepts; serde_json's recursion limit. */
+export const MAX_NESTING = 127;
 
 const LF = 0x0a;
 
@@ -48,11 +54,46 @@ function parseFrame(bytes: Uint8Array): FrameResult | undefined {
   } catch (error) {
     return frameError('parseError', `frame is not valid UTF-8: ${describe(error)}`);
   }
+  let value: unknown;
   try {
-    return { ok: true, value: JSON.parse(text) as unknown };
+    value = JSON.parse(text);
   } catch (error) {
     return frameError('parseError', `frame is not valid JSON: ${describe(error)}`);
   }
+  const problem = findRejected(value, 1);
+  return problem === undefined
+    ? { ok: true, value }
+    : frameError('parseError', `frame is not valid JSON: ${problem}`);
+}
+
+/**
+ * Finds what serde_json would reject in a value JSON.parse accepted: lone surrogates in
+ * strings or keys, and nesting deeper than MAX_NESTING. `depth` is the nesting level of
+ * `value` if it is an array or object.
+ */
+function findRejected(value: unknown, depth: number): string | undefined {
+  if (typeof value === 'string') {
+    return value.isWellFormed() ? undefined : 'string contains a lone surrogate';
+  }
+  if (typeof value !== 'object' || value === null) {
+    return undefined;
+  }
+  if (depth > MAX_NESTING) {
+    return `nesting deeper than ${String(MAX_NESTING)} levels`;
+  }
+  const entries: [string | undefined, unknown][] = Array.isArray(value)
+    ? value.map((item: unknown) => [undefined, item])
+    : Object.entries(value);
+  for (const [key, item] of entries) {
+    if (key !== undefined && !key.isWellFormed()) {
+      return 'key contains a lone surrogate';
+    }
+    const problem = findRejected(item, depth + 1);
+    if (problem !== undefined) {
+      return problem;
+    }
+  }
+  return undefined;
 }
 
 function describe(error: unknown): string {
@@ -135,14 +176,24 @@ export class FrameDecoder {
 }
 
 /**
+ * JSON.stringify writes a lone surrogate as a lowercase `\udXXX` escape and every literal
+ * backslash as `\\`, so an escape preceded by an even run of backslashes is a lone
+ * surrogate.
+ */
+const LONE_SURROGATE_ESCAPE = /(?:^|[^\\])(?:\\\\)*\\ud[89a-f][0-9a-f]{2}/;
+
+/**
  * Serializes `value` as one frame: compact JSON followed by LF.
  * Throws a TypeError when `value` cannot be represented as JSON (for example `undefined`,
- * a function, or a BigInt).
+ * a function, or a BigInt) or contains a string with a lone surrogate.
  */
 export function encodeFrame(value: unknown): Uint8Array {
   const json: unknown = JSON.stringify(value);
   if (typeof json !== 'string') {
     throw new TypeError('value cannot be encoded as JSON');
+  }
+  if (json.includes('\\ud') && LONE_SURROGATE_ESCAPE.test(json)) {
+    throw new TypeError('value contains a string with a lone surrogate');
   }
   return encoder.encode(`${json}\n`);
 }

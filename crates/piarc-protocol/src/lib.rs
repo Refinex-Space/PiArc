@@ -65,7 +65,7 @@ mod version;
 
 pub use contract::{CONTRACTS, Contract, ContractKind, contract};
 pub use error::{Error, Result};
-pub use framing::{DEFAULT_MAX_FRAME_BYTES, FrameDecoder, encode_frame};
+pub use framing::{DEFAULT_MAX_FRAME_BYTES, FrameDecoder, MAX_NESTING, encode_frame};
 pub use rpc_error::{ErrorData, ErrorKind, ErrorObject};
 pub use schema::{CONTRACTS_FILE, SCHEMA_FILE, export_schema};
 pub use version::{Capability, PROTOCOL_VERSION, ProtocolVersion, negotiate};

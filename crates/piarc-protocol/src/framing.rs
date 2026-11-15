@@ -15,7 +15,10 @@
 //!   reported once as [`Error::FrameTooLarge`] and discarded up to the next LF; frames
 //!   after it decode normally. The buffer never grows beyond the limit.
 //! - Invalid UTF-8 and invalid JSON are reported per frame as structured errors; decoding
-//!   never panics.
+//!   never panics. Invalid JSON includes a UTF-8 byte order mark, a lone surrogate escape
+//!   such as `"\ud800"` (Rust strings cannot hold one), and arrays or objects nested deeper
+//!   than [`MAX_NESTING`] levels (`serde_json`'s recursion limit, which keeps a hostile
+//!   frame from overflowing the stack). The TypeScript decoder enforces the same rules.
 //! - Encoding writes compact JSON, which never contains a raw LF, and appends one LF.
 
 use serde::Serialize;
@@ -25,6 +28,10 @@ use crate::error::{Error, Result};
 
 /// Default limit for the content of one frame (excluding the LF): 8 MiB.
 pub const DEFAULT_MAX_FRAME_BYTES: usize = 8 * 1024 * 1024;
+
+/// Deepest array/object nesting the decoder accepts. This is `serde_json`'s recursion
+/// limit; the test `accepts_the_maximum_nesting` fails if a `serde_json` upgrade changes it.
+pub const MAX_NESTING: usize = 127;
 
 const LF: u8 = b'\n';
 
@@ -183,6 +190,25 @@ mod tests {
             .map(|f| f.as_ref().expect_err("both frames are invalid").kind())
             .collect();
         assert_eq!(kinds, [ErrorKind::ParseError, ErrorKind::ParseError]);
+    }
+
+    fn nested(depth: usize) -> Vec<u8> {
+        let mut frame = "[".repeat(depth).into_bytes();
+        frame.extend("]".repeat(depth).into_bytes());
+        frame.push(LF);
+        frame
+    }
+
+    #[test]
+    fn accepts_the_maximum_nesting() {
+        let mut decoder = FrameDecoder::new();
+        let frames = decoder.decode(&nested(MAX_NESTING));
+        assert!(frames[0].is_ok(), "{:?}", frames[0]);
+        let frames = decoder.decode(&nested(MAX_NESTING + 1));
+        assert_eq!(
+            frames[0].as_ref().map_err(Error::kind).err(),
+            Some(ErrorKind::ParseError)
+        );
     }
 
     #[test]
