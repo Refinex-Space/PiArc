@@ -115,7 +115,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T05 | [严格校验的 mock provider](tasks/T05-strict-mock-provider.md) | 1 | T02 | macOS | high | 中 | 无 | 已完成 | 1487154 |
 | T06 | [Agent Host 骨架：Pi SDK 多会话与 AHP](tasks/T06-agent-host-skeleton.md) | 1 | T04、T05 | macOS | xhigh | 大 | S3、S9 | 已完成 | 2214b08 |
 | T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 已完成 | 3a8744f |
-| T08 | [凭据保险箱](tasks/T08-credential-vault.md) | 1 | T06；D2 | macOS | high | 中 | S5 | 进行中 | — |
+| T08 | [凭据保险箱](tasks/T08-credential-vault.md) | 1 | T06；D2 | macOS | high | 中 | S5 | 部分完成 | 80f3133 |
 | T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 未开始 | — |
 | T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 未开始 | — |
 | T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 未开始 | — |
@@ -294,17 +294,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-**T08 凭据保险箱**（开工 2026-11-15，基线 verify 13 步全绿；D2 尚未落实，A12 依赖它，其余先做；分支未推送，T03-A03、T04-A09 的 Windows CI 仍待核对）
-
-- [x] 1. 查锁定版本：Pi 1.5.2 的 `CredentialStore`、`ModelRuntime.create({ credentials })`、刷新阈值；keyring-core 与 store crate、AES-GCM 实现选型（cargo-deny）
-- [x] 2. `piarc-ports`：`SecretStore` 窄 trait；`piarc-secrets`：保险箱格式、主密钥状态表、原子写入、清零、错误类型；内存与可注入错误的替身（A01–A05）
-- [x] 3. 集中定义的应用标识与凭据库服务名（A12，`piarc-core::identity`，D2 未定故为占位值）；macOS 登录钥匙串集成测试（测试服务名，结束清理）（A11，已完成：`piarc-secrets/tests/system_store.rs`）
-- [x] 4. 协议：`secrets/*` 请求与变更通知，生成 TS 类型，golden 样本与反例（A06）
-- [x] 5. `piarc-core` 分派 `secrets/*`：多个 Agent Host 共享的凭据服务、变更推送、并发刷新的互斥
-- [x] 6. Agent Host 凭据适配层（`agent-host/src/runtime/`）：启动取回、同步读、按 provider 串行、异步回写、失败上报会话错误（A06、A07）
-- [x] 7. 端到端：mock 登录与 token 刷新（A08）、多会话与两个 Agent Host 并发（A09）、无明文扫描与环境变量检查（A10）
-- [x] 8. S5 报告与 `docs/spikes/README.md`（A13）；CLAUDE.md（piarc-secrets、agent-host）、coding-standards 复用表、架构同步
-- [ ] 9. 收尾：`npm run verify`（A14）、acceptance.json、PLAN.md、最终报告
+（当前没有进行中的任务）
 
 ## 登记事项
 
@@ -401,6 +391,12 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 验收：13 项通过，0 项阻塞（Windows 由 CI 的 `verify` 运行同一组测试，分支未推送，待核对；未取得时由 W0 核对）
 - 决策：ADR-0020（补充，已接受）：read/write/edit 在替身路径上运行 Pi 的工具代码，bash/find 用 Operations，grep 自写，写入用 Harness Kit 的队列串行；文本以 ≤ 1 MiB 范围内联、图片以 blob 引用；Bash 用 bash（与 Pi 原生一致），命令环境为 Core 白名单加 Pi 会话变量；超时与中断经 `exec/kill`
 - 遗留：I19（工具 I/O 排在受背压的通知之后）、I20（Pi 会话创建时的 cwd 检查）、I21（委托工具未读的 Pi 设置）；T03-A03、T04-A09 的 Windows CI 仍待推送后核对
+
+### 2026-11-15 T08 部分完成（提交 80f3133）
+- 交付：`piarc-ports::SecretStore`；`piarc-secrets`（保险箱格式 v1：AES-256-GCM、头部作附加数据、每次写入新 nonce、原子替换；主密钥状态表；`SystemSecretStore` 经 keyring-core 用 macOS 登录钥匙串与 Windows 凭据管理器；`MemorySecretStore` 替身）；协议 `secrets/getAll|get|set|delete|lock|unlock` 与通知 `secrets/changed`、五个错误类别、13 个契约的样本与反例；`piarc-core::secrets::SecretsService`（懒打开与重试、变更推送、键锁与租约）与 `identity`（应用标识占位）；`piarc-host::Peer` 的 `is_closed`、`same_connection`；Agent Host `CoreCredentialStore`（pi-ai `CredentialStore`）与测试专用 `--test-oauth-provider`；端到端凭据测试、本地 token 端点、`piarc_testkit::plaintext` 扫描；S5 报告、ADR-0021、架构 v2.11、复用表、六份 CLAUDE.md（新增 `piarc-secrets`）
+- 验收：13 项通过，1 项阻塞（A12：D2 未落实，服务名由集中定义的占位应用标识生成）
+- 决策：ADR-0021（补充，已接受）：Pi 1.5.2 的凭据注入点是异步 `CredentialStore`（R11 不出现）；Core 是唯一写入方，变更推送给所有 Agent Host，读改写在 Core 的键锁内（两个 Agent Host 只刷新一次）；`modify` 先改内存、等 Core 存好再完成，失败时请求失败（会话报错）；macOS 用登录钥匙串而非 data protection keychain
+- 遗留：I22（D2 占位应用标识与迁移）、I23（超时后授予的锁要等租约）；待 W0：凭据管理器实机、Windows 数据目录与进程环境扫描；待 T12：两次构建之间的钥匙串弹窗次数；T03-A03、T04-A09 的 Windows CI 仍待推送后核对
 
 ## 计划变更记录
 
