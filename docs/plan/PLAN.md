@@ -302,7 +302,7 @@ T01 仓库脚手架、工程规范与质量门禁（开工 2026-11-14，macOS）
 - [x] 4 `.editorconfig`、`.gitattributes`、`.github/workflows/ci.yml`、`.claude/settings.json`
 - [x] 5 工程规范：`coding-standards.md`、`testing.md`、`claude-md.md`
 - [x] 6 `.claude/rules/rust.md`、`.claude/rules/typescript.md`、根 `CLAUDE.md`
-- [ ] 7 门禁有效性验证（A02–A07 临时违规，验证后撤销）
+- [x] 7 门禁有效性验证（A02–A07 临时违规，验证后撤销）
 - [ ] 8 收尾：verify 全绿、acceptance.json、PLAN.md、会话日志
 
 ## 登记事项
