@@ -1,0 +1,11 @@
+[package]
+name = "piarc-protocol"
+description = "AHP and Core API data types, protocol versions and JSON Schema export."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

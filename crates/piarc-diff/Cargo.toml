@@ -1,0 +1,11 @@
+[package]
+name = "piarc-diff"
+description = "Diff computation (similar), hunk structure, large-diff degradation, UTF-16 offsets."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

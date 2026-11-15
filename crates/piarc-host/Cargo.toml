@@ -1,0 +1,11 @@
+[package]
+name = "piarc-host"
+description = "Agent Host supervision: launch, handshake, framing, backpressure, restart and call reconciliation."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

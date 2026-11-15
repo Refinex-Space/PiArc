@@ -296,8 +296,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 T01 仓库脚手架、工程规范与质量门禁（开工 2026-11-14，macOS）
 
-- [ ] 1 npm workspaces 与 TypeScript 工具链（tsconfig、ESLint、Prettier、Vitest、`.nvmrc`、精确锁定）
-- [ ] 2 Cargo workspace 与 21 个 crate 骨架（`rust-toolchain.toml`、`rustfmt.toml`、clippy、`deny.toml`）
+- [x] 1 npm workspaces 与 TypeScript 工具链（tsconfig、ESLint、Prettier、Vitest、`.nvmrc`、精确锁定）
+- [x] 2 Cargo workspace 与 21 个 crate 骨架（`rust-toolchain.toml`、`rustfmt.toml`、clippy、`deny.toml`）
 - [ ] 3 检查脚本：`check-crate-deps.mjs` + `crates/deps-rules.json`、`check-acceptance.mjs`、`verify.mjs`、根 `scripts`
 - [ ] 4 `.editorconfig`、`.gitattributes`、`.github/workflows/ci.yml`、`.claude/settings.json`
 - [ ] 5 工程规范：`coding-standards.md`、`testing.md`、`claude-md.md`

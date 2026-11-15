@@ -1,0 +1,16 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "allowJs": true,
+    "checkJs": true,
+    "emitDeclarationOnly": true,
+    "declarationMap": false,
+    "sourceMap": false,
+    "rootDir": "..",
+    "outDir": "../node_modules/.cache/tsc/scripts",
+    "tsBuildInfoFile": "../node_modules/.cache/tsc/scripts/.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["**/*.mjs", "../*.mjs"]
+}

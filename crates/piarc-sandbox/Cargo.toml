@@ -1,0 +1,11 @@
+[package]
+name = "piarc-sandbox"
+description = "macOS Seatbelt profile generation, local network proxy; Windows isolation (evaluated in M4)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

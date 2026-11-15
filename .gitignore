@@ -123,3 +123,6 @@ logs/
 test-results/
 .artifacts/
 tmp/
+
+# Repository-local developer tools (scripts/dev/install-tools.mjs)
+/.tools/

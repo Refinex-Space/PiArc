@@ -1,0 +1,8 @@
+{
+  "name": "@piarc/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "description": "PiArc Electron desktop client (main, preload and renderer processes).",
+  "license": "MIT",
+  "type": "module"
+}

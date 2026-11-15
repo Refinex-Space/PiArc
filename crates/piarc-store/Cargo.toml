@@ -1,0 +1,11 @@
+[package]
+name = "piarc-store"
+description = "SQLite storage (rusqlite): index, FTS5, audit; streaming read-only parsing of Pi JSONL."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

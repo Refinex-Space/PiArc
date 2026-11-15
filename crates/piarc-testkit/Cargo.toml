@@ -1,0 +1,11 @@
+[package]
+name = "piarc-testkit"
+description = "Test support: strict mock provider, scenario runner and event assertions."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

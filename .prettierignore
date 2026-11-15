@@ -1,0 +1,13 @@
+# Prettier also honours .gitignore. Entries below are tracked but not formatted
+# by Prettier.
+
+# Hand-written documentation (wide Chinese tables would be re-padded on every edit).
+docs/
+**/*.md
+
+# Lockfiles are owned by their package managers.
+package-lock.json
+Cargo.lock
+
+# Brand assets are generated artefacts with their own provenance.
+design/brand/

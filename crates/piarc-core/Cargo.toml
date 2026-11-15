@@ -1,0 +1,11 @@
+[package]
+name = "piarc-core"
+description = "Runtime facade: workspace and session orchestration, event bus, incremental merging, background task registry."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

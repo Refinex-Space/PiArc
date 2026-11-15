@@ -1,0 +1,11 @@
+[package]
+name = "piarc-checkpoint"
+description = "Content-addressed snapshot store, checkpoint index, rewind and conflict detection."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

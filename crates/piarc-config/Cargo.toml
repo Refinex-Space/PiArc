@@ -1,0 +1,11 @@
+[package]
+name = "piarc-config"
+description = "Layered settings loading and merging (PiArc and Claude Code compatibility), project trust, configuration diagnostics."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,11 @@
+[package]
+name = "piarc-ghostty-sys"
+description = "libghostty-vt -sys layer: committed bindgen bindings, download and verification of official prebuilt artefacts (ADR-0017)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

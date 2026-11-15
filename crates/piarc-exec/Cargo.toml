@@ -1,0 +1,11 @@
+[package]
+name = "piarc-exec"
+description = "Process management (process groups / Job Object, implements ProcessSpawner), output spooling, timeout to background."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

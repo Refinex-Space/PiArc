@@ -1,0 +1,11 @@
+[package]
+name = "piarc-telemetry"
+description = "Tracing, log rotation, local metrics and diagnostic bundle export."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
