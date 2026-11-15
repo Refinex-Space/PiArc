@@ -303,7 +303,7 @@ T05 严格校验的 mock provider（2026-11-15 开工，基线 `npm run verify` 
 - [x] 5. HTTP 服务（库形态）：场景选择、错误注入、请求记录与查询（A05、A06、A07）
 - [x] 6. 独立进程 bin：`--port 0`、stdout 首行端口、stdin 关闭退出、HTTP 查询端点（A07、A08）
 - [x] 7. `packages/testkit` 工作区：pi-ai 精确锁定，两种线格式的工具调用往返（A09、A10、A11）
-- [ ] 8. 文档：crate 文档与 `CLAUDE.md`、`testing.md`、`coding-standards.md` 复用表、架构同步、登记事项
+- [x] 8. 文档：crate 文档与 `CLAUDE.md`、`testing.md`、`coding-standards.md` 复用表、架构同步、登记事项
 - [ ] 9. 收尾：`npm run verify`（A12）、`acceptance.json`、看板与会话日志
 
 ## 登记事项
@@ -325,6 +325,8 @@ T05 严格校验的 mock provider（2026-11-15 开工，基线 `npm run verify` 
 | I11 | T03 | 应用仍使用 Electron 默认菜单，发布构建中也有"Toggle Developer Tools"与"Reload" | T18 替换原生菜单时决定发布构建是否保留开发者工具入口 |
 | I12 | T04 | 架构第 11 章"主进程内存（含 Core，空闲）≤ 120 MB"低于 Electron 自身基线：macOS arm64 上裸 Electron 45.3.2 开一个空窗口主进程 RSS 约 155 MB，PiArc 含 Core 160–164 MB（Core 与应用代码约 5–8 MB），数据见 `docs/spikes/S02-napi-event-channel.md` 第 4.4 节 | R1 按 M0 实测校准该预算（放宽要在第 18 章写明原因），可改为"相对裸 Electron 的增量"；W0 补 Windows 数据 |
 | I13 | T04 | 渲染进程的 `#/event-probe` 测试页随发布构建的渲染包分发（发布版 Core 没有演示事件源与测试钩子，页面只能订阅、计数） | T45 评估是否在发布构建中剔除测试页 |
+| I14 | T05 | `packages/testkit` 把 `@earendil-works/pi-ai` 精确锁定为 1.5.2（任务开工时 npm 上的最新稳定版），尚未与 Agent Host 统一 | T06 锁定 Pi 版本时把 `packages/testkit` 与 `agent-host` 的 `@earendil-works/*` 统一到同一精确版本，并重跑 `npx vitest run packages/testkit` |
+| I15 | T05 | pi-ai 的 API 实现（`anthropicMessagesApi`、`openAICompletionsApi`）只经公开子路径 `@earendil-works/pi-ai/api/<api>.lazy` 导出，主入口不导出；`packages/testkit` 使用了它们 | T06 落地"禁止深度导入"的 ESLint 规则时放行 `package.json` `exports` 中声明的子路径（只禁 `dist/` 等未导出路径） |
 
 ## 技术债
 

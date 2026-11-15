@@ -9,7 +9,7 @@
 | L0 单元（Rust） | 权限、Bash 分析、hooks 决策、快照、diff、终端状态等纯逻辑 | 同文件 `#[cfg(test)] mod tests`；跨模块的放 `crates/<crate>/tests/*.rs` | `cargo test -p <crate>`；全部：`cargo test --workspace` | 每次提交 | T01 |
 | L0 单元（TS） | 投影、工具包装、Harness Kit；渲染进程的 store 归约器、Markdown 增量解析、交互规则纯函数；仓库脚本 | 与源文件同目录：`foo.ts` ↔ `foo.test.ts`，脚本为 `foo.test.mjs` | `npm test`；单个文件：`npx vitest run <路径>` | 每次提交 | T01 |
 | L1 契约 | AHP schema 往返、录制事件样本的反序列化与再序列化、Pi 事件到 AHP 投影的 golden、NAPI 导出声明与 preload API 快照 | 样本：`tests/contracts/<契约名>/*.json`，反例在其下的 `invalid/`；Rust：`crates/piarc-protocol/tests/*.rs`；TS：`packages/protocol/src/*.test.ts`；NAPI 声明快照：`apps/desktop/src/main/core/native/*.d.ts`；见第 7 节 | `cargo test -p piarc-protocol`、`npx vitest run packages/protocol`、`node scripts/ci/check-core-types.mjs`；全部由 `npm run verify` 运行 | 每次提交 | T02、T04 |
-| L2 场景回放 | 无头运行 Core + 真实 Agent Host，模型侧接严格校验请求的 mock provider，按场景数据文件驱动 | `tests/scenarios/<场景 id>.yaml`，文件名与 `id` 一致；运行器在 `piarc-testkit`，驱动在 `piarc-devcli` | T15 补充 | 每次提交 | T05、T15 |
+| L2 场景回放 | 无头运行 Core + 真实 Agent Host，模型侧接严格校验请求的 mock provider，按场景数据文件驱动 | `tests/scenarios/<场景 id>.yaml`，文件名与 `id` 一致；运行器在 `piarc-testkit`，驱动在 `piarc-devcli`；模型侧的 mock provider 见第 10 节 | T15 补充 | 每次提交 | T05、T15 |
 | L3 行为对齐 | 对真实 Claude Code 录制同一批场景，与 PiArc 做结构化 diff | 有意偏离写在 `tests/l3-allowlist.yaml` | T30 补充 | 每晚 / 手动 | T30 |
 | L4 客户端 | Playwright 驱动 Electron 应用（开发形态与打包产物）；关键组件视觉快照；录制事件流驱动渲染进程（假 Core） | `apps/desktop/e2e/*.e2e.ts`；见第 9 节 | 先 `npm run package:desktop -- --flavor development`，再 `npm run test:e2e -w @piarc/desktop` | 每次提交（CI `desktop` 作业）/ 每晚（UI 流程） | T03、T19 |
 | 安全回归 | Markdown 与链接渲染的 XSS 载荷集、preload API 越权调用、外部导航拦截（架构第 10.3 节） | Electron 层：L4 的 `csp`、`navigation`、`external-links`、`preload`、`permissions`、`app-instance` 用例；纯函数（来源校验、外链白名单、CSP、资源路径）：`apps/desktop/src/main/**/*.test.ts`；XSS 载荷集由 T09 加入 | 纯函数部分由 `npm run verify` 运行；Electron 层同 L4 | 每次提交 | T03 起 |
@@ -152,3 +152,82 @@ Playwright 配置在 `apps/desktop/playwright.config.ts`，两个 project 跑同
 
 设置 `PIARC_EVIDENCE_TASK=<任务编号>` 后，输出写到 `tmp/evidence/<任务编号>/l4/<用例>/`：`app.log`（应用日志）、用例自己保存的截图（例如冒烟用例的 `window.png`），失败时还有 `trace.zip`（`npx playwright show-trace <路径>` 查看）。不设置时目录名为 `L4`；CI 用 `ci` 并上传为 artifact。Playwright 每次运行前会清空这个 `l4/` 目录。
 
+
+## 10. 严格 mock provider
+
+L0–L2 的模型侧一律接 `piarc-testkit` 的严格 mock provider（架构第 12.2 节）。它模拟两种流式线格式，先校验每个请求，不合规就返回 400 并写明违反的规则；合规才按场景脚本返回下一步。
+
+### 10.1 运行形态
+
+| 形态 | 用法 | 适用 |
+|---|---|---|
+| 库 | `MockProvider::start(library).await`（tokio 运行时内）；`port()`、`anthropic_base_url()`、`openai_base_url()`、`records()`、`log()` | Rust 测试 |
+| 独立进程 | `piarc-mock-provider --port 0 --scenarios <文件或目录>...`：stdout 第一行是实际端口；stdin 关闭后退出，终止信号按默认处置结束进程 | 跨进程测试（T06 起）；TS 侧用 `packages/testkit/src/mock-provider.ts` 的 `buildMockProvider`、`startMockProvider` |
+
+| 端点 | 作用 |
+|---|---|
+| `POST /v1/messages` | Anthropic Messages（SSE），客户端 base URL 为 `http://127.0.0.1:<端口>`；接受查询串（Anthropic SDK 的 beta 客户端会加 `?beta=true`） |
+| `POST /v1/chat/completions` | OpenAI 兼容 Chat Completions（`data:` 分块），base URL 为 `http://127.0.0.1:<端口>/v1` |
+| `GET /_piarc/requests` | 请求记录（JSON 数组），与库的 `records()` 内容相同 |
+
+只绑定 `127.0.0.1`。非流式请求返回 400 `streaming_required`。
+
+### 10.2 场景选择
+
+- 请求头 `x-piarc-scenario: <选择器>`，或首条用户消息中的标记 `[[piarc-scenario:<选择器>]]`；两者都有时以请求头为准。
+- 选择器是 `<场景 id>` 或 `<场景 id>#<实例>`。每个选择器单独计数：同一脚本供多个会话并行使用时，各会话用不同实例即可互不影响。
+- 一个选择器的第 N 个被接受的请求得到第 N 步；校验未通过的请求不消耗步数；步数用完后返回 400 `scenario_exhausted`。
+
+### 10.3 脚本格式
+
+一个文件（`.json`、`.yaml` 或 `.yml`）一个场景；未知字段一律报错。T15 的场景文件内嵌其中的 `validation` 与 `steps` 两部分（Rust 类型 `Script`）。
+
+```yaml
+id: read-then-answer               # ASCII 字母、数字与 . _ -
+validation:                        # 可省略，默认全部规则开启
+  rules: { cache_breakpoint_position: false }   # 逐条关闭
+  required_system_sections: ["<environment>"]  # system 必须包含的文本
+  cache_breakpoints:               # 仅 Anthropic
+    max_message_level: 1           # messages 内最多几个断点，默认 1（架构第 6.15 节）
+    last_message_only: false       # 消息级断点必须在最后一条消息
+steps:
+  - text: "Reading the file."      # 分 3 段 text 增量
+    tool_calls:
+      - id: toolu_read_1           # 可省略，默认 <toolu|call>_mock_<步序号>_<序号>
+        name: read_file
+        input: { path: "a b/中文.txt" }   # 必须是 JSON 对象
+        fragments: 4               # 参数分段数，默认 3；或 split_at: [字符偏移…]
+    usage: { input_tokens: 120, output_tokens: 30, cache_read_tokens: 0, cache_write_tokens: 100 }
+    stop_reason: tool_use          # 可省略：有工具调用为 tool_use，否则 end_turn；另有 max_tokens
+  - text: "Done."
+    disconnect_after_events: 3     # 只发前 3 个线上事件，然后断开连接
+  - error:
+      kind: rate_limit             # rate_limit 429 | overloaded 529 | server_error 500 | unavailable 503
+      retry_after_secs: 2          # 仅 rate_limit，默认 1
+      message: "slow down"         # 可省略
+```
+
+- 参数按紧凑 JSON 序列化（键按字典序），按字符切分：`split_at` 可以切在字符串值内部和转义序列中间，不会切开一个 UTF-8 字符。
+- 用量在 Anthropic 中写入 `message_start` 与 `message_delta`；在 OpenAI 中只在请求带 `stream_options.include_usage` 时追加用量块，`prompt_tokens` 为三类输入之和，缓存读取在 `prompt_tokens_details.cached_tokens`，缓存写入在 `cache_write_tokens`（OpenRouter 扩展，pi-ai 读取它）。
+- OpenAI 官方没有 529；mock 仍按脚本返回 529，让两种线格式的重试路径一致。
+
+### 10.4 校验规则
+
+400 的错误体沿用服务商的官方形状（Anthropic：`{"type":"error","error":{"type","message"},"request_id"}`；OpenAI：`{"error":{"message","type","param","code"}}`），另加 `error.code`（第一条违规的规则 ID）与 `error.violations`（全部违规，每条含 `rule`、`message`、`location`）。测试按规则 ID 断言，不解析 message。
+
+| 规则 ID | 检查 |
+|---|---|
+| `tool_pairing` | 每个工具调用在下一条消息中都有同 id 的结果；无孤立、多余或重复的 id；Anthropic 的 `tool_result` 块排在该消息其他内容之前 |
+| `role_order` | Anthropic：user 与 assistant 严格交替，首条与末条为 user（当前模型不支持 assistant 预填），`system` 角色消息不参与交替；OpenAI：`tool` 消息紧跟带 `tool_calls` 的 assistant 消息；两者都拒绝未知角色与空消息列表 |
+| `tool_schema` | 名称符合 `^[a-zA-Z0-9_-]{1,128}$`（Anthropic）或 `{1,64}`（OpenAI）且不重复；参数 schema 是对象、顶层 `"type": "object"`、通过 JSON Schema 元 schema 校验；Anthropic 自定义工具必须有 `input_schema`，带 `type` 的内置工具不查 schema |
+| `system_sections` | system（Anthropic 的 `system` 与 `system` 角色消息，OpenAI 的 `system`/`developer` 消息）包含场景要求的每段文本 |
+| `cache_breakpoint_count` | Anthropic 的 `cache_control`（含顶层自动缓存）不超过 4 个 |
+| `cache_breakpoint_position` | 消息级断点数量与位置符合场景配置；thinking 块与空文本块不能带断点 |
+
+不可关闭的 400：`malformed_request`、`streaming_required`、`scenario_not_selected`、`scenario_not_found`、`scenario_exhausted`；未知端点为 404 `not_found`。
+
+新增规则：在 `crates/piarc-testkit/src/rules.rs` 的 `Rule` 中加变体与 ID，写检查函数并接进 `validate`；可关闭的规则同时加进 `Rule::VALIDATION` 与 `scenario.rs` 的 `RuleSwitches`；补一个触发 400 的测试（`tests/validation.rs`），并更新本节表格与 crate 的 `CLAUDE.md`。
+
+### 10.5 请求记录
+
+每个请求按到达顺序记录：`seq`、`method`、`path`（含查询串）、`format`、`scenario`（选择器）、`step_index`（从 0 开始，未消耗步数时为空）、`headers`（小写名；`authorization`、`x-api-key` 等凭据头的值记为 `<redacted>`）、原始请求体 `body`、校验结果 `violations`（空表示通过）、`outcome`（`streamed`、`disconnected`、`injected_error`、`rejected`）。
