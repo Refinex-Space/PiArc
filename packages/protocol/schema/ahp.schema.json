@@ -956,6 +956,12 @@
           "description": "Its working directory, as given to `session/create`.",
           "type": "string"
         },
+        "lastSeq": {
+          "description": "The last `seq` Core received for this session; the session's notifications continue\nfrom the next number, so `seq` keeps increasing across Agent Host restarts.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
         "sessionId": {
           "$ref": "#/$defs/SessionId",
           "description": "The session to reopen."

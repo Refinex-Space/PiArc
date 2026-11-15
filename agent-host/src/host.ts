@@ -8,6 +8,7 @@ import { AhpError, describeError } from './protocol/errors.js';
 import { OutboundQueue, type FrameSink } from './protocol/outbound.js';
 import {
   modelField,
+  optionalCount,
   paramsObject,
   parseTrust,
   parseWelcome,
@@ -117,10 +118,14 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
   });
   connection.handle('session/resume', async (params) => {
     const fields = paramsObject('session/resume', params);
-    return (await sessions('session/resume')).resume(
-      stringField('session/resume', fields, 'sessionId'),
-      stringField('session/resume', fields, 'cwd'),
-    );
+    const sessionId = stringField('session/resume', fields, 'sessionId');
+    const cwd = stringField('session/resume', fields, 'cwd');
+    const lastSeq = optionalCount('session/resume', fields, 'lastSeq');
+    const registry = await sessions('session/resume');
+    if (lastSeq !== undefined) {
+      outbound.continueSeq(sessionId, lastSeq);
+    }
+    return registry.resume(sessionId, cwd);
   });
   connection.handle('session/prompt', async (params) => {
     const fields = paramsObject('session/prompt', params);

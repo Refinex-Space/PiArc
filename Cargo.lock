@@ -780,6 +780,9 @@ version = "0.0.0"
 name = "piarc-core"
 version = "0.0.0"
 dependencies = [
+ "piarc-exec",
+ "piarc-host",
+ "piarc-ports",
  "piarc-protocol",
  "serde",
  "serde_json",

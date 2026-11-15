@@ -127,6 +127,14 @@ export class OutboundQueue {
     this.#enqueueSession(entry);
   }
 
+  /**
+   * Continues a session's numbering after `lastSeq`: a session reopened after a restart keeps
+   * increasing `seq` from where Core last saw it.
+   */
+  continueSeq(sessionId: string, lastSeq: number): void {
+    this.#seq.set(sessionId, Math.max(this.#seq.get(sessionId) ?? 0, lastSeq));
+  }
+
   /** Current counters. */
   stats(): OutboundStats {
     return {

@@ -119,6 +119,16 @@ describe('OutboundQueue', () => {
     ).toEqual(['s:turn/started', 's:a', 's:b', 's:item/completed', 's:ce', 'other:d']);
   });
 
+  it('continues numbering after the last seq Core saw', () => {
+    const sink = new FakeSink();
+    const { q } = queue(sink);
+    q.continueSeq('s', 41);
+    q.sendSessionEvent('s', 'turn/started', { turnId: 't' });
+    q.continueSeq('s', 7);
+    q.sendSessionEvent('s', 'turn/completed', { turnId: 't' });
+    expect(sink.frames.map((f) => params(f).seq)).toEqual([42, 43]);
+  });
+
   it('reports an overflow once when waiting frames exceed the ceiling', () => {
     const sink = new FakeSink();
     const { q, overflows } = queue(sink, 4_096);

@@ -29,6 +29,20 @@ export function stringField(method: string, params: Fields, name: string): strin
   return value;
 }
 
+/** An optional non-negative integer member, such as `lastSeq`. */
+export function optionalCount(method: string, params: Fields, name: string): number | undefined {
+  const value = params[name];
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw new AhpError('invalidParams', `${method}: ${name} must be a non-negative integer`, {
+      details: { member: name },
+    });
+  }
+  return value;
+}
+
 /** The optional `model` member of `session/create`. */
 export function modelField(method: string, params: Fields): ModelRef | undefined {
   const value = params.model;

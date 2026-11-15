@@ -33,7 +33,15 @@
 //! backpressure policy and batch format are documented in [`events`]; the ordered shutdown
 //! in the `runtime` module docs of [`CoreRuntime`]. Demo event sources ([`demo`]) exist for
 //! tests and benchmarks only.
+//!
+//! # Agent Host (T06)
+//!
+//! [`agent_host::start`] supervises one workspace's Agent Host with the production I/O: the
+//! `piarc-exec` process spawner and the system clock. Session orchestration on top of it
+//! (routing its notifications into the event path, answering `trust/get` from the trust
+//! store) arrives with T13 and T14.
 
+pub mod agent_host;
 pub mod demo;
 mod error;
 pub mod events;

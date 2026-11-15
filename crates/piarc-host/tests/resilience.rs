@@ -239,7 +239,7 @@ async fn killing_the_host_mid_prompt_marks_open_calls_uncertain_restarts_it_and_
     );
     assert_eq!(
         resume_rx.await.expect("resume seen"),
-        json!({ "sessionId": "s1", "cwd": "work space/项目" })
+        json!({ "sessionId": "s1", "cwd": "work space/项目", "lastSeq": 1 })
     );
     assert!(
         supervisor.calls().is_empty(),

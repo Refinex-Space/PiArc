@@ -22,7 +22,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 
 use crate::config::HostConfig;
-use crate::connection::{self, Connection, Link, Reply, Shared, StartError, lock};
+use crate::connection::{self, Connection, Link, Reply, Shared, StartError, TrackedSession, lock};
 
 /// How long to wait for the reader to drain stdout after the process exited.
 const DRAIN_TIMEOUT: Duration = Duration::from_secs(2);
@@ -78,8 +78,6 @@ struct Inner {
     shared: Arc<Shared>,
     link: Mutex<Option<Link>>,
     state: Mutex<SupervisorState>,
-    /// Open sessions and their cwd, reopened after a restart.
-    sessions: Mutex<BTreeMap<String, String>>,
     last_status: Mutex<Option<HostStatus>>,
     next_id: AtomicI64,
     commands: mpsc::Sender<Command>,
@@ -103,6 +101,7 @@ impl HostSupervisor {
             events,
             inbound: Arc::clone(&deps.inbound),
             workspace: config.workspace.to_string_lossy().into_owned(),
+            sessions: Mutex::new(BTreeMap::new()),
         });
         let inner = Arc::new(Inner {
             config,
@@ -110,7 +109,6 @@ impl HostSupervisor {
             shared,
             link: Mutex::new(None),
             state: Mutex::new(SupervisorState::Starting { epoch: 1 }),
-            sessions: Mutex::new(BTreeMap::new()),
             last_status: Mutex::new(None),
             next_id: AtomicI64::new(1),
             commands,
@@ -140,7 +138,7 @@ impl HostSupervisor {
     /// Ids of the sessions the supervisor reopens after a restart.
     #[must_use]
     pub fn open_sessions(&self) -> Vec<String> {
-        lock(&self.inner.sessions).keys().cloned().collect()
+        lock(&self.inner.shared.sessions).keys().cloned().collect()
     }
 
     /// Calls `M` on the Agent Host and waits for the result.
@@ -182,7 +180,13 @@ impl HostSupervisor {
                 self.inner.config.call_timeout,
             )
             .await?;
-        lock(&self.inner.sessions).insert(opened.session_id.0.clone(), cwd.to_owned());
+        lock(&self.inner.shared.sessions).insert(
+            opened.session_id.0.clone(),
+            TrackedSession {
+                cwd: cwd.to_owned(),
+                last_seq: 0,
+            },
+        );
         Ok(opened)
     }
 
@@ -249,7 +253,7 @@ impl HostSupervisor {
             .call::<SessionClose>(target, tracking, self.inner.config.call_timeout)
             .await;
         if result.is_ok() || matches!(&result, Err(e) if e.kind() == ErrorKind::SessionNotFound) {
-            lock(&self.inner.sessions).remove(&session_id.0);
+            lock(&self.inner.shared.sessions).remove(&session_id.0);
         }
         result
     }
@@ -597,14 +601,15 @@ impl Inner {
     }
 
     async fn restore_sessions(&self, epoch: u64) {
-        let sessions: Vec<(String, String)> = lock(&self.sessions)
+        let sessions: Vec<(String, TrackedSession)> = lock(&self.shared.sessions)
             .iter()
-            .map(|(id, cwd)| (id.clone(), cwd.clone()))
+            .map(|(id, tracked)| (id.clone(), tracked.clone()))
             .collect();
-        for (session_id, cwd) in sessions {
+        for (session_id, tracked) in sessions {
             let params = SessionResumeParams {
                 session_id: SessionId(session_id.clone()),
-                cwd,
+                cwd: tracked.cwd,
+                last_seq: Some(tracked.last_seq),
             };
             match self
                 .call::<SessionResume>(params, Tracking::untracked(), self.config.call_timeout)
@@ -619,7 +624,7 @@ impl Inner {
                     .await;
                 }
                 Err(error) => {
-                    lock(&self.sessions).remove(&session_id);
+                    lock(&self.shared.sessions).remove(&session_id);
                     self.emit(HostEvent::SessionRestoreFailed {
                         epoch,
                         session_id,

@@ -13,8 +13,8 @@
 //! # Session requests (Core → Agent Host)
 //!
 //! - `session/create` opens a new session in a working directory; `session/resume` reopens
-//!   one by id (Core uses it after an Agent Host restart). Both answer with
-//!   [`SessionOpened`].
+//!   one by id (Core uses it after an Agent Host restart, passing the last `seq` it received
+//!   so numbering continues). Both answer with [`SessionOpened`].
 //! - `session/prompt` starts a turn. The response ([`PromptAccepted`]) only acknowledges
 //!   it: the turn's outcome arrives later as `turn/completed` with the same `turnId`. Its
 //!   `requestId` is an idempotency key: the same key on the same session returns the turn
@@ -100,6 +100,10 @@ pub struct SessionResumeParams {
     pub session_id: SessionId,
     /// Its working directory, as given to `session/create`.
     pub cwd: String,
+    /// The last `seq` Core received for this session; the session's notifications continue
+    /// from the next number, so `seq` keeps increasing across Agent Host restarts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_seq: Option<u64>,
 }
 
 /// Result of `session/create` and `session/resume`.

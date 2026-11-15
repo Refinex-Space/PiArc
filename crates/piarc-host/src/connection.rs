@@ -10,7 +10,7 @@
 //!   Host);
 //! - stderr: forwards each line to `tracing` with workspace and session fields.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -47,6 +47,16 @@ pub(crate) struct Shared {
     pub events: mpsc::Sender<HostEvent>,
     pub inbound: SharedInbound,
     pub workspace: String,
+    /// Sessions opened through the supervisor, reopened after a restart.
+    pub sessions: Mutex<BTreeMap<String, TrackedSession>>,
+}
+
+/// What a restart needs to reopen a session.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TrackedSession {
+    pub cwd: String,
+    /// The highest `seq` received for the session, on any connection.
+    pub last_seq: u64,
 }
 
 /// The answer a caller waits for.
@@ -456,6 +466,10 @@ impl Reader {
     }
 
     async fn notification(&self, event: SessionEventNotification) {
+        let header = &event.params.header;
+        if let Some(session) = lock(&self.shared.sessions).get_mut(&header.session_id.0) {
+            session.last_seq = session.last_seq.max(header.seq);
+        }
         if event.method == TurnCompleted::NAME
             && let Some(turn_id) = event.params.payload.get("turnId").and_then(Value::as_str)
         {

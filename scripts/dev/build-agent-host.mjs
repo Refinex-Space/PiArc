@@ -44,6 +44,9 @@ export async function buildAgentHost() {
       js: 'import { createRequire as __piarcCreateRequire } from "node:module"; const require = __piarcCreateRequire(import.meta.url);',
     },
     define: { PI_BUNDLED_NODE: 'true' },
+    // Bundle the protocol package from source, so the bundle does not depend on a prior
+    // `tsc --build` of packages/protocol (Rust tests build the bundle on their own).
+    alias: { '@piarc/protocol': path.join(repoRoot, 'packages', 'protocol', 'src', 'index.ts') },
     external: [...EXTERNAL_PACKAGES, ...OPTIONAL_PACKAGES],
     legalComments: 'none',
     logLevel: 'warning',

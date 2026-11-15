@@ -509,6 +509,11 @@ export interface SessionResumeParams {
    */
   cwd: string;
   /**
+   * The last `seq` Core received for this session; the session's notifications continue
+   * from the next number, so `seq` keeps increasing across Agent Host restarts.
+   */
+  lastSeq?: number | null;
+  /**
    * The session to reopen.
    */
   sessionId: SessionId;
