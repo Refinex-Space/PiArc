@@ -12,6 +12,6 @@
     "types": [],
     "jsx": "react-jsx"
   },
-  "include": ["**/*.ts", "**/*.tsx"],
+  "include": ["**/*.ts", "**/*.tsx", "terminal/frame/frame-samples.json"],
   "references": [{ "path": "../shared" }, { "path": "../../../../packages/protocol" }]
 }

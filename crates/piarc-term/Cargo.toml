@@ -13,5 +13,8 @@ piarc-protocol.workspace = true
 portable-pty.workspace = true
 thiserror.workspace = true
 
+[dev-dependencies]
+serde_json.workspace = true
+
 [lints]
 workspace = true

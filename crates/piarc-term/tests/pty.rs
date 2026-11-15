@@ -197,3 +197,35 @@ fn the_direct_echo_probe_measures_the_pty_round_trip() {
         .expect("echo");
     assert!(elapsed < Duration::from_secs(1), "{elapsed:?}");
 }
+
+/// Real vim on the alternate screen (macOS ships /usr/bin/vim): the screen rebuilt from frames
+/// equals the formatter's text while vim runs and after it quits.
+#[cfg(target_os = "macos")]
+#[test]
+fn vim_on_the_alternate_screen_matches_the_formatter() {
+    let dir = std::env::temp_dir().join(format!("piarc-term-vim-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("dir");
+    let file = dir.join("notes.txt");
+    std::fs::write(&file, "first line\n中文 second\nthird 😀\n").expect("file");
+    let path = file.to_string_lossy().into_owned();
+    let (session, events) = spawn("vim", &["-u", "NONE", "-i", "NONE", "-N", &path]);
+    wait_for_screen(&session, "vim's file view", |text| {
+        text.contains("中文 second") && text.lines().filter(|l| *l == "~").count() > 3
+    });
+    let mut screen = Screen::new();
+    let mut full = true;
+    let compare = |screen: &mut Screen, full: &mut bool| {
+        let frame = term_frame::decode(&session.frame(9, *full).expect("frame")).expect("decode");
+        *full = false;
+        screen.apply(&frame).expect("apply");
+        assert_eq!(screen.plain_text(), session.viewport_text().expect("text"));
+    };
+    compare(&mut screen, &mut full);
+    session.write(b"ggAX\x1b".to_vec()).expect("edit");
+    wait_for_screen(&session, "the edit", |text| text.contains("first lineX"));
+    compare(&mut screen, &mut full);
+    session.write(b":q!\r".to_vec()).expect("quit");
+    assert_eq!(wait_for_exit(&events), Some(0));
+    compare(&mut screen, &mut full);
+    let _ = std::fs::remove_dir_all(&dir);
+}
