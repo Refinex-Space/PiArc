@@ -120,37 +120,6 @@ async fn reads_writes_and_pushes_changes_to_subscribed_connections() {
             .expect("second delete"),
         json!({})
     );
-    // `prefixes` narrows what getAll returns.
-    f.call(
-        &host_a,
-        "secrets/set",
-        json!({ "key": "mcp/s", "value": { "token": "t" } }),
-    )
-    .await
-    .expect("set");
-    let _ = next_change(&mut frames_a).await;
-    let _ = next_change(&mut frames_b).await;
-    let only_mcp = f
-        .call(
-            &bystander,
-            "secrets/getAll",
-            json!({ "prefixes": ["mcp/"] }),
-        )
-        .await
-        .expect("getAll with prefixes");
-    assert_eq!(only_mcp["entries"].as_array().map(Vec::len), Some(1));
-    assert_eq!(only_mcp["entries"][0]["key"], "mcp/s");
-    let models = f
-        .call(
-            &host_a,
-            "secrets/getAll",
-            json!({ "prefixes": ["provider/", "oauth/"] }),
-        )
-        .await
-        .expect("getAll with prefixes");
-    assert_eq!(models, json!({ "entries": [] }));
-    drop(frames_c);
-    let (bystander, mut frames_c) = Peer::channel(16);
     // `bystander` never called getAll: nothing was pushed to it.
     assert!(frames_c.try_recv().is_err());
     // A closed connection is dropped from the subscribers without affecting writes.
@@ -391,4 +360,41 @@ async fn concurrent_locked_updates_lose_nothing() {
         .await
         .expect("get");
     assert_eq!(got["entry"]["value"]["n"], 50);
+}
+
+#[tokio::test]
+async fn get_all_returns_only_the_requested_prefixes() {
+    let f = Fixture::new("prefixes", Duration::from_secs(30));
+    let (peer, _frames) = Peer::channel(16);
+    for (key, value) in [
+        ("mcp/s", json!({ "token": "t" })),
+        ("oauth/p", oauth("a")),
+        ("provider/p", json!({ "type": "api_key" })),
+    ] {
+        f.call(&peer, "secrets/set", json!({ "key": key, "value": value }))
+            .await
+            .expect("set");
+    }
+    let keys = |result: Value| -> Vec<String> {
+        result["entries"]
+            .as_array()
+            .expect("entries")
+            .iter()
+            .map(|e| e["key"].as_str().expect("key").to_owned())
+            .collect()
+    };
+    let models = f
+        .call(
+            &peer,
+            "secrets/getAll",
+            json!({ "prefixes": ["provider/", "oauth/"] }),
+        )
+        .await
+        .expect("getAll");
+    assert_eq!(keys(models), vec!["oauth/p", "provider/p"]);
+    let all = f
+        .call(&peer, "secrets/getAll", json!({}))
+        .await
+        .expect("getAll");
+    assert_eq!(keys(all), vec!["mcp/s", "oauth/p", "provider/p"]);
 }
