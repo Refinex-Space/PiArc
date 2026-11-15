@@ -163,18 +163,50 @@ function desktopProcessBoundaries() {
   );
   /** @param {string} message */
   const builtinPaths = (message) => nodeBuiltins.map((name) => ({ name, message }));
+  const browserWindow = ['Identifier', 'MemberExpression'].map((callee) => ({
+    selector: `NewExpression[callee.type='${callee}'][callee.${callee === 'Identifier' ? 'name' : 'property.name'}='BrowserWindow']`,
+    message: 'Create windows with createMainWindow() in src/main/window.ts.',
+  }));
+  // Model output and repository content are untrusted (architecture section 10.3): the renderer
+  // builds DOM through React elements only, never from HTML strings.
+  const htmlSinkMessage =
+    'The renderer never parses HTML strings: render React elements (see transcript/markdown/MarkdownView.tsx).';
+  const htmlSinks = [
+    {
+      selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']",
+      message: htmlSinkMessage,
+    },
+    {
+      selector: "Property[key.name='dangerouslySetInnerHTML']",
+      message: htmlSinkMessage,
+    },
+    ...['innerHTML', 'outerHTML'].map((property) => ({
+      selector: `MemberExpression[property.name='${property}']`,
+      message: htmlSinkMessage,
+    })),
+    ...['insertAdjacentHTML', 'createContextualFragment', 'setHTMLUnsafe', 'parseHTMLUnsafe'].map(
+      (method) => ({
+        selector: `CallExpression[callee.property.name='${method}']`,
+        message: htmlSinkMessage,
+      }),
+    ),
+    {
+      selector: "CallExpression[callee.object.name='document'][callee.property.name=/^writeln?$/]",
+      message: htmlSinkMessage,
+    },
+  ];
   return [
     {
       files: ['apps/desktop/src/**/*.{ts,tsx}'],
-      ignores: ['apps/desktop/src/main/window.ts'],
+      ignores: ['apps/desktop/src/main/window.ts', 'apps/desktop/src/renderer/**'],
       rules: {
-        'no-restricted-syntax': [
-          'error',
-          ...['Identifier', 'MemberExpression'].map((callee) => ({
-            selector: `NewExpression[callee.type='${callee}'][callee.${callee === 'Identifier' ? 'name' : 'property.name'}='BrowserWindow']`,
-            message: 'Create windows with createMainWindow() in src/main/window.ts.',
-          })),
-        ],
+        'no-restricted-syntax': ['error', ...browserWindow],
+      },
+    },
+    {
+      files: ['apps/desktop/src/renderer/**/*.{ts,tsx}'],
+      rules: {
+        'no-restricted-syntax': ['error', ...browserWindow, ...htmlSinks],
       },
     },
     {

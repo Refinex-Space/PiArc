@@ -297,11 +297,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 T09 Transcript 渲染与 composer 原型（S1），2026-11-15 开工。T03 为"部分完成"（A03 等 Windows CI），不影响本任务；分支未推送，无法核对前序 Windows CI。
 
 - [x] 1. 事件流夹具：协议 item 事件、按 token/s 回放的合成器、内容覆盖（段落、列表、表格、多语言、超长代码、未闭合标记、XSS）、1 万条历史
-- [ ] 2. 增量 Markdown：Worker 解析、只重解析最后一个未完成块、自动闭合、块与 span 中间结构、单元测试（A05）（解析器与单元测试已完成，选定 marked 18.2.0；Worker 待接）
-- [ ] 3. 代码高亮：Worker 中 shiki token 级 API、JS 正则引擎（不放宽 CSP）、流式先纯文本（A06）
+- [x] 2. 增量 Markdown：Worker 解析、只重解析最后一个未完成块、自动闭合、块与 span 中间结构、单元测试（A05）
+- [ ] 3. 代码高亮：Worker 中 shiki token 级 API、JS 正则引擎（不放宽 CSP）、流式先纯文本（A06）（实现完成，待 L4）
 - [ ] 4. 安全渲染：禁止 innerHTML 的 ESLint 规则、原始 HTML 当文本、外链确认、远程图片显示为链接、XSS 载荷集（A06、A07）
-- [ ] 5. transcript：最小 store（按 item 订阅）、虚拟列表两候选、流式节奏、滚动跟随与"回到底部"、选择与复制、剪贴板权限放行（A10、A11）
-- [ ] 6. composer：ProseMirror、@ 胶囊、键盘语义、输入法守卫（A08、A09）
+- [ ] 5. transcript：最小 store（按 item 订阅）、虚拟列表两候选、流式节奏、滚动跟随与"回到底部"、选择与复制、剪贴板权限放行（A10、A11）（实现完成，原型页 `#/transcript-lab`；剪贴板放行与 L4 待做）
+- [ ] 6. composer：ProseMirror、@ 胶囊、键盘语义、输入法守卫（A08、A09）（实现与单元测试完成，待 L4）
 - [ ] 7. L4 用例：XSS、输入法（CDP 合成）、键盘语义、复制、滚动跟随
 - [ ] 8. 性能测量：两个候选的流式 60 s、万条滚动、千条冷加载、渲染进程内存（A01–A04）
 - [ ] 9. 库选型 ADR、架构 8.4 同步、S1 报告与 spikes README（A01、A12）
