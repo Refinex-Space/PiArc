@@ -112,7 +112,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T02 | [协议单一来源与契约测试基座](tasks/T02-protocol-and-contract-tests.md) | 0 | T01 | macOS | high | 中 | 无 | 已完成 | ce41191 |
 | T03 | [Electron 应用骨架与安全基线](tasks/T03-electron-shell-and-security-baseline.md) | 1 | T02 | macOS | xhigh | 大 | S10 | 部分完成 | 63eabea |
 | T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 部分完成 | aa2817f |
-| T05 | [严格校验的 mock provider](tasks/T05-strict-mock-provider.md) | 1 | T02 | macOS | high | 中 | 无 | 进行中 | — |
+| T05 | [严格校验的 mock provider](tasks/T05-strict-mock-provider.md) | 1 | T02 | macOS | high | 中 | 无 | 已完成 | 1487154 |
 | T06 | [Agent Host 骨架：Pi SDK 多会话与 AHP](tasks/T06-agent-host-skeleton.md) | 1 | T04、T05 | macOS | xhigh | 大 | S3、S9 | 未开始 | — |
 | T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 未开始 | — |
 | T08 | [凭据保险箱](tasks/T08-credential-vault.md) | 1 | T06；D2 | macOS | high | 中 | S5 | 未开始 | — |
@@ -294,17 +294,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-T05 严格校验的 mock provider（2026-11-15 开工，基线 `npm run verify` 13 步全部通过）
-
-- [x] 1. 选型：HTTP 服务、YAML、JSON Schema 校验库，cargo-deny 通过
-- [x] 2. 场景脚本格式（serde，JSON 与 YAML 加载）与场景库
-- [x] 3. 线格式编码：Anthropic Messages SSE、OpenAI Chat Completions 分块（A01）；工具参数至少 3 段增量（A04）
-- [x] 4. 请求解析与校验器：配对、角色顺序、工具 schema、system 必要段落、缓存断点数量与位置（A02、A03）
-- [x] 5. HTTP 服务（库形态）：场景选择、错误注入、请求记录与查询（A05、A06、A07）
-- [x] 6. 独立进程 bin：`--port 0`、stdout 首行端口、stdin 关闭退出、HTTP 查询端点（A07、A08）
-- [x] 7. `packages/testkit` 工作区：pi-ai 精确锁定，两种线格式的工具调用往返（A09、A10、A11）
-- [x] 8. 文档：crate 文档与 `CLAUDE.md`、`testing.md`、`coding-standards.md` 复用表、架构同步、登记事项
-- [ ] 9. 收尾：`npm run verify`（A12）、`acceptance.json`、看板与会话日志
+（当前没有进行中的任务）
 
 ## 登记事项
 
@@ -375,6 +365,12 @@ T05 严格校验的 mock provider（2026-11-15 开工，基线 `npm run verify` 
 - 验收：12 项通过，1 项阻塞（A09：Windows 两个目标的 `core-build`/`core-load` 结果待推送后核对，实机部分由 W0 做）
 - 决策：ADR-0019 已接受（批次一律复制转发）；A06 描述按用户授权改写，见计划变更记录 v1.2
 - 遗留：I12、I13；T03-A03 与 T04-A09 待 Windows CI
+
+### 2026-11-15 T05 已完成（提交 1487154）
+- 交付：`piarc-testkit` 严格 mock provider——两种流式线格式编码（Anthropic Messages SSE、OpenAI Chat Completions 分块）、serde 场景脚本（JSON/YAML，未知字段报错，多步、参数分段与 `split_at`、429/529/500/503 与断流注入）、线格式中立的请求模型与六条校验规则（400 带官方错误形状 + 规则 ID 与位置）、请求记录（库 API 与 `GET /_piarc/requests`）、库形态 `MockProvider` 与 bin `piarc-mock-provider`；新 npm 工作区 `packages/testkit`（pi-ai 1.5.2 精确锁定）两种线格式的工具调用往返；testing.md 第 10 节、架构 v2.8（12.2 补充）、两份 CLAUDE.md、复用表三行
+- 验收：12 项通过，0 项阻塞
+- 决策：未写 ADR；HTTP 用 hyper 1.12 + hyper-util + http-body-util（自定义响应体以控制断流），YAML 用 serde-saphyr 2.1.1，元 schema 校验用 jsonschema 0.61.2；`deny.toml` 为 MIT-0 的 `borrow-or-share` 加单 crate 许可证例外；场景选择器支持 `<id>#<实例>` 独立计数
+- 遗留：I14（T06 统一 pi-ai 版本）、I15（T06 的深度导入规则放行 `exports` 子路径）；本机 `gh` 已登录但分支未推送，T03-A03、T04-A09 的 Windows CI 仍待推送后核对
 
 ## 计划变更记录
 
