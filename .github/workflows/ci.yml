@@ -56,3 +56,50 @@ jobs:
 
       - name: Verify
         run: npm run verify
+
+  desktop:
+    # L4 tests and the fuse check need a packaged Electron app (docs/engineering/testing.md, L4).
+    name: desktop L4 (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      PIARC_EVIDENCE_TASK: ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Download the Electron binary (skipped by --ignore-scripts)
+        run: node node_modules/electron/install.js
+
+      - name: Package the development flavor
+        run: npm run package:desktop -- --flavor development
+
+      - name: L4 smoke and security tests (dev form and packaged app)
+        run: npm run test:e2e -w @piarc/desktop
+
+      - name: Package the release flavor
+        run: npm run package:desktop -- --flavor release
+
+      - name: Check the fuses of the release package
+        run: npm run check:fuses
+
+      - name: Upload L4 evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: l4-evidence-${{ matrix.os }}
+          path: tmp/evidence/ci
+          if-no-files-found: ignore

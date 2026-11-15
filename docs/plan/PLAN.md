@@ -304,7 +304,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 4 preload 与 IPC：`window.piarc` 白名单、统一注册函数与来源校验纯函数 + 单元测试（A08 单元部分）
 - [x] 5 fuses：开发与发布配置分开（`apps/desktop/fuses.mjs`）、`scripts/ci/check-fuses.mjs`、`npm run check:fuses`；改一项配置后脚本失败并指出该项（A12）
 - [ ] 6 L4 基座：Playwright 开发模式与 `package` 产物两种形态，冒烟与安全用例（已提交，本机 58 项通过），证据约定写进 testing.md（待做）（A02、A04–A11）
-- [ ] 7 CI：macOS 与 Windows 跑冒烟、安全用例与 fuse 校验，actionlint / YAML 校验（A03）
+- [x] 7 CI：`desktop` 作业在 macOS 与 Windows 跑冒烟、安全用例与 fuse 校验，actionlint 1.7.12 通过；Windows 实际结果待推送（A03）
 - [ ] 8 S10 报告与 `docs/spikes/README.md`（A13）
 - [ ] 9 收尾：`apps/desktop/CLAUDE.md`、coding-standards 复用表、根 CLAUDE.md 命令、`npm run verify`（A14）、acceptance.json、看板与会话日志
 
