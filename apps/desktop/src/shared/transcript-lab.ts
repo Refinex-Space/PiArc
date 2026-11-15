@@ -36,6 +36,14 @@ export interface ScrollSnapshot {
   readonly distanceFromBottom: number;
 }
 
+/** The transcript's scroll-follow thresholds (renderer transcript/constants.ts). */
+export interface ScrollThresholds {
+  readonly releasePx: number;
+  readonly resumePx: number;
+  readonly buttonPx: number;
+  readonly userInputWindowMs: number;
+}
+
 export interface TranscriptLabApi {
   readonly list: LabListKind;
   /** Removes every row. */
@@ -72,6 +80,7 @@ export interface TranscriptLabApi {
   renderCounts(): Readonly<Record<string, number>>;
   resetRenderCounts(): void;
   scroll(): ScrollSnapshot;
+  scrollThresholds(): ScrollThresholds;
   actions(): readonly ComposerActionRecord[];
   clearActions(): void;
   /** Ids of the rows currently in the DOM, in order. */

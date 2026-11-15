@@ -12,6 +12,7 @@ import {
   type TranscriptLabApi,
 } from '../../shared/transcript-lab.js';
 import { Composer, type ComposerHandlers } from '../composer/Composer.js';
+import { SCROLL_FOLLOW } from '../transcript/constants.js';
 import { useRunning, type TranscriptNotification } from '../transcript/item-store.js';
 import type { ScrollFollow } from '../transcript/scroll-follow.js';
 import { distanceFromBottom } from '../transcript/scroll-follow.js';
@@ -273,16 +274,21 @@ function createLabApi(
       return recorder.stop();
     },
     async autoScroll({ pxPerSecond, durationMs, direction }) {
+      // Relative steps, like wheel input: rows measured above the viewport may shift the
+      // position, and an absolute target would fight those corrections.
       const element = scroller();
       const sign = direction === 'up' ? -1 : 1;
-      const start = element.scrollTop;
+      let distancePx = 0;
       const began = await nextFrame();
-      let now = began;
-      while (now - began < durationMs) {
-        now = await nextFrame();
-        element.scrollTop = start + sign * pxPerSecond * ((now - began) / 1000);
+      let last = began;
+      while (last - began < durationMs) {
+        const now = await nextFrame();
+        const step = (pxPerSecond * (now - last)) / 1000;
+        element.scrollBy({ top: sign * step, behavior: 'instant' });
+        distancePx += step;
+        last = now;
       }
-      return { distancePx: Math.abs(element.scrollTop - start) };
+      return { distancePx };
     },
     renderCounts() {
       return Object.fromEntries(counts);
@@ -303,6 +309,9 @@ function createLabApi(
         ...metrics,
         distanceFromBottom: distanceFromBottom(metrics),
       };
+    },
+    scrollThresholds() {
+      return { ...SCROLL_FOLLOW };
     },
     actions() {
       return [...actions];

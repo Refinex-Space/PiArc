@@ -37,7 +37,11 @@ function pixelOverscan(range: Range, instance: RowVirtualizer | null): number[] 
   return indexes;
 }
 
-export function TanstackList({ ids, onScroller, onContent }: ListProps) {
+export function TanstackList({
+  ids,
+  onScroller,
+  onContent,
+}: Omit<ListProps, 'follow' | 'onPinner'>) {
   const { store, heights } = useTranscriptServices();
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(0);

@@ -1,7 +1,7 @@
 # S10 Electron 安全基线
 
 - 任务：T03（2026-11-14）
-- 范围：S10 中 CSP、导航、IPC、fuses 这一层。Markdown 渲染路径上的 XSS 载荷集由 T09 完成，S10 的整体结论由 R1 汇总。
+- 范围：S10 中 CSP、导航、IPC、fuses 这一层。Markdown 渲染路径上的 XSS 载荷集由 T09 完成（结果见 `S01-transcript-composer.md` 第 5 节），S10 的整体结论由 R1 汇总。
 - 结论：macOS 上 T03 负责的部分**通过**；Windows **未验证**，CI 的 `desktop` 作业已配置，结果待首次推送后由下一个任务或 W0 核对。
 
 ## 1. 验证环境
@@ -34,7 +34,7 @@
 | 2 | 不对远程内容开启 Node 集成 | `nodeIntegration`、`nodeIntegrationInWorker`、`nodeIntegrationInSubFrames` 固定为 false | 单元 `web-preferences.test.ts`；L4 `preload.e2e.ts`（`require`、`process`、`module`、`Buffer` 均为 `undefined`） |
 | 3 | 所有渲染进程开启上下文隔离 | `contextIsolation: true` 固定在窗口工厂 | 单元 `web-preferences.test.ts`；L4 `preload.e2e.ts`（页面只看到 `window.piarc`，扫描不到 `ipcRenderer`） |
 | 4 | 开启进程沙箱 | `sandbox: true`，并在 `ready` 前调用 `app.enableSandbox()` 全局强制 | 单元 `web-preferences.test.ts`；L4 `preload.e2e.ts`（`app.getAppMetrics()` 报告窗口渲染进程 `sandboxed: true`） |
-| 5 | 所有会话设置权限处理器 | `setPermissionRequestHandler`、`setPermissionCheckHandler` 默认拒绝，`setDevicePermissionHandler` 返回 false；放行清单 `PERMISSION_ALLOWLIST` 集中定义，本任务为空；`session-created` 时对新会话同样安装 | 单元 `permissions.test.ts`；L4 `permissions.e2e.ts`（通知、摄像头、地理位置被拒，权限查询为 `denied`） |
+| 5 | 所有会话设置权限处理器 | `setPermissionRequestHandler`、`setPermissionCheckHandler` 默认拒绝，`setDevicePermissionHandler` 返回 false；放行清单 `PERMISSION_ALLOWLIST` 集中定义，T03 时为空，T09 加入 `clipboard-sanitized-write`（"复制本条消息"按钮用 `navigator.clipboard.writeText`；只写、由 Chromium 净化，读剪贴板仍拒绝）；`session-created` 时对新会话同样安装 | 单元 `permissions.test.ts`（放行清单只有这一项且有理由，`clipboard-read` 等仍拒绝）；L4 `permissions.e2e.ts`（通知、摄像头、地理位置被拒，权限查询为 `denied`）与 `transcript-copy.e2e.ts`（复制按钮写入剪贴板） |
 | 6 | 不关闭 `webSecurity` | 固定为 true；`new BrowserWindow` 只允许出现在窗口工厂（ESLint） | 单元 `web-preferences.test.ts`；ESLint `no-restricted-syntax` |
 | 7 | 定义 CSP | 主进程在 `protocol.handle` 的每个响应上发送 `Content-Security-Policy` 响应头：`default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`，另加 `X-Content-Type-Options: nosniff` | 单元 `csp.test.ts`；L4 `csp.e2e.ts`（响应头存在；注入的内联脚本、内联事件属性、`eval`、`new Function` 都不执行；外部 fetch 与图片触发 `connect-src`、`img-src` 违规） |
 | 8 | 不开启 `allowRunningInsecureContent` | 固定为 false | 单元 `web-preferences.test.ts` |
@@ -110,7 +110,7 @@ ADR-0013 的触发条件"威胁模型中的某项对策必须放松 Electron 安
 ## 8. 后续
 
 - Windows：CI `desktop` 作业（冒烟、安全用例、fuse 校验）的结果在推送后核对；W0 只补测 CI 覆盖不到的部分。
-- T09：Markdown 渲染路径的 XSS 载荷集。
+- T09：Markdown 渲染路径的 XSS 载荷集（已完成：`src/shared/xss-payloads.ts`、`e2e/transcript-security.e2e.ts`；ESLint 禁止渲染进程使用 `innerHTML` 等 HTML 字符串入口）。
 - T12：应用标识（D2）确定后，协议名 `app` 与 bundle id（当前为打包工具默认的 `com.github.Electron`）随之确定；签名与安装包。
 - T18：替换 Electron 默认菜单；权限放行清单按功能需要增加时，在 `PERMISSION_ALLOWLIST` 中写理由并补用例。
 - T45：第 6 节第 2 条（I10）。

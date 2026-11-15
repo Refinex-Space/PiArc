@@ -1,6 +1,6 @@
 # @piarc/desktop
 
-Electron 客户端：主进程只做平台集成与转发，渲染进程只做呈现，业务逻辑在 Core 与 Agent Host（ADR-0013）。Markdown 渲染见 T09。
+Electron 客户端：主进程只做平台集成与转发，渲染进程只做呈现，业务逻辑在 Core 与 Agent Host（ADR-0013）。transcript 与 composer 的库选型见 ADR-0022。
 
 ## 命令
 
@@ -16,6 +16,8 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 | `npm run check:fuses` | 读 `out/release/` 产物的 fuse 与 `fuses.mjs` 比对；`-- --flavor development` 查开发构建 |
 | `npx vitest run apps/desktop` | 主进程纯函数的单元测试，以及 `core.integration.test.ts`（真实 Core 在 Node 中跑事件通道，需先 `npm run build:core`） |
 | `npm run bench:s2 -- --form packaged` | S2 基准（默认 10 万事件/分钟 × 5 分钟），JSON 写到 `tmp/evidence/T04/bench/`；`--minutes 0.5` 快速版 |
+| `npm run bench:s1 -- --form packaged` | S1 基准（transcript）：100 token/s 流式 60 s、1 万条滚动、1,000 条冷加载、渲染进程内存；帧数据来自 CDP 追踪，JSON 写到 `tmp/evidence/T09/bench/`；`--lists`、`--seconds`、`--scroll-seconds`、`--cold-runs` 可调 |
+| `npx vitest run apps/desktop/src/renderer` | 渲染进程纯逻辑的单元测试：增量 Markdown、自动闭合、转换与链接净化、滚动跟随、流式节奏、store、复制、composer |
 
 ## 结构
 
@@ -34,6 +36,17 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
   - `test-hooks.ts`：加载的是开发版 Core 时才装 `globalThis.__piarcTestHooks`（类型在 `src/shared/test-hooks.ts`），L4 与基准经 `app.evaluate` 使用；
   - `native/*.d.ts`：NAPI-RS 生成的 L1 快照，不手改。
 - `src/renderer/probe/`：`#/event-probe` 测试页，订阅、计数、校验序号，经 `globalThis.__piarcEventProbe` 暴露统计（类型在 `src/shared/event-probe.ts`）。
+- transcript（T09，架构第 8.4 节）在 `src/renderer/transcript/`：
+  - `item-store.ts`：最小 store，把协议的 `turn/*`、`item/*` 通知归约成行，按行订阅（T18 的正式 store 取代它）；`streaming-driver.ts`：一个 rAF 循环按 `pacer.ts` 的节奏把流式消息喂给 Markdown Worker；
+  - `markdown/`：`incremental.ts`（只重新词法分析不稳定的尾部）、`autoclose.ts`、`to-ir.ts`（marked 词法单元 → `ir.ts` 的块与 span）、`text.ts`（字符引用解码、`safeHref`）、`MarkdownView.tsx`（只用 React 元素渲染）、`markdown-client.ts`；
+  - `highlight/`：`languages.ts`（别名与支持的语言）、`highlight-client.ts`（结果缓存）、`CodeBlock.tsx`；
+  - `scroll-follow.ts`（状态机）、`use-scroll-follow.ts`（接到滚动元素）、`lists/TanstackList.tsx`（虚拟列表）、`row-heights.ts`、`Rows.tsx`、`copy.ts`、`Transcript.tsx`；
+  - 常量集中在 `constants.ts`：`SCROLL_FOLLOW`（解除、恢复、按钮阈值与用户输入窗口）、`STREAMING`（流式节奏）、`VIRTUAL_LIST`（预渲染范围与估算参数）。
+- Worker 在 `src/renderer/workers/`，以 ES module 从应用协议加载（`vite.renderer.config.ts` 的 `worker.format: 'es'`），同样受 CSP 约束：
+  - `markdown.worker.ts`：请求 `append`（流式文档追加，`final` 结束）、`parse`（成批解析已完成的文档）、`drop`；响应 `updates`，每个文档给 `keep`（保留前几个块，同一对象）与之后的 `blocks`。类型与守卫在 `transcript/markdown/protocol.ts`；
+  - `highlight.worker.ts`：shiki core + JavaScript 正则引擎，请求 `highlight`（`id`、语言 id、代码），响应 `highlighted`（每行的 token：文本、明暗两套颜色、字形位）或 `failed`。类型在 `transcript/highlight/protocol.ts`；
+- composer（T09）在 `src/renderer/composer/`：`schema.ts`（段落与 mention 节点）、`mention-plugin.ts`、`serialize.ts`（发送文本、mention 数据、显示片段三者分开）、`intents.ts`（键位语义）、`ime-guard.ts`、`Composer.tsx`。
+- `src/renderer/lab/`：`#/transcript-lab` 原型页（`?list=virtuoso` 只在 T09 对比时存在过），用 `fixtures/` 的合成事件驱动 transcript 与 composer，经 `globalThis.__piarcTranscriptLab` 给 L4 与 S1 基准用（类型在 `src/shared/transcript-lab.ts`）。XSS 载荷集在 `src/shared/xss-payloads.ts`。
 
 ## 不变量
 
@@ -46,6 +59,11 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 主进程比较 origin 用 `originOf`，不用前缀匹配，也不直接用 `new URL(x).origin`。
 - 主进程只按路由键转发事件批次，不解析载荷；批次一律经结构化克隆复制（Electron 45 的 `MessagePortMain` 只能转移端口，ADR-0019）；不要尝试转移 `ArrayBuffer`。
 - 渲染进程不加载原生模块；Core 只经主进程（`window.piarc.subscribeEvents` 等）。页面回调只收到批次，没有 Electron 的 event 对象。
+- 安全渲染（架构第 10.3 节）：渲染进程不从 HTML 字符串建 DOM，ESLint 禁止 `innerHTML`、`outerHTML`、`dangerouslySetInnerHTML`、`insertAdjacentHTML`、`createContextualFragment`、`setHTMLUnsafe`、`document.write`；模型输出里的原始 HTML 作为 `html` 节点按文本显示；链接只保留 `safeHref` 通过的 `https:`、`http:`、`mailto:`，点击经 `window.piarc.openExternal`（主进程确认框）；图片不加载，显示为链接；代码高亮只输出 token 与颜色。
+- 高亮不放宽 CSP：shiki 用 `@shikijs/engine-javascript`，不用需要 `wasm-unsafe-eval` 的 Oniguruma 引擎；语法按需加载，每种一个 chunk，`GRAMMARS` 与 `languages.ts` 的别名表一起改。
+- 输入法守卫：所有键盘处理先过 `isImeComposing`（`isComposing`、`keyCode === 229`、`view.composing`）。composer 在 `handleDOMEvents.keydown` 里先拦，ProseMirror 的按键处理整个跳过且不 `preventDefault`；`handleTextInput` 里的 `@`、`/` 触发也先查 `view.composing`。
+- 滚动跟随只认用户输入（滚轮、触摸、键盘、按住滚动条）引起的滚动；贴底在 ResizeObserver 回调里做（布局后、绘制前），阈值只改 `constants.ts`。
+- 流式期间只有流式那一行重新渲染：行组件按 id 订阅 store 与解析结果，块组件按对象身份记忆化；改动时用 L4 的渲染计数用例（`transcript-render.e2e.ts`）验证。
 
 ## 开发构建与发布构建
 
@@ -61,7 +79,12 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 应用启动早期打印的日志行，L4 夹具接上 stdout 之前就被读走了；要断言启动状态，用测试钩子读主进程状态，不等日志。
 - `monitorEventLoopDelay` 记录的是两次采样之间的完整间隔，每个值都含采样间隔（钩子用 1 ms）；比较预算时按原始值算偏保守。
 - 基准与 L4 都要开发版 Core：发布版没有测试钩子，`expectTestHooks` 会直接报错提示重新打开发构建。
+- Electron 的 `contentTracing` 输出 protobuf 追踪；要 JSON 就用 CDP 的 `Tracing.start`（`streamFormat: 'json'`），S1 基准就是这样做的。
+- 帧时间的口径：rAF 间隔与 `AnimationFrame`（LoAF 口径）在 60 Hz 屏上空闲时也约 16.7 ms，不能拿来和"p99 ≤ 16 ms"比；S1 基准用两次 `BeginMainThreadFrame` 之间主线程任务的总耗时（每帧工作量）。
+- 复制相关的 L4 会写系统剪贴板：用例经 `withSavedClipboard` 读出原内容、结束后写回（只恢复文本）。
+- ProseMirror 自己在合成期间不分发按键，所以只测合成中的按键测不出守卫是否生效；`composer.e2e.ts` 另有"合成开始前到达的 229 按键"和"合成文本恰为 `@`、`/`"两类用例，去掉守卫时它们会失败。
+- 在 react-virtuoso 的列表元素上用 ResizeObserver 设 `scrollTop` 会和它的初始定位打架，可能一行都不渲染（T09 对比时发现，见 ADR-0022）。
 
 ## 参考
 
-- 架构第 3.4、7.6、8.1、8.3、10.3 节；ADR-0013、ADR-0014、ADR-0018 第 1 条；`docs/spikes/S10-electron-security.md`、`S02-napi-event-channel.md`；`docs/engineering/testing.md` 第 9 节。
+- 架构第 3.4、7.6、8.1–8.5、10.3、11 章；ADR-0013、ADR-0014、ADR-0018 第 1 条、ADR-0022；`docs/spikes/S10-electron-security.md`、`S02-napi-event-channel.md`、`S01-transcript-composer.md`；`docs/engineering/testing.md` 第 9 节。

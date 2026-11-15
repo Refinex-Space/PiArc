@@ -7,6 +7,7 @@ import {
   type ComposerActionRecord,
   type LabListKind,
   type ScrollSnapshot,
+  type ScrollThresholds,
 } from '../src/shared/transcript-lab.js';
 
 /** Reloads the window on the prototype page with the given virtual list. */
@@ -93,6 +94,14 @@ export async function scrollState(page: Page): Promise<ScrollSnapshot> {
     throw new Error('not the transcript prototype page');
   }
   return state;
+}
+
+export async function scrollThresholds(page: Page): Promise<ScrollThresholds> {
+  const thresholds = await page.evaluate(() => globalThis.__piarcTranscriptLab?.scrollThresholds());
+  if (thresholds === undefined) {
+    throw new Error('not the transcript prototype page');
+  }
+  return thresholds;
 }
 
 export function renderCounts(page: Page): Promise<Readonly<Record<string, number>>> {

@@ -7,7 +7,13 @@ import { TanstackList } from './lists/TanstackList.js';
 import { VirtuosoList } from './lists/VirtuosoList.js';
 import { ScrollFollow } from './scroll-follow.js';
 import { useTranscriptServices } from './services.js';
-import { pinToBottom, useFollowView, useScrollFollow } from './use-scroll-follow.js';
+import {
+  pinToBottom,
+  scrollTopPinner,
+  useFollowView,
+  useScrollFollow,
+  type Pinner,
+} from './use-scroll-follow.js';
 
 export type VirtualListKind = 'tanstack' | 'virtuoso';
 
@@ -24,7 +30,8 @@ export function Transcript({
   const follow = useMemo(() => new ScrollFollow(), []);
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
   const [content, setContent] = useState<HTMLElement | null>(null);
-  useScrollFollow(follow, scroller, content);
+  const [pinner, setPinner] = useState<Pinner>(() => scrollTopPinner);
+  useScrollFollow(follow, scroller, content, pinner);
   const view = useFollowView(follow);
   useEffect(() => {
     onFollow?.(follow, scroller);
@@ -32,7 +39,15 @@ export function Transcript({
   const List = list === 'tanstack' ? TanstackList : VirtuosoList;
   return (
     <div className="transcript" data-testid="transcript" data-following={view.following}>
-      <List ids={ids} follow={follow} onScroller={setScroller} onContent={setContent} />
+      <List
+        ids={ids}
+        follow={follow}
+        onScroller={setScroller}
+        onContent={setContent}
+        onPinner={(next) => {
+          setPinner(() => next ?? scrollTopPinner);
+        }}
+      />
       {view.showButton ? (
         <button
           type="button"
@@ -41,7 +56,7 @@ export function Transcript({
           onClick={() => {
             follow.jumpToBottom();
             if (scroller !== null) {
-              pinToBottom(scroller, follow);
+              pinToBottom(scroller, follow, pinner);
               scroller.focus();
             }
           }}

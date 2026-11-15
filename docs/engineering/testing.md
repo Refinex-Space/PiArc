@@ -153,6 +153,14 @@ Playwright 配置在 `apps/desktop/playwright.config.ts`，两个 project 跑同
 设置 `PIARC_EVIDENCE_TASK=<任务编号>` 后，输出写到 `tmp/evidence/<任务编号>/l4/<用例>/`：`app.log`（应用日志）、用例自己保存的截图（例如冒烟用例的 `window.png`），失败时还有 `trace.zip`（`npx playwright show-trace <路径>` 查看）。不设置时目录名为 `L4`；CI 用 `ci` 并上传为 artifact。Playwright 每次运行前会清空这个 `l4/` 目录。
 
 
+### 9.5 transcript 与 composer（T09）
+
+- 用例经 `e2e/transcript.ts` 的 `openLab(page, list)` 把窗口重载到 `#/transcript-lab` 原型页，再用同一文件里的 `addMessage`、`streamTurn`、`loadHistory`、`setRunning`、`actions`、`scrollState` 等调用页面的 `window.__piarcTranscriptLab`。数据是合成的协议事件（`src/renderer/lab/fixtures/`），不需要 Core 的测试钩子。
+- 输入法：Playwright 没有输入法接口，用 CDP 驱动。`Input.imeSetComposition` 产生 `compositionstart`/`compositionupdate`，`Input.insertText` 提交并结束合成，合成中的按键用 `Input.dispatchKeyEvent` 发 `windowsVirtualKeyCode: 229`。ProseMirror 自己在合成中不分发按键，所以还要测合成开始前就到达的 229 按键和合成文本恰为触发字符（`@`、`/`）的情形，否则守卫失效也测不出来（`e2e/composer.e2e.ts`）。真实输入法的核对按 S1 报告的清单人工进行。
+- 剪贴板：在主进程读（`clipboard.readText()`），用例包在 `withSavedClipboard` 里，结束后写回原来的文本。
+- 安全用例针对渲染不可信内容的界面，用 `src/shared/xss-payloads.ts` 的载荷集：哨兵变量未变、无 CSP 违规、界面内没有载荷要的元素和 `on*` 属性、链接只有 `https:`/`http:`/`mailto:`、没有对外请求、载荷原文以文本出现（`e2e/transcript-security.e2e.ts`）。
+- 性能不在 L4 中断言：`npm run bench:s1` 测量并输出 JSON（`tmp/evidence/T09/bench/`），数字写进 S1 报告；T44 把预算接入 CI。
+
 ## 10. 严格 mock provider
 
 L0–L2 的模型侧一律接 `piarc-testkit` 的严格 mock provider（架构第 12.2 节）。它模拟两种流式线格式，先校验每个请求，不合规就返回 400 并写明违反的规则；合规才按场景脚本返回下一步。

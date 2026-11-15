@@ -9,7 +9,14 @@ import type { FollowView, ScrollFollow, ScrollMetrics } from './scroll-follow.js
 /** Keys that scroll a focused scroll container. */
 const SCROLL_KEYS = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ']);
 
-function metricsOf(element: HTMLElement): ScrollMetrics {
+/** How a list scrolls itself to the bottom; the default sets `scrollTop`. */
+export type Pinner = (scroller: HTMLElement) => void;
+
+export const scrollTopPinner: Pinner = (scroller) => {
+  scroller.scrollTop = scroller.scrollHeight;
+};
+
+export function metricsOf(element: HTMLElement): ScrollMetrics {
   return {
     scrollTop: element.scrollTop,
     scrollHeight: element.scrollHeight,
@@ -18,15 +25,24 @@ function metricsOf(element: HTMLElement): ScrollMetrics {
 }
 
 /** Scrolls `scroller` to the bottom at once and tells `follow`. */
-export function pinToBottom(scroller: HTMLElement, follow: ScrollFollow): void {
-  scroller.scrollTop = scroller.scrollHeight;
+export function pinToBottom(
+  scroller: HTMLElement,
+  follow: ScrollFollow,
+  pinner: Pinner = scrollTopPinner,
+): void {
+  pinner(scroller);
   follow.pinned(metricsOf(scroller));
 }
 
+/**
+ * `content` is the element whose size changes with the rows; a list that reports growth itself
+ * (react-virtuoso) passes `null` and calls `follow.resized` on its own.
+ */
 export function useScrollFollow(
   follow: ScrollFollow,
   scroller: HTMLElement | null,
   content: HTMLElement | null,
+  pinner: Pinner = scrollTopPinner,
 ): void {
   useEffect(() => {
     if (scroller === null) {
@@ -35,7 +51,7 @@ export function useScrollFollow(
     const now = (): number => performance.now();
     const onScroll = (): void => {
       if (follow.scrolled(metricsOf(scroller), now())) {
-        pinToBottom(scroller, follow);
+        pinToBottom(scroller, follow, pinner);
       }
     };
     const onUserInput = (): void => {
@@ -57,7 +73,7 @@ export function useScrollFollow(
     };
     const onResize = (): void => {
       if (follow.resized(metricsOf(scroller), now())) {
-        pinToBottom(scroller, follow);
+        pinToBottom(scroller, follow, pinner);
       }
     };
     const observer = new ResizeObserver(onResize);
@@ -82,7 +98,7 @@ export function useScrollFollow(
       scroller.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointerup', onPointerUp);
     };
-  }, [follow, scroller, content]);
+  }, [follow, scroller, content, pinner]);
 }
 
 export function useFollowView(follow: ScrollFollow): FollowView {
