@@ -1,0 +1,80 @@
+{
+  "$comment": [
+    "Allowed dependency directions between workspace crates (architecture section 7.1).",
+    "Enforced by scripts/ci/check-crate-deps.mjs for normal, build and dev dependencies.",
+    "A crate may depend on crates in the layers listed in its layer's mayDependOn, never on crates in its own layer.",
+    "Chain: piarc-napi -> piarc-core -> feature crates -> {piarc-protocol, piarc-ports}. Feature crates collaborate through piarc-core.",
+    "Any other edge must be listed in exceptions with a reason. Adding a one-way exception that keeps the graph acyclic is a supplementary decision; reversing or bypassing the chain needs an ADR (docs/plan/protocol.md)."
+  ],
+  "layers": [
+    {
+      "name": "binding",
+      "description": "Thin NAPI-RS export layer loaded by the Electron main process (ADR-0014).",
+      "crates": ["piarc-napi"],
+      "mayDependOn": ["core", "foundation"]
+    },
+    {
+      "name": "core",
+      "description": "Runtime facade that composes the feature crates.",
+      "crates": ["piarc-core"],
+      "mayDependOn": ["feature", "foundation"]
+    },
+    {
+      "name": "feature",
+      "description": "Feature crates. They do not depend on each other except through registered exceptions.",
+      "crates": [
+        "piarc-host",
+        "piarc-policy",
+        "piarc-hooks",
+        "piarc-config",
+        "piarc-fs",
+        "piarc-checkpoint",
+        "piarc-exec",
+        "piarc-term",
+        "piarc-sandbox",
+        "piarc-store",
+        "piarc-diff",
+        "piarc-git",
+        "piarc-secrets",
+        "piarc-telemetry"
+      ],
+      "mayDependOn": ["foundation"]
+    },
+    {
+      "name": "foundation",
+      "description": "Protocol data types and narrow port traits; they depend on no workspace crate.",
+      "crates": ["piarc-protocol", "piarc-ports"],
+      "mayDependOn": []
+    },
+    {
+      "name": "sys",
+      "description": "-sys crates with raw FFI bindings. Each is reachable only through a registered exception.",
+      "crates": ["piarc-ghostty-sys"],
+      "mayDependOn": []
+    },
+    {
+      "name": "devtool",
+      "description": "Development-only binaries, never shipped.",
+      "crates": ["piarc-devcli"],
+      "mayDependOn": ["core", "testsupport", "foundation"]
+    },
+    {
+      "name": "testsupport",
+      "description": "Test-only support crates; shipping crates never depend on them.",
+      "crates": ["piarc-testkit"],
+      "mayDependOn": ["core", "foundation"]
+    }
+  ],
+  "exceptions": [
+    {
+      "from": "piarc-fs",
+      "to": "piarc-checkpoint",
+      "reason": "Every write through Core saves the original file content to a checkpoint first (architecture section 6.9). The edge is one-way: piarc-checkpoint never depends on piarc-fs."
+    },
+    {
+      "from": "piarc-term",
+      "to": "piarc-ghostty-sys",
+      "reason": "piarc-ghostty-sys is the -sys layer of libghostty-vt and piarc-term is its only consumer (ADR-0017)."
+    }
+  ]
+}
