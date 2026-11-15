@@ -299,7 +299,7 @@ T02 协议单一来源与契约测试基座（开工 2026-11-14，基线 `npm ru
 - [x] 1. 最小链路：一个类型 → schema → TS → 样本 → 两侧测试 → 漂移检查
 - [x] 2. `piarc-protocol` 骨架类型：JSON-RPC 消息、结构化错误、握手与 `negotiate`、会话事件信封、turn/item（A08、A09）
 - [x] 3. Schema 导出与 TS 生成：`npm run gen:protocol`、`check-protocol-drift.mjs` 并入 verify（A01、A02、A10）
-- [ ] 4. L1 契约基座：golden 样本与反例、Rust 往返、TS ajv 校验与往返、`check-contract-samples.mjs` 并入 verify、testing.md L1 一节（A03、A04、A05）
+- [x] 4. L1 契约基座：golden 样本与反例、Rust 往返、TS ajv 校验与往返、`check-contract-samples.mjs` 并入 verify、testing.md L1 一节（A03、A04、A05）
 - [x] 5. LF 分帧编解码器 Rust 与 TS，共用 `tests/contracts/framing/` 用例（A06、A07）
 - [ ] 6. 收尾：两份 CLAUDE.md、复用表、根 CLAUDE.md 命令、架构与文档同步、验收记录、全量 verify（A11）
 

@@ -17,8 +17,8 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | 命令 | 用途 |
 |---|---|
 | `npm ci --ignore-scripts` | 按 lockfile 安装 npm 依赖（CI 同款） |
-| `node scripts/dev/install-tools.mjs` | 把锁定版本的 cargo-deny 装进 `.tools/`（不做全局安装）；verify 第 8 步需要它 |
-| `npm run verify` | 全部 10 项检查，结束时打印汇总表；开工与收尾各跑一次 |
+| `node scripts/dev/install-tools.mjs` | 把锁定版本的 cargo-deny 装进 `.tools/`（不做全局安装）；verify 第 10 步需要它 |
+| `npm run verify` | 全部 12 项检查，结束时打印汇总表；开工与收尾各跑一次 |
 | `npm run format` | Prettier 写入格式（不处理 Markdown） |
 | `npm run lint` | ESLint（类型感知） |
 | `npm run typecheck` | `tsc --build`：三个工作区与 `scripts/` |

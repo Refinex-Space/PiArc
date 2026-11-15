@@ -35,7 +35,7 @@ Markdown 不进 Prettier：文档中的宽表格每次编辑都会被重新填�
 
 - npm 依赖精确锁定，`package.json` 中不出现 `^`、`~`；`package-lock.json` 入库。安装用 `npm install --save-exact`。
 - Cargo 依赖只在根 `Cargo.toml` 的 `[workspace.dependencies]` 中声明版本，crate 中一律写 `<name>.workspace = true`（或 `{ workspace = true, features = [...] }`）。`Cargo.lock` 入库，verify 以 `--locked` 运行。
-- 新依赖的许可证必须在 `deny.toml` 白名单内（verify 第 8 步）；GPL、AGPL、LGPL 不得进入依赖树。
+- 新依赖的许可证必须在 `deny.toml` 白名单内（verify 第 10 步）；GPL、AGPL、LGPL 不得进入依赖树。
 - 引入依赖前确认没有已有依赖或标准库能满足需求。
 
 ### 1.5 平台与路径
@@ -55,7 +55,7 @@ Markdown 不进 Prettier：文档中的宽表格每次编辑都会被重新填�
 ### 2.1 crate 与模块组织
 
 - 一个 crate 一个职责，划分见架构第 7.1 节。crate 根文件以 `//!` 文档开头，写三段：职责（Responsibilities）、不负责什么（Not responsible for）、允许依赖的 workspace crate（Allowed workspace dependencies）。
-- crate 之间的依赖方向由 `crates/deps-rules.json` 规定、`scripts/ci/check-crate-deps.mjs` 检查（verify 第 9 步）。功能 crate 之间需要协作时经 `piarc-core` 编排。新增不改变方向的单向例外属于补充型决策，在 `deps-rules.json` 中登记并写明理由；反转或绕过依赖链属于变更型决策，先写 ADR。
+- crate 之间的依赖方向由 `crates/deps-rules.json` 规定、`scripts/ci/check-crate-deps.mjs` 检查（verify 第 11 步）。功能 crate 之间需要协作时经 `piarc-core` 编排。新增不改变方向的单向例外属于补充型决策，在 `deps-rules.json` 中登记并写明理由；反转或绕过依赖链属于变更型决策，先写 ADR。
 - `lib.rs` 只做模块声明与公开项的 re-export；实现放在按领域命名的模块中（例如 `rules.rs`、`ledger.rs`），不按技术层命名（不用 `utils.rs`、`helpers.rs`、`types.rs` 收纳杂项）。
 - 公开面最小化：默认私有，crate 内共享用 `pub(crate)`，只有其他 crate 需要的项才 `pub`。
 
@@ -72,7 +72,7 @@ Markdown 不进 Prettier：文档中的宽表格每次编辑都会被重新填�
 - `Error` 提供两个方法：
   - `kind(&self)`：返回稳定的、可机读的类别（snake_case 字符串或无数据的枚举），调用方按它分支，不解析 message；
   - `retryable(&self) -> bool`：同样的输入再试一次是否可能成功（超时、暂时不可用为 true，校验失败、权限拒绝为 false）。
-- 跨 NAPI 与 AHP 时，错误映射为 `piarc-protocol` 中定义的结构化错误（至少含 `kind`、`retryable`、`message`），不传裸字符串。
+- 跨 NAPI 与 AHP 时，错误映射为 `piarc-protocol` 中定义的结构化错误 `ErrorObject`（`code`、`message`、`data.kind`、`data.retryable`，可选 `data.details`），不传裸字符串。线上的 `kind` 取 `piarc_protocol::ErrorKind` 的 camelCase 值；新增类别在 `ErrorKind` 中加变体，并从 `rpc_error::code` 的应用错误码段取一个码。
 - 库 crate 不用 `anyhow`；`piarc-devcli` 等二进制和测试代码可以用。
 - 不吞错误：`let _ = fallible()` 与空的 `Err(_) => {}` 分支必须有注释说明为什么可以忽略。
 - 用 `?` 传播并在边界处补充上下文（例如出错的路径），不在每一层重复包装。
@@ -148,6 +148,7 @@ Markdown 不进 Prettier：文档中的宽表格每次编辑都会被重新填�
 ### 3.5 lint
 
 - ESLint 使用 typescript-eslint 的 `strictTypeChecked` 与 `stylisticTypeChecked`，对全部 TS 与 JS 文件做类型感知检查（verify 第 2 步）；`eslint-config-prettier` 关闭与 Prettier 冲突的规则。
+- `packages/protocol/src/generated/` 是生成代码，只关闭 `consistent-type-definitions` 与 `consistent-indexed-object-style` 两条风格规则（生成器输出的形状），其余规则照常检查（`eslint.config.mjs`）。
 - 禁用某条规则时写在最小范围内并说明理由：`// eslint-disable-next-line <rule> -- <reason>`。不再需要的禁用注释会报错（`reportUnusedDisableDirectives`）。
 
 ### 3.6 仓库脚本
@@ -167,8 +168,12 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 
 | 能力 | 位置 | 说明 | 登记任务 |
 |---|---|---|---|
-| 统一检查入口 | `scripts/dev/verify.mjs`（`npm run verify`） | 按顺序运行 10 个检查步骤，失败后继续，最后打印汇总表；新增检查在 `STEPS` 中追加 | T01 |
+| 统一检查入口 | `scripts/dev/verify.mjs`（`npm run verify`） | 按顺序运行 12 个检查步骤，失败后继续，最后打印汇总表；新增检查在 `STEPS` 中追加 | T01 |
 | crate 依赖方向检查 | `scripts/ci/check-crate-deps.mjs` + `crates/deps-rules.json` | 读取 `cargo metadata`，按层与例外校验 workspace crate 之间的依赖 | T01 |
 | 验收清单一致性检查 | `scripts/plan/check-acceptance.mjs` | 比对任务文件中的 `- [Txx-Ayy]` 验收项与 `docs/plan/acceptance.json` | T01 |
 | 仓库内工具安装 | `scripts/dev/install-tools.mjs` | 把锁定版本的 Rust 工具（当前为 cargo-deny）装进 `.tools/`，不做全局安装；`localToolPath()` 给出可执行文件路径 | T01 |
 | 脚本公共函数 | `scripts/lib/repo.mjs` | `repoRoot`、`isMain`、`run`（继承输出）、`capture`（捕获输出）、`resolveBin`、`readJsonFile`、`isRecord` | T01 |
+| AHP 帧编解码器 | Rust：`piarc_protocol::{FrameDecoder, encode_frame}`；TS：`@piarc/protocol` 的 `FrameDecoder`、`encodeFrame` | LF 分帧的 UTF-8 JSON，只处理字节缓冲，不做 I/O；半包缓存、超限帧丢弃到下一个 LF、错误按帧返回；两份实现跑同一份 `tests/contracts/framing/` 用例 | T02 |
+| 协议版本协商 | `piarc_protocol::negotiate`、`PROTOCOL_VERSION`（TS 为生成的 `PROTOCOL_VERSION`） | 主版本不同返回 `protocolVersionMismatch`；次版本不同取双方能力交集 | T02 |
+| 结构化错误 | `piarc_protocol::{ErrorObject, ErrorData, ErrorKind}`、`rpc_error::code` | JSON-RPC error 对象，`data.kind`、`data.retryable` 必填；跨 AHP 与 NAPI 的错误都用它；crate 错误经 `to_error_object()` 映射 | T02 |
+| 协议生成与检查 | `npm run gen:protocol`（`scripts/dev/gen-protocol.mjs`）、`scripts/ci/check-protocol-drift.mjs`、`scripts/ci/check-contract-samples.mjs` | Rust 类型 → JSON Schema → TS 类型；漂移与样本完整性检查在 verify 中运行；新增协议消息的步骤见 `testing.md` 第 7 节 | T02 |
