@@ -95,7 +95,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | 阶段 | 内容 | 任务 | 阶段门 | 状态 |
 |---|---|---|---|---|
 | 0 工程基座 | 脚手架、质量门禁、工程规范、协议与契约测试 | T01–T02 | — | 已完成 |
-| 1 M0 技术验证 | Electron 安全基线、NAPI 事件通道、mock provider、Agent Host 多会话与 AHP、Operations 委托、凭据保险箱、transcript 渲染、终端、沙箱、打包与首次运行；S1–S10 两个平台的结论 | T03–T12、W0 | R1 | 未开始 |
+| 1 M0 技术验证 | Electron 安全基线、NAPI 事件通道、mock provider、Agent Host 多会话与 AHP、Operations 委托、凭据保险箱、transcript 渲染、终端、沙箱、打包与首次运行；S1–S10 两个平台的结论 | T03–T12、W0 | R1 | 进行中 |
 | 2 M1 可行走骨架 | 存储与信任、会话编排与投影、L2 场景、文件工具与 Bash、客户端外壳、transcript 与 composer、基础审批、模型与凭据、system prompt 与 memory | T13–T22 | R2 | 未开始 |
 | 3 M2 Harness 核心 | 权限规则与 Bash 分析、配置兼容层、hooks、计划模式与任务清单、压缩与用量、检查点与回退、WebFetch 与登录、L3 对齐；Windows 达到 M1 | W1、T23–T30 | R3 | 未开始 |
 | 4 M3 多会话与生态 | 子 agent、后台任务、终端、worktree 与并行会话、MCP、skills 与命令、WebSearch 与 hooks 扩展；Windows 达到 M2 | W2、T31–T38 | R4 | 未开始 |
@@ -110,7 +110,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 |---|---|---|---|---|---|---|---|---|---|
 | T01 | [仓库脚手架、工程规范与质量门禁](tasks/T01-scaffold-and-quality-gates.md) | 0 | 无 | macOS | high | 大 | 无 | 已完成 | 47fb1e9 |
 | T02 | [协议单一来源与契约测试基座](tasks/T02-protocol-and-contract-tests.md) | 0 | T01 | macOS | high | 中 | 无 | 已完成 | ce41191 |
-| T03 | [Electron 应用骨架与安全基线](tasks/T03-electron-shell-and-security-baseline.md) | 1 | T02 | macOS | xhigh | 大 | S10 | 未开始 | — |
+| T03 | [Electron 应用骨架与安全基线](tasks/T03-electron-shell-and-security-baseline.md) | 1 | T02 | macOS | xhigh | 大 | S10 | 进行中 | — |
 | T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 未开始 | — |
 | T05 | [严格校验的 mock provider](tasks/T05-strict-mock-provider.md) | 1 | T02 | macOS | high | 中 | 无 | 未开始 | — |
 | T06 | [Agent Host 骨架：Pi SDK 多会话与 AHP](tasks/T06-agent-host-skeleton.md) | 1 | T04、T05 | macOS | xhigh | 大 | S3、S9 | 未开始 | — |
@@ -294,7 +294,19 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（当前没有进行中的任务）
+### T03 Electron 应用骨架与安全基线
+
+开工：2026-11-14，基线 `npm run verify` 12 项通过；无前序 `blocked` 项；本机 `gh` 未登录。
+
+- [ ] 1 工程：版本核对与精确锁定（Electron、Forge 及插件、Vite、React），`.nvmrc` 与 Electron 内置 Node 核对（A01）
+- [ ] 2 工程：`src/main`、`src/preload`、`src/renderer` 三个 TS 工程，Forge + Vite 构建，React 三栏占位，窗口工厂 + ESLint 禁止他处 `new BrowserWindow`
+- [ ] 3 安全基线：自定义协议、CSP 响应头、webPreferences、导航、新窗口与外链确认、权限默认拒绝、`web-contents-created` 兜底、单实例锁
+- [ ] 4 preload 与 IPC：`window.piarc` 白名单、统一注册函数与来源校验纯函数 + 单元测试（A08 单元部分）
+- [ ] 5 fuses：开发与发布配置分开、`scripts/ci/check-fuses.mjs`、`npm run check:fuses`（A12）
+- [ ] 6 L4 基座：Playwright 开发模式与 `package` 产物两种形态，冒烟与安全用例，证据约定写进 testing.md（A02、A04–A11）
+- [ ] 7 CI：macOS 与 Windows 跑冒烟、安全用例与 fuse 校验，actionlint / YAML 校验（A03）
+- [ ] 8 S10 报告与 `docs/spikes/README.md`（A13）
+- [ ] 9 收尾：`apps/desktop/CLAUDE.md`、coding-standards 复用表、根 CLAUDE.md 命令、`npm run verify`（A14）、acceptance.json、看板与会话日志
 
 ## 登记事项
 
