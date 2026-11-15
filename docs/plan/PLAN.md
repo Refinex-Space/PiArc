@@ -298,9 +298,9 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 - [x] 1. 查锁定版本：Pi 1.5.2 的 `CredentialStore`、`ModelRuntime.create({ credentials })`、刷新阈值；keyring-core 与 store crate、AES-GCM 实现选型（cargo-deny）
 - [x] 2. `piarc-ports`：`SecretStore` 窄 trait；`piarc-secrets`：保险箱格式、主密钥状态表、原子写入、清零、错误类型；内存与可注入错误的替身（A01–A05）
-- [ ] 3. 集中定义的应用标识与凭据库服务名（A12）；macOS 登录钥匙串集成测试（测试服务名，结束清理）（A11，已完成：`piarc-secrets/tests/system_store.rs`）
+- [x] 3. 集中定义的应用标识与凭据库服务名（A12，`piarc-core::identity`，D2 未定故为占位值）；macOS 登录钥匙串集成测试（测试服务名，结束清理）（A11，已完成：`piarc-secrets/tests/system_store.rs`）
 - [x] 4. 协议：`secrets/*` 请求与变更通知，生成 TS 类型，golden 样本与反例（A06）
-- [ ] 5. `piarc-core` 分派 `secrets/*`：多个 Agent Host 共享的凭据服务、变更推送、并发刷新的互斥
+- [x] 5. `piarc-core` 分派 `secrets/*`：多个 Agent Host 共享的凭据服务、变更推送、并发刷新的互斥
 - [ ] 6. Agent Host 凭据适配层（`agent-host/src/runtime/`）：启动取回、同步读、按 provider 串行、异步回写、失败上报会话错误（A06、A07）
 - [ ] 7. 端到端：mock 登录与 token 刷新（A08）、多会话与两个 Agent Host 并发（A09）、无明文扫描与环境变量检查（A10）
 - [ ] 8. S5 报告与 `docs/spikes/README.md`（A13）；CLAUDE.md（piarc-secrets、agent-host）、coding-standards 复用表、架构同步
