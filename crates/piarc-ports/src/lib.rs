@@ -17,3 +17,20 @@
 //!
 //! The authoritative rules are in `crates/deps-rules.json`, enforced by
 //! `scripts/ci/check-crate-deps.mjs` (architecture section 7.1).
+//!
+//! # Defined so far
+//!
+//! - [`ProcessSpawner`]: starts a process with piped stdio and a [`ProcessControl`] to kill it
+//!   and wait for its exit (T06; `piarc-exec` implements it).
+//! - [`Clock`]: monotonic time and sleeping, so restart windows and backoff can run on a test
+//!   clock (T06).
+//!
+//! `FileSystem`, `SecretStore` and `AgentHostTransport` arrive with the tasks that need them.
+
+mod clock;
+mod process;
+
+pub use clock::Clock;
+pub use process::{
+    BoxFuture, ExitStatus, ProcessControl, ProcessSpawner, SpawnSpec, SpawnedProcess,
+};

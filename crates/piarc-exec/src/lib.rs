@@ -19,3 +19,14 @@
 //!
 //! The authoritative rules are in `crates/deps-rules.json`, enforced by
 //! `scripts/ci/check-crate-deps.mjs` (architecture section 7.1).
+//!
+//! # Implemented so far (T06)
+//!
+//! [`TokioProcessSpawner`] starts a process with tokio, with exactly the environment given
+//! and piped stdio, and kills it when its handle is dropped. It terminates only the direct
+//! child: process-group (macOS) and Job Object (Windows) termination of the whole process
+//! tree is still to come (`docs/plan/PLAN.md`, I17).
+
+mod spawner;
+
+pub use spawner::TokioProcessSpawner;

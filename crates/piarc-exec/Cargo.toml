@@ -7,5 +7,12 @@ license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[dependencies]
+piarc-ports.workspace = true
+tokio = { workspace = true, features = ["process"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["process", "io-util"] }
+
 [lints]
 workspace = true
