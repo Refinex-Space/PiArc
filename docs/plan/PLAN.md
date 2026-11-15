@@ -303,7 +303,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 5. `piarc-core` 分派 `fs/*`、`exec/*`，按会话解析工作区根与 cwd；依赖规则不变
 - [x] 6. Agent Host 工具层 `agent-host/src/tools/`：六个规范名工具、默认 Tool Profile、名称映射表、停用 Pi 原生工具（A04、A05）
 - [x] 7. ESLint `no-restricted-imports` 禁止 tools/harness 引入 fs 与 child_process（A03）
-- [ ] 8. 场景测试：Core 侧调用记录（A01）、运行时 spy（A02）、测试 Profile 改名（A05）、S3 双会话改用委托工具（A11）
+- [x] 8. 场景测试：Core 侧调用记录（A01）、运行时 spy（A02）、测试 Profile 改名（A05）、S3 双会话改用委托工具（A11）
 - [ ] 9. 行为对照：Pi 原生 vs 委托，mock 请求记录 + 工作区快照（A06）
 - [ ] 10. `fs/read` AHP 往返 p95 计时 ≥ 1,000 次（A10）
 - [ ] 11. S4 报告与 `docs/spikes/README.md`（A12）；CLAUDE.md（agent-host、piarc-fs、piarc-exec）、coding-standards 复用表、架构同步

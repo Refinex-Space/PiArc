@@ -4,6 +4,7 @@
 //! and `docs/spikes/S09-ahp-resilience.md`.
 
 mod harness;
+mod tools;
 
 use harness::{Env, assert_contiguous_seq, notification, open, payload, ping, prompt_text};
 use piarc_core::agent_host::{CallState, ExitReason, HostEvent};
@@ -16,9 +17,9 @@ const FILES_A: &str = r#"
 id: files-a
 steps:
   - text: "Writing the note."
-    tool_calls: [{ name: write, input: { path: "notes/note.txt", content: "written by session A" } }]
-  - tool_calls: [{ name: edit, input: { path: "notes/note.txt", edits: [{ oldText: "session A", newText: "session A, edited" }] } }]
-  - tool_calls: [{ name: read, input: { path: "notes/note.txt" } }]
+    tool_calls: [{ name: Write, input: { path: "notes/note.txt", content: "written by session A" } }]
+  - tool_calls: [{ name: Edit, input: { path: "notes/note.txt", edits: [{ oldText: "session A", newText: "session A, edited" }] } }]
+  - tool_calls: [{ name: Read, input: { path: "notes/note.txt" } }]
   - text: "Done in A."
 "#;
 
@@ -26,23 +27,23 @@ const FILES_B: &str = r#"
 id: files-b
 steps:
   - text: "Writing the note."
-    tool_calls: [{ name: write, input: { path: "notes/note.txt", content: "written by session B" } }]
-  - tool_calls: [{ name: edit, input: { path: "notes/note.txt", edits: [{ oldText: "session B", newText: "session B, edited" }] } }]
-  - tool_calls: [{ name: read, input: { path: "notes/note.txt" } }]
+    tool_calls: [{ name: Write, input: { path: "notes/note.txt", content: "written by session B" } }]
+  - tool_calls: [{ name: Edit, input: { path: "notes/note.txt", edits: [{ oldText: "session B", newText: "session B, edited" }] } }]
+  - tool_calls: [{ name: Read, input: { path: "notes/note.txt" } }]
   - text: "Done in B."
 "#;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn two_sessions_run_tool_calls_concurrently_and_only_touch_their_own_workspace() {
     let env = Env::new("files", &[FILES_A, FILES_B], json!({})).await;
-    let (supervisor, mut events, trust) = env.start(&[]);
+    let (supervisor, mut events, core) = env.start(&[]);
     events
         .until(|e| matches!(e, HostEvent::Connected { .. }))
         .await;
     let rss_none = ping(&supervisor).await.rss_bytes;
-    let a = open(&supervisor, &env.cwd(0), "mock-large").await;
+    let a = open(&supervisor, &core, &env.cwd(0), "mock-large").await;
     let rss_one = ping(&supervisor).await.rss_bytes;
-    let b = open(&supervisor, &env.cwd(1), "mock-large").await;
+    let b = open(&supervisor, &core, &env.cwd(1), "mock-large").await;
     let rss_two = ping(&supervisor).await.rss_bytes;
 
     let (text_a, text_b) = (
@@ -74,6 +75,7 @@ async fn two_sessions_run_tool_calls_concurrently_and_only_touch_their_own_works
     assert_eq!(repeated, ta);
     assert_eq!(env.requests("files-a").len(), 4);
     check_own_notes(&env, &events, &a, &b);
+    check_own_core_calls(&env, &core, &a, &b);
     check_overlap(&events, &a);
     let (na, nb) = (
         assert_contiguous_seq(&events, &a.0),
@@ -83,7 +85,7 @@ async fn two_sessions_run_tool_calls_concurrently_and_only_touch_their_own_works
         "seq 1..={na} for A, 1..={nb} for B; RSS (bytes): no session {rss_none}, one {rss_one}, \
          two {rss_two}, after both turns {rss_after}"
     );
-    assert_eq!(*trust.asked.lock().expect("lock"), [env.cwd(0), env.cwd(1)]);
+    assert_eq!(*core.asked.lock().expect("lock"), [env.cwd(0), env.cwd(1)]);
     supervisor.shutdown().await;
 }
 
@@ -115,12 +117,12 @@ steps:
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn interrupting_one_session_leaves_the_other_running_to_completion() {
     let env = Env::new("abort", &[STALL_A, FILES_B], json!({})).await;
-    let (supervisor, mut events, _) = env.start(&[]);
+    let (supervisor, mut events, core) = env.start(&[]);
     events
         .until(|e| matches!(e, HostEvent::Connected { .. }))
         .await;
-    let a = open(&supervisor, &env.cwd(0), "mock-large").await;
-    let b = open(&supervisor, &env.cwd(1), "mock-large").await;
+    let a = open(&supervisor, &core, &env.cwd(0), "mock-large").await;
+    let b = open(&supervisor, &core, &env.cwd(1), "mock-large").await;
     let ta = supervisor
         .prompt(&a, "req-a", &prompt_text("Think.", "stall-a"))
         .await
@@ -203,12 +205,12 @@ async fn compacting_one_session_leaves_the_history_of_the_other_untouched() {
         json!({ "compaction": { "keepRecentTokens": 1 } }),
     )
     .await;
-    let (supervisor, mut events, _) = env.start(&[]);
+    let (supervisor, mut events, core) = env.start(&[]);
     events
         .until(|e| matches!(e, HostEvent::Connected { .. }))
         .await;
-    let a = open(&supervisor, &env.cwd(0), "mock-small").await;
-    let b = open(&supervisor, &env.cwd(1), "mock-large").await;
+    let a = open(&supervisor, &core, &env.cwd(0), "mock-small").await;
+    let b = open(&supervisor, &core, &env.cwd(1), "mock-large").await;
 
     let b1 = supervisor
         .prompt(&b, "b1", &prompt_text("B question one.", "history-b"))
@@ -278,12 +280,12 @@ async fn each_session_gets_only_the_mcp_servers_of_its_own_project() {
         std::fs::write(ws.join(".pi").join("mcp.json"), config.to_string())
             .expect("mcp.json written");
     }
-    let (supervisor, mut events, _) = env.start(&[env.ws[0].as_path(), env.ws[1].as_path()]);
+    let (supervisor, mut events, core) = env.start(&[env.ws[0].as_path(), env.ws[1].as_path()]);
     events
         .until(|e| matches!(e, HostEvent::Connected { .. }))
         .await;
-    let a = open(&supervisor, &env.cwd(0), "mock-large").await;
-    let b = open(&supervisor, &env.cwd(1), "mock-large").await;
+    let a = open(&supervisor, &core, &env.cwd(0), "mock-large").await;
+    let b = open(&supervisor, &core, &env.cwd(1), "mock-large").await;
     let ta = supervisor
         .prompt(&a, "a", &prompt_text("Call alpha.", "mcp-a"))
         .await
@@ -348,11 +350,11 @@ steps:
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn killing_the_agent_host_mid_prompt_restarts_it_and_restores_the_session() {
     let env = Env::new("kill", &[KILL_A], json!({})).await;
-    let (supervisor, mut events, _) = env.start(&[]);
+    let (supervisor, mut events, core) = env.start(&[]);
     events
         .until(|e| matches!(e, HostEvent::Connected { epoch: 1, .. }))
         .await;
-    let a = open(&supervisor, &env.cwd(0), "mock-large").await;
+    let a = open(&supervisor, &core, &env.cwd(0), "mock-large").await;
     let turn = supervisor
         .prompt(&a, "req-1", &prompt_text("Work.", "kill-a"))
         .await
@@ -396,15 +398,19 @@ async fn killing_the_agent_host_mid_prompt_restarts_it_and_restores_the_session(
     supervisor.shutdown().await;
 }
 
-/// One step with 100 parallel `write` calls of 4 KiB each: about 800 KiB of notifications,
-/// more than the pipe and Core's reader buffer absorb, while the history (about 100k tokens)
-/// stays below the compaction threshold of the 200k window.
+/// One step with 100 parallel tool calls carrying 4 KiB of arguments each: about 800 KiB of
+/// notifications, more than the pipe and Core's reader buffer absorb, while the history (about
+/// 100k tokens) stays below the compaction threshold of the 200k window.
+///
+/// The tool does not exist, so Pi answers each call itself. A real tool would not do: since
+/// T07 every tool sends its I/O to Core over the same stdout, behind the queued notifications,
+/// so a Core that stops reading stops the tools too (by design, docs/spikes/S04).
 fn flood_scenario() -> String {
     let content = "x".repeat(4096);
     let calls: Vec<String> = (0..100)
         .map(|i| {
             format!(
-                r#"{{ name: write, input: {{ path: "flood/{i}.txt", content: "{content}" }} }}"#
+                r#"{{ name: NoSuchTool, input: {{ path: "flood/{i}.txt", content: "{content}" }} }}"#
             )
         })
         .collect();
@@ -412,10 +418,6 @@ fn flood_scenario() -> String {
         "id: flood\nsteps:\n  - tool_calls: [{}]\n  - text: \"Wrote them all.\"\n",
         calls.join(", ")
     )
-}
-
-fn files_in(dir: &std::path::Path) -> usize {
-    std::fs::read_dir(dir).map_or(0, Iterator::count)
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -426,11 +428,11 @@ async fn a_slow_core_reader_makes_the_agent_host_queue_with_bounded_memory() {
     config.event_queue = 1;
     config.heartbeat_interval = std::time::Duration::from_millis(50);
     config.heartbeat_timeout = std::time::Duration::from_millis(50);
-    let (supervisor, mut events, _) = env.start_with(config, &[]);
+    let (supervisor, mut events, core) = env.start_with(config, &[]);
     events
         .until(|e| matches!(e, HostEvent::Connected { .. }))
         .await;
-    let a = open(&supervisor, &env.cwd(0), "mock-large").await;
+    let a = open(&supervisor, &core, &env.cwd(0), "mock-large").await;
     let baseline = ping(&supervisor).await;
     let turn = supervisor
         .prompt(&a, "req", &prompt_text("Write the files.", "flood"))
@@ -438,15 +440,14 @@ async fn a_slow_core_reader_makes_the_agent_host_queue_with_bounded_memory() {
         .expect("accepted")
         .turn_id;
 
-    // Core takes no events until Pi finished the turn: both model requests answered and every
-    // file written. Waiting polls those two conditions.
+    // Core takes no events until Pi finished the turn: both model requests answered. Waiting
+    // polls that condition.
     let deadline = std::time::Instant::now() + harness::WAIT;
-    while env.requests("flood").len() < 2 || files_in(&env.ws[0].join("flood")) < 100 {
+    while env.requests("flood").len() < 2 {
         assert!(
             std::time::Instant::now() < deadline,
-            "the turn did not finish while Core was stalled: {} model requests, {} files",
+            "the turn did not finish while Core was stalled: {} model requests",
             env.requests("flood").len(),
-            files_in(&env.ws[0].join("flood"))
         );
         tokio::time::sleep(std::time::Duration::from_millis(20)).await;
     }
@@ -455,7 +456,12 @@ async fn a_slow_core_reader_makes_the_agent_host_queue_with_bounded_memory() {
     let after = ping(&supervisor).await;
     let items = events.tool_results(&a.0);
     assert_eq!(items.len(), 100);
-    assert!(items.iter().all(|item| item["status"] == "completed"));
+    assert!(items.iter().all(|item| {
+        item["status"] == "failed"
+            && item["output"]
+                .as_str()
+                .is_some_and(|o| o.contains("NoSuchTool"))
+    }));
     let count = assert_contiguous_seq(&events, &a.0);
     assert!(
         !events
@@ -504,7 +510,7 @@ fn check_own_notes(env: &Env, events: &harness::Recorder, a: &SessionId, b: &Ses
         let results = harness_tools(events, &session.0);
         assert_eq!(
             results.iter().map(|r| r.0.as_str()).collect::<Vec<_>>(),
-            ["write", "edit", "read"]
+            ["Write", "Edit", "Read"]
         );
         assert!(results.iter().all(|r| r.1 == "completed"), "{results:?}");
         let read = &results[2].2;
@@ -512,6 +518,47 @@ fn check_own_notes(env: &Env, events: &harness::Recorder, a: &SessionId, b: &Ses
             read.contains(&format!("written by {own}, edited")) && !read.contains(other),
             "{read}"
         );
+    }
+}
+
+/// T07-A11: every file request of a session reached Core with the canonical tool name and
+/// resolved inside that session's own workspace, the same relative path in both sessions.
+fn check_own_core_calls(env: &Env, core: &harness::Core, a: &SessionId, b: &SessionId) {
+    for (index, session) in [a, b].into_iter().enumerate() {
+        let calls = core.calls_of(&session.0);
+        let methods: Vec<(&str, Option<&str>)> = calls
+            .iter()
+            .map(|c| (c.method.as_str(), c.tool.as_deref()))
+            .collect();
+        assert_eq!(
+            methods,
+            [
+                ("fs/mkdir", Some("Write")),
+                ("fs/write", Some("Write")),
+                ("fs/stat", Some("Edit")),
+                ("fs/read", Some("Edit")),
+                ("fs/write", Some("Edit")),
+                ("fs/stat", Some("Read")),
+                ("fs/read", Some("Read"))
+            ],
+            "{calls:#?}"
+        );
+        let own = std::fs::canonicalize(&env.ws[index]).expect("workspace exists");
+        for call in &calls {
+            // The Agent Host resolved "notes/note.txt" against the session's own cwd ...
+            let requested = call.path.as_deref().expect("a path");
+            assert!(
+                std::path::Path::new(requested).starts_with(&env.ws[index]),
+                "{requested}"
+            );
+            // ... and Core resolved it inside the session's own workspace root.
+            let resolved = call.resolved.as_deref().expect("succeeded");
+            assert!(
+                std::path::Path::new(resolved).starts_with(&own),
+                "{resolved} is not in {}",
+                own.display()
+            );
+        }
     }
 }
 
@@ -672,7 +719,7 @@ async fn the_real_agent_host_exits_readably_when_core_speaks_another_major_versi
     let env = Env::new("mismatch", &[], json!({})).await;
     let mut config = env.config();
     config.protocol = "2.0".parse().expect("valid version");
-    let (supervisor, mut events, _) = env.start_with(config, &[]);
+    let (supervisor, mut events, _core) = env.start_with(config, &[]);
     let rejected = events
         .until(|e| matches!(e, HostEvent::HandshakeRejected { .. }))
         .await;

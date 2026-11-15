@@ -11,6 +11,7 @@ use std::time::Duration;
 use piarc_core::agent_host::{
     self, HostConfig, HostEvent, HostEvents, HostSupervisor, InboundHandler, Peer,
 };
+use piarc_core::tool_io::{ToolIo, ToolIoConfig};
 use piarc_ports::BoxFuture;
 use piarc_protocol::session::{ModelRef, SessionEventNotification, SessionId};
 use piarc_protocol::{ErrorKind, ErrorObject};
@@ -78,42 +79,99 @@ pub fn mcp_fixture() -> PathBuf {
         .join("mcp-echo-server.ts")
 }
 
-/// Answers `trust/get` from a fixed set of trusted directories and records the questions.
-#[derive(Default)]
-pub struct Trust {
+/// Core's side of the connection: answers `trust/get` from a fixed set of trusted directories,
+/// delegated tool I/O (`fs/*`, `exec/*`) with the real `ToolIo`, and records both.
+pub struct Core {
     trusted: Vec<String>,
     pub asked: Mutex<Vec<String>>,
+    pub io: ToolIo,
+    pub calls: Arc<Mutex<Vec<Call>>>,
 }
 
-impl InboundHandler for Trust {
+/// One `fs/*` or `exec/*` request Core answered.
+#[derive(Debug, Clone)]
+pub struct Call {
+    pub method: String,
+    pub session: String,
+    /// `origin.tool`: the canonical tool name the Agent Host sent.
+    pub tool: Option<String>,
+    /// The path as requested.
+    pub path: Option<String>,
+    /// The resolved path of a successful file operation.
+    pub resolved: Option<String>,
+    /// The error kind of a failed request.
+    pub error: Option<String>,
+}
+
+impl Core {
+    /// The recorded calls of `session`.
+    pub fn calls_of(&self, session: &str) -> Vec<Call> {
+        self.calls
+            .lock()
+            .expect("lock")
+            .iter()
+            .filter(|c| c.session == session)
+            .cloned()
+            .collect()
+    }
+}
+
+impl InboundHandler for Core {
     fn handle(
         &self,
         method: String,
         params: Map<String, Value>,
-        _peer: Peer,
+        peer: Peer,
     ) -> BoxFuture<'static, Result<Value, ErrorObject>> {
-        let path = params
-            .get("path")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_owned();
-        self.asked.lock().expect("lock").push(path.clone());
-        let trusted = self.trusted.contains(&path);
-        Box::pin(async move {
-            if method == "trust/get" {
-                Ok(json!({ "trusted": trusted }))
-            } else {
+        if method == "trust/get" {
+            let path = params
+                .get("path")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned();
+            self.asked.lock().expect("lock").push(path.clone());
+            let trusted = self.trusted.contains(&path);
+            return Box::pin(async move { Ok(json!({ "trusted": trusted })) });
+        }
+        if !ToolIo::handles(&method) {
+            return Box::pin(async move {
                 Err(ErrorObject::new(
                     ErrorKind::MethodNotFound,
                     format!("unexpected {method}"),
                     false,
                 ))
+            });
+        }
+        let text = |name: &str| params.get(name).and_then(Value::as_str).map(str::to_owned);
+        let mut call = Call {
+            method: method.clone(),
+            session: text("sessionId").unwrap_or_default(),
+            tool: params
+                .get("origin")
+                .and_then(|o| o.get("tool"))
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+            path: text("path").or_else(|| text("command")),
+            resolved: None,
+            error: None,
+        };
+        let io = self.io.clone();
+        let calls = Arc::clone(&self.calls);
+        Box::pin(async move {
+            let result = io.dispatch(&method, params, peer).await;
+            match &result {
+                Ok(value) => {
+                    call.resolved = value.get("path").and_then(Value::as_str).map(str::to_owned);
+                }
+                Err(error) => call.error = Some(format!("{:?}", error.data.kind)),
             }
+            calls.lock().expect("lock").push(call);
+            result
         })
     }
 }
 
-/// One test's files, mock provider and Agent Host.
+/// One test's files, mock provider and Agent Host./// One test's files, mock provider and Agent Host.
 pub struct Env {
     pub root: PathBuf,
     pub data_dir: PathBuf,
@@ -182,7 +240,7 @@ impl Env {
     }
 
     /// Starts the real Agent Host; `trusted` directories get project-level Pi resources.
-    pub fn start(&self, trusted: &[&Path]) -> (HostSupervisor, Recorder, Arc<Trust>) {
+    pub fn start(&self, trusted: &[&Path]) -> (HostSupervisor, Recorder, Arc<Core>) {
         self.start_with(self.config(), trusted)
     }
 
@@ -191,23 +249,25 @@ impl Env {
         &self,
         config: HostConfig,
         trusted: &[&Path],
-    ) -> (HostSupervisor, Recorder, Arc<Trust>) {
-        let trust = Arc::new(Trust {
+    ) -> (HostSupervisor, Recorder, Arc<Core>) {
+        let core = Arc::new(Core {
             trusted: trusted
                 .iter()
                 .map(|p| p.to_string_lossy().into_owned())
                 .collect(),
             asked: Mutex::default(),
+            io: ToolIo::new(ToolIoConfig::new(self.data_dir.clone())),
+            calls: Arc::default(),
         });
         let (supervisor, events) =
-            agent_host::start(config, Arc::clone(&trust) as Arc<dyn InboundHandler>);
+            agent_host::start(config, Arc::clone(&core) as Arc<dyn InboundHandler>);
         (
             supervisor,
             Recorder {
                 events,
                 all: Vec::new(),
             },
-            trust,
+            core,
         )
     }
 
@@ -358,13 +418,23 @@ pub fn model(id: &str) -> Option<ModelRef> {
     })
 }
 
-/// Opens a session in `cwd` with `model_id` and returns its id.
-pub async fn open(supervisor: &HostSupervisor, cwd: &str, model_id: &str) -> SessionId {
-    supervisor
+/// Opens a session in `cwd` with `model_id`, registers `cwd` as its workspace root with Core's
+/// tool I/O, and returns its id.
+pub async fn open(
+    supervisor: &HostSupervisor,
+    core: &Core,
+    cwd: &str,
+    model_id: &str,
+) -> SessionId {
+    let id = supervisor
         .create_session(cwd, model(model_id))
         .await
         .expect("session opens")
-        .session_id
+        .session_id;
+    core.io
+        .open_session(&id.0, Path::new(cwd), Path::new(cwd))
+        .expect("Core knows the session's workspace");
+    id
 }
 
 /// A prompt that selects mock scenario `selector`.
@@ -390,4 +460,120 @@ pub async fn ping(supervisor: &HostSupervisor) -> piarc_protocol::host::HostStat
         .call::<piarc_protocol::host::HostPing>(piarc_protocol::host::HostPingParams { sent_at: 0 })
         .await
         .expect("ping answered")
+}
+
+/// Loads the I/O spy (`packages/testkit/src/io-spy.ts`) into the Agent Host: its `fs` calls on
+/// paths inside `roots` and all its `child_process` calls are written to the returned file when
+/// it exits.
+pub fn with_io_spy(config: &mut HostConfig, root: &Path, roots: &[PathBuf]) -> PathBuf {
+    let report = root.join("io-spy.json");
+    let spy = repo_root()
+        .join("packages")
+        .join("testkit")
+        .join("src")
+        .join("io-spy.ts");
+    let mut watched: Vec<PathBuf> = roots.to_vec();
+    // The Agent Host uses the paths as given; canonical spellings (macOS /private/var) count too.
+    watched.extend(roots.iter().filter_map(|r| std::fs::canonicalize(r).ok()));
+    config.extra_env.push((
+        "NODE_OPTIONS".into(),
+        format!("--import={}", file_url(&spy)).into(),
+    ));
+    config.extra_env.push((
+        "PIARC_IO_SPY_ROOTS".into(),
+        std::env::join_paths(&watched).expect("joinable roots"),
+    ));
+    config
+        .extra_env
+        .push(("PIARC_IO_SPY_REPORT".into(), report.clone().into()));
+    report
+}
+
+/// Milliseconds since the Unix epoch, comparable with the spy's `at`.
+pub fn now_ms() -> u64 {
+    let since = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("after the epoch");
+    u64::try_from(since.as_millis()).expect("fits")
+}
+
+/// The spy's records: `{ module, fn, path?, at, stack }`.
+pub fn spy_report(report: &Path) -> Vec<Value> {
+    let text = std::fs::read_to_string(report).expect("the Agent Host wrote the spy report");
+    serde_json::from_str(&text).expect("spy report is JSON")
+}
+
+/// A `file://` URL for `path` (Node's `--import` needs one on Windows).
+fn file_url(path: &Path) -> String {
+    let text = path.to_string_lossy().replace('\\', "/");
+    let mut url = String::from(if text.starts_with('/') {
+        "file://"
+    } else {
+        "file:///"
+    });
+    for byte in text.bytes() {
+        if byte.is_ascii_alphanumeric() || b"/-._~:".contains(&byte) {
+            url.push(char::from(byte));
+        } else {
+            url.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    url
+}
+
+/// The tools a request offered the model: `(name, description)` in order.
+pub fn offered_tools(body: &str) -> Vec<(String, String)> {
+    let request: Value = serde_json::from_str(body).expect("JSON request");
+    request["tools"]
+        .as_array()
+        .map(|tools| {
+            tools
+                .iter()
+                .map(|t| {
+                    (
+                        t["name"].as_str().unwrap_or_default().to_owned(),
+                        t["description"].as_str().unwrap_or_default().to_owned(),
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The tool results of a request's history: `(tool_use name, text, is_error)` in order.
+pub fn tool_results_in(body: &str) -> Vec<(String, String, bool)> {
+    let request: Value = serde_json::from_str(body).expect("JSON request");
+    let mut names = std::collections::HashMap::new();
+    let mut results = Vec::new();
+    for message in request["messages"].as_array().into_iter().flatten() {
+        for block in message["content"].as_array().into_iter().flatten() {
+            match block["type"].as_str() {
+                Some("tool_use") => {
+                    names.insert(
+                        block["id"].as_str().unwrap_or_default().to_owned(),
+                        block["name"].as_str().unwrap_or_default().to_owned(),
+                    );
+                }
+                Some("tool_result") => {
+                    let text = match &block["content"] {
+                        Value::String(text) => text.clone(),
+                        Value::Array(parts) => parts
+                            .iter()
+                            .filter_map(|p| p["text"].as_str())
+                            .collect::<Vec<_>>()
+                            .join("\n"),
+                        _ => String::new(),
+                    };
+                    let id = block["tool_use_id"].as_str().unwrap_or_default();
+                    results.push((
+                        names.get(id).cloned().unwrap_or_default(),
+                        text,
+                        block["is_error"].as_bool().unwrap_or(false),
+                    ));
+                }
+                _ => {}
+            }
+        }
+    }
+    results
 }
