@@ -2,11 +2,12 @@
 //!
 //! # Responsibilities
 //!
-//! - Supervises the Agent Host process: launch, AHP handshake, framing, backpressure, restart and
-//!   reconciliation of in-flight calls.
+//! - Supervises the Agent Host process: launch, AHP handshake, stdio I/O (with the frame codec
+//!   from `piarc-protocol`), backpressure, restart and reconciliation of in-flight calls.
 //!
 //! # Not responsible for
 //!
+//! - Frame encoding and decoding, message types and version negotiation (`piarc-protocol`).
 //! - Process tree management: it launches the Agent Host through the `ProcessSpawner` injected by
 //!   `piarc-core`.
 //! - Sandbox profile generation (`piarc-sandbox`).

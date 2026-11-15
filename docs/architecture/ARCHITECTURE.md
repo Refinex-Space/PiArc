@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.3（2026-11-14） |
+| 版本 | 2.4（2026-11-14） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -669,9 +669,9 @@ Agent Host 按类别统计上下文构成（system prompt、工具定义、MCP �
 
 ```
 crates/
-├── piarc-protocol     # AHP 与 Core API 的数据类型、版本号、JSON Schema 导出（schemars）
+├── piarc-protocol     # AHP 与 Core API 的数据类型、版本号与协商、JSON Schema 导出（schemars）、LF 帧编解码（只处理字节缓冲）
 ├── piarc-core         # 运行时门面：工作区与会话编排、事件总线、增量合并、后台任务注册
-├── piarc-host         # Agent Host 监管：启动、握手、分帧、背压、重启、调用对账
+├── piarc-host         # Agent Host 监管：启动、握手、stdio 读写（用 piarc-protocol 的帧编解码）、背压、重启、调用对账
 ├── piarc-policy       # 权限模式与规则、Bash 命令分析（tree-sitter-bash）、审批账本
 ├── piarc-hooks        # hooks 配置解析、匹配、执行器、决策合并
 ├── piarc-config       # 设置分层加载与合并（PiArc + Claude Code 兼容）、项目信任、配置诊断
@@ -763,6 +763,15 @@ crates/
 `turn/started`、`turn/retrying`、`turn/completed`、`item/started`、`item/delta`、`item/updated`、`item/completed`、`session/queueChanged`、`session/usage`、`session/stateChanged`、`harness/todo`、`harness/plan`、`subagent/*`、`mcp/statusChanged`、`log`。
 
 每条会话通知带 `{sessionId, seq, ts}`；Core 发现 `seq` 缺口时用 `session/getEntries(since)` 补齐。
+
+**消息约定**（细则以 `piarc-protocol` 的 crate 文档为准，新增消息的流程见 `docs/engineering/testing.md` 第 7 节）
+
+- 握手：`core/welcome` 是 `host/hello` 成功响应的 `result`；主版本不同时 Core 回错误响应，`data.kind` 为 `protocolVersionMismatch`；次版本不同时 `enabled` 取双方能力的交集。
+- 错误：JSON-RPC 2.0 的 error 对象，`data.kind`（可机读类别）与 `data.retryable` 必填，`data.details` 可选；标准错误码之外的应用错误码取 `-32099..=-32000`。
+- 不支持批量请求：收到 JSON 数组时回 Invalid Request（`-32600`，`id` 为 `null`）。
+- 会话事件：ADR-0009 第 4 条的 `type` 就是 JSON-RPC `method`；`sessionId`、`seq`、`ts`（Unix 毫秒）是 `params` 的成员，`params` 的其余成员是 `payload`。
+- 兼容：成员与枚举值都用 camelCase。同一主版本内新增成员必须可选，接收方忽略未知成员；新方法与已有成员的新枚举值只发给启用了相应能力的对端；删除、改名、可选改必填要升主版本。
+- 分帧：单帧上限默认 8 MiB，超限的帧报 `frameTooLarge` 并丢弃到下一个 LF，后续帧照常解析；嵌套超过 127 层、含孤立代理项的字符串都按非法 JSON 处理（serde_json 的限制，TS 实现同样执行）。
 
 ### 7.5 Agent Host 监管
 
@@ -1334,6 +1343,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | 版本 | 日期 | 说明 |
 |---|---|---|
 | 1.0 | 2026-11-14 | 首版：基于对 Claude 官方文档、Pi v1.4.0 源码、claude-code / claw-code / OpenClaudeDesktop / open-claude-ui 参考实现与原生技术栈的调研 |
+| 2.4 | 2026-11-14 | T02 补充：LF 帧编解码器放在 `piarc-protocol`（只处理字节缓冲，Rust 与 TS 各一份），`piarc-host` 负责 stdio 读写；7.4 增加"消息约定"：握手响应、错误对象与错误码段、不支持批量、会话事件信封与 `method` 的映射、兼容规则、分帧限制 |
 | 2.3 | 2026-11-14 | T01 补充（不改变依赖方向）：7.1 写明链外 crate（`piarc-napi` 对基础 crate 的直接使用、`piarc-testkit`、`piarc-devcli`、`piarc-ghostty-sys`）在 `crates/deps-rules.json` 中的位置，以及依赖规则的检查方式 |
 | 2.2 | 2026-11-14 | 制定交付计划时发现并修正的不一致：新增 `piarc-ports`（共享窄 trait）与 `piarc-ghostty-sys` 两个 crate，Job Object 归 `piarc-exec` 并经 `ProcessSpawner` 注入；plan 模式不再用 `setActiveTools` 收起写工具，改为闸门拒绝加追加消息（避免缓存失效，与 6.6.1 一致）；6.6.1 第 4 段明确 rules 的加载方式；6.6.4 的压缩后重注入与 6.15 的上限对齐；第 16 章链接交付计划 |
 | 2.1 | 2026-11-14 | 不做平台代码签名（ADR-0018 取代 ADR-0016，修订 ADR-0015 第 5 条）：macOS 只做 ad-hoc 签名、更新改为提示后手动下载；Windows 不签名、用 Velopack；新增发布清单签名与凭据保险箱；同步更新威胁模型、构建流水线、风险与 M0 S5/S6 |

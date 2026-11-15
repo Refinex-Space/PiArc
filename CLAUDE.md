@@ -19,6 +19,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `npm ci --ignore-scripts` | 按 lockfile 安装 npm 依赖（CI 同款） |
 | `node scripts/dev/install-tools.mjs` | 把锁定版本的 cargo-deny 装进 `.tools/`（不做全局安装）；verify 第 10 步需要它 |
 | `npm run verify` | 全部 12 项检查，结束时打印汇总表；开工与收尾各跑一次 |
+| `npm run gen:protocol` | 由 `piarc-protocol` 重新生成 `packages/protocol/schema/` 与 `src/generated/`；改了协议类型后运行并提交 |
 | `npm run format` | Prettier 写入格式（不处理 Markdown） |
 | `npm run lint` | ESLint（类型感知） |
 | `npm run typecheck` | `tsc --build`：三个工作区与 `scripts/` |
@@ -34,6 +35,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 
 - `apps/desktop/`：Electron 应用；`agent-host/`：Agent Host；`packages/protocol/`：由 `piarc-protocol` 生成的 TS 类型。三者是 npm workspaces。
 - `crates/`：Rust workspace，21 个 crate，职责见各 crate 的 `src/lib.rs` 顶部文档与架构第 7.1 节。
+- `tests/contracts/`：L1 契约样本（`<契约名>/` 与 `invalid/`）和帧编解码共享用例（`framing/`），流程见 `docs/engineering/testing.md` 第 7 节。
 - `scripts/`：跨平台 Node 脚本（`dev/` 本地入口、`ci/` 检查、`plan/` 计划文件检查、`lib/` 公共函数）。
 - `docs/engineering/`：编码规范、测试规范、CLAUDE.md 规范。
 - `reference/`：只读参考仓库（gitignore），用法与边界见 `docs/plan/references.md`。
@@ -54,4 +56,5 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - `rust-toolchain.toml` 锁定 1.99.1；cargo 命令会自动使用它。
 - 在 `.mjs` 脚本里，JSDoc 类型断言对 ESLint 不可见，`JSON.parse` 的结果会触发 `no-unsafe-*`。用 `scripts/lib/repo.mjs` 的 `readJsonFile` 与 `isRecord` 收窄。
 - Windows 上不要用 shell 调 npm 命令：用 `resolveBin` 解析入口后以 `node` 运行。
+- 改了 `piarc-protocol` 的类型却没运行 `npm run gen:protocol`，verify 的"protocol drift"会失败；新增契约没有样本与反例，"contract samples"会失败。
 - 需要保留 CRLF 的测试夹具放在 `fixtures/crlf/` 目录下，其余文本文件都会被 `.gitattributes` 规范为 LF。
