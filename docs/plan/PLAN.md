@@ -94,7 +94,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 | 阶段 | 内容 | 任务 | 阶段门 | 状态 |
 |---|---|---|---|---|
-| 0 工程基座 | 脚手架、质量门禁、工程规范、协议与契约测试 | T01–T02 | — | 进行中 |
+| 0 工程基座 | 脚手架、质量门禁、工程规范、协议与契约测试 | T01–T02 | — | 已完成 |
 | 1 M0 技术验证 | Electron 安全基线、NAPI 事件通道、mock provider、Agent Host 多会话与 AHP、Operations 委托、凭据保险箱、transcript 渲染、终端、沙箱、打包与首次运行；S1–S10 两个平台的结论 | T03–T12、W0 | R1 | 未开始 |
 | 2 M1 可行走骨架 | 存储与信任、会话编排与投影、L2 场景、文件工具与 Bash、客户端外壳、transcript 与 composer、基础审批、模型与凭据、system prompt 与 memory | T13–T22 | R2 | 未开始 |
 | 3 M2 Harness 核心 | 权限规则与 Bash 分析、配置兼容层、hooks、计划模式与任务清单、压缩与用量、检查点与回退、WebFetch 与登录、L3 对齐；Windows 达到 M1 | W1、T23–T30 | R3 | 未开始 |
@@ -109,7 +109,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | 编号 | 任务 | 阶段 | 依赖 | 平台 | effort | 规模 | 验证项 | 状态 | 完成提交 |
 |---|---|---|---|---|---|---|---|---|---|
 | T01 | [仓库脚手架、工程规范与质量门禁](tasks/T01-scaffold-and-quality-gates.md) | 0 | 无 | macOS | high | 大 | 无 | 已完成 | 47fb1e9 |
-| T02 | [协议单一来源与契约测试基座](tasks/T02-protocol-and-contract-tests.md) | 0 | T01 | macOS | high | 中 | 无 | 进行中 | — |
+| T02 | [协议单一来源与契约测试基座](tasks/T02-protocol-and-contract-tests.md) | 0 | T01 | macOS | high | 中 | 无 | 已完成 | ce41191 |
 | T03 | [Electron 应用骨架与安全基线](tasks/T03-electron-shell-and-security-baseline.md) | 1 | T02 | macOS | xhigh | 大 | S10 | 未开始 | — |
 | T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 未开始 | — |
 | T05 | [严格校验的 mock provider](tasks/T05-strict-mock-provider.md) | 1 | T02 | macOS | high | 中 | 无 | 未开始 | — |
@@ -294,14 +294,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-T02 协议单一来源与契约测试基座（开工 2026-11-14，基线 `npm run verify` 10/10 通过）
-
-- [x] 1. 最小链路：一个类型 → schema → TS → 样本 → 两侧测试 → 漂移检查
-- [x] 2. `piarc-protocol` 骨架类型：JSON-RPC 消息、结构化错误、握手与 `negotiate`、会话事件信封、turn/item（A08、A09）
-- [x] 3. Schema 导出与 TS 生成：`npm run gen:protocol`、`check-protocol-drift.mjs` 并入 verify（A01、A02、A10）
-- [x] 4. L1 契约基座：golden 样本与反例、Rust 往返、TS ajv 校验与往返、`check-contract-samples.mjs` 并入 verify、testing.md L1 一节（A03、A04、A05）
-- [x] 5. LF 分帧编解码器 Rust 与 TS，共用 `tests/contracts/framing/` 用例（A06、A07）
-- [ ] 6. 收尾：两份 CLAUDE.md、复用表、根 CLAUDE.md 命令、架构与文档同步、验收记录、全量 verify（A11）
+（当前没有进行中的任务）
 
 ## 登记事项
 
@@ -316,6 +309,8 @@ T02 协议单一来源与契约测试基座（开工 2026-11-14，基线 `npm ru
 | I05 | 制定计划 | 架构第 6.10 节说 MCP server 在沙箱外，但 stdio MCP server 由 Agent Host 启动，会继承 Agent Host 的 Seatbelt 写入限制（第 10.3 节） | T39 定稿 Agent Host 配置时澄清并更新架构；放宽写入范围属于变更型 |
 | I06 | T01 | `npm audit` 报告 8 个 moderate（GHSA-g3hv-75wg-m249，minimatch 经 eslint 10.14 与 typescript-eslint 8.72 引入，仅开发工具链，不进安装包）；架构第 13.3 节要求的 `npm audit`、`cargo-audit` 尚未接入 CI（cargo-deny 的 advisories 已覆盖 RustSec 数据库） | 上游修复后升级 eslint 与 typescript-eslint；T45 或 T50 把 `npm audit --omit=dev` 接入 CI |
 | I07 | T01 | TypeScript 7.0 已发布，typescript-eslint 8.72 只支持 `<6.1`，仓库锁在 TypeScript 6.0.3 | 各评审任务按月复查 typescript-eslint 的支持范围，支持后再升级 |
+| I08 | T02 | Node 的 `JSON.stringify` 把孤立代理项写成 `\udXXX` 转义，serde_json 拒绝这种帧；TS 的 `encodeFrame` 因此直接抛 `TypeError`。模型 SDK 按 UTF-16 切分的流式文本增量可能在代理对中间断开 | T06 在发送 `item/agentMessage/delta` 等文本前处理（例如把末尾的高代理项留到下一个增量），并加测试 |
+| I09 | T02 | 帧解码按 serde_json 的递归上限拒绝嵌套超过 127 层的 JSON（TS 实现同样执行）。工具参数等任意 JSON 若更深会被整帧拒绝 | T07 实现工具调用转发时确认可接受；需要更深时评估在 Core 侧放宽并补栈深度保护 |
 
 ## 技术债
 
@@ -340,6 +335,12 @@ T02 协议单一来源与契约测试基座（开工 2026-11-14，基线 `npm ru
 - 验收：12 项通过，0 项阻塞（Windows CI 待首次推送后观察）
 - 决策：未写 ADR；架构 7.1 补充链外 crate 的层位置（v2.3）；cargo-deny 仓库内安装而非全局安装；TypeScript 锁 6.0.x；`.nvmrc` 按"满两周"取 24.22.2
 - 遗留：I06（npm audit 与开发依赖公告）、I07（TypeScript 7）
+
+### 2026-11-14 T02 已完成（提交 ce41191）
+- 交付：`piarc-protocol` 骨架类型（JSON-RPC 消息、结构化错误与错误码段、`host/hello`/`core/welcome` 与 `negotiate`、会话事件头、turn/item 最小通知）、契约注册表 `CONTRACTS`、`export-schema`；LF 帧编解码器 Rust 与 TS 各一份；`npm run gen:protocol`（json-schema-to-typescript 16.0.0）、`check-protocol-drift.mjs`、`check-contract-samples.mjs` 接入 verify（共 12 步）；`tests/contracts/` 12 个契约的 22 个样本与 41 个反例、27 个解码与 3 个编码共享用例；ajv 8.20.0 契约测试；两份子目录 CLAUDE.md、testing.md 第 7 节
+- 验收：11 项通过，0 项阻塞（A10 的 Windows runner 实际运行待推送后观察）
+- 决策：未写 ADR；架构 v2.4（帧编解码器放在 `piarc-protocol`，7.4 增加消息约定）；TS 解码器对齐 serde_json 的嵌套与孤立代理项规则
+- 遗留：I08（流式文本的孤立代理项，T06）、I09（嵌套上限，T07）
 
 ## 计划变更记录
 
