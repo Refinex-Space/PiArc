@@ -468,85 +468,85 @@
       "id": "T01-A01",
       "task": "T01",
       "description": "干净检出上执行 `npm ci --ignore-scripts` 与 `npm run verify` 通过，汇总表列出 10 个检查步骤全部成功。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "2026-11-14 macOS：git clone 到临时目录（git status 干净）→ node scripts/dev/install-tools.mjs（装入 cargo-deny 0.20.2）→ npm ci --ignore-scripts 成功 → npm run verify exit 0，汇总表 10 步全部 PASS（Prettier、ESLint、tsc --build、Vitest、cargo fmt、clippy、cargo test、cargo-deny、crate 依赖规则、验收清单），末行 All 10 steps passed. 日志：tmp/evidence/T01/A01-clean.log。Windows 由 CI 覆盖，推送后可在 Actions 查看"
     },
     {
       "id": "T01-A02",
       "task": "T01",
       "description": "格式检查生效：故意破坏一个 `.rs` 文件与一个 `.ts` 文件的格式，`npm run verify` 分别在 `cargo fmt --check` 与 Prettier 步骤失败并指出文件；恢复后通过。验证：两次运行的关键输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "2026-11-14 macOS：在 crates/piarc-core/src/lib.rs 追加 `pub fn  answer( )->u32{42}`、在 packages/protocol/src/index.ts 追加未格式化对象后 `npm run verify` 退出 1，汇总表仅 [1] Prettier --check FAIL（`[warn] packages/protocol/src/index.ts`）与 [5] cargo fmt --check FAIL（`Diff in .../crates/piarc-core/src/lib.rs:25`），其余 8 步 PASS；`git checkout` 恢复后 verify 10 步全 PASS。日志：tmp/evidence/T01/A02-broken.log"
     },
     {
       "id": "T01-A03",
       "task": "T01",
       "description": "lint 与类型检查生效：临时引入一个 clippy 警告、一个 ESLint 违规、一个 TS 类型错误，verify 分别在对应步骤失败；撤销后通过。验证：关键输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "2026-11-14 macOS：临时加入 `fn total_len(items: &Vec<u32>)`（piarc-policy）、`let value = 1` 不再赋值（agent-host）、`return name` 返回 string 给 number（apps/desktop）。`npm run verify` 退出 1，汇总表 [2] ESLint FAIL（agent-host/src/index.ts 5:7 prefer-const）、[3] tsc --build FAIL（apps/desktop/src/index.ts(5,3): error TS2322）、[6] cargo clippy FAIL（crates/piarc-policy/src/lib.rs:22:25 clippy::ptr_arg），Prettier 与 cargo fmt PASS；撤销后全 PASS。日志：tmp/evidence/T01/A03-broken.log"
     },
     {
       "id": "T01-A04",
       "task": "T01",
       "description": "80 行函数规则生效：临时写一个超过 80 行的 Rust 函数，clippy 报 `too_many_lines`；加上不带 `reason` 的 `#[allow]` 仍然失败；加上带 `reason` 的 `#[allow]` 后通过。验证：三次运行的关键输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "2026-11-14 macOS，`cargo clippy -p piarc-policy --all-targets --locked -- -D warnings`，临时 86 行函数：①无 allow → exit 101 `error: this function has too many lines (86/80)`；②`#[allow(clippy::too_many_lines)]` → exit 101 `error: \\`allow\\` attribute without specifying a reason`；③`#[allow(clippy::too_many_lines, reason = \"...\")]` → exit 0 `Finished`。撤销后工作区干净。日志：tmp/evidence/T01/A04-{1-no-allow,2-allow-without-reason,3-allow-with-reason}.log"
     },
     {
       "id": "T01-A05",
       "task": "T01",
       "description": "crate 依赖检查生效：临时让 `piarc-policy` 依赖 `piarc-hooks`，`check-crate-deps.mjs` 失败并指出这条依赖；撤销后通过。验证：关键输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "2026-11-14 macOS：piarc-policy 临时加 `piarc-hooks.workspace = true`，`node scripts/ci/check-crate-deps.mjs` exit 1：`✗ piarc-policy depends on piarc-hooks (normal dependency), which is not allowed: piarc-policy is in layer \"feature\" and may depend on layers [foundation], piarc-hooks is in layer \"feature\", and no exception is registered`；撤销后 exit 0 `Crate dependency check passed: 21 crates, 0 internal edge(s), 2 exception(s).`（另测 fs→checkpoint 例外：passed, 1 internal edge）。日志：tmp/evidence/T01/A05-*.log"
     },
     {
       "id": "T01-A06",
       "task": "T01",
       "description": "许可证检查生效：临时引入一个 GPL 许可证的 crate（只为演示，不提交），cargo-deny 失败并指出许可证；撤销后通过。验证：关键输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "2026-11-14 macOS：[workspace.dependencies] 临时加 `zexc = \"=1.2.1\"`（GPL-3.0-only）并由 piarc-store 引用，`.tools/bin/cargo-deny check` exit 4：`error[rejected]: failed to satisfy license requirements … license = \"GPL-3.0-only\" rejected: license is not explicitly allowed … zexc v1.2.1 └── piarc-store`，`licenses FAILED`；`git checkout` 恢复 Cargo.toml/Cargo.lock 后 exit 0 `advisories ok, bans ok, licenses ok, sources ok`，Cargo.lock 中无 zexc。日志：tmp/evidence/T01/A06-*.log"
     },
     {
       "id": "T01-A07",
       "task": "T01",
       "description": "验收清单检查生效：临时改动 `acceptance.json` 中一条描述、再临时删除一条，`check-acceptance.mjs` 分别报告\"描述不一致\"\"缺失\"；恢复后通过。验证：关键输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "2026-11-14 macOS，`node scripts/plan/check-acceptance.mjs`：①把 T02-A01 描述中的“。”改为“，” → exit 1 `✗ 描述不一致：T02-A01（T02-protocol-and-contract-tests.md）` 并并列两版描述；②删除 T03-A02 → exit 1 `✗ 缺失：T03-A02（T03-electron-shell-and-security-baseline.md）不在 acceptance.json 中`；恢复后 exit 0 `验收清单检查通过：773 个验收项与任务文件一致。` 日志：tmp/evidence/T01/A07-*.log"
     },
     {
       "id": "T01-A08",
       "task": "T01",
       "description": "每个 crate 都有 crate 级文档，写明职责、不负责什么、允许依赖的 crate，与架构第 7.1 节一致；`crates/deps-rules.json` 与架构一致。验证：列出 crate 清单与 `deps-rules.json` 内容摘要。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "21 个 crate（protocol、core、host、policy、hooks、config、fs、checkpoint、ports、exec、term、ghostty-sys、sandbox、store、diff、git、secrets、telemetry、napi、testkit、devcli）各有 Cargo.toml 与 src/lib.rs（devcli 为 src/main.rs），crate 根 `//!` 文档含 Responsibilities / Not responsible for / Allowed workspace dependencies 三段，内容取自架构 7.1。crates/deps-rules.json：7 层 binding(napi)→[core,foundation]、core→[feature,foundation]、feature(14 个)→[foundation]、foundation(protocol,ports)→[]、sys(ghostty-sys)→[]、devtool(devcli)→[core,testsupport,foundation]、testsupport(testkit)→[core,foundation]；例外 fs→checkpoint、term→ghostty-sys 各附理由。check-crate-deps 校验成员与规则一一对应（21 crates passed）。架构 7.1 已同步补充（v2.3）"
     },
     {
       "id": "T01-A09",
       "task": "T01",
       "description": "`ci.yml` 语法有效，且矩阵包含 macOS 与 Windows（有 actionlint 就用 actionlint，否则用 YAML 解析器校验）。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "2026-11-14 macOS：actionlint 1.7.12（官方 release，SHA256 校验通过，临时下载未安装）`actionlint -verbose .github/workflows/ci.yml` → `Found total 0 errors`，exit 0；YAML 解析：jobs ['verify']，matrix.os ['macos-latest', 'windows-latest']，触发 push/pull_request/workflow_dispatch"
     },
     {
       "id": "T01-A10",
       "task": "T01",
       "description": "三份工程规范存在，内容覆盖\"交付物 5\"列出的要点，且与架构设计不冲突。验证：列出各文档的章节标题。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/engineering/coding-standards.md：1 通用（语言、提交、格式化、依赖、平台与路径、禁止写入）、2 Rust（crate 与模块组织、命名、错误 thiserror+kind+retryable、panic 与 NAPI 边界、I/O 窄 trait、异步、规模 1000/80、unsafe 与 SAFETY、lint、文档注释）、3 TypeScript（编译选项、禁止 any、模块边界、Pi 深度导入禁令、lint、脚本、测试）、4 通用能力复用（登记 verify、依赖检查、验收检查、install-tools、repo.mjs）；testing.md：1 分层 L0–L4+安全回归+性能+多服务商、2 质量门禁、3 命名、4 fixture（纪律、CRLF 夹具目录）、5 测试纪律、6 测试证据 tmp/evidence/<任务编号>/、7 真实服务商成本约束；claude-md.md：1 分层、2 长度上限（根 200/子目录 120）、3 写什么不写什么、4 维护、5 模板"
     },
     {
       "id": "T01-A11",
       "task": "T01",
       "description": "根 `CLAUDE.md` 有\"交付流程\"与\"命令\"两节，\"命令\"中每条命令都实际执行成功过。验证：在报告中列出命令与结果。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "根 CLAUDE.md 新建（57 行），含“交付流程”与“命令”两节。命令表 13 条均在 2026-11-14 macOS 实际执行成功：npm ci --ignore-scripts（干净检出）、node scripts/dev/install-tools.mjs、npm run verify、npm run format、npm run lint、npm run typecheck、npm test、npx vitest run scripts/plan、cargo test -p piarc-core、cargo clippy -p piarc-core --all-targets -- -D warnings、.tools/bin/cargo-deny check、node scripts/ci/check-crate-deps.mjs、node scripts/plan/check-acceptance.mjs"
     },
     {
       "id": "T01-A12",
       "task": "T01",
       "description": "所有 TS 依赖精确锁定（`package.json` 中没有 `^`、`~`），Cargo 依赖都经 `[workspace.dependencies]` 声明。验证：检查命令输出（例如 grep 结果为空）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`grep -nE '\"[~^]' package.json apps/desktop/package.json agent-host/package.json packages/protocol/package.json` 无输出（exit 1）；devDependencies 均为精确版本（typescript 6.0.3、eslint 10.14.0、@eslint/js 10.0.1、typescript-eslint 8.72.1、prettier 3.9.10、eslint-config-prettier 10.1.8、vitest 5.0.5、@types/node 24.19.2），package-lock.json 入库；crates/*/Cargo.toml 无任何直接声明版本的依赖，内部 crate 全部登记在根 [workspace.dependencies]"
     },
     {
       "id": "T02-A01",
