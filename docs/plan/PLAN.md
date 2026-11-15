@@ -116,7 +116,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T06 | [Agent Host 骨架：Pi SDK 多会话与 AHP](tasks/T06-agent-host-skeleton.md) | 1 | T04、T05 | macOS | xhigh | 大 | S3、S9 | 已完成 | 2214b08 |
 | T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 已完成 | 3a8744f |
 | T08 | [凭据保险箱](tasks/T08-credential-vault.md) | 1 | T06；D2 | macOS | high | 中 | S5 | 已完成 | 83dc25b |
-| T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 进行中 | — |
+| T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 已完成 | 9c0738d |
 | T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 未开始 | — |
 | T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 未开始 | — |
 | T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 未开始 | — |
@@ -294,18 +294,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-T09 Transcript 渲染与 composer 原型（S1），2026-11-15 开工。T03 为"部分完成"（A03 等 Windows CI），不影响本任务；分支未推送，无法核对前序 Windows CI。
-
-- [x] 1. 事件流夹具：协议 item 事件、按 token/s 回放的合成器、内容覆盖（段落、列表、表格、多语言、超长代码、未闭合标记、XSS）、1 万条历史
-- [x] 2. 增量 Markdown：Worker 解析、只重解析最后一个未完成块、自动闭合、块与 span 中间结构、单元测试（A05）
-- [ ] 3. 代码高亮：Worker 中 shiki token 级 API、JS 正则引擎（不放宽 CSP）、流式先纯文本（A06）（实现完成，待 L4）
-- [ ] 4. 安全渲染：禁止 innerHTML 的 ESLint 规则、原始 HTML 当文本、外链确认、远程图片显示为链接、XSS 载荷集（A06、A07）
-- [ ] 5. transcript：最小 store（按 item 订阅）、虚拟列表两候选、流式节奏、滚动跟随与"回到底部"、选择与复制、剪贴板权限放行（A10、A11）（实现完成，原型页 `#/transcript-lab`；剪贴板放行与 L4 待做）
-- [ ] 6. composer：ProseMirror、@ 胶囊、键盘语义、输入法守卫（A08、A09）（实现与单元测试完成，待 L4）
-- [ ] 7. L4 用例：XSS、输入法（CDP 合成）、键盘语义、复制、滚动跟随
-- [ ] 8. 性能测量：两个候选的流式 60 s、万条滚动、千条冷加载、渲染进程内存（A01–A04）
-- [ ] 9. 库选型 ADR、架构 8.4 同步、S1 报告与 spikes README（A01、A12）
-- [ ] 10. 收尾：CLAUDE.md、复用表、verify（A13）、验收记录、看板与会话日志
+（当前没有进行中的任务）
 
 ## 登记事项
 
@@ -336,6 +325,9 @@ T09 Transcript 渲染与 composer 原型（S1），2026-11-15 开工。T03 为"�
 | I21 | T07 | 委托工具不读 Pi 设置中的 `shellPath`、`shellCommandPrefix`（Bash）与 `images.autoResize`（Read），取默认值；命令环境是 Core 的白名单环境加 Pi 的会话变量，不含 Agent Host 内部的 `PI_*` 变量 | T17 接上 shell 相关设置（与 Git Bash 探测一起），T21 生成 Pi 设置时决定图片缩放并让 Read 读取 |
 | I22 | T08 | D2（应用标识）尚未落实，`piarc-core::identity::APP_IDENTIFIER` 是占位值 `PiArc.pending-D2`，凭据库服务名 `PiArc.pending-D2.credential-vault` 由它生成。改成正式标识后，用占位标识存过凭据的构建找不到主密钥，保险箱返回 `masterKeyMissing` | 已落地（2026-11-15）：D2 定为域名 `piarc.cn`、应用标识 `cn.piarc.desktop`，`APP_IDENTIFIER` 已替换，T08-A12 通过。占位标识只用于未发布的开发构建，无需迁移；T12 用同一常量设置 bundle id 与 AppUserModelID |
 | I23 | T08 | Agent Host 的 `secrets/lock` 请求超时（桥接默认 30 s）后 Core 才授予的锁无人释放，要等 30 s 租约到期，期间同一 provider 的写入等待；pi-ai 的取消信号只取消排队，同样可能留下这种锁 | 影响限于同一 provider 的写入延迟；R1 评估是否让 Core 在授予前检查请求方是否仍在等待（例如锁请求带截止时间） |
+| I24 | T09 | transcript 原型页 `#/transcript-lab` 与合成夹具（`src/renderer/lab/`）随发布构建的渲染包分发，与 I13 的 `#/event-probe` 同类 | T45 与 I13 一起评估在发布构建中剔除测试页 |
+| I25 | T09 | 真实输入法（macOS 简体拼音、日文）与触控板滚动手感需要人工核对，清单见 `docs/spikes/S01-transcript-composer.md` 第 7 节（M1–M10）；自动化部分已用 CDP 合成通过 | 用户核对后把结果告诉智能体补记到 S1 报告；R1 汇总 S1 时检查 |
+| I26 | T09 | S1 基准中应用全部进程合计 489 MiB，超出第 11 章"不含 Agent Host 的全部进程 ≤ 450 MB"；渲染进程 179 MiB 在预算内，超出主要来自主进程（179 MiB，含 Core 与测试驱动） | R1 与 I12 一起按 M0 实测校准；W0 补 Windows 数据 |
 
 ## 技术债
 
@@ -413,6 +405,12 @@ T09 Transcript 渲染与 composer 原型（S1），2026-11-15 开工。T03 为"�
 - 交付：用户决定 D2（域名 `piarc.cn`，应用标识 `cn.piarc.desktop`），写入需求规格第 7 节；`piarc-core::identity::APP_IDENTIFIER` 由占位值改为正式标识，凭据库服务名为 `cn.piarc.desktop.credential-vault`；ADR-0021、架构、S5 报告与 CLAUDE.md 同步
 - 验收：14 项通过，0 项阻塞（A12 由阻塞改为通过，verify 13 步全部通过）
 - 遗留：I23；待 W0、T12 的项见上一条记录
+
+### 2026-11-15 T09 已完成（提交 9c0738d）
+- 交付：渲染进程 transcript 原型（`#/transcript-lab`，协议事件驱动的最小 store、流式驱动与节奏、@tanstack/react-virtual 列表、滚动跟随状态机与"回到底部"、复制本条消息）；Markdown Worker（marked 词法器的增量解析、自动闭合、块与 span 中间结构、字符引用解码与 `safeHref`）；高亮 Worker（shiki core + JavaScript 正则引擎，token 级输出，语法按需加载）；ProseMirror composer（@ 胶囊、空闲/运行中键位、输入法守卫在 `handleDOMEvents.keydown`）；夹具（token/s 回放、1 万条历史、XSS 载荷集 `src/shared/xss-payloads.ts`）；ESLint 禁止渲染进程的 HTML 字符串入口；权限放行 `clipboard-sanitized-write`；`npm run bench:s1`（CDP 追踪）；L4 五个文件 27 个用例；S1 报告、ADR-0022、架构 v2.12、S10 报告、testing.md 9.5、复用表六行、两份 CLAUDE.md
+- 验收：13 项通过，0 项阻塞
+- 决策：ADR-0022（补充，已接受）：@tanstack/react-virtual（virtuoso 同组测量下流式掉帧、冷加载慢一倍、增长时贴底晚一帧）、marked 词法器（比 mdast 快 17–50 倍）、shiki JavaScript 引擎（不放宽 CSP）；帧时间按每帧主线程工作量计（60 Hz 屏上 rAF 间隔不能对照 16 ms）；滚动阈值取 2/40/200 px 与 150 ms 输入窗口；transcript 滚动条改为自绘（覆盖式滚动条不可拖动）
+- 遗留：I24（原型页随发布包分发，T45）、I25（真实输入法与触控板待用户核对，S1 报告第 7 节）、I26（全部进程内存 489 MiB，R1）；T03-A03、T04-A09 的 Windows CI 仍待推送后核对（分支未推送）
 
 ## 计划变更记录
 
