@@ -27,7 +27,7 @@
 | Agent Host 输出半帧后挂起 | 超时后按挂死处理，Core 不崩溃 | 通过。半帧留在解码器缓冲中；心跳（测试中 20 ms 间隔、20 ms 超时）连续两次无响应且期间没有任何新帧，判为挂死并 SIGKILL：`Exited{reason: Hung}`，随后重启，新连接上的调用正常 | `a_half_frame_followed_by_silence_…` |
 | 非法 JSON、超长帧 | 记录错误，丢弃该帧，Core 不崩溃 | 通过。依次注入非法 JSON、超过上限（测试中 1 KiB）的帧、JSON 数组（批量请求）、缺少会话头的通知，得到 `FrameError` 事件 `[parseError, frameTooLarge, invalidRequest, invalidRequest]` 与 `tracing` 警告；连接不中断，之后的通知与调用照常处理。按架构第 7.4 节，超长帧丢弃到下一个 LF，不断开重连 | `invalid_json_oversized_frames_and_batches_…` |
 | Core 读取变慢 | 背压生效，Agent Host 不无限缓冲，内存有界 | 通过。假 Agent Host 连续发 5,000 条通知，Core 的事件队列 8、管道 4 KiB、消费者不读：假 Agent Host 写到第 51 条后被阻塞；恢复读取后 5,000 条按序到达，期间心跳不把它判为挂死。真实 Agent Host：事件队列 1，一个回合产生 205 条通知、891 KB，Core 停止读取期间 Agent Host 的出站队列峰值 758 KB（低于本回合产生的总量），全部通知按序到达、`seq` 连续，进程没有被杀 | `a_slow_event_consumer_…`、`a_slow_core_reader_…` |
-| 主版本不匹配的 `host/hello` | 握手被拒绝，错误可读 | 通过。Core 回 `-32000`、`data.kind: protocolVersionMismatch`、`details: {local: "1.0", remote: "2.0"}`，消息为 "protocol major version mismatch: local speaks 1.0, remote speaks 2.0; update the older side so both use the same major version"；Agent Host 以退出码 3 退出；Core 报 `HandshakeRejected`、`Exited{reason: HandshakeRejected}`、`Stopped`，不重启 | `refuses_a_different_major_version_…` |
+| 主版本不匹配的 `host/hello` | 握手被拒绝，错误可读 | 通过。Core 回 `-32000`、`data.kind: protocolVersionMismatch`、`details: {local: "1.0", remote: "2.0"}`，消息为 "protocol major version mismatch: local speaks 1.0, remote speaks 2.0; update the older side so both use the same major version"；Core 报 `HandshakeRejected`、`Exited{reason: HandshakeRejected}`、`Stopped`，不重启。真实 Agent Host（Core 改说 `2.0`）记录 `handshake failed` 后以退出码 3 退出 | `refuses_a_different_major_version_…`、`the_real_agent_host_exits_readably_…` |
 | 10 分钟内连续崩溃 6 次 | 第 6 次后停止重启并上报 | 通过。每次握手后立即以退出码 1 退出：6 次崩溃、5 次重启（退避 1、2、4、8、16 s，测试时钟共前进 31 s），第 6 次崩溃后 `GaveUp{restarts: 5}`、`Stopped`，之后的调用返回 `shuttingDown`。10 分钟窗口的滑动在 `restart.rs` 的单元测试中验证 | `gives_up_after_the_sixth_crash_…` |
 
 另外验证的行为：
@@ -45,7 +45,7 @@
 - **心跳与背压的区分。** 心跳超时只在"期间没有收到任何帧，且读者没有停在投递上"时计为失败，连续 2 次视为挂死。被背压的 Agent Host 仍活着，不会被误杀。
 - **Agent Host 侧不无限缓冲。** Agent Host 只经出站队列写 stdout：`write()` 返回 false 后等 `drain` 再写下一帧；等待中的同一条目的文本增量合并成一帧，所以积压按产生的文本量增长、不按增量条数增长；`seq` 在写出时分配，合并不产生缺口。积压超过 64 MiB 时 Agent Host 记录错误并以退出码 70 退出，由 Core 重启，内存因此有上限。
 - **`seq` 跨重启连续。** Core 记录每个会话收到的最大 `seq`，重启后在 `session/resume` 中以可选的 `lastSeq` 传回；新的 Agent Host 从下一个数继续编号（协议补充，架构第 7.4 节同步）。
-- **不重放。** `uncertain` 的调用只上报，由会话层决定重试或提示用户（ADR-0009 第 5 条）；`session/prompt` 的 `requestId` 是幂等键，同一连接上重复的键返回已开始的回合。
+- **不重放。** `uncertain` 的调用只上报，由会话层决定重试或提示用户（ADR-0009 第 5 条）；`session/prompt` 的 `requestId` 是幂等键，同一个 Agent Host 进程内重复的键返回已开始的回合，不再请求模型（S3 第一个测试中验证）；重启后的新进程不认识旧键，这正是 Core 不自动重放的原因。
 
 ## 5. 结论与后续
 

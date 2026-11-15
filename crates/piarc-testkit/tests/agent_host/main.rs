@@ -65,6 +65,14 @@ async fn two_sessions_run_tool_calls_concurrently_and_only_touch_their_own_works
     );
 
     let rss_after = ping(&supervisor).await.rss_bytes;
+    // The same idempotency key returns the turn it started; nothing new reaches the model.
+    let repeated = supervisor
+        .prompt(&a, "req-a", &text_a)
+        .await
+        .expect("answered")
+        .turn_id;
+    assert_eq!(repeated, ta);
+    assert_eq!(env.requests("files-a").len(), 4);
     check_own_notes(&env, &events, &a, &b);
     check_overlap(&events, &a);
     let (na, nb) = (
@@ -657,4 +665,43 @@ async fn check_restart(events: &mut harness::Recorder, turn: &TurnId, a: &Sessio
     };
     assert_eq!(session_id, a.0);
     assert!(restored_messages >= 1, "the user's prompt was on disk");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_real_agent_host_exits_readably_when_core_speaks_another_major_version() {
+    let env = Env::new("mismatch", &[], json!({})).await;
+    let mut config = env.config();
+    config.protocol = "2.0".parse().expect("valid version");
+    let (supervisor, mut events, _) = env.start_with(config, &[]);
+    let rejected = events
+        .until(|e| matches!(e, HostEvent::HandshakeRejected { .. }))
+        .await;
+    let exited = events
+        .until(|e| matches!(e, HostEvent::Exited { .. }))
+        .await;
+    events.until(|e| matches!(e, HostEvent::Stopped)).await;
+    println!("{rejected:?}\n{exited:?}");
+    let HostEvent::HandshakeRejected { error, .. } = rejected else {
+        unreachable!()
+    };
+    assert_eq!(
+        error.data.kind,
+        piarc_protocol::ErrorKind::ProtocolVersionMismatch
+    );
+    let HostEvent::Exited { reason, status, .. } = exited else {
+        unreachable!()
+    };
+    assert_eq!(reason, ExitReason::HandshakeRejected);
+    assert_eq!(
+        status.and_then(|s| s.code),
+        Some(3),
+        "the Agent Host's exit code for a protocol mismatch"
+    );
+    assert!(
+        !events
+            .all
+            .iter()
+            .any(|e| matches!(e, HostEvent::Restarting { .. }))
+    );
+    drop(supervisor);
 }
