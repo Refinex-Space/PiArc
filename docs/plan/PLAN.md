@@ -114,7 +114,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 部分完成 | aa2817f |
 | T05 | [严格校验的 mock provider](tasks/T05-strict-mock-provider.md) | 1 | T02 | macOS | high | 中 | 无 | 已完成 | 1487154 |
 | T06 | [Agent Host 骨架：Pi SDK 多会话与 AHP](tasks/T06-agent-host-skeleton.md) | 1 | T04、T05 | macOS | xhigh | 大 | S3、S9 | 已完成 | 2214b08 |
-| T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 进行中 | — |
+| T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 已完成 | 3a8744f |
 | T08 | [凭据保险箱](tasks/T08-credential-vault.md) | 1 | T06；D2 | macOS | high | 中 | S5 | 未开始 | — |
 | T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 未开始 | — |
 | T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 未开始 | — |
@@ -294,20 +294,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-**T07 Operations 委托与规范名工具**（开工 2026-11-15，基线 verify 13 步全绿；T03-A03、T04-A09 的 Windows CI 仍待推送后核对）
-
-- [x] 1. 排查 Pi 1.5.2 各工厂的 Operations 覆盖与 Operations 之外的 fs/child_process 访问
-- [x] 2. 协议：`fs/read|stat|write|mkdir|grep|glob|list`、`exec/run` 与输出通知、取消方式；生成 TS 类型；golden 样本与反例（A09）
-- [x] 3. `piarc-fs`：路径限定（规范化 + 符号链接 + 工作区根）、读（偏移与长度）、stat、写、mkdir、glob、grep、list；越界结构化错误（A07）
-- [x] 4. `piarc-exec`：经用户 shell 在会话 cwd 执行、流式通知、退出码、取消终止直接子进程、环境不含凭据（A08）
-- [x] 5. `piarc-core` 分派 `fs/*`、`exec/*`，按会话解析工作区根与 cwd；依赖规则不变
-- [x] 6. Agent Host 工具层 `agent-host/src/tools/`：六个规范名工具、默认 Tool Profile、名称映射表、停用 Pi 原生工具（A04、A05）
-- [x] 7. ESLint `no-restricted-imports` 禁止 tools/harness 引入 fs 与 child_process（A03）
-- [x] 8. 场景测试：Core 侧调用记录（A01）、运行时 spy（A02）、测试 Profile 改名（A05）、S3 双会话改用委托工具（A11）
-- [x] 9. 行为对照：Pi 原生 vs 委托，mock 请求记录 + 工作区快照（A06）
-- [x] 10. `fs/read` AHP 往返 p95 计时 ≥ 1,000 次（A10）
-- [x] 11. S4 报告与 `docs/spikes/README.md`（A12）；CLAUDE.md（agent-host、piarc-fs、piarc-exec）、coding-standards 复用表、架构同步
-- [x] 12. 收尾：`npm run verify`（A13）、acceptance.json、PLAN.md、最终报告
+（当前没有进行中的任务）
 
 ## 登记事项
 
@@ -396,6 +383,12 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 验收：12 项通过，0 项阻塞（S3、S9 的 Windows 结果由 CI 的 `verify` 作业给出，待推送后核对）
 - 决策：未写 ADR；架构 v2.9 补充；写入背压选"写队列满立即返回可重试 `busy`"；生命周期事件不占读背压许可；`seq` 写出时分配、跨重启以 `lastSeq` 续编；信任经 `trust/get`；`PI_CODING_AGENT_DIR` 固定到 PiArc 目录；凭据只在内存
 - 遗留：I16（`cacheWarming` 默认值）、I17（进程树清理，T17）、I18（中断后相邻 user 消息，T14）；本机 node 24.14.1 与 `.nvmrc` 24.22.2 不一致；分支未推送，T03-A03、T04-A09 的 Windows CI 仍待核对
+
+### 2026-11-15 T07 已完成（提交 3a8744f）
+- 交付：协议新增 `fs/stat|read|write|mkdir|list|glob|grep`、`exec/run|kill` 与 Core → Agent Host 通知 `exec/output`，错误类别 `notFound`、`outsideWorkspace`、`ioError`，20 个契约的样本与反例；`piarc-fs`（`Scope` 路径限定、按范围读、blob、写、mkdir、stat 与图片嗅探、list、fd 规则的 glob、ripgrep 库的 grep）；`piarc-exec` 的 `CommandRunner`（bash、流式、取消）；`piarc-host` 的 `Peer`（入站处理者回传通知）；`piarc-core::tool_io::ToolIo`；Agent Host 工具层 `agent-host/src/tools/`（六个规范名工具、默认 Profile、`ToolNameMap`、替身路径、`CoreIo`），ESLint 禁止 tools/harness 导入 `fs`、`child_process`；端到端测试（全工具场景、Profile 改名、I/O spy、与 Pi 原生工具的行为对照、S3 改用委托工具）、AHP 往返计时；`install-tools.mjs` 加 ripgrep 15.2.0、fd 10.5.0；S4 报告、ADR-0020、架构 v2.10、testing.md 11.1、复用表、八份 CLAUDE.md
+- 验收：13 项通过，0 项阻塞（Windows 由 CI 的 `verify` 运行同一组测试，分支未推送，待核对；未取得时由 W0 核对）
+- 决策：ADR-0020（补充，已接受）：read/write/edit 在替身路径上运行 Pi 的工具代码，bash/find 用 Operations，grep 自写，写入用 Harness Kit 的队列串行；文本以 ≤ 1 MiB 范围内联、图片以 blob 引用；Bash 用 bash（与 Pi 原生一致），命令环境为 Core 白名单加 Pi 会话变量；超时与中断经 `exec/kill`
+- 遗留：I19（工具 I/O 排在受背压的通知之后）、I20（Pi 会话创建时的 cwd 检查）、I21（委托工具未读的 Pi 设置）；T03-A03、T04-A09 的 Windows CI 仍待推送后核对
 
 ## 计划变更记录
 
