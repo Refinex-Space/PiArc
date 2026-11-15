@@ -629,99 +629,99 @@
       "id": "T03-A01",
       "task": "T03",
       "description": "Electron、Forge 及其插件、Vite、React 精确锁定，Electron 大版本在官方支持的最新 3 个大版本之内。验证：`package.json` 与 `npm view electron` 输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "apps/desktop/package.json 精确锁定 electron 45.3.2、@electron-forge/cli、plugin-vite、plugin-fuses、shared-types 8.0.1、@electron/fuses 2.1.3、vite 8.3.8、react/react-dom 19.3.1、@vitejs/plugin-react 6.3.0（无 ^/~）；npm view electron dist-tags：latest=45.3.2，受支持线 45.3.2/44.11.3/43.8.10，46 仅 alpha；Electron 45.3.2 内置 Node 24.22.2 与 .nvmrc 一致（tmp/evidence/T03/npm-view-electron.log）"
     },
     {
       "id": "T03-A02",
       "task": "T03",
       "description": "开发模式与 `electron-forge package` 产物都能启动并通过 Playwright 冒烟用例。验证：macOS 本机测试输出与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PIARC_EVIDENCE_TASK=T03 npm run test:e2e -w @piarc/desktop：58 passed（dev 与 packaged 两种形态，日志 tmp/evidence/T03/l4-run.log）；smoke.e2e.ts 2 个用例在两种形态均通过；截图 tmp/evidence/T03/l4/smoke.e2e.ts-opens-one-win-1d89a-s-the-three-column-skeleton-{dev,packaged}/window.png"
     },
     {
       "id": "T03-A03",
       "task": "T03",
       "description": "CI 配置在 macOS 与 Windows runner 上运行冒烟用例、安全用例与 fuse 校验，配置语法有效。验证：actionlint（或 YAML 解析）输出；Windows 实际运行结果未取得时标 `blocked`，由 W0 核对。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "CI desktop 作业（macos-latest、windows-latest）运行 package dev → test:e2e → package release → check:fuses；actionlint 1.7.12 对 .github/workflows/ci.yml 退出码 0、无发现（tmp/evidence/T03/actionlint.log）；本机按同款命令全部通过。Windows 实际运行结果需推送后取得（任务不推送），由下一任务开工检查或 W0 核对"
     },
     {
       "id": "T03-A04",
       "task": "T03",
       "description": "页面中注入的内联脚本、内联事件属性与 `eval` 都不执行，访问外部地址的 `fetch` 与外部图片被 CSP 阻止。验证：Playwright 安全用例。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PIARC_EVIDENCE_TASK=T03 npm run test:e2e -w @piarc/desktop：58 passed（dev 与 packaged 两种形态，日志 tmp/evidence/T03/l4-run.log）；e2e/csp.e2e.ts 6 个用例：响应头含生产 CSP；注入内联脚本与内联事件属性不执行（script-src-elem/script-src-attr 违规），eval 与 new Function 抛 EvalError，fetch https://example.com 失败并触发 connect-src 违规，外部图片触发 img-src 违规；变异对照（放开 CSP）6 项全部失败"
     },
     {
       "id": "T03-A05",
       "task": "T03",
       "description": "页面导航到外部地址（修改 `location`、点击链接、重定向）被拦截，窗口仍停留在应用协议页面。验证：Playwright 安全用例。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PIARC_EVIDENCE_TASK=T03 npm run test:e2e -w @piarc/desktop：58 passed（dev 与 packaged 两种形态，日志 tmp/evidence/T03/l4-run.log）；e2e/navigation.e2e.ts：改 location、鼠标点击外链、app 页面经 webRequest 重定向到外部地址均被拦截（日志 blocked navigation/redirect），窗口仍为 app://piarc/index.html 且原文档标记仍在；同源导航放行；变异对照（去掉守卫）3 项失败"
     },
     {
       "id": "T03-A06",
       "task": "T03",
       "description": "`window.open` 被拒绝；外链经确认后才调用 `shell.openExternal`，`javascript:`、`file:` 及其他非白名单协议被拒绝。验证：Playwright 用例（确认框与 `openExternal` 用替身断言）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PIARC_EVIDENCE_TASK=T03 npm run test:e2e -w @piarc/desktop：58 passed（dev 与 packaged 两种形态，日志 tmp/evidence/T03/l4-run.log）；e2e/external-links.e2e.ts（主进程中把 dialog.showMessageBox 与 shell.openExternal 替换为记录替身）：window.open 与 target=_blank 被拒、窗口数仍为 1；确认后才调用 openExternal，取消不调用；javascript:、file:、data:、ftp:、piarc:、app:、非 URL 均返回 false 且不弹框；单元 external-links.test.ts 7 项"
     },
     {
       "id": "T03-A07",
       "task": "T03",
       "description": "`window.piarc` 的键集合与白名单快照完全一致，页面中拿不到 `ipcRenderer`。验证：Playwright 枚举测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PIARC_EVIDENCE_TASK=T03 npm run test:e2e -w @piarc/desktop：58 passed（dev 与 packaged 两种形态，日志 tmp/evidence/T03/l4-run.log）；e2e/preload.e2e.ts：window.piarc 属性集合 = 快照 [getAppVersion, openExternal]（均为 function）；遍历 window 全部自有属性未发现 ipcRenderer/sendSync/contextBridge/webFrame 或名称含 ipc/electron 的属性"
     },
     {
       "id": "T03-A08",
       "task": "T03",
       "description": "IPC 来源校验拒绝 frame 为空、origin 不同、origin 前缀相似三种情况，合法调用通过。验证：单元测试与端到端测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npx vitest run apps/desktop：ipc/sender.test.ts 覆盖 frame 为空、其他 origin、前缀相似 origin（app://piarcx、app://piarc.evil.com 等）均拒绝；PIARC_EVIDENCE_TASK=T03 npm run test:e2e -w @piarc/desktop：58 passed（dev 与 packaged 两种形态，日志 tmp/evidence/T03/l4-run.log）：合法调用通过，data: 页面与 app://piarcx 页面加载同一 preload 后调用被拒（日志 [ipc] rejected ... from null / from app://piarcx）；变异对照（去掉校验）2 项失败"
     },
     {
       "id": "T03-A09",
       "task": "T03",
       "description": "渲染进程中 `require`、`process`、`module`、`Buffer` 均不可用。验证：Playwright 用例。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PIARC_EVIDENCE_TASK=T03 npm run test:e2e -w @piarc/desktop：58 passed（dev 与 packaged 两种形态，日志 tmp/evidence/T03/l4-run.log）；e2e/preload.e2e.ts：页面中 typeof require/process/module/Buffer 均为 undefined；窗口渲染进程在 app.getAppMetrics() 中 sandboxed=true"
     },
     {
       "id": "T03-A10",
       "task": "T03",
       "description": "未放行的权限请求（通知、摄像头、地理位置）被拒绝。验证：Playwright 用例。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PIARC_EVIDENCE_TASK=T03 npm run test:e2e -w @piarc/desktop：58 passed（dev 与 packaged 两种形态，日志 tmp/evidence/T03/l4-run.log）；e2e/permissions.e2e.ts（--use-fake-device-for-media-stream）：Notification.requestPermission → denied，getUserMedia → NotAllowedError，geolocation → PERMISSION_DENIED，日志记录 denied permission request notifications/media/geolocation，permissions.query 对四项均为 denied；变异对照（全部放行）4 项失败"
     },
     {
       "id": "T03-A11",
       "task": "T03",
       "description": "页面经自定义协议加载（`location.protocol` 不是 `file:`）；第二个应用实例启动后立即退出并聚焦已有窗口。验证：Playwright 用例。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PIARC_EVIDENCE_TASK=T03 npm run test:e2e -w @piarc/desktop：58 passed（dev 与 packaged 两种形态，日志 tmp/evidence/T03/l4-run.log）；e2e/app-instance.e2e.ts：location.protocol=app:、origin=app://piarc、isSecureContext=true；以同一 --user-data-dir 启动第二个实例，退出码 0 并输出 another instance is running，已有窗口从隐藏恢复为可见且窗口数仍为 1"
     },
     {
       "id": "T03-A12",
       "task": "T03",
       "description": "发布配置 `package` 产物的 fuse 状态与配置一致；临时改动一项配置后 `check-fuses.mjs` 失败并指出该项。验证：脚本输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run package:desktop 后 npm run check:fuses：9 个 fuse 与发布配置一致，退出码 0（tmp/evidence/T03/check-fuses-release.log）；临时把 fuses.mjs 中 EnableCookieEncryption 改为 false 后退出码 1 并输出 \"EnableCookieEncryption: expected disabled, found enabled\"（tmp/evidence/T03/check-fuses-mutated.log），还原后退出码 0；开发构建 --flavor development 同样 9 项一致"
     },
     {
       "id": "T03-A13",
       "task": "T03",
       "description": "S10 报告覆盖官方安全清单 20 条，每条有落实方式与对应测试或检查，`docs/spikes/README.md` 已更新。验证：文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/spikes/S10-electron-security.md 第 3 节逐条覆盖官方安全清单 20 条（落实方式与对应测试或检查；11、12 写明不适用原因），第 4 节开发/发布构建差异；docs/spikes/README.md 的 S10 行已更新状态与报告链接"
     },
     {
       "id": "T03-A14",
       "task": "T03",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify：12 个步骤全部 PASS，退出码 0（Vitest 178 passed、1 skipped；tmp/evidence/T03/verify-final.log）"
     },
     {
       "id": "T04-A01",
