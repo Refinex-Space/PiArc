@@ -140,6 +140,18 @@ fn rejects_unknown_fields_and_broken_steps() {
             "id: x\nsteps:\n  - text: hi\n    disconnect_after_events: 0\n",
             "at least 1",
         ),
+        (
+            "id: x\nsteps:\n  - text: hi\n    stall_after_events: 0\n",
+            "stall_after_events must be at least 1",
+        ),
+        (
+            "id: x\nsteps:\n  - text: hi\n    stall_after_events: 2\n    disconnect_after_events: 2\n",
+            "not both",
+        ),
+        (
+            "id: x\nsteps:\n  - error: { kind: overloaded }\n    stall_after_events: 2\n",
+            "cannot also carry a response",
+        ),
         ("id: 'bad id'\nsteps:\n  - text: hi\n", "id must be"),
         ("id: x\nsteps:\n  - error: { kind: teapot }\n", "teapot"),
     ];

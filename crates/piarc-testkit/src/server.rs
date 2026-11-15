@@ -414,12 +414,16 @@ fn respond(
             );
         }
     };
-    let body = match step.disconnect_after_events {
-        Some(count) => {
+    let body = match (step.disconnect_after_events, step.stall_after_events) {
+        (Some(count), _) => {
             record.outcome = Outcome::Disconnected;
             ScriptBody::aborted(events.into_iter().take(count))
         }
-        None => {
+        (None, Some(count)) => {
+            record.outcome = Outcome::Stalled;
+            ScriptBody::stalled(events.into_iter().take(count))
+        }
+        (None, None) => {
             record.outcome = Outcome::Streamed;
             ScriptBody::complete(events)
         }

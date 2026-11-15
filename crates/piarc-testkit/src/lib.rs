@@ -79,6 +79,8 @@
 //!     stop_reason: tool_use       # optional: end_turn | tool_use | max_tokens
 //!   - text: "Done."
 //!     disconnect_after_events: 3  # optional: send 3 wire events, then drop the connection
+//!   - text: "Thinking"
+//!     stall_after_events: 4       # optional: send 4 wire events, then hold the connection open
 //!   - error:
 //!       kind: rate_limit          # rate_limit 429 | overloaded 529 | server_error 500 | unavailable 503
 //!       retry_after_secs: 2       # rate_limit only, default 1

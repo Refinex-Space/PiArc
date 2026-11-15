@@ -438,3 +438,73 @@ async fn shutdown_stops_accepting_connections() {
     provider.shutdown().await;
     assert!(tokio::net::TcpStream::connect(address).await.is_err());
 }
+
+const STALL: &str = r#"
+id: stall
+steps:
+  - text: "still thinking about it"
+    stall_after_events: 4
+  - text: "next"
+"#;
+
+#[tokio::test]
+async fn stall_sends_partial_events_and_keeps_the_connection_open_until_the_client_leaves() {
+    use http_body_util::BodyExt as _;
+
+    let provider = MockProvider::start(library(&[STALL])).await.expect("start");
+    let stream = tokio::net::TcpStream::connect(provider.address())
+        .await
+        .expect("connect");
+    let (mut sender, connection) =
+        hyper::client::conn::http1::handshake(hyper_util::rt::TokioIo::new(stream))
+            .await
+            .expect("handshake");
+    let connection = tokio::spawn(connection);
+    let request = hyper::Request::post(ANTHROPIC)
+        .header("host", provider.address().to_string())
+        .header("x-piarc-scenario", "stall")
+        .body(http_body_util::Full::new(hyper::body::Bytes::from(
+            anthropic("hi").to_string(),
+        )))
+        .expect("request");
+    let mut body = sender
+        .send_request(request)
+        .await
+        .expect("response head")
+        .into_body();
+    let mut received = String::new();
+    while parse_sse(&received).len() < 4 {
+        let frame = body.frame().await.expect("a frame").expect("no error");
+        received.push_str(std::str::from_utf8(frame.data_ref().expect("data")).expect("UTF-8"));
+    }
+    let names: Vec<String> = parse_sse(&received)
+        .into_iter()
+        .filter_map(|event| event.name)
+        .collect();
+    assert_eq!(
+        names,
+        [
+            "message_start",
+            "ping",
+            "content_block_start",
+            "content_block_delta"
+        ]
+    );
+    // Nothing more arrives and the stream does not end: the mock holds it open.
+    let next = tokio::time::timeout(std::time::Duration::from_millis(200), body.frame()).await;
+    assert!(next.is_err(), "the stalled stream sent more: {next:?}");
+    drop(body);
+    drop(sender);
+    connection.abort();
+
+    let after = post(
+        provider.address(),
+        ANTHROPIC,
+        Some("stall"),
+        &anthropic("hi"),
+    )
+    .await;
+    assert_eq!(streamed_text(&after.body), "next");
+    let outcomes: Vec<Outcome> = provider.records().iter().map(|r| r.outcome).collect();
+    assert_eq!(outcomes, [Outcome::Stalled, Outcome::Streamed]);
+}

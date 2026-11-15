@@ -31,13 +31,13 @@
 
 - 校验器与编码器分开：`rules.rs` 只依赖 `request.rs`；线格式细节只在 `anthropic.rs`、`openai.rs`。
 - mock 不含场景特判，脚本是数据；不为某个测试硬编码响应。
-- 被校验拒绝的请求不消耗步数；注入错误与断流消耗步数（模拟客户端重试时下一步应答）。
+- 被校验拒绝的请求不消耗步数；注入错误、断流（`disconnect_after_events`）与挂起（`stall_after_events`）消耗步数（模拟客户端重试时下一步应答）。
 - 只绑定 `127.0.0.1`；记录里凭据头的值一律 `<redacted>`。
 - 对客户端发来的未知字段宽容，对规则覆盖的结构严格。新增对某个客户端（pi-ai 等）的兼容前，先在其锁定版本源码里确认它实际发出的形状。
 
 ## 易错点
 
-- 断流靠 `body.rs` 的 `ScriptBody::aborted`：最后一块之后先返回一次 `Pending` 让 hyper 把已写数据刷到 socket，再返回错误让 hyper 关闭连接。直接返回错误会丢掉已缓冲的事件。
+- 断流靠 `body.rs` 的 `ScriptBody::aborted`：最后一块之后先返回一次 `Pending` 让 hyper 把已写数据刷到 socket，再返回错误让 hyper 关闭连接。直接返回错误会丢掉已缓冲的事件。挂起（`stalled`）在最后一块之后一直返回 `Pending` 且不唤醒，客户端关闭连接时 hyper 丢弃响应体。
 - 参数分段按字符而不是字节计偏移；`split_at` 的每个偏移必须严格递增且落在 `(0, 长度)` 内，加载时检查。
 - 工具参数以紧凑 JSON、键按字典序流出（serde_json 默认），断言拼接结果时用同样的序列化。
 - Anthropic SDK 的 beta 客户端请求 `/v1/messages?beta=true`；路由只比较路径，记录里保留查询串。

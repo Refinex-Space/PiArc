@@ -29,6 +29,8 @@ pub enum Outcome {
     Streamed,
     /// Streamed part of a response, then closed the connection (scripted).
     Disconnected,
+    /// Streamed part of a response, then held the connection open (scripted).
+    Stalled,
     /// Answered with a scripted HTTP error.
     InjectedError,
     /// Answered 400 (or 404) without consuming a step; see `violations`.

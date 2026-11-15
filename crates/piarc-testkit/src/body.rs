@@ -1,4 +1,4 @@
-//! The HTTP response body: a fixed list of chunks, optionally ending in an abort.
+//! The HTTP response body: a fixed list of chunks, optionally ending in an abort or a stall.
 
 use std::collections::VecDeque;
 use std::pin::Pin;
@@ -11,15 +11,25 @@ use hyper::body::{Body, Bytes, Frame, SizeHint};
 #[error("scripted disconnect")]
 pub(crate) struct ScriptedDisconnect;
 
+/// How the body ends after its last chunk.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Ending {
+    Complete,
+    Abort,
+    Stall,
+}
+
 /// Response body built from pre-encoded chunks.
 ///
-/// With `abort` set, the body returns `Pending` once after its last chunk (waking itself
-/// at once) so hyper flushes the chunks to the socket, and then fails; hyper reacts to
-/// the failure by closing the connection without finishing the chunked encoding, which
-/// is what a client sees when a stream breaks.
+/// With `Abort`, the body returns `Pending` once after its last chunk (waking itself at
+/// once) so hyper flushes the chunks to the socket, and then fails; hyper reacts to the
+/// failure by closing the connection without finishing the chunked encoding, which is what
+/// a client sees when a stream breaks. With `Stall`, it returns `Pending` without ever
+/// waking: hyper flushes the chunks and the response stays open until the client closes the
+/// connection, which drops the body.
 pub(crate) struct ScriptBody {
     chunks: VecDeque<Bytes>,
-    abort: bool,
+    ending: Ending,
     flushed: bool,
 }
 
@@ -27,14 +37,21 @@ impl ScriptBody {
     pub(crate) fn complete(chunks: impl IntoIterator<Item = String>) -> Self {
         Self {
             chunks: chunks.into_iter().map(Bytes::from).collect(),
-            abort: false,
+            ending: Ending::Complete,
             flushed: false,
         }
     }
 
     pub(crate) fn aborted(chunks: impl IntoIterator<Item = String>) -> Self {
         Self {
-            abort: true,
+            ending: Ending::Abort,
+            ..Self::complete(chunks)
+        }
+    }
+
+    pub(crate) fn stalled(chunks: impl IntoIterator<Item = String>) -> Self {
+        Self {
+            ending: Ending::Stall,
             ..Self::complete(chunks)
         }
     }
@@ -52,8 +69,11 @@ impl Body for ScriptBody {
         if let Some(chunk) = this.chunks.pop_front() {
             return Poll::Ready(Some(Ok(Frame::data(chunk))));
         }
-        if !this.abort {
-            return Poll::Ready(None);
+        match this.ending {
+            Ending::Complete => return Poll::Ready(None),
+            // Never woken: the connection stays open until the client closes it.
+            Ending::Stall => return Poll::Pending,
+            Ending::Abort => {}
         }
         if !this.flushed {
             this.flushed = true;
@@ -64,11 +84,11 @@ impl Body for ScriptBody {
     }
 
     fn is_end_stream(&self) -> bool {
-        !self.abort && self.chunks.is_empty()
+        self.ending == Ending::Complete && self.chunks.is_empty()
     }
 
     fn size_hint(&self) -> SizeHint {
-        if self.abort {
+        if self.ending != Ending::Complete {
             return SizeHint::default();
         }
         let length = self.chunks.iter().map(Bytes::len).sum::<usize>();

@@ -46,7 +46,7 @@ pub struct Script {
 /// One scripted response.
 ///
 /// A step is either a response (`text`, `tool_calls` or both, optionally cut short with
-/// `disconnect_after_events`) or an injected `error`.
+/// `disconnect_after_events` or `stall_after_events`) or an injected `error`.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Step {
@@ -66,6 +66,11 @@ pub struct Step {
     /// without finishing the stream.
     #[serde(default)]
     pub disconnect_after_events: Option<usize>,
+    /// Send only this many wire events, then keep the connection open without sending
+    /// anything until the client gives up (an aborted request, a killed process): a model
+    /// that is still "thinking" at a known point of the stream.
+    #[serde(default)]
+    pub stall_after_events: Option<usize>,
     /// Answer with an HTTP error instead of a response.
     #[serde(default)]
     pub error: Option<InjectedError>,
@@ -357,6 +362,7 @@ fn check_step(step: &Step) -> Result<(), String> {
             || !step.tool_calls.is_empty()
             || step.stop_reason.is_some()
             || step.disconnect_after_events.is_some()
+            || step.stall_after_events.is_some()
             || step.usage != Usage::default();
         if has_response {
             return Err("an error step cannot also carry a response".to_owned());
@@ -371,6 +377,12 @@ fn check_step(step: &Step) -> Result<(), String> {
     }
     if step.disconnect_after_events == Some(0) {
         return Err("disconnect_after_events must be at least 1".to_owned());
+    }
+    if step.stall_after_events == Some(0) {
+        return Err("stall_after_events must be at least 1".to_owned());
+    }
+    if step.disconnect_after_events.is_some() && step.stall_after_events.is_some() {
+        return Err("set disconnect_after_events or stall_after_events, not both".to_owned());
     }
     for (index, call) in step.tool_calls.iter().enumerate() {
         check_tool_call(call).map_err(|reason| format!("tool_calls[{index}]: {reason}"))?;

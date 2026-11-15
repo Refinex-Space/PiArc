@@ -201,6 +201,8 @@ steps:
     stop_reason: tool_use          # 可省略：有工具调用为 tool_use，否则 end_turn；另有 max_tokens
   - text: "Done."
     disconnect_after_events: 3     # 只发前 3 个线上事件，然后断开连接
+  - text: "Thinking"
+    stall_after_events: 4          # 只发前 4 个线上事件，然后保持连接不再发送，直到客户端断开（中断、杀进程的确定性时点）
   - error:
       kind: rate_limit             # rate_limit 429 | overloaded 529 | server_error 500 | unavailable 503
       retry_after_secs: 2          # 仅 rate_limit，默认 1
@@ -230,4 +232,4 @@ steps:
 
 ### 10.5 请求记录
 
-每个请求按到达顺序记录：`seq`、`method`、`path`（含查询串）、`format`、`scenario`（选择器）、`step_index`（从 0 开始，未消耗步数时为空）、`headers`（小写名；`authorization`、`x-api-key` 等凭据头的值记为 `<redacted>`）、原始请求体 `body`、校验结果 `violations`（空表示通过）、`outcome`（`streamed`、`disconnected`、`injected_error`、`rejected`）。
+每个请求按到达顺序记录：`seq`、`method`、`path`（含查询串）、`format`、`scenario`（选择器）、`step_index`（从 0 开始，未消耗步数时为空）、`headers`（小写名；`authorization`、`x-api-key` 等凭据头的值记为 `<redacted>`）、原始请求体 `body`、校验结果 `violations`（空表示通过）、`outcome`（`streamed`、`disconnected`、`stalled`、`injected_error`、`rejected`）。
