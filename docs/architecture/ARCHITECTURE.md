@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.6（2026-11-14） |
+| 版本 | 2.7（2026-11-15） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -240,11 +240,12 @@ PiArc/
 | [0010](../adr/0010-process-model.md) | 每工作区一个 Agent Host | 控制多会话内存，MCP 按工作区共享 |
 | [0011](../adr/0011-session-storage.md) | Pi JSONL 为事实来源 + SQLite 索引 + 内容寻址快照 | 跟随上游格式，索引可重建 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
+| [0019](../adr/0019-event-batches-copied-not-transferred.md) | 事件批次经主进程转发时复制，不转移 `ArrayBuffer` | Electron 主进程只能转移端口；实测 8 MiB 批次复制转发约 2 ms |
 | [0015](../adr/0015-agent-host-runtime-bundled-node.md) | Agent Host 继续单独内置 Node LTS | 要套 Seatbelt、走 stdio、给 npx 用，Electron 自带的 Node 都做不到 |
 | [0018](../adr/0018-unsigned-distribution.md) | Electron Forge 打包；macOS 只做 ad-hoc 签名、Windows 不签名；发布清单用项目密钥签名；不上应用商店 | 免费开源、零成本；用发布清单签名保住更新的完整性 |
 | [0017](../adr/0017-terminal-libghostty-vt.md) | 终端状态由 Core 中的 libghostty-vt 持有，渲染层可替换 | agent 读屏与用户所见一致；IPC 流量与输出量无关 |
 
-已被取代的决策（原文保留在 `docs/adr/`）：0001、0007 → 0013；0008 → 0014；0003 → 0015；0012 → 0016 → 0018。ADR-0015 第 5 条（签名）被 ADR-0018 修订。
+已被取代的决策（原文保留在 `docs/adr/`）：0001、0007 → 0013；0008 → 0014；0003 → 0015；0012 → 0016 → 0018。ADR-0015 第 5 条（签名）被 ADR-0018 修订；ADR-0014 第 4 条（大块数据转移）被 ADR-0019 修订。
 
 ---
 
@@ -816,7 +817,7 @@ impl Session {
 - `on_events` 由 Core 约每 16 ms 调用一次，传入合并后的事件批次。主进程不解析批次内容，按 `sessionId` 转发给订阅了该会话的窗口（每个窗口一个 MessagePort）。
 - 渲染进程能调用的命令是上面接口的子集，在 preload 中逐个列出；主进程校验调用来源（发起请求的窗口和页面地址）后才转给 Core。
 - NAPI-RS 生成的 TypeScript 声明与 `packages/protocol` 的类型都纳入 L1 快照测试，接口变化必须同时更新快照。
-- 已实现的导出面（T04）：`CoreRuntime.create(options, onEvents)`、`shutdown(): Promise<void>`、`state`。`onEvents` 每次收到一组批次 `{ route, seq, payload }`：`route` 是路由键（1–128 个 `[A-Za-z0-9._:/-]`，`core/` 前缀保留给 Core 自己的事件，例如 `core/errors`），`seq` 是每个路由从 1 起连续的批次序号，`payload` 是该路由事件的 UTF-8 JSON 数组（`Uint8Array`），主进程不解析。开发构建另有 `testing` 导出（演示事件源、同步轻量方法 `echo`、计数、panic 触发），发布构建不含。
+- 已实现的导出面（T04）：`CoreRuntime.create(options, onEvents)`、`shutdown(): Promise<void>`、`state`。`onEvents` 每次收到一组批次 `{ route, seq, payload }`：`route` 是路由键（1–128 个 `[A-Za-z0-9._:/-]`，`core/` 前缀保留给 Core 自己的事件，例如 `core/errors`），`seq` 是每个路由从 1 起连续的批次序号，`payload` 是该路由事件的 UTF-8 JSON 数组（`Uint8Array`），主进程不解析，以结构化克隆转发（ADR-0019）。开发构建另有 `testing` 导出（演示事件源、同步轻量方法 `echo`、计数、panic 触发），发布构建不含。
 - 错误跨 NAPI 时是抛出的 `Error`，带 `code` 与 `data: { kind, retryable, details? }`（`piarc_protocol::ErrorObject` 的形状）；导出函数在边界捕获 panic，kind 为 `internalError`。Core API 专用的错误类别有 `shuttingDown`（关闭后的请求）与 `busy`（队列满，可重试）。
 - Promise 由 Core 自己的运行时经 NAPI-RS 的 `JsDeferred` 结算，不用 `#[napi] async fn`（它会另起 NAPI-RS 的全局 tokio 运行时）。
 - 声明快照在 `apps/desktop/src/main/core/native/`（`piarc-core.d.ts` 为发布构建，`piarc-core.testing.d.ts` 为开发构建），由 `npm run build:core` 生成，verify 比对。
@@ -891,7 +892,7 @@ Core 事件批次 ──► 主进程（只转发）──MessagePort──► �
 2. 呈现状态（展开、滚动、选择、面板布局）由渲染进程持有，不回传 Core。
 3. store 自己实现，基于 React 的 `useSyncExternalStore`，按会话和 item 粒度订阅。流式增量只让最后一个 item 的订阅者重新渲染，不触发整棵组件树刷新。
 4. 实体快照按 `revision` 门控，旧数据丢弃。
-5. 大块数据（transcript 窗口、长 diff）走结构化克隆；单批超过阈值时用 `ArrayBuffer` 转移所有权，不复制。
+5. 事件批次（包括 transcript 窗口、长 diff 等大块数据）以二进制载荷经结构化克隆复制转发：Electron 主进程的 `MessagePortMain` 只能转移端口，不能转移 `ArrayBuffer`（ADR-0019）。单批转发耗时计入第 11 章"Core 事件到渲染进程"的预算；大块内容的体量从源头控制，例如按需拉取 transcript 窗口。
 
 ### 8.4 Transcript 渲染管线
 
@@ -1233,7 +1234,7 @@ Forge 打包 ──► 放入 .node（app.asar.unpacked/native/）、内置 Node
 | R3 | 上游贡献门槛高，补丁积累 | 中 | 补丁登记与移除条件；优先用扩展点绕开 | 补丁超过 10 个时复审 ADR-0002 |
 | R4 | 失去"原生、轻量"卖点，差异化不足 | 中 | 差异化放在 Harness 深度、多模型、工作区共享 MCP、确定性回退；对外如实表述，不宣称"原生"或"比 Electron 轻" | 每个里程碑评审时复核产品定位 |
 | R5 | 同进程多会话存在串扰 | 中 | M0 验证；协议按会话多路复用 | 退回每会话一个进程 |
-| R6 | NAPI 边界的事件吞吐不足，或 Core 与窗口逻辑争用主进程事件循环 | 中 | 事件约 16 ms 合并一批；大块数据用 `ArrayBuffer` 转移；M0 压测 | 把 Core 移到 utilityProcess，渲染进程经 MessagePort 直连（ADR-0014） |
+| R6 | NAPI 边界的事件吞吐不足，或 Core 与窗口逻辑争用主进程事件循环 | 中 | 事件约 16 ms 合并一批；大块数据以二进制载荷复制转发，从源头控制批次体量（ADR-0019）；M0 压测（S2：10 万事件/分钟下事件循环延迟 p99 3.6 ms，8 MiB 批次转发约 2 ms） | 把 Core 移到 utilityProcess，渲染进程经 MessagePort 直连（ADR-0014） |
 | R7 | Claude Code 迭代极快，对标目标持续移动 | 中 | 以能力清单定义范围，按用户价值排序，不追求全量 | 每个里程碑评审时更新能力清单 |
 | R8 | 合规风险（服务商条款、clean-room、品牌） | 高 | ADR-0006；PR 检查项；P2 外部内核需法务评审；参考实现的界面组件一律不复用 | 条款变化时复审 |
 | R9 | 不同服务商的工具调用质量差异大 | 中 | Tool Profile；模型能力表；多服务商场景矩阵 | 对低可靠性模型默认收紧工具集 |
@@ -1350,6 +1351,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | 版本 | 日期 | 说明 |
 |---|---|---|
 | 1.0 | 2026-11-14 | 首版：基于对 Claude 官方文档、Pi v1.4.0 源码、claude-code / claw-code / OpenClaudeDesktop / open-claude-ui 参考实现与原生技术栈的调研 |
+| 2.7 | 2026-11-15 | ADR-0019 接受：8.3 第 5 条改为事件批次一律以二进制载荷复制转发（Electron 主进程不能转移 `ArrayBuffer`），7.6 与第 14 章 R6 同步；第 4 章加入 ADR-0019 |
 | 2.6 | 2026-11-14 | T04 补充：7.2 写明 Core 的有序关闭顺序、任务 panic 转错误事件、事件合并的刷出规则与背压策略（不丢事件）；7.6 写明已实现的导出面、批次形状与路由键语法、跨 NAPI 的错误形状与 `shuttingDown`、`busy` 两个错误类别、Promise 的结算方式与 `.d.ts` 快照位置；13.2 写明 `.node` 的命名与打包位置 |
 | 2.5 | 2026-11-14 | T03 补充：3.4 增加 `apps/desktop/src/shared/`（IPC 契约）；10.3 写明应用协议当前为 `app://piarc`、权限检查处理器与设备权限默认拒绝、开发构建与发布构建只差 `NodeCliInspect` 一个 fuse 以及 L4 打包形态使用开发构建 |
 | 2.4 | 2026-11-14 | T02 补充：LF 帧编解码器放在 `piarc-protocol`（只处理字节缓冲，Rust 与 TS 各一份），`piarc-host` 负责 stdio 读写；7.4 增加"消息约定"：握手响应、错误对象与错误码段、不支持批量、会话事件信封与 `method` 的映射、兼容规则、分帧限制 |

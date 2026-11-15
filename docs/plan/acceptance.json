@@ -761,9 +761,9 @@
     {
       "id": "T04-A06",
       "task": "T04",
-      "description": "超过阈值的批次以 `ArrayBuffer` 转移：转发后主进程侧缓冲区已分离（`byteLength` 为 0），渲染进程收到的数据完整。验证：测试。",
-      "status": "blocked",
-      "evidence": "转移部分不可实现：Electron 45.3.2 的 MessagePortMain.postMessage 只能转移 MessagePortMain（源码 message_port.cc 的 DisentanglePorts；实测转移 ArrayBuffer 抛『Port at index 0 is not a valid port』），已写 ADR-0019（提议）改为复制转发，等待用户确认并改写本项。完整性部分已验证：L4『a batch above 1 MiB reaches the window complete』两种形态通过、Vitest『forwards a batch above 1 MiB intact』通过；1/4/8 MiB 批次转发 p50 0.67/1.68/1.96 ms（S2 报告第 4.3 节）"
+      "description": "1 MiB 以上的批次完整到达渲染进程；基准记录其主进程转发耗时，同期事件循环延迟 p99 不超过 16 ms（按 ADR-0019，批次复制转发，不转移 `ArrayBuffer`）。验证：测试与基准输出。",
+      "status": "passing",
+      "evidence": "按 ADR-0019（已接受）改写后验证：L4『a batch above 1 MiB reaches the window complete』dev 与 packaged 两种形态通过（3 个约 1.5 MiB 的批次全部到达，序号错误 0、全部可解析、总字节数不少于载荷，tmp/evidence/T04/l4-a06.log）；Vitest『forwards a batch above 1 MiB intact』逐个比对 1.5 MiB 的 pad 内容通过；S2 基准（tmp/evidence/T04/bench/s2-packaged-2026-11-15T07-56-50-894Z.json）1/4/8 MiB 批次主进程转发 p50 0.67/1.68/1.96 ms、max 4.81/2.29/3.03 ms，同期事件循环延迟 p99 3.38/3.16/3.09 ms（≤ 16 ms）；压测轮 p99 3.20/3.16/3.23 ms"
     },
     {
       "id": "T04-A07",
@@ -805,7 +805,7 @@
       "task": "T04",
       "description": "S2 报告含吞吐、延迟分位数、同步调用、四个目标构建与加载结果和结论，`docs/spikes/README.md` 已更新。验证：文件内容。",
       "status": "passing",
-      "evidence": "docs/spikes/S02-napi-event-channel.md：环境与版本、方法、吞吐与序号校验、事件循环延迟分位数、同步调用、大批次（含 ArrayBuffer 转移不可行的结论）、主进程内存、四个目标的构建与加载表、发现与结论（macOS 有条件通过）；docs/spikes/README.md 的 S2 行已更新"
+      "evidence": "docs/spikes/S02-napi-event-channel.md：环境与版本、方法、吞吐与序号校验、事件循环延迟分位数、同步调用、大批次（ArrayBuffer 转移不可行，按 ADR-0019 复制转发）、主进程内存、四个目标的构建与加载表、发现与结论（macOS 通过）；docs/spikes/README.md 的 S2 行已更新"
     },
     {
       "id": "T04-A13",

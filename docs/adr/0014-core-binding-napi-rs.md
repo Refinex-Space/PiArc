@@ -1,6 +1,6 @@
 # 0014. Rust Core 以 NAPI-RS 原生模块加载在 Electron 主进程
 
-- 状态：已接受
+- 状态：已接受（第 4 条中"大块数据用 `ArrayBuffer` 转移所有权"被 [ADR-0019](0019-event-batches-copied-not-transferred.md) 修订）
 - 日期：2026-11-14
 - 取代：[ADR-0008](0008-ffi-uniffi.md)
 - 相关：架构文档第 3.1、7.1、7.2、7.6 章；`docs/research/electron-stack.md` 第 4 节

@@ -2,9 +2,9 @@
 
 - 任务：T04（2026-11-14 至 11-15）
 - 范围：Core 以 NAPI-RS 原生模块加载在 Electron 主进程，事件经 `ThreadsafeFunction` 合并后送到主进程，再按路由键经 MessagePort 转发到渲染进程；四个目标的预编译与加载。
-- 结论：macOS **有条件通过**。吞吐、事件循环延迟、同步调用与 darwin 两个目标的加载全部达标；有两个条件：
-  1. "超过阈值的批次用 `ArrayBuffer` 转移所有权"在 Electron 45 上做不到（`MessagePortMain` 只能转移端口），已写 [ADR-0019](../adr/0019-event-batches-copied-not-transferred.md) 提议改为复制转发，等待用户确认；
-  2. 主进程空闲 RSS 160–164 MB，超出第 11 章 120 MB 的初始预算，但其中约 155 MB 是不加载 Core 的裸 Electron 自身，Core 与应用代码只占约 5–8 MB。预算由 R1 校准（登记事项 I12）。
+- 结论：macOS **通过**。S2 的三条标准（10 万事件/分钟下无丢失、主进程事件循环延迟 p99 ≤ 16 ms、预编译产物可加载）在 macOS 上全部达标，darwin-arm64 与 darwin-x64 都能加载。另有两点：
+  1. "超过阈值的批次用 `ArrayBuffer` 转移所有权"在 Electron 45 上做不到（`MessagePortMain` 只能转移端口）。[ADR-0019](../adr/0019-event-batches-copied-not-transferred.md) 已接受：批次一律复制转发，实测代价很小（第 4.3 节）。
+  2. 主进程空闲 RSS 160–164 MB，超出第 11 章 120 MB 的初始预算（不属于 S2 的通过标准），但其中约 155 MB 是不加载 Core 的裸 Electron 自身，Core 与应用代码只占约 5–8 MB。预算由 R1 校准（登记事项 I12）。
 
   Windows **未验证**：win32-x64 的实机基准、win32-arm64 的实机加载留给 W0；CI 的 `core-load` 作业已配置在 `windows-latest` 与 `windows-11-arm` 上加载，结果待推送后核对。
 
@@ -99,7 +99,7 @@ max 38 ms 是 5 分钟内的单次尖峰，p99 远低于预算。
 
 ## 5. 发现
 
-1. **Electron 45 主进程不能转移 `ArrayBuffer`。** `MessagePortMain.postMessage` 的转移列表只接受 `MessagePortMain`，放入 `ArrayBuffer` 会抛 `Port at index 0 is not a valid port`；源码中消息经 V8 `ValueSerializer` 复制。这与 ADR-0014 第 4 条、架构第 8.3 节第 5 条不符，按协议属于变更型，写了 ADR-0019（提议）。T04-A06 中"转移后主进程侧缓冲区已分离"无法实现，只完成了"大批次完整到达"的部分。
+1. **Electron 45 主进程不能转移 `ArrayBuffer`。** `MessagePortMain.postMessage` 的转移列表只接受 `MessagePortMain`，放入 `ArrayBuffer` 会抛 `Port at index 0 is not a valid port`；源码中消息经 V8 `ValueSerializer` 复制。这与 ADR-0014 第 4 条、架构第 8.3 节第 5 条不符，按协议属于变更型，写了 ADR-0019，已接受：批次一律复制转发，T04-A06 随之改为"1 MiB 以上的批次完整到达，记录转发耗时，同期事件循环延迟 p99 ≤ 16 ms"。
 2. **Electron 不允许外部 buffer。** NAPI-RS 在 `napi_create_external_buffer` 返回 `napi_no_external_buffers_allowed` 时退回复制（源码 `env.rs`、`arraybuffer.rs`），所以 Core 的载荷进 JavaScript 时也复制一次。
 3. **`monitorEventLoopDelay` 的值含采样间隔。** 空闲的 Node 进程在 `resolution: 10` 时 p50 约 11 ms、`resolution: 1` 时约 1.2 ms。只看原始值会把 10 ms 的采样间隔误当成延迟；基准改用 1 ms。
 4. **`ThreadsafeFunction` 确实让进程保持存活。** Vitest 用例中，加载 Core 后不关闭的 Node 子进程 2 秒内不退出；`await shutdown()` 后自行退出（退出码 0）。Electron 中 `will-quit` 时先关闭 Core，L4 验证应用在事件流进行中退出正常。
@@ -109,10 +109,9 @@ max 38 ms 是 5 分钟内的单次尖峰，p99 远低于预算。
 ## 6. ADR 触发条件
 
 - ADR-0014 的触发条件（事件循环延迟 p99 超过 16 ms 且由 Core 造成）未触发：实测 p99 3.58 ms（含 1 ms 采样间隔）。不需要把 Core 移到 `utilityProcess`。
-- 转移 `ArrayBuffer` 不可行，触发 ADR-0019（提议）。
+- 转移 `ArrayBuffer` 不可行，写了 ADR-0019 并已接受（修订 ADR-0014 第 4 条，架构 v2.7）。
 
 ## 7. 后续
 
-- 用户确认 ADR-0019 后：修订 ADR-0014 第 4 条与架构第 7.6、8.3 节；用户改写 T04-A06。
 - W0：win32-x64 实机运行 `npm run bench:s2 -- --form packaged`，win32-arm64 实机加载（`node scripts/ci/load-core.mjs`）。
 - R1：按第 4.4 节的数据校准主进程内存预算（I12）。

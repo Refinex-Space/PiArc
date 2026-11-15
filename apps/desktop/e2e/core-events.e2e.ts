@@ -161,8 +161,8 @@ test('a panic in Core becomes an internalError; the main process and Core keep w
 });
 
 test('a batch above 1 MiB reaches the window complete', async ({ app }) => {
-  // The integrity half of A06. Transferring the ArrayBuffer is pending ADR-0019: Electron 45
-  // cannot transfer an ArrayBuffer through MessagePortMain.
+  // A06 (ADR-0019): Electron 45 cannot transfer an ArrayBuffer through MessagePortMain, so
+  // batches are copied; a batch above 1 MiB must still arrive complete.
   const { page } = await openProbe(app);
   await subscribe(page, ['large']);
   const pad = 1536 * 1024;

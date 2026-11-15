@@ -29,9 +29,9 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0011](0011-session-storage.md) | 会话以 Pi JSONL 为事实来源，Core 维护 SQLite 索引与文件快照 | 已接受 |
 | [0012](0012-distribution-developer-id.md) | 分发走 Developer ID + 公证 + Sparkle，不上 Mac App Store | 已取代 → 0016 |
 | [0013](0013-electron-desktop-client.md) | 桌面客户端改用 Electron + React，macOS 与 Windows 同一代码库推进 | 已接受 |
-| [0014](0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在 Electron 主进程 | 已接受 |
+| [0014](0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在 Electron 主进程 | 已接受（第 4 条被 0019 修订） |
 | [0015](0015-agent-host-runtime-bundled-node.md) | Agent Host 继续使用单独内置的 Node LTS，不复用 Electron 自带的 Node | 已接受（第 5 条被 0018 修订） |
 | [0016](0016-packaging-signing-updates.md) | 打包、签名与更新：Electron Forge；macOS Developer ID + 公证 + 内置更新；Windows 签名安装包；不上应用商店 | 已取代 → 0018 |
 | [0017](0017-terminal-libghostty-vt.md) | 内置终端：终端状态由 Core 中的 libghostty-vt 持有，渲染层可替换 | 已接受 |
 | [0018](0018-unsigned-distribution.md) | 不做平台代码签名：macOS 只做 ad-hoc 签名，Windows 不签名，更新与凭据存储随之调整 | 已接受 |
-| [0019](0019-event-batches-copied-not-transferred.md) | 事件批次经主进程转发时复制，不转移 ArrayBuffer（修订 ADR-0014 第 4 条） | 提议 |
+| [0019](0019-event-batches-copied-not-transferred.md) | 事件批次经主进程转发时复制，不转移 ArrayBuffer（修订 ADR-0014 第 4 条） | 已接受 |
