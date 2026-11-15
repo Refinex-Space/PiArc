@@ -10,6 +10,15 @@ import path from 'node:path';
 export const CORE_BINARY_STEM = 'piarc-core';
 
 /**
+ * DLLs the Windows module imports from its own directory (ADR-0017): libghostty-vt is linked
+ * through the import library of the official DLL, which must sit next to the `.node`
+ * (Node's `process.dlopen` loads add-ons with `LOAD_WITH_ALTERED_SEARCH_PATH`). build-core.mjs
+ * puts them next to the module; forge.config.ts copies them into `native/` and keeps them out
+ * of app.asar.
+ */
+export const CORE_WINDOWS_DLLS = Object.freeze(['ghostty-vt.dll']);
+
+/**
  * The four shipping targets (ADR-0014): Rust target triple → Node platform and architecture.
  * @type {Readonly<Record<string, { platform: 'darwin' | 'win32', arch: 'arm64' | 'x64' }>>}
  */

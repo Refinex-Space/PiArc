@@ -12,15 +12,23 @@
 //   for development). They are the L1 snapshot that scripts/ci/check-core-types.mjs checks.
 // - `--target` cross-builds one of the four shipping targets (the Rust target must be
 //   installed); without it the host target is built.
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+// - Windows targets: the DLLs the module imports (`CORE_WINDOWS_DLLS`, libghostty-vt) are
+//   copied next to it from the artefact crates/piarc-ghostty-sys/build.rs verified.
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { NapiCli } from '@napi-rs/cli';
 import * as prettier from 'prettier';
 
-import { CORE_BINARY_STEM, CORE_TARGETS, coreBuildDir } from '../../apps/desktop/core-binary.mjs';
+import {
+  CORE_BINARY_STEM,
+  CORE_TARGETS,
+  CORE_WINDOWS_DLLS,
+  coreBuildDir,
+} from '../../apps/desktop/core-binary.mjs';
 import { parseBuildFlavor } from '../../apps/desktop/fuses.mjs';
+import { ghosttyArtifact, hostTarget } from '../lib/ghostty-vt.mjs';
 import { isMain, repoRoot } from '../lib/repo.mjs';
 
 /** @typedef {import('../../apps/desktop/fuses.mjs').BuildFlavor} BuildFlavor */
@@ -73,6 +81,7 @@ export async function buildCore({ flavor, target, declarationsDir }) {
   if (binary === undefined) {
     throw new Error('@napi-rs/cli produced no .node file');
   }
+  await copyWindowsDlls(target, outputDir);
   const raw = await readFile(path.join(outputDir, rawDeclarations), 'utf8');
   // Format as the committed file would be, wherever this copy goes (the drift check writes
   // to a temporary directory, outside the reach of the repository's Prettier config).
@@ -89,6 +98,24 @@ export async function buildCore({ flavor, target, declarationsDir }) {
     'utf8',
   );
   return { binary, declarations };
+}
+
+/**
+ * Copies `CORE_WINDOWS_DLLS` next to the module when it is built for Windows.
+ * @param {string | undefined} target `--target`, or undefined for the host
+ * @param {string} outputDir
+ */
+async function copyWindowsDlls(target, outputDir) {
+  const triple = target ?? (await hostTarget());
+  if (CORE_TARGETS[triple]?.platform !== 'win32') {
+    return;
+  }
+  // Same profile and target as the module, so cargo reuses the verified unpacked artefact.
+  const { dll } = await ghosttyArtifact({ target, release: true });
+  if (dll === undefined || !CORE_WINDOWS_DLLS.includes(path.basename(dll))) {
+    throw new Error(`the libghostty-vt artefact for ${triple} names no DLL from CORE_WINDOWS_DLLS`);
+  }
+  await copyFile(dll, path.join(outputDir, path.basename(dll)));
 }
 
 async function main() {

@@ -297,7 +297,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 T10（2026-11-15 开工；基线 verify 13 步通过；依赖 T04 为"部分完成"，遗留的 A09 只涉及 Windows CI，不影响本任务；分支未推送，前序 Windows CI 无法核对）：
 
 - [x] 1 `piarc-ghostty-sys`：产物锁定文件、下载与 SHA256 + minisign 校验、离线缓存、bindgen 绑定入库与重新生成脚本、macOS 静态链接（A02、A03）
-- [ ] 2 Windows 链接方式选定与 CI 四目标链接配置（A01）
+- [x] 2 Windows 链接方式选定与 CI 四目标链接配置（A01；选定官方 DLL 放在 `.node` 旁边，CI 结果待推送）
 - [ ] 3 `piarc-term`：safe 封装（Terminal、RenderState、KeyEncoder、Formatter）、PTY 与 IO 线程、effects（A04）
 - [ ] 4 帧格式草案进 `piarc-protocol`：格式说明、Rust 编解码器、往返测试；render state 增量帧编码与行 id 复用（A05）
 - [ ] 5 Core 与 NAPI 导出、主进程转发、preload API（拉取式帧）

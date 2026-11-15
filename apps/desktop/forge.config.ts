@@ -11,7 +11,7 @@ import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import type { ForgeConfig } from '@electron-forge/shared-types';
 
-import { coreBinaryName, coreBuildDir } from './core-binary.mjs';
+import { CORE_WINDOWS_DLLS, coreBinaryName, coreBuildDir } from './core-binary.mjs';
 import { fuseSettingsFor, parseBuildFlavor, toFuseConfig } from './fuses.mjs';
 
 const flavor = parseBuildFlavor(process.env.PIARC_BUILD_FLAVOR);
@@ -19,7 +19,8 @@ const repoRoot = path.join(import.meta.dirname, '..', '..');
 
 /**
  * Copies the Core module of this flavor into the app as `native/<name>`. The main process
- * loads it from app.asar.unpacked/native/ (src/main/core/native-path.ts).
+ * loads it from app.asar.unpacked/native/ (src/main/core/native-path.ts). On Windows the DLLs
+ * it imports (libghostty-vt) go next to it, where the loader looks first.
  */
 async function copyCoreModule(buildPath: string, platform: string, arch: string): Promise<void> {
   const name = coreBinaryName(platform, arch);
@@ -33,13 +34,24 @@ async function copyCoreModule(buildPath: string, platform: string, arch: string)
   const destination = path.join(buildPath, 'native', name);
   await mkdir(path.dirname(destination), { recursive: true });
   await copyFile(source, destination);
+  if (platform === 'win32') {
+    for (const dll of CORE_WINDOWS_DLLS) {
+      const dllSource = path.join(path.dirname(source), dll);
+      if (!existsSync(dllSource)) {
+        throw new Error(`${dllSource} is missing; build:core copies it next to the module.`);
+      }
+      await copyFile(dllSource, path.join(path.dirname(destination), dll));
+    }
+  }
 }
 
 const config: ForgeConfig = {
   outDir: path.join('out', flavor),
   packagerConfig: {
-    // Required by OnlyLoadAppFromAsar and ASAR integrity validation.
-    asar: true,
+    // Required by OnlyLoadAppFromAsar and ASAR integrity validation. The DLLs the Windows
+    // Core module imports stay out of the archive like the module itself (the plugin below
+    // adds the .node pattern): the system loader cannot read from app.asar.
+    asar: { unpack: '**/native/*.dll' },
   },
   rebuildConfig: {},
   makers: [],

@@ -101,27 +101,24 @@ export async function hostTarget() {
 }
 
 /**
- * Builds piarc-ghostty-sys (a no-op when it is fresh) for `target` and `profile`, so its build
- * script has downloaded, verified and unpacked the artefact, and returns where the pieces are.
+ * Builds piarc-ghostty-sys (a no-op when it is fresh) the way a dependent build would, so its
+ * build script has downloaded, verified and unpacked the artefact, and returns where the pieces
+ * are. Without `target` the host is built without `--target`, which shares cargo's default
+ * target directory with `cargo test` and host builds of the Core module.
  * @param {{ target?: string | undefined, release?: boolean }} [options]
  * @returns {Promise<GhosttyArtifact>}
  */
 export async function ghosttyArtifact(options = {}) {
-  const target = options.target ?? (await hostTarget());
-  const args = [
-    'build',
-    '--locked',
-    '--message-format=json',
-    '-p',
-    GHOSTTY_SYS_PACKAGE,
-    '--target',
-    target,
-  ];
+  const args = ['build', '--locked', '--message-format=json', '-p', GHOSTTY_SYS_PACKAGE];
+  if (options.target !== undefined) {
+    args.push('--target', options.target);
+  }
   if (options.release === true) {
     args.push('--release');
   }
   const outDir = findBuildScriptOutDir(await capture('cargo', args));
-  const entry = lockEntryFor(readJsonFile(GHOSTTY_LOCK_PATH), target);
+  const triple = options.target ?? (await hostTarget());
+  const entry = lockEntryFor(readJsonFile(GHOSTTY_LOCK_PATH), triple);
   const root = path.join(outDir, 'ghostty-vt');
   return {
     version: entry.version,

@@ -48,7 +48,13 @@ jobs:
           path: .tools
           key: tools-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/dev/install-tools.mjs', 'rust-toolchain.toml') }}
 
-      - name: Install pinned tools (cargo-deny)
+      - name: Cache the libghostty-vt artefacts (build.rs verifies them on every use)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/cache/ghostty-vt
+          key: ghostty-vt-${{ github.job }}-${{ matrix.target || matrix.os }}-${{ hashFiles('crates/piarc-ghostty-sys/ghostty-vt.lock.json') }}
+
+      - name: Install pinned tools (cargo-deny, ripgrep, fd, bindgen-cli)
         run: node scripts/dev/install-tools.mjs
 
       - name: Install npm dependencies
@@ -86,6 +92,12 @@ jobs:
       - name: Cache cargo registry and target
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
+      - name: Cache the libghostty-vt artefacts (build.rs verifies them on every use)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/cache/ghostty-vt
+          key: ghostty-vt-${{ github.job }}-${{ matrix.target || matrix.os }}-${{ hashFiles('crates/piarc-ghostty-sys/ghostty-vt.lock.json') }}
+
       - name: Install npm dependencies
         run: npm ci --ignore-scripts
 
@@ -116,6 +128,8 @@ jobs:
   core-build:
     # The four prebuilt Core modules (ADR-0014). Both macOS targets build on Apple silicon,
     # both Windows targets on x64 with MSVC (docs/research/electron-stack.md section 4).
+    # Each links libghostty-vt: the static library on macOS, the import library of the
+    # official DLL on Windows, which is uploaded next to the module (ADR-0017, S7 report).
     name: core build (${{ matrix.target }})
     strategy:
       fail-fast: false
@@ -150,6 +164,12 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
+      - name: Cache the libghostty-vt artefacts (build.rs verifies them on every use)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/cache/ghostty-vt
+          key: ghostty-vt-${{ github.job }}-${{ matrix.target || matrix.os }}-${{ hashFiles('crates/piarc-ghostty-sys/ghostty-vt.lock.json') }}
+
       - name: Install npm dependencies
         run: npm ci --ignore-scripts
 
@@ -160,7 +180,10 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: core-${{ matrix.target }}
-          path: target/piarc-core/*/*.node
+          # Windows modules import ghostty-vt.dll from their own directory (ADR-0017).
+          path: |
+            target/piarc-core/*/*.node
+            target/piarc-core/*/*.dll
           if-no-files-found: error
 
   core-load:
