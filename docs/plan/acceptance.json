@@ -1302,7 +1302,7 @@
       "task": "T10",
       "description": "渲染进程按 rAF 拉取帧，隐藏的终端在测试期间产生 0 帧。验证：Playwright 测试。",
       "status": "passing",
-      "evidence": "L4 terminal.e2e.ts（dev 与 packaged 均通过，npm run test:e2e -w @piarc/desktop 136 passed）：\"output appears in frames pulled per animation frame\"（空闲 500 ms 内页面收到 >10 帧且每帧约 14 字节）；\"a hidden terminal produces no frames\"：程序每 20 ms 输出一行，隐藏 1.5 s 期间 Core 读取字节数增加，而 Core 帧计数增量为 0、页面 requestTerminalFrame 次数增量为 0，显示后恢复拉取。"
+      "evidence": "L4 terminal.e2e.ts（ADR-0023 实现后重跑，dev 与 packaged 均通过，npm run test:e2e -w @piarc/desktop 136 passed）：\"output appears in frames pulled per animation frame\"（空闲 500 ms 内页面收到 >10 帧且每帧约 14 字节）；\"a hidden terminal produces no frames\"：程序每 20 ms 输出一行，隐藏 1.5 s 期间 Core 读取字节数增加，而 Core 帧计数增量为 0、页面 requestTerminalFrame 次数增量为 0，显示后恢复拉取。"
     },
     {
       "id": "T10-A07",
@@ -1323,14 +1323,14 @@
       "task": "T10",
       "description": "`cat` 100 MB 期间主进程事件循环延迟 p99 ≤ 16 ms，渲染进程没有超过 50 ms 的长任务。验证：测量输出。",
       "status": "passing",
-      "evidence": "npm run bench:s7 -- --form packaged（tmp/evidence/T10/bench/s7-packaged.json，M1 Max、macOS 26.5.2）：cat 100 MB 期间主进程事件循环延迟 p50 1.17 / p99 1.85 / 最大 12.4 ms（monitorEventLoopDelay 原始值，含 1 ms 采样）；CDP 追踪中渲染进程超过 50 ms 的任务 0 个，每帧主线程工作 p99 6.87 ms。持续 1 GB（--repeat 10，s7-packaged-sustained.json）：p99 1.88 ms，长任务 0，58.9 帧/s，每帧工作 p99 5.14 ms；帧流量 6.7 MiB / 输出 1011 MiB。"
+      "evidence": "npm run bench:s7 -- --form packaged（最终实现，帧作为拉取请求的返回值；tmp/evidence/T10/bench/s7-packaged.json，M1 Max、macOS 26.5.2、内建 120 Hz 屏）：cat 100 MB 期间主进程事件循环延迟 p50 1.30 / p99 2.04 / 最大 21.8 ms（monitorEventLoopDelay 原始值，含 1 ms 采样）；CDP 追踪中渲染进程超过 50 ms 的任务 0 个，每帧主线程工作 p99 7.9 ms。持续 1 GB（--repeat 10，s7-packaged-sustained.json）：p99 2.03 ms，长任务 0，合成器呈现 672 帧、丢 1 帧，每帧工作 p99 6.6 ms；帧流量 14.4 MiB / 输出 1011 MiB。"
     },
     {
       "id": "T10-A10",
       "task": "T10",
       "description": "键入回显额外延迟 p95 ≤ 5 ms（≥ 200 个样本）。验证：测量输出。",
-      "status": "blocked",
-      "evidence": "npm run bench:s7（200 个配对样本，tmp/evidence/T10/bench/s7-packaged.json）：按 ADR-0017 原文帧经事件 MessagePort 时，键入回显额外延迟 p50 12.68 / p95 16.18 ms，不达标；原因是页面处理按键后 MessagePort 消息被推迟到下一帧之后处理（invoke 回复不受影响，S7 报告第 5.2 节）。同一构建临时改为帧作为 invoke 返回值（未提交，s7-experiment-invoke-reply.json）：p50 0.49 / p95 0.77 ms。阻塞原因：已写 ADR-0023（提议，修订 ADR-0017 第 3 条），等待用户确认后实现并重测。"
+      "status": "passing",
+      "evidence": "按 ADR-0023（用户已采纳）帧作为拉取请求的返回值后，npm run bench:s7 -- --form packaged：200 个配对样本，Core 直写 PTY 的回显基线 p50 0.020 / p95 0.036 ms，keydown 到解码出含回显的帧 p50 0.60 / p95 0.80 ms，额外延迟 p50 0.57 / p95 0.79 ms ≤ 5 ms（tmp/evidence/T10/bench/s7-packaged.json）；第二组 200 个样本 p95 0.78 ms（s7-packaged-sustained.json）。对照：ADR-0017 原文的事件 MessagePort 送帧为 p95 16.18 ms（S7 报告第 5.2 节）。"
     },
     {
       "id": "T10-A11",
@@ -1358,7 +1358,7 @@
       "task": "T10",
       "description": "`npm run verify` 通过。验证：命令输出。",
       "status": "passing",
-      "evidence": "npm run verify：13 步全部 PASS（Prettier、ESLint、tsc、Core 模块与 API 快照、Vitest、cargo fmt、clippy、cargo test、协议漂移、契约样本、cargo-deny、crate 依赖、验收清单），All 13 steps passed。另 npm run test:e2e -w @piarc/desktop：dev 与 packaged 两种形态 136 passed。"
+      "evidence": "ADR-0023 实现后重跑 npm run verify：13 步全部 PASS（Prettier、ESLint、tsc、Core 模块与 API 快照、Vitest、cargo fmt、clippy、cargo test、协议漂移、契约样本、cargo-deny、crate 依赖、验收清单），All 13 steps passed。另 npm run test:e2e -w @piarc/desktop：dev 与 packaged 两种形态 136 passed（前一轮 T09 的 transcript-scroll 用例偶发失败一次，单独重跑 10 次通过，登记 I32）。"
     },
     {
       "id": "T11-A01",
