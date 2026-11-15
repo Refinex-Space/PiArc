@@ -68,7 +68,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 | 事项 | 最晚在 | 说明 |
 |---|---|---|
-| D2：应用标识（bundle id、AppUserModelID）与产品域名 | T08 开工前 | 凭据服务名、URL scheme、安装包都依赖它；以后改动要做数据迁移 |
+| ~~D2：应用标识（bundle id、AppUserModelID）与产品域名~~ | T08 开工前 | **已决定**（2026-11-15）：域名 `piarc.cn`，应用标识 `cn.piarc.desktop`；发布后不能再改 |
 | D6：Intel（x64）版本是否发布 | T12 开工前 | 没有决定时按需求规格的建议首发 x64，之后按使用统计决定是否继续 |
 | D3：视觉品牌的主色与字标（图标已定，见 `design/brand/`） | T18 开工前 | 没有时 T18 用中性临时令牌，并在视觉关口请你确认；Pi logo 的使用许可在 R6 前确认 |
 | Windows 11 电脑 | W0 开工前 | 有 arm64 设备时也请准备，用于验证 win32-arm64 |
@@ -115,7 +115,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T05 | [严格校验的 mock provider](tasks/T05-strict-mock-provider.md) | 1 | T02 | macOS | high | 中 | 无 | 已完成 | 1487154 |
 | T06 | [Agent Host 骨架：Pi SDK 多会话与 AHP](tasks/T06-agent-host-skeleton.md) | 1 | T04、T05 | macOS | xhigh | 大 | S3、S9 | 已完成 | 2214b08 |
 | T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 已完成 | 3a8744f |
-| T08 | [凭据保险箱](tasks/T08-credential-vault.md) | 1 | T06；D2 | macOS | high | 中 | S5 | 部分完成 | 80f3133 |
+| T08 | [凭据保险箱](tasks/T08-credential-vault.md) | 1 | T06；D2 | macOS | high | 中 | S5 | 已完成 | 83dc25b |
 | T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 未开始 | — |
 | T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 未开始 | — |
 | T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 未开始 | — |
@@ -323,7 +323,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I19 | T07 | 工具的 `fs/*`、`exec/*` 请求与会话通知共用 Agent Host 的 stdout：Core 的事件消费者停住、读取停在投递上时，后面的工具请求也读不到，工具随之等待（背压，不丢失）。T06 的慢读者测试因此改为用不存在的工具制造通知 | T14 的事件消费者持续取走事件，不在消费路径上做阻塞等待；R1 评估是否需要让请求帧绕开通知背压（例如单独的通道） |
 | I20 | T07 | Pi 1.5.2 的 `createAgentSessionRuntime` 在会话创建时于 Agent Host 本进程 `existsSync(cwd)`（`assertSessionCwdExists`），是 Agent Host 对工作区路径唯一的直接访问（只读元数据，场景期间为 0） | T14 决定接受（写入架构）或由 Core 在 `session/create` 前检查；T39 的 Agent Host Seatbelt 配置允许对工作区的元数据读取 |
 | I21 | T07 | 委托工具不读 Pi 设置中的 `shellPath`、`shellCommandPrefix`（Bash）与 `images.autoResize`（Read），取默认值；命令环境是 Core 的白名单环境加 Pi 的会话变量，不含 Agent Host 内部的 `PI_*` 变量 | T17 接上 shell 相关设置（与 Git Bash 探测一起），T21 生成 Pi 设置时决定图片缩放并让 Read 读取 |
-| I22 | T08 | D2（应用标识）尚未落实，`piarc-core::identity::APP_IDENTIFIER` 是占位值 `PiArc.pending-D2`，凭据库服务名 `PiArc.pending-D2.credential-vault` 由它生成。改成正式标识后，用占位标识存过凭据的构建找不到主密钥，保险箱返回 `masterKeyMissing` | 用户在需求规格第 7 节给出 D2 后改常量（T08-A12 随之复验）；T12 用同一常量设置 bundle id 与 AppUserModelID；首个对外发布前处理占位标识下的旧保险箱（迁移或提示重新登录），T21 的设置界面给出 `masterKeyMissing` 的恢复入口 |
+| I22 | T08 | D2（应用标识）尚未落实，`piarc-core::identity::APP_IDENTIFIER` 是占位值 `PiArc.pending-D2`，凭据库服务名 `PiArc.pending-D2.credential-vault` 由它生成。改成正式标识后，用占位标识存过凭据的构建找不到主密钥，保险箱返回 `masterKeyMissing` | 已落地（2026-11-15）：D2 定为域名 `piarc.cn`、应用标识 `cn.piarc.desktop`，`APP_IDENTIFIER` 已替换，T08-A12 通过。占位标识只用于未发布的开发构建，无需迁移；T12 用同一常量设置 bundle id 与 AppUserModelID |
 | I23 | T08 | Agent Host 的 `secrets/lock` 请求超时（桥接默认 30 s）后 Core 才授予的锁无人释放，要等 30 s 租约到期，期间同一 provider 的写入等待；pi-ai 的取消信号只取消排队，同样可能留下这种锁 | 影响限于同一 provider 的写入延迟；R1 评估是否让 Core 在授予前检查请求方是否仍在等待（例如锁请求带截止时间） |
 
 ## 技术债
@@ -397,6 +397,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 验收：13 项通过，1 项阻塞（A12：D2 未落实，服务名由集中定义的占位应用标识生成）
 - 决策：ADR-0021（补充，已接受）：Pi 1.5.2 的凭据注入点是异步 `CredentialStore`（R11 不出现）；Core 是唯一写入方，变更推送给所有 Agent Host，读改写在 Core 的键锁内（两个 Agent Host 只刷新一次）；`modify` 先改内存、等 Core 存好再完成，失败时请求失败（会话报错）；macOS 用登录钥匙串而非 data protection keychain
 - 遗留：I22（D2 占位应用标识与迁移）、I23（超时后授予的锁要等租约）；待 W0：凭据管理器实机、Windows 数据目录与进程环境扫描；待 T12：两次构建之间的钥匙串弹窗次数；T03-A03、T04-A09 的 Windows CI 仍待推送后核对
+
+### 2026-11-15 T08 已完成（提交 83dc25b）
+- 交付：用户决定 D2（域名 `piarc.cn`，应用标识 `cn.piarc.desktop`），写入需求规格第 7 节；`piarc-core::identity::APP_IDENTIFIER` 由占位值改为正式标识，凭据库服务名为 `cn.piarc.desktop.credential-vault`；ADR-0021、架构、S5 报告与 CLAUDE.md 同步
+- 验收：14 项通过，0 项阻塞（A12 由阻塞改为通过，verify 13 步全部通过）
+- 遗留：I23；待 W0、T12 的项见上一条记录
 
 ## 计划变更记录
 
