@@ -119,7 +119,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 已完成 | 9c0738d |
 | T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 部分完成 | ff591d6 |
 | T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 部分完成 | 1b92a25 |
-| T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 部分完成 | 32ed668 |
+| T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 部分完成 | 815c32d |
 | W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 未开始 | — |
 | R1 | [M0 评审与收口](tasks/R1-m0-review.md) | 1 | W0 | macOS | high | 中 | S1–S10 汇总 | 未开始 | — |
 | T13 | [存储、数据目录、配置与项目信任](tasks/T13-storage-config-and-trust.md) | 2 | R1（结论为进入 M1） | macOS | high | 大 | 无 | 未开始 | — |
@@ -458,6 +458,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 验收：11 项通过，4 项阻塞（A04：CI 产物待推送；A10：允许通知后的横幅目视待补；A12、A14：Windows 部分待 CI/W0）
 - 决策：A09 按"各项有结论，未验证项写明原因"关闭；Gatekeeper 开启时的首次打开未验证，作为 I42 交 R1 安排
 - 遗留：I42（Gatekeeper 开启时的首次打开、macOS 15）、I43（通知的 `show` 不反映是否允许）；I38–I41 见上一条记录；分支未推送，前序任务与本任务 A04 的 Windows CI 仍待核对
+
+### 2026-11-16 T12 部分完成（提交 815c32d）
+- 交付：系统通知实机复测：用户打开 PiArc 的"允许通知"后横幅显示（目视确认，统一日志 `displaying as banner`）；查明第一次没看到横幅的原因是探针 8 秒后关闭应用、Electron 退出时删除已投递的通知，`notify` 改为默认停留 30 秒
+- 验收：12 项通过，3 项阻塞（A04：CI 产物待推送；A12、A14：Windows 部分待 CI/W0）
+- 遗留：I42（Gatekeeper 开启时的首次打开、macOS 15）；I43 更新为"通知可用，但 `show` 不反映是否允许、退出时通知被删除"
 
 ## 计划变更记录
 
