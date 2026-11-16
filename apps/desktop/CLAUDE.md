@@ -26,39 +26,12 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 
 ## 结构
 
-- `src/main/main.ts`：主进程入口，只做生命周期与模块装配。`src/preload/preload.ts`：`window.piarc`。`src/renderer/`：React，入口 `index.html` → `main.tsx`。`src/shared/ipc.ts`：通道名与 `PiarcApi` 类型，三方共用。
-- 四个 TS 工程分开：`src/main`、`src/preload` 不含 DOM 类型，`src/renderer` 不含 Node 类型；`tsconfig.config.json` 管 Forge、Vite、Playwright 配置与 `fuses.mjs`，`e2e/` 是 L4。
-- 安全基线（架构第 10.3 节，逐条对照见 `docs/spikes/S10-electron-security.md`）：
-  - `app-scheme.ts`、`app-protocol.ts`、`asset-path.ts`：`app://piarc` 自定义协议与路径校验；
-  - `security/csp.ts`：生产 CSP；`dev-server.ts`：开发服务器模式的全部放宽；
-  - `security/navigation.ts`：导航、重定向、新窗口、`<webview>` 守卫；`security/permissions.ts`：权限默认拒绝与放行清单；`security/origin.ts`：origin 计算；
-  - `ipc/register.ts`、`ipc/sender.ts`：IPC 注册与来源校验；`external-links.ts`：外链确认；
-  - `window.ts`、`web-preferences.ts`：窗口工厂与固定的 webPreferences。
-- Core（T04，ADR-0014）在 `src/main/core/`：
-  - `native-path.ts`：`.node` 路径的唯一解析处。源码树指向 `target/piarc-core/development/`，打包后是 `app.asar.unpacked/native/<名>`（`forge.config.ts` 的 `packageAfterCopy` 拷入，`plugin-auto-unpack-natives` 移出 asar）；`load.ts` 用 `process.dlopen` 加载并校验导出；
-  - `core-host.ts`：窗口打开前启动 Core，`will-quit` 时先 `await shutdown()` 再退出；
-  - `router.ts`：路由键 → 窗口表，每次 Core 投递给每个订阅窗口发一条消息，不读载荷；`event-ipc.ts`：每次页面加载一个 `MessageChannelMain`（`port2` 经 `EVENTS_PORT_CHANNEL` 交给 preload），`subscribe`/`unsubscribe` 两个命令；
-  - `test-hooks.ts`：加载的是开发版 Core 时才装 `globalThis.__piarcTestHooks`（类型在 `src/shared/test-hooks.ts`），L4 与基准经 `app.evaluate` 使用；
-  - `native/*.d.ts`：NAPI-RS 生成的 L1 快照，不手改。
-- `src/renderer/probe/`：`#/event-probe` 测试页，订阅、计数、校验序号，经 `globalThis.__piarcEventProbe` 暴露统计（类型在 `src/shared/event-probe.ts`）。
-- transcript（T09，架构第 8.4 节）在 `src/renderer/transcript/`：
-  - `item-store.ts`：最小 store，把协议的 `turn/*`、`item/*` 通知归约成行，按行订阅（T18 的正式 store 取代它）；`streaming-driver.ts`：一个 rAF 循环按 `pacer.ts` 的节奏把流式消息喂给 Markdown Worker；
-  - `markdown/`：`incremental.ts`（只重新词法分析不稳定的尾部）、`autoclose.ts`、`to-ir.ts`（marked 词法单元 → `ir.ts` 的块与 span）、`text.ts`（字符引用解码、`safeHref`）、`MarkdownView.tsx`（只用 React 元素渲染）、`markdown-client.ts`；
-  - `highlight/`：`languages.ts`（别名与支持的语言）、`highlight-client.ts`（结果缓存）、`CodeBlock.tsx`；
-  - `scroll-follow.ts`（状态机）、`use-scroll-follow.ts`（接到滚动元素）、`TranscriptList.tsx`（@tanstack/react-virtual 虚拟列表）、`row-heights.ts`、`Rows.tsx`、`copy.ts`、`Transcript.tsx`；
-  - 常量集中在 `constants.ts`：`SCROLL_FOLLOW`（解除、恢复、按钮阈值与用户输入窗口）、`STREAMING`（流式节奏）、`VIRTUAL_LIST`（预渲染范围与估算参数）。
-- Worker 在 `src/renderer/workers/`，以 ES module 从应用协议加载（`vite.renderer.config.ts` 的 `worker.format: 'es'`），同样受 CSP 约束：
-  - `markdown.worker.ts`：请求 `append`（流式文档追加，`final` 结束）、`parse`（成批解析已完成的文档）、`drop`；响应 `updates`，每个文档给 `keep`（保留前几个块，同一对象）与之后的 `blocks`。类型与守卫在 `transcript/markdown/protocol.ts`；
-  - `highlight.worker.ts`：shiki core + JavaScript 正则引擎，请求 `highlight`（`id`、语言 id、代码），响应 `highlighted`（每行的 token：文本、明暗两套颜色、字形位）或 `failed`。类型在 `transcript/highlight/protocol.ts`；
-- composer（T09）在 `src/renderer/composer/`：`schema.ts`（段落与 mention 节点）、`mention-plugin.ts`、`serialize.ts`（发送文本、mention 数据、显示片段三者分开）、`intents.ts`（键位语义）、`ime-guard.ts`、`Composer.tsx`。
-- 终端（T10，ADR-0017）：主进程 `src/main/core/terminal-ipc.ts`（六个命令、终端归属，帧原样作为拉取请求的返回值交回，ADR-0023）；渲染进程 `src/renderer/terminal/`：`frame/`（帧解码器与 `Screen`，共享样本 `frame-samples.json` 由 Rust 生成）、`remote-renderable.ts`、`controller.ts`（rAF 拉取、隐藏不拉取、输入后连续拉取、键盘与输入法）、`keys.ts`、`TerminalLab.tsx`（`#/terminal-lab`，`?manual` 不自带 shell，`globalThis.__piarcTerminalLab`，类型在 `src/shared/terminal-lab.ts`）；`vendor/ghostty-web/` 是 fork 的 `CanvasRenderer`（MIT，来源与改动见其 README）。
-- 打包（T12，架构第 5.6、10.3、13.2 节）在 `packaging/`：
-  - `agent-host-layout.mjs`：`Resources/agent-host/` 的布局（`agentHostLayout`）与拷入（`copyAgentHostResources`，在 `forge.config.ts` 的 `postPackage` 中，签名之前）；Core 的 `BundledRuntime` 解析同样的相对路径；
-  - `macos-sign.mjs`：分层 ad-hoc 签名：先 `--deep` 重签 Electron（此时还没有 agent-host），再逐个签 Resources 中的 Mach-O（跳过内置 node），最后不带 `--deep` 签 bundle；hardened runtime 与 `entitlements.mac.plist`（只有 `allow-jit`、`disable-library-validation`）；
-  - `maker-dmg.mjs`：用 `hdiutil` 出 DMG 的 Forge maker（maker-dmg 依赖要安装脚本编译的原生模块）；ZIP 用 `@electron-forge/maker-zip`；
-  - `velopack-runtime.mjs`：Windows 构建把 Velopack 绑定（只含目标架构的 `.node`）拷进 app.asar 的 `node_modules/`；主进程 `src/main/platform/velopack.ts` 在最开始运行它的钩子；
-  - 图标取 `design/brand/icon`（`.icns`/`.ico`），bundle id 与 AppUserModelID 取应用标识（`app-identity.mjs`、`src/main/app-identity.ts`，`app-identity.test.mjs` 保证与 Rust 的定义一致）。
-- `src/renderer/lab/`：`#/transcript-lab` 原型页，用 `fixtures/` 的合成事件驱动 transcript 与 composer，经 `globalThis.__piarcTranscriptLab` 给 L4 与 S1 基准用（类型在 `src/shared/transcript-lab.ts`）。XSS 载荷集在 `src/shared/xss-payloads.ts`。
+- `src/main/`（主进程，入口 `main.ts` 只做装配）、`src/preload/preload.ts`（`window.piarc`）、`src/renderer/`（React，入口 `main.tsx`）、`src/shared/`（三方共用的通道名与类型，`ipc.ts` 是 `PiarcApi` 的唯一定义）。四个 TS 工程分开：main 与 preload 没有 DOM 类型，renderer 没有 Node 类型；`e2e/` 是 L4。
+- 安全基线（架构第 10.3 节）的实现位置与逐条对照见 `docs/spikes/S10-electron-security.md` 第 3 节；`src/main/security/` 与 `src/main/ipc/` 是入口。
+- Core 只在 `src/main/core/` 加载与转发（ADR-0014）：`.node` 路径的唯一解析处是 `native-path.ts`；`router.ts` 按路由键转发事件批次；`terminal-ipc.ts` 管终端归属；`test-hooks.ts` 只在加载开发版 Core 时安装。`native/*.d.ts` 是 NAPI-RS 生成的 L1 快照，不手改。
+- 渲染进程：transcript 在 `src/renderer/transcript/`（常量只在 `constants.ts`），Worker 在 `src/renderer/workers/`（ES module，受同一 CSP 约束），composer 在 `src/renderer/composer/`，终端在 `src/renderer/terminal/`（`vendor/ghostty-web/` 是 fork 的 MIT 代码，改动清单在其 README）。消息形状与守卫在各目录的 `protocol.ts`。
+- 原型页 `#/event-probe`、`#/transcript-lab`、`#/terminal-lab` 经 `globalThis.__piarc*` 给 L4 与基准用（类型在 `src/shared/`），目前也随发布构建分发（I13、I24、I30）。
+- 打包在 `packaging/`（`Resources/agent-host/` 布局、分层签名、DMG maker、Velopack 绑定，架构第 5.6、13.2 节）；图标取 `design/brand/`，bundle id 与 AppUserModelID 取应用标识（`app-identity.mjs` 与 Rust 的定义由测试保持一致）。
 
 ## 不变量
 

@@ -30,11 +30,6 @@
 
 `exec/output` `{ requestId, stream, seq, data }`：`seq` 跨 stdout、stderr 从 1 递增；`data` 按流解 UTF-8，被切断的序列留到下一块，命令结束时剩下的字节变为 U+FFFD；全部写在 `exec/run` 的响应之前。响应 `{ exitCode?, signal?, killed }`。
 
-## T17 要叠加的
-
-- 把 `ProcessTreeSpawner` 用于全部命令（I17；现在只有沙箱会话用它）。
-- 超时（现在由 Agent Host 的 Bash 工具经 `exec/kill` 实现）、转后台、输出落盘、`cd` 保留、语义退出码；PowerShell 工具与 Git Bash 探测。
-
 ## 易错点
 
 - `ProcessControl::wait` 与 `kill` 都借用 `&mut self`：等待与取消要分两步写（`watch` 函数），不能在同一个 `select!` 分支里既等又杀。

@@ -27,11 +27,6 @@ Core 侧的文件操作：AHP `fs/*` 背后的实现（架构第 6.1.3 节），
 - 文本按范围读（每次最多 `MAX_READ_CHUNK` = 1 MiB），不切断 UTF-8 序列（规则在 `piarc_protocol::text`）；非法 UTF-8 变为 U+FFFD。二进制走 `read_blob`：按 SHA-256 复制到调用方给的 blob 目录，先写临时名再 rename。
 - glob 对齐 `fd --glob --hidden`（Pi 原生 find 的行为），grep 对齐 `rg --json --hidden` 与 Pi grep 的匹配上限规则；两者都按路径排序输出。规则细节在各自的模块文档。
 
-## T16 与之后要叠加的
-
-- 先读后改与外部修改检测（文件状态表）、唯一匹配、保真写入（换行符、编码、BOM、临时文件 + 原子 rename）、写前快照（`piarc-checkpoint` 例外依赖）、结构化 diff、截断落盘；越界改为询问，受保护路径。
-- 文件监听（`notify`）在 T35。
-
 ## 易错点
 
 - glob 的 `.gitignore` 在 Git 仓库外也生效（Pi 给 fd 传 `--no-require-git`），grep 的只在仓库内生效（ripgrep 默认）：两者故意不同，对照测试依赖这一点。

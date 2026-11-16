@@ -15,14 +15,11 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 
 - `src/main.ts`：进程入口。解析 `--data-dir`、`--bridge-timeout-ms`；设置 `PI_CODING_AGENT_DIR`；接管 stdout（第三方的 `console.log` 改写到 stderr）；SIGTERM/SIGINT 有序退出，第二个信号立即退出。
 - `src/host.ts`：与进程无关的主体：握手（`host/hello` → `core/welcome`）、请求分派、`host/shutdown`、stdin 关闭即退出。退出码见 `EXIT`（3 = 协议主版本不符，70 = 出站积压超限）。
-- `src/runtime/session-registry.ts`：会话注册表，`sessionId → AgentSessionRuntime`；创建、恢复（`session/resume`）、提示词、中断、关闭。
-- `src/runtime/projector.ts`：投影入口，Pi 的 `AgentSessionEvent` → `turn/*`、`item/*`。
+- `src/runtime/`：会话注册表（`session-registry.ts`）、投影（`projector.ts`，Pi 事件 → `turn/*`、`item/*`）、blob 读取（只接受数据目录 `sessions/` 下的路径）。
 - `src/runtime/core-bridge.ts`：向 Core 发请求的唯一入口（统一超时，默认 30 s；`timeoutMs: null` 给等待用户的请求，靠 `signal` 取消）。
 - `src/protocol/outbound.ts`：写 stdout 的唯一路径：等 `drain`、合并增量、写出时分配 `seq`。
 - `src/tools/`：工具层（架构第 6.1 节、ADR-0020）。`profile.ts` 规范名、默认 Profile（描述原创，ADR-0006）与 `ToolNameMap`；`core-io.ts` 经 Core 桥接发 `fs/*`、`exec/*`（结果在此校验，错误重建为 Node 风格）；`read.ts`、`write.ts`、`edit.ts` 在替身路径（`stand-in.ts`）上运行 Pi 的工具定义；`bash.ts`、`glob.ts` 用 Pi 工厂加 Operations；`grep.ts` 自写；`ls.ts` 只提供 `LsOperations`，不暴露。
-- `src/runtime/blobs.ts`：读取 Core 交出的 blob（图片），只接受数据目录 `sessions/` 下的路径。
 - `src/runtime/credentials.ts`：`CoreCredentialStore`，pi-ai 的 `CredentialStore`，经 `secrets/*` 由 Core 的保险箱支撑（ADR-0021）；`host.ts` 在握手后 `load()`，再交给 `ModelRuntime.create({ credentials })`。
-- `src/runtime/test-oauth-provider.ts`：`--test-oauth-provider` 的测试 provider（OpenAI 线格式、本地 token 端点、请求头 `x-piarc-test-token` 带 token 的非机密标签）。
 
 ## 打包的外部依赖
 
