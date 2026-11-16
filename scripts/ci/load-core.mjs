@@ -1,5 +1,6 @@
 // Load test of prebuilt Core modules (T04, ADR-0014): loads each module in plain Node and in
-// Electron on the current machine and runs its event channel (scripts/ci/core-load-check.mjs).
+// Electron on the current machine, runs its event channel and one terminal
+// (scripts/ci/core-load-check.mjs).
 //
 //   node scripts/ci/load-core.mjs --module <file.node> [--module <file.node> ...]
 //                                 [--electron <binary>] [--skip-node]
@@ -107,6 +108,7 @@ export function parseResult(text) {
     typeof value.events !== 'number' ||
     typeof value.ordered !== 'boolean' ||
     (value.panicKind !== null && typeof value.panicKind !== 'string') ||
+    typeof value.terminal !== 'boolean' ||
     typeof value.finalState !== 'string' ||
     typeof value.ok !== 'boolean'
   ) {
@@ -121,6 +123,7 @@ export function parseResult(text) {
     events: value.events,
     ordered: value.ordered,
     panicKind: value.panicKind,
+    terminal: value.terminal,
     finalState: value.finalState,
     ok: value.ok,
   };
@@ -153,7 +156,7 @@ async function main() {
         (r.testingExports
           ? `${String(r.events)} events, ordered ${String(r.ordered)}, panic -> ${String(r.panicKind)}, `
           : 'release build, ') +
-        `state ${r.finalState}`,
+        `terminal ${r.terminal ? 'ok' : 'FAILED'}, state ${r.finalState}`,
     );
   }
   if (results.some((r) => !r.ok)) {

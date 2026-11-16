@@ -8,57 +8,18 @@
 //
 // Only the `packaged` project runs this file (playwright.config.ts): the `dev` form runs
 // Electron from node_modules, which has no Resources/agent-host/.
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { copyFile, mkdir, mkdtemp, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createInterface } from 'node:readline';
 
+import { startMock } from './agent-host.js';
 import { expectTestHooks } from './core.js';
 import { expect, test } from './fixtures.js';
 
 const repoRoot = path.join(import.meta.dirname, '..', '..', '..');
 const isMac = process.platform === 'darwin';
-
-interface MockProcess {
-  baseUrl: string;
-  stop: () => void;
-}
-
-/** Starts piarc-mock-provider (built by cargo on first use) with one scenario file. */
-async function startMock(scenario: string): Promise<MockProcess> {
-  const child = spawn(
-    'cargo',
-    [
-      'run',
-      '-q',
-      '--locked',
-      '-p',
-      'piarc-testkit',
-      '--bin',
-      'piarc-mock-provider',
-      '--',
-      '--port',
-      '0',
-      '--scenarios',
-      scenario,
-    ],
-    { cwd: repoRoot, stdio: ['pipe', 'pipe', 'inherit'] },
-  );
-  const lines = createInterface({ input: child.stdout });
-  const first = await new Promise<string>((resolve, reject) => {
-    lines.once('line', resolve);
-    child.once('exit', (code) => {
-      reject(new Error(`piarc-mock-provider exited with ${String(code)}`));
-    });
-  });
-  lines.close();
-  return {
-    baseUrl: `http://127.0.0.1:${first.trim()}`,
-    stop: () => child.stdin.end(),
-  };
-}
 
 interface ProbeItem {
   type?: string;

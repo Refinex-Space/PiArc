@@ -25,12 +25,13 @@ export default defineConfig<{ appForm: 'dev' | 'packaged' }>({
   reporter: [['list']],
   use: { trace: 'retain-on-failure' },
   projects: [
-    // agent-host.e2e.ts needs Resources/agent-host/, which only the packaged app has;
+    // agent-host.e2e.ts and agent-host-kill.e2e.ts need Resources/agent-host/, which only the
+    // packaged app has;
     // notification.e2e.ts is about PiArc's own (ad-hoc) signature, not Electron's.
     {
       name: 'dev',
       use: { appForm: 'dev' },
-      testIgnore: ['agent-host.e2e.ts', 'notification.e2e.ts'],
+      testIgnore: ['agent-host.e2e.ts', 'agent-host-kill.e2e.ts', 'notification.e2e.ts'],
     },
     { name: 'packaged', use: { appForm: 'packaged' } },
   ],

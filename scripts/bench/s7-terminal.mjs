@@ -168,10 +168,12 @@ function coreStats(app, id) {
  */
 async function measureCat(app, page, megabytes, repeat) {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'piarc-s7-'));
+  /** @type {number | undefined} */
+  let id;
   try {
     const file = path.join(dir, 'log.txt');
     await writeLogFile(file, megabytes);
-    const id = await openTerminal(app, page, { cols: 120, rows: 40, cwd: dir, ...SHELL });
+    id = await openTerminal(app, page, { cols: 120, rows: 40, cwd: dir, ...SHELL });
     await waitForScreen(page, (text) => text.startsWith('$'), 10_000);
     const pid = await app.evaluate(({ BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows()[0];
@@ -245,7 +247,12 @@ async function measureCat(app, page, megabytes, repeat) {
       },
     };
   } finally {
-    await rm(dir, { recursive: true, force: true });
+    // The shell's working directory is `dir`; Windows cannot remove it while the shell runs.
+    if (id !== undefined) {
+      await page.keyboard.type('exit');
+      await page.keyboard.press('Enter');
+    }
+    await rm(dir, { recursive: true, force: true, maxRetries: 20 });
   }
 }
 
