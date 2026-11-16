@@ -85,12 +85,14 @@ impl SandboxPolicy {
     ///
     /// A path is relative, a writable directory does not exist, or a path is not UTF-8.
     pub fn resolve(&self) -> Result<ResolvedPolicy> {
-        let mut writable = Vec::new();
-        let dirs = [&self.workspace_root, &self.session_tmp]
-            .into_iter()
-            .chain(&self.extra_dirs);
-        for dir in dirs {
-            let dir = resolve_existing(dir)?;
+        let session_tmp = resolve_existing(&self.session_tmp)?;
+        let mut writable = vec![resolve_existing(&self.workspace_root)?];
+        for dir in std::iter::once(session_tmp.clone()).chain(
+            self.extra_dirs
+                .iter()
+                .map(|dir| resolve_existing(dir))
+                .collect::<Result<Vec<_>>>()?,
+        ) {
             if !writable.contains(&dir) {
                 writable.push(dir);
             }
@@ -104,6 +106,7 @@ impl SandboxPolicy {
         }
         Ok(ResolvedPolicy {
             writable,
+            session_tmp,
             deny_read,
             protected: self.protected.clone(),
         })
@@ -116,6 +119,8 @@ pub struct ResolvedPolicy {
     /// Writable directories: the workspace root, the session's temporary directory, then the
     /// extra directories, without duplicates.
     pub writable: Vec<PathBuf>,
+    /// The session's temporary directory (also in `writable`).
+    pub session_tmp: PathBuf,
     /// Unreadable paths.
     pub deny_read: Vec<PathBuf>,
     /// Protected path patterns.

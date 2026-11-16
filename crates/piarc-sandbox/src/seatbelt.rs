@@ -297,6 +297,9 @@ mod tests {
                 PathBuf::from("/Users/dev/Library/Application Support/PiArc/sessions/s1/tmp"),
                 PathBuf::from("/Users/dev/extra [x]"),
             ],
+            session_tmp: PathBuf::from(
+                "/Users/dev/Library/Application Support/PiArc/sessions/s1/tmp",
+            ),
             deny_read: vec![
                 PathBuf::from("/Users/dev/.ssh"),
                 PathBuf::from("/Users/dev/项目 one/secrets/key.pem"),

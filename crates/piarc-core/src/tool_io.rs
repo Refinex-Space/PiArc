@@ -14,13 +14,24 @@
 //! The command environment is Core's allow-listed environment
 //! ([`piarc_host::DEFAULT_ENV_PASSTHROUGH`], no credentials) with the request's `env` overlay
 //! on top (Pi's `PI_*` session variables and `PATH`).
+//!
+//! A session opened with [`ToolIo::open_sandboxed_session`] runs its commands sandboxed
+//! (architecture section 6.10, T11): `piarc-sandbox` gives the wrapper (`sandbox-exec` with a
+//! profile generated for the command) and the proxy and cache variables, which go on top of
+//! the environment; `piarc-exec` runs it with the process-tree spawner, so cancelling a
+//! command ends everything it started. The session's network proxy stops when the session is
+//! closed. Output, exit status and cancellation are those of any `exec/run`. Which sessions
+//! are sandboxed, and the Bash tool's two sandbox modes, are T39's.
 
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
-use piarc_exec::{CommandRunner, CommandSpec, OutputChunk, Stream, TokioProcessSpawner};
+use piarc_exec::{
+    CommandRunner, CommandSpec, Launcher, OutputChunk, ProcessTreeSpawner, Stream,
+    TokioProcessSpawner,
+};
 use piarc_fs::{GrepQuery, Scope};
 use piarc_host::{InboundHandler, Peer};
 use piarc_ports::BoxFuture;
@@ -34,6 +45,8 @@ use piarc_protocol::fs::{
 };
 use piarc_protocol::text::incomplete_utf8_suffix;
 use piarc_protocol::{ErrorKind, ErrorObject};
+use piarc_sandbox::proxy::{Allowlist, SystemNetwork};
+use piarc_sandbox::{SandboxPolicy, SessionSandbox};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
@@ -73,6 +86,19 @@ struct SessionIo {
     scope: Scope,
     blob_dir: PathBuf,
     running: Mutex<HashMap<String, CancellationToken>>,
+    /// Present when the session's commands run sandboxed; owns the session's proxy.
+    sandbox: Option<SessionSandbox>,
+}
+
+/// What a sandboxed session may reach besides its workspace (architecture section 6.10).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SandboxSettings {
+    /// Directories added to the session: writable.
+    pub extra_dirs: Vec<PathBuf>,
+    /// Paths commands may not read.
+    pub deny_read: Vec<PathBuf>,
+    /// Domains the proxy lets through: exact names and `*.` wildcards. Empty denies all.
+    pub allowed_domains: Vec<String>,
 }
 
 /// Answers `fs/*` and `exec/*` for the registered sessions. Cheap to clone.
@@ -81,6 +107,8 @@ pub struct ToolIo {
     sessions: Arc<Mutex<HashMap<String, Arc<SessionIo>>>>,
     config: Arc<ToolIoConfig>,
     runner: CommandRunner,
+    /// Runs sandboxed commands; kills reach the whole process tree.
+    sandboxed_runner: CommandRunner,
 }
 
 impl std::fmt::Debug for ToolIo {
@@ -99,6 +127,7 @@ impl ToolIo {
             sessions: Arc::default(),
             config: Arc::new(config),
             runner: CommandRunner::new(Arc::new(TokioProcessSpawner)),
+            sandboxed_runner: CommandRunner::new(Arc::new(ProcessTreeSpawner)),
         }
     }
 
@@ -121,35 +150,69 @@ impl ToolIo {
         root: &Path,
         cwd: &Path,
     ) -> Result<(), ErrorObject> {
-        let usable = !session_id.is_empty()
-            && session_id != "."
-            && session_id != ".."
-            && session_id
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
-        if !usable {
-            return Err(ErrorObject::new(
-                ErrorKind::InvalidParams,
-                format!("unusable session id {session_id:?}"),
-                false,
-            ));
-        }
+        check_session_id(session_id)?;
         let scope = Scope::new(root, cwd).map_err(|e| e.to_error_object())?;
-        let blob_dir = self
-            .config
-            .data_dir
-            .join("sessions")
-            .join(session_id)
-            .join("blobs");
+        self.register(session_id, scope, None);
+        Ok(())
+    }
+
+    /// Like [`ToolIo::open_session`], with every command of the session sandboxed: writes
+    /// limited to the workspace, the session's temporary directory
+    /// (`<data dir>/sessions/<id>/tmp/`, created here) and `settings.extra_dirs`, network only
+    /// through a proxy started for the session with `settings.allowed_domains`.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`ToolIo::open_session`]; an allowlist entry that is not a domain
+    /// (`invalidParams`); the temporary directory cannot be created; this platform has no
+    /// sandbox, or the proxy cannot start.
+    pub async fn open_sandboxed_session(
+        &self,
+        session_id: &str,
+        root: &Path,
+        cwd: &Path,
+        settings: SandboxSettings,
+    ) -> Result<(), ErrorObject> {
+        check_session_id(session_id)?;
+        let scope = Scope::new(root, cwd).map_err(|e| e.to_error_object())?;
+        let allowlist = Allowlist::new(&settings.allowed_domains)
+            .map_err(|e| ErrorObject::new(ErrorKind::InvalidParams, e.to_string(), false))?;
+        let tmp = self.session_dir(session_id).join("tmp");
+        std::fs::create_dir_all(&tmp)
+            .map_err(|e| piarc_fs::Error::io(&tmp, e).to_error_object())?;
+        let mut policy = SandboxPolicy::new(scope.root().to_path_buf(), tmp);
+        policy.extra_dirs = settings.extra_dirs;
+        policy.deny_read = settings.deny_read;
+        let sandbox = SessionSandbox::start(&policy, allowlist, Arc::new(SystemNetwork))
+            .await
+            .map_err(|e| sandbox_error(&e))?;
+        self.register(session_id, scope, Some(sandbox));
+        Ok(())
+    }
+
+    fn session_dir(&self, session_id: &str) -> PathBuf {
+        self.config.data_dir.join("sessions").join(session_id)
+    }
+
+    fn register(&self, session_id: &str, scope: Scope, sandbox: Option<SessionSandbox>) {
+        let blob_dir = self.session_dir(session_id).join("blobs");
         lock(&self.sessions).insert(
             session_id.to_owned(),
             Arc::new(SessionIo {
                 scope,
                 blob_dir,
                 running: Mutex::default(),
+                sandbox,
             }),
         );
-        Ok(())
+    }
+
+    /// The proxy port of a sandboxed session.
+    #[must_use]
+    pub fn sandbox_proxy_port(&self, session_id: &str) -> Option<u16> {
+        lock(&self.sessions)
+            .get(session_id)
+            .and_then(|s| s.sandbox.as_ref().map(SessionSandbox::proxy_port))
     }
 
     /// Forgets the session and terminates its running commands.
@@ -274,11 +337,24 @@ impl ToolIo {
             }
             running.insert(p.request_id.clone(), token.clone());
         }
+        let mut env = command_env(&self.config.command_env, p.env.unwrap_or_default());
+        let (runner, launcher) = match &session.sandbox {
+            Some(sandbox) => {
+                let launch = sandbox.launch().map_err(|e| sandbox_error(&e))?;
+                env = overlay_env(env, launch.env);
+                let launcher = Launcher {
+                    program: launch.program,
+                    args: launch.args,
+                };
+                (&self.sandboxed_runner, Some(launcher))
+            }
+            None => (&self.runner, None),
+        };
         let spec = CommandSpec {
             command: p.command,
             cwd,
-            env: command_env(&self.config.command_env, p.env.unwrap_or_default()),
-            launcher: None,
+            env,
+            launcher,
         };
         let (tx, rx) = mpsc::channel(OUTPUT_BUFFER);
         let watcher = {
@@ -291,12 +367,11 @@ impl ToolIo {
             })
         };
         let forward = forward_output(rx, peer, p.request_id.clone(), token.clone());
-        let (exit, ()) = tokio::join!(self.runner.run(spec, tx, token.clone()), forward);
+        let (exit, ()) = tokio::join!(runner.run(spec, tx, token.clone()), forward);
         watcher.abort();
         lock(&session.running).remove(&p.request_id);
         // Starting the shell is what can fail here (the working directory was checked).
-        let exit =
-            exit.map_err(|e| piarc_fs::Error::io(self.runner.shell(), e).to_error_object())?;
+        let exit = exit.map_err(|e| piarc_fs::Error::io(runner.shell(), e).to_error_object())?;
         to_value(&ExecRunResult {
             exit_code: exit.status.code,
             signal: exit.status.signal,
@@ -412,6 +487,46 @@ fn command_env(
             .map(|(k, v)| (OsString::from(k), OsString::from(v))),
     );
     env
+}
+
+/// `env` with every variable of `overlay` replacing one of the same name (ignoring case on
+/// Windows).
+fn overlay_env(
+    env: Vec<(OsString, OsString)>,
+    overlay: Vec<(OsString, OsString)>,
+) -> Vec<(OsString, OsString)> {
+    let overlay = overlay
+        .into_iter()
+        .map(|(k, v)| {
+            (
+                k.to_string_lossy().into_owned(),
+                v.to_string_lossy().into_owned(),
+            )
+        })
+        .collect();
+    command_env(&env, overlay)
+}
+
+fn check_session_id(session_id: &str) -> Result<(), ErrorObject> {
+    let usable = !session_id.is_empty()
+        && session_id != "."
+        && session_id != ".."
+        && session_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
+    if usable {
+        Ok(())
+    } else {
+        Err(ErrorObject::new(
+            ErrorKind::InvalidParams,
+            format!("unusable session id {session_id:?}"),
+            false,
+        ))
+    }
+}
+
+fn sandbox_error(error: &piarc_sandbox::Error) -> ErrorObject {
+    ErrorObject::new(error.kind(), error.to_string(), error.retryable())
 }
 
 fn parse<T: DeserializeOwned>(method: &str, params: Map<String, Value>) -> Result<T, ErrorObject> {

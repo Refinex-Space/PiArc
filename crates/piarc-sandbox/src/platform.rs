@@ -15,6 +15,8 @@ pub struct SandboxedLaunch {
     pub program: PathBuf,
     /// The wrapper's arguments before the shell.
     pub args: Vec<OsString>,
+    /// Variables that replace the command's own of the same name ([`crate::sandbox_env`]).
+    pub env: Vec<(OsString, OsString)>,
 }
 
 /// Wraps commands in an OS sandbox.
@@ -53,6 +55,7 @@ impl CommandSandbox for Seatbelt {
         Ok(SandboxedLaunch {
             program: PathBuf::from(crate::seatbelt::SANDBOX_EXEC),
             args: profile.args(),
+            env: crate::sandbox_env(&policy.session_tmp, proxy_port),
         })
     }
 }

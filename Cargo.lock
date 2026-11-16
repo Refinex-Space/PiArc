@@ -1159,6 +1159,7 @@ dependencies = [
  "piarc-host",
  "piarc-ports",
  "piarc-protocol",
+ "piarc-sandbox",
  "piarc-secrets",
  "piarc-term",
  "serde",

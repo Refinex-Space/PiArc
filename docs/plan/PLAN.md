@@ -299,8 +299,8 @@ T11（2026-11-15 开工；基线 verify 13 步通过；依赖 T07 已完成；T1
 - [x] 1 `piarc-exec` 进程树启动器：macOS 进程组、Windows Job Object（`KILL_ON_JOB_CLOSE`、挂起创建后入 Job、不允许 breakaway），Windows CI 单测父子孙三级（A10；Windows 代码待 CI 编译与运行）
 - [x] 2 `piarc-sandbox` Seatbelt 配置生成：路径规范化与转义、受保护路径清单、`denyRead`、缓存目录方案、`sandbox-exec -D` 参数、快照测试（含空格与中文路径）（A09）
 - [x] 3 `piarc-sandbox` 本地代理：HTTP 与 `CONNECT`、精确与 `*.` 通配白名单、可注入解析器、拒绝回环与云元数据地址（A04、A06）
-- [ ] 4 Core 编排：沙箱会话的 `exec/run` 经 `piarc-sandbox` 包装、经 `piarc-exec` 执行，流式、退出码、取消与无残留进程（A08）
-- [ ] 5 沙箱行为测试：写入范围、受保护路径、`denyRead`、绕过代理直连（A01、A02、A03、A05）
+- [x] 4 Core 编排：沙箱会话的 `exec/run` 经 `piarc-sandbox` 包装、经 `piarc-exec` 执行，流式、退出码、取消与无残留进程（A08）
+- [x] 5 沙箱行为测试：写入范围、受保护路径、`denyRead`、绕过代理直连（A01、A02、A03、A05）
 - [ ] 6 常见命令测试：git、npm install、cargo build、python（A07）
 - [ ] 7 测量：`sandbox-exec` 每条命令额外耗时、代理额外延迟（A11）
 - [ ] 8 S8 报告、spikes README、架构 6.10 受保护路径清单、`piarc-sandbox` CLAUDE.md、复用表、登记事项（A12）
