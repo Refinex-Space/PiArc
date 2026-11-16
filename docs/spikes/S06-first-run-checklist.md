@@ -57,8 +57,10 @@ node scripts/dev/s6-probe.mjs agent-host
 ## 4. 系统通知
 
 ```bash
-node scripts/dev/s6-probe.mjs notify
+node scripts/dev/s6-probe.mjs notify --wait 30
 ```
+
+应用会保持运行 30 秒，请在这段时间里看屏幕右上角。Electron 在应用退出时会删掉自己已投递的通知，应用一退出，横幅和通知中心里的条目就都消失了。
 
 第一次运行时 macOS 可能先问是否允许 PiArc 发通知，选"允许"。记录：
 

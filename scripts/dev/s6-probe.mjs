@@ -9,8 +9,11 @@
 //   node scripts/dev/s6-probe.mjs agent-host [--app /Applications/PiArc.app]
 //       One mock conversation with the installed app's Agent Host (bundled node under
 //       sandbox-exec, one Bash call). Shows whether Gatekeeper stops the bundled node.
-//   node scripts/dev/s6-probe.mjs notify [--app …]
-//       Posts a notification; prints the program-side events (`show` / `failed`).
+//   node scripts/dev/s6-probe.mjs notify [--app …] [--wait 30]
+//       Posts a notification and keeps the app running for --wait seconds (default 30), then
+//       prints the program-side events (`show` / `failed`). Electron removes the app's
+//       delivered notifications when it quits, so the banner and its Notification Center
+//       entry are only there while the app runs.
 //   node scripts/dev/s6-probe.mjs variant --app <A.app> --out <dir> [--version 0.0.1]
 //       Makes "build B" for the keychain count: a copy of build A with another bundle version,
 //       re-signed the way packaging signs, as PiArc-B.dmg. Rebuilding unchanged sources can
@@ -261,6 +264,7 @@ async function main() {
       app: { type: 'string', default: DEFAULT_APP },
       dir: { type: 'string', default: DEFAULT_KEYCHAIN_DIR },
       port: { type: 'string', default: '8765' },
+      wait: { type: 'string', default: '30' },
       out: { type: 'string' },
       version: { type: 'string', default: '0.0.1' },
     },
@@ -285,14 +289,21 @@ async function main() {
       console.log(JSON.stringify(await agentHost(values.app), null, 2));
       return;
     case 'notify': {
+      const waitMs = Number.parseInt(values.wait, 10) * 1000;
+      if (!Number.isInteger(waitMs) || waitMs <= 0) {
+        throw new Error('--wait must be a positive number of seconds');
+      }
+      console.log(
+        `Posting a notification; watch the top right of the screen for ${values.wait} s.`,
+      );
       const result = await withApp(values.app, (app) =>
-        app.evaluate(async () => {
+        app.evaluate(async (_electron, wait) => {
           const hooks = globalThis.__piarcTestHooks;
           if (hooks === undefined) {
             throw new Error('no Core test hooks');
           }
-          return hooks.showNotification('PiArc', 'S6 notification probe: did you see this?', 8000);
-        }),
+          return hooks.showNotification('PiArc', 'S6 notification probe: did you see this?', wait);
+        }, waitMs),
       );
       console.log(JSON.stringify(result, null, 2));
       return;
