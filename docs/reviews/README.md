@@ -4,7 +4,7 @@
 
 | 评审 | 阶段门 | 发现记录 | 结论 |
 |---|---|---|---|
-| R1 | M0 → M1 | `R1-findings.md`（另见 `docs/spikes/M0-summary.md`） | 未开始 |
+| R1 | M0 → M1 | [`R1-findings.md`](R1-findings.md)（另见 [`docs/spikes/M0-summary.md`](../spikes/M0-summary.md)） | **有条件进入 M1**（2026-11-16）：没有不通过的验证项，没有触发 ADR 的重新评估；48 条审查发现中 12 个缺陷已修复，其余登记 I50–I61；前提条件与检查时间点见 M0 总结第 9 节 |
 | R2 | M1（macOS）达标 | `R2-findings.md` | 未开始 |
 | R3 | M2 达标 | `R3-findings.md` | 未开始 |
 | R4 | M3 达标 | `R4-findings.md` | 未开始 |
