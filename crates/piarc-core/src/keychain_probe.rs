@@ -19,8 +19,8 @@ use serde_json::json;
 /// `piarc-test.s6-keychain.credential-vault`, account `master-key`.
 pub const PROBE_MASTER_KEY_LABEL: &str = "piarc-test.s6-keychain";
 
-/// The credential the probe stores in its vault.
-const PROBE_KEY: &str = "probe/s6";
+/// The credential the probe stores in its vault (keys must use a vault prefix: `provider/`).
+const PROBE_KEY: &str = "provider/piarc-s6-probe";
 
 /// What to do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -166,6 +166,11 @@ mod tests {
             Some(KeychainProbeAction::Delete)
         );
         assert_eq!(KeychainProbeAction::parse("other"), None);
+    }
+
+    #[test]
+    fn the_probe_credential_key_is_one_the_vault_accepts() {
+        piarc_secrets::validate_key(PROBE_KEY).expect("the vault accepts the probe's key");
     }
 
     #[test]
