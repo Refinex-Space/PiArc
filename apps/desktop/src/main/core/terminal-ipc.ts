@@ -88,6 +88,18 @@ export class TerminalOwners {
     return id;
   }
 
+  /**
+   * Whether window `windowId` may subscribe to `route`: a terminal's route `term/<id>` only by
+   * the window that owns it; other routes are not terminal routes and are not judged here.
+   */
+  mayObserve(windowId: number, route: string): boolean {
+    const terminal = /^term\/(\d+)$/.exec(route);
+    if (terminal === null) {
+      return !route.startsWith('term/');
+    }
+    return this.#owners.get(Number(terminal[1])) === windowId;
+  }
+
   release(id: number): void {
     this.#owners.delete(id);
   }

@@ -140,8 +140,10 @@ function start(): void {
     shutdownCoreBeforeQuit(app, core.runtime);
     const registerHandler = createIpcRegistrar(trustedOrigins);
     registerIpcHandlers(registerHandler);
-    registerEventHandlers(registerHandler, eventRouter);
     const terminalOwners = new TerminalOwners(core.runtime);
+    registerEventHandlers(registerHandler, eventRouter, (windowId, route) =>
+      terminalOwners.mayObserve(windowId, route),
+    );
     registerTerminalHandlers(registerHandler, core.runtime, terminalOwners, terminalStats);
     startTestHooks(core, terminalOwners);
     openMainWindow();

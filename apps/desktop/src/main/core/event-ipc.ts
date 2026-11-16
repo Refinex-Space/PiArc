@@ -8,8 +8,15 @@ import { EVENTS_PORT_CHANNEL, IPC_CHANNELS, isRouteKey } from '../../shared/ipc.
 import type { RegisterHandler } from '../ipc/register.js';
 import type { EventRouter } from './router.js';
 
+/** Whether window `windowId` may receive the events of `route` (for example its own terminals). */
+export type RouteAuthorizer = (windowId: number, route: string) => boolean;
+
 /** Registers the three event commands of `window.piarc`. */
-export function registerEventHandlers(registerHandler: RegisterHandler, router: EventRouter): void {
+export function registerEventHandlers(
+  registerHandler: RegisterHandler,
+  router: EventRouter,
+  authorize: RouteAuthorizer,
+): void {
   const watched = new WeakSet<WebContents>();
   registerHandler(IPC_CHANNELS.eventsConnect, (event) => {
     connectWindow(router, event.sender, watched);
@@ -17,6 +24,9 @@ export function registerEventHandlers(registerHandler: RegisterHandler, router: 
   registerHandler(IPC_CHANNELS.eventsSubscribe, (event, [route]) => {
     if (!isRouteKey(route)) {
       throw new TypeError('route must be 1-128 characters of A-Z a-z 0-9 . _ : / -');
+    }
+    if (!authorize(event.sender.id, route)) {
+      throw new Error(`This page is not allowed to observe ${route}`);
     }
     if (!router.subscribe(event.sender.id, route)) {
       throw new Error('This page has no event port; connect first');

@@ -176,6 +176,23 @@ describe('terminal IPC', () => {
     expect(() => invoke(window, IPC_CHANNELS.terminalInput, 1, 'x')).toThrow('Unknown terminal');
   });
 
+  it("lets a window observe only its own terminals' events", () => {
+    const owners = new TerminalOwners({
+      createTerminal: () => 1,
+      closeTerminal: () => undefined,
+      terminalInput: () => undefined,
+      terminalKey: () => undefined,
+      terminalResize: () => undefined,
+      terminalFrame: () => Promise.resolve(new Uint8Array()),
+    });
+    owners.assign(7, new FakeContents(1));
+    expect(owners.mayObserve(1, 'term/7')).toBe(true);
+    expect(owners.mayObserve(2, 'term/7')).toBe(false);
+    expect(owners.mayObserve(1, 'term/8')).toBe(false);
+    expect(owners.mayObserve(1, 'term/7x')).toBe(false);
+    expect(owners.mayObserve(2, 'demo/1')).toBe(true);
+  });
+
   it('closes the terminals of a page that reloads or crashes, not on in-page navigation', () => {
     const { calls, invoke } = setup(() => Promise.resolve(new Uint8Array()));
     const window = new FakeContents(1);
