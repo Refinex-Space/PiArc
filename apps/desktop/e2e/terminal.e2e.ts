@@ -1,7 +1,9 @@
 // T10 terminal prototype (ADR-0017): frames pulled per animation frame, none while hidden
 // (A06), keys encoded by Core with the terminal's modes, and the input-method textarea and
-// preedit at the cursor (A11). Programs run in a real PTY; the shell is /bin/sh, so these
-// tests run on macOS (ConPTY is W0's).
+// preedit at the cursor (A11). Programs run in a real PTY: /bin/sh on macOS, cmd.exe and
+// PowerShell in ConPTY on Windows (W0).
+import path from 'node:path';
+
 import type { CDPSession } from '@playwright/test';
 
 import { expect, test } from './fixtures.js';
@@ -10,15 +12,18 @@ import {
   labStats,
   openTerminal,
   PLAIN_SHELL,
+  powershell,
   screenText,
   waitForScreen,
+  WINDOWS,
 } from './terminal.js';
-
-test.skip(process.platform === 'win32', 'ConPTY and Windows shells are verified in W0');
 
 test('output appears in frames pulled per animation frame', async ({ app, page }, testInfo) => {
   const id = await openTerminal(app, page, { cols: 60, rows: 12, ...PLAIN_SHELL });
-  await page.keyboard.type('echo hello-$((6*7))');
+  // The shell computes the number, so the line is its output, not the echoed input.
+  await page.keyboard.type(
+    WINDOWS ? 'for /L %i in (42,1,42) do @echo hello-%i' : 'echo hello-$((6*7))',
+  );
   await page.keyboard.press('Enter');
   await waitForScreen(page, (text) => text.split('\n').includes('hello-42'));
   const stats = await labStats(page);
@@ -40,8 +45,12 @@ test('a hidden terminal produces no frames', async ({ app, page }) => {
   const id = await openTerminal(app, page, {
     cols: 40,
     rows: 8,
-    program: '/bin/sh',
-    args: ['-c', 'n=0; while :; do n=$((n+1)); echo tick $n; sleep 0.02; done'],
+    ...(WINDOWS
+      ? powershell('$n = 0; while ($true) { $n++; "tick $n"; Start-Sleep -Milliseconds 20 }')
+      : {
+          program: '/bin/sh',
+          args: ['-c', 'n=0; while :; do n=$((n+1)); echo tick $n; sleep 0.02; done'],
+        }),
   });
   await waitForScreen(page, (text) => text.includes('tick'));
   await page.evaluate(() => {
@@ -69,16 +78,29 @@ test('a hidden terminal produces no frames', async ({ app, page }) => {
 });
 
 test('keys are encoded by Core with the terminal modes', async ({ app, page }) => {
-  // cat -v shows control characters; the program first turns on application cursor keys.
+  // The program first turns on application cursor keys, then shows the control characters it
+  // reads: cat -v on macOS, a Node script on Windows.
   await openTerminal(app, page, {
     cols: 40,
     rows: 6,
-    program: '/bin/sh',
-    args: ['-c', "printf '\\033[?1hready\\n'; exec cat -v"],
+    ...(WINDOWS
+      ? {
+          program: process.execPath,
+          args: [path.join(import.meta.dirname, 'programs', 'show-keys.ts')],
+        }
+      : { program: '/bin/sh', args: ['-c', "printf '\\033[?1hready\\n'; exec cat -v"] }),
   });
   // Only press once the mode is set: Core encodes with the modes at the time of the key.
   await waitForScreen(page, (text) => text.startsWith('ready'));
   await page.keyboard.press('ArrowUp');
+  if (WINDOWS) {
+    // Core sends ESC O A, but conhost turns terminal input into console key events and Node
+    // reads those back as ESC [ A whatever the mode: through ConPTY the key arrives, and its
+    // mode-dependent encoding is covered by the key encoder's unit tests.
+    await waitForScreen(page, (text) => text.includes('got ^[[A'));
+    await page.keyboard.press('q');
+    return;
+  }
   await page.keyboard.press('Enter');
   await page.keyboard.press('Control+C');
   // DECCKM is on: ArrowUp is ESC O A, which cat -v prints as ^[OA.

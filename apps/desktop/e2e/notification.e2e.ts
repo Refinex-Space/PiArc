@@ -23,6 +23,15 @@ test('a notification reports show or failed to the program', async ({ app }, tes
     `${JSON.stringify({ platform: process.platform, ...result }, null, 2)}\n`,
   );
   expect(result.supported).toBe(true);
-  const outcomes = result.events.filter((e) => e.type === 'show' || e.type === 'failed');
-  expect(outcomes, JSON.stringify(result.events)).toHaveLength(1);
+  const outcomes = result.events
+    .filter((e) => e.type === 'show' || e.type === 'failed')
+    .map((e) => e.type)
+    .join(',');
+  // Electron reports `show` once it hands the notification to the system. On Windows a toast
+  // the system then refuses (notifications turned off for the app, W0) also reports `failed`
+  // after it, so there the last event is the outcome.
+  expect(
+    process.platform === 'win32' ? ['show', 'failed', 'show,failed'] : ['show', 'failed'],
+    JSON.stringify(result.events),
+  ).toContain(outcomes);
 });

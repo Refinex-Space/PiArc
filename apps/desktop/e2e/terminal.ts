@@ -7,12 +7,20 @@ import { TERMINAL_LAB_HASH, type TerminalLabStats } from '../src/shared/terminal
 import type { TerminalCoreStats, TestTerminalOptions } from '../src/shared/test-hooks.js';
 import { expectTestHooks } from './core.js';
 
-/** A prompt that does not depend on the user's shell setup. */
-export const PLAIN_SHELL: Pick<TestTerminalOptions, 'program' | 'args' | 'env'> = {
-  program: '/bin/sh',
-  args: [],
-  env: { PS1: '$ ', ENV: '' },
-};
+export const WINDOWS = process.platform === 'win32';
+
+/**
+ * A shell whose prompt is `$ ` whatever the user's setup: sh on macOS, cmd.exe in ConPTY on
+ * Windows (`PROMPT=$$$S`).
+ */
+export const PLAIN_SHELL: Pick<TestTerminalOptions, 'program' | 'args' | 'env'> = WINDOWS
+  ? { program: 'cmd.exe', args: ['/Q', '/K'], env: { PROMPT: '$$$S' } }
+  : { program: '/bin/sh', args: [], env: { PS1: '$ ', ENV: '' } };
+
+/** PowerShell running `script` without a profile or a banner. */
+export function powershell(script: string): Pick<TestTerminalOptions, 'program' | 'args'> {
+  return { program: 'powershell.exe', args: ['-NoLogo', '-NoProfile', '-Command', script] };
+}
 
 /**
  * Reloads the window on the prototype page without its own shell, starts a terminal with

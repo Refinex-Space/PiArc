@@ -7,13 +7,14 @@
 // measures, against architecture chapter 11 and the S7 criteria (chapter 16):
 //
 // 1. `cat` of a `--megabytes` MB text file (`--repeat` times in one command, for a sustained
-//    run) in a 120 × 40 terminal running /bin/sh: the main
+//    run) in a 120 × 40 terminal running /bin/sh (on Windows `type` in cmd.exe): the main
 //    process's event-loop delay (`monitorEventLoopDelay`, 1 ms resolution, raw values), a
 //    Chrome trace of the window's renderer (main-thread work per frame, tasks over 50 ms), the
 //    frames the page received and drew, Core's counters (bytes parsed, time in `vt_write`,
 //    frames and their encode time, rows sent and reused), the main process's CPU time, and the
 //    bytes of frames the main process forwarded (the IPC traffic);
-// 2. typing echo in a terminal running `cat` (the kernel echoes in canonical mode): for each
+// 2. typing echo in a terminal running `cat` (the kernel echoes in canonical mode; on Windows
+//    `echo-program.mjs`, a raw-mode Node program that writes its input back): for each
 //    sample, Core writes one byte straight to the PTY and times its echo (`terminalProbeEcho`,
 //    the baseline), then the page times a typed key from its `keydown` to the decoded frame that
 //    shows it (the full path: renderer → main → Core key encoder → PTY → parser → frame → main →
@@ -39,7 +40,26 @@ import { appCommand, summarize, traced } from './s1-transcript.mjs';
  */
 
 const LAB_HASH = '#/terminal-lab?manual';
-const SHELL = { program: '/bin/sh', args: [], env: { PS1: '$ ', ENV: '' } };
+const WINDOWS = process.platform === 'win32';
+const SHELL = WINDOWS
+  ? { program: 'cmd.exe', args: ['/Q', '/K'], env: { PROMPT: '$$$S' } }
+  : { program: '/bin/sh', args: [], env: { PS1: '$ ', ENV: '' } };
+const ECHO_PROGRAM = WINDOWS
+  ? {
+      program: process.execPath,
+      args: [path.join(repoRoot, 'scripts', 'bench', 'echo-program.mjs')],
+    }
+  : { program: 'cat', args: [] };
+
+/**
+ * The shell command that prints `file` `repeat` times, then `CAT-DONE` on a line of its own.
+ * @param {number} repeat
+ */
+function catCommand(repeat) {
+  return WINDOWS
+    ? `(for /L %i in (1,1,${String(repeat)}) do @type log.txt) & echo CAT-DONE`
+    : `cat ${Array(repeat).fill('log.txt').join(' ')}; echo CAT-DONE`;
+}
 
 /**
  * Writes a text file of `megabytes` MB: numbered log-like lines of printable ASCII.
@@ -166,7 +186,7 @@ async function measureCat(app, page, megabytes, repeat) {
     });
     const started = Date.now();
     const { result: wallMs, trace } = await traced(page, pid, async () => {
-      await page.keyboard.type(`cat ${Array(repeat).fill('log.txt').join(' ')}; echo CAT-DONE`);
+      await page.keyboard.type(catCommand(repeat));
       await page.keyboard.press('Enter');
       await waitForScreen(
         page,
@@ -247,7 +267,7 @@ async function waitForCursorColumn(page, x) {
  * @param {number} samples
  */
 async function measureEcho(app, page, samples) {
-  const id = await openTerminal(app, page, { cols: 120, rows: 10, program: 'cat', args: [] });
+  const id = await openTerminal(app, page, { cols: 120, rows: 10, ...ECHO_PROGRAM });
   await page.waitForTimeout(500);
   const letters = 'abcdefghijklmnopqrstuvwxyz';
   const digits = '0123456789';
@@ -261,7 +281,8 @@ async function measureEcho(app, page, samples) {
   let column = 0;
   for (let i = 0; i < samples + warmup; i += 1) {
     if (column >= 100) {
-      // cat prints the line back; start a fresh one.
+      // cat prints the line back (the Windows program only moves to a new line); start a
+      // fresh one.
       await page.keyboard.press('Enter');
       column = 0;
       await waitForCursorColumn(page, 0);
