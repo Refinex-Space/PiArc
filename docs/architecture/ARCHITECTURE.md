@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.16（2026-11-16） |
+| 版本 | 2.17（2026-11-16） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -212,16 +212,19 @@ PiArc/
 ├── crates/                    # Rust workspace（第 7 章），含 NAPI-RS 绑定 piarc-napi
 ├── agent-host/                # TypeScript：Agent Host 与 Harness Kit（第 5、6 章）
 ├── packages/
-│   └── protocol/              # 由 piarc-protocol 的 JSON Schema 生成的 TS 类型，Agent Host 与客户端共用
-├── design/tokens/             # 设计令牌单一来源（JSON），生成 CSS 变量与 TS 常量
+│   ├── protocol/              # 由 piarc-protocol 的 JSON Schema 生成的 TS 类型，Agent Host 与客户端共用
+│   └── testkit/               # 仅测试：用 pi-ai 驱动严格 mock provider
+├── design/tokens/             # 设计令牌单一来源（JSON），生成 CSS 变量与 TS 常量（T18 建立）
 ├── design/brand/              # 应用图标与标记的单一来源（.svg/.icns/.ico/.png），来源与许可证见其 README
+├── third-party/               # 不经包管理器进入产物的第三方代码与二进制：来源登记、锁定文件、许可证全文
 ├── docs/
 │   ├── architecture/          # 本文
 │   ├── adr/                   # 架构决策记录
 │   ├── product/               # 需求规格
 │   └── research/              # 调研资料与参考源清单
 ├── scripts/                   # 跨平台脚本（Node 或 Python）
-├── tests/scenarios/           # 数据驱动的 Harness 场景（第 12 章）
+├── tests/contracts/           # L1 契约样本、反例与帧编解码共享用例（第 12 章）
+├── tests/scenarios/           # 数据驱动的 Harness 场景（第 12 章，T15 建立）
 └── reference/                 # 本地参考仓库副本（gitignore）
 ```
 
@@ -400,7 +403,7 @@ PiArc.app/Contents/
 
 - **规范名采用 Claude Code 的工具名**：`Read`、`Write`、`Edit`、`Bash`、`PowerShell`（仅 Windows）、`Glob`、`Grep`、`WebFetch`、`WebSearch`、`Agent`、`TodoWrite`、`AskUserQuestion`、`EnterPlanMode`、`ExitPlanMode`、`Skill`、`ToolSearch`、`NotebookEdit`、`KillShell`、`Monitor`，MCP 工具为 `mcp__<server>__<tool>`。权限规则、hooks matcher、子 agent 的 `tools` 列表一律使用规范名，这样用户现有的 Claude Code 配置可以直接生效。
 - **Tool Profile** 决定某个模型看到的工具名、描述和参数风格。默认 Profile 直接使用规范名；针对特定模型家族可以调整描述文字或参数命名，但规则与 hooks 始终按规范名匹配。Agent Host 维护"模型可见名 ↔ 规范名"映射表。
-- 实现方式：用 Pi 的 `createReadTool/createEditTool/createWriteTool/createBashTool/...` 加 Operations 委托（6.1.3）创建内置工具，再包装成规范名与 PiArc 自写的描述。Pi 内置工具重命名的可行性在 M0 验证。
+- 实现方式：用 Pi 的 `createReadTool/createEditTool/createWriteTool/createBashTool/...` 加 Operations 委托（6.1.3）创建内置工具，再包装成规范名与 PiArc 自写的描述。M0 S4 已验证改名与委托可行，Pi 1.5.2 的 Operations 不足以零绕过的部分由替身路径与自写 Grep 解决（ADR-0020）。
 - T07 落地（S4，ADR-0020）：工具层在 `agent-host/src/tools/`。六个规范名工具 Read、Write、Edit、Bash、Glob、Grep 以 `customTools` 注册，会话以 `noTools: "builtin"` 加 `excludeTools` 排除 Pi 的 read、bash、powershell、edit、write、grep、find、ls；参数 schema 沿用 Pi 的。默认 Profile（`profile.ts`）给出名称、描述与 system prompt 中的工具摘要与指引；`ToolNameMap` 双向映射模型可见名与规范名（未知名原样返回，拒绝重名与 Pi 原生名），投影器发出的 `item/*` 与发往 Core 的 `origin.tool` 都用规范名。`--tool-profile <json>` 只供测试覆盖名称与描述，按模型家族选择 Profile 留待 T21、T29。
 
 #### 6.1.2 工具语义不变量
@@ -978,7 +981,7 @@ Core 事件批次 ──► 主进程（只转发）──MessagePort──► �
 
 | 规范 | 规则 |
 |---|---|
-| 输入法守卫 | 所有键盘处理先检查 `event.isComposing`（兼容 `keyCode === 229`）；`compositionstart` 到 `compositionend` 期间 Enter、Esc、`/`、`@` 都不触发业务。M0 在两个平台上用中文、日文输入法实测 composer |
+| 输入法守卫 | 所有键盘处理先检查 `event.isComposing`（兼容 `keyCode === 229`）；`compositionstart` 到 `compositionend` 期间 Enter、Esc、`/`、`@` 都不触发业务。M0 结果：CDP 合成用例两个平台通过，Windows 微软拼音实机通过；macOS 简体拼音在 composer 中的真实核对与两个平台的日文输入法未做，由 T19、W1 补做（M0 总结第 3 节） |
 | 审批热键 | Mod+Enter 允许、Mod+Shift+Enter 本会话允许、Esc 拒绝（仅当 composer 为空或焦点在卡片上）；新卡出现后 400 ms 内不响应热键，防误触；多张卡时只有第一张可见卡响应 |
 | 长参数阅读闸门 | 审批卡中被折叠的长命令或长 diff，未展开查看时"总是允许"按钮不可用 |
 | 拖拽 | 移动 4 px 后才开始拖拽 |
@@ -1123,6 +1126,8 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 - preload 只暴露窄接口，不直接暴露 `ipcRenderer`；事件回调剥掉 Electron 的 event 对象后再交给页面。
 - 主进程对每个 IPC 请求校验 `senderFrame` 的 origin（用 origin，不用 URL 前缀匹配；frame 可能为空，此时拒绝）。
 - 即使渲染进程被攻破，它能调用的也只是 preload 白名单中的命令；有副作用的操作（执行命令、写文件、改权限规则）仍要经 Core 的权限裁决，"总是允许"类规则的修改需要在主进程弹出的原生确认框中确认。
+- 现状与这条的差距（R1）：终端面板的输入（`terminalInput`、`terminalKey`）是用户在自己的 shell 里打字，不经 Core 的权限裁决，渲染进程被注入时可以借它执行命令；发布构建目前也带着原型终端的函数。防线与每窗口上限由 T34 决定并写入本节，以文档例外接受时先写 ADR（登记事项 I51、I30）。
+- 外链确认框每个窗口同一时刻最多一个，带用户信息的地址（`https://a@b/`）直接拒绝（R1）。
 
 **应用二进制**：
 
@@ -1153,35 +1158,35 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 
 基准机型：macOS 为 Apple silicon M1 Pro / 16 GB、当前正式版 macOS；Windows 为 x64 8 核 / 16 GB / NVMe SSD、当前正式版 Windows 11。两个平台都进 CI，回归超过 10% 视为失败。
 
-下表是 Electron 方案的初始预算。Electron 官方没有发布启动与内存的基线数字，M0 用 `--cpu-prof` 与 `app.getAppMetrics()` 实测后校准；校准只能收紧，放宽必须在第 18 章修订记录中写明原因。
+下表的预算由 R1 按 M0 实测校准（2026-11-16，[M0 总结](../spikes/M0-summary.md)第 7 节）。校准只能收紧，放宽必须在第 18 章修订记录中写明原因。收紧规则：两个平台都有有效实测值，且原预算不低于两者中较差值的 2 倍时，收紧为较差值的 2 倍（向上取两位有效数字）；只有一个平台的数据、某个平台的口径无效、或 M0 的场景不覆盖该行条件时不改。"M0 实测"一列的 macOS 数据来自 M1 Max / 32 GB，Windows 来自 i5-1340P / 16 GB 笔记本（都不是基准机型）；"未测"由 T44 补测。超出预算的行（标 **超出**）不放宽，按 M0 总结第 7 节指派优化任务。
 
-| 指标 | 预算 | 测量方式 |
-|---|---|---|
-| 冷启动到可交互窗口（侧栏已加载） | ≤ 1.0 s | 启动到首帧 + 侧栏数据就绪的打点 |
-| 打开工作区到 Agent Host 就绪 | ≤ 1.0 s | 预热计时（含 Pi 会话恢复） |
-| PiArc 引入的首 token 额外延迟 | ≤ 50 ms | 与直接调用 Pi SDK 对比 |
-| 主进程内存（含 Core，空闲） | ≤ 120 MB | RSS |
-| 渲染进程内存（1 窗口、侧栏 100 个会话、打开 1 个含 1,000 条 item 的会话） | ≤ 220 MB | `app.getAppMetrics()` |
-| 应用全部进程合计（不含 Agent Host，1 窗口） | ≤ 450 MB | 主进程 + 渲染进程 + GPU 等辅助进程 |
-| Agent Host 内存（1 个活动会话） | ≤ 150 MB | RSS |
-| 每增加一个活动会话的 Agent Host 内存增量 | ≤ 40 MB | M0 实测后校准 |
-| 8 小时长会话内存增长（稳态后） | ≤ 10% | 长跑测试 |
-| 流式渲染（100 token/s） | 渲染进程主线程无超过 50 ms 的长任务；帧时间 p99 ≤ 16 ms | Chrome tracing / Performance API |
-| 万条 item 的 transcript 滚动 | 60 fps | 自动化滚动测试 |
-| 会话切换 | 已缓存 ≤ 100 ms；冷加载 1,000 条 item ≤ 300 ms | 打点 |
-| 主进程事件循环延迟 | p99 ≤ 16 ms | `monitorEventLoopDelay` |
-| Core 事件到渲染进程（主进程转发） | p95 ≤ 5 ms | 打点 |
-| AHP 往返（小文件 fs 操作） | p95 ≤ 5 ms | 契约测试中计时 |
-| 无需用户参与的权限裁决 | p95 ≤ 2 ms | Core 基准测试 |
-| 终端键入回显的额外延迟（相对直接写 PTY） | p95 ≤ 5 ms | S7 测量 |
-| 安装包体积（macOS arm64 DMG / Windows x64 安装包） | ≤ 200 MB | 构建产物 |
-| 安装后体积 | ≤ 450 MB | 构建产物 |
-| 空闲 CPU | 接近 0%，无轮询；窗口隐藏时停止动画与终端帧 | Activity Monitor / 任务管理器 |
-| Agent Host 崩溃后恢复 | ≤ 3 s | 故障注入测试 |
-| 渲染进程崩溃或重载后恢复 | ≤ 2 s，会话不中断 | 故障注入测试 |
-| Beta 期无崩溃会话率 | ≥ 99.5% | 崩溃统计（用户同意后） |
+| 指标 | 预算 | M0 实测 macOS | M0 实测 Windows | 测量方式 |
+|---|---|---|---|---|
+| 冷启动到可交互窗口（侧栏已加载） | ≤ 1.0 s | 未测 | 未测 | 启动到首帧 + 侧栏数据就绪的打点 |
+| 打开工作区到 Agent Host 就绪 | ≤ 1.0 s | 未测 | 未测 | 预热计时（含 Pi 会话恢复） |
+| PiArc 引入的首 token 额外延迟 | ≤ 50 ms | 未测 | 未测 | 与直接调用 Pi SDK 对比 |
+| 主进程内存（含 Core，空闲） | 相对同平台、同版本裸 Electron（一个空窗口）的增量 ≤ 24 MB（原：≤ 120 MB，R1 放宽） | 160–164 MB，裸 Electron 155–157 MB，增量 5–8 MB | 108.4 MB，裸 Electron 96.1 MB，增量 12.3 MB | RSS，与裸 Electron 同机同轮测量 |
+| 渲染进程内存（1 窗口、侧栏 100 个会话、打开 1 个含 1,000 条 item 的会话） | ≤ 220 MB | 179 MiB（无侧栏） | 137 MiB（无侧栏） | `app.getAppMetrics()` |
+| 应用全部进程合计（不含 Agent Host，1 窗口） | macOS ≤ 510 MB（原：≤ 450 MB，R1 放宽）；Windows ≤ 450 MB | **超出**：489 MiB（513 MB，主进程含测试驱动约 27 MB） | **超出**：450 MiB（472 MB，GPU 进程 137 MiB） | 主进程 + 渲染进程 + GPU 等辅助进程 |
+| Agent Host 内存（1 个活动会话） | ≤ 150 MB | **超出**：165–168 MB（无会话 157 MB） | 未测 | RSS |
+| 每增加一个活动会话的 Agent Host 内存增量 | ≤ 40 MB | 第二个会话 1–4 MB（刚创建）；两个会话各一个回合后共 188–191 MB | 未测 | RSS；M0 不含真实会话内容，不收紧 |
+| 8 小时长会话内存增长（稳态后） | ≤ 10% | 未测 | 未测 | 长跑测试 |
+| 流式渲染（100 token/s） | 渲染进程主线程无超过 50 ms 的长任务；每帧主线程工作 p99 ≤ 12 ms（原：帧时间 p99 ≤ 16 ms） | 长任务 0；p99 5.7 ms | 长任务 0；p99 4.7 ms | CDP 追踪：相邻两次 `BeginMainThreadFrame` 之间主线程任务的总耗时（S1 第 2 节） |
+| 万条 item 的 transcript 滚动 | 60 fps | 60.1 fps（60 Hz 屏） | 75.1 fps（75 Hz 屏） | 自动化滚动测试 |
+| 会话切换 | 已缓存 ≤ 100 ms；冷加载 1,000 条 item ≤ 170 ms（原：≤ 300 ms） | 已缓存未测；冷加载中位 52 ms | 已缓存未测；冷加载中位 81 ms | 打点 |
+| 主进程事件循环延迟 | p99 ≤ 16 ms | 10 万事件/分钟 3.58 ms；终端 100 MB 输出 2.04 ms | 原始值 16.81 ms，同机空闲 16.58 ms，超出空闲 0.23 ms；终端 100 MB 输出 14.34 ms | `monitorEventLoopDelay`（1 ms 采样）；计时器粒度粗于 1 ms 的平台（Windows 约 15.6 ms）取"满载 p99 − 同机同轮空闲 p99" |
+| Core 事件到渲染进程（主进程转发） | p95 ≤ 1.1 ms（原：≤ 5 ms） | 0.50 ms | ≤ 0.21 ms（p99） | 打点，每次投递，常规批次（≤ 1 MiB） |
+| AHP 往返（小文件 fs 操作） | p95 ≤ 5 ms | 0.19–0.22 ms | ≤ 5 ms（断言通过，数值未记录） | 契约测试中计时 |
+| 无需用户参与的权限裁决 | p95 ≤ 2 ms | 未测 | 未测 | Core 基准测试 |
+| 终端键入回显的额外延迟（相对直接写 PTY） | p95 ≤ 5 ms | 0.76 ms（逐对相减 0.79 ms） | −0.85 ms（逐对相减 6.86 ms） | 两组样本各 ≥ 1,000 个，取"完整路径 p95 − 直接写 PTY p95"；逐对相减在 ConPTY 下会叠加两次独立往返的抖动 |
+| 安装包体积（macOS arm64 DMG / Windows x64 安装包） | ≤ 200 MB | 168.8 MB | **超出**：225.3 MB（开发构建） | 构建产物 |
+| 安装后体积 | ≤ 450 MB | 449.0 MB（余约 1 MB） | **超出**：521.3 MB | 构建产物 |
+| 空闲 CPU | 接近 0%，无轮询；窗口隐藏时停止动画与终端帧 | 未测（隐藏终端不拉帧已由 L4 验证） | 未测 | Activity Monitor / 任务管理器 |
+| Agent Host 崩溃后恢复 | ≤ 3 s | 未测（S9 验证了流程，首次退避 1 s） | 未测 | 故障注入测试 |
+| 渲染进程崩溃或重载后恢复 | ≤ 2 s，会话不中断 | 未测 | 未测 | 故障注入测试 |
+| Beta 期无崩溃会话率 | ≥ 99.5% | 不适用 | 不适用 | 崩溃统计（用户同意后） |
 
-体积估算依据：Electron 45 的 darwin-arm64 发行包压缩后约 121 MB，内置 Node 压缩后约 28–38 MB，再加应用代码、Core、rg、fd。作为对照，Claude Desktop 5.1231.2 安装后 621 MB（本机实测）。
+体积估算依据：Electron 45 的 darwin-arm64 发行包压缩后约 121 MB，内置 Node 压缩后约 28–38 MB，再加应用代码、Core、rg、fd。作为对照，Claude Desktop 5.1231.2 安装后 621 MB（本机实测）。M0 实测：macOS arm64 安装后 449.0 MB，其中 Electron Framework 250 MiB、内置 node 145 MiB；Windows x64 的 Electron 本体约 360 MiB（`PiArc.exe` 238.5 MiB、locales 48.8 MiB），内置 node 102 MiB（S6 第 8、9.2 节）。
 
 ---
 
@@ -1304,11 +1309,11 @@ Forge 打包 ──► 放入 .node 与 Windows 的 ghostty-vt.dll（app.asar.un
 
 | 编号 | 风险 | 等级 | 对策 | 触发后的决策 |
 |---|---|---|---|---|
-| R1 | Electron 的内存或启动时间超出第 11 章预算 | 中 | 预算在两个平台的 CI 中把关；主进程保持轻量；渲染进程虚拟化列表、重活放 Worker；V8 代码缓存与懒加载 | 超出 30% 且无法优化时，按 ADR-0013 的触发条件复审 |
+| R1 | Electron 的内存或启动时间超出第 11 章预算 | 中 | 预算在两个平台的 CI 中把关；主进程保持轻量；渲染进程虚拟化列表、重活放 Worker；V8 代码缓存与懒加载。M0：主进程预算低于裸 Electron 自身，R1 改为相对裸 Electron 的增量；进程合计、Agent Host 单会话、Windows 体积超出 5–16%，交 T44（M0 总结第 7 节） | 超出 30% 且无法优化时，按 ADR-0013 的触发条件复审 |
 | R2 | Pi 接口变化快 | 高 | 精确版本锁定；SDK 让不兼容变更在编译期暴露；L1/L2 回归；按月升级 | 连续两次升级成本超过 3 人日，复审升级节奏 |
 | R3 | 上游贡献门槛高，补丁积累 | 中 | 补丁登记与移除条件；优先用扩展点绕开 | 补丁超过 10 个时复审 ADR-0002 |
 | R4 | 失去"原生、轻量"卖点，差异化不足 | 中 | 差异化放在 Harness 深度、多模型、工作区共享 MCP、确定性回退；对外如实表述，不宣称"原生"或"比 Electron 轻" | 每个里程碑评审时复核产品定位 |
-| R5 | 同进程多会话存在串扰 | 中 | M0 验证；协议按会话多路复用 | 退回每会话一个进程 |
+| R5 | 同进程多会话存在串扰 | 中 | 协议按会话多路复用。M0 S3 两个平台通过：工具、中断、压缩、MCP 按会话隔离 | 退回每会话一个进程 |
 | R6 | NAPI 边界的事件吞吐不足，或 Core 与窗口逻辑争用主进程事件循环 | 中 | 事件约 16 ms 合并一批；大块数据以二进制载荷复制转发，从源头控制批次体量（ADR-0019）；M0 压测（S2：10 万事件/分钟下事件循环延迟 p99 3.6 ms，8 MiB 批次转发约 2 ms） | 把 Core 移到 utilityProcess，渲染进程经 MessagePort 直连（ADR-0014） |
 | R7 | Claude Code 迭代极快，对标目标持续移动 | 中 | 以能力清单定义范围，按用户价值排序，不追求全量 | 每个里程碑评审时更新能力清单 |
 | R8 | 合规风险（服务商条款、clean-room、品牌） | 高 | ADR-0006；PR 检查项；P2 外部内核需法务评审；参考实现的界面组件一律不复用 | 条款变化时复审 |
@@ -1318,7 +1323,7 @@ Forge 打包 ──► 放入 .node 与 Windows 的 ghostty-vt.dll（app.asar.un
 | R12 | 项目 hooks 执行任意命令 | 高 | 项目信任闸门；hooks 执行审计 | — |
 | R13 | 渲染进程被注入（XSS）后越权 | 高 | 第 10.3 节的 Electron 加固；Markdown 不走 `innerHTML`；preload 白名单与来源校验；安全回归测试 | 发现绕过时按安全事件处理，补回归用例后发布修复 |
 | R14 | 双平台同步拖慢整体节奏 | 中 | Windows 最多滞后一个里程碑；两个平台 CI 全量运行；平台差异集中在适配层 | macOS 里程碑连续两次延期时，Windows 改为固定滞后一个里程碑（ADR-0013） |
-| R15 | libghostty-vt 刚发布 1.0，绑定与周边生态不成熟 | 中 | 直接对 C ABI 生成绑定；精确锁版本；保留 ADR-0017 中的退路 | M0 S7 不通过时启用退路 |
+| R15 | libghostty-vt 刚发布 1.0，绑定与周边生态不成熟 | 中 | 直接对 C ABI 生成绑定；精确锁版本；保留 ADR-0017 中的退路。M0 S7 两个平台通过，走正式路线，不启用退路 | M0 S7 不通过时启用退路 |
 | R16 | Windows 第一版没有 OS 级沙箱 | 中 | 权限规则 + Job Object 进程树管理；界面明确提示（需求 D7） | M4 评估 AppContainer 等方案 |
 | R17 | Chromium 安全更新跟进不及时 | 中 | 只使用 Electron 仍在支持期内的大版本，按第 13.4 节的节奏升级；macOS 没有自动更新，应用内提示标明"安全更新" | 出现在野利用的高危漏洞时立即发版 |
 | R18 | 不做平台签名带来的安装摩擦、更新滞后与安全软件拦截 | 中 | 首次运行指引；发布清单签名；Defender 扫描与误报申诉；凭据保险箱把授权弹窗降到每次更新最多一次（ADR-0018） | 安装受阻或用户停留旧版本成为主要反馈时，先申请 SignPath 免费签名（Windows），再评估 Apple 开发者计划 |
@@ -1339,9 +1344,9 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 
 | 方面 | macOS | Windows | 位置 | 里程碑 |
 |---|---|---|---|---|
-| Shell | zsh / bash | `Bash` 工具经 Git Bash 执行，另有 `PowerShell` 工具（第 6.2.2 节）；未安装 Git Bash 时提示安装，期间只提供 `PowerShell` | piarc-exec、Harness Kit | M1 |
+| Shell | zsh / bash | `Bash` 工具经 Git Bash 执行，另有 `PowerShell` 工具（第 6.2.2 节）；未安装 Git Bash 时提示安装，期间只提供 `PowerShell`。Git Bash 没有真正的 `exec`，命令总是 bash.exe 的子进程，取消命令必须结束整个进程树（W0） | piarc-exec、Harness Kit | M1 |
 | 进程树 | 进程组 + 信号 | Job Object | piarc-exec | M1 |
-| PTY | Unix PTY | ConPTY | piarc-term | M3 |
+| PTY | Unix PTY | ConPTY（用系统自带的，不随附 conpty.dll；程序退出由单独的等待线程报告；启动前清除继承的"忽略 Ctrl+C"状态，W0） | piarc-term | M3 |
 | 凭据主密钥 | 钥匙串 | 凭据管理器（保险箱方案避开了单条 2,560 字节上限） | piarc-secrets | M1 |
 | 沙箱 | Seatbelt + 网络代理 | 第一版不提供（需求 D7） | piarc-sandbox | M4 |
 | 路径 | `/`；默认卷大小写不敏感 | `\` 与盘符、UNC、超过 260 字符的长路径、保留文件名（`CON`、`NUL` 等）；大小写不敏感 | piarc-fs | M1 |
@@ -1367,7 +1372,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 
 | 里程碑 | 目标 | 退出标准 |
 |---|---|---|
-| **M0 技术验证**（3–5 周） | 在两个平台上验证高风险假设 | 每个 spike 的结论（通过 / 失败 / 有条件通过）记录在 `docs/spikes/`，两个平台分别给结论；失败项触发对应 ADR 复审 |
+| **M0 技术验证**（3–5 周） | 在两个平台上验证高风险假设 | 每个 spike 的结论（通过 / 失败 / 有条件通过）记录在 `docs/spikes/`，两个平台分别给结论；失败项触发对应 ADR 复审。**已完成（R1，2026-11-16）：有条件进入 M1**，见 [M0 总结](../spikes/M0-summary.md) |
 | **M1 可行走骨架** | 单工作区、多会话列表、流式对话；Read/Write/Edit/Bash（Windows 另有 PowerShell）/Glob/Grep 经 Core 执行；Manual 与 Accept edits 模式的基础审批；模型与凭据设置（凭据保险箱）；会话持久化与恢复；transcript P0 行类型 | 能用至少 2 家服务商完成"读代码 → 改代码 → 跑测试"的完整任务；L2 场景 ≥ 20 个通过 |
 | **M2 Harness 核心** | 完整权限规则与 Bash 分析；plan 模式；任务清单；AskUserQuestion；hooks（M2 事件集，command 类型）；checkpoint 与 rewind；压缩与上下文用量；WebFetch；Changes 面板；memory 文件兼容 | 第 6 章 M2 能力全部有场景覆盖；L3 对齐在权限与 hooks 上无未解释差异 |
 | **M3 多会话与生态** | 子 agent；后台任务与 Monitor；终端面板（libghostty-vt）；worktree；MCP 共享连接池；skills 与命令；WebSearch；ToolSearch；hooks 的 http/prompt 类型 | 3 个并行会话 + 子 agent 场景满足第 11 章内存预算 |
@@ -1390,6 +1395,8 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | S8 | macOS：Seatbelt 执行 + 网络代理；Windows：Job Object 终止进程树 | 写入与网络限制生效，常见构建命令可运行；超时与停止时无残留进程 |
 | S9 | AHP 握手、背压、崩溃重启与对账 | 故障注入下行为符合 ADR-0009 |
 | S10 | Electron 安全基线：fuses、CSP、渲染进程沙箱、preload 白名单、外部导航拦截 | XSS 载荷集全部被拦截；Electron 官方安全清单逐项通过 |
+
+M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。macOS：S2–S5、S7–S10 通过，S1（composer 的真实输入法与日文未核对）、S6（Gatekeeper 开启时的首次打开未观察）有条件通过。Windows：S2、S7 按第 11 章校准后的测量口径通过，S3–S5、S8–S10 通过，S1（日文未验证）、S6（体积超预算、SmartScreen 放行未观察）有条件通过。条件、负责任务与检查时间点见 [M0 总结](../spikes/M0-summary.md)第 3、9 节。
 
 ---
 
@@ -1425,6 +1432,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.17 | 2026-11-16 | R1（M0 阶段门）：第 11 章按 M0 实测校准，表中逐行写两个平台的实测值；收紧三行（流式每帧主线程工作 p99 16 → 12 ms、冷加载 1,000 条 300 → 170 ms、主进程转发 p95 5 → 1.1 ms），收紧规则写在第 11 章；放宽两行：**主进程内存**由"≤ 120 MB"改为"相对同平台同版本裸 Electron 的增量 ≤ 24 MB"，原因是 macOS 上裸 Electron 一个空窗口就有 155–157 MB，原预算无法由 PiArc 达到（Windows 裸 Electron 96 MB，原预算隐含的增量正是 24 MB，所以 Windows 不变）；**进程合计**在 macOS 上由 450 MB 改为 510 MB，原因是同一个主进程基线差额（约 59 MB），Windows 不变。两项测量口径校准：Windows 的事件循环延迟取超出同机空闲基线的部分，终端回显取两组样本 p95 之差。超出且不放宽的行（进程合计、Agent Host 单会话、Windows 体积）交 T44。同步：3.4 仓库结构（`packages/testkit`、`third-party/`、`tests/contracts/`）、6.1.1 与 8.5 的 M0 结果、10.3 终端输入与外链确认框、第 14 章 R1/R5/R15、15.2 的 Shell 与 PTY、第 16 章 M0 状态与结论 |
 | 2.16 | 2026-11-16 | T12 补充：8.8 系统通知一行写明 S6 的结论；第 4 章加入 ADR-0024（发布清单格式）；5.6 写明打包布局中的 `node_modules/`、Agent Host 的启动命令（`sandbox-exec -p`，路径经 `-D`）、`ProcessTreeSpawner` 与环境变量清单；9.1 增加数据目录下的 `agent-host/`；10.1 增加"同一用户的进程向 PiArc 注入代码"一行；10.3 写明分层签名、hardened runtime 的 M0 结论（开启，需 `disable-library-validation` 与 `allow-jit`）与 Agent Host 的宽松 Seatbelt 配置；13.2 写明二进制锁定、DMG 由 hdiutil 生成、vpk 打包与清单签名 |
 | 2.15 | 2026-11-15 | T11 补充：6.10 增加沙箱受保护路径清单（比 6.1.2 窄，`.git/` 整体可写）与 Seatbelt、代理、缓存目录、进程树的原型实现；7.1 的 `unsafe` 范围增加 `piarc-exec` 的 `job` 模块（Windows Job Object 的 safe 封装） |
 | 1.0 | 2026-11-14 | 首版：基于对 Claude 官方文档、Pi v1.4.0 源码、claude-code / claw-code / OpenClaudeDesktop / open-claude-ui 参考实现与原生技术栈的调研 |
