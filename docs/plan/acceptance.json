@@ -1364,92 +1364,92 @@
       "id": "T11-A01",
       "task": "T11",
       "description": "沙箱内命令写入工作区、会话临时目录、附加目录成功；写入这些目录以外的位置（用户主目录、系统临时目录中的其他路径）被拒绝。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --test sandbox writes_stay_inside_the_writable_directories：ok。工作区（含新建子目录）、会话临时目录（直接路径与 $TMPDIR）、附加目录写入成功并读回；$HOME/piarc-sandbox-test-<pid>、系统临时目录下的其他路径、/tmp/…、工作区外的兄弟目录均失败，stderr 含 \"Operation not permitted\"，文件不存在。日志 tmp/evidence/T11/sandbox-tests.log"
     },
     {
       "id": "T11-A02",
       "task": "T11",
       "description": "工作区内受保护路径清单中的每一项写入都被拒绝。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --test sandbox protected_paths_refuse_writes：ok。PROTECTED_PATHS 23 项在工作区顶层、嵌套子目录、附加目录三处，作为文件写入与在其下写入全部为 Operation not permitted 且内容不变；追加 .git/config、mv .git、mv .git/hooks、ln .git/config、mkdir .CLAUDE、rm -rf .git 全部被拒。清单见 S8 报告第 3 节与架构 6.10"
     },
     {
       "id": "T11-A03",
       "task": "T11",
       "description": "`denyRead` 中的路径不可读，其余路径可读。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --test sandbox deny_read_paths_are_unreadable：ok。denyRead 中工作区外的文件与工作区内的目录 cat/ls 均为 Operation not permitted，mv 改名被拒；其他文件、/etc/hosts 可读"
     },
     {
       "id": "T11-A04",
       "task": "T11",
       "description": "经代理访问白名单内域名成功，白名单外域名被拒绝并返回明确原因；精确与通配匹配、HTTP 与 `CONNECT` 都有用例。验证：代理测试（可注入解析器与本地上游）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-sandbox --test proxy：9 passed。精确域名（registry.npmjs.org）与通配（*.github.com、*.example.org）的 HTTP 与 CONNECT 放行；白名单外与通配不含的裸域名返回 403、x-piarc-proxy-denied: not-allowed 与正文 \"PiArc sandbox proxy: <host> is not in the sandbox network allowlist\"；注入解析器 + 本机上游，不用外网"
     },
     {
       "id": "T11-A05",
       "task": "T11",
       "description": "沙箱内绕过代理直连（不设代理环境变量、直接连 IP）失败。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --test sandbox connections_around_the_proxy_fail：ok。去掉代理变量的 curl、--noproxy 直连本机端口、python 直接 connect 127.0.0.1/1.1.1.1/IPv6 公网地址全部失败（Operation not permitted / Couldn't connect），测试监听端口未收到任何连接；经代理访问 example.com 得到 403 not-allowed，https 为 CONNECT tunnel failed, response 403"
     },
     {
       "id": "T11-A06",
       "task": "T11",
       "description": "解析到回环或云元数据地址的目标被代理拒绝。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-sandbox --test proxy names_resolving_to_loopback_or_metadata_are_refused：ok。解析到 127.0.0.1、::1、169.254.169.254 的名字与白名单中的 IP 字面量，HTTP 与 CONNECT 都返回 403 x-piarc-proxy-denied: blocked-address 与原因正文；地址规则单测含 IPv4 映射形式与 100.100.100.200、fd00:ec2::254"
     },
     {
       "id": "T11-A07",
       "task": "T11",
       "description": "git（status、add、commit）、npm install（白名单含 registry）、cargo build、python 脚本在沙箱内成功。验证：集成测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --test sandbox_commands -- --nocapture：5 passed（需要网络，见测试文件说明）。git status/add/commit/log 0.11 s；python3 脚本 0.07 s（tempfile 指向会话临时目录）；cargo build --offline 0.65 s；cargo build 拉 itoa 1.0.15（Downloaded itoa v1.0.15）约 6 s；npm install is-number（added 1 package）1.6 s。日志 tmp/evidence/T11/sandbox-tests.log，S8 报告第 8 节"
     },
     {
       "id": "T11-A08",
       "task": "T11",
       "description": "沙箱内命令经 Core 的 exec 路径执行，流式输出、退出码与取消语义与 `exec/run` 一致；停止后没有残留进程。验证：测试（检查进程列表）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --test sandbox：sandboxed_commands_stream_and_report_exit_codes（首块输出在命令结束前到达、exitCode 7 与 stderr、通知通道关闭即终止）、killing_a_sandboxed_command_leaves_no_process（exec/kill → killed true、signal 9；ps 进程组 before [1605, 1608, 1610, 1616, 1617] → after []）、closing_the_session_stops_its_proxy 均 ok"
     },
     {
       "id": "T11-A09",
       "task": "T11",
       "description": "含空格与中文的工作区路径下，配置生成与写入限制正确。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "上述沙箱测试的工作区为 \"piarc sandbox … 中文 …/ws 工作 区 [x](y)+\"、附加目录 \"extra 附加\"，写入限制与受保护路径全部按预期；cargo test -p piarc-sandbox 的 profile_snapshot 与 paths_reach_sandbox_exec_as_parameters 覆盖中文路径参数与 [x] 的正则转义（快照 crates/piarc-sandbox/tests/snapshots/seatbelt-profile.sbpl）"
     },
     {
       "id": "T11-A10",
       "task": "T11",
       "description": "Job Object 关闭后，父、子、孙三级进程全部退出。验证：Windows CI 测试输出；未取得时标 `blocked`，由 W0 核对。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "Windows CI 未取得（分支未推送）。实现：piarc-exec 的 ProcessTreeSpawner + job 模块（CREATE_SUSPENDED → 加入 KILL_ON_JOB_CLOSE、无 breakaway 的 Job → 恢复）；测试 tree::tests::windows::{closing_the_job_ends_three_levels, kill_ends_three_levels}（父 cmd → 子 cmd → 孙 ping）与 job::tests。本机 cargo clippy --target x86_64-pc-windows-msvc --workspace --all-targets -- -D warnings 通过（只编译不运行）。推送后由下一任务开工检查核对，实机由 W0 核对"
     },
     {
       "id": "T11-A11",
       "task": "T11",
       "description": "`sandbox-exec` 的每条命令额外耗时与代理额外延迟已测量。验证：报告中的数据。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo run -p piarc-sandbox --release --example s8-bench -- --iterations 300（macOS 26.5.2）：bash -c true 直接 p50 1.90 / p95 2.34 ms，sandbox-exec p50 10.31 / p95 11.15 ms，额外 p50 8.41 / p95 8.82 ms（配置生成 0.03 ms）；代理每请求 p50 0.18 ms（HTTP）/ 0.22 ms（CONNECT），直连 0.09 ms；64 MiB 吞吐 HTTP 4.2 GiB/s、CONNECT 1.5 GiB/s。S8 报告第 9 节"
     },
     {
       "id": "T11-A12",
       "task": "T11",
       "description": "S8 报告（macOS 部分）含受保护路径清单、缓存目录方案、结论与待 W0 的项；架构第 6.10 节已同步沙箱受保护路径清单；`docs/spikes/README.md` 已更新。验证：文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/spikes/S08-sandbox.md：受保护路径清单（第 3 节）、缓存目录方案（第 4 节）、结论（第 12 节）、待 W0 项（第 10 节）；架构 v2.15 第 6.10 节同步受保护路径清单；docs/spikes/README.md 的 S8 行已更新"
     },
     {
       "id": "T11-A13",
       "task": "T11",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify（收尾，最终提交前）：13 步全部 PASS（cargo test 27.4 s，含 piarc-core 的 sandbox 与 sandbox_commands 测试），exit 0"
     },
     {
       "id": "T12-A01",
