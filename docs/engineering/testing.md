@@ -56,6 +56,8 @@ CI（`.github/workflows/ci.yml`）在 `macos-latest`（arm64）与 `windows-late
 - 测试 fixture 同时覆盖 LF 与 CRLF、含空格与中文的路径（架构第 15.3 节）。
 - 测试需要写文件时在系统临时目录下创建独立目录（路径含空格与中文），结束后清理；不写入仓库工作区。
 - L0–L2 不访问网络与真实模型服务商；模型侧一律接 mock provider。
+- 例外（不访问模型服务商）：`crates/piarc-core/tests/sandbox_commands.rs` 的 `npm install`、`cargo build` 两个用例验证沙箱代理放行真实 registry（S8），经代理连 `registry.npmjs.org`、`index.crates.io`、`static.crates.io`；离线时失败并写明原因，不静默通过。新增访问网络的测试要在这里登记（R1-Q1）。
+- 需要系统凭据库的测试（`piarc-secrets` 的 `system_store`）在没有设 `PIARC_REQUIRE_KEYCHAIN=1` 时打印 `NOT RUN` 而不失败：它只证明"没有运行"，不算通过。实机结论以设了该变量的运行为准（T08-A11、W0），CI 是否设置由 T44 决定（R1-Q2）。
 
 ### 4.2 CRLF 夹具目录
 
