@@ -54,7 +54,23 @@ test('vim renders on the alternate screen', async ({ app, page }, testInfo) => {
       cols: 90,
       rows: 24,
       program: vim(),
-      args: ['-u', 'NONE', '-i', 'NONE', '-N', '-c', 'syntax on', '-c', 'set number', file],
+      // With `-u NONE` vim takes its encoding from the locale; where LANG is unset (CI runners,
+      // some agent shells) it reads the file as latin1 and draws the Chinese as byte escapes.
+      // `--cmd` runs before the file is read.
+      args: [
+        '-u',
+        'NONE',
+        '-i',
+        'NONE',
+        '-N',
+        '--cmd',
+        'set encoding=utf-8',
+        '-c',
+        'syntax on',
+        '-c',
+        'set number',
+        file,
+      ],
       cwd: dir,
     });
     await waitForScreen(page, (text) => text.includes('fn main()') && text.includes('main.rs'));
