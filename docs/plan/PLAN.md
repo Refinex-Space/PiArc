@@ -296,7 +296,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 R1（M0 评审与收口），开工 2026-11-16。依赖 W0 为"部分完成"：遗留的 W0-A04、A10（Windows 测量口径，I44）本就交 R1 处理，不影响开工。基线 `npm run verify` 见会话记录。
 
-- [ ] 四个只读审查子代理（Electron 安全与 IPC、Core/NAPI 并发与错误边界、Agent Host/AHP 健壮性、工程质量与 CLAUDE.md 一致性）并行完成，原始发现记入 `docs/reviews/R1-findings.md`（A04）
+- [x] 四个只读审查子代理（Electron 安全与 IPC、Core/NAPI 并发与错误边界、Agent Host/AHP 健壮性、工程质量与 CLAUDE.md 一致性）并行完成，原始发现记入 `docs/reviews/R1-findings.md`（A04）
 - [ ] 逐条核实发现；确认的先写失败测试再修复，每个修复单独提交；其余写理由或登记（A05、A06）
 - [ ] `docs/spikes/M0-summary.md`：S1–S10 × 两平台总表、有条件通过与未验证项、对后续任务的影响（A01）
 - [ ] ADR 触发条件检查表：ADR-0013–0018 全部条件与 ADR-0004/0009/0010 中 S4/S9/S3 相关条件；ADR-0015/0018 留给 M0 的事项（A02、A03）
@@ -362,6 +362,18 @@ R1（M0 评审与收口），开工 2026-11-16。依赖 W0 为"部分完成"：�
 | I47 | W0 | win32-arm64 上 libghostty-vt 的实际运行尚无结果：CI 只做过加载，W0 给 `core-load-check.mjs` 加了终端检查，要下一次推送后的 `core-load`（`windows-11-arm`）才有结果 | 已落地（2026-11-16）：提交 3ae1d23 的 CI（https://github.com/Refinex-Space/PiArc/actions/runs/43855932047）中 `core load (aarch64-pc-windows-msvc)` 通过，node 24.22.2 与 Electron 45.3.2 的开发版、发布版都报 `terminal ok` |
 | I48 | W0 | 主进程没有按架构第 9.1 节用 `app.setPath('userData', …)` 固定数据目录：Windows 上 Electron 默认把 userData（Chromium 缓存、本地存储）放在漫游的 `%APPDATA%\PiArc\`，卸载后留在那里（实测 71 个文件 9.5 MiB）；macOS 的默认位置恰好与架构一致 | T13 设定数据目录时一并设 `userData`；T50 决定卸载时是否提供删除数据的选项 |
 | I49 | W0 | Windows 上 SmartScreen 的"更多信息 → 仍要运行"流程没有观察到：W0 的机器关着"检查应用和文件"（安装包带 `ZoneId=3`，没有拦截），智能应用控制也是关的；系统通知总开关关闭，横幅也没看到（程序侧正确收到 `failed`） | R1 与 I42 一起安排：在开着"检查应用和文件"与通知的 Windows 11 上，用浏览器下载的安装包重做 S6 检查清单第 8 节 W3 与通知；最晚 T50 首次发布前 |
+| I50 | R1 | 渲染进程没有 React 错误边界：任何一个组件抛错都会卸载整个 root（R1-E1 的后果） | T19 给 transcript 行与整页加错误边界，单条内容出错只影响该行 |
+| I51 | R1 | 终端是页面可调用的命令执行通道：`createTerminal` + `terminalInput` 不经 Core 权限裁决，与架构第 10.3 节"有副作用的操作仍要经 Core 的权限裁决"不一致；每窗口终端数与在途拉帧请求没有上限（R1-E3、E6）。发布构建现在也带着原型终端的函数（I30） | T34 决定防线（例如要求近期真实用户输入）与上限并写入 10.3；若以文档例外接受，属于放松安全基线，写 ADR 提议。T34 之前 T45 与 I30 一起评估发布构建去掉终端函数 |
+| I52 | R1 | ESLint 进程边界规则只拦 `ipcMain.<method>`，不拦 `webContents.ipc` 与别名；导航守卫没有 `will-frame-navigate`（当前由 CSP 挡住）；渲染进程规则拦不住 Node 专用 npm 包（R1-E7、Q12） | T45 补规则与守卫，S10 第 13、17 项的措辞改准 |
+| I53 | R1 | `piarc_fs::read_blob` 把整个文件读进 Core 所在的主进程内存，没有大小上限（R1-C1） | T16 给 blob 模式设上限并流式写入 |
+| I54 | R1 | 沙箱代理：accept 失败（EMFILE）立即重试空转，没有连接数上限与读头、空闲、上游 connect 超时；地址黑名单不含私网、CGNAT、ULA；明文 HTTP 转发保留客户端的 `Host`（R1-C3、C10） | T39 定稿代理时处理，或在 6.10 写明不防的范围 |
+| I55 | R1 | 终端：`createTerminal` 在主进程 JS 线程同步 `openpty` 与 spawn（未测耗时，违反 7.2 的 1 ms 预算）；IO、写入、等待线程与取帧等 `spawn_blocking` 回调没有 panic 防护；IO 线程把 `Interrupted` 当作输出结束；查询应答队列无界且与按键共用写线程（R1-C4–C7） | T33（`spawn_blocking` 回调 panic 时以带 `kind` 的错误结算 Promise 一项 T14 一并处理） |
+| I56 | R1 | 执行路径：`exec_run` 在 `sandbox.launch()` 失败时遗留 `running` 条目；`exec/kill` 与 `exec/run` 分在两个任务处理，kill 先到会丢失中断；`Tree::kill` 在 leader 被回收后仍用旧 pgid（R1-C8、C11、A11、A15） | T17 重写执行路径时一并处理，补可注入失败的测试 |
+| I57 | R1 | 凭据：锁的解锁与带 `lockId` 的写入不校验持有者连接；30 s 租约不续期，OAuth 刷新加钥匙串弹窗超过租约时，轮换后的 refresh token 只留在内存；服务商错误原文经 `errorMessage` 进入日志与界面，是否可能回显密钥未核实（R1-C9、A5、A15） | T21（与 I23 一起）；日志脱敏覆盖 `errorMessage` 由 T45 验证 |
+| I58 | R1 | AHP 会话层：`session/create`、`session/resume` 超时后两端状态不一致；恢复循环在 `select!` 之外串行执行，挂住时不响应关闭与 Kill；Agent Host 出站帧没有单帧上限（可能超过 Core 的 8 MiB）；被拒或未完成握手的连接仍分派请求；命令通道的 `Kill` 不带 epoch；`ToolIo` 的会话表不绑定连接；入站请求任务数无上界；同 id 的并发 `session/resume` 会建两个运行时（R1-A3、A4、A6、A7、A10、A13、A14、A15） | T14 接手会话编排时处理，补故障注入用例 |
+| I59 | R1 | 测试用固定时长等待异步结果：`transcript-scroll.e2e.ts`（与 I32 的偶发失败位置一致）、`terminal.e2e.ts`、`e2e/terminal.ts`、`e2e/core.ts`、`agent-host/src/runtime/credentials.test.ts`（R1-Q3） | T19 改 transcript 用例并关闭 I32；T34 改终端用例；T21 改凭据测试 |
+| I60 | R1 | 测试与脚本：CI 没设 `PIARC_REQUIRE_KEYCHAIN`，凭据库测试在 CI 上可能只是 NOT RUN（`system_store.rs` 的 `let _ = tx.send` 也缺注释）；基准脚本复制了 `e2e/app.ts` 的应用定位逻辑；`fetch-binaries.mjs` 的完整性校验与若干脚本没有单元测试（R1-Q2、Q4、Q7） | T44 决定 CI 的凭据库测试并让基准复用 `e2e/app.ts`；T50 给 `fetch-binaries.mjs` 补测试 |
+| I61 | R1 | `piarc-exec` 没有带 `kind()`、`retryable()` 的 `Error`，直接返回 `io::Result`；`piarc-ports` 的 `SecretStoreError` 同样没有（只放 trait，可豁免）（R1-Q5） | T17 定义 `piarc-exec::Error`，并把 `piarc-ports` 的豁免写进 `coding-standards.md` 2.3 |
 
 ## 技术债
 
