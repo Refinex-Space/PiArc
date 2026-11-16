@@ -15,7 +15,9 @@ export const WINDOWS = process.platform === 'win32';
  */
 export const PLAIN_SHELL: Pick<TestTerminalOptions, 'program' | 'args' | 'env'> = WINDOWS
   ? { program: 'cmd.exe', args: ['/Q', '/K'], env: { PROMPT: '$$$S' } }
-  : { program: '/bin/sh', args: [], env: { PS1: '$ ', ENV: '' } };
+  : // A UTF-8 locale: with LANG empty (CI runners, agent shells) readline reads the bytes of
+    // committed Chinese text as Meta keys (I38).
+    { program: '/bin/sh', args: [], env: { PS1: '$ ', ENV: '', LANG: 'en_US.UTF-8' } };
 
 /** PowerShell running `script` without a profile or a banner. */
 export function powershell(script: string): Pick<TestTerminalOptions, 'program' | 'args'> {
