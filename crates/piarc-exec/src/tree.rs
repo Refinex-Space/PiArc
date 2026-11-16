@@ -143,6 +143,7 @@ mod tests {
     use std::ffi::OsString;
     use std::time::{Duration, Instant};
 
+    #[cfg(unix)]
     use tokio::io::AsyncReadExt;
 
     use super::*;

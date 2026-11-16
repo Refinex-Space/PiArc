@@ -195,6 +195,8 @@ fn utf8(path: PathBuf) -> Result<PathBuf> {
 mod tests {
     use super::*;
 
+    /// A fresh directory under the system temporary directory, not canonicalized: on
+    /// Windows a canonical path is verbatim (`\\?\`) and `..` would not be resolved in it.
     fn temp(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!(
             "piarc-sandbox-policy-{name}-{}",
@@ -202,7 +204,11 @@ mod tests {
         ));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("temp dir");
-        std::fs::canonicalize(dir).expect("canonical temp dir")
+        dir
+    }
+
+    fn canonical(path: &Path) -> PathBuf {
+        std::fs::canonicalize(path).expect("canonical path")
     }
 
     #[test]
@@ -213,7 +219,8 @@ mod tests {
         let mut policy = SandboxPolicy::new(ws.join("sub").join(".."), base.clone());
         policy.extra_dirs.push(ws.clone());
         let resolved = policy.resolve().expect("resolves");
-        assert_eq!(resolved.writable, vec![ws, base.clone()]);
+        assert_eq!(resolved.writable, vec![canonical(&ws), canonical(&base)]);
+        assert_eq!(resolved.session_tmp, canonical(&base));
         std::fs::remove_dir_all(base).expect("cleanup");
     }
 
@@ -228,8 +235,9 @@ mod tests {
             .deny_read
             .push(base.join("link").join("missing").join("..").join("secret"));
         let resolved = policy.resolve().expect("resolves");
-        assert_eq!(resolved.writable[0], base.join("real"));
-        assert_eq!(resolved.deny_read, vec![base.join("real").join("secret")]);
+        let real = canonical(&base.join("real"));
+        assert_eq!(resolved.writable[0], real);
+        assert_eq!(resolved.deny_read, vec![real.join("secret")]);
         std::fs::remove_dir_all(base).expect("cleanup");
     }
 

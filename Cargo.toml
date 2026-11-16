@@ -92,9 +92,10 @@ windows-sys = { version = "=0.61.2", default-features = false }
 zeroize     = { version = "=1.9.1", features = ["serde", "std"] }
 
 [workspace.lints.rust]
-# `unsafe` is allowed only in -sys crates, at the NAPI boundary and in the safe
-# wrapper module of a -sys crate (piarc-term's `vt`); the crates opt out at the
-# crate root, the wrapper on its module declaration, each with a reason.
+# `unsafe` is allowed only in -sys crates, at the NAPI boundary and in safe
+# wrapper modules over system interfaces (piarc-term's `vt`, piarc-exec's `job`);
+# the crates opt out at the crate root, the wrappers on their module declaration,
+# each with a reason.
 unsafe_code = "deny"
 
 [workspace.lints.clippy]
