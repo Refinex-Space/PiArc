@@ -528,6 +528,9 @@ impl Reader {
     async fn frame_error(&self, error: ErrorObject) {
         tracing::warn!(target: "piarc_host", workspace = %self.shared.workspace, epoch = self.link.epoch,
             kind = ?error.data.kind, "dropped an invalid frame from the Agent Host: {}", error.message);
+        // Like a notification, a frame error waits for a permit: the heartbeat must see that
+        // the reader is held back by Core's consumer, not by a hung Agent Host.
+        self.link.activity.delivering.store(true, Ordering::Release);
         self.shared
             .events
             .bounded(HostEvent::FrameError {
@@ -535,6 +538,10 @@ impl Reader {
                 error,
             })
             .await;
+        self.link
+            .activity
+            .delivering
+            .store(false, Ordering::Release);
     }
 }
 

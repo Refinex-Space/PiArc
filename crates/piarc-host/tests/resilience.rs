@@ -751,3 +751,40 @@ async fn a_crash_during_restore_keeps_the_sessions_for_the_next_restart() {
     assert_eq!(restored, ["s1", "s2"]);
     supervisor.shutdown().await;
 }
+
+#[tokio::test]
+async fn a_consumer_held_back_by_frame_errors_does_not_get_the_host_killed() {
+    const BAD_FRAMES: usize = 50;
+    let spawner = FakeSpawner::new(vec![script(|mut host| async move {
+        host.hello("1.0", &[]).await;
+        for _ in 0..BAD_FRAMES {
+            host.send_raw(b"{not json\n").await;
+        }
+        host.until_stdin_closes().await;
+        0
+    })]);
+    let mut config = config();
+    config.event_queue = 1;
+    config.heartbeat_interval = Duration::from_millis(10);
+    config.heartbeat_timeout = Duration::from_millis(10);
+    let (supervisor, mut events) = HostSupervisor::start(config, deps(spawner, TestClock::new()));
+    until(&mut events, |e| matches!(e, HostEvent::Connected { .. })).await;
+    // Hold the consumer back long enough for several missed heartbeats.
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    let mut frame_errors = 0;
+    while frame_errors < BAD_FRAMES {
+        match tokio::time::timeout(support::EVENT_WAIT, events.recv())
+            .await
+            .expect("events flow")
+            .expect("open")
+        {
+            HostEvent::FrameError { .. } => frame_errors += 1,
+            HostEvent::Exited { reason, .. } => {
+                panic!("the host was killed while backpressured: {reason:?}")
+            }
+            _ => {}
+        }
+    }
+    assert_eq!(supervisor.state(), SupervisorState::Connected { epoch: 1 });
+    supervisor.shutdown().await;
+}
