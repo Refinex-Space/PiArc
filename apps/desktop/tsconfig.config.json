@@ -19,6 +19,9 @@
     "vite.*.config.ts",
     "playwright.config.ts",
     "fuses.mjs",
-    "core-binary.mjs"
+    "core-binary.mjs",
+    "app-identity.mjs",
+    "app-identity.test.mjs",
+    "packaging/*.mjs"
   ]
 }

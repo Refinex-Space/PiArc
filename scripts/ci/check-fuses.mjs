@@ -2,8 +2,9 @@
 // apps/desktop/fuses.mjs (ADR-0018 rule 1, architecture section 10.3). Run it after
 // `npm run package:desktop`; the packaging (T12) and release (T50) pipelines call it too.
 //
-// Usage: node scripts/ci/check-fuses.mjs [--flavor release|development] [--app <path>]
+// Usage: node scripts/ci/check-fuses.mjs [--flavor release|development] [--arch <arch>] [--app <path>]
 //   --flavor  settings to expect and default output directory (default: release)
+//   --arch    architecture of the default output directory (default: this machine's)
 //   --app     packaged app to read: the .app bundle on macOS, the .exe on Windows
 //             (default: apps/desktop/out/<flavor>/<name>-<platform>-<arch>/...)
 // Exit code 0 when every fuse matches, 1 on any mismatch or when the app is missing.
@@ -94,7 +95,7 @@ export function compareFuses(expected, wire) {
 }
 
 /** @returns {string} */
-function productName() {
+export function productName() {
   const manifest = readJsonFile(path.join(desktopDir, 'package.json'));
   if (!isRecord(manifest) || typeof manifest.productName !== 'string') {
     throw new Error('apps/desktop/package.json has no productName');
@@ -123,11 +124,15 @@ export function packagedAppPath(flavor, name, platform, arch) {
 
 async function main() {
   const { values } = parseArgs({
-    options: { flavor: { type: 'string' }, app: { type: 'string' } },
+    options: {
+      flavor: { type: 'string' },
+      arch: { type: 'string', default: process.arch },
+      app: { type: 'string' },
+    },
   });
   const flavor = parseBuildFlavor(values.flavor);
   const appPath =
-    values.app ?? packagedAppPath(flavor, productName(), process.platform, process.arch);
+    values.app ?? packagedAppPath(flavor, productName(), process.platform, values.arch);
   if (!existsSync(appPath)) {
     console.error(
       `Packaged app not found: ${appPath}\nRun: npm run package:desktop -- --flavor ${flavor}`,

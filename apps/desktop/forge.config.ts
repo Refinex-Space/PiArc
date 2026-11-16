@@ -1,18 +1,30 @@
 // Electron Forge configuration. `PIARC_BUILD_FLAVOR` selects the fuse settings
 // (`release` by default, or `development`) and the Core build that is packaged; use
 // `npm run package:desktop` from the repository root rather than setting it by hand.
-// Output goes to `out/<flavor>/`.
+// Output goes to `out/<flavor>/`. Packaging also copies the Agent Host resources next to
+// app.asar (packaging/agent-host-layout.mjs) and, on macOS, redoes the ad-hoc signatures in
+// layers (packaging/macos-sign.mjs); `make` adds the DMG and ZIP.
 import { existsSync } from 'node:fs';
 import { copyFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
+import { MakerZIP } from '@electron-forge/maker-zip';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import type { ForgeConfig } from '@electron-forge/shared-types';
 
+import { APP_IDENTIFIER } from './app-identity.mjs';
 import { CORE_WINDOWS_DLLS, coreBinaryName, coreBuildDir } from './core-binary.mjs';
 import { fuseSettingsFor, parseBuildFlavor, toFuseConfig } from './fuses.mjs';
+import {
+  agentHostLayout,
+  AGENT_HOST_DIR,
+  copyAgentHostResources,
+  resourcesDirOf,
+} from './packaging/agent-host-layout.mjs';
+import { MakerHdiutilDmg } from './packaging/maker-dmg.mjs';
+import { resealElectron, signResourcesAndBundle } from './packaging/macos-sign.mjs';
 
 const flavor = parseBuildFlavor(process.env.PIARC_BUILD_FLAVOR);
 const repoRoot = path.join(import.meta.dirname, '..', '..');
@@ -45,6 +57,29 @@ async function copyCoreModule(buildPath: string, platform: string, arch: string)
   }
 }
 
+/**
+ * After packaging: puts the Agent Host resources next to app.asar and, on macOS, signs the
+ * app in layers so the bundled Node keeps its official signature (ADR-0018 rule 2).
+ */
+async function finishPackage(outputPath: string, platform: string, arch: string): Promise<void> {
+  const appName = 'PiArc';
+  const resourcesDir = resourcesDirOf(outputPath, platform, appName);
+  if (platform === 'darwin') {
+    await resealElectron(path.join(outputPath, `${appName}.app`));
+  }
+  const agentHost = await copyAgentHostResources({ repoRoot, resourcesDir, platform, arch });
+  if (platform === 'darwin') {
+    const nodeDir = path.join(agentHost, 'node');
+    const signed = await signResourcesAndBundle(path.join(outputPath, `${appName}.app`), {
+      keepSigned: [nodeDir],
+    });
+    console.log(
+      `ad-hoc signed ${String(signed.length)} Mach-O files in Resources; ` +
+        `${path.join(AGENT_HOST_DIR, agentHostLayout(platform).node)} keeps its own signature`,
+    );
+  }
+}
+
 const config: ForgeConfig = {
   outDir: path.join('out', flavor),
   packagerConfig: {
@@ -52,12 +87,21 @@ const config: ForgeConfig = {
     // Core module imports stay out of the archive like the module itself (the plugin below
     // adds the .node pattern): the system loader cannot read from app.asar.
     asar: { unpack: '**/native/*.dll' },
+    // design/brand/ is the single source of the icons (icon.icns, icon.ico); the packager
+    // appends the platform's extension.
+    icon: path.join(repoRoot, 'design', 'brand', 'icon'),
+    appBundleId: APP_IDENTIFIER,
   },
   rebuildConfig: {},
-  makers: [],
+  makers: [new MakerHdiutilDmg({}), new MakerZIP({}, ['darwin'])],
   hooks: {
     packageAfterCopy: async (_config, buildPath, _electronVersion, platform, arch) => {
       await copyCoreModule(buildPath, platform, arch);
+    },
+    postPackage: async (_config, { platform, arch, outputPaths }) => {
+      for (const outputPath of outputPaths) {
+        await finishPackage(outputPath, platform, arch);
+      }
     },
   },
   plugins: [

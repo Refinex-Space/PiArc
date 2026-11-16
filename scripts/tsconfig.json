@@ -18,6 +18,8 @@
     "**/*.mjs",
     "../*.mjs",
     "../apps/desktop/fuses.mjs",
-    "../apps/desktop/core-binary.mjs"
+    "../apps/desktop/core-binary.mjs",
+    "../apps/desktop/packaging/agent-host-layout.mjs",
+    "../apps/desktop/packaging/macos-sign.mjs"
   ]
 }
