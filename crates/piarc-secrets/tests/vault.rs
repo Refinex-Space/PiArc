@@ -18,9 +18,12 @@ struct Dir(PathBuf);
 impl Dir {
     fn new(label: &str) -> Self {
         let dir = std::env::temp_dir().join(format!(
-            "piarc secrets {label} 中文 {}-{:?}",
+            "piarc secrets {label} 中文 {}-{}",
             std::process::id(),
             std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("after 1970")
+                .as_nanos()
         ));
         std::fs::create_dir_all(&dir).expect("temp dir");
         Self(dir)

@@ -391,6 +391,13 @@ mod tests {
             .run(missing, tx, CancellationToken::new())
             .await
             .expect_err("no cwd");
-        assert_eq!(error.kind(), io::ErrorKind::NotFound);
+        // Windows reports a missing working directory as ERROR_DIRECTORY ("the directory name
+        // is invalid"), which std maps to `NotADirectory`.
+        let expected = if cfg!(windows) {
+            io::ErrorKind::NotADirectory
+        } else {
+            io::ErrorKind::NotFound
+        };
+        assert_eq!(error.kind(), expected);
     }
 }

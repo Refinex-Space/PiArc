@@ -20,11 +20,13 @@ const COUNT: usize = 2000;
 const WARMUP: usize = 200;
 
 fn repo_root() -> PathBuf {
+    // Not `canonicalize`: on Windows it gives a verbatim (`\\?\`) path, which Node cannot run a
+    // script from.
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .canonicalize()
-        .expect("the repository root exists")
+        .ancestors()
+        .nth(2)
+        .expect("the repository root")
+        .to_path_buf()
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

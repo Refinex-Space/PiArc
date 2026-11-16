@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import { createLsToolDefinition, type ExtensionToolContext } from '@earendil-works/pi-coding-agent';
 import { describe, expect, it } from 'vitest';
 
@@ -125,11 +127,14 @@ describe('ExecOutputRouter', () => {
 
 describe('lsOperations', () => {
   it('lets Pi list a directory through Core', async () => {
+    // A root of one letter would not do: on Windows Pi reads `/w` as Git Bash's spelling of the
+    // drive `W:\`. `path.resolve` gives an absolute path on either platform.
+    const root = path.resolve('/workspace');
     const { io: core, sent } = io((request) => {
       if (request.method === 'fs/list') {
         return {
           result: {
-            path: '/w',
+            path: root,
             entries: [
               { name: 'b.txt', kind: 'file' },
               { name: 'A', kind: 'directory' },
@@ -144,13 +149,13 @@ describe('lsOperations', () => {
           error: new AhpError('notFound', 'missing', { details: { code: 'ENOENT', path } }),
         };
       }
-      const kind = path === '/w' || path.endsWith('A') ? 'directory' : 'file';
+      const kind = path === root || path.endsWith('A') ? 'directory' : 'file';
       return { result: { path, kind, size: 0, readonly: false } };
     });
-    const ls = createLsToolDefinition('/w', {
+    const ls = createLsToolDefinition(root, {
       operations: lsOperations(core, { tool: 'Read', toolCallId: 'c' }),
     });
-    const ctx = { cwd: '/w' } as ExtensionToolContext;
+    const ctx = { cwd: root } as ExtensionToolContext;
     const result = await ls.execute('c', {}, undefined, undefined, ctx);
     expect(result.content).toEqual([{ type: 'text', text: 'A/\nb.txt' }]);
     expect(new Set(sent.map((s) => s.method))).toEqual(new Set(['fs/stat', 'fs/list']));

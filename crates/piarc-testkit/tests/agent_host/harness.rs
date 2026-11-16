@@ -26,11 +26,24 @@ pub const SMALL_WINDOW_SCENARIO: &str = "small-window";
 pub const WAIT: Duration = Duration::from_secs(20);
 
 pub fn repo_root() -> PathBuf {
+    // Not `canonicalize`: on Windows it gives a verbatim (`\\?\`) path, which Node cannot run a
+    // script from.
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .canonicalize()
-        .expect("the repository root exists")
+        .ancestors()
+        .nth(2)
+        .expect("the repository root")
+        .to_path_buf()
+}
+
+/// The canonical spelling of an existing `path` as Core reports it: resolved links (macOS
+/// `/private/var`), without the verbatim `\\?\` prefix `canonicalize` adds on Windows.
+pub fn canonical(path: &Path) -> PathBuf {
+    let canonical = std::fs::canonicalize(path).expect("the path exists");
+    let text = canonical.to_string_lossy();
+    match text.strip_prefix(r"\\?\") {
+        Some(plain) if cfg!(windows) => PathBuf::from(plain),
+        _ => canonical,
+    }
 }
 
 /// The Node executable: `PIARC_TEST_NODE`, or `node` from PATH.

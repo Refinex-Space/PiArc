@@ -63,6 +63,8 @@ apps/desktop/release/
 *.node
 # Release packaging output
 *.dmg
+# ...except the fake artefacts the release manifest tests verify
+!crates/piarc-core/tests/fixtures/release/*.dmg
 *.pkg
 *.blockmap
 *.nupkg

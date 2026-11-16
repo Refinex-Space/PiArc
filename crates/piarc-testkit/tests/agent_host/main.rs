@@ -423,6 +423,33 @@ fn flood_scenario() -> String {
     )
 }
 
+/// What the Agent Host gets done while Core reads nothing.
+async fn check_progress_while_core_is_stalled(env: &Env) {
+    // Node writes to a stdout pipe asynchronously on macOS: Core takes no events until Pi
+    // finished the turn, both model requests answered. On Windows it writes synchronously
+    // (`net.Socket` makes fd 1 and 2 blocking there): once the pipe is full the Agent Host's
+    // event loop waits in the write, so the pressure reaches Pi itself and the second step is
+    // not requested until Core reads again (docs/spikes/S09-ahp-resilience.md).
+    let expected = if cfg!(windows) { 1 } else { 2 };
+    let deadline = std::time::Instant::now() + harness::WAIT;
+    while env.requests("flood").len() < expected {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the turn did not get far while Core was stalled: {} model requests",
+            env.requests("flood").len(),
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    if cfg!(windows) {
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        assert_eq!(
+            env.requests("flood").len(),
+            1,
+            "the Agent Host kept going while its stdout was full"
+        );
+    }
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_slow_core_reader_makes_the_agent_host_queue_with_bounded_memory() {
     let scenario = flood_scenario();
@@ -443,17 +470,7 @@ async fn a_slow_core_reader_makes_the_agent_host_queue_with_bounded_memory() {
         .expect("accepted")
         .turn_id;
 
-    // Core takes no events until Pi finished the turn: both model requests answered. Waiting
-    // polls that condition.
-    let deadline = std::time::Instant::now() + harness::WAIT;
-    while env.requests("flood").len() < 2 {
-        assert!(
-            std::time::Instant::now() < deadline,
-            "the turn did not finish while Core was stalled: {} model requests",
-            env.requests("flood").len(),
-        );
-        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-    }
+    check_progress_while_core_is_stalled(&env).await;
     let done = events.turn_completed(&turn.0).await;
     assert_eq!(done["status"], "completed", "{done}");
     let after = ping(&supervisor).await;
@@ -486,10 +503,14 @@ async fn a_slow_core_reader_makes_the_agent_host_queue_with_bounded_memory() {
         baseline.rss_bytes,
         after.rss_bytes
     );
-    assert!(
-        after.outbound_peak_bytes > 64 * 1024,
-        "stdout pushed back and the Agent Host queued"
-    );
+    if !cfg!(windows) {
+        // Asynchronous stdout: the writes report the full pipe and the outbound queue holds
+        // the rest. On Windows the write itself waits instead.
+        assert!(
+            after.outbound_peak_bytes > 64 * 1024,
+            "stdout pushed back and the Agent Host queued"
+        );
+    }
     let peak = usize::try_from(after.outbound_peak_bytes).expect("fits");
     assert!(
         peak < produced,
@@ -546,7 +567,7 @@ fn check_own_core_calls(env: &Env, core: &harness::Core, a: &SessionId, b: &Sess
             ],
             "{calls:#?}"
         );
-        let own = std::fs::canonicalize(&env.ws[index]).expect("workspace exists");
+        let own = harness::canonical(&env.ws[index]);
         for call in &calls {
             // The Agent Host resolved "notes/note.txt" against the session's own cwd ...
             let requested = call.path.as_deref().expect("a path");

@@ -110,9 +110,16 @@ export function resetRenderCounts(page: Page): Promise<void> {
   });
 }
 
-/** Text on the system clipboard (read in the main process). */
-export function readClipboard(app: ElectronApplication): Promise<string> {
+function readRawClipboard(app: ElectronApplication): Promise<string> {
   return app.evaluate(({ clipboard }) => clipboard.readText());
+}
+
+/**
+ * Text on the system clipboard (read in the main process), with line breaks as `\n`: Chromium
+ * writes plain text with the platform's line breaks, CRLF on Windows.
+ */
+export async function readClipboard(app: ElectronApplication): Promise<string> {
+  return (await readRawClipboard(app)).replaceAll('\r\n', '\n');
 }
 
 /** Runs `body` and puts the clipboard's previous text back afterwards. */
@@ -120,7 +127,7 @@ export async function withSavedClipboard(
   app: ElectronApplication,
   body: () => Promise<void>,
 ): Promise<void> {
-  const saved = await readClipboard(app);
+  const saved = await readRawClipboard(app);
   try {
     await body();
   } finally {

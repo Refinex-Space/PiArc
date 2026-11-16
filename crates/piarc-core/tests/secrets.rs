@@ -23,9 +23,12 @@ struct Fixture {
 impl Fixture {
     fn new(label: &str, lease: Duration) -> Self {
         let dir = std::env::temp_dir().join(format!(
-            "piarc core secrets {label} {}-{:?}",
+            "piarc core secrets {label} {}-{}",
             std::process::id(),
             std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("after 1970")
+                .as_nanos()
         ));
         std::fs::create_dir_all(&dir).expect("dir");
         let store = Arc::new(MemorySecretStore::new());
