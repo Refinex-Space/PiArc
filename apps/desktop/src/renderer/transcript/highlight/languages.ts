@@ -61,8 +61,10 @@ export function languageId(lang: string | null): string | null {
   if (lang === null) {
     return null;
   }
-  const id = ALIASES[lang.toLowerCase()];
-  return id ?? null;
+  // The info string is untrusted text: look up own keys only, so names such as `constructor`
+  // or `__proto__` do not reach `Object.prototype` and hand a function to the worker.
+  const key = lang.toLowerCase();
+  return Object.hasOwn(ALIASES, key) ? (ALIASES[key] ?? null) : null;
 }
 
 /** Code longer than this stays plain text: highlighting it would cost more than it helps. */
