@@ -6,85 +6,85 @@
       "id": "R1-A01",
       "task": "R1",
       "description": "`docs/spikes/M0-summary.md` 列出 S1–S10 在 macOS 与 Windows 上的结论、关键数据与报告链接，有条件通过与未验证项写明条件与跟进任务。验证：文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/spikes/M0-summary.md 第 2 节总表列出 S1–S10 × macOS/Windows 的结论、关键数据与报告链接；第 3 节列出有条件通过与未验证项的条件、风险与跟进任务（T19、W1、T50、T44、T39）。"
     },
     {
       "id": "R1-A02",
       "task": "R1",
       "description": "ADR 触发条件检查表覆盖 ADR-0013–0018 的全部触发条件，以及 ADR-0004、0009、0010 中与 S4、S9、S3 相关的条件，每条有证据与\"是否触发\"；已触发的条件有 ADR 提议。验证：检查表与 ADR 文件。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "M0-summary.md 第 5 节逐条列出 ADR-0013–0018 的全部触发条件与 ADR-0004（S4）、0009（S9）、0010（S3）的条件，每条有原文、M0 证据与是否触发；没有触发的条件，因此没有新的 ADR 提议。"
     },
     {
       "id": "R1-A03",
       "task": "R1",
       "description": "ADR-0015 与 ADR-0018 中留给 M0 的事项逐项有结论，或有负责任务。验证：检查表。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "M0-summary.md 第 6 节逐项给出 hardened runtime、内置 node 签名、系统通知、钥匙串弹窗次数、LoadBrowserProcessSpecificV8Snapshot、Velopack 接入、清单校验、首次运行与 SmartScreen、TCC、npx 原生模块、Seatbelt 下的工具、PI_PACKAGE_DIR、安装包增量的结论或负责任务（T44、T50、T39、T45、T36）。"
     },
     {
       "id": "R1-A04",
       "task": "R1",
       "description": "四个只读审查子代理按维度表并行完成，原始发现全部记录在 `docs/reviews/R1-findings.md`。验证：文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "四个只读子代理（read-only-reviewer）按维度表并行审查（E 7、C 11、A 15、Q 15 条），原始发现逐条记录在 docs/reviews/R1-findings.md（提交 77b8bf8、e9e9e9b）。"
     },
     {
       "id": "R1-A05",
       "task": "R1",
       "description": "每条发现都有核实结论（确认 / 不同意及理由）与处理（修复提交 / 登记事项编号 / ADR），没有未处理的项。验证：发现记录。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "R1-findings.md 每条都有核实结论（确认 / 部分确认 / 不同意及理由）与处理（修复提交、登记 I50–I61、技术债或豁免），文末汇总表 48 行，没有\"待核实\"或\"待定\"的项。"
     },
     {
       "id": "R1-A06",
       "task": "R1",
       "description": "每个确认并修复的缺陷都有先失败、后通过的测试。验证：测试输出与提交记录。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "12 个确认并修复的缺陷各有修复前失败、修复后通过的测试，各自单独提交：8a6e3e5（languages.test.ts）、d50b9a2（terminal-ipc.test.ts）、15857e6（event-ipc.test.ts）、c7173d8（external-links.test.ts）、8f158c8（content.rs 并发 blob）、00f805e（event_channel.rs SinkClosed）、dc1f2ad、f99a76f、c800fa1、396c116（resilience.rs 四个用例）、1ac1470（core-io.test.ts、core-bridge.test.ts）；失败输出见会话记录与 R1-findings.md 各条的核实一栏。"
     },
     {
       "id": "R1-A07",
       "task": "R1",
       "description": "第 11 章每一行都对照了两个平台的实测值；改动只收紧，放宽的行（如有）在修订记录中写明原因。验证：架构文档 diff 与修订记录。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "架构 v2.17 第 11 章每一行都列出两个平台的 M0 实测值（未测的写\"未测\"）；收紧 3 行，放宽 2 行（主进程内存、macOS 进程合计），原因写在第 18 章 v2.17 修订记录；超出且不放宽的行交 T44（M0 总结第 7 节）。"
     },
     {
       "id": "R1-A08",
       "task": "R1",
       "description": "架构文档中与 M0 结论不一致的章节已同步，版本号已递增，修订记录已追加。验证：架构文档 diff。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "架构 v2.16 → v2.17：同步 3.4、6.1.1、8.5、10.3、第 11 章、第 14 章 R1/R5/R15、15.2、第 16 章 M0 状态与结论，修订记录已追加（提交 9fb4801）。"
     },
     {
       "id": "R1-A09",
       "task": "R1",
       "description": "根目录与各模块 CLAUDE.md 中的命令都实际执行成功，长度符合 `docs/engineering/claude-md.md` 的上限。验证：命令输出与行数统计。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "根与 14 份模块 CLAUDE.md 中的命令逐条执行：76 条中 75 条首次即成功，npm run start -w @piarc/desktop 经日志核实启动成功（Core 加载、测试钩子安装，脚本的匹配串不对、退出码 143 来自 pkill）；npm ci --ignore-scripts 与 electron install.js 成功；全量 L4 138 通过 1 跳过（a90ad25 修复终端 IME 用例的 locale 之后）。pack-windows.mjs 只在 Windows CI 运行（package-windows 作业，运行 43855932047 通过），s6-probe.mjs 的 serve 与 keychain 子命令需要人在场，未运行。行数：根 96（上限 200），模块最大 89（apps/desktop，上限 120）。"
     },
     {
       "id": "R1-A10",
       "task": "R1",
       "description": "`acceptance.json` 中 T02–T12 与 W0 的验收项都是 `passing` 或带原因的 `blocked`，`blocked` 项在结论中有处理；M0 登记事项逐条有归属。验证：`acceptance.json` 与 `PLAN.md`。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "T02–T12 的 144 项与 W0 的 15 项全部 passing：W0-A04、A10 经用户在 R1 中授权按第 11 章校准口径改判（fb950c9，计划变更记录 v1.3）；M0 登记事项 I01–I49 在 PLAN.md 中逐条有归属，R1 决定的 12 项见 M0 总结第 8 节。"
     },
     {
       "id": "R1-A11",
       "task": "R1",
       "description": "结论明确为\"进入 M1\"\"有条件进入\"\"不进入\"之一，前提条件或阻塞项各有负责任务，已写入 `M0-summary.md`、`docs/reviews/README.md` 与 `PLAN.md`。验证：文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "结论\"有条件进入 M1\"写入 docs/spikes/M0-summary.md 第 1、9 节、docs/reviews/README.md 与 PLAN.md 会话日志；7 项前提条件各有负责任务（W1、T19、T14、T16、T17、T21、T44、T50、T33、T34）与检查时间点（R2–R6）。"
     },
     {
       "id": "R1-A12",
       "task": "R1",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify：13 步全部通过（Prettier、ESLint、tsc、Core 模块与 API 快照、Vitest、cargo fmt、clippy、cargo test、protocol drift、contract samples、cargo-deny、crate 依赖、验收清单），在 npm ci --ignore-scripts 之后运行。"
     },
     {
       "id": "R2-A01",

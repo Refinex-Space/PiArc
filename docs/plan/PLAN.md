@@ -95,7 +95,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | 阶段 | 内容 | 任务 | 阶段门 | 状态 |
 |---|---|---|---|---|
 | 0 工程基座 | 脚手架、质量门禁、工程规范、协议与契约测试 | T01–T02 | — | 已完成 |
-| 1 M0 技术验证 | Electron 安全基线、NAPI 事件通道、mock provider、Agent Host 多会话与 AHP、Operations 委托、凭据保险箱、transcript 渲染、终端、沙箱、打包与首次运行；S1–S10 两个平台的结论 | T03–T12、W0 | R1 | 进行中 |
+| 1 M0 技术验证 | Electron 安全基线、NAPI 事件通道、mock provider、Agent Host 多会话与 AHP、Operations 委托、凭据保险箱、transcript 渲染、终端、沙箱、打包与首次运行；S1–S10 两个平台的结论 | T03–T12、W0 | R1 | 已完成（有条件进入 M1） |
 | 2 M1 可行走骨架 | 存储与信任、会话编排与投影、L2 场景、文件工具与 Bash、客户端外壳、transcript 与 composer、基础审批、模型与凭据、system prompt 与 memory | T13–T22 | R2 | 未开始 |
 | 3 M2 Harness 核心 | 权限规则与 Bash 分析、配置兼容层、hooks、计划模式与任务清单、压缩与用量、检查点与回退、WebFetch 与登录、L3 对齐；Windows 达到 M1 | W1、T23–T30 | R3 | 未开始 |
 | 4 M3 多会话与生态 | 子 agent、后台任务、终端、worktree 与并行会话、MCP、skills 与命令、WebSearch 与 hooks 扩展；Windows 达到 M2 | W2、T31–T38 | R4 | 未开始 |
@@ -121,7 +121,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 已完成 | 1b92a25 |
 | T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 已完成 | 815c32d |
 | W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 已完成 | f278039 |
-| R1 | [M0 评审与收口](tasks/R1-m0-review.md) | 1 | W0 | macOS | high | 中 | S1–S10 汇总 | 进行中 | — |
+| R1 | [M0 评审与收口](tasks/R1-m0-review.md) | 1 | W0 | macOS | high | 中 | S1–S10 汇总 | 已完成 | 6eef36d |
 | T13 | [存储、数据目录、配置与项目信任](tasks/T13-storage-config-and-trust.md) | 2 | R1（结论为进入 M1） | macOS | high | 大 | 无 | 未开始 | — |
 | T14 | [会话编排与事件投影](tasks/T14-session-orchestration-and-projection.md) | 2 | T13 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T15 | [无头驱动、L2 场景运行器与能力清单](tasks/T15-devcli-l2-scenarios-and-capabilities.md) | 2 | T14 | macOS | high | 中 | 无 | 未开始 | — |
@@ -294,19 +294,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-R1（M0 评审与收口），开工 2026-11-16。依赖 W0 为"部分完成"：遗留的 W0-A04、A10（Windows 测量口径，I44）本就交 R1 处理，不影响开工。基线 `npm run verify` 见会话记录。
-
-- [x] 四个只读审查子代理（Electron 安全与 IPC、Core/NAPI 并发与错误边界、Agent Host/AHP 健壮性、工程质量与 CLAUDE.md 一致性）并行完成，原始发现记入 `docs/reviews/R1-findings.md`（A04）
-- [x] 逐条核实发现；确认的先写失败测试再修复，每个修复单独提交；其余写理由或登记（A05、A06）
-- [x] `docs/spikes/M0-summary.md`：S1–S10 × 两平台总表、有条件通过与未验证项、对后续任务的影响（A01）
-- [x] ADR 触发条件检查表：ADR-0013–0018 全部条件与 ADR-0004/0009/0010 中 S4/S9/S3 相关条件；ADR-0015/0018 留给 M0 的事项（A02、A03）
-- [x] 第 11 章预算校准（两平台实测、只收紧、放宽写原因），I12、I26、I41、I44、I45（A07）
-- [x] 架构文档同步 M0 结论、版本号递增、修订记录（A08）
-- [x] 根目录与各模块 CLAUDE.md 的命令实际执行、长度符合上限（A09）：76 条命令中 75 条成功（日志在会话 scratchpad，未入库）；`npm run start -w @piarc/desktop` 的自动判定失败（未在 120 s 内匹配到启动日志），待人工复核；`npm ci --ignore-scripts`、`pack-windows.mjs`（Windows 专用，CI 覆盖）、`s6-probe.mjs serve`/`keychain` 未运行。L4 136 通过、2 失败（终端输入法用例，原因是会话环境 LANG 为空，已修复后单独重跑 8/8 通过），修复后未重跑全量 L4
-- [ ] 续做：复核 `npm run start`；全量 L4 重跑；可选：S1 macOS 输入法清单经 computer-use 核对（否则交 T19）
-- [x] M0 验收项与登记事项逐条归属（A10）
-- [ ] 结论写入 `M0-summary.md`、`docs/reviews/README.md`、`PLAN.md`；技术债排序；spikes README 同步（A11）
-- [ ] 收尾 `npm run verify`（A12）
+（当前没有进行中的任务）
 
 ## 登记事项
 
@@ -523,6 +511,13 @@ R1（M0 评审与收口），开工 2026-11-16。依赖 W0 为"部分完成"：�
 - 结果：`core-build`、`core-load` 四个目标与四个打包作业通过；win32-arm64 的加载检查报 `terminal ok`，I47 已落地
 - 失败与处理：`desktop L4 (windows-latest)` 的 `terminal-tui.e2e.ts` vim 用例两种形态失败——runner 未设 `LANG`，Git 的 vim 在 `-u NONE` 下按 latin1 读文件、中文显示为字节转义（本机清空 locale 变量复现，54c63bd 用 `--cmd 'set encoding=utf-8'` 修复，Windows 待下一次 CI 确认）；`verify (windows-latest)` 的 `cargo test` 因同一原因失败在 `piarc-term --test pty_windows` 的 vim 用例，macOS 版 `pty.rs` 同修（I38 已落地）；`desktop L4 (macos-latest)` 的 `transcript-scroll.e2e.ts` "the wheel releases and resumes following"（packaged）离底 31 px，即 I32，按登记交 T19/T44
 - 未推送：e2c302d、bdd540a、54c63bd 与本条记录
+
+### 2026-11-16 R1 已完成（提交 6eef36d）
+- 结论：**有条件进入 M1**，T13 可以开始。没有不通过的验证项，没有触发 ADR 的重新评估；前提条件 7 项（W1 复测 Windows 口径、T19/W1 的真实输入法与日文、M1 任务处理 I50 与 I53、I56–I59、T44 的内存与体积、T50 的首次运行放行、T33/T34 的终端），检查点 R2–R6，见 `docs/spikes/M0-summary.md` 第 9 节
+- 交付：`docs/spikes/M0-summary.md`（总表、ADR 触发条件检查表、ADR-0015/0018 的 M0 事项、预算校准、登记事项归属）；`docs/reviews/R1-findings.md`（四个只读子代理的 48 条发现与处理）；12 个缺陷修复（渲染进程崩溃、终端孤儿与订阅归属、外链确认框、并发 blob、合并器下溢、Agent Host 断开后命令不取消、恢复会话丢失、心跳两处、工具请求的孤立代理项）；架构 v2.17（第 11 章逐行实测与校准、3.4、10.3、14、15.2、16 章同步）；`third-party/sources.json` 登记 Pi 移植代码与 Pi 字形；`testing.md` 登记网络与凭据库测试的例外；CLAUDE.md 精简；终端 L4 固定 UTF-8 locale
+- 验收：12 项通过，0 项阻塞；经用户授权按校准口径改判 W0-A04、A10，W0 改为已完成（计划变更记录 v1.3）
+- 决策：未写 ADR；预算收紧 3 行、放宽 2 行（主进程内存改为相对裸 Electron 的增量，macOS 进程合计 510 MB），原因写在架构第 18 章；Windows 的事件循环与回显改用对抖动稳健的口径；I19/I46 不新增独立请求通道
+- 遗留：I50–I61（审查中范围较大的问题，已指派）；技术债 9 条；S1 macOS composer 的真实输入法核对交 T19；分支未推送
 
 ## 计划变更记录
 
