@@ -1,0 +1,44 @@
+
+; PiArc: reads
+(allow file-read*)
+(deny file-read*
+  (subpath (param "DENY_READ_0"))
+  (subpath (param "DENY_READ_1")))
+
+; PiArc: writes
+(allow file-write*
+  (subpath (param "WRITABLE_0"))
+  (subpath (param "WRITABLE_1"))
+  (subpath (param "WRITABLE_2")))
+(allow file-write-data (literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr") (literal "/dev/tty") (regex #"^/dev/fd/[0-9]+$"))
+
+; PiArc: protected paths
+(deny file-write*
+  (regex (string-append "^" (param "WRITABLE_0_RE") "/(.*/)?(\\.git/hooks|\\.git/config|\\.git/config\\.worktree|\\.git/modules/.+/hooks|\\.git/modules/.+/config|\\.git/worktrees/[^/]+/config\\.worktree|\\.piarc|\\.claude|\\.pi|\\.mcp\\.json|\\.vscode|\\.idea|\\.gitconfig|\\.bashrc|\\.bash_profile|\\.bash_login|\\.bash_logout|\\.profile|\\.zshrc|\\.zshenv|\\.zprofile|\\.zlogin|\\.zlogout)(/.*)?$"))
+  (regex (string-append "^" (param "WRITABLE_1_RE") "/(.*/)?(\\.git/hooks|\\.git/config|\\.git/config\\.worktree|\\.git/modules/.+/hooks|\\.git/modules/.+/config|\\.git/worktrees/[^/]+/config\\.worktree|\\.piarc|\\.claude|\\.pi|\\.mcp\\.json|\\.vscode|\\.idea|\\.gitconfig|\\.bashrc|\\.bash_profile|\\.bash_login|\\.bash_logout|\\.profile|\\.zshrc|\\.zshenv|\\.zprofile|\\.zlogin|\\.zlogout)(/.*)?$"))
+  (regex (string-append "^" (param "WRITABLE_2_RE") "/(.*/)?(\\.git/hooks|\\.git/config|\\.git/config\\.worktree|\\.git/modules/.+/hooks|\\.git/modules/.+/config|\\.git/worktrees/[^/]+/config\\.worktree|\\.piarc|\\.claude|\\.pi|\\.mcp\\.json|\\.vscode|\\.idea|\\.gitconfig|\\.bashrc|\\.bash_profile|\\.bash_login|\\.bash_logout|\\.profile|\\.zshrc|\\.zshenv|\\.zprofile|\\.zlogin|\\.zlogout)(/.*)?$")))
+(deny file-write-unlink
+  (regex (string-append "^" (param "WRITABLE_0_RE") "/(.*/)?(\\.git|\\.git/modules|\\.git/worktrees)$"))
+  (regex (string-append "^" (param "WRITABLE_1_RE") "/(.*/)?(\\.git|\\.git/modules|\\.git/worktrees)$"))
+  (regex (string-append "^" (param "WRITABLE_2_RE") "/(.*/)?(\\.git|\\.git/modules|\\.git/worktrees)$")))
+(deny file-write-unlink
+  (subpath (param "DENY_READ_0"))
+  (subpath (param "DENY_READ_1"))
+  (literal (param "KEEP_0")))
+
+; PiArc: network (the proxy only)
+(allow network-outbound (remote ip "localhost:50123"))
+
+; PiArc: no writes through read-only descriptors
+(deny system-fcntl (fcntl-command 80 110))
+
+;; params
+DENY_READ_0=/Users/dev/.ssh
+DENY_READ_1=/Users/dev/项目 one/secrets/key.pem
+WRITABLE_0=/Users/dev/项目 one
+WRITABLE_0_RE=/Users/dev/项目 one
+WRITABLE_1=/Users/dev/Library/Application Support/PiArc/sessions/s1/tmp
+WRITABLE_1_RE=/Users/dev/Library/Application Support/PiArc/sessions/s1/tmp
+WRITABLE_2=/Users/dev/extra [x]
+WRITABLE_2_RE=/Users/dev/extra \[x\]
+KEEP_0=/Users/dev/项目 one/secrets

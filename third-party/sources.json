@@ -36,6 +36,22 @@
       },
       "usedBy": "apps/desktop/src/renderer/terminal/vendor/ghostty-web/renderer.ts (modified; changes listed in README.md next to it)",
       "addedBy": "T10"
+    },
+    {
+      "id": "openai-codex-seatbelt-base-policy",
+      "name": "OpenAI Codex Seatbelt base policy",
+      "version": "main@aea4c6e",
+      "license": "Apache-2.0",
+      "licenseFile": "third-party/licenses/openai-codex.LICENSE",
+      "copyright": "Copyright 2025 OpenAI",
+      "source": {
+        "repository": "https://github.com/openai/codex",
+        "path": "codex-rs/sandboxing/src/seatbelt_base_policy.sbpl",
+        "commit": "aea4c6ee4b652d84b416731b11c2b8299d767209"
+      },
+      "usedBy": "crates/piarc-sandbox/src/seatbelt/base.sbpl (copied unmodified after a PiArc header comment; compiled into the Core module with include_str!)",
+      "addedBy": "T11",
+      "notes": "Codex's NOTICE reads \"OpenAI Codex / Copyright 2025 OpenAI\" (its Ratatui note concerns code PiArc does not use); T50 reproduces it in THIRD_PARTY_NOTICES."
     }
   ]
 }

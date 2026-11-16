@@ -18,3 +18,29 @@
 //!
 //! The authoritative rules are in `crates/deps-rules.json`, enforced by
 //! `scripts/ci/check-crate-deps.mjs` (architecture section 7.1).
+//!
+//! # Implemented so far (T11)
+//!
+//! - [`SandboxPolicy`] → [`ResolvedPolicy`]: writable directories, `denyRead`, the protected
+//!   paths ([`PROTECTED_PATHS`]), canonical and with symlinks resolved.
+//! - [`CommandSandbox`] and [`platform_sandbox`]: Seatbelt on macOS (`seatbelt` module: one
+//!   profile per command, paths passed as `sandbox-exec -D` parameters), none elsewhere.
+//! - [`sandbox_env`]: proxy variables, `TMPDIR` and package caches in the session's
+//!   temporary directory.
+//!
+//! `piarc-core` hands the wrapper to `piarc-exec`, which runs it with its process-tree spawner;
+//! this crate starts no processes.
+
+mod env;
+mod error;
+mod platform;
+mod policy;
+#[cfg(target_os = "macos")]
+pub mod seatbelt;
+
+pub use env::sandbox_env;
+pub use error::{Error, Result};
+#[cfg(target_os = "macos")]
+pub use platform::Seatbelt;
+pub use platform::{CommandSandbox, SandboxedLaunch, platform_sandbox};
+pub use policy::{PROTECTED_PATHS, ResolvedPolicy, SandboxPolicy};
