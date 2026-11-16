@@ -121,7 +121,7 @@ TLS：配置没有放开 `trustd`、`ocspd` 等证书服务（它们会替调用
 | A07 常见命令 | 通过 | `sandbox_commands.rs`（见第 8 节） |
 | A08 经 Core 执行 | 通过 | `sandboxed_commands_stream_and_report_exit_codes`（第一块输出在命令结束前到达、退出码 7 与 stderr、通知通道关闭即终止）；`killing_a_sandboxed_command_leaves_no_process`：bash → sh → sleep 共 5 个进程，`exec/kill` 后响应 `killed: true`、`signal: 9`，`ps` 中该进程组为空（日志：`before kill, group 1605: [1605, 1608, 1610, 1616, 1617]`，`after kill … []`）；会话关闭后代理端口不再监听 |
 | A09 空格与中文路径 | 通过 | 上述测试的工作区为 `piarc sandbox … 中文 …/ws 工作 区 [x](y)+`，附加目录为 `extra 附加`；配置快照与参数用例覆盖中文与 `[x]` 的转义 |
-| A10 Job Object | 待 CI | `piarc-exec` 的 `tree::tests::windows`（父 cmd → 子 cmd → 孙 ping，关闭 Job 与终止 Job 两个用例）与 `job::tests`（无 breakaway 标志）只在 Windows 编译运行；本机无法编译 Windows 目标 |
+| A10 Job Object | 待 CI | `piarc-exec` 的 `tree::tests::windows`（父 cmd → 子 cmd → 孙 ping，关闭 Job 与终止 Job 两个用例）与 `job::tests`（无 breakaway 标志）只在 Windows 运行；本机已用 `cargo clippy --target x86_64-pc-windows-msvc --workspace --all-targets -- -D warnings` 做类型检查与 lint（通过），未运行 |
 | A11 测量 | 通过 | 第 9 节 |
 
 ## 8. 常见命令
@@ -163,6 +163,7 @@ TLS：配置没有放开 `trustd`、`ocspd` 等证书服务（它们会替调用
 
 - 第一版不提供 OS 级沙箱（需求 D7）：`platform_sandbox()` 在 Windows 返回 `None`，`open_sandboxed_session` 返回 `internalError`（"commands cannot be sandboxed on this platform"）。设置页的提示与不静默降级由 T39 实现。
 - Job Object 实现在 `piarc-exec` 的 `job` 模块（safe 封装，`unsafe` 只在这个模块，编码规范 2.8），作为 `ProcessSpawner` 的 Windows 实现 `ProcessTreeSpawner`。
+- 已在 macOS 上对 Windows 目标做类型检查与 lint（整个 workspace 通过；顺带修了 T07 测试中两处只在 Windows 出现的 `unused_mut`）。
 - 待 Windows CI：`cargo test -p piarc-exec` 中的三级进程树用例与 Job 标志用例。
 - 待 W0 实机：Job Object 终止进程树（包括 T12 用它启动的 Agent Host 及其子进程、Agent Host 被杀时其子进程随之结束）。
 

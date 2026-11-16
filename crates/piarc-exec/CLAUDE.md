@@ -39,4 +39,4 @@
 
 - `ProcessControl::wait` 与 `kill` 都借用 `&mut self`：等待与取消要分两步写（`watch` 函数），不能在同一个 `select!` 分支里既等又杀。
 - 测试里的命令用 `exec sleep`，让 shell 被替换，终止直接子进程即可结束管道；不用 `exec` 时后台进程会占住管道直到 `EXIT_GRACE`。
-- Windows 代码只能由 CI 编译（本机未装 Windows 目标）：改 `job.rs`、`tree.rs` 的 Windows 部分后，推送前按 windows-sys 0.61.2 的源码核对签名。
+- Windows 代码在 macOS 上只能做类型检查与 lint（`cargo clippy --target x86_64-pc-windows-msvc -p piarc-exec --all-targets -- -D warnings`，需先 `rustup target add x86_64-pc-windows-msvc`）；Job Object 的测试只在 Windows CI 运行。

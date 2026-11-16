@@ -30,6 +30,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `npx vitest run <路径>` | 只跑某个目录或文件的测试 |
 | `cargo test -p <crate>` | 只跑某个 crate 的测试（检查点提交用） |
 | `cargo clippy -p <crate> --all-targets -- -D warnings` | 只检查某个 crate |
+| `cargo clippy --target x86_64-pc-windows-msvc --workspace --all-targets -- -D warnings` | 在 macOS 上类型检查与 lint Windows 代码（`cfg(windows)`）；需先 `rustup target add x86_64-pc-windows-msvc`（经用户同意安装），只编译不运行 |
 | `.tools/bin/cargo-deny check` | 许可证、安全公告、来源检查 |
 | `PIARC_REQUIRE_KEYCHAIN=1 cargo test -p piarc-secrets --test system_store -- --nocapture` | 真实系统凭据库（macOS 登录钥匙串）中创建、读取、删除测试主密钥；不设该变量时凭据库不可用只打印 NOT RUN |
 | `node scripts/ci/check-crate-deps.mjs` | crate 依赖方向检查（规则在 `crates/deps-rules.json`） |

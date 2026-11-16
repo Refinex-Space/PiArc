@@ -172,10 +172,18 @@ async fn every_fs_method_refuses_paths_outside_the_workspace() {
     let f = Fixture::new("boundary");
     let outside = f.path("outside.txt");
     // Files and directories outside: by absolute path, by `..`, through symlinks.
+    #[cfg_attr(
+        not(unix),
+        allow(unused_mut, reason = "the symlink cases below are added on Unix only")
+    )]
     let mut files = vec![
         outside.to_string_lossy().into_owned(),
         "../outside.txt".to_owned(),
     ];
+    #[cfg_attr(
+        not(unix),
+        allow(unused_mut, reason = "the symlink cases below are added on Unix only")
+    )]
     let mut dirs = vec![f.root.to_string_lossy().into_owned(), "..".to_owned()];
     #[cfg(unix)]
     {
