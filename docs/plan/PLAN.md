@@ -296,7 +296,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 T12 打包、首次运行与发布清单（开工 2026-11-16；依赖中 T03、T04、T11 为"部分完成"，遗留项都是 Windows CI 核对，不影响本任务；D2 已决定；分支未推送，前序 Windows CI 未核对）
 
-- [ ] 1. 第三方二进制清单（node、rg、fd、Velopack 工具）与下载校验脚本
+- [x] 1. 第三方二进制清单（node、rg、fd、Velopack 工具）与下载校验脚本
 - [ ] 2. 打包布局：`Resources/agent-host/`（node、bundle、pi-assets、photon、bin/rg fd），图标引用 `design/brand/`，bundle id 取自集中标识
 - [ ] 3. 签名分层（node 保留官方签名，rg/fd/.node ad-hoc，外层不 `--deep`）、DMG + ZIP（arm64、x64）、布局检查脚本、hardened runtime 结论（A01–A03、A14）
 - [ ] 4. Core 从打包产物启动 Agent Host：宽松 Seatbelt、`ProcessTreeSpawner`（I33）、最小环境变量、`PI_PACKAGE_DIR`

@@ -52,6 +52,68 @@
       "usedBy": "crates/piarc-sandbox/src/seatbelt/base.sbpl (copied unmodified after a PiArc header comment; compiled into the Core module with include_str!)",
       "addedBy": "T11",
       "notes": "Codex's NOTICE reads \"OpenAI Codex / Copyright 2025 OpenAI\" (its Ratatui note concerns code PiArc does not use); T50 reproduces it in THIRD_PARTY_NOTICES."
+    },
+    {
+      "id": "nodejs",
+      "name": "Node.js runtime (node, npm, npx)",
+      "version": "24.22.3",
+      "license": "MIT AND others (see the licence file: Node.js bundles npm and third-party code under their own permissive licences)",
+      "licenseFile": "third-party/licenses/nodejs-24.22.3.LICENSE",
+      "copyright": "Copyright Node.js contributors. All rights reserved.",
+      "source": {
+        "repository": "https://github.com/nodejs/node",
+        "tag": "v24.22.3",
+        "artefacts": "https://nodejs.org/dist/v24.22.3/ (locked in third-party/binaries.lock.json)"
+      },
+      "usedBy": "Resources/agent-host/node/ of the packaged app: runs the Agent Host and the MCP servers it starts (ADR-0015); node keeps the Node.js Foundation signature on macOS",
+      "addedBy": "T12",
+      "notes": "Only bin/node, bin/npm, bin/npx, lib/node_modules/npm and LICENSE ship (node.exe, npm, npx and node_modules/npm on Windows); headers, docs and corepack are left out by scripts/dev/fetch-binaries.mjs."
+    },
+    {
+      "id": "ripgrep",
+      "name": "ripgrep (rg)",
+      "version": "15.2.0",
+      "license": "MIT OR Unlicense",
+      "licenseFile": "third-party/licenses/ripgrep-15.2.0.LICENSE",
+      "copyright": "Copyright (c) 2015 Andrew Gallant",
+      "source": {
+        "repository": "https://github.com/BurntSushi/ripgrep",
+        "tag": "15.2.0",
+        "artefacts": "GitHub release assets (locked in third-party/binaries.lock.json)"
+      },
+      "usedBy": "Resources/agent-host/bin/rg: preinstalled so Pi never downloads it at run time (ADR-0015 rule 7); ad-hoc signed on macOS",
+      "addedBy": "T12"
+    },
+    {
+      "id": "fd",
+      "name": "fd",
+      "version": "10.5.0",
+      "license": "MIT OR Apache-2.0",
+      "licenseFile": "third-party/licenses/fd-10.5.0.LICENSE",
+      "copyright": "Copyright (c) 2017-present The fd developers",
+      "source": {
+        "repository": "https://github.com/sharkdp/fd",
+        "tag": "v10.5.0",
+        "artefacts": "GitHub release assets (locked in third-party/binaries.lock.json)"
+      },
+      "usedBy": "Resources/agent-host/bin/fd: preinstalled so Pi never downloads it at run time (ADR-0015 rule 7); ad-hoc signed on macOS",
+      "addedBy": "T12"
+    },
+    {
+      "id": "velopack-update",
+      "name": "Velopack installer and Update.exe",
+      "version": "1.2.161",
+      "license": "MIT",
+      "licenseFile": "third-party/licenses/velopack-1.2.161.LICENSE",
+      "copyright": "Copyright © 2021 Caelan Sayler; Copyright © 2024 Velopack Ltd.",
+      "source": {
+        "repository": "https://github.com/velopack/velopack",
+        "tag": "1.2.161",
+        "commit": "92d6a1c91716729d449034df5c50307dcce39493",
+        "artefacts": "vpk 1.2.161 from nuget.org (locked in third-party/binaries.lock.json)"
+      },
+      "usedBy": "Windows installers built by vpk pack: Setup.exe and the Update.exe it installs next to PiArc (the npm package velopack, the main-process binding, is covered by npm metadata)",
+      "addedBy": "T12"
     }
   ]
 }

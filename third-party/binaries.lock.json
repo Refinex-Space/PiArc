@@ -1,0 +1,107 @@
+{
+  "$comment": [
+    "Third-party binaries that packaging downloads (architecture section 5.6, ADR-0015): the Node.js runtime, ripgrep and fd that ship in Resources/agent-host/, and Velopack's vpk tool that builds the Windows installers.",
+    "scripts/dev/fetch-binaries.mjs downloads each artefact into .tools/cache/binaries/, checks size and SHA-256 against this file and fails on any mismatch; nothing is downloaded without an entry here.",
+    "Node: the SHA-256 values are copied from https://nodejs.org/dist/v<version>/SHASUMS256.txt. ripgrep and fd: from the release assets' digests on GitHub (and ripgrep's .sha256 files). vpk: computed from the nuget.org package.",
+    "Bumping a version: update version, url, size and sha256 together, run `node scripts/dev/fetch-binaries.mjs --all` and record the licence in third-party/sources.json."
+  ],
+  "binaries": {
+    "node": {
+      "version": "24.22.3",
+      "artefacts": {
+        "darwin-arm64": {
+          "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-darwin-arm64.tar.gz",
+          "size": 53084299,
+          "sha256": "ff6e17d4874b76d272212b908cc020d6e815fba5a6c7eaaa06add725840307fd",
+          "root": "node-v24.22.3-darwin-arm64"
+        },
+        "darwin-x64": {
+          "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-darwin-x64.tar.gz",
+          "size": 54395976,
+          "sha256": "977614af0504c81045e7fd85596dbca0e5f951b96681516dadafedcca8c447f7",
+          "root": "node-v24.22.3-darwin-x64"
+        },
+        "win32-x64": {
+          "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-win-x64.zip",
+          "size": 37762649,
+          "sha256": "e612af99f626ab415ea225af6bce5c971feb448cb5cae250bb1c3fa50c5f7d9f",
+          "root": "node-v24.22.3-win-x64"
+        },
+        "win32-arm64": {
+          "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-win-arm64.zip",
+          "size": 33802073,
+          "sha256": "b3cc74a295b39d4f273271e96f58c06dd2b35757ca12abec64c7d0598b434f14",
+          "root": "node-v24.22.3-win-arm64"
+        }
+      }
+    },
+    "ripgrep": {
+      "version": "15.2.0",
+      "artefacts": {
+        "darwin-arm64": {
+          "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-aarch64-apple-darwin.tar.gz",
+          "size": 1764284,
+          "sha256": "3750b2e93f37e0c692657da574d7019a101c0084da05a790c83fd335bad973e4",
+          "root": "ripgrep-15.2.0-aarch64-apple-darwin"
+        },
+        "darwin-x64": {
+          "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-apple-darwin.tar.gz",
+          "size": 1878284,
+          "sha256": "af7825fcc69a2afc7a7aea55fc9af90e26421d8f20fe59df32e233c0b8a231c1",
+          "root": "ripgrep-15.2.0-x86_64-apple-darwin"
+        },
+        "win32-x64": {
+          "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-pc-windows-msvc.zip",
+          "size": 1789611,
+          "sha256": "71b2fef860abe467217a538ff31de02f5258807c0129f771846f87bd029aafc5",
+          "root": "ripgrep-15.2.0-x86_64-pc-windows-msvc"
+        },
+        "win32-arm64": {
+          "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-aarch64-pc-windows-msvc.zip",
+          "size": 1640124,
+          "sha256": "e4abca10c3a64ebea742667dd7009449d49403db5460dd6873e389fa2945360f",
+          "root": "ripgrep-15.2.0-aarch64-pc-windows-msvc"
+        }
+      }
+    },
+    "fd": {
+      "version": "10.5.0",
+      "artefacts": {
+        "darwin-arm64": {
+          "url": "https://github.com/sharkdp/fd/releases/download/v10.5.0/fd-v10.5.0-aarch64-apple-darwin.tar.gz",
+          "size": 1334374,
+          "sha256": "b67e1836c468e42e411984b56e52fa7abec08c2bd22c867398e7cc134aac5e12",
+          "root": "fd-v10.5.0-aarch64-apple-darwin"
+        },
+        "darwin-x64": {
+          "url": "https://github.com/sharkdp/fd/releases/download/v10.5.0/fd-v10.5.0-x86_64-apple-darwin.tar.gz",
+          "size": 1426858,
+          "sha256": "7e31028c62c6955877735d0406807aa484c2a5e6f86235a59e26c29c301da590",
+          "root": "fd-v10.5.0-x86_64-apple-darwin"
+        },
+        "win32-x64": {
+          "url": "https://github.com/sharkdp/fd/releases/download/v10.5.0/fd-v10.5.0-x86_64-pc-windows-msvc.zip",
+          "size": 1535063,
+          "sha256": "a227701b8551c35a9931d9f6da75503cf86d88e182d71fb849a70864c5d57cd7",
+          "root": "fd-v10.5.0-x86_64-pc-windows-msvc"
+        },
+        "win32-arm64": {
+          "url": "https://github.com/sharkdp/fd/releases/download/v10.5.0/fd-v10.5.0-aarch64-pc-windows-msvc.zip",
+          "size": 1370512,
+          "sha256": "a2bcddcfd259b05357a77bbc6cd671fdb30f63fd266a0e748305890a8c5ceaa6",
+          "root": "fd-v10.5.0-aarch64-pc-windows-msvc"
+        }
+      }
+    },
+    "vpk": {
+      "version": "1.2.161",
+      "artefacts": {
+        "any": {
+          "url": "https://api.nuget.org/v3-flatcontainer/vpk/1.2.161/vpk.1.2.161.nupkg",
+          "size": 146897348,
+          "sha256": "ac9be73846d9a7a76483f8684abd1503cd50703b992727429dcdc045589c5e08"
+        }
+      }
+    }
+  }
+}
