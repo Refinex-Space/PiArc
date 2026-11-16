@@ -4983,8 +4983,8 @@
       "id": "W0-A04",
       "task": "W0",
       "description": "S2：win32-x64 在开发模式与打包产物中加载 `.node`；完整基准无丢失无乱序，主进程事件循环延迟 p99 ≤ 16 ms，同步调用 p99 ≤ 1 ms。验证：基准输出。",
-      "status": "failing",
-      "evidence": "开发与打包形态加载 .node 通过（L4 core-events 两种形态、bench:s2 打包形态）；npm run bench:s2 -- --form packaged（tmp/evidence/W0/bench/s2-packaged.json）：10 万事件/分钟 × 5 分钟 50 万个全部到达、乱序 0；同步调用 p99 0.008 ms（≤1 ms，通过）；主进程事件循环延迟按原始值 p99 16.81 ms，未达到 ≤16 ms。原因分析（S2 第 8 节）：Windows 默认计时器粒度约 15.6 ms，同机空闲 Node 24.13.1 同一测量 p50 15.56 ms、p99 16.58 ms，满载只多 0.23 ms，每次投递的主进程转发 p99 0.214 ms，Core 没有造成可见阻塞。预算与测量口径不改，交 R1 校准 Windows 上的口径"
+      "status": "passing",
+      "evidence": "用户在 R1 会话中授权（2026-11-16，\"Yes, re-judge\"）按架构 v2.17 第 11 章校准后的口径改判：Windows 计时器粒度粗于 1 ms，事件循环延迟取\"满载 p99 − 同机同轮空闲 p99\"= 16.81 − 16.58 = 0.23 ms ≤ 16 ms（tmp/evidence/W0/bench/s2-packaged.json，S2 报告第 8 节）；其余数据不变：开发与打包形态加载 .node 通过，50 万事件全部到达、乱序 0，同步调用 p99 0.008 ms。原始值 p99 16.81 ms 仍记在 S2 报告中。W1 按新口径复测一次（M0 总结第 9 节）"
     },
     {
       "id": "W0-A05",
@@ -5025,8 +5025,8 @@
       "id": "W0-A10",
       "task": "W0",
       "description": "S7：键入回显额外延迟 p95 ≤ 5 ms；输出 100 MB 期间主进程事件循环延迟 p99 ≤ 16 ms；微软拼音的候选框与预编辑位置有结论。验证：测量输出与截图。",
-      "status": "failing",
-      "evidence": "输出 100 MB 期间主进程事件循环延迟 p99 14.34 ms（≤16 ms，通过，tmp/evidence/W0/bench/s7-packaged.json）；微软拼音候选框与预编辑位置：用户在已安装应用的 #/terminal-lab 核对 WT1–WT4（含 vim 插入模式）全部符合预期。键入回显额外延迟按原始配对口径 p95 6.86 ms（1,000 样本，s7-echo-1000.json；200 样本 6.95 ms），未达到 ≤5 ms：均值 −0.12 ms，完整路径在 p50、p95 上都不比直接写 PTY 慢，超出部分来自 ConPTY 两次独立往返的 0–16 ms 抖动（S7 第 11.3 节）。预算不改，测量口径交 R1 校准（I44）"
+      "status": "passing",
+      "evidence": "用户在 R1 会话中授权（2026-11-16，\"Yes, re-judge\"）按架构 v2.17 第 11 章校准后的口径改判：回显额外延迟取两组样本（各 1,000 个）的\"完整路径 p95 − 直接写 PTY p95\"= 9.00 − 9.85 = −0.85 ms ≤ 5 ms（tmp/evidence/W0/bench/s7-echo-1000.json，S7 报告第 11.3 节；原始逐对口径 p95 6.86 ms 仍记在报告中）；输出 100 MB 期间主进程事件循环 p99 14.34 ms（≤ 16 ms）；微软拼音 WT1–WT4 全部符合预期。W1 按新口径复测一次（M0 总结第 9 节）"
     },
     {
       "id": "W0-A11",
