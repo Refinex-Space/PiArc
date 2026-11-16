@@ -297,13 +297,13 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 R1（M0 评审与收口），开工 2026-11-16。依赖 W0 为"部分完成"：遗留的 W0-A04、A10（Windows 测量口径，I44）本就交 R1 处理，不影响开工。基线 `npm run verify` 见会话记录。
 
 - [x] 四个只读审查子代理（Electron 安全与 IPC、Core/NAPI 并发与错误边界、Agent Host/AHP 健壮性、工程质量与 CLAUDE.md 一致性）并行完成，原始发现记入 `docs/reviews/R1-findings.md`（A04）
-- [ ] 逐条核实发现；确认的先写失败测试再修复，每个修复单独提交；其余写理由或登记（A05、A06）
-- [ ] `docs/spikes/M0-summary.md`：S1–S10 × 两平台总表、有条件通过与未验证项、对后续任务的影响（A01）
-- [ ] ADR 触发条件检查表：ADR-0013–0018 全部条件与 ADR-0004/0009/0010 中 S4/S9/S3 相关条件；ADR-0015/0018 留给 M0 的事项（A02、A03）
-- [ ] 第 11 章预算校准（两平台实测、只收紧、放宽写原因），I12、I26、I41、I44、I45（A07）
-- [ ] 架构文档同步 M0 结论、版本号递增、修订记录（A08）
+- [x] 逐条核实发现；确认的先写失败测试再修复，每个修复单独提交；其余写理由或登记（A05、A06）
+- [x] `docs/spikes/M0-summary.md`：S1–S10 × 两平台总表、有条件通过与未验证项、对后续任务的影响（A01）
+- [x] ADR 触发条件检查表：ADR-0013–0018 全部条件与 ADR-0004/0009/0010 中 S4/S9/S3 相关条件；ADR-0015/0018 留给 M0 的事项（A02、A03）
+- [x] 第 11 章预算校准（两平台实测、只收紧、放宽写原因），I12、I26、I41、I44、I45（A07）
+- [x] 架构文档同步 M0 结论、版本号递增、修订记录（A08）
 - [ ] 根目录与各模块 CLAUDE.md 的命令实际执行、长度符合上限（A09）
-- [ ] M0 验收项与登记事项逐条归属（A10）
+- [x] M0 验收项与登记事项逐条归属（A10）
 - [ ] 结论写入 `M0-summary.md`、`docs/reviews/README.md`、`PLAN.md`；技术债排序；spikes README 同步（A11）
 - [ ] 收尾 `npm run verify`（A12）
 
@@ -316,7 +316,7 @@ R1（M0 评审与收口），开工 2026-11-16。依赖 W0 为"部分完成"：�
 | I01 | 制定计划 | Claude Code 当前默认使用 TaskCreate / TaskUpdate 等任务工具，TodoWrite 已是旧版（`claude-official-capabilities.md`）。PiArc 的规范名仍是 TodoWrite，权限规则与 L3 比对会出现差异 | T26 评估是否增加兼容映射；T30 先把差异写入 L3 allowlist |
 | I02 | 制定计划 | FR-MD-05 要求 skills 能引用模型别名，但架构第 6.7 节的 skill frontmatter 没有 `model` 字段 | T37 评估：支持则补架构与实现，不支持则改需求描述 |
 | I03 | 制定计划 | Monitor 在会话空闲时唤醒会话（按 Claude Code 官方行为）会自动产生模型费用 | T32 实现时提供开关与限速，R4 请用户确认默认值 |
-| I04 | 制定计划 | macOS App Intents 在 ad-hoc 签名下能否工作，M0 没有验证（需要 Xcode 生成的元数据随包分发） | T49 先做可行性原型；不可行时写 ADR 提议。若想提前知道结论，可在 R1 时追加一次快速验证 |
+| I04 | 制定计划 | macOS App Intents 在 ad-hoc 签名下能否工作，M0 没有验证（需要 Xcode 生成的元数据随包分发） | T49 先做可行性原型；不可行时写 ADR 提议。若想提前知道结论，可在 R1 时追加一次快速验证；R1 决定：不在 R1 追加验证，T49 先做可行性原型（不影响 M1） |
 | I05 | 制定计划 | 架构第 6.10 节说 MCP server 在沙箱外，但 stdio MCP server 由 Agent Host 启动，会继承 Agent Host 的 Seatbelt 写入限制（第 10.3 节） | T39 定稿 Agent Host 配置时澄清并更新架构；放宽写入范围属于变更型 |
 | I06 | T01 | `npm audit` 报告 8 个 moderate（GHSA-g3hv-75wg-m249，minimatch 经 eslint 10.14 与 typescript-eslint 8.72 引入，仅开发工具链，不进安装包）；架构第 13.3 节要求的 `npm audit`、`cargo-audit` 尚未接入 CI（cargo-deny 的 advisories 已覆盖 RustSec 数据库） | 上游修复后升级 eslint 与 typescript-eslint；T45 或 T50 把 `npm audit --omit=dev` 接入 CI |
 | I07 | T01 | TypeScript 7.0 已发布，typescript-eslint 8.72 只支持 `<6.1`，仓库锁在 TypeScript 6.0.3 | 各评审任务按月复查 typescript-eslint 的支持范围，支持后再升级 |
@@ -324,21 +324,21 @@ R1（M0 评审与收口），开工 2026-11-16。依赖 W0 为"部分完成"：�
 | I09 | T02 | 帧解码按 serde_json 的递归上限拒绝嵌套超过 127 层的 JSON（TS 实现同样执行）。工具参数等任意 JSON 若更深会被整帧拒绝 | 已确认（T07）：`fs/*`、`exec/*` 的参数是扁平结构；模型给的工具参数只出现在 `item/*` 通知里，超过 127 层时该帧被 Core 拒绝、工具照常执行，现有工具 schema 都很浅，可以接受（`docs/spikes/S04-operations-delegation.md` 第 10 节）。T14 投影时若要保住这类帧，对深层参数做截断 |
 | I10 | T03 | 发布构建仍接受 Chromium 的 `--remote-debugging-port`（没有对应 fuse，运行时探测 `/json/version` 返回 200）：能以该参数启动 PiArc 的本机进程可经 CDP 在页面中执行脚本并调用 `window.piarc`。威胁等级与 ADR-0018 已接受的本机篡改相同，详见 `docs/spikes/S10-electron-security.md` 第 6 节 | T45 评估在发布构建启动时拒绝或移除该开关（先验证可行性），补回归用例 |
 | I11 | T03 | 应用仍使用 Electron 默认菜单，发布构建中也有"Toggle Developer Tools"与"Reload" | T18 替换原生菜单时决定发布构建是否保留开发者工具入口 |
-| I12 | T04 | 架构第 11 章"主进程内存（含 Core，空闲）≤ 120 MB"低于 Electron 自身基线：macOS arm64 上裸 Electron 45.3.2 开一个空窗口主进程 RSS 约 155 MB，PiArc 含 Core 160–164 MB（Core 与应用代码约 5–8 MB），数据见 `docs/spikes/S02-napi-event-channel.md` 第 4.4 节 | R1 按 M0 实测校准该预算（放宽要在第 18 章写明原因），可改为"相对裸 Electron 的增量"；W0 补 Windows 数据 |
+| I12 | T04 | 架构第 11 章"主进程内存（含 Core，空闲）≤ 120 MB"低于 Electron 自身基线：macOS arm64 上裸 Electron 45.3.2 开一个空窗口主进程 RSS 约 155 MB，PiArc 含 Core 160–164 MB（Core 与应用代码约 5–8 MB），数据见 `docs/spikes/S02-napi-event-channel.md` 第 4.4 节 | R1 按 M0 实测校准该预算（放宽要在第 18 章写明原因），可改为"相对裸 Electron 的增量"；W0 补 Windows 数据；已落地（R1）：第 11 章改为"相对同平台同版本裸 Electron 的增量 ≤ 24 MB"（放宽原因见架构第 18 章 v2.17），实测增量 macOS 5–8 MB、Windows 12 MB |
 | I13 | T04 | 渲染进程的 `#/event-probe` 测试页随发布构建的渲染包分发（发布版 Core 没有演示事件源与测试钩子，页面只能订阅、计数） | T45 评估是否在发布构建中剔除测试页 |
 | I14 | T05 | `packages/testkit` 把 `@earendil-works/pi-ai` 精确锁定为 1.5.2（任务开工时 npm 上的最新稳定版），尚未与 Agent Host 统一 | 已落地（T06）：Pi 锁定 1.5.2，`agent-host` 与 `packages/testkit` 的 `@earendil-works/*` 同为 1.5.2，lockfile 中无第二个版本 |
 | I15 | T05 | pi-ai 的 API 实现（`anthropicMessagesApi`、`openAICompletionsApi`）只经公开子路径 `@earendil-works/pi-ai/api/<api>.lazy` 导出，主入口不导出；`packages/testkit` 使用了它们 | 已落地（T06）：`eslint.config.mjs` 的 `piPublicImports` 按各包 `exports` 放行子路径，只禁未导出的路径 |
 | I16 | T06 | Pi 1.5.1 起 `cacheWarming` 默认为 `"idle"`：会话空闲时最多 30 分钟内自动发请求保温提示缓存（模型配置了 `promptCache` 才会触发），会产生模型费用；Agent Host 目前沿用 Pi 默认值 | T21 生成 `pi/settings.json` 时显式设定，T27 的用量与成本界面说明这类请求；默认值请用户在 R2 确认 |
 | I17 | T06 | `piarc-exec` 的 `TokioProcessSpawner` 只终止直接子进程：Agent Host 被杀时，它启动的子进程（bash 命令、MCP server）不随之结束；架构第 5.6 节要求的进程组（macOS）与 Job Object（`KILL_ON_JOB_CLOSE`，Windows）尚未实现。需要 `killpg` 或 Win32 API，而 `unsafe` 只允许在 sys 与 NAPI crate | 部分落地（T11）：`piarc_exec::ProcessTreeSpawner` 实现了进程组（nix 的 `killpg`）与 Job Object（`piarc-exec` 的 `job` 模块），沙箱命令已用它；T12、T17 的接入见 I33 |
 | I18 | T06 | Pi 1.5.2 中断一个回合后，下一次请求丢弃被中断的 assistant 消息，出现两条相邻的 user 消息（Anthropic API 会合并它们，严格 mock 的 `role_order` 拒绝）。PiArc 需要决定中断后的对话形态（例如像 Claude Code 那样补一条中断标记），S3/S9 的中断场景暂时关闭了 `role_order` | T14 定义中断后的 transcript 形态并恢复 `role_order`；T27 对齐压缩与中断标记 |
-| I19 | T07 | 工具的 `fs/*`、`exec/*` 请求与会话通知共用 Agent Host 的 stdout：Core 的事件消费者停住、读取停在投递上时，后面的工具请求也读不到，工具随之等待（背压，不丢失）。T06 的慢读者测试因此改为用不存在的工具制造通知 | T14 的事件消费者持续取走事件，不在消费路径上做阻塞等待；R1 评估是否需要让请求帧绕开通知背压（例如单独的通道） |
+| I19 | T07 | 工具的 `fs/*`、`exec/*` 请求与会话通知共用 Agent Host 的 stdout：Core 的事件消费者停住、读取停在投递上时，后面的工具请求也读不到，工具随之等待（背压，不丢失）。T06 的慢读者测试因此改为用不存在的工具制造通知 | T14 的事件消费者持续取走事件，不在消费路径上做阻塞等待；R1 评估是否需要让请求帧绕开通知背压（例如单独的通道）；R1 决定：不新增独立的请求通道（改变 AHP 传输属变更型）；T14 的事件消费者持续取走事件、不在消费路径阻塞，R2 用 T14 的场景测通知洪峰下的工具 I/O 延迟，超标时再写 ADR |
 | I20 | T07 | Pi 1.5.2 的 `createAgentSessionRuntime` 在会话创建时于 Agent Host 本进程 `existsSync(cwd)`（`assertSessionCwdExists`），是 Agent Host 对工作区路径唯一的直接访问（只读元数据，场景期间为 0） | T14 决定接受（写入架构）或由 Core 在 `session/create` 前检查；T39 的 Agent Host Seatbelt 配置允许对工作区的元数据读取 |
 | I21 | T07 | 委托工具不读 Pi 设置中的 `shellPath`、`shellCommandPrefix`（Bash）与 `images.autoResize`（Read），取默认值；命令环境是 Core 的白名单环境加 Pi 的会话变量，不含 Agent Host 内部的 `PI_*` 变量 | T17 接上 shell 相关设置（与 Git Bash 探测一起），T21 生成 Pi 设置时决定图片缩放并让 Read 读取 |
 | I22 | T08 | D2（应用标识）尚未落实，`piarc-core::identity::APP_IDENTIFIER` 是占位值 `PiArc.pending-D2`，凭据库服务名 `PiArc.pending-D2.credential-vault` 由它生成。改成正式标识后，用占位标识存过凭据的构建找不到主密钥，保险箱返回 `masterKeyMissing` | 已落地（2026-11-15）：D2 定为域名 `piarc.cn`、应用标识 `cn.piarc.desktop`，`APP_IDENTIFIER` 已替换，T08-A12 通过。占位标识只用于未发布的开发构建，无需迁移；T12 用同一常量设置 bundle id 与 AppUserModelID |
-| I23 | T08 | Agent Host 的 `secrets/lock` 请求超时（桥接默认 30 s）后 Core 才授予的锁无人释放，要等 30 s 租约到期，期间同一 provider 的写入等待；pi-ai 的取消信号只取消排队，同样可能留下这种锁 | 影响限于同一 provider 的写入延迟；R1 评估是否让 Core 在授予前检查请求方是否仍在等待（例如锁请求带截止时间） |
+| I23 | T08 | Agent Host 的 `secrets/lock` 请求超时（桥接默认 30 s）后 Core 才授予的锁无人释放，要等 30 s 租约到期，期间同一 provider 的写入等待；pi-ai 的取消信号只取消排队，同样可能留下这种锁 | 影响限于同一 provider 的写入延迟；R1 评估是否让 Core 在授予前检查请求方是否仍在等待（例如锁请求带截止时间）；R1：与 R1-C9、A5 合并为 I57，交 T21 |
 | I24 | T09 | transcript 原型页 `#/transcript-lab` 与合成夹具（`src/renderer/lab/`）随发布构建的渲染包分发，与 I13 的 `#/event-probe` 同类 | T45 与 I13 一起评估在发布构建中剔除测试页 |
-| I25 | T09 | 真实输入法（macOS 简体拼音、日文）与触控板滚动手感需要人工核对，清单见 `docs/spikes/S01-transcript-composer.md` 第 7 节（M1–M10）；自动化部分已用 CDP 合成通过 | 用户核对后把结果告诉智能体补记到 S1 报告；R1 汇总 S1 时检查 |
-| I26 | T09 | S1 基准中应用全部进程合计 489 MiB，超出第 11 章"不含 Agent Host 的全部进程 ≤ 450 MB"；渲染进程 179 MiB 在预算内，超出主要来自主进程（179 MiB，含 Core 与测试驱动） | R1 与 I12 一起按 M0 实测校准；W0 补 Windows 数据 |
+| I25 | T09 | 真实输入法（macOS 简体拼音、日文）与触控板滚动手感需要人工核对，清单见 `docs/spikes/S01-transcript-composer.md` 第 7 节（M1–M10）；自动化部分已用 CDP 合成通过 | 用户核对后把结果告诉智能体补记到 S1 报告；R1 汇总 S1 时检查；R1：macOS composer 的真实输入法与触控板核对交 T19，R2 检查；日文输入法两个平台都未验证（T19、W1） |
+| I26 | T09 | S1 基准中应用全部进程合计 489 MiB，超出第 11 章"不含 Agent Host 的全部进程 ≤ 450 MB"；渲染进程 179 MiB 在预算内，超出主要来自主进程（179 MiB，含 Core 与测试驱动） | R1 与 I12 一起按 M0 实测校准；W0 补 Windows 数据；已落地（R1）：进程合计改为 macOS ≤ 510 MB（放宽原因见架构 v2.17）、Windows ≤ 450 MB；两平台实测仍超出，交 T44，R4 复核 |
 | I27 | T10 | 终端的 L4（`terminal.e2e.ts`、`terminal-tui.e2e.ts`）与 `crates/piarc-term/tests/pty.rs`、`crates/piarc-core/tests/terminal.rs` 使用 `/bin/sh`、`cat`、`vim`、`top`，在 Windows 上不运行；ConPTY 的 resize、Ctrl+C、kill（portable-pty 0.9.0 的 kill 返回值问题由 `wait` 兜底）与是否随附 `conpty.dll`/OpenConsole.exe 未验证 | W0 补 Windows 程序版本的用例并实测 ConPTY；S7 报告第 10 节 |
 | I28 | T10 | PTY 子进程由 portable-pty 启动，不经 `ProcessSpawner`，没有进程组或 Job Object：终端里的程序再起的子进程不随终端关闭而结束 | T33 引入终端承载的任务时决定（与 I17 一起，在 `piarc-exec` 的进程树管理落地后接入） |
 | I29 | T10 | `cat` 以约 190 MB/s 输出时主进程 CPU（含 Core 全部线程）约为一个核的 74%，主要是 IO 线程读 PTY 与解析；第 11 章没有对应预算 | T44 把终端吞吐纳入性能回归时评估（例如增大读块、合并读） |
@@ -353,15 +353,15 @@ R1（M0 评审与收口），开工 2026-11-16。依赖 W0 为"部分完成"：�
 | I38 | T12 | `piarc-term` 的 PTY 用例 `vim_on_the_alternate_screen_matches_the_formatter` 依赖 UTF-8 locale：`LANG` 为空的 shell（本次智能体会话的环境）里 vim 把中文显示成转义，`cargo test`（含 verify）失败；设 `LANG=en_US.UTF-8` 后通过 | 已落地（2026-11-16）：`pty.rs`、`pty_windows.rs` 与 L4 `terminal-tui.e2e.ts` 的 vim 都加 `--cmd 'set encoding=utf-8'`，在读文件之前固定编码；Windows CI 的 `verify`、`desktop L4` 因此失败过（运行 43855932047），根 `CLAUDE.md` 易错点已改写 |
 | I39 | T12 | 内置 node 保留 Node.js 官方签名（ADR-0018），其 entitlements 含 `get-task-allow` 与 `allow-dyld-environment-variables`：同一用户的进程可以调试附加 Agent Host，读到 Core 交给它的凭据（PiArc 自身已用 hardened runtime 挡住注入，S6 报告第 3 节）。Core 以最小环境启动 node，不传 `DYLD_*` | T45 评估（例如凭据只在用时经 AHP 取、缩短驻留时间，或重新评估是否对 node 重签去掉 `get-task-allow`，后者涉及 ADR-0018，属变更型） |
 | I40 | T12 | 在 Agent Host 的宽松 Seatbelt 下，`npx <本地目录>` 形式的 MCP server 启动失败：npm 链接目录后 `chmod` 其 bin，文件在可写目录之外（`EPERM`）。registry 包（tarball）不受影响 | T36 接入 MCP 配置时给出明确错误提示或改用 `npm pack` 后的路径；T39 定稿 Agent Host 配置时一并评估 |
-| I41 | T12 | macOS arm64 安装后体积 449.0 MB，预算 450 MB 只余约 1 MB（内置 node 145 MiB、Electron Framework 250 MiB）；任何新增随包内容都会超出 | R1 决定：校准预算（写明原因）或裁剪（npm 的 docs/man 约 3.2 MiB、压缩 bundle 等），T44 把体积纳入回归 |
-| I42 | T12 | S6 中 Gatekeeper 开启时的首次打开没有验证："仍要打开"是否出现、`xattr -dr com.apple.quarantine` 备选、Gatekeeper 是否单独拦截内置 node（以及带隔离属性的 rg、fd）。用户的 Mac（macOS 26.5.2）`spctl --status` 为 `assessments disabled`，从 `127.0.0.1` 经 Safari 下载的 DMG 也没有 `com.apple.quarantine`；没有 macOS 15 设备。检查清单与 `scripts/dev/s6-probe.mjs` 可直接复用 | R1 汇总 M0 时安排：在开着 Gatekeeper 的 Mac（26 与 15）上、用从 GitHub 等外部地址下载的 DMG 重做检查清单第 2、3 项；最晚 T50 首次发布前完成，结果补进 S6 报告 |
+| I41 | T12 | macOS arm64 安装后体积 449.0 MB，预算 450 MB 只余约 1 MB（内置 node 145 MiB、Electron Framework 250 MiB）；任何新增随包内容都会超出 | R1 决定：校准预算（写明原因）或裁剪（npm 的 docs/man 约 3.2 MiB、压缩 bundle 等），T44 把体积纳入回归；R1 决定：不放宽，T44 裁剪（npm 文档与 man 页等），R5 复核 |
+| I42 | T12 | S6 中 Gatekeeper 开启时的首次打开没有验证："仍要打开"是否出现、`xattr -dr com.apple.quarantine` 备选、Gatekeeper 是否单独拦截内置 node（以及带隔离属性的 rg、fd）。用户的 Mac（macOS 26.5.2）`spctl --status` 为 `assessments disabled`，从 `127.0.0.1` 经 Safari 下载的 DMG 也没有 `com.apple.quarantine`；没有 macOS 15 设备。检查清单与 `scripts/dev/s6-probe.mjs` 可直接复用 | R1 汇总 M0 时安排：在开着 Gatekeeper 的 Mac（26 与 15）上、用从 GitHub 等外部地址下载的 DMG 重做检查清单第 2、3 项；最晚 T50 首次发布前完成，结果补进 S6 报告；R1：T50 首次发布前在开启 Gatekeeper 的 Mac（26 与 15）上完成，R6 检查 |
 | I43 | T12 | ad-hoc 签名的 PiArc 的系统通知可用（允许后横幅显示，实机确认），但用户未允许通知时 Electron 仍发 `show`、不发 `failed`（Windows 上不同：系统拒绝时 `show` 之后再发 `failed`，W0），程序侧事件不能用来决定是否退回应用内提醒；另外应用退出时 Electron 删除已投递的通知，通知中心里的条目随之消失 | T18/T35 做系统通知时：通知之外总给应用内提醒与 Dock 角标，或经原生模块读取 `UNUserNotificationCenter` 的授权设置；T35 的后台运行设计考虑通知随应用退出被删除 |
-| I44 | W0 | Windows 上两项测量的口径失效：①`monitorEventLoopDelay` 受约 15.6 ms 的计时器粒度支配，空闲 Node 就是 p99 16.58 ms，S2 满载原始 p99 16.81 ms（W0-A04 按原始值未达标）；②终端回显的配对相减被 ConPTY 两次独立往返的 0–16 ms 抖动淹没，均值 −0.12 ms 而 p95 6.86 ms（W0-A10）。预算未改 | R1 校准 Windows 的测量方法（扣除同机空闲基线，或改测回调执行时长、在 Core 内分段打点），再据此改判 W0-A04、A10 |
-| I45 | W0 | Windows 体积超预算：CI 的 `Setup.exe`（开发构建）225.3 MB > 200 MB；本机发布构建打包目录 516.4 MB > 450 MB（Electron 本体约 360 MiB、内置 node 约 102 MiB），安装后体积见 S6 第 9 节 | R1 与 I41 一起决定（裁剪 locales、校准 Windows 预算等），T44 纳入回归 |
-| I46 | W0 | Windows 上 Node 写管道式 stdout 是同步的：Core 停止读取时 Agent Host 整个事件循环停住，连 Core 发来的请求（中断、关闭）也处理不了，直到 Core 恢复读取；macOS 上它会继续在内存里排队 | T14 的事件消费者持续取走事件（同 I19）；R1 评估是否需要让 Agent Host 的 AHP 写入在 Windows 上异步（例如单独的管道而不是 fd 1） |
+| I44 | W0 | Windows 上两项测量的口径失效：①`monitorEventLoopDelay` 受约 15.6 ms 的计时器粒度支配，空闲 Node 就是 p99 16.58 ms，S2 满载原始 p99 16.81 ms（W0-A04 按原始值未达标）；②终端回显的配对相减被 ConPTY 两次独立往返的 0–16 ms 抖动淹没，均值 −0.12 ms 而 p95 6.86 ms（W0-A10）。预算未改 | R1 校准 Windows 的测量方法（扣除同机空闲基线，或改测回调执行时长、在 Core 内分段打点），再据此改判 W0-A04、A10；已落地（R1）：口径校准写入第 11 章（Windows 事件循环取超出同机空闲基线的部分，回显取两组样本 p95 之差），按此 W0-A04 为 0.23 ms、W0-A10 为 −0.85 ms；改判 W0 的验收项需要用户确认（M0 总结第 8 节），W1 按新口径复测 |
+| I45 | W0 | Windows 体积超预算：CI 的 `Setup.exe`（开发构建）225.3 MB > 200 MB；本机发布构建打包目录 516.4 MB > 450 MB（Electron 本体约 360 MiB、内置 node 约 102 MiB），安装后体积见 S6 第 9 节 | R1 与 I41 一起决定（裁剪 locales、校准 Windows 预算等），T44 纳入回归；R1 决定：不放宽，T44 裁剪（locales、单架构安装包、`dxcompiler.dll` 是否需要），R5 复核 |
+| I46 | W0 | Windows 上 Node 写管道式 stdout 是同步的：Core 停止读取时 Agent Host 整个事件循环停住，连 Core 发来的请求（中断、关闭）也处理不了，直到 Core 恢复读取；macOS 上它会继续在内存里排队 | T14 的事件消费者持续取走事件（同 I19）；R1 评估是否需要让 Agent Host 的 AHP 写入在 Windows 上异步（例如单独的管道而不是 fd 1）；R1：同 I19，T14 持续消费，不改 Windows 上的写入方式 |
 | I47 | W0 | win32-arm64 上 libghostty-vt 的实际运行尚无结果：CI 只做过加载，W0 给 `core-load-check.mjs` 加了终端检查，要下一次推送后的 `core-load`（`windows-11-arm`）才有结果 | 已落地（2026-11-16）：提交 3ae1d23 的 CI（https://github.com/Refinex-Space/PiArc/actions/runs/43855932047）中 `core load (aarch64-pc-windows-msvc)` 通过，node 24.22.2 与 Electron 45.3.2 的开发版、发布版都报 `terminal ok` |
 | I48 | W0 | 主进程没有按架构第 9.1 节用 `app.setPath('userData', …)` 固定数据目录：Windows 上 Electron 默认把 userData（Chromium 缓存、本地存储）放在漫游的 `%APPDATA%\PiArc\`，卸载后留在那里（实测 71 个文件 9.5 MiB）；macOS 的默认位置恰好与架构一致 | T13 设定数据目录时一并设 `userData`；T50 决定卸载时是否提供删除数据的选项 |
-| I49 | W0 | Windows 上 SmartScreen 的"更多信息 → 仍要运行"流程没有观察到：W0 的机器关着"检查应用和文件"（安装包带 `ZoneId=3`，没有拦截），智能应用控制也是关的；系统通知总开关关闭，横幅也没看到（程序侧正确收到 `failed`） | R1 与 I42 一起安排：在开着"检查应用和文件"与通知的 Windows 11 上，用浏览器下载的安装包重做 S6 检查清单第 8 节 W3 与通知；最晚 T50 首次发布前 |
+| I49 | W0 | Windows 上 SmartScreen 的"更多信息 → 仍要运行"流程没有观察到：W0 的机器关着"检查应用和文件"（安装包带 `ZoneId=3`，没有拦截），智能应用控制也是关的；系统通知总开关关闭，横幅也没看到（程序侧正确收到 `failed`） | R1 与 I42 一起安排：在开着"检查应用和文件"与通知的 Windows 11 上，用浏览器下载的安装包重做 S6 检查清单第 8 节 W3 与通知；最晚 T50 首次发布前；R1：T50 首次发布前，与 I42 一起，R6 检查 |
 | I50 | R1 | 渲染进程没有 React 错误边界：任何一个组件抛错都会卸载整个 root（R1-E1 的后果） | T19 给 transcript 行与整页加错误边界，单条内容出错只影响该行 |
 | I51 | R1 | 终端是页面可调用的命令执行通道：`createTerminal` + `terminalInput` 不经 Core 权限裁决，与架构第 10.3 节"有副作用的操作仍要经 Core 的权限裁决"不一致；每窗口终端数与在途拉帧请求没有上限（R1-E3、E6）。发布构建现在也带着原型终端的函数（I30） | T34 决定防线（例如要求近期真实用户输入）与上限并写入 10.3；若以文档例外接受，属于放松安全基线，写 ADR 提议。T34 之前 T45 与 I30 一起评估发布构建去掉终端函数 |
 | I52 | R1 | ESLint 进程边界规则只拦 `ipcMain.<method>`，不拦 `webContents.ipc` 与别名；导航守卫没有 `will-frame-navigate`（当前由 CSP 挡住）；渲染进程规则拦不住 Node 专用 npm 包（R1-E7、Q12） | T45 补规则与守卫，S10 第 13、17 项的措辞改准 |
