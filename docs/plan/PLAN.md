@@ -339,7 +339,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I35 | T11 | 沙箱内不能绑定端口、不能连 Unix socket（本地测试服务器、Docker、ssh-agent 不可用），`git init`/`clone`/`config` 因 `.git/config`、`.git/hooks` 受保护而失败；`GIT_CONFIG_COUNT` 被沙箱用来指定代理，命令继承的同类变量失效 | T39 评估"允许本机绑定""允许写 `.git/config`"两个选项与 Unix socket 白名单，设置页写明这些限制 |
 | I36 | T11 | macOS 的进程组终止不覆盖主动 `setsid`/`setpgid` 的后代：它们仍在沙箱里，但停止命令后会活下来（Windows 的 Job 无此问题） | T17 实现通用进程管理时评估是否需要按后代追踪（例如记录会话内的进程并在停止时扫描） |
 | I37 | T11 | `piarc-exec` 的 Windows 代码（`job.rs` 与 `tree.rs` 的 Windows 部分）只在本机做了类型检查与 lint（用户同意后安装了 `x86_64-pc-windows-msvc` 目标，`cargo clippy --target x86_64-pc-windows-msvc --workspace --all-targets -- -D warnings` 通过），没有运行；同一检查发现 T07 的 `crates/piarc-core/tests/tool_io.rs` 在 Windows 上有两处 `unused_mut`（会让 Windows CI 的 clippy 步骤失败），T11 已修 | 用户推送后由下一个任务的开工检查核对 Windows CI 并关闭 T11-A10；失败时修复后再关闭 |
-| I38 | T12 | `piarc-term` 的 PTY 用例 `vim_on_the_alternate_screen_matches_the_formatter` 依赖 UTF-8 locale：`LANG` 为空的 shell（本次智能体会话的环境）里 vim 把中文显示成转义，`cargo test`（含 verify）失败；设 `LANG=en_US.UTF-8` 后通过 | T33 或 R1：测试的 `SessionConfig` 显式设 `LANG`/`LC_CTYPE`，不依赖调用方环境；在此之前根 `CLAUDE.md` 的易错点已写明 |
+| I38 | T12 | `piarc-term` 的 PTY 用例 `vim_on_the_alternate_screen_matches_the_formatter` 依赖 UTF-8 locale：`LANG` 为空的 shell（本次智能体会话的环境）里 vim 把中文显示成转义，`cargo test`（含 verify）失败；设 `LANG=en_US.UTF-8` 后通过 | 已落地（2026-11-16）：`pty.rs`、`pty_windows.rs` 与 L4 `terminal-tui.e2e.ts` 的 vim 都加 `--cmd 'set encoding=utf-8'`，在读文件之前固定编码；Windows CI 的 `verify`、`desktop L4` 因此失败过（运行 43855932047），根 `CLAUDE.md` 易错点已改写 |
 | I39 | T12 | 内置 node 保留 Node.js 官方签名（ADR-0018），其 entitlements 含 `get-task-allow` 与 `allow-dyld-environment-variables`：同一用户的进程可以调试附加 Agent Host，读到 Core 交给它的凭据（PiArc 自身已用 hardened runtime 挡住注入，S6 报告第 3 节）。Core 以最小环境启动 node，不传 `DYLD_*` | T45 评估（例如凭据只在用时经 AHP 取、缩短驻留时间，或重新评估是否对 node 重签去掉 `get-task-allow`，后者涉及 ADR-0018，属变更型） |
 | I40 | T12 | 在 Agent Host 的宽松 Seatbelt 下，`npx <本地目录>` 形式的 MCP server 启动失败：npm 链接目录后 `chmod` 其 bin，文件在可写目录之外（`EPERM`）。registry 包（tarball）不受影响 | T36 接入 MCP 配置时给出明确错误提示或改用 `npm pack` 后的路径；T39 定稿 Agent Host 配置时一并评估 |
 | I41 | T12 | macOS arm64 安装后体积 449.0 MB，预算 450 MB 只余约 1 MB（内置 node 145 MiB、Electron Framework 250 MiB）；任何新增随包内容都会超出 | R1 决定：校准预算（写明原因）或裁剪（npm 的 docs/man 约 3.2 MiB、压缩 bundle 等），T44 把体积纳入回归 |
@@ -487,7 +487,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 ### 2026-11-16 CI 核对（提交 3ae1d23 的运行 43855932047）
 - 结果：`core-build`、`core-load` 四个目标与四个打包作业通过；win32-arm64 的加载检查报 `terminal ok`，I47 已落地
-- 失败与处理：`desktop L4 (windows-latest)` 的 `terminal-tui.e2e.ts` vim 用例两种形态失败——runner 未设 `LANG`，Git 的 vim 在 `-u NONE` 下按 latin1 读文件、中文显示为字节转义（本机清空 locale 变量复现，54c63bd 用 `--cmd 'set encoding=utf-8'` 修复，Windows 待下一次 CI 确认）；`desktop L4 (macos-latest)` 的 `transcript-scroll.e2e.ts` "the wheel releases and resumes following"（packaged）离底 31 px，即 I32，按登记交 T19/T44
+- 失败与处理：`desktop L4 (windows-latest)` 的 `terminal-tui.e2e.ts` vim 用例两种形态失败——runner 未设 `LANG`，Git 的 vim 在 `-u NONE` 下按 latin1 读文件、中文显示为字节转义（本机清空 locale 变量复现，54c63bd 用 `--cmd 'set encoding=utf-8'` 修复，Windows 待下一次 CI 确认）；`verify (windows-latest)` 的 `cargo test` 因同一原因失败在 `piarc-term --test pty_windows` 的 vim 用例，macOS 版 `pty.rs` 同修（I38 已落地）；`desktop L4 (macos-latest)` 的 `transcript-scroll.e2e.ts` "the wheel releases and resumes following"（packaged）离底 31 px，即 I32，按登记交 T19/T44
 - 未推送：e2c302d、bdd540a、54c63bd 与本条记录
 
 ## 计划变更记录

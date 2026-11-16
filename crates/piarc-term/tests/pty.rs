@@ -208,7 +208,21 @@ fn vim_on_the_alternate_screen_matches_the_formatter() {
     let file = dir.join("notes.txt");
     std::fs::write(&file, "first line\n中文 second\nthird 😀\n").expect("file");
     let path = file.to_string_lossy().into_owned();
-    let (session, events) = spawn("vim", &["-u", "NONE", "-i", "NONE", "-N", &path]);
+    // With `-u NONE` vim takes its encoding from the locale; where LANG is unset (CI runners,
+    // some agent shells) it reads the file as latin1. `--cmd` runs before the file is read.
+    let (session, events) = spawn(
+        "vim",
+        &[
+            "-u",
+            "NONE",
+            "-i",
+            "NONE",
+            "-N",
+            "--cmd",
+            "set encoding=utf-8",
+            &path,
+        ],
+    );
     wait_for_screen(&session, "vim's file view", |text| {
         text.contains("中文 second") && text.lines().filter(|l| *l == "~").count() > 3
     });
