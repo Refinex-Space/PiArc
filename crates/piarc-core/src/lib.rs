@@ -70,6 +70,7 @@
 
 pub mod agent_host;
 pub mod demo;
+pub mod dirs;
 mod error;
 pub mod events;
 pub mod host_probe;
@@ -79,10 +80,14 @@ pub mod release;
 pub mod route;
 mod runtime;
 pub mod secrets;
+pub mod storage;
 pub mod terminal;
 pub mod tool_io;
+pub mod trust;
+pub mod workspace_settings;
 
 pub use demo::{DemoReport, DemoSourceConfig};
+pub use dirs::DataDirs;
 pub use error::{Error, Result};
 pub use events::{DeliveryDone, EventBatch, EventSink, EventStats, SinkClosed};
 pub use piarc_term::SessionStats as TerminalStats;

@@ -48,6 +48,21 @@ pub enum Error {
         /// The underlying I/O error.
         reason: String,
     },
+    /// Core was started without a data directory, so it has no database or settings.
+    #[error("Core was started without a data directory")]
+    NoDataDirectory,
+    /// A feature crate (store, settings, git) failed; carries its structured error.
+    #[error("{message}")]
+    Feature {
+        /// The feature crate's error kind.
+        kind: ErrorKind,
+        /// Whether it can be retried.
+        retryable: bool,
+        /// Its message.
+        message: String,
+        /// Its details as JSON text.
+        details: Option<String>,
+    },
     /// An unexpected internal failure, including a caught panic.
     #[error("internal error: {reason}")]
     Internal {
@@ -71,9 +86,11 @@ impl Error {
             Self::QueueFull => ErrorKind::Busy,
             Self::UnknownTerminal { .. } => ErrorKind::NotFound,
             Self::Terminal(error) => error.kind(),
-            Self::BundledRuntime { .. } | Self::RuntimeStart { .. } | Self::Internal { .. } => {
-                ErrorKind::InternalError
-            }
+            Self::BundledRuntime { .. }
+            | Self::RuntimeStart { .. }
+            | Self::Internal { .. }
+            | Self::NoDataDirectory => ErrorKind::InternalError,
+            Self::Feature { kind, .. } => *kind,
         }
     }
 
@@ -81,7 +98,11 @@ impl Error {
     /// itself.
     #[must_use]
     pub fn retryable(&self) -> bool {
-        matches!(self, Self::QueueFull)
+        match self {
+            Self::QueueFull => true,
+            Self::Feature { retryable, .. } => *retryable,
+            _ => false,
+        }
     }
 
     /// Converts the error into the structured error object shared by AHP and the NAPI
@@ -93,7 +114,11 @@ impl Error {
             Self::UnknownDemoSource { id } | Self::UnknownTerminal { id } => {
                 Some(serde_json::json!({ "id": id }))
             }
+            Self::Feature { details, .. } => details
+                .as_deref()
+                .and_then(|text| serde_json::from_str(text).ok()),
             Self::Terminal(_)
+            | Self::NoDataDirectory
             | Self::ShuttingDown
             | Self::QueueFull
             | Self::BundledRuntime { .. }
@@ -112,6 +137,17 @@ impl Error {
         }
     }
 
+    /// Wraps a feature crate's structured error.
+    #[must_use]
+    pub fn feature(object: &ErrorObject) -> Self {
+        Self::Feature {
+            kind: object.data.kind,
+            retryable: object.data.retryable,
+            message: object.message.clone(),
+            details: object.data.details.as_ref().map(ToString::to_string),
+        }
+    }
+
     /// The error for a caught panic. `payload` is the value `catch_unwind` or a tokio
     /// `JoinError` returned; `location` says where it was caught.
     #[must_use]
@@ -123,6 +159,48 @@ impl Error {
             .unwrap_or_else(|| "non-string panic payload".to_owned());
         Self::Internal {
             reason: format!("panic in {location}: {message}"),
+        }
+    }
+}
+
+impl From<piarc_store::Error> for Error {
+    fn from(error: piarc_store::Error) -> Self {
+        Self::feature(&error.to_error_object())
+    }
+}
+
+impl From<piarc_git::Error> for Error {
+    fn from(error: piarc_git::Error) -> Self {
+        let kind = match &error {
+            piarc_git::Error::Io { source, .. }
+                if source.kind() == std::io::ErrorKind::NotFound =>
+            {
+                ErrorKind::NotFound
+            }
+            piarc_git::Error::Io { .. } | piarc_git::Error::MalformedGitFile { .. } => {
+                ErrorKind::IoError
+            }
+        };
+        Self::Feature {
+            kind,
+            retryable: false,
+            message: error.to_string(),
+            details: None,
+        }
+    }
+}
+
+impl From<piarc_config::WriteError> for Error {
+    fn from(error: piarc_config::WriteError) -> Self {
+        let kind = match &error {
+            piarc_config::WriteError::Io { .. } => ErrorKind::IoError,
+            _ => ErrorKind::InvalidParams,
+        };
+        Self::Feature {
+            kind,
+            retryable: false,
+            message: error.to_string(),
+            details: None,
         }
     }
 }

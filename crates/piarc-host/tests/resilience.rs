@@ -829,3 +829,52 @@ async fn a_consumer_held_back_by_frame_errors_does_not_get_the_host_killed() {
     assert_eq!(supervisor.state(), SupervisorState::Connected { epoch: 1 });
     supervisor.shutdown().await;
 }
+
+#[tokio::test]
+async fn a_requested_restart_is_not_a_failure_and_restores_the_sessions() {
+    let (resume_tx, resume_rx) = oneshot::channel();
+    let first = script(|mut host| async move {
+        host.hello("1.0", &[]).await;
+        host.accept_session("s1").await;
+        let (id, params) = host.request("host/shutdown").await;
+        assert_eq!(params["reason"], "coreShutdown");
+        host.respond(id, json!({ "closedSessions": 1 })).await;
+        0
+    });
+    let spawner = FakeSpawner::new(vec![first, resuming(resume_tx)]);
+    let clock = TestClock::new();
+    let (supervisor, mut events) =
+        HostSupervisor::start(config(), deps(Arc::clone(&spawner), Arc::clone(&clock)));
+    until(&mut events, |e| matches!(e, HostEvent::Connected { epoch: 1, .. })).await;
+    supervisor
+        .create_session("work space/项目", None)
+        .await
+        .expect("session opens");
+
+    supervisor.restart().await;
+    let (restored, seen) = until(&mut events, |e| {
+        matches!(e, HostEvent::SessionRestored { .. })
+    })
+    .await;
+    assert!(seen.iter().any(|e| matches!(
+        e,
+        HostEvent::Exited { epoch: 1, reason: ExitReason::Restarted, status: Some(s) } if s.success()
+    )));
+    assert!(
+        !seen.iter().any(|e| matches!(e, HostEvent::Restarting { .. })),
+        "no backoff: {seen:?}"
+    );
+    assert!(seen.iter().any(|e| matches!(e, HostEvent::Connected { epoch: 2, .. })));
+    assert_eq!(
+        restored,
+        HostEvent::SessionRestored {
+            epoch: 2,
+            session_id: "s1".into(),
+            restored_messages: 4
+        }
+    );
+    assert_eq!(resume_rx.await.expect("resume seen")["sessionId"], "s1");
+    assert_eq!(clock.elapsed(), Duration::ZERO, "no backoff delay");
+    assert_eq!(spawner.spawned(), 2);
+    supervisor.shutdown().await;
+}

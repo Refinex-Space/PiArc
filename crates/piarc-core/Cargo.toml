@@ -10,13 +10,17 @@ publish.workspace = true
 [dependencies]
 getrandom.workspace = true
 minisign-verify.workspace = true
+piarc-config.workspace = true
 piarc-exec.workspace = true
 piarc-fs.workspace = true
+piarc-git.workspace = true
 piarc-host.workspace = true
 piarc-ports.workspace = true
 piarc-protocol.workspace = true
 piarc-sandbox.workspace = true
 piarc-secrets.workspace = true
+piarc-store.workspace = true
+piarc-telemetry.workspace = true
 piarc-term.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -24,8 +28,10 @@ sha2.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
+rusqlite.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 
 [lints]

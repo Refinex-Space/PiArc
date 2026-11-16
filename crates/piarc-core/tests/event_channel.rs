@@ -53,6 +53,7 @@ fn start(interval_ms: u64) -> (CoreRuntime, Receiver<Message>) {
     let sink = Arc::new(ChannelSink { tx: Mutex::new(tx) });
     let config = CoreConfig {
         coalesce_interval: Duration::from_millis(interval_ms),
+        dirs: None,
     };
     (
         CoreRuntime::start(config, sink).expect("runtime starts"),
@@ -402,6 +403,7 @@ fn rejects_an_out_of_range_interval() {
     let sink = Arc::new(ChannelSink { tx: Mutex::new(tx) });
     let config = CoreConfig {
         coalesce_interval: Duration::ZERO,
+        dirs: None,
     };
     let Err(error) = CoreRuntime::start(config, sink) else {
         panic!("a zero interval was accepted");
@@ -437,6 +439,7 @@ fn a_closed_sink_drops_events_and_shutdown_does_not_wait_for_a_delivery() {
     });
     let config = CoreConfig {
         coalesce_interval: Duration::from_millis(16),
+        dirs: None,
     };
     let core = CoreRuntime::start(config, sink.clone()).expect("runtime starts");
     core.echo("echo", "lost").expect("valid echo");

@@ -35,6 +35,9 @@ pub enum ExitReason {
     Killed,
     /// The process exited after `shutdown`.
     Shutdown,
+    /// Core restarted the Agent Host on purpose (`HostSupervisor::restart`, for example after
+    /// project trust changed). Not a failure: the restart policy does not count it.
+    Restarted,
 }
 
 /// An event of the supervised Agent Host, in the order it happened.

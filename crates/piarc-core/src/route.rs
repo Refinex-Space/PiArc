@@ -55,6 +55,12 @@ impl RouteKey {
         }
     }
 
+    /// The route of Core's settings change events (`core/settings`, T13).
+    #[must_use]
+    pub fn settings() -> Self {
+        Self(Arc::from(crate::workspace_settings::SETTINGS_ROUTE))
+    }
+
     /// The route of Core's own error events.
     #[must_use]
     pub fn errors() -> Self {

@@ -70,6 +70,7 @@ pub enum SupervisorState {
 enum Command {
     Shutdown(oneshot::Sender<()>),
     Kill(ExitReason),
+    Restart,
 }
 
 struct Inner {
@@ -269,6 +270,16 @@ impl HostSupervisor {
             .await;
     }
 
+    /// Restarts the Agent Host on purpose: asks the current process to shut down
+    /// (`host/shutdown`, killing it after `shutdown_timeout`), starts a new one at once and
+    /// reopens the open sessions on it. Calls still open become `uncertain`. Not counted by
+    /// the restart policy. Project trust changes use it so the new process loads (or no
+    /// longer loads) project-level resources.
+    pub async fn restart(&self) {
+        // A closed command channel means the supervisor already stopped.
+        let _ = self.inner.commands.send(Command::Restart).await;
+    }
+
     /// Stops supervising: asks the Agent Host to shut down (`host/shutdown`), waits for its
     /// exit (killing it after `shutdown_timeout`) and does not restart it.
     pub async fn shutdown(&self) {
@@ -445,6 +456,9 @@ impl Inner {
             if reason == ExitReason::Shutdown {
                 return self.stop(stop).await;
             }
+            if reason == ExitReason::Restarted {
+                continue;
+            }
             match policy.on_failure(self.deps.clock.now()) {
                 RestartDecision::Restart { attempt, delay } => {
                     self.set_state(SupervisorState::Restarting { attempt });
@@ -500,6 +514,14 @@ impl Inner {
                     Some(Command::Kill(why)) => {
                         reason = why;
                         connection.kill();
+                    }
+                    Some(Command::Restart) => {
+                        reason = ExitReason::Restarted;
+                        tracing::info!(target: "piarc_host", workspace = %self.shared.workspace, epoch,
+                            "restarting the Agent Host on request");
+                        if let Some(status) = self.request_shutdown(&mut connection).await {
+                            break status;
+                        }
                     }
                     Some(Command::Shutdown(done)) => {
                         stop = Some(done);

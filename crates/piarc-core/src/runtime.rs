@@ -27,6 +27,7 @@
 
 use std::collections::HashMap;
 use std::future::Future;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
@@ -36,13 +37,17 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::demo::{self, DemoReport, DemoSource, DemoSourceConfig};
+use crate::dirs::DataDirs;
 use crate::error::{Error, Result};
 use crate::events::{
     self, DEFAULT_COALESCE_INTERVAL, DeliveryDone, Event, EventBatch, EventCounters, EventSender,
     EventSink, EventStats,
 };
 use crate::route::RouteKey;
+use crate::storage::{Storage, report_json};
 use crate::terminal::{KeyEvent, TerminalOptions, Terminals};
+use crate::trust::{TrustService, TrustView};
+use crate::workspace_settings::WorkspaceSettings;
 
 /// Shortest accepted coalescing interval.
 pub const MIN_COALESCE_INTERVAL: Duration = Duration::from_millis(1);
@@ -61,16 +66,21 @@ const SHUTTING_DOWN: u8 = 1;
 const STOPPED: u8 = 2;
 
 /// Settings of the runtime.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CoreConfig {
     /// How often the coalescer may deliver a batch.
     pub coalesce_interval: Duration,
+    /// The data and cache directories (architecture section 9.1). Without them Core has no
+    /// database, settings, trust or log files: only tests and benchmarks of the event path
+    /// run that way.
+    pub dirs: Option<DataDirs>,
 }
 
 impl Default for CoreConfig {
     fn default() -> Self {
         Self {
             coalesce_interval: DEFAULT_COALESCE_INTERVAL,
+            dirs: None,
         }
     }
 }
@@ -125,7 +135,15 @@ struct Shared {
     coalescer: Mutex<Option<JoinHandle<()>>>,
     demo: Mutex<DemoRegistry>,
     terminals: Terminals,
+    state_dirs: Option<StateServices>,
     waiters: Mutex<Vec<Box<dyn FnOnce() + Send>>>,
+}
+
+/// The services that need the data directory.
+#[derive(Clone)]
+struct StateServices {
+    storage: Storage,
+    trust: TrustService,
 }
 
 #[derive(Default)]
@@ -149,6 +167,7 @@ impl CoreRuntime {
     /// tokio runtime cannot be created.
     pub fn start(config: CoreConfig, sink: Arc<dyn EventSink>) -> Result<Self> {
         config.validate()?;
+        let state_dirs = config.dirs.clone().map(open_state).transpose()?;
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .thread_name("piarc-core")
             // I/O: the Agent Host's pipes, the sandbox proxy and child processes (T12).
@@ -174,7 +193,7 @@ impl CoreRuntime {
             }
         });
         let terminals = Terminals::new(handle.clone(), events.clone());
-        Ok(Self {
+        let core = Self {
             shared: Arc::new(Shared {
                 state: AtomicU8::new(RUNNING),
                 handle,
@@ -186,9 +205,24 @@ impl CoreRuntime {
                 coalescer: Mutex::new(Some(supervisor)),
                 demo: Mutex::new(DemoRegistry::default()),
                 terminals,
+                state_dirs,
                 waiters: Mutex::new(Vec::new()),
             }),
-        })
+        };
+        if let Some(services) = core.shared.state_dirs.clone() {
+            // Catch the index up with session files written while the app was closed.
+            spawn_supervised(
+                &core.shared.handle,
+                &core.shared.events,
+                "session index sync",
+                async move {
+                    if let Err(error) = services.storage.sync_sessions().await {
+                        tracing::error!(target: "piarc_core::storage", "syncing the session index failed: {error}");
+                    }
+                },
+            );
+        }
+        Ok(core)
     }
 
     /// The current lifecycle state.
@@ -456,6 +490,127 @@ impl CoreRuntime {
         Ok(())
     }
 
+    /// The database, when Core was started with a data directory.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NoDataDirectory`].
+    pub fn storage(&self) -> Result<Storage> {
+        self.services().map(|s| s.storage)
+    }
+
+    /// Project trust, when Core was started with a data directory. Its
+    /// [`TrustService::trust_get`] answers the Agent Host's `trust/get`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NoDataDirectory`].
+    pub fn trust(&self) -> Result<TrustService> {
+        self.services().map(|s| s.trust)
+    }
+
+    /// Loads the settings of `workspace` and keeps them current; changes arrive as events on
+    /// the route `core/settings` ([`crate::workspace_settings`]).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NoDataDirectory`], [`Error::ShuttingDown`], or a watcher that cannot start.
+    pub async fn open_settings(&self, workspace: PathBuf) -> Result<WorkspaceSettings> {
+        self.ensure_running()?;
+        let services = self.services()?;
+        let dirs = services.storage.dirs().clone();
+        let events = self.shared.events.clone();
+        self.shared
+            .handle
+            .spawn(async move {
+                WorkspaceSettings::open(&dirs, workspace, services.trust, events).await
+            })
+            .await
+            .map_err(|e| Error::Internal {
+                reason: format!("opening settings failed: {e}"),
+            })?
+    }
+
+    /// Rebuilds the session index from Pi's files (the "rebuild index" diagnostic action)
+    /// and calls `on_done` with the report as JSON.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NoDataDirectory`], [`Error::ShuttingDown`]; the rebuild's errors go to
+    /// `on_done`.
+    pub fn rebuild_session_index(
+        &self,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.ensure_running()?;
+        let storage = self.storage()?;
+        self.shared.handle.spawn(async move {
+            on_done(
+                storage
+                    .rebuild_session_index()
+                    .await
+                    .map(|r| report_json(&r)),
+            );
+        });
+        Ok(())
+    }
+
+    /// The trust view of `path` (`decide`: `None` reads it, `Some(trusted)` records the user's
+    /// decision first; [`revoke_trust`](Self::revoke_trust) forgets it), for the client.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NoDataDirectory`], [`Error::ShuttingDown`], [`Error::InvalidArgument`] for a
+    /// relative path; lookup errors go to `on_done`.
+    pub fn trust_view(
+        &self,
+        path: PathBuf,
+        decide: Option<bool>,
+        on_done: impl FnOnce(Result<TrustView>) + Send + 'static,
+    ) -> Result<()> {
+        let trust = self.trust_for(&path)?;
+        self.shared.handle.spawn(async move {
+            on_done(match decide {
+                None => trust.view(&path).await,
+                Some(trusted) => trust.decide(&path, trusted).await,
+            });
+        });
+        Ok(())
+    }
+
+    /// Revokes the trust decision of the project containing `path`; the workspace's Agent
+    /// Host restarts without project resources ([`crate::agent_host::restart_on_trust_change`]).
+    ///
+    /// # Errors
+    ///
+    /// As [`trust_view`](Self::trust_view).
+    pub fn revoke_trust(
+        &self,
+        path: PathBuf,
+        on_done: impl FnOnce(Result<TrustView>) + Send + 'static,
+    ) -> Result<()> {
+        let trust = self.trust_for(&path)?;
+        self.shared.handle.spawn(async move {
+            on_done(trust.revoke(&path).await);
+        });
+        Ok(())
+    }
+
+    fn trust_for(&self, path: &std::path::Path) -> Result<TrustService> {
+        self.ensure_running()?;
+        if !path.is_absolute() {
+            return Err(Error::InvalidArgument {
+                field: "path",
+                reason: "must be an absolute path".into(),
+            });
+        }
+        self.trust()
+    }
+
+    fn services(&self) -> Result<StateServices> {
+        self.shared.state_dirs.clone().ok_or(Error::NoDataDirectory)
+    }
+
     /// Starts the ordered shutdown described in the module documentation on a dedicated
     /// thread and returns at once. `on_stopped` runs once the runtime has stopped; it runs
     /// immediately when that already happened, and every caller's callback runs when
@@ -541,6 +696,10 @@ impl Shared {
         if let Some(runtime) = lock(&self.runtime).take() {
             runtime.shutdown_timeout(RUNTIME_SHUTDOWN_TIMEOUT);
         }
+        if self.state_dirs.is_some() {
+            // Stop writing log files into a data directory that may go away with this Core.
+            piarc_telemetry::detach();
+        }
         let waiters = {
             let mut waiters = lock(&self.waiters);
             self.state.store(STOPPED, Ordering::Release);
@@ -567,6 +726,29 @@ impl Drop for Shared {
             runtime.shutdown_background();
         }
     }
+}
+
+/// Creates the data directory layout, routes the logs to `logs/` and opens the database.
+fn open_state(dirs: DataDirs) -> Result<StateServices> {
+    let io = |what: &str, error: std::io::Error| Error::Feature {
+        kind: piarc_protocol::ErrorKind::IoError,
+        retryable: false,
+        message: format!("{what}: {error}"),
+        details: None,
+    };
+    dirs.create_layout()
+        .map_err(|e| io("cannot create the data directory", e))?;
+    match piarc_telemetry::install(&dirs.logs()) {
+        Ok(piarc_telemetry::Installed::Files) => {}
+        Ok(piarc_telemetry::Installed::External) => {
+            tracing::info!(target: "piarc_core", "another log subscriber is installed; log files are not written");
+        }
+        Err(error) => return Err(io("cannot open the log directory", error)),
+    }
+    let storage = Storage::open(dirs)?;
+    let trust = TrustService::new(storage.clone());
+    tracing::info!(target: "piarc_core", data = %storage.dirs().data().display(), "Core state opened");
+    Ok(StateServices { storage, trust })
 }
 
 /// Spawns `future` and a supervisor that reports a panic as an error event. The returned

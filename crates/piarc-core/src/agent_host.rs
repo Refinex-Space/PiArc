@@ -63,6 +63,42 @@ fn start_with(
     )
 }
 
+/// Restarts `supervisor` (the Agent Host of `workspace`) whenever the trust decision of the
+/// workspace's main checkout changes, so the new process loads, or no longer loads,
+/// project-level Pi resources; open sessions are reopened on it (`HostSupervisor::restart`).
+/// The task ends when the supervisor stops or Core's trust service goes away.
+///
+/// # Errors
+///
+/// [`CoreError::Feature`] when the workspace's main checkout cannot be resolved.
+pub fn restart_on_trust_change(
+    supervisor: HostSupervisor,
+    workspace: &Path,
+    trust: &crate::trust::TrustService,
+) -> Result<tokio::task::JoinHandle<()>> {
+    use tokio::sync::broadcast::error::RecvError;
+    let checkout = piarc_git::resolve(workspace)?.main;
+    let mut changes = trust.subscribe();
+    Ok(tokio::spawn(async move {
+        loop {
+            let relevant = match changes.recv().await {
+                Ok(change) => change.checkout == checkout,
+                // Missed changes may include this checkout's.
+                Err(RecvError::Lagged(_)) => true,
+                Err(RecvError::Closed) => return,
+            };
+            if supervisor.state() == SupervisorState::Stopped {
+                return;
+            }
+            if relevant {
+                tracing::info!(target: "piarc_core::trust", checkout = %checkout.display(),
+                    "project trust changed; restarting the workspace's Agent Host");
+                supervisor.restart().await;
+            }
+        }
+    }))
+}
+
 /// The Agent Host files of a packaged app: `Resources/agent-host/` (macOS) or
 /// `resources\agent-host\` (Windows), laid out as in architecture section 5.6 and
 /// `apps/desktop/packaging/agent-host-layout.mjs`.

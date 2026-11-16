@@ -1296,20 +1296,26 @@ version = "0.0.0"
 dependencies = [
  "getrandom 0.4.3",
  "minisign-verify",
+ "piarc-config",
  "piarc-exec",
  "piarc-fs",
+ "piarc-git",
  "piarc-host",
  "piarc-ports",
  "piarc-protocol",
  "piarc-sandbox",
  "piarc-secrets",
+ "piarc-store",
+ "piarc-telemetry",
  "piarc-term",
+ "rusqlite",
  "serde",
  "serde_json",
  "sha2",
  "thiserror 2.0.21",
  "tokio",
  "tokio-util",
+ "tracing",
 ]
 
 [[package]]
