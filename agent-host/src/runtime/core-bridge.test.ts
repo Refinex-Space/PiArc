@@ -100,6 +100,16 @@ describe('CoreBridge', () => {
     expect(sent).toHaveLength(1);
   });
 
+  it('rejects and forgets a request whose frame cannot be sent', async () => {
+    const b = new CoreBridge(() => {
+      throw new TypeError('lone surrogate');
+    });
+    await expect(b.request('exec/run', { command: 'x' }, { timeoutMs: null })).rejects.toThrow(
+      'lone surrogate',
+    );
+    expect(b.pendingCount).toBe(0);
+  });
+
   it('rejects a malformed result of a typed request', async () => {
     const { bridge: b } = bridge();
     const pending = failure(

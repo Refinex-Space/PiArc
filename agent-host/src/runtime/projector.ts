@@ -20,6 +20,8 @@ import { randomUUID } from 'node:crypto';
 import type { AgentSessionEvent } from '@earendil-works/pi-coding-agent';
 import type { Item, ItemStatus, TurnStatus } from '@piarc/protocol';
 
+import { wellFormedJson } from '../protocol/well-formed.js';
+
 /** Where projected notifications go (the outbound queue, bound to one session). */
 export interface ProjectionSink {
   event(method: string, payload: Record<string, unknown>): void;
@@ -269,6 +271,7 @@ function toolCall(
     itemId,
     status,
     tool: open.tool,
+    // Tool arguments come from the model.
     arguments: wellFormedJson(open.arguments),
     ...(output === undefined ? {} : { output }),
   };
@@ -290,23 +293,6 @@ function resultText(result: unknown): string | undefined {
     isObject(part) && part.type === 'text' && typeof part.text === 'string' ? [part.text] : [],
   );
   return parts.join('\n').toWellFormed();
-}
-
-/** Tool arguments come from the model: replace unpaired surrogates in every key and string. */
-function wellFormedJson(value: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(value).map(([key, member]) => [key.toWellFormed(), wellFormedValue(member)]),
-  );
-}
-
-function wellFormedValue(value: unknown): unknown {
-  if (typeof value === 'string') {
-    return value.toWellFormed();
-  }
-  if (Array.isArray(value)) {
-    return value.map(wellFormedValue);
-  }
-  return isObject(value) ? wellFormedJson(value) : value;
 }
 
 function isHighSurrogate(code: number): boolean {

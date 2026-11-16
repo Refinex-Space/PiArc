@@ -81,6 +81,15 @@ describe('CoreIo', () => {
     expect(sent.map((s) => s.params.append)).toEqual([undefined, true]);
   });
 
+  it('sends paths and commands from the model as well-formed strings', async () => {
+    const { io: core, sent } = io(() => ({
+      result: { path: '/w/a', kind: 'file', size: 0, readonly: false },
+    }));
+    // A model can cut an emoji in half: a lone high surrogate cannot be encoded as UTF-8.
+    await core.stat('/w/\ud83d.txt', origin);
+    expect(sent[0]?.params.path).toBe('/w/\ufffd.txt');
+  });
+
   it('rejects malformed results', async () => {
     const { io: core } = io(() => ({
       result: { path: '/w', kind: 'socket', size: 0, readonly: false },

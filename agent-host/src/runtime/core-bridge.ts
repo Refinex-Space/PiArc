@@ -82,7 +82,13 @@ export class CoreBridge {
         }, timeoutMs);
       }
       signal?.addEventListener('abort', onAbort, { once: true });
-      this.#send({ jsonrpc: '2.0', id, method, params });
+      try {
+        this.#send({ jsonrpc: '2.0', id, method, params });
+      } catch (error) {
+        // The frame never left (it could not be encoded): nothing will answer it.
+        settle();
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
     });
   }
 

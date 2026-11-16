@@ -18,6 +18,7 @@ import type {
 } from '@piarc/protocol';
 
 import { AhpError } from '../protocol/errors.js';
+import { wellFormedJson } from '../protocol/well-formed.js';
 import type { CoreBridge } from '../runtime/core-bridge.js';
 import type { CanonicalTool } from './profile.js';
 
@@ -299,7 +300,8 @@ export class CoreIo {
   ): Promise<T> {
     return this.#options.bridge.requestTyped(
       method,
-      { sessionId: this.#options.sessionId, ...params },
+      // Paths, patterns, commands and contents come from the model.
+      wellFormedJson({ sessionId: this.#options.sessionId, ...params }),
       parse,
       {
         ...(signal === undefined ? {} : { signal }),
