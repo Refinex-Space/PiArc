@@ -280,10 +280,29 @@ fn check_process_environment(what: &str, pid: u32, needles: &[String]) {
     } else if cfg!(target_os = "linux") {
         std::fs::read_to_string(format!("/proc/{pid}/environ")).unwrap_or_default()
     } else {
-        println!(
-            "T08-A10 NOT RUN for {what}: reading another process's environment is checked in W0 on Windows"
+        // Windows: the process's environment block, read from its PEB (process-env.ps1).
+        let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("agent_host")
+            .join("process-env.ps1");
+        let out = std::process::Command::new("powershell.exe")
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+            ])
+            .arg(&script)
+            .args(["-ProcessId", &pid.to_string()])
+            .stdin(std::process::Stdio::null())
+            .output()
+            .expect("powershell runs");
+        assert!(
+            out.status.success(),
+            "{what}: reading the environment of pid {pid} failed"
         );
-        return;
+        String::from_utf8_lossy(&out.stdout).into_owned()
     };
     assert!(
         environment.contains("PATH="),
