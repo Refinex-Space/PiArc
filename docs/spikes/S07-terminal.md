@@ -12,7 +12,7 @@ Windows（W0，第 11 节）**有条件通过**：
 - **通过的项**：TUI 渲染、帧与 formatter 逐格一致、resize、Ctrl+C、终止进程；打包产物中的 DLL 链接方式可用；输出 100 MB 期间主进程事件循环 p99 14.34 ms。
 - **未达标的项**：键入回显额外延迟按原始配对口径 p95 6.86 ms，超出 5 ms。均值是 −0.12 ms，完整路径在各分位上都不比直接写 PTY 慢，超出的部分来自 ConPTY 两次独立往返的抖动，这套测量方法在 Windows 上需要 R1 校准。
 - **实机核对**：微软拼音的候选框与预编辑位置全部符合预期（第 11.4 节）。
-- **待核对的项**：win32-arm64 上 libghostty-vt 的实际运行（下一次 CI，I47）。
+- **win32-arm64**：CI 的 `core-load`（`windows-11-arm`）中 libghostty-vt 在 node 与 Electron 里实际运行终端通过（I47）。
 
 | S7 通过标准 | macOS 结果 |
 |---|---|
@@ -21,7 +21,7 @@ Windows（W0，第 11 节）**有条件通过**：
 | 键入回显额外延迟 p95 ≤ 5 ms | 通过：p95 0.79 ms（200 个配对样本）。按 ADR-0017 原文让帧经事件 MessagePort 时是 p95 16.2 ms（Chromium 在按键之后把 MessagePort 消息推迟到下一帧之后处理），因此按 ADR-0023（已接受）改为拉取请求的返回值（第 5.2 节） |
 | 中文输入法候选框与预编辑文本位置正确 | 通过。预编辑在光标处绘制、隐藏 textarea 跟随光标，CDP 合成验证通过；系统"简体拼音"实测 T1–T4 全部符合预期（第 8 节） |
 | formatter 输出与渲染帧逐格一致 | 通过。普通屏幕、备用屏幕、中日韩全角、emoji、ZWJ 与组合字符、宽字符换行、滚动，以及真实 vim，Rust 逐格比较全部一致；TS 解码器对同一组帧得到相同屏幕（第 6 节） |
-| 四个目标都能链接，win32-arm64 实机运行 | darwin-arm64、darwin-x64 本机链接通过；Windows 两个目标选定"官方 DLL 放在 `.node` 旁边"，CI `core-build` 两个目标通过，`core-load` 在 x64 与 arm64 runner 上加载通过；win32-arm64 上 libghostty-vt 的实际运行由加载检查新增的终端检查在下一次 CI 中给出（第 3 节、第 11 节） |
+| 四个目标都能链接，win32-arm64 实机运行 | darwin-arm64、darwin-x64 本机链接通过；Windows 两个目标选定"官方 DLL 放在 `.node` 旁边"，CI `core-build` 两个目标通过，`core-load` 在 x64 与 arm64 runner 上加载通过；win32-arm64 上 libghostty-vt 的实际运行经加载检查新增的终端检查在 CI 中通过（第 3 节、第 11 节） |
 
 回显问题出在 Electron 的跨进程送达方式，不在 libghostty-vt 或渲染器；xterm.js 退路同样要把数据送进渲染进程，换退路解决不了它，改送达方式解决了它。
 
@@ -60,7 +60,7 @@ XCFramework 里 `macos-arm64_x86_64/libghostty-vt.a` 是双架构静态库，`ca
 
 落地：`build.rs` 链接导入库（Rust 对 `dylib` 链接的符号生成 dllimport），并把 DLL 所在目录加入链接搜索路径，`cargo test` 运行时 cargo 会把它放进 PATH；`build-core.mjs` 在 Windows 目标上把 `ghostty-vt.dll` 复制到 `.node` 旁边；Forge 把它复制进 `native/` 并用 `asar.unpack` 留在 asar 之外；CI `core-build` 上传 `.node` 与 `.dll`，`core-load` 在同一目录加载。
 
-**W0 结果**：CI 运行 43827342553 中 `core-build` 的两个 Windows 目标链接通过，`core-load` 在 `windows-latest` 与 `windows-11-arm`（arm64 实机 runner）上把 `.node` 与旁边的 `ghostty-vt.dll` 一起加载通过；Windows 11 本机 MSVC 14.51 构建通过，打包产物（`app.asar.unpacked/native/` 下的 `.node` 与 DLL）的终端 L4 通过。win32-arm64 的 DLL 官方"只构建、从不运行"：加载已在 arm64 上成功，而加载检查此前不调用终端，W0 给它加了终端检查（第 11 节）。
+**W0 结果**：CI 运行 43827342553 中 `core-build` 的两个 Windows 目标链接通过，`core-load` 在 `windows-latest` 与 `windows-11-arm`（arm64 实机 runner）上把 `.node` 与旁边的 `ghostty-vt.dll` 一起加载通过；Windows 11 本机 MSVC 14.51 构建通过，打包产物（`app.asar.unpacked/native/` 下的 `.node` 与 DLL）的终端 L4 通过。win32-arm64 的 DLL 官方"只构建、从不运行"：加载已在 arm64 上成功，而加载检查此前不调用终端，W0 给它加了终端检查（第 11 节）。下一次 CI（运行 43855932047，2026-11-16）中 arm64 的 node 与 Electron、开发版与发布版都报 `terminal ok`，libghostty-vt 在 win32-arm64 上实际运行通过。
 
 ## 4. PTY、线程与帧
 
@@ -182,7 +182,7 @@ L4 `apps/desktop/e2e/terminal-tui.e2e.ts`（dev 与 packaged 两种形态）等�
 | 项 | 负责 |
 |---|---|
 | Windows 两个目标的链接与加载；ConPTY；Windows 渲染、回显延迟与终端用例的 Windows 版本 | W0 已完成（第 11 节） |
-| win32-arm64 上 libghostty-vt 的实际运行（加载检查新增的终端检查，下一次 CI 的 `core-load`） | R1 核对 |
+| win32-arm64 上 libghostty-vt 的实际运行（加载检查新增的终端检查，下一次 CI 的 `core-load`） | 已完成（2026-11-16 CI，`terminal ok`） |
 | 微软拼音的候选框与预编辑位置（第 11 节 WT1–WT4） | W0 已完成，全部符合预期 |
 | Windows 上键入回显额外延迟的测量口径 | R1 |
 | 真实拼音输入法核对（第 8 节 T1–T4，T10-A11） | 已完成（2026-11-16），全部符合预期 |

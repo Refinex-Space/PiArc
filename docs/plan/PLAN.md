@@ -333,7 +333,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I29 | T10 | `cat` 以约 190 MB/s 输出时主进程 CPU（含 Core 全部线程）约为一个核的 74%，主要是 IO 线程读 PTY 与解析；第 11 章没有对应预算 | T44 把终端吞吐纳入性能回归时评估（例如增大读块、合并读） |
 | I30 | T10 | `#/terminal-lab` 原型页随发布构建的渲染包分发；发布构建的 `window.piarc` 也有七个终端函数（`createTerminal` 只能启动登录 shell），与 I13、I24 同类 | T34 接入正式终端面板时收口；T45 与 I13、I24 一起评估剔除原型页 |
 | I31 | T10 | 真实拼音输入法的候选框位置未核对，清单见 `docs/spikes/S07-terminal.md` 第 8 节（T1–T4） | 已落地（2026-11-16）：智能体经 computer-use 在本机用系统"简体拼音"实测，T1–T4 全部符合预期，结果见 S7 报告第 8 节；T10-A11 改为通过 |
-| I32 | T10 | T09 的 L4 `transcript-scroll.e2e.ts` 中 "the wheel releases and resumes following" 在一次全量运行中失败（dev 形态，内容增长时离底 31 px，期望 ≤ 1 px），单独重跑 10 次（两种形态各 5 次）都通过；本机此时的主屏是 120 Hz | T19 接手 transcript 时检查贴底在高刷新率下的时序；T44 把 L4 的偶发失败纳入统计 |
+| I32 | T10 | T09 的 L4 `transcript-scroll.e2e.ts` 中 "the wheel releases and resumes following" 在一次全量运行中失败（dev 形态，内容增长时离底 31 px，期望 ≤ 1 px），单独重跑 10 次（两种形态各 5 次）都通过；本机此时的主屏是 120 Hz | T19 接手 transcript 时检查贴底在高刷新率下的时序；T44 把 L4 的偶发失败纳入统计；2026-11-16 在 CI 的 `desktop L4 (macos-latest)`（packaged，https://github.com/Refinex-Space/PiArc/actions/runs/43855932047）再次失败，离底同为 31 px |
 | I33 | T11 | 进程树终止的接口已就绪：`piarc_exec::ProcessTreeSpawner`（`ProcessSpawner` 的实现；macOS 新进程组 + `killpg`，Windows 挂起创建后加入 `KILL_ON_JOB_CLOSE`、不许 breakaway 的 Job 再恢复；`kill` 与丢弃句柄都结束整棵树，丢弃也会结束命令留在后台的进程）。目前只有沙箱会话的 `exec/run` 用它 | 部分落地（T12）：`piarc_core::agent_host::start` 与 `start_bundled` 改用 `ProcessTreeSpawner`（W0 实机核对 Agent Host 被杀时子进程随之结束）；T17 让 `ToolIo` 的普通命令也用它，并决定后台进程在命令结束时是否保留（与 T32 的后台任务一起）。W0 补充：Windows 的 Git Bash 没有真正的 `exec`，命令总是 bash.exe 的子进程，所以现在取消或超时一个委托的 Bash 命令时，命令本身（不只是它的后台进程）都继续运行（`piarc-exec` 的 `cancelling_kills_the_command` 中 `sleep.exe` 活满 30 s），T17 在 Windows 上必须改用 `ProcessTreeSpawner` |
 | I34 | T11 | 沙箱把 `CARGO_HOME` 指向会话临时目录（防止缓存投毒，S8 报告第 4 节），沙箱内读不到 `~/.cargo/config.toml` 的镜像源设置；每个会话第一次安装或构建是冷缓存 | T39 决定是否把用户的 Cargo 配置（不含凭据）复制进会话，以及是否提供共享只读缓存 |
 | I35 | T11 | 沙箱内不能绑定端口、不能连 Unix socket（本地测试服务器、Docker、ssh-agent 不可用），`git init`/`clone`/`config` 因 `.git/config`、`.git/hooks` 受保护而失败；`GIT_CONFIG_COUNT` 被沙箱用来指定代理，命令继承的同类变量失效 | T39 评估"允许本机绑定""允许写 `.git/config`"两个选项与 Unix socket 白名单，设置页写明这些限制 |
@@ -348,7 +348,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I44 | W0 | Windows 上两项测量的口径失效：①`monitorEventLoopDelay` 受约 15.6 ms 的计时器粒度支配，空闲 Node 就是 p99 16.58 ms，S2 满载原始 p99 16.81 ms（W0-A04 按原始值未达标）；②终端回显的配对相减被 ConPTY 两次独立往返的 0–16 ms 抖动淹没，均值 −0.12 ms 而 p95 6.86 ms（W0-A10）。预算未改 | R1 校准 Windows 的测量方法（扣除同机空闲基线，或改测回调执行时长、在 Core 内分段打点），再据此改判 W0-A04、A10 |
 | I45 | W0 | Windows 体积超预算：CI 的 `Setup.exe`（开发构建）225.3 MB > 200 MB；本机发布构建打包目录 516.4 MB > 450 MB（Electron 本体约 360 MiB、内置 node 约 102 MiB），安装后体积见 S6 第 9 节 | R1 与 I41 一起决定（裁剪 locales、校准 Windows 预算等），T44 纳入回归 |
 | I46 | W0 | Windows 上 Node 写管道式 stdout 是同步的：Core 停止读取时 Agent Host 整个事件循环停住，连 Core 发来的请求（中断、关闭）也处理不了，直到 Core 恢复读取；macOS 上它会继续在内存里排队 | T14 的事件消费者持续取走事件（同 I19）；R1 评估是否需要让 Agent Host 的 AHP 写入在 Windows 上异步（例如单独的管道而不是 fd 1） |
-| I47 | W0 | win32-arm64 上 libghostty-vt 的实际运行尚无结果：CI 只做过加载，W0 给 `core-load-check.mjs` 加了终端检查，要下一次推送后的 `core-load`（`windows-11-arm`）才有结果 | R1 开工时核对该作业；失败按 ADR-0017 的触发条件处理 |
+| I47 | W0 | win32-arm64 上 libghostty-vt 的实际运行尚无结果：CI 只做过加载，W0 给 `core-load-check.mjs` 加了终端检查，要下一次推送后的 `core-load`（`windows-11-arm`）才有结果 | 已落地（2026-11-16）：提交 3ae1d23 的 CI（https://github.com/Refinex-Space/PiArc/actions/runs/43855932047）中 `core load (aarch64-pc-windows-msvc)` 通过，node 24.22.2 与 Electron 45.3.2 的开发版、发布版都报 `terminal ok` |
 | I48 | W0 | 主进程没有按架构第 9.1 节用 `app.setPath('userData', …)` 固定数据目录：Windows 上 Electron 默认把 userData（Chromium 缓存、本地存储）放在漫游的 `%APPDATA%\PiArc\`，卸载后留在那里（实测 71 个文件 9.5 MiB）；macOS 的默认位置恰好与架构一致 | T13 设定数据目录时一并设 `userData`；T50 决定卸载时是否提供删除数据的选项 |
 | I49 | W0 | Windows 上 SmartScreen 的"更多信息 → 仍要运行"流程没有观察到：W0 的机器关着"检查应用和文件"（安装包带 `ZoneId=3`，没有拦截），智能应用控制也是关的；系统通知总开关关闭，横幅也没看到（程序侧正确收到 `failed`） | R1 与 I42 一起安排：在开着"检查应用和文件"与通知的 Windows 11 上，用浏览器下载的安装包重做 S6 检查清单第 8 节 W3 与通知；最晚 T50 首次发布前 |
 
@@ -484,6 +484,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 验收：T10 14 项全部通过（A11 由阻塞改为通过）
 - 决策：无
 - 遗留：I31 已落地；后台方式投递的按键不经过输入法，真实输入法核对必须用前台键盘事件（S7 第 8 节）。W0 的 A04、A10（Windows 测量口径，I44）仍交 R1，需要 Windows 电脑
+
+### 2026-11-16 CI 核对（提交 3ae1d23 的运行 43855932047）
+- 结果：`core-build`、`core-load` 四个目标与四个打包作业通过；win32-arm64 的加载检查报 `terminal ok`，I47 已落地
+- 失败与处理：`desktop L4 (windows-latest)` 的 `terminal-tui.e2e.ts` vim 用例两种形态失败——runner 未设 `LANG`，Git 的 vim 在 `-u NONE` 下按 latin1 读文件、中文显示为字节转义（本机清空 locale 变量复现，54c63bd 用 `--cmd 'set encoding=utf-8'` 修复，Windows 待下一次 CI 确认）；`desktop L4 (macos-latest)` 的 `transcript-scroll.e2e.ts` "the wheel releases and resumes following"（packaged）离底 31 px，即 I32，按登记交 T19/T44
+- 未推送：e2c302d、bdd540a、54c63bd 与本条记录
 
 ## 计划变更记录
 

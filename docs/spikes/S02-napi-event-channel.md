@@ -142,4 +142,4 @@ max 38 ms 是 5 分钟内的单次尖峰，p99 远低于预算。
 - **空闲内存比 macOS 低**：Windows 上裸 Electron 96.1 MB，含 Core 108.4 MB，在 120 MB 预算内；Core 与应用代码约 12 MB。I12 的校准要分平台写。
 - 结论：**有条件通过**。功能性标准（无丢失、无乱序、四个目标加载）全部达标；事件循环延迟的测量口径在 Windows 上需要 R1 校准，例如扣除同机空闲基线，或改为测量每次回调的执行时长。
 
-win32-arm64：没有本地 arm64 设备。CI 的 `core-load` 在 GitHub 的 arm64 Windows 11 runner（真实 arm64 硬件上的 Windows 11）上通过，开发版跑完 2,000 个事件。W0 给加载检查加了一项终端检查，在 PTY 中运行命令，并从 libghostty-vt 的帧中读回输出（`scripts/ci/core-load-check.mjs`），本机 x64 四种组合通过。arm64 上 libghostty-vt 的实际运行要等下一次 CI 才有结果，由 R1 核对（S7 报告第 11 节）。
+win32-arm64：没有本地 arm64 设备。CI 的 `core-load` 在 GitHub 的 arm64 Windows 11 runner（真实 arm64 硬件上的 Windows 11）上通过，开发版跑完 2,000 个事件。W0 给加载检查加了一项终端检查，在 PTY 中运行命令，并从 libghostty-vt 的帧中读回输出（`scripts/ci/core-load-check.mjs`），本机 x64 四种组合通过。2026-11-16 的 CI 中 arm64 的四种组合（node、Electron × 开发版、发布版）都报 `terminal ok`（S7 报告第 11 节，I47）。
