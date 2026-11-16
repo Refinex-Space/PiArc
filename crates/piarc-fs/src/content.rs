@@ -3,6 +3,7 @@
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use piarc_protocol::fs::{BlobRef, FsMkdirResult, FsReadResult, FsWriteResult, MAX_READ_CHUNK};
 use piarc_protocol::text::incomplete_utf8_suffix;
@@ -57,6 +58,9 @@ pub fn read_text(
     })
 }
 
+/// Distinguishes the temporary files of concurrent blob writes in this process.
+static PARTIAL_SEQ: AtomicU64 = AtomicU64::new(0);
+
 /// Copies the whole file into `blob_dir`, named by its SHA-256, and returns the reference
 /// (ADR-0009 rule 8). An existing blob with the same name is reused.
 ///
@@ -74,8 +78,14 @@ pub fn read_blob(scope: &Scope, requested: &str, blob_dir: &Path) -> Result<FsRe
     let blob = blob_dir.join(&sha256);
     if !blob.is_file() {
         std::fs::create_dir_all(blob_dir).map_err(|e| Error::io(blob_dir, e))?;
-        // Written under a temporary name first, so a reader never sees half a blob.
-        let partial = blob_dir.join(format!("{sha256}.partial-{}", std::process::id()));
+        // Written under a temporary name first, so a reader never sees half a blob. The name is
+        // unique per call: concurrent reads of the same content must not share (and truncate)
+        // one partial file; the last rename wins with identical bytes.
+        let partial = blob_dir.join(format!(
+            "{sha256}.partial-{}-{}",
+            std::process::id(),
+            PARTIAL_SEQ.fetch_add(1, Ordering::Relaxed)
+        ));
         std::fs::write(&partial, &bytes).map_err(|e| Error::io(&partial, e))?;
         std::fs::rename(&partial, &blob).map_err(|e| Error::io(&blob, e))?;
     }
@@ -182,6 +192,40 @@ mod tests {
 
     fn scope(tree: &TempTree) -> Scope {
         Scope::new(&tree.path("ws"), &tree.path("ws")).expect("scope")
+    }
+
+    #[test]
+    fn concurrent_blob_reads_of_the_same_content_all_succeed_with_an_intact_blob() {
+        let tree = TempTree::new("content-blob-race");
+        let content: Vec<u8> = (0..4 * 1024 * 1024_u32).map(|i| (i % 251) as u8).collect();
+        let path = tree.path("ws/image.bin");
+        std::fs::create_dir_all(tree.path("ws")).expect("ws created");
+        std::fs::write(&path, &content).expect("written");
+        let scope = std::sync::Arc::new(scope(&tree));
+        for round in 0..10 {
+            let blob_dir = std::sync::Arc::new(tree.path(&format!("blobs-{round}")));
+            let start = std::sync::Arc::new(std::sync::Barrier::new(8));
+            let readers: Vec<_> = (0..8)
+                .map(|_| {
+                    let (scope, blob_dir, start) = (scope.clone(), blob_dir.clone(), start.clone());
+                    std::thread::spawn(move || {
+                        start.wait();
+                        read_blob(&scope, "image.bin", &blob_dir)
+                    })
+                })
+                .collect();
+            for reader in readers {
+                let result = reader.join().expect("reader thread").expect("blob read");
+                let blob = result.blob.expect("blob reference");
+                let stored = std::fs::read(&blob.path).expect("blob readable");
+                assert!(
+                    stored == content,
+                    "blob holds {} of {} bytes",
+                    stored.len(),
+                    content.len()
+                );
+            }
+        }
     }
 
     #[test]
