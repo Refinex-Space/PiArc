@@ -3,7 +3,7 @@
 | 项 | 内容 |
 |---|---|
 | 任务 | T12（2026-11-16） |
-| 结论 | macOS：自动化部分通过，首次运行部分等待实机操作。arm64 与 x64 的 DMG、ZIP 本机产出，分层 ad-hoc 签名与 fuse 检查通过；hardened runtime 可以启用（需 `disable-library-validation`）；打包产物经 `sandbox-exec` 宽松配置启动内置 node 完成 mock 对话，bash、grep、find、git、`worker_threads`、npx 拉起 MCP、原生模块正常，越界写入被拒；发布清单签名与三种篡改用例通过；arm64 DMG 168.8 MB、安装后 449.0 MB，都在预算内（后者只余约 1 MB）。首次打开、Gatekeeper 对内置 node 的表现、通知横幅、钥匙串弹窗次数待用户按检查清单操作。Windows：CI 配置就绪，产物与实机待推送后的 CI 与 W0 |
+| 结论 | macOS：有条件通过。arm64 与 x64 的 DMG、ZIP 本机产出，分层 ad-hoc 签名与 fuse 检查通过；hardened runtime 可以启用（需 `disable-library-validation`）；打包产物经 `sandbox-exec` 宽松配置启动内置 node 完成 mock 对话，bash、grep、find、git、`worker_threads`、npx 拉起 MCP、原生模块正常，越界写入被拒；发布清单签名与三种篡改用例通过；arm64 DMG 168.8 MB、安装后 449.0 MB，都在预算内（后者只余约 1 MB）。钥匙串每次更新弹 1 次（用户实机确认）；通知能注册，但程序侧 `show` 不反映是否允许（I43）；Gatekeeper 开启时的首次打开未验证（用户的 Mac 关着 Gatekeeper，I42）。Windows：CI 配置就绪，产物与实机待推送后的 CI 与 W0 |
 | 代码 | `apps/desktop/packaging/`（布局、签名、DMG maker、Velopack 绑定）、`scripts/dev/fetch-binaries.mjs` + `third-party/binaries.lock.json`、`crates/piarc-core/src/agent_host.rs`（`BundledRuntime`、`start_bundled`）、`crates/piarc-sandbox/src/seatbelt.rs`（Agent Host 配置）、`crates/piarc-core/src/release.rs`、`scripts/release/` |
 | 测试 | `apps/desktop/e2e/agent-host.e2e.ts`、`notification.e2e.ts`；`crates/piarc-core/tests/release.rs`、`agent_host_probe.rs`；`scripts/ci/check-app-layout.mjs`；`scripts/release/release-manifest.test.mjs`、`scripts/lib/blake2b.test.mjs` |
 | 实机清单 | [S06-first-run-checklist.md](S06-first-run-checklist.md) |
@@ -105,7 +105,11 @@ macOS 的隐私授权（"文稿""桌面"、下载文件夹等）按"负责进程
 
 ## 5. 系统通知
 
-程序侧：L4 `notification.e2e.ts`（打包形态）在 ad-hoc 签名、hardened runtime 的开发构建上调用 `new Notification().show()`：`Notification.isSupported()` 为 true，7 ms 后收到 `show` 事件，没有 `failed`（`tmp/evidence/T12/l4/notification*/notification.json`）。程序因此能得知结果，通知不可用时可以按 ADR-0018 第 6 条退回应用内提醒。横幅是否真的显示、系统设置中是否出现 PiArc，待用户在检查清单第 4 项目视确认。
+程序侧：L4 `notification.e2e.ts`（打包形态）在 ad-hoc 签名、hardened runtime 的开发构建上调用 `new Notification().show()`：`Notification.isSupported()` 为 true，7 ms 后收到 `show` 事件，没有 `failed`（`tmp/evidence/T12/l4/notification*/notification.json`）；用户在已安装的构建上运行 `notify`，同样 4 ms 后收到 `show`。
+
+系统侧（用户的 Mac，智能体用 computer use 查看"系统设置 → 通知"）：PiArc 出现在应用列表中（ad-hoc 签名的应用能注册到通知中心），但"允许通知"为关，横幅没有显示。也就是说，用户关闭（或从未允许）通知时，程序收到的仍是 `show`，`failed` 不会出现。
+
+结论：ad-hoc 签名不妨碍 `UNNotification` 注册与提交；但程序侧的 `show`/`failed` 不能反映通知是否真的送达，不能用它决定是否退回应用内提醒加 Dock 角标（ADR-0018 第 6 条）。T35/T18 做通知时要另找授权状态的来源（例如原生模块查询 `UNUserNotificationCenter` 的设置），或者在通知之外总是给应用内提醒（I43）。允许通知后横幅能否显示没有实测。
 
 ## 6. 发布清单
 
@@ -144,20 +148,22 @@ Windows x64 安装包体积在 CI 产物取得后补记（W0）。
 - Velopack 接入：主进程最先运行 `VelopackApp.build().run()`（只在打包后的 Windows 构建，绑定从 app.asar 的 `node_modules` 加载，只带目标架构的 `.node`）；`vpk` 对非 .NET 主程序跳过 VelopackApp 检查。pack id 与快捷方式的 AUMID 都是 `cn.piarc.desktop`，与主进程 `app.setAppUserModelId` 一致；pack id 不能用 `PiArc`，否则安装目录 `%LocalAppData%\PiArc` 与数据目录重合，卸载会删掉数据。
 - 待 W0：安装（按用户、无 UAC）、启动后经 Job Object 运行 Agent Host 并完成 mock 对话、卸载残留、相邻版本更新、SmartScreen、智能应用控制、安装包与安装后体积、Defender 表现；Windows 上 AUMID 与 Velopack 快捷方式是否一致、通知是否显示。
 
-## 10. 实机项（待用户）
+## 10. 实机项
 
-检查清单 [S06-first-run-checklist.md](S06-first-run-checklist.md) 已准备好构建 A、构建 B（同一应用改版本号重签，代码身份不同）与驱动脚本 `scripts/dev/s6-probe.mjs`。待用户操作的项：
+2026-11-16 在用户的 Mac（macOS 26.5.2）上按检查清单完成，细节见清单第 7 节。用户实测时发现钥匙串探针写入的键名不合保险箱规则（`probe/s6`），已先写失败测试再修复（提交 89c560f）并重打构建 A、B。
 
-| 项 | 状态 |
+| 项 | 结果 |
 |---|---|
-| 首次打开、"仍要打开"（macOS 26、macOS 15） | 待用户操作 |
-| `xattr -dr com.apple.quarantine` 备选 | 待用户操作 |
-| Gatekeeper 是否单独拦截内置 node | 待用户操作 |
-| 通知横幅目视 | 待用户操作（程序侧已通过） |
-| 钥匙串授权弹窗次数（构建 A 创建、构建 B 读取） | 待用户操作 |
+| 首次打开、"仍要打开"（macOS 26、macOS 15） | 未验证：这台 Mac 的 Gatekeeper 评估被关闭，浏览器下载的 DMG 也没有隔离属性；没有 macOS 15 设备（I42） |
+| `xattr -dr com.apple.quarantine` 备选 | 未验证（同上） |
+| Gatekeeper 是否单独拦截内置 node | 未出现拦截，但 Gatekeeper 关闭，不构成证据（I42） |
+| 通知 | 程序侧收到 `show`；PiArc 的"允许通知"为关，横幅未显示；`show` 不反映投递结果（I43） |
+| 钥匙串授权弹窗次数 | 构建 A 创建与读取 0 次；换装构建 B 后第一次读取 1 次（用户确认），之后 0 次，符合 ADR-0018 的预期 |
 
 ## 11. 结论
 
-- 有条件通过（macOS）：打包、签名分层、hardened runtime、fuses、内置运行时与宽松 Seatbelt、发布清单都已验证；首次运行四项待实机结果，收到后在本节更新结论。
+- 有条件通过（macOS）：打包、签名分层、hardened runtime、fuses、内置运行时与宽松 Seatbelt、发布清单都已验证；钥匙串每次更新弹 1 次，符合 ADR-0018。
+- 未验证：Gatekeeper 开启时的首次打开（"仍要打开"、备选命令、对内置 node 的表现），这台 Mac 关着 Gatekeeper，也没有 macOS 15 设备（I42）；通知横幅在允许通知时能否显示。
+- 通知的程序侧事件不可靠（I43）：用户关闭通知时仍收到 `show`。
 - 安装后体积贴着预算（I41），需要在 R1 决定余量策略。
 - 内置 node 的官方 entitlements 允许同一用户调试附加 Agent Host（I39），这是保留官方签名的代价。

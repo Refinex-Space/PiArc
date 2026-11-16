@@ -294,21 +294,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-T12 打包、首次运行与发布清单（开工 2026-11-16；依赖中 T03、T04、T11 为"部分完成"，遗留项都是 Windows CI 核对，不影响本任务；D2 已决定；分支未推送，前序 Windows CI 未核对）
-
-- [x] 1. 第三方二进制清单（node、rg、fd、Velopack 工具）与下载校验脚本
-- [ ] 2. 打包布局：`Resources/agent-host/`（node、bundle、pi-assets、photon、bin/rg fd），图标引用 `design/brand/`，bundle id 取自集中标识
-- [ ] 3. 签名分层（node 保留官方签名，rg/fd/.node ad-hoc，外层不 `--deep`）、DMG + ZIP（arm64、x64）、布局检查脚本、hardened runtime 结论（A01–A03、A14）
-- [x] 4. Core 从打包产物启动 Agent Host：宽松 Seatbelt、`ProcessTreeSpawner`（I33）、最小环境变量、`PI_PACKAGE_DIR`
-- [x] 5. 宽松配置下的验证：bash、grep、find、git、`worker_threads`、写入范围、内置 npx 拉起 MCP、原生模块（A06、A07）
-- [ ] 6. 打包产物的 Playwright 测试：一轮 mock 对话（A05）；系统通知程序侧事件（A10）
-- [x] 7. 发布清单：生成脚本、测试密钥、Core 校验与三种篡改用例（A08）
-- [x] 8. CI：Windows Velopack x64/arm64（相邻两个版本）与 macOS 产物，actionlint（A04）
-- [x] 9. 体积测量（A12：macOS 通过，Windows 待 CI）
-- [x] 10. 首次运行检查清单 `docs/spikes/S06-first-run-checklist.md` 与产物 `tmp/s6/PiArc-A.dmg`、`PiArc-B.dmg`、`scripts/dev/s6-probe.mjs`
-- [x] 11. S6 报告、架构 v2.16、ADR-0024、spikes README、CLAUDE.md、复用表
-- [x] 12. `npm run verify` 13 步通过（A15）、验收记录、登记 I38–I41
-- [ ] 13. 等待用户按检查清单在实机上操作（macOS 26、macOS 15）：首次打开与"仍要打开"、备选 `xattr`、Gatekeeper 对内置 node、通知横幅、钥匙串弹窗次数。收到结果后：填检查清单第 7 节与 S6 报告第 10、11 节，更新 T12-A09、A10、A11、A13 与 spikes README，看板改为"部分完成"（A04、A12、A14 的 Windows 部分仍待 CI/W0）
+（当前没有进行中的任务）
 
 ## 登记事项
 
@@ -357,6 +343,8 @@ T12 打包、首次运行与发布清单（开工 2026-11-16；依赖中 T03、T
 | I39 | T12 | 内置 node 保留 Node.js 官方签名（ADR-0018），其 entitlements 含 `get-task-allow` 与 `allow-dyld-environment-variables`：同一用户的进程可以调试附加 Agent Host，读到 Core 交给它的凭据（PiArc 自身已用 hardened runtime 挡住注入，S6 报告第 3 节）。Core 以最小环境启动 node，不传 `DYLD_*` | T45 评估（例如凭据只在用时经 AHP 取、缩短驻留时间，或重新评估是否对 node 重签去掉 `get-task-allow`，后者涉及 ADR-0018，属变更型） |
 | I40 | T12 | 在 Agent Host 的宽松 Seatbelt 下，`npx <本地目录>` 形式的 MCP server 启动失败：npm 链接目录后 `chmod` 其 bin，文件在可写目录之外（`EPERM`）。registry 包（tarball）不受影响 | T36 接入 MCP 配置时给出明确错误提示或改用 `npm pack` 后的路径；T39 定稿 Agent Host 配置时一并评估 |
 | I41 | T12 | macOS arm64 安装后体积 449.0 MB，预算 450 MB 只余约 1 MB（内置 node 145 MiB、Electron Framework 250 MiB）；任何新增随包内容都会超出 | R1 决定：校准预算（写明原因）或裁剪（npm 的 docs/man 约 3.2 MiB、压缩 bundle 等），T44 把体积纳入回归 |
+| I42 | T12 | S6 中 Gatekeeper 开启时的首次打开没有验证："仍要打开"是否出现、`xattr -dr com.apple.quarantine` 备选、Gatekeeper 是否单独拦截内置 node（以及带隔离属性的 rg、fd）。用户的 Mac（macOS 26.5.2）`spctl --status` 为 `assessments disabled`，从 `127.0.0.1` 经 Safari 下载的 DMG 也没有 `com.apple.quarantine`；没有 macOS 15 设备。检查清单与 `scripts/dev/s6-probe.mjs` 可直接复用 | R1 汇总 M0 时安排：在开着 Gatekeeper 的 Mac（26 与 15）上、用从 GitHub 等外部地址下载的 DMG 重做检查清单第 2、3 项；最晚 T50 首次发布前完成，结果补进 S6 报告 |
+| I43 | T12 | ad-hoc 签名的 PiArc 能注册到通知中心，但用户未允许通知时 Electron 仍发 `show`、不发 `failed`（实机：允许通知为关，程序收到 `show`）。程序侧事件不能用来决定是否退回应用内提醒；允许通知后横幅能否显示也未实测 | T18/T35 做系统通知时：通知之外总给应用内提醒与 Dock 角标，或经原生模块读取 `UNUserNotificationCenter` 的授权设置；届时在实机上补测横幅 |
 
 ## 技术债
 

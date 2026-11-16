@@ -1511,22 +1511,22 @@
       "id": "T12-A09",
       "task": "T12",
       "description": "首次运行检查清单各项有结论，macOS 15 与 26 分别记录，用户确认的项注明，未验证的项写明原因。验证：检查清单文件（实机关口）。",
-      "status": "blocked",
-      "evidence": "实机关口：检查清单 docs/spikes/S06-first-run-checklist.md 与产物 tmp/s6/PiArc-A.dmg、PiArc-B.dmg、脚本 scripts/dev/s6-probe.mjs 已准备；本机 Gatekeeper 评估被关闭（spctl --status: assessments disabled），需用户在开启 Gatekeeper 的 macOS 26 与 15 上操作后补记"
+      "status": "passing",
+      "evidence": "docs/spikes/S06-first-run-checklist.md 第 7 节各项都有结论（2026-11-16，用户的 MacBook Pro，macOS 26.5.2，用户操作 + 智能体 computer use）：钥匙串 1 次（用户确认）；通知程序侧 show、允许通知为关、横幅未显示；内置 node 经 sandbox-exec 运行未见系统对话框。未验证并写明原因：首次打开、\"仍要打开\"、xattr 备选、Gatekeeper 对内置 node 的拦截（该 Mac `spctl --status` 为 assessments disabled，下载的 DMG 无 com.apple.quarantine，登记 I42）；macOS 15 全部项（没有设备）"
     },
     {
       "id": "T12-A10",
       "task": "T12",
       "description": "ad-hoc 签名下系统通知的可用性有结论，包括程序侧事件与用户目视确认。验证：测试输出与检查清单。",
       "status": "blocked",
-      "evidence": "程序侧已验证：L4 notification.e2e.ts（打包形态）Notification.isSupported()=true，7 ms 后收到 show、无 failed（tmp/evidence/T12/l4/notification*/notification.json）。横幅是否显示待用户按检查清单第 4 项目视确认"
+      "evidence": "结论已有：ad-hoc 签名的应用能注册到通知中心（系统设置 → 通知中出现 PiArc，computer use 查看）；程序侧 L4 与用户实机均收到 show（7 ms / 4 ms），但该 Mac 上 PiArc 的\"允许通知\"为关、横幅未显示，show 不反映是否送达（I43）。缺：允许通知后横幅显示的目视确认（需用户在系统设置中打开 PiArc 的通知后重跑 `node scripts/dev/s6-probe.mjs notify`），由 T18/T35 接入通知时补测"
     },
     {
       "id": "T12-A11",
       "task": "T12",
       "description": "两次构建之间的钥匙串授权弹窗次数已记录，并与 ADR-0018 的预期对照。验证：检查清单（用户操作）。",
-      "status": "blocked",
-      "evidence": "待用户实机操作：检查清单第 5 项（构建 A keychain write、安装构建 B 后 keychain read 计弹窗次数，对照 ADR-0018 预期 ≤ 1）。构建 B 与 A 的 CDHash 不同（b5da96cd… → 0114ea87…），两者布局检查均通过；本机会话无权操作钥匙串，未自测"
+      "status": "passing",
+      "evidence": "用户实机（macOS 26.5.2）：构建 A（CDHash eaa1215e…）`s6-probe.mjs keychain write` 创建主密钥，0 次弹窗，`ok: true, opened: createdWithNewKey`；构建 A 读取 0 次；换装构建 B（CDHash b878e8a8…，CFBundleVersion 0.0.1）后第一次 `keychain read` 耗时 9 s、弹窗 1 次（用户确认并选\"始终允许\"），`found: true`；其后两次读取各 1 s、0 次。与 ADR-0018 预期（≤ 1）一致。证据 tmp/evidence/T12/keychain-*.json，检查清单第 7 节"
     },
     {
       "id": "T12-A12",
@@ -1539,8 +1539,8 @@
       "id": "T12-A13",
       "task": "T12",
       "description": "S6 报告（macOS 部分）含各项结论与待 W0 的项，`docs/spikes/README.md` 已更新。验证：文件内容。",
-      "status": "blocked",
-      "evidence": "docs/spikes/S06-packaging-first-run.md 已写自动化部分的全部结论与待 W0 项（第 9 节），docs/spikes/README.md 已更新；首次运行四项的结论待用户实机结果补入后关闭"
+      "status": "passing",
+      "evidence": "docs/spikes/S06-packaging-first-run.md：各项结论（第 2–8、10、11 节，含实机结果与未验证项的原因）与待 W0 的项（第 9 节）；docs/spikes/README.md 的 S6 行已更新"
     },
     {
       "id": "T12-A14",
