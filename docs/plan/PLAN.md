@@ -111,16 +111,16 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T01 | [仓库脚手架、工程规范与质量门禁](tasks/T01-scaffold-and-quality-gates.md) | 0 | 无 | macOS | high | 大 | 无 | 已完成 | 47fb1e9 |
 | T02 | [协议单一来源与契约测试基座](tasks/T02-protocol-and-contract-tests.md) | 0 | T01 | macOS | high | 中 | 无 | 已完成 | ce41191 |
 | T03 | [Electron 应用骨架与安全基线](tasks/T03-electron-shell-and-security-baseline.md) | 1 | T02 | macOS | xhigh | 大 | S10 | 部分完成 | 63eabea |
-| T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 部分完成 | aa2817f |
+| T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 已完成 | aa2817f |
 | T05 | [严格校验的 mock provider](tasks/T05-strict-mock-provider.md) | 1 | T02 | macOS | high | 中 | 无 | 已完成 | 1487154 |
 | T06 | [Agent Host 骨架：Pi SDK 多会话与 AHP](tasks/T06-agent-host-skeleton.md) | 1 | T04、T05 | macOS | xhigh | 大 | S3、S9 | 已完成 | 2214b08 |
 | T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 已完成 | 3a8744f |
 | T08 | [凭据保险箱](tasks/T08-credential-vault.md) | 1 | T06；D2 | macOS | high | 中 | S5 | 已完成 | 83dc25b |
 | T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 已完成 | 9c0738d |
 | T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 部分完成 | ff591d6 |
-| T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 部分完成 | 1b92a25 |
+| T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 已完成 | 1b92a25 |
 | T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 部分完成 | 815c32d |
-| W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 未开始 | — |
+| W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 进行中 | — |
 | R1 | [M0 评审与收口](tasks/R1-m0-review.md) | 1 | W0 | macOS | high | 中 | S1–S10 汇总 | 未开始 | — |
 | T13 | [存储、数据目录、配置与项目信任](tasks/T13-storage-config-and-trust.md) | 2 | R1（结论为进入 M1） | macOS | high | 大 | 无 | 未开始 | — |
 | T14 | [会话编排与事件投影](tasks/T14-session-orchestration-and-projection.md) | 2 | T13 | macOS | xhigh | 大 | 无 | 未开始 | — |
@@ -294,7 +294,21 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（当前没有进行中的任务）
+W0（Windows 11 实机，2026-11-16 开工；同时闭环 T03、T04、T10、T11、T12 中的 Windows 验收项）：
+
+- [x] 环境：npm 依赖、Electron、`.tools/`（经本机代理）；机器信息已采集
+- [x] 基线修复（9d6b01b、1c6750b、15ce450）：CI 的 verify 两个平台失败（release 夹具 `.dmg` 被 `.gitignore` 排除、`core-io.test.ts` 的 `/w` 在 Windows 被 Pi 解析为 `W:\`），desktop L4 Windows 失败（剪贴板 CRLF）
+- [ ] 基线 `npm run verify` 在 Windows 通过（W0-A15）
+- [x] CI 结果关闭 T04-A09、T10-A01、T12-A04；本机关闭 T11-A10（T04、T11 改为已完成）
+- [ ] T03-A03：本机按 CI 同款步骤跑 L4 与 fuse 校验（W0-A13）
+- [ ] S2：开发与打包形态加载、`bench:s2` 完整基准（W0-A04）
+- [ ] S5：凭据管理器实机测试、数据目录无明文扫描（W0-A05）
+- [ ] S7：终端用例的 Windows 版本（ConPTY、TUI、formatter 一致）、`bench:s7`、随附 conpty 的结论（W0-A09、A10 自动化部分）
+- [ ] S8：Job Object 进程树与结束主进程（W0-A12）
+- [ ] S1：T09 自动化测试、`bench:s1`（W0-A02）
+- [ ] arm64：CI `windows-11-arm` 结果或"未验证"（W0-A11）
+- [ ] 实机关口（用户）：SmartScreen、智能应用控制、安装/卸载/更新、Defender、微软拼音（composer 与终端）（W0-A03、A06、A07、A08、A10 IME、T12-A12、T12-A14）
+- [ ] 报告 Windows 部分、spikes README、CLAUDE.md、收尾（W0-A01、A14）
 
 ## 登记事项
 

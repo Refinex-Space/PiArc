@@ -783,8 +783,8 @@
       "id": "T04-A09",
       "task": "T04",
       "description": "四个目标都构建成功；darwin-arm64 与 win32-x64 在对应平台加载通过，darwin-x64 与 win32-arm64 的加载结果或替代方式记录在报告中。验证：本机输出、CI 配置与报告；Windows 运行结果未取得时标 `blocked`，由 W0 核对。",
-      "status": "blocked",
-      "evidence": "darwin-arm64：本机构建，Node 24.14.1 与 Electron 45.3.2 中开发版、发布版加载并跑通事件通道（tmp/evidence/T04/load-darwin-arm64.log），L4 两种形态通过；darwin-x64：本机交叉构建，Rosetta 2 下 x64 Electron 45.3.2（官方发布包，SHA-256 已核对）中两种构建都通过（tmp/evidence/T04/load-darwin-x64-rosetta.log）；win32-x64、win32-arm64：CI core-build（windows-latest，MSVC）与 core-load（windows-latest、windows-11-arm；macOS 两项另在 macos-latest、macos-15-intel）已配置，actionlint 1.7.12 退出码 0（tmp/evidence/T04/actionlint.log）。Windows 结果需推送后取得，由下一任务开工检查或 W0 核对"
+      "status": "passing",
+      "evidence": "由 W0 在 Windows 上验证：CI 运行 https://github.com/Refinex-Space/PiArc/actions/runs/43827342553（提交 1ab2417）中 core build 的 x86_64-pc-windows-msvc 与 aarch64-pc-windows-msvc 作业通过；core load 在 windows-latest（x64）与 windows-11-arm（windows-11-vs2026-arm64，arm64 实机 runner）上开发版与发布版 .node 都在 Node 24.22.2 与 Electron 45.3.2 中加载通过（\"PASS piarc-core.win32-arm64-msvc.node in electron 45.3.2 (win32-arm64): 2000 events, ordered true, panic -> internalError, state stopped\"）；本机 Windows 11 x64 的开发与打包形态 L4、bench:s2 加载同一模块（tmp/evidence/W0/）。darwin 两项证据不变：darwin-arm64：本机构建，Node 24.14.1 与 Electron 45.3.2 中开发版、发布版加载并跑通事件通道（tmp/evidence/T04/load-darwin-arm64.log），L4 两种形态通过；darwin-x64：本机交叉构建，Rosetta 2 下 x64 Electron 45.3.2（官方发布包，SHA-256 已核对）中两种构建都通过（tmp/evidence/T04/load-darwin-x64-rosetta.log）"
     },
     {
       "id": "T04-A10",
@@ -1266,8 +1266,8 @@
       "id": "T10-A01",
       "task": "T10",
       "description": "darwin-arm64、darwin-x64、win32-x64、win32-arm64 四个目标链接成功，Windows 的链接方式及理由写入报告。验证：本机构建输出与 CI 配置；Windows 运行结果未取得时标 `blocked`，由 W0 核对。",
-      "status": "blocked",
-      "evidence": "本机：darwin-arm64 构建与链接通过（npm run build:core -- --flavor all；cargo test -p piarc-ghostty-sys 链接冒烟 2 项通过）；darwin-x64 交叉构建两种构建通过（node scripts/dev/build-core.mjs --flavor all --target x86_64-apple-darwin，exit 0，产物为 Mach-O x86_64，tmp/evidence/T10/a01/darwin-x64-build.txt）。Windows 选定\"官方 ghostty-vt.dll 放在 .node 旁边\"并写入 S7 报告第 3.3 节（官方文档：MSVC link.exe 不能用静态库；DLL 只依赖 KERNEL32/ntdll/UCRT；libuv uv_dlopen 用 LOAD_WITH_ALTERED_SEARCH_PATH）；CI core-build 上传 .node 与 .dll、core-load 同目录加载已配置（.github/workflows/ci.yml）。阻塞原因：分支未推送，Windows 两个目标的 CI 链接与加载结果待推送后核对；win32-arm64 实机运行由 W0 核对。"
+      "status": "passing",
+      "evidence": "由 W0 在 Windows 上验证：CI 运行 https://github.com/Refinex-Space/PiArc/actions/runs/43827342553 中 core build（x86_64-pc-windows-msvc、aarch64-pc-windows-msvc，MSVC 链接 ghostty-vt.dll 的导入库）通过，core load 在 x64 与 arm64 runner 上加载（.node 与同目录的 ghostty-vt.dll）通过；本机 Windows 11 x64 上 cargo test -p piarc-term（含 tests/pty_windows.rs 10 项）与打包产物的终端 L4 通过。链接方式（官方 DLL 放在 .node 旁边）及理由见 S7 报告第 3.3 节。darwin 两项：本机构建与 x64 交叉构建通过（tmp/evidence/T10/a01/）。"
     },
     {
       "id": "T10-A02",
@@ -1427,8 +1427,8 @@
       "id": "T11-A10",
       "task": "T11",
       "description": "Job Object 关闭后，父、子、孙三级进程全部退出。验证：Windows CI 测试输出；未取得时标 `blocked`，由 W0 核对。",
-      "status": "blocked",
-      "evidence": "Windows CI 未取得（分支未推送）。实现：piarc-exec 的 ProcessTreeSpawner + job 模块（CREATE_SUSPENDED → 加入 KILL_ON_JOB_CLOSE、无 breakaway 的 Job → 恢复）；测试 tree::tests::windows::{closing_the_job_ends_three_levels, kill_ends_three_levels}（父 cmd → 子 cmd → 孙 ping）与 job::tests。本机 cargo clippy --target x86_64-pc-windows-msvc --workspace --all-targets -- -D warnings 通过（只编译不运行）。推送后由下一任务开工检查核对，实机由 W0 核对"
+      "status": "passing",
+      "evidence": "由 W0 在 Windows 上验证：Windows 11 x64 本机 cargo test --workspace（tmp/evidence/W0/cargo-test-full.log）中 tree::tests::windows::closing_the_job_ends_three_levels、kill_ends_three_levels 与 job::tests::a_new_job_kills_on_close_and_allows_no_breakaway 通过（父 cmd → 子 cmd → 孙 ping 全部退出）；CI https://github.com/Refinex-Space/PiArc/actions/runs/43827342553 的 verify 作业在更早的 release 夹具失败处停止，未跑到这些用例"
     },
     {
       "id": "T11-A11",
@@ -1476,8 +1476,8 @@
       "id": "T12-A04",
       "task": "T12",
       "description": "CI 配置产出 Windows x64 与 arm64 Velopack 安装包（含版本相邻的两个版本）与 macOS 产物，配置语法有效。验证：actionlint 输出；实际产物需要用户推送后由 CI 产出，未取得时标 `blocked`，由 W0 核对。",
-      "status": "blocked",
-      "evidence": "actionlint 1.7.12 对 .github/workflows/ci.yml：0 errors（tmp/evidence/T12/actionlint.txt；shellcheck 未安装，相关规则未运行）。新增 package-macos（arm64/x64 release DMG+ZIP、fuse 与布局检查）与 package-windows（x64/arm64 开发构建、vpk 打 0.0.1 与 0.0.2）作业。实际产物要用户推送后由 CI 产出，未取得，由下一任务开工检查或 W0 核对"
+      "status": "passing",
+      "evidence": "由 W0 在 Windows 上验证：CI 运行 https://github.com/Refinex-Space/PiArc/actions/runs/43827342553 中 package Windows (x64)、package Windows (arm64)、package macOS (arm64)、package macOS (x64) 四个作业通过，产物 piarc-windows-x64-velopack（871 MB）、piarc-windows-arm64-velopack（847 MB）、piarc-macos-arm64、piarc-macos-x64；下载的 x64 产物含 cn.piarc.desktop-0.0.1-win-x64-full.nupkg、0.0.2-full、0.0.2-delta（1.0 MB）、Setup.exe（214.9 MB）、Portable.zip 与 releases.win-x64.json（tmp/w0-artifacts/x64/）。actionlint 证据见 tmp/evidence/T12/actionlint.txt"
     },
     {
       "id": "T12-A05",
