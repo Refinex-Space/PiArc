@@ -419,6 +419,9 @@ impl Coalescer {
                 self.counters.delivered.fetch_add(events, Ordering::Relaxed);
             }
             Err(SinkClosed) => {
+                // The sink dropped `done`, which has already signalled completion: count the
+                // attempt as in flight so that signal balances it.
+                self.in_flight += 1;
                 eprintln!(
                     "[piarc-core] event sink closed; dropping {events} events and all later ones"
                 );

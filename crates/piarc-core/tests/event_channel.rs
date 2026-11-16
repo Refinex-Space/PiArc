@@ -414,3 +414,45 @@ fn rejects_an_out_of_range_interval() {
         }
     ));
 }
+
+/// A client whose environment is gone: every delivery fails and drops its completion signal.
+struct ClosedSink {
+    calls: Mutex<Vec<String>>,
+}
+
+impl EventSink for ClosedSink {
+    fn deliver(&self, batches: Vec<EventBatch>, done: DeliveryDone) -> Result<(), SinkClosed> {
+        if let Ok(mut calls) = self.calls.lock() {
+            calls.extend(batches.iter().map(|b| b.route.as_str().to_owned()));
+        }
+        drop(done);
+        Err(SinkClosed)
+    }
+}
+
+#[test]
+fn a_closed_sink_drops_events_and_shutdown_does_not_wait_for_a_delivery() {
+    let sink = Arc::new(ClosedSink {
+        calls: Mutex::new(Vec::new()),
+    });
+    let config = CoreConfig {
+        coalesce_interval: Duration::from_millis(16),
+    };
+    let core = CoreRuntime::start(config, sink.clone()).expect("runtime starts");
+    core.echo("echo", "lost").expect("valid echo");
+    let deadline = Instant::now() + WAIT;
+    while sink.calls.lock().expect("calls").is_empty() {
+        assert!(Instant::now() < deadline, "the coalescer never delivered");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    // The failed delivery is not in flight: shutting down has nothing to wait for.
+    let started = Instant::now();
+    core.shutdown_blocking().expect("shutdown");
+    assert!(
+        started.elapsed() < Duration::from_secs(2),
+        "shutdown waited {:?} for a delivery that was never made",
+        started.elapsed()
+    );
+    // Only the one attempt: the coalescer did not panic (which would deliver core/errors).
+    assert_eq!(*sink.calls.lock().expect("calls"), ["echo"]);
+}
