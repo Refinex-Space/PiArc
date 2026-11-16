@@ -10,8 +10,12 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 |---|---|
 | `npm run build:core` | 构建 Core 的开发版 `.node`（`target/piarc-core/development/`）；源码树运行、`dev` 形态与 Vitest 集成测试都加载它 |
 | `npm run start -w @piarc/desktop` | 开发服务器模式（`electron-forge start`，HMR，放宽的开发 CSP） |
-| `npm run package:desktop` | 发布构建打包到 `apps/desktop/out/release/`（发布 fuses） |
-| `npm run package:desktop -- --flavor development` | 先构建该类型的 Core，再打包到 `out/development/`，同时生成 `.vite/` 生产构建；L4 前必须运行 |
+| `npm run package:desktop` | 发布构建打包到 `apps/desktop/out/release/`（发布 fuses）；先构建该类型的 Core、Agent Host bundle，并下载校验内置 node、rg、fd |
+| `npm run package:desktop -- --flavor development` | 同上，打包到 `out/development/`，同时生成 `.vite/` 生产构建；L4 前必须运行 |
+| `npm run package:desktop -- --flavor release --arch x64 --make` | 指定架构并出安装包：macOS 为 `out/<flavor>/make/dmg/<arch>/*.dmg` 与 `make/zip/darwin/<arch>/*.zip`（x64 需 `rustup target add x86_64-apple-darwin`） |
+| `node scripts/ci/check-app-layout.mjs --flavor <f> [--arch <a>] [--json <file>]` | 打包产物的布局（第 5.6 节）与 macOS 签名分层检查（21 项） |
+| `node scripts/release/pack-windows.mjs --arch x64 --flavor development --versions 0.0.1,0.0.2` | Windows：vpk 打 Velopack 安装包（CI 中运行，需要 .NET SDK） |
+| `node scripts/dev/s6-probe.mjs serve\|variant\|agent-host\|notify\|keychain …` | S6 首次运行检查清单中要人在场的步骤（驱动已安装的开发构建，见 `docs/spikes/S06-first-run-checklist.md`） |
 | `npm run test:e2e -w @piarc/desktop` | L4：两种形态（`dev`、`packaged`）的冒烟与安全用例；`PIARC_EVIDENCE_TASK=Txx` 把证据写到 `tmp/evidence/Txx/l4/` |
 | `npm run check:fuses` | 读 `out/release/` 产物的 fuse 与 `fuses.mjs` 比对；`-- --flavor development` 查开发构建 |
 | `npx vitest run apps/desktop` | 主进程纯函数的单元测试，以及 `core.integration.test.ts`（真实 Core 在 Node 中跑事件通道，需先 `npm run build:core`） |
@@ -48,6 +52,12 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
   - `highlight.worker.ts`：shiki core + JavaScript 正则引擎，请求 `highlight`（`id`、语言 id、代码），响应 `highlighted`（每行的 token：文本、明暗两套颜色、字形位）或 `failed`。类型在 `transcript/highlight/protocol.ts`；
 - composer（T09）在 `src/renderer/composer/`：`schema.ts`（段落与 mention 节点）、`mention-plugin.ts`、`serialize.ts`（发送文本、mention 数据、显示片段三者分开）、`intents.ts`（键位语义）、`ime-guard.ts`、`Composer.tsx`。
 - 终端（T10，ADR-0017）：主进程 `src/main/core/terminal-ipc.ts`（六个命令、终端归属，帧原样作为拉取请求的返回值交回，ADR-0023）；渲染进程 `src/renderer/terminal/`：`frame/`（帧解码器与 `Screen`，共享样本 `frame-samples.json` 由 Rust 生成）、`remote-renderable.ts`、`controller.ts`（rAF 拉取、隐藏不拉取、输入后连续拉取、键盘与输入法）、`keys.ts`、`TerminalLab.tsx`（`#/terminal-lab`，`?manual` 不自带 shell，`globalThis.__piarcTerminalLab`，类型在 `src/shared/terminal-lab.ts`）；`vendor/ghostty-web/` 是 fork 的 `CanvasRenderer`（MIT，来源与改动见其 README）。
+- 打包（T12，架构第 5.6、10.3、13.2 节）在 `packaging/`：
+  - `agent-host-layout.mjs`：`Resources/agent-host/` 的布局（`agentHostLayout`）与拷入（`copyAgentHostResources`，在 `forge.config.ts` 的 `postPackage` 中，签名之前）；Core 的 `BundledRuntime` 解析同样的相对路径；
+  - `macos-sign.mjs`：分层 ad-hoc 签名：先 `--deep` 重签 Electron（此时还没有 agent-host），再逐个签 Resources 中的 Mach-O（跳过内置 node），最后不带 `--deep` 签 bundle；hardened runtime 与 `entitlements.mac.plist`（只有 `allow-jit`、`disable-library-validation`）；
+  - `maker-dmg.mjs`：用 `hdiutil` 出 DMG 的 Forge maker（maker-dmg 依赖要安装脚本编译的原生模块）；ZIP 用 `@electron-forge/maker-zip`；
+  - `velopack-runtime.mjs`：Windows 构建把 Velopack 绑定（只含目标架构的 `.node`）拷进 app.asar 的 `node_modules/`；主进程 `src/main/platform/velopack.ts` 在最开始运行它的钩子；
+  - 图标取 `design/brand/icon`（`.icns`/`.ico`），bundle id 与 AppUserModelID 取应用标识（`app-identity.mjs`、`src/main/app-identity.ts`，`app-identity.test.mjs` 保证与 Rust 的定义一致）。
 - `src/renderer/lab/`：`#/transcript-lab` 原型页，用 `fixtures/` 的合成事件驱动 transcript 与 composer，经 `globalThis.__piarcTranscriptLab` 给 L4 与 S1 基准用（类型在 `src/shared/transcript-lab.ts`）。XSS 载荷集在 `src/shared/xss-payloads.ts`。
 
 ## 不变量
@@ -67,6 +77,11 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 输入法守卫：所有键盘处理先过 `isImeComposing`（`isComposing`、`keyCode === 229`、`view.composing`）。composer 在 `handleDOMEvents.keydown` 里先拦，ProseMirror 的按键处理整个跳过且不 `preventDefault`；`handleTextInput` 里的 `@`、`/` 触发也先查 `view.composing`。
 - 滚动跟随只认用户输入（滚轮、触摸、键盘、按住滚动条）引起的滚动；贴底在 ResizeObserver 回调里做（布局后、绘制前），阈值只改 `constants.ts`。
 - 流式期间只有流式那一行重新渲染：行组件按 id 订阅 store 与解析结果，块组件按对象身份记忆化；改动时用 L4 的渲染计数用例（`transcript-render.e2e.ts`）验证。
+
+## 打包产物的测试入口（S6）
+
+- 开发构建的 Core 导出 `agentHostProbe`（从 `process.resourcesPath` 下的 `agent-host/` 按生产方式启动 Agent Host，跑一轮对话）与 `keychainProbe`；主进程测试钩子另有 `showNotification`。模型经测试数据目录的 `pi/models.json` 指向 mock provider，不需要额外的启动参数；发布构建没有这些导出。
+- `e2e/agent-host.e2e.ts`、`e2e/notification.e2e.ts` 只在 `packaged` 项目运行（`playwright.config.ts` 的 `testIgnore`）：`dev` 形态没有 `Resources/agent-host/`，签名也是 Electron 自己的。
 
 ## 开发构建与发布构建
 
@@ -88,6 +103,9 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - ProseMirror 自己在合成期间不分发按键，所以只测合成中的按键测不出守卫是否生效；`composer.e2e.ts` 另有"合成开始前到达的 229 按键"和"合成文本恰为 `@`、`/`"两类用例，去掉守卫时它们会失败。
 - 页面处理按键之后，经事件 MessagePort 投来的消息要到下一帧的 rAF 之后才被处理（`invoke` 的回复不受影响）：所以终端帧作为 `requestTerminalFrame` 的返回值送达，不要改回事件端口（ADR-0023，S7 报告第 5.2 节）。
 - 终端 L4（`terminal.e2e.ts`、`terminal-tui.e2e.ts`）用 `/bin/sh`、`cat`、`vim`、`top`，在 Windows 上跳过，由 W0 换成 Windows 程序。
+- 不要在 `postPackage` 之前把内置 node 放进 bundle：fuses 插件与 `resealElectron` 的 `--deep` 会把它改成 ad-hoc 签名。新增随包的 Mach-O 文件放在 Resources 下即可，`signResourcesAndBundle` 会扫描签名；要保留原签名的目录加进 `keepSigned`。
+- 本机 Gatekeeper 评估被关闭时（`spctl --status` 为 `assessments disabled`），`spctl --assess` 一律显示 accepted，不能作为首次打开的证据；首次运行检查要在开启 Gatekeeper 的机器上做。
+- MCP 夹具要先 `npm pack` 再经 `npx --package <tgz>` 启动：`npx <目录>` 会链接目录并 chmod 其中的 bin，在 Agent Host 的 Seatbelt 下被拒绝（真实 MCP 包来自 registry 的 tarball，不受影响）。
 - 贴底依赖 ResizeObserver 观察列表的尺寸容器（`TranscriptList` 的 sizer）：换虚拟列表实现时要保证内容增长能在同一帧报告尺寸变化，react-virtuoso 做不到（ADR-0022）。
 
 ## 参考

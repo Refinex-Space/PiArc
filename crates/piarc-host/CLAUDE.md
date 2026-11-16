@@ -10,7 +10,13 @@ Core 侧的 Agent Host 监管：启动、握手、stdio 读写、背压、心跳
 | `cargo test -p piarc-host --test resilience -- --nocapture --test-threads 1` | 打印 S9 报告引用的观察值 |
 | `cargo clippy -p piarc-host --all-targets -- -D warnings` | lint |
 
-真实进程的测试在 `crates/piarc-testkit/tests/agent_host/`（需要 node，测试会先打包 Agent Host）。
+真实进程的测试在 `crates/piarc-testkit/tests/agent_host/`（需要 node，测试会先打包 Agent Host）；打包产物上的启动路径由 L4 `apps/desktop/e2e/agent-host.e2e.ts` 覆盖（`npm run package:desktop -- --flavor development` 之后）。
+
+## 打包后的启动路径（T12）
+
+- 装配在 `piarc-core::agent_host::start_bundled`：`BundledRuntime::locate(<process.resourcesPath>)` 找到 `agent-host/` 下的 node、`agent-host.mjs`、`pi-assets/`；`host_config` 生成本 crate 的 `HostConfig`。
+- 环境变量：`DEFAULT_ENV_PASSTHROUGH` 去掉 `PATH`、`TMPDIR` 后照常透传；`extra_env` 设 `PATH`（内置 Node 的 `bin`、rg/fd 的 `bin/` 在前）、`TMPDIR` 与 `npm_config_cache`（数据目录下 `agent-host/tmp`、`agent-host/npm-cache`）、`npm_config_update_notifier=false`；`PI_PACKAGE_DIR` 经 `pi_package_dir`。
+- macOS 的宽松 Seatbelt 配置在 `piarc-sandbox`（`agent_host_launch`，快照 `tests/snapshots/agent-host-profile.sbpl`）；Core 用 `LauncherSpawner` 把每次启动包成 `sandbox-exec -p … -- <node> …`，内层是 `ProcessTreeSpawner`。本 crate 不感知包装，重启时同样经过它。
 
 ## 重启策略
 

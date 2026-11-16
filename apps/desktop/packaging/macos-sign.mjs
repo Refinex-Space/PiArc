@@ -120,6 +120,14 @@ export async function signResourcesAndBundle(appPath, { keepSigned }) {
   for (const file of files) {
     await codesign(['--sign', '-', '--force', file]);
   }
-  await codesign(['--sign', '-', '--force', ...HARDENED, appPath]);
+  await signBundle(appPath);
   return files;
+}
+
+/**
+ * Step 3 alone: (re)signs the bundle itself without `--deep`, leaving nested signatures.
+ * @param {string} appPath
+ */
+export async function signBundle(appPath) {
+  await codesign(['--sign', '-', '--force', ...HARDENED, appPath]);
 }

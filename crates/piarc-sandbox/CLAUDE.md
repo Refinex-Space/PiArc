@@ -7,7 +7,7 @@
 | 命令 | 用途 |
 |---|---|
 | `cargo test -p piarc-sandbox` | 策略规范化、配置快照与转义、白名单、地址检查、代理（`tests/proxy.rs`：本机上游 + 注入解析器，不用外网） |
-| `PIARC_UPDATE_SNAPSHOTS=1 cargo test -p piarc-sandbox seatbelt` | 有意改了配置后重写 `tests/snapshots/seatbelt-profile.sbpl`，在评审中看 diff |
+| `PIARC_UPDATE_SNAPSHOTS=1 cargo test -p piarc-sandbox seatbelt` | 有意改了配置后重写 `tests/snapshots/seatbelt-profile.sbpl` 与 `agent-host-profile.sbpl`，在评审中看 diff |
 | `cargo run -p piarc-sandbox --release --example s8-bench [-- --iterations N]` | S8 测量：`sandbox-exec` 每条命令额外耗时、代理每请求延迟与吞吐（macOS） |
 
 沙箱行为的端到端测试在 `piarc-core`：`cargo test -p piarc-core --test sandbox`（写入、受保护路径、`denyRead`、绕过代理、终止无残留）与 `--test sandbox_commands`（git、python、cargo build、npm install；后两项要连 registry）。
@@ -18,6 +18,10 @@
 - 每条命令一份配置：`/usr/bin/sandbox-exec -p <配置> -DKEY=VALUE… -- /bin/bash -c <命令>`。路径只经 `-D` 参数进入，配置正文不含路径；正则用的目录前缀在 Rust 侧转义后作为 `WRITABLE_i_RE` 传入。
 - 规则顺序：Codex 的 deny-default 基础配置（`src/seatbelt/base.sbpl`，Apache-2.0，见 `third-party/sources.json`）→ 读取全开、`denyRead` 拒绝 → 可写目录 → 受保护路径与防改名 → 只允许连 `localhost:<代理端口>`。Seatbelt 后面的规则优先，拒绝必须写在放开之后。
 - 受保护路径清单与理由：`policy.rs` 的 `PROTECTED_PATHS` 文档（架构 6.10 同步了同一张表）。改清单要同时改架构与快照。
+
+## Agent Host 的宽松配置（T12）
+
+- `SeatbeltProfile::agent_host(writable)` 与 `agent_host_launch`：`(allow default)`，再 `(deny file-write*)`，放行可写目录（工作区、数据目录，真实路径经 `-D` 传入）与终端设备的写；读与网络不限。和沙箱命令的配置是两回事：后者 deny-default、只连代理。T39 定稿 Agent Host 的配置时改这里与快照。
 
 ## 代理（`proxy/mod.rs` 模块文档为准）
 

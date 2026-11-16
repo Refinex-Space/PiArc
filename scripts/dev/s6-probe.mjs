@@ -11,6 +11,10 @@
 //       sandbox-exec, one Bash call). Shows whether Gatekeeper stops the bundled node.
 //   node scripts/dev/s6-probe.mjs notify [--app …]
 //       Posts a notification; prints the program-side events (`show` / `failed`).
+//   node scripts/dev/s6-probe.mjs variant --app <A.app> --out <dir> [--version 0.0.1]
+//       Makes "build B" for the keychain count: a copy of build A with another bundle version,
+//       re-signed the way packaging signs, as PiArc-B.dmg. Rebuilding unchanged sources can
+//       give the same ad-hoc identity; an update always changes Info.plist and the seal.
 //   node scripts/dev/s6-probe.mjs keychain write|read|delete [--app …] [--dir <dir>]
 //       Creates (write) or reads (read) a probe vault whose master key is the keychain item
 //       `piarc-test.s6-keychain.credential-vault`; delete removes both. Run write with build A,
@@ -19,7 +23,7 @@
 // Every run uses a fresh user-data directory and prints the report as JSON.
 import { spawn } from 'node:child_process';
 import { createReadStream, existsSync, statSync } from 'node:fs';
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
@@ -28,7 +32,9 @@ import { parseArgs } from 'node:util';
 
 import { _electron as electron } from 'playwright';
 
-import { isMain, repoRoot } from '../lib/repo.mjs';
+import { signBundle } from '../../apps/desktop/packaging/macos-sign.mjs';
+
+import { isMain, repoRoot, run } from '../lib/repo.mjs';
 
 const DEFAULT_APP = '/Applications/PiArc.app';
 const DEFAULT_KEYCHAIN_DIR = path.join(os.tmpdir(), 'piarc-s6-keychain-probe');
@@ -200,6 +206,54 @@ async function agentHost(appPath) {
   }
 }
 
+/**
+ * @param {string} command
+ * @param {string[]} args
+ */
+async function mustRun(command, args) {
+  const code = await run(command, args);
+  if (code !== 0) {
+    throw new Error(`${command} ${args.join(' ')} failed (${String(code)})`);
+  }
+}
+
+/**
+ * Build B: build A with another bundle version, re-signed, in a DMG.
+ * @param {string} appPath
+ * @param {string} outDir
+ * @param {string} version
+ */
+async function variant(appPath, outDir, version) {
+  const staging = path.join(outDir, 'PiArc-B');
+  await rm(staging, { recursive: true, force: true });
+  await mkdir(staging, { recursive: true });
+  const copy = path.join(staging, 'PiArc.app');
+  await mustRun('ditto', [appPath, copy]);
+  const plist = path.join(copy, 'Contents', 'Info.plist');
+  for (const key of ['CFBundleVersion', 'CFBundleShortVersionString']) {
+    await mustRun('plutil', ['-replace', key, '-string', version, plist]);
+  }
+  await signBundle(copy);
+  await mustRun('codesign', ['--verify', '--deep', '--strict', copy]);
+  await symlink('/Applications', path.join(staging, 'Applications'));
+  const dmg = path.join(outDir, 'PiArc-B.dmg');
+  await mustRun('hdiutil', [
+    'create',
+    '-volname',
+    'PiArc',
+    '-srcfolder',
+    staging,
+    '-fs',
+    'HFS+',
+    '-format',
+    'ULFO',
+    '-ov',
+    dmg,
+  ]);
+  await rm(staging, { recursive: true, force: true });
+  return dmg;
+}
+
 async function main() {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
@@ -207,6 +261,8 @@ async function main() {
       app: { type: 'string', default: DEFAULT_APP },
       dir: { type: 'string', default: DEFAULT_KEYCHAIN_DIR },
       port: { type: 'string', default: '8765' },
+      out: { type: 'string' },
+      version: { type: 'string', default: '0.0.1' },
     },
   });
   const [command, argument] = positionals;
@@ -217,6 +273,14 @@ async function main() {
       }
       serve(path.resolve(argument), Number.parseInt(values.port, 10));
       return;
+    case 'variant': {
+      if (values.out === undefined) {
+        throw new Error('usage: s6-probe.mjs variant --app <A.app> --out <dir>');
+      }
+      await mkdir(values.out, { recursive: true });
+      console.log(await variant(values.app, values.out, values.version));
+      return;
+    }
     case 'agent-host':
       console.log(JSON.stringify(await agentHost(values.app), null, 2));
       return;
@@ -256,7 +320,7 @@ async function main() {
       return;
     }
     default:
-      throw new Error('usage: s6-probe.mjs serve|agent-host|notify|keychain …');
+      throw new Error('usage: s6-probe.mjs serve|variant|agent-host|notify|keychain …');
   }
 }
 

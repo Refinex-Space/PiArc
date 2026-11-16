@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.15（2026-11-15） |
+| 版本 | 2.16（2026-11-16） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -246,6 +246,7 @@ PiArc/
 | [0019](../adr/0019-event-batches-copied-not-transferred.md) | 事件批次经主进程转发时复制，不转移 `ArrayBuffer` | Electron 主进程只能转移端口；实测 8 MiB 批次复制转发约 2 ms |
 | [0015](../adr/0015-agent-host-runtime-bundled-node.md) | Agent Host 继续单独内置 Node LTS | 要套 Seatbelt、走 stdio、给 npx 用，Electron 自带的 Node 都做不到 |
 | [0018](../adr/0018-unsigned-distribution.md) | Electron Forge 打包；macOS 只做 ad-hoc 签名、Windows 不签名；发布清单用项目密钥签名；不上应用商店 | 免费开源、零成本；用发布清单签名保住更新的完整性 |
+| [0024](../adr/0024-release-manifest-format.md) | 发布清单 `piarc-release-manifest/1`：产物名、大小、SHA-256，minisign 预哈希签名；Core 的 `release` 模块先验签后校验文件，没有内置公钥时一律拒绝 | 两个平台共用一份签名清单；签名覆盖版本号与产物列表，防混搭 |
 | [0017](../adr/0017-terminal-libghostty-vt.md) | 终端状态由 Core 中的 libghostty-vt 持有，渲染层可替换 | agent 读屏与用户所见一致；IPC 流量与输出量无关 |
 | [0023](../adr/0023-terminal-frames-as-pull-replies.md) | 终端帧作为拉取请求的返回值送达渲染进程，不经事件 MessagePort | 按键之后 MessagePort 消息被推迟到下一帧之后处理；改为回复后回显额外延迟 p95 从 16.2 ms 降到 0.77 ms |
 
@@ -344,13 +345,15 @@ PiArc.app/Contents/
         ├── node/               # Node LTS 发行包：bin/node、bin/npm、bin/npx（保留 Node.js 官方签名）
         ├── agent-host.mjs      # bundle
         ├── pi-assets/          # Pi 运行时需要的资源（经 PI_PACKAGE_DIR 指定）
-        └── bin/ rg fd          # 预置，避免 Pi 运行时下载
+        ├── node_modules/       # bundle 的外部依赖（photon-node，加载自己目录下的 wasm）
+        └── bin/ rg fd          # 预置，避免 Pi 运行时下载（ad-hoc 签名）
 ```
 
-- 启动：
-  - macOS：Core 执行 `/usr/bin/sandbox-exec -f <profile> -D …参数… <内置 node> agent-host.mjs`（Seatbelt 配置见第 10.3 节）；
+- 启动（T12 实现：`piarc_core::agent_host::{BundledRuntime, start_bundled}`）：
+  - macOS：Core 执行 `/usr/bin/sandbox-exec -p <profile> -DWRITABLE_0=<工作区> -DWRITABLE_1=<数据目录> -- <内置 node> agent-host.mjs`。配置正文由 `piarc_sandbox::agent_host_launch` 生成，路径只经 `-D` 传入，与沙箱命令的做法一致（第 6.10 节），所以用 `-p` 而不是写临时文件给 `-f`；配置内容见第 10.3 节；
   - Windows：Core 用 `CreateProcess` 启动，把进程挂进 Job Object（`KILL_ON_JOB_CLOSE`），宿主退出时整棵进程树被清理；
-  - 两个平台都由 Core 持有 stdio 管道；环境变量最小化（PATH 前置内置 Node 的 `bin` 目录、`PI_PACKAGE_DIR`、关闭遥测与更新），工作目录为工作区根。
+  - 两个平台都经 `piarc_exec::ProcessTreeSpawner` 启动（macOS 新进程组），由 Core 持有 stdio 管道，工作目录为工作区根；
+  - 环境变量最小化：`piarc_host::DEFAULT_ENV_PASSTHROUGH` 中除 `PATH`、`TMPDIR` 以外 Core 自己有的变量；`PATH` 为内置 Node 的 `bin`、`bin/`（rg、fd）再接 Core 的 `PATH`，`npx` 拉起的 MCP server 因此也跑在内置 node 上；`PI_PACKAGE_DIR`、`PI_SKIP_VERSION_CHECK=1`、`PI_TELEMETRY=0`；`TMPDIR` 与 `npm_config_cache` 指向数据目录下的 `agent-host/tmp`、`agent-host/npm-cache`（Seatbelt 只放行数据目录的写入），`npm_config_update_notifier=false`。凭据不经环境变量（第 5.4 节）。
 
 ### 5.7 跟随上游
 
@@ -1033,6 +1036,7 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 │   └── sessions/              # Pi 会话 JSONL（对话事实来源）
 ├── checkpoints/objects/       # 内容寻址的文件快照（sha256 分桶）
 ├── sessions/<sessionId>/      # 工具输出落盘、后台任务输出、会话临时目录
+├── agent-host/                # Agent Host 的 tmp/（TMPDIR）与 npm-cache/（npx 安装的 MCP server），可丢弃
 └── logs/                      # Core 与 Agent Host 日志（按天轮转，默认保留 7 天）
 
 ~/Library/Caches/PiArc/        # 可丢弃：模型目录缓存、Chromium 缓存（Windows：%LOCALAPPDATA%\PiArc\Cache\）
@@ -1092,6 +1096,7 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 | 供应链 | npm / crates 依赖被投毒 | 精确版本锁定；`npm ci --ignore-scripts`；`cargo-deny`、`cargo-audit`、`npm audit`；新增依赖需评审 |
 | 更新通道被劫持 | 恶意更新包 | 没有平台签名可依赖（ADR-0018）：HTTPS；每个版本的发布清单（文件名 + SHA-256）用项目自有 Ed25519 密钥签名，应用内置公钥，验证失败拒绝更新；私钥只在需要维护者审批的发布环境中使用。不防发布账号本身被攻破 |
 | 应用文件被篡改 | 替换应用内的 asar、bundle 或 node | app.asar 开启完整性校验与 `OnlyLoadAppFromAsar`，但没有平台签名时完整性信息本身不受保护，只能防意外损坏。对安装目录有写权限的本机攻击者可以篡改应用而不被发现，作为已接受的风险（ADR-0018）；安装位置使用系统默认目录，依靠文件系统权限 |
+| 同一用户的进程向 PiArc 注入代码 | 用 `DYLD_INSERT_LIBRARIES` 启动 PiArc，或调试器附加，借 PiArc 的代码身份读取钥匙串中的主密钥 | macOS 的 PiArc 自身在 ad-hoc 签名下开启 hardened runtime（只给 `allow-jit` 与 `disable-library-validation`），实测 `DYLD_INSERT_LIBRARIES` 不再生效（S6 报告第 3 节）。内置 node 保留 Node.js 官方签名，它自带 `get-task-allow` 与 `allow-dyld-environment-variables`：Core 以最小环境启动它（不传 `DYLD_*`），但同一用户的进程仍可调试附加 Agent Host、读到其内存中的凭据，作为已接受的风险登记（I39） |
 | 渲染进程注入（XSS） | 模型输出、仓库文件、MCP 返回内容中嵌入 HTML、脚本或恶意链接，在渲染进程中执行，进而调用 preload 暴露的能力 | 渲染进程 sandbox + contextIsolation、无 Node；严格 CSP；Markdown 不走 `innerHTML`，原始 HTML 当文本；preload 白名单 + 主进程校验来源；有副作用的命令仍经 Core 的权限裁决；XSS 载荷回归测试（第 10.3 节） |
 | 应用被当作通用运行时滥用 | 攻击者借 PiArc 的可执行文件执行任意脚本（`ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`--inspect`） | 发布构建关闭对应 fuses（ADR-0018）；Agent Host 用独立的 node，不依赖这些开关 |
 | 恶意链接与导航 | 诱导用户点击链接，或让应用窗口导航到外部页面 | 窗口禁止导航到应用自身协议以外的地址；新窗口一律拒绝；外部链接确认后交给系统浏览器，且只放行 `https:`、`http:`、`mailto:` |
@@ -1122,12 +1127,13 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 **应用二进制**：
 
 - 发布构建写入 fuses（配置见 ADR-0018）：关闭 `RunAsNode`、`NodeOptions`、`NodeCliInspect`、`GrantFileProtocolExtraPrivileges`，开启 ASAR 完整性校验、`OnlyLoadAppFromAsar` 与 cookie 加密。CI 读取产物的 fuse 状态并与配置比对。开发构建只多开 `NodeCliInspect`，便于调试打包产物；L4 的打包形态用它驱动（Playwright 经 `--inspect` 连接主进程），发布构建由 fuse 比对覆盖。
-- 平台代码签名不做（ADR-0018）。macOS：ad-hoc 签名，写入 fuses 后重新签名；hardened runtime 能否在 ad-hoc 签名下启用由 M0 验证，不能启用时如实记录；内置 node 保留 Node.js 官方签名，rg、fd 与 `.node` 原生模块用 ad-hoc 签名。Windows：不签名。
+- 平台代码签名不做（ADR-0018）。macOS：ad-hoc 签名，写入 fuses 后由内到外分层重签（`apps/desktop/packaging/macos-sign.mjs`）：Electron 的框架与 Helper 先整体重签，Resources 中的 Mach-O（Core 的 `.node`、rg、fd）逐个 ad-hoc 签名，内置 node 保留 Node.js 官方的 Developer ID 签名，最后不带 `--deep` 签整个 bundle。Windows：不签名。
+- hardened runtime（M0 S6 结论）：在 ad-hoc 签名下可以启用，但必须同时给 `com.apple.security.cs.disable-library-validation`：ad-hoc 签名没有 Team ID，库验证会以"different Team IDs"拒绝应用自己的 Electron Framework，应用无法启动；另需 `allow-jit`（V8）。PiArc 采用这一组合（`entitlements.mac.plist` 只有这两项）：库验证关闭，但 hardened runtime 仍阻止 `DYLD_*` 注入与调试器附加，保护绑定在应用代码身份上的钥匙串授权。
 - 没有平台签名，ASAR 完整性校验只防意外损坏；fuses 仍然写入，代价很低。
 
 **Agent Host**：
 
-- macOS：运行在 Seatbelt 配置下（ADR-0015）。允许读取广泛路径；写入限于工作区、PiArc 数据目录、会话临时目录；网络允许（模型请求需要）。具体配置在 M4 确定并写入测试。
+- macOS：运行在 Seatbelt 配置下（ADR-0015）。允许读取广泛路径；写入限于工作区、PiArc 数据目录（含会话临时目录与 Agent Host 的 `agent-host/` 目录）；网络允许（模型请求需要）。T12 的宽松配置（`piarc_sandbox::seatbelt::SeatbeltProfile::agent_host`，快照 `crates/piarc-sandbox/tests/snapshots/agent-host-profile.sbpl`）是 `allow default` 之后拒绝全部写入、再放行这两个目录与终端设备；子进程（npx、MCP server、git）继承它。打包产物上的验证见 S6 报告第 4 节；定稿在 M4（T39）。
 - Windows：第一版没有等价的进程级隔离，只用 Job Object 管理进程树（第 6.10 节、需求 D7）。
 
 ### 10.4 合规
@@ -1268,10 +1274,11 @@ crates/*  ──cargo + @napi-rs/cli──► piarc-core.<platform>-<arch>[-msvc
 agent-host ──esbuild──► agent-host.mjs
 design/tokens ──脚本──► CSS 自定义属性 + TS 常量
 apps/desktop ──Forge（plugin-vite）──► 主进程 / preload / 渲染进程产物 ──► app.asar
-Forge 打包 ──► 放入 .node 与 Windows 的 ghostty-vt.dll（app.asar.unpacked/native/）、内置 Node、rg、fd、agent-host ──► 写入 fuses
-  macOS：ad-hoc 重签 ──► DMG + ZIP
-  Windows：Velopack 安装包与更新包（不签名）
-全部产物 ──► 发布清单（文件名 + SHA-256）──► 项目 Ed25519 密钥签名（minisign）──► GitHub Releases
+Forge 打包 ──► 放入 .node 与 Windows 的 ghostty-vt.dll（app.asar.unpacked/native/）、Windows 的 Velopack 绑定 ──► 写入 fuses
+  ──► 放入 Resources/agent-host/（内置 Node、rg、fd 按 third-party/binaries.lock.json 下载并校验 SHA-256；bundle、pi-assets）
+  macOS：分层 ad-hoc 重签（第 10.3 节）──► DMG（hdiutil）+ ZIP
+  Windows：vpk 打 Velopack 安装包与更新包（不签名，按用户安装，pack id 与快捷方式 AUMID 为应用标识）
+全部产物 ──► 发布清单（文件名 + 大小 + SHA-256）──► 项目 Ed25519 密钥签名（minisign，ADR-0024）──► GitHub Releases
 ```
 
 ### 13.3 CI
@@ -1418,6 +1425,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.16 | 2026-11-16 | T12 补充：第 4 章加入 ADR-0024（发布清单格式）；5.6 写明打包布局中的 `node_modules/`、Agent Host 的启动命令（`sandbox-exec -p`，路径经 `-D`）、`ProcessTreeSpawner` 与环境变量清单；9.1 增加数据目录下的 `agent-host/`；10.1 增加"同一用户的进程向 PiArc 注入代码"一行；10.3 写明分层签名、hardened runtime 的 M0 结论（开启，需 `disable-library-validation` 与 `allow-jit`）与 Agent Host 的宽松 Seatbelt 配置；13.2 写明二进制锁定、DMG 由 hdiutil 生成、vpk 打包与清单签名 |
 | 2.15 | 2026-11-15 | T11 补充：6.10 增加沙箱受保护路径清单（比 6.1.2 窄，`.git/` 整体可写）与 Seatbelt、代理、缓存目录、进程树的原型实现；7.1 的 `unsafe` 范围增加 `piarc-exec` 的 `job` 模块（Windows Job Object 的 safe 封装） |
 | 1.0 | 2026-11-14 | 首版：基于对 Claude 官方文档、Pi v1.4.0 源码、claude-code / claw-code / OpenClaudeDesktop / open-claude-ui 参考实现与原生技术栈的调研 |
 | 2.14 | 2026-11-15 | ADR-0023 接受：第 4 章加入 ADR-0023 并注明 ADR-0017 第 3 条被修订；6.11 写明帧作为拉取请求的返回值送达及实测依据；8.3 新增第 6 条（终端帧不走事件通道）；7.6 的终端导出同步 |

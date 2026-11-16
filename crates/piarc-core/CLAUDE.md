@@ -9,6 +9,8 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 | `cargo test -p piarc-core` | 单元测试 + `tests/event_channel.rs`（回调频率、无丢失与顺序、背压、有序关闭、任务 panic、未关闭直接丢弃）+ `tests/tool_io.rs`（越界、流式输出、取消、会话隔离）+ `tests/secrets.rs`（推送、保险箱错误、锁与租约、并发读改写） |
 | `cargo test -p piarc-core --test sandbox` | 沙箱会话（macOS）：写入范围、受保护路径、`denyRead`、绕过代理、流式与退出码、`exec/kill` 后进程组为空、关闭会话停止代理 |
 | `cargo test -p piarc-core --test sandbox_commands -- --nocapture` | 沙箱内 git、python、cargo build、npm install（后两项连真实 registry，连不上就失败并说明） |
+| `cargo test -p piarc-core --test release -- --nocapture` | 发布清单校验（T12-A08）：有效、篡改内容、篡改哈希与大小、未列出、换密钥、无内置公钥，打印结构化错误 |
+| `cargo test -p piarc-core --test agent_host_probe` | 探针在 Core 运行时上启动进程（运行时开着 I/O）、Agent Host 未握手就退出时报告错误（Unix） |
 | `cargo test -p piarc-core --test terminal` | 终端：`term/<id>` 事件、经回调取帧、错误类别、关闭时结束终端（Unix） |
 | `cargo clippy -p piarc-core --all-targets -- -D warnings` | lint |
 
@@ -40,6 +42,17 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 参数错误不带 serde 的原文（它会引用出错的值，可能是凭据）。不要在日志里写值。
 - 测试与 `piarc-testkit` 经本模块的再导出使用 `MemorySecretStore`、`test_master_key_name`（testkit 不能直接依赖 `piarc-secrets`）。
 - `identity::APP_IDENTIFIER` 是 D2 决定的应用标识 `cn.piarc.desktop`（bundle id 与 AppUserModelID 也取它）。发布后不能再改：改了保险箱找不到主密钥，系统授权也要重给。
+
+## 打包的 Agent Host 与 S6 探针（T12）
+
+- `agent_host::start` 一律用 `ProcessTreeSpawner`；`start_bundled` 从打包产物启动（布局、环境变量与 Seatbelt 包装见 `crates/piarc-host/CLAUDE.md`）。Core 的 tokio 运行时开着 I/O（`enable_io`），在它上面监管子进程、跑代理都依赖这一点。
+- `host_probe`、`keychain_probe` 只给测试用：开发构建的 `piarc-napi` 导出 `agentHostProbe`、`keychainProbe`，发布构建不导出。钥匙串探针的条目固定为 `piarc-test.s6-keychain.credential-vault`（构建 A 写、构建 B 读要同一个名字），不碰 `identity` 的正式条目。
+
+## 发布清单（`release`，ADR-0024）
+
+- `verify_manifest` 先验签后解析，只接受预哈希签名；`verify_file` 先比大小再流式算 SHA-256。所有失败是 `ReleaseError`，类别 `releaseIntegrity`（读不了文件为 `ioError`），`details.reason` 区分原因，调用方一律拒绝更新。
+- `BUILTIN_RELEASE_KEYS` 在 T50 之前为空：没有信任的公钥时任何清单都被拒绝。不要把 `scripts/release/test-keys/` 的测试公钥放进去。
+- 测试样本由 Node 的 `scripts/release/release-manifest.mjs` 签名（`tests/fixtures/release/`，`.gitattributes` 设为 `-text` 保持字节不变），换测试密钥后按该目录 README 重写。
 
 ## 终端（`terminal`）
 

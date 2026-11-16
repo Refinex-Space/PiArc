@@ -37,7 +37,11 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `node scripts/plan/check-acceptance.mjs` | 验收清单与任务文件一致性检查 |
 | `node node_modules/electron/install.js` | 下载 Electron 二进制（`--ignore-scripts` 不会下载）；启动、打包、L4 之前需要 |
 | `npm run start -w @piarc/desktop` | 桌面应用开发服务器模式（`electron-forge start`） |
-| `npm run package:desktop -- --flavor development` | 开发构建打包到 `apps/desktop/out/development/`，并生成 L4 用的 `.vite/` 生产构建；不带参数为发布构建 |
+| `npm run package:desktop -- --flavor development` | 开发构建打包到 `apps/desktop/out/development/`，并生成 L4 用的 `.vite/` 生产构建；不带参数为发布构建。会先构建 Core、Agent Host bundle，并按 `third-party/binaries.lock.json` 下载校验内置 node、rg、fd |
+| `npm run package:desktop -- --flavor release --arch arm64 --make` | 出 macOS 安装包（DMG 与 ZIP，`apps/desktop/out/release/make/`）；`--arch x64` 需要已安装 `x86_64-apple-darwin` 目标 |
+| `node scripts/ci/check-app-layout.mjs --flavor release --arch arm64` | 打包产物的布局与 macOS 签名分层检查 |
+| `node scripts/dev/fetch-binaries.mjs [--all]` | 下载并校验锁定的第三方二进制，暂存 Agent Host 运行时（`target/agent-host-runtime/`） |
+| `node scripts/release/release-manifest.mjs generate --version <v> --key <密钥> <产物…>` | 生成并签名发布清单（测试密钥在 `scripts/release/test-keys/`）；`verify --pub <公钥> <清单>` 校验 |
 | `npm run test:e2e -w @piarc/desktop` | L4：Playwright 驱动开发形态与打包产物（先打开发构建） |
 | `npm run check:fuses` | 发布构建产物的 fuse 与 `apps/desktop/fuses.mjs` 比对 |
 | `npm run bench:s2 -- --form packaged` | S2 基准：事件吞吐、主进程事件循环延迟、同步调用、大批次、空闲内存（先打开发构建） |
@@ -85,4 +89,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - 渲染进程不从 HTML 字符串建 DOM（ESLint 禁止 `innerHTML`、`dangerouslySetInnerHTML` 等）；模型输出经 `transcript/markdown/` 的增量解析与 `MarkdownView` 渲染，代码高亮只用 shiki 的 JavaScript 正则引擎，CSP 不放宽（ADR-0022）。复制相关的 L4 会写系统剪贴板（用例结束后恢复文本）。
 - `cargo test`（含 `npm run verify`）会在登录钥匙串中以 `piarc-test.` 开头的服务名创建并删除测试条目；测试代码只用 `test_master_key_name` 命名条目，不碰 `piarc-core::identity` 的正式服务名。
 - `cargo test`（含 verify）中 `piarc-core` 的 `sandbox_commands` 测试经沙箱代理连 `registry.npmjs.org`、`index.crates.io`：离线时这两个用例失败并写明原因。沙箱内命令要联网的工具，配置文件里的代理设置会盖过 `HTTP_PROXY`（`crates/piarc-sandbox/CLAUDE.md`）。
+- `cargo test` 的 `piarc-term` PTY 用例（vim）依赖 UTF-8 locale：`LANG` 为空的 shell（例如某些 IDE 或智能体的子进程环境）里中文显示成转义，用例失败。跑 verify 前确认 `LANG=en_US.UTF-8` 一类的设置（I38）。
+- 打包时 `postPackage` 才把内置 node 放进 `.app`，签名分层见 `apps/desktop/CLAUDE.md`；不要对整个 bundle 用 `codesign --deep` 重签，会覆盖 node 的 Node.js 官方签名。
+- Windows 安装包由 CI 的 `package-windows` 作业产出（`scripts/release/pack-windows.mjs`，需要 .NET SDK）；Velopack 的 pack id 是应用标识，不能用 `PiArc`（会与数据目录 `%LOCALAPPDATA%\PiArc\` 重合）。
 - Agent Host 的工具不碰文件系统与子进程：`agent-host/src/tools/`、`src/harness/` 禁止导入 `fs`、`child_process`，I/O 一律经 AHP `fs/*`、`exec/*` 由 Core 执行（ADR-0004、ADR-0020）；端到端测试的 I/O spy 会抓到绕过。
