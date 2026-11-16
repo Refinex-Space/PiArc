@@ -60,7 +60,7 @@
 | 任务关口 | 设计增补、截图证据或实机操作清单，看板状态为"阻塞（等待用户……）" | 按报告确认或完成实机操作，在新会话中再次 `/task` 该任务并附上你的意见或结果 |
 | 需要的用户决定 | 任务头部列出的 D 编号（需求规格第 7 节）尚未落实 | 在需求规格中给出决定，再继续该任务 |
 
-带关口的任务：T12（实机）、T18（视觉）、T39（Windows 隔离方案以 ADR 提议的形式请你决定）、T46（设计）、T47（设计）、T49（实机：快捷指令）、T50（实机：推送、受保护环境与密钥、批准签名步骤）、R1（实机：T09、T10 留下的 macOS 输入法核对清单）、T51 与 W0–W4（实机：系统放行、输入法、读屏等需要你在真实系统界面上操作的步骤）。
+带关口的任务：T12（实机）、T18（视觉）、T39（Windows 隔离方案以 ADR 提议的形式请你决定）、T46（设计）、T47（设计）、T49（实机：快捷指令）、T50（实机：推送、受保护环境与密钥、批准签名步骤）、R1（实机：T09 留下的 macOS 输入法核对清单）、T51 与 W0–W4（实机：系统放行、输入法、读屏等需要你在真实系统界面上操作的步骤）。
 
 macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标为 `blocked`（智能体不推送，拿不到 CI 结果），任务显示"部分完成"。你推送后，下一个任务开工时会按 CI 结果关闭这些项（执行协议"开工"第 4 步）。
 
@@ -332,7 +332,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I28 | T10 | PTY 子进程由 portable-pty 启动，不经 `ProcessSpawner`，没有进程组或 Job Object：终端里的程序再起的子进程不随终端关闭而结束 | T33 引入终端承载的任务时决定（与 I17 一起，在 `piarc-exec` 的进程树管理落地后接入） |
 | I29 | T10 | `cat` 以约 190 MB/s 输出时主进程 CPU（含 Core 全部线程）约为一个核的 74%，主要是 IO 线程读 PTY 与解析；第 11 章没有对应预算 | T44 把终端吞吐纳入性能回归时评估（例如增大读块、合并读） |
 | I30 | T10 | `#/terminal-lab` 原型页随发布构建的渲染包分发；发布构建的 `window.piarc` 也有七个终端函数（`createTerminal` 只能启动登录 shell），与 I13、I24 同类 | T34 接入正式终端面板时收口；T45 与 I13、I24 一起评估剔除原型页 |
-| I31 | T10 | 真实拼音输入法的候选框位置未核对，清单见 `docs/spikes/S07-terminal.md` 第 8 节（T1–T4） | 用户核对后把结果告诉智能体补记到 S7 报告；R1 汇总 S7 时检查（同 I25） |
+| I31 | T10 | 真实拼音输入法的候选框位置未核对，清单见 `docs/spikes/S07-terminal.md` 第 8 节（T1–T4） | 已落地（2026-11-16）：智能体经 computer-use 在本机用系统"简体拼音"实测，T1–T4 全部符合预期，结果见 S7 报告第 8 节；T10-A11 改为通过 |
 | I32 | T10 | T09 的 L4 `transcript-scroll.e2e.ts` 中 "the wheel releases and resumes following" 在一次全量运行中失败（dev 形态，内容增长时离底 31 px，期望 ≤ 1 px），单独重跑 10 次（两种形态各 5 次）都通过；本机此时的主屏是 120 Hz | T19 接手 transcript 时检查贴底在高刷新率下的时序；T44 把 L4 的偶发失败纳入统计 |
 | I33 | T11 | 进程树终止的接口已就绪：`piarc_exec::ProcessTreeSpawner`（`ProcessSpawner` 的实现；macOS 新进程组 + `killpg`，Windows 挂起创建后加入 `KILL_ON_JOB_CLOSE`、不许 breakaway 的 Job 再恢复；`kill` 与丢弃句柄都结束整棵树，丢弃也会结束命令留在后台的进程）。目前只有沙箱会话的 `exec/run` 用它 | 部分落地（T12）：`piarc_core::agent_host::start` 与 `start_bundled` 改用 `ProcessTreeSpawner`（W0 实机核对 Agent Host 被杀时子进程随之结束）；T17 让 `ToolIo` 的普通命令也用它，并决定后台进程在命令结束时是否保留（与 T32 的后台任务一起）。W0 补充：Windows 的 Git Bash 没有真正的 `exec`，命令总是 bash.exe 的子进程，所以现在取消或超时一个委托的 Bash 命令时，命令本身（不只是它的后台进程）都继续运行（`piarc-exec` 的 `cancelling_kills_the_command` 中 `sleep.exe` 活满 30 s），T17 在 Windows 上必须改用 `ProcessTreeSpawner` |
 | I34 | T11 | 沙箱把 `CARGO_HOME` 指向会话临时目录（防止缓存投毒，S8 报告第 4 节），沙箱内读不到 `~/.cargo/config.toml` 的镜像源设置；每个会话第一次安装或构建是冷缓存 | T39 决定是否把用户的 Cargo 配置（不含凭据）复制进会话，以及是否提供共享只读缓存 |
