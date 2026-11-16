@@ -119,7 +119,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 已完成 | 9c0738d |
 | T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 部分完成 | ff591d6 |
 | T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 部分完成 | 1b92a25 |
-| T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 未开始 | — |
+| T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 进行中 | — |
 | W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 未开始 | — |
 | R1 | [M0 评审与收口](tasks/R1-m0-review.md) | 1 | W0 | macOS | high | 中 | S1–S10 汇总 | 未开始 | — |
 | T13 | [存储、数据目录、配置与项目信任](tasks/T13-storage-config-and-trust.md) | 2 | R1（结论为进入 M1） | macOS | high | 大 | 无 | 未开始 | — |
@@ -294,7 +294,20 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（当前没有进行中的任务）
+T12 打包、首次运行与发布清单（开工 2026-11-16；依赖中 T03、T04、T11 为"部分完成"，遗留项都是 Windows CI 核对，不影响本任务；D2 已决定；分支未推送，前序 Windows CI 未核对）
+
+- [ ] 1. 第三方二进制清单（node、rg、fd、Velopack 工具）与下载校验脚本
+- [ ] 2. 打包布局：`Resources/agent-host/`（node、bundle、pi-assets、photon、bin/rg fd），图标引用 `design/brand/`，bundle id 取自集中标识
+- [ ] 3. 签名分层（node 保留官方签名，rg/fd/.node ad-hoc，外层不 `--deep`）、DMG + ZIP（arm64、x64）、布局检查脚本、hardened runtime 结论（A01–A03、A14）
+- [ ] 4. Core 从打包产物启动 Agent Host：宽松 Seatbelt、`ProcessTreeSpawner`（I33）、最小环境变量、`PI_PACKAGE_DIR`
+- [ ] 5. 宽松配置下的验证：bash、grep、find、git、`worker_threads`、写入范围、内置 npx 拉起 MCP、原生模块（A06、A07）
+- [ ] 6. 打包产物的 Playwright 测试：一轮 mock 对话（A05）；系统通知程序侧事件（A10）
+- [ ] 7. 发布清单：生成脚本、测试密钥、Core 校验与三种篡改用例（A08）
+- [ ] 8. CI：Windows Velopack x64/arm64（相邻两个版本）与 macOS 产物，actionlint（A04）
+- [ ] 9. 体积测量（A12）
+- [ ] 10. 首次运行检查清单 `docs/spikes/S06-first-run-checklist.md`，实机关口（A09–A11）
+- [ ] 11. S6 报告、架构 10.1/10.3/5.6、spikes README、CLAUDE.md、复用表（A02、A13）
+- [ ] 12. 收尾：`npm run verify`（A15）、验收记录、看板
 
 ## 登记事项
 
