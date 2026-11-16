@@ -753,6 +753,47 @@ async fn a_crash_during_restore_keeps_the_sessions_for_the_next_restart() {
 }
 
 #[tokio::test]
+async fn an_error_answer_to_a_heartbeat_does_not_stop_hang_detection() {
+    let spawner = FakeSpawner::new(vec![
+        script(|mut host| async move {
+            host.hello("1.0", &[]).await;
+            // `request` would answer the heartbeat itself.
+            let ping = host.recv().await;
+            assert_eq!(ping["method"], "host/ping");
+            host.send(&json!({ "jsonrpc": "2.0", "id": ping["id"], "error": {
+                "code": -32603, "message": "ping failed",
+                "data": { "kind": "internalError", "retryable": false }
+            }}))
+            .await;
+            // Then hangs without reading or writing anything.
+            std::future::pending::<i32>().await
+        }),
+        script(|mut host| async move {
+            host.hello("1.0", &[]).await;
+            host.until_stdin_closes().await;
+            0
+        }),
+    ]);
+    let mut config = config();
+    config.heartbeat_interval = Duration::from_millis(20);
+    config.heartbeat_timeout = Duration::from_millis(20);
+    let (supervisor, mut events) = HostSupervisor::start(config, deps(spawner, TestClock::new()));
+    let (exited, _) = until(&mut events, |e| matches!(e, HostEvent::Exited { .. })).await;
+    assert!(
+        matches!(
+            exited,
+            HostEvent::Exited {
+                epoch: 1,
+                reason: ExitReason::Hung,
+                ..
+            }
+        ),
+        "{exited:?}"
+    );
+    supervisor.shutdown().await;
+}
+
+#[tokio::test]
 async fn a_consumer_held_back_by_frame_errors_does_not_get_the_host_killed() {
     const BAD_FRAMES: usize = 50;
     let spawner = FakeSpawner::new(vec![script(|mut host| async move {

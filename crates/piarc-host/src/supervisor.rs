@@ -591,7 +591,14 @@ impl Inner {
                                 failures, "the Agent Host missed a heartbeat");
                         }
                     }
-                    Err(_) => return,
+                    // The connection is gone: the next connection has its own heartbeat.
+                    Err(Error::Uncertain { .. } | Error::HostUnavailable { .. }) => return,
+                    Err(error) => {
+                        // An answer, even an error, shows the Agent Host is reading and writing.
+                        failures = 0;
+                        tracing::warn!(target: "piarc_host", workspace = %inner.shared.workspace, epoch = link.epoch,
+                            %error, "the Agent Host answered a heartbeat with an error");
+                    }
                 }
                 if failures >= inner.config.heartbeat_failures {
                     tracing::error!(target: "piarc_host", workspace = %inner.shared.workspace, epoch = link.epoch,
