@@ -1270,8 +1270,14 @@ dependencies = [
 name = "piarc-sandbox"
 version = "0.0.0"
 dependencies = [
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "piarc-ports",
  "piarc-protocol",
  "thiserror 2.0.21",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]

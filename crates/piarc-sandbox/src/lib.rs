@@ -27,6 +27,8 @@
 //!   profile per command, paths passed as `sandbox-exec -D` parameters), none elsewhere.
 //! - [`sandbox_env`]: proxy variables, `TMPDIR` and package caches in the session's
 //!   temporary directory.
+//! - [`proxy`]: the local HTTP/`CONNECT` proxy with the domain allowlist, refusing loopback and
+//!   cloud metadata destinations.
 //!
 //! `piarc-core` hands the wrapper to `piarc-exec`, which runs it with its process-tree spawner;
 //! this crate starts no processes.
@@ -35,6 +37,7 @@ mod env;
 mod error;
 mod platform;
 mod policy;
+pub mod proxy;
 #[cfg(target_os = "macos")]
 pub mod seatbelt;
 
