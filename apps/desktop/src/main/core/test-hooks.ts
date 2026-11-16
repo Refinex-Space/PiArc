@@ -4,9 +4,13 @@
 // Core without them, so the hooks never exist there.
 import { monitorEventLoopDelay, performance, type ELDHistogram } from 'node:perf_hooks';
 
-import { webContents } from 'electron';
+import { Notification, webContents } from 'electron';
 
-import type { ForwardObservation, TerminalForwardStats } from '../../shared/test-hooks.js';
+import type {
+  ForwardObservation,
+  NotificationProbeEvent,
+  TerminalForwardStats,
+} from '../../shared/test-hooks.js';
 import type { TestingCore } from './load.js';
 import type { EventRouter } from './router.js';
 import type { TerminalOwners } from './terminal-ipc.js';
@@ -84,6 +88,28 @@ export function installTestHooks(options: {
       return id;
     },
     terminalForwardStats: () => ({ ...options.terminalStats }),
+    showNotification: (title, body, waitMs) =>
+      new Promise((resolve) => {
+        const supported = Notification.isSupported();
+        const events: NotificationProbeEvent[] = [];
+        const started = performance.now();
+        const at = (): number => Math.round(performance.now() - started);
+        if (!supported) {
+          resolve({ supported, events });
+          return;
+        }
+        const notification = new Notification({ title, body, silent: true });
+        notification.on('show', () => events.push({ type: 'show', atMs: at() }));
+        notification.on('failed', (_event, error) => {
+          events.push({ type: 'failed', atMs: at(), detail: error });
+        });
+        notification.on('click', () => events.push({ type: 'click', atMs: at() }));
+        notification.on('close', () => events.push({ type: 'close', atMs: at() }));
+        notification.show();
+        setTimeout(() => {
+          resolve({ supported, events: [...events] });
+        }, waitMs);
+      }),
   };
   console.info('[core] test hooks installed (development build of Core)');
 }

@@ -83,6 +83,12 @@ export declare class CoreRuntime {
    * resolves with the report as JSON (`piarc_core::host_probe::ProbeReport`).
    */
   agentHostProbe(options: AgentHostProbeOptions): Promise<string>;
+  /**
+   * The keychain half of the S6 checklist (`piarc_core::keychain_probe`): `action` is
+   * `write`, `read` or `delete`, `dir` the probe vault's directory. Resolves with the report
+   * as JSON; it may wait while macOS asks the user for keychain access.
+   */
+  keychainProbe(action: string, dir: string): Promise<string>;
 }
 
 /** What `agentHostProbe` runs (S6, T12): see `piarc_core::host_probe`. */

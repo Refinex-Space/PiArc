@@ -420,6 +420,25 @@ impl CoreRuntime {
         Ok(())
     }
 
+    /// Runs [`crate::keychain_probe::run`] on the blocking pool (it may wait for the user to
+    /// answer a keychain dialog). Only the `testing` build of piarc-napi exports it (S6).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::ShuttingDown`] after shutdown started.
+    pub fn run_keychain_probe(
+        &self,
+        action: crate::keychain_probe::KeychainProbeAction,
+        dir: std::path::PathBuf,
+        on_done: impl FnOnce(crate::keychain_probe::KeychainProbeReport) + Send + 'static,
+    ) -> Result<()> {
+        self.ensure_running()?;
+        self.shared.handle.spawn_blocking(move || {
+            on_done(crate::keychain_probe::run(action, &dir));
+        });
+        Ok(())
+    }
+
     /// Spawns a supervised task that panics, to test that task panics become error events.
     /// Only the `testing` build of piarc-napi exports it.
     ///

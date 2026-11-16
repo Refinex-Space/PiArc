@@ -121,6 +121,15 @@ export interface TestCoreApi {
   }): Promise<string>;
 }
 
+/** One event of a test notification (`Notification` in the main process, S6). */
+export interface NotificationProbeEvent {
+  readonly type: 'show' | 'failed' | 'click' | 'close';
+  /** Milliseconds after `show()` was called. */
+  readonly atMs: number;
+  /** The error text of `failed`. */
+  readonly detail?: string;
+}
+
 export interface PiarcTestHooks {
   /** The loaded `.node` file. */
   readonly modulePath: string;
@@ -145,6 +154,15 @@ export interface PiarcTestHooks {
   createTerminal(webContentsId: number, options: TestTerminalOptions): number;
   /** Counters of the frames the main process returned. */
   terminalForwardStats(): TerminalForwardStats;
+  /**
+   * Shows a system notification and resolves after `waitMs` with whether notifications are
+   * supported and the events it emitted (S6: ad-hoc signed builds on macOS).
+   */
+  showNotification(
+    title: string,
+    body: string,
+    waitMs: number,
+  ): Promise<{ supported: boolean; events: NotificationProbeEvent[] }>;
 }
 
 declare global {

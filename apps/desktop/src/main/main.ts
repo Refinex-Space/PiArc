@@ -15,7 +15,7 @@ import { installTestHooks } from './core/test-hooks.js';
 import { applyDevServerCsp, resolveDevServer } from './dev-server.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
 import { createIpcRegistrar } from './ipc/register.js';
-import { quitsWhenAllWindowsClosed } from './platform/index.js';
+import { applyAppIdentity, quitsWhenAllWindowsClosed } from './platform/index.js';
 import { PRODUCTION_CSP } from './security/csp.js';
 import { guardWebContents } from './security/navigation.js';
 import { applyPermissionPolicy } from './security/permissions.js';
@@ -149,6 +149,7 @@ function start(): void {
 
 // Must run before `ready`: force the sandbox for every renderer and give the app scheme its
 // privileges.
+applyAppIdentity();
 app.enableSandbox();
 protocol.registerSchemesAsPrivileged([APP_SCHEME_REGISTRATION]);
 

@@ -275,3 +275,36 @@ impl CoreRuntime {
         Ok(promise)
     }
 }
+
+#[napi]
+impl CoreRuntime {
+    /// The keychain half of the S6 checklist (`piarc_core::keychain_probe`): `action` is
+    /// `write`, `read` or `delete`, `dir` the probe vault's directory. Resolves with the report
+    /// as JSON; it may wait while macOS asks the user for keychain access.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn keychain_probe<'env>(
+        &self,
+        env: &'env Env,
+        action: String,
+        dir: String,
+    ) -> napi::Result<Object<'env>> {
+        type Settle = Box<dyn FnOnce(Env) -> napi::Result<String> + Send>;
+        let (deferred, promise) = env.create_deferred::<String, Settle>()?;
+        boundary::call(env, "CoreRuntime.keychainProbe", || {
+            let action = piarc_core::keychain_probe::KeychainProbeAction::parse(&action)
+                .ok_or_else(|| piarc_core::Error::InvalidArgument {
+                    field: "action",
+                    reason: format!("expected write, read or delete, got {action:?}"),
+                })?;
+            self.core
+                .run_keychain_probe(action, dir.into(), move |report| {
+                    deferred.resolve(Box::new(move |_env| {
+                        serde_json::to_string(&report).map_err(|e| {
+                            napi::Error::from_reason(format!("cannot serialize the report: {e}"))
+                        })
+                    }));
+                })
+        })?;
+        Ok(promise)
+    }
+}

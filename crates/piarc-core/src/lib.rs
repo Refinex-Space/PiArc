@@ -68,6 +68,7 @@ mod error;
 pub mod events;
 pub mod host_probe;
 pub mod identity;
+pub mod keychain_probe;
 pub mod route;
 mod runtime;
 pub mod secrets;
