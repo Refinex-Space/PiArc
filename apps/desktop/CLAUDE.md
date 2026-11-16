@@ -70,7 +70,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 外链只放行 `https:`、`http:`、`mailto:`，必须先经原生确认框。
 - 主进程比较 origin 用 `originOf`，不用前缀匹配，也不直接用 `new URL(x).origin`。
 - 主进程只按路由键转发事件批次，不解析载荷；批次一律经结构化克隆复制（Electron 45 的 `MessagePortMain` 只能转移端口，ADR-0019）；不要尝试转移 `ArrayBuffer`。
-- 终端：窗口只能用自己创建的终端（`TerminalOwners`），窗口销毁时关闭它的终端；主进程不解析拉取请求与帧。改 `vendor/ghostty-web/` 下的代码要同步其 README 的改动清单，保留 MIT 声明。
+- 终端：窗口只能用自己创建的终端（`TerminalOwners`），创建它的页面消失（窗口销毁、渲染进程崩溃、重载）时关闭它的终端；主进程不解析拉取请求与帧。改 `vendor/ghostty-web/` 下的代码要同步其 README 的改动清单，保留 MIT 声明。
 - 渲染进程不加载原生模块；Core 只经主进程（`window.piarc.subscribeEvents` 等）。页面回调只收到批次，没有 Electron 的 event 对象。
 - 安全渲染（架构第 10.3 节）：渲染进程不从 HTML 字符串建 DOM，ESLint 禁止 `innerHTML`、`outerHTML`、`dangerouslySetInnerHTML`、`insertAdjacentHTML`、`createContextualFragment`、`setHTMLUnsafe`、`document.write`；模型输出里的原始 HTML 作为 `html` 节点按文本显示；链接只保留 `safeHref` 通过的 `https:`、`http:`、`mailto:`，点击经 `window.piarc.openExternal`（主进程确认框）；图片不加载，显示为链接；代码高亮只输出 token 与颜色。
 - 高亮不放宽 CSP：shiki 用 `@shikijs/engine-javascript`，不用需要 `wasm-unsafe-eval` 的 Oniguruma 引擎；语法按需加载，每种一个 chunk，`GRAMMARS` 与 `languages.ts` 的别名表一起改。

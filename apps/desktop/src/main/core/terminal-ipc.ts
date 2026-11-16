@@ -25,10 +25,18 @@ export type TerminalCore = Pick<
   | 'terminalFrame'
 >;
 
+/** The fields of Electron's `did-start-navigation` details that ownership reads. */
+export interface NavigationDetails {
+  readonly isMainFrame: boolean;
+  readonly isSameDocument: boolean;
+}
+
 /** The part of a window's `WebContents` ownership needs. */
 export interface OwnerContents {
   readonly id: number;
   once(event: 'destroyed', listener: () => void): unknown;
+  on(event: 'render-process-gone', listener: () => void): unknown;
+  on(event: 'did-start-navigation', listener: (details: NavigationDetails) => void): unknown;
 }
 
 /** `registerHandler` (src/main/ipc/register.ts) as this module uses it. */
@@ -38,8 +46,9 @@ export type TerminalRegistrar = (
 ) => void;
 
 /**
- * Which window owns which terminal. A window may only use its own terminals; closing or
- * crashing the window closes them.
+ * Which window owns which terminal. A window may only use its own terminals. They are closed
+ * when the page that created them goes away: the window closes, its renderer crashes, or it
+ * loads a new document (a reload); the new page could not know their ids.
  */
 export class TerminalOwners {
   readonly #owners = new Map<number, number>();
@@ -58,6 +67,15 @@ export class TerminalOwners {
       const windowId = contents.id;
       contents.once('destroyed', () => {
         this.closeAllOf(windowId);
+      });
+      contents.on('render-process-gone', () => {
+        this.closeAllOf(windowId);
+      });
+      contents.on('did-start-navigation', (details) => {
+        // Hash routes are same-document; subframes do not own terminals.
+        if (details.isMainFrame && !details.isSameDocument) {
+          this.closeAllOf(windowId);
+        }
       });
     }
   }

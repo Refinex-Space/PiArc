@@ -4,19 +4,46 @@ import { IPC_CHANNELS } from '../../shared/ipc.js';
 import {
   registerTerminalHandlers,
   TerminalOwners,
+  type NavigationDetails,
   type OwnerContents,
   type TerminalCore,
 } from './terminal-ipc.js';
 
 class FakeContents implements OwnerContents {
   #destroyed: (() => void)[] = [];
+  #gone: (() => void)[] = [];
+  #navigations: ((details: NavigationDetails) => void)[] = [];
   constructor(readonly id: number) {}
   once(_event: 'destroyed', listener: () => void): void {
     this.#destroyed.push(listener);
   }
+  on(event: 'render-process-gone', listener: () => void): void;
+  on(event: 'did-start-navigation', listener: (details: NavigationDetails) => void): void;
+  on(
+    event: 'render-process-gone' | 'did-start-navigation',
+    listener: (details: NavigationDetails) => void,
+  ): void {
+    if (event === 'render-process-gone') {
+      this.#gone.push(() => {
+        listener({ isMainFrame: true, isSameDocument: false });
+      });
+    } else {
+      this.#navigations.push(listener);
+    }
+  }
   destroy(): void {
     for (const listener of this.#destroyed) {
       listener();
+    }
+  }
+  crash(): void {
+    for (const listener of this.#gone) {
+      listener();
+    }
+  }
+  navigate(details: NavigationDetails): void {
+    for (const listener of this.#navigations) {
+      listener(details);
     }
   }
 }
@@ -147,5 +174,23 @@ describe('terminal IPC', () => {
     window.destroy();
     expect(calls.filter((c) => c.startsWith('close'))).toEqual(['close 1', 'close 2']);
     expect(() => invoke(window, IPC_CHANNELS.terminalInput, 1, 'x')).toThrow('Unknown terminal');
+  });
+
+  it('closes the terminals of a page that reloads or crashes, not on in-page navigation', () => {
+    const { calls, invoke } = setup(() => Promise.resolve(new Uint8Array()));
+    const window = new FakeContents(1);
+    const closes = () => calls.filter((c) => c.startsWith('close'));
+    invoke(window, IPC_CHANNELS.terminalCreate, size);
+    // A hash route change and a subframe navigation keep the page and its terminals.
+    window.navigate({ isMainFrame: true, isSameDocument: true });
+    window.navigate({ isMainFrame: false, isSameDocument: false });
+    expect(closes()).toEqual([]);
+    // A reload starts a new document: the new page cannot know the old ids.
+    window.navigate({ isMainFrame: true, isSameDocument: false });
+    expect(closes()).toEqual(['close 1']);
+    expect(() => invoke(window, IPC_CHANNELS.terminalInput, 1, 'x')).toThrow('Unknown terminal');
+    invoke(window, IPC_CHANNELS.terminalCreate, size);
+    window.crash();
+    expect(closes()).toEqual(['close 1', 'close 2']);
   });
 });
