@@ -302,7 +302,7 @@ T12 打包、首次运行与发布清单（开工 2026-11-16；依赖中 T03、T
 - [x] 4. Core 从打包产物启动 Agent Host：宽松 Seatbelt、`ProcessTreeSpawner`（I33）、最小环境变量、`PI_PACKAGE_DIR`
 - [x] 5. 宽松配置下的验证：bash、grep、find、git、`worker_threads`、写入范围、内置 npx 拉起 MCP、原生模块（A06、A07）
 - [ ] 6. 打包产物的 Playwright 测试：一轮 mock 对话（A05）；系统通知程序侧事件（A10）
-- [ ] 7. 发布清单：生成脚本、测试密钥、Core 校验与三种篡改用例（A08）
+- [x] 7. 发布清单：生成脚本、测试密钥、Core 校验与三种篡改用例（A08）
 - [ ] 8. CI：Windows Velopack x64/arm64（相邻两个版本）与 macOS 产物，actionlint（A04）
 - [ ] 9. 体积测量（A12）
 - [ ] 10. 首次运行检查清单 `docs/spikes/S06-first-run-checklist.md`，实机关口（A09–A11）

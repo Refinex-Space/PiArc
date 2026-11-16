@@ -119,6 +119,11 @@ export interface TestCoreApi {
     prompt: string;
     timeoutMs?: number;
   }): Promise<string>;
+  /**
+   * The keychain probe of the S6 checklist (`piarc_core::keychain_probe`): `write`, `read` or
+   * `delete` a probe vault in `dir`; resolves with the report as JSON.
+   */
+  keychainProbe(action: 'write' | 'read' | 'delete', dir: string): Promise<string>;
 }
 
 /** One event of a test notification (`Notification` in the main process, S6). */

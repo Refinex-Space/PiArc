@@ -1154,6 +1154,7 @@ name = "piarc-core"
 version = "0.0.0"
 dependencies = [
  "getrandom 0.4.3",
+ "minisign-verify",
  "piarc-exec",
  "piarc-fs",
  "piarc-host",
@@ -1164,6 +1165,7 @@ dependencies = [
  "piarc-term",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror 2.0.21",
  "tokio",
  "tokio-util",

@@ -56,6 +56,12 @@
 //! locks that serialize concurrent OAuth refreshes across Agent Hosts. The master key's
 //! service name comes from the application identifier in [`identity`].
 //!
+//! # Release manifests (T12)
+//!
+//! [`release::verify_manifest`] and [`release::verify_file`] check a release's signed
+//! manifest and each downloaded artefact before an update (ADR-0018 rule 4, ADR-0024); every
+//! failure is a structured `releaseIntegrity` error and the caller refuses the update.
+//!
 //! # Terminals (T10)
 //!
 //! [`CoreRuntime::create_terminal`] and its siblings run `piarc-term` sessions (ADR-0017):
@@ -69,6 +75,7 @@ pub mod events;
 pub mod host_probe;
 pub mod identity;
 pub mod keychain_probe;
+pub mod release;
 pub mod route;
 mod runtime;
 pub mod secrets;

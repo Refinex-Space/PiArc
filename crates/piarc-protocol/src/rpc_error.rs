@@ -71,6 +71,8 @@ pub mod code {
     pub const VAULT_VERSION: i64 = -32015;
     /// A credential lock is no longer held: it expired or was released.
     pub const SECRET_LOCK_LOST: i64 = -32016;
+    /// A release manifest or a downloaded artefact failed verification.
+    pub const RELEASE_INTEGRITY: i64 = -32017;
 }
 
 /// JSON-RPC 2.0 error object with PiArc's mandatory structured `data`.
@@ -161,6 +163,11 @@ pub enum ErrorKind {
     VaultVersion,
     /// A `secrets/*` request named a lock that is no longer held (expired or released).
     SecretLockLost,
+    /// A release manifest's signature or a downloaded artefact's size or SHA-256 did not
+    /// verify; the update must be refused (ADR-0018 rule 4). `details`: `{ reason, file? }`
+    /// with `reason` one of `noTrustedKey`, `malformedSignature`, `unknownKey`,
+    /// `badSignature`, `malformedManifest`, `notListed`, `sizeMismatch`, `hashMismatch`.
+    ReleaseIntegrity,
 }
 
 impl ErrorKind {
@@ -190,6 +197,7 @@ impl ErrorKind {
             Self::VaultIntegrity => code::VAULT_INTEGRITY,
             Self::VaultVersion => code::VAULT_VERSION,
             Self::SecretLockLost => code::SECRET_LOCK_LOST,
+            Self::ReleaseIntegrity => code::RELEASE_INTEGRITY,
         }
     }
 }
@@ -214,7 +222,7 @@ impl ErrorObject {
 mod tests {
     use super::*;
 
-    const ALL_KINDS: [ErrorKind; 22] = [
+    const ALL_KINDS: [ErrorKind; 23] = [
         ErrorKind::ParseError,
         ErrorKind::InvalidRequest,
         ErrorKind::MethodNotFound,
@@ -237,6 +245,7 @@ mod tests {
         ErrorKind::VaultIntegrity,
         ErrorKind::VaultVersion,
         ErrorKind::SecretLockLost,
+        ErrorKind::ReleaseIntegrity,
     ];
 
     #[test]

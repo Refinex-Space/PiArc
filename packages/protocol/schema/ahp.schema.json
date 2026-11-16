@@ -233,6 +233,11 @@
           "const": "secretLockLost",
           "description": "A `secrets/*` request named a lock that is no longer held (expired or released).",
           "type": "string"
+        },
+        {
+          "const": "releaseIntegrity",
+          "description": "A release manifest's signature or a downloaded artefact's size or SHA-256 did not\nverify; the update must be refused (ADR-0018 rule 4). `details`: `{ reason, file? }`\nwith `reason` one of `noTrustedKey`, `malformedSignature`, `unknownKey`,\n`badSignature`, `malformedManifest`, `notListed`, `sizeMismatch`, `hashMismatch`.",
+          "type": "string"
         }
       ]
     },

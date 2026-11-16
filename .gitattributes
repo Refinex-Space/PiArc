@@ -13,3 +13,6 @@
 # Put files that must keep CRLF line endings under any `fixtures/crlf/`
 # directory, e.g. tests/fixtures/crlf/ (see docs/engineering/testing.md).
 **/fixtures/crlf/** -text
+
+# Signed release-manifest fixtures: the signature covers the exact bytes.
+crates/piarc-core/tests/fixtures/release/** -text

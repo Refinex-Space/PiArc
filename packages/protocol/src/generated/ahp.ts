@@ -97,7 +97,8 @@ export type ErrorKind =
   | 'credentialStoreUnavailable'
   | 'vaultIntegrity'
   | 'vaultVersion'
-  | 'secretLockLost';
+  | 'secretLockLost'
+  | 'releaseIntegrity';
 /**
  * Session identifier.
  */
