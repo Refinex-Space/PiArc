@@ -14,7 +14,7 @@ paths:
 - 非测试代码不用 `unwrap()`；`todo!`、`unimplemented!`、`dbg!` 不得提交；panic 不得穿过 NAPI 边界（2.4）。
 - I/O 走 `piarc-ports` 的窄 trait，进程启动统一经 `ProcessSpawner`；平台代码只在 trait 实现里用 `cfg(target_os)`（2.5）。
 - 函数不超过 80 行，文件不超过 1,000 行；确需超过时 `#[expect(clippy::too_many_lines, reason = "...")]`（2.7）。
-- `unsafe` 只在 `piarc-ghostty-sys`、`piarc-napi` 与 `piarc-term` 的 `vt` 模块，每个 `unsafe` 块前写 `// SAFETY:`（2.8）。
+- `unsafe` 只在 `piarc-ghostty-sys`、`piarc-napi`、`piarc-term` 的 `vt` 模块与 `piarc-exec` 的 `job` 模块，每个 `unsafe` 块前写 `// SAFETY:`（2.8）。
 - 放宽 lint 必须带 `reason`，优先用 `#[expect]`（2.9）。
 - 路径用 `std::path`，不拼分隔符；测试覆盖 LF/CRLF 与含空格、中文的路径（1.5，`testing.md` 第 4 节）。
 - 改完运行 `cargo test -p <crate>` 与 `cargo clippy -p <crate> --all-targets -- -D warnings`。

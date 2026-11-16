@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.14（2026-11-15） |
+| 版本 | 2.15（2026-11-15） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -625,6 +625,19 @@ Agent Host 按类别统计上下文构成（system prompt、工具定义、MCP �
 - 两种模式：沙箱内命令自动批准 / 沙箱内仍走正常审批（默认）。命令因沙箱失败时，模型可请求在沙箱外重试，这一请求总是需要审批。
 - Agent Host 进程本身也运行在一个较宽松的 Seatbelt 配置中，作为第二道防线（ADR-0004、ADR-0015）。
 - Windows：第一版不提供 OS 级沙箱（与 Claude Code 在原生 Windows 上的现状一致，需求 D7）。Core 用 Job Object 管理进程树，保证超时与停止时整棵进程树被终止；权限规则照常生效。设置页与沙箱开关处明确提示"Windows 上沙箱不可用"，不静默降级。隔离方案（AppContainer 等）在 M4 评估，结论另写 ADR。
+- **沙箱受保护路径**（T11，`piarc_sandbox::PROTECTED_PATHS`）：在每个可写目录下任意深度禁写，目录连同其下内容；比 6.1.2 面向文件工具的清单窄，整个 `.git/` 保持可写，`git add`、`git commit` 才能在沙箱内运行。
+
+  | 路径 | 理由 |
+  |---|---|
+  | `.git/hooks`、`.git/modules/**/hooks` | 钩子在之后的 git 命令中于沙箱外运行 |
+  | `.git/config`、`.git/config.worktree`、`.git/modules/**/config`、`.git/worktrees/*/config.worktree` | `core.hooksPath`、`core.fsmonitor`、别名与过滤器能运行代码 |
+  | `.piarc`、`.claude`、`.pi` | 项目设置：权限规则、hooks、扩展 |
+  | `.mcp.json` | MCP server 在沙箱外启动 |
+  | `.vscode`、`.idea` | 编辑器任务与设置能运行代码 |
+  | `.gitconfig` 与 shell 配置文件（`.bashrc`、`.bash_profile`、`.bash_login`、`.bash_logout`、`.profile`、`.zshrc`、`.zshenv`、`.zprofile`、`.zlogin`、`.zlogout`） | 之后的 git 与 shell 会读取执行 |
+
+  `.git`、`.git/modules`、`.git/worktrees` 以及 `denyRead` 路径（含其在可写目录内的祖先）禁止改名与删除，防止把受保护内容移出规则覆盖的路径。代价：`git init`、`clone`、`config` 在沙箱内失败。
+- **T11 原型的实现**（`docs/spikes/S08-sandbox.md`）：每条命令以 `/usr/bin/sandbox-exec -p <配置> -D… -- /bin/bash -c <命令>` 运行，路径全部经 `-D` 参数传入；基础配置拷自 Codex（Apache-2.0）的 deny-default 配置，读取放开（`denyRead` 除外），网络只允许连本机代理端口，不能绑定端口、不能连 Unix socket。包管理器缓存经环境变量指向会话临时目录（`TMPDIR`、`npm_config_cache`、`CARGO_HOME`、`PIP_CACHE_DIR` 等），不放开用户目录下的共享缓存（它们会被之后沙箱外的构建直接使用）。代理每会话一个，只听 `127.0.0.1`，支持 HTTP 与 `CONNECT`，白名单为精确域名与 `*.` 通配，解析到回环、链路本地与云元数据地址时拒绝，拒绝返回 403 与 `x-piarc-proxy-denied`；除标准代理变量外还设置 `CARGO_HTTP_PROXY`、`npm_config_*proxy`、`PIP_PROXY` 与 `GIT_CONFIG_*`，因为这些工具的配置文件优先于代理变量。命令经 `piarc-exec` 的 `ProcessTreeSpawner` 运行（macOS 进程组，Windows Job Object），终止时整个进程组结束。每条命令额外约 8.4 ms（p50），代理每请求额外约 0.1 ms。
 
 ### 6.11 后台任务、终端、Monitor
 
@@ -732,7 +745,7 @@ crates/
 - I/O 边界用窄 trait 隔离（`ProcessSpawner`、`FileSystem`、`Clock`、`SecretStore`、`AgentHostTransport`），测试用内存实现驱动。
 - 错误类型化：每个 crate 定义 `thiserror` 枚举，带可机读的 `kind` 与 `retryable`；跨 NAPI 和 AHP 时映射为结构化错误，不传裸字符串。
 - panic 不得穿过 NAPI 边界：导出函数在边界处捕获 panic 并转成结构化错误，Core 内部错误不能让主进程崩溃。
-- `unsafe` 只出现在 `-sys` crate、`piarc-napi` 与 `piarc-term` 的 `vt` 模块（libghostty-vt 的 safe 封装，T10）；规则与写法见 `docs/engineering/coding-standards.md` 第 2.8 节。
+- `unsafe` 只出现在 `-sys` crate、`piarc-napi`、`piarc-term` 的 `vt` 模块（libghostty-vt 的 safe 封装，T10）与 `piarc-exec` 的 `job` 模块（Windows Job Object 的 safe 封装，T11）；规则与写法见 `docs/engineering/coding-standards.md` 第 2.8 节。
 - 单文件超过 1,000 行、单函数超过 80 行需要在评审中说明理由（规避 claw-code 的上帝文件问题）。
 
 ### 7.2 运行时与并发
@@ -1405,6 +1418,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.15 | 2026-11-15 | T11 补充：6.10 增加沙箱受保护路径清单（比 6.1.2 窄，`.git/` 整体可写）与 Seatbelt、代理、缓存目录、进程树的原型实现；7.1 的 `unsafe` 范围增加 `piarc-exec` 的 `job` 模块（Windows Job Object 的 safe 封装） |
 | 1.0 | 2026-11-14 | 首版：基于对 Claude 官方文档、Pi v1.4.0 源码、claude-code / claw-code / OpenClaudeDesktop / open-claude-ui 参考实现与原生技术栈的调研 |
 | 2.14 | 2026-11-15 | ADR-0023 接受：第 4 章加入 ADR-0023 并注明 ADR-0017 第 3 条被修订；6.11 写明帧作为拉取请求的返回值送达及实测依据；8.3 新增第 6 条（终端帧不走事件通道）；7.6 的终端导出同步 |
 | 2.13 | 2026-11-15 | T10 补充：6.11 写明终端原型的线程、effects、同步输出处理、帧格式草案位置、viewer 与 RESET、事件路由、拉取节奏与 PTY 子进程的启动方式，并指出按原文经 MessagePort 送帧时回显超出预算（ADR-0023 提议，未改 ADR-0017 原文）；7.1 写明 `unsafe` 也可出现在 `piarc-term` 的 `vt` 模块；7.6 加入终端导出与主进程的归属校验；13.1、13.2 写明 libghostty-vt 的锁定文件、缓存与 Windows DLL 的随附方式 |

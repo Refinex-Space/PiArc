@@ -103,7 +103,7 @@ Markdown 不进 Prettier：文档中的宽表格每次编辑都会被重新填�
 
 ### 2.8 unsafe
 
-- `unsafe` 只允许出现在 `-sys` crate（`piarc-ghostty-sys`）、NAPI 边界（`piarc-napi`）与 `-sys` 层的 safe 封装模块（`piarc-term` 的 `vt` 模块，T10）。workspace lints 对 `unsafe_code` 设为 deny；前两个 crate 在 crate 根写 `#![allow(unsafe_code, reason = "...")]` 放开，safe 封装只在模块声明上放开（`#[allow(unsafe_code, reason = "...")] mod vt;`），crate 的其余部分仍然禁止。
+- `unsafe` 只允许出现在 `-sys` crate（`piarc-ghostty-sys`）、NAPI 边界（`piarc-napi`）与系统接口的 safe 封装模块（`piarc-term` 的 `vt` 模块，T10；`piarc-exec` 的 `job` 模块，Windows Job Object，T11）。workspace lints 对 `unsafe_code` 设为 deny；前两个 crate 在 crate 根写 `#![allow(unsafe_code, reason = "...")]` 放开，safe 封装只在模块声明上放开（`#[allow(unsafe_code, reason = "...")] mod vt;`），crate 的其余部分仍然禁止。
 - 按输出类型读值的 FFI 辅助函数（传入数据键与输出指针）写成 `unsafe fn`，在 `# Safety` 中写明"类型必须与数据键对应"，调用处的 `// SAFETY:` 写出具体的对应关系。
 - 每个 `unsafe` 块前写 `// SAFETY:` 注释，说明满足了哪些前置条件（clippy `undocumented_unsafe_blocks`，verify 第 7 步）。
 - `unsafe fn` 内部的不安全操作也要包在 `unsafe {}` 块中（edition 2024 默认的 `unsafe_op_in_unsafe_fn`）。
@@ -193,7 +193,7 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | mock provider（库与独立进程） | `piarc_testkit::{MockProvider, ScenarioLibrary, Scenario, Script}`；bin `piarc-mock-provider`；TS 侧 `packages/testkit/src/mock-provider.ts`（`buildMockProvider`、`startMockProvider`） | 模拟 Anthropic Messages 与 OpenAI 兼容 Chat Completions 两种流式线格式，按场景脚本逐步应答，可注入 429/529/500/503 与断流；只绑定 `127.0.0.1`；脚本格式见 `testing.md` 第 10 节 | T05 |
 | 请求校验器 | `piarc_testkit::{parse_request, validate, Rule, Violation}` | 把两种线格式的请求体解析成中立的 `Request`，按六条规则（配对、角色顺序、工具 schema、system 必要段落、缓存断点数量与位置）给出带规则 ID 与位置的违规；可单独用于断言任意请求体 | T05 |
 | 请求记录查询 | `MockProvider::records()`、`RequestLog::snapshot()`；HTTP `GET /_piarc/requests` | 按到达顺序记录原始请求体、线格式、场景选择器、步序号、校验结果与结果类型，凭据头脱敏 | T05 |
-| 进程启动与时钟端口 | `piarc_ports::{ProcessSpawner, SpawnSpec, SpawnedProcess, ProcessControl, Clock}`；实现 `piarc_exec::TokioProcessSpawner`、`piarc_core::agent_host::SystemClock` | 功能 crate 启动进程、按时间做决定都经这两个 trait；测试注入内存实现（例如只在 sleep 时前进的时钟）。当前启动器只终止直接子进程（I17） | T06 |
+| 进程启动与时钟端口 | `piarc_ports::{ProcessSpawner, SpawnSpec, SpawnedProcess, ProcessControl, Clock}`；实现 `piarc_exec::TokioProcessSpawner`、`piarc_core::agent_host::SystemClock` | 功能 crate 启动进程、按时间做决定都经这两个 trait；测试注入内存实现（例如只在 sleep 时前进的时钟）。`TokioProcessSpawner` 只终止直接子进程，要终止整棵进程树用下面的 `ProcessTreeSpawner` | T06 |
 | Agent Host 监管器 | `piarc_core::agent_host::start`（`piarc_host::HostSupervisor`、`HostEvents`、`HostConfig`） | 启动 Agent Host、握手、背压、心跳、退避重启、会话恢复、调用对账；Agent Host 的请求经注入的 `InboundHandler` 回答。T14 的会话层在它之上编排 | T06 |
 | 脚本化的假 Agent Host | `crates/piarc-host/tests/support`（`FakeSpawner`、`FakeHost`、`TestClock`、`until`） | 内存管道上的确定性故障注入：半帧、非法 JSON、超长帧、崩溃、停读；新增 AHP 行为的监管测试优先用它 | T06 |
 | Agent Host 端到端夹具 | `crates/piarc-testkit/tests/agent_host/harness.rs`（`Env`、`Recorder`、`bundle()`） | 打包并启动真实 Agent Host、临时工作区、mock 模型配置、事件记录与 `seq` 断言；T07、T14 的会话场景复用 | T06 |
@@ -226,3 +226,8 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | 工具名映射 | `agent-host/src/tools/profile.ts`（`ToolNameMap`、`DEFAULT_PROFILE`、`profileWithOverrides`） | 模型可见名 ↔ 规范名双向查询；规则、hooks、事件、Core 一律用规范名，按模型家族调整的 Profile 在这里扩展 | T07 |
 | 在 Pi 工具代码上换掉路径 | `agent-host/src/tools/stand-in.ts`（`StandIn`、`serialized`） | 让 Pi 的工具定义在替身路径上运行、Operations 指向真实路径、结果换回原路径；同一文件的写入串行（ADR-0020） | T07 |
 | 行为对照与 I/O spy | `crates/piarc-testkit/tests/agent_host/parity.rs`；`harness.rs` 的 `with_io_spy`、`spy_report`、`offered_tools`、`tool_results_in`、`Core::calls_of`；`packages/testkit/src/io-spy.ts` | 同一脚本对比 Pi 原生工具与委托工具（结果与工作区快照，预期差异登记原因）；证明 Agent Host 不绕过 Core；读取 mock 请求中的工具列表与工具结果（含图片块） | T07 |
+| 进程树启动器（进程组 / Job Object） | `piarc_exec::ProcessTreeSpawner`（`ProcessSpawner` 的实现）；Windows 封装 `piarc-exec/src/job.rs` | macOS 新进程组、`killpg(SIGKILL)`；Windows 挂起创建、加入 `KILL_ON_JOB_CLOSE` 且不许 breakaway 的 Job 后再恢复。`kill` 与丢弃句柄都结束整棵树。沙箱命令已用它；T12 启动 Agent Host、T17 的通用命令执行改用它 | T11 |
+| 命令包装 | `piarc_exec::{CommandSpec::launcher, Launcher}` | 以包装程序启动 shell（`program args… <shell> -c <命令>`），沙箱与以后其他包装（例如 Windows 隔离方案）都经它，不另写命令执行 | T11 |
+| Seatbelt 配置生成 | `piarc_sandbox::{SandboxPolicy, ResolvedPolicy, PROTECTED_PATHS, SessionSandbox, CommandSandbox, platform_sandbox}`；macOS `piarc_sandbox::seatbelt::SeatbeltProfile` | 路径规范化（解析符号链接）、每条命令一份配置、路径经 `-D` 参数传入、受保护路径正则；快照 `crates/piarc-sandbox/tests/snapshots/seatbelt-profile.sbpl`。T12、T39 的 Agent Host 配置复用生成方式 | T11 |
+| 沙箱网络代理 | `piarc_sandbox::proxy::{NetworkProxy, Allowlist, Network, SystemNetwork, blocked_reason, DENIED_HEADER}`；环境 `piarc_sandbox::sandbox_env` | 本机 HTTP/`CONNECT` 代理、域名白名单、回环与云元数据拒绝；`Network` 可注入，测试用本机上游（`crates/piarc-sandbox/tests/proxy.rs`）。WebFetch 等需要出站白名单的地方复用白名单与地址检查 | T11 |
+| 沙箱会话 | `piarc_core::tool_io::{ToolIo::open_sandboxed_session, SandboxSettings}` | 会话临时目录、会话的代理、`exec/run` 自动包装与进程树终止；T39 的 Bash 沙箱模式在它之上接入 | T11 |
