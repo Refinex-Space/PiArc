@@ -195,10 +195,15 @@ mod tests {
         }
     }
 
+    /// The file the tree script passes the pids through; the test removes it at the end.
+    #[cfg(unix)]
+    fn pid_file(name: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!("piarc-exec-tree-{name}-{}", std::process::id()))
+    }
+
     #[cfg(unix)]
     fn tree_spec(name: &str) -> SpawnSpec {
-        let file =
-            std::env::temp_dir().join(format!("piarc-exec-tree-{name}-{}", std::process::id()));
+        let file = pid_file(name);
         let _ = std::fs::remove_file(&file);
         let mut spec = spec(TREE);
         spec.env.push(("TMPFILE".into(), file.into_os_string()));
@@ -218,6 +223,7 @@ mod tests {
         assert_eq!(status.signal, Some(9), "{status:?}");
         wait_gone(&pids).await;
         assert!(!alive(leader));
+        std::fs::remove_file(pid_file("kill")).expect("pid file removed");
     }
 
     #[cfg(unix)]
@@ -227,6 +233,7 @@ mod tests {
         let pids = descendant_pids(&mut process).await;
         drop(process);
         wait_gone(&pids).await;
+        std::fs::remove_file(pid_file("drop")).expect("pid file removed");
     }
 
     #[cfg(unix)]
