@@ -119,7 +119,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 已完成 | 9c0738d |
 | T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 部分完成 | ff591d6 |
 | T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 部分完成 | 1b92a25 |
-| T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 进行中 | — |
+| T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 阻塞（等待用户实机操作） | — |
 | W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 未开始 | — |
 | R1 | [M0 评审与收口](tasks/R1-m0-review.md) | 1 | W0 | macOS | high | 中 | S1–S10 汇总 | 未开始 | — |
 | T13 | [存储、数据目录、配置与项目信任](tasks/T13-storage-config-and-trust.md) | 2 | R1（结论为进入 M1） | macOS | high | 大 | 无 | 未开始 | — |
@@ -304,10 +304,11 @@ T12 打包、首次运行与发布清单（开工 2026-11-16；依赖中 T03、T
 - [ ] 6. 打包产物的 Playwright 测试：一轮 mock 对话（A05）；系统通知程序侧事件（A10）
 - [x] 7. 发布清单：生成脚本、测试密钥、Core 校验与三种篡改用例（A08）
 - [x] 8. CI：Windows Velopack x64/arm64（相邻两个版本）与 macOS 产物，actionlint（A04）
-- [ ] 9. 体积测量（A12）
-- [ ] 10. 首次运行检查清单 `docs/spikes/S06-first-run-checklist.md`，实机关口（A09–A11）
-- [ ] 11. S6 报告、架构 10.1/10.3/5.6、spikes README、CLAUDE.md、复用表（A02、A13）
-- [ ] 12. 收尾：`npm run verify`（A15）、验收记录、看板
+- [x] 9. 体积测量（A12：macOS 通过，Windows 待 CI）
+- [x] 10. 首次运行检查清单 `docs/spikes/S06-first-run-checklist.md` 与产物 `tmp/s6/PiArc-A.dmg`、`PiArc-B.dmg`、`scripts/dev/s6-probe.mjs`
+- [x] 11. S6 报告、架构 v2.16、ADR-0024、spikes README、CLAUDE.md、复用表
+- [x] 12. `npm run verify` 13 步通过（A15）、验收记录、登记 I38–I41
+- [ ] 13. 等待用户按检查清单在实机上操作（macOS 26、macOS 15）：首次打开与"仍要打开"、备选 `xattr`、Gatekeeper 对内置 node、通知横幅、钥匙串弹窗次数。收到结果后：填检查清单第 7 节与 S6 报告第 10、11 节，更新 T12-A09、A10、A11、A13 与 spikes README，看板改为"部分完成"（A04、A12、A14 的 Windows 部分仍待 CI/W0）
 
 ## 登记事项
 
@@ -347,11 +348,15 @@ T12 打包、首次运行与发布清单（开工 2026-11-16；依赖中 T03、T
 | I30 | T10 | `#/terminal-lab` 原型页随发布构建的渲染包分发；发布构建的 `window.piarc` 也有七个终端函数（`createTerminal` 只能启动登录 shell），与 I13、I24 同类 | T34 接入正式终端面板时收口；T45 与 I13、I24 一起评估剔除原型页 |
 | I31 | T10 | 真实拼音输入法的候选框位置未核对，清单见 `docs/spikes/S07-terminal.md` 第 8 节（T1–T4） | 用户核对后把结果告诉智能体补记到 S7 报告；R1 汇总 S7 时检查（同 I25） |
 | I32 | T10 | T09 的 L4 `transcript-scroll.e2e.ts` 中 "the wheel releases and resumes following" 在一次全量运行中失败（dev 形态，内容增长时离底 31 px，期望 ≤ 1 px），单独重跑 10 次（两种形态各 5 次）都通过；本机此时的主屏是 120 Hz | T19 接手 transcript 时检查贴底在高刷新率下的时序；T44 把 L4 的偶发失败纳入统计 |
-| I33 | T11 | 进程树终止的接口已就绪：`piarc_exec::ProcessTreeSpawner`（`ProcessSpawner` 的实现；macOS 新进程组 + `killpg`，Windows 挂起创建后加入 `KILL_ON_JOB_CLOSE`、不许 breakaway 的 Job 再恢复；`kill` 与丢弃句柄都结束整棵树，丢弃也会结束命令留在后台的进程）。目前只有沙箱会话的 `exec/run` 用它 | T12 启动 Agent Host 时把 `piarc_core::agent_host` 里的 `TokioProcessSpawner` 换成它（W0 实机核对 Agent Host 被杀时子进程随之结束）；T17 让 `ToolIo` 的普通命令也用它，并决定后台进程在命令结束时是否保留（与 T32 的后台任务一起） |
+| I33 | T11 | 进程树终止的接口已就绪：`piarc_exec::ProcessTreeSpawner`（`ProcessSpawner` 的实现；macOS 新进程组 + `killpg`，Windows 挂起创建后加入 `KILL_ON_JOB_CLOSE`、不许 breakaway 的 Job 再恢复；`kill` 与丢弃句柄都结束整棵树，丢弃也会结束命令留在后台的进程）。目前只有沙箱会话的 `exec/run` 用它 | 部分落地（T12）：`piarc_core::agent_host::start` 与 `start_bundled` 改用 `ProcessTreeSpawner`（W0 实机核对 Agent Host 被杀时子进程随之结束）；T17 让 `ToolIo` 的普通命令也用它，并决定后台进程在命令结束时是否保留（与 T32 的后台任务一起） |
 | I34 | T11 | 沙箱把 `CARGO_HOME` 指向会话临时目录（防止缓存投毒，S8 报告第 4 节），沙箱内读不到 `~/.cargo/config.toml` 的镜像源设置；每个会话第一次安装或构建是冷缓存 | T39 决定是否把用户的 Cargo 配置（不含凭据）复制进会话，以及是否提供共享只读缓存 |
 | I35 | T11 | 沙箱内不能绑定端口、不能连 Unix socket（本地测试服务器、Docker、ssh-agent 不可用），`git init`/`clone`/`config` 因 `.git/config`、`.git/hooks` 受保护而失败；`GIT_CONFIG_COUNT` 被沙箱用来指定代理，命令继承的同类变量失效 | T39 评估"允许本机绑定""允许写 `.git/config`"两个选项与 Unix socket 白名单，设置页写明这些限制 |
 | I36 | T11 | macOS 的进程组终止不覆盖主动 `setsid`/`setpgid` 的后代：它们仍在沙箱里，但停止命令后会活下来（Windows 的 Job 无此问题） | T17 实现通用进程管理时评估是否需要按后代追踪（例如记录会话内的进程并在停止时扫描） |
 | I37 | T11 | `piarc-exec` 的 Windows 代码（`job.rs` 与 `tree.rs` 的 Windows 部分）只在本机做了类型检查与 lint（用户同意后安装了 `x86_64-pc-windows-msvc` 目标，`cargo clippy --target x86_64-pc-windows-msvc --workspace --all-targets -- -D warnings` 通过），没有运行；同一检查发现 T07 的 `crates/piarc-core/tests/tool_io.rs` 在 Windows 上有两处 `unused_mut`（会让 Windows CI 的 clippy 步骤失败），T11 已修 | 用户推送后由下一个任务的开工检查核对 Windows CI 并关闭 T11-A10；失败时修复后再关闭 |
+| I38 | T12 | `piarc-term` 的 PTY 用例 `vim_on_the_alternate_screen_matches_the_formatter` 依赖 UTF-8 locale：`LANG` 为空的 shell（本次智能体会话的环境）里 vim 把中文显示成转义，`cargo test`（含 verify）失败；设 `LANG=en_US.UTF-8` 后通过 | T33 或 R1：测试的 `SessionConfig` 显式设 `LANG`/`LC_CTYPE`，不依赖调用方环境；在此之前根 `CLAUDE.md` 的易错点已写明 |
+| I39 | T12 | 内置 node 保留 Node.js 官方签名（ADR-0018），其 entitlements 含 `get-task-allow` 与 `allow-dyld-environment-variables`：同一用户的进程可以调试附加 Agent Host，读到 Core 交给它的凭据（PiArc 自身已用 hardened runtime 挡住注入，S6 报告第 3 节）。Core 以最小环境启动 node，不传 `DYLD_*` | T45 评估（例如凭据只在用时经 AHP 取、缩短驻留时间，或重新评估是否对 node 重签去掉 `get-task-allow`，后者涉及 ADR-0018，属变更型） |
+| I40 | T12 | 在 Agent Host 的宽松 Seatbelt 下，`npx <本地目录>` 形式的 MCP server 启动失败：npm 链接目录后 `chmod` 其 bin，文件在可写目录之外（`EPERM`）。registry 包（tarball）不受影响 | T36 接入 MCP 配置时给出明确错误提示或改用 `npm pack` 后的路径；T39 定稿 Agent Host 配置时一并评估 |
+| I41 | T12 | macOS arm64 安装后体积 449.0 MB，预算 450 MB 只余约 1 MB（内置 node 145 MiB、Electron Framework 250 MiB）；任何新增随包内容都会超出 | R1 决定：校准预算（写明原因）或裁剪（npm 的 docs/man 约 3.2 MiB、压缩 bundle 等），T44 把体积纳入回归 |
 
 ## 技术债
 
@@ -453,6 +458,12 @@ T12 打包、首次运行与发布清单（开工 2026-11-16；依赖中 T03、T
 - 验收：12 项通过，1 项阻塞（A10：Job Object 三级进程树单测待 Windows CI，本机已对 Windows 目标做类型检查与 lint；实机待 W0）
 - 决策：沙箱受保护路径清单比 6.1.2 窄（`.git/` 整体可写，只保护 hooks 与 config 等，代价是沙箱内 `git init`/`clone`/`config` 失败）；缓存经环境变量指向会话临时目录而不放开用户缓存（防缓存投毒，代价是冷缓存与读不到 `~/.cargo/config.toml`）；Cargo、git、npm 的配置文件优先于代理变量，沙箱另设 `CARGO_HTTP_PROXY`、`npm_config_*proxy`、`PIP_PROXY`、`GIT_CONFIG_*`；`unsafe` 放开到 `piarc-exec` 的 `job` 模块（与 T10 的 `vt` 同类，补充型，未写 ADR）；进程树丢弃句柄时也结束命令留下的后台进程；经用户同意安装 `x86_64-pc-windows-msvc` 目标，顺带修了 T07 测试中两处 Windows 才有的 `unused_mut`
 - 遗留：I33（T12、T17 改用 `ProcessTreeSpawner`）、I34（Cargo 配置与冷缓存，T39）、I35（不能绑定端口与连 Unix socket、git init 失败，T39）、I36（`setsid` 脱离进程组，T17）、I37（T11-A10 待 Windows CI）；T03-A03、T04-A09、T10-A01 的 Windows CI 仍待推送后核对
+
+### 2026-11-16 T12 阻塞（等待用户实机操作）
+- 交付：`third-party/binaries.lock.json` + `scripts/dev/fetch-binaries.mjs`（node 24.22.3、rg 15.2.0、fd 10.5.0、vpk 1.2.161 的版本与 SHA-256）；`apps/desktop/packaging/`（`Resources/agent-host/` 布局、分层 ad-hoc 签名与 hardened runtime、hdiutil DMG maker、Velopack 绑定）、maker-zip、图标与 bundle id 取自 `design/brand/` 与应用标识；`package:desktop` 加 `--arch`、`--make`；`scripts/ci/check-app-layout.mjs`；`piarc-sandbox` 的 Agent Host 宽松配置与 `agent_host_launch`；`piarc-core::agent_host::{BundledRuntime, start_bundled, LauncherSpawner}`、Agent Host 改用 `ProcessTreeSpawner`（I33）、Core 运行时开启 I/O；测试入口 `host_probe`/`agentHostProbe`、`keychain_probe`/`keychainProbe`、主进程 `showNotification`；L4 `agent-host.e2e.ts`、`notification.e2e.ts`；npx 拉起的 MCP 探针夹具；`scripts/release/release-manifest.mjs`（minisign 格式、测试密钥）与 `piarc_core::release`（错误类别 `releaseIntegrity`）；Windows：主进程 Velopack 钩子与 AppUserModelID、`scripts/release/pack-windows.mjs`；CI `package-macos`、`package-windows`；检查清单与 `scripts/dev/s6-probe.mjs`；S6 报告、ADR-0024、架构 v2.16、四份 CLAUDE.md、复用表
+- 验收：8 项通过，7 项阻塞（A04：CI 产物待推送；A09、A11：实机关口；A10：横幅待目视，程序侧通过；A12、A14：Windows 部分待 CI；A13：首次运行结论待补）
+- 决策：ADR-0024（补充，已接受）：发布清单格式与 Core 校验；hardened runtime 启用（需 `disable-library-validation`，实测阻止 DYLD 注入）；DMG 用自写 hdiutil maker；Agent Host 用 `sandbox-exec -p`（同沙箱命令）；Agent Host 的 tmp 与 npm 缓存放数据目录下 `agent-host/`；Velopack pack id 用应用标识（`PiArc` 会与数据目录重合）；CI 的 Windows 安装包用开发构建（W0 需要测试入口）
+- 遗留：I38（PTY 用例依赖 UTF-8 locale）、I39（内置 node 的 `get-task-allow`）、I40（`npx <本地目录>` 在 Seatbelt 下失败）、I41（安装后体积余量约 1 MB）；本机 Gatekeeper 评估被关闭，首次打开须在开启 Gatekeeper 的机器上做；分支未推送，T03-A03、T04-A09、T10-A01、T11-A10 与本任务 A04 的 CI 仍待核对
 
 ## 计划变更记录
 

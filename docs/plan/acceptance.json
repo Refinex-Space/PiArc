@@ -1455,106 +1455,106 @@
       "id": "T12-A01",
       "task": "T12",
       "description": "本机产出 arm64 与 x64 的 DMG 与 ZIP；最终产物为 ad-hoc 签名，`codesign --verify --deep --strict` 通过，`check-fuses.mjs` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run package:desktop -- --flavor release --arch arm64|x64 --make`：DMG（arm64 168,829,697 B、x64 177,326,620 B）与 ZIP（171,301,948 B、180,162,085 B）。两个架构的 `out/` 产物、DMG 内与 ZIP 解开后的 PiArc.app：`codesign --verify --deep --strict` valid on disk / satisfies its Designated Requirement，`codesign -dv` flags=0x10002(adhoc,runtime)；`npm run check:fuses -- --arch <arch>`：All 9 fuses match the release settings。证据 tmp/evidence/T12/codesign-release-arm64.txt、layout-release-*.json"
     },
     {
       "id": "T12-A02",
       "task": "T12",
       "description": "hardened runtime 在 ad-hoc 签名下能否启用有结论与证据，已写入报告与架构第 10.1、10.3 节。验证：`codesign -dv` 输出与文档改动。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "结论：ad-hoc 签名下可启用，但必须加 disable-library-validation。runtime 无 entitlements 或只加 allow-jit：dyld \"different Team IDs\" 拒绝 Electron Framework、Abort trap；加 allow-jit + disable-library-validation 正常运行，打包 L4 68/68 通过；DYLD_INSERT_LIBRARIES 注入 4 次 → 0 次。最终 `codesign -dv` flags=0x10002(adhoc,runtime)，entitlements 两项（check-app-layout 校验）。写入架构 10.1（新增注入威胁行）、10.3（应用二进制）与 S6 报告第 3 节；证据 tmp/evidence/T12/hardened-runtime.txt"
     },
     {
       "id": "T12-A03",
       "task": "T12",
       "description": "产物布局符合第 5.6 节：内置 node 保留 Node.js 官方签名，rg、fd 与 `.node` 为 ad-hoc 签名，Agent Host 资源在 asar 之外；运行中 Pi 经 `PI_PACKAGE_DIR` 找到资源，不在运行时下载 rg、fd。验证：布局检查脚本、`codesign -dv` 输出与运行日志。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`node scripts/ci/check-app-layout.mjs --flavor release --arch arm64|x64`：All 21 checks passed（agent-host 下 node/npm/npx/bundle/pi-assets/photon/rg/fd 在 asar 外、asar 无这些文件；node Authority=Developer ID Application: Node.js Foundation、TeamIdentifier=HX7739G8FX、runtime；rg、fd、Core .node 为 adhoc）。L4 agent-host.e2e.ts：piVersion 1.5.2（经 PI_PACKAGE_DIR），MCP 子进程 PI_PACKAGE_DIR 指向 Resources/agent-host/pi-assets，数据目录无 pi/bin（未下载 rg/fd）"
     },
     {
       "id": "T12-A04",
       "task": "T12",
       "description": "CI 配置产出 Windows x64 与 arm64 Velopack 安装包（含版本相邻的两个版本）与 macOS 产物，配置语法有效。验证：actionlint 输出；实际产物需要用户推送后由 CI 产出，未取得时标 `blocked`，由 W0 核对。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "actionlint 1.7.12 对 .github/workflows/ci.yml：0 errors（tmp/evidence/T12/actionlint.txt；shellcheck 未安装，相关规则未运行）。新增 package-macos（arm64/x64 release DMG+ZIP、fuse 与布局检查）与 package-windows（x64/arm64 开发构建、vpk 打 0.0.1 与 0.0.2）作业。实际产物要用户推送后由 CI 产出，未取得，由下一任务开工检查或 W0 核对"
     },
     {
       "id": "T12-A05",
       "task": "T12",
       "description": "打包后的应用经 `sandbox-exec` 宽松配置启动内置 node 运行 Agent Host，并完成一轮 mock 对话。验证：针对打包产物的 Playwright 测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npx playwright test --project=packaged e2e/agent-host.e2e.ts`：1 passed（4.3 s）。打包开发构建经 Core 测试导出 agentHostProbe 按生产方式（sandbox-exec -p 宽松配置、内置 node、ProcessTreeSpawner）启动 Agent Host，mock provider 应答，turn.status=completed；全套 L4 138 passed。报告 tmp/evidence/T12/agent-host/probe-report.json"
     },
     {
       "id": "T12-A06",
       "task": "T12",
       "description": "宽松配置下 Pi 的 bash、grep、find、git、`worker_threads` 正常，写入允许范围以外的位置失败。验证：测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "同一 L4 用例：Bash（printf + git status）、Grep、Glob 均 completed，Core 侧 exec/run、fs/grep、fs/glob 无错误；Seatbelt 下的 MCP server：git --version 与 git status 成功、worker_threads 往返 42、写工作区成功、写可写目录之外得到 EPERM 且文件不存在（tmp/evidence/T12/agent-host/mcp-probe.json）"
     },
     {
       "id": "T12-A07",
       "task": "T12",
       "description": "内置 npx 拉起本地夹具 MCP stdio server，server 进程使用的是内置 node；含原生模块的 npx 包的加载结果已记录。验证：测试输出与报告。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4：npx -y --package <tgz> 启动的 MCP server execPath 等于 Resources/agent-host/node/bin/node（v24.22.3），npx 缓存在 <数据目录>/agent-host/npm-cache/_npx；process.dlopen 加载 ad-hoc 原生模块成功。另在同一配置下用内置 npm 从 registry 安装 @napi-rs/lzma@1.5.3（adhoc,linker-signed，无隔离属性）并由内置 node 加载、xz 往返成功（tmp/evidence/T12/npm-native-module.txt）。npx <本地目录> 因 chmod 越界失败，记入报告与 I40"
     },
     {
       "id": "T12-A08",
       "task": "T12",
       "description": "清单签名校验通过；篡改清单内容、篡改文件哈希、换用其他密钥签名三种情况都返回结构化错误并拒绝。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-core --test release -- --nocapture`：5 passed。测试密钥签名的清单与产物通过；改清单内容 → releaseIntegrity/badSignature；改产物一个字节 → hashMismatch（另测 sizeMismatch、notListed）；另一把密钥签名 → unknownKey；无内置公钥 → noTrustedKey；均为 code -32017、retryable false 的结构化错误（tmp/evidence/T12/release-manifest-tests.txt）。生成脚本测试 `npx vitest run scripts/release scripts/lib` 8 passed"
     },
     {
       "id": "T12-A09",
       "task": "T12",
       "description": "首次运行检查清单各项有结论，macOS 15 与 26 分别记录，用户确认的项注明，未验证的项写明原因。验证：检查清单文件（实机关口）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "实机关口：检查清单 docs/spikes/S06-first-run-checklist.md 与产物 tmp/s6/PiArc-A.dmg、PiArc-B.dmg、脚本 scripts/dev/s6-probe.mjs 已准备；本机 Gatekeeper 评估被关闭（spctl --status: assessments disabled），需用户在开启 Gatekeeper 的 macOS 26 与 15 上操作后补记"
     },
     {
       "id": "T12-A10",
       "task": "T12",
       "description": "ad-hoc 签名下系统通知的可用性有结论，包括程序侧事件与用户目视确认。验证：测试输出与检查清单。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "程序侧已验证：L4 notification.e2e.ts（打包形态）Notification.isSupported()=true，7 ms 后收到 show、无 failed（tmp/evidence/T12/l4/notification*/notification.json）。横幅是否显示待用户按检查清单第 4 项目视确认"
     },
     {
       "id": "T12-A11",
       "task": "T12",
       "description": "两次构建之间的钥匙串授权弹窗次数已记录，并与 ADR-0018 的预期对照。验证：检查清单（用户操作）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "待用户实机操作：检查清单第 5 项（构建 A keychain write、安装构建 B 后 keychain read 计弹窗次数，对照 ADR-0018 预期 ≤ 1）。构建 B 与 A 的 CDHash 不同（b5da96cd… → 0114ea87…），两者布局检查均通过；本机会话无权操作钥匙串，未自测"
     },
     {
       "id": "T12-A12",
       "task": "T12",
       "description": "macOS arm64 DMG ≤ 200 MB，安装后体积 ≤ 450 MB；Windows x64 安装包体积在 CI 产物取得后补记。验证：体积测量输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "macOS 通过：arm64 DMG 168.8 MB ≤ 200 MB，安装后 .app 449.0 MB（438,448 KiB）≤ 450 MB（余量约 1 MB，登记 I41）；各部分占用见 tmp/evidence/T12/size.txt 与 S6 报告第 8 节。Windows x64 安装包体积待 CI 产物取得后补记"
     },
     {
       "id": "T12-A13",
       "task": "T12",
       "description": "S6 报告（macOS 部分）含各项结论与待 W0 的项，`docs/spikes/README.md` 已更新。验证：文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "docs/spikes/S06-packaging-first-run.md 已写自动化部分的全部结论与待 W0 项（第 9 节），docs/spikes/README.md 已更新；首次运行四项的结论待用户实机结果补入后关闭"
     },
     {
       "id": "T12-A14",
       "task": "T12",
       "description": "安装包与应用使用 `design/brand/` 的图标（macOS `icon.icns`、Windows `icon.ico`），`apps/desktop` 中没有另存图标副本。验证：Forge 配置与两个平台产物的图标截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "macOS：forge.config.ts 的 packagerConfig.icon 指向 design/brand/icon，包内 electron.icns 与 design/brand/icon.icns SHA-1 相同（7a09c5f7…），渲染图 tmp/evidence/T12/icon/macos-bundle-icon.png；apps/desktop 下无 .icns/.ico 副本（find 为空）；vpk --icon 指向 design/brand/icon.ico。Windows 产物图标截图待 CI 产物（W0）"
     },
     {
       "id": "T12-A15",
       "task": "T12",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`LANG=en_US.UTF-8 npm run verify`：All 13 steps passed（tmp/evidence/T12/verify.txt）。注：本会话 shell 未设 LANG 时 piarc-term 的 vim 用例因 locale 失败（开工基线即如此，与本任务无关，登记 I38）"
     },
     {
       "id": "T13-A01",
