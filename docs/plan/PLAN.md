@@ -344,7 +344,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I40 | T12 | 在 Agent Host 的宽松 Seatbelt 下，`npx <本地目录>` 形式的 MCP server 启动失败：npm 链接目录后 `chmod` 其 bin，文件在可写目录之外（`EPERM`）。registry 包（tarball）不受影响 | T36 接入 MCP 配置时给出明确错误提示或改用 `npm pack` 后的路径；T39 定稿 Agent Host 配置时一并评估 |
 | I41 | T12 | macOS arm64 安装后体积 449.0 MB，预算 450 MB 只余约 1 MB（内置 node 145 MiB、Electron Framework 250 MiB）；任何新增随包内容都会超出 | R1 决定：校准预算（写明原因）或裁剪（npm 的 docs/man 约 3.2 MiB、压缩 bundle 等），T44 把体积纳入回归 |
 | I42 | T12 | S6 中 Gatekeeper 开启时的首次打开没有验证："仍要打开"是否出现、`xattr -dr com.apple.quarantine` 备选、Gatekeeper 是否单独拦截内置 node（以及带隔离属性的 rg、fd）。用户的 Mac（macOS 26.5.2）`spctl --status` 为 `assessments disabled`，从 `127.0.0.1` 经 Safari 下载的 DMG 也没有 `com.apple.quarantine`；没有 macOS 15 设备。检查清单与 `scripts/dev/s6-probe.mjs` 可直接复用 | R1 汇总 M0 时安排：在开着 Gatekeeper 的 Mac（26 与 15）上、用从 GitHub 等外部地址下载的 DMG 重做检查清单第 2、3 项；最晚 T50 首次发布前完成，结果补进 S6 报告 |
-| I43 | T12 | ad-hoc 签名的 PiArc 能注册到通知中心，但用户未允许通知时 Electron 仍发 `show`、不发 `failed`（实机：允许通知为关，程序收到 `show`）。程序侧事件不能用来决定是否退回应用内提醒；允许通知后横幅能否显示也未实测 | T18/T35 做系统通知时：通知之外总给应用内提醒与 Dock 角标，或经原生模块读取 `UNUserNotificationCenter` 的授权设置；届时在实机上补测横幅 |
+| I43 | T12 | ad-hoc 签名的 PiArc 的系统通知可用（允许后横幅显示，实机确认），但用户未允许通知时 Electron 仍发 `show`、不发 `failed`，程序侧事件不能用来决定是否退回应用内提醒；另外应用退出时 Electron 删除已投递的通知，通知中心里的条目随之消失 | T18/T35 做系统通知时：通知之外总给应用内提醒与 Dock 角标，或经原生模块读取 `UNUserNotificationCenter` 的授权设置；T35 的后台运行设计考虑通知随应用退出被删除 |
 
 ## 技术债
 

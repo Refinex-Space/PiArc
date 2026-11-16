@@ -1518,8 +1518,8 @@
       "id": "T12-A10",
       "task": "T12",
       "description": "ad-hoc 签名下系统通知的可用性有结论，包括程序侧事件与用户目视确认。验证：测试输出与检查清单。",
-      "status": "blocked",
-      "evidence": "结论已有：ad-hoc 签名的应用能注册到通知中心（系统设置 → 通知中出现 PiArc，computer use 查看）；程序侧 L4 与用户实机均收到 show（7 ms / 4 ms），但该 Mac 上 PiArc 的\"允许通知\"为关、横幅未显示，show 不反映是否送达（I43）。缺：允许通知后横幅显示的目视确认（需用户在系统设置中打开 PiArc 的通知后重跑 `node scripts/dev/s6-probe.mjs notify`），由 T18/T35 接入通知时补测"
+      "status": "passing",
+      "evidence": "程序侧：L4 notification.e2e.ts 与用户实机 `s6-probe.mjs notify` 均收到 show（7 ms / 4 ms）。系统侧（用户的 Mac，macOS 26.5.2）：\"允许通知\"为关时横幅不显示而程序仍收到 show（I43）；用户打开允许通知后运行 `notify --wait 30`，横幅显示（用户目视确认），统一日志 NotificationCenter `displaying as banner`、`interruptionSuppression: none`（tmp/evidence/T12/notification-usernoted.log）。结论：ad-hoc 签名下系统通知可用；show 不反映投递结果；应用退出时 Electron 删除已投递的通知。记入 S6 报告第 5 节与检查清单第 7 节"
     },
     {
       "id": "T12-A11",

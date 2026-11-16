@@ -3,7 +3,7 @@
 | 项 | 内容 |
 |---|---|
 | 任务 | T12（2026-11-16） |
-| 结论 | macOS：有条件通过。arm64 与 x64 的 DMG、ZIP 本机产出，分层 ad-hoc 签名与 fuse 检查通过；hardened runtime 可以启用（需 `disable-library-validation`）；打包产物经 `sandbox-exec` 宽松配置启动内置 node 完成 mock 对话，bash、grep、find、git、`worker_threads`、npx 拉起 MCP、原生模块正常，越界写入被拒；发布清单签名与三种篡改用例通过；arm64 DMG 168.8 MB、安装后 449.0 MB，都在预算内（后者只余约 1 MB）。钥匙串每次更新弹 1 次（用户实机确认）；通知能注册，但程序侧 `show` 不反映是否允许（I43）；Gatekeeper 开启时的首次打开未验证（用户的 Mac 关着 Gatekeeper，I42）。Windows：CI 配置就绪，产物与实机待推送后的 CI 与 W0 |
+| 结论 | macOS：有条件通过。arm64 与 x64 的 DMG、ZIP 本机产出，分层 ad-hoc 签名与 fuse 检查通过；hardened runtime 可以启用（需 `disable-library-validation`）；打包产物经 `sandbox-exec` 宽松配置启动内置 node 完成 mock 对话，bash、grep、find、git、`worker_threads`、npx 拉起 MCP、原生模块正常，越界写入被拒；发布清单签名与三种篡改用例通过；arm64 DMG 168.8 MB、安装后 449.0 MB，都在预算内（后者只余约 1 MB）。钥匙串每次更新弹 1 次（用户实机确认）；系统通知可用，允许后横幅显示，但程序侧 `show` 不反映是否允许（I43）；Gatekeeper 开启时的首次打开未验证（用户的 Mac 关着 Gatekeeper，I42）。Windows：CI 配置就绪，产物与实机待推送后的 CI 与 W0 |
 | 代码 | `apps/desktop/packaging/`（布局、签名、DMG maker、Velopack 绑定）、`scripts/dev/fetch-binaries.mjs` + `third-party/binaries.lock.json`、`crates/piarc-core/src/agent_host.rs`（`BundledRuntime`、`start_bundled`）、`crates/piarc-sandbox/src/seatbelt.rs`（Agent Host 配置）、`crates/piarc-core/src/release.rs`、`scripts/release/` |
 | 测试 | `apps/desktop/e2e/agent-host.e2e.ts`、`notification.e2e.ts`；`crates/piarc-core/tests/release.rs`、`agent_host_probe.rs`；`scripts/ci/check-app-layout.mjs`；`scripts/release/release-manifest.test.mjs`、`scripts/lib/blake2b.test.mjs` |
 | 实机清单 | [S06-first-run-checklist.md](S06-first-run-checklist.md) |
@@ -109,7 +109,11 @@ macOS 的隐私授权（"文稿""桌面"、下载文件夹等）按"负责进程
 
 系统侧（用户的 Mac，智能体用 computer use 查看"系统设置 → 通知"）：PiArc 出现在应用列表中（ad-hoc 签名的应用能注册到通知中心），但"允许通知"为关，横幅没有显示。也就是说，用户关闭（或从未允许）通知时，程序收到的仍是 `show`，`failed` 不会出现。
 
-结论：ad-hoc 签名不妨碍 `UNNotification` 注册与提交；但程序侧的 `show`/`failed` 不能反映通知是否真的送达，不能用它决定是否退回应用内提醒加 Dock 角标（ADR-0018 第 6 条）。T35/T18 做通知时要另找授权状态的来源（例如原生模块查询 `UNUserNotificationCenter` 的设置），或者在通知之外总是给应用内提醒（I43）。允许通知后横幅能否显示没有实测。
+结论：ad-hoc 签名不妨碍 `UNNotification` 注册与提交；但程序侧的 `show`/`failed` 不能反映通知是否真的送达，不能用它决定是否退回应用内提醒加 Dock 角标（ADR-0018 第 6 条）。T35/T18 做通知时要另找授权状态的来源（例如原生模块查询 `UNUserNotificationCenter` 的设置），或者在通知之外总是给应用内提醒（I43）。
+
+允许通知之后：用户打开 PiArc 的"允许通知"，运行 `node scripts/dev/s6-probe.mjs notify --wait 30`，横幅显示（用户目视确认）。系统统一日志同时记录通知中心收到 `cn.piarc.desktop` 的通知并 `displaying as banner`，勿扰未拦截（`interruptionSuppression: none`）。所以 ad-hoc 签名下系统通知可用，不需要按 ADR-0018 第 6 条降级。
+
+另一个行为：应用退出时 Electron 会删除自己已投递的通知（日志 `Removing 1 delivered notifications`），通知中心里的条目随之消失。最初的探针 8 秒后就关闭应用，加上"临时"样式的横幅只停留约 5 秒，第一次没看到横幅就是这个原因；T35 设计"关闭窗口后后台运行"时要考虑这一点（I43）。证据 `tmp/evidence/T12/notification-usernoted.log`。
 
 ## 6. 发布清单
 
@@ -157,13 +161,13 @@ Windows x64 安装包体积在 CI 产物取得后补记（W0）。
 | 首次打开、"仍要打开"（macOS 26、macOS 15） | 未验证：这台 Mac 的 Gatekeeper 评估被关闭，浏览器下载的 DMG 也没有隔离属性；没有 macOS 15 设备（I42） |
 | `xattr -dr com.apple.quarantine` 备选 | 未验证（同上） |
 | Gatekeeper 是否单独拦截内置 node | 未出现拦截，但 Gatekeeper 关闭，不构成证据（I42） |
-| 通知 | 程序侧收到 `show`；PiArc 的"允许通知"为关，横幅未显示；`show` 不反映投递结果（I43） |
+| 通知 | 允许通知后横幅显示（用户目视确认，系统日志 `displaying as banner`）；允许通知为关时程序仍收到 `show`，事件不反映投递结果；应用退出时 Electron 删除已投递的通知（I43） |
 | 钥匙串授权弹窗次数 | 构建 A 创建与读取 0 次；换装构建 B 后第一次读取 1 次（用户确认），之后 0 次，符合 ADR-0018 的预期 |
 
 ## 11. 结论
 
 - 有条件通过（macOS）：打包、签名分层、hardened runtime、fuses、内置运行时与宽松 Seatbelt、发布清单都已验证；钥匙串每次更新弹 1 次，符合 ADR-0018。
-- 未验证：Gatekeeper 开启时的首次打开（"仍要打开"、备选命令、对内置 node 的表现），这台 Mac 关着 Gatekeeper，也没有 macOS 15 设备（I42）；通知横幅在允许通知时能否显示。
-- 通知的程序侧事件不可靠（I43）：用户关闭通知时仍收到 `show`。
+- 系统通知在 ad-hoc 签名下可用：允许通知后横幅显示；但程序侧事件不可靠，用户关闭通知时仍收到 `show`（I43）。
+- 未验证：Gatekeeper 开启时的首次打开（"仍要打开"、备选命令、对内置 node 的表现），这台 Mac 关着 Gatekeeper，也没有 macOS 15 设备（I42）。
 - 安装后体积贴着预算（I41），需要在 R1 决定余量策略。
 - 内置 node 的官方 entitlements 允许同一用户调试附加 Agent Host（I39），这是保留官方签名的代价。
