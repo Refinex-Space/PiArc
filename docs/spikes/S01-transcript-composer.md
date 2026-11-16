@@ -2,7 +2,7 @@
 
 - 任务：T09（2026-11-15）。Windows 部分（微软拼音、Windows 上的性能测量）由 W0 完成。
 - 结论（macOS）：**通过**。第 11 章的流式、滚动、冷加载与渲染进程内存四项预算全部满足；跨块选择复制、XSS 载荷、输入法守卫的自动化用例全部通过。真实输入法（macOS 拼音、日文）的人工核对列在第 7 节，待用户完成后补记。
-- 结论（Windows，W0）：自动化部分**通过**：L4 的 transcript 与 composer 用例两种形态通过；流式、滚动、冷加载、渲染进程内存四项预算满足；全部进程合计 450 MiB，与 macOS 同样超出第 11 章的 450 MB（I26）。微软拼音的实机核对见第 8 节。
+- 结论（Windows，W0）：**通过**。L4 的 transcript 与 composer 用例两种形态通过；流式、滚动、冷加载、渲染进程内存四项预算满足；微软拼音实机核对全部符合预期（第 8 节）。全部进程合计 450 MiB，与 macOS 同样超出第 11 章的 450 MB（I26）；日文输入法未验证。
 - 库选型：ADR-0022（@tanstack/react-virtual、marked 词法器、shiki JavaScript 正则引擎；composer 为 ProseMirror）。
 
 ## 1. 验证环境
@@ -139,7 +139,9 @@ open "apps/desktop/out/development/PiArc-darwin-arm64/PiArc.app"
 
 全部进程合计超出预算约 22 MB，与 macOS 的 I26 同类；Windows 的主进程比 macOS 小（120 对 179 MiB），GPU 进程更大，由 R1 与 I12、I26 一起校准。
 
-**微软拼音与手感**：实机核对清单见 `S06-first-run-checklist.md` 第 8.2 节 WM1–WM4，结果待填。日文输入法需要安装语言包，属于系统配置变更，W0 不做，记"未验证"。滚动条拖动与精确式触摸板手感需要人工操作，本次只有自动化的拖动用例（`transcript-scroll.e2e.ts` 的"dragging the scrollbar releases following"通过）。
+**微软拼音**：用户在已安装的应用（CI 的开发构建 0.0.2）的 `#/transcript-lab` 中按 `S06-first-run-checklist.md` 第 8.2 节核对，WM1–WM4 全部符合预期：候选框出现时 Enter 只上屏字母不发送，Esc 只取消候选（运行状态下也不停止），选字后 Enter 发送，`@` 打开文件候选、`/` 不报错。日文输入法需要安装语言包，属于系统配置变更，W0 不做，记"未验证"。
+
+**手感**：滚动条拖动与精确式触摸板手感需要人工操作，本次只有自动化的拖动用例（`transcript-scroll.e2e.ts` 的"dragging the scrollbar releases following"通过）。
 
 ## 9. 发现与遗留
 

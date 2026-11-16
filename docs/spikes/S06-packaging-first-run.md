@@ -177,13 +177,34 @@ Windows x64 的体积见第 9.2 节。
 |---|---|---|
 | 安装包（`Setup.exe`，CI 的开发构建） | ≤ 200 MB | 214.9 MiB（225.3 MB），**超出约 25 MB** |
 | 本机发布构建的打包目录 | — | 492.5 MiB（516.4 MB） |
-| 安装后 | ≤ 450 MB | 待实机（第 9.3 节） |
+| 安装后（`%LOCALAPPDATA%\cn.piarc.desktop\current`，CI 的开发构建 0.0.2） | ≤ 450 MB | 497.2 MiB（521.3 MB），**超出约 71 MB** |
+| 安装目录合计（另含 Velopack 为增量更新缓存的完整包 207.8 MiB、`Update.exe` 5.0 MiB、启动桩） | — | 710.4 MiB（745.0 MB）；卸载登记的 `EstimatedSize` 为 509,120 KiB |
 
 打包目录各部分：`PiArc.exe` 238.5 MiB（与 Electron 45.3.2 原版 `electron.exe` 同样大）、`locales` 48.8 MiB、`dxcompiler.dll` 24.6 MiB、`resources.pak` 12.8 MiB、`icudtl.dat` 10.3 MiB、其余 Chromium 文件约 25 MiB；`resources/agent-host` 126.1 MiB（内置 node 101.7 MiB、`agent-host.mjs` 14.2 MiB、rg 与 fd 7.9 MiB、photon-node 2.2 MiB）；`app.asar` 与 Core 9.5 MiB。Electron 本体就有约 360 MiB，Windows 版比 macOS 的 Electron Framework（250 MiB）大得多，加上内置 node，打包目录已经超出安装后 450 MB 的预算。按任务要求 W0 不裁剪，与 I41 一起交 R1 决定（方向：去掉不需要的 locales、Velopack 安装包只带一个架构、校准 Windows 的预算）。
 
-### 9.3 实机项（实机关口）
+### 9.3 实机项（2026-11-16，用户操作 + 智能体检查）
 
-步骤见检查清单第 8 节，结果待用户操作后补填：SmartScreen 流程、智能应用控制的状态与表现、按用户安装与 UAC、安装后经 Job Object 的 mock 对话、相邻版本更新（`Update.exe apply`）、卸载残留、安装后体积、Defender 表现、AUMID 与快捷方式、图标。
+| 项 | 结果 |
+|---|---|
+| 安全设置（用户截图，未更改） | "检查应用和文件"**关**；"适用于 Microsoft Edge 的 SmartScreen"开；网络钓鱼防护开；"阻止可能不需要的应用"关；"适用于 Microsoft Store 应用的 SmartScreen"开。智能应用控制：注册表 `VerifiedAndReputablePolicyState=0`（关），截图未包含该页 |
+| 下载 | 用户用 Edge 从 CI 运行页面下载 `piarc-windows-x64-velopack.zip`，**没有下载警告**；资源管理器"全部解压缩"。zip 与解压出的 `Setup.exe` 都带 `Zone.Identifier`，`ZoneId=3`（来自网络），zip 的 `ReferrerUrl` 是 CI 运行页面 |
+| SmartScreen 放行流程 | **本机无法观察**：双击 `Setup.exe` 后没有出现"Windows 已保护你的电脑"，直接安装。原因是"检查应用和文件"关闭，不是标记丢失（文件带 `ZoneId=3`）。"更多信息 → 仍要运行"的步骤要在开着该开关的机器上做（I42 的 Windows 部分，登记 I49） |
+| 智能应用控制 | 当前状态为关，未实测；按 ADR-0018 预期，开启时未签名的安装包与应用无法运行 |
+| 安装 | 按用户安装到 `%LOCALAPPDATA%\cn.piarc.desktop\`（`current\`、`packages\`、`Update.exe`、启动桩 `PiArc.exe`），**没有 UAC**，安装后自动打开 PiArc；卸载登记在 HKCU（`DisplayName` PiArc、`DisplayVersion` 0.0.2、`Publisher` PiArc）；开始菜单与桌面各一个快捷方式，AUMID 都是 `cn.piarc.desktop`（与主进程 `setAppUserModelId` 一致），目标 `current\PiArc.exe` |
+| 图标 | 安装后的 `PiArc.exe`、`Setup.exe`、启动桩与 `design/brand/icon.ico` 的系统渲染一致（`tmp/evidence/W0/icon/compare.png`） |
+| 首次运行与 Agent Host | 已安装的应用用 `node scripts/dev/s6-probe.mjs agent-host` 驱动：Core 经 Job Object 用内置 node 启动 Agent Host（Pi 1.5.2），mock 对话中 Bash 工具经 Git Bash 输出 `bash-ok`，`turn.status: completed`（`tmp/evidence/W0/s6-installed-agent-host.json`）。结束主进程后进程树全部退出的验证见 S8 报告第 10 节 |
+| 系统通知 | 已安装、带 AUMID 快捷方式的应用：`show`（19 ms）之后 `failed`（44 ms，"Settings prevent the notification type from being delivered"）。原因是系统通知总开关关闭（`PushNotifications\ToastEnabled=0`），横幅**本机无法观察**；程序侧的 `failed` 正确反映了投递被拒 |
+| 相邻版本更新 | **可行**。已安装的 `Update.exe apply --norestart --package <0.0.1-full>` 换装 0.0.1（14 s），再 `apply` 由 `Update.exe patch` 用 0.0.1 完整包 + 0.0.2 delta 重建的完整包（17 s）：`sq.version` 与卸载登记的版本 0.0.2 → 0.0.1 → 0.0.2，都没有 UAC；数据目录中的标记文件保留，两个快捷方式保留，`packages\` 只留最新完整包；更新后 mock 对话再次 `completed`（`tmp/evidence/W0/update-apply-*.log`、`s6-updated-agent-host.json`）。应用内的检查更新、下载 delta 与提示由 T50 实现 |
+| Defender | 下载、安装、运行、更新、卸载全程没有报警（用户确认）；`Get-MpThreatDetection` 6 小时内 0 条 |
+| 卸载 | 用户在"设置 → 应用 → 已安装的应用"中卸载，顺利完成，无 UAC。之后安装目录、开始菜单与桌面快捷方式、HKCU 卸载登记、通知注册项都不存在，无残留进程。留下：`%APPDATA%\PiArc\`（Electron 默认的 userData，71 个文件 9.5 MiB 的 Chromium 缓存与本地存储；架构第 9.1 节要求用 `app.setPath('userData', …)` 改到 `%LOCALAPPDATA%\PiArc\`，尚未实现，登记 I48）与 `%LOCALAPPDATA%\velopack\` 下 Velopack 自己的两份日志（约 85 KB） |
+| 微软拼音 | 用户在已安装的应用中核对，composer 与终端全部符合预期（S1 报告第 8 节、S7 报告第 11.4 节） |
+
+结论（Windows）：**有条件通过**。
+
+- **通过的部分**：按用户安装、无 UAC、Job Object 下的 Agent Host、相邻版本更新、卸载后程序文件与登记清理、图标与 AUMID。
+- **未达标的部分**：安装包 225 MB、安装后 521 MB，都超出预算（I45）。
+- **本机无法观察的部分**：本机关闭了 SmartScreen"检查应用和文件"与系统通知，SmartScreen 放行流程与通知横幅都看不到（I49）。
+- **留给后续任务**：卸载后留下 Electron 默认 userData（I48）。
 
 ## 10. 实机项
 

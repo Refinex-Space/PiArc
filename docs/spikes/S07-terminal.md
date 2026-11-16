@@ -11,7 +11,8 @@ Windows（W0，第 11 节）**有条件通过**：
 - **ConPTY 两处缺陷已修复**：程序自行退出后收不到 `Exited`；启动者忽略 Ctrl+C 时，这个状态会传给终端里的程序。
 - **通过的项**：TUI 渲染、帧与 formatter 逐格一致、resize、Ctrl+C、终止进程；打包产物中的 DLL 链接方式可用；输出 100 MB 期间主进程事件循环 p99 14.34 ms。
 - **未达标的项**：键入回显额外延迟按原始配对口径 p95 6.86 ms，超出 5 ms。均值是 −0.12 ms，完整路径在各分位上都不比直接写 PTY 慢，超出的部分来自 ConPTY 两次独立往返的抖动，这套测量方法在 Windows 上需要 R1 校准。
-- **待核对的项**：微软拼音候选框等实机核对；win32-arm64 上 libghostty-vt 的实际运行。
+- **实机核对**：微软拼音的候选框与预编辑位置全部符合预期（第 11.4 节）。
+- **待核对的项**：win32-arm64 上 libghostty-vt 的实际运行（下一次 CI，I47）。
 
 | S7 通过标准 | macOS 结果 |
 |---|---|
@@ -171,7 +172,7 @@ L4 `apps/desktop/e2e/terminal-tui.e2e.ts`（dev 与 packaged 两种形态）等�
 |---|---|
 | Windows 两个目标的链接与加载；ConPTY；Windows 渲染、回显延迟与终端用例的 Windows 版本 | W0 已完成（第 11 节） |
 | win32-arm64 上 libghostty-vt 的实际运行（加载检查新增的终端检查，下一次 CI 的 `core-load`） | R1 核对 |
-| 微软拼音的候选框与预编辑位置（第 11 节 WT1–WT4） | W0 实机关口 |
+| 微软拼音的候选框与预编辑位置（第 11 节 WT1–WT4） | W0 已完成，全部符合预期 |
 | Windows 上键入回显额外延迟的测量口径 | R1 |
 | 真实拼音输入法核对（第 8 节 T1–T4，T10-A11） | R1 |
 | 帧协议定稿、JSON Schema 与 L1 样本、终端事件形状、agent 读屏、OSC 133、snapshot | T33 |
@@ -238,4 +239,4 @@ L4 `apps/desktop/e2e/terminal-tui.e2e.ts`（dev 与 packaged 两种形态）等�
 
 ### 11.4 微软拼音
 
-实机核对清单见 `S06-first-run-checklist.md` 第 8.2 节 WT1–WT4，结果待填。
+用户在已安装的应用的 `#/terminal-lab`（cmd）中按 `S06-first-run-checklist.md` 第 8.2 节核对，WT1–WT4 全部符合预期：候选框紧贴光标所在格，预编辑画在光标处并带下划线；选词后"你好"出现在提示符后、光标随之移动；连续输入时候选框跟随光标；Git 的 vim 插入模式下同样正确，合成中的 Esc 只取消合成、不退出插入模式。

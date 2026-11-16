@@ -1532,8 +1532,8 @@
       "id": "T12-A12",
       "task": "T12",
       "description": "macOS arm64 DMG ≤ 200 MB，安装后体积 ≤ 450 MB；Windows x64 安装包体积在 CI 产物取得后补记。验证：体积测量输出。",
-      "status": "blocked",
-      "evidence": "macOS 通过：arm64 DMG 168.8 MB ≤ 200 MB，安装后 .app 449.0 MB（438,448 KiB）≤ 450 MB（余量约 1 MB，登记 I41）；各部分占用见 tmp/evidence/T12/size.txt 与 S6 报告第 8 节。Windows x64 安装包体积待 CI 产物取得后补记"
+      "status": "passing",
+      "evidence": "macOS 通过：arm64 DMG 168.8 MB ≤ 200 MB，安装后 .app 449.0 MB（438,448 KiB）≤ 450 MB（余量约 1 MB，登记 I41）；各部分占用见 tmp/evidence/T12/size.txt 与 S6 报告第 8 节。由 W0 在 Windows 上验证（补记 Windows x64）：CI https://github.com/Refinex-Space/PiArc/actions/runs/43827342553 的 cn.piarc.desktop-win-x64-Setup.exe 214.9 MiB（225.3 MB，开发构建）；安装后 %LOCALAPPDATA%\\cn.piarc.desktop\\current 521.3 MB，安装目录合计 745.0 MB（含 Velopack 缓存的完整包 217.9 MB）；本机发布构建打包目录 516.4 MB。Windows 的安装包与安装后体积都超出第 11 章预算，登记 I45 交 R1（S6 第 9.2 节）"
     },
     {
       "id": "T12-A13",
@@ -1546,8 +1546,8 @@
       "id": "T12-A14",
       "task": "T12",
       "description": "安装包与应用使用 `design/brand/` 的图标（macOS `icon.icns`、Windows `icon.ico`），`apps/desktop` 中没有另存图标副本。验证：Forge 配置与两个平台产物的图标截图。",
-      "status": "blocked",
-      "evidence": "macOS：forge.config.ts 的 packagerConfig.icon 指向 design/brand/icon，包内 electron.icns 与 design/brand/icon.icns SHA-1 相同（7a09c5f7…），渲染图 tmp/evidence/T12/icon/macos-bundle-icon.png；apps/desktop 下无 .icns/.ico 副本（find 为空）；vpk --icon 指向 design/brand/icon.ico。Windows 产物图标截图待 CI 产物（W0）"
+      "status": "passing",
+      "evidence": "macOS：forge.config.ts 的 packagerConfig.icon 指向 design/brand/icon，包内 electron.icns 与 design/brand/icon.icns SHA-1 相同（7a09c5f7…），渲染图 tmp/evidence/T12/icon/macos-bundle-icon.png；apps/desktop 下无 .icns/.ico 副本（find 为空）；vpk --icon 指向 design/brand/icon.ico。由 W0 在 Windows 上验证：CI 产出的 Setup.exe、安装后的 current\\PiArc.exe 与 Velopack 启动桩的系统图标渲染与 design/brand/icon.ico 一致（tmp/evidence/W0/icon/compare.png）；快捷方式图标取自 current\\PiArc.exe；apps/desktop 下无 .ico/.icns 副本"
     },
     {
       "id": "T12-A15",
@@ -4976,8 +4976,8 @@
       "id": "W0-A03",
       "task": "W0",
       "description": "S1：微软拼音合成期间 Enter、Esc、`/`、`@` 不触发业务；日文输入法已验证，或注明\"未验证\"及原因。验证：用户核对记录与截图（实机关口）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "用户在已安装的应用（CI 开发构建 0.0.2）#/transcript-lab 中用微软拼音核对 WM1–WM4（docs/spikes/S06-first-run-checklist.md 第 8.2 节），全部符合预期：候选框出现时 Enter 只上屏字母不发送、Esc 只取消候选（运行状态下也不停止）、选字后 Enter 发送、@ 打开文件候选且 / 不报错。日文输入法未验证：需要安装语言包，属于系统配置变更（S1 第 8 节）"
     },
     {
       "id": "W0-A04",
@@ -4997,22 +4997,22 @@
       "id": "W0-A06",
       "task": "W0",
       "description": "S6：Velopack 安装包按用户安装、不弹 UAC，启动后经 Job Object 运行 Agent Host 并完成一轮 mock 对话，卸载后无残留；体积与 Defender 表现已记录。验证：测试输出、截图与报告。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "S6 第 9.3 节：CI 的 Setup.exe（带 ZoneId=3）按用户安装到 %LOCALAPPDATA%\\cn.piarc.desktop，无 UAC，HKCU 卸载登记，快捷方式 AUMID cn.piarc.desktop；已安装的应用经 Job Object 用内置 node 启动 Agent Host 完成 mock 对话（Bash 输出 bash-ok，turn completed，tmp/evidence/W0/s6-installed-agent-host.json）；用户经\"设置 → 应用\"卸载，安装目录、开始菜单与桌面快捷方式、卸载登记、通知注册项都已清除，无残留进程。留下的是用户数据：%APPDATA%\\PiArc\\（Electron 默认 userData，9.5 MiB Chromium 缓存，架构 9.1 节要求改到 %LOCALAPPDATA%\\PiArc，I48）与 Velopack 日志。体积：安装包 225.3 MB、安装后 521.3 MB（超预算，I45）；Defender：全程无报警，Get-MpThreatDetection 0 条"
     },
     {
       "id": "W0-A07",
       "task": "W0",
       "description": "S6：SmartScreen 放行流程的每一步与结果已记录；智能应用控制的当前状态与表现已记录，用户的安全设置未被更改。验证：用户操作记录（实机关口）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "S6 第 9.3 节与检查清单第 8.3 节：用户截图——\"检查应用和文件\"关、Edge 的 SmartScreen 开；智能应用控制为关（注册表 VerifiedAndReputablePolicyState=0）。下载的 zip 与 Setup.exe 带 ZoneId=3，Edge 无下载警告；双击 Setup.exe 没有出现\"Windows 已保护你的电脑\"，直接安装，原因是\"检查应用和文件\"关闭，\"更多信息 → 仍要运行\"的步骤在本机无法观察，登记 I49 在开着该开关的机器上补做；智能应用控制关闭，未实测，按 ADR-0018 预期开启时无法运行。用户的安全设置未被更改（只读注册表与用户截图）"
     },
     {
       "id": "W0-A08",
       "task": "W0",
       "description": "S6：相邻两个版本之间的 Velopack 更新机制可行性有结论。验证：操作记录与报告。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "可行（S6 第 9.3 节）：Update.exe patch 用 0.0.1 完整包 + 0.0.2 delta 重建的包与 CI 的 0.0.2 完整包 2,026 个文件内容一致；在已安装的应用上 Update.exe apply --package 先换装 0.0.1（14 s）、再换装重建的 0.0.2（17 s），sq.version 与卸载登记 0.0.2 → 0.0.1 → 0.0.2，无 UAC，数据目录标记文件与快捷方式保留，更新后 mock 对话 completed（tmp/evidence/W0/update-apply-*.log、s6-updated-agent-host.json）。应用内检查与下载由 T50 实现"
     },
     {
       "id": "W0-A09",
@@ -5025,8 +5025,8 @@
       "id": "W0-A10",
       "task": "W0",
       "description": "S7：键入回显额外延迟 p95 ≤ 5 ms；输出 100 MB 期间主进程事件循环延迟 p99 ≤ 16 ms；微软拼音的候选框与预编辑位置有结论。验证：测量输出与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "failing",
+      "evidence": "输出 100 MB 期间主进程事件循环延迟 p99 14.34 ms（≤16 ms，通过，tmp/evidence/W0/bench/s7-packaged.json）；微软拼音候选框与预编辑位置：用户在已安装应用的 #/terminal-lab 核对 WT1–WT4（含 vim 插入模式）全部符合预期。键入回显额外延迟按原始配对口径 p95 6.86 ms（1,000 样本，s7-echo-1000.json；200 样本 6.95 ms），未达到 ≤5 ms：均值 −0.12 ms，完整路径在 p50、p95 上都不比直接写 PTY 慢，超出部分来自 ConPTY 两次独立往返的 0–16 ms 抖动（S7 第 11.3 节）。预算不改，测量口径交 R1 校准（I44）"
     },
     {
       "id": "W0-A11",
@@ -5046,15 +5046,15 @@
       "id": "W0-A13",
       "task": "W0",
       "description": "T02–T12 中因\"需要 Windows\"而 `blocked` 的验收项都已在 Windows 上验证并按协议关闭，或写明仍无法关闭的原因。验证：`acceptance.json` 中的 `evidence` 与看板状态。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "T02–T12 中因\"需要 Windows\"而 blocked 的项：T03-A03、T04-A09、T10-A01、T11-A10、T12-A04、T12-A12、T12-A14 都已在 Windows 上验证并改为 passing，evidence 以\"由 W0 在 Windows 上验证\"开头；看板中 T03、T04、T11、T12 改为已完成。T10 仍为部分完成：剩下的 T10-A11 是 macOS 系统拼音候选框的实机核对，不需要 Windows，按原计划交 R1"
     },
     {
       "id": "W0-A14",
       "task": "W0",
       "description": "发现的平台问题都已修复（附失败测试）、提出 ADR 或登记到 `PLAN.md`；S1、S2、S5、S6、S7、S8 报告的 Windows 部分与 `docs/spikes/README.md` 已更新。验证：提交记录与文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "平台问题：修复并附失败测试——ConPTY 自行退出无 Exited 与继承的忽略 Ctrl+C（1c6750b，tests/pty_windows.rs）、Windows 才有的测试问题（9d6b01b）、Windows 进程环境检查（e8959fc）、取消用例的启动时序（8264191）；登记 I44（Windows 测量口径）、I45（体积）、I46（同步 stdout）、I47（arm64 终端运行）、I48（userData 位置）、I49（SmartScreen 放行未观察），I33 补充 Windows 证据；S1、S2、S5、S6、S7、S8 报告的 Windows 部分与 docs/spikes/README.md 已更新（另补 S3、S4、S9、S10 的本机复跑）"
     },
     {
       "id": "W0-A15",

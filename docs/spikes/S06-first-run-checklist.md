@@ -149,3 +149,14 @@ W0 的实机关口。智能体不会改动、也不建议改动 SmartScreen、�
 | WT4 | 终端：在 vim 插入模式下重复 WT1–WT3 | 同上；Esc 先取消合成，不退出插入模式 |
 
 日文输入法要安装语言包，属于系统配置变更，W0 不做，记"未验证"。
+
+### 8.3 结果（2026-11-16）
+
+| 项 | 结果 |
+|---|---|
+| W1 安全设置 | "检查应用和文件"关；Edge 的 SmartScreen 开；智能应用控制关（注册表 `VerifiedAndReputablePolicyState=0`） |
+| W2 下载 | Edge 无下载警告；zip 与解压出的 `Setup.exe` 带 `ZoneId=3` |
+| W3 安装 | 没有 SmartScreen 对话框（"检查应用和文件"关闭，本机无法观察放行流程）；没有 UAC；安装后自动打开；Defender 无报警 |
+| W4 智能体检查 | 安装位置、HKCU 卸载登记、快捷方式与 AUMID、图标、安装后体积、mock 对话、通知（系统总开关关闭，`failed`）、`Update.exe apply` 0.0.2 → 0.0.1 → 0.0.2（S6 报告第 9.3 节） |
+| W5 微软拼音 | WM1–WM4、WT1–WT4 全部符合预期（用户确认，在已安装的应用中操作）；日文输入法未验证（需要安装语言包） |
+| W6 卸载 | 顺利，无 UAC；程序文件、快捷方式与登记清理干净；留下 `%APPDATA%\PiArc\`（Electron 默认 userData，I48）与 Velopack 日志 |
