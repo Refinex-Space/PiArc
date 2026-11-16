@@ -137,7 +137,7 @@ Markdown 不进 Prettier：文档中的宽表格每次编辑都会被重新填�
 - 只用 ESM（`"type": "module"`）；相对导入写 `.js` 扩展名（NodeNext 要求）。
 - 每个工作区经 `src/index.ts` 暴露公开 API；跨工作区只按包名导入（例如 `@piarc/protocol`），不导入另一个工作区的内部文件。
 - 进程边界（ADR-0013）：
-  - 渲染进程不导入 Node 内置模块、Electron、主进程代码或原生模块，只能调用 preload 暴露的白名单 API；preload 只能导入 `electron`；`new BrowserWindow` 只在窗口工厂、`ipcMain.handle` 只在 IPC 注册函数中出现（`eslint.config.mjs` 的 `desktopProcessBoundaries`，verify 第 2 步）；
+  - 渲染进程不导入 Node 内置模块、Electron、主进程代码或原生模块，只能调用 preload 暴露的白名单 API；preload 不导入 Node 内置模块（沙箱中的 preload 只能 `require("electron")`，其余依赖由打包工具内联）；`new BrowserWindow` 只在窗口工厂、`ipcMain.handle` 只在 IPC 注册函数中出现（`eslint.config.mjs` 的 `desktopProcessBoundaries`，verify 第 2 步）；
   - 主进程只做平台集成与转发，不承载业务逻辑；两个平台都需要的逻辑放进 Core 或 Agent Host。
 - `packages/protocol/src/generated/` 由 `piarc-protocol` 的 JSON Schema 生成，不手工编辑（T02）。
 
@@ -172,7 +172,7 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | 统一检查入口 | `scripts/dev/verify.mjs`（`npm run verify`） | 按顺序运行 13 个检查步骤，失败后继续，最后打印汇总表；新增检查在 `STEPS` 中追加 | T01 |
 | crate 依赖方向检查 | `scripts/ci/check-crate-deps.mjs` + `crates/deps-rules.json` | 读取 `cargo metadata`，按层与例外校验 workspace crate 之间的依赖 | T01 |
 | 验收清单一致性检查 | `scripts/plan/check-acceptance.mjs` | 比对任务文件中的 `- [Txx-Ayy]` 验收项与 `docs/plan/acceptance.json` | T01 |
-| 仓库内工具安装 | `scripts/dev/install-tools.mjs` | 把锁定版本的 Rust 工具（当前为 cargo-deny）装进 `.tools/`，不做全局安装；`localToolPath()` 给出可执行文件路径 | T01 |
+| 仓库内工具安装 | `scripts/dev/install-tools.mjs` | 把锁定版本的工具（cargo-deny、ripgrep、fd、bindgen-cli）装进 `.tools/`，不做全局安装；`localToolPath()` 给出可执行文件路径 | T01 |
 | 脚本公共函数 | `scripts/lib/repo.mjs` | `repoRoot`、`isMain`、`run`（继承输出）、`capture`（捕获输出）、`resolveBin`、`readJsonFile`、`isRecord` | T01 |
 | AHP 帧编解码器 | Rust：`piarc_protocol::{FrameDecoder, encode_frame}`；TS：`@piarc/protocol` 的 `FrameDecoder`、`encodeFrame` | LF 分帧的 UTF-8 JSON，只处理字节缓冲，不做 I/O；半包缓存、超限帧丢弃到下一个 LF、错误按帧返回；两份实现跑同一份 `tests/contracts/framing/` 用例 | T02 |
 | 协议版本协商 | `piarc_protocol::negotiate`、`PROTOCOL_VERSION`（TS 为生成的 `PROTOCOL_VERSION`） | 主版本不同返回 `protocolVersionMismatch`；次版本不同取双方能力交集 | T02 |
@@ -185,7 +185,7 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | 桌面应用打包 | `scripts/dev/package-desktop.mjs`（`npm run package:desktop -- --flavor <release\|development>`） | 以指定构建类型运行 `electron-forge package`，输出到 `apps/desktop/out/<flavor>/`；fuse 配置的单一来源是 `apps/desktop/fuses.mjs` | T03 |
 | fuse 校验 | `scripts/ci/check-fuses.mjs`（`npm run check:fuses`） | 用 `@electron/fuses` 读打包产物的实际 fuse，与 `apps/desktop/fuses.mjs` 的配置逐项比对，列出不一致与未配置的 fuse；T12、T50 的流水线调用它 | T03 |
 | L4 夹具 | `apps/desktop/e2e/fixtures.ts`、`e2e/app.ts` | 每个用例独立启动应用与 user-data 目录、收集应用日志；两种形态的可执行文件按平台解析 | T03 |
-| 事件合并器 | `piarc_core::events`（`EventSink`、`DeliveryDone`、`EventBatch`）；`CoreRuntime::start`、`spawn_supervised` | Core 发往客户端的事件一律经它：按路由键合并、每间隔最多一次投递、最多 1 个在途、超过上限对上游背压，不丢事件；任务 panic 转成 `core/errors` 上的错误事件 | T04 |
+| 事件合并器 | `piarc_core::events`（`EventSink`、`DeliveryDone`、`EventBatch`）；`CoreRuntime::start`（内部的 `spawn_supervised` 是私有函数，Core 内新任务经它启动） | Core 发往客户端的事件一律经它：按路由键合并、每间隔最多一次投递、最多 1 个在途、超过上限对上游背压，不丢事件；任务 panic 转成 `core/errors` 上的错误事件 | T04 |
 | NAPI 错误映射与 panic 边界 | `crates/piarc-napi/src/boundary.rs`（`call`、`js_error`） | 每个导出加 `#[napi(catch_unwind)]` 并把函数体放进 `boundary::call`：Core 错误与 panic 都变成带 `code`、`data.kind`、`data.retryable` 的 `Error`；Promise 用 `JsDeferred` 由 Core 运行时结算 | T04 |
 | `.node` 构建与路径解析 | `scripts/dev/build-core.mjs`（`npm run build:core`）、`apps/desktop/core-binary.mjs`；运行时 `apps/desktop/src/main/core/native-path.ts`（`resolveCoreModulePath`）与 `load.ts` | 构建、打包、加载 Core 的唯一入口：文件名按 `@napi-rs/cli --platform` 规则，开发构建在 `target/piarc-core/<flavor>/`，打包后从 `app.asar.unpacked/native/` 加载 | T04 |
 | 主进程事件路由 | `apps/desktop/src/main/core/router.ts`（`EventRouter`）、`event-ipc.ts` | 路由键 → 窗口表，每窗口一个 `MessageChannelMain`，只按路由键转发；T14 的会话事件、T10 的终端帧走同一条通道 | T04 |

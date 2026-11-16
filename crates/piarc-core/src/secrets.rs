@@ -385,6 +385,7 @@ impl SecretsService {
 
     /// Pushes a change to every subscribed connection and to in-process observers.
     fn publish(&self, key: String, revision: u64, value: Option<Map<String, Value>>) {
+        // Fails only when no in-process observer is subscribed, which is the common case.
         let _ = self.inner.changes.send(SecretChange {
             key: key.clone(),
             revision,

@@ -114,6 +114,38 @@
       },
       "usedBy": "Windows installers built by vpk pack: Setup.exe and the Update.exe it installs next to PiArc (the npm package velopack, the main-process binding, is covered by npm metadata)",
       "addedBy": "T12"
+    },
+    {
+      "id": "pi-source-ports",
+      "name": "Pi (earendil-works/pi) source ported into PiArc",
+      "version": "1.5.2",
+      "license": "MIT",
+      "licenseFile": "third-party/licenses/pi-1.5.2.LICENSE",
+      "copyright": "Copyright (c) 2025 Mario Zechner",
+      "source": {
+        "repository": "https://github.com/earendil-works/pi",
+        "tag": "v1.5.2",
+        "commit": "b4afdddf44e059c67ccf5097e5317d913521b470",
+        "path": "packages/coding-agent/src/utils/paths.ts, src/core/tools/path-utils.ts, src/core/tools/grep.ts (output formatting), src/utils/mime.ts"
+      },
+      "usedBy": "agent-host/src/tools/paths.ts and grep.ts (bundled into agent-host.mjs); crates/piarc-fs/src/image.rs (compiled into the Core module). Each file's header names the functions it ports and what changed.",
+      "addedBy": "T07 (registered in R1)",
+      "notes": "Pi itself is an npm dependency and is listed from the npm tree; this entry covers only the code ported at source level. agent-host/src/runtime/credentials.test.ts adapts Pi's tests but does not ship."
+    },
+    {
+      "id": "thesvg-pi-mark",
+      "name": "Pi mark (thesvg.org icon)",
+      "version": "main",
+      "license": "MIT",
+      "licenseFile": "design/brand/mark.LICENSE",
+      "copyright": "Copyright (c) 2025 thesvg.org",
+      "source": {
+        "repository": "https://github.com/GLINCKER/thesvg",
+        "path": "public/icons/pi/default.svg"
+      },
+      "usedBy": "design/brand/mark.svg, source of menu bar and tray icons (T35, T50)",
+      "addedBy": "T12 (registered in R1)",
+      "notes": "The licence covers the SVG file only, not the Pi name or logo as trademarks; see design/brand/README.md (requirement D3)."
     }
   ]
 }

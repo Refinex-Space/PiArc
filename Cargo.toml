@@ -56,7 +56,7 @@ piarc-telemetry   = { path = "crates/piarc-telemetry" }
 piarc-napi        = { path = "crates/piarc-napi" }
 piarc-testkit     = { path = "crates/piarc-testkit" }
 
-# Third-party dependencies (alphabetical).
+# Third-party dependencies.
 aes-gcm     = { version = "=0.11.1", default-features = false, features = ["aes", "zeroize"] }
 apple-native-keyring-store = { version = "=1.0.2", default-features = false, features = ["keychain"] }
 getrandom   = { version = "=0.4.3", default-features = false }
@@ -100,7 +100,7 @@ unsafe_code = "deny"
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
-# Functions over 80 lines (clippy.toml) need `#[allow(clippy::too_many_lines, reason = "...")]`.
+# Functions over 80 lines (clippy.toml) need `#[expect(clippy::too_many_lines, reason = "...")]`.
 too_many_lines = "deny"
 allow_attributes_without_reason = "deny"
 # Every `unsafe` block needs a `// SAFETY:` comment.
