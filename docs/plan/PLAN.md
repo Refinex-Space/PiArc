@@ -118,7 +118,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T08 | [凭据保险箱](tasks/T08-credential-vault.md) | 1 | T06；D2 | macOS | high | 中 | S5 | 已完成 | 83dc25b |
 | T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 已完成 | 9c0738d |
 | T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 部分完成 | ff591d6 |
-| T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 未开始 | — |
+| T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 进行中 | — |
 | T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 未开始 | — |
 | W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 未开始 | — |
 | R1 | [M0 评审与收口](tasks/R1-m0-review.md) | 1 | W0 | macOS | high | 中 | S1–S10 汇总 | 未开始 | — |
@@ -294,7 +294,17 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（当前没有进行中的任务）
+T11（2026-11-15 开工；基线 verify 13 步通过；依赖 T07 已完成；T12 尚未开工，没有可复用的 Job Object；分支未推送，前序 Windows CI 无法核对）：
+
+- [ ] 1 `piarc-exec` 进程树启动器：macOS 进程组、Windows Job Object（`KILL_ON_JOB_CLOSE`、挂起创建后入 Job、不允许 breakaway），Windows CI 单测父子孙三级（A10）
+- [ ] 2 `piarc-sandbox` Seatbelt 配置生成：路径规范化与转义、受保护路径清单、`denyRead`、缓存目录方案、`sandbox-exec -D` 参数、快照测试（含空格与中文路径）（A09）
+- [ ] 3 `piarc-sandbox` 本地代理：HTTP 与 `CONNECT`、精确与 `*.` 通配白名单、可注入解析器、拒绝回环与云元数据地址（A04、A06）
+- [ ] 4 Core 编排：沙箱会话的 `exec/run` 经 `piarc-sandbox` 包装、经 `piarc-exec` 执行，流式、退出码、取消与无残留进程（A08）
+- [ ] 5 沙箱行为测试：写入范围、受保护路径、`denyRead`、绕过代理直连（A01、A02、A03、A05）
+- [ ] 6 常见命令测试：git、npm install、cargo build、python（A07）
+- [ ] 7 测量：`sandbox-exec` 每条命令额外耗时、代理额外延迟（A11）
+- [ ] 8 S8 报告、spikes README、架构 6.10 受保护路径清单、`piarc-sandbox` CLAUDE.md、复用表、登记事项（A12）
+- [ ] 9 收尾：verify、验收记录、PLAN 收尾（A13）
 
 ## 登记事项
 
