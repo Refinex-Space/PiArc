@@ -122,7 +122,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 已完成 | 815c32d |
 | W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 已完成 | f278039 |
 | R1 | [M0 评审与收口](tasks/R1-m0-review.md) | 1 | W0 | macOS | high | 中 | S1–S10 汇总 | 已完成 | 6eef36d |
-| T13 | [存储、数据目录、配置与项目信任](tasks/T13-storage-config-and-trust.md) | 2 | R1（结论为进入 M1） | macOS | high | 大 | 无 | 进行中 | — |
+| T13 | [存储、数据目录、配置与项目信任](tasks/T13-storage-config-and-trust.md) | 2 | R1（结论为进入 M1） | macOS | high | 大 | 无 | 部分完成 | 12ad055 |
 | T14 | [会话编排与事件投影](tasks/T14-session-orchestration-and-projection.md) | 2 | T13 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T15 | [无头驱动、L2 场景运行器与能力清单](tasks/T15-devcli-l2-scenarios-and-capabilities.md) | 2 | T14 | macOS | high | 中 | 无 | 未开始 | — |
 | T16 | [文件工具与编辑不变量](tasks/T16-file-tools-invariants.md) | 2 | T15 | macOS | xhigh | 大 | 无 | 未开始 | — |
@@ -294,17 +294,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-### T13 存储、数据目录、配置与项目信任（开工 2026-11-16，基线 verify 13/13 通过）
-
-- [x] 1 数据目录：主进程路径纯函数（两平台单测）、`ready` 前 `app.setPath('userData')`、经 `CoreConfig` 交给 Core、Core 建第 9.1 节子目录（A02）
-- [x] 2 piarc-store 迁移框架与表（`workspaces`、`sessions`、`audit_events`、`background_tasks`、`schema_migrations`、`project_trust`）（A01）
-- [x] 3 Pi JSONL 流式解析、增量同步、重建索引、内存预算（A03、A04、A05；100 MiB 堆峰值 +14.08 MiB）
-- [x] 4 piarc-telemetry 日志按天轮转、保留 7 天（A06）
-- [x] 5 piarc-config 分层加载、校验、合并、变更监听、写接口（A07、A08）：完成（piarc-fs 监听由 Core 转发，事件路由 `core/settings`）
-- [x] 6 piarc-git 主 checkout 解析（A09 的 git 部分；信任共享在第 7 项验证）
-- [x] 7 项目信任：持久化、撤销、可执行配置枚举与新增项检测、`trust/get`、Harness Kit 接管 `project_trust`（A10–A13）：完成（`piarc_core::trust`、`HostSupervisor::restart`、`restart_on_trust_change`、`agent-host/src/harness/project-trust.ts`、端到端 `tests/agent_host/trust.rs`）
-- [x] 8 CLAUDE.md（store、config、git、telemetry 新建；core、host、fs、agent-host、根目录更新）、架构 v2.18、ADR-0025（补充）、复用表登记
-- [ ] 9 收尾：verify（A14）、验收记录、PLAN 更新
+（当前没有进行中的任务）
 
 ## 登记事项
 
@@ -359,7 +349,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I45 | W0 | Windows 体积超预算：CI 的 `Setup.exe`（开发构建）225.3 MB > 200 MB；本机发布构建打包目录 516.4 MB > 450 MB（Electron 本体约 360 MiB、内置 node 约 102 MiB），安装后体积见 S6 第 9 节 | R1 与 I41 一起决定（裁剪 locales、校准 Windows 预算等），T44 纳入回归；R1 决定：不放宽，T44 裁剪（locales、单架构安装包、`dxcompiler.dll` 是否需要），R5 复核 |
 | I46 | W0 | Windows 上 Node 写管道式 stdout 是同步的：Core 停止读取时 Agent Host 整个事件循环停住，连 Core 发来的请求（中断、关闭）也处理不了，直到 Core 恢复读取；macOS 上它会继续在内存里排队 | T14 的事件消费者持续取走事件（同 I19）；R1 评估是否需要让 Agent Host 的 AHP 写入在 Windows 上异步（例如单独的管道而不是 fd 1）；R1：同 I19，T14 持续消费，不改 Windows 上的写入方式 |
 | I47 | W0 | win32-arm64 上 libghostty-vt 的实际运行尚无结果：CI 只做过加载，W0 给 `core-load-check.mjs` 加了终端检查，要下一次推送后的 `core-load`（`windows-11-arm`）才有结果 | 已落地（2026-11-16）：提交 3ae1d23 的 CI（https://github.com/Refinex-Space/PiArc/actions/runs/43855932047）中 `core load (aarch64-pc-windows-msvc)` 通过，node 24.22.2 与 Electron 45.3.2 的开发版、发布版都报 `terminal ok` |
-| I48 | W0 | 主进程没有按架构第 9.1 节用 `app.setPath('userData', …)` 固定数据目录：Windows 上 Electron 默认把 userData（Chromium 缓存、本地存储）放在漫游的 `%APPDATA%\PiArc\`，卸载后留在那里（实测 71 个文件 9.5 MiB）；macOS 的默认位置恰好与架构一致 | T13 设定数据目录时一并设 `userData`；T50 决定卸载时是否提供删除数据的选项 |
+| I48 | W0 | 主进程没有按架构第 9.1 节用 `app.setPath('userData', …)` 固定数据目录：Windows 上 Electron 默认把 userData（Chromium 缓存、本地存储）放在漫游的 `%APPDATA%\PiArc\`，卸载后留在那里（实测 71 个文件 9.5 MiB）；macOS 的默认位置恰好与架构一致 | T13 设定数据目录时一并设 `userData`；T50 决定卸载时是否提供删除数据的选项；已落地（T13）：`apps/desktop/src/main/platform/data-dirs.ts` 在 `ready` 前把 `userData` 设为 `%LOCALAPPDATA%\PiArc\`、`sessionData` 设为其下 `Cache\Chromium\`（Windows 上待 CI 确认，T13-A02）；卸载选项仍交 T50 |
 | I49 | W0 | Windows 上 SmartScreen 的"更多信息 → 仍要运行"流程没有观察到：W0 的机器关着"检查应用和文件"（安装包带 `ZoneId=3`，没有拦截），智能应用控制也是关的；系统通知总开关关闭，横幅也没看到（程序侧正确收到 `failed`） | R1 与 I42 一起安排：在开着"检查应用和文件"与通知的 Windows 11 上，用浏览器下载的安装包重做 S6 检查清单第 8 节 W3 与通知；最晚 T50 首次发布前；R1：T50 首次发布前，与 I42 一起，R6 检查 |
 | I50 | R1 | 渲染进程没有 React 错误边界：任何一个组件抛错都会卸载整个 root（R1-E1 的后果） | T19 给 transcript 行与整页加错误边界，单条内容出错只影响该行 |
 | I51 | R1 | 终端是页面可调用的命令执行通道：`createTerminal` + `terminalInput` 不经 Core 权限裁决，与架构第 10.3 节"有副作用的操作仍要经 Core 的权限裁决"不一致；每窗口终端数与在途拉帧请求没有上限（R1-E3、E6）。发布构建现在也带着原型终端的函数（I30） | T34 决定防线（例如要求近期真实用户输入）与上限并写入 10.3；若以文档例外接受，属于放松安全基线，写 ADR 提议。T34 之前 T45 与 I30 一起评估发布构建去掉终端函数 |
@@ -373,6 +363,10 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I59 | R1 | 测试用固定时长等待异步结果：`transcript-scroll.e2e.ts`（与 I32 的偶发失败位置一致）、`terminal.e2e.ts`、`e2e/terminal.ts`、`e2e/core.ts`、`agent-host/src/runtime/credentials.test.ts`（R1-Q3） | T19 改 transcript 用例并关闭 I32；T34 改终端用例；T21 改凭据测试 |
 | I60 | R1 | 测试与脚本：CI 没设 `PIARC_REQUIRE_KEYCHAIN`，凭据库测试在 CI 上可能只是 NOT RUN（`system_store.rs` 的 `let _ = tx.send` 也缺注释）；基准脚本复制了 `e2e/app.ts` 的应用定位逻辑；`fetch-binaries.mjs` 的完整性校验与若干脚本没有单元测试（R1-Q2、Q4、Q7） | T44 决定 CI 的凭据库测试并让基准复用 `e2e/app.ts`；T50 给 `fetch-binaries.mjs` 补测试 |
 | I61 | R1 | `piarc-exec` 没有带 `kind()`、`retryable()` 的 `Error`，直接返回 `io::Result`；`piarc-ports` 的 `SecretStoreError` 同样没有（只放 trait，可豁免）（R1-Q5） | T17 定义 `piarc-exec::Error`，并把 `piarc-ports` 的豁免写进 `coding-standards.md` 2.3 |
+| I62 | T13 | 生产路径上还没有调用方：`agent_host::restart_on_trust_change`（信任变化重启工作区的 Agent Host）、`CoreRuntime::open_settings`（工作区设置与 `core/settings` 事件）、运行中会话文件的增量索引同步（`Storage::sync_sessions`）都只由测试驱动，启动时只做一次索引同步 | T14 的工作区 actor 打开工作区时启动这三项，会话文件变化（或回合结束）时触发增量同步 |
+| I63 | T13 | 信任后新增的可执行项（`TrustView.newItems`）在再次确认之前已经生效：`trust/get` 只看决定，不看快照；例如 `git pull` 带来的新 hooks 会在下一次重启后加载 | T18 的对话框接入时决定闸门：新增项未确认前 `trust/get` 返回不信任，或各消费者只启用快照内的条目；若改变 `trust/get` 语义，按协议同主版本内新增可选成员 |
+| I64 | T13 | 日志按 UTC 日期分文件（`piarc-telemetry`，没有引入时区库）：东八区用户的"某天的日志"跨两个文件 | T45（诊断包）评估是否改为本地日期，改动只在 `rotation::Day::of` |
+| I65 | T13 | 新增的 Windows 首次运行项未在 Windows 上执行过：真实 git 夹具（`piarc-git`、`piarc-core --test state`）、notify 的 `ReadDirectoryChangesW` 监听、bundled SQLite 的 MSVC 编译、`data-dirs.ts` 的 win32 分支 | 推送后看 Windows CI；失败时由下一个任务开工检查按协议处理（T13-A02 为 blocked） |
 
 ## 技术债
 
@@ -528,6 +522,13 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 验收：12 项通过，0 项阻塞；经用户授权按校准口径改判 W0-A04、A10，W0 改为已完成（计划变更记录 v1.3）
 - 决策：未写 ADR；预算收紧 3 行、放宽 2 行（主进程内存改为相对裸 Electron 的增量，macOS 进程合计 510 MB），原因写在架构第 18 章；Windows 的事件循环与回显改用对抖动稳健的口径；I19/I46 不新增独立请求通道
 - 遗留：I50–I61（审查中范围较大的问题，已指派）；技术债 9 条；S1 macOS composer 的真实输入法核对交 T19；分支未推送
+
+### 2026-11-16 T13 部分完成（完成提交 12ad055）
+- 结果：13 项验收通过，T13-A02 阻塞（等待 Windows CI 的 Vitest 输出；macOS 上两个平台的路径纯函数与 `ready` 前设置均已验证）
+- 交付：`piarc-store`（迁移框架、6 张表 + `session_files`、JSONL 流式解析、增量同步与重建；100 MiB 会话堆峰值 +14.08 MiB）；`piarc-telemetry`（UTC 按天轮转、保留 7 天、Core 与 Agent Host 分文件）；`piarc-config`（层级表、结构化 schema、合并、重载保留有效内容、写接口、信任查询入口、可执行项枚举与新增项）；`piarc-git`（主 checkout 解析）；`piarc-fs::watch`（notify）；`piarc-core`（`DataDirs`、`Storage`、`TrustService`/`trust/get`、`workspace_settings` 与 `core/settings` 事件、`restart_on_trust_change`）；`piarc-host`（计划内 `restart`）；NAPI（`dataDir`/`cacheDir`、`rebuildSessionIndex`、`projectTrust`、`decideProjectTrust`、`revokeProjectTrust`）；主进程 `platform/data-dirs.ts`；Agent Host `harness/project-trust.ts`（经 `resolveProjectTrust` 接管 Pi 信任）
+- 决策：ADR-0025（补充）；`deny.toml` 为 notify 加 CC0-1.0 单 crate 例外；rusqlite 0.41.1（`bundled`）；Windows 交叉 clippy 需 `LIBSQLITE3_SYS_USE_PKG_CONFIG=1 SQLITE3_LIB_DIR=…`；设置校验用自写的结构化 `Shape`，不引入 JSON Schema 引擎；`piarc-config` 写文件自带原子替换（不能依赖 `piarc-secrets::atomic`）
+- 验证：`npm run verify` 13/13；L4 138 passed、1 skipped；Agent Host 端到端 13 passed；Windows 交叉 clippy 通过
+- 遗留：I62–I65；未推送
 
 ## 计划变更记录
 
