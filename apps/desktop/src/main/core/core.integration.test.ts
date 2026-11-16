@@ -4,7 +4,8 @@
 // The Electron form of the same checks runs in L4 (e2e/core-events.e2e.ts); performance is
 // measured by scripts/bench/s2-event-channel.mjs and never asserted here.
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { MessageChannel, type MessagePort } from 'node:worker_threads';
 
@@ -293,4 +294,52 @@ describe('Core and process exit', () => {
     const result = await runChild(false);
     expect(result.exited).toBe(false);
   }, 30_000);
+});
+
+/** An event listener that drops every batch. */
+function ignore(): void {
+  // The state requests under test emit no events the test needs.
+}
+
+describe('Core state over a data directory (T13)', () => {
+  it('opens the layout and answers trust and index requests as JSON', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'piarc state 中文 '));
+    const dataDir = path.join(root, 'data');
+    const cacheDir = path.join(root, 'cache');
+    const workspace = path.join(root, 'ws');
+    mkdirSync(workspace);
+    const core = loadCoreModule(modulePath).CoreRuntime.create({ dataDir, cacheDir }, ignore);
+    try {
+      expect(statSync(path.join(dataDir, 'core.sqlite')).isFile()).toBe(true);
+      expect(statSync(path.join(dataDir, 'pi', 'sessions')).isDirectory()).toBe(true);
+      expect(statSync(cacheDir).isDirectory()).toBe(true);
+
+      const before: unknown = JSON.parse(await core.projectTrust(workspace));
+      expect(before).toMatchObject({ kind: 'notGit', trusted: false, items: [] });
+      const decided: unknown = JSON.parse(await core.decideProjectTrust(workspace, true));
+      expect(decided).toMatchObject({ trusted: true, decision: 'trusted' });
+      const revoked: unknown = JSON.parse(await core.revokeProjectTrust(workspace));
+      expect(revoked).toMatchObject({ trusted: false });
+      // Argument errors are thrown synchronously, as by every export.
+      let thrown: unknown;
+      try {
+        void core.projectTrust('relative/path');
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toMatchObject({ data: { kind: 'invalidParams' } });
+
+      const report: unknown = JSON.parse(await core.rebuildSessionIndex());
+      expect(report).toMatchObject({ files: 0, removed: 0 });
+    } finally {
+      await core.shutdown();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses a data directory without a cache directory', () => {
+    expect(() =>
+      loadCoreModule(modulePath).CoreRuntime.create({ dataDir: '/tmp/x' }, ignore),
+    ).toThrow(/dataDir and cacheDir go together/);
+  });
 });

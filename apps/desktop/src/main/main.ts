@@ -15,6 +15,7 @@ import { installTestHooks } from './core/test-hooks.js';
 import { applyDevServerCsp, resolveDevServer } from './dev-server.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
 import { createIpcRegistrar } from './ipc/register.js';
+import { applyDataDirs, type DataDirs } from './platform/data-dirs.js';
 import { applyAppIdentity, quitsWhenAllWindowsClosed } from './platform/index.js';
 import { runVelopackStartup } from './platform/velopack.js';
 import { PRODUCTION_CSP } from './security/csp.js';
@@ -55,7 +56,7 @@ function openMainWindow(): void {
 }
 
 /** Loads and starts Core; on failure tells the user and exits. */
-function startCoreOrExit(): CoreHost | undefined {
+function startCoreOrExit(dirs: DataDirs): CoreHost | undefined {
   try {
     return startCore(
       {
@@ -65,6 +66,7 @@ function startCoreOrExit(): CoreHost | undefined {
         arch: process.arch,
       },
       eventRouter,
+      { dataDir: dirs.data, cacheDir: dirs.cache },
     );
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
@@ -105,7 +107,7 @@ function focusMainWindow(): void {
   mainWindow.focus();
 }
 
-function start(): void {
+function start(dirs: DataDirs): void {
   app.on('session-created', (created) => {
     applyPermissionPolicy(created, trustedOrigins);
   });
@@ -133,7 +135,7 @@ function start(): void {
     if (import.meta.env.DEV && devServer !== undefined) {
       applyDevServerCsp(session.defaultSession, devServer);
     }
-    const core = startCoreOrExit();
+    const core = startCoreOrExit(dirs);
     if (core === undefined) {
       return;
     }
@@ -158,9 +160,11 @@ runVelopackStartup();
 applyAppIdentity();
 app.enableSandbox();
 protocol.registerSchemesAsPrivileged([APP_SCHEME_REGISTRATION]);
+// Before `ready` and before the single-instance lock, which lives in `userData`.
+const dataDirs = applyDataDirs(app, process.env, process.platform);
 
 if (app.requestSingleInstanceLock()) {
-  start();
+  start(dataDirs);
 } else {
   console.info('[app] another instance is running; exiting');
   app.quit();

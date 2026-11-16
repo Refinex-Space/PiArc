@@ -21,6 +21,7 @@ napi.workspace = true
 napi-derive.workspace = true
 piarc-core.workspace = true
 piarc-protocol.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 
 [build-dependencies]

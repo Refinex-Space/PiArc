@@ -296,13 +296,13 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 ### T13 存储、数据目录、配置与项目信任（开工 2026-11-16，基线 verify 13/13 通过）
 
-- [ ] 1 数据目录：主进程路径纯函数（两平台单测）、`ready` 前 `app.setPath('userData')`、经 `CoreConfig` 交给 Core、Core 建第 9.1 节子目录（A02）
+- [x] 1 数据目录：主进程路径纯函数（两平台单测）、`ready` 前 `app.setPath('userData')`、经 `CoreConfig` 交给 Core、Core 建第 9.1 节子目录（A02）
 - [x] 2 piarc-store 迁移框架与表（`workspaces`、`sessions`、`audit_events`、`background_tasks`、`schema_migrations`、`project_trust`）（A01）
 - [x] 3 Pi JSONL 流式解析、增量同步、重建索引、内存预算（A03、A04、A05；100 MiB 堆峰值 +14.08 MiB）
 - [x] 4 piarc-telemetry 日志按天轮转、保留 7 天（A06）
 - [x] 5 piarc-config 分层加载、校验、合并、变更监听、写接口（A07、A08）：完成（piarc-fs 监听由 Core 转发，事件路由 `core/settings`）
 - [x] 6 piarc-git 主 checkout 解析（A09 的 git 部分；信任共享在第 7 项验证）
-- [ ] 7 项目信任：持久化、撤销、可执行配置枚举与新增项检测、`trust/get`、Harness Kit 接管 `project_trust`（A10–A13）：Core 侧完成（`piarc_core::trust`、`HostSupervisor::restart`、`restart_on_trust_change`），待 Agent Host 与端到端
+- [x] 7 项目信任：持久化、撤销、可执行配置枚举与新增项检测、`trust/get`、Harness Kit 接管 `project_trust`（A10–A13）：完成（`piarc_core::trust`、`HostSupervisor::restart`、`restart_on_trust_change`、`agent-host/src/harness/project-trust.ts`、端到端 `tests/agent_host/trust.rs`）
 - [ ] 8 CLAUDE.md（store、config、git）、架构 9.2 补 `project_trust`、复用表登记
 - [ ] 9 收尾：verify（A14）、验收记录、PLAN 更新
 

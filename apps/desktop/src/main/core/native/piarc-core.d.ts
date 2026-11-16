@@ -18,6 +18,29 @@ export declare class CoreRuntime {
    */
   shutdown(): Promise<void>;
   /**
+   * Rebuilds the session index from Pi's session files (the "rebuild index" diagnostic
+   * action). Resolves with the report as JSON: `files`, `rescanned`, `appended`,
+   * `unchanged`, `removed`, `unavailable`, `failed`, `skippedLines`.
+   */
+  rebuildSessionIndex(): Promise<string>;
+  /**
+   * The project trust of an absolute directory as JSON (`TrustView`: `checkout`, `kind`,
+   * `decision`, `trusted`, `items`, `newItems`, ...).
+   */
+  projectTrust(path: string): Promise<string>;
+  /**
+   * Records the user's trust decision for the project containing an absolute directory,
+   * with the executable items listed now as its snapshot; resolves with the new
+   * `TrustView` as JSON.
+   */
+  decideProjectTrust(path: string, trusted: boolean): Promise<string>;
+  /**
+   * Revokes the trust decision of the project containing an absolute directory; resolves
+   * with the new `TrustView` as JSON. The workspace's Agent Host restarts without project
+   * resources.
+   */
+  revokeProjectTrust(path: string): Promise<string>;
+  /**
    * Starts a terminal and returns its id. Its title, bell and exit events arrive on the
    * route `term/<id>`; frames are pulled with `terminalFrame`.
    */
@@ -58,6 +81,13 @@ export interface CoreEventBatch {
 export interface CoreOptions {
   /** Coalescing interval in milliseconds (1 to 1000). Default 16. */
   coalesceIntervalMs?: number;
+  /**
+   * Absolute data directory (architecture section 9.1). With `cacheDir`, Core opens its
+   * database, settings, project trust and log files there; without both, none of them.
+   */
+  dataDir?: string;
+  /** Absolute cache directory (discardable). */
+  cacheDir?: string;
 }
 
 /** Lifecycle state of a runtime. */

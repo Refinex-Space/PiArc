@@ -13,6 +13,7 @@ use piarc_core::agent_host::{
 };
 use piarc_core::secrets::{MemorySecretStore, SecretsConfig, SecretsService, test_master_key_name};
 use piarc_core::tool_io::{ToolIo, ToolIoConfig};
+use piarc_core::trust::TrustService;
 use piarc_ports::BoxFuture;
 use piarc_protocol::session::{ModelRef, SessionEventNotification, SessionId};
 use piarc_protocol::{ErrorKind, ErrorObject};
@@ -99,6 +100,8 @@ pub fn mcp_fixture() -> PathBuf {
 /// in an in-memory credential store.
 pub struct Core {
     trusted: Vec<String>,
+    /// When set, `trust/get` is answered by Core's real trust service instead of `trusted`.
+    pub trust: Option<TrustService>,
     pub asked: Mutex<Vec<String>>,
     pub io: ToolIo,
     pub secrets: SecretsService,
@@ -147,6 +150,9 @@ impl InboundHandler for Core {
                 .unwrap_or_default()
                 .to_owned();
             self.asked.lock().expect("lock").push(path.clone());
+            if let Some(trust) = self.trust.clone() {
+                return Box::pin(async move { trust.trust_get(params).await });
+            }
             let trusted = self.trusted.contains(&path);
             return Box::pin(async move { Ok(json!({ "trusted": trusted })) });
         }
@@ -285,8 +291,23 @@ impl Env {
         config: HostConfig,
         trusted: &[&Path],
     ) -> (HostSupervisor, Recorder, Arc<Core>) {
+        self.start_core(config, trusted, None)
+    }
+
+    /// As [`Env::start`], with `trust/get` answered by Core's trust service `trust`.
+    pub fn start_with_trust(&self, trust: TrustService) -> (HostSupervisor, Recorder, Arc<Core>) {
+        self.start_core(self.config(), &[], Some(trust))
+    }
+
+    fn start_core(
+        &self,
+        config: HostConfig,
+        trusted: &[&Path],
+        trust: Option<TrustService>,
+    ) -> (HostSupervisor, Recorder, Arc<Core>) {
         let secrets = self.secrets.clone();
         let core = Arc::new(Core {
+            trust,
             trusted: trusted
                 .iter()
                 .map(|p| p.to_string_lossy().into_owned())

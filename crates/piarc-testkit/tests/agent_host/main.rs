@@ -8,6 +8,7 @@ mod harness;
 mod parity;
 mod token_server;
 mod tools;
+mod trust;
 
 use harness::{Env, assert_contiguous_seq, notification, open, payload, ping, prompt_text};
 use piarc_core::agent_host::{CallState, ExitReason, HostEvent};

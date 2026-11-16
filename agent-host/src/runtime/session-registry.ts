@@ -22,6 +22,7 @@ import {
 } from '@earendil-works/pi-coding-agent';
 import type { ModelRef, PromptAccepted, SessionOpened, SessionStopped } from '@piarc/protocol';
 
+import { takeOverProjectTrust, type TrustTakeover } from '../harness/project-trust.js';
 import { AhpError, describeError } from '../protocol/errors.js';
 import { ToolNameMap, toolOptions, type CoreIo, type ToolProfile } from '../tools/index.js';
 import { Projector, type ProjectionSink } from './projector.js';
@@ -50,7 +51,10 @@ export interface RegistryOptions {
   readonly workspace: Workspace;
   readonly tools: ToolBackend;
   readonly sinkFor: SessionSinkFactory;
-  /** Asks Core whether `cwd` is a trusted project; must resolve `false` on any failure. */
+  /**
+   * Asks Core whether `cwd` is a trusted project (`askCoreTrust`); must resolve `false` on any
+   * failure. Answers Pi's project trust hook (`takeOverProjectTrust`).
+   */
   readonly isTrusted: (cwd: string) => Promise<boolean>;
   readonly log: (line: string) => void;
 }
@@ -172,7 +176,7 @@ export class SessionRegistry {
     model: ModelRef | undefined,
   ): Promise<SessionOpened> {
     const { workspace } = this.#options;
-    const trusted = await this.#options.isTrusted(cwd);
+    let trust: TrustTakeover | undefined;
     const selected =
       model === undefined ? undefined : workspace.modelRuntime.getModel(model.provider, model.id);
     if (model !== undefined && selected === undefined) {
@@ -187,15 +191,18 @@ export class SessionRegistry {
         tools.kind === 'core'
           ? toolOptions(tools.ioFor(target.sessionManager.getSessionId()), tools.profile)
           : { tools: PI_NATIVE_TOOLS };
+      // Project-level Pi resources (`.pi/settings.json`, `.pi/mcp.json`, extensions) load
+      // only for directories Core trusts: nothing project-level is read until the takeover
+      // hook has Core's answer.
+      trust = takeOverProjectTrust(target.cwd, this.#options.isTrusted);
       const services = await createAgentSessionServices({
         cwd: target.cwd,
         agentDir: target.agentDir,
         modelRuntime: workspace.modelRuntime,
-        // Project-level Pi resources (`.pi/settings.json`, `.pi/mcp.json`, extensions) load
-        // only for directories Core trusts.
         settingsManager: SettingsManager.create(target.cwd, target.agentDir, {
-          projectTrusted: trusted,
+          projectTrusted: false,
         }),
+        resourceLoaderReloadOptions: trust.reloadOptions,
         resourceLoaderOptions: {
           // PiArc assembles project context itself (T22).
           noContextFiles: true,
@@ -244,7 +251,7 @@ export class SessionRegistry {
       },
     });
     log(
-      `opened in ${cwd} (trusted: ${String(trusted)}, model: ${session.model?.provider ?? '-'}/${session.model?.id ?? '-'})`,
+      `opened in ${cwd} (trusted: ${String(trust?.trusted() ?? false)}, model: ${session.model?.provider ?? '-'}/${session.model?.id ?? '-'})`,
     );
     return { sessionId, restoredMessages: session.messages.length };
   }

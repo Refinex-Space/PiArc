@@ -3,6 +3,7 @@
 import { PROTOCOL_VERSION } from '@piarc/protocol';
 import type { HostShutdownResult, HostStatus } from '@piarc/protocol';
 
+import { askCoreTrust } from './harness/project-trust.js';
 import { Connection, type FrameSource } from './protocol/connection.js';
 import { AhpError, describeError } from './protocol/errors.js';
 import { OutboundQueue, type FrameSink } from './protocol/outbound.js';
@@ -10,7 +11,6 @@ import {
   modelField,
   optionalCount,
   paramsObject,
-  parseTrust,
   parseWelcome,
   stringField,
 } from './protocol/params.js';
@@ -238,19 +238,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
             outbound.sendDelta(sessionId, method, mergeKey, payload, delta);
           },
         }),
-        isTrusted: async (cwd) => {
-          try {
-            const { trusted } = await connection.bridge.requestTyped(
-              'trust/get',
-              { path: cwd },
-              parseTrust,
-            );
-            return trusted;
-          } catch (error) {
-            log(`trust/get for ${cwd} failed, treating it as untrusted: ${describeError(error)}`);
-            return false;
-          }
-        },
+        isTrusted: (cwd) => askCoreTrust(connection.bridge, cwd, log),
       });
       ready.resolve(registry);
     } catch (error) {

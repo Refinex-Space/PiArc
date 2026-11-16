@@ -14,13 +14,18 @@ export interface CoreHost {
 }
 
 /**
- * Loads Core and starts it with every event batch going to `router`. Throws when the module
- * cannot be loaded or Core does not start.
+ * Loads Core and starts it on the data and cache directories (architecture section 9.1) with
+ * every event batch going to `router`. Throws when the module cannot be loaded or Core does
+ * not start.
  */
-export function startCore(location: CoreModuleLocation, router: EventRouter): CoreHost {
+export function startCore(
+  location: CoreModuleLocation,
+  router: EventRouter,
+  dirs: { readonly dataDir: string; readonly cacheDir: string },
+): CoreHost {
   const modulePath = resolveCoreModulePath(location);
   const { CoreRuntime } = loadCoreModule(modulePath);
-  const runtime = CoreRuntime.create({}, (batches) => {
+  const runtime = CoreRuntime.create({ ...dirs }, (batches) => {
     router.forward(batches);
   });
   console.info(`[core] loaded ${modulePath}`);

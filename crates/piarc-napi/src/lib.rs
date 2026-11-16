@@ -29,6 +29,10 @@
 //! - Terminals (T10, ADR-0017): `createTerminal`, `terminalInput`, `terminalKey`,
 //!   `terminalResize`, `terminalFrame` (a Promise of the frame bytes) and `closeTerminal`
 //!   ([`terminal`]).
+//! - State (T13): `CoreRuntime.create` takes `dataDir` and `cacheDir`;
+//!   `rebuildSessionIndex`, `projectTrust`, `decideProjectTrust`, `revokeProjectTrust` resolve
+//!   with JSON
+//!   ([`state`]).
 //! - With the `testing` feature only: demo event sources, `echo`, `eventStats`, two panic
 //!   triggers, terminal measurements and `agentHostProbe` (T12: one mock conversation with
 //!   the packaged app's Agent Host) ([`testing`]).
@@ -44,6 +48,7 @@
 mod boundary;
 pub mod runtime;
 pub mod sink;
+pub mod state;
 pub mod terminal;
 #[cfg(feature = "testing")]
 pub mod testing;

@@ -1,5 +1,6 @@
 //! `CoreRuntime`: the JavaScript face of `piarc_core::CoreRuntime`.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -15,6 +16,11 @@ use crate::sink::{EventListener, JsEventSink};
 pub struct CoreOptions {
     /// Coalescing interval in milliseconds (1 to 1000). Default 16.
     pub coalesce_interval_ms: Option<u32>,
+    /// Absolute data directory (architecture section 9.1). With `cacheDir`, Core opens its
+    /// database, settings, project trust and log files there; without both, none of them.
+    pub data_dir: Option<String>,
+    /// Absolute cache directory (discardable).
+    pub cache_dir: Option<String>,
 }
 
 /// Lifecycle state of a runtime.
@@ -51,6 +57,19 @@ impl CoreRuntime {
             if let Some(ms) = options.coalesce_interval_ms {
                 config.coalesce_interval = Duration::from_millis(u64::from(ms));
             }
+            config.dirs = match (options.data_dir, options.cache_dir) {
+                (Some(data), Some(cache)) => Some(piarc_core::DataDirs::new(
+                    PathBuf::from(data),
+                    PathBuf::from(cache),
+                )?),
+                (None, None) => None,
+                _ => {
+                    return Err(piarc_core::Error::InvalidArgument {
+                        field: "dataDir",
+                        reason: "dataDir and cacheDir go together".into(),
+                    });
+                }
+            };
             let sink = Arc::new(JsEventSink::new(on_events));
             piarc_core::CoreRuntime::start(config, sink).map(|core| Self { core })
         })

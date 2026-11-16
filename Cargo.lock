@@ -1397,6 +1397,7 @@ dependencies = [
  "napi-derive",
  "piarc-core",
  "piarc-protocol",
+ "serde",
  "serde_json",
 ]
 
