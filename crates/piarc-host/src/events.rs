@@ -67,7 +67,10 @@ pub enum HostEvent {
         /// Messages restored from its file.
         restored_messages: u64,
     },
-    /// A session open before a restart could not be reopened; it is forgotten.
+    /// A session open before a restart could not be reopened. Forgotten when the Agent Host
+    /// refused it (`error` not retryable); kept for the next restart after a timeout or a full
+    /// write queue. A connection that ends mid-restore reports nothing: the sessions not
+    /// restored yet are tried again on the next connection.
     SessionRestoreFailed {
         /// Connection the attempt was made on.
         epoch: u64,

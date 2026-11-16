@@ -627,8 +627,15 @@ impl Inner {
                     })
                     .await;
                 }
+                // The connection ended mid-restore: this is not the session's failure. Keep
+                // it and the ones not tried yet for the next connection.
+                Err(Error::Uncertain { .. } | Error::HostUnavailable { .. }) => return,
                 Err(error) => {
-                    lock(&self.shared.sessions).remove(&session_id);
+                    // A refusal or a malformed answer will not change on a retry; a timeout or a
+                    // full write queue leaves the session tracked for the next restart.
+                    if matches!(error, Error::Remote { .. } | Error::MalformedResult { .. }) {
+                        lock(&self.shared.sessions).remove(&session_id);
+                    }
                     self.emit(HostEvent::SessionRestoreFailed {
                         epoch,
                         session_id,

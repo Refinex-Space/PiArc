@@ -22,7 +22,7 @@ Core 侧的 Agent Host 监管：启动、握手、stdio 读写、背压、心跳
 
 - 任何非 `shutdown` 的结束（崩溃、启动失败、握手超时、心跳判定挂死、`kill()`）都计入 `RestartPolicy`：退避 1、2、4、8、16 s（上限 30 s），10 分钟滑动窗口内最多 5 次重启，下一次失败发 `GaveUp` 并停止。
 - 握手被拒（主版本不同、`host/hello` 格式错误）不重启，直接 `Stopped`。
-- 重启后对经 `create_session` 打开的会话依次 `session/resume`（带 `lastSeq`），失败的会话从跟踪表移除并发 `SessionRestoreFailed`。
+- 重启后对经 `create_session` 打开的会话依次 `session/resume`（带 `lastSeq`）：Agent Host 拒绝或答非所问的会话从跟踪表移除并发 `SessionRestoreFailed`；超时、写队列满的会话保留并发 `SessionRestoreFailed`；连接中途结束时停止本轮，未恢复的会话留到下一次连接（R1-A1）。恢复期间不响应关闭与 Kill（R1-A4，T14）。
 
 ## 背压
 

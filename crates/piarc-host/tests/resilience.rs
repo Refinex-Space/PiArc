@@ -678,3 +678,76 @@ async fn a_crash_ends_the_peers_of_requests_still_running() {
     .await;
     supervisor.shutdown().await;
 }
+
+#[tokio::test]
+async fn a_crash_during_restore_keeps_the_sessions_for_the_next_restart() {
+    let (crash_tx, crash_rx) = oneshot::channel::<()>();
+    let spawner = FakeSpawner::new(vec![
+        script(|mut host| async move {
+            host.hello("1.0", &[]).await;
+            host.accept_session("s1").await;
+            host.accept_session("s2").await;
+            let _ = crash_rx.await;
+            1
+        }),
+        // Crashes on the first resume, before answering it.
+        script(|mut host| async move {
+            host.hello("1.0", &[]).await;
+            host.request("session/resume").await;
+            1
+        }),
+        script(|mut host| async move {
+            host.hello("1.0", &[]).await;
+            for _ in 0..2 {
+                let (id, params) = host.request("session/resume").await;
+                host.respond(
+                    id,
+                    json!({ "sessionId": params["sessionId"], "restoredMessages": 0 }),
+                )
+                .await;
+            }
+            host.until_stdin_closes().await;
+            0
+        }),
+    ]);
+    let (supervisor, mut events) =
+        HostSupervisor::start(config(), deps(Arc::clone(&spawner), TestClock::new()));
+    until(&mut events, |e| matches!(e, HostEvent::Connected { .. })).await;
+    supervisor
+        .create_session("work space/项目", None)
+        .await
+        .expect("s1");
+    supervisor
+        .create_session("work space/项目", None)
+        .await
+        .expect("s2");
+    let _ = crash_tx.send(());
+    let (_, seen) = until(&mut events, |e| {
+        matches!(e, HostEvent::Connected { epoch: 3, .. })
+    })
+    .await;
+    assert!(
+        !seen
+            .iter()
+            .any(|e| matches!(e, HostEvent::SessionRestoreFailed { .. })),
+        "a lost connection is not a failed session: {seen:#?}"
+    );
+    let mut restored = Vec::new();
+    while restored.len() < 2 {
+        let (event, _) = until(&mut events, |e| {
+            matches!(e, HostEvent::SessionRestored { .. })
+        })
+        .await;
+        if let HostEvent::SessionRestored {
+            epoch: 3,
+            session_id,
+            ..
+        } = event
+        {
+            restored.push(session_id);
+        }
+    }
+    restored.sort();
+    assert_eq!(restored, ["s1", "s2"]);
+    supervisor.shutdown().await;
+}
