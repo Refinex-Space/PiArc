@@ -81,7 +81,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 ## 打包产物的测试入口（S6）
 
 - 开发构建的 Core 导出 `agentHostProbe`（从 `process.resourcesPath` 下的 `agent-host/` 按生产方式启动 Agent Host，跑一轮对话）与 `keychainProbe`；主进程测试钩子另有 `showNotification`。模型经测试数据目录的 `pi/models.json` 指向 mock provider，不需要额外的启动参数；发布构建没有这些导出。
-- `e2e/agent-host.e2e.ts`、`e2e/notification.e2e.ts` 只在 `packaged` 项目运行（`playwright.config.ts` 的 `testIgnore`）：`dev` 形态没有 `Resources/agent-host/`，签名也是 Electron 自己的。
+- `e2e/agent-host.e2e.ts`、`e2e/agent-host-kill.e2e.ts`、`e2e/notification.e2e.ts` 只在 `packaged` 项目运行（`playwright.config.ts` 的 `testIgnore`）：`dev` 形态没有 `Resources/agent-host/`，签名也是 Electron 自己的。`agent-host-kill.e2e.ts` 只在 Windows 运行：回合进行中 `taskkill /F` 主进程，检查 Job Object 结束 Agent Host 的整棵进程树（S8）。两者共用 `e2e/agent-host.ts` 的 `startMock`。
 
 ## 开发构建与发布构建
 
@@ -95,14 +95,17 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 导航被取消后 Playwright 定位器会一直等导航完成：拦截之后用 `page.evaluate` 检查，会触发导航的点击用 `page.mouse.click`。
 - 发布构建仍接受 Chromium 的 `--remote-debugging-port`（没有对应 fuse），登记为 I10。
 - 应用启动早期打印的日志行，L4 夹具接上 stdout 之前就被读走了；要断言启动状态，用测试钩子读主进程状态，不等日志。
-- `monitorEventLoopDelay` 记录的是两次采样之间的完整间隔，每个值都含采样间隔（钩子用 1 ms）；比较预算时按原始值算偏保守。
+- `monitorEventLoopDelay` 记录的是两次采样之间的完整间隔，每个值都含采样间隔（钩子用 1 ms）；比较预算时按原始值算偏保守。Windows 默认计时器粒度约 15.6 ms，1 ms 的采样实际约 15.6 ms 一次，空闲的 Node 就是 p50 15.6 ms、p99 16.6 ms（S2 报告第 8 节）：在 Windows 上要和同机空闲基线一起看。
 - 基准与 L4 都要开发版 Core：发布版没有测试钩子，`expectTestHooks` 会直接报错提示重新打开发构建。
 - Electron 的 `contentTracing` 输出 protobuf 追踪；要 JSON 就用 CDP 的 `Tracing.start`（`streamFormat: 'json'`），S1 基准就是这样做的。
 - 帧时间的口径：rAF 间隔与 `AnimationFrame`（LoAF 口径）在 60 Hz 屏上空闲时也约 16.7 ms，不能拿来和"p99 ≤ 16 ms"比；S1 基准用两次 `BeginMainThreadFrame` 之间主线程任务的总耗时（每帧工作量）。
-- 复制相关的 L4 会写系统剪贴板：用例经 `withSavedClipboard` 读出原内容、结束后写回（只恢复文本）。
+- 复制相关的 L4 会写系统剪贴板：用例经 `withSavedClipboard` 读出原内容、结束后写回（只恢复文本）。Windows 上 Chromium 以 CRLF 写纯文本，`readClipboard` 已规范为 LF。
+- Windows 上的系统通知：Electron 先发 `show`，系统拒绝（未经安装、没有带 AUMID 的开始菜单快捷方式，或用户关了通知）时再发 `failed`；以最后一个事件为准。
+- L4 里 `app.process().pid` 不一定是主进程（Windows 上可能是 Playwright 前面的启动器）：要主进程 pid 用 `app.evaluate(() => process.pid)`。
+- 从 Node 调 PowerShell 时关掉它的 stdin（`stdio: ['ignore', …]`），否则命令打印完结果还会一直等 stdin。
 - ProseMirror 自己在合成期间不分发按键，所以只测合成中的按键测不出守卫是否生效；`composer.e2e.ts` 另有"合成开始前到达的 229 按键"和"合成文本恰为 `@`、`/`"两类用例，去掉守卫时它们会失败。
 - 页面处理按键之后，经事件 MessagePort 投来的消息要到下一帧的 rAF 之后才被处理（`invoke` 的回复不受影响）：所以终端帧作为 `requestTerminalFrame` 的返回值送达，不要改回事件端口（ADR-0023，S7 报告第 5.2 节）。
-- 终端 L4（`terminal.e2e.ts`、`terminal-tui.e2e.ts`）用 `/bin/sh`、`cat`、`vim`、`top`，在 Windows 上跳过，由 W0 换成 Windows 程序。
+- 终端 L4（`terminal.e2e.ts`、`terminal-tui.e2e.ts`）按平台选程序：macOS 用 `/bin/sh`、`cat`、`vim`、`top`；Windows 用 cmd（`PROMPT=$$$S`）、PowerShell、Git 自带的 vim（由 `git --exec-path` 找到）与 `e2e/programs/show-keys.ts`（Node 直接运行 `.ts`）。ConPTY 下 conhost 会重新编码按键，Windows 版的按键用例只断言按键到达程序。
 - 不要在 `postPackage` 之前把内置 node 放进 bundle：fuses 插件与 `resealElectron` 的 `--deep` 会把它改成 ad-hoc 签名。新增随包的 Mach-O 文件放在 Resources 下即可，`signResourcesAndBundle` 会扫描签名；要保留原签名的目录加进 `keepSigned`。
 - 本机 Gatekeeper 评估被关闭时（`spctl --status` 为 `assessments disabled`），`spctl --assess` 一律显示 accepted，不能作为首次打开的证据；首次运行检查要在开启 Gatekeeper 的机器上做。
 - MCP 夹具要先 `npm pack` 再经 `npx --package <tgz>` 启动：`npx <目录>` 会链接目录并 chmod 其中的 bin，在 Agent Host 的 Seatbelt 下被拒绝（真实 MCP 包来自 registry 的 tarball，不受影响）。

@@ -2,7 +2,7 @@
 
 - 任务：T08（2026-11-15）
 - 范围：保险箱本身的正确性与安全性；它与 Pi 凭据接口的适配，包括多会话、多个 Agent Host 的缓存一致（架构第 5.4、9.1 节，ADR-0018 第 5 条）。
-- 结论：macOS **通过**。加解密往返正确，改动文件任一字节都读不出任何条目；主密钥在登录钥匙串中的创建、读取、删除与各错误路径符合状态表；Pi 1.5.2 的凭据注入点是异步接口，适配层按"启动取回、内存读、加锁写回"运行；一次登录、两个 Agent Host 的三个会话同时使用即将过期的 token，只刷新一次，所有请求都用新 token，保险箱与各会话一致；数据目录、日志与临时目录中搜不到明文，Agent Host 及其子进程的环境变量中没有凭据。设计决策见 ADR-0021。待 W0：Windows 凭据管理器实机与 Windows 数据目录扫描；待 T12：两次构建之间的钥匙串弹窗次数。
+- 结论：macOS **通过**。加解密往返正确，改动文件任一字节都读不出任何条目；主密钥在登录钥匙串中的创建、读取、删除与各错误路径符合状态表；Pi 1.5.2 的凭据注入点是异步接口，适配层按"启动取回、内存读、加锁写回"运行；一次登录、两个 Agent Host 的三个会话同时使用即将过期的 token，只刷新一次，所有请求都用新 token，保险箱与各会话一致；数据目录、日志与临时目录中搜不到明文，Agent Host 及其子进程的环境变量中没有凭据。设计决策见 ADR-0021。Windows（W0）**通过**：凭据管理器中主密钥的创建、读取、删除与"主密钥缺失"路径实机通过，测试条目已清理；Windows 上的数据目录、日志与临时目录扫描无明文，Agent Host 与 MCP server 的进程环境中没有凭据（第 12 节）。T12 已实测两次构建之间的钥匙串弹窗次数。
 
 ## 1. 验证环境
 
@@ -146,10 +146,10 @@ Core 侧测试（`crates/piarc-core/tests/secrets.rs`）：推送只发给订阅
 | 项 | macOS | 待验证 |
 |---|---|---|
 | 保险箱格式、篡改检测、原子写入 | 通过 | — |
-| 主密钥状态表与错误路径 | 通过（替身与真实登录钥匙串） | W0：Windows 凭据管理器实机 |
+| 主密钥状态表与错误路径 | 通过（替身与真实登录钥匙串） | Windows：通过（第 12 节） |
 | 适配层与 Pi 接口契约 | 通过 | — |
 | 多会话、多 Agent Host 的一致与只刷新一次 | 通过 | — |
-| 无明文、环境变量无凭据 | 通过 | W0：Windows 数据目录（`%LOCALAPPDATA%\PiArc\`）扫描与进程环境检查（本测试在 Windows 上不读取其他进程的环境，打印 NOT RUN） |
+| 无明文、环境变量无凭据 | 通过 | Windows：通过（第 12 节） |
 | 更新后最多一次钥匙串授权 | — | T12：两次打包构建之间实测 |
 
 其他：
@@ -157,3 +157,17 @@ Core 侧测试（`crates/piarc-core/tests/secrets.rs`）：推送只发给订阅
 - D2 已在本任务收尾后决定（`cn.piarc.desktop`），替换了开发期的占位标识 `PiArc.pending-D2`。占位标识只在未发布的开发构建中用过；如果本机开发构建在占位标识下存过凭据，新构建会得到 `masterKeyMissing`，删除数据目录下的 `secrets.vault` 后重新登录即可。
 - JavaScript 无法清零字符串，Agent Host 内存中的凭据在进程结束前一直存在；这与架构第 5.4 节"凭据只经 AHP 传给 Agent Host"一致，Seatbelt（T39）限制 Agent Host 的其他出口。
 - 日志与诊断包的自动脱敏（架构第 10.1 节）属于 `piarc-telemetry`，本任务只保证凭据值不进日志与错误信息。
+
+## 12. Windows（W0，2026-11-16）
+
+机器见 S2 报告第 8 节（Windows 11 专业版 25H2 26200.9974，x64，本地登录会话）。
+
+| 项 | 命令 | 结果 |
+|---|---|---|
+| 凭据管理器实机 | `PIARC_REQUIRE_KEYCHAIN=1 cargo test -p piarc-secrets --test system_store -- --nocapture` | 通过（`tmp/evidence/W0/s5-system-store.log`）：服务名 `piarc-test.a11.<pid>.<随机>.credential-vault`、账户 `master-key`。首次打开生成主密钥并写入凭据管理器，读回 32 字节密钥解密保险箱；删除后再读为无，保险箱返回 `masterKeyMissing`，第二次删除报告没有条目。之后 `cmdkey /list` 中没有 `piarc` 条目。凭据管理器没有交互授权，全程无对话框 |
+| 状态表的其余错误路径（拒绝、不可用、失败） | `cargo test -p piarc-secrets`、`cargo test -p piarc-core --test secrets` | 替身注入的用例在 Windows 上通过。要让真实凭据管理器拒绝或不可用，只能停用系统服务或改策略，属于系统配置变更，不做；Windows 的分类是 keyring-core 的 `NoStorageAccess` 为 `unavailable`、其余为 `failed`（第 4 节），实机没有遇到任何错误 |
+| 无明文与进程环境 | `cargo test -p piarc-testkit --test agent_host -- --nocapture credentials` | 通过（`tmp/evidence/W0/s5-credentials.log`）：两个 Agent Host、三个会话只刷新一次 token。数据目录、`pi/`、`sessions/`、工作区与 Core 日志共 12 个文件，加上测试期间写入 `%TEMP%` 的 35 个文件，都搜不到 token，`pi/` 下没有 Pi 自己的凭据文件。Bash 工具的环境（24 个变量）、Agent Host A 与 B、A 的 MCP server 的进程环境中都没有凭据 |
+
+进程环境检查原先在 Windows 上打印 `NOT RUN`。W0 增加了 `tests/agent_host/process-env.ps1`：它从目标进程的 PEB 读取环境块（`NtQueryInformationProcess` + `ReadProcessMemory`，作用与 macOS 的 `ps -E` 相同），现在这项检查在 Windows CI 上也会运行。
+
+数据目录：测试用临时数据目录（路径含空格与中文），与正式数据目录走同一套代码；正式的 `%LOCALAPPDATA%\PiArc\` 要到 T13 才有存储层写入，M0 的打包产物不在那里存凭据。

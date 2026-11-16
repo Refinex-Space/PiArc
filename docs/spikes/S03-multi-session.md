@@ -2,7 +2,7 @@
 
 - 任务：T06（2026-11-15）
 - 范围：同一个 Agent Host 进程用 Pi SDK 托管多个不同 cwd 的会话时，工具副作用、中断、压缩与 MCP 是否互不串扰（ADR-0010 的前提）。
-- 结论：macOS **通过**。工具、中断、压缩与 MCP 四项都按会话隔离，ADR-0010"每工作区一个 Agent Host"的前提成立，不触发"退回每会话一个进程"。两个附带发现不影响隔离结论：中断后的下一次请求出现相邻的 user 消息（I18），MCP server 按会话各起一份、尚未共享（T36）。Windows 由 CI 运行同一组测试，结果待推送后核对。
+- 结论：macOS **通过**。工具、中断、压缩与 MCP 四项都按会话隔离，ADR-0010"每工作区一个 Agent Host"的前提成立，不触发"退回每会话一个进程"。两个附带发现不影响隔离结论：中断后的下一次请求出现相邻的 user 消息（I18），MCP server 按会话各起一份、尚未共享（T36）。Windows **通过**（W0 本机复跑，第 6 节）。
 
 ## 1. 验证环境
 
@@ -90,4 +90,4 @@
 - S3 在 macOS 上通过：工具副作用、中断、压缩、MCP 均按会话隔离。
 - I18：中断后的对话形态（相邻 user 消息）由 T14 定义，届时恢复中断场景的 `role_order` 校验。
 - MCP 共享连接池（同一 server 只起一份）由 T36 实现；替换内置 MCP 扩展时保留"按会话 cwd 与信任加载配置"的行为。
-- Windows：同一组测试在 CI 的 `verify` 作业中运行（`cargo test --workspace`），结果待推送后核对。
+- Windows：W0 在 Windows 11 本机复跑通过（2026-11-16）：`cargo test -p piarc-testkit --test agent_host` 12 项，修复了两处只在 Windows 出现的测试问题（`canonicalize` 的 `\\?\` 路径让 Node 无法运行脚本；慢读者用例的 Windows 断言，见 S9 报告第 5 节）。CI 的 verify 在更早的 release 夹具失败处停止，下次推送后复核。

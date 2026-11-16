@@ -52,6 +52,9 @@
 
 ## 易错点
 
+- Windows：不要把 `canonicalize` 的结果（`\\?\C:\…` 形式）交给 Node 运行脚本，Node 会 `lstat 'C:'` 失败；仓库根用 `CARGO_MANIFEST_DIR` 的上两级。Core 报告的路径不带 `\\?\`，比较时用 harness 的 `canonical()`。
+- `credentials.rs` 在 Windows 上用 `tests/agent_host/process-env.ps1` 从 PEB 读另一个进程的环境块（对应 macOS 的 `ps -E`）。
+- 慢读者用例按平台断言：Windows 上 Node 写 stdout 同步阻塞，Core 停读期间 Pi 停在第一次模型请求（S9 报告第 5 节）。
 - 断流靠 `body.rs` 的 `ScriptBody::aborted`：最后一块之后先返回一次 `Pending` 让 hyper 把已写数据刷到 socket，再返回错误让 hyper 关闭连接。直接返回错误会丢掉已缓冲的事件。挂起（`stalled`）在最后一块之后一直返回 `Pending` 且不唤醒，客户端关闭连接时 hyper 丢弃响应体。
 - 参数分段按字符而不是字节计偏移；`split_at` 的每个偏移必须严格递增且落在 `(0, 长度)` 内，加载时检查。
 - 工具参数以紧凑 JSON、键按字典序流出（serde_json 默认），断言拼接结果时用同样的序列化。

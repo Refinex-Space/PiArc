@@ -2,6 +2,7 @@
 
 - 任务：T09（2026-11-15）。Windows 部分（微软拼音、Windows 上的性能测量）由 W0 完成。
 - 结论（macOS）：**通过**。第 11 章的流式、滚动、冷加载与渲染进程内存四项预算全部满足；跨块选择复制、XSS 载荷、输入法守卫的自动化用例全部通过。真实输入法（macOS 拼音、日文）的人工核对列在第 7 节，待用户完成后补记。
+- 结论（Windows，W0）：自动化部分**通过**：L4 的 transcript 与 composer 用例两种形态通过；流式、滚动、冷加载、渲染进程内存四项预算满足；全部进程合计 450 MiB，与 macOS 同样超出第 11 章的 450 MB（I26）。微软拼音的实机核对见第 8 节。
 - 库选型：ADR-0022（@tanstack/react-virtual、marked 词法器、shiki JavaScript 正则引擎；composer 为 ProseMirror）。
 
 ## 1. 验证环境
@@ -120,11 +121,25 @@ open "apps/desktop/out/development/PiArc-darwin-arm64/PiArc.app"
 | M9 | 流式中拖动滚动条向上、按 PageUp | 都解除跟随 |
 | M10 | 选中一段跨段落和代码块的文字按 ⌘C，粘贴到文本编辑器 | 文本顺序正确、代码缩进保留，不含"ts"语言标签和"Copy Markdown"按钮文字 |
 
-## 8. 待 W0 的项
+## 8. Windows（W0，2026-11-16）
 
-- 微软拼音（Windows 11）：第 7 节 M1–M4 的同类核对，以及 CDP 用例在 Windows 上的结果（CI 的 L4 作业会运行同一组用例）；
-- Windows 上运行 `npm run bench:s1 -- --form packaged`，对照第 11 章的 Windows 基准机型；
-- Windows 的滚动条（经典样式）拖动与触控板/精确式触摸板滚动的手感。
+机器与对照见 S2 报告第 8 节（i5-1340P、16 GB、NVMe，Windows 11 专业版 25H2 26200.9974，x64）。窗口 1280 × 800，缩放 1，显示刷新率 75 Hz（Iris Xe 核显）。
+
+**自动化用例**：L4 的 `transcript-*.e2e.ts`、`composer.e2e.ts` 在开发与打包两种形态通过（本机全量 138 项）。CI 的 Windows 作业原先在三个复制用例上失败：Chromium 在 Windows 上把纯文本以 CRLF 写进剪贴板，用例按 LF 比较，复制内容本身正确。读剪贴板的辅助函数改为把 CRLF 规范为 LF 后通过（提交 9d6b01b）。
+
+**测量**（`npm run bench:s1 -- --form packaged`，`tmp/evidence/W0/bench/s1-packaged.json`）：
+
+| 项 | Windows | 预算 | macOS（第 4 节） |
+|---|---|---|---|
+| 100 token/s 流式 60 s | 每帧主线程工作 p50 1.6 ms、p99 4.7 ms、max 13.8 ms；超过 50 ms 的任务 0；75 Hz 下帧间隔 p99 13.6 ms，丢帧 0 | 无长任务；帧时间 p99 ≤ 16 ms | p99 5.7 ms |
+| 1 万条滚动 10 s | 75.1 fps，每帧工作 p99 2.6 ms；超过 16 ms 的帧 2 个（最长 21.9 ms），合成器丢 1 帧 | 60 fps | 60 fps |
+| 冷加载 1,000 条 | 中位 80.9 ms，最大 88.5 ms（5 次） | ≤ 300 ms | 52 ms |
+| 渲染进程内存 | 1,000 条时 137 MiB；空页面 96 MiB | ≤ 220 MB | 179 MiB |
+| 全部进程合计（不含 Agent Host） | 450.0 MiB（472 MB）：主进程 120 MiB、GPU 137 MiB、Utility 56 MiB、渲染进程 137 MiB | ≤ 450 MB | 489 MiB |
+
+全部进程合计超出预算约 22 MB，与 macOS 的 I26 同类；Windows 的主进程比 macOS 小（120 对 179 MiB），GPU 进程更大，由 R1 与 I12、I26 一起校准。
+
+**微软拼音与手感**：实机核对清单见 `S06-first-run-checklist.md` 第 8.2 节 WM1–WM4，结果待填。日文输入法需要安装语言包，属于系统配置变更，W0 不做，记"未验证"。滚动条拖动与精确式触摸板手感需要人工操作，本次只有自动化的拖动用例（`transcript-scroll.e2e.ts` 的"dragging the scrollbar releases following"通过）。
 
 ## 9. 发现与遗留
 

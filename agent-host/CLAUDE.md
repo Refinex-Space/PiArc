@@ -70,6 +70,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - Pi 1.5.2 的 read 在 Operations 之外 `access` 路径、write 与 edit 对路径 `realpath`、grep 自己跑 ripgrep（S4 第 2 节）。升级 Pi 后先跑端到端测试：I/O spy（场景期间对工作区路径零 `fs`、零 `child_process`）与行为对照会发现新的绕过与行为变化。
 - Pi 的 `withFileMutationQueue` 按替身排队，不起串行作用；Write、Edit 用 `stand-in.ts` 的 `serialized`。
 - 工具 I/O 与会话通知走同一个 stdout：Core 停止读取（事件消费者停住）时工具也等着，这是背压，不是死锁（I19）。
+- Windows 上 Node 写管道式 stdout 是同步的（`net.Socket` 对 fd 1、2 的管道 `setBlocking(true)`）：管道满时写入本身阻塞，整个事件循环停住，`OutboundQueue` 几乎不排队，也不会出现 `drain` 等待；Core 恢复读取后一切照常（S9 报告第 5 节）。
 - 文本写入按 256 Ki 个 UTF-16 码元分段（`fs/write` 的 `append`），不能在代理对中间切；读取按 Core 返回的 `bytesRead` 续读。
 - 委托的 Bash 不读 Pi 设置的 `shellPath`、`shellCommandPrefix`，Read 不读 `images.autoResize`（I21）；命令环境是 Core 的白名单环境加 Pi 的会话变量，看不到 Agent Host 自己的 `PI_*` 内部变量。
 

@@ -6,7 +6,7 @@
   1. "超过阈值的批次用 `ArrayBuffer` 转移所有权"在 Electron 45 上做不到（`MessagePortMain` 只能转移端口）。[ADR-0019](../adr/0019-event-batches-copied-not-transferred.md) 已接受：批次一律复制转发，实测代价很小（第 4.3 节）。
   2. 主进程空闲 RSS 160–164 MB，超出第 11 章 120 MB 的初始预算（不属于 S2 的通过标准），但其中约 155 MB 是不加载 Core 的裸 Electron 自身，Core 与应用代码只占约 5–8 MB。预算由 R1 校准（登记事项 I12）。
 
-  Windows **未验证**：win32-x64 的实机基准、win32-arm64 的实机加载留给 W0；CI 的 `core-load` 作业已配置在 `windows-latest` 与 `windows-11-arm` 上加载，结果待推送后核对。
+  Windows（W0）**有条件通过**：win32-x64 与 win32-arm64 都能加载（CI `core-load`，arm64 为 GitHub 的 arm64 Windows 11 runner），实机基准无丢失、无乱序，同步调用 p99 0.008 ms，空闲主进程 108.4 MB。主进程事件循环延迟按原始值 p99 16.81 ms，超出 16 ms：Windows 的计时器粒度约 15.6 ms，同一台机器上空闲的 Node 就是 p50 15.56 ms、p99 16.58 ms，满载只多 0.23 ms。Core 没有造成可见的阻塞，ADR-0014 的触发条件不成立；Windows 上这项指标的测量口径交 R1 校准（第 8 节）。
 
 ## 1. 验证环境
 
@@ -92,8 +92,8 @@ max 38 ms 是 5 分钟内的单次尖峰，p99 远低于预算。
 |---|---|---|---|
 | darwin-arm64 | 本机 `@napi-rs/cli` 构建通过；CI `core-build` 已配置 | 本机 Node 24.14.1 与 Electron 45.3.2 中开发版与发布版都通过；L4 两种形态通过；CI `core-load`（`macos-latest`）待推送 | `tmp/evidence/T04/load-darwin-arm64.log` |
 | darwin-x64 | 本机交叉构建（`x86_64-apple-darwin`）通过 | 本机 Rosetta 2 下的 x64 Electron 45.3.2（官方发布包，SHA-256 已核对）中开发版与发布版都通过；CI `core-load`（`macos-15-intel`）待推送 | `tmp/evidence/T04/load-darwin-x64-rosetta.log` |
-| win32-x64 | CI `core-build`（`windows-latest`，MSVC）已配置，待推送 | CI `core-load`（`windows-latest`）与 `desktop` 作业的 L4 已配置，待推送；实机基准待 W0 | — |
-| win32-arm64 | CI `core-build`（`windows-latest` 交叉构建）已配置，待推送 | CI `core-load`（`windows-11-arm`）已配置，待推送；实机加载待 W0 | — |
+| win32-x64 | CI `core-build`（`windows-latest`，MSVC）通过（运行 43827342553）；W0 本机 `npm run build:core -- --flavor all` 通过 | CI `core-load`（`windows-latest`）开发版与发布版在 Node、Electron 中通过；W0 本机同样通过，L4 两种形态通过，实机基准见第 8 节 | `tmp/evidence/W0/` |
+| win32-arm64 | CI `core-build`（`windows-latest` 交叉构建）通过 | CI `core-load`（`windows-11-arm`，镜像 `windows-11-vs2026-arm64`）开发版与发布版在 Node 24.22.2、Electron 45.3.2 中通过；没有本地 arm64 设备 | CI 运行 43827342553 |
 
 加载检查的内容：在 Node 与 Electron 中 `process.dlopen`，开发版跑 2,000 个演示事件（全部到达、序号连续）、`triggerPanic` 得到 `internalError`、有序关闭后状态为 `stopped`；发布版只检查创建与关闭。
 
@@ -113,5 +113,33 @@ max 38 ms 是 5 分钟内的单次尖峰，p99 远低于预算。
 
 ## 7. 后续
 
-- W0：win32-x64 实机运行 `npm run bench:s2 -- --form packaged`，win32-arm64 实机加载（`node scripts/ci/load-core.mjs`）。
-- R1：按第 4.4 节的数据校准主进程内存预算（I12）。
+- R1：按第 4.4 节的数据校准主进程内存预算（I12）；按第 8 节校准 Windows 上事件循环延迟的测量口径。
+
+## 8. Windows（W0，2026-11-16）
+
+| 项 | 内容 |
+|---|---|
+| 机器 | HUAWEI 笔记本，Intel Core i5-1340P（4 个性能核 + 8 个能效核，16 线程），16 GB，NVMe SSD 1 TB；Windows 11 专业版 25H2（10.0.26200.9974），x64；接交流电，平衡电源计划；Defender 实时保护开启；运行时还开着微信、IDE 等常驻程序 |
+| 对照第 11 章基准机型 | x64 8 核 / 16 GB / NVMe：核数、内存、磁盘都满足；能效核与笔记本散热使它弱于台式机，数据偏保守 |
+| 产物 | 本机开发构建打包（`npm run package:desktop -- --flavor development`），Electron 45.3.2 |
+
+`npm run bench:s2 -- --form packaged`（`tmp/evidence/W0/bench/s2-packaged.json`）：
+
+| 项 | Windows | 预算 | macOS（第 4 节） |
+|---|---|---|---|
+| 10 万事件/分钟 × 5 分钟 | 50 万个全部到达，乱序 0；9,974 次回调（33.0 次/秒），每批 50.1 个 | 无丢失、无乱序 | 同 |
+| 同步调用 `echo` | p50 0.003 ms，p99 0.008 ms，max 1.44 ms | p99 ≤ 1 ms | p99 约 0.01 ms |
+| 主进程事件循环延迟（原始值，1 ms 采样） | p50 15.35 ms，p99 16.81 ms，max 36.47 ms | p99 ≤ 16 ms | p99 3.58 ms |
+| 同机空闲 Node 24.13.1 的同一测量 | p50 15.56 ms，p99 16.58 ms，max 16.79 ms | — | 1 ms 采样时 p50 约 1.2 ms |
+| 每次投递的主进程转发 | p50 0.098 ms，p99 0.214 ms | — | — |
+| 1 / 4 / 8 MiB 批次转发 | p50 1.63 / 5.08 / 10.74 ms；同期事件循环 p99 16.89 / 16.42 / 21.32 ms | 完整到达 | — |
+| 空闲主进程 RSS | 108.4 MB；裸 Electron 96.1 MB | ≤ 120 MB | 160–164 MB |
+
+分析：
+
+- **事件循环延迟的原始值受 Windows 计时器粒度支配。** 1 ms 的采样定时器在 Windows 默认计时器精度下约 15.6 ms 才触发一次，`monitorEventLoopDelay` 记录的是两次采样的完整间隔，所以空闲的 Node 进程也是 p50 15.56 ms、p99 16.58 ms。满载的 p99 只比空闲多 0.23 ms，事件流没有让主进程出现可见的阻塞。同一机器上 S7 的 `type` 100 MB 期间 p50 为 4.12 ms（S7 报告第 11 节），说明 Chromium 在有渲染负载时提高了计时器精度，同一指标的底数随负载变化。
+- 按原始值，p99 16.81 ms 超出预算 0.81 ms，这里如实记录为"原始值不通过"，预算不改。8 MiB 批次期间的 21.3 ms 是一次 10.7 ms 复制转发叠加在 15.6 ms 底数上的结果，与 macOS 的分析一致（ADR-0019 已接受复制转发）。
+- **空闲内存比 macOS 低**：Windows 上裸 Electron 96.1 MB，含 Core 108.4 MB，在 120 MB 预算内；Core 与应用代码约 12 MB。I12 的校准要分平台写。
+- 结论：**有条件通过**。功能性标准（无丢失、无乱序、四个目标加载）全部达标；事件循环延迟的测量口径在 Windows 上需要 R1 校准，例如扣除同机空闲基线，或改为测量每次回调的执行时长。
+
+win32-arm64：没有本地 arm64 设备。CI 的 `core-load` 在 GitHub 的 arm64 Windows 11 runner（真实 arm64 硬件上的 Windows 11）上通过，开发版跑完 2,000 个事件。W0 给加载检查加了一项终端检查，在 PTY 中运行命令，并从 libghostty-vt 的帧中读回输出（`scripts/ci/core-load-check.mjs`），本机 x64 四种组合通过。arm64 上 libghostty-vt 的实际运行要等下一次 CI 才有结果，由 R1 核对（S7 报告第 11 节）。

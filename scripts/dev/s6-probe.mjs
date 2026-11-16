@@ -1,7 +1,9 @@
-// The steps of the S6 first-run checklist that need a person at the Mac
+// The steps of the S6 first-run checklist that need a person at the Mac or the Windows PC
 // (docs/spikes/S06-first-run-checklist.md). Each command launches an installed
 // development-flavor PiArc with Playwright (it needs the `--inspect` fuse of development
-// builds) and calls a Core test export or main-process test hook.
+// builds) and calls a Core test export or main-process test hook. `--app` is the .app bundle
+// on macOS and PiArc.exe on Windows (default: the Velopack install,
+// %LOCALAPPDATA%\cn.piarc.desktop\current\PiArc.exe); `variant` and `keychain` are macOS only.
 //
 //   node scripts/dev/s6-probe.mjs serve <file> [--port 8765]
 //       Serves one file over http://127.0.0.1:<port>/ so a browser download gets the
@@ -39,7 +41,15 @@ import { signBundle } from '../../apps/desktop/packaging/macos-sign.mjs';
 
 import { isMain, repoRoot, run } from '../lib/repo.mjs';
 
-const DEFAULT_APP = '/Applications/PiArc.app';
+const DEFAULT_APP =
+  process.platform === 'win32'
+    ? path.join(
+        process.env.LOCALAPPDATA ?? os.homedir(),
+        'cn.piarc.desktop',
+        'current',
+        'PiArc.exe',
+      )
+    : '/Applications/PiArc.app';
 const DEFAULT_KEYCHAIN_DIR = path.join(os.tmpdir(), 'piarc-s6-keychain-probe');
 
 /**
@@ -50,9 +60,11 @@ const DEFAULT_KEYCHAIN_DIR = path.join(os.tmpdir(), 'piarc-s6-keychain-probe');
  * @returns {Promise<T>}
  */
 async function withApp(appPath, fn) {
-  const executable = path.join(appPath, 'Contents', 'MacOS', 'PiArc');
+  const executable = appPath.endsWith('.app')
+    ? path.join(appPath, 'Contents', 'MacOS', 'PiArc')
+    : appPath;
   if (!existsSync(executable)) {
-    throw new Error(`${executable} not found; pass --app <path to PiArc.app>`);
+    throw new Error(`${executable} not found; pass --app <PiArc.app or PiArc.exe>`);
   }
   const userData = await mkdtemp(path.join(os.tmpdir(), 'piarc-s6-probe-'));
   const app = await electron.launch({
@@ -62,7 +74,7 @@ async function withApp(appPath, fn) {
   try {
     const hasHooks = await app.evaluate(() => globalThis.__piarcTestHooks !== undefined);
     if (!hasHooks) {
-      throw new Error('This build has no test hooks: install the development-flavor DMG.');
+      throw new Error('This build has no test hooks: install a development-flavor build.');
     }
     return await fn(app);
   } finally {

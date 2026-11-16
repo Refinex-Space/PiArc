@@ -79,6 +79,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - 改了 `piarc-protocol` 的类型却没运行 `npm run gen:protocol`，verify 的"protocol drift"会失败；新增契约没有样本与反例，"contract samples"会失败。
 - 第一次构建 `piarc-ghostty-sys`（任何依赖 `piarc-core` 的构建）会联网下载 libghostty-vt 预编译产物到 `.tools/cache/ghostty-vt/`，并校验 SHA-256 与 minisign 签名；校验失败直接报错，不会重下。离线时设 `PIARC_GHOSTTY_VT_OFFLINE=1` 并预先填好缓存（`PIARC_GHOSTTY_VT_CACHE` 可换目录），详见 `crates/piarc-term/CLAUDE.md`。
 - Windows 的 Core 模块依赖同目录下的 `ghostty-vt.dll`：手工拷 `.node` 时要一起拷（`build:core` 与打包会处理）。
+- Windows 开发环境：Visual Studio Build Tools（MSVC 与 Windows SDK）、Git for Windows（委托的 Bash 用 Git Bash，终端 L4 用它自带的 vim）、Node 24；`npm run verify` 与 L4 在 Windows 上都能完整运行。Windows 专有的行为差异（ConPTY、同步的 stdout、计时器粒度、`\\?\` 路径）见 `crates/piarc-term`、`agent-host`、`apps/desktop`、`crates/piarc-testkit` 的 CLAUDE.md 与 S2、S7、S9 报告。
 - 改了终端帧的编码或格式，要用 `PIARC_UPDATE_FRAME_SAMPLES=1 cargo test -p piarc-term --test consistency` 重写 TS 共享样本，否则 Rust 与 TS 两侧的样本检查都会失败。
 - 改了 `piarc-napi` 的导出却没运行 `npm run build:core -- --flavor all`，verify 的"Core module + API snapshot"会失败。源码树运行应用、L4 的 `dev` 形态、Vitest 的 Core 集成测试都加载 `target/piarc-core/development/` 下的模块，缺了会直接报错（`package:desktop` 会先构建它）。
 - 需要保留 CRLF 的测试夹具放在 `fixtures/crlf/` 目录下，其余文本文件都会被 `.gitattributes` 规范为 LF。

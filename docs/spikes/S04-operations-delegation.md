@@ -2,7 +2,7 @@
 
 - 任务：T07（2026-11-15）
 - 范围：Pi 的内置工具能否经 Operations 把 I/O 全部交给 Core；能否改为 Claude Code 的规范名、换上 PiArc 自写的描述，而行为与 Pi 原生一致（架构第 6.1.1、6.1.3 节，ADR-0004）。本任务把 Glob、Grep 也纳入。
-- 结论：macOS **通过**。Read、Write、Edit、Bash、Glob、Grep 六个规范名工具的文件与命令 I/O 全部经 AHP 到 Core；场景运行期间 Agent Host 进程对工作区路径的 `fs` 调用为 0、`child_process` 调用为 0；16 个对照场景与 Pi 原生工具结果一致，1 项有意差异；小文件 `fs/read` 往返 p95 约 0.2 ms。Pi 1.5.2 的 Operations 本身**不足以**做到零绕过：read、write、edit 在 Operations 之外探测路径，grep 直接运行 ripgrep。前三者改用"替身路径"运行 Pi 的工具代码，Grep 改为 PiArc 自写的同名工具（ADR-0020）。Windows 以 CI 结果为准，尚未取得，由 W0 核对。
+- 结论：macOS **通过**。Read、Write、Edit、Bash、Glob、Grep 六个规范名工具的文件与命令 I/O 全部经 AHP 到 Core；场景运行期间 Agent Host 进程对工作区路径的 `fs` 调用为 0、`child_process` 调用为 0；16 个对照场景与 Pi 原生工具结果一致，1 项有意差异；小文件 `fs/read` 往返 p95 约 0.2 ms。Pi 1.5.2 的 Operations 本身**不足以**做到零绕过：read、write、edit 在 Operations 之外探测路径，grep 直接运行 ripgrep。前三者改用"替身路径"运行 Pi 的工具代码，Grep 改为 PiArc 自写的同名工具（ADR-0020）。Windows **通过**（W0 本机复跑，第 11 节）。
 
 ## 1. 验证环境
 
@@ -154,4 +154,4 @@ read、write、edit 的探测只依赖传给工具的 `path` 字符串。PiArc �
 
 - macOS：**通过**。六个规范名工具的 I/O 全部经 Core，Agent Host 在场景运行期间零直接调用，对照场景一致（1 项有意差异已列出原因），往返耗时远低于预算。
 - 附加条件：read、write、edit 依赖"Pi 只在 Operations 之外按传入的路径做探测"这一事实，grep 是 PiArc 自写（ADR-0020）。Pi 升级时由运行时 spy 测试与对照测试把关。
-- Windows：CI 的 `verify` 作业运行同一组测试（Git Bash 下的 `exec/run`、路径与换行），结果待推送后核对；未取得时由 W0 核对。
+- Windows：W0 在 Windows 11 本机复跑通过（2026-11-16）：`cargo test -p piarc-testkit --test agent_host` 12 项，修复了两处只在 Windows 出现的测试问题（`canonicalize` 的 `\\?\` 路径让 Node 无法运行脚本；慢读者用例的 Windows 断言，见 S9 报告第 5 节）。CI 的 verify 在更早的 release 夹具失败处停止，下次推送后复核。Git Bash 下的 `exec/run`、路径与换行、与 Pi 原生工具的对照（`parity.rs`，用 `.tools/bin` 的 rg 与 fd）都通过。另修了 `core-io.test.ts`：Pi 在 Windows 上把单字母根目录 `/w` 当作 Git Bash 写法的盘符 `W:\`。

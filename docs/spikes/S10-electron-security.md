@@ -2,7 +2,7 @@
 
 - 任务：T03（2026-11-14）
 - 范围：S10 中 CSP、导航、IPC、fuses 这一层。Markdown 渲染路径上的 XSS 载荷集由 T09 完成（结果见 `S01-transcript-composer.md` 第 5 节），S10 的整体结论由 R1 汇总。
-- 结论：macOS 上 T03 负责的部分**通过**；Windows **未验证**，CI 的 `desktop` 作业已配置，结果待首次推送后由下一个任务或 W0 核对。
+- 结论：macOS 上 T03 负责的部分**通过**；Windows（W0）**通过**：本机按 CI `desktop` 作业的步骤运行，开发构建打包、L4 两种形态（含全部安全用例）、发布构建打包与 fuse 校验都通过（第 8 节）。
 
 ## 1. 验证环境
 
@@ -109,7 +109,10 @@ ADR-0013 的触发条件"威胁模型中的某项对策必须放松 Electron 安
 
 ## 8. 后续
 
-- Windows：CI `desktop` 作业（冒烟、安全用例、fuse 校验）的结果在推送后核对；W0 只补测 CI 覆盖不到的部分。
+- Windows（W0，Windows 11 专业版 25H2，机器见 S2 报告第 8 节）：
+  - CI 运行 43827342553 的 Windows `desktop` 作业中，安全与冒烟用例全部通过，只有三个复制用例因剪贴板 CRLF 在两种形态下失败（共 6 项），fuse 校验步骤因此没有运行。
+  - 本机修复读剪贴板的辅助函数后（提交 9d6b01b），按同款步骤运行：`package:desktop -- --flavor development`；`test:e2e` 两种形态 138 项全部通过，含新改为 Windows 程序的终端用例与 `agent-host-kill.e2e.ts`；`package:desktop` 发布构建后 `check:fuses` 9 项一致。
+  - 下一次推送后 CI 复核。
 - T09：Markdown 渲染路径的 XSS 载荷集（已完成：`src/shared/xss-payloads.ts`、`e2e/transcript-security.e2e.ts`；ESLint 禁止渲染进程使用 `innerHTML` 等 HTML 字符串入口）。
 - T12：应用标识（D2）确定后，协议名 `app` 与 bundle id（当前为打包工具默认的 `com.github.Electron`）随之确定；签名与安装包。
 - T18：替换 Electron 默认菜单；权限放行清单按功能需要增加时，在 `PERMISSION_ALLOWLIST` 中写理由并补用例。

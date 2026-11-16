@@ -3,7 +3,7 @@
 | 项 | 内容 |
 |---|---|
 | 任务 | T12（2026-11-16） |
-| 结论 | macOS：有条件通过。arm64 与 x64 的 DMG、ZIP 本机产出，分层 ad-hoc 签名与 fuse 检查通过；hardened runtime 可以启用（需 `disable-library-validation`）；打包产物经 `sandbox-exec` 宽松配置启动内置 node 完成 mock 对话，bash、grep、find、git、`worker_threads`、npx 拉起 MCP、原生模块正常，越界写入被拒；发布清单签名与三种篡改用例通过；arm64 DMG 168.8 MB、安装后 449.0 MB，都在预算内（后者只余约 1 MB）。钥匙串每次更新弹 1 次（用户实机确认）；系统通知可用，允许后横幅显示，但程序侧 `show` 不反映是否允许（I43）；Gatekeeper 开启时的首次打开未验证（用户的 Mac 关着 Gatekeeper，I42）。Windows：CI 配置就绪，产物与实机待推送后的 CI 与 W0 |
+| 结论 | macOS：有条件通过。arm64 与 x64 的 DMG、ZIP 本机产出，分层 ad-hoc 签名与 fuse 检查通过；hardened runtime 可以启用（需 `disable-library-validation`）；打包产物经 `sandbox-exec` 宽松配置启动内置 node 完成 mock 对话，bash、grep、find、git、`worker_threads`、npx 拉起 MCP、原生模块正常，越界写入被拒；发布清单签名与三种篡改用例通过；arm64 DMG 168.8 MB、安装后 449.0 MB，都在预算内（后者只余约 1 MB）。钥匙串每次更新弹 1 次（用户实机确认）；系统通知可用，允许后横幅显示，但程序侧 `show` 不反映是否允许（I43）；Gatekeeper 开启时的首次打开未验证（用户的 Mac 关着 Gatekeeper，I42）。Windows（W0，第 9 节）：CI 产出 x64、arm64 的 Velopack 安装包与 0.0.1、0.0.2 两个版本；本机发布构建 fuse 与布局检查通过；打包产物经 Job Object 启动内置 node 完成 mock 对话（含 npx 拉起 MCP）；delta 包能把 0.0.1 重建成与 0.0.2 内容一致的完整包。安装、更新、卸载与 SmartScreen 见第 9.3 节 |
 | 代码 | `apps/desktop/packaging/`（布局、签名、DMG maker、Velopack 绑定）、`scripts/dev/fetch-binaries.mjs` + `third-party/binaries.lock.json`、`crates/piarc-core/src/agent_host.rs`（`BundledRuntime`、`start_bundled`）、`crates/piarc-sandbox/src/seatbelt.rs`（Agent Host 配置）、`crates/piarc-core/src/release.rs`、`scripts/release/` |
 | 测试 | `apps/desktop/e2e/agent-host.e2e.ts`、`notification.e2e.ts`；`crates/piarc-core/tests/release.rs`、`agent_host_probe.rs`；`scripts/ci/check-app-layout.mjs`；`scripts/release/release-manifest.test.mjs`、`scripts/lib/blake2b.test.mjs` |
 | 实机清单 | [S06-first-run-checklist.md](S06-first-run-checklist.md) |
@@ -144,13 +144,46 @@ macOS 的隐私授权（"文稿""桌面"、下载文件夹等）按"负责进程
 
 arm64 `.app` 各部分（KiB）：Electron Framework 255,872；四个 Helper 各 232；`app.asar` 3,052；`app.asar.unpacked`（Core）3,280；`agent-host/node` 148,784（其中 node 可执行文件 122.6 MB，npm 17,456 KiB，npm 自带的 docs 与 man 约 3.2 MiB）；`agent-host.mjs` 15,424；rg + fd 6,820；photon-node 2,584。安装后体积已经贴着预算，后续任何随包内容都会超出；按任务要求本任务不裁剪，登记为 I41 交 R1 决定（可选的方向：裁掉 npm 包内的文档与 man 页、压缩 bundle、为 x64 与 arm64 之外不另出通用包）。
 
-Windows x64 安装包体积在 CI 产物取得后补记（W0）。
+Windows x64 的体积见第 9.2 节。
 
-## 9. Windows（待 CI 与 W0）
+## 9. Windows
 
 - CI 作业 `package-windows`：x64 与 arm64（arm64 在 x64 runner 上交叉构建 Core），开发构建（带 W0 需要的测试入口），`check:fuses` 与布局检查，`vpk pack` 出 0.0.1 与 0.0.2 两个版本到同一个发布目录。actionlint 1.7.12 对 `.github/workflows/ci.yml` 无报错（`tmp/evidence/T12/actionlint.txt`；shellcheck 未安装，相关规则未运行）。
 - Velopack 接入：主进程最先运行 `VelopackApp.build().run()`（只在打包后的 Windows 构建，绑定从 app.asar 的 `node_modules` 加载，只带目标架构的 `.node`）；`vpk` 对非 .NET 主程序跳过 VelopackApp 检查。pack id 与快捷方式的 AUMID 都是 `cn.piarc.desktop`，与主进程 `app.setAppUserModelId` 一致；pack id 不能用 `PiArc`，否则安装目录 `%LocalAppData%\PiArc` 与数据目录重合，卸载会删掉数据。
-- 待 W0：安装（按用户、无 UAC）、启动后经 Job Object 运行 Agent Host 并完成 mock 对话、卸载残留、相邻版本更新、SmartScreen、智能应用控制、安装包与安装后体积、Defender 表现；Windows 上 AUMID 与 Velopack 快捷方式是否一致、通知是否显示。
+
+### 9.1 CI 与本机检查（W0，2026-11-16）
+
+机器见 S2 报告第 8 节（Windows 11 专业版 25H2 26200.9974，x64）。
+
+- CI 运行 43827342553（提交 1ab2417）：`package Windows (x64)`、`package Windows (arm64)` 通过。x64 产物 `piarc-windows-x64-velopack` 包含：
+  - `cn.piarc.desktop-0.0.1-win-x64-full.nupkg` 与 `0.0.2-full.nupkg`（各 207.8 MiB）；
+  - `0.0.2-delta.nupkg`（1.0 MiB）；
+  - `cn.piarc.desktop-win-x64-Setup.exe`（214.9 MiB，安装最新版 0.0.2）；
+  - `Portable.zip`、`releases.win-x64.json`、`RELEASES-win-x64`。
+- 本机发布构建：`npm run package:desktop` 之后，`npm run check:fuses` 9 项全部与发布配置一致，`check-app-layout.mjs --flavor release` 10 项通过（`tmp/evidence/W0/check-fuses.log`、`check-layout-release.log`）。
+- 打包产物的 Agent Host：L4 `agent-host.e2e.ts`（打包形态）在 Windows 上通过。Core 经 Job Object 用内置 `node.exe` 启动 Agent Host，完成 Bash（Git Bash）、Grep、Glob 与内置 npx 拉起的 MCP 一轮 mock 对话。结束主进程后，Agent Host 的进程树全部退出（S8 报告第 10 节）。
+- 通知（L4 `notification.e2e.ts`）：Windows 上 Electron 先发 `show`，系统拒绝时随后再发 `failed`。本机这次是 `failed`："Settings prevent the notification type from being delivered"，因为打包目录里的开发构建没有带 AUMID 的开始菜单快捷方式，或者系统通知设置挡住了它。CI 的 Windows runner 上只有 `show`。与 macOS 不同，Windows 上的 `failed` 能反映投递被拒（I43 的 Windows 部分），用例改为允许 `show` 之后跟 `failed`。
+- 更新包：用 Portable 包里的 `Update.exe patch` 把 `0.0.1-full` 加 `0.0.2-delta` 重建为完整包，用时 34 s。重建包的 SHA-256 与 CI 的 `0.0.2-full` 不同（zip 重新组装），但 2,026 个文件的名称、大小与 CRC 全部一致。这正是 UpdateManager 下载 delta 后要做的一步。
+- 安全设置（只读注册表，未改）：
+  - 智能应用控制 `VerifiedAndReputablePolicyState=0`（关）；
+  - 资源管理器的 SmartScreen"检查应用和文件"为 `Off`；
+  - Defender 实时保护开启。
+  
+  所以在这台机器上运行安装包时，资源管理器层面的 SmartScreen 拦截不会出现（与 macOS 上 Gatekeeper 被关闭同类，I42）。以用户在"Windows 安全中心"界面看到的状态为准（检查清单第 8.1 节 W1）。
+
+### 9.2 体积
+
+| 项 | 预算 | x64 |
+|---|---|---|
+| 安装包（`Setup.exe`，CI 的开发构建） | ≤ 200 MB | 214.9 MiB（225.3 MB），**超出约 25 MB** |
+| 本机发布构建的打包目录 | — | 492.5 MiB（516.4 MB） |
+| 安装后 | ≤ 450 MB | 待实机（第 9.3 节） |
+
+打包目录各部分：`PiArc.exe` 238.5 MiB（与 Electron 45.3.2 原版 `electron.exe` 同样大）、`locales` 48.8 MiB、`dxcompiler.dll` 24.6 MiB、`resources.pak` 12.8 MiB、`icudtl.dat` 10.3 MiB、其余 Chromium 文件约 25 MiB；`resources/agent-host` 126.1 MiB（内置 node 101.7 MiB、`agent-host.mjs` 14.2 MiB、rg 与 fd 7.9 MiB、photon-node 2.2 MiB）；`app.asar` 与 Core 9.5 MiB。Electron 本体就有约 360 MiB，Windows 版比 macOS 的 Electron Framework（250 MiB）大得多，加上内置 node，打包目录已经超出安装后 450 MB 的预算。按任务要求 W0 不裁剪，与 I41 一起交 R1 决定（方向：去掉不需要的 locales、Velopack 安装包只带一个架构、校准 Windows 的预算）。
+
+### 9.3 实机项（实机关口）
+
+步骤见检查清单第 8 节，结果待用户操作后补填：SmartScreen 流程、智能应用控制的状态与表现、按用户安装与 UAC、安装后经 Job Object 的 mock 对话、相邻版本更新（`Update.exe apply`）、卸载残留、安装后体积、Defender 表现、AUMID 与快捷方式、图标。
 
 ## 10. 实机项
 

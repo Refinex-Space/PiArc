@@ -3,7 +3,7 @@
 | 项 | 内容 |
 |---|---|
 | 任务 | T11（2026-11-15） |
-| 结论 | macOS：通过。写入与网络限制生效，git、npm install、cargo build、python 在沙箱内正常运行，停止后无残留进程；每条命令额外约 8.4 ms（p50）。Windows：Job Object 已实现，单测待 CI，实机待 W0 |
+| 结论 | macOS：通过。写入与网络限制生效，git、npm install、cargo build、python 在沙箱内正常运行，停止后无残留进程；每条命令额外约 8.4 ms（p50）。Windows（W0）：Job Object 通过。三级进程树在关闭 Job 或 `kill` 后全部退出；PiArc 主进程被 `taskkill /F` 结束后，Agent Host 及其经 npx 启动的进程树（7 个进程）全部退出（第 10 节） |
 | 代码 | `crates/piarc-sandbox`（配置生成、代理）、`crates/piarc-exec/src/tree.rs` 与 `job.rs`（进程树）、`crates/piarc-core/src/tool_io.rs`（编排） |
 | 测试 | `crates/piarc-sandbox/tests/proxy.rs`、`crates/piarc-core/tests/sandbox.rs`、`crates/piarc-core/tests/sandbox_commands.rs`、`crates/piarc-exec` 单元测试 |
 
@@ -164,8 +164,10 @@ TLS：配置没有放开 `trustd`、`ocspd` 等证书服务（它们会替调用
 - 第一版不提供 OS 级沙箱（需求 D7）：`platform_sandbox()` 在 Windows 返回 `None`，`open_sandboxed_session` 返回 `internalError`（"commands cannot be sandboxed on this platform"）。设置页的提示与不静默降级由 T39 实现。
 - Job Object 实现在 `piarc-exec` 的 `job` 模块（safe 封装，`unsafe` 只在这个模块，编码规范 2.8），作为 `ProcessSpawner` 的 Windows 实现 `ProcessTreeSpawner`。
 - 已在 macOS 上对 Windows 目标做类型检查与 lint（整个 workspace 通过；顺带修了 T07 测试中两处只在 Windows 出现的 `unused_mut`）。
-- 待 Windows CI：`cargo test -p piarc-exec` 中的三级进程树用例与 Job 标志用例。
-- 待 W0 实机：Job Object 终止进程树（包括 T12 用它启动的 Agent Host 及其子进程、Agent Host 被杀时其子进程随之结束）。
+- W0 实机（Windows 11 专业版 25H2 26200.9974，x64，机器见 S2 报告第 8 节）：
+  - `cargo test -p piarc-exec`：`tree::tests::windows::closing_the_job_ends_three_levels`、`kill_ends_three_levels`（父 cmd → 子 cmd → 孙 ping，用 ToolHelp 进程快照确认三级都已退出）与 `job::tests::a_new_job_kills_on_close_and_allows_no_breakaway` 通过。CI 运行 43827342553 的 verify 作业在更早的 release 夹具失败处停止，没有跑到这些用例。
+  - 结束主进程：新 L4 `e2e/agent-host-kill.e2e.ts`（打包形态，只在 Windows 运行）让打包产物经 Job Object 启动 Agent Host，Agent Host 经内置 npx 启动 MCP server；回合进行中（mock 在流式中途挂起）对主进程执行 `taskkill /F`，即任务管理器"结束任务"所用的 `TerminateProcess`。之前的进程树：`PiArc.exe → node.exe（Agent Host）→ cmd.exe（npx）→ node.exe（npm exec）→ cmd.exe → node.exe（MCP server）`，另有两个 conhost。之后 Agent Host 子树的 7 个进程全部不在进程表（CIM `Win32_Process`）中；连续 3 次通过（`tmp/evidence/W0/l4/agent-host-kill.e2e.ts-*/process-tree.txt`）。
+  - 不在 Job 里的：Core 的 `ToolIo` 直接启动的普通命令（委托的 Bash）仍用 `TokioProcessSpawner`，主进程被强制结束时不会随之结束（I33，T17 接入 `ProcessTreeSpawner`）。沙箱会话的命令已用 `ProcessTreeSpawner`，但 Windows 没有沙箱会话。
 
 ## 11. 风险与遗留
 
@@ -179,4 +181,4 @@ TLS：配置没有放开 `trustd`、`ocspd` 等证书服务（它们会替调用
 
 macOS：**通过**。按命令生成的 Seatbelt 配置把写入限制在工作区、会话临时目录与附加目录，受保护路径与 `denyRead` 生效；本地代理按白名单放行、拒绝回环与元数据地址，绕过代理的连接全部失败；git、npm install、cargo build、python 正常；停止后进程组为空。每条命令额外约 8.4 ms，代理每请求额外约 0.1 ms。
 
-Windows：Job Object 已实现；三级进程树单测待 CI，实机（含 Agent Host 场景）待 W0。
+Windows：**通过**。Job Object 终止三级进程树；结束主进程后，Agent Host 与它启动的进程树全部退出。Core 直接启动的普通命令尚未放进 Job（I33，T17）。

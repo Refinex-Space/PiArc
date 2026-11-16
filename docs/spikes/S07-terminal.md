@@ -6,6 +6,13 @@ T10，2026-11-15。对应架构第 16 章 S7、ADR-0017、风险 R15。
 
 macOS 通过，余下的 Windows 项与真实输入法核对分别交给 CI/W0 与 R1；路线结论为**正式路线**（终端状态在 Core 的 libghostty-vt，渲染进程画 Core 的帧），不启用 xterm.js 退路。
 
+Windows（W0，第 11 节）**有条件通过**：
+
+- **ConPTY 两处缺陷已修复**：程序自行退出后收不到 `Exited`；启动者忽略 Ctrl+C 时，这个状态会传给终端里的程序。
+- **通过的项**：TUI 渲染、帧与 formatter 逐格一致、resize、Ctrl+C、终止进程；打包产物中的 DLL 链接方式可用；输出 100 MB 期间主进程事件循环 p99 14.34 ms。
+- **未达标的项**：键入回显额外延迟按原始配对口径 p95 6.86 ms，超出 5 ms。均值是 −0.12 ms，完整路径在各分位上都不比直接写 PTY 慢，超出的部分来自 ConPTY 两次独立往返的抖动，这套测量方法在 Windows 上需要 R1 校准。
+- **待核对的项**：微软拼音候选框等实机核对；win32-arm64 上 libghostty-vt 的实际运行。
+
 | S7 通过标准 | macOS 结果 |
 |---|---|
 | vim、htop 等 TUI 渲染正确 | 通过。vim（备用屏幕、语法颜色、行号、中文、emoji）与 top（htop 未安装，以 top 代替）渲染正确，截图时刻页面重建的屏幕与 Core 的 formatter 输出逐字一致（第 7 节） |
@@ -13,7 +20,7 @@ macOS 通过，余下的 Windows 项与真实输入法核对分别交给 CI/W0 �
 | 键入回显额外延迟 p95 ≤ 5 ms | 通过：p95 0.79 ms（200 个配对样本）。按 ADR-0017 原文让帧经事件 MessagePort 时是 p95 16.2 ms（Chromium 在按键之后把 MessagePort 消息推迟到下一帧之后处理），因此按 ADR-0023（已接受）改为拉取请求的返回值（第 5.2 节） |
 | 中文输入法候选框与预编辑文本位置正确 | 预编辑在光标处绘制、隐藏 textarea 跟随光标，CDP 合成验证通过；系统候选框位置需要真实拼音输入法，清单交 R1（第 8 节） |
 | formatter 输出与渲染帧逐格一致 | 通过。普通屏幕、备用屏幕、中日韩全角、emoji、ZWJ 与组合字符、宽字符换行、滚动，以及真实 vim，Rust 逐格比较全部一致；TS 解码器对同一组帧得到相同屏幕（第 6 节） |
-| 四个目标都能链接，win32-arm64 实机运行 | darwin-arm64、darwin-x64 本机链接通过；Windows 两个目标选定"官方 DLL 放在 `.node` 旁边"，CI 已配置，结果待推送后核对；win32-arm64 实机运行由 W0 做（第 3 节） |
+| 四个目标都能链接，win32-arm64 实机运行 | darwin-arm64、darwin-x64 本机链接通过；Windows 两个目标选定"官方 DLL 放在 `.node` 旁边"，CI `core-build` 两个目标通过，`core-load` 在 x64 与 arm64 runner 上加载通过；win32-arm64 上 libghostty-vt 的实际运行由加载检查新增的终端检查在下一次 CI 中给出（第 3 节、第 11 节） |
 
 回显问题出在 Electron 的跨进程送达方式，不在 libghostty-vt 或渲染器；xterm.js 退路同样要把数据送进渲染进程，换退路解决不了它，改送达方式解决了它。
 
@@ -52,7 +59,7 @@ XCFramework 里 `macos-arm64_x86_64/libghostty-vt.a` 是双架构静态库，`ca
 
 落地：`build.rs` 链接导入库（Rust 对 `dylib` 链接的符号生成 dllimport），并把 DLL 所在目录加入链接搜索路径，`cargo test` 运行时 cargo 会把它放进 PATH；`build-core.mjs` 在 Windows 目标上把 `ghostty-vt.dll` 复制到 `.node` 旁边；Forge 把它复制进 `native/` 并用 `asar.unpack` 留在 asar 之外；CI `core-build` 上传 `.node` 与 `.dll`，`core-load` 在同一目录加载。
 
-**未验证**：本机不能链接 MSVC 目标（没有 MSVC 库，安装 cargo-xwin 属于全局安装，未做）。两个 Windows 目标的链接与加载结果要等推送后看 CI；win32-arm64 的 DLL 官方"只构建、从不运行"，实机运行由 W0 做（T10-A01 标为阻塞）。
+**W0 结果**：CI 运行 43827342553 中 `core-build` 的两个 Windows 目标链接通过，`core-load` 在 `windows-latest` 与 `windows-11-arm`（arm64 实机 runner）上把 `.node` 与旁边的 `ghostty-vt.dll` 一起加载通过；Windows 11 本机 MSVC 14.51 构建通过，打包产物（`app.asar.unpacked/native/` 下的 `.node` 与 DLL）的终端 L4 通过。win32-arm64 的 DLL 官方"只构建、从不运行"：加载已在 arm64 上成功，而加载检查此前不调用终端，W0 给它加了终端检查（第 11 节）。
 
 ## 4. PTY、线程与帧
 
@@ -162,9 +169,73 @@ L4 `apps/desktop/e2e/terminal-tui.e2e.ts`（dev 与 packaged 两种形态）等�
 
 | 项 | 负责 |
 |---|---|
-| Windows 两个目标的链接与加载（CI `core-build`、`core-load`，推送后核对）；win32-arm64 实机运行 | W0（T10-A01） |
-| ConPTY：resize、Ctrl+C、kill（0.9.0 的 kill 返回值问题由 `wait` 兜底，需实测）、是否随附 `conpty.dll` 与 OpenConsole.exe | W0 |
-| Windows 渲染、回显延迟（`npm run bench:s7`）与微软拼音；`terminal.e2e.ts`、`terminal-tui.e2e.ts` 和 `crates/piarc-term/tests/pty.rs` 目前限定 Unix（用 `/bin/sh`、`cat`、`vim`、`top`），W0 换成 Windows 程序后运行 | W0 |
+| Windows 两个目标的链接与加载；ConPTY；Windows 渲染、回显延迟与终端用例的 Windows 版本 | W0 已完成（第 11 节） |
+| win32-arm64 上 libghostty-vt 的实际运行（加载检查新增的终端检查，下一次 CI 的 `core-load`） | R1 核对 |
+| 微软拼音的候选框与预编辑位置（第 11 节 WT1–WT4） | W0 实机关口 |
+| Windows 上键入回显额外延迟的测量口径 | R1 |
 | 真实拼音输入法核对（第 8 节 T1–T4，T10-A11） | R1 |
 | 帧协议定稿、JSON Schema 与 L1 样本、终端事件形状、agent 读屏、OSC 133、snapshot | T33 |
 | 选区、复制、滚动与 scrollback、链接、查找、无障碍、多窗口同时查看一个终端（现在每个终端只有一个 viewer，换 viewer 时发 RESET 帧）、光标闪烁 | T34 |
+
+## 11. Windows（W0，2026-11-16）
+
+机器与对照见 S2 报告第 8 节（i5-1340P、16 GB、NVMe，Windows 11 专业版 25H2 26200.9974，x64）。显卡为 Intel Iris Xe 核显。
+
+### 11.1 ConPTY
+
+`crates/piarc-term/tests/pty_windows.rs` 把 `pty.rs` 的用例换成 Windows 程序（cmd.exe 带 `PROMPT=$$$S`、PowerShell、Git for Windows 自带的 vim），并新增 Ctrl+C 用例，10 项通过：
+
+| 用例 | 程序 | 结果 |
+|---|---|---|
+| 输入与输出 | cmd：`for /L %i in (42,1,42) do @echo piarc-42` | 通过 |
+| 键事件编码后写入 | cmd：`echo k` 逐键发送 | 通过 |
+| 调整尺寸 | `resize(100, 30)` 后 PowerShell 读 `$Host.UI.RawUI.WindowSize` | `size 30 100`，帧尺寸 100 × 30 |
+| Ctrl+C | cmd 中 `ping -n 30` 出现第一行回复后写 0x03 | ping 被中断，后续命令立即执行 |
+| 退出码 | `cmd /C exit 7` | `Exited { code: 7 }` |
+| 关闭即终止 | 关闭会话 | 收到 `Exited`，之后写入报 `Closed` |
+| 标题与响铃 | PowerShell 设窗口标题、写 BEL | 标题 `piarc title`（ConPTY 另外先报一次程序路径作标题）、响铃 1 次 |
+| 帧重建与 formatter 一致 | PowerShell 输出带颜色的中文 | 一致 |
+| 回显探针 | cmd 的行输入回显 | < 1 s |
+| vim 备用屏幕 | Git 的 vim 打开含中文与 emoji 的文件、编辑、`:q!` | 运行中与退出后帧与 formatter 一致，退出码 0 |
+
+实测发现并修复两处缺陷（提交 1c6750b，补充型，未写 ADR）：
+
+1. **程序自行退出后没有 `Exited`。** ConPTY 只在伪控制台关闭（`ClosePseudoConsole`）时结束输出管道，而会话原先等读到输出结束才 `wait` 程序，伪控制台又要到会话关闭才释放，形成循环等待。现在由单独的等待线程 `wait`，Windows 上程序退出后让写线程结束、释放 master，读线程随之读到结束，再取等待线程的退出码。`the_exit_code_is_reported` 与 vim 用例修复前超时、修复后通过。
+2. **Ctrl+C 不起作用。** 进程"忽略 Ctrl+C"的状态（`SetConsoleCtrlHandler(NULL, TRUE)` 或新进程组）会被子进程继承；本次会话由智能体的进程链启动，cmd 与 ping 继承了这个状态，0x03 到达 conhost 后没有产生 `CTRL_C_EVENT`。从干净的进程树（WMI 启动）运行同一个测试二进制则通过。PiArc 被这样的进程启动时，用户在终端里按 Ctrl+C 同样无效，所以 `piarc-term` 在启动程序前清掉本进程的这个标志（新 `console` 模块里的一次 `SetConsoleCtrlHandler(NULL, FALSE)`，编码规范 2.8 已登记）。修复后在同一会话中连续通过。
+
+`kill`：portable-pty 0.9.0 在 Windows 上把成功报成错误，`close` 不信它的返回值，退出以等待线程为准；"关闭即终止"用例通过。
+
+**是否随附 `conpty.dll` 与 OpenConsole.exe：不随附。** portable-pty 0.9.0 先按 DLL 搜索路径找 `conpty.dll`，找不到才用系统 kernel32 的 ConPTY。Windows 11 25H2 自带的 ConPTY 能跑通 cmd、PowerShell、MSYS2 程序（vim）、备用屏幕、标题、响铃与 resize，没有发现非要新版 conhost 才能解决的问题。随附会增加约 1–2 MB，还要跟随 Windows Terminal 发版更新。只有出现系统 ConPTY 解决不了的缺陷时再随附，并固定版本与校验和。
+
+**ConPTY 与 macOS 的差异**：conhost 把终端发来的按键解析成控制台按键事件，再按程序自己的输入模式重新编码。程序打开 DECCKM 后，Core 发出的 `ESC O A` 到 Node 程序那里变成 `ESC [ A`，所以"按终端模式编码"只能由键盘编码器的单元测试验证（L4 的 Windows 版断言 ↑ 到达程序）。
+
+### 11.2 L4 与 TUI
+
+`terminal.e2e.ts`、`terminal-tui.e2e.ts` 在 Windows 上去掉跳过、改用 Windows 程序，开发与打包两种形态都通过：
+
+- shell 用 cmd；隐藏终端用 PowerShell 循环；键位用 `e2e/programs/show-keys.ts`；输入法 CDP 合成在光标处绘制预编辑，提交后经 Core 回显；
+- TUI 用 Git 的 vim（语法颜色、行号、中文注释、emoji、`~` 行），另一个用 PowerShell 每 2 秒清屏重绘的进程表代替 top。截图与 formatter 文本在 `tmp/evidence/W0/l4/terminal-tui.e2e.ts-*/`，页面重建的屏幕与 Core 的 formatter 输出逐字一致。
+
+### 11.3 测量
+
+`npm run bench:s7 -- --form packaged`（`tmp/evidence/W0/bench/s7-packaged.json`）在 cmd 中 `type` 100 MB 文件；回显改用原始模式的 Node 回显程序（`scripts/bench/echo-program.mjs`），因为 ConPTY 下 cooked 模式的行回显由 conhost 完成，cmd 会把每一行当命令执行。
+
+| 项 | Windows | 预算 | macOS（第 5 节） |
+|---|---|---|---|
+| 输出 100 MB | 105.8 s（约 1 MB/s） | — | 约 190 MB/s |
+| 主进程事件循环延迟 | p50 4.12 ms，p99 14.34 ms，max 189 ms（单次） | p99 ≤ 16 ms | p99 2.04 ms |
+| 渲染进程 | 每秒绘制 72.1 帧；每帧主线程工作 p50 9.35 ms、p99 20.78 ms；超过 50 ms 的任务 0 个 | 无长任务 | p99 6.6 ms |
+| Core | `vt_write` 2.18 s（墙钟的 2.1%）；10,304 帧编码共 10.2 s | — | — |
+| 主进程 CPU | 一个核的 48% | — | 74% |
+| 键入回显（200 个配对样本） | 直接写 PTY p50 3.14 / p95 10.13 ms；完整路径 p50 2.70 / p95 9.30 ms；额外 p50 1.04 / p95 6.95 ms，均值 0.05 ms | 额外 p95 ≤ 5 ms | 额外 p95 0.79 ms |
+| 同上，1,000 个样本（`s7-echo-1000.json`） | 直接 p50 3.12 / p95 9.85 / p99 14.07 ms；完整 p50 2.70 / p95 9.00 / p99 14.50 ms；额外 p50 0.52 / p95 6.86 ms，均值 −0.12 ms | | |
+
+分析：
+
+- **吞吐的瓶颈在 conhost。** Core 解析只占墙钟的 2.1%，每秒 72 帧都按时拉取；ConPTY 把程序的输出先画进自己的缓冲区，再按帧把变化转成 VT 发出，所以 `type` 大文件只有约 1 MB/s（ConPTY 发出的是重绘序列，Core 收到 101 MiB）。这是 ConPTY 的上限，不是 PiArc 的；主进程与渲染进程在这期间都没有长任务。
+- **回显的配对相减在 Windows 上失效。** 每个样本的两半是两次独立的 ConPTY 往返，各自带 0–16 ms 的抖动（conhost 按自己的帧节奏刷新输出），相减得到以 0 为中心的宽分布：均值 −0.12 ms，而 p95 6.86 ms。完整路径在 p50、p95 上都不比直接写 PTY 慢，客户端路径（渲染进程 → 主进程 → Core 键盘编码 → … → 帧 → 渲染进程）没有测出可见的额外延迟。按原始口径记为"超出预算"，不改预算；R1 校准 Windows 上的测量方法（例如在 Core 内分别打点客户端路径的两段）。
+- 渲染进程每帧工作 p99 20.8 ms 高于 macOS，可能的原因是核显，以及 ConPTY 每帧重绘整屏：本次发送了 303,060 行，复用的只有 2,060 行。没有超过 50 ms 的任务，帧率稳定在 72 帧/秒。
+
+### 11.4 微软拼音
+
+实机核对清单见 `S06-first-run-checklist.md` 第 8.2 节 WT1–WT4，结果待填。
