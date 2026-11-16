@@ -141,7 +141,12 @@ export async function fetchArtefact(name, target) {
  */
 async function extract(archive, into) {
   await mkdir(into, { recursive: true });
-  const code = await run('tar', ['-xf', archive, '-C', into]);
+  // On Windows, Git's GNU tar can come first on PATH and cannot read zip files.
+  const tar =
+    process.platform === 'win32'
+      ? path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe')
+      : 'tar';
+  const code = await run(tar, ['-xf', archive, '-C', into]);
   if (code !== 0) {
     throw new Error(`tar could not extract ${archive} (exit code ${String(code)})`);
   }

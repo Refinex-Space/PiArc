@@ -24,6 +24,7 @@ import {
   resourcesDirOf,
 } from './packaging/agent-host-layout.mjs';
 import { MakerHdiutilDmg } from './packaging/maker-dmg.mjs';
+import { copyVelopackRuntime } from './packaging/velopack-runtime.mjs';
 import { resealElectron, signResourcesAndBundle } from './packaging/macos-sign.mjs';
 
 const flavor = parseBuildFlavor(process.env.PIARC_BUILD_FLAVOR);
@@ -97,6 +98,9 @@ const config: ForgeConfig = {
   hooks: {
     packageAfterCopy: async (_config, buildPath, _electronVersion, platform, arch) => {
       await copyCoreModule(buildPath, platform, arch);
+      if (platform === 'win32') {
+        await copyVelopackRuntime({ repoRoot, buildPath, arch });
+      }
     },
     postPackage: async (_config, { platform, arch, outputPaths }) => {
       for (const outputPath of outputPaths) {

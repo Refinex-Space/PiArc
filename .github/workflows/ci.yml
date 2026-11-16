@@ -52,7 +52,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .tools/cache/ghostty-vt
-          key: ghostty-vt-${{ github.job }}-${{ matrix.target || matrix.os }}-${{ hashFiles('crates/piarc-ghostty-sys/ghostty-vt.lock.json') }}
+          key: ghostty-vt-${{ github.job }}-${{ matrix.os }}-${{ hashFiles('crates/piarc-ghostty-sys/ghostty-vt.lock.json') }}
 
       - name: Install pinned tools (cargo-deny, ripgrep, fd, bindgen-cli)
         run: node scripts/dev/install-tools.mjs
@@ -96,7 +96,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .tools/cache/ghostty-vt
-          key: ghostty-vt-${{ github.job }}-${{ matrix.target || matrix.os }}-${{ hashFiles('crates/piarc-ghostty-sys/ghostty-vt.lock.json') }}
+          key: ghostty-vt-${{ github.job }}-${{ matrix.os }}-${{ hashFiles('crates/piarc-ghostty-sys/ghostty-vt.lock.json') }}
 
       - name: Install npm dependencies
         run: npm ci --ignore-scripts
@@ -236,3 +236,145 @@ jobs:
           node scripts/ci/load-core.mjs
           --module core-modules/development/${{ matrix.module }}
           --module core-modules/release/${{ matrix.module }}
+
+  package-macos:
+    # S6 (T12): release DMG and ZIP of both architectures, signed in layers (node keeps the
+    # Node.js Foundation signature), with the fuse and layout/signature checks.
+    name: package macOS (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: arm64, target: aarch64-apple-darwin }
+          - { arch: x64, target: x86_64-apple-darwin }
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install Rust toolchain and the ${{ matrix.target }} target
+        run: |
+          rustup toolchain install
+          rustup target add ${{ matrix.target }}
+          rustup show
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: package-${{ matrix.target }}
+
+      - name: Cache the libghostty-vt artefacts (build.rs verifies them on every use)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/cache/ghostty-vt
+          key: ghostty-vt-${{ github.job }}-${{ matrix.target }}-${{ hashFiles('crates/piarc-ghostty-sys/ghostty-vt.lock.json') }}
+
+      - name: Cache the bundled node, rg and fd (fetch-binaries.mjs verifies them on every use)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/cache/binaries
+          key: binaries-${{ github.job }}-${{ matrix.arch }}-${{ hashFiles('third-party/binaries.lock.json') }}
+
+      - name: Install npm dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Package and make the release flavor (DMG and ZIP)
+        run: npm run package:desktop -- --flavor release --arch ${{ matrix.arch }} --make
+
+      - name: Check the fuses
+        run: npm run check:fuses -- --arch ${{ matrix.arch }}
+
+      - name: Check the layout and the signing layers
+        run: node scripts/ci/check-app-layout.mjs --flavor release --arch ${{ matrix.arch }}
+
+      - name: Upload the DMG and ZIP
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: piarc-macos-${{ matrix.arch }}
+          path: |
+            apps/desktop/out/release/make/dmg/${{ matrix.arch }}/*.dmg
+            apps/desktop/out/release/make/zip/darwin/${{ matrix.arch }}/*.zip
+          if-no-files-found: error
+
+  package-windows:
+    # S6 (T12): Velopack installers (per-user, unsigned, ADR-0018 rule 3) for both
+    # architectures, two adjacent versions in one release feed so W0 can check updates. The
+    # development flavor carries the test entry W0 uses for its mock conversation. Both
+    # architectures build on x64 (the arm64 Core module is cross-compiled with MSVC).
+    name: package Windows (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, target: x86_64-pc-windows-msvc }
+          - { arch: arm64, target: aarch64-pc-windows-msvc }
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install Rust toolchain and the ${{ matrix.target }} target
+        run: |
+          rustup toolchain install
+          rustup target add ${{ matrix.target }}
+          rustup show
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: package-${{ matrix.target }}
+
+      - name: Cache the libghostty-vt artefacts (build.rs verifies them on every use)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/cache/ghostty-vt
+          key: ghostty-vt-${{ github.job }}-${{ matrix.target }}-${{ hashFiles('crates/piarc-ghostty-sys/ghostty-vt.lock.json') }}
+
+      - name: Cache the bundled node, rg, fd and vpk (fetch-binaries.mjs verifies them on every use)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/cache/binaries
+          key: binaries-${{ github.job }}-${{ matrix.arch }}-${{ hashFiles('third-party/binaries.lock.json') }}
+
+      - name: Install npm dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Package the development flavor
+        run: npm run package:desktop -- --flavor development --arch ${{ matrix.arch }}
+
+      - name: Check the fuses
+        run: npm run check:fuses -- --flavor development --arch ${{ matrix.arch }}
+
+      - name: Check the layout
+        run: node scripts/ci/check-app-layout.mjs --flavor development --arch ${{ matrix.arch }}
+
+      # vpk is a .NET tool: the runner's .NET SDK installs the locked nupkg into .tools/vpk/.
+      - name: Build Velopack installers 0.0.1 and 0.0.2
+        run: >-
+          node scripts/release/pack-windows.mjs
+          --arch ${{ matrix.arch }} --flavor development --versions 0.0.1,0.0.2
+
+      - name: Upload the Velopack release feed
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: piarc-windows-${{ matrix.arch }}-velopack
+          path: apps/desktop/out/development/velopack/win32-${{ matrix.arch }}
+          if-no-files-found: error

@@ -16,6 +16,7 @@ import { applyDevServerCsp, resolveDevServer } from './dev-server.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
 import { createIpcRegistrar } from './ipc/register.js';
 import { applyAppIdentity, quitsWhenAllWindowsClosed } from './platform/index.js';
+import { runVelopackStartup } from './platform/velopack.js';
 import { PRODUCTION_CSP } from './security/csp.js';
 import { guardWebContents } from './security/navigation.js';
 import { applyPermissionPolicy } from './security/permissions.js';
@@ -146,6 +147,9 @@ function start(): void {
     openMainWindow();
   });
 }
+
+// Velopack's install, update and uninstall hooks exit the process before anything else runs.
+runVelopackStartup();
 
 // Must run before `ready`: force the sandbox for every renderer and give the app scheme its
 // privileges.
