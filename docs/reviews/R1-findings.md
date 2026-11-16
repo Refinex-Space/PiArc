@@ -346,7 +346,7 @@ R1 用四个只读子代理按维度并行审查 M0 的代码（2026-11-16）。
 - 位置：`apps/desktop/CLAUDE.md` 结构一节（116 行，上限 120）、`agent-host/CLAUDE.md` 入口与结构；`crates/piarc-exec/CLAUDE.md`“T17 要叠加的”、`piarc-fs/CLAUDE.md`“T16 与之后要叠加的”、`piarc-core/CLAUDE.md` 首段
 - 失败场景或后果：逐文件说明与任务进度最容易过时，`apps/desktop/CLAUDE.md` 下一次改动就会超限。
 - 核实：**确认**。
-- 处理：已处理（CLAUDE.md 收口提交，见文末汇总）：删去逐文件说明与任务进度，改为指向代码与架构的链接。
+- 处理：已处理（640aa63）：删去逐文件说明与任务进度，改为指向代码与架构的链接。
 
 ### R1-Q9 测试夹具的 package.json 描述指向已知会失败的启动方式
 
@@ -450,7 +450,7 @@ R1 用四个只读子代理按维度并行审查 M0 的代码（2026-11-16）。
 | R1-Q5 | `piarc-exec` 与 `piarc-ports` 没有按 2.3 定义带 `kind()`、`retryable()` 的 `Error` | 中 | 确认 | 登记 I61 |
 | R1-Q6 | 复用代码的来源登记不全 | 中 | 确认 | 修复 e7a62af |
 | R1-Q7 | `fetch-binaries.mjs` 的完整性校验没有单元测试 | 中 | 确认 | 登记 I60 |
-| R1-Q8 | CLAUDE.md 违反规范第 3 节“不写”清单 | 中 | 确认 | 已处理 |
+| R1-Q8 | CLAUDE.md 违反规范第 3 节“不写”清单 | 中 | 确认 | 修复 640aa63 |
 | R1-Q9 | 测试夹具的 package.json 描述指向已知会失败的启动方式 | 低 | 确认 | 修复 e7a62af |
 | R1-Q10 | `deps-rules.json` 有一条实际不存在的依赖边 | 低 | 不同意 | 不改（见条目） |
 | R1-Q11 | `piarc-testkit/src/lib.rs` 含实现 | 低 | 确认 | 技术债 |
