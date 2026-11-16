@@ -301,7 +301,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 3 Pi JSONL 流式解析、增量同步、重建索引、内存预算（A03、A04、A05；100 MiB 堆峰值 +14.08 MiB）
 - [x] 4 piarc-telemetry 日志按天轮转、保留 7 天（A06）
 - [ ] 5 piarc-config 分层加载、校验、合并、变更监听、写接口（A07、A08）
-- [ ] 6 piarc-git 主 checkout 解析（A09）
+- [x] 6 piarc-git 主 checkout 解析（A09 的 git 部分；信任共享在第 7 项验证）
 - [ ] 7 项目信任：持久化、撤销、可执行配置枚举与新增项检测、`trust/get`、Harness Kit 接管 `project_trust`（A10–A13）
 - [ ] 8 CLAUDE.md（store、config、git）、架构 9.2 补 `project_trust`、复用表登记
 - [ ] 9 收尾：verify（A14）、验收记录、PLAN 更新
