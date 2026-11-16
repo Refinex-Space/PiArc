@@ -3,10 +3,10 @@
 //! it only after the project is trusted, and no longer after the trust is revoked and the
 //! workspace's Agent Host restarted (the session is reopened on the new process).
 
+use piarc_core::DataDirs;
 use piarc_core::agent_host::{self, HostEvent};
 use piarc_core::storage::Storage;
 use piarc_core::trust::TrustService;
-use piarc_core::DataDirs;
 use serde_json::{Value, json};
 
 use crate::harness::{Env, offered_tools, open, prompt_text};
@@ -36,7 +36,9 @@ const EXTENSION: &str = r#"export default function (pi: any) {
 const PROBE_TOOL: &str = "fixture_probe";
 
 fn offers_probe(body: &str) -> bool {
-    offered_tools(body).iter().any(|(name, _)| name == PROBE_TOOL)
+    offered_tools(body)
+        .iter()
+        .any(|(name, _)| name == PROBE_TOOL)
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -65,7 +67,11 @@ async fn project_extensions_load_only_while_core_trusts_the_project() {
         .turn_id;
     assert_eq!(events.turn_completed(&turn.0).await["status"], "completed");
     let requests = env.requests("trust-probe");
-    assert!(!offers_probe(&requests[0].body), "untrusted: {:?}", offered_tools(&requests[0].body));
+    assert!(
+        !offers_probe(&requests[0].body),
+        "untrusted: {:?}",
+        offered_tools(&requests[0].body)
+    );
 
     // Trusted: Core restarts the Agent Host, the session is reopened and the tool is offered.
     trust.decide(&env.ws[0], true).await.expect("trust");
@@ -80,7 +86,11 @@ async fn project_extensions_load_only_while_core_trusts_the_project() {
         .turn_id;
     assert_eq!(events.turn_completed(&turn.0).await["status"], "completed");
     let requests = env.requests("trust-probe");
-    assert!(offers_probe(&requests[1].body), "trusted: {:?}", offered_tools(&requests[1].body));
+    assert!(
+        offers_probe(&requests[1].body),
+        "trusted: {:?}",
+        offered_tools(&requests[1].body)
+    );
 
     // Revoked: trust/get answers false and the restarted Agent Host no longer loads it.
     trust.revoke(&env.ws[0]).await.expect("revoke");
@@ -100,7 +110,11 @@ async fn project_extensions_load_only_while_core_trusts_the_project() {
     assert_eq!(events.turn_completed(&turn.0).await["status"], "completed");
     let requests = env.requests("trust-probe");
     assert_eq!(requests.len(), 3);
-    assert!(!offers_probe(&requests[2].body), "revoked: {:?}", offered_tools(&requests[2].body));
+    assert!(
+        !offers_probe(&requests[2].body),
+        "revoked: {:?}",
+        offered_tools(&requests[2].body)
+    );
     let restarted = events
         .all
         .iter()
@@ -109,7 +123,10 @@ async fn project_extensions_load_only_while_core_trusts_the_project() {
     assert_eq!(restarted, 0, "trust restarts are not failures");
     let asked = core.asked.lock().expect("lock").clone();
     println!("trust/get asked for: {asked:?}");
-    assert!(asked.len() >= 3, "every (re)opened session asked Core: {asked:?}");
+    assert!(
+        asked.len() >= 3,
+        "every (re)opened session asked Core: {asked:?}"
+    );
 
     restarts.abort();
     supervisor.shutdown().await;

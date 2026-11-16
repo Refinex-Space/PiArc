@@ -845,7 +845,10 @@ async fn a_requested_restart_is_not_a_failure_and_restores_the_sessions() {
     let clock = TestClock::new();
     let (supervisor, mut events) =
         HostSupervisor::start(config(), deps(Arc::clone(&spawner), Arc::clone(&clock)));
-    until(&mut events, |e| matches!(e, HostEvent::Connected { epoch: 1, .. })).await;
+    until(&mut events, |e| {
+        matches!(e, HostEvent::Connected { epoch: 1, .. })
+    })
+    .await;
     supervisor
         .create_session("work space/项目", None)
         .await
@@ -861,10 +864,15 @@ async fn a_requested_restart_is_not_a_failure_and_restores_the_sessions() {
         HostEvent::Exited { epoch: 1, reason: ExitReason::Restarted, status: Some(s) } if s.success()
     )));
     assert!(
-        !seen.iter().any(|e| matches!(e, HostEvent::Restarting { .. })),
+        !seen
+            .iter()
+            .any(|e| matches!(e, HostEvent::Restarting { .. })),
         "no backoff: {seen:?}"
     );
-    assert!(seen.iter().any(|e| matches!(e, HostEvent::Connected { epoch: 2, .. })));
+    assert!(
+        seen.iter()
+            .any(|e| matches!(e, HostEvent::Connected { epoch: 2, .. }))
+    );
     assert_eq!(
         restored,
         HostEvent::SessionRestored {
