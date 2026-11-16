@@ -1,6 +1,9 @@
 //! Environment variables of sandboxed commands: the proxy, the temporary directory and the
 //! package-manager caches.
 //!
+//! `GIT_CONFIG_COUNT` replaces any the command inherits: git configuration passed that way is
+//! not available inside the sandbox.
+//!
 //! Caches go to `<session tmp>/cache/` instead of the user's directories. A writable shared
 //! cache would let a sandboxed command plant code that runs later outside the sandbox: an
 //! unpacked crate in `~/.cargo/registry/src` is compiled (and its `build.rs` run) by the next
@@ -29,6 +32,25 @@ pub fn sandbox_env(session_tmp: &Path, proxy_port: u16) -> Vec<(OsString, OsStri
     .into_iter()
     .map(|name| (OsString::from(name), proxy.clone()))
     .collect();
+    // Tools whose own configuration outranks the variables above: Cargo and git read
+    // `http.proxy` from the user's git configuration before the environment, npm reads
+    // `.npmrc`. Their environment overrides win over every configuration file.
+    let overrides = [
+        ("CARGO_HTTP_PROXY", proxy.clone()),
+        ("npm_config_proxy", proxy.clone()),
+        ("npm_config_https_proxy", proxy.clone()),
+        ("PIP_PROXY", proxy.clone()),
+        ("GIT_CONFIG_COUNT", OsString::from("2")),
+        ("GIT_CONFIG_KEY_0", OsString::from("http.proxy")),
+        ("GIT_CONFIG_VALUE_0", proxy.clone()),
+        ("GIT_CONFIG_KEY_1", OsString::from("https.proxy")),
+        ("GIT_CONFIG_VALUE_1", proxy.clone()),
+    ];
+    env.extend(
+        overrides
+            .into_iter()
+            .map(|(name, value)| (OsString::from(name), value)),
+    );
     let fixed = [
         // An inherited bypass list must not send anything around the proxy (it would fail
         // anyway: the sandbox allows no other connection).
@@ -66,7 +88,14 @@ mod tests {
                 .map(|(_, v)| v.clone())
                 .unwrap_or_else(|| panic!("{name} is set"))
         };
-        for name in ["HTTP_PROXY", "https_proxy", "ALL_PROXY"] {
+        for name in [
+            "HTTP_PROXY",
+            "https_proxy",
+            "ALL_PROXY",
+            "CARGO_HTTP_PROXY",
+            "npm_config_https_proxy",
+            "GIT_CONFIG_VALUE_0",
+        ] {
             assert_eq!(get(name), "http://127.0.0.1:4321");
         }
         assert_eq!(get("NO_PROXY"), "");
