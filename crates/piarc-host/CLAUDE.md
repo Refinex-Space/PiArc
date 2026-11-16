@@ -54,7 +54,7 @@ Core 侧的 Agent Host 监管：启动、握手、stdio 读写、背压、心跳
 - 不要在等待 `HostEvents` 之外阻塞消费者却又期待通知继续流动：通知受许可数约束。生命周期事件不受影响。
 - Windows 上 Agent Host 写 stdout 是同步的：Core 停读时 Agent Host 整个停住（不再处理 Core 发来的请求），而不是在内存里排队；心跳仍按"读者停在投递上不计失败"的规则不误判（S9 报告第 5 节）。
 - 测试用 `tests/support` 的 `FakeSpawner`（脚本化的假 Agent Host，duplex 管道）与 `TestClock`（只在 sleep 时前进）。假 Agent Host 空闲时用 `until_stdin_closes`，它会回答心跳与 `host/shutdown`；否则 `shutdown()` 要等 `shutdown_timeout`。
-- `Link` 的克隆不控制 stdin 的关闭：关闭靠 `close_stdin`（`request_shutdown` 中触发）。
+- `Link` 的克隆不控制 stdin 的关闭：关闭靠 `close_stdin`（`request_shutdown` 与连接结束时触发）。入站任务持有的 `Peer` 也是写队列的发送端，连接结束后要靠 `close_stdin` 让写任务丢弃队列，`Peer::closed()` 才完成（R1-A2）。
 
 ## 参考
 

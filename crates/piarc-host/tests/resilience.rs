@@ -612,3 +612,69 @@ async fn shutdown_and_restarts_never_wait_for_a_consumer_that_stopped_reading() 
         }
     )));
 }
+
+/// Hands the `Peer` of each request to the test, then holds it like a quiet `exec/run` until
+/// the connection ends.
+struct QuietCommand {
+    peers: std::sync::Mutex<Option<oneshot::Sender<piarc_host::Peer>>>,
+}
+
+impl piarc_host::InboundHandler for QuietCommand {
+    fn handle(
+        &self,
+        _method: String,
+        _params: serde_json::Map<String, serde_json::Value>,
+        peer: piarc_host::Peer,
+    ) -> piarc_ports::BoxFuture<'static, Result<serde_json::Value, piarc_protocol::ErrorObject>>
+    {
+        if let Some(tx) = self.peers.lock().expect("lock").take() {
+            let _ = tx.send(peer.clone());
+        }
+        Box::pin(async move {
+            peer.closed().await;
+            Ok(json!({ "exitCode": null, "killed": true }))
+        })
+    }
+}
+
+#[tokio::test]
+async fn a_crash_ends_the_peers_of_requests_still_running() {
+    let (crash_tx, crash_rx) = oneshot::channel::<()>();
+    let spawner = FakeSpawner::new(vec![
+        script(|mut host| async move {
+            host.hello("1.0", &[]).await;
+            host.send(&json!({ "jsonrpc": "2.0", "id": 7, "method": "exec/run", "params": {} }))
+                .await;
+            let _ = crash_rx.await;
+            1
+        }),
+        script(|mut host| async move {
+            host.hello("1.0", &[]).await;
+            host.until_stdin_closes().await;
+            0
+        }),
+    ]);
+    let (peer_tx, peer_rx) = oneshot::channel();
+    let mut deps = deps(spawner, TestClock::new());
+    deps.inbound = Arc::new(QuietCommand {
+        peers: std::sync::Mutex::new(Some(peer_tx)),
+    });
+    let (supervisor, mut events) = HostSupervisor::start(config(), deps);
+    let peer = tokio::time::timeout(support::EVENT_WAIT, peer_rx)
+        .await
+        .expect("the request reached the handler")
+        .expect("peer sent");
+    assert!(!peer.is_closed());
+    let _ = crash_tx.send(());
+    until(&mut events, |e| matches!(e, HostEvent::Exited { .. })).await;
+    // The command watching this peer must learn that its connection is gone.
+    tokio::time::timeout(Duration::from_secs(5), peer.closed())
+        .await
+        .expect("Peer::closed completes when the Agent Host crashes");
+    assert!(peer.is_closed());
+    until(&mut events, |e| {
+        matches!(e, HostEvent::Connected { epoch: 2, .. })
+    })
+    .await;
+    supervisor.shutdown().await;
+}

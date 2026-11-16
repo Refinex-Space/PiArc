@@ -513,6 +513,10 @@ impl Inner {
             }
         };
         heartbeat.abort();
+        // End the write queue: requests still running hold `Peer` clones of it, and their
+        // `Peer::closed()` (which cancels a delegated command) completes only once the writer
+        // task drops the queue.
+        connection.link.close_stdin.notify_one();
         // Frames written just before the exit are still in the pipe: read them before the
         // open calls are judged uncertain.
         if tokio::time::timeout(DRAIN_TIMEOUT, &mut connection.reader_done)
