@@ -14,29 +14,56 @@ pub struct TokioProcessSpawner;
 
 impl ProcessSpawner for TokioProcessSpawner {
     fn spawn(&self, spec: SpawnSpec) -> io::Result<SpawnedProcess> {
-        let mut command = Command::new(&spec.program);
-        command
-            .args(&spec.args)
-            .current_dir(&spec.cwd)
-            .env_clear()
-            .envs(spec.env.iter().map(|(key, value)| (key, value)))
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .kill_on_drop(true);
-        let mut child = command.spawn()?;
-        let (Some(stdin), Some(stdout), Some(stderr)) =
-            (child.stdin.take(), child.stdout.take(), child.stderr.take())
-        else {
-            return Err(io::Error::other("a piped stdio handle is missing"));
-        };
+        let mut child = command(&spec).spawn()?;
+        let (stdin, stdout, stderr) = take_stdio(&mut child)?;
         Ok(SpawnedProcess {
-            stdin: Box::pin(stdin),
-            stdout: Box::pin(stdout),
-            stderr: Box::pin(stderr),
+            stdin,
+            stdout,
+            stderr,
             control: Box::new(TokioChild(child)),
         })
     }
+}
+
+/// `spec` as a tokio command: exactly the given environment, piped stdio, killed on drop.
+pub(crate) fn command(spec: &SpawnSpec) -> Command {
+    let mut command = Command::new(&spec.program);
+    command
+        .args(&spec.args)
+        .current_dir(&spec.cwd)
+        .env_clear()
+        .envs(spec.env.iter().map(|(key, value)| (key, value)))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    command
+}
+
+/// The three piped stdio handles of a freshly started child.
+pub(crate) type Stdio3 = (
+    std::pin::Pin<Box<dyn tokio::io::AsyncWrite + Send>>,
+    std::pin::Pin<Box<dyn tokio::io::AsyncRead + Send>>,
+    std::pin::Pin<Box<dyn tokio::io::AsyncRead + Send>>,
+);
+
+/// Takes the piped stdio handles out of `child`.
+pub(crate) fn take_stdio(child: &mut Child) -> io::Result<Stdio3> {
+    let (Some(stdin), Some(stdout), Some(stderr)) =
+        (child.stdin.take(), child.stdout.take(), child.stderr.take())
+    else {
+        return Err(io::Error::other("a piped stdio handle is missing"));
+    };
+    Ok((Box::pin(stdin), Box::pin(stdout), Box::pin(stderr)))
+}
+
+/// How `child` ended, as [`ExitStatus`].
+pub(crate) async fn wait_child(child: &mut Child) -> io::Result<ExitStatus> {
+    let status = child.wait().await?;
+    Ok(ExitStatus {
+        code: status.code(),
+        signal: signal_of(status),
+    })
 }
 
 struct TokioChild(Child);
@@ -51,13 +78,7 @@ impl ProcessControl for TokioChild {
     }
 
     fn wait(&mut self) -> BoxFuture<'_, io::Result<ExitStatus>> {
-        Box::pin(async move {
-            let status = self.0.wait().await?;
-            Ok(ExitStatus {
-                code: status.code(),
-                signal: signal_of(status),
-            })
-        })
+        Box::pin(wait_child(&mut self.0))
     }
 }
 

@@ -278,6 +278,7 @@ impl ToolIo {
             command: p.command,
             cwd,
             env: command_env(&self.config.command_env, p.env.unwrap_or_default()),
+            launcher: None,
         };
         let (tx, rx) = mpsc::channel(OUTPUT_BUFFER);
         let watcher = {

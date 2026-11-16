@@ -296,7 +296,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 T11（2026-11-15 开工；基线 verify 13 步通过；依赖 T07 已完成；T12 尚未开工，没有可复用的 Job Object；分支未推送，前序 Windows CI 无法核对）：
 
-- [ ] 1 `piarc-exec` 进程树启动器：macOS 进程组、Windows Job Object（`KILL_ON_JOB_CLOSE`、挂起创建后入 Job、不允许 breakaway），Windows CI 单测父子孙三级（A10）
+- [x] 1 `piarc-exec` 进程树启动器：macOS 进程组、Windows Job Object（`KILL_ON_JOB_CLOSE`、挂起创建后入 Job、不允许 breakaway），Windows CI 单测父子孙三级（A10；Windows 代码待 CI 编译与运行）
 - [ ] 2 `piarc-sandbox` Seatbelt 配置生成：路径规范化与转义、受保护路径清单、`denyRead`、缓存目录方案、`sandbox-exec -D` 参数、快照测试（含空格与中文路径）（A09）
 - [ ] 3 `piarc-sandbox` 本地代理：HTTP 与 `CONNECT`、精确与 `*.` 通配白名单、可注入解析器、拒绝回环与云元数据地址（A04、A06）
 - [ ] 4 Core 编排：沙箱会话的 `exec/run` 经 `piarc-sandbox` 包装、经 `piarc-exec` 执行，流式、退出码、取消与无残留进程（A08）

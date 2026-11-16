@@ -10,8 +10,10 @@
 //! [`EXIT_GRACE`]: a background process the command started can keep a pipe open, and the
 //! command's own last writes must not be lost (the same rule as Pi's `waitForChildProcess`).
 //!
-//! Only the direct child is terminated so far; process groups and Job Objects, timeouts and
-//! moving long commands to the background arrive with T17 (`docs/plan/PLAN.md`, I17).
+//! A [`Launcher`] runs the shell through a wrapper program, the way a sandbox does
+//! (`/usr/bin/sandbox-exec … -- /bin/bash -c <command>`). Which process tree a kill reaches is
+//! the injected spawner's choice ([`crate::ProcessTreeSpawner`] ends the whole tree); timeouts
+//! and moving long commands to the background arrive with T17 (`docs/plan/PLAN.md`, I17).
 
 use std::ffi::OsString;
 use std::io;
@@ -57,6 +59,17 @@ pub struct CommandSpec {
     pub cwd: PathBuf,
     /// The complete environment: nothing is inherited.
     pub env: Vec<(OsString, OsString)>,
+    /// A wrapper that starts the shell, or `None` to start the shell directly.
+    pub launcher: Option<Launcher>,
+}
+
+/// A program that runs the shell: `program args… <shell> -c <command>`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Launcher {
+    /// The wrapper's executable.
+    pub program: PathBuf,
+    /// The wrapper's arguments before the shell.
+    pub args: Vec<OsString>,
 }
 
 /// How a command ended.
@@ -110,9 +123,19 @@ impl CommandRunner {
         output: mpsc::Sender<OutputChunk>,
         cancel: CancellationToken,
     ) -> io::Result<CommandExit> {
+        let shell_args = [OsString::from("-c"), OsString::from(spec.command)];
+        let (program, args) = match spec.launcher {
+            Some(launcher) => {
+                let mut args = launcher.args;
+                args.push(self.shell.clone().into_os_string());
+                args.extend(shell_args);
+                (launcher.program, args)
+            }
+            None => (self.shell.clone(), shell_args.into()),
+        };
         let process = self.spawner.spawn(SpawnSpec {
-            program: self.shell.clone(),
-            args: vec![OsString::from("-c"), OsString::from(spec.command)],
+            program,
+            args,
             cwd: spec.cwd,
             env: spec.env,
         })?;
@@ -251,6 +274,7 @@ mod tests {
             env: std::env::vars_os()
                 .filter(|(k, _)| k == "PATH" || k == "SystemRoot")
                 .collect(),
+            launcher: None,
         }
     }
 
@@ -335,6 +359,27 @@ mod tests {
         assert!(!exit.status.success());
         assert!(started.elapsed() < Duration::from_secs(10));
         assert_eq!(reader.await.expect("reader").0, "started\n");
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_launcher_wraps_the_shell() {
+        let (tx, rx) = mpsc::channel(16);
+        let reader = tokio::spawn(collect(rx));
+        let mut wrapped = spec("");
+        // `env X=1 /bin/bash -c …`: the launcher's arguments come before the shell.
+        wrapped.launcher = Some(Launcher {
+            program: "/usr/bin/env".into(),
+            args: vec![OsString::from("PIARC_LAUNCHED=1")],
+        });
+        wrapped.command = "echo \"$PIARC_LAUNCHED $0\"".to_owned();
+        let exit = runner()
+            .run(wrapped, tx, CancellationToken::new())
+            .await
+            .expect("runs");
+        assert_eq!(exit.status.code, Some(0));
+        let shell = runner().shell().display().to_string();
+        assert_eq!(reader.await.expect("reader").0, format!("1 {shell}\n"));
     }
 
     #[tokio::test]

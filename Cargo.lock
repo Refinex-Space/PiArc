@@ -1180,9 +1180,11 @@ version = "0.0.0"
 name = "piarc-exec"
 version = "0.0.0"
 dependencies = [
+ "nix",
  "piarc-ports",
  "tokio",
  "tokio-util",
+ "windows-sys",
 ]
 
 [[package]]

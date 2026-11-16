@@ -28,12 +28,29 @@
 //!   bash, streams stdout and stderr as they are read and terminates the command on
 //!   cancellation: the work behind AHP's `exec/run`.
 //!
-//! Both terminate only the direct child: process-group (macOS) and Job Object (Windows)
-//! termination of the whole process tree, timeouts, output spooling and moving commands to the
-//! background are still to come (T17; `docs/plan/PLAN.md`, I17).
+//! - [`ProcessTreeSpawner`] (T11) kills the whole process tree: a process group on Unix, a Job
+//!   Object with `KILL_ON_JOB_CLOSE` on Windows (the child joins it before running). Sandboxed
+//!   commands run with it; T12 starts the Agent Host with it and T17 makes it the spawner of
+//!   every command (`docs/plan/PLAN.md`, I17).
+//!
+//! [`TokioProcessSpawner`] terminates only the direct child. Timeouts, output spooling and
+//! moving commands to the background are still to come (T17).
+//!
+//! The Windows `job` module is the crate's only unsafe code: a safe wrapper over the Job
+//! Object calls (coding standards section 2.8).
 
 mod command;
+#[cfg(windows)]
+#[allow(
+    unsafe_code,
+    reason = "safe wrapper over the Win32 Job Object API (coding standards section 2.8)"
+)]
+mod job;
 mod spawner;
+mod tree;
 
-pub use command::{CommandExit, CommandRunner, CommandSpec, EXIT_GRACE, OutputChunk, Stream};
+pub use command::{
+    CommandExit, CommandRunner, CommandSpec, EXIT_GRACE, Launcher, OutputChunk, Stream,
+};
 pub use spawner::TokioProcessSpawner;
+pub use tree::ProcessTreeSpawner;
