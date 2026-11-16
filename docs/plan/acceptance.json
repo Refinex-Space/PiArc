@@ -643,8 +643,8 @@
       "id": "T03-A03",
       "task": "T03",
       "description": "CI 配置在 macOS 与 Windows runner 上运行冒烟用例、安全用例与 fuse 校验，配置语法有效。验证：actionlint（或 YAML 解析）输出；Windows 实际运行结果未取得时标 `blocked`，由 W0 核对。",
-      "status": "blocked",
-      "evidence": "CI desktop 作业（macos-latest、windows-latest）运行 package dev → test:e2e → package release → check:fuses；actionlint 1.7.12 对 .github/workflows/ci.yml 退出码 0、无发现（tmp/evidence/T03/actionlint.log）；本机按同款命令全部通过。Windows 实际运行结果需推送后取得（任务不推送），由下一任务开工检查或 W0 核对"
+      "status": "passing",
+      "evidence": "由 W0 在 Windows 上验证：Windows 11 25H2 本机按 CI desktop 作业的步骤运行：package:desktop --flavor development → test:e2e（dev 与 packaged 两种形态 138 项全部通过，含冒烟与全部安全用例）→ package:desktop（发布构建）→ check:fuses（9 项与发布配置一致），日志 tmp/evidence/W0/l4.log、check-fuses.log。CI https://github.com/Refinex-Space/PiArc/actions/runs/43827342553 的 Windows desktop 作业中安全与冒烟用例通过，只有 3 个复制用例因 Chromium 在 Windows 上以 CRLF 写剪贴板而失败（两种形态共 6 项），已在 9d6b01b 修复读剪贴板的辅助函数；下一次推送后由 CI 复核。actionlint 证据不变（tmp/evidence/T03/actionlint.log）"
     },
     {
       "id": "T03-A04",
@@ -4962,15 +4962,15 @@
       "id": "W0-A01",
       "task": "W0",
       "description": "机器信息（CPU、内存、Windows 版本与构建号、架构）已记录在各报告的 Windows 部分，并与第 11 章基准机型对照。验证：报告内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "机器信息写入 S1 第 8 节、S2 第 8 节（主表）、S5 第 12 节、S6 第 9 节、S7 第 11 节、S8 第 10 节：HUAWEI 笔记本 Intel Core i5-1340P（4P+8E，16 线程）、16 GB、NVMe SSD 1 TB、Windows 11 专业版 25H2 10.0.26200.9974、x64，接交流电、平衡电源计划、Defender 实时保护开启；与第 11 章 x64 8 核 / 16 GB / NVMe 对照：核数、内存、磁盘满足，笔记本与能效核使数据偏保守"
     },
     {
       "id": "W0-A02",
       "task": "W0",
       "description": "S1：T09 的自动化测试在 Windows 上通过；流式、滚动、冷加载、内存的测量数据已记录并与第 11 章预算对照。验证：测试与测量输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 transcript-*.e2e.ts 与 composer.e2e.ts 在 dev、packaged 两种形态通过（tmp/evidence/W0/l4.log，全量 138 项）；npm run bench:s1 -- --form packaged（tmp/evidence/W0/bench/s1-packaged.json）：100 token/s 流式每帧主线程工作 p99 4.7 ms、长任务 0、丢帧 0（≤16 ms，通过）；1 万条滚动 75.1 fps（75 Hz 屏，≥60，通过）；冷加载 1,000 条中位 80.9 ms（≤300 ms，通过）；渲染进程 137 MiB（≤220 MB，通过）；全部进程合计 450.0 MiB（472 MB）超出 450 MB，与 macOS 同类，记入 S1 第 8 节与 I26 由 R1 校准"
     },
     {
       "id": "W0-A03",
@@ -4983,15 +4983,15 @@
       "id": "W0-A04",
       "task": "W0",
       "description": "S2：win32-x64 在开发模式与打包产物中加载 `.node`；完整基准无丢失无乱序，主进程事件循环延迟 p99 ≤ 16 ms，同步调用 p99 ≤ 1 ms。验证：基准输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "failing",
+      "evidence": "开发与打包形态加载 .node 通过（L4 core-events 两种形态、bench:s2 打包形态）；npm run bench:s2 -- --form packaged（tmp/evidence/W0/bench/s2-packaged.json）：10 万事件/分钟 × 5 分钟 50 万个全部到达、乱序 0；同步调用 p99 0.008 ms（≤1 ms，通过）；主进程事件循环延迟按原始值 p99 16.81 ms，未达到 ≤16 ms。原因分析（S2 第 8 节）：Windows 默认计时器粒度约 15.6 ms，同机空闲 Node 24.13.1 同一测量 p50 15.56 ms、p99 16.58 ms，满载只多 0.23 ms，每次投递的主进程转发 p99 0.214 ms，Core 没有造成可见阻塞。预算与测量口径不改，交 R1 校准 Windows 上的口径"
     },
     {
       "id": "W0-A05",
       "task": "W0",
       "description": "S5：凭据管理器中主密钥的创建、读取、删除与错误路径通过，测试条目已清理；Windows 数据目录的无明文扫描通过。验证：测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PIARC_REQUIRE_KEYCHAIN=1 cargo test -p piarc-secrets --test system_store -- --nocapture（tmp/evidence/W0/s5-system-store.log）：Windows 凭据管理器中 piarc-test.a11.<pid>.<随机>.credential-vault 的创建、读取、删除与\"保险箱在、主密钥缺失\"路径（masterKeyMissing）通过，之后 cmdkey /list 无 piarc 条目；拒绝、不可用、失败路径由替身注入用例覆盖并在 Windows 通过（真实凭据管理器要停服务或改策略才能制造，属系统配置变更，未做）；无明文：cargo test -p piarc-testkit --test agent_host credentials（tmp/evidence/W0/s5-credentials.log）扫描数据目录、pi/、sessions/、工作区、Core 日志与 %TEMP% 无 token，Agent Host A、B 与 MCP server 的进程环境（新增 process-env.ps1 从 PEB 读取）无凭据"
     },
     {
       "id": "W0-A06",
@@ -5018,8 +5018,8 @@
       "id": "W0-A09",
       "task": "W0",
       "description": "S7：选定的 MSVC 链接方式在打包产物中可用；ConPTY 下启动、调整尺寸、Ctrl+C、终止进程正常；TUI 截图正确；formatter 与帧逐格一致的测试通过。验证：测试输出与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "选定的链接方式（官方 ghostty-vt.dll 在 .node 旁边）在本机打包产物中可用：packaged 形态的终端 L4 通过（app.asar.unpacked/native/）；ConPTY：crates/piarc-term/tests/pty_windows.rs 10 项通过——启动 cmd、resize 后 PowerShell 读到 30 × 100、Ctrl+C 中断 ping、自行退出与关闭都报告 Exited（实测发现并修复两处缺陷，1c6750b）；TUI：Git 的 vim 与 PowerShell 进程表的截图正确（tmp/evidence/W0/l4/terminal-tui.e2e.ts-*/vim.png、top.png，与 formatter 文本逐字一致）；formatter 与帧逐格一致：cargo test -p piarc-term 的 consistency 与 pty_windows 的帧重建用例通过"
     },
     {
       "id": "W0-A10",
@@ -5032,15 +5032,15 @@
       "id": "W0-A11",
       "task": "W0",
       "description": "win32-arm64：`.node` 与 libghostty-vt 在 arm64 实机上加载运行，或注明\"未验证\"并列为 R1 跟进项。验证：测试输出或报告。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "没有本地 arm64 设备。CI 43827342553 的 core-load 在 windows-11-arm（GitHub arm64 Windows 11 runner，镜像 windows-11-vs2026-arm64）上把开发版与发布版 piarc-core.win32-arm64-msvc.node 与旁边的 ghostty-vt.dll 一起加载，在 Node 24.22.2 与 Electron 45.3.2 中跑通事件通道。libghostty-vt 在 arm64 上的实际运行\"未验证\"：W0 给 scripts/ci/core-load-check.mjs 加了终端检查（83cada8，本机 x64 四种组合通过），下一次推送后的 core-load 给出结果，列为 R1 跟进项（S2 第 8 节、S7 第 3.3 与 11 节）"
     },
     {
       "id": "W0-A12",
       "task": "W0",
       "description": "S8：Job Object 终止多级进程树后无残留；结束主进程后 Agent Host 及其子进程全部退出。验证：测试输出与进程列表。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-exec：tree::tests::windows::closing_the_job_ends_three_levels、kill_ends_three_levels（父 cmd → 子 cmd → 孙 ping，ToolHelp 进程快照确认全部退出）通过；新 L4 agent-host-kill.e2e.ts（packaged，Windows）：回合进行中 taskkill /F 主进程（TerminateProcess，同任务管理器\"结束任务\"），之前进程树 PiArc.exe → node.exe（Agent Host）→ cmd.exe → node.exe → cmd.exe → node.exe（npx 拉起的 MCP server）加两个 conhost，之后 Agent Host 子树 7 个进程都不在 CIM 进程表中，连续 3 次通过（tmp/evidence/W0/l4/agent-host-kill.e2e.ts-*/process-tree.txt）。Core 直接启动的普通命令尚未进 Job（I33，T17）"
     },
     {
       "id": "W0-A13",

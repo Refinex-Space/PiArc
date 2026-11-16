@@ -110,7 +110,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 |---|---|---|---|---|---|---|---|---|---|
 | T01 | [仓库脚手架、工程规范与质量门禁](tasks/T01-scaffold-and-quality-gates.md) | 0 | 无 | macOS | high | 大 | 无 | 已完成 | 47fb1e9 |
 | T02 | [协议单一来源与契约测试基座](tasks/T02-protocol-and-contract-tests.md) | 0 | T01 | macOS | high | 中 | 无 | 已完成 | ce41191 |
-| T03 | [Electron 应用骨架与安全基线](tasks/T03-electron-shell-and-security-baseline.md) | 1 | T02 | macOS | xhigh | 大 | S10 | 部分完成 | 63eabea |
+| T03 | [Electron 应用骨架与安全基线](tasks/T03-electron-shell-and-security-baseline.md) | 1 | T02 | macOS | xhigh | 大 | S10 | 已完成 | 63eabea |
 | T04 | [Core NAPI 绑定与事件通道](tasks/T04-core-napi-and-event-channel.md) | 1 | T03 | macOS | xhigh | 大 | S2 | 已完成 | aa2817f |
 | T05 | [严格校验的 mock provider](tasks/T05-strict-mock-provider.md) | 1 | T02 | macOS | high | 中 | 无 | 已完成 | 1487154 |
 | T06 | [Agent Host 骨架：Pi SDK 多会话与 AHP](tasks/T06-agent-host-skeleton.md) | 1 | T04、T05 | macOS | xhigh | 大 | S3、S9 | 已完成 | 2214b08 |
@@ -120,7 +120,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 部分完成 | ff591d6 |
 | T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 已完成 | 1b92a25 |
 | T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 部分完成 | 815c32d |
-| W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 进行中 | — |
+| W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 阻塞（等待用户实机操作） | — |
 | R1 | [M0 评审与收口](tasks/R1-m0-review.md) | 1 | W0 | macOS | high | 中 | S1–S10 汇总 | 未开始 | — |
 | T13 | [存储、数据目录、配置与项目信任](tasks/T13-storage-config-and-trust.md) | 2 | R1（结论为进入 M1） | macOS | high | 大 | 无 | 未开始 | — |
 | T14 | [会话编排与事件投影](tasks/T14-session-orchestration-and-projection.md) | 2 | T13 | macOS | xhigh | 大 | 无 | 未开始 | — |
@@ -296,19 +296,14 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 W0（Windows 11 实机，2026-11-16 开工；同时闭环 T03、T04、T10、T11、T12 中的 Windows 验收项）：
 
-- [x] 环境：npm 依赖、Electron、`.tools/`（经本机代理）；机器信息已采集
-- [x] 基线修复（9d6b01b、1c6750b、15ce450）：CI 的 verify 两个平台失败（release 夹具 `.dmg` 被 `.gitignore` 排除、`core-io.test.ts` 的 `/w` 在 Windows 被 Pi 解析为 `W:\`），desktop L4 Windows 失败（剪贴板 CRLF）
-- [ ] 基线 `npm run verify` 在 Windows 通过（W0-A15）
-- [x] CI 结果关闭 T04-A09、T10-A01、T12-A04；本机关闭 T11-A10（T04、T11 改为已完成）
-- [ ] T03-A03：本机按 CI 同款步骤跑 L4 与 fuse 校验（W0-A13）
-- [ ] S2：开发与打包形态加载、`bench:s2` 完整基准（W0-A04）
-- [ ] S5：凭据管理器实机测试、数据目录无明文扫描（W0-A05）
-- [ ] S7：终端用例的 Windows 版本（ConPTY、TUI、formatter 一致）、`bench:s7`、随附 conpty 的结论（W0-A09、A10 自动化部分）
-- [ ] S8：Job Object 进程树与结束主进程（W0-A12）
-- [ ] S1：T09 自动化测试、`bench:s1`（W0-A02）
-- [ ] arm64：CI `windows-11-arm` 结果或"未验证"（W0-A11）
-- [ ] 实机关口（用户）：SmartScreen、智能应用控制、安装/卸载/更新、Defender、微软拼音（composer 与终端）（W0-A03、A06、A07、A08、A10 IME、T12-A12、T12-A14）
-- [ ] 报告 Windows 部分、spikes README、CLAUDE.md、收尾（W0-A01、A14）
+- [x] 环境：npm 依赖、Electron、`.tools/`（经本机代理）；机器信息已采集（A01）
+- [x] 基线修复（9d6b01b、1c6750b、15ce450、83cada8、e8959fc）：release 夹具、Windows 才有的测试问题、ConPTY 两处缺陷、终端 L4 与 S7 基准的 Windows 版、结束主进程的 L4、arm64 终端检查、Windows 进程环境检查
+- [x] CI 与本机关闭 T03-A03、T04-A09、T10-A01、T11-A10、T12-A04（T03、T04、T11 改为已完成）
+- [x] S1 自动化与测量（A02）、S2（A04 按原始值未达标，交 R1）、S5（A05）、S7 自动化与测量（A09；A10 的回显 p95 按原始口径未达标，交 R1）、S8（A12）、arm64（A11）
+- [x] 报告 Windows 部分、spikes README、CLAUDE.md（7e2f310）
+- [ ] `npm run verify` 收尾（A15）
+- [ ] 实机关口（用户，`docs/spikes/S06-first-run-checklist.md` 第 8 节）：W1 安全设置状态、W2 浏览器下载、W3 SmartScreen 与安装、W5 微软拼音（composer、终端）、W6 卸载；智能体在 W3 之后做安装检查、mock 对话、更新（`Update.exe apply`）、体积、图标、通知（A03、A06、A07、A08、A10 输入法部分、T12-A12、T12-A14）
+- [ ] 实机结果写回 S1、S6、S7 与检查清单，A13、A14，收尾
 
 ## 登记事项
 
@@ -348,7 +343,7 @@ W0（Windows 11 实机，2026-11-16 开工；同时闭环 T03、T04、T10、T11�
 | I30 | T10 | `#/terminal-lab` 原型页随发布构建的渲染包分发；发布构建的 `window.piarc` 也有七个终端函数（`createTerminal` 只能启动登录 shell），与 I13、I24 同类 | T34 接入正式终端面板时收口；T45 与 I13、I24 一起评估剔除原型页 |
 | I31 | T10 | 真实拼音输入法的候选框位置未核对，清单见 `docs/spikes/S07-terminal.md` 第 8 节（T1–T4） | 用户核对后把结果告诉智能体补记到 S7 报告；R1 汇总 S7 时检查（同 I25） |
 | I32 | T10 | T09 的 L4 `transcript-scroll.e2e.ts` 中 "the wheel releases and resumes following" 在一次全量运行中失败（dev 形态，内容增长时离底 31 px，期望 ≤ 1 px），单独重跑 10 次（两种形态各 5 次）都通过；本机此时的主屏是 120 Hz | T19 接手 transcript 时检查贴底在高刷新率下的时序；T44 把 L4 的偶发失败纳入统计 |
-| I33 | T11 | 进程树终止的接口已就绪：`piarc_exec::ProcessTreeSpawner`（`ProcessSpawner` 的实现；macOS 新进程组 + `killpg`，Windows 挂起创建后加入 `KILL_ON_JOB_CLOSE`、不许 breakaway 的 Job 再恢复；`kill` 与丢弃句柄都结束整棵树，丢弃也会结束命令留在后台的进程）。目前只有沙箱会话的 `exec/run` 用它 | 部分落地（T12）：`piarc_core::agent_host::start` 与 `start_bundled` 改用 `ProcessTreeSpawner`（W0 实机核对 Agent Host 被杀时子进程随之结束）；T17 让 `ToolIo` 的普通命令也用它，并决定后台进程在命令结束时是否保留（与 T32 的后台任务一起） |
+| I33 | T11 | 进程树终止的接口已就绪：`piarc_exec::ProcessTreeSpawner`（`ProcessSpawner` 的实现；macOS 新进程组 + `killpg`，Windows 挂起创建后加入 `KILL_ON_JOB_CLOSE`、不许 breakaway 的 Job 再恢复；`kill` 与丢弃句柄都结束整棵树，丢弃也会结束命令留在后台的进程）。目前只有沙箱会话的 `exec/run` 用它 | 部分落地（T12）：`piarc_core::agent_host::start` 与 `start_bundled` 改用 `ProcessTreeSpawner`（W0 实机核对 Agent Host 被杀时子进程随之结束）；T17 让 `ToolIo` 的普通命令也用它，并决定后台进程在命令结束时是否保留（与 T32 的后台任务一起）。W0 补充：Windows 的 Git Bash 没有真正的 `exec`，命令总是 bash.exe 的子进程，所以现在取消或超时一个委托的 Bash 命令时，命令本身（不只是它的后台进程）都继续运行（`piarc-exec` 的 `cancelling_kills_the_command` 中 `sleep.exe` 活满 30 s），T17 在 Windows 上必须改用 `ProcessTreeSpawner` |
 | I34 | T11 | 沙箱把 `CARGO_HOME` 指向会话临时目录（防止缓存投毒，S8 报告第 4 节），沙箱内读不到 `~/.cargo/config.toml` 的镜像源设置；每个会话第一次安装或构建是冷缓存 | T39 决定是否把用户的 Cargo 配置（不含凭据）复制进会话，以及是否提供共享只读缓存 |
 | I35 | T11 | 沙箱内不能绑定端口、不能连 Unix socket（本地测试服务器、Docker、ssh-agent 不可用），`git init`/`clone`/`config` 因 `.git/config`、`.git/hooks` 受保护而失败；`GIT_CONFIG_COUNT` 被沙箱用来指定代理，命令继承的同类变量失效 | T39 评估"允许本机绑定""允许写 `.git/config`"两个选项与 Unix socket 白名单，设置页写明这些限制 |
 | I36 | T11 | macOS 的进程组终止不覆盖主动 `setsid`/`setpgid` 的后代：它们仍在沙箱里，但停止命令后会活下来（Windows 的 Job 无此问题） | T17 实现通用进程管理时评估是否需要按后代追踪（例如记录会话内的进程并在停止时扫描） |
@@ -358,7 +353,11 @@ W0（Windows 11 实机，2026-11-16 开工；同时闭环 T03、T04、T10、T11�
 | I40 | T12 | 在 Agent Host 的宽松 Seatbelt 下，`npx <本地目录>` 形式的 MCP server 启动失败：npm 链接目录后 `chmod` 其 bin，文件在可写目录之外（`EPERM`）。registry 包（tarball）不受影响 | T36 接入 MCP 配置时给出明确错误提示或改用 `npm pack` 后的路径；T39 定稿 Agent Host 配置时一并评估 |
 | I41 | T12 | macOS arm64 安装后体积 449.0 MB，预算 450 MB 只余约 1 MB（内置 node 145 MiB、Electron Framework 250 MiB）；任何新增随包内容都会超出 | R1 决定：校准预算（写明原因）或裁剪（npm 的 docs/man 约 3.2 MiB、压缩 bundle 等），T44 把体积纳入回归 |
 | I42 | T12 | S6 中 Gatekeeper 开启时的首次打开没有验证："仍要打开"是否出现、`xattr -dr com.apple.quarantine` 备选、Gatekeeper 是否单独拦截内置 node（以及带隔离属性的 rg、fd）。用户的 Mac（macOS 26.5.2）`spctl --status` 为 `assessments disabled`，从 `127.0.0.1` 经 Safari 下载的 DMG 也没有 `com.apple.quarantine`；没有 macOS 15 设备。检查清单与 `scripts/dev/s6-probe.mjs` 可直接复用 | R1 汇总 M0 时安排：在开着 Gatekeeper 的 Mac（26 与 15）上、用从 GitHub 等外部地址下载的 DMG 重做检查清单第 2、3 项；最晚 T50 首次发布前完成，结果补进 S6 报告 |
-| I43 | T12 | ad-hoc 签名的 PiArc 的系统通知可用（允许后横幅显示，实机确认），但用户未允许通知时 Electron 仍发 `show`、不发 `failed`，程序侧事件不能用来决定是否退回应用内提醒；另外应用退出时 Electron 删除已投递的通知，通知中心里的条目随之消失 | T18/T35 做系统通知时：通知之外总给应用内提醒与 Dock 角标，或经原生模块读取 `UNUserNotificationCenter` 的授权设置；T35 的后台运行设计考虑通知随应用退出被删除 |
+| I43 | T12 | ad-hoc 签名的 PiArc 的系统通知可用（允许后横幅显示，实机确认），但用户未允许通知时 Electron 仍发 `show`、不发 `failed`（Windows 上不同：系统拒绝时 `show` 之后再发 `failed`，W0），程序侧事件不能用来决定是否退回应用内提醒；另外应用退出时 Electron 删除已投递的通知，通知中心里的条目随之消失 | T18/T35 做系统通知时：通知之外总给应用内提醒与 Dock 角标，或经原生模块读取 `UNUserNotificationCenter` 的授权设置；T35 的后台运行设计考虑通知随应用退出被删除 |
+| I44 | W0 | Windows 上两项测量的口径失效：①`monitorEventLoopDelay` 受约 15.6 ms 的计时器粒度支配，空闲 Node 就是 p99 16.58 ms，S2 满载原始 p99 16.81 ms（W0-A04 按原始值未达标）；②终端回显的配对相减被 ConPTY 两次独立往返的 0–16 ms 抖动淹没，均值 −0.12 ms 而 p95 6.86 ms（W0-A10）。预算未改 | R1 校准 Windows 的测量方法（扣除同机空闲基线，或改测回调执行时长、在 Core 内分段打点），再据此改判 W0-A04、A10 |
+| I45 | W0 | Windows 体积超预算：CI 的 `Setup.exe`（开发构建）225.3 MB > 200 MB；本机发布构建打包目录 516.4 MB > 450 MB（Electron 本体约 360 MiB、内置 node 约 102 MiB），安装后体积见 S6 第 9 节 | R1 与 I41 一起决定（裁剪 locales、校准 Windows 预算等），T44 纳入回归 |
+| I46 | W0 | Windows 上 Node 写管道式 stdout 是同步的：Core 停止读取时 Agent Host 整个事件循环停住，连 Core 发来的请求（中断、关闭）也处理不了，直到 Core 恢复读取；macOS 上它会继续在内存里排队 | T14 的事件消费者持续取走事件（同 I19）；R1 评估是否需要让 Agent Host 的 AHP 写入在 Windows 上异步（例如单独的管道而不是 fd 1） |
+| I47 | W0 | win32-arm64 上 libghostty-vt 的实际运行尚无结果：CI 只做过加载，W0 给 `core-load-check.mjs` 加了终端检查，要下一次推送后的 `core-load`（`windows-11-arm`）才有结果 | R1 开工时核对该作业；失败按 ADR-0017 的触发条件处理 |
 
 ## 技术债
 

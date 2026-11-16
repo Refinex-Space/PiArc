@@ -38,5 +38,6 @@
 ## 易错点
 
 - `ProcessControl::wait` 与 `kill` 都借用 `&mut self`：等待与取消要分两步写（`watch` 函数），不能在同一个 `select!` 分支里既等又杀。
-- 测试里的命令用 `exec sleep`，让 shell 被替换，终止直接子进程即可结束管道；不用 `exec` 时后台进程会占住管道直到 `EXIT_GRACE`。
+- 测试里的命令用 `exec sleep`，让 shell 被替换，终止直接子进程即可结束管道；不用 `exec` 时后台进程会占住管道直到 `EXIT_GRACE`。Windows 的 Git Bash（MSYS）没有真正的 `exec`：`sleep.exe` 仍是 bash.exe 的子进程，`TokioProcessSpawner` 取消时只杀 bash，`sleep` 活到自己结束（W0 实测，`cancelling_kills_the_command` 因此在 Windows 上要 30 s 才结束测试进程；I33，T17 改用 `ProcessTreeSpawner`）。
+- Git Bash 在繁忙的 Windows 机器上启动可能超过几百毫秒：测试不要按固定延迟假设命令已经开始输出，等第一段输出再动作。
 - Windows 代码在 macOS 上只能做类型检查与 lint（`cargo clippy --target x86_64-pc-windows-msvc -p piarc-exec --all-targets -- -D warnings`，需先 `rustup target add x86_64-pc-windows-msvc`）；Job Object 的测试只在 Windows CI 运行。

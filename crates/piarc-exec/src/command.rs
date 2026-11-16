@@ -342,13 +342,20 @@ mod tests {
 
     #[tokio::test]
     async fn cancelling_kills_the_command() {
-        let (tx, rx) = mpsc::channel(16);
+        let (tx, mut rx) = mpsc::channel::<OutputChunk>(16);
         let cancel = CancellationToken::new();
-        let reader = tokio::spawn(collect(rx));
         let canceller = cancel.clone();
-        tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_millis(200)).await;
-            canceller.cancel();
+        // Cancel once the command has started, not after a fixed delay: Git Bash on a busy
+        // Windows machine can take longer than that to print anything.
+        let reader = tokio::spawn(async move {
+            let mut out = Vec::new();
+            while let Some(chunk) = rx.recv().await {
+                if chunk.stream == Stream::Stdout {
+                    out.extend(chunk.bytes);
+                    canceller.cancel();
+                }
+            }
+            String::from_utf8_lossy(&out).into_owned()
         });
         let started = Instant::now();
         let exit = runner()
@@ -358,7 +365,7 @@ mod tests {
         assert!(exit.killed);
         assert!(!exit.status.success());
         assert!(started.elapsed() < Duration::from_secs(10));
-        assert_eq!(reader.await.expect("reader").0, "started\n");
+        assert_eq!(reader.await.expect("reader"), "started\n");
     }
 
     #[cfg(unix)]
