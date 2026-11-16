@@ -117,7 +117,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T07 | [Operations 委托与规范名工具](tasks/T07-operations-delegation-and-canonical-tools.md) | 1 | T06 | macOS | xhigh | 大 | S4 | 已完成 | 3a8744f |
 | T08 | [凭据保险箱](tasks/T08-credential-vault.md) | 1 | T06；D2 | macOS | high | 中 | S5 | 已完成 | 83dc25b |
 | T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 已完成 | 9c0738d |
-| T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 部分完成 | ff591d6 |
+| T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 已完成 | e2c302d |
 | T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 已完成 | 1b92a25 |
 | T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 已完成 | 815c32d |
 | W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 部分完成 | f278039 |
@@ -477,6 +477,13 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 验收：W0 13 项通过、2 项未达标（A04 事件循环延迟原始 p99 16.81 ms、A10 回显额外延迟原始 p95 6.86 ms，都是 Windows 计时器粒度与 ConPTY 抖动造成的测量口径问题，I44 交 R1）；前序任务关闭 T03-A03、T04-A09、T10-A01、T11-A10、T12-A04、A12、A14，T03、T04、T11、T12 改为已完成，T10 仍余 A11（macOS 拼音，R1）
 - 决策：未写 ADR。补充型：`piarc-term` 的 `unsafe` 范围增加 Windows 专用 `console` 模块（编码规范 2.8）；不随附 `conpty.dll`；Windows 上 stdout 同步写的背压形态按平台断言，其余结论不变；A06 把卸载后留下的用户数据目录视为数据而非程序残留（I48），A07 以"本机无法观察"加原因关闭（I49）
 - 遗留：I44–I49；I33 补充 Windows 证据（委托的 Bash 被取消后命令本身继续运行，T17 必须改用 `ProcessTreeSpawner`）；I47 要下一次 CI 的 arm64 `core-load`；用户需在 Windows 上推送
+
+### 2026-11-16 T10 已完成（提交 e2c302d）
+- 环境：macOS 26.5.2（MacBook Pro，BenQ 外接屏），已安装的开发构建 `/Applications/PiArc.app`（T12 构建 B）
+- 交付：S7 报告第 8 节 T1–T4 的真实拼音结果（智能体经 computer-use 以前台键盘事件输入，截图 `tmp/evidence/T10/ime/`）
+- 验收：T10 14 项全部通过（A11 由阻塞改为通过）
+- 决策：无
+- 遗留：I31 已落地；后台方式投递的按键不经过输入法，真实输入法核对必须用前台键盘事件（S7 第 8 节）。W0 的 A04、A10（Windows 测量口径，I44）仍交 R1，需要 Windows 电脑
 
 ## 计划变更记录
 
