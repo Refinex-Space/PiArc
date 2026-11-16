@@ -1,0 +1,201 @@
+//! Writing settings: only to the layers marked writable (`.piarc/` files and the user file;
+//! never `.claude/`, ADR-0005), through a temporary file in the same directory renamed over
+//! the target, so a reader never sees half a file.
+
+use std::fs::{self, OpenOptions};
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+use serde_json::{Map, Value};
+
+use crate::layers::LayerTable;
+
+/// Why a write was refused or failed.
+#[derive(Debug, thiserror::Error)]
+pub enum WriteError {
+    /// No layer has this id.
+    #[error("there is no settings layer {0:?}")]
+    UnknownLayer(String),
+    /// The layer is read-only for PiArc.
+    #[error("the settings layer {0:?} is not writable")]
+    ReadOnly(String),
+    /// The pointer is empty or not of the `/key/key` form.
+    #[error("invalid settings key {0:?}")]
+    InvalidPointer(String),
+    /// The existing file is not a JSON object; it is left as it is.
+    #[error("{} is not a JSON object; it was not changed", path.display())]
+    NotAnObject {
+        /// The file.
+        path: PathBuf,
+    },
+    /// A file system step failed; the file keeps its previous content.
+    #[error("{op} {}: {source}", path.display())]
+    Io {
+        /// What was being done.
+        op: &'static str,
+        /// The file.
+        path: PathBuf,
+        /// The operating system's error.
+        source: io::Error,
+    },
+}
+
+/// Sets (`Some`) or removes (`None`) the value at `pointer` in the file of layer `layer`,
+/// creating the file, its directory and intermediate objects as needed. Returns the file.
+///
+/// # Errors
+///
+/// See [`WriteError`]. On any error the file is unchanged.
+pub fn write_value(
+    table: &LayerTable,
+    layer: &str,
+    pointer: &str,
+    value: Option<Value>,
+) -> Result<PathBuf, WriteError> {
+    let spec = table
+        .get(layer)
+        .ok_or_else(|| WriteError::UnknownLayer(layer.to_owned()))?;
+    let path = match (spec.writable, spec.file()) {
+        (true, Some(path)) => path.to_owned(),
+        _ => return Err(WriteError::ReadOnly(layer.to_owned())),
+    };
+    let tokens = parse_pointer(pointer)?;
+    let mut document = match fs::read(&path) {
+        Ok(bytes) if bytes.iter().all(u8::is_ascii_whitespace) => Value::Object(Map::new()),
+        Ok(bytes) => serde_json::from_slice(&bytes)
+            .map_err(|_| WriteError::NotAnObject { path: path.clone() })?,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Value::Object(Map::new()),
+        Err(source) => {
+            return Err(WriteError::Io {
+                op: "cannot read",
+                path,
+                source,
+            });
+        }
+    };
+    if !document.is_object() {
+        return Err(WriteError::NotAnObject { path });
+    }
+    apply(&mut document, &tokens, value);
+    let mut text = serde_json::to_string_pretty(&document).unwrap_or_else(|_| "{}".to_owned());
+    text.push('\n');
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(|source| WriteError::Io {
+            op: "cannot create",
+            path: dir.to_owned(),
+            source,
+        })?;
+    }
+    replace_file(&path, text.as_bytes())?;
+    Ok(path)
+}
+
+fn parse_pointer(pointer: &str) -> Result<Vec<String>, WriteError> {
+    let invalid = || WriteError::InvalidPointer(pointer.to_owned());
+    let rest = pointer.strip_prefix('/').ok_or_else(invalid)?;
+    rest.split('/')
+        .map(|token| {
+            if token.is_empty() {
+                Err(invalid())
+            } else {
+                Ok(token.replace("~1", "/").replace("~0", "~"))
+            }
+        })
+        .collect()
+}
+
+fn apply(document: &mut Value, tokens: &[String], value: Option<Value>) {
+    let Some((last, parents)) = tokens.split_last() else {
+        return;
+    };
+    let mut current = document;
+    for token in parents {
+        let Value::Object(map) = current else {
+            return;
+        };
+        let child = map
+            .entry(token.clone())
+            .or_insert_with(|| Value::Object(Map::new()));
+        if !child.is_object() {
+            if value.is_none() {
+                return;
+            }
+            *child = Value::Object(Map::new());
+        }
+        current = child;
+    }
+    if let Value::Object(map) = current {
+        match value {
+            Some(value) => {
+                map.insert(last.clone(), value);
+            }
+            None => {
+                map.remove(last);
+            }
+        }
+    }
+}
+
+/// Writes `bytes` to a temporary file next to `target`, flushes it and renames it over
+/// `target`. On failure the temporary file is removed and `target` is unchanged.
+fn replace_file(target: &Path, bytes: &[u8]) -> Result<(), WriteError> {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let name = target
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let temp = target.with_file_name(format!(
+        ".{name}.tmp-{}-{}",
+        std::process::id(),
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    ));
+    let io_error = |op: &'static str, path: &Path| {
+        let path = path.to_owned();
+        move |source| WriteError::Io { op, path, source }
+    };
+    let result = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temp)
+        .map_err(io_error("cannot create", &temp))
+        .and_then(|mut file| {
+            file.write_all(bytes)
+                .and_then(|()| file.sync_all())
+                .map_err(io_error("cannot write", &temp))
+        })
+        .and_then(|()| fs::rename(&temp, target).map_err(io_error("cannot replace", target)));
+    if result.is_err() {
+        let _ = fs::remove_file(&temp);
+    }
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn pointers_create_and_remove_nested_keys() {
+        let mut doc = json!({ "permissions": { "allow": ["Read"] }, "model": "x" });
+        apply(
+            &mut doc,
+            &parse_pointer("/permissions/deny").expect("pointer"),
+            Some(json!(["Bash(rm *)"])),
+        );
+        apply(&mut doc, &parse_pointer("/model").expect("pointer"), None);
+        apply(
+            &mut doc,
+            &parse_pointer("/a~1b/c").expect("pointer"),
+            Some(json!(1)),
+        );
+        assert_eq!(
+            doc,
+            json!({ "permissions": { "allow": ["Read"], "deny": ["Bash(rm *)"] }, "a/b": { "c": 1 } })
+        );
+        for bad in ["", "model", "/", "/a//b"] {
+            assert!(parse_pointer(bad).is_err(), "{bad}");
+        }
+    }
+}
