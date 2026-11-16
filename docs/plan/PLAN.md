@@ -119,7 +119,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 已完成 | 9c0738d |
 | T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 部分完成 | ff591d6 |
 | T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 部分完成 | 1b92a25 |
-| T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 阻塞（等待用户实机操作） | — |
+| T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 部分完成 | 32ed668 |
 | W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 未开始 | — |
 | R1 | [M0 评审与收口](tasks/R1-m0-review.md) | 1 | W0 | macOS | high | 中 | S1–S10 汇总 | 未开始 | — |
 | T13 | [存储、数据目录、配置与项目信任](tasks/T13-storage-config-and-trust.md) | 2 | R1（结论为进入 M1） | macOS | high | 大 | 无 | 未开始 | — |
@@ -452,6 +452,12 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 验收：8 项通过，7 项阻塞（A04：CI 产物待推送；A09、A11：实机关口；A10：横幅待目视，程序侧通过；A12、A14：Windows 部分待 CI；A13：首次运行结论待补）
 - 决策：ADR-0024（补充，已接受）：发布清单格式与 Core 校验；hardened runtime 启用（需 `disable-library-validation`，实测阻止 DYLD 注入）；DMG 用自写 hdiutil maker；Agent Host 用 `sandbox-exec -p`（同沙箱命令）；Agent Host 的 tmp 与 npm 缓存放数据目录下 `agent-host/`；Velopack pack id 用应用标识（`PiArc` 会与数据目录重合）；CI 的 Windows 安装包用开发构建（W0 需要测试入口）
 - 遗留：I38（PTY 用例依赖 UTF-8 locale）、I39（内置 node 的 `get-task-allow`）、I40（`npx <本地目录>` 在 Seatbelt 下失败）、I41（安装后体积余量约 1 MB）；本机 Gatekeeper 评估被关闭，首次打开须在开启 Gatekeeper 的机器上做；分支未推送，T03-A03、T04-A09、T10-A01、T11-A10 与本任务 A04 的 CI 仍待核对
+
+### 2026-11-16 T12 部分完成（提交 32ed668）
+- 交付：用户实机（macOS 26.5.2）按检查清单操作，智能体用 computer use 查看系统设置并驱动钥匙串探针；实测发现钥匙串探针的键名不合保险箱规则，先写失败测试再修复（89c560f），重打构建 A、B；检查清单第 7 节、S6 报告第 5、10、11 节、spikes README、架构 8.8 记录结果
+- 验收：11 项通过，4 项阻塞（A04：CI 产物待推送；A10：允许通知后的横幅目视待补；A12、A14：Windows 部分待 CI/W0）
+- 决策：A09 按"各项有结论，未验证项写明原因"关闭；Gatekeeper 开启时的首次打开未验证，作为 I42 交 R1 安排
+- 遗留：I42（Gatekeeper 开启时的首次打开、macOS 15）、I43（通知的 `show` 不反映是否允许）；I38–I41 见上一条记录；分支未推送，前序任务与本任务 A04 的 Windows CI 仍待核对
 
 ## 计划变更记录
 
