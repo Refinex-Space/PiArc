@@ -7,7 +7,8 @@
 //!   generated for that command (generation included), alternating, `N` times each.
 //! - Proxy: one request per new TCP connection to a local HTTP server, directly vs. through the
 //!   proxy as an absolute-form request vs. through a `CONNECT` tunnel; the proxy resolves the
-//!   name with an injected resolver, so no external network is involved.
+//!   name with an injected resolver, so no external network is involved. Then one 64 MiB
+//!   download each way, for throughput.
 //!
 //! macOS only: elsewhere there is no sandbox to measure.
 
@@ -31,6 +32,8 @@ mod bench {
 
     const HOST: &str = "bench.example.org";
     const FAKE_IP: [u8; 4] = [203, 0, 113, 1];
+    /// Size of the bulk download.
+    const BULK: usize = 64 * 1024 * 1024;
 
     struct LocalNetwork(u16);
 
@@ -65,6 +68,7 @@ mod bench {
         println!("macOS {}, {iterations} iterations each\n", os_version());
         commands(&sandbox, &ws, iterations);
         proxy(sandbox.proxy_port(), upstream, iterations).await;
+        throughput(sandbox.proxy_port(), upstream).await;
         let _ = std::fs::remove_dir_all(dir);
     }
 
@@ -143,6 +147,59 @@ mod bench {
         println!();
     }
 
+    async fn throughput(proxy_port: u16, upstream: u16) {
+        println!(
+            "| download of {} MiB | time | MiB/s |\n|---|---|---|",
+            BULK >> 20
+        );
+        for (label, port, via) in [
+            ("direct to the local server", upstream, None),
+            (
+                "through the proxy (absolute-form HTTP)",
+                proxy_port,
+                Some(false),
+            ),
+            ("through the proxy (CONNECT tunnel)", proxy_port, Some(true)),
+        ] {
+            let started = Instant::now();
+            let bytes = download(port, via).await;
+            let elapsed = started.elapsed().as_secs_f64();
+            assert!(bytes >= BULK);
+            println!(
+                "| {label} | {:.0} ms | {:.0} |",
+                elapsed * 1000.0,
+                (BULK >> 20) as f64 / elapsed
+            );
+        }
+        println!();
+    }
+
+    async fn download(port: u16, via: Option<bool>) -> usize {
+        let mut stream = TcpStream::connect(("127.0.0.1", port))
+            .await
+            .expect("connects");
+        let target = match via {
+            Some(false) => format!("http://{HOST}/bulk"),
+            _ => "/bulk".to_owned(),
+        };
+        if via == Some(true) {
+            let connect = format!("CONNECT {HOST}:80 HTTP/1.1\r\nHost: {HOST}:80\r\n\r\n");
+            stream.write_all(connect.as_bytes()).await.expect("writes");
+            read_until_blank(&mut stream).await;
+        }
+        let get = format!("GET {target} HTTP/1.1\r\nHost: {HOST}\r\nConnection: close\r\n\r\n");
+        stream.write_all(get.as_bytes()).await.expect("writes");
+        let mut total = 0;
+        let mut buf = vec![0_u8; 256 * 1024];
+        loop {
+            let n = stream.read(&mut buf).await.expect("reads");
+            if n == 0 {
+                return total;
+            }
+            total += n;
+        }
+    }
+
     async fn timed(work: impl Future<Output = ()>) -> Duration {
         let started = Instant::now();
         work.await;
@@ -193,9 +250,15 @@ mod bench {
             loop {
                 let (stream, _) = listener.accept().await.expect("accepts");
                 tokio::spawn(async move {
-                    let service = hyper::service::service_fn(|_request| async {
-                        Ok::<_, Infallible>(hyper::Response::new(Full::new(Bytes::from("pong"))))
-                    });
+                    let service =
+                        hyper::service::service_fn(|request: hyper::Request<_>| async move {
+                            let body = if request.uri().path() == "/bulk" {
+                                Bytes::from(vec![b'x'; BULK])
+                            } else {
+                                Bytes::from("pong")
+                            };
+                            Ok::<_, Infallible>(hyper::Response::new(Full::new(body)))
+                        });
                     let _ = hyper::server::conn::http1::Builder::new()
                         .serve_connection(TokioIo::new(stream), service)
                         .await;
