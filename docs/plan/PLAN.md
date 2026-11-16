@@ -302,7 +302,8 @@ R1（M0 评审与收口），开工 2026-11-16。依赖 W0 为"部分完成"：�
 - [x] ADR 触发条件检查表：ADR-0013–0018 全部条件与 ADR-0004/0009/0010 中 S4/S9/S3 相关条件；ADR-0015/0018 留给 M0 的事项（A02、A03）
 - [x] 第 11 章预算校准（两平台实测、只收紧、放宽写原因），I12、I26、I41、I44、I45（A07）
 - [x] 架构文档同步 M0 结论、版本号递增、修订记录（A08）
-- [ ] 根目录与各模块 CLAUDE.md 的命令实际执行、长度符合上限（A09）
+- [x] 根目录与各模块 CLAUDE.md 的命令实际执行、长度符合上限（A09）：76 条命令中 75 条成功（日志在会话 scratchpad，未入库）；`npm run start -w @piarc/desktop` 的自动判定失败（未在 120 s 内匹配到启动日志），待人工复核；`npm ci --ignore-scripts`、`pack-windows.mjs`（Windows 专用，CI 覆盖）、`s6-probe.mjs serve`/`keychain` 未运行。L4 136 通过、2 失败（终端输入法用例，原因是会话环境 LANG 为空，已修复后单独重跑 8/8 通过），修复后未重跑全量 L4
+- [ ] 续做：复核 `npm run start`；全量 L4 重跑；可选：S1 macOS 输入法清单经 computer-use 核对（否则交 T19）
 - [x] M0 验收项与登记事项逐条归属（A10）
 - [ ] 结论写入 `M0-summary.md`、`docs/reviews/README.md`、`PLAN.md`；技术债排序；spikes README 同步（A11）
 - [ ] 收尾 `npm run verify`（A12）
