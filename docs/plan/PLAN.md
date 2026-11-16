@@ -119,8 +119,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T09 | [Transcript 渲染与 composer 原型](tasks/T09-transcript-and-composer-prototype.md) | 1 | T03 | macOS | xhigh | 大 | S1 | 已完成 | 9c0738d |
 | T10 | [终端验证：libghostty-vt + PTY + 帧协议](tasks/T10-terminal-spike.md) | 1 | T04 | macOS | xhigh | 大 | S7 | 部分完成 | ff591d6 |
 | T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 已完成 | 1b92a25 |
-| T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 部分完成 | 815c32d |
-| W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 阻塞（等待用户实机操作） | — |
+| T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 已完成 | 815c32d |
+| W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 部分完成 | f278039 |
 | R1 | [M0 评审与收口](tasks/R1-m0-review.md) | 1 | W0 | macOS | high | 中 | S1–S10 汇总 | 未开始 | — |
 | T13 | [存储、数据目录、配置与项目信任](tasks/T13-storage-config-and-trust.md) | 2 | R1（结论为进入 M1） | macOS | high | 大 | 无 | 未开始 | — |
 | T14 | [会话编排与事件投影](tasks/T14-session-orchestration-and-projection.md) | 2 | T13 | macOS | xhigh | 大 | 无 | 未开始 | — |
@@ -294,16 +294,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-W0（Windows 11 实机，2026-11-16 开工；同时闭环 T03、T04、T10、T11、T12 中的 Windows 验收项）：
-
-- [x] 环境：npm 依赖、Electron、`.tools/`（经本机代理）；机器信息已采集（A01）
-- [x] 基线修复（9d6b01b、1c6750b、15ce450、83cada8、e8959fc）：release 夹具、Windows 才有的测试问题、ConPTY 两处缺陷、终端 L4 与 S7 基准的 Windows 版、结束主进程的 L4、arm64 终端检查、Windows 进程环境检查
-- [x] CI 与本机关闭 T03-A03、T04-A09、T10-A01、T11-A10、T12-A04（T03、T04、T11 改为已完成）
-- [x] S1 自动化与测量（A02）、S2（A04 按原始值未达标，交 R1）、S5（A05）、S7 自动化与测量（A09；A10 的回显 p95 按原始口径未达标，交 R1）、S8（A12）、arm64（A11）
-- [x] 报告 Windows 部分、spikes README、CLAUDE.md（7e2f310）
-- [x] `npm run verify` 13 步通过（A15，8264191）
-- [ ] 实机关口（用户，`docs/spikes/S06-first-run-checklist.md` 第 8 节）：W1 安全设置状态、W2 浏览器下载、W3 SmartScreen 与安装、W5 微软拼音（composer、终端）、W6 卸载；智能体在 W3 之后做安装检查、mock 对话、更新（`Update.exe apply`）、体积、图标、通知（A03、A06、A07、A08、A10 输入法部分、T12-A12、T12-A14）
-- [ ] 实机结果写回 S1、S6、S7 与检查清单，A13、A14，收尾
+（当前没有进行中的任务）
 
 ## 登记事项
 
@@ -358,6 +349,8 @@ W0（Windows 11 实机，2026-11-16 开工；同时闭环 T03、T04、T10、T11�
 | I45 | W0 | Windows 体积超预算：CI 的 `Setup.exe`（开发构建）225.3 MB > 200 MB；本机发布构建打包目录 516.4 MB > 450 MB（Electron 本体约 360 MiB、内置 node 约 102 MiB），安装后体积见 S6 第 9 节 | R1 与 I41 一起决定（裁剪 locales、校准 Windows 预算等），T44 纳入回归 |
 | I46 | W0 | Windows 上 Node 写管道式 stdout 是同步的：Core 停止读取时 Agent Host 整个事件循环停住，连 Core 发来的请求（中断、关闭）也处理不了，直到 Core 恢复读取；macOS 上它会继续在内存里排队 | T14 的事件消费者持续取走事件（同 I19）；R1 评估是否需要让 Agent Host 的 AHP 写入在 Windows 上异步（例如单独的管道而不是 fd 1） |
 | I47 | W0 | win32-arm64 上 libghostty-vt 的实际运行尚无结果：CI 只做过加载，W0 给 `core-load-check.mjs` 加了终端检查，要下一次推送后的 `core-load`（`windows-11-arm`）才有结果 | R1 开工时核对该作业；失败按 ADR-0017 的触发条件处理 |
+| I48 | W0 | 主进程没有按架构第 9.1 节用 `app.setPath('userData', …)` 固定数据目录：Windows 上 Electron 默认把 userData（Chromium 缓存、本地存储）放在漫游的 `%APPDATA%\PiArc\`，卸载后留在那里（实测 71 个文件 9.5 MiB）；macOS 的默认位置恰好与架构一致 | T13 设定数据目录时一并设 `userData`；T50 决定卸载时是否提供删除数据的选项 |
+| I49 | W0 | Windows 上 SmartScreen 的"更多信息 → 仍要运行"流程没有观察到：W0 的机器关着"检查应用和文件"（安装包带 `ZoneId=3`，没有拦截），智能应用控制也是关的；系统通知总开关关闭，横幅也没看到（程序侧正确收到 `failed`） | R1 与 I42 一起安排：在开着"检查应用和文件"与通知的 Windows 11 上，用浏览器下载的安装包重做 S6 检查清单第 8 节 W3 与通知；最晚 T50 首次发布前 |
 
 ## 技术债
 
@@ -476,6 +469,14 @@ W0（Windows 11 实机，2026-11-16 开工；同时闭环 T03、T04、T10、T11�
 - 交付：系统通知实机复测：用户打开 PiArc 的"允许通知"后横幅显示（目视确认，统一日志 `displaying as banner`）；查明第一次没看到横幅的原因是探针 8 秒后关闭应用、Electron 退出时删除已投递的通知，`notify` 改为默认停留 30 秒
 - 验收：12 项通过，3 项阻塞（A04：CI 产物待推送；A12、A14：Windows 部分待 CI/W0）
 - 遗留：I42（Gatekeeper 开启时的首次打开、macOS 15）；I43 更新为"通知可用，但 `show` 不反映是否允许、退出时通知被删除"
+
+### 2026-11-16 W0 部分完成（提交 f278039）
+- 环境：Windows 11 专业版 25H2（26200.9974）x64，i5-1340P / 16 GB / NVMe；VS Build Tools 2026（MSVC 14.51）、Git for Windows、Node 24.13.1；依赖与 `.tools/` 经本机代理安装；`gh` 由用户登录后读取 CI 日志与产物
+- 交付：CI 失败的根因（release 夹具 `.dmg` 未入库）与 6 处只在 Windows 出现的测试问题（9d6b01b、8264191）；ConPTY 两处产品缺陷——自行退出无 `Exited`、继承的忽略 Ctrl+C（1c6750b，新 `tests/pty_windows.rs`、`console` 模块）；终端 L4 与 S7 基准的 Windows 版（15ce450）；L4 `agent-host-kill.e2e.ts`、`load-core` 的终端检查（83cada8）；Windows 进程环境检查 `process-env.ps1`（e8959fc）；S1–S10 报告的 Windows 部分、检查清单第 8 节、CLAUDE.md（7e2f310 与收尾提交）
+- 实机（用户操作）：安全设置截图、Edge 下载、安装、微软拼音（composer WM1–WM4、终端 WT1–WT4 全部通过）、卸载；智能体检查安装位置与 AUMID、图标、mock 对话、`Update.exe apply` 0.0.2 → 0.0.1 → 0.0.2、卸载残留
+- 验收：W0 13 项通过、2 项未达标（A04 事件循环延迟原始 p99 16.81 ms、A10 回显额外延迟原始 p95 6.86 ms，都是 Windows 计时器粒度与 ConPTY 抖动造成的测量口径问题，I44 交 R1）；前序任务关闭 T03-A03、T04-A09、T10-A01、T11-A10、T12-A04、A12、A14，T03、T04、T11、T12 改为已完成，T10 仍余 A11（macOS 拼音，R1）
+- 决策：未写 ADR。补充型：`piarc-term` 的 `unsafe` 范围增加 Windows 专用 `console` 模块（编码规范 2.8）；不随附 `conpty.dll`；Windows 上 stdout 同步写的背压形态按平台断言，其余结论不变；A06 把卸载后留下的用户数据目录视为数据而非程序残留（I48），A07 以"本机无法观察"加原因关闭（I49）
+- 遗留：I44–I49；I33 补充 Windows 证据（委托的 Bash 被取消后命令本身继续运行，T17 必须改用 `ProcessTreeSpawner`）；I47 要下一次 CI 的 arm64 `core-load`；用户需在 Windows 上推送
 
 ## 计划变更记录
 
