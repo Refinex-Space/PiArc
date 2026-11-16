@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  LinkConfirmations,
   MAX_EXTERNAL_URL_LENGTH,
   openExternalLink,
   parseExternalUrl,
@@ -23,6 +24,12 @@ function recordingPort(confirmAnswer: boolean) {
 }
 
 describe('parseExternalUrl', () => {
+  it('rejects URLs with user information, which hide the real host', () => {
+    expect(parseExternalUrl('https://github.com@evil.example/')).toBeNull();
+    expect(parseExternalUrl('https://user:secret@example.com/')).toBeNull();
+    expect(parseExternalUrl('http://:pw@example.com/')).toBeNull();
+  });
+
   it('accepts https, http and mailto URLs', () => {
     expect(parseExternalUrl('https://example.com/a?b=c')?.href).toBe('https://example.com/a?b=c');
     expect(parseExternalUrl('http://example.com')?.href).toBe('http://example.com/');
@@ -78,5 +85,44 @@ describe('openExternalLink', () => {
       await expect(openExternalLink(value, port)).resolves.toBe(false);
     }
     expect(calls).toEqual([]);
+  });
+});
+
+describe('LinkConfirmations', () => {
+  it('refuses a second link from a window while its confirmation is open', async () => {
+    const calls: string[] = [];
+    const answers: ((value: boolean) => void)[] = [];
+    const port: ExternalLinkPort = {
+      confirm: (url) => {
+        calls.push(`confirm ${url}`);
+        return new Promise((resolve) => answers.push(resolve));
+      },
+      open: (url) => {
+        calls.push(`open ${url}`);
+        return Promise.resolve();
+      },
+    };
+    const confirmations = new LinkConfirmations();
+    const first = confirmations.open(1, 'https://a.example', port);
+    await expect(confirmations.open(1, 'https://b.example', port)).resolves.toBe(false);
+    // Another window has its own confirmation.
+    const other = confirmations.open(2, 'https://c.example', port);
+    answers[1]?.(true);
+    await expect(other).resolves.toBe(true);
+    answers[0]?.(false);
+    await expect(first).resolves.toBe(false);
+    expect(calls).toEqual([
+      'confirm https://a.example/',
+      'confirm https://c.example/',
+      'open https://c.example/',
+    ]);
+  });
+
+  it('accepts the next link once the confirmation is answered', async () => {
+    const { port, calls } = recordingPort(false);
+    const confirmations = new LinkConfirmations();
+    await expect(confirmations.open(1, 'https://a.example', port)).resolves.toBe(false);
+    await expect(confirmations.open(1, 'https://b.example', port)).resolves.toBe(false);
+    expect(calls).toEqual(['confirm https://a.example/', 'confirm https://b.example/']);
   });
 });

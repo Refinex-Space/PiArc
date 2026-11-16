@@ -67,7 +67,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 新增权限放行：在 `PERMISSION_ALLOWLIST` 加条目并写 `reason`，补 L4 用例，记入 S10 报告。
 - 不得放宽 `PRODUCTION_CSP`。开发服务器模式的放宽只放在 `dev-server.ts`，主进程只在 `import.meta.env.DEV` 下调用，打包时被删除。
 - 窗口只经 `createMainWindow` 创建（ESLint 禁止别处 `new BrowserWindow`）；导航与新窗口守卫由 `app.on('web-contents-created')` 装到所有 webContents。
-- 外链只放行 `https:`、`http:`、`mailto:`，必须先经原生确认框。
+- 外链只放行 `https:`、`http:`、`mailto:`（不带用户信息），必须先经原生确认框，每个窗口同一时刻最多一个（`LinkConfirmations`）。
 - 主进程比较 origin 用 `originOf`，不用前缀匹配，也不直接用 `new URL(x).origin`。
 - 主进程只按路由键转发事件批次，不解析载荷；批次一律经结构化克隆复制（Electron 45 的 `MessagePortMain` 只能转移端口，ADR-0019）；不要尝试转移 `ArrayBuffer`。
 - 终端：窗口只能用自己创建的终端（`TerminalOwners`），创建它的页面消失（窗口销毁、渲染进程崩溃、重载）时关闭它的终端；主进程不解析拉取请求与帧。改 `vendor/ghostty-web/` 下的代码要同步其 README 的改动清单，保留 MIT 声明。

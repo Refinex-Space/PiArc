@@ -18,8 +18,9 @@ export interface ExternalLinkPort {
 
 /**
  * Parses an untrusted value into an external URL. Returns `null` for non-strings, overlong or
- * malformed input, and for any scheme outside `EXTERNAL_PROTOCOLS` (`javascript:`, `file:`,
- * `data:`, custom schemes, ...).
+ * malformed input, for any scheme outside `EXTERNAL_PROTOCOLS` (`javascript:`, `file:`,
+ * `data:`, custom schemes, ...), and for URLs with user information
+ * (`https://github.com@evil.example/` goes to `evil.example`).
  */
 export function parseExternalUrl(value: unknown): URL | null {
   if (typeof value !== 'string' || value.length > MAX_EXTERNAL_URL_LENGTH) {
@@ -29,6 +30,9 @@ export function parseExternalUrl(value: unknown): URL | null {
   try {
     url = new URL(value);
   } catch {
+    return null;
+  }
+  if (url.username !== '' || url.password !== '') {
     return null;
   }
   return EXTERNAL_PROTOCOLS.includes(url.protocol) ? url : null;
@@ -50,4 +54,25 @@ export async function openExternalLink(value: unknown, port: ExternalLinkPort): 
   }
   await port.open(url.href);
   return true;
+}
+
+/**
+ * At most one open link confirmation per window: a page that asks again while its dialog is
+ * still showing gets `false`, so a script cannot stack dialogs until the user clicks "Open".
+ */
+export class LinkConfirmations {
+  readonly #open = new Set<number>();
+
+  async open(windowId: number, value: unknown, port: ExternalLinkPort): Promise<boolean> {
+    if (this.#open.has(windowId)) {
+      console.warn('[security] rejected external link: a confirmation is already open');
+      return false;
+    }
+    this.#open.add(windowId);
+    try {
+      return await openExternalLink(value, port);
+    } finally {
+      this.#open.delete(windowId);
+    }
+  }
 }
