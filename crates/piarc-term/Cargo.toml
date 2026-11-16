@@ -13,6 +13,10 @@ piarc-protocol.workspace = true
 portable-pty.workspace = true
 thiserror.workspace = true
 
+[target.'cfg(windows)'.dependencies]
+# Clears the inherited ignore-Ctrl+C flag before starting programs (the `console` module).
+windows-sys = { workspace = true, features = ["Win32_System_Console"] }
+
 [dev-dependencies]
 serde_json.workspace = true
 

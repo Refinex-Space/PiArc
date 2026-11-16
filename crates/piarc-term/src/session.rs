@@ -5,8 +5,12 @@
 //!
 //! - The IO thread (`piarc-term-io`) reads the PTY and writes each chunk into the terminal
 //!   under its lock, then collects the effects: query replies go to the writer, title and bell
-//!   become [`Event`]s. At end of output it waits for the program and reports
-//!   [`Event::Exited`].
+//!   become [`Event`]s. At end of output it takes the program's exit code from the waiter thread
+//!   and reports [`Event::Exited`].
+//! - The waiter thread (`piarc-term-wait`) waits for the program. On Windows it then stops the
+//!   writer: ConPTY ends its output only when the pseudoconsole closes, which happens when the
+//!   writer drops the master, so without this a program that exits on its own would never
+//!   reach end of output.
 //! - The writer thread (`piarc-term-writer`) owns the PTY master. It writes input, encodes key
 //!   events with the terminal's current modes, and resizes. Every request from callers is a
 //!   message to it, so [`Session::write`], [`Session::key`] and [`Session::resize`] never
@@ -20,7 +24,7 @@
 //! [`Session::close`] (and `Drop`) stops the writer and kills the program. The IO thread ends
 //! when the PTY reports end of output. portable-pty 0.9.0's Windows `ChildKiller::kill`
 //! reports success as an error (fixed only on wezterm's main branch), so its result is not
-//! trusted on any platform: the exit is confirmed by the IO thread's `wait`.
+//! trusted on any platform: the exit is confirmed by the waiter thread's `wait`.
 
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -167,6 +171,8 @@ enum WriterMessage {
         byte: u8,
         done: Sender<Duration>,
     },
+    /// The program exited: drop the master (Windows, see the module documentation).
+    ProgramExited,
 }
 
 /// Locks `mutex`, recovering the data after a panic elsewhere: every critical section leaves
@@ -211,6 +217,9 @@ impl Session {
                 config.cell_height,
             ))
             .map_err(|error| spawn_error("open a PTY", &error))?;
+        // Programs in the terminal inherit whether Ctrl+C is ignored (see `console`).
+        #[cfg(windows)]
+        crate::console::let_children_handle_ctrl_c();
         let mut child = pair
             .slave
             .spawn_command(command(&config))
@@ -240,13 +249,28 @@ impl Session {
             .name("piarc-term-writer".into())
             .spawn(move || writer_loop(&writer_shared, &rx, output, master.as_ref(), keys))
             .map_err(|error| spawn_error("start the writer thread", &error))?;
+        let (exit_tx, exit_rx) = mpsc::channel();
+        let wait_tx = tx.clone();
+        thread::Builder::new()
+            .name("piarc-term-wait".into())
+            .spawn(move || {
+                let code = child.wait().ok().map(|status| status.exit_code());
+                // The IO thread is still reading; it takes the code at end of output.
+                let _ = exit_tx.send(code);
+                if cfg!(windows) {
+                    // Closed already when the session was closed first.
+                    let _ = wait_tx.send(WriterMessage::ProgramExited);
+                }
+            })
+            .map_err(|error| spawn_error("start the waiter thread", &error))?;
         let io_shared = Arc::clone(&shared);
         let io_tx = tx.clone();
         thread::Builder::new()
             .name("piarc-term-io".into())
             .spawn(move || {
                 io_loop(&io_shared, reader, &io_tx, on_event.as_ref());
-                let code = child.wait().ok().map(|status| status.exit_code());
+                // The waiter sends exactly once; a failed `wait` is an unknown exit code.
+                let code = exit_rx.recv().ok().flatten();
                 *lock(&io_shared.exit) = Some(code);
                 on_event(Event::Exited { code });
             })
@@ -572,6 +596,7 @@ fn writer_loop(
                 });
                 let _ = output.write_all(&[byte]).and_then(|()| output.flush());
             }
+            WriterMessage::ProgramExited => break,
         }
     }
 }

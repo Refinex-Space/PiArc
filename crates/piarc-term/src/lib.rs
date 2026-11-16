@@ -18,6 +18,12 @@
 //! The authoritative rules are in `crates/deps-rules.json`, enforced by
 //! `scripts/ci/check-crate-deps.mjs` (architecture section 7.1).
 
+#[cfg(windows)]
+#[allow(
+    unsafe_code,
+    reason = "one Win32 call that clears the inherited ignore-Ctrl+C flag; unsafe stays inside it"
+)]
+mod console;
 mod error;
 pub mod frame;
 pub mod keymap;
