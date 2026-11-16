@@ -280,4 +280,124 @@ R1 用四个只读子代理按维度并行审查 M0 的代码（2026-11-16）。
 
 ## Q：工程质量与 CLAUDE.md 一致性
 
-（待子代理返回）
+审查范围：整个仓库。子代理另列出已核对无问题的部分：没有 `TODO(Txx)` 等标记；没有 `#[ignore]`、`.only`、`it.skip`、注释掉的断言（`agent-host-kill.e2e.ts` 的按平台跳过与 `asset-path.test.ts` 的 `it.runIf` 符合规范）；npm 与 Cargo 依赖全部精确锁定；`deny.toml` 只有一条带理由的例外；依赖方向除 Q10 外与规则一致；没有本机路径与凭据样式字符串；根与 `apps/desktop` 的 CLAUDE.md 中的命令、参数、脚本都存在；行数均在上限内（根 96、`apps/desktop` 116、`agent-host` 80，其余更短）。
+
+### R1-Q1 默认 `cargo test`（含 verify）访问真实 npm 与 crates.io
+
+- 子代理评级：中。依据：`testing.md` 4.1“L0–L2 不访问网络”。
+- 位置：`crates/piarc-core/tests/sandbox_commands.rs:4-43`；根 `CLAUDE.md` 易错点
+- 失败场景或后果：沙箱内的 `npm install`、`cargo build` 经代理连 registry，离线或 registry 抖动时 verify 失败；规范没有登记这个例外。
+- 核实：待核实
+- 处理：待定
+
+### R1-Q2 真实凭据库测试在不可用时打印 NOT RUN 后以通过收尾
+
+- 子代理评级：中。依据：`testing.md` 4.1、架构 12.6。
+- 位置：`crates/piarc-secrets/tests/system_store.rs:23-45`；`.github/workflows/ci.yml:63-64`
+- 失败场景或后果：CI 没设 `PIARC_REQUIRE_KEYCHAIN`，凭据库不可用时测试为绿、没有断言；同文件 31 行 `let _ = tx.send(f())` 没有注释。
+- 核实：待核实
+- 处理：待定
+
+### R1-Q3 e2e 与单元测试用固定时长等待异步结果
+
+- 子代理评级：中。依据：`testing.md` 5“测试不靠 sleep 等待异步结果”。
+- 位置：`apps/desktop/e2e/transcript-scroll.e2e.ts:50-133`、`terminal.e2e.ts:34,60`、`terminal.ts:94,157`、`core.ts:76`；`agent-host/src/runtime/credentials.test.ts:311-566`
+- 失败场景或后果：结果依赖机器与刷新率；I32 的偶发失败就在 `transcript-scroll.e2e.ts` 的固定 300–400 ms 等待处。`terminal.e2e.ts:63` 的 1500 ms 是有意的负向观察窗口。
+- 核实：待核实
+- 处理：待定
+
+### R1-Q4 基准脚本就地重写了 L4 夹具的应用定位逻辑
+
+- 子代理评级：中。依据：`coding-standards.md` 第 4 节复用表、3.6。
+- 位置：`scripts/bench/s2-event-channel.mjs:79-110`、`s1-transcript.mjs:196-225`，对照 `apps/desktop/e2e/app.ts:30-78`
+- 失败场景或后果：两份副本不检查 `.vite/renderer` 是否存在、不处理其他平台、用 `JSON.parse` 而不是 `readJsonFile`。
+- 核实：待核实
+- 处理：待定
+
+### R1-Q5 `piarc-exec` 与 `piarc-ports` 没有按 2.3 定义带 `kind()`、`retryable()` 的 `Error`
+
+- 子代理评级：中。依据：`coding-standards.md` 2.3。
+- 位置：`crates/piarc-exec/src/command.rs:125` 等返回 `io::Result`；`crates/piarc-ports/src/secret.rs:17`
+- 失败场景或后果：边界上无法把执行错误映射为结构化错误。
+- 核实：待核实
+- 处理：待定
+
+### R1-Q6 复用代码的来源登记不全
+
+- 子代理评级：中。依据：`coding-standards.md` 第 4 节“第三方许可证来源登记”、`design/brand/README.md:33`。
+- 位置：`agent-host/src/tools/paths.ts:4-6`、`grep.ts:6`、`crates/piarc-fs/src/image.rs:3-4`、`agent-host/src/runtime/credentials.test.ts:6-7`（移植自 Pi，MIT）；`design/brand/mark.svg` 与 `mark.LICENSE`
+- 失败场景或后果：这些都不在 `third-party/sources.json`，T50 据它生成的第三方声明会漏掉它们。
+- 核实：待核实
+- 处理：待定
+
+### R1-Q7 `fetch-binaries.mjs` 的完整性校验没有单元测试
+
+- 子代理评级：中。依据：`coding-standards.md` 3.6、`testing.md` 5。
+- 位置：`scripts/dev/fetch-binaries.mjs:75-134`；同类 `scripts/bench/s1-transcript.mjs` 的导出纯函数、`install-tools.mjs`、`pack-windows.mjs`、`gen-protocol.mjs`
+- 失败场景或后果：大小不符、哈希不符、缓存损坏后删除三条分支没有测试。
+- 核实：待核实
+- 处理：待定
+
+### R1-Q8 CLAUDE.md 违反规范第 3 节“不写”清单
+
+- 子代理评级：中。依据：`docs/engineering/claude-md.md` 第 3 节。
+- 位置：`apps/desktop/CLAUDE.md` 结构一节（116 行，上限 120）、`agent-host/CLAUDE.md` 入口与结构；`crates/piarc-exec/CLAUDE.md`“T17 要叠加的”、`piarc-fs/CLAUDE.md`“T16 与之后要叠加的”、`piarc-core/CLAUDE.md` 首段
+- 失败场景或后果：逐文件说明与任务进度最容易过时，`apps/desktop/CLAUDE.md` 下一次改动就会超限。
+- 核实：待核实
+- 处理：待定
+
+### R1-Q9 测试夹具的 package.json 描述指向已知会失败的启动方式
+
+- 子代理评级：低。
+- 位置：`packages/testkit/src/mcp-probe-server/package.json:5`
+- 失败场景或后果：描述写 `npx -y <this directory>`，而这种方式在 Agent Host 的 Seatbelt 下失败（I40），L4 实际用 `npm pack` 加 `--package`。
+- 核实：待核实
+- 处理：待定
+
+### R1-Q10 `deps-rules.json` 有一条实际不存在的依赖边
+
+- 子代理评级：低。依据：`coding-standards.md` 2.1。
+- 位置：`crates/deps-rules.json:69-73`（`piarc-fs → piarc-checkpoint`）；`crates/piarc-fs/Cargo.toml` 没有该依赖
+- 失败场景或后果：检查脚本不发现未使用的例外，预留的例外让以后加这条依赖时不再触发评审。
+- 核实：待核实
+- 处理：待定
+
+### R1-Q11 `piarc-testkit/src/lib.rs` 含实现
+
+- 子代理评级：低。依据：`coding-standards.md` 2.1。
+- 位置：`crates/piarc-testkit/src/lib.rs:126-140`（`parse_request`）
+- 失败场景或后果：`lib.rs` 只应做模块声明与 re-export。
+- 核实：待核实
+- 处理：待定
+
+### R1-Q12 ESLint 的 preload 规则弱于 `coding-standards.md` 的表述
+
+- 子代理评级：低。
+- 位置：`eslint.config.mjs:226-256`；`coding-standards.md` 3.3
+- 失败场景或后果：规范写“preload 只能导入 `electron`”，规则只禁 Node 内置模块；渲染进程规则也拦不住 Node 专用的 npm 原生模块。
+- 核实：待核实
+- 处理：待定
+
+### R1-Q13 小范围文档漂移
+
+- 子代理评级：低。
+- 位置：`coding-standards.md:175`（install-tools 只写 cargo-deny）、`:188`（`spawn_supervised` 是私有函数）；根 `Cargo.toml:59`（不是字母序）、`:103`（注释写 `allow`，规范与代码用 `expect`）；架构 3.4（缺 `packages/testkit`、`third-party/` 等，列出不存在的 `design/tokens/`、`tests/scenarios/`）；`.gitignore:56`（不存在的 `apps/desktop/build/`）；`.nvmrc` 24.22.2 与内置 node 24.22.3；`docs/reviews/README.md` 的 R1 状态
+- 失败场景或后果：文档与代码不一致。
+- 核实：待核实
+- 处理：待定
+
+### R1-Q14 一处没有注释的 `let _ =`
+
+- 子代理评级：低。依据：`coding-standards.md` 2.3。
+- 位置：`crates/piarc-core/src/secrets.rs:388`
+- 失败场景或后果：丢弃 `changes.send` 的结果没有说明理由。
+- 核实：待核实
+- 处理：待定
+
+### R1-Q15 生成文件超过 1,000 行没有写明豁免
+
+- 子代理评级：低。依据：`coding-standards.md` 2.7。
+- 位置：`crates/piarc-ghostty-sys/src/bindings.rs`（3,712 行，bindgen 生成）
+- 失败场景或后果：规范要求超限在评审中写明豁免。
+- 核实：待核实
+- 处理：待定
