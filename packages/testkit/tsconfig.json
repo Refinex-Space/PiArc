@@ -6,7 +6,10 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/.tsbuildinfo",
     // child_process and readline drive the mock provider binary.
-    "types": ["node"]
+    "types": ["node"],
+    // The MCP probe server is plain JavaScript: npx runs it from a package directory.
+    "allowJs": true,
+    "checkJs": true
   },
   "include": ["src"]
 }

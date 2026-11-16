@@ -29,8 +29,9 @@
 //! - Terminals (T10, ADR-0017): `createTerminal`, `terminalInput`, `terminalKey`,
 //!   `terminalResize`, `terminalFrame` (a Promise of the frame bytes) and `closeTerminal`
 //!   ([`terminal`]).
-//! - With the `testing` feature only: demo event sources, `echo`, `eventStats` and two panic
-//!   triggers ([`testing`]).
+//! - With the `testing` feature only: demo event sources, `echo`, `eventStats`, two panic
+//!   triggers, terminal measurements and `agentHostProbe` (T12: one mock conversation with
+//!   the packaged app's Agent Host) ([`testing`]).
 //!
 //! Every export runs its body through [`boundary::call`]: Core errors and panics become a
 //! thrown `Error` with `code` and `data: { kind, retryable, details? }` (the

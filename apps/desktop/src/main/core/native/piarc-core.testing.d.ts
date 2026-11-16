@@ -78,6 +78,29 @@ export declare class CoreRuntime {
    * until the PTY echoed it back, in microseconds: the baseline of the echo budget.
    */
   terminalProbeEcho(id: number, byte: number): Promise<number>;
+  /**
+   * Starts the packaged app's Agent Host as production does, runs one conversation and
+   * resolves with the report as JSON (`piarc_core::host_probe::ProbeReport`).
+   */
+  agentHostProbe(options: AgentHostProbeOptions): Promise<string>;
+}
+
+/** What `agentHostProbe` runs (S6, T12): see `piarc_core::host_probe`. */
+export interface AgentHostProbeOptions {
+  /** The app's resources directory (`process.resourcesPath`). */
+  resourcesDir: string;
+  /** Workspace root (absolute, existing). */
+  workspace: string;
+  /** Data directory for the Agent Host (absolute, existing; `pi/models.json` inside). */
+  dataDir: string;
+  /** Provider id of the session's model. */
+  provider: string;
+  /** Model id. */
+  model: string;
+  /** The prompt. */
+  prompt: string;
+  /** Upper bound of the conversation in milliseconds. Default 60,000. */
+  timeoutMs?: number;
 }
 
 /** One batch as JavaScript receives it. */

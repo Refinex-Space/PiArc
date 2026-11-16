@@ -25,7 +25,8 @@ export default defineConfig<{ appForm: 'dev' | 'packaged' }>({
   reporter: [['list']],
   use: { trace: 'retain-on-failure' },
   projects: [
-    { name: 'dev', use: { appForm: 'dev' } },
+    // agent-host.e2e.ts needs Resources/agent-host/, which only the packaged app has.
+    { name: 'dev', use: { appForm: 'dev' }, testIgnore: ['agent-host.e2e.ts'] },
     { name: 'packaged', use: { appForm: 'packaged' } },
   ],
 });

@@ -1,0 +1,11 @@
+{
+  "name": "piarc-mcp-probe-server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Test-only stdio MCP server that reports how it runs inside the Agent Host's sandbox (T12, S6). Started with `npx -y <this directory>`.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "piarc-mcp-probe-server": "./server.mjs"
+  }
+}

@@ -1,0 +1,15 @@
+(version 1)
+
+; PiArc Agent Host: permissive profile (ADR-0015; tightened in T39)
+(allow default)
+
+; PiArc Agent Host: writes only inside these directories
+(deny file-write*)
+(allow file-write*
+  (subpath (param "WRITABLE_0"))
+  (subpath (param "WRITABLE_1")))
+(allow file-write-data (literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr") (literal "/dev/dtracehelper") (regex #"^/dev/tty") (regex #"^/dev/fd/[0-9]+$"))
+
+;; params
+WRITABLE_0=/Users/dev/项目 one
+WRITABLE_1=/Users/dev/Library/Application Support/PiArc

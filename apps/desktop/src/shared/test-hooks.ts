@@ -106,6 +106,19 @@ export interface TestCoreApi {
   terminalStats(id: number): TerminalCoreStats;
   /** Microseconds from writing `byte` straight to the PTY until its echo was read back. */
   terminalProbeEcho(id: number, byte: number): Promise<number>;
+  /**
+   * Starts the packaged app's Agent Host as production does, holds one conversation and
+   * resolves with the report as JSON (`piarc_core::host_probe::ProbeReport`, S6).
+   */
+  agentHostProbe(options: {
+    resourcesDir: string;
+    workspace: string;
+    dataDir: string;
+    provider: string;
+    model: string;
+    prompt: string;
+    timeoutMs?: number;
+  }): Promise<string>;
 }
 
 export interface PiarcTestHooks {

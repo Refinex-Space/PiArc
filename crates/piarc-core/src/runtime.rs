@@ -151,6 +151,8 @@ impl CoreRuntime {
         config.validate()?;
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .thread_name("piarc-core")
+            // I/O: the Agent Host's pipes, the sandbox proxy and child processes (T12).
+            .enable_io()
             .enable_time()
             .build()
             .map_err(|error| Error::RuntimeStart {
@@ -398,6 +400,24 @@ impl CoreRuntime {
     ) -> Result<()> {
         self.ensure_running()?;
         self.shared.terminals.probe_echo(id, byte, on_done)
+    }
+
+    /// Runs [`crate::host_probe::run`] on the runtime: one mock conversation with the Agent
+    /// Host of a packaged app. Only the `testing` build of piarc-napi exports it (S6).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::ShuttingDown`] after shutdown started; the probe's own errors reach `on_done`.
+    pub fn run_agent_host_probe(
+        &self,
+        options: crate::host_probe::ProbeOptions,
+        on_done: impl FnOnce(Result<crate::host_probe::ProbeReport>) + Send + 'static,
+    ) -> Result<()> {
+        self.ensure_running()?;
+        self.shared.handle.spawn(async move {
+            on_done(crate::host_probe::run(options).await);
+        });
+        Ok(())
     }
 
     /// Spawns a supervised task that panics, to test that task panics become error events.

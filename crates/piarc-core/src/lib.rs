@@ -37,7 +37,10 @@
 //! # Agent Host (T06)
 //!
 //! [`agent_host::start`] supervises one workspace's Agent Host with the production I/O: the
-//! `piarc-exec` process spawner and the system clock. Session orchestration on top of it
+//! `piarc-exec` process-tree spawner and the system clock. A packaged app starts it from its
+//! own resources with [`agent_host::start_bundled`] (T12: bundled Node, `PI_PACKAGE_DIR`, minimal
+//! environment, `sandbox-exec` with the permissive profile on macOS);
+//! [`host_probe`] is that path's test entry. Session orchestration on top of it
 //! (routing its notifications into the event path, answering `trust/get` from the trust
 //! store) arrives with T13 and T14.
 //!
@@ -63,6 +66,7 @@ pub mod agent_host;
 pub mod demo;
 mod error;
 pub mod events;
+pub mod host_probe;
 pub mod identity;
 pub mod route;
 mod runtime;

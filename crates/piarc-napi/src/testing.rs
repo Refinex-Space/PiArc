@@ -217,3 +217,61 @@ impl CoreRuntime {
         Ok(promise)
     }
 }
+
+/// What `agentHostProbe` runs (S6, T12): see `piarc_core::host_probe`.
+#[napi(object, object_to_js = false)]
+pub struct AgentHostProbeOptions {
+    /// The app's resources directory (`process.resourcesPath`).
+    pub resources_dir: String,
+    /// Workspace root (absolute, existing).
+    pub workspace: String,
+    /// Data directory for the Agent Host (absolute, existing; `pi/models.json` inside).
+    pub data_dir: String,
+    /// Provider id of the session's model.
+    pub provider: String,
+    /// Model id.
+    pub model: String,
+    /// The prompt.
+    pub prompt: String,
+    /// Upper bound of the conversation in milliseconds. Default 60,000.
+    pub timeout_ms: Option<u32>,
+}
+
+#[napi]
+impl CoreRuntime {
+    /// Starts the packaged app's Agent Host as production does, runs one conversation and
+    /// resolves with the report as JSON (`piarc_core::host_probe::ProbeReport`).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn agent_host_probe<'env>(
+        &self,
+        env: &'env Env,
+        options: AgentHostProbeOptions,
+    ) -> napi::Result<Object<'env>> {
+        type Settle = Box<dyn FnOnce(Env) -> napi::Result<String> + Send>;
+        let (deferred, promise) = env.create_deferred::<String, Settle>()?;
+        boundary::call(env, "CoreRuntime.agentHostProbe", || {
+            let options = piarc_core::host_probe::ProbeOptions {
+                resources_dir: options.resources_dir.into(),
+                workspace: options.workspace.into(),
+                data_dir: options.data_dir.into(),
+                model: piarc_protocol::session::ModelRef {
+                    provider: options.provider,
+                    id: options.model,
+                },
+                prompt: options.prompt,
+                timeout: std::time::Duration::from_millis(u64::from(
+                    options.timeout_ms.unwrap_or(60_000),
+                )),
+            };
+            self.core.run_agent_host_probe(options, move |report| {
+                deferred.resolve(Box::new(move |env| match report {
+                    Ok(report) => serde_json::to_string(&report).map_err(|e| {
+                        napi::Error::from_reason(format!("cannot serialize the report: {e}"))
+                    }),
+                    Err(error) => Err(boundary::js_error(&env, &error.to_error_object())),
+                }));
+            })
+        })?;
+        Ok(promise)
+    }
+}

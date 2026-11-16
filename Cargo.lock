@@ -1244,6 +1244,7 @@ dependencies = [
  "napi-derive",
  "piarc-core",
  "piarc-protocol",
+ "serde_json",
 ]
 
 [[package]]

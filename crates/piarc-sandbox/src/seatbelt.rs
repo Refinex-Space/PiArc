@@ -122,6 +122,40 @@ impl SeatbeltProfile {
         })
     }
 
+    /// The permissive profile of the Agent Host process and everything it starts (MCP
+    /// servers, npm, npx; ADR-0015, architecture section 10.3): everything is allowed except
+    /// writing files outside `writable` (canonical directories: the workspace, PiArc's data
+    /// directory) and the terminal devices. Reads and network stay open: the Agent Host reads
+    /// broadly and sends the model requests. T39 tightens it; until then it only keeps a
+    /// compromised Agent Host or MCP server from writing into the rest of the user's files.
+    ///
+    /// # Errors
+    ///
+    /// A path is not UTF-8.
+    pub fn agent_host(writable: &[PathBuf]) -> Result<Self> {
+        let mut builder = Builder::default();
+        builder.line("(version 1)");
+        builder.section("PiArc Agent Host: permissive profile (ADR-0015; tightened in T39)");
+        builder.line("(allow default)");
+        builder.section("PiArc Agent Host: writes only inside these directories");
+        builder.line("(deny file-write*)");
+        let keys: Vec<String> = writable
+            .iter()
+            .enumerate()
+            .map(|(i, dir)| builder.param(&format!("WRITABLE_{i}"), dir))
+            .collect::<Result<_>>()?;
+        builder.rule("allow file-write*", keys.iter().map(|k| subpath(k)));
+        builder.line(
+            "(allow file-write-data (literal \"/dev/null\") (literal \"/dev/stdout\") \
+             (literal \"/dev/stderr\") (literal \"/dev/dtracehelper\") \
+             (regex #\"^/dev/tty\") (regex #\"^/dev/fd/[0-9]+$\"))",
+        );
+        Ok(Self {
+            text: builder.text,
+            params: builder.params,
+        })
+    }
+
     /// `sandbox-exec` arguments before the command: `-p <profile> -DKEY=VALUE… --`.
     #[must_use]
     pub fn args(&self) -> Vec<OsString> {
@@ -323,6 +357,34 @@ mod tests {
         let snapshot = format!("{generated}\n;; params\n{params}");
         let path =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/snapshots/seatbelt-profile.sbpl");
+        if std::env::var_os("PIARC_UPDATE_SNAPSHOTS").is_some() {
+            std::fs::write(&path, &snapshot).expect("snapshot written");
+        }
+        let expected = std::fs::read_to_string(&path).expect(
+            "snapshot exists (PIARC_UPDATE_SNAPSHOTS=1 cargo test -p piarc-sandbox writes it)",
+        );
+        assert_eq!(snapshot, expected);
+    }
+
+    #[test]
+    fn agent_host_profile_snapshot() {
+        let profile = SeatbeltProfile::agent_host(&[
+            PathBuf::from("/Users/dev/项目 one"),
+            PathBuf::from("/Users/dev/Library/Application Support/PiArc"),
+        ])
+        .expect("builds");
+        assert!(
+            !profile.text.contains("项目"),
+            "paths only reach the profile as parameters"
+        );
+        let params: String = profile
+            .params
+            .iter()
+            .map(|(k, v)| format!("{k}={v}\n"))
+            .collect();
+        let snapshot = format!("{}\n;; params\n{params}", profile.text);
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/snapshots/agent-host-profile.sbpl");
         if std::env::var_os("PIARC_UPDATE_SNAPSHOTS").is_some() {
             std::fs::write(&path, &snapshot).expect("snapshot written");
         }

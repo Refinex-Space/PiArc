@@ -35,6 +35,13 @@ pub enum Error {
     /// A terminal session failed.
     #[error(transparent)]
     Terminal(#[from] piarc_term::Error),
+    /// The Agent Host runtime of a packaged app is incomplete or cannot be prepared
+    /// (`agent_host::BundledRuntime`): a broken installation, not a caller error.
+    #[error("the bundled Agent Host runtime is unusable: {reason}")]
+    BundledRuntime {
+        /// What is missing or failed.
+        reason: String,
+    },
     /// The tokio runtime could not be started.
     #[error("failed to start the Core runtime: {reason}")]
     RuntimeStart {
@@ -64,7 +71,9 @@ impl Error {
             Self::QueueFull => ErrorKind::Busy,
             Self::UnknownTerminal { .. } => ErrorKind::NotFound,
             Self::Terminal(error) => error.kind(),
-            Self::RuntimeStart { .. } | Self::Internal { .. } => ErrorKind::InternalError,
+            Self::BundledRuntime { .. } | Self::RuntimeStart { .. } | Self::Internal { .. } => {
+                ErrorKind::InternalError
+            }
         }
     }
 
@@ -87,6 +96,7 @@ impl Error {
             Self::Terminal(_)
             | Self::ShuttingDown
             | Self::QueueFull
+            | Self::BundledRuntime { .. }
             | Self::RuntimeStart { .. }
             | Self::Internal { .. } => None,
         };

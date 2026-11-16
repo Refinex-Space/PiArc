@@ -59,3 +59,27 @@ impl CommandSandbox for Seatbelt {
         })
     }
 }
+
+/// The wrapper that starts the Agent Host under its permissive Seatbelt profile
+/// ([`crate::seatbelt::SeatbeltProfile::agent_host`]): `sandbox-exec -p <profile> -D… --`
+/// before the bundled `node`. `writable` are the directories the Agent Host and its children
+/// may write (the workspace and PiArc's data directory); they must exist and are resolved to
+/// their real paths, which Seatbelt matches. `env` is empty: Core sets the Agent Host's
+/// environment itself.
+///
+/// # Errors
+///
+/// A directory does not exist, is not absolute or is not UTF-8.
+#[cfg(target_os = "macos")]
+pub fn agent_host_launch(writable: &[PathBuf]) -> Result<SandboxedLaunch> {
+    let resolved: Vec<PathBuf> = writable
+        .iter()
+        .map(|dir| crate::policy::resolve_existing(dir))
+        .collect::<Result<_>>()?;
+    let profile = crate::seatbelt::SeatbeltProfile::agent_host(&resolved)?;
+    Ok(SandboxedLaunch {
+        program: PathBuf::from(crate::seatbelt::SANDBOX_EXEC),
+        args: profile.args(),
+        env: Vec::new(),
+    })
+}

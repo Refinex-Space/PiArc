@@ -32,6 +32,9 @@
 //! - [`proxy`]: the local HTTP/`CONNECT` proxy with the domain allowlist, refusing loopback and
 //!   cloud metadata destinations.
 //!
+//! - [`agent_host_launch`] (T12, macOS): the `sandbox-exec` wrapper of the Agent Host's
+//!   permissive profile (writes limited to the workspace and the data directory).
+//!
 //! `piarc-core` hands the wrapper to `piarc-exec`, which runs it with its process-tree spawner;
 //! this crate starts no processes.
 
@@ -46,8 +49,8 @@ mod session;
 
 pub use env::sandbox_env;
 pub use error::{Error, Result};
-#[cfg(target_os = "macos")]
-pub use platform::Seatbelt;
 pub use platform::{CommandSandbox, SandboxedLaunch, platform_sandbox};
+#[cfg(target_os = "macos")]
+pub use platform::{Seatbelt, agent_host_launch};
 pub use policy::{PROTECTED_PATHS, ResolvedPolicy, SandboxPolicy};
 pub use session::SessionSandbox;

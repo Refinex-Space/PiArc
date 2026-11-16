@@ -128,7 +128,7 @@ pub struct ResolvedPolicy {
 }
 
 /// The canonical form of an existing directory.
-fn resolve_existing(path: &Path) -> Result<PathBuf> {
+pub(crate) fn resolve_existing(path: &Path) -> Result<PathBuf> {
     if !path.is_absolute() {
         return Err(Error::NotAbsolute {
             path: path.to_path_buf(),
