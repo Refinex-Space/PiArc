@@ -1560,99 +1560,99 @@
       "id": "T13-A01",
       "task": "T13",
       "description": "迁移在空库与已迁移库上各执行两次，结果一致且 `schema_migrations` 记录正确；注入失败的迁移整体回滚，数据库停留在上一版本。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-store --test migrations`：3 passed。空库与已迁移库各执行两次后表集合与 `schema_migrations`（仅 1 initial，applied_at 保留首次）一致；注入\"先建表、改列、再失败\"的 v2 两次都返回 Migration{2}，表与列未残留，版本停在 1；新构建写过的 v2 库被拒为 SchemaTooNew"
     },
     {
       "id": "T13-A02",
       "task": "T13",
       "description": "数据目录与缓存目录在 macOS 与 Windows 上解析为第 9.1 节的位置，主进程在 `ready` 前设置 `userData`。验证：单测（Windows 部分由 CI 输出证明）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "等待 Windows CI：macOS 上 `npx vitest run apps/desktop/src/main/platform` 6 passed（darwin 与 win32 两个平台的路径纯函数、--user-data-dir 覆盖、applyDataDirs 在 ready 后拒绝执行并且在 ready 前设置 userData 与 sessionData）；`main.ts` 在单实例锁与 ready 之前调用 applyDataDirs；L4 `npm run test:e2e -w @piarc/desktop` 138 passed（含 app-instance 的 userData 断言）。Windows 部分按任务要求由推送后 Windows CI 的 Vitest 输出证明"
     },
     {
       "id": "T13-A03",
       "task": "T13",
       "description": "对同一组会话文件，随机追加 entry 后做增量同步，与全量重建索引得到的 `sessions` 表内容完全相同；末行写到一半时不报错，补全后被同步。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-store --test index`：4 passed。4 个会话 60 轮随机追加（含跨轮写到一半的末行），每 7 轮与最终都和全新库的全量重建逐列相等，原地重建后亦相等；末行写到一半时同步结果 Unchanged、不报坏行，补全后 Appended 并计入用量；变短、改写、换 id 的文件整文件重扫"
     },
     {
       "id": "T13-A04",
       "task": "T13",
       "description": "100 MB 的合成会话文件建立索引期间，Core 内存增量不超过 32 MB。验证：测试中记录的内存数据。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-store --test memory -- --nocapture`：100.0 MiB、36,908 个 entry（含约 4.4 MB 的长行），建索引 4.37 s（debug），计数分配器测得 Rust 堆峰值 +14.08 MiB，加 SQLite 页缓存上限 2 MiB 共 16.08 MiB ≤ 32 MiB"
     },
     {
       "id": "T13-A05",
       "task": "T13",
       "description": "未知会话格式版本与损坏行不会让 Core 失败：前者标为索引不可用，后者跳过并记录。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-store --test index unknown_versions`：版本 9 的会话与没有 header 的文件同步不失败，`index_status = unavailable` 并写明原因；两条坏行跳过并在 SyncReport.skipped_lines 记录（Core 写 warn 日志），其余 entry 照常计入；之后增长与删除也不失败"
     },
     {
       "id": "T13-A06",
       "task": "T13",
       "description": "日志按天轮转，超过 7 天的日志被清理。验证：测试（时钟可注入）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-telemetry --test rotation`：2 passed。注入时钟：打开时删除 7 天前的 core 日志、保留本前缀外的文件；23:00 → 次日 01:00 换新文件并清理最旧一天；6 天后只余 7 天内的文件；全局 subscriber 把 Core 与 Agent Host（target piarc_host::agent_host）分到 core-/agent-host- 两个文件"
     },
     {
       "id": "T13-A07",
       "task": "T13",
       "description": "四个层级的设置按优先级合并；无效文件被跳过且错误报告含文件路径与 JSON Pointer，其余层照常生效。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-config --test settings`：6 passed。defaults < user < .piarc/settings.json < .piarc/settings.local.json 合并（标量覆盖、对象深合并、列表去重）；项目文件 `/permissions/allow/1` 类型错与 local 文件非法 JSON 都被跳过，Issue 带文件路径与 JSON Pointer，用户层照常生效，未知键 `/theme` 为警告；插入 .claude 层与会话层不改合并代码"
     },
     {
       "id": "T13-A08",
       "task": "T13",
       "description": "运行中修改设置文件后发出带变化键的事件；改成无效内容时保留上一份有效配置并报告错误。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-core --test state editing_settings`：运行中创建 `.piarc/settings.json` 后 `core/settings` 事件 changed=[\"/model\",\"/permissions/deny\"]，改 model 后 [\"/model\"]；改成无效内容后事件 changed=[]、issues[0].pointer=/permissions/deny、severity=error、file 为该文件，merged 仍为上一份有效值；信任变化触发 [\"/permissions/allow\"]。piarc-config 的重载语义另见 `tests/settings.rs`"
     },
     {
       "id": "T13-A09",
       "task": "T13",
       "description": "信任按主 checkout 解析：同一仓库的 linked worktree 共享信任，submodule 与非 git 目录各自独立。验证：测试（用真实 git 夹具）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-core --test state worktrees_share` 与 `cargo test -p piarc-git`：真实 git 夹具（git worktree add、git submodule add、非 git 目录，路径含空格与中文）。从 linked worktree 信任后主仓库及其子目录 trust/get 为真，submodule 与非 git 目录不受影响；符号链接与大小写不同的写法解析到同一主 checkout"
     },
     {
       "id": "T13-A10",
       "task": "T13",
       "description": "信任决定在 Core 重启后保留；撤销后 `trust/get` 返回不信任，且该工作区的 Agent Host 重启后不再加载项目级 Pi 扩展。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-core --test state` 中新建 Core 读到上一个 Core 的信任决定；撤销后所有 worktree 的 trust/get 为假。`cargo test -p piarc-testkit --test agent_host trust`：真实 Agent Host，撤销后 restart_on_trust_change 计划内重启（epoch 3，无 Restarting 事件），会话自动恢复，之后的模型请求不再含 `.pi/extensions/` 夹具注册的 fixture_probe"
     },
     {
       "id": "T13-A11",
       "task": "T13",
       "description": "`trust/get` 在超时、Core 返回错误、响应无法解析三种情况下，Agent Host 都按不信任处理。验证：故障注入测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npx vitest run agent-host/src/harness`：11 passed。askCoreTrust 在超时（30 s，fake timers）、Core 错误响应、结果无法解析（字符串、缺字段、null、列表、数字）、连接已断时都为 false；信任钩子在询问抛错时为 false。Core 侧 `cargo test -p piarc-core --test state trust_get_answers`：目录不存在、lookup 返回错误、lookup panic、表被删除都答 trusted:false，参数格式错回 invalidParams"
     },
     {
       "id": "T13-A12",
       "task": "T13",
       "description": "未信任工作区中，夹具 `.pi/extensions/` 注册的工具不出现在模型请求的工具列表中；信任后出现。验证：mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-testkit --test agent_host trust -- --nocapture`：mock provider 请求断言。未信任时第 1 个请求的 tools 不含 fixture_probe；`decide(ws, true)` 后 Agent Host 重启、会话恢复，第 2 个请求含 fixture_probe；撤销后第 3 个请求不含"
     },
     {
       "id": "T13-A13",
       "task": "T13",
       "description": "可执行配置枚举对夹具工作区按类别列出全部条目与来源文件；在 `.piarc/settings.json` 中新增一个 allow 规则后，新增项检测只返回这一条。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-config --test executables` 与 `cargo test -p piarc-core --test state a_trust_view`：夹具工作区按类别列出 14 项（hooks 2、MCP server 3、allow 规则 3、插件 2、Pi 扩展 4）及来源文件；在 `.piarc/settings.json` 新增 `Bash(curl *)` 后新增项检测只返回这一条（category allowRule、source .piarc/settings.json）；损坏的文件单独列为 unreadable"
     },
     {
       "id": "T13-A14",
       "task": "T13",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run verify`：All 13 steps passed（cargo test 39.8 s）。另：`npm run test:e2e -w @piarc/desktop` 138 passed、1 skipped；`LIBSQLITE3_SYS_USE_PKG_CONFIG=1 SQLITE3_LIB_DIR=/nonexistent cargo clippy --target x86_64-pc-windows-msvc --workspace --all-targets -- -D warnings` 通过"
     },
     {
       "id": "T14-A01",
