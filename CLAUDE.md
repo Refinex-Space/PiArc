@@ -30,7 +30,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `npx vitest run <路径>` | 只跑某个目录或文件的测试 |
 | `cargo test -p <crate>` | 只跑某个 crate 的测试（检查点提交用） |
 | `cargo clippy -p <crate> --all-targets -- -D warnings` | 只检查某个 crate |
-| `cargo clippy --target x86_64-pc-windows-msvc --workspace --all-targets -- -D warnings` | 在 macOS 上类型检查与 lint Windows 代码（`cfg(windows)`）；需先 `rustup target add x86_64-pc-windows-msvc`（经用户同意安装），只编译不运行 |
+| `LIBSQLITE3_SYS_USE_PKG_CONFIG=1 SQLITE3_LIB_DIR=/nonexistent cargo clippy --target x86_64-pc-windows-msvc --workspace --all-targets -- -D warnings` | 在 macOS 上类型检查与 lint Windows 代码（`cfg(windows)`）；需先 `rustup target add x86_64-pc-windows-msvc`（经用户同意安装），只编译不运行。两个环境变量让 rusqlite 跳过 SQLite C 源码的编译（macOS 上没有 Windows SDK 头文件） |
 | `.tools/bin/cargo-deny check` | 许可证、安全公告、来源检查 |
 | `PIARC_REQUIRE_KEYCHAIN=1 cargo test -p piarc-secrets --test system_store -- --nocapture` | 真实系统凭据库（macOS 登录钥匙串）中创建、读取、删除测试主密钥；不设该变量时凭据库不可用只打印 NOT RUN |
 | `node scripts/ci/check-crate-deps.mjs` | crate 依赖方向检查（规则在 `crates/deps-rules.json`） |
@@ -88,6 +88,8 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - Pi 锁定 1.5.2（`@earendil-works/*` 全部同版本，`agent-host` 与 `packages/testkit` 一起升级）；Pi 的 API 以 `node_modules` 中的类型声明或 `reference/pi` 的同一 tag 为准，基线差异见 `docs/research/pi-v1.4.0-baseline.md` 文末。
 - L4 的 `dev` 形态跑上次打包生成的 `apps/desktop/.vite/`：改了 `apps/desktop/src/` 后先重新 `npm run package:desktop -- --flavor development`。
 - 渲染进程不从 HTML 字符串建 DOM（ESLint 禁止 `innerHTML`、`dangerouslySetInnerHTML` 等）；模型输出经 `transcript/markdown/` 的增量解析与 `MarkdownView` 渲染，代码高亮只用 shiki 的 JavaScript 正则引擎，CSP 不放宽（ADR-0022）。复制相关的 L4 会写系统剪贴板（用例结束后恢复文本）。
+- 主进程在 `ready` 前固定 `userData` 与 `sessionData`（`apps/desktop/src/main/platform/data-dirs.ts`）：带 `--user-data-dir=<dir>` 启动时 Core 的数据库、`pi/`、日志与 Chromium 数据都在 `<dir>` 下（L4 的隔离依赖它），否则在 macOS `~/Library/Application Support/PiArc/`、Windows `%LOCALAPPDATA%\PiArc\`。
+- 项目级可执行配置（hooks、MCP、allow 规则、插件、Pi 扩展）只经 `piarc_config::project_trust` 判断信任（Core 侧 `piarc_core::trust`，Agent Host 侧 `agent-host/src/harness/project-trust.ts`），失败一律不信任；不要另写读表或读 Pi `trust.json` 的路径（ADR-0025）。
 - `cargo test`（含 `npm run verify`）会在登录钥匙串中以 `piarc-test.` 开头的服务名创建并删除测试条目；测试代码只用 `test_master_key_name` 命名条目，不碰 `piarc-core::identity` 的正式服务名。
 - `cargo test`（含 verify）中 `piarc-core` 的 `sandbox_commands` 测试经沙箱代理连 `registry.npmjs.org`、`index.crates.io`：离线时这两个用例失败并写明原因。沙箱内命令要联网的工具，配置文件里的代理设置会盖过 `HTTP_PROXY`（`crates/piarc-sandbox/CLAUDE.md`）。
 - 测试里用 `vim -u NONE` 时加 `--cmd 'set encoding=utf-8'`：否则 vim 按 locale 选编码，`LANG` 为空的环境（CI runner、某些 IDE 或智能体的子进程）里中文显示成转义（I38）。

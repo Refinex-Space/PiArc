@@ -7,8 +7,8 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 | 命令 | 用途 |
 |---|---|
 | `npm run build:agent-host` | esbuild 打包到 `agent-host/dist/bundle/agent-host.mjs`，并写 `pi-assets/package.json`；`@piarc/protocol` 从源码打包，不依赖 `tsc` 产物 |
-| `npx vitest run agent-host` | 单元测试：出站队列、投影、Core 桥接、工具层（名称映射、路径、替身、Core I/O）、凭据存储（Pi 接口契约与假 Core） |
-| `cargo test -p piarc-testkit --test agent_host -- --nocapture` | 端到端：Core 监管真实 bundle、mock provider 应答（S3、S4、S5 与进程级 S9）；测试会先自己打包 |
+| `npx vitest run agent-host` | 单元测试：出站队列、投影、Core 桥接、工具层（名称映射、路径、替身、Core I/O）、凭据存储（Pi 接口契约与假 Core）、信任接管（`trust/get` 故障注入） |
+| `cargo test -p piarc-testkit --test agent_host -- --nocapture` | 端到端：Core 监管真实 bundle、mock provider 应答（S3、S4、S5 与进程级 S9；`trust.rs` 是 T13 的项目扩展随信任加载与撤销）；测试会先自己打包 |
 | `node agent-host/dist/bundle/agent-host.mjs --data-dir <dir>` | 手动运行；需设 `PI_PACKAGE_DIR=<bundle>/pi-assets`，stdout 只走 AHP 帧。`--tool-profile <json>` 覆盖默认 Profile 的名称与描述、`--pi-native-tools` 换回 Pi 原生工具、`--test-oauth-provider <json>` 注册接本地 token 端点的 OAuth provider，都只给测试用，Core 不传 |
 
 ## 入口与结构
@@ -19,6 +19,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - `src/runtime/core-bridge.ts`：向 Core 发请求的唯一入口（统一超时，默认 30 s；`timeoutMs: null` 给等待用户的请求，靠 `signal` 取消）。
 - `src/protocol/outbound.ts`：写 stdout 的唯一路径：等 `drain`、合并增量、写出时分配 `seq`。
 - `src/tools/`：工具层（架构第 6.1 节、ADR-0020）。`profile.ts` 规范名、默认 Profile（描述原创，ADR-0006）与 `ToolNameMap`；`core-io.ts` 经 Core 桥接发 `fs/*`、`exec/*`（结果在此校验，错误重建为 Node 风格）；`read.ts`、`write.ts`、`edit.ts` 在替身路径（`stand-in.ts`）上运行 Pi 的工具定义；`bash.ts`、`glob.ts` 用 Pi 工厂加 Operations；`grep.ts` 自写；`ls.ts` 只提供 `LsOperations`，不暴露。
+- `src/harness/project-trust.ts`：Harness Kit 接管 Pi 的项目信任（T13）。`askCoreTrust` 发 `trust/get`，超时、错误响应、结果无法解析、连接已断都按不信任；`takeOverProjectTrust` 给 `createAgentSessionServices` 的 `resourceLoaderReloadOptions.resolveProjectTrust`，会话的 `SettingsManager` 一律以 `projectTrusted: false` 创建，项目级资源（`.pi/extensions/`、`.pi/settings.json`、`.pi/mcp.json` 等）在钩子拿到 Core 的回答后才加载。
 - `src/runtime/credentials.ts`：`CoreCredentialStore`，pi-ai 的 `CredentialStore`，经 `secrets/*` 由 Core 的保险箱支撑（ADR-0021）；`host.ts` 在握手后 `load()`，再交给 `ModelRuntime.create({ credentials })`。
 
 ## 打包的外部依赖
@@ -46,7 +47,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - 不要调用 `process.chdir`，也不要读 `process.cwd()` 推断会话目录：Pi 按每个会话的 `cwd` 解析工具路径。
 - 不要在会话代码里改 `process.env`：bash 工具的子进程继承它，所有会话共享。
 - Pi 的 MCP 扩展、默认会话目录、默认 `auth.json` 读进程级的 `getAgentDir()`，不看 SDK 的 `agentDir`。`main.ts` 把 `PI_CODING_AGENT_DIR` 固定为 `<data>/pi`，`SessionRegistry` 构造时校验；测试直接用注册表时也要先设它。
-- `SettingsManager.create()` 默认 `projectTrusted: true`；注册表总是按 `trust/get` 的结果显式传入。
+- `SettingsManager.create()` 默认 `projectTrusted: true`：注册表总是传 `false`，由信任钩子改成 Core 的回答。Pi 的 `project_trust` 扩展事件、`<agentDir>/trust.json` 与 `defaultProjectTrust` 只在 Pi 的 CLI 路径生效，SDK 路径不经过它们；不要调用 Pi 的 `resolveProjectTrusted`。
 - `ModelRuntime` 是工作区共享的：扩展注册的 provider 对所有会话可见。
 - 关闭会话要走 `AgentSessionRuntime.dispose()`：单独的 `session.dispose()` 不发 `session_shutdown`，MCP 不会断开。
 - MCP 扩展按会话实例化：同一个 server 被两个会话配置时会起两份进程（共享池是 T36）。

@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.17（2026-11-16） |
+| 版本 | 2.18（2026-11-16） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -245,6 +245,7 @@ PiArc/
 | [0009](../adr/0009-agent-host-protocol.md) | 自有协议 AHP | 双向请求、版本握手、事件回放、调用对账 |
 | [0010](../adr/0010-process-model.md) | 每工作区一个 Agent Host | 控制多会话内存，MCP 按工作区共享 |
 | [0011](../adr/0011-session-storage.md) | Pi JSONL 为事实来源 + SQLite 索引 + 内容寻址快照 | 跟随上游格式，索引可重建 |
+| [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
 | [0019](../adr/0019-event-batches-copied-not-transferred.md) | 事件批次经主进程转发时复制，不转移 `ArrayBuffer` | Electron 主进程只能转移端口；实测 8 MiB 批次复制转发约 2 ms |
 | [0015](../adr/0015-agent-host-runtime-bundled-node.md) | Agent Host 继续单独内置 Node LTS | 要套 Seatbelt、走 stdio、给 npx 用，Electron 自带的 Node 都做不到 |
@@ -326,7 +327,7 @@ agent-host/
 
 - Pi 的 agent 目录指向 PiArc 数据目录下的 `pi/`（经 SDK `agentDir`，目录位置见第 9.1 节），与用户本机 `~/.pi/agent` 隔离；设置界面提供一次性导入（模型配置、skills、prompts）。
 - 关闭 Pi 的版本检查与自更新；`PI_OFFLINE` 只在需要时开启（它也会关闭模型目录刷新）。模型目录刷新是否走网络由 PiArc 设置控制。
-- Pi 的项目信任（`project_trust`）由 Harness Kit 接管：信任决定来自 Core（第 10.2 节），不使用 Pi 的 `trust.json`。T06 起 Agent Host 创建会话前经 `trust/get` 询问 Core，失败按不信任处理。
+- Pi 的项目信任（`project_trust`）由 Harness Kit 接管：信任决定来自 Core（第 10.2 节），不使用 Pi 的 `trust.json`。T06 起 Agent Host 创建会话前经 `trust/get` 询问 Core，失败按不信任处理。T13 落地（ADR-0025）：Pi 1.5.2 的 `project_trust` 扩展事件与 `trust.json` 只在 CLI 路径使用；Agent Host 以 `projectTrusted: false` 创建会话的 `SettingsManager`，经资源加载器的 `resolveProjectTrust` 钩子用 `trust/get` 回答（`agent-host/src/harness/project-trust.ts`），未信任时 `.pi/extensions/`、`.pi/settings.json`、`.pi/mcp.json`、项目 skills 与 prompts 都不加载；超时、错误、结果无法解析一律不信任。
 - Pi 的部分默认路径（MCP 扩展的 `mcp.json`、`mcp.log`、`mcp-auth.json`，默认会话目录）读进程级的 `getAgentDir()`，不看 SDK 的 `agentDir`。Agent Host 启动时把 `PI_CODING_AGENT_DIR` 设为 PiArc 的 `pi/` 目录，会话注册表校验两者一致。
 - 凭据经适配层存放在 Core 的保险箱（第 5.4 节，T08）；关闭 Pi 自带的上下文文件加载（`noContextFiles`），项目上下文由 PiArc 组装（第 6.6 节）。
 
@@ -824,6 +825,8 @@ T07 已实现的方法（Agent Host → Core，`piarc-core::tool_io::ToolIo` 应
 
 T08 已实现的方法（Agent Host → Core，`piarc-core::secrets::SecretsService` 应答，所有 Agent Host 共用一个，ADR-0021）：`secrets/getAll`（启动时取回全部凭据，可用 `prefixes` 只取某几类键；并把该连接登记为变更订阅者）、`secrets/get`、`secrets/set`、`secrets/delete`（值是 JSON 对象，结果带保险箱级递增的 `revision`）、`secrets/lock`（一组键一起加锁，结果带它们的当前值与 `expiresInMs`；持锁期间其他锁与未持锁的写入等待；`secrets/unlock`、30 秒租约或持有者连接结束时释放）、`secrets/unlock`，以及 Core → Agent Host 的通知 `secrets/changed`（`{ key, revision, value? }`，删除时没有 `value`，推给所有订阅者）。键为 `provider/<id>`、`oauth/<id>`、`mcp/<server>`。新增错误类别：`masterKeyMissing`、`credentialStoreUnavailable`（可重试，`details.reason` 为 `accessDenied`、`unavailable` 或 `failed`）、`vaultIntegrity`、`vaultVersion`、`secretLockLost`。保险箱在第一次请求时打开，失败的请求返回上述错误，下一次请求重新尝试。参数错误不带 serde 的原文（它可能引用凭据值）。
 
+T13 已实现的方法（Agent Host → Core，`piarc-core::trust::TrustService` 应答）：`trust/get` 先把路径解析到仓库主 checkout（`piarc-git`），再查 `project_trust`；目录解析不了、数据库出错、任务 panic 都回答 `trusted: false`，只有参数格式错回 `invalidParams`。信任变化时 Core 计划内重启该工作区的 Agent Host（`HostSupervisor::restart`，不计入崩溃退避），会话随之 `session/resume`。
+
 T06 已实现的方法：Core → Agent Host 的 `host/ping`（结果附带 Agent Host 的 RSS 与出站队列计数）、`host/shutdown`、`session/create`、`session/resume`、`session/prompt`（结果只确认回合已开始，回合结束以 `turn/completed` 为准；`requestId` 是幂等键）、`session/abort`、`session/close`；Agent Host → Core 的 `trust/get`；通知 `turn/started`、`turn/completed`、`item/started`、`item/completed`、`item/agentMessage/delta`。新增的错误类别：`timeout`、`uncertain`、`hostUnavailable`（后两者只用于 Core API）、`sessionNotFound`、`sessionBusy`。请求方法的成功响应契约名为 `<方法>/result`。
 
 **消息约定**（细则以 `piarc-protocol` 的 crate 文档为准，新增消息的流程见 `docs/engineering/testing.md` 第 7 节）
@@ -887,6 +890,7 @@ impl Session {
 - 已实现的导出面（T04）：`CoreRuntime.create(options, onEvents)`、`shutdown(): Promise<void>`、`state`。`onEvents` 每次收到一组批次 `{ route, seq, payload }`：`route` 是路由键（1–128 个 `[A-Za-z0-9._:/-]`，`core/` 前缀保留给 Core 自己的事件，例如 `core/errors`），`seq` 是每个路由从 1 起连续的批次序号，`payload` 是该路由事件的 UTF-8 JSON 数组（`Uint8Array`），主进程不解析，以结构化克隆转发（ADR-0019）。开发构建另有 `testing` 导出（演示事件源、同步轻量方法 `echo`、计数、panic 触发），发布构建不含。
 - 终端导出（T10）：`createTerminal`、`terminalInput`、`terminalKey`、`terminalResize`、`terminalFrame(id, viewer, full): Promise<Uint8Array>`、`closeTerminal`；开发构建另有 `terminalText`、`terminalStats`、`terminalProbeEcho`。主进程校验终端归属（窗口只能用自己创建的终端，窗口销毁时关闭它们），帧不解析，作为拉取请求的返回值交给发起的窗口（ADR-0023）。
 - 错误跨 NAPI 时是抛出的 `Error`，带 `code` 与 `data: { kind, retryable, details? }`（`piarc_protocol::ErrorObject` 的形状）；导出函数在边界捕获 panic，kind 为 `internalError`。Core API 专用的错误类别有 `shuttingDown`（关闭后的请求）与 `busy`（队列满，可重试）。
+- 状态导出（T13）：`CoreRuntime.create` 的选项增加 `dataDir` 与 `cacheDir`（同时给或都不给；不给时没有数据库、设置、信任与日志文件，只用于事件通道的测试）；`rebuildSessionIndex()`、`projectTrust(path)`、`decideProjectTrust(path, trusted)`、`revokeProjectTrust(path)` 都返回 JSON 文本的 Promise（`piarc_core::storage::report_json`、`piarc_core::trust::TrustView`）。设置变化以事件发到 `core/settings`（`{ workspace, changed, issues }`）。
 - Promise 由 Core 自己的运行时经 NAPI-RS 的 `JsDeferred` 结算，不用 `#[napi] async fn`（它会另起 NAPI-RS 的全局 tokio 运行时）。
 - 声明快照在 `apps/desktop/src/main/core/native/`（`piarc-core.d.ts` 为发布构建，`piarc-core.testing.d.ts` 为开发构建），由 `npm run build:core` 生成，verify 比对。
 
@@ -1054,6 +1058,7 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 - 凭据保险箱（ADR-0018）：服务商 API key、OAuth token、MCP token 加密（AES-256-GCM）存放在数据目录下的 `secrets.vault`；系统凭据库（macOS 钥匙串、Windows 凭据管理器，服务名使用应用标识前缀）只存一个主密钥。未签名构建每次更新后，macOS 最多弹一次钥匙串授权。主密钥不可用时凭据不可读，提示重新授权，不回退到明文。`pi/` 下不出现 `auth.json`、`mcp-auth.json`。
   - T08 落地（ADR-0021）：文件格式 v1 为魔数 `PIARCVLT`、2 字节版本、16 字节主密钥标识、12 字节 nonce、密文、16 字节标签，前 38 字节头部作为附加数据参与认证，每次写入换新 nonce，经同目录临时文件与 rename 原子替换（文件权限 0600）。主密钥在 macOS 登录钥匙串（不用 data protection keychain）与 Windows 凭据管理器中，服务名 `<应用标识>.credential-vault`、账户 `master-key`；应用标识为 `cn.piarc.desktop`（D2），定义在 `piarc-core::identity`。
 - 首次在某个工作区创建 `.piarc/` 时，提示把 `settings.local.json` 与 `worktrees/` 加入该仓库的 `.gitignore`。
+- T13 落地（ADR-0025）：主进程在 `ready` 与单实例锁之前设置 `userData`（数据目录）与 `sessionData`（缓存目录下的 `Chromium/`，Chromium 的缓存与 `localStorage`），路径由 `apps/desktop/src/main/platform/data-dirs.ts` 的纯函数计算；`--user-data-dir=<dir>` 时两者都在 `<dir>` 下（缓存为 `<dir>/Cache`）。Core 收到目录后建上面的子目录、打开 `core.sqlite`，日志按 UTC 天写成 `logs/core-<日期>.log` 与 `logs/agent-host-<日期>.log`，启动时与每次换天时删除 7 天前的文件。
 
 ### 9.2 SQLite 模型（概要）
 
@@ -1066,8 +1071,12 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 | `audit_events` | 权限裁决、审批结果、hooks 执行结果、沙箱拒绝 |
 | `background_tasks` | 后台命令与子 agent 的元数据与输出文件路径 |
 | `schema_migrations` | 迁移记录 |
+| `project_trust` | 主 checkout 的规范路径（键）、决定（信任 / 拒绝）、决定时间、当时可执行项的快照（T13） |
+| `session_files` | 每个会话文件的增量同步状态：已读到的字节偏移、末行起点与哈希、最后的 entry id、跳过的坏行数（T13） |
 
 索引可以从 Pi JSONL 完整重建；应用提供"重建索引"诊断操作。
+
+T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失败整体回滚；`workspaces` 记主 checkout 而不另存信任状态（信任看 `project_trust`）；`sessions` 中从 JSONL 派生的列（标题来源、模型、用量、时间、格式版本、索引状态）重建时清空重读，置顶、归档、未读、所属工作区、状态、worktree 保留。解析器流式读取，末行未写完时下次从行首继续；未知格式版本标为"索引不可用"，坏行跳过并记录。`session_fts`（T35）与 `checkpoints`（T28）尚未建表。
 
 ### 9.3 保留与清理
 
@@ -1109,6 +1118,7 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 - 第一次在某个工作区创建会话前，客户端显示信任对话框，列出将被启用的项目级配置（hooks、MCP server、权限 allow 规则、插件、扩展）。
 - 信任前：memory 文件照常加载（它们是指令而非代码，但 UI 会标注来源）；不执行项目 hooks；不连接项目 MCP；不应用项目 allow 规则（deny 与 ask 照常生效）；不加载项目插件与 Pi 扩展。
 - 信任决定存在 Core（按仓库主 checkout 解析，worktree 共享），可在设置中撤销。项目配置文件发生变化时，新增的可执行项需要再次确认。
+- T13 落地（ADR-0025）：主 checkout 规则见 `crates/piarc-git/CLAUDE.md`（linked worktree 经 `gitdir` 与 `commondir` 找到主仓库；submodule 没有 `commondir`，按独立项目；非 git 目录取自身规范路径）。可执行项枚举只读键名与条目：`.piarc/settings*.json`、`.claude/settings*.json` 的 hooks、allow 规则、`enabledPlugins`，`.mcp.json` 与 `.pi/mcp.json` 的 server，`.claude-plugin/` 的插件，`.pi/extensions/` 的条目与 `.pi/settings.json` 的 `extensions`、`packages`；信任时的条目存为快照，之后多出的条目是"新增项"。撤销删除决定并重启该工作区的 Agent Host。所有消费者经 `piarc_config::project_trust` 查询；项目不受信任时，设置合并排除项目层的 hooks 与 allow 规则，deny 与 ask 照常生效。
 
 ### 10.3 进程加固
 
@@ -1432,6 +1442,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.18 | 2026-11-16 | T13 补充（ADR-0025）：第 4 章加入 ADR-0025；5.5 写明 Pi 项目信任的接管挂点；7.4 写明 `trust/get` 的 Core 实现与信任变化时的计划内重启；7.6 加入状态导出与 `core/settings` 事件；9.1 写明 `userData`、`sessionData` 与 `--user-data-dir`、日志文件；9.2 增加 `project_trust`、`session_files` 两表与迁移、派生列和 Core 自有列的区分；10.2 写明主 checkout 规则、可执行项枚举与新增项、设置合并对未信任项目的处理 |
 | 2.17 | 2026-11-16 | R1（M0 阶段门）：第 11 章按 M0 实测校准，表中逐行写两个平台的实测值；收紧三行（流式每帧主线程工作 p99 16 → 12 ms、冷加载 1,000 条 300 → 170 ms、主进程转发 p95 5 → 1.1 ms），收紧规则写在第 11 章；放宽两行：**主进程内存**由"≤ 120 MB"改为"相对同平台同版本裸 Electron 的增量 ≤ 24 MB"，原因是 macOS 上裸 Electron 一个空窗口就有 155–157 MB，原预算无法由 PiArc 达到（Windows 裸 Electron 96 MB，原预算隐含的增量正是 24 MB，所以 Windows 不变）；**进程合计**在 macOS 上由 450 MB 改为 510 MB，原因是同一个主进程基线差额（约 59 MB），Windows 不变。两项测量口径校准：Windows 的事件循环延迟取超出同机空闲基线的部分，终端回显取两组样本 p95 之差。超出且不放宽的行（进程合计、Agent Host 单会话、Windows 体积）交 T44。同步：3.4 仓库结构（`packages/testkit`、`third-party/`、`tests/contracts/`）、6.1.1 与 8.5 的 M0 结果、10.3 终端输入与外链确认框、第 14 章 R1/R5/R15、15.2 的 Shell 与 PTY、第 16 章 M0 状态与结论 |
 | 2.16 | 2026-11-16 | T12 补充：8.8 系统通知一行写明 S6 的结论；第 4 章加入 ADR-0024（发布清单格式）；5.6 写明打包布局中的 `node_modules/`、Agent Host 的启动命令（`sandbox-exec -p`，路径经 `-D`）、`ProcessTreeSpawner` 与环境变量清单；9.1 增加数据目录下的 `agent-host/`；10.1 增加"同一用户的进程向 PiArc 注入代码"一行；10.3 写明分层签名、hardened runtime 的 M0 结论（开启，需 `disable-library-validation` 与 `allow-jit`）与 Agent Host 的宽松 Seatbelt 配置；13.2 写明二进制锁定、DMG 由 hdiutil 生成、vpk 打包与清单签名 |
 | 2.15 | 2026-11-15 | T11 补充：6.10 增加沙箱受保护路径清单（比 6.1.2 窄，`.git/` 整体可写）与 Seatbelt、代理、缓存目录、进程树的原型实现；7.1 的 `unsafe` 范围增加 `piarc-exec` 的 `job` 模块（Windows Job Object 的 safe 封装） |

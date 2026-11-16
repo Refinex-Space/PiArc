@@ -1,6 +1,6 @@
 # piarc-core
 
-Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、有序关闭、任务监督；`agent_host` 模块把 `piarc-host` 的监管器与生产 I/O（`piarc-exec` 的进程启动器、`SystemClock`）装配起来，是 Agent Host 测试的无头入口（T06）；`tool_io` 应答 Agent Host 委托的 `fs/*`、`exec/*`（T07），沙箱会话的命令经 `piarc-sandbox` 包装（T11）；`secrets` 把凭据保险箱提供给所有 Agent Host（`secrets/*`，T08），`identity` 是应用标识的唯一定义；`terminal` 是终端会话的注册表（T10）。不负责 JavaScript 绑定（`piarc-napi`）。
+Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、有序关闭、任务监督；`agent_host` 模块把 `piarc-host` 的监管器与生产 I/O（`piarc-exec` 的进程启动器、`SystemClock`）装配起来，是 Agent Host 测试的无头入口（T06）；`tool_io` 应答 Agent Host 委托的 `fs/*`、`exec/*`（T07），沙箱会话的命令经 `piarc-sandbox` 包装（T11）；`secrets` 把凭据保险箱提供给所有 Agent Host（`secrets/*`，T08），`identity` 是应用标识的唯一定义；`terminal` 是终端会话的注册表（T10）；`dirs`、`storage`、`trust`、`workspace_settings` 是数据目录、数据库、项目信任与工作区设置（T13）。不负责 JavaScript 绑定（`piarc-napi`）。
 
 ## 命令
 
@@ -11,6 +11,7 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 | `cargo test -p piarc-core --test sandbox_commands -- --nocapture` | 沙箱内 git、python、cargo build、npm install（后两项连真实 registry，连不上就失败并说明） |
 | `cargo test -p piarc-core --test release -- --nocapture` | 发布清单校验（T12-A08）：有效、篡改内容、篡改哈希与大小、未列出、换密钥、无内置公钥，打印结构化错误 |
 | `cargo test -p piarc-core --test agent_host_probe` | 探针在 Core 运行时上启动进程（运行时开着 I/O）、Agent Host 未握手就退出时报告错误（Unix） |
+| `cargo test -p piarc-core --test state` | 数据目录布局、信任按主 checkout（真实 git 夹具）、重启后保留与撤销、`trust/get` 故障注入、信任视图与新增项、设置文件变化事件（T13） |
 | `cargo test -p piarc-core --test terminal` | 终端：`term/<id>` 事件、经回调取帧、错误类别、关闭时结束终端（Unix） |
 | `cargo clippy -p piarc-core --all-targets -- -D warnings` | lint |
 
@@ -59,11 +60,19 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 注册表持有 `piarc_term::Session`；`create_terminal` 校验尺寸（1–1000）与绝对 cwd，事件（标题、响铃、退出）以 JSON 发到 `term/<id>`：IO 线程上用 `EventSender::blocking_send`，不能在运行时线程调用。
 - 取帧、读屏、回显探针都放到阻塞线程池，结果经回调交给 NAPI；关闭 Core 时先关掉全部终端（有序关闭第 2 步）。
 
+## 数据目录与状态（T13）
+
+- `CoreConfig.dirs`（NAPI 的 `dataDir` + `cacheDir`，主进程算好传入）为 `None` 时没有数据库、设置、信任与日志文件，只给事件通道的测试与基准用；`storage()`、`trust()` 返回 `NoDataDirectory`。
+- 启动时：建第 9.1 节的目录 → `piarc_telemetry::install(<data>/logs)`（进程级，只装一次；关闭时 `detach`）→ 打开并迁移 `core.sqlite`（同步，只在启动做一次）→ 后台增量同步 `pi/sessions/` 的索引。运行中会话文件的增量同步由 T14 的会话层触发（`Storage::sync_sessions`）。
+- `Storage` 是 `Store` 加互斥锁，经阻塞线程池使用；不要在异步任务里拿着锁等待。
+- 信任（`trust`）：`TrustService::trust_get` 应答 `trust/get`，任何失败（目录解析不了、数据库错、任务 panic）都答 `trusted: false`，只有参数格式错时回 `invalidParams`；查询一律经 `piarc_config::project_trust`。`decide`、`revoke` 广播 `TrustChange`；`agent_host::restart_on_trust_change` 订阅它，对同一主 checkout 调 `HostSupervisor::restart`（不计入崩溃退避，会话自动恢复）。T14 的工作区 actor 负责为每个工作区启动这个任务。
+- 设置（`workspace_settings`）：`CoreRuntime::open_settings(workspace)` 加载四层并用 `piarc_fs::watch` 监听各层文件所在目录（`.piarc/` 不存在时监听工作区本身），去抖 150 ms 后重载；有变化键或问题变化时向 `core/settings` 发 `{ workspace, changed, issues }`。信任变化同样触发重新合并。
+
 ## 不变量
 
 - 同步方法（`echo`）只做校验与 `try_send`，不做 I/O、不拿长时间持有的锁（架构第 7.2 节，单次预算 1 ms）。
-- 路由键语法：1–128 个 `[A-Za-z0-9._:/-]`；`core/` 前缀保留给 Core 自己的事件，客户端传入会被拒绝。主进程 `src/shared/ipc.ts` 的 `isRouteKey` 与之保持一致。
-- 错误映射为 `piarc_protocol::ErrorObject`：`ShuttingDown` → `shuttingDown`，`QueueFull` → `busy`（唯一可重试），参数错误 → `invalidParams`，其余 → `internalError`。
+- 路由键语法：1–128 个 `[A-Za-z0-9._:/-]`；`core/` 前缀保留给 Core 自己的事件（`core/errors`、`core/settings`），客户端传入会被拒绝。主进程 `src/shared/ipc.ts` 的 `isRouteKey` 与之保持一致。
+- 错误映射为 `piarc_protocol::ErrorObject`：`ShuttingDown` → `shuttingDown`，`QueueFull` → `busy`，参数错误 → `invalidParams`，功能 crate 的错误（`Feature`）保留它们自己的 kind 与 `retryable`，其余 → `internalError`。
 - 演示事件源（`demo.rs`）只给测试与基准用；发布构建的 `piarc-napi` 不导出启动它的函数。
 
 ## 易错点

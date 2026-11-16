@@ -303,7 +303,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 5 piarc-config 分层加载、校验、合并、变更监听、写接口（A07、A08）：完成（piarc-fs 监听由 Core 转发，事件路由 `core/settings`）
 - [x] 6 piarc-git 主 checkout 解析（A09 的 git 部分；信任共享在第 7 项验证）
 - [x] 7 项目信任：持久化、撤销、可执行配置枚举与新增项检测、`trust/get`、Harness Kit 接管 `project_trust`（A10–A13）：完成（`piarc_core::trust`、`HostSupervisor::restart`、`restart_on_trust_change`、`agent-host/src/harness/project-trust.ts`、端到端 `tests/agent_host/trust.rs`）
-- [ ] 8 CLAUDE.md（store、config、git）、架构 9.2 补 `project_trust`、复用表登记
+- [x] 8 CLAUDE.md（store、config、git、telemetry 新建；core、host、fs、agent-host、根目录更新）、架构 v2.18、ADR-0025（补充）、复用表登记
 - [ ] 9 收尾：verify（A14）、验收记录、PLAN 更新
 
 ## 登记事项

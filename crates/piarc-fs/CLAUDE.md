@@ -1,6 +1,6 @@
 # piarc-fs
 
-Core 侧的文件操作：AHP `fs/*` 背后的实现（架构第 6.1.3 节），以会话 `Scope`（工作区根 + cwd）为单位的阻塞函数，由 `piarc-core::tool_io` 放到 tokio 的阻塞线程池上调用。本 crate 就是文件 I/O 的实现，所以直接用 `std::fs`。不负责权限裁决（`piarc-policy`）、快照（`piarc-checkpoint`）、diff（`piarc-diff`）。
+Core 侧的文件操作：AHP `fs/*` 背后的实现（架构第 6.1.3 节），以会话 `Scope`（工作区根 + cwd）为单位的阻塞函数，由 `piarc-core::tool_io` 放到 tokio 的阻塞线程池上调用。本 crate 就是文件 I/O 的实现，所以直接用 `std::fs`。`watch` 是 notify 的目录监听封装（T13：Core 监听设置文件；T35 在其上做工作区监听），只报告路径，去抖与重读由调用方做（FSEvents 会把 `/var/...` 报成 `/private/var/...`，不要按单个事件的路径精确匹配）。不负责权限裁决（`piarc-policy`）、快照（`piarc-checkpoint`）、diff（`piarc-diff`）。
 
 ## 命令
 
