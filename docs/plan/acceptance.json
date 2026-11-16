@@ -5060,8 +5060,8 @@
       "id": "W0-A15",
       "task": "W0",
       "description": "Windows 上 `npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Windows 11 专业版 25H2（10.0.26200.9974，x64）本机 npm run verify：13 步全部 PASS（cargo test 198.3 s），提交 8264191，日志 tmp/evidence/W0/verify-final.log。开工时同一命令 2 步失败（release 夹具未入库、core-io.test.ts 的 /w），修复见 9d6b01b"
     },
     {
       "id": "W1-A01",

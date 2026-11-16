@@ -301,7 +301,7 @@ W0（Windows 11 实机，2026-11-16 开工；同时闭环 T03、T04、T10、T11�
 - [x] CI 与本机关闭 T03-A03、T04-A09、T10-A01、T11-A10、T12-A04（T03、T04、T11 改为已完成）
 - [x] S1 自动化与测量（A02）、S2（A04 按原始值未达标，交 R1）、S5（A05）、S7 自动化与测量（A09；A10 的回显 p95 按原始口径未达标，交 R1）、S8（A12）、arm64（A11）
 - [x] 报告 Windows 部分、spikes README、CLAUDE.md（7e2f310）
-- [ ] `npm run verify` 收尾（A15）
+- [x] `npm run verify` 13 步通过（A15，8264191）
 - [ ] 实机关口（用户，`docs/spikes/S06-first-run-checklist.md` 第 8 节）：W1 安全设置状态、W2 浏览器下载、W3 SmartScreen 与安装、W5 微软拼音（composer、终端）、W6 卸载；智能体在 W3 之后做安装检查、mock 对话、更新（`Update.exe apply`）、体积、图标、通知（A03、A06、A07、A08、A10 输入法部分、T12-A12、T12-A14）
 - [ ] 实机结果写回 S1、S6、S7 与检查清单，A13、A14，收尾
 
