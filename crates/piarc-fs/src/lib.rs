@@ -35,7 +35,10 @@
 //!
 //! This crate implements file I/O, so it uses `std::fs` directly. The editing invariants of
 //! architecture section 6.1.2 (read before edit, faithful atomic writes, the file state table,
-//! asking instead of refusing outside the root) arrive with T16; file watching with T35.
+//! asking instead of refusing outside the root) arrive with T16.
+//!
+//! [`watch::Watcher`] (T13) watches directories for `piarc-core`, which forwards the changes
+//! of settings files to `piarc-config`; T35 builds workspace watching on it.
 
 mod content;
 mod entry;
@@ -46,6 +49,7 @@ mod image;
 mod scope;
 #[cfg(test)]
 mod testing;
+pub mod watch;
 
 pub use content::{mkdir, read_blob, read_text, write};
 pub use entry::{MAX_LIST_ENTRIES, list, stat};

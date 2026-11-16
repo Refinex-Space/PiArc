@@ -43,6 +43,9 @@ exceptions = [
     # borrow-or-share reaches the tree only through jsonschema (via fluent-uri)
     # in piarc-testkit, a test-only crate that is never shipped (T05).
     { allow = ["MIT-0"], crate = "borrow-or-share" },
+    # CC0-1.0 is a public-domain dedication (OSI approved, permissive). notify is the file
+    # watcher architecture section 7.1 names for piarc-fs (T13: settings file changes).
+    { allow = ["CC0-1.0"], crate = "notify" },
 ]
 
 [licenses.private]

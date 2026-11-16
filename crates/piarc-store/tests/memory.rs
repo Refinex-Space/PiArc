@@ -21,11 +21,11 @@ struct Counting;
 static LIVE: AtomicUsize = AtomicUsize::new(0);
 static PEAK: AtomicUsize = AtomicUsize::new(0);
 
-// SAFETY: forwards to the system allocator and only adds bookkeeping.
 #[expect(
     unsafe_code,
     reason = "a counting global allocator for the memory measurement"
 )]
+// SAFETY: forwards to the system allocator and only adds bookkeeping.
 unsafe impl GlobalAlloc for Counting {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         // SAFETY: same contract as the caller's.
