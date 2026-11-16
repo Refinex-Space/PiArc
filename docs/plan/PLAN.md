@@ -121,7 +121,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T11 | [沙箱验证：Seatbelt、网络代理与 Job Object](tasks/T11-sandbox-spike.md) | 1 | T07 | macOS | high | 中 | S8 | 已完成 | 1b92a25 |
 | T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 已完成 | 815c32d |
 | W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 部分完成 | f278039 |
-| R1 | [M0 评审与收口](tasks/R1-m0-review.md) | 1 | W0 | macOS | high | 中 | S1–S10 汇总 | 未开始 | — |
+| R1 | [M0 评审与收口](tasks/R1-m0-review.md) | 1 | W0 | macOS | high | 中 | S1–S10 汇总 | 进行中 | — |
 | T13 | [存储、数据目录、配置与项目信任](tasks/T13-storage-config-and-trust.md) | 2 | R1（结论为进入 M1） | macOS | high | 大 | 无 | 未开始 | — |
 | T14 | [会话编排与事件投影](tasks/T14-session-orchestration-and-projection.md) | 2 | T13 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T15 | [无头驱动、L2 场景运行器与能力清单](tasks/T15-devcli-l2-scenarios-and-capabilities.md) | 2 | T14 | macOS | high | 中 | 无 | 未开始 | — |
@@ -294,7 +294,18 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（当前没有进行中的任务）
+R1（M0 评审与收口），开工 2026-11-16。依赖 W0 为"部分完成"：遗留的 W0-A04、A10（Windows 测量口径，I44）本就交 R1 处理，不影响开工。基线 `npm run verify` 见会话记录。
+
+- [ ] 四个只读审查子代理（Electron 安全与 IPC、Core/NAPI 并发与错误边界、Agent Host/AHP 健壮性、工程质量与 CLAUDE.md 一致性）并行完成，原始发现记入 `docs/reviews/R1-findings.md`（A04）
+- [ ] 逐条核实发现；确认的先写失败测试再修复，每个修复单独提交；其余写理由或登记（A05、A06）
+- [ ] `docs/spikes/M0-summary.md`：S1–S10 × 两平台总表、有条件通过与未验证项、对后续任务的影响（A01）
+- [ ] ADR 触发条件检查表：ADR-0013–0018 全部条件与 ADR-0004/0009/0010 中 S4/S9/S3 相关条件；ADR-0015/0018 留给 M0 的事项（A02、A03）
+- [ ] 第 11 章预算校准（两平台实测、只收紧、放宽写原因），I12、I26、I41、I44、I45（A07）
+- [ ] 架构文档同步 M0 结论、版本号递增、修订记录（A08）
+- [ ] 根目录与各模块 CLAUDE.md 的命令实际执行、长度符合上限（A09）
+- [ ] M0 验收项与登记事项逐条归属（A10）
+- [ ] 结论写入 `M0-summary.md`、`docs/reviews/README.md`、`PLAN.md`；技术债排序；spikes README 同步（A11）
+- [ ] 收尾 `npm run verify`（A12）
 
 ## 登记事项
 
