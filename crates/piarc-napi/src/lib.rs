@@ -33,6 +33,11 @@
 //!   `rebuildSessionIndex`, `projectTrust`, `decideProjectTrust`, `revokeProjectTrust` resolve
 //!   with JSON
 //!   ([`state`]).
+//! - Sessions (T14): `CoreRuntime.create` takes `agentHost` (how Agent Hosts start) and
+//!   `idleTimeoutMs`; `openWorkspace`, `closeWorkspace`, `createSession`, `resumeSession`,
+//!   `forkSession`, `closeSession`, `prompt`, `steer`, `followUp`, `abort`, `editQueueItem`,
+//!   `deleteQueueItem`, `reorderQueue`, `markSessionRead`, `transcriptWindow` resolve with JSON;
+//!   `resendSnapshots` queues the list snapshots again ([`sessions`]).
 //! - With the `testing` feature only: demo event sources, `echo`, `eventStats`, two panic
 //!   triggers, terminal measurements and `agentHostProbe` (T12: one mock conversation with
 //!   the packaged app's Agent Host) ([`testing`]).
@@ -47,6 +52,7 @@
 
 mod boundary;
 pub mod runtime;
+pub mod sessions;
 pub mod sink;
 pub mod state;
 pub mod terminal;

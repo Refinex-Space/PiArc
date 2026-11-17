@@ -64,6 +64,7 @@ function startCoreOrExit(dirs: DataDirs): CoreHost | undefined {
         appPath: app.getAppPath(),
         platform: process.platform,
         arch: process.arch,
+        resourcesPath: process.resourcesPath,
       },
       eventRouter,
       { dataDir: dirs.data, cacheDir: dirs.cache },

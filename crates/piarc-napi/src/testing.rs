@@ -51,6 +51,30 @@ fn to_i64(value: u64) -> i64 {
 
 #[napi]
 impl CoreRuntime {
+    /// Like `create`, with the vault's master key in memory under a `piarc-test.` name instead
+    /// of the system credential store: tests that open workspaces never touch the keychain
+    /// (T14).
+    #[napi(factory, catch_unwind)]
+    pub fn create_for_tests(
+        env: Env,
+        options: crate::runtime::CoreOptions,
+        #[napi(ts_arg_type = "(batches: CoreEventBatch[]) => void")]
+        on_events: crate::sink::EventListener,
+    ) -> napi::Result<Self> {
+        boundary::call(&env, "CoreRuntime.createForTests", move || {
+            let mut config = crate::runtime::config_of(options)?;
+            config.secret_store = Some(piarc_core::SecretStoreSetup {
+                master_key: piarc_core::secrets::test_master_key_name("napi"),
+                store: std::sync::Arc::new(piarc_core::secrets::MemorySecretStore::new()),
+            });
+            let sink = std::sync::Arc::new(crate::sink::JsEventSink::new(on_events));
+            piarc_core::CoreRuntime::start(config, sink).map(|core| Self { core })
+        })
+    }
+}
+
+#[napi]
+impl CoreRuntime {
     /// Starts a demo event source and returns its id. Each event is
     /// `{"source":id,"seq":n,"pad":"x…"}` with `seq` counting from 1.
     #[napi(catch_unwind)]

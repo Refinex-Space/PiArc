@@ -2,7 +2,9 @@
 import type { App } from 'electron';
 
 import { loadCoreModule } from './load.js';
-import type { CoreRuntime } from './native/piarc-core.js';
+import path from 'node:path';
+
+import type { AgentHostOptions, CoreRuntime } from './native/piarc-core.js';
 import { resolveCoreModulePath, type CoreModuleLocation } from './native-path.js';
 import type { EventRouter } from './router.js';
 
@@ -14,20 +16,44 @@ export interface CoreHost {
 }
 
 /**
+ * Where workspaces start their Agent Host (T14): a packaged app's own runtime under
+ * `resourcesPath` (bundled Node, ADR-0015); on the source tree the bundle
+ * `npm run build:agent-host` writes, run on the `node` found on PATH.
+ */
+export function agentHostOptions(location: {
+  readonly isPackaged: boolean;
+  readonly appPath: string;
+  readonly resourcesPath: string;
+}): AgentHostOptions {
+  if (location.isPackaged) {
+    return { resourcesPath: location.resourcesPath };
+  }
+  const bundleDir = path.join(location.appPath, '..', '..', 'agent-host', 'dist', 'bundle');
+  return {
+    node: 'node',
+    bundle: path.join(bundleDir, 'agent-host.mjs'),
+    piPackageDir: path.join(bundleDir, 'pi-assets'),
+  };
+}
+
+/**
  * Loads Core and starts it on the data and cache directories (architecture section 9.1) with
  * every event batch going to `router`. Throws when the module cannot be loaded or Core does
  * not start.
  */
 export function startCore(
-  location: CoreModuleLocation,
+  location: CoreModuleLocation & { readonly resourcesPath: string },
   router: EventRouter,
   dirs: { readonly dataDir: string; readonly cacheDir: string },
 ): CoreHost {
   const modulePath = resolveCoreModulePath(location);
   const { CoreRuntime } = loadCoreModule(modulePath);
-  const runtime = CoreRuntime.create({ ...dirs }, (batches) => {
-    router.forward(batches);
-  });
+  const runtime = CoreRuntime.create(
+    { ...dirs, agentHost: agentHostOptions(location) },
+    (batches) => {
+      router.forward(batches);
+    },
+  );
   console.info(`[core] loaded ${modulePath}`);
   return { runtime, modulePath };
 }

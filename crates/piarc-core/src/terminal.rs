@@ -77,6 +77,13 @@ pub(crate) struct Terminals {
     sessions: Mutex<HashMap<u32, Arc<Session>>>,
 }
 
+/// Runs `work` (on the blocking pool), turning a panic into an internal error, so the caller's
+/// callback always runs and a Promise waiting on it always settles (I55).
+fn guarded<T>(location: &str, work: impl FnOnce() -> Result<T>) -> Result<T> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(work))
+        .unwrap_or_else(|payload| Err(Error::from_panic(location, &*payload)))
+}
+
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
@@ -177,7 +184,9 @@ impl Terminals {
     ) -> Result<()> {
         let session = self.session(id)?;
         self.handle.spawn_blocking(move || {
-            on_done(session.frame(viewer, full).map_err(Error::from));
+            on_done(guarded("terminal frame", || {
+                session.frame(viewer, full).map_err(Error::from)
+            }));
         });
         Ok(())
     }
@@ -205,7 +214,9 @@ impl Terminals {
     ) -> Result<()> {
         let session = self.session(id)?;
         self.handle.spawn_blocking(move || {
-            on_done(session.viewport_text().map_err(Error::from));
+            on_done(guarded("terminal text", || {
+                session.viewport_text().map_err(Error::from)
+            }));
         });
         Ok(())
     }
@@ -222,12 +233,31 @@ impl Terminals {
     ) -> Result<()> {
         let session = self.session(id)?;
         self.handle.spawn_blocking(move || {
-            on_done(
+            on_done(guarded("terminal echo probe", || {
                 session
                     .probe_direct_echo(byte, Duration::from_secs(5))
-                    .map_err(Error::from),
-            );
+                    .map_err(Error::from)
+            }));
         });
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// I55: a panic in work run on the blocking pool settles the caller with an internal error
+    /// instead of leaving its Promise unsettled.
+    #[test]
+    fn a_panic_on_the_blocking_pool_becomes_an_internal_error() {
+        let result: Result<u8> = guarded("terminal frame", || panic!("broken frame"));
+        let error = result.expect_err("the panic is reported");
+        assert_eq!(error.kind(), piarc_protocol::ErrorKind::InternalError);
+        assert!(error.to_string().contains("broken frame"), "{error}");
+        assert_eq!(
+            guarded("terminal frame", || Ok(7)).expect("passes through"),
+            7
+        );
     }
 }

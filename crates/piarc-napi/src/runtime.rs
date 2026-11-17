@@ -21,6 +21,85 @@ pub struct CoreOptions {
     pub data_dir: Option<String>,
     /// Absolute cache directory (discardable).
     pub cache_dir: Option<String>,
+    /// How workspaces start their Agent Host; without it workspaces cannot open.
+    pub agent_host: Option<AgentHostOptions>,
+    /// Idle time in milliseconds after which a workspace's Agent Host is stopped (default 30
+    /// minutes).
+    pub idle_timeout_ms: Option<u32>,
+}
+
+/// Where the Agent Host comes from: the packaged app's resources, or a Node executable and a
+/// bundle (development).
+#[napi(object, object_to_js = false)]
+pub struct AgentHostOptions {
+    /// Electron's `process.resourcesPath` of a packaged app (`agent-host/` below it).
+    pub resources_path: Option<String>,
+    /// Development: the Node executable.
+    pub node: Option<String>,
+    /// Development: `agent-host.mjs`.
+    pub bundle: Option<String>,
+    /// Development: Pi's resources next to the bundle (`pi-assets/`).
+    pub pi_package_dir: Option<String>,
+}
+
+fn launch(
+    options: AgentHostOptions,
+) -> piarc_core::Result<piarc_core::agent_host::AgentHostLaunch> {
+    use piarc_core::agent_host::AgentHostLaunch;
+    match options {
+        AgentHostOptions {
+            resources_path: Some(resources),
+            node: None,
+            bundle: None,
+            pi_package_dir: None,
+        } => Ok(AgentHostLaunch::Bundled {
+            resources_dir: PathBuf::from(resources),
+        }),
+        AgentHostOptions {
+            resources_path: None,
+            node: Some(node),
+            bundle: Some(bundle),
+            pi_package_dir,
+        } => Ok(AgentHostLaunch::Custom {
+            node: PathBuf::from(node),
+            bundle: PathBuf::from(bundle),
+            pi_package_dir: pi_package_dir.map(PathBuf::from),
+            extra_args: Vec::new(),
+            extra_env: Vec::new(),
+        }),
+        _ => Err(piarc_core::Error::InvalidArgument {
+            field: "agentHost",
+            reason: "give resourcesPath, or node and bundle".into(),
+        }),
+    }
+}
+
+/// Core's settings from `CoreRuntime.create`'s options.
+pub(crate) fn config_of(options: CoreOptions) -> piarc_core::Result<piarc_core::CoreConfig> {
+    let mut config = piarc_core::CoreConfig::default();
+    if let Some(ms) = options.coalesce_interval_ms {
+        config.coalesce_interval = Duration::from_millis(u64::from(ms));
+    }
+    config.dirs = match (options.data_dir, options.cache_dir) {
+        (Some(data), Some(cache)) => Some(piarc_core::DataDirs::new(
+            PathBuf::from(data),
+            PathBuf::from(cache),
+        )?),
+        (None, None) => None,
+        _ => {
+            return Err(piarc_core::Error::InvalidArgument {
+                field: "dataDir",
+                reason: "dataDir and cacheDir go together".into(),
+            });
+        }
+    };
+    if let Some(agent_host) = options.agent_host {
+        config.sessions.launch = Some(launch(agent_host)?);
+    }
+    if let Some(ms) = options.idle_timeout_ms {
+        config.sessions.idle_timeout = Duration::from_millis(u64::from(ms));
+    }
+    Ok(config)
 }
 
 /// Lifecycle state of a runtime.
@@ -53,23 +132,7 @@ impl CoreRuntime {
         #[napi(ts_arg_type = "(batches: CoreEventBatch[]) => void")] on_events: EventListener,
     ) -> napi::Result<Self> {
         boundary::call(&env, "CoreRuntime.create", move || {
-            let mut config = piarc_core::CoreConfig::default();
-            if let Some(ms) = options.coalesce_interval_ms {
-                config.coalesce_interval = Duration::from_millis(u64::from(ms));
-            }
-            config.dirs = match (options.data_dir, options.cache_dir) {
-                (Some(data), Some(cache)) => Some(piarc_core::DataDirs::new(
-                    PathBuf::from(data),
-                    PathBuf::from(cache),
-                )?),
-                (None, None) => None,
-                _ => {
-                    return Err(piarc_core::Error::InvalidArgument {
-                        field: "dataDir",
-                        reason: "dataDir and cacheDir go together".into(),
-                    });
-                }
-            };
+            let config = config_of(options)?;
             let sink = Arc::new(JsEventSink::new(on_events));
             piarc_core::CoreRuntime::start(config, sink).map(|core| Self { core })
         })

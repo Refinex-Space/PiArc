@@ -18,6 +18,56 @@ export declare class CoreRuntime {
    */
   shutdown(): Promise<void>;
   /**
+   * Opens a workspace (an absolute directory): starts its Agent Host at once and resolves
+   * when it is ready, with the workspace as `core/workspaces` lists it (JSON).
+   */
+  openWorkspace(path: string): Promise<string>;
+  /** Closes a workspace: its sessions and its Agent Host. Resolves with `null`. */
+  closeWorkspace(path: string): Promise<string>;
+  /**
+   * Creates a session in a workspace (opened when needed). Resolves with
+   * `{ sessionId, workspace, cwd, restoredMessages }`.
+   */
+  createSession(workspace: string, options?: CreateSessionOptions | null): Promise<string>;
+  /** Reopens a session from its file (its workspace is opened when needed). */
+  resumeSession(id: string): Promise<string>;
+  /** Opens a copy of a session's conversation (up to `entryId`) as a new session. */
+  forkSession(id: string, entryId?: string | null): Promise<string>;
+  /** Closes an open session. */
+  closeSession(id: string): Promise<string>;
+  /** Starts a turn on an idle session; resolves with `{ turnId }`. */
+  prompt(id: string, text: string): Promise<string>;
+  /**
+   * A steering message for the running turn (a new turn when idle); resolves with
+   * `{ disposition: "queued", itemId }` or `{ disposition: "started", turnId }`.
+   */
+  steer(id: string, text: string): Promise<string>;
+  /** A follow-up for after the running turn (a new turn when idle); resolves like `steer`. */
+  followUp(id: string, text: string): Promise<string>;
+  /**
+   * Interrupts the running turn; resolves with `{ sessionId, interruptedTurnId?,
+   * returnedQueue? }`.
+   */
+  abort(id: string): Promise<string>;
+  /** Changes a queued item's text; resolves with the queue (`{ items }`). */
+  editQueueItem(id: string, itemId: string, text: string): Promise<string>;
+  /** Removes a queued item; resolves with the queue. */
+  deleteQueueItem(id: string, itemId: string): Promise<string>;
+  /** Reorders the queue (every item's id once); resolves with the queue. */
+  reorderQueue(id: string, itemIds: string[]): Promise<string>;
+  /** Clears a session's unread flag; resolves with `null`. */
+  markSessionRead(id: string): Promise<string>;
+  /**
+   * Items of a session's conversation (open or not): `start .. start + limit`, or the last
+   * `limit` without `start`. Resolves with `{ start, total, items: [{ entryId, item }] }`.
+   */
+  transcriptWindow(id: string, start: number | null, limit: number): Promise<string>;
+  /**
+   * Sends the `core/workspaces` and `core/sessions` snapshots again (a window subscribed
+   * anew). Only queues.
+   */
+  resendSnapshots(): void;
+  /**
    * Rebuilds the session index from Pi's session files (the "rebuild index" diagnostic
    * action). Resolves with the report as JSON: `files`, `rescanned`, `appended`,
    * `unchanged`, `removed`, `unavailable`, `failed`, `skippedLines`.
@@ -66,6 +116,15 @@ export declare class CoreRuntime {
   /** Kills the terminal's program and forgets the terminal. */
   closeTerminal(id: number): void;
   /**
+   * Like `create`, with the vault's master key in memory under a `piarc-test.` name instead
+   * of the system credential store: tests that open workspaces never touch the keychain
+   * (T14).
+   */
+  static createForTests(
+    options: CoreOptions,
+    onEvents: (batches: CoreEventBatch[]) => void,
+  ): CoreRuntime;
+  /**
    * Starts a demo event source and returns its id. Each event is
    * `{"source":id,"seq":n,"pad":"x…"}` with `seq` counting from 1.
    */
@@ -112,6 +171,21 @@ export declare class CoreRuntime {
    * as JSON; it may wait while macOS asks the user for keychain access.
    */
   keychainProbe(action: string, dir: string): Promise<string>;
+}
+
+/**
+ * Where the Agent Host comes from: the packaged app's resources, or a Node executable and a
+ * bundle (development).
+ */
+export interface AgentHostOptions {
+  /** Electron's `process.resourcesPath` of a packaged app (`agent-host/` below it). */
+  resourcesPath?: string;
+  /** Development: the Node executable. */
+  node?: string;
+  /** Development: `agent-host.mjs`. */
+  bundle?: string;
+  /** Development: Pi's resources next to the bundle (`pi-assets/`). */
+  piPackageDir?: string;
 }
 
 /** What `agentHostProbe` runs (S6, T12): see `piarc_core::host_probe`. */
@@ -167,10 +241,25 @@ export interface CoreOptions {
   dataDir?: string;
   /** Absolute cache directory (discardable). */
   cacheDir?: string;
+  /** How workspaces start their Agent Host; without it workspaces cannot open. */
+  agentHost?: AgentHostOptions;
+  /**
+   * Idle time in milliseconds after which a workspace's Agent Host is stopped (default 30
+   * minutes).
+   */
+  idleTimeoutMs?: number;
 }
 
 /** Lifecycle state of a runtime. */
 export type CoreState = 'running' | 'shuttingDown' | 'stopped';
+
+/** Options of `createSession`. */
+export interface CreateSessionOptions {
+  /** Absolute working directory inside the workspace; the workspace itself when absent. */
+  cwd?: string;
+  /** The model to start with; the Agent Host's default when absent. */
+  model?: SessionModel;
+}
 
 /** Settings of a demo event source. */
 export interface DemoSourceOptions {
@@ -190,6 +279,14 @@ export interface DemoSourceReport {
   id: number;
   /** Events queued; each one is delivered unless the listener's environment is gone. */
   emitted: number;
+}
+
+/** A model by provider and id. */
+export interface SessionModel {
+  /** Provider id, for example `anthropic`. */
+  provider: string;
+  /** Model id within the provider. */
+  id: string;
 }
 
 /** Options of `createTerminal`. */
