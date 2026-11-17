@@ -30,15 +30,33 @@ actions:
   - prompt: { session: b, text: 'Copy the note.', turn: tb }
 expect:
   events:
-    - { session: a, method: item/completed, params: { item: { itemId: toolu_a_read, status: completed } } }
+    - {
+        session: a,
+        method: item/completed,
+        params: { item: { itemId: toolu_a_read, status: completed } },
+      }
     - { session: a, method: turn/completed, turn: ta, params: { status: completed } }
-    - { session: b, method: item/completed, params: { item: { itemId: toolu_b_read, status: completed } } }
+    - {
+        session: b,
+        method: item/completed,
+        params: { item: { itemId: toolu_b_read, status: completed } },
+      }
     - { session: b, method: turn/completed, turn: tb, params: { status: completed } }
   files:
     'alpha dir/out.txt': "written by a\n"
     'beta 目录/out.txt': "written by b\n"
     'out.txt': null
   requests:
-    - { provider: one, index: 1, tool_results: [{ id: toolu_a_read, is_error: false, contains: alpha note }], not_contains: [beta note, toolu_b_] }
-    - { provider: two, index: 1, tool_results: [{ id: toolu_b_read, is_error: false, contains: beta note }], not_contains: [alpha note, toolu_a_] }
+    - {
+        provider: one,
+        index: 1,
+        tool_results: [{ id: toolu_a_read, is_error: false, contains: alpha note }],
+        not_contains: [beta note, toolu_b_],
+      }
+    - {
+        provider: two,
+        index: 1,
+        tool_results: [{ id: toolu_b_read, is_error: false, contains: beta note }],
+        not_contains: [alpha note, toolu_a_],
+      }
   request_counts: { one: 3, two: 3 }

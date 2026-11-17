@@ -17,5 +17,10 @@ expect:
     - { method: item/completed, params: { item: { type: agentMessage, text: 'Recovered.' } } }
     - { method: turn/completed, turn: t, params: { status: completed } }
   requests:
-    - { index: 2, roles: [user], user_texts: ['Answer despite errors.'], not_contains: [overloaded, rate limited] }
+    - {
+        index: 2,
+        roles: [user],
+        user_texts: ['Answer despite errors.'],
+        not_contains: [overloaded, rate limited],
+      }
   request_counts: { main: 3 }

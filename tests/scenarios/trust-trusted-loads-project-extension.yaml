@@ -27,7 +27,10 @@ actions:
   - prompt: { text: 'Call the probe.', turn: t }
 expect:
   events:
-    - { method: item/completed, params: { item: { itemId: toolu_probe, tool: fixture_probe, status: completed } } }
+    - {
+        method: item/completed,
+        params: { item: { itemId: toolu_probe, tool: fixture_probe, status: completed } },
+      }
     - { method: turn/completed, turn: t, params: { status: completed } }
   requests:
     - { index: 0, tools: [Read, Write, Edit, Bash, Glob, Grep, fixture_probe] }

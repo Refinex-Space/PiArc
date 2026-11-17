@@ -10,7 +10,11 @@ providers:
     steps:
       - text: 'Waiting for the signal.'
         tool_calls:
-          - { id: toolu_wait, name: Bash, input: { command: 'while [ ! -f go ]; do sleep 0.05; done; echo go' } }
+          - {
+              id: toolu_wait,
+              name: Bash,
+              input: { command: 'while [ ! -f go ]; do sleep 0.05; done; echo go' },
+            }
       - text: 'Steered answer.'
 actions:
   - prompt: { text: 'Wait for the signal.', turn: t }
@@ -20,9 +24,21 @@ actions:
 expect:
   events:
     - { method: item/completed, params: { item: { itemId: toolu_wait, status: completed } } }
-    - { method: item/completed, turn: t, params: { item: { type: userMessage, text: 'Also count the files.' } } }
-    - { method: item/completed, turn: t, params: { item: { type: agentMessage, text: 'Steered answer.' } } }
+    - {
+        method: item/completed,
+        turn: t,
+        params: { item: { type: userMessage, text: 'Also count the files.' } },
+      }
+    - {
+        method: item/completed,
+        turn: t,
+        params: { item: { type: agentMessage, text: 'Steered answer.' } },
+      }
     - { method: turn/completed, turn: t, params: { status: completed } }
   requests:
-    - { index: 1, user_texts: ['Wait for the signal.', 'Also count the files.'], tool_results: [{ id: toolu_wait, is_error: false, contains: go }] }
+    - {
+        index: 1,
+        user_texts: ['Wait for the signal.', 'Also count the files.'],
+        tool_results: [{ id: toolu_wait, is_error: false, contains: go }],
+      }
   request_counts: { main: 2 }

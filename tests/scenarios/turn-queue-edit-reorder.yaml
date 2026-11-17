@@ -9,7 +9,11 @@ providers:
     steps:
       - text: 'Waiting for the signal.'
         tool_calls:
-          - { id: toolu_wait, name: Bash, input: { command: 'while [ ! -f go ]; do sleep 0.05; done; echo go' } }
+          - {
+              id: toolu_wait,
+              name: Bash,
+              input: { command: 'while [ ! -f go ]; do sleep 0.05; done; echo go' },
+            }
       - text: 'Turn one done.'
       - text: 'Follow-up D done.'
       - text: 'Follow-up C done.'

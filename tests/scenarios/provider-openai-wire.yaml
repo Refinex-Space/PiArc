@@ -16,7 +16,10 @@ actions:
   - prompt: { text: 'Read hello.txt.', turn: t }
 expect:
   events:
-    - { method: item/completed, params: { item: { itemId: call_read, tool: Read, status: completed } } }
+    - {
+        method: item/completed,
+        params: { item: { itemId: call_read, tool: Read, status: completed } },
+      }
     - { method: item/completed, params: { item: { type: agentMessage, text: 'Done reading.' } } }
     - { method: turn/completed, turn: t, params: { status: completed } }
   requests:
