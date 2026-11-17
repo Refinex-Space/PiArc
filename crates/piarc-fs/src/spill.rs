@@ -46,14 +46,16 @@ pub fn spill(tmp_dir: &Path, name: &str, text: &str) -> Result<Spilled> {
 }
 
 /// `path` as the model is told about it: `~` plus the rest below the home directory, otherwise
-/// the usual absolute spelling.
+/// the usual absolute spelling. Both are canonicalized first when they exist, so a path spelled
+/// through a symlink or a Windows short name (`RUNNER~1`) is still recognized below home.
 #[must_use]
 pub fn model_path(path: &Path) -> String {
-    let shown = display(path);
+    let canonical = |p: &Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+    let shown = display(&canonical(path));
     let Some(home) = std::env::home_dir() else {
         return shown;
     };
-    let home = display(&home);
+    let home = display(&canonical(&home));
     let home = home.trim_end_matches(['/', '\\']);
     match shown.strip_prefix(home) {
         Some(rest) if rest.starts_with(['/', '\\']) => format!("~{MAIN_SEPARATOR}{}", &rest[1..]),

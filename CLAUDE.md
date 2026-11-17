@@ -90,7 +90,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - Windows 开发环境：Visual Studio Build Tools（MSVC 与 Windows SDK）、Git for Windows（委托的 Bash 用 Git Bash，终端 L4 用它自带的 vim）、Node 24；`npm run verify` 与 L4 在 Windows 上都能完整运行。Windows 专有的行为差异（ConPTY、同步的 stdout、计时器粒度、`\\?\` 路径）见 `crates/piarc-term`、`agent-host`、`apps/desktop`、`crates/piarc-testkit` 的 CLAUDE.md 与 S2、S7、S9 报告。
 - 改了终端帧的编码或格式，要用 `PIARC_UPDATE_FRAME_SAMPLES=1 cargo test -p piarc-term --test consistency` 重写 TS 共享样本，否则 Rust 与 TS 两侧的样本检查都会失败。
 - 改了 `piarc-napi` 的导出却没运行 `npm run build:core -- --flavor all`，verify 的"Core module + API snapshot"会失败。源码树运行应用、L4 的 `dev` 形态、Vitest 的 Core 集成测试都加载 `target/piarc-core/development/` 下的模块，缺了会直接报错（`package:desktop` 会先构建它）。
-- 需要保留 CRLF 的测试夹具放在 `fixtures/crlf/` 目录下，其余文本文件都会被 `.gitattributes` 规范为 LF。
+- 需要保留 CRLF 的测试夹具放在 `fixtures/crlf/` 目录下，L2 场景的按字节夹具放在 `tests/scenarios/fixtures/`（两处都是 `-text`），其余文本文件都会被 `.gitattributes` 规范为 LF。
 - Vitest 中的 `packages/testkit` 测试会先 `cargo build` mock provider 的 bin，所以 `npm test` 需要 Rust 工具链；L0–L2 测试不访问真实服务商，模型侧一律用 mock provider。
 - 反过来，`cargo test`（`piarc-testkit` 的 `agent_host` 测试）会用 PATH 上的 node 运行 `scripts/dev/build-agent-host.mjs` 打包 Agent Host，需要先 `npm ci --ignore-scripts`。
 - Pi 锁定 1.5.2（`@earendil-works/*` 全部同版本，`agent-host` 与 `packages/testkit` 一起升级）；Pi 的 API 以 `node_modules` 中的类型声明或 `reference/pi` 的同一 tag 为准，基线差异见 `docs/research/pi-v1.4.0-baseline.md` 文末。
@@ -105,4 +105,5 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - Windows 安装包由 CI 的 `package-windows` 作业产出（`scripts/release/pack-windows.mjs`，需要 .NET SDK）；Velopack 的 pack id 是应用标识，不能用 `PiArc`（会与数据目录 `%LOCALAPPDATA%\PiArc\` 重合）。
 - L2 场景目标（`--test scenarios`）设了 `test = false`，`cargo test --workspace` 不跑它，只有 verify 第 14 步与显式 `--test scenarios` 跑。新增或改动场景、改能力状态后重新生成 `docs/product/capabilities.md`（手改会被漂移检查拒绝）；`active` 能力没有场景时报 MISSING。
 - 升级 Pi 前后跑 golden 录制与漂移检查（见命令表）：投影、排队、中断补齐与工具批次都依赖 Pi 的事件顺序与队列语义（ADR-0026）。
+- 文件工具的不变量（先读后改、外部修改、编码与换行保持、原子替换、diff、越界与受保护路径）在 Core 的 `piarc-fs` 与 `tool_io/files.rs`，结果预算在 Agent Host 的 `harness/tool-results.ts`（ADR-0027）。替换已存在的文件只经 `piarc_fs::write`；会话目录外与受保护路径的操作只标记需要询问，由 `adjudicate` 决定（T20 之前拒绝）。
 - Agent Host 的工具不碰文件系统与子进程：`agent-host/src/tools/`、`src/harness/` 禁止导入 `fs`、`child_process`，I/O 一律经 AHP `fs/*`、`exec/*` 由 Core 执行（ADR-0004、ADR-0020）；端到端测试的 I/O spy 会抓到绕过。

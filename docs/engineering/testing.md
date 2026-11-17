@@ -290,20 +290,23 @@ platform_reason: 依赖 /bin/sh     # 报告中列为"跳过（平台）"并带�
 workspace:
   trusted: false                  # 可选：打开前记录信任决定（缺省不信任）
   files: { 'src/a.ts': "export const a = 1;\n" }   # 相对路径用 /，不能含 ..
+  fixtures: { 'gbk.txt': gbk.txt } # 按字节复制 tests/scenarios/fixtures/ 下的文件（CRLF、BOM、GBK、图片、PDF）
 providers:                        # mock 端点，可定义多个；名称为小写标签
   main:
     wire: anthropic               # 或 openai
     validation: { rules: { role_order: false } }   # 可选，与第 10.3 节相同
+    vision: true                  # 可选：模型接受图片输入（缺省只有文本）
     steps: [...]                  # 与第 10.3 节的 steps 相同
 sessions:                         # 可选；缺省为一个会话 main，使用唯一的端点、工作目录为工作区
   a: { provider: one, cwd: 'alpha dir' }
 actions: [...]                    # 见 12.2
 approvals: []                     # 见 12.3
-expect: { events, files, requests, request_counts, tool_batches, core_io }   # 见 12.4
+expect: { events, files, fixtures, requests, request_counts, tool_batches, core_io }   # 见 12.4
 ```
 
 - 每个端点有自己的 `MockProvider` 与自己的 Pi provider（`mock-<端点名>`，唯一的模型 `mock-model`）；场景经模型配置里的 `x-piarc-scenario` 请求头选择脚本，提示词里没有场景标记。两个会话要并发请求时用两个端点，各自的步数互不影响。
 - `workspace.files` 与 `expect.files` 的路径都相对工作区；工作区本身在临时根下的 `work space 工作区`，会话的 `cwd` 相对它。
+- 按字节的夹具放在 `tests/scenarios/fixtures/`（`.gitattributes` 设为 `-text`，换行与编码不被 Git 改动）；加载时检查夹具存在。PDF 夹具用 `piarc-fs` 测试里的 `make_pdf` 生成，手写的 PDF 可能取不到文字。
 
 ### 12.2 动作
 
@@ -333,6 +336,7 @@ expect: { events, files, requests, request_counts, tool_batches, core_io }   # �
 | `events` | 每项是 `{ session, method, params, turn }`，或 `{ any_order: [...] }`。按会话分别做**有序子序列**匹配：每项匹配的事件必须在上一项之后；`any_order` 组内的事件顺序任意（每个成员取第一个未用的匹配），组整体在上一项之后、下一项之前；组内成员必须属于同一会话。不同会话之间不比较顺序 |
 | 事件的字段匹配 | `params` 是**字段子集**：对象只比较写出的键（id、`seq`、时间戳不写就不比较），数组长度必须相同并逐元素按子集比较，标量相等；`turn` 要求 `params.turnId` 等于该标签记下的回合 id |
 | `files` | 路径 → 完整内容（UTF-8，逐字节相等），或 `null` 表示文件不存在；没写的文件不检查 |
+| `fixtures` | 路径 → `tests/scenarios/fixtures/` 下的文件名：工作区文件与它逐字节相等（非 UTF-8 编码、BOM、CRLF 用它断言），失败时给出第一处不同的字节偏移与前后的字节 |
 | `requests` | 按端点名（只有一个端点时可省略）与请求序号（`index`，从 0 开始）断言：`roles`（消息角色顺序）、`tools`（工具名集合，恰好相等）、`tools_include`、`tools_exclude`、`user_texts`（每条有文本的 user 消息的文本，按顺序）、`last_user_text`、`contains`、`not_contains`（原始请求体子串）、`tool_results`（全部工具结果按顺序：`id`，可选 `is_error`（仅 Anthropic）与 `contains`）、`body`（请求体的字段子集） |
 | `request_counts` | 每个端点收到的请求数，恰好相等 |
 | （总是检查） | 每个请求都通过严格 mock 的校验；被拒的请求列出规则 ID |

@@ -42,3 +42,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0024](0024-release-manifest-format.md) | 发布清单的格式、签名与校验位置（补充 ADR-0018 第 4 条） | 已接受 |
 | [0025](0025-core-state-and-project-trust.md) | Core 状态的落地：数据目录、SQLite 迁移、按主 checkout 的信任与 Pi 信任接管（补充 ADR-0011、ADR-0005 第 4 条） | 已接受 |
 | [0026](0026-turns-queue-and-interrupted-transcript.md) | 回合、排队与中断后的对话形态（补充 ADR-0009、ADR-0010、ADR-0011） | 已接受 |
+| [0027](0027-file-tool-invariants.md) | 文件工具不变量的落点：Core 的状态表与写入，Harness Kit 的匹配与结果预算（补充 ADR-0004 第 3 条、ADR-0020） | 已接受 |

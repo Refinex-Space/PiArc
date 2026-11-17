@@ -49,7 +49,7 @@
 - 中断或杀进程的时点靠场景步骤的 `stall_after_events`。中断后的对话由 Harness Kit 补齐（ADR-0026），这类场景开着 `role_order`；只有含 steer 的场景关闭它（steer 按 Pi 的做法紧跟工具结果，形成相邻的 user 消息）。
 - `golden.rs`：用 `--test-record-events <目录>` 让 Agent Host 把 Pi 的原始事件与注册表的步骤（回合接受、中断、排队）写到 `<目录>/<会话 id>.jsonl`，按场景录制 `agent-host/test/golden/` 的输入。平时只检查已提交的录制与 Pi 现在产生的事件类型一致；投影的期望输出是 Vitest 文件快照。
 - Core 侧的 `Core` 处理者回答 `trust/get`，并把 `fs/*`、`exec/*` 交给真实的 `ToolIo`、记录每次调用（`calls_of`）。会话一律经 `open()` 打开：它在 `session/create` 之后把 cwd 登记为该会话的工作区根，否则工具请求会得到 `sessionNotFound`。
-- `tools.rs`（A01、A02、A04、A05）、`parity.rs`（A06，Pi 原生工具 vs 委托工具）与 `with_io_spy`（`NODE_OPTIONS` 预加载 `packages/testkit/src/io-spy.ts`）是 S4 的证据。spy 记录带时间戳，按场景窗口判定；会话创建时 Pi 的 `existsSync(cwd)` 是已知的唯一一次（I20）。
+- `tools.rs`（A01、A02、A04、A05）、`parity.rs`（A06，Pi 原生工具 vs 委托工具；T16 起脚本在每次 Edit 前先 Read，比较 Read 结果时去掉行号）与 `with_io_spy`（`NODE_OPTIONS` 预加载 `packages/testkit/src/io-spy.ts`）是 S4 的证据。spy 记录带时间戳，按场景窗口判定；会话创建时 Pi 的 `existsSync(cwd)` 是已知的唯一一次（I20）。
 - 工具的 I/O 要 Core 读 stdout 才能进行：让 Core 停读的测试（背压）不能等真实工具完成，用不存在的工具名制造通知。
 - `mock-vision` 模型接受图片输入，`tool_results_in` 把图片块写成 `[image <类型> <base64>]`。
 - Core 侧的 `secrets/*` 由 `Env.secrets`（真实 `SecretsService`，保险箱在测试数据目录，主密钥在 `Env.key_store` 这个内存替身里）回答；同一个 `Env` 的所有 Agent Host 共用它，就像一个 Core。要注入凭据库失败，对 `env.key_store` 调 `fail_with`。
@@ -64,6 +64,7 @@
 
 ## L2 场景运行器（`src/l2/`，T15）
 
+- 夹具：`workspace.fixtures` 把 `tests/scenarios/fixtures/` 下的文件按字节复制进工作区，`expect.fixtures` 按字节比对（CRLF、BOM、GBK、图片、PDF；该目录在 `.gitattributes` 里设为 `-text`）。端点的 `vision: true` 让模型接受图片输入。PDF 夹具用 `piarc-fs` 的 `make_pdf` 生成（手写的 PDF 可能取不到文字，见 `crates/piarc-fs/CLAUDE.md`）。
 - 场景格式的唯一描述是 `tests/scenarios/schema.json`（`format.rs` 以 `include_str!` 嵌入）：改格式时同时改 schema、`format.rs` 的类型与引用检查、`testing.md` 第 12 节。加载分三遍：schema（报字段的 JSON Pointer）→ serde → 引用检查（id 与文件名、会话与端点、标签先定义后使用、路径不出工作区、mock 脚本自检）。
 - 运行器只经 `CoreRuntime` 的公开方法驱动、只读 sink 送达的事件与 `ToolIoObserver`（`gate.rs`）；不复制 Core 的逻辑。每个端点一个 `MockProvider` 与一个 Pi provider（`mock-<端点名>`，模型 `mock-model`），场景经模型的 `x-piarc-scenario` 请求头选择，提示词里没有场景标记。
 - 每次运行一个新的临时根（含空格与中文，带进程号与计数）和一个新 Core；结束后删除并在结果里报告。并行的场景各起一个 Agent Host（默认半数核心、至多 4 个）。

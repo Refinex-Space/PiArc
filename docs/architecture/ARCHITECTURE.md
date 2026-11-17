@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.20（2026-11-17） |
+| 版本 | 2.21（2026-11-17） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -245,6 +245,7 @@ PiArc/
 | [0009](../adr/0009-agent-host-protocol.md) | 自有协议 AHP | 双向请求、版本握手、事件回放、调用对账 |
 | [0010](../adr/0010-process-model.md) | 每工作区一个 Agent Host | 控制多会话内存，MCP 按工作区共享 |
 | [0011](../adr/0011-session-storage.md) | Pi JSONL 为事实来源 + SQLite 索引 + 内容寻址快照 | 跟随上游格式，索引可重建 |
+| [0027](../adr/0027-file-tool-invariants.md) | 文件状态表与写入（先读后改、外部修改、编码与换行、原子替换、diff）在 Core；匹配沿用 Pi 的 edit，加 `replaceAll`；Read 的行号、存根、PDF 与 notebook 在工具层；结果预算（单个 50K、单条消息 200K）在 Harness Kit；越界与受保护路径由 `piarc-fs` 标记、Core 裁决 | 只有 Core 能对真实文件做检查与原子写入，只有 Agent Host 的钩子看得到每个工具与整条回复的结果 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -431,6 +432,19 @@ PiArc.app/Contents/
 | 并发 | 只读工具可以并发；写同一文件的操作串行（Write 与 Edit 用 Harness Kit 的队列，键为词法绝对路径、Windows 不区分大小写；Pi 的 `withFileMutationQueue` 在替身路径上排队，不再承担这项职责，ADR-0020）；预检（含审批）串行。 |
 | 中断 | 中断时为所有未完成的工具调用补齐"已中断"结果，保证 tool_use / tool_result 配对完整。 |
 
+T16 落地（ADR-0027），每条不变量的 L2 场景在 `tests/scenarios/tools-*.yaml`：
+
+| 不变量 | 实现 |
+|---|---|
+| 先读后改 | 每会话的文件状态表 `piarc_fs::FileStates`（规范路径 → SHA-256、大小、mtime、Read 的范围），键在大小写不敏感的卷上折叠大小写；`fs/stat` 带 `read` 登记读取，`fs/read` 带 `requireFresh`（Edit 读文件时）与 `fs/write` 替换已存在的文件时要求本会话读过或写过，否则 `fileNotRead` |
+| 外部修改检测 | 以内容哈希判断，不看 mtime；变化则 `fileModified`，消息要求重新 Read |
+| 唯一匹配 | Pi 的 edit 报出匹配次数或零匹配，PiArc 补上 `replaceAll` 的提示；`replaceAll: true` 由工具层精确匹配全部出现处 |
+| 保真写入 | `piarc_fs::write`：路径锁内检查新鲜度，按旧文件的编码（`encoding_rs`，非 UTF-8 时才用 `chardetng` 检测）与 BOM 编码，Write 用旧文件的主要换行风格，同目录临时文件 + `fsync` + rename；新文件 UTF-8 无 BOM；编码表示不了的字符整次拒绝；大文本经 `upload` 分段，最后一段到达才写 |
+| 结构化 diff | `piarc-diff`（similar）随 `fs/write` 结果返回 `FileDiff`，经工具结果的 `details.fileDiff` 进入 `fileChange` 条目的 `diff` |
+| 输出截断 | Harness Kit 的 `tool-results.ts`：单个结果超过 50K 字符经 `fs/spill` 写入会话临时目录，模型收到约 2KB 头尾预览与路径（家目录下以 `~` 开头）；一次回复的结果合计超过 200K 字符时从最大的开始换成预览，按调用 id 记住；Read 不参与 |
+| 路径边界、受保护路径 | `piarc-fs` 把会话目录之外的读写、受保护路径的写入标记为需要询问，会话临时目录可读不可写；Core 的 `adjudicate` 在 T20 之前拒绝（`permissionDenied`，消息写明原因与下一步） |
+| 并发 | Harness Kit 的队列之外，Core 以所有会话共享的路径锁串行同一文件的写入 |
+
 #### 6.1.3 Operations 委托
 
 | Pi 接口 | 委托到 Core 的 AHP 方法 | Core 额外做的事 |
@@ -445,9 +459,9 @@ T07 实测（S4，ADR-0020）：Pi 1.5.2 的 Operations 覆盖 bash、find（给
 
 | 规范名 | 实现 | AHP 方法 |
 |---|---|---|
-| Read | Pi 的 read 定义运行在**替身路径**上（系统临时目录下从不创建的路径，Pi 的探测落在那里），每个 Operation 由 Core 对真实路径执行；拼写变体由 `fs/stat` 逐个确认 | `fs/stat`（带图片嗅探）、`fs/read` |
-| Write | Pi 的 write 定义，替身路径 | `fs/mkdir`、`fs/write` |
-| Edit | Pi 的 edit 定义，替身路径 | `fs/stat`、`fs/read`、`fs/write` |
+| Read | Pi 的 read 定义运行在**替身路径**上（系统临时目录下从不创建的路径，Pi 的探测落在那里），每个 Operation 由 Core 对真实路径执行；拼写变体由 `fs/stat` 逐个确认。T16：文本流先加行号再交给 Pi 选行；重复读取返回存根；`.pdf`、`.ipynb` 走工具层自己的路径 | `fs/stat`（带图片嗅探与读取登记）、`fs/read`、`fs/pdf` |
+| Write | Pi 的 write 定义，替身路径 | `fs/mkdir`、`fs/write`（`lineEndings: matchFile`） |
+| Edit | Pi 的 edit 定义，替身路径；`replaceAll` 由工具层匹配（T16） | `fs/stat`、`fs/read`（`requireFresh`）、`fs/write` |
 | Bash | Pi 的 bash 工厂 + `BashOperations` | `exec/run`、`exec/output`、`exec/kill` |
 | Glob | Pi 的 find 工厂 + `FindOperations` | `fs/stat`、`fs/glob` |
 | Grep | PiArc 自写，沿用 Pi 的参数与输出格式 | `fs/grep` |
@@ -715,8 +729,8 @@ Agent Host 按类别统计上下文构成（system prompt、工具定义、MCP �
 | 压缩熔断 | 连续 3 次自动压缩失败或无效后停止自动压缩，提示用户 |
 | 压缩摘要结构 | 固定分节（任务目标、关键决策、已改文件、错误与修复、待办、当前进展等），便于压缩后续接 |
 | 压缩后恢复 | 最多重新附带 5 个最近读写的文件，合计不超过 50K token；已调用 skill 正文单个 5K、合计 25K token |
-| 工具结果截断 | 单个结果超过 50K 字符落盘，模型收到约 2KB 预览与路径；单条消息内工具结果合计上限 200K 字符 |
-| 重复读取 | 文件自上次读取后未变化时，`Read` 返回简短存根而非全文 |
+| 工具结果截断 | 单个结果超过 50K 字符落盘，模型收到约 2KB 预览与路径；单条消息内工具结果合计上限 200K 字符（T16：`agent-host/src/harness/tool-results.ts` 的 `TOOL_RESULT_LIMITS`，Read 不参与） |
+| 重复读取 | 文件自上次读取后未变化、且读取范围相同时，`Read` 返回简短存根而非全文（T16：Core 的文件状态表判断） |
 | 缓存断点 | system prompt 分为静态段与动态段并分别缓存；动态信息走 system-reminder；每个请求只放一个消息级缓存断点（Anthropic）；其他服务商按 pi-ai 的缓存策略 |
 | 子 agent 隔离 | 默认不继承父会话对话历史，只接收任务描述；fork 模式（继承历史、共享缓存）列为 M5 |
 | plan 模式 | 硬拦截：写工具与非只读命令在 `tool_call` 闸门处拒绝；工具列表保持不变以免缓存失效；不能只靠提示词约束 |
@@ -838,6 +852,8 @@ T08 已实现的方法（Agent Host → Core，`piarc-core::secrets::SecretsServ
 
 T13 已实现的方法（Agent Host → Core，`piarc-core::trust::TrustService` 应答）：`trust/get` 先把路径解析到仓库主 checkout（`piarc-git`），再查 `project_trust`；目录解析不了、数据库出错、任务 panic 都回答 `trusted: false`，只有参数格式错回 `invalidParams`。信任变化时 Core 计划内重启该工作区的 Agent Host（`HostSupervisor::restart`，不计入崩溃退避），会话随之 `session/resume`。
 
+T16 已实现（ADR-0027）：Agent Host → Core 的 `fs/spill`（把过长的工具结果写到会话临时目录的 `tool-results/<名字>.txt`，返回给模型看的路径）与 `fs/pdf`（PDF 的页数与指定页的文本）；`fs/stat` 增加 `read`（登记 Read 及其范围）与结果的 `unchanged`，`fs/read` 增加 `requireFresh` 与结果的 `encoding`，`fs/write` 增加 `lineEndings`（`asWritten`、`matchFile`）、`upload`（分段上传，最后一段写入）与结果的 `diff`、`staged`、`encoding`；`append` 改为追加到当前文本并受同样的检查。`fileChange` 条目增加 `diff`（`FileDiff`：unified 文本、hunk、增删行数、超限降级）。路径边界由"越界即 `outsideWorkspace`"改为会话目录之外需要询问：会话临时目录可读，T20 之前一律 `permissionDenied`（`details.reason` 为 `outsideWorkspace` 或 `protectedPath`）；`exec/run` 的工作目录仍按 `outsideWorkspace`。新错误类别 `fileNotRead`、`fileModified`、`permissionDenied`、`unencodableText`；这类错误的消息写给模型看，Agent Host 去掉桥接层的方法名前缀后原样交给模型。
+
 T14 已实现的方法（ADR-0026）：Core → Agent Host 的 `session/fork`（复制一个会话当前分支到某个 entry 为止的对话，新会话的 id 由 Pi 生成）、`session/steer`、`session/followUp`（运行中排队并回 `{ disposition: "queued", itemId }`，空闲时像 prompt 一样开始回合并回 `{ disposition: "started", turnId }`；`requestId` 是幂等键）、`session/queue/edit`、`session/queue/delete`、`session/queue/reorder`（结果为整张排队表）、`session/getEntries`（`since` 为 seq，返回回放缓冲中其后的通知与是否完整）、`session/history`（会话文件当前分支投影出的条目窗口，会话不必打开）；`session/create` 增加可选的 `sessionId`（Core 生成，超时后按该 id 对账），`session/abort` 的结果增加 `returnedQueue`。通知 `item/updated`、`item/reasoning/delta`、`turn/retrying`、`session/queueChanged`、`harness/entry`；条目类型增加 `userMessage`、`reasoning`、`commandExecution`、`fileChange`、`mcpToolCall`、`subagent`、`webFetch`、`contextCompaction`，`turn/completed` 增加 `usage`。新错误类别 `queueItemNotFound`。这些都在同一主版本 1.0 内新增，Core 与 Agent Host 随应用一起发布，尚未有旧版本对端。I20 的决定：接受 Pi 在会话创建时对 cwd 的 `existsSync`（只读元数据）；Core 在 `session/create` 前确认 cwd 是工作区内已存在的目录。
 
 T06 已实现的方法：Core → Agent Host 的 `host/ping`（结果附带 Agent Host 的 RSS 与出站队列计数）、`host/shutdown`、`session/create`、`session/resume`、`session/prompt`（结果只确认回合已开始，回合结束以 `turn/completed` 为准；`requestId` 是幂等键）、`session/abort`、`session/close`；Agent Host → Core 的 `trust/get`；通知 `turn/started`、`turn/completed`、`item/started`、`item/completed`、`item/agentMessage/delta`。新增的错误类别：`timeout`、`uncertain`、`hostUnavailable`（后两者只用于 Core API）、`sessionNotFound`、`sessionBusy`。请求方法的成功响应契约名为 `<方法>/result`。
@@ -918,7 +934,7 @@ diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高�
 
 ### 7.7 diff 与预处理
 
-- **diff**：similar 计算行级与词级 diff，输出 hunk 结构；Changes 面板、审批卡、快照回退用同一份结构。超过阈值（例如 5,000 行或 300 个文件）时降级为折叠与纯文本。
+- **diff**：similar 计算行级与词级 diff，输出 hunk 结构；Changes 面板、审批卡、快照回退用同一份结构。超过阈值（例如 5,000 行或 300 个文件）时降级为折叠与纯文本。T16 落地行级部分：`piarc_diff::file_diff` 给出 `FileDiff`（unified 文本、3 行上下文的 hunk、增删行数，行文本不含换行符，末行无换行时标记 `noNewline`）；增删超过 5,000 行或文本超过 512 KiB 时不给 hunk、文本截断（`degraded`）；similar 的搜索限时 2 秒，超时后给出较粗的 diff。词级 diff 与 UTF-16 偏移由用到它们的任务（T28）补上。
 - **文件预览分类**：二进制、图片、超大文件在 Core 中识别，渲染进程按类型选择展示方式，不读原始字节。
 - **偏移**：Core 对外给出的文本偏移统一为 UTF-16 码元，与 JavaScript 字符串索引一致。
 - **为什么 Markdown 与高亮不放在 Core**：原生方案中 Core 做 Markdown 块解析和高亮，是为了给 AppKit 直接提供 span。改用 Web 界面后，渲染进程的生态（Markdown、shiki、公式、Mermaid）更完整；放在 Core 只会多一层序列化和一套重复实现。重活放在 Web Worker 里，不占用界面线程。
@@ -1461,6 +1477,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.21 | 2026-11-17 | T16 补充（ADR-0027）：第 4 章加入 ADR-0027；6.1.2 增加各条不变量的实现表；6.1.3 的工具表写明 Read、Write、Edit 在 T16 的变化与新方法；6.15 的截断与重复读取两行写明实现位置；7.4 写明 `fs/spill`、`fs/pdf`、新成员、路径边界改为询问与四个新错误类别；7.7 写明行级 diff 的结构与降级 |
 | 2.20 | 2026-11-17 | T15 补充：12.3 写明场景格式的扩展（会话、动作、能力 ID、多端点、工具批次与 Core I/O 断言）、匹配规则与进程不复用的取舍；12.4 写明能力清单的字段、`client_only` 与检查命令 |
 | 2.19 | 2026-11-17 | T14 补充（ADR-0026）：第 4 章加入 ADR-0026；5.3 投影表的压缩一行写明为 `contextCompaction` 条目，增加 T14 的投影规则、条目类型映射、状态规则、排队表与 golden 测试；6.15 写明三条回合不变量的落地方式；7.2 写明工作区与会话 actor、事件消费、取消链与关闭时关闭数据库；7.4 方法族增加 `queue/delete`、`queue/reorder`、`history`，通知增加 `item/agentMessage/delta`、`item/reasoning/delta`、`harness/entry`，写明 T14 已实现的方法、新条目类型与 I20 的决定；7.5 写明监管器的会话跟踪与 I58 的处理；7.6 加入会话导出与事件路由；第 11 章写入预热实测 |
 | 2.18 | 2026-11-16 | T13 补充（ADR-0025）：第 4 章加入 ADR-0025；5.5 写明 Pi 项目信任的接管挂点；7.4 写明 `trust/get` 的 Core 实现与信任变化时的计划内重启；7.6 加入状态导出与 `core/settings` 事件；9.1 写明 `userData`、`sessionData` 与 `--user-data-dir`、日志文件；9.2 增加 `project_trust`、`session_files` 两表与迁移、派生列和 Core 自有列的区分；10.2 写明主 checkout 规则、可执行项枚举与新增项、设置合并对未信任项目的处理 |

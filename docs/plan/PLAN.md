@@ -306,7 +306,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 7 Read：行号分页、图片（视觉/非视觉）、PDF 页码范围、ipynb；I53 blob 上限
 - [x] 8 Glob、Grep：`.gitignore`、二进制跳过、结果上限与说明
 - [x] 9 L2 场景 `tools-*.yaml` 与能力 ID；CRLF/BOM/GBK 夹具
-- [ ] 10 文档：piarc-fs、piarc-diff 的 CLAUDE.md，`coding-standards.md` 复用表，架构与 ADR
+- [x] 10 文档：piarc-fs、piarc-diff 的 CLAUDE.md，`coding-standards.md` 复用表，架构与 ADR
 - [ ] 11 收尾：verify、L4、acceptance、PLAN
 
 ## 登记事项
@@ -367,7 +367,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I50 | R1 | 渲染进程没有 React 错误边界：任何一个组件抛错都会卸载整个 root（R1-E1 的后果） | T19 给 transcript 行与整页加错误边界，单条内容出错只影响该行 |
 | I51 | R1 | 终端是页面可调用的命令执行通道：`createTerminal` + `terminalInput` 不经 Core 权限裁决，与架构第 10.3 节"有副作用的操作仍要经 Core 的权限裁决"不一致；每窗口终端数与在途拉帧请求没有上限（R1-E3、E6）。发布构建现在也带着原型终端的函数（I30） | T34 决定防线（例如要求近期真实用户输入）与上限并写入 10.3；若以文档例外接受，属于放松安全基线，写 ADR 提议。T34 之前 T45 与 I30 一起评估发布构建去掉终端函数 |
 | I52 | R1 | ESLint 进程边界规则只拦 `ipcMain.<method>`，不拦 `webContents.ipc` 与别名；导航守卫没有 `will-frame-navigate`（当前由 CSP 挡住）；渲染进程规则拦不住 Node 专用 npm 包（R1-E7、Q12） | T45 补规则与守卫，S10 第 13、17 项的措辞改准 |
-| I53 | R1 | `piarc_fs::read_blob` 把整个文件读进 Core 所在的主进程内存，没有大小上限（R1-C1） | T16 给 blob 模式设上限并流式写入 |
+| I53 | R1 | `piarc_fs::read_blob` 把整个文件读进 Core 所在的主进程内存，没有大小上限（R1-C1） | T16 给 blob 模式设上限并流式写入；已落地（T16）：超过 32 MiB（`MAX_BLOB_BYTES`）报 `EFBIG`，边读边算哈希写入临时文件再 rename，不再整文件进内存（`crates/piarc-fs/src/content.rs`）；PDF 同样受这个上限 |
 | I54 | R1 | 沙箱代理：accept 失败（EMFILE）立即重试空转，没有连接数上限与读头、空闲、上游 connect 超时；地址黑名单不含私网、CGNAT、ULA；明文 HTTP 转发保留客户端的 `Host`（R1-C3、C10） | T39 定稿代理时处理，或在 6.10 写明不防的范围 |
 | I55 | R1 | 终端：`createTerminal` 在主进程 JS 线程同步 `openpty` 与 spawn（未测耗时，违反 7.2 的 1 ms 预算）；IO、写入、等待线程与取帧等 `spawn_blocking` 回调没有 panic 防护；IO 线程把 `Interrupted` 当作输出结束；查询应答队列无界且与按键共用写线程（R1-C4–C7） | T33（`spawn_blocking` 回调 panic 时以带 `kind` 的错误结算 Promise 一项 T14 一并处理）；T14 已落地其中一项：`crates/piarc-core/src/terminal.rs` 的 `guarded` 把 `spawn_blocking` 回调的 panic 结算为 `internalError`（测试同文件）；其余仍交 T33 |
 | I56 | R1 | 执行路径：`exec_run` 在 `sandbox.launch()` 失败时遗留 `running` 条目；`exec/kill` 与 `exec/run` 分在两个任务处理，kill 先到会丢失中断；`Tree::kill` 在 leader 被回收后仍用旧 pgid（R1-C8、C11、A11、A15） | T17 重写执行路径时一并处理，补可注入失败的测试 |
@@ -385,6 +385,10 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I68 | T14 | 实时条目与历史条目的 id 不同：文本与 reasoning 实时为 `<投影器生成的 messageId>#<序号>`，历史为 `<entry id>#<序号>`；用户消息实时为 `<turnId>:user:<n>`，历史为 entry id；工具调用两边相同（`agent-host/CLAUDE.md`）。客户端不能按 id 把重新加载的窗口与流式条目合并 | T19 的 transcript 重载以 `transcript_window` 整段替换，或由 T19 决定在 `turn/completed` 后补发 entry id 的映射 |
 | I69 | T15 | L2 运行器还没有审批请求的观测点：T20 之前 Core 不发审批请求，场景声明的 `approvals` 一律判失败（`piarc_testkit::l2::runner` 的 `assert_all`）。审批落地后场景要能按顺序应答审批，并在请求没被应答或应答没被用上时失败 | T20 经 Core 的公开接口（事件或回调）把审批请求交给运行器，改 `runner.rs` 与 `testing.md` 第 12.3 节，把审批场景写成 L2 |
 | I70 | T16 开工检查 | T15 推送后的 CI 运行 44031571343（T14 的运行 44021743399 已出现）：① Windows `cargo test` 中 `tests/sessions/lifecycle.rs` 用 `canonicalize` 的结果（带 `\\?\` 前缀）与 Core 报告的工作区路径比较，永远找不到工作区；② 两个平台 L4 的 `agent-host.e2e.ts` 仍按 T14 之前的条目类型筛选（Bash 与 MCP 调用已改为 `commandExecution`、`mcpToolCall`）。都是测试缺陷，产品行为无误 | 已落地（T16）：比较前去掉 `\\?\` 前缀；L4 按条目的 `tool` 字段筛选并断言各自的条目类型；推送后看 Windows CI 与两平台 L4 |
+| I71 | T16 | PDF 文本用 lopdf 0.46 的 `extract_text`：资源以内联字典写在页树节点上（被页面继承）时取不到文字，空格与换行也不如 `pdf-extract`；`pdf-extract` 0.12 锁 lopdf 0.42，引入已停止维护的 `ttf-parser`（RUSTSEC-2026-0192），cargo-deny 拒绝 | 有服务商原生 PDF 输入的任务（T29 模型设置或 M2 之后）评估把 PDF 作为文档块交给支持的模型；`pdf-extract` 升级到新 lopdf 后换回（ADR-0027 触发条件） |
+| I72 | T16 | 重复读取的存根依赖"上一次 Read 的结果还在上下文里"：压缩（T27）删掉旧结果后，存根会指向模型已经看不到的内容 | T27 在压缩完成时清掉会话状态表里的读取范围（保留哈希，先读后改仍然成立），在 `piarc_fs::FileStates` 上加一个方法并经 AHP 或会话层调用 |
+| I73 | T16 | 子 agent（T31）在 Agent Host 进程内运行，若沿用父会话的 `sessionId` 调 `fs/*`，读取会记在父会话的状态表里 | T31 给子 agent 的工具调用一个自己的会话 id，并在 Core 以同一工作区 `ToolIo::open_session` 登记（各自一张状态表），或在 `fs/*` 请求上加子 agent 标识 |
+| I74 | T16 | 工具结果阈值（50K、200K、预览 2K）集中在 `TOOL_RESULT_LIMITS` 并可经注册表选项覆盖，但没有用户可改的设置项；Bash 的内联上限（6.11 的 30K）尚未接入 | T17 接 Bash 输出落盘时复用 `fs/spill` 与同一位置；是否开放为用户设置由 T24 的配置兼容层决定 |
 
 ## 技术债
 
@@ -399,7 +403,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | 5 | R1 | 内存与体积超出第 11 章预算：进程合计、Agent Host 单会话、Windows 体积（I26、I41、I45） | M3/M4 退出标准不达标 | T44 |
 | 6 | R1 | 沙箱代理没有连接上限与超时，不拦私网（I54） | 沙箱内命令可耗尽主进程的文件描述符 | T39 |
 | 7 | R1 | 测试用固定时长等待、基准复制了 L4 的定位逻辑、供应链校验脚本没有测试（I32、I59、I60） | 偶发失败与检查失效 | T19、T34、T44、T50 |
-| 8 | R1 | 渲染进程没有错误边界；`read_blob` 无大小上限（I50、I53） | 一条坏内容卸载整个界面；大文件占满主进程内存 | T19、T16 |
+| 8 | R1 | 渲染进程没有错误边界；`read_blob` 无大小上限（I50、I53） | 一条坏内容卸载整个界面；大文件占满主进程内存 | T19、T16（I53 已由 T16 落地） |
 | 9 | R1 | `piarc-exec` 没有结构化 `Error`；`piarc-testkit/src/lib.rs` 含实现（T15 已移出 `parse_request`）；ESLint 进程边界规则覆盖面窄（I61、R1-Q11、I52） | 边界错误无法分类；规范一致性 | T17、T15、T45 |
 
 ## 会话日志
