@@ -8,7 +8,7 @@
 
 | 里程碑 | 能力数 | 已实现 | 计划中 | BLOCKED |
 |---|---|---|---|---|
-| M1 | 52 | 34 | 18 | 0 |
+| M1 | 61 | 45 | 16 | 0 |
 | M2 | 30 | 0 | 30 | 0 |
 | M3 | 21 | 0 | 21 | 0 |
 | M4 | 10 | 0 | 10 | 0 |
@@ -22,6 +22,15 @@
 | CAP-CHAT-MENTION-001 | 输入中的 `@` 文件提及与 `/` 命令解析后送达模型 | FR-CH-02 | T19 | — | 计划中 |
 | CAP-CTX-MEMORY-001 | CLAUDE.md、AGENTS.md、CLAUDE.local.md 层级，`@import` 与子目录懒加载 | FR-CX-01、ARCH-6.6.2、ARCH-6.14 | T22 | — | 计划中 |
 | CAP-CTX-PROMPT-001 | 分段 system prompt（静态段与动态段分别缓存，每个请求一个消息级缓存断点） | ARCH-6.6.1、ARCH-6.15 | T22 | — | 计划中 |
+| CAP-EXEC-ABORT-001 | 中断回合时正在执行的命令连同子孙进程一起终止，条目为 interrupted | FR-TL-01、ARCH-6.11、ARCH-15.2 | T17 | `exec-abort-kills-tree` | 已实现 |
+| CAP-EXEC-CWD-001 | cd 在工作区内跨命令保留；越出工作区时下一条命令回到工作区根并说明原因 | FR-TL-01、ARCH-6.11 | T17 | `exec-cwd-carry-over` | 已实现 |
+| CAP-EXEC-ENV-001 | 命令环境不含 Electron、Node、Pi、PiArc 的内部变量与任何凭据 | ARCH-5.4、ARCH-6.11 | T17 | `exec-env-internal-vars` | 已实现 |
+| CAP-EXEC-EXITCODE-001 | grep 无匹配、diff 有差异等退出码 1 按语义判为成功，结果与条目说明含义 | FR-TL-02、ARCH-5.3 | T17 | `exec-exit-code-meaning` | 已实现 |
+| CAP-EXEC-GITBASH-001 | Windows 上 Bash 经 Git Bash 执行，中文输出不乱码，/c/ 形式路径转换后做边界判断 | ARCH-6.2.2、ARCH-15.2 | T17 | `exec-windows-shells`（仅 windows） | 已实现 |
+| CAP-EXEC-LOGINENV-001 | 命令环境以用户登录 shell 的环境为基础，profile 中配置的 PATH 生效 | ARCH-6.11 | T17 | `exec-env-login-path`（仅 macos） | 已实现 |
+| CAP-EXEC-OUTPUT-001 | 成功输出超过 30,000 字符时落盘并给约 2,000 字符预览与路径；失败输出给头部与尾部 | FR-TL-02、ARCH-6.11、ARCH-6.15 | T17 | `exec-output-budget` | 已实现 |
+| CAP-EXEC-STREAM-001 | 命令输出在结束前以条目增量到达客户端；完成的条目带 bash 卡的结构化字段 | FR-TL-02、ARCH-5.3、ARCH-6.1.3 | T17 | `exec-streaming-output` | 已实现 |
+| CAP-EXEC-TIMEOUT-001 | 命令超时（默认 2 分钟、上限 10 分钟）后整棵进程树被终止，结果带已有输出与超时说明 | FR-TL-01、ARCH-6.11 | T17 | `exec-timeout-kills-tree` | 已实现 |
 | CAP-EXT-PI-001 | 信任的项目 Pi 扩展被加载，其注册的工具可被模型调用 | ARCH-5.5、ARCH-10.2 | T13 | `trust-trusted-loads-project-extension` | 已实现 |
 | CAP-MODEL-SWITCH-001 | 会话内切换模型与 effort，提示切换代价 | FR-MD-03、ARCH-6.13 | T21 | — | 计划中 |
 | CAP-PERM-APPROVAL-001 | 结构化审批：仅本次、本会话、总是允许、拒绝并反馈 | FR-PM-02、ARCH-6.2.3 | T20 | — | 计划中 |
@@ -37,7 +46,7 @@
 | CAP-SESSION-TURN-001 | 输入开始一个回合，正文与工具调用以条目事件流式送达客户端 | FR-CH-01、ARCH-5.3 | T14 | `chat-basic` | 已实现 |
 | CAP-SYS-NOTIFY-001 | 会话完成或等待审批时发出通知事件 | FR-SY-01 | T20 | — | 计划中 |
 | CAP-TOOL-BASH-001 | Bash 经 Core 执行命令并返回输出 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
-| CAP-TOOL-BASH-002 | Bash 超时终止整个进程树，输出给出语义成败 | FR-TL-01、FR-TL-02、ARCH-6.11 | T17 | — | 计划中 |
+| CAP-TOOL-BASH-002 | Bash 超时终止整个进程树，输出给出语义成败 | FR-TL-01、FR-TL-02、ARCH-6.11 | T17 | `exec-exit-code-meaning`<br>`exec-timeout-kills-tree` | 已实现 |
 | CAP-TOOL-CORE-001 | 工具的文件与命令 I/O 全部经 Core 的 AHP fs/exec 方法执行 | FR-TL-01、ARCH-6.1.3 | T07 | `tools-canonical-via-core` | 已实现 |
 | CAP-TOOL-DIFF-001 | 每次文件变更的 fileChange 条目带 Core 生成的 unified diff 与 hunk | FR-TL-01、ARCH-6.1.2、ARCH-7.7 | T16 | `tools-file-change-diff` | 已实现 |
 | CAP-TOOL-EDIT-001 | Edit 按文本替换修改文件 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
@@ -50,7 +59,7 @@
 | CAP-TOOL-OUTPUT-001 | 超长工具结果落盘，模型收到预览与路径；单条消息的工具结果有总上限 | FR-TL-02、ARCH-6.15 | T16 | `tools-output-spill` | 已实现 |
 | CAP-TOOL-PATH-BOUNDARY-001 | 会话目录之外的读写需要询问；审批落地（T20）之前按拒绝处理并说明理由 | FR-TL-01、ARCH-6.1.2 | T16 | `tools-path-boundary` | 已实现 |
 | CAP-TOOL-PATH-PROTECTED-001 | 受保护路径（.git/、.piarc/、.claude/、.pi/、shell 配置文件）的写入需要询问，T20 之前按拒绝处理 | FR-TL-01、ARCH-6.1.2 | T16 | `tools-protected-paths` | 已实现 |
-| CAP-TOOL-POWERSHELL-001 | Windows 上的 PowerShell 工具 | ARCH-6.1.4、ARCH-6.2.2 | T17 | — | 计划中 |
+| CAP-TOOL-POWERSHELL-001 | Windows 上的 PowerShell 工具 | ARCH-6.1.4、ARCH-6.2.2 | T17 | `exec-shell-tools-macos`（仅 macos）<br>`exec-windows-shells`（仅 windows） | 已实现 |
 | CAP-TOOL-PROFILE-001 | 模型看到的工具名是规范名，不出现 Pi 原生工具名 | ARCH-6.1.1 | T07 | `tools-model-sees-canonical-names` | 已实现 |
 | CAP-TOOL-READ-001 | Read 读取工作区文本文件 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
 | CAP-TOOL-READ-002 | Read 带行号分页、图片、PDF 分页与 ipynb | FR-TL-01、ARCH-6.1.4 | T16 | `tools-read-formats` | 已实现 |

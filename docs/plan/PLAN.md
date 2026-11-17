@@ -297,14 +297,14 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 T17（开工 2026-11-17，基线 `npm run verify` 14/14 通过）：
 
 - [x] 1 进程与终止：进程组 SIGTERM → 宽限 → SIGKILL、Job Object；超时、abort、Core 关闭终止整棵树（A01、A02）
-- [ ] 2 工作目录：cd 跨命令保留、越界重置并说明、Git Bash 路径转换（A03）
+- [x] 2 工作目录：cd 跨命令保留、越界重置并说明、Git Bash 路径转换（A03）
 - [x] 3 超时与输出：默认 2 分钟、上限 10 分钟；30,000 字符内联、落盘与 2,000 字符预览、失败头尾；持续读管道（A04、A05、A06）
 - [x] 4 语义退出码判定表（A07）
 - [x] 5 命令环境：登录 shell 环境解析与缓存、内部变量剔除、无凭据、Windows UTF-8（A08）
 - [ ] 6 Windows：Git Bash 探测与安装提示、PowerShell 工具（A11、A12）
 - [x] 7 流式输出与 `commandExecution` 结构化字段、golden（A09、A10）
-- [ ] 8 L2 场景 `exec-*` 与能力 ID
-- 进展：piarc-exec（limits、capture、semantic、env、shells、cwd、超时与两段终止）、协议（`exec/run` 结构化结果、`exec/shells`、`commandExecution.execution`）、Core `tool_io/exec.rs`、Agent Host 自写的 Bash/PowerShell（`tools/shell.ts`）、`exec/shells` 决定工具集、投影的 `execution` 与 golden 已完成；剩 Windows 项核对、L2、文档
+- [x] 8 L2 场景 `exec-*` 与能力 ID
+- 进展：piarc-exec（limits、capture、semantic、env、shells、cwd、超时与两段终止）、协议（`exec/run` 结构化结果、`exec/shells`、`commandExecution.execution`）、Core `tool_io/exec.rs`、Agent Host 自写的 Bash/PowerShell（`tools/shell.ts`）、`exec/shells` 决定工具集、投影的 `execution` 与 golden 已完成；L2 新增 10 个 `exec-*` 场景（35 passed、1 Windows 专属跳过）；剩 Windows 项核对与文档
 - [ ] 9 文档（piarc-exec CLAUDE.md、coding-standards 复用表、架构与 ADR）、verify、验收与收尾（A13）
 
 ## 登记事项

@@ -1,0 +1,47 @@
+id: exec-abort-kills-tree
+description: Interrupting a turn while a command runs stops the command with its child and grandchild; its item ends interrupted with how it ran, and the next turn finds both processes gone.
+capabilities: [CAP-EXEC-ABORT-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: toolu_tree
+            name: Bash
+            input:
+              command: >-
+                bash -c 'sleep 60 & echo $! > grand.pid; wait' & echo $! > child.pid;
+                while [ ! -s grand.pid ]; do sleep 0.05; done; echo started; wait
+      - tool_calls:
+          - id: toolu_check
+            name: Bash
+            input:
+              command: >-
+                for f in child.pid grand.pid; do p=$(cat $f);
+                for i in $(seq 1 25); do kill -0 $p 2>/dev/null || break; sleep 0.2; done;
+                if kill -0 $p 2>/dev/null; then echo "running:$f"; else echo "ended:$f"; fi; done
+      - text: 'Checked.'
+actions:
+  - prompt: { text: 'Start the tree.', turn: first }
+  - wait:
+      method: item/updated
+      params: { item: { itemId: toolu_tree, output: "started\n" } }
+  - abort: {}
+  - wait: { method: turn/completed, turn: first }
+  - prompt: { text: 'Check the processes.', turn: second }
+expect:
+  events:
+    - method: item/completed
+      params:
+        item:
+          itemId: toolu_tree
+          status: interrupted
+          output: "started\n\n\nCommand aborted"
+          execution: { outcome: failure, timedOut: false }
+    - { method: turn/completed, turn: first, params: { status: interrupted } }
+    - { method: turn/completed, turn: second, params: { status: completed } }
+  requests:
+    - index: 2
+      contains: ['ended:child.pid', 'ended:grand.pid']
+      not_contains: ['running:child.pid', 'running:grand.pid']
+  request_counts: { main: 3 }

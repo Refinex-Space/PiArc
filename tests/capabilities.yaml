@@ -342,13 +342,67 @@ capabilities:
     milestone: M1
     refs: [FR-TL-01, FR-TL-02, ARCH-6.11]
     task: T17
-    status: planned
+    status: active
   - id: CAP-TOOL-POWERSHELL-001
     title: 'Windows 上的 PowerShell 工具'
     milestone: M1
     refs: [ARCH-6.1.4, ARCH-6.2.2]
     task: T17
-    status: planned
+    status: active
+  - id: CAP-EXEC-TIMEOUT-001
+    title: '命令超时（默认 2 分钟、上限 10 分钟）后整棵进程树被终止，结果带已有输出与超时说明'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.11]
+    task: T17
+    status: active
+  - id: CAP-EXEC-ABORT-001
+    title: '中断回合时正在执行的命令连同子孙进程一起终止，条目为 interrupted'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.11, ARCH-15.2]
+    task: T17
+    status: active
+  - id: CAP-EXEC-CWD-001
+    title: 'cd 在工作区内跨命令保留；越出工作区时下一条命令回到工作区根并说明原因'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.11]
+    task: T17
+    status: active
+  - id: CAP-EXEC-OUTPUT-001
+    title: '成功输出超过 30,000 字符时落盘并给约 2,000 字符预览与路径；失败输出给头部与尾部'
+    milestone: M1
+    refs: [FR-TL-02, ARCH-6.11, ARCH-6.15]
+    task: T17
+    status: active
+  - id: CAP-EXEC-EXITCODE-001
+    title: 'grep 无匹配、diff 有差异等退出码 1 按语义判为成功，结果与条目说明含义'
+    milestone: M1
+    refs: [FR-TL-02, ARCH-5.3]
+    task: T17
+    status: active
+  - id: CAP-EXEC-ENV-001
+    title: '命令环境不含 Electron、Node、Pi、PiArc 的内部变量与任何凭据'
+    milestone: M1
+    refs: [ARCH-5.4, ARCH-6.11]
+    task: T17
+    status: active
+  - id: CAP-EXEC-LOGINENV-001
+    title: '命令环境以用户登录 shell 的环境为基础，profile 中配置的 PATH 生效'
+    milestone: M1
+    refs: [ARCH-6.11]
+    task: T17
+    status: active
+  - id: CAP-EXEC-STREAM-001
+    title: '命令输出在结束前以条目增量到达客户端；完成的条目带 bash 卡的结构化字段'
+    milestone: M1
+    refs: [FR-TL-02, ARCH-5.3, ARCH-6.1.3]
+    task: T17
+    status: active
+  - id: CAP-EXEC-GITBASH-001
+    title: 'Windows 上 Bash 经 Git Bash 执行，中文输出不乱码，/c/ 形式路径转换后做边界判断'
+    milestone: M1
+    refs: [ARCH-6.2.2, ARCH-15.2]
+    task: T17
+    status: active
   - id: CAP-TOOL-GLOB-001
     title: 'Glob 由 Core 按模式列出文件'
     milestone: M1

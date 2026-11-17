@@ -181,6 +181,8 @@ struct Env {
     key_store: Arc<MemorySecretStore>,
     master_key: piarc_ports::SecretName,
     config: RunnerConfig,
+    /// What commands start from (see [`command_env`]).
+    command_env: piarc_core::tool_io::CommandEnv,
 }
 
 impl Env {
@@ -237,6 +239,7 @@ impl Env {
             &json!({ "retry": { "baseDelayMs": 5 } }),
         )?;
         let gate = Arc::new(Gate::new(spec.expect.tool_batches.clone()));
+        let command_env = command_env(root)?;
         Ok(Self {
             workspace,
             data,
@@ -246,6 +249,7 @@ impl Env {
             key_store: Arc::new(MemorySecretStore::new()),
             master_key: test_master_key_name("l2"),
             config: config.clone(),
+            command_env,
         })
     }
 
@@ -268,6 +272,7 @@ impl Env {
                 store: Arc::clone(&self.key_store) as _,
             }),
             tool_observer: Some(Arc::clone(&self.gate) as _),
+            command_env: Some(self.command_env.clone()),
             ..CoreConfig::default()
         }
     }
@@ -320,6 +325,62 @@ fn resolve(workspace: &Path, relative: &str) -> PathBuf {
         .split('/')
         .filter(|part| *part != ".")
         .fold(workspace.to_path_buf(), |path, part| path.join(part))
+}
+
+/// Variables PiArc's processes carry that commands must not see (T17): what Electron, Node and
+/// PiArc set in the real application, here added to the test process's environment.
+pub const INTERNAL_PROBES: [(&str, &str); 4] = [
+    ("ELECTRON_RUN_AS_NODE", "1"),
+    ("NODE_OPTIONS", "--no-deprecation"),
+    ("PI_CODING_AGENT_DIR", "/l2/pi"),
+    ("PIARC_L2_INTERNAL", "1"),
+];
+
+/// The command environment of a run's Core: the login shell (on Unix `/bin/bash` with a home
+/// directory of the run, whose `.bash_profile` puts `<home>/bin` with the program
+/// `l2-login-tool` on `PATH` and sets `L2_LOGIN_PROFILE`) started from the test process's
+/// environment plus [`INTERNAL_PROBES`] and `L2_USER_VAR=kept`. Windows has no login shell:
+/// the same environment, stripped.
+fn command_env(root: &Path) -> Result<piarc_core::tool_io::CommandEnv, String> {
+    let home = root.join("home 家");
+    let bin = home.join("bin");
+    std::fs::create_dir_all(&bin).map_err(|e| format!("{}: {e}", bin.display()))?;
+    let mut base: Vec<(std::ffi::OsString, std::ffi::OsString)> = std::env::vars_os()
+        .filter(|(k, _)| k != "HOME" && k != "SHELL" && k != "BASH_ENV")
+        .collect();
+    base.extend(
+        INTERNAL_PROBES
+            .iter()
+            .map(|(k, v)| (std::ffi::OsString::from(k), std::ffi::OsString::from(v))),
+    );
+    base.push(("L2_USER_VAR".into(), "kept".into()));
+    if cfg!(unix) {
+        let tool = bin.join("l2-login-tool");
+        std::fs::write(&tool, "#!/bin/sh\necho 'login PATH works'\n")
+            .map_err(|e| format!("{}: {e}", tool.display()))?;
+        make_executable(&tool)?;
+        let quoted = bin.display().to_string().replace('\'', r"'\''");
+        std::fs::write(
+            home.join(".bash_profile"),
+            format!("export PATH='{quoted}':\"$PATH\"\nexport L2_LOGIN_PROFILE=loaded\n"),
+        )
+        .map_err(|e| format!("{}: {e}", home.display()))?;
+        base.push(("HOME".into(), home.into_os_string()));
+        base.push(("SHELL".into(), "/bin/bash".into()));
+    }
+    Ok(piarc_core::tool_io::CommandEnv::LoginShell { base })
+}
+
+#[cfg(unix)]
+fn make_executable(path: &Path) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
+        .map_err(|e| format!("{}: {e}", path.display()))
+}
+
+#[cfg(not(unix))]
+fn make_executable(_path: &Path) -> Result<(), String> {
+    Ok(())
 }
 
 fn write_file(workspace: &Path, relative: &str, content: &str) -> Result<(), String> {

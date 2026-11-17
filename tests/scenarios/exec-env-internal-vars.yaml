@@ -1,0 +1,27 @@
+id: exec-env-internal-vars
+description: Commands see the user's variables but none of Electron's, Node's, Pi's or PiArc's internal ones (the L2 Core carries them, as the application does), and no provider key.
+capabilities: [CAP-EXEC-ENV-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: toolu_env, name: Bash, input: { command: 'env' } }
+      - text: 'Listed.'
+actions:
+  - prompt: { text: 'Show the environment.', turn: t }
+expect:
+  events:
+    - { method: item/completed, params: { item: { itemId: toolu_env, status: completed } } }
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  requests:
+    - index: 1
+      tool_results:
+        - { id: toolu_env, is_error: false, contains: 'L2_USER_VAR=kept' }
+      not_contains:
+        - 'ELECTRON_RUN_AS_NODE'
+        - 'NODE_OPTIONS'
+        - 'PI_CODING_AGENT_DIR'
+        - 'PIARC_L2_INTERNAL'
+        - 'piarc-mock-test-key'
+  request_counts: { main: 2 }

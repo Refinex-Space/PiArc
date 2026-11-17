@@ -1,0 +1,51 @@
+id: exec-output-budget
+description: Successful output over 30,000 characters reaches the model as a short start and end with the path of the full text; a failing command's long output keeps a longer start and end; short output stays whole.
+capabilities: [CAP-EXEC-OUTPUT-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: toolu_long_ok
+            name: Bash
+            input: { command: "for i in $(seq 1 4000); do printf 'line %05d\\n' $i; done" }
+      - tool_calls:
+          - id: toolu_long_fail
+            name: Bash
+            input: { command: "for i in $(seq 1 4000); do printf 'line %05d\\n' $i; done; exit 3" }
+      - tool_calls:
+          - { id: toolu_short, name: Bash, input: { command: 'echo short output' } }
+      - text: 'Printed.'
+actions:
+  - prompt: { text: 'Print a lot.', turn: t }
+expect:
+  events:
+    - method: item/completed
+      params:
+        item:
+          itemId: toolu_long_ok
+          status: completed
+          execution: { truncated: true, outcome: success }
+    - method: item/completed
+      params: { item: { itemId: toolu_long_fail, status: failed, execution: { truncated: true } } }
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  requests:
+    - index: 1
+      tool_results:
+        - id: toolu_long_ok
+          is_error: false
+          contains: 'characters omitted. The full output (44000 characters) is in '
+      contains: ['line 00001', 'line 04000', 'toolu_long_ok.txt']
+      not_contains: ['line 00500', 'line 03500']
+    - index: 2
+      tool_results:
+        - { id: toolu_long_ok }
+        - { id: toolu_long_fail, is_error: true, contains: "\n\n\nCommand exited with code 3" }
+      contains: ['line 00500', 'line 03500', 'toolu_long_fail.txt']
+      not_contains: ['line 01500']
+    - index: 3
+      tool_results:
+        - { id: toolu_long_ok }
+        - { id: toolu_long_fail }
+        - { id: toolu_short, is_error: false, contains: "short output\n" }
+  request_counts: { main: 4 }
