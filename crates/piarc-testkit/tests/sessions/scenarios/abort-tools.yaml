@@ -3,7 +3,7 @@
 id: abort-tools
 steps:
   - tool_calls:
-      - { id: toolu_hang, name: Bash, input: { command: "sleep 30" } }
-      - { id: toolu_read, name: Read, input: { path: "notes/a.txt" } }
-      - { id: toolu_grep, name: Grep, input: { pattern: "alpha" } }
-  - text: "Answered after the interruption."
+      - { id: toolu_hang, name: Bash, input: { command: 'sleep 30' } }
+      - { id: toolu_read, name: Read, input: { path: 'notes/a.txt' } }
+      - { id: toolu_grep, name: Grep, input: { pattern: 'alpha' } }
+  - text: 'Answered after the interruption.'

@@ -1,6 +1,6 @@
 # T14-A07: an overloaded (529) and a rate-limited (429) answer before the real one.
 id: retry
 steps:
-  - error: { kind: overloaded, message: "the mock is overloaded" }
-  - error: { kind: rate_limit, retry_after_secs: 1, message: "the mock is rate limited" }
-  - text: "Recovered."
+  - error: { kind: overloaded, message: 'the mock is overloaded' }
+  - error: { kind: rate_limit, retry_after_secs: 1, message: 'the mock is rate limited' }
+  - text: 'Recovered.'

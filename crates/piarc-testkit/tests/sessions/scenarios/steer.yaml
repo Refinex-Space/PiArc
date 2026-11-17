@@ -4,7 +4,14 @@ id: steer
 validation:
   rules: { role_order: false }
 steps:
-  - text: "Waiting for the signal."
-    tool_calls: [{ id: toolu_wait, name: Bash, input: { command: "while [ ! -f go ]; do sleep 0.05; done; echo go" } }]
-  - text: "Steered answer."
-  - text: "Follow-up answer."
+  - text: 'Waiting for the signal.'
+    tool_calls:
+      [
+        {
+          id: toolu_wait,
+          name: Bash,
+          input: { command: 'while [ ! -f go ]; do sleep 0.05; done; echo go' },
+        },
+      ]
+  - text: 'Steered answer.'
+  - text: 'Follow-up answer.'
