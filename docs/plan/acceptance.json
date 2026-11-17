@@ -1840,8 +1840,8 @@
       "id": "T16-A03",
       "task": "T16",
       "description": "CRLF、带 BOM、非 UTF-8 编码的文件经 Edit 后，换行风格、BOM 与编码保持不变，且只有目标文本被修改。验证：macOS 与 Windows CI 上的测试输出。",
-      "status": "blocked",
-      "evidence": "macOS 已验证：场景 tools-edit-preserves-encoding ok，CRLF、带 BOM 的 UTF-8、GBK 三个文件 Edit 后与 tests/scenarios/fixtures/*.after.txt 逐字节相等，Write 覆盖 CRLF 文件后为 CRLF；故意把 GBK 的期望改成原文件时报 \"bytes differ ... at byte 42\"。piarc-fs write::tests::keeps_crlf_bom_and_legacy_encodings 与 Core file_invariants::legacy_encodings_are_read_and_written_back 通过；Windows 代码经 cargo clippy --target x86_64-pc-windows-msvc 检查。需要 Windows CI 的测试输出：本任务未推送，推送后由下一个任务的开工检查按 verify (windows-latest) 的 L2 与 cargo test 日志关闭。"
+      "status": "passing",
+      "evidence": "macOS：场景 tools-edit-preserves-encoding ok，CRLF、带 BOM 的 UTF-8、GBK 三个文件 Edit 后与 tests/scenarios/fixtures/*.after.txt 逐字节相等，Write 覆盖 CRLF 文件后为 CRLF；故意把 GBK 的期望改成原文件时报 \"bytes differ ... at byte 42\"。Windows CI：运行 https://github.com/Refinex-Space/PiArc/actions/runs/44069688031（提交 cfe664b）的 verify (windows-latest) 中 \"test tools-edit-preserves-encoding ... ok\"，cargo test 中 write::tests::keeps_crlf_bom_and_legacy_encodings、legacy_encodings_are_read_and_written_back 均 ok，无 FAILED。"
     },
     {
       "id": "T16-A04",
@@ -1896,8 +1896,8 @@
       "id": "T16-A11",
       "task": "T16",
       "description": "`npm run verify` 通过（含 Windows CI 上的 L2 场景）。验证：命令输出。",
-      "status": "blocked",
-      "evidence": "macOS：npm run verify 14/14 passed（提交 aec65f4；Vitest 823 passed | 1 skipped（基线即有的 1 个），L2 26 passed，cargo-deny ok）。Windows CI 上的 L2 场景需要推送后才有结果；本任务未推送，由下一个任务的开工检查按 CI 日志关闭。"
+      "status": "passing",
+      "evidence": "macOS：npm run verify 14/14 passed（提交 aec65f4；Vitest 823 passed | 1 skipped（基线即有的 1 个），L2 26 passed，cargo-deny ok）。Windows CI：运行 https://github.com/Refinex-Space/PiArc/actions/runs/44069688031（提交 cfe664b）的 verify (windows-latest) 14/14 passed，「L2 result: ok. 26 passed; 0 failed; 0 skipped (platform)」「L2 coverage: 26 scenarios (0 skipped on windows), MISSING 0」；同一运行全部 16 个作业成功。"
     },
     {
       "id": "T17-A01",
