@@ -69,6 +69,7 @@
 //! [`CoreRuntime::terminal_frame`] ([`terminal`]).
 
 pub mod agent_host;
+pub mod clock;
 pub mod demo;
 pub mod dirs;
 mod error;
@@ -80,6 +81,7 @@ pub mod release;
 pub mod route;
 mod runtime;
 pub mod secrets;
+pub mod sessions;
 pub mod storage;
 pub mod terminal;
 pub mod tool_io;

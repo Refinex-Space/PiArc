@@ -1,0 +1,526 @@
+//! Session orchestration (T14; architecture sections 3.2, 3.3, 7.2–7.6, ADR-0010).
+//!
+//! # Actors
+//!
+//! - [`Hub`]: the entry for Core's API. It routes each request to the actor that owns the
+//!   state: a routing table (workspace path → actor, session id → actor) behind a mutex that is
+//!   never held across an await.
+//! - `WorkspaceActor` (one per open workspace, `workspace.rs`): owns the workspace's Agent
+//!   Host supervisor. Opening the workspace starts the Agent Host at once (warm-up); when every
+//!   session stayed idle for [`SessionsConfig::idle_timeout`] (30 minutes by default, measured on
+//!   the injected clock) it shuts the process down, and starts it again and reopens the open
+//!   sessions when one needs it. It also runs the workspace's settings watcher and the restart
+//!   on trust changes. A separate consumer task drains the supervisor's events without ever
+//!   waiting on slow work (I19): session notifications go to their session actor's mailbox.
+//! - `SessionActor` (one per open session, `session.rs`): delivers the session's
+//!   notifications to the client on the route `session/<id>` in `seq` order, backfilling a gap
+//!   with `session/getEntries`; computes the session's status and unread flag; runs the
+//!   client's requests as tasks so it never waits on the Agent Host itself.
+//! - The snapshot task (`snapshot.rs`): `core/workspaces` and `core/sessions` with increasing
+//!   revisions.
+//!
+//! # Cancellation (architecture section 7.2)
+//!
+//! Core's root token → a token per session → the session's running requests; closing a session
+//! cancels its token. An interrupted turn also cancels the commands the session runs through
+//! the tool I/O (`ToolIo::cancel_running`), and each command's own token kills its process.
+//!
+//! # Persistence
+//!
+//! Pi's JSONL files are the conversation (ADR-0011). Core's own state of a session (workspace,
+//! last status, unread) goes into its `sessions` row once the index has it: after every turn the
+//! index is synced incrementally and the row updated. After a restart the session list comes
+//! from the index and `resume` reopens a session from its file.
+
+mod inbound;
+mod session;
+mod snapshot;
+mod workspace;
+
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::time::Duration;
+
+use piarc_host::HostConfig;
+use piarc_ports::Clock;
+use piarc_protocol::history::{HistoryParams, SessionHistory};
+use piarc_protocol::session::{ModelRef, SessionId};
+use serde_json::Value;
+use tokio::runtime::Handle;
+use tokio_util::sync::CancellationToken;
+
+use crate::agent_host::AgentHostLaunch;
+use crate::error::{Error, Result};
+use crate::events::EventSender;
+use crate::secrets::SecretsService;
+use crate::storage::Storage;
+use crate::tool_io::ToolIo;
+use crate::trust::TrustService;
+
+pub use session::{Op, QueueOp};
+pub(crate) use snapshot::Snapshots;
+
+pub use snapshot::{HostState, SessionStatus, SessionView, WorkspaceView};
+
+/// How long every session of a workspace stays idle before its Agent Host is stopped.
+pub const DEFAULT_IDLE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
+
+/// The most items one `transcript_window` returns.
+pub const MAX_WINDOW: u64 = 1000;
+
+/// Adjusts the supervisor settings of every Agent Host (tests shorten timeouts).
+pub type HostTuning = Arc<dyn Fn(&mut HostConfig) + Send + Sync>;
+
+/// Settings of the session layer.
+#[derive(Clone)]
+pub struct SessionsConfig {
+    /// How Agent Hosts start; without it workspaces cannot open.
+    pub launch: Option<AgentHostLaunch>,
+    /// Idle time after which a workspace's Agent Host is stopped.
+    pub idle_timeout: Duration,
+    /// The clock of the idle timer.
+    pub clock: Arc<dyn Clock>,
+    /// Supervisor settings adjustments, applied to every start.
+    pub tune_host: Option<HostTuning>,
+}
+
+impl std::fmt::Debug for SessionsConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SessionsConfig")
+            .field("launch", &self.launch)
+            .field("idle_timeout", &self.idle_timeout)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Default for SessionsConfig {
+    fn default() -> Self {
+        Self {
+            launch: None,
+            idle_timeout: DEFAULT_IDLE_TIMEOUT,
+            clock: Arc::new(crate::clock::SystemClock),
+            tune_host: None,
+        }
+    }
+}
+
+impl PartialEq for SessionsConfig {
+    fn eq(&self, other: &Self) -> bool {
+        self.launch == other.launch && self.idle_timeout == other.idle_timeout
+    }
+}
+
+impl Eq for SessionsConfig {}
+
+/// What every actor shares.
+#[doc(hidden)]
+pub(crate) struct Ctx {
+    pub handle: Handle,
+    pub events: EventSender,
+    pub storage: Storage,
+    pub trust: TrustService,
+    pub secrets: SecretsService,
+    pub tool_io: ToolIo,
+    pub config: SessionsConfig,
+    pub snapshots: Snapshots,
+    pub cancel: CancellationToken,
+}
+
+/// The entry of the session layer. Cheap to clone.
+#[derive(Clone)]
+pub(crate) struct Hub {
+    ctx: Arc<Ctx>,
+    routes: Arc<Mutex<Routes>>,
+}
+
+#[derive(Default)]
+struct Routes {
+    workspaces: HashMap<PathBuf, workspace::WorkspaceHandle>,
+    sessions: HashMap<String, session::SessionHandle>,
+    closed: bool,
+}
+
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+impl Hub {
+    pub fn new(ctx: Ctx) -> Self {
+        Self {
+            ctx: Arc::new(ctx),
+            routes: Arc::default(),
+        }
+    }
+
+    /// Opens `path` (an existing directory) as a workspace and waits until its Agent Host is
+    /// ready: connected, and the sessions that were open reopened.
+    pub async fn open_workspace(&self, path: PathBuf) -> Result<WorkspaceView> {
+        let workspace = self.workspace(path).await?;
+        workspace.acquire().await?;
+        Ok(workspace.view().await)
+    }
+
+    /// Closes every session of the workspace and stops its Agent Host.
+    pub async fn close_workspace(&self, path: PathBuf) -> Result<()> {
+        let path = canonical_dir(path, "path").await?;
+        let removed = lock(&self.routes).workspaces.remove(&path);
+        let Some(workspace) = removed else {
+            return Ok(());
+        };
+        let sessions: Vec<session::SessionHandle> = {
+            let mut routes = lock(&self.routes);
+            let ids: Vec<String> = routes
+                .sessions
+                .values()
+                .filter(|s| s.workspace == path)
+                .map(|s| s.id.clone())
+                .collect();
+            ids.iter()
+                .filter_map(|id| routes.sessions.remove(id))
+                .collect()
+        };
+        for session in sessions {
+            // A session that fails to close is gone with the Agent Host anyway.
+            let _ = session.close().await;
+        }
+        workspace.close().await;
+        Ok(())
+    }
+
+    /// Creates a session in `workspace` (opened when it is not), working in `cwd` (the
+    /// workspace itself by default).
+    pub async fn create_session(
+        &self,
+        workspace: PathBuf,
+        cwd: Option<PathBuf>,
+        model: Option<ModelRef>,
+    ) -> Result<Value> {
+        let workspace = self.workspace(workspace).await?;
+        let cwd = match cwd {
+            Some(cwd) => canonical_dir(cwd, "cwd").await?,
+            None => workspace.path.clone(),
+        };
+        if !cwd.starts_with(&workspace.path) {
+            return Err(Error::InvalidArgument {
+                field: "cwd",
+                reason: "must be inside the workspace".into(),
+            });
+        }
+        let id = new_session_id()?;
+        let handle = session::SessionHandle::spawn(&self.ctx, &workspace, id.clone(), cwd)?;
+        self.register(handle.clone())?;
+        match handle.create(model).await {
+            Ok(opened) => Ok(opened),
+            Err(error) => {
+                lock(&self.routes).sessions.remove(&id);
+                // Nothing to close when the create never reached the Agent Host.
+                let _ = handle.close().await;
+                Err(error)
+            }
+        }
+    }
+
+    /// Reopens a session from its file, opening its workspace when needed.
+    pub async fn resume_session(&self, id: String) -> Result<Value> {
+        check_session_id(&id)?;
+        if let Some(live) = self.live(&id) {
+            return live.info().await;
+        }
+        let (workspace, cwd) = self.indexed_location(&id).await?;
+        let workspace = self.workspace(workspace).await?;
+        let handle = session::SessionHandle::spawn(&self.ctx, &workspace, id.clone(), cwd)?;
+        self.register(handle.clone())?;
+        match handle.resume().await {
+            Ok(opened) => Ok(opened),
+            Err(error) => {
+                lock(&self.routes).sessions.remove(&id);
+                let _ = handle.close().await;
+                Err(error)
+            }
+        }
+    }
+
+    /// Opens a copy of session `id`'s conversation (up to `entry_id`) as a new session.
+    pub async fn fork_session(&self, id: String, entry_id: Option<String>) -> Result<Value> {
+        check_session_id(&id)?;
+        let (workspace, cwd) = match self.live(&id) {
+            Some(live) => (live.workspace.clone(), live.cwd.clone()),
+            None => self.indexed_location(&id).await?,
+        };
+        let workspace = self.workspace(workspace).await?;
+        let new_id = workspace.fork(&id, &cwd, entry_id).await?;
+        let handle = session::SessionHandle::spawn(&self.ctx, &workspace, new_id, cwd)?;
+        self.register(handle.clone())?;
+        handle.adopt().await
+    }
+
+    /// Closes an open session: it leaves the Agent Host and the session list's open ones.
+    pub async fn close_session(&self, id: String) -> Result<Value> {
+        check_session_id(&id)?;
+        let removed = lock(&self.routes).sessions.remove(&id);
+        match removed {
+            Some(session) => session.close().await,
+            None => Err(session_not_found(&id)),
+        }
+    }
+
+    /// Runs `op` on open session `id`.
+    pub async fn op(&self, id: String, op: Op) -> Result<Value> {
+        check_session_id(&id)?;
+        match self.live(&id) {
+            Some(session) => session.op(op).await,
+            None => Err(session_not_found(&id)),
+        }
+    }
+
+    /// Items of a session's persisted conversation (open or not): `start .. start + limit`,
+    /// the last `limit` when `start` is `None`.
+    pub async fn transcript_window(
+        &self,
+        id: String,
+        start: Option<u64>,
+        limit: u64,
+    ) -> Result<Value> {
+        check_session_id(&id)?;
+        if limit == 0 || limit > MAX_WINDOW {
+            return Err(Error::InvalidArgument {
+                field: "limit",
+                reason: format!("must be between 1 and {MAX_WINDOW}"),
+            });
+        }
+        let (workspace, cwd) = match self.live(&id) {
+            Some(live) => (live.workspace.clone(), live.cwd.clone()),
+            None => self.indexed_location(&id).await?,
+        };
+        let workspace = self.workspace(workspace).await?;
+        let supervisor = workspace.acquire().await?;
+        let window = supervisor
+            .call::<SessionHistory>(HistoryParams {
+                session_id: SessionId(id),
+                cwd: cwd.to_string_lossy().into_owned(),
+                start,
+                limit,
+            })
+            .await
+            .map_err(host_error)?;
+        serde_json::to_value(window).map_err(|e| Error::Internal {
+            reason: format!("cannot encode the window: {e}"),
+        })
+    }
+
+    /// Clears the unread flag of a session (the client showed it).
+    pub async fn mark_read(&self, id: String) -> Result<()> {
+        check_session_id(&id)?;
+        if let Some(session) = self.live(&id) {
+            return session.op(Op::MarkRead).await.map(|_| ());
+        }
+        let storage = self.ctx.storage.clone();
+        storage
+            .run(move |store| {
+                let record = store.session(&id)?;
+                if let Some(record) = record {
+                    let workspace = record.workspace_path.or(record.meta.cwd).unwrap_or_default();
+                    let status = record.status.unwrap_or_else(|| "idle".into());
+                    store.set_session_state(&id, &workspace, &status, false)?;
+                }
+                Ok::<_, piarc_store::Error>(())
+            })
+            .await??;
+        self.ctx.snapshots.send(snapshot::SnapshotMsg::Reload);
+        Ok(())
+    }
+
+    /// Sends both snapshots again (a client subscribed or reloaded).
+    pub fn resend_snapshots(&self) {
+        self.ctx.snapshots.send(snapshot::SnapshotMsg::Resend);
+    }
+
+    /// Ordered shutdown: refuses new workspaces and sessions, then stops every Agent Host
+    /// (`host/shutdown`, which closes their sessions) and waits for them.
+    pub async fn shutdown(&self) {
+        let workspaces: Vec<workspace::WorkspaceHandle> = {
+            let mut routes = lock(&self.routes);
+            routes.closed = true;
+            routes.sessions.clear();
+            routes.workspaces.drain().map(|(_, w)| w).collect()
+        };
+        for workspace in workspaces {
+            workspace.close().await;
+        }
+        self.ctx.cancel.cancel();
+    }
+
+    fn live(&self, id: &str) -> Option<session::SessionHandle> {
+        lock(&self.routes).sessions.get(id).cloned()
+    }
+
+    fn register(&self, handle: session::SessionHandle) -> Result<()> {
+        let mut routes = lock(&self.routes);
+        if routes.closed {
+            return Err(Error::ShuttingDown);
+        }
+        routes.sessions.insert(handle.id.clone(), handle);
+        Ok(())
+    }
+
+    /// The open workspace at `path`, opening it (and starting its Agent Host) when needed.
+    async fn workspace(&self, path: PathBuf) -> Result<workspace::WorkspaceHandle> {
+        let path = canonical_dir(path, "workspace").await?;
+        if let Some(open) = lock(&self.routes).workspaces.get(&path).cloned() {
+            return Ok(open);
+        }
+        let opened = workspace::WorkspaceHandle::open(&self.ctx, path.clone()).await?;
+        // Another request may have opened it meanwhile (keep the first), or Core began to shut
+        // down: the new one is closed again.
+        let kept: Result<Option<workspace::WorkspaceHandle>> = {
+            let mut routes = lock(&self.routes);
+            if routes.closed {
+                Err(Error::ShuttingDown)
+            } else if let Some(first) = routes.workspaces.get(&path).cloned() {
+                Ok(Some(first))
+            } else {
+                routes.workspaces.insert(path, opened.clone());
+                Ok(None)
+            }
+        };
+        match kept {
+            Ok(None) => Ok(opened),
+            Ok(Some(first)) => {
+                opened.close().await;
+                Ok(first)
+            }
+            Err(error) => {
+                opened.close().await;
+                Err(error)
+            }
+        }
+    }
+
+    /// Workspace and working directory of a session known to the index.
+    async fn indexed_location(&self, id: &str) -> Result<(PathBuf, PathBuf)> {
+        let key = id.to_owned();
+        let record = self
+            .ctx
+            .storage
+            .run(move |store| store.session(&key))
+            .await??;
+        let Some(record) = record else {
+            return Err(session_not_found(id));
+        };
+        let Some(cwd) = record.meta.cwd.clone() else {
+            return Err(session_not_found(id));
+        };
+        let workspace = record.workspace_path.unwrap_or_else(|| cwd.clone());
+        Ok((PathBuf::from(workspace), PathBuf::from(cwd)))
+    }
+}
+
+/// The canonical spelling of an existing directory.
+async fn canonical_dir(path: PathBuf, field: &'static str) -> Result<PathBuf> {
+    if !path.is_absolute() {
+        return Err(Error::InvalidArgument {
+            field,
+            reason: "must be an absolute path".into(),
+        });
+    }
+    let resolved = tokio::task::spawn_blocking(move || {
+        let canonical = std::fs::canonicalize(&path)?;
+        if canonical.is_dir() {
+            Ok(strip_verbatim(canonical))
+        } else {
+            Err(std::io::Error::other("not a directory"))
+        }
+    })
+    .await
+    .map_err(|e| Error::Internal {
+        reason: format!("resolving a path failed: {e}"),
+    })?;
+    resolved.map_err(|e| Error::InvalidArgument {
+        field,
+        reason: format!("must be an existing directory ({e})"),
+    })
+}
+
+/// `\\?\C:\x` → `C:\x` on Windows: Node and the tools take plain paths.
+fn strip_verbatim(path: PathBuf) -> PathBuf {
+    let text = path.to_string_lossy();
+    match text.strip_prefix(r"\\?\") {
+        Some(plain) if cfg!(windows) && !plain.starts_with("UNC") => PathBuf::from(plain),
+        _ => path,
+    }
+}
+
+/// A random UUID (v4): Pi accepts it as a session id.
+pub(crate) fn new_session_id() -> Result<String> {
+    let mut bytes = [0_u8; 16];
+    getrandom::fill(&mut bytes).map_err(|e| Error::Internal {
+        reason: format!("no randomness for a session id: {e}"),
+    })?;
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+    Ok(format!(
+        "{}-{}-{}-{}-{}",
+        &hex[0..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..32]
+    ))
+}
+
+/// Session ids as Pi accepts them.
+pub(crate) fn check_session_id(id: &str) -> Result<()> {
+    let edge = |c: Option<char>| c.is_some_and(|c| c.is_ascii_alphanumeric());
+    let valid = id.len() <= 128
+        && edge(id.chars().next())
+        && edge(id.chars().last())
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'));
+    if valid {
+        Ok(())
+    } else {
+        Err(Error::InvalidArgument {
+            field: "sessionId",
+            reason: "must be 1 to 128 letters, digits, '.', '_' or '-', starting and ending with \
+                     a letter or digit"
+                .into(),
+        })
+    }
+}
+
+fn session_not_found(id: &str) -> Error {
+    Error::Feature {
+        kind: piarc_protocol::ErrorKind::SessionNotFound,
+        retryable: false,
+        message: format!("no session {id}"),
+        details: Some(serde_json::json!({ "sessionId": id }).to_string()),
+    }
+}
+
+/// A supervisor error as Core's error, keeping its kind.
+pub(crate) fn host_error(error: piarc_host::Error) -> Error {
+    Error::feature(&error.to_error_object())
+}
+
+/// A path as text for the client and the database.
+pub(crate) fn path_text(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn session_ids_follow_pis_rule() {
+        let id = new_session_id().expect("random");
+        assert_eq!(id.len(), 36);
+        check_session_id(&id).expect("a generated id is valid");
+        for bad in ["", "-a", "a-", "a/b", "a b", &"x".repeat(129)] {
+            assert!(check_session_id(bad).is_err(), "{bad:?}");
+        }
+    }
+}

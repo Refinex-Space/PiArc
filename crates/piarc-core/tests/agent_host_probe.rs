@@ -53,6 +53,7 @@ fn a_probe_whose_agent_host_exits_reports_an_error() {
         CoreConfig {
             coalesce_interval: Duration::from_millis(16),
             dirs: None,
+            ..CoreConfig::default()
         },
         Arc::new(NullSink),
     )

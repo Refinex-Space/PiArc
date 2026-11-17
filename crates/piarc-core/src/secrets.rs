@@ -79,6 +79,36 @@ impl SecretsConfig {
     }
 }
 
+/// The system credential store, or, where it cannot be opened, a store that answers every
+/// call with that error (the vault then reports `credentialStoreUnavailable` per request and
+/// retries on the next one).
+#[must_use]
+pub fn system_store() -> Arc<dyn SecretStore> {
+    match SystemSecretStore::new() {
+        Ok(store) => Arc::new(store),
+        Err(error) => {
+            tracing::warn!(target: "piarc_core::secrets", "the system credential store cannot be opened: {error}");
+            Arc::new(UnavailableStore(error))
+        }
+    }
+}
+
+struct UnavailableStore(piarc_ports::SecretStoreError);
+
+impl SecretStore for UnavailableStore {
+    fn read(&self, _: &SecretName) -> Result<Option<Vec<u8>>, piarc_ports::SecretStoreError> {
+        Err(self.0.clone())
+    }
+
+    fn write(&self, _: &SecretName, _: &[u8]) -> Result<(), piarc_ports::SecretStoreError> {
+        Err(self.0.clone())
+    }
+
+    fn delete(&self, _: &SecretName) -> Result<bool, piarc_ports::SecretStoreError> {
+        Err(self.0.clone())
+    }
+}
+
 /// A vault change, for observers inside Core (no value).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SecretChange {

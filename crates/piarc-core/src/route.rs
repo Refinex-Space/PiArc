@@ -61,6 +61,27 @@ impl RouteKey {
         Self(Arc::from(crate::workspace_settings::SETTINGS_ROUTE))
     }
 
+    /// The route of the workspace list snapshots (`core/workspaces`, T14).
+    #[must_use]
+    pub fn workspaces() -> Self {
+        Self(Arc::from("core/workspaces"))
+    }
+
+    /// The route of the session list snapshots (`core/sessions`, T14).
+    #[must_use]
+    pub fn sessions() -> Self {
+        Self(Arc::from("core/sessions"))
+    }
+
+    /// The route of one session's events: `session/<id>` (T14).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::InvalidArgument`] when the id makes an invalid route.
+    pub fn session(id: &str) -> Result<Self> {
+        Self::parse(&format!("session/{id}"))
+    }
+
     /// The route of Core's own error events.
     #[must_use]
     pub fn errors() -> Self {

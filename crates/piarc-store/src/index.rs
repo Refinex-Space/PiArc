@@ -70,6 +70,8 @@ pub struct SessionRecord {
     pub index_error: Option<String>,
     /// Core's own state: the workspace the session belongs to.
     pub workspace_path: Option<String>,
+    /// Core's own state: the session's last state (`idle`, `error`).
+    pub status: Option<String>,
     /// Core's own state: pinned.
     pub pinned: bool,
     /// Core's own state: archived.
@@ -362,6 +364,30 @@ impl Store {
             .map_err(Error::sqlite("cannot read sessions"))
     }
 
+    /// Records Core's own state of session `id`: its workspace, last state and unread flag.
+    /// Returns false when the index has no row for it yet (Pi writes the file with the first
+    /// response; the next sync adds the row).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Sqlite`] when the row cannot be written.
+    pub fn set_session_state(
+        &self,
+        id: &str,
+        workspace_path: &str,
+        status: &str,
+        unread: bool,
+    ) -> Result<bool> {
+        let changed = self
+            .conn
+            .execute(
+                "UPDATE sessions SET workspace_path = ?2, status = ?3, unread = ?4 WHERE id = ?1",
+                params![id, workspace_path, status, unread],
+            )
+            .map_err(Error::sqlite("cannot write the session state"))?;
+        Ok(changed > 0)
+    }
+
     /// One session by id.
     ///
     /// # Errors
@@ -459,7 +485,7 @@ impl Store {
 const SESSION_COLUMNS: &str = "id, file_path, cwd, parent_session, name, first_message, \
     model_provider, model_id, message_count, input_tokens, output_tokens, cache_read_tokens, \
     cache_write_tokens, cost_total, created_at, updated_at, format_version, index_status, \
-    index_error, workspace_path, pinned, archived, unread";
+    index_error, workspace_path, pinned, archived, unread, status";
 
 fn session_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SessionRecord> {
     let status: String = row.get(17)?;
@@ -493,6 +519,7 @@ fn session_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SessionRecord> 
         pinned: row.get(20)?,
         archived: row.get(21)?,
         unread: row.get(22)?,
+        status: row.get(23)?,
     })
 }
 

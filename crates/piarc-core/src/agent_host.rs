@@ -63,6 +63,68 @@ fn start_with(
     )
 }
 
+/// How Core starts the Agent Host of a workspace.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AgentHostLaunch {
+    /// The packaged app's own runtime under `resources_dir` (Electron's
+    /// `process.resourcesPath`): [`start_bundled`].
+    Bundled {
+        /// The app's resources directory.
+        resources_dir: PathBuf,
+    },
+    /// A Node executable and an Agent Host bundle (development and tests).
+    Custom {
+        /// The Node executable.
+        node: PathBuf,
+        /// `agent-host.mjs`.
+        bundle: PathBuf,
+        /// Pi's resources (`PI_PACKAGE_DIR`), next to the bundle.
+        pi_package_dir: Option<PathBuf>,
+        /// Extra arguments (tests only: `--test-*` flags).
+        extra_args: Vec<OsString>,
+        /// Extra environment variables (tests only).
+        extra_env: Vec<(OsString, OsString)>,
+    },
+}
+
+/// Starts supervising the Agent Host of `workspace` as `launch` says, with `inbound` answering
+/// its requests. `tune` adjusts the supervisor settings (tests shorten timeouts).
+///
+/// # Errors
+///
+/// The errors of [`BundledRuntime::locate`] and [`start_bundled`].
+pub fn start_for(
+    launch: &AgentHostLaunch,
+    workspace: PathBuf,
+    data_dir: PathBuf,
+    inbound: SharedInbound,
+    tune: &dyn Fn(&mut HostConfig),
+) -> Result<(HostSupervisor, HostEvents)> {
+    match launch {
+        AgentHostLaunch::Bundled { resources_dir } => bundled(
+            &BundledRuntime::locate(resources_dir)?,
+            workspace,
+            data_dir,
+            inbound,
+            tune,
+        ),
+        AgentHostLaunch::Custom {
+            node,
+            bundle,
+            pi_package_dir,
+            extra_args,
+            extra_env,
+        } => {
+            let mut config = HostConfig::new(workspace, data_dir, node.clone(), bundle.clone());
+            config.pi_package_dir.clone_from(pi_package_dir);
+            config.extra_args.clone_from(extra_args);
+            config.extra_env.clone_from(extra_env);
+            tune(&mut config);
+            Ok(start(config, inbound))
+        }
+    }
+}
+
 /// Restarts `supervisor` (the Agent Host of `workspace`) whenever the trust decision of the
 /// workspace's main checkout changes, so the new process loads, or no longer loads,
 /// project-level Pi resources; open sessions are reopened on it (`HostSupervisor::restart`).
@@ -245,6 +307,16 @@ pub fn start_bundled(
     data_dir: PathBuf,
     inbound: SharedInbound,
 ) -> Result<(HostSupervisor, HostEvents)> {
+    bundled(runtime, workspace, data_dir, inbound, &|_| {})
+}
+
+fn bundled(
+    runtime: &BundledRuntime,
+    workspace: PathBuf,
+    data_dir: PathBuf,
+    inbound: SharedInbound,
+    tune: &dyn Fn(&mut HostConfig),
+) -> Result<(HostSupervisor, HostEvents)> {
     let (tmp, npm_cache) = agent_host_dirs(&data_dir);
     for dir in [&tmp, &npm_cache] {
         std::fs::create_dir_all(dir).map_err(|e| CoreError::BundledRuntime {
@@ -252,7 +324,8 @@ pub fn start_bundled(
         })?;
     }
     let spawner = platform_spawner(&workspace, &data_dir)?;
-    let config = runtime.host_config(workspace, data_dir, &|name| std::env::var_os(name))?;
+    let mut config = runtime.host_config(workspace, data_dir, &|name| std::env::var_os(name))?;
+    tune(&mut config);
     Ok(start_with(config, inbound, spawner))
 }
 

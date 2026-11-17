@@ -224,6 +224,17 @@ impl ToolIo {
         }
     }
 
+    /// Terminates the commands `session_id` is running and keeps the session (its turn was
+    /// interrupted: the cancellation reaches the tool calls' processes even if the Agent Host
+    /// never sends their `exec/kill`).
+    pub fn cancel_running(&self, session_id: &str) {
+        if let Some(session) = lock(&self.sessions).get(session_id) {
+            for token in lock(&session.running).values() {
+                token.cancel();
+            }
+        }
+    }
+
     /// The registered scope of `session_id`.
     #[must_use]
     pub fn scope(&self, session_id: &str) -> Option<Scope> {

@@ -44,7 +44,10 @@ use crate::events::{
     EventSink, EventStats,
 };
 use crate::route::RouteKey;
+use crate::secrets::{SecretsConfig, SecretsService};
+use crate::sessions::{Hub, Op, SessionsConfig};
 use crate::storage::{Storage, report_json};
+use crate::tool_io::{ToolIo, ToolIoConfig};
 use crate::terminal::{KeyEvent, TerminalOptions, Terminals};
 use crate::trust::{TrustService, TrustView};
 use crate::workspace_settings::WorkspaceSettings;
@@ -66,14 +69,38 @@ const SHUTTING_DOWN: u8 = 1;
 const STOPPED: u8 = 2;
 
 /// Settings of the runtime.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct CoreConfig {
     /// How often the coalescer may deliver a batch.
     pub coalesce_interval: Duration,
     /// The data and cache directories (architecture section 9.1). Without them Core has no
-    /// database, settings, trust or log files: only tests and benchmarks of the event path
-    /// run that way.
+    /// database, settings, trust, log files or sessions: only tests and benchmarks of the
+    /// event path run that way.
     pub dirs: Option<DataDirs>,
+    /// The session layer: how Agent Hosts start, the idle threshold and its clock (T14).
+    pub sessions: SessionsConfig,
+    /// The credential store of the vault's master key; the system credential store under the
+    /// application's own name when absent. Tests use an in-memory store and a `piarc-test.` name.
+    pub secret_store: Option<SecretStoreSetup>,
+}
+
+/// A credential store for the vault's master key and the key's name in it.
+#[derive(Clone)]
+pub struct SecretStoreSetup {
+    /// Where the master key lives.
+    pub master_key: piarc_ports::SecretName,
+    /// The store.
+    pub store: Arc<dyn piarc_ports::SecretStore>,
+}
+
+impl std::fmt::Debug for CoreConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CoreConfig")
+            .field("coalesce_interval", &self.coalesce_interval)
+            .field("dirs", &self.dirs)
+            .field("sessions", &self.sessions)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Default for CoreConfig {
@@ -81,6 +108,8 @@ impl Default for CoreConfig {
         Self {
             coalesce_interval: DEFAULT_COALESCE_INTERVAL,
             dirs: None,
+            sessions: SessionsConfig::default(),
+            secret_store: None,
         }
     }
 }
@@ -144,6 +173,7 @@ struct Shared {
 struct StateServices {
     storage: Storage,
     trust: TrustService,
+    sessions: Hub,
 }
 
 #[derive(Default)]
@@ -167,7 +197,6 @@ impl CoreRuntime {
     /// tokio runtime cannot be created.
     pub fn start(config: CoreConfig, sink: Arc<dyn EventSink>) -> Result<Self> {
         config.validate()?;
-        let state_dirs = config.dirs.clone().map(open_state).transpose()?;
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .thread_name("piarc-core")
             // I/O: the Agent Host's pipes, the sandbox proxy and child processes (T12).
@@ -193,6 +222,11 @@ impl CoreRuntime {
             }
         });
         let terminals = Terminals::new(handle.clone(), events.clone());
+        let cancel = CancellationToken::new();
+        let state_dirs = match config.dirs.clone() {
+            Some(dirs) => Some(open_state(dirs, &config, &handle, &events, &cancel)?),
+            None => None,
+        };
         let core = Self {
             shared: Arc::new(Shared {
                 state: AtomicU8::new(RUNNING),
@@ -200,7 +234,7 @@ impl CoreRuntime {
                 runtime: Mutex::new(Some(runtime)),
                 events,
                 counters,
-                cancel: CancellationToken::new(),
+                cancel,
                 close_events,
                 coalescer: Mutex::new(Some(supervisor)),
                 demo: Mutex::new(DemoRegistry::default()),
@@ -596,6 +630,171 @@ impl CoreRuntime {
         Ok(())
     }
 
+    /// Runs `job` on the session layer and calls `on_done` with its result from a runtime
+    /// thread. Validation that needs no I/O happens in `job` too, but the call itself only
+    /// queues the work: nothing here blocks the caller (architecture section 7.2).
+    fn on_sessions<F, Fut>(
+        &self,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+        job: F,
+    ) -> Result<()>
+    where
+        F: FnOnce(Hub) -> Fut + Send + 'static,
+        Fut: Future<Output = Result<serde_json::Value>> + Send + 'static,
+    {
+        self.ensure_running()?;
+        let hub = self.services()?.sessions;
+        self.shared.handle.spawn(async move { on_done(job(hub).await) });
+        Ok(())
+    }
+
+    /// Opens a workspace: starts its Agent Host at once and answers once it is ready (the
+    /// workspace as in `core/workspaces`).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NoDataDirectory`], [`Error::ShuttingDown`]; the rest goes to `on_done`.
+    pub fn open_workspace(
+        &self,
+        path: PathBuf,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            let view = hub.open_workspace(path).await?;
+            serde_json::to_value(view).map_err(encode_error)
+        })
+    }
+
+    /// Closes a workspace: its sessions and its Agent Host.
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn close_workspace(
+        &self,
+        path: PathBuf,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.close_workspace(path).await?;
+            Ok(serde_json::Value::Null)
+        })
+    }
+
+    /// Creates a session in `workspace` (opened when needed), working in `cwd` (default: the
+    /// workspace), optionally with a model.
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn create_session(
+        &self,
+        workspace: PathBuf,
+        cwd: Option<PathBuf>,
+        model: Option<piarc_protocol::session::ModelRef>,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.create_session(workspace, cwd, model).await
+        })
+    }
+
+    /// Reopens a session from the index and its file.
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn resume_session(
+        &self,
+        id: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        crate::sessions::check_session_id(&id)?;
+        self.on_sessions(on_done, move |hub| async move { hub.resume_session(id).await })
+    }
+
+    /// Opens a copy of a session (up to `entry_id`) as a new session.
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn fork_session(
+        &self,
+        id: String,
+        entry_id: Option<String>,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        crate::sessions::check_session_id(&id)?;
+        self.on_sessions(on_done, move |hub| async move {
+            hub.fork_session(id, entry_id).await
+        })
+    }
+
+    /// Closes an open session.
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn close_session(
+        &self,
+        id: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        crate::sessions::check_session_id(&id)?;
+        self.on_sessions(on_done, move |hub| async move { hub.close_session(id).await })
+    }
+
+    /// Runs `op` (prompt, steer, follow-up, abort, a queue change, mark read) on an open
+    /// session.
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn session_op(
+        &self,
+        id: String,
+        op: Op,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        crate::sessions::check_session_id(&id)?;
+        self.on_sessions(on_done, move |hub| async move {
+            if op == Op::MarkRead {
+                hub.mark_read(id).await?;
+                return Ok(serde_json::Value::Null);
+            }
+            hub.op(id, op).await
+        })
+    }
+
+    /// Items of a session's conversation: `start .. start + limit`, or the last `limit`.
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn transcript_window(
+        &self,
+        id: String,
+        start: Option<u64>,
+        limit: u64,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        crate::sessions::check_session_id(&id)?;
+        self.on_sessions(on_done, move |hub| async move {
+            hub.transcript_window(id, start, limit).await
+        })
+    }
+
+    /// Sends the workspace and session list snapshots again (a client subscribed anew).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NoDataDirectory`], [`Error::ShuttingDown`].
+    pub fn resend_snapshots(&self) -> Result<()> {
+        self.ensure_running()?;
+        self.services()?.sessions.resend_snapshots();
+        Ok(())
+    }
+
     fn trust_for(&self, path: &std::path::Path) -> Result<TrustService> {
         self.ensure_running()?;
         if !path.is_absolute() {
@@ -682,6 +881,10 @@ impl Shared {
         let coalescer = lock(&self.coalescer).take();
         self.terminals.close_all();
         self.handle.block_on(async {
+            // Agent Hosts first: they flush their sessions and may still send notifications.
+            if let Some(services) = &self.state_dirs {
+                services.sessions.shutdown().await;
+            }
             self.cancel.cancel();
             for source in sources {
                 // A source that panicked was already reported by its supervisor.
@@ -730,8 +933,15 @@ impl Drop for Shared {
     }
 }
 
-/// Creates the data directory layout, routes the logs to `logs/` and opens the database.
-fn open_state(dirs: DataDirs) -> Result<StateServices> {
+/// Creates the data directory layout, routes the logs to `logs/`, opens the database and starts
+/// the session layer.
+fn open_state(
+    dirs: DataDirs,
+    config: &CoreConfig,
+    handle: &Handle,
+    events: &EventSender,
+    cancel: &CancellationToken,
+) -> Result<StateServices> {
     let io = |what: &str, error: std::io::Error| Error::Feature {
         kind: piarc_protocol::ErrorKind::IoError,
         retryable: false,
@@ -749,8 +959,38 @@ fn open_state(dirs: DataDirs) -> Result<StateServices> {
     }
     let storage = Storage::open(dirs)?;
     let trust = TrustService::new(storage.clone());
+    let data = storage.dirs().data().to_owned();
+    let secrets = match &config.secret_store {
+        Some(setup) => SecretsService::new(
+            SecretsConfig::with_master_key(&data, setup.master_key.clone()),
+            Arc::clone(&setup.store),
+        ),
+        None => SecretsService::new(SecretsConfig::new(&data), crate::secrets::system_store()),
+    };
+    let snapshots = crate::sessions::Snapshots::spawn(handle, events.clone(), storage.clone());
+    let sessions = Hub::new(crate::sessions::Ctx {
+        handle: handle.clone(),
+        events: events.clone(),
+        storage: storage.clone(),
+        trust: trust.clone(),
+        secrets,
+        tool_io: ToolIo::new(ToolIoConfig::new(data)),
+        config: config.sessions.clone(),
+        snapshots,
+        cancel: cancel.child_token(),
+    });
     tracing::info!(target: "piarc_core", data = %storage.dirs().data().display(), "Core state opened");
-    Ok(StateServices { storage, trust })
+    Ok(StateServices {
+        storage,
+        trust,
+        sessions,
+    })
+}
+
+fn encode_error(error: serde_json::Error) -> Error {
+    Error::Internal {
+        reason: format!("cannot encode the result: {error}"),
+    }
 }
 
 /// Spawns `future` and a supervisor that reports a panic as an error event. The returned

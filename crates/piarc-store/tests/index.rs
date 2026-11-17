@@ -280,3 +280,32 @@ fn unknown_versions_are_unavailable_and_damaged_lines_are_skipped() {
     assert_eq!(after.removed, 1);
     assert!(store.session("s-future").expect("read").is_none());
 }
+
+/// Core's own columns (T14): written for an indexed session, kept by a rebuild, and refused
+/// (false) for a session the index does not have yet.
+#[test]
+fn core_state_is_written_per_session_and_survives_a_rebuild() {
+    let dir = TempDir::new("core state");
+    let sessions = dir.path().join("sessions");
+    let mut store = Store::open_in_memory(0).expect("store");
+    let mut writer = SessionWriter::create(&sessions, "/w", "s-state", Some(3));
+    let line = writer.user("hello");
+    writer.append_raw(&line);
+    store.sync_dir(&sessions).expect("sync");
+    assert!(!store
+        .set_session_state("s-unknown", "/w", "idle", true)
+        .expect("write"));
+    assert!(store
+        .set_session_state("s-state", "/w 工作区", "error", true)
+        .expect("write"));
+    store.rebuild_index(&sessions).expect("rebuild");
+    let record = store.session("s-state").expect("read").expect("indexed");
+    assert_eq!(
+        (
+            record.workspace_path.as_deref(),
+            record.status.as_deref(),
+            record.unread
+        ),
+        (Some("/w 工作区"), Some("error"), true)
+    );
+}
