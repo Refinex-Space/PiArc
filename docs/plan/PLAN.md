@@ -296,10 +296,10 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 T15（2026-11-17 开工；基线 `npm run verify` 13/13 通过；没有等待 Windows CI 的 blocked 验收项）
 
-- [ ] 1. 场景格式：Rust 类型、`tests/scenarios/schema.json`、加载与校验（A01）
-- [ ] 2. 运行器（piarc-testkit `l2`）：临时目录、驱动 Core + Agent Host + mock、事件/文件/请求断言、可读差异、审批应答（A04、A05、A06）
-- [ ] 3. 自定义 test harness：每个场景一个测试，平台跳过（A03）
-- [ ] 4. `piarc-devcli`：运行单个场景与目录、JSON 输出；打包产物检查断言无 devcli（A02）
+- [x] 1. 场景格式：Rust 类型、`tests/scenarios/schema.json`、加载与校验（A01）
+- [x] 2. 运行器（piarc-testkit `l2`）：临时目录、驱动 Core + Agent Host + mock、事件/文件/请求断言、可读差异、审批应答（A04、A05、A06）
+- [x] 3. 自定义 test harness：每个场景一个测试，平台跳过（A03）
+- [x] 4. `piarc-devcli`：运行单个场景与目录、JSON 输出；打包产物检查断言无 devcli（A02）
 - [ ] 5. 首批 ≥ 10 个场景（A03）
 - [ ] 6. `tests/capabilities.yaml` 完整清单（M1–M5）、覆盖检查、`--milestone`、`capabilities.md` 生成与漂移检查（A07、A08、A10）
 - [ ] 7. 并入 verify 与 CI（A09、A11）

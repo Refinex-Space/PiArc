@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { entitlementKeys, parseCodesignDisplay } from './check-app-layout.mjs';
+import { entitlementKeys, findDevTools, parseCodesignDisplay } from './check-app-layout.mjs';
 
 describe('parseCodesignDisplay', () => {
   it('reads an ad-hoc signature with the hardened runtime', () => {
@@ -45,5 +45,21 @@ describe('entitlementKeys', () => {
       '<plist><dict><key>com.b</key><true/><key>com.a</key><true />' +
       '<key>com.off</key><false/></dict></plist>';
     expect(entitlementKeys(xml)).toEqual(['com.a', 'com.b']);
+  });
+});
+
+describe('findDevTools', () => {
+  it('finds the development binaries on both platforms and nothing else', () => {
+    const paths = [
+      '/x/PiArc.app/Contents/MacOS/PiArc',
+      '/x/PiArc.app/Contents/Resources/piarc-devcli',
+      'C:\\PiArc\\resources\\piarc-mock-provider.exe',
+      '/native/piarc-devcli-notes.txt',
+      '\\native\\piarc-core.darwin-arm64.node',
+    ];
+    expect(findDevTools(paths)).toEqual([
+      '/x/PiArc.app/Contents/Resources/piarc-devcli',
+      'C:\\PiArc\\resources\\piarc-mock-provider.exe',
+    ]);
   });
 });

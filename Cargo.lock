@@ -1321,6 +1321,9 @@ dependencies = [
 [[package]]
 name = "piarc-devcli"
 version = "0.0.0"
+dependencies = [
+ "piarc-testkit",
+]
 
 [[package]]
 name = "piarc-diff"

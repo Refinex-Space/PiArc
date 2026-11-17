@@ -8,6 +8,8 @@
 //   --json  also writes every check with its evidence (codesign output) to <file>
 //
 // Checks:
+// - No development-only binary (piarc-devcli, piarc-mock-provider) is anywhere in the app or
+//   in app.asar (architecture section 7.1: they never ship).
 // - Resources/agent-host/ holds node, npm, npx, the bundle, pi-assets/package.json, the
 //   bundle's external packages, rg and fd, as real files outside app.asar; app.asar holds none
 //   of them; the Core module is in app.asar.unpacked/native/.
@@ -17,7 +19,7 @@
 //   ad-hoc signed.
 // Exit code 0 when every check passes.
 import { spawnSync } from 'node:child_process';
-import { existsSync, lstatSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -88,6 +90,30 @@ function signatureOf(file) {
   return { code, output, info: parseCodesignDisplay(output) };
 }
 
+/** Development-only binaries of the Rust workspace that must never ship. */
+export const DEV_TOOLS = ['piarc-devcli', 'piarc-mock-provider'];
+
+/**
+ * The paths among `paths` whose file name is a development-only binary (any extension).
+ * @param {readonly string[]} paths
+ * @returns {string[]}
+ */
+export function findDevTools(paths) {
+  return paths.filter((p) => {
+    const name = p.split(/[\\/]/).pop() ?? '';
+    return DEV_TOOLS.some((tool) => name === tool || name.startsWith(`${tool}.`));
+  });
+}
+
+/**
+ * Every file and directory below `dir`, without following symbolic links.
+ * @param {string} dir
+ * @returns {string[]}
+ */
+function walk(dir) {
+  return readdirSync(dir, { recursive: true, encoding: 'utf8' }).map((p) => path.join(dir, p));
+}
+
 /**
  * Runs every check against one packaged app.
  * @param {{ app: string, platform: string, arch: string }} options
@@ -130,6 +156,15 @@ export function checkAppLayout({ app, platform, arch }) {
       )
     : ['app.asar missing'];
   add('app.asar holds no Agent Host resources', inAsar.length === 0, inAsar.join(', '));
+  const devTools = findDevTools([
+    ...walk(app),
+    ...(existsSync(asar) ? listPackage(asar, { isPack: false }) : []),
+  ]);
+  add(
+    'no development tools (piarc-devcli, piarc-mock-provider)',
+    devTools.length === 0,
+    devTools.join(', '),
+  );
   const core = path.join(resources, 'app.asar.unpacked', 'native', coreBinaryName(platform, arch));
   add('Core module in app.asar.unpacked/native/', existsSync(core), core);
 
