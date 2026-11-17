@@ -11,10 +11,14 @@ import { randomUUID } from 'node:crypto';
 import type {
   BlobRef,
   DirEntry,
+  FileDiff,
   FileKind,
   FileStat,
   FsGrepResult,
+  FsPdfResult,
   GrepLine,
+  LineEndings,
+  ReadRange,
 } from '@piarc/protocol';
 
 import { AhpError } from '../protocol/errors.js';
@@ -28,9 +32,10 @@ export interface Origin {
   readonly toolCallId: string;
 }
 
-/** Largest UTF-16 string sent in one `fs/write`; well below the 8 MiB frame limit even when
- * every code unit needs a `\uXXXX` escape. */
-const WRITE_CHUNK = 256 * 1024;
+/** Largest UTF-16 string sent in one `fs/write` or `fs/spill`; well below the 8 MiB frame
+ * limit even when every code unit needs a `\uXXXX` escape. Longer texts go as one upload in
+ * pieces of this size, which Core writes once the last one arrives. */
+export const WRITE_CHUNK = 256 * 1024;
 
 /** Descriptions Node gives the error codes Core reports. */
 const DESCRIPTIONS: Record<string, string> = {
@@ -152,20 +157,44 @@ export class CoreIo {
     return this.#options.sessionId;
   }
 
-  async stat(path: string, origin: Origin, detectImage = false): Promise<FileStat> {
+  /**
+   * Inspects a path. With `read`, the `Read` tool reads the file now with that range: Core
+   * records it, and `unchanged` says whether it repeats the session's previous read.
+   */
+  async stat(
+    path: string,
+    origin: Origin,
+    detectImage = false,
+    read?: ReadRange,
+  ): Promise<FileStat> {
     return this.#request(
       'fs/stat',
-      { path, origin, ...(detectImage ? { detectImage } : {}) },
+      { path, origin, ...(detectImage ? { detectImage } : {}), ...(read ? { read } : {}) },
       parseStat,
     );
   }
 
-  /** Reads the file range by range, each piece whole UTF-8; stops early when `signal` aborts. */
-  async *readChunks(path: string, origin: Origin, signal?: AbortSignal): AsyncGenerator<Buffer> {
+  /**
+   * Reads the file range by range, each piece whole characters (decoded from the file's
+   * encoding by Core); stops early when `signal` aborts. With `requireFresh` Core first checks
+   * that the session read the file and it has not changed since (`Edit`).
+   */
+  async *readChunks(
+    path: string,
+    origin: Origin,
+    signal?: AbortSignal,
+    requireFresh = false,
+  ): AsyncGenerator<Buffer> {
     let offset = 0;
     for (;;) {
       signal?.throwIfAborted();
-      const chunk = await this.#request('fs/read', { path, origin, offset }, parseRead, signal);
+      const fresh = requireFresh && offset === 0 ? { requireFresh: true } : {};
+      const chunk = await this.#request(
+        'fs/read',
+        { path, origin, offset, ...fresh },
+        parseRead,
+        signal,
+      );
       if (chunk.text !== undefined && chunk.text.length > 0) {
         yield Buffer.from(chunk.text, 'utf8');
       }
@@ -177,9 +206,14 @@ export class CoreIo {
   }
 
   /** The whole file as text bytes (UTF-8, invalid sequences replaced). */
-  async readText(path: string, origin: Origin, signal?: AbortSignal): Promise<Buffer> {
+  async readText(
+    path: string,
+    origin: Origin,
+    signal?: AbortSignal,
+    requireFresh = false,
+  ): Promise<Buffer> {
     const parts: Buffer[] = [];
-    for await (const part of this.readChunks(path, origin, signal)) {
+    for await (const part of this.readChunks(path, origin, signal, requireFresh)) {
       parts.push(part);
     }
     return Buffer.concat(parts);
@@ -194,27 +228,72 @@ export class CoreIo {
     return this.#options.readBlob(result.blob);
   }
 
-  /** Writes `content` as the file's text, in pieces when it is large. */
-  async write(path: string, content: string, origin: Origin): Promise<void> {
+  /**
+   * Writes `content` as the file's new text and returns the change Core made. Core checks that
+   * an existing file was read by this session and is unchanged since, keeps its encoding and
+   * byte order mark, with `lineEndings: 'matchFile'` its line ending style, and replaces it
+   * atomically; a large text goes as one upload in pieces.
+   */
+  async write(
+    path: string,
+    content: string,
+    origin: Origin,
+    lineEndings: LineEndings = 'asWritten',
+  ): Promise<FileDiff | undefined> {
+    const params: Record<string, unknown> = { path, origin };
+    if (lineEndings !== 'asWritten') params.lineEndings = lineEndings;
+    const result = await this.#upload('fs/write', params, content, parseWrite);
+    return result.diff;
+  }
+
+  /**
+   * Keeps a tool result too long for the model's context in the session's temporary directory
+   * (`fs/spill`); returns the path to give the model.
+   */
+  async spill(name: string, content: string, origin?: Origin): Promise<string> {
+    const params: Record<string, unknown> = { name, ...(origin ? { origin } : {}) };
+    const result = await this.#upload('fs/spill', params, content, parseSpill);
+    return result.path;
+  }
+
+  /** The text of a PDF's pages (`pages`: `3`, `1-5`, `10-`; all pages of a small document). */
+  async pdf(path: string, pages: string | undefined, origin: Origin): Promise<FsPdfResult> {
+    return this.#request(
+      'fs/pdf',
+      { path, origin, ...(pages === undefined ? {} : { pages }) },
+      parsePdf,
+    );
+  }
+
+  /** Sends `content` with `params` in one request, or as an upload in pieces. */
+  async #upload<T>(
+    method: string,
+    params: Record<string, unknown>,
+    content: string,
+    parse: (result: unknown) => T | undefined,
+  ): Promise<T> {
+    if (content.length <= WRITE_CHUNK) {
+      return this.#request(method, { ...params, content }, parse);
+    }
+    const id = `upload-${randomUUID()}`;
     let start = 0;
-    do {
+    for (;;) {
       let end = Math.min(start + WRITE_CHUNK, content.length);
       // Never split a surrogate pair between two requests.
       if (end < content.length && isHighSurrogate(content.charCodeAt(end - 1))) {
         end -= 1;
       }
-      await this.#request(
-        'fs/write',
-        {
-          path,
-          origin,
-          content: content.slice(start, end),
-          ...(start > 0 ? { append: true } : {}),
-        },
-        parseObject,
+      const last = end >= content.length;
+      const result = await this.#request(
+        method,
+        { ...params, content: content.slice(start, end), upload: { id, last } },
+        parse,
       );
+      if (last) {
+        return result;
+      }
       start = end;
-    } while (start < content.length);
+    }
   }
 
   async mkdir(path: string, origin: Origin): Promise<void> {
@@ -298,6 +377,20 @@ export class CoreIo {
     signal?: AbortSignal,
     timeoutMs?: number | null,
   ): Promise<T> {
+    try {
+      return await this.#send(method, params, parse, signal, timeoutMs);
+    } catch (error) {
+      throw forModel(error, method);
+    }
+  }
+
+  async #send<T>(
+    method: string,
+    params: Record<string, unknown>,
+    parse: (result: unknown) => T | undefined,
+    signal?: AbortSignal,
+    timeoutMs?: number | null,
+  ): Promise<T> {
     return this.#options.bridge.requestTyped(
       method,
       // Paths, patterns, commands and contents come from the model.
@@ -309,6 +402,32 @@ export class CoreIo {
       },
     );
   }
+}
+
+/** Core errors whose message is written for the model (what happened, what to do next). */
+const FOR_MODEL = new Set<string>([
+  'fileNotRead',
+  'fileModified',
+  'permissionDenied',
+  'unencodableText',
+  'invalidParams',
+]);
+
+/** `error` with the bridge's `<method> failed: ` prefix removed when Core wrote the message for
+ * the model; other errors are returned as they are. */
+function forModel(error: unknown, method: string): unknown {
+  const prefix = `${method} failed: `;
+  if (
+    !(error instanceof AhpError) ||
+    !FOR_MODEL.has(error.kind) ||
+    !error.message.startsWith(prefix)
+  ) {
+    return error;
+  }
+  return new AhpError(error.kind, error.message.slice(prefix.length), {
+    retryable: error.retryable,
+    details: error.details,
+  });
 }
 
 function isHighSurrogate(code: number): boolean {
@@ -349,7 +468,79 @@ function parseStat(result: unknown): FileStat | undefined {
   };
   if (typeof result.imageMimeType === 'string') stat.imageMimeType = result.imageMimeType;
   if (isCount(result.modifiedMs)) stat.modifiedMs = result.modifiedMs;
+  if (typeof result.unchanged === 'boolean') stat.unchanged = result.unchanged;
   return stat;
+}
+
+function parseWrite(result: unknown): { diff: FileDiff | undefined } | undefined {
+  if (!isRecord(result) || typeof result.path !== 'string' || !isCount(result.bytesWritten)) {
+    return undefined;
+  }
+  if (result.staged === true || result.diff === undefined) {
+    return { diff: undefined };
+  }
+  const diff = parseDiff(result.diff);
+  return diff === undefined ? undefined : { diff };
+}
+
+/** A `FileDiff` from Core: checked to the depth the projection relies on. */
+export function parseDiff(value: unknown): FileDiff | undefined {
+  if (
+    !isRecord(value) ||
+    typeof value.path !== 'string' ||
+    !isCount(value.added) ||
+    !isCount(value.removed) ||
+    typeof value.unified !== 'string' ||
+    !Array.isArray(value.hunks) ||
+    !value.hunks.every(isHunk)
+  ) {
+    return undefined;
+  }
+  // Checked member by member above; the hunks' lines by `isHunk`.
+  return value as unknown as FileDiff;
+}
+
+function isHunk(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isCount(value.oldStart) &&
+    isCount(value.oldLines) &&
+    isCount(value.newStart) &&
+    isCount(value.newLines) &&
+    Array.isArray(value.lines) &&
+    value.lines.every(
+      (line) =>
+        isRecord(line) &&
+        typeof line.text === 'string' &&
+        (line.kind === 'context' || line.kind === 'added' || line.kind === 'removed'),
+    )
+  );
+}
+
+function parseSpill(result: unknown): { path: string } | undefined {
+  if (!isRecord(result) || typeof result.path !== 'string') {
+    return undefined;
+  }
+  return { path: result.path };
+}
+
+function parsePdf(result: unknown): FsPdfResult | undefined {
+  if (
+    !isRecord(result) ||
+    typeof result.path !== 'string' ||
+    !isCount(result.pageCount) ||
+    !Array.isArray(result.pages)
+  ) {
+    return undefined;
+  }
+  const pages: FsPdfResult['pages'] = [];
+  for (const page of result.pages) {
+    if (!isRecord(page) || !isCount(page.number) || typeof page.text !== 'string') {
+      return undefined;
+    }
+    pages.push({ number: page.number, text: page.text });
+  }
+  return { path: result.path, pageCount: result.pageCount, pages };
 }
 
 interface ReadPiece {

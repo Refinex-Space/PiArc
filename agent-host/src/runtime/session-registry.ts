@@ -42,6 +42,11 @@ import type {
 import { repairInterruptedTurn } from '../harness/interruption.js';
 import { takeOverProjectTrust, type TrustTakeover } from '../harness/project-trust.js';
 import { CONCURRENCY_SAFE_TOOLS, ToolBatches } from '../harness/tool-batches.js';
+import {
+  createToolResultBudget,
+  TOOL_RESULT_LIMITS,
+  type ToolResultLimits,
+} from '../harness/tool-results.js';
 import { AhpError, describeError } from '../protocol/errors.js';
 import { ToolNameMap, toolOptions, type CoreIo, type ToolProfile } from '../tools/index.js';
 import { historyWindow, MAX_HISTORY_LIMIT, projectHistory } from './history.js';
@@ -89,6 +94,8 @@ export interface RegistryOptions {
   readonly onPiEvent?: (sessionId: string, event: AgentSessionEvent | RecordedControl) => void;
   /** A session was closed: its replay buffer can go. */
   readonly onClosed?: (sessionId: string) => void;
+  /** How much of a tool result reaches the model; `TOOL_RESULT_LIMITS` when absent. */
+  readonly toolResultLimits?: ToolResultLimits;
 }
 
 /** A registry step in a recording (`onPiEvent`). */
@@ -379,13 +386,23 @@ export class SessionRegistry {
     const toCanonical = (tool: string): string => names?.toCanonical(tool) ?? tool;
     const batches = new ToolBatches((tool) => CONCURRENCY_SAFE_TOOLS.has(toCanonical(tool)));
     const factory: CreateAgentSessionRuntimeFactory = async (target) => {
+      const io =
+        tools.kind === 'core' ? tools.ioFor(target.sessionManager.getSessionId()) : undefined;
       const sessionTools =
-        tools.kind === 'core'
-          ? scheduled(
-              toolOptions(tools.ioFor(target.sessionManager.getSessionId()), tools.profile),
-              batches,
-            )
+        tools.kind === 'core' && io !== undefined
+          ? scheduled(toolOptions(io, tools.profile), batches)
           : { tools: PI_NATIVE_TOOLS };
+      // Long tool results go to the session's temporary directory (Harness Kit).
+      const budget =
+        io === undefined
+          ? []
+          : [
+              createToolResultBudget({
+                io,
+                isExempt: (tool) => toCanonical(tool) === 'Read',
+                limits: this.#options.toolResultLimits ?? TOOL_RESULT_LIMITS,
+              }),
+            ];
       // Project-level Pi resources (`.pi/settings.json`, `.pi/mcp.json`, extensions) load
       // only for directories Core trusts: nothing project-level is read until the takeover
       // hook has Core's answer.
@@ -406,7 +423,7 @@ export class SessionRegistry {
         resourceLoaderOptions: {
           // PiArc assembles project context itself (T22).
           noContextFiles: true,
-          extensionFactories: [createMcpExtension()],
+          extensionFactories: [createMcpExtension(), ...budget],
           // Extension tools (MCP, project extensions) run under the same batches.
           extensionsOverride: (result) => batches.wrapExtensions(result),
         },

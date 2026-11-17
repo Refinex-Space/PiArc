@@ -4,6 +4,10 @@
 //! compares what the model got back from every call (the mock's request log) and the workspaces
 //! afterwards. Run with `--nocapture` for the table in `docs/spikes/S04-operations-delegation.md`.
 //!
+//! T16 changed two things on purpose, and the script follows: `Read` numbers its lines (the
+//! comparison drops the numbers, see [`comparable`]), and `Edit` needs a `Read` of the file first
+//! (the script reads each file before editing it; Pi's native tools ignore the extra reads).
+//!
 //! Pi's native grep and find run ripgrep and fd: they come from `.tools/bin`
 //! (`node scripts/dev/install-tools.mjs`) or PATH.
 
@@ -27,7 +31,7 @@ const NATIVE_NAMES: [(&str, &str); 6] = [
 ];
 
 /// One call per step: (what it shows, canonical tool, input as YAML flow mapping).
-const STEPS: [(&str, &str, &str); 17] = [
+const STEPS: [(&str, &str, &str); 20] = [
     ("Read a whole file", "Read", r#"{ path: "README.md" }"#),
     (
         "Read with offset and limit",
@@ -46,15 +50,22 @@ const STEPS: [(&str, &str, &str); 17] = [
         "Write",
         r##"{ path: "README.md", content: "# Parity, rewritten\n" }"##,
     ),
+    ("Read before editing", "Read", r#"{ path: "src/main.rs" }"#),
     (
         "Edit with a unique match",
         "Edit",
         r#"{ path: "src/main.rs", edits: [{ oldText: "// TODO: real work", newText: "// done" }] }"#,
     ),
+    ("Read a CRLF file", "Read", r#"{ path: "crlf.txt" }"#),
     (
         "Edit a CRLF file",
         "Edit",
         r#"{ path: "crlf.txt", edits: [{ oldText: "second", newText: "2nd" }] }"#,
+    ),
+    (
+        "Read before a failing edit",
+        "Read",
+        r#"{ path: "docs/guide.md" }"#,
     ),
     (
         "Edit with text not in the file",
@@ -101,7 +112,7 @@ const STEPS: [(&str, &str, &str); 17] = [
 
 /// Differences that are intended, by step index: (what differs, why).
 const EXPECTED_DIFFERENCES: [(usize, &str); 1] = [(
-    15,
+    18,
     "node_modules/dep/readme.md is listed only by Pi's native find: given FindOperations.glob, \
      Pi itself passes exclude patterns for **/node_modules/** and **/.git/** (find.ts), which fd \
      does not apply",
@@ -216,14 +227,29 @@ fn snapshot(ws: &Path) -> BTreeMap<String, Vec<u8>> {
     files
 }
 
-/// Glob results are compared as sets: fd's output order is not defined.
+/// Glob results are compared as sets: fd's output order is not defined. Read results are
+/// compared without the line numbers PiArc's `Read` adds (`cat -n` prefixes: up to six columns
+/// of digits and a tab); Pi's native read has none, so its text passes unchanged.
 fn comparable(tool: &str, text: &str) -> String {
-    if tool == "Glob" {
-        let mut lines: Vec<&str> = text.lines().collect();
-        lines.sort_unstable();
-        lines.join("\n")
-    } else {
-        text.to_owned()
+    match tool {
+        "Glob" => {
+            let mut lines: Vec<&str> = text.lines().collect();
+            lines.sort_unstable();
+            lines.join("\n")
+        }
+        "Read" => text
+            .split_inclusive('\n')
+            .map(|line| {
+                let digits = line.trim_start_matches(' ');
+                let number_end = digits.find(|c: char| !c.is_ascii_digit()).unwrap_or(0);
+                if number_end > 0 && digits[number_end..].starts_with('\t') {
+                    &digits[number_end + 1..]
+                } else {
+                    line
+                }
+            })
+            .collect(),
+        _ => text.to_owned(),
     }
 }
 

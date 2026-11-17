@@ -1,9 +1,10 @@
 // Builders shared by the live projection (projector.ts) and the history projection
 // (history.ts): one canonical tool name maps to one item type, and item fields are bounded the
 // same way in both (architecture section 5.3).
-import type { CompactionReason, Item, ItemStatus, TurnUsage } from '@piarc/protocol';
+import type { CompactionReason, FileDiff, Item, ItemStatus, TurnUsage } from '@piarc/protocol';
 
 import { wellFormedJson } from '../protocol/well-formed.js';
+import { parseDiff } from '../tools/core-io.js';
 
 /** The most UTF-16 code units of tool output an item carries; longer output keeps its end. */
 export const MAX_ITEM_OUTPUT = 64 * 1024;
@@ -52,13 +53,17 @@ function splitMcpName(tool: string): { server: string; serverTool: string } | un
   return { server: rest.slice(0, separator), serverTool: rest.slice(separator + 2) };
 }
 
-/** A tool call as an item of the type its canonical name maps to. */
+/**
+ * A tool call as an item of the type its canonical name maps to; `diff` is the change Core made
+ * (on `fileChange` items only).
+ */
 export function toolItem(
   itemId: string,
   status: ItemStatus,
   tool: string,
   args: Record<string, unknown>,
   output: string | undefined,
+  diff?: FileDiff,
 ): Item {
   const common = {
     itemId,
@@ -79,6 +84,7 @@ export function toolItem(
         type: 'fileChange',
         ...common,
         path: text('path') || text('file_path') || text('notebook_path'),
+        ...(diff === undefined ? {} : { diff }),
       };
     case 'mcpToolCall': {
       const names = splitMcpName(tool) ?? { server: '', serverTool: tool };
@@ -188,6 +194,12 @@ export function contentText(content: unknown): string | undefined {
 /** The text of a tool result (`{ content }`). */
 export function resultText(result: unknown): string | undefined {
   return isObject(result) ? contentText(result.content) : undefined;
+}
+
+/** The change a file tool reported in its result's details (`details.fileDiff`, set by Write
+ * and Edit from Core's `fs/write` result). */
+export function resultDiff(details: unknown): FileDiff | undefined {
+  return isObject(details) ? parseDiff(details.fileDiff) : undefined;
 }
 
 /** Pi's per-response usage, summed into a turn's usage. */

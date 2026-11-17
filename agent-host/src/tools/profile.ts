@@ -46,31 +46,41 @@ export const DEFAULT_PROFILE: ToolProfile = {
   Read: {
     name: 'Read',
     description:
-      'Return the contents of one file. Text comes back as at most 2000 lines or 50 KB, ' +
-      'whichever ends first; page through longer files with `offset` (first line to show, ' +
-      'counting from 1) and `limit` (number of lines), following the note at the end of the ' +
-      'output. JPEG, PNG, GIF, WebP and BMP files come back as images. `path` is absolute or ' +
+      'Return the contents of one file. Text comes back with each line prefixed by its number ' +
+      'and a tab (the prefix is not part of the file), at most 2000 lines or 50 KB, whichever ' +
+      'ends first; page through longer files with `offset` (first line to show, counting ' +
+      'from 1) and `limit` (number of lines), following the note at the end of the output. ' +
+      'JPEG, PNG, GIF, WebP and BMP files come back as images; PDF files as the text of their ' +
+      'pages (`pages`, such as "1-5", is required for PDFs over 10 pages, at most 20 per ' +
+      'call); Jupyter notebooks as their cells and outputs. Reading the same range of an ' +
+      'unchanged file again returns a short note instead of the content. `path` is absolute or ' +
       'relative to the working directory.',
-    snippet: 'Read: show a text file or an image',
-    guidelines: ['Look at files with Read rather than printing them through Bash.'],
+    snippet: 'Read: show a text file, image, PDF or notebook',
+    guidelines: [
+      'Look at files with Read rather than printing them through Bash.',
+      'Read a file before changing it with Edit or Write.',
+    ],
   },
   Write: {
     name: 'Write',
     description:
       'Store `content` as the complete text of the file at `path`: a new file is created ' +
-      '(with any missing parent directories), an existing one is replaced. To change part of ' +
-      'an existing file, Edit is safer.',
+      '(with any missing parent directories), an existing one is replaced. An existing file ' +
+      'must have been read with Read first and not changed since; it keeps its encoding and ' +
+      'line ending style. To change part of an existing file, Edit is safer.',
     snippet: 'Write: create a file or replace all of its text',
     guidelines: [],
   },
   Edit: {
     name: 'Edit',
     description:
-      'Change an existing file by replacing exact passages. Each entry of `edits` gives an ' +
-      '`oldText`, copied character for character from the file (indentation and line breaks ' +
-      'included) and found exactly once in it, and the `newText` that takes its place. All ' +
-      'entries refer to the file as it is before the call and must not overlap; put several ' +
-      'changes to one file into one call.',
+      'Change an existing file by replacing exact passages. The file must have been read with ' +
+      'Read first and not changed since. Each entry of `edits` gives an `oldText`, copied ' +
+      'character for character from the file (indentation and line breaks included, the line ' +
+      'number prefixes Read shows left out) and found exactly once in it, and the `newText` ' +
+      'that takes its place; with `replaceAll: true` every occurrence of each `oldText` is ' +
+      'replaced instead. All entries refer to the file as it is before the call and must not ' +
+      'overlap; put several changes to one file into one call.',
     snippet: 'Edit: replace exact passages of an existing file',
     guidelines: [
       'Keep each oldText short but unique; merge changes that sit close together into one entry.',

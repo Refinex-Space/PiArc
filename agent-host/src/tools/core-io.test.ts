@@ -71,14 +71,46 @@ describe('CoreIo', () => {
     expect(sent[0]?.params).toMatchObject({ sessionId: 'sess-1', path: '/w/a', origin });
   });
 
-  it('splits large writes without cutting a surrogate pair', async () => {
-    const { io: core, sent } = io(() => ({ result: { path: '/w/a', bytesWritten: 1 } }));
+  it('sends a large write as one upload without cutting a surrogate pair', async () => {
+    const { io: core, sent } = io((request) => ({
+      result:
+        (request.params.upload as { last?: boolean } | undefined)?.last === false
+          ? { path: '/w/a', bytesWritten: 0, staged: true }
+          : { path: '/w/a', bytesWritten: 1 },
+    }));
     const content = `${'x'.repeat(256 * 1024 - 1)}🙂tail`;
-    await core.write('/w/a', content, origin);
+    await core.write('/w/a', content, origin, 'matchFile');
     const chunks = sent.map((s) => s.params.content as string);
     expect(chunks.join('')).toBe(content);
     expect(chunks[0]?.length).toBe(256 * 1024 - 1);
-    expect(sent.map((s) => s.params.append)).toEqual([undefined, true]);
+    const uploads = sent.map((s) => s.params.upload as { id: string; last: boolean });
+    expect(uploads.map((u) => u.last)).toEqual([false, true]);
+    expect(new Set(uploads.map((u) => u.id)).size).toBe(1);
+    expect(sent.every((s) => s.params.append === undefined)).toBe(true);
+    expect(sent.every((s) => s.params.lineEndings === 'matchFile')).toBe(true);
+  });
+
+  it('sends a small write in one request and returns the diff', async () => {
+    const diff = {
+      path: 'a',
+      added: 1,
+      removed: 0,
+      unified: '+x',
+      hunks: [
+        {
+          oldStart: 0,
+          oldLines: 0,
+          newStart: 1,
+          newLines: 1,
+          lines: [{ kind: 'added', text: 'x' }],
+        },
+      ],
+    };
+    const { io: core, sent } = io(() => ({ result: { path: '/w/a', bytesWritten: 1, diff } }));
+    await expect(core.write('/w/a', 'x', origin)).resolves.toEqual(diff);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.params).not.toHaveProperty('upload');
+    expect(sent[0]?.params).not.toHaveProperty('lineEndings');
   });
 
   it('sends paths and commands from the model as well-formed strings', async () => {

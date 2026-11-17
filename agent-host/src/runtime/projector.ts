@@ -41,6 +41,7 @@ import {
   isObject,
   NO_USAGE,
   reasoning,
+  resultDiff,
   resultText,
   toolItem,
   userMessage,
@@ -396,7 +397,14 @@ export class Projector {
     this.#itemEvent(
       turn,
       'item/completed',
-      toolItem(toolCallId, status, open.tool, open.arguments, resultText(result)),
+      toolItem(
+        toolCallId,
+        status,
+        open.tool,
+        open.arguments,
+        resultText(result),
+        isObject(result) ? resultDiff(result.details) : undefined,
+      ),
     );
   }
 
