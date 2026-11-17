@@ -186,14 +186,15 @@ test('the bundled Agent Host holds a mock conversation with tools and an npx MCP
 
     // One completed conversation through every tool.
     expect(report.turn.status).toBe('completed');
+    // Every tool call is an item of the type its canonical name maps to (architecture 5.3).
     const tools = report.items
-      .filter((item) => item.type === 'dynamicToolCall')
-      .map((item) => `${String(item.tool)}:${String(item.status)}`);
+      .filter((item) => item.tool !== undefined)
+      .map((item) => `${String(item.type)}:${String(item.tool)}:${String(item.status)}`);
     expect(tools).toEqual([
-      'Bash:completed',
-      'Grep:completed',
-      'Glob:completed',
-      'mcp__probe__probe:completed',
+      'commandExecution:Bash:completed',
+      'dynamicToolCall:Grep:completed',
+      'dynamicToolCall:Glob:completed',
+      'mcpToolCall:mcp__probe__probe:completed',
     ]);
     const bash = report.items.find((item) => item.tool === 'Bash');
     expect(String(bash?.output)).toContain('bash-ok');

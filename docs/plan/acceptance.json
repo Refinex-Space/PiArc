@@ -1805,8 +1805,8 @@
       "id": "T15-A09",
       "task": "T15",
       "description": "Windows CI 上 L2 步骤运行并通过。验证：CI 日志。",
-      "status": "blocked",
-      "evidence": "需要 Windows CI：L2 步骤已并入 npm run verify（第 14 步），CI 的 verify 作业在 windows-latest 上运行并上传 l2-report-windows-latest；本任务的提交尚未推送，没有 Windows 运行结果。推送后由下一个任务的开工检查按 CI 日志关闭。"
+      "status": "passing",
+      "evidence": "由 T16 开工检查按 Windows CI 关闭：运行 https://github.com/Refinex-Space/PiArc/actions/runs/44031571343（提交 f55022f）的 verify (windows-latest) 中「✔ [14/14] L2 scenarios + capabilities: passed」，并上传了 l2-report-windows-latest。同一运行的 cargo test 失败来自 T14 的 lifecycle 测试（I70，T16 已修），与 L2 步骤无关。"
     },
     {
       "id": "T15-A10",

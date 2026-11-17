@@ -124,8 +124,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | R1 | [M0 评审与收口](tasks/R1-m0-review.md) | 1 | W0 | macOS | high | 中 | S1–S10 汇总 | 已完成 | 6eef36d |
 | T13 | [存储、数据目录、配置与项目信任](tasks/T13-storage-config-and-trust.md) | 2 | R1（结论为进入 M1） | macOS | high | 大 | 无 | 已完成 | 12ad055 |
 | T14 | [会话编排与事件投影](tasks/T14-session-orchestration-and-projection.md) | 2 | T13 | macOS | xhigh | 大 | 无 | 已完成 | eedccea |
-| T15 | [无头驱动、L2 场景运行器与能力清单](tasks/T15-devcli-l2-scenarios-and-capabilities.md) | 2 | T14 | macOS | high | 中 | 无 | 部分完成 | 5546027 |
-| T16 | [文件工具与编辑不变量](tasks/T16-file-tools-invariants.md) | 2 | T15 | macOS | xhigh | 大 | 无 | 未开始 | — |
+| T15 | [无头驱动、L2 场景运行器与能力清单](tasks/T15-devcli-l2-scenarios-and-capabilities.md) | 2 | T14 | macOS | high | 中 | 无 | 已完成 | 5546027 |
+| T16 | [文件工具与编辑不变量](tasks/T16-file-tools-invariants.md) | 2 | T15 | macOS | xhigh | 大 | 无 | 进行中 | — |
 | T17 | [Bash / PowerShell 执行与进程管理](tasks/T17-bash-powershell-execution.md) | 2 | T16 | macOS | high | 大 | 无 | 未开始 | — |
 | T18 | [客户端外壳、会话列表、设置窗口与信任对话框](tasks/T18-client-shell-and-session-list.md) | 2 | T17；D3 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T19 | [Transcript 与 composer 正式版](tasks/T19-transcript-and-composer.md) | 2 | T18 | macOS | xhigh | 大 | 无 | 未开始 | — |
@@ -294,6 +294,21 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
+### T16 文件工具与编辑不变量（进行中）
+
+- [x] 开工检查：基线 `npm run verify` 14/14；T15-A09 按 Windows CI 运行 44031571343 关闭；I70（T14 遗留的两处 CI 失败）已修测试
+- [ ] 1 文件状态表与路径规范化（piarc-fs，按会话隔离）
+- [ ] 2 编辑不变量：先读后改、外部修改、唯一匹配与 `replaceAll`、保真写入（换行、编码、BOM、原子替换、分段暂存）、路径锁
+- [ ] 3 结构化 diff（piarc-diff）随 `fileChange` 下发
+- [ ] 4 输出截断与落盘（单结果 50K、单条消息 200K）
+- [ ] 5 重复读取存根
+- [ ] 6 路径边界与受保护路径（需要询问，T20 前按拒绝）
+- [ ] 7 Read：行号分页、图片（视觉/非视觉）、PDF 页码范围、ipynb；I53 blob 上限
+- [ ] 8 Glob、Grep：`.gitignore`、二进制跳过、结果上限与说明
+- [ ] 9 L2 场景 `tools-*.yaml` 与能力 ID；CRLF/BOM/GBK 夹具
+- [ ] 10 文档：piarc-fs、piarc-diff 的 CLAUDE.md，`coding-standards.md` 复用表，架构与 ADR
+- [ ] 11 收尾：verify、L4、acceptance、PLAN
+
 ## 登记事项
 
 任务执行中发现、但不属于本任务范围的问题，在这里登记：编号（I01 起）、发现于哪个任务、内容、建议由哪个任务处理。处理完成后在"建议处理"一列注明"已落地"与位置。
@@ -369,6 +384,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I67 | T14 | 回合以失败（非中断）结束时不补中断标记：pi-ai 丢弃出错的 assistant 消息，下一条输入会紧跟上一条 user 消息（Anthropic API 合并，严格 mock 的 `role_order` 拒绝）。中断的回合已由 ADR-0026 补齐 | T27 与压缩、中断标记一起决定失败回合的对话形态 |
 | I68 | T14 | 实时条目与历史条目的 id 不同：文本与 reasoning 实时为 `<投影器生成的 messageId>#<序号>`，历史为 `<entry id>#<序号>`；用户消息实时为 `<turnId>:user:<n>`，历史为 entry id；工具调用两边相同（`agent-host/CLAUDE.md`）。客户端不能按 id 把重新加载的窗口与流式条目合并 | T19 的 transcript 重载以 `transcript_window` 整段替换，或由 T19 决定在 `turn/completed` 后补发 entry id 的映射 |
 | I69 | T15 | L2 运行器还没有审批请求的观测点：T20 之前 Core 不发审批请求，场景声明的 `approvals` 一律判失败（`piarc_testkit::l2::runner` 的 `assert_all`）。审批落地后场景要能按顺序应答审批，并在请求没被应答或应答没被用上时失败 | T20 经 Core 的公开接口（事件或回调）把审批请求交给运行器，改 `runner.rs` 与 `testing.md` 第 12.3 节，把审批场景写成 L2 |
+| I70 | T16 开工检查 | T15 推送后的 CI 运行 44031571343（T14 的运行 44021743399 已出现）：① Windows `cargo test` 中 `tests/sessions/lifecycle.rs` 用 `canonicalize` 的结果（带 `\\?\` 前缀）与 Core 报告的工作区路径比较，永远找不到工作区；② 两个平台 L4 的 `agent-host.e2e.ts` 仍按 T14 之前的条目类型筛选（Bash 与 MCP 调用已改为 `commandExecution`、`mcpToolCall`）。都是测试缺陷，产品行为无误 | 已落地（T16）：比较前去掉 `\\?\` 前缀；L4 按条目的 `tool` 字段筛选并断言各自的条目类型；推送后看 Windows CI 与两平台 L4 |
 
 ## 技术债
 

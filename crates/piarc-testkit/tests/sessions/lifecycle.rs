@@ -12,11 +12,19 @@ use crate::support::{Env, answer, mock_model, prompt_text, reply, shutdown, user
 use crate::{open_session, prompt};
 
 fn host_of(snapshot: &Value, ws: &std::path::Path) -> Option<String> {
+    // Core reports the canonical path without the verbatim `\\?\` prefix `canonicalize` adds on
+    // Windows.
     let ws = std::fs::canonicalize(ws).expect("workspace");
+    let ws = ws.to_string_lossy();
+    let ws = if cfg!(windows) {
+        ws.strip_prefix(r"\\?\").unwrap_or(&ws)
+    } else {
+        &ws
+    };
     snapshot["workspaces"]
         .as_array()?
         .iter()
-        .find(|w| w["path"].as_str() == Some(ws.to_string_lossy().as_ref()))
+        .find(|w| w["path"].as_str() == Some(ws))
         .and_then(|w| w["host"].as_str())
         .map(str::to_owned)
 }
