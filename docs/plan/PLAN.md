@@ -125,7 +125,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T13 | [存储、数据目录、配置与项目信任](tasks/T13-storage-config-and-trust.md) | 2 | R1（结论为进入 M1） | macOS | high | 大 | 无 | 已完成 | 12ad055 |
 | T14 | [会话编排与事件投影](tasks/T14-session-orchestration-and-projection.md) | 2 | T13 | macOS | xhigh | 大 | 无 | 已完成 | eedccea |
 | T15 | [无头驱动、L2 场景运行器与能力清单](tasks/T15-devcli-l2-scenarios-and-capabilities.md) | 2 | T14 | macOS | high | 中 | 无 | 已完成 | 5546027 |
-| T16 | [文件工具与编辑不变量](tasks/T16-file-tools-invariants.md) | 2 | T15 | macOS | xhigh | 大 | 无 | 进行中 | — |
+| T16 | [文件工具与编辑不变量](tasks/T16-file-tools-invariants.md) | 2 | T15 | macOS | xhigh | 大 | 无 | 部分完成 | ea75a25 |
 | T17 | [Bash / PowerShell 执行与进程管理](tasks/T17-bash-powershell-execution.md) | 2 | T16 | macOS | high | 大 | 无 | 未开始 | — |
 | T18 | [客户端外壳、会话列表、设置窗口与信任对话框](tasks/T18-client-shell-and-session-list.md) | 2 | T17；D3 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T19 | [Transcript 与 composer 正式版](tasks/T19-transcript-and-composer.md) | 2 | T18 | macOS | xhigh | 大 | 无 | 未开始 | — |
@@ -293,21 +293,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-### T16 文件工具与编辑不变量（进行中）
-
-- [x] 开工检查：基线 `npm run verify` 14/14；T15-A09 按 Windows CI 运行 44031571343 关闭；I70（T14 遗留的两处 CI 失败）已修测试
-- [x] 1 文件状态表与路径规范化（piarc-fs，按会话隔离）
-- [x] 2 编辑不变量：先读后改、外部修改、唯一匹配与 `replaceAll`、保真写入（换行、编码、BOM、原子替换、分段暂存）、路径锁
-- [x] 3 结构化 diff（piarc-diff）随 `fileChange` 下发
-- [x] 4 输出截断与落盘（单结果 50K、单条消息 200K）
-- [x] 5 重复读取存根
-- [x] 6 路径边界与受保护路径（需要询问，T20 前按拒绝）
-- [x] 7 Read：行号分页、图片（视觉/非视觉）、PDF 页码范围、ipynb；I53 blob 上限
-- [x] 8 Glob、Grep：`.gitignore`、二进制跳过、结果上限与说明
-- [x] 9 L2 场景 `tools-*.yaml` 与能力 ID；CRLF/BOM/GBK 夹具
-- [x] 10 文档：piarc-fs、piarc-diff 的 CLAUDE.md，`coding-standards.md` 复用表，架构与 ADR
-- [ ] 11 收尾：verify、L4、acceptance、PLAN
 
 ## 登记事项
 
@@ -566,6 +551,14 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 决策：自定义 test harness（不引入数据驱动测试库）；每个场景独立的 Core 与 Agent Host（不复用进程）；每个 mock 端点一个 Pi provider、按请求头选场景；`client_only` 列出由 L4 验证的需求；新增 `yaml` 2.9.0 开发依赖；架构 v2.20
 - 验证：`npm run verify` 14/14；L2 14 passed；l2_runner 5 passed；发布构建布局检查 22/22
 - 遗留：I69（T20 接入审批观测点）；T15-A09 待 Windows CI；未推送
+
+### 2026-11-17 T16 部分完成（完成提交 ea75a25）
+
+- 结果：11 项验收中 9 项通过；T16-A03（Windows CI 上的编码与换行测试输出）与 T16-A11（Windows CI 上的 verify 与 L2）待推送后的 Windows CI，标为 blocked。开工检查按 CI 运行 44031571343 关闭 T15-A09（T15 改为已完成），同一运行暴露的两处 T14 测试缺陷记为 I70 并修复（L4 打包形态已在 macOS 上验证）
+- 交付：`piarc-protocol`（`FileDiff`、`fs/stat` 的 `read` 与 `unchanged`、`fs/read` 的 `requireFresh` 与 `encoding`、`fs/write` 的 `lineEndings`/`upload`/`diff`、`fs/spill`、`fs/pdf`、`fileChange.diff`、四个错误类别）；`piarc-fs`（`access` 受保护路径与需要询问、`Scope::check`/`key`/大小写探测、`FileStates` 与 `PathLocks`、`encoding`（encoding_rs + chardetng）、`atomic`、`write`、`spill`、`pdf`（lopdf 0.46）、blob 上限与流式复制、编码缓存）；`piarc-diff`（similar，hunk 与降级）；`piarc-core::tool_io::files`（状态表、上传、diff、`adjudicate`）；Agent Host（Read 行号、存根、PDF、notebook、非视觉模型去掉图片；Edit 的 `requireFresh` 与 `replaceAll`；Write 的 `matchFile`；上传分段；`harness/tool-results.ts`；投影带 diff）；L2 格式的 `fixtures`、`vision`、`expect.fixtures` 与 12 个 `tools-*` 场景、10 个能力 ID
+- 决策：ADR-0027（补充）；架构 v2.21；PDF 改用 lopdf 0.46（pdf-extract 引入已停止维护的 ttf-parser）；agent-host 增加与 Pi 同版本的 `typebox` 直接依赖；Read 不参与结果预算；越界由 `outsideWorkspace` 改为需要询问（T20 前 `permissionDenied`）
+- 验证：`npm run verify` 14/14（Vitest 823 passed、L2 26 passed、MISSING 0）；Windows 交叉 clippy 通过；对照测试 20 步一致；L4 `agent-host.e2e.ts`（packaged）通过
+- 遗留：I71–I74；T16 的改动未在 Windows 上运行；未推送
 
 ## 计划变更记录
 
