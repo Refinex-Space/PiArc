@@ -123,7 +123,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 已完成 | f278039 |
 | R1 | [M0 评审与收口](tasks/R1-m0-review.md) | 1 | W0 | macOS | high | 中 | S1–S10 汇总 | 已完成 | 6eef36d |
 | T13 | [存储、数据目录、配置与项目信任](tasks/T13-storage-config-and-trust.md) | 2 | R1（结论为进入 M1） | macOS | high | 大 | 无 | 已完成 | 12ad055 |
-| T14 | [会话编排与事件投影](tasks/T14-session-orchestration-and-projection.md) | 2 | T13 | macOS | xhigh | 大 | 无 | 进行中 | — |
+| T14 | [会话编排与事件投影](tasks/T14-session-orchestration-and-projection.md) | 2 | T13 | macOS | xhigh | 大 | 无 | 已完成 | eedccea |
 | T15 | [无头驱动、L2 场景运行器与能力清单](tasks/T15-devcli-l2-scenarios-and-capabilities.md) | 2 | T14 | macOS | high | 中 | 无 | 未开始 | — |
 | T16 | [文件工具与编辑不变量](tasks/T16-file-tools-invariants.md) | 2 | T15 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T17 | [Bash / PowerShell 执行与进程管理](tasks/T17-bash-powershell-execution.md) | 2 | T16 | macOS | high | 大 | 无 | 未开始 | — |
@@ -293,20 +293,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-T14 会话编排与事件投影（2026-11-17 开工；开工检查：基线 verify 13/13；Windows CI 运行 43879135441 中 T13-A02 的 data-dirs 用例通过，T13 改为已完成；同一运行的 Core 关闭后数据库仍被占用登记为 I66，本任务修复）
-
-- [x] 1. I66：有序关闭释放数据库与日志文件（先写失败测试）
-- [x] 2. 协议：会话方法（steer、followUp、fork、queue/edit|delete|reorder、getEntries、history）、条目类型、通知（item/updated、reasoning、contextCompaction、turn/retrying、session/queueChanged、harness/entry）、契约样本
-- [x] 3. Agent Host 投影：第 5.3 节投影表完整实现、历史投影、golden 测试与覆盖矩阵（A01、A02）
-- [x] 4. Agent Host 会话：排队表（编辑、删除、重排）、steer、followUp、fork、history、回放缓冲（getEntries）、并发 resume 去重、出站单帧上限
-- [x] 5. 回合不变量：工具批次并发（上限 10）、中断补齐与中断后 transcript 形态（I18）、重试核对；agent-host/CLAUDE.md 的"Pi 已满足 / Harness Kit 补齐"清单
-- [x] 6. piarc-host：跟踪 resume/fork 的会话、I58（恢复可中断、Kill 带 epoch、握手前后不分派、入站并发上限）
-- [x] 7. Core：WorkspaceActor、SessionActor、取消传播、预热与空闲回收（可注入时钟）、seq 缺口补齐、实体快照 revision、持久化与重启恢复、transcript_window、I62 接线、ToolIo 按工作区绑定、I55 的 panic 结算
-- [x] 8. NAPI：工作区与会话方法、排队操作、transcript_window、快照；`.d.ts` 快照（A12）
-- [x] 9. 场景测试（Core 无头驱动 + mock provider，数据化夹具）：A03–A11；A09 release 测量
-- [x] 10. 文档：架构 5.3、7.4、7.6 与第 11 章、ADR（补充）、CLAUDE.md（agent-host、piarc-core、piarc-host、根）
-- [ ] 11. 收尾：verify（A13）、验收记录、看板与会话日志
 
 ## 登记事项
 
@@ -544,6 +530,13 @@ T14 会话编排与事件投影（2026-11-17 开工；开工检查：基线 veri
 - 决策：ADR-0025（补充）；`deny.toml` 为 notify 加 CC0-1.0 单 crate 例外；rusqlite 0.41.1（`bundled`）；Windows 交叉 clippy 需 `LIBSQLITE3_SYS_USE_PKG_CONFIG=1 SQLITE3_LIB_DIR=…`；设置校验用自写的结构化 `Shape`，不引入 JSON Schema 引擎；`piarc-config` 写文件自带原子替换（不能依赖 `piarc-secrets::atomic`）
 - 验证：`npm run verify` 13/13；L4 138 passed、1 skipped；Agent Host 端到端 13 passed；Windows 交叉 clippy 通过
 - 遗留：I62–I65；未推送
+
+### 2026-11-17 T14 已完成（完成提交 eedccea）
+- 结果：13 项验收全部通过；开工检查中 Windows CI 确认 T13-A02 通过，T13 改为已完成，同一运行发现的 I66 已修复
+- 交付：`piarc-protocol`（steer、followUp、fork、排队表三种操作、getEntries、history；完整条目模型与 `item/updated`、`item/reasoning/delta`、`turn/retrying`、`session/queueChanged`、`harness/entry`；`queueItemNotFound`）；Agent Host（第 5.3 节完整投影与历史投影、golden 录制与快照、排队表、回放缓冲、出站单帧上限、并发 resume 去重、工具批次调度、中断补齐、重试覆盖）；`piarc-host`（resume/fork 跟踪、结果未知的创建对账、I58）；`piarc-core::sessions`（Hub、WorkspaceActor、SessionActor、快照任务、按工作区绑定的入站处理、预热与空闲回收、seq 缺口补齐、重启恢复、`transcript_window`、I62 接线）、`clock::ManualClock`、有序关闭关闭数据库（I66）、终端回调 panic 结算（I55 一项）；`piarc-store` 的会话状态列；NAPI 的工作区、会话、排队与 transcript 导出及 `.d.ts` 快照；`piarc-testkit` 的会话层端到端测试与预热测量
+- 决策：ADR-0026（补充：回合、排队与中断后的对话形态）；架构 v2.19；I20 接受 Pi 的 `existsSync(cwd)`，Core 在创建前校验 cwd
+- 验证：`npm run verify` 13/13；会话端到端 10 passed；golden 11 passed；预热 release 10 次最大 279.5 ms（打开并恢复 309.5 ms）
+- 遗留：I67、I68；T14 的改动未在 Windows 上运行（I66 的修复待 Windows CI）；未推送
 
 ## 计划变更记录
 
