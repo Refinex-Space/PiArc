@@ -1567,8 +1567,8 @@
       "id": "T13-A02",
       "task": "T13",
       "description": "数据目录与缓存目录在 macOS 与 Windows 上解析为第 9.1 节的位置，主进程在 `ready` 前设置 `userData`。验证：单测（Windows 部分由 CI 输出证明）。",
-      "status": "blocked",
-      "evidence": "等待 Windows CI：macOS 上 `npx vitest run apps/desktop/src/main/platform` 6 passed（darwin 与 win32 两个平台的路径纯函数、--user-data-dir 覆盖、applyDataDirs 在 ready 后拒绝执行并且在 ready 前设置 userData 与 sessionData）；`main.ts` 在单实例锁与 ready 之前调用 applyDataDirs；L4 `npm run test:e2e -w @piarc/desktop` 138 passed（含 app-instance 的 userData 断言）。Windows 部分按任务要求由推送后 Windows CI 的 Vitest 输出证明"
+      "status": "passing",
+      "evidence": "Windows CI 运行 https://github.com/Refinex-Space/PiArc/actions/runs/43879135441（提交 fd7ed0e）的 verify (windows-latest) 中 apps/desktop/src/main/platform/data-dirs.test.ts 6 tests 通过（win32 分支的 %LOCALAPPDATA%\\PiArc 与 Cache\\Chromium、--user-data-dir 覆盖、ready 前设置 userData 与 sessionData）；desktop L4 (windows-latest) 通过。macOS 上 npx vitest run apps/desktop/src/main/platform 6 passed；main.ts 在单实例锁与 ready 之前调用 applyDataDirs。同一运行的 Vitest 另有 core.integration.test.ts 的 T13 用例在清理时 EPERM（Core 关闭后仍占用数据库文件），登记为 I66 由 T14 修复"
     },
     {
       "id": "T13-A03",

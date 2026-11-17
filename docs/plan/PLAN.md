@@ -122,8 +122,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T12 | [打包、首次运行与发布清单](tasks/T12-packaging-first-run-and-release-manifest.md) | 1 | T03、T04、T06、T08、T11；D2 | macOS | high | 大 | S6 | 已完成 | 815c32d |
 | W0 | [Windows：M0 验证项实机确认](tasks/W0-windows-m0-verification.md) | 1 | T08–T12 | Windows | high | 中 | S1、S2、S5–S8（Windows 部分） | 已完成 | f278039 |
 | R1 | [M0 评审与收口](tasks/R1-m0-review.md) | 1 | W0 | macOS | high | 中 | S1–S10 汇总 | 已完成 | 6eef36d |
-| T13 | [存储、数据目录、配置与项目信任](tasks/T13-storage-config-and-trust.md) | 2 | R1（结论为进入 M1） | macOS | high | 大 | 无 | 部分完成 | 12ad055 |
-| T14 | [会话编排与事件投影](tasks/T14-session-orchestration-and-projection.md) | 2 | T13 | macOS | xhigh | 大 | 无 | 未开始 | — |
+| T13 | [存储、数据目录、配置与项目信任](tasks/T13-storage-config-and-trust.md) | 2 | R1（结论为进入 M1） | macOS | high | 大 | 无 | 已完成 | 12ad055 |
+| T14 | [会话编排与事件投影](tasks/T14-session-orchestration-and-projection.md) | 2 | T13 | macOS | xhigh | 大 | 无 | 进行中 | — |
 | T15 | [无头驱动、L2 场景运行器与能力清单](tasks/T15-devcli-l2-scenarios-and-capabilities.md) | 2 | T14 | macOS | high | 中 | 无 | 未开始 | — |
 | T16 | [文件工具与编辑不变量](tasks/T16-file-tools-invariants.md) | 2 | T15 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T17 | [Bash / PowerShell 执行与进程管理](tasks/T17-bash-powershell-execution.md) | 2 | T16 | macOS | high | 大 | 无 | 未开始 | — |
@@ -294,7 +294,19 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（当前没有进行中的任务）
+T14 会话编排与事件投影（2026-11-17 开工；开工检查：基线 verify 13/13；Windows CI 运行 43879135441 中 T13-A02 的 data-dirs 用例通过，T13 改为已完成；同一运行的 Core 关闭后数据库仍被占用登记为 I66，本任务修复）
+
+- [ ] 1. I66：有序关闭释放数据库与日志文件（先写失败测试）
+- [ ] 2. 协议：会话方法（steer、followUp、fork、queue/edit|delete|reorder、getEntries、history）、条目类型、通知（item/updated、reasoning、contextCompaction、turn/retrying、session/queueChanged、harness/entry）、契约样本
+- [ ] 3. Agent Host 投影：第 5.3 节投影表完整实现、历史投影、golden 测试与覆盖矩阵（A01、A02）
+- [ ] 4. Agent Host 会话：排队表（编辑、删除、重排）、steer、followUp、fork、history、回放缓冲（getEntries）、并发 resume 去重、出站单帧上限
+- [ ] 5. 回合不变量：工具批次并发（上限 10）、中断补齐与中断后 transcript 形态（I18）、重试核对；agent-host/CLAUDE.md 的"Pi 已满足 / Harness Kit 补齐"清单
+- [ ] 6. piarc-host：跟踪 resume/fork 的会话、I58（恢复可中断、Kill 带 epoch、握手前后不分派、入站并发上限）
+- [ ] 7. Core：WorkspaceActor、SessionActor、取消传播、预热与空闲回收（可注入时钟）、seq 缺口补齐、实体快照 revision、持久化与重启恢复、transcript_window、I62 接线、ToolIo 按工作区绑定、I55 的 panic 结算
+- [ ] 8. NAPI：工作区与会话方法、排队操作、transcript_window、快照；`.d.ts` 快照（A12）
+- [ ] 9. 场景测试（Core 无头驱动 + mock provider，数据化夹具）：A03–A11；A09 release 测量
+- [ ] 10. 文档：架构 5.3、7.4、7.6 与第 11 章、ADR（补充）、CLAUDE.md（agent-host、piarc-core、piarc-host、根）
+- [ ] 11. 收尾：verify（A13）、验收记录、看板与会话日志
 
 ## 登记事项
 
@@ -366,7 +378,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I62 | T13 | 生产路径上还没有调用方：`agent_host::restart_on_trust_change`（信任变化重启工作区的 Agent Host）、`CoreRuntime::open_settings`（工作区设置与 `core/settings` 事件）、运行中会话文件的增量索引同步（`Storage::sync_sessions`）都只由测试驱动，启动时只做一次索引同步 | T14 的工作区 actor 打开工作区时启动这三项，会话文件变化（或回合结束）时触发增量同步 |
 | I63 | T13 | 信任后新增的可执行项（`TrustView.newItems`）在再次确认之前已经生效：`trust/get` 只看决定，不看快照；例如 `git pull` 带来的新 hooks 会在下一次重启后加载 | T18 的对话框接入时决定闸门：新增项未确认前 `trust/get` 返回不信任，或各消费者只启用快照内的条目；若改变 `trust/get` 语义，按协议同主版本内新增可选成员 |
 | I64 | T13 | 日志按 UTC 日期分文件（`piarc-telemetry`，没有引入时区库）：东八区用户的"某天的日志"跨两个文件 | T45（诊断包）评估是否改为本地日期，改动只在 `rotation::Day::of` |
-| I65 | T13 | 新增的 Windows 首次运行项未在 Windows 上执行过：真实 git 夹具（`piarc-git`、`piarc-core --test state`）、notify 的 `ReadDirectoryChangesW` 监听、bundled SQLite 的 MSVC 编译、`data-dirs.ts` 的 win32 分支 | 推送后看 Windows CI；失败时由下一个任务开工检查按协议处理（T13-A02 为 blocked） |
+| I65 | T13 | 新增的 Windows 首次运行项未在 Windows 上执行过：真实 git 夹具（`piarc-git`、`piarc-core --test state`）、notify 的 `ReadDirectoryChangesW` 监听、bundled SQLite 的 MSVC 编译、`data-dirs.ts` 的 win32 分支 | 推送后看 Windows CI；失败时由下一个任务开工检查按协议处理（T13-A02 为 blocked）；已确认（T14 开工检查，运行 43879135441）：Windows 上 `cargo test`（真实 git 夹具、notify、bundled SQLite 的 MSVC 编译）与 `data-dirs.test.ts` 通过，唯一失败见 I66 |
+| I66 | T14 开工检查 | Windows CI（运行 43879135441）中 `core.integration.test.ts` 的 T13 用例清理临时目录时 EPERM：`CoreRuntime.shutdown()` 之后 Core 仍持有数据目录里的文件（数据库连接随 NAPI 对象存活到 GC），Windows 不能删除打开的文件；macOS 上不报错。同一运行的 `cargo test`、`data-dirs.test.ts` 与 Windows L4 均通过 | T14：有序关闭最后一步关闭数据库，补测试；推送后看 Windows CI |
 
 ## 技术债
 
