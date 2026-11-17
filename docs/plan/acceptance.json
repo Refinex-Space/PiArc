@@ -1749,78 +1749,78 @@
       "id": "T15-A01",
       "task": "T15",
       "description": "场景格式有 JSON Schema 与 `testing.md` 中的字段说明；字段缺失或类型错误的场景文件被拒绝，错误指出文件与字段。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "tests/scenarios/schema.json（JSON Schema 2020-12）+ docs/engineering/testing.md 第 12.1–12.4 节逐字段说明。cargo test -p piarc-testkit --test l2_runner：invalid_scenario_files_are_rejected_with_the_file_and_the_field 通过，缺字段（`/: \"expect\" is a required property`）、类型错误（`/expect/request_counts/main: \"one\" is not of type \"integer\"`）、未知字段、枚举值、未知会话、id 与文件名不符、越界路径各自被拒，错误含文件名与字段；every_committed_scenario_loads 通过。"
     },
     {
       "id": "T15-A02",
       "task": "T15",
       "description": "`piarc-devcli` 不经 UI 运行单个场景与整个目录，并输出 JSON 结果；打包产物检查确认发布产物中没有 devcli。验证：命令输出与检查脚本输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo run -q -p piarc-devcli -- run tests/scenarios/turn-steer.yaml --json tmp/evidence/T15/devcli-single.json → 1 passed；run tests/scenarios --json tmp/evidence/T15/devcli-all.json → 13 passed（当时 13 个场景），JSON 报告含 id、file、capabilities、platforms、status、failures。scripts/ci/check-app-layout.mjs 新增 `no development tools (piarc-devcli, piarc-mock-provider)`：重新打的发布构建（npm run package:desktop -- --flavor release --arch arm64，target/debug 下存在 piarc-devcli）`node scripts/ci/check-app-layout.mjs --flavor release --arch arm64` → All 22 checks passed（tmp/evidence/T15/check-app-layout.log）；findDevTools 单元测试覆盖两平台文件名。"
     },
     {
       "id": "T15-A03",
       "task": "T15",
       "description": "首批不少于 10 个场景全部通过，覆盖交付物 5 列出的行为；每个场景作为独立测试出现在测试报告中。验证：测试输出（列出场景名）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify 第 14 步（tmp/evidence/T15/verify.log）：14 个场景各为一个测试并全部通过：chat-basic、provider-openai-wire、sessions-two-cwds-isolated（两会话不同 cwd）、sessions-persist-across-restart、tools-canonical-via-core（六个规范名工具经 Core，core_io 断言 fs/read、fs/glob、fs/grep、exec/run、fs/write）、tools-model-sees-canonical-names、trust-untrusted-skips-project-extension、trust-trusted-loads-project-extension、turn-steer、turn-follow-up、turn-queue-edit-reorder、turn-interrupt-pairs-tool-calls、turn-tool-batches、turn-retry-recoverable-errors；`L2 result: ok. 14 passed; 0 failed; 0 skipped (platform); 14 scenarios`。"
     },
     {
       "id": "T15-A04",
       "task": "T15",
       "description": "分别故意改坏一个场景的期望事件、期望文件、期望请求，运行器失败并给出可读差异；恢复后通过。验证：三次运行的关键输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "改 tests/scenarios/tools-canonical-via-core.yaml 后运行 cargo test -p piarc-testkit --test scenarios -- tools-canonical-via-core --exact（tmp/evidence/T15/A04-*.txt）：事件 → `[events] expect.events[2] has no match in session `main`: turn/completed turn=t {\"status\":\"failed\"}`，并给出 `closest event … params.status: expected \"failed\", got \"completed\"` 与附近事件；文件 → `[files] files.src/app 应用.ts: content differs at line 1: expected \"export const answer = 43;\", got \"export const answer = 42;\"` 与两边全文；请求 → `[requests] requests[main#1].tool_results[3] (toolu_bash).contains: \"from zsh\" is not in \"from bash 中文\\n\"`；恢复后 ok。l2_runner 的 broken_expectations_fail_with_readable_differences 自动化同样三种情况。"
     },
     {
       "id": "T15-A05",
       "task": "T15",
       "description": "声明了审批应答但没有收到审批请求的场景判为失败。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test l2_runner：declared_approvals_without_approval_requests_fail 通过，chat-basic 加一条 approvals 应答后失败：`approvals: 1 answer(s) declared, but Core issued 0 approval requests`。"
     },
     {
       "id": "T15-A06",
       "task": "T15",
       "description": "同一场景连续运行两次结果一致；场景在含空格与中文的临时路径中运行，结束后临时目录被清理。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test l2_runner：a_scenario_gives_the_same_result_twice_and_removes_its_root 通过：turn-queue-edit-reorder 连续两次运行均无失败、结果相同；临时根如 `…/T/piarc l2 turn-queue-edit-reorder 中文 230-1`（含空格与中文），两次 cleaned=true 且目录不存在。运行器不含 sleep，等待只等事件。"
     },
     {
       "id": "T15-A07",
       "task": "T15",
       "description": "`active` 能力的全部覆盖场景被删掉时输出 MISSING 并失败；`planned` 能力没有场景时不失败；`blocked` 能力缺少 `reason` 或 `link` 时失败；场景引用不存在的能力 ID 时失败。验证：四次运行的关键输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "tmp/evidence/T15/A07-*.txt：① 移走 turn-steer.yaml 后 devcli 生成报告，check-capabilities --results → `✖ MISSING CAP-TURN-STEER-001: active but no L2 scenario covers it`，exit=1；② 现状 CAP-TOOL-EDIT-002（planned）无场景 → `capability checks passed`，exit=0；③ 把它改为 blocked 而不写 reason/link → `✖ CAP-TOOL-EDIT-002: blocked needs `reason` and `link``，exit=1；④ turn-steer 引用 CAP-TURN-STEER-999 → `✖ tests/scenarios/turn-steer.yaml: capability CAP-TURN-STEER-999 is not in tests/capabilities.yaml`，exit=1。scripts/lib/capabilities.test.mjs 12 个用例覆盖同样规则。"
     },
     {
       "id": "T15-A08",
       "task": "T15",
       "description": "`docs/product/capabilities.md` 由命令生成且与测试结果一致；手工改动它后 verify 失败。验证：生成命令与 verify 的关键输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "node scripts/plan/check-capabilities.mjs --results target/l2/results.json --doc write 生成 docs/product/capabilities.md（与已提交文件无差异）；手改其中 CAP-TURN-STEER-001 的状态后 verify 第 14 步 node scripts/ci/run-l2.mjs → `✖ docs/product/capabilities.md differs from the list and the L2 results; regenerate it …`，exit=1；恢复后 `docs/product/capabilities.md is up to date`，exit=0（tmp/evidence/T15/A08-*.txt）。"
     },
     {
       "id": "T15-A09",
       "task": "T15",
       "description": "Windows CI 上 L2 步骤运行并通过。验证：CI 日志。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "需要 Windows CI：L2 步骤已并入 npm run verify（第 14 步），CI 的 verify 作业在 windows-latest 上运行并上传 l2-report-windows-latest；本任务的提交尚未推送，没有 Windows 运行结果。推送后由下一个任务的开工检查按 CI 日志关闭。"
     },
     {
       "id": "T15-A10",
       "task": "T15",
       "description": "`tests/capabilities.yaml` 已登记 M1–M5 的完整能力清单，每项都能对应到需求编号或架构章节；`--milestone M1` 列出的未完成能力与 M1 剩余任务一致。验证：清单统计输出与抽查记录。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "node scripts/plan/check-capabilities.mjs：111 项（active 21、planned 90），8 个 client_only；脚本检查需求第 4 章每个 FR 编号都被引用或列为 client_only、ARCH 引用都是架构标题、task 都在看板上。--milestone M1 列出 22 项 planned，分属 T16–T22，即看板上 M1 剩余的全部任务（tmp/evidence/T15/A10-milestone-M1.txt）；8 项抽查记录见 tmp/evidence/T15/A10-spot-check.md。"
     },
     {
       "id": "T15-A11",
       "task": "T15",
       "description": "`npm run verify` 通过，输出中包含 L2 场景数与能力覆盖结果。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify → All 14 steps passed（tmp/evidence/T15/verify.log）；第 14 步输出 `L2 result: ok. 14 passed; 0 failed; 0 skipped (platform); 14 scenarios`、`capabilities: 111 (active 21, planned 90, blocked 0)`、`L2 coverage: 14 scenarios (0 skipped on macos), MISSING 0`、`docs/product/capabilities.md is up to date`。"
     },
     {
       "id": "T16-A01",
