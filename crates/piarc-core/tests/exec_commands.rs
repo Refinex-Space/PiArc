@@ -93,7 +93,8 @@ fn head(result: &Value) -> String {
 /// How Core reports `path`: without the `\\?\` prefix canonical Windows paths carry.
 fn shown(path: &std::path::Path) -> String {
     let text = path.display().to_string();
-    text.strip_prefix(r"\\?\").map_or(text.clone(), str::to_owned)
+    text.strip_prefix(r"\\?\")
+        .map_or(text.clone(), str::to_owned)
 }
 
 fn base_env() -> Vec<(OsString, OsString)> {
