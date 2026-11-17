@@ -828,7 +828,20 @@
       ]
     },
     "ExecShellsParams": {
-      "description": "Parameters of `exec/shells`: none. Which shells exist is a fact about the machine, asked\nwhile a session's tools are set up, before Core has registered the session; any members\nsent (the Agent Host adds its `sessionId` to every request) are ignored.",
+      "description": "Parameters of `exec/shells`. Which shells exist is a fact about the machine, asked while a\nsession's tools are set up, before Core has registered the session: Core answers whatever\nthe session.",
+      "properties": {
+        "sessionId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The session whose tools are being set up; need not be registered with Core yet."
+        }
+      },
       "type": "object"
     },
     "ExecShellsRequest": {

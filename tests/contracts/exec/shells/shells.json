@@ -2,5 +2,7 @@
   "jsonrpc": "2.0",
   "id": 30,
   "method": "exec/shells",
-  "params": {}
+  "params": {
+    "sessionId": "sess-7f3a"
+  }
 }

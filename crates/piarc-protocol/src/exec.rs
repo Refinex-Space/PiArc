@@ -240,12 +240,16 @@ pub struct ExecKillResult {
     pub killed: bool,
 }
 
-/// Parameters of `exec/shells`: none. Which shells exist is a fact about the machine, asked
-/// while a session's tools are set up, before Core has registered the session; any members
-/// sent (the Agent Host adds its `sessionId` to every request) are ignored.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+/// Parameters of `exec/shells`. Which shells exist is a fact about the machine, asked while a
+/// session's tools are set up, before Core has registered the session: Core answers whatever
+/// the session.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct ExecShellsParams {}
+pub struct ExecShellsParams {
+    /// The session whose tools are being set up; need not be registered with Core yet.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<SessionId>,
+}
 
 /// Result of `exec/shells`: which shells the session's command tools can use. When bash is
 /// missing (Windows without Git Bash) the session gets no `Bash` tool, and Core has told the
