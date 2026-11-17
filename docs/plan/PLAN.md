@@ -297,12 +297,12 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ### T16 文件工具与编辑不变量（进行中）
 
 - [x] 开工检查：基线 `npm run verify` 14/14；T15-A09 按 Windows CI 运行 44031571343 关闭；I70（T14 遗留的两处 CI 失败）已修测试
-- [ ] 1 文件状态表与路径规范化（piarc-fs，按会话隔离）
+- [x] 1 文件状态表与路径规范化（piarc-fs，按会话隔离）
 - [ ] 2 编辑不变量：先读后改、外部修改、唯一匹配与 `replaceAll`、保真写入（换行、编码、BOM、原子替换、分段暂存）、路径锁
-- [ ] 3 结构化 diff（piarc-diff）随 `fileChange` 下发
+- [ ] 3 结构化 diff（piarc-diff）随 `fileChange` 下发（Core 侧完成：`fs/write` 结果带 diff）
 - [ ] 4 输出截断与落盘（单结果 50K、单条消息 200K）
 - [ ] 5 重复读取存根
-- [ ] 6 路径边界与受保护路径（需要询问，T20 前按拒绝）
+- [x] 6 路径边界与受保护路径（需要询问，T20 前按拒绝）
 - [ ] 7 Read：行号分页、图片（视觉/非视觉）、PDF 页码范围、ipynb；I53 blob 上限
 - [ ] 8 Glob、Grep：`.gitignore`、二进制跳过、结果上限与说明
 - [ ] 9 L2 场景 `tools-*.yaml` 与能力 ID；CRLF/BOM/GBK 夹具

@@ -11,6 +11,7 @@ publish.workspace = true
 getrandom.workspace = true
 minisign-verify.workspace = true
 piarc-config.workspace = true
+piarc-diff.workspace = true
 piarc-exec.workspace = true
 piarc-fs.workspace = true
 piarc-git.workspace = true
@@ -31,6 +32,7 @@ tokio-util.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
+encoding_rs.workspace = true
 rusqlite.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 

@@ -48,7 +48,7 @@ pub fn glob(
     exclude: &[String],
     limit: Option<u64>,
 ) -> Result<FsGlobResult> {
-    let root = scope.resolve(requested)?;
+    let root = scope.check(requested, crate::access::Access::Read)?;
     let metadata = std::fs::metadata(&root).map_err(|e| Error::io(&root, e))?;
     if !metadata.is_dir() {
         return Err(Error::coded(&root, "ENOTDIR", "not a directory"));

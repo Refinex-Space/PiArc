@@ -1,12 +1,14 @@
 //! Answers the Agent Host's delegated tool I/O: `fs/*` with `piarc-fs`, `exec/*` with
 //! `piarc-exec` (ADR-0004, architecture section 6.1.3).
 //!
-//! [`ToolIo`] knows each open session's [`Scope`] (workspace root and working directory);
-//! the session layer registers it with [`ToolIo::open_session`] when the session opens (T14;
-//! the end-to-end tests do it today). Requests for an unknown session fail with
-//! `sessionNotFound`.
+//! [`ToolIo`] knows each open session's [`Scope`] (workspace root, working directory, added
+//! directories and the session's temporary directory, read-only); the session layer registers
+//! it with [`ToolIo::open_session`] when the session opens (T14). Requests for an unknown
+//! session fail with `sessionNotFound`.
 //!
-//! File operations run on tokio's blocking pool. `exec/run` streams the command's output as
+//! File operations run on tokio's blocking pool. Each session has its file state table (what it
+//! read and wrote, T16), kept while the session is open; the path locks are shared by all
+//! sessions; `files.rs` holds the `fs/*` side of the invariants (architecture section 6.1.2). `exec/run` streams the command's output as
 //! `exec/output` notifications on the requesting connection ([`Peer`]), all written before the
 //! response; it is cancelled by `exec/kill` with the same `requestId`, and terminated when the
 //! connection ends.
@@ -28,11 +30,13 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
+mod files;
+
 use piarc_exec::{
     CommandRunner, CommandSpec, Launcher, OutputChunk, ProcessTreeSpawner, Stream,
     TokioProcessSpawner,
 };
-use piarc_fs::{GrepQuery, Scope};
+use piarc_fs::{FileStates, GrepQuery, Scope};
 use piarc_host::{InboundHandler, Peer};
 use piarc_ports::BoxFuture;
 use piarc_protocol::exec::{
@@ -40,8 +44,8 @@ use piarc_protocol::exec::{
     OutputStream,
 };
 use piarc_protocol::fs::{
-    FsGlobParams, FsGrepParams, FsListParams, FsMkdirParams, FsReadParams, FsStatParams,
-    FsWriteParams, ReadMode,
+    FsGlobParams, FsGrepParams, FsListParams, FsMkdirParams, FsPdfParams, FsReadParams,
+    FsSpillParams, FsStatParams, FsWriteParams,
 };
 use piarc_protocol::text::incomplete_utf8_suffix;
 use piarc_protocol::{ErrorKind, ErrorObject};
@@ -107,10 +111,16 @@ impl ToolIoConfig {
     }
 }
 
-/// A session's scope and its running commands.
+/// A session's scope, file state and running commands.
 struct SessionIo {
     scope: Scope,
     blob_dir: PathBuf,
+    /// `<data dir>/sessions/<id>/tmp/`: long tool results (`fs/spill`), readable by the tools.
+    tmp_dir: PathBuf,
+    /// What the session read and wrote (architecture section 6.1.2).
+    files: Mutex<FileStates>,
+    /// Texts arriving in pieces.
+    uploads: Mutex<files::Uploads>,
     running: Mutex<HashMap<String, CancellationToken>>,
     /// Present when the session's commands run sandboxed; owns the session's proxy.
     sandbox: Option<SessionSandbox>,
@@ -132,6 +142,8 @@ pub struct SandboxSettings {
 pub struct ToolIo {
     sessions: Arc<Mutex<HashMap<String, Arc<SessionIo>>>>,
     config: Arc<ToolIoConfig>,
+    /// One file is written by one request at a time, whichever session sends it.
+    locks: files::Locks,
     runner: CommandRunner,
     /// Runs sandboxed commands; kills reach the whole process tree.
     sandboxed_runner: CommandRunner,
@@ -152,6 +164,7 @@ impl ToolIo {
         Self {
             sessions: Arc::default(),
             config: Arc::new(config),
+            locks: Arc::default(),
             runner: CommandRunner::new(Arc::new(TokioProcessSpawner)),
             sandboxed_runner: CommandRunner::new(Arc::new(ProcessTreeSpawner)),
         }
@@ -163,13 +176,15 @@ impl ToolIo {
         method.starts_with("fs/") || method.starts_with("exec/")
     }
 
-    /// Registers `session_id` with its workspace root and working directory; a later
-    /// registration of the same id replaces the scope.
+    /// Registers `session_id` with its workspace root and working directory, and creates its
+    /// temporary directory; a later registration of the same id replaces the scope and starts
+    /// a new file state table.
     ///
     /// # Errors
     ///
-    /// The id cannot name a directory (empty, `.`, `..` or containing a separator), or
-    /// [`Scope::new`] fails (missing directories, `cwd` outside `root`).
+    /// The id cannot name a directory (empty, `.`, `..` or containing a separator),
+    /// [`Scope::new`] fails (missing directories, `cwd` outside `root`), or the temporary
+    /// directory cannot be created.
     pub fn open_session(
         &self,
         session_id: &str,
@@ -177,9 +192,19 @@ impl ToolIo {
         cwd: &Path,
     ) -> Result<(), ErrorObject> {
         check_session_id(session_id)?;
-        let scope = Scope::new(root, cwd).map_err(|e| e.to_error_object())?;
-        self.register(session_id, scope, None);
+        let tmp = self.create_tmp(session_id)?;
+        let scope = Scope::new(root, cwd)
+            .and_then(|scope| scope.with_read_only_dir(&tmp))
+            .map_err(|e| e.to_error_object())?;
+        self.register(session_id, scope, tmp, None);
         Ok(())
+    }
+
+    fn create_tmp(&self, session_id: &str) -> Result<PathBuf, ErrorObject> {
+        let tmp = self.session_dir(session_id).join("tmp");
+        std::fs::create_dir_all(&tmp)
+            .map_err(|e| piarc_fs::Error::io(&tmp, e).to_error_object())?;
+        Ok(tmp)
     }
 
     /// Like [`ToolIo::open_session`], with every command of the session sandboxed: writes
@@ -200,19 +225,22 @@ impl ToolIo {
         settings: SandboxSettings,
     ) -> Result<(), ErrorObject> {
         check_session_id(session_id)?;
-        let scope = Scope::new(root, cwd).map_err(|e| e.to_error_object())?;
         let allowlist = Allowlist::new(&settings.allowed_domains)
             .map_err(|e| ErrorObject::new(ErrorKind::InvalidParams, e.to_string(), false))?;
-        let tmp = self.session_dir(session_id).join("tmp");
-        std::fs::create_dir_all(&tmp)
-            .map_err(|e| piarc_fs::Error::io(&tmp, e).to_error_object())?;
-        let mut policy = SandboxPolicy::new(scope.root().to_path_buf(), tmp);
+        let tmp = self.create_tmp(session_id)?;
+        let mut scope = Scope::new(root, cwd)
+            .and_then(|scope| scope.with_read_only_dir(&tmp))
+            .map_err(|e| e.to_error_object())?;
+        for dir in &settings.extra_dirs {
+            scope = scope.with_added_dir(dir).map_err(|e| e.to_error_object())?;
+        }
+        let mut policy = SandboxPolicy::new(scope.root().to_path_buf(), tmp.clone());
         policy.extra_dirs = settings.extra_dirs;
         policy.deny_read = settings.deny_read;
         let sandbox = SessionSandbox::start(&policy, allowlist, Arc::new(SystemNetwork))
             .await
             .map_err(|e| sandbox_error(&e))?;
-        self.register(session_id, scope, Some(sandbox));
+        self.register(session_id, scope, tmp, Some(sandbox));
         Ok(())
     }
 
@@ -220,13 +248,22 @@ impl ToolIo {
         self.config.data_dir.join("sessions").join(session_id)
     }
 
-    fn register(&self, session_id: &str, scope: Scope, sandbox: Option<SessionSandbox>) {
+    fn register(
+        &self,
+        session_id: &str,
+        scope: Scope,
+        tmp_dir: PathBuf,
+        sandbox: Option<SessionSandbox>,
+    ) {
         let blob_dir = self.session_dir(session_id).join("blobs");
         lock(&self.sessions).insert(
             session_id.to_owned(),
             Arc::new(SessionIo {
                 scope,
                 blob_dir,
+                tmp_dir,
+                files: Mutex::default(),
+                uploads: Mutex::default(),
                 running: Mutex::default(),
                 sandbox,
             }),
@@ -288,27 +325,27 @@ impl ToolIo {
             "fs/stat" => {
                 let p: FsStatParams = parse(method, params)?;
                 let s = self.session(&p.session_id.0)?;
-                blocking(move || piarc_fs::stat(&s.scope, &p.path, p.detect_image.unwrap_or(false)))
-                    .await
+                answer(move || files::stat(&s, &p)).await
             }
             "fs/read" => {
                 let p: FsReadParams = parse(method, params)?;
                 let s = self.session(&p.session_id.0)?;
-                blocking(move || match p.mode.unwrap_or(ReadMode::Text) {
-                    ReadMode::Text => {
-                        piarc_fs::read_text(&s.scope, &p.path, p.offset.unwrap_or(0), p.length)
-                    }
-                    ReadMode::Blob => piarc_fs::read_blob(&s.scope, &p.path, &s.blob_dir),
-                })
-                .await
+                answer(move || files::read(&s, &p)).await
             }
             "fs/write" => {
                 let p: FsWriteParams = parse(method, params)?;
+                let (s, locks) = (self.session(&p.session_id.0)?, Arc::clone(&self.locks));
+                answer(move || files::write(&s, &locks, p)).await
+            }
+            "fs/spill" => {
+                let p: FsSpillParams = parse(method, params)?;
                 let s = self.session(&p.session_id.0)?;
-                blocking(move || {
-                    piarc_fs::write(&s.scope, &p.path, &p.content, p.append.unwrap_or(false))
-                })
-                .await
+                answer(move || files::spill(&s, p)).await
+            }
+            "fs/pdf" => {
+                let p: FsPdfParams = parse(method, params)?;
+                let s = self.session(&p.session_id.0)?;
+                answer(move || files::pdf(&s, &p)).await
             }
             "fs/mkdir" => {
                 let p: FsMkdirParams = parse(method, params)?;
@@ -594,18 +631,25 @@ fn to_value<T: Serialize>(result: &T) -> Result<Value, ErrorObject> {
     })
 }
 
-/// Runs a file operation on the blocking pool.
+/// Runs a file operation on the blocking pool; operations that need approval are decided by
+/// [`files::adjudicate`].
 async fn blocking<T: Serialize + Send + 'static>(
     operation: impl FnOnce() -> piarc_fs::Result<T> + Send + 'static,
 ) -> Result<Value, ErrorObject> {
-    let result = tokio::task::spawn_blocking(operation).await.map_err(|e| {
+    answer(move || to_value(&operation().map_err(files::adjudicate)?)).await
+}
+
+/// Runs a request's answer on the blocking pool.
+async fn answer(
+    operation: impl FnOnce() -> Result<Value, ErrorObject> + Send + 'static,
+) -> Result<Value, ErrorObject> {
+    tokio::task::spawn_blocking(operation).await.map_err(|e| {
         ErrorObject::new(
             ErrorKind::InternalError,
             format!("file operation panicked or was cancelled: {e}"),
             false,
         )
-    })?;
-    to_value(&result.map_err(|e| e.to_error_object())?)
+    })?
 }
 
 /// Locks `mutex`, recovering the data if a panicking thread poisoned it: every critical

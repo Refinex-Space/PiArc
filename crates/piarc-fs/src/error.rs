@@ -1,5 +1,6 @@
-//! Errors of file operations, mapped onto AHP's `notFound`, `outsideWorkspace`, `ioError` and
-//! `invalidParams`.
+//! Errors of file operations, mapped onto AHP's `notFound`, `outsideWorkspace`,
+//! `permissionDenied`, `fileNotRead`, `fileModified`, `unencodableText`, `ioError` and
+//! `invalidParams`. Messages are written for the model: what happened, and what to do next.
 
 use std::io;
 use std::path::Path;
@@ -7,6 +8,7 @@ use std::path::Path;
 use piarc_protocol::{ErrorKind, ErrorObject};
 use serde_json::json;
 
+use crate::access::{Access, ApprovalReason};
 use crate::scope::display;
 
 /// A failed file operation.
@@ -44,6 +46,57 @@ pub enum Error {
     InvalidPattern {
         /// The compiler's description.
         message: String,
+    },
+    /// The request cannot be carried out as asked (for example a page range of a PDF).
+    #[error("{message}")]
+    InvalidRequest {
+        /// What is wrong and what to ask instead.
+        message: String,
+    },
+    /// The operation needs the user's approval; nothing was touched. The caller decides.
+    #[error("{access} {path} needs the user's approval: {reason}")]
+    NeedsApproval {
+        /// The path as resolved.
+        path: String,
+        /// Reading or writing.
+        access: Access,
+        /// Why.
+        reason: ApprovalReason,
+    },
+    /// An existing file was to be changed before the session read it.
+    #[error(
+        "{path} has not been read in this session. Read it with the Read tool first, then \
+         make the change. The file is unchanged."
+    )]
+    NotRead {
+        /// The path as resolved.
+        path: String,
+    },
+    /// The file changed since the session last read or wrote it.
+    #[error(
+        "{path} has changed since this session last read it (another program or session \
+         modified it). Read it again with the Read tool, then make the change against its \
+         current content. The file is unchanged."
+    )]
+    Modified {
+        /// The path as resolved.
+        path: String,
+    },
+    /// The new text has a character the file's encoding cannot represent.
+    #[error(
+        "The new text for {path} has a character ({character:?} on line {line}) that the \
+         file's encoding {encoding} cannot represent. The file is unchanged; use only \
+         characters {encoding} can encode."
+    )]
+    Unencodable {
+        /// The path as resolved.
+        path: String,
+        /// The file's encoding.
+        encoding: &'static str,
+        /// The character.
+        character: char,
+        /// 1-based line of the new text it is on.
+        line: u64,
     },
 }
 
@@ -84,7 +137,11 @@ impl Error {
             Self::NotFound { .. } => ErrorKind::NotFound,
             Self::OutsideWorkspace { .. } => ErrorKind::OutsideWorkspace,
             Self::Io { .. } => ErrorKind::IoError,
-            Self::InvalidPattern { .. } => ErrorKind::InvalidParams,
+            Self::InvalidPattern { .. } | Self::InvalidRequest { .. } => ErrorKind::InvalidParams,
+            Self::NeedsApproval { .. } => ErrorKind::PermissionDenied,
+            Self::NotRead { .. } => ErrorKind::FileNotRead,
+            Self::Modified { .. } => ErrorKind::FileModified,
+            Self::Unencodable { .. } => ErrorKind::UnencodableText,
         }
     }
 
@@ -100,7 +157,7 @@ impl Error {
         match self {
             Self::NotFound { .. } => Some("ENOENT"),
             Self::Io { code, .. } => Some(code),
-            Self::OutsideWorkspace { .. } | Self::InvalidPattern { .. } => None,
+            _ => None,
         }
     }
 
@@ -116,7 +173,23 @@ impl Error {
                 root,
             } => Some(json!({ "path": path, "resolved": resolved, "root": root })),
             Self::Io { path, code, .. } => Some(json!({ "code": code, "path": path })),
-            Self::InvalidPattern { .. } => None,
+            Self::InvalidPattern { .. } | Self::InvalidRequest { .. } => None,
+            Self::NeedsApproval {
+                path,
+                access,
+                reason,
+            } => Some(json!({
+                "path": path,
+                "reason": reason.name(),
+                "operation": access.name(),
+            })),
+            Self::NotRead { path } | Self::Modified { path } => Some(json!({ "path": path })),
+            Self::Unencodable {
+                path,
+                encoding,
+                line,
+                ..
+            } => Some(json!({ "path": path, "encoding": encoding, "line": line })),
         };
         object
     }

@@ -56,7 +56,7 @@ pub struct GrepQuery<'a> {
 /// The path is outside the scope or does not exist; the pattern or glob does not compile
 /// (`invalidParams`).
 pub fn grep(scope: &Scope, requested: &str, query: &GrepQuery<'_>) -> Result<FsGrepResult> {
-    let target = scope.resolve(requested)?;
+    let target = scope.check(requested, crate::access::Access::Read)?;
     let metadata = std::fs::metadata(&target).map_err(|e| Error::io(&target, e))?;
     let matcher = RegexMatcherBuilder::new()
         .case_insensitive(query.ignore_case)

@@ -165,8 +165,9 @@ fn boundary_calls(files: &[String], dirs: &[String]) -> Vec<(&'static str, Value
     calls
 }
 
-/// T07-A07: absolute paths, `..` and symlinks leading out of the workspace are refused with
-/// `outsideWorkspace` for every `fs/*` method, and the target is not touched.
+/// T07-A07, T16-A07: absolute paths, `..` and symlinks leading out of the workspace need the
+/// user's approval for every `fs/*` method; until approvals exist (T20) they are refused with
+/// `permissionDenied` (reason `outsideWorkspace`), and the target is not touched.
 #[tokio::test]
 async fn every_fs_method_refuses_paths_outside_the_workspace() {
     let f = Fixture::new("boundary");
@@ -202,11 +203,23 @@ async fn every_fs_method_refuses_paths_outside_the_workspace() {
             .expect_err("outside the workspace");
         assert_eq!(
             (error.data.kind, error.data.retryable),
-            (ErrorKind::OutsideWorkspace, false),
+            (ErrorKind::PermissionDenied, false),
             "{method} {params}: {error:?}"
         );
         let details = error.data.details.expect("details");
-        assert!(details["root"].is_string() && details["resolved"].is_string());
+        let operation = if matches!(method, "fs/write" | "fs/mkdir") {
+            "write"
+        } else {
+            "read"
+        };
+        assert_eq!(details["reason"], "outsideWorkspace", "{method} {params}");
+        assert_eq!(details["operation"], operation, "{method} {params}");
+        assert!(details["path"].is_string());
+        assert!(
+            error.message.contains("needs the user's approval"),
+            "{}",
+            error.message
+        );
     }
     assert_eq!(text(&outside), "outside");
     assert_eq!(

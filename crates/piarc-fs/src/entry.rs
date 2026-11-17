@@ -18,9 +18,9 @@ pub const MAX_LIST_ENTRIES: u64 = 10_000;
 ///
 /// # Errors
 ///
-/// The path is outside the scope, does not exist or cannot be inspected.
+/// The path needs approval, does not exist or cannot be inspected.
 pub fn stat(scope: &Scope, requested: &str, detect_image: bool) -> Result<FileStat> {
-    let path = scope.resolve(requested)?;
+    let path = scope.check(requested, crate::access::Access::Read)?;
     let metadata = std::fs::metadata(&path).map_err(|e| Error::io(&path, e))?;
     let kind = kind_of(&metadata);
     let image_mime_type = if detect_image && kind == FileKind::File {
@@ -36,6 +36,7 @@ pub fn stat(scope: &Scope, requested: &str, detect_image: bool) -> Result<FileSt
         modified_ms: modified_ms(&metadata),
         readonly: metadata.permissions().readonly(),
         image_mime_type,
+        unchanged: None,
     })
 }
 
@@ -47,7 +48,7 @@ pub fn stat(scope: &Scope, requested: &str, detect_image: bool) -> Result<FileSt
 /// The path is outside the scope, does not exist, is not a directory (`ENOTDIR`) or cannot be
 /// read.
 pub fn list(scope: &Scope, requested: &str, limit: Option<u64>) -> Result<FsListResult> {
-    let path = scope.resolve(requested)?;
+    let path = scope.check(requested, crate::access::Access::Read)?;
     if path.is_file() {
         // Windows reports this differently; the code is the same everywhere.
         return Err(Error::coded(&path, "ENOTDIR", "not a directory"));

@@ -21,39 +21,55 @@
 //! The authoritative rules are in `crates/deps-rules.json`, enforced by
 //! `scripts/ci/check-crate-deps.mjs` (architecture section 7.1).
 //!
-//! # Implemented so far (T07)
+//! # Implemented so far (T07, T16)
 //!
-//! The minimal, correct file operations behind AHP's `fs/*` (architecture section 6.1.3), as
+//! The file operations behind AHP's `fs/*` (architecture sections 6.1.2 and 6.1.3), as
 //! blocking functions over a session [`Scope`]; `piarc-core` runs them on its blocking pool:
 //!
-//! - path boundary: every path is resolved by [`Scope::resolve`] (normalized, symlinks
-//!   resolved, inside the workspace root) before anything touches it;
-//! - [`read_text`] by range without splitting UTF-8, [`read_blob`] by reference, [`write`],
-//!   [`mkdir`], [`stat`] (with image sniffing), [`list`];
+//! - path boundary: every path is checked by [`Scope::check`] (normalized, symlinks resolved,
+//!   inside the session's directories, not protected for writes) before anything touches it;
+//!   what needs approval is [`Error::NeedsApproval`], decided by the caller ([`access`]);
+//! - [`read_text`] by range in the file's encoding without splitting characters
+//!   ([`encoding`]), [`read_blob`] by reference (streamed, capped), [`mkdir`], [`stat`] (with
+//!   image sniffing), [`list`], [`read_pdf`];
+//! - the file state table ([`FileStates`]) and path locks ([`PathLocks`]): [`stat_for_read`]
+//!   records reads, [`check_fresh`] and [`write()`] refuse stale changes, [`write()`] keeps
+//!   encoding, byte order mark and line endings and replaces files atomically;
+//! - [`spill()`] keeps long tool results in the session's temporary directory;
 //! - [`glob()`] with fd's matching rules and [`grep()`] with ripgrep's libraries, both honoring
 //!   ignore files.
 //!
-//! This crate implements file I/O, so it uses `std::fs` directly. The editing invariants of
-//! architecture section 6.1.2 (read before edit, faithful atomic writes, the file state table,
-//! asking instead of refusing outside the root) arrive with T16.
+//! This crate implements file I/O, so it uses `std::fs` directly.
 //!
 //! [`watch::Watcher`] (T13) watches directories for `piarc-core`, which forwards the changes
 //! of settings files to `piarc-config`; T35 builds workspace watching on it.
 
+pub mod access;
+mod atomic;
 mod content;
+pub mod encoding;
 mod entry;
 mod error;
 mod glob;
 mod grep;
 mod image;
+mod pdf;
 mod scope;
+mod spill;
+mod state;
 #[cfg(test)]
 mod testing;
 pub mod watch;
+mod write;
 
-pub use content::{mkdir, read_blob, read_text, write};
+pub use access::{Access, ApprovalReason};
+pub use content::{DETECT_BYTES, mkdir, read_blob, read_text};
 pub use entry::{MAX_LIST_ENTRIES, list, stat};
 pub use error::{Error, Result};
 pub use glob::{MAX_GLOB_MATCHES, glob};
 pub use grep::{DEFAULT_MATCH_LIMIT, GrepQuery, MAX_LINE_CHARS, MAX_OUTPUT_BYTES, grep};
+pub use pdf::{MAX_PAGES_PER_READ, MAX_PAGES_WITHOUT_RANGE, read_pdf};
 pub use scope::{Scope, display};
+pub use spill::{SPILL_DIR, Spilled, model_path, spill};
+pub use state::{FileStates, Freshness, PathGuard, PathLocks, Snapshot};
+pub use write::{WriteSpec, Written, check_fresh, reported_encoding, stat_for_read, write};

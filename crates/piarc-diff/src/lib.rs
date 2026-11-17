@@ -204,7 +204,12 @@ mod tests {
         assert_eq!(diff.hunks.len(), 1);
         let hunk = &diff.hunks[0];
         assert_eq!(
-            (hunk.old_start, hunk.old_lines, hunk.new_start, hunk.new_lines),
+            (
+                hunk.old_start,
+                hunk.old_lines,
+                hunk.new_start,
+                hunk.new_lines
+            ),
             (2, 7, 2, 7)
         );
         assert_eq!(
@@ -233,7 +238,12 @@ mod tests {
         assert_eq!((diff.added, diff.removed), (2, 0));
         let hunk = &diff.hunks[0];
         assert_eq!(
-            (hunk.old_start, hunk.old_lines, hunk.new_start, hunk.new_lines),
+            (
+                hunk.old_start,
+                hunk.old_lines,
+                hunk.new_start,
+                hunk.new_lines
+            ),
             (0, 0, 1, 2)
         );
         assert_eq!(hunk.lines[1].no_newline, Some(true));
@@ -270,7 +280,12 @@ mod tests {
         let diff = file_diff("gone.txt", Some("a\nb\n"), "");
         let hunk = &diff.hunks[0];
         assert_eq!(
-            (hunk.old_start, hunk.old_lines, hunk.new_start, hunk.new_lines),
+            (
+                hunk.old_start,
+                hunk.old_lines,
+                hunk.new_start,
+                hunk.new_lines
+            ),
             (1, 2, 0, 0)
         );
         assert!(diff.unified.contains("@@ -1,2 +0,0 @@"));
