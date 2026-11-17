@@ -14,7 +14,11 @@ providers:
       - tool_calls:
           - { id: toolu_diff, name: Bash, input: { command: 'diff a.txt b.txt' } }
       - tool_calls:
-          - { id: toolu_grep_error, name: Bash, input: { command: 'grep missing no-such-file.txt' } }
+          - {
+              id: toolu_grep_error,
+              name: Bash,
+              input: { command: 'grep missing no-such-file.txt' },
+            }
       - text: 'Compared.'
 actions:
   - prompt: { text: 'Search and compare.', turn: t }
@@ -34,12 +38,17 @@ expect:
           execution: { exitCode: 1, outcome: success, meaning: files differ }
     - method: item/completed
       params:
-        item: { itemId: toolu_grep_error, status: failed, execution: { exitCode: 2, outcome: failure } }
+        item:
+          { itemId: toolu_grep_error, status: failed, execution: { exitCode: 2, outcome: failure } }
     - { method: turn/completed, turn: t, params: { status: completed } }
   requests:
     - index: 3
       tool_results:
-        - { id: toolu_grep_none, is_error: false, contains: 'Command exited with code 1 (no matches; not an error)' }
+        - {
+            id: toolu_grep_none,
+            is_error: false,
+            contains: 'Command exited with code 1 (no matches; not an error)',
+          }
         - { id: toolu_diff, is_error: false, contains: 'files differ' }
         - { id: toolu_grep_error, is_error: true, contains: 'Command exited with code 2' }
   request_counts: { main: 4 }

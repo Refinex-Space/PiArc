@@ -8,7 +8,11 @@ providers:
     wire: anthropic
     steps:
       - tool_calls:
-          - { id: toolu_tool, name: Bash, input: { command: 'l2-login-tool; echo "profile: $L2_LOGIN_PROFILE"' } }
+          - {
+              id: toolu_tool,
+              name: Bash,
+              input: { command: 'l2-login-tool; echo "profile: $L2_LOGIN_PROFILE"' },
+            }
       - text: 'Ran it.'
 actions:
   - prompt: { text: 'Run the tool from my PATH.', turn: t }

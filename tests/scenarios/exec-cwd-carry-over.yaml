@@ -37,6 +37,10 @@ expect:
       tool_results:
         - { id: toolu_cd }
         - { id: toolu_pwd_sub }
-        - { id: toolu_leave, is_error: false, contains: 'outside the workspace; the next command starts in' }
+        - {
+            id: toolu_leave,
+            is_error: false,
+            contains: 'outside the workspace; the next command starts in',
+          }
         - { id: toolu_pwd_root, is_error: false, contains: "工作区\n" }
   request_counts: { main: 5 }

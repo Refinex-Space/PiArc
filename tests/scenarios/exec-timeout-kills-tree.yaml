@@ -38,7 +38,11 @@ expect:
   requests:
     - index: 1
       tool_results:
-        - { id: toolu_tree, is_error: true, contains: "started\n\n\nCommand timed out after 2 seconds" }
+        - {
+            id: toolu_tree,
+            is_error: true,
+            contains: "started\n\n\nCommand timed out after 2 seconds",
+          }
     - index: 2
       contains: ['ended:child.pid', 'ended:grand.pid']
       not_contains: ['running:child.pid', 'running:grand.pid']

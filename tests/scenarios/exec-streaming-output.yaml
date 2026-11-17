@@ -22,6 +22,7 @@ expect:
           status: completed
           command: 'echo first; sleep 1; echo second'
           output: "first\nsecond\n"
-          execution: { exitCode: 0, outcome: success, timedOut: false, timeoutMs: 120000, truncated: false }
+          execution:
+            { exitCode: 0, outcome: success, timedOut: false, timeoutMs: 120000, truncated: false }
     - { method: turn/completed, turn: t, params: { status: completed } }
   request_counts: { main: 2 }
