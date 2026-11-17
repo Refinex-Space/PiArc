@@ -225,7 +225,10 @@ struct WorkspaceActor {
     /// Increments whenever the idle timer is armed or disarmed.
     idle_generation: u64,
     /// Kept for its watcher; dropped with the actor.
-    #[expect(dead_code, reason = "held for its file watcher, which stops when it is dropped")]
+    #[expect(
+        dead_code,
+        reason = "held for its file watcher, which stops when it is dropped"
+    )]
     settings: Option<WorkspaceSettings>,
     trust_task: Option<JoinHandle<()>>,
 }
@@ -323,9 +326,12 @@ impl WorkspaceActor {
         };
         match started {
             Ok((supervisor, events)) => {
-                self.ctx
-                    .handle
-                    .spawn(consume(events, self.generation, self.handle.clone(), self.tx.clone()));
+                self.ctx.handle.spawn(consume(
+                    events,
+                    self.generation,
+                    self.handle.clone(),
+                    self.tx.clone(),
+                ));
                 self.trust_task = match crate::agent_host::restart_on_trust_change(
                     supervisor.clone(),
                     &self.handle.path,
@@ -446,7 +452,8 @@ impl WorkspaceActor {
     /// Arms the idle timer when nothing keeps the Agent Host busy; any activity disarms it.
     fn arm_idle(&mut self) {
         self.idle_generation += 1;
-        if !matches!(self.host, Host::Ready(_)) || !self.busy.is_empty() || !self.waiting.is_empty() {
+        if !matches!(self.host, Host::Ready(_)) || !self.busy.is_empty() || !self.waiting.is_empty()
+        {
             return;
         }
         let generation = self.idle_generation;
@@ -470,7 +477,9 @@ impl WorkspaceActor {
         if let Some(task) = self.trust_task.take() {
             task.abort();
         }
-        self.ctx.handle.spawn(async move { supervisor.shutdown().await });
+        self.ctx
+            .handle
+            .spawn(async move { supervisor.shutdown().await });
         self.publish(HostState::Reclaimed, true);
     }
 
@@ -554,16 +563,20 @@ async fn route(handle: &WorkspaceHandle, session: &str, msg: SessionMsg) {
 }
 
 /// Upserts the `workspaces` row: display name, main checkout, last opened.
-async fn record_workspace(ctx: &Ctx, path: &std::path::Path) -> Result<piarc_store::WorkspaceRecord> {
+async fn record_workspace(
+    ctx: &Ctx,
+    path: &std::path::Path,
+) -> Result<piarc_store::WorkspaceRecord> {
     let checkout = match piarc_git::resolve(path) {
         Ok(checkout) => path_text(&checkout.main),
         Err(_) => path_text(path),
     };
     let record = piarc_store::WorkspaceRecord {
         path: path_text(path),
-        display_name: path
-            .file_name()
-            .map_or_else(|| path_text(path), |name| name.to_string_lossy().into_owned()),
+        display_name: path.file_name().map_or_else(
+            || path_text(path),
+            |name| name.to_string_lossy().into_owned(),
+        ),
         main_checkout: checkout,
         last_opened_at: now_ms(),
         default_mode: None,

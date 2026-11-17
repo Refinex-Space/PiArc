@@ -47,8 +47,8 @@ use crate::route::RouteKey;
 use crate::secrets::{SecretsConfig, SecretsService};
 use crate::sessions::{Hub, Op, SessionsConfig};
 use crate::storage::{Storage, report_json};
-use crate::tool_io::{ToolIo, ToolIoConfig};
 use crate::terminal::{KeyEvent, TerminalOptions, Terminals};
+use crate::tool_io::{ToolIo, ToolIoConfig};
 use crate::trust::{TrustService, TrustView};
 use crate::workspace_settings::WorkspaceSettings;
 
@@ -82,6 +82,8 @@ pub struct CoreConfig {
     /// The credential store of the vault's master key; the system credential store under the
     /// application's own name when absent. Tests use an in-memory store and a `piarc-test.` name.
     pub secret_store: Option<SecretStoreSetup>,
+    /// Sees every delegated tool request first (tests only, T14-A06).
+    pub tool_observer: Option<Arc<dyn crate::tool_io::ToolIoObserver>>,
 }
 
 /// A credential store for the vault's master key and the key's name in it.
@@ -110,6 +112,7 @@ impl Default for CoreConfig {
             dirs: None,
             sessions: SessionsConfig::default(),
             secret_store: None,
+            tool_observer: None,
         }
     }
 }
@@ -644,7 +647,9 @@ impl CoreRuntime {
     {
         self.ensure_running()?;
         let hub = self.services()?.sessions;
-        self.shared.handle.spawn(async move { on_done(job(hub).await) });
+        self.shared
+            .handle
+            .spawn(async move { on_done(job(hub).await) });
         Ok(())
     }
 
@@ -710,7 +715,10 @@ impl CoreRuntime {
         on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
     ) -> Result<()> {
         crate::sessions::check_session_id(&id)?;
-        self.on_sessions(on_done, move |hub| async move { hub.resume_session(id).await })
+        self.on_sessions(
+            on_done,
+            move |hub| async move { hub.resume_session(id).await },
+        )
     }
 
     /// Opens a copy of a session (up to `entry_id`) as a new session.
@@ -741,7 +749,10 @@ impl CoreRuntime {
         on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
     ) -> Result<()> {
         crate::sessions::check_session_id(&id)?;
-        self.on_sessions(on_done, move |hub| async move { hub.close_session(id).await })
+        self.on_sessions(
+            on_done,
+            move |hub| async move { hub.close_session(id).await },
+        )
     }
 
     /// Runs `op` (prompt, steer, follow-up, abort, a queue change, mark read) on an open
@@ -974,7 +985,10 @@ fn open_state(
         storage: storage.clone(),
         trust: trust.clone(),
         secrets,
-        tool_io: ToolIo::new(ToolIoConfig::new(data)),
+        tool_io: ToolIo::new(ToolIoConfig {
+            observer: config.tool_observer.clone(),
+            ..ToolIoConfig::new(data)
+        }),
         config: config.sessions.clone(),
         snapshots,
         cancel: cancel.child_token(),

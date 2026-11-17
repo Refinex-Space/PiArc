@@ -97,6 +97,6 @@ pub use piarc_term::vt::KeyAction;
 pub use route::RouteKey;
 pub use runtime::{
     CoreConfig, CoreRuntime, MAX_COALESCE_INTERVAL, MAX_ECHO_BYTES, MIN_COALESCE_INTERVAL,
-    RuntimeState,
+    RuntimeState, SecretStoreSetup,
 };
 pub use terminal::{KeyEvent, TerminalOptions};

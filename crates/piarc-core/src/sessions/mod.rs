@@ -320,7 +320,10 @@ impl Hub {
             .run(move |store| {
                 let record = store.session(&id)?;
                 if let Some(record) = record {
-                    let workspace = record.workspace_path.or(record.meta.cwd).unwrap_or_default();
+                    let workspace = record
+                        .workspace_path
+                        .or(record.meta.cwd)
+                        .unwrap_or_default();
                     let status = record.status.unwrap_or_else(|| "idle".into());
                     store.set_session_state(&id, &workspace, &status, false)?;
                 }

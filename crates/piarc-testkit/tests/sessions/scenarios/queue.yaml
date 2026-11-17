@@ -1,0 +1,14 @@
+# T14-A03: the turn waits on a file while the client queues, edits, deletes and reorders
+# inputs; the steering item is edited before it is delivered. The steering message follows the
+# tool results as a second user message (Pi 1.5.2; the Anthropic API combines consecutive user
+# turns, the strict alternation rule does not), so role_order is off here.
+id: queue
+validation:
+  rules: { role_order: false }
+steps:
+  - text: "Waiting for the signal."
+    tool_calls: [{ id: toolu_wait, name: Bash, input: { command: "while [ ! -f go ]; do sleep 0.05; done; echo go" } }]
+  - text: "Turn one done."
+  - text: "Follow-up D done."
+  - text: "Follow-up C done."
+  - text: "Follow-up B2 done."

@@ -20,13 +20,11 @@ use piarc_host::{CallRecord, HostSupervisor};
 use piarc_protocol::history::{GetEntriesParams, SessionEntries, SessionGetEntries};
 use piarc_protocol::method::RequestMethod;
 use piarc_protocol::queue::{
-    QueueDelete, QueueDeleteParams, QueueEdit, QueueEditParams, QueueReorder,
-    QueueReorderParams,
+    QueueDelete, QueueDeleteParams, QueueEdit, QueueEditParams, QueueReorder, QueueReorderParams,
 };
 use piarc_protocol::session::{
     ModelRef, SessionAbort, SessionCreateParams, SessionEventNotification, SessionFollowUp,
-    SessionId, SessionInputParams, SessionPrompt, SessionPromptParams, SessionSteer,
-    SessionTarget,
+    SessionId, SessionInputParams, SessionPrompt, SessionPromptParams, SessionSteer, SessionTarget,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -348,7 +346,13 @@ impl SessionActor {
         }
         let last = self.last_seq.load(Ordering::Acquire);
         // Still a hole before what is waiting: those notifications are gone for good.
-        if let Some(first) = self.pending.keys().next().copied().filter(|f| *f > last + 1) {
+        if let Some(first) = self
+            .pending
+            .keys()
+            .next()
+            .copied()
+            .filter(|f| *f > last + 1)
+        {
             if complete {
                 tracing::warn!(target: "piarc_core::sessions", session = %self.id,
                     "the Agent Host's replay did not reach the waiting notifications");
@@ -516,17 +520,19 @@ impl SessionActor {
         let (ws, id) = (self.ws.clone(), SessionId(self.id.clone()));
         self.ctx.handle.spawn(async move {
             let result = match ws.peek().await {
-                Some(supervisor) => supervisor
-                    .close_session(&id)
-                    .await
-                    .map(to_value)
-                    .or_else(|error| {
-                        if error.kind() == piarc_protocol::ErrorKind::SessionNotFound {
-                            Ok(json!({ "sessionId": id.0 }))
-                        } else {
-                            Err(host_error(error))
-                        }
-                    }),
+                Some(supervisor) => {
+                    supervisor
+                        .close_session(&id)
+                        .await
+                        .map(to_value)
+                        .or_else(|error| {
+                            if error.kind() == piarc_protocol::ErrorKind::SessionNotFound {
+                                Ok(json!({ "sessionId": id.0 }))
+                            } else {
+                                Err(host_error(error))
+                            }
+                        })
+                }
                 // No Agent Host runs: the session is open nowhere.
                 None => Ok(json!({ "sessionId": id.0 })),
             };

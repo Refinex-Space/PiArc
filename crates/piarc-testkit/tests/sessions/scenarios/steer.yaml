@@ -1,0 +1,10 @@
+# T14-A04: a steering message sent during the tool step reaches the model in the next request
+# of the same turn; a follow-up runs as its own turn after the turn completed.
+id: steer
+validation:
+  rules: { role_order: false }
+steps:
+  - text: "Waiting for the signal."
+    tool_calls: [{ id: toolu_wait, name: Bash, input: { command: "while [ ! -f go ]; do sleep 0.05; done; echo go" } }]
+  - text: "Steered answer."
+  - text: "Follow-up answer."

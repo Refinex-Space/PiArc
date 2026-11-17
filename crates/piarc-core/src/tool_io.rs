@@ -56,13 +56,38 @@ use tokio_util::sync::CancellationToken;
 /// Output chunks waiting to become notifications; a full buffer pauses the command's pipes.
 const OUTPUT_BUFFER: usize = 16;
 
+/// Sees every request [`ToolIo`] answers, before it is answered (tests count and hold
+/// requests to observe tool concurrency on Core's side, T14-A06). Production sets none.
+pub trait ToolIoObserver: Send + Sync {
+    /// Request `method` of `session_id`, made by tool call `tool_call_id` when the Agent Host
+    /// named one, is about to run; it runs once the returned future completes.
+    fn before(
+        &self,
+        session_id: &str,
+        method: &str,
+        tool_call_id: Option<&str>,
+    ) -> piarc_ports::BoxFuture<'static, ()>;
+}
+
 /// Where [`ToolIo`] keeps its files and what commands inherit.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ToolIoConfig {
     /// PiArc's data directory: blobs go to `sessions/<sessionId>/blobs/` below it.
     pub data_dir: PathBuf,
     /// The base environment of every command.
     pub command_env: Vec<(OsString, OsString)>,
+    /// Sees every request first (tests only).
+    pub observer: Option<Arc<dyn ToolIoObserver>>,
+}
+
+impl std::fmt::Debug for ToolIoConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ToolIoConfig")
+            .field("data_dir", &self.data_dir)
+            .field("command_env", &self.command_env.len())
+            .field("observer", &self.observer.is_some())
+            .finish()
+    }
 }
 
 impl ToolIoConfig {
@@ -77,6 +102,7 @@ impl ToolIoConfig {
         Self {
             data_dir,
             command_env,
+            observer: None,
         }
     }
 }
@@ -250,6 +276,14 @@ impl ToolIo {
         params: Map<String, Value>,
         peer: Peer,
     ) -> Result<Value, ErrorObject> {
+        if let Some(observer) = &self.config.observer {
+            let text = |name: &str| params.get(name).and_then(Value::as_str).unwrap_or_default();
+            let call = params
+                .get("origin")
+                .and_then(|origin| origin.get("toolCallId"))
+                .and_then(Value::as_str);
+            observer.before(text("sessionId"), method, call).await;
+        }
         match method {
             "fs/stat" => {
                 let p: FsStatParams = parse(method, params)?;

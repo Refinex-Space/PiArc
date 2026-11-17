@@ -292,12 +292,16 @@ fn core_state_is_written_per_session_and_survives_a_rebuild() {
     let line = writer.user("hello");
     writer.append_raw(&line);
     store.sync_dir(&sessions).expect("sync");
-    assert!(!store
-        .set_session_state("s-unknown", "/w", "idle", true)
-        .expect("write"));
-    assert!(store
-        .set_session_state("s-state", "/w 工作区", "error", true)
-        .expect("write"));
+    assert!(
+        !store
+            .set_session_state("s-unknown", "/w", "idle", true)
+            .expect("write")
+    );
+    assert!(
+        store
+            .set_session_state("s-state", "/w 工作区", "error", true)
+            .expect("write")
+    );
     store.rebuild_index(&sessions).expect("rebuild");
     let record = store.session("s-state").expect("read").expect("indexed");
     assert_eq!(
