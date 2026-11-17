@@ -70,6 +70,8 @@ pub use glob::{MAX_GLOB_MATCHES, glob};
 pub use grep::{DEFAULT_MATCH_LIMIT, GrepQuery, MAX_LINE_CHARS, MAX_OUTPUT_BYTES, grep};
 pub use pdf::{MAX_PAGES_PER_READ, MAX_PAGES_WITHOUT_RANGE, read_pdf};
 pub use scope::{Scope, display};
+/// Streaming spill files (`spill::create`).
+pub use spill::create as create_spill;
 pub use spill::{SPILL_DIR, Spilled, model_path, spill};
 pub use state::{FileStates, Freshness, PathGuard, PathLocks, Snapshot};
 pub use write::{WriteSpec, Written, check_fresh, reported_encoding, stat_for_read, write};

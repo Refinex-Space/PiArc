@@ -65,6 +65,17 @@ pub trait ProcessControl: Send {
     /// The operating system's error when the signal cannot be sent.
     fn kill(&mut self) -> io::Result<()>;
 
+    /// Asks the process (and, for spawners that manage process trees, everything it started)
+    /// to exit: `SIGTERM` where the platform has signals. Callers that need the process gone
+    /// follow up with [`ProcessControl::kill`] after a grace period. The default is `kill`.
+    ///
+    /// # Errors
+    ///
+    /// The operating system's error when the request cannot be sent.
+    fn terminate(&mut self) -> io::Result<()> {
+        self.kill()
+    }
+
     /// Completes when the process has exited.
     fn wait(&mut self) -> BoxFuture<'_, io::Result<ExitStatus>>;
 }

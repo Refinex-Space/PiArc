@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::diff::FileDiff;
+use crate::exec::{CommandOutcome, CwdReset};
 use crate::method::notification;
 use crate::session::SessionEventHeader;
 
@@ -123,6 +124,9 @@ pub enum Item {
         /// The output the model sees: so far in `item/updated`, final in `item/completed`.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         output: Option<String>,
+        /// How the command ran, in `item/completed` of a command Core ran (the bash card).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        execution: Option<CommandExecutionInfo>,
     },
     /// A file write or edit (`Write`, `Edit`, `NotebookEdit`). The structured diff arrives
     /// with the file tools of T16.
@@ -229,6 +233,39 @@ pub enum Item {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         error_message: Option<String>,
     },
+}
+
+/// How a shell command ran: what the client shows on its card, as Core reported it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandExecutionInfo {
+    /// The directory the command ran in.
+    pub cwd: String,
+    /// The exit code, when the command exited normally.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exit_code: Option<i32>,
+    /// The terminating signal number on Unix, when a signal ended the command.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signal: Option<i32>,
+    /// Whether it succeeded, judged by what its exit code means.
+    pub outcome: CommandOutcome,
+    /// What a non-zero exit code of a successful command means (`no matches`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub meaning: Option<String>,
+    /// How long it ran, in milliseconds.
+    pub duration_ms: u64,
+    /// Whether it was stopped because its timeout passed.
+    pub timed_out: bool,
+    /// The timeout it ran with, in milliseconds.
+    pub timeout_ms: u64,
+    /// Whether the model got only part of the output.
+    pub truncated: bool,
+    /// The file holding the full output, when it was saved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub full_output_path: Option<String>,
+    /// The next command starts somewhere else, and why.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cwd_reset: Option<CwdReset>,
 }
 
 impl Item {

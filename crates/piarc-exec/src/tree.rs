@@ -1,13 +1,13 @@
 //! [`ProcessTreeSpawner`]: a [`ProcessSpawner`] whose kill ends the whole process tree.
 //!
 //! - Unix: the child leads a new process group (`process_group(0)`, set between `fork` and
-//!   `exec`, so nothing it starts runs outside the group); kill and drop send `SIGKILL` to the
-//!   group. A descendant that leaves the group on purpose (`setsid`, `setpgid`) is not reached;
-//!   process groups are a cleanup tool, not a boundary (T17 decides whether more is needed).
+//!   `exec`, so nothing it starts runs outside the group); terminate sends `SIGTERM`, kill and
+//!   drop send `SIGKILL` to the group. A descendant that leaves the group on purpose (`setsid`, `setpgid`) is not reached;
+//!   process groups are a cleanup tool, not a boundary (the sandbox is, architecture 6.10).
 //! - Windows: the child is created suspended, put into a new Job Object with
 //!   `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` and no breakaway permission, and only then resumed,
-//!   so it cannot start anything outside the job. Kill terminates the job; drop closes its
-//!   handle, which ends every process still in it.
+//!   so it cannot start anything outside the job. Terminate and kill terminate the job; drop
+//!   closes its handle, which ends every process still in it.
 //!
 //! Drop ends the tree on both platforms, also after the direct child exited normally:
 //! background processes a command left behind end with it.
@@ -53,6 +53,10 @@ impl ProcessControl for TreeChild {
         self.tree.kill()
     }
 
+    fn terminate(&mut self) -> io::Result<()> {
+        self.tree.terminate()
+    }
+
     fn wait(&mut self) -> BoxFuture<'_, io::Result<ExitStatus>> {
         Box::pin(wait_child(&mut self.child))
     }
@@ -84,7 +88,16 @@ mod platform {
 
     impl Tree {
         pub(super) fn kill(&self) -> io::Result<()> {
-            match killpg(self.0, Signal::SIGKILL) {
+            self.signal(Signal::SIGKILL)
+        }
+
+        /// `SIGTERM` to the whole group: processes may clean up before the follow-up kill.
+        pub(super) fn terminate(&self) -> io::Result<()> {
+            self.signal(Signal::SIGTERM)
+        }
+
+        fn signal(&self, signal: Signal) -> io::Result<()> {
+            match killpg(self.0, signal) {
                 // The whole group is gone already.
                 Ok(()) | Err(Errno::ESRCH) => Ok(()),
                 Err(errno) => Err(io::Error::from(errno)),
@@ -133,6 +146,11 @@ mod platform {
 
     impl Tree {
         pub(super) fn kill(&self) -> io::Result<()> {
+            self.0.terminate()
+        }
+
+        /// Windows has no polite request to a whole tree: the job is terminated at once.
+        pub(super) fn terminate(&self) -> io::Result<()> {
             self.0.terminate()
         }
     }

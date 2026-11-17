@@ -445,7 +445,9 @@ async fn killing_a_sandboxed_command_leaves_no_process() {
     assert_eq!(killed["killed"], true);
     let result = call.await.expect("joins").expect("answers");
     assert_eq!(result["killed"], true);
-    assert_eq!(result["signal"], 9);
+    // T17: the group gets SIGTERM first; the shell exits on it (SIGKILL follows the grace
+    // period for whatever ignores it).
+    assert_eq!(result["signal"], 15);
     let deadline = Instant::now() + Duration::from_secs(5);
     while !group_members(pgid).is_empty() {
         assert!(

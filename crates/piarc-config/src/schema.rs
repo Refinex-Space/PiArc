@@ -249,6 +249,15 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
         name: "hooks",
         shape: Shape::MapOf(&HOOK_GROUPS),
     },
+    // Read by Core from the user's file only (`<data>/settings.json`): which executable runs
+    // commands is not a project's choice (T17).
+    Field {
+        name: "shell",
+        shape: Shape::Object(&[Field {
+            name: "gitBashPath",
+            shape: Shape::String,
+        }]),
+    },
 ]);
 
 #[cfg(test)]

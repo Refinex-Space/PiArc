@@ -1509,6 +1509,8 @@ version = "0.0.0"
 dependencies = [
  "nix",
  "piarc-ports",
+ "piarc-protocol",
+ "thiserror 2.0.21",
  "tokio",
  "tokio-util",
  "windows-sys",

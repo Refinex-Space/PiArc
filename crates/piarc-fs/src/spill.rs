@@ -45,6 +45,21 @@ pub fn spill(tmp_dir: &Path, name: &str, text: &str) -> Result<Spilled> {
     })
 }
 
+/// Creates (or truncates) `<tmp_dir>/tool-results/<name>.txt` for text written as it arrives
+/// (a command's output, T17): the same directory and naming as [`spill`], but not atomic,
+/// since the text is longer than memory should hold.
+///
+/// # Errors
+///
+/// The directory or the file cannot be created.
+pub fn create(tmp_dir: &Path, name: &str) -> Result<(std::fs::File, PathBuf)> {
+    let dir = tmp_dir.join(SPILL_DIR);
+    std::fs::create_dir_all(&dir).map_err(|e| Error::io(&dir, e))?;
+    let path = dir.join(format!("{}.txt", file_stem(name)));
+    let file = std::fs::File::create(&path).map_err(|e| Error::io(&path, e))?;
+    Ok((file, path))
+}
+
 /// `path` as the model is told about it: `~` plus the rest below the home directory, otherwise
 /// the usual absolute spelling. Both are canonicalized first when they exist, so a path spelled
 /// through a symlink or a Windows short name (`RUNNER~1`) is still recognized below home.
@@ -108,6 +123,16 @@ mod tests {
                 .path
                 .ends_with("result.txt")
         );
+    }
+
+    #[test]
+    fn creates_a_streaming_file_under_the_same_name() {
+        use std::io::Write;
+        let tree = TempTree::new("spill-create");
+        let (mut file, path) = create(&tree.path("tmp"), "toolu 1").expect("created");
+        file.write_all("部分".as_bytes()).expect("writes");
+        assert_eq!(path, tree.path("tmp").join(SPILL_DIR).join("toolu_1.txt"));
+        assert_eq!(std::fs::read_to_string(&path).expect("reads"), "部分");
     }
 
     #[test]

@@ -1,0 +1,28 @@
+{
+  "jsonrpc": "2.0",
+  "id": 32,
+  "result": {
+    "signal": 15,
+    "killed": false,
+    "timedOut": true,
+    "timeout": {
+      "ms": 600000,
+      "requestedMs": 900000
+    },
+    "durationMs": 600004,
+    "outcome": "failure",
+    "cwd": "/Users/dev/work space/项目",
+    "cwdReset": {
+      "endedIn": "/tmp",
+      "resetTo": "/Users/dev/work space/项目",
+      "reason": "outsideWorkspace"
+    },
+    "output": {
+      "head": "building 1/400\n",
+      "tail": "building 399/400\n",
+      "totalChars": 61234,
+      "omittedChars": 61202,
+      "fullOutputPath": "~/Library/Application Support/PiArc/sessions/sess-7f3a/tmp/tool-results/toolu_09.txt"
+    }
+  }
+}

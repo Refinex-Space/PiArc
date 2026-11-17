@@ -1,19 +1,23 @@
-//! Running a shell command with streamed output: the work behind AHP's `exec/run`.
+//! Running a command with streamed output: the work behind AHP's `exec/run`.
 //!
-//! [`CommandRunner::run`] starts the command with bash (`bash -c <command>`, the shell Pi's
-//! `bash` tool uses: `/bin/bash` on Unix, Git Bash on Windows), closes its stdin, and sends each
-//! read from stdout and stderr to an output channel as it arrives. A full channel pauses the
-//! reading (and so the command, once its pipe fills); a closed channel or a cancelled token
-//! terminates the command.
+//! [`CommandRunner::run`] starts the program of a [`CommandSpec`] (a shell with its arguments:
+//! see [`crate::shells`]), closes its stdin, and sends each read from stdout and stderr to an
+//! output channel as it arrives. A full channel pauses the reading (and so the command, once
+//! its pipe fills); a closed channel or a cancelled token stops the command, and so does its
+//! timeout.
+//!
+//! Stopping is two-step: [`ProcessControl::terminate`] (`SIGTERM` to the process group with
+//! [`crate::ProcessTreeSpawner`]), then [`ProcessControl::kill`] once
+//! [`CommandSpec::kill_grace`] has passed without an exit. When the shell is gone, the runner
+//! drops its handle, which ends whatever the command left behind (the tree spawner kills the
+//! group, Windows closes the job).
 //!
 //! After the shell exits, output is still read until both pipes close or stay quiet for
 //! [`EXIT_GRACE`]: a background process the command started can keep a pipe open, and the
 //! command's own last writes must not be lost (the same rule as Pi's `waitForChildProcess`).
 //!
-//! A [`Launcher`] runs the shell through a wrapper program, the way a sandbox does
-//! (`/usr/bin/sandbox-exec … -- /bin/bash -c <command>`). Which process tree a kill reaches is
-//! the injected spawner's choice ([`crate::ProcessTreeSpawner`] ends the whole tree); timeouts
-//! and moving long commands to the background arrive with T17 (`docs/plan/PLAN.md`, I17).
+//! A [`Launcher`] runs the program through a wrapper, the way a sandbox does
+//! (`/usr/bin/sandbox-exec … -- /bin/bash -c <command>`).
 
 use std::ffi::OsString;
 use std::io;
@@ -53,22 +57,28 @@ pub struct OutputChunk {
 /// What to run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandSpec {
-    /// The command line, passed to `bash -c`.
-    pub command: String,
+    /// The executable: the shell.
+    pub program: PathBuf,
+    /// Its arguments (`-c <command>`).
+    pub args: Vec<OsString>,
     /// Working directory.
     pub cwd: PathBuf,
     /// The complete environment: nothing is inherited.
     pub env: Vec<(OsString, OsString)>,
-    /// A wrapper that starts the shell, or `None` to start the shell directly.
+    /// A wrapper that starts the program, or `None` to start it directly.
     pub launcher: Option<Launcher>,
+    /// Stops the command once it has run this long; `None` lets it run.
+    pub timeout: Option<Duration>,
+    /// Between the polite request to stop and the kill.
+    pub kill_grace: Duration,
 }
 
-/// A program that runs the shell: `program args… <shell> -c <command>`.
+/// A program that runs the command: `program args… <program of the spec> <its args>`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Launcher {
     /// The wrapper's executable.
     pub program: PathBuf,
-    /// The wrapper's arguments before the shell.
+    /// The wrapper's arguments before the wrapped program.
     pub args: Vec<OsString>,
 }
 
@@ -77,61 +87,58 @@ pub struct Launcher {
 pub struct CommandExit {
     /// The process's exit status.
     pub status: ExitStatus,
-    /// Whether it was terminated because the token was cancelled or the output channel closed.
+    /// Whether it was stopped because the token was cancelled or the output channel closed.
     pub killed: bool,
+    /// Whether it was stopped because its timeout passed.
+    pub timed_out: bool,
 }
 
-/// Runs shell commands through an injected [`ProcessSpawner`] (the sandbox wraps it later).
+/// Runs commands through an injected [`ProcessSpawner`].
 #[derive(Clone)]
 pub struct CommandRunner {
     spawner: Arc<dyn ProcessSpawner>,
-    shell: PathBuf,
 }
 
 impl std::fmt::Debug for CommandRunner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CommandRunner")
-            .field("shell", &self.shell)
-            .finish_non_exhaustive()
+        f.debug_struct("CommandRunner").finish_non_exhaustive()
     }
 }
 
+/// Why the watcher stopped the command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StopReason {
+    Cancelled,
+    TimedOut,
+}
+
 impl CommandRunner {
-    /// A runner that starts processes with `spawner` and the default bash.
+    /// A runner that starts processes with `spawner`.
     #[must_use]
     pub fn new(spawner: Arc<dyn ProcessSpawner>) -> Self {
-        Self {
-            spawner,
-            shell: default_bash(),
-        }
+        Self { spawner }
     }
 
-    /// The shell commands run with.
-    #[must_use]
-    pub fn shell(&self) -> &std::path::Path {
-        &self.shell
-    }
-
-    /// Runs `spec`, sending its output to `output`, until it exits or `cancel` fires.
+    /// Runs `spec`, sending its output to `output`, until it exits, `cancel` fires or its
+    /// timeout passes.
     ///
     /// # Errors
     ///
-    /// The shell cannot be started, or its exit status cannot be read.
+    /// The program cannot be started, or its exit status cannot be read.
     pub async fn run(
         &self,
         spec: CommandSpec,
         output: mpsc::Sender<OutputChunk>,
         cancel: CancellationToken,
     ) -> io::Result<CommandExit> {
-        let shell_args = [OsString::from("-c"), OsString::from(spec.command)];
         let (program, args) = match spec.launcher {
             Some(launcher) => {
                 let mut args = launcher.args;
-                args.push(self.shell.clone().into_os_string());
-                args.extend(shell_args);
+                args.push(spec.program.into_os_string());
+                args.extend(spec.args);
                 (launcher.program, args)
             }
-            None => (self.shell.clone(), shell_args.into()),
+            None => (spec.program, spec.args),
         };
         let process = self.spawner.spawn(SpawnSpec {
             program,
@@ -141,10 +148,16 @@ impl CommandRunner {
         })?;
         // The command reads nothing: EOF on its stdin, as Pi's tool gives it.
         drop(process.stdin);
-        // Stopping also covers a consumer that went away.
+        // Stopping also covers a consumer that went away, and a caller that dropped this
+        // future (its request ended): the guard stops the command then.
         let stop = cancel.child_token();
+        let _stop_on_drop = stop.clone().drop_guard();
         let (exit_tx, exit_rx) = oneshot::channel();
-        tokio::spawn(watch(process.control, stop.clone(), exit_tx));
+        let limits = Stopping {
+            timeout: spec.timeout,
+            grace: spec.kill_grace,
+        };
+        tokio::spawn(watch(process.control, stop.clone(), limits, exit_tx));
         let pump = Pump {
             output,
             stop: stop.clone(),
@@ -153,35 +166,62 @@ impl CommandRunner {
     }
 }
 
-/// Waits for the process to exit, killing it first when `stop` fires.
+#[derive(Debug, Clone, Copy)]
+struct Stopping {
+    timeout: Option<Duration>,
+    grace: Duration,
+}
+
+/// Waits for the process to exit, stopping it first when `stop` fires or the timeout passes.
+/// Dropping `control` at the end ends what the command left behind.
 async fn watch(
     mut control: Box<dyn ProcessControl>,
     stop: CancellationToken,
+    limits: Stopping,
     exit: oneshot::Sender<io::Result<CommandExit>>,
 ) {
+    let deadline = async {
+        match limits.timeout {
+            Some(timeout) => tokio::time::sleep(timeout).await,
+            None => std::future::pending().await,
+        }
+    };
     let exited = {
         let wait = control.wait();
         tokio::select! {
-            status = wait => Some(status),
-            () = stop.cancelled() => None,
+            status = wait => Ok(status),
+            () = stop.cancelled() => Err(StopReason::Cancelled),
+            () = deadline => Err(StopReason::TimedOut),
         }
     };
     let result = match exited {
-        Some(status) => status.map(|status| CommandExit {
+        Ok(status) => status.map(|status| CommandExit {
             status,
             killed: false,
+            timed_out: false,
         }),
-        None => {
-            // An error means the process is already gone; its status follows from wait.
-            let _ = control.kill();
-            control.wait().await.map(|status| CommandExit {
+        Err(reason) => stop_process(control.as_mut(), limits.grace)
+            .await
+            .map(|status| CommandExit {
                 status,
-                killed: true,
-            })
-        }
+                killed: reason == StopReason::Cancelled,
+                timed_out: reason == StopReason::TimedOut,
+            }),
     };
+    drop(control);
     // The runner only stops listening when it was dropped itself.
     let _ = exit.send(result);
+}
+
+/// `terminate`, then `kill` when the process has not exited after `grace`.
+async fn stop_process(control: &mut dyn ProcessControl, grace: Duration) -> io::Result<ExitStatus> {
+    // An error means the process is already gone; its status follows from wait.
+    let _ = control.terminate();
+    if let Ok(status) = tokio::time::timeout(grace, control.wait()).await {
+        return status;
+    }
+    let _ = control.kill();
+    control.wait().await
 }
 
 struct Pump {
@@ -240,46 +280,49 @@ impl Pump {
     }
 }
 
-/// bash as Pi finds it: `/bin/bash`, then `bash` on PATH (Unix); Git Bash under Program Files,
-/// then `bash.exe` on PATH (Windows). Telling the user that Git Bash is missing is T17's.
-fn default_bash() -> PathBuf {
-    if cfg!(windows) {
-        for base in ["ProgramFiles", "ProgramFiles(x86)"] {
-            if let Some(dir) = std::env::var_os(base) {
-                let bash = PathBuf::from(dir).join("Git").join("bin").join("bash.exe");
-                if bash.is_file() {
-                    return bash;
-                }
-            }
-        }
-        PathBuf::from("bash.exe")
-    } else if std::path::Path::new("/bin/bash").is_file() {
-        PathBuf::from("/bin/bash")
-    } else {
-        PathBuf::from("bash")
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::time::Instant;
 
     use super::*;
-    use crate::TokioProcessSpawner;
+    use crate::{ProcessTreeSpawner, TokioProcessSpawner};
 
-    fn spec(command: &str) -> CommandSpec {
+    fn bash() -> PathBuf {
+        crate::shells::detect(&crate::shells::Probe::system(&env()), None)
+            .bash
+            .expect("bash")
+    }
+
+    fn env() -> Vec<(OsString, OsString)> {
+        std::env::vars_os()
+            .filter(|(k, _)| {
+                [
+                    "PATH",
+                    "SystemRoot",
+                    "ProgramFiles",
+                    "ProgramFiles(x86)",
+                    "LOCALAPPDATA",
+                ]
+                .iter()
+                .any(|name| k.to_string_lossy().eq_ignore_ascii_case(name))
+            })
+            .collect()
+    }
+
+    pub(crate) fn spec(command: &str) -> CommandSpec {
         CommandSpec {
-            command: command.to_owned(),
+            program: bash(),
+            args: crate::shells::bash_args(command),
             cwd: std::env::temp_dir(),
-            env: std::env::vars_os()
-                .filter(|(k, _)| k == "PATH" || k == "SystemRoot")
-                .collect(),
+            env: env(),
             launcher: None,
+            timeout: None,
+            kill_grace: Duration::from_secs(2),
         }
     }
 
     fn runner() -> CommandRunner {
-        CommandRunner::new(Arc::new(TokioProcessSpawner))
+        CommandRunner::new(Arc::new(ProcessTreeSpawner))
     }
 
     async fn collect(mut rx: mpsc::Receiver<OutputChunk>) -> (String, String) {
@@ -309,7 +352,7 @@ mod tests {
             .await
             .expect("runs");
         assert_eq!(exit.status.code, Some(3));
-        assert!(!exit.killed);
+        assert!(!exit.killed && !exit.timed_out);
         assert_eq!(
             reader.await.expect("reader"),
             ("中文\n".to_owned(), "oops\n".to_owned())
@@ -359,34 +402,47 @@ mod tests {
         });
         let started = Instant::now();
         let exit = runner()
-            .run(spec("echo started; exec sleep 30"), tx, cancel)
+            .run(spec("echo started; sleep 30"), tx, cancel)
             .await
             .expect("runs");
-        assert!(exit.killed);
+        assert!(exit.killed && !exit.timed_out);
         assert!(!exit.status.success());
         assert!(started.elapsed() < Duration::from_secs(10));
         assert_eq!(reader.await.expect("reader"), "started\n");
     }
 
-    #[cfg(unix)]
     #[tokio::test]
-    async fn a_launcher_wraps_the_shell() {
+    async fn the_direct_child_spawner_still_works() {
         let (tx, rx) = mpsc::channel(16);
         let reader = tokio::spawn(collect(rx));
-        let mut wrapped = spec("");
-        // `env X=1 /bin/bash -c …`: the launcher's arguments come before the shell.
+        let exit = CommandRunner::new(Arc::new(TokioProcessSpawner))
+            .run(spec("echo plain"), tx, CancellationToken::new())
+            .await
+            .expect("runs");
+        assert_eq!(exit.status.code, Some(0));
+        assert_eq!(reader.await.expect("reader").0, "plain\n");
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_launcher_wraps_the_program() {
+        let (tx, rx) = mpsc::channel(16);
+        let reader = tokio::spawn(collect(rx));
+        let mut wrapped = spec("echo \"$PIARC_LAUNCHED $0\"");
+        // `env X=1 /bin/bash -c …`: the launcher's arguments come before the program.
         wrapped.launcher = Some(Launcher {
             program: "/usr/bin/env".into(),
             args: vec![OsString::from("PIARC_LAUNCHED=1")],
         });
-        wrapped.command = "echo \"$PIARC_LAUNCHED $0\"".to_owned();
         let exit = runner()
             .run(wrapped, tx, CancellationToken::new())
             .await
             .expect("runs");
         assert_eq!(exit.status.code, Some(0));
-        let shell = runner().shell().display().to_string();
-        assert_eq!(reader.await.expect("reader").0, format!("1 {shell}\n"));
+        assert_eq!(
+            reader.await.expect("reader").0,
+            format!("1 {}\n", bash().display())
+        );
     }
 
     #[tokio::test]

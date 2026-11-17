@@ -1,6 +1,6 @@
 [package]
 name = "piarc-exec"
-description = "Process management (process groups / Job Object, implements ProcessSpawner), output spooling, timeout to background."
+description = "Process management (process groups / Job Object, implements ProcessSpawner) and shell commands: timeouts, output spooling, exit code meaning, environment, working directory."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,6 +9,8 @@ publish.workspace = true
 
 [dependencies]
 piarc-ports.workspace = true
+piarc-protocol.workspace = true
+thiserror.workspace = true
 tokio = { workspace = true, features = ["process", "io-util"] }
 tokio-util.workspace = true
 
@@ -27,7 +29,8 @@ windows-sys = { workspace = true, features = [
 ] }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["process", "io-util"] }
+# `test-util` pauses tokio's clock: timeouts of minutes run instantly (T17-A04).
+tokio = { workspace = true, features = ["process", "io-util", "test-util"] }
 
 [lints]
 workspace = true

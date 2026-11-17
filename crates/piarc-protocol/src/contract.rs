@@ -15,7 +15,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::exec::{ExecKill, ExecOutput, ExecRun};
+use crate::exec::{ExecKill, ExecOutput, ExecRun, ExecShells};
 use crate::fs::{FsGlob, FsGrep, FsList, FsMkdir, FsPdf, FsRead, FsSpill, FsStat, FsWrite};
 use crate::handshake::HostHello;
 use crate::history::{HarnessEntry, SessionGetEntries, SessionHistory};
@@ -203,6 +203,8 @@ pub static CONTRACTS: &[Contract] = &[
     response::<ExecRun>("exec/run/result"),
     request::<ExecKill>(ExecKill::NAME),
     response::<ExecKill>("exec/kill/result"),
+    request::<ExecShells>(ExecShells::NAME),
+    response::<ExecShells>("exec/shells/result"),
     notification::<ExecOutput>(),
     request::<SecretsGetAll>(SecretsGetAll::NAME),
     response::<SecretsGetAll>("secrets/getAll/result"),

@@ -8,19 +8,18 @@
 //!
 //! File operations run on tokio's blocking pool. Each session has its file state table (what it
 //! read and wrote, T16), kept while the session is open; the path locks are shared by all
-//! sessions; `files.rs` holds the `fs/*` side of the invariants (architecture section 6.1.2). `exec/run` streams the command's output as
-//! `exec/output` notifications on the requesting connection ([`Peer`]), all written before the
-//! response; it is cancelled by `exec/kill` with the same `requestId`, and terminated when the
-//! connection ends.
-//!
-//! The command environment is Core's allow-listed environment
-//! ([`piarc_host::DEFAULT_ENV_PASSTHROUGH`], no credentials) with the request's `env` overlay
-//! on top (Pi's `PI_*` session variables and `PATH`).
+//! sessions; `files.rs` holds the `fs/*` side of the invariants (architecture section 6.1.2).
+//! `exec.rs` holds `exec/run` and `exec/shells` (T17, architecture section 6.11): shell,
+//! working directory carried between commands, environment, timeout, output budget and the
+//! meaning of exit codes. `exec/run` streams the command's output as `exec/output`
+//! notifications on the requesting connection ([`Peer`]), all written before the response; it
+//! is cancelled by `exec/kill` with the same `requestId`, and stopped with its whole process
+//! tree when the connection ends or the session's turn is interrupted.
 //!
 //! A session opened with [`ToolIo::open_sandboxed_session`] runs its commands sandboxed
 //! (architecture section 6.10, T11): `piarc-sandbox` gives the wrapper (`sandbox-exec` with a
 //! profile generated for the command) and the proxy and cache variables, which go on top of
-//! the environment; `piarc-exec` runs it with the process-tree spawner, so cancelling a
+//! the environment; like every command it runs with the process-tree spawner, so cancelling a
 //! command ends everything it started. The session's network proxy stops when the session is
 //! closed. Output, exit status and cancellation are those of any `exec/run`. Which sessions
 //! are sandboxed, and the Bash tool's two sandbox modes, are T39's.
@@ -30,35 +29,28 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
+mod exec;
 mod files;
 
-use piarc_exec::{
-    CommandRunner, CommandSpec, Launcher, OutputChunk, ProcessTreeSpawner, Stream,
-    TokioProcessSpawner,
-};
+pub use exec::{CommandEnv, DISPLAY_WINDOW};
+use piarc_exec::{ExecLimits, Launcher};
 use piarc_fs::{EncodingCache, FileStates, GrepQuery, Scope};
 use piarc_host::{InboundHandler, Peer};
 use piarc_ports::BoxFuture;
-use piarc_protocol::exec::{
-    ExecKillParams, ExecKillResult, ExecOutput, ExecOutputParams, ExecRunParams, ExecRunResult,
-    OutputStream,
-};
+use piarc_protocol::exec::{ExecKillParams, ExecKillResult, ExecRunParams, ExecShellsParams};
 use piarc_protocol::fs::{
     FsGlobParams, FsGrepParams, FsListParams, FsMkdirParams, FsPdfParams, FsReadParams,
     FsSpillParams, FsStatParams, FsWriteParams,
 };
-use piarc_protocol::text::incomplete_utf8_suffix;
 use piarc_protocol::{ErrorKind, ErrorObject};
 use piarc_sandbox::proxy::{Allowlist, SystemNetwork};
 use piarc_sandbox::{SandboxPolicy, SessionSandbox};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
-use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-/// Output chunks waiting to become notifications; a full buffer pauses the command's pipes.
-const OUTPUT_BUFFER: usize = 16;
+use crate::events::EventSender;
 
 /// Sees every request [`ToolIo`] answers, before it is answered (tests count and hold
 /// requests to observe tool concurrency on Core's side, T14-A06). Production sets none.
@@ -76,10 +68,13 @@ pub trait ToolIoObserver: Send + Sync {
 /// Where [`ToolIo`] keeps its files and what commands inherit.
 #[derive(Clone)]
 pub struct ToolIoConfig {
-    /// PiArc's data directory: blobs go to `sessions/<sessionId>/blobs/` below it.
+    /// PiArc's data directory: blobs go to `sessions/<sessionId>/blobs/` below it, the
+    /// user's settings (`shell.gitBashPath`) are read from `settings.json` in it.
     pub data_dir: PathBuf,
-    /// The base environment of every command.
-    pub command_env: Vec<(OsString, OsString)>,
+    /// Where commands get their environment.
+    pub command_env: CommandEnv,
+    /// Timeouts and output budgets of commands.
+    pub exec_limits: ExecLimits,
     /// Sees every request first (tests only).
     pub observer: Option<Arc<dyn ToolIoObserver>>,
 }
@@ -88,24 +83,22 @@ impl std::fmt::Debug for ToolIoConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ToolIoConfig")
             .field("data_dir", &self.data_dir)
-            .field("command_env", &self.command_env.len())
+            .field("exec_limits", &self.exec_limits)
             .field("observer", &self.observer.is_some())
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
 impl ToolIoConfig {
-    /// Blobs under `data_dir`; commands get the variables of
-    /// [`piarc_host::DEFAULT_ENV_PASSTHROUGH`] that Core's own environment sets.
+    /// Blobs under `data_dir`; commands get Core's own environment without PiArc's variables
+    /// ([`CommandEnv::process`]; Core's runtime asks the login shell instead) and the default
+    /// limits.
     #[must_use]
     pub fn new(data_dir: PathBuf) -> Self {
-        let command_env = piarc_host::DEFAULT_ENV_PASSTHROUGH
-            .iter()
-            .filter_map(|name| std::env::var_os(name).map(|value| (OsString::from(name), value)))
-            .collect();
         Self {
             data_dir,
-            command_env,
+            command_env: CommandEnv::process(),
+            exec_limits: ExecLimits::default(),
             observer: None,
         }
     }
@@ -124,6 +117,8 @@ struct SessionIo {
     /// Detected encodings of the files the session reads.
     encodings: EncodingCache,
     running: Mutex<HashMap<String, CancellationToken>>,
+    /// Where the session's next bash command without an explicit `cwd` starts.
+    shell_cwd: Mutex<PathBuf>,
     /// Present when the session's commands run sandboxed; owns the session's proxy.
     sandbox: Option<SessionSandbox>,
 }
@@ -146,9 +141,8 @@ pub struct ToolIo {
     config: Arc<ToolIoConfig>,
     /// One file is written by one request at a time, whichever session sends it.
     locks: files::Locks,
-    runner: CommandRunner,
-    /// Runs sandboxed commands; kills reach the whole process tree.
-    sandboxed_runner: CommandRunner,
+    /// Shells, environment and runner of commands.
+    exec: Arc<exec::Exec>,
 }
 
 impl std::fmt::Debug for ToolIo {
@@ -160,15 +154,25 @@ impl std::fmt::Debug for ToolIo {
 }
 
 impl ToolIo {
-    /// A dispatcher running commands with the production process spawner.
+    /// A dispatcher running commands with the process-tree spawner.
     #[must_use]
     pub fn new(config: ToolIoConfig) -> Self {
+        Self::with_notices(config, None)
+    }
+
+    /// Like [`ToolIo::new`], with notices for the user (`core/notices`) going to `notices`.
+    pub(crate) fn with_notices(config: ToolIoConfig, notices: Option<EventSender>) -> Self {
+        let exec = exec::Exec::new(
+            config.exec_limits,
+            config.command_env.clone(),
+            config.data_dir.clone(),
+            notices,
+        );
         Self {
             sessions: Arc::default(),
             config: Arc::new(config),
             locks: Arc::default(),
-            runner: CommandRunner::new(Arc::new(TokioProcessSpawner)),
-            sandboxed_runner: CommandRunner::new(Arc::new(ProcessTreeSpawner)),
+            exec: Arc::new(exec),
         }
     }
 
@@ -258,6 +262,7 @@ impl ToolIo {
         sandbox: Option<SessionSandbox>,
     ) {
         let blob_dir = self.session_dir(session_id).join("blobs");
+        let shell_cwd = Mutex::new(scope.cwd().to_path_buf());
         lock(&self.sessions).insert(
             session_id.to_owned(),
             Arc::new(SessionIo {
@@ -268,6 +273,7 @@ impl ToolIo {
                 uploads: Mutex::default(),
                 encodings: EncodingCache::default(),
                 running: Mutex::default(),
+                shell_cwd,
                 sandbox,
             }),
         );
@@ -387,8 +393,9 @@ impl ToolIo {
                 })
                 .await
             }
-            "exec/run" => self.exec_run(parse(method, params)?, peer).await,
-            "exec/kill" => self.exec_kill(&parse(method, params)?),
+            "exec/run" | "exec/shells" | "exec/kill" => {
+                self.dispatch_exec(method, params, peer).await
+            }
             _ => Err(ErrorObject::new(
                 ErrorKind::MethodNotFound,
                 format!("Core does not handle {method}"),
@@ -397,21 +404,26 @@ impl ToolIo {
         }
     }
 
+    async fn dispatch_exec(
+        &self,
+        method: &str,
+        params: Map<String, Value>,
+        peer: Peer,
+    ) -> Result<Value, ErrorObject> {
+        match method {
+            "exec/run" => self.exec_run(parse(method, params)?, peer).await,
+            "exec/shells" => {
+                let p: ExecShellsParams = parse(method, params)?;
+                self.session(&p.session_id.0)?;
+                to_value(&self.exec.answer_shells().await)
+            }
+            _ => self.exec_kill(&parse(method, params)?),
+        }
+    }
+
     async fn exec_run(&self, p: ExecRunParams, peer: Peer) -> Result<Value, ErrorObject> {
         let session = self.session(&p.session_id.0)?;
-        let cwd = match &p.cwd {
-            Some(cwd) => session
-                .scope
-                .resolve(cwd)
-                .map_err(|e| e.to_error_object())?,
-            None => session.scope.cwd().to_path_buf(),
-        };
-        if !cwd.is_dir() {
-            return Err(piarc_fs::Error::NotFound {
-                path: piarc_fs::display(&cwd),
-            }
-            .to_error_object());
-        }
+        let launch = exec::launch_dir(&session, p.cwd.as_deref())?;
         let token = CancellationToken::new();
         {
             let mut running = lock(&session.running);
@@ -424,26 +436,22 @@ impl ToolIo {
             }
             running.insert(p.request_id.clone(), token.clone());
         }
-        let mut env = command_env(&self.config.command_env, p.env.unwrap_or_default());
-        let (runner, launcher) = match &session.sandbox {
-            Some(sandbox) => {
-                let launch = sandbox.launch().map_err(|e| sandbox_error(&e))?;
-                env = overlay_env(env, launch.env);
-                let launcher = Launcher {
-                    program: launch.program,
-                    args: launch.args,
-                };
-                (&self.sandboxed_runner, Some(launcher))
-            }
-            None => (&self.runner, None),
+        let wrap = match &session.sandbox {
+            Some(sandbox) => match sandbox.launch() {
+                Ok(launch) => exec::Wrap {
+                    launcher: Some(Launcher {
+                        program: launch.program,
+                        args: launch.args,
+                    }),
+                    env: launch.env,
+                },
+                Err(e) => {
+                    lock(&session.running).remove(&p.request_id);
+                    return Err(sandbox_error(&e));
+                }
+            },
+            None => exec::Wrap::default(),
         };
-        let spec = CommandSpec {
-            command: p.command,
-            cwd,
-            env,
-            launcher,
-        };
-        let (tx, rx) = mpsc::channel(OUTPUT_BUFFER);
         let watcher = {
             let (peer, token) = (peer.clone(), token.clone());
             tokio::spawn(async move {
@@ -453,17 +461,11 @@ impl ToolIo {
                 }
             })
         };
-        let forward = forward_output(rx, peer, p.request_id.clone(), token.clone());
-        let (exit, ()) = tokio::join!(runner.run(spec, tx, token.clone()), forward);
+        let request_id = p.request_id.clone();
+        let result = self.exec.run(&session, p, launch, wrap, peer, token).await;
         watcher.abort();
-        lock(&session.running).remove(&p.request_id);
-        // Starting the shell is what can fail here (the working directory was checked).
-        let exit = exit.map_err(|e| piarc_fs::Error::io(runner.shell(), e).to_error_object())?;
-        to_value(&ExecRunResult {
-            exit_code: exit.status.code,
-            signal: exit.status.signal,
-            killed: exit.killed,
-        })
+        lock(&session.running).remove(&request_id);
+        to_value(&result?)
     }
 
     fn exec_kill(&self, p: &ExecKillParams) -> Result<Value, ErrorObject> {
@@ -502,51 +504,6 @@ impl InboundHandler for ToolIo {
     ) -> BoxFuture<'static, Result<Value, ErrorObject>> {
         let io = self.clone();
         Box::pin(async move { io.dispatch(&method, params, peer).await })
-    }
-}
-
-/// Turns output chunks into `exec/output` notifications, never splitting a UTF-8 sequence; a
-/// closed connection cancels the command.
-async fn forward_output(
-    mut rx: mpsc::Receiver<OutputChunk>,
-    peer: Peer,
-    request_id: String,
-    token: CancellationToken,
-) {
-    let mut seq = 0_u64;
-    let mut pending: HashMap<Stream, Vec<u8>> = HashMap::new();
-    let mut send = async |stream: Stream, data: String| {
-        if data.is_empty() {
-            return;
-        }
-        seq += 1;
-        let params = ExecOutputParams {
-            request_id: request_id.clone(),
-            stream: match stream {
-                Stream::Stdout => OutputStream::Stdout,
-                Stream::Stderr => OutputStream::Stderr,
-            },
-            seq,
-            data,
-        };
-        if peer.notify::<ExecOutput>(params).await.is_err() {
-            token.cancel();
-        }
-    };
-    while let Some(chunk) = rx.recv().await {
-        let buffer = pending.entry(chunk.stream).or_default();
-        buffer.extend_from_slice(&chunk.bytes);
-        let complete = buffer.len() - incomplete_utf8_suffix(buffer);
-        let rest = buffer.split_off(complete);
-        let text = String::from_utf8_lossy(buffer).into_owned();
-        *buffer = rest;
-        send(chunk.stream, text).await;
-    }
-    // Whatever is left can no longer complete: U+FFFD.
-    for stream in [Stream::Stdout, Stream::Stderr] {
-        if let Some(rest) = pending.remove(&stream) {
-            send(stream, String::from_utf8_lossy(&rest).into_owned()).await;
-        }
     }
 }
 

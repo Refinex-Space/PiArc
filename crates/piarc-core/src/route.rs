@@ -20,6 +20,10 @@ pub const RESERVED_PREFIX: &str = "core/";
 /// return an error to. Each event is a structured error object (`code`, `message`, `data`).
 pub const ERROR_ROUTE: &str = "core/errors";
 
+/// Route of notices for the user (T17): `{ "type": "gitBashMissing", "message", "searched",
+/// "downloadUrl" }` when Windows sessions run without the `Bash` tool.
+pub const NOTICES_ROUTE: &str = "core/notices";
+
 /// A validated route key. Cheap to clone.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct RouteKey(Arc<str>);
@@ -59,6 +63,13 @@ impl RouteKey {
     #[must_use]
     pub fn settings() -> Self {
         Self(Arc::from(crate::workspace_settings::SETTINGS_ROUTE))
+    }
+
+    /// The route of notices for the user that no request answers, such as a missing Git
+    /// Bash on Windows (`core/notices`, T17).
+    #[must_use]
+    pub fn notices() -> Self {
+        Self(Arc::from(NOTICES_ROUTE))
     }
 
     /// The route of the workspace list snapshots (`core/workspaces`, T14).

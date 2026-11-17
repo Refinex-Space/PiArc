@@ -308,7 +308,17 @@ async fn exec_run_streams_output_before_the_command_ends() {
         ]
     );
     let result = run.await.expect("joins").expect("runs");
-    assert_eq!(result, json!({ "exitCode": 4, "killed": false }));
+    assert_eq!(
+        (&result["exitCode"], &result["killed"]),
+        (&json!(4), &json!(false))
+    );
+    // T17: the structured result of the bash card and the model's view of the output.
+    assert_eq!(result["outcome"], "failure");
+    assert_eq!(result["timedOut"], false);
+    assert_eq!(result["timeout"], json!({ "ms": 120_000 }));
+    assert!(result["durationMs"].as_u64().expect("duration") >= 2000);
+    assert_eq!(result["output"]["totalChars"], 23);
+    assert!(result["output"].get("tail").is_none());
 }
 
 /// T07-A08: `exec/kill` terminates the running command and `exec/run` reports it.

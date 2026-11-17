@@ -65,6 +65,8 @@ export type AhpMessage =
   | ExecRunResponse
   | ExecKillRequest
   | ExecKillResponse
+  | ExecShellsRequest
+  | ExecShellsResponse
   | ExecOutputNotification
   | SecretsGetAllRequest
   | SecretsGetAllResponse
@@ -237,6 +239,10 @@ export type Item =
        * The command line.
        */
       command: string;
+      /**
+       * How the command ran, in `item/completed` of a command Core ran (the bash card).
+       */
+      execution?: CommandExecutionInfo | null;
       /**
        * The item's identifier: the tool call id.
        */
@@ -441,6 +447,14 @@ export type ItemId = string;
  */
 export type ItemStatus = 'inProgress' | 'completed' | 'failed' | 'declined' | 'interrupted';
 /**
+ * Reasons for a [`CwdReset`].
+ */
+export type CwdResetReason = 'outsideWorkspace' | 'missing';
+/**
+ * Whether a command succeeded.
+ */
+export type CommandOutcome = 'success' | 'failure';
+/**
  * What happened to a line.
  */
 export type DiffLineKind = 'context' | 'added' | 'removed';
@@ -460,6 +474,10 @@ export type ReadMode = 'text' | 'blob';
  * How `fs/write` treats the line breaks of the new text when it replaces an existing file.
  */
 export type LineEndings = 'asWritten' | 'matchFile';
+/**
+ * A shell commands run with.
+ */
+export type ExecShell = 'bash' | 'powershell';
 /**
  * Which output stream a chunk came from.
  */
@@ -1300,6 +1318,72 @@ export interface HistoryItem {
    * The item in its final state.
    */
   item: Item;
+}
+/**
+ * How a shell command ran: what the client shows on its card, as Core reported it.
+ */
+export interface CommandExecutionInfo {
+  /**
+   * The directory the command ran in.
+   */
+  cwd: string;
+  /**
+   * The next command starts somewhere else, and why.
+   */
+  cwdReset?: CwdReset | null;
+  /**
+   * How long it ran, in milliseconds.
+   */
+  durationMs: number;
+  /**
+   * The exit code, when the command exited normally.
+   */
+  exitCode?: number | null;
+  /**
+   * The file holding the full output, when it was saved.
+   */
+  fullOutputPath?: string | null;
+  /**
+   * What a non-zero exit code of a successful command means (`no matches`).
+   */
+  meaning?: string | null;
+  /**
+   * Whether it succeeded, judged by what its exit code means.
+   */
+  outcome: CommandOutcome;
+  /**
+   * The terminating signal number on Unix, when a signal ended the command.
+   */
+  signal?: number | null;
+  /**
+   * Whether it was stopped because its timeout passed.
+   */
+  timedOut: boolean;
+  /**
+   * The timeout it ran with, in milliseconds.
+   */
+  timeoutMs: number;
+  /**
+   * Whether the model got only part of the output.
+   */
+  truncated: boolean;
+}
+/**
+ * Why a session's next command starts somewhere else than where the last one ended.
+ */
+export interface CwdReset {
+  /**
+   * The directory the shell ended in (or the remembered one that no longer exists).
+   */
+  endedIn: string;
+  /**
+   * Why.
+   */
+  reason: CwdResetReason;
+  /**
+   * Where the next command starts: the workspace root.
+   */
+  resetTo: string;
 }
 /**
  * One file change as a diff.
@@ -2184,6 +2268,14 @@ export interface ExecRunParams {
    * The session whose workspace and working directory apply.
    */
   sessionId: SessionId;
+  /**
+   * The shell; `bash` when absent.
+   */
+  shell?: ExecShell | null;
+  /**
+   * How long the command may run, in milliseconds; Core's default when absent.
+   */
+  timeoutMs?: number | null;
 }
 /**
  * Successful response to `exec/run`.
@@ -2199,17 +2291,92 @@ export interface ExecRunResponse {
  */
 export interface ExecRunResult {
   /**
+   * The directory the command ran in.
+   */
+  cwd?: string | null;
+  /**
+   * The session's next command will not start where this one ended, and why.
+   */
+  cwdReset?: CwdReset | null;
+  /**
+   * How long the command ran, in milliseconds.
+   */
+  durationMs?: number | null;
+  /**
    * The exit code, when the command exited normally.
    */
   exitCode?: number | null;
   /**
-   * Whether `exec/kill` terminated the command.
+   * Whether `exec/kill` (or the connection's end) stopped the command.
    */
   killed: boolean;
+  /**
+   * What a non-zero exit code of a successful command means (`no matches`).
+   */
+  meaning?: string | null;
+  /**
+   * Whether the command did what it was asked, judged by what its exit code means.
+   */
+  outcome?: CommandOutcome | null;
+  /**
+   * The output the model sees.
+   */
+  output?: CommandOutput | null;
   /**
    * The terminating signal number on Unix, when a signal ended the command.
    */
   signal?: number | null;
+  /**
+   * Whether the command was stopped because its timeout passed.
+   */
+  timedOut?: boolean | null;
+  /**
+   * The timeout the command ran with.
+   */
+  timeout?: ExecTimeout | null;
+}
+/**
+ * A command's output as the model sees it.
+ */
+export interface CommandOutput {
+  /**
+   * The file holding the full output (`~` for the home directory), when it was saved.
+   */
+  fullOutputPath?: string | null;
+  /**
+   * All of the output (stdout and stderr in the order they were read), or its start when
+   * `tail` is present.
+   */
+  head: string;
+  /**
+   * Characters left out between `head` and `tail`.
+   */
+  omittedChars?: number | null;
+  /**
+   * Why the full output could not be saved.
+   */
+  saveError?: string | null;
+  /**
+   * The end of the output, when its middle was left out.
+   */
+  tail?: string | null;
+  /**
+   * Characters of the whole output.
+   */
+  totalChars: number;
+}
+/**
+ * The timeout a command ran with.
+ */
+export interface ExecTimeout {
+  /**
+   * The timeout applied, in milliseconds.
+   */
+  ms: number;
+  /**
+   * The timeout asked for, when it was longer than Core's maximum and was cut to `ms`.
+   */
+  requestedMs?: number | null;
 }
 /**
  * Request for `exec/kill`.
@@ -2252,6 +2419,48 @@ export interface ExecKillResult {
   killed: boolean;
 }
 /**
+ * Request for `exec/shells`.
+ */
+export interface ExecShellsRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'exec/shells';
+  params: ExecShellsParams;
+}
+/**
+ * Parameters of `exec/shells`.
+ */
+export interface ExecShellsParams {
+  /**
+   * The session whose tools are being set up.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `exec/shells`.
+ */
+export interface ExecShellsResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: ExecShellsResult;
+}
+/**
+ * Result of `exec/shells`: which shells the session's command tools can use. When bash is
+ * missing (Windows without Git Bash) the session gets no `Bash` tool, and Core has told the
+ * user how to install it.
+ */
+export interface ExecShellsResult {
+  /**
+   * bash (Git Bash on Windows) was found.
+   */
+  bash: boolean;
+  /**
+   * PowerShell was found (Windows only).
+   */
+  powershell: boolean;
+}
+/**
  * Notification `exec/output`.
  */
 export interface ExecOutputNotification {
@@ -2275,6 +2484,11 @@ export interface ExecOutputParams {
    * 1, 2, 3, ... across both streams of the command, in the order Core read them.
    */
   seq: number;
+  /**
+   * Bytes of this stream left out right before this chunk, because the Agent Host read
+   * slower than the command wrote.
+   */
+  skipped?: number | null;
   /**
    * The stream the chunk came from.
    */

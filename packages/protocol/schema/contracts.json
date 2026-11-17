@@ -368,6 +368,18 @@
       "schema": "ExecKillResponse"
     },
     {
+      "kind": "request",
+      "method": "exec/shells",
+      "name": "exec/shells",
+      "schema": "ExecShellsRequest"
+    },
+    {
+      "kind": "response",
+      "method": "exec/shells",
+      "name": "exec/shells/result",
+      "schema": "ExecShellsResponse"
+    },
+    {
       "kind": "notification",
       "method": "exec/output",
       "name": "exec/output",

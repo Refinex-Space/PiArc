@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 29,
+  "result": {
+    "exitCode": 1,
+    "killed": false,
+    "outcome": "maybe"
+  }
+}

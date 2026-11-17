@@ -25,6 +25,120 @@
       "description": "A named optional protocol feature, for example `planMode`.\n\nCapabilities are open strings rather than an enum: a peer must accept capability names\nit does not know, because that is how newer minor versions announce additions.",
       "type": "string"
     },
+    "CommandExecutionInfo": {
+      "description": "How a shell command ran: what the client shows on its card, as Core reported it.",
+      "properties": {
+        "cwd": {
+          "description": "The directory the command ran in.",
+          "type": "string"
+        },
+        "cwdReset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CwdReset"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The next command starts somewhere else, and why."
+        },
+        "durationMs": {
+          "description": "How long it ran, in milliseconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "exitCode": {
+          "description": "The exit code, when the command exited normally.",
+          "format": "int32",
+          "type": ["integer", "null"]
+        },
+        "fullOutputPath": {
+          "description": "The file holding the full output, when it was saved.",
+          "type": ["string", "null"]
+        },
+        "meaning": {
+          "description": "What a non-zero exit code of a successful command means (`no matches`).",
+          "type": ["string", "null"]
+        },
+        "outcome": {
+          "$ref": "#/$defs/CommandOutcome",
+          "description": "Whether it succeeded, judged by what its exit code means."
+        },
+        "signal": {
+          "description": "The terminating signal number on Unix, when a signal ended the command.",
+          "format": "int32",
+          "type": ["integer", "null"]
+        },
+        "timedOut": {
+          "description": "Whether it was stopped because its timeout passed.",
+          "type": "boolean"
+        },
+        "timeoutMs": {
+          "description": "The timeout it ran with, in milliseconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "truncated": {
+          "description": "Whether the model got only part of the output.",
+          "type": "boolean"
+        }
+      },
+      "required": ["cwd", "outcome", "durationMs", "timedOut", "timeoutMs", "truncated"],
+      "type": "object"
+    },
+    "CommandOutcome": {
+      "description": "Whether a command succeeded.",
+      "oneOf": [
+        {
+          "const": "success",
+          "description": "It did what it was asked: exit code 0, or an exit code that is an answer.",
+          "type": "string"
+        },
+        {
+          "const": "failure",
+          "description": "It failed, was stopped or timed out.",
+          "type": "string"
+        }
+      ]
+    },
+    "CommandOutput": {
+      "description": "A command's output as the model sees it.",
+      "properties": {
+        "fullOutputPath": {
+          "description": "The file holding the full output (`~` for the home directory), when it was saved.",
+          "type": ["string", "null"]
+        },
+        "head": {
+          "description": "All of the output (stdout and stderr in the order they were read), or its start when\n`tail` is present.",
+          "type": "string"
+        },
+        "omittedChars": {
+          "description": "Characters left out between `head` and `tail`.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "saveError": {
+          "description": "Why the full output could not be saved.",
+          "type": ["string", "null"]
+        },
+        "tail": {
+          "description": "The end of the output, when its middle was left out.",
+          "type": ["string", "null"]
+        },
+        "totalChars": {
+          "description": "Characters of the whole output.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["head", "totalChars"],
+      "type": "object"
+    },
     "CompactionReason": {
       "description": "Why a compaction ran.",
       "oneOf": [
@@ -72,6 +186,40 @@
       },
       "required": ["protocol", "enabled", "workspace", "connectionEpoch"],
       "type": "object"
+    },
+    "CwdReset": {
+      "description": "Why a session's next command starts somewhere else than where the last one ended.",
+      "properties": {
+        "endedIn": {
+          "description": "The directory the shell ended in (or the remembered one that no longer exists).",
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/CwdResetReason",
+          "description": "Why."
+        },
+        "resetTo": {
+          "description": "Where the next command starts: the workspace root.",
+          "type": "string"
+        }
+      },
+      "required": ["endedIn", "resetTo", "reason"],
+      "type": "object"
+    },
+    "CwdResetReason": {
+      "description": "Reasons for a [`CwdReset`].",
+      "oneOf": [
+        {
+          "const": "outsideWorkspace",
+          "description": "Outside the workspace root and the added directories.",
+          "type": "string"
+        },
+        {
+          "const": "missing",
+          "description": "The directory no longer exists.",
+          "type": "string"
+        }
+      ]
     },
     "DiffHunk": {
       "description": "A run of changed lines with their context.",
@@ -472,6 +620,12 @@
           "minimum": 0,
           "type": "integer"
         },
+        "skipped": {
+          "description": "Bytes of this stream left out right before this chunk, because the Agent Host read\nslower than the command wrote.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
         "stream": {
           "$ref": "#/$defs/OutputStream",
           "description": "The stream the chunk came from."
@@ -516,6 +670,23 @@
         "sessionId": {
           "$ref": "#/$defs/SessionId",
           "description": "The session whose workspace and working directory apply."
+        },
+        "shell": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExecShell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The shell; `bash` when absent."
+        },
+        "timeoutMs": {
+          "description": "How long the command may run, in milliseconds; Core's default when absent.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
         }
       },
       "required": ["sessionId", "requestId", "command"],
@@ -561,22 +732,181 @@
     "ExecRunResult": {
       "description": "Result of `exec/run`.",
       "properties": {
+        "cwd": {
+          "description": "The directory the command ran in.",
+          "type": ["string", "null"]
+        },
+        "cwdReset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CwdReset"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The session's next command will not start where this one ended, and why."
+        },
+        "durationMs": {
+          "description": "How long the command ran, in milliseconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
         "exitCode": {
           "description": "The exit code, when the command exited normally.",
           "format": "int32",
           "type": ["integer", "null"]
         },
         "killed": {
-          "description": "Whether `exec/kill` terminated the command.",
+          "description": "Whether `exec/kill` (or the connection's end) stopped the command.",
           "type": "boolean"
+        },
+        "meaning": {
+          "description": "What a non-zero exit code of a successful command means (`no matches`).",
+          "type": ["string", "null"]
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CommandOutcome"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether the command did what it was asked, judged by what its exit code means."
+        },
+        "output": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CommandOutput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The output the model sees."
         },
         "signal": {
           "description": "The terminating signal number on Unix, when a signal ended the command.",
           "format": "int32",
           "type": ["integer", "null"]
+        },
+        "timedOut": {
+          "description": "Whether the command was stopped because its timeout passed.",
+          "type": ["boolean", "null"]
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExecTimeout"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The timeout the command ran with."
         }
       },
       "required": ["killed"],
+      "type": "object"
+    },
+    "ExecShell": {
+      "description": "A shell commands run with.",
+      "oneOf": [
+        {
+          "const": "bash",
+          "description": "bash; Git Bash on Windows.",
+          "type": "string"
+        },
+        {
+          "const": "powershell",
+          "description": "PowerShell 7, or Windows PowerShell 5.1 without it (Windows only).",
+          "type": "string"
+        }
+      ]
+    },
+    "ExecShellsParams": {
+      "description": "Parameters of `exec/shells`.",
+      "properties": {
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session whose tools are being set up."
+        }
+      },
+      "required": ["sessionId"],
+      "type": "object"
+    },
+    "ExecShellsRequest": {
+      "description": "Request for `exec/shells`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "exec/shells",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ExecShellsParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "ExecShellsResponse": {
+      "description": "Successful response to `exec/shells`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/ExecShellsResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "ExecShellsResult": {
+      "description": "Result of `exec/shells`: which shells the session's command tools can use. When bash is\nmissing (Windows without Git Bash) the session gets no `Bash` tool, and Core has told the\nuser how to install it.",
+      "properties": {
+        "bash": {
+          "description": "bash (Git Bash on Windows) was found.",
+          "type": "boolean"
+        },
+        "powershell": {
+          "description": "PowerShell was found (Windows only).",
+          "type": "boolean"
+        }
+      },
+      "required": ["bash", "powershell"],
+      "type": "object"
+    },
+    "ExecTimeout": {
+      "description": "The timeout a command ran with.",
+      "properties": {
+        "ms": {
+          "description": "The timeout applied, in milliseconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "requestedMs": {
+          "description": "The timeout asked for, when it was longer than Core's maximum and was cut to `ms`.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        }
+      },
+      "required": ["ms"],
       "type": "object"
     },
     "FileDiff": {
@@ -2112,6 +2442,17 @@
             "command": {
               "description": "The command line.",
               "type": "string"
+            },
+            "execution": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CommandExecutionInfo"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "How the command ran, in `item/completed` of a command Core ran (the bash card)."
             },
             "itemId": {
               "$ref": "#/$defs/ItemId",
@@ -4592,6 +4933,12 @@
     },
     {
       "$ref": "#/$defs/ExecKillResponse"
+    },
+    {
+      "$ref": "#/$defs/ExecShellsRequest"
+    },
+    {
+      "$ref": "#/$defs/ExecShellsResponse"
     },
     {
       "$ref": "#/$defs/ExecOutputNotification"

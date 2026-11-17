@@ -84,6 +84,9 @@ pub struct CoreConfig {
     pub secret_store: Option<SecretStoreSetup>,
     /// Sees every delegated tool request first (tests only, T14-A06).
     pub tool_observer: Option<Arc<dyn crate::tool_io::ToolIoObserver>>,
+    /// Where shell commands get their environment; the user's login shell of Core's own
+    /// environment when absent (T17). Tests pass a fixed or prepared environment.
+    pub command_env: Option<crate::tool_io::CommandEnv>,
 }
 
 /// A credential store for the vault's master key and the key's name in it.
@@ -113,6 +116,7 @@ impl Default for CoreConfig {
             sessions: SessionsConfig::default(),
             secret_store: None,
             tool_observer: None,
+            command_env: None,
         }
     }
 }
@@ -985,10 +989,17 @@ fn open_state(
         storage: storage.clone(),
         trust: trust.clone(),
         secrets,
-        tool_io: ToolIo::new(ToolIoConfig {
-            observer: config.tool_observer.clone(),
-            ..ToolIoConfig::new(data)
-        }),
+        tool_io: ToolIo::with_notices(
+            ToolIoConfig {
+                observer: config.tool_observer.clone(),
+                command_env: config
+                    .command_env
+                    .clone()
+                    .unwrap_or_else(crate::tool_io::CommandEnv::login_shell),
+                ..ToolIoConfig::new(data)
+            },
+            Some(events.clone()),
+        ),
         config: config.sessions.clone(),
         snapshots,
         cancel: cancel.child_token(),
