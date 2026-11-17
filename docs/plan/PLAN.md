@@ -126,7 +126,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T14 | [会话编排与事件投影](tasks/T14-session-orchestration-and-projection.md) | 2 | T13 | macOS | xhigh | 大 | 无 | 已完成 | eedccea |
 | T15 | [无头驱动、L2 场景运行器与能力清单](tasks/T15-devcli-l2-scenarios-and-capabilities.md) | 2 | T14 | macOS | high | 中 | 无 | 已完成 | 5546027 |
 | T16 | [文件工具与编辑不变量](tasks/T16-file-tools-invariants.md) | 2 | T15 | macOS | xhigh | 大 | 无 | 已完成 | ea75a25 |
-| T17 | [Bash / PowerShell 执行与进程管理](tasks/T17-bash-powershell-execution.md) | 2 | T16 | macOS | high | 大 | 无 | 未开始 | — |
+| T17 | [Bash / PowerShell 执行与进程管理](tasks/T17-bash-powershell-execution.md) | 2 | T16 | macOS | high | 大 | 无 | 进行中 | — |
 | T18 | [客户端外壳、会话列表、设置窗口与信任对话框](tasks/T18-client-shell-and-session-list.md) | 2 | T17；D3 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T19 | [Transcript 与 composer 正式版](tasks/T19-transcript-and-composer.md) | 2 | T18 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T20 | [基础权限与审批](tasks/T20-basic-permissions-and-approvals.md) | 2 | T19 | macOS | xhigh | 大 | 无 | 未开始 | — |
@@ -293,6 +293,18 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+T17（开工 2026-11-17，基线 `npm run verify` 14/14 通过）：
+
+- [ ] 1 进程与终止：进程组 SIGTERM → 宽限 → SIGKILL、Job Object；超时、abort、Core 关闭终止整棵树（A01、A02）
+- [ ] 2 工作目录：cd 跨命令保留、越界重置并说明、Git Bash 路径转换（A03）
+- [ ] 3 超时与输出：默认 2 分钟、上限 10 分钟；30,000 字符内联、落盘与 2,000 字符预览、失败头尾；持续读管道（A04、A05、A06）
+- [ ] 4 语义退出码判定表（A07）
+- [ ] 5 命令环境：登录 shell 环境解析与缓存、内部变量剔除、无凭据、Windows UTF-8（A08）
+- [ ] 6 Windows：Git Bash 探测与安装提示、PowerShell 工具（A11、A12）
+- [ ] 7 流式输出与 `commandExecution` 结构化字段、golden（A09、A10）
+- [ ] 8 L2 场景 `exec-*` 与能力 ID
+- [ ] 9 文档（piarc-exec CLAUDE.md、coding-standards 复用表、架构与 ADR）、verify、验收与收尾（A13）
 
 ## 登记事项
 
