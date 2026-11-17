@@ -56,8 +56,21 @@ pub struct Message {
     /// Ids this message answers (Anthropic `tool_result.tool_use_id`, OpenAI
     /// `tool_call_id`).
     pub tool_results: Vec<String>,
+    /// The answers themselves, in the same order as [`Self::tool_results`].
+    pub tool_result_contents: Vec<ToolResultContent>,
     /// Anthropic: no other content block comes before a `tool_result` block.
     pub results_first: bool,
+}
+
+/// What a tool result says.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ToolResultContent {
+    /// The tool call it answers.
+    pub id: String,
+    /// Its text parts joined with newlines; an image part is `[image <media type>]`.
+    pub text: String,
+    /// Anthropic `is_error`; `None` where the wire format has no such flag (OpenAI).
+    pub is_error: Option<bool>,
 }
 
 /// Message roles; anything unknown is kept as [`Role::Other`] for the validator to
@@ -204,8 +217,22 @@ impl Message {
             texts: Vec::new(),
             tool_calls: Vec::new(),
             tool_results: Vec::new(),
+            tool_result_contents: Vec::new(),
             results_first: true,
         }
+    }
+}
+
+/// Parses a request body of the given wire format into a [`Request`], the structure
+/// [`crate::validate`] checks.
+///
+/// # Errors
+///
+/// A [`Rule::MalformedRequest`] violation when the body lacks the wire format's structure.
+pub fn parse_request(format: WireFormat, body: &Value) -> Result<Request, Violation> {
+    match format {
+        WireFormat::AnthropicMessages => crate::anthropic::parse(body),
+        WireFormat::OpenaiChatCompletions => crate::openai::parse(body),
     }
 }
 

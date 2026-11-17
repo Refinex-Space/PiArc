@@ -1,0 +1,744 @@
+//! The L2 scenario file (architecture section 12.3): types, loading and checks.
+//!
+//! A file is checked in three passes, each reporting the file and the field:
+//!
+//! 1. the JSON Schema `tests/scenarios/schema.json` (embedded at build time, the single
+//!    description of the format): missing fields, wrong types, unknown fields;
+//! 2. deserialization into [`ScenarioSpec`];
+//! 3. references the schema cannot express: the id equals the file name, sessions and
+//!    providers exist, labels are defined before use, paths stay inside the workspace,
+//!    mock scripts pass the mock's own checks.
+
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
+
+use serde::Deserialize;
+use serde_json::Value;
+
+use crate::scenario::{Scenario, Script, Step, ValidationConfig};
+
+/// The format's JSON Schema, embedded so the loader and the documentation use one file.
+pub const SCHEMA: &str = include_str!("../../../../tests/scenarios/schema.json");
+
+/// A scenario file that failed to load: the file and every problem found, each naming the
+/// field (a JSON pointer such as `/expect/events/0/method`).
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{}: invalid scenario:\n{}", file.display(), problems.iter().map(|p| format!("  - {p}")).collect::<Vec<_>>().join("\n"))]
+pub struct FormatError {
+    /// The scenario file.
+    pub file: PathBuf,
+    /// One line per problem, starting with the field.
+    pub problems: Vec<String>,
+}
+
+/// A platform a scenario runs on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Platform {
+    /// macOS.
+    Macos,
+    /// Windows.
+    Windows,
+}
+
+impl Platform {
+    /// Every platform.
+    pub const ALL: [Self; 2] = [Self::Macos, Self::Windows];
+
+    /// The platform this binary was built for, if it is one of [`Self::ALL`].
+    #[must_use]
+    pub fn current() -> Option<Self> {
+        if cfg!(target_os = "macos") {
+            Some(Self::Macos)
+        } else if cfg!(windows) {
+            Some(Self::Windows)
+        } else {
+            None
+        }
+    }
+
+    /// The name used in scenario files.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Macos => "macos",
+            Self::Windows => "windows",
+        }
+    }
+}
+
+/// One scenario file.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScenarioSpec {
+    /// Equals the file name without extension.
+    pub id: String,
+    /// The behavior the scenario proves.
+    pub description: String,
+    /// Capability ids it covers.
+    pub capabilities: Vec<String>,
+    /// Platforms it runs on; both when absent.
+    #[serde(default)]
+    pub platforms: Option<Vec<Platform>>,
+    /// Why a platform is left out.
+    #[serde(default)]
+    pub platform_reason: Option<String>,
+    /// The workspace fixture.
+    #[serde(default)]
+    pub workspace: WorkspaceSpec,
+    /// Mock endpoints by name.
+    pub providers: BTreeMap<String, ProviderSpec>,
+    /// Sessions by label; see [`ScenarioSpec::sessions`].
+    #[serde(default, rename = "sessions")]
+    pub declared_sessions: Option<BTreeMap<String, SessionSpec>>,
+    /// What the runner does, in order.
+    pub actions: Vec<Action>,
+    /// Answers to approval requests, in order.
+    #[serde(default)]
+    pub approvals: Vec<Approval>,
+    /// What must hold after the run.
+    pub expect: Expect,
+}
+
+/// The workspace fixture.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkspaceSpec {
+    /// Relative path (forward slashes) to content.
+    #[serde(default)]
+    pub files: BTreeMap<String, String>,
+    /// Trust the workspace before opening it.
+    #[serde(default)]
+    pub trusted: bool,
+}
+
+/// A wire format of a mock endpoint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Wire {
+    /// Anthropic Messages.
+    Anthropic,
+    /// OpenAI-compatible Chat Completions.
+    Openai,
+}
+
+/// One mock endpoint: its own mock provider, Pi provider and model.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderSpec {
+    /// Its wire format.
+    pub wire: Wire,
+    /// Request validation; every rule on by default.
+    #[serde(default)]
+    pub validation: ValidationConfig,
+    /// One response per request.
+    pub steps: Vec<Step>,
+}
+
+impl ProviderSpec {
+    /// The mock script of this endpoint.
+    #[must_use]
+    pub fn script(&self) -> Script {
+        Script {
+            validation: self.validation.clone(),
+            steps: self.steps.clone(),
+        }
+    }
+}
+
+/// One session.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SessionSpec {
+    /// The endpoint its model talks to.
+    pub provider: String,
+    /// Working directory relative to the workspace.
+    #[serde(default)]
+    pub cwd: Option<String>,
+}
+
+/// An input (prompt, steering message, follow-up).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InputAction {
+    /// The session; the only one when absent.
+    #[serde(default)]
+    pub session: Option<String>,
+    /// The text.
+    pub text: String,
+    /// Label for the turn it started.
+    #[serde(default)]
+    pub turn: Option<String>,
+    /// Label for the queue item it became.
+    #[serde(default)]
+    pub item: Option<String>,
+}
+
+/// One thing the runner does.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum Action {
+    /// `session_op(Prompt)`.
+    Prompt(InputAction),
+    /// `session_op(Steer)`.
+    Steer(InputAction),
+    /// `session_op(FollowUp)`.
+    FollowUp(InputAction),
+    /// Edits a queue item.
+    QueueEdit {
+        /// The session.
+        #[serde(default)]
+        session: Option<String>,
+        /// The item's label.
+        item: String,
+        /// Its new text.
+        text: String,
+    },
+    /// Deletes a queue item.
+    QueueDelete {
+        /// The session.
+        #[serde(default)]
+        session: Option<String>,
+        /// The item's label.
+        item: String,
+    },
+    /// Reorders the queue.
+    QueueReorder {
+        /// The session.
+        #[serde(default)]
+        session: Option<String>,
+        /// Every item's label in the new order.
+        items: Vec<String>,
+    },
+    /// Interrupts the running turn.
+    Abort {
+        /// The session.
+        #[serde(default)]
+        session: Option<String>,
+    },
+    /// Waits for events.
+    Wait(WaitAction),
+    /// Writes a workspace file (a signal for a waiting command).
+    WriteFile {
+        /// Relative path.
+        path: String,
+        /// Content.
+        content: String,
+    },
+}
+
+impl Action {
+    /// The action's name as written in the file.
+    #[must_use]
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Prompt(_) => "prompt",
+            Self::Steer(_) => "steer",
+            Self::FollowUp(_) => "follow_up",
+            Self::QueueEdit { .. } => "queue_edit",
+            Self::QueueDelete { .. } => "queue_delete",
+            Self::QueueReorder { .. } => "queue_reorder",
+            Self::Abort { .. } => "abort",
+            Self::Wait(_) => "wait",
+            Self::WriteFile { .. } => "write_file",
+        }
+    }
+
+    fn session(&self) -> Option<&Option<String>> {
+        match self {
+            Self::Prompt(input) | Self::Steer(input) | Self::FollowUp(input) => {
+                Some(&input.session)
+            }
+            Self::QueueEdit { session, .. }
+            | Self::QueueDelete { session, .. }
+            | Self::QueueReorder { session, .. }
+            | Self::Abort { session } => Some(session),
+            Self::Wait(wait) => Some(&wait.session),
+            Self::WriteFile { .. } => None,
+        }
+    }
+}
+
+/// Waits until `count` events match.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WaitAction {
+    /// The session; the only one when absent.
+    #[serde(default)]
+    pub session: Option<String>,
+    /// The notification method.
+    pub method: String,
+    /// Field subset of `params`.
+    #[serde(default)]
+    pub params: Option<Value>,
+    /// `params.turnId` is the turn with this label.
+    #[serde(default)]
+    pub turn: Option<String>,
+    /// How many matching events; 1 when absent.
+    #[serde(default)]
+    pub count: Option<usize>,
+}
+
+impl WaitAction {
+    /// What it waits for.
+    #[must_use]
+    pub fn matcher(&self) -> EventMatcher {
+        EventMatcher {
+            session: self.session.clone(),
+            method: self.method.clone(),
+            params: self.params.clone(),
+            turn: self.turn.clone(),
+        }
+    }
+}
+
+/// A field subset of one session notification.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EventMatcher {
+    /// The session; the only one when absent.
+    #[serde(default)]
+    pub session: Option<String>,
+    /// The notification method.
+    pub method: String,
+    /// Field subset of `params`.
+    #[serde(default)]
+    pub params: Option<Value>,
+    /// `params.turnId` is the turn with this label.
+    #[serde(default)]
+    pub turn: Option<String>,
+}
+
+/// An expected event, or several in any order.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(untagged)]
+pub enum EventExpect {
+    /// One event.
+    One(EventMatcher),
+    /// Events in any order, all after the previous item and before the next.
+    AnyOrder {
+        /// The events; all of the same session.
+        any_order: Vec<EventMatcher>,
+    },
+}
+
+impl EventExpect {
+    /// The matchers of this item.
+    #[must_use]
+    pub fn matchers(&self) -> &[EventMatcher] {
+        match self {
+            Self::One(matcher) => std::slice::from_ref(matcher),
+            Self::AnyOrder { any_order } => any_order,
+        }
+    }
+}
+
+/// An approval answer.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Approval {
+    /// The decision.
+    pub decision: ApprovalDecision,
+    /// The tool the request must be for.
+    #[serde(default)]
+    pub tool: Option<String>,
+}
+
+/// Approval decisions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ApprovalDecision {
+    /// Allow.
+    Allow,
+    /// Deny.
+    Deny,
+}
+
+/// What must hold after the run.
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Expect {
+    /// Ordered subsequence of events per session.
+    #[serde(default)]
+    pub events: Vec<EventExpect>,
+    /// Workspace files: content, or `None` for absent.
+    #[serde(default)]
+    pub files: BTreeMap<String, Option<String>>,
+    /// Request assertions.
+    #[serde(default)]
+    pub requests: Vec<RequestExpect>,
+    /// Exact request counts per endpoint.
+    #[serde(default)]
+    pub request_counts: BTreeMap<String, usize>,
+    /// Tool call ids in the batches their Core requests arrive in.
+    #[serde(default)]
+    pub tool_batches: Vec<Vec<String>>,
+    /// Core requests per tool call.
+    #[serde(default)]
+    pub core_io: Vec<CoreIoExpect>,
+}
+
+/// One request assertion; every field present must hold.
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RequestExpect {
+    /// The endpoint; the only one when absent.
+    #[serde(default)]
+    pub provider: Option<String>,
+    /// Request number of the endpoint, from 0.
+    pub index: usize,
+    /// Message roles in order.
+    #[serde(default)]
+    pub roles: Option<Vec<String>>,
+    /// Exactly these tool names, any order.
+    #[serde(default)]
+    pub tools: Option<Vec<String>>,
+    /// These tool names among others.
+    #[serde(default)]
+    pub tools_include: Option<Vec<String>>,
+    /// None of these tool names.
+    #[serde(default)]
+    pub tools_exclude: Option<Vec<String>>,
+    /// The text of every user message, in order.
+    #[serde(default)]
+    pub user_texts: Option<Vec<String>>,
+    /// The text of the last user message.
+    #[serde(default)]
+    pub last_user_text: Option<String>,
+    /// Substrings of the raw body.
+    #[serde(default)]
+    pub contains: Option<Vec<String>>,
+    /// Strings the raw body must not contain.
+    #[serde(default)]
+    pub not_contains: Option<Vec<String>>,
+    /// Every tool result, in order.
+    #[serde(default)]
+    pub tool_results: Option<Vec<ToolResultExpect>>,
+    /// Field subset of the body.
+    #[serde(default)]
+    pub body: Option<Value>,
+}
+
+/// One expected tool result.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ToolResultExpect {
+    /// The tool call it answers.
+    pub id: String,
+    /// Whether it is an error (Anthropic only).
+    #[serde(default)]
+    pub is_error: Option<bool>,
+    /// A substring of its text.
+    #[serde(default)]
+    pub contains: Option<String>,
+}
+
+/// Core answered a request with `method` for tool call `call`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CoreIoExpect {
+    /// The tool call id.
+    pub call: String,
+    /// The AHP method, such as `fs/read`.
+    pub method: String,
+}
+
+/// The label of the session a scenario without `sessions` gets.
+pub const DEFAULT_SESSION: &str = "main";
+
+impl ScenarioSpec {
+    /// Sessions by label: the declared ones, or `main` on the only provider.
+    #[must_use]
+    pub fn sessions(&self) -> BTreeMap<String, SessionSpec> {
+        if let Some(sessions) = &self.declared_sessions {
+            return sessions.clone();
+        }
+        let provider = self.providers.keys().next().cloned().unwrap_or_default();
+        BTreeMap::from([(
+            DEFAULT_SESSION.to_owned(),
+            SessionSpec {
+                provider,
+                cwd: None,
+            },
+        )])
+    }
+
+    /// The platforms the scenario runs on.
+    #[must_use]
+    pub fn platforms(&self) -> Vec<Platform> {
+        self.platforms
+            .clone()
+            .unwrap_or_else(|| Platform::ALL.to_vec())
+    }
+
+    /// Resolves an optional session reference: the named one, or the only one.
+    ///
+    /// # Errors
+    ///
+    /// A description when the name is unknown or there are several sessions to choose from.
+    pub fn session_label(&self, session: Option<&str>) -> Result<String, String> {
+        let sessions = self.sessions();
+        match session {
+            Some(name) if sessions.contains_key(name) => Ok(name.to_owned()),
+            Some(name) => Err(format!("no session `{name}`")),
+            None if sessions.len() == 1 => Ok(sessions.keys().next().cloned().unwrap_or_default()),
+            None => Err("several sessions are declared; name one with `session`".to_owned()),
+        }
+    }
+
+    /// Resolves an optional endpoint reference.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::session_label`].
+    pub fn provider_label(&self, provider: Option<&str>) -> Result<String, String> {
+        match provider {
+            Some(name) if self.providers.contains_key(name) => Ok(name.to_owned()),
+            Some(name) => Err(format!("no provider `{name}`")),
+            None if self.providers.len() == 1 => {
+                Ok(self.providers.keys().next().cloned().unwrap_or_default())
+            }
+            None => Err("several providers are declared; name one with `provider`".to_owned()),
+        }
+    }
+
+    /// The mock scenario id of endpoint `provider`.
+    #[must_use]
+    pub fn mock_scenario_id(&self, provider: &str) -> String {
+        format!("{}.{provider}", self.id)
+    }
+}
+
+fn schema_validator() -> &'static Result<jsonschema::Validator, String> {
+    static VALIDATOR: OnceLock<Result<jsonschema::Validator, String>> = OnceLock::new();
+    VALIDATOR.get_or_init(|| {
+        let schema: Value =
+            serde_json::from_str(SCHEMA).map_err(|e| format!("schema.json is not JSON: {e}"))?;
+        jsonschema::validator_for(&schema).map_err(|e| format!("schema.json is invalid: {e}"))
+    })
+}
+
+/// Loads and checks one scenario file.
+///
+/// # Errors
+///
+/// [`FormatError`] with every problem found and the field it concerns.
+pub fn load(file: &Path) -> Result<ScenarioSpec, FormatError> {
+    let fail = |problems: Vec<String>| FormatError {
+        file: file.to_path_buf(),
+        problems,
+    };
+    let text =
+        std::fs::read_to_string(file).map_err(|e| fail(vec![format!("cannot read: {e}")]))?;
+    let value: Value =
+        serde_saphyr::from_str(&text).map_err(|e| fail(vec![format!("not valid YAML: {e}")]))?;
+    let validator = schema_validator()
+        .as_ref()
+        .map_err(|e| fail(vec![e.clone()]))?;
+    let mut problems: Vec<String> = validator
+        .iter_errors(&value)
+        .map(|error| {
+            let field = error.instance_path().to_string();
+            format!("{}: {error}", if field.is_empty() { "/" } else { &field })
+        })
+        .collect();
+    if !problems.is_empty() {
+        problems.sort();
+        problems.dedup();
+        return Err(fail(problems));
+    }
+    let spec: ScenarioSpec =
+        serde_json::from_value(value).map_err(|e| fail(vec![format!("/: {e}")]))?;
+    let stem = file
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or_default();
+    let problems = check(&spec, stem);
+    if problems.is_empty() {
+        Ok(spec)
+    } else {
+        Err(fail(problems))
+    }
+}
+
+/// The scenario files of a directory (`*.yaml`, `*.yml`, sorted), or the file itself.
+///
+/// # Errors
+///
+/// A description when the directory cannot be read.
+pub fn scenario_files(path: &Path) -> Result<Vec<PathBuf>, String> {
+    if !path.is_dir() {
+        return Ok(vec![path.to_path_buf()]);
+    }
+    let entries =
+        std::fs::read_dir(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+    let mut files = Vec::new();
+    for entry in entries {
+        let file = entry
+            .map_err(|e| format!("cannot read {}: {e}", path.display()))?
+            .path();
+        let yaml = file
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| e == "yaml" || e == "yml");
+        if file.is_file() && yaml {
+            files.push(file);
+        }
+    }
+    files.sort();
+    Ok(files)
+}
+
+/// The checks the schema cannot express.
+fn check(spec: &ScenarioSpec, stem: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    if spec.id != stem {
+        problems.push(format!(
+            "/id: `{}` differs from the file name `{stem}`",
+            spec.id
+        ));
+    }
+    let platforms = spec.platforms();
+    if platforms.len() < Platform::ALL.len() && spec.platform_reason.is_none() {
+        problems.push("/platform_reason: required when `platforms` leaves a platform out".into());
+    }
+    for (provider, endpoint) in &spec.providers {
+        if let Err(e) = Scenario::new(spec.mock_scenario_id(provider), endpoint.script()) {
+            problems.push(format!("/providers/{provider}: {e}"));
+        }
+    }
+    for (label, session) in spec.sessions() {
+        if !spec.providers.contains_key(&session.provider) {
+            problems.push(format!(
+                "/sessions/{label}/provider: no provider `{}`",
+                session.provider
+            ));
+        }
+        if let Some(cwd) = &session.cwd {
+            check_path(&format!("/sessions/{label}/cwd"), cwd, &mut problems);
+        }
+    }
+    if spec.declared_sessions.is_none() && spec.providers.len() > 1 {
+        problems.push("/sessions: required when several providers are declared".into());
+    }
+    for path in spec.workspace.files.keys() {
+        check_path(&format!("/workspace/files/{path}"), path, &mut problems);
+    }
+    for path in spec.expect.files.keys() {
+        check_path(&format!("/expect/files/{path}"), path, &mut problems);
+    }
+    check_actions(spec, &mut problems);
+    check_expect(spec, &mut problems);
+    problems
+}
+
+fn check_path(field: &str, path: &str, problems: &mut Vec<String>) {
+    let bad = path.contains('\\')
+        || path.starts_with('/')
+        || path.as_bytes().get(1) == Some(&b':')
+        || path.split('/').any(|part| part == ".." || part.is_empty());
+    if bad {
+        problems.push(format!(
+            "{field}: `{path}` must be relative, use forward slashes and stay inside the workspace"
+        ));
+    }
+}
+
+/// Session references resolve, and turn and item labels are defined (once) before use.
+fn check_actions(spec: &ScenarioSpec, problems: &mut Vec<String>) {
+    let mut turns = BTreeSet::new();
+    let mut items = BTreeSet::new();
+    for (n, action) in spec.actions.iter().enumerate() {
+        let field = format!("/actions/{n}/{}", action.name());
+        if let Some(session) = action.session()
+            && let Err(e) = spec.session_label(session.as_deref())
+        {
+            problems.push(format!("{field}/session: {e}"));
+        }
+        let mut define = |set: &mut BTreeSet<String>, label: &Option<String>, what: &str| {
+            if let Some(label) = label
+                && !set.insert(label.clone())
+            {
+                problems.push(format!(
+                    "{field}/{what}: label `{label}` is already defined"
+                ));
+            }
+        };
+        match action {
+            Action::Prompt(input) | Action::Steer(input) | Action::FollowUp(input) => {
+                define(&mut turns, &input.turn, "turn");
+                define(&mut items, &input.item, "item");
+            }
+            Action::QueueEdit { item, .. } | Action::QueueDelete { item, .. } => {
+                if !items.contains(item) {
+                    problems.push(format!("{field}/item: no earlier item `{item}`"));
+                }
+            }
+            Action::QueueReorder { items: order, .. } => {
+                for item in order.iter().filter(|item| !items.contains(*item)) {
+                    problems.push(format!("{field}/items: no earlier item `{item}`"));
+                }
+            }
+            Action::Wait(wait) => {
+                if let Some(turn) = wait.turn.as_ref().filter(|t| !turns.contains(*t)) {
+                    problems.push(format!("{field}/turn: no earlier turn `{turn}`"));
+                }
+            }
+            Action::Abort { .. } => {}
+            Action::WriteFile { path, .. } => check_path(&format!("{field}/path"), path, problems),
+        }
+    }
+}
+
+fn check_expect(spec: &ScenarioSpec, problems: &mut Vec<String>) {
+    let turns: BTreeSet<&String> = spec
+        .actions
+        .iter()
+        .filter_map(|action| match action {
+            Action::Prompt(input) | Action::Steer(input) | Action::FollowUp(input) => {
+                input.turn.as_ref()
+            }
+            _ => None,
+        })
+        .collect();
+    for (n, expected) in spec.expect.events.iter().enumerate() {
+        let mut sessions = BTreeSet::new();
+        for matcher in expected.matchers() {
+            match spec.session_label(matcher.session.as_deref()) {
+                Ok(label) => {
+                    sessions.insert(label);
+                }
+                Err(e) => problems.push(format!("/expect/events/{n}/session: {e}")),
+            }
+            if let Some(turn) = matcher.turn.as_ref().filter(|t| !turns.contains(t)) {
+                problems.push(format!("/expect/events/{n}/turn: no turn `{turn}`"));
+            }
+        }
+        if sessions.len() > 1 {
+            problems.push(format!(
+                "/expect/events/{n}/any_order: all events of a group belong to one session"
+            ));
+        }
+    }
+    for (n, request) in spec.expect.requests.iter().enumerate() {
+        if let Err(e) = spec.provider_label(request.provider.as_deref()) {
+            problems.push(format!("/expect/requests/{n}/provider: {e}"));
+        }
+    }
+    for provider in spec.expect.request_counts.keys() {
+        if !spec.providers.contains_key(provider) {
+            problems.push(format!(
+                "/expect/request_counts/{provider}: no such provider"
+            ));
+        }
+    }
+    let mut seen = BTreeSet::new();
+    for (n, batch) in spec.expect.tool_batches.iter().enumerate() {
+        for call in batch.iter().filter(|call| !seen.insert(*call)) {
+            problems.push(format!(
+                "/expect/tool_batches/{n}: `{call}` is in more than one batch"
+            ));
+        }
+    }
+}

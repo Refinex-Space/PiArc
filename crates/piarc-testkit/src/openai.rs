@@ -11,8 +11,8 @@
 use serde_json::{Value, json};
 
 use crate::request::{
-    Message, Request, Role, Tool, ToolKind, WireFormat, as_object, malformed, optional_array,
-    required_str,
+    Message, Request, Role, Tool, ToolKind, ToolResultContent, WireFormat, as_object, malformed,
+    optional_array, required_str,
 };
 use crate::rules::{Violation, attach_violations};
 use crate::scenario::{InjectedErrorKind, Step, StopReason};
@@ -123,9 +123,13 @@ fn parse_message(index: usize, value: &Value) -> Result<Message, Violation> {
             .push(required_str(call, "id", &call_location)?.to_owned());
     }
     if message.role == Role::Tool {
-        message
-            .tool_results
-            .push(required_str(object, "tool_call_id", &location)?.to_owned());
+        let id = required_str(object, "tool_call_id", &location)?.to_owned();
+        message.tool_result_contents.push(ToolResultContent {
+            id: id.clone(),
+            text: message.texts.join("\n"),
+            is_error: None,
+        });
+        message.tool_results.push(id);
     }
     Ok(message)
 }

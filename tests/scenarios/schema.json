@@ -1,0 +1,380 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://piarc.cn/schemas/l2-scenario.json",
+  "title": "PiArc L2 scenario",
+  "description": "One L2 scenario (architecture section 12.3): workspace fixture, mock provider scripts, the actions that drive Core, approval answers and the expected events, files and requests. Field reference and matching rules: docs/engineering/testing.md section 12.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "description", "capabilities", "providers", "actions", "expect"],
+  "properties": {
+    "id": {
+      "description": "Equals the file name without extension.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "description": {
+      "description": "The behavior the scenario proves, in one sentence that matches its assertions.",
+      "type": "string",
+      "minLength": 1
+    },
+    "capabilities": {
+      "description": "Capability ids of tests/capabilities.yaml this scenario covers.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/capabilityId" }
+    },
+    "platforms": {
+      "description": "Platforms the scenario runs on; both when absent.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "enum": ["macos", "windows"] }
+    },
+    "platform_reason": {
+      "description": "Why a platform is left out; required when platforms excludes one.",
+      "type": "string",
+      "minLength": 1
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "files": {
+          "description": "Initial files: relative path (forward slashes) to UTF-8 content.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/relativePath" },
+          "additionalProperties": { "type": "string" }
+        },
+        "trusted": {
+          "description": "Record a trust decision for the workspace before it opens; untrusted when absent.",
+          "type": "boolean"
+        }
+      }
+    },
+    "providers": {
+      "description": "Mock provider endpoints by name; each is its own Pi provider with one model.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "#/$defs/label" },
+      "additionalProperties": { "$ref": "#/$defs/provider" }
+    },
+    "sessions": {
+      "description": "Sessions by label; a single session `main` on the only provider when absent.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "#/$defs/label" },
+      "additionalProperties": { "$ref": "#/$defs/session" }
+    },
+    "actions": {
+      "description": "What the runner does, in order.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/action" }
+    },
+    "approvals": {
+      "description": "Answers to Core's approval requests, in order.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/approval" }
+    },
+    "expect": { "$ref": "#/$defs/expect" }
+  },
+  "$defs": {
+    "capabilityId": { "type": "string", "pattern": "^CAP-[A-Z0-9]+(-[A-Z0-9]+)*-[0-9]{3}$" },
+    "label": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Relative, forward slashes; the loader also rejects `..` segments and drive letters.",
+      "pattern": "^[^/\\\\]"
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wire", "steps"],
+      "properties": {
+        "wire": { "description": "Wire format of the endpoint.", "enum": ["anthropic", "openai"] },
+        "validation": { "$ref": "#/$defs/validation" },
+        "steps": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/step" } }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rules": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tool_pairing": { "type": "boolean" },
+            "role_order": { "type": "boolean" },
+            "tool_schema": { "type": "boolean" },
+            "system_sections": { "type": "boolean" },
+            "cache_breakpoint_count": { "type": "boolean" },
+            "cache_breakpoint_position": { "type": "boolean" }
+          }
+        },
+        "required_system_sections": { "type": "array", "items": { "type": "string" } },
+        "cache_breakpoints": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_message_level": { "type": "integer", "minimum": 0 },
+            "last_message_only": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text": { "type": "string" },
+        "tool_calls": { "type": "array", "items": { "$ref": "#/$defs/toolCall" } },
+        "usage": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "input_tokens": { "type": "integer", "minimum": 0 },
+            "output_tokens": { "type": "integer", "minimum": 0 },
+            "cache_read_tokens": { "type": "integer", "minimum": 0 },
+            "cache_write_tokens": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "stop_reason": { "enum": ["end_turn", "tool_use", "max_tokens"] },
+        "disconnect_after_events": { "type": "integer", "minimum": 0 },
+        "stall_after_events": { "type": "integer", "minimum": 0 },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "enum": ["rate_limit", "overloaded", "server_error", "unavailable"] },
+            "retry_after_secs": { "type": "integer", "minimum": 0 },
+            "message": { "type": "string" }
+          }
+        }
+      }
+    },
+    "toolCall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "input"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "input": { "type": "object" },
+        "fragments": { "type": "integer", "minimum": 1 },
+        "split_at": { "type": "array", "items": { "type": "integer", "minimum": 1 } }
+      }
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider"],
+      "properties": {
+        "provider": { "$ref": "#/$defs/label" },
+        "cwd": {
+          "description": "Working directory relative to the workspace; the workspace when absent.",
+          "$ref": "#/$defs/relativePath"
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "prompt": { "$ref": "#/$defs/inputAction" },
+        "steer": { "$ref": "#/$defs/inputAction" },
+        "follow_up": { "$ref": "#/$defs/inputAction" },
+        "queue_edit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["item", "text"],
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "item": { "$ref": "#/$defs/label" },
+            "text": { "type": "string" }
+          }
+        },
+        "queue_delete": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["item"],
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "item": { "$ref": "#/$defs/label" }
+          }
+        },
+        "queue_reorder": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["items"],
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "items": { "type": "array", "items": { "$ref": "#/$defs/label" } }
+          }
+        },
+        "abort": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "session": { "$ref": "#/$defs/label" } }
+        },
+        "wait": { "$ref": "#/$defs/waitAction" },
+        "write_file": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "content"],
+          "properties": {
+            "path": { "$ref": "#/$defs/relativePath" },
+            "content": { "type": "string" }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "inputAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": {
+        "session": { "$ref": "#/$defs/label" },
+        "text": { "type": "string", "minLength": 1 },
+        "turn": { "description": "Label for the turn the input started.", "$ref": "#/$defs/label" },
+        "item": { "description": "Label for the queue item it became.", "$ref": "#/$defs/label" }
+      }
+    },
+    "waitAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method"],
+      "properties": {
+        "session": { "$ref": "#/$defs/label" },
+        "method": { "type": "string", "minLength": 1 },
+        "params": { "type": "object" },
+        "turn": { "$ref": "#/$defs/label" },
+        "count": {
+          "description": "Wait until this many matching events arrived.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "eventMatcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method"],
+      "properties": {
+        "session": { "$ref": "#/$defs/label" },
+        "method": { "type": "string", "minLength": 1 },
+        "params": { "description": "Field subset of the event's params.", "type": "object" },
+        "turn": {
+          "description": "params.turnId is the turn with this label.",
+          "$ref": "#/$defs/label"
+        }
+      }
+    },
+    "eventGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["any_order"],
+      "properties": {
+        "any_order": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/eventMatcher" } }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision"],
+      "properties": {
+        "decision": { "enum": ["allow", "deny"] },
+        "tool": {
+          "description": "The canonical tool name the request must be for.",
+          "type": "string"
+        }
+      }
+    },
+    "requestExpect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index"],
+      "properties": {
+        "provider": { "$ref": "#/$defs/label" },
+        "index": {
+          "description": "Request number of the endpoint, from 0.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "roles": { "type": "array", "items": { "type": "string" } },
+        "tools": {
+          "description": "Exactly these tool names, in any order.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "tools_include": { "type": "array", "items": { "type": "string" } },
+        "tools_exclude": { "type": "array", "items": { "type": "string" } },
+        "user_texts": { "type": "array", "items": { "type": "string" } },
+        "last_user_text": { "type": "string" },
+        "contains": { "type": "array", "items": { "type": "string" } },
+        "not_contains": { "type": "array", "items": { "type": "string" } },
+        "tool_results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": { "type": "string" },
+              "is_error": { "type": "boolean" },
+              "contains": { "type": "string" }
+            }
+          }
+        },
+        "body": { "description": "Field subset of the request body.", "type": "object" }
+      }
+    },
+    "expect": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "events": {
+          "description": "Ordered subsequence per session; each item a field subset.",
+          "type": "array",
+          "items": {
+            "oneOf": [{ "$ref": "#/$defs/eventMatcher" }, { "$ref": "#/$defs/eventGroup" }]
+          }
+        },
+        "files": {
+          "description": "Workspace files after the run: exact content, or null for absent.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/relativePath" },
+          "additionalProperties": { "type": ["string", "null"] }
+        },
+        "requests": { "type": "array", "items": { "$ref": "#/$defs/requestExpect" } },
+        "request_counts": {
+          "description": "Exact number of requests each endpoint received.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/label" },
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "tool_batches": {
+          "description": "Tool call ids in the batches their Core requests arrive in.",
+          "type": "array",
+          "items": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+        },
+        "core_io": {
+          "description": "Core answered a request with this method for this tool call.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["call", "method"],
+            "properties": { "call": { "type": "string" }, "method": { "type": "string" } }
+          }
+        }
+      }
+    }
+  }
+}

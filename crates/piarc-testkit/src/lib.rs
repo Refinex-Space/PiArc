@@ -99,6 +99,7 @@ mod anthropic;
 mod body;
 mod error;
 mod fragment;
+pub mod l2;
 mod openai;
 pub mod plaintext;
 mod record;
@@ -111,7 +112,8 @@ pub use error::{Error, ErrorKind, Result};
 pub use fragment::{split_at_offsets, split_even};
 pub use record::{Outcome, REDACTED, RequestLog, RequestRecord};
 pub use request::{
-    CacheBreakpoint, CacheSection, Message, Request, Role, Tool, ToolKind, WireFormat,
+    CacheBreakpoint, CacheSection, Message, Request, Role, Tool, ToolKind, ToolResultContent,
+    WireFormat, parse_request,
 };
 pub use rules::{MAX_CACHE_BREAKPOINTS, Rule, Violation, validate};
 pub use scenario::{
@@ -122,19 +124,3 @@ pub use scenario::{
 pub use server::{
     MockProvider, REQUESTS_PATH, SCENARIO_HEADER, SCENARIO_MARKER_CLOSE, SCENARIO_MARKER_OPEN,
 };
-
-/// Parses a request body of the given wire format into a [`Request`], the structure
-/// [`validate`] checks.
-///
-/// # Errors
-///
-/// A [`Rule::MalformedRequest`] violation when the body lacks the wire format's structure.
-pub fn parse_request(
-    format: WireFormat,
-    body: &serde_json::Value,
-) -> std::result::Result<Request, Violation> {
-    match format {
-        WireFormat::AnthropicMessages => anthropic::parse(body),
-        WireFormat::OpenaiChatCompletions => openai::parse(body),
-    }
-}

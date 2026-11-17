@@ -1,0 +1,38 @@
+id: turn-interrupt-pairs-tool-calls
+description: Aborting while tools run completes every tool call of the response as interrupted, and the next request pairs each call with an error result and keeps the roles alternating.
+capabilities: [CAP-TURN-INTERRUPT-001]
+workspace:
+  files:
+    'notes/a.txt': "alpha\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: toolu_hang, name: Bash, input: { command: 'sleep 30' } }
+          - { id: toolu_read, name: Read, input: { path: 'notes/a.txt' } }
+          - { id: toolu_grep, name: Grep, input: { pattern: 'alpha' } }
+      - text: 'Answered after the interruption.'
+actions:
+  - prompt: { text: 'Run the three tools.', turn: first }
+  - wait: { method: item/started, params: { item: { itemId: toolu_hang } } }
+  - abort: {}
+  - wait: { method: turn/completed, turn: first }
+  - prompt: { text: 'Go on.', turn: second }
+expect:
+  events:
+    - any_order:
+        - { method: item/completed, params: { item: { itemId: toolu_hang, status: interrupted } } }
+        - { method: item/completed, params: { item: { itemId: toolu_read, status: interrupted } } }
+        - { method: item/completed, params: { item: { itemId: toolu_grep, status: interrupted } } }
+    - { method: turn/completed, turn: first, params: { status: interrupted } }
+    - { method: turn/completed, turn: second, params: { status: completed } }
+  requests:
+    - index: 1
+      roles: [user, assistant, user, assistant, user]
+      user_texts: ['Run the three tools.', 'Go on.']
+      tool_results:
+        - { id: toolu_hang, is_error: true }
+        - { id: toolu_read, is_error: true }
+        - { id: toolu_grep, is_error: true }
+  request_counts: { main: 2 }

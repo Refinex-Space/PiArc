@@ -11,11 +11,23 @@ publish.workspace = true
 name = "piarc-mock-provider"
 path = "src/bin/mock_provider.rs"
 
+# One test per L2 scenario (tests/scenarios/*.yaml). Not part of `cargo test --workspace`:
+# `npm run verify` runs it as its own step, `cargo test -p piarc-testkit --test scenarios`
+# runs it by hand.
+[[test]]
+name = "scenarios"
+path = "tests/scenarios.rs"
+harness = false
+test = false
+
 [dependencies]
 http-body-util.workspace = true
 hyper.workspace = true
 hyper-util.workspace = true
 jsonschema.workspace = true
+piarc-core.workspace = true
+piarc-ports.workspace = true
+piarc-protocol.workspace = true
 serde.workspace = true
 serde-saphyr.workspace = true
 serde_json.workspace = true
@@ -24,9 +36,6 @@ tokio = { workspace = true, features = ["net", "io-util", "io-std"] }
 
 [dev-dependencies]
 hyper = { workspace = true, features = ["client"] }
-piarc-core.workspace = true
-piarc-ports.workspace = true
-piarc-protocol.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 

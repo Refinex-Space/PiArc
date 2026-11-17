@@ -1,0 +1,24 @@
+id: tools-model-sees-canonical-names
+description: The model is offered exactly the six canonical tool names, none of Pi's native names, and a call by canonical name runs.
+capabilities: [CAP-TOOL-PROFILE-001]
+workspace:
+  files:
+    'readme.md': "# Fixture\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: toolu_read, name: Read, input: { path: readme.md } }
+      - text: 'Read it.'
+actions:
+  - prompt: { text: 'Read the readme.', turn: t }
+expect:
+  events:
+    - { method: item/completed, params: { item: { itemId: toolu_read, tool: Read, status: completed } } }
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  requests:
+    - index: 0
+      tools: [Read, Write, Edit, Bash, Glob, Grep]
+      tools_exclude: [read, write, edit, bash, grep, find, ls, powershell]
+    - { index: 1, tool_results: [{ id: toolu_read, is_error: false, contains: '# Fixture' }] }

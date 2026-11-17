@@ -8,8 +8,8 @@
 use serde_json::{Map, Value, json};
 
 use crate::request::{
-    CacheBreakpoint, CacheSection, Message, Request, Role, Tool, ToolKind, WireFormat, as_object,
-    malformed, optional_array, required_str,
+    CacheBreakpoint, CacheSection, Message, Request, Role, Tool, ToolKind, ToolResultContent,
+    WireFormat, as_object, malformed, optional_array, required_str,
 };
 use crate::rules::{Violation, attach_violations};
 use crate::scenario::{InjectedErrorKind, Step, StopReason};
@@ -137,9 +137,15 @@ fn parse_message(
                         .tool_calls
                         .push(required_str(block, "id", &block_location)?.to_owned()),
                     "tool_result" => {
-                        message
-                            .tool_results
-                            .push(required_str(block, "tool_use_id", &block_location)?.to_owned());
+                        let id = required_str(block, "tool_use_id", &block_location)?.to_owned();
+                        message.tool_result_contents.push(ToolResultContent {
+                            id: id.clone(),
+                            text: tool_result_text(block.get("content")),
+                            is_error: Some(
+                                block.get("is_error").and_then(Value::as_bool) == Some(true),
+                            ),
+                        });
+                        message.tool_results.push(id);
                         message.results_first &= !other_content_seen;
                         for (inner, nested) in optional_array(block, "content", &block_location)
                             .unwrap_or_default()
@@ -178,6 +184,31 @@ fn parse_message(
         }
     }
     Ok(message)
+}
+
+/// The text of a `tool_result` block's `content`: a string, or its parts joined with newlines.
+fn tool_result_text(content: Option<&Value>) -> String {
+    match content {
+        Some(Value::String(text)) => text.clone(),
+        Some(Value::Array(parts)) => parts
+            .iter()
+            .map(|part| match part.get("type").and_then(Value::as_str) {
+                Some("image") => format!(
+                    "[image {}]",
+                    part.pointer("/source/media_type")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                ),
+                _ => part
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned(),
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
+        _ => String::new(),
+    }
 }
 
 fn note_cache_control(
