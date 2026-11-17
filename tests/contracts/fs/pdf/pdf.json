@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 23,
+  "method": "fs/pdf",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": "docs/报告 report.pdf",
+    "pages": "2-3",
+    "origin": { "tool": "Read", "toolCallId": "toolu_05" }
+  }
+}

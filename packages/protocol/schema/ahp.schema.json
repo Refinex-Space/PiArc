@@ -73,6 +73,83 @@
       "required": ["protocol", "enabled", "workspace", "connectionEpoch"],
       "type": "object"
     },
+    "DiffHunk": {
+      "description": "A run of changed lines with their context.",
+      "properties": {
+        "lines": {
+          "description": "The hunk's lines in order.",
+          "items": {
+            "$ref": "#/$defs/DiffLine"
+          },
+          "type": "array"
+        },
+        "newLines": {
+          "description": "Lines of the new file the hunk covers.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "newStart": {
+          "description": "First line of the hunk in the new file.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "oldLines": {
+          "description": "Lines of the old file the hunk covers.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "oldStart": {
+          "description": "First line of the hunk in the old file.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["oldStart", "oldLines", "newStart", "newLines", "lines"],
+      "type": "object"
+    },
+    "DiffLine": {
+      "description": "One line of a hunk.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/DiffLineKind",
+          "description": "Whether the line is kept, added or removed."
+        },
+        "noNewline": {
+          "description": "Set on a last line that has no line break at the end of its file.",
+          "type": ["boolean", "null"]
+        },
+        "text": {
+          "description": "The line without its line break.",
+          "type": "string"
+        }
+      },
+      "required": ["kind", "text"],
+      "type": "object"
+    },
+    "DiffLineKind": {
+      "description": "What happened to a line.",
+      "oneOf": [
+        {
+          "const": "context",
+          "description": "In both files.",
+          "type": "string"
+        },
+        {
+          "const": "added",
+          "description": "Only in the new file.",
+          "type": "string"
+        },
+        {
+          "const": "removed",
+          "description": "Only in the old file.",
+          "type": "string"
+        }
+      ]
+    },
     "DirEntry": {
       "description": "One directory entry.",
       "properties": {
@@ -227,6 +304,26 @@
         {
           "const": "queueItemNotFound",
           "description": "A `session/queue/*` request named a queued input that is no longer waiting: it was\ndelivered to the model or removed meanwhile. `details`: `{ sessionId, itemId }`.",
+          "type": "string"
+        },
+        {
+          "const": "fileNotRead",
+          "description": "`Edit` or `Write` of an existing file that this session has not read: the model has to\nread it first. The file is unchanged. `details`: `{ path }`.",
+          "type": "string"
+        },
+        {
+          "const": "fileModified",
+          "description": "The file changed (by another program, session or tool) since this session last read or\nwrote it: the model has to read it again. The file is unchanged. `details`: `{ path }`.",
+          "type": "string"
+        },
+        {
+          "const": "permissionDenied",
+          "description": "The operation needs the user's approval (a path outside the session's directories, or a\nprotected path) and was not approved; nothing was touched. `details`: `{ path,\nreason, operation }` with `reason` `outsideWorkspace` or `protectedPath` and\n`operation` `read` or `write`.",
+          "type": "string"
+        },
+        {
+          "const": "unencodableText",
+          "description": "The new text has characters the file's encoding cannot represent; the file is\nunchanged. `details`: `{ path, encoding, line }` (1-based line of the first such\ncharacter).",
           "type": "string"
         }
       ]
@@ -482,6 +579,48 @@
       "required": ["killed"],
       "type": "object"
     },
+    "FileDiff": {
+      "description": "One file change as a diff.",
+      "properties": {
+        "added": {
+          "description": "Lines added.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "created": {
+          "description": "Whether the file did not exist before the change.",
+          "type": ["boolean", "null"]
+        },
+        "degraded": {
+          "description": "Set when the change was too large for hunks: `hunks` is empty and `unified` may be cut.",
+          "type": ["boolean", "null"]
+        },
+        "hunks": {
+          "description": "The change as hunks, in file order; empty when `degraded`.",
+          "items": {
+            "$ref": "#/$defs/DiffHunk"
+          },
+          "type": "array"
+        },
+        "path": {
+          "description": "The file as the diff names it: relative to the workspace root with `/` separators, or\nabsolute outside it.",
+          "type": "string"
+        },
+        "removed": {
+          "description": "Lines removed.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unified": {
+          "description": "The change as unified diff text (`---`/`+++` headers, three lines of context).",
+          "type": "string"
+        }
+      },
+      "required": ["path", "added", "removed", "unified", "hunks"],
+      "type": "object"
+    },
     "FileKind": {
       "description": "What a path names.",
       "oneOf": [
@@ -532,6 +671,10 @@
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
+        },
+        "unchanged": {
+          "description": "With `read`: true when the session's previous read of this file asked for the same\nrange and the content has not changed since (the earlier result still holds).",
+          "type": ["boolean", "null"]
         }
       },
       "required": ["path", "kind", "size", "readonly"],
@@ -931,6 +1074,97 @@
       "required": ["path", "created"],
       "type": "object"
     },
+    "FsPdfParams": {
+      "description": "Parameters of `fs/pdf`: the text of a PDF's pages.",
+      "properties": {
+        "origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolOrigin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The tool call this request serves."
+        },
+        "pages": {
+          "description": "Pages to extract, for example `3`, `1-5` or `10-`; all pages when absent, which only\nsmall documents allow.",
+          "type": ["string", "null"]
+        },
+        "path": {
+          "description": "The PDF file.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session whose workspace and working directory apply."
+        }
+      },
+      "required": ["sessionId", "path"],
+      "type": "object"
+    },
+    "FsPdfRequest": {
+      "description": "Request for `fs/pdf`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "fs/pdf",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/FsPdfParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "FsPdfResponse": {
+      "description": "Successful response to `fs/pdf`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/FsPdfResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "FsPdfResult": {
+      "description": "Result of `fs/pdf`.",
+      "properties": {
+        "pageCount": {
+          "description": "Pages in the document.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pages": {
+          "description": "The requested pages, in order.",
+          "items": {
+            "$ref": "#/$defs/PdfPage"
+          },
+          "type": "array"
+        },
+        "path": {
+          "description": "The resolved path.",
+          "type": "string"
+        }
+      },
+      "required": ["path", "pageCount", "pages"],
+      "type": "object"
+    },
     "FsReadParams": {
       "description": "Parameters of `fs/read`.",
       "properties": {
@@ -971,6 +1205,10 @@
         "path": {
           "description": "The file to read.",
           "type": "string"
+        },
+        "requireFresh": {
+          "description": "Fail with `fileNotRead` or `fileModified` unless the session read or wrote this file\nand its content has not changed since (the `Edit` tool reads this way).",
+          "type": ["boolean", "null"]
         },
         "sessionId": {
           "$ref": "#/$defs/SessionId",
@@ -1037,6 +1275,10 @@
           "minimum": 0,
           "type": "integer"
         },
+        "encoding": {
+          "description": "The file's encoding when it is not UTF-8 (text mode), for example `GBK` or `UTF-16LE`.",
+          "type": ["string", "null"]
+        },
         "eof": {
           "description": "Whether the content reaches the end of the file.",
           "type": "boolean"
@@ -1065,6 +1307,105 @@
       "required": ["path", "size", "offset", "bytesRead", "eof"],
       "type": "object"
     },
+    "FsSpillParams": {
+      "description": "Parameters of `fs/spill`: a tool result too long for the model's context, kept in the\nsession's temporary directory (`tool-results/<name>.txt`) for the model to read in parts.",
+      "properties": {
+        "content": {
+          "description": "The text (or the next piece of it, with `upload`).",
+          "type": "string"
+        },
+        "name": {
+          "description": "File name without extension, normally the tool call id; characters other than ASCII\nletters, digits, `-` and `_` are replaced.",
+          "type": "string"
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolOrigin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The tool call this request serves."
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session whose temporary directory receives the file."
+        },
+        "upload": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UploadPart"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Set when the text comes in several requests."
+        }
+      },
+      "required": ["sessionId", "name", "content"],
+      "type": "object"
+    },
+    "FsSpillRequest": {
+      "description": "Request for `fs/spill`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "fs/spill",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/FsSpillParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "FsSpillResponse": {
+      "description": "Successful response to `fs/spill`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/FsSpillResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "FsSpillResult": {
+      "description": "Result of `fs/spill`.",
+      "properties": {
+        "bytesWritten": {
+          "description": "Bytes written (UTF-8).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "description": "The file as the model is told about it: below the home directory as `~/…` (no user\nname), otherwise absolute. The `Read` tool accepts it.",
+          "type": "string"
+        },
+        "staged": {
+          "description": "Set for a piece that was collected, not written.",
+          "type": ["boolean", "null"]
+        }
+      },
+      "required": ["path", "bytesWritten"],
+      "type": "object"
+    },
     "FsStatParams": {
       "description": "Parameters of `fs/stat`.",
       "properties": {
@@ -1086,6 +1427,17 @@
         "path": {
           "description": "The path to inspect; symlinks are followed.",
           "type": "string"
+        },
+        "read": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReadRange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `Read` tool reads this regular file now, with this range: Core records the read in\nthe session's file state table and sets `unchanged` in the result."
         },
         "sessionId": {
           "$ref": "#/$defs/SessionId",
@@ -1136,12 +1488,23 @@
       "description": "Parameters of `fs/write`.",
       "properties": {
         "append": {
-          "description": "Append to the file instead of replacing it; false when absent.",
+          "description": "Append the text to the file's current text; false when absent.",
           "type": ["boolean", "null"]
         },
         "content": {
-          "description": "Text to write, encoded as UTF-8.",
+          "description": "The new text of the file (or the next piece of it, with `upload`).",
           "type": "string"
+        },
+        "lineEndings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LineEndings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "[`LineEndings::AsWritten`] when absent."
         },
         "origin": {
           "anyOf": [
@@ -1161,6 +1524,17 @@
         "sessionId": {
           "$ref": "#/$defs/SessionId",
           "description": "The session whose workspace and working directory apply."
+        },
+        "upload": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UploadPart"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Set when the text comes in several requests: pieces before the last are collected, the\nlast writes the file."
         }
       },
       "required": ["sessionId", "path", "content"],
@@ -1207,14 +1581,33 @@
       "description": "Result of `fs/write`.",
       "properties": {
         "bytesWritten": {
-          "description": "Bytes written by this request.",
+          "description": "Bytes written to the file (0 for a collected piece).",
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
         },
+        "diff": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FileDiff"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The change, once the file is written."
+        },
+        "encoding": {
+          "description": "The encoding the file was written in when it is not UTF-8.",
+          "type": ["string", "null"]
+        },
         "path": {
           "description": "The resolved path.",
           "type": "string"
+        },
+        "staged": {
+          "description": "Set for a piece that was collected, not written.",
+          "type": ["boolean", "null"]
         }
       },
       "required": ["path", "bytesWritten"],
@@ -1752,6 +2145,17 @@
               "description": "The arguments the tool was called with.",
               "type": "object"
             },
+            "diff": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/FileDiff"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The change Core made, in `item/completed` of a call that changed the file."
+            },
             "itemId": {
               "$ref": "#/$defs/ItemId",
               "description": "The item's identifier: the tool call id."
@@ -2161,6 +2565,21 @@
       "const": "2.0",
       "type": "string"
     },
+    "LineEndings": {
+      "description": "How `fs/write` treats the line breaks of the new text when it replaces an existing file.",
+      "oneOf": [
+        {
+          "const": "asWritten",
+          "description": "Write them as they are (the text was derived from the file, as an edit is).",
+          "type": "string"
+        },
+        {
+          "const": "matchFile",
+          "description": "Convert them to the file's style, LF or CRLF (new content for the file, as a `Write`\nis). Without line breaks in the old file, as written.",
+          "type": "string"
+        }
+      ]
+    },
     "ModelRef": {
       "description": "Selects a model by provider id and model id, for example `anthropic` / `claude-opus-5-5`.",
       "properties": {
@@ -2210,6 +2629,23 @@
           "type": "string"
         }
       ]
+    },
+    "PdfPage": {
+      "description": "The text of one PDF page.",
+      "properties": {
+        "number": {
+          "description": "1-based page number.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "text": {
+          "description": "The page's text in reading order, as well as the PDF allows.",
+          "type": "string"
+        }
+      },
+      "required": ["number", "text"],
+      "type": "object"
     },
     "PromptAccepted": {
       "description": "Result of `session/prompt`: the turn was accepted and will report `turn/started` and\n`turn/completed` with this id.",
@@ -2499,6 +2935,28 @@
           "type": "string"
         }
       ]
+    },
+    "ReadRange": {
+      "description": "The part of a file a `Read` call asked for, as the call wrote it.",
+      "properties": {
+        "limit": {
+          "description": "Lines at most.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "offset": {
+          "description": "First line, 1-based.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "pages": {
+          "description": "Pages of a PDF, for example `3` or `1-5`.",
+          "type": ["string", "null"]
+        }
+      },
+      "type": "object"
     },
     "Request": {
       "description": "A request whose method is not interpreted.",
@@ -3933,6 +4391,21 @@
       },
       "required": ["inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens", "cost"],
       "type": "object"
+    },
+    "UploadPart": {
+      "description": "One piece of a text sent in several requests.",
+      "properties": {
+        "id": {
+          "description": "Names the upload; unique among the session's unfinished uploads.",
+          "type": "string"
+        },
+        "last": {
+          "description": "Whether this is the last piece: the collected text is used now.",
+          "type": "boolean"
+        }
+      },
+      "required": ["id", "last"],
+      "type": "object"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -4071,6 +4544,18 @@
     },
     {
       "$ref": "#/$defs/FsWriteResponse"
+    },
+    {
+      "$ref": "#/$defs/FsSpillRequest"
+    },
+    {
+      "$ref": "#/$defs/FsSpillResponse"
+    },
+    {
+      "$ref": "#/$defs/FsPdfRequest"
+    },
+    {
+      "$ref": "#/$defs/FsPdfResponse"
     },
     {
       "$ref": "#/$defs/FsMkdirRequest"

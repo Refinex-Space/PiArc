@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 22,
+  "method": "fs/spill",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "name": "toolu_04",
+    "content": "the last piece",
+    "upload": { "id": "spill-toolu_04", "last": true }
+  }
+}

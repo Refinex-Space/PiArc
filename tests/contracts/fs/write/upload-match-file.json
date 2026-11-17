@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 19,
+  "method": "fs/write",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": "notes/big 大.txt",
+    "content": "first piece\n",
+    "lineEndings": "matchFile",
+    "upload": { "id": "upload-1", "last": false },
+    "origin": { "tool": "Write", "toolCallId": "toolu_03" }
+  }
+}

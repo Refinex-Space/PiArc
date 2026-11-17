@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 12,
+  "method": "fs/stat",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": "src/main 主.ts",
+    "detectImage": true,
+    "read": { "offset": 10, "limit": 20 },
+    "origin": { "tool": "Read", "toolCallId": "toolu_01" }
+  }
+}

@@ -16,7 +16,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::exec::{ExecKill, ExecOutput, ExecRun};
-use crate::fs::{FsGlob, FsGrep, FsList, FsMkdir, FsRead, FsStat, FsWrite};
+use crate::fs::{FsGlob, FsGrep, FsList, FsMkdir, FsPdf, FsRead, FsSpill, FsStat, FsWrite};
 use crate::handshake::HostHello;
 use crate::history::{HarnessEntry, SessionGetEntries, SessionHistory};
 use crate::host::{HostPing, HostShutdown};
@@ -187,6 +187,10 @@ pub static CONTRACTS: &[Contract] = &[
     response::<FsRead>("fs/read/result"),
     request::<FsWrite>(FsWrite::NAME),
     response::<FsWrite>("fs/write/result"),
+    request::<FsSpill>(FsSpill::NAME),
+    response::<FsSpill>("fs/spill/result"),
+    request::<FsPdf>(FsPdf::NAME),
+    response::<FsPdf>("fs/pdf/result"),
     request::<FsMkdir>(FsMkdir::NAME),
     response::<FsMkdir>("fs/mkdir/result"),
     request::<FsList>(FsList::NAME),

@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 23,
+  "result": {
+    "path": "/Users/dev/work space/项目/docs/报告 report.pdf",
+    "pageCount": 12,
+    "pages": [
+      { "number": 2, "text": "Second page 第二页" },
+      { "number": 3, "text": "" }
+    ]
+  }
+}

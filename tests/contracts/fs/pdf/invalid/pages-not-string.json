@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 23,
+  "method": "fs/pdf",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": "a.pdf",
+    "pages": 2
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 21,
+  "result": {
+    "path": "~/Library/Application Support/PiArc/sessions/sess-7f3a/tmp/tool-results/toolu_04.txt",
+    "bytesWritten": 61440
+  }
+}

@@ -49,6 +49,10 @@ export type AhpMessage =
   | FsReadResponse
   | FsWriteRequest
   | FsWriteResponse
+  | FsSpillRequest
+  | FsSpillResponse
+  | FsPdfRequest
+  | FsPdfResponse
   | FsMkdirRequest
   | FsMkdirResponse
   | FsListRequest
@@ -120,7 +124,11 @@ export type ErrorKind =
   | 'vaultVersion'
   | 'secretLockLost'
   | 'releaseIntegrity'
-  | 'queueItemNotFound';
+  | 'queueItemNotFound'
+  | 'fileNotRead'
+  | 'fileModified'
+  | 'permissionDenied'
+  | 'unencodableText';
 /**
  * Session identifier.
  */
@@ -254,6 +262,10 @@ export type Item =
       arguments: {
         [k: string]: unknown;
       };
+      /**
+       * The change Core made, in `item/completed` of a call that changed the file.
+       */
+      diff?: FileDiff | null;
       /**
        * The item's identifier: the tool call id.
        */
@@ -429,6 +441,10 @@ export type ItemId = string;
  */
 export type ItemStatus = 'inProgress' | 'completed' | 'failed' | 'declined' | 'interrupted';
 /**
+ * What happened to a line.
+ */
+export type DiffLineKind = 'context' | 'added' | 'removed';
+/**
  * Why a compaction ran.
  */
 export type CompactionReason = 'manual' | 'threshold' | 'overflow';
@@ -440,6 +456,10 @@ export type FileKind = 'file' | 'directory' | 'other';
  * How `fs/read` returns the content.
  */
 export type ReadMode = 'text' | 'blob';
+/**
+ * How `fs/write` treats the line breaks of the new text when it replaces an existing file.
+ */
+export type LineEndings = 'asWritten' | 'matchFile';
 /**
  * Which output stream a chunk came from.
  */
@@ -1282,6 +1302,82 @@ export interface HistoryItem {
   item: Item;
 }
 /**
+ * One file change as a diff.
+ */
+export interface FileDiff {
+  /**
+   * Lines added.
+   */
+  added: number;
+  /**
+   * Whether the file did not exist before the change.
+   */
+  created?: boolean | null;
+  /**
+   * Set when the change was too large for hunks: `hunks` is empty and `unified` may be cut.
+   */
+  degraded?: boolean | null;
+  /**
+   * The change as hunks, in file order; empty when `degraded`.
+   */
+  hunks: DiffHunk[];
+  /**
+   * The file as the diff names it: relative to the workspace root with `/` separators, or
+   * absolute outside it.
+   */
+  path: string;
+  /**
+   * Lines removed.
+   */
+  removed: number;
+  /**
+   * The change as unified diff text (`---`/`+++` headers, three lines of context).
+   */
+  unified: string;
+}
+/**
+ * A run of changed lines with their context.
+ */
+export interface DiffHunk {
+  /**
+   * The hunk's lines in order.
+   */
+  lines: DiffLine[];
+  /**
+   * Lines of the new file the hunk covers.
+   */
+  newLines: number;
+  /**
+   * First line of the hunk in the new file.
+   */
+  newStart: number;
+  /**
+   * Lines of the old file the hunk covers.
+   */
+  oldLines: number;
+  /**
+   * First line of the hunk in the old file.
+   */
+  oldStart: number;
+}
+/**
+ * One line of a hunk.
+ */
+export interface DiffLine {
+  /**
+   * Whether the line is kept, added or removed.
+   */
+  kind: DiffLineKind;
+  /**
+   * Set on a last line that has no line break at the end of its file.
+   */
+  noNewline?: boolean | null;
+  /**
+   * The line without its line break.
+   */
+  text: string;
+}
+/**
  * Request for `trust/get`.
  */
 export interface TrustGetRequest {
@@ -1343,6 +1439,11 @@ export interface FsStatParams {
    */
   path: string;
   /**
+   * The `Read` tool reads this regular file now, with this range: Core records the read in
+   * the session's file state table and sets `unchanged` in the result.
+   */
+  read?: ReadRange | null;
+  /**
    * The session whose workspace and working directory apply.
    */
   sessionId: SessionId;
@@ -1359,6 +1460,23 @@ export interface ToolOrigin {
    * Pi's id of the tool call.
    */
   toolCallId: string;
+}
+/**
+ * The part of a file a `Read` call asked for, as the call wrote it.
+ */
+export interface ReadRange {
+  /**
+   * Lines at most.
+   */
+  limit?: number | null;
+  /**
+   * First line, 1-based.
+   */
+  offset?: number | null;
+  /**
+   * Pages of a PDF, for example `3` or `1-5`.
+   */
+  pages?: string | null;
 }
 /**
  * Successful response to `fs/stat`.
@@ -1398,6 +1516,11 @@ export interface FileStat {
    * Size in bytes (0 for directories on some platforms).
    */
   size: number;
+  /**
+   * With `read`: true when the session's previous read of this file asked for the same
+   * range and the content has not changed since (the earlier result still holds).
+   */
+  unchanged?: boolean | null;
 }
 /**
  * Request for `fs/read`.
@@ -1433,6 +1556,11 @@ export interface FsReadParams {
    */
   path: string;
   /**
+   * Fail with `fileNotRead` or `fileModified` unless the session read or wrote this file
+   * and its content has not changed since (the `Edit` tool reads this way).
+   */
+  requireFresh?: boolean | null;
+  /**
    * The session whose workspace and working directory apply.
    */
   sessionId: SessionId;
@@ -1459,6 +1587,10 @@ export interface FsReadResult {
    * bytesRead`.
    */
   bytesRead: number;
+  /**
+   * The file's encoding when it is not UTF-8 (text mode), for example `GBK` or `UTF-16LE`.
+   */
+  encoding?: string | null;
   /**
    * Whether the content reaches the end of the file.
    */
@@ -1511,13 +1643,17 @@ export interface FsWriteRequest {
  */
 export interface FsWriteParams {
   /**
-   * Append to the file instead of replacing it; false when absent.
+   * Append the text to the file's current text; false when absent.
    */
   append?: boolean | null;
   /**
-   * Text to write, encoded as UTF-8.
+   * The new text of the file (or the next piece of it, with `upload`).
    */
   content: string;
+  /**
+   * [`LineEndings::AsWritten`] when absent.
+   */
+  lineEndings?: LineEndings | null;
   /**
    * The tool call this request serves.
    */
@@ -1530,6 +1666,24 @@ export interface FsWriteParams {
    * The session whose workspace and working directory apply.
    */
   sessionId: SessionId;
+  /**
+   * Set when the text comes in several requests: pieces before the last are collected, the
+   * last writes the file.
+   */
+  upload?: UploadPart | null;
+}
+/**
+ * One piece of a text sent in several requests.
+ */
+export interface UploadPart {
+  /**
+   * Names the upload; unique among the session's unfinished uploads.
+   */
+  id: string;
+  /**
+   * Whether this is the last piece: the collected text is used now.
+   */
+  last: boolean;
 }
 /**
  * Successful response to `fs/write`.
@@ -1545,13 +1699,158 @@ export interface FsWriteResponse {
  */
 export interface FsWriteResult {
   /**
-   * Bytes written by this request.
+   * Bytes written to the file (0 for a collected piece).
    */
   bytesWritten: number;
+  /**
+   * The change, once the file is written.
+   */
+  diff?: FileDiff | null;
+  /**
+   * The encoding the file was written in when it is not UTF-8.
+   */
+  encoding?: string | null;
   /**
    * The resolved path.
    */
   path: string;
+  /**
+   * Set for a piece that was collected, not written.
+   */
+  staged?: boolean | null;
+}
+/**
+ * Request for `fs/spill`.
+ */
+export interface FsSpillRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'fs/spill';
+  params: FsSpillParams;
+}
+/**
+ * Parameters of `fs/spill`: a tool result too long for the model's context, kept in the
+ * session's temporary directory (`tool-results/<name>.txt`) for the model to read in parts.
+ */
+export interface FsSpillParams {
+  /**
+   * The text (or the next piece of it, with `upload`).
+   */
+  content: string;
+  /**
+   * File name without extension, normally the tool call id; characters other than ASCII
+   * letters, digits, `-` and `_` are replaced.
+   */
+  name: string;
+  /**
+   * The tool call this request serves.
+   */
+  origin?: ToolOrigin | null;
+  /**
+   * The session whose temporary directory receives the file.
+   */
+  sessionId: SessionId;
+  /**
+   * Set when the text comes in several requests.
+   */
+  upload?: UploadPart | null;
+}
+/**
+ * Successful response to `fs/spill`.
+ */
+export interface FsSpillResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: FsSpillResult;
+}
+/**
+ * Result of `fs/spill`.
+ */
+export interface FsSpillResult {
+  /**
+   * Bytes written (UTF-8).
+   */
+  bytesWritten: number;
+  /**
+   * The file as the model is told about it: below the home directory as `~/…` (no user
+   * name), otherwise absolute. The `Read` tool accepts it.
+   */
+  path: string;
+  /**
+   * Set for a piece that was collected, not written.
+   */
+  staged?: boolean | null;
+}
+/**
+ * Request for `fs/pdf`.
+ */
+export interface FsPdfRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'fs/pdf';
+  params: FsPdfParams;
+}
+/**
+ * Parameters of `fs/pdf`: the text of a PDF's pages.
+ */
+export interface FsPdfParams {
+  /**
+   * The tool call this request serves.
+   */
+  origin?: ToolOrigin | null;
+  /**
+   * Pages to extract, for example `3`, `1-5` or `10-`; all pages when absent, which only
+   * small documents allow.
+   */
+  pages?: string | null;
+  /**
+   * The PDF file.
+   */
+  path: string;
+  /**
+   * The session whose workspace and working directory apply.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `fs/pdf`.
+ */
+export interface FsPdfResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: FsPdfResult;
+}
+/**
+ * Result of `fs/pdf`.
+ */
+export interface FsPdfResult {
+  /**
+   * Pages in the document.
+   */
+  pageCount: number;
+  /**
+   * The requested pages, in order.
+   */
+  pages: PdfPage[];
+  /**
+   * The resolved path.
+   */
+  path: string;
+}
+/**
+ * The text of one PDF page.
+ */
+export interface PdfPage {
+  /**
+   * 1-based page number.
+   */
+  number: number;
+  /**
+   * The page's text in reading order, as well as the PDF allows.
+   */
+  text: string;
 }
 /**
  * Request for `fs/mkdir`.

@@ -29,6 +29,10 @@ const CODES: Record<ErrorKind, number> = {
   secretLockLost: -32016,
   releaseIntegrity: -32017,
   queueItemNotFound: -32018,
+  fileNotRead: -32019,
+  fileModified: -32020,
+  permissionDenied: -32021,
+  unencodableText: -32022,
 };
 
 /** An error with an AHP kind; thrown by request handlers and the Core bridge. */

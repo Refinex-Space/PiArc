@@ -11,6 +11,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+use crate::diff::FileDiff;
 use crate::method::notification;
 use crate::session::SessionEventHeader;
 
@@ -139,6 +140,9 @@ pub enum Item {
         /// The text the tool returned, in `item/completed`.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         output: Option<String>,
+        /// The change Core made, in `item/completed` of a call that changed the file.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        diff: Option<FileDiff>,
     },
     /// A tool of an MCP server (`mcp__<server>__<tool>`).
     McpToolCall {

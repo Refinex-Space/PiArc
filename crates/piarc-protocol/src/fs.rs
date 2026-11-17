@@ -2,38 +2,56 @@
 //!
 //! The Agent Host's tools never touch the workspace themselves (ADR-0004): reading, writing,
 //! listing and searching go to Core, which resolves the path against the session's working
-//! directory and refuses anything outside the session's workspace root (architecture section
-//! 6.1.3).
+//! directory and keeps the file tools' invariants (architecture sections 6.1.2 and 6.1.3,
+//! ADR-0027).
 //!
 //! # Paths
 //!
-//! - `path` is absolute, or relative to the session's working directory. Core normalizes it,
-//!   resolves symlinks of the part that exists and requires the result to lie inside the
-//!   session's workspace root; otherwise the request fails with `outsideWorkspace` and the
-//!   target is not touched.
+//! - `path` is absolute, or relative to the session's working directory. Core normalizes it and
+//!   resolves symlinks of the part that exists. Reading is allowed inside the session's
+//!   directories (the workspace root and added directories) and its temporary directory;
+//!   writing inside the session's directories, except protected paths (`.git/`, `.piarc/`,
+//!   `.claude/`, `.pi/`, shell configuration files). Anything else needs the user's approval:
+//!   until approvals exist (T20) the request fails with `permissionDenied` and the target is
+//!   not touched.
 //! - Paths in results are absolute, in the platform's usual form (no `\\?\` prefix), with
 //!   symlinks resolved, unless a member says otherwise.
 //!
+//! # File state
+//!
+//! Core keeps a table per session: the files the session read (with the `Read` call's range)
+//! or wrote, with their content hash. `fs/stat` with `read` records a read; replacing an
+//! existing file with `fs/write` requires an entry whose hash still matches the file
+//! (`fileNotRead`, `fileModified`) and records the write.
+//!
 //! # Content transfer
 //!
-//! - Text travels inline as UTF-8 strings. `fs/read` returns at most [`MAX_READ_CHUNK`]
-//!   bytes per request and never splits a UTF-8 sequence; larger files are read by range
-//!   (`offset`, `length`). `fs/write` with `append` lets a caller write a large text in
-//!   pieces. Invalid UTF-8 is replaced with U+FFFD.
+//! - Text travels inline as strings. `fs/read` returns at most [`MAX_READ_CHUNK`] file bytes
+//!   per request and never splits a character; larger files are read by range (`offset`,
+//!   `length`). Files that are not UTF-8 are decoded from their detected encoding (UTF-16 with
+//!   a byte order mark, or a legacy encoding such as GBK); invalid sequences become U+FFFD. A
+//!   byte order mark is kept as U+FEFF at the start of the text.
+//! - `fs/write` writes the whole new text at once: to a temporary file in the same directory,
+//!   renamed over the target. A large text comes in pieces of one upload (`upload`), written
+//!   when the last piece arrives. Writing keeps an existing file's encoding and byte order mark
+//!   and, with [`LineEndings::MatchFile`], its line ending style.
 //! - Binary content (images) does not travel over AHP (ADR-0009 rule 8): `fs/read` in
 //!   [`ReadMode::Blob`] mode copies the file into the session's blob directory under Core's
 //!   data directory and returns a [`BlobRef`] (path, SHA-256 and size) that the Agent Host
-//!   reads.
+//!   reads. Files over [`MAX_BLOB_BYTES`] are refused (`ioError`, `EFBIG`).
 //!
 //! # Errors
 //!
-//! `notFound` (the path does not exist), `outsideWorkspace` (the boundary check failed),
-//! `ioError` (any other operating system error; `details.code` is a POSIX-style code such as
-//! `EACCES`), `sessionNotFound` (Core knows no such session) and `invalidParams`.
+//! `notFound` (the path does not exist), `permissionDenied` (the path needs approval),
+//! `fileNotRead`, `fileModified`, `unencodableText`, `ioError` (any other operating system
+//! error; `details.code` is a POSIX-style code such as `EACCES`), `sessionNotFound` (Core
+//! knows no such session) and `invalidParams`. Messages are written for the model: what
+//! happened and what to do next.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::diff::FileDiff;
 use crate::method::request;
 use crate::session::SessionId;
 use crate::tool_call::ToolOrigin;
@@ -41,6 +59,13 @@ use crate::tool_call::ToolOrigin;
 /// Largest number of bytes one `fs/read` returns in text mode: 1 MiB. Even if every byte had
 /// to be escaped as `\u00XX`, the response stays below the 8 MiB frame limit.
 pub const MAX_READ_CHUNK: u64 = 1024 * 1024;
+
+/// Largest file `fs/read` copies in blob mode, and largest PDF `fs/pdf` reads: 32 MiB.
+pub const MAX_BLOB_BYTES: u64 = 32 * 1024 * 1024;
+
+/// Largest text one upload (`fs/write`, `fs/spill`) collects before it is written: 64 MiB of
+/// UTF-8.
+pub const MAX_UPLOAD_BYTES: u64 = 64 * 1024 * 1024;
 
 /// What a path names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -65,9 +90,28 @@ pub struct FsStatParams {
     /// Also sniff the first bytes of a regular file for a supported image type.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detect_image: Option<bool>,
+    /// The `Read` tool reads this regular file now, with this range: Core records the read in
+    /// the session's file state table and sets `unchanged` in the result.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read: Option<ReadRange>,
     /// The tool call this request serves.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ToolOrigin>,
+}
+
+/// The part of a file a `Read` call asked for, as the call wrote it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadRange {
+    /// First line, 1-based.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offset: Option<u64>,
+    /// Lines at most.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u64>,
+    /// Pages of a PDF, for example `3` or `1-5`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pages: Option<String>,
 }
 
 /// Result of `fs/stat`.
@@ -89,6 +133,10 @@ pub struct FileStat {
     /// `detectImage` was set and the content is such an image.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image_mime_type: Option<String>,
+    /// With `read`: true when the session's previous read of this file asked for the same
+    /// range and the content has not changed since (the earlier result still holds).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unchanged: Option<bool>,
 }
 
 /// How `fs/read` returns the content.
@@ -118,6 +166,10 @@ pub struct FsReadParams {
     /// Text when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mode: Option<ReadMode>,
+    /// Fail with `fileNotRead` or `fileModified` unless the session read or wrote this file
+    /// and its content has not changed since (the `Edit` tool reads this way).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub require_fresh: Option<bool>,
     /// The tool call this request serves.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ToolOrigin>,
@@ -156,6 +208,30 @@ pub struct FsReadResult {
     /// The content's copy, in blob mode.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blob: Option<BlobRef>,
+    /// The file's encoding when it is not UTF-8 (text mode), for example `GBK` or `UTF-16LE`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub encoding: Option<String>,
+}
+
+/// How `fs/write` treats the line breaks of the new text when it replaces an existing file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum LineEndings {
+    /// Write them as they are (the text was derived from the file, as an edit is).
+    AsWritten,
+    /// Convert them to the file's style, LF or CRLF (new content for the file, as a `Write`
+    /// is). Without line breaks in the old file, as written.
+    MatchFile,
+}
+
+/// One piece of a text sent in several requests.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UploadPart {
+    /// Names the upload; unique among the session's unfinished uploads.
+    pub id: String,
+    /// Whether this is the last piece: the collected text is used now.
+    pub last: bool,
 }
 
 /// Parameters of `fs/write`.
@@ -166,11 +242,18 @@ pub struct FsWriteParams {
     pub session_id: SessionId,
     /// The file to write; its parent directory must exist.
     pub path: String,
-    /// Text to write, encoded as UTF-8.
+    /// The new text of the file (or the next piece of it, with `upload`).
     pub content: String,
-    /// Append to the file instead of replacing it; false when absent.
+    /// Append the text to the file's current text; false when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub append: Option<bool>,
+    /// [`LineEndings::AsWritten`] when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub line_endings: Option<LineEndings>,
+    /// Set when the text comes in several requests: pieces before the last are collected, the
+    /// last writes the file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upload: Option<UploadPart>,
     /// The tool call this request serves.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ToolOrigin>,
@@ -182,8 +265,90 @@ pub struct FsWriteParams {
 pub struct FsWriteResult {
     /// The resolved path.
     pub path: String,
-    /// Bytes written by this request.
+    /// Bytes written to the file (0 for a collected piece).
     pub bytes_written: u64,
+    /// Set for a piece that was collected, not written.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub staged: Option<bool>,
+    /// The change, once the file is written.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diff: Option<FileDiff>,
+    /// The encoding the file was written in when it is not UTF-8.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub encoding: Option<String>,
+}
+
+/// Parameters of `fs/spill`: a tool result too long for the model's context, kept in the
+/// session's temporary directory (`tool-results/<name>.txt`) for the model to read in parts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FsSpillParams {
+    /// The session whose temporary directory receives the file.
+    pub session_id: SessionId,
+    /// File name without extension, normally the tool call id; characters other than ASCII
+    /// letters, digits, `-` and `_` are replaced.
+    pub name: String,
+    /// The text (or the next piece of it, with `upload`).
+    pub content: String,
+    /// Set when the text comes in several requests.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upload: Option<UploadPart>,
+    /// The tool call this request serves.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<ToolOrigin>,
+}
+
+/// Result of `fs/spill`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FsSpillResult {
+    /// The file as the model is told about it: below the home directory as `~/…` (no user
+    /// name), otherwise absolute. The `Read` tool accepts it.
+    pub path: String,
+    /// Set for a piece that was collected, not written.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub staged: Option<bool>,
+    /// Bytes written (UTF-8).
+    pub bytes_written: u64,
+}
+
+/// Parameters of `fs/pdf`: the text of a PDF's pages.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FsPdfParams {
+    /// The session whose workspace and working directory apply.
+    pub session_id: SessionId,
+    /// The PDF file.
+    pub path: String,
+    /// Pages to extract, for example `3`, `1-5` or `10-`; all pages when absent, which only
+    /// small documents allow.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pages: Option<String>,
+    /// The tool call this request serves.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<ToolOrigin>,
+}
+
+/// The text of one PDF page.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PdfPage {
+    /// 1-based page number.
+    pub number: u64,
+    /// The page's text in reading order, as well as the PDF allows.
+    pub text: String,
+}
+
+/// Result of `fs/pdf`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FsPdfResult {
+    /// The resolved path.
+    pub path: String,
+    /// Pages in the document.
+    pub page_count: u64,
+    /// The requested pages, in order.
+    pub pages: Vec<PdfPage>,
 }
 
 /// Parameters of `fs/mkdir`.
@@ -356,6 +521,14 @@ request!(
 request!(
     /// Method marker for `fs/write` (Agent Host → Core).
     FsWrite, "fs/write", FsWriteParams, FsWriteResult
+);
+request!(
+    /// Method marker for `fs/spill` (Agent Host → Core).
+    FsSpill, "fs/spill", FsSpillParams, FsSpillResult
+);
+request!(
+    /// Method marker for `fs/pdf` (Agent Host → Core).
+    FsPdf, "fs/pdf", FsPdfParams, FsPdfResult
 );
 request!(
     /// Method marker for `fs/mkdir` (Agent Host → Core).

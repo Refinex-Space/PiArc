@@ -84,6 +84,7 @@ serde-saphyr = { version = "=2.1.1", default-features = false, features = ["dese
 security-framework = { version = "=3.7.0", default-features = false }
 serde_json  = "=1.0.154"
 sha2        = "=0.11.1"
+similar     = { version = "=3.2.1", default-features = false, features = ["std", "text"] }
 thiserror   = "=2.0.21"
 tokio       = { version = "=1.54.1", default-features = false, features = ["rt-multi-thread", "sync", "time", "macros"] }
 tokio-util  = { version = "=0.7.20", default-features = false }

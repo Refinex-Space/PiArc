@@ -273,6 +273,30 @@
     },
     {
       "kind": "request",
+      "method": "fs/spill",
+      "name": "fs/spill",
+      "schema": "FsSpillRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/spill",
+      "name": "fs/spill/result",
+      "schema": "FsSpillResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/pdf",
+      "name": "fs/pdf",
+      "schema": "FsPdfRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/pdf",
+      "name": "fs/pdf/result",
+      "schema": "FsPdfResponse"
+    },
+    {
+      "kind": "request",
       "method": "fs/mkdir",
       "name": "fs/mkdir",
       "schema": "FsMkdirRequest"

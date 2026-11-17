@@ -1,0 +1,38 @@
+{
+  "jsonrpc": "2.0",
+  "method": "item/completed",
+  "params": {
+    "sessionId": "019a8f3e-5b2c-7d41-9e60-3f1a2b4c5d6e",
+    "seq": 43,
+    "ts": 1763200000000,
+    "turnId": "turn-7c1f",
+    "item": {
+      "type": "fileChange",
+      "itemId": "toolu_03",
+      "status": "completed",
+      "tool": "Write",
+      "arguments": { "path": "新文件.txt", "content": "one\ntwo" },
+      "path": "新文件.txt",
+      "output": "Successfully wrote 7 bytes to 新文件.txt",
+      "diff": {
+        "path": "新文件.txt",
+        "created": true,
+        "added": 2,
+        "removed": 0,
+        "unified": "--- /dev/null\n+++ b/新文件.txt\n@@ -0,0 +1,2 @@\n+one\n+two\n\\ No newline at end of file\n",
+        "hunks": [
+          {
+            "oldStart": 0,
+            "oldLines": 0,
+            "newStart": 1,
+            "newLines": 2,
+            "lines": [
+              { "kind": "added", "text": "one" },
+              { "kind": "added", "text": "two", "noNewline": true }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

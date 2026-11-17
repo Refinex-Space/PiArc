@@ -75,6 +75,14 @@ pub mod code {
     pub const RELEASE_INTEGRITY: i64 = -32017;
     /// A queued input with the given id is no longer waiting: it was delivered or removed.
     pub const QUEUE_ITEM_NOT_FOUND: i64 = -32018;
+    /// An existing file was to be changed before the session read it.
+    pub const FILE_NOT_READ: i64 = -32019;
+    /// A file changed since the session last read or wrote it.
+    pub const FILE_MODIFIED: i64 = -32020;
+    /// The operation needs the user's approval and was not approved.
+    pub const PERMISSION_DENIED: i64 = -32021;
+    /// The text cannot be written in the file's encoding.
+    pub const UNENCODABLE_TEXT: i64 = -32022;
 }
 
 /// JSON-RPC 2.0 error object with PiArc's mandatory structured `data`.
@@ -173,6 +181,21 @@ pub enum ErrorKind {
     /// A `session/queue/*` request named a queued input that is no longer waiting: it was
     /// delivered to the model or removed meanwhile. `details`: `{ sessionId, itemId }`.
     QueueItemNotFound,
+    /// `Edit` or `Write` of an existing file that this session has not read: the model has to
+    /// read it first. The file is unchanged. `details`: `{ path }`.
+    FileNotRead,
+    /// The file changed (by another program, session or tool) since this session last read or
+    /// wrote it: the model has to read it again. The file is unchanged. `details`: `{ path }`.
+    FileModified,
+    /// The operation needs the user's approval (a path outside the session's directories, or a
+    /// protected path) and was not approved; nothing was touched. `details`: `{ path,
+    /// reason, operation }` with `reason` `outsideWorkspace` or `protectedPath` and
+    /// `operation` `read` or `write`.
+    PermissionDenied,
+    /// The new text has characters the file's encoding cannot represent; the file is
+    /// unchanged. `details`: `{ path, encoding, line }` (1-based line of the first such
+    /// character).
+    UnencodableText,
 }
 
 impl ErrorKind {
@@ -204,6 +227,10 @@ impl ErrorKind {
             Self::SecretLockLost => code::SECRET_LOCK_LOST,
             Self::ReleaseIntegrity => code::RELEASE_INTEGRITY,
             Self::QueueItemNotFound => code::QUEUE_ITEM_NOT_FOUND,
+            Self::FileNotRead => code::FILE_NOT_READ,
+            Self::FileModified => code::FILE_MODIFIED,
+            Self::PermissionDenied => code::PERMISSION_DENIED,
+            Self::UnencodableText => code::UNENCODABLE_TEXT,
         }
     }
 }
@@ -228,7 +255,7 @@ impl ErrorObject {
 mod tests {
     use super::*;
 
-    const ALL_KINDS: [ErrorKind; 24] = [
+    const ALL_KINDS: [ErrorKind; 28] = [
         ErrorKind::ParseError,
         ErrorKind::InvalidRequest,
         ErrorKind::MethodNotFound,
@@ -253,6 +280,10 @@ mod tests {
         ErrorKind::SecretLockLost,
         ErrorKind::ReleaseIntegrity,
         ErrorKind::QueueItemNotFound,
+        ErrorKind::FileNotRead,
+        ErrorKind::FileModified,
+        ErrorKind::PermissionDenied,
+        ErrorKind::UnencodableText,
     ];
 
     #[test]
