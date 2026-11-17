@@ -146,14 +146,14 @@ async fn run_in(spec: &ScenarioSpec, config: &RunnerConfig, root: &Path) -> Vec<
         Err(e) => return vec![failure("setup", e)],
     };
     let events = Arc::new(Events::default());
-    let core = match CoreRuntime::start(env.core_config(), Arc::new(Sink(Arc::clone(&events)))) {
+    let core = match env.start_core(&events) {
         Ok(core) => core,
-        Err(e) => return vec![failure("setup", format!("Core did not start: {e}"))],
+        Err(e) => return vec![failure("setup", e)],
     };
     let mut driver = Driver {
         spec,
         env: &env,
-        core: &core,
+        core,
         events: &events,
         sessions: BTreeMap::new(),
         turns: BTreeMap::new(),
@@ -164,7 +164,7 @@ async fn run_in(spec: &ScenarioSpec, config: &RunnerConfig, root: &Path) -> Vec<
         Ok(()) => driver.assert_all(),
         Err(e) => vec![failure("action", format!("{e}\n{}", driver.context()))],
     };
-    if let Err(e) = shutdown(&core).await {
+    if let Err(e) = shutdown(&driver.core).await {
         failures.push(failure("cleanup", e));
     }
     failures
@@ -177,6 +177,9 @@ struct Env {
     cache: PathBuf,
     mocks: BTreeMap<String, MockProvider>,
     gate: Arc<Gate>,
+    /// Kept across Core restarts, so a restarted Core finds its vault's master key.
+    key_store: Arc<MemorySecretStore>,
+    master_key: piarc_ports::SecretName,
     config: RunnerConfig,
 }
 
@@ -231,6 +234,8 @@ impl Env {
             cache,
             mocks,
             gate,
+            key_store: Arc::new(MemorySecretStore::new()),
+            master_key: test_master_key_name("l2"),
             config: config.clone(),
         })
     }
@@ -250,12 +255,18 @@ impl Env {
                 ..SessionsConfig::default()
             },
             secret_store: Some(SecretStoreSetup {
-                master_key: test_master_key_name("l2"),
-                store: Arc::new(MemorySecretStore::new()) as _,
+                master_key: self.master_key.clone(),
+                store: Arc::clone(&self.key_store) as _,
             }),
             tool_observer: Some(Arc::clone(&self.gate) as _),
             ..CoreConfig::default()
         }
+    }
+
+    /// Starts Core; every Core of the run delivers to the same `events`.
+    fn start_core(&self, events: &Arc<Events>) -> Result<CoreRuntime, String> {
+        CoreRuntime::start(self.core_config(), Arc::new(Sink(Arc::clone(events))))
+            .map_err(|e| format!("Core did not start: {e}"))
     }
 
     fn records(&self) -> BTreeMap<String, Vec<RequestRecord>> {
@@ -356,8 +367,8 @@ impl EventSink for Sink {
 struct Driver<'a> {
     spec: &'a ScenarioSpec,
     env: &'a Env,
-    core: &'a CoreRuntime,
-    events: &'a Events,
+    core: CoreRuntime,
+    events: &'a Arc<Events>,
     /// Session label to session id, and back through [`Self::observed`].
     sessions: BTreeMap<String, String>,
     turns: BTreeMap<String, String>,
@@ -472,6 +483,16 @@ impl Driver<'_> {
                 .await
             }
             Action::WriteFile { path, content } => write_file(&self.env.workspace, path, content),
+            Action::RestartCore {} => self.restart().await,
+            Action::Resume { session } => {
+                let id = self.session_id(session.as_deref())?;
+                call(
+                    |done| self.core.resume_session(id, done),
+                    "resuming the session",
+                )
+                .await
+                .map(drop)
+            }
         }
     }
 
@@ -496,9 +517,27 @@ impl Driver<'_> {
         Ok(())
     }
 
-    async fn op(&self, session: Option<&str>, op: Op) -> Result<Value, String> {
+    /// Shuts Core down and starts it again on the same directories; sessions keep their ids
+    /// and are closed until resumed.
+    async fn restart(&mut self) -> Result<(), String> {
+        shutdown(&self.core).await?;
+        self.core = self.env.start_core(self.events)?;
+        let ws = self.env.workspace.clone();
+        call(
+            |done| self.core.open_workspace(ws, done),
+            "reopening the workspace",
+        )
+        .await
+        .map(drop)
+    }
+
+    fn session_id(&self, session: Option<&str>) -> Result<String, String> {
         let label = self.label(session)?;
-        let id = self.sessions.get(&label).cloned().unwrap_or_default();
+        Ok(self.sessions.get(&label).cloned().unwrap_or_default())
+    }
+
+    async fn op(&self, session: Option<&str>, op: Op) -> Result<Value, String> {
+        let id = self.session_id(session)?;
         call(
             |done| self.core.session_op(id, op, done),
             "the session operation",

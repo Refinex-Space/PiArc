@@ -1,0 +1,727 @@
+# Harness capabilities of M1–M5 (architecture section 12.4). Format and rules:
+# docs/engineering/testing.md section 13. `docs/product/capabilities.md` is generated from this
+# file and the L2 report: node scripts/plan/check-capabilities.mjs --results <report> --doc write
+#
+# - id: CAP-<DOMAIN>-<CAPABILITY>-<NNN>, stable; never renumber or reuse.
+# - status: planned (no scenario needed), active (at least one L2 scenario covers it, else
+#   MISSING), blocked (needs `reason` and `link`).
+# - refs: requirement ids (FR-…) of docs/product/REQUIREMENTS.md chapter 4 and/or architecture
+#   sections (ARCH-<n>, ARCH-<n>.<m>, …) of docs/architecture/ARCHITECTURE.md.
+# - task: the task of docs/plan/PLAN.md that implements it (and moves it to active).
+# - client_only: requirements whose behavior lives in the client and is verified by L4, not
+#   L2. Every FR id of chapter 4 appears in a capability's refs or here.
+version: 1
+capabilities:
+  # Workspaces, trust and sessions
+  - id: CAP-TRUST-PROJECT-001
+    title: '未信任的工作区不加载项目级可执行配置（Pi 扩展等）；信任后加载'
+    milestone: M1
+    refs: [FR-WS-01, ARCH-10.2]
+    task: T13
+    status: active
+  - id: CAP-TRUST-DIALOG-001
+    title: '首次打开工作区时列出将启用的可执行配置并记录用户的信任决定'
+    milestone: M1
+    refs: [FR-WS-01, ARCH-10.2]
+    task: T18
+    status: planned
+  - id: CAP-SESSION-MULTI-001
+    title: '同一工作区的多个会话同时运行，各自的工作目录与请求互不串扰'
+    milestone: M1
+    refs: [ARCH-5.2, ARCH-5.3]
+    task: T14
+    status: active
+  - id: CAP-SESSION-PERSIST-001
+    title: '会话持久化，Core 重启后可恢复并带着完整历史继续'
+    milestone: M1
+    refs: [FR-WS-03, ARCH-9]
+    task: T14
+    status: active
+  - id: CAP-SESSION-MANAGE-001
+    title: '新建、重命名、置顶、归档、删除会话'
+    milestone: M1
+    refs: [FR-WS-03]
+    task: T18
+    status: planned
+  - id: CAP-SESSION-STATUS-001
+    title: 'Core 计算会话状态（错误 > 等待审批 > 运行中 > 未读 > 空闲）并随会话列表快照送达'
+    milestone: M1
+    refs: [FR-WS-02]
+    task: T20
+    status: planned
+  - id: CAP-SESSION-FORK-001
+    title: '从某条消息分出会话分支并在分支间切换'
+    milestone: M2
+    refs: [FR-WS-07, ARCH-6.9]
+    task: T28
+    status: planned
+  - id: CAP-SESSION-SEARCH-001
+    title: '会话全文搜索'
+    milestone: M3
+    refs: [FR-WS-04, ARCH-9.2]
+    task: T35
+    status: planned
+  - id: CAP-SESSION-PARALLEL-001
+    title: '跨工作区与多窗口的会话并行运行'
+    milestone: M3
+    refs: [FR-WS-05]
+    task: T35
+    status: planned
+  - id: CAP-WT-SESSION-001
+    title: '新建会话可选在独立 git worktree 中运行，归档时处理未提交改动'
+    milestone: M3
+    refs: [FR-WS-06, ARCH-6.12]
+    task: T35
+    status: planned
+  - id: CAP-WT-AGENT-001
+    title: '子 agent 可在独立 worktree 中隔离运行'
+    milestone: M3
+    refs: [ARCH-6.12]
+    task: T35
+    status: planned
+
+  # Turns, queue and conversation
+  - id: CAP-SESSION-TURN-001
+    title: '输入开始一个回合，正文与工具调用以条目事件流式送达客户端'
+    milestone: M1
+    refs: [FR-CH-01, ARCH-5.3]
+    task: T14
+    status: active
+  - id: CAP-TURN-REASONING-001
+    title: '思考内容以 reasoning 条目流式送达，effort 映射到服务商参数'
+    milestone: M1
+    refs: [FR-CH-01, FR-MD-03, ARCH-6.13]
+    task: T21
+    status: planned
+  - id: CAP-TURN-STEER-001
+    title: '运行中 steer：消息在当前步骤之后进入本回合的下一次请求'
+    milestone: M1
+    refs: [FR-CH-03, ARCH-5.3]
+    task: T14
+    status: active
+  - id: CAP-TURN-FOLLOWUP-001
+    title: '运行中排队的 follow-up 在回合结束后作为新回合执行'
+    milestone: M1
+    refs: [FR-CH-03]
+    task: T14
+    status: active
+  - id: CAP-TURN-QUEUE-001
+    title: '排队项可编辑、删除、重排，按新顺序各执行一次'
+    milestone: M1
+    refs: [FR-CH-03]
+    task: T14
+    status: active
+  - id: CAP-TURN-INTERRUPT-001
+    title: '停止回合时为未完成的工具调用补齐结果，下一次请求配对完整、角色交替'
+    milestone: M1
+    refs: [FR-CH-03, ARCH-6.15]
+    task: T14
+    status: active
+  - id: CAP-TURN-BATCH-001
+    title: '连续的只读工具调用成批并行（单批至多 10 个），写操作单独执行'
+    milestone: M1
+    refs: [ARCH-6.15]
+    task: T14
+    status: active
+  - id: CAP-TURN-RETRY-001
+    title: '限流、过载与 5xx 自动重试，每次重试报给客户端，失败的尝试不进入上下文'
+    milestone: M1
+    refs: [FR-CH-04, FR-CH-06, ARCH-6.15]
+    task: T14
+    status: active
+  - id: CAP-TURN-ERROR-001
+    title: '不可恢复的错误按类别报告，可重试，未送达的消息可重发'
+    milestone: M1
+    refs: [FR-CH-06]
+    task: T19
+    status: planned
+  - id: CAP-TURN-STATUS-001
+    title: '回合进行中提供当前工具、计时、token、重试次数与压缩状态'
+    milestone: M1
+    refs: [FR-CH-04]
+    task: T19
+    status: planned
+  - id: CAP-CHAT-MENTION-001
+    title: '输入中的 `@` 文件提及与 `/` 命令解析后送达模型'
+    milestone: M1
+    refs: [FR-CH-02]
+    task: T19
+    status: planned
+  - id: CAP-CHAT-ATTACH-001
+    title: '图片与 PDF 附件送达模型'
+    milestone: M1
+    refs: [FR-CH-02]
+    task: T19
+    status: planned
+  - id: CAP-CHAT-SIDE-001
+    title: '侧边对话基于当前上下文提问，不写入主对话'
+    milestone: M5
+    refs: [FR-CH-08]
+    task: T49
+    status: planned
+
+  # Models and providers
+  - id: CAP-PROVIDER-ANTHROPIC-001
+    title: 'Anthropic Messages 线格式的服务商'
+    milestone: M1
+    refs: [FR-MD-01, ARCH-6.13]
+    task: T06
+    status: active
+  - id: CAP-PROVIDER-OPENAI-001
+    title: 'OpenAI 兼容端点的服务商（流式正文、工具调用与工具结果）'
+    milestone: M1
+    refs: [FR-MD-01, ARCH-6.13]
+    task: T06
+    status: active
+  - id: CAP-PROVIDER-CONFIG-001
+    title: '配置服务商与 API key；凭据只存在 Core 的保险箱并经 AHP 交给 Agent Host'
+    milestone: M1
+    refs: [FR-MD-01, ARCH-5.4]
+    task: T21
+    status: planned
+  - id: CAP-PROVIDER-CLOUD-001
+    title: '云厂商凭证与本地模型服务商'
+    milestone: M1
+    refs: [FR-MD-01]
+    task: T21
+    status: planned
+  - id: CAP-MODEL-SWITCH-001
+    title: '会话内切换模型与 effort，提示切换代价'
+    milestone: M1
+    refs: [FR-MD-03, ARCH-6.13]
+    task: T21
+    status: planned
+  - id: CAP-PROVIDER-OAUTH-001
+    title: '服务商的 OAuth 与设备码登录（不含 Anthropic 订阅登录）'
+    milestone: M2
+    refs: [FR-MD-02, ARCH-5.4]
+    task: T29
+    status: planned
+  - id: CAP-MODEL-SETTINGS-001
+    title: '每个模型的显示名、上下文窗口、图片输入与默认 effort'
+    milestone: M2
+    refs: [FR-MD-04]
+    task: T29
+    status: planned
+  - id: CAP-MODEL-ALIAS-001
+    title: '模型别名表供子 agent 与 skills 引用'
+    milestone: M3
+    refs: [FR-MD-05]
+    task: T31
+    status: planned
+  - id: CAP-MODEL-DEGRADE-001
+    title: '按模型能力降级（例如不支持图片输入时的处理）'
+    milestone: M3
+    refs: [ARCH-6.13]
+    task: T31
+    status: planned
+  - id: CAP-USAGE-COST-001
+    title: '按会话、按模型统计用量与成本'
+    milestone: M4
+    refs: [FR-MD-06]
+    task: T41
+    status: planned
+
+  # Tools and execution
+  - id: CAP-TOOL-CORE-001
+    title: '工具的文件与命令 I/O 全部经 Core 的 AHP fs/exec 方法执行'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.1.3]
+    task: T07
+    status: active
+  - id: CAP-TOOL-PROFILE-001
+    title: '模型看到的工具名是规范名，不出现 Pi 原生工具名'
+    milestone: M1
+    refs: [ARCH-6.1.1]
+    task: T07
+    status: active
+  - id: CAP-TOOL-READ-001
+    title: 'Read 读取工作区文本文件'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.1.4]
+    task: T07
+    status: active
+  - id: CAP-TOOL-READ-002
+    title: 'Read 带行号分页、图片、PDF 分页与 ipynb'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.1.4]
+    task: T16
+    status: planned
+  - id: CAP-TOOL-REREAD-001
+    title: '文件自上次读取后未变化时 Read 返回简短存根'
+    milestone: M1
+    refs: [ARCH-6.15]
+    task: T16
+    status: planned
+  - id: CAP-TOOL-WRITE-001
+    title: 'Write 创建与覆盖文件'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.1.4]
+    task: T07
+    status: active
+  - id: CAP-TOOL-EDIT-001
+    title: 'Edit 按文本替换修改文件'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.1.4]
+    task: T07
+    status: active
+  - id: CAP-TOOL-EDIT-002
+    title: '编辑不变量：先读后写、外部修改检测、多处匹配拒绝、编码与换行保持'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.1.2]
+    task: T16
+    status: planned
+  - id: CAP-TOOL-OUTPUT-001
+    title: '超长工具结果落盘，模型收到预览与路径；单条消息的工具结果有总上限'
+    milestone: M1
+    refs: [FR-TL-02, ARCH-6.15]
+    task: T16
+    status: planned
+  - id: CAP-TOOL-BASH-001
+    title: 'Bash 经 Core 执行命令并返回输出'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.1.4]
+    task: T07
+    status: active
+  - id: CAP-TOOL-BASH-002
+    title: 'Bash 超时终止整个进程树，输出给出语义成败'
+    milestone: M1
+    refs: [FR-TL-01, FR-TL-02, ARCH-6.11]
+    task: T17
+    status: planned
+  - id: CAP-TOOL-POWERSHELL-001
+    title: 'Windows 上的 PowerShell 工具'
+    milestone: M1
+    refs: [ARCH-6.1.4, ARCH-6.2.2]
+    task: T17
+    status: planned
+  - id: CAP-TOOL-GLOB-001
+    title: 'Glob 由 Core 按模式列出文件'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.1.4]
+    task: T07
+    status: active
+  - id: CAP-TOOL-GREP-001
+    title: 'Grep 由 Core 搜索文件内容'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.1.4]
+    task: T07
+    status: active
+  - id: CAP-TOOL-WEBFETCH-001
+    title: 'WebFetch 本地抓取转 Markdown，辅助模型按提示提取，受域名规则约束'
+    milestone: M2
+    refs: [FR-TL-03, ARCH-6.1.4]
+    task: T29
+    status: planned
+  - id: CAP-TOOL-WEBSEARCH-001
+    title: 'WebSearch 可配置后端'
+    milestone: M3
+    refs: [FR-TL-03, ARCH-6.1.4]
+    task: T38
+    status: planned
+  - id: CAP-BG-COMMAND-001
+    title: '后台命令、超时转后台与 KillShell'
+    milestone: M3
+    refs: [FR-TL-04, ARCH-6.11]
+    task: T32
+    status: planned
+  - id: CAP-BG-MONITOR-001
+    title: 'Monitor 监视后台任务输出并唤醒会话'
+    milestone: M3
+    refs: [FR-TL-04, ARCH-6.11]
+    task: T32
+    status: planned
+  - id: CAP-TERM-SCREEN-001
+    title: '集成终端与会话共享目录和环境，agent 可读取后台终端的屏幕内容'
+    milestone: M3
+    refs: [FR-TL-05, ARCH-6.11]
+    task: T33
+    status: planned
+  - id: CAP-TOOL-NOTEBOOK-001
+    title: 'NotebookEdit 编辑 Jupyter cell'
+    milestone: M4
+    refs: [FR-TL-06, ARCH-6.1.4]
+    task: T42
+    status: planned
+  - id: CAP-SANDBOX-MACOS-001
+    title: 'macOS 上 Bash 在 Seatbelt 中执行，文件写入与网络按白名单放行'
+    milestone: M4
+    refs: [FR-TL-07, ARCH-6.10]
+    task: T39
+    status: planned
+  - id: CAP-SANDBOX-WINDOWS-001
+    title: 'Windows 上命令的隔离方案（第一版只做进程树管理，见需求 D7）'
+    milestone: M4
+    refs: [FR-TL-07, ARCH-6.10]
+    task: T39
+    status: planned
+
+  # Permissions
+  - id: CAP-PERM-MODE-001
+    title: '手动与自动接受编辑两种权限模式'
+    milestone: M1
+    refs: [FR-PM-01, ARCH-6.2.1]
+    task: T20
+    status: planned
+  - id: CAP-PERM-APPROVAL-001
+    title: '结构化审批：仅本次、本会话、总是允许、拒绝并反馈'
+    milestone: M1
+    refs: [FR-PM-02, ARCH-6.2.3]
+    task: T20
+    status: planned
+  - id: CAP-PERM-MODE-002
+    title: '计划与跳过权限模式（跳过权限需显式开启并二次确认）'
+    milestone: M2
+    refs: [FR-PM-01, ARCH-6.2.1]
+    task: T23
+    status: planned
+  - id: CAP-PERM-RULE-001
+    title: '兼容 Claude Code 的规则语法，按 deny → ask → allow 裁决'
+    milestone: M2
+    refs: [FR-PM-03, ARCH-6.2.2]
+    task: T23
+    status: planned
+  - id: CAP-PERM-BASH-001
+    title: 'Bash 复合命令逐个子命令判定'
+    milestone: M2
+    refs: [FR-PM-03, ARCH-6.2.2]
+    task: T23
+    status: planned
+  - id: CAP-PERM-AUDIT-001
+    title: '规则管理与审计记录'
+    milestone: M2
+    refs: [FR-PM-04]
+    task: T23
+    status: planned
+  - id: CAP-PERM-AUTO-001
+    title: '自动审查模式：可配置的审查模型代替人审批，决策可审计'
+    milestone: M5
+    refs: [FR-PM-06, ARCH-6.0]
+    task: T46
+    status: planned
+
+  # Harness orchestration
+  - id: CAP-PLAN-MODE-001
+    title: '计划模式：写工具与非只读命令被硬拦截，提交计划，批准时选择后续模式'
+    milestone: M2
+    refs: [FR-HN-01, ARCH-6.5, ARCH-6.15]
+    task: T26
+    status: planned
+  - id: CAP-TODO-001
+    title: '任务清单由模型维护，结构化送达客户端，压缩后保留'
+    milestone: M2
+    refs: [FR-HN-02, ARCH-6.5]
+    task: T26
+    status: planned
+  - id: CAP-ASK-001
+    title: 'AskUserQuestion 结构化提问'
+    milestone: M2
+    refs: [FR-HN-03, ARCH-6.5]
+    task: T26
+    status: planned
+  - id: CAP-NEXT-001
+    title: '回合结束时的"下一步"建议'
+    milestone: M2
+    refs: [FR-HN-06, ARCH-6.5]
+    task: T26
+    status: planned
+  - id: CAP-AGENT-DEF-001
+    title: '读取 `.claude/agents` 与 `.piarc/agents` 的子 agent 定义，内置 general-purpose、Explore、Plan'
+    milestone: M3
+    refs: [FR-HN-04, ARCH-6.4]
+    task: T31
+    status: planned
+  - id: CAP-AGENT-RUN-001
+    title: '子 agent 使用任意服务商模型、可后台运行、最多 3 层、默认不继承父会话历史'
+    milestone: M3
+    refs: [FR-HN-04, ARCH-6.4, ARCH-6.15]
+    task: T31
+    status: planned
+  - id: CAP-AGENT-FORK-001
+    title: 'fork 模式子 agent 继承父会话历史并共享缓存'
+    milestone: M5
+    refs: [ARCH-6.15]
+    task: T48
+    status: planned
+  - id: CAP-STYLE-001
+    title: '输出风格切换与自定义'
+    milestone: M3
+    refs: [FR-HN-07, ARCH-6.7]
+    task: T37
+    status: planned
+
+  # Hooks (architecture section 6.3.2)
+  - id: CAP-HOOK-SESSION-001
+    title: 'SessionStart 与 SessionEnd hooks'
+    milestone: M2
+    refs: [FR-HN-05, ARCH-6.3.2]
+    task: T25
+    status: planned
+  - id: CAP-HOOK-PROMPT-001
+    title: 'UserPromptSubmit hook'
+    milestone: M2
+    refs: [FR-HN-05, ARCH-6.3.2]
+    task: T25
+    status: planned
+  - id: CAP-HOOK-PRE-001
+    title: 'PreToolUse hook 参与权限裁决'
+    milestone: M2
+    refs: [FR-HN-05, ARCH-6.3.2, ARCH-6.2.3]
+    task: T25
+    status: planned
+  - id: CAP-HOOK-PERM-001
+    title: 'PermissionRequest hook'
+    milestone: M2
+    refs: [FR-HN-05, ARCH-6.3.2]
+    task: T25
+    status: planned
+  - id: CAP-HOOK-POST-001
+    title: 'PostToolUse 与 PostToolUseFailure hooks（可改写输出、追加上下文）'
+    milestone: M2
+    refs: [FR-HN-05, ARCH-6.3.2]
+    task: T25
+    status: planned
+  - id: CAP-HOOK-STOP-001
+    title: 'Stop hook（block 时续跑一轮，带防循环计数）'
+    milestone: M2
+    refs: [FR-HN-05, ARCH-6.3.2]
+    task: T25
+    status: planned
+  - id: CAP-HOOK-COMPACT-001
+    title: 'PreCompact 与 PostCompact hooks'
+    milestone: M2
+    refs: [FR-HN-05, ARCH-6.3.2]
+    task: T25
+    status: planned
+  - id: CAP-HOOK-NOTIFY-001
+    title: 'Notification hook'
+    milestone: M2
+    refs: [FR-HN-05, ARCH-6.3.2]
+    task: T25
+    status: planned
+  - id: CAP-HOOK-SUBAGENT-001
+    title: 'SubagentStart、SubagentStop 与 PostToolBatch hooks'
+    milestone: M3
+    refs: [FR-HN-05, ARCH-6.3.2]
+    task: T38
+    status: planned
+  - id: CAP-HOOK-HANDLER-001
+    title: 'http 与 prompt 类型的 hook handler'
+    milestone: M3
+    refs: [FR-HN-05, ARCH-6.3.2]
+    task: T38
+    status: planned
+  - id: CAP-HOOK-M4-001
+    title: 'UserPromptExpansion、InstructionsLoaded、CwdChanged、FileChanged、ConfigChange、StopFailure hooks 与 mcp_tool handler'
+    milestone: M4
+    refs: [FR-HN-05, ARCH-6.3.2]
+    task: T41
+    status: planned
+  - id: CAP-HOOK-M5-001
+    title: 'WorktreeCreate、WorktreeRemove、PreModelSwitch、PostModelSwitch、Elicitation、ElicitationResult、PermissionDenied hooks'
+    milestone: M5
+    refs: [FR-HN-05, ARCH-6.3.2]
+    task: T48
+    status: planned
+
+  # Context and memory
+  - id: CAP-CTX-PROMPT-001
+    title: '分段 system prompt（静态段与动态段分别缓存，每个请求一个消息级缓存断点）'
+    milestone: M1
+    refs: [ARCH-6.6.1, ARCH-6.15]
+    task: T22
+    status: planned
+  - id: CAP-CTX-MEMORY-001
+    title: 'CLAUDE.md、AGENTS.md、CLAUDE.local.md 层级，`@import` 与子目录懒加载'
+    milestone: M1
+    refs: [FR-CX-01, ARCH-6.6.2, ARCH-6.14]
+    task: T22
+    status: planned
+  - id: CAP-CTX-RULES-001
+    title: '`.claude/rules` 与 `paths:` 条件加载'
+    milestone: M2
+    refs: [FR-CX-02, ARCH-6.14]
+    task: T24
+    status: planned
+  - id: CAP-CTX-REMINDER-001
+    title: '动态信息经 system reminder 送达，不破坏缓存'
+    milestone: M2
+    refs: [ARCH-6.6.3]
+    task: T27
+    status: planned
+  - id: CAP-CTX-COMPACT-001
+    title: '自动压缩与手动 `/compact`，熔断与压缩后恢复关键上下文'
+    milestone: M2
+    refs: [FR-CX-03, ARCH-6.6.4, ARCH-6.15]
+    task: T27
+    status: planned
+  - id: CAP-CTX-USAGE-001
+    title: '上下文用量与分类明细'
+    milestone: M2
+    refs: [FR-CX-04, ARCH-6.6.5]
+    task: T27
+    status: planned
+  - id: CAP-MEM-AUTO-001
+    title: '自动记忆（跨会话笔记）'
+    milestone: M5
+    refs: [FR-CX-05]
+    task: T47
+    status: planned
+
+  # Extensions and configuration
+  - id: CAP-EXT-PI-001
+    title: '信任的项目 Pi 扩展被加载，其注册的工具可被模型调用'
+    milestone: M1
+    refs: [ARCH-5.5, ARCH-10.2]
+    task: T13
+    status: active
+  - id: CAP-CONFIG-COMPAT-001
+    title: '读取 Claude Code 的 `.claude/settings*.json`（permissions 等与 PiArc 功能对应的键）'
+    milestone: M2
+    refs: [ARCH-6.14]
+    task: T24
+    status: planned
+  - id: CAP-CONFIG-DIAG-001
+    title: '配置诊断：每个配置文件的加载状态与生效、覆盖、忽略的键（基础）'
+    milestone: M2
+    refs: [FR-EX-05, ARCH-6.14]
+    task: T24
+    status: planned
+  - id: CAP-CONFIG-DIAG-002
+    title: '配置诊断完善（全部配置来源）'
+    milestone: M4
+    refs: [FR-EX-05]
+    task: T41
+    status: planned
+  - id: CAP-CONFIG-MANAGED-001
+    title: '企业托管配置（兼容读取 Claude Code 的托管文件）'
+    milestone: M5
+    refs: [ARCH-6.14]
+    task: T47
+    status: planned
+  - id: CAP-SKILL-001
+    title: 'Skills（Agent Skills 标准；`.claude/skills`、`.piarc/skills`、用户级），渐进加载'
+    milestone: M3
+    refs: [FR-EX-01, ARCH-6.7]
+    task: T37
+    status: planned
+  - id: CAP-SKILL-FORK-001
+    title: 'skill 的 `context: fork`'
+    milestone: M5
+    refs: [ARCH-6.14]
+    task: T48
+    status: planned
+  - id: CAP-CMD-001
+    title: '自定义斜杠命令（`.claude/commands`、Pi prompt templates）'
+    milestone: M3
+    refs: [FR-EX-02, ARCH-6.7]
+    task: T37
+    status: planned
+  - id: CAP-MCP-TRANSPORT-001
+    title: 'MCP 的 stdio 与 Streamable HTTP 传输'
+    milestone: M3
+    refs: [FR-EX-03, ARCH-6.8]
+    task: T36
+    status: planned
+  - id: CAP-MCP-OAUTH-001
+    title: 'MCP 的 OAuth'
+    milestone: M3
+    refs: [FR-EX-03, ARCH-6.8]
+    task: T36
+    status: planned
+  - id: CAP-MCP-POOL-001
+    title: 'MCP 工作区共享连接池'
+    milestone: M3
+    refs: [FR-EX-03, ARCH-6.8]
+    task: T36
+    status: planned
+  - id: CAP-MCP-DEFER-001
+    title: '工具多时延迟加载（ToolSearch）'
+    milestone: M3
+    refs: [FR-EX-03, ARCH-6.1.4, ARCH-6.8]
+    task: T36
+    status: planned
+  - id: CAP-MCP-PROMPTS-001
+    title: 'MCP prompts'
+    milestone: M4
+    refs: [ARCH-6.8]
+    task: T40
+    status: planned
+  - id: CAP-PLUGIN-001
+    title: '插件：Claude Code 插件目录与 Pi 包，启用前展示来源与能力'
+    milestone: M4
+    refs: [FR-EX-04, ARCH-6.7, ARCH-6.14]
+    task: T40
+    status: planned
+
+  # Review and rewind
+  - id: CAP-CKPT-001
+    title: '每次写入前保存快照，形成检查点'
+    milestone: M2
+    refs: [FR-RV-03, ARCH-6.9]
+    task: T28
+    status: planned
+  - id: CAP-CKPT-REWIND-001
+    title: '回退：恢复代码与对话、只恢复对话或只恢复代码，冲突时提示'
+    milestone: M2
+    refs: [FR-RV-03, ARCH-6.9]
+    task: T28
+    status: planned
+  - id: CAP-RV-CHANGES-001
+    title: '会话改动按文件给出统一 diff，大 diff 降级'
+    milestone: M2
+    refs: [FR-RV-01, ARCH-7.7]
+    task: T28
+    status: planned
+  - id: CAP-RV-DISCARD-001
+    title: '按文件或按 hunk 丢弃改动'
+    milestone: M2
+    refs: [FR-RV-02]
+    task: T28
+    status: planned
+  - id: CAP-RV-COMMENT-001
+    title: 'diff 行内评论批量发送给 agent'
+    milestone: M4
+    refs: [FR-RV-04]
+    task: T42
+    status: planned
+
+  # System integration (Core side)
+  - id: CAP-SYS-NOTIFY-001
+    title: '会话完成或等待审批时发出通知事件'
+    milestone: M1
+    refs: [FR-SY-01]
+    task: T20
+    status: planned
+  - id: CAP-SYS-NOTIFY-002
+    title: '在通知中直接允许或拒绝'
+    milestone: M4
+    refs: [FR-SY-03]
+    task: T42
+    status: planned
+
+client_only:
+  - ref: FR-CH-05
+    reason: 三档视图只改变客户端的展示
+    task: T29
+  - ref: FR-CH-07
+    reason: 复制消息与选中回合是客户端交互
+    task: T19
+  - ref: FR-PM-05
+    reason: 审批热键、防误触、阅读闸门与输入法守卫是客户端交互规则
+    task: T20
+  - ref: FR-SY-02
+    reason: 关窗后后台常驻、菜单栏与系统托盘属于 Electron 主进程
+    task: T35
+  - ref: FR-SY-04
+    reason: URL scheme 与从文件管理器打开属于 Electron 主进程
+    task: T35
+  - ref: FR-SY-05
+    reason: 快捷键与命令面板是客户端交互
+    task: T18
+  - ref: FR-SY-06
+    reason: 更新与发布清单校验在打包与主进程中，由发布流水线与 L4 验证
+    task: T50
+  - ref: FR-SY-07
+    reason: App Intents、快捷指令与跳转列表属于平台集成
+    task: T49

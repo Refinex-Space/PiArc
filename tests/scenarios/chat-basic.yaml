@@ -1,6 +1,6 @@
 id: chat-basic
 description: A prompt starts a turn whose streamed answer reaches the client and whose request carries the prompt.
-capabilities: [CAP-SESSION-TURN-001]
+capabilities: [CAP-SESSION-TURN-001, CAP-PROVIDER-ANTHROPIC-001]
 providers:
   main:
     wire: anthropic

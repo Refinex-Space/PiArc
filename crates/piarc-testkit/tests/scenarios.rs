@@ -4,7 +4,7 @@
 //! ```text
 //! cargo test -p piarc-testkit --test scenarios                       # all
 //! cargo test -p piarc-testkit --test scenarios -- turn-steer --exact # one
-//! cargo test -p piarc-testkit --test scenarios -- --results target/l2/results.json
+//! cargo test -p piarc-testkit --test scenarios -- --results target/l2/results.json  # relative to the repository root
 //! ```
 
 use std::path::{Path, PathBuf};
@@ -46,7 +46,8 @@ fn main() -> ExitCode {
         }
     };
     let report = l2::run_suite(entries, &config, &repo, &options);
-    if let Some(path) = results {
+    // Cargo runs test binaries in the crate directory: a relative path means the repository's.
+    if let Some(path) = results.map(|p| if p.is_relative() { repo.join(p) } else { p }) {
         if let Err(e) = l2::write_report(&report, &path) {
             eprintln!("error: {e}");
             return ExitCode::FAILURE;

@@ -226,6 +226,15 @@ pub enum Action {
         /// Content.
         content: String,
     },
+    /// Shuts Core down and starts it again on the same data directory, then reopens the
+    /// workspace; sessions stay closed until `resume`.
+    RestartCore {},
+    /// Reopens a closed session from the index and its file.
+    Resume {
+        /// The session.
+        #[serde(default)]
+        session: Option<String>,
+    },
 }
 
 impl Action {
@@ -242,6 +251,8 @@ impl Action {
             Self::Abort { .. } => "abort",
             Self::Wait(_) => "wait",
             Self::WriteFile { .. } => "write_file",
+            Self::RestartCore {} => "restart_core",
+            Self::Resume { .. } => "resume",
         }
     }
 
@@ -253,9 +264,10 @@ impl Action {
             Self::QueueEdit { session, .. }
             | Self::QueueDelete { session, .. }
             | Self::QueueReorder { session, .. }
-            | Self::Abort { session } => Some(session),
+            | Self::Abort { session }
+            | Self::Resume { session } => Some(session),
             Self::Wait(wait) => Some(&wait.session),
-            Self::WriteFile { .. } => None,
+            Self::WriteFile { .. } | Self::RestartCore {} => None,
         }
     }
 }
@@ -685,7 +697,7 @@ fn check_actions(spec: &ScenarioSpec, problems: &mut Vec<String>) {
                     problems.push(format!("{field}/turn: no earlier turn `{turn}`"));
                 }
             }
-            Action::Abort { .. } => {}
+            Action::Abort { .. } | Action::RestartCore {} | Action::Resume { .. } => {}
             Action::WriteFile { path, .. } => check_path(&format!("{field}/path"), path, problems),
         }
     }

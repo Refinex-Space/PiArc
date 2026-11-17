@@ -222,6 +222,16 @@
           "properties": { "session": { "$ref": "#/$defs/label" } }
         },
         "wait": { "$ref": "#/$defs/waitAction" },
+        "restart_core": {
+          "description": "Shut Core down, start it again on the same data directory and reopen the workspace; sessions stay closed until resumed.",
+          "type": "object",
+          "additionalProperties": false
+        },
+        "resume": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "session": { "$ref": "#/$defs/label" } }
+        },
         "write_file": {
           "type": "object",
           "additionalProperties": false,
