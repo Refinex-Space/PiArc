@@ -25,7 +25,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use piarc_ports::{ExitStatus, ProcessControl, ProcessSpawner, SpawnSpec};
+use piarc_ports::{BoxFuture, Clock, ExitStatus, ProcessControl, ProcessSpawner, SpawnSpec};
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
@@ -93,10 +93,25 @@ pub struct CommandExit {
     pub timed_out: bool,
 }
 
-/// Runs commands through an injected [`ProcessSpawner`].
+/// Runs commands through an injected [`ProcessSpawner`]; timeouts are measured on an injected
+/// [`Clock`] (tokio's timer by default).
 #[derive(Clone)]
 pub struct CommandRunner {
     spawner: Arc<dyn ProcessSpawner>,
+    clock: Arc<dyn Clock>,
+}
+
+/// The default clock of timeouts: tokio's timer.
+struct TokioClock;
+
+impl Clock for TokioClock {
+    fn now(&self) -> std::time::Instant {
+        tokio::time::Instant::now().into_std()
+    }
+
+    fn sleep(&self, duration: Duration) -> BoxFuture<'static, ()> {
+        Box::pin(tokio::time::sleep(duration))
+    }
 }
 
 impl std::fmt::Debug for CommandRunner {
@@ -116,7 +131,14 @@ impl CommandRunner {
     /// A runner that starts processes with `spawner`.
     #[must_use]
     pub fn new(spawner: Arc<dyn ProcessSpawner>) -> Self {
-        Self { spawner }
+        Self::with_clock(spawner, Arc::new(TokioClock))
+    }
+
+    /// A runner whose timeouts run on `clock` (tests pass one they advance themselves). The
+    /// termination grace and [`EXIT_GRACE`] stay on tokio's timer: they wait for real processes.
+    #[must_use]
+    pub fn with_clock(spawner: Arc<dyn ProcessSpawner>, clock: Arc<dyn Clock>) -> Self {
+        Self { spawner, clock }
     }
 
     /// Runs `spec`, sending its output to `output`, until it exits, `cancel` fires or its
@@ -154,7 +176,7 @@ impl CommandRunner {
         let _stop_on_drop = stop.clone().drop_guard();
         let (exit_tx, exit_rx) = oneshot::channel();
         let limits = Stopping {
-            timeout: spec.timeout,
+            deadline: spec.timeout.map(|timeout| self.clock.sleep(timeout)),
             grace: spec.kill_grace,
         };
         tokio::spawn(watch(process.control, stop.clone(), limits, exit_tx));
@@ -166,9 +188,9 @@ impl CommandRunner {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
 struct Stopping {
-    timeout: Option<Duration>,
+    /// Completes when the timeout passes.
+    deadline: Option<BoxFuture<'static, ()>>,
     grace: Duration,
 }
 
@@ -181,8 +203,8 @@ async fn watch(
     exit: oneshot::Sender<io::Result<CommandExit>>,
 ) {
     let deadline = async {
-        match limits.timeout {
-            Some(timeout) => tokio::time::sleep(timeout).await,
+        match limits.deadline {
+            Some(deadline) => deadline.await,
             None => std::future::pending().await,
         }
     };

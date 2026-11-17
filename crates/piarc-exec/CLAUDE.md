@@ -6,7 +6,7 @@
 
 | 命令 | 用途 |
 |---|---|
-| `cargo test -p piarc-exec` | 全部单元测试；`termination_tests` 是进程树（超时、取消、shell 退出后的后台进程、运行时关闭各自按 PID 确认子孙进程退出）、SIGTERM 先于 SIGKILL、暂停时钟上的 2/10 分钟超时、两个管道各 50 MB |
+| `cargo test -p piarc-exec` | 全部单元测试；`termination_tests` 是进程树（超时、取消、shell 退出后的后台进程、运行时关闭各自按 PID 确认子孙进程退出）、SIGTERM 先于 SIGKILL、注入时钟上的 2/10 分钟超时（`CommandRunner::with_clock`）、两个管道各 50 MB |
 | `cargo test -p piarc-exec termination -- --nocapture` | 只跑终止相关测试并打印 PID 与 100 MB 耗时 |
 | `cargo clippy -p piarc-exec --all-targets -- -D warnings` | lint；Windows 代码在 macOS 上用根 `CLAUDE.md` 的交叉 clippy 命令 |
 
@@ -41,5 +41,5 @@ Core 层的集成测试在 `crates/piarc-core/tests/exec_commands.rs`（cwd、�
 - `ProcessControl::wait` 与 `kill`/`terminate` 都借用 `&mut self`：等待与停止分两步写（`watch` 的 `select!` 只决定原因，`stop_process` 再停）。
 - `OutputCapture::push` 在异步任务里同步写文件（`BufWriter`），只在输出超过内联预算后才写；不要在这里做阻塞更久的事。
 - 登录 shell 会执行用户的配置文件：测试里用 `/bin/bash` 加临时 `HOME` 的 `.bash_profile`（`env.rs` 的测试、L2 运行器），不要依赖开发机自己的 shell 配置；macOS 的 `/etc/profile` 会经 `path_helper` 重排 `PATH`，断言写"包含"不写"等于"。
-- 暂停的 tokio 时钟（`start_paused`）在运行时空闲时直接跳到下一个定时器：真实子进程运行时也会跳，所以超时测试量的是 tokio 的 `Instant`，不是墙钟。
+- 不要用 tokio 的暂停时钟（`start_paused`）测命令超时：Windows 上子进程管道在阻塞线程池上读，进行中的阻塞任务会阻止暂停时钟自动前进，定时器永远不触发（CI 运行 44116918422 卡到作业超时）。超时走注入的 `Clock`（`CommandRunner::with_clock`），宽限与 `EXIT_GRACE` 仍用 tokio 计时。
 - Git Bash 在繁忙的 Windows 机器上启动可能超过几百毫秒：测试等第一段输出或文件出现再动作，不按固定延迟。

@@ -1,6 +1,6 @@
 //! How commands end (T17): a timeout, a cancellation and a dropped runtime end the whole process
 //! tree, grandchildren included, checked by process id; `SIGTERM` comes before `SIGKILL`;
-//! timeouts follow [`ExecLimits`] on a paused clock; 50 MB on each pipe does not block.
+//! timeouts follow [`ExecLimits`] on an injected clock; 50 MB on each pipe does not block.
 
 use std::ffi::OsString;
 use std::path::PathBuf;
@@ -255,44 +255,75 @@ async fn sigterm_comes_first_and_sigkill_follows() {
     assert!(started.elapsed() < Duration::from_secs(10));
 }
 
-/// Runs `sleep 100000` with the timeout `limits` gives for `requested` on a paused clock and
-/// returns how long the run took on that clock.
-async fn paused_run(requested: Option<Duration>) -> (CommandExit, Duration) {
+/// Runs `sleep 100000` with the timeout `limits` gives for `requested`, on a clock the test
+/// controls: returns the duration the runner's deadline was set to and how the command ended
+/// once the test let that deadline pass.
+async fn held_run(requested: Option<Duration>) -> (Duration, CommandExit) {
     let limits = ExecLimits::default();
-    let mut long = spec("sleep 100000");
+    let asked = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let release = Arc::new(tokio::sync::Notify::new());
+    let clock = Arc::new(ReleasedClock {
+        asked: Arc::clone(&asked),
+        release: Arc::clone(&release),
+    });
+    let mut long = spec("echo started; sleep 100000");
     long.timeout = Some(limits.timeout(requested).duration);
     let (tx, mut rx) = mpsc::channel::<OutputChunk>(16);
+    let runner = CommandRunner::with_clock(Arc::new(ProcessTreeSpawner), clock);
+    let run = tokio::spawn(async move { runner.run(long, tx, CancellationToken::new()).await });
+    // The command is running and its deadline is set; nothing ends it until the clock says so.
+    let first = rx.recv().await.expect("output");
+    assert_eq!(first.bytes, b"started\n");
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert!(!run.is_finished(), "the command ended before its timeout");
+    let deadline = asked.lock().expect("asked").clone();
+    assert_eq!(deadline.len(), 1, "{deadline:?}");
+    release.notify_waiters();
     tokio::spawn(async move { while rx.recv().await.is_some() {} });
-    let started = tokio::time::Instant::now();
-    let exit = runner()
-        .run(long, tx, CancellationToken::new())
+    let exit = tokio::time::timeout(Duration::from_secs(30), run)
         .await
+        .expect("ends once the timeout passes")
+        .expect("joins")
         .expect("runs");
-    (exit, started.elapsed())
+    (deadline[0], exit)
 }
 
-#[tokio::test(start_paused = true)]
+/// A clock whose sleeps record their duration and complete when `release` is notified.
+struct ReleasedClock {
+    asked: Arc<std::sync::Mutex<Vec<Duration>>>,
+    release: Arc<tokio::sync::Notify>,
+}
+
+impl piarc_ports::Clock for ReleasedClock {
+    fn now(&self) -> Instant {
+        Instant::now()
+    }
+
+    fn sleep(&self, duration: Duration) -> piarc_ports::BoxFuture<'static, ()> {
+        self.asked.lock().expect("asked").push(duration);
+        let release = Arc::clone(&self.release);
+        // Registered before returning, so a release right after cannot be missed.
+        let mut notified = Box::pin(release.notified_owned());
+        notified.as_mut().enable();
+        Box::pin(notified)
+    }
+}
+
+/// T17-A04: the runner's deadline is the default 2 minutes, a 15-minute request runs with the
+/// 10-minute maximum, and the command times out when that deadline passes (an injected clock,
+/// so no minutes go by; tokio's paused clock cannot advance while Windows reads pipes on
+/// blocking threads).
+#[tokio::test]
 async fn timeouts_default_to_two_minutes_and_stop_at_ten() {
-    // The paused clock jumps ahead whenever nothing else is ready: minutes pass at once.
-    let slack = ExecLimits::default().kill_grace + Duration::from_secs(1);
-    let (exit, took) = paused_run(None).await;
-    assert!(exit.timed_out);
-    assert!(
-        took >= Duration::from_secs(120) && took < Duration::from_secs(120) + slack,
-        "{took:?}"
-    );
-    let (exit, took) = paused_run(Some(Duration::from_secs(15 * 60))).await;
-    assert!(exit.timed_out);
-    assert!(
-        took >= Duration::from_secs(600) && took < Duration::from_secs(600) + slack,
-        "{took:?}"
-    );
-    let (exit, took) = paused_run(Some(Duration::from_secs(5))).await;
-    assert!(exit.timed_out);
-    assert!(
-        took >= Duration::from_secs(5) && took < Duration::from_secs(5) + slack,
-        "{took:?}"
-    );
+    let (deadline, exit) = held_run(None).await;
+    assert_eq!(deadline, Duration::from_secs(120));
+    assert!(exit.timed_out && !exit.killed, "{exit:?}");
+    let (deadline, exit) = held_run(Some(Duration::from_secs(15 * 60))).await;
+    assert_eq!(deadline, Duration::from_secs(600));
+    assert!(exit.timed_out, "{exit:?}");
+    let (deadline, exit) = held_run(Some(Duration::from_secs(5))).await;
+    assert_eq!(deadline, Duration::from_secs(5));
+    assert!(exit.timed_out, "{exit:?}");
 }
 
 #[tokio::test]

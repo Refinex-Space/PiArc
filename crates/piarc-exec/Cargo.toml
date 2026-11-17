@@ -29,8 +29,7 @@ windows-sys = { workspace = true, features = [
 ] }
 
 [dev-dependencies]
-# `test-util` pauses tokio's clock: timeouts of minutes run instantly (T17-A04).
-tokio = { workspace = true, features = ["process", "io-util", "test-util"] }
+tokio = { workspace = true, features = ["process", "io-util"] }
 
 [lints]
 workspace = true
