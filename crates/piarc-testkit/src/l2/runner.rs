@@ -647,7 +647,7 @@ impl Driver<'_> {
         for f in check_files(&self.spec.expect.files, &self.env.workspace) {
             failures.push(failure("files", f));
         }
-        for f in check_fixture_files(&self.spec, &self.env.workspace) {
+        for f in check_fixture_files(self.spec, &self.env.workspace) {
             failures.push(failure("files", f));
         }
         for f in check_requests(self.spec, &self.env.records()) {
