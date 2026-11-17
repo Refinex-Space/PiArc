@@ -169,7 +169,7 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 
 | 能力 | 位置 | 说明 | 登记任务 |
 |---|---|---|---|
-| 统一检查入口 | `scripts/dev/verify.mjs`（`npm run verify`） | 按顺序运行 13 个检查步骤，失败后继续，最后打印汇总表；新增检查在 `STEPS` 中追加 | T01 |
+| 统一检查入口 | `scripts/dev/verify.mjs`（`npm run verify`） | 按顺序运行 14 个检查步骤，失败后继续，最后打印汇总表；新增检查在 `STEPS` 中追加 | T01 |
 | crate 依赖方向检查 | `scripts/ci/check-crate-deps.mjs` + `crates/deps-rules.json` | 读取 `cargo metadata`，按层与例外校验 workspace crate 之间的依赖 | T01 |
 | 验收清单一致性检查 | `scripts/plan/check-acceptance.mjs` | 比对任务文件中的 `- [Txx-Ayy]` 验收项与 `docs/plan/acceptance.json` | T01 |
 | 仓库内工具安装 | `scripts/dev/install-tools.mjs` | 把锁定版本的工具（cargo-deny、ripgrep、fd、bindgen-cli）装进 `.tools/`，不做全局安装；`localToolPath()` 给出可执行文件路径 | T01 |
@@ -242,3 +242,6 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | 日志文件 | `piarc_telemetry::{install, DailyLog, Calendar}` | 按 UTC 天轮转、保留 7 天、Core 与 Agent Host 分文件；时钟可注入 | T13 |
 | SQLite 迁移 | `piarc_store::migrate::{MIGRATIONS, Migration, apply}` | 按版本号顺序、每个迁移一个事务并记录在 `schema_migrations`；新表新字段只追加迁移，写法见 `crates/piarc-store/CLAUDE.md` | T13 |
 | 目录监听 | `piarc_fs::watch::Watcher` | notify 封装，非递归监听目录，回调给出路径；调用方去抖并重读 | T13 |
+| L2 场景运行器 | `piarc_testkit::l2`（`load`、`run`、`run_suite`、`RunnerConfig::build`）；`cargo test -p piarc-testkit --test scenarios`；`piarc-devcli run` | 加载并校验场景文件（`tests/scenarios/schema.json`），在含空格与中文的临时根中驱动 Core 无头运行时 + 真实 Agent Host + 每个端点一个严格 mock，断言事件、文件、请求、工具批次与 Core I/O，输出可读差异与 JSON 报告；新增 Harness 行为写一个场景，见 `testing.md` 第 12 节 | T15 |
+| 事件部分匹配断言 | `piarc_testkit::l2::matcher`（`is_subset`、`subset_mismatch`、`check_events`） | 字段子集匹配（对象按键子集、数组逐元素同长度、标量相等）与按会话的有序子序列（含 `any_order` 组）；失败时给出第一个未匹配的期望、乱序位置与附近的实际事件 | T15 |
+| 能力覆盖检查 | `scripts/plan/check-capabilities.mjs`、`scripts/lib/capabilities.mjs`；verify 第 14 步（`scripts/ci/run-l2.mjs`） | `tests/capabilities.yaml` 与需求、架构、看板对照；按 L2 报告报 MISSING 与未登记的能力 ID；`--milestone Mx` 列出未完成能力；生成并比对 `docs/product/capabilities.md`；见 `testing.md` 第 13 节 | T15 |

@@ -2,7 +2,7 @@
 //! with the real Agent Host and the strict mock provider, then assert events, file side
 //! effects and the requests the model received.
 //!
-//! - [`format`]: the file format and its checks (schema: `tests/scenarios/schema.json`);
+//! - [`format`](mod@format): the file format and its checks (schema: `tests/scenarios/schema.json`);
 //! - [`runner`]: runs one scenario in its own temporary root;
 //! - [`matcher`]: field-subset matching and ordered event subsequences;
 //! - [`checks`]: request and file assertions;

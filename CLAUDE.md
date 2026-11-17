@@ -19,7 +19,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `npm ci --ignore-scripts` | 按 lockfile 安装 npm 依赖（CI 同款） |
 | `node scripts/dev/install-tools.mjs` | 把锁定版本的 cargo-deny、ripgrep、fd、bindgen-cli 装进 `.tools/`（不做全局安装）；verify 第 11 步需要 cargo-deny，Agent Host 行为对照测试（Pi 原生 grep/find）需要 ripgrep 与 fd，重新生成 libghostty-vt 绑定需要 bindgen |
 | `node scripts/dev/gen-ghostty-bindings.mjs [--check]` | 重新生成（或比对）`crates/piarc-ghostty-sys/src/bindings.rs`；只在升级 libghostty-vt 时需要 |
-| `npm run verify` | 全部 13 项检查，结束时打印汇总表；开工与收尾各跑一次 |
+| `npm run verify` | 全部 14 项检查，结束时打印汇总表；开工与收尾各跑一次 |
 | `npm run gen:protocol` | 由 `piarc-protocol` 重新生成 `packages/protocol/schema/` 与 `src/generated/`；改了协议类型后运行并提交 |
 | `npm run build:agent-host` | esbuild 把 Agent Host 打成 `agent-host/dist/bundle/agent-host.mjs`（另写 `pi-assets/package.json`，运行时以 `PI_PACKAGE_DIR` 指向它） |
 | `npm run build:core` | 用 `@napi-rs/cli` 构建本机的 Core 开发版 `.node`（`target/piarc-core/development/`）并更新 `.d.ts` 快照；`-- --flavor all` 两种构建都出 |
@@ -50,6 +50,10 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `cargo run -p piarc-sandbox --release --example s8-bench` | S8 测量：`sandbox-exec` 每条命令额外耗时、沙箱代理延迟与吞吐（macOS） |
 | `node scripts/ci/load-core.mjs --module <file.node>` | 在 Node 与 Electron 中加载一个 Core 模块并跑一次事件通道 |
 | `cargo run -q -p piarc-testkit --bin piarc-mock-provider -- --port 0 --scenarios <文件或目录>` | 启动严格 mock provider 独立进程：stdout 第一行是端口，stdin 关闭后退出（`testing.md` 第 10 节） |
+| `node scripts/ci/run-l2.mjs` | verify 第 14 步：构建 Agent Host bundle → 全部 L2 场景（报告写到 `target/l2/results.json`）→ 能力覆盖与 `docs/product/capabilities.md` 漂移检查 |
+| `cargo test -p piarc-testkit --test scenarios -- <id> --exact` | 只跑一个 L2 场景（`tests/scenarios/<id>.yaml`）；不加筛选跑全部，`-- --results <文件>` 写报告 |
+| `cargo run -q -p piarc-devcli -- run tests/scenarios [--json <文件>]` | 不经 UI 运行一个场景文件或整个目录，输出 JSON 报告 |
+| `node scripts/plan/check-capabilities.mjs [--milestone M2]` | 检查能力清单；`--milestone` 列出该里程碑及之前未完成的能力；`--results <报告> --doc write` 重新生成 `capabilities.md` |
 | `cargo test -p piarc-testkit --test sessions` | 会话层端到端：Core 的工作区与会话 actor 驱动真实 Agent Host 与 mock（排队、中断、工具批次、重试、缺口补齐、空闲回收、重启恢复） |
 | `PIARC_UPDATE_GOLDEN=1 cargo test -p piarc-testkit --test agent_host golden` | 重新录制投影 golden 的 Pi 事件序列（`agent-host/test/golden/`）；之后 `npx vitest run agent-host -u` 更新投影快照。不带变量时只做漂移检查 |
 | `cargo run --release -p piarc-testkit --example t14-warmup` | 工作区预热测量：打开到 Agent Host 就绪、打开并恢复会话，10 次取最大值（预算 1 s） |
@@ -58,6 +62,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 
 - `apps/desktop/`：Electron 应用（主进程、preload、渲染进程，安全基线与 L4 见其 `CLAUDE.md`）；`agent-host/`：Agent Host；`packages/protocol/`：由 `piarc-protocol` 生成的 TS 类型；`packages/testkit/`：仅测试，用 pi-ai 驱动 mock provider。四者是 npm workspaces。
 - `crates/`：Rust workspace，21 个 crate，职责见各 crate 的 `src/lib.rs` 顶部文档与架构第 7.1 节。
+- `tests/scenarios/`：L2 场景（`schema.json` 是格式）；`tests/capabilities.yaml`：M1–M5 能力清单，生成 `docs/product/capabilities.md`（`testing.md` 第 12、13 节）。
 - `tests/contracts/`：L1 契约样本（`<契约名>/` 与 `invalid/`）和帧编解码共享用例（`framing/`），流程见 `docs/engineering/testing.md` 第 7 节。
 - `scripts/`：跨平台 Node 脚本（`dev/` 本地入口、`ci/` 检查、`plan/` 计划文件检查、`lib/` 公共函数）。
 - `docs/engineering/`：编码规范、测试规范、CLAUDE.md 规范。
@@ -98,5 +103,6 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - 测试里用 `vim -u NONE` 时加 `--cmd 'set encoding=utf-8'`：否则 vim 按 locale 选编码，`LANG` 为空的环境（CI runner、某些 IDE 或智能体的子进程）里中文显示成转义（I38）。
 - 打包时 `postPackage` 才把内置 node 放进 `.app`，签名分层见 `apps/desktop/CLAUDE.md`；不要对整个 bundle 用 `codesign --deep` 重签，会覆盖 node 的 Node.js 官方签名。
 - Windows 安装包由 CI 的 `package-windows` 作业产出（`scripts/release/pack-windows.mjs`，需要 .NET SDK）；Velopack 的 pack id 是应用标识，不能用 `PiArc`（会与数据目录 `%LOCALAPPDATA%\PiArc\` 重合）。
+- L2 场景目标（`--test scenarios`）设了 `test = false`，`cargo test --workspace` 不跑它，只有 verify 第 14 步与显式 `--test scenarios` 跑。新增或改动场景、改能力状态后重新生成 `docs/product/capabilities.md`（手改会被漂移检查拒绝）；`active` 能力没有场景时报 MISSING。
 - 升级 Pi 前后跑 golden 录制与漂移检查（见命令表）：投影、排队、中断补齐与工具批次都依赖 Pi 的事件顺序与队列语义（ADR-0026）。
 - Agent Host 的工具不碰文件系统与子进程：`agent-host/src/tools/`、`src/harness/` 禁止导入 `fs`、`child_process`，I/O 一律经 AHP `fs/*`、`exec/*` 由 Core 执行（ADR-0004、ADR-0020）；端到端测试的 I/O spy 会抓到绕过。

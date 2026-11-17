@@ -1,6 +1,6 @@
 # piarc-testkit
 
-仅测试用的支持 crate：严格校验请求的 mock provider（架构第 12.2 节），以及 Agent Host 的端到端测试（`tests/agent_host/`，T06）；T15 在这里加 L2 场景运行器与事件断言。发布的 crate 不得依赖它（`crates/deps-rules.json` 的 testsupport 层）。完整说明（端点、场景选择、脚本格式、规则表、记录字段）在 `docs/engineering/testing.md` 第 10 节，crate 文档（`src/lib.rs`）有同一份脚本格式。
+仅测试用的支持 crate：严格校验请求的 mock provider（架构第 12.2 节）、L2 场景运行器与事件断言（`src/l2/`，T15，架构第 12.3 节），以及 Agent Host 与会话层的端到端测试（`tests/agent_host/`、`tests/sessions/`）。发布的 crate 不得依赖它（`crates/deps-rules.json` 的 testsupport 层）。完整说明（端点、场景选择、脚本格式、规则表、记录字段）在 `docs/engineering/testing.md` 第 10 节，crate 文档（`src/lib.rs`）有同一份脚本格式。
 
 ## 命令
 
@@ -15,6 +15,8 @@
 | `cargo test -p piarc-testkit --test sessions` | T14：经 `piarc_core::CoreRuntime` 的会话层端到端（真实 Agent Host + mock，`tests/sessions/`） |
 | `cargo run --release -p piarc-testkit --example t14-warmup` | T14-A09：打开工作区到就绪、打开并恢复会话的 10 次测量，超过 1 s 预算即失败 |
 | `cargo test -p piarc-testkit --test ahp_round_trip -- --nocapture` | T07-A10：`fs/read` 的 AHP 往返计时（独立测试二进制，计时期间不跑别的测试） |
+| `cargo test -p piarc-testkit --test scenarios` | L2：`tests/scenarios/*.yaml` 每个文件一个测试（自定义 harness）；`-- <id> --exact` 只跑一个，`-- --results target/l2/results.json` 写 JSON 报告（相对路径按仓库根解析）。`test = false`：不在 `cargo test --workspace` 里，由 verify 第 14 步运行 |
+| `cargo test -p piarc-testkit --test l2_runner -- --nocapture` | 运行器自身：格式错误、可读差异、未用的审批应答、重复运行与临时目录清理 |
 
 ## 两种运行形态
 
@@ -60,6 +62,14 @@
 - `ToolIoConfig.observer` 记录同时进行的 `fs/*` 调用数（A06 的批次上限）；`--test-drop-seq <n>` 让 Agent Host 不写出第 n 条通知（A08 的缺口补齐）。
 - 场景在 `tests/sessions/scenarios/`；等事件一律经 `Events::wait`，合并器按 16 ms 刷出。
 
+## L2 场景运行器（`src/l2/`，T15）
+
+- 场景格式的唯一描述是 `tests/scenarios/schema.json`（`format.rs` 以 `include_str!` 嵌入）：改格式时同时改 schema、`format.rs` 的类型与引用检查、`testing.md` 第 12 节。加载分三遍：schema（报字段的 JSON Pointer）→ serde → 引用检查（id 与文件名、会话与端点、标签先定义后使用、路径不出工作区、mock 脚本自检）。
+- 运行器只经 `CoreRuntime` 的公开方法驱动、只读 sink 送达的事件与 `ToolIoObserver`（`gate.rs`）；不复制 Core 的逻辑。每个端点一个 `MockProvider` 与一个 Pi provider（`mock-<端点名>`，模型 `mock-model`），场景经模型的 `x-piarc-scenario` 请求头选择，提示词里没有场景标记。
+- 每次运行一个新的临时根（含空格与中文，带进程号与计数）和一个新 Core；结束后删除并在结果里报告。并行的场景各起一个 Agent Host（默认半数核心、至多 4 个）。
+- 动作结束后先等每个被启动的回合 `turn/completed`，再一次性检查全部断言；没有 sleep，等待只有 30 s 安全网。
+- 每个请求都必须通过严格 mock 的校验（总是检查）；`approvals` 在 T20 之前一律判失败（Core 不发审批请求，声明的应答必然用不上）。T20 接入审批请求的观测点时改 `runner.rs` 的 `assert_all`。
+
 ## 易错点
 
 - Windows：不要把 `canonicalize` 的结果（`\\?\C:\…` 形式）交给 Node 运行脚本，Node 会 `lstat 'C:'` 失败；仓库根用 `CARGO_MANIFEST_DIR` 的上两级。Core 报告的路径不带 `\\?\`，比较时用 harness 的 `canonical()`。
@@ -69,4 +79,7 @@
 - 参数分段按字符而不是字节计偏移；`split_at` 的每个偏移必须严格递增且落在 `(0, 长度)` 内，加载时检查。
 - 工具参数以紧凑 JSON、键按字典序流出（serde_json 默认），断言拼接结果时用同样的序列化。
 - Anthropic SDK 的 beta 客户端请求 `/v1/messages?beta=true`；路由只比较路径，记录里保留查询串。
+- `restart_core` 之后的新 Core 必须用同一个保险箱主密钥名：`test_master_key_name` 每次调用都生成新名字，存在 `Env` 里复用，否则 Pi 读不到凭据（"No API key found"）。
+- Cargo 在 crate 目录里运行测试二进制：harness 收到的相对路径要按仓库根解析（`scenarios.rs` 已处理 `--results`）。
+- 工具批次靠 `Gate` 扣住下一批的请求直到整批到齐再放行，不靠计时；某批不完整时回合停住，30 s 后以"never completed"报告。
 - `jsonschema` 经 `fluent-uri` 引入 MIT-0 的 `borrow-or-share`，`deny.toml` 为它单独设了许可证例外；升级 `jsonschema` 后例外不再命中时 cargo-deny 会警告。

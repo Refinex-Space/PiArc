@@ -9,7 +9,7 @@
 | L0 单元（Rust） | 权限、Bash 分析、hooks 决策、快照、diff、终端状态等纯逻辑 | 同文件 `#[cfg(test)] mod tests`；跨模块的放 `crates/<crate>/tests/*.rs` | `cargo test -p <crate>`；全部：`cargo test --workspace` | 每次提交 | T01 |
 | L0 单元（TS） | 投影、工具包装、Harness Kit；渲染进程的 store 归约器、Markdown 增量解析、交互规则纯函数；仓库脚本 | 与源文件同目录：`foo.ts` ↔ `foo.test.ts`，脚本为 `foo.test.mjs` | `npm test`；单个文件：`npx vitest run <路径>` | 每次提交 | T01 |
 | L1 契约 | AHP schema 往返、录制事件样本的反序列化与再序列化、Pi 事件到 AHP 投影的 golden、NAPI 导出声明与 preload API 快照 | 样本：`tests/contracts/<契约名>/*.json`，反例在其下的 `invalid/`；Rust：`crates/piarc-protocol/tests/*.rs`；TS：`packages/protocol/src/*.test.ts`；NAPI 声明快照：`apps/desktop/src/main/core/native/*.d.ts`；见第 7 节 | `cargo test -p piarc-protocol`、`npx vitest run packages/protocol`、`node scripts/ci/check-core-types.mjs`；全部由 `npm run verify` 运行 | 每次提交 | T02、T04 |
-| L2 场景回放 | 无头运行 Core + 真实 Agent Host，模型侧接严格校验请求的 mock provider，按场景数据文件驱动 | `tests/scenarios/<场景 id>.yaml`，文件名与 `id` 一致；运行器在 `piarc-testkit`，驱动在 `piarc-devcli`；模型侧的 mock provider 见第 10 节 | T15 补充 | 每次提交 | T05、T15 |
+| L2 场景回放 | 无头运行 Core + 真实 Agent Host，模型侧接严格校验请求的 mock provider，按场景数据文件驱动 | `tests/scenarios/<场景 id>.yaml`，文件名与 `id` 一致；运行器在 `piarc-testkit`（`src/l2/`），驱动在 `piarc-devcli`；能力清单 `tests/capabilities.yaml`；见第 12、13 节 | `cargo test -p piarc-testkit --test scenarios`；全部（含能力检查）：`node scripts/ci/run-l2.mjs` | 每次提交 | T05、T15 |
 | L3 行为对齐 | 对真实 Claude Code 录制同一批场景，与 PiArc 做结构化 diff | 有意偏离写在 `tests/l3-allowlist.yaml` | T30 补充 | 每晚 / 手动 | T30 |
 | L4 客户端 | Playwright 驱动 Electron 应用（开发形态与打包产物）；关键组件视觉快照；录制事件流驱动渲染进程（假 Core） | `apps/desktop/e2e/*.e2e.ts`；见第 9 节 | 先 `npm run package:desktop -- --flavor development`，再 `npm run test:e2e -w @piarc/desktop` | 每次提交（CI `desktop` 作业）/ 每晚（UI 流程） | T03、T19 |
 | 安全回归 | Markdown 与链接渲染的 XSS 载荷集、preload API 越权调用、外部导航拦截（架构第 10.3 节） | Electron 层：L4 的 `csp`、`navigation`、`external-links`、`preload`、`permissions`、`app-instance` 用例；纯函数（来源校验、外链白名单、CSP、资源路径）：`apps/desktop/src/main/**/*.test.ts`；XSS 载荷集由 T09 加入 | 纯函数部分由 `npm run verify` 运行；Electron 层同 L4 | 每次提交 | T03 起 |
@@ -18,7 +18,7 @@
 
 ## 2. 质量门禁
 
-`npm run verify`（`scripts/dev/verify.mjs`）按顺序执行全部 13 项检查，一步失败后继续执行后续步骤，最后打印汇总表，任一步失败则退出码非 0：
+`npm run verify`（`scripts/dev/verify.mjs`）按顺序执行全部 14 项检查，一步失败后继续执行后续步骤，最后打印汇总表，任一步失败则退出码非 0：
 
 | # | 步骤 | 单独运行 |
 |---|---|---|
@@ -35,8 +35,9 @@
 | 11 | cargo-deny | `.tools/bin/cargo-deny check`（先运行 `node scripts/dev/install-tools.mjs`） |
 | 12 | crate 依赖规则 | `node scripts/ci/check-crate-deps.mjs` |
 | 13 | 验收清单一致性 | `node scripts/plan/check-acceptance.mjs` |
+| 14 | L2 场景与能力清单 | `node scripts/ci/run-l2.mjs`：构建 Agent Host bundle → 全部场景（`cargo test -p piarc-testkit --test scenarios -- --results target/l2/results.json`）→ 能力覆盖与 `capabilities.md` 漂移检查（第 12、13 节） |
 
-CI（`.github/workflows/ci.yml`）在 `macos-latest`（arm64）与 `windows-latest`（x64）上执行 `npm ci --ignore-scripts` 与 `npm run verify`。后续任务新增的检查（L1 契约、L2 场景、schema 漂移等）都接进 verify，使本地与 CI 运行同一套检查。
+CI（`.github/workflows/ci.yml`）在 `macos-latest`（arm64）与 `windows-latest`（x64）上执行 `npm ci --ignore-scripts` 与 `npm run verify`。后续任务新增的检查（L1 契约、L2 场景、schema 漂移等）都接进 verify，使本地与 CI 运行同一套检查。verify 作业结束后把 L2 报告（`target/l2/results.json`）上传为 artifact `l2-report-<os>`。
 
 需要打包产物的检查不进 verify，由同一工作流的 `desktop` 作业在两个平台上运行：下载 Electron 二进制、打开发构建（先构建 Core）、跑 L4（第 9 节）、打发布构建、`npm run check:fuses`，证据作为 artifact 上传。四个目标的 Core 预编译由 `core-build` 作业完成，`core-load` 作业在各自架构的 runner（`macos-latest`、`macos-15-intel`、`windows-latest`、`windows-11-arm`）上用 `scripts/ci/load-core.mjs` 在 Node 与 Electron 中加载并跑一次事件通道。
 
@@ -273,3 +274,133 @@ Agent Host 有三层测试（T06 建立）：
 - **零直接调用**：`harness::with_io_spy` 经 `NODE_OPTIONS=--import` 把 `packages/testkit/src/io-spy.ts` 预加载进 Agent Host，包装 `fs`、`fs/promises`、`child_process` 的全部函数；记录带时间戳，测试按场景窗口（提示词发出到回合结束）断言对工作区路径的 `fs` 调用与 `child_process` 调用为 0。新增工具或升级 Pi 时，把它们加进 `tools.rs` 的全工具场景。
 - **行为对照**：`parity.rs` 用同一份脚本在 `--pi-native-tools` 的 Agent Host 与委托工具的 Agent Host 中各跑一遍，比较模型收到的工具结果（`harness::tool_results_in`，工作区路径替换为 `<WS>`）与运行后的工作区快照。有意差异登记在 `EXPECTED_DIFFERENCES` 并写明原因，差异消失或出现新差异都会失败。Pi 原生 grep、find 需要 ripgrep 与 fd：`node scripts/dev/install-tools.mjs` 装进 `.tools/bin`，测试优先用那里的。
 - **Core 侧记录**：harness 的 `Core` 处理者记录每个 `fs/*`、`exec/*` 请求的方法、`origin.tool`、请求路径与解析后的路径（`calls_of`），用于断言工具到 AHP 方法的对应与会话隔离。
+
+## 12. L2 场景（T15）
+
+一个场景是一次完整的交互：工作区夹具、各 mock 端点的逐步响应、驱动 Core 的动作、审批应答，以及期望的事件、文件副作用与发给模型的请求（架构第 12.3 节）。场景放在 `tests/scenarios/<id>.yaml`，格式的唯一描述是同目录的 `schema.json`（JSON Schema 2020-12），运行器在 `piarc-testkit` 的 `src/l2/`。
+
+### 12.1 字段
+
+```yaml
+id: turn-steer                    # 与文件名一致：小写字母、数字与 -
+description: 一句话写清场景证明的行为，与断言一致
+capabilities: [CAP-TURN-STEER-001] # tests/capabilities.yaml 中的 ID，至少一个
+platforms: [macos]                # 可选，缺省为两个平台；排除平台时必须写 platform_reason
+platform_reason: 依赖 /bin/sh     # 报告中列为"跳过（平台）"并带上原因
+workspace:
+  trusted: false                  # 可选：打开前记录信任决定（缺省不信任）
+  files: { 'src/a.ts': "export const a = 1;\n" }   # 相对路径用 /，不能含 ..
+providers:                        # mock 端点，可定义多个；名称为小写标签
+  main:
+    wire: anthropic               # 或 openai
+    validation: { rules: { role_order: false } }   # 可选，与第 10.3 节相同
+    steps: [...]                  # 与第 10.3 节的 steps 相同
+sessions:                         # 可选；缺省为一个会话 main，使用唯一的端点、工作目录为工作区
+  a: { provider: one, cwd: 'alpha dir' }
+actions: [...]                    # 见 12.2
+approvals: []                     # 见 12.3
+expect: { events, files, requests, request_counts, tool_batches, core_io }   # 见 12.4
+```
+
+- 每个端点有自己的 `MockProvider` 与自己的 Pi provider（`mock-<端点名>`，唯一的模型 `mock-model`）；场景经模型配置里的 `x-piarc-scenario` 请求头选择脚本，提示词里没有场景标记。两个会话要并发请求时用两个端点，各自的步数互不影响。
+- `workspace.files` 与 `expect.files` 的路径都相对工作区；工作区本身在临时根下的 `work space 工作区`，会话的 `cwd` 相对它。
+
+### 12.2 动作
+
+按顺序执行；会话缺省为唯一的会话，有多个会话时必须写 `session`。
+
+| 动作 | 字段 | 做什么 |
+|---|---|---|
+| `prompt` | `text`、`turn`（标签） | `session_op(Prompt)`，记下回合 id |
+| `steer`、`follow_up` | `text`、`item`（标签）、`turn` | 运行中进入排队表（`item` 记下排队项 id）；空闲时直接开始回合（`turn` 记下回合 id） |
+| `queue_edit`、`queue_delete`、`queue_reorder` | `item`/`text`；`items`（全部标签的新顺序） | 改排队表 |
+| `abort` | — | 中断当前回合 |
+| `wait` | 事件匹配字段（12.4）+ `count` | 等到至少 `count` 个（缺省 1）匹配的事件已送达 |
+| `write_file` | `path`、`content` | 写工作区文件（例如给等待中的命令发信号） |
+| `restart_core` | — | 关闭 Core，在同一数据目录上重新启动并打开工作区；会话保持关闭直到 `resume` |
+| `resume` | — | `resume_session` 重新打开会话 |
+
+动作全部完成后，运行器先等每个被动作启动的回合的 `turn/completed`，再检查全部断言。follow-up 自己启动的回合没有标签，用 `wait: { method: turn/completed, count: N }` 等它们。
+
+### 12.3 审批应答
+
+`approvals` 按顺序回答 Core 发出的审批请求（`decision: allow|deny`，可选 `tool` 限定工具规范名）。T20 之前 Core 不产生审批请求：声明了应答的场景一律失败（"N answer(s) declared, but Core issued 0 approval requests"），不静默通过。T20 接入审批请求的观测点时同步本节。
+
+### 12.4 断言与匹配规则
+
+| 字段 | 规则 |
+|---|---|
+| `events` | 每项是 `{ session, method, params, turn }`，或 `{ any_order: [...] }`。按会话分别做**有序子序列**匹配：每项匹配的事件必须在上一项之后；`any_order` 组内的事件顺序任意（每个成员取第一个未用的匹配），组整体在上一项之后、下一项之前；组内成员必须属于同一会话。不同会话之间不比较顺序 |
+| 事件的字段匹配 | `params` 是**字段子集**：对象只比较写出的键（id、`seq`、时间戳不写就不比较），数组长度必须相同并逐元素按子集比较，标量相等；`turn` 要求 `params.turnId` 等于该标签记下的回合 id |
+| `files` | 路径 → 完整内容（UTF-8，逐字节相等），或 `null` 表示文件不存在；没写的文件不检查 |
+| `requests` | 按端点名（只有一个端点时可省略）与请求序号（`index`，从 0 开始）断言：`roles`（消息角色顺序）、`tools`（工具名集合，恰好相等）、`tools_include`、`tools_exclude`、`user_texts`（每条有文本的 user 消息的文本，按顺序）、`last_user_text`、`contains`、`not_contains`（原始请求体子串）、`tool_results`（全部工具结果按顺序：`id`，可选 `is_error`（仅 Anthropic）与 `contains`）、`body`（请求体的字段子集） |
+| `request_counts` | 每个端点收到的请求数，恰好相等 |
+| （总是检查） | 每个请求都通过严格 mock 的校验；被拒的请求列出规则 ID |
+| `tool_batches` | 工具调用 id 的分批：Core 收到的委托请求按这些批次成组到达。运行器经 Core 的 `ToolIoObserver` 扣住下一批的请求，整批到齐才一起放行；另一批的调用提前到达即失败。不靠计时 |
+| `core_io` | `{ call, method }`：Core 为该工具调用回答过这个 AHP 方法（例如 `fs/read`、`exec/run`），证明工具经 Core 执行 |
+
+失败输出：事件给出第一个未匹配的期望项、上一个匹配的位置、乱序时匹配事件的实际位置、同方法事件中第一个不符的字段，以及该会话附近的实际事件（去掉 `seq`、`sessionId`、`ts`）；文件给出第一处不同的行号与两边的全文（带行号）；请求给出端点、序号与不符的字段。一个场景的全部失败一起报告。
+
+### 12.5 运行方式与取舍
+
+- **自定义 test harness**（`crates/piarc-testkit/tests/scenarios.rs`，`harness = false`）：每个场景文件是一个测试，按 id 筛选（`-- <id>`、`--exact`、`--list`、`--test-threads <n>`），输出 `test <id> ... ok|FAILED|ignored, 跳过（平台）: <原因>` 与汇总；`--results <文件>` 写 JSON 报告（相对路径按仓库根解析）。不引入数据驱动测试库：需要的只是筛选、并行与报告。该目标设了 `test = false`，不在 `cargo test --workspace` 中重复运行，由 verify 第 14 步运行。
+- **进程不复用**：每个场景一个新的临时根（路径含空格与中文）、一个新的 `CoreRuntime` 与 Agent Host，结束后删除临时根。实测单个场景（含 Core 与 Agent Host 冷启动）0.4–4 s，并行时偏长；换来会话、工作区、保险箱与 mock 步数的完全隔离；场景之间按线程并行（缺省半数核心、至多 4 个）补回总时长。
+- 场景一个失败不影响其他场景的执行与报告；同一场景连续运行两次结果相同（`l2_runner.rs` 检查），没有 sleep，等待只有 30 s 安全网。
+- `piarc-devcli` 用同一个运行器：`run <文件或目录> [--json <文件>]`（见 `crates/piarc-devcli/CLAUDE.md`）。
+
+### 12.6 新增一个 L2 场景
+
+1. 在 `tests/capabilities.yaml` 找到能力 ID（没有时按第 13 节新增并在报告中说明）；实现了它的任务把状态改为 `active`。
+2. 写 `tests/scenarios/<id>.yaml`：先写 mock 的逐步响应，再写动作，最后写断言；名字与 `description` 和断言一致。
+3. 运行 `cargo test -p piarc-testkit --test scenarios -- <id> --exact`；故意改坏一条断言确认它会失败，再改回来。
+4. 运行 `node scripts/ci/run-l2.mjs`；能力状态变化后用 `node scripts/plan/check-capabilities.mjs --results target/l2/results.json --doc write` 重新生成 `docs/product/capabilities.md` 并提交。
+5. 只在一个平台上成立的场景写 `platforms` 与 `platform_reason`。
+
+### 12.7 调试
+
+- 单个场景串行运行：`cargo run -q -p piarc-devcli -- run tests/scenarios/<id>.yaml --threads 1`。
+- 动作失败时报告附带最后 12 个事件与每个请求的结果类型和违规规则；mock 的完整请求体在 `MockProvider::records()`（运行器的 `RunOutcome` 不保留临时根）。
+- 格式错误在加载时报告文件与字段的 JSON Pointer，例如 `/expect/request_counts/main: "one" is not of type "integer"`。
+
+## 13. 能力清单（T15）
+
+### 13.1 格式
+
+`tests/capabilities.yaml` 登记 M1–M5 的全部 Harness 能力（架构第 12.4 节）：
+
+```yaml
+capabilities:
+  - id: CAP-TURN-STEER-001        # CAP-<领域>-<能力>-<三位序号>，稳定，不重编号、不复用
+    title: '运行中 steer：……'      # 一句话
+    milestone: M1                 # M1–M5
+    refs: [FR-CH-03, ARCH-5.3]    # 需求编号（需求第 4 章）和/或架构章节号
+    task: T14                     # 实现它的任务（看板上的编号）
+    status: active                # planned | active | blocked
+    # blocked 时必须有 reason 与 link（issue 或登记事项编号）
+client_only:                      # 行为全在客户端、由 L4 验证的需求
+  - { ref: FR-CH-05, reason: '……', task: T29 }
+```
+
+领域前缀：`SESSION`、`TURN`、`CHAT`、`TRUST`、`WT`、`PROVIDER`、`MODEL`、`USAGE`、`TOOL`、`BG`、`TERM`、`SANDBOX`、`PERM`、`PLAN`、`TODO`、`ASK`、`NEXT`、`AGENT`、`STYLE`、`HOOK`、`CTX`、`MEM`、`EXT`、`CONFIG`、`SKILL`、`CMD`、`MCP`、`PLUGIN`、`CKPT`、`RV`、`SYS`。新领域在本节登记。
+
+### 13.2 规则
+
+| 检查 | 失败条件 |
+|---|---|
+| 清单本身 | ID 格式不对或重复；里程碑、状态取值非法；`blocked` 缺 `reason` 或 `link`；`refs` 中的需求编号不在需求第 4 章、架构章节号不是 `ARCHITECTURE.md` 的标题；`task` 不在看板上；需求第 4 章的某个编号既没有被任何能力引用、也不在 `client_only` 中 |
+| 覆盖（需要 L2 报告） | `active` 能力没有任何场景引用：输出 `MISSING <ID>`；场景引用了清单中没有的 ID；报告来自筛选过的运行。`planned` 能力没有场景不失败；`blocked` 能力显示为 BLOCKED，不失败 |
+| 里程碑门禁 | `--milestone Mx` 列出里程碑不晚于 Mx、仍为 `planned` 的能力，按任务分组并带上看板状态；任务已完成而能力仍为 `planned` 时失败 |
+| 文档漂移 | `docs/product/capabilities.md` 与清单和 L2 报告重新生成的结果不同 |
+
+`capabilities.md` 的内容只取决于清单与场景（ID、描述、里程碑、引用、任务、覆盖场景、状态），按 ID 排序，不含耗时与平台：同一份绿色结果在两个平台上生成同一个文件；被平台排除的场景仍算覆盖，名字后注明适用平台。覆盖它的场景失败时状态显示"失败"。
+
+### 13.3 命令
+
+| 命令 | 用途 |
+|---|---|
+| `node scripts/plan/check-capabilities.mjs` | 只检查清单 |
+| `node scripts/plan/check-capabilities.mjs --results target/l2/results.json --doc check` | 覆盖检查与文档漂移（verify 第 14 步） |
+| `node scripts/plan/check-capabilities.mjs --results target/l2/results.json --doc write` | 重新生成 `docs/product/capabilities.md` |
+| `node scripts/plan/check-capabilities.mjs --milestone M2` | 评审任务（R2–R6）用：列出 M2 及之前未完成的能力 |
+
+L2 报告来自 `cargo test -p piarc-testkit --test scenarios -- --results target/l2/results.json` 或 `cargo run -p piarc-devcli -- run tests/scenarios --json <文件>`。

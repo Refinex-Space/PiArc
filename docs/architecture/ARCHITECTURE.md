@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.19（2026-11-17） |
+| 版本 | 2.20（2026-11-17） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -1250,11 +1250,15 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 - 期望的文件副作用；
 - 期望的请求断言（例如第 3 个请求必须包含某个 tool_result）。
 
+实现（T15）：运行器在 `piarc-testkit` 的 `l2` 模块，`piarc-devcli` 是它的命令行外壳。格式的唯一描述是 `tests/scenarios/schema.json`；场景还声明会话（多个会话各有 `cwd`）、驱动 Core 的动作（提示、steer、follow-up、排队编辑、中断、等待事件、写文件、重启 Core 与恢复会话）与能力 ID。每个 mock 端点是一个独立的 mock 与 Pi provider，请求断言按端点名与序号；事件按会话做"有序子序列 + 字段子集"匹配；另有工具批次（经 Core 的 `ToolIoObserver` 扣住整批再放行，不靠计时）与 Core I/O 断言，每个请求都必须通过严格 mock 的校验。每个场景在独立临时根中启动自己的 Core 与 Agent Host（不复用进程，换取完全隔离），自定义 test harness 让每个场景成为一个测试，verify 第 14 步运行全部场景。字段、匹配规则与取舍见 `docs/engineering/testing.md` 第 12 节。
+
 ### 12.4 能力清单与覆盖
 
 - 每项 Harness 能力有稳定 ID（如 `CAP-PERM-RULE-001`、`CAP-HOOK-PRE-001`），登记在 `tests/capabilities.yaml`。
 - 每个能力至少被一个场景覆盖，否则 CI 报 MISSING。
 - 能力完成状态由测试结果自动生成到 `docs/product/capabilities.md`，不手工勾选，避免文档与代码漂移。
+
+实现（T15）：清单一次登记 M1–M5 的全部能力，每项带里程碑、需求编号或架构章节、负责任务与状态（`planned`、`active`、`blocked`，后者带原因与链接）；行为全在客户端的需求列在 `client_only`，由 L4 验证，使需求第 4 章的每个编号都有归属。`scripts/plan/check-capabilities.mjs` 对照需求、架构与看板检查清单，按 L2 报告报 MISSING，`--milestone` 给评审任务列出未完成能力，并生成 `capabilities.md`；verify 重新生成并比对。规则见 `docs/engineering/testing.md` 第 13 节。
 
 ### 12.5 L3 行为对齐的做法
 
@@ -1457,6 +1461,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.20 | 2026-11-17 | T15 补充：12.3 写明场景格式的扩展（会话、动作、能力 ID、多端点、工具批次与 Core I/O 断言）、匹配规则与进程不复用的取舍；12.4 写明能力清单的字段、`client_only` 与检查命令 |
 | 2.19 | 2026-11-17 | T14 补充（ADR-0026）：第 4 章加入 ADR-0026；5.3 投影表的压缩一行写明为 `contextCompaction` 条目，增加 T14 的投影规则、条目类型映射、状态规则、排队表与 golden 测试；6.15 写明三条回合不变量的落地方式；7.2 写明工作区与会话 actor、事件消费、取消链与关闭时关闭数据库；7.4 方法族增加 `queue/delete`、`queue/reorder`、`history`，通知增加 `item/agentMessage/delta`、`item/reasoning/delta`、`harness/entry`，写明 T14 已实现的方法、新条目类型与 I20 的决定；7.5 写明监管器的会话跟踪与 I58 的处理；7.6 加入会话导出与事件路由；第 11 章写入预热实测 |
 | 2.18 | 2026-11-16 | T13 补充（ADR-0025）：第 4 章加入 ADR-0025；5.5 写明 Pi 项目信任的接管挂点；7.4 写明 `trust/get` 的 Core 实现与信任变化时的计划内重启；7.6 加入状态导出与 `core/settings` 事件；9.1 写明 `userData`、`sessionData` 与 `--user-data-dir`、日志文件；9.2 增加 `project_trust`、`session_files` 两表与迁移、派生列和 Core 自有列的区分；10.2 写明主 checkout 规则、可执行项枚举与新增项、设置合并对未信任项目的处理 |
 | 2.17 | 2026-11-16 | R1（M0 阶段门）：第 11 章按 M0 实测校准，表中逐行写两个平台的实测值；收紧三行（流式每帧主线程工作 p99 16 → 12 ms、冷加载 1,000 条 300 → 170 ms、主进程转发 p95 5 → 1.1 ms），收紧规则写在第 11 章；放宽两行：**主进程内存**由"≤ 120 MB"改为"相对同平台同版本裸 Electron 的增量 ≤ 24 MB"，原因是 macOS 上裸 Electron 一个空窗口就有 155–157 MB，原预算无法由 PiArc 达到（Windows 裸 Electron 96 MB，原预算隐含的增量正是 24 MB，所以 Windows 不变）；**进程合计**在 macOS 上由 450 MB 改为 510 MB，原因是同一个主进程基线差额（约 59 MB），Windows 不变。两项测量口径校准：Windows 的事件循环延迟取超出同机空闲基线的部分，终端回显取两组样本 p95 之差。超出且不放宽的行（进程合计、Agent Host 单会话、Windows 体积）交 T44。同步：3.4 仓库结构（`packages/testkit`、`third-party/`、`tests/contracts/`）、6.1.1 与 8.5 的 M0 结果、10.3 终端输入与外链确认框、第 14 章 R1/R5/R15、15.2 的 Shell 与 PTY、第 16 章 M0 状态与结论 |

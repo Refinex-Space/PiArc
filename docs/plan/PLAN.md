@@ -303,7 +303,7 @@ T15（2026-11-17 开工；基线 `npm run verify` 13/13 通过；没有等待 Wi
 - [x] 5. 首批 ≥ 10 个场景（A03）
 - [x] 6. `tests/capabilities.yaml` 完整清单（M1–M5）、覆盖检查、`--milestone`、`capabilities.md` 生成与漂移检查（A07、A08、A10）
 - [x] 7. 并入 verify 与 CI（A09、A11）
-- [ ] 8. 文档：`testing.md`、testkit 与 devcli 的 CLAUDE.md、`coding-standards.md` 复用表、根 CLAUDE.md
+- [x] 8. 文档：`testing.md`、testkit 与 devcli 的 CLAUDE.md、`coding-standards.md` 复用表、根 CLAUDE.md
 - [ ] 9. 收尾：verify、验收记录、看板与会话日志
 
 ## 登记事项
@@ -380,6 +380,7 @@ T15（2026-11-17 开工；基线 `npm run verify` 13/13 通过；没有等待 Wi
 | I66 | T14 开工检查 | Windows CI（运行 43879135441）中 `core.integration.test.ts` 的 T13 用例清理临时目录时 EPERM：`CoreRuntime.shutdown()` 之后 Core 仍持有数据目录里的文件（数据库连接随 NAPI 对象存活到 GC），Windows 不能删除打开的文件；macOS 上不报错。同一运行的 `cargo test`、`data-dirs.test.ts` 与 Windows L4 均通过 | T14：有序关闭最后一步关闭数据库，补测试；推送后看 Windows CI；已落地（T14，提交 8a95b84）：有序关闭最后关闭数据库（`Storage::close`），测试 `crates/piarc-core/tests/state.rs` 与 `apps/desktop/src/main/core/core.integration.test.ts`；Windows CI 尚未运行（推送后看） |
 | I67 | T14 | 回合以失败（非中断）结束时不补中断标记：pi-ai 丢弃出错的 assistant 消息，下一条输入会紧跟上一条 user 消息（Anthropic API 合并，严格 mock 的 `role_order` 拒绝）。中断的回合已由 ADR-0026 补齐 | T27 与压缩、中断标记一起决定失败回合的对话形态 |
 | I68 | T14 | 实时条目与历史条目的 id 不同：文本与 reasoning 实时为 `<投影器生成的 messageId>#<序号>`，历史为 `<entry id>#<序号>`；用户消息实时为 `<turnId>:user:<n>`，历史为 entry id；工具调用两边相同（`agent-host/CLAUDE.md`）。客户端不能按 id 把重新加载的窗口与流式条目合并 | T19 的 transcript 重载以 `transcript_window` 整段替换，或由 T19 决定在 `turn/completed` 后补发 entry id 的映射 |
+| I69 | T15 | L2 运行器还没有审批请求的观测点：T20 之前 Core 不发审批请求，场景声明的 `approvals` 一律判失败（`piarc_testkit::l2::runner` 的 `assert_all`）。审批落地后场景要能按顺序应答审批，并在请求没被应答或应答没被用上时失败 | T20 经 Core 的公开接口（事件或回调）把审批请求交给运行器，改 `runner.rs` 与 `testing.md` 第 12.3 节，把审批场景写成 L2 |
 
 ## 技术债
 
@@ -395,7 +396,7 @@ T15（2026-11-17 开工；基线 `npm run verify` 13/13 通过；没有等待 Wi
 | 6 | R1 | 沙箱代理没有连接上限与超时，不拦私网（I54） | 沙箱内命令可耗尽主进程的文件描述符 | T39 |
 | 7 | R1 | 测试用固定时长等待、基准复制了 L4 的定位逻辑、供应链校验脚本没有测试（I32、I59、I60） | 偶发失败与检查失效 | T19、T34、T44、T50 |
 | 8 | R1 | 渲染进程没有错误边界；`read_blob` 无大小上限（I50、I53） | 一条坏内容卸载整个界面；大文件占满主进程内存 | T19、T16 |
-| 9 | R1 | `piarc-exec` 没有结构化 `Error`；`piarc-testkit/src/lib.rs` 含实现；ESLint 进程边界规则覆盖面窄（I61、R1-Q11、I52） | 边界错误无法分类；规范一致性 | T17、T15、T45 |
+| 9 | R1 | `piarc-exec` 没有结构化 `Error`；`piarc-testkit/src/lib.rs` 含实现（T15 已移出 `parse_request`）；ESLint 进程边界规则覆盖面窄（I61、R1-Q11、I52） | 边界错误无法分类；规范一致性 | T17、T15、T45 |
 
 ## 会话日志
 

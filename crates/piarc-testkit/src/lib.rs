@@ -2,14 +2,15 @@
 //!
 //! # Responsibilities
 //!
-//! - Test-only support. Today: the strict mock provider (architecture section 12.2) and the
-//!   plaintext scan ([`plaintext`], T08). The L2 scenario runner and event assertions arrive
-//!   with T15.
+//! - Test-only support: the strict mock provider (architecture section 12.2), the L2 scenario
+//!   runner and event assertions ([`l2`], T15, architecture section 12.3), and the plaintext
+//!   scan ([`plaintext`], T08).
 //!
 //! # Not responsible for
 //!
 //! - Anything shipped in the app: production crates must never depend on it.
-//! - Running Core or the Agent Host; it only stands in for the model services.
+//! - Core's behavior: the L2 runner drives Core only through `CoreRuntime`'s public API and
+//!   observes what it delivers; it holds no copy of Core's logic.
 //!
 //! # Allowed workspace dependencies
 //!
