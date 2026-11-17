@@ -36,7 +36,7 @@ use piarc_exec::{
     CommandRunner, CommandSpec, Launcher, OutputChunk, ProcessTreeSpawner, Stream,
     TokioProcessSpawner,
 };
-use piarc_fs::{FileStates, GrepQuery, Scope};
+use piarc_fs::{EncodingCache, FileStates, GrepQuery, Scope};
 use piarc_host::{InboundHandler, Peer};
 use piarc_ports::BoxFuture;
 use piarc_protocol::exec::{
@@ -121,6 +121,8 @@ struct SessionIo {
     files: Mutex<FileStates>,
     /// Texts arriving in pieces.
     uploads: Mutex<files::Uploads>,
+    /// Detected encodings of the files the session reads.
+    encodings: EncodingCache,
     running: Mutex<HashMap<String, CancellationToken>>,
     /// Present when the session's commands run sandboxed; owns the session's proxy.
     sandbox: Option<SessionSandbox>,
@@ -264,6 +266,7 @@ impl ToolIo {
                 tmp_dir,
                 files: Mutex::default(),
                 uploads: Mutex::default(),
+                encodings: EncodingCache::default(),
                 running: Mutex::default(),
                 sandbox,
             }),
@@ -289,7 +292,9 @@ impl ToolIo {
 
     /// Terminates the commands `session_id` is running and keeps the session (its turn was
     /// interrupted: the cancellation reaches the tool calls' processes even if the Agent Host
-    /// never sends their `exec/kill`).
+    /// never sends their `exec/kill`). Uploads are left alone: a write already sending its
+    /// pieces finishes them, and dropping the collected start would turn the next piece into a
+    /// complete, truncated text.
     pub fn cancel_running(&self, session_id: &str) {
         if let Some(session) = lock(&self.sessions).get(session_id) {
             for token in lock(&session.running).values() {

@@ -1,10 +1,13 @@
 //! Reading file content and creating directories: `fs/read`, `fs/mkdir`. Writing is in
 //! [`crate::write`].
 
-use std::fs::File;
+use std::collections::HashMap;
+use std::fs::{File, Metadata};
 use std::io::{self, Read, Seek, SeekFrom, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, PoisonError};
+use std::time::SystemTime;
 
 use piarc_protocol::fs::{BlobRef, FsMkdirResult, FsReadResult, MAX_BLOB_BYTES, MAX_READ_CHUNK};
 use piarc_protocol::text::incomplete_utf8_suffix;
@@ -18,10 +21,43 @@ use crate::scope::{Scope, display};
 /// How much of a file encoding detection looks at: the whole file up to this size.
 pub const DETECT_BYTES: u64 = 8 * 1024 * 1024;
 
+/// Most files an [`EncodingCache`] remembers before it starts over.
+const MAX_CACHED_ENCODINGS: usize = 4096;
+
+/// The detected encoding of each file a session reads, kept while the file's size and
+/// modification time stay the same: reading a large file range by range detects once instead
+/// of reading its first [`DETECT_BYTES`] for every range.
+#[derive(Debug, Default)]
+pub struct EncodingCache {
+    entries: Mutex<HashMap<PathBuf, (Stamp, TextEncoding)>>,
+}
+
+/// A file's size and modification time.
+type Stamp = (u64, Option<SystemTime>);
+
+impl EncodingCache {
+    fn encoding_of(&self, path: &Path, metadata: &Metadata) -> io::Result<TextEncoding> {
+        let stamp = (metadata.len(), metadata.modified().ok());
+        let lock = || self.entries.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(&(seen, encoding)) = lock().get(path)
+            && seen == stamp
+        {
+            return Ok(encoding);
+        }
+        let encoding = detect(&read_head(path, DETECT_BYTES)?);
+        let mut entries = lock();
+        if entries.len() >= MAX_CACHED_ENCODINGS {
+            entries.clear();
+        }
+        entries.insert(path.to_path_buf(), (stamp, encoding));
+        Ok(encoding)
+    }
+}
+
 /// Reads up to `length` bytes (at most [`MAX_READ_CHUNK`]) from `offset` as text.
 ///
-/// The file's encoding is detected from its first [`DETECT_BYTES`] ([`crate::encoding`]);
-/// text that is not UTF-8 is decoded from it. Unless the range reaches the end of the file, a
+/// The file's encoding is detected from its first [`DETECT_BYTES`] ([`crate::encoding`]) and
+/// remembered in `encodings`; text that is not UTF-8 is decoded from it. Unless the range reaches the end of the file, a
 /// character cut by the range end is left for the next range, so reading range after range
 /// never splits a character. Invalid sequences become U+FFFD.
 ///
@@ -30,14 +66,18 @@ pub const DETECT_BYTES: u64 = 8 * 1024 * 1024;
 /// The path needs approval, does not exist, is a directory (`EISDIR`) or cannot be read.
 pub fn read_text(
     scope: &Scope,
+    encodings: &EncodingCache,
     requested: &str,
     offset: u64,
     length: Option<u64>,
 ) -> Result<FsReadResult> {
     let path = scope.check(requested, Access::Read)?;
     let mut file = open_file(&path)?;
-    let size = file.metadata().map_err(|e| Error::io(&path, e))?.len();
-    let encoding = detect(&read_head(&path, DETECT_BYTES).map_err(|e| Error::io(&path, e))?);
+    let metadata = file.metadata().map_err(|e| Error::io(&path, e))?;
+    let size = metadata.len();
+    let encoding = encodings
+        .encoding_of(&path, &metadata)
+        .map_err(|e| Error::io(&path, e))?;
     let want = length.map_or(MAX_READ_CHUNK, |n| n.min(MAX_READ_CHUNK));
     file.seek(SeekFrom::Start(offset))
         .map_err(|e| Error::io(&path, e))?;
@@ -268,7 +308,14 @@ mod tests {
         let mut offset = 0;
         let mut collected = String::new();
         loop {
-            let chunk = read_text(&scope, "文 件.txt", offset, Some(4)).expect("reads");
+            let chunk = read_text(
+                &scope,
+                &EncodingCache::default(),
+                "文 件.txt",
+                offset,
+                Some(4),
+            )
+            .expect("reads");
             assert_eq!(chunk.size, text.len() as u64);
             collected.push_str(chunk.text.as_deref().expect("text"));
             offset += chunk.bytes_read;
@@ -277,7 +324,8 @@ mod tests {
             }
         }
         assert_eq!(collected, text);
-        let whole = read_text(&scope, "文 件.txt", 0, None).expect("reads");
+        let whole =
+            read_text(&scope, &EncodingCache::default(), "文 件.txt", 0, None).expect("reads");
         assert!(whole.eof);
         assert_eq!(whole.text.as_deref(), Some(text));
     }
@@ -291,17 +339,19 @@ mod tests {
         // ... text that is not UTF-8 is decoded from its detected legacy encoding.
         std::fs::write(tree.path("ws/latin.txt"), [b'a', 0xff, b'b']).expect("written");
         let scope = scope(&tree);
-        let bad = read_text(&scope, "bad.bin", 0, None).expect("reads");
+        let bad = read_text(&scope, &EncodingCache::default(), "bad.bin", 0, None).expect("reads");
         assert_eq!(bad.text.as_deref(), Some("a\u{fffd}\0b"));
         assert_eq!(bad.encoding, None);
-        let latin = read_text(&scope, "latin.txt", 0, None).expect("reads");
+        let latin =
+            read_text(&scope, &EncodingCache::default(), "latin.txt", 0, None).expect("reads");
         assert_eq!(latin.text.as_deref(), Some("a\u{ff}b"));
         assert_eq!(latin.encoding.as_deref(), Some("windows-1252"));
         assert!(matches!(
-            read_text(&scope, "missing.txt", 0, None),
+            read_text(&scope, &EncodingCache::default(), "missing.txt", 0, None),
             Err(Error::NotFound { .. })
         ));
-        let error = read_text(&scope, "dir", 0, None).expect_err("directory");
+        let error =
+            read_text(&scope, &EncodingCache::default(), "dir", 0, None).expect_err("directory");
         assert_eq!(error.code(), Some("EISDIR"));
     }
 
@@ -326,7 +376,14 @@ mod tests {
         let mut offset = 0;
         let mut collected = String::new();
         loop {
-            let chunk = read_text(&scope, "gbk.txt", offset, Some(5)).expect("reads");
+            let chunk = read_text(
+                &scope,
+                &EncodingCache::default(),
+                "gbk.txt",
+                offset,
+                Some(5),
+            )
+            .expect("reads");
             assert_eq!(chunk.encoding.as_deref(), Some("GBK"));
             collected.push_str(chunk.text.as_deref().expect("text"));
             offset += chunk.bytes_read;
@@ -338,6 +395,30 @@ mod tests {
             collected,
             "国标编码的中文文件，第一行。\r\n第二行，结束。\r\n"
         );
+    }
+
+    #[test]
+    fn the_encoding_is_detected_again_once_the_file_changes() {
+        let tree = TempTree::new("content-encoding-cache");
+        tree.dir("ws");
+        let scope = scope(&tree);
+        let cache = EncodingCache::default();
+        let gbk = crate::encoding::encode(
+            TextEncoding::Legacy(encoding_rs::GBK),
+            "国标编码的中文文件，用来检查缓存。\n",
+        )
+        .expect("GBK");
+        std::fs::write(tree.path("ws/f.txt"), &gbk).expect("written");
+        let first = read_text(&scope, &cache, "f.txt", 0, None).expect("reads");
+        assert_eq!(first.encoding.as_deref(), Some("GBK"));
+        // Same file, read again: from the cache.
+        let again = read_text(&scope, &cache, "f.txt", 0, None).expect("reads");
+        assert_eq!(again.text, first.text);
+        // Rewritten as UTF-8 (a different size): detected again.
+        std::fs::write(tree.path("ws/f.txt"), "now plain UTF-8 文本\n").expect("written");
+        let changed = read_text(&scope, &cache, "f.txt", 0, None).expect("reads");
+        assert_eq!(changed.encoding, None);
+        assert_eq!(changed.text.as_deref(), Some("now plain UTF-8 文本\n"));
     }
 
     #[test]

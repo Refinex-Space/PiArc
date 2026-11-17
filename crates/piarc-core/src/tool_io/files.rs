@@ -101,7 +101,13 @@ pub(super) fn read(session: &SessionIo, p: &FsReadParams) -> Result<Value, Error
         piarc_fs::check_fresh(&session.scope, &session.files, &p.path).map_err(adjudicate)?;
     }
     let result = match p.mode.unwrap_or(ReadMode::Text) {
-        ReadMode::Text => piarc_fs::read_text(&session.scope, &p.path, offset, p.length),
+        ReadMode::Text => piarc_fs::read_text(
+            &session.scope,
+            &session.encodings,
+            &p.path,
+            offset,
+            p.length,
+        ),
         ReadMode::Blob => piarc_fs::read_blob(&session.scope, &p.path, &session.blob_dir),
     };
     to_value(&result.map_err(adjudicate)?)

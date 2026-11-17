@@ -63,7 +63,7 @@ pub mod watch;
 mod write;
 
 pub use access::{Access, ApprovalReason};
-pub use content::{DETECT_BYTES, mkdir, read_blob, read_text};
+pub use content::{DETECT_BYTES, EncodingCache, mkdir, read_blob, read_text};
 pub use entry::{MAX_LIST_ENTRIES, list, stat};
 pub use error::{Error, Result};
 pub use glob::{MAX_GLOB_MATCHES, glob};
