@@ -124,7 +124,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | R1 | [M0 评审与收口](tasks/R1-m0-review.md) | 1 | W0 | macOS | high | 中 | S1–S10 汇总 | 已完成 | 6eef36d |
 | T13 | [存储、数据目录、配置与项目信任](tasks/T13-storage-config-and-trust.md) | 2 | R1（结论为进入 M1） | macOS | high | 大 | 无 | 已完成 | 12ad055 |
 | T14 | [会话编排与事件投影](tasks/T14-session-orchestration-and-projection.md) | 2 | T13 | macOS | xhigh | 大 | 无 | 已完成 | eedccea |
-| T15 | [无头驱动、L2 场景运行器与能力清单](tasks/T15-devcli-l2-scenarios-and-capabilities.md) | 2 | T14 | macOS | high | 中 | 无 | 进行中 | — |
+| T15 | [无头驱动、L2 场景运行器与能力清单](tasks/T15-devcli-l2-scenarios-and-capabilities.md) | 2 | T14 | macOS | high | 中 | 无 | 部分完成 | 5546027 |
 | T16 | [文件工具与编辑不变量](tasks/T16-file-tools-invariants.md) | 2 | T15 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T17 | [Bash / PowerShell 执行与进程管理](tasks/T17-bash-powershell-execution.md) | 2 | T16 | macOS | high | 大 | 无 | 未开始 | — |
 | T18 | [客户端外壳、会话列表、设置窗口与信任对话框](tasks/T18-client-shell-and-session-list.md) | 2 | T17；D3 | macOS | xhigh | 大 | 无 | 未开始 | — |
@@ -293,18 +293,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-T15（2026-11-17 开工；基线 `npm run verify` 13/13 通过；没有等待 Windows CI 的 blocked 验收项）
-
-- [x] 1. 场景格式：Rust 类型、`tests/scenarios/schema.json`、加载与校验（A01）
-- [x] 2. 运行器（piarc-testkit `l2`）：临时目录、驱动 Core + Agent Host + mock、事件/文件/请求断言、可读差异、审批应答（A04、A05、A06）
-- [x] 3. 自定义 test harness：每个场景一个测试，平台跳过（A03）
-- [x] 4. `piarc-devcli`：运行单个场景与目录、JSON 输出；打包产物检查断言无 devcli（A02）
-- [x] 5. 首批 ≥ 10 个场景（A03）
-- [x] 6. `tests/capabilities.yaml` 完整清单（M1–M5）、覆盖检查、`--milestone`、`capabilities.md` 生成与漂移检查（A07、A08、A10）
-- [x] 7. 并入 verify 与 CI（A09、A11）
-- [x] 8. 文档：`testing.md`、testkit 与 devcli 的 CLAUDE.md、`coding-standards.md` 复用表、根 CLAUDE.md
-- [ ] 9. 收尾：verify、验收记录、看板与会话日志
 
 ## 登记事项
 
@@ -550,6 +538,14 @@ T15（2026-11-17 开工；基线 `npm run verify` 13/13 通过；没有等待 Wi
 - 决策：ADR-0026（补充：回合、排队与中断后的对话形态）；架构 v2.19；I20 接受 Pi 的 `existsSync(cwd)`，Core 在创建前校验 cwd
 - 验证：`npm run verify` 13/13；会话端到端 10 passed；golden 11 passed；预热 release 10 次最大 279.5 ms（打开并恢复 309.5 ms）
 - 遗留：I67、I68；T14 的改动未在 Windows 上运行（I66 的修复待 Windows CI）；未推送
+
+### 2026-11-17 T15 部分完成（完成提交 5546027）
+
+- 结果：11 项验收中 10 项通过；T15-A09（Windows CI 上的 L2 步骤）待推送后的 Windows CI，标为 blocked
+- 交付：`piarc-testkit` 的 `l2` 模块（场景格式与 `tests/scenarios/schema.json`、运行器、事件部分匹配、请求与文件断言、工具批次 Gate、并行 suite 与 JSON 报告）与自定义 harness 的 `scenarios` 测试目标；`piarc-devcli`（run/list、JSON 报告）；14 个首批场景；`tests/capabilities.yaml`（111 项、8 个仅客户端需求）、`scripts/plan/check-capabilities.mjs` 与生成的 `docs/product/capabilities.md`；verify 第 14 步 `scripts/ci/run-l2.mjs` 与 CI 上传 L2 报告；发布产物检查新增"无开发工具"；mock 请求增加工具结果内容；`parse_request` 移出 lib.rs（R1-Q11）
+- 决策：自定义 test harness（不引入数据驱动测试库）；每个场景独立的 Core 与 Agent Host（不复用进程）；每个 mock 端点一个 Pi provider、按请求头选场景；`client_only` 列出由 L4 验证的需求；新增 `yaml` 2.9.0 开发依赖；架构 v2.20
+- 验证：`npm run verify` 14/14；L2 14 passed；l2_runner 5 passed；发布构建布局检查 22/22
+- 遗留：I69（T20 接入审批观测点）；T15-A09 待 Windows CI；未推送
 
 ## 计划变更记录
 
