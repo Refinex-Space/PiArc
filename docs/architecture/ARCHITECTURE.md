@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.21（2026-11-17） |
+| 版本 | 2.22（2026-11-17） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -237,7 +237,7 @@ PiArc/
 | [0013](../adr/0013-electron-desktop-client.md) | Electron + React 客户端，三层结构不变，macOS 与 Windows 同一代码库 | 双平台同步推进；Pi 本来就要带 JS 运行时；消除原生富文本渲染风险 |
 | [0002](../adr/0002-pi-integration-via-sdk-host.md) | 基于 Pi SDK 自研 Agent Host | 官方 RPC 缺多会话、版本握手、结构化审批；SDK 让上游不兼容变更在编译期暴露 |
 | [0004](../adr/0004-harness-control-plane-in-core.md) | 策略在 Core、循环在 Pi、I/O 下沉 Core | 安全边界不能落在无隔离的扩展上；快照与沙箱需要统一入口 |
-| [0020](../adr/0020-tool-layer-composition.md) | 工具层：Pi 的工具代码加 Core 的 I/O（read/write/edit 用替身路径，bash/find 用 Operations，grep 自写） | Pi 1.5.2 的 Operations 不覆盖路径探测与 ripgrep；保留 Pi 的工具逻辑又做到零绕过 |
+| [0020](../adr/0020-tool-layer-composition.md) | 工具层：Pi 的工具代码加 Core 的 I/O（read/write/edit 用替身路径，bash/find 用 Operations，grep 自写；bash 由 ADR-0028 改为自写） | Pi 1.5.2 的 Operations 不覆盖路径探测与 ripgrep；保留 Pi 的工具逻辑又做到零绕过 |
 | [0021](../adr/0021-credential-vault-and-pi-adapter.md) | 凭据保险箱 v1 格式；Core 是唯一写入方，变更推送给所有 Agent Host，读改写在 Core 的键锁内进行；Agent Host 以 pi-ai 的 `CredentialStore` 适配 | 磁盘无明文；两个 Agent Host 同时刷新同一 token 只刷新一次 |
 | [0022](../adr/0022-transcript-rendering-libraries.md) | transcript 用 @tanstack/react-virtual、marked 词法器、shiki JavaScript 正则引擎 | 同组测量下流式不掉帧、冷加载快一倍；解析器输出语法树且快；高亮不放宽 CSP |
 | [0005](../adr/0005-claude-code-config-compatibility.md) | 只读兼容 Claude Code 配置 | 用户零成本迁移，又不污染其 Claude Code 配置 |
@@ -246,6 +246,7 @@ PiArc/
 | [0010](../adr/0010-process-model.md) | 每工作区一个 Agent Host | 控制多会话内存，MCP 按工作区共享 |
 | [0011](../adr/0011-session-storage.md) | Pi JSONL 为事实来源 + SQLite 索引 + 内容寻址快照 | 跟随上游格式，索引可重建 |
 | [0027](../adr/0027-file-tool-invariants.md) | 文件状态表与写入（先读后改、外部修改、编码与换行、原子替换、diff）在 Core；匹配沿用 Pi 的 edit，加 `replaceAll`；Read 的行号、存根、PDF 与 notebook 在工具层；结果预算（单个 50K、单条消息 200K）在 Harness Kit；越界与受保护路径由 `piarc-fs` 标记、Core 裁决 | 只有 Core 能对真实文件做检查与原子写入，只有 Agent Host 的钩子看得到每个工具与整条回复的结果 |
+| [0028](../adr/0028-shell-command-execution.md) | 命令的进程树终止、超时、cwd 跟踪、输出预算与落盘、语义退出码、登录 shell 环境都在 Core（`exec/run` 返回结构化结果）；Bash 与 PowerShell 为 PiArc 自写工具，按 `exec/shells` 决定工具集 | Pi 的 bash 工具自己截断输出（末尾 2,000 行）、非 0 一律失败、超时无默认，`BashOperations` 改不了；进程只有 Core 能管 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -462,7 +463,8 @@ T07 实测（S4，ADR-0020）：Pi 1.5.2 的 Operations 覆盖 bash、find（给
 | Read | Pi 的 read 定义运行在**替身路径**上（系统临时目录下从不创建的路径，Pi 的探测落在那里），每个 Operation 由 Core 对真实路径执行；拼写变体由 `fs/stat` 逐个确认。T16：文本流先加行号再交给 Pi 选行；重复读取返回存根；`.pdf`、`.ipynb` 走工具层自己的路径 | `fs/stat`（带图片嗅探与读取登记）、`fs/read`、`fs/pdf` |
 | Write | Pi 的 write 定义，替身路径 | `fs/mkdir`、`fs/write`（`lineEndings: matchFile`） |
 | Edit | Pi 的 edit 定义，替身路径；`replaceAll` 由工具层匹配（T16） | `fs/stat`、`fs/read`（`requireFresh`）、`fs/write` |
-| Bash | Pi 的 bash 工厂 + `BashOperations` | `exec/run`、`exec/output`、`exec/kill` |
+| Bash | T17 起 PiArc 自写，沿用 Pi 的参数（`command`、`timeout`），结果按 Core 的结构化结果组织（ADR-0028）；T07–T16 为 Pi 的 bash 工厂 + `BashOperations` | `exec/shells`、`exec/run`、`exec/output`、`exec/kill` |
+| PowerShell | PiArc 自写，只在 Windows 注册（ADR-0028） | 同 Bash，`shell: powershell` |
 | Glob | Pi 的 find 工厂 + `FindOperations` | `fs/stat`、`fs/glob` |
 | Grep | PiArc 自写，沿用 Pi 的参数与输出格式 | `fs/grep` |
 
@@ -511,7 +513,7 @@ T07 实测（S4，ADR-0020）：Pi 1.5.2 的 Operations 覆盖 bash、find（给
 - 规则来源与优先级见 ADR-0005：企业策略 > 会话 > `.piarc/settings.local.json` > `.piarc/settings.json` > `.claude/settings.local.json` > `.claude/settings.json` > 用户级 PiArc 设置 > `~/.claude/settings.json`；列表合并。
 - **Bash 命令分析在 Core 中完成**：用 tree-sitter-bash 解析，拆分 `&& || ; | |& &` 与换行、子 shell、命令替换；剥离 `timeout`、`time`、`nice`、`nohup`、`env` 赋值等包装；逐个子命令匹配。deny/ask 只要任一子命令命中即生效，allow 要求所有子命令都被允许。解析失败按"需要询问"处理。
 - 内置只读命令白名单（如 `ls`、`cat`、`git status`、`git diff`、`rg`）在 Manual 模式下免审批；白名单维护在 Core，带测试。
-- **Windows 上的命令**：`Bash` 工具在 Windows 上通过 Git Bash 执行（Pi 的默认行为），分析方式同上；另提供 `PowerShell` 工具，规则写作 `PowerShell(命令模式)`（与 Claude Code 一致）。第一版不对 PowerShell 做语法级拆分，也不设只读白名单：除非整条命令被规则精确允许，否则在 Manual 模式下一律询问。PowerShell 的语法级分析在 M4 评估。
+- **Windows 上的命令**：`Bash` 工具在 Windows 上通过 Git Bash 执行（Pi 的默认行为），分析方式同上；另提供 `PowerShell` 工具，规则写作 `PowerShell(命令模式)`（与 Claude Code 一致）。第一版不对 PowerShell 做语法级拆分，也不设只读白名单：除非整条命令被规则精确允许，否则在 Manual 模式下一律询问。PowerShell 的语法级分析在 M4 评估。T17 落地（ADR-0028）：Git Bash 依次查用户设置 `shell.gitBashPath`、`%ProgramFiles%\Git`、`%ProgramFiles(x86)%\Git`、`%LOCALAPPDATA%\Programs\Git`、`PATH` 上 `git.exe` 所在的安装，不用 `PATH` 上其他的 `bash.exe`（`System32\bash.exe` 是 WSL）；找不到时会话不注册 `Bash`、只有 `PowerShell`，Core 在 `core/notices` 发一次 `gitBashMissing` 提示安装 Git for Windows。`PowerShell` 优先 PowerShell 7（`pwsh`），没有时用 Windows PowerShell 5.1。
 - 关键路径删除（`rm -rf` 指向工作区根、家目录、`/` 等）与 `requiresUserInteraction` 类工具在任何模式下都询问。
 
 #### 6.2.3 裁决流程
@@ -671,6 +673,13 @@ Agent Host 按类别统计上下文构成（system prompt、工具定义、MCP �
 ### 6.11 后台任务、终端、Monitor
 
 - **Bash 行为**：每条命令独立进程；`cd` 在工作区内跨命令保留（越界则重置并提示）；默认超时 2 分钟、上限 10 分钟；前台命令超时后转为后台任务而不是直接杀掉；成功输出内联约 30,000 字符，超出则写文件并给出约 2,000 字符预览；失败输出给出头尾。数值可配置。
+- **T17 落地（ADR-0028）**，实现在 `piarc-exec`（阈值 `ExecLimits`、输出 `capture`、语义 `semantic`、环境 `env`、shell `shells`、目录 `cwd`）与 `piarc-core::tool_io::exec`，工具在 `agent-host/src/tools/shell.ts`：
+  - 终止：所有命令用 `ProcessTreeSpawner`；超时、`exec/kill`、回合中断、连接断开、会话关闭先向进程组发 `SIGTERM`，宽限 2 秒后 `SIGKILL`（Windows 直接终止 Job）；shell 退出后留在后台的进程随之结束；Core 关闭时丢弃任务同样结束整棵树。T32 之前超时即终止，不转后台。
+  - 目录：未给 `cwd` 的命令在会话的 shell 目录执行；bash 经 `BASH_ENV` 的初始化文件装 `EXIT` trap 写出 `pwd -P`，不改命令文本与退出码；最终目录在工作区根或已添加目录内才记住，否则回到工作区根并在结果的 `cwdReset` 说明。PowerShell 在 shell 目录执行但不改变它。
+  - 输出：持续读取两个管道；内联 30,000 字符，超出后全文流式写入会话临时目录的 `tool-results/<工具调用 id>.txt`，成功给首尾共约 2,000 字符，失败给首 10,000 与尾 20,000 字符。实时输出经 256 KiB 的显示窗口发 `exec/output`，连接慢时丢旧数据并报告 `skipped`，不拖慢命令。
+  - 语义：单个简单命令套用判定表（`grep`/`egrep`/`fgrep`/`rg` 的 1、`diff`/`cmp` 的 1、`test`/`[` 的 1 为成功），管道与控制运算符只看退出码；Agent Host 的 `isError` 与条目状态按 Core 的 `outcome`。
+  - 环境：用户登录 shell（`$SHELL -i -l -c`，10 秒超时，失败退回 Core 的环境）的环境，剔除 `ELECTRON_*`、`PIARC_*`、`PI_*` 与 Node 的内部变量，不含凭据；Windows 用进程环境，Git Bash 无 locale 时加 `LANG=C.UTF-8`，PowerShell 先把控制台输出设为 UTF-8。
+  - 条目：`commandExecution` 的 `execution` 带 cwd、退出码或信号、语义状态与含义、耗时、是否超时、超时值、是否截断、全文路径与 cwd 重置，供 bash 卡（T19）使用。
 - **后台任务**：`run_in_background` 启动；输出写入会话目录下的文件，模型用 `Read` 查看；`KillShell` 停止；任务完成以通知注入下一回合。Core 的任务管理器统一管理后台命令、后台子 agent、Monitor，客户端的后台任务面板展示与控制它们。
 - **Monitor**：后台运行命令并把新增输出逐行回灌给模型（日志跟踪、CI 轮询）。
 - **终端面板**（ADR-0017）：
@@ -853,6 +862,8 @@ T08 已实现的方法（Agent Host → Core，`piarc-core::secrets::SecretsServ
 T13 已实现的方法（Agent Host → Core，`piarc-core::trust::TrustService` 应答）：`trust/get` 先把路径解析到仓库主 checkout（`piarc-git`），再查 `project_trust`；目录解析不了、数据库出错、任务 panic 都回答 `trusted: false`，只有参数格式错回 `invalidParams`。信任变化时 Core 计划内重启该工作区的 Agent Host（`HostSupervisor::restart`，不计入崩溃退避），会话随之 `session/resume`。
 
 T16 已实现（ADR-0027）：Agent Host → Core 的 `fs/spill`（把过长的工具结果写到会话临时目录的 `tool-results/<名字>.txt`，返回给模型看的路径）与 `fs/pdf`（PDF 的页数与指定页的文本）；`fs/stat` 增加 `read`（登记 Read 及其范围）与结果的 `unchanged`，`fs/read` 增加 `requireFresh` 与结果的 `encoding`，`fs/write` 增加 `lineEndings`（`asWritten`、`matchFile`）、`upload`（分段上传，最后一段写入）与结果的 `diff`、`staged`、`encoding`；`append` 改为追加到当前文本并受同样的检查。`fileChange` 条目增加 `diff`（`FileDiff`：unified 文本、hunk、增删行数、超限降级）。路径边界由"越界即 `outsideWorkspace`"改为会话目录之外需要询问：会话临时目录可读，T20 之前一律 `permissionDenied`（`details.reason` 为 `outsideWorkspace` 或 `protectedPath`）；`exec/run` 的工作目录仍按 `outsideWorkspace`。新错误类别 `fileNotRead`、`fileModified`、`permissionDenied`、`unencodableText`；这类错误的消息写给模型看，Agent Host 去掉桥接层的方法名前缀后原样交给模型。
+
+T17 已实现（ADR-0028）：`exec/run` 增加 `shell`（`bash`、`powershell`）与 `timeoutMs`，未给 `cwd` 时在会话的 shell 目录执行；结果增加 `timedOut`、`timeout`（`ms` 与被截断时的 `requestedMs`）、`durationMs`、`outcome`（`success`、`failure`）、`meaning`、`cwd`、`cwdReset`、`output`（`head`、`tail`、`totalChars`、`omittedChars`、`fullOutputPath`、`saveError`），`exec/output` 增加 `skipped`。新方法 `exec/shells`（Agent Host → Core）回答会话有哪些 shell。未给 `timeoutMs` 的命令由"不限时"变为默认 2 分钟。Core 事件新增路由 `core/notices`（`gitBashMissing`）。`commandExecution` 条目增加 `execution`。
 
 T14 已实现的方法（ADR-0026）：Core → Agent Host 的 `session/fork`（复制一个会话当前分支到某个 entry 为止的对话，新会话的 id 由 Pi 生成）、`session/steer`、`session/followUp`（运行中排队并回 `{ disposition: "queued", itemId }`，空闲时像 prompt 一样开始回合并回 `{ disposition: "started", turnId }`；`requestId` 是幂等键）、`session/queue/edit`、`session/queue/delete`、`session/queue/reorder`（结果为整张排队表）、`session/getEntries`（`since` 为 seq，返回回放缓冲中其后的通知与是否完整）、`session/history`（会话文件当前分支投影出的条目窗口，会话不必打开）；`session/create` 增加可选的 `sessionId`（Core 生成，超时后按该 id 对账），`session/abort` 的结果增加 `returnedQueue`。通知 `item/updated`、`item/reasoning/delta`、`turn/retrying`、`session/queueChanged`、`harness/entry`；条目类型增加 `userMessage`、`reasoning`、`commandExecution`、`fileChange`、`mcpToolCall`、`subagent`、`webFetch`、`contextCompaction`，`turn/completed` 增加 `usage`。新错误类别 `queueItemNotFound`。这些都在同一主版本 1.0 内新增，Core 与 Agent Host 随应用一起发布，尚未有旧版本对端。I20 的决定：接受 Pi 在会话创建时对 cwd 的 `existsSync`（只读元数据）；Core 在 `session/create` 前确认 cwd 是工作区内已存在的目录。
 
@@ -1477,6 +1488,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.22 | 2026-11-17 | T17 补充（ADR-0028）：第 4 章加入 ADR-0028 并注明 ADR-0020 第 1 条的 bash 部分被修订；6.1.3 的工具表 Bash 改为 PiArc 自写、增加 PowerShell；6.2.2 写明 Git Bash 的探测顺序与缺失时只提供 PowerShell；6.11 写明 Bash 行为的落地（进程树终止、超时、cwd 跟踪、输出预算、语义退出码、命令环境、实时输出窗口）；7.4 写明 `exec/run` 的新成员、`exec/shells` 与 `core/notices` |
 | 2.21 | 2026-11-17 | T16 补充（ADR-0027）：第 4 章加入 ADR-0027；6.1.2 增加各条不变量的实现表；6.1.3 的工具表写明 Read、Write、Edit 在 T16 的变化与新方法；6.15 的截断与重复读取两行写明实现位置；7.4 写明 `fs/spill`、`fs/pdf`、新成员、路径边界改为询问与四个新错误类别；7.7 写明行级 diff 的结构与降级 |
 | 2.20 | 2026-11-17 | T15 补充：12.3 写明场景格式的扩展（会话、动作、能力 ID、多端点、工具批次与 Core I/O 断言）、匹配规则与进程不复用的取舍；12.4 写明能力清单的字段、`client_only` 与检查命令 |
 | 2.19 | 2026-11-17 | T14 补充（ADR-0026）：第 4 章加入 ADR-0026；5.3 投影表的压缩一行写明为 `contextCompaction` 条目，增加 T14 的投影规则、条目类型映射、状态规则、排队表与 golden 测试；6.15 写明三条回合不变量的落地方式；7.2 写明工作区与会话 actor、事件消费、取消链与关闭时关闭数据库；7.4 方法族增加 `queue/delete`、`queue/reorder`、`history`，通知增加 `item/agentMessage/delta`、`item/reasoning/delta`、`harness/entry`，写明 T14 已实现的方法、新条目类型与 I20 的决定；7.5 写明监管器的会话跟踪与 I58 的处理；7.6 加入会话导出与事件路由；第 11 章写入预热实测 |

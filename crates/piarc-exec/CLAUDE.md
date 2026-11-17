@@ -1,38 +1,45 @@
 # piarc-exec
 
-进程管理：`ProcessSpawner` 的两个实现——只终止直接子进程的 `TokioProcessSpawner`（T06）与终止整棵进程树的 `ProcessTreeSpawner`（T11）——以及 AHP `exec/run` 背后的 `CommandRunner`（T07）。`piarc-core` 注入启动器；本 crate 不决定命令能否运行（`piarc-policy`），不生成沙箱配置（`piarc-sandbox`），不管 PTY（`piarc-term`）。
+进程与 shell 命令（架构第 6.11 节，ADR-0028）：`ProcessSpawner` 的两个实现（只终止直接子进程的 `TokioProcessSpawner`，终止整棵进程树的 `ProcessTreeSpawner`）、`CommandRunner`（超时与两段终止），以及 T17 的命令行为模块：`limits`（阈值）、`capture`（输出预算与落盘）、`semantic`（语义退出码）、`env`（登录 shell 环境与剔除）、`shells`（bash / Git Bash / PowerShell 的探测与参数）、`cwd`（bash 命令的最终目录）。`piarc-core::tool_io::exec` 把它们装配成 `exec/run`。不决定命令能否运行（`piarc-policy`），不生成沙箱配置（`piarc-sandbox`），不管 PTY（`piarc-term`）。
 
 ## 命令
 
 | 命令 | 用途 |
 |---|---|
-| `cargo test -p piarc-exec` | 启动器与命令执行：输出、退出码、流式、取消、缺失的工作目录、包装程序；进程树（Unix 子孙进程随 kill/丢弃结束；Windows 父 → 子 → 孙三级与 Job 标志，只在 Windows 编译运行） |
-| `cargo clippy -p piarc-exec --all-targets -- -D warnings` | lint |
+| `cargo test -p piarc-exec` | 全部单元测试；`termination_tests` 是进程树（超时、取消、shell 退出后的后台进程、运行时关闭各自按 PID 确认子孙进程退出）、SIGTERM 先于 SIGKILL、暂停时钟上的 2/10 分钟超时、两个管道各 50 MB |
+| `cargo test -p piarc-exec termination -- --nocapture` | 只跑终止相关测试并打印 PID 与 100 MB 耗时 |
+| `cargo clippy -p piarc-exec --all-targets -- -D warnings` | lint；Windows 代码在 macOS 上用根 `CLAUDE.md` 的交叉 clippy 命令 |
 
-`exec/run` 经 AHP 的集成测试在 `crates/piarc-core/tests/tool_io.rs`。
+Core 层的集成测试在 `crates/piarc-core/tests/exec_commands.rs`（cwd、超时、落盘、50 MB、语义、环境、`exec/shells`、Windows 中文输出）与 `tests/tool_io.rs`。
 
-## CommandRunner
+## 终止流程
 
-- 用 bash 运行（`bash -c <命令>`）：Unix 为 `/bin/bash`，否则 PATH 上的 `bash`；Windows 为 `%ProgramFiles%\Git\bin\bash.exe`、`%ProgramFiles(x86)%` 下的同名文件，否则 PATH 上的 `bash.exe`。与 Pi 原生 bash 工具一致；Git Bash 缺失的探测与提示是 T17 的。
-- 环境由调用方给全（`SpawnSpec.env`，不继承）；stdin 立即关闭。
-- stdout、stderr 每次读取（最多 64 KiB）作为一个 `OutputChunk` 发到有界通道；通道满时停止读取，命令的管道写满后被阻塞。通道关闭或令牌取消时终止命令。
-- shell 退出后继续读，直到两个管道都关闭或安静 `EXIT_GRACE`（100 ms）：后台进程可能一直占着管道，命令最后的输出又不能丢（Pi 的 `waitForChildProcess` 同样的规则）。
+- 停止 = `ProcessControl::terminate`（Unix 向进程组发 `SIGTERM`；Windows 直接 `TerminateJobObject`）→ 等 `kill_grace`（默认 2 s）→ `kill`（`SIGKILL`）。触发：超时、取消令牌（`exec/kill`、回合中断、连接断开、会话关闭）、输出通道关闭、`run` 的 future 被丢弃（drop guard）。
+- 等到 shell 退出后 `watch` 丢弃 `ProcessControl`：`ProcessTreeSpawner` 的句柄丢弃即 `killpg(SIGKILL)` / 关闭 Job，命令留在后台的进程随之结束。所以 shell 先退出时，忽略 `SIGTERM` 的孙进程立刻收到 `SIGKILL`，不再等宽限。
+- `TokioProcessSpawner` 只杀直接子进程，Core 的命令不再用它（只剩 T06 的测试与兼容）。
 
-## ProcessTreeSpawner（`tree.rs` 模块文档为准）
+## cwd 跟踪（`cwd.rs`）
 
-- Unix：`process_group(0)`，`kill` 与丢弃句柄都 `killpg(SIGKILL)`（nix，不写 `unsafe`）；组为空时的 `ESRCH` 当作成功。主动 `setsid`/`setpgid` 的后代不受影响。
-- Windows：`CREATE_SUSPENDED` 创建 → 放进 `KILL_ON_JOB_CLOSE`、无 breakaway 标志的 Job → 用 Toolhelp 找到主线程并恢复。`kill` = `TerminateJobObject`（退出码 1），丢弃 = 关闭 Job 句柄。`job.rs` 是本 crate 唯一的 `unsafe`（编码规范 2.8）。
-- 丢弃句柄在命令结束后也会结束整棵树：命令留在后台的进程随之结束（与 Windows 关闭 Job 一致）。
-- 注入方式：`piarc-core` 构造后交给使用方（沙箱命令已用；T12 启动 Agent Host、T17 的通用命令执行改用它，`PLAN.md` 登记事项）。
-- `CommandSpec::launcher` 以包装程序启动 shell（`program args… <shell> -c <命令>`），沙箱的 `sandbox-exec` 经它进入。
+- 不改命令文本：`BASH_ENV` 指向会话临时目录 `exec/<requestId>.bash-env`，内容是 `trap 'builtin pwd -P >| <answer>' EXIT` 加 `unset BASH_ENV`（用户原有的 `BASH_ENV` 则先 `export` 回去再 source）。退出码在 `EXIT` trap 中保持；子 bash 看不到 `BASH_ENV`，不会覆盖答案。
+- 没有答案（命令 `exec` 换掉了 shell、自己装了 `EXIT` trap、被杀）时 Core 保持原目录。Windows 上答案是 `/c/…`，`msys_to_windows` 转换；`/tmp`、`/usr` 等 Git 自己的目录转换不了，按越界处理。
 
-## `exec/run` 的通知格式（由 `piarc-core::tool_io` 发出）
+## 阈值与清单的位置
 
-`exec/output` `{ requestId, stream, seq, data }`：`seq` 跨 stdout、stderr 从 1 递增；`data` 按流解 UTF-8，被切断的序列留到下一块，命令结束时剩下的字节变为 U+FFFD；全部写在 `exec/run` 的响应之前。响应 `{ exitCode?, signal?, killed }`。
+- `limits.rs` 的 `ExecLimits::default()` 是全部阈值的唯一定义：默认超时 120 s、上限 600 s、内联 30,000 字符、预览 2,000、失败头 10,000 / 尾 20,000、终止宽限 2 s。Core 经 `ToolIoConfig.exec_limits` 传入；Agent Host 的工具描述里写的 120/600 与之对应，改值时一起改。
+- 语义退出码表 `semantic::EXIT_ONE_MEANINGS`：`grep`/`egrep`/`fgrep`/`rg` → no matches，`diff`/`cmp` → files differ，`test`/`[` → condition is false。只对单个简单命令（未加引号的 `| & ; \n ( ) ` 与命令替换都算复合）；允许前置 `NAME=value` 与带目录的程序名。
+- 环境剔除清单 `env::{INTERNAL_PREFIXES, INTERNAL_NAMES, SHELL_STATE}`：`ELECTRON_*`、`PIARC_*`、`PI_*`，`NODE_OPTIONS` 等 Node/Electron 变量，`_`、`SHLVL`、`PWD`、`OLDPWD`。Windows 上不区分大小写。
+
+## Windows 差异
+
+- Git Bash 探测顺序见 `shells.rs` 模块文档；不用 `PATH` 上的 `bash.exe`（WSL）。PowerShell 参数沿用 Pi 的 UTF-8 前缀与 5.1 退出码后缀（MIT，`third-party/sources.json` 已登记），前缀占一行，错误位置的行号因此加 1。
+- Windows 没有登录 shell：环境就是进程环境（Core 加 `LANG=C.UTF-8` 给没有 locale 的 Git Bash）。`ProcessTreeSpawner` 的 `terminate` 与 `kill` 相同（Job 没有温和终止），退出码为 1，没有 signal。
+- Git Bash 的 `$!` 是 MSYS 的 pid；Windows pid 在 `/proc/<pid>/winpid`（`termination_tests.rs` 的 `LAST_PID`）。
+- PowerShell 输出编码、Git Bash 路径转换与中文输出只能在 Windows 上验证：CI 跑 `exec_commands.rs` 的 Windows 用例与 L2 的 `exec-windows-shells`，实机核对留给 W1。
 
 ## 易错点
 
-- `ProcessControl::wait` 与 `kill` 都借用 `&mut self`：等待与取消要分两步写（`watch` 函数），不能在同一个 `select!` 分支里既等又杀。
-- 测试里的命令用 `exec sleep`，让 shell 被替换，终止直接子进程即可结束管道；不用 `exec` 时后台进程会占住管道直到 `EXIT_GRACE`。Windows 的 Git Bash（MSYS）没有真正的 `exec`：`sleep.exe` 仍是 bash.exe 的子进程，`TokioProcessSpawner` 取消时只杀 bash，`sleep` 活到自己结束（W0 实测，`cancelling_kills_the_command` 因此在 Windows 上要 30 s 才结束测试进程；I33，T17 改用 `ProcessTreeSpawner`）。
-- Git Bash 在繁忙的 Windows 机器上启动可能超过几百毫秒：测试不要按固定延迟假设命令已经开始输出，等第一段输出再动作。
-- Windows 代码在 macOS 上只能做类型检查与 lint（`cargo clippy --target x86_64-pc-windows-msvc -p piarc-exec --all-targets -- -D warnings`，需先 `rustup target add x86_64-pc-windows-msvc`）；Job Object 的测试只在 Windows CI 运行。
+- `ProcessControl::wait` 与 `kill`/`terminate` 都借用 `&mut self`：等待与停止分两步写（`watch` 的 `select!` 只决定原因，`stop_process` 再停）。
+- `OutputCapture::push` 在异步任务里同步写文件（`BufWriter`），只在输出超过内联预算后才写；不要在这里做阻塞更久的事。
+- 登录 shell 会执行用户的配置文件：测试里用 `/bin/bash` 加临时 `HOME` 的 `.bash_profile`（`env.rs` 的测试、L2 运行器），不要依赖开发机自己的 shell 配置；macOS 的 `/etc/profile` 会经 `path_helper` 重排 `PATH`，断言写"包含"不写"等于"。
+- 暂停的 tokio 时钟（`start_paused`）在运行时空闲时直接跳到下一个定时器：真实子进程运行时也会跳，所以超时测试量的是 tokio 的 `Instant`，不是墙钟。
+- Git Bash 在繁忙的 Windows 机器上启动可能超过几百毫秒：测试等第一段输出或文件出现再动作，不按固定延迟。

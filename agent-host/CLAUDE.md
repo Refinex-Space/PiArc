@@ -22,7 +22,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - `test/golden/`：投影 golden 测试的输入（录制或构造的 Pi 事件，`*.events.json`）与期望输出（`*.expected.json`）；Prettier 不处理这个目录。
 - `src/runtime/core-bridge.ts`：向 Core 发请求的唯一入口（统一超时，默认 30 s；`timeoutMs: null` 给等待用户的请求，靠 `signal` 取消）。
 - `src/protocol/outbound.ts`：写 stdout 的唯一路径：等 `drain`、合并增量、`item/updated` 只保留最新、写出时分配 `seq`；每个会话保留最近 4,096 条或 8 MiB 已写出的通知供 `session/getEntries` 回放；超过 8 MiB 单帧上限的会话通知不写出、不占 `seq`。
-- `src/tools/`：工具层（架构第 6.1 节、ADR-0020、ADR-0027）。`profile.ts` 规范名、默认 Profile（描述原创，ADR-0006）与 `ToolNameMap`；`core-io.ts` 经 Core 桥接发 `fs/*`、`exec/*`（结果在此校验，错误重建为 Node 风格；写给模型的 Core 错误去掉 `<method> failed:` 前缀）；`read.ts`、`write.ts`、`edit.ts` 在替身路径（`stand-in.ts`）上运行 Pi 的工具定义（T16 的扩展：`line-numbers.ts` 行号、`documents.ts` PDF 与 notebook、`replace-all.ts`）；`bash.ts`、`glob.ts` 用 Pi 工厂加 Operations；`grep.ts` 自写；`ls.ts` 只提供 `LsOperations`，不暴露。
+- `src/tools/`：工具层（架构第 6.1 节、ADR-0020、ADR-0027）。`profile.ts` 规范名、默认 Profile（描述原创，ADR-0006）与 `ToolNameMap`；`core-io.ts` 经 Core 桥接发 `fs/*`、`exec/*`（结果在此校验，错误重建为 Node 风格；写给模型的 Core 错误去掉 `<method> failed:` 前缀）；`read.ts`、`write.ts`、`edit.ts` 在替身路径（`stand-in.ts`）上运行 Pi 的工具定义（T16 的扩展：`line-numbers.ts` 行号、`documents.ts` PDF 与 notebook、`replace-all.ts`）；`glob.ts` 用 Pi 工厂加 Operations；`grep.ts` 自写；`shell.ts` 自写 Bash 与 PowerShell（T17，ADR-0028：Core 的 `exec/run` 管超时、进程树、cwd、输出预算与语义，工具只组织文本与 `details.commandExecution`），会话的工具集按 `exec/shells`（`session-registry.ts` 的 `shellsFor`）；`ls.ts` 只提供 `LsOperations`，不暴露。
 - `src/harness/tool-results.ts`（T16）：工具结果预算，作为内联扩展挂在每个会话上（`tool_result` 单个 50K 落盘、`context` 单条消息 200K），阈值只改 `TOOL_RESULT_LIMITS` 或注册表选项 `toolResultLimits`。
 - `src/harness/project-trust.ts`：Harness Kit 接管 Pi 的项目信任（T13）。`askCoreTrust` 发 `trust/get`，超时、错误响应、结果无法解析、连接已断都按不信任；`takeOverProjectTrust` 给 `createAgentSessionServices` 的 `resourceLoaderReloadOptions.resolveProjectTrust`，会话的 `SettingsManager` 一律以 `projectTrusted: false` 创建，项目级资源（`.pi/extensions/`、`.pi/settings.json`、`.pi/mcp.json` 等）在钩子拿到 Core 的回答后才加载。
 - `src/runtime/credentials.ts`：`CoreCredentialStore`，pi-ai 的 `CredentialStore`，经 `secrets/*` 由 Core 的保险箱支撑（ADR-0021）；`host.ts` 在握手后 `load()`，再交给 `ModelRuntime.create({ credentials })`。
@@ -99,7 +99,9 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - Read 的查找经 `fs/stat` 的 `read` 登记读取，Core 据此判断重复读取与 Edit 的先读后改；不要为别的用途带 `read` 调 `fs/stat`。
 - Edit 与 Write 把 Core 返回的 diff 放进结果的 `details.fileDiff`，投影器从这里取（`items.ts` 的 `resultDiff`）；改结果形状时两边一起改。
 - 参数 schema 在 Pi 的之上扩展（Read 的 `pages`、Edit 的 `replaceAll`）用 `typebox`（与 Pi 同版本 1.3.27 的直接依赖）。
-- 委托的 Bash 不读 Pi 设置的 `shellPath`、`shellCommandPrefix`，Read 不读 `images.autoResize`（I21）；命令环境是 Core 的白名单环境加 Pi 的会话变量，看不到 Agent Host 自己的 `PI_*` 内部变量。
+- Bash 不读 Pi 设置的 `shellPath`、`shellCommandPrefix`（Windows 的 Git Bash 路径是 PiArc 设置 `shell.gitBashPath`），Read 不读 `images.autoResize`（I21）；命令环境是 Core 的登录 shell 环境去掉内部变量，Agent Host 不再传 Pi 的 `PI_*` 会话变量。
+- Bash 的结果文本在与 Pi 含义相同处用 Pi 的措辞（"Command exited with code N" 等，`parity.rs` 的 Bash 步骤与 L2 断言依赖）；输出保留原样的末尾换行。改措辞时同步对照测试与 `tests/scenarios/exec-*.yaml`。
+- 命令的 `details.commandExecution` 由 `shell.ts` 写、`items.ts` 的 `resultExecution` 校验后放进条目的 `execution`（实时与历史都经它）；改形状时两边与协议类型一起改。
 
 ## 参考
 

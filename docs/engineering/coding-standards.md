@@ -201,7 +201,7 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | stdio MCP 测试夹具 | `packages/testkit/src/mcp-echo-server.ts` | 一个 `echo` 工具，结果带 server 名、工作目录与 pid，用来证明 MCP 调用到了哪个实例 | T06 |
 | 路径限定检查 | `piarc_fs::Scope`（`resolve`、`display`） | 会话的工作区根与 cwd；请求路径接到 cwd、按词法去掉 `.`/`..`、解析符号链接（含悬空链接）后必须在根内，否则 `OutsideWorkspace` 且不触碰目标；结果路径去掉 `\\?\` 前缀。所有按路径操作文件的 Core 代码先经它 | T07 |
 | 委托的工具 I/O | Core：`piarc_core::tool_io::ToolIo`（`open_session`、`dispatch`，实现 `InboundHandler`）；Agent Host：`agent-host/src/tools/core-io.ts`（`CoreIo`、`ExecOutputRouter`、`asFileError`） | Agent Host 的文件与命令 I/O 只经它们：`fs/*`、`exec/*` 的类型化请求、结果校验、Node 风格错误重建、`exec/output` 路由；新工具的 I/O 在这里加方法 | T07 |
-| 命令执行 | `piarc_exec::CommandRunner`（`CommandSpec`、`OutputChunk`、`CommandExit`） | bash 执行、stdout/stderr 流式读取（有界通道背压）、退出后的静默宽限、取消终止直接子进程；进程经注入的 `ProcessSpawner` 启动 | T07 |
+| 命令执行 | `piarc_exec::CommandRunner`（`CommandSpec`、`OutputChunk`、`CommandExit`） | 程序加参数（shell 由 `piarc_exec::shells` 给出）、stdout/stderr 流式读取（有界通道背压）、退出后的静默宽限、超时与取消的两段终止（`terminate` → 宽限 → `kill`）；进程经注入的 `ProcessSpawner` 启动，命令一律用 `ProcessTreeSpawner`（T17） | T07 |
 | 入站请求的通知回传 | `piarc_host::Peer`（`notify`、`closed`） | 入站处理者在回复前向 Agent Host 发通知，与响应同序；连接结束可感知 | T07 |
 | UTF-8 分段 | `piarc_protocol::text::incomplete_utf8_suffix` | 分段传输文本时不切断 UTF-8 序列（`fs/read` 的范围、`exec/output` 的流） | T07 |
 | 系统凭据库端口 | `piarc_ports::{SecretStore, SecretName, SecretStoreError}`；实现 `piarc_secrets::SystemSecretStore`（keyring-core），替身 `piarc_secrets::MemorySecretStore`（`fail_with` 注入拒绝、锁定、失败） | 系统凭据库只经这个窄 trait 访问，调用会阻塞（可能弹授权），异步代码放到阻塞线程池；测试条目一律用 `test_master_key_name`（`piarc-test.` 前缀） | T08 |
@@ -249,3 +249,8 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | 保真写入与文件状态 | `piarc_fs::{write, WriteSpec, check_fresh, stat_for_read, FileStates, PathLocks}`、`piarc_fs::encoding`；底层原子替换 `atomic::replace`（crate 内） | 替换已存在的文件：先读后改与外部修改检查、编码与 BOM 保持、按需换成文件的换行风格、同目录临时文件 + rename、失败不留半个文件；编码检测与按范围解码也在这里。Core 以外的写入（例如配置）若要同样的保证，复用这里而不是再写一份 | T16 |
 | 结构化 diff | `piarc_diff::file_diff` → `piarc_protocol::diff::FileDiff` | unified 文本与 hunk 同源，超限降级；Changes 面板、审批卡、快照回退都用这份结构 | T16 |
 | 工具结果截断与落盘 | Agent Host `agent-host/src/harness/tool-results.ts`（`createToolResultBudget`、`TOOL_RESULT_LIMITS`、`headAndTail`）；Core `fs/spill`（`piarc_fs::spill`、`model_path`） | 单个结果超过 50K 字符落盘、模型收到头尾预览与 `~` 开头的路径；单条消息合计 200K 从最大的开始换成预览且决定可复现；Bash 的输出落盘（T17）、后台任务输出复用同一个落盘位置与路径写法 | T16 |
+| 进程树终止 | `piarc_ports::ProcessControl::terminate`（默认即 `kill`）；`piarc_exec::ProcessTreeSpawner`（Unix 进程组 `SIGTERM`/`SIGKILL`，Windows Job）；`CommandRunner` 的超时与取消 | 结束一条命令及其全部子孙进程：先 `terminate`，`kill_grace` 后 `kill`，丢弃句柄结束留在后台的进程；测试用 PID 确认孙进程退出（`piarc-exec/src/termination_tests.rs`） | T17 |
+| 登录 shell 环境解析 | `piarc_exec::env::{login_shell_env, strip_internal, is_internal, INTERNAL_PREFIXES, INTERNAL_NAMES}`；Core `piarc_core::tool_io::CommandEnv` | 用户登录 shell（`-i -l -c` 打印 `env -0`，10 秒超时）的环境，再剔除 PiArc、Electron、Node 的内部变量；Core 每次运行解析一次并缓存。要给子进程用户环境的地方都经它，不另读 shell 配置 | T17 |
+| 语义退出码判定 | `piarc_exec::semantic::{interpret, EXIT_ONE_MEANINGS}` | 单个简单命令的退出码 1 是否为答案（`grep` 无匹配、`diff` 有差异、`test` 为假），管道与控制运算符只看退出码；T23 换成语法树判断 | T17 |
+| 命令输出预算与落盘 | `piarc_exec::{ExecLimits, OutputCapture, CapturedOutput}`；落盘文件 `piarc_fs::create_spill` | 阈值（超时默认与上限、内联 30,000、预览 2,000、失败头尾、终止宽限）的唯一定义；内存有界，超出预算时全文流式写入会话临时目录 | T17 |
+| shell 探测与调用 | `piarc_exec::shells::{detect, Probe, bash_args, powershell_args, msys_to_windows}`、`piarc_exec::CwdProbe` | bash / Git Bash / PowerShell 的查找顺序（测试可描述一台假机器）、两种 shell 的参数、Git Bash 路径转换、经 `BASH_ENV` 取 bash 命令的最终目录 | T17 |

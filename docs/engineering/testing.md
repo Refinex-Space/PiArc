@@ -352,6 +352,8 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 - 场景一个失败不影响其他场景的执行与报告；同一场景连续运行两次结果相同（`l2_runner.rs` 检查），没有 sleep，等待只有 30 s 安全网。
 - `piarc-devcli` 用同一个运行器：`run <文件或目录> [--json <文件>]`（见 `crates/piarc-devcli/CLAUDE.md`）。
 
+- **命令环境**（T17）：L2 的 Core 以准备好的登录 shell 起命令环境：测试进程环境加上应用里 Core 会带的内部变量（`ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`PI_CODING_AGENT_DIR`、`PIARC_L2_INTERNAL`）与 `L2_USER_VAR=kept`，Unix 上 `/bin/bash` 加本次运行的 `HOME`（`.bash_profile` 往 `PATH` 加含 `l2-login-tool` 的目录）。环境剔除与登录 `PATH` 的场景因此不依赖开发机的 shell 配置（`crates/piarc-testkit/src/l2/runner.rs` 的 `command_env`）。
+
 ### 12.6 新增一个 L2 场景
 
 1. 在 `tests/capabilities.yaml` 找到能力 ID（没有时按第 13 节新增并在报告中说明）；实现了它的任务把状态改为 `active`。

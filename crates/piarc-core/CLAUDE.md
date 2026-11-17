@@ -7,7 +7,8 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 | 命令 | 用途 |
 |---|---|
 | `cargo test -p piarc-core` | 单元测试 + `tests/event_channel.rs`（回调频率、无丢失与顺序、背压、有序关闭、任务 panic、未关闭直接丢弃）+ `tests/tool_io.rs`（越界需要询问、流式输出、取消、会话隔离）+ `tests/file_invariants.rs`（T16：先读后改、外部修改、重复读取、上传与 diff、受保护路径、spill、编码）+ `tests/secrets.rs`（推送、保险箱错误、锁与租约、并发读改写） |
-| `cargo test -p piarc-core --test sandbox` | 沙箱会话（macOS）：写入范围、受保护路径、`denyRead`、绕过代理、流式与退出码、`exec/kill` 后进程组为空、关闭会话停止代理 |
+| `cargo test -p piarc-core --test exec_commands -- --nocapture` | 命令（T17）：cd 跨命令保留与越界重置、超时与截断的上限、落盘与预览、两个管道各 50 MB、语义退出码、环境剔除、`exec/shells`；Windows 上另有 PowerShell 与 Git Bash 的中文输出 |
+| `cargo test -p piarc-core --test sandbox` | 沙箱会话（macOS）：写入范围、受保护路径、`denyRead`、绕过代理、流式与退出码、`exec/kill` 后进程组为空（T17 起 shell 以 `SIGTERM` 结束）、关闭会话停止代理 |
 | `cargo test -p piarc-core --test sandbox_commands -- --nocapture` | 沙箱内 git、python、cargo build、npm install（后两项连真实 registry，连不上就失败并说明） |
 | `cargo test -p piarc-core --test release -- --nocapture` | 发布清单校验（T12-A08）：有效、篡改内容、篡改哈希与大小、未列出、换密钥、无内置公钥，打印结构化错误 |
 | `cargo test -p piarc-core --test agent_host_probe` | 探针在 Core 运行时上启动进程（运行时开着 I/O）、Agent Host 未握手就退出时报告错误（Unix） |
@@ -34,8 +35,9 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - `ToolIo` 按会话登记的 `Scope`（工作区根 + cwd + 只读的会话临时目录 `<数据目录>/sessions/<id>/tmp/`，登记时创建）应答 `fs/*`（`piarc-fs`，放在阻塞线程池）与 `exec/*`（`piarc-exec`）；未登记的会话返回 `sessionNotFound`。登记由会话层做（会话 actor 启动时 `open_session`，关闭时 `close_session`）；每个工作区的入站处理者（`sessions/inbound.rs`）只放行本工作区的会话。`cancel_running` 终止会话正在运行的命令而保留会话（回合中断）。`ToolIoConfig.observer`（`ToolIoObserver`）在每个请求执行前被调用，只给测试用（T14-A06 的并发计数）。
 - 文件工具的不变量（T16，ADR-0027）在 `tool_io/files.rs`：每个会话一张 `piarc_fs::FileStates`（随会话登记创建、`close_session` 释放；同一 id 重新登记即新表），所有会话共用一组 `PathLocks`；`fs/write`、`fs/spill` 的 `upload` 分段在会话的 `Uploads` 里收齐（同一 id 的目标必须相同，上限 `MAX_UPLOAD_BYTES`）；每次写入后用 `piarc_diff::file_diff` 生成结果的 `diff`。
 - 需要询问的操作（`piarc_fs::Error::NeedsApproval`）一律经 `files::adjudicate` 变成错误对象：T20 之前拒绝为 `permissionDenied`，消息写明原因与下一步。T20 的审批接在这里；不要在别处直接 `to_error_object()` 掉这类错误（`blocking`、`answer` 已经经过它）。
-- `exec/run` 的输出经入站请求带来的 `Peer` 以 `exec/output` 发回，`forward_output` 先发完再回响应；连接断开（`Peer::closed`）或 `exec/kill` 终止命令。
-- 命令环境 = `piarc_host::DEFAULT_ENV_PASSTHROUGH` 中 Core 自己有的变量 + 请求的 `env` 叠加（同名覆盖，Windows 不区分大小写）；凭据不在白名单里。
+- 命令（T17，ADR-0028）在 `tool_io/exec.rs`：shell 每个 Core 探测一次（`exec/shells` 回答；Windows 缺 Git Bash 时在 `core/notices` 发一次 `gitBashMissing`，Git Bash 路径只读用户级 `<data>/settings.json` 的 `shell.gitBashPath`）；每个会话一个 shell 目录（`SessionIo.shell_cwd`），未给 `cwd` 的 bash 命令带 `CwdProbe`，结束后越界就回到工作区根；全部命令用 `ProcessTreeSpawner`，超时与阈值取 `ToolIoConfig.exec_limits`。
+- 输出：每块同时进 `OutputCapture`（结果的 `output`，超出预算全文写 `<会话临时目录>/tool-results/<工具调用 id>.txt`）与显示窗口 `Display`（`exec/output`，待发超过 `DISPLAY_WINDOW` 256 KiB 时丢最旧的块并报 `skipped`），转发任务发完才回响应；连接断开（`Peer::closed`）或 `exec/kill` 停止命令。
+- 命令环境 = `ToolIoConfig.command_env`（`CommandEnv`）：`ToolIoConfig::new` 用 Core 自己的环境（`CommandEnv::process`），运行时（`CoreConfig.command_env` 为 `None`）用登录 shell（`CommandEnv::login_shell`，首次命令时解析并缓存）；两者都经 `piarc_exec::env::strip_internal`；再叠加请求的 `env`（同名覆盖，Windows 不区分大小写）。凭据从不进入。`ToolIoConfig` 不能带 `notices`（crate 私有类型），要发通知用 `ToolIo::with_notices`。
 - blob 放在 `<数据目录>/sessions/<会话 id>/blobs/`；会话 id 只允许 `[A-Za-z0-9._-]`，不能是 `.`、`..`。
 - 沙箱会话（T11）：`open_sandboxed_session` 建 `<数据目录>/sessions/<会话 id>/tmp/`、启动会话代理（`piarc_sandbox::SessionSandbox`）；`exec/run` 加上 `sandbox-exec` 包装与沙箱变量（同名覆盖请求的 `env`），用 `ProcessTreeSpawner` 运行。非 macOS 返回 `internalError`。代理随 `SessionIo` 释放而停止（`close_session` 后、最后一个运行中的命令结束时）。
 

@@ -35,7 +35,7 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0017](0017-terminal-libghostty-vt.md) | 内置终端：终端状态由 Core 中的 libghostty-vt 持有，渲染层可替换 | 已接受（第 3 条被 0023 修订） |
 | [0018](0018-unsigned-distribution.md) | 不做平台代码签名：macOS 只做 ad-hoc 签名，Windows 不签名，更新与凭据存储随之调整 | 已接受 |
 | [0019](0019-event-batches-copied-not-transferred.md) | 事件批次经主进程转发时复制，不转移 ArrayBuffer（修订 ADR-0014 第 4 条） | 已接受 |
-| [0020](0020-tool-layer-composition.md) | 工具层的组成：Pi 的工具代码加 Core 的 I/O（补充 ADR-0004 第 3 条） | 已接受 |
+| [0020](0020-tool-layer-composition.md) | 工具层的组成：Pi 的工具代码加 Core 的 I/O（补充 ADR-0004 第 3 条） | 已接受（第 1 条 bash 的部分被 0028 修订） |
 | [0021](0021-credential-vault-and-pi-adapter.md) | 凭据保险箱的格式、并发与 Pi 凭据接口适配（补充 ADR-0018 第 5 条） | 已接受 |
 | [0022](0022-transcript-rendering-libraries.md) | Transcript 渲染的库选型：@tanstack/react-virtual、marked 词法器、shiki JavaScript 引擎（补充 ADR-0013 第 5 条） | 已接受 |
 | [0023](0023-terminal-frames-as-pull-replies.md) | 终端帧作为拉取请求的返回值送达渲染进程，不经事件 MessagePort（修订 ADR-0017 第 3 条） | 已接受 |
@@ -43,3 +43,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0025](0025-core-state-and-project-trust.md) | Core 状态的落地：数据目录、SQLite 迁移、按主 checkout 的信任与 Pi 信任接管（补充 ADR-0011、ADR-0005 第 4 条） | 已接受 |
 | [0026](0026-turns-queue-and-interrupted-transcript.md) | 回合、排队与中断后的对话形态（补充 ADR-0009、ADR-0010、ADR-0011） | 已接受 |
 | [0027](0027-file-tool-invariants.md) | 文件工具不变量的落点：Core 的状态表与写入，Harness Kit 的匹配与结果预算（补充 ADR-0004 第 3 条、ADR-0020） | 已接受 |
+| [0028](0028-shell-command-execution.md) | Shell 命令的执行：Core 管进程、输出与语义，Bash 与 PowerShell 为 PiArc 自写工具（补充 ADR-0004 第 3 条，修订 ADR-0020 第 1 条） | 已接受 |
