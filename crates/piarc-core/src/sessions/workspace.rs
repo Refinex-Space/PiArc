@@ -582,9 +582,18 @@ async fn record_workspace(
         default_mode: None,
         default_model: None,
     };
-    let row = record.clone();
-    ctx.storage
-        .run(move |store| store.upsert_workspace(&row))
+    // Reopening keeps what the user chose for the workspace.
+    let stored = ctx
+        .storage
+        .run(move |store| {
+            let mut row = record;
+            if let Some(known) = store.workspaces()?.into_iter().find(|w| w.path == row.path) {
+                row.default_mode = known.default_mode;
+                row.default_model = known.default_model;
+            }
+            store.upsert_workspace(&row)?;
+            Ok::<_, piarc_store::Error>(row)
+        })
         .await??;
-    Ok(record)
+    Ok(stored)
 }

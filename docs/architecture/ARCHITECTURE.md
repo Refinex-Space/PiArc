@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.18（2026-11-16） |
+| 版本 | 2.19（2026-11-17） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -245,6 +245,7 @@ PiArc/
 | [0009](../adr/0009-agent-host-protocol.md) | 自有协议 AHP | 双向请求、版本握手、事件回放、调用对账 |
 | [0010](../adr/0010-process-model.md) | 每工作区一个 Agent Host | 控制多会话内存，MCP 按工作区共享 |
 | [0011](../adr/0011-session-storage.md) | Pi JSONL 为事实来源 + SQLite 索引 + 内容寻址快照 | 跟随上游格式，索引可重建 |
+| [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
 | [0019](../adr/0019-event-batches-copied-not-transferred.md) | 事件批次经主进程转发时复制，不转移 `ArrayBuffer` | Electron 主进程只能转移端口；实测 8 MiB 批次复制转发约 2 ms |
@@ -302,7 +303,7 @@ agent-host/
 | `agent_settled` | `turn/completed` | 不用 `agent_end`；附带用量汇总 |
 | `message_update`（`text_delta` / `thinking_delta`） | `item/agentMessage/delta`、`item/reasoning/delta` | itemId = `messageId#contentIndex`，保证稳定 |
 | `tool_execution_start/update/end` | `item/started`、`item/updated`、`item/completed` | 按工具映射到 item 类型：`commandExecution`、`fileChange`（带结构化 diff）、`mcpToolCall`、`subagent`、`webFetch`、`dynamicToolCall` |
-| `compaction_start/end` | `item/contextCompaction` | 带原因与压缩前后 token 数 |
+| `compaction_start/end` | `item/contextCompaction` | `contextCompaction` 类型条目的 `item/started` 与 `item/completed`，带原因与压缩前后 token 数 |
 | `auto_retry_*` | `turn/retrying` | 带 attempt / maxAttempts / delayMs |
 | `queue_update` | `session/queueChanged` | Agent Host 给每个排队项分配 id，支持编辑、删除、重排 |
 | `entry_appended`（Harness Kit 写入的自定义 entry） | 对应的 Harness 事件 | 例如 todo 更新、plan 提交 |
@@ -314,6 +315,13 @@ agent-host/
   - 文本增量末尾的高代理项留到下一个增量再发，无法配对的代理项替换为 U+FFFD：发往 Core 的字符串都是合法 UTF-16。
   - 所有帧经出站队列写 stdout：`write()` 返回 false 后等 `drain`；等待中同一条目的文本增量合并成一帧；`seq` 在写出时按会话分配，合并不产生缺口；积压超过 64 MiB 时以退出码 70 退出，由 Core 重启。
   - `session/prompt` 先回复 `turnId` 再开始回合，Core 总是先知道 `turnId`，再收到该回合的通知。
+
+- T14 落地（ADR-0026），投影规则的唯一实现是 `agent-host/src/runtime/projector.ts`（live）与 `history.ts`（会话文件的当前分支，`session/history`），两者共用 `items.ts` 的条目构造：
+  - 用户消息（提示词、送达的 steer）投影为 `userMessage` 条目；`thinking_*` 投影为 `reasoning` 条目与 `item/reasoning/delta`；`tool_execution_update` 投影为 `item/updated`（出站队列中只保留同一条目最新的一条）；`auto_retry_end` 不单独投影，最终失败由 `turn/completed` 体现；Harness Kit 写入的 `piarc.*` 自定义 entry 投影为 `harness/entry`；`turn/completed` 带本回合各次回复的用量之和。
+  - 规范名到条目类型：`Bash`/`PowerShell` → `commandExecution`，`Write`/`Edit`/`NotebookEdit` → `fileChange`，`mcp__<server>__<tool>` → `mcpToolCall`，`Agent` → `subagent`，`WebFetch` → `webFetch`，其余 → `dynamicToolCall`。条目里的工具输出最多保留末尾 64 K 个 UTF-16 码元，参数超过 256 K 字符或嵌套超过 64 层时以说明代替（I09）。
+  - 状态：工具的成败取工具层结果（`isError`），中断请求之后失败的调用为 `interrupted`，策略闸门拒绝的调用为 `declined`（T20 调用 `Projector.markDeclined`）；回合中断时，仍在执行与未开始执行的调用都补发 `interrupted`。
+  - 排队：Agent Host 的排队表（`queue.ts`）给每项 id；steer 立即交给 Pi，follow-up 在回合完成后作为新回合启动；编辑、删除、重排 steer 时清空并按新顺序重新交给 Pi；`session/abort` 把排队项交回 Core。
+  - 投影的 golden 测试回放从真实 Agent Host 录制的 Pi 事件序列（`agent-host/test/golden/`），覆盖上表每一行、六种工具条目与五种状态；mock 产生不了的三类（thinking、Harness entry、被拒的调用）用同形状的构造事件。
 
 ### 5.4 凭据与登录
 
@@ -713,6 +721,8 @@ Agent Host 按类别统计上下文构成（system prompt、工具定义、MCP �
 | 子 agent 隔离 | 默认不继承父会话对话历史，只接收任务描述；fork 模式（继承历史、共享缓存）列为 M5 |
 | plan 模式 | 硬拦截：写工具与非只读命令在 `tool_call` 闸门处拒绝；工具列表保持不变以免缓存失效；不能只靠提示词约束 |
 
+T14 落地（ADR-0026）：回合继续条件与截断时判失败由 Pi 1.5.2 满足；工具并发由 Harness Kit 的调度器（`agent-host/src/harness/tool-batches.ts`）实现，Pi 只负责并行启动；中断时 Harness Kit 为没有结果的调用补写"已中断"结果并追加中断标记（`harness/interruption.ts`），会话重新打开时对崩溃留下的未完成回合做同样处理；重试由 Pi 的 agent 循环完成（失败的那次不进入上下文），Agent Host 关掉服务商 SDK 的静默重试，使每次重试都以 `turn/retrying` 报给界面。各条的"Pi 已满足 / Harness Kit 补齐"清单在 `agent-host/CLAUDE.md`。
+
 ---
 
 ## 7. PiArc Core 设计（Rust）
@@ -761,6 +771,7 @@ crates/
 - 每个工作区一个 actor（`WorkspaceActor`），每个会话一个 actor（`SessionActor`），通过消息通道交互，避免共享可变状态加锁。
 - 所有长任务可取消（`CancellationToken`），取消沿会话 → 回合 → 工具调用 → 子进程传播。
 - NAPI 调用不阻塞主进程的事件循环：同步方法只做参数校验与入队，结果经事件或 async（Promise）返回。主进程的事件循环同时负责窗口与菜单响应，单次 NAPI 同步调用的耗时预算为 1 ms。
+- T14 落地：`piarc-core::sessions` 中 `WorkspaceActor`（每个打开的工作区一个，持有 Agent Host 监管器，打开即启动，全部会话空闲超过阈值后停止、需要时再启动并恢复会话）与 `SessionActor`（每个打开的会话一个，按 `seq` 顺序把通知交给客户端、计算状态与未读、请求以任务方式执行，自己不等待 Agent Host）；监管器的事件由单独的消费任务持续取走，会话通知进入会话 actor 的有界邮箱（客户端停读时形成背压，不丢失）。取消链为根 token → 会话 token → 会话的进行中请求；回合中断时 Core 同时终止该会话经工具 I/O 运行的命令。有序关闭在停止事件源之前先关闭所有工作区（`host/shutdown`），最后关闭数据库（I66）。
 - 有序关闭：停止接受新请求 → 取消根 `CancellationToken` 并等事件源结束 → 关闭事件队列、投递最后一批并等客户端处理完 → 释放事件回调 → 停止运行时。任务经监督者启动，panic 不被吞掉，转成 `core/errors` 路由上的结构化错误事件（`piarc-core` crate 文档）。
 - 事件合并与背压：上游事件进入有界队列（65,536 个事件），合并器按路由键合并，刷出时机不早于首个待发事件到达且距上次刷出至少一个间隔，因此回调频率不超过 `1000 / 间隔（ms）`；最多 1 个在途投递，客户端未处理完时继续累积；待发超过 64 MiB 时停止读队列，由队列向生产者施加背压（异步生产者等待，同步调用返回可重试的 `busy`）。任何情况下都不丢事件，只有客户端环境已销毁时才丢弃并计数。
 
@@ -795,7 +806,7 @@ crates/
 
 | 方法族 | 方法 |
 |---|---|
-| `session/*` | `create`、`resume`、`fork`、`close`、`prompt`、`steer`、`followUp`、`abort`、`queue/clear`、`queue/edit`、`compact`、`setModel`、`setEffort`、`setMode`、`setName`、`getContextUsage`、`getEntries(since)` |
+| `session/*` | `create`、`resume`、`fork`、`close`、`prompt`、`steer`、`followUp`、`abort`、`queue/clear`、`queue/edit`、`queue/delete`、`queue/reorder`、`compact`、`setModel`、`setEffort`、`setMode`、`setName`、`getContextUsage`、`getEntries(since)`、`history` |
 | `models/*` | `list`、`login/start`、`login/cancel`、`logout` |
 | `resources/*` | `listCommands`、`listSkills`、`listAgents`、`reload` |
 | `mcp/*` | `status`、`reconnect`、`setEnabled` |
@@ -815,7 +826,7 @@ crates/
 
 **Agent Host → Core 通知**
 
-`turn/started`、`turn/retrying`、`turn/completed`、`item/started`、`item/delta`、`item/updated`、`item/completed`、`session/queueChanged`、`session/usage`、`session/stateChanged`、`harness/todo`、`harness/plan`、`subagent/*`、`mcp/statusChanged`、`log`。
+`turn/started`、`turn/retrying`、`turn/completed`、`item/started`、`item/agentMessage/delta`、`item/reasoning/delta`、`item/updated`、`item/completed`、`session/queueChanged`、`session/usage`、`session/stateChanged`、`harness/entry`、`harness/todo`、`harness/plan`、`subagent/*`、`mcp/statusChanged`、`log`。
 
 **Core → Agent Host 通知**：`exec/output`（T07）、`secrets/changed`（T08）。
 
@@ -826,6 +837,8 @@ T07 已实现的方法（Agent Host → Core，`piarc-core::tool_io::ToolIo` 应
 T08 已实现的方法（Agent Host → Core，`piarc-core::secrets::SecretsService` 应答，所有 Agent Host 共用一个，ADR-0021）：`secrets/getAll`（启动时取回全部凭据，可用 `prefixes` 只取某几类键；并把该连接登记为变更订阅者）、`secrets/get`、`secrets/set`、`secrets/delete`（值是 JSON 对象，结果带保险箱级递增的 `revision`）、`secrets/lock`（一组键一起加锁，结果带它们的当前值与 `expiresInMs`；持锁期间其他锁与未持锁的写入等待；`secrets/unlock`、30 秒租约或持有者连接结束时释放）、`secrets/unlock`，以及 Core → Agent Host 的通知 `secrets/changed`（`{ key, revision, value? }`，删除时没有 `value`，推给所有订阅者）。键为 `provider/<id>`、`oauth/<id>`、`mcp/<server>`。新增错误类别：`masterKeyMissing`、`credentialStoreUnavailable`（可重试，`details.reason` 为 `accessDenied`、`unavailable` 或 `failed`）、`vaultIntegrity`、`vaultVersion`、`secretLockLost`。保险箱在第一次请求时打开，失败的请求返回上述错误，下一次请求重新尝试。参数错误不带 serde 的原文（它可能引用凭据值）。
 
 T13 已实现的方法（Agent Host → Core，`piarc-core::trust::TrustService` 应答）：`trust/get` 先把路径解析到仓库主 checkout（`piarc-git`），再查 `project_trust`；目录解析不了、数据库出错、任务 panic 都回答 `trusted: false`，只有参数格式错回 `invalidParams`。信任变化时 Core 计划内重启该工作区的 Agent Host（`HostSupervisor::restart`，不计入崩溃退避），会话随之 `session/resume`。
+
+T14 已实现的方法（ADR-0026）：Core → Agent Host 的 `session/fork`（复制一个会话当前分支到某个 entry 为止的对话，新会话的 id 由 Pi 生成）、`session/steer`、`session/followUp`（运行中排队并回 `{ disposition: "queued", itemId }`，空闲时像 prompt 一样开始回合并回 `{ disposition: "started", turnId }`；`requestId` 是幂等键）、`session/queue/edit`、`session/queue/delete`、`session/queue/reorder`（结果为整张排队表）、`session/getEntries`（`since` 为 seq，返回回放缓冲中其后的通知与是否完整）、`session/history`（会话文件当前分支投影出的条目窗口，会话不必打开）；`session/create` 增加可选的 `sessionId`（Core 生成，超时后按该 id 对账），`session/abort` 的结果增加 `returnedQueue`。通知 `item/updated`、`item/reasoning/delta`、`turn/retrying`、`session/queueChanged`、`harness/entry`；条目类型增加 `userMessage`、`reasoning`、`commandExecution`、`fileChange`、`mcpToolCall`、`subagent`、`webFetch`、`contextCompaction`，`turn/completed` 增加 `usage`。新错误类别 `queueItemNotFound`。这些都在同一主版本 1.0 内新增，Core 与 Agent Host 随应用一起发布，尚未有旧版本对端。I20 的决定：接受 Pi 在会话创建时对 cwd 的 `existsSync`（只读元数据）；Core 在 `session/create` 前确认 cwd 是工作区内已存在的目录。
 
 T06 已实现的方法：Core → Agent Host 的 `host/ping`（结果附带 Agent Host 的 RSS 与出站队列计数）、`host/shutdown`、`session/create`、`session/resume`、`session/prompt`（结果只确认回合已开始，回合结束以 `turn/completed` 为准；`requestId` 是幂等键）、`session/abort`、`session/close`；Agent Host → Core 的 `trust/get`；通知 `turn/started`、`turn/completed`、`item/started`、`item/completed`、`item/agentMessage/delta`。新增的错误类别：`timeout`、`uncertain`、`hostUnavailable`（后两者只用于 Core API）、`sessionNotFound`、`sessionBusy`。请求方法的成功响应契约名为 `<方法>/result`。
 
@@ -853,6 +866,7 @@ T06 已实现的方法：Core → Agent Host 的 `host/ping`（结果附带 Agen
   - 重启：退避 1、2、4、8、16 秒（上限 30 秒），10 分钟窗口内最多 5 次，下一次失败停止并上报；重启时间与退避经 `Clock` 注入。重启后对经监管器打开的会话依次 `session/resume`。
   - 对账：调用状态为已发送 → （`session/prompt` 的已确认 →）终态；连接结束时未到终态的调用标为 `uncertain` 上报，不重放。进程退出后先等读取把 stdout 读完再判定，避免把已经回复的调用误标。
   - 尚未实现：Agent Host 的整棵进程树清理（进程组 / Job Object，T17），见 `docs/plan/PLAN.md` I17。
+- T14 落地（I58）：经 `create_session`、`resume_session`、`fork_session` 打开的会话都被跟踪并在重启后恢复；Core 指定 id 的 `session/create` 超时或连接中断时仍按该 id 跟踪；重启后的会话恢复与关闭、Kill 命令并行处理，恢复挂住时不阻塞关闭；Kill 命令绑定它所针对的连接，迟到的 Kill 不会杀掉下一个进程；握手被接受之前与被拒之后，Agent Host 的请求一律以 `invalidRequest` 回答，不交给处理者；同时处理的入站请求至多 `inbound_concurrency`（默认 256）个，超出时读取等待。Core 侧每个工作区的入站处理者只为本工作区的会话回答 `fs/*`、`exec/*`。
 
 ### 7.6 Core API（NAPI-RS 导出面）
 
@@ -892,6 +906,7 @@ impl Session {
 - 错误跨 NAPI 时是抛出的 `Error`，带 `code` 与 `data: { kind, retryable, details? }`（`piarc_protocol::ErrorObject` 的形状）；导出函数在边界捕获 panic，kind 为 `internalError`。Core API 专用的错误类别有 `shuttingDown`（关闭后的请求）与 `busy`（队列满，可重试）。
 - 状态导出（T13）：`CoreRuntime.create` 的选项增加 `dataDir` 与 `cacheDir`（同时给或都不给；不给时没有数据库、设置、信任与日志文件，只用于事件通道的测试）；`rebuildSessionIndex()`、`projectTrust(path)`、`decideProjectTrust(path, trusted)`、`revokeProjectTrust(path)` 都返回 JSON 文本的 Promise（`piarc_core::storage::report_json`、`piarc_core::trust::TrustView`）。设置变化以事件发到 `core/settings`（`{ workspace, changed, issues }`）。
 - Promise 由 Core 自己的运行时经 NAPI-RS 的 `JsDeferred` 结算，不用 `#[napi] async fn`（它会另起 NAPI-RS 的全局 tokio 运行时）。
+- 会话导出（T14）：`CoreRuntime.create` 的选项增加 `agentHost`（打包产物的 `resourcesPath`，或开发时的 `node` 与 `bundle`）与 `idleTimeoutMs`；`openWorkspace`（Agent Host 就绪后才解析）、`closeWorkspace`、`createSession`、`resumeSession`、`forkSession`、`closeSession`、`prompt`、`steer`、`followUp`、`abort`、`editQueueItem`、`deleteQueueItem`、`reorderQueue`、`markSessionRead`、`transcriptWindow(id, start, limit)` 返回 JSON 文本的 Promise，`resendSnapshots` 只入队。事件路由：`core/workspaces`、`core/sessions`（实体快照，各自的 `revision` 严格递增，由同一个任务按顺序发出）与 `session/<id>`（会话通知 `{ method, params }`，按 Agent Host 的 `seq` 连续交付；Core 自己的 `session/resync`（缺口无法补齐，需重新加载 transcript）与 `session/uncertain`（Agent Host 重启时在途的调用））。开发构建另有 `createForTests`（保险箱主密钥放在内存，测试不碰钥匙串）。
 - 声明快照在 `apps/desktop/src/main/core/native/`（`piarc-core.d.ts` 为发布构建，`piarc-core.testing.d.ts` 为开发构建），由 `npm run build:core` 生成，verify 比对。
 
 事件分两类：
@@ -1173,7 +1188,7 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 | 指标 | 预算 | M0 实测 macOS | M0 实测 Windows | 测量方式 |
 |---|---|---|---|---|
 | 冷启动到可交互窗口（侧栏已加载） | ≤ 1.0 s | 未测 | 未测 | 启动到首帧 + 侧栏数据就绪的打点 |
-| 打开工作区到 Agent Host 就绪 | ≤ 1.0 s | 未测 | 未测 | 预热计时（含 Pi 会话恢复） |
+| 打开工作区到 Agent Host 就绪 | ≤ 1.0 s | 10 次最大 0.28–0.29 s；含恢复一个有历史的会话 0.31–0.32 s（T14，release 构建） | 未测 | 预热计时（含 Pi 会话恢复）：`cargo run --release -p piarc-testkit --example t14-warmup` |
 | PiArc 引入的首 token 额外延迟 | ≤ 50 ms | 未测 | 未测 | 与直接调用 Pi SDK 对比 |
 | 主进程内存（含 Core，空闲） | 相对同平台、同版本裸 Electron（一个空窗口）的增量 ≤ 24 MB（原：≤ 120 MB，R1 放宽） | 160–164 MB，裸 Electron 155–157 MB，增量 5–8 MB | 108.4 MB，裸 Electron 96.1 MB，增量 12.3 MB | RSS，与裸 Electron 同机同轮测量 |
 | 渲染进程内存（1 窗口、侧栏 100 个会话、打开 1 个含 1,000 条 item 的会话） | ≤ 220 MB | 179 MiB（无侧栏） | 137 MiB（无侧栏） | `app.getAppMetrics()` |
@@ -1442,6 +1457,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.19 | 2026-11-17 | T14 补充（ADR-0026）：第 4 章加入 ADR-0026；5.3 投影表的压缩一行写明为 `contextCompaction` 条目，增加 T14 的投影规则、条目类型映射、状态规则、排队表与 golden 测试；6.15 写明三条回合不变量的落地方式；7.2 写明工作区与会话 actor、事件消费、取消链与关闭时关闭数据库；7.4 方法族增加 `queue/delete`、`queue/reorder`、`history`，通知增加 `item/agentMessage/delta`、`item/reasoning/delta`、`harness/entry`，写明 T14 已实现的方法、新条目类型与 I20 的决定；7.5 写明监管器的会话跟踪与 I58 的处理；7.6 加入会话导出与事件路由；第 11 章写入预热实测 |
 | 2.18 | 2026-11-16 | T13 补充（ADR-0025）：第 4 章加入 ADR-0025；5.5 写明 Pi 项目信任的接管挂点；7.4 写明 `trust/get` 的 Core 实现与信任变化时的计划内重启；7.6 加入状态导出与 `core/settings` 事件；9.1 写明 `userData`、`sessionData` 与 `--user-data-dir`、日志文件；9.2 增加 `project_trust`、`session_files` 两表与迁移、派生列和 Core 自有列的区分；10.2 写明主 checkout 规则、可执行项枚举与新增项、设置合并对未信任项目的处理 |
 | 2.17 | 2026-11-16 | R1（M0 阶段门）：第 11 章按 M0 实测校准，表中逐行写两个平台的实测值；收紧三行（流式每帧主线程工作 p99 16 → 12 ms、冷加载 1,000 条 300 → 170 ms、主进程转发 p95 5 → 1.1 ms），收紧规则写在第 11 章；放宽两行：**主进程内存**由"≤ 120 MB"改为"相对同平台同版本裸 Electron 的增量 ≤ 24 MB"，原因是 macOS 上裸 Electron 一个空窗口就有 155–157 MB，原预算无法由 PiArc 达到（Windows 裸 Electron 96 MB，原预算隐含的增量正是 24 MB，所以 Windows 不变）；**进程合计**在 macOS 上由 450 MB 改为 510 MB，原因是同一个主进程基线差额（约 59 MB），Windows 不变。两项测量口径校准：Windows 的事件循环延迟取超出同机空闲基线的部分，终端回显取两组样本 p95 之差。超出且不放宽的行（进程合计、Agent Host 单会话、Windows 体积）交 T44。同步：3.4 仓库结构（`packages/testkit`、`third-party/`、`tests/contracts/`）、6.1.1 与 8.5 的 M0 结果、10.3 终端输入与外链确认框、第 14 章 R1/R5/R15、15.2 的 Shell 与 PTY、第 16 章 M0 状态与结论 |
 | 2.16 | 2026-11-16 | T12 补充：8.8 系统通知一行写明 S6 的结论；第 4 章加入 ADR-0024（发布清单格式）；5.6 写明打包布局中的 `node_modules/`、Agent Host 的启动命令（`sandbox-exec -p`，路径经 `-D`）、`ProcessTreeSpawner` 与环境变量清单；9.1 增加数据目录下的 `agent-host/`；10.1 增加"同一用户的进程向 PiArc 注入代码"一行；10.3 写明分层签名、hardened runtime 的 M0 结论（开启，需 `disable-library-validation` 与 `allow-jit`）与 Agent Host 的宽松 Seatbelt 配置；13.2 写明二进制锁定、DMG 由 hdiutil 生成、vpk 打包与清单签名 |
