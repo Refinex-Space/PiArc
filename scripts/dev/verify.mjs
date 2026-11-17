@@ -62,6 +62,8 @@ export const STEPS = [
   { name: 'cargo-deny', command: cargoDeny },
   { name: 'crate dependency rules', command: nodeScript('scripts/ci/check-crate-deps.mjs') },
   { name: 'acceptance list', command: nodeScript('scripts/plan/check-acceptance.mjs') },
+  // Agent Host bundle, every L2 scenario, capability coverage and capabilities.md drift.
+  { name: 'L2 scenarios + capabilities', command: nodeScript('scripts/ci/run-l2.mjs') },
 ];
 
 /**
