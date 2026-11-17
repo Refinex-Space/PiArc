@@ -40,6 +40,11 @@ impl InboundHandler for WorkspaceInbound {
             let secrets = self.secrets.clone();
             return Box::pin(async move { secrets.dispatch(&method, params, peer).await });
         }
+        if method == "exec/shells" {
+            // Machine-wide, and asked while a session is being created (before it is ours).
+            let io = self.tool_io.clone();
+            return Box::pin(async move { io.dispatch(&method, params, peer).await });
+        }
         if ToolIo::handles(&method) {
             let session = params
                 .get("sessionId")

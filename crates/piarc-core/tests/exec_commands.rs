@@ -298,6 +298,29 @@ async fn the_environment_has_no_internal_variables() {
     assert!(printed.contains("USER_OWN_VAR=kept"));
 }
 
+/// The Agent Host asks while a session is still being created, before Core registered its
+/// scope: the answer does not depend on a session (CI run 44116918422, Windows L4).
+#[tokio::test]
+async fn shells_are_reported_before_any_session_is_registered() {
+    let f = Fixture::new("shells-early", CommandEnv::Fixed(base_env()));
+    let (peer, _frames) = Peer::channel(4);
+    let shells =
+        f.io.dispatch(
+            "exec/shells",
+            object(json!({ "sessionId": "not-registered-yet" })),
+            peer,
+        )
+        .await
+        .expect("answers without a registered session");
+    assert_eq!(shells["bash"], true);
+    let (peer, _frames) = Peer::channel(4);
+    let bare =
+        f.io.dispatch("exec/shells", object(json!({})), peer)
+            .await
+            .expect("answers without a session id");
+    assert_eq!(bare, shells);
+}
+
 #[tokio::test]
 async fn shells_are_reported() {
     let f = Fixture::new("shells", CommandEnv::Fixed(base_env()));

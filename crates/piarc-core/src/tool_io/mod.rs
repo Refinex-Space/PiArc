@@ -413,8 +413,8 @@ impl ToolIo {
         match method {
             "exec/run" => self.exec_run(parse(method, params)?, peer).await,
             "exec/shells" => {
-                let p: ExecShellsParams = parse(method, params)?;
-                self.session(&p.session_id.0)?;
+                // No session: asked before Core registered the one being created.
+                let _: ExecShellsParams = parse(method, params)?;
                 to_value(&self.exec.answer_shells().await)
             }
             _ => self.exec_kill(&parse(method, params)?),

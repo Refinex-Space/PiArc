@@ -828,14 +828,7 @@
       ]
     },
     "ExecShellsParams": {
-      "description": "Parameters of `exec/shells`.",
-      "properties": {
-        "sessionId": {
-          "$ref": "#/$defs/SessionId",
-          "description": "The session whose tools are being set up."
-        }
-      },
-      "required": ["sessionId"],
+      "description": "Parameters of `exec/shells`: none. Which shells exist is a fact about the machine, asked\nwhile a session's tools are set up, before Core has registered the session; any members\nsent (the Agent Host adds its `sessionId` to every request) are ignored.",
       "type": "object"
     },
     "ExecShellsRequest": {

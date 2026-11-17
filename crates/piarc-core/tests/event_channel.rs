@@ -20,7 +20,9 @@ enum Message {
         batches: Vec<EventBatch>,
         done: DeliveryDone,
     },
-    Dropped,
+    /// The sink was released, at this instant (taken in `Drop`, not when the test thread
+    /// gets around to reading the message).
+    Dropped(Instant),
 }
 
 /// Forwards every delivery, with its completion signal, to the test thread.
@@ -43,7 +45,7 @@ impl EventSink for ChannelSink {
 impl Drop for ChannelSink {
     fn drop(&mut self) {
         if let Ok(tx) = self.tx.lock() {
-            let _ = tx.send(Message::Dropped);
+            let _ = tx.send(Message::Dropped(Instant::now()));
         }
     }
 }
@@ -136,7 +138,7 @@ fn receive_until(
                 received.record(at, batches);
                 drop(done);
             }
-            Ok(Message::Dropped) => panic!("the sink was dropped while events were expected"),
+            Ok(Message::Dropped(_)) => panic!("the sink was dropped while events were expected"),
             Err(error) => panic!("no delivery within {WAIT:?}: {error}"),
         }
     }
@@ -219,7 +221,7 @@ fn events_of_several_sources_arrive_complete_and_in_order_with_a_slow_client() {
                 drop(done);
                 outstanding -= 1;
             }
-            Ok(Message::Dropped) => panic!("sink dropped early"),
+            Ok(Message::Dropped(_)) => panic!("sink dropped early"),
             Err(error) => panic!("missing deliveries: {error}"),
         }
     }
@@ -268,7 +270,7 @@ fn ordered_shutdown_flushes_the_last_batch_then_never_delivers_again() {
                 received.record(at, batches);
                 drop(done);
             }
-            Ok(Message::Dropped) => break Instant::now(),
+            Ok(Message::Dropped(at)) => break at,
             Err(error) => panic!("the sink was not released: {error}"),
         }
     };
@@ -392,7 +394,7 @@ fn dropping_a_running_runtime_releases_the_sink_without_a_shutdown_call() {
     loop {
         match rx.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
             Ok(Message::Delivery { done, .. }) => drop(done),
-            Ok(Message::Dropped) => break,
+            Ok(Message::Dropped(_)) => break,
             Err(error) => panic!("the sink was not released after drop: {error}"),
         }
     }

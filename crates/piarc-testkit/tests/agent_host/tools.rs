@@ -152,7 +152,11 @@ fn check_results(results: &[(String, String, bool)]) {
 /// T07-A01: every tool call reached Core with the expected methods and its canonical name.
 fn check_core_calls(calls: &[crate::harness::Call]) {
     let mut by_tool: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
-    // `exec/shells` (T17) is asked once when the session's tools are set up, for no tool call.
+    // `exec/shells` (T17) is asked once when the session's tools are set up, for no tool call;
+    // it must succeed, or the session silently gets the platform's guess of its shells.
+    let shells: Vec<_> = calls.iter().filter(|c| c.method == "exec/shells").collect();
+    assert_eq!(shells.len(), 1, "{shells:?}");
+    assert!(shells[0].error.is_none(), "{:?}", shells[0]);
     for call in calls.iter().filter(|c| c.method != "exec/shells") {
         let tool = call.tool.as_deref().expect("every request names its tool");
         by_tool

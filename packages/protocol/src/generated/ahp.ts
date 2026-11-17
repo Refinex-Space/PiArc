@@ -2428,14 +2428,11 @@ export interface ExecShellsRequest {
   params: ExecShellsParams;
 }
 /**
- * Parameters of `exec/shells`.
+ * Parameters of `exec/shells`: none. Which shells exist is a fact about the machine, asked
+ * while a session's tools are set up, before Core has registered the session; any members
+ * sent (the Agent Host adds its `sessionId` to every request) are ignored.
  */
-export interface ExecShellsParams {
-  /**
-   * The session whose tools are being set up.
-   */
-  sessionId: SessionId;
-}
+export interface ExecShellsParams {}
 /**
  * Successful response to `exec/shells`.
  */
