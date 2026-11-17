@@ -458,6 +458,14 @@ export class SessionRegistry {
       this.#onEvent(sessionId, hosted, event);
     });
     this.#sessions.set(sessionId, hosted);
+    // A turn the previous process left unfinished (it crashed or was killed) is closed like an
+    // interrupted one; a conversation that ends with a response stays as it is.
+    const repair = repairInterruptedTurn(session);
+    if (repair.toolResults > 0 || repair.marker) {
+      log(
+        `closed a turn left unfinished: ${String(repair.toolResults)} interrupted tool result(s), marker ${String(repair.marker)}`,
+      );
+    }
     // Emits session_start: the MCP extension connects its servers now.
     await session.bindExtensions({
       onError: (error) => {

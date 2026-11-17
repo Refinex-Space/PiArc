@@ -108,11 +108,8 @@ fn harness_tools(events: &harness::Recorder, session: &str) -> Vec<(String, Stri
 
 const STALL_A: &str = r#"
 id: stall-a
-# Pi 1.5.2 drops the interrupted assistant message from the next request, which then holds two
-# consecutive user messages. The Anthropic API merges them; the mock's strict alternation rule
-# would reject the request (PLAN.md I18).
-validation:
-  rules: { role_order: false }
+# Every rule on: the Harness Kit closes the interrupted turn, so the next request alternates
+# (PLAN.md I18, T14).
 steps:
   - text: "Still thinking about the answer"
     stall_after_events: 4
@@ -341,11 +338,8 @@ async fn each_session_gets_only_the_mcp_servers_of_its_own_project() {
 
 const KILL_A: &str = r#"
 id: kill-a
-# Pi 1.5.2 drops the interrupted assistant message from the next request, which then holds two
-# consecutive user messages. The Anthropic API merges them; the mock's strict alternation rule
-# would reject the request (PLAN.md I18).
-validation:
-  rules: { role_order: false }
+# Every rule on: the reopened session's turn, cut off by the kill, is closed when the session
+# is resumed (PLAN.md I18, T14).
 steps:
   - text: "Working on it"
     stall_after_events: 4

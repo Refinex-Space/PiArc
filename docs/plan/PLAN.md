@@ -302,9 +302,9 @@ T14 会话编排与事件投影（2026-11-17 开工；开工检查：基线 veri
 - [x] 4. Agent Host 会话：排队表（编辑、删除、重排）、steer、followUp、fork、history、回放缓冲（getEntries）、并发 resume 去重、出站单帧上限
 - [x] 5. 回合不变量：工具批次并发（上限 10）、中断补齐与中断后 transcript 形态（I18）、重试核对；agent-host/CLAUDE.md 的"Pi 已满足 / Harness Kit 补齐"清单
 - [x] 6. piarc-host：跟踪 resume/fork 的会话、I58（恢复可中断、Kill 带 epoch、握手前后不分派、入站并发上限）
-- [ ] 7. Core：WorkspaceActor、SessionActor、取消传播、预热与空闲回收（可注入时钟）、seq 缺口补齐、实体快照 revision、持久化与重启恢复、transcript_window、I62 接线、ToolIo 按工作区绑定、I55 的 panic 结算
-- [ ] 8. NAPI：工作区与会话方法、排队操作、transcript_window、快照；`.d.ts` 快照（A12）
-- [ ] 9. 场景测试（Core 无头驱动 + mock provider，数据化夹具）：A03–A11；A09 release 测量
+- [x] 7. Core：WorkspaceActor、SessionActor、取消传播、预热与空闲回收（可注入时钟）、seq 缺口补齐、实体快照 revision、持久化与重启恢复、transcript_window、I62 接线、ToolIo 按工作区绑定、I55 的 panic 结算
+- [x] 8. NAPI：工作区与会话方法、排队操作、transcript_window、快照；`.d.ts` 快照（A12）
+- [x] 9. 场景测试（Core 无头驱动 + mock provider，数据化夹具）：A03–A11；A09 release 测量
 - [ ] 10. 文档：架构 5.3、7.4、7.6 与第 11 章、ADR（补充）、CLAUDE.md（agent-host、piarc-core、piarc-host、根）
 - [ ] 11. 收尾：verify（A13）、验收记录、看板与会话日志
 
