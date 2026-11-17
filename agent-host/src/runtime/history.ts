@@ -17,7 +17,7 @@
 // adds after an interrupted turn (harness/interruption.ts) is bookkeeping for the model and is
 // not shown.
 import type { SessionEntry } from '@earendil-works/pi-coding-agent';
-import type { FileDiff, HistoryItem, HistoryWindow, ItemStatus } from '@piarc/protocol';
+import type { HistoryItem, HistoryWindow, ItemStatus } from '@piarc/protocol';
 
 import { isInterruptionMarker } from '../harness/interruption.js';
 import {
@@ -26,7 +26,6 @@ import {
   contextCompaction,
   isObject,
   reasoning,
-  resultDiff,
   toolItem,
   userMessage,
 } from './items.js';
@@ -37,7 +36,7 @@ export const MAX_HISTORY_LIMIT = 1000;
 interface ToolResult {
   readonly text: string | undefined;
   readonly isError: boolean;
-  readonly diff: FileDiff | undefined;
+  readonly details: unknown;
 }
 
 /** Every item of `branch` (root to leaf), in conversation order. */
@@ -51,7 +50,7 @@ export function projectHistory(
       results.set(entry.message.toolCallId, {
         text: contentText(entry.message.content),
         isError: entry.message.isError,
-        diff: resultDiff(entry.message.details),
+        details: entry.message.details,
       });
     }
   }
@@ -112,7 +111,7 @@ function assistantItems(
           toCanonical(part.name),
           isObject(part.arguments) ? part.arguments : {},
           result?.text,
-          result?.diff,
+          result?.details,
         ),
       });
     }

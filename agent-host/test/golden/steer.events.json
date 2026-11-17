@@ -4,7 +4,7 @@
   "steps": [
     {
       "control": "beginTurn",
-      "turnId": "turn-8103fa8f-844f-445b-84d2-c9934a1dfb45"
+      "turnId": "turn-a9adf87d-af5a-40c9-9b19-a186083f5e24"
     },
     {
       "type": "agent_start"
@@ -17,20 +17,20 @@
         "content": "",
         "role": "system",
         "sections": {
-          "cwd": "<cwd>\n/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 61644/ws a 甲\n</cwd>",
+          "cwd": "<cwd>\n/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 85010/ws a 甲\n</cwd>",
           "docs": "<docs>\nPi documentation (read only when the user asks about the harness itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: /Users/refinex/develop/project/PiArc/agent-host/dist/bundle/pi-assets/README.md\n- Additional docs: /Users/refinex/develop/project/PiArc/agent-host/dist/bundle/pi-assets/docs\n- Examples: /Users/refinex/develop/project/PiArc/agent-host/dist/bundle/pi-assets/examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- Before implementing harness changes, read the relevant docs and examples in full, following related cross-references.\n</docs>",
           "preamble": "You are a coding assistant running inside pi, a coding agent harness. Help users inspect files, run commands, and modify code.",
-          "rules": "<rules>\n- Look at files with Read rather than printing them through Bash.\n- Keep each oldText short but unique; merge changes that sit close together into one entry.\n- Search with Grep and Glob rather than grep, rg or find in Bash.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
-          "tools": "<tools>\n- Read: Read: show a text file or an image\n- Write: Write: create a file or replace all of its text\n- Edit: Edit: replace exact passages of an existing file\n- Bash: Bash: run a shell command\n- Glob: Glob: find files by name or path pattern\n- Grep: Grep: search file contents with a regular expression\n\nAdditional tools may be available.\n</tools>"
+          "rules": "<rules>\n- Look at files with Read rather than printing them through Bash.\n- Read a file before changing it with Edit or Write.\n- Keep each oldText short but unique; merge changes that sit close together into one entry.\n- Search with Grep and Glob rather than grep, rg or find in Bash.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+          "tools": "<tools>\n- Read: Read: show a text file, image, PDF or notebook\n- Write: Write: create a file or replace all of its text\n- Edit: Edit: replace exact passages of an existing file\n- Bash: Bash: run a shell command\n- Glob: Glob: find files by name or path pattern\n- Grep: Grep: search file contents with a regular expression\n\nAdditional tools may be available.\n</tools>"
         },
-        "timestamp": 1794879399250,
+        "timestamp": 1794928386970,
         "toolsAdded": [
           {
             "constrainedSampling": {
               "strict": "prefer",
               "type": "json_schema"
             },
-            "description": "Return the contents of one file. Text comes back as at most 2000 lines or 50 KB, whichever ends first; page through longer files with `offset` (first line to show, counting from 1) and `limit` (number of lines), following the note at the end of the output. JPEG, PNG, GIF, WebP and BMP files come back as images. `path` is absolute or relative to the working directory.",
+            "description": "Return the contents of one file. Text comes back with each line prefixed by its number and a tab (the prefix is not part of the file), at most 2000 lines or 50 KB, whichever ends first; page through longer files with `offset` (first line to show, counting from 1) and `limit` (number of lines), following the note at the end of the output. JPEG, PNG, GIF, WebP and BMP files come back as images; PDF files as the text of their pages (`pages`, such as \"1-5\", is required for PDFs over 10 pages, at most 20 per call); Jupyter notebooks as their cells and outputs. Reading the same range of an unchanged file again returns a short note instead of the content. `path` is absolute or relative to the working directory.",
             "name": "Read",
             "parameters": {
               "properties": {
@@ -42,12 +42,18 @@
                   "description": "Line number to start reading from (1-indexed)",
                   "type": "number"
                 },
+                "pages": {
+                  "description": "PDF files only: the pages to read, such as \"3\" or \"1-5\"; at most 20 per call. Required for PDFs over 10 pages.",
+                  "type": "string"
+                },
                 "path": {
                   "description": "Path to the file to read (relative or absolute)",
                   "type": "string"
                 }
               },
-              "required": ["path"],
+              "required": [
+                "path"
+              ],
               "type": "object"
             }
           },
@@ -56,7 +62,7 @@
               "strict": "prefer",
               "type": "json_schema"
             },
-            "description": "Store `content` as the complete text of the file at `path`: a new file is created (with any missing parent directories), an existing one is replaced. To change part of an existing file, Edit is safer.",
+            "description": "Store `content` as the complete text of the file at `path`: a new file is created (with any missing parent directories), an existing one is replaced. An existing file must have been read with Read first and not changed since; it keeps its encoding and line ending style. To change part of an existing file, Edit is safer.",
             "name": "Write",
             "parameters": {
               "properties": {
@@ -69,7 +75,10 @@
                   "type": "string"
                 }
               },
-              "required": ["path", "content"],
+              "required": [
+                "path",
+                "content"
+              ],
               "type": "object"
             }
           },
@@ -78,7 +87,7 @@
               "strict": "prefer",
               "type": "json_schema"
             },
-            "description": "Change an existing file by replacing exact passages. Each entry of `edits` gives an `oldText`, copied character for character from the file (indentation and line breaks included) and found exactly once in it, and the `newText` that takes its place. All entries refer to the file as it is before the call and must not overlap; put several changes to one file into one call.",
+            "description": "Change an existing file by replacing exact passages. The file must have been read with Read first and not changed since. Each entry of `edits` gives an `oldText`, copied character for character from the file (indentation and line breaks included, the line number prefixes Read shows left out) and found exactly once in it, and the `newText` that takes its place; with `replaceAll: true` every occurrence of each `oldText` is replaced instead. All entries refer to the file as it is before the call and must not overlap; put several changes to one file into one call.",
             "name": "Edit",
             "parameters": {
               "properties": {
@@ -95,7 +104,10 @@
                         "type": "string"
                       }
                     },
-                    "required": ["oldText", "newText"],
+                    "required": [
+                      "oldText",
+                      "newText"
+                    ],
                     "type": "object"
                   },
                   "type": "array"
@@ -103,31 +115,36 @@
                 "path": {
                   "description": "Path to the file to edit (relative or absolute)",
                   "type": "string"
+                },
+                "replaceAll": {
+                  "description": "Replace every occurrence of each oldText instead of requiring exactly one. The match must still be exact.",
+                  "type": "boolean"
                 }
               },
-              "required": ["path", "edits"],
+              "required": [
+                "path",
+                "edits"
+              ],
               "type": "object"
             }
           },
           {
-            "constrainedSampling": {
-              "strict": "prefer",
-              "type": "json_schema"
-            },
-            "description": "Run a command line with bash in the working directory and return what it printed (stdout and stderr) and, when it fails, its exit code. Only the last 2000 lines or 50 KB of output are shown; the complete output is then saved to a file named in the result. `timeout` is in seconds; without it the command may run indefinitely. Every call starts a new shell: `cd` and exported variables do not carry over.",
+            "description": "Run a command line with bash in the working directory (Git Bash on Windows) and return what it printed (stdout and stderr together) and, when it is not 0, its exit code. The working directory is where the previous command ended: `cd` carries over while it stays inside the workspace, and leaving the workspace sends the next command back to its root; exported variables do not carry over. `timeout` is in seconds, 120 when omitted and at most 600; when it passes, the command and every process it started are stopped. Long output comes back as its start and its end, with the full text saved to a file named in the result (read it with Read). Exit code 1 of grep, rg, diff, cmp and test is an answer (no match, a difference, a false condition), not a failure.",
             "name": "Bash",
             "parameters": {
               "properties": {
                 "command": {
-                  "description": "Shell command to execute",
+                  "description": "The command line to run",
                   "type": "string"
                 },
                 "timeout": {
-                  "description": "Timeout in seconds (optional, no default timeout)",
+                  "description": "Timeout in seconds; 120 when omitted, at most 600",
                   "type": "number"
                 }
               },
-              "required": ["command"],
+              "required": [
+                "command"
+              ],
               "type": "object"
             }
           },
@@ -149,7 +166,9 @@
                   "type": "string"
                 }
               },
-              "required": ["pattern"],
+              "required": [
+                "pattern"
+              ],
               "type": "object"
             }
           },
@@ -187,7 +206,9 @@
                   "type": "string"
                 }
               },
-              "required": ["pattern"],
+              "required": [
+                "pattern"
+              ],
               "type": "object"
             }
           }
@@ -200,20 +221,20 @@
         "content": "",
         "role": "system",
         "sections": {
-          "cwd": "<cwd>\n/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 61644/ws a 甲\n</cwd>",
+          "cwd": "<cwd>\n/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 85010/ws a 甲\n</cwd>",
           "docs": "<docs>\nPi documentation (read only when the user asks about the harness itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: /Users/refinex/develop/project/PiArc/agent-host/dist/bundle/pi-assets/README.md\n- Additional docs: /Users/refinex/develop/project/PiArc/agent-host/dist/bundle/pi-assets/docs\n- Examples: /Users/refinex/develop/project/PiArc/agent-host/dist/bundle/pi-assets/examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- Before implementing harness changes, read the relevant docs and examples in full, following related cross-references.\n</docs>",
           "preamble": "You are a coding assistant running inside pi, a coding agent harness. Help users inspect files, run commands, and modify code.",
-          "rules": "<rules>\n- Look at files with Read rather than printing them through Bash.\n- Keep each oldText short but unique; merge changes that sit close together into one entry.\n- Search with Grep and Glob rather than grep, rg or find in Bash.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
-          "tools": "<tools>\n- Read: Read: show a text file or an image\n- Write: Write: create a file or replace all of its text\n- Edit: Edit: replace exact passages of an existing file\n- Bash: Bash: run a shell command\n- Glob: Glob: find files by name or path pattern\n- Grep: Grep: search file contents with a regular expression\n\nAdditional tools may be available.\n</tools>"
+          "rules": "<rules>\n- Look at files with Read rather than printing them through Bash.\n- Read a file before changing it with Edit or Write.\n- Keep each oldText short but unique; merge changes that sit close together into one entry.\n- Search with Grep and Glob rather than grep, rg or find in Bash.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+          "tools": "<tools>\n- Read: Read: show a text file, image, PDF or notebook\n- Write: Write: create a file or replace all of its text\n- Edit: Edit: replace exact passages of an existing file\n- Bash: Bash: run a shell command\n- Glob: Glob: find files by name or path pattern\n- Grep: Grep: search file contents with a regular expression\n\nAdditional tools may be available.\n</tools>"
         },
-        "timestamp": 1794879399250,
+        "timestamp": 1794928386970,
         "toolsAdded": [
           {
             "constrainedSampling": {
               "strict": "prefer",
               "type": "json_schema"
             },
-            "description": "Return the contents of one file. Text comes back as at most 2000 lines or 50 KB, whichever ends first; page through longer files with `offset` (first line to show, counting from 1) and `limit` (number of lines), following the note at the end of the output. JPEG, PNG, GIF, WebP and BMP files come back as images. `path` is absolute or relative to the working directory.",
+            "description": "Return the contents of one file. Text comes back with each line prefixed by its number and a tab (the prefix is not part of the file), at most 2000 lines or 50 KB, whichever ends first; page through longer files with `offset` (first line to show, counting from 1) and `limit` (number of lines), following the note at the end of the output. JPEG, PNG, GIF, WebP and BMP files come back as images; PDF files as the text of their pages (`pages`, such as \"1-5\", is required for PDFs over 10 pages, at most 20 per call); Jupyter notebooks as their cells and outputs. Reading the same range of an unchanged file again returns a short note instead of the content. `path` is absolute or relative to the working directory.",
             "name": "Read",
             "parameters": {
               "properties": {
@@ -225,12 +246,18 @@
                   "description": "Line number to start reading from (1-indexed)",
                   "type": "number"
                 },
+                "pages": {
+                  "description": "PDF files only: the pages to read, such as \"3\" or \"1-5\"; at most 20 per call. Required for PDFs over 10 pages.",
+                  "type": "string"
+                },
                 "path": {
                   "description": "Path to the file to read (relative or absolute)",
                   "type": "string"
                 }
               },
-              "required": ["path"],
+              "required": [
+                "path"
+              ],
               "type": "object"
             }
           },
@@ -239,7 +266,7 @@
               "strict": "prefer",
               "type": "json_schema"
             },
-            "description": "Store `content` as the complete text of the file at `path`: a new file is created (with any missing parent directories), an existing one is replaced. To change part of an existing file, Edit is safer.",
+            "description": "Store `content` as the complete text of the file at `path`: a new file is created (with any missing parent directories), an existing one is replaced. An existing file must have been read with Read first and not changed since; it keeps its encoding and line ending style. To change part of an existing file, Edit is safer.",
             "name": "Write",
             "parameters": {
               "properties": {
@@ -252,7 +279,10 @@
                   "type": "string"
                 }
               },
-              "required": ["path", "content"],
+              "required": [
+                "path",
+                "content"
+              ],
               "type": "object"
             }
           },
@@ -261,7 +291,7 @@
               "strict": "prefer",
               "type": "json_schema"
             },
-            "description": "Change an existing file by replacing exact passages. Each entry of `edits` gives an `oldText`, copied character for character from the file (indentation and line breaks included) and found exactly once in it, and the `newText` that takes its place. All entries refer to the file as it is before the call and must not overlap; put several changes to one file into one call.",
+            "description": "Change an existing file by replacing exact passages. The file must have been read with Read first and not changed since. Each entry of `edits` gives an `oldText`, copied character for character from the file (indentation and line breaks included, the line number prefixes Read shows left out) and found exactly once in it, and the `newText` that takes its place; with `replaceAll: true` every occurrence of each `oldText` is replaced instead. All entries refer to the file as it is before the call and must not overlap; put several changes to one file into one call.",
             "name": "Edit",
             "parameters": {
               "properties": {
@@ -278,7 +308,10 @@
                         "type": "string"
                       }
                     },
-                    "required": ["oldText", "newText"],
+                    "required": [
+                      "oldText",
+                      "newText"
+                    ],
                     "type": "object"
                   },
                   "type": "array"
@@ -286,31 +319,36 @@
                 "path": {
                   "description": "Path to the file to edit (relative or absolute)",
                   "type": "string"
+                },
+                "replaceAll": {
+                  "description": "Replace every occurrence of each oldText instead of requiring exactly one. The match must still be exact.",
+                  "type": "boolean"
                 }
               },
-              "required": ["path", "edits"],
+              "required": [
+                "path",
+                "edits"
+              ],
               "type": "object"
             }
           },
           {
-            "constrainedSampling": {
-              "strict": "prefer",
-              "type": "json_schema"
-            },
-            "description": "Run a command line with bash in the working directory and return what it printed (stdout and stderr) and, when it fails, its exit code. Only the last 2000 lines or 50 KB of output are shown; the complete output is then saved to a file named in the result. `timeout` is in seconds; without it the command may run indefinitely. Every call starts a new shell: `cd` and exported variables do not carry over.",
+            "description": "Run a command line with bash in the working directory (Git Bash on Windows) and return what it printed (stdout and stderr together) and, when it is not 0, its exit code. The working directory is where the previous command ended: `cd` carries over while it stays inside the workspace, and leaving the workspace sends the next command back to its root; exported variables do not carry over. `timeout` is in seconds, 120 when omitted and at most 600; when it passes, the command and every process it started are stopped. Long output comes back as its start and its end, with the full text saved to a file named in the result (read it with Read). Exit code 1 of grep, rg, diff, cmp and test is an answer (no match, a difference, a false condition), not a failure.",
             "name": "Bash",
             "parameters": {
               "properties": {
                 "command": {
-                  "description": "Shell command to execute",
+                  "description": "The command line to run",
                   "type": "string"
                 },
                 "timeout": {
-                  "description": "Timeout in seconds (optional, no default timeout)",
+                  "description": "Timeout in seconds; 120 when omitted, at most 600",
                   "type": "number"
                 }
               },
-              "required": ["command"],
+              "required": [
+                "command"
+              ],
               "type": "object"
             }
           },
@@ -332,7 +370,9 @@
                   "type": "string"
                 }
               },
-              "required": ["pattern"],
+              "required": [
+                "pattern"
+              ],
               "type": "object"
             }
           },
@@ -370,7 +410,9 @@
                   "type": "string"
                 }
               },
-              "required": ["pattern"],
+              "required": [
+                "pattern"
+              ],
               "type": "object"
             }
           }
@@ -387,7 +429,7 @@
           }
         ],
         "role": "user",
-        "timestamp": 1794879399250
+        "timestamp": 1794928386970
       },
       "type": "message_start"
     },
@@ -400,7 +442,7 @@
           }
         ],
         "role": "user",
-        "timestamp": 1794879399250
+        "timestamp": 1794928386970
       },
       "type": "message_end"
     },
@@ -413,7 +455,7 @@
         "responseId": "msg_mock_7",
         "role": "assistant",
         "stopReason": "pending",
-        "timestamp": 1794879399251,
+        "timestamp": 1794928386971,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -449,7 +491,7 @@
           "responseId": "msg_mock_7",
           "role": "assistant",
           "stopReason": "pending",
-          "timestamp": 1794879399251,
+          "timestamp": 1794928386971,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -482,7 +524,7 @@
         "responseId": "msg_mock_7",
         "role": "assistant",
         "stopReason": "pending",
-        "timestamp": 1794879399251,
+        "timestamp": 1794928386971,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -519,7 +561,7 @@
           "responseId": "msg_mock_7",
           "role": "assistant",
           "stopReason": "pending",
-          "timestamp": 1794879399251,
+          "timestamp": 1794928386971,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -552,7 +594,7 @@
         "responseId": "msg_mock_7",
         "role": "assistant",
         "stopReason": "pending",
-        "timestamp": 1794879399251,
+        "timestamp": 1794928386971,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -595,7 +637,7 @@
           "responseId": "msg_mock_7",
           "role": "assistant",
           "stopReason": "pending",
-          "timestamp": 1794879399251,
+          "timestamp": 1794928386971,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -634,7 +676,7 @@
         "responseId": "msg_mock_7",
         "role": "assistant",
         "stopReason": "pending",
-        "timestamp": 1794879399251,
+        "timestamp": 1794928386971,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -679,7 +721,7 @@
           "responseId": "msg_mock_7",
           "role": "assistant",
           "stopReason": "pending",
-          "timestamp": 1794879399251,
+          "timestamp": 1794928386971,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -720,7 +762,7 @@
         "responseId": "msg_mock_7",
         "role": "assistant",
         "stopReason": "pending",
-        "timestamp": 1794879399251,
+        "timestamp": 1794928386971,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -765,7 +807,7 @@
           "responseId": "msg_mock_7",
           "role": "assistant",
           "stopReason": "pending",
-          "timestamp": 1794879399251,
+          "timestamp": 1794928386971,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -806,7 +848,7 @@
         "responseId": "msg_mock_7",
         "role": "assistant",
         "stopReason": "pending",
-        "timestamp": 1794879399251,
+        "timestamp": 1794928386971,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -850,7 +892,7 @@
           "responseId": "msg_mock_7",
           "role": "assistant",
           "stopReason": "pending",
-          "timestamp": 1794879399251,
+          "timestamp": 1794928386971,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -891,7 +933,7 @@
         "responseId": "msg_mock_7",
         "role": "assistant",
         "stopReason": "pending",
-        "timestamp": 1794879399251,
+        "timestamp": 1794928386971,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -936,7 +978,7 @@
           "responseId": "msg_mock_7",
           "role": "assistant",
           "stopReason": "pending",
-          "timestamp": 1794879399251,
+          "timestamp": 1794928386971,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -977,7 +1019,7 @@
         "responseId": "msg_mock_7",
         "role": "assistant",
         "stopReason": "pending",
-        "timestamp": 1794879399251,
+        "timestamp": 1794928386971,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -1023,7 +1065,7 @@
           "responseId": "msg_mock_7",
           "role": "assistant",
           "stopReason": "toolUse",
-          "timestamp": 1794879399251,
+          "timestamp": 1794928386971,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -1065,7 +1107,7 @@
         "responseId": "msg_mock_7",
         "role": "assistant",
         "stopReason": "toolUse",
-        "timestamp": 1794879399251,
+        "timestamp": 1794928386971,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -1111,7 +1153,7 @@
           "responseId": "msg_mock_7",
           "role": "assistant",
           "stopReason": "toolUse",
-          "timestamp": 1794879399251,
+          "timestamp": 1794928386971,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -1153,7 +1195,7 @@
         "responseId": "msg_mock_7",
         "role": "assistant",
         "stopReason": "toolUse",
-        "timestamp": 1794879399251,
+        "timestamp": 1794928386971,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -1198,7 +1240,7 @@
           "responseId": "msg_mock_7",
           "role": "assistant",
           "stopReason": "toolUse",
-          "timestamp": 1794879399251,
+          "timestamp": 1794928386971,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -1248,7 +1290,7 @@
         "responseId": "msg_mock_7",
         "role": "assistant",
         "stopReason": "toolUse",
-        "timestamp": 1794879399251,
+        "timestamp": 1794928386971,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -1293,7 +1335,7 @@
         "role": "assistant",
         "stopReason": "toolUse",
         "thinkingLevel": "off",
-        "timestamp": 1794879399251,
+        "timestamp": 1794928386971,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -1322,23 +1364,14 @@
       "type": "tool_execution_start"
     },
     {
-      "args": {
-        "command": "while [ ! -f go ]; do sleep 0.05; done; echo go"
-      },
-      "partialResult": {
-        "content": []
-      },
-      "toolCallId": "toolu_wait",
-      "toolName": "Bash",
-      "type": "tool_execution_update"
-    },
-    {
       "control": "steer",
       "text": "Also mention the signal."
     },
     {
       "followUp": [],
-      "steering": ["Also mention the signal."],
+      "steering": [
+        "Also mention the signal."
+      ],
       "type": "queue_update"
     },
     {
@@ -1355,15 +1388,14 @@
             "text": "go\n",
             "type": "text"
           }
-        ],
-        "details": {}
+        ]
       },
       "toolCallId": "toolu_wait",
       "toolName": "Bash",
       "type": "tool_execution_update"
     },
     {
-      "durationMs": 5,
+      "durationMs": 4,
       "isError": false,
       "result": {
         "content": [
@@ -1372,12 +1404,18 @@
             "type": "text"
           }
         ],
-        "structuredContent": {
-          "exit_code": 0,
-          "output": "go\n",
-          "truncated": false,
-          "wall_time_seconds": 0
-        }
+        "details": {
+          "commandExecution": {
+            "cwd": "/private/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 85010/ws a 甲",
+            "durationMs": 3,
+            "exitCode": 0,
+            "outcome": "success",
+            "timedOut": false,
+            "timeoutMs": 120000,
+            "truncated": false
+          }
+        },
+        "isError": false
       },
       "toolCallId": "toolu_wait",
       "toolName": "Bash",
@@ -1391,10 +1429,21 @@
             "type": "text"
           }
         ],
-        "durationMs": 5,
+        "details": {
+          "commandExecution": {
+            "cwd": "/private/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 85010/ws a 甲",
+            "durationMs": 3,
+            "exitCode": 0,
+            "outcome": "success",
+            "timedOut": false,
+            "timeoutMs": 120000,
+            "truncated": false
+          }
+        },
+        "durationMs": 4,
         "isError": false,
         "role": "toolResult",
-        "timestamp": 1794879399259,
+        "timestamp": 1794928386979,
         "toolCallId": "toolu_wait",
         "toolName": "Bash"
       },
@@ -1408,10 +1457,21 @@
             "type": "text"
           }
         ],
-        "durationMs": 5,
+        "details": {
+          "commandExecution": {
+            "cwd": "/private/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 85010/ws a 甲",
+            "durationMs": 3,
+            "exitCode": 0,
+            "outcome": "success",
+            "timedOut": false,
+            "timeoutMs": 120000,
+            "truncated": false
+          }
+        },
+        "durationMs": 4,
         "isError": false,
         "role": "toolResult",
-        "timestamp": 1794879399259,
+        "timestamp": 1794928386979,
         "toolCallId": "toolu_wait",
         "toolName": "Bash"
       },
@@ -1442,7 +1502,7 @@
         "role": "assistant",
         "stopReason": "toolUse",
         "thinkingLevel": "off",
-        "timestamp": 1794879399251,
+        "timestamp": 1794928386971,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -1468,10 +1528,21 @@
               "type": "text"
             }
           ],
-          "durationMs": 5,
+          "details": {
+            "commandExecution": {
+              "cwd": "/private/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 85010/ws a 甲",
+              "durationMs": 3,
+              "exitCode": 0,
+              "outcome": "success",
+              "timedOut": false,
+              "timeoutMs": 120000,
+              "truncated": false
+            }
+          },
+          "durationMs": 4,
           "isError": false,
           "role": "toolResult",
-          "timestamp": 1794879399259,
+          "timestamp": 1794928386979,
           "toolCallId": "toolu_wait",
           "toolName": "Bash"
         }
@@ -1495,7 +1566,7 @@
           }
         ],
         "role": "user",
-        "timestamp": 1794879399255
+        "timestamp": 1794928386975
       },
       "type": "message_start"
     },
@@ -1508,7 +1579,7 @@
           }
         ],
         "role": "user",
-        "timestamp": 1794879399255
+        "timestamp": 1794928386975
       },
       "type": "message_end"
     },
@@ -1521,7 +1592,7 @@
         "responseId": "msg_mock_8",
         "role": "assistant",
         "stopReason": "pending",
-        "timestamp": 1794879399260,
+        "timestamp": 1794928386980,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -1557,7 +1628,7 @@
           "responseId": "msg_mock_8",
           "role": "assistant",
           "stopReason": "pending",
-          "timestamp": 1794879399260,
+          "timestamp": 1794928386980,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -1590,7 +1661,7 @@
         "responseId": "msg_mock_8",
         "role": "assistant",
         "stopReason": "pending",
-        "timestamp": 1794879399260,
+        "timestamp": 1794928386980,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -1627,7 +1698,7 @@
           "responseId": "msg_mock_8",
           "role": "assistant",
           "stopReason": "pending",
-          "timestamp": 1794879399260,
+          "timestamp": 1794928386980,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -1660,7 +1731,7 @@
         "responseId": "msg_mock_8",
         "role": "assistant",
         "stopReason": "pending",
-        "timestamp": 1794879399260,
+        "timestamp": 1794928386980,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -1698,7 +1769,7 @@
           "responseId": "msg_mock_8",
           "role": "assistant",
           "stopReason": "stop",
-          "timestamp": 1794879399260,
+          "timestamp": 1794928386980,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -1731,7 +1802,7 @@
         "responseId": "msg_mock_8",
         "role": "assistant",
         "stopReason": "pending",
-        "timestamp": 1794879399260,
+        "timestamp": 1794928386980,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -1769,7 +1840,7 @@
           "responseId": "msg_mock_8",
           "role": "assistant",
           "stopReason": "stop",
-          "timestamp": 1794879399260,
+          "timestamp": 1794928386980,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -1803,7 +1874,7 @@
         "responseId": "msg_mock_8",
         "role": "assistant",
         "stopReason": "stop",
-        "timestamp": 1794879399260,
+        "timestamp": 1794928386980,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -1841,7 +1912,7 @@
           "responseId": "msg_mock_8",
           "role": "assistant",
           "stopReason": "stop",
-          "timestamp": 1794879399260,
+          "timestamp": 1794928386980,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -1875,7 +1946,7 @@
         "responseId": "msg_mock_8",
         "role": "assistant",
         "stopReason": "stop",
-        "timestamp": 1794879399260,
+        "timestamp": 1794928386980,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -1904,7 +1975,7 @@
             "type": "text"
           }
         ],
-        "durationMs": 3,
+        "durationMs": 2,
         "model": "mock-large",
         "provider": "piarc-mock",
         "rawStopReason": "end_turn",
@@ -1912,7 +1983,7 @@
         "role": "assistant",
         "stopReason": "stop",
         "thinkingLevel": "off",
-        "timestamp": 1794879399260,
+        "timestamp": 1794928386980,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -1941,7 +2012,7 @@
             "type": "text"
           }
         ],
-        "durationMs": 3,
+        "durationMs": 2,
         "model": "mock-large",
         "provider": "piarc-mock",
         "rawStopReason": "end_turn",
@@ -1949,7 +2020,7 @@
         "role": "assistant",
         "stopReason": "stop",
         "thinkingLevel": "off",
-        "timestamp": 1794879399260,
+        "timestamp": 1794928386980,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -1976,20 +2047,20 @@
           "content": "",
           "role": "system",
           "sections": {
-            "cwd": "<cwd>\n/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 61644/ws a 甲\n</cwd>",
+            "cwd": "<cwd>\n/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 85010/ws a 甲\n</cwd>",
             "docs": "<docs>\nPi documentation (read only when the user asks about the harness itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: /Users/refinex/develop/project/PiArc/agent-host/dist/bundle/pi-assets/README.md\n- Additional docs: /Users/refinex/develop/project/PiArc/agent-host/dist/bundle/pi-assets/docs\n- Examples: /Users/refinex/develop/project/PiArc/agent-host/dist/bundle/pi-assets/examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- Before implementing harness changes, read the relevant docs and examples in full, following related cross-references.\n</docs>",
             "preamble": "You are a coding assistant running inside pi, a coding agent harness. Help users inspect files, run commands, and modify code.",
-            "rules": "<rules>\n- Look at files with Read rather than printing them through Bash.\n- Keep each oldText short but unique; merge changes that sit close together into one entry.\n- Search with Grep and Glob rather than grep, rg or find in Bash.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
-            "tools": "<tools>\n- Read: Read: show a text file or an image\n- Write: Write: create a file or replace all of its text\n- Edit: Edit: replace exact passages of an existing file\n- Bash: Bash: run a shell command\n- Glob: Glob: find files by name or path pattern\n- Grep: Grep: search file contents with a regular expression\n\nAdditional tools may be available.\n</tools>"
+            "rules": "<rules>\n- Look at files with Read rather than printing them through Bash.\n- Read a file before changing it with Edit or Write.\n- Keep each oldText short but unique; merge changes that sit close together into one entry.\n- Search with Grep and Glob rather than grep, rg or find in Bash.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+            "tools": "<tools>\n- Read: Read: show a text file, image, PDF or notebook\n- Write: Write: create a file or replace all of its text\n- Edit: Edit: replace exact passages of an existing file\n- Bash: Bash: run a shell command\n- Glob: Glob: find files by name or path pattern\n- Grep: Grep: search file contents with a regular expression\n\nAdditional tools may be available.\n</tools>"
           },
-          "timestamp": 1794879399250,
+          "timestamp": 1794928386970,
           "toolsAdded": [
             {
               "constrainedSampling": {
                 "strict": "prefer",
                 "type": "json_schema"
               },
-              "description": "Return the contents of one file. Text comes back as at most 2000 lines or 50 KB, whichever ends first; page through longer files with `offset` (first line to show, counting from 1) and `limit` (number of lines), following the note at the end of the output. JPEG, PNG, GIF, WebP and BMP files come back as images. `path` is absolute or relative to the working directory.",
+              "description": "Return the contents of one file. Text comes back with each line prefixed by its number and a tab (the prefix is not part of the file), at most 2000 lines or 50 KB, whichever ends first; page through longer files with `offset` (first line to show, counting from 1) and `limit` (number of lines), following the note at the end of the output. JPEG, PNG, GIF, WebP and BMP files come back as images; PDF files as the text of their pages (`pages`, such as \"1-5\", is required for PDFs over 10 pages, at most 20 per call); Jupyter notebooks as their cells and outputs. Reading the same range of an unchanged file again returns a short note instead of the content. `path` is absolute or relative to the working directory.",
               "name": "Read",
               "parameters": {
                 "properties": {
@@ -2001,12 +2072,18 @@
                     "description": "Line number to start reading from (1-indexed)",
                     "type": "number"
                   },
+                  "pages": {
+                    "description": "PDF files only: the pages to read, such as \"3\" or \"1-5\"; at most 20 per call. Required for PDFs over 10 pages.",
+                    "type": "string"
+                  },
                   "path": {
                     "description": "Path to the file to read (relative or absolute)",
                     "type": "string"
                   }
                 },
-                "required": ["path"],
+                "required": [
+                  "path"
+                ],
                 "type": "object"
               }
             },
@@ -2015,7 +2092,7 @@
                 "strict": "prefer",
                 "type": "json_schema"
               },
-              "description": "Store `content` as the complete text of the file at `path`: a new file is created (with any missing parent directories), an existing one is replaced. To change part of an existing file, Edit is safer.",
+              "description": "Store `content` as the complete text of the file at `path`: a new file is created (with any missing parent directories), an existing one is replaced. An existing file must have been read with Read first and not changed since; it keeps its encoding and line ending style. To change part of an existing file, Edit is safer.",
               "name": "Write",
               "parameters": {
                 "properties": {
@@ -2028,7 +2105,10 @@
                     "type": "string"
                   }
                 },
-                "required": ["path", "content"],
+                "required": [
+                  "path",
+                  "content"
+                ],
                 "type": "object"
               }
             },
@@ -2037,7 +2117,7 @@
                 "strict": "prefer",
                 "type": "json_schema"
               },
-              "description": "Change an existing file by replacing exact passages. Each entry of `edits` gives an `oldText`, copied character for character from the file (indentation and line breaks included) and found exactly once in it, and the `newText` that takes its place. All entries refer to the file as it is before the call and must not overlap; put several changes to one file into one call.",
+              "description": "Change an existing file by replacing exact passages. The file must have been read with Read first and not changed since. Each entry of `edits` gives an `oldText`, copied character for character from the file (indentation and line breaks included, the line number prefixes Read shows left out) and found exactly once in it, and the `newText` that takes its place; with `replaceAll: true` every occurrence of each `oldText` is replaced instead. All entries refer to the file as it is before the call and must not overlap; put several changes to one file into one call.",
               "name": "Edit",
               "parameters": {
                 "properties": {
@@ -2054,7 +2134,10 @@
                           "type": "string"
                         }
                       },
-                      "required": ["oldText", "newText"],
+                      "required": [
+                        "oldText",
+                        "newText"
+                      ],
                       "type": "object"
                     },
                     "type": "array"
@@ -2062,31 +2145,36 @@
                   "path": {
                     "description": "Path to the file to edit (relative or absolute)",
                     "type": "string"
+                  },
+                  "replaceAll": {
+                    "description": "Replace every occurrence of each oldText instead of requiring exactly one. The match must still be exact.",
+                    "type": "boolean"
                   }
                 },
-                "required": ["path", "edits"],
+                "required": [
+                  "path",
+                  "edits"
+                ],
                 "type": "object"
               }
             },
             {
-              "constrainedSampling": {
-                "strict": "prefer",
-                "type": "json_schema"
-              },
-              "description": "Run a command line with bash in the working directory and return what it printed (stdout and stderr) and, when it fails, its exit code. Only the last 2000 lines or 50 KB of output are shown; the complete output is then saved to a file named in the result. `timeout` is in seconds; without it the command may run indefinitely. Every call starts a new shell: `cd` and exported variables do not carry over.",
+              "description": "Run a command line with bash in the working directory (Git Bash on Windows) and return what it printed (stdout and stderr together) and, when it is not 0, its exit code. The working directory is where the previous command ended: `cd` carries over while it stays inside the workspace, and leaving the workspace sends the next command back to its root; exported variables do not carry over. `timeout` is in seconds, 120 when omitted and at most 600; when it passes, the command and every process it started are stopped. Long output comes back as its start and its end, with the full text saved to a file named in the result (read it with Read). Exit code 1 of grep, rg, diff, cmp and test is an answer (no match, a difference, a false condition), not a failure.",
               "name": "Bash",
               "parameters": {
                 "properties": {
                   "command": {
-                    "description": "Shell command to execute",
+                    "description": "The command line to run",
                     "type": "string"
                   },
                   "timeout": {
-                    "description": "Timeout in seconds (optional, no default timeout)",
+                    "description": "Timeout in seconds; 120 when omitted, at most 600",
                     "type": "number"
                   }
                 },
-                "required": ["command"],
+                "required": [
+                  "command"
+                ],
                 "type": "object"
               }
             },
@@ -2108,7 +2196,9 @@
                     "type": "string"
                   }
                 },
-                "required": ["pattern"],
+                "required": [
+                  "pattern"
+                ],
                 "type": "object"
               }
             },
@@ -2146,7 +2236,9 @@
                     "type": "string"
                   }
                 },
-                "required": ["pattern"],
+                "required": [
+                  "pattern"
+                ],
                 "type": "object"
               }
             }
@@ -2160,7 +2252,7 @@
             }
           ],
           "role": "user",
-          "timestamp": 1794879399250
+          "timestamp": 1794928386970
         },
         {
           "api": "anthropic-messages",
@@ -2186,7 +2278,7 @@
           "role": "assistant",
           "stopReason": "toolUse",
           "thinkingLevel": "off",
-          "timestamp": 1794879399251,
+          "timestamp": 1794928386971,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -2211,10 +2303,21 @@
               "type": "text"
             }
           ],
-          "durationMs": 5,
+          "details": {
+            "commandExecution": {
+              "cwd": "/private/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 85010/ws a 甲",
+              "durationMs": 3,
+              "exitCode": 0,
+              "outcome": "success",
+              "timedOut": false,
+              "timeoutMs": 120000,
+              "truncated": false
+            }
+          },
+          "durationMs": 4,
           "isError": false,
           "role": "toolResult",
-          "timestamp": 1794879399259,
+          "timestamp": 1794928386979,
           "toolCallId": "toolu_wait",
           "toolName": "Bash"
         },
@@ -2226,7 +2329,7 @@
             }
           ],
           "role": "user",
-          "timestamp": 1794879399255
+          "timestamp": 1794928386975
         },
         {
           "api": "anthropic-messages",
@@ -2236,7 +2339,7 @@
               "type": "text"
             }
           ],
-          "durationMs": 3,
+          "durationMs": 2,
           "model": "mock-large",
           "provider": "piarc-mock",
           "rawStopReason": "end_turn",
@@ -2244,7 +2347,7 @@
           "role": "assistant",
           "stopReason": "stop",
           "thinkingLevel": "off",
-          "timestamp": 1794879399260,
+          "timestamp": 1794928386980,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -2275,7 +2378,7 @@
     },
     {
       "control": "beginTurn",
-      "turnId": "turn-eb2b3b4a-0df9-4145-bf78-fa4d4d93c00e"
+      "turnId": "turn-f5bb1f10-b38f-4301-935b-15242678fca0"
     },
     {
       "type": "agent_start"
@@ -2292,7 +2395,7 @@
           }
         ],
         "role": "user",
-        "timestamp": 1794879399264
+        "timestamp": 1794928386984
       },
       "type": "message_start"
     },
@@ -2305,7 +2408,7 @@
           }
         ],
         "role": "user",
-        "timestamp": 1794879399264
+        "timestamp": 1794928386984
       },
       "type": "message_end"
     },
@@ -2318,7 +2421,7 @@
         "responseId": "msg_mock_9",
         "role": "assistant",
         "stopReason": "pending",
-        "timestamp": 1794879399265,
+        "timestamp": 1794928386985,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -2354,7 +2457,7 @@
           "responseId": "msg_mock_9",
           "role": "assistant",
           "stopReason": "pending",
-          "timestamp": 1794879399265,
+          "timestamp": 1794928386985,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -2387,7 +2490,7 @@
         "responseId": "msg_mock_9",
         "role": "assistant",
         "stopReason": "pending",
-        "timestamp": 1794879399265,
+        "timestamp": 1794928386985,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -2424,7 +2527,7 @@
           "responseId": "msg_mock_9",
           "role": "assistant",
           "stopReason": "pending",
-          "timestamp": 1794879399265,
+          "timestamp": 1794928386985,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -2457,7 +2560,7 @@
         "responseId": "msg_mock_9",
         "role": "assistant",
         "stopReason": "pending",
-        "timestamp": 1794879399265,
+        "timestamp": 1794928386985,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -2495,7 +2598,7 @@
           "responseId": "msg_mock_9",
           "role": "assistant",
           "stopReason": "stop",
-          "timestamp": 1794879399265,
+          "timestamp": 1794928386985,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -2528,7 +2631,7 @@
         "responseId": "msg_mock_9",
         "role": "assistant",
         "stopReason": "pending",
-        "timestamp": 1794879399265,
+        "timestamp": 1794928386985,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -2566,7 +2669,7 @@
           "responseId": "msg_mock_9",
           "role": "assistant",
           "stopReason": "stop",
-          "timestamp": 1794879399265,
+          "timestamp": 1794928386985,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -2600,7 +2703,7 @@
         "responseId": "msg_mock_9",
         "role": "assistant",
         "stopReason": "stop",
-        "timestamp": 1794879399265,
+        "timestamp": 1794928386985,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -2638,7 +2741,7 @@
           "responseId": "msg_mock_9",
           "role": "assistant",
           "stopReason": "stop",
-          "timestamp": 1794879399265,
+          "timestamp": 1794928386985,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,
@@ -2672,7 +2775,7 @@
         "responseId": "msg_mock_9",
         "role": "assistant",
         "stopReason": "stop",
-        "timestamp": 1794879399265,
+        "timestamp": 1794928386985,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -2709,7 +2812,7 @@
         "role": "assistant",
         "stopReason": "stop",
         "thinkingLevel": "off",
-        "timestamp": 1794879399265,
+        "timestamp": 1794928386985,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -2746,7 +2849,7 @@
         "role": "assistant",
         "stopReason": "stop",
         "thinkingLevel": "off",
-        "timestamp": 1794879399265,
+        "timestamp": 1794928386985,
         "usage": {
           "cacheRead": 0,
           "cacheWrite": 0,
@@ -2777,7 +2880,7 @@
             }
           ],
           "role": "user",
-          "timestamp": 1794879399264
+          "timestamp": 1794928386984
         },
         {
           "api": "anthropic-messages",
@@ -2795,7 +2898,7 @@
           "role": "assistant",
           "stopReason": "stop",
           "thinkingLevel": "off",
-          "timestamp": 1794879399265,
+          "timestamp": 1794928386985,
           "usage": {
             "cacheRead": 0,
             "cacheWrite": 0,

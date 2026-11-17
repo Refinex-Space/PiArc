@@ -8,8 +8,18 @@
 // The descriptions are PiArc's own text (ADR-0006): they describe the behavior of these tools
 // (Pi's tool implementations behind Core's I/O), not Claude Code's.
 
-/** The tools the default profile exposes, in the order the model sees them. */
-export const CANONICAL_TOOLS = ['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep'] as const;
+/** The tools the default profile describes, in the order the model sees them. A session gets
+ * `Bash` when Core found bash (Git Bash on Windows) and `PowerShell` on Windows only
+ * (`exec/shells`, T17). */
+export const CANONICAL_TOOLS = [
+  'Read',
+  'Write',
+  'Edit',
+  'Bash',
+  'PowerShell',
+  'Glob',
+  'Grep',
+] as const;
 
 /** A canonical tool name of this tool set. */
 export type CanonicalTool = (typeof CANONICAL_TOOLS)[number];
@@ -89,12 +99,29 @@ export const DEFAULT_PROFILE: ToolProfile = {
   Bash: {
     name: 'Bash',
     description:
-      'Run a command line with bash in the working directory and return what it printed ' +
-      '(stdout and stderr) and, when it fails, its exit code. Only the last 2000 lines or ' +
-      '50 KB of output are shown; the complete output is then saved to a file named in the ' +
-      'result. `timeout` is in seconds; without it the command may run indefinitely. Every ' +
-      'call starts a new shell: `cd` and exported variables do not carry over.',
+      'Run a command line with bash in the working directory (Git Bash on Windows) and return ' +
+      'what it printed (stdout and stderr together) and, when it is not 0, its exit code. The ' +
+      'working directory is where the previous command ended: `cd` carries over while it stays inside the workspace, and leaving ' +
+      'the workspace sends the next command back to its root; exported variables do not carry ' +
+      'over. `timeout` is in seconds, 120 when omitted and at most 600; when it passes, the ' +
+      'command and every process it started are stopped. Long output comes back as its start ' +
+      'and its end, with the full text saved to a file named in the result (read it with ' +
+      'Read). Exit code 1 of grep, rg, diff, cmp and test is an answer (no match, a ' +
+      'difference, a false condition), not a failure.',
     snippet: 'Bash: run a shell command',
+    guidelines: [],
+  },
+  PowerShell: {
+    name: 'PowerShell',
+    description:
+      'Run a PowerShell command (PowerShell 7 when installed, otherwise Windows PowerShell ' +
+      "5.1) in the directory the session's bash commands are in, and return what it printed " +
+      'and, when it failed, its exit code. Set-Location does not carry over to the next ' +
+      'call. `timeout` is in seconds, 120 when omitted and at most 600; when it passes, the ' +
+      'command and every process it started are stopped. Long output comes back as its start ' +
+      'and its end, with the full text saved to a file named in the result (read it with ' +
+      'Read).',
+    snippet: 'PowerShell: run a PowerShell command',
     guidelines: [],
   },
   Glob: {

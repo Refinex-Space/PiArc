@@ -41,7 +41,6 @@ import {
   isObject,
   NO_USAGE,
   reasoning,
-  resultDiff,
   resultText,
   toolItem,
   userMessage,
@@ -403,7 +402,7 @@ export class Projector {
         open.tool,
         open.arguments,
         resultText(result),
-        isObject(result) ? resultDiff(result.details) : undefined,
+        isObject(result) ? result.details : undefined,
       ),
     );
   }

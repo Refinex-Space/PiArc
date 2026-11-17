@@ -99,7 +99,7 @@
         "status": "completed",
         "reason": "threshold",
         "tokensBefore": 20500,
-        "tokensAfter": 1931
+        "tokensAfter": 2263
       }
     }
   },

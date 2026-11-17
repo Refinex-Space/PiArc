@@ -10,7 +10,11 @@ import { randomUUID } from 'node:crypto';
 
 import type {
   BlobRef,
+  CommandOutcome,
+  CommandOutput,
+  CwdReset,
   DirEntry,
+  ExecShell,
   FileDiff,
   FileKind,
   FileStat,
@@ -100,14 +104,16 @@ export function asFileError(error: unknown, syscall: string, path: string): unkn
   return code === undefined ? error : new FileError(code, syscall, path);
 }
 
+/** One `exec/output` chunk: its stream, its text and the bytes of the stream Core left out
+ * before it (the live view skips output when the Agent Host reads slower than the command
+ * writes; the result's output is complete). */
+export type OutputListener = (stream: 'stdout' | 'stderr', data: string, skipped: number) => void;
+
 /** Routes `exec/output` notifications to the command that produced them. */
 export class ExecOutputRouter {
-  readonly #listeners = new Map<string, (stream: 'stdout' | 'stderr', data: string) => void>();
+  readonly #listeners = new Map<string, OutputListener>();
 
-  listen(
-    requestId: string,
-    listener: (stream: 'stdout' | 'stderr', data: string) => void,
-  ): () => void {
+  listen(requestId: string, listener: OutputListener): () => void {
     this.#listeners.set(requestId, listener);
     return () => {
       this.#listeners.delete(requestId);
@@ -124,17 +130,51 @@ export class ExecOutputRouter {
     ) {
       return false;
     }
+    const skipped =
+      typeof params.skipped === 'number' && Number.isSafeInteger(params.skipped)
+        ? params.skipped
+        : 0;
     const listener = this.#listeners.get(params.requestId);
-    listener?.(params.stream, params.data);
+    listener?.(params.stream, params.data, skipped);
     return listener !== undefined;
   }
 }
 
-/** How a command ended. */
-export interface CommandOutcome {
+/** How a command ended, as Core reports it (`exec/run`'s result, validated). */
+export interface CommandResult {
   readonly exitCode: number | undefined;
   readonly signal: number | undefined;
+  /** `exec/kill`, an interruption or the connection's end stopped it. */
   readonly killed: boolean;
+  readonly timedOut: boolean;
+  /** The timeout applied, and the longer one asked for when Core cut it. */
+  readonly timeoutMs: number | undefined;
+  readonly requestedTimeoutMs: number | undefined;
+  readonly durationMs: number | undefined;
+  /** Success judged by what the exit code means; undefined from a Core without T17. */
+  readonly outcome: CommandOutcome | undefined;
+  readonly meaning: string | undefined;
+  readonly cwd: string | undefined;
+  readonly cwdReset: CwdReset | undefined;
+  readonly output: CommandOutput | undefined;
+}
+
+/** A command for `exec/run`. */
+export interface CommandRequest {
+  readonly command: string;
+  /** `bash` when absent. */
+  readonly shell?: ExecShell;
+  /** Core's default when absent; Core cuts it to its maximum. */
+  readonly timeoutMs?: number;
+  /** Runs there and does not move the session's shell directory; the session's when absent. */
+  readonly cwd?: string;
+  readonly env?: Record<string, string>;
+}
+
+/** Which shells the session's command tools can use. */
+export interface Shells {
+  readonly bash: boolean;
+  readonly powershell: boolean;
 }
 
 export interface CoreIoOptions {
@@ -343,25 +383,33 @@ export class CoreIo {
     return this.#request('fs/grep', params, parseGrep, signal);
   }
 
+  /** Which shells Core found for this session's command tools (`exec/shells`). */
+  async shells(): Promise<Shells> {
+    return this.#request('exec/shells', {}, parseShells);
+  }
+
   /**
    * Starts `command` in Core and streams its output to `onData`. `outcome` settles once the
-   * command has ended; `kill` terminates it (the caller's abort or timeout).
+   * command has ended (Core applies the timeout); `kill` stops it (the caller's abort).
    */
   run(
-    command: { command: string; cwd: string; env: Record<string, string> },
-    onData: (data: Buffer) => void,
+    command: CommandRequest,
+    onData: OutputListener,
     origin: Origin,
-  ): { outcome: Promise<CommandOutcome>; kill: () => Promise<void> } {
+  ): { outcome: Promise<CommandResult>; kill: () => Promise<void> } {
     const requestId = `exec-${randomUUID()}`;
-    const stopListening = this.#options.execOutput.listen(requestId, (_stream, data) => {
-      onData(Buffer.from(data, 'utf8'));
-    });
+    const stopListening = this.#options.execOutput.listen(requestId, onData);
+    const params: Record<string, unknown> = { requestId, command: command.command, origin };
+    if (command.shell !== undefined) params.shell = command.shell;
+    if (command.timeoutMs !== undefined) params.timeoutMs = command.timeoutMs;
+    if (command.cwd !== undefined) params.cwd = command.cwd;
+    if (command.env !== undefined) params.env = command.env;
     const outcome = this.#request(
       'exec/run',
-      { requestId, command: command.command, cwd: command.cwd, env: command.env, origin },
-      parseOutcome,
+      params,
+      parseRunResult,
       undefined,
-      // Commands run as long as they run; the caller kills them on abort or timeout.
+      // Core ends the command (timeout, kill); the request waits as long as it runs.
       null,
     ).finally(stopListening);
     const kill = async (): Promise<void> => {
@@ -626,15 +674,74 @@ function parseGrep(result: unknown): FsGrepResult | undefined {
   };
 }
 
-function parseOutcome(result: unknown): CommandOutcome | undefined {
+function parseShells(result: unknown): Shells | undefined {
+  return isRecord(result) &&
+    typeof result.bash === 'boolean' &&
+    typeof result.powershell === 'boolean'
+    ? { bash: result.bash, powershell: result.powershell }
+    : undefined;
+}
+
+function integer(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) ? value : undefined;
+}
+
+function text(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function parseRunResult(result: unknown): CommandResult | undefined {
   if (!isRecord(result) || typeof result.killed !== 'boolean') {
     return undefined;
   }
-  const integer = (value: unknown): number | undefined =>
-    typeof value === 'number' && Number.isSafeInteger(value) ? value : undefined;
+  const timeout = isRecord(result.timeout) ? result.timeout : {};
+  const outcome = result.outcome;
   return {
     exitCode: integer(result.exitCode),
     signal: integer(result.signal),
     killed: result.killed,
+    timedOut: result.timedOut === true,
+    timeoutMs: integer(timeout.ms),
+    requestedTimeoutMs: integer(timeout.requestedMs),
+    durationMs: integer(result.durationMs),
+    outcome: outcome === 'success' || outcome === 'failure' ? outcome : undefined,
+    meaning: text(result.meaning),
+    cwd: text(result.cwd),
+    cwdReset: parseCwdReset(result.cwdReset),
+    output: parseOutput(result.output),
+  };
+}
+
+function parseCwdReset(value: unknown): CwdReset | undefined {
+  if (
+    !isRecord(value) ||
+    typeof value.endedIn !== 'string' ||
+    typeof value.resetTo !== 'string' ||
+    (value.reason !== 'outsideWorkspace' && value.reason !== 'missing')
+  ) {
+    return undefined;
+  }
+  return { endedIn: value.endedIn, resetTo: value.resetTo, reason: value.reason };
+}
+
+function parseOutput(value: unknown): CommandOutput | undefined {
+  if (!isRecord(value) || typeof value.head !== 'string') {
+    return undefined;
+  }
+  const totalChars = integer(value.totalChars);
+  if (totalChars === undefined) {
+    return undefined;
+  }
+  const tail = text(value.tail);
+  const omittedChars = integer(value.omittedChars);
+  const fullOutputPath = text(value.fullOutputPath);
+  const saveError = text(value.saveError);
+  return {
+    head: value.head,
+    totalChars,
+    ...(tail === undefined ? {} : { tail }),
+    ...(omittedChars === undefined ? {} : { omittedChars }),
+    ...(fullOutputPath === undefined ? {} : { fullOutputPath }),
+    ...(saveError === undefined ? {} : { saveError }),
   };
 }

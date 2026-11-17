@@ -206,7 +206,28 @@
           "path": "notes/a b.txt"
         },
         "output": "Successfully wrote to notes/a b.txt",
-        "path": "notes/a b.txt"
+        "path": "notes/a b.txt",
+        "diff": {
+          "added": 1,
+          "created": true,
+          "hunks": [
+            {
+              "lines": [
+                {
+                  "kind": "added",
+                  "text": "first line"
+                }
+              ],
+              "newLines": 1,
+              "newStart": 1,
+              "oldLines": 0,
+              "oldStart": 0
+            }
+          ],
+          "path": "notes/a b.txt",
+          "removed": 0,
+          "unified": "--- /dev/null\n+++ b/notes/a b.txt\n@@ -0,0 +1 @@\n+first line\n"
+        }
       }
     }
   },
@@ -222,7 +243,7 @@
         "arguments": {
           "path": "notes/a b.txt"
         },
-        "output": "first line\n"
+        "output": "     1\tfirst line\n"
       }
     }
   },
@@ -245,24 +266,31 @@
           "path": "notes/a b.txt"
         },
         "output": "Successfully replaced 1 block(s) in notes/a b.txt.",
-        "path": "notes/a b.txt"
-      }
-    }
-  },
-  {
-    "method": "item/updated",
-    "payload": {
-      "turnId": "turn-<id:1>",
-      "item": {
-        "type": "commandExecution",
-        "itemId": "toolu_bash",
-        "status": "inProgress",
-        "tool": "Bash",
-        "arguments": {
-          "command": "echo 中文 output"
-        },
-        "output": "",
-        "command": "echo 中文 output"
+        "path": "notes/a b.txt",
+        "diff": {
+          "added": 1,
+          "hunks": [
+            {
+              "lines": [
+                {
+                  "kind": "removed",
+                  "text": "first line"
+                },
+                {
+                  "kind": "added",
+                  "text": "1st line"
+                }
+              ],
+              "newLines": 1,
+              "newStart": 1,
+              "oldLines": 1,
+              "oldStart": 1
+            }
+          ],
+          "path": "notes/a b.txt",
+          "removed": 1,
+          "unified": "--- a/notes/a b.txt\n+++ b/notes/a b.txt\n@@ -1 +1 @@\n-first line\n+1st line\n"
+        }
       }
     }
   },
@@ -312,7 +340,16 @@
           "command": "echo 中文 output"
         },
         "output": "中文 output\n",
-        "command": "echo 中文 output"
+        "command": "echo 中文 output",
+        "execution": {
+          "cwd": "/private/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 85010/ws a 甲",
+          "outcome": "success",
+          "durationMs": 3,
+          "timedOut": false,
+          "timeoutMs": 120000,
+          "truncated": false,
+          "exitCode": 0
+        }
       }
     }
   },
@@ -328,7 +365,7 @@
         "arguments": {
           "path": "missing.txt"
         },
-        "output": "ENOENT: no such file or directory, access '/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 61644/ws a 甲/missing.txt'"
+        "output": "ENOENT: no such file or directory, access '/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 85010/ws a 甲/missing.txt'"
       }
     }
   },

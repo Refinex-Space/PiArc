@@ -158,13 +158,16 @@ impl ToolIoObserver for Rounds {
         _method: &str,
         tool_call_id: Option<&str>,
     ) -> BoxFuture<'static, ()> {
+        // Requests made for no tool call (`exec/shells` while the session's tools are set up,
+        // T17) are not part of a batch.
+        let Some(tool_call_id) = tool_call_id else {
+            return Box::pin(async {});
+        };
         let (tx, mut rx) = watch::channel(false);
         {
             let mut state = self.state.lock().expect("lock");
             state.arrivals += 1;
-            state
-                .held
-                .push((tool_call_id.unwrap_or("?").to_owned(), tx));
+            state.held.push((tool_call_id.to_owned(), tx));
         }
         Box::pin(async move {
             // The sender lives until it releases this request.

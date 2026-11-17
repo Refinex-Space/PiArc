@@ -68,10 +68,42 @@ describe('file change diffs', () => {
 
   it('take the diff Core returned from the result details onto fileChange items only', () => {
     expect(resultDiff({ diff: 'pi display diff', fileDiff: diff })).toEqual(diff);
-    const item = toolItem('t1', 'completed', 'Edit', { path: 'src/a.ts' }, 'ok', diff);
+    const details = { fileDiff: diff };
+    const item = toolItem('t1', 'completed', 'Edit', { path: 'src/a.ts' }, 'ok', details);
     expect(item).toMatchObject({ type: 'fileChange', path: 'src/a.ts', diff });
-    const other = toolItem('t2', 'completed', 'Grep', {}, 'ok', diff);
+    const other = toolItem('t2', 'completed', 'Grep', {}, 'ok', details);
     expect(other).not.toHaveProperty('diff');
+  });
+
+  it('take how a command ran from the result details onto commandExecution items (T17)', () => {
+    const execution = {
+      cwd: '/w s/项目',
+      exitCode: 1,
+      outcome: 'success',
+      meaning: 'no matches',
+      durationMs: 12,
+      timedOut: false,
+      timeoutMs: 120000,
+      truncated: false,
+    } as const;
+    const item = toolItem('t3', 'completed', 'Bash', { command: 'grep x f' }, 'ok', {
+      commandExecution: execution,
+    });
+    expect(item).toEqual({
+      type: 'commandExecution',
+      itemId: 't3',
+      status: 'completed',
+      tool: 'Bash',
+      arguments: { command: 'grep x f' },
+      command: 'grep x f',
+      output: 'ok',
+      execution,
+    });
+    // Details that do not validate (a session file is input) are left out.
+    const broken = toolItem('t4', 'completed', 'Bash', { command: 'x' }, 'ok', {
+      commandExecution: { ...execution, outcome: 'maybe' },
+    });
+    expect(broken).not.toHaveProperty('execution');
   });
 
   it('ignore details that are not a diff', () => {

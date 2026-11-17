@@ -48,7 +48,13 @@ import {
   type ToolResultLimits,
 } from '../harness/tool-results.js';
 import { AhpError, describeError } from '../protocol/errors.js';
-import { ToolNameMap, toolOptions, type CoreIo, type ToolProfile } from '../tools/index.js';
+import {
+  ToolNameMap,
+  toolOptions,
+  type CoreIo,
+  type Shells,
+  type ToolProfile,
+} from '../tools/index.js';
 import { historyWindow, MAX_HISTORY_LIMIT, projectHistory } from './history.js';
 import { Projector, type ProjectionSink } from './projector.js';
 import { InputQueue } from './queue.js';
@@ -388,9 +394,13 @@ export class SessionRegistry {
     const factory: CreateAgentSessionRuntimeFactory = async (target) => {
       const io =
         tools.kind === 'core' ? tools.ioFor(target.sessionManager.getSessionId()) : undefined;
+      // Which command tools the session gets depends on the shells Core found (T17).
       const sessionTools =
         tools.kind === 'core' && io !== undefined
-          ? scheduled(toolOptions(io, tools.profile), batches)
+          ? scheduled(
+              toolOptions(io, tools.profile, await shellsFor(io, this.#options.log)),
+              batches,
+            )
           : { tools: PI_NATIVE_TOOLS };
       // Long tool results go to the session's temporary directory (Harness Kit).
       const budget =
@@ -619,4 +629,20 @@ function stopped(
     ...(turnId === undefined ? {} : { interruptedTurnId: turnId }),
     ...(returned.length === 0 ? {} : { returnedQueue: [...returned] }),
   };
+}
+
+/**
+ * The shells for a session's command tools. When Core cannot say (the request failed), the
+ * platform's usual answer: bash everywhere but Windows, PowerShell on Windows only.
+ */
+async function shellsFor(io: CoreIo, log: (line: string) => void): Promise<Shells> {
+  try {
+    return await io.shells();
+  } catch (error) {
+    log(
+      `[session ${io.sessionId}] exec/shells failed, assuming the platform's shells: ${String(error)}`,
+    );
+    const windows = process.platform === 'win32';
+    return { bash: !windows, powershell: windows };
+  }
 }

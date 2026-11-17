@@ -1,10 +1,18 @@
 // Builders shared by the live projection (projector.ts) and the history projection
 // (history.ts): one canonical tool name maps to one item type, and item fields are bounded the
 // same way in both (architecture section 5.3).
-import type { CompactionReason, FileDiff, Item, ItemStatus, TurnUsage } from '@piarc/protocol';
+import type {
+  CommandExecutionInfo,
+  CompactionReason,
+  FileDiff,
+  Item,
+  ItemStatus,
+  TurnUsage,
+} from '@piarc/protocol';
 
 import { wellFormedJson } from '../protocol/well-formed.js';
 import { parseDiff } from '../tools/core-io.js';
+import { parseExecutionInfo } from '../tools/shell.js';
 
 /** The most UTF-16 code units of tool output an item carries; longer output keeps its end. */
 export const MAX_ITEM_OUTPUT = 64 * 1024;
@@ -54,8 +62,9 @@ function splitMcpName(tool: string): { server: string; serverTool: string } | un
 }
 
 /**
- * A tool call as an item of the type its canonical name maps to; `diff` is the change Core made
- * (on `fileChange` items only).
+ * A tool call as an item of the type its canonical name maps to; `details` are the details of
+ * the tool's result, where Write and Edit put the change Core made (`fileChange.diff`) and Bash
+ * and PowerShell how the command ran (`commandExecution.execution`).
  */
 export function toolItem(
   itemId: string,
@@ -63,7 +72,7 @@ export function toolItem(
   tool: string,
   args: Record<string, unknown>,
   output: string | undefined,
-  diff?: FileDiff,
+  details?: unknown,
 ): Item {
   const common = {
     itemId,
@@ -77,15 +86,24 @@ export function toolItem(
     return typeof value === 'string' ? value.toWellFormed() : '';
   };
   switch (toolItemType(tool)) {
-    case 'commandExecution':
-      return { type: 'commandExecution', ...common, command: text('command') };
-    case 'fileChange':
+    case 'commandExecution': {
+      const execution = resultExecution(details);
+      return {
+        type: 'commandExecution',
+        ...common,
+        command: text('command'),
+        ...(execution === undefined ? {} : { execution }),
+      };
+    }
+    case 'fileChange': {
+      const diff = resultDiff(details);
       return {
         type: 'fileChange',
         ...common,
         path: text('path') || text('file_path') || text('notebook_path'),
         ...(diff === undefined ? {} : { diff }),
       };
+    }
     case 'mcpToolCall': {
       const names = splitMcpName(tool) ?? { server: '', serverTool: tool };
       return { type: 'mcpToolCall', ...common, ...names };
@@ -200,6 +218,12 @@ export function resultText(result: unknown): string | undefined {
  * and Edit from Core's `fs/write` result). */
 export function resultDiff(details: unknown): FileDiff | undefined {
   return isObject(details) ? parseDiff(details.fileDiff) : undefined;
+}
+
+/** How a command ran, as Bash and PowerShell put it in their result's details
+ * (`details.commandExecution`, from Core's `exec/run` result). */
+export function resultExecution(details: unknown): CommandExecutionInfo | undefined {
+  return isObject(details) ? parseExecutionInfo(details.commandExecution) : undefined;
 }
 
 /** Pi's per-response usage, summed into a turn's usage. */

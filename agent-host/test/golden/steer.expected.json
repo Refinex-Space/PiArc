@@ -94,23 +94,6 @@
     }
   },
   {
-    "method": "item/updated",
-    "payload": {
-      "turnId": "turn-<id:1>",
-      "item": {
-        "type": "commandExecution",
-        "itemId": "toolu_wait",
-        "status": "inProgress",
-        "tool": "Bash",
-        "arguments": {
-          "command": "while [ ! -f go ]; do sleep 0.05; done; echo go"
-        },
-        "output": "",
-        "command": "while [ ! -f go ]; do sleep 0.05; done; echo go"
-      }
-    }
-  },
-  {
     "method": "session/queueChanged",
     "payload": {
       "items": [
@@ -169,7 +152,16 @@
           "command": "while [ ! -f go ]; do sleep 0.05; done; echo go"
         },
         "output": "go\n",
-        "command": "while [ ! -f go ]; do sleep 0.05; done; echo go"
+        "command": "while [ ! -f go ]; do sleep 0.05; done; echo go",
+        "execution": {
+          "cwd": "/private/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 85010/ws a 甲",
+          "outcome": "success",
+          "durationMs": 3,
+          "timedOut": false,
+          "timeoutMs": 120000,
+          "truncated": false,
+          "exitCode": 0
+        }
       }
     }
   },
