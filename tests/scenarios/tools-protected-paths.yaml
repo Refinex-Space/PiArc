@@ -1,0 +1,57 @@
+id: tools-protected-paths
+description: Writing below .git/, .claude/ or .pi/ or to a shell configuration file needs the user's approval even inside the workspace; until approvals exist the write fails with the reason and the files stay as they were, while reading them works.
+capabilities: [CAP-TOOL-PATH-PROTECTED-001]
+workspace:
+  files:
+    '.git/HEAD': "ref: refs/heads/main\n"
+    '.claude/settings.json': "{}\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: toolu_read_settings, name: Read, input: { path: .claude/settings.json } }
+      - tool_calls:
+          - {
+              id: toolu_edit_settings,
+              name: Edit,
+              input:
+                {
+                  path: .claude/settings.json,
+                  edits: [{ oldText: '{}', newText: '{ "permissions": {} }' }],
+                },
+            }
+      - tool_calls:
+          - {
+              id: toolu_write_git,
+              name: Write,
+              input: { path: .git/HEAD, content: "ref: refs/heads/evil\n" },
+            }
+      - tool_calls:
+          - {
+              id: toolu_write_pi,
+              name: Write,
+              input: { path: .pi/extensions/x.ts, content: "export default () => {};\n" },
+            }
+      - tool_calls:
+          - { id: toolu_write_zshrc, name: Write, input: { path: .zshrc, content: "alias x=y\n" } }
+      - text: 'Those are protected.'
+actions:
+  - prompt: { text: 'Change the configuration.', turn: t }
+expect:
+  events:
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  files:
+    '.git/HEAD': "ref: refs/heads/main\n"
+    '.claude/settings.json': "{}\n"
+    '.pi/extensions/x.ts': null
+    '.zshrc': null
+  requests:
+    - index: 5
+      tool_results:
+        - { id: toolu_read_settings, is_error: false, contains: "     1\t{}" }
+        - { id: toolu_edit_settings, is_error: true, contains: '.claude/ is a protected path' }
+        - { id: toolu_write_git, is_error: true, contains: '.git/ is a protected path' }
+        - { id: toolu_write_pi, is_error: true, contains: '.pi/ is a protected path' }
+        - { id: toolu_write_zshrc, is_error: true, contains: '.zshrc is a protected path' }
+  request_counts: { main: 6 }

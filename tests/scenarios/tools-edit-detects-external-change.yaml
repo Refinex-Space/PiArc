@@ -1,0 +1,60 @@
+id: tools-edit-detects-external-change
+description: After a Read, a change made outside the session makes the next Edit fail with an error that asks for a new Read, keeping the outside content; after reading again the Edit applies to the current content.
+capabilities: [CAP-TOOL-EDIT-EXTERNAL-001, CAP-TOOL-EDIT-002]
+workspace:
+  files:
+    'notes.md': "status: draft\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: toolu_read_1, name: Read, input: { path: notes.md } }
+      - text: 'It is a draft.'
+      - tool_calls:
+          - {
+              id: toolu_edit_stale,
+              name: Edit,
+              input: { path: notes.md, edits: [{ oldText: 'draft', newText: 'final' }] },
+            }
+      - tool_calls:
+          - { id: toolu_read_2, name: Read, input: { path: notes.md } }
+      - tool_calls:
+          - {
+              id: toolu_edit_fresh,
+              name: Edit,
+              input: { path: notes.md, edits: [{ oldText: 'review', newText: 'final' }] },
+            }
+      - text: 'Now final.'
+actions:
+  - prompt: { text: 'What is the status?', turn: first }
+  - wait: { method: turn/completed, turn: first }
+  - write_file: { path: notes.md, content: "status: review\n" }
+  - prompt: { text: 'Mark it final.', turn: second }
+expect:
+  events:
+    - {
+        method: item/completed,
+        turn: second,
+        params: { item: { itemId: toolu_edit_stale, tool: Edit, status: failed } },
+      }
+    - {
+        method: item/completed,
+        turn: second,
+        params: { item: { itemId: toolu_edit_fresh, tool: Edit, status: completed } },
+      }
+    - { method: turn/completed, turn: second, params: { status: completed } }
+  files:
+    'notes.md': "status: final\n"
+  requests:
+    - index: 5
+      tool_results:
+        - { id: toolu_read_1, is_error: false, contains: "     1\tstatus: draft" }
+        - {
+            id: toolu_edit_stale,
+            is_error: true,
+            contains: 'has changed since this session last read it',
+          }
+        - { id: toolu_read_2, is_error: false, contains: "     1\tstatus: review" }
+        - { id: toolu_edit_fresh, is_error: false, contains: 'Successfully replaced 1 block(s)' }
+  request_counts: { main: 6 }

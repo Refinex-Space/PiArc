@@ -245,6 +245,52 @@ pub fn check_files(expected: &BTreeMap<String, Option<String>>, workspace: &Path
     failures
 }
 
+/// Checks `expect.fixtures`: each workspace file has exactly the bytes of its fixture.
+#[must_use]
+pub fn check_fixture_files(spec: &ScenarioSpec, workspace: &Path) -> Vec<String> {
+    let mut failures = Vec::new();
+    for (path, name) in &spec.expect.fixtures {
+        let file = path
+            .split('/')
+            .fold(workspace.to_path_buf(), |p, part| p.join(part));
+        let (actual, expected) = match (std::fs::read(&file), std::fs::read(spec.fixture(name))) {
+            (Ok(actual), Ok(expected)) => (actual, expected),
+            (Err(e), _) => {
+                failures.push(format!("files.{path}: cannot read: {e}"));
+                continue;
+            }
+            (_, Err(e)) => {
+                failures.push(format!("files.{path}: cannot read fixture {name}: {e}"));
+                continue;
+            }
+        };
+        if actual != expected {
+            let at = actual
+                .iter()
+                .zip(&expected)
+                .position(|(a, e)| a != e)
+                .unwrap_or_else(|| actual.len().min(expected.len()));
+            let window = |bytes: &[u8]| {
+                let start = at.saturating_sub(8);
+                let end = (at + 16).min(bytes.len());
+                bytes
+                    .get(start..end)
+                    .map(|b| b.escape_ascii().to_string())
+                    .unwrap_or_default()
+            };
+            failures.push(format!(
+                "files.{path}: bytes differ from fixture {name} at byte {at} ({} vs {} bytes): \
+                 expected …{}…, got …{}…",
+                expected.len(),
+                actual.len(),
+                window(&expected),
+                window(&actual)
+            ));
+        }
+    }
+    failures
+}
+
 /// The first differing line and both texts, line-numbered.
 #[must_use]
 pub fn text_diff(expected: &str, actual: &str) -> String {

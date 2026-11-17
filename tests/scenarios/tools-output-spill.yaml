@@ -1,0 +1,45 @@
+id: tools-output-spill
+description: A tool result over 50K characters reaches the model as a head-and-tail preview with the path of the full text in the session's temporary directory; when the results answering one response exceed 200K characters together, the largest is replaced the same way and the rest arrive whole.
+capabilities: [CAP-TOOL-OUTPUT-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: toolu_setup
+            name: Bash
+            input:
+              command: >-
+                for f in a b c d; do for i in $(seq 1 85); do printf 'match %0600d\n' $i; done > $f.txt; done;
+                for i in $(seq 1 88); do printf 'match %0600d\n' $i; done > e.txt;
+                for i in $(seq 1 100); do printf 'match %0600d\n' $i; done > big.txt
+      - tool_calls:
+          - { id: toolu_big, name: Grep, input: { pattern: match, path: big.txt } }
+      - tool_calls:
+          - { id: toolu_g_a, name: Grep, input: { pattern: match, path: a.txt } }
+          - { id: toolu_g_b, name: Grep, input: { pattern: match, path: b.txt } }
+          - { id: toolu_g_c, name: Grep, input: { pattern: match, path: c.txt } }
+          - { id: toolu_g_d, name: Grep, input: { pattern: match, path: d.txt } }
+          - { id: toolu_g_e, name: Grep, input: { pattern: match, path: e.txt } }
+      - text: 'Searched.'
+actions:
+  - prompt: { text: 'Search the files.', turn: t }
+expect:
+  events:
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  requests:
+    - index: 2
+      contains: ['tool-results']
+      tool_results:
+        - { id: toolu_setup, is_error: false }
+        - { id: toolu_big, is_error: false, contains: 'too many for the context' }
+    - index: 3
+      tool_results:
+        - { id: toolu_setup }
+        - { id: toolu_big, contains: 'toolu_big.txt: read it in parts with Read' }
+        - { id: toolu_g_a, is_error: false, contains: 'a.txt:40: match' }
+        - { id: toolu_g_b, is_error: false, contains: 'b.txt:40: match' }
+        - { id: toolu_g_c, is_error: false, contains: 'c.txt:40: match' }
+        - { id: toolu_g_d, is_error: false, contains: 'd.txt:40: match' }
+        - { id: toolu_g_e, is_error: false, contains: 'too many for the context' }
+  request_counts: { main: 4 }

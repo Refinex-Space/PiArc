@@ -246,13 +246,13 @@ capabilities:
     milestone: M1
     refs: [FR-TL-01, ARCH-6.1.4]
     task: T16
-    status: planned
+    status: active
   - id: CAP-TOOL-REREAD-001
     title: '文件自上次读取后未变化时 Read 返回简短存根'
     milestone: M1
     refs: [ARCH-6.15]
     task: T16
-    status: planned
+    status: active
   - id: CAP-TOOL-WRITE-001
     title: 'Write 创建与覆盖文件'
     milestone: M1
@@ -270,13 +270,67 @@ capabilities:
     milestone: M1
     refs: [FR-TL-01, ARCH-6.1.2]
     task: T16
-    status: planned
+    status: active
+  - id: CAP-TOOL-EDIT-READFIRST-001
+    title: '对已存在的文件 Edit 或 Write 前，本会话必须读过它，否则报错并要求先 Read，文件不变'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.1.2]
+    task: T16
+    status: active
+  - id: CAP-TOOL-EDIT-EXTERNAL-001
+    title: '读取后文件被外部修改，Edit 报错并要求重新读取，文件保持外部修改后的内容'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.1.2]
+    task: T16
+    status: active
+  - id: CAP-TOOL-EDIT-UNIQUE-001
+    title: 'Edit 的旧文本必须唯一出现或显式 replaceAll；多处匹配报出次数、零匹配报错，都不改文件'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.1.2]
+    task: T16
+    status: active
+  - id: CAP-TOOL-WRITE-FIDELITY-001
+    title: 'Edit 与 Write 保留文件的换行风格、BOM 与编码，只改目标文本，原子替换'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.1.2]
+    task: T16
+    status: active
+  - id: CAP-TOOL-DIFF-001
+    title: '每次文件变更的 fileChange 条目带 Core 生成的 unified diff 与 hunk'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.1.2, ARCH-7.7]
+    task: T16
+    status: active
+  - id: CAP-TOOL-PATH-BOUNDARY-001
+    title: '会话目录之外的读写需要询问；审批落地（T20）之前按拒绝处理并说明理由'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.1.2]
+    task: T16
+    status: active
+  - id: CAP-TOOL-PATH-PROTECTED-001
+    title: '受保护路径（.git/、.piarc/、.claude/、.pi/、shell 配置文件）的写入需要询问，T20 之前按拒绝处理'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.1.2]
+    task: T16
+    status: active
+  - id: CAP-TOOL-WRITE-SERIAL-001
+    title: '写同一文件的工具调用串行执行，结果按调用顺序叠加'
+    milestone: M1
+    refs: [ARCH-6.1.2, ARCH-6.15]
+    task: T16
+    status: active
+  - id: CAP-TOOL-SEARCH-LIMITS-001
+    title: 'Grep 与 Glob 遵守 .gitignore，Grep 跳过二进制文件，结果超过上限时截断并说明'
+    milestone: M1
+    refs: [FR-TL-01, ARCH-6.1.3]
+    task: T16
+    status: active
   - id: CAP-TOOL-OUTPUT-001
     title: '超长工具结果落盘，模型收到预览与路径；单条消息的工具结果有总上限'
     milestone: M1
     refs: [FR-TL-02, ARCH-6.15]
     task: T16
-    status: planned
+    status: active
   - id: CAP-TOOL-BASH-001
     title: 'Bash 经 Core 执行命令并返回输出'
     milestone: M1

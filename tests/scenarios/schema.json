@@ -46,6 +46,12 @@
           "propertyNames": { "$ref": "#/$defs/relativePath" },
           "additionalProperties": { "type": "string" }
         },
+        "fixtures": {
+          "description": "Files copied byte for byte from the scenarios' fixtures/ directory: relative path in the workspace to the fixture's name (relative, forward slashes). For CRLF, byte order marks, legacy encodings, images and PDFs.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/relativePath" },
+          "additionalProperties": { "$ref": "#/$defs/relativePath" }
+        },
         "trusted": {
           "description": "Record a trust decision for the workspace before it opens; untrusted when absent.",
           "type": "boolean"
@@ -95,6 +101,10 @@
       "properties": {
         "wire": { "description": "Wire format of the endpoint.", "enum": ["anthropic", "openai"] },
         "validation": { "$ref": "#/$defs/validation" },
+        "vision": {
+          "description": "The endpoint's model takes images as input; text only when absent.",
+          "type": "boolean"
+        },
         "steps": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/step" } }
       }
     },
@@ -373,6 +383,12 @@
           "description": "Tool call ids in the batches their Core requests arrive in.",
           "type": "array",
           "items": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+        },
+        "fixtures": {
+          "description": "Workspace files after the run whose bytes equal a fixture file: relative path to the fixture's name.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/relativePath" },
+          "additionalProperties": { "$ref": "#/$defs/relativePath" }
         },
         "core_io": {
           "description": "Core answered a request with this method for this tool call.",

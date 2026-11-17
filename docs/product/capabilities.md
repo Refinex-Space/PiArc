@@ -8,7 +8,7 @@
 
 | 里程碑 | 能力数 | 已实现 | 计划中 | BLOCKED |
 |---|---|---|---|---|
-| M1 | 43 | 21 | 22 | 0 |
+| M1 | 52 | 34 | 18 | 0 |
 | M2 | 30 | 0 | 30 | 0 |
 | M3 | 21 | 0 | 21 | 0 |
 | M4 | 10 | 0 | 10 | 0 |
@@ -39,17 +39,26 @@
 | CAP-TOOL-BASH-001 | Bash 经 Core 执行命令并返回输出 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
 | CAP-TOOL-BASH-002 | Bash 超时终止整个进程树，输出给出语义成败 | FR-TL-01、FR-TL-02、ARCH-6.11 | T17 | — | 计划中 |
 | CAP-TOOL-CORE-001 | 工具的文件与命令 I/O 全部经 Core 的 AHP fs/exec 方法执行 | FR-TL-01、ARCH-6.1.3 | T07 | `tools-canonical-via-core` | 已实现 |
+| CAP-TOOL-DIFF-001 | 每次文件变更的 fileChange 条目带 Core 生成的 unified diff 与 hunk | FR-TL-01、ARCH-6.1.2、ARCH-7.7 | T16 | `tools-file-change-diff` | 已实现 |
 | CAP-TOOL-EDIT-001 | Edit 按文本替换修改文件 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
-| CAP-TOOL-EDIT-002 | 编辑不变量：先读后写、外部修改检测、多处匹配拒绝、编码与换行保持 | FR-TL-01、ARCH-6.1.2 | T16 | — | 计划中 |
+| CAP-TOOL-EDIT-002 | 编辑不变量：先读后写、外部修改检测、多处匹配拒绝、编码与换行保持 | FR-TL-01、ARCH-6.1.2 | T16 | `tools-edit-detects-external-change`<br>`tools-edit-preserves-encoding`<br>`tools-edit-requires-read`<br>`tools-edit-unique-match` | 已实现 |
+| CAP-TOOL-EDIT-EXTERNAL-001 | 读取后文件被外部修改，Edit 报错并要求重新读取，文件保持外部修改后的内容 | FR-TL-01、ARCH-6.1.2 | T16 | `tools-edit-detects-external-change` | 已实现 |
+| CAP-TOOL-EDIT-READFIRST-001 | 对已存在的文件 Edit 或 Write 前，本会话必须读过它，否则报错并要求先 Read，文件不变 | FR-TL-01、ARCH-6.1.2 | T16 | `tools-edit-requires-read` | 已实现 |
+| CAP-TOOL-EDIT-UNIQUE-001 | Edit 的旧文本必须唯一出现或显式 replaceAll；多处匹配报出次数、零匹配报错，都不改文件 | FR-TL-01、ARCH-6.1.2 | T16 | `tools-edit-unique-match` | 已实现 |
 | CAP-TOOL-GLOB-001 | Glob 由 Core 按模式列出文件 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
 | CAP-TOOL-GREP-001 | Grep 由 Core 搜索文件内容 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
-| CAP-TOOL-OUTPUT-001 | 超长工具结果落盘，模型收到预览与路径；单条消息的工具结果有总上限 | FR-TL-02、ARCH-6.15 | T16 | — | 计划中 |
+| CAP-TOOL-OUTPUT-001 | 超长工具结果落盘，模型收到预览与路径；单条消息的工具结果有总上限 | FR-TL-02、ARCH-6.15 | T16 | `tools-output-spill` | 已实现 |
+| CAP-TOOL-PATH-BOUNDARY-001 | 会话目录之外的读写需要询问；审批落地（T20）之前按拒绝处理并说明理由 | FR-TL-01、ARCH-6.1.2 | T16 | `tools-path-boundary` | 已实现 |
+| CAP-TOOL-PATH-PROTECTED-001 | 受保护路径（.git/、.piarc/、.claude/、.pi/、shell 配置文件）的写入需要询问，T20 之前按拒绝处理 | FR-TL-01、ARCH-6.1.2 | T16 | `tools-protected-paths` | 已实现 |
 | CAP-TOOL-POWERSHELL-001 | Windows 上的 PowerShell 工具 | ARCH-6.1.4、ARCH-6.2.2 | T17 | — | 计划中 |
 | CAP-TOOL-PROFILE-001 | 模型看到的工具名是规范名，不出现 Pi 原生工具名 | ARCH-6.1.1 | T07 | `tools-model-sees-canonical-names` | 已实现 |
 | CAP-TOOL-READ-001 | Read 读取工作区文本文件 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
-| CAP-TOOL-READ-002 | Read 带行号分页、图片、PDF 分页与 ipynb | FR-TL-01、ARCH-6.1.4 | T16 | — | 计划中 |
-| CAP-TOOL-REREAD-001 | 文件自上次读取后未变化时 Read 返回简短存根 | ARCH-6.15 | T16 | — | 计划中 |
+| CAP-TOOL-READ-002 | Read 带行号分页、图片、PDF 分页与 ipynb | FR-TL-01、ARCH-6.1.4 | T16 | `tools-read-formats` | 已实现 |
+| CAP-TOOL-REREAD-001 | 文件自上次读取后未变化时 Read 返回简短存根 | ARCH-6.15 | T16 | `tools-read-repeat-stub` | 已实现 |
+| CAP-TOOL-SEARCH-LIMITS-001 | Grep 与 Glob 遵守 .gitignore，Grep 跳过二进制文件，结果超过上限时截断并说明 | FR-TL-01、ARCH-6.1.3 | T16 | `tools-search-ignore-and-limits` | 已实现 |
 | CAP-TOOL-WRITE-001 | Write 创建与覆盖文件 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
+| CAP-TOOL-WRITE-FIDELITY-001 | Edit 与 Write 保留文件的换行风格、BOM 与编码，只改目标文本，原子替换 | FR-TL-01、ARCH-6.1.2 | T16 | `tools-edit-preserves-encoding` | 已实现 |
+| CAP-TOOL-WRITE-SERIAL-001 | 写同一文件的工具调用串行执行，结果按调用顺序叠加 | ARCH-6.1.2、ARCH-6.15 | T16 | `tools-write-serial` | 已实现 |
 | CAP-TRUST-DIALOG-001 | 首次打开工作区时列出将启用的可执行配置并记录用户的信任决定 | FR-WS-01、ARCH-10.2 | T18 | — | 计划中 |
 | CAP-TRUST-PROJECT-001 | 未信任的工作区不加载项目级可执行配置（Pi 扩展等）；信任后加载 | FR-WS-01、ARCH-10.2 | T13 | `trust-trusted-loads-project-extension`<br>`trust-untrusted-skips-project-extension` | 已实现 |
 | CAP-TURN-BATCH-001 | 连续的只读工具调用成批并行（单批至多 10 个），写操作单独执行 | ARCH-6.15 | T14 | `turn-tool-batches` | 已实现 |

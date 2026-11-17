@@ -304,8 +304,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 5 重复读取存根
 - [x] 6 路径边界与受保护路径（需要询问，T20 前按拒绝）
 - [x] 7 Read：行号分页、图片（视觉/非视觉）、PDF 页码范围、ipynb；I53 blob 上限
-- [ ] 8 Glob、Grep：`.gitignore`、二进制跳过、结果上限与说明
-- [ ] 9 L2 场景 `tools-*.yaml` 与能力 ID；CRLF/BOM/GBK 夹具
+- [x] 8 Glob、Grep：`.gitignore`、二进制跳过、结果上限与说明
+- [x] 9 L2 场景 `tools-*.yaml` 与能力 ID；CRLF/BOM/GBK 夹具
 - [ ] 10 文档：piarc-fs、piarc-diff 的 CLAUDE.md，`coding-standards.md` 复用表，架构与 ADR
 - [ ] 11 收尾：verify、L4、acceptance、PLAN
 

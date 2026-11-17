@@ -1,0 +1,45 @@
+id: tools-path-boundary
+description: Reading, writing or searching a path outside the session's directories needs the user's approval; until approvals exist each tool fails with the reason and the model is told nothing was changed.
+capabilities: [CAP-TOOL-PATH-BOUNDARY-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: toolu_read_out, name: Read, input: { path: ../secret.txt } }
+      - tool_calls:
+          - {
+              id: toolu_write_out,
+              name: Write,
+              input: { path: ../escaped/new.txt, content: "should not exist\n" },
+            }
+      - tool_calls:
+          - { id: toolu_grep_out, name: Grep, input: { pattern: secret, path: .. } }
+      - text: 'Those paths are outside the workspace.'
+actions:
+  - prompt: { text: 'Look outside the workspace.', turn: t }
+expect:
+  events:
+    - { method: item/completed, params: { item: { itemId: toolu_read_out, status: failed } } }
+    - { method: item/completed, params: { item: { itemId: toolu_write_out, status: failed } } }
+    - { method: item/completed, params: { item: { itemId: toolu_grep_out, status: failed } } }
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  requests:
+    - index: 3
+      tool_results:
+        - {
+            id: toolu_read_out,
+            is_error: true,
+            contains: "needs the user's approval: it is outside the session's directories",
+          }
+        - {
+            id: toolu_write_out,
+            is_error: true,
+            contains: 'Asking the user is not available yet, so the operation was refused and nothing was changed.',
+          }
+        - {
+            id: toolu_grep_out,
+            is_error: true,
+            contains: "needs the user's approval: it is outside the session's directories",
+          }
+  request_counts: { main: 4 }

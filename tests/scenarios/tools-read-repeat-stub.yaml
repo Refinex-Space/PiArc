@@ -1,0 +1,40 @@
+id: tools-read-repeat-stub
+description: Reading an unchanged file again with the same range returns a short note instead of the content; a different range, or the same range after the file changed, returns the content.
+capabilities: [CAP-TOOL-REREAD-001]
+workspace:
+  files:
+    'todo.txt': "one\ntwo\nthree\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: toolu_first, name: Read, input: { path: todo.txt } }
+      - tool_calls:
+          - { id: toolu_again, name: Read, input: { path: todo.txt } }
+      - tool_calls:
+          - { id: toolu_range, name: Read, input: { path: todo.txt, offset: 2, limit: 1 } }
+      - text: 'Read it.'
+      - tool_calls:
+          - { id: toolu_changed, name: Read, input: { path: todo.txt, offset: 2, limit: 1 } }
+      - text: 'Read the change.'
+actions:
+  - prompt: { text: 'Show the list.', turn: first }
+  - wait: { method: turn/completed, turn: first }
+  - write_file: { path: todo.txt, content: "one\nTWO\nthree\n" }
+  - prompt: { text: 'Show the second line again.', turn: second }
+expect:
+  events:
+    - { method: turn/completed, turn: second, params: { status: completed } }
+  requests:
+    - index: 5
+      tool_results:
+        - { id: toolu_first, is_error: false, contains: "     2\ttwo" }
+        - {
+            id: toolu_again,
+            is_error: false,
+            contains: 'todo.txt is unchanged since your last Read of it with the same range',
+          }
+        - { id: toolu_range, is_error: false, contains: "     2\ttwo" }
+        - { id: toolu_changed, is_error: false, contains: "     2\tTWO" }
+  request_counts: { main: 6 }

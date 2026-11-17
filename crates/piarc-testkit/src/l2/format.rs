@@ -99,6 +99,18 @@ pub struct ScenarioSpec {
     pub approvals: Vec<Approval>,
     /// What must hold after the run.
     pub expect: Expect,
+    /// Where `fixtures` entries are: `fixtures/` next to the scenario file (set by [`load`]).
+    #[serde(skip)]
+    pub fixture_dir: PathBuf,
+}
+
+impl ScenarioSpec {
+    /// The file of fixture `name` (relative, forward slashes).
+    #[must_use]
+    pub fn fixture(&self, name: &str) -> PathBuf {
+        name.split('/')
+            .fold(self.fixture_dir.clone(), |path, part| path.join(part))
+    }
 }
 
 /// The workspace fixture.
@@ -108,6 +120,10 @@ pub struct WorkspaceSpec {
     /// Relative path (forward slashes) to content.
     #[serde(default)]
     pub files: BTreeMap<String, String>,
+    /// Relative path to a fixture file copied byte for byte (CRLF, byte order marks, legacy
+    /// encodings, images, PDFs): its name below the scenarios' `fixtures/` directory.
+    #[serde(default)]
+    pub fixtures: BTreeMap<String, String>,
     /// Trust the workspace before opening it.
     #[serde(default)]
     pub trusted: bool,
@@ -132,6 +148,9 @@ pub struct ProviderSpec {
     /// Request validation; every rule on by default.
     #[serde(default)]
     pub validation: ValidationConfig,
+    /// The endpoint's model takes images as input.
+    #[serde(default)]
+    pub vision: bool,
     /// One response per request.
     pub steps: Vec<Step>,
 }
@@ -377,6 +396,9 @@ pub struct Expect {
     /// Workspace files: content, or `None` for absent.
     #[serde(default)]
     pub files: BTreeMap<String, Option<String>>,
+    /// Workspace files whose bytes equal a fixture file (`fixtures/` name).
+    #[serde(default)]
+    pub fixtures: BTreeMap<String, String>,
     /// Request assertions.
     #[serde(default)]
     pub requests: Vec<RequestExpect>,
@@ -560,8 +582,11 @@ pub fn load(file: &Path) -> Result<ScenarioSpec, FormatError> {
         problems.dedup();
         return Err(fail(problems));
     }
-    let spec: ScenarioSpec =
+    let mut spec: ScenarioSpec =
         serde_json::from_value(value).map_err(|e| fail(vec![format!("/: {e}")]))?;
+    spec.fixture_dir = file
+        .parent()
+        .map_or_else(|| PathBuf::from("fixtures"), |dir| dir.join("fixtures"));
     let stem = file
         .file_stem()
         .and_then(|s| s.to_str())
@@ -639,6 +664,22 @@ fn check(spec: &ScenarioSpec, stem: &str) -> Vec<String> {
     }
     for path in spec.expect.files.keys() {
         check_path(&format!("/expect/files/{path}"), path, &mut problems);
+    }
+    for (section, fixtures) in [
+        ("workspace", &spec.workspace.fixtures),
+        ("expect", &spec.expect.fixtures),
+    ] {
+        for (path, name) in fixtures {
+            let field = format!("/{section}/fixtures/{path}");
+            check_path(&field, path, &mut problems);
+            check_path(&field, name, &mut problems);
+            if !spec.fixture(name).is_file() {
+                problems.push(format!(
+                    "{field}: no fixture `{name}` in {}",
+                    spec.fixture_dir.display()
+                ));
+            }
+        }
     }
     check_actions(spec, &mut problems);
     check_expect(spec, &mut problems);

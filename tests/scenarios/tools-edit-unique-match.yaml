@@ -1,0 +1,57 @@
+id: tools-edit-unique-match
+description: An Edit whose old text occurs three times fails with the count and a hint about replaceAll, one whose old text is missing fails, both leaving the file unchanged; with replaceAll every occurrence is replaced.
+capabilities: [CAP-TOOL-EDIT-UNIQUE-001, CAP-TOOL-EDIT-002]
+workspace:
+  files:
+    'app.py': "log('a')\nlog('b')\nlog('c')\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: toolu_read, name: Read, input: { path: app.py } }
+      - tool_calls:
+          - {
+              id: toolu_many,
+              name: Edit,
+              input: { path: app.py, edits: [{ oldText: 'log(', newText: 'print(' }] },
+            }
+      - tool_calls:
+          - {
+              id: toolu_none,
+              name: Edit,
+              input: { path: app.py, edits: [{ oldText: 'warn(', newText: 'print(' }] },
+            }
+      - tool_calls:
+          - {
+              id: toolu_all,
+              name: Edit,
+              input:
+                { path: app.py, edits: [{ oldText: 'log(', newText: 'print(' }], replaceAll: true },
+            }
+      - text: 'Replaced every call.'
+actions:
+  - prompt: { text: 'Use print instead of log.', turn: t }
+expect:
+  events:
+    - { method: item/completed, params: { item: { itemId: toolu_many, status: failed } } }
+    - { method: item/completed, params: { item: { itemId: toolu_none, status: failed } } }
+    - {
+        method: item/completed,
+        params: { item: { itemId: toolu_all, type: fileChange, status: completed } },
+      }
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  files:
+    'app.py': "print('a')\nprint('b')\nprint('c')\n"
+  requests:
+    - index: 2
+      tool_results:
+        - { id: toolu_read, is_error: false }
+        - { id: toolu_many, is_error: true, contains: 'Found 3 occurrences of the text in app.py' }
+    - index: 4
+      tool_results:
+        - { id: toolu_read, is_error: false }
+        - { id: toolu_many, is_error: true, contains: 'call Edit again with replaceAll: true' }
+        - { id: toolu_none, is_error: true, contains: 'Could not find the exact text in app.py' }
+        - { id: toolu_all, is_error: false, contains: 'Replaced 3 occurrence(s) in app.py' }
+  request_counts: { main: 5 }

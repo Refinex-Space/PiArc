@@ -14,5 +14,9 @@
 # directory, e.g. tests/fixtures/crlf/ (see docs/engineering/testing.md).
 **/fixtures/crlf/** -text
 
+# L2 scenario fixtures (tests/scenarios/fixtures/): copied into the workspace and compared
+# byte for byte, so CRLF, byte order marks and legacy encodings must survive checkout.
+tests/scenarios/fixtures/** -text
+
 # Signed release-manifest fixtures: the signature covers the exact bytes.
 crates/piarc-core/tests/fixtures/release/** -text

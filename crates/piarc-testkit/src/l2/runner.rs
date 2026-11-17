@@ -20,7 +20,7 @@ use piarc_core::{
 use serde_json::{Value, json};
 use tokio::sync::{Notify, oneshot};
 
-use super::checks::{check_files, check_requests};
+use super::checks::{check_files, check_fixture_files, check_requests};
 use super::format::{Action, InputAction, ScenarioSpec, Wire};
 use super::gate::Gate;
 use super::matcher::{ObservedEvent, check_events, compact, describe, matches, without_noise};
@@ -198,6 +198,15 @@ impl Env {
         for (path, content) in &spec.workspace.files {
             write_file(&workspace, path, content)?;
         }
+        for (path, name) in &spec.workspace.fixtures {
+            let target = resolve(&workspace, path);
+            if let Some(parent) = target.parent() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| format!("{}: {e}", parent.display()))?;
+            }
+            std::fs::copy(spec.fixture(name), &target)
+                .map_err(|e| format!("fixture {name} → {}: {e}", target.display()))?;
+        }
         for session in spec.sessions().values() {
             if let Some(cwd) = &session.cwd {
                 let dir = resolve(&workspace, cwd);
@@ -216,7 +225,7 @@ impl Env {
                 .map_err(|e| format!("mock `{name}`: {e}"))?;
             providers.insert(
                 pi_provider(name),
-                pi_provider_entry(&mock, endpoint.wire, &id),
+                pi_provider_entry(&mock, endpoint.wire, endpoint.vision, &id),
             );
             mocks.insert(name.clone(), mock);
         }
@@ -282,7 +291,7 @@ fn pi_provider(name: &str) -> String {
     format!("mock-{name}")
 }
 
-fn pi_provider_entry(mock: &MockProvider, wire: Wire, scenario: &str) -> Value {
+fn pi_provider_entry(mock: &MockProvider, wire: Wire, vision: bool, scenario: &str) -> Value {
     let (base_url, api) = match wire {
         Wire::Anthropic => (mock.anthropic_base_url(), "anthropic-messages"),
         Wire::Openai => (mock.openai_base_url(), "openai-completions"),
@@ -290,10 +299,15 @@ fn pi_provider_entry(mock: &MockProvider, wire: Wire, scenario: &str) -> Value {
     // Header selection keeps the prompts free of scenario markers.
     let mut headers = serde_json::Map::new();
     headers.insert(crate::server::SCENARIO_HEADER.to_owned(), json!(scenario));
+    let input = if vision {
+        json!(["text", "image"])
+    } else {
+        json!(["text"])
+    };
     json!({
         "baseUrl": base_url, "api": api, "apiKey": "piarc-mock-test-key",
         "models": [{
-            "id": MOCK_MODEL, "name": MOCK_MODEL, "reasoning": false, "input": ["text"],
+            "id": MOCK_MODEL, "name": MOCK_MODEL, "reasoning": false, "input": input,
             "contextWindow": 200_000, "maxTokens": 4096,
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
             "headers": headers
@@ -631,6 +645,9 @@ impl Driver<'_> {
             failures.push(failure("events", report));
         }
         for f in check_files(&self.spec.expect.files, &self.env.workspace) {
+            failures.push(failure("files", f));
+        }
+        for f in check_fixture_files(&self.spec, &self.env.workspace) {
             failures.push(failure("files", f));
         }
         for f in check_requests(self.spec, &self.env.records()) {
