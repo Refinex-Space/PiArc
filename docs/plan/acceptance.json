@@ -1903,92 +1903,92 @@
       "id": "T17-A01",
       "task": "T17",
       "description": "命令超时后整棵进程树（含孙进程）被终止，结果包含已有输出与超时说明（T32 之后超时改为转后台，届时由 T32 更新场景期望，进程树终止能力仍用于 abort 与 KillShell）。验证：macOS 与 Windows CI 上的测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "macOS 已通过：`cargo test -p piarc-exec termination -- --nocapture` 的 a_timeout_ends_child_and_grandchild（超时 3 s，按 PID 确认子 bash 与孙 sleep 均退出，输出 \"all exited: [..]\"）、shutting_the_runtime_down_ends_the_tree；L2 `exec-timeout-kills-tree`（结果含 \"started\\n\\n\\nCommand timed out after 2 seconds\"，后续命令报告 ended:child.pid、ended:grand.pid）。Windows 部分（Job Object + Git Bash，/proc/<pid>/winpid）待推送后的 Windows CI。"
     },
     {
       "id": "T17-A02",
       "task": "T17",
       "description": "会话 abort 时正在执行的命令及其子进程全部被终止，对应 item 状态为 `interrupted`。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `exec-abort-kills-tree` 通过：命令输出 started 后中断，item/completed 为 interrupted、output \"started\\n\\n\\nCommand aborted\"、execution.outcome failure；下一回合的检查命令报告 ended:child.pid 与 ended:grand.pid。另有 `cargo test -p piarc-exec` 的 a_cancellation_ends_child_and_grandchild。"
     },
     {
       "id": "T17-A03",
       "task": "T17",
       "description": "`cd` 到工作区内子目录后，下一条命令在该目录执行；`cd` 到工作区外后，下一条命令回到工作区根，结果中说明了重置原因。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `exec-cwd-carry-over` 通过：cd sub 后 pwd -P 结果含 \"工作区/sub\"；cd ../.. 的 item 带 execution.cwdReset.reason outsideWorkspace，结果含 \"outside the workspace; the next command starts in\"，下一条 pwd 回到工作区根。`cargo test -p piarc-core --test exec_commands` 的 cd_carries_over_inside_the_workspace_and_resets_outside 另覆盖显式 cwd 不改 shell 目录、目录被删时 missing 重置。"
     },
     {
       "id": "T17-A04",
       "task": "T17",
       "description": "默认超时为 2 分钟；传入超过 10 分钟的超时按 10 分钟执行并说明。验证：单测（时钟可注入）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-exec` 的 timeouts_default_to_two_minutes_and_stop_at_ten（tokio 暂停时钟：不给超时 120 s、请求 15 分钟按 600 s、5 s 按 5 s 执行并 timed_out）与 limits::tests；`--test exec_commands` 的 timeouts_report_the_limit_and_a_cut_request（timeout {ms:120000}；timeoutMs 900000 → {ms:600000, requestedMs:900000}）；Agent Host 结果写明 \"The requested timeout of 900 seconds is above the maximum\"（shell.test.ts）。"
     },
     {
       "id": "T17-A05",
       "task": "T17",
       "description": "超过 30,000 字符的成功输出落盘，模型收到约 2,000 字符预览与路径；失败输出给出头部与尾部。验证：场景测试中的 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `exec-output-budget` 的 mock 请求断言通过：44,000 字符成功输出的结果含 \"characters omitted. The full output (44000 characters) is in\" 与 toolu_long_ok.txt，含 line 00001/line 04000、不含 line 00500/03500（预览约 2,000 字符）；失败输出含 line 00500 与 line 03500（头 10,000、尾 20,000）、不含 line 01500，并以 \"Command exited with code 3\" 结束；短输出原样。`--test exec_commands` 的 long_output_is_saved_and_previewed 核对落盘文件 4,000 行完整。"
     },
     {
       "id": "T17-A06",
       "task": "T17",
       "description": "stdout 与 stderr 各输出 50 MB 的命令正常结束，不死锁。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-exec termination -- --nocapture` 的 fifty_megabytes_on_each_pipe_do_not_block：stdout、stderr 各 52,428,800 字节全部读到，退出码 0，\"100 MB through both pipes in 2.19s\"，落盘文件 104,857,600 字节；`cargo test -p piarc-core --test exec_commands -- --nocapture` 的 fifty_megabytes_on_each_pipe_finish 经 ToolIo 同样完成（\"100 MB through Core in 4.35s\"）。"
     },
     {
       "id": "T17-A07",
       "task": "T17",
       "description": "`grep` 无匹配与 `diff` 有差异时退出码为 1，语义状态与 item 状态为成功；同一命令真正出错（退出码 2）时为失败。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `exec-exit-code-meaning` 通过：grep 无匹配与 diff 有差异的 item 为 completed、execution {exitCode:1, outcome:success, meaning:\"no matches\"/\"files differ\"}，工具结果 is_error false；grep 读不存在的文件 exitCode 2、item failed、is_error true。判定表单测在 piarc-exec semantic::tests（管道、控制运算符、命令替换只看退出码）。"
     },
     {
       "id": "T17-A08",
       "task": "T17",
       "description": "命令环境中没有 PiArc、Electron、Node 的内部变量，也没有任何凭据；登录 shell 中配置的 PATH 生效。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-exec` 的 env::tests（剔除 ELECTRON_*、NODE_OPTIONS、NODE_CHANNEL_FD、PI_*、PIARC_*、SHLVL、_、PWD，保留用户变量；reads_the_login_shells_path 用临时 HOME 的 .bash_profile 证明登录 shell 的 PATH 生效）；L2 `exec-env-internal-vars`（env 输出不含 ELECTRON_RUN_AS_NODE、NODE_OPTIONS、PI_CODING_AGENT_DIR、PIARC_L2_INTERNAL 与 provider key piarc-mock-test-key，含 L2_USER_VAR=kept）与 `exec-env-login-path`（\"login PATH works\\nprofile: loaded\"）。"
     },
     {
       "id": "T17-A09",
       "task": "T17",
       "description": "输出在命令结束前就以增量到达 Agent Host 与客户端事件流。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `exec-streaming-output` 通过：`echo first; sleep 1; echo second` 先到达 item/updated {status:inProgress, output:\"first\\n\"}，之后才是 item/completed；`cargo test -p piarc-core --test tool_io` 的 exec_run_streams_output_before_the_command_ends 证明 exec/output 在命令结束前到达 Agent Host 一侧（1.5 s 内收到第一段，命令仍在运行）。"
     },
     {
       "id": "T17-A10",
       "task": "T17",
       "description": "`commandExecution` item 带命令、cwd、退出码、语义状态、耗时、超时与截断标记。验证：golden 测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "golden：`PIARC_UPDATE_GOLDEN=1 cargo test -p piarc-testkit --test agent_host golden` 重新录制后 `npx vitest run agent-host -u` 更新并审阅快照，`agent-host/test/golden/tools.expected.json` 与 abort-tools.expected.json 的 commandExecution 条目带 execution {cwd, exitCode/signal, outcome, durationMs, timedOut, timeoutMs, truncated}；不带变量的漂移检查与 projector.golden.test.ts 通过；items.test.ts 覆盖 meaning 与校验失败的细节。"
     },
     {
       "id": "T17-A11",
       "task": "T17",
       "description": "Windows 上找到 Git Bash 时 `Bash` 经它执行；找不到时模型请求的工具列表中没有 `Bash`、有 `PowerShell`，并产生安装提示事件；macOS 上工具列表中没有 `PowerShell`。验证：mock provider 请求断言（Windows 部分由 CI 证明）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "macOS 部分已通过：L2 `exec-shell-tools-macos`（请求 0 的工具含 Bash、不含 PowerShell）；无 Git Bash 时的行为由跨平台单测证明：shell.test.ts 的 createToolSet（bash:false → 只有 PowerShell）、piarc-core tool_io::exec::tests::a_missing_git_bash_is_announced_once（exec/shells 答 bash:false 且 core/notices 只发一次 gitBashMissing）、piarc-exec shells::tests（Git Bash 查找顺序）。Windows 上经 Git Bash 执行（L2 `exec-windows-shells` 的 tools_include [Bash, PowerShell]、uname -o 为 Msys）待推送后的 Windows CI。"
     },
     {
       "id": "T17-A12",
       "task": "T17",
       "description": "Windows 上 PowerShell 与 Git Bash 的中文输出不乱码，Git Bash 的 `cd` 路径转换后边界判断正确。验证：Windows CI 上的测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "需要 Windows：L2 `exec-windows-shells`（PowerShell 与 Git Bash 的中文输出、cd sub 后 pwd 含 \"工作区/sub\"）与 `cargo test -p piarc-core --test exec_commands` 的 powershell_and_git_bash_print_chinese 只在 Windows 编译运行，待推送后的 Windows CI；macOS 上 `cargo clippy --target x86_64-pc-windows-msvc --workspace --all-targets` 通过，路径转换的纯函数 msys_to_windows 单测已过。"
     },
     {
       "id": "T17-A13",
       "task": "T17",
       "description": "`npm run verify` 通过（含 Windows CI 上的 L2 场景）。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "macOS 上 `npm run verify` 14/14 通过（Vitest 849 passed、cargo test 446 passed 0 failed、L2 35 passed 1 skipped（exec-windows-shells 为 Windows 专属）、MISSING 0）。Windows CI 上的 verify 与 L2 待推送后的 Windows CI。"
     },
     {
       "id": "T18-A01",
