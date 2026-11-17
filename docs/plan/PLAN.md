@@ -577,6 +577,17 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 验证：`npm run verify` 14/14（Vitest 849 passed、cargo test 446 passed、L2 35 passed 1 skipped、MISSING 0）；Windows 交叉 clippy 通过；agent_host 端到端 14 passed（含对照测试 Bash 三步一致）；sessions 10 passed
 - 遗留：I75–I78；T17 的 Windows 部分未在 Windows 上运行；未推送
 
+### 2026-11-18 T17 的 CI 核对（提交 b533040 的运行 44116918422）
+
+- 结果：core build、core load、四个打包作业通过；`verify (macos-latest)`、`desktop L4 (windows-latest)` 失败，`verify (windows-latest)` 卡住后被 60 分钟作业超时取消，`desktop L4 (macos-latest)` 随之取消
+- 原因与修复：
+  - Windows L4 的 packaged 形态 `agent-host.e2e.ts` 中 Bash 为 failed（"Tool Bash not found"）：Agent Host 在创建会话时问 `exec/shells`，此时 Core 还没登记该会话，答 `sessionNotFound`，Agent Host 按平台默认值（Windows 无 bash）建了工具集；macOS 的默认值恰好有 bash 而掩盖了问题，`tools.rs` 又过滤掉了这个请求。e377be8 让 `exec/shells` 不依赖会话（工作区入站也放行），e2e 改为断言它成功；7d8c5c0 把参数改为可选 `sessionId`（空结构体生成的空接口过不了 ESLint）
+  - Windows verify 卡在 `timeouts_default_to_two_minutes_and_stop_at_ten`：Windows 上 tokio 在阻塞线程池读子进程管道，阻塞任务阻止暂停时钟自动前进，10 分钟的定时器永远不触发。2656691 给 `CommandRunner` 注入时钟（`with_clock`），测试记录截止时间并手动放行
+  - macOS verify 的 `event_channel.rs` `ordered_shutdown_flushes_the_last_batch_then_never_delivers_again`（T04 的测试）：释放时间取自测试线程读到消息的时刻，繁忙的 runner 上会晚于关闭回调的时间戳。e377be8 改为在 `Drop` 中取时间
+- 本次已在 Windows 上通过的部分：`piarc-exec` 的进程树测试（含按 `/proc/<pid>/winpid` 确认孙进程退出的超时、取消、后台进程、运行时关闭、50 MB）、`piarc-core --test exec_commands` 8/8（含 PowerShell 与 Git Bash 中文输出、`/c/` 路径转换后的 cd 保留）、`tool_io` 6/6；Windows 的 L2 场景没有跑到
+- 本机：`npm run verify` 14/14；L4 全部 138 passed、1 skipped（含 packaged 的 `agent-host.e2e.ts`）
+- T17-A01、A11、A12、A13 仍为 blocked，等下一次推送的 Windows CI；未推送
+
 ## 计划变更记录
 
 | 日期 | 版本 | 变更 |
