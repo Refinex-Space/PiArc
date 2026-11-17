@@ -13,8 +13,8 @@ use piarc_protocol::host::{
 };
 use piarc_protocol::method::{Method, RequestMethod};
 use piarc_protocol::session::{
-    ModelRef, PromptAccepted, SessionAbort, SessionClose, SessionCreate, SessionCreateParams,
-    SessionId, SessionOpened, SessionPrompt, SessionPromptParams, SessionResume,
+    PromptAccepted, SessionAbort, SessionClose, SessionCreate, SessionCreateParams, SessionFork,
+    SessionForkParams, SessionId, SessionOpened, SessionPrompt, SessionPromptParams, SessionResume,
     SessionResumeParams, SessionStopped, SessionTarget,
 };
 use serde_json::Value;
@@ -69,7 +69,9 @@ pub enum SupervisorState {
 
 enum Command {
     Shutdown(oneshot::Sender<()>),
-    Kill(ExitReason),
+    /// Kill the process of connection `epoch` (the current one when `None`): a kill decided
+    /// for one connection never reaches the next one (R1-A10).
+    Kill(ExitReason, Option<u64>),
     Restart,
 }
 
@@ -160,36 +162,120 @@ impl HostSupervisor {
             .await
     }
 
-    /// Opens a session in `cwd`; it is reopened automatically after a restart.
+    /// Opens a new session; it is reopened automatically after a restart.
+    ///
+    /// When Core chose the id (`params.session_id`) and the outcome is unknown (timeout, or
+    /// the connection ended), the session is tracked anyway: the restart's `session/resume`,
+    /// or one the caller sends, reconciles both sides under that id (R1-A3).
     ///
     /// # Errors
     ///
     /// As [`HostSupervisor::call`].
-    pub async fn create_session(
-        &self,
-        cwd: &str,
-        model: Option<ModelRef>,
-    ) -> Result<SessionOpened> {
-        let params = SessionCreateParams {
-            cwd: cwd.to_owned(),
-            model,
-        };
-        let opened = self
+    pub async fn create_session(&self, params: SessionCreateParams) -> Result<SessionOpened> {
+        let cwd = params.cwd.clone();
+        let chosen = params.session_id.clone();
+        let result = self
             .inner
             .call::<SessionCreate>(
                 params,
                 Tracking::untracked(),
                 self.inner.config.call_timeout,
             )
+            .await;
+        match (&result, chosen) {
+            (Ok(opened), _) => self.track(&opened.session_id, &cwd),
+            (Err(error), Some(id)) if error.outcome_unknown() => self.track(&id, &cwd),
+            _ => {}
+        }
+        result
+    }
+
+    /// Reopens a session by id from its file (or under that id, empty, when it never stored a
+    /// message); it is reopened automatically after a restart. An unknown outcome keeps it
+    /// tracked, as for [`HostSupervisor::create_session`].
+    ///
+    /// # Errors
+    ///
+    /// As [`HostSupervisor::call`].
+    pub async fn resume_session(
+        &self,
+        session_id: &SessionId,
+        cwd: &str,
+        last_seq: Option<u64>,
+    ) -> Result<SessionOpened> {
+        let params = SessionResumeParams {
+            session_id: session_id.clone(),
+            cwd: cwd.to_owned(),
+            last_seq,
+        };
+        let result = self
+            .inner
+            .call::<SessionResume>(
+                params,
+                Tracking::untracked(),
+                self.inner.config.call_timeout,
+            )
+            .await;
+        match &result {
+            Ok(_) => self.track(session_id, cwd),
+            Err(error) if error.outcome_unknown() => self.track(session_id, cwd),
+            Err(_) => {}
+        }
+        if let Some(seq) = last_seq
+            && let Some(tracked) = lock(&self.inner.shared.sessions).get_mut(&session_id.0)
+        {
+            tracked.last_seq = tracked.last_seq.max(seq);
+        }
+        result
+    }
+
+    /// Opens a copy of a session as a new session; the copy is reopened after a restart.
+    ///
+    /// # Errors
+    ///
+    /// As [`HostSupervisor::call`].
+    pub async fn fork_session(&self, params: SessionForkParams) -> Result<SessionOpened> {
+        let cwd = params.cwd.clone();
+        let opened = self
+            .inner
+            .call::<SessionFork>(
+                params,
+                Tracking::untracked(),
+                self.inner.config.call_timeout,
+            )
             .await?;
-        lock(&self.inner.shared.sessions).insert(
-            opened.session_id.0.clone(),
-            TrackedSession {
+        self.track(&opened.session_id, &cwd);
+        Ok(opened)
+    }
+
+    fn track(&self, session_id: &SessionId, cwd: &str) {
+        lock(&self.inner.shared.sessions)
+            .entry(session_id.0.clone())
+            .or_insert_with(|| TrackedSession {
                 cwd: cwd.to_owned(),
                 last_seq: 0,
-            },
-        );
-        Ok(opened)
+            });
+    }
+
+    /// Calls `M` for `session_id`, recording it in the ledger (with `request_key` as its
+    /// idempotency key) so it is reported as uncertain if the connection ends first.
+    ///
+    /// # Errors
+    ///
+    /// As [`HostSupervisor::call`].
+    pub async fn session_call<M: RequestMethod>(
+        &self,
+        session_id: &SessionId,
+        request_key: Option<&str>,
+        params: M::Params,
+    ) -> Result<M::Result> {
+        let tracking = Tracking {
+            session_id: Some(session_id.0.clone()),
+            request_key: request_key.map(str::to_owned),
+        };
+        self.inner
+            .call::<M>(params, tracking, self.inner.config.call_timeout)
+            .await
     }
 
     /// Starts a turn. The result only acknowledges it: the turn's end arrives as a
@@ -266,7 +352,7 @@ impl HostSupervisor {
         let _ = self
             .inner
             .commands
-            .send(Command::Kill(ExitReason::Killed))
+            .send(Command::Kill(ExitReason::Killed, None))
             .await;
     }
 
@@ -466,6 +552,7 @@ impl Inner {
                     tokio::select! {
                         () = self.deps.clock.sleep(delay) => {}
                         command = commands.recv() => {
+                            // A kill or restart for the ended connection has nothing to act on.
                             if let Some(Command::Shutdown(done)) = command {
                                 return self.stop(Some(done)).await;
                             }
@@ -502,18 +589,23 @@ impl Inner {
         })
         .await;
         let heartbeat = self.spawn_heartbeat(connection.link.clone());
-        if epoch > 1 {
-            self.restore_sessions(epoch).await;
-        }
+        // Reopen the sessions while staying responsive: a restore that hangs must not keep
+        // shutdown or a kill waiting (R1-A4).
+        let mut restoring = epoch > 1;
+        let restore = self.restore_sessions(epoch);
+        tokio::pin!(restore);
         let mut reason = ExitReason::Crashed;
         let mut stop = None;
         let status = loop {
             tokio::select! {
                 status = &mut connection.exited => break status.ok().and_then(Result::ok),
+                () = &mut restore, if restoring => restoring = false,
                 command = commands.recv(), if stop.is_none() => match command {
-                    Some(Command::Kill(why)) => {
-                        reason = why;
-                        connection.kill();
+                    Some(Command::Kill(why, target)) => {
+                        if target.is_none_or(|target| target == epoch) {
+                            reason = why;
+                            connection.kill();
+                        }
                     }
                     Some(Command::Restart) => {
                         reason = ExitReason::Restarted;
@@ -626,7 +718,10 @@ impl Inner {
                     tracing::error!(target: "piarc_host", workspace = %inner.shared.workspace, epoch = link.epoch,
                         "the Agent Host is hung; killing it");
                     // A closed channel means the supervisor stopped.
-                    let _ = inner.commands.send(Command::Kill(ExitReason::Hung)).await;
+                    let _ = inner
+                        .commands
+                        .send(Command::Kill(ExitReason::Hung, Some(link.epoch)))
+                        .await;
                     return;
                 }
             }

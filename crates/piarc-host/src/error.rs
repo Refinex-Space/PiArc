@@ -92,6 +92,14 @@ impl Error {
         }
     }
 
+    /// Whether the call may or may not have taken effect: it timed out or its connection
+    /// ended first. The caller reconciles (for example by resuming a session it tried to
+    /// create).
+    #[must_use]
+    pub fn outcome_unknown(&self) -> bool {
+        matches!(self, Self::Timeout { .. } | Self::Uncertain { .. })
+    }
+
     /// The structured error object shared by AHP and the NAPI boundary.
     #[must_use]
     pub fn to_error_object(&self) -> ErrorObject {

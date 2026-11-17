@@ -25,6 +25,22 @@ export type AhpMessage =
   | SessionAbortResponse
   | SessionPromptRequest
   | SessionPromptResponse
+  | SessionForkRequest
+  | SessionForkResponse
+  | SessionSteerRequest
+  | SessionSteerResponse
+  | SessionFollowUpRequest
+  | SessionFollowUpResponse
+  | QueueEditRequest
+  | QueueEditResponse
+  | QueueDeleteRequest
+  | QueueDeleteResponse
+  | QueueReorderRequest
+  | QueueReorderResponse
+  | SessionGetEntriesRequest
+  | SessionGetEntriesResponse
+  | SessionHistoryRequest
+  | SessionHistoryResponse
   | TrustGetRequest
   | TrustGetResponse
   | FsStatRequest
@@ -62,8 +78,13 @@ export type AhpMessage =
   | TurnStartedNotification
   | TurnCompletedNotification
   | ItemStartedNotification
+  | ItemUpdatedNotification
   | ItemCompletedNotification
-  | ItemAgentMessageDeltaNotification;
+  | ItemAgentMessageDeltaNotification
+  | ItemReasoningDeltaNotification
+  | TurnRetryingNotification
+  | QueueChangedNotification
+  | HarnessEntryNotification;
 /**
  * A request id: an integer or a string. `null` and fractional numbers are not accepted.
  */
@@ -98,7 +119,8 @@ export type ErrorKind =
   | 'vaultIntegrity'
   | 'vaultVersion'
   | 'secretLockLost'
-  | 'releaseIntegrity';
+  | 'releaseIntegrity'
+  | 'queueItemNotFound';
 /**
  * Session identifier.
  */
@@ -119,29 +141,56 @@ export type ProtocolVersion = string;
  */
 export type TurnId = string;
 /**
- * What a path names.
+ * How a queued input is delivered.
  */
-export type FileKind = 'file' | 'directory' | 'other';
+export type QueueKind = 'steer' | 'followUp';
 /**
- * How `fs/read` returns the content.
+ * Result of `session/steer` and `session/followUp`.
  */
-export type ReadMode = 'text' | 'blob';
+export type InputAccepted =
+  | {
+      disposition: 'queued';
+      /**
+       * The queued item.
+       */
+      itemId: string;
+    }
+  | {
+      disposition: 'started';
+      /**
+       * The new turn.
+       */
+      turnId: TurnId;
+    };
 /**
- * Which output stream a chunk came from.
- */
-export type OutputStream = 'stdout' | 'stderr';
-/**
- * How a turn ended.
- */
-export type TurnStatus = 'completed' | 'failed' | 'interrupted';
-/**
- * An item in its current state, discriminated by the `type` member. Every variant
- * carries `itemId` and `status`.
+ * An item in its current state, discriminated by the `type` member. Every variant carries
+ * `itemId` and `status`.
+ *
+ * Tool calls are items too: the Agent Host maps each canonical tool name to one of the tool
+ * item types (architecture section 5.3) and every tool item carries the canonical `tool`
+ * name, the `arguments` the model gave and, once known, the `output` text the model sees
+ * (bounded; longer text keeps its end and starts with a truncation note). Whether a tool
+ * call succeeded comes from the tool layer's own result, never from an exit code.
  */
 export type Item =
   | {
       /**
        * The item's identifier.
+       */
+      itemId: ItemId;
+      /**
+       * Lifecycle state (always `completed`).
+       */
+      status: ItemStatus;
+      /**
+       * The text.
+       */
+      text: string;
+      type: 'userMessage';
+    }
+  | {
+      /**
+       * The item's identifier: `<messageId>#<contentIndex>`.
        */
       itemId: ItemId;
       /**
@@ -153,6 +202,141 @@ export type Item =
        */
       text: string;
       type: 'agentMessage';
+    }
+  | {
+      /**
+       * The item's identifier: `<messageId>#<contentIndex>`.
+       */
+      itemId: ItemId;
+      /**
+       * Lifecycle state.
+       */
+      status: ItemStatus;
+      /**
+       * The reasoning text accumulated so far (complete in `item/completed`).
+       */
+      text: string;
+      type: 'reasoning';
+    }
+  | {
+      /**
+       * The arguments the tool was called with.
+       */
+      arguments: {
+        [k: string]: unknown;
+      };
+      /**
+       * The command line.
+       */
+      command: string;
+      /**
+       * The item's identifier: the tool call id.
+       */
+      itemId: ItemId;
+      /**
+       * The output the model sees: so far in `item/updated`, final in `item/completed`.
+       */
+      output?: string | null;
+      /**
+       * Lifecycle state.
+       */
+      status: ItemStatus;
+      /**
+       * Canonical tool name.
+       */
+      tool: string;
+      type: 'commandExecution';
+    }
+  | {
+      /**
+       * The arguments the tool was called with.
+       */
+      arguments: {
+        [k: string]: unknown;
+      };
+      /**
+       * The item's identifier: the tool call id.
+       */
+      itemId: ItemId;
+      /**
+       * The text the tool returned, in `item/completed`.
+       */
+      output?: string | null;
+      /**
+       * The file, as the model named it.
+       */
+      path: string;
+      /**
+       * Lifecycle state.
+       */
+      status: ItemStatus;
+      /**
+       * Canonical tool name.
+       */
+      tool: string;
+      type: 'fileChange';
+    }
+  | {
+      /**
+       * The arguments the tool was called with.
+       */
+      arguments: {
+        [k: string]: unknown;
+      };
+      /**
+       * The item's identifier: the tool call id.
+       */
+      itemId: ItemId;
+      /**
+       * The text the tool returned, in `item/completed`.
+       */
+      output?: string | null;
+      /**
+       * The MCP server's name.
+       */
+      server: string;
+      /**
+       * The tool's name on the server.
+       */
+      serverTool: string;
+      /**
+       * Lifecycle state.
+       */
+      status: ItemStatus;
+      /**
+       * Canonical tool name.
+       */
+      tool: string;
+      type: 'mcpToolCall';
+    }
+  | {
+      /**
+       * The arguments the tool was called with.
+       */
+      arguments: {
+        [k: string]: unknown;
+      };
+      /**
+       * The task description the model gave, when it gave one.
+       */
+      description?: string | null;
+      /**
+       * The item's identifier: the tool call id.
+       */
+      itemId: ItemId;
+      /**
+       * The subagent's final answer, in `item/completed`.
+       */
+      output?: string | null;
+      /**
+       * Lifecycle state.
+       */
+      status: ItemStatus;
+      /**
+       * Canonical tool name.
+       */
+      tool: string;
+      type: 'subagent';
     }
   | {
       /**
@@ -174,10 +358,67 @@ export type Item =
        */
       status: ItemStatus;
       /**
-       * The tool's name.
+       * Canonical tool name.
+       */
+      tool: string;
+      type: 'webFetch';
+      /**
+       * The address.
+       */
+      url: string;
+    }
+  | {
+      /**
+       * The arguments the tool was called with.
+       */
+      arguments: {
+        [k: string]: unknown;
+      };
+      /**
+       * The item's identifier: the tool call id.
+       */
+      itemId: ItemId;
+      /**
+       * The text the tool returned, in `item/completed`.
+       */
+      output?: string | null;
+      /**
+       * Lifecycle state.
+       */
+      status: ItemStatus;
+      /**
+       * Canonical tool name.
        */
       tool: string;
       type: 'dynamicToolCall';
+    }
+  | {
+      /**
+       * What went wrong, when it failed.
+       */
+      errorMessage?: string | null;
+      /**
+       * The item's identifier.
+       */
+      itemId: ItemId;
+      /**
+       * Why it ran.
+       */
+      reason: CompactionReason;
+      /**
+       * Lifecycle state: `completed`, or `failed` / `interrupted` when no summary replaced
+       * the context.
+       */
+      status: ItemStatus;
+      /**
+       * Estimated context tokens after, once known.
+       */
+      tokensAfter?: number | null;
+      /**
+       * Estimated context tokens before, once known.
+       */
+      tokensBefore?: number | null;
+      type: 'contextCompaction';
     };
 /**
  * Item identifier, unique within a session.
@@ -187,6 +428,26 @@ export type ItemId = string;
  * Lifecycle state of an item.
  */
 export type ItemStatus = 'inProgress' | 'completed' | 'failed' | 'declined' | 'interrupted';
+/**
+ * Why a compaction ran.
+ */
+export type CompactionReason = 'manual' | 'threshold' | 'overflow';
+/**
+ * What a path names.
+ */
+export type FileKind = 'file' | 'directory' | 'other';
+/**
+ * How `fs/read` returns the content.
+ */
+export type ReadMode = 'text' | 'blob';
+/**
+ * Which output stream a chunk came from.
+ */
+export type OutputStream = 'stdout' | 'stderr';
+/**
+ * How a turn ended.
+ */
+export type TurnStatus = 'completed' | 'failed' | 'interrupted';
 
 /**
  * A request whose method is not interpreted.
@@ -508,6 +769,12 @@ export interface SessionCreateParams {
    * Model to start with; the Agent Host's configured default when absent.
    */
   model?: ModelRef | null;
+  /**
+   * The new session's id, chosen by Core so that a timed-out request can still be
+   * reconciled (closed or resumed) under a known id; the Agent Host chooses one when
+   * absent. Letters, digits, `.`, `_` and `-`, at most 128 characters.
+   */
+  sessionId?: SessionId | null;
 }
 /**
  * Selects a model by provider id and model id, for example `anthropic` / `claude-opus-5-5`.
@@ -616,9 +883,31 @@ export interface SessionStopped {
    */
   interruptedTurnId?: TurnId | null;
   /**
+   * The inputs that were still queued, in queue order: they did not run and the client can
+   * offer them for editing again.
+   */
+  returnedQueue?: QueueItem[];
+  /**
    * The session acted on.
    */
   sessionId: SessionId;
+}
+/**
+ * One queued input.
+ */
+export interface QueueItem {
+  /**
+   * The item's id, unique within the session.
+   */
+  itemId: string;
+  /**
+   * How it is delivered.
+   */
+  kind: QueueKind;
+  /**
+   * The text.
+   */
+  text: string;
 }
 /**
  * Request for `session/abort`.
@@ -682,6 +971,315 @@ export interface PromptAccepted {
    * The turn running the prompt.
    */
   turnId: TurnId;
+}
+/**
+ * Request for `session/fork`.
+ */
+export interface SessionForkRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/fork';
+  params: SessionForkParams;
+}
+/**
+ * Parameters of `session/fork`.
+ */
+export interface SessionForkParams {
+  /**
+   * Its working directory, which the new session shares.
+   */
+  cwd: string;
+  /**
+   * The last entry to keep; the source's current position when absent.
+   */
+  entryId?: string | null;
+  /**
+   * The session to copy.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `session/fork`.
+ */
+export interface SessionForkResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SessionOpened;
+}
+/**
+ * Request for `session/steer`.
+ */
+export interface SessionSteerRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/steer';
+  params: SessionInputParams;
+}
+/**
+ * Parameters of `session/steer` and `session/followUp`.
+ */
+export interface SessionInputParams {
+  /**
+   * Idempotency key chosen by Core; repeating it returns the first answer.
+   */
+  requestId: string;
+  /**
+   * The session.
+   */
+  sessionId: SessionId;
+  /**
+   * The user's input.
+   */
+  text: string;
+}
+/**
+ * Successful response to `session/steer`.
+ */
+export interface SessionSteerResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: InputAccepted;
+}
+/**
+ * Request for `session/followUp`.
+ */
+export interface SessionFollowUpRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/followUp';
+  params: SessionInputParams;
+}
+/**
+ * Successful response to `session/followUp`.
+ */
+export interface SessionFollowUpResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: InputAccepted;
+}
+/**
+ * Request for `session/queue/edit`.
+ */
+export interface QueueEditRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/queue/edit';
+  params: QueueEditParams;
+}
+/**
+ * Parameters of `session/queue/edit`.
+ */
+export interface QueueEditParams {
+  /**
+   * The item to change.
+   */
+  itemId: string;
+  /**
+   * The session.
+   */
+  sessionId: SessionId;
+  /**
+   * Its new text.
+   */
+  text: string;
+}
+/**
+ * Successful response to `session/queue/edit`.
+ */
+export interface QueueEditResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: QueueState;
+}
+/**
+ * The whole queue, in order: the result of `session/queue/*` and the payload of
+ * `session/queueChanged`.
+ */
+export interface QueueState {
+  /**
+   * The queued items, in queue order.
+   */
+  items: QueueItem[];
+}
+/**
+ * Request for `session/queue/delete`.
+ */
+export interface QueueDeleteRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/queue/delete';
+  params: QueueDeleteParams;
+}
+/**
+ * Parameters of `session/queue/delete`.
+ */
+export interface QueueDeleteParams {
+  /**
+   * The item to remove.
+   */
+  itemId: string;
+  /**
+   * The session.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `session/queue/delete`.
+ */
+export interface QueueDeleteResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: QueueState;
+}
+/**
+ * Request for `session/queue/reorder`.
+ */
+export interface QueueReorderRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/queue/reorder';
+  params: QueueReorderParams;
+}
+/**
+ * Parameters of `session/queue/reorder`.
+ */
+export interface QueueReorderParams {
+  /**
+   * Every queued item's id, each once, in the new order.
+   */
+  itemIds: string[];
+  /**
+   * The session.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `session/queue/reorder`.
+ */
+export interface QueueReorderResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: QueueState;
+}
+/**
+ * Request for `session/getEntries`.
+ */
+export interface SessionGetEntriesRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/getEntries';
+  params: GetEntriesParams;
+}
+/**
+ * Parameters of `session/getEntries`.
+ */
+export interface GetEntriesParams {
+  /**
+   * The session.
+   */
+  sessionId: SessionId;
+  /**
+   * The last `seq` Core received in order; the answer starts after it.
+   */
+  since: number;
+}
+/**
+ * Successful response to `session/getEntries`.
+ */
+export interface SessionGetEntriesResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SessionEntries;
+}
+/**
+ * Result of `session/getEntries`.
+ */
+export interface SessionEntries {
+  /**
+   * Whether `entries` starts right after `since`: false when the buffer dropped some of
+   * them.
+   */
+  complete: boolean;
+  /**
+   * The notifications with `seq` greater than `since`, in `seq` order.
+   */
+  entries: SessionEventNotification[];
+}
+/**
+ * Request for `session/history`.
+ */
+export interface SessionHistoryRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/history';
+  params: HistoryParams;
+}
+/**
+ * Parameters of `session/history`.
+ */
+export interface HistoryParams {
+  /**
+   * Its working directory (where its file is stored).
+   */
+  cwd: string;
+  /**
+   * The most items to return (1 to 1000).
+   */
+  limit: number;
+  /**
+   * The session; it does not need to be open.
+   */
+  sessionId: SessionId;
+  /**
+   * Index of the first item; the last `limit` items when absent.
+   */
+  start?: number | null;
+}
+/**
+ * Successful response to `session/history`.
+ */
+export interface SessionHistoryResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: HistoryWindow;
+}
+/**
+ * Result of `session/history`: items `start .. start + items.len()` of `total`.
+ */
+export interface HistoryWindow {
+  /**
+   * The items, in conversation order.
+   */
+  items: HistoryItem[];
+  /**
+   * Index of the first returned item.
+   */
+  start: number;
+  /**
+   * How many items the history has.
+   */
+  total: number;
+}
+/**
+ * One item of the history.
+ */
+export interface HistoryItem {
+  /**
+   * The Pi entry the item comes from (for a tool call: the assistant message's entry).
+   */
+  entryId: string;
+  /**
+   * The item in its final state.
+   */
+  item: Item;
 }
 /**
  * Request for `trust/get`.
@@ -1734,6 +2332,35 @@ export interface TurnCompletedParams {
    * The turn that ended.
    */
   turnId: TurnId;
+  /**
+   * Token use and cost of the turn's model responses.
+   */
+  usage?: TurnUsage | null;
+}
+/**
+ * Token use and cost of a turn: the sum over the model responses it received.
+ */
+export interface TurnUsage {
+  /**
+   * Tokens read from the prompt cache.
+   */
+  cacheReadTokens: number;
+  /**
+   * Tokens written to the prompt cache.
+   */
+  cacheWriteTokens: number;
+  /**
+   * Cost in US dollars, from the model catalog's prices.
+   */
+  cost: number;
+  /**
+   * Input tokens, excluding cache reads and writes.
+   */
+  inputTokens: number;
+  /**
+   * Output tokens.
+   */
+  outputTokens: number;
 }
 /**
  * Notification `item/started`.
@@ -1744,11 +2371,11 @@ export interface ItemStartedNotification {
   params: ItemEventParams;
 }
 /**
- * Parameters of `item/started` and `item/completed`.
+ * Parameters of `item/started`, `item/updated` and `item/completed`.
  */
 export interface ItemEventParams {
   /**
-   * The item's state: `inProgress` when started, final when completed.
+   * The item's state: `inProgress` when started and updated, final when completed.
    */
   item: Item;
   /**
@@ -1769,6 +2396,14 @@ export interface ItemEventParams {
   turnId: TurnId;
 }
 /**
+ * Notification `item/updated`.
+ */
+export interface ItemUpdatedNotification {
+  jsonrpc: JsonRpcVersion;
+  method: 'item/updated';
+  params: ItemEventParams;
+}
+/**
  * Notification `item/completed`.
  */
 export interface ItemCompletedNotification {
@@ -1782,18 +2417,18 @@ export interface ItemCompletedNotification {
 export interface ItemAgentMessageDeltaNotification {
   jsonrpc: JsonRpcVersion;
   method: 'item/agentMessage/delta';
-  params: AgentMessageDeltaParams;
+  params: ItemDeltaParams;
 }
 /**
- * Parameters of `item/agentMessage/delta`.
+ * Parameters of `item/agentMessage/delta` and `item/reasoning/delta`.
  */
-export interface AgentMessageDeltaParams {
+export interface ItemDeltaParams {
   /**
    * Text to append.
    */
   delta: string;
   /**
-   * The `agentMessage` item being extended.
+   * The `agentMessage` or `reasoning` item being extended.
    */
   itemId: ItemId;
   /**
@@ -1812,4 +2447,125 @@ export interface AgentMessageDeltaParams {
    * The turn the item belongs to.
    */
   turnId: TurnId;
+}
+/**
+ * Notification `item/reasoning/delta`.
+ */
+export interface ItemReasoningDeltaNotification {
+  jsonrpc: JsonRpcVersion;
+  method: 'item/reasoning/delta';
+  params: ItemDeltaParams;
+}
+/**
+ * Notification `turn/retrying`.
+ */
+export interface TurnRetryingNotification {
+  jsonrpc: JsonRpcVersion;
+  method: 'turn/retrying';
+  params: TurnRetryingParams;
+}
+/**
+ * Parameters of `turn/retrying`: a model request failed with a recoverable error (rate
+ * limit, overload, server error) and is retried after `delayMs`. The failed attempt never
+ * reaches the model's context.
+ */
+export interface TurnRetryingParams {
+  /**
+   * The retry about to happen, from 1.
+   */
+  attempt: number;
+  /**
+   * Wait before the retry, in milliseconds.
+   */
+  delayMs: number;
+  /**
+   * The error of the failed attempt.
+   */
+  errorMessage: string;
+  /**
+   * The most retries the turn makes.
+   */
+  maxAttempts: number;
+  /**
+   * Sequence number, monotonically increasing within the session.
+   */
+  seq: number;
+  /**
+   * The session the event belongs to.
+   */
+  sessionId: SessionId;
+  /**
+   * Time the event was produced, in milliseconds since the Unix epoch (UTC).
+   */
+  ts: number;
+  /**
+   * The turn being retried.
+   */
+  turnId: TurnId;
+}
+/**
+ * Notification `session/queueChanged`.
+ */
+export interface QueueChangedNotification {
+  jsonrpc: JsonRpcVersion;
+  method: 'session/queueChanged';
+  params: QueueChangedParams;
+}
+/**
+ * Parameters of `session/queueChanged`.
+ */
+export interface QueueChangedParams {
+  /**
+   * The queued items, in queue order.
+   */
+  items: QueueItem[];
+  /**
+   * Sequence number, monotonically increasing within the session.
+   */
+  seq: number;
+  /**
+   * The session the event belongs to.
+   */
+  sessionId: SessionId;
+  /**
+   * Time the event was produced, in milliseconds since the Unix epoch (UTC).
+   */
+  ts: number;
+}
+/**
+ * Notification `harness/entry`.
+ */
+export interface HarnessEntryNotification {
+  jsonrpc: JsonRpcVersion;
+  method: 'harness/entry';
+  params: HarnessEntryParams;
+}
+/**
+ * Parameters of `harness/entry`.
+ */
+export interface HarnessEntryParams {
+  /**
+   * The entry's type, for example `piarc.todo`.
+   */
+  customType: string;
+  /**
+   * The entry's data.
+   */
+  data?: unknown;
+  /**
+   * Pi's id of the custom entry.
+   */
+  entryId: string;
+  /**
+   * Sequence number, monotonically increasing within the session.
+   */
+  seq: number;
+  /**
+   * The session the event belongs to.
+   */
+  sessionId: SessionId;
+  /**
+   * Time the event was produced, in milliseconds since the Unix epoch (UTC).
+   */
+  ts: number;
 }

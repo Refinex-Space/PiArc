@@ -58,6 +58,7 @@ const ajv = new Ajv2020({
     int32: { type: 'number', validate: (n: number) => integer(-(2 ** 31))(n) && n < 2 ** 31 },
     int64: { type: 'number', validate: integer(Number.MIN_SAFE_INTEGER) },
     uint64: { type: 'number', validate: integer(0) },
+    double: { type: 'number', validate: Number.isFinite },
   },
 });
 const rootSchema = readJson(path.join(schemaDir, 'ahp.schema.json'));

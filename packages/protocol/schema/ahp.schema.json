@@ -1,40 +1,5 @@
 {
   "$defs": {
-    "AgentMessageDeltaParams": {
-      "description": "Parameters of `item/agentMessage/delta`.",
-      "properties": {
-        "delta": {
-          "description": "Text to append.",
-          "type": "string"
-        },
-        "itemId": {
-          "$ref": "#/$defs/ItemId",
-          "description": "The `agentMessage` item being extended."
-        },
-        "seq": {
-          "description": "Sequence number, monotonically increasing within the session.",
-          "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "sessionId": {
-          "$ref": "#/$defs/SessionId",
-          "description": "The session the event belongs to."
-        },
-        "ts": {
-          "description": "Time the event was produced, in milliseconds since the Unix epoch (UTC).",
-          "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "turnId": {
-          "$ref": "#/$defs/TurnId",
-          "description": "The turn the item belongs to."
-        }
-      },
-      "required": ["sessionId", "seq", "ts", "turnId", "itemId", "delta"],
-      "type": "object"
-    },
     "BlobRef": {
       "description": "A copy of a file's content kept by Core (ADR-0009 rule 8).",
       "properties": {
@@ -59,6 +24,26 @@
     "Capability": {
       "description": "A named optional protocol feature, for example `planMode`.\n\nCapabilities are open strings rather than an enum: a peer must accept capability names\nit does not know, because that is how newer minor versions announce additions.",
       "type": "string"
+    },
+    "CompactionReason": {
+      "description": "Why a compaction ran.",
+      "oneOf": [
+        {
+          "const": "manual",
+          "description": "The user asked for it.",
+          "type": "string"
+        },
+        {
+          "const": "threshold",
+          "description": "The context crossed the automatic compaction threshold.",
+          "type": "string"
+        },
+        {
+          "const": "overflow",
+          "description": "The model rejected the context as too long; the turn continues after compaction.",
+          "type": "string"
+        }
+      ]
     },
     "CoreWelcome": {
       "description": "Result of `host/hello` (`core/welcome`).",
@@ -237,6 +222,11 @@
         {
           "const": "releaseIntegrity",
           "description": "A release manifest's signature or a downloaded artefact's size or SHA-256 did not\nverify; the update must be refused (ADR-0018 rule 4). `details`: `{ reason, file? }`\nwith `reason` one of `noTrustedKey`, `malformedSignature`, `unknownKey`,\n`badSignature`, `malformedManifest`, `notListed`, `sizeMismatch`, `hashMismatch`.",
+          "type": "string"
+        },
+        {
+          "const": "queueItemNotFound",
+          "description": "A `session/queue/*` request named a queued input that is no longer waiting: it was\ndelivered to the model or removed meanwhile. `details`: `{ sessionId, itemId }`.",
           "type": "string"
         }
       ]
@@ -1230,6 +1220,23 @@
       "required": ["path", "bytesWritten"],
       "type": "object"
     },
+    "GetEntriesParams": {
+      "description": "Parameters of `session/getEntries`.",
+      "properties": {
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session."
+        },
+        "since": {
+          "description": "The last `seq` Core received in order; the answer starts after it.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["sessionId", "since"],
+      "type": "object"
+    },
     "GrepLine": {
       "description": "One line of grep output: a match or a context line.",
       "properties": {
@@ -1253,6 +1260,125 @@
         }
       },
       "required": ["path", "lineNumber", "text", "isMatch"],
+      "type": "object"
+    },
+    "HarnessEntryNotification": {
+      "description": "Notification `harness/entry`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "harness/entry",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/HarnessEntryParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "HarnessEntryParams": {
+      "description": "Parameters of `harness/entry`.",
+      "properties": {
+        "customType": {
+          "description": "The entry's type, for example `piarc.todo`.",
+          "type": "string"
+        },
+        "data": {
+          "description": "The entry's data."
+        },
+        "entryId": {
+          "description": "Pi's id of the custom entry.",
+          "type": "string"
+        },
+        "seq": {
+          "description": "Sequence number, monotonically increasing within the session.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session the event belongs to."
+        },
+        "ts": {
+          "description": "Time the event was produced, in milliseconds since the Unix epoch (UTC).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["sessionId", "seq", "ts", "entryId", "customType"],
+      "type": "object"
+    },
+    "HistoryItem": {
+      "description": "One item of the history.",
+      "properties": {
+        "entryId": {
+          "description": "The Pi entry the item comes from (for a tool call: the assistant message's entry).",
+          "type": "string"
+        },
+        "item": {
+          "$ref": "#/$defs/Item",
+          "description": "The item in its final state."
+        }
+      },
+      "required": ["entryId", "item"],
+      "type": "object"
+    },
+    "HistoryParams": {
+      "description": "Parameters of `session/history`.",
+      "properties": {
+        "cwd": {
+          "description": "Its working directory (where its file is stored).",
+          "type": "string"
+        },
+        "limit": {
+          "description": "The most items to return (1 to 1000).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session; it does not need to be open."
+        },
+        "start": {
+          "description": "Index of the first item; the last `limit` items when absent.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        }
+      },
+      "required": ["sessionId", "cwd", "limit"],
+      "type": "object"
+    },
+    "HistoryWindow": {
+      "description": "Result of `session/history`: items `start .. start + items.len()` of `total`.",
+      "properties": {
+        "items": {
+          "description": "The items, in conversation order.",
+          "items": {
+            "$ref": "#/$defs/HistoryItem"
+          },
+          "type": "array"
+        },
+        "start": {
+          "description": "Index of the first returned item.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "total": {
+          "description": "How many items the history has.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["start", "total", "items"],
       "type": "object"
     },
     "HostHelloParams": {
@@ -1475,15 +1601,73 @@
       ],
       "type": "object"
     },
-    "Item": {
-      "description": "An item in its current state, discriminated by the `type` member. Every variant\ncarries `itemId` and `status`.",
+    "InputAccepted": {
+      "description": "Result of `session/steer` and `session/followUp`.",
       "oneOf": [
+        {
+          "description": "A turn was running: the input waits in the queue under `itemId`.",
+          "properties": {
+            "disposition": {
+              "const": "queued",
+              "type": "string"
+            },
+            "itemId": {
+              "description": "The queued item.",
+              "type": "string"
+            }
+          },
+          "required": ["disposition", "itemId"],
+          "type": "object"
+        },
+        {
+          "description": "The session was idle: the input started turn `turnId`, as a prompt would.",
+          "properties": {
+            "disposition": {
+              "const": "started",
+              "type": "string"
+            },
+            "turnId": {
+              "$ref": "#/$defs/TurnId",
+              "description": "The new turn."
+            }
+          },
+          "required": ["disposition", "turnId"],
+          "type": "object"
+        }
+      ]
+    },
+    "Item": {
+      "description": "An item in its current state, discriminated by the `type` member. Every variant carries\n`itemId` and `status`.\n\nTool calls are items too: the Agent Host maps each canonical tool name to one of the tool\nitem types (architecture section 5.3) and every tool item carries the canonical `tool`\nname, the `arguments` the model gave and, once known, the `output` text the model sees\n(bounded; longer text keeps its end and starts with a truncation note). Whether a tool\ncall succeeded comes from the tool layer's own result, never from an exit code.",
+      "oneOf": [
+        {
+          "description": "Input the user gave: the prompt that started the turn, or a steering or follow-up\nmessage when the model receives it.",
+          "properties": {
+            "itemId": {
+              "$ref": "#/$defs/ItemId",
+              "description": "The item's identifier."
+            },
+            "status": {
+              "$ref": "#/$defs/ItemStatus",
+              "description": "Lifecycle state (always `completed`)."
+            },
+            "text": {
+              "description": "The text.",
+              "type": "string"
+            },
+            "type": {
+              "const": "userMessage",
+              "type": "string"
+            }
+          },
+          "required": ["type", "itemId", "status", "text"],
+          "type": "object"
+        },
         {
           "description": "Text produced by the agent.",
           "properties": {
             "itemId": {
               "$ref": "#/$defs/ItemId",
-              "description": "The item's identifier."
+              "description": "The item's identifier: `<messageId>#<contentIndex>`."
             },
             "status": {
               "$ref": "#/$defs/ItemStatus",
@@ -1499,6 +1683,213 @@
             }
           },
           "required": ["type", "itemId", "status", "text"],
+          "type": "object"
+        },
+        {
+          "description": "The model's visible reasoning (thinking).",
+          "properties": {
+            "itemId": {
+              "$ref": "#/$defs/ItemId",
+              "description": "The item's identifier: `<messageId>#<contentIndex>`."
+            },
+            "status": {
+              "$ref": "#/$defs/ItemStatus",
+              "description": "Lifecycle state."
+            },
+            "text": {
+              "description": "The reasoning text accumulated so far (complete in `item/completed`).",
+              "type": "string"
+            },
+            "type": {
+              "const": "reasoning",
+              "type": "string"
+            }
+          },
+          "required": ["type", "itemId", "status", "text"],
+          "type": "object"
+        },
+        {
+          "description": "A shell command (`Bash`, `PowerShell`).",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "description": "The arguments the tool was called with.",
+              "type": "object"
+            },
+            "command": {
+              "description": "The command line.",
+              "type": "string"
+            },
+            "itemId": {
+              "$ref": "#/$defs/ItemId",
+              "description": "The item's identifier: the tool call id."
+            },
+            "output": {
+              "description": "The output the model sees: so far in `item/updated`, final in `item/completed`.",
+              "type": ["string", "null"]
+            },
+            "status": {
+              "$ref": "#/$defs/ItemStatus",
+              "description": "Lifecycle state."
+            },
+            "tool": {
+              "description": "Canonical tool name.",
+              "type": "string"
+            },
+            "type": {
+              "const": "commandExecution",
+              "type": "string"
+            }
+          },
+          "required": ["type", "itemId", "status", "tool", "arguments", "command"],
+          "type": "object"
+        },
+        {
+          "description": "A file write or edit (`Write`, `Edit`, `NotebookEdit`). The structured diff arrives\nwith the file tools of T16.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "description": "The arguments the tool was called with.",
+              "type": "object"
+            },
+            "itemId": {
+              "$ref": "#/$defs/ItemId",
+              "description": "The item's identifier: the tool call id."
+            },
+            "output": {
+              "description": "The text the tool returned, in `item/completed`.",
+              "type": ["string", "null"]
+            },
+            "path": {
+              "description": "The file, as the model named it.",
+              "type": "string"
+            },
+            "status": {
+              "$ref": "#/$defs/ItemStatus",
+              "description": "Lifecycle state."
+            },
+            "tool": {
+              "description": "Canonical tool name.",
+              "type": "string"
+            },
+            "type": {
+              "const": "fileChange",
+              "type": "string"
+            }
+          },
+          "required": ["type", "itemId", "status", "tool", "arguments", "path"],
+          "type": "object"
+        },
+        {
+          "description": "A tool of an MCP server (`mcp__<server>__<tool>`).",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "description": "The arguments the tool was called with.",
+              "type": "object"
+            },
+            "itemId": {
+              "$ref": "#/$defs/ItemId",
+              "description": "The item's identifier: the tool call id."
+            },
+            "output": {
+              "description": "The text the tool returned, in `item/completed`.",
+              "type": ["string", "null"]
+            },
+            "server": {
+              "description": "The MCP server's name.",
+              "type": "string"
+            },
+            "serverTool": {
+              "description": "The tool's name on the server.",
+              "type": "string"
+            },
+            "status": {
+              "$ref": "#/$defs/ItemStatus",
+              "description": "Lifecycle state."
+            },
+            "tool": {
+              "description": "Canonical tool name.",
+              "type": "string"
+            },
+            "type": {
+              "const": "mcpToolCall",
+              "type": "string"
+            }
+          },
+          "required": ["type", "itemId", "status", "tool", "arguments", "server", "serverTool"],
+          "type": "object"
+        },
+        {
+          "description": "A subagent run (`Agent`).",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "description": "The arguments the tool was called with.",
+              "type": "object"
+            },
+            "description": {
+              "description": "The task description the model gave, when it gave one.",
+              "type": ["string", "null"]
+            },
+            "itemId": {
+              "$ref": "#/$defs/ItemId",
+              "description": "The item's identifier: the tool call id."
+            },
+            "output": {
+              "description": "The subagent's final answer, in `item/completed`.",
+              "type": ["string", "null"]
+            },
+            "status": {
+              "$ref": "#/$defs/ItemStatus",
+              "description": "Lifecycle state."
+            },
+            "tool": {
+              "description": "Canonical tool name.",
+              "type": "string"
+            },
+            "type": {
+              "const": "subagent",
+              "type": "string"
+            }
+          },
+          "required": ["type", "itemId", "status", "tool", "arguments"],
+          "type": "object"
+        },
+        {
+          "description": "A web page fetch (`WebFetch`).",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "description": "The arguments the tool was called with.",
+              "type": "object"
+            },
+            "itemId": {
+              "$ref": "#/$defs/ItemId",
+              "description": "The item's identifier: the tool call id."
+            },
+            "output": {
+              "description": "The text the tool returned, in `item/completed`.",
+              "type": ["string", "null"]
+            },
+            "status": {
+              "$ref": "#/$defs/ItemStatus",
+              "description": "Lifecycle state."
+            },
+            "tool": {
+              "description": "Canonical tool name.",
+              "type": "string"
+            },
+            "type": {
+              "const": "webFetch",
+              "type": "string"
+            },
+            "url": {
+              "description": "The address.",
+              "type": "string"
+            }
+          },
+          "required": ["type", "itemId", "status", "tool", "arguments", "url"],
           "type": "object"
         },
         {
@@ -1522,7 +1913,7 @@
               "description": "Lifecycle state."
             },
             "tool": {
-              "description": "The tool's name.",
+              "description": "Canonical tool name.",
               "type": "string"
             },
             "type": {
@@ -1531,6 +1922,45 @@
             }
           },
           "required": ["type", "itemId", "status", "tool", "arguments"],
+          "type": "object"
+        },
+        {
+          "description": "The conversation was compacted: older messages were replaced by a summary.",
+          "properties": {
+            "errorMessage": {
+              "description": "What went wrong, when it failed.",
+              "type": ["string", "null"]
+            },
+            "itemId": {
+              "$ref": "#/$defs/ItemId",
+              "description": "The item's identifier."
+            },
+            "reason": {
+              "$ref": "#/$defs/CompactionReason",
+              "description": "Why it ran."
+            },
+            "status": {
+              "$ref": "#/$defs/ItemStatus",
+              "description": "Lifecycle state: `completed`, or `failed` / `interrupted` when no summary replaced\nthe context."
+            },
+            "tokensAfter": {
+              "description": "Estimated context tokens after, once known.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": ["integer", "null"]
+            },
+            "tokensBefore": {
+              "description": "Estimated context tokens before, once known.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": ["integer", "null"]
+            },
+            "type": {
+              "const": "contextCompaction",
+              "type": "string"
+            }
+          },
+          "required": ["type", "itemId", "status", "reason"],
           "type": "object"
         }
       ]
@@ -1546,7 +1976,7 @@
           "type": "string"
         },
         "params": {
-          "$ref": "#/$defs/AgentMessageDeltaParams"
+          "$ref": "#/$defs/ItemDeltaParams"
         }
       },
       "required": ["jsonrpc", "method", "params"],
@@ -1569,12 +1999,47 @@
       "required": ["jsonrpc", "method", "params"],
       "type": "object"
     },
+    "ItemDeltaParams": {
+      "description": "Parameters of `item/agentMessage/delta` and `item/reasoning/delta`.",
+      "properties": {
+        "delta": {
+          "description": "Text to append.",
+          "type": "string"
+        },
+        "itemId": {
+          "$ref": "#/$defs/ItemId",
+          "description": "The `agentMessage` or `reasoning` item being extended."
+        },
+        "seq": {
+          "description": "Sequence number, monotonically increasing within the session.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session the event belongs to."
+        },
+        "ts": {
+          "description": "Time the event was produced, in milliseconds since the Unix epoch (UTC).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "turnId": {
+          "$ref": "#/$defs/TurnId",
+          "description": "The turn the item belongs to."
+        }
+      },
+      "required": ["sessionId", "seq", "ts", "turnId", "itemId", "delta"],
+      "type": "object"
+    },
     "ItemEventParams": {
-      "description": "Parameters of `item/started` and `item/completed`.",
+      "description": "Parameters of `item/started`, `item/updated` and `item/completed`.",
       "properties": {
         "item": {
           "$ref": "#/$defs/Item",
-          "description": "The item's state: `inProgress` when started, final when completed."
+          "description": "The item's state: `inProgress` when started and updated, final when completed."
         },
         "seq": {
           "description": "Sequence number, monotonically increasing within the session.",
@@ -1603,6 +2068,23 @@
     "ItemId": {
       "description": "Item identifier, unique within a session.",
       "type": "string"
+    },
+    "ItemReasoningDeltaNotification": {
+      "description": "Notification `item/reasoning/delta`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "item/reasoning/delta",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ItemDeltaParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
     },
     "ItemStartedNotification": {
       "description": "Notification `item/started`.",
@@ -1650,6 +2132,23 @@
           "type": "string"
         }
       ]
+    },
+    "ItemUpdatedNotification": {
+      "description": "Notification `item/updated`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "item/updated",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ItemEventParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
     },
     "JsonRpcVersion": {
       "const": "2.0",
@@ -1720,6 +2219,264 @@
       "description": "Protocol version as \"major.minor\", for example \"1.0\".",
       "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
       "type": "string"
+    },
+    "QueueChangedNotification": {
+      "description": "Notification `session/queueChanged`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/queueChanged",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/QueueChangedParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "QueueChangedParams": {
+      "description": "Parameters of `session/queueChanged`.",
+      "properties": {
+        "items": {
+          "description": "The queued items, in queue order.",
+          "items": {
+            "$ref": "#/$defs/QueueItem"
+          },
+          "type": "array"
+        },
+        "seq": {
+          "description": "Sequence number, monotonically increasing within the session.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session the event belongs to."
+        },
+        "ts": {
+          "description": "Time the event was produced, in milliseconds since the Unix epoch (UTC).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["sessionId", "seq", "ts", "items"],
+      "type": "object"
+    },
+    "QueueDeleteParams": {
+      "description": "Parameters of `session/queue/delete`.",
+      "properties": {
+        "itemId": {
+          "description": "The item to remove.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session."
+        }
+      },
+      "required": ["sessionId", "itemId"],
+      "type": "object"
+    },
+    "QueueDeleteRequest": {
+      "description": "Request for `session/queue/delete`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/queue/delete",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/QueueDeleteParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "QueueDeleteResponse": {
+      "description": "Successful response to `session/queue/delete`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/QueueState"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "QueueEditParams": {
+      "description": "Parameters of `session/queue/edit`.",
+      "properties": {
+        "itemId": {
+          "description": "The item to change.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session."
+        },
+        "text": {
+          "description": "Its new text.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "itemId", "text"],
+      "type": "object"
+    },
+    "QueueEditRequest": {
+      "description": "Request for `session/queue/edit`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/queue/edit",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/QueueEditParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "QueueEditResponse": {
+      "description": "Successful response to `session/queue/edit`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/QueueState"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "QueueItem": {
+      "description": "One queued input.",
+      "properties": {
+        "itemId": {
+          "description": "The item's id, unique within the session.",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/QueueKind",
+          "description": "How it is delivered."
+        },
+        "text": {
+          "description": "The text.",
+          "type": "string"
+        }
+      },
+      "required": ["itemId", "kind", "text"],
+      "type": "object"
+    },
+    "QueueKind": {
+      "description": "How a queued input is delivered.",
+      "oneOf": [
+        {
+          "const": "steer",
+          "description": "Reaches the model after the current step of the running turn.",
+          "type": "string"
+        },
+        {
+          "const": "followUp",
+          "description": "Starts a new turn after the running turn completes.",
+          "type": "string"
+        }
+      ]
+    },
+    "QueueReorderParams": {
+      "description": "Parameters of `session/queue/reorder`.",
+      "properties": {
+        "itemIds": {
+          "description": "Every queued item's id, each once, in the new order.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session."
+        }
+      },
+      "required": ["sessionId", "itemIds"],
+      "type": "object"
+    },
+    "QueueReorderRequest": {
+      "description": "Request for `session/queue/reorder`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/queue/reorder",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/QueueReorderParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "QueueReorderResponse": {
+      "description": "Successful response to `session/queue/reorder`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/QueueState"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "QueueState": {
+      "description": "The whole queue, in order: the result of `session/queue/*` and the payload of\n`session/queueChanged`.",
+      "properties": {
+        "items": {
+          "description": "The queued items, in queue order.",
+          "items": {
+            "$ref": "#/$defs/QueueItem"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["items"],
+      "type": "object"
     },
     "ReadMode": {
       "description": "How `fs/read` returns the content.",
@@ -2323,6 +3080,17 @@
             }
           ],
           "description": "Model to start with; the Agent Host's configured default when absent."
+        },
+        "sessionId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The new session's id, chosen by Core so that a timed-out request can still be\nreconciled (closed or resumed) under a known id; the Agent Host chooses one when\nabsent. Letters, digits, `.`, `_` and `-`, at most 128 characters."
         }
       },
       "required": ["cwd"],
@@ -2363,6 +3131,24 @@
         }
       },
       "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SessionEntries": {
+      "description": "Result of `session/getEntries`.",
+      "properties": {
+        "complete": {
+          "description": "Whether `entries` starts right after `since`: false when the buffer dropped some of\nthem.",
+          "type": "boolean"
+        },
+        "entries": {
+          "description": "The notifications with `seq` greater than `since`, in `seq` order.",
+          "items": {
+            "$ref": "#/$defs/SessionEventNotification"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["entries", "complete"],
       "type": "object"
     },
     "SessionEventNotification": {
@@ -2408,9 +3194,195 @@
       "required": ["sessionId", "seq", "ts"],
       "type": "object"
     },
+    "SessionFollowUpRequest": {
+      "description": "Request for `session/followUp`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/followUp",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SessionInputParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionFollowUpResponse": {
+      "description": "Successful response to `session/followUp`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/InputAccepted"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SessionForkParams": {
+      "description": "Parameters of `session/fork`.",
+      "properties": {
+        "cwd": {
+          "description": "Its working directory, which the new session shares.",
+          "type": "string"
+        },
+        "entryId": {
+          "description": "The last entry to keep; the source's current position when absent.",
+          "type": ["string", "null"]
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session to copy."
+        }
+      },
+      "required": ["sessionId", "cwd"],
+      "type": "object"
+    },
+    "SessionForkRequest": {
+      "description": "Request for `session/fork`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/fork",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SessionForkParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionForkResponse": {
+      "description": "Successful response to `session/fork`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SessionOpened"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SessionGetEntriesRequest": {
+      "description": "Request for `session/getEntries`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/getEntries",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/GetEntriesParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionGetEntriesResponse": {
+      "description": "Successful response to `session/getEntries`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SessionEntries"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SessionHistoryRequest": {
+      "description": "Request for `session/history`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/history",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/HistoryParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionHistoryResponse": {
+      "description": "Successful response to `session/history`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/HistoryWindow"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
     "SessionId": {
       "description": "Session identifier.",
       "type": "string"
+    },
+    "SessionInputParams": {
+      "description": "Parameters of `session/steer` and `session/followUp`.",
+      "properties": {
+        "requestId": {
+          "description": "Idempotency key chosen by Core; repeating it returns the first answer.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session."
+        },
+        "text": {
+          "description": "The user's input.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "requestId", "text"],
+      "type": "object"
     },
     "SessionOpened": {
       "description": "Result of `session/create` and `session/resume`.",
@@ -2543,6 +3515,43 @@
       "required": ["jsonrpc", "id", "result"],
       "type": "object"
     },
+    "SessionSteerRequest": {
+      "description": "Request for `session/steer`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/steer",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SessionInputParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionSteerResponse": {
+      "description": "Successful response to `session/steer`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/InputAccepted"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
     "SessionStopped": {
       "description": "Result of `session/close` and `session/abort`.",
       "properties": {
@@ -2556,6 +3565,13 @@
             }
           ],
           "description": "The turn that was running and got interrupted, if any."
+        },
+        "returnedQueue": {
+          "description": "The inputs that were still queued, in queue order: they did not run and the client can\noffer them for editing again.",
+          "items": {
+            "$ref": "#/$defs/QueueItem"
+          },
+          "type": "array"
         },
         "sessionId": {
           "$ref": "#/$defs/SessionId",
@@ -2716,6 +3732,17 @@
         "turnId": {
           "$ref": "#/$defs/TurnId",
           "description": "The turn that ended."
+        },
+        "usage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnUsage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Token use and cost of the turn's model responses."
         }
       },
       "required": ["sessionId", "seq", "ts", "turnId", "status"],
@@ -2724,6 +3751,81 @@
     "TurnId": {
       "description": "Turn identifier, unique within a session.",
       "type": "string"
+    },
+    "TurnRetryingNotification": {
+      "description": "Notification `turn/retrying`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "turn/retrying",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/TurnRetryingParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "TurnRetryingParams": {
+      "description": "Parameters of `turn/retrying`: a model request failed with a recoverable error (rate\nlimit, overload, server error) and is retried after `delayMs`. The failed attempt never\nreaches the model's context.",
+      "properties": {
+        "attempt": {
+          "description": "The retry about to happen, from 1.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "delayMs": {
+          "description": "Wait before the retry, in milliseconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "errorMessage": {
+          "description": "The error of the failed attempt.",
+          "type": "string"
+        },
+        "maxAttempts": {
+          "description": "The most retries the turn makes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "seq": {
+          "description": "Sequence number, monotonically increasing within the session.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session the event belongs to."
+        },
+        "ts": {
+          "description": "Time the event was produced, in milliseconds since the Unix epoch (UTC).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "turnId": {
+          "$ref": "#/$defs/TurnId",
+          "description": "The turn being retried."
+        }
+      },
+      "required": [
+        "sessionId",
+        "seq",
+        "ts",
+        "turnId",
+        "attempt",
+        "maxAttempts",
+        "delayMs",
+        "errorMessage"
+      ],
+      "type": "object"
     },
     "TurnStartedNotification": {
       "description": "Notification `turn/started`.",
@@ -2788,6 +3890,42 @@
           "type": "string"
         }
       ]
+    },
+    "TurnUsage": {
+      "description": "Token use and cost of a turn: the sum over the model responses it received.",
+      "properties": {
+        "cacheReadTokens": {
+          "description": "Tokens read from the prompt cache.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cacheWriteTokens": {
+          "description": "Tokens written to the prompt cache.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cost": {
+          "description": "Cost in US dollars, from the model catalog's prices.",
+          "format": "double",
+          "type": "number"
+        },
+        "inputTokens": {
+          "description": "Input tokens, excluding cache reads and writes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outputTokens": {
+          "description": "Output tokens.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens", "cost"],
+      "type": "object"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2854,6 +3992,54 @@
     },
     {
       "$ref": "#/$defs/SessionPromptResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionForkRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionForkResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionSteerRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionSteerResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionFollowUpRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionFollowUpResponse"
+    },
+    {
+      "$ref": "#/$defs/QueueEditRequest"
+    },
+    {
+      "$ref": "#/$defs/QueueEditResponse"
+    },
+    {
+      "$ref": "#/$defs/QueueDeleteRequest"
+    },
+    {
+      "$ref": "#/$defs/QueueDeleteResponse"
+    },
+    {
+      "$ref": "#/$defs/QueueReorderRequest"
+    },
+    {
+      "$ref": "#/$defs/QueueReorderResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionGetEntriesRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionGetEntriesResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionHistoryRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionHistoryResponse"
     },
     {
       "$ref": "#/$defs/TrustGetRequest"
@@ -2967,10 +4153,25 @@
       "$ref": "#/$defs/ItemStartedNotification"
     },
     {
+      "$ref": "#/$defs/ItemUpdatedNotification"
+    },
+    {
       "$ref": "#/$defs/ItemCompletedNotification"
     },
     {
       "$ref": "#/$defs/ItemAgentMessageDeltaNotification"
+    },
+    {
+      "$ref": "#/$defs/ItemReasoningDeltaNotification"
+    },
+    {
+      "$ref": "#/$defs/TurnRetryingNotification"
+    },
+    {
+      "$ref": "#/$defs/QueueChangedNotification"
+    },
+    {
+      "$ref": "#/$defs/HarnessEntryNotification"
     }
   ],
   "description": "Any message covered by the Agent Host Protocol 1.0 contracts. Generated from the piarc-protocol crate by `npm run gen:protocol`; do not edit.",

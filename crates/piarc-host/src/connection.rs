@@ -26,7 +26,7 @@ use piarc_protocol::turn::TurnCompleted;
 use piarc_protocol::{ErrorKind, ErrorObject, FrameDecoder, encode_frame, negotiate};
 use serde_json::Value;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use tokio::sync::{Notify, mpsc, oneshot};
+use tokio::sync::{Notify, Semaphore, mpsc, oneshot};
 
 use crate::config::HostConfig;
 use crate::events::{EventSender, HostEvent};
@@ -123,6 +123,9 @@ pub(crate) struct Link {
     pub close_stdin: Arc<Notify>,
     pub pending: Arc<Mutex<Pending>>,
     pub activity: Arc<Activity>,
+    /// Set once Core accepted the handshake: requests from the Agent Host are dispatched only
+    /// on an accepted connection, never before `core/welcome` or after a refusal (R1-A7).
+    pub accepted: Arc<AtomicBool>,
 }
 
 /// A connection that completed its handshake.
@@ -189,19 +192,9 @@ pub(crate) async fn start(
         close_stdin,
         pending: Arc::new(Mutex::new(Pending::default())),
         activity: Arc::new(Activity::default()),
+        accepted: Arc::new(AtomicBool::new(false)),
     };
-    let (hello_tx, hello_rx) = oneshot::channel();
-    let (done_tx, reader_done) = oneshot::channel();
-    let reader = Reader {
-        shared: Arc::clone(shared),
-        link: link.clone(),
-        hello: Some(hello_tx),
-    };
-    tokio::spawn(reader.run(
-        stdout,
-        FrameDecoder::with_max_frame_bytes(config.max_frame_bytes),
-        done_tx,
-    ));
+    let (hello_rx, reader_done) = spawn_reader(config, shared, &link, stdout);
 
     let mut kill = Some(kill_tx);
     let hello = match tokio::time::timeout(config.handshake_timeout, hello_rx).await {
@@ -219,6 +212,9 @@ pub(crate) async fn start(
                 hello.id.clone(),
                 welcome.clone(),
             ));
+            // Before the welcome is queued: the Agent Host may send a request as soon as it
+            // reads it.
+            link.accepted.store(true, Ordering::Release);
             if link.writer.send(frame).await.is_err() {
                 return Err(StartError::Exited(exit_status(&mut exited, None).await));
             }
@@ -248,6 +244,30 @@ pub(crate) async fn start(
             Err(StartError::Rejected { error, status })
         }
     }
+}
+
+/// Starts the reader of `stdout`; returns where `host/hello` arrives and the signal that the
+/// reader saw the end of stdout.
+fn spawn_reader(
+    config: &HostConfig,
+    shared: &Arc<Shared>,
+    link: &Link,
+    stdout: Pin<Box<dyn AsyncRead + Send>>,
+) -> (oneshot::Receiver<Request>, oneshot::Receiver<()>) {
+    let (hello_tx, hello_rx) = oneshot::channel();
+    let (done_tx, reader_done) = oneshot::channel();
+    let reader = Reader {
+        shared: Arc::clone(shared),
+        link: link.clone(),
+        hello: Some(hello_tx),
+        inbound_permits: Arc::new(Semaphore::new(config.inbound_concurrency.max(1))),
+    };
+    tokio::spawn(reader.run(
+        stdout,
+        FrameDecoder::with_max_frame_bytes(config.max_frame_bytes),
+        done_tx,
+    ));
+    (hello_rx, reader_done)
 }
 
 /// Checks `host/hello` and builds `core/welcome`, or the error to refuse it with.
@@ -349,6 +369,9 @@ struct Reader {
     shared: Arc<Shared>,
     link: Link,
     hello: Option<oneshot::Sender<Request>>,
+    /// Bounds the Agent Host's requests in progress (R1-A14): the reader waits for a permit,
+    /// which pushes back on the Agent Host like a slow notification consumer does.
+    inbound_permits: Arc<Semaphore>,
 }
 
 impl Reader {
@@ -435,19 +458,23 @@ impl Reader {
             }
             return;
         }
-        if self.hello.is_some() {
+        if self.hello.is_some() || !self.link.accepted.load(Ordering::Acquire) {
             self.reply_error(
                 request.id,
                 ErrorKind::InvalidRequest,
-                "host/hello must come first",
+                "the handshake has not completed: host/hello must come first and be accepted",
             )
             .await;
             return;
         }
+        let Ok(permit) = Arc::clone(&self.inbound_permits).acquire_owned().await else {
+            return; // the semaphore is never closed
+        };
         let inbound = Arc::clone(&self.shared.inbound);
         let writer = self.link.writer.clone();
         let peer = Peer::new(writer.clone(), self.link.epoch);
         tokio::spawn(async move {
+            let _permit = permit;
             let id = request.id;
             let frame = match inbound
                 .handle(request.method, request.params.unwrap_or_default(), peer)

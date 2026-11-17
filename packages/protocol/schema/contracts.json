@@ -129,6 +129,102 @@
     },
     {
       "kind": "request",
+      "method": "session/fork",
+      "name": "session/fork",
+      "schema": "SessionForkRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/fork",
+      "name": "session/fork/result",
+      "schema": "SessionForkResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/steer",
+      "name": "session/steer",
+      "schema": "SessionSteerRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/steer",
+      "name": "session/steer/result",
+      "schema": "SessionSteerResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/followUp",
+      "name": "session/followUp",
+      "schema": "SessionFollowUpRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/followUp",
+      "name": "session/followUp/result",
+      "schema": "SessionFollowUpResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/queue/edit",
+      "name": "session/queue/edit",
+      "schema": "QueueEditRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/queue/edit",
+      "name": "session/queue/edit/result",
+      "schema": "QueueEditResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/queue/delete",
+      "name": "session/queue/delete",
+      "schema": "QueueDeleteRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/queue/delete",
+      "name": "session/queue/delete/result",
+      "schema": "QueueDeleteResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/queue/reorder",
+      "name": "session/queue/reorder",
+      "schema": "QueueReorderRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/queue/reorder",
+      "name": "session/queue/reorder/result",
+      "schema": "QueueReorderResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/getEntries",
+      "name": "session/getEntries",
+      "schema": "SessionGetEntriesRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/getEntries",
+      "name": "session/getEntries/result",
+      "schema": "SessionGetEntriesResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/history",
+      "name": "session/history",
+      "schema": "SessionHistoryRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/history",
+      "name": "session/history/result",
+      "schema": "SessionHistoryResponse"
+    },
+    {
+      "kind": "request",
       "method": "trust/get",
       "name": "trust/get",
       "schema": "TrustGetRequest"
@@ -351,6 +447,12 @@
     },
     {
       "kind": "notification",
+      "method": "item/updated",
+      "name": "item/updated",
+      "schema": "ItemUpdatedNotification"
+    },
+    {
+      "kind": "notification",
       "method": "item/completed",
       "name": "item/completed",
       "schema": "ItemCompletedNotification"
@@ -360,6 +462,30 @@
       "method": "item/agentMessage/delta",
       "name": "item/agentMessage/delta",
       "schema": "ItemAgentMessageDeltaNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "item/reasoning/delta",
+      "name": "item/reasoning/delta",
+      "schema": "ItemReasoningDeltaNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "turn/retrying",
+      "name": "turn/retrying",
+      "schema": "TurnRetryingNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "session/queueChanged",
+      "name": "session/queueChanged",
+      "schema": "QueueChangedNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "harness/entry",
+      "name": "harness/entry",
+      "schema": "HarnessEntryNotification"
     }
   ],
   "protocolVersion": "1.0"

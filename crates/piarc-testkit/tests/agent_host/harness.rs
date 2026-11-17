@@ -15,7 +15,7 @@ use piarc_core::secrets::{MemorySecretStore, SecretsConfig, SecretsService, test
 use piarc_core::tool_io::{ToolIo, ToolIoConfig};
 use piarc_core::trust::TrustService;
 use piarc_ports::BoxFuture;
-use piarc_protocol::session::{ModelRef, SessionEventNotification, SessionId};
+use piarc_protocol::session::{ModelRef, SessionCreateParams, SessionEventNotification, SessionId};
 use piarc_protocol::{ErrorKind, ErrorObject};
 use piarc_testkit::{MockProvider, RequestRecord, Scenario, ScenarioLibrary};
 use serde_json::{Map, Value, json};
@@ -485,7 +485,7 @@ pub async fn open(
     model_id: &str,
 ) -> SessionId {
     let id = supervisor
-        .create_session(cwd, model(model_id))
+        .create_session(SessionCreateParams::new(cwd).with_model(model(model_id)))
         .await
         .expect("session opens")
         .session_id;

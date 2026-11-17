@@ -1,0 +1,42 @@
+{
+  "jsonrpc": "2.0",
+  "id": 29,
+  "result": {
+    "start": 0,
+    "total": 3,
+    "items": [
+      {
+        "entryId": "e1",
+        "item": {
+          "type": "userMessage",
+          "itemId": "e1",
+          "status": "completed",
+          "text": "Rename a b/中文.txt"
+        }
+      },
+      {
+        "entryId": "e2",
+        "item": {
+          "type": "agentMessage",
+          "itemId": "e2#0",
+          "status": "completed",
+          "text": "Renaming it."
+        }
+      },
+      {
+        "entryId": "e2",
+        "item": {
+          "type": "commandExecution",
+          "itemId": "toolu_01",
+          "status": "completed",
+          "tool": "Bash",
+          "arguments": {
+            "command": "mv \"a b/中文.txt\" b.txt"
+          },
+          "command": "mv \"a b/中文.txt\" b.txt",
+          "output": ""
+        }
+      }
+    ]
+  }
+}

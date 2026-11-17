@@ -18,19 +18,24 @@ use serde_json::Value;
 use crate::exec::{ExecKill, ExecOutput, ExecRun};
 use crate::fs::{FsGlob, FsGrep, FsList, FsMkdir, FsRead, FsStat, FsWrite};
 use crate::handshake::HostHello;
+use crate::history::{HarnessEntry, SessionGetEntries, SessionHistory};
 use crate::host::{HostPing, HostShutdown};
 use crate::jsonrpc::{ErrorResponse, Notification, Request, SuccessResponse};
 use crate::method::{Method, NotificationMessage, RequestMessage, ResultMessage};
+use crate::queue::{QueueChanged, QueueDelete, QueueEdit, QueueReorder};
 use crate::secrets::{
     SecretsChanged, SecretsDelete, SecretsGet, SecretsGetAll, SecretsLock, SecretsSet,
     SecretsUnlock,
 };
 use crate::session::{
-    SessionAbort, SessionClose, SessionCreate, SessionEventNotification, SessionPrompt,
-    SessionResume,
+    SessionAbort, SessionClose, SessionCreate, SessionEventNotification, SessionFollowUp,
+    SessionFork, SessionPrompt, SessionResume, SessionSteer,
 };
 use crate::trust::TrustGet;
-use crate::turn::{ItemAgentMessageDelta, ItemCompleted, ItemStarted, TurnCompleted, TurnStarted};
+use crate::turn::{
+    ItemAgentMessageDelta, ItemCompleted, ItemReasoningDelta, ItemStarted, ItemUpdated,
+    TurnCompleted, TurnRetrying, TurnStarted,
+};
 
 /// What a contract describes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -158,6 +163,22 @@ pub static CONTRACTS: &[Contract] = &[
     response::<SessionAbort>("session/abort/result"),
     request::<SessionPrompt>(SessionPrompt::NAME),
     response::<SessionPrompt>("session/prompt/result"),
+    request::<SessionFork>(SessionFork::NAME),
+    response::<SessionFork>("session/fork/result"),
+    request::<SessionSteer>(SessionSteer::NAME),
+    response::<SessionSteer>("session/steer/result"),
+    request::<SessionFollowUp>(SessionFollowUp::NAME),
+    response::<SessionFollowUp>("session/followUp/result"),
+    request::<QueueEdit>(QueueEdit::NAME),
+    response::<QueueEdit>("session/queue/edit/result"),
+    request::<QueueDelete>(QueueDelete::NAME),
+    response::<QueueDelete>("session/queue/delete/result"),
+    request::<QueueReorder>(QueueReorder::NAME),
+    response::<QueueReorder>("session/queue/reorder/result"),
+    request::<SessionGetEntries>(SessionGetEntries::NAME),
+    response::<SessionGetEntries>("session/getEntries/result"),
+    request::<SessionHistory>(SessionHistory::NAME),
+    response::<SessionHistory>("session/history/result"),
     request::<TrustGet>(TrustGet::NAME),
     response::<TrustGet>("trust/get/result"),
     request::<FsStat>(FsStat::NAME),
@@ -195,8 +216,13 @@ pub static CONTRACTS: &[Contract] = &[
     notification::<TurnStarted>(),
     notification::<TurnCompleted>(),
     notification::<ItemStarted>(),
+    notification::<ItemUpdated>(),
     notification::<ItemCompleted>(),
     notification::<ItemAgentMessageDelta>(),
+    notification::<ItemReasoningDelta>(),
+    notification::<TurnRetrying>(),
+    notification::<QueueChanged>(),
+    notification::<HarnessEntry>(),
 ];
 
 /// Looks up a contract by name.

@@ -10,7 +10,7 @@ use std::time::Duration;
 use piarc_host::{
     CallState, Error, ExitReason, HostEvent, HostEvents, HostSupervisor, SupervisorState,
 };
-use piarc_protocol::session::{SessionId, SessionStopped};
+use piarc_protocol::session::{SessionCreateParams, SessionId, SessionStopped};
 use piarc_protocol::{Capability, ErrorKind};
 use serde_json::json;
 use support::{FakeSpawner, Script, TestClock, config, deps, script, until};
@@ -138,7 +138,7 @@ async fn turn_with_pending_abort(
     })
     .await;
     let session = supervisor
-        .create_session("work space/项目", None)
+        .create_session(SessionCreateParams::new("work space/项目"))
         .await
         .expect("session opens")
         .session_id;
@@ -287,7 +287,7 @@ async fn a_half_frame_followed_by_silence_is_treated_as_hung_and_core_keeps_runn
     })
     .await;
     let opened = supervisor
-        .create_session("w", None)
+        .create_session(SessionCreateParams::new("w"))
         .await
         .expect("Core still serves calls");
     assert_eq!(opened.session_id.0, "after-restart");
@@ -336,7 +336,7 @@ async fn invalid_json_oversized_frames_and_batches_are_dropped_without_ending_th
     assert!(!seen.iter().any(|e| matches!(e, HostEvent::Exited { .. })));
     assert_eq!(
         supervisor
-            .create_session("w", None)
+            .create_session(SessionCreateParams::new("w"))
             .await
             .expect("connection continues")
             .session_id
@@ -437,7 +437,11 @@ async fn a_full_write_queue_refuses_new_calls_with_a_retryable_busy_error() {
     let busy = loop {
         let supervisor = supervisor.clone();
         let cwd = big.clone();
-        let call = tokio::spawn(async move { supervisor.create_session(&cwd, None).await });
+        let call = tokio::spawn(async move {
+            supervisor
+                .create_session(SessionCreateParams::new(&cwd))
+                .await
+        });
         tokio::task::yield_now().await;
         if call.is_finished() {
             break call.await.expect("joins");
@@ -511,7 +515,7 @@ async fn gives_up_after_the_sixth_crash_within_ten_minutes() {
     assert!(clock.elapsed() < Duration::from_secs(600));
     assert_eq!(supervisor.state(), SupervisorState::Stopped);
     let refused = supervisor
-        .create_session("w", None)
+        .create_session(SessionCreateParams::new("w"))
         .await
         .expect_err("stopped");
     assert_eq!(refused.kind(), ErrorKind::ShuttingDown);
@@ -714,11 +718,11 @@ async fn a_crash_during_restore_keeps_the_sessions_for_the_next_restart() {
         HostSupervisor::start(config(), deps(Arc::clone(&spawner), TestClock::new()));
     until(&mut events, |e| matches!(e, HostEvent::Connected { .. })).await;
     supervisor
-        .create_session("work space/项目", None)
+        .create_session(SessionCreateParams::new("work space/项目"))
         .await
         .expect("s1");
     supervisor
-        .create_session("work space/项目", None)
+        .create_session(SessionCreateParams::new("work space/项目"))
         .await
         .expect("s2");
     let _ = crash_tx.send(());
@@ -850,7 +854,7 @@ async fn a_requested_restart_is_not_a_failure_and_restores_the_sessions() {
     })
     .await;
     supervisor
-        .create_session("work space/项目", None)
+        .create_session(SessionCreateParams::new("work space/项目"))
         .await
         .expect("session opens");
 
@@ -884,5 +888,205 @@ async fn a_requested_restart_is_not_a_failure_and_restores_the_sessions() {
     assert_eq!(resume_rx.await.expect("resume seen")["sessionId"], "s1");
     assert_eq!(clock.elapsed(), Duration::ZERO, "no backoff delay");
     assert_eq!(spawner.spawned(), 2);
+    supervisor.shutdown().await;
+}
+
+/// R1-A4: the sessions are reopened inside the command loop, so a restore the new process never
+/// answers does not keep `shutdown()` waiting for the call timeout.
+#[tokio::test]
+async fn a_restore_that_hangs_does_not_hold_back_shutdown() {
+    let (crash_tx, crash_rx) = oneshot::channel::<()>();
+    let (resumed_tx, resumed_rx) = oneshot::channel::<()>();
+    let spawner = FakeSpawner::new(vec![
+        script(|mut host| async move {
+            host.hello("1.0", &[]).await;
+            host.accept_session("s1").await;
+            let _ = crash_rx.await;
+            1
+        }),
+        // Reads the resume and never answers it; still answers host/shutdown.
+        script(|mut host| async move {
+            host.hello("1.0", &[]).await;
+            host.request("session/resume").await;
+            let _ = resumed_tx.send(());
+            host.until_stdin_closes().await;
+            0
+        }),
+    ]);
+    let mut config = config();
+    config.call_timeout = Duration::from_secs(600);
+    let (supervisor, mut events) = HostSupervisor::start(config, deps(spawner, TestClock::new()));
+    until(&mut events, |e| matches!(e, HostEvent::Connected { .. })).await;
+    supervisor
+        .create_session(SessionCreateParams::new("work space/项目"))
+        .await
+        .expect("s1");
+    let _ = crash_tx.send(());
+    resumed_rx.await.expect("the restore started");
+    tokio::time::timeout(Duration::from_secs(20), supervisor.shutdown())
+        .await
+        .expect("shutdown does not wait for the pending restore");
+    assert_eq!(supervisor.state(), SupervisorState::Stopped);
+}
+
+/// R1-A7: the Agent Host's requests are dispatched only on a connection whose handshake Core
+/// accepted; after a refusal they get an error and never reach the handler.
+#[tokio::test]
+async fn requests_on_a_refused_connection_are_not_dispatched() {
+    let (answers_tx, answers_rx) = oneshot::channel();
+    let spawner = FakeSpawner::new(vec![script(|mut host| async move {
+        let refusal = host.hello("2.0", &[]).await;
+        host.send(&json!({ "jsonrpc": "2.0", "id": 7, "method": "trust/get", "params": { "path": "/w" } }))
+            .await;
+        let answer = host.recv().await;
+        let _ = answers_tx.send((refusal, answer));
+        3
+    })]);
+    let trust = Arc::new(support::TrustTable {
+        trusted: true,
+        ..support::TrustTable::default()
+    });
+    let mut deps = deps(spawner, TestClock::new());
+    deps.inbound = Arc::clone(&trust) as _;
+    let (supervisor, mut events) = HostSupervisor::start(config(), deps);
+    until(&mut events, |e| matches!(e, HostEvent::Stopped)).await;
+    let (refusal, answer) = answers_rx.await.expect("the fake host read both answers");
+    assert_eq!(refusal["error"]["data"]["kind"], "protocolVersionMismatch");
+    assert_eq!(answer["id"], 7);
+    assert_eq!(
+        answer["error"]["data"]["kind"], "invalidRequest",
+        "{answer}"
+    );
+    assert!(trust.asked.lock().expect("lock").is_empty());
+    assert_eq!(supervisor.state(), SupervisorState::Stopped);
+}
+
+/// Holds every request until released and records how many run at once.
+#[derive(Default)]
+struct GateState {
+    running: std::sync::atomic::AtomicUsize,
+    peak: std::sync::atomic::AtomicUsize,
+    arrived: std::sync::atomic::AtomicUsize,
+    released: tokio::sync::watch::Sender<bool>,
+}
+
+#[derive(Clone, Default)]
+struct Gate(Arc<GateState>);
+
+impl piarc_host::InboundHandler for Gate {
+    fn handle(
+        &self,
+        _method: String,
+        _params: serde_json::Map<String, serde_json::Value>,
+        _peer: piarc_host::Peer,
+    ) -> piarc_ports::BoxFuture<'static, Result<serde_json::Value, piarc_protocol::ErrorObject>>
+    {
+        use std::sync::atomic::Ordering;
+        let state = Arc::clone(&self.0);
+        let now = state.running.fetch_add(1, Ordering::SeqCst) + 1;
+        state.peak.fetch_max(now, Ordering::SeqCst);
+        state.arrived.fetch_add(1, Ordering::SeqCst);
+        Box::pin(async move {
+            let mut released = state.released.subscribe();
+            // The sender lives in `state`, which this future holds.
+            let _ = released.wait_for(|open| *open).await;
+            state.running.fetch_sub(1, Ordering::SeqCst);
+            Ok(json!({ "trusted": false }))
+        })
+    }
+}
+
+/// R1-A14: the Agent Host's requests in progress are bounded; the rest wait in the pipe until
+/// one finishes, and all are answered in the end.
+#[tokio::test]
+async fn the_agent_hosts_requests_in_progress_are_bounded() {
+    use std::sync::atomic::Ordering;
+    let (answers_tx, answers_rx) = oneshot::channel();
+    let spawner = FakeSpawner::new(vec![script(|mut host| async move {
+        host.hello("1.0", &[]).await;
+        for id in 10..16 {
+            host.send(&json!({ "jsonrpc": "2.0", "id": id, "method": "trust/get", "params": { "path": "/w" } }))
+                .await;
+        }
+        let mut answered = Vec::new();
+        while answered.len() < 6 {
+            let frame = host.recv().await;
+            if frame.get("result").is_some() {
+                answered.push(frame["id"].as_i64().expect("numeric id"));
+            }
+        }
+        let _ = answers_tx.send(answered);
+        host.until_stdin_closes().await;
+        0
+    })]);
+    let gate = Gate::default();
+    let mut config = config();
+    config.inbound_concurrency = 2;
+    let mut deps = deps(spawner, TestClock::new());
+    deps.inbound = Arc::new(gate.clone());
+    let (supervisor, mut events) = HostSupervisor::start(config, deps);
+    until(&mut events, |e| matches!(e, HostEvent::Connected { .. })).await;
+    while gate.0.arrived.load(Ordering::SeqCst) < 2 {
+        tokio::task::yield_now().await;
+    }
+    // The reader waits for a permit: nothing more reaches the handler while two are held.
+    for _ in 0..100 {
+        tokio::task::yield_now().await;
+    }
+    assert_eq!(gate.0.arrived.load(Ordering::SeqCst), 2);
+    gate.0.released.send_replace(true);
+    let mut answered = answers_rx.await.expect("every request answered");
+    answered.sort_unstable();
+    assert_eq!(answered, [10, 11, 12, 13, 14, 15]);
+    assert_eq!(gate.0.peak.load(Ordering::SeqCst), 2);
+    supervisor.shutdown().await;
+}
+
+/// R1-A3: a `session/create` with a Core-chosen id that times out stays tracked, so the next
+/// connection reopens it under that id and both sides agree on the session.
+#[tokio::test]
+async fn a_create_that_times_out_is_reconciled_by_the_next_restore() {
+    let (crash_tx, crash_rx) = oneshot::channel::<()>();
+    let (resumed_tx, resumed_rx) = oneshot::channel();
+    let spawner = FakeSpawner::new(vec![
+        script(|mut host| async move {
+            host.hello("1.0", &[]).await;
+            host.request("session/create").await; // never answered
+            let _ = crash_rx.await;
+            1
+        }),
+        script(|mut host| async move {
+            host.hello("1.0", &[]).await;
+            let (id, params) = host.request("session/resume").await;
+            let _ = resumed_tx.send(params.clone());
+            host.respond(
+                id,
+                json!({ "sessionId": params["sessionId"], "restoredMessages": 0 }),
+            )
+            .await;
+            host.until_stdin_closes().await;
+            0
+        }),
+    ]);
+    let mut config = config();
+    config.call_timeout = Duration::from_millis(200);
+    let (supervisor, mut events) = HostSupervisor::start(config, deps(spawner, TestClock::new()));
+    until(&mut events, |e| matches!(e, HostEvent::Connected { .. })).await;
+    let mut params = SessionCreateParams::new("work space/项目");
+    params.session_id = Some(SessionId("chosen-by-core".into()));
+    let error = supervisor
+        .create_session(params)
+        .await
+        .expect_err("no answer");
+    assert_eq!(error.kind(), ErrorKind::Timeout);
+    assert_eq!(supervisor.open_sessions(), ["chosen-by-core"]);
+    let _ = crash_tx.send(());
+    let resumed = resumed_rx.await.expect("the session is resumed");
+    assert_eq!(resumed["sessionId"], "chosen-by-core");
+    assert_eq!(resumed["cwd"], "work space/项目");
+    until(&mut events, |e| {
+        matches!(e, HostEvent::SessionRestored { session_id, .. } if session_id == "chosen-by-core")
+    })
+    .await;
     supervisor.shutdown().await;
 }

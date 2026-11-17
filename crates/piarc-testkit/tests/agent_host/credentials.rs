@@ -10,7 +10,7 @@ use std::time::{Duration, SystemTime};
 
 use piarc_core::agent_host::{HostConfig, HostEvent, HostSupervisor, Peer};
 use piarc_ports::SecretStoreError;
-use piarc_protocol::session::{ModelRef, SessionId};
+use piarc_protocol::session::{ModelRef, SessionCreateParams, SessionId};
 use piarc_testkit::plaintext;
 use serde_json::{Map, Value, json};
 
@@ -82,13 +82,10 @@ async fn connected_pid(events: &mut Recorder) -> u32 {
 
 async fn oauth_session(supervisor: &HostSupervisor, cwd: &str) -> SessionId {
     supervisor
-        .create_session(
-            cwd,
-            Some(ModelRef {
-                provider: PROVIDER.into(),
-                id: "mock-oauth".into(),
-            }),
-        )
+        .create_session(SessionCreateParams::new(cwd).with_model(Some(ModelRef {
+            provider: PROVIDER.into(),
+            id: "mock-oauth".into(),
+        })))
         .await
         .expect("session opens")
         .session_id

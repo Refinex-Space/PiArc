@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 21,
+  "result": {
+    "sessionId": "019a8f40-0000-7000-8000-000000000001",
+    "restoredMessages": 6
+  }
+}

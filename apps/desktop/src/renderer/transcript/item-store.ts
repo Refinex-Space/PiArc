@@ -43,10 +43,17 @@ export type Row =
       readonly text: string;
     };
 
-function rowOf(item: Item): Row {
-  return item.type === 'agentMessage'
-    ? { kind: 'agentMessage', id: item.itemId, item }
-    : { kind: 'toolCall', id: item.itemId, item };
+/** The row of an item; the prototype shows agent messages and generic tool calls only (the item
+ * types T14 added are rendered by T19). */
+function rowOf(item: Item): Row | undefined {
+  switch (item.type) {
+    case 'agentMessage':
+      return { kind: 'agentMessage', id: item.itemId, item };
+    case 'dynamicToolCall':
+      return { kind: 'toolCall', id: item.itemId, item };
+    default:
+      return undefined;
+  }
 }
 
 export class TranscriptStore {
@@ -87,10 +94,14 @@ export class TranscriptStore {
         case 'item/started':
         case 'item/completed': {
           const { item } = notification.params;
+          const row = rowOf(item);
+          if (row === undefined) {
+            break;
+          }
           if (!this.rows.has(item.itemId)) {
             added.push(item.itemId);
           }
-          this.rows.set(item.itemId, rowOf(item));
+          this.rows.set(item.itemId, row);
           changed.add(item.itemId);
           break;
         }

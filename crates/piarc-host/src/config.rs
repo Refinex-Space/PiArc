@@ -75,6 +75,9 @@ pub struct HostConfig {
     /// Session notifications waiting for the consumer; a full queue stops reading stdout, which
     /// pushes back on the Agent Host. Lifecycle events are not counted.
     pub event_queue: usize,
+    /// The most requests from the Agent Host handled at once; further requests wait (the
+    /// reader stops) until one finishes. Default 256.
+    pub inbound_concurrency: usize,
     /// Largest frame accepted from the Agent Host.
     pub max_frame_bytes: usize,
     /// Restart limits.
@@ -104,6 +107,7 @@ impl HostConfig {
             shutdown_timeout: Duration::from_secs(5),
             write_queue_frames: 256,
             event_queue: 1024,
+            inbound_concurrency: 256,
             max_frame_bytes: DEFAULT_MAX_FRAME_BYTES,
             restart: RestartConfig::default(),
         }

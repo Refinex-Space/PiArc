@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 11,
+  "method": "session/create",
+  "params": {
+    "cwd": "/w",
+    "sessionId": 5
+  }
+}

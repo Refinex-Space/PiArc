@@ -19,8 +19,20 @@
 //!   it: the turn's outcome arrives later as `turn/completed` with the same `turnId`. Its
 //!   `requestId` is an idempotency key: the same key on the same session returns the turn
 //!   it already started instead of starting another (ADR-0009 rule 5).
-//! - `session/abort` interrupts the running turn and answers once the session is idle;
+//! - `session/steer` and `session/followUp` add input to a running turn: a steering message
+//!   reaches the model after the current step (before its next request), a follow-up starts a
+//!   new turn once the current one completes. Both are queued items with ids that
+//!   `session/queue/*` edits, deletes and reorders ([`crate::queue`]). On an idle session
+//!   either starts a turn at once, like `session/prompt`.
+//! - `session/abort` interrupts the running turn and answers once the session is idle; the
+//!   queued items come back in the result and the queue is empty afterwards.
 //!   `session/close` aborts, shuts the session down and forgets it.
+//! - `session/fork` opens a new session whose conversation is a copy of another session's
+//!   current branch, up to an entry when one is given.
+//! - `session/getEntries` returns the session's notifications after a `seq` from the Agent
+//!   Host's replay buffer (Core backfills a gap with it); `session/history` returns the
+//!   persisted conversation as items, projected by the same rules as the live notifications
+//!   ([`crate::history`]).
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -28,6 +40,7 @@ use serde_json::{Map, Value};
 
 use crate::jsonrpc::Version;
 use crate::method::request;
+use crate::queue::QueueItem;
 use crate::turn::TurnId;
 
 /// Session identifier.
@@ -87,9 +100,33 @@ pub struct ModelRef {
 pub struct SessionCreateParams {
     /// Absolute working directory of the session: tools resolve relative paths against it.
     pub cwd: String,
+    /// The new session's id, chosen by Core so that a timed-out request can still be
+    /// reconciled (closed or resumed) under a known id; the Agent Host chooses one when
+    /// absent. Letters, digits, `.`, `_` and `-`, at most 128 characters.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<SessionId>,
     /// Model to start with; the Agent Host's configured default when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<ModelRef>,
+}
+
+impl SessionCreateParams {
+    /// A session in `cwd` with the Agent Host's choice of id and model.
+    #[must_use]
+    pub fn new(cwd: impl Into<String>) -> Self {
+        Self {
+            cwd: cwd.into(),
+            session_id: None,
+            model: None,
+        }
+    }
+
+    /// The same, starting with `model`.
+    #[must_use]
+    pub fn with_model(mut self, model: Option<ModelRef>) -> Self {
+        self.model = model;
+        self
+    }
 }
 
 /// Parameters of `session/resume`.
@@ -133,6 +170,55 @@ pub struct SessionStopped {
     /// The turn that was running and got interrupted, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interrupted_turn_id: Option<TurnId>,
+    /// The inputs that were still queued, in queue order: they did not run and the client can
+    /// offer them for editing again.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub returned_queue: Vec<QueueItem>,
+}
+
+/// Parameters of `session/fork`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionForkParams {
+    /// The session to copy.
+    pub session_id: SessionId,
+    /// Its working directory, which the new session shares.
+    pub cwd: String,
+    /// The last entry to keep; the source's current position when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entry_id: Option<String>,
+}
+
+/// Parameters of `session/steer` and `session/followUp`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionInputParams {
+    /// The session.
+    pub session_id: SessionId,
+    /// Idempotency key chosen by Core; repeating it returns the first answer.
+    pub request_id: String,
+    /// The user's input.
+    pub text: String,
+}
+
+/// Result of `session/steer` and `session/followUp`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(
+    tag = "disposition",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum InputAccepted {
+    /// A turn was running: the input waits in the queue under `itemId`.
+    Queued {
+        /// The queued item.
+        item_id: String,
+    },
+    /// The session was idle: the input started turn `turnId`, as a prompt would.
+    Started {
+        /// The new turn.
+        turn_id: TurnId,
+    },
 }
 
 /// Parameters of `session/prompt`.
@@ -175,4 +261,16 @@ request!(
 request!(
     /// Method marker for `session/prompt` (Core → Agent Host).
     SessionPrompt, "session/prompt", SessionPromptParams, PromptAccepted
+);
+request!(
+    /// Method marker for `session/fork` (Core → Agent Host).
+    SessionFork, "session/fork", SessionForkParams, SessionOpened
+);
+request!(
+    /// Method marker for `session/steer` (Core → Agent Host).
+    SessionSteer, "session/steer", SessionInputParams, InputAccepted
+);
+request!(
+    /// Method marker for `session/followUp` (Core → Agent Host).
+    SessionFollowUp, "session/followUp", SessionInputParams, InputAccepted
 );

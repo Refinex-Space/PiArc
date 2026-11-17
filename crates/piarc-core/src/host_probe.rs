@@ -16,7 +16,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use piarc_ports::BoxFuture;
-use piarc_protocol::session::ModelRef;
+use piarc_protocol::session::{ModelRef, SessionCreateParams};
 use piarc_protocol::{ErrorKind, ErrorObject};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
@@ -189,7 +189,9 @@ async fn converse(
     };
     let cwd = options.workspace.to_string_lossy().into_owned();
     let opened = supervisor
-        .create_session(&cwd, Some(options.model.clone()))
+        .create_session(
+            SessionCreateParams::new(cwd.clone()).with_model(Some(options.model.clone())),
+        )
         .await
         .map_err(|e| failed("session/create", e))?;
     let session_id = opened.session_id;

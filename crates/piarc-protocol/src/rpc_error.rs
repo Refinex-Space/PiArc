@@ -73,6 +73,8 @@ pub mod code {
     pub const SECRET_LOCK_LOST: i64 = -32016;
     /// A release manifest or a downloaded artefact failed verification.
     pub const RELEASE_INTEGRITY: i64 = -32017;
+    /// A queued input with the given id is no longer waiting: it was delivered or removed.
+    pub const QUEUE_ITEM_NOT_FOUND: i64 = -32018;
 }
 
 /// JSON-RPC 2.0 error object with PiArc's mandatory structured `data`.
@@ -168,6 +170,9 @@ pub enum ErrorKind {
     /// with `reason` one of `noTrustedKey`, `malformedSignature`, `unknownKey`,
     /// `badSignature`, `malformedManifest`, `notListed`, `sizeMismatch`, `hashMismatch`.
     ReleaseIntegrity,
+    /// A `session/queue/*` request named a queued input that is no longer waiting: it was
+    /// delivered to the model or removed meanwhile. `details`: `{ sessionId, itemId }`.
+    QueueItemNotFound,
 }
 
 impl ErrorKind {
@@ -198,6 +203,7 @@ impl ErrorKind {
             Self::VaultVersion => code::VAULT_VERSION,
             Self::SecretLockLost => code::SECRET_LOCK_LOST,
             Self::ReleaseIntegrity => code::RELEASE_INTEGRITY,
+            Self::QueueItemNotFound => code::QUEUE_ITEM_NOT_FOUND,
         }
     }
 }
@@ -222,7 +228,7 @@ impl ErrorObject {
 mod tests {
     use super::*;
 
-    const ALL_KINDS: [ErrorKind; 23] = [
+    const ALL_KINDS: [ErrorKind; 24] = [
         ErrorKind::ParseError,
         ErrorKind::InvalidRequest,
         ErrorKind::MethodNotFound,
@@ -246,6 +252,7 @@ mod tests {
         ErrorKind::VaultVersion,
         ErrorKind::SecretLockLost,
         ErrorKind::ReleaseIntegrity,
+        ErrorKind::QueueItemNotFound,
     ];
 
     #[test]

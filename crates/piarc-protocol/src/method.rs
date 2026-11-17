@@ -131,6 +131,27 @@ macro_rules! request {
 }
 pub(crate) use request;
 
+/// Defines the marker type of a notification method: `notification!(/// docs Marker, "name",
+/// Params);`. The marker's `TYPE_NAME` is its own name.
+macro_rules! notification {
+    ($(#[$doc:meta])* $marker:ident, $name:literal, $params:ty) => {
+        $(#[$doc])*
+        #[derive(Debug, Clone, Copy)]
+        pub struct $marker;
+
+        impl $crate::method::Method for $marker {
+            const NAME: &'static str = $name;
+            const TYPE_NAME: &'static str = stringify!($marker);
+        }
+
+        impl $crate::method::NotificationMethod for $marker {
+            type Params = $params;
+        }
+    };
+}
+
+pub(crate) use notification;
+
 /// A request for method `M`.
 #[derive(Serialize, Deserialize)]
 #[serde(bound(serialize = "", deserialize = ""))]
