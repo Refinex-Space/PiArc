@@ -1,6 +1,7 @@
 import type { AgentSessionEvent } from '@earendil-works/pi-coding-agent';
 import { describe, expect, it } from 'vitest';
 
+import { NO_USAGE } from './items.js';
 import { Projector, type ProjectionSink } from './projector.js';
 
 interface Emitted {
@@ -16,6 +17,7 @@ function recorder(): { sink: ProjectionSink; out: Emitted[] } {
     sink: {
       event: (method, payload) => out.push({ method, payload }),
       delta: (method, _key, payload, delta) => out.push({ method, payload, delta }),
+      replaceable: (method, _key, payload) => out.push({ method, payload }),
     },
   };
 }
@@ -107,7 +109,7 @@ describe('Projector', () => {
         output: 'Wrote 1 line',
       },
     });
-    expect(out[7]?.payload).toEqual({ turnId: 'turn-1', status: 'completed' });
+    expect(out[7]?.payload).toEqual({ turnId: 'turn-1', status: 'completed', usage: NO_USAGE });
     expect(projector.activeTurnId).toBeUndefined();
   });
 
@@ -126,7 +128,7 @@ describe('Projector', () => {
         turnId: 'turn-2',
         item: expect.objectContaining({ status: 'interrupted', text: 'Hal' }) as unknown,
       },
-      { turnId: 'turn-2', status: 'interrupted' },
+      { turnId: 'turn-2', status: 'interrupted', usage: NO_USAGE },
     ]);
   });
 
@@ -146,6 +148,7 @@ describe('Projector', () => {
       turnId: 'turn-3',
       status: 'failed',
       errorMessage: '400 bad',
+      usage: NO_USAGE,
     });
   });
 

@@ -3,15 +3,20 @@
 //
 // Usage: node agent-host.mjs --data-dir <PiArc data dir> [--bridge-timeout-ms <ms>]
 //          [--tool-profile <json file>] [--pi-native-tools] [--test-oauth-provider <json file>]
+//          [--test-record-events <dir>] [--test-drop-seq <n>]
 //
 // `--tool-profile` overrides names and descriptions of the default Tool Profile (tests of the
 // name map); `--pi-native-tools` gives sessions Pi's own tools with local I/O (the behavior
 // comparison test); `--test-oauth-provider` registers an OAuth provider backed by a local test
-// token endpoint (the credential tests). Core passes none of them.
+// token endpoint (the credential tests); `--test-record-events` writes every raw Pi session
+// event to `<dir>/<sessionId>.jsonl` (recording the projection's golden inputs);
+// `--test-drop-seq` leaves the session notification with that `seq` out of stdout while keeping
+// it for replay (the gap backfill test). Core passes none of them.
 //
 // stdout carries AHP frames only. Anything else that writes to it (a library's console.log)
 // is redirected to stderr, which is the log channel Core reads line by line.
-import { readFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { VERSION } from '@earendil-works/pi-coding-agent';
@@ -31,6 +36,8 @@ const { values } = parseArgs({
     'tool-profile': { type: 'string' },
     'pi-native-tools': { type: 'boolean' },
     'test-oauth-provider': { type: 'string' },
+    'test-record-events': { type: 'string' },
+    'test-drop-seq': { type: 'string' },
   },
   strict: true,
 });
@@ -64,6 +71,16 @@ if (oauthFile !== undefined) {
   }
   testOAuthProvider = parsed;
 }
+const recordDir = values['test-record-events'];
+const recordEvents =
+  recordDir === undefined
+    ? undefined
+    : (sessionId: string, event: unknown): void => {
+        mkdirSync(recordDir, { recursive: true });
+        appendFileSync(path.join(recordDir, `${sessionId}.jsonl`), `${JSON.stringify(event)}\n`);
+      };
+const dropSeqText = values['test-drop-seq'];
+const dropSeq = dropSeqText === undefined ? undefined : Number.parseInt(dropSeqText, 10);
 const bridgeTimeout = values['bridge-timeout-ms'];
 const bridgeTimeoutMs =
   bridgeTimeout === undefined ? undefined : Number.parseInt(bridgeTimeout, 10);
@@ -98,6 +115,8 @@ const host = runHost(
     ...(toolProfile === undefined ? {} : { toolProfile }),
     ...(values['pi-native-tools'] === true ? { piNativeTools: true } : {}),
     ...(testOAuthProvider === undefined ? {} : { testOAuthProvider }),
+    ...(recordEvents === undefined ? {} : { recordEvents }),
+    ...(dropSeq === undefined || Number.isNaN(dropSeq) ? {} : { dropSeq }),
     log,
     exit,
   },

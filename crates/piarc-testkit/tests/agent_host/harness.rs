@@ -446,13 +446,13 @@ impl Recorder {
             .collect()
     }
 
-    /// The final `dynamicToolCall` items of `session_id`.
+    /// The final tool items of `session_id` (every item type that carries a `tool`).
     pub fn tool_results(&self, session_id: &str) -> Vec<Value> {
         self.notifications(session_id)
             .into_iter()
             .filter(|n| n.method == "item/completed")
             .map(|n| payload(n)["item"].clone())
-            .filter(|item| item["type"] == "dynamicToolCall")
+            .filter(|item| item.get("tool").is_some())
             .collect()
     }
 }

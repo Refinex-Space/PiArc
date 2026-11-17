@@ -212,8 +212,9 @@ pub enum Item {
         /// Lifecycle state: `completed`, or `failed` / `interrupted` when no summary replaced
         /// the context.
         status: ItemStatus,
-        /// Why it ran.
-        reason: CompactionReason,
+        /// Why it ran; absent in the history, where Pi does not record it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reason: Option<CompactionReason>,
         /// Estimated context tokens before, once known.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         tokens_before: Option<u64>,

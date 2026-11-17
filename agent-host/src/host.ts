@@ -10,9 +10,12 @@ import { OutboundQueue, type FrameSink } from './protocol/outbound.js';
 import {
   modelField,
   optionalCount,
+  optionalString,
   paramsObject,
   parseWelcome,
   stringField,
+  stringList,
+  textField,
 } from './protocol/params.js';
 import { blobReader } from './runtime/blobs.js';
 import { CoreCredentialStore } from './runtime/credentials.js';
@@ -49,6 +52,10 @@ export interface HostOptions {
   readonly piNativeTools?: boolean;
   /** Register the OAuth test provider (credential tests only). */
   readonly testOAuthProvider?: TestOAuthProviderConfig;
+  /** Receives every raw Pi session event (recording golden inputs, tests only). */
+  readonly recordEvents?: (sessionId: string, event: unknown) => void;
+  /** Leaves the session notification with this `seq` out of stdout (gap tests only). */
+  readonly dropSeq?: number;
   /** Writes one log line to stderr. */
   readonly log: (line: string) => void;
   /** Ends the process once stdout is flushed. */
@@ -77,6 +84,10 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
       );
       options.exit(EXIT.outboundOverflow);
     },
+    onOversize: (method, sessionId, bytes) => {
+      log(`[session ${sessionId}] dropped a ${method} notification of ${String(bytes)} bytes`);
+    },
+    ...(options.dropSeq === undefined ? {} : { dropSeq: options.dropSeq }),
   });
   const connection = new Connection(outbound, {
     log,
@@ -149,7 +160,12 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
   connection.handle('session/create', async (params) => {
     const fields = paramsObject('session/create', params);
     const cwd = stringField('session/create', fields, 'cwd');
-    return (await sessions('session/create')).create(cwd, modelField('session/create', fields));
+    const sessionId = optionalString('session/create', fields, 'sessionId');
+    return (await sessions('session/create')).create(
+      cwd,
+      modelField('session/create', fields),
+      sessionId,
+    );
   });
   connection.handle('session/resume', async (params) => {
     const fields = paramsObject('session/resume', params);
@@ -162,15 +178,70 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     }
     return registry.resume(sessionId, cwd);
   });
+  connection.handle('session/fork', async (params) => {
+    const fields = paramsObject('session/fork', params);
+    return (await sessions('session/fork')).fork(
+      stringField('session/fork', fields, 'sessionId'),
+      stringField('session/fork', fields, 'cwd'),
+      optionalString('session/fork', fields, 'entryId'),
+    );
+  });
   connection.handle('session/prompt', async (params) => {
     const fields = paramsObject('session/prompt', params);
-    const text = fields.text;
-    if (typeof text !== 'string') {
-      throw new AhpError('invalidParams', 'session/prompt: text must be a string');
-    }
+    const text = textField('session/prompt', fields);
     const sessionId = stringField('session/prompt', fields, 'sessionId');
     const requestId = stringField('session/prompt', fields, 'requestId');
     return (await sessions('session/prompt')).prompt(sessionId, requestId, text);
+  });
+  for (const [method, kind] of [
+    ['session/steer', 'steer'],
+    ['session/followUp', 'followUp'],
+  ] as const) {
+    connection.handle(method, async (params) => {
+      const fields = paramsObject(method, params);
+      const text = textField(method, fields);
+      const sessionId = stringField(method, fields, 'sessionId');
+      const requestId = stringField(method, fields, 'requestId');
+      return (await sessions(method)).input(sessionId, requestId, text, kind);
+    });
+  }
+  connection.handle('session/queue/edit', async (params) => {
+    const fields = paramsObject('session/queue/edit', params);
+    return (await sessions('session/queue/edit')).editQueue(
+      stringField('session/queue/edit', fields, 'sessionId'),
+      stringField('session/queue/edit', fields, 'itemId'),
+      textField('session/queue/edit', fields),
+    );
+  });
+  connection.handle('session/queue/delete', async (params) => {
+    const fields = paramsObject('session/queue/delete', params);
+    return (await sessions('session/queue/delete')).deleteQueued(
+      stringField('session/queue/delete', fields, 'sessionId'),
+      stringField('session/queue/delete', fields, 'itemId'),
+    );
+  });
+  connection.handle('session/queue/reorder', async (params) => {
+    const fields = paramsObject('session/queue/reorder', params);
+    return (await sessions('session/queue/reorder')).reorderQueue(
+      stringField('session/queue/reorder', fields, 'sessionId'),
+      stringList('session/queue/reorder', fields, 'itemIds'),
+    );
+  });
+  connection.handle('session/getEntries', async (params) => {
+    const fields = paramsObject('session/getEntries', params);
+    const sessionId = stringField('session/getEntries', fields, 'sessionId');
+    const since = optionalCount('session/getEntries', fields, 'since') ?? 0;
+    await sessions('session/getEntries');
+    return outbound.entriesSince(sessionId, since);
+  });
+  connection.handle('session/history', async (params) => {
+    const fields = paramsObject('session/history', params);
+    return (await sessions('session/history')).history(
+      stringField('session/history', fields, 'sessionId'),
+      stringField('session/history', fields, 'cwd'),
+      optionalCount('session/history', fields, 'start'),
+      optionalCount('session/history', fields, 'limit') ?? 0,
+    );
   });
   connection.handle('session/abort', async (params) => {
     const sessionId = stringField(
@@ -237,8 +308,15 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
           delta: (method, mergeKey, payload, delta) => {
             outbound.sendDelta(sessionId, method, mergeKey, payload, delta);
           },
+          replaceable: (method, key, payload) => {
+            outbound.sendReplaceable(sessionId, method, key, payload);
+          },
         }),
         isTrusted: (cwd) => askCoreTrust(connection.bridge, cwd, log),
+        onClosed: (sessionId) => {
+          outbound.forget(sessionId);
+        },
+        ...(options.recordEvents === undefined ? {} : { onPiEvent: options.recordEvents }),
       });
       ready.resolve(registry);
     } catch (error) {

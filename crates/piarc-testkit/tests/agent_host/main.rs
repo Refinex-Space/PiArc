@@ -615,13 +615,19 @@ fn check_only_a_was_interrupted(events: &harness::Recorder, a: &SessionId) {
         .iter()
         .filter(|n| n.method == "item/completed")
         .map(|n| {
-            payload(n)["item"]["status"]
-                .as_str()
-                .unwrap_or_default()
-                .to_owned()
+            let item = &payload(n)["item"];
+            format!(
+                "{}:{}",
+                item["type"].as_str().unwrap_or_default(),
+                item["status"].as_str().unwrap_or_default()
+            )
         })
         .collect();
-    assert_eq!(a_items, ["interrupted"]);
+    // The prompt itself, then the reply that the abort cut off.
+    assert_eq!(
+        a_items,
+        ["userMessage:completed", "agentMessage:interrupted"]
+    );
     println!(
         "turns: {}",
         events

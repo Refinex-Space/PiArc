@@ -402,9 +402,9 @@ export type Item =
        */
       itemId: ItemId;
       /**
-       * Why it ran.
+       * Why it ran; absent in the history, where Pi does not record it.
        */
-      reason: CompactionReason;
+      reason?: CompactionReason | null;
       /**
        * Lifecycle state: `completed`, or `failed` / `interrupted` when no summary replaced
        * the context.

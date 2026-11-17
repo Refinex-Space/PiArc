@@ -1936,8 +1936,15 @@
               "description": "The item's identifier."
             },
             "reason": {
-              "$ref": "#/$defs/CompactionReason",
-              "description": "Why it ran."
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CompactionReason"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Why it ran; absent in the history, where Pi does not record it."
             },
             "status": {
               "$ref": "#/$defs/ItemStatus",
@@ -1960,7 +1967,7 @@
               "type": "string"
             }
           },
-          "required": ["type", "itemId", "status", "reason"],
+          "required": ["type", "itemId", "status"],
           "type": "object"
         }
       ]

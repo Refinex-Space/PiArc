@@ -2,6 +2,12 @@
 // section 5.3). Every session has its own cwd, its own file-backed SessionManager under
 // `<agentDir>/sessions/` and its own resource loader; they share the workspace's ModelRuntime.
 //
+// Turns: one accepted input (`session/prompt`, or `session/steer` / `session/followUp` on an
+// idle session) is one turn. While it runs, steering messages go to Pi's queue and follow-ups
+// wait in the session's input queue (queue.ts); when the turn completes, each follow-up starts
+// the next turn, in queue order. An interrupted turn returns the queue to Core and is closed in
+// the transcript by the Harness Kit (harness/interruption.ts).
+//
 // Process-wide state is the hazard of running sessions side by side (ADR-0010). This file
 // never touches `process.cwd()` or `process.env`; Pi resolves relative tool paths against each
 // session's cwd. The few Pi defaults that read the process-global agent directory
@@ -17,15 +23,30 @@ import {
   getAgentDir,
   SessionManager,
   SettingsManager,
+  type AgentSessionEvent,
   type AgentSessionRuntime,
   type CreateAgentSessionRuntimeFactory,
+  type ToolDefinition,
 } from '@earendil-works/pi-coding-agent';
-import type { ModelRef, PromptAccepted, SessionOpened, SessionStopped } from '@piarc/protocol';
+import type {
+  HistoryWindow,
+  InputAccepted,
+  ModelRef,
+  PromptAccepted,
+  QueueItem,
+  QueueState,
+  SessionOpened,
+  SessionStopped,
+} from '@piarc/protocol';
 
+import { repairInterruptedTurn } from '../harness/interruption.js';
 import { takeOverProjectTrust, type TrustTakeover } from '../harness/project-trust.js';
+import { CONCURRENCY_SAFE_TOOLS, ToolBatches } from '../harness/tool-batches.js';
 import { AhpError, describeError } from '../protocol/errors.js';
 import { ToolNameMap, toolOptions, type CoreIo, type ToolProfile } from '../tools/index.js';
+import { historyWindow, MAX_HISTORY_LIMIT, projectHistory } from './history.js';
 import { Projector, type ProjectionSink } from './projector.js';
+import { InputQueue } from './queue.js';
 import type { Workspace } from './workspace.js';
 
 /** Emits the projected notifications of one session. */
@@ -47,6 +68,9 @@ export type ToolBackend =
 /** Pi's tools the `pi-native` backend activates: the counterparts of the canonical six. */
 const PI_NATIVE_TOOLS = ['read', 'write', 'edit', 'bash', 'find', 'grep'];
 
+/** Session ids Core may choose: Pi's own rule is stricter about nothing but length. */
+const SESSION_ID = /^[A-Za-z0-9._-]{1,128}$/;
+
 export interface RegistryOptions {
   readonly workspace: Workspace;
   readonly tools: ToolBackend;
@@ -57,19 +81,31 @@ export interface RegistryOptions {
    */
   readonly isTrusted: (cwd: string) => Promise<boolean>;
   readonly log: (line: string) => void;
+  /** Test only: receives every raw Pi event of every session (`--test-record-events`). */
+  readonly onPiEvent?: (sessionId: string, event: AgentSessionEvent) => void;
+  /** A session was closed: its replay buffer can go. */
+  readonly onClosed?: (sessionId: string) => void;
 }
 
 interface HostedSession {
   readonly runtime: AgentSessionRuntime;
   readonly projector: Projector;
-  readonly unsubscribe: () => void;
+  readonly queue: InputQueue;
+  readonly batches: ToolBatches;
+  readonly toCanonical: (tool: string) => string;
+  unsubscribe: () => void;
   /** Idempotency keys of accepted prompts → their turn ids. */
   readonly prompts: Map<string, string>;
+  /** Idempotency keys of accepted steering and follow-up inputs → their answers. */
+  readonly inputs: Map<string, InputAccepted>;
+  closed: boolean;
 }
 
 export class SessionRegistry {
   readonly #options: RegistryOptions;
   readonly #sessions = new Map<string, HostedSession>();
+  /** Opens in progress by session id: a second resume of the same id waits for the first. */
+  readonly #opening = new Map<string, Promise<SessionOpened>>();
 
   constructor(options: RegistryOptions) {
     if (path.resolve(getAgentDir()) !== path.resolve(options.workspace.agentDir)) {
@@ -85,22 +121,69 @@ export class SessionRegistry {
     return this.#sessions.size;
   }
 
-  /** Creates a session in `cwd`. */
-  async create(cwd: string, model: ModelRef | undefined): Promise<SessionOpened> {
-    return this.#open(cwd, SessionManager.create(cwd), model);
+  /** Creates a session in `cwd`, under `sessionId` when Core chose one. */
+  async create(
+    cwd: string,
+    model: ModelRef | undefined,
+    sessionId: string | undefined,
+  ): Promise<SessionOpened> {
+    if (sessionId === undefined) {
+      return this.#open(cwd, SessionManager.create(cwd), model);
+    }
+    checkSessionId(sessionId);
+    if (this.#sessions.has(sessionId)) {
+      // A retried create (its first answer was lost): the session is already open.
+      return this.#opened(sessionId);
+    }
+    return this.#once(sessionId, () =>
+      this.#open(cwd, SessionManager.create(cwd, undefined, { id: sessionId }), model),
+    );
   }
 
   /** Reopens a session by id; one that never stored a message starts empty under that id. */
   async resume(sessionId: string, cwd: string): Promise<SessionOpened> {
+    checkSessionId(sessionId);
     if (this.#sessions.has(sessionId)) {
-      return { sessionId, restoredMessages: this.#get(sessionId).runtime.session.messages.length };
+      return this.#opened(sessionId);
     }
-    const file = SessionManager.findById(cwd, sessionId);
-    const manager =
-      file === undefined
-        ? SessionManager.create(cwd, undefined, { id: sessionId })
-        : SessionManager.open(file);
-    return this.#open(cwd, manager, undefined);
+    return this.#once(sessionId, () => {
+      const file = SessionManager.findById(cwd, sessionId);
+      const manager =
+        file === undefined
+          ? SessionManager.create(cwd, undefined, { id: sessionId })
+          : SessionManager.open(file);
+      return this.#open(cwd, manager, undefined);
+    });
+  }
+
+  /** Opens a new session whose conversation is `sessionId`'s current branch up to `entryId`. */
+  async fork(sessionId: string, cwd: string, entryId: string | undefined): Promise<SessionOpened> {
+    checkSessionId(sessionId);
+    const file =
+      this.#sessions.get(sessionId)?.runtime.session.sessionFile ??
+      SessionManager.findById(cwd, sessionId);
+    if (file === undefined) {
+      throw new AhpError(
+        'invalidParams',
+        `session ${sessionId} has no saved conversation to fork`,
+        {
+          details: { sessionId },
+        },
+      );
+    }
+    // A separate reader of the file: the open session's own manager keeps writing its file.
+    const source = SessionManager.open(file);
+    const leaf = entryId ?? source.getLeafId();
+    if (leaf === null || source.getEntry(leaf) === undefined) {
+      throw new AhpError('invalidParams', `session ${sessionId} has no entry ${String(entryId)}`, {
+        details: { sessionId, entryId },
+      });
+    }
+    const forked = source.createBranchedSession(leaf);
+    if (forked === undefined) {
+      throw new AhpError('internalError', `forking session ${sessionId} wrote no file`);
+    }
+    return this.#open(cwd, SessionManager.open(forked), undefined);
   }
 
   /** Accepts a prompt; the turn runs after the response is queued. */
@@ -117,32 +200,70 @@ export class SessionRegistry {
         details: { sessionId, turnId: running },
       });
     }
-    const turnId = `turn-${randomUUID()}`;
+    const turnId = this.#startTurn(sessionId, hosted, text);
     hosted.prompts.set(requestId, turnId);
-    hosted.projector.beginTurn(turnId);
-    // Start on the next macrotask: the handler's response is queued first, so Core learns the
-    // turn id before any of the turn's notifications.
-    setImmediate(() => {
-      void this.#run(sessionId, hosted, turnId, text);
-    });
     return { turnId };
   }
 
-  /** Interrupts the running turn and waits until the session is idle. */
+  /**
+   * A steering message (`kind` steer) or a follow-up: queued while a turn runs, otherwise it
+   * starts a turn like a prompt.
+   */
+  async input(
+    sessionId: string,
+    requestId: string,
+    text: string,
+    kind: 'steer' | 'followUp',
+  ): Promise<InputAccepted> {
+    const hosted = this.#get(sessionId);
+    const known = hosted.inputs.get(requestId);
+    if (known !== undefined) {
+      return known;
+    }
+    let answer: InputAccepted;
+    if (hosted.projector.activeTurnId === undefined) {
+      answer = { disposition: 'started', turnId: this.#startTurn(sessionId, hosted, text) };
+    } else if (kind === 'steer') {
+      answer = { disposition: 'queued', itemId: await hosted.queue.steer(text) };
+    } else {
+      answer = { disposition: 'queued', itemId: hosted.queue.followUp(text) };
+    }
+    hosted.inputs.set(requestId, answer);
+    return answer;
+  }
+
+  async editQueue(sessionId: string, itemId: string, text: string): Promise<QueueState> {
+    return { items: [...(await this.#get(sessionId).queue.edit(itemId, text))] };
+  }
+
+  async deleteQueued(sessionId: string, itemId: string): Promise<QueueState> {
+    return { items: [...(await this.#get(sessionId).queue.delete(itemId))] };
+  }
+
+  async reorderQueue(sessionId: string, itemIds: readonly string[]): Promise<QueueState> {
+    return { items: [...(await this.#get(sessionId).queue.reorder(itemIds))] };
+  }
+
+  /** Interrupts the running turn, waits until the session is idle and returns the queue. */
   async abort(sessionId: string): Promise<SessionStopped> {
     const hosted = this.#get(sessionId);
     const turnId = hosted.projector.activeTurnId;
+    hosted.projector.markAborting();
+    const returned = hosted.queue.takeAll();
     await hosted.runtime.session.abort();
     if (turnId !== undefined) {
       hosted.projector.finishTurn(turnId, 'interrupted');
     }
-    return stopped(sessionId, turnId);
+    return stopped(sessionId, turnId, returned);
   }
 
   /** Aborts, shuts the session down (extensions get `session_shutdown`) and forgets it. */
   async close(sessionId: string): Promise<SessionStopped> {
     const hosted = this.#get(sessionId);
     const turnId = hosted.projector.activeTurnId;
+    hosted.closed = true;
+    hosted.projector.markAborting();
+    const returned = hosted.queue.takeAll();
     this.#sessions.delete(sessionId);
     try {
       await hosted.runtime.dispose();
@@ -151,8 +272,9 @@ export class SessionRegistry {
         hosted.projector.finishTurn(turnId, 'interrupted');
       }
       hosted.unsubscribe();
+      this.#options.onClosed?.(sessionId);
     }
-    return stopped(sessionId, turnId);
+    return stopped(sessionId, turnId, returned);
   }
 
   /** Closes every session; failures are logged, not thrown. */
@@ -168,6 +290,59 @@ export class SessionRegistry {
       }),
     );
     return ids.length;
+  }
+
+  /** The persisted conversation of a session (open or not) as items. */
+  history(sessionId: string, cwd: string, start: number | undefined, limit: number): HistoryWindow {
+    checkSessionId(sessionId);
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_HISTORY_LIMIT) {
+      throw new AhpError(
+        'invalidParams',
+        `session/history: limit must be between 1 and ${String(MAX_HISTORY_LIMIT)}`,
+        { details: { member: 'limit' } },
+      );
+    }
+    const hosted = this.#sessions.get(sessionId);
+    let branch;
+    let toCanonical = (tool: string): string => tool;
+    if (hosted !== undefined) {
+      branch = hosted.runtime.session.sessionManager.getBranch();
+      toCanonical = hosted.toCanonical;
+    } else {
+      const file = SessionManager.findById(cwd, sessionId);
+      branch = file === undefined ? [] : SessionManager.open(file).getBranch();
+      const { tools } = this.#options;
+      if (tools.kind === 'core') {
+        const names = new ToolNameMap(tools.profile);
+        toCanonical = (tool) => names.toCanonical(tool);
+      }
+    }
+    return historyWindow(projectHistory(branch, toCanonical), start, limit);
+  }
+
+  #once(sessionId: string, open: () => Promise<SessionOpened>): Promise<SessionOpened> {
+    const pending = this.#opening.get(sessionId);
+    if (pending !== undefined) {
+      return pending;
+    }
+    const opening = open().finally(() => this.#opening.delete(sessionId));
+    this.#opening.set(sessionId, opening);
+    return opening;
+  }
+
+  #opened(sessionId: string): SessionOpened {
+    return { sessionId, restoredMessages: this.#get(sessionId).runtime.session.messages.length };
+  }
+
+  #startTurn(sessionId: string, hosted: HostedSession, text: string): string {
+    const turnId = `turn-${randomUUID()}`;
+    hosted.projector.beginTurn(turnId);
+    // Start on the next macrotask: the handler's response is queued first, so Core learns the
+    // turn id before any of the turn's notifications.
+    setImmediate(() => {
+      void this.#run(sessionId, hosted, turnId, text);
+    });
+    return turnId;
   }
 
   async #open(
@@ -186,10 +361,15 @@ export class SessionRegistry {
     }
     const { tools } = this.#options;
     const names = tools.kind === 'core' ? new ToolNameMap(tools.profile) : undefined;
+    const toCanonical = (tool: string): string => names?.toCanonical(tool) ?? tool;
+    const batches = new ToolBatches((tool) => CONCURRENCY_SAFE_TOOLS.has(toCanonical(tool)));
     const factory: CreateAgentSessionRuntimeFactory = async (target) => {
       const sessionTools =
         tools.kind === 'core'
-          ? toolOptions(tools.ioFor(target.sessionManager.getSessionId()), tools.profile)
+          ? scheduled(
+              toolOptions(tools.ioFor(target.sessionManager.getSessionId()), tools.profile),
+              batches,
+            )
           : { tools: PI_NATIVE_TOOLS };
       // Project-level Pi resources (`.pi/settings.json`, `.pi/mcp.json`, extensions) load
       // only for directories Core trusts: nothing project-level is read until the takeover
@@ -207,6 +387,8 @@ export class SessionRegistry {
           // PiArc assembles project context itself (T22).
           noContextFiles: true,
           extensionFactories: [createMcpExtension()],
+          // Extension tools (MCP, project extensions) run under the same batches.
+          extensionsOverride: (result) => batches.wrapExtensions(result),
         },
       });
       const result = await createAgentSessionFromServices({
@@ -236,14 +418,26 @@ export class SessionRegistry {
     if (runtime.modelFallbackMessage !== undefined) {
       log(runtime.modelFallbackMessage);
     }
-    const projector = new Projector(
-      this.#options.sinkFor(sessionId),
-      names === undefined ? undefined : (tool) => names.toCanonical(tool),
-    );
-    const unsubscribe = session.subscribe((event) => {
-      projector.handle(event);
+    const sink = this.#options.sinkFor(sessionId);
+    const projector = new Projector(sink, toCanonical);
+    const queue = new InputQueue(sessionId, session, (items) => {
+      sink.event('session/queueChanged', { items: [...items] });
     });
-    this.#sessions.set(sessionId, { runtime, projector, unsubscribe, prompts: new Map() });
+    const hosted: HostedSession = {
+      runtime,
+      projector,
+      queue,
+      batches,
+      toCanonical,
+      unsubscribe: () => undefined,
+      prompts: new Map(),
+      inputs: new Map(),
+      closed: false,
+    };
+    hosted.unsubscribe = session.subscribe((event) => {
+      this.#onEvent(sessionId, hosted, event);
+    });
+    this.#sessions.set(sessionId, hosted);
     // Emits session_start: the MCP extension connects its servers now.
     await session.bindExtensions({
       onError: (error) => {
@@ -256,22 +450,81 @@ export class SessionRegistry {
     return { sessionId, restoredMessages: session.messages.length };
   }
 
+  #onEvent(sessionId: string, hosted: HostedSession, event: AgentSessionEvent): void {
+    this.#options.onPiEvent?.(sessionId, event);
+    const { batches, queue, projector } = hosted;
+    switch (event.type) {
+      case 'message_end':
+        if (event.message.role === 'assistant' && event.message.stopReason === 'toolUse') {
+          batches.plan(
+            event.message.content.flatMap((part) =>
+              part.type === 'toolCall' ? [{ id: part.id, name: part.name }] : [],
+            ),
+          );
+        }
+        break;
+      case 'tool_execution_end':
+        batches.done(event.toolCallId);
+        break;
+      case 'agent_end':
+        batches.clear();
+        break;
+      case 'queue_update':
+        queue.reconcile(event.steering);
+        break;
+      case 'agent_settled':
+        if (event.aborted) {
+          const repair = repairInterruptedTurn(hosted.runtime.session);
+          if (repair.toolResults > 0 || repair.marker) {
+            this.#options.log(
+              `[session ${sessionId}] interrupted turn closed: ${String(repair.toolResults)} interrupted tool result(s), marker ${String(repair.marker)}`,
+            );
+          }
+        }
+        break;
+      default:
+        break;
+    }
+    projector.handle(event);
+    if (event.type === 'agent_settled') {
+      queue.settle();
+    }
+  }
+
   async #run(
     sessionId: string,
     hosted: HostedSession,
     turnId: string,
     text: string,
   ): Promise<void> {
-    if (hosted.projector.activeTurnId !== turnId) {
-      return; // aborted or closed before it started
+    let next: { readonly turnId: string; readonly text: string } | undefined = { turnId, text };
+    while (next !== undefined) {
+      if (hosted.closed || hosted.projector.activeTurnId !== next.turnId) {
+        return; // aborted or closed before it started
+      }
+      try {
+        await hosted.runtime.session.prompt(next.text);
+        hosted.projector.finishTurn(next.turnId, 'completed');
+      } catch (error) {
+        this.#options.log(`[session ${sessionId}] prompt failed: ${describeError(error)}`);
+        hosted.projector.finishTurn(next.turnId, 'failed', describeError(error));
+      }
+      next = this.#nextFollowUp(hosted);
     }
-    try {
-      await hosted.runtime.session.prompt(text);
-      hosted.projector.finishTurn(turnId, 'completed');
-    } catch (error) {
-      this.#options.log(`[session ${sessionId}] prompt failed: ${describeError(error)}`);
-      hosted.projector.finishTurn(turnId, 'failed', describeError(error));
+  }
+
+  /** Starts the first queued follow-up as the next turn, when the session is idle. */
+  #nextFollowUp(hosted: HostedSession): { turnId: string; text: string } | undefined {
+    if (hosted.closed || hosted.projector.activeTurnId !== undefined) {
+      return undefined;
     }
+    const item = hosted.queue.takeFollowUp();
+    if (item === undefined) {
+      return undefined;
+    }
+    const turnId = `turn-${randomUUID()}`;
+    hosted.projector.beginTurn(turnId);
+    return { turnId, text: item.text };
   }
 
   #get(sessionId: string): HostedSession {
@@ -285,6 +538,35 @@ export class SessionRegistry {
   }
 }
 
-function stopped(sessionId: string, turnId: string | undefined): SessionStopped {
-  return { sessionId, ...(turnId === undefined ? {} : { interruptedTurnId: turnId }) };
+/** The canonical tools with their executions held by `batches`. */
+function scheduled(
+  options: ReturnType<typeof toolOptions>,
+  batches: ToolBatches,
+): ReturnType<typeof toolOptions> {
+  return {
+    ...options,
+    customTools: options.customTools.map((tool: ToolDefinition) => batches.wrap(tool)),
+  };
+}
+
+function checkSessionId(sessionId: string): void {
+  if (!SESSION_ID.test(sessionId)) {
+    throw new AhpError(
+      'invalidParams',
+      'sessionId must be 1 to 128 letters, digits, ".", "_" or "-"',
+      { details: { member: 'sessionId' } },
+    );
+  }
+}
+
+function stopped(
+  sessionId: string,
+  turnId: string | undefined,
+  returned: readonly QueueItem[],
+): SessionStopped {
+  return {
+    sessionId,
+    ...(turnId === undefined ? {} : { interruptedTurnId: turnId }),
+    ...(returned.length === 0 ? {} : { returnedQueue: [...returned] }),
+  };
 }

@@ -29,6 +29,37 @@ export function stringField(method: string, params: Fields, name: string): strin
   return value;
 }
 
+/** An optional non-empty string member. */
+export function optionalString(method: string, params: Fields, name: string): string | undefined {
+  const value = params[name];
+  return value === undefined || value === null ? undefined : stringField(method, params, name);
+}
+
+/** The required `text` member: any string, empty included. */
+export function textField(method: string, params: Fields): string {
+  const value = params.text;
+  if (typeof value !== 'string') {
+    throw new AhpError('invalidParams', `${method}: text must be a string`, {
+      details: { member: 'text' },
+    });
+  }
+  return value;
+}
+
+/** A required array of non-empty strings. */
+export function stringList(method: string, params: Fields, name: string): string[] {
+  const value = params[name];
+  if (
+    !Array.isArray(value) ||
+    !value.every((item): item is string => typeof item === 'string' && item.length > 0)
+  ) {
+    throw new AhpError('invalidParams', `${method}: ${name} must be an array of strings`, {
+      details: { member: name },
+    });
+  }
+  return value;
+}
+
 /** An optional non-negative integer member, such as `lastSeq`. */
 export function optionalCount(method: string, params: Fields, name: string): number | undefined {
   const value = params[name];
