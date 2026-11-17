@@ -126,7 +126,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T14 | [会话编排与事件投影](tasks/T14-session-orchestration-and-projection.md) | 2 | T13 | macOS | xhigh | 大 | 无 | 已完成 | eedccea |
 | T15 | [无头驱动、L2 场景运行器与能力清单](tasks/T15-devcli-l2-scenarios-and-capabilities.md) | 2 | T14 | macOS | high | 中 | 无 | 已完成 | 5546027 |
 | T16 | [文件工具与编辑不变量](tasks/T16-file-tools-invariants.md) | 2 | T15 | macOS | xhigh | 大 | 无 | 已完成 | ea75a25 |
-| T17 | [Bash / PowerShell 执行与进程管理](tasks/T17-bash-powershell-execution.md) | 2 | T16 | macOS | high | 大 | 无 | 进行中 | — |
+| T17 | [Bash / PowerShell 执行与进程管理](tasks/T17-bash-powershell-execution.md) | 2 | T16 | macOS | high | 大 | 无 | 部分完成 | d154ab3 |
 | T18 | [客户端外壳、会话列表、设置窗口与信任对话框](tasks/T18-client-shell-and-session-list.md) | 2 | T17；D3 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T19 | [Transcript 与 composer 正式版](tasks/T19-transcript-and-composer.md) | 2 | T18 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T20 | [基础权限与审批](tasks/T20-basic-permissions-and-approvals.md) | 2 | T19 | macOS | xhigh | 大 | 无 | 未开始 | — |
@@ -293,19 +293,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-T17（开工 2026-11-17，基线 `npm run verify` 14/14 通过）：
-
-- [x] 1 进程与终止：进程组 SIGTERM → 宽限 → SIGKILL、Job Object；超时、abort、Core 关闭终止整棵树（A01、A02）
-- [x] 2 工作目录：cd 跨命令保留、越界重置并说明、Git Bash 路径转换（A03）
-- [x] 3 超时与输出：默认 2 分钟、上限 10 分钟；30,000 字符内联、落盘与 2,000 字符预览、失败头尾；持续读管道（A04、A05、A06）
-- [x] 4 语义退出码判定表（A07）
-- [x] 5 命令环境：登录 shell 环境解析与缓存、内部变量剔除、无凭据、Windows UTF-8（A08）
-- [x] 6 Windows：Git Bash 探测与安装提示、PowerShell 工具（A11、A12；Windows 部分待 CI）
-- [x] 7 流式输出与 `commandExecution` 结构化字段、golden（A09、A10）
-- [x] 8 L2 场景 `exec-*` 与能力 ID
-- 进展：piarc-exec（limits、capture、semantic、env、shells、cwd、超时与两段终止）、协议（`exec/run` 结构化结果、`exec/shells`、`commandExecution.execution`）、Core `tool_io/exec.rs`、Agent Host 自写的 Bash/PowerShell（`tools/shell.ts`）、`exec/shells` 决定工具集、投影的 `execution` 与 golden 已完成；L2 新增 10 个 `exec-*` 场景（35 passed、1 Windows 专属跳过）；剩 Windows 项核对与文档
-- [ ] 9 文档（piarc-exec CLAUDE.md、coding-standards 复用表、架构与 ADR）、verify、验收与收尾（A13）
 
 ## 登记事项
 
@@ -581,6 +568,14 @@ T17（开工 2026-11-17，基线 `npm run verify` 14/14 通过）：
 
 - 用户推送后核对提交 cfe664b 的 CI：16 个作业全部成功。verify (windows-latest) 14/14，L2 26 passed（含 12 个 `tools-*` 场景）、MISSING 0；cargo test 无失败（含编码保真、写入失败与路径大小写的单元测试）。T16-A03、T16-A11 改为 passing，T16 改为已完成
 - I70 确认修复：Windows 的 `lifecycle` 测试与 macOS、Windows L4 的 `agent-host.e2e.ts`（packaged）通过
+
+### 2026-11-17 T17 部分完成（完成提交 d154ab3）
+
+- 结果：13 项验收中 9 项通过；T17-A01、A11、A12、A13 的 Windows 部分待推送后的 Windows CI，标为 blocked（macOS 部分均已验证）
+- 交付：`piarc-exec`（`limits` 阈值、`capture` 输出预算与流式落盘、`semantic` 语义退出码、`env` 登录 shell 环境与内部变量剔除、`shells` 的 bash / Git Bash / PowerShell 探测与参数、`cwd` 的 `BASH_ENV` 目录探针、`CommandRunner` 的超时与 SIGTERM → 宽限 → SIGKILL、drop guard）；`piarc-ports::ProcessControl::terminate`；`piarc-protocol`（`exec/run` 的 `shell`、`timeoutMs` 与结构化结果、`exec/output` 的 `skipped`、`exec/shells`、`commandExecution.execution`）；`piarc-core::tool_io::exec`（全部命令用 `ProcessTreeSpawner`、会话 shell 目录、显示窗口、`CommandEnv`、`core/notices` 的 `gitBashMissing`）；`piarc-fs::create_spill`；`piarc-config` 的 `shell.gitBashPath`；Agent Host 的 `tools/shell.ts`（自写 Bash 与 PowerShell，按 `exec/shells` 决定工具集）、投影的 `execution`、golden 重录；L2 运行器的准备好的登录 shell 环境与 10 个 `exec-*` 场景、10 个能力 ID
+- 决策：ADR-0028（补充，修订 ADR-0020 第 1 条的 bash 部分：Pi 的 bash 工具截断方式、退出码判定与超时都改不了，改为 PiArc 自写，沿用 Pi 的参数与状态措辞）；架构 v2.22；cwd 用 `BASH_ENV` + `EXIT` trap（不改命令文本）；实时输出走 256 KiB 显示窗口（连接慢时丢旧数据，不拖慢命令）；命令结束时后台进程随之结束；`exec/run` 未给超时时默认 2 分钟；沙箱测试的退出信号由 9 改为 15（先 SIGTERM）
+- 验证：`npm run verify` 14/14（Vitest 849 passed、cargo test 446 passed、L2 35 passed 1 skipped、MISSING 0）；Windows 交叉 clippy 通过；agent_host 端到端 14 passed（含对照测试 Bash 三步一致）；sessions 10 passed
+- 遗留：I75–I78；T17 的 Windows 部分未在 Windows 上运行；未推送
 
 ## 计划变更记录
 
