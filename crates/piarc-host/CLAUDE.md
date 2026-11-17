@@ -1,6 +1,6 @@
 # piarc-host
 
-Core 侧的 Agent Host 监管：启动、握手、stdio 读写、背压、心跳、重启、调用对账、stderr 日志（架构第 7.5 节、ADR-0009）。只依赖 `piarc-protocol` 与 `piarc-ports`；进程经注入的 `ProcessSpawner` 启动，时间经注入的 `Clock`。生产装配在 `piarc-core::agent_host::start`（`piarc-exec` 的启动器 + 系统时钟）。不负责回答 Agent Host 的请求（注入的 `InboundHandler`，T07 起由 `piarc-core::tool_io` 回答 `fs/*`、`exec/*`），也不负责会话编排（T14）。
+Core 侧的 Agent Host 监管：启动、握手、stdio 读写、背压、心跳、重启、调用对账、stderr 日志（架构第 7.5 节、ADR-0009）。只依赖 `piarc-protocol` 与 `piarc-ports`；进程经注入的 `ProcessSpawner` 启动，时间经注入的 `Clock`。生产装配在 `piarc-core::agent_host::start`（`piarc-exec` 的启动器 + 系统时钟）。不负责回答 Agent Host 的请求（注入的 `InboundHandler`，T07 起由 `piarc-core::tool_io` 回答 `fs/*`、`exec/*`），也不负责会话编排（`piarc-core::sessions`，T14）。
 
 ## 命令
 
@@ -23,7 +23,8 @@ Core 侧的 Agent Host 监管：启动、握手、stdio 读写、背压、心跳
 - 任何非 `shutdown` 的结束（崩溃、启动失败、握手超时、心跳判定挂死、`kill()`）都计入 `RestartPolicy`：退避 1、2、4、8、16 s（上限 30 s），10 分钟滑动窗口内最多 5 次重启，下一次失败发 `GaveUp` 并停止。
 - 握手被拒（主版本不同、`host/hello` 格式错误）不重启，直接 `Stopped`。
 - `restart()`（T13）是计划内重启：`host/shutdown` 后立即启动新进程，`Exited` 的原因为 `Restarted`，不计入 `RestartPolicy`、不退避、不发 `Restarting`；会话照常 `session/resume`。项目信任变化时由 `piarc-core::agent_host::restart_on_trust_change` 调用。
-- 重启后对经 `create_session` 打开的会话依次 `session/resume`（带 `lastSeq`）：Agent Host 拒绝或答非所问的会话从跟踪表移除并发 `SessionRestoreFailed`；超时、写队列满的会话保留并发 `SessionRestoreFailed`；连接中途结束时停止本轮，未恢复的会话留到下一次连接（R1-A1）。恢复期间不响应关闭与 Kill（R1-A4，T14）。
+- 跟踪表：`create_session`、`resume_session`、`fork_session` 成功的会话都进入跟踪表；`create_session` 带 Core 选定的 id 而结果未知（`Error::outcome_unknown()`：超时或连接中断）时同样按该 id 跟踪，下一次连接以 `session/resume` 收敛（R1-A3）。`resume_session` 的 `last_seq` 取跟踪值与传入值的较大者。
+- 重启后对跟踪表中的会话依次 `session/resume`（带 `lastSeq`）：Agent Host 拒绝或答非所问的会话从跟踪表移除并发 `SessionRestoreFailed`；超时、写队列满的会话保留并发 `SessionRestoreFailed`；连接中途结束时停止本轮，未恢复的会话留到下一次连接（R1-A1）。恢复在命令循环里与关闭、Kill、连接结束一起 `select`：新进程不回答恢复请求时 `shutdown()` 不必等调用超时（R1-A4）。`Kill` 带目标连接的 epoch（心跳判定挂死时），只结束那一次连接，不会误杀之后的新进程（R1-A10）。
 
 ## 背压
 
@@ -40,6 +41,7 @@ Core 侧的 Agent Host 监管：启动、握手、stdio 读写、背压、心跳
 
 ## 入站请求
 
+- 只有 Core 接受了握手（`core/welcome` 已发出）的连接才分发入站请求；握手前或被拒后的请求直接回错误，不到处理者（R1-A7）。同时处理的入站请求至多 `inbound_concurrency`（默认 256）个，许可用完时读取停住（R1-A14，I58）。
 - 每个入站请求在独立任务里交给 `InboundHandler::handle(method, params, peer)`；`Peer` 绑定该连接的写队列，`notify::<M>()` 发出的通知与随后的响应同序写出（`exec/output` 先于 `exec/run` 的响应）。写队列满时 `notify` 等待，连接结束时返回 `PeerClosed`；`Peer::closed()` 在连接结束时完成，`is_closed()` 查询是否已结束，`same_connection()` 判断两个 `Peer` 是否同一连接（凭据变更订阅去重）。
 - Agent Host 的请求与会话通知共用 stdout：读取停在投递上时（许可用完），后面的请求也读不到，工具 I/O 随之等待（S4 第 10 节，I19）。
 

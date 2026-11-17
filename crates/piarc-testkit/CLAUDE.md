@@ -11,6 +11,9 @@
 | `cargo run -q -p piarc-testkit --bin piarc-mock-provider -- --port 0 --scenarios packages/testkit/scenarios` | 手动起一个独立进程：第一行打印端口，回车或关闭 stdin 后退出 |
 | `npx vitest run packages/testkit` | pi-ai 对 mock 的两种线格式往返（会先 `cargo build` 这个 bin） |
 | `cargo test -p piarc-testkit --test agent_host -- --nocapture` | S3、S4 与进程级 S9：`piarc-core::agent_host` 监管真实 Agent Host bundle（测试先运行 `node scripts/dev/build-agent-host.mjs`），mock 库形态应答，Core 侧用真实 `ToolIo`；需要 PATH 上的 node（或 `PIARC_TEST_NODE`）。`parity.rs` 还需要 ripgrep 与 fd（`.tools/bin` 或 PATH） |
+| `cargo test -p piarc-testkit --test agent_host golden` | T14 的 golden 漂移检查：重新录制 Pi 事件序列，与 `agent-host/test/golden/*.events.json` 比对；`PIARC_UPDATE_GOLDEN=1` 时改写录制文件（之后 `npx vitest run agent-host -u` 更新投影快照） |
+| `cargo test -p piarc-testkit --test sessions` | T14：经 `piarc_core::CoreRuntime` 的会话层端到端（真实 Agent Host + mock，`tests/sessions/`） |
+| `cargo run --release -p piarc-testkit --example t14-warmup` | T14-A09：打开工作区到就绪、打开并恢复会话的 10 次测量，超过 1 s 预算即失败 |
 | `cargo test -p piarc-testkit --test ahp_round_trip -- --nocapture` | T07-A10：`fs/read` 的 AHP 往返计时（独立测试二进制，计时期间不跑别的测试） |
 
 ## 两种运行形态
@@ -41,7 +44,8 @@
 
 - `tests/agent_host/harness.rs`：每个测试一个临时根目录（含空格与中文），`data/pi/models.json` 定义 provider `piarc-mock` 与 `mock-large`（200k）、`mock-small`（32k）两个模型。`mock-small` 的请求一律以请求头选择场景 `small-window`：压缩会替换首条 user 消息，消息里的场景标记随之消失。
 - 等待一律等事件或条件（`Recorder::until`、`turn_completed`），超时只作安全网。
-- 中断或杀进程的时点靠场景步骤的 `stall_after_events`；这类场景关闭 `role_order`（`docs/plan/PLAN.md` I18）。
+- 中断或杀进程的时点靠场景步骤的 `stall_after_events`。中断后的对话由 Harness Kit 补齐（ADR-0026），这类场景开着 `role_order`；只有含 steer 的场景关闭它（steer 按 Pi 的做法紧跟工具结果，形成相邻的 user 消息）。
+- `golden.rs`：用 `--test-record-events <目录>` 让 Agent Host 把 Pi 的原始事件与注册表的步骤（回合接受、中断、排队）写到 `<目录>/<会话 id>.jsonl`，按场景录制 `agent-host/test/golden/` 的输入。平时只检查已提交的录制与 Pi 现在产生的事件类型一致；投影的期望输出是 Vitest 文件快照。
 - Core 侧的 `Core` 处理者回答 `trust/get`，并把 `fs/*`、`exec/*` 交给真实的 `ToolIo`、记录每次调用（`calls_of`）。会话一律经 `open()` 打开：它在 `session/create` 之后把 cwd 登记为该会话的工作区根，否则工具请求会得到 `sessionNotFound`。
 - `tools.rs`（A01、A02、A04、A05）、`parity.rs`（A06，Pi 原生工具 vs 委托工具）与 `with_io_spy`（`NODE_OPTIONS` 预加载 `packages/testkit/src/io-spy.ts`）是 S4 的证据。spy 记录带时间戳，按场景窗口判定；会话创建时 Pi 的 `existsSync(cwd)` 是已知的唯一一次（I20）。
 - 工具的 I/O 要 Core 读 stdout 才能进行：让 Core 停读的测试（背压）不能等真实工具完成，用不存在的工具名制造通知。
@@ -49,6 +53,12 @@
 - Core 侧的 `secrets/*` 由 `Env.secrets`（真实 `SecretsService`，保险箱在测试数据目录，主密钥在 `Env.key_store` 这个内存替身里）回答；同一个 `Env` 的所有 Agent Host 共用它，就像一个 Core。要注入凭据库失败，对 `env.key_store` 调 `fail_with`。
 - `credentials.rs`（S5）：`--test-oauth-provider` 与 `token_server.rs`（refresh token 用过即失效）验证登录、只刷新一次、无明文与进程环境；`capture_logs()` 把 Core 的 tracing（含 Agent Host 的 stderr）写到一个文件供扫描，整个测试二进制只装一次。
 - 无明文扫描用库里的 `piarc_testkit::plaintext::scan`：逐字节、不跟随符号链接、读不了的文件单独列出；先放一个对照文件证明扫描路径有效。
+
+## 会话层端到端测试（`tests/sessions/`，T14）
+
+- `support.rs`：`Env` 起 mock、写 `models.json`、用 `CoreConfig` 启动真实 `CoreRuntime`（`AgentHostLaunch::Custom` 指向测试打包的 bundle，`SecretStoreSetup` 用内存保险箱，`ManualClock` 控制空闲回收）；`Events` 收集 sink 的批次，`wait` 等某路由上满足条件的事件。同一个 `Env` 上重启 Core 复用同一个主密钥名。
+- `ToolIoConfig.observer` 记录同时进行的 `fs/*` 调用数（A06 的批次上限）；`--test-drop-seq <n>` 让 Agent Host 不写出第 n 条通知（A08 的缺口补齐）。
+- 场景在 `tests/sessions/scenarios/`；等事件一律经 `Events::wait`，合并器按 16 ms 刷出。
 
 ## 易错点
 

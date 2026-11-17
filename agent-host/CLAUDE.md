@@ -7,17 +7,21 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 | 命令 | 用途 |
 |---|---|
 | `npm run build:agent-host` | esbuild 打包到 `agent-host/dist/bundle/agent-host.mjs`，并写 `pi-assets/package.json`；`@piarc/protocol` 从源码打包，不依赖 `tsc` 产物 |
-| `npx vitest run agent-host` | 单元测试：出站队列、投影、Core 桥接、工具层（名称映射、路径、替身、Core I/O）、凭据存储（Pi 接口契约与假 Core）、信任接管（`trust/get` 故障注入） |
+| `npx vitest run agent-host` | 单元测试：出站队列（含回放缓冲、单帧上限）、投影与 golden 测试（`projector.golden.test.ts` 打印覆盖矩阵）、排队表、工具批次、中断补齐、Core 桥接、工具层、凭据存储、信任接管 |
+| `npx vitest run agent-host -u` | golden 录制更新后重写投影的期望输出（`test/golden/*.expected.json`，提交前逐个审阅） |
+| `PIARC_UPDATE_GOLDEN=1 cargo test -p piarc-testkit --test agent_host golden` | 用真实 Agent Host 与 mock 重新录制 golden 输入（`test/golden/*.events.json`）；不带变量时只核对 Pi 产生的事件类型没有变化 |
 | `cargo test -p piarc-testkit --test agent_host -- --nocapture` | 端到端：Core 监管真实 bundle、mock provider 应答（S3、S4、S5 与进程级 S9；`trust.rs` 是 T13 的项目扩展随信任加载与撤销）；测试会先自己打包 |
-| `node agent-host/dist/bundle/agent-host.mjs --data-dir <dir>` | 手动运行；需设 `PI_PACKAGE_DIR=<bundle>/pi-assets`，stdout 只走 AHP 帧。`--tool-profile <json>` 覆盖默认 Profile 的名称与描述、`--pi-native-tools` 换回 Pi 原生工具、`--test-oauth-provider <json>` 注册接本地 token 端点的 OAuth provider，都只给测试用，Core 不传 |
+| `node agent-host/dist/bundle/agent-host.mjs --data-dir <dir>` | 手动运行；需设 `PI_PACKAGE_DIR=<bundle>/pi-assets`，stdout 只走 AHP 帧。`--tool-profile <json>` 覆盖默认 Profile 的名称与描述、`--pi-native-tools` 换回 Pi 原生工具、`--test-oauth-provider <json>` 注册接本地 token 端点的 OAuth provider、`--test-record-events <dir>` 把每个会话的原始 Pi 事件与注册表的步骤写成 `<dir>/<sessionId>.jsonl`、`--test-drop-seq <n>` 让 seq 为 n 的会话通知不写出（仍进回放缓冲），都只给测试用，Core 不传 |
 
 ## 入口与结构
 
 - `src/main.ts`：进程入口。解析 `--data-dir`、`--bridge-timeout-ms`；设置 `PI_CODING_AGENT_DIR`；接管 stdout（第三方的 `console.log` 改写到 stderr）；SIGTERM/SIGINT 有序退出，第二个信号立即退出。
 - `src/host.ts`：与进程无关的主体：握手（`host/hello` → `core/welcome`）、请求分派、`host/shutdown`、stdin 关闭即退出。退出码见 `EXIT`（3 = 协议主版本不符，70 = 出站积压超限）。
-- `src/runtime/`：会话注册表（`session-registry.ts`）、投影（`projector.ts`，Pi 事件 → `turn/*`、`item/*`）、blob 读取（只接受数据目录 `sessions/` 下的路径）。
+- `src/runtime/`：会话注册表（`session-registry.ts`：回合、steer 与 follow-up、fork、history、并发 resume 合并）、投影（`projector.ts` 实时、`history.ts` 会话文件，共用 `items.ts` 的条目构造；规则表在 `projector.ts` 文件头，与架构第 5.3 节一致）、排队表（`queue.ts`）、blob 读取（只接受数据目录 `sessions/` 下的路径）。
+- `src/harness/tool-batches.ts`、`src/harness/interruption.ts`：回合不变量的 Harness Kit 部分（工具批次、中断补齐），见下文"回合不变量"。
+- `test/golden/`：投影 golden 测试的输入（录制或构造的 Pi 事件，`*.events.json`）与期望输出（`*.expected.json`）；Prettier 不处理这个目录。
 - `src/runtime/core-bridge.ts`：向 Core 发请求的唯一入口（统一超时，默认 30 s；`timeoutMs: null` 给等待用户的请求，靠 `signal` 取消）。
-- `src/protocol/outbound.ts`：写 stdout 的唯一路径：等 `drain`、合并增量、写出时分配 `seq`。
+- `src/protocol/outbound.ts`：写 stdout 的唯一路径：等 `drain`、合并增量、`item/updated` 只保留最新、写出时分配 `seq`；每个会话保留最近 4,096 条或 8 MiB 已写出的通知供 `session/getEntries` 回放；超过 8 MiB 单帧上限的会话通知不写出、不占 `seq`。
 - `src/tools/`：工具层（架构第 6.1 节、ADR-0020）。`profile.ts` 规范名、默认 Profile（描述原创，ADR-0006）与 `ToolNameMap`；`core-io.ts` 经 Core 桥接发 `fs/*`、`exec/*`（结果在此校验，错误重建为 Node 风格）；`read.ts`、`write.ts`、`edit.ts` 在替身路径（`stand-in.ts`）上运行 Pi 的工具定义；`bash.ts`、`glob.ts` 用 Pi 工厂加 Operations；`grep.ts` 自写；`ls.ts` 只提供 `LsOperations`，不暴露。
 - `src/harness/project-trust.ts`：Harness Kit 接管 Pi 的项目信任（T13）。`askCoreTrust` 发 `trust/get`，超时、错误响应、结果无法解析、连接已断都按不信任；`takeOverProjectTrust` 给 `createAgentSessionServices` 的 `resourceLoaderReloadOptions.resolveProjectTrust`，会话的 `SettingsManager` 一律以 `projectTrusted: false` 创建，项目级资源（`.pi/extensions/`、`.pi/settings.json`、`.pi/mcp.json` 等）在钩子拿到 Core 的回答后才加载。
 - `src/runtime/credentials.ts`：`CoreCredentialStore`，pi-ai 的 `CredentialStore`，经 `secrets/*` 由 Core 的保险箱支撑（ADR-0021）；`host.ts` 在握手后 `load()`，再交给 `ModelRuntime.create({ credentials })`。
@@ -52,7 +56,27 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - 关闭会话要走 `AgentSessionRuntime.dispose()`：单独的 `session.dispose()` 不发 `session_shutdown`，MCP 不会断开。
 - MCP 扩展按会话实例化：同一个 server 被两个会话配置时会起两份进程（共享池是 T36）。
 - 扩展加载器的模块级缓存按 cwd 失效，不同 cwd 的会话交替加载文件型扩展会互相清空它；Harness Kit 用内联工厂不受影响。
-- 中断后的下一次请求里 Pi 丢弃被中断的 assistant 消息，出现相邻的 user 消息（`docs/plan/PLAN.md` I18）。
+- Pi 丢弃被中断的 assistant 消息；中断后的对话靠 Harness Kit 补写的结果与中断标记保持角色交替（I18 已处理，ADR-0026）。不要在别处再补一份。
+
+## 回合、排队与投影（T14，ADR-0026）
+
+- 一个被接受的输入是一个回合：`session/prompt`，或空闲时的 `session/steer`、`session/followUp`（回 `disposition: "started"`）。回合从首个 `agent_start` 到 `agent_settled`；`turn/completed` 带本回合各次回复的用量之和。
+- steer 立即交给 Pi（`session.steer`），在当前步骤（本次回复的工具调用全部结束）之后、下一次请求之前进入上下文，属于当前回合；在 Pi 的最后一步之后才到的 steer，回合结束时转为表头的 follow-up。与 Pi 的差异：Pi 自己的 follow-up 在同一次运行里继续、不分回合，所以 follow-up 不交给 Pi，留在排队表里，回合完成后由注册表作为新回合启动。
+- 排队表（`queue.ts`）是 id、类别、文本与顺序的唯一来源；任何变化都发 `session/queueChanged`（整张表）。编辑、删除、重排 steer 项会清空 Pi 的队列再按新顺序重新交给 Pi，期间忽略 `queue_update`，结束后按 `getSteeringMessages()` 对齐一次。`session/abort` 先清空排队表并在结果中交回（`returnedQueue`），中断之后不自动开始新回合。
+- 投影器只认 `parentToolCallId` 为空的工具事件（工具嵌套调用的子调用不成条目）。条目 id：文本与 reasoning 为 `<messageId>#<contentIndex>`（`messageId` 由投影器生成，历史里是 Pi 的 entry id，两者不同），工具为工具调用 id（实时与历史相同），用户消息为 `<turnId>:user:<n>`（历史里是 entry id）。
+- 记录事件的测试钩子在注册表里也记下 `beginTurn`、`markAborting`、`steer`、`followUp`、`takeFollowUp` 这些步骤，golden 测试按同样的顺序回放（`projector.golden.test.ts` 的 `replay` 与 `#onEvent` 保持一致）。
+
+## 回合不变量：Pi 已满足 / Harness Kit 补齐（架构第 6.15 节）
+
+| 不变量 | Pi 1.5.2 已满足 | Harness Kit 补齐 |
+|---|---|---|
+| 回合继续条件 | 回复里有工具调用才继续；`length` 截断时整条回复的调用判为失败、不执行 | — |
+| 工具并发 | 并行模式同时启动一条回复的全部调用（无上限）；有一个 `sequential` 工具时全部串行 | `tool-batches.ts`：所有工具保持并行模式，执行被调度器按批放行：连续的 Read、Glob、Grep 每批至多 10 个，其余调用单独成批，前面的批次全部结束才放行下一批；Pi 不经执行就回答的调用按 `tool_execution_end` 计为结束。包住自定义工具（注册表的 `scheduled`）与所有扩展工具（`extensionsOverride` 替换扩展的 `tools` 映射，之后注册的 MCP 工具也被包住） |
+| 中断补齐 | 已开始执行的调用收到 abort 信号后得到错误结果；没开始执行的得到 "Operation aborted"；还没准备的调用没有结果，pi-ai 只在请求里临时补 "No result provided"；被中断的回复写进文件但不进上下文 | `interruption.ts`：`agent_settled` 的 `aborted` 为真时，为没有结果的调用补写 "Interrupted by the user before this tool call finished."，对话不以回复结尾时追加中断标记（会话当前模型、零用量、`rawStopReason: piarc-interrupted`）；会话重新打开时对崩溃留下的未完成回合做同样处理。投影把这些调用的条目标为 `interrupted` |
+| 重试 | agent 循环对限流、过载、5xx 重试，发 `auto_retry_*`，失败的那次不进上下文 | 每个会话的设置施加 `retry.provider.maxRetries = 0`（内存覆盖），让服务商 SDK 不静默重试，重试都经 `turn/retrying` 报给界面 |
+
+- steer 消息按 Pi 的做法紧跟工具结果，形成相邻的 user 消息（Anthropic API 合并，严格 mock 的 `role_order` 不接受）：steer 场景关闭 `role_order`，其余场景（包括中断之后的请求）全部规则开启。
+- 失败（非中断）结束的回合不补中断标记：下一条输入同样会紧跟上一条 user 消息（`docs/plan/PLAN.md` I67）。
 
 ## 凭据适配层
 
