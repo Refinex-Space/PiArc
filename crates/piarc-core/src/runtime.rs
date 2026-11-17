@@ -696,8 +696,10 @@ impl Shared {
         if let Some(runtime) = lock(&self.runtime).take() {
             runtime.shutdown_timeout(RUNTIME_SHUTDOWN_TIMEOUT);
         }
-        if self.state_dirs.is_some() {
-            // Stop writing log files into a data directory that may go away with this Core.
+        if let Some(services) = &self.state_dirs {
+            // Release every file in the data directory, which may go away with this Core: the
+            // JavaScript object holding this Core lives until it is collected (I66).
+            services.storage.close();
             piarc_telemetry::detach();
         }
         let waiters = {

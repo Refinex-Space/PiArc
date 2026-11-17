@@ -8,10 +8,10 @@ use piarc_store::{Store, SyncReport};
 use crate::dirs::DataDirs;
 use crate::error::{Error, Result};
 
-/// The database of one Core. Clones share it.
+/// The database of one Core. Clones share it; [`Storage::close`] closes it for all of them.
 #[derive(Clone)]
 pub struct Storage {
-    store: Arc<Mutex<Store>>,
+    store: Arc<Mutex<Option<Store>>>,
     dirs: DataDirs,
 }
 
@@ -41,7 +41,7 @@ impl Storage {
     pub fn open(dirs: DataDirs) -> Result<Self> {
         let store = Store::open(&dirs.database(), now_ms())?;
         Ok(Self {
-            store: Arc::new(Mutex::new(store)),
+            store: Arc::new(Mutex::new(Some(store))),
             dirs,
         })
     }
@@ -53,16 +53,33 @@ impl Storage {
     }
 
     /// Runs `f` with the store on the current thread (blocking).
-    pub fn with<R>(&self, f: impl FnOnce(&mut Store) -> R) -> R {
+    ///
+    /// # Errors
+    ///
+    /// [`Error::ShuttingDown`] once the database is closed.
+    pub fn with<R>(&self, f: impl FnOnce(&mut Store) -> R) -> Result<R> {
         let mut store = self.store.lock().unwrap_or_else(PoisonError::into_inner);
-        f(&mut store)
+        store.as_mut().map(f).ok_or(Error::ShuttingDown)
+    }
+
+    /// Closes the database (the last step of Core's ordered shutdown): the connection and its
+    /// WAL files are released, so the data directory can be deleted on Windows (I66). Later
+    /// calls fail with [`Error::ShuttingDown`].
+    pub fn close(&self) {
+        let store = self
+            .store
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take();
+        drop(store);
     }
 
     /// Runs `f` with the store on the blocking pool.
     ///
     /// # Errors
     ///
-    /// [`Error::Internal`] when the blocking task panicked.
+    /// [`Error::Internal`] when the blocking task panicked; [`Error::ShuttingDown`] once the
+    /// database is closed.
     pub async fn run<R: Send + 'static>(
         &self,
         f: impl FnOnce(&mut Store) -> R + Send + 'static,
@@ -72,7 +89,7 @@ impl Storage {
             .await
             .map_err(|error| Error::Internal {
                 reason: format!("a storage task failed: {error}"),
-            })
+            })?
     }
 
     /// Brings the session index up to date with `pi/sessions/` (incremental).

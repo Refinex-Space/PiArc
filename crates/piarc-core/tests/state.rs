@@ -152,9 +152,20 @@ fn the_data_directory_gets_its_layout_and_database() {
         .storage()
         .expect("storage")
         .with(|s| s.schema_version())
+        .expect("open")
         .expect("version");
     assert_eq!(version, 1);
+    let storage = core.storage().expect("storage");
     core.shutdown_blocking().expect("shutdown");
+    // The ordered shutdown closes the database: a JavaScript `CoreRuntime` lives on until it
+    // is collected, and Windows cannot delete a data directory with open files (I66).
+    assert_eq!(
+        storage
+            .with(|s| s.schema_version())
+            .expect_err("the database is closed")
+            .kind(),
+        ErrorKind::ShuttingDown
+    );
 
     // Without a data directory the state services are absent, not broken.
     let (tx, _rx) = channel();

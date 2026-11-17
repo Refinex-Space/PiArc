@@ -80,6 +80,7 @@ impl TrustLookup for StoreLookup {
         let record = self
             .0
             .with(|store| store.trust(&key))
+            .map_err(|e| e.to_string())?
             .map_err(|e| e.to_string())?;
         Ok(record.is_some_and(|r| r.decision == TrustDecision::Trusted))
     }
@@ -149,7 +150,7 @@ impl TrustService {
                     decided_at: now_ms(),
                     snapshot,
                 })
-            })?;
+            })??;
             Ok((build_view(&storage, &dir_owned)?, checkout.main))
         })
         .await?;
@@ -171,7 +172,7 @@ impl TrustService {
         let (view, checkout) = blocking(move || {
             let checkout = piarc_git::resolve(&dir_owned)?;
             let key = checkout_key(&checkout.main)?;
-            storage.with(|store| store.remove_trust(&key))?;
+            storage.with(|store| store.remove_trust(&key))??;
             Ok((build_view(&storage, &dir_owned)?, checkout.main))
         })
         .await?;
@@ -243,7 +244,7 @@ async fn query(lookup: Arc<dyn TrustLookup>, dir: PathBuf) -> TrustState {
 fn build_view(storage: &Storage, dir: &Path) -> Result<TrustView> {
     let checkout = piarc_git::resolve(dir)?;
     let key = checkout_key(&checkout.main)?;
-    let record = storage.with(|store| store.trust(&key))?;
+    let record = storage.with(|store| store.trust(&key))??;
     let Inventory { items, unreadable } = piarc_config::enumerate(&checkout.root);
     let trusted = record
         .as_ref()

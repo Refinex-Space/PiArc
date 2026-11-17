@@ -296,7 +296,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 T14 会话编排与事件投影（2026-11-17 开工；开工检查：基线 verify 13/13；Windows CI 运行 43879135441 中 T13-A02 的 data-dirs 用例通过，T13 改为已完成；同一运行的 Core 关闭后数据库仍被占用登记为 I66，本任务修复）
 
-- [ ] 1. I66：有序关闭释放数据库与日志文件（先写失败测试）
+- [x] 1. I66：有序关闭释放数据库与日志文件（先写失败测试）
 - [ ] 2. 协议：会话方法（steer、followUp、fork、queue/edit|delete|reorder、getEntries、history）、条目类型、通知（item/updated、reasoning、contextCompaction、turn/retrying、session/queueChanged、harness/entry）、契约样本
 - [ ] 3. Agent Host 投影：第 5.3 节投影表完整实现、历史投影、golden 测试与覆盖矩阵（A01、A02）
 - [ ] 4. Agent Host 会话：排队表（编辑、删除、重排）、steer、followUp、fork、history、回放缓冲（getEntries）、并发 resume 去重、出站单帧上限
