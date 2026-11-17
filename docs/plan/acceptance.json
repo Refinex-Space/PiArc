@@ -1658,92 +1658,92 @@
       "id": "T14-A01",
       "task": "T14",
       "description": "投影 golden 测试覆盖第 5.3 节投影表的每一行、六种工具 item 类型与五种 item 状态，全部通过。验证：L1 测试输出（列出覆盖矩阵）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npx vitest run agent-host/src/runtime/projector.golden.test.ts`：11 passed。10 个 golden 场景（7 个由 `cargo test -p piarc-testkit --test agent_host golden` 经真实 Pi 1.5.2 录制，3 个构造：thinking、declined、harness-entry）覆盖第 5.3 节 13 行投影（打印的覆盖矩阵全部 covered），条目类型含 commandExecution、fileChange、mcpToolCall、subagent、webFetch、dynamicToolCall 六种工具条目，状态含 inProgress、completed、failed、interrupted、declined；漂移检查 1 passed。输出 tmp/evidence/T14/projection-golden.txt"
     },
     {
       "id": "T14-A02",
       "task": "T14",
       "description": "Grep 无匹配等语义成功的工具调用投影为 `completed`，工具抛出错误投影为 `failed`。验证：golden 测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "同上 golden 测试 \"marks tool calls by their own result\"：录制的 tools 场景中 Grep 无匹配（Core 回 \"No matches found\"）投影为 completed，读不存在的文件（工具抛错）投影为 failed 并带错误文本"
     },
     {
       "id": "T14-A03",
       "task": "T14",
       "description": "排队项可编辑、删除、重排，`session/queueChanged` 反映新顺序，回合结束后按新顺序执行且不丢项、不重复。验证：场景测试（mock provider 请求断言）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-testkit --test sessions queued_inputs`：1 passed。回合等待文件期间排入 1 个 steer 与 3 个 follow-up（A、B、C），编辑 steer 与 B、删除 A、追加 D、重排为 steer、D、C、B；操作结果与最后一次 `session/queueChanged` 都是 [Steer S2, D, C, B2]。steer 在第一个回合内送达，之后的 3 个 follow-up 回合依次为 D、C、B2；mock 记录的请求中各出现一次，删除的 A 与编辑前的文本没有出现；4 个回合都 completed，最后排队表为空"
     },
     {
       "id": "T14-A04",
       "task": "T14",
       "description": "运行中 steer 的内容在当前步骤后进入模型请求；followUp 在回合结束后作为新输入执行。验证：场景测试（mock provider 请求断言）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-testkit --test sessions steering_joins`：1 passed。工具运行时发 steer 与 followUp：第 2 次模型请求在工具结果之后带 steer 文本、不含 follow-up，属于第一个回合；第 3 次请求是 follow-up 的新回合，在第一个回合的最终回复之后，且在第一个回合 `turn/completed` 之后才开始"
     },
     {
       "id": "T14-A05",
       "task": "T14",
       "description": "工具执行中 abort：每个未完成的工具调用都补齐\"已中断\"结果，下一次请求通过 mock provider 的配对校验，相关 item 状态为 `interrupted`。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-testkit --test sessions an_abort_completes`：1 passed。Bash、Read、Grep 三个调用执行中 abort：abort 的结果带被中断的 turnId，回合 interrupted，三个工具条目都以 interrupted 完成；下一次请求在全部校验规则（含 tool_pairing、role_order）下没有违规，三个 tool_use 都有 is_error 的结果，角色序列 [user, assistant, user, assistant, user]（第二条 assistant 是中断标记）"
     },
     {
       "id": "T14-A06",
       "task": "T14",
       "description": "一条助手消息含 12 个只读调用、1 个写调用、2 个只读调用时，执行批次为 10、2、写、2，任一时刻并行数不超过 10，写调用单独执行。验证：测试（Core 侧并发计数断言）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-testkit --test sessions tool_calls_run_in_batches`：1 passed。12 个 Read、1 个 Write、2 个 Read 的回复：Core 侧的 `ToolIoObserver` 扣住委托请求直到静默期过去再一起放行，记录同时到达的调用，批次为 [r1–r10]、[r11–r12]、[w13]、[r14–r15]，大小 [10, 2, 1, 2]，任一批次不超过 10，写调用单独一批"
     },
     {
       "id": "T14-A07",
       "task": "T14",
       "description": "mock provider 注入 529 与 429 后恢复：客户端收到带 attempt、maxAttempts、delayMs 的 `turn/retrying`，后续发给模型的请求中不含这些错误。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-testkit --test sessions retries_are_reported`：1 passed。mock 依次注入 529、429 后正常应答：客户端收到两条 `turn/retrying`（attempt 1、2，maxAttempts、delayMs 齐全），回合 completed；最后一次模型请求只含用户提示，不含错误回复"
     },
     {
       "id": "T14-A08",
       "task": "T14",
       "description": "故障注入丢弃一条会话通知后，Core 用 `session/getEntries(since)` 补齐，客户端收到的事件完整且有序。验证：故障注入测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-testkit --test sessions a_lost_notification`：1 passed。Agent Host 以 `--test-drop-seq 3` 不写出 seq 3，Core 暂存其后的通知并以 `session/getEntries(2)` 补齐，客户端收到 seq 1–9（含被丢弃的 item/completed#3）各一次、按序，没有 `session/resync`；全部会话测试 10 passed，输出 tmp/evidence/T14/sessions.txt"
     },
     {
       "id": "T14-A09",
       "task": "T14",
       "description": "打开工作区即启动 Agent Host，release 构建下到就绪的时间 10 次测量的最大值不超过 1.0 s；全部会话空闲达到配置阈值后进程被回收，再次 prompt 时自动恢复。验证：测量输出与测试（时钟可注入）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo run --release -p piarc-testkit --example t14-warmup`：10 次打开工作区到 Agent Host 就绪最大 279.5 ms，打开并恢复一个有历史的会话最大 309.5 ms（预算 1,000 ms，macOS arm64，输出 tmp/evidence/T14/warmup-release.txt）。`cargo test -p piarc-testkit --test sessions an_idle_workspace`：1 passed，ManualClock 推进到空闲阈值后工作区状态 reclaimed、Agent Host 进程退出，再次 prompt 自动启动并恢复会话后回合 completed"
     },
     {
       "id": "T14-A10",
       "task": "T14",
       "description": "工作区列表与会话列表快照的 `revision` 单调递增；同一实体的旧 revision 快照不会覆盖新快照。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-testkit --test sessions snapshot_revisions`：1 passed。一个工作区里并发创建 4 个会话（共 5 个）、跑一个回合、标记已读、关闭一个并重发快照：`core/workspaces` 与 `core/sessions` 的 revision 按到达顺序严格递增（本次分别为 1–6 与 1–11），最后一个会话快照与最终状态一致（4 个打开、已读的会话 unread 为 false）"
     },
     {
       "id": "T14-A11",
       "task": "T14",
       "description": "重启 Core 后会话列表从索引恢复，resume 后发出的下一个请求带有完整历史，`transcript_window` 返回的条目与重启前一致。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-testkit --test sessions a_restarted_core`：1 passed。两个回合后在同一数据目录重启 Core：`core/sessions` 从索引列出该会话（open false，messageCount 5：system 加两组 user、assistant）；`transcript_window` 与重启前逐项相等（total 4）；resume 的 restoredMessages 为 5，下一次模型请求同时带两个回合的回复"
     },
     {
       "id": "T14-A12",
       "task": "T14",
       "description": "会话 create、resume、fork、close 可经 NAPI 调用，`.d.ts` L1 快照已更新。验证：测试与快照文件。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npx vitest run apps/desktop/src/main/core/sessions.integration.test.ts`：1 passed。经开发构建的 `.node` 调 openWorkspace、createSession、prompt、forkSession（副本的 transcriptWindow total 2）、closeSession（关闭后 prompt 抛 sessionNotFound，参数错误同步抛出）、resumeSession（restoredMessages 3）后再 prompt 完成，收到 `session/<id>`、`core/sessions`、`core/workspaces` 事件；Core 侧 fork 与 close 另由 `cargo test -p piarc-testkit --test sessions fork_copies` 覆盖。`npm run build:core -- --flavor all` 更新 `piarc-core.d.ts` 与 `piarc-core.testing.d.ts`，verify 的 Core module + API snapshot 通过"
     },
     {
       "id": "T14-A13",
       "task": "T14",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run verify`：13/13 通过（Prettier、ESLint、tsc、Core 模块与 API 快照、Vitest 766 passed 1 skipped（Windows 专用用例）、cargo fmt、clippy、cargo test、protocol drift、contract samples、cargo-deny、crate 依赖规则、验收清单）。首次运行时 Prettier 报 6 个会话场景 YAML 的引号风格，格式化（提交 9847d73）并重跑会话测试 10 passed 后再次 verify 全部通过。输出 tmp/evidence/T14/verify.txt"
     },
     {
       "id": "T15-A01",
