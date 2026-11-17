@@ -1,0 +1,199 @@
+[
+  {
+    "method": "turn/started",
+    "payload": {
+      "turnId": "turn-<id:1>"
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "userMessage",
+        "itemId": "turn-<id:1>:user:1",
+        "status": "completed",
+        "text": "Use the other tools. [[piarc-scenario:golden-unknown-tools]]"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "userMessage",
+        "itemId": "turn-<id:1>:user:1",
+        "status": "completed",
+        "text": "Use the other tools. [[piarc-scenario:golden-unknown-tools]]"
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "subagent",
+        "itemId": "toolu_agent",
+        "status": "inProgress",
+        "tool": "Agent",
+        "arguments": {
+          "description": "Find usages",
+          "prompt": "Find them."
+        },
+        "description": "Find usages"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "subagent",
+        "itemId": "toolu_agent",
+        "status": "failed",
+        "tool": "Agent",
+        "arguments": {
+          "description": "Find usages",
+          "prompt": "Find them."
+        },
+        "output": "Tool Agent not found",
+        "description": "Find usages"
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "webFetch",
+        "itemId": "toolu_fetch",
+        "status": "inProgress",
+        "tool": "WebFetch",
+        "arguments": {
+          "prompt": "Summarize.",
+          "url": "https://example.com/"
+        },
+        "url": "https://example.com/"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "webFetch",
+        "itemId": "toolu_fetch",
+        "status": "failed",
+        "tool": "WebFetch",
+        "arguments": {
+          "prompt": "Summarize.",
+          "url": "https://example.com/"
+        },
+        "output": "Tool WebFetch not found",
+        "url": "https://example.com/"
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "mcpToolCall",
+        "itemId": "toolu_mcp",
+        "status": "inProgress",
+        "tool": "mcp__echo__say",
+        "arguments": {
+          "text": "hi"
+        },
+        "server": "echo",
+        "serverTool": "say"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "mcpToolCall",
+        "itemId": "toolu_mcp",
+        "status": "failed",
+        "tool": "mcp__echo__say",
+        "arguments": {
+          "text": "hi"
+        },
+        "output": "Tool mcp__echo__say not found",
+        "server": "echo",
+        "serverTool": "say"
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "agentMessage",
+        "itemId": "<id:2>#0",
+        "status": "inProgress",
+        "text": ""
+      }
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "itemId": "<id:2>#0",
+      "delta": "Those tools"
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "itemId": "<id:2>#0",
+      "delta": " are not ava"
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "itemId": "<id:2>#0",
+      "delta": "ilable here."
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "agentMessage",
+        "itemId": "<id:2>#0",
+        "status": "completed",
+        "text": "Those tools are not available here."
+      }
+    }
+  },
+  {
+    "method": "turn/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "status": "completed",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
+    }
+  }
+]

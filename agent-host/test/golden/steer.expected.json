@@ -1,0 +1,372 @@
+[
+  {
+    "method": "turn/started",
+    "payload": {
+      "turnId": "turn-<id:1>"
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "userMessage",
+        "itemId": "turn-<id:1>:user:1",
+        "status": "completed",
+        "text": "Wait for the signal. [[piarc-scenario:golden-steer]]"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "userMessage",
+        "itemId": "turn-<id:1>:user:1",
+        "status": "completed",
+        "text": "Wait for the signal. [[piarc-scenario:golden-steer]]"
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "agentMessage",
+        "itemId": "<id:2>#0",
+        "status": "inProgress",
+        "text": ""
+      }
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "itemId": "<id:2>#0",
+      "delta": "Waiting"
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "itemId": "<id:2>#0",
+      "delta": " for the"
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "itemId": "<id:2>#0",
+      "delta": " signal."
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "agentMessage",
+        "itemId": "<id:2>#0",
+        "status": "completed",
+        "text": "Waiting for the signal."
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "commandExecution",
+        "itemId": "toolu_wait",
+        "status": "inProgress",
+        "tool": "Bash",
+        "arguments": {
+          "command": "while [ ! -f go ]; do sleep 0.05; done; echo go"
+        },
+        "command": "while [ ! -f go ]; do sleep 0.05; done; echo go"
+      }
+    }
+  },
+  {
+    "method": "item/updated",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "commandExecution",
+        "itemId": "toolu_wait",
+        "status": "inProgress",
+        "tool": "Bash",
+        "arguments": {
+          "command": "while [ ! -f go ]; do sleep 0.05; done; echo go"
+        },
+        "output": "",
+        "command": "while [ ! -f go ]; do sleep 0.05; done; echo go"
+      }
+    }
+  },
+  {
+    "method": "session/queueChanged",
+    "payload": {
+      "items": [
+        {
+          "itemId": "queue-<id:3>",
+          "kind": "steer",
+          "text": "Also mention the signal."
+        }
+      ]
+    }
+  },
+  {
+    "method": "session/queueChanged",
+    "payload": {
+      "items": [
+        {
+          "itemId": "queue-<id:3>",
+          "kind": "steer",
+          "text": "Also mention the signal."
+        },
+        {
+          "itemId": "queue-<id:4>",
+          "kind": "followUp",
+          "text": "Then say goodbye."
+        }
+      ]
+    }
+  },
+  {
+    "method": "item/updated",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "commandExecution",
+        "itemId": "toolu_wait",
+        "status": "inProgress",
+        "tool": "Bash",
+        "arguments": {
+          "command": "while [ ! -f go ]; do sleep 0.05; done; echo go"
+        },
+        "output": "go\n",
+        "command": "while [ ! -f go ]; do sleep 0.05; done; echo go"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "commandExecution",
+        "itemId": "toolu_wait",
+        "status": "completed",
+        "tool": "Bash",
+        "arguments": {
+          "command": "while [ ! -f go ]; do sleep 0.05; done; echo go"
+        },
+        "output": "go\n",
+        "command": "while [ ! -f go ]; do sleep 0.05; done; echo go"
+      }
+    }
+  },
+  {
+    "method": "session/queueChanged",
+    "payload": {
+      "items": [
+        {
+          "itemId": "queue-<id:4>",
+          "kind": "followUp",
+          "text": "Then say goodbye."
+        }
+      ]
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "userMessage",
+        "itemId": "turn-<id:1>:user:2",
+        "status": "completed",
+        "text": "Also mention the signal."
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "userMessage",
+        "itemId": "turn-<id:1>:user:2",
+        "status": "completed",
+        "text": "Also mention the signal."
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "agentMessage",
+        "itemId": "<id:5>#0",
+        "status": "inProgress",
+        "text": ""
+      }
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "itemId": "<id:5>#0",
+      "delta": "Got the "
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "itemId": "<id:5>#0",
+      "delta": "steering"
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "itemId": "<id:5>#0",
+      "delta": " message."
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "agentMessage",
+        "itemId": "<id:5>#0",
+        "status": "completed",
+        "text": "Got the steering message."
+      }
+    }
+  },
+  {
+    "method": "turn/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "status": "completed",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
+    }
+  },
+  {
+    "method": "session/queueChanged",
+    "payload": {
+      "items": []
+    }
+  },
+  {
+    "method": "turn/started",
+    "payload": {
+      "turnId": "turn-<id:6>"
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:6>",
+      "item": {
+        "type": "userMessage",
+        "itemId": "turn-<id:6>:user:1",
+        "status": "completed",
+        "text": "Then say goodbye."
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:6>",
+      "item": {
+        "type": "userMessage",
+        "itemId": "turn-<id:6>:user:1",
+        "status": "completed",
+        "text": "Then say goodbye."
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:6>",
+      "item": {
+        "type": "agentMessage",
+        "itemId": "<id:7>#0",
+        "status": "inProgress",
+        "text": ""
+      }
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:6>",
+      "itemId": "<id:7>#0",
+      "delta": "Follow"
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:6>",
+      "itemId": "<id:7>#0",
+      "delta": "-up an"
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:6>",
+      "itemId": "<id:7>#0",
+      "delta": "swered."
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:6>",
+      "item": {
+        "type": "agentMessage",
+        "itemId": "<id:7>#0",
+        "status": "completed",
+        "text": "Follow-up answered."
+      }
+    }
+  },
+  {
+    "method": "turn/completed",
+    "payload": {
+      "turnId": "turn-<id:6>",
+      "status": "completed",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
+    }
+  }
+]

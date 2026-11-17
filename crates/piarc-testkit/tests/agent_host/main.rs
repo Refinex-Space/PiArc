@@ -4,6 +4,7 @@
 //! and `docs/spikes/S09-ahp-resilience.md`.
 
 mod credentials;
+mod golden;
 mod harness;
 mod parity;
 mod token_server;

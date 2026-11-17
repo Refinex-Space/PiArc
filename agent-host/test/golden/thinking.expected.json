@@ -1,0 +1,118 @@
+[
+  {
+    "method": "turn/started",
+    "payload": {
+      "turnId": "turn-thinking"
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-thinking",
+      "item": {
+        "type": "userMessage",
+        "itemId": "turn-thinking:user:1",
+        "status": "completed",
+        "text": "Answer in 中文."
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-thinking",
+      "item": {
+        "type": "userMessage",
+        "itemId": "turn-thinking:user:1",
+        "status": "completed",
+        "text": "Answer in 中文."
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-thinking",
+      "item": {
+        "type": "reasoning",
+        "itemId": "<id:1>#0",
+        "status": "inProgress",
+        "text": ""
+      }
+    }
+  },
+  {
+    "method": "item/reasoning/delta",
+    "payload": {
+      "turnId": "turn-thinking",
+      "itemId": "<id:1>#0",
+      "delta": "The user wants "
+    }
+  },
+  {
+    "method": "item/reasoning/delta",
+    "payload": {
+      "turnId": "turn-thinking",
+      "itemId": "<id:1>#0",
+      "delta": "中文 output."
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-thinking",
+      "item": {
+        "type": "reasoning",
+        "itemId": "<id:1>#0",
+        "status": "completed",
+        "text": "The user wants 中文 output."
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-thinking",
+      "item": {
+        "type": "agentMessage",
+        "itemId": "<id:1>#1",
+        "status": "inProgress",
+        "text": ""
+      }
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-thinking",
+      "itemId": "<id:1>#1",
+      "delta": "Here it is."
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-thinking",
+      "item": {
+        "type": "agentMessage",
+        "itemId": "<id:1>#1",
+        "status": "completed",
+        "text": "Here it is."
+      }
+    }
+  },
+  {
+    "method": "turn/completed",
+    "payload": {
+      "turnId": "turn-thinking",
+      "status": "completed",
+      "usage": {
+        "inputTokens": 100,
+        "outputTokens": 20,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0.003
+      }
+    }
+  }
+]

@@ -1,0 +1,112 @@
+{
+  "description": "Constructed: the policy gate refuses a write (T20 calls Projector.markDeclined from its tool_call handler; Pi then answers the call with an error result without running it).",
+  "source": "constructed",
+  "steps": [
+    {
+      "control": "beginTurn",
+      "turnId": "turn-declined"
+    },
+    {
+      "type": "agent_start"
+    },
+    {
+      "type": "message_start",
+      "message": {
+        "role": "assistant",
+        "api": "anthropic-messages",
+        "provider": "piarc-mock",
+        "model": "mock-large",
+        "content": [],
+        "stopReason": "pending",
+        "timestamp": 1794879399292,
+        "usage": {
+          "input": 100,
+          "output": 20,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "totalTokens": 120,
+          "cost": {
+            "input": 0.001,
+            "output": 0.002,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0.003
+          }
+        }
+      }
+    },
+    {
+      "type": "message_end",
+      "message": {
+        "role": "assistant",
+        "api": "anthropic-messages",
+        "provider": "piarc-mock",
+        "model": "mock-large",
+        "content": [
+          {
+            "type": "toolCall",
+            "id": "toolu_denied",
+            "name": "Write",
+            "arguments": {
+              "path": ".git/config",
+              "content": "x"
+            }
+          }
+        ],
+        "stopReason": "toolUse",
+        "timestamp": 1794879399292,
+        "usage": {
+          "input": 100,
+          "output": 20,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "totalTokens": 120,
+          "cost": {
+            "input": 0.001,
+            "output": 0.002,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0.003
+          }
+        }
+      }
+    },
+    {
+      "type": "tool_execution_start",
+      "toolCallId": "toolu_denied",
+      "toolName": "Write",
+      "args": {
+        "path": ".git/config",
+        "content": "x"
+      }
+    },
+    {
+      "control": "markDeclined",
+      "toolCallId": "toolu_denied"
+    },
+    {
+      "type": "tool_execution_end",
+      "toolCallId": "toolu_denied",
+      "toolName": "Write",
+      "isError": true,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Denied: writes to .git/ need approval."
+          }
+        ],
+        "details": {}
+      }
+    },
+    {
+      "type": "agent_end",
+      "messages": [],
+      "willRetry": false
+    },
+    {
+      "type": "agent_settled",
+      "aborted": false
+    }
+  ]
+}

@@ -38,6 +38,9 @@ export function isInterruptionMarker(message: { readonly rawStopReason?: string 
   return message.rawStopReason === INTERRUPTION_MARKER_REASON;
 }
 
+/** What the repair needs from Pi's session. */
+export type RepairableSession = Pick<AgentSession, 'sessionManager' | 'model' | 'refreshContext'>;
+
 type ContextMessage = ReturnType<
   AgentSession['sessionManager']['buildSessionProjection']
 >['messages'][number];
@@ -57,7 +60,7 @@ function isResponse(message: ContextMessage): boolean {
  * response. Persists both to the session file and refreshes the agent's context. Call it when
  * the turn settled aborted, before the next input.
  */
-export function repairInterruptedTurn(session: AgentSession): InterruptionRepair {
+export function repairInterruptedTurn(session: RepairableSession): InterruptionRepair {
   const manager = session.sessionManager;
   const messages = manager.buildSessionProjection().messages;
   let toolResults = 0;

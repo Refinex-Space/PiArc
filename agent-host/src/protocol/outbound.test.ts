@@ -161,4 +161,66 @@ describe('OutboundQueue', () => {
     await done;
     expect(sink.frames).toHaveLength(2);
   });
+
+  it('replaces a waiting item/updated with the newer one for the same item', () => {
+    const sink = new FakeSink();
+    sink.blocked = true;
+    const { q } = queue(sink);
+    q.sendSessionEvent('a', 'item/started', { turnId: 't', item: { itemId: 'c1' } });
+    q.sendReplaceable('a', 'item/updated', 'c1', { turnId: 't', output: 'one' });
+    q.sendReplaceable('a', 'item/updated', 'c1', { turnId: 't', output: 'one two' });
+    sink.drain();
+    expect(sink.frames.map((f) => [f.method, params(f).seq, params(f).output])).toEqual([
+      ['item/started', 1, undefined],
+      ['item/updated', 2, 'one two'],
+    ]);
+  });
+
+  it('replays the events after a seq, and says when the buffer no longer has them all', () => {
+    const sink = new FakeSink();
+    const { q } = queue(sink);
+    for (let i = 1; i <= 5; i += 1) {
+      q.sendSessionEvent('a', 'turn/started', { turnId: `t${String(i)}` });
+    }
+    const since3 = q.entriesSince('a', 3);
+    expect(since3.complete).toBe(true);
+    expect(since3.entries.map((e) => [e.method, e.params.seq, e.params.turnId])).toEqual([
+      ['turn/started', 4, 't4'],
+      ['turn/started', 5, 't5'],
+    ]);
+    expect(q.entriesSince('a', 5)).toEqual({ entries: [], complete: true });
+    expect(q.entriesSince('unknown', 0)).toEqual({ entries: [], complete: true });
+    for (let i = 0; i < 5000; i += 1) {
+      q.sendSessionEvent('a', 'turn/started', { turnId: 'many' });
+    }
+    expect(q.entriesSince('a', 3).complete).toBe(false);
+  });
+
+  it('leaves the dropped seq out of stdout but keeps it for replay (test hook)', () => {
+    const sink = new FakeSink();
+    const q = new OutboundQueue(sink, { onOverflow: () => undefined, dropSeq: 2 });
+    for (let i = 1; i <= 3; i += 1) {
+      q.sendSessionEvent('a', 'turn/started', { turnId: `t${String(i)}` });
+    }
+    expect(sink.frames.map((f) => params(f).seq)).toEqual([1, 3]);
+    expect(q.entriesSince('a', 1).entries.map((e) => e.params.seq)).toEqual([2, 3]);
+  });
+
+  it('does not write a session event larger than a frame may be, and leaves no seq gap', () => {
+    const sink = new FakeSink();
+    const oversize: string[] = [];
+    const q = new OutboundQueue(sink, {
+      onOverflow: () => undefined,
+      maxFrameBytes: 1024,
+      onOversize: (method) => oversize.push(method),
+    });
+    q.sendSessionEvent('a', 'turn/started', { turnId: 't1' });
+    q.sendSessionEvent('a', 'item/completed', { turnId: 't1', item: { output: 'x'.repeat(4096) } });
+    q.sendSessionEvent('a', 'turn/completed', { turnId: 't1', status: 'completed' });
+    expect(oversize).toEqual(['item/completed']);
+    expect(sink.frames.map((f) => [f.method, params(f).seq])).toEqual([
+      ['turn/started', 1],
+      ['turn/completed', 2],
+    ]);
+  });
 });

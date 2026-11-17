@@ -1,0 +1,57 @@
+[
+  {
+    "method": "turn/started",
+    "payload": {
+      "turnId": "turn-declined"
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-declined",
+      "item": {
+        "type": "fileChange",
+        "itemId": "toolu_denied",
+        "status": "inProgress",
+        "tool": "Write",
+        "arguments": {
+          "path": ".git/config",
+          "content": "x"
+        },
+        "path": ".git/config"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-declined",
+      "item": {
+        "type": "fileChange",
+        "itemId": "toolu_denied",
+        "status": "declined",
+        "tool": "Write",
+        "arguments": {
+          "path": ".git/config",
+          "content": "x"
+        },
+        "output": "Denied: writes to .git/ need approval.",
+        "path": ".git/config"
+      }
+    }
+  },
+  {
+    "method": "turn/completed",
+    "payload": {
+      "turnId": "turn-declined",
+      "status": "completed",
+      "usage": {
+        "inputTokens": 100,
+        "outputTokens": 20,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0.003
+      }
+    }
+  }
+]

@@ -1,0 +1,114 @@
+[
+  {
+    "method": "turn/started",
+    "payload": {
+      "turnId": "turn-<id:1>"
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "userMessage",
+        "itemId": "turn-<id:1>:user:1",
+        "status": "completed",
+        "text": "Answer despite errors. [[piarc-scenario:golden-retry]]"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "userMessage",
+        "itemId": "turn-<id:1>:user:1",
+        "status": "completed",
+        "text": "Answer despite errors. [[piarc-scenario:golden-retry]]"
+      }
+    }
+  },
+  {
+    "method": "turn/retrying",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "attempt": 1,
+      "maxAttempts": 3,
+      "delayMs": 5,
+      "errorMessage": "529 {\"error\":{\"message\":\"Overloaded (injected by the PiArc mock provider)\",\"type\":\"overloaded_error\"},\"request_id\":\"req_mock_4\",\"type\":\"error\"}"
+    }
+  },
+  {
+    "method": "turn/retrying",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "attempt": 2,
+      "maxAttempts": 3,
+      "delayMs": 10,
+      "errorMessage": "429 {\"error\":{\"message\":\"Too Many Requests (injected by the PiArc mock provider)\",\"type\":\"rate_limit_error\"},\"request_id\":\"req_mock_5\",\"type\":\"error\"}"
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "agentMessage",
+        "itemId": "<id:2>#0",
+        "status": "inProgress",
+        "text": ""
+      }
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "itemId": "<id:2>#0",
+      "delta": "Recovered"
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "itemId": "<id:2>#0",
+      "delta": " after tw"
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "itemId": "<id:2>#0",
+      "delta": "o retries."
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "agentMessage",
+        "itemId": "<id:2>#0",
+        "status": "completed",
+        "text": "Recovered after two retries."
+      }
+    }
+  },
+  {
+    "method": "turn/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "status": "completed",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
+    }
+  }
+]

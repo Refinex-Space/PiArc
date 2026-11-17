@@ -298,9 +298,9 @@ T14 会话编排与事件投影（2026-11-17 开工；开工检查：基线 veri
 
 - [x] 1. I66：有序关闭释放数据库与日志文件（先写失败测试）
 - [x] 2. 协议：会话方法（steer、followUp、fork、queue/edit|delete|reorder、getEntries、history）、条目类型、通知（item/updated、reasoning、contextCompaction、turn/retrying、session/queueChanged、harness/entry）、契约样本
-- [ ] 3. Agent Host 投影：第 5.3 节投影表完整实现、历史投影、golden 测试与覆盖矩阵（A01、A02）
-- [ ] 4. Agent Host 会话：排队表（编辑、删除、重排）、steer、followUp、fork、history、回放缓冲（getEntries）、并发 resume 去重、出站单帧上限
-- [ ] 5. 回合不变量：工具批次并发（上限 10）、中断补齐与中断后 transcript 形态（I18）、重试核对；agent-host/CLAUDE.md 的"Pi 已满足 / Harness Kit 补齐"清单
+- [x] 3. Agent Host 投影：第 5.3 节投影表完整实现、历史投影、golden 测试与覆盖矩阵（A01、A02）
+- [x] 4. Agent Host 会话：排队表（编辑、删除、重排）、steer、followUp、fork、history、回放缓冲（getEntries）、并发 resume 去重、出站单帧上限
+- [x] 5. 回合不变量：工具批次并发（上限 10）、中断补齐与中断后 transcript 形态（I18）、重试核对；agent-host/CLAUDE.md 的"Pi 已满足 / Harness Kit 补齐"清单
 - [x] 6. piarc-host：跟踪 resume/fork 的会话、I58（恢复可中断、Kill 带 epoch、握手前后不分派、入站并发上限）
 - [ ] 7. Core：WorkspaceActor、SessionActor、取消传播、预热与空闲回收（可注入时钟）、seq 缺口补齐、实体快照 revision、持久化与重启恢复、transcript_window、I62 接线、ToolIo 按工作区绑定、I55 的 panic 结算
 - [ ] 8. NAPI：工作区与会话方法、排队操作、transcript_window、快照；`.d.ts` 快照（A12）

@@ -81,11 +81,22 @@ export interface RegistryOptions {
    */
   readonly isTrusted: (cwd: string) => Promise<boolean>;
   readonly log: (line: string) => void;
-  /** Test only: receives every raw Pi event of every session (`--test-record-events`). */
-  readonly onPiEvent?: (sessionId: string, event: AgentSessionEvent) => void;
+  /**
+   * Test only (`--test-record-events`): receives every raw Pi event of every session, and the
+   * registry's own steps that shape the projection (a turn accepted, an abort, a queued input),
+   * so a recording replays exactly.
+   */
+  readonly onPiEvent?: (sessionId: string, event: AgentSessionEvent | RecordedControl) => void;
   /** A session was closed: its replay buffer can go. */
   readonly onClosed?: (sessionId: string) => void;
 }
+
+/** A registry step in a recording (`onPiEvent`). */
+export type RecordedControl =
+  | { readonly control: 'beginTurn'; readonly turnId: string }
+  | { readonly control: 'markAborting' }
+  | { readonly control: 'takeFollowUp' }
+  | { readonly control: 'steer' | 'followUp'; readonly text: string };
 
 interface HostedSession {
   readonly runtime: AgentSessionRuntime;
@@ -224,8 +235,10 @@ export class SessionRegistry {
     if (hosted.projector.activeTurnId === undefined) {
       answer = { disposition: 'started', turnId: this.#startTurn(sessionId, hosted, text) };
     } else if (kind === 'steer') {
+      this.#options.onPiEvent?.(sessionId, { control: 'steer', text });
       answer = { disposition: 'queued', itemId: await hosted.queue.steer(text) };
     } else {
+      this.#options.onPiEvent?.(sessionId, { control: 'followUp', text });
       answer = { disposition: 'queued', itemId: hosted.queue.followUp(text) };
     }
     hosted.inputs.set(requestId, answer);
@@ -248,6 +261,7 @@ export class SessionRegistry {
   async abort(sessionId: string): Promise<SessionStopped> {
     const hosted = this.#get(sessionId);
     const turnId = hosted.projector.activeTurnId;
+    this.#options.onPiEvent?.(sessionId, { control: 'markAborting' });
     hosted.projector.markAborting();
     const returned = hosted.queue.takeAll();
     await hosted.runtime.session.abort();
@@ -336,6 +350,7 @@ export class SessionRegistry {
 
   #startTurn(sessionId: string, hosted: HostedSession, text: string): string {
     const turnId = `turn-${randomUUID()}`;
+    this.#options.onPiEvent?.(sessionId, { control: 'beginTurn', turnId });
     hosted.projector.beginTurn(turnId);
     // Start on the next macrotask: the handler's response is queued first, so Core learns the
     // turn id before any of the turn's notifications.
@@ -375,13 +390,18 @@ export class SessionRegistry {
       // only for directories Core trusts: nothing project-level is read until the takeover
       // hook has Core's answer.
       trust = takeOverProjectTrust(target.cwd, this.#options.isTrusted);
+      const settingsManager = SettingsManager.create(target.cwd, target.agentDir, {
+        projectTrusted: false,
+      });
+      // Recoverable model errors are retried by Pi's agent loop, which reports each retry
+      // (`turn/retrying`) and keeps the failed attempt out of the context; the provider SDK
+      // would retry rate limits and overloads silently (architecture section 6.15).
+      settingsManager.applyOverrides({ retry: { provider: { maxRetries: 0 } } });
       const services = await createAgentSessionServices({
         cwd: target.cwd,
         agentDir: target.agentDir,
         modelRuntime: workspace.modelRuntime,
-        settingsManager: SettingsManager.create(target.cwd, target.agentDir, {
-          projectTrusted: false,
-        }),
+        settingsManager,
         resourceLoaderReloadOptions: trust.reloadOptions,
         resourceLoaderOptions: {
           // PiArc assembles project context itself (T22).
@@ -509,12 +529,15 @@ export class SessionRegistry {
         this.#options.log(`[session ${sessionId}] prompt failed: ${describeError(error)}`);
         hosted.projector.finishTurn(next.turnId, 'failed', describeError(error));
       }
-      next = this.#nextFollowUp(hosted);
+      next = this.#nextFollowUp(sessionId, hosted);
     }
   }
 
   /** Starts the first queued follow-up as the next turn, when the session is idle. */
-  #nextFollowUp(hosted: HostedSession): { turnId: string; text: string } | undefined {
+  #nextFollowUp(
+    sessionId: string,
+    hosted: HostedSession,
+  ): { turnId: string; text: string } | undefined {
     if (hosted.closed || hosted.projector.activeTurnId !== undefined) {
       return undefined;
     }
@@ -522,7 +545,9 @@ export class SessionRegistry {
     if (item === undefined) {
       return undefined;
     }
+    this.#options.onPiEvent?.(sessionId, { control: 'takeFollowUp' });
     const turnId = `turn-${randomUUID()}`;
+    this.#options.onPiEvent?.(sessionId, { control: 'beginTurn', turnId });
     hosted.projector.beginTurn(turnId);
     return { turnId, text: item.text };
   }

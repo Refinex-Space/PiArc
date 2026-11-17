@@ -1,0 +1,58 @@
+{
+  "description": "Constructed: custom entries the Harness Kit writes (`piarc.*`, T26 adds the first ones) become harness/entry; other custom entries and other entry types do not.",
+  "source": "constructed",
+  "steps": [
+    {
+      "type": "entry_appended",
+      "entry": {
+        "type": "custom",
+        "id": "e1",
+        "parentId": "e0",
+        "timestamp": "2026-11-17T01:00:00.000Z",
+        "customType": "piarc.todo",
+        "data": {
+          "items": [
+            {
+              "content": "写测试",
+              "status": "pending"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "entry_appended",
+      "entry": {
+        "type": "custom",
+        "id": "e2",
+        "parentId": "e0",
+        "timestamp": "2026-11-17T01:00:00.000Z",
+        "customType": "other-extension.state",
+        "data": {
+          "x": 1
+        }
+      }
+    },
+    {
+      "type": "entry_appended",
+      "entry": {
+        "type": "label",
+        "id": "e3",
+        "parentId": "e1",
+        "timestamp": "2026-11-17T01:00:01.000Z",
+        "targetId": "e1",
+        "label": "start"
+      }
+    },
+    {
+      "type": "entry_appended",
+      "entry": {
+        "type": "custom",
+        "id": "e4",
+        "parentId": "e0",
+        "timestamp": "2026-11-17T01:00:00.000Z",
+        "customType": "piarc.plan"
+      }
+    }
+  ]
+}

@@ -1,0 +1,3131 @@
+{
+  "description": "Recorded from the real Agent Host and Pi 1.5.2 (unknown-tools); regenerate with PIARC_UPDATE_GOLDEN=1 cargo test -p piarc-testkit --test agent_host golden",
+  "source": "recorded",
+  "steps": [
+    {
+      "control": "beginTurn",
+      "turnId": "turn-8dc65f57-2c9b-42c8-80d8-86e119ab6df8"
+    },
+    {
+      "type": "agent_start"
+    },
+    {
+      "type": "turn_start"
+    },
+    {
+      "message": {
+        "content": "",
+        "role": "system",
+        "sections": {
+          "cwd": "<cwd>\n/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 61644/ws a 甲\n</cwd>",
+          "docs": "<docs>\nPi documentation (read only when the user asks about the harness itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: /Users/refinex/develop/project/PiArc/agent-host/dist/bundle/pi-assets/README.md\n- Additional docs: /Users/refinex/develop/project/PiArc/agent-host/dist/bundle/pi-assets/docs\n- Examples: /Users/refinex/develop/project/PiArc/agent-host/dist/bundle/pi-assets/examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- Before implementing harness changes, read the relevant docs and examples in full, following related cross-references.\n</docs>",
+          "preamble": "You are a coding assistant running inside pi, a coding agent harness. Help users inspect files, run commands, and modify code.",
+          "rules": "<rules>\n- Look at files with Read rather than printing them through Bash.\n- Keep each oldText short but unique; merge changes that sit close together into one entry.\n- Search with Grep and Glob rather than grep, rg or find in Bash.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+          "tools": "<tools>\n- Read: Read: show a text file or an image\n- Write: Write: create a file or replace all of its text\n- Edit: Edit: replace exact passages of an existing file\n- Bash: Bash: run a shell command\n- Glob: Glob: find files by name or path pattern\n- Grep: Grep: search file contents with a regular expression\n\nAdditional tools may be available.\n</tools>"
+        },
+        "timestamp": 1794879399193,
+        "toolsAdded": [
+          {
+            "constrainedSampling": {
+              "strict": "prefer",
+              "type": "json_schema"
+            },
+            "description": "Return the contents of one file. Text comes back as at most 2000 lines or 50 KB, whichever ends first; page through longer files with `offset` (first line to show, counting from 1) and `limit` (number of lines), following the note at the end of the output. JPEG, PNG, GIF, WebP and BMP files come back as images. `path` is absolute or relative to the working directory.",
+            "name": "Read",
+            "parameters": {
+              "properties": {
+                "limit": {
+                  "description": "Maximum number of lines to read",
+                  "type": "number"
+                },
+                "offset": {
+                  "description": "Line number to start reading from (1-indexed)",
+                  "type": "number"
+                },
+                "path": {
+                  "description": "Path to the file to read (relative or absolute)",
+                  "type": "string"
+                }
+              },
+              "required": ["path"],
+              "type": "object"
+            }
+          },
+          {
+            "constrainedSampling": {
+              "strict": "prefer",
+              "type": "json_schema"
+            },
+            "description": "Store `content` as the complete text of the file at `path`: a new file is created (with any missing parent directories), an existing one is replaced. To change part of an existing file, Edit is safer.",
+            "name": "Write",
+            "parameters": {
+              "properties": {
+                "content": {
+                  "description": "Content to write to the file",
+                  "type": "string"
+                },
+                "path": {
+                  "description": "Path to the file to write (relative or absolute)",
+                  "type": "string"
+                }
+              },
+              "required": ["path", "content"],
+              "type": "object"
+            }
+          },
+          {
+            "constrainedSampling": {
+              "strict": "prefer",
+              "type": "json_schema"
+            },
+            "description": "Change an existing file by replacing exact passages. Each entry of `edits` gives an `oldText`, copied character for character from the file (indentation and line breaks included) and found exactly once in it, and the `newText` that takes its place. All entries refer to the file as it is before the call and must not overlap; put several changes to one file into one call.",
+            "name": "Edit",
+            "parameters": {
+              "properties": {
+                "edits": {
+                  "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead.",
+                  "items": {
+                    "properties": {
+                      "newText": {
+                        "description": "Replacement text for this targeted edit.",
+                        "type": "string"
+                      },
+                      "oldText": {
+                        "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call.",
+                        "type": "string"
+                      }
+                    },
+                    "required": ["oldText", "newText"],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "path": {
+                  "description": "Path to the file to edit (relative or absolute)",
+                  "type": "string"
+                }
+              },
+              "required": ["path", "edits"],
+              "type": "object"
+            }
+          },
+          {
+            "constrainedSampling": {
+              "strict": "prefer",
+              "type": "json_schema"
+            },
+            "description": "Run a command line with bash in the working directory and return what it printed (stdout and stderr) and, when it fails, its exit code. Only the last 2000 lines or 50 KB of output are shown; the complete output is then saved to a file named in the result. `timeout` is in seconds; without it the command may run indefinitely. Every call starts a new shell: `cd` and exported variables do not carry over.",
+            "name": "Bash",
+            "parameters": {
+              "properties": {
+                "command": {
+                  "description": "Shell command to execute",
+                  "type": "string"
+                },
+                "timeout": {
+                  "description": "Timeout in seconds (optional, no default timeout)",
+                  "type": "number"
+                }
+              },
+              "required": ["command"],
+              "type": "object"
+            }
+          },
+          {
+            "description": "List the files and directories below `path` (default: the working directory) that match a glob `pattern`. Without `/` the pattern matches names at any depth (`*.json`); with `/` it matches paths relative to `path` (`src/**/*.test.ts`). Entries ignored by .gitignore are left out, directories end with `/`. At most `limit` entries (default 1000) or 50 KB are returned.",
+            "name": "Glob",
+            "parameters": {
+              "properties": {
+                "limit": {
+                  "description": "Maximum number of results (default: 1000)",
+                  "type": "number"
+                },
+                "path": {
+                  "description": "Directory to search in (default: current directory)",
+                  "type": "string"
+                },
+                "pattern": {
+                  "description": "Glob pattern to match files, e.g. '*.ts', '**/*.json', or 'src/**/*.spec.ts'",
+                  "type": "string"
+                }
+              },
+              "required": ["pattern"],
+              "type": "object"
+            }
+          },
+          {
+            "description": "Search file contents for a regular expression (or, with `literal`, a plain string) and return the matching lines as `file:line: text`. Searches the working directory unless `path` names a directory or a file; `glob` restricts which files are searched (`*.py`, `src/**/*.ts`); `context` adds lines around each match. Files ignored by .gitignore are skipped. At most `limit` matches (default 100) or 50 KB are returned, and very long lines are shortened.",
+            "name": "Grep",
+            "parameters": {
+              "properties": {
+                "context": {
+                  "description": "Number of lines to show before and after each match (default: 0)",
+                  "type": "number"
+                },
+                "glob": {
+                  "description": "Filter files by glob pattern, relative to path, e.g. '*.ts', 'src/**/*.ts' or '**/*.spec.ts'. A pattern without '/' matches file names at any depth",
+                  "type": "string"
+                },
+                "ignoreCase": {
+                  "description": "Case-insensitive search (default: false)",
+                  "type": "boolean"
+                },
+                "limit": {
+                  "description": "Maximum number of matches to return (default: 100)",
+                  "type": "number"
+                },
+                "literal": {
+                  "description": "Treat pattern as literal string instead of regex (default: false)",
+                  "type": "boolean"
+                },
+                "path": {
+                  "description": "Directory or file to search (default: current directory)",
+                  "type": "string"
+                },
+                "pattern": {
+                  "description": "Search pattern (regex or literal string)",
+                  "type": "string"
+                }
+              },
+              "required": ["pattern"],
+              "type": "object"
+            }
+          }
+        ]
+      },
+      "type": "message_start"
+    },
+    {
+      "message": {
+        "content": "",
+        "role": "system",
+        "sections": {
+          "cwd": "<cwd>\n/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 61644/ws a 甲\n</cwd>",
+          "docs": "<docs>\nPi documentation (read only when the user asks about the harness itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: /Users/refinex/develop/project/PiArc/agent-host/dist/bundle/pi-assets/README.md\n- Additional docs: /Users/refinex/develop/project/PiArc/agent-host/dist/bundle/pi-assets/docs\n- Examples: /Users/refinex/develop/project/PiArc/agent-host/dist/bundle/pi-assets/examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- Before implementing harness changes, read the relevant docs and examples in full, following related cross-references.\n</docs>",
+          "preamble": "You are a coding assistant running inside pi, a coding agent harness. Help users inspect files, run commands, and modify code.",
+          "rules": "<rules>\n- Look at files with Read rather than printing them through Bash.\n- Keep each oldText short but unique; merge changes that sit close together into one entry.\n- Search with Grep and Glob rather than grep, rg or find in Bash.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+          "tools": "<tools>\n- Read: Read: show a text file or an image\n- Write: Write: create a file or replace all of its text\n- Edit: Edit: replace exact passages of an existing file\n- Bash: Bash: run a shell command\n- Glob: Glob: find files by name or path pattern\n- Grep: Grep: search file contents with a regular expression\n\nAdditional tools may be available.\n</tools>"
+        },
+        "timestamp": 1794879399193,
+        "toolsAdded": [
+          {
+            "constrainedSampling": {
+              "strict": "prefer",
+              "type": "json_schema"
+            },
+            "description": "Return the contents of one file. Text comes back as at most 2000 lines or 50 KB, whichever ends first; page through longer files with `offset` (first line to show, counting from 1) and `limit` (number of lines), following the note at the end of the output. JPEG, PNG, GIF, WebP and BMP files come back as images. `path` is absolute or relative to the working directory.",
+            "name": "Read",
+            "parameters": {
+              "properties": {
+                "limit": {
+                  "description": "Maximum number of lines to read",
+                  "type": "number"
+                },
+                "offset": {
+                  "description": "Line number to start reading from (1-indexed)",
+                  "type": "number"
+                },
+                "path": {
+                  "description": "Path to the file to read (relative or absolute)",
+                  "type": "string"
+                }
+              },
+              "required": ["path"],
+              "type": "object"
+            }
+          },
+          {
+            "constrainedSampling": {
+              "strict": "prefer",
+              "type": "json_schema"
+            },
+            "description": "Store `content` as the complete text of the file at `path`: a new file is created (with any missing parent directories), an existing one is replaced. To change part of an existing file, Edit is safer.",
+            "name": "Write",
+            "parameters": {
+              "properties": {
+                "content": {
+                  "description": "Content to write to the file",
+                  "type": "string"
+                },
+                "path": {
+                  "description": "Path to the file to write (relative or absolute)",
+                  "type": "string"
+                }
+              },
+              "required": ["path", "content"],
+              "type": "object"
+            }
+          },
+          {
+            "constrainedSampling": {
+              "strict": "prefer",
+              "type": "json_schema"
+            },
+            "description": "Change an existing file by replacing exact passages. Each entry of `edits` gives an `oldText`, copied character for character from the file (indentation and line breaks included) and found exactly once in it, and the `newText` that takes its place. All entries refer to the file as it is before the call and must not overlap; put several changes to one file into one call.",
+            "name": "Edit",
+            "parameters": {
+              "properties": {
+                "edits": {
+                  "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead.",
+                  "items": {
+                    "properties": {
+                      "newText": {
+                        "description": "Replacement text for this targeted edit.",
+                        "type": "string"
+                      },
+                      "oldText": {
+                        "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call.",
+                        "type": "string"
+                      }
+                    },
+                    "required": ["oldText", "newText"],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "path": {
+                  "description": "Path to the file to edit (relative or absolute)",
+                  "type": "string"
+                }
+              },
+              "required": ["path", "edits"],
+              "type": "object"
+            }
+          },
+          {
+            "constrainedSampling": {
+              "strict": "prefer",
+              "type": "json_schema"
+            },
+            "description": "Run a command line with bash in the working directory and return what it printed (stdout and stderr) and, when it fails, its exit code. Only the last 2000 lines or 50 KB of output are shown; the complete output is then saved to a file named in the result. `timeout` is in seconds; without it the command may run indefinitely. Every call starts a new shell: `cd` and exported variables do not carry over.",
+            "name": "Bash",
+            "parameters": {
+              "properties": {
+                "command": {
+                  "description": "Shell command to execute",
+                  "type": "string"
+                },
+                "timeout": {
+                  "description": "Timeout in seconds (optional, no default timeout)",
+                  "type": "number"
+                }
+              },
+              "required": ["command"],
+              "type": "object"
+            }
+          },
+          {
+            "description": "List the files and directories below `path` (default: the working directory) that match a glob `pattern`. Without `/` the pattern matches names at any depth (`*.json`); with `/` it matches paths relative to `path` (`src/**/*.test.ts`). Entries ignored by .gitignore are left out, directories end with `/`. At most `limit` entries (default 1000) or 50 KB are returned.",
+            "name": "Glob",
+            "parameters": {
+              "properties": {
+                "limit": {
+                  "description": "Maximum number of results (default: 1000)",
+                  "type": "number"
+                },
+                "path": {
+                  "description": "Directory to search in (default: current directory)",
+                  "type": "string"
+                },
+                "pattern": {
+                  "description": "Glob pattern to match files, e.g. '*.ts', '**/*.json', or 'src/**/*.spec.ts'",
+                  "type": "string"
+                }
+              },
+              "required": ["pattern"],
+              "type": "object"
+            }
+          },
+          {
+            "description": "Search file contents for a regular expression (or, with `literal`, a plain string) and return the matching lines as `file:line: text`. Searches the working directory unless `path` names a directory or a file; `glob` restricts which files are searched (`*.py`, `src/**/*.ts`); `context` adds lines around each match. Files ignored by .gitignore are skipped. At most `limit` matches (default 100) or 50 KB are returned, and very long lines are shortened.",
+            "name": "Grep",
+            "parameters": {
+              "properties": {
+                "context": {
+                  "description": "Number of lines to show before and after each match (default: 0)",
+                  "type": "number"
+                },
+                "glob": {
+                  "description": "Filter files by glob pattern, relative to path, e.g. '*.ts', 'src/**/*.ts' or '**/*.spec.ts'. A pattern without '/' matches file names at any depth",
+                  "type": "string"
+                },
+                "ignoreCase": {
+                  "description": "Case-insensitive search (default: false)",
+                  "type": "boolean"
+                },
+                "limit": {
+                  "description": "Maximum number of matches to return (default: 100)",
+                  "type": "number"
+                },
+                "literal": {
+                  "description": "Treat pattern as literal string instead of regex (default: false)",
+                  "type": "boolean"
+                },
+                "path": {
+                  "description": "Directory or file to search (default: current directory)",
+                  "type": "string"
+                },
+                "pattern": {
+                  "description": "Search pattern (regex or literal string)",
+                  "type": "string"
+                }
+              },
+              "required": ["pattern"],
+              "type": "object"
+            }
+          }
+        ]
+      },
+      "type": "message_end"
+    },
+    {
+      "message": {
+        "content": [
+          {
+            "text": "Use the other tools. [[piarc-scenario:golden-unknown-tools]]",
+            "type": "text"
+          }
+        ],
+        "role": "user",
+        "timestamp": 1794879399193
+      },
+      "type": "message_start"
+    },
+    {
+      "message": {
+        "content": [
+          {
+            "text": "Use the other tools. [[piarc-scenario:golden-unknown-tools]]",
+            "type": "text"
+          }
+        ],
+        "role": "user",
+        "timestamp": 1794879399193
+      },
+      "type": "message_end"
+    },
+    {
+      "message": {
+        "api": "anthropic-messages",
+        "content": [],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "responseId": "msg_mock_2",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1794879399195,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_start"
+    },
+    {
+      "assistantMessageEvent": {
+        "contentIndex": 0,
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "arguments": {
+                "description": "Find usages"
+              },
+              "id": "toolu_agent",
+              "name": "Agent",
+              "type": "toolCall"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "responseId": "msg_mock_2",
+          "role": "assistant",
+          "stopReason": "pending",
+          "timestamp": 1794879399195,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "type": "toolcall_start"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "arguments": {
+              "description": "Find usages"
+            },
+            "id": "toolu_agent",
+            "name": "Agent",
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "responseId": "msg_mock_2",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1794879399195,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "assistantMessageEvent": {
+        "contentIndex": 0,
+        "delta": "{\"description\":\"F",
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "arguments": {
+                "description": "Find usages",
+                "prompt": "Find them."
+              },
+              "id": "toolu_agent",
+              "name": "Agent",
+              "type": "toolCall"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "responseId": "msg_mock_2",
+          "role": "assistant",
+          "stopReason": "pending",
+          "timestamp": 1794879399195,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "type": "toolcall_delta"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "arguments": {
+              "description": "Find usages",
+              "prompt": "Find them."
+            },
+            "id": "toolu_agent",
+            "name": "Agent",
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "responseId": "msg_mock_2",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1794879399195,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "assistantMessageEvent": {
+        "contentIndex": 0,
+        "delta": "ind usages\",\"prom",
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "arguments": {
+                "description": "Find usages",
+                "prompt": "Find them."
+              },
+              "id": "toolu_agent",
+              "name": "Agent",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {},
+              "id": "toolu_fetch",
+              "name": "WebFetch",
+              "type": "toolCall"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "responseId": "msg_mock_2",
+          "role": "assistant",
+          "stopReason": "pending",
+          "timestamp": 1794879399195,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "type": "toolcall_delta"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "arguments": {
+              "description": "Find usages",
+              "prompt": "Find them."
+            },
+            "id": "toolu_agent",
+            "name": "Agent",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {},
+            "id": "toolu_fetch",
+            "name": "WebFetch",
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "responseId": "msg_mock_2",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1794879399195,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "assistantMessageEvent": {
+        "contentIndex": 0,
+        "delta": "pt\":\"Find them.\"}",
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "arguments": {
+                "description": "Find usages",
+                "prompt": "Find them."
+              },
+              "id": "toolu_agent",
+              "name": "Agent",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "prompt": "Summar"
+              },
+              "id": "toolu_fetch",
+              "name": "WebFetch",
+              "type": "toolCall"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "responseId": "msg_mock_2",
+          "role": "assistant",
+          "stopReason": "pending",
+          "timestamp": 1794879399195,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "type": "toolcall_delta"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "arguments": {
+              "description": "Find usages",
+              "prompt": "Find them."
+            },
+            "id": "toolu_agent",
+            "name": "Agent",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "prompt": "Summar"
+            },
+            "id": "toolu_fetch",
+            "name": "WebFetch",
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "responseId": "msg_mock_2",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1794879399195,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "assistantMessageEvent": {
+        "contentIndex": 0,
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "arguments": {
+                "description": "Find usages",
+                "prompt": "Find them."
+              },
+              "id": "toolu_agent",
+              "name": "Agent",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "prompt": "Summarize.",
+                "url": "http"
+              },
+              "id": "toolu_fetch",
+              "name": "WebFetch",
+              "type": "toolCall"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "responseId": "msg_mock_2",
+          "role": "assistant",
+          "stopReason": "pending",
+          "timestamp": 1794879399195,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "toolCall": {
+          "arguments": {
+            "description": "Find usages",
+            "prompt": "Find them."
+          },
+          "id": "toolu_agent",
+          "name": "Agent",
+          "type": "toolCall"
+        },
+        "type": "toolcall_end"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "arguments": {
+              "description": "Find usages",
+              "prompt": "Find them."
+            },
+            "id": "toolu_agent",
+            "name": "Agent",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "prompt": "Summarize.",
+              "url": "http"
+            },
+            "id": "toolu_fetch",
+            "name": "WebFetch",
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "responseId": "msg_mock_2",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1794879399195,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "assistantMessageEvent": {
+        "contentIndex": 1,
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "arguments": {
+                "description": "Find usages",
+                "prompt": "Find them."
+              },
+              "id": "toolu_agent",
+              "name": "Agent",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "prompt": "Summarize.",
+                "url": "https://example.com/"
+              },
+              "id": "toolu_fetch",
+              "name": "WebFetch",
+              "type": "toolCall"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "responseId": "msg_mock_2",
+          "role": "assistant",
+          "stopReason": "pending",
+          "timestamp": 1794879399195,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "type": "toolcall_start"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "arguments": {
+              "description": "Find usages",
+              "prompt": "Find them."
+            },
+            "id": "toolu_agent",
+            "name": "Agent",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "prompt": "Summarize.",
+              "url": "https://example.com/"
+            },
+            "id": "toolu_fetch",
+            "name": "WebFetch",
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "responseId": "msg_mock_2",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1794879399195,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "assistantMessageEvent": {
+        "contentIndex": 1,
+        "delta": "{\"prompt\":\"Summar",
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "arguments": {
+                "description": "Find usages",
+                "prompt": "Find them."
+              },
+              "id": "toolu_agent",
+              "name": "Agent",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "prompt": "Summarize.",
+                "url": "https://example.com/"
+              },
+              "id": "toolu_fetch",
+              "name": "WebFetch",
+              "type": "toolCall"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "responseId": "msg_mock_2",
+          "role": "assistant",
+          "stopReason": "pending",
+          "timestamp": 1794879399195,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "type": "toolcall_delta"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "arguments": {
+              "description": "Find usages",
+              "prompt": "Find them."
+            },
+            "id": "toolu_agent",
+            "name": "Agent",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "prompt": "Summarize.",
+              "url": "https://example.com/"
+            },
+            "id": "toolu_fetch",
+            "name": "WebFetch",
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "responseId": "msg_mock_2",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1794879399195,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "assistantMessageEvent": {
+        "contentIndex": 1,
+        "delta": "ize.\",\"url\":\"http",
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "arguments": {
+                "description": "Find usages",
+                "prompt": "Find them."
+              },
+              "id": "toolu_agent",
+              "name": "Agent",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "prompt": "Summarize.",
+                "url": "https://example.com/"
+              },
+              "id": "toolu_fetch",
+              "name": "WebFetch",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {},
+              "id": "toolu_mcp",
+              "name": "mcp__echo__say",
+              "type": "toolCall"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "responseId": "msg_mock_2",
+          "role": "assistant",
+          "stopReason": "pending",
+          "timestamp": 1794879399195,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "type": "toolcall_delta"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "arguments": {
+              "description": "Find usages",
+              "prompt": "Find them."
+            },
+            "id": "toolu_agent",
+            "name": "Agent",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "prompt": "Summarize.",
+              "url": "https://example.com/"
+            },
+            "id": "toolu_fetch",
+            "name": "WebFetch",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {},
+            "id": "toolu_mcp",
+            "name": "mcp__echo__say",
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "responseId": "msg_mock_2",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1794879399195,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "assistantMessageEvent": {
+        "contentIndex": 1,
+        "delta": "s://example.com/\"}",
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "arguments": {
+                "description": "Find usages",
+                "prompt": "Find them."
+              },
+              "id": "toolu_agent",
+              "name": "Agent",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "prompt": "Summarize.",
+                "url": "https://example.com/"
+              },
+              "id": "toolu_fetch",
+              "name": "WebFetch",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {},
+              "id": "toolu_mcp",
+              "name": "mcp__echo__say",
+              "type": "toolCall"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "responseId": "msg_mock_2",
+          "role": "assistant",
+          "stopReason": "pending",
+          "timestamp": 1794879399195,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "type": "toolcall_delta"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "arguments": {
+              "description": "Find usages",
+              "prompt": "Find them."
+            },
+            "id": "toolu_agent",
+            "name": "Agent",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "prompt": "Summarize.",
+              "url": "https://example.com/"
+            },
+            "id": "toolu_fetch",
+            "name": "WebFetch",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {},
+            "id": "toolu_mcp",
+            "name": "mcp__echo__say",
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "responseId": "msg_mock_2",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1794879399195,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "assistantMessageEvent": {
+        "contentIndex": 1,
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "arguments": {
+                "description": "Find usages",
+                "prompt": "Find them."
+              },
+              "id": "toolu_agent",
+              "name": "Agent",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "prompt": "Summarize.",
+                "url": "https://example.com/"
+              },
+              "id": "toolu_fetch",
+              "name": "WebFetch",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "text": "hi"
+              },
+              "id": "toolu_mcp",
+              "name": "mcp__echo__say",
+              "type": "toolCall"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "responseId": "msg_mock_2",
+          "role": "assistant",
+          "stopReason": "pending",
+          "timestamp": 1794879399195,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "toolCall": {
+          "arguments": {
+            "prompt": "Summarize.",
+            "url": "https://example.com/"
+          },
+          "id": "toolu_fetch",
+          "name": "WebFetch",
+          "type": "toolCall"
+        },
+        "type": "toolcall_end"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "arguments": {
+              "description": "Find usages",
+              "prompt": "Find them."
+            },
+            "id": "toolu_agent",
+            "name": "Agent",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "prompt": "Summarize.",
+              "url": "https://example.com/"
+            },
+            "id": "toolu_fetch",
+            "name": "WebFetch",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "text": "hi"
+            },
+            "id": "toolu_mcp",
+            "name": "mcp__echo__say",
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "responseId": "msg_mock_2",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1794879399195,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "assistantMessageEvent": {
+        "contentIndex": 2,
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "arguments": {
+                "description": "Find usages",
+                "prompt": "Find them."
+              },
+              "id": "toolu_agent",
+              "name": "Agent",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "prompt": "Summarize.",
+                "url": "https://example.com/"
+              },
+              "id": "toolu_fetch",
+              "name": "WebFetch",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "text": "hi"
+              },
+              "id": "toolu_mcp",
+              "name": "mcp__echo__say",
+              "type": "toolCall"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "responseId": "msg_mock_2",
+          "role": "assistant",
+          "stopReason": "pending",
+          "timestamp": 1794879399195,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "type": "toolcall_start"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "arguments": {
+              "description": "Find usages",
+              "prompt": "Find them."
+            },
+            "id": "toolu_agent",
+            "name": "Agent",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "prompt": "Summarize.",
+              "url": "https://example.com/"
+            },
+            "id": "toolu_fetch",
+            "name": "WebFetch",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "text": "hi"
+            },
+            "id": "toolu_mcp",
+            "name": "mcp__echo__say",
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "responseId": "msg_mock_2",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1794879399195,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "assistantMessageEvent": {
+        "contentIndex": 2,
+        "delta": "{\"te",
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "arguments": {
+                "description": "Find usages",
+                "prompt": "Find them."
+              },
+              "id": "toolu_agent",
+              "name": "Agent",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "prompt": "Summarize.",
+                "url": "https://example.com/"
+              },
+              "id": "toolu_fetch",
+              "name": "WebFetch",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "text": "hi"
+              },
+              "id": "toolu_mcp",
+              "name": "mcp__echo__say",
+              "type": "toolCall"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "responseId": "msg_mock_2",
+          "role": "assistant",
+          "stopReason": "pending",
+          "timestamp": 1794879399195,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "type": "toolcall_delta"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "arguments": {
+              "description": "Find usages",
+              "prompt": "Find them."
+            },
+            "id": "toolu_agent",
+            "name": "Agent",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "prompt": "Summarize.",
+              "url": "https://example.com/"
+            },
+            "id": "toolu_fetch",
+            "name": "WebFetch",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "text": "hi"
+            },
+            "id": "toolu_mcp",
+            "name": "mcp__echo__say",
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "responseId": "msg_mock_2",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1794879399195,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "assistantMessageEvent": {
+        "contentIndex": 2,
+        "delta": "xt\":",
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "arguments": {
+                "description": "Find usages",
+                "prompt": "Find them."
+              },
+              "id": "toolu_agent",
+              "name": "Agent",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "prompt": "Summarize.",
+                "url": "https://example.com/"
+              },
+              "id": "toolu_fetch",
+              "name": "WebFetch",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "text": "hi"
+              },
+              "id": "toolu_mcp",
+              "name": "mcp__echo__say",
+              "type": "toolCall"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "responseId": "msg_mock_2",
+          "role": "assistant",
+          "stopReason": "pending",
+          "timestamp": 1794879399195,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "type": "toolcall_delta"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "arguments": {
+              "description": "Find usages",
+              "prompt": "Find them."
+            },
+            "id": "toolu_agent",
+            "name": "Agent",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "prompt": "Summarize.",
+              "url": "https://example.com/"
+            },
+            "id": "toolu_fetch",
+            "name": "WebFetch",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "text": "hi"
+            },
+            "id": "toolu_mcp",
+            "name": "mcp__echo__say",
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "responseId": "msg_mock_2",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1794879399195,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "assistantMessageEvent": {
+        "contentIndex": 2,
+        "delta": "\"hi\"}",
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "arguments": {
+                "description": "Find usages",
+                "prompt": "Find them."
+              },
+              "id": "toolu_agent",
+              "name": "Agent",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "prompt": "Summarize.",
+                "url": "https://example.com/"
+              },
+              "id": "toolu_fetch",
+              "name": "WebFetch",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "text": "hi"
+              },
+              "id": "toolu_mcp",
+              "name": "mcp__echo__say",
+              "type": "toolCall"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "responseId": "msg_mock_2",
+          "role": "assistant",
+          "stopReason": "pending",
+          "timestamp": 1794879399195,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "type": "toolcall_delta"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "arguments": {
+              "description": "Find usages",
+              "prompt": "Find them."
+            },
+            "id": "toolu_agent",
+            "name": "Agent",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "prompt": "Summarize.",
+              "url": "https://example.com/"
+            },
+            "id": "toolu_fetch",
+            "name": "WebFetch",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "text": "hi"
+            },
+            "id": "toolu_mcp",
+            "name": "mcp__echo__say",
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "responseId": "msg_mock_2",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1794879399195,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "assistantMessageEvent": {
+        "contentIndex": 2,
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "arguments": {
+                "description": "Find usages",
+                "prompt": "Find them."
+              },
+              "id": "toolu_agent",
+              "name": "Agent",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "prompt": "Summarize.",
+                "url": "https://example.com/"
+              },
+              "id": "toolu_fetch",
+              "name": "WebFetch",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "text": "hi"
+              },
+              "id": "toolu_mcp",
+              "name": "mcp__echo__say",
+              "type": "toolCall"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "rawStopReason": "tool_use",
+          "responseId": "msg_mock_2",
+          "role": "assistant",
+          "stopReason": "toolUse",
+          "timestamp": 1794879399195,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "toolCall": {
+          "arguments": {
+            "text": "hi"
+          },
+          "id": "toolu_mcp",
+          "name": "mcp__echo__say",
+          "type": "toolCall"
+        },
+        "type": "toolcall_end"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "arguments": {
+              "description": "Find usages",
+              "prompt": "Find them."
+            },
+            "id": "toolu_agent",
+            "name": "Agent",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "prompt": "Summarize.",
+              "url": "https://example.com/"
+            },
+            "id": "toolu_fetch",
+            "name": "WebFetch",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "text": "hi"
+            },
+            "id": "toolu_mcp",
+            "name": "mcp__echo__say",
+            "type": "toolCall"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "rawStopReason": "tool_use",
+        "responseId": "msg_mock_2",
+        "role": "assistant",
+        "stopReason": "toolUse",
+        "timestamp": 1794879399195,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "arguments": {
+              "description": "Find usages",
+              "prompt": "Find them."
+            },
+            "id": "toolu_agent",
+            "name": "Agent",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "prompt": "Summarize.",
+              "url": "https://example.com/"
+            },
+            "id": "toolu_fetch",
+            "name": "WebFetch",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "text": "hi"
+            },
+            "id": "toolu_mcp",
+            "name": "mcp__echo__say",
+            "type": "toolCall"
+          }
+        ],
+        "durationMs": 4,
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "rawStopReason": "tool_use",
+        "responseId": "msg_mock_2",
+        "role": "assistant",
+        "stopReason": "toolUse",
+        "thinkingLevel": "off",
+        "timestamp": 1794879399195,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_end"
+    },
+    {
+      "args": {
+        "description": "Find usages",
+        "prompt": "Find them."
+      },
+      "toolCallId": "toolu_agent",
+      "toolName": "Agent",
+      "type": "tool_execution_start"
+    },
+    {
+      "isError": true,
+      "result": {
+        "content": [
+          {
+            "text": "Tool Agent not found",
+            "type": "text"
+          }
+        ],
+        "details": {}
+      },
+      "toolCallId": "toolu_agent",
+      "toolName": "Agent",
+      "type": "tool_execution_end"
+    },
+    {
+      "args": {
+        "prompt": "Summarize.",
+        "url": "https://example.com/"
+      },
+      "toolCallId": "toolu_fetch",
+      "toolName": "WebFetch",
+      "type": "tool_execution_start"
+    },
+    {
+      "isError": true,
+      "result": {
+        "content": [
+          {
+            "text": "Tool WebFetch not found",
+            "type": "text"
+          }
+        ],
+        "details": {}
+      },
+      "toolCallId": "toolu_fetch",
+      "toolName": "WebFetch",
+      "type": "tool_execution_end"
+    },
+    {
+      "args": {
+        "text": "hi"
+      },
+      "toolCallId": "toolu_mcp",
+      "toolName": "mcp__echo__say",
+      "type": "tool_execution_start"
+    },
+    {
+      "isError": true,
+      "result": {
+        "content": [
+          {
+            "text": "Tool mcp__echo__say not found",
+            "type": "text"
+          }
+        ],
+        "details": {}
+      },
+      "toolCallId": "toolu_mcp",
+      "toolName": "mcp__echo__say",
+      "type": "tool_execution_end"
+    },
+    {
+      "message": {
+        "content": [
+          {
+            "text": "Tool Agent not found",
+            "type": "text"
+          }
+        ],
+        "details": {},
+        "isError": true,
+        "role": "toolResult",
+        "timestamp": 1794879399200,
+        "toolCallId": "toolu_agent",
+        "toolName": "Agent"
+      },
+      "type": "message_start"
+    },
+    {
+      "message": {
+        "content": [
+          {
+            "text": "Tool Agent not found",
+            "type": "text"
+          }
+        ],
+        "details": {},
+        "isError": true,
+        "role": "toolResult",
+        "timestamp": 1794879399200,
+        "toolCallId": "toolu_agent",
+        "toolName": "Agent"
+      },
+      "type": "message_end"
+    },
+    {
+      "message": {
+        "content": [
+          {
+            "text": "Tool WebFetch not found",
+            "type": "text"
+          }
+        ],
+        "details": {},
+        "isError": true,
+        "role": "toolResult",
+        "timestamp": 1794879399200,
+        "toolCallId": "toolu_fetch",
+        "toolName": "WebFetch"
+      },
+      "type": "message_start"
+    },
+    {
+      "message": {
+        "content": [
+          {
+            "text": "Tool WebFetch not found",
+            "type": "text"
+          }
+        ],
+        "details": {},
+        "isError": true,
+        "role": "toolResult",
+        "timestamp": 1794879399200,
+        "toolCallId": "toolu_fetch",
+        "toolName": "WebFetch"
+      },
+      "type": "message_end"
+    },
+    {
+      "message": {
+        "content": [
+          {
+            "text": "Tool mcp__echo__say not found",
+            "type": "text"
+          }
+        ],
+        "details": {},
+        "isError": true,
+        "role": "toolResult",
+        "timestamp": 1794879399200,
+        "toolCallId": "toolu_mcp",
+        "toolName": "mcp__echo__say"
+      },
+      "type": "message_start"
+    },
+    {
+      "message": {
+        "content": [
+          {
+            "text": "Tool mcp__echo__say not found",
+            "type": "text"
+          }
+        ],
+        "details": {},
+        "isError": true,
+        "role": "toolResult",
+        "timestamp": 1794879399200,
+        "toolCallId": "toolu_mcp",
+        "toolName": "mcp__echo__say"
+      },
+      "type": "message_end"
+    },
+    {
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "arguments": {
+              "description": "Find usages",
+              "prompt": "Find them."
+            },
+            "id": "toolu_agent",
+            "name": "Agent",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "prompt": "Summarize.",
+              "url": "https://example.com/"
+            },
+            "id": "toolu_fetch",
+            "name": "WebFetch",
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "text": "hi"
+            },
+            "id": "toolu_mcp",
+            "name": "mcp__echo__say",
+            "type": "toolCall"
+          }
+        ],
+        "durationMs": 4,
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "rawStopReason": "tool_use",
+        "responseId": "msg_mock_2",
+        "role": "assistant",
+        "stopReason": "toolUse",
+        "thinkingLevel": "off",
+        "timestamp": 1794879399195,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "toolResults": [
+        {
+          "content": [
+            {
+              "text": "Tool Agent not found",
+              "type": "text"
+            }
+          ],
+          "details": {},
+          "isError": true,
+          "role": "toolResult",
+          "timestamp": 1794879399200,
+          "toolCallId": "toolu_agent",
+          "toolName": "Agent"
+        },
+        {
+          "content": [
+            {
+              "text": "Tool WebFetch not found",
+              "type": "text"
+            }
+          ],
+          "details": {},
+          "isError": true,
+          "role": "toolResult",
+          "timestamp": 1794879399200,
+          "toolCallId": "toolu_fetch",
+          "toolName": "WebFetch"
+        },
+        {
+          "content": [
+            {
+              "text": "Tool mcp__echo__say not found",
+              "type": "text"
+            }
+          ],
+          "details": {},
+          "isError": true,
+          "role": "toolResult",
+          "timestamp": 1794879399200,
+          "toolCallId": "toolu_mcp",
+          "toolName": "mcp__echo__say"
+        }
+      ],
+      "type": "turn_end"
+    },
+    {
+      "type": "turn_start"
+    },
+    {
+      "message": {
+        "api": "anthropic-messages",
+        "content": [],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "responseId": "msg_mock_3",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1794879399201,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_start"
+    },
+    {
+      "assistantMessageEvent": {
+        "contentIndex": 0,
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "text": "Those tools are not ava",
+              "type": "text"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "responseId": "msg_mock_3",
+          "role": "assistant",
+          "stopReason": "pending",
+          "timestamp": 1794879399201,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "type": "text_start"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "text": "Those tools are not ava",
+            "type": "text"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "responseId": "msg_mock_3",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1794879399201,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "assistantMessageEvent": {
+        "contentIndex": 0,
+        "delta": "Those tools",
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "text": "Those tools are not available here.",
+              "type": "text"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "responseId": "msg_mock_3",
+          "role": "assistant",
+          "stopReason": "pending",
+          "timestamp": 1794879399201,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "type": "text_delta"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "text": "Those tools are not available here.",
+            "type": "text"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "responseId": "msg_mock_3",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1794879399201,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "assistantMessageEvent": {
+        "contentIndex": 0,
+        "delta": " are not ava",
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "text": "Those tools are not available here.",
+              "type": "text"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "rawStopReason": "end_turn",
+          "responseId": "msg_mock_3",
+          "role": "assistant",
+          "stopReason": "stop",
+          "timestamp": 1794879399201,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "type": "text_delta"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "text": "Those tools are not available here.",
+            "type": "text"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "responseId": "msg_mock_3",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1794879399201,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "assistantMessageEvent": {
+        "contentIndex": 0,
+        "delta": "ilable here.",
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "text": "Those tools are not available here.",
+              "type": "text"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "rawStopReason": "end_turn",
+          "responseId": "msg_mock_3",
+          "role": "assistant",
+          "stopReason": "stop",
+          "timestamp": 1794879399201,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "type": "text_delta"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "text": "Those tools are not available here.",
+            "type": "text"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "rawStopReason": "end_turn",
+        "responseId": "msg_mock_3",
+        "role": "assistant",
+        "stopReason": "stop",
+        "timestamp": 1794879399201,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "assistantMessageEvent": {
+        "content": "Those tools are not available here.",
+        "contentIndex": 0,
+        "partial": {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "text": "Those tools are not available here.",
+              "type": "text"
+            }
+          ],
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "rawStopReason": "end_turn",
+          "responseId": "msg_mock_3",
+          "role": "assistant",
+          "stopReason": "stop",
+          "timestamp": 1794879399201,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        "type": "text_end"
+      },
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "text": "Those tools are not available here.",
+            "type": "text"
+          }
+        ],
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "rawStopReason": "end_turn",
+        "responseId": "msg_mock_3",
+        "role": "assistant",
+        "stopReason": "stop",
+        "timestamp": 1794879399201,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_update"
+    },
+    {
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "text": "Those tools are not available here.",
+            "type": "text"
+          }
+        ],
+        "durationMs": 4,
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "rawStopReason": "end_turn",
+        "responseId": "msg_mock_3",
+        "role": "assistant",
+        "stopReason": "stop",
+        "thinkingLevel": "off",
+        "timestamp": 1794879399201,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "message_end"
+    },
+    {
+      "message": {
+        "api": "anthropic-messages",
+        "content": [
+          {
+            "text": "Those tools are not available here.",
+            "type": "text"
+          }
+        ],
+        "durationMs": 4,
+        "model": "mock-large",
+        "provider": "piarc-mock",
+        "rawStopReason": "end_turn",
+        "responseId": "msg_mock_3",
+        "role": "assistant",
+        "stopReason": "stop",
+        "thinkingLevel": "off",
+        "timestamp": 1794879399201,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cacheWrite1h": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "totalFromProvider": false
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "toolResults": [],
+      "type": "turn_end"
+    },
+    {
+      "messages": [
+        {
+          "content": "",
+          "role": "system",
+          "sections": {
+            "cwd": "<cwd>\n/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 61644/ws a 甲\n</cwd>",
+            "docs": "<docs>\nPi documentation (read only when the user asks about the harness itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: /Users/refinex/develop/project/PiArc/agent-host/dist/bundle/pi-assets/README.md\n- Additional docs: /Users/refinex/develop/project/PiArc/agent-host/dist/bundle/pi-assets/docs\n- Examples: /Users/refinex/develop/project/PiArc/agent-host/dist/bundle/pi-assets/examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- Before implementing harness changes, read the relevant docs and examples in full, following related cross-references.\n</docs>",
+            "preamble": "You are a coding assistant running inside pi, a coding agent harness. Help users inspect files, run commands, and modify code.",
+            "rules": "<rules>\n- Look at files with Read rather than printing them through Bash.\n- Keep each oldText short but unique; merge changes that sit close together into one entry.\n- Search with Grep and Glob rather than grep, rg or find in Bash.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+            "tools": "<tools>\n- Read: Read: show a text file or an image\n- Write: Write: create a file or replace all of its text\n- Edit: Edit: replace exact passages of an existing file\n- Bash: Bash: run a shell command\n- Glob: Glob: find files by name or path pattern\n- Grep: Grep: search file contents with a regular expression\n\nAdditional tools may be available.\n</tools>"
+          },
+          "timestamp": 1794879399193,
+          "toolsAdded": [
+            {
+              "constrainedSampling": {
+                "strict": "prefer",
+                "type": "json_schema"
+              },
+              "description": "Return the contents of one file. Text comes back as at most 2000 lines or 50 KB, whichever ends first; page through longer files with `offset` (first line to show, counting from 1) and `limit` (number of lines), following the note at the end of the output. JPEG, PNG, GIF, WebP and BMP files come back as images. `path` is absolute or relative to the working directory.",
+              "name": "Read",
+              "parameters": {
+                "properties": {
+                  "limit": {
+                    "description": "Maximum number of lines to read",
+                    "type": "number"
+                  },
+                  "offset": {
+                    "description": "Line number to start reading from (1-indexed)",
+                    "type": "number"
+                  },
+                  "path": {
+                    "description": "Path to the file to read (relative or absolute)",
+                    "type": "string"
+                  }
+                },
+                "required": ["path"],
+                "type": "object"
+              }
+            },
+            {
+              "constrainedSampling": {
+                "strict": "prefer",
+                "type": "json_schema"
+              },
+              "description": "Store `content` as the complete text of the file at `path`: a new file is created (with any missing parent directories), an existing one is replaced. To change part of an existing file, Edit is safer.",
+              "name": "Write",
+              "parameters": {
+                "properties": {
+                  "content": {
+                    "description": "Content to write to the file",
+                    "type": "string"
+                  },
+                  "path": {
+                    "description": "Path to the file to write (relative or absolute)",
+                    "type": "string"
+                  }
+                },
+                "required": ["path", "content"],
+                "type": "object"
+              }
+            },
+            {
+              "constrainedSampling": {
+                "strict": "prefer",
+                "type": "json_schema"
+              },
+              "description": "Change an existing file by replacing exact passages. Each entry of `edits` gives an `oldText`, copied character for character from the file (indentation and line breaks included) and found exactly once in it, and the `newText` that takes its place. All entries refer to the file as it is before the call and must not overlap; put several changes to one file into one call.",
+              "name": "Edit",
+              "parameters": {
+                "properties": {
+                  "edits": {
+                    "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead.",
+                    "items": {
+                      "properties": {
+                        "newText": {
+                          "description": "Replacement text for this targeted edit.",
+                          "type": "string"
+                        },
+                        "oldText": {
+                          "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call.",
+                          "type": "string"
+                        }
+                      },
+                      "required": ["oldText", "newText"],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "path": {
+                    "description": "Path to the file to edit (relative or absolute)",
+                    "type": "string"
+                  }
+                },
+                "required": ["path", "edits"],
+                "type": "object"
+              }
+            },
+            {
+              "constrainedSampling": {
+                "strict": "prefer",
+                "type": "json_schema"
+              },
+              "description": "Run a command line with bash in the working directory and return what it printed (stdout and stderr) and, when it fails, its exit code. Only the last 2000 lines or 50 KB of output are shown; the complete output is then saved to a file named in the result. `timeout` is in seconds; without it the command may run indefinitely. Every call starts a new shell: `cd` and exported variables do not carry over.",
+              "name": "Bash",
+              "parameters": {
+                "properties": {
+                  "command": {
+                    "description": "Shell command to execute",
+                    "type": "string"
+                  },
+                  "timeout": {
+                    "description": "Timeout in seconds (optional, no default timeout)",
+                    "type": "number"
+                  }
+                },
+                "required": ["command"],
+                "type": "object"
+              }
+            },
+            {
+              "description": "List the files and directories below `path` (default: the working directory) that match a glob `pattern`. Without `/` the pattern matches names at any depth (`*.json`); with `/` it matches paths relative to `path` (`src/**/*.test.ts`). Entries ignored by .gitignore are left out, directories end with `/`. At most `limit` entries (default 1000) or 50 KB are returned.",
+              "name": "Glob",
+              "parameters": {
+                "properties": {
+                  "limit": {
+                    "description": "Maximum number of results (default: 1000)",
+                    "type": "number"
+                  },
+                  "path": {
+                    "description": "Directory to search in (default: current directory)",
+                    "type": "string"
+                  },
+                  "pattern": {
+                    "description": "Glob pattern to match files, e.g. '*.ts', '**/*.json', or 'src/**/*.spec.ts'",
+                    "type": "string"
+                  }
+                },
+                "required": ["pattern"],
+                "type": "object"
+              }
+            },
+            {
+              "description": "Search file contents for a regular expression (or, with `literal`, a plain string) and return the matching lines as `file:line: text`. Searches the working directory unless `path` names a directory or a file; `glob` restricts which files are searched (`*.py`, `src/**/*.ts`); `context` adds lines around each match. Files ignored by .gitignore are skipped. At most `limit` matches (default 100) or 50 KB are returned, and very long lines are shortened.",
+              "name": "Grep",
+              "parameters": {
+                "properties": {
+                  "context": {
+                    "description": "Number of lines to show before and after each match (default: 0)",
+                    "type": "number"
+                  },
+                  "glob": {
+                    "description": "Filter files by glob pattern, relative to path, e.g. '*.ts', 'src/**/*.ts' or '**/*.spec.ts'. A pattern without '/' matches file names at any depth",
+                    "type": "string"
+                  },
+                  "ignoreCase": {
+                    "description": "Case-insensitive search (default: false)",
+                    "type": "boolean"
+                  },
+                  "limit": {
+                    "description": "Maximum number of matches to return (default: 100)",
+                    "type": "number"
+                  },
+                  "literal": {
+                    "description": "Treat pattern as literal string instead of regex (default: false)",
+                    "type": "boolean"
+                  },
+                  "path": {
+                    "description": "Directory or file to search (default: current directory)",
+                    "type": "string"
+                  },
+                  "pattern": {
+                    "description": "Search pattern (regex or literal string)",
+                    "type": "string"
+                  }
+                },
+                "required": ["pattern"],
+                "type": "object"
+              }
+            }
+          ]
+        },
+        {
+          "content": [
+            {
+              "text": "Use the other tools. [[piarc-scenario:golden-unknown-tools]]",
+              "type": "text"
+            }
+          ],
+          "role": "user",
+          "timestamp": 1794879399193
+        },
+        {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "arguments": {
+                "description": "Find usages",
+                "prompt": "Find them."
+              },
+              "id": "toolu_agent",
+              "name": "Agent",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "prompt": "Summarize.",
+                "url": "https://example.com/"
+              },
+              "id": "toolu_fetch",
+              "name": "WebFetch",
+              "type": "toolCall"
+            },
+            {
+              "arguments": {
+                "text": "hi"
+              },
+              "id": "toolu_mcp",
+              "name": "mcp__echo__say",
+              "type": "toolCall"
+            }
+          ],
+          "durationMs": 4,
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "rawStopReason": "tool_use",
+          "responseId": "msg_mock_2",
+          "role": "assistant",
+          "stopReason": "toolUse",
+          "thinkingLevel": "off",
+          "timestamp": 1794879399195,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        },
+        {
+          "content": [
+            {
+              "text": "Tool Agent not found",
+              "type": "text"
+            }
+          ],
+          "details": {},
+          "isError": true,
+          "role": "toolResult",
+          "timestamp": 1794879399200,
+          "toolCallId": "toolu_agent",
+          "toolName": "Agent"
+        },
+        {
+          "content": [
+            {
+              "text": "Tool WebFetch not found",
+              "type": "text"
+            }
+          ],
+          "details": {},
+          "isError": true,
+          "role": "toolResult",
+          "timestamp": 1794879399200,
+          "toolCallId": "toolu_fetch",
+          "toolName": "WebFetch"
+        },
+        {
+          "content": [
+            {
+              "text": "Tool mcp__echo__say not found",
+              "type": "text"
+            }
+          ],
+          "details": {},
+          "isError": true,
+          "role": "toolResult",
+          "timestamp": 1794879399200,
+          "toolCallId": "toolu_mcp",
+          "toolName": "mcp__echo__say"
+        },
+        {
+          "api": "anthropic-messages",
+          "content": [
+            {
+              "text": "Those tools are not available here.",
+              "type": "text"
+            }
+          ],
+          "durationMs": 4,
+          "model": "mock-large",
+          "provider": "piarc-mock",
+          "rawStopReason": "end_turn",
+          "responseId": "msg_mock_3",
+          "role": "assistant",
+          "stopReason": "stop",
+          "thinkingLevel": "off",
+          "timestamp": 1794879399201,
+          "usage": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "cacheWrite1h": 0,
+            "cost": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "input": 0,
+              "output": 0,
+              "total": 0,
+              "totalFromProvider": false
+            },
+            "input": 0,
+            "output": 0,
+            "totalTokens": 0
+          }
+        }
+      ],
+      "type": "agent_end",
+      "willRetry": false
+    },
+    {
+      "aborted": false,
+      "type": "agent_settled"
+    }
+  ]
+}
