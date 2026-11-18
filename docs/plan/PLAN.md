@@ -145,7 +145,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T18 | [客户端外壳、会话列表、设置窗口与信任对话框](tasks/T18-client-shell-and-session-list.md) | 2 | T17；D3 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 6b1d5f0 |
 | T19 | [Transcript 与 composer 正式版](tasks/T19-transcript-and-composer.md) | 2 | T18 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 0b72964 |
 | T20 | [基础权限与审批](tasks/T20-basic-permissions-and-approvals.md) | 2 | T19 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | ee03128 |
-| T21 | [模型、服务商与凭据设置](tasks/T21-models-providers-and-credentials.md) | 2 | T20 | macOS | high / 高 | 大 | 无 | 未开始 | — |
+| T21 | [模型、服务商与凭据设置](tasks/T21-models-providers-and-credentials.md) | 2 | T20 | macOS | high / 高 | 大 | 无 | 进行中 | — |
 | T22 | [System prompt 组装与 memory 文件](tasks/T22-system-prompt-and-memory-files.md) | 2 | T21 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | R2 | [M1 评审](tasks/R2-m1-review.md) | 2 | T22 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 未开始 | — |
@@ -309,7 +309,15 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（无进行中的任务。）
+**T21 模型、服务商与凭据设置（macOS）**
+- [x] 开工基线重新运行 `npm run verify`，15/15 通过，T20 权限裁决预算保持 2 ms。
+- [ ] 自定义提供商、协议及套餐模型列表调研与设计。
+- [ ] 凭据锁、超时和凭据存储验证。
+- [ ] Core 配置增删改、模型与会话契约。
+- [ ] Agent Host 能力目录、刷新、effort、切换预览、凭据与图片检查。
+- [ ] 设置、环境栏及 composer 交互。
+- [ ] 两种协议的工具回合、会话恢复、凭据扫描与交互实测。
+- [ ] 全量验证、证据、文档与收尾。
 
 ## 登记事项
 
