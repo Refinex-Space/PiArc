@@ -1994,99 +1994,99 @@
       "id": "T18-A01",
       "task": "T18",
       "description": "令牌生成 CSS 自定义属性与 TS 常量，四种模式 × 两档密度齐全；故意把一对前景 / 背景改到 AA 以下时 verify 失败，恢复后通过。验证：生成产物与两次 verify 的关键输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "design/tokens/*.json → npm run gen:tokens 生成 apps/desktop/src/renderer/theme/tokens.generated.css（:root 与 data-color-mode 的 light、dark、lightHighContrast、darkHighContrast 四块，data-density=compact，forced-colors 映射）与 apps/desktop/src/shared/design-tokens.ts（COLORS 四种模式、CSS_VARS、tokenVar）；单测 scripts/lib/design-tokens.test.mjs 7/7。故意把 slate.light[11]（text.secondary）改为 #9a9ea6 并重新生成后 npm run verify：第 15 步 design tokens FAIL（\"text.secondary on surface.app (text) in light is 2.62:1, needs 4.5:1\" 等 9 项，159/168），Vitest 的令牌用例同样失败，\"2 of 15 steps failed\"（tmp/evidence/T18/checks/verify-broken-contrast.txt）；还原后 npm run verify \"All 15 steps passed\"，第 15 步 \"168/168 pairs pass\"（tmp/evidence/T18/checks/verify-final.txt）。"
     },
     {
       "id": "T18-A02",
       "task": "T18",
       "description": "品牌检查生效：故意把主色改为橙色色相时检查失败；界面不含 Anthropic 的字体、图标与提示音。验证：检查脚本输出与资源清单。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "node scripts/ci/check-design-tokens.mjs --tokens <副本>，副本把 indigo 第 9 级改为 #e8742a/#ef8a3c：EXIT 1，\"brand: accent indigo.light[9] #e8742a has hue 23°, inside the forbidden orange/terracotta range 10–50°\" 及 accent.solid 两项（tmp/evidence/T18/checks/brand-orange-accent.txt）；仓库令牌 EXIT 0，\"brand: accent ramp \\\"indigo\\\" outside the orange/terracotta hues; system fonts only; no bundled fonts, sounds or other brands’ icons\"（brand-restored.txt）。资源清单 tmp/evidence/T18/checks/asset-inventory.txt：应用源码、打包与 design/ 下没有字体与音频文件，图标只有 design/brand/ 的 Pi 字形；字体栈为系统字体（SF Pro / Segoe UI Variable / PingFang SC / Microsoft YaHei UI，等宽 SF Mono / Cascadia Mono）。检查在 verify 第 15 步。"
     },
     {
       "id": "T18-A03",
       "task": "T18",
       "description": "用户已确认视觉方向。验证：亮暗评审截图（`tmp/evidence/T18/`）与用户在会话中的确认。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "等待用户在视觉关口确认视觉方向。评审截图（macOS 原生窗口捕获，含 vibrancy 与红绿灯）在 tmp/evidence/T18/review/：main-{light,dark}-{comfortable,compact}.png、main-{light,dark}-high-contrast.png、trust-{light,dark}.png、settings-{light,dark}.png、native-window.png；由 L4 e2e/t18-review.e2e.ts 生成。D3 未定，当前为中性临时令牌（主色 indigo 色族）。"
     },
     {
       "id": "T18-A04",
       "task": "T18",
       "description": "macOS 上隐藏式标题栏与侧栏 vibrancy 生效；Windows 上应用能启动并加载 Mica 配置。验证：macOS 截图与 Windows CI 冒烟输出（实机外观在 W1）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "macOS 部分已验证：tmp/evidence/T18/review/native-window.png（screencapture -l 捕获的真实窗口：隐藏式标题栏保留红绿灯、侧栏 vibrancy 材质，正文不透明），暗色与高对比度见同目录 main-*.png；窗口选项在 apps/desktop/src/main/platform/window-chrome.ts（darwin：titleBarStyle hidden、trafficLightPosition、vibrancy sidebar；win32：titleBarStyle hidden、titleBarOverlay、backgroundMaterial mica）。Windows 部分等用户推送后由 CI 的 desktop L4 (windows-latest) 冒烟（smoke.e2e.ts 启动应用并加载该配置）确认；实机外观在 W1。"
     },
     {
       "id": "T18-A05",
       "task": "T18",
       "description": "侧栏徽标按\"错误 > 等待审批 > 运行中 > 未读 > 空闲\"取最高优先级。验证：单测与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "单测 apps/desktop/src/renderer/store/store.test.tsx \"takes the highest badge: error > awaiting > running > unread > idle\"（badgeOf，五级逐一覆盖）通过；L4 e2e/t18-sessions.e2e.ts \"status badges follow Core: running, unread, error\" 两种形态通过（Core 快照驱动的 data-badge 依次为 error、running、unread、idle；等待审批的快照字段 pendingApprovals 由 T20 填入）；截图 tmp/evidence/T18/l4/t18-sessions.e2e.ts-status-*-{dev,packaged}/badges.png 与 tmp/evidence/T18/review/main-*.png（出错、运行中、未读三种徽标形状不同）。"
     },
     {
       "id": "T18-A06",
       "task": "T18",
       "description": "过滤、置顶、归档、重命名、删除会话可用；删除后 Pi JSONL 与会话临时目录被移除，重启应用后结果保持。验证：Playwright 流程与文件检查。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 e2e/t18-sessions.e2e.ts \"rename, pin, filter, archive and delete sessions; the result survives a restart\" 两种形态通过：重命名（中文标题）、置顶（排到组首并显示图钉）、过滤只剩匹配项、归档后隐藏且 <data>/sessions/<id>/ 被删除、\"显示已归档\"可见；删除经主进程原生确认（桩替换 dialog.showMessageBox，取消时会话保留），之后 pi/sessions/ 下该会话的 JSONL 与 sessions/<id>/ 都不存在；重启应用后标题、归档、删除结果保持。Core 端：cargo test -p piarc-testkit --test sessions 的 titles_pins_and_archives_persist_and_delete_removes_the_files、deleting_an_open_session_closes_it_first 通过；piarc-store 的 user_titles_pins_and_archives_survive_a_rebuild… 通过。截图 managed.png、after-restart.png。"
     },
     {
       "id": "T18-A07",
       "task": "T18",
       "description": "新建会话时乐观消息立即出现；注入创建失败后消息回滚，输入框保留原内容。验证：Playwright 流程（故障注入）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 e2e/t18-sessions.e2e.ts \"the new message shows at once; a failed create rolls it back into the input\" 两种形态通过：经测试钩子 failNext 在主进程注入 piarc:session.create 失败，MutationObserver 记录到乐观消息出现（含输入文字），之后消息移除、输入框恢复原文、显示\"会话没能启动：injected create failure\"、侧栏没有会话；同一文字再次开始时会话创建成功，Core 的用户消息替换乐观行（user-message 1 条、optimistic-message 0 条）。截图 rolled-back.png、started.png。"
     },
     {
       "id": "T18-A08",
       "task": "T18",
       "description": "信任对话框按类别列出夹具工作区的全部可执行项；选择暂不信任后，夹具 `.pi/extensions/` 注册的工具不出现在模型请求中；信任后出现；新增一个可执行项后再次打开只列出该项。验证：Playwright 端到端与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 e2e/t18-trust.e2e.ts 两种形态通过：夹具工作区含 .pi/extensions/probe-tool.ts、.mcp.json、.piarc/settings.json（allow 规则与 hook）；对话框按类别列出 hook、mcpServer、allowRule、piExtension 及来源文件，并说明 memory 文件；\"暂不信任\"后 mock provider 记录的请求 tools 含 Read、Bash、不含 fixture_probe；从文件夹菜单改为信任后新会话的请求含 fixture_probe；向 .piarc/settings.json 新增 Bash(curl *) 后再次新建会话，对话框只列这 1 项，确认后请求仍含 fixture_probe。Core：tests/state.rs 的信任视图用例（未确认的新增项使 trust/get 为不信任）、testkit 的 a_session_created_right_after_a_trust_decision_starts 与 a_trust_decision_while_the_agent_host_starts… 通过。截图 trust-dialog.png、trust-new-items.png。"
     },
     {
       "id": "T18-A09",
       "task": "T18",
       "description": "流式增量只触发最后一个 item 订阅者的渲染；旧 revision 快照被丢弃；乐观回显被 Core 确认替换且不重复。验证：store 单测（含渲染计数）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npx vitest run apps/desktop/src/renderer/store：store.test.tsx 8/8（happy-dom 中真实 React 渲染）：\"a streaming delta re-renders only the last item\"（5 次增量后渲染计数 m1:1、m2:1、m3:6，列表 1 次）；\"drops older revisions and keeps unchanged entries\"（revision 1、2 与非法 revision 被丢弃，未变化条目保持同一对象）；\"re-renders only the subscribers of the session that changed\"；乐观回显三项：确认后原位替换、事件先于提示应答到达时不重复、失败回滚。"
     },
     {
       "id": "T18-A10",
       "task": "T18",
       "description": "在设置中修改 Mod+N 后新按键立即生效、旧按键失效，主进程菜单显示新按键；与已有快捷键冲突时提示。验证：Playwright 流程。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 e2e/t18-settings.e2e.ts \"a changed shortcut works at once, the old one stops, the menu follows; conflicts are refused\" 两种形态通过：设置窗口录入 Mod+W 给\"新建会话\"时提示冲突（shortcut-conflict.png）；改为 Mod+Shift+N 后主进程菜单项 session.new 的 accelerator 为 CommandOrControl+Shift+N，主窗口按 ⌘N 不再切到新建视图、按 ⇧⌘N 切换；恢复默认后菜单回到 CommandOrControl+N；⌘/ 打开快捷键列表（shortcut-changed.png、shortcut-list.png）。单测 apps/desktop/src/shared/keybindings.test.ts 4/4、src/main/menu.test.ts 2/2。"
     },
     {
       "id": "T18-A11",
       "task": "T18",
       "description": "窗口不在前台时，会话完成触发系统通知（不可用时为应用内提醒与 Dock 弹跳），Dock 角标数字正确。验证：macOS 实测记录与截图（Windows 在 W1）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "macOS：L4 e2e/t18-attention.e2e.ts 两种形态通过：会话运行中把设置窗口放到前台（主窗口失去焦点），回合完成后主进程记录 notified=[{kind:\"completed\", title:\"“Take a while …”已完成\", shown:true}]（Notification.isSupported 为真，已调用 show）、Dock 弹跳 1 次、计数 1，app.getBadgeCount() 为 1，主窗口出现应用内提醒（reminder.png）；回到前台并打开该会话后计数与角标为 0。程序无法判断横幅是否真的显示（S6、I43），所以应用内提醒与弹跳总会出现。Windows 在 W1。"
     },
     {
       "id": "T18-A12",
       "task": "T18",
       "description": "中英文切换后界面文字与主进程菜单立即更新。验证：Playwright 流程与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 e2e/t18-settings.e2e.ts \"switching the language updates the window and the menu at once\" 两种形态通过：设置中选 English 后主窗口筛选框占位为 \"Filter sessions\"、设置导航为 \"General\"、菜单顶层含 \"File\"、session.new 菜单项为 \"New Session\"；切回简体中文后为\"筛选会话\"、\"通用\"、\"文件\"、\"新建会话\"。截图 language-en.png、language-zh.png、settings-zh.png。"
     },
     {
       "id": "T18-A13",
       "task": "T18",
       "description": "打包产物冷启动到侧栏（100 个会话）就绪不超过 1.0 s。验证：10 次测量的最大值。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run bench:t18（打包产物，开发构建，darwin-arm64，数据目录含 100 个已索引的会话，10 次冷启动，从进程启动到渲染进程打点 piarc:sidebar-ready 且侧栏 100 行）：中位 453 ms、最大 463 ms ≤ 1000 ms（tmp/evidence/T18/bench/cold-start.json；此前一次为中位 423 ms、最大 436 ms）。计时包含 Playwright 启动的调试连接，为上界。"
     },
     {
       "id": "T18-A14",
       "task": "T18",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify：All 15 steps passed（Prettier、ESLint、tsc、Core 模块与快照、Vitest、cargo fmt/clippy/test、协议漂移、契约样本、cargo-deny、crate 依赖、验收清单、L2 场景与能力、design tokens），tmp/evidence/T18/checks/verify-final.txt。L4 全量 154 passed、1 skipped（Windows 专用的 agent-host-kill），两种形态（tmp/evidence/T18/l4-summary.txt）。"
     },
     {
       "id": "T19-A01",

@@ -127,7 +127,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T15 | [无头驱动、L2 场景运行器与能力清单](tasks/T15-devcli-l2-scenarios-and-capabilities.md) | 2 | T14 | macOS | high | 中 | 无 | 已完成 | 5546027 |
 | T16 | [文件工具与编辑不变量](tasks/T16-file-tools-invariants.md) | 2 | T15 | macOS | xhigh | 大 | 无 | 已完成 | ea75a25 |
 | T17 | [Bash / PowerShell 执行与进程管理](tasks/T17-bash-powershell-execution.md) | 2 | T16 | macOS | high | 大 | 无 | 已完成 | d154ab3 |
-| T18 | [客户端外壳、会话列表、设置窗口与信任对话框](tasks/T18-client-shell-and-session-list.md) | 2 | T17；D3 | macOS | xhigh | 大 | 无 | 进行中 | — |
+| T18 | [客户端外壳、会话列表、设置窗口与信任对话框](tasks/T18-client-shell-and-session-list.md) | 2 | T17；D3 | macOS | xhigh | 大 | 无 | 阻塞（等待用户确认视觉方向） | — |
 | T19 | [Transcript 与 composer 正式版](tasks/T19-transcript-and-composer.md) | 2 | T18 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T20 | [基础权限与审批](tasks/T20-basic-permissions-and-approvals.md) | 2 | T19 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T21 | [模型、服务商与凭据设置](tasks/T21-models-providers-and-credentials.md) | 2 | T20 | macOS | high | 大 | 无 | 未开始 | — |
@@ -298,22 +298,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 D3 只定了图标，主色与字标未定：用中性临时令牌，视觉关口请用户确认。
 
-- [x] 1 Core 会话元数据命令：重命名、置顶、归档（清会话临时目录）、删除（先关闭，再删 JSONL 与临时目录）；快照带 `pinned`、`archived`；NAPI 导出与快照
-- [x] 2 信任闸门（I63）：有未确认的新增项时 `trusted` 为 false；Core 用户设置读写（语言、外观、快捷键覆盖、通知）
-- [x] 3 设计令牌管线：`design/tokens/*.json` → CSS 与 TS，漂移检查、对比度检查、品牌检查并入 verify（A01、A02）
-- [x] 4 i18n（ICU MessageFormat，中英两套，主进程与渲染进程共用）
-- [x] 5 主进程：窗口外观（隐藏标题栏 + vibrancy / Mica + 覆盖层）、原生菜单（i18n + 快捷键）、设置窗口、打开文件夹、删除确认、通知与 Dock 角标、会话 IPC 白名单（A04、A11）
-- [x] 6 渲染进程 store（`useSyncExternalStore`，revision 门控、clientId 对账、item 粒度订阅）（A09）
-- [x] 7 窗口骨架（三栏 + 注册式右栏与面板区、尺寸记忆）、侧栏会话列表与徽标（A05、A06）
-- [x] 8 新建会话流程（乐观消息、失败回滚）与信任对话框（A07、A08）
-- [x] 9 设置窗口三页、快捷键注册表与自定义（A10）、语言切换（A12）
-- [ ] 10 Playwright 流程用例、亮暗 × 两档密度评审截图、冷启动 100 会话测量（A13）
-- [ ] 11 文档：架构、ADR、CLAUDE.md、复用表；verify；视觉关口（A03、A14）
-
-续做要点（2026-11-18 会话因用量上限中断）：
-- 渲染进程（第 7–9 项）代码已写完并提交，L4 `t18-sessions`、`t18-settings` 在 dev 形态通过；`t18-trust` 刚修了点击隐藏的菜单按钮（hover 表头）未重跑；`t18-attention` 失败：设置窗口在前台时 main 页面 `document.hasFocus()` 仍为真，Conversation 立即标记已读，徽标变 idle——改为主进程告知焦点（或用 `BrowserWindow.isFocused` 经 app 事件）后再判断
-- 还没做：评审截图脚本（亮暗 × 两档密度）、macOS 窗口外观截图（A04）、冷启动 100 会话测量（A13）、`npm run package:desktop -- --flavor development` 后跑全部 L4 两种形态、S10 报告与 preload 白名单说明、架构 7.6/8.x/10.2 与 ADR-0025 增补、CLAUDE.md 与复用表、acceptance.json、全量 verify、视觉关口
-- Core 侧本任务另修了两个竞态（信任决定后立即建会话、首个 Agent Host 连上时恢复正在创建的会话），各有 testkit 用例
+- [x] 1–9 Core 命令与信任闸门、设计令牌管线、i18n、主进程、store、窗口骨架与侧栏、新建会话与信任对话框、设置窗口与快捷键（提交 9770bc8 … 1898503）
+- [x] 10 Playwright 流程（L4 全量 154 passed、1 skipped，两种形态）、评审截图 `tmp/evidence/T18/review/`、冷启动 100 会话最大 463 ms
+- [x] 11 文档（架构 v2.23、ADR-0029、S10、CLAUDE.md、复用表）；verify 15/15；acceptance.json（12 项 passing）
+- [ ] 视觉关口：等用户确认视觉方向（T18-A03）。确认或给出修改意见后：只改 `design/tokens/`（主色色族在 `ramps.json` / `palette.json`），`npm run gen:tokens`，重跑 `PIARC_EVIDENCE_TASK=T18 npx playwright test t18-review --project dev` 刷新截图并复制到 `tmp/evidence/T18/review/`，A03 标 passing，看板改为"部分完成"（A04 等 Windows CI）或"已完成"
+- [ ] T18-A04 的 Windows 部分：用户推送后看 CI 的 `desktop L4 (windows-latest)`
 
 ## 登记事项
 
@@ -633,6 +622,13 @@ D3 只定了图标，主色与字标未定：用中性临时令牌，视觉关�
 
 - 用户推送后核对提交 9e6cd3e 的 CI：verify 两个平台 14/14 通过（Windows：Vitest 851 passed、cargo test 418 passed、L2 34 passed 2 skipped、MISSING 0），desktop L4 (windows-latest)、全部 core build / core load / 打包通过。T17-A01、A11、A12、A13 改为 passing，T17 改为已完成
 - `desktop L4 (macos-latest)` 失败于 `transcript-scroll.e2e.ts` 的贴底用例（离底 21 px），即 I32 的偶发失败，T17 未改渲染进程；已在 I32 中补记，仍交 T19/T44
+
+### 2026-11-18 T18 阻塞（等待用户确认视觉方向）
+
+- 交付：Core 会话元数据命令（重命名、置顶、归档清临时目录、删除先关闭再删 JSONL 与临时目录，schema v2 `custom_title`）、信任闸门（有未确认新增项时不信任，I63）、客户端偏好读写（`client_settings`）；三个 Core 竞态修复（信任决定后立即建会话、Agent Host 启动中做信任决定、首个进程连上时恢复正在创建的会话）与启动同步后重发会话快照，各有失败在先的 testkit 用例；设计令牌管线（`design/tokens/`、`npm run gen:tokens`、verify 第 15 步：漂移、168 对 WCAG、品牌与资源）；ICU MessageFormat（intl-messageformat 12.1.4）中英目录；快捷键注册表；原生菜单（I11）；窗口外观（隐藏标题栏 + vibrancy / Mica + 覆盖层）；渲染进程 store（revision 门控、clientId 对账、细粒度订阅，happy-dom 渲染计数）；三栏窗口骨架与注册式右栏、面板区；侧栏分组、徽标、过滤、置顶、归档、重命名、删除；新建会话（乐观消息、失败回滚）；信任对话框；设置窗口（通用、外观、快捷键）；通知、Dock 角标、应用内提醒；`core/notices` 提示条；L4 流程 6 个文件；`npm run bench:t18`
+- 验收：12 项通过；A03 阻塞（视觉关口），A04 阻塞（Windows 部分等 CI）
+- 决策：ADR-0029（补充）：令牌管线、偏好存储、快捷键、本地化、信任闸门、信任重启在应答前生效、会话元数据；架构 v2.23
+- 遗留：I79（信任决定没有原生确认，T45）、I80（信任变化可能漏掉刚打开、未登记路由的工作区）、I81（`runtime.rs` 超过 1,000 行，R2）；L4 用 `PIARC_TEST_MEMORY_KEYCHAIN` 让开发构建的保险箱主密钥放在内存（每次重新打包的 ad-hoc 签名都会触发钥匙串授权弹窗）；未推送
 
 ## 计划变更记录
 
