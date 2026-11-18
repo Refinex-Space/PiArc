@@ -33,7 +33,7 @@ export async function expectTestHooks(app: ElectronApplication): Promise<void> {
 /** Opens a probe window and returns its page and `webContents.id`. */
 export async function openProbe(app: ElectronApplication): Promise<{ page: Page; id: number }> {
   await expectTestHooks(app);
-  const pageCreated = app.waitForEvent('window');
+  const known = new Set(app.windows());
   const id = await app.evaluate(async (_electron, hash) => {
     const hooks = globalThis.__piarcTestHooks;
     if (hooks === undefined) {
@@ -41,7 +41,21 @@ export async function openProbe(app: ElectronApplication): Promise<{ page: Page;
     }
     return hooks.openWindow(hash);
   }, EVENT_PROBE_HASH);
-  const page = await pageCreated;
+  // The probe is the new page on the probe's URL: the app's main window may open at about the
+  // same time (after the preferences load), so "the next window" can be the wrong one.
+  let page: Page | undefined;
+  const deadline = Date.now() + 10_000;
+  while (page === undefined && Date.now() < deadline) {
+    page = app
+      .windows()
+      .find((candidate) => !known.has(candidate) && candidate.url().includes(EVENT_PROBE_HASH));
+    if (page === undefined) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+  if (page === undefined) {
+    throw new Error('the probe window did not appear');
+  }
   await page.getByTestId('event-probe').waitFor();
   return { page, id };
 }

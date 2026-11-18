@@ -219,14 +219,15 @@ export async function focusMain(app: ElectronApplication): Promise<void> {
   await app.evaluate(({ app: electronApp, BrowserWindow }) => {
     electronApp.focus({ steal: true });
     BrowserWindow.getAllWindows()
-      .find((w) => !w.webContents.getURL().includes('#/settings'))
+      .find((w) => !w.isDestroyed() && !w.webContents.getURL().includes('#/settings'))
       ?.focus();
   });
   await expect
     .poll(() =>
       app.evaluate(({ BrowserWindow }) =>
         BrowserWindow.getAllWindows().some(
-          (w) => w.isFocused() && !w.webContents.getURL().includes('#/settings'),
+          (w) =>
+            !w.isDestroyed() && w.isFocused() && !w.webContents.getURL().includes('#/settings'),
         ),
       ),
     )

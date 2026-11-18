@@ -33,7 +33,7 @@ test('a session finishing in the background notifies and counts on the Dock badg
     .poll(() =>
       app.evaluate(({ BrowserWindow }) =>
         BrowserWindow.getAllWindows()
-          .filter((w) => !w.webContents.getURL().includes('#/settings'))
+          .filter((w) => !w.isDestroyed() && !w.webContents.getURL().includes('#/settings'))
           .some((w) => w.isFocused()),
       ),
     )

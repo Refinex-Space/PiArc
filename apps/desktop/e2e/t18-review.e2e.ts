@@ -26,7 +26,7 @@ async function captureMain(app: ElectronApplication, page: Page, file: string): 
   }
   const source = await app.evaluate(({ BrowserWindow }) => {
     const window = BrowserWindow.getAllWindows().find(
-      (w) => !w.webContents.getURL().includes('#/settings'),
+      (w) => !w.isDestroyed() && !w.webContents.getURL().includes('#/settings'),
     );
     window?.focus();
     return window?.getMediaSourceId() ?? '';
