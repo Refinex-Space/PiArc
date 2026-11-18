@@ -18,7 +18,7 @@ use serde_json::Value;
 
 use crate::method::{notification, request};
 use crate::session::{SessionEventHeader, SessionEventNotification, SessionId};
-use crate::turn::Item;
+use crate::turn::{Item, TurnId};
 
 /// Parameters of `session/getEntries`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -62,6 +62,9 @@ pub struct HistoryParams {
 pub struct HistoryItem {
     /// The Pi entry the item comes from (for a tool call: the assistant message's entry).
     pub entry_id: String,
+    /// The enclosing turn, or its first user entry in session files without PiArc turn IDs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn_id: Option<TurnId>,
     /// The item in its final state.
     pub item: Item,
 }

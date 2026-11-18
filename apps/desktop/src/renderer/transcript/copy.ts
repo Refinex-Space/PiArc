@@ -1,5 +1,6 @@
 // "Copy this message" (architecture section 8.4): the Markdown source as received, or plain text
 // derived from the parsed blocks without any Markdown syntax.
+import type { SessionTranscript } from '../store/transcript.js';
 import type { Block, Span } from './markdown/ir.js';
 
 function spanText(spans: readonly Span[]): string {
@@ -75,4 +76,23 @@ export function blocksText(blocks: readonly Block[]): string {
     .map(blockText)
     .filter((text) => text !== '')
     .join('\n\n');
+}
+
+/** Load preceding pages while the requested turn still touches the window's upper edge. */
+export async function loadExchange(
+  transcript: SessionTranscript,
+  rowId: string,
+  loadEarlier: (() => Promise<void>) | undefined,
+  signal: AbortSignal,
+): Promise<readonly string[]> {
+  let rows = transcript.exchangeOf(rowId);
+  while (loadEarlier && !signal.aborted && rows.length > 0 && rows[0] === transcript.rowIds()[0]) {
+    const start = transcript.historyStart();
+    if (start === undefined || start === 0) break;
+    await loadEarlier();
+    // A failed or stale read must not produce an incomplete selection.
+    if ((transcript.historyStart() ?? start) >= start) return [];
+    rows = transcript.exchangeOf(rowId);
+  }
+  return signal.aborted ? [] : rows;
 }

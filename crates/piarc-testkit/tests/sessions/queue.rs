@@ -5,7 +5,7 @@ use piarc_core::sessions::{Op, QueueOp};
 use serde_json::Value;
 
 use crate::support::{Env, answer, prompt_text, reply, shutdown, user_texts};
-use crate::{open_session, prompt};
+use crate::{open_session, prompt, window};
 
 async fn op(core: &piarc_core::CoreRuntime, id: &str, op: Op) -> Value {
     let (done, rx) = reply();
@@ -252,5 +252,23 @@ async fn steering_joins_the_running_turn_and_a_follow_up_waits_for_the_next() {
             "turn/completed:2"
         ]
     );
+    assert_persisted_turns(&core, &id, &turn, &next_turn).await;
     shutdown(core).await;
+}
+
+async fn assert_persisted_turns(
+    core: &piarc_core::CoreRuntime,
+    id: &str,
+    turn: &str,
+    next_turn: &str,
+) {
+    let history = window(core, id, None).await;
+    let turns: Vec<_> = history["items"]
+        .as_array()
+        .expect("items")
+        .iter()
+        .filter(|entry| entry["item"]["type"] == "userMessage")
+        .map(|entry| entry["turnId"].as_str().expect("persisted turn ID"))
+        .collect();
+    assert_eq!(turns, [turn, turn, next_turn]);
 }

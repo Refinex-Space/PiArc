@@ -11,7 +11,8 @@
 // |                                           | tool call (id: tool call id) with the status  |
 // |                                           | and output of its tool result                 |
 // | compaction                                | contextCompaction (no reason: Pi keeps none)  |
-// | `piarc.input` custom entry                | nothing; applies to the next user message     |
+// | `piarc.input` custom entry                | turn ID and any input data for the next user  |
+// |                                           | message, or the following manual compaction   |
 // | everything else                           | nothing                                       |
 //
 // A tool call without a result was interrupted; one in an aborted response never ran and is
@@ -42,6 +43,12 @@ interface ToolResult {
   readonly details: unknown;
 }
 
+interface InputRecord {
+  readonly kind: 'user' | 'compact';
+  readonly turnId: string | undefined;
+  readonly input: UserInput | undefined;
+}
+
 /** Every item of `branch` (root to leaf), in conversation order. */
 export function projectHistory(
   branch: readonly SessionEntry[],
@@ -58,15 +65,26 @@ export function projectHistory(
     }
   }
   const items: HistoryItem[] = [];
-  let record: UserInput | undefined;
+  let pending: InputRecord | undefined;
+  let currentTurn: string | undefined;
   for (const entry of branch) {
     if (entry.type === 'custom' && entry.customType === INPUT_ENTRY) {
-      record = parseInputRecord(entry.data);
+      const data: unknown = entry.data;
+      pending = {
+        kind: isObject(data) && data.action === 'compact' ? 'compact' : 'user',
+        turnId: isObject(data) && typeof data.turnId === 'string' ? data.turnId : undefined,
+        input: parseInputRecord(data),
+      };
       continue;
     }
     if (entry.type === 'compaction') {
+      if (pending?.kind === 'compact') {
+        currentTurn = pending.turnId;
+        pending = undefined;
+      }
       items.push({
         entryId: entry.id,
+        turnId: currentTurn ?? entry.id,
         item: contextCompaction(entry.id, 'completed', { tokensBefore: entry.tokensBefore }),
       });
       continue;
@@ -79,11 +97,20 @@ export function projectHistory(
       const text = contentText(message.content) ?? '';
       // The record belongs to this message when the message starts with what the user wrote
       // (attached PDFs' text follows it).
-      const own = record !== undefined && text.startsWith(record.text) ? record : undefined;
-      record = undefined;
-      items.push({ entryId: entry.id, item: userMessage(entry.id, text, own) });
+      const record = pending?.kind === 'user' ? pending : undefined;
+      const own = record?.input;
+      const matches = own === undefined || text.startsWith(own.text);
+      currentTurn = (matches ? record?.turnId : undefined) ?? entry.id;
+      pending = undefined;
+      items.push({
+        entryId: entry.id,
+        turnId: currentTurn,
+        item: userMessage(entry.id, text, matches ? own : undefined),
+      });
     } else if (message.role === 'assistant' && !isInterruptionMarker(message)) {
-      items.push(...assistantItems(entry.id, message, results, toCanonical));
+      items.push(
+        ...assistantItems(entry.id, currentTurn ?? entry.id, message, results, toCanonical),
+      );
     }
   }
   return items;
@@ -91,6 +118,7 @@ export function projectHistory(
 
 function assistantItems(
   entryId: string,
+  turnId: string,
   message: Extract<SessionEntry, { type: 'message' }>['message'] & { role: 'assistant' },
   results: ReadonlyMap<string, ToolResult>,
   toCanonical: (tool: string) => string,
@@ -106,15 +134,24 @@ function assistantItems(
   message.content.forEach((part, index) => {
     const itemId = `${entryId}#${String(index)}`;
     if (part.type === 'text') {
-      items.push({ entryId, item: agentMessage(itemId, textStatus, part.text.toWellFormed()) });
+      items.push({
+        entryId,
+        turnId,
+        item: agentMessage(itemId, textStatus, part.text.toWellFormed()),
+      });
     } else if (part.type === 'thinking') {
-      items.push({ entryId, item: reasoning(itemId, textStatus, part.thinking.toWellFormed()) });
+      items.push({
+        entryId,
+        turnId,
+        item: reasoning(itemId, textStatus, part.thinking.toWellFormed()),
+      });
     } else if (ran) {
       const result = results.get(part.id);
       const status: ItemStatus =
         result === undefined ? 'interrupted' : result.isError ? 'failed' : 'completed';
       items.push({
         entryId,
+        turnId,
         item: toolItem(
           part.id,
           status,

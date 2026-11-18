@@ -3,7 +3,7 @@
 // composer with the queue above it. A session shown before in this window is still in the store
 // and shows at once; one shown for the first time loads its last page of history, and earlier
 // pages when the user scrolls to the top.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useT } from '../app/app-context.js';
 import { useWindowFocused } from '../app/window-focus.js';
@@ -17,7 +17,7 @@ import {
 import type { MentionData } from '../composer/schema.js';
 import { useNeedsReload, useQueue, useSession, useStore, useTurnInfo } from '../store/hooks.js';
 import { badgeOf } from '../store/status.js';
-import type { SessionTranscript } from '../store/transcript.js';
+import type { SessionTranscript, TranscriptEntry } from '../store/transcript.js';
 import { HISTORY } from '../transcript/constants.js';
 import { TranscriptContext, type TranscriptView } from '../transcript/services.js';
 import { Transcript } from '../transcript/Transcript.js';
@@ -33,14 +33,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** Core's `transcript_window` answer: `{ start, items: [{ entryId, item }] }`. */
-function parseWindow(text: string): { start: number; items: { entryId: string; item: unknown }[] } {
+function parseWindow(text: string): { start: number; items: TranscriptEntry[] } {
   const value: unknown = JSON.parse(text);
   if (!isRecord(value) || !Array.isArray(value.items)) {
     return { start: 0, items: [] };
   }
   const items = value.items.flatMap((entry: unknown) =>
     isRecord(entry) && typeof entry.entryId === 'string'
-      ? [{ entryId: entry.entryId, item: entry.item }]
+      ? [
+          {
+            entryId: entry.entryId,
+            ...(typeof entry.turnId === 'string' ? { turnId: entry.turnId } : {}),
+            item: entry.item,
+          },
+        ]
       : [],
   );
   return { start: typeof value.start === 'number' ? value.start : 0, items };
@@ -88,11 +94,12 @@ function useHistory(
 ): {
   loading: boolean;
   loadingEarlier: boolean;
-  loadEarlier: () => void;
+  loadEarlier: () => Promise<void>;
 } {
   const needsReload = useNeedsReload(id);
   const [loading, setLoading] = useState(false);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
+  const earlierRequest = useRef<Promise<void> | undefined>(undefined);
   useEffect(() => {
     if (transcript.hasContent() && !needsReload) {
       return;
@@ -122,24 +129,26 @@ function useHistory(
     };
   }, [id, transcript, needsReload]);
   const loadEarlier = useCallback(() => {
+    if (earlierRequest.current !== undefined) return earlierRequest.current;
     const start = transcript.historyStart();
-    if (start === undefined || start === 0 || loadingEarlier) {
-      return;
-    }
+    if (start === undefined || start === 0) return Promise.resolve();
     const from = Math.max(0, start - HISTORY.pageItems);
     setLoadingEarlier(true);
-    window.piarc.transcriptWindow(id, from, start - from).then(
-      (text) => {
-        setLoadingEarlier(false);
-        const window = parseWindow(text);
-        transcript.prepend(window.items, window.start);
-      },
-      (failure: unknown) => {
-        setLoadingEarlier(false);
+    earlierRequest.current = window.piarc
+      .transcriptWindow(id, from, start - from)
+      .then((text) => {
+        const page = parseWindow(text);
+        if (transcript.historyStart() === start) transcript.prepend(page.items, page.start);
+      })
+      .catch((failure: unknown) => {
         console.error('[conversation] cannot load earlier messages', failure);
-      },
-    );
-  }, [id, transcript, loadingEarlier]);
+      })
+      .finally(() => {
+        earlierRequest.current = undefined;
+        setLoadingEarlier(false);
+      });
+    return earlierRequest.current;
+  }, [id, transcript]);
   return { loading, loadingEarlier, loadEarlier };
 }
 

@@ -122,17 +122,18 @@ export function AgentMessageRow({
   readonly item: AgentMessageItem;
 }) {
   const t = useT();
-  const { services } = useTranscriptView();
+  const { services, transcript } = useTranscriptView();
   const list = useListActions();
-  const parsed = useParsedDoc(id);
+  const docKey = transcript.cacheKey(id);
+  const parsed = useParsedDoc(docKey);
   useRowCommitted();
   const complete = item.status !== 'inProgress';
-  const streamed = services.driver.streams(id);
+  const streamed = services.driver.streams(docKey);
   useEffect(() => {
     if (complete && !streamed) {
-      services.markdown.parseFinished(id, item.text);
+      services.markdown.parseFinished(docKey, item.text);
     }
-  }, [services, id, item.text, complete, streamed]);
+  }, [services, docKey, item.text, complete, streamed]);
   let body;
   if (parsed !== undefined) {
     body = <MarkdownView blocks={parsed.blocks} />;
@@ -153,7 +154,7 @@ export function AgentMessageRow({
     >
       {body}
       {complete && parsed?.final === true ? (
-        <div className="row-actions" data-testid="message-actions">
+        <div className="row-actions is-hover" data-testid="message-actions">
           <CopyButton label={t('transcript.copyMarkdown')} text={() => item.text} />
           <CopyButton label={t('transcript.copyText')} text={() => blocksText(parsed.blocks)} />
           <button

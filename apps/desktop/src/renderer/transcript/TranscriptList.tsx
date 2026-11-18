@@ -13,6 +13,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { useT } from '../app/app-context.js';
 import { VIRTUAL_LIST } from './constants.js';
+import { loadExchange } from './copy.js';
 import { ListActionsContext, type ListActions } from './rows/list-actions.js';
 import { RowView } from './rows/RowView.js';
 import { useTranscriptView } from './services.js';
@@ -54,6 +55,7 @@ export function TranscriptList({
   onScroller,
   onContent,
   onRowCommitted,
+  loadEarlier,
 }: {
   ids: readonly string[];
   /** Receives the scroll element. */
@@ -62,6 +64,7 @@ export function TranscriptList({
   onContent: (element: HTMLElement | null) => void;
   /** A row committed new content (layout phase, before paint). */
   onRowCommitted: () => void;
+  loadEarlier: (() => Promise<void>) | undefined;
 }) {
   const t = useT();
   const { services, transcript } = useTranscriptView();
@@ -69,6 +72,8 @@ export function TranscriptList({
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(0);
   const [selected, setSelected] = useState<readonly string[] | null>(null);
+  const selectionRequest = useRef<AbortController | null>(null);
+  useLayoutEffect(() => () => selectionRequest.current?.abort(), []);
   const instance = useRef<RowVirtualizer | null>(null);
   const keep = useMemo(() => {
     if (selected === null) {
@@ -86,7 +91,7 @@ export function TranscriptList({
     getScrollElement: () => scroller,
     estimateSize: (index) => {
       const id = ids[index] ?? '';
-      return heights.estimate(transcript.row(id), id, width);
+      return heights.estimate(transcript.row(id), transcript.cacheKey(id), width);
     },
     getItemKey: (index) => ids[index] ?? index,
     anchorTo: 'end',
@@ -95,7 +100,7 @@ export function TranscriptList({
       const size = measureWithObserver(element, entry, owner);
       const id = element.dataset.rowId;
       if (id !== undefined && width > 0) {
-        heights.set(id, width, size);
+        heights.set(transcript.cacheKey(id), width, size);
       }
       return size;
     },
@@ -167,12 +172,16 @@ export function TranscriptList({
   const actions = useMemo<ListActions>(
     () => ({
       selectExchange: (rowId) => {
-        const exchange = transcript.exchangeOf(rowId);
-        setSelected(exchange.length === 0 ? null : exchange);
+        selectionRequest.current?.abort();
+        const request = new AbortController();
+        selectionRequest.current = request;
+        void loadExchange(transcript, rowId, loadEarlier, request.signal).then((rows) => {
+          if (!request.signal.aborted) setSelected(rows.length === 0 ? null : rows);
+        });
       },
       rowCommitted: onRowCommitted,
     }),
-    [transcript, onRowCommitted],
+    [transcript, onRowCommitted, loadEarlier],
   );
 
   return (

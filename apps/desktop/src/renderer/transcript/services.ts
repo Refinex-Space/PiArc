@@ -173,24 +173,28 @@ export function useTranscriptRows(ids: readonly string[]): readonly (TranscriptR
 
 /** Whether row `id` is expanded (`fallback` until the user chooses). */
 export function useExpanded(id: string, fallback: boolean): [boolean, (open: boolean) => void] {
-  const { expansion } = useTranscriptServices();
-  const subscribe = useCallback((l: () => void) => expansion.subscribe(id, l), [expansion, id]);
-  const read = useCallback(() => expansion.get(id, fallback), [expansion, id, fallback]);
+  const {
+    services: { expansion },
+    transcript,
+  } = useTranscriptView();
+  const key = transcript.cacheKey(id);
+  const subscribe = useCallback((l: () => void) => expansion.subscribe(key, l), [expansion, key]);
+  const read = useCallback(() => expansion.get(key, fallback), [expansion, key, fallback]);
   const expanded = useSyncExternalStore(subscribe, read);
   const set = useCallback(
     (open: boolean) => {
-      expansion.set(id, open);
+      expansion.set(key, open);
     },
-    [expansion, id],
+    [expansion, key],
   );
   return [expanded, set];
 }
 
 /** The parsed blocks of one item, re-rendering only when that item's blocks change. */
-export function useParsedDoc(id: string): ParsedDoc | undefined {
+export function useParsedDoc(docKey: string): ParsedDoc | undefined {
   const { markdown } = useTranscriptServices();
   return useSyncExternalStore(
-    (listener) => markdown.subscribe(id, listener),
-    () => markdown.get(id),
+    (listener) => markdown.subscribe(docKey, listener),
+    () => markdown.get(docKey),
   );
 }

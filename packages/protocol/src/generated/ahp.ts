@@ -1456,6 +1456,10 @@ export interface HistoryItem {
    * The item in its final state.
    */
   item: Item;
+  /**
+   * The enclosing turn, or its first user entry in session files without PiArc turn IDs.
+   */
+  turnId?: TurnId | null;
 }
 /**
  * How a shell command ran: what the client shows on its card, as Core reported it.

@@ -10,20 +10,16 @@
 import type { InputAttachment, InputMention } from '@piarc/protocol';
 
 import type { OutgoingInput, PiarcApi } from '../../shared/ipc.js';
-import type { PendingAttachment } from '../composer/attachments.js';
 import type { AppStore } from '../store/app-store.js';
-import { chipOf, type AttachmentChip } from '../store/transcript.js';
+import { chipOf, type AttachmentChip, type DraftFiles } from '../store/transcript.js';
 import { reason } from './errors.js';
 
 type Api = Pick<PiarcApi, 'prompt' | 'steer' | 'followUp' | 'storeAttachment' | 'resumeSession'>;
 
 /** An input on its way: what the user wrote and what is attached. */
-export interface Draft {
+export interface Draft extends DraftFiles {
   readonly text: string;
   readonly mentions: readonly InputMention[];
-  /** Files still to store, or attachments Core already stored. */
-  readonly pending: readonly PendingAttachment[];
-  readonly stored: readonly InputAttachment[];
 }
 
 function field(text: string, name: string): string | undefined {
@@ -82,10 +78,8 @@ function parseAttachment(text: string): InputAttachment {
   };
 }
 
-/** One session's input path. Keeps what each client id sent, for resends and retries. */
+/** One session's input path. Recovery data lives with the optimistic row until Core echoes it. */
 export class SessionInput {
-  private readonly drafts = new Map<string, Draft>();
-
   constructor(
     private readonly api: Api,
     private readonly store: AppStore,
@@ -104,23 +98,30 @@ export class SessionInput {
     } else {
       transcript.markSending(clientId);
     }
-    this.drafts.set(clientId, draft);
+    const stored = [...draft.stored];
     try {
-      const input = await this.outgoing(clientId, draft);
+      const input = await this.outgoing(clientId, draft, stored);
       const turnId = field(await this.api.prompt(this.sessionId, input), 'turnId');
-      if (turnId !== undefined) {
-        transcript.confirm(clientId, turnId);
+      if (turnId === undefined) {
+        throw new Error('Core did not confirm the prompt');
       }
+      transcript.confirm(clientId, turnId, stored);
     } catch (error) {
-      transcript.markUndelivered(clientId, reason(error));
+      transcript.markUndelivered(clientId, reason(error), {
+        stored,
+        pending: draft.pending.slice(stored.length - draft.stored.length),
+      });
     }
   }
 
   /** Sends an undelivered input again with the same idempotency key. */
   async resend(clientId: string): Promise<void> {
-    const draft = this.drafts.get(clientId);
-    if (draft !== undefined) {
-      await this.send(draft, clientId);
+    const row = this.store.transcript(this.sessionId).row(`optimistic:${clientId}`);
+    if (row?.kind === 'optimistic' && row.state === 'undelivered') {
+      await this.send(
+        { text: row.input.text, mentions: row.input.mentions, ...row.files },
+        clientId,
+      );
     }
   }
 
@@ -130,18 +131,12 @@ export class SessionInput {
     if (found === undefined) {
       return;
     }
-    const draft =
-      found.kind === 'stored'
-        ? {
-            text: found.input.text,
-            mentions: found.input.mentions,
-            pending: [],
-            stored: found.input.attachments,
-          }
-        : this.drafts.get(found.clientId);
-    if (draft !== undefined) {
-      await this.send(draft);
-    }
+    await this.send({
+      text: found.input.text,
+      mentions: found.input.mentions,
+      pending: [],
+      stored: found.input.attachments,
+    });
   }
 
   /** A steering message (`steer`) or a follow-up for the running turn. Throws when Core refuses. */
@@ -160,9 +155,12 @@ export class SessionInput {
   }
 
   /** The input for Core: stores the files first and remembers what was stored. */
-  private async outgoing(clientId: string, draft: Draft): Promise<OutgoingInput> {
+  private async outgoing(
+    clientId: string,
+    draft: Draft,
+    stored = [...draft.stored],
+  ): Promise<OutgoingInput> {
     await this.ensureOpen();
-    const stored = [...draft.stored];
     for (const file of draft.pending) {
       const bytes = new Uint8Array(await file.file.arrayBuffer());
       stored.push(
@@ -171,8 +169,6 @@ export class SessionInput {
         ),
       );
     }
-    // A resend stores nothing again.
-    this.drafts.set(clientId, { ...draft, pending: [], stored });
     return { requestId: clientId, text: draft.text, mentions: draft.mentions, attachments: stored };
   }
 }

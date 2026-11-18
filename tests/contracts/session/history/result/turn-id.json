@@ -1,0 +1,20 @@
+{
+  "jsonrpc": "2.0",
+  "id": 29,
+  "result": {
+    "start": 0,
+    "total": 1,
+    "items": [
+      {
+        "entryId": "e1",
+        "item": {
+          "type": "userMessage",
+          "itemId": "e1",
+          "status": "completed",
+          "text": "Rename a b/中文.txt"
+        },
+        "turnId": "turn-1"
+      }
+    ]
+  }
+}

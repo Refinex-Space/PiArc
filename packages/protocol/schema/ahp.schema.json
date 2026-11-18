@@ -2072,6 +2072,17 @@
         "item": {
           "$ref": "#/$defs/Item",
           "description": "The item in its final state."
+        },
+        "turnId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The enclosing turn, or its first user entry in session files without PiArc turn IDs."
         }
       },
       "required": ["entryId", "item"],

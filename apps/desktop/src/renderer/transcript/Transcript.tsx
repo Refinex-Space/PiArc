@@ -18,7 +18,7 @@ export function Transcript({
   /** Receives the scroll-follow state machine and scroll element (prototype page, tests). */
   onFollow?: (follow: ScrollFollow, scroller: HTMLElement | null) => void;
   /** The user scrolled near the top: load earlier history, when there is any. */
-  onReachTop?: () => void;
+  onReachTop?: () => Promise<void>;
   /** Earlier history is being loaded. */
   loadingEarlier?: boolean;
 }) {
@@ -60,7 +60,7 @@ export function Transcript({
         clientHeight: scroller.clientHeight,
       });
       if (scroller.scrollTop <= SCROLL_FOLLOW.loadEarlierPx && away > 0) {
-        onReachTop();
+        void onReachTop();
       }
     };
     scroller.addEventListener('scroll', check, { passive: true });
@@ -85,6 +85,7 @@ export function Transcript({
         onScroller={setScroller}
         onContent={setContent}
         onRowCommitted={onRowCommitted}
+        loadEarlier={onReachTop}
       />
       {view.showButton ? (
         <button

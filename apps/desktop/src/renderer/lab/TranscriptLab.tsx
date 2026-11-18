@@ -208,7 +208,7 @@ function createLabApi(
       await replayer.play(planTurn(session, { turnId, messages: texts, tokensPerSecond }));
       const itemIds = texts.map((_, index) => `${turnId}-msg-${String(index + 1)}`);
       await waitFor(
-        () => itemIds.every((id) => markdown.get(id)?.final === true),
+        () => itemIds.every((id) => markdown.get(store.current.cacheKey(id))?.final === true),
         10_000,
         'the streamed messages to finish',
       );
@@ -228,7 +228,11 @@ function createLabApi(
           },
         },
       ]);
-      await waitFor(() => markdown.get(itemId)?.final === true, 10_000, `${itemId} to parse`);
+      await waitFor(
+        () => markdown.get(store.current.cacheKey(itemId))?.final === true,
+        10_000,
+        `${itemId} to parse`,
+      );
       return itemId;
     },
     setRunning(running) {
@@ -255,7 +259,7 @@ function createLabApi(
     },
     async settled(itemId) {
       await waitFor(
-        () => markdown.get(itemId)?.final === true && codeSettled(itemId),
+        () => markdown.get(store.current.cacheKey(itemId))?.final === true && codeSettled(itemId),
         15_000,
         `${itemId} to settle`,
       );

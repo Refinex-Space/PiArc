@@ -238,6 +238,25 @@ describe('SessionTranscript rows', () => {
     expect(transcript.exchangeOf('m2')).toEqual(['u2', 'm2']);
   });
 
+  it('keeps steering messages in their running turn and separates the next prompt', () => {
+    const transcript = new SessionTranscript();
+    const first = [user('u1', 'Start'), read('r1'), user('steer', 'Also this'), text('m1', 'Done')];
+    const second = [user('u2', 'Next'), text('m2', 'Okay')];
+    transcript.apply([...liveTurn('t1', first), ...liveTurn('t2', second)]);
+    expect(transcript.exchangeOf('steer')).toEqual(['u1', 'group:r1', 'steer', 'm1']);
+    expect(transcript.exchangeOf('m2')).toEqual(['u2', 'm2']);
+    const history = new SessionTranscript();
+    history.load(
+      second.map((item) => ({ entryId: item.itemId, turnId: 't2', item })),
+      first.length,
+    );
+    history.prepend(
+      first.map((item) => ({ entryId: item.itemId, turnId: 't1', item })),
+      0,
+    );
+    expect(history.exchangeOf('group:r1')).toEqual(transcript.exchangeOf('steer'));
+  });
+
   it('records when items started and ended (thinking time, command timers)', () => {
     const transcript = new SessionTranscript();
     transcript.apply([

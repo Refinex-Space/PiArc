@@ -25,6 +25,8 @@ import type {
   TurnUsage,
 } from '@piarc/protocol';
 
+import type { PendingAttachment } from '../composer/attachments.js';
+
 /** An attachment as the user message shows it: a stored attachment or one being sent. */
 export interface AttachmentChip {
   readonly kind: 'image' | 'pdf';
@@ -48,11 +50,23 @@ export interface StoredInput {
   readonly attachments: readonly InputAttachment[];
 }
 
+/** Files to recover if the user resends an optimistic message after switching sessions. */
+export interface DraftFiles {
+  readonly pending: readonly PendingAttachment[];
+  readonly stored: readonly InputAttachment[];
+}
+
+export interface TranscriptEntry {
+  readonly entryId: string;
+  readonly turnId?: string;
+  readonly item: unknown;
+}
+
 export type TranscriptRow =
   | {
       readonly kind: 'item';
       readonly id: string;
-      readonly turnId: string;
+      readonly turnId: string | undefined;
       readonly item: Item;
       /** Core's time of the first event of the item (ms since the epoch); absent in history. */
       readonly startedAt?: number;
@@ -65,6 +79,7 @@ export type TranscriptRow =
       readonly id: string;
       readonly clientId: string;
       readonly input: ShownInput;
+      readonly files: DraftFiles;
       /** The turn Core started for it, once the prompt was accepted. */
       readonly turnId: string | undefined;
       readonly state: 'sending' | 'undelivered';
@@ -226,6 +241,14 @@ function sameList(a: readonly string[], b: readonly string[]): boolean {
 }
 
 export class SessionTranscript {
+  // Pi entry ids are local to one history. The store keeps this instance across view switches.
+  private readonly cachePrefix = crypto.randomUUID();
+
+  /** Key for this row in the window's shared presentation caches and Markdown worker. */
+  cacheKey(id: string): string {
+    return this.cachePrefix + '/' + id;
+  }
+
   /** Source rows in conversation order (items, optimistic, error, uncertain). */
   private order: string[] = [];
   /** The rows shown, in order: groups in place of their members, the working row last. */
@@ -289,10 +312,7 @@ export class SessionTranscript {
    * Replaces the rows with a window of the persisted conversation (a session opened again, or
    * reloaded after lost notifications). Optimistic rows still waiting stay at the end.
    */
-  load(
-    items: readonly { readonly entryId: string; readonly item: unknown }[],
-    start?: number,
-  ): void {
+  load(items: readonly TranscriptEntry[], start?: number): void {
     this.loadedFrom = start;
     const batch = new Batch();
     const pending = this.order.filter((id) => this.rows.get(id)?.kind === 'optimistic');
@@ -303,9 +323,9 @@ export class SessionTranscript {
       }
     }
     this.order = [];
-    for (const { entryId, item } of items) {
+    for (const { turnId, item } of items) {
       if (isItem(item) && !this.rows.has(item.itemId)) {
-        this.rows.set(item.itemId, { kind: 'item', id: item.itemId, turnId: entryId, item });
+        this.rows.set(item.itemId, { kind: 'item', id: item.itemId, turnId, item });
         this.order.push(item.itemId);
       }
     }
@@ -320,16 +340,13 @@ export class SessionTranscript {
    * Puts an earlier window of the persisted conversation before the rows loaded so far (the
    * user scrolled to the top).
    */
-  prepend(
-    items: readonly { readonly entryId: string; readonly item: unknown }[],
-    start: number,
-  ): void {
+  prepend(items: readonly TranscriptEntry[], start: number): void {
     this.loadedFrom = start;
     const batch = new Batch();
     const earlier: string[] = [];
-    for (const { entryId, item } of items) {
+    for (const { turnId, item } of items) {
       if (isItem(item) && !this.rows.has(item.itemId)) {
-        this.rows.set(item.itemId, { kind: 'item', id: item.itemId, turnId: entryId, item });
+        this.rows.set(item.itemId, { kind: 'item', id: item.itemId, turnId, item });
         earlier.push(item.itemId);
       }
     }
@@ -349,6 +366,7 @@ export class SessionTranscript {
       id,
       clientId,
       input,
+      files: { pending: [], stored: [] },
       turnId: undefined,
       state: 'sending',
       failure: undefined,
@@ -361,7 +379,7 @@ export class SessionTranscript {
   }
 
   /** Core accepted the input as turn `turnId`. */
-  confirm(clientId: string, turnId: string): void {
+  confirm(clientId: string, turnId: string, stored: readonly InputAttachment[] = []): void {
     const id = optimisticId(clientId);
     const row = this.rows.get(id);
     if (row?.kind !== 'optimistic') {
@@ -379,15 +397,21 @@ export class SessionTranscript {
       this.remove(id);
       return;
     }
-    this.update(id, { ...row, turnId, state: 'sending', failure: undefined });
+    this.update(id, {
+      ...row,
+      turnId,
+      state: 'sending',
+      failure: undefined,
+      files: { pending: [], stored },
+    });
   }
 
   /** Core did not take the input: it stays, marked as not delivered, for a resend. */
-  markUndelivered(clientId: string, failure: string): void {
+  markUndelivered(clientId: string, failure: string, files?: DraftFiles): void {
     const id = optimisticId(clientId);
     const row = this.rows.get(id);
     if (row?.kind === 'optimistic' && row.turnId === undefined) {
-      this.update(id, { ...row, state: 'undelivered', failure });
+      this.update(id, { ...row, state: 'undelivered', failure, files: files ?? row.files });
     }
   }
 
@@ -407,12 +431,9 @@ export class SessionTranscript {
 
   /**
    * What a retry of turn `turnId` sends again: its first user message as Core stored it, or the
-   * optimistic row Core accepted for it when no user message arrived (its client keeps what was
-   * sent under the `clientId`).
+   * optimistic row Core accepted for it when no user message arrived.
    */
-  retryInput(
-    turnId: string,
-  ): { kind: 'stored'; input: StoredInput } | { kind: 'client'; clientId: string } | undefined {
+  retryInput(turnId: string): { kind: 'stored' | 'client'; input: StoredInput } | undefined {
     for (const id of this.order) {
       const row = this.rows.get(id);
       if (row?.kind === 'item' && row.turnId === turnId && row.item.type === 'userMessage') {
@@ -429,7 +450,14 @@ export class SessionTranscript {
     for (const id of this.order) {
       const row = this.rows.get(id);
       if (row?.kind === 'optimistic' && row.turnId === turnId) {
-        return { kind: 'client', clientId: row.clientId };
+        return {
+          kind: 'client',
+          input: {
+            text: row.input.text,
+            mentions: row.input.mentions,
+            attachments: row.files.stored,
+          },
+        };
       }
     }
     return undefined;
@@ -440,25 +468,28 @@ export class SessionTranscript {
     return this.loadedFrom;
   }
 
-  /**
-   * The rows of the exchange `rowId` belongs to: from the user message that starts it to the
-   * row before the next user message (what "select this turn" selects).
-   */
+  /** Select the whole turn, including steers, grouped tools and the working row. Older
+   * windows without turn IDs start a new exchange at each user message. */
   exchangeOf(rowId: string): readonly string[] {
-    const ids = this.display.filter((id) => id !== WORKING_ROW);
-    const at = ids.indexOf(rowId);
-    if (at === -1) {
-      return [];
+    const at = this.display.indexOf(rowId);
+    if (at === -1) return [];
+    let current: string | undefined;
+    let start = 0;
+    for (const [index, id] of this.display.entries()) {
+      let row = this.rows.get(id);
+      if (row?.kind === 'group') row = this.rows.get(row.members[0] ?? '');
+      if (row === undefined || row.kind === 'group') continue;
+      const turn = row.kind === 'working' ? this.turn.turnId : row.turnId;
+      const starts =
+        row.kind === 'optimistic' || (row.kind === 'item' && row.item.type === 'userMessage');
+      const next: string | undefined = turn ?? (starts ? id : current);
+      if (next !== current) {
+        if (index > at) return this.display.slice(start, index);
+        current = next;
+        start = index;
+      }
     }
-    let start = at;
-    while (start > 0 && !this.startsExchange(ids[start])) {
-      start -= 1;
-    }
-    let end = at + 1;
-    while (end < ids.length && !this.startsExchange(ids[end])) {
-      end += 1;
-    }
-    return ids.slice(start, end);
+    return this.display.slice(start);
   }
 
   subscribeList(listener: () => void): () => void {
@@ -492,11 +523,6 @@ export class SessionTranscript {
         this.rowListeners.delete(id);
       }
     };
-  }
-
-  private startsExchange(id: string | undefined): boolean {
-    const row = id === undefined ? undefined : this.rows.get(id);
-    return row?.kind === 'optimistic' || (row?.kind === 'item' && row.item.type === 'userMessage');
   }
 
   private applyOne(method: string, params: Record<string, unknown>, batch: Batch): void {
@@ -689,8 +715,9 @@ export class SessionTranscript {
       if (row.turnId === turnId) {
         return id;
       }
-      // The event can overtake the prompt's reply: the first unconfirmed row with the same text.
-      if (row.turnId === undefined && row.input.text === text) {
+      // The event can overtake the prompt's reply. A previous failed send with identical
+      // text is still the user's to resend.
+      if (row.state === 'sending' && row.turnId === undefined && row.input.text === text) {
         unconfirmed ??= id;
       }
     }
@@ -720,6 +747,7 @@ export class SessionTranscript {
     const next: string[] = [];
     const groups = new Set<string>();
     let members: string[] = [];
+    let groupTurn: string | undefined;
     const flush = (): void => {
       const first = members[0];
       if (first === undefined) {
@@ -738,6 +766,8 @@ export class SessionTranscript {
     for (const id of this.order) {
       const row = this.rows.get(id);
       if (row?.kind === 'item' && isGrouped(row.item)) {
+        if (groupTurn !== row.turnId) flush();
+        groupTurn = row.turnId;
         members.push(id);
       } else {
         flush();

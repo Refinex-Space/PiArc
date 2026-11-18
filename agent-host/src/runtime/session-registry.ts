@@ -651,9 +651,8 @@ export class SessionRegistry {
   }
 
   /**
-   * A user message starts: when it is an input PiArc gave Pi with mentions or attachments, the
-   * record of what the user wrote goes into the session file just before the message (Pi
-   * persists the message at its end) and into the live projection.
+   * Pi persists the user message at message_end. Record its turn before it, including what
+   * the user wrote when the composed message has additional attachment or mention data.
    */
   #recordInput(hosted: HostedSession, text: string): void {
     const index = hosted.delivering.findIndex((prepared) => composedText(prepared) === text);
@@ -661,12 +660,13 @@ export class SessionRegistry {
       return;
     }
     const [prepared] = hosted.delivering.splice(index, 1);
-    const record = prepared === undefined ? undefined : inputRecord(prepared);
-    if (record === undefined) {
-      return;
-    }
-    hosted.runtime.session.sessionManager.appendCustomEntry(INPUT_ENTRY, record);
-    hosted.projector.useInput(record);
+    if (prepared === undefined) return;
+    const record = inputRecord(prepared);
+    hosted.runtime.session.sessionManager.appendCustomEntry(INPUT_ENTRY, {
+      turnId: hosted.projector.activeTurnId,
+      ...record,
+    });
+    if (record !== undefined) hosted.projector.useInput(record);
   }
 
   async #run(sessionId: string, hosted: HostedSession, turnId: string, job: Job): Promise<void> {
@@ -678,6 +678,10 @@ export class SessionRegistry {
       try {
         const { session } = hosted.runtime;
         if (next.job.kind === 'compact') {
+          session.sessionManager.appendCustomEntry(INPUT_ENTRY, {
+            turnId: next.turnId,
+            action: 'compact',
+          });
           await session.compact();
         } else {
           const { prepared } = next.job;

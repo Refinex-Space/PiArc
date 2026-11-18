@@ -13,6 +13,7 @@ export interface FrameScheduler {
 }
 
 interface Revealing {
+  readonly rowId: string;
   readonly transcript: SessionTranscript;
   visible: number;
 }
@@ -35,15 +36,16 @@ export class StreamingDriver {
     return transcript.subscribeChanges((ids) => {
       for (const id of ids) {
         const row = transcript.row(id);
+        const docKey = transcript.cacheKey(id);
         if (
           row?.kind === 'item' &&
           row.item.type === 'agentMessage' &&
           row.item.status === 'inProgress' &&
-          !this.revealing.has(id) &&
-          !this.streamed.has(id)
+          !this.revealing.has(docKey) &&
+          !this.streamed.has(docKey)
         ) {
-          this.revealing.set(id, { transcript, visible: 0 });
-          this.streamed.add(id);
+          this.revealing.set(docKey, { transcript, rowId: id, visible: 0 });
+          this.streamed.add(docKey);
         }
       }
       if (this.revealing.size > 0) {
@@ -53,8 +55,8 @@ export class StreamingDriver {
   }
 
   /** True when the message's Markdown comes from streaming, not from a one-shot parse. */
-  streams(id: string): boolean {
-    return this.streamed.has(id);
+  streams(docKey: string): boolean {
+    return this.streamed.has(docKey);
   }
 
   /** Stops the loop and forgets every message (the transcript was cleared). */
@@ -76,20 +78,20 @@ export class StreamingDriver {
     this.frame = null;
     const dt = this.lastFrameAt === null ? 1000 / 60 : now - this.lastFrameAt;
     let backlog = false;
-    for (const [id, revealing] of this.revealing) {
-      const row = revealing.transcript.row(id);
+    for (const [docKey, revealing] of this.revealing) {
+      const row = revealing.transcript.row(revealing.rowId);
       if (row?.kind !== 'item' || row.item.type !== 'agentMessage') {
-        this.revealing.delete(id);
+        this.revealing.delete(docKey);
         continue;
       }
       const { text, status } = row.item;
       const next = revealLength(text, revealing.visible, dt);
       const done = status !== 'inProgress' && next === text.length;
       if (next !== revealing.visible || done) {
-        this.markdown.stream(id, text.slice(0, next), done);
+        this.markdown.stream(docKey, text.slice(0, next), done);
       }
       if (done) {
-        this.revealing.delete(id);
+        this.revealing.delete(docKey);
       } else {
         revealing.visible = next;
         backlog ||= next < text.length;

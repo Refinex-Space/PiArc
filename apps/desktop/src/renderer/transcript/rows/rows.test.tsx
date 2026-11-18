@@ -9,6 +9,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_PREFERENCES } from '../../../shared/preferences.js';
 import { AppProvider } from '../../app/app-context.js';
+import { AppStore } from '../../store/app-store.js';
 import { SessionTranscript, WORKING_ROW } from '../../store/transcript.js';
 import { HighlightClient } from '../highlight/highlight-client.js';
 import { IncrementalMarkdown, parseMarkdown } from '../markdown/incremental.js';
@@ -95,7 +96,11 @@ afterEach(() => {
 
 const actions: TranscriptActions = { retry: vi.fn(), resend: vi.fn() };
 
-async function render(transcript: SessionTranscript, ids: readonly string[]): Promise<HTMLElement> {
+async function render(
+  transcript: SessionTranscript,
+  ids: readonly string[],
+  shared = services(),
+): Promise<HTMLElement> {
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
@@ -108,7 +113,7 @@ async function render(transcript: SessionTranscript, ids: readonly string[]): Pr
         focused: true,
       }}
     >
-      <TranscriptContext.Provider value={{ services: services(), transcript, actions }}>
+      <TranscriptContext.Provider value={{ services: shared, transcript, actions }}>
         {ids.map((id) => (
           <RowView key={id} id={id} />
         ))}
@@ -164,6 +169,28 @@ const byTestId = (root: HTMLElement, id: string): HTMLElement => {
 };
 
 describe('P0 row types', () => {
+  it('switches between histories with identical entry ids without showing the other reply', async () => {
+    const store = new AppStore();
+    const shared = services();
+    const entryId = 'deadbeef';
+    const itemId = entryId + '#0';
+    const show = async (session: string, text: string) => {
+      const transcript = store.transcript(session);
+      transcript.load([
+        { entryId, item: { type: 'agentMessage', itemId, status: 'completed', text } },
+      ]);
+      const root = await render(transcript, [itemId], shared);
+      const message = byTestId(root, 'agent-message');
+      expect(message.dataset.parsed).toBe('final');
+      expect(message.querySelector('p')?.textContent).toBe(text);
+      unmount?.();
+      unmount = undefined;
+    };
+    await show('one', 'Only in the first transcript');
+    await show('two', 'Only in the other transcript');
+    await show('one', 'Only in the first transcript');
+  });
+
   it('user message: text with mention chips and attachment chips', async () => {
     const item: Item = {
       type: 'userMessage',
@@ -469,7 +496,7 @@ describe('P0 row types', () => {
         }),
       ]);
       const root = await render(transcript, [WORKING_ROW]);
-      expect(byTestId(root, 'working-activity').textContent).toBe('Searched “TODO”');
+      expect(byTestId(root, 'working-activity').textContent).toBe('Grep · TODO');
       expect(byTestId(root, 'working-elapsed').textContent).toBe('7 s');
       expect(byTestId(root, 'working-tokens').textContent).toBe('1,234 tokens');
       expect(byTestId(root, 'working-retry').textContent).toBe('Retrying 1/3');

@@ -47,6 +47,28 @@ describe('projectHistory with input records', () => {
     ]);
   });
 
+  it('recovers steering boundaries from PiArc input records and starts fresh for older inputs', () => {
+    const marker = (id: string, turnId: string): SessionEntry => ({
+      ...base(id),
+      type: 'custom',
+      customType: INPUT_ENTRY,
+      data: { turnId },
+    });
+    const history = projectHistory(
+      [
+        marker('c1', 't1'),
+        user('u1', 'Start'),
+        marker('c2', 't1'),
+        user('u2', 'Also this'),
+        marker('c3', 't2'),
+        user('u3', 'Next prompt'),
+        user('legacy', 'Older unmarked input'),
+      ],
+      (tool) => tool,
+    );
+    expect(history.map((entry) => entry.turnId)).toEqual(['t1', 't1', 't2', 'legacy']);
+  });
+
   it('ignores a record that does not match the next user message', () => {
     const items = projectHistory(
       [
