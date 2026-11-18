@@ -1,0 +1,149 @@
+// Core's entity snapshots (architecture section 7.6): the workspace list on `core/workspaces`
+// and the session list on `core/sessions`, each with a `revision`. They arrive over the event
+// channel as JSON, so every field is checked before the store uses it.
+
+/** Where a workspace's Agent Host stands (`piarc_core::sessions::HostState`). */
+export type HostState =
+  'closed' | 'starting' | 'ready' | 'reclaimed' | 'restarting' | 'unavailable';
+
+export interface WorkspaceEntry {
+  readonly path: string;
+  readonly displayName: string;
+  readonly mainCheckout: string;
+  readonly open: boolean;
+  readonly host: HostState;
+  readonly lastOpenedAt: number;
+}
+
+export type SessionStatus = 'idle' | 'running' | 'error';
+
+export interface SessionEntry {
+  readonly id: string;
+  readonly workspace: string | undefined;
+  readonly cwd: string | undefined;
+  readonly title: string | undefined;
+  readonly status: SessionStatus;
+  readonly unread: boolean;
+  readonly pinned: boolean;
+  readonly archived: boolean;
+  readonly open: boolean;
+  readonly model: string | undefined;
+  readonly messageCount: number;
+  readonly createdAt: number | undefined;
+  readonly updatedAt: number | undefined;
+  readonly error: string | undefined;
+  /** Approval requests waiting for the user (Core reports them from T20 on). */
+  readonly pendingApprovals: number;
+}
+
+export interface Snapshot<T> {
+  readonly revision: number;
+  readonly entries: readonly T[];
+}
+
+const HOST_STATES: readonly HostState[] = [
+  'closed',
+  'starting',
+  'ready',
+  'reclaimed',
+  'restarting',
+  'unavailable',
+];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function revisionOf(value: Record<string, unknown>): number | undefined {
+  const { revision } = value;
+  return typeof revision === 'number' && Number.isSafeInteger(revision) && revision >= 0
+    ? revision
+    : undefined;
+}
+
+function workspaceEntry(value: unknown): WorkspaceEntry | undefined {
+  if (!isRecord(value) || typeof value.path !== 'string') {
+    return undefined;
+  }
+  const host = HOST_STATES.find((state) => state === value.host) ?? 'closed';
+  return {
+    path: value.path,
+    displayName: optionalString(value.displayName) ?? value.path,
+    mainCheckout: optionalString(value.mainCheckout) ?? value.path,
+    open: value.open === true,
+    host,
+    lastOpenedAt: optionalNumber(value.lastOpenedAt) ?? 0,
+  };
+}
+
+function sessionEntry(value: unknown): SessionEntry | undefined {
+  if (!isRecord(value) || typeof value.id !== 'string') {
+    return undefined;
+  }
+  const status: SessionStatus =
+    value.status === 'running' || value.status === 'error' ? value.status : 'idle';
+  return {
+    id: value.id,
+    workspace: optionalString(value.workspace),
+    cwd: optionalString(value.cwd),
+    title: optionalString(value.title),
+    status,
+    unread: value.unread === true,
+    pinned: value.pinned === true,
+    archived: value.archived === true,
+    open: value.open === true,
+    model: optionalString(value.model),
+    messageCount: optionalNumber(value.messageCount) ?? 0,
+    createdAt: optionalNumber(value.createdAt),
+    updatedAt: optionalNumber(value.updatedAt),
+    error: optionalString(value.error),
+    pendingApprovals: optionalNumber(value.pendingApprovals) ?? 0,
+  };
+}
+
+function parse<T>(
+  value: unknown,
+  key: string,
+  entry: (value: unknown) => T | undefined,
+): Snapshot<T> | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const revision = revisionOf(value);
+  const list = value[key];
+  if (revision === undefined || !Array.isArray(list)) {
+    return undefined;
+  }
+  const entries: T[] = [];
+  for (const item of list) {
+    const parsed = entry(item);
+    if (parsed !== undefined) {
+      entries.push(parsed);
+    }
+  }
+  return { revision, entries };
+}
+
+/** A `core/workspaces` event, or `undefined` when it is malformed. */
+export function parseWorkspaces(value: unknown): Snapshot<WorkspaceEntry> | undefined {
+  return parse(value, 'workspaces', workspaceEntry);
+}
+
+/** A `core/sessions` event, or `undefined` when it is malformed. */
+export function parseSessions(value: unknown): Snapshot<SessionEntry> | undefined {
+  return parse(value, 'sessions', sessionEntry);
+}
+
+/** Whether two entries show the same thing (the store keeps the old object when they do). */
+export function sameEntry<T extends object>(a: T, b: T): boolean {
+  const keys = Object.keys(a) as (keyof T)[];
+  return keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key]);
+}

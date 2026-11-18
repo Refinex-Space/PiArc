@@ -303,7 +303,7 @@ D3 只定了图标，主色与字标未定：用中性临时令牌，视觉关�
 - [x] 3 设计令牌管线：`design/tokens/*.json` → CSS 与 TS，漂移检查、对比度检查、品牌检查并入 verify（A01、A02）
 - [x] 4 i18n（ICU MessageFormat，中英两套，主进程与渲染进程共用）
 - [ ] 5 主进程：窗口外观（隐藏标题栏 + vibrancy / Mica + 覆盖层）、原生菜单（i18n + 快捷键）、设置窗口、打开文件夹、删除确认、通知与 Dock 角标、会话 IPC 白名单（A04、A11）
-- [ ] 6 渲染进程 store（`useSyncExternalStore`，revision 门控、clientId 对账、item 粒度订阅）（A09）
+- [x] 6 渲染进程 store（`useSyncExternalStore`，revision 门控、clientId 对账、item 粒度订阅）（A09）
 - [ ] 7 窗口骨架（三栏 + 注册式右栏与面板区、尺寸记忆）、侧栏会话列表与徽标（A05、A06）
 - [ ] 8 新建会话流程（乐观消息、失败回滚）与信任对话框（A07、A08）
 - [ ] 9 设置窗口三页、快捷键注册表与自定义（A10）、语言切换（A12）
