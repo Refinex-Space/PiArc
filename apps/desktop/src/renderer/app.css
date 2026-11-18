@@ -953,3 +953,58 @@ textarea.input {
   background: transparent;
   padding: 0;
 }
+
+.provider-form {
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+.provider-list,
+.model-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.provider-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  padding-block: var(--piarc-space-2);
+  border-bottom: 1px solid var(--piarc-border-default);
+}
+.provider-list li > div {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.model-list {
+  max-height: 45vh;
+  overflow: auto;
+  margin-block: var(--piarc-space-3);
+}
+.model-option {
+  display: grid;
+  width: 100%;
+  text-align: start;
+  gap: var(--piarc-space-1);
+  padding: var(--piarc-space-2);
+  overflow-wrap: anywhere;
+}
+.model-option:hover {
+  background: var(--piarc-accent-subtle);
+}
+.model-preview {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--piarc-space-2) var(--piarc-space-4);
+  margin-block: var(--piarc-space-3);
+}
+.model-preview dd {
+  margin: 0;
+}
+.environment-bar {
+  display: flex;
+  gap: var(--piarc-space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}

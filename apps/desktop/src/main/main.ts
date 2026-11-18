@@ -149,7 +149,15 @@ function start(dirs: DataDirs): void {
     const registerHandler = createIpcRegistrar(trustedOrigins);
     registerIpcHandlers(registerHandler);
     appShell.registerHandlers(registerHandler);
-    registerSessionHandlers(registerHandler, core.runtime, () => appShell.t(), faults);
+    registerSessionHandlers(
+      registerHandler,
+      core.runtime,
+      () => appShell.t(),
+      faults,
+      () => {
+        appShell.providersChanged();
+      },
+    );
     const terminalOwners = new TerminalOwners(core.runtime);
     registerEventHandlers(registerHandler, eventRouter, (windowId, route) =>
       terminalOwners.mayObserve(windowId, route),

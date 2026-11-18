@@ -40,6 +40,15 @@ export type SessionCore = Pick<
   | 'storeAttachment'
   | 'searchFiles'
   | 'cancelFileSearch'
+  | 'providerSettings'
+  | 'saveProvider'
+  | 'deleteProvider'
+  | 'setCatalogRefresh'
+  | 'workspaceModels'
+  | 'sessionModels'
+  | 'previewModelSwitch'
+  | 'setSessionModel'
+  | 'setSessionEffort'
   | 'composerInfo'
   | 'markSessionRead'
   | 'renameSession'
@@ -208,6 +217,7 @@ export function registerSessionHandlers(
   core: SessionCore,
   translator: () => Translator,
   faults: FaultInjector,
+  providersChanged: () => void,
 ): void {
   registerHandler(IPC_CHANNELS.folderDialog, async (event) => {
     const t = translator();
@@ -226,10 +236,16 @@ export function registerSessionHandlers(
   registerHandler(IPC_CHANNELS.workspaceOpen, (_event, [dir]) =>
     core.openWorkspace(absolutePath(dir)),
   );
-  registerHandler(IPC_CHANNELS.sessionCreate, (_event, [workspace]) => {
+  registerHandler(IPC_CHANNELS.sessionCreate, (_event, [workspace, selected]) => {
     const dir = absolutePath(workspace);
     faults.check(IPC_CHANNELS.sessionCreate);
-    return core.createSession(dir, null);
+    if (selected == null) return core.createSession(dir, null);
+    if (typeof selected !== 'object' || !('provider' in selected) || !('id' in selected)) {
+      throw new TypeError('invalid model');
+    }
+    return core.createSession(dir, {
+      model: { provider: token(selected.provider, 'provider'), id: text(selected.id, 'model') },
+    });
   });
   registerHandler(IPC_CHANNELS.sessionResume, (_event, [id]) => core.resumeSession(sessionId(id)));
   registerHandler(IPC_CHANNELS.sessionClose, (_event, [id]) => core.closeSession(sessionId(id)));
@@ -317,6 +333,57 @@ export function registerSessionHandlers(
   registerHandler(IPC_CHANNELS.filesCancel, (_event, [searchId]) => {
     core.cancelFileSearch(token(searchId, 'searchId'));
   });
+  registerHandler(IPC_CHANNELS.providerSettings, () => core.providerSettings());
+  const notifyProviders = (settings: string) => {
+    providersChanged();
+    return settings;
+  };
+  registerHandler(IPC_CHANNELS.saveProvider, async (_event, [config, secret]) =>
+    notifyProviders(
+      await core.saveProvider(
+        text(config, 'provider settings'),
+        secret == null ? undefined : text(secret, 'credential'),
+      ),
+    ),
+  );
+  registerHandler(IPC_CHANNELS.deleteProvider, async (event, [value]) => {
+    const id = token(value, 'provider');
+    const t = translator();
+    const window = BrowserWindow.fromWebContents(event.sender);
+    const options: Electron.MessageBoxOptions = {
+      type: 'warning',
+      message: t.t('providers.confirmDelete', { id }),
+      buttons: [t.t('dialog.delete.confirm'), t.t('dialog.cancel')],
+      defaultId: 1,
+      cancelId: 1,
+    };
+    const dialogResult =
+      window === null
+        ? await dialog.showMessageBox(options)
+        : await dialog.showMessageBox(window, options);
+    return dialogResult.response === 0 ? notifyProviders(await core.deleteProvider(id)) : null;
+  });
+  registerHandler(IPC_CHANNELS.setCatalogRefresh, async (_event, [enabled]) =>
+    notifyProviders(await core.setCatalogRefresh(flag(enabled, 'enabled'))),
+  );
+  registerHandler(IPC_CHANNELS.workspaceModels, (_event, [workspace]) =>
+    core.workspaceModels(absolutePath(workspace)),
+  );
+  registerHandler(IPC_CHANNELS.sessionModels, (_event, [id]) => core.sessionModels(sessionId(id)));
+  registerHandler(IPC_CHANNELS.previewModelSwitch, (_event, [id, provider, model]) =>
+    core.previewModelSwitch(sessionId(id), token(provider, 'provider'), text(model, 'model')),
+  );
+  registerHandler(IPC_CHANNELS.setSessionModel, (_event, [id, provider, model, effort]) =>
+    core.setSessionModel(
+      sessionId(id),
+      token(provider, 'provider'),
+      text(model, 'model'),
+      effort == null ? undefined : token(effort, 'effort'),
+    ),
+  );
+  registerHandler(IPC_CHANNELS.setSessionEffort, (_event, [id, effort]) =>
+    core.setSessionEffort(sessionId(id), token(effort, 'effort')),
+  );
   registerHandler(IPC_CHANNELS.composerInfo, () => core.composerInfo());
   registerHandler(IPC_CHANNELS.sessionMarkRead, async (_event, [id]) => {
     await core.markSessionRead(sessionId(id));

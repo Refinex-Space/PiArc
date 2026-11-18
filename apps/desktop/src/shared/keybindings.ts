@@ -33,6 +33,8 @@ export const COMMANDS = [
     label: 'approval.modeMenu',
     scope: 'app',
   },
+  { id: 'session.model', defaultKey: 'Mod+Shift+I', label: 'models.label', scope: 'app' },
+  { id: 'session.effort', defaultKey: 'Mod+Shift+E', label: 'models.effort', scope: 'app' },
   { id: 'session.next', defaultKey: 'Ctrl+Tab', label: 'command.session.next', scope: 'app' },
   {
     id: 'help.shortcuts',

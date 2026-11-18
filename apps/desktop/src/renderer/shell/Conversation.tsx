@@ -22,6 +22,8 @@ import { HISTORY } from '../transcript/constants.js';
 import { TranscriptContext, type TranscriptView } from '../transcript/services.js';
 import { Transcript } from '../transcript/Transcript.js';
 import { reason } from './errors.js';
+import { keyOf, useModelCatalog } from './model-catalog.js';
+import { ModelMenus } from './ModelMenus.js';
 import { PermissionModeMenu } from './PermissionModeMenu.js';
 import { QueueList } from './QueueList.js';
 import { SessionInput, type Draft } from './session-input.js';
@@ -156,14 +158,24 @@ function useHistory(
 export function Conversation({
   id,
   modeButton,
+  modelButton,
+  effortButton,
 }: {
   readonly id: string;
+  readonly modelButton: React.Ref<HTMLButtonElement>;
+  readonly effortButton: React.Ref<HTMLButtonElement>;
   readonly modeButton: React.Ref<HTMLButtonElement>;
 }) {
   const t = useT();
   const ui = useUi();
   const store = useStore();
   const session = useSession(id);
+  const {
+    catalog,
+    refresh,
+    failure: catalogFailure,
+  } = useModelCatalog(session?.open ? id : undefined, true);
+  const model = catalog?.models.find((m) => catalog.model && keyOf(m) === keyOf(catalog.model));
   const transcript = store.transcript(id);
   const turn = useTurnInfo(id);
   const queue = useQueue(id);
@@ -293,7 +305,10 @@ export function Conversation({
           mentions={mentions}
           commands={ui.composer?.commands ?? []}
           limits={ui.composer?.limits}
-          error={error}
+          supportsImages={model?.vision}
+          error={
+            error ?? (catalogFailure ? t('models.failed', { reason: catalogFailure }) : undefined)
+          }
           above={
             queue.length === 0 ? null : (
               <QueueList
@@ -312,15 +327,28 @@ export function Conversation({
             )
           }
         />
-        <PermissionModeMenu
-          key={id}
-          id={id}
-          mode={session?.open === true ? session.permissionMode : undefined}
-          buttonRef={modeButton}
-          onError={(failure) => {
-            setError(t('composer.failed', { reason: reason(failure) }));
-          }}
-        />
+        <div className="environment-bar">
+          <ModelMenus
+            id={id}
+            catalog={catalog}
+            running={turn.running}
+            modelButton={modelButton}
+            effortButton={effortButton}
+            onChange={refresh}
+            onError={(e) => {
+              setError(t('models.failed', { reason: reason(e) }));
+            }}
+          />
+          <PermissionModeMenu
+            key={id}
+            id={id}
+            mode={session?.open === true ? session.permissionMode : undefined}
+            buttonRef={modeButton}
+            onError={(failure) => {
+              setError(t('composer.failed', { reason: reason(failure) }));
+            }}
+          />
+        </div>
       </div>
     </section>
   );

@@ -196,6 +196,8 @@ export function Shell() {
     ],
   );
 
+  const modelButton = useRef<HTMLButtonElement>(null);
+  const effortButton = useRef<HTMLButtonElement>(null);
   const modeButton = useRef<HTMLButtonElement>(null);
   const run = (command: AppCommand) => {
     switch (command) {
@@ -218,6 +220,12 @@ export function Shell() {
         }
         break;
       }
+      case 'session.model':
+        if (!trust && !shortcutsOpen) modelButton.current?.click();
+        break;
+      case 'session.effort':
+        if (!trust && !shortcutsOpen) effortButton.current?.click();
+        break;
       case 'session.permissionMode':
         if (!trust && !shortcutsOpen) modeButton.current?.click();
         break;
@@ -340,7 +348,12 @@ export function Shell() {
                   {view.kind === 'home' ? (
                     <Home workspace={view.workspace} draft={view.draft} failure={view.error} />
                   ) : (
-                    <Conversation id={view.id} modeButton={modeButton} />
+                    <Conversation
+                      id={view.id}
+                      modeButton={modeButton}
+                      modelButton={modelButton}
+                      effortButton={effortButton}
+                    />
                   )}
                 </PageBoundary>
               </main>

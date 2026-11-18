@@ -3,6 +3,7 @@
 // any step rolls the optimistic message back and gives the text back to the input; a session
 // that was created but did not take its first prompt is closed again (Pi keeps no file for a
 // session without a reply, so it leaves no trace).
+import type { ModelRef } from '@piarc/protocol';
 import type { PiarcApi } from '../../shared/ipc.js';
 import type { AppStore } from '../store/app-store.js';
 
@@ -32,6 +33,7 @@ export async function startSession(options: {
   readonly api: Pick<PiarcApi, 'createSession' | 'prompt' | 'closeSession'>;
   readonly store: AppStore;
   readonly workspace: string;
+  readonly model?: ModelRef;
   readonly text: string;
   readonly clientId: string;
   readonly watch: (sessionId: string) => () => void;
@@ -39,7 +41,7 @@ export async function startSession(options: {
 }): Promise<string> {
   const { api, store, workspace, text, clientId } = options;
   options.onStep({ kind: 'echo', clientId, text });
-  const sessionId = field(await api.createSession(workspace), 'sessionId');
+  const sessionId = field(await api.createSession(workspace, options.model), 'sessionId');
   if (sessionId === undefined) {
     throw new Error('Core did not return a session id');
   }

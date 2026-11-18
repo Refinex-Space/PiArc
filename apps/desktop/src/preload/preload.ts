@@ -245,9 +245,9 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.workspaceOpen, path)
       .then((value: unknown) => expectString(value)),
-  createSession: (workspace) =>
+  createSession: (workspace, model) =>
     ipcRenderer
-      .invoke(IPC_CHANNELS.sessionCreate, workspace)
+      .invoke(IPC_CHANNELS.sessionCreate, workspace, model)
       .then((value: unknown) => expectString(value)),
   resumeSession: (id) =>
     ipcRenderer
@@ -299,6 +299,38 @@ const api: PiarcApi = {
   cancelFileSearch: async (searchId) => {
     await ipcRenderer.invoke(IPC_CHANNELS.filesCancel, searchId);
   },
+  providerSettings: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.providerSettings).then((v: unknown) => expectString(v)),
+  saveProvider: (config, secret) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.saveProvider, config, secret)
+      .then((v: unknown) => expectString(v)),
+  deleteProvider: (id) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.deleteProvider, id)
+      .then((v: unknown) => (v === null ? null : expectString(v))),
+  setCatalogRefresh: (enabled) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.setCatalogRefresh, enabled)
+      .then((v: unknown) => expectString(v)),
+  workspaceModels: (workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.workspaceModels, workspace)
+      .then((v: unknown) => expectString(v)),
+  sessionModels: (id) =>
+    ipcRenderer.invoke(IPC_CHANNELS.sessionModels, id).then((v: unknown) => expectString(v)),
+  previewModelSwitch: (id, provider, model) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.previewModelSwitch, id, provider, model)
+      .then((v: unknown) => expectString(v)),
+  setSessionModel: (id, provider, model, effort) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.setSessionModel, id, provider, model, effort)
+      .then((v: unknown) => expectString(v)),
+  setSessionEffort: (id, effort) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.setSessionEffort, id, effort)
+      .then((v: unknown) => expectString(v)),
   composerInfo: () =>
     ipcRenderer.invoke(IPC_CHANNELS.composerInfo).then((value: unknown) => expectString(value)),
   markSessionRead: async (id) => {

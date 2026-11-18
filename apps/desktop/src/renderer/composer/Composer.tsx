@@ -117,6 +117,7 @@ export function Composer({
   mentions,
   commands,
   limits,
+  supportsImages = true,
   above,
   error,
 }: {
@@ -127,6 +128,7 @@ export function Composer({
   commands: readonly PaletteCommand[];
   /** What can be attached; without limits nothing can. */
   limits: AttachmentLimits | undefined;
+  supportsImages?: boolean | undefined;
   /** Shown above the input (the queue). */
   above?: ReactNode;
   /** Why the last message was not sent. */
@@ -152,10 +154,21 @@ export function Composer({
     mentions,
     commands,
     limits,
+    supportsImages,
     results,
     pending,
   });
-  latest.current = { running, disabled, handlers, mentions, commands, limits, results, pending };
+  latest.current = {
+    running,
+    disabled,
+    handlers,
+    mentions,
+    commands,
+    limits,
+    supportsImages,
+    results,
+    pending,
+  };
 
   const addFiles = (files: readonly File[]): void => {
     const { limits: current, pending: attached } = latest.current;
@@ -167,6 +180,7 @@ export function Composer({
       attached.length,
       current ?? { maxCount: 0, kinds: [] },
       () => crypto.randomUUID(),
+      latest.current.supportsImages,
     );
     setPending((list) => [...list, ...accepted]);
     setProblems(refused);
@@ -174,24 +188,40 @@ export function Composer({
   const addFilesRef = useRef(addFiles);
   addFilesRef.current = addFiles;
 
+  const submitInput = (
+    intent: 'send' | 'steer' | 'queue',
+    state: EditorState,
+    view?: EditorView,
+  ) => {
+    const {
+      pending: attachments,
+      handlers: current,
+      disabled: locked,
+      supportsImages: vision,
+    } = latest.current;
+    if (!vision) {
+      const refused = attachments
+        .filter((a) => a.kind === 'image')
+        .map((a) => ({ reason: 'vision' as const, name: a.name }));
+      if (refused.length) {
+        setProblems(refused);
+        return;
+      }
+    }
+    const payload = serializeDoc(state.doc);
+    if (locked || (isBlank(payload) && attachments.length === 0)) return;
+    current.submit(intent, { ...payload, attachments });
+    if (view) clearCommand()(state, view.dispatch.bind(view), view);
+    setPending([]);
+    setProblems([]);
+  };
+  const send = useRef(submitInput);
+  send.current = submitInput;
   useEffect(() => {
     const element = mount.current;
     if (element === null) {
       return;
     }
-    const submit = (intent: 'send' | 'steer' | 'queue', state: EditorState, view?: EditorView) => {
-      const payload = serializeDoc(state.doc);
-      const attachments = latest.current.pending;
-      if (latest.current.disabled || (isBlank(payload) && attachments.length === 0)) {
-        return;
-      }
-      latest.current.handlers.submit(intent, { ...payload, attachments });
-      if (view !== undefined) {
-        clearCommand()(view.state, view.dispatch.bind(view), view);
-      }
-      setPending([]);
-      setProblems([]);
-    };
     const command =
       (key: ComposerKey): Command =>
       (state, dispatch, view) => {
@@ -205,7 +235,7 @@ export function Composer({
           case 'send':
           case 'steer':
           case 'queue':
-            submit(intent, state, view);
+            send.current(intent, state, view);
             return true;
           case null:
             return false;
@@ -398,6 +428,8 @@ export function Composer({
   const queueKey = platform === 'darwin' ? '⌘↩' : 'Ctrl+Enter';
   const problemText = (problem: AttachmentProblem): string => {
     switch (problem.reason) {
+      case 'vision':
+        return t('composer.attachment.vision', { name: problem.name });
       case 'type':
         return t('composer.attachment.type', { name: problem.name });
       case 'size':
@@ -587,14 +619,7 @@ export function Composer({
               if (view === null) {
                 return;
               }
-              const payload = serializeDoc(view.state.doc);
-              if (isBlank(payload) && pending.length === 0) {
-                return;
-              }
-              handlers.submit(running ? 'steer' : 'send', { ...payload, attachments: pending });
-              clearCommand()(view.state, view.dispatch.bind(view), view);
-              setPending([]);
-              setProblems([]);
+              send.current(running ? 'steer' : 'send', view.state, view);
               view.focus();
             }}
           >

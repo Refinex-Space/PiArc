@@ -23,6 +23,7 @@ import {
   type PreferenceChange,
 } from '../../shared/preferences.js';
 import { useApp } from '../app/app-context.js';
+import { ProvidersPage } from './ProvidersPage.js';
 import { registerSettingsPage } from './registry.js';
 
 function useSave(): { save: (change: PreferenceChange) => void; error: string | undefined } {
@@ -320,6 +321,12 @@ export function registerBuiltInSettingsPages(): void {
     title: 'settings.appearance',
     order: 10,
     component: AppearancePage,
+  });
+  registerSettingsPage({
+    id: 'providers',
+    title: 'settings.providers',
+    order: 20,
+    component: ProvidersPage,
   });
   registerSettingsPage({
     id: 'shortcuts',

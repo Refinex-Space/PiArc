@@ -26,6 +26,7 @@ export interface PendingAttachment {
 }
 
 export type AttachmentProblem =
+  | { readonly reason: 'vision'; readonly name: string }
   | { readonly reason: 'type'; readonly name: string }
   | { readonly reason: 'size'; readonly name: string; readonly maxBytes: number }
   | { readonly reason: 'count'; readonly maxCount: number };
@@ -71,6 +72,7 @@ export function checkFiles(
   current: number,
   limits: AttachmentLimits,
   newId: () => string,
+  supportsImages = true,
 ): { accepted: PendingAttachment[]; problems: AttachmentProblem[] } {
   const accepted: PendingAttachment[] = [];
   const problems: AttachmentProblem[] = [];
@@ -79,6 +81,8 @@ export function checkFiles(
     const kind = limits.kinds.find((entry) => entry.mimeTypes.includes(mimeType));
     if (kind === undefined) {
       problems.push({ reason: 'type', name: file.name });
+    } else if (kind.kind === 'image' && !supportsImages) {
+      problems.push({ reason: 'vision', name: file.name });
     } else if (file.size === 0 || file.size > kind.maxBytes) {
       problems.push({ reason: 'size', name: file.name, maxBytes: kind.maxBytes });
     } else if (current + accepted.length >= limits.maxCount) {

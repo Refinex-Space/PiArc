@@ -74,3 +74,15 @@ describe('attachment checks', () => {
     expect(parseComposerInfo('not json').commands).toEqual([]);
   });
 });
+
+it('refuses images for text-only models while accepting PDF extraction', () => {
+  const { accepted, problems } = checkFiles(
+    [file('x.png', 8), file('y.pdf', 12)],
+    0,
+    LIMITS,
+    () => 'attachment',
+    false,
+  );
+  expect(accepted.map((a) => a.name)).toEqual(['y.pdf']);
+  expect(problems).toEqual([{ reason: 'vision', name: 'x.png' }]);
+});

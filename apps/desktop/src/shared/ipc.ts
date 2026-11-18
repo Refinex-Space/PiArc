@@ -2,6 +2,7 @@
 // shape of `window.piarc`. Every channel is registered in the main process through
 // `registerHandler` (src/main/ipc/register.ts), which checks the sender's origin first.
 import type {
+  ModelRef,
   ApprovalAnswer,
   PermissionMode,
   InputAttachment,
@@ -47,6 +48,15 @@ export const IPC_CHANNELS = {
   attachmentStore: 'piarc:session.attachmentStore',
   filesSearch: 'piarc:files.search',
   filesCancel: 'piarc:files.cancel',
+  providerSettings: 'piarc:providers.list',
+  saveProvider: 'piarc:providers.save',
+  deleteProvider: 'piarc:providers.delete',
+  setCatalogRefresh: 'piarc:providers.catalogRefresh',
+  workspaceModels: 'piarc:workspace.models',
+  sessionModels: 'piarc:session.models',
+  previewModelSwitch: 'piarc:session.previewModelSwitch',
+  setSessionModel: 'piarc:session.setModel',
+  setSessionEffort: 'piarc:session.setEffort',
   composerInfo: 'piarc:composer.info',
   sessionMarkRead: 'piarc:session.markRead',
   sessionRename: 'piarc:session.rename',
@@ -84,6 +94,7 @@ export interface AppState {
 /** Messages on `APP_EVENT_CHANNEL`. */
 export type AppEvent =
   | { readonly type: 'preferences'; readonly preferences: Preferences; readonly locale: Locale }
+  | { readonly type: 'providersChanged' }
   | { readonly type: 'command'; readonly command: AppCommand }
   | { readonly type: 'openSession'; readonly sessionId: string }
   /**
@@ -301,7 +312,21 @@ export interface PiarcApi {
   /** Opens a directory as a workspace (starts its Agent Host); resolves with Core's JSON. */
   openWorkspace(path: string): Promise<string>;
   /** Creates a session in a workspace; resolves with `{ sessionId, ... }` as JSON. */
-  createSession(workspace: string): Promise<string>;
+  createSession(workspace: string, model?: ModelRef): Promise<string>;
+  providerSettings(): Promise<string>;
+  saveProvider(configJson: string, secretJson?: string): Promise<string>;
+  deleteProvider(id: string): Promise<string | null>;
+  setCatalogRefresh(enabled: boolean): Promise<string>;
+  workspaceModels(workspace: string): Promise<string>;
+  sessionModels(sessionId: string): Promise<string>;
+  previewModelSwitch(sessionId: string, provider: string, model: string): Promise<string>;
+  setSessionModel(
+    sessionId: string,
+    provider: string,
+    model: string,
+    effort?: string,
+  ): Promise<string>;
+  setSessionEffort(sessionId: string, effort: string): Promise<string>;
   /** Reopens a session from its file. */
   resumeSession(id: string): Promise<string>;
   /** Closes an open session. */

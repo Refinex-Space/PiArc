@@ -64,6 +64,11 @@ export class AppShell {
     this.applyPreferences();
   }
 
+  /** Invalidate the main window's model directory after a settings change. */
+  providersChanged(): void {
+    if (this.main !== null) this.send(this.main, { type: 'providersChanged' });
+  }
+
   mainWindow(): BrowserWindow | null {
     return this.main;
   }

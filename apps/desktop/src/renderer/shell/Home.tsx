@@ -8,6 +8,7 @@ import { flushSync } from 'react-dom';
 import { isImeComposing } from '../composer/ime-guard.js';
 import { useT } from '../app/app-context.js';
 import { useStore, useWorkspaces } from '../store/hooks.js';
+import { keyOf, useModelCatalog } from './model-catalog.js';
 import { reason } from './errors.js';
 import { startSession } from './start-session.js';
 import { useUi } from './ui.js';
@@ -26,6 +27,14 @@ export function Home({
   const store = useStore();
   const workspaces = useWorkspaces();
   const [workspace, setWorkspace] = useState<string | undefined>(requested);
+  const [catalogRequested, setCatalogRequested] = useState<string>();
+  const ready = workspaces.some((w) => w.path === workspace && w.open);
+  // Listing models starts a Host. Avoid reopening an indexed workspace merely because
+  // its name is restored in the home screen after restarting the app.
+  const catalogTarget = ready || workspace === catalogRequested ? workspace : undefined;
+  const { catalog, failure: catalogFailure } = useModelCatalog(catalogTarget, false);
+  const [modelKey, setModelKey] = useState('');
+  const model = catalog?.models.find((m) => keyOf(m) === modelKey);
   const [text, setText] = useState(draft ?? '');
   const [echo, setEcho] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(failure);
@@ -54,6 +63,7 @@ export function Home({
         api: window.piarc,
         store,
         workspace,
+        ...(model ? { model: { provider: model.provider, id: model.id } } : {}),
         text: message,
         clientId: crypto.randomUUID(),
         watch: (id) => ui.connection.watchSession(id),
@@ -129,6 +139,35 @@ export function Home({
             {t('home.chooseFolder')}
           </button>
         </div>
+        {workspace && (
+          <label className="field-row">
+            {t('models.label')}
+            <select
+              className="input"
+              data-testid="home-model"
+              onFocus={() => {
+                setCatalogRequested(workspace);
+              }}
+              disabled={busy}
+              value={model ? keyOf(model) : ''}
+              onChange={(e) => {
+                setModelKey(e.currentTarget.value);
+              }}
+            >
+              <option value="">{t('models.default')}</option>
+              {catalog?.models.map((m) => (
+                <option key={keyOf(m)} value={keyOf(m)}>
+                  {keyOf(m)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {catalogFailure && (
+          <p className="error-text" role="alert">
+            {t('models.failed', { reason: catalogFailure })}
+          </p>
+        )}
         {echo !== undefined && (
           <div className="message message-user is-pending" data-testid="optimistic-message">
             <div className="message-author">{t('conversation.you')}</div>

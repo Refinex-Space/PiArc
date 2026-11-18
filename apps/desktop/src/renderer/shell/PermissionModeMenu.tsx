@@ -19,7 +19,7 @@ export function PermissionModeMenu({
   const t = useT();
   const menu = useMenu();
   return (
-    <div className="environment-bar">
+    <>
       <button
         ref={buttonRef}
         className="row-action"
@@ -50,6 +50,6 @@ export function PermissionModeMenu({
           }))}
         />
       )}
-    </div>
+    </>
   );
 }

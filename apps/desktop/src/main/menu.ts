@@ -119,6 +119,8 @@ export function buildMenuTemplate(context: MenuContext): MenuItemConstructorOpti
     label: t('menu.window'),
     submenu: [
       command('session.next'),
+      command('session.model'),
+      command('session.effort'),
       separator,
       { role: 'minimize', label: t('menu.window.minimize') },
       ...(mac
