@@ -331,7 +331,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I29 | T10 | `cat` 以约 190 MB/s 输出时主进程 CPU（含 Core 全部线程）约为一个核的 74%，主要是 IO 线程读 PTY 与解析；第 11 章没有对应预算 | T44 把终端吞吐纳入性能回归时评估（例如增大读块、合并读） |
 | I30 | T10 | `#/terminal-lab` 原型页随发布构建的渲染包分发；发布构建的 `window.piarc` 也有七个终端函数（`createTerminal` 只能启动登录 shell），与 I13、I24 同类 | T34 接入正式终端面板时收口；T45 与 I13、I24 一起评估剔除原型页 |
 | I31 | T10 | 真实拼音输入法的候选框位置未核对，清单见 `docs/spikes/S07-terminal.md` 第 8 节（T1–T4） | 已落地（2026-11-16）：智能体经 computer-use 在本机用系统"简体拼音"实测，T1–T4 全部符合预期，结果见 S7 报告第 8 节；T10-A11 改为通过 |
-| I32 | T10 | T09 的 L4 `transcript-scroll.e2e.ts` 中 "the wheel releases and resumes following" 在一次全量运行中失败（dev 形态，内容增长时离底 31 px，期望 ≤ 1 px），单独重跑 10 次（两种形态各 5 次）都通过；本机此时的主屏是 120 Hz | T19 接手 transcript 时检查贴底在高刷新率下的时序；T44 把 L4 的偶发失败纳入统计；2026-11-16 在 CI 的 `desktop L4 (macos-latest)`（packaged，https://github.com/Refinex-Space/PiArc/actions/runs/43855932047）再次失败，离底同为 31 px；2026-11-18 再次出现在 CI 的 `desktop L4 (macos-latest)`（packaged，"keeps the bottom in view while a reply streams" 离底 21 px，https://github.com/Refinex-Space/PiArc/actions/runs/44214484957），同一提交前一次运行中通过 |
+| I32 | T10 | T09 的 L4 `transcript-scroll.e2e.ts` 中 "the wheel releases and resumes following" 在一次全量运行中失败（dev 形态，内容增长时离底 31 px，期望 ≤ 1 px），单独重跑 10 次（两种形态各 5 次）都通过；本机此时的主屏是 120 Hz | T19 接手 transcript 时检查贴底在高刷新率下的时序；T44 把 L4 的偶发失败纳入统计；2026-11-16 在 CI 的 `desktop L4 (macos-latest)`（packaged，https://github.com/Refinex-Space/PiArc/actions/runs/43855932047）再次失败，离底同为 31 px；2026-11-18 再次出现在 CI 的 `desktop L4 (macos-latest)`（packaged，"keeps the bottom in view while a reply streams" 离底 21 px，https://github.com/Refinex-Space/PiArc/actions/runs/44214484957），同一提交前一次运行中通过；2026-11-18 第三次出现在 CI 的 `desktop L4 (macos-latest)`（packaged，同一用例离底 32 px，https://github.com/Refinex-Space/PiArc/actions/runs/44255962868） |
 | I33 | T11 | 进程树终止的接口已就绪：`piarc_exec::ProcessTreeSpawner`（`ProcessSpawner` 的实现；macOS 新进程组 + `killpg`，Windows 挂起创建后加入 `KILL_ON_JOB_CLOSE`、不许 breakaway 的 Job 再恢复；`kill` 与丢弃句柄都结束整棵树，丢弃也会结束命令留在后台的进程）。目前只有沙箱会话的 `exec/run` 用它 | 部分落地（T12）：`piarc_core::agent_host::start` 与 `start_bundled` 改用 `ProcessTreeSpawner`（W0 实机核对 Agent Host 被杀时子进程随之结束）；T17 让 `ToolIo` 的普通命令也用它，并决定后台进程在命令结束时是否保留（与 T32 的后台任务一起）。W0 补充：Windows 的 Git Bash 没有真正的 `exec`，命令总是 bash.exe 的子进程，所以现在取消或超时一个委托的 Bash 命令时，命令本身（不只是它的后台进程）都继续运行（`piarc-exec` 的 `cancelling_kills_the_command` 中 `sleep.exe` 活满 30 s），T17 在 Windows 上必须改用 `ProcessTreeSpawner`；**已落地（T17）**：`ToolIo` 的全部命令用它，命令结束时留在后台的进程随之结束（`run_in_background` 由 T32 提供）；Windows 取消与超时结束整棵树由 `piarc-exec` 的终止测试在 Windows CI 上验证 |
 | I34 | T11 | 沙箱把 `CARGO_HOME` 指向会话临时目录（防止缓存投毒，S8 报告第 4 节），沙箱内读不到 `~/.cargo/config.toml` 的镜像源设置；每个会话第一次安装或构建是冷缓存 | T39 决定是否把用户的 Cargo 配置（不含凭据）复制进会话，以及是否提供共享只读缓存 |
 | I35 | T11 | 沙箱内不能绑定端口、不能连 Unix socket（本地测试服务器、Docker、ssh-agent 不可用），`git init`/`clone`/`config` 因 `.git/config`、`.git/hooks` 受保护而失败；`GIT_CONFIG_COUNT` 被沙箱用来指定代理，命令继承的同类变量失效 | T39 评估"允许本机绑定""允许写 `.git/config`"两个选项与 Unix socket 白名单，设置页写明这些限制 |
@@ -636,6 +636,18 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
   - macOS 的 `core-events.e2e.ts` "a batch above 1 MiB" 偶发 "no Core test hooks"：钩子在 `app.whenReady` 后安装，`expectTestHooks` 改为等待最多 15 s
 - 本机：L4 全量 154 passed、1 skipped（两种形态）
 - T18-A04 仍为 blocked，等下一次推送的 Windows CI 全部通过后关闭；未推送
+
+### 2026-11-18 T18 的第二次 CI 核对（提交 73f7181 的运行 44255962868）
+
+- 结果：verify（macOS）通过；verify（Windows）、`desktop L4` 两个平台失败
+- 原因与修复：
+  - Windows verify：`piarc-core` 的 `secrets` 测试 `locks_serialize_writers_until_unlocked` 用 300 ms 的锁租期，慢的 runner 上租期在解锁前到期，第二个写入方提前拿到锁。该用例改用 30 s 租期；到期行为由同文件的 `a_lock_ends_after_its_lease_or_when_its_connection_ends` 单独覆盖（仍为 300 ms）
+  - Windows L4 `t18-attention`："Object has been destroyed"：`focusMain` 在上一个窗口关闭时取到了已销毁的窗口。`focusMain`、评审用例的 `captureMain` 与前台轮询都先过滤 `isDestroyed()`
+  - macOS L4 `core-events` "the app quits normally while Core is streaming events" 超时：T18 起主窗口在偏好读完后才打开，`openProbe` 用"下一个出现的窗口"拿到的是主窗口而不是探针。改为在打开前记下已有页面，取新出现的、地址是探针的那一页（同一用例开两个探针也能区分）
+  - macOS L4 `transcript-render` "a streaming delta re-renders only the streaming row" 多渲染了 `history-21`：T18 的 `app.css` 的元素级规则（`box-sizing`、`body` 字体与行高、表单元素、`kbd`、`:focus-visible`）也作用于 T09/T10 的原型页，改变了行高与虚拟列表的测量。这些规则改为只在应用自己的窗口生效（`<html data-app>`，由 `main.tsx` 在主窗口与设置窗口设置），原型页恢复 T18 之前的样式
+  - macOS L4 `transcript-scroll` "keeps the bottom in view while a reply streams"（packaged，离底 32 px）：已登记的 I32，本次未改
+- 本机：L4 全量 154 passed、1 skipped（两种形态，重新打包开发构建之后）；`cargo test -p piarc-core --test secrets` 6 passed；ESLint、`tsc --build`、Prettier、`cargo fmt --check`、设计令牌检查、`npx vitest run apps/desktop`（215 passed、1 skipped）通过。未重跑完整的 `npm run verify`
+- T18-A04 仍为 blocked；未推送
 
 ## 计划变更记录
 
