@@ -23,6 +23,11 @@ expect:
     - { method: item/completed, params: { item: { type: agentMessage, text: 'Done reading.' } } }
     - { method: turn/completed, turn: t, params: { status: completed } }
   requests:
-    - { index: 0, tools: [Read, Write, Edit, Bash, Glob, Grep] }
+    # Windows sessions also get PowerShell (T17), so the list is checked by inclusion.
+    - {
+        index: 0,
+        tools_include: [Read, Write, Edit, Bash, Glob, Grep],
+        tools_exclude: [read, bash, powershell, edit, write, grep, find, ls],
+      }
     - { index: 1, tool_results: [{ id: call_read, contains: hello from the workspace }] }
   request_counts: { main: 2 }

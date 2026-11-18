@@ -1,5 +1,5 @@
 id: tools-model-sees-canonical-names
-description: The model is offered exactly the six canonical tool names, none of Pi's native names, and a call by canonical name runs.
+description: The model is offered the canonical tool names (Read, Write, Edit, Bash, Glob, Grep, and PowerShell on Windows), none of Pi's native names, and a call by canonical name runs.
 capabilities: [CAP-TOOL-PROFILE-001]
 workspace:
   files:
@@ -22,6 +22,7 @@ expect:
     - { method: turn/completed, turn: t, params: { status: completed } }
   requests:
     - index: 0
-      tools: [Read, Write, Edit, Bash, Glob, Grep]
+      # Windows sessions also get PowerShell (T17): every canonical name, none of Pi's own.
+      tools_include: [Read, Write, Edit, Bash, Glob, Grep]
       tools_exclude: [read, write, edit, bash, grep, find, ls, powershell]
     - { index: 1, tool_results: [{ id: toolu_read, is_error: false, contains: '# Fixture' }] }

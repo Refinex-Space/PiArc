@@ -15,6 +15,15 @@ use crate::harness::{
 
 const CANONICAL: [&str; 6] = ["Read", "Write", "Edit", "Bash", "Glob", "Grep"];
 
+/// The tools a session offers on this platform: Windows adds PowerShell after Bash (T17).
+fn offered_canonical() -> Vec<&'static str> {
+    let mut names = CANONICAL.to_vec();
+    if cfg!(windows) {
+        names.insert(4, "PowerShell");
+    }
+    names
+}
+
 /// The first words of each default description (agent-host/src/tools/profile.ts).
 const DEFAULT_DESCRIPTIONS: [(&str, &str); 6] = [
     ("Read", "Return the contents of one file."),
@@ -86,7 +95,7 @@ async fn the_six_canonical_tools_delegate_every_operation_to_core() {
             .into_iter()
             .map(|(name, _)| name)
             .collect();
-        assert_eq!(names, CANONICAL, "request {}", request.seq);
+        assert_eq!(names, offered_canonical(), "request {}", request.seq);
     }
     check_results(&tool_results_in(&requests[6].body));
     check_core_calls(&core.calls_of(&a.0));
@@ -119,7 +128,7 @@ fn check_offered_tools(body: &str) {
         println!("  {name}: {description}");
     }
     let names: Vec<&str> = offered.iter().map(|(name, _)| name.as_str()).collect();
-    assert_eq!(names, CANONICAL);
+    assert_eq!(names, offered_canonical());
     for (name, start) in DEFAULT_DESCRIPTIONS {
         let description = &offered.iter().find(|(n, _)| n == name).expect("offered").1;
         assert!(description.starts_with(start), "{name}: {description}");
@@ -269,7 +278,16 @@ async fn a_tool_profile_renames_tools_for_the_model_only() {
             )
         })
         .collect();
-    assert_eq!(offered, expected);
+    // The profile renames the six tools; Windows also offers PowerShell under its own name.
+    let (powershell, renamed_tools): (Vec<_>, Vec<_>) = offered
+        .into_iter()
+        .partition(|(name, _)| name == "PowerShell");
+    assert_eq!(renamed_tools, expected);
+    assert_eq!(
+        powershell.len(),
+        usize::from(cfg!(windows)),
+        "{powershell:?}"
+    );
     let model_side: Vec<String> = tool_results_in(&requests[3].body)
         .into_iter()
         .map(|(name, text, is_error)| {

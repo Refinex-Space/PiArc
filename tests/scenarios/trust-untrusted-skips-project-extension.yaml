@@ -26,4 +26,8 @@ expect:
   events:
     - { method: turn/completed, turn: t, params: { status: completed } }
   requests:
-    - { index: 0, tools: [Read, Write, Edit, Bash, Glob, Grep], tools_exclude: [fixture_probe] }
+    - {
+        index: 0,
+        tools_include: [Read, Write, Edit, Bash, Glob, Grep],
+        tools_exclude: [fixture_probe],
+      }
