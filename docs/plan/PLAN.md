@@ -626,6 +626,17 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 验收：13 项通过，1 项阻塞（A04 的 Windows 部分：推送后看 CI 的 `desktop L4 (windows-latest)` 冒烟；实机外观在 W1）
 - 未推送
 
+### 2026-11-18 T18 的 CI 核对（提交 4fb3b28 的运行 44250455860）
+
+- 结果：verify 两个平台通过；`desktop L4` 两个平台失败（其余作业通过）。Windows 的冒烟用例（`smoke.e2e.ts`，带 Mica 配置启动应用）两种形态都通过
+- 原因与修复：
+  - 新会话在第一条回复写入文件前没有标题，通知写成 "New session finished"、侧栏显示"新会话"（两个平台的 `t18-attention`）：会话 actor 记下发出的第一条消息，快照在索引还没有标题时用它；testkit 用例 `a_new_session_is_listed_under_its_first_message_while_it_runs` 先失败后通过
+  - Windows 上用例结束时删除工作区目录 EBUSY（应用还占着 Agent Host 的工作目录与设置监听）：`workspaces` 夹具先关闭应用再删除，带重试
+  - Windows 上评审用例用 CSS 属性选择器匹配含反斜杠的路径：改为按文件夹名称过滤
+  - macOS 的 `core-events.e2e.ts` "a batch above 1 MiB" 偶发 "no Core test hooks"：钩子在 `app.whenReady` 后安装，`expectTestHooks` 改为等待最多 15 s
+- 本机：L4 全量 154 passed、1 skipped（两种形态）
+- T18-A04 仍为 blocked，等下一次推送的 Windows CI 全部通过后关闭；未推送
+
 ## 计划变更记录
 
 | 日期 | 版本 | 变更 |
