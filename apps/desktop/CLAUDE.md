@@ -73,6 +73,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 
 ## 易错点
 
+- L4 夹具给应用设 `PIARC_TEST_MEMORY_KEYCHAIN=1`：开发构建的 Core 改用 `createForTests`，保险箱主密钥放在内存。每次重新打包都是新的 ad-hoc 签名，打包形态读钥匙串里的 `cn.piarc.desktop.credential-vault` 时 macOS 会弹窗要登录密码，会话创建会一直等它（T18 实测）。发布构建没有 `createForTests`，这个开关不起作用；真实钥匙串的验证在 `piarc-secrets` 的 `system_store` 测试与 S6 的 `keychainProbe`。
 - T18 的 L4 依赖窗口真的在前台（标记已读只在前台发生）：测试里用 `e2e/sessions.ts` 的 `focusMain(app)`（`app.focus({ steal: true })`），不要假设 Playwright 启动的窗口有焦点。原生对话框用 `stubFolderDialog`、`stubMessageBox` 替换，Playwright 点不到它们。
 - macOS 上页面截图把半透明的侧栏合成在白底上，看不到 vibrancy：评审截图用 `screencapture -l <窗口号>`（`BrowserWindow.getMediaSourceId()` 的数字部分，见 `e2e/t18-review.e2e.ts`）。
 - 新建会话时乐观消息用 `flushSync` 立即提交：创建失败可能在下一次渲染之前就返回。

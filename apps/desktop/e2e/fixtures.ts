@@ -81,7 +81,13 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   },
   running: async ({ appForm, appArgs, userDataDir }, use, testInfo) => {
     const { command, args } = appCommand(appForm, [`--user-data-dir=${userDataDir}`, ...appArgs]);
-    const app = await electron.launch({ executablePath: command, args });
+    // A development build keeps the vault's master key in memory: a rebuilt package would
+    // otherwise wait for the login keychain password (src/main/core/core-host.ts).
+    const app = await electron.launch({
+      executablePath: command,
+      args,
+      env: { ...process.env, PIARC_TEST_MEMORY_KEYCHAIN: '1' },
+    });
     const log = createLog(app);
     await use({ app, log });
     await app.close();

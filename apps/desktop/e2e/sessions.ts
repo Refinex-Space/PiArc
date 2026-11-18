@@ -236,7 +236,11 @@ export async function relaunch(
   userDataDir: string,
 ): Promise<{ app: ElectronApplication; page: Page }> {
   const { command, args } = appCommand(form, [`--user-data-dir=${userDataDir}`]);
-  const app = await electron.launch({ executablePath: command, args });
+  const app = await electron.launch({
+    executablePath: command,
+    args,
+    env: { ...process.env, PIARC_TEST_MEMORY_KEYCHAIN: '1' },
+  });
   const page = await app.firstWindow();
   await page.getByTestId('app-shell').waitFor();
   return { app, page };

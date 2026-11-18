@@ -45,18 +45,32 @@ export function startCore(
   location: CoreModuleLocation & { readonly resourcesPath: string },
   router: EventRouter,
   dirs: { readonly dataDir: string; readonly cacheDir: string },
+  memoryKeychain = false,
 ): CoreHost {
   const modulePath = resolveCoreModulePath(location);
   const { CoreRuntime } = loadCoreModule(modulePath);
-  const runtime = CoreRuntime.create(
-    { ...dirs, agentHost: agentHostOptions(location) },
-    (batches) => {
-      router.forward(batches);
-    },
-  );
+  const options = { ...dirs, agentHost: agentHostOptions(location) };
+  const onEvents = (batches: Parameters<typeof router.forward>[0]) => {
+    router.forward(batches);
+  };
+  // L4 runs every rebuilt package with a new ad-hoc signature, and macOS asks for the login
+  // keychain password before such a build may read the vault's master key. A development
+  // build of Core can keep the key in memory instead (`createForTests`); release builds do
+  // not have it, so the switch does nothing there.
+  const testing: unknown = CoreRuntime;
+  const runtime =
+    memoryKeychain &&
+    typeof testing === 'function' &&
+    'createForTests' in testing &&
+    typeof testing.createForTests === 'function'
+      ? (testing.createForTests as typeof CoreRuntime.create).call(CoreRuntime, options, onEvents)
+      : CoreRuntime.create(options, onEvents);
   console.info(`[core] loaded ${modulePath}`);
   return { runtime, modulePath };
 }
+
+/** The environment switch L4 sets for development builds (see `startCore`). */
+export const MEMORY_KEYCHAIN_ENV = 'PIARC_TEST_MEMORY_KEYCHAIN';
 
 /**
  * Holds the app's exit until Core has shut down: the shutdown releases Core's event

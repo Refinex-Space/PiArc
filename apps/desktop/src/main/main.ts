@@ -7,7 +7,12 @@ import { app, BrowserWindow, dialog, protocol, session } from 'electron';
 import { APP_ENTRY_URL, APP_ORIGIN } from './app-scheme.js';
 import { APP_SCHEME_REGISTRATION, registerAppProtocol } from './app-protocol.js';
 import { AppShell } from './app-shell.js';
-import { shutdownCoreBeforeQuit, startCore, type CoreHost } from './core/core-host.js';
+import {
+  MEMORY_KEYCHAIN_ENV,
+  shutdownCoreBeforeQuit,
+  startCore,
+  type CoreHost,
+} from './core/core-host.js';
 import { registerEventHandlers } from './core/event-ipc.js';
 import { hasTestingExports } from './core/load.js';
 import { EventRouter } from './core/router.js';
@@ -67,6 +72,7 @@ function startCoreOrExit(dirs: DataDirs): CoreHost | undefined {
       },
       eventRouter,
       { dataDir: dirs.data, cacheDir: dirs.cache },
+      process.env[MEMORY_KEYCHAIN_ENV] === '1',
     );
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
