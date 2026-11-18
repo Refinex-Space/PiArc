@@ -270,6 +270,15 @@ async fn delegated_tools_behave_like_pi_native_tools() {
 
     let mut native = env.config();
     native.extra_args.push("--pi-native-tools".into());
+    // Pi's native bash looks for Git Bash under %ProgramFiles%, which the Agent Host's
+    // passthrough environment leaves out; without it Pi falls back to `where bash.exe` with a
+    // 5 s timeout, which a busy Windows runner can miss ("No bash shell found", CI run
+    // 44209310729). A user's Agent Host process has these variables.
+    for name in ["ProgramFiles", "ProgramFiles(x86)"] {
+        if let Some(value) = std::env::var_os(name) {
+            native.extra_env.push((OsString::from(name), value));
+        }
+    }
     let search_tools = pinned_search_tools();
     if let Some(bin) = &search_tools {
         let path = std::env::var_os("PATH").unwrap_or_default();

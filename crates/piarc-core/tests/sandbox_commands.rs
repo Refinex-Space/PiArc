@@ -118,6 +118,9 @@ async fn require_network(host: &str) {
 /// The toolchain `cargo test` runs with, so rustup in the sandbox picks the same one.
 fn rust_env() -> Value {
     let mut env = Map::new();
+    // Commands see the caller's environment (T17); CI sets `CARGO_TERM_COLOR=always`, and the
+    // assertions read cargo's plain text.
+    env.insert("CARGO_TERM_COLOR".into(), Value::String("never".into()));
     if let Ok(toolchain) = std::env::var("RUSTUP_TOOLCHAIN") {
         env.insert("RUSTUP_TOOLCHAIN".into(), Value::String(toolchain));
     }
