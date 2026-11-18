@@ -315,7 +315,7 @@ T20 基础权限与审批，macOS arm64。基线 `1c8ad0e`，`npm run verify` 15
 - [x] 权限契约、模式矩阵、精确规则与配置层信任（`cargo test -p piarc-policy -p piarc-protocol -p piarc-config` 通过；A01 的场景部分见下）
 - [x] Core 审批账本、裁决、审计、失效与 I/O 绑定（Core 权限测试 6/6，1000 次真实自动裁决 p95 0.528 ms；A07 的桌面流程单列）
 - [x] Agent Host 阻断、反馈、模式 entry 与恢复（真实 Host 故障注入、强杀后恢复、模式重启恢复和跨帧 Write 已通过）
-- [ ] 客户端四类审批卡、模式菜单、原生确认与热键（A07、A09、A11、A12）
+- [x] 客户端四类审批卡、模式菜单、原生确认与热键（定向 Vitest 46/46；dev 与 packaged Electron 34/34；本地 ego-browser 已操作）
 - [ ] L2 场景、L4、截图、基准与全量门禁（A01–A14）
 - [ ] 文档、验收与收尾
 

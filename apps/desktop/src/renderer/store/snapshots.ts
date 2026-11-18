@@ -2,6 +2,11 @@
 // and the session list on `core/sessions`, each with a `revision`. They arrive over the event
 // channel as JSON, so every field is checked before the store uses it.
 
+import type { ApprovalRequest } from '@piarc/protocol';
+import type { PermissionMode } from '../../shared/ipc.js';
+import { isApproval } from './approvals.js';
+const NO_APPROVALS: readonly ApprovalRequest[] = [];
+
 /** Where a workspace's Agent Host stands (`piarc_core::sessions::HostState`). */
 export type HostState =
   'closed' | 'starting' | 'ready' | 'reclaimed' | 'restarting' | 'unavailable';
@@ -33,6 +38,8 @@ export interface SessionEntry {
   readonly updatedAt: number | undefined;
   readonly error: string | undefined;
   /** Approval requests waiting for the user (Core reports them from T20 on). */
+  readonly approvals: readonly ApprovalRequest[];
+  readonly permissionMode: PermissionMode;
   readonly pendingApprovals: number;
 }
 
@@ -105,6 +112,13 @@ function sessionEntry(value: unknown): SessionEntry | undefined {
     createdAt: optionalNumber(value.createdAt),
     updatedAt: optionalNumber(value.updatedAt),
     error: optionalString(value.error),
+    permissionMode: value.permissionMode === 'acceptEdits' ? 'acceptEdits' : 'default',
+    approvals:
+      Array.isArray(value.approvals) && value.approvals.length > 0
+        ? value.approvals.filter((a: unknown): a is ApprovalRequest =>
+            isApproval(a, String(value.id)),
+          )
+        : NO_APPROVALS,
     pendingApprovals: optionalNumber(value.pendingApprovals) ?? 0,
   };
 }

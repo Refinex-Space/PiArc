@@ -894,3 +894,37 @@
   gap: var(--piarc-space-1);
   user-select: none;
 }
+
+/* Approval rows share the transcript's diff view and the shell's button styles. */
+.approval-card {
+  display: grid;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-3);
+  border: 1px solid var(--piarc-border-strong);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-raised);
+}
+.approval-card label {
+  display: grid;
+  gap: var(--piarc-space-1);
+  color: var(--piarc-text-secondary);
+}
+.approval-card input {
+  min-width: 0;
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  color: var(--piarc-text-primary);
+  background: var(--piarc-surface-panel);
+  border: 1px solid var(--piarc-border-default);
+  border-radius: var(--piarc-radius-sm);
+}
+.approval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-2);
+}
+.approval-path {
+  overflow-wrap: anywhere;
+}
+.environment-bar {
+  padding: 0 var(--piarc-space-5) var(--piarc-space-2);
+}

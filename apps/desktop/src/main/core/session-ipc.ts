@@ -8,6 +8,7 @@ import path from 'node:path';
 import { BrowserWindow, dialog } from 'electron';
 
 import {
+  type ApprovalAnswer,
   IPC_CHANNELS,
   MAX_ATTACHMENT_IPC_BYTES,
   MAX_PROMPT_LENGTH,
@@ -31,6 +32,8 @@ export type SessionCore = Pick<
   | 'followUp'
   | 'followUpInput'
   | 'abort'
+  | 'answerApproval'
+  | 'setPermissionMode'
   | 'compact'
   | 'editQueueItem'
   | 'deleteQueueItem'
@@ -158,6 +161,47 @@ function input(value: unknown): string {
   return JSON.stringify(message);
 }
 
+function nonnegative(value: unknown, name: string): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw new TypeError(`${name} must be a non-negative integer`);
+  }
+  return value;
+}
+
+function approvalAnswer(value: unknown): ApprovalAnswer {
+  if (typeof value !== 'object' || value === null) throw new TypeError('invalid approval answer');
+  const a = value as Record<string, unknown>;
+  const { decision } = a;
+  if (
+    decision !== 'allowOnce' &&
+    decision !== 'allowSession' &&
+    decision !== 'allowAlways' &&
+    decision !== 'deny'
+  ) {
+    throw new TypeError('unknown approval decision');
+  }
+  const fields = {
+    sessionId: sessionId(a.sessionId),
+    requestId: token(a.requestId, 'requestId'),
+    revision: nonnegative(a.revision, 'revision'),
+    connectionEpoch: nonnegative(a.connectionEpoch, 'connectionEpoch'),
+    decision,
+  } satisfies ApprovalAnswer;
+  if (decision === 'allowAlways') {
+    if (a.directory === undefined && a.rule === undefined) {
+      throw new TypeError('always allow needs a rule or directory');
+    }
+    return {
+      ...fields,
+      ...(a.rule === undefined ? {} : { rule: text(a.rule, 'rule') }),
+      ...(a.directory === undefined ? {} : { directory: absolutePath(a.directory) }),
+    };
+  }
+  return decision === 'deny' && a.feedback !== undefined
+    ? { ...fields, feedback: text(a.feedback, 'feedback', true) }
+    : fields;
+}
+
 /** Registers the session, workspace and trust commands. */
 export function registerSessionHandlers(
   registerHandler: RegisterHandler,
@@ -206,6 +250,40 @@ export function registerSessionHandlers(
       : core.followUpInput(sessionId(id), input(message)),
   );
   registerHandler(IPC_CHANNELS.sessionAbort, (_event, [id]) => core.abort(sessionId(id)));
+  registerHandler(IPC_CHANNELS.sessionPermissionMode, async (_event, [id, mode]) => {
+    if (mode !== 'default' && mode !== 'acceptEdits')
+      throw new TypeError('unknown permission mode');
+    await core.setPermissionMode(sessionId(id), mode);
+  });
+  registerHandler(IPC_CHANNELS.approvalAnswer, async (event, [raw]) => {
+    const answer = approvalAnswer(raw);
+    if (answer.decision === 'allowAlways') {
+      const t = translator();
+      const window = BrowserWindow.fromWebContents(event.sender);
+      const options: Electron.MessageBoxOptions = {
+        type: 'warning',
+        message: t.t(
+          answer.directory === undefined ? 'approval.confirmRule' : 'approval.confirmDirectory',
+        ),
+        detail: [
+          ...(answer.rule == null ? [] : [t.t('approval.rule') + '\n' + answer.rule]),
+          ...(answer.directory == null
+            ? []
+            : [t.t('approval.directory') + '\n' + answer.directory]),
+        ].join('\n\n'),
+        buttons: [t.t('approval.always'), t.t('dialog.cancel')],
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true,
+      };
+      const result =
+        window === null
+          ? await dialog.showMessageBox(options)
+          : await dialog.showMessageBox(window, options);
+      if (result.response !== 0) return JSON.stringify({ status: 'cancelled' });
+    }
+    return core.answerApproval(JSON.stringify(answer));
+  });
   registerHandler(IPC_CHANNELS.sessionCompact, (_event, [id]) => core.compact(sessionId(id)));
   registerHandler(IPC_CHANNELS.queueEdit, (_event, [id, itemId, value]) =>
     core.editQueueItem(sessionId(id), token(itemId, 'itemId'), text(value, 'text')),

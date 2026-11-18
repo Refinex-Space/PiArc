@@ -27,11 +27,13 @@ export function useMenu() {
 export function MenuPopup({
   items,
   at,
+  numbered = false,
   onClose,
   label,
   testId,
 }: {
   readonly items: readonly MenuItem[];
+  readonly numbered?: boolean;
   readonly at: { x: number; y: number };
   readonly onClose: () => void;
   readonly label: string;
@@ -62,6 +64,12 @@ export function MenuPopup({
   };
   const onKeyDown = (event: React.KeyboardEvent) => {
     if (isImeComposing(event.nativeEvent)) {
+      return;
+    }
+    if (numbered && /^[1-9]$/u.test(event.key)) {
+      event.preventDefault();
+      event.stopPropagation();
+      run(items[Number(event.key) - 1]);
       return;
     }
     switch (event.key) {
@@ -117,6 +125,7 @@ export function MenuPopup({
             run(item);
           }}
         >
+          {numbered ? `${String(i + 1)} · ` : null}
           {item.label}
         </div>
       ))}

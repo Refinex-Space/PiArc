@@ -33,3 +33,5 @@
 | `VIRTUAL_LIST.overscanViewports = 1` | 可见区上下各多挂载约一屏，尺寸按会话、行 ID 与宽度缓存。 |
 
 行内容和虚拟列表提交后在布局阶段检查贴底。`ResizeObserver` 处理尺寸变化。可见内容先增高、列表随后更新尺寸时，这两次提交都可能影响同一帧的滚动位置。
+
+- 审批是 `SessionTranscript.setApprovals` 从 Core 实体快照追加的临时行，历史重载仍显示未处理的请求，重连后的新快照移除旧行。`rows/RowView.tsx` 把审批路由到 `ApprovalCard`、把 `permissionModeChanged` 显示为模式变更记录。快捷键与阅读闸门在 `rows/approval-keys.ts`，仅首个与滚动窗口相交的审批卡可响应。提问表单由 `shell/use-unsupported-questions.ts` 在窗口层拒绝，切换会话不影响答复。

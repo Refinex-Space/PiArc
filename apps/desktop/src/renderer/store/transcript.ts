@@ -18,6 +18,7 @@
 // Everything the rows show comes from Core's events: item states, error kinds and retry counts
 // are never inferred here (architecture principle 8).
 import type {
+  ApprovalRequest,
   InputAttachment,
   InputMention,
   Item,
@@ -25,6 +26,7 @@ import type {
   TurnUsage,
 } from '@piarc/protocol';
 
+import { sameRequest } from './approvals.js';
 import type { PendingAttachment } from '../composer/attachments.js';
 
 /** An attachment as the user message shows it: a stored attachment or one being sent. */
@@ -95,6 +97,12 @@ export type TranscriptRow =
       readonly retryable: boolean;
     }
   | { readonly kind: 'uncertain'; readonly id: string; readonly turnId: string }
+  | {
+      readonly kind: 'approval';
+      readonly id: string;
+      readonly request: ApprovalRequest;
+      readonly turnId?: string;
+    }
   | { readonly kind: 'working'; readonly id: string };
 
 /** The running turn as the working row shows it. */
@@ -254,6 +262,7 @@ export class SessionTranscript {
   /** The rows shown, in order: groups in place of their members, the working row last. */
   private display: readonly string[] = [];
   private readonly rows = new Map<string, TranscriptRow>();
+  private approvalIds: string[] = [];
   private turn: TurnInfo = IDLE;
   private queueItems: readonly QueuedInput[] = [];
   private reload = false;
@@ -263,6 +272,31 @@ export class SessionTranscript {
   private readonly stateListeners = new Set<() => void>();
   private readonly queueListeners = new Set<() => void>();
   private readonly changeListeners = new Set<(ids: readonly string[]) => void>();
+
+  /** Replaces the live approval rows from a revision-checked entity snapshot. */
+  setApprovals(requests: readonly ApprovalRequest[]): void {
+    const ids = requests.map(
+      (r) => `approval:${String(r.connectionEpoch)}:${r.requestId}:${String(r.revision)}`,
+    );
+    const batch = new Batch();
+    for (const id of this.approvalIds) {
+      if (!ids.includes(id)) {
+        this.rows.delete(id);
+        batch.changed.add(id);
+      }
+    }
+    requests.forEach((request, i) => {
+      const id = ids[i];
+      if (id === undefined) return;
+      const existing = this.rows.get(id);
+      if (existing?.kind === 'approval' && sameRequest(request, existing.request)) return;
+      this.rows.set(id, { kind: 'approval', id, request });
+      batch.changed.add(id);
+    });
+    batch.list = !sameList(this.approvalIds, ids);
+    this.approvalIds = ids;
+    this.finish(batch);
+  }
 
   rowIds(): readonly string[] {
     return this.display;
@@ -775,6 +809,7 @@ export class SessionTranscript {
       }
     }
     flush();
+    next.push(...this.approvalIds);
     if (this.turn.running) {
       next.push(WORKING_ROW);
       if (!this.rows.has(WORKING_ROW)) {

@@ -1,0 +1,33 @@
+{
+  "id": "t20-approval",
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "first",
+          "name": "Bash",
+          "input": { "command": "echo one", "description": "First command" }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "approved",
+          "name": "Bash",
+          "input": { "command": "echo approved", "description": "Saved rule" }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "protected",
+          "name": "Write",
+          "input": { "path": ".piarc/note.txt", "content": "a note" }
+        }
+      ]
+    },
+    { "text": "Finished reviewing." }
+  ]
+}

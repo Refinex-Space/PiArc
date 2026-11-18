@@ -184,6 +184,9 @@ function createLabApi(
   };
 
   return {
+    setApprovals(requests) {
+      store.current.setApprovals(requests);
+    },
     clear() {
       replayer.stop();
       services.driver.reset();

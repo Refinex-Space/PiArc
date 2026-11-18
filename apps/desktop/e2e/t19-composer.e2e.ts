@@ -238,6 +238,7 @@ test('running: Enter steers, Mod+Enter queues (edit, delete), Esc stops', async 
   const composer = page.getByTestId('composer');
   await expect(composer).toHaveAttribute('data-running', 'true', { timeout: 20_000 });
   await expect(page.getByTestId('bash-card')).toBeVisible();
+  await page.getByRole('button', { name: 'Allow once', exact: true }).click();
   // Enter while running: a steering message for this turn.
   await send(page, 'Also mention the steer');
   // Mod+Enter: queued for after the turn; edited, then a second one deleted.

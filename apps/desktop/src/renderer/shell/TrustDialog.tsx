@@ -75,7 +75,15 @@ export function needsDecision(view: TrustView): boolean {
   return view.decision === null || (view.decision === 'trusted' && view.newItems.length > 0);
 }
 
-const CATEGORY_ORDER = ['hook', 'mcpServer', 'allowRule', 'plugin', 'piExtension'];
+const CATEGORY_ORDER = [
+  'hook',
+  'mcpServer',
+  'allowRule',
+  'permissionMode',
+  'additionalDirectory',
+  'plugin',
+  'piExtension',
+];
 
 export function TrustDialog({
   workspace,

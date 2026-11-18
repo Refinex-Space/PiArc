@@ -24,6 +24,10 @@ test('a session finishing in the background notifies and counts on the Dock badg
   await openFolder(page, app, ws);
   // The model runs `sleep 3` before answering: time to put another window in front.
   const id = await startSession(page, 'Take a while', 't18-slow#notify');
+  await page
+    .locator('[data-approval-card=command] button')
+    .filter({ hasText: /^(Allow once|仅本次允许)$/u })
+    .click();
   const settings = app.waitForEvent('window');
   await page.getByTestId('open-settings').click();
   const front = await settings;

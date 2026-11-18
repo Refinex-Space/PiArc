@@ -269,6 +269,13 @@ const api: PiarcApi = {
       .then((value: unknown) => expectString(value)),
   abort: (id) =>
     ipcRenderer.invoke(IPC_CHANNELS.sessionAbort, id).then((value: unknown) => expectString(value)),
+  setPermissionMode: async (id, mode) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.sessionPermissionMode, id, mode);
+  },
+  answerApproval: (answer) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.approvalAnswer, answer)
+      .then((value: unknown) => expectString(value)),
   compact: (id) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.sessionCompact, id)

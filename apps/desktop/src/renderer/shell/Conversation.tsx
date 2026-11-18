@@ -22,6 +22,7 @@ import { HISTORY } from '../transcript/constants.js';
 import { TranscriptContext, type TranscriptView } from '../transcript/services.js';
 import { Transcript } from '../transcript/Transcript.js';
 import { reason } from './errors.js';
+import { PermissionModeMenu } from './PermissionModeMenu.js';
 import { QueueList } from './QueueList.js';
 import { SessionInput, type Draft } from './session-input.js';
 import { sessionTitle } from './SessionRow.js';
@@ -152,7 +153,13 @@ function useHistory(
   return { loading, loadingEarlier, loadEarlier };
 }
 
-export function Conversation({ id }: { readonly id: string }) {
+export function Conversation({
+  id,
+  modeButton,
+}: {
+  readonly id: string;
+  readonly modeButton: React.Ref<HTMLButtonElement>;
+}) {
   const t = useT();
   const ui = useUi();
   const store = useStore();
@@ -162,6 +169,20 @@ export function Conversation({ id }: { readonly id: string }) {
   const queue = useQueue(id);
   const [error, setError] = useState<string | undefined>(undefined);
   const input = useMemo(() => new SessionInput(window.piarc, store, id), [store, id]);
+
+  // Indexed sessions carry no live policy. Resume alongside the history read so the
+  // environment bar reflects the latest persisted mode as soon as Core restores it.
+  const needsResume = session?.open === false;
+  useEffect(() => {
+    if (!needsResume) return;
+    let current = true;
+    input.ensureOpen().catch((failure: unknown) => {
+      if (current) setError(reason(failure));
+    });
+    return () => {
+      current = false;
+    };
+  }, [input, needsResume]);
 
   // Live notifications: the window keeps receiving them once the session was shown, so a
   // cached transcript stays current when the user comes back.
@@ -290,6 +311,15 @@ export function Conversation({ id }: { readonly id: string }) {
               />
             )
           }
+        />
+        <PermissionModeMenu
+          key={id}
+          id={id}
+          mode={session?.open === true ? session.permissionMode : undefined}
+          buttonRef={modeButton}
+          onError={(failure) => {
+            setError(t('composer.failed', { reason: reason(failure) }));
+          }}
         />
       </div>
     </section>

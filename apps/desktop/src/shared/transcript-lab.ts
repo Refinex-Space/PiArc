@@ -1,6 +1,8 @@
 // The transcript prototype page (renderer, `#/transcript-lab`) and what it exposes to L4 tests
 // and the S1 benchmark as `window.__piarcTranscriptLab`. Test-only: no product feature uses it.
 
+import type { ApprovalRequest } from '@piarc/protocol';
+
 /** Hash that opens the prototype page. */
 export const TRANSCRIPT_LAB_HASH = '#/transcript-lab';
 
@@ -43,6 +45,8 @@ export interface ScrollThresholds {
 }
 
 export interface TranscriptLabApi {
+  /** Displays a synthetic Core approval snapshot through the production rows. */
+  setApprovals(requests: ApprovalRequest[]): void;
   /** Removes every row. */
   clear(): void;
   /**

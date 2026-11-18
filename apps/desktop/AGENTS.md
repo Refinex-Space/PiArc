@@ -45,6 +45,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 ## 不变量
 
 - 新增 IPC 命令：在 `src/shared/ipc.ts` 加通道与 `PiarcApi` 成员，处理函数经 `registerHandler` 注册（ESLint 禁止直接 `ipcMain.handle`），参数当作 `unknown` 校验；同步更新 `e2e/preload.e2e.ts` 的键快照与 S10 报告。
+- T20 审批卡来自 `core/sessions` 的 `approvals` 实体快照，以 `requestId`、`connectionEpoch`、`revision` 绑定答复。审批入口是 `window.piarc.answerApproval`；`allowAlways` 必须由主进程用原生确认框显示准备保存的每条规则和目录，用户确认后才交给 Core。模式菜单使用注册表命令 `session.permissionMode`，模式与变更记录以 Core 为准。运行 `PIARC_EVIDENCE_TASK=T20 npm run test:e2e -w @piarc/desktop -- t20-approvals.e2e.ts` 覆盖端到端流程。
 - preload 不暴露 `ipcRenderer`，只能 `require('electron')`（ESLint 禁止 Node 内置模块）；以后的事件 API 必须剥掉 Electron 的 event 对象再交给页面回调。
 - 新增权限放行：在 `PERMISSION_ALLOWLIST` 加条目并写 `reason`，补 L4 用例，记入 S10 报告。
 - 不得放宽 `PRODUCTION_CSP`。开发服务器模式的放宽只放在 `dev-server.ts`，主进程只在 `import.meta.env.DEV` 下调用，打包时被删除。

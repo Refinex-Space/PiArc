@@ -10,6 +10,7 @@ import {
   type SessionEntry,
   type WorkspaceEntry,
 } from './snapshots.js';
+import { sameRequest } from './approvals.js';
 import { SessionTranscript } from './transcript.js';
 
 /** A notice for the user from Core (`core/notices`, for example a missing Git Bash). */
@@ -51,6 +52,7 @@ export class AppStore {
     let transcript = this.transcripts.get(id);
     if (transcript === undefined) {
       transcript = new SessionTranscript();
+      transcript.setApprovals(this.sessionById.get(id)?.approvals ?? []);
       this.transcripts.set(id, transcript);
       for (const listener of [...this.transcriptListeners]) {
         listener(transcript);
@@ -96,18 +98,26 @@ export class AppStore {
     this.sessionRevision = snapshot.revision;
     const changed: string[] = [];
     const seen = new Set<string>();
-    const next = snapshot.entries.map((entry) => {
-      seen.add(entry.id);
-      const old = this.sessionById.get(entry.id);
+    const next = snapshot.entries.map((snapshotEntry) => {
+      seen.add(snapshotEntry.id);
+      const old = this.sessionById.get(snapshotEntry.id);
+      const approvals = snapshotEntry.approvals;
+      const entry =
+        old?.approvals.length === approvals.length &&
+        old.approvals.every((a, i) => approvals[i] !== undefined && sameRequest(a, approvals[i]))
+          ? { ...snapshotEntry, approvals: old.approvals }
+          : snapshotEntry;
       if (old !== undefined && sameEntry(old, entry)) {
         return old;
       }
+      this.transcripts.get(entry.id)?.setApprovals(entry.approvals);
       this.sessionById.set(entry.id, entry);
       changed.push(entry.id);
       return entry;
     });
     for (const id of [...this.sessionById.keys()]) {
       if (!seen.has(id)) {
+        this.transcripts.get(id)?.setApprovals([]);
         this.sessionById.delete(id);
         changed.push(id);
       }

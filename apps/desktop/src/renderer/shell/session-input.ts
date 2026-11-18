@@ -80,6 +80,8 @@ function parseAttachment(text: string): InputAttachment {
 
 /** One session's input path. Recovery data lives with the optimistic row until Core echoes it. */
 export class SessionInput {
+  private opening: Promise<string> | undefined;
+
   constructor(
     private readonly api: Api,
     private readonly store: AppStore,
@@ -148,10 +150,12 @@ export class SessionInput {
   }
 
   /** Opens the session in Core when it is not (a session from the list, never opened here). */
-  private async ensureOpen(): Promise<void> {
-    if (this.store.session(this.sessionId)?.open !== true) {
-      await this.api.resumeSession(this.sessionId);
-    }
+  async ensureOpen(): Promise<void> {
+    if (this.store.session(this.sessionId)?.open === true) return;
+    this.opening ??= this.api.resumeSession(this.sessionId).finally(() => {
+      this.opening = undefined;
+    });
+    await this.opening;
   }
 
   /** The input for Core: stores the files first and remembers what was stored. */

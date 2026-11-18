@@ -7,6 +7,7 @@ import { expect, test } from './fixtures.js';
 /** The `window.piarc` allowlist. Changing it is a security review item (apps/desktop/CLAUDE.md). */
 const PIARC_API_SNAPSHOT = [
   'abort',
+  'answerApproval',
   'cancelFileSearch',
   'chooseFolder',
   'closeSession',
@@ -36,6 +37,7 @@ const PIARC_API_SNAPSHOT = [
   'resumeSession',
   'searchFiles',
   'setAttentionCount',
+  'setPermissionMode',
   'setPreference',
   'setSessionArchived',
   'setSessionPinned',

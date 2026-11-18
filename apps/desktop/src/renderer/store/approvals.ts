@@ -1,0 +1,72 @@
+// The approval ledger arrives inside session snapshots. Records are immutable at a revision.
+import type { ApprovalRequest, DiffHunk } from '@piarc/protocol';
+
+function record(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function integer(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+function hunk(value: unknown): value is DiffHunk {
+  if (
+    !record(value) ||
+    !integer(value.oldStart) ||
+    !integer(value.oldLines) ||
+    !integer(value.newStart) ||
+    !integer(value.newLines) ||
+    !Array.isArray(value.lines)
+  )
+    return false;
+  return value.lines.every(
+    (line: unknown) =>
+      record(line) &&
+      typeof line.text === 'string' &&
+      (line.kind === 'added' || line.kind === 'removed' || line.kind === 'context'),
+  );
+}
+
+export function isApproval(value: unknown, sessionId: string): value is ApprovalRequest {
+  if (
+    !record(value) ||
+    value.sessionId !== sessionId ||
+    typeof value.requestId !== 'string' ||
+    !integer(value.revision) ||
+    !integer(value.connectionEpoch) ||
+    typeof value.tool !== 'string'
+  )
+    return false;
+  if (
+    !['command', 'fileChange', 'permissionExpansion', 'question'].some(
+      (kind) => kind === value.kind,
+    )
+  )
+    return false;
+  if (
+    !['command', 'cwd', 'path', 'rule', 'directory'].every(
+      (key) => value[key] == null || typeof value[key] === 'string',
+    )
+  )
+    return false;
+  if (value.protectedPath != null && typeof value.protectedPath !== 'boolean') return false;
+  const diff = value.diff;
+  return (
+    diff == null ||
+    (record(diff) &&
+      typeof diff.unified === 'string' &&
+      typeof diff.path === 'string' &&
+      integer(diff.added) &&
+      integer(diff.removed) &&
+      Array.isArray(diff.hunks) &&
+      diff.hunks.every(hunk))
+  );
+}
+
+export function sameRequest(a: ApprovalRequest, b: ApprovalRequest): boolean {
+  return (
+    a.requestId === b.requestId &&
+    a.revision === b.revision &&
+    a.connectionEpoch === b.connectionEpoch
+  );
+}

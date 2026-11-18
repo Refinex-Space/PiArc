@@ -27,6 +27,12 @@ export interface CommandSpec {
 export const COMMANDS = [
   { id: 'session.new', defaultKey: 'Mod+N', label: 'command.session.new', scope: 'app' },
   { id: 'session.close', defaultKey: 'Mod+W', label: 'command.session.close', scope: 'app' },
+  {
+    id: 'session.permissionMode',
+    defaultKey: 'Mod+Shift+M',
+    label: 'approval.modeMenu',
+    scope: 'app',
+  },
   { id: 'session.next', defaultKey: 'Ctrl+Tab', label: 'command.session.next', scope: 'app' },
   {
     id: 'help.shortcuts',

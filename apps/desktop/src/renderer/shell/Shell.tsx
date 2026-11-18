@@ -22,6 +22,7 @@ import { groupSessions } from './Sidebar.js';
 import { Toasts } from './Toasts.js';
 import { TrustDialog, needsDecision, parseTrustView } from './TrustDialog.js';
 import { UiContext, type Toast, type TrustMode, type Ui, type View } from './ui.js';
+import { useUnsupportedQuestions } from './use-unsupported-questions.js';
 import { useAttention } from './use-attention.js';
 import { useCommands } from './use-commands.js';
 
@@ -32,6 +33,7 @@ interface TrustRequest {
 }
 
 function Attention() {
+  useUnsupportedQuestions();
   useAttention();
   return null;
 }
@@ -194,6 +196,7 @@ export function Shell() {
     ],
   );
 
+  const modeButton = useRef<HTMLButtonElement>(null);
   const run = (command: AppCommand) => {
     switch (command) {
       case 'session.new':
@@ -215,6 +218,9 @@ export function Shell() {
         }
         break;
       }
+      case 'session.permissionMode':
+        if (!trust && !shortcutsOpen) modeButton.current?.click();
+        break;
       case 'session.next': {
         const order = groupSessions(store.workspaces(), store.sessions(), '', false, '').flatMap(
           (g) => g.sessions.map((s) => s.id),
@@ -334,7 +340,7 @@ export function Shell() {
                   {view.kind === 'home' ? (
                     <Home workspace={view.workspace} draft={view.draft} failure={view.error} />
                   ) : (
-                    <Conversation id={view.id} />
+                    <Conversation id={view.id} modeButton={modeButton} />
                   )}
                 </PageBoundary>
               </main>

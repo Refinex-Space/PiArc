@@ -7,6 +7,7 @@ import { useT } from '../../app/app-context.js';
 import { useTranscriptRow, useTranscriptServices } from '../services.js';
 import { useListActions } from './list-actions.js';
 import { AgentMessageRow, OptimisticRow, ThinkingRow, UserMessageRow } from './messages.js';
+import { ApprovalCard } from './ApprovalCard.js';
 import { CompactionRow, ErrorCard, UncertainCard, WorkingRow } from './status.js';
 import { BashCard, FileChangeCard, ToolGroupRow } from './tools.js';
 
@@ -55,6 +56,15 @@ export class RowBoundary extends Component<
   }
 }
 
+function ModeChangeRow({ mode }: { readonly mode: 'default' | 'acceptEdits' }) {
+  const t = useT();
+  return (
+    <div className="row muted" data-testid="mode-change-row">
+      {t('approval.modeChanged', { mode: t(`approval.mode.${mode}`) })}
+    </div>
+  );
+}
+
 const RowContent = memo(function RowContent({ id }: { readonly id: string }) {
   const row = useTranscriptRow(id);
   useCommitted(id);
@@ -69,6 +79,8 @@ const RowContent = memo(function RowContent({ id }: { readonly id: string }) {
       return <ErrorCard row={row} />;
     case 'uncertain':
       return <UncertainCard row={row} />;
+    case 'approval':
+      return <ApprovalCard request={row.request} />;
     case 'working':
       return <WorkingRow />;
     case 'item':
@@ -86,6 +98,8 @@ const RowContent = memo(function RowContent({ id }: { readonly id: string }) {
       return <BashCard id={id} item={item} startedAt={row.startedAt} />;
     case 'fileChange':
       return <FileChangeCard id={id} item={item} />;
+    case 'permissionModeChanged':
+      return <ModeChangeRow mode={item.mode} />;
     case 'contextCompaction':
       return <CompactionRow id={id} item={item} />;
     default:

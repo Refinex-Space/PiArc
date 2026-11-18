@@ -34,6 +34,7 @@ test('the P0 rows of a real turn, and the working row through its phases', async
   await expect(page.getByTestId('thinking-block').first()).toBeVisible({ timeout: 20_000 });
   await expect(working).toBeVisible();
   await expect(page.getByTestId('working-elapsed')).toHaveText(/\d+ s/u);
+  await page.getByRole('button', { name: 'Allow once', exact: true }).click();
   // The command runs about two seconds: the working row names it.
   await expect(activity).toHaveText('Bash · sleep 2; echo checked', { timeout: 20_000 });
   await screenshots(page, testInfo, 'working-tool');
@@ -41,6 +42,7 @@ test('the P0 rows of a real turn, and the working row through its phases', async
   // The third response is a 429: Pi retries it, the working row counts.
   await expect(page.getByTestId('working-retry')).toHaveText('Retrying 1/3', { timeout: 20_000 });
   await page.screenshot({ path: testInfo.outputPath('working-retry.png') });
+  await page.getByRole('button', { name: 'Allow once', exact: true }).click();
   await idle(page);
 
   await expect(page.getByTestId('user-message').first()).toContainText('Resolve the TODO');

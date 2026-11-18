@@ -1,11 +1,18 @@
 // The IPC contract between the preload script and the main process: channel names and the
 // shape of `window.piarc`. Every channel is registered in the main process through
 // `registerHandler` (src/main/ipc/register.ts), which checks the sender's origin first.
-import type { InputAttachment, InputMention } from '@piarc/protocol';
+import type {
+  ApprovalAnswer,
+  PermissionMode,
+  InputAttachment,
+  InputMention,
+} from '@piarc/protocol';
 
 import type { CommandId } from './keybindings.js';
 import type { Locale } from './i18n/index.js';
 import type { PreferenceChange, Preferences } from './preferences.js';
+
+export type { ApprovalAnswer, PermissionMode } from '@piarc/protocol';
 
 /** Channel names, one per `window.piarc` command. */
 export const IPC_CHANNELS = {
@@ -32,6 +39,8 @@ export const IPC_CHANNELS = {
   sessionSteer: 'piarc:session.steer',
   sessionFollowUp: 'piarc:session.followUp',
   sessionAbort: 'piarc:session.abort',
+  sessionPermissionMode: 'piarc:session.permissionMode',
+  approvalAnswer: 'piarc:approval.answer',
   sessionCompact: 'piarc:session.compact',
   queueEdit: 'piarc:session.queueEdit',
   queueDelete: 'piarc:session.queueDelete',
@@ -308,6 +317,8 @@ export interface PiarcApi {
   followUp(id: string, input: string | OutgoingInput): Promise<string>;
   /** Stops the running turn; resolves with the returned queue as JSON. */
   abort(id: string): Promise<string>;
+  setPermissionMode(id: string, mode: PermissionMode): Promise<void>;
+  answerApproval(answer: ApprovalAnswer): Promise<string>;
   /** Compacts the conversation as a turn of its own (`/compact`); resolves with `{ turnId }`. */
   compact(id: string): Promise<string>;
   /** Changes the text of a queued input; resolves with the queue as JSON. */

@@ -335,7 +335,7 @@ export function FileChangeCard({
   );
 }
 
-function DiffView({
+export function DiffView({
   hunks,
   limit,
   onShowAll,

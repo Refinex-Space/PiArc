@@ -534,3 +534,77 @@ describe('P0 row types', () => {
     expect(byTestId(root, 'agent-message').textContent).toContain('fine');
   });
 });
+
+it('renders the four ledger card kinds, keeps approvals through a history reload, and removes invalidated requests', async () => {
+  const store = new AppStore();
+  const request = {
+    sessionId: 's',
+    revision: 1,
+    connectionEpoch: 2,
+    requestId: 'file',
+    tool: 'Edit',
+  };
+  const approvals = [
+    {
+      ...request,
+      kind: 'fileChange',
+      path: '.piarc/settings.json',
+      protectedPath: true,
+      diff: {
+        path: '.piarc/settings.json',
+        unified: '+new',
+        added: 1,
+        removed: 0,
+        hunks: [
+          {
+            oldStart: 1,
+            newStart: 1,
+            oldLines: 0,
+            newLines: 1,
+            lines: [{ text: 'new', kind: 'added' }],
+          },
+        ],
+      },
+    },
+    {
+      ...request,
+      requestId: 'bash',
+      tool: 'Bash',
+      kind: 'command',
+      command: 'echo first',
+      cwd: '/project',
+    },
+    {
+      ...request,
+      requestId: 'outside',
+      tool: 'Read',
+      kind: 'permissionExpansion',
+      path: '../a',
+      directory: '/other',
+    },
+    { ...request, requestId: 'form', tool: 'AskUserQuestion', kind: 'question' },
+  ];
+  store.applySessions({ revision: 1, sessions: [{ id: 's', approvals, pendingApprovals: 4 }] });
+  const transcript = store.transcript('s');
+  transcript.load([], 0);
+  const root = await render(transcript, transcript.rowIds());
+  expect(root.querySelectorAll('[data-approval-card]')).toHaveLength(4);
+  expect(root.querySelector('[data-approval-card="question"]')?.textContent).toContain(
+    'does not support question forms',
+  );
+  expect(root.querySelector('[data-approval-card="fileChange"]')?.textContent).not.toContain(
+    'Always allow',
+  );
+  expect(root.querySelector('.diff-line.is-added')?.textContent).toContain('new');
+  expect(root.querySelector('[data-approval-card="command"]')?.textContent).toContain('echo first');
+  expect(root.querySelector('[data-approval-card="permissionExpansion"]')?.textContent).toContain(
+    '/other',
+  );
+  act(() => {
+    store.applySessions({
+      revision: 2,
+      sessions: [{ id: 's', approvals: [], pendingApprovals: 0 }],
+    });
+  });
+  expect(root.querySelectorAll('[data-approval-card]')).toHaveLength(0);
+});
