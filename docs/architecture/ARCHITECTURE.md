@@ -1049,7 +1049,7 @@ T18 落地（ADR-0029）：快捷键注册表在 `src/shared/keybindings.ts`（�
 - **令牌分层**：原始色板 → 明暗阶梯 → 语义层（surface / text / border / accent / state / agent-status / diff / code）→ 组件层；四种模式（明、暗，各自含高对比度）× 两档密度。跟随 `prefers-color-scheme`、`prefers-contrast` 与 Windows 的 `forced-colors`。
 - **单一来源**：`design/tokens/*.json`，由脚本生成 CSS 自定义属性和 TypeScript 常量；CI 检查文本对比度（WCAG AA）。组件只读语义层。
 - **平台外观**：macOS 用隐藏式标题栏保留红绿灯、侧栏使用系统 vibrancy；Windows 11 使用 Mica 背景与标题栏覆盖层（窗口控件在右上）。Electron 45 没有 Liquid Glass API（相关 PR 已关闭未合并），第一版只用 vibrancy；系统绘制的标题栏、菜单和对话框会随系统外观变化。正文、代码、diff 使用不透明背景，保证可读性。
-- T18 落地（ADR-0029）：令牌在 `design/tokens/`（`palette` → `ramps` → `semantic` → `component`，另有 `scale` 与 `contrast`），`npm run gen:tokens` 生成 `tokens.generated.css`（`:root` 加 `data-color-mode` 四种模式、`data-density`、`prefers-color-scheme` 回退、`forced-colors` 映射到系统色）与 `src/shared/design-tokens.ts`（主进程取窗口背景与标题栏覆盖层颜色）。verify 检查生成物漂移、42 对前景 / 背景在四种模式下的对比度、主色色相不在 10°–50°、表面色不是暖奶油色、只用系统字体、不打包字体与音频。主题偏好经 `nativeTheme.themeSource` 同时作用于页面、vibrancy 材质与原生对话框。D3 未定，主色暂为中性的 indigo 色族，等视觉关口确认。窗口外观：macOS 为 `titleBarStyle: 'hidden'`、红绿灯位于 (16, 13)、`vibrancy: 'sidebar'`；Windows 为 Mica 与透明的标题栏覆盖层（符号色随主题），页面顶部 40 px 是拖动区；高对比度模式下侧栏不透明。
+- T18 落地（ADR-0029）：令牌在 `design/tokens/`（`palette` → `ramps` → `semantic` → `component`，另有 `scale` 与 `contrast`），`npm run gen:tokens` 生成 `tokens.generated.css`（`:root` 加 `data-color-mode` 四种模式、`data-density`、`prefers-color-scheme` 回退、`forced-colors` 映射到系统色）与 `src/shared/design-tokens.ts`（主进程取窗口背景与标题栏覆盖层颜色）。verify 检查生成物漂移、42 对前景 / 背景在四种模式下的对比度、主色色相不在 10°–50°、表面色不是暖奶油色、只用系统字体、不打包字体与音频。主题偏好经 `nativeTheme.themeSource` 同时作用于页面、vibrancy 材质与原生对话框。主色为 indigo 色族（用户在 T18 视觉关口确认，D3），名称字标仍待定。窗口外观：macOS 为 `titleBarStyle: 'hidden'`、红绿灯位于 (16, 13)、`vibrancy: 'sidebar'`；Windows 为 Mica 与透明的标题栏覆盖层（符号色随主题），页面顶部 40 px 是拖动区；高对比度模式下侧栏不透明。
 
 ### 8.7 无障碍与本地化
 
@@ -1504,7 +1504,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
-| 2.23 | 2026-11-18 | T18 补充（ADR-0029）：第 4 章加入 ADR-0029；7.6 写明会话元数据与客户端偏好的导出、信任决定在重启生效后才应答、启动同步后重发快照；8.2、8.3、8.5–8.8 写明窗口骨架与注册式容器、store、快捷键注册表、令牌管线与平台外观、本地化、通知与计数的落地；9.2 写明 schema v2 的 `custom_title`，9.3 写明归档与删除；10.2 写明信任闸门（I63）与对话框；10.3 写明新命令的校验与删除确认；第 11 章填入冷启动实测 |
+| 2.23 | 2026-11-18 | T18 补充（ADR-0029）：第 4 章加入 ADR-0029；7.6 写明会话元数据与客户端偏好的导出、信任决定在重启生效后才应答、启动同步后重发快照；8.2、8.3、8.5–8.8 写明窗口骨架与注册式容器、store、快捷键注册表、令牌管线与平台外观、本地化、通知与计数的落地；9.2 写明 schema v2 的 `custom_title`，9.3 写明归档与删除；10.2 写明信任闸门（I63）与对话框；10.3 写明新命令的校验与删除确认；第 11 章填入冷启动实测；8.6 写明主色经视觉关口确认 |
 | 2.22 | 2026-11-17 | T17 补充（ADR-0028）：第 4 章加入 ADR-0028 并注明 ADR-0020 第 1 条的 bash 部分被修订；6.1.3 的工具表 Bash 改为 PiArc 自写、增加 PowerShell；6.2.2 写明 Git Bash 的探测顺序与缺失时只提供 PowerShell；6.11 写明 Bash 行为的落地（进程树终止、超时、cwd 跟踪、输出预算、语义退出码、命令环境、实时输出窗口）；7.4 写明 `exec/run` 的新成员、`exec/shells` 与 `core/notices` |
 | 2.21 | 2026-11-17 | T16 补充（ADR-0027）：第 4 章加入 ADR-0027；6.1.2 增加各条不变量的实现表；6.1.3 的工具表写明 Read、Write、Edit 在 T16 的变化与新方法；6.15 的截断与重复读取两行写明实现位置；7.4 写明 `fs/spill`、`fs/pdf`、新成员、路径边界改为询问与四个新错误类别；7.7 写明行级 diff 的结构与降级 |
 | 2.20 | 2026-11-17 | T15 补充：12.3 写明场景格式的扩展（会话、动作、能力 ID、多端点、工具批次与 Core I/O 断言）、匹配规则与进程不复用的取舍；12.4 写明能力清单的字段、`client_only` 与检查命令 |

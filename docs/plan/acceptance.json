@@ -2008,8 +2008,8 @@
       "id": "T18-A03",
       "task": "T18",
       "description": "用户已确认视觉方向。验证：亮暗评审截图（`tmp/evidence/T18/`）与用户在会话中的确认。",
-      "status": "blocked",
-      "evidence": "等待用户在视觉关口确认视觉方向。评审截图（macOS 原生窗口捕获，含 vibrancy 与红绿灯）在 tmp/evidence/T18/review/：main-{light,dark}-{comfortable,compact}.png、main-{light,dark}-high-contrast.png、trust-{light,dark}.png、settings-{light,dark}.png、native-window.png；由 L4 e2e/t18-review.e2e.ts 生成。D3 未定，当前为中性临时令牌（主色 indigo 色族）。"
+      "status": "passing",
+      "evidence": "用户于 2026-11-18 在本任务会话中确认视觉方向（选择 \"Approve direction\"）：中性冷灰 + indigo 主色（明 #3b5bdb、暗 #4568e6）、系统字体，令牌在 design/tokens/。评审截图（macOS 原生窗口捕获）tmp/evidence/T18/review/：main-{light,dark}-{comfortable,compact}.png、main-{light,dark}-high-contrast.png、trust-{light,dark}.png、settings-{light,dark}.png、native-window.png，由 L4 e2e/t18-review.e2e.ts 生成。"
     },
     {
       "id": "T18-A04",
