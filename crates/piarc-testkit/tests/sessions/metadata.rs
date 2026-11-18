@@ -156,6 +156,45 @@ async fn deleted_sessions_stay_deleted(env: &Env, id: &str, file: &str) {
     shutdown(core).await;
 }
 
+/// The same while the workspace's Agent Host is still starting: the decision must not let a
+/// request reach the first process, which is about to restart.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_trust_decision_while_the_agent_host_starts_still_lets_a_session_start() {
+    let env = Env::new("trust while starting").await;
+    let (core, events) = env.start(env.config(&[]));
+    let (done, opened) = reply();
+    core.open_workspace(env.ws.clone(), done).expect("queued");
+    // Decide as soon as Core lists the workspace as starting, before it is ready.
+    events
+        .until("the workspace starting", |route, v| {
+            route == "core/workspaces"
+                && v["workspaces"]
+                    .as_array()
+                    .is_some_and(|w| w.iter().any(|w| w["host"] == "starting"))
+        })
+        .await;
+    let (decided_tx, decided_rx) = tokio::sync::oneshot::channel();
+    core.trust_view(env.ws.clone(), Some(true), move |result| {
+        let _ = decided_tx.send(result.map(|view| view.trusted));
+    })
+    .expect("queued");
+    assert!(decided_rx.await.expect("answered").expect("decided"));
+    let (done, rx) = reply();
+    core.create_session(env.ws.clone(), None, crate::support::mock_model(), done)
+        .expect("queued");
+    let created = answer(rx)
+        .await
+        .expect("the session starts on the restarted host");
+    answer(opened).await.expect("the workspace opened");
+    let id = created["sessionId"].as_str().expect("an id").to_owned();
+    let turn = prompt(&core, &id, &prompt_text("Question one.", "chat")).await;
+    assert_eq!(
+        events.turn_completed(&id, &turn).await["status"],
+        "completed"
+    );
+    shutdown(core).await;
+}
+
 /// Deleting an open session that is running closes it first (its Agent Host stops writing).
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn deleting_an_open_session_closes_it_first() {
@@ -194,14 +233,22 @@ async fn a_session_created_right_after_a_trust_decision_starts() {
             let _ = decided_tx.send(result.map(|view| view.trusted));
         })
         .expect("queued");
-        assert_eq!(decided_rx.await.expect("answered").expect("decided"), trusted);
+        assert_eq!(
+            decided_rx.await.expect("answered").expect("decided"),
+            trusted
+        );
         let (done, rx) = reply();
         core.create_session(env.ws.clone(), None, crate::support::mock_model(), done)
             .expect("queued");
-        let created = answer(rx).await.expect("the session starts on the restarted host");
+        let created = answer(rx)
+            .await
+            .expect("the session starts on the restarted host");
         let id = created["sessionId"].as_str().expect("an id").to_owned();
         let turn = prompt(&core, &id, &prompt_text("Question one.", "chat")).await;
-        assert_eq!(events.turn_completed(&id, &turn).await["status"], "completed");
+        assert_eq!(
+            events.turn_completed(&id, &turn).await["status"],
+            "completed"
+        );
     }
     shutdown(core).await;
 }

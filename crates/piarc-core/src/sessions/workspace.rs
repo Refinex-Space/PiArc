@@ -120,6 +120,8 @@ impl WorkspaceHandle {
             waiting: Vec::new(),
             busy: HashSet::new(),
             idle_generation: 0,
+            connected_epoch: 0,
+            trust_restart_epoch: None,
             settings,
         };
         ctx.handle.spawn(actor.run(rx));
@@ -252,6 +254,11 @@ struct WorkspaceActor {
         reason = "held for its file watcher, which stops when it is dropped"
     )]
     settings: Option<WorkspaceSettings>,
+    /// The epoch of the last `Connected` of the current supervisor (0 before the first).
+    connected_epoch: u64,
+    /// A trust restart was asked for: the host is ready only once a process of this epoch or
+    /// later connected (the process before it is about to restart).
+    trust_restart_epoch: Option<u64>,
 }
 
 impl WorkspaceActor {
@@ -280,7 +287,11 @@ impl WorkspaceActor {
                 }
                 WsMsg::Host { .. } => {}
                 WsMsg::Restored { generation } if generation == self.generation => {
-                    self.ready();
+                    // Sessions reopened on a process that a trust change restarts next: the
+                    // restarted process is the one to wait for.
+                    if self.trust_restart_epoch.is_none() {
+                        self.ready();
+                    }
                 }
                 WsMsg::Restored { .. } => {}
                 WsMsg::IdleTimeout { generation } => self.on_idle(generation),
@@ -326,6 +337,9 @@ impl WorkspaceActor {
 
     fn start_host(&mut self) {
         self.generation += 1;
+        // A new process asks for the trust itself when it starts.
+        self.connected_epoch = 0;
+        self.trust_restart_epoch = None;
         self.idle_generation += 1;
         let Some(launch) = self.ctx.config.launch.clone() else {
             return;
@@ -378,6 +392,8 @@ impl WorkspaceActor {
         tracing::info!(target: "piarc_core::trust", workspace = %self.handle.path.display(),
             "project trust changed; restarting the workspace's Agent Host");
         self.host = Host::Restarting(supervisor.clone());
+        // A process still starting will connect as epoch 1 and then restart: wait for epoch 2.
+        self.trust_restart_epoch = Some(self.connected_epoch.max(1) + 1);
         self.publish(HostState::Restarting, true);
         self.ctx
             .handle
@@ -391,10 +407,25 @@ impl WorkspaceActor {
                     Host::Starting(s) | Host::Restarting(s) | Host::Ready(s) => s.clone(),
                     Host::Stopped | Host::Failed(_) => return,
                 };
+                self.connected_epoch = epoch;
+                // The process a pending trust restart replaces: requests keep waiting.
+                let replaced = self
+                    .trust_restart_epoch
+                    .is_some_and(|wanted| epoch < wanted);
+                if !replaced {
+                    self.trust_restart_epoch = None;
+                }
                 if epoch == 1 {
-                    // A fresh process: reopen the sessions that are open in Core.
-                    self.host = Host::Starting(supervisor.clone());
+                    // A fresh process: reopen the sessions that are open in Core (the
+                    // supervisor carries them over if a trust change restarts it).
+                    self.host = if replaced {
+                        Host::Restarting(supervisor.clone())
+                    } else {
+                        Host::Starting(supervisor.clone())
+                    };
                     self.restore(supervisor);
+                } else if replaced {
+                    self.host = Host::Restarting(supervisor);
                 } else {
                     // A restart: the supervisor reopens its sessions itself.
                     self.host = Host::Ready(supervisor);
