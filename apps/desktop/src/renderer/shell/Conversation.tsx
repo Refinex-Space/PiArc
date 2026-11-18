@@ -1,109 +1,113 @@
-// A session in the main area: its title and status, and its messages as plain text. The full
-// transcript (Markdown, tool cards, virtualization, composer) is T19's; this view reads the
-// same store rows, so T19 replaces the row rendering without touching the data flow.
-import { memo, useEffect, useState } from 'react';
+// A session in the main area (architecture section 8.2): its title and status, the transcript
+// (Core's live notifications and its persisted history through one reducer, T19) and the
+// composer with the queue above it. A session shown before in this window is still in the store
+// and shows at once; one shown for the first time loads its last page of history, and earlier
+// pages when the user scrolls to the top.
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useT } from '../app/app-context.js';
 import { useWindowFocused } from '../app/window-focus.js';
-import { useRow, useRowIds, useSession, useStore, useTurnState } from '../store/hooks.js';
+import type { PaletteCommand } from '../composer/command-plugin.js';
+import {
+  Composer,
+  type ComposerHandlers,
+  type ComposerSubmission,
+  type MentionSource,
+} from '../composer/Composer.js';
+import type { MentionData } from '../composer/schema.js';
+import { useNeedsReload, useQueue, useSession, useStore, useTurnInfo } from '../store/hooks.js';
 import { badgeOf } from '../store/status.js';
+import type { SessionTranscript } from '../store/transcript.js';
+import { HISTORY } from '../transcript/constants.js';
+import { TranscriptContext, type TranscriptView } from '../transcript/services.js';
+import { Transcript } from '../transcript/Transcript.js';
+import { reason } from './errors.js';
+import { QueueList } from './QueueList.js';
+import { SessionInput, type Draft } from './session-input.js';
 import { sessionTitle } from './SessionRow.js';
 import { StatusBadge } from './StatusBadge.js';
 import { useUi } from './ui.js';
 
-/** How many persisted items a session shows when it is opened. */
-const WINDOW = 200;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
-const Row = memo(function Row({
-  sessionId,
-  id,
-}: {
-  readonly sessionId: string;
-  readonly id: string;
-}) {
-  const t = useT();
-  const row = useRow(sessionId, id);
-  if (row === undefined) {
-    return null;
+/** Core's `transcript_window` answer: `{ start, items: [{ entryId, item }] }`. */
+function parseWindow(text: string): { start: number; items: { entryId: string; item: unknown }[] } {
+  const value: unknown = JSON.parse(text);
+  if (!isRecord(value) || !Array.isArray(value.items)) {
+    return { start: 0, items: [] };
   }
-  if (row.kind === 'optimistic') {
-    return (
-      <div className="message message-user is-pending" data-testid="optimistic-message">
-        <div className="message-author">{t('conversation.you')}</div>
-        <div className="message-text">{row.text}</div>
-        {row.turnId === undefined && <div className="muted small">{t('conversation.pending')}</div>}
-      </div>
-    );
-  }
-  const { item } = row;
-  switch (item.type) {
-    case 'userMessage':
-      return (
-        <div className="message message-user" data-testid="user-message">
-          <div className="message-author">{t('conversation.you')}</div>
-          <div className="message-text">{item.text}</div>
-        </div>
-      );
-    case 'agentMessage':
-      return (
-        <div className="message message-agent" data-testid="agent-message">
-          <div className="message-author">{t('conversation.agent')}</div>
-          <div className="message-text">{item.text}</div>
-        </div>
-      );
-    case 'reasoning':
-      return <div className="message-note muted small">{t('conversation.thinking')}</div>;
-    default:
-      return (
-        <div className="message-note muted small" data-testid="tool-item">
-          <code>{'tool' in item && typeof item.tool === 'string' ? item.tool : item.type}</code>
-          {' · '}
-          {item.status}
-        </div>
-      );
-  }
-});
+  const items = value.items.flatMap((entry: unknown) =>
+    isRecord(entry) && typeof entry.entryId === 'string'
+      ? [{ entryId: entry.entryId, item: entry.item }]
+      : [],
+  );
+  return { start: typeof value.start === 'number' ? value.start : 0, items };
+}
 
-export function Conversation({ id }: { readonly id: string }) {
-  const t = useT();
-  const ui = useUi();
-  const store = useStore();
-  const session = useSession(id);
-  const ids = useRowIds(id);
-  const { error } = useTurnState(id);
+/** Core's file search as the composer's `@` source, below the session's working directory. */
+function coreMentions(root: string | undefined, limit: number): MentionSource {
+  const searchId = `mention-${crypto.randomUUID()}`;
+  return {
+    search: async (query) => {
+      if (root === undefined) {
+        return [];
+      }
+      const value: unknown = JSON.parse(
+        await window.piarc.searchFiles(searchId, root, query, limit),
+      );
+      const results = isRecord(value) && Array.isArray(value.results) ? value.results : [];
+      return results.flatMap((result: unknown): MentionData[] =>
+        isRecord(result) && typeof result.path === 'string' && typeof result.name === 'string'
+          ? [{ id: result.path, label: result.name, path: result.path }]
+          : [],
+      );
+    },
+    cancel: () => {
+      window.piarc.cancelFileSearch(searchId).catch((error: unknown) => {
+        console.error('[conversation] cannot cancel the file search', error);
+      });
+    },
+  };
+}
+
+function draftOf(submission: ComposerSubmission): Draft {
+  return {
+    text: submission.text,
+    mentions: submission.spans,
+    pending: submission.attachments,
+    stored: [],
+  };
+}
+
+/** Loads the history when the session was not shown before, and again after lost events. */
+function useHistory(
+  id: string,
+  transcript: SessionTranscript,
+): {
+  loading: boolean;
+  loadingEarlier: boolean;
+  loadEarlier: () => void;
+} {
+  const needsReload = useNeedsReload(id);
   const [loading, setLoading] = useState(false);
-
-  // Live notifications while the session is shown; the persisted conversation when it was not
-  // started in this window.
-  useEffect(() => ui.connection.watchSession(id), [ui.connection, id]);
+  const [loadingEarlier, setLoadingEarlier] = useState(false);
   useEffect(() => {
-    const transcript = store.transcript(id);
-    if (transcript.rowIds().length > 0) {
+    if (transcript.hasContent() && !needsReload) {
       return;
     }
     let active = true;
     setLoading(true);
-    window.piarc.transcriptWindow(id, null, WINDOW).then(
+    window.piarc.transcriptWindow(id, null, HISTORY.pageItems).then(
       (text) => {
         if (!active) {
           return;
         }
         setLoading(false);
-        const parsed: unknown = JSON.parse(text);
-        const items =
-          typeof parsed === 'object' &&
-          parsed !== null &&
-          Array.isArray((parsed as { items?: unknown }).items)
-            ? (parsed as { items: unknown[] }).items.flatMap((entry) =>
-                typeof entry === 'object' &&
-                entry !== null &&
-                typeof (entry as { entryId?: unknown }).entryId === 'string'
-                  ? [entry as { entryId: string; item: unknown }]
-                  : [],
-              )
-            : [];
-        if (transcript.rowIds().length === 0) {
-          transcript.load(items);
+        const window = parseWindow(text);
+        if (!transcript.hasContent() || transcript.needsReload()) {
+          transcript.load(window.items, window.start);
         }
       },
       (failure: unknown) => {
@@ -116,7 +120,46 @@ export function Conversation({ id }: { readonly id: string }) {
     return () => {
       active = false;
     };
-  }, [store, id]);
+  }, [id, transcript, needsReload]);
+  const loadEarlier = useCallback(() => {
+    const start = transcript.historyStart();
+    if (start === undefined || start === 0 || loadingEarlier) {
+      return;
+    }
+    const from = Math.max(0, start - HISTORY.pageItems);
+    setLoadingEarlier(true);
+    window.piarc.transcriptWindow(id, from, start - from).then(
+      (text) => {
+        setLoadingEarlier(false);
+        const window = parseWindow(text);
+        transcript.prepend(window.items, window.start);
+      },
+      (failure: unknown) => {
+        setLoadingEarlier(false);
+        console.error('[conversation] cannot load earlier messages', failure);
+      },
+    );
+  }, [id, transcript, loadingEarlier]);
+  return { loading, loadingEarlier, loadEarlier };
+}
+
+export function Conversation({ id }: { readonly id: string }) {
+  const t = useT();
+  const ui = useUi();
+  const store = useStore();
+  const session = useSession(id);
+  const transcript = store.transcript(id);
+  const turn = useTurnInfo(id);
+  const queue = useQueue(id);
+  const [error, setError] = useState<string | undefined>(undefined);
+  const input = useMemo(() => new SessionInput(window.piarc, store, id), [store, id]);
+
+  // Live notifications: the window keeps receiving them once the session was shown, so a
+  // cached transcript stays current when the user comes back.
+  useEffect(() => {
+    ui.watchSession(id);
+  }, [ui, id]);
+  const history = useHistory(id, transcript);
 
   // Shown to the user (the window in front): no longer unread.
   const unread = session?.unread === true;
@@ -129,7 +172,73 @@ export function Conversation({ id }: { readonly id: string }) {
     }
   }, [id, unread, focused]);
 
+  const view = useMemo<TranscriptView>(
+    () => ({
+      services: ui.transcriptServices,
+      transcript,
+      actions: {
+        retry: (turnId) => {
+          void input.retry(turnId);
+        },
+        resend: (clientId) => {
+          void input.resend(clientId);
+        },
+      },
+    }),
+    [ui.transcriptServices, transcript, input],
+  );
+  const mentions = useMemo(
+    () => coreMentions(session?.cwd ?? session?.workspace, ui.composer?.maxSearchResults ?? 20),
+    [session?.cwd, session?.workspace, ui.composer?.maxSearchResults],
+  );
+  const runCommand = useCallback(
+    (command: PaletteCommand) => {
+      switch (command.action) {
+        case 'newSession':
+          ui.show({ kind: 'home', workspace: session?.workspace });
+          break;
+        case 'compact':
+          window.piarc.compact(id).catch((failure: unknown) => {
+            setError(t('composer.failed', { reason: reason(failure) }));
+          });
+          break;
+        case 'help':
+          ui.openShortcuts();
+          break;
+        default:
+          break;
+      }
+    },
+    [ui, session?.workspace, id, t],
+  );
+  const handlers = useMemo<ComposerHandlers>(
+    () => ({
+      submit(intent, submission) {
+        setError(undefined);
+        const draft = draftOf(submission);
+        if (intent === 'send') {
+          void input.send(draft);
+          return;
+        }
+        input.add(intent === 'steer' ? 'steer' : 'followUp', draft).catch((failure: unknown) => {
+          setError(t('composer.failed', { reason: reason(failure) }));
+        });
+      },
+      stop() {
+        window.piarc.abort(id).catch((failure: unknown) => {
+          console.error('[conversation] cannot stop the turn', failure);
+        });
+      },
+      command: () => undefined,
+      runCommand,
+      mentionOpened: () => undefined,
+      mentionChosen: () => undefined,
+    }),
+    [input, id, t, runCommand],
+  );
+
   const title = sessionTitle(session?.title, t('session.untitled'));
+  const empty = !history.loading && !transcript.hasContent();
   return (
     <section className="conversation" data-testid="conversation" data-session-id={id}>
       <header className="titlebar main-titlebar conversation-header">
@@ -138,17 +247,41 @@ export function Conversation({ id }: { readonly id: string }) {
           {title}
         </h1>
       </header>
-      <div className="conversation-body">
-        {loading && ids.length === 0 && <p className="muted">{t('conversation.loading')}</p>}
-        {!loading && ids.length === 0 && <p className="muted">{t('conversation.empty')}</p>}
-        {ids.map((rowId) => (
-          <Row key={rowId} sessionId={id} id={rowId} />
-        ))}
-        {(error ?? session?.error) !== undefined && session?.status === 'error' && (
-          <p className="error-text" role="alert">
-            {t('conversation.error', { message: error ?? session.error ?? '' })}
-          </p>
-        )}
+      <TranscriptContext.Provider value={view}>
+        <div className="conversation-body">
+          {history.loading && !transcript.hasContent() ? (
+            <p className="muted conversation-note">{t('conversation.loading')}</p>
+          ) : null}
+          {empty ? <p className="muted conversation-note">{t('conversation.empty')}</p> : null}
+          <Transcript onReachTop={history.loadEarlier} loadingEarlier={history.loadingEarlier} />
+        </div>
+      </TranscriptContext.Provider>
+      <div className="conversation-composer">
+        <Composer
+          running={turn.running}
+          handlers={handlers}
+          mentions={mentions}
+          commands={ui.composer?.commands ?? []}
+          limits={ui.composer?.limits}
+          error={error}
+          above={
+            queue.length === 0 ? null : (
+              <QueueList
+                items={queue}
+                onEdit={(itemId, text) => {
+                  window.piarc.editQueueItem(id, itemId, text).catch((failure: unknown) => {
+                    setError(t('composer.failed', { reason: reason(failure) }));
+                  });
+                }}
+                onDelete={(itemId) => {
+                  window.piarc.deleteQueueItem(id, itemId).catch((failure: unknown) => {
+                    setError(t('composer.failed', { reason: reason(failure) }));
+                  });
+                }}
+              />
+            )
+          }
+        />
       </div>
     </section>
   );

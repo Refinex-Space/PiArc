@@ -162,7 +162,7 @@ describe('optimistic echo', () => {
   it('is replaced in place by Core’s message once confirmed, never twice', () => {
     const transcript = new AppStore().transcript(SESSION);
     transcript.apply([started('t0', agent('m0', 'earlier'))]);
-    transcript.addOptimistic('c1', 'Hello');
+    transcript.addOptimistic('c1', { text: 'Hello', mentions: [], attachments: [] });
     expect(transcript.rowIds()).toEqual(['m0', 'optimistic:c1']);
     transcript.confirm('c1', 't1');
     transcript.apply([user('t1', 'Hello'), started('t1', agent('m1', 'Hi'))]);
@@ -171,7 +171,7 @@ describe('optimistic echo', () => {
 
   it('handles Core’s message arriving before the prompt’s reply', () => {
     const transcript = new AppStore().transcript(SESSION);
-    transcript.addOptimistic('c1', 'Hello');
+    transcript.addOptimistic('c1', { text: 'Hello', mentions: [], attachments: [] });
     transcript.apply([user('t1', 'Hello')]);
     expect(transcript.rowIds()).toEqual(['t1:user:0']);
     transcript.confirm('c1', 't1');
@@ -180,7 +180,7 @@ describe('optimistic echo', () => {
 
   it('rolls back a failed input', () => {
     const transcript = new AppStore().transcript(SESSION);
-    transcript.addOptimistic('c1', 'Hello');
+    transcript.addOptimistic('c1', { text: 'Hello', mentions: [], attachments: [] });
     transcript.rollback('c1');
     expect(transcript.rowIds()).toEqual([]);
   });

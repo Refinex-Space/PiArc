@@ -637,10 +637,24 @@ textarea.input {
 }
 
 .conversation-body {
+  position: relative;
+  display: flex;
   flex: 1;
-  overflow-y: auto;
-  padding: var(--piarc-space-4) max(var(--piarc-space-5), calc((100% - 760px) / 2));
-  user-select: text;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.conversation-note {
+  position: absolute;
+  top: var(--piarc-space-4);
+  left: 50%;
+  margin: 0;
+  transform: translateX(-50%);
+}
+
+.conversation-composer {
+  border-top: 1px solid var(--piarc-border-subtle);
+  background: var(--piarc-surface-app);
 }
 
 .message {

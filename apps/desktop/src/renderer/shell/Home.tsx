@@ -8,14 +8,9 @@ import { flushSync } from 'react-dom';
 import { isImeComposing } from '../composer/ime-guard.js';
 import { useT } from '../app/app-context.js';
 import { useStore, useWorkspaces } from '../store/hooks.js';
+import { reason } from './errors.js';
 import { startSession } from './start-session.js';
 import { useUi } from './ui.js';
-
-function reason(error: unknown): string {
-  const text = error instanceof Error ? error.message : String(error);
-  // `ipcRenderer.invoke` prefixes "Error invoking remote method '<channel>': Error: ".
-  return text.replace(/^Error invoking remote method '[^']*': (?:\w*Error: )?/, '');
-}
 
 export function Home({
   workspace: requested,

@@ -16,6 +16,7 @@ import {
 } from './mention-plugin.js';
 import { composerSchema, type MentionData } from './schema.js';
 import { isBlank, serializeDoc } from './serialize.js';
+import { commandKey, commandPlugin, filterCommands, openCommands } from './command-plugin.js';
 
 const README: MentionData = { id: 'readme', label: 'README.md', path: 'docs/README.md' };
 
@@ -91,11 +92,8 @@ describe('mentions', () => {
     // Sent text: the path; data: the full mention; display: a chip with the label.
     expect(payload.text).toBe('read @docs/README.md please');
     expect(payload.mentions).toEqual([README]);
-    expect(payload.segments).toEqual([
-      { kind: 'text', text: 'read ' },
-      { kind: 'mention', label: 'README.md', path: 'docs/README.md' },
-      { kind: 'text', text: ' please' },
-    ]);
+    expect(payload.spans).toEqual([{ path: 'docs/README.md', start: 5, end: 20 }]);
+    expect(payload.text.slice(5, 20)).toBe('@docs/README.md');
     const mentionNode = current.doc.firstChild?.child(1);
     expect(mentionNode?.type.name).toBe('mention');
     expect(mentionNode?.textContent).toBe('');
@@ -118,5 +116,30 @@ describe('serializeDoc', () => {
     expect(serializeDoc(doc).text).toBe('one\n\ntwo');
     expect(isBlank(serializeDoc(state('   ').doc))).toBe(true);
     expect(isBlank(serializeDoc(doc))).toBe(false);
+  });
+});
+
+describe('command palette', () => {
+  const COMMANDS = [
+    { name: 'clear', description: '', source: 'builtin', action: 'newSession' },
+    { name: 'compact', description: '', source: 'builtin', action: 'compact' },
+    { name: 'help', description: '', source: 'builtin', action: 'help' },
+  ];
+
+  it('filters commands fuzzily, prefixes first', () => {
+    expect(filterCommands(COMMANDS, '').map((c) => c.name)).toEqual(['clear', 'compact', 'help']);
+    expect(filterCommands(COMMANDS, 'cp').map((c) => c.name)).toEqual(['compact']);
+    expect(filterCommands(COMMANDS, 'l').map((c) => c.name)).toEqual(['clear', 'help']);
+    expect(filterCommands(COMMANDS, 'HE').map((c) => c.name)).toEqual(['help']);
+  });
+
+  it('opens on a typed slash, follows the query and closes on whitespace', () => {
+    let current = EditorState.create({ schema: composerSchema, plugins: [commandPlugin()] });
+    current = current.apply(openCommands(current, 1, 1));
+    expect(commandKey.getState(current)).toMatchObject({ active: true, query: '' });
+    current = current.apply(current.tr.insertText('co'));
+    expect(commandKey.getState(current)).toMatchObject({ active: true, query: 'co' });
+    current = current.apply(current.tr.insertText(' '));
+    expect(commandKey.getState(current)?.active).toBe(false);
   });
 });

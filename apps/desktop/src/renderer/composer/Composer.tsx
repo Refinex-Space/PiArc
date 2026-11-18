@@ -1,21 +1,40 @@
 // The composer (architecture sections 8.2 and 8.5): ProseMirror multi-line input with `@` mention
-// chips, the idle/running key semantics of intents.ts, and the input method guard in front of
-// every key and trigger. Pasting inserts plain text only.
+// chips found by Core's fuzzy file search, the `/` command palette of Core's commands, image and
+// PDF attachments by drop or paste, the idle/running key semantics of intents.ts, and the input
+// method guard in front of every key and trigger. Pasting text inserts plain text only.
 import { baseKeymap, splitBlock } from 'prosemirror-commands';
 import { history, redo, undo } from 'prosemirror-history';
 import { keydownHandler, keymap } from 'prosemirror-keymap';
 import { Fragment, Slice } from 'prosemirror-model';
 import { EditorState, type Command } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
+import { useApp } from '../app/app-context.js';
+import { formatSize } from '../transcript/rows/common.js';
+import {
+  checkFiles,
+  type AttachmentLimits,
+  type AttachmentProblem,
+  type PendingAttachment,
+} from './attachments.js';
+import {
+  CLOSED_COMMANDS,
+  closeCommands,
+  commandKey,
+  commandPlugin,
+  filterCommands,
+  moveCommands,
+  openCommands,
+  type CommandState,
+  type PaletteCommand,
+} from './command-plugin.js';
 import { isImeComposing } from './ime-guard.js';
 import { COMPOSER_KEYS, intentFor, type ComposerKey } from './intents.js';
 import {
   CLOSED_MENTION,
   chooseMention,
   closeMention,
-  matchCandidates,
   mentionKey,
   mentionPlugin,
   moveMention,
@@ -25,17 +44,32 @@ import {
 import { composerSchema, type MentionData } from './schema.js';
 import { isBlank, serializeDoc, type ComposerPayload } from './serialize.js';
 
+/** What the composer hands over on Enter / Mod+Enter. */
+export interface ComposerSubmission extends ComposerPayload {
+  readonly attachments: readonly PendingAttachment[];
+}
+
 export interface ComposerHandlers {
   /** Enter, Mod+Enter: send when idle; steer or queue while running. */
-  submit(intent: 'send' | 'steer' | 'queue', payload: ComposerPayload): void;
+  submit(intent: 'send' | 'steer' | 'queue', submission: ComposerSubmission): void;
   /** Esc while running. */
   stop(): void;
-  /** `/` typed into an empty composer (the command list arrives with T37). */
+  /** `/` typed into an empty composer opened the palette. */
   command(): void;
+  /** A command was chosen in the palette. */
+  runCommand?(command: PaletteCommand): void;
   /** `@` opened the mention picker. */
   mentionOpened(): void;
   /** A mention was inserted. */
   mentionChosen(mention: MentionData): void;
+}
+
+/** Where `@` candidates come from (Core's file search; a fixed list on the prototype page). */
+export interface MentionSource {
+  /** The candidates for `query`; a newer call supersedes an older one. */
+  search(query: string): Promise<readonly MentionData[]>;
+  /** The picker closed: stop searching. */
+  cancel(): void;
 }
 
 function emptyState(): EditorState {
@@ -43,6 +77,7 @@ function emptyState(): EditorState {
     schema: composerSchema,
     plugins: [
       mentionPlugin(),
+      commandPlugin(),
       history(),
       keymap({ 'Mod-z': undo, 'Mod-Shift-z': redo, 'Mod-y': redo }),
       keymap(baseKeymap),
@@ -60,41 +95,103 @@ function clearCommand(): Command {
 }
 
 /** Plain-text paste: one paragraph per line, never the clipboard's HTML. */
-function pastePlainText(view: EditorView, event: ClipboardEvent): boolean {
-  const text = event.clipboardData?.getData('text/plain') ?? '';
-  if (text !== '') {
-    const paragraphs = text
-      .replace(/\r\n?/gu, '\n')
-      .split('\n')
-      .map((line) =>
-        composerSchema.node('paragraph', null, line === '' ? [] : [composerSchema.text(line)]),
-      );
-    view.dispatch(view.state.tr.replaceSelection(new Slice(Fragment.from(paragraphs), 1, 1)));
-  }
-  return true;
+function pastePlainText(view: EditorView, text: string): void {
+  const paragraphs = text
+    .replace(/\r\n?/gu, '\n')
+    .split('\n')
+    .map((line) =>
+      composerSchema.node('paragraph', null, line === '' ? [] : [composerSchema.text(line)]),
+    );
+  view.dispatch(view.state.tr.replaceSelection(new Slice(Fragment.from(paragraphs), 1, 1)));
+}
+
+/** Files of a paste or drop. */
+function filesOf(transfer: DataTransfer | null): File[] {
+  return transfer === null ? [] : [...transfer.files];
 }
 
 export function Composer({
   running,
-  candidates,
+  disabled = false,
   handlers,
+  mentions,
+  commands,
+  limits,
+  above,
+  error,
 }: {
   running: boolean;
-  candidates: readonly MentionData[];
+  disabled?: boolean;
   handlers: ComposerHandlers;
+  mentions: MentionSource;
+  commands: readonly PaletteCommand[];
+  /** What can be attached; without limits nothing can. */
+  limits: AttachmentLimits | undefined;
+  /** Shown above the input (the queue). */
+  above?: ReactNode;
+  /** Why the last message was not sent. */
+  error?: string | undefined;
 }) {
+  const { t, platform } = useApp();
   const mount = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
-  // The editor's callbacks are created once; they read the latest props through these refs.
-  const latest = useRef({ running, candidates, handlers });
-  latest.current = { running, candidates, handlers };
   const [mention, setMention] = useState<MentionState>(CLOSED_MENTION);
+  const [palette, setPalette] = useState<CommandState>(CLOSED_COMMANDS);
+  const [results, setResults] = useState<{ query: string; items: readonly MentionData[] }>({
+    query: '',
+    items: [],
+  });
+  const [pending, setPending] = useState<readonly PendingAttachment[]>([]);
+  const [problems, setProblems] = useState<readonly AttachmentProblem[]>([]);
+  const [empty, setEmpty] = useState(true);
+  // The editor's callbacks are created once; they read the latest values through this ref.
+  const latest = useRef({
+    running,
+    disabled,
+    handlers,
+    mentions,
+    commands,
+    limits,
+    results,
+    pending,
+  });
+  latest.current = { running, disabled, handlers, mentions, commands, limits, results, pending };
+
+  const addFiles = (files: readonly File[]): void => {
+    const { limits: current, pending: attached } = latest.current;
+    if (files.length === 0) {
+      return;
+    }
+    const { accepted, problems: refused } = checkFiles(
+      files,
+      attached.length,
+      current ?? { maxCount: 0, kinds: [] },
+      () => crypto.randomUUID(),
+    );
+    setPending((list) => [...list, ...accepted]);
+    setProblems(refused);
+  };
+  const addFilesRef = useRef(addFiles);
+  addFilesRef.current = addFiles;
 
   useEffect(() => {
     const element = mount.current;
     if (element === null) {
       return;
     }
+    const submit = (intent: 'send' | 'steer' | 'queue', state: EditorState, view?: EditorView) => {
+      const payload = serializeDoc(state.doc);
+      const attachments = latest.current.pending;
+      if (latest.current.disabled || (isBlank(payload) && attachments.length === 0)) {
+        return;
+      }
+      latest.current.handlers.submit(intent, { ...payload, attachments });
+      if (view !== undefined) {
+        clearCommand()(view.state, view.dispatch.bind(view), view);
+      }
+      setPending([]);
+      setProblems([]);
+    };
     const command =
       (key: ComposerKey): Command =>
       (state, dispatch, view) => {
@@ -107,14 +204,9 @@ export function Composer({
             return true;
           case 'send':
           case 'steer':
-          case 'queue': {
-            const payload = serializeDoc(state.doc);
-            if (!isBlank(payload)) {
-              latest.current.handlers.submit(intent, payload);
-              clearCommand()(state, dispatch, view);
-            }
+          case 'queue':
+            submit(intent, state, view);
             return true;
-          }
           case null:
             return false;
         }
@@ -122,6 +214,13 @@ export function Composer({
     const keys = keydownHandler(
       Object.fromEntries(COMPOSER_KEYS.map((key) => [key, command(key)])),
     );
+    const runPaletteCommand = (editor: EditorView, choice: PaletteCommand | undefined): void => {
+      editor.dispatch(closeCommands(editor.state));
+      if (choice !== undefined) {
+        clearCommand()(editor.state, editor.dispatch.bind(editor), editor);
+        latest.current.handlers.runCommand?.(choice);
+      }
+    };
 
     const view = new EditorView(element, {
       state: emptyState(),
@@ -129,13 +228,19 @@ export function Composer({
         class: 'composer-editor',
         role: 'textbox',
         'aria-multiline': 'true',
-        'aria-label': 'Message',
+        'aria-label': t('composer.label'),
         'data-testid': 'composer-input',
       },
       dispatchTransaction(tr) {
         const next = view.state.apply(tr);
         view.updateState(next);
         setMention(mentionKey.getState(next) ?? CLOSED_MENTION);
+        setPalette(commandKey.getState(next) ?? CLOSED_COMMANDS);
+        setEmpty(
+          next.doc.childCount === 1 &&
+            next.doc.textContent === '' &&
+            next.doc.firstChild?.childCount === 0,
+        );
       },
       handleDOMEvents: {
         // Input method guard, ahead of everything ProseMirror does with a key: returning true
@@ -144,6 +249,15 @@ export function Composer({
         // keyCode 229 keys that arrive before compositionstart, when ProseMirror itself does
         // not consider the editor composing yet.
         keydown: (editor, event) => isImeComposing(event, editor.composing),
+        drop: (_editor, event) => {
+          const files = filesOf(event.dataTransfer);
+          if (files.length === 0) {
+            return false;
+          }
+          event.preventDefault();
+          addFilesRef.current(files);
+          return true;
+        },
       },
       handleKeyDown(editor, event) {
         if (isImeComposing(event, editor.composing)) {
@@ -151,7 +265,7 @@ export function Composer({
         }
         const picker = mentionKey.getState(editor.state) ?? CLOSED_MENTION;
         if (picker.active) {
-          const matches = matchCandidates(latest.current.candidates, picker.query);
+          const matches = latest.current.results.items;
           switch (event.key) {
             case 'ArrowDown':
             case 'ArrowUp':
@@ -168,10 +282,35 @@ export function Composer({
                 editor.dispatch(chooseMention(editor.state, choice));
                 latest.current.handlers.mentionChosen(choice);
               }
+              latest.current.mentions.cancel();
               return true;
             }
             case 'Escape':
               editor.dispatch(closeMention(editor.state));
+              latest.current.mentions.cancel();
+              return true;
+            default:
+              break;
+          }
+        }
+        const open = commandKey.getState(editor.state) ?? CLOSED_COMMANDS;
+        if (open.active) {
+          const matches = filterCommands(latest.current.commands, open.query);
+          const count = matches.length;
+          switch (event.key) {
+            case 'ArrowDown':
+            case 'ArrowUp':
+              editor.dispatch(moveCommands(editor.state, event.key === 'ArrowDown' ? 1 : -1));
+              return true;
+            case 'Enter':
+            case 'Tab':
+              runPaletteCommand(
+                editor,
+                count === 0 ? undefined : matches[((open.index % count) + count) % count],
+              );
+              return true;
+            case 'Escape':
+              editor.dispatch(closeCommands(editor.state));
               return true;
             default:
               break;
@@ -194,30 +333,112 @@ export function Composer({
           editor.state.doc.textContent === '' &&
           editor.state.doc.childCount === 1
         ) {
+          editor.dispatch(openCommands(editor.state, from, to));
           latest.current.handlers.command();
+          return true;
         }
         return false;
       },
-      handlePaste: (editor, event) => pastePlainText(editor, event),
+      handlePaste: (editor, event) => {
+        const files = filesOf(event.clipboardData);
+        if (files.length > 0) {
+          addFilesRef.current(files);
+          return true;
+        }
+        const text = event.clipboardData?.getData('text/plain') ?? '';
+        if (text !== '') {
+          pastePlainText(editor, text);
+        }
+        return true;
+      },
     });
     viewRef.current = view;
     return () => {
       viewRef.current = null;
       view.destroy();
     };
+    // The editor is created once; translations of its label follow on the next mount.
   }, []);
 
-  const matches = mention.active ? matchCandidates(candidates, mention.query) : [];
+  // Core's file search for the mention picker's query.
+  useEffect(() => {
+    if (!mention.active) {
+      return;
+    }
+    let current = true;
+    const query = mention.query;
+    mentions.search(query).then(
+      (items) => {
+        if (current) {
+          setResults({ query, items });
+        }
+      },
+      (failure: unknown) => {
+        if (current && !(failure instanceof Error && failure.message.includes('cancelled'))) {
+          console.error('[composer] the file search failed', failure);
+        }
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [mention.active, mention.query, mentions]);
+
+  const matches = mention.active && results.query === mention.query ? results.items : [];
+  const searching = mention.active && results.query !== mention.query;
   const highlighted =
     matches.length === 0
       ? -1
       : ((mention.index % matches.length) + matches.length) % matches.length;
+  const paletteMatches = palette.active ? filterCommands(commands, palette.query) : [];
+  const paletteIndex =
+    paletteMatches.length === 0
+      ? -1
+      : ((palette.index % paletteMatches.length) + paletteMatches.length) % paletteMatches.length;
+  const queueKey = platform === 'darwin' ? '⌘↩' : 'Ctrl+Enter';
+  const problemText = (problem: AttachmentProblem): string => {
+    switch (problem.reason) {
+      case 'type':
+        return t('composer.attachment.type', { name: problem.name });
+      case 'size':
+        return t('composer.attachment.size', {
+          name: problem.name,
+          limit: formatSize(problem.maxBytes),
+        });
+      case 'count':
+        return t('composer.attachment.count', { count: problem.maxCount });
+    }
+  };
   return (
-    <div className="composer" data-testid="composer" data-running={running}>
+    <div
+      className="composer"
+      data-testid="composer"
+      data-running={running}
+      onDragOver={(event) => {
+        if (event.dataTransfer.types.includes('Files')) {
+          event.preventDefault();
+        }
+      }}
+      onDrop={(event) => {
+        const files = filesOf(event.dataTransfer);
+        if (files.length > 0) {
+          event.preventDefault();
+          addFiles(files);
+        }
+      }}
+    >
+      {above}
       {mention.active ? (
-        <ul className="mention-popup" role="listbox" data-testid="mention-popup" aria-label="Files">
+        <ul
+          className="composer-popup mention-popup"
+          role="listbox"
+          data-testid="mention-popup"
+          aria-label={t('composer.mentions.label')}
+        >
           {matches.length === 0 ? (
-            <li className="mention-empty">No matching files</li>
+            <li className="mention-empty">
+              {searching ? t('composer.mentions.searching') : t('composer.mentions.none')}
+            </li>
           ) : (
             matches.map((candidate, index) => (
               <li
@@ -231,6 +452,7 @@ export function Composer({
                   if (view !== null) {
                     view.dispatch(chooseMention(view.state, candidate));
                     handlers.mentionChosen(candidate);
+                    mentions.cancel();
                   }
                 }}
               >
@@ -241,12 +463,150 @@ export function Composer({
           )}
         </ul>
       ) : null}
-      <div ref={mount} className="composer-mount" />
+      {palette.active ? (
+        <ul
+          className="composer-popup command-popup"
+          role="listbox"
+          data-testid="command-popup"
+          aria-label={t('composer.commands.label')}
+        >
+          {paletteMatches.length === 0 ? (
+            <li className="mention-empty">{t('composer.commands.none')}</li>
+          ) : (
+            paletteMatches.map((choice, index) => (
+              <li
+                key={choice.name}
+                role="option"
+                aria-selected={index === paletteIndex}
+                data-command={choice.name}
+                className={index === paletteIndex ? 'mention-option is-active' : 'mention-option'}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  const view = viewRef.current;
+                  if (view !== null) {
+                    view.dispatch(closeCommands(view.state));
+                    clearCommand()(view.state, view.dispatch.bind(view), view);
+                    handlers.runCommand?.(choice);
+                  }
+                }}
+              >
+                <span className="mention-label">/{choice.name}</span>
+                <span className="mention-path">
+                  {choice.source === 'builtin' && isBuiltinName(choice.name)
+                    ? t(`composer.command.${choice.name}`)
+                    : choice.description}
+                </span>
+              </li>
+            ))
+          )}
+        </ul>
+      ) : null}
+      {pending.length === 0 ? null : (
+        <div className="composer-attachments" data-testid="composer-attachments">
+          {pending.map((attachment) => (
+            <span
+              key={attachment.id}
+              className={`attachment-chip is-${attachment.kind}`}
+              data-testid="pending-attachment"
+              data-kind={attachment.kind}
+            >
+              <span className="attachment-chip-icon" aria-hidden="true">
+                {attachment.kind === 'pdf' ? 'PDF' : 'IMG'}
+              </span>
+              <span className="attachment-chip-name">
+                {attachment.name} · {formatSize(attachment.size)}
+              </span>
+              <button
+                type="button"
+                className="attachment-remove"
+                aria-label={t('composer.attachment.remove', { name: attachment.name })}
+                onClick={() => {
+                  setPending((list) => list.filter((entry) => entry.id !== attachment.id));
+                }}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      {problems.length === 0 && error === undefined ? null : (
+        <div className="composer-problems" role="alert" data-testid="composer-problems">
+          {problems.map((problem, index) => (
+            <div key={index}>{problemText(problem)}</div>
+          ))}
+          {error === undefined ? null : <div>{error}</div>}
+        </div>
+      )}
+      <div className={`composer-box${disabled ? ' is-disabled' : ''}`}>
+        <div
+          ref={mount}
+          className="composer-mount"
+          data-empty={empty}
+          data-placeholder={t('composer.placeholder')}
+        />
+        <div className="composer-actions">
+          <label className="icon-button composer-attach" title={t('composer.attach')}>
+            <input
+              type="file"
+              className="visually-hidden"
+              data-testid="composer-file-input"
+              accept={(limits?.kinds ?? []).flatMap((kind) => kind.mimeTypes).join(',')}
+              multiple
+              onChange={(event) => {
+                addFiles([...(event.currentTarget.files ?? [])]);
+                event.currentTarget.value = '';
+              }}
+            />
+            <span aria-hidden="true">＋</span>
+            <span className="visually-hidden">{t('composer.attach')}</span>
+          </label>
+          {running ? (
+            <button
+              type="button"
+              className="button composer-stop"
+              data-testid="composer-stop"
+              onClick={() => {
+                handlers.stop();
+              }}
+            >
+              {t('composer.stop')}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="button button-primary composer-send"
+            data-testid="composer-send"
+            disabled={disabled}
+            onClick={() => {
+              const view = viewRef.current;
+              if (view === null) {
+                return;
+              }
+              const payload = serializeDoc(view.state.doc);
+              if (isBlank(payload) && pending.length === 0) {
+                return;
+              }
+              handlers.submit(running ? 'steer' : 'send', { ...payload, attachments: pending });
+              clearCommand()(view.state, view.dispatch.bind(view), view);
+              setPending([]);
+              setProblems([]);
+              view.focus();
+            }}
+          >
+            {t('composer.send')}
+          </button>
+        </div>
+      </div>
       <div className="composer-hint" aria-live="polite">
-        {running
-          ? 'Enter to steer · Mod+Enter to queue · Esc to stop'
-          : 'Enter to send · Shift+Enter for a new line · @ to mention a file'}
+        {running ? t('composer.hint.running', { queue: queueKey }) : t('composer.hint.idle')}
       </div>
     </div>
   );
+}
+
+const BUILTIN_NAMES = new Set(['clear', 'compact', 'help']);
+
+function isBuiltinName(name: string): name is 'clear' | 'compact' | 'help' {
+  return BUILTIN_NAMES.has(name);
 }

@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { AppCommand } from '../../shared/ipc.js';
+import { parseComposerInfo, type ComposerInfo } from '../composer/attachments.js';
 import { isImeComposing } from '../composer/ime-guard.js';
 import { useApp } from '../app/app-context.js';
 import { AppStore } from '../store/app-store.js';
 import { StoreConnection } from '../store/connection.js';
 import { StoreContext } from '../store/hooks.js';
+import { createTranscriptServices } from '../transcript/services.js';
 import { Conversation } from './Conversation.js';
 import { Home } from './Home.js';
 import { clampSidebar, loadLayout, localStore, saveLayout, type Layout } from './layout.js';
@@ -37,6 +39,41 @@ export function Shell() {
   const { t } = useApp();
   const store = useMemo(() => new AppStore(), []);
   const connection = useMemo(() => new StoreConnection(store, window.piarc), [store]);
+  const transcriptServices = useMemo(() => createTranscriptServices(null), []);
+  // The streaming driver follows every session's transcript, shown or not.
+  useEffect(() => {
+    const stops: (() => void)[] = [];
+    const stop = store.onTranscript((transcript) => {
+      stops.push(transcriptServices.driver.follow(transcript));
+    });
+    return () => {
+      stop();
+      for (const each of stops) {
+        each();
+      }
+    };
+  }, [store, transcriptServices]);
+  const watched = useRef(new Set<string>());
+  const watchSession = useCallback(
+    (id: string) => {
+      if (!watched.current.has(id)) {
+        watched.current.add(id);
+        connection.watchSession(id);
+      }
+    },
+    [connection],
+  );
+  const [composer, setComposer] = useState<ComposerInfo | undefined>(undefined);
+  useEffect(() => {
+    window.piarc.composerInfo().then(
+      (text) => {
+        setComposer(parseComposerInfo(text));
+      },
+      (error: unknown) => {
+        console.error('[shell] cannot read the composer configuration', error);
+      },
+    );
+  }, []);
   const [view, setView] = useState<View>({ kind: 'home', workspace: undefined });
   const [viewNonce, setViewNonce] = useState(0);
   const [layout, setLayout] = useState<Layout>(() => loadLayout(localStore()));
@@ -125,6 +162,9 @@ export function Shell() {
       view,
       show,
       connection,
+      watchSession,
+      transcriptServices,
+      composer,
       ensureTrust,
       openFolder,
       toggleSidebar,
@@ -139,7 +179,18 @@ export function Shell() {
         setToasts((list) => list.filter((toast) => toast.id !== id));
       },
     }),
-    [view, show, connection, ensureTrust, openFolder, toggleSidebar, toasts],
+    [
+      view,
+      show,
+      connection,
+      watchSession,
+      transcriptServices,
+      composer,
+      ensureTrust,
+      openFolder,
+      toggleSidebar,
+      toasts,
+    ],
   );
 
   const run = (command: AppCommand) => {

@@ -1,23 +1,31 @@
 // The transcript's virtual list on @tanstack/react-virtual (ADR-0022): rows absolutely positioned
 // in a sizer, measured with ResizeObserver, heights remembered per row id and width (RowHeights),
-// about one viewport of rows rendered beyond each edge, and the list anchored to its end. The
-// sizer is the content element scroll following observes.
+// about one viewport of rows rendered beyond each edge, and the list anchored to its end (rows
+// put before the first one keep the viewport where it was). The rows of a selected exchange are
+// kept rendered so a DOM selection can cover them.
 import {
   measureElement as measureWithObserver,
   useVirtualizer,
   type Range,
   type Virtualizer,
 } from '@tanstack/react-virtual';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 
+import { useT } from '../app/app-context.js';
 import { VIRTUAL_LIST } from './constants.js';
-import { RowView } from './Rows.js';
-import { useTranscriptServices } from './services.js';
+import { ListActionsContext, type ListActions } from './rows/list-actions.js';
+import { RowView } from './rows/RowView.js';
+import { useTranscriptView } from './services.js';
 
 type RowVirtualizer = Virtualizer<HTMLDivElement, HTMLDivElement>;
 
-/** Visible rows plus about `overscanViewports` viewport heights of rows on each side. */
-function pixelOverscan(range: Range, instance: RowVirtualizer | null): number[] {
+/** Visible rows plus about `overscanViewports` viewport heights of rows on each side, and the
+ * rows of `keep` (a selected exchange). */
+function pixelOverscan(
+  range: Range,
+  instance: RowVirtualizer | null,
+  keep: { start: number; end: number } | null,
+): number[] {
   const viewport = (instance?.scrollRect?.height ?? 0) * VIRTUAL_LIST.overscanViewports;
   const sizeOf = (index: number): number => instance?.measurementsCache[index]?.size ?? 0;
   let start = range.startIndex;
@@ -30,6 +38,10 @@ function pixelOverscan(range: Range, instance: RowVirtualizer | null): number[] 
     end += 1;
     covered += sizeOf(end);
   }
+  if (keep !== null && keep.end < range.count) {
+    start = Math.min(start, keep.start);
+    end = Math.max(end, keep.end);
+  }
   const indexes: number[] = [];
   for (let index = start; index <= end; index += 1) {
     indexes.push(index);
@@ -41,28 +53,44 @@ export function TranscriptList({
   ids,
   onScroller,
   onContent,
+  onRowCommitted,
 }: {
   ids: readonly string[];
   /** Receives the scroll element. */
   onScroller: (element: HTMLElement | null) => void;
   /** Receives the element whose size changes when rows change size. */
   onContent: (element: HTMLElement | null) => void;
+  /** A row committed new content (layout phase, before paint). */
+  onRowCommitted: () => void;
 }) {
-  const { store, heights } = useTranscriptServices();
+  const t = useT();
+  const { services, transcript } = useTranscriptView();
+  const { heights } = services;
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(0);
+  const [selected, setSelected] = useState<readonly string[] | null>(null);
   const instance = useRef<RowVirtualizer | null>(null);
+  const keep = useMemo(() => {
+    if (selected === null) {
+      return null;
+    }
+    const first = ids.indexOf(selected[0] ?? '');
+    const last = ids.indexOf(selected.at(-1) ?? '');
+    return first === -1 || last === -1 ? null : { start: first, end: last };
+  }, [ids, selected]);
+  const keepRef = useRef(keep);
+  keepRef.current = keep;
 
   const virtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: ids.length,
     getScrollElement: () => scroller,
     estimateSize: (index) => {
       const id = ids[index] ?? '';
-      return heights.estimate(store.row(id), id, width);
+      return heights.estimate(transcript.row(id), id, width);
     },
     getItemKey: (index) => ids[index] ?? index,
     anchorTo: 'end',
-    rangeExtractor: (range) => pixelOverscan(range, instance.current),
+    rangeExtractor: (range) => pixelOverscan(range, instance.current, keepRef.current),
     measureElement: (element, entry, owner) => {
       const size = measureWithObserver(element, entry, owner);
       const id = element.dataset.rowId;
@@ -94,39 +122,94 @@ export function TranscriptList({
     }
   }, [virtualizer, width]);
 
+  // The selected exchange's rows are rendered now: select them in the DOM.
+  useLayoutEffect(() => {
+    if (selected === null || scroller === null) {
+      return;
+    }
+    const element = (id: string | undefined): Element | null =>
+      id === undefined ? null : scroller.querySelector(`[data-row-id="${CSS.escape(id)}"]`);
+    const first = element(selected[0]);
+    const last = element(selected.at(-1));
+    const selection = window.getSelection();
+    if (first === null || last === null || selection === null) {
+      return;
+    }
+    const range = document.createRange();
+    range.setStartBefore(first);
+    range.setEndAfter(last);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }, [selected, scroller, keep]);
+  // A new selection elsewhere releases the kept rows.
+  useLayoutEffect(() => {
+    if (selected === null) {
+      return;
+    }
+    const release = (): void => {
+      const selection = window.getSelection();
+      if (selection === null || selection.isCollapsed) {
+        setSelected(null);
+      }
+    };
+    document.addEventListener('selectionchange', release);
+    return () => {
+      document.removeEventListener('selectionchange', release);
+    };
+  }, [selected]);
+
+  // Every commit of the list (a measurement moved rows or grew the sizer) keeps the bottom in
+  // view before paint, like a row's own commit.
+  useLayoutEffect(() => {
+    onRowCommitted();
+  });
+
+  const actions = useMemo<ListActions>(
+    () => ({
+      selectExchange: (rowId) => {
+        const exchange = transcript.exchangeOf(rowId);
+        setSelected(exchange.length === 0 ? null : exchange);
+      },
+      rowCommitted: onRowCommitted,
+    }),
+    [transcript, onRowCommitted],
+  );
+
   return (
-    <div
-      ref={(element) => {
-        setScroller(element);
-        onScroller(element);
-      }}
-      className="transcript-scroller"
-      data-testid="transcript-scroller"
-      tabIndex={0}
-      role="log"
-      aria-label="Transcript"
-    >
+    <ListActionsContext.Provider value={actions}>
       <div
-        ref={onContent}
-        className="transcript-sizer"
-        style={{ height: virtualizer.getTotalSize() }}
+        ref={(element) => {
+          setScroller(element);
+          onScroller(element);
+        }}
+        className="transcript-scroller"
+        data-testid="transcript-scroller"
+        tabIndex={0}
+        role="log"
+        aria-label={t('transcript.label')}
       >
-        {virtualizer.getVirtualItems().map((item) => {
-          const id = ids[item.index] ?? '';
-          return (
-            <div
-              key={item.key}
-              ref={virtualizer.measureElement}
-              data-index={item.index}
-              data-row-id={id}
-              className="transcript-row"
-              style={{ transform: `translateY(${String(item.start)}px)` }}
-            >
-              <RowView id={id} />
-            </div>
-          );
-        })}
+        <div
+          ref={onContent}
+          className="transcript-sizer"
+          style={{ height: virtualizer.getTotalSize() }}
+        >
+          {virtualizer.getVirtualItems().map((item) => {
+            const id = ids[item.index] ?? '';
+            return (
+              <div
+                key={item.key}
+                ref={virtualizer.measureElement}
+                data-index={item.index}
+                data-row-id={id}
+                className="transcript-row"
+                style={{ transform: `translateY(${String(item.start)}px)` }}
+              >
+                <RowView id={id} />
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
+    </ListActionsContext.Provider>
   );
 }

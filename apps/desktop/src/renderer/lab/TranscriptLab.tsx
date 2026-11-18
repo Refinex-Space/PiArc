@@ -1,22 +1,24 @@
 // The transcript prototype page (`#/transcript-lab`, T09): the transcript and the composer driven
 // by synthetic protocol events instead of Core. L4 tests and the S1 benchmark drive it through
 // `window.__piarcTranscriptLab`; the toolbar does the same by hand.
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import type {
   ComposerActionRecord,
   FrameRecording,
   TranscriptLabApi,
 } from '../../shared/transcript-lab.js';
-import { Composer, type ComposerHandlers } from '../composer/Composer.js';
+import { Composer, type ComposerHandlers, type MentionSource } from '../composer/Composer.js';
+import { matchCandidates } from '../composer/mention-plugin.js';
+import { SessionTranscript } from '../store/transcript.js';
 import { SCROLL_FOLLOW } from '../transcript/constants.js';
-import { useRunning, type TranscriptNotification } from '../transcript/item-store.js';
 import type { ScrollFollow } from '../transcript/scroll-follow.js';
 import { distanceFromBottom } from '../transcript/scroll-follow.js';
 import {
   TranscriptContext,
   createTranscriptServices,
   type TranscriptServices,
+  type TranscriptView,
 } from '../transcript/services.js';
 import { Transcript } from '../transcript/Transcript.js';
 import { MENTION_CANDIDATES } from './fixtures/mention-candidates.js';
@@ -27,6 +29,7 @@ import {
   generateHistory,
   messagesForTokens,
   planTurn,
+  type TranscriptNotification,
 } from './fixtures/synthesizer.js';
 import { xssMessage } from '../../shared/xss-payloads.js';
 
@@ -141,14 +144,15 @@ function codeSettled(itemId: string): boolean {
 
 function createLabApi(
   services: TranscriptServices,
+  store: { current: SessionTranscript; replace: () => void },
   counts: Map<string, number>,
   actions: ComposerActionRecord[],
   scrollRef: { follow: ScrollFollow | null; scroller: HTMLElement | null },
 ): TranscriptLabApi {
-  const { store, markdown } = services;
+  const { markdown } = services;
   const session = new FixtureSession('lab-session');
   const replayer = new StreamReplayer((notifications) => {
-    store.apply(notifications);
+    store.current.apply(notifications);
   });
   const recorder = new FrameRecorder();
   let turns = 0;
@@ -156,7 +160,7 @@ function createLabApi(
   let runningTurn: string | null = null;
 
   const apply = (notifications: readonly TranscriptNotification[]): void => {
-    store.apply(notifications);
+    store.current.apply(notifications);
   };
   const scroller = (): HTMLElement => {
     if (scrollRef.scroller === null) {
@@ -183,7 +187,7 @@ function createLabApi(
     clear() {
       replayer.stop();
       services.driver.reset();
-      store.clear();
+      store.replace();
       counts.clear();
     },
     async loadHistory(count, seed = 1) {
@@ -316,6 +320,18 @@ function createLabApi(
   };
 }
 
+/** The fixed candidates of the prototype page, filtered like Core's search would. */
+const LAB_MENTIONS: MentionSource = {
+  search: (query) => Promise.resolve(matchCandidates(MENTION_CANDIDATES, query)),
+  cancel: () => undefined,
+};
+
+const LAB_COMMANDS = [
+  { name: 'clear', description: '', source: 'builtin', action: 'newSession' },
+  { name: 'compact', description: '', source: 'builtin', action: 'compact' },
+  { name: 'help', description: '', source: 'builtin', action: 'help' },
+];
+
 export function TranscriptLab() {
   const counts = useRef(new Map<string, number>()).current;
   const actions = useRef<ComposerActionRecord[]>([]).current;
@@ -330,12 +346,27 @@ export function TranscriptLab() {
       },
     }),
   );
+  const [transcript, setTranscript] = useState(() => new SessionTranscript());
+  const store = useRef({
+    current: transcript,
+    replace: (): void => undefined,
+  }).current;
+  store.current = transcript;
+  store.replace = () => {
+    const next = new SessionTranscript();
+    store.current = next;
+    setTranscript(next);
+  };
+  useEffect(() => services.driver.follow(transcript), [services, transcript]);
   const api = useMemo(() => {
-    const created = createLabApi(services, counts, actions, scrollRef);
+    const created = createLabApi(services, store, counts, actions, scrollRef);
     globalThis.__piarcTranscriptLab = created;
     return created;
-  }, [services, counts, actions, scrollRef]);
-  const running = useRunning(services.store);
+  }, [services, store, counts, actions, scrollRef]);
+  const running = useSyncExternalStore(
+    useCallback((listener: () => void) => transcript.subscribeState(listener), [transcript]),
+    useCallback(() => transcript.isRunning(), [transcript]),
+  );
   const onFollow = useCallback(
     (follow: ScrollFollow, scroller: HTMLElement | null) => {
       scrollRef.follow = follow;
@@ -353,7 +384,11 @@ export function TranscriptLab() {
           mentions: payload.mentions.map((mention) => mention.path),
         });
         clientIds.current += 1;
-        services.store.addUserMessage(String(clientIds.current), payload.segments, payload.text);
+        store.current.addOptimistic(String(clientIds.current), {
+          text: payload.text,
+          mentions: payload.spans,
+          attachments: [],
+        });
       },
       stop() {
         actions.push({ kind: 'stop' });
@@ -368,7 +403,15 @@ export function TranscriptLab() {
         actions.push({ kind: 'mentionChosen', path: mention.path });
       },
     }),
-    [actions, services],
+    [actions, store],
+  );
+  const view = useMemo<TranscriptView>(
+    () => ({
+      services,
+      transcript,
+      actions: { retry: () => undefined, resend: () => undefined },
+    }),
+    [services, transcript],
   );
   const run = (task: Promise<unknown>): void => {
     task.catch((error: unknown) => {
@@ -376,7 +419,7 @@ export function TranscriptLab() {
     });
   };
   return (
-    <TranscriptContext.Provider value={services}>
+    <TranscriptContext.Provider value={view}>
       <div className="lab" data-testid="transcript-lab">
         <header className="lab-toolbar">
           <span className="lab-title">Transcript prototype</span>
@@ -430,7 +473,13 @@ export function TranscriptLab() {
           </button>
         </header>
         <Transcript onFollow={onFollow} />
-        <Composer running={running} candidates={MENTION_CANDIDATES} handlers={handlers} />
+        <Composer
+          running={running}
+          handlers={handlers}
+          mentions={LAB_MENTIONS}
+          commands={LAB_COMMANDS}
+          limits={undefined}
+        />
       </div>
     </TranscriptContext.Provider>
   );

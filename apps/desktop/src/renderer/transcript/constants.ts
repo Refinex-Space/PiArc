@@ -1,5 +1,7 @@
 // Tuning constants of the transcript (architecture section 8.4), in one place. The values were
-// calibrated in T09 (docs/spikes/S01-transcript-composer.md); change them there and here together.
+// calibrated in T09 (docs/spikes/S01-transcript-composer.md) and confirmed with Core's real event
+// stream in T19 (apps/desktop/src/renderer/transcript/CLAUDE.md); change them there and here
+// together.
 
 /** Scroll following: when the viewport sticks to the bottom and when it lets go. */
 export const SCROLL_FOLLOW = {
@@ -14,6 +16,8 @@ export const SCROLL_FOLLOW = {
    * content growth does not pull the viewport down during it either (ms).
    */
   userInputWindowMs: 150,
+  /** Earlier history is loaded once the viewport's top is this close to the list's top (px). */
+  loadEarlierPx: 400,
 } as const;
 
 export type ScrollFollowThresholds = typeof SCROLL_FOLLOW;
@@ -41,4 +45,10 @@ export const VIRTUAL_LIST = {
   estimatedLineHeightPx: 22,
   /** Assumed average character width of message text before a row is measured (px). */
   estimatedCharWidthPx: 7.5,
+} as const;
+
+/** History windows (Core's `transcript_window`). */
+export const HISTORY = {
+  /** Items loaded when a session is opened, and per earlier page (Core's maximum is 1,000). */
+  pageItems: 1000,
 } as const;

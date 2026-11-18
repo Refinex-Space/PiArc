@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useSyncExternalStore } from 're
 
 import type { AppStore, Notice } from './app-store.js';
 import type { SessionEntry, WorkspaceEntry } from './snapshots.js';
-import type { TranscriptRow } from './transcript.js';
+import type { QueuedInput, TranscriptRow, TurnInfo } from './transcript.js';
 
 export const StoreContext = createContext<AppStore | null>(null);
 
@@ -62,17 +62,32 @@ export function useRow(sessionId: string, rowId: string): TranscriptRow | undefi
   return useSyncExternalStore(subscribe, read);
 }
 
-/** Whether a turn runs and why the last one failed. */
-export function useTurnState(sessionId: string): { running: boolean; error: string | undefined } {
+/** The running turn of a session (the working row, the composer's keys). */
+export function useTurnInfo(sessionId: string): TurnInfo {
   const transcript = useStore().transcript(sessionId);
   const subscribe = useCallback((l: () => void) => transcript.subscribeState(l), [transcript]);
-  const running = useSyncExternalStore(
+  return useSyncExternalStore(
     subscribe,
-    useCallback(() => transcript.isRunning(), [transcript]),
+    useCallback(() => transcript.turnInfo(), [transcript]),
   );
-  const error = useSyncExternalStore(
+}
+
+/** Whether the session's persisted conversation must be loaded again (`session/resync`). */
+export function useNeedsReload(sessionId: string): boolean {
+  const transcript = useStore().transcript(sessionId);
+  const subscribe = useCallback((l: () => void) => transcript.subscribeState(l), [transcript]);
+  return useSyncExternalStore(
     subscribe,
-    useCallback(() => transcript.lastError(), [transcript]),
+    useCallback(() => transcript.needsReload(), [transcript]),
   );
-  return { running, error };
+}
+
+/** The session's queued inputs. */
+export function useQueue(sessionId: string): readonly QueuedInput[] {
+  const transcript = useStore().transcript(sessionId);
+  const subscribe = useCallback((l: () => void) => transcript.subscribeQueue(l), [transcript]);
+  return useSyncExternalStore(
+    subscribe,
+    useCallback(() => transcript.queue(), [transcript]),
+  );
 }

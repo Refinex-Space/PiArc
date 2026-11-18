@@ -1,21 +1,136 @@
-// One session's conversation in the renderer (architecture section 8.3): Core's session
-// notifications reduced into rows, each row with its own subscribers, so a streaming delta
-// re-renders only the row it extends (rule 3). The user's input is echoed at once as an
-// optimistic row carrying a `clientId`; Core's user message replaces it in place when it
-// arrives, and never shows twice (rule 1).
-import type { Item } from '@piarc/protocol';
+// One session's conversation in the renderer (architecture sections 8.2–8.4): Core's session
+// notifications and history windows reduced into rows by one reducer, so the live stream and a
+// reopened session show the same rows (T19). Every row has its own subscribers: a streaming
+// delta re-renders only the row it extends (section 8.3, rule 3).
+//
+// Rows:
+// - `item`: one item from Core (user message, reply, thinking, bash command, file change,
+//   compaction, other tool call), with the times Core reported it started and completed.
+// - `group`: consecutive tool calls other than shell commands, shown as one summary (verb,
+//   object, lines added and removed) that expands to the calls; derived from the item order,
+//   the same way for history and live items.
+// - `optimistic`: the user's input shown at once with a `clientId`; Core's user message
+//   replaces it in place (rule 1). When Core did not take it, it stays as undelivered.
+// - `error`: a failed turn with Core's kind of failure and whether a retry may succeed.
+// - `uncertain`: the Agent Host restarted during the turn; its outcome is unknown.
+// - `working`: the last row while a turn runs.
+//
+// Everything the rows show comes from Core's events: item states, error kinds and retry counts
+// are never inferred here (architecture principle 8).
+import type {
+  InputAttachment,
+  InputMention,
+  Item,
+  TurnErrorKind,
+  TurnUsage,
+} from '@piarc/protocol';
 
-/** A row of the conversation. */
+/** An attachment as the user message shows it: a stored attachment or one being sent. */
+export interface AttachmentChip {
+  readonly kind: 'image' | 'pdf';
+  readonly name: string;
+  readonly mimeType: string;
+  readonly size: number;
+  readonly pageCount?: number;
+}
+
+/** The user's input as the transcript shows it before Core echoes it. */
+export interface ShownInput {
+  readonly text: string;
+  readonly mentions: readonly InputMention[];
+  readonly attachments: readonly AttachmentChip[];
+}
+
+/** What a retry sends again: the turn's input as Core stored it. */
+export interface StoredInput {
+  readonly text: string;
+  readonly mentions: readonly InputMention[];
+  readonly attachments: readonly InputAttachment[];
+}
+
 export type TranscriptRow =
-  | { readonly kind: 'item'; readonly id: string; readonly turnId: string; readonly item: Item }
+  | {
+      readonly kind: 'item';
+      readonly id: string;
+      readonly turnId: string;
+      readonly item: Item;
+      /** Core's time of the first event of the item (ms since the epoch); absent in history. */
+      readonly startedAt?: number;
+      /** Core's time of `item/completed`; absent in history. */
+      readonly endedAt?: number;
+    }
+  | { readonly kind: 'group'; readonly id: string; readonly members: readonly string[] }
   | {
       readonly kind: 'optimistic';
       readonly id: string;
       readonly clientId: string;
-      readonly text: string;
+      readonly input: ShownInput;
       /** The turn Core started for it, once the prompt was accepted. */
       readonly turnId: string | undefined;
-    };
+      readonly state: 'sending' | 'undelivered';
+      /** Why it was not delivered. */
+      readonly failure: string | undefined;
+    }
+  | {
+      readonly kind: 'error';
+      readonly id: string;
+      readonly turnId: string;
+      readonly errorKind: TurnErrorKind;
+      readonly message: string;
+      readonly retryable: boolean;
+    }
+  | { readonly kind: 'uncertain'; readonly id: string; readonly turnId: string }
+  | { readonly kind: 'working'; readonly id: string };
+
+/** The running turn as the working row shows it. */
+export interface TurnInfo {
+  readonly running: boolean;
+  readonly turnId: string | undefined;
+  /** Core's time of `turn/started`. */
+  readonly startedAt: number | undefined;
+  /** The automatic retry in progress (`turn/retrying`), until the next response arrives. */
+  readonly retry: { readonly attempt: number; readonly max: number } | undefined;
+  /** The turn's usage so far (`turn/usage`). */
+  readonly usage: TurnUsage | undefined;
+  /** Tool items in progress, in the order they started. */
+  readonly openTools: readonly string[];
+  /** A compaction in progress. */
+  readonly compacting: boolean;
+}
+
+/** The id of the working row. */
+export const WORKING_ROW = 'working';
+
+const IDLE: TurnInfo = {
+  running: false,
+  turnId: undefined,
+  startedAt: undefined,
+  retry: undefined,
+  usage: undefined,
+  openTools: [],
+  compacting: false,
+};
+
+/**
+ * Item types folded into a tool group: every tool call but shell commands, which keep a card of
+ * their own (status, exit code, timer). A group expands to its calls; file changes then show
+ * their diff cards.
+ */
+const GROUPED_TYPES = new Set([
+  'dynamicToolCall',
+  'mcpToolCall',
+  'webFetch',
+  'subagent',
+  'fileChange',
+]);
+
+export function isGrouped(item: Item): boolean {
+  return GROUPED_TYPES.has(item.type);
+}
+
+function isTool(item: Item): boolean {
+  return 'tool' in item;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -26,21 +141,108 @@ function isItem(value: unknown): value is Item {
   return isRecord(value) && typeof value.itemId === 'string' && typeof value.type === 'string';
 }
 
+function numberOr(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+const ERROR_KINDS: readonly TurnErrorKind[] = [
+  'auth',
+  'rateLimit',
+  'provider',
+  'network',
+  'contextOverflow',
+  'invalidRequest',
+  'internal',
+];
+
+function errorKindOf(value: unknown): TurnErrorKind {
+  return ERROR_KINDS.find((kind) => kind === value) ?? 'internal';
+}
+
+/** An attachment of an item or a queued input, as its chip shows it. */
+export function chipOf(value: unknown): AttachmentChip[] {
+  if (
+    !isRecord(value) ||
+    (value.kind !== 'image' && value.kind !== 'pdf') ||
+    typeof value.name !== 'string' ||
+    typeof value.mimeType !== 'string'
+  ) {
+    return [];
+  }
+  const size = isRecord(value.blob) ? numberOr(value.blob.size) : numberOr(value.size);
+  const pageCount = numberOr(value.pageCount);
+  return [
+    {
+      kind: value.kind,
+      name: value.name,
+      mimeType: value.mimeType,
+      size: size ?? 0,
+      ...(pageCount === undefined ? {} : { pageCount }),
+    },
+  ];
+}
+
+function usageOf(value: unknown): TurnUsage | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const count = (name: string): number => numberOr(value[name]) ?? 0;
+  return {
+    inputTokens: count('inputTokens'),
+    outputTokens: count('outputTokens'),
+    cacheReadTokens: count('cacheReadTokens'),
+    cacheWriteTokens: count('cacheWriteTokens'),
+    cost: count('cost'),
+  };
+}
+
+/** A queued input as the composer lists it. */
+export interface QueuedInput {
+  readonly itemId: string;
+  readonly kind: 'steer' | 'followUp';
+  readonly text: string;
+  readonly attachments: readonly AttachmentChip[];
+}
+
+function queueItemOf(value: unknown): QueuedInput[] {
+  if (
+    !isRecord(value) ||
+    typeof value.itemId !== 'string' ||
+    (value.kind !== 'steer' && value.kind !== 'followUp') ||
+    typeof value.text !== 'string'
+  ) {
+    return [];
+  }
+  const attachments = Array.isArray(value.attachments) ? value.attachments.flatMap(chipOf) : [];
+  return [{ itemId: value.itemId, kind: value.kind, text: value.text, attachments }];
+}
+
 function optimisticId(clientId: string): string {
   return `optimistic:${clientId}`;
 }
 
+function sameList(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
 export class SessionTranscript {
-  private ids: readonly string[] = [];
+  /** Source rows in conversation order (items, optimistic, error, uncertain). */
+  private order: string[] = [];
+  /** The rows shown, in order: groups in place of their members, the working row last. */
+  private display: readonly string[] = [];
   private readonly rows = new Map<string, TranscriptRow>();
-  private running = false;
-  private failure: string | undefined;
+  private turn: TurnInfo = IDLE;
+  private queueItems: readonly QueuedInput[] = [];
+  private reload = false;
+  private loadedFrom: number | undefined;
   private readonly rowListeners = new Map<string, Set<() => void>>();
   private readonly listListeners = new Set<() => void>();
   private readonly stateListeners = new Set<() => void>();
+  private readonly queueListeners = new Set<() => void>();
+  private readonly changeListeners = new Set<(ids: readonly string[]) => void>();
 
   rowIds(): readonly string[] {
-    return this.ids;
+    return this.display;
   }
 
   row(id: string): TranscriptRow | undefined {
@@ -48,12 +250,25 @@ export class SessionTranscript {
   }
 
   isRunning(): boolean {
-    return this.running;
+    return this.turn.running;
   }
 
-  /** Why the last turn failed, until the next turn starts. */
-  lastError(): string | undefined {
-    return this.failure;
+  turnInfo(): TurnInfo {
+    return this.turn;
+  }
+
+  queue(): readonly QueuedInput[] {
+    return this.queueItems;
+  }
+
+  /** Core said notifications were lost: the persisted conversation must be loaded again. */
+  needsReload(): boolean {
+    return this.reload;
+  }
+
+  /** Whether any row came from Core (history or live). */
+  hasContent(): boolean {
+    return this.order.length > 0;
   }
 
   /**
@@ -61,90 +276,88 @@ export class SessionTranscript {
    * Malformed or unknown notifications are skipped.
    */
   apply(notifications: readonly unknown[]): void {
-    const changed = new Set<string>();
-    let listChanged = false;
-    let stateChanged = false;
+    const batch = new Batch();
     for (const notification of notifications) {
-      if (!isRecord(notification) || !isRecord(notification.params)) {
-        continue;
-      }
-      const { params } = notification;
-      switch (notification.method) {
-        case 'turn/started':
-          stateChanged ||= !this.running || this.failure !== undefined;
-          this.running = true;
-          this.failure = undefined;
-          break;
-        case 'turn/completed':
-          stateChanged = true;
-          this.running = false;
-          this.failure =
-            params.status === 'failed'
-              ? typeof params.errorMessage === 'string'
-                ? params.errorMessage
-                : ''
-              : undefined;
-          break;
-        case 'item/started':
-        case 'item/updated':
-        case 'item/completed': {
-          const { item } = params;
-          const turnId = typeof params.turnId === 'string' ? params.turnId : '';
-          if (!isItem(item)) {
-            break;
-          }
-          listChanged = this.upsert(item, turnId, changed) || listChanged;
-          break;
-        }
-        case 'item/agentMessage/delta':
-        case 'item/reasoning/delta': {
-          const { itemId, delta } = params;
-          if (typeof itemId !== 'string' || typeof delta !== 'string') {
-            break;
-          }
-          const row = this.rows.get(itemId);
-          if (row?.kind !== 'item' || !('text' in row.item)) {
-            break;
-          }
-          this.rows.set(itemId, { ...row, item: { ...row.item, text: row.item.text + delta } });
-          changed.add(itemId);
-          break;
-        }
-        default:
-          break;
+      if (isRecord(notification) && isRecord(notification.params)) {
+        this.applyOne(String(notification.method), notification.params, batch);
       }
     }
-    this.notify(changed, listChanged, stateChanged);
+    this.finish(batch);
   }
 
-  /** Replaces the rows with a window of the persisted conversation (a session opened again). */
-  load(items: readonly { readonly entryId: string; readonly item: unknown }[]): void {
-    const pending = this.ids.filter((id) => this.rows.get(id)?.kind === 'optimistic');
-    const previous = this.ids;
-    this.ids = [];
-    const kept = new Map(pending.map((id) => [id, this.rows.get(id)]));
-    this.rows.clear();
+  /**
+   * Replaces the rows with a window of the persisted conversation (a session opened again, or
+   * reloaded after lost notifications). Optimistic rows still waiting stay at the end.
+   */
+  load(
+    items: readonly { readonly entryId: string; readonly item: unknown }[],
+    start?: number,
+  ): void {
+    this.loadedFrom = start;
+    const batch = new Batch();
+    const pending = this.order.filter((id) => this.rows.get(id)?.kind === 'optimistic');
+    for (const id of this.order) {
+      if (!pending.includes(id)) {
+        this.rows.delete(id);
+        batch.changed.add(id);
+      }
+    }
+    this.order = [];
     for (const { entryId, item } of items) {
       if (isItem(item) && !this.rows.has(item.itemId)) {
         this.rows.set(item.itemId, { kind: 'item', id: item.itemId, turnId: entryId, item });
-        this.ids = [...this.ids, item.itemId];
+        this.order.push(item.itemId);
       }
     }
-    for (const [id, row] of kept) {
-      if (row !== undefined) {
-        this.rows.set(id, row);
-        this.ids = [...this.ids, id];
+    this.order.push(...pending);
+    this.reload = false;
+    batch.list = true;
+    batch.state = true;
+    this.finish(batch);
+  }
+
+  /**
+   * Puts an earlier window of the persisted conversation before the rows loaded so far (the
+   * user scrolled to the top).
+   */
+  prepend(
+    items: readonly { readonly entryId: string; readonly item: unknown }[],
+    start: number,
+  ): void {
+    this.loadedFrom = start;
+    const batch = new Batch();
+    const earlier: string[] = [];
+    for (const { entryId, item } of items) {
+      if (isItem(item) && !this.rows.has(item.itemId)) {
+        this.rows.set(item.itemId, { kind: 'item', id: item.itemId, turnId: entryId, item });
+        earlier.push(item.itemId);
       }
     }
-    this.notify(new Set([...previous, ...this.ids]), true, false);
+    if (earlier.length > 0) {
+      this.order = [...earlier, ...this.order];
+      batch.list = true;
+    }
+    this.finish(batch);
   }
 
   /** Shows the user's input at once (before Core has it). */
-  addOptimistic(clientId: string, text: string): void {
+  addOptimistic(clientId: string, input: ShownInput): void {
     const id = optimisticId(clientId);
-    this.rows.set(id, { kind: 'optimistic', id, clientId, text, turnId: undefined });
-    this.ids = [...this.ids, id];
-    this.notify(new Set([id]), true, false);
+    const batch = new Batch();
+    this.rows.set(id, {
+      kind: 'optimistic',
+      id,
+      clientId,
+      input,
+      turnId: undefined,
+      state: 'sending',
+      failure: undefined,
+    });
+    this.order = this.order.filter((other) => other !== id);
+    this.order.push(id);
+    batch.changed.add(id);
+    batch.list = true;
+    this.finish(batch);
   }
 
   /** Core accepted the input as turn `turnId`. */
@@ -154,7 +367,7 @@ export class SessionTranscript {
     if (row?.kind !== 'optimistic') {
       return;
     }
-    const echoed = this.ids.some((other) => {
+    const echoed = this.order.some((other) => {
       const candidate = this.rows.get(other);
       return (
         candidate?.kind === 'item' &&
@@ -166,13 +379,86 @@ export class SessionTranscript {
       this.remove(id);
       return;
     }
-    this.rows.set(id, { ...row, turnId });
-    this.notify(new Set([id]), false, false);
+    this.update(id, { ...row, turnId, state: 'sending', failure: undefined });
   }
 
-  /** The input failed: the optimistic row goes away. */
+  /** Core did not take the input: it stays, marked as not delivered, for a resend. */
+  markUndelivered(clientId: string, failure: string): void {
+    const id = optimisticId(clientId);
+    const row = this.rows.get(id);
+    if (row?.kind === 'optimistic' && row.turnId === undefined) {
+      this.update(id, { ...row, state: 'undelivered', failure });
+    }
+  }
+
+  /** The input is being sent again. */
+  markSending(clientId: string): void {
+    const id = optimisticId(clientId);
+    const row = this.rows.get(id);
+    if (row?.kind === 'optimistic') {
+      this.update(id, { ...row, state: 'sending', failure: undefined });
+    }
+  }
+
+  /** The input failed and the user gets it back: the optimistic row goes away. */
   rollback(clientId: string): void {
     this.remove(optimisticId(clientId));
+  }
+
+  /**
+   * What a retry of turn `turnId` sends again: its first user message as Core stored it, or the
+   * optimistic row Core accepted for it when no user message arrived (its client keeps what was
+   * sent under the `clientId`).
+   */
+  retryInput(
+    turnId: string,
+  ): { kind: 'stored'; input: StoredInput } | { kind: 'client'; clientId: string } | undefined {
+    for (const id of this.order) {
+      const row = this.rows.get(id);
+      if (row?.kind === 'item' && row.turnId === turnId && row.item.type === 'userMessage') {
+        return {
+          kind: 'stored',
+          input: {
+            text: row.item.text,
+            mentions: row.item.mentions ?? [],
+            attachments: row.item.attachments ?? [],
+          },
+        };
+      }
+    }
+    for (const id of this.order) {
+      const row = this.rows.get(id);
+      if (row?.kind === 'optimistic' && row.turnId === turnId) {
+        return { kind: 'client', clientId: row.clientId };
+      }
+    }
+    return undefined;
+  }
+
+  /** Index of the first loaded item of the persisted conversation; undefined before a load. */
+  historyStart(): number | undefined {
+    return this.loadedFrom;
+  }
+
+  /**
+   * The rows of the exchange `rowId` belongs to: from the user message that starts it to the
+   * row before the next user message (what "select this turn" selects).
+   */
+  exchangeOf(rowId: string): readonly string[] {
+    const ids = this.display.filter((id) => id !== WORKING_ROW);
+    const at = ids.indexOf(rowId);
+    if (at === -1) {
+      return [];
+    }
+    let start = at;
+    while (start > 0 && !this.startsExchange(ids[start])) {
+      start -= 1;
+    }
+    let end = at + 1;
+    while (end < ids.length && !this.startsExchange(ids[end])) {
+      end += 1;
+    }
+    return ids.slice(start, end);
   }
 
   subscribeList(listener: () => void): () => void {
@@ -181,6 +467,15 @@ export class SessionTranscript {
 
   subscribeState(listener: () => void): () => void {
     return subscribe(this.stateListeners, listener);
+  }
+
+  subscribeQueue(listener: () => void): () => void {
+    return subscribe(this.queueListeners, listener);
+  }
+
+  /** Every change, with the ids of the rows it changed (the streaming driver). */
+  subscribeChanges(listener: (ids: readonly string[]) => void): () => void {
+    return subscribe(this.changeListeners, listener);
   }
 
   subscribeRow(id: string, listener: () => void): () => void {
@@ -199,33 +494,194 @@ export class SessionTranscript {
     };
   }
 
-  /** Inserts or updates an item; returns whether the row list changed. */
-  private upsert(item: Item, turnId: string, changed: Set<string>): boolean {
+  private startsExchange(id: string | undefined): boolean {
+    const row = id === undefined ? undefined : this.rows.get(id);
+    return row?.kind === 'optimistic' || (row?.kind === 'item' && row.item.type === 'userMessage');
+  }
+
+  private applyOne(method: string, params: Record<string, unknown>, batch: Batch): void {
+    const ts = numberOr(params.ts);
+    const turnId = typeof params.turnId === 'string' ? params.turnId : '';
+    switch (method) {
+      case 'turn/started':
+        this.turn = { ...IDLE, running: true, turnId, startedAt: ts };
+        batch.state = true;
+        batch.list = true;
+        break;
+      case 'turn/completed':
+        this.onTurnCompleted(turnId, params, batch);
+        break;
+      case 'turn/retrying': {
+        const attempt = numberOr(params.attempt);
+        const max = numberOr(params.maxAttempts);
+        if (attempt !== undefined && max !== undefined) {
+          this.turn = { ...this.turn, retry: { attempt, max } };
+          batch.state = true;
+        }
+        break;
+      }
+      case 'turn/usage': {
+        const usage = usageOf(params.usage);
+        if (usage !== undefined) {
+          this.turn = { ...this.turn, usage, retry: undefined };
+          batch.state = true;
+        }
+        break;
+      }
+      case 'item/started':
+      case 'item/updated':
+      case 'item/completed':
+        if (isItem(params.item)) {
+          this.upsert(params.item, turnId, ts, method === 'item/completed', batch);
+        }
+        break;
+      case 'item/agentMessage/delta':
+      case 'item/reasoning/delta':
+        this.appendDelta(params, batch);
+        break;
+      case 'session/queueChanged':
+        this.queueItems = Array.isArray(params.items) ? params.items.flatMap(queueItemOf) : [];
+        batch.queue = true;
+        break;
+      case 'session/uncertain':
+        this.onUncertain(params, batch);
+        break;
+      case 'session/resync':
+        this.reload = true;
+        batch.state = true;
+        break;
+      default:
+        break;
+    }
+  }
+
+  private onTurnCompleted(turnId: string, params: Record<string, unknown>, batch: Batch): void {
+    if (this.turn.running && (this.turn.turnId === turnId || turnId === '')) {
+      this.turn = IDLE;
+      batch.state = true;
+      batch.list = true;
+    }
+    if (params.status === 'failed') {
+      const id = `error:${turnId}`;
+      if (!this.rows.has(id)) {
+        this.rows.set(id, {
+          kind: 'error',
+          id,
+          turnId,
+          errorKind: errorKindOf(params.errorKind),
+          message: typeof params.errorMessage === 'string' ? params.errorMessage : '',
+          retryable: params.retryable !== false,
+        });
+        this.order.push(id);
+        batch.changed.add(id);
+        batch.list = true;
+      }
+    }
+  }
+
+  private onUncertain(params: Record<string, unknown>, batch: Batch): void {
+    const turnId = typeof params.turnId === 'string' ? params.turnId : undefined;
+    if (turnId === undefined) {
+      return;
+    }
+    const id = `uncertain:${turnId}`;
+    if (!this.rows.has(id)) {
+      this.rows.set(id, { kind: 'uncertain', id, turnId });
+      this.order.push(id);
+      batch.changed.add(id);
+      batch.list = true;
+    }
+    if (this.turn.turnId === turnId) {
+      this.turn = IDLE;
+      batch.state = true;
+    }
+  }
+
+  private upsert(
+    item: Item,
+    turnId: string,
+    ts: number | undefined,
+    completed: boolean,
+    batch: Batch,
+  ): void {
     const existing = this.rows.get(item.itemId);
-    if (existing !== undefined) {
-      this.rows.set(item.itemId, { kind: 'item', id: item.itemId, turnId, item });
-      changed.add(item.itemId);
-      return false;
+    if (existing?.kind === 'item') {
+      this.rows.set(item.itemId, {
+        ...existing,
+        item,
+        ...(completed && ts !== undefined ? { endedAt: ts } : {}),
+      });
+      batch.changed.add(item.itemId);
+    } else {
+      const row: TranscriptRow = {
+        kind: 'item',
+        id: item.itemId,
+        turnId,
+        item,
+        ...(ts === undefined ? {} : { startedAt: ts }),
+        ...(completed && ts !== undefined ? { endedAt: ts } : {}),
+      };
+      this.rows.set(item.itemId, row);
+      batch.changed.add(item.itemId);
+      batch.list = true;
+      const echo = item.type === 'userMessage' ? this.optimisticFor(turnId, item.text) : undefined;
+      if (echo === undefined) {
+        this.order.push(item.itemId);
+      } else {
+        // Core's message takes the optimistic row's place.
+        this.order = this.order.map((id) => (id === echo ? item.itemId : id));
+        this.rows.delete(echo);
+        batch.changed.add(echo);
+      }
     }
-    const row: TranscriptRow = { kind: 'item', id: item.itemId, turnId, item };
-    const echo = item.type === 'userMessage' ? this.optimisticFor(turnId, item.text) : undefined;
-    this.rows.set(item.itemId, row);
-    changed.add(item.itemId);
-    if (echo === undefined) {
-      this.ids = [...this.ids, item.itemId];
-      return true;
+    this.trackTurn(item, batch);
+  }
+
+  /** Open tools and compaction of the running turn (the working row). */
+  private trackTurn(item: Item, batch: Batch): void {
+    if (!this.turn.running) {
+      return;
     }
-    // Core's message takes the optimistic row's place.
-    this.ids = this.ids.map((id) => (id === echo ? item.itemId : id));
-    this.rows.delete(echo);
-    changed.add(echo);
-    return true;
+    const open = item.status === 'inProgress';
+    if (isTool(item)) {
+      const has = this.turn.openTools.includes(item.itemId);
+      if (open !== has) {
+        this.turn = {
+          ...this.turn,
+          openTools: open
+            ? [...this.turn.openTools, item.itemId]
+            : this.turn.openTools.filter((id) => id !== item.itemId),
+          retry: undefined,
+        };
+        batch.state = true;
+      }
+    } else if (item.type === 'contextCompaction' && this.turn.compacting !== open) {
+      this.turn = { ...this.turn, compacting: open };
+      batch.state = true;
+    }
+  }
+
+  private appendDelta(params: Record<string, unknown>, batch: Batch): void {
+    const { itemId, delta } = params;
+    if (typeof itemId !== 'string' || typeof delta !== 'string') {
+      return;
+    }
+    const row = this.rows.get(itemId);
+    if (row?.kind !== 'item' || !('text' in row.item)) {
+      return;
+    }
+    this.rows.set(itemId, { ...row, item: { ...row.item, text: row.item.text + delta } });
+    batch.changed.add(itemId);
+    if (this.turn.retry !== undefined) {
+      this.turn = { ...this.turn, retry: undefined };
+      batch.state = true;
+    }
   }
 
   /** The optimistic row Core's user message of `turnId` confirms. */
   private optimisticFor(turnId: string, text: string): string | undefined {
     let unconfirmed: string | undefined;
-    for (const id of this.ids) {
+    for (const id of this.order) {
       const row = this.rows.get(id);
       if (row?.kind !== 'optimistic') {
         continue;
@@ -234,41 +690,122 @@ export class SessionTranscript {
         return id;
       }
       // The event can overtake the prompt's reply: the first unconfirmed row with the same text.
-      if (row.turnId === undefined && row.text === text) {
+      if (row.turnId === undefined && row.input.text === text) {
         unconfirmed ??= id;
       }
     }
     return unconfirmed;
   }
 
+  private update(id: string, row: TranscriptRow): void {
+    const batch = new Batch();
+    this.rows.set(id, row);
+    batch.changed.add(id);
+    this.finish(batch);
+  }
+
   private remove(id: string): void {
     if (!this.rows.delete(id)) {
       return;
     }
-    this.ids = this.ids.filter((other) => other !== id);
-    this.notify(new Set([id]), true, false);
+    const batch = new Batch();
+    this.order = this.order.filter((other) => other !== id);
+    batch.changed.add(id);
+    batch.list = true;
+    this.finish(batch);
   }
 
-  private notify(changed: ReadonlySet<string>, listChanged: boolean, stateChanged: boolean): void {
-    if (listChanged) {
-      for (const listener of [...this.listListeners]) {
-        listener();
+  /** Recomputes the shown rows (groups, working row) after the order changed. */
+  private relist(batch: Batch): void {
+    const next: string[] = [];
+    const groups = new Set<string>();
+    let members: string[] = [];
+    const flush = (): void => {
+      const first = members[0];
+      if (first === undefined) {
+        return;
+      }
+      const id = `group:${first}`;
+      const previous = this.rows.get(id);
+      if (previous?.kind !== 'group' || !sameList(previous.members, members)) {
+        this.rows.set(id, { kind: 'group', id, members });
+        batch.changed.add(id);
+      }
+      groups.add(id);
+      next.push(id);
+      members = [];
+    };
+    for (const id of this.order) {
+      const row = this.rows.get(id);
+      if (row?.kind === 'item' && isGrouped(row.item)) {
+        members.push(id);
+      } else {
+        flush();
+        next.push(id);
       }
     }
-    for (const id of changed) {
-      for (const listener of [...(this.rowListeners.get(id) ?? [])]) {
-        listener();
+    flush();
+    if (this.turn.running) {
+      next.push(WORKING_ROW);
+      if (!this.rows.has(WORKING_ROW)) {
+        this.rows.set(WORKING_ROW, { kind: 'working', id: WORKING_ROW });
       }
     }
-    if (stateChanged) {
-      for (const listener of [...this.stateListeners]) {
-        listener();
+    for (const id of this.display) {
+      if (id.startsWith('group:') && !groups.has(id)) {
+        this.rows.delete(id);
+      }
+    }
+    if (!sameList(this.display, next)) {
+      this.display = next;
+      batch.listChanged = true;
+    }
+  }
+
+  private finish(batch: Batch): void {
+    if (batch.list) {
+      this.relist(batch);
+    }
+    if (batch.listChanged) {
+      emit(this.listListeners);
+    }
+    for (const id of batch.changed) {
+      emit(this.rowListeners.get(id));
+    }
+    if (batch.state) {
+      emit(this.stateListeners);
+      emit(this.rowListeners.get(WORKING_ROW));
+    }
+    if (batch.queue) {
+      emit(this.queueListeners);
+    }
+    if (batch.changed.size > 0) {
+      const ids = [...batch.changed];
+      for (const listener of [...this.changeListeners]) {
+        listener(ids);
       }
     }
   }
 }
 
-function subscribe(set: Set<() => void>, listener: () => void): () => void {
+/** What one change touched. */
+class Batch {
+  readonly changed = new Set<string>();
+  /** The order may have changed: recompute the shown rows. */
+  list = false;
+  /** The shown rows changed. */
+  listChanged = false;
+  state = false;
+  queue = false;
+}
+
+function emit(listeners: Set<() => void> | undefined): void {
+  for (const listener of [...(listeners ?? [])]) {
+    listener();
+  }
+}
+
+function subscribe<T>(set: Set<T>, listener: T): () => void {
   set.add(listener);
   return () => {
     set.delete(listener);

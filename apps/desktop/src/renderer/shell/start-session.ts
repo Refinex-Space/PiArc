@@ -44,7 +44,7 @@ export async function startSession(options: {
     throw new Error('Core did not return a session id');
   }
   const transcript = store.transcript(sessionId);
-  transcript.addOptimistic(clientId, text);
+  transcript.addOptimistic(clientId, { text, mentions: [], attachments: [] });
   const unwatch = options.watch(sessionId);
   options.onStep({ kind: 'created', sessionId });
   try {

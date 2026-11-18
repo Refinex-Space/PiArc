@@ -1,7 +1,7 @@
 // Measured row heights keyed by row id and list width (architecture section 8.4), so rows that
 // scroll back into view, and lists that return to an earlier width, start at the right size.
 import { VIRTUAL_LIST } from './constants.js';
-import type { Row } from './item-store.js';
+import type { TranscriptRow } from '../store/transcript.js';
 
 /** Heights kept before the oldest are dropped. */
 const MAX_ENTRIES = 20_000;
@@ -30,26 +30,37 @@ export class RowHeights {
   }
 
   /** The measured height, or an estimate from the row's content and the width. */
-  estimate(row: Row | undefined, id: string, width: number): number {
+  estimate(row: TranscriptRow | undefined, id: string, width: number): number {
     const measured = this.get(id, width);
     if (measured !== undefined) {
       return measured;
     }
     const { estimatedCharWidthPx, estimatedLineHeightPx } = VIRTUAL_LIST;
     const perLine = Math.max(20, Math.floor(Math.max(width - 48, 100) / estimatedCharWidthPx));
+    const textHeight = (text: string): number => {
+      const lines = text
+        .split('\n')
+        .reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / perLine)), 0);
+      return 32 + lines * estimatedLineHeightPx;
+    };
     switch (row?.kind) {
-      case 'agentMessage':
-      case 'user': {
-        const text = row.kind === 'user' ? row.text : row.item.text;
-        const lines = text
-          .split('\n')
-          .reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / perLine)), 0);
-        return 32 + lines * estimatedLineHeightPx;
-      }
-      case 'toolCall':
+      case 'optimistic':
+        return textHeight(row.input.text);
+      case 'item':
+        switch (row.item.type) {
+          case 'agentMessage':
+          case 'userMessage':
+            return textHeight(row.item.text);
+          case 'commandExecution':
+            return 96;
+          default:
+            return 40;
+        }
+      case 'group':
+      case 'working':
         return 40;
       default:
-        return 60;
+        return 72;
     }
   }
 }

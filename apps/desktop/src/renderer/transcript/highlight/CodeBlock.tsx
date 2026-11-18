@@ -3,6 +3,7 @@
 // are React elements with colors set through the style object, never HTML.
 import { memo, useEffect, useState } from 'react';
 
+import { useRowCommitted } from '../rows/list-actions.js';
 import { useTranscriptServices } from '../services.js';
 import { useDarkScheme } from '../use-color-scheme.js';
 import { HighlightClient } from './highlight-client.js';
@@ -90,6 +91,8 @@ export const CodeBlock = memo(function CodeBlock({
   complete: boolean;
 }) {
   const lines = useHighlight(lang, code, complete);
+  // Highlighting can change the block's height on its own: keep the bottom in view.
+  useRowCommitted();
   const state = lines === undefined ? 'pending' : lines === null ? 'plain' : 'highlighted';
   return (
     <div

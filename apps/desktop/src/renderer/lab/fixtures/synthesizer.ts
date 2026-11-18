@@ -11,12 +11,19 @@ import type {
   ItemAgentMessageDeltaNotification,
   ItemCompletedNotification,
   ItemStartedNotification,
+  TurnCompletedNotification,
+  TurnStartedNotification,
 } from '@piarc/protocol';
 
-import type { TranscriptNotification } from '../../transcript/item-store.js';
 import { CORPUS, longCodeBlock, mixedReply } from './corpus.js';
 
-export type { TranscriptNotification };
+/** The session notifications the synthesizer produces (the session store reads them as Core's). */
+export type TranscriptNotification =
+  | TurnStartedNotification
+  | TurnCompletedNotification
+  | ItemStartedNotification
+  | ItemAgentMessageDeltaNotification
+  | ItemCompletedNotification;
 
 /** Core merges text deltas over about one frame (architecture section 8.4). */
 export const CORE_MERGE_INTERVAL_MS = 16;

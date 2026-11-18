@@ -2,7 +2,9 @@
 // open dialogs and in-app reminders. Business facts stay in the store.
 import { createContext, useContext } from 'react';
 
+import type { ComposerInfo } from '../composer/attachments.js';
 import type { StoreConnection } from '../store/connection.js';
+import type { TranscriptServices } from '../transcript/services.js';
 
 /** What the main area shows. */
 export type View =
@@ -29,6 +31,15 @@ export interface Ui {
   readonly view: View;
   readonly show: (view: View) => void;
   readonly connection: StoreConnection;
+  /**
+   * Receives session `id`'s notifications for the rest of the window's life: a session shown
+   * once stays current in the store, so showing it again needs no reload.
+   */
+  readonly watchSession: (id: string) => void;
+  /** The window's transcript workers, streaming driver and row heights. */
+  readonly transcriptServices: TranscriptServices;
+  /** Core's commands and attachment limits, once known. */
+  readonly composer: ComposerInfo | undefined;
   /**
    * Shows the trust dialog for `workspace` when the user must decide (first session there, or
    * items added since the user trusted it; `review` always shows it). Resolves `true` when the

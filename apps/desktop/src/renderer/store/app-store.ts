@@ -31,6 +31,7 @@ export class AppStore {
   private readonly sessionListeners = new Set<() => void>();
   private readonly entryListeners = new Map<string, Set<() => void>>();
   private readonly noticeListeners = new Set<() => void>();
+  private readonly transcriptListeners = new Set<(transcript: SessionTranscript) => void>();
 
   workspaces = (): readonly WorkspaceEntry[] => this.workspaceList;
   sessions = (): readonly SessionEntry[] => this.sessionList;
@@ -51,8 +52,19 @@ export class AppStore {
     if (transcript === undefined) {
       transcript = new SessionTranscript();
       this.transcripts.set(id, transcript);
+      for (const listener of [...this.transcriptListeners]) {
+        listener(transcript);
+      }
     }
     return transcript;
+  }
+
+  /** Hears every transcript created from now on (the streaming driver follows them all). */
+  onTranscript(listener: (transcript: SessionTranscript) => void): () => void {
+    for (const transcript of this.transcripts.values()) {
+      listener(transcript);
+    }
+    return subscribe(this.transcriptListeners, listener);
   }
 
   /** Applies a `core/workspaces` event; false when it was stale or malformed. */
@@ -171,7 +183,7 @@ function emit(listeners: Set<() => void> | undefined): void {
   }
 }
 
-function subscribe(set: Set<() => void>, listener: () => void): () => void {
+function subscribe<T>(set: Set<T>, listener: T): () => void {
   set.add(listener);
   return () => {
     set.delete(listener);

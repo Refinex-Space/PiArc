@@ -28,11 +28,23 @@ if (hash.startsWith(EVENT_PROBE_HASH)) {
     </StrictMode>,
   );
 } else if (hash.startsWith(TRANSCRIPT_LAB_HASH)) {
-  root.render(
-    <StrictMode>
-      <TranscriptLab />
-    </StrictMode>,
-  );
+  // The prototype page shares the app's transcript rows, which read the translator: English,
+  // whatever the system language, so the page's tests find the same labels everywhere.
+  void window.piarc.getAppState().then((state) => {
+    root.render(
+      <StrictMode>
+        <AppProvider
+          initial={{
+            ...state,
+            preferences: { ...state.preferences, language: 'en' },
+            locale: 'en',
+          }}
+        >
+          <TranscriptLab />
+        </AppProvider>
+      </StrictMode>,
+    );
+  });
 } else if (hash.startsWith(TERMINAL_LAB_HASH)) {
   root.render(
     <StrictMode>
