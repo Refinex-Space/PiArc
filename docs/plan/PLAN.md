@@ -144,7 +144,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T17 | [Bash / PowerShell 执行与进程管理](tasks/T17-bash-powershell-execution.md) | 2 | T16 | macOS | high / 高 | 大 | 无 | 已完成 | d154ab3 |
 | T18 | [客户端外壳、会话列表、设置窗口与信任对话框](tasks/T18-client-shell-and-session-list.md) | 2 | T17；D3 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 6b1d5f0 |
 | T19 | [Transcript 与 composer 正式版](tasks/T19-transcript-and-composer.md) | 2 | T18 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 0b72964 |
-| T20 | [基础权限与审批](tasks/T20-basic-permissions-and-approvals.md) | 2 | T19 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
+| T20 | [基础权限与审批](tasks/T20-basic-permissions-and-approvals.md) | 2 | T19 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | ee03128 |
 | T21 | [模型、服务商与凭据设置](tasks/T21-models-providers-and-credentials.md) | 2 | T20 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T22 | [System prompt 组装与 memory 文件](tasks/T22-system-prompt-and-memory-files.md) | 2 | T21 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | R2 | [M1 评审](tasks/R2-m1-review.md) | 2 | T22 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -309,16 +309,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-T20 基础权限与审批，macOS arm64。基线 `1c8ad0e`，`npm run verify` 15/15。
-用户确认：未信任项目的自动接受编辑与额外目录都受信任快照约束；会话显式选择与用户设置继续生效。
-
-- [x] 权限契约、模式矩阵、精确规则与配置层信任（`cargo test -p piarc-policy -p piarc-protocol -p piarc-config` 通过；A01 的场景部分见下）
-- [x] Core 审批账本、裁决、审计、失效与 I/O 绑定（Core 权限测试 6/6，1000 次真实自动裁决 p95 0.528 ms；A07 的桌面流程单列）
-- [x] Agent Host 阻断、反馈、模式 entry 与恢复（真实 Host 故障注入、强杀后恢复、模式重启恢复和跨帧 Write 已通过）
-- [x] 客户端四类审批卡、模式菜单、原生确认与热键（定向 Vitest 46/46；dev 与 packaged Electron 34/34；本地 ego-browser 已操作）
-- [x] L2 场景、L4、截图与基准（48 个 L2 中本机 47 通过、Windows 专有 1 项由 CI 执行；Electron 34/34）
-- [x] 收尾 `npm run verify` 15/15（A14），sessions 默认并发 24/24。证据 `tmp/evidence/T20/verify.log`。
-- [ ] 文档、验收与收尾
+（无进行中的任务。）
 
 ## 登记事项
 
@@ -689,6 +680,15 @@ T20 基础权限与审批，macOS arm64。基线 `1c8ad0e`，`npm run verify` 15
 - 验证：`npm run verify` 15/15；Vitest 952 passed、1 skipped；L2 37 passed、1 个 Windows 专用、MISSING 0；`npm run package:desktop -- --flavor development` 后相关 Electron L4 108/108 通过。证据在 `tmp/evidence/T19/`（`verify.log`、`regression.log`、亮暗截图及本地 ego-browser 提及实测截图）。用户确认 S01 第 7 节的 macOS M1–M10 已实测通过。
 - `npm run bench:t19`：M1 Max、60 Hz，真实路径 7,005 个 mock token / 67.58 s；帧主线程工作 p99 8.768 ms，超过 50 ms 的任务 0；万条滚动 59.996 fps；五次千条冷加载与已缓存切换最大分别为 63.9、29.1 ms。原始数据在 `tmp/evidence/T19/bench/t19.bench.ts-real-Core-transcript-budgets/timings.json`。120 Hz、4 倍 CPU 降速下 8 次测量最大离底 0 px。
 - 只在 macOS 实施与验收；Windows CI 等用户推送，Windows 输入法实测属 W1。I67 的失败回合历史语义留 T27。下一个任务是 macOS 上的 T20。
+
+### 2026-11-19 T20 已完成（验收提交 ee03128）
+
+- 验收 A01–A14 全部通过。macOS arm64，基线 `1c8ad0e` 和收尾 `2730864` 的 `npm run verify` 均通过 15 项。收尾 L2 47 通过，另 1 项为 Windows 专有，能力覆盖 MISSING 0。逐项命令与输出见 `acceptance.json` 和 `tmp/evidence/T20/`。
+- 交付：Core 纯裁决、审批账本、精确规则和审计，绑定到实际工具操作的授权，Agent Host 的预检、超时与中断处理、会话模式 entry，客户端四类审批卡、热键与阅读门控、原生确认和模式菜单。设置和账本字段见 ADR-0031。用户确认把项目的自动接受编辑与额外目录纳入信任快照。
+- 参考：核对安装的 Pi 1.5.2 的 `tool_call`、`appendEntry`、中断和工具配对；Core 对照 Pi 的 MIT 编辑匹配语义校验实际写入，出处登记在 `third-party/sources.json`。UI 依据交互研究记录自行实现。
+- 收尾修复：macOS 的设置监听首次注册与 Host 启动并行，注册后重读以覆盖启动期间的改动。预检中断时保留尚待补齐的工具项，在模型转换前过滤已丢弃的中断回复。严格 mock 的配对回归连续 6 次通过，默认并发 Rust 会话集成 24/24。
+- 自动裁决 1,000 次 p95 0.526 ms（预算 2 ms）。Electron dev/packaged 相关 L4 共 34/34，重新打包后的审批专项 4/4；ego-browser 在本地假 Core 实际验证了阅读闸门、规则编辑与快捷键。仅使用测试数据。Windows 目标 Core/exec Clippy 已通过，原生 Windows 行为留 CI；macOS 的 PowerShell 场景通过测试工具验证 Core 的询问决定。
+- 下一项为 macOS 上的 T21。本地提交，未推送。
 
 ## 计划变更记录
 
