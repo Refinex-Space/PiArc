@@ -2288,71 +2288,71 @@
       "id": "T21-A01",
       "task": "T21",
       "description": "经设置页配置两个服务商（Anthropic Messages 形态与 OpenAI 兼容端点的 mock）后，各完成一轮带工具调用的对话；真实服务商在用户同意后补测，未同意时注明。验证：Playwright 流程与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Playwright t21-models.e2e.ts（dev、packaged）经设置页添加两个含假 key 的自定义服务商；同一会话两次 Read 得到文件内容，实际四个请求的端点、模型 ID、工具结果和 violations 均经断言。仅 mock，未调用付费服务商。截图 tmp/evidence/T21/l4/。"
     },
     {
       "id": "T21-A02",
       "task": "T21",
       "description": "API key、云厂商凭证、OpenAI 兼容端点、本地模型四种配置都能保存、编辑、删除，非法配置给出字段级错误。验证：测试与截图（`tmp/evidence/T21/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test sessions provider_settings_crud 验证四类配置增改删；Playwright 核对输入错误、编辑时密钥不回显及删除；ego-browser 本地操作自定义协议和模型列表、Vertex ADC。截图 tmp/evidence/T21/ego-custom-provider.png、ego-cloud-provider.png。"
     },
     {
       "id": "T21-A03",
       "task": "T21",
       "description": "用已知假凭据配置后扫描数据目录、日志、`pi/` 与 Agent Host 进程环境，只在保险箱密文中找到它（明文零命中）；删除服务商后保险箱条目同时删除。验证：扫描测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test sessions provider_settings_crud -- --nocapture 通过：扫描含日志、pi/ 与保险箱的数据目录，假密钥明文零命中；直接检查两次独立启动的 Host 的进程环境，均无凭据。重新打开保险箱确认删除。无 pi/auth.json。"
     },
     {
       "id": "T21-A04",
       "task": "T21",
       "description": "能力表由 pi-ai 目录与 PiArc 覆盖合并而成，覆盖项生效。验证：单测。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npx vitest run agent-host/src/providers/catalog.test.ts 通过。以实际 Pi 目录中的 qwen-token-plan-cn/qwen3.6-plus 验证精确匹配的缓存能力覆盖，其他服务商及模型保持目录结果。"
     },
     {
       "id": "T21-A05",
       "task": "T21",
       "description": "effort 菜单只显示当前模型支持的档位，各档位映射到正确的 Pi thinking level。验证：单测与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "catalog.test.ts 校验 Pi 支持档位及无效 effort 拒绝，t21-models.e2e.ts 在纯文本非推理模型只看到 off；L2 turn-model-effort 在实际 mock 请求中断言 reasoning_effort 为 high，同时收到 reasoning 事件。"
     },
     {
       "id": "T21-A06",
       "task": "T21",
       "description": "切换模型前的代价提示中，上下文 token 数、缓存写入成本估算、thinking 块丢弃标记与夹具数据计算结果一致；没有价格时显示\"未知\"。验证：单测。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "catalog.test.ts 用实际价格分档阈值、固定上下文 token 数和不同来源 thinking 块核算 cacheWriteUsd、cacheInvalidated、dropsThinking；无价格与 Token Plan 积分计价显示未知。截图 tmp/evidence/T21/ego-switch-preview.png。"
     },
     {
       "id": "T21-A07",
       "task": "T21",
       "description": "确认切换后，下一次请求使用新模型与新 effort 参数，切换记录在会话 entry 中，恢复会话后保持。验证：场景测试与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test sessions -- models::confirmed_model_and_effort_reach_the_wire_after_resume --exact 通过：切换模型与 effort 后、重启 Core 恢复后两个请求都是目标模型和 high。session.test.ts 核对 Pi 会话文件里的变更记录。"
     },
     {
       "id": "T21-A08",
       "task": "T21",
       "description": "可用登录方式列表不含 Anthropic 订阅 OAuth，直接调用返回结构化错误；订阅类凭据被设置页与 Agent Host 拒绝（若 pi-ai 存在该路径）。验证：CI 中运行的测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npx vitest run agent-host/src/providers/policy.test.ts 与桌面 provider-form.test.ts 通过。刷新后枚举仍无 Anthropic OAuth，直接登录返回 permissionDenied，危险凭据值与环境认证被拒。Playwright 验证订阅类输入的字段级错误。"
     },
     {
       "id": "T21-A09",
       "task": "T21",
       "description": "当前模型不支持视觉时，图片附件被拒绝并显示原因，模型请求中没有图片内容。验证：测试与 Playwright 流程。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "t21-models.e2e.ts 在纯文本模型上拖入图片立即提示，实际 OpenAI 请求没有图片。session.test.ts 在已排队图片送达前移除视觉能力，验证该输入失败且未产生额外模型请求。截图 tmp/evidence/T21/ego-image-rejected.png。"
     },
     {
       "id": "T21-A10",
       "task": "T21",
       "description": "关闭\"联网刷新模型目录\"后，启动与切换模型都不发出目录刷新请求，模型列表来自本地缓存；重新打开后恢复刷新。验证：测试（拦截网络请求并断言）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "policy.test.ts 在本地拦截目录 fetch，关闭时从缓存恢复并切换会话模型，目录请求为零；开启后拉取远端模型，关闭后该模型仍在离线缓存中可用。"
     },
     {
       "id": "T21-A11",

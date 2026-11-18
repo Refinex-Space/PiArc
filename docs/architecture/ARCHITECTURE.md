@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.25（2026-11-19） |
+| 版本 | 2.26（2026-11-19） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -344,11 +344,13 @@ agent-host/
 - Pi 的部分默认路径（MCP 扩展的 `mcp.json`、`mcp.log`、`mcp-auth.json`，默认会话目录）读进程级的 `getAgentDir()`，不看 SDK 的 `agentDir`。Agent Host 启动时把 `PI_CODING_AGENT_DIR` 设为 PiArc 的 `pi/` 目录，会话注册表校验两者一致。
 - 凭据经适配层存放在 Core 的保险箱（第 5.4 节，T08）；关闭 Pi 自带的上下文文件加载（`noContextFiles`），项目上下文由 PiArc 组装（第 6.6 节）。
 
+T21（ADR-0032）把非密钥配置保存在用户级设置中，由 Core 生成自定义端点的 `pi/models.json`。没有工作区时也能打开设置，设置操作经临时 Host 的 ModelRuntime 更新保险箱。工作区 Host 在目录刷新时读取这些定义，联网开关只控制 Pi 目录刷新。Core 为 `pi/settings.json` 补全缺失的 `cacheWarming: "off"` 与 `images.autoResize: true`；Read 遵循后者。
+
 ### 5.6 运行时与打包
 
 运行时决策见 ADR-0015：Agent Host 用单独内置的 Node LTS，由 Core 直接启动，不经过 Electron。
 
-- 构建：esbuild 把 Agent Host 打成单个 bundle（目标与 Pi 一致：node22.19+），外部依赖只保留 Pi 要求的原生/wasm 资源（photon、quickjs wasm 等）。T06 的 `npm run build:agent-host` 输出 `agent-host/dist/bundle/agent-host.mjs` 与 `pi-assets/package.json`（Pi 从中读版本与配置目录名，经 `PI_PACKAGE_DIR` 指定）；外部依赖为 `@silvia-odwyer/photon-node`（wasm）与四个可选原生加速包，清单见 `agent-host/CLAUDE.md`。codemode worker、图片缩放 worker、OAuth 与 Bedrock 的懒加载模块尚未打包，接入对应功能时补上。
+- 构建：esbuild 把 Agent Host 打成单个 bundle（目标与 Pi 一致：node22.19+），外部依赖只保留 Pi 要求的原生/wasm 资源（photon、quickjs wasm 等）。T06 的 `npm run build:agent-host` 输出 `agent-host/dist/bundle/agent-host.mjs` 与 `pi-assets/package.json`（Pi 从中读版本与配置目录名，经 `PI_PACKAGE_DIR` 指定）；外部依赖为 `@silvia-odwyer/photon-node`（wasm）与四个可选原生加速包，清单见 `agent-host/CLAUDE.md`。Bedrock 的懒加载适配已随 T21 打入，codemode worker、图片缩放 worker 与 OAuth 的懒加载模块尚未打包，接入对应功能时补上。
 - 应用内布局（macOS；Windows 在安装目录的 `resources\` 下是同样的结构）：
 
 ```
@@ -711,6 +713,8 @@ Agent Host 按类别统计上下文构成（system prompt、工具定义、MCP �
 - **切换代价提示**：会话中途切换模型会导致 prompt cache 失效、部分服务商的 thinking 块被丢弃；切换前显示预计影响（上下文 token 数、估算的缓存写入成本）。PreModelSwitch hook 可介入（M5）。
 - **消息保真**：会话历史保留各服务商返回的原始 thinking 块与签名（由 Pi 负责），不按模型维护多份历史。
 
+T21 的 `models/list` 返回可用模型的 `provider`、`id`、`name`、`contextWindow`、`maxOutput`、`vision`、`efforts`、`promptCache`、`toolReliability`。Agent Host 以锁定版本的 Pi 模型记录为基础，由 `providers/catalog.ts` 按完整提供商 ID 与模型 ID 应用覆盖。例如 `qwen-token-plan-cn/qwen3.6-plus` 根据百炼公布的额度规则标记支持缓存，Token Plan 缺少美元单价时显示费用未知。支持档位取 Pi 的有效集合并去掉 minimal。切换前核对实际历史里的 thinking 块，缓存写入单价按目标模型的价格分档选取。自定义端点可以分别选择 Anthropic Messages、OpenAI Chat Completions、OpenAI Responses 并填写多个模型 ID。
+
 ### 6.14 Claude Code 配置兼容矩阵
 
 | 配置 | 兼容程度（第一版目标） | 说明 |
@@ -835,7 +839,7 @@ crates/
 | 方法族 | 方法 |
 |---|---|
 | `session/*` | `create`、`resume`、`fork`、`close`、`prompt`、`steer`、`followUp`、`abort`、`queue/clear`、`queue/edit`、`queue/delete`、`queue/reorder`、`compact`、`setModel`、`setEffort`、`setMode`、`setName`、`getContextUsage`、`getEntries(since)`、`history` |
-| `models/*` | `list`、`login/start`、`login/cancel`、`logout` |
+| `models/*` | `list`、`reload`、`credential`、`credentialStatus`（T21），`login/start`、`login/cancel`、`logout` |
 | `resources/*` | `listCommands`、`listSkills`、`listAgents`、`reload` |
 | `mcp/*` | `status`、`reconnect`、`setEnabled` |
 | `host/*` | `shutdown`、`ping` |
@@ -848,13 +852,15 @@ crates/
 | `hooks/run` | 在指定事件点执行 hooks，返回合并后的决策 | 按 handler 超时；失败按事件语义处理 |
 | `fs/*` | `read`、`stat`、`write`、`mkdir`、`grep`、`glob`、`list` | 本地操作，p95 < 5 ms（小文件） |
 | `exec/*` | `run`（流式）、`kill`、`background/list`、`background/read` | 按命令超时 |
-| `secrets/*` | `getAll`、`get`、`set`、`delete`、`lock`、`unlock` | 失败时会话报错，不回退到明文 |
+| `secrets/*` | `getAll`、`get`、`set`、`delete`、`lock`、`renew`、`unlock` | 失败时会话报错，不回退到明文 |
 | `ui/*` | `ask`（AskUserQuestion）、`loginInteraction`、`notify` | 等待用户 |
 | `trust/get` | 查询项目信任状态 | 失败按"不信任" |
 
 **Agent Host → Core 通知**
 
 `turn/started`、`turn/retrying`、`turn/usage`、`turn/completed`、`item/started`、`item/agentMessage/delta`、`item/reasoning/delta`、`item/updated`、`item/completed`、`session/queueChanged`、`session/usage`、`session/stateChanged`、`harness/entry`、`harness/todo`、`harness/plan`、`subagent/*`、`mcp/statusChanged`、`log`。
+
+T21 增加 `session/previewModelSwitch`、`session/setModel`、`session/setEffort`，凭据锁的续约和连接绑定见 ADR-0032。
 
 T19（ADR-0030）为 `session/prompt`、`session/steer`、`session/followUp` 添加可选的提及区间与附件引用，`session/queueChanged` 和 `userMessage` 可带相同元数据。每次模型回复结束时 `turn/usage` 发本回合的累计用量，失败的 `turn/completed` 提供 `errorKind`、`retryable`。`session/compact` 在空闲会话中开始独立回合。
 
@@ -1518,6 +1524,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.26 | 2026-11-19 | T21（ADR-0032）补充服务商配置投影、凭据更新、模型目录与会话选择 |
 | 2.25 | 2026-11-19 | T20（ADR-0031）补充第 6.2 节权限裁决与第 10.2 节配置授权边界 |
 | 2.24 | 2026-11-18 | T19（ADR-0030）补充 7.4–7.6、8.2、8.4 的输入协议、错误分类、历史窗口与虚拟列表贴底方式，修订 9.3 的归档清理范围以保留附件 |
 | 2.23 | 2026-11-18 | T18 补充（ADR-0029）：第 4 章加入 ADR-0029；7.6 写明会话元数据与客户端偏好的导出、信任决定在重启生效后才应答、启动同步后重发快照；8.2、8.3、8.5–8.8 写明窗口骨架与注册式容器、store、快捷键注册表、令牌管线与平台外观、本地化、通知与计数的落地；9.2 写明 schema v2 的 `custom_title`，9.3 写明归档与删除；10.2 写明信任闸门（I63）与对话框；10.3 写明新命令的校验与删除确认；第 11 章填入冷启动实测；8.6 写明主色经视觉关口确认 |

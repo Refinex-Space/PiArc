@@ -47,3 +47,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0029](0029-client-shell-foundations.md) | 客户端外壳的基础设施：令牌管线、偏好存储、快捷键、本地化、信任闸门与会话元数据（补充 ADR-0013、ADR-0025） | 已接受（第 7 条归档清理由 0030 修订） |
 | [0030](0030-transcript-and-composer.md) | 会话输入、附件和 transcript 的呈现（补充 ADR-0009、ADR-0013、ADR-0026，修订 ADR-0029 第 7 条） | 已接受 |
 | [0031](0031-basic-permissions.md) | M1 权限预检、审批账本与项目信任 | 已接受 |
+| [0032](0032-provider-settings-and-model-selection.md) | 服务商设置、凭据更新与会话选型（补充 ADR-0006、0021、0026） | 已接受 |

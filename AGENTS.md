@@ -107,6 +107,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - `cargo test`（含 `npm run verify`）会在登录钥匙串中以 `piarc-test.` 开头的服务名创建并删除测试条目；测试代码只用 `test_master_key_name` 命名条目，不碰 `piarc-core::identity` 的正式服务名。
 - `cargo test`（含 verify）中 `piarc-core` 的 `sandbox_commands` 测试经沙箱代理连 `registry.npmjs.org`、`index.crates.io`：离线时这两个用例失败并写明原因。沙箱内命令要联网的工具，配置文件里的代理设置会盖过 `HTTP_PROXY`（`crates/piarc-sandbox/AGENTS.md`）。
 - 测试里用 `vim -u NONE` 时加 `--cmd 'set encoding=utf-8'`：否则 vim 按 locale 选编码，`LANG` 为空的环境（CI runner、某些 IDE 或智能体的子进程）里中文显示成转义（I38）。
+- T21 服务商设置通过 Core 的设置 Host 调用 Pi 的 ModelRuntime 更新保险箱；自定义端点在用户设置中保存协议、基础地址和模型 ID，Core 生成隔离目录下的 `pi/models.json`。不要把密钥写入该文件或传入进程环境。设置变更中断时由 Core 对照保险箱恢复，见 ADR-0032。百炼 Token Plan 的内置提供商、两种协议的北京端点和套餐模型选择见 [Pi 调研](docs/research/pi-v1.4.0-baseline.md#t21-自定义提供商线协议与可用模型v152)。
 - 打包时 `postPackage` 才把内置 node 放进 `.app`，签名分层见 `apps/desktop/AGENTS.md`；不要对整个 bundle 用 `codesign --deep` 重签，会覆盖 node 的 Node.js 官方签名。
 - Windows 安装包由 CI 的 `package-windows` 作业产出（`scripts/release/pack-windows.mjs`，需要 .NET SDK）；Velopack 的 pack id 是应用标识，不能用 `PiArc`（会与数据目录 `%LOCALAPPDATA%\PiArc\` 重合）。
 - L2 场景目标（`--test scenarios`）设了 `test = false`，`cargo test --workspace` 不跑它，只有 verify 第 14 步与显式 `--test scenarios` 跑。新增或改动场景、改能力状态后重新生成 `docs/product/capabilities.md`（手改会被漂移检查拒绝）；`active` 能力没有场景时报 MISSING。

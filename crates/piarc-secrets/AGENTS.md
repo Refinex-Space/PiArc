@@ -2,6 +2,8 @@
 
 凭据保险箱：服务商 API key、OAuth token、MCP token 加密存放在 `<数据目录>/secrets.vault`（AES-256-GCM），32 字节主密钥在系统凭据库（macOS 登录钥匙串、Windows 凭据管理器，经 `keyring-core`）。ADR-0018 第 5 条、ADR-0021、`docs/spikes/S05-credential-vault.md`。不负责把凭据交给 Agent Host、锁与变更推送（`piarc-core::secrets`），不负责登录流程（Agent Host），不选择应用标识（`piarc-core::identity`）。
 
+返回完整凭据快照时，条目及保险箱 revision 必须取自同一次读取，使客户端可以识别已经删除的条目及迟到的通知（ADR-0032）。
+
 ## 命令
 
 | 命令 | 用途 |

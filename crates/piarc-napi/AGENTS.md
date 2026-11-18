@@ -27,6 +27,8 @@ NAPI-RS 导出层（薄）：把 `piarc_core::CoreRuntime` 暴露为主进程里
 - `.d.ts` 快照在 `apps/desktop/src/main/core/native/`：`piarc-core.d.ts`（发布）与 `piarc-core.testing.d.ts`（开发），由构建脚本经 Prettier 格式化写入，不手改。字符串枚举生成为类型联合（`constEnum: false`）。
 - 会话的文本入口始终把字符串当作用户正文（包括 JSON 文本）。主进程将带提及、附件或指定幂等键的输入交给 `promptInput`、`steerInput`、`followUpInput`（ADR-0030）。
 
+- 设置窗口经 `providerSettings/saveProvider/deleteProvider/setCatalogRefresh` 访问 Core，`saveProvider` 的写入专用凭据参数与公开配置分开。模型菜单经 `workspaceModels/sessionModels/previewModelSwitch/setSessionModel/setSessionEffort`；切换预览不修改 Pi 会话。
+
 ## 易错点
 
 - 改了导出签名不更新快照，verify 的 "Core module + API snapshot" 失败；运行 `npm run build:core -- --flavor all` 后提交。

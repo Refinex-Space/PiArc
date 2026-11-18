@@ -29,6 +29,8 @@ AHP 与 Core API 数据类型的唯一来源：Rust 类型 → JSON Schema → `
 - `contracts` 名中 `jsonrpc/`、`envelope/` 留给顶层消息类型，`framing/` 留给帧用例目录，方法不得使用。
 - 错误：crate 内 `Error`（`kind()`、`retryable()`、`to_error_object()`）；线上形状是 `rpc_error::ErrorObject`，应用错误码取 `-32099..=-32000`。
 
+- `models.rs` 定义目录、设置 Host 写入与公开状态、会话切换与代价预览。可空价格字段用 JSON `null` 表达未知；切换输入明确区分目标模型和当前 effort。
+
 ## 易错点
 
 - `Option` 字段在 serde 中缺失即 `None`、在 schemars 中非必填；"必须出现但可为 null" 要 `#[serde(deserialize_with = "Option::deserialize")]` 加自定义 schema（见 `ErrorResponse::id`）。`Value` 字段缺失会被当成 `null`，必填时同样加 `deserialize_with`。
