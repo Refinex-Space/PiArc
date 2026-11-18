@@ -2163,14 +2163,14 @@
       "task": "T19",
       "description": "真实事件流 100 token/s 输出时，渲染进程主线程无超过 50 ms 的长任务，帧时间 p99 ≤ 16 ms。验证：Performance API 测量输出。",
       "status": "passing",
-      "evidence": "npm run bench:t19（打包开发版，M1 Max，60 Hz，Core + Agent Host + 严格 mock）：含思考、Markdown、Read 和后续回复，7,005 个 mock 输出 token / 67.56 s = 103.68 token/s；4,054 帧主线程工作 p99 8.702 ms、最大 15.495 ms，超过 50 ms 的任务 0。tmp/evidence/T19/bench/t19.bench.ts-real-Core-transcript-budgets/timings.json。"
+      "evidence": "npm run bench:t19（打包开发版，M1 Max，60 Hz，Core + Agent Host + 严格 mock）：含思考、Markdown、Read 和后续回复，7,005 个 mock 输出 token / 67.58 s = 103.66 token/s；4,055 帧主线程工作 p99 8.768 ms、最大 15.089 ms，超过 50 ms 的任务 0。tmp/evidence/T19/bench/t19.bench.ts-real-Core-transcript-budgets/timings.json。"
     },
     {
       "id": "T19-A12",
       "task": "T19",
       "description": "1 万条 item 的会话滚动 60 fps；会话切换已缓存 ≤ 100 ms，冷加载 1,000 条 item ≤ 300 ms。验证：测量输出。",
       "status": "passing",
-      "evidence": "npm run bench:t19：真实会话分页加载 10,000 项，10 s 滚过 30,002 px，59.996 fps（屏幕 59.997 Hz）；各取 5 次，从侧栏点击至可见 Markdown 完成并绘制，1,000 项冷加载最大 64.4 ms、缓存切换最大 30.0 ms。原始数据同 T19-A11。"
+      "evidence": "npm run bench:t19：真实会话分页加载 10,000 项，10 s 滚过 30,002 px，59.996 fps（屏幕 59.997 Hz）；各取 5 次，从侧栏点击至可见 Markdown 完成并绘制，1,000 项冷加载最大 63.9 ms、缓存切换最大 29.1 ms。原始数据同 T19-A11。"
     },
     {
       "id": "T19-A13",
@@ -2184,7 +2184,7 @@
       "task": "T19",
       "description": "`npm run verify` 通过。验证：命令输出。",
       "status": "passing",
-      "evidence": "macOS arm64 下 npm run verify 全部 15 步通过，含 Vitest 952 passed / 1 skipped、cargo test（sessions 默认并发 20/20）、L2 37 passed / 1 Windows 专用、MISSING 0。详见 tmp/evidence/T19/verify.log。"
+      "evidence": "macOS arm64 下 npm run verify 全部 15 步通过，含 Vitest 952 passed / 1 skipped、cargo test（sessions 默认并发 20/20）、L2 37 passed / 1 Windows 专用、MISSING 0。详见 tmp/evidence/T19/verify.log。 同一版本重新打包后，与本次改动相关的 108 个 Electron L4 用例全过（tmp/evidence/T19/regression.log）。"
     },
     {
       "id": "T20-A01",
