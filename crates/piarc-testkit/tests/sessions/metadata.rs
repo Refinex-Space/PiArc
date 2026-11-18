@@ -264,3 +264,22 @@ async fn a_session_created_right_after_a_trust_decision_starts() {
     }
     shutdown(core).await;
 }
+
+/// Session files Core has not indexed yet (written while it was closed, or a lost index) show in
+/// the session list once the startup sync read them: the sync is followed by a new snapshot.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn sessions_indexed_at_startup_reach_the_list() {
+    let env = Env::new("startup index").await;
+    let (core, events) = env.start(env.config(&[]));
+    let id = open_session(&core, &env).await;
+    let turn = prompt(&core, &id, &prompt_text("Question one.", "chat")).await;
+    events.turn_completed(&id, &turn).await;
+    shutdown(core).await;
+    // The index is gone; the session file is still there.
+    for name in ["core.sqlite", "core.sqlite-wal", "core.sqlite-shm"] {
+        let _ = std::fs::remove_file(env.data.join(name));
+    }
+    let (core, events) = env.start(env.config(&[]));
+    listed(&events, &id, "the session from its file", |_| true).await;
+    shutdown(core).await;
+}

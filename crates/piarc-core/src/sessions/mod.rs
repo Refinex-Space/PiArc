@@ -432,6 +432,11 @@ impl Hub {
         }
     }
 
+    /// Reads the lists from the database again and sends them (after an index sync).
+    pub fn reload_snapshots(&self) {
+        self.ctx.snapshots.send(snapshot::SnapshotMsg::Reload);
+    }
+
     /// Sends both snapshots again (a client subscribed or reloaded).
     pub fn resend_snapshots(&self) {
         self.ctx.snapshots.send(snapshot::SnapshotMsg::Resend);

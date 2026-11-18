@@ -260,6 +260,8 @@ impl CoreRuntime {
                     if let Err(error) = services.storage.sync_sessions().await {
                         tracing::error!(target: "piarc_core::storage", "syncing the session index failed: {error}");
                     }
+                    // The first session snapshot was read before the sync finished.
+                    services.sessions.reload_snapshots();
                 },
             );
         }
