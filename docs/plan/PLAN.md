@@ -317,7 +317,7 @@ T20 基础权限与审批，macOS arm64。基线 `1c8ad0e`，`npm run verify` 15
 - [x] Agent Host 阻断、反馈、模式 entry 与恢复（真实 Host 故障注入、强杀后恢复、模式重启恢复和跨帧 Write 已通过）
 - [x] 客户端四类审批卡、模式菜单、原生确认与热键（定向 Vitest 46/46；dev 与 packaged Electron 34/34；本地 ego-browser 已操作）
 - [x] L2 场景、L4、截图与基准（48 个 L2 中本机 47 通过、Windows 专有 1 项由 CI 执行；Electron 34/34）
-- [ ] 收尾 `npm run verify` 15 项（A14）
+- [ ] 收尾 `npm run verify` 15 项（A14）。首次收尾发现空响应 TS 类型、i18n 测试参数和并发打开工作区超时；修复后 ESLint、协议漂移、i18n/mock 定向通过，默认并发 sessions 23/23（10.71 s）
 - [ ] 文档、验收与收尾
 
 ## 登记事项

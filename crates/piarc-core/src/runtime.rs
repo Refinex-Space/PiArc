@@ -566,7 +566,7 @@ impl CoreRuntime {
         self.shared
             .handle
             .spawn(async move {
-                WorkspaceSettings::open(&dirs, workspace, services.trust, events).await
+                WorkspaceSettings::open(&dirs, workspace, services.trust, events, true).await
             })
             .await
             .map_err(|e| Error::Internal {

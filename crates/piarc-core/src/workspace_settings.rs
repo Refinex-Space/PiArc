@@ -18,7 +18,7 @@ use std::time::Duration;
 use piarc_config::{Issue, LayerTable, Settings, TrustState};
 use piarc_fs::watch::{WatchEvent, Watcher};
 use serde_json::Value;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinHandle;
 
 use crate::dirs::DataDirs;
@@ -62,7 +62,9 @@ impl WorkspaceSettings {
         workspace: PathBuf,
         trust: TrustService,
         events: EventSender,
+        wait_for_registration: bool,
     ) -> Result<Self> {
+        let trust_changes = trust.subscribe();
         let state = trust.state(&workspace).await;
         let table = LayerTable::piarc(dirs.data(), &workspace);
         let settings = tokio::task::spawn_blocking(move || Settings::load(table, state))
@@ -86,21 +88,31 @@ impl WorkspaceSettings {
             reason: e.to_string(),
         })?;
         let watcher = Arc::new(Mutex::new(watcher));
-        watch_dirs(&watcher, &inner, &workspace);
-        let task = tokio::spawn(run(Loop {
-            inner: Arc::clone(&inner),
-            watcher: Arc::clone(&watcher),
-            workspace: workspace.clone(),
-            trust,
-            events,
-            notifications: rx,
-        }));
-        Ok(Self {
+        let (registered, ready) = oneshot::channel();
+        let task = tokio::spawn(run(
+            Loop {
+                inner: Arc::clone(&inner),
+                watcher: Arc::clone(&watcher),
+                workspace: workspace.clone(),
+                trust,
+                events,
+                notifications: rx,
+            },
+            trust_changes,
+            registered,
+        ));
+        let settings = Self {
             inner,
             workspace,
             task,
             _watcher: watcher,
-        })
+        };
+        if wait_for_registration {
+            ready.await.map_err(|_| Error::Internal {
+                reason: "settings registration stopped".into(),
+            })?;
+        }
+        Ok(settings)
     }
 
     /// The merged settings now.
@@ -151,8 +163,27 @@ struct Loop {
     notifications: mpsc::UnboundedReceiver<()>,
 }
 
-async fn run(mut state: Loop) {
-    let mut trust_changes = state.trust.subscribe();
+async fn run(
+    mut state: Loop,
+    mut trust_changes: broadcast::Receiver<crate::trust::TrustChange>,
+    registered: oneshot::Sender<()>,
+) {
+    // FSEvents can block in the system daemon while several streams start or stop.
+    // Establish the watch off the runtime workers; then pick up edits made since load.
+    let (watcher, inner, workspace) = (
+        state.watcher.clone(),
+        state.inner.clone(),
+        state.workspace.clone(),
+    );
+    if let Err(error) =
+        tokio::task::spawn_blocking(move || watch_dirs(&watcher, &inner, &workspace)).await
+    {
+        tracing::error!(target:"piarc_core::settings","settings registration failed: {error}");
+        return;
+    }
+    state.reload().await;
+    let _ = registered.send(());
+
     loop {
         tokio::select! {
             notified = state.notifications.recv() => {

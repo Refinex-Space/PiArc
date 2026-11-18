@@ -89,6 +89,9 @@ impl WorkspaceHandle {
             path.clone(),
             ctx.trust.clone(),
             ctx.events.clone(),
+            // On macOS FSEvents registration is independent of the host handshake.
+            // Permission evaluation reads the current trusted settings for each call.
+            !cfg!(target_os = "macos"),
         )
         .await
         {
