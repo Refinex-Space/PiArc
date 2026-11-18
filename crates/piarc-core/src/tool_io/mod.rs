@@ -199,8 +199,10 @@ impl ToolIo {
     ) -> Result<(), ErrorObject> {
         check_session_id(session_id)?;
         let tmp = self.create_tmp(session_id)?;
+        let attachments = self.create_attachments(session_id)?;
         let scope = Scope::new(root, cwd)
             .and_then(|scope| scope.with_read_only_dir(&tmp))
+            .and_then(|scope| scope.with_read_only_dir(&attachments))
             .map_err(|e| e.to_error_object())?;
         self.register(session_id, scope, tmp, None);
         Ok(())
@@ -211,6 +213,16 @@ impl ToolIo {
         std::fs::create_dir_all(&tmp)
             .map_err(|e| piarc_fs::Error::io(&tmp, e).to_error_object())?;
         Ok(tmp)
+    }
+
+    /// The session's attachments (ADR-0030): read without asking, like its temporary files.
+    fn create_attachments(&self, session_id: &str) -> Result<PathBuf, ErrorObject> {
+        let dir = self
+            .session_dir(session_id)
+            .join(crate::composer::attachments::ATTACHMENTS_DIR);
+        std::fs::create_dir_all(&dir)
+            .map_err(|e| piarc_fs::Error::io(&dir, e).to_error_object())?;
+        Ok(dir)
     }
 
     /// Like [`ToolIo::open_session`], with every command of the session sandboxed: writes
@@ -234,8 +246,10 @@ impl ToolIo {
         let allowlist = Allowlist::new(&settings.allowed_domains)
             .map_err(|e| ErrorObject::new(ErrorKind::InvalidParams, e.to_string(), false))?;
         let tmp = self.create_tmp(session_id)?;
+        let attachments = self.create_attachments(session_id)?;
         let mut scope = Scope::new(root, cwd)
             .and_then(|scope| scope.with_read_only_dir(&tmp))
+            .and_then(|scope| scope.with_read_only_dir(&attachments))
             .map_err(|e| e.to_error_object())?;
         for dir in &settings.extra_dirs {
             scope = scope.with_added_dir(dir).map_err(|e| e.to_error_object())?;

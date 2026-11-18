@@ -129,6 +129,18 @@
     },
     {
       "kind": "request",
+      "method": "session/compact",
+      "name": "session/compact",
+      "schema": "SessionCompactRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/compact",
+      "name": "session/compact/result",
+      "schema": "SessionCompactResponse"
+    },
+    {
+      "kind": "request",
       "method": "session/fork",
       "name": "session/fork",
       "schema": "SessionForkRequest"
@@ -510,6 +522,12 @@
       "method": "turn/retrying",
       "name": "turn/retrying",
       "schema": "TurnRetryingNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "turn/usage",
+      "name": "turn/usage",
+      "schema": "TurnUsageReportNotification"
     },
     {
       "kind": "notification",

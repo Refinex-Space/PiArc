@@ -102,6 +102,19 @@
     }
   },
   {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-thinking",
+      "usage": {
+        "inputTokens": 100,
+        "outputTokens": 20,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0.003
+      }
+    }
+  },
+  {
     "method": "turn/completed",
     "payload": {
       "turnId": "turn-thinking",

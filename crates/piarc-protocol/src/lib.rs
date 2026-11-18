@@ -63,6 +63,7 @@ pub mod fs;
 pub mod handshake;
 pub mod history;
 pub mod host;
+pub mod input;
 pub mod jsonrpc;
 pub mod method;
 pub mod queue;

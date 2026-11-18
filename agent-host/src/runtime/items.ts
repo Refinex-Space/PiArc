@@ -5,6 +5,8 @@ import type {
   CommandExecutionInfo,
   CompactionReason,
   FileDiff,
+  InputAttachment,
+  InputMention,
   Item,
   ItemStatus,
   TurnUsage,
@@ -119,8 +121,28 @@ export function toolItem(
   }
 }
 
-export function userMessage(itemId: string, text: string): Item {
-  return { type: 'userMessage', itemId, status: 'completed', text: text.toWellFormed() };
+/** A user message; `record` is what the user wrote with its mentions and attachments, when the
+ * input carried any (`piarc.input`, input.ts), otherwise the message's own `text` is shown. */
+export function userMessage(
+  itemId: string,
+  text: string,
+  record?: {
+    text: string;
+    mentions: readonly InputMention[];
+    attachments: readonly InputAttachment[];
+  },
+): Item {
+  if (record === undefined) {
+    return { type: 'userMessage', itemId, status: 'completed', text: text.toWellFormed() };
+  }
+  return {
+    type: 'userMessage',
+    itemId,
+    status: 'completed',
+    text: record.text.toWellFormed(),
+    ...(record.mentions.length === 0 ? {} : { mentions: [...record.mentions] }),
+    ...(record.attachments.length === 0 ? {} : { attachments: [...record.attachments] }),
+  };
 }
 
 export function agentMessage(itemId: string, status: ItemStatus, text: string): Item {

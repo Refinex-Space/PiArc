@@ -295,6 +295,8 @@ impl HostSupervisor {
             session_id: session_id.clone(),
             request_id: request_id.to_owned(),
             text: text.to_owned(),
+            mentions: Vec::new(),
+            attachments: Vec::new(),
         };
         let tracking = Tracking {
             session_id: Some(session_id.0.clone()),

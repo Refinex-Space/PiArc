@@ -427,7 +427,8 @@ fn respond(
             record.outcome = Outcome::Streamed;
             ScriptBody::complete(events)
         }
-    };
+    }
+    .paced(step.chunk_delay());
     let mut response = hyper::Response::new(body);
     let headers = response.headers_mut();
     headers.insert(CONTENT_TYPE, HeaderValue::from_static("text/event-stream"));

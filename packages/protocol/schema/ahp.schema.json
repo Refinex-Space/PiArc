@@ -1,5 +1,20 @@
 {
   "$defs": {
+    "AttachmentKind": {
+      "description": "What an attachment is.",
+      "oneOf": [
+        {
+          "const": "image",
+          "description": "A PNG, JPEG, GIF or WebP image: image content of the user message.",
+          "type": "string"
+        },
+        {
+          "const": "pdf",
+          "description": "A PDF: the text of its pages follows the user's text.",
+          "type": "string"
+        }
+      ]
+    },
     "BlobRef": {
       "description": "A copy of a file's content kept by Core (ADR-0009 rule 8).",
       "properties": {
@@ -472,6 +487,11 @@
         {
           "const": "unencodableText",
           "description": "The new text has characters the file's encoding cannot represent; the file is\nunchanged. `details`: `{ path, encoding, line }` (1-based line of the first such\ncharacter).",
+          "type": "string"
+        },
+        {
+          "const": "cancelled",
+          "description": "A Core API request the client cancelled or replaced with a newer one (a file search\nfor `@` mentions); its result no longer matters.",
           "type": "string"
         }
       ]
@@ -2365,22 +2385,88 @@
         }
       ]
     },
+    "InputAttachment": {
+      "description": "An attachment Core stored for a session.",
+      "properties": {
+        "blob": {
+          "$ref": "#/$defs/BlobRef",
+          "description": "Where Core stored it: below `<data>/sessions/<session id>/attachments/`."
+        },
+        "kind": {
+          "$ref": "#/$defs/AttachmentKind",
+          "description": "What it is."
+        },
+        "mimeType": {
+          "description": "Its media type, for example `image/png`.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The file name the user attached, for display.",
+          "type": "string"
+        },
+        "pageCount": {
+          "description": "How many pages a PDF has.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        }
+      },
+      "required": ["kind", "name", "mimeType", "blob"],
+      "type": "object"
+    },
+    "InputMention": {
+      "description": "A file the user mentioned with `@`: the span of the input's text that names it.",
+      "properties": {
+        "end": {
+          "description": "UTF-16 offset just past the mention.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "description": "The file as the text spells it after the `@`, relative to the session's working\ndirectory.",
+          "type": "string"
+        },
+        "start": {
+          "description": "UTF-16 offset of the `@` in the text.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["path", "start", "end"],
+      "type": "object"
+    },
     "Item": {
       "description": "An item in its current state, discriminated by the `type` member. Every variant carries\n`itemId` and `status`.\n\nTool calls are items too: the Agent Host maps each canonical tool name to one of the tool\nitem types (architecture section 5.3) and every tool item carries the canonical `tool`\nname, the `arguments` the model gave and, once known, the `output` text the model sees\n(bounded; longer text keeps its end and starts with a truncation note). Whether a tool\ncall succeeded comes from the tool layer's own result, never from an exit code.",
       "oneOf": [
         {
           "description": "Input the user gave: the prompt that started the turn, or a steering or follow-up\nmessage when the model receives it.",
           "properties": {
+            "attachments": {
+              "description": "The images and PDFs the user attached.",
+              "items": {
+                "$ref": "#/$defs/InputAttachment"
+              },
+              "type": "array"
+            },
             "itemId": {
               "$ref": "#/$defs/ItemId",
               "description": "The item's identifier."
+            },
+            "mentions": {
+              "description": "The files the text mentions.",
+              "items": {
+                "$ref": "#/$defs/InputMention"
+              },
+              "type": "array"
             },
             "status": {
               "$ref": "#/$defs/ItemStatus",
               "description": "Lifecycle state (always `completed`)."
             },
             "text": {
-              "description": "The text.",
+              "description": "The text the user wrote (mentions spelled `@<path>`); the text of attached PDFs\nthat the model also received is not part of it.",
               "type": "string"
             },
             "type": {
@@ -3168,6 +3254,13 @@
     "QueueItem": {
       "description": "One queued input.",
       "properties": {
+        "attachments": {
+          "description": "Images and PDFs delivered with it; an edit keeps them.",
+          "items": {
+            "$ref": "#/$defs/InputAttachment"
+          },
+          "type": "array"
+        },
         "itemId": {
           "description": "The item's id, unique within the session.",
           "type": "string"
@@ -3175,6 +3268,13 @@
         "kind": {
           "$ref": "#/$defs/QueueKind",
           "description": "How it is delivered."
+        },
+        "mentions": {
+          "description": "The files the text mentions; an edit of the text drops them (the `@<path>` spans stay\nin the text).",
+          "items": {
+            "$ref": "#/$defs/InputMention"
+          },
+          "type": "array"
         },
         "text": {
           "description": "The text.",
@@ -3875,6 +3975,58 @@
       "required": ["jsonrpc", "id", "result"],
       "type": "object"
     },
+    "SessionCompactParams": {
+      "description": "Parameters of `session/compact`.",
+      "properties": {
+        "requestId": {
+          "description": "Idempotency key chosen by Core; repeating it returns the turn already started.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session to compact."
+        }
+      },
+      "required": ["sessionId", "requestId"],
+      "type": "object"
+    },
+    "SessionCompactRequest": {
+      "description": "Request for `session/compact`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/compact",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SessionCompactParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionCompactResponse": {
+      "description": "Successful response to `session/compact`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/PromptAccepted"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
     "SessionCreateParams": {
       "description": "Parameters of `session/create`.",
       "properties": {
@@ -4180,6 +4332,20 @@
     "SessionInputParams": {
       "description": "Parameters of `session/steer` and `session/followUp`.",
       "properties": {
+        "attachments": {
+          "description": "Images and PDFs, by reference.",
+          "items": {
+            "$ref": "#/$defs/InputAttachment"
+          },
+          "type": "array"
+        },
+        "mentions": {
+          "description": "The files the text mentions.",
+          "items": {
+            "$ref": "#/$defs/InputMention"
+          },
+          "type": "array"
+        },
         "requestId": {
           "description": "Idempotency key chosen by Core; repeating it returns the first answer.",
           "type": "string"
@@ -4216,6 +4382,20 @@
     "SessionPromptParams": {
       "description": "Parameters of `session/prompt`.",
       "properties": {
+        "attachments": {
+          "description": "Images and PDFs, by reference.",
+          "items": {
+            "$ref": "#/$defs/InputAttachment"
+          },
+          "type": "array"
+        },
+        "mentions": {
+          "description": "The files the text mentions.",
+          "items": {
+            "$ref": "#/$defs/InputMention"
+          },
+          "type": "array"
+        },
         "requestId": {
           "description": "Idempotency key chosen by Core; repeating it returns the turn already started.",
           "type": "string"
@@ -4517,9 +4697,24 @@
     "TurnCompletedParams": {
       "description": "Parameters of `turn/completed`.",
       "properties": {
+        "errorKind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnErrorKind"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The kind of failure, when `status` is `failed`."
+        },
         "errorMessage": {
           "description": "What went wrong, when `status` is `failed`.",
           "type": ["string", "null"]
+        },
+        "retryable": {
+          "description": "Whether sending the same input again may succeed without the user changing anything,\nwhen `status` is `failed`.",
+          "type": ["boolean", "null"]
         },
         "seq": {
           "description": "Sequence number, monotonically increasing within the session.",
@@ -4559,6 +4754,46 @@
       },
       "required": ["sessionId", "seq", "ts", "turnId", "status"],
       "type": "object"
+    },
+    "TurnErrorKind": {
+      "description": "What kind of failure ended a turn, as the client groups errors (architecture section 8.5).",
+      "oneOf": [
+        {
+          "const": "auth",
+          "description": "The provider refused the credentials, or none are configured.",
+          "type": "string"
+        },
+        {
+          "const": "rateLimit",
+          "description": "The provider's rate limit, still hit after the automatic retries; or a usage quota.",
+          "type": "string"
+        },
+        {
+          "const": "provider",
+          "description": "The provider was overloaded or failed on its side, after the automatic retries.",
+          "type": "string"
+        },
+        {
+          "const": "network",
+          "description": "The provider could not be reached: network, DNS, proxy or timeout.",
+          "type": "string"
+        },
+        {
+          "const": "contextOverflow",
+          "description": "The conversation does not fit the model's context window.",
+          "type": "string"
+        },
+        {
+          "const": "invalidRequest",
+          "description": "The provider rejected the request itself (an invalid parameter, an unsupported input).",
+          "type": "string"
+        },
+        {
+          "const": "internal",
+          "description": "Anything else, including failures inside PiArc or Pi.",
+          "type": "string"
+        }
+      ]
     },
     "TurnId": {
       "description": "Turn identifier, unique within a session.",
@@ -4739,6 +4974,54 @@
       "required": ["inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens", "cost"],
       "type": "object"
     },
+    "TurnUsageParams": {
+      "description": "Parameters of `turn/usage`: the turn's token use so far, after each model response.",
+      "properties": {
+        "seq": {
+          "description": "Sequence number, monotonically increasing within the session.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session the event belongs to."
+        },
+        "ts": {
+          "description": "Time the event was produced, in milliseconds since the Unix epoch (UTC).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "turnId": {
+          "$ref": "#/$defs/TurnId",
+          "description": "The running turn."
+        },
+        "usage": {
+          "$ref": "#/$defs/TurnUsage",
+          "description": "The sum over the responses received so far."
+        }
+      },
+      "required": ["sessionId", "seq", "ts", "turnId", "usage"],
+      "type": "object"
+    },
+    "TurnUsageReportNotification": {
+      "description": "Notification `turn/usage`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "turn/usage",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/TurnUsageParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
     "UploadPart": {
       "description": "One piece of a text sent in several requests.",
       "properties": {
@@ -4819,6 +5102,12 @@
     },
     {
       "$ref": "#/$defs/SessionPromptResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionCompactRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionCompactResponse"
     },
     {
       "$ref": "#/$defs/SessionForkRequest"
@@ -5011,6 +5300,9 @@
     },
     {
       "$ref": "#/$defs/TurnRetryingNotification"
+    },
+    {
+      "$ref": "#/$defs/TurnUsageReportNotification"
     },
     {
       "$ref": "#/$defs/QueueChangedNotification"

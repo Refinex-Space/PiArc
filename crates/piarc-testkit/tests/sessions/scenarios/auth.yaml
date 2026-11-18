@@ -1,0 +1,4 @@
+# T19: the provider refuses the credentials.
+id: auth
+steps:
+  - error: { kind: unauthorized, message: 'invalid x-api-key' }

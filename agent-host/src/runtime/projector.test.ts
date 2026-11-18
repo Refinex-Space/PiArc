@@ -83,6 +83,7 @@ describe('Projector', () => {
       'item/agentMessage/delta',
       'item/agentMessage/delta',
       'item/completed',
+      'turn/usage',
       'item/started',
       'item/completed',
       'turn/completed',
@@ -98,7 +99,7 @@ describe('Projector', () => {
       turnId: 'turn-1',
       item: { type: 'agentMessage', itemId, status: 'completed', text: 'Writing.' },
     });
-    expect(out[6]?.payload).toEqual({
+    expect(out[7]?.payload).toEqual({
       turnId: 'turn-1',
       item: {
         type: 'dynamicToolCall',
@@ -109,7 +110,7 @@ describe('Projector', () => {
         output: 'Wrote 1 line',
       },
     });
-    expect(out[7]?.payload).toEqual({ turnId: 'turn-1', status: 'completed', usage: NO_USAGE });
+    expect(out[8]?.payload).toEqual({ turnId: 'turn-1', status: 'completed', usage: NO_USAGE });
     expect(projector.activeTurnId).toBeUndefined();
   });
 
@@ -148,6 +149,8 @@ describe('Projector', () => {
       turnId: 'turn-3',
       status: 'failed',
       errorMessage: '400 bad',
+      errorKind: 'invalidRequest',
+      retryable: false,
       usage: NO_USAGE,
     });
   });

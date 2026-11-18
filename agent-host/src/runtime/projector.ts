@@ -4,8 +4,11 @@
 // | Pi event                                   | AHP notification                              |
 // |--------------------------------------------|-----------------------------------------------|
 // | first `agent_start` of an accepted input   | `turn/started`                                |
-// | `agent_settled`                            | `turn/completed` with the turn's usage        |
+// | `agent_settled`                            | `turn/completed` with the turn's usage and,   |
+// |                                            | when it failed, the kind (turn-errors.ts)     |
 // | `message_start` of a user message          | `item/started` + `item/completed` userMessage |
+// |                                            | (as the user wrote it: `useInput`, input.ts)  |
+// | `message_end` of an assistant message      | `turn/usage` (the turn's usage so far)        |
 // | `message_update` text / thinking           | `item/started`, `item/agentMessage/delta` /   |
 // |                                            | `item/reasoning/delta`, `item/completed`      |
 // | `tool_execution_start/update/end`          | `item/started`, `item/updated`,               |
@@ -30,8 +33,11 @@
 // back and sent with the next delta. Any surrogate still unpaired becomes U+FFFD.
 import { randomUUID } from 'node:crypto';
 
+import type { AssistantMessage } from '@earendil-works/pi-ai';
 import type { AgentSessionEvent } from '@earendil-works/pi-coding-agent';
 import type { Item, ItemStatus, TurnStatus, TurnUsage } from '@piarc/protocol';
+
+import type { UserInput } from './input.js';
 
 import {
   addUsage,
@@ -45,6 +51,7 @@ import {
   toolItem,
   userMessage,
 } from './items.js';
+import { classifyTurnError } from './turn-errors.js';
 
 /** Where projected notifications go (the outbound queue, bound to one session). */
 export interface ProjectionSink {
@@ -89,6 +96,8 @@ interface Turn {
   usage: TurnUsage;
   lastStopReason: string | undefined;
   lastErrorMessage: string | undefined;
+  /** The latest response, for the kind of failure. */
+  lastResponse: AssistantMessage | undefined;
 }
 
 export class Projector {
@@ -96,6 +105,7 @@ export class Projector {
   readonly #toCanonical: (tool: string) => string;
   readonly #declined = new Set<string>();
   #turn: Turn | undefined;
+  #nextInput: UserInput | undefined;
 
   /** `toCanonical` maps the model-visible tool names of the session's Tool Profile to canonical
    * names: Core sees canonical names only (architecture section 6.1.1). */
@@ -126,7 +136,13 @@ export class Projector {
       usage: NO_USAGE,
       lastStopReason: undefined,
       lastErrorMessage: undefined,
+      lastResponse: undefined,
     };
+  }
+
+  /** The next user message is this input: it shows as the user wrote it (input.ts). */
+  useInput(record: UserInput | undefined): void {
+    this.#nextInput = record;
   }
 
   /** The running turn is being interrupted: tool calls that fail from now on are `interrupted`. */
@@ -177,6 +193,9 @@ export class Projector {
         this.#onAssistantEvent(turn, event.assistantMessageEvent);
         break;
       case 'message_end':
+        if (event.message.role === 'assistant') {
+          turn.lastResponse = event.message;
+        }
         this.#onMessageEnd(turn, event.message);
         break;
       case 'tool_execution_start':
@@ -236,9 +255,12 @@ export class Projector {
     if (message.role === 'user') {
       this.#startTurn(turn);
       turn.userMessages += 1;
+      const record = this.#nextInput;
+      this.#nextInput = undefined;
       const item = userMessage(
         `${turn.turnId}:user:${String(turn.userMessages)}`,
         contentText(message.content) ?? '',
+        record,
       );
       this.#itemEvent(turn, 'item/started', item);
       this.#itemEvent(turn, 'item/completed', item);
@@ -254,6 +276,7 @@ export class Projector {
     turn.lastErrorMessage =
       typeof message.errorMessage === 'string' ? message.errorMessage : undefined;
     turn.usage = addUsage(turn.usage, message.usage);
+    this.#sink.event('turn/usage', { turnId: turn.turnId, usage: turn.usage });
     this.#closeStreams(turn, statusForStop(stopReason));
     // Only a complete tool-use response makes calls; an aborted or failed one never runs them
     // (Pi drops it from the model's context).
@@ -470,7 +493,12 @@ export class Projector {
     if (aborted) {
       this.#completeTurn(turn, 'interrupted');
     } else if (turn.lastStopReason === 'error') {
-      this.#completeTurn(turn, 'failed', turn.lastErrorMessage ?? 'the model request failed');
+      this.#completeTurn(
+        turn,
+        'failed',
+        turn.lastErrorMessage ?? 'the model request failed',
+        turn.lastResponse,
+      );
     } else {
       this.#completeTurn(turn, 'completed');
     }
@@ -517,12 +545,20 @@ export class Projector {
     }
   }
 
-  #completeTurn(turn: Turn, status: TurnStatus, errorMessage?: string): void {
+  #completeTurn(
+    turn: Turn,
+    status: TurnStatus,
+    errorMessage?: string,
+    response?: AssistantMessage,
+  ): void {
     this.#turn = undefined;
+    const failure =
+      status === 'failed' ? classifyTurnError(response, errorMessage ?? '') : undefined;
     this.#sink.event('turn/completed', {
       turnId: turn.turnId,
       status,
       ...(errorMessage === undefined ? {} : { errorMessage: errorMessage.toWellFormed() }),
+      ...(failure === undefined ? {} : { errorKind: failure.kind, retryable: failure.retryable }),
       usage: turn.usage,
     });
   }

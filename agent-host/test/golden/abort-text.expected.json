@@ -50,6 +50,19 @@
     }
   },
   {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
+    }
+  },
+  {
     "method": "item/completed",
     "payload": {
       "turnId": "turn-<id:1>",
@@ -150,6 +163,19 @@
         "itemId": "<id:4>#0",
         "status": "completed",
         "text": "Answered after the interruption."
+      }
+    }
+  },
+  {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-<id:3>",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
       }
     }
   },

@@ -1,5 +1,5 @@
-// The session, workspace and trust commands of `window.piarc` (T18): each validates its
-// arguments (they come from the renderer) and calls Core. Results are Core's JSON text, passed
+// The session, workspace, trust and composer commands of `window.piarc` (T18, T19): each
+// validates its arguments (they come from the renderer) and calls Core. Results are Core's JSON text, passed
 // through unread (the renderer validates them). Deleting a session is irreversible, so the
 // main process asks the user in a native dialog before it calls Core (architecture section
 // 10.3): a page cannot delete a session without the user's click in that dialog.
@@ -7,7 +7,12 @@ import path from 'node:path';
 
 import { BrowserWindow, dialog } from 'electron';
 
-import { IPC_CHANNELS, MAX_PROMPT_LENGTH, isSessionId } from '../../shared/ipc.js';
+import {
+  IPC_CHANNELS,
+  MAX_ATTACHMENT_IPC_BYTES,
+  MAX_PROMPT_LENGTH,
+  isSessionId,
+} from '../../shared/ipc.js';
 import type { Translator } from '../../shared/i18n/index.js';
 import type { RegisterHandler } from '../ipc/register.js';
 import type { CoreRuntime } from './native/piarc-core.js';
@@ -20,6 +25,16 @@ export type SessionCore = Pick<
   | 'resumeSession'
   | 'closeSession'
   | 'prompt'
+  | 'steer'
+  | 'followUp'
+  | 'abort'
+  | 'compact'
+  | 'editQueueItem'
+  | 'deleteQueueItem'
+  | 'storeAttachment'
+  | 'searchFiles'
+  | 'cancelFileSearch'
+  | 'composerInfo'
   | 'markSessionRead'
   | 'renameSession'
   | 'setSessionPinned'
@@ -93,6 +108,53 @@ function title(value: unknown): string | null {
   return value;
 }
 
+/** Ids the renderer chooses (request keys, queue items, searches): Core's key alphabet. */
+function token(value: unknown, name: string): string {
+  if (typeof value !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/u.test(value)) {
+    throw new TypeError(`${name} must be 1 to 128 letters, digits, '.', '_', ':' or '-'`);
+  }
+  return value;
+}
+
+function text(value: unknown, name: string, allowEmpty = false): string {
+  if (
+    typeof value !== 'string' ||
+    (!allowEmpty && value.length === 0) ||
+    value.length > MAX_PROMPT_LENGTH
+  ) {
+    throw new TypeError(`${name} must be a string of at most ${String(MAX_PROMPT_LENGTH)} units`);
+  }
+  return value;
+}
+
+function list(value: unknown, name: string, max: number): unknown[] {
+  if (!Array.isArray(value) || value.length > max) {
+    throw new TypeError(`${name} must be an array of at most ${String(max)} entries`);
+  }
+  return value;
+}
+
+/**
+ * The composer's input as JSON for Core: the shape is checked here (types and sizes), the
+ * meaning (spans inside the text, attachments of this session) by Core.
+ */
+function input(value: unknown): string {
+  if (typeof value !== 'object' || value === null) {
+    throw new TypeError('input must be an object');
+  }
+  const fields = value as Record<string, unknown>;
+  const message = {
+    requestId: token(fields.requestId, 'requestId'),
+    text: text(fields.text, 'text', true),
+    mentions: list(fields.mentions, 'mentions', 100),
+    attachments: list(fields.attachments, 'attachments', 10),
+  };
+  if (message.text.trim() === '' && message.attachments.length === 0) {
+    throw new TypeError('input must have text or attachments');
+  }
+  return JSON.stringify(message);
+}
+
 /** Registers the session, workspace and trust commands. */
 export function registerSessionHandlers(
   registerHandler: RegisterHandler,
@@ -124,12 +186,52 @@ export function registerSessionHandlers(
   });
   registerHandler(IPC_CHANNELS.sessionResume, (_event, [id]) => core.resumeSession(sessionId(id)));
   registerHandler(IPC_CHANNELS.sessionClose, (_event, [id]) => core.closeSession(sessionId(id)));
-  registerHandler(IPC_CHANNELS.sessionPrompt, (_event, [id, text]) => {
-    if (typeof text !== 'string' || text.length === 0 || text.length > MAX_PROMPT_LENGTH) {
-      throw new TypeError('text must be a non-empty string');
-    }
-    return core.prompt(sessionId(id), text);
+  registerHandler(IPC_CHANNELS.sessionPrompt, (_event, [id, message]) => {
+    const json = input(message);
+    faults.check(IPC_CHANNELS.sessionPrompt);
+    return core.prompt(sessionId(id), json);
   });
+  registerHandler(IPC_CHANNELS.sessionSteer, (_event, [id, message]) =>
+    core.steer(sessionId(id), input(message)),
+  );
+  registerHandler(IPC_CHANNELS.sessionFollowUp, (_event, [id, message]) =>
+    core.followUp(sessionId(id), input(message)),
+  );
+  registerHandler(IPC_CHANNELS.sessionAbort, (_event, [id]) => core.abort(sessionId(id)));
+  registerHandler(IPC_CHANNELS.sessionCompact, (_event, [id]) => core.compact(sessionId(id)));
+  registerHandler(IPC_CHANNELS.queueEdit, (_event, [id, itemId, value]) =>
+    core.editQueueItem(sessionId(id), token(itemId, 'itemId'), text(value, 'text')),
+  );
+  registerHandler(IPC_CHANNELS.queueDelete, (_event, [id, itemId]) =>
+    core.deleteQueueItem(sessionId(id), token(itemId, 'itemId')),
+  );
+  registerHandler(IPC_CHANNELS.attachmentStore, (_event, [id, name, mimeType, data]) => {
+    if (typeof name !== 'string' || name.length > 1024) {
+      throw new TypeError('name must be a string of at most 1024 characters');
+    }
+    if (typeof mimeType !== 'string' || mimeType.length > 128) {
+      throw new TypeError('mimeType must be a media type');
+    }
+    if (!(data instanceof Uint8Array) || data.byteLength > MAX_ATTACHMENT_IPC_BYTES) {
+      throw new TypeError(
+        `data must be at most ${String(MAX_ATTACHMENT_IPC_BYTES)} bytes in a Uint8Array`,
+      );
+    }
+    return core.storeAttachment(sessionId(id), name, mimeType, data);
+  });
+  registerHandler(IPC_CHANNELS.filesSearch, (_event, [searchId, root, query, limit]) => {
+    if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > 1000) {
+      throw new TypeError('limit must be an integer from 1 to 1000');
+    }
+    if (typeof query !== 'string' || query.length > 256) {
+      throw new TypeError('query must be a string of at most 256 characters');
+    }
+    return core.searchFiles(token(searchId, 'searchId'), absolutePath(root), query, limit);
+  });
+  registerHandler(IPC_CHANNELS.filesCancel, (_event, [searchId]) => {
+    core.cancelFileSearch(token(searchId, 'searchId'));
+  });
+  registerHandler(IPC_CHANNELS.composerInfo, () => core.composerInfo());
   registerHandler(IPC_CHANNELS.sessionMarkRead, async (_event, [id]) => {
     await core.markSessionRead(sessionId(id));
   });
@@ -166,11 +268,14 @@ export function registerSessionHandlers(
     await core.deleteSession(target);
     return true;
   });
-  registerHandler(IPC_CHANNELS.sessionTranscript, (_event, [id, limit]) => {
+  registerHandler(IPC_CHANNELS.sessionTranscript, (_event, [id, start, limit]) => {
     if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > 1000) {
       throw new TypeError('limit must be an integer from 1 to 1000');
     }
-    return core.transcriptWindow(sessionId(id), null, limit);
+    if (start !== null && (typeof start !== 'number' || !Number.isInteger(start) || start < 0)) {
+      throw new TypeError('start must be a non-negative integer or null');
+    }
+    return core.transcriptWindow(sessionId(id), start, limit);
   });
   registerHandler(IPC_CHANNELS.snapshotsResend, () => {
     core.resendSnapshots();

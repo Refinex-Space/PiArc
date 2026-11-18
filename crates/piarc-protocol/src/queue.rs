@@ -14,6 +14,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::input::{InputAttachment, InputMention};
 use crate::method::{notification, request};
 use crate::session::{SessionEventHeader, SessionId};
 
@@ -37,6 +38,13 @@ pub struct QueueItem {
     pub kind: QueueKind,
     /// The text.
     pub text: String,
+    /// The files the text mentions; an edit of the text drops them (the `@<path>` spans stay
+    /// in the text).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mentions: Vec<InputMention>,
+    /// Images and PDFs delivered with it; an edit keeps them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attachments: Vec<InputAttachment>,
 }
 
 /// The whole queue, in order: the result of `session/queue/*` and the payload of

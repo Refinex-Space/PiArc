@@ -13,67 +13,100 @@
 // - Editing, deleting or reordering steering items clears Pi's queue and enqueues the remaining
 //   steering items again in the new order; queue updates during that are ignored and the table
 //   is aligned with Pi's list once at the end, so nothing is lost or delivered twice.
+//
+// Each item keeps its prepared input (input.ts): Pi holds the composed text (the user's text and
+// any attached PDF's pages) with the images, the table shows what the user wrote.
 import { randomUUID } from 'node:crypto';
 
+import type { ImageContent } from '@earendil-works/pi-ai';
 import type { QueueItem, QueueKind } from '@piarc/protocol';
 
 import { AhpError } from '../protocol/errors.js';
+import { composedText, withText, type PreparedInput } from './input.js';
 
 /** What the queue needs from Pi's session. */
 export interface PiQueue {
-  steer(text: string): Promise<unknown>;
+  steer(text: string, images?: ImageContent[]): Promise<unknown>;
   clearQueue(): unknown;
   getSteeringMessages(): readonly string[];
+}
+
+/** A queued input: the item Core sees and the input Pi gets. */
+interface Entry {
+  readonly item: QueueItem;
+  readonly prepared: PreparedInput;
+}
+
+function itemOf(itemId: string, kind: QueueKind, prepared: PreparedInput): QueueItem {
+  const { text, mentions, attachments } = prepared.input;
+  return {
+    itemId,
+    kind,
+    text: text.toWellFormed(),
+    ...(mentions.length === 0 ? {} : { mentions: [...mentions] }),
+    ...(attachments.length === 0 ? {} : { attachments: [...attachments] }),
+  };
 }
 
 export class InputQueue {
   readonly #sessionId: string;
   readonly #pi: PiQueue;
   readonly #changed: (items: readonly QueueItem[]) => void;
-  #items: QueueItem[] = [];
+  #items: Entry[] = [];
   /** Set while the steering items are being enqueued again. */
   #rebuilding = false;
   /** The turn settled during a rebuild: settle once the rebuild is done. */
   #settleAfterRebuild = false;
 
-  /** `changed` receives the whole queue after every change (`session/queueChanged`). */
-  constructor(sessionId: string, pi: PiQueue, changed: (items: readonly QueueItem[]) => void) {
+  readonly #delivered: (prepared: PreparedInput) => void;
+
+  /**
+   * `changed` receives the whole queue after every change (`session/queueChanged`);
+   * `delivered` each steering input Pi took out of its queue to deliver.
+   */
+  constructor(
+    sessionId: string,
+    pi: PiQueue,
+    changed: (items: readonly QueueItem[]) => void,
+    delivered: (prepared: PreparedInput) => void = () => undefined,
+  ) {
     this.#sessionId = sessionId;
     this.#pi = pi;
     this.#changed = changed;
+    this.#delivered = delivered;
   }
 
   get items(): readonly QueueItem[] {
-    return this.#items;
+    return this.#items.map((entry) => entry.item);
   }
 
   /** Adds a steering message; Pi delivers it after the current step. */
-  async steer(text: string): Promise<string> {
-    const item = this.#add('steer', text);
+  async steer(prepared: PreparedInput): Promise<string> {
+    const entry = this.#add('steer', prepared);
     try {
-      await this.#pi.steer(text);
+      await this.#pi.steer(composedText(prepared), [...prepared.images]);
     } catch (error) {
-      this.#items = this.#items.filter((current) => current !== item);
+      this.#items = this.#items.filter((current) => current !== entry);
       this.#emit();
       throw error;
     }
-    return item.itemId;
+    return entry.item.itemId;
   }
 
   /** Adds a follow-up message. */
-  followUp(text: string): string {
-    return this.#add('followUp', text).itemId;
+  followUp(prepared: PreparedInput): string {
+    return this.#add('followUp', prepared).item.itemId;
   }
 
   /** Takes the first follow-up item out of the queue, to start it as the next turn. */
-  takeFollowUp(): QueueItem | undefined {
-    const index = this.#items.findIndex((item) => item.kind === 'followUp');
+  takeFollowUp(): { readonly item: QueueItem; readonly prepared: PreparedInput } | undefined {
+    const index = this.#items.findIndex((entry) => entry.item.kind === 'followUp');
     if (index === -1) {
       return undefined;
     }
-    const [item] = this.#items.splice(index, 1);
+    const [entry] = this.#items.splice(index, 1);
     this.#emit();
-    return item;
+    return entry;
   }
 
   /**
@@ -86,29 +119,32 @@ export class InputQueue {
       return;
     }
     this.reconcile(this.#pi.getSteeringMessages());
-    if (!this.#items.some((item) => item.kind === 'steer')) {
+    if (!this.#items.some((entry) => entry.item.kind === 'steer')) {
       return;
     }
     this.#pi.clearQueue();
-    const late = this.#items.filter((item) => item.kind === 'steer');
+    const late = this.#items.filter((entry) => entry.item.kind === 'steer');
     this.#items = [
-      ...late.map((item) => ({ ...item, kind: 'followUp' as const })),
-      ...this.#items.filter((item) => item.kind === 'followUp'),
+      ...late.map((entry) => ({
+        ...entry,
+        item: { ...entry.item, kind: 'followUp' as const },
+      })),
+      ...this.#items.filter((entry) => entry.item.kind === 'followUp'),
     ];
     this.#emit();
   }
 
   /** Empties the queue (abort, close) and returns what it held. */
   takeAll(): QueueItem[] {
-    const items = this.#items;
+    const entries = this.#items;
     this.#items = [];
-    if (items.some((item) => item.kind === 'steer')) {
+    if (entries.some((entry) => entry.item.kind === 'steer')) {
       this.#pi.clearQueue();
     }
-    if (items.length > 0) {
+    if (entries.length > 0) {
       this.#emit();
     }
-    return items;
+    return entries.map((entry) => entry.item);
   }
 
   /** Aligns the steering items with Pi's list after Pi delivered some (`queue_update`). */
@@ -116,41 +152,48 @@ export class InputQueue {
     if (this.#rebuilding) {
       return;
     }
-    const steering = this.#items.filter((item) => item.kind === 'steer');
-    const kept = new Set<QueueItem>();
+    const steering = this.#items.filter((entry) => entry.item.kind === 'steer');
+    const kept = new Set<Entry>();
     let next = 0;
     for (const text of piSteering) {
-      while (next < steering.length && steering[next]?.text !== text) {
+      while (next < steering.length && composedOf(steering[next]) !== text) {
         next += 1;
       }
-      const item = steering[next];
-      if (item === undefined) {
+      const entry = steering[next];
+      if (entry === undefined) {
         break;
       }
-      kept.add(item);
+      kept.add(entry);
       next += 1;
     }
     const before = this.#items.length;
-    this.#items = this.#items.filter((item) => item.kind !== 'steer' || kept.has(item));
+    for (const entry of steering) {
+      if (!kept.has(entry)) {
+        this.#delivered(entry.prepared);
+      }
+    }
+    this.#items = this.#items.filter((entry) => entry.item.kind !== 'steer' || kept.has(entry));
     if (this.#items.length !== before) {
       this.#emit();
     }
   }
 
   async edit(itemId: string, text: string): Promise<readonly QueueItem[]> {
-    const item = this.#find(itemId);
-    const next = this.#items.map((current) => (current === item ? { ...current, text } : current));
-    await this.#replace(next, item.kind === 'steer');
-    return this.#items;
+    const entry = this.#find(itemId);
+    const prepared = withText(entry.prepared, text);
+    const edited: Entry = { item: itemOf(itemId, entry.item.kind, prepared), prepared };
+    const next = this.#items.map((current) => (current === entry ? edited : current));
+    await this.#replace(next, entry.item.kind === 'steer');
+    return this.items;
   }
 
   async delete(itemId: string): Promise<readonly QueueItem[]> {
-    const item = this.#find(itemId);
+    const entry = this.#find(itemId);
     await this.#replace(
-      this.#items.filter((current) => current !== item),
-      item.kind === 'steer',
+      this.#items.filter((current) => current !== entry),
+      entry.item.kind === 'steer',
     );
-    return this.#items;
+    return this.items;
   }
 
   async reorder(itemIds: readonly string[]): Promise<readonly QueueItem[]> {
@@ -163,25 +206,25 @@ export class InputQueue {
       );
     }
     const next = itemIds.map((id) => this.#find(id));
-    const steerOrder = (items: readonly QueueItem[]): string =>
-      items
-        .filter((item) => item.kind === 'steer')
-        .map((item) => item.itemId)
+    const steerOrder = (entries: readonly Entry[]): string =>
+      entries
+        .filter((entry) => entry.item.kind === 'steer')
+        .map((entry) => entry.item.itemId)
         .join('\n');
     await this.#replace(next, steerOrder(next) !== steerOrder(this.#items));
-    return this.#items;
+    return this.items;
   }
 
-  #add(kind: QueueKind, text: string): QueueItem {
-    const item: QueueItem = { itemId: `queue-${randomUUID()}`, kind, text: text.toWellFormed() };
-    this.#items = [...this.#items, item];
+  #add(kind: QueueKind, prepared: PreparedInput): Entry {
+    const entry: Entry = { item: itemOf(`queue-${randomUUID()}`, kind, prepared), prepared };
+    this.#items = [...this.#items, entry];
     this.#emit();
-    return item;
+    return entry;
   }
 
-  #find(itemId: string): QueueItem {
-    const item = this.#items.find((current) => current.itemId === itemId);
-    if (item === undefined) {
+  #find(itemId: string): Entry {
+    const entry = this.#items.find((current) => current.item.itemId === itemId);
+    if (entry === undefined) {
       throw new AhpError(
         'queueItemNotFound',
         `no queued item ${itemId}: it was delivered or removed`,
@@ -190,18 +233,18 @@ export class InputQueue {
         },
       );
     }
-    return item;
+    return entry;
   }
 
   /** Installs `next` as the queue; rebuilds Pi's steering queue when its content changed. */
-  async #replace(next: QueueItem[], steeringChanged: boolean): Promise<void> {
+  async #replace(next: Entry[], steeringChanged: boolean): Promise<void> {
     this.#items = next;
     if (steeringChanged) {
       this.#rebuilding = true;
       try {
         this.#pi.clearQueue();
-        for (const item of next.filter((current) => current.kind === 'steer')) {
-          await this.#pi.steer(item.text);
+        for (const entry of next.filter((current) => current.item.kind === 'steer')) {
+          await this.#pi.steer(composedText(entry.prepared), [...entry.prepared.images]);
         }
       } finally {
         this.#rebuilding = false;
@@ -217,6 +260,10 @@ export class InputQueue {
   }
 
   #emit(): void {
-    this.#changed(this.#items);
+    this.#changed(this.items);
   }
+}
+
+function composedOf(entry: Entry | undefined): string | undefined {
+  return entry === undefined ? undefined : composedText(entry.prepared);
 }

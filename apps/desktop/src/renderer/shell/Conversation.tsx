@@ -83,7 +83,7 @@ export function Conversation({ id }: { readonly id: string }) {
     }
     let active = true;
     setLoading(true);
-    window.piarc.transcriptWindow(id, WINDOW).then(
+    window.piarc.transcriptWindow(id, null, WINDOW).then(
       (text) => {
         if (!active) {
           return;

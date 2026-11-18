@@ -4,12 +4,14 @@
 //
 // | Pi entry                                  | Items                                         |
 // |-------------------------------------------|-----------------------------------------------|
-// | user message                              | userMessage (id: entry id)                    |
+// | user message                              | userMessage (id: entry id), as the user wrote |
+// |                                           | it when a `piarc.input` entry precedes it     |
 // | assistant message                         | agentMessage / reasoning per content block    |
 // |                                           | (`<entry id>#<index>`), one tool item per     |
 // |                                           | tool call (id: tool call id) with the status  |
 // |                                           | and output of its tool result                 |
 // | compaction                                | contextCompaction (no reason: Pi keeps none)  |
+// | `piarc.input` custom entry                | nothing; applies to the next user message     |
 // | everything else                           | nothing                                       |
 //
 // A tool call without a result was interrupted; one in an aborted response never ran and is
@@ -20,6 +22,7 @@ import type { SessionEntry } from '@earendil-works/pi-coding-agent';
 import type { HistoryItem, HistoryWindow, ItemStatus } from '@piarc/protocol';
 
 import { isInterruptionMarker } from '../harness/interruption.js';
+import { INPUT_ENTRY, parseInputRecord, type UserInput } from './input.js';
 import {
   agentMessage,
   contentText,
@@ -55,7 +58,12 @@ export function projectHistory(
     }
   }
   const items: HistoryItem[] = [];
+  let record: UserInput | undefined;
   for (const entry of branch) {
+    if (entry.type === 'custom' && entry.customType === INPUT_ENTRY) {
+      record = parseInputRecord(entry.data);
+      continue;
+    }
     if (entry.type === 'compaction') {
       items.push({
         entryId: entry.id,
@@ -68,10 +76,12 @@ export function projectHistory(
     }
     const { message } = entry;
     if (message.role === 'user') {
-      items.push({
-        entryId: entry.id,
-        item: userMessage(entry.id, contentText(message.content) ?? ''),
-      });
+      const text = contentText(message.content) ?? '';
+      // The record belongs to this message when the message starts with what the user wrote
+      // (attached PDFs' text follows it).
+      const own = record !== undefined && text.startsWith(record.text) ? record : undefined;
+      record = undefined;
+      items.push({ entryId: entry.id, item: userMessage(entry.id, text, own) });
     } else if (message.role === 'assistant' && !isInterruptionMarker(message)) {
       items.push(...assistantItems(entry.id, message, results, toCanonical));
     }

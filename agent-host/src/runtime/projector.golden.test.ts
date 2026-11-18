@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import type { AgentSessionEvent } from '@earendil-works/pi-coding-agent';
 import { describe, expect, it } from 'vitest';
 
+import { plainInput } from './input.js';
 import { isObject } from './items.js';
 import { Projector, type ProjectionSink } from './projector.js';
 import { InputQueue, type PiQueue } from './queue.js';
@@ -106,10 +107,10 @@ async function replay(steps: readonly Step[]): Promise<Emitted[]> {
           projector.markDeclined(String(control.toolCallId));
           break;
         case 'steer':
-          await queue.steer(text);
+          await queue.steer(plainInput(text));
           break;
         case 'followUp':
-          queue.followUp(text);
+          queue.followUp(plainInput(text));
           break;
         case 'takeFollowUp':
           queue.takeFollowUp();

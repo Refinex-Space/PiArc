@@ -197,6 +197,11 @@ export class CoreIo {
     return this.#options.sessionId;
   }
 
+  /** The content of a blob Core made (an attachment, a file read in blob mode). */
+  async readBlob(blob: BlobRef): Promise<Buffer> {
+    return this.#options.readBlob(blob);
+  }
+
   /**
    * Inspects a path. With `read`, the `Read` tool reads the file now with that range: Core
    * records it, and `unchanged` says whether it repeats the session's previous read.
@@ -297,10 +302,10 @@ export class CoreIo {
   }
 
   /** The text of a PDF's pages (`pages`: `3`, `1-5`, `10-`; all pages of a small document). */
-  async pdf(path: string, pages: string | undefined, origin: Origin): Promise<FsPdfResult> {
+  async pdf(path: string, pages: string | undefined, origin?: Origin): Promise<FsPdfResult> {
     return this.#request(
       'fs/pdf',
-      { path, origin, ...(pages === undefined ? {} : { pages }) },
+      { path, ...(origin ? { origin } : {}), ...(pages === undefined ? {} : { pages }) },
       parsePdf,
     );
   }

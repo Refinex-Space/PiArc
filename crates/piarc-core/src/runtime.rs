@@ -881,6 +881,54 @@ impl CoreRuntime {
         })
     }
 
+    /// Stores an attachment for open session `id` and answers with its description (ADR-0030).
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn store_attachment(
+        &self,
+        id: String,
+        name: String,
+        mime_type: String,
+        bytes: Vec<u8>,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        crate::sessions::check_session_id(&id)?;
+        self.on_sessions(on_done, move |hub| async move {
+            hub.store_attachment(id, name, mime_type, bytes).await
+        })
+    }
+
+    /// Searches the files below `root` for an `@` mention (ADR-0030).
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn search_files(
+        &self,
+        search_id: String,
+        root: PathBuf,
+        query: String,
+        limit: usize,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.search_files(search_id, root, query, limit).await
+        })
+    }
+
+    /// Stops file search `search_id`; only queues.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NoDataDirectory`], [`Error::ShuttingDown`].
+    pub fn cancel_file_search(&self, search_id: &str) -> Result<()> {
+        self.ensure_running()?;
+        self.services()?.sessions.cancel_file_search(search_id);
+        Ok(())
+    }
+
     /// Sends the workspace and session list snapshots again (a client subscribed anew).
     ///
     /// # Errors
@@ -1085,6 +1133,7 @@ fn open_state(
         config: config.sessions.clone(),
         snapshots,
         cancel: cancel.child_token(),
+        files: crate::composer::file_search::FileSearch::default(),
     });
     tracing::info!(target: "piarc_core", data = %storage.dirs().data().display(), "Core state opened");
     Ok(StateServices {

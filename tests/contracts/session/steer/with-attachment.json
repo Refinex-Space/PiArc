@@ -1,0 +1,22 @@
+{
+  "jsonrpc": "2.0",
+  "id": 16,
+  "method": "session/steer",
+  "params": {
+    "sessionId": "019a8f3e-5b2c-7d41-9e60-3f1a2b4c5d6e",
+    "requestId": "req-03",
+    "text": "Use this screenshot instead.",
+    "attachments": [
+      {
+        "kind": "image",
+        "name": "截图 1.png",
+        "mimeType": "image/png",
+        "blob": {
+          "path": "/data/sessions/019a8f3e/attachments/9f86d081.png",
+          "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "size": 2048
+        }
+      }
+    ]
+  }
+}

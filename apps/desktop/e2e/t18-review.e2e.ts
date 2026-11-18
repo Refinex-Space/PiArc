@@ -47,7 +47,12 @@ async function startInBackground(page: Page, ws: string, text: string): Promise<
       const created = JSON.parse(await window.piarc.createSession(workspace)) as {
         sessionId: string;
       };
-      await window.piarc.prompt(created.sessionId, prompt);
+      await window.piarc.prompt(created.sessionId, {
+        requestId: crypto.randomUUID(),
+        text: prompt,
+        mentions: [],
+        attachments: [],
+      });
       return created.sessionId;
     },
     { workspace: ws, prompt: text },

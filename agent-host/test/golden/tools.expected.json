@@ -78,6 +78,19 @@
     }
   },
   {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
+    }
+  },
+  {
     "method": "item/started",
     "payload": {
       "turnId": "turn-<id:1>",
@@ -430,6 +443,19 @@
         "itemId": "<id:3>#0",
         "status": "completed",
         "text": "Done."
+      }
+    }
+  },
+  {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
       }
     }
   },

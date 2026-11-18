@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "method": "turn/completed",
+  "params": {
+    "sessionId": "019a8f3e-5b2c-7d41-9e60-3f1a2b4c5d6e",
+    "seq": 41,
+    "ts": 1763200001000,
+    "turnId": "turn-7c1f",
+    "status": "failed",
+    "errorMessage": "429 rate_limit_error: Too many requests",
+    "errorKind": "rateLimit",
+    "retryable": true
+  }
+}

@@ -1,6 +1,6 @@
 // Checks for request params and results arriving over AHP (a system boundary): values are
 // `unknown` until one of these functions has narrowed them.
-import type { CoreWelcome, ModelRef } from '@piarc/protocol';
+import type { CoreWelcome, InputAttachment, InputMention, ModelRef } from '@piarc/protocol';
 
 import { AhpError } from './errors.js';
 
@@ -113,4 +113,85 @@ export function parseTrust(result: unknown): { trusted: boolean } | undefined {
   return isFields(result) && typeof result.trusted === 'boolean'
     ? { trusted: result.trusted }
     : undefined;
+}
+
+/** The user input of `session/prompt`, `session/steer` and `session/followUp`. */
+export function inputFields(
+  method: string,
+  params: Fields,
+): { text: string; mentions: InputMention[]; attachments: InputAttachment[] } {
+  const text = textField(method, params);
+  const mentions = listField(method, params, 'mentions', (value, index) => {
+    if (
+      isFields(value) &&
+      typeof value.path === 'string' &&
+      value.path.length > 0 &&
+      isCount(value.start) &&
+      isCount(value.end) &&
+      value.start < value.end &&
+      value.end <= text.length
+    ) {
+      return { path: value.path, start: value.start, end: value.end };
+    }
+    throw new AhpError(
+      'invalidParams',
+      `${method}: mentions[${String(index)}] is not a mention of the text`,
+      {
+        details: { member: 'mentions' },
+      },
+    );
+  });
+  const attachments = listField(method, params, 'attachments', (value, index) => {
+    const blob = isFields(value) ? value.blob : undefined;
+    const kind = isFields(value) ? attachmentKind(value.kind) : undefined;
+    if (
+      isFields(value) &&
+      kind !== undefined &&
+      typeof value.name === 'string' &&
+      typeof value.mimeType === 'string' &&
+      isFields(blob) &&
+      typeof blob.path === 'string' &&
+      typeof blob.sha256 === 'string' &&
+      isCount(blob.size) &&
+      (value.pageCount === undefined || isCount(value.pageCount))
+    ) {
+      return {
+        kind,
+        name: value.name,
+        mimeType: value.mimeType,
+        blob: { path: blob.path, sha256: blob.sha256, size: blob.size },
+        ...(value.pageCount === undefined ? {} : { pageCount: value.pageCount }),
+      };
+    }
+    throw new AhpError('invalidParams', `${method}: attachments[${String(index)}] is malformed`, {
+      details: { member: 'attachments' },
+    });
+  });
+  return { text, mentions, attachments };
+}
+
+function listField<T>(
+  method: string,
+  params: Fields,
+  name: string,
+  item: (value: unknown, index: number) => T,
+): T[] {
+  const value = params[name];
+  if (value === undefined || value === null) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    throw new AhpError('invalidParams', `${method}: ${name} must be an array`, {
+      details: { member: name },
+    });
+  }
+  return value.map((entry: unknown, index) => item(entry, index));
+}
+
+function isCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+function attachmentKind(value: unknown): 'image' | 'pdf' | undefined {
+  return value === 'image' || value === 'pdf' ? value : undefined;
 }

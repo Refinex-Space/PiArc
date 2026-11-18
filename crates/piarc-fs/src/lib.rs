@@ -37,7 +37,7 @@
 //!   encoding, byte order mark and line endings and replaces files atomically;
 //! - [`spill()`] keeps long tool results in the session's temporary directory;
 //! - [`glob()`] with fd's matching rules and [`grep()`] with ripgrep's libraries, both honoring
-//!   ignore files.
+//!   ignore files; [`fuzzy`] lists and ranks files for the composer's `@` mentions (T19).
 //!
 //! This crate implements file I/O, so it uses `std::fs` directly.
 //!
@@ -50,6 +50,7 @@ mod content;
 pub mod encoding;
 mod entry;
 mod error;
+pub mod fuzzy;
 mod glob;
 mod grep;
 mod image;
@@ -68,7 +69,7 @@ pub use entry::{MAX_LIST_ENTRIES, list, stat};
 pub use error::{Error, Result};
 pub use glob::{MAX_GLOB_MATCHES, glob};
 pub use grep::{DEFAULT_MATCH_LIMIT, GrepQuery, MAX_LINE_CHARS, MAX_OUTPUT_BYTES, grep};
-pub use pdf::{MAX_PAGES_PER_READ, MAX_PAGES_WITHOUT_RANGE, read_pdf};
+pub use pdf::{MAX_PAGES_PER_READ, MAX_PAGES_WITHOUT_RANGE, pdf_page_count, read_pdf};
 pub use scope::{Scope, display};
 /// Streaming spill files (`spill::create`).
 pub use spill::create as create_spill;

@@ -1,0 +1,6 @@
+# T19: a prompt with a mention, an image and a PDF; the request carries the image and the PDF's
+# pages, the transcript shows what the user wrote.
+id: input
+steps:
+  - text: 'Compared.'
+  - text: 'Again.'

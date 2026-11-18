@@ -83,6 +83,8 @@ pub mod code {
     pub const PERMISSION_DENIED: i64 = -32021;
     /// The text cannot be written in the file's encoding.
     pub const UNENCODABLE_TEXT: i64 = -32022;
+    /// The client cancelled the request or replaced it with a newer one.
+    pub const CANCELLED: i64 = -32023;
 }
 
 /// JSON-RPC 2.0 error object with PiArc's mandatory structured `data`.
@@ -196,6 +198,9 @@ pub enum ErrorKind {
     /// unchanged. `details`: `{ path, encoding, line }` (1-based line of the first such
     /// character).
     UnencodableText,
+    /// A Core API request the client cancelled or replaced with a newer one (a file search
+    /// for `@` mentions); its result no longer matters.
+    Cancelled,
 }
 
 impl ErrorKind {
@@ -231,6 +236,7 @@ impl ErrorKind {
             Self::FileModified => code::FILE_MODIFIED,
             Self::PermissionDenied => code::PERMISSION_DENIED,
             Self::UnencodableText => code::UNENCODABLE_TEXT,
+            Self::Cancelled => code::CANCELLED,
         }
     }
 }
@@ -255,7 +261,7 @@ impl ErrorObject {
 mod tests {
     use super::*;
 
-    const ALL_KINDS: [ErrorKind; 28] = [
+    const ALL_KINDS: [ErrorKind; 29] = [
         ErrorKind::ParseError,
         ErrorKind::InvalidRequest,
         ErrorKind::MethodNotFound,
@@ -284,6 +290,7 @@ mod tests {
         ErrorKind::FileModified,
         ErrorKind::PermissionDenied,
         ErrorKind::UnencodableText,
+        ErrorKind::Cancelled,
     ];
 
     #[test]

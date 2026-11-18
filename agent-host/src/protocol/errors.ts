@@ -33,6 +33,7 @@ const CODES: Record<ErrorKind, number> = {
   fileModified: -32020,
   permissionDenied: -32021,
   unencodableText: -32022,
+  cancelled: -32023,
 };
 
 /** An error with an AHP kind; thrown by request handlers and the Core bridge. */

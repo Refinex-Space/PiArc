@@ -187,7 +187,12 @@ async function startSessionElsewhere(page: Page, ws: string): Promise<string> {
     const created = JSON.parse(await window.piarc.createSession(workspace)) as {
       sessionId: string;
     };
-    await window.piarc.prompt(created.sessionId, 'Background [[piarc-scenario:t18-chat#unread]]');
+    await window.piarc.prompt(created.sessionId, {
+      requestId: crypto.randomUUID(),
+      text: 'Background [[piarc-scenario:t18-chat#unread]]',
+      mentions: [],
+      attachments: [],
+    });
     return created.sessionId;
   }, ws);
 }

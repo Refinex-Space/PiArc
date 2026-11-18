@@ -2,6 +2,7 @@
 //! persisted in the index and surviving a restart; deleting removes the Pi session file and the
 //! session's temporary directory.
 
+use piarc_core::composer::UserInput;
 use piarc_core::sessions::{Op, SessionPrefsChange};
 use serde_json::Value;
 
@@ -219,7 +220,7 @@ async fn deleting_an_open_session_closes_it_first() {
     core.delete_session(id.clone(), done).expect("queued");
     answer(rx).await.expect("deleted while open");
     let (done, rx) = reply();
-    core.session_op(id.clone(), Op::Prompt("again".into()), done)
+    core.session_op(id.clone(), Op::Prompt(UserInput::text("again")), done)
         .expect("queued");
     let gone = answer(rx).await.expect_err("no longer open");
     assert_eq!(

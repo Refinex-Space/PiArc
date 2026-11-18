@@ -35,15 +35,39 @@ export declare class CoreRuntime {
   forkSession(id: string, entryId?: string | null): Promise<string>;
   /** Closes an open session. */
   closeSession(id: string): Promise<string>;
-  /** Starts a turn on an idle session; resolves with `{ turnId }`. */
-  prompt(id: string, text: string): Promise<string>;
   /**
-   * A steering message for the running turn (a new turn when idle); resolves with
-   * `{ disposition: "queued", itemId }` or `{ disposition: "started", turnId }`.
+   * Starts a turn on an idle session; resolves with `{ turnId }`. `input` is JSON:
+   * `{ requestId?, text, mentions?, attachments? }` (ADR-0030); the same `requestId` sent
+   * again returns the turn it already started.
    */
-  steer(id: string, text: string): Promise<string>;
+  prompt(id: string, input: string): Promise<string>;
+  /**
+   * A steering message for the running turn (a new turn when idle); `input` as for
+   * `prompt`. Resolves with `{ disposition: "queued", itemId }` or `{ disposition:
+   * "started", turnId }`.
+   */
+  steer(id: string, input: string): Promise<string>;
   /** A follow-up for after the running turn (a new turn when idle); resolves like `steer`. */
-  followUp(id: string, text: string): Promise<string>;
+  followUp(id: string, input: string): Promise<string>;
+  /** Compacts the conversation as a turn of its own (`/compact`); resolves with `{ turnId }`. */
+  compact(id: string): Promise<string>;
+  /**
+   * Stores an attachment (image or PDF bytes) for an open session; resolves with the
+   * attachment to put in an input (`{ kind, name, mimeType, blob, pageCount? }`). The bytes
+   * are copied; the caller's buffer is not kept.
+   */
+  storeAttachment(id: string, name: string, mimeType: string, data: Uint8Array): Promise<string>;
+  /**
+   * Fuzzy-searches the files below `root` (inside a workspace) for an `@` mention; at most
+   * `limit` matches. A newer search with the same `searchId` cancels this one, which then
+   * rejects with kind `cancelled`. Resolves with `{ root, results: [{ path, name,
+   * positions }], truncated }`.
+   */
+  searchFiles(searchId: string, root: string, query: string, limit: number): Promise<string>;
+  /** Stops a file search. Only queues. */
+  cancelFileSearch(searchId: string): void;
+  /** The composer's configuration (JSON): built-in commands, attachment limits, search cap. */
+  composerInfo(): string;
   /**
    * Interrupts the running turn; resolves with `{ sessionId, interruptedTurnId?,
    * returnedQueue? }`.

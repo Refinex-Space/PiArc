@@ -213,6 +213,8 @@ async fn steer_and_follow_up(
         session_id: id.clone(),
         request_id: request_id.into(),
         text: text.into(),
+        mentions: Vec::new(),
+        attachments: Vec::new(),
     };
     supervisor
         .session_call::<SessionSteer>(&id, Some("s1"), input("s1", "Also mention the signal."))

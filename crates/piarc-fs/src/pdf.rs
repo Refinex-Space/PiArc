@@ -79,6 +79,34 @@ pub fn read_pdf(scope: &Scope, requested: &str, pages: Option<&str>) -> Result<F
     extracted.unwrap_or_else(|_| Err(unreadable("its content could not be parsed")))
 }
 
+/// How many pages the PDF at `path` has (an attachment Core stores, ADR-0030). The caller
+/// chose the path; there is no scope to check.
+///
+/// # Errors
+///
+/// The file cannot be read, is over [`MAX_BLOB_BYTES`] (`EFBIG`), is not a readable PDF or is
+/// protected by a password (`EINVAL`).
+pub fn pdf_page_count(path: &Path) -> Result<u64> {
+    let size = open_file(path)?
+        .metadata()
+        .map_err(|e| Error::io(path, e))?
+        .len();
+    if size > MAX_BLOB_BYTES {
+        return Err(too_large(path, size));
+    }
+    let bytes = std::fs::read(path).map_err(|e| Error::io(path, e))?;
+    let unreadable =
+        |detail: &str| Error::coded(path, "EINVAL", &format!("not a readable PDF: {detail}"));
+    let counted = catch_unwind(AssertUnwindSafe(|| -> Result<u64> {
+        let mut document = Document::load_mem(&bytes).map_err(|e| unreadable(&e.to_string()))?;
+        if document.is_encrypted() && document.decrypt("").is_err() {
+            return Err(unreadable("it is encrypted with a password"));
+        }
+        Ok(document.get_pages().len() as u64)
+    }));
+    counted.unwrap_or_else(|_| Err(unreadable("its content could not be parsed")))
+}
+
 /// The pages `spec` names in a document of `count` pages.
 fn page_range(path: &Path, spec: Option<&str>, count: u64) -> Result<RangeInclusive<u64>> {
     let invalid = |message: String| Error::InvalidRequest { message };

@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use piarc_core::clock::ManualClock;
+use piarc_core::composer::UserInput;
 use piarc_core::sessions::Op;
 use serde_json::Value;
 
@@ -214,8 +215,12 @@ async fn fork_copies_the_conversation_and_close_ends_the_session() {
         answer(rx).await.expect("closed");
     }
     let (done, rx) = reply();
-    core.session_op(id.clone(), Op::Prompt("After close.".into()), done)
-        .expect("queued");
+    core.session_op(
+        id.clone(),
+        Op::Prompt(UserInput::text("After close.")),
+        done,
+    )
+    .expect("queued");
     let error = answer(rx)
         .await
         .expect_err("closed sessions take no prompts");

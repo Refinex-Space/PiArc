@@ -121,3 +121,16 @@ fn a_file_that_is_not_a_pdf_is_reported_as_unreadable() {
     assert_eq!(error.code(), Some("EINVAL"));
     assert!(error.to_string().contains("not a readable PDF"), "{error}");
 }
+
+#[test]
+fn counts_the_pages_of_an_attachment_and_refuses_what_is_not_a_pdf() {
+    let tree = TempTree::new("pdf-count");
+    tree.file("placeholder", "");
+    let pdf = tree.path("a 中文.pdf");
+    std::fs::write(&pdf, make_pdf(&["one", "two", "three"])).expect("written");
+    assert_eq!(pdf_page_count(&pdf).expect("counted"), 3);
+    let fake = tree.path("fake.pdf");
+    std::fs::write(&fake, "%PDF-1.5 but nothing else").expect("written");
+    let error = pdf_page_count(&fake).expect_err("not a PDF");
+    assert!(error.to_string().contains("not a readable PDF"), "{error}");
+}

@@ -25,6 +25,8 @@ export type AhpMessage =
   | SessionAbortResponse
   | SessionPromptRequest
   | SessionPromptResponse
+  | SessionCompactRequest
+  | SessionCompactResponse
   | SessionForkRequest
   | SessionForkResponse
   | SessionSteerRequest
@@ -89,6 +91,7 @@ export type AhpMessage =
   | ItemAgentMessageDeltaNotification
   | ItemReasoningDeltaNotification
   | TurnRetryingNotification
+  | TurnUsageReportNotification
   | QueueChangedNotification
   | HarnessEntryNotification;
 /**
@@ -130,7 +133,8 @@ export type ErrorKind =
   | 'fileNotRead'
   | 'fileModified'
   | 'permissionDenied'
-  | 'unencodableText';
+  | 'unencodableText'
+  | 'cancelled';
 /**
  * Session identifier.
  */
@@ -150,6 +154,10 @@ export type ProtocolVersion = string;
  * Turn identifier, unique within a session.
  */
 export type TurnId = string;
+/**
+ * What an attachment is.
+ */
+export type AttachmentKind = 'image' | 'pdf';
 /**
  * How a queued input is delivered.
  */
@@ -185,15 +193,24 @@ export type InputAccepted =
 export type Item =
   | {
       /**
+       * The images and PDFs the user attached.
+       */
+      attachments?: InputAttachment[];
+      /**
        * The item's identifier.
        */
       itemId: ItemId;
+      /**
+       * The files the text mentions.
+       */
+      mentions?: InputMention[];
       /**
        * Lifecycle state (always `completed`).
        */
       status: ItemStatus;
       /**
-       * The text.
+       * The text the user wrote (mentions spelled `@<path>`); the text of attached PDFs
+       * that the model also received is not part of it.
        */
       text: string;
       type: 'userMessage';
@@ -482,6 +499,11 @@ export type ExecShell = 'bash' | 'powershell';
  * Which output stream a chunk came from.
  */
 export type OutputStream = 'stdout' | 'stderr';
+/**
+ * What kind of failure ended a turn, as the client groups errors (architecture section 8.5).
+ */
+export type TurnErrorKind =
+  'auth' | 'rateLimit' | 'provider' | 'network' | 'contextOverflow' | 'invalidRequest' | 'internal';
 /**
  * How a turn ended.
  */
@@ -935,6 +957,10 @@ export interface SessionStopped {
  */
 export interface QueueItem {
   /**
+   * Images and PDFs delivered with it; an edit keeps them.
+   */
+  attachments?: InputAttachment[];
+  /**
    * The item's id, unique within the session.
    */
   itemId: string;
@@ -943,9 +969,74 @@ export interface QueueItem {
    */
   kind: QueueKind;
   /**
+   * The files the text mentions; an edit of the text drops them (the `@<path>` spans stay
+   * in the text).
+   */
+  mentions?: InputMention[];
+  /**
    * The text.
    */
   text: string;
+}
+/**
+ * An attachment Core stored for a session.
+ */
+export interface InputAttachment {
+  /**
+   * Where Core stored it: below `<data>/sessions/<session id>/attachments/`.
+   */
+  blob: BlobRef;
+  /**
+   * What it is.
+   */
+  kind: AttachmentKind;
+  /**
+   * Its media type, for example `image/png`.
+   */
+  mimeType: string;
+  /**
+   * The file name the user attached, for display.
+   */
+  name: string;
+  /**
+   * How many pages a PDF has.
+   */
+  pageCount?: number | null;
+}
+/**
+ * A copy of a file's content kept by Core (ADR-0009 rule 8).
+ */
+export interface BlobRef {
+  /**
+   * Absolute path of the copy, under Core's data directory.
+   */
+  path: string;
+  /**
+   * SHA-256 of the content, lowercase hex.
+   */
+  sha256: string;
+  /**
+   * Size in bytes.
+   */
+  size: number;
+}
+/**
+ * A file the user mentioned with `@`: the span of the input's text that names it.
+ */
+export interface InputMention {
+  /**
+   * UTF-16 offset just past the mention.
+   */
+  end: number;
+  /**
+   * The file as the text spells it after the `@`, relative to the session's working
+   * directory.
+   */
+  path: string;
+  /**
+   * UTF-16 offset of the `@` in the text.
+   */
+  start: number;
 }
 /**
  * Request for `session/abort`.
@@ -979,6 +1070,14 @@ export interface SessionPromptRequest {
  */
 export interface SessionPromptParams {
   /**
+   * Images and PDFs, by reference.
+   */
+  attachments?: InputAttachment[];
+  /**
+   * The files the text mentions.
+   */
+  mentions?: InputMention[];
+  /**
    * Idempotency key chosen by Core; repeating it returns the turn already started.
    */
   requestId: string;
@@ -1009,6 +1108,37 @@ export interface PromptAccepted {
    * The turn running the prompt.
    */
   turnId: TurnId;
+}
+/**
+ * Request for `session/compact`.
+ */
+export interface SessionCompactRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/compact';
+  params: SessionCompactParams;
+}
+/**
+ * Parameters of `session/compact`.
+ */
+export interface SessionCompactParams {
+  /**
+   * Idempotency key chosen by Core; repeating it returns the turn already started.
+   */
+  requestId: string;
+  /**
+   * The session to compact.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `session/compact`.
+ */
+export interface SessionCompactResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: PromptAccepted;
 }
 /**
  * Request for `session/fork`.
@@ -1058,6 +1188,14 @@ export interface SessionSteerRequest {
  * Parameters of `session/steer` and `session/followUp`.
  */
 export interface SessionInputParams {
+  /**
+   * Images and PDFs, by reference.
+   */
+  attachments?: InputAttachment[];
+  /**
+   * The files the text mentions.
+   */
+  mentions?: InputMention[];
   /**
    * Idempotency key chosen by Core; repeating it returns the first answer.
    */
@@ -1695,23 +1833,6 @@ export interface FsReadResult {
    * The content, in text mode.
    */
   text?: string | null;
-}
-/**
- * A copy of a file's content kept by Core (ADR-0009 rule 8).
- */
-export interface BlobRef {
-  /**
-   * Absolute path of the copy, under Core's data directory.
-   */
-  path: string;
-  /**
-   * SHA-256 of the content, lowercase hex.
-   */
-  sha256: string;
-  /**
-   * Size in bytes.
-   */
-  size: number;
 }
 /**
  * Request for `fs/write`.
@@ -2824,9 +2945,18 @@ export interface TurnCompletedNotification {
  */
 export interface TurnCompletedParams {
   /**
+   * The kind of failure, when `status` is `failed`.
+   */
+  errorKind?: TurnErrorKind | null;
+  /**
    * What went wrong, when `status` is `failed`.
    */
   errorMessage?: string | null;
+  /**
+   * Whether sending the same input again may succeed without the user changing anything,
+   * when `status` is `failed`.
+   */
+  retryable?: boolean | null;
   /**
    * Sequence number, monotonically increasing within the session.
    */
@@ -3017,6 +3147,39 @@ export interface TurnRetryingParams {
    * The turn being retried.
    */
   turnId: TurnId;
+}
+/**
+ * Notification `turn/usage`.
+ */
+export interface TurnUsageReportNotification {
+  jsonrpc: JsonRpcVersion;
+  method: 'turn/usage';
+  params: TurnUsageParams;
+}
+/**
+ * Parameters of `turn/usage`: the turn's token use so far, after each model response.
+ */
+export interface TurnUsageParams {
+  /**
+   * Sequence number, monotonically increasing within the session.
+   */
+  seq: number;
+  /**
+   * The session the event belongs to.
+   */
+  sessionId: SessionId;
+  /**
+   * Time the event was produced, in milliseconds since the Unix epoch (UTC).
+   */
+  ts: number;
+  /**
+   * The running turn.
+   */
+  turnId: TurnId;
+  /**
+   * The sum over the responses received so far.
+   */
+  usage: TurnUsage;
 }
 /**
  * Notification `session/queueChanged`.

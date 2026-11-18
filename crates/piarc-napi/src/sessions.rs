@@ -9,8 +9,9 @@
 use std::path::PathBuf;
 
 use napi::Env;
-use napi::bindgen_prelude::Object;
+use napi::bindgen_prelude::{Object, Uint8Array};
 use napi_derive::napi;
+use piarc_core::composer::UserInput;
 use piarc_core::sessions::SessionPrefsChange;
 use piarc_core::sessions::{Op, QueueOp};
 use piarc_protocol::session::ModelRef;
@@ -125,27 +126,32 @@ impl CoreRuntime {
         })
     }
 
-    /// Starts a turn on an idle session; resolves with `{ turnId }`.
+    /// Starts a turn on an idle session; resolves with `{ turnId }`. `input` is JSON:
+    /// `{ requestId?, text, mentions?, attachments? }` (ADR-0030); the same `requestId` sent
+    /// again returns the turn it already started.
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]
     pub fn prompt<'env>(
         &self,
         env: &'env Env,
         id: String,
-        text: String,
+        input: String,
     ) -> napi::Result<Object<'env>> {
-        self.op(env, "CoreRuntime.prompt", id, Op::Prompt(text))
+        let input = boundary::call(env, "CoreRuntime.prompt", || UserInput::from_json(&input))?;
+        self.op(env, "CoreRuntime.prompt", id, Op::Prompt(input))
     }
 
-    /// A steering message for the running turn (a new turn when idle); resolves with
-    /// `{ disposition: "queued", itemId }` or `{ disposition: "started", turnId }`.
+    /// A steering message for the running turn (a new turn when idle); `input` as for
+    /// `prompt`. Resolves with `{ disposition: "queued", itemId }` or `{ disposition:
+    /// "started", turnId }`.
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]
     pub fn steer<'env>(
         &self,
         env: &'env Env,
         id: String,
-        text: String,
+        input: String,
     ) -> napi::Result<Object<'env>> {
-        self.op(env, "CoreRuntime.steer", id, Op::Steer(text))
+        let input = boundary::call(env, "CoreRuntime.steer", || UserInput::from_json(&input))?;
+        self.op(env, "CoreRuntime.steer", id, Op::Steer(input))
     }
 
     /// A follow-up for after the running turn (a new turn when idle); resolves like `steer`.
@@ -154,9 +160,72 @@ impl CoreRuntime {
         &self,
         env: &'env Env,
         id: String,
-        text: String,
+        input: String,
     ) -> napi::Result<Object<'env>> {
-        self.op(env, "CoreRuntime.followUp", id, Op::FollowUp(text))
+        let input = boundary::call(env, "CoreRuntime.followUp", || UserInput::from_json(&input))?;
+        self.op(env, "CoreRuntime.followUp", id, Op::FollowUp(input))
+    }
+
+    /// Compacts the conversation as a turn of its own (`/compact`); resolves with `{ turnId }`.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn compact<'env>(&self, env: &'env Env, id: String) -> napi::Result<Object<'env>> {
+        self.op(env, "CoreRuntime.compact", id, Op::Compact)
+    }
+
+    /// Stores an attachment (image or PDF bytes) for an open session; resolves with the
+    /// attachment to put in an input (`{ kind, name, mimeType, blob, pageCount? }`). The bytes
+    /// are copied; the caller's buffer is not kept.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn store_attachment<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        name: String,
+        mime_type: String,
+        data: Uint8Array,
+    ) -> napi::Result<Object<'env>> {
+        let bytes = data.to_vec();
+        self.queue(env, "CoreRuntime.storeAttachment", |core, done| {
+            core.store_attachment(id, name, mime_type, bytes, done)
+        })
+    }
+
+    /// Fuzzy-searches the files below `root` (inside a workspace) for an `@` mention; at most
+    /// `limit` matches. A newer search with the same `searchId` cancels this one, which then
+    /// rejects with kind `cancelled`. Resolves with `{ root, results: [{ path, name,
+    /// positions }], truncated }`.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn search_files<'env>(
+        &self,
+        env: &'env Env,
+        search_id: String,
+        root: String,
+        query: String,
+        limit: u32,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.searchFiles", |core, done| {
+            core.search_files(
+                search_id,
+                PathBuf::from(root),
+                query,
+                usize::try_from(limit).unwrap_or(usize::MAX),
+                done,
+            )
+        })
+    }
+
+    /// Stops a file search. Only queues.
+    #[napi(catch_unwind)]
+    pub fn cancel_file_search(&self, env: Env, search_id: String) -> napi::Result<()> {
+        boundary::call(&env, "CoreRuntime.cancelFileSearch", || {
+            self.core.cancel_file_search(&search_id)
+        })
+    }
+
+    /// The composer's configuration (JSON): built-in commands, attachment limits, search cap.
+    #[napi(catch_unwind)]
+    pub fn composer_info(&self) -> String {
+        piarc_core::composer::info().to_string()
     }
 
     /// Interrupts the running turn; resolves with `{ sessionId, interruptedTurnId?,

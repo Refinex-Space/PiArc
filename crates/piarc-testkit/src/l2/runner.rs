@@ -11,6 +11,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use piarc_core::agent_host::AgentHostLaunch;
+use piarc_core::composer::UserInput;
 use piarc_core::secrets::{MemorySecretStore, test_master_key_name};
 use piarc_core::sessions::{Op, QueueOp, SessionsConfig};
 use piarc_core::{
@@ -512,9 +513,18 @@ impl Driver<'_> {
 
     async fn act(&mut self, action: &Action) -> Result<(), String> {
         match action {
-            Action::Prompt(input) => self.input(input, Op::Prompt(input.text.clone())).await,
-            Action::Steer(input) => self.input(input, Op::Steer(input.text.clone())).await,
-            Action::FollowUp(input) => self.input(input, Op::FollowUp(input.text.clone())).await,
+            Action::Prompt(input) => {
+                self.input(input, Op::Prompt(UserInput::text(input.text.clone())))
+                    .await
+            }
+            Action::Steer(input) => {
+                self.input(input, Op::Steer(UserInput::text(input.text.clone())))
+                    .await
+            }
+            Action::FollowUp(input) => {
+                self.input(input, Op::FollowUp(UserInput::text(input.text.clone())))
+                    .await
+            }
             Action::QueueEdit {
                 session,
                 item,

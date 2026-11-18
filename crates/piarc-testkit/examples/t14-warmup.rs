@@ -16,6 +16,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use piarc_core::agent_host::AgentHostLaunch;
+use piarc_core::composer::UserInput;
 use piarc_core::secrets::{MemorySecretStore, test_master_key_name};
 use piarc_core::sessions::{Op, SessionsConfig};
 use piarc_core::{
@@ -140,7 +141,7 @@ async fn seed_session(setup: &Setup) -> String {
     });
     let session = call(|done| core.create_session(setup.ws.clone(), None, model, done)).await;
     let id = session["sessionId"].as_str().expect("id").to_owned();
-    let prompt = Op::Prompt("Hello [[piarc-scenario:chat]]".into());
+    let prompt = Op::Prompt(UserInput::text("Hello [[piarc-scenario:chat]]"));
     call(|done| core.session_op(id.clone(), prompt, done)).await;
     // The measurement needs the answer in the session file.
     let sessions = setup.base.join("data").join("pi").join("sessions");

@@ -1,6 +1,8 @@
 // The IPC contract between the preload script and the main process: channel names and the
 // shape of `window.piarc`. Every channel is registered in the main process through
 // `registerHandler` (src/main/ipc/register.ts), which checks the sender's origin first.
+import type { InputAttachment, InputMention } from '@piarc/protocol';
+
 import type { CommandId } from './keybindings.js';
 import type { Locale } from './i18n/index.js';
 import type { PreferenceChange, Preferences } from './preferences.js';
@@ -27,6 +29,16 @@ export const IPC_CHANNELS = {
   sessionResume: 'piarc:session.resume',
   sessionClose: 'piarc:session.close',
   sessionPrompt: 'piarc:session.prompt',
+  sessionSteer: 'piarc:session.steer',
+  sessionFollowUp: 'piarc:session.followUp',
+  sessionAbort: 'piarc:session.abort',
+  sessionCompact: 'piarc:session.compact',
+  queueEdit: 'piarc:session.queueEdit',
+  queueDelete: 'piarc:session.queueDelete',
+  attachmentStore: 'piarc:session.attachmentStore',
+  filesSearch: 'piarc:files.search',
+  filesCancel: 'piarc:files.cancel',
+  composerInfo: 'piarc:composer.info',
   sessionMarkRead: 'piarc:session.markRead',
   sessionRename: 'piarc:session.rename',
   sessionSetPinned: 'piarc:session.setPinned',
@@ -82,6 +94,24 @@ export interface AttentionNotice {
 
 /** Longest text the renderer may send as one prompt (bytes of UTF-16 code units). */
 export const MAX_PROMPT_LENGTH = 1_000_000;
+
+/**
+ * Largest attachment the main process passes to Core. Core enforces the real limits per kind
+ * (`composerInfo().attachments`); this only bounds what one IPC message may carry.
+ */
+export const MAX_ATTACHMENT_IPC_BYTES = 33 * 1024 * 1024;
+
+/**
+ * What the composer sends (ADR-0030): the text the model reads (mentions spelled `@<path>`),
+ * where the mentions are, the attachments Core stored for this session, and the client's
+ * idempotency key, so sending the same message again does not repeat it.
+ */
+export interface OutgoingInput {
+  readonly requestId: string;
+  readonly text: string;
+  readonly mentions: readonly InputMention[];
+  readonly attachments: readonly InputAttachment[];
+}
 
 /** Session ids as Core accepts them (`piarc_core::sessions::check_session_id`). */
 export function isSessionId(value: unknown): value is string {
@@ -268,7 +298,37 @@ export interface PiarcApi {
   /** Closes an open session. */
   closeSession(id: string): Promise<string>;
   /** Starts a turn; resolves with `{ turnId }` as JSON. */
-  prompt(id: string, text: string): Promise<string>;
+  prompt(id: string, input: OutgoingInput): Promise<string>;
+  /**
+   * A steering message for the running turn (a new turn when idle); resolves with
+   * `{ disposition: "queued", itemId }` or `{ disposition: "started", turnId }` as JSON.
+   */
+  steer(id: string, input: OutgoingInput): Promise<string>;
+  /** A follow-up queued for after the running turn (a new turn when idle); like `steer`. */
+  followUp(id: string, input: OutgoingInput): Promise<string>;
+  /** Stops the running turn; resolves with the returned queue as JSON. */
+  abort(id: string): Promise<string>;
+  /** Compacts the conversation as a turn of its own (`/compact`); resolves with `{ turnId }`. */
+  compact(id: string): Promise<string>;
+  /** Changes the text of a queued input; resolves with the queue as JSON. */
+  editQueueItem(id: string, itemId: string, text: string): Promise<string>;
+  /** Removes a queued input; resolves with the queue as JSON. */
+  deleteQueueItem(id: string, itemId: string): Promise<string>;
+  /**
+   * Hands an attachment's bytes to Core, which stores them in the session's directory;
+   * resolves with the attachment (`InputAttachment`) as JSON.
+   */
+  storeAttachment(id: string, name: string, mimeType: string, data: Uint8Array): Promise<string>;
+  /**
+   * Fuzzy-searches the files below `root` (inside a workspace) for an `@` mention; a newer
+   * search with the same `searchId` cancels this one. Resolves with `{ root, results: [{ path,
+   * name, positions }], truncated }` as JSON.
+   */
+  searchFiles(searchId: string, root: string, query: string, limit: number): Promise<string>;
+  /** Stops a file search. */
+  cancelFileSearch(searchId: string): Promise<void>;
+  /** The composer's configuration as JSON: commands, attachment limits, search cap. */
+  composerInfo(): Promise<string>;
   /** Clears a session's unread flag. */
   markSessionRead(id: string): Promise<void>;
   /** Gives a session a title, or removes it (`null`). */
@@ -281,10 +341,10 @@ export interface PiarcApi {
    */
   deleteSession(id: string, title: string): Promise<boolean>;
   /**
-   * The last `limit` items of a session's persisted conversation (open or not) as JSON:
-   * `{ start, total, items: [{ entryId, item }] }`.
+   * Items `start .. start + limit` of a session's persisted conversation (open or not), the
+   * last `limit` when `start` is `null`, as JSON: `{ start, total, items: [{ entryId, item }] }`.
    */
-  transcriptWindow(id: string, limit: number): Promise<string>;
+  transcriptWindow(id: string, start: number | null, limit: number): Promise<string>;
   /** Asks Core to send the workspace and session snapshots again. */
   resendSnapshots(): Promise<void>;
   /** The trust view of a directory as JSON (`TrustView`). */

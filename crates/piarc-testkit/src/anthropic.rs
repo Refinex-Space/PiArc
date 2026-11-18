@@ -268,6 +268,18 @@ pub(crate) fn encode_stream(step: &Step, context: &StreamContext) -> Result<Vec<
         event("ping", &json!({ "type": "ping" })),
     ];
     let mut index = 0;
+    let thinking = step.thinking_fragments();
+    if !thinking.is_empty() {
+        let start = json!({ "type": "thinking", "thinking": "" });
+        let deltas = thinking
+            .iter()
+            .map(|piece| json!({ "type": "thinking_delta", "thinking": piece }))
+            .chain(std::iter::once(
+                json!({ "type": "signature_delta", "signature": format!("mock-signature-{}", context.response_number) }),
+            ));
+        push_block(&mut events, index, &start, deltas);
+        index += 1;
+    }
     let text = step.text_fragments();
     if !text.is_empty() {
         let start = json!({ "type": "text", "text": "" });
@@ -348,6 +360,7 @@ pub(crate) fn injected_error_type(kind: InjectedErrorKind) -> &'static str {
         InjectedErrorKind::RateLimit => "rate_limit_error",
         InjectedErrorKind::Overloaded => "overloaded_error",
         InjectedErrorKind::ServerError | InjectedErrorKind::Unavailable => "api_error",
+        InjectedErrorKind::Unauthorized => "authentication_error",
     }
 }
 

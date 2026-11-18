@@ -78,6 +78,19 @@
     }
   },
   {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
+    }
+  },
+  {
     "method": "item/started",
     "payload": {
       "turnId": "turn-<id:1>",
@@ -250,6 +263,19 @@
     }
   },
   {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
+    }
+  },
+  {
     "method": "turn/completed",
     "payload": {
       "turnId": "turn-<id:1>",
@@ -344,6 +370,19 @@
         "itemId": "<id:7>#0",
         "status": "completed",
         "text": "Follow-up answered."
+      }
+    }
+  },
+  {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-<id:6>",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
       }
     }
   },

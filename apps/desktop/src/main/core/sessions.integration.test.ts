@@ -216,7 +216,9 @@ describe('Core sessions over NAPI (T14)', () => {
         }),
       );
       const id = String(created.sessionId);
-      const accepted = json(await core.prompt(id, 'Question one. [[piarc-scenario:chat]]'));
+      const accepted = json(
+        await core.prompt(id, JSON.stringify({ text: 'Question one. [[piarc-scenario:chat]]' })),
+      );
       await events.until(completed(id, accepted.turnId));
 
       const copy = String(json(await core.forkSession(id, null)).sessionId);
@@ -227,7 +229,7 @@ describe('Core sessions over NAPI (T14)', () => {
       json(await core.closeSession(copy));
       json(await core.closeSession(id));
       // A closed session refuses requests with a structured error.
-      await expect(core.prompt(id, 'Too late.')).rejects.toMatchObject({
+      await expect(core.prompt(id, JSON.stringify({ text: 'Too late.' }))).rejects.toMatchObject({
         data: { kind: 'sessionNotFound' },
       });
       // Argument errors are thrown synchronously.
@@ -235,7 +237,7 @@ describe('Core sessions over NAPI (T14)', () => {
 
       const resumed = json(await core.resumeSession(id));
       expect(resumed).toMatchObject({ sessionId: id, restoredMessages: 3 });
-      const again = json(await core.prompt(id, 'Question two.'));
+      const again = json(await core.prompt(id, JSON.stringify({ text: 'Question two.' })));
       await events.until(completed(id, again.turnId));
       expect(events.all.some((e) => e.route === 'core/sessions')).toBe(true);
       expect(events.all.some((e) => e.route === 'core/workspaces')).toBe(true);

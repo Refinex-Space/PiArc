@@ -15,6 +15,7 @@ import {
   parseWelcome,
   stringField,
   stringList,
+  inputFields,
   textField,
 } from './protocol/params.js';
 import { blobReader } from './runtime/blobs.js';
@@ -188,10 +189,16 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
   });
   connection.handle('session/prompt', async (params) => {
     const fields = paramsObject('session/prompt', params);
-    const text = textField('session/prompt', fields);
+    const input = inputFields('session/prompt', fields);
     const sessionId = stringField('session/prompt', fields, 'sessionId');
     const requestId = stringField('session/prompt', fields, 'requestId');
-    return (await sessions('session/prompt')).prompt(sessionId, requestId, text);
+    return (await sessions('session/prompt')).prompt(sessionId, requestId, input);
+  });
+  connection.handle('session/compact', async (params) => {
+    const fields = paramsObject('session/compact', params);
+    const sessionId = stringField('session/compact', fields, 'sessionId');
+    const requestId = stringField('session/compact', fields, 'requestId');
+    return (await sessions('session/compact')).compact(sessionId, requestId);
   });
   for (const [method, kind] of [
     ['session/steer', 'steer'],
@@ -199,10 +206,10 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
   ] as const) {
     connection.handle(method, async (params) => {
       const fields = paramsObject(method, params);
-      const text = textField(method, fields);
+      const input = inputFields(method, fields);
       const sessionId = stringField(method, fields, 'sessionId');
       const requestId = stringField(method, fields, 'requestId');
-      return (await sessions(method)).input(sessionId, requestId, text, kind);
+      return (await sessions(method)).input(sessionId, requestId, input, kind);
     });
   }
   connection.handle('session/queue/edit', async (params) => {

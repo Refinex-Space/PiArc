@@ -50,9 +50,21 @@ pub struct Script {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Step {
+    /// Visible reasoning, streamed before the text (Anthropic `thinking` blocks, OpenAI
+    /// `reasoning_content`).
+    #[serde(default)]
+    pub thinking: Option<String>,
     /// Assistant text, streamed before any tool call.
     #[serde(default)]
     pub text: Option<String>,
+    /// Stream the thinking and the text in deltas of this many characters instead of
+    /// [`TEXT_FRAGMENTS`] pieces.
+    #[serde(default)]
+    pub chunk_chars: Option<usize>,
+    /// Wait this long before each wire event after the first: a model that streams at a
+    /// known rate (for example 8 characters every 20 ms is 100 tokens a second).
+    #[serde(default)]
+    pub chunk_delay_ms: Option<u64>,
     /// Tool calls, streamed in order after the text.
     #[serde(default)]
     pub tool_calls: Vec<ToolCall>,
@@ -153,6 +165,8 @@ pub enum InjectedErrorKind {
     ServerError,
     /// 503 service unavailable.
     Unavailable,
+    /// 401: the credentials were refused.
+    Unauthorized,
 }
 
 impl InjectedErrorKind {
@@ -164,6 +178,7 @@ impl InjectedErrorKind {
             Self::Overloaded => 529,
             Self::ServerError => 500,
             Self::Unavailable => 503,
+            Self::Unauthorized => 401,
         }
     }
 }
@@ -285,15 +300,35 @@ impl Step {
     /// The text deltas of the step (empty pieces dropped).
     #[must_use]
     pub fn text_fragments(&self) -> Vec<String> {
-        self.text
-            .as_deref()
-            .map(|text| {
-                fragment::split_even(text, TEXT_FRAGMENTS)
-                    .into_iter()
-                    .filter(|piece| !piece.is_empty())
-                    .collect()
-            })
-            .unwrap_or_default()
+        self.fragments_of(self.text.as_deref())
+    }
+
+    /// The thinking deltas of the step (empty pieces dropped).
+    #[must_use]
+    pub fn thinking_fragments(&self) -> Vec<String> {
+        self.fragments_of(self.thinking.as_deref())
+    }
+
+    /// The pause before each wire event after the first.
+    #[must_use]
+    pub fn chunk_delay(&self) -> Option<std::time::Duration> {
+        self.chunk_delay_ms
+            .filter(|ms| *ms > 0)
+            .map(std::time::Duration::from_millis)
+    }
+
+    fn fragments_of(&self, text: Option<&str>) -> Vec<String> {
+        let Some(text) = text else {
+            return Vec::new();
+        };
+        let pieces = match self.chunk_chars {
+            Some(size) if size > 0 => text.chars().count().div_ceil(size),
+            _ => TEXT_FRAGMENTS,
+        };
+        fragment::split_even(text, pieces)
+            .into_iter()
+            .filter(|piece| !piece.is_empty())
+            .collect()
     }
 }
 
@@ -359,6 +394,7 @@ impl Script {
 fn check_step(step: &Step) -> Result<(), String> {
     if let Some(error) = &step.error {
         let has_response = step.text.is_some()
+            || step.thinking.is_some()
             || !step.tool_calls.is_empty()
             || step.stop_reason.is_some()
             || step.disconnect_after_events.is_some()
@@ -374,6 +410,12 @@ fn check_step(step: &Step) -> Result<(), String> {
     }
     if step.text.is_none() && step.tool_calls.is_empty() {
         return Err("a step needs text, tool_calls or error".to_owned());
+    }
+    if step.chunk_chars == Some(0) {
+        return Err("chunk_chars must be at least 1".to_owned());
+    }
+    if step.chunk_delay_ms.is_some_and(|ms| ms > 10_000) {
+        return Err("chunk_delay_ms must be at most 10000".to_owned());
     }
     if step.disconnect_after_events == Some(0) {
         return Err("disconnect_after_events must be at least 1".to_owned());

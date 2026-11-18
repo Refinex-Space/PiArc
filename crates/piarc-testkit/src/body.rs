@@ -1,10 +1,13 @@
 //! The HTTP response body: a fixed list of chunks, optionally ending in an abort or a stall.
 
 use std::collections::VecDeque;
+use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::time::Duration;
 
 use hyper::body::{Body, Bytes, Frame, SizeHint};
+use tokio::time::Sleep;
 
 /// The error that aborts a response, making hyper close the connection mid-body.
 #[derive(Debug, thiserror::Error)]
@@ -31,6 +34,10 @@ pub(crate) struct ScriptBody {
     chunks: VecDeque<Bytes>,
     ending: Ending,
     flushed: bool,
+    /// The pause before each chunk after the first (a model streaming at a known rate).
+    pace: Option<Duration>,
+    sent: usize,
+    sleep: Option<Pin<Box<Sleep>>>,
 }
 
 impl ScriptBody {
@@ -39,7 +46,15 @@ impl ScriptBody {
             chunks: chunks.into_iter().map(Bytes::from).collect(),
             ending: Ending::Complete,
             flushed: false,
+            pace: None,
+            sent: 0,
+            sleep: None,
         }
+    }
+
+    /// The same body, waiting `pace` before each chunk after the first.
+    pub(crate) fn paced(self, pace: Option<Duration>) -> Self {
+        Self { pace, ..self }
     }
 
     pub(crate) fn aborted(chunks: impl IntoIterator<Item = String>) -> Self {
@@ -66,8 +81,20 @@ impl Body for ScriptBody {
         context: &mut Context<'_>,
     ) -> Poll<Option<Result<Frame<Bytes>, ScriptedDisconnect>>> {
         let this = self.get_mut();
-        if let Some(chunk) = this.chunks.pop_front() {
-            return Poll::Ready(Some(Ok(Frame::data(chunk))));
+        if !this.chunks.is_empty() {
+            if let Some(pace) = this.pace.filter(|_| this.sent > 0) {
+                let sleep = this
+                    .sleep
+                    .get_or_insert_with(|| Box::pin(tokio::time::sleep(pace)));
+                if sleep.as_mut().poll(context).is_pending() {
+                    return Poll::Pending;
+                }
+                this.sleep = None;
+            }
+            if let Some(chunk) = this.chunks.pop_front() {
+                this.sent += 1;
+                return Poll::Ready(Some(Ok(Frame::data(chunk))));
+            }
         }
         match this.ending {
             Ending::Complete => return Poll::Ready(None),

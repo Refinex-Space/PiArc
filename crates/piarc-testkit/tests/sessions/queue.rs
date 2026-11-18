@@ -1,5 +1,6 @@
 //! The input queue (T14-A03) and the timing of steering and follow-up messages (T14-A04).
 
+use piarc_core::composer::UserInput;
 use piarc_core::sessions::{Op, QueueOp};
 use serde_json::Value;
 
@@ -77,10 +78,10 @@ async fn queued_inputs_are_edited_deleted_and_reordered_and_run_in_the_new_order
 /// reorders; checks the answer and the reported queue.
 async fn edit_the_queue(core: &piarc_core::CoreRuntime, events: &crate::support::Events, id: &str) {
     let item = |answer: Value| answer["itemId"].as_str().expect("queued").to_owned();
-    let steer = item(op(core, id, Op::Steer("Steer S".into())).await);
-    let a = item(op(core, id, Op::FollowUp("Follow-up A".into())).await);
-    let b = item(op(core, id, Op::FollowUp("Follow-up B".into())).await);
-    let c = item(op(core, id, Op::FollowUp("Follow-up C".into())).await);
+    let steer = item(op(core, id, Op::Steer(UserInput::text("Steer S"))).await);
+    let a = item(op(core, id, Op::FollowUp(UserInput::text("Follow-up A"))).await);
+    let b = item(op(core, id, Op::FollowUp(UserInput::text("Follow-up B"))).await);
+    let c = item(op(core, id, Op::FollowUp(UserInput::text("Follow-up C"))).await);
     let edit = |item_id: &str, text: &str| {
         Op::Queue(QueueOp::Edit {
             item_id: item_id.into(),
@@ -90,7 +91,7 @@ async fn edit_the_queue(core: &piarc_core::CoreRuntime, events: &crate::support:
     op(core, id, edit(&steer, "Steer S2")).await;
     op(core, id, edit(&b, "Follow-up B2")).await;
     op(core, id, Op::Queue(QueueOp::Delete { item_id: a })).await;
-    let d = item(op(core, id, Op::FollowUp("Follow-up D".into())).await);
+    let d = item(op(core, id, Op::FollowUp(UserInput::text("Follow-up D"))).await);
     let reordered = op(
         core,
         id,
@@ -173,8 +174,13 @@ async fn steering_joins_the_running_turn_and_a_follow_up_waits_for_the_next() {
     let id = open_session(&core, &env).await;
     let turn = prompt(&core, &id, &prompt_text("Wait for the signal.", "steer")).await;
     waiting(&events, &id).await;
-    op(&core, &id, Op::Steer("Also count the files.".into())).await;
-    op(&core, &id, Op::FollowUp("Then summarize.".into())).await;
+    op(
+        &core,
+        &id,
+        Op::Steer(UserInput::text("Also count the files.")),
+    )
+    .await;
+    op(&core, &id, Op::FollowUp(UserInput::text("Then summarize."))).await;
     std::fs::write(env.ws.join("go"), "").expect("signal");
     assert_eq!(
         events.turn_completed(&id, &turn).await["status"],

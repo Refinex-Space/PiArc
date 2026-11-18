@@ -51,6 +51,8 @@ use tokio::runtime::Handle;
 use tokio_util::sync::CancellationToken;
 
 use crate::agent_host::AgentHostLaunch;
+use crate::composer::attachments::{self, ATTACHMENTS_DIR};
+use crate::composer::file_search::FileSearch;
 use crate::error::{Error, Result};
 use crate::events::EventSender;
 use crate::secrets::SecretsService;
@@ -126,6 +128,7 @@ pub(crate) struct Ctx {
     pub config: SessionsConfig,
     pub snapshots: Snapshots,
     pub cancel: CancellationToken,
+    pub files: FileSearch,
 }
 
 /// The entry of the session layer. Cheap to clone.
@@ -266,13 +269,83 @@ impl Hub {
         }
     }
 
-    /// Runs `op` on open session `id`.
+    /// Runs `op` on open session `id`; an input's mentions and attachments are checked first.
     pub async fn op(&self, id: String, op: Op) -> Result<Value> {
         check_session_id(&id)?;
+        if let Op::Prompt(input) | Op::Steer(input) | Op::FollowUp(input) = &op {
+            input.check(&self.attachments_dir(&id))?;
+        }
         match self.live(&id) {
             Some(session) => session.op(op).await,
             None => Err(session_not_found(&id)),
         }
+    }
+
+    /// Stores an attachment for open session `id` (`<data>/sessions/<id>/attachments/`) and
+    /// describes it for the input that will carry it.
+    pub async fn store_attachment(
+        &self,
+        id: String,
+        name: String,
+        mime_type: String,
+        bytes: Vec<u8>,
+    ) -> Result<Value> {
+        check_session_id(&id)?;
+        if self.live(&id).is_none() {
+            return Err(session_not_found(&id));
+        }
+        let dir = self.attachments_dir(&id);
+        let stored = tokio::task::spawn_blocking(move || {
+            attachments::store(&dir, &name, &mime_type, &bytes)
+        })
+        .await
+        .map_err(|e| Error::Internal {
+            reason: format!("storing an attachment failed: {e}"),
+        })??;
+        serde_json::to_value(stored).map_err(|e| Error::Internal {
+            reason: format!("cannot encode the attachment: {e}"),
+        })
+    }
+
+    /// Searches the files below `root` (a directory inside a workspace Core knows) for an `@`
+    /// mention; a newer search with the same `search_id` cancels this one.
+    pub async fn search_files(
+        &self,
+        search_id: String,
+        root: PathBuf,
+        query: String,
+        limit: usize,
+    ) -> Result<Value> {
+        let root = canonical_dir(root, "root").await?;
+        let known = self
+            .ctx
+            .storage
+            .run(|store| store.workspaces())
+            .await??
+            .iter()
+            .any(|workspace| root.starts_with(&workspace.path));
+        if !known {
+            return Err(Error::InvalidArgument {
+                field: "root",
+                reason: "must be inside a workspace".into(),
+            });
+        }
+        self.ctx.files.search(search_id, root, query, limit).await
+    }
+
+    /// Stops file search `search_id`.
+    pub fn cancel_file_search(&self, search_id: &str) {
+        self.ctx.files.cancel(search_id);
+    }
+
+    /// `<data>/sessions/<id>/attachments/`.
+    fn attachments_dir(&self, id: &str) -> PathBuf {
+        self.ctx
+            .storage
+            .dirs()
+            .sessions()
+            .join(id)
+            .join(ATTACHMENTS_DIR)
     }
 
     /// Items of a session's persisted conversation (open or not): `start .. start + limit`,

@@ -15,10 +15,13 @@
 //! - `session/create` opens a new session in a working directory; `session/resume` reopens
 //!   one by id (Core uses it after an Agent Host restart, passing the last `seq` it received
 //!   so numbering continues). Both answer with [`SessionOpened`].
-//! - `session/prompt` starts a turn. The response ([`PromptAccepted`]) only acknowledges
-//!   it: the turn's outcome arrives later as `turn/completed` with the same `turnId`. Its
+//! - `session/prompt` starts a turn. Mentions and attachments travel beside the text
+//!   ([`crate::input`]). The response ([`PromptAccepted`]) only acknowledges it: the turn's outcome arrives later as `turn/completed` with the same `turnId`. Its
 //!   `requestId` is an idempotency key: the same key on the same session returns the turn
 //!   it already started instead of starting another (ADR-0009 rule 5).
+//! - `session/compact` compacts the conversation as a turn of its own (the user's `/compact`):
+//!   it answers with the turn's id like `session/prompt`, and the turn reports the
+//!   `contextCompaction` item. The session must be idle.
 //! - `session/steer` and `session/followUp` add input to a running turn: a steering message
 //!   reaches the model after the current step (before its next request), a follow-up starts a
 //!   new turn once the current one completes. Both are queued items with ids that
@@ -38,6 +41,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+use crate::input::{InputAttachment, InputMention};
 use crate::jsonrpc::Version;
 use crate::method::request;
 use crate::queue::QueueItem;
@@ -199,6 +203,12 @@ pub struct SessionInputParams {
     pub request_id: String,
     /// The user's input.
     pub text: String,
+    /// The files the text mentions.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mentions: Vec<InputMention>,
+    /// Images and PDFs, by reference.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attachments: Vec<InputAttachment>,
 }
 
 /// Result of `session/steer` and `session/followUp`.
@@ -231,6 +241,22 @@ pub struct SessionPromptParams {
     pub request_id: String,
     /// The user's input.
     pub text: String,
+    /// The files the text mentions.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mentions: Vec<InputMention>,
+    /// Images and PDFs, by reference.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attachments: Vec<InputAttachment>,
+}
+
+/// Parameters of `session/compact`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCompactParams {
+    /// The session to compact.
+    pub session_id: SessionId,
+    /// Idempotency key chosen by Core; repeating it returns the turn already started.
+    pub request_id: String,
 }
 
 /// Result of `session/prompt`: the turn was accepted and will report `turn/started` and
@@ -261,6 +287,10 @@ request!(
 request!(
     /// Method marker for `session/prompt` (Core → Agent Host).
     SessionPrompt, "session/prompt", SessionPromptParams, PromptAccepted
+);
+request!(
+    /// Method marker for `session/compact` (Core → Agent Host).
+    SessionCompact, "session/compact", SessionCompactParams, PromptAccepted
 );
 request!(
     /// Method marker for `session/fork` (Core → Agent Host).

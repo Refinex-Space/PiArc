@@ -56,6 +56,15 @@ import {
   type ToolProfile,
 } from '../tools/index.js';
 import { historyWindow, MAX_HISTORY_LIMIT, projectHistory } from './history.js';
+import {
+  composedText,
+  INPUT_ENTRY,
+  inputRecord,
+  prepareInput,
+  type PreparedInput,
+  type UserInput,
+} from './input.js';
+import { contentText } from './items.js';
 import { Projector, type ProjectionSink } from './projector.js';
 import { InputQueue } from './queue.js';
 import type { Workspace } from './workspace.js';
@@ -104,6 +113,10 @@ export interface RegistryOptions {
   readonly toolResultLimits?: ToolResultLimits;
 }
 
+/** What a turn runs: an input, or a compaction (`/compact`). */
+type Job =
+  { readonly kind: 'prompt'; readonly prepared: PreparedInput } | { readonly kind: 'compact' };
+
 /** A registry step in a recording (`onPiEvent`). */
 export type RecordedControl =
   | { readonly control: 'beginTurn'; readonly turnId: string }
@@ -122,6 +135,10 @@ interface HostedSession {
   readonly prompts: Map<string, string>;
   /** Idempotency keys of accepted steering and follow-up inputs → their answers. */
   readonly inputs: Map<string, InputAccepted>;
+  /** Idempotency keys of requests whose attachments are still being read → their answer. */
+  readonly preparing: Map<string, Promise<unknown>>;
+  /** Inputs given to Pi whose user message has not started yet (input.ts records). */
+  readonly delivering: PreparedInput[];
   closed: boolean;
 }
 
@@ -210,21 +227,38 @@ export class SessionRegistry {
     return this.#open(cwd, SessionManager.open(forked), undefined);
   }
 
-  /** Accepts a prompt; the turn runs after the response is queued. */
-  prompt(sessionId: string, requestId: string, text: string): PromptAccepted {
+  /**
+   * Accepts a prompt; the turn runs after the response is queued. Attachments are read first
+   * (input.ts), so an unreadable attachment fails the request rather than the turn.
+   */
+  async prompt(sessionId: string, requestId: string, input: UserInput): Promise<PromptAccepted> {
     const hosted = this.#get(sessionId);
     const known = hosted.prompts.get(requestId);
     if (known !== undefined) {
       return { turnId: known };
     }
-    const running = hosted.projector.activeTurnId;
-    if (running !== undefined) {
-      throw new AhpError('sessionBusy', `session ${sessionId} is running turn ${running}`, {
-        retryable: true,
-        details: { sessionId, turnId: running },
-      });
+    return this.#onceFor(hosted, requestId, async () => {
+      const prepared = await this.#prepare(sessionId, input);
+      const again = hosted.prompts.get(requestId);
+      if (again !== undefined) {
+        return { turnId: again };
+      }
+      this.#checkIdle(sessionId, hosted);
+      const turnId = this.#startTurn(sessionId, hosted, { kind: 'prompt', prepared });
+      hosted.prompts.set(requestId, turnId);
+      return { turnId };
+    });
+  }
+
+  /** Compacts the conversation as a turn of its own (`/compact`); the session must be idle. */
+  compact(sessionId: string, requestId: string): PromptAccepted {
+    const hosted = this.#get(sessionId);
+    const known = hosted.prompts.get(requestId);
+    if (known !== undefined) {
+      return { turnId: known };
     }
-    const turnId = this.#startTurn(sessionId, hosted, text);
+    this.#checkIdle(sessionId, hosted);
+    const turnId = this.#startTurn(sessionId, hosted, { kind: 'compact' });
     hosted.prompts.set(requestId, turnId);
     return { turnId };
   }
@@ -236,7 +270,7 @@ export class SessionRegistry {
   async input(
     sessionId: string,
     requestId: string,
-    text: string,
+    input: UserInput,
     kind: 'steer' | 'followUp',
   ): Promise<InputAccepted> {
     const hosted = this.#get(sessionId);
@@ -244,18 +278,29 @@ export class SessionRegistry {
     if (known !== undefined) {
       return known;
     }
-    let answer: InputAccepted;
-    if (hosted.projector.activeTurnId === undefined) {
-      answer = { disposition: 'started', turnId: this.#startTurn(sessionId, hosted, text) };
-    } else if (kind === 'steer') {
-      this.#options.onPiEvent?.(sessionId, { control: 'steer', text });
-      answer = { disposition: 'queued', itemId: await hosted.queue.steer(text) };
-    } else {
-      this.#options.onPiEvent?.(sessionId, { control: 'followUp', text });
-      answer = { disposition: 'queued', itemId: hosted.queue.followUp(text) };
-    }
-    hosted.inputs.set(requestId, answer);
-    return answer;
+    return this.#onceFor(hosted, requestId, async () => {
+      const prepared = await this.#prepare(sessionId, input);
+      const again = hosted.inputs.get(requestId);
+      if (again !== undefined) {
+        return again;
+      }
+      const text = composedText(prepared);
+      let answer: InputAccepted;
+      if (hosted.projector.activeTurnId === undefined) {
+        answer = {
+          disposition: 'started',
+          turnId: this.#startTurn(sessionId, hosted, { kind: 'prompt', prepared }),
+        };
+      } else if (kind === 'steer') {
+        this.#options.onPiEvent?.(sessionId, { control: 'steer', text });
+        answer = { disposition: 'queued', itemId: await hosted.queue.steer(prepared) };
+      } else {
+        this.#options.onPiEvent?.(sessionId, { control: 'followUp', text });
+        answer = { disposition: 'queued', itemId: hosted.queue.followUp(prepared) };
+      }
+      hosted.inputs.set(requestId, answer);
+      return answer;
+    });
   }
 
   async editQueue(sessionId: string, itemId: string, text: string): Promise<QueueState> {
@@ -357,18 +402,61 @@ export class SessionRegistry {
     return opening;
   }
 
+  /** Runs `answer` once per idempotency key while it is in progress. */
+  async #onceFor<T>(
+    hosted: HostedSession,
+    requestId: string,
+    answer: () => Promise<T>,
+  ): Promise<T> {
+    const pending = hosted.preparing.get(requestId);
+    if (pending !== undefined) {
+      return pending as Promise<T>;
+    }
+    const running = answer().finally(() => hosted.preparing.delete(requestId));
+    hosted.preparing.set(requestId, running);
+    return running;
+  }
+
+  /** Reads an input's attachments through Core (images by blob, PDFs by `fs/pdf`). */
+  async #prepare(sessionId: string, input: UserInput): Promise<PreparedInput> {
+    if (input.attachments.length === 0) {
+      return { input, sections: '', images: [] };
+    }
+    const { tools } = this.#options;
+    if (tools.kind !== 'core') {
+      throw new AhpError('invalidParams', 'attachments need the Core tool backend', {
+        details: { sessionId },
+      });
+    }
+    const io = tools.ioFor(sessionId);
+    return prepareInput(input, {
+      readBlob: (blob) => io.readBlob(blob),
+      pdf: (path, pages) => io.pdf(path, pages),
+    });
+  }
+
+  #checkIdle(sessionId: string, hosted: HostedSession): void {
+    const running = hosted.projector.activeTurnId;
+    if (running !== undefined) {
+      throw new AhpError('sessionBusy', `session ${sessionId} is running turn ${running}`, {
+        retryable: true,
+        details: { sessionId, turnId: running },
+      });
+    }
+  }
+
   #opened(sessionId: string): SessionOpened {
     return { sessionId, restoredMessages: this.#get(sessionId).runtime.session.messages.length };
   }
 
-  #startTurn(sessionId: string, hosted: HostedSession, text: string): string {
+  #startTurn(sessionId: string, hosted: HostedSession, job: Job): string {
     const turnId = `turn-${randomUUID()}`;
     this.#options.onPiEvent?.(sessionId, { control: 'beginTurn', turnId });
     hosted.projector.beginTurn(turnId);
     // Start on the next macrotask: the handler's response is queued first, so Core learns the
     // turn id before any of the turn's notifications.
     setImmediate(() => {
-      void this.#run(sessionId, hosted, turnId, text);
+      void this.#run(sessionId, hosted, turnId, job);
     });
     return turnId;
   }
@@ -467,9 +555,17 @@ export class SessionRegistry {
     }
     const sink = this.#options.sinkFor(sessionId);
     const projector = new Projector(sink, toCanonical);
-    const queue = new InputQueue(sessionId, session, (items) => {
-      sink.event('session/queueChanged', { items: [...items] });
-    });
+    const delivering: PreparedInput[] = [];
+    const queue = new InputQueue(
+      sessionId,
+      session,
+      (items) => {
+        sink.event('session/queueChanged', { items: [...items] });
+      },
+      (prepared) => {
+        delivering.push(prepared);
+      },
+    );
     const hosted: HostedSession = {
       runtime,
       projector,
@@ -479,6 +575,8 @@ export class SessionRegistry {
       unsubscribe: () => undefined,
       prompts: new Map(),
       inputs: new Map(),
+      preparing: new Map(),
+      delivering,
       closed: false,
     };
     hosted.unsubscribe = session.subscribe((event) => {
@@ -527,6 +625,11 @@ export class SessionRegistry {
       case 'queue_update':
         queue.reconcile(event.steering);
         break;
+      case 'message_start':
+        if (event.message.role === 'user') {
+          this.#recordInput(hosted, contentText(event.message.content) ?? '');
+        }
+        break;
       case 'agent_settled':
         if (event.aborted) {
           const repair = repairInterruptedTurn(hosted.runtime.session);
@@ -543,25 +646,52 @@ export class SessionRegistry {
     projector.handle(event);
     if (event.type === 'agent_settled') {
       queue.settle();
+      hosted.delivering.length = 0;
     }
   }
 
-  async #run(
-    sessionId: string,
-    hosted: HostedSession,
-    turnId: string,
-    text: string,
-  ): Promise<void> {
-    let next: { readonly turnId: string; readonly text: string } | undefined = { turnId, text };
+  /**
+   * A user message starts: when it is an input PiArc gave Pi with mentions or attachments, the
+   * record of what the user wrote goes into the session file just before the message (Pi
+   * persists the message at its end) and into the live projection.
+   */
+  #recordInput(hosted: HostedSession, text: string): void {
+    const index = hosted.delivering.findIndex((prepared) => composedText(prepared) === text);
+    if (index === -1) {
+      return;
+    }
+    const [prepared] = hosted.delivering.splice(index, 1);
+    const record = prepared === undefined ? undefined : inputRecord(prepared);
+    if (record === undefined) {
+      return;
+    }
+    hosted.runtime.session.sessionManager.appendCustomEntry(INPUT_ENTRY, record);
+    hosted.projector.useInput(record);
+  }
+
+  async #run(sessionId: string, hosted: HostedSession, turnId: string, job: Job): Promise<void> {
+    let next: { readonly turnId: string; readonly job: Job } | undefined = { turnId, job };
     while (next !== undefined) {
       if (hosted.closed || hosted.projector.activeTurnId !== next.turnId) {
         return; // aborted or closed before it started
       }
       try {
-        await hosted.runtime.session.prompt(next.text);
+        const { session } = hosted.runtime;
+        if (next.job.kind === 'compact') {
+          await session.compact();
+        } else {
+          const { prepared } = next.job;
+          hosted.delivering.push(prepared);
+          await session.prompt(
+            composedText(prepared),
+            prepared.images.length === 0 ? undefined : { images: [...prepared.images] },
+          );
+        }
         hosted.projector.finishTurn(next.turnId, 'completed');
       } catch (error) {
-        this.#options.log(`[session ${sessionId}] prompt failed: ${describeError(error)}`);
+        this.#options.log(
+          `[session ${sessionId}] ${next.job.kind} failed: ${describeError(error)}`,
+        );
         hosted.projector.finishTurn(next.turnId, 'failed', describeError(error));
       }
       next = this.#nextFollowUp(sessionId, hosted);
@@ -572,19 +702,19 @@ export class SessionRegistry {
   #nextFollowUp(
     sessionId: string,
     hosted: HostedSession,
-  ): { turnId: string; text: string } | undefined {
+  ): { turnId: string; job: Job } | undefined {
     if (hosted.closed || hosted.projector.activeTurnId !== undefined) {
       return undefined;
     }
-    const item = hosted.queue.takeFollowUp();
-    if (item === undefined) {
+    const entry = hosted.queue.takeFollowUp();
+    if (entry === undefined) {
       return undefined;
     }
     this.#options.onPiEvent?.(sessionId, { control: 'takeFollowUp' });
     const turnId = `turn-${randomUUID()}`;
     this.#options.onPiEvent?.(sessionId, { control: 'beginTurn', turnId });
     hosted.projector.beginTurn(turnId);
-    return { turnId, text: item.text };
+    return { turnId, job: { kind: 'prompt', prepared: entry.prepared } };
   }
 
   #get(sessionId: string): HostedSession {

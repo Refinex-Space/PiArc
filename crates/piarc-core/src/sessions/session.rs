@@ -23,8 +23,9 @@ use piarc_protocol::queue::{
     QueueDelete, QueueDeleteParams, QueueEdit, QueueEditParams, QueueReorder, QueueReorderParams,
 };
 use piarc_protocol::session::{
-    ModelRef, SessionAbort, SessionCreateParams, SessionEventNotification, SessionFollowUp,
-    SessionId, SessionInputParams, SessionPrompt, SessionPromptParams, SessionSteer, SessionTarget,
+    ModelRef, SessionAbort, SessionCompact, SessionCompactParams, SessionCreateParams,
+    SessionEventNotification, SessionFollowUp, SessionId, SessionInputParams, SessionPrompt,
+    SessionPromptParams, SessionSteer, SessionTarget,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -34,6 +35,7 @@ use tokio_util::sync::CancellationToken;
 use super::snapshot::{LiveSession, SessionStatus, SnapshotMsg};
 use super::workspace::{SessionLink, WorkspaceHandle};
 use super::{Ctx, host_error, new_session_id, path_text};
+use crate::composer::UserInput;
 use crate::error::{Error, Result};
 use crate::events::Event;
 use crate::route::RouteKey;
@@ -46,11 +48,13 @@ const MAILBOX: usize = 1024;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Op {
     /// Starts a turn (the session must be idle).
-    Prompt(String),
+    Prompt(UserInput),
     /// A steering message for the running turn (starts a turn when idle).
-    Steer(String),
+    Steer(UserInput),
     /// A follow-up for after the running turn (starts a turn when idle).
-    FollowUp(String),
+    FollowUp(UserInput),
+    /// Compacts the conversation as a turn of its own (`/compact`; the session must be idle).
+    Compact,
     /// Interrupts the running turn; the queue comes back.
     Abort,
     /// Edits the queue.
@@ -495,12 +499,14 @@ impl SessionActor {
             }
             _ => {}
         }
-        if let Op::Prompt(text) | Op::Steer(text) | Op::FollowUp(text) = &op
+        if let Op::Prompt(input) | Op::Steer(input) | Op::FollowUp(input) = &op
             && self.first_message.is_none()
-            && !text.trim().is_empty()
+            && !input.text.trim().is_empty()
         {
             self.first_message = Some(
-                text.chars()
+                input
+                    .text
+                    .chars()
                     .take(piarc_store::pi_session::FIRST_MESSAGE_CHARS)
                     .collect(),
             );
@@ -637,18 +643,32 @@ impl Request {
     async fn run(&self, op: Op) -> Result<Value> {
         let supervisor = self.ws.acquire().await?;
         match op {
-            Op::Prompt(text) => {
-                let request_id = new_session_id()?;
+            Op::Prompt(input) => {
+                let request_id = match input.request_id {
+                    Some(key) => key,
+                    None => new_session_id()?,
+                };
                 let params = SessionPromptParams {
                     session_id: self.id.clone(),
                     request_id: request_id.clone(),
-                    text,
+                    text: input.text,
+                    mentions: input.mentions,
+                    attachments: input.attachments,
                 };
                 self.call::<SessionPrompt>(&supervisor, Some(&request_id), params)
                     .await
             }
-            Op::Steer(text) => self.input::<SessionSteer>(&supervisor, text).await,
-            Op::FollowUp(text) => self.input::<SessionFollowUp>(&supervisor, text).await,
+            Op::Steer(input) => self.input::<SessionSteer>(&supervisor, input).await,
+            Op::FollowUp(input) => self.input::<SessionFollowUp>(&supervisor, input).await,
+            Op::Compact => {
+                let request_id = new_session_id()?;
+                let params = SessionCompactParams {
+                    session_id: self.id.clone(),
+                    request_id: request_id.clone(),
+                };
+                self.call::<SessionCompact>(&supervisor, Some(&request_id), params)
+                    .await
+            }
             Op::Abort => {
                 let target = SessionTarget {
                     session_id: self.id.clone(),
@@ -664,15 +684,20 @@ impl Request {
         }
     }
 
-    async fn input<M>(&self, supervisor: &HostSupervisor, text: String) -> Result<Value>
+    async fn input<M>(&self, supervisor: &HostSupervisor, input: UserInput) -> Result<Value>
     where
         M: RequestMethod<Params = SessionInputParams>,
     {
-        let request_id = new_session_id()?;
+        let request_id = match input.request_id {
+            Some(key) => key,
+            None => new_session_id()?,
+        };
         let params = SessionInputParams {
             session_id: self.id.clone(),
             request_id: request_id.clone(),
-            text,
+            text: input.text,
+            mentions: input.mentions,
+            attachments: input.attachments,
         };
         self.call::<M>(supervisor, Some(&request_id), params).await
     }

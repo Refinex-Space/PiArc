@@ -5,7 +5,8 @@
 //! compactions). Each item goes `item/started` → optional deltas (`item/agentMessage/delta`,
 //! `item/reasoning/delta`) or updates (`item/updated`) → `item/completed`, identified by
 //! `sessionId / turnId / itemId`. `turn/retrying` reports a model request retried after a
-//! recoverable error; `turn/completed` carries the outcome and the turn's usage.
+//! recoverable error; `turn/usage` the turn's token use after each model response;
+//! `turn/completed` carries the outcome (with the kind of failure) and the turn's usage.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -13,6 +14,7 @@ use serde_json::{Map, Value};
 
 use crate::diff::FileDiff;
 use crate::exec::{CommandOutcome, CwdReset};
+use crate::input::{InputAttachment, InputMention};
 use crate::method::notification;
 use crate::session::SessionEventHeader;
 
@@ -54,6 +56,26 @@ pub enum TurnStatus {
     Interrupted,
 }
 
+/// What kind of failure ended a turn, as the client groups errors (architecture section 8.5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum TurnErrorKind {
+    /// The provider refused the credentials, or none are configured.
+    Auth,
+    /// The provider's rate limit, still hit after the automatic retries; or a usage quota.
+    RateLimit,
+    /// The provider was overloaded or failed on its side, after the automatic retries.
+    Provider,
+    /// The provider could not be reached: network, DNS, proxy or timeout.
+    Network,
+    /// The conversation does not fit the model's context window.
+    ContextOverflow,
+    /// The provider rejected the request itself (an invalid parameter, an unsupported input).
+    InvalidRequest,
+    /// Anything else, including failures inside PiArc or Pi.
+    Internal,
+}
+
 /// Why a compaction ran.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -88,8 +110,15 @@ pub enum Item {
         item_id: ItemId,
         /// Lifecycle state (always `completed`).
         status: ItemStatus,
-        /// The text.
+        /// The text the user wrote (mentions spelled `@<path>`); the text of attached PDFs
+        /// that the model also received is not part of it.
         text: String,
+        /// The files the text mentions.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        mentions: Vec<InputMention>,
+        /// The images and PDFs the user attached.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        attachments: Vec<InputAttachment>,
     },
     /// Text produced by the agent.
     AgentMessage {
@@ -345,6 +374,13 @@ pub struct TurnCompletedParams {
     /// What went wrong, when `status` is `failed`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error_message: Option<String>,
+    /// The kind of failure, when `status` is `failed`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_kind: Option<TurnErrorKind>,
+    /// Whether sending the same input again may succeed without the user changing anything,
+    /// when `status` is `failed`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retryable: Option<bool>,
     /// Token use and cost of the turn's model responses.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage: Option<TurnUsage>,
@@ -369,6 +405,19 @@ pub struct TurnRetryingParams {
     pub delay_ms: u64,
     /// The error of the failed attempt.
     pub error_message: String,
+}
+
+/// Parameters of `turn/usage`: the turn's token use so far, after each model response.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TurnUsageParams {
+    /// Session event header.
+    #[serde(flatten)]
+    pub header: SessionEventHeader,
+    /// The running turn.
+    pub turn_id: TurnId,
+    /// The sum over the responses received so far.
+    pub usage: TurnUsage,
 }
 
 /// Parameters of `item/started`, `item/updated` and `item/completed`.
@@ -430,4 +479,8 @@ notification!(
 notification!(
     /// Method marker for `turn/retrying` (Agent Host → Core).
     TurnRetrying, "turn/retrying", TurnRetryingParams
+);
+notification!(
+    /// Method marker for `turn/usage` (Agent Host → Core).
+    TurnUsageReport, "turn/usage", TurnUsageParams
 );

@@ -30,6 +30,19 @@
     }
   },
   {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
+    }
+  },
+  {
     "method": "turn/retrying",
     "payload": {
       "turnId": "turn-<id:1>",
@@ -37,6 +50,19 @@
       "maxAttempts": 3,
       "delayMs": 5,
       "errorMessage": "529 {\"error\":{\"message\":\"Overloaded (injected by the PiArc mock provider)\",\"type\":\"overloaded_error\"},\"request_id\":\"req_mock_4\",\"type\":\"error\"}"
+    }
+  },
+  {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
     }
   },
   {
@@ -94,6 +120,19 @@
         "itemId": "<id:2>#0",
         "status": "completed",
         "text": "Recovered after two retries."
+      }
+    }
+  },
+  {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
       }
     }
   },

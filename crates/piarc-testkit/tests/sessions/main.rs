@@ -2,12 +2,14 @@
 //! bundle on Node, the strict mock provider, and Core's actors in between. Provider scripts
 //! are in `scenarios/`.
 
+mod input;
 mod lifecycle;
 mod metadata;
 mod queue;
 mod support;
 mod turns;
 
+use piarc_core::composer::UserInput;
 use piarc_core::sessions::Op;
 use serde_json::Value;
 use support::{Env, answer, mock_model, prompt_text, reply, shutdown, user_texts};
@@ -28,7 +30,7 @@ pub(crate) async fn open_session(core: &piarc_core::CoreRuntime, env: &Env) -> S
 /// Starts a turn and returns its id.
 pub(crate) async fn prompt(core: &piarc_core::CoreRuntime, id: &str, text: &str) -> String {
     let (done, rx) = reply();
-    core.session_op(id.to_owned(), Op::Prompt(text.to_owned()), done)
+    core.session_op(id.to_owned(), Op::Prompt(UserInput::text(text)), done)
         .expect("queued");
     let accepted = answer(rx).await.expect("the prompt is accepted");
     accepted["turnId"].as_str().expect("a turn id").to_owned()

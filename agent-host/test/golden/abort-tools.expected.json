@@ -30,6 +30,19 @@
     }
   },
   {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
+    }
+  },
+  {
     "method": "item/started",
     "payload": {
       "turnId": "turn-<id:1>",
@@ -99,6 +112,19 @@
           "truncated": false,
           "signal": 15
         }
+      }
+    }
+  },
+  {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
       }
     }
   },
@@ -191,6 +217,19 @@
         "itemId": "<id:3>#0",
         "status": "completed",
         "text": "Answered after the interruption."
+      }
+    }
+  },
+  {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-<id:2>",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
       }
     }
   },

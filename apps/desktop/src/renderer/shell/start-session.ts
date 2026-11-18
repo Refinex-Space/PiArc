@@ -48,7 +48,8 @@ export async function startSession(options: {
   const unwatch = options.watch(sessionId);
   options.onStep({ kind: 'created', sessionId });
   try {
-    const turnId = field(await api.prompt(sessionId, text), 'turnId');
+    const input = { requestId: clientId, text, mentions: [], attachments: [] };
+    const turnId = field(await api.prompt(sessionId, input), 'turnId');
     if (turnId !== undefined) {
       transcript.confirm(clientId, turnId);
     }

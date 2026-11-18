@@ -160,6 +160,9 @@ pub(crate) fn encode_stream(
         }))
     };
     let mut events = vec![chunk(json!({ "role": "assistant", "content": "" }), None)];
+    for piece in step.thinking_fragments() {
+        events.push(chunk(json!({ "reasoning_content": piece }), None));
+    }
     for piece in step.text_fragments() {
         events.push(chunk(json!({ "content": piece }), None));
     }
@@ -240,6 +243,7 @@ pub(crate) fn injected_error_type(kind: InjectedErrorKind) -> (&'static str, Opt
         InjectedErrorKind::Overloaded => ("server_error", Some("overloaded")),
         InjectedErrorKind::ServerError => ("server_error", None),
         InjectedErrorKind::Unavailable => ("server_error", Some("service_unavailable")),
+        InjectedErrorKind::Unauthorized => ("invalid_request_error", Some("invalid_api_key")),
     }
 }
 

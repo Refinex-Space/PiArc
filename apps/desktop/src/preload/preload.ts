@@ -255,10 +255,45 @@ const api: PiarcApi = {
       .then((value: unknown) => expectString(value)),
   closeSession: (id) =>
     ipcRenderer.invoke(IPC_CHANNELS.sessionClose, id).then((value: unknown) => expectString(value)),
-  prompt: (id, text) =>
+  prompt: (id, input) =>
     ipcRenderer
-      .invoke(IPC_CHANNELS.sessionPrompt, id, text)
+      .invoke(IPC_CHANNELS.sessionPrompt, id, input)
       .then((value: unknown) => expectString(value)),
+  steer: (id, input) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionSteer, id, input)
+      .then((value: unknown) => expectString(value)),
+  followUp: (id, input) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionFollowUp, id, input)
+      .then((value: unknown) => expectString(value)),
+  abort: (id) =>
+    ipcRenderer.invoke(IPC_CHANNELS.sessionAbort, id).then((value: unknown) => expectString(value)),
+  compact: (id) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionCompact, id)
+      .then((value: unknown) => expectString(value)),
+  editQueueItem: (id, itemId, text) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.queueEdit, id, itemId, text)
+      .then((value: unknown) => expectString(value)),
+  deleteQueueItem: (id, itemId) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.queueDelete, id, itemId)
+      .then((value: unknown) => expectString(value)),
+  storeAttachment: (id, name, mimeType, data) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.attachmentStore, id, name, mimeType, data)
+      .then((value: unknown) => expectString(value)),
+  searchFiles: (searchId, root, query, limit) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.filesSearch, searchId, root, query, limit)
+      .then((value: unknown) => expectString(value)),
+  cancelFileSearch: async (searchId) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.filesCancel, searchId);
+  },
+  composerInfo: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.composerInfo).then((value: unknown) => expectString(value)),
   markSessionRead: async (id) => {
     await ipcRenderer.invoke(IPC_CHANNELS.sessionMarkRead, id);
   },
@@ -275,9 +310,9 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.sessionDelete, id, title)
       .then((value: unknown) => expectBoolean(value)),
-  transcriptWindow: (id, limit) =>
+  transcriptWindow: (id, start, limit) =>
     ipcRenderer
-      .invoke(IPC_CHANNELS.sessionTranscript, id, limit)
+      .invoke(IPC_CHANNELS.sessionTranscript, id, start, limit)
       .then((value: unknown) => expectString(value)),
   resendSnapshots: async () => {
     await ipcRenderer.invoke(IPC_CHANNELS.snapshotsResend);

@@ -28,13 +28,13 @@ use crate::secrets::{
     SecretsUnlock,
 };
 use crate::session::{
-    SessionAbort, SessionClose, SessionCreate, SessionEventNotification, SessionFollowUp,
-    SessionFork, SessionPrompt, SessionResume, SessionSteer,
+    SessionAbort, SessionClose, SessionCompact, SessionCreate, SessionEventNotification,
+    SessionFollowUp, SessionFork, SessionPrompt, SessionResume, SessionSteer,
 };
 use crate::trust::TrustGet;
 use crate::turn::{
     ItemAgentMessageDelta, ItemCompleted, ItemReasoningDelta, ItemStarted, ItemUpdated,
-    TurnCompleted, TurnRetrying, TurnStarted,
+    TurnCompleted, TurnRetrying, TurnStarted, TurnUsageReport,
 };
 
 /// What a contract describes.
@@ -163,6 +163,8 @@ pub static CONTRACTS: &[Contract] = &[
     response::<SessionAbort>("session/abort/result"),
     request::<SessionPrompt>(SessionPrompt::NAME),
     response::<SessionPrompt>("session/prompt/result"),
+    request::<SessionCompact>(SessionCompact::NAME),
+    response::<SessionCompact>("session/compact/result"),
     request::<SessionFork>(SessionFork::NAME),
     response::<SessionFork>("session/fork/result"),
     request::<SessionSteer>(SessionSteer::NAME),
@@ -227,6 +229,7 @@ pub static CONTRACTS: &[Contract] = &[
     notification::<ItemAgentMessageDelta>(),
     notification::<ItemReasoningDelta>(),
     notification::<TurnRetrying>(),
+    notification::<TurnUsageReport>(),
     notification::<QueueChanged>(),
     notification::<HarnessEntry>(),
 ];
