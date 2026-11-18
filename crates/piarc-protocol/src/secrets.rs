@@ -60,6 +60,9 @@ pub struct SecretsGetAllParams {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SecretsGetAllResult {
+    /// Vault revision at which the entries were read, including deletions. Older Core omits it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<u64>,
     /// Every stored credential, ordered by key.
     pub entries: Vec<SecretEntry>,
 }

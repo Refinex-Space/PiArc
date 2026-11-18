@@ -105,6 +105,9 @@ export function parseWelcome(result: unknown): CoreWelcome | undefined {
     enabled: result.enabled.filter((name): name is string => typeof name === 'string'),
     workspace: result.workspace,
     connectionEpoch: result.connectionEpoch,
+    ...(typeof result.allowModelNetwork === 'boolean'
+      ? { allowModelNetwork: result.allowModelNetwork }
+      : {}),
   };
 }
 

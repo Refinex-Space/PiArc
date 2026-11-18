@@ -162,6 +162,12 @@ impl Vault {
             .map(|(key, entry)| view(key, entry))
     }
 
+    /// Latest committed revision, including deletions. An empty new vault is revision zero.
+    #[must_use]
+    pub fn revision(&self) -> u64 {
+        self.document.next_revision.saturating_sub(1)
+    }
+
     /// Every entry, ordered by key.
     pub fn entries(&self) -> impl Iterator<Item = EntryView<'_>> {
         self.document

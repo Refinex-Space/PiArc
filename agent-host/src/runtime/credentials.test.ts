@@ -489,6 +489,34 @@ describe('CoreCredentialStore', () => {
     expect(core.entries.size).toBe(0);
   });
 
+  it('reconciles a deleted credential and ignores pushes older than a Core snapshot', async () => {
+    const key = 'provider/relay';
+    const value = { type: 'api_key', key: 'fixture' };
+    const snapshot = Promise.withResolvers<unknown>();
+    let reads = 0;
+    const store = new CoreCredentialStore({
+      core: {
+        request: () =>
+          ++reads === 1
+            ? Promise.resolve({ revision: 1, entries: [{ key, revision: 1, value }] })
+            : snapshot.promise,
+      },
+      log: () => undefined,
+    });
+    await store.load();
+    expect(await store.read('relay')).toEqual(value);
+    const reload = store.load();
+    // A second provider changed after Core took the snapshot but before its response arrived.
+    store.applyChange({ key: 'provider/newer', revision: 5, value });
+    snapshot.resolve({ revision: 4, entries: [] });
+    await reload;
+    store.applyChange({ key, revision: 2, value });
+    store.applyChange({ key: 'provider/absent', revision: 3, value });
+    expect(await store.read('relay')).toBeUndefined();
+    expect(await store.read('absent')).toBeUndefined();
+    expect(await store.read('newer')).toEqual(value);
+  });
+
   it('applies changes pushed by Core and ignores stale ones', async () => {
     const { store, core } = await coreStore();
     const r1 = core.write('provider/p1', { type: 'api_key', key: 'one' });

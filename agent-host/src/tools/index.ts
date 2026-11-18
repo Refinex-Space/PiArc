@@ -62,10 +62,15 @@ const FACTORIES: Record<CanonicalTool, (setup: ToolSetup) => ToolDefinition> = {
 
 /** The session's tool definitions, presented as `profile` says: `Bash` only with bash,
  * `PowerShell` only with PowerShell (Windows). */
-export function createToolSet(io: CoreIo, profile: ToolProfile, shells: Shells): ToolDefinition[] {
+export function createToolSet(
+  io: CoreIo,
+  profile: ToolProfile,
+  shells: Shells,
+  autoResizeImages = true,
+): ToolDefinition[] {
   return CANONICAL_TOOLS.filter(
     (tool) => (tool !== 'Bash' || shells.bash) && (tool !== 'PowerShell' || shells.powershell),
-  ).map((tool) => FACTORIES[tool]({ io, presentation: profile[tool] }));
+  ).map((tool) => FACTORIES[tool]({ io, presentation: profile[tool], autoResizeImages }));
 }
 
 /**
@@ -77,13 +82,14 @@ export function toolOptions(
   io: CoreIo,
   profile: ToolProfile,
   shells: Shells,
+  autoResizeImages = true,
 ): {
   customTools: ToolDefinition[];
   noTools: 'builtin';
   excludeTools: string[];
 } {
   return {
-    customTools: createToolSet(io, profile, shells),
+    customTools: createToolSet(io, profile, shells, autoResizeImages),
     noTools: 'builtin',
     excludeTools: [...PI_BUILTIN_TOOL_NAMES],
   };

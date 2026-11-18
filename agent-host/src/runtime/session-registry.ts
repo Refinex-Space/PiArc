@@ -14,6 +14,9 @@
 // (`getAgentDir()`) are pinned to PiArc's directory once, in main.ts.
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
+import { getBuiltinProviders } from '@earendil-works/pi-ai/providers/all';
+
+import { capabilities, supportedEffort, switchPreview } from '../providers/catalog.js';
 
 import {
   createAgentSessionFromServices,
@@ -32,6 +35,8 @@ import type {
   HistoryWindow,
   InputAccepted,
   ModelRef,
+  ModelsListResult,
+  SessionModelSelection,
   PermissionMode,
   PromptAccepted,
   QueueItem,
@@ -148,6 +153,7 @@ interface HostedSession {
   readonly preparing: Map<string, Promise<unknown>>;
   /** Inputs given to Pi whose user message has not started yet (input.ts records). */
   readonly delivering: PreparedInput[];
+  changingModel: boolean;
   closed: boolean;
 }
 
@@ -169,6 +175,79 @@ export class SessionRegistry {
 
   get size(): number {
     return this.#sessions.size;
+  }
+
+  get workspace(): Workspace {
+    return this.#options.workspace;
+  }
+
+  async models(sessionId?: string): Promise<ModelsListResult> {
+    const runtime = this.workspace.modelRuntime;
+    const providers = getBuiltinProviders().flatMap((id) => {
+      const provider = runtime.getProvider(id);
+      return provider?.auth.apiKey ? [{ id, name: provider.name }] : [];
+    });
+    const models = (await runtime.getAvailable()).map(capabilities);
+    const session = sessionId === undefined ? undefined : this.#get(sessionId).runtime.session;
+    const model = session?.model;
+    return {
+      providers,
+      models,
+      ...(session && model
+        ? {
+            model: { provider: model.provider, id: model.id },
+            ...(session.thinkingLevel === 'minimal' ? {} : { effort: session.thinkingLevel }),
+          }
+        : {}),
+    };
+  }
+
+  #target(ref: ModelRef) {
+    const model = this.workspace.modelRuntime.getModel(ref.provider, ref.id);
+    if (!model) throw new AhpError('notFound', 'The selected model is unavailable');
+    return model;
+  }
+
+  previewModelSwitch(sessionId: string, ref: ModelRef) {
+    return switchPreview(
+      this.#get(sessionId).runtime.session,
+      this.#target(ref),
+      this.workspace.unpriced,
+    );
+  }
+
+  async setModel(
+    sessionId: string,
+    ref: ModelRef,
+    requested?: string,
+  ): Promise<SessionModelSelection> {
+    const hosted = this.#get(sessionId);
+    this.#checkIdle(sessionId, hosted);
+    const { session } = hosted.runtime;
+    const model = this.#target(ref);
+    const effort = supportedEffort(model, requested ?? session.thinkingLevel);
+    hosted.changingModel = true;
+    try {
+      await session.setModel(model);
+      session.setThinkingLevel(effort);
+      return { model: ref, effort };
+    } finally {
+      hosted.changingModel = false;
+    }
+  }
+
+  setEffort(sessionId: string, requested: string): SessionModelSelection {
+    const hosted = this.#get(sessionId);
+    this.#checkIdle(sessionId, hosted);
+    const { session } = hosted.runtime;
+    const model = session.model;
+    if (!model) throw new AhpError('notFound', 'Select a model first');
+    const effort = supportedEffort(
+      this.#target({ provider: model.provider, id: model.id }),
+      requested,
+    );
+    session.setThinkingLevel(effort);
+    return { model: { provider: model.provider, id: model.id }, effort };
   }
 
   /** Creates a session in `cwd`, under `sessionId` when Core chose one. */
@@ -293,6 +372,8 @@ export class SessionRegistry {
       if (again !== undefined) {
         return again;
       }
+      if (hosted.changingModel) throw new AhpError('sessionBusy', 'The model is changing');
+      this.#checkImageInput(sessionId, input);
       const text = composedText(prepared);
       let answer: InputAccepted;
       if (hosted.projector.activeTurnId === undefined) {
@@ -428,6 +509,7 @@ export class SessionRegistry {
 
   /** Reads an input's attachments through Core (images by blob, PDFs by `fs/pdf`). */
   async #prepare(sessionId: string, input: UserInput): Promise<PreparedInput> {
+    this.#checkImageInput(sessionId, input);
     if (input.attachments.length === 0) {
       return { input, sections: '', images: [] };
     }
@@ -444,7 +526,25 @@ export class SessionRegistry {
     });
   }
 
+  #checkImageInput(sessionId: string, input: UserInput): void {
+    if (!input.attachments.some((attachment) => attachment.kind === 'image')) return;
+    const model = this.#get(sessionId).runtime.session.model;
+    if (
+      !model?.input.includes('image') ||
+      !this.workspace.modelRuntime.getModel(model.provider, model.id)?.input.includes('image')
+    ) {
+      throw new AhpError(
+        'invalidParams',
+        'Image attachments are not supported by the selected model',
+        {
+          details: { member: 'attachments', reason: 'visionUnsupported' },
+        },
+      );
+    }
+  }
+
   #checkIdle(sessionId: string, hosted: HostedSession): void {
+    if (hosted.changingModel) throw new AhpError('sessionBusy', 'The model is changing');
     const running = hosted.projector.activeTurnId;
     if (running !== undefined) {
       throw new AhpError('sessionBusy', `session ${sessionId} is running turn ${running}`, {
@@ -509,13 +609,27 @@ export class SessionRegistry {
     const toCanonical = (tool: string): string => names?.toCanonical(tool) ?? tool;
     const batches = new ToolBatches((tool) => CONCURRENCY_SAFE_TOOLS.has(toCanonical(tool)));
     const factory: CreateAgentSessionRuntimeFactory = async (target) => {
+      const settingsManager = SettingsManager.create(target.cwd, target.agentDir, {
+        projectTrusted: false,
+      });
+      // Recoverable model errors are retried by Pi's agent loop, which reports each retry
+      // (`turn/retrying`) and keeps the failed attempt out of the context; the provider SDK
+      // would retry rate limits and overloads silently (architecture section 6.15).
+      settingsManager.applyOverrides({
+        retry: { provider: { maxRetries: 0 } },
+      });
       const io =
         tools.kind === 'core' ? tools.ioFor(target.sessionManager.getSessionId()) : undefined;
       // Which command tools the session gets depends on the shells Core found (T17).
       const sessionTools =
         tools.kind === 'core' && io !== undefined
           ? scheduled(
-              toolOptions(io, tools.profile, await shellsFor(io, this.#options.log)),
+              toolOptions(
+                io,
+                tools.profile,
+                await shellsFor(io, this.#options.log),
+                settingsManager.getImageAutoResize(),
+              ),
               batches,
             )
           : { tools: PI_NATIVE_TOOLS };
@@ -534,13 +648,6 @@ export class SessionRegistry {
       // only for directories Core trusts: nothing project-level is read until the takeover
       // hook has Core's answer.
       trust = takeOverProjectTrust(target.cwd, this.#options.isTrusted);
-      const settingsManager = SettingsManager.create(target.cwd, target.agentDir, {
-        projectTrusted: false,
-      });
-      // Recoverable model errors are retried by Pi's agent loop, which reports each retry
-      // (`turn/retrying`) and keeps the failed attempt out of the context; the provider SDK
-      // would retry rate limits and overloads silently (architecture section 6.15).
-      settingsManager.applyOverrides({ retry: { provider: { maxRetries: 0 } } });
       const services = await createAgentSessionServices({
         cwd: target.cwd,
         agentDir: target.agentDir,
@@ -622,6 +729,7 @@ export class SessionRegistry {
       inputs: new Map(),
       preparing: new Map(),
       delivering,
+      changingModel: false,
       closed: false,
     };
     hosted.unsubscribe = session.subscribe((event) => {
@@ -753,6 +861,7 @@ export class SessionRegistry {
           await session.compact();
         } else {
           const { prepared } = next.job;
+          this.#checkImageInput(sessionId, prepared.input);
           hosted.delivering.push(prepared);
           await session.prompt(
             composedText(prepared),

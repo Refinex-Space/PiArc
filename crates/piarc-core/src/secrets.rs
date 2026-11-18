@@ -216,14 +216,21 @@ impl SecretsService {
                         .as_ref()
                         .is_none_or(|prefixes| prefixes.iter().any(|x| key.starts_with(x.as_str())))
                 };
-                let entries: Vec<Result<SecretEntry, ErrorObject>> = self
+                // Subscribe first: writes between subscription and the snapshot are harmless
+                // duplicates. A subscription after the snapshot could permanently miss a write.
+                self.subscribe(peer);
+                let (revision, entries) = self
                     .with_vault(move |v| {
-                        Ok(v.entries().filter(|e| wanted(e.key)).map(entry).collect())
+                        let entries: Vec<_> =
+                            v.entries().filter(|e| wanted(e.key)).map(entry).collect();
+                        Ok((v.revision(), entries))
                     })
                     .await?;
                 let entries = entries.into_iter().collect::<Result<Vec<_>, _>>()?;
-                self.subscribe(peer);
-                to_value(&SecretsGetAllResult { entries })
+                to_value(&SecretsGetAllResult {
+                    entries,
+                    revision: Some(revision),
+                })
             }
             "secrets/get" => {
                 let p: SecretsGetParams = parse(method, params)?;
@@ -667,4 +674,37 @@ fn to_value<T: Serialize>(result: &T) -> Result<Value, ErrorObject> {
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::future::Future;
+    use std::task::{Context, Waker};
+
+    #[tokio::test]
+    async fn get_all_subscribes_before_reading_the_vault_snapshot() {
+        let dir = std::env::temp_dir().join(format!("piarc-snapshot-{}", random_id().unwrap()));
+        std::fs::create_dir(&dir).unwrap();
+        let config = SecretsConfig::with_master_key(&dir, test_master_key_name("snapshot"));
+        let service = SecretsService::new(config, Arc::new(MemorySecretStore::new()));
+        let (peer, _frames) = Peer::channel(4);
+        let mut call = Box::pin(service.dispatch("secrets/getAll", Map::new(), peer.clone()));
+        {
+            // Holding the same mutex used by the snapshot makes this first poll deterministic.
+            let _vault = lock(&service.inner.vault);
+            assert!(
+                call.as_mut()
+                    .poll(&mut Context::from_waker(Waker::noop()))
+                    .is_pending()
+            );
+            assert!(
+                lock(&service.inner.subscribers)
+                    .iter()
+                    .any(|p| p.same_connection(&peer))
+            );
+        }
+        assert_eq!(call.await.unwrap()["revision"], 0);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }

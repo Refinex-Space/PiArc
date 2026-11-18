@@ -83,7 +83,7 @@ async fn reads_writes_and_pushes_changes_to_subscribed_connections() {
             .call(peer, "secrets/getAll", json!({}))
             .await
             .expect("getAll");
-        assert_eq!(all, json!({ "entries": [] }));
+        assert_eq!(all, json!({ "entries": [], "revision": 0 }));
     }
     let set = f
         .call(
@@ -112,6 +112,14 @@ async fn reads_writes_and_pushes_changes_to_subscribed_connections() {
         .expect("delete");
     let delete_revision = deleted["revision"].as_u64().expect("revision");
     assert!(delete_revision > revision);
+    let snapshot = f
+        .call(&host_a, "secrets/getAll", json!({}))
+        .await
+        .expect("snapshot");
+    assert_eq!(
+        snapshot,
+        json!({ "entries": [], "revision": delete_revision })
+    );
     for frames in [&mut frames_a, &mut frames_b] {
         let change = next_change(frames).await;
         assert_eq!(change["revision"], delete_revision);

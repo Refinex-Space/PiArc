@@ -141,6 +141,7 @@ export class CoreCredentialStore implements CredentialStore {
   /** key → highest revision seen, deletions included. */
   readonly #revisions = new Map<string, number>();
   readonly #chains = new Map<string, Promise<unknown>>();
+  #snapshotRevision = 0;
   #loaded = false;
   #loading: Promise<void> | undefined;
   #loadError: unknown;
@@ -157,17 +158,32 @@ export class CoreCredentialStore implements CredentialStore {
   load(): Promise<void> {
     this.#loading ??= (async () => {
       try {
-        const entries = entriesOf(
-          'secrets/getAll',
-          await this.#core.request('secrets/getAll', { prefixes: [API_KEY_PREFIX, OAUTH_PREFIX] }),
-        );
+        const result = await this.#core.request('secrets/getAll', {
+          prefixes: [API_KEY_PREFIX, OAUTH_PREFIX],
+        });
+        const entries = entriesOf('secrets/getAll', result);
+        const revision = isRecord(result) ? result.revision : undefined;
+        if (
+          revision !== undefined &&
+          (typeof revision !== 'number' || !Number.isSafeInteger(revision) || revision < 0)
+        ) {
+          throw new AhpError('invalidRequest', 'Invalid credential snapshot revision');
+        }
         for (const entry of entries) {
           this.#apply(entry.key, entry.revision, entry.value);
+        }
+        if (typeof revision === 'number') {
+          const present = new Set(entries.map((entry) => entry.key));
+          for (const [key, existing] of this.#entries) {
+            if (!present.has(key) && existing.revision <= revision) this.#entries.delete(key);
+          }
+          this.#snapshotRevision = revision;
         }
         this.#loaded = true;
         this.#loadError = undefined;
         this.#log(`credentials loaded from Core (${String(this.#entries.size)} model credentials)`);
       } catch (error) {
+        this.#loaded = false;
         this.#loadError = error;
         this.#log(`loading credentials from Core failed: ${describeError(error)}`);
       } finally {
@@ -175,6 +191,13 @@ export class CoreCredentialStore implements CredentialStore {
       }
     })();
     return this.#loading;
+  }
+
+  /** Reconcile with committed vault state before the Host acknowledges a settings reload. */
+  async synchronize(): Promise<void> {
+    await this.#loading;
+    await this.load();
+    if (!this.loaded) throw this.#loadError;
   }
 
   /** Whether the credentials are in memory. */
@@ -191,7 +214,8 @@ export class CoreCredentialStore implements CredentialStore {
     ) {
       return false;
     }
-    this.#apply(params.key, params.revision, params.value);
+    if (params.revision > this.#snapshotRevision)
+      this.#apply(params.key, params.revision, params.value);
     return true;
   }
 

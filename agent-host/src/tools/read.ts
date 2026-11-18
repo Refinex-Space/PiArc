@@ -48,7 +48,11 @@ interface Lookup {
   readonly error?: unknown;
 }
 
-export function createReadTool({ io, presentation }: ToolSetup): ToolDefinition {
+export function createReadTool({
+  io,
+  presentation,
+  autoResizeImages = true,
+}: ToolSetup): ToolDefinition {
   return defineTool<typeof readSchema, ReadToolDetails | undefined>({
     ...presentationOf(presentation),
     parameters: readSchema,
@@ -76,6 +80,7 @@ export function createReadTool({ io, presentation }: ToolSetup): ToolDefinition 
       }
       const standIn = new StandIn(lookup.path);
       const pi = createReadToolDefinition(ctx.cwd, {
+        autoResizeImages,
         operations: operations(io, standIn, lookup, origin),
       });
       try {

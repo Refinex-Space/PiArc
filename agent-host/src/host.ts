@@ -3,6 +3,7 @@
 import { PROTOCOL_VERSION } from '@piarc/protocol';
 import type { HostShutdownResult, HostStatus } from '@piarc/protocol';
 
+import { credentialStatus, saveCredential } from './providers/settings.js';
 import { askCoreTrust } from './harness/project-trust.js';
 import { Connection, type FrameSource } from './protocol/connection.js';
 import { AhpError, describeError } from './protocol/errors.js';
@@ -30,8 +31,8 @@ import {
 import { agentDirOf, openWorkspace } from './runtime/workspace.js';
 import { CoreIo, DEFAULT_PROFILE, ExecOutputRouter, type ToolProfile } from './tools/index.js';
 
-/** Capabilities this Agent Host announces in `host/hello`. None of the optional features exist yet. */
-export const HOST_CAPABILITIES: readonly string[] = [];
+/** Capabilities this Agent Host announces in `host/hello`. The models capability includes session selection and provider settings. */
+export const HOST_CAPABILITIES: readonly string[] = ['models'];
 
 /** Exit codes, for Core's log and restart decisions. */
 export const EXIT = {
@@ -177,6 +178,61 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
       );
     });
     return { closedSessions };
+  });
+  connection.handle('models/list', async (params) => {
+    const method = 'models/list';
+    return (await sessions(method)).models(
+      optionalString(method, paramsObject(method, params), 'sessionId'),
+    );
+  });
+  connection.handle('models/reload', async (params) => {
+    const method = 'models/reload';
+    const { allowNetwork } = paramsObject(method, params);
+    if (typeof allowNetwork !== 'boolean')
+      throw new AhpError('invalidParams', 'Expected allowNetwork');
+    const registry = await sessions(method);
+    await credentials.synchronize();
+    await registry.workspace.reload(allowNetwork);
+    return {};
+  });
+  connection.handle('models/credential', async (params) => {
+    const method = 'models/credential';
+    const fields = paramsObject(method, params);
+    return saveCredential(
+      (await sessions(method)).workspace.modelRuntime,
+      credentials,
+      stringField(method, fields, 'provider'),
+      fields.credential,
+      fields.keepKey === true,
+    );
+  });
+  connection.handle('models/credentialStatus', async (params) => {
+    const method = 'models/credentialStatus';
+    await sessions(method);
+    return credentialStatus(
+      credentials,
+      stringField(method, paramsObject(method, params), 'provider'),
+    );
+  });
+  for (const method of ['session/previewModelSwitch', 'session/setModel'] as const) {
+    connection.handle(method, async (params) => {
+      const fields = paramsObject(method, params);
+      const model = modelField(method, fields);
+      if (!model) throw new AhpError('invalidParams', 'Select a model');
+      const id = stringField(method, fields, 'sessionId');
+      const registry = await sessions(method);
+      return method === 'session/previewModelSwitch'
+        ? registry.previewModelSwitch(id, model)
+        : registry.setModel(id, model, optionalString(method, fields, 'effort'));
+    });
+  }
+  connection.handle('session/setEffort', async (params) => {
+    const method = 'session/setEffort';
+    const fields = paramsObject(method, params);
+    return (await sessions(method)).setEffort(
+      stringField(method, fields, 'sessionId'),
+      stringField(method, fields, 'effort'),
+    );
   });
   connection.handle('session/create', async (params) => {
     const fields = paramsObject('session/create', params);
@@ -329,6 +385,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
         welcome.workspace,
         agentDirOf(options.dataDir),
         credentials,
+        welcome.allowModelNetwork === true,
       );
       if (options.testOAuthProvider !== undefined) {
         registerTestOAuthProvider(workspace.modelRuntime, options.testOAuthProvider);

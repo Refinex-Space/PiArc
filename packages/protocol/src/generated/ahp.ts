@@ -3315,6 +3315,10 @@ export interface SecretsGetAllResult {
    * Every stored credential, ordered by key.
    */
   entries: SecretEntry[];
+  /**
+   * Vault revision at which the entries were read, including deletions. Older Core omits it.
+   */
+  revision?: number | null;
 }
 /**
  * One stored credential.

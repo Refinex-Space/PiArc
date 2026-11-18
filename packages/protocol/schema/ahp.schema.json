@@ -4598,6 +4598,12 @@
             "$ref": "#/$defs/SecretEntry"
           },
           "type": "array"
+        },
+        "revision": {
+          "description": "Vault revision at which the entries were read, including deletions. Older Core omits it.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
         }
       },
       "required": ["entries"],

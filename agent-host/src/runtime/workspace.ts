@@ -1,40 +1,67 @@
-// What the sessions of one workspace share: the workspace root, PiArc's Pi agent directory and
-// one ModelRuntime (architecture section 5.2).
+// Shared state for one workspace (architecture section 5.2).
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 
 import type { CredentialStore } from '@earendil-works/pi-ai';
+import { registerLazyBedrockProvider } from '@earendil-works/pi-ai/lazy-bedrock-provider';
 import { ModelRuntime } from '@earendil-works/pi-coding-agent';
 
+import { unpricedModels } from '../providers/catalog.js';
+import { installProviderPolicy } from '../providers/policy.js';
+
 export interface Workspace {
-  /** Absolute path of the workspace root, from `core/welcome`. */
   readonly root: string;
-  /** Pi's agent directory: `<PiArc data dir>/pi` (architecture section 5.5). */
   readonly agentDir: string;
   readonly modelRuntime: ModelRuntime;
+  readonly unpriced: ReadonlySet<string>;
+  reload(allowNetwork: boolean): Promise<void>;
 }
 
-/** The Pi agent directory inside PiArc's data directory. */
 export function agentDirOf(dataDir: string): string {
   return path.join(dataDir, 'pi');
 }
 
-/**
- * Opens the workspace's shared state. `credentials` is the store backed by Core's vault
- * (`credentials.ts`), so Pi never writes `auth.json` under `pi/` (architecture section 9.1).
- * Model definitions come from `<agentDir>/models.json`; the catalog is not refreshed over the
- * network.
- */
+/** The supplied vault replaces Pi's default auth.json storage. The cache belongs to this agentDir. */
 export async function openWorkspace(
   root: string,
   agentDir: string,
   credentials: CredentialStore,
+  allowModelNetwork = false,
+  catalogBaseUrl?: string,
 ): Promise<Workspace> {
   mkdirSync(agentDir, { recursive: true });
+  registerLazyBedrockProvider();
+  const modelsPath = path.join(agentDir, 'models.json');
   const modelRuntime = await ModelRuntime.create({
     credentials,
-    modelsPath: path.join(agentDir, 'models.json'),
-    allowModelNetwork: false,
+    modelsPath,
+    refreshOnCreate: false,
+    ...(catalogBaseUrl === undefined ? {} : { catalogBaseUrl }),
   });
-  return { root, agentDir, modelRuntime };
+  installProviderPolicy(modelRuntime);
+  let unpriced = new Set<string>();
+  let latestRefresh: AbortController | undefined;
+  const reload = async (allowNetwork: boolean): Promise<void> => {
+    latestRefresh?.abort();
+    const controller = new AbortController();
+    latestRefresh = controller;
+    const prices = await unpricedModels(modelsPath);
+    if (controller.signal.aborted) return;
+    unpriced = prices;
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]);
+    await modelRuntime.refresh({
+      allowNetwork: allowNetwork && process.env.PI_OFFLINE === undefined,
+      signal,
+    });
+  };
+  await reload(allowModelNetwork);
+  return {
+    root,
+    agentDir,
+    modelRuntime,
+    get unpriced() {
+      return unpriced;
+    },
+    reload,
+  };
 }

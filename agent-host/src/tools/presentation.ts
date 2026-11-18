@@ -7,6 +7,8 @@ import type { ToolPresentation } from './profile.js';
 export interface ToolSetup {
   /** Core I/O for the tool's session. */
   readonly io: CoreIo;
+  /** Pi image scaling preference for the Read tool. */
+  readonly autoResizeImages?: boolean;
   /** Name, description and prompt lines from the session's Tool Profile. */
   readonly presentation: ToolPresentation;
 }
