@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.22（2026-11-17） |
+| 版本 | 2.23（2026-11-18） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -247,6 +247,7 @@ PiArc/
 | [0011](../adr/0011-session-storage.md) | Pi JSONL 为事实来源 + SQLite 索引 + 内容寻址快照 | 跟随上游格式，索引可重建 |
 | [0027](../adr/0027-file-tool-invariants.md) | 文件状态表与写入（先读后改、外部修改、编码与换行、原子替换、diff）在 Core；匹配沿用 Pi 的 edit，加 `replaceAll`；Read 的行号、存根、PDF 与 notebook 在工具层；结果预算（单个 50K、单条消息 200K）在 Harness Kit；越界与受保护路径由 `piarc-fs` 标记、Core 裁决 | 只有 Core 能对真实文件做检查与原子写入，只有 Agent Host 的钩子看得到每个工具与整条回复的结果 |
 | [0028](../adr/0028-shell-command-execution.md) | 命令的进程树终止、超时、cwd 跟踪、输出预算与落盘、语义退出码、登录 shell 环境都在 Core（`exec/run` 返回结构化结果）；Bash 与 PowerShell 为 PiArc 自写工具，按 `exec/shells` 决定工具集 | Pi 的 bash 工具自己截断输出（末尾 2,000 行）、非 0 一律失败、超时无默认，`BashOperations` 改不了；进程只有 Core 能管 |
+| [0029](../adr/0029-client-shell-foundations.md) | 设计令牌单一来源（`design/tokens/`，生成 CSS 与 TS，verify 检查漂移、对比度与品牌）；客户端偏好写在用户级 `settings.json`、Core 为唯一写入方；intl-messageformat；快捷键注册表；有未确认新增项时项目不受信任；信任变化的重启在决定应答前生效；会话标题、置顶、归档、删除由 Core 管 | 第 8 章只写了规则；I63 的闸门空白；信任决定后立即建会话会落到正在关闭的旧进程上 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -934,6 +935,7 @@ impl Session {
 - 状态导出（T13）：`CoreRuntime.create` 的选项增加 `dataDir` 与 `cacheDir`（同时给或都不给；不给时没有数据库、设置、信任与日志文件，只用于事件通道的测试）；`rebuildSessionIndex()`、`projectTrust(path)`、`decideProjectTrust(path, trusted)`、`revokeProjectTrust(path)` 都返回 JSON 文本的 Promise（`piarc_core::storage::report_json`、`piarc_core::trust::TrustView`）。设置变化以事件发到 `core/settings`（`{ workspace, changed, issues }`）。
 - Promise 由 Core 自己的运行时经 NAPI-RS 的 `JsDeferred` 结算，不用 `#[napi] async fn`（它会另起 NAPI-RS 的全局 tokio 运行时）。
 - 会话导出（T14）：`CoreRuntime.create` 的选项增加 `agentHost`（打包产物的 `resourcesPath`，或开发时的 `node` 与 `bundle`）与 `idleTimeoutMs`；`openWorkspace`（Agent Host 就绪后才解析）、`closeWorkspace`、`createSession`、`resumeSession`、`forkSession`、`closeSession`、`prompt`、`steer`、`followUp`、`abort`、`editQueueItem`、`deleteQueueItem`、`reorderQueue`、`markSessionRead`、`transcriptWindow(id, start, limit)` 返回 JSON 文本的 Promise，`resendSnapshots` 只入队。事件路由：`core/workspaces`、`core/sessions`（实体快照，各自的 `revision` 严格递增，由同一个任务按顺序发出）与 `session/<id>`（会话通知 `{ method, params }`，按 Agent Host 的 `seq` 连续交付；Core 自己的 `session/resync`（缺口无法补齐，需重新加载 transcript）与 `session/uncertain`（Agent Host 重启时在途的调用））。开发构建另有 `createForTests`（保险箱主密钥放在内存，测试不碰钥匙串）。
+- 会话元数据与客户端偏好（T18，ADR-0029）：`renameSession(id, title|null)`、`setSessionPinned`、`setSessionArchived`（归档时先关闭会话并删除会话临时目录）、`deleteSession`（先关闭，再删除 Pi 的 JSONL、临时目录与索引行；确认由调用方负责）对打开与未打开的会话都可用；`core/sessions` 的条目增加 `pinned`、`archived`，标题取用户标题 > 会话名 > 首条消息。`userSettings()` 返回用户级 `settings.json`，`writeClientSetting(pointer, valueJson|null)` 只写 `/language`、`/appearance`、`/keybindings`、`/notifications`。`decideProjectTrust` 与 `revokeProjectTrust` 在同一主 checkout 的打开工作区都进入重启状态之后才应答，之后的请求等新进程就绪。启动时的索引同步结束后重新发出会话快照。
 - 声明快照在 `apps/desktop/src/main/core/native/`（`piarc-core.d.ts` 为发布构建，`piarc-core.testing.d.ts` 为开发构建），由 `npm run build:core` 生成，verify 比对。
 
 事件分两类：
@@ -991,6 +993,7 @@ diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高�
 - **右栏卡片**：运行环境、上下文（百分比 + 分类明细 + 压缩按钮）、改动、任务、后台任务；空间不足时变为浮层。
 - **设置**（独立窗口）：通用、模型与服务商（每模型显示名、上下文窗口、图片输入、默认 effort；密钥加密存储）、权限（规则可视化管理、审计记录）、hooks、MCP、skills 与插件、memory 文件、沙箱、外观、快捷键、配置诊断、关于与更新。
 - **系统集成**：见第 8.8 节。
+- T18 落地（ADR-0029）：窗口为侧栏 | 主区（+ 右栏）在上、停靠面板区在下；右栏与面板区是注册式容器（`src/renderer/shell/registry.ts` 的 `registerPanel`），没有注册内容时不渲染，尺寸存于窗口的 localStorage。侧栏按工作区分组，组内置顶在前、其余按最近更新；徽标形状各不相同（出错为圆形加叹号、等待审批为方形加问号、运行中为旋转的环、未读为圆点），不只靠颜色区分。新建会话的顺序是：需要时先显示信任对话框，再立即显示乐观消息（`flushSync`），然后创建会话、发送首条输入；任一步失败，回到新建视图并把文字放回输入框；会话已创建但首条输入失败时关闭该会话（Pi 没有回复就不写文件，不留痕迹）。设置窗口是独立的 `BrowserWindow`（`#/settings`），页面经 `src/renderer/settings/registry.ts` 的 `registerSettingsPage` 注册，T18 注册通用、外观、快捷键三页。T19 之前主区的会话视图以纯文本显示消息，数据来自同一个 store。
 
 ### 8.3 状态与数据流
 
@@ -1008,6 +1011,7 @@ Core 事件批次 ──► 主进程（只转发）──MessagePort──► �
 4. 实体快照按 `revision` 门控，旧数据丢弃。
 5. 事件批次（包括 transcript 窗口、长 diff 等大块数据）以二进制载荷经结构化克隆复制转发：Electron 主进程的 `MessagePortMain` 只能转移端口，不能转移 `ArrayBuffer`（ADR-0019）。单批转发耗时计入第 11 章"Core 事件到渲染进程"的预算；大块内容的体量从源头控制，例如按需拉取 transcript 窗口。
 6. 终端帧不走事件通道：渲染进程按动画帧拉取，帧作为拉取请求（`ipcRenderer.invoke`）的返回值送达；事件 MessagePort 上的消息在按键之后会被推迟到下一帧之后处理（ADR-0023）。终端的标题、响铃、退出事件仍经事件通道（路由 `term/<id>`）。
+7. T18 落地：store 在 `src/renderer/store/`（`AppStore`、`SessionTranscript`，React 绑定在 `hooks.ts`），订阅粒度为工作区列表、会话列表、单个会话条目与单行 transcript；revision 不大于当前值的快照丢弃，未变化的条目保留原对象；乐观行按 `clientId` 记录，提示被接受后记下 `turnId`，Core 的用户消息在原位置替换它（事件先于提示的应答到达时按相同文本匹配第一条未确认的行），不会出现两次。渲染计数由 happy-dom 下的单元测试验证。窗口是否在前台由主进程的 `focus`、`blur` 应用事件告知，标记已读与提醒以它为准。
 
 ### 8.4 Transcript 渲染管线
 
@@ -1036,6 +1040,8 @@ Core 事件批次 ──► 主进程（只转发）──MessagePort──► �
 | 快捷键 | Mod+N 新会话、Mod+W 关闭、Ctrl+Tab 切换、Mod+K 命令面板、Mod+/ 快捷键列表、Mod+Shift+D Changes、Ctrl+\` 终端、Mod+Shift+M 权限模式、Mod+Shift+I 模型、Mod+Shift+E effort；全部可在设置中修改。终端获得焦点时，除少数全局快捷键外按键都交给终端 |
 | 外部链接 | 模型输出与仓库内容中的链接点击后先显示目标地址，确认后用系统浏览器打开；应用窗口内不导航到外部页面 |
 
+T18 落地（ADR-0029）：快捷键注册表在 `src/shared/keybindings.ts`（命令 id、`Mod` 记法的默认键、标签消息 id）。渲染进程按 `KeyboardEvent.code` 匹配用户覆盖后的有效绑定，执行命令并阻止默认行为；输入法合成中不匹配。主进程菜单显示同一份绑定作为加速键，菜单点击经应用事件送到窗口。冲突按平台换算后的物理按键判断，只允许 Mod、Ctrl、Alt 组合或功能键。T18 注册了 Mod+N、Mod+W、Ctrl+Tab、Mod+/，以及设置窗口的 Mod+,；其余快捷键由所属任务在 `COMMANDS` 中追加。
+
 ### 8.6 设计语言
 
 - PiArc 使用**自有视觉品牌**（ADR-0006）：主色避开橙色 / 陶土色系；不用"暖奶油底 + 衬线大标题"组合；插画、提示音自行设计。应用图标与标记用 `design/brand/` 中的黑白 Pi 字形（来源与许可证见该目录 README）；公开发布前要确认 Pi logo 的使用许可（需求 D3）。
@@ -1043,6 +1049,7 @@ Core 事件批次 ──► 主进程（只转发）──MessagePort──► �
 - **令牌分层**：原始色板 → 明暗阶梯 → 语义层（surface / text / border / accent / state / agent-status / diff / code）→ 组件层；四种模式（明、暗，各自含高对比度）× 两档密度。跟随 `prefers-color-scheme`、`prefers-contrast` 与 Windows 的 `forced-colors`。
 - **单一来源**：`design/tokens/*.json`，由脚本生成 CSS 自定义属性和 TypeScript 常量；CI 检查文本对比度（WCAG AA）。组件只读语义层。
 - **平台外观**：macOS 用隐藏式标题栏保留红绿灯、侧栏使用系统 vibrancy；Windows 11 使用 Mica 背景与标题栏覆盖层（窗口控件在右上）。Electron 45 没有 Liquid Glass API（相关 PR 已关闭未合并），第一版只用 vibrancy；系统绘制的标题栏、菜单和对话框会随系统外观变化。正文、代码、diff 使用不透明背景，保证可读性。
+- T18 落地（ADR-0029）：令牌在 `design/tokens/`（`palette` → `ramps` → `semantic` → `component`，另有 `scale` 与 `contrast`），`npm run gen:tokens` 生成 `tokens.generated.css`（`:root` 加 `data-color-mode` 四种模式、`data-density`、`prefers-color-scheme` 回退、`forced-colors` 映射到系统色）与 `src/shared/design-tokens.ts`（主进程取窗口背景与标题栏覆盖层颜色）。verify 检查生成物漂移、42 对前景 / 背景在四种模式下的对比度、主色色相不在 10°–50°、表面色不是暖奶油色、只用系统字体、不打包字体与音频。主题偏好经 `nativeTheme.themeSource` 同时作用于页面、vibrancy 材质与原生对话框。D3 未定，主色暂为中性的 indigo 色族，等视觉关口确认。窗口外观：macOS 为 `titleBarStyle: 'hidden'`、红绿灯位于 (16, 13)、`vibrancy: 'sidebar'`；Windows 为 Mica 与透明的标题栏覆盖层（符号色随主题），页面顶部 40 px 是拖动区；高对比度模式下侧栏不透明。
 
 ### 8.7 无障碍与本地化
 
@@ -1050,6 +1057,7 @@ Core 事件批次 ──► 主进程（只转发）──MessagePort──► �
 - 屏幕阅读器在 macOS VoiceOver 与 Windows Narrator / NVDA 上验证。
 - 键盘：所有功能可以只用键盘完成；焦点顺序经过设计和测试；焦点环始终可见。
 - 本地化：第一版提供简体中文与英文；字符串集中管理（ICU MessageFormat），主进程菜单与渲染进程共用同一份资源，不在代码中硬编码。
+- T18 落地（ADR-0029）：intl-messageformat 12.1.4（解释执行，不放宽 CSP）；目录在 `src/shared/i18n/`（`en.ts` 定义消息 id，`zh-CN.ts` 必须覆盖全部 id），主进程的菜单、原生对话框、通知与渲染进程共用；语言偏好为 `system` 时取系统首选语言，改语言后各窗口与菜单立即更新。缺失翻译的检查与全面无障碍由 T43 做。
 
 ### 8.8 平台集成
 
@@ -1065,6 +1073,8 @@ Core 事件批次 ──► 主进程（只转发）──MessagePort──► �
 | 系统快捷操作 | App Intents（原生模块） | 跳转列表 | M5 |
 
 平台差异集中在主进程的 `platform/` 模块和渲染进程的少量样式里，业务代码不出现平台分支。
+
+T18 落地（ADR-0029，I43）：渲染进程按 `store/status.ts` 判断哪些会话需要处理（出错、等待审批、完成未读，归档除外）。会话开始需要处理、且它不在前台窗口中显示时，窗口给应用内提醒，主进程（`src/main/platform/attention.ts`）在 macOS 上 Dock 弹跳、在 Windows 上闪烁任务栏；窗口不在前台且通知开启时另发系统通知，点击通知打开该会话。计数在 macOS 上是 Dock 角标（`app.setBadgeCount`），在 Windows 上是任务栏覆盖图标（状态色圆点，描述文字为数量）。
 
 ---
 
@@ -1118,6 +1128,8 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 
 索引可以从 Pi JSONL 完整重建；应用提供"重建索引"诊断操作。
 
+T18（schema v2，ADR-0029）：`sessions` 增加 `custom_title`（用户给的标题，属于 Core 自己的列，重建时保留）。
+
 T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失败整体回滚；`workspaces` 记主 checkout 而不另存信任状态（信任看 `project_trust`）；`sessions` 中从 JSONL 派生的列（标题来源、模型、用量、时间、格式版本、索引状态）重建时清空重读，置顶、归档、未读、所属工作区、状态、worktree 保留。解析器流式读取，末行未写完时下次从行首继续；未知格式版本标为"索引不可用"，坏行跳过并记录。`session_fts`（T35）与 `checkpoints`（T28）尚未建表。
 
 ### 9.3 保留与清理
@@ -1129,6 +1141,8 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 | 会话临时目录 | 会话归档时清理 |
 | 归档会话的 worktree | 30 天后清理（有未提交改动时先询问） |
 | 日志 | 7 天 |
+
+T18 落地：归档会话时先关闭它，再删除 `<数据目录>/sessions/<id>/`；删除会话时先关闭它，再删除 `pi/sessions/` 之下它的 JSONL、临时目录与索引行。删除前的确认由主进程弹原生对话框。
 
 所有数据都在本机。除用户选择的模型服务商、MCP server 与 hooks 自身的网络行为外，PiArc 不向任何地方发送会话内容。
 
@@ -1161,6 +1175,7 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 - 信任前：memory 文件照常加载（它们是指令而非代码，但 UI 会标注来源）；不执行项目 hooks；不连接项目 MCP；不应用项目 allow 规则（deny 与 ask 照常生效）；不加载项目插件与 Pi 扩展。
 - 信任决定存在 Core（按仓库主 checkout 解析，worktree 共享），可在设置中撤销。项目配置文件发生变化时，新增的可执行项需要再次确认。
 - T13 落地（ADR-0025）：主 checkout 规则见 `crates/piarc-git/CLAUDE.md`（linked worktree 经 `gitdir` 与 `commondir` 找到主仓库；submodule 没有 `commondir`，按独立项目；非 git 目录取自身规范路径）。可执行项枚举只读键名与条目：`.piarc/settings*.json`、`.claude/settings*.json` 的 hooks、allow 规则、`enabledPlugins`，`.mcp.json` 与 `.pi/mcp.json` 的 server，`.claude-plugin/` 的插件，`.pi/extensions/` 的条目与 `.pi/settings.json` 的 `extensions`、`packages`；信任时的条目存为快照，之后多出的条目是"新增项"。撤销删除决定并重启该工作区的 Agent Host。所有消费者经 `piarc_config::project_trust` 查询；项目不受信任时，设置合并排除项目层的 hooks 与 allow 规则，deny 与 ask 照常生效。
+- T18 落地（ADR-0029）：信任决定为"信任"、且当前没有快照之外的新增可执行项时，项目才受信任（I63）：`trust/get` 与客户端的信任视图在用户确认之前都答"不信任"，删除的条目不需要再确认。客户端在工作区的第一个会话之前（没有决定时）、或有新增项时显示信任对话框：前者按类别与来源文件列出全部可执行项，后者只列新增项；对话框说明 memory 文件不受信任影响。"暂不信任"同样写入决定，之后不再询问，可从文件夹菜单的"项目信任…"修改。决定与撤销在应答之前让同一主 checkout 的打开工作区进入重启，客户端随后可以立即创建会话。信任决定由渲染进程发出、没有原生确认，登记为 I79，由 T45 评估。
 
 ### 10.3 进程加固
 
@@ -1180,6 +1195,7 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 - 即使渲染进程被攻破，它能调用的也只是 preload 白名单中的命令；有副作用的操作（执行命令、写文件、改权限规则）仍要经 Core 的权限裁决，"总是允许"类规则的修改需要在主进程弹出的原生确认框中确认。
 - 现状与这条的差距（R1）：终端面板的输入（`terminalInput`、`terminalKey`）是用户在自己的 shell 里打字，不经 Core 的权限裁决，渲染进程被注入时可以借它执行命令；发布构建目前也带着原型终端的函数。防线与每窗口上限由 T34 决定并写入本节，以文档例外接受时先写 ADR（登记事项 I51、I30）。
 - 外链确认框每个窗口同一时刻最多一个，带用户信息的地址（`https://a@b/`）直接拒绝（R1）。
+- T18 新增的命令（会话、工作区、信任、偏好、设置窗口、通知与计数）都在主进程校验参数：会话 id 按 Core 的规则校验，路径必须是绝对路径，标题不超过 200 字符，偏好只接受白名单内的键与值。删除会话由主进程弹原生确认框，页面无法绕过。主进程经 `piarc:app.event` 推送应用事件（偏好、菜单命令、打开会话、窗口焦点），preload 去掉 Electron 的 event 对象后再交给页面。
 
 **应用二进制**：
 
@@ -1214,7 +1230,7 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 
 | 指标 | 预算 | M0 实测 macOS | M0 实测 Windows | 测量方式 |
 |---|---|---|---|---|
-| 冷启动到可交互窗口（侧栏已加载） | ≤ 1.0 s | 未测 | 未测 | 启动到首帧 + 侧栏数据就绪的打点 |
+| 冷启动到可交互窗口（侧栏已加载） | ≤ 1.0 s | 侧栏 100 个会话，打包产物 10 次：中位 423 ms、最大 436 ms（T18） | 未测 | 进程启动到渲染进程打点 `piarc:sidebar-ready`（Core 的会话列表上屏）：`npm run bench:t18`（Playwright 启动，含其调试连接的开销） |
 | 打开工作区到 Agent Host 就绪 | ≤ 1.0 s | 10 次最大 0.28–0.29 s；含恢复一个有历史的会话 0.31–0.32 s（T14，release 构建） | 未测 | 预热计时（含 Pi 会话恢复）：`cargo run --release -p piarc-testkit --example t14-warmup` |
 | PiArc 引入的首 token 额外延迟 | ≤ 50 ms | 未测 | 未测 | 与直接调用 Pi SDK 对比 |
 | 主进程内存（含 Core，空闲） | 相对同平台、同版本裸 Electron（一个空窗口）的增量 ≤ 24 MB（原：≤ 120 MB，R1 放宽） | 160–164 MB，裸 Electron 155–157 MB，增量 5–8 MB | 108.4 MB，裸 Electron 96.1 MB，增量 12.3 MB | RSS，与裸 Electron 同机同轮测量 |
@@ -1488,6 +1504,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.23 | 2026-11-18 | T18 补充（ADR-0029）：第 4 章加入 ADR-0029；7.6 写明会话元数据与客户端偏好的导出、信任决定在重启生效后才应答、启动同步后重发快照；8.2、8.3、8.5–8.8 写明窗口骨架与注册式容器、store、快捷键注册表、令牌管线与平台外观、本地化、通知与计数的落地；9.2 写明 schema v2 的 `custom_title`，9.3 写明归档与删除；10.2 写明信任闸门（I63）与对话框；10.3 写明新命令的校验与删除确认；第 11 章填入冷启动实测 |
 | 2.22 | 2026-11-17 | T17 补充（ADR-0028）：第 4 章加入 ADR-0028 并注明 ADR-0020 第 1 条的 bash 部分被修订；6.1.3 的工具表 Bash 改为 PiArc 自写、增加 PowerShell；6.2.2 写明 Git Bash 的探测顺序与缺失时只提供 PowerShell；6.11 写明 Bash 行为的落地（进程树终止、超时、cwd 跟踪、输出预算、语义退出码、命令环境、实时输出窗口）；7.4 写明 `exec/run` 的新成员、`exec/shells` 与 `core/notices` |
 | 2.21 | 2026-11-17 | T16 补充（ADR-0027）：第 4 章加入 ADR-0027；6.1.2 增加各条不变量的实现表；6.1.3 的工具表写明 Read、Write、Edit 在 T16 的变化与新方法；6.15 的截断与重复读取两行写明实现位置；7.4 写明 `fs/spill`、`fs/pdf`、新成员、路径边界改为询问与四个新错误类别；7.7 写明行级 diff 的结构与降级 |
 | 2.20 | 2026-11-17 | T15 补充：12.3 写明场景格式的扩展（会话、动作、能力 ID、多端点、工具批次与 Core I/O 断言）、匹配规则与进程不复用的取舍；12.4 写明能力清单的字段、`client_only` 与检查命令 |

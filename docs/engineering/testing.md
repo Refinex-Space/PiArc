@@ -18,7 +18,7 @@
 
 ## 2. 质量门禁
 
-`npm run verify`（`scripts/dev/verify.mjs`）按顺序执行全部 14 项检查，一步失败后继续执行后续步骤，最后打印汇总表，任一步失败则退出码非 0：
+`npm run verify`（`scripts/dev/verify.mjs`）按顺序执行全部 15 项检查，一步失败后继续执行后续步骤，最后打印汇总表，任一步失败则退出码非 0：
 
 | # | 步骤 | 单独运行 |
 |---|---|---|
@@ -36,6 +36,7 @@
 | 12 | crate 依赖规则 | `node scripts/ci/check-crate-deps.mjs` |
 | 13 | 验收清单一致性 | `node scripts/plan/check-acceptance.mjs` |
 | 14 | L2 场景与能力清单 | `node scripts/ci/run-l2.mjs`：构建 Agent Host bundle → 全部场景（`cargo test -p piarc-testkit --test scenarios -- --results target/l2/results.json`）→ 能力覆盖与 `capabilities.md` 漂移检查（第 12、13 节） |
+| 15 | 设计令牌 | `node scripts/ci/check-design-tokens.mjs`：生成物与 `design/tokens/` 一致、声明的前景 / 背景对在四种颜色模式下达到 WCAG、主色色相与表面色的品牌规则、不打包字体与音频（ADR-0029；试改令牌用 `--tokens <目录>`） |
 
 CI（`.github/workflows/ci.yml`）在 `macos-latest`（arm64）与 `windows-latest`（x64）上执行 `npm ci --ignore-scripts` 与 `npm run verify`。后续任务新增的检查（L1 契约、L2 场景、schema 漂移等）都接进 verify，使本地与 CI 运行同一套检查。verify 作业结束后把 L2 报告（`target/l2/results.json`）上传为 artifact `l2-report-<os>`。
 

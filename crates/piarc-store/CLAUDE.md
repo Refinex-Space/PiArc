@@ -18,7 +18,7 @@ Core 的数据库 `<数据目录>/core.sqlite`（rusqlite，SQLite 随 `bundled`
 
 ## 会话索引（`src/index.rs`）
 
-- `sessions` 前半是从 JSONL 派生的列（标题来源 `name`/`first_message`、模型、用量累计、时间、格式版本、`index_status`），后半（`workspace_path`、`status`、`worktree`、`pinned`、`archived`、`unread`）是 Core 自己的状态。重建只清派生列与 `session_files`，Core 的列保留；文件不在了的行删除。
+- `sessions` 前半是从 JSONL 派生的列（标题来源 `name`/`first_message`、模型、用量累计、时间、格式版本、`index_status`），后半（`workspace_path`、`status`、`worktree`、`pinned`、`archived`、`unread`，schema v2 起还有 `custom_title`）是 Core 自己的状态。`set_session_prefs` 只改给出的字段（索引还没有该行时返回 false），`remove_session` 删除行与同步状态并返回文件路径（文件由调用方删除）；`SessionRecord::title` 的优先级是 `custom_title` > `name` > `first_message`。重建只清派生列与 `session_files`，Core 的列保留；文件不在了的行删除。
 - 增量同步状态在 `session_files`：已读到的字节偏移（最后一个完整行之后）、该行起点与 SHA-256、最后一个 entry id、跳过的行数。文件长度等于偏移 → 不变；变长且末行哈希一致 → 从偏移续读；变短或末行变了 → 整文件重扫。
 - 末行没有 `\n` 是 Pi 还没写完（`appendFileSync` 不加锁）：不报错、不前进偏移，补全后再读。坏行跳过并计入报告（`SyncReport::skipped_lines`），由 Core 写日志。
 - 已知格式版本 1–3（`pi_session::KNOWN_VERSIONS`，Pi 1.5.2 写 3）。其他版本或首行不是 header：该会话 `index_status = unavailable`、`index_error` 写原因，同步不失败。升级 Pi 时先核对 `session-manager.ts` 的 `CURRENT_SESSION_VERSION` 与 entry 类型。

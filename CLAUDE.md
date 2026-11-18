@@ -19,7 +19,8 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `npm ci --ignore-scripts` | 按 lockfile 安装 npm 依赖（CI 同款） |
 | `node scripts/dev/install-tools.mjs` | 把锁定版本的 cargo-deny、ripgrep、fd、bindgen-cli 装进 `.tools/`（不做全局安装）；verify 第 11 步需要 cargo-deny，Agent Host 行为对照测试（Pi 原生 grep/find）需要 ripgrep 与 fd，重新生成 libghostty-vt 绑定需要 bindgen |
 | `node scripts/dev/gen-ghostty-bindings.mjs [--check]` | 重新生成（或比对）`crates/piarc-ghostty-sys/src/bindings.rs`；只在升级 libghostty-vt 时需要 |
-| `npm run verify` | 全部 14 项检查，结束时打印汇总表；开工与收尾各跑一次 |
+| `npm run verify` | 全部 15 项检查，结束时打印汇总表；开工与收尾各跑一次 |
+| `npm run gen:tokens` | 由 `design/tokens/` 生成渲染进程的 CSS 自定义属性与共享的 TS 常量；改令牌后运行并提交（verify 第 15 步检查漂移、对比度与品牌，ADR-0029） |
 | `npm run gen:protocol` | 由 `piarc-protocol` 重新生成 `packages/protocol/schema/` 与 `src/generated/`；改了协议类型后运行并提交 |
 | `npm run build:agent-host` | esbuild 把 Agent Host 打成 `agent-host/dist/bundle/agent-host.mjs`（另写 `pi-assets/package.json`，运行时以 `PI_PACKAGE_DIR` 指向它） |
 | `npm run build:core` | 用 `@napi-rs/cli` 构建本机的 Core 开发版 `.node`（`target/piarc-core/development/`）并更新 `.d.ts` 快照；`-- --flavor all` 两种构建都出 |
@@ -46,6 +47,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `npm run check:fuses` | 发布构建产物的 fuse 与 `apps/desktop/fuses.mjs` 比对 |
 | `npm run bench:s2 -- --form packaged` | S2 基准：事件吞吐、主进程事件循环延迟、同步调用、大批次、空闲内存（先打开发构建） |
 | `npm run bench:s7 -- --form packaged` | S7 基准：终端中 `cat` 大文件（`--megabytes`、`--repeat`）与键入回显配对测量（先打开发构建） |
+| `npm run bench:t18` | T18 冷启动：打包产物以 100 个会话的数据目录冷启动 10 次，测到侧栏就绪（预算 1.0 s，先打开发构建） |
 | `npm run bench:s1 -- --form packaged` | S1 基准：transcript 流式 60 s、万条滚动、千条冷加载、渲染进程内存（CDP 追踪，先打开发构建） |
 | `cargo run -p piarc-sandbox --release --example s8-bench` | S8 测量：`sandbox-exec` 每条命令额外耗时、沙箱代理延迟与吞吐（macOS） |
 | `node scripts/ci/load-core.mjs --module <file.node>` | 在 Node 与 Electron 中加载一个 Core 模块并跑一次事件通道 |
@@ -60,6 +62,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 
 ## 仓库结构
 
+- `design/tokens/`：设计令牌的单一来源（色板、明暗阶梯、语义层、组件层、尺度、对比度对，ADR-0029）；`design/brand/` 是图标。
 - `apps/desktop/`：Electron 应用（主进程、preload、渲染进程，安全基线与 L4 见其 `CLAUDE.md`）；`agent-host/`：Agent Host；`packages/protocol/`：由 `piarc-protocol` 生成的 TS 类型；`packages/testkit/`：仅测试，用 pi-ai 驱动 mock provider。四者是 npm workspaces。
 - `crates/`：Rust workspace，21 个 crate，职责见各 crate 的 `src/lib.rs` 顶部文档与架构第 7.1 节。
 - `tests/scenarios/`：L2 场景（`schema.json` 是格式）；`tests/capabilities.yaml`：M1–M5 能力清单，生成 `docs/product/capabilities.md`（`testing.md` 第 12、13 节）。
@@ -97,7 +100,8 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - L4 的 `dev` 形态跑上次打包生成的 `apps/desktop/.vite/`：改了 `apps/desktop/src/` 后先重新 `npm run package:desktop -- --flavor development`。
 - 渲染进程不从 HTML 字符串建 DOM（ESLint 禁止 `innerHTML`、`dangerouslySetInnerHTML` 等）；模型输出经 `transcript/markdown/` 的增量解析与 `MarkdownView` 渲染，代码高亮只用 shiki 的 JavaScript 正则引擎，CSP 不放宽（ADR-0022）。复制相关的 L4 会写系统剪贴板（用例结束后恢复文本）。
 - 主进程在 `ready` 前固定 `userData` 与 `sessionData`（`apps/desktop/src/main/platform/data-dirs.ts`）：带 `--user-data-dir=<dir>` 启动时 Core 的数据库、`pi/`、日志与 Chromium 数据都在 `<dir>` 下（L4 的隔离依赖它），否则在 macOS `~/Library/Application Support/PiArc/`、Windows `%LOCALAPPDATA%\PiArc\`。
-- 项目级可执行配置（hooks、MCP、allow 规则、插件、Pi 扩展）只经 `piarc_config::project_trust` 判断信任（Core 侧 `piarc_core::trust`，Agent Host 侧 `agent-host/src/harness/project-trust.ts`），失败一律不信任；不要另写读表或读 Pi `trust.json` 的路径（ADR-0025）。
+- 项目级可执行配置（hooks、MCP、allow 规则、插件、Pi 扩展）只经 `piarc_config::project_trust` 判断信任（Core 侧 `piarc_core::trust`，Agent Host 侧 `agent-host/src/harness/project-trust.ts`），失败一律不信任；不要另写读表或读 Pi `trust.json` 的路径（ADR-0025）。有未确认的新增可执行项时项目不受信任（ADR-0029，I63）。
+- 界面颜色、字号、间距只来自设计令牌（`var(--piarc-…)`），界面字符串只经 `src/shared/i18n/` 的目录（英文与简体中文同键）；verify 第 15 步拒绝对比度不达标、主色落在橙色 / 陶土色、打包字体或音频的改动。
 - `cargo test`（含 `npm run verify`）会在登录钥匙串中以 `piarc-test.` 开头的服务名创建并删除测试条目；测试代码只用 `test_master_key_name` 命名条目，不碰 `piarc-core::identity` 的正式服务名。
 - `cargo test`（含 verify）中 `piarc-core` 的 `sandbox_commands` 测试经沙箱代理连 `registry.npmjs.org`、`index.crates.io`：离线时这两个用例失败并写明原因。沙箱内命令要联网的工具，配置文件里的代理设置会盖过 `HTTP_PROXY`（`crates/piarc-sandbox/CLAUDE.md`）。
 - 测试里用 `vim -u NONE` 时加 `--cmd 'set encoding=utf-8'`：否则 vim 按 locale 选编码，`LANG` 为空的环境（CI runner、某些 IDE 或智能体的子进程）里中文显示成转义（I38）。

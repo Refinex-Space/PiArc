@@ -169,7 +169,7 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 
 | 能力 | 位置 | 说明 | 登记任务 |
 |---|---|---|---|
-| 统一检查入口 | `scripts/dev/verify.mjs`（`npm run verify`） | 按顺序运行 14 个检查步骤，失败后继续，最后打印汇总表；新增检查在 `STEPS` 中追加 | T01 |
+| 统一检查入口 | `scripts/dev/verify.mjs`（`npm run verify`） | 按顺序运行 15 个检查步骤，失败后继续，最后打印汇总表；新增检查在 `STEPS` 中追加 | T01 |
 | crate 依赖方向检查 | `scripts/ci/check-crate-deps.mjs` + `crates/deps-rules.json` | 读取 `cargo metadata`，按层与例外校验 workspace crate 之间的依赖 | T01 |
 | 验收清单一致性检查 | `scripts/plan/check-acceptance.mjs` | 比对任务文件中的 `- [Txx-Ayy]` 验收项与 `docs/plan/acceptance.json` | T01 |
 | 仓库内工具安装 | `scripts/dev/install-tools.mjs` | 把锁定版本的工具（cargo-deny、ripgrep、fd、bindgen-cli）装进 `.tools/`，不做全局安装；`localToolPath()` 给出可执行文件路径 | T01 |
@@ -254,3 +254,9 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | 语义退出码判定 | `piarc_exec::semantic::{interpret, EXIT_ONE_MEANINGS}` | 单个简单命令的退出码 1 是否为答案（`grep` 无匹配、`diff` 有差异、`test` 为假），管道与控制运算符只看退出码；T23 换成语法树判断 | T17 |
 | 命令输出预算与落盘 | `piarc_exec::{ExecLimits, OutputCapture, CapturedOutput}`；落盘文件 `piarc_fs::create_spill` | 阈值（超时默认与上限、内联 30,000、预览 2,000、失败头尾、终止宽限）的唯一定义；内存有界，超出预算时全文流式写入会话临时目录 | T17 |
 | shell 探测与调用 | `piarc_exec::shells::{detect, Probe, bash_args, powershell_args, msys_to_windows}`、`piarc_exec::CwdProbe` | bash / Git Bash / PowerShell 的查找顺序（测试可描述一台假机器）、两种 shell 的参数、Git Bash 路径转换、经 `BASH_ENV` 取 bash 命令的最终目录 | T17 |
+| 渲染进程 store | `apps/desktop/src/renderer/store/`（`AppStore`、`SessionTranscript`、`StoreConnection`；React 绑定 `hooks.ts`；`status.ts` 的 `badgeOf`、`needsAttention`、`attentionCount`） | Core 事件的唯一归约处：实体快照按 `revision` 门控、未变化的条目保留对象身份；按列表、单个会话、单行订阅（`useSyncExternalStore`）；乐观回显按 `clientId` 对账；"需要处理"与徽标优先级的唯一定义 | T18 |
+| 面板与设置页注册 | `apps/desktop/src/renderer/shell/registry.ts`（`registerPanel`，area 为 `rail` 或 `dock`）、`src/renderer/settings/registry.ts`（`registerSettingsPage`） | 右栏卡片、停靠面板、设置页都在所属任务里注册，容器负责布局、尺寸记忆与导航；没有注册内容的区域不显示 | T18 |
+| 快捷键注册表 | `apps/desktop/src/shared/keybindings.ts`（`COMMANDS`、`effectiveBindings`、`commandForEvent`、`conflictFor`、`toAccelerator`、`displayKey`） | 命令 id → `Mod` 记法默认键；用户覆盖存于用户级设置；渲染进程按 `KeyboardEvent.code` 匹配，主进程菜单显示同一绑定；按平台换算物理按键判断冲突 | T18 |
+| 本地化 | `apps/desktop/src/shared/i18n/`（`Translator`、`resolveLocale`；目录 `en.ts`、`zh-CN.ts`）；渲染进程 `useT()`，主进程 `AppShell.t()` | ICU MessageFormat（intl-messageformat，不用 eval）；英文目录定义消息 id，中文目录类型上必须覆盖全部 id；主进程菜单、原生对话框、通知与渲染进程共用 | T18 |
+| 设计令牌 | `design/tokens/*.json` → `npm run gen:tokens`（`scripts/lib/design-tokens.mjs`）→ `src/renderer/theme/tokens.generated.css`、`src/shared/design-tokens.ts`（`COLORS`、`tokenVar`）；检查 `scripts/ci/check-design-tokens.mjs` | 四种颜色模式 × 两档密度；组件只读语义与组件令牌；对比度、品牌与资源检查在 verify 第 15 步 | T18 |
+| 客户端偏好 | Core `piarc_core::client_settings`（NAPI `userSettings`、`writeClientSetting`）；主进程 `src/main/preferences.ts`（`PreferenceStore`）；共享 `src/shared/preferences.ts`（`preferencesFrom`、`pointerOf`） | 语言、外观、快捷键覆盖、通知写在用户级 `settings.json`，Core 是唯一写入方；改动推送到所有窗口 | T18 |
