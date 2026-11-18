@@ -312,11 +312,12 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 T19 Transcript 与 composer 正式版（2026-11-18 开工；基线 `npm run verify` 15/15 通过）
 
 - [x] 协议与 Core：用户输入的提及与附件（AHP、Core API、Agent Host 的图片与 PDF 文本）、错误分类（`kind`、`retryable`）、模糊文件匹配 API（遵守 `.gitignore`、上限、可取消）、内置命令列表、附件存储（f4f62d5；`turn/usage`、`session/compact`、mock 的 thinking / 分段速率 / 401）
-- [ ] transcript 接入真实事件流与历史窗口、会话缓存；同一套归约器与行组件
+- [x] transcript 接入真实事件流与历史窗口、会话缓存；同一套归约器与行组件（e081f8e，渲染进程单测已复跑，万条真实数据的分窗加载已验证）
 - [ ] P0 九种行类型组件（用户消息、回复、思考块、工具组、bash 卡、文件改动卡、压缩提示、错误卡、working 行）与 `uncertain` 提示；行级错误边界（I50）
-- [ ] composer 正式版：`@` 提及（Core 模糊匹配）、`/` 命令面板、图片与 PDF 附件（拖放、粘贴、类型与大小上限）、steer / 排队 / Esc、排队项编辑删除、输入法守卫
+- [x] composer 正式版（dev 形态五个输入流程已通过，含 mock 请求断言）：`@` 提及（Core 模糊匹配）、`/` 命令面板、图片与 PDF 附件（拖放、粘贴、类型与大小上限）、steer / 排队 / Esc、排队项编辑删除、输入法守卫
 - [ ] 错误、重试与重发未送达消息；复制本条消息（Markdown / 纯文本）与选中本回合
 - [ ] 节奏与滚动参数定稿；贴底在高刷新率与 CPU 降速下稳定（I32、I59）
+- [x] 四项 T19 Harness 能力已接入 L2（37 passed、1 Windows 专用；MISSING 0）
 - [ ] 验收：A01 组件测试与亮暗截图、A02、A03、A04、A05、A06、A07、A08、A09、A10、A11、A12、A13、A14
 - [ ] 收尾：transcript 与 composer 的 CLAUDE.md、`coding-standards.md` 通用能力复用表、架构与 ADR 同步、PLAN 与 acceptance
 

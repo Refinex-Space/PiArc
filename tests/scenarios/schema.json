@@ -140,6 +140,9 @@
       "additionalProperties": false,
       "properties": {
         "text": { "type": "string" },
+        "thinking": { "type": "string" },
+        "chunk_chars": { "type": "integer", "minimum": 1 },
+        "chunk_delay_ms": { "type": "integer", "minimum": 0, "maximum": 10000 },
         "tool_calls": { "type": "array", "items": { "$ref": "#/$defs/toolCall" } },
         "usage": {
           "type": "object",
@@ -159,7 +162,9 @@
           "additionalProperties": false,
           "required": ["kind"],
           "properties": {
-            "kind": { "enum": ["rate_limit", "overloaded", "server_error", "unavailable"] },
+            "kind": {
+              "enum": ["unauthorized", "rate_limit", "overloaded", "server_error", "unavailable"]
+            },
             "retry_after_secs": { "type": "integer", "minimum": 0 },
             "message": { "type": "string" }
           }
@@ -226,6 +231,11 @@
             "items": { "type": "array", "items": { "$ref": "#/$defs/label" } }
           }
         },
+        "compact": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "session": { "$ref": "#/$defs/label" } }
+        },
         "abort": {
           "type": "object",
           "additionalProperties": false,
@@ -261,6 +271,37 @@
       "properties": {
         "session": { "$ref": "#/$defs/label" },
         "text": { "type": "string", "minLength": 1 },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9._:-]+$"
+        },
+        "mentions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "start", "end"],
+            "properties": {
+              "path": { "$ref": "#/$defs/relativePath" },
+              "start": { "type": "integer", "minimum": 0 },
+              "end": { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["fixture", "mime_type"],
+            "properties": {
+              "fixture": { "$ref": "#/$defs/relativePath" },
+              "mime_type": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
         "turn": { "description": "Label for the turn the input started.", "$ref": "#/$defs/label" },
         "item": { "description": "Label for the queue item it became.", "$ref": "#/$defs/label" }
       }

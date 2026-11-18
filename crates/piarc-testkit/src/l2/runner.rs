@@ -513,17 +513,16 @@ impl Driver<'_> {
 
     async fn act(&mut self, action: &Action) -> Result<(), String> {
         match action {
-            Action::Prompt(input) => {
-                self.input(input, Op::Prompt(UserInput::text(input.text.clone())))
-                    .await
-            }
-            Action::Steer(input) => {
-                self.input(input, Op::Steer(UserInput::text(input.text.clone())))
-                    .await
-            }
-            Action::FollowUp(input) => {
-                self.input(input, Op::FollowUp(UserInput::text(input.text.clone())))
-                    .await
+            Action::Prompt(input) => self.input(input, Op::Prompt).await,
+            Action::Steer(input) => self.input(input, Op::Steer).await,
+            Action::FollowUp(input) => self.input(input, Op::FollowUp).await,
+            Action::Compact { session } => {
+                let accepted = self.op(session.as_deref(), Op::Compact).await?;
+                let turn = accepted["turnId"]
+                    .as_str()
+                    .ok_or_else(|| format!("no compaction turn was started: {accepted}"))?;
+                self.unlabeled_turns.push(turn.to_owned());
+                Ok(())
             }
             Action::QueueEdit {
                 session,
@@ -581,8 +580,40 @@ impl Driver<'_> {
         }
     }
 
-    async fn input(&mut self, input: &InputAction, op: Op) -> Result<(), String> {
-        let accepted = self.op(input.session.as_deref(), op).await?;
+    async fn input(&mut self, input: &InputAction, op: fn(UserInput) -> Op) -> Result<(), String> {
+        let mut outgoing = UserInput {
+            request_id: input.request_id.clone(),
+            text: input.text.clone(),
+            mentions: input.mentions.clone(),
+            attachments: Vec::new(),
+        };
+        for file in &input.attachments {
+            let path = self.spec.fixture(&file.fixture);
+            let name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .ok_or_else(|| format!("invalid attachment file name: {}", path.display()))?;
+            let bytes = std::fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+            let id = self.session_id(input.session.as_deref())?;
+            let stored = call(
+                |done| {
+                    self.core.store_attachment(
+                        id,
+                        name.to_owned(),
+                        file.mime_type.clone(),
+                        bytes,
+                        done,
+                    )
+                },
+                "storing a composer attachment",
+            )
+            .await?;
+            outgoing.attachments.push(
+                serde_json::from_value(stored)
+                    .map_err(|e| format!("invalid attachment returned by Core: {e}"))?,
+            );
+        }
+        let accepted = self.op(input.session.as_deref(), op(outgoing)).await?;
         if let Some(turn) = accepted["turnId"].as_str() {
             match &input.turn {
                 Some(label) => {

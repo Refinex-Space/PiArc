@@ -8,7 +8,7 @@
 
 | 里程碑 | 能力数 | 已实现 | 计划中 | BLOCKED |
 |---|---|---|---|---|
-| M1 | 61 | 45 | 16 | 0 |
+| M1 | 61 | 49 | 12 | 0 |
 | M2 | 30 | 0 | 30 | 0 |
 | M3 | 21 | 0 | 21 | 0 |
 | M4 | 10 | 0 | 10 | 0 |
@@ -18,8 +18,8 @@
 
 | ID | 能力 | 需求与架构 | 任务 | 覆盖场景 | 状态 |
 |---|---|---|---|---|---|
-| CAP-CHAT-ATTACH-001 | 图片与 PDF 附件送达模型 | FR-CH-02 | T19 | — | 计划中 |
-| CAP-CHAT-MENTION-001 | 输入中的 `@` 文件提及与 `/` 命令解析后送达模型 | FR-CH-02 | T19 | — | 计划中 |
+| CAP-CHAT-ATTACH-001 | 图片与 PDF 附件送达模型 | FR-CH-02 | T19 | `chat-composer-input` | 已实现 |
+| CAP-CHAT-MENTION-001 | 输入中的 `@` 文件提及与 `/` 命令解析后送达模型 | FR-CH-02 | T19 | `chat-composer-input` | 已实现 |
 | CAP-CTX-MEMORY-001 | CLAUDE.md、AGENTS.md、CLAUDE.local.md 层级，`@import` 与子目录懒加载 | FR-CX-01、ARCH-6.6.2、ARCH-6.14 | T22 | — | 计划中 |
 | CAP-CTX-PROMPT-001 | 分段 system prompt（静态段与动态段分别缓存，每个请求一个消息级缓存断点） | ARCH-6.6.1、ARCH-6.15 | T22 | — | 计划中 |
 | CAP-EXEC-ABORT-001 | 中断回合时正在执行的命令连同子孙进程一起终止，条目为 interrupted | FR-TL-01、ARCH-6.11、ARCH-15.2 | T17 | `exec-abort-kills-tree` | 已实现 |
@@ -71,13 +71,13 @@
 | CAP-TRUST-DIALOG-001 | 首次打开工作区时列出将启用的可执行配置并记录用户的信任决定 | FR-WS-01、ARCH-10.2 | T18 | — | 计划中 |
 | CAP-TRUST-PROJECT-001 | 未信任的工作区不加载项目级可执行配置（Pi 扩展等）；信任后加载 | FR-WS-01、ARCH-10.2 | T13 | `trust-trusted-loads-project-extension`<br>`trust-untrusted-skips-project-extension` | 已实现 |
 | CAP-TURN-BATCH-001 | 连续的只读工具调用成批并行（单批至多 10 个），写操作单独执行 | ARCH-6.15 | T14 | `turn-tool-batches` | 已实现 |
-| CAP-TURN-ERROR-001 | 不可恢复的错误按类别报告，可重试，未送达的消息可重发 | FR-CH-06 | T19 | — | 计划中 |
+| CAP-TURN-ERROR-001 | 不可恢复的错误按类别报告，可重试，未送达的消息可重发 | FR-CH-06 | T19 | `turn-classified-errors` | 已实现 |
 | CAP-TURN-FOLLOWUP-001 | 运行中排队的 follow-up 在回合结束后作为新回合执行 | FR-CH-03 | T14 | `turn-follow-up` | 已实现 |
 | CAP-TURN-INTERRUPT-001 | 停止回合时为未完成的工具调用补齐结果，下一次请求配对完整、角色交替 | FR-CH-03、ARCH-6.15 | T14 | `turn-interrupt-pairs-tool-calls` | 已实现 |
 | CAP-TURN-QUEUE-001 | 排队项可编辑、删除、重排，按新顺序各执行一次 | FR-CH-03 | T14 | `turn-queue-edit-reorder` | 已实现 |
 | CAP-TURN-REASONING-001 | 思考内容以 reasoning 条目流式送达，effort 映射到服务商参数 | FR-CH-01、FR-MD-03、ARCH-6.13 | T21 | — | 计划中 |
 | CAP-TURN-RETRY-001 | 限流、过载与 5xx 自动重试，每次重试报给客户端，失败的尝试不进入上下文 | FR-CH-04、FR-CH-06、ARCH-6.15 | T14 | `turn-retry-recoverable-errors` | 已实现 |
-| CAP-TURN-STATUS-001 | 回合进行中提供当前工具、计时、token、重试次数与压缩状态 | FR-CH-04 | T19 | — | 计划中 |
+| CAP-TURN-STATUS-001 | 回合进行中提供当前工具、计时、token、重试次数与压缩状态 | FR-CH-04 | T19 | `chat-composer-input`<br>`turn-classified-errors` | 已实现 |
 | CAP-TURN-STEER-001 | 运行中 steer：消息在当前步骤之后进入本回合的下一次请求 | FR-CH-03、ARCH-5.3 | T14 | `turn-steer` | 已实现 |
 
 ## M2

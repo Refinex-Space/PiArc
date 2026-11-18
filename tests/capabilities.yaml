@@ -134,25 +134,25 @@ capabilities:
     milestone: M1
     refs: [FR-CH-06]
     task: T19
-    status: planned
+    status: active
   - id: CAP-TURN-STATUS-001
     title: '回合进行中提供当前工具、计时、token、重试次数与压缩状态'
     milestone: M1
     refs: [FR-CH-04]
     task: T19
-    status: planned
+    status: active
   - id: CAP-CHAT-MENTION-001
     title: '输入中的 `@` 文件提及与 `/` 命令解析后送达模型'
     milestone: M1
     refs: [FR-CH-02]
     task: T19
-    status: planned
+    status: active
   - id: CAP-CHAT-ATTACH-001
     title: '图片与 PDF 附件送达模型'
     milestone: M1
     refs: [FR-CH-02]
     task: T19
-    status: planned
+    status: active
   - id: CAP-CHAT-SIDE-001
     title: '侧边对话基于当前上下文提问，不写入主对话'
     milestone: M5

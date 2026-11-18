@@ -212,7 +212,10 @@ validation:                        # 可省略，默认全部规则开启
     max_message_level: 1           # messages 内最多几个断点，默认 1（架构第 6.15 节）
     last_message_only: false       # 消息级断点必须在最后一条消息
 steps:
-  - text: "Reading the file."      # 分 3 段 text 增量
+  - text: "Reading the file."      # 默认分 3 段 text 增量
+    thinking: "I need the source." # 可选，先输出 reasoning，再输出正文
+    chunk_chars: 8                 # 可选，每段的字符数
+    chunk_delay_ms: 20             # 可选，相邻线上事件间隔
     tool_calls:
       - id: toolu_read_1           # 可省略，默认 <toolu|call>_mock_<步序号>_<序号>
         name: read_file
@@ -225,7 +228,7 @@ steps:
   - text: "Thinking"
     stall_after_events: 4          # 只发前 4 个线上事件，然后保持连接不再发送，直到客户端断开（中断、杀进程的确定性时点）
   - error:
-      kind: rate_limit             # rate_limit 429 | overloaded 529 | server_error 500 | unavailable 503
+      kind: rate_limit             # unauthorized 401 | rate_limit 429 | overloaded 529 | server_error 500 | unavailable 503
       retry_after_secs: 2          # 仅 rate_limit，默认 1
       message: "slow down"         # 可省略
 ```
@@ -318,11 +321,14 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | `prompt` | `text`、`turn`（标签） | `session_op(Prompt)`，记下回合 id |
 | `steer`、`follow_up` | `text`、`item`（标签）、`turn` | 运行中进入排队表（`item` 记下排队项 id）；空闲时直接开始回合（`turn` 记下回合 id） |
 | `queue_edit`、`queue_delete`、`queue_reorder` | `item`/`text`；`items`（全部标签的新顺序） | 改排队表 |
+| `compact` | — | 经 Core 执行内置 `/compact`，记录这次压缩启动的回合并等待完成 |
 | `abort` | — | 中断当前回合 |
 | `wait` | 事件匹配字段（12.4）+ `count` | 等到至少 `count` 个（缺省 1）匹配的事件已送达 |
 | `write_file` | `path`、`content` | 写工作区文件（例如给等待中的命令发信号） |
 | `restart_core` | — | 关闭 Core，在同一数据目录上重新启动并打开工作区；会话保持关闭直到 `resume` |
 | `resume` | — | `resume_session` 重新打开会话 |
+
+`prompt`、`steer`、`follow_up` 都可带客户端的 `request_id`（重发时沿用），以及 `mentions` 和 `attachments`。提及按 Core 输入格式写 `{path, start, end}`，两个偏移是发送文本中 `@path` 的 UTF-16 起止位置。附件写 `{fixture, mime_type}`；运行器读取 `fixtures/` 中对应文件并调用 Core 的 `store_attachment`，将返回的引用随输入发送。面板的键盘交互在 L4 验证。
 
 动作全部完成后，运行器先等每个被动作启动的回合的 `turn/completed`，再检查全部断言。follow-up 自己启动的回合没有标签，用 `wait: { method: turn/completed, count: N }` 等它们。
 

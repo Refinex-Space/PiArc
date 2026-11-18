@@ -13,6 +13,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
+use piarc_protocol::input::InputMention;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -177,6 +178,16 @@ pub struct SessionSpec {
     pub cwd: Option<String>,
 }
 
+/// A file the client attaches, read from the scenario fixtures and stored through Core.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AttachmentFixture {
+    /// A path below the scenario's fixtures directory.
+    pub fixture: String,
+    /// The MIME type passed to Core.
+    pub mime_type: String,
+}
+
 /// An input (prompt, steering message, follow-up).
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -186,6 +197,15 @@ pub struct InputAction {
     pub session: Option<String>,
     /// The text.
     pub text: String,
+    /// The client-selected idempotency key.
+    #[serde(default)]
+    pub request_id: Option<String>,
+    /// File references with UTF-16 offsets in the submitted text.
+    #[serde(default)]
+    pub mentions: Vec<InputMention>,
+    /// Binary fixtures to store in this session before submitting the input.
+    #[serde(default)]
+    pub attachments: Vec<AttachmentFixture>,
     /// Label for the turn it started.
     #[serde(default)]
     pub turn: Option<String>,
@@ -204,6 +224,12 @@ pub enum Action {
     Steer(InputAction),
     /// `session_op(FollowUp)`.
     FollowUp(InputAction),
+    /// Runs the built-in manual compaction command.
+    Compact {
+        /// The session; the only one when absent.
+        #[serde(default)]
+        session: Option<String>,
+    },
     /// Edits a queue item.
     QueueEdit {
         /// The session.
@@ -264,6 +290,7 @@ impl Action {
             Self::Prompt(_) => "prompt",
             Self::Steer(_) => "steer",
             Self::FollowUp(_) => "follow_up",
+            Self::Compact { .. } => "compact",
             Self::QueueEdit { .. } => "queue_edit",
             Self::QueueDelete { .. } => "queue_delete",
             Self::QueueReorder { .. } => "queue_reorder",
@@ -283,6 +310,7 @@ impl Action {
             Self::QueueEdit { session, .. }
             | Self::QueueDelete { session, .. }
             | Self::QueueReorder { session, .. }
+            | Self::Compact { session }
             | Self::Abort { session }
             | Self::Resume { session } => Some(session),
             Self::Wait(wait) => Some(&wait.session),
@@ -672,18 +700,22 @@ fn check(spec: &ScenarioSpec, stem: &str) -> Vec<String> {
         for (path, name) in fixtures {
             let field = format!("/{section}/fixtures/{path}");
             check_path(&field, path, &mut problems);
-            check_path(&field, name, &mut problems);
-            if !spec.fixture(name).is_file() {
-                problems.push(format!(
-                    "{field}: no fixture `{name}` in {}",
-                    spec.fixture_dir.display()
-                ));
-            }
+            check_fixture(spec, &field, name, &mut problems);
         }
     }
     check_actions(spec, &mut problems);
     check_expect(spec, &mut problems);
     problems
+}
+
+fn check_fixture(spec: &ScenarioSpec, field: &str, name: &str, problems: &mut Vec<String>) {
+    check_path(field, name, problems);
+    if !spec.fixture(name).is_file() {
+        problems.push(format!(
+            "{field}: no fixture `{name}` in {}",
+            spec.fixture_dir.display()
+        ));
+    }
 }
 
 fn check_path(field: &str, path: &str, problems: &mut Vec<String>) {
@@ -722,6 +754,14 @@ fn check_actions(spec: &ScenarioSpec, problems: &mut Vec<String>) {
             Action::Prompt(input) | Action::Steer(input) | Action::FollowUp(input) => {
                 define(&mut turns, &input.turn, "turn");
                 define(&mut items, &input.item, "item");
+                for (index, attachment) in input.attachments.iter().enumerate() {
+                    check_fixture(
+                        spec,
+                        &format!("{field}/attachments/{index}/fixture"),
+                        &attachment.fixture,
+                        problems,
+                    );
+                }
             }
             Action::QueueEdit { item, .. } | Action::QueueDelete { item, .. } => {
                 if !items.contains(item) {
@@ -738,7 +778,10 @@ fn check_actions(spec: &ScenarioSpec, problems: &mut Vec<String>) {
                     problems.push(format!("{field}/turn: no earlier turn `{turn}`"));
                 }
             }
-            Action::Abort { .. } | Action::RestartCore {} | Action::Resume { .. } => {}
+            Action::Compact { .. }
+            | Action::Abort { .. }
+            | Action::RestartCore {}
+            | Action::Resume { .. } => {}
             Action::WriteFile { path, .. } => check_path(&format!("{field}/path"), path, problems),
         }
     }
