@@ -14,7 +14,7 @@ import type {} from '../src/shared/test-hooks.js';
 
 const SCENARIOS = path.join(import.meta.dirname, 'scenarios');
 
-interface SessionFixtures {
+export interface SessionFixtures {
   mock: MockProcess;
   /** A directory for workspaces (path with a space and Chinese characters). */
   workspaces: string;
@@ -100,11 +100,11 @@ export async function stubMessageBox(app: ElectronApplication, response: number)
   await app.evaluate(({ dialog }, answer) => {
     const shown: string[] = [];
     (globalThis as { __piarcMessageBoxes?: string[] }).__piarcMessageBoxes = shown;
-    dialog.showMessageBox = ((...args: unknown[]) => {
+    dialog.showMessageBox = (...args: unknown[]) => {
       const options = args[args.length - 1] as { message?: string };
       shown.push(options.message ?? '');
       return Promise.resolve({ response: answer, checkboxChecked: false });
-    }) as typeof dialog.showMessageBox;
+    };
   }, response);
 }
 

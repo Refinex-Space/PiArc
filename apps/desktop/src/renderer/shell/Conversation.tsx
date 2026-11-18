@@ -4,6 +4,7 @@
 import { memo, useEffect, useState } from 'react';
 
 import { useT } from '../app/app-context.js';
+import { useWindowFocused } from '../app/window-focus.js';
 import { useRow, useRowIds, useSession, useStore, useTurnState } from '../store/hooks.js';
 import { badgeOf } from '../store/status.js';
 import { sessionTitle } from './SessionRow.js';
@@ -117,25 +118,16 @@ export function Conversation({ id }: { readonly id: string }) {
     };
   }, [store, id]);
 
-  // Shown to the user: no longer unread.
+  // Shown to the user (the window in front): no longer unread.
   const unread = session?.unread === true;
+  const focused = useWindowFocused();
   useEffect(() => {
-    if (!unread) {
-      return;
+    if (unread && focused) {
+      window.piarc.markSessionRead(id).catch((failure: unknown) => {
+        console.error('[conversation] cannot mark the session read', failure);
+      });
     }
-    const mark = () => {
-      if (document.hasFocus()) {
-        window.piarc.markSessionRead(id).catch((failure: unknown) => {
-          console.error('[conversation] cannot mark the session read', failure);
-        });
-      }
-    };
-    mark();
-    window.addEventListener('focus', mark);
-    return () => {
-      window.removeEventListener('focus', mark);
-    };
-  }, [id, unread]);
+  }, [id, unread, focused]);
 
   const title = sessionTitle(session?.title, t('session.untitled'));
   return (

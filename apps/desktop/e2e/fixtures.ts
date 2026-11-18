@@ -21,7 +21,7 @@ export interface AppLog {
   waitFor(pattern: RegExp, timeoutMs?: number): Promise<void>;
 }
 
-interface Fixtures {
+export interface Fixtures {
   userDataDir: string;
   /** Extra command-line arguments for the app, set per test file with `test.use`. */
   appArgs: string[];
@@ -31,7 +31,7 @@ interface Fixtures {
   page: Page;
 }
 
-interface WorkerFixtures {
+export interface WorkerFixtures {
   appForm: AppForm;
 }
 

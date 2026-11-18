@@ -23,6 +23,7 @@
     "package:desktop": "node scripts/dev/package-desktop.mjs",
     "check:fuses": "node scripts/ci/check-fuses.mjs",
     "bench:s1": "node scripts/bench/s1-transcript.mjs",
+    "bench:t18": "node scripts/bench/t18-cold-start.mjs",
     "bench:s2": "node scripts/bench/s2-event-channel.mjs",
     "bench:s7": "node scripts/bench/s7-terminal.mjs"
   },

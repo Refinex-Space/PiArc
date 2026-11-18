@@ -65,6 +65,7 @@ export function Dialog({
         ref={ref}
         className={wide ? 'dialog dialog-wide' : 'dialog'}
         role="dialog"
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby={labelledBy}
         data-testid={testId}

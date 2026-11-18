@@ -36,7 +36,7 @@ test('a session finishing in the background notifies and counts on the Dock badg
   expect(observed?.notified).toEqual([
     expect.objectContaining({
       kind: 'completed',
-      title: expect.stringContaining('Take a while') as unknown,
+      title: expect.stringContaining('Take a while'),
     }),
   ]);
   expect(observed?.bounces).toBe(1);

@@ -4,6 +4,8 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
+import type { Page } from '@playwright/test';
+
 import { IPC_CHANNELS } from '../src/shared/ipc.js';
 import { expectTestHooks } from './core.js';
 import {
@@ -178,10 +180,7 @@ test('status badges follow Core: running, unread, error', async ({
 /**
  * Starts a session through `window.piarc` without showing it, so its completion stays unread.
  */
-async function startSessionElsewhere(
-  page: import('@playwright/test').Page,
-  ws: string,
-): Promise<string> {
+async function startSessionElsewhere(page: Page, ws: string): Promise<string> {
   return page.evaluate(async (workspace) => {
     const created = JSON.parse(await window.piarc.createSession(workspace)) as {
       sessionId: string;

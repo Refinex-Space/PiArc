@@ -56,13 +56,21 @@ export interface AppState {
   readonly preferences: Preferences;
   /** The locale the preferences and the system languages resolve to. */
   readonly locale: Locale;
+  /** Whether the asking window is the one in front (keyboard focus). */
+  readonly focused: boolean;
 }
 
 /** Messages on `APP_EVENT_CHANNEL`. */
 export type AppEvent =
   | { readonly type: 'preferences'; readonly preferences: Preferences; readonly locale: Locale }
   | { readonly type: 'command'; readonly command: AppCommand }
-  | { readonly type: 'openSession'; readonly sessionId: string };
+  | { readonly type: 'openSession'; readonly sessionId: string }
+  /**
+   * The window came to the front or left it. The main process tells: a page cannot trust
+   * `document.hasFocus()` for this (it stays true under automation and in some window
+   * arrangements).
+   */
+  | { readonly type: 'focus'; readonly focused: boolean };
 
 /** Something the user should look at (architecture section 8.8): the main process notifies. */
 export interface AttentionNotice {

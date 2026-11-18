@@ -13,6 +13,7 @@ import {
 import { keyPlatformOf, type KeyPlatform } from '../../shared/keybindings.js';
 import type { Preferences } from '../../shared/preferences.js';
 import { applyAppearance } from './appearance.js';
+import { setWindowFocused } from './window-focus.js';
 
 export interface AppContextValue {
   readonly platform: string;
@@ -45,15 +46,16 @@ export function AppProvider({
   readonly children: ReactNode;
 }) {
   const [state, setState] = useState({ preferences: initial.preferences, locale: initial.locale });
-  useEffect(
-    () =>
-      window.piarc.onAppEvent((event: AppEvent) => {
-        if (event.type === 'preferences') {
-          setState({ preferences: event.preferences, locale: event.locale });
-        }
-      }),
-    [],
-  );
+  useEffect(() => {
+    setWindowFocused(initial.focused);
+    return window.piarc.onAppEvent((event: AppEvent) => {
+      if (event.type === 'preferences') {
+        setState({ preferences: event.preferences, locale: event.locale });
+      } else if (event.type === 'focus') {
+        setWindowFocused(event.focused);
+      }
+    });
+  }, [initial.focused]);
   useEffect(
     () => applyAppearance(document.documentElement, initial.platform, state.preferences),
     [initial.platform, state.preferences],

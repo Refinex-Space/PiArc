@@ -2,7 +2,7 @@
 // workspace, it lists the project's executable configuration by category and source file and
 // asks the user to trust it or continue restricted. When items were added after the user
 // trusted the project, it lists only those. The decision is stored in Core.
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { isMessageId } from '../../shared/i18n/index.js';
 import { useT } from '../app/app-context.js';
@@ -91,6 +91,14 @@ export function TrustDialog({
   const titleId = useId();
   const [view, setView] = useState<TrustView | 'loading' | { failed: string }>('loading');
   const [busy, setBusy] = useState(false);
+  const deny = useRef<HTMLButtonElement>(null);
+  const loaded = typeof view === 'object' && 'items' in view;
+  // Once the items are on screen, the safe choice has the focus.
+  useEffect(() => {
+    if (loaded) {
+      deny.current?.focus();
+    }
+  }, [loaded]);
   useEffect(() => {
     let active = true;
     window.piarc.projectTrust(workspace).then(
@@ -216,7 +224,7 @@ export function TrustDialog({
           className="button"
           disabled={busy || typeof view !== 'object' || 'failed' in view}
           data-testid="trust-deny"
-          data-autofocus
+          ref={deny}
           onClick={() => {
             decide(false);
           }}

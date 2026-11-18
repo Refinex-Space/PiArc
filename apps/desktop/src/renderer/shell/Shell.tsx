@@ -63,12 +63,20 @@ export function Shell() {
       }),
     [],
   );
-  // A session that disappears (deleted, archived elsewhere) leaves the main area.
+  // A session that disappears (deleted, archived elsewhere) leaves the main area. A session
+  // just created may not be in the list yet: only one that was listed can disappear.
+  const listedRef = useRef<string | undefined>(undefined);
   useEffect(
     () =>
       store.subscribeSessions(() => {
         const current = viewRef.current;
-        if (current.kind === 'session' && store.session(current.id) === undefined) {
+        if (current.kind !== 'session') {
+          return;
+        }
+        if (store.session(current.id) !== undefined) {
+          listedRef.current = current.id;
+        } else if (listedRef.current === current.id) {
+          listedRef.current = undefined;
           setView({ kind: 'home', workspace: undefined });
         }
       }),

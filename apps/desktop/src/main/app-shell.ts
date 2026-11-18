@@ -82,6 +82,7 @@ export class AppShell {
   openMain(): BrowserWindow {
     const window = createMainWindow(this.options.preloadPath, mainWindowChrome(process.platform));
     followTheme(window, process.platform);
+    this.reportFocus(window);
     void window.loadURL(this.options.entryUrl);
     this.main = window;
     window.on('closed', () => {
@@ -109,6 +110,7 @@ export class AppShell {
       this.translator.t('settings.title'),
       settingsWindowChrome(),
     );
+    this.reportFocus(window);
     void window.loadURL(`${this.options.entryUrl}${hash}`);
     this.settings = window;
     window.on('closed', () => {
@@ -131,10 +133,11 @@ export class AppShell {
 
   /** Registers the app-level commands of `window.piarc`. */
   registerHandlers(registerHandler: RegisterHandler): void {
-    registerHandler(IPC_CHANNELS.appState, (): AppState => ({
+    registerHandler(IPC_CHANNELS.appState, (event): AppState => ({
       platform: process.platform,
       preferences: this.options.preferences.get(),
       locale: this.options.preferences.locale(),
+      focused: BrowserWindow.fromWebContents(event.sender)?.isFocused() ?? false,
     }));
     registerHandler(IPC_CHANNELS.preferencesSet, (_event, [change]) =>
       this.options.preferences.set(change),
@@ -194,6 +197,16 @@ export class AppShell {
     for (const window of BrowserWindow.getAllWindows()) {
       this.send(window, event);
     }
+  }
+
+  /** Tells the window's page when it comes to the front or leaves it. */
+  private reportFocus(window: BrowserWindow): void {
+    window.on('focus', () => {
+      this.send(window, { type: 'focus', focused: true });
+    });
+    window.on('blur', () => {
+      this.send(window, { type: 'focus', focused: false });
+    });
   }
 
   private send(window: BrowserWindow, event: AppEvent): void {

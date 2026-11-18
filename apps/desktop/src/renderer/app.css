@@ -690,6 +690,11 @@ textarea.input {
   user-select: text;
 }
 
+/* The container only holds the focus while its content loads. */
+.dialog:focus {
+  outline: none;
+}
+
 .dialog-wide {
   width: min(560px, 100% - 32px);
 }

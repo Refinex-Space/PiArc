@@ -5,6 +5,7 @@
 import { useEffect, useRef } from 'react';
 
 import { useT } from '../app/app-context.js';
+import { isWindowFocused } from '../app/window-focus.js';
 import { useSessions } from '../store/hooks.js';
 import { attentionCount, badgeOf, needsAttention, type BadgeState } from '../store/status.js';
 import { sessionTitle } from './SessionRow.js';
@@ -35,7 +36,7 @@ export function useAttention(): void {
       if (is === was || is === undefined || !needsAttention(session)) {
         continue;
       }
-      const shown = ui.view.kind === 'session' && ui.view.id === session.id && document.hasFocus();
+      const shown = ui.view.kind === 'session' && ui.view.id === session.id && isWindowFocused();
       if (shown) {
         continue;
       }
