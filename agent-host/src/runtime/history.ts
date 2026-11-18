@@ -23,6 +23,8 @@ import type { SessionEntry } from '@earendil-works/pi-coding-agent';
 import type { HistoryItem, HistoryWindow, ItemStatus } from '@piarc/protocol';
 
 import { isInterruptionMarker } from '../harness/interruption.js';
+import { DECLINED_ENTRY } from '../harness/policy.js';
+import { modeItem, modeRecord } from './permission-mode.js';
 import { INPUT_ENTRY, parseInputRecord, type UserInput } from './input.js';
 import {
   agentMessage,
@@ -55,7 +57,16 @@ export function projectHistory(
   toCanonical: (tool: string) => string,
 ): HistoryItem[] {
   const results = new Map<string, ToolResult>();
+  const declined = new Set<string>();
   for (const entry of branch) {
+    if (
+      entry.type === 'custom' &&
+      entry.customType === DECLINED_ENTRY &&
+      isObject(entry.data) &&
+      typeof entry.data.toolCallId === 'string'
+    ) {
+      declined.add(entry.data.toolCallId);
+    }
     if (entry.type === 'message' && entry.message.role === 'toolResult') {
       results.set(entry.message.toolCallId, {
         text: contentText(entry.message.content),
@@ -75,6 +86,15 @@ export function projectHistory(
         turnId: isObject(data) && typeof data.turnId === 'string' ? data.turnId : undefined,
         input: parseInputRecord(data),
       };
+      continue;
+    }
+    const record = modeRecord(entry);
+    if (record !== undefined) {
+      items.push({
+        entryId: entry.id,
+        turnId: record.turnId ?? entry.id,
+        item: modeItem(entry.id, record.mode),
+      });
       continue;
     }
     if (entry.type === 'compaction') {
@@ -109,7 +129,14 @@ export function projectHistory(
       });
     } else if (message.role === 'assistant' && !isInterruptionMarker(message)) {
       items.push(
-        ...assistantItems(entry.id, currentTurn ?? entry.id, message, results, toCanonical),
+        ...assistantItems(
+          entry.id,
+          currentTurn ?? entry.id,
+          message,
+          results,
+          declined,
+          toCanonical,
+        ),
       );
     }
   }
@@ -121,6 +148,7 @@ function assistantItems(
   turnId: string,
   message: Extract<SessionEntry, { type: 'message' }>['message'] & { role: 'assistant' },
   results: ReadonlyMap<string, ToolResult>,
+  declined: ReadonlySet<string>,
   toCanonical: (tool: string) => string,
 ): HistoryItem[] {
   const textStatus: ItemStatus =
@@ -148,7 +176,14 @@ function assistantItems(
     } else if (ran) {
       const result = results.get(part.id);
       const status: ItemStatus =
-        result === undefined ? 'interrupted' : result.isError ? 'failed' : 'completed';
+        declined.has(part.id) ||
+        (isObject(result?.details) && result.details.approvalExpired === true)
+          ? 'declined'
+          : result === undefined
+            ? 'interrupted'
+            : result.isError
+              ? 'failed'
+              : 'completed';
       items.push({
         entryId,
         turnId,

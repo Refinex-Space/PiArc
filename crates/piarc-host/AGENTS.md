@@ -49,6 +49,8 @@ Core 侧的 Agent Host 监管：启动、握手、stdio 读写、背压、心跳
 
 ## 不变量
 
+- `HostSupervisor::set_permission_mode` 经 `session_call` 向相应会话发送 `session/setPermissionMode`。模式条目由 Agent Host 写入，确认后 Core 才更新会话快照。失联时审批按连接代次作废，恢复请求中缺失的工具结果由 Host 经 `policy/recover` 查询。
+
 - 功能 crate 不直接启动进程、不读系统时钟做判断：经 `ProcessSpawner` 与 `Clock`。超时与心跳间隔用 tokio 计时器。
 - 启动环境只含 `DEFAULT_ENV_PASSTHROUGH` 中存在的变量、`PI_SKIP_VERSION_CHECK=1`、`PI_TELEMETRY=0`、`PI_PACKAGE_DIR` 与配置的 `extra_env`；不传凭据。
 - 帧错误（非法 JSON、超长帧、批量请求、缺会话头的通知）只报告并丢弃，不断开连接（架构第 7.4 节）。

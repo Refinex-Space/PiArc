@@ -170,6 +170,11 @@ impl Env {
     /// Directories, Pi's `models.json` and `settings.json`, and the mock with every provider
     /// script of `scenarios/`.
     pub async fn new(name: &str) -> Self {
+        Self::with_scenario(name, None).await
+    }
+
+    /// Adds a generated response when its input would be too large for a checked-in fixture.
+    pub async fn with_scenario(name: &str, extra: Option<piarc_testkit::Scenario>) -> Self {
         let root =
             std::env::temp_dir().join(format!("piarc sessions {name} 中文 {}", std::process::id()));
         if root.exists() {
@@ -185,7 +190,10 @@ impl Env {
             .join("tests")
             .join("sessions")
             .join("scenarios");
-        let library = ScenarioLibrary::load_paths(&[scenarios]).expect("provider scripts load");
+        let mut library = ScenarioLibrary::load_paths(&[scenarios]).expect("provider scripts load");
+        if let Some(scenario) = extra {
+            library.insert(scenario).expect("generated scenario");
+        }
         let mock = MockProvider::start(library).await.expect("mock starts");
         let models = json!({ "providers": { "piarc-mock": {
             "baseUrl": mock.anthropic_base_url(), "api": "anthropic-messages",
@@ -195,6 +203,15 @@ impl Env {
                 "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 } }]
         }}});
         write_json(&data.join("pi").join("models.json"), &models);
+        // These orchestration fixtures exercise tool execution after approval. Their user
+        // preapproves only the three exact calls used as barriers or batch boundaries.
+        write_json(
+            &data.join("settings.json"),
+            &json!({ "permissions": { "allow": [
+                "Bash(while [ ! -f go ]; do sleep 0.05; done; echo go)",
+                "Bash(sleep 30)", "Write(files/out.txt)"
+            ]}}),
+        );
         // Retries wait milliseconds, not seconds.
         let settings = json!({ "retry": { "baseDelayMs": 5 } });
         write_json(&data.join("pi").join("settings.json"), &settings);

@@ -32,6 +32,7 @@ import type {
   HistoryWindow,
   InputAccepted,
   ModelRef,
+  PermissionMode,
   PromptAccepted,
   QueueItem,
   QueueState,
@@ -39,7 +40,8 @@ import type {
   SessionStopped,
 } from '@piarc/protocol';
 
-import { repairInterruptedTurn } from '../harness/interruption.js';
+import { policyGate } from '../harness/policy.js';
+import { missingToolCalls, repairInterruptedTurn } from '../harness/interruption.js';
 import { takeOverProjectTrust, type TrustTakeover } from '../harness/project-trust.js';
 import { CONCURRENCY_SAFE_TOOLS, ToolBatches } from '../harness/tool-batches.js';
 import {
@@ -64,7 +66,9 @@ import {
   type PreparedInput,
   type UserInput,
 } from './input.js';
-import { contentText } from './items.js';
+import type { CoreBridge } from './core-bridge.js';
+import { MODE_ENTRY, modeItem, modeRecord } from './permission-mode.js';
+import { contentText, isObject } from './items.js';
 import { Projector, type ProjectionSink } from './projector.js';
 import { InputQueue } from './queue.js';
 import type { Workspace } from './workspace.js';
@@ -80,6 +84,7 @@ export type SessionSinkFactory = (sessionId: string) => ProjectionSink;
 export type ToolBackend =
   | {
       readonly kind: 'core';
+      readonly bridge: CoreBridge;
       readonly profile: ToolProfile;
       readonly ioFor: (sessionId: string) => CoreIo;
     }
@@ -193,7 +198,7 @@ export class SessionRegistry {
         file === undefined
           ? SessionManager.create(cwd, undefined, { id: sessionId })
           : SessionManager.open(file);
-      return this.#open(cwd, manager, undefined);
+      return this.#open(cwd, manager, undefined, true);
     });
   }
 
@@ -446,7 +451,26 @@ export class SessionRegistry {
   }
 
   #opened(sessionId: string): SessionOpened {
-    return { sessionId, restoredMessages: this.#get(sessionId).runtime.session.messages.length };
+    const { session } = this.#get(sessionId).runtime;
+    const last = session.sessionManager
+      .getBranch()
+      .findLast((entry) => modeRecord(entry) !== undefined);
+    const mode = last === undefined ? undefined : modeRecord(last)?.mode;
+    return {
+      sessionId,
+      restoredMessages: session.messages.length,
+      ...(mode === undefined ? {} : { permissionMode: mode }),
+    };
+  }
+
+  /** Record before notifying Core or publishing the row. */
+  setPermissionMode(sessionId: string, mode: PermissionMode): void {
+    const { runtime, projector } = this.#get(sessionId);
+    const turnId = projector.activeTurnId;
+    const itemId = runtime.session.sessionManager.appendCustomEntry(MODE_ENTRY, { mode, turnId });
+    this.#options
+      .sinkFor(sessionId)
+      .event('item/completed', { turnId: turnId ?? itemId, item: modeItem(itemId, mode) });
   }
 
   #startTurn(sessionId: string, hosted: HostedSession, job: Job): string {
@@ -465,6 +489,7 @@ export class SessionRegistry {
     cwd: string,
     manager: SessionManager,
     model: ModelRef | undefined,
+    recovering = false,
   ): Promise<SessionOpened> {
     const { workspace } = this.#options;
     let trust: TrustTakeover | undefined;
@@ -521,7 +546,22 @@ export class SessionRegistry {
         resourceLoaderOptions: {
           // PiArc assembles project context itself (T22).
           noContextFiles: true,
-          extensionFactories: [createMcpExtension(), ...budget],
+          extensionFactories: [
+            ...(tools.kind === 'core'
+              ? [
+                  policyGate(
+                    tools.bridge,
+                    target.sessionManager.getSessionId(),
+                    toCanonical,
+                    (id) => {
+                      projector.markDeclined(id);
+                    },
+                  ),
+                ]
+              : []),
+            createMcpExtension(),
+            ...budget,
+          ],
           // Extension tools (MCP, project extensions) run under the same batches.
           extensionsOverride: (result) => batches.wrapExtensions(result),
         },
@@ -582,25 +622,48 @@ export class SessionRegistry {
     hosted.unsubscribe = session.subscribe((event) => {
       this.#onEvent(sessionId, hosted, event);
     });
-    this.#sessions.set(sessionId, hosted);
-    // A turn the previous process left unfinished (it crashed or was killed) is closed like an
-    // interrupted one; a conversation that ends with a response stays as it is.
-    const repair = repairInterruptedTurn(session);
-    if (repair.toolResults > 0 || repair.marker) {
-      log(
-        `closed a turn left unfinished: ${String(repair.toolResults)} interrupted tool result(s), marker ${String(repair.marker)}`,
-      );
+    try {
+      // A turn the previous process left unfinished (it crashed or was killed) is closed like an
+      // interrupted one; a conversation that ends with a response stays as it is.
+      const expired = new Map<string, string>();
+      if (recovering && tools.kind === 'core') {
+        for (const call of missingToolCalls(session)) {
+          const result = await tools.bridge.requestTyped(
+            'policy/recover',
+            { sessionId, toolCallId: call.id },
+            (value) =>
+              isObject(value) &&
+              (value.reason === undefined ||
+                value.reason === null ||
+                typeof value.reason === 'string')
+                ? { reason: value.reason }
+                : undefined,
+          );
+          if (typeof result.reason === 'string') expired.set(call.id, result.reason);
+        }
+      }
+      const repair = repairInterruptedTurn(session, expired);
+      if (repair.toolResults > 0 || repair.marker) {
+        log(
+          `closed a turn left unfinished: ${String(repair.toolResults)} interrupted tool result(s), marker ${String(repair.marker)}`,
+        );
+      }
+      // Emits session_start: the MCP extension connects its servers now.
+      await session.bindExtensions({
+        onError: (error) => {
+          log(`extension ${error.extensionPath} failed in ${error.event}: ${error.error}`);
+        },
+      });
+    } catch (error) {
+      hosted.unsubscribe();
+      await runtime.dispose();
+      throw error;
     }
-    // Emits session_start: the MCP extension connects its servers now.
-    await session.bindExtensions({
-      onError: (error) => {
-        log(`extension ${error.extensionPath} failed in ${error.event}: ${error.error}`);
-      },
-    });
     log(
       `opened in ${cwd} (trusted: ${String(trust?.trusted() ?? false)}, model: ${session.model?.provider ?? '-'}/${session.model?.id ?? '-'})`,
     );
-    return { sessionId, restoredMessages: session.messages.length };
+    this.#sessions.set(sessionId, hosted);
+    return this.#opened(sessionId);
   }
 
   #onEvent(sessionId: string, hosted: HostedSession, event: AgentSessionEvent): void {

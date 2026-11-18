@@ -314,3 +314,69 @@ async fn a_tool_profile_renames_tools_for_the_model_only() {
     println!("model sees {model_side:?}; events carry {event_side:?}; Core sees {core_side:?}");
     supervisor.shutdown().await;
 }
+
+/// A Core error (including a reported timeout) and a malformed success result all reach
+/// the strict provider as refusals; not one of the file tools runs.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn policy_faults_decline_the_call_and_give_the_model_a_reason() {
+    let script = r#"
+id: policy-faults
+steps:
+  - tool_calls:
+      - {id: a, name: Write, input: {path: a, content: a}}
+      - {id: b, name: Write, input: {path: b, content: b}}
+      - {id: c, name: Write, input: {path: c, content: c}}
+  - text: "No files were written."
+"#;
+    let env = Env::new("policy-faults", &[script], json!({})).await;
+    let (supervisor, mut events, core) = env.start(&[]);
+    events
+        .until(|e| matches!(e, HostEvent::Connected { .. }))
+        .await;
+    let session = open(&supervisor, &core, &env.cwd(0), "mock-large").await;
+    core.policy_answers.lock().expect("queue").extend([
+        Err(piarc_protocol::ErrorObject::new(
+            piarc_protocol::ErrorKind::InternalError,
+            "injected audit failure",
+            false,
+        )),
+        Err(piarc_protocol::ErrorObject::new(
+            piarc_protocol::ErrorKind::Timeout,
+            "injected approval transport timeout",
+            true,
+        )),
+        Ok(json!({"allowed": "yes"})),
+    ]);
+    let turn = supervisor
+        .prompt(
+            &session,
+            "req-faults",
+            &prompt_text("Write.", "policy-faults"),
+        )
+        .await
+        .expect("accepted")
+        .turn_id;
+    events.turn_completed(&turn.0).await;
+    let requests = env.requests("policy-faults");
+    assert_eq!(requests.len(), 2);
+    let results = tool_results_in(&requests[1].body);
+    assert_eq!(results.len(), 3);
+    for ((tool, text, is_error), reason) in results.iter().zip([
+        "injected audit failure",
+        "injected approval transport timeout",
+        "malformed result",
+    ]) {
+        assert_eq!(tool, "Write");
+        assert!(
+            *is_error && text.contains("Permission denied") && text.contains(reason),
+            "{text}"
+        );
+    }
+    let completed = events.tool_results(&session.0);
+    assert_eq!(completed.len(), 3);
+    assert!(completed.iter().all(|item| item["status"] == "declined"));
+    for name in ["a", "b", "c"] {
+        assert!(!env.ws[0].join(name).exists(), "{name} was written");
+    }
+    supervisor.shutdown().await;
+}

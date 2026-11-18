@@ -20,6 +20,7 @@ import {
 } from './protocol/params.js';
 import { blobReader } from './runtime/blobs.js';
 import { CoreCredentialStore } from './runtime/credentials.js';
+import { isObject } from './runtime/items.js';
 import { SessionRegistry, type ToolBackend } from './runtime/session-registry.js';
 import {
   registerTestOAuthProvider,
@@ -101,6 +102,24 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
 
   // Tools delegate their I/O to Core; command output comes back as `exec/output`.
   const execOutput = new ExecOutputRouter();
+  connection.onNotification('policy/pending', (params) => {
+    if (
+      !isObject(params) ||
+      typeof params.sessionId !== 'string' ||
+      typeof params.toolCallId !== 'string'
+    )
+      return false;
+    const { sessionId, toolCallId } = params;
+    if (!connection.bridge.awaitingApproval(sessionId, toolCallId)) {
+      // A late acknowledgement cannot revive an expired call or leave a card on screen.
+      void connection.bridge
+        .request('policy/cancel', { sessionId, toolCallId })
+        .catch((error: unknown) => {
+          log(`cancelling a stale approval failed: ${describeError(error)}`);
+        });
+    }
+    return true;
+  });
   connection.onNotification('exec/output', (params) => execOutput.deliver(params));
   const readBlob = blobReader(options.dataDir);
   const tools: ToolBackend =
@@ -108,6 +127,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
       ? { kind: 'pi-native' }
       : {
           kind: 'core',
+          bridge: connection.bridge,
           profile: options.toolProfile ?? DEFAULT_PROFILE,
           ioFor: (sessionId) =>
             new CoreIo({ bridge: connection.bridge, sessionId, execOutput, readBlob }),
@@ -193,6 +213,16 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     const sessionId = stringField('session/prompt', fields, 'sessionId');
     const requestId = stringField('session/prompt', fields, 'requestId');
     return (await sessions('session/prompt')).prompt(sessionId, requestId, input);
+  });
+  connection.handle('session/setPermissionMode', async (params) => {
+    const method = 'session/setPermissionMode';
+    const fields = paramsObject(method, params);
+    const mode = fields.mode;
+    if (mode !== 'default' && mode !== 'acceptEdits') {
+      throw new AhpError('invalidParams', 'Unsupported permission mode');
+    }
+    (await sessions(method)).setPermissionMode(stringField(method, fields, 'sessionId'), mode);
+    return {};
   });
   connection.handle('session/compact', async (params) => {
     const fields = paramsObject('session/compact', params);

@@ -60,32 +60,25 @@ function isResponse(message: ContextMessage): boolean {
  * response. Persists both to the session file and refreshes the agent's context. Call it when
  * the turn settled aborted, before the next input.
  */
-export function repairInterruptedTurn(session: RepairableSession): InterruptionRepair {
+export function repairInterruptedTurn(
+  session: RepairableSession,
+  expired: ReadonlyMap<string, string> = new Map(),
+): InterruptionRepair {
   const manager = session.sessionManager;
-  const messages = manager.buildSessionProjection().messages;
-  let toolResults = 0;
-  const lastResponse = messages.findLastIndex(isResponse);
-  const response = messages[lastResponse];
-  if (response?.role === 'assistant') {
-    const answered = new Set(
-      messages
-        .slice(lastResponse + 1)
-        .flatMap((message) => (message.role === 'toolResult' ? [message.toolCallId] : [])),
-    );
-    for (const part of response.content) {
-      if (part.type === 'toolCall' && !answered.has(part.id)) {
-        const result: ToolResultMessage = {
-          role: 'toolResult',
-          toolCallId: part.id,
-          toolName: part.name,
-          content: [{ type: 'text', text: INTERRUPTED_TOOL_RESULT }],
-          isError: true,
-          timestamp: Date.now(),
-        };
-        manager.appendMessage(result);
-        toolResults += 1;
-      }
-    }
+  const missing = missingToolCalls(session);
+  const toolResults = missing.length;
+  for (const call of missing) {
+    const reason = expired.get(call.id);
+    const result: ToolResultMessage = {
+      role: 'toolResult',
+      toolCallId: call.id,
+      toolName: call.name,
+      content: [{ type: 'text', text: reason ?? INTERRUPTED_TOOL_RESULT }],
+      isError: true,
+      timestamp: Date.now(),
+      ...(reason === undefined ? {} : { details: { approvalExpired: true } }),
+    };
+    manager.appendMessage(result);
   }
   const tail = manager
     .buildSessionProjection()
@@ -118,4 +111,20 @@ export function repairInterruptedTurn(session: RepairableSession): InterruptionR
     session.refreshContext();
   }
   return { toolResults, marker };
+}
+
+/** Only the last model-visible response can have calls to complete during recovery. */
+export function missingToolCalls(session: RepairableSession): { id: string; name: string }[] {
+  const messages = session.sessionManager.buildSessionProjection().messages;
+  const lastResponse = messages.findLastIndex(isResponse);
+  const response = messages[lastResponse];
+  if (response?.role !== 'assistant') return [];
+  const answered = new Set(
+    messages
+      .slice(lastResponse + 1)
+      .flatMap((m) => (m.role === 'toolResult' ? [m.toolCallId] : [])),
+  );
+  return response.content.flatMap((part) =>
+    part.type === 'toolCall' && !answered.has(part.id) ? [{ id: part.id, name: part.name }] : [],
+  );
 }

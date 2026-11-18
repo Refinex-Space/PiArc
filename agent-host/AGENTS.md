@@ -20,7 +20,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - `src/runtime/`：会话注册表（`session-registry.ts`：回合、steer 与 follow-up、fork、history、并发 resume 合并）、投影（`projector.ts` 实时、`history.ts` 会话文件，共用 `items.ts` 的条目构造；规则表在 `projector.ts` 文件头，与架构第 5.3 节一致）、排队表（`queue.ts`）、blob 读取（只接受数据目录 `sessions/` 下的路径）。
 - `src/harness/tool-batches.ts`、`src/harness/interruption.ts`：回合不变量的 Harness Kit 部分（工具批次、中断补齐），见下文"回合不变量"。
 - `test/golden/`：投影 golden 测试的输入（录制或构造的 Pi 事件，`*.events.json`）与期望输出（`*.expected.json`）；Prettier 不处理这个目录。
-- `src/runtime/core-bridge.ts`：向 Core 发请求的唯一入口（统一超时，默认 30 s；`timeoutMs: null` 给等待用户的请求，靠 `signal` 取消）。
+- `src/runtime/core-bridge.ts`：向 Core 发请求的唯一入口（统一超时，默认 30 s；`policy/evaluate` 收到匹配的 `policy/pending` 才停止计时，用户等待由会话中断或连接关闭取消）。
 - `src/protocol/outbound.ts`：写 stdout 的唯一路径：等 `drain`、合并增量、`item/updated` 只保留最新、写出时分配 `seq`；每个会话保留最近 4,096 条或 8 MiB 已写出的通知供 `session/getEntries` 回放；超过 8 MiB 单帧上限的会话通知不写出、不占 `seq`。
 - `src/tools/`：工具层（架构第 6.1 节、ADR-0020、ADR-0027）。`profile.ts` 规范名、默认 Profile（描述原创，ADR-0006）与 `ToolNameMap`；`core-io.ts` 经 Core 桥接发 `fs/*`、`exec/*`（结果在此校验，错误重建为 Node 风格；写给模型的 Core 错误去掉 `<method> failed:` 前缀）；`read.ts`、`write.ts`、`edit.ts` 在替身路径（`stand-in.ts`）上运行 Pi 的工具定义（T16 的扩展：`line-numbers.ts` 行号、`documents.ts` PDF 与 notebook、`replace-all.ts`）；`glob.ts` 用 Pi 工厂加 Operations；`grep.ts` 自写；`shell.ts` 自写 Bash 与 PowerShell（T17，ADR-0028：Core 的 `exec/run` 管超时、进程树、cwd、输出预算与语义，工具只组织文本与 `details.commandExecution`），会话的工具集按 `exec/shells`（`session-registry.ts` 的 `shellsFor`）；`ls.ts` 只提供 `LsOperations`，不暴露。
 - `src/harness/tool-results.ts`（T16）：工具结果预算，作为内联扩展挂在每个会话上（`tool_result` 单个 50K 落盘、`context` 单条消息 200K），阈值只改 `TOOL_RESULT_LIMITS` 或注册表选项 `toolResultLimits`。
@@ -52,6 +52,14 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - 锁定的 pi-ai 1.5.2 在 `UserMessage.content` 接受字符串或文本与图像块。图片读取 blob 后作为图像块交给 Pi。PDF 经 `fs/pdf` 读取前 20 页以内的文本，后续页可按路径用 Read 的 `pages` 参数读取。升级 pi-ai 时复核 `types.d.ts` 是否支持文档输入。
 - 每次交付用户消息前写 `piarc.input` 记录 `turnId`，带提及或附件时还记录原始正文和元数据。手动压缩前记录 `{turnId, action: "compact"}`。历史窗口输出 `turnId`，旧文件按最近用户消息的 entry id 分组。编辑排队文本会清除失效的提及区间，保留已经准备好的附件。
 - 每条模型回复结束时投影 `turn/usage`（本回合累计量）。`turn/completed` 的错误分类在 `runtime/turn-errors.ts` 计算，客户端按 `errorKind`、`retryable` 呈现。
+
+## 权限预检与历史
+
+- `src/harness/policy.ts` 使用 Pi 1.5.2 的 `tool_call`。Pi 校验工具参数后调用处理器。处理器把规范工具名、会话、工具调用 id 和参数发给 Core，文件路径与工具执行使用同一套解析规则。只有结构正确的 `allowed: true` 放行。
+- 参数超过 8 MiB 帧预算时，Host 用 `policy/inputChunk` 逐块送给 Core，再带 `stagedInputBytes` 裁决。Write 分块传原始 content，沿用文件工具的 UTF-16 分片边界，避免 JSON 转义缩小 64 MiB 的文件上限。Core 校验会话、连接、调用、工具、UTF-8 偏移与总长度，重组后的参数同时用于预览与裁决。
+- Core 要询问时发送 `policy/pending`。过期通知让 Host 用 `policy/cancel` 撤下旧请求。拒绝反馈通过 Pi 的 `{block:true,reason}` 进入模型下一次请求，实时投影用 `markDeclined`，历史从 `piarc.toolDeclined` 条目恢复状态。
+- `session/setPermissionMode` 写入所选分支的 `piarc.permissionMode` 条目，实时与历史都投影为 `permissionModeChanged`。会话打开结果的可选 `permissionMode` 传回该分支最后的显式选择，起始模式的配置优先级由 Core 解析。
+- Host 重连恢复时，最后一个模型回复中尚无结果的调用经 `policy/recover` 查询审批失效原因。只给失效调用写入拒绝结果，其余缺失结果按 ADR-0026 补齐。`cargo test -p piarc-testkit --test sessions permissions::` 覆盖真实进程终止、恢复后的模型请求、审批快照与模式历史。
 
 ## 多会话的易错点
 

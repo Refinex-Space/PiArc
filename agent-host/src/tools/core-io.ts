@@ -323,11 +323,7 @@ export class CoreIo {
     const id = `upload-${randomUUID()}`;
     let start = 0;
     for (;;) {
-      let end = Math.min(start + WRITE_CHUNK, content.length);
-      // Never split a surrogate pair between two requests.
-      if (end < content.length && isHighSurrogate(content.charCodeAt(end - 1))) {
-        end -= 1;
-      }
+      const end = uploadChunkEnd(content, start);
       const last = end >= content.length;
       const result = await this.#request(
         method,
@@ -481,6 +477,12 @@ function forModel(error: unknown, method: string): unknown {
     retryable: error.retryable,
     details: error.details,
   });
+}
+
+/** Exclusive end of one frame-sized UTF-16 slice, never between a surrogate pair. */
+export function uploadChunkEnd(content: string, start: number): number {
+  const end = Math.min(start + WRITE_CHUNK, content.length);
+  return end < content.length && isHighSurrogate(content.charCodeAt(end - 1)) ? end - 1 : end;
 }
 
 function isHighSurrogate(code: number): boolean {

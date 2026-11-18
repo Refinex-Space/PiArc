@@ -103,6 +103,8 @@ pub struct Core {
     /// When set, `trust/get` is answered by Core's real trust service instead of `trusted`.
     pub trust: Option<TrustService>,
     pub asked: Mutex<Vec<String>>,
+    /// Faults to inject in the next preflights; an empty queue explicitly allows the call.
+    pub policy_answers: Mutex<std::collections::VecDeque<Result<Value, ErrorObject>>>,
     pub io: ToolIo,
     pub secrets: SecretsService,
     pub calls: Arc<Mutex<Vec<Call>>>,
@@ -143,6 +145,20 @@ impl InboundHandler for Core {
         params: Map<String, Value>,
         peer: Peer,
     ) -> BoxFuture<'static, Result<Value, ErrorObject>> {
+        // This harness tests delegation, scheduling and Pi parity. Its operator approves
+        // every preflight. The scenario runner exercises the production approval ledger.
+        if method == "policy/evaluate" {
+            let reply = self
+                .policy_answers
+                .lock()
+                .expect("policy queue")
+                .pop_front()
+                .unwrap_or_else(|| Ok(json!({"allowed": true})));
+            return Box::pin(async move { reply });
+        }
+        if method == "policy/recover" {
+            return Box::pin(async { Ok(json!({})) });
+        }
         if method == "trust/get" {
             let path = params
                 .get("path")
@@ -313,6 +329,7 @@ impl Env {
                 .map(|p| p.to_string_lossy().into_owned())
                 .collect(),
             asked: Mutex::default(),
+            policy_answers: Mutex::default(),
             io: ToolIo::new(ToolIoConfig::new(self.data_dir.clone())),
             secrets,
             calls: Arc::default(),

@@ -14,16 +14,19 @@ export const DEFAULT_BRIDGE_TIMEOUT_MS = 30_000;
 
 export interface RequestOptions {
   /**
-   * Milliseconds to wait for the response; `null` waits without limit (requests that wait for
-   * the user, such as `policy/evaluate`). Defaults to the bridge's timeout.
+   * Milliseconds to wait for the response; `null` waits until the response, cancellation or
+   * connection close (for example exec/run). Defaults to the bridge's timeout.
    */
   timeoutMs?: number | null;
+  /** A matching policy/pending suspends the deadline once Core is waiting for the user. */
+  approval?: { sessionId: string; toolCallId: string };
   /** Cancels the wait, for example when the session's turn is interrupted. */
   signal?: AbortSignal;
 }
 
 interface Pending {
   readonly method: string;
+  readonly approval?: { sessionId: string; toolCallId: string; suspend: () => void };
   readonly resolve: (result: unknown) => void;
   readonly reject: (error: AhpError) => void;
 }
@@ -62,6 +65,16 @@ export class CoreBridge {
       };
       this.#pending.set(id, {
         method,
+        ...(options.approval === undefined
+          ? {}
+          : {
+              approval: {
+                ...options.approval,
+                suspend: () => {
+                  clearTimeout(timer);
+                },
+              },
+            }),
         resolve: (result) => {
           settle();
           resolve(result);
@@ -107,6 +120,17 @@ export class CoreBridge {
       throw new AhpError('invalidRequest', `${method} returned a malformed result`);
     }
     return result;
+  }
+
+  /** Stops the transport deadline for the named approval. False means the caller is gone. */
+  awaitingApproval(sessionId: string, toolCallId: string): boolean {
+    for (const { approval } of this.#pending.values()) {
+      if (approval?.sessionId === sessionId && approval.toolCallId === toolCallId) {
+        approval.suspend();
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Routes a response from Core. Returns false when no request with that id is waiting. */
