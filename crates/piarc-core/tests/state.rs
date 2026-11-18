@@ -524,3 +524,80 @@ fn editing_settings_while_running_emits_changed_keys_and_invalid_files_keep_the_
     drop(settings);
     core.shutdown_blocking().expect("shutdown");
 }
+
+#[test]
+fn approval_extends_only_the_selected_entries_of_an_existing_trust_snapshot() {
+    use piarc_config::{Category, LayerTable, TrustState, append_local_permissions};
+
+    let fixture = Fixture::new("permission snapshot");
+    let repository = fixture.root.join("repository");
+    let nested = repository.join("sub");
+    std::fs::create_dir_all(repository.join(".git")).expect("repo");
+    std::fs::create_dir_all(nested.join(".piarc")).expect("nested workspace");
+    let rt = runtime();
+    let (core, _events) = fixture.start();
+    let trust = core.trust().expect("trust");
+    rt.block_on(async {
+        trust
+            .decide(&nested, true)
+            .await
+            .expect("trust empty project");
+        let table = LayerTable::piarc(fixture.dirs().data(), &nested);
+        let permission = [(Category::AllowRule, "Bash(npm test)")];
+        let confirmed = append_local_permissions(&table, &permission).expect("write");
+        assert_eq!(
+            trust
+                .permission_settings(&nested)
+                .await
+                .expect("settings")
+                .trust(),
+            TrustState::Untrusted
+        );
+        trust
+            .confirm_items(&nested, confirmed)
+            .await
+            .expect("user approved the entry");
+        let settings = trust.permission_settings(&nested).await.expect("settings");
+        assert_eq!(settings.trust(), TrustState::Trusted);
+        assert_eq!(
+            settings.get("/permissions/allow"),
+            Some(&json!(["Bash(npm test)"]))
+        );
+        std::fs::write(
+            nested.join(".piarc/settings.json"),
+            r#"{"permissions":{"defaultMode":"acceptEdits"}}"#,
+        )
+        .expect("external edit");
+        let items = append_local_permissions(&table, &[(Category::AllowRule, "Edit(src/a.ts)")])
+            .expect("write another rule");
+        trust
+            .confirm_items(&nested, items)
+            .await
+            .expect("confirm another rule");
+        let view = trust.view(&nested).await.expect("view");
+        assert_eq!(view.new_items.len(), 1);
+        assert_eq!(view.new_items[0].source, "sub/.piarc/settings.json");
+        assert_eq!(view.new_items[0].name, "acceptEdits");
+        let settings = trust.permission_settings(&nested).await.expect("settings");
+        assert_eq!(settings.trust(), TrustState::Untrusted);
+        assert_eq!(
+            settings.get("/permissions/defaultMode"),
+            Some(&json!("default"))
+        );
+        trust.revoke(&nested).await.expect("revoke");
+        let items = append_local_permissions(&table, &permission).expect("write again");
+        trust
+            .confirm_items(&nested, items)
+            .await
+            .expect("native confirmation");
+        assert_eq!(
+            trust
+                .permission_settings(&nested)
+                .await
+                .expect("settings")
+                .trust(),
+            TrustState::Untrusted
+        );
+    });
+    core.shutdown_blocking().expect("shutdown");
+}

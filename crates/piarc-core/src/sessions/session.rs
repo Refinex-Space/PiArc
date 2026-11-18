@@ -55,6 +55,8 @@ pub enum Op {
     FollowUp(UserInput),
     /// Compacts the conversation as a turn of its own (`/compact`; the session must be idle).
     Compact,
+    /// Switches the session permission mode and records a transcript entry.
+    SetPermissionMode(piarc_protocol::policy::PermissionMode),
     /// Interrupts the running turn; the queue comes back.
     Abort,
     /// Edits the queue.
@@ -107,6 +109,7 @@ pub(crate) struct SessionHandle {
     ws: WorkspaceHandle,
     /// Shared with the workspace's link: the session exists in the Agent Host.
     in_host: Arc<AtomicBool>,
+    io: crate::tool_io::ToolIo,
 }
 
 impl SessionHandle {
@@ -161,11 +164,16 @@ impl SessionHandle {
             tx,
             ws: workspace.clone(),
             in_host,
+            io: ctx.tool_io.clone(),
         })
     }
 
     /// Opens the session as new in the Agent Host, under this id.
-    pub async fn create(&self, model: Option<ModelRef>) -> Result<Value> {
+    pub async fn create(
+        &self,
+        model: Option<ModelRef>,
+        mode: Option<piarc_protocol::policy::PermissionMode>,
+    ) -> Result<Value> {
         let supervisor = self.ws.acquire().await?;
         let mut params = SessionCreateParams::new(path_text(&self.cwd)).with_model(model);
         params.session_id = Some(SessionId(self.id.clone()));
@@ -179,6 +187,16 @@ impl SessionHandle {
             Err(error) => return Err(host_error(error)),
         };
         self.in_host.store(true, Ordering::Release);
+        if let Some(mode) = mode {
+            supervisor
+                .set_permission_mode(&SessionId(self.id.clone()), mode)
+                .await
+                .map_err(host_error)?;
+        }
+        self.io
+            .set_initial_mode(&self.id, mode)
+            .await
+            .map_err(|e| Error::feature(&e))?;
         Ok(self.opened(opened.restored_messages))
     }
 
@@ -190,11 +208,22 @@ impl SessionHandle {
             .await
             .map_err(host_error)?;
         self.in_host.store(true, Ordering::Release);
+        self.io
+            .set_initial_mode(&self.id, opened.permission_mode)
+            .await
+            .map_err(|e| Error::feature(&e))?;
         Ok(self.opened(opened.restored_messages))
     }
 
     /// The session was opened by someone else (a fork): only report it.
-    pub async fn adopt(&self) -> Result<Value> {
+    pub async fn adopt(
+        &self,
+        mode: Option<piarc_protocol::policy::PermissionMode>,
+    ) -> Result<Value> {
+        self.io
+            .set_initial_mode(&self.id, mode)
+            .await
+            .map_err(|e| Error::feature(&e))?;
         self.in_host.store(true, Ordering::Release);
         self.info().await
     }
@@ -434,7 +463,20 @@ impl SessionActor {
                 self.status = SessionStatus::Running;
                 self.error = None;
             }
+            "item/completed" => {
+                if let Some(id) = notification
+                    .params
+                    .payload
+                    .get("item")
+                    .and_then(|i| i.get("itemId"))
+                    .and_then(Value::as_str)
+                {
+                    self.ctx.tool_io.finish_tool(&self.id, id);
+                }
+                return;
+            }
             "turn/completed" => {
+                self.ctx.tool_io.cancel_approvals(&self.id, false);
                 self.active_turn = None;
                 let failed = notification.params.payload.get("status") == Some(&json!("failed"));
                 self.status = if failed {
@@ -669,7 +711,18 @@ impl Request {
                 self.call::<SessionCompact>(&supervisor, Some(&request_id), params)
                     .await
             }
+            Op::SetPermissionMode(mode) => {
+                supervisor
+                    .set_permission_mode(&self.id, mode)
+                    .await
+                    .map_err(host_error)?;
+                self.tool_io
+                    .changed_mode(&self.id.0, mode)
+                    .map_err(|e| Error::feature(&e))?;
+                Ok(Value::Null)
+            }
             Op::Abort => {
+                self.tool_io.cancel_approvals(&self.id.0, false);
                 let target = SessionTarget {
                     session_id: self.id.clone(),
                 };

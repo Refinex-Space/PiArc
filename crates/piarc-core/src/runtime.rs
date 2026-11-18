@@ -764,8 +764,37 @@ impl CoreRuntime {
         model: Option<piarc_protocol::session::ModelRef>,
         on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
     ) -> Result<()> {
+        self.create_session_with_mode(workspace, cwd, model, None, on_done)
+    }
+
+    /// Creates a session with an explicit starting permission mode.
+    ///
+    /// # Errors
+    /// As [`Self::create_session`].
+    pub fn create_session_with_mode(
+        &self,
+        workspace: PathBuf,
+        cwd: Option<PathBuf>,
+        model: Option<piarc_protocol::session::ModelRef>,
+        mode: Option<piarc_protocol::policy::PermissionMode>,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
         self.on_sessions(on_done, move |hub| async move {
-            hub.create_session(workspace, cwd, model).await
+            hub.create_session(workspace, cwd, model, mode).await
+        })
+    }
+
+    /// Answers the request identified by its session, revision and connection epoch.
+    ///
+    /// # Errors
+    /// As [`Self::session_op`].
+    pub fn answer_approval(
+        &self,
+        answer: piarc_protocol::policy::ApprovalAnswer,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.answer_approval(answer).await
         })
     }
 
@@ -1129,7 +1158,12 @@ fn open_state(
                 ..ToolIoConfig::new(data)
             },
             Some(events.clone()),
-        ),
+        )
+        .policy_services(crate::tool_io::policy::Services {
+            storage: storage.clone(),
+            trust: trust.clone(),
+            snapshots: snapshots.clone(),
+        }),
         config: config.sessions.clone(),
         snapshots,
         cancel: cancel.child_token(),

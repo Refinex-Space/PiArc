@@ -29,6 +29,10 @@ export declare class CoreRuntime {
    * `{ sessionId, workspace, cwd, restoredMessages }`.
    */
   createSession(workspace: string, options?: CreateSessionOptions | null): Promise<string>;
+  /** Answers a pending permission request and returns its status as JSON. */
+  answerApproval(answer: string): Promise<string>;
+  /** Changes the mode and appends its entry to the session before resolving. */
+  setPermissionMode(id: string, mode: string): Promise<string>;
   /** Reopens a session from its file (its workspace is opened when needed). */
   resumeSession(id: string): Promise<string>;
   /** Opens a copy of a session's conversation (up to `entryId`) as a new session. */
@@ -230,6 +234,8 @@ export interface CreateSessionOptions {
   cwd?: string;
   /** The model to start with; the Agent Host's default when absent. */
   model?: SessionModel;
+  /** Optional explicit M1 permission mode. */
+  permissionMode?: string;
 }
 
 /** A model by provider and id. */

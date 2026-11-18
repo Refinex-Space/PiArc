@@ -63,6 +63,12 @@ pub enum Error {
         /// Why.
         reason: ApprovalReason,
     },
+    /// The delegated operation does not match the approved change or canonical path.
+    #[error("The operation on {path} no longer matches its approval. Request approval again.")]
+    ApprovalMismatch {
+        /// The resolved path.
+        path: String,
+    },
     /// An existing file was to be changed before the session read it.
     #[error(
         "{path} has not been read in this session. Read it with the Read tool first, then \
@@ -138,7 +144,9 @@ impl Error {
             Self::OutsideWorkspace { .. } => ErrorKind::OutsideWorkspace,
             Self::Io { .. } => ErrorKind::IoError,
             Self::InvalidPattern { .. } | Self::InvalidRequest { .. } => ErrorKind::InvalidParams,
-            Self::NeedsApproval { .. } => ErrorKind::PermissionDenied,
+            Self::NeedsApproval { .. } | Self::ApprovalMismatch { .. } => {
+                ErrorKind::PermissionDenied
+            }
             Self::NotRead { .. } => ErrorKind::FileNotRead,
             Self::Modified { .. } => ErrorKind::FileModified,
             Self::Unencodable { .. } => ErrorKind::UnencodableText,
@@ -183,7 +191,9 @@ impl Error {
                 "reason": reason.name(),
                 "operation": access.name(),
             })),
-            Self::NotRead { path } | Self::Modified { path } => Some(json!({ "path": path })),
+            Self::ApprovalMismatch { path } | Self::NotRead { path } | Self::Modified { path } => {
+                Some(json!({ "path": path }))
+            }
             Self::Unencodable {
                 path,
                 encoding,

@@ -412,3 +412,76 @@ fn project_mode_and_directories_require_confirmation_and_preserve_lower_layers()
         Some(&json!("acceptEdits"))
     );
 }
+
+#[test]
+fn simultaneous_native_confirmations_append_atomically_without_acknowledging_other_entries() {
+    use piarc_config::{Category, append_local_permissions};
+
+    let f = Fixture::new("confirm-local");
+    write(
+        &f.local(),
+        r#"{"model":"m","permissions":{"ask":["some rule"]}}"#,
+    );
+    let table = f.table();
+    std::thread::scope(|scope| {
+        let mut writers = Vec::new();
+        for name in ["Read(a)", "Edit(b)", "Bash(npm test)"] {
+            let table = &table;
+            writers.push(scope.spawn(move || {
+                let confirmed = append_local_permissions(
+                    table,
+                    &[
+                        (Category::AllowRule, name),
+                        (Category::AdditionalDirectory, "extra"),
+                    ],
+                )
+                .expect("saved");
+                assert_eq!(confirmed.len(), 2);
+                assert_eq!(confirmed[0].name, name);
+                assert_eq!(confirmed[1].name, "extra");
+            }));
+        }
+        for writer in writers {
+            writer.join().expect("writer");
+        }
+    });
+    let settings = Settings::load(table, TrustState::Trusted);
+    assert_eq!(
+        settings.get("/permissions/additionalDirectories"),
+        Some(&json!(["extra"]))
+    );
+    let rules = settings
+        .get("/permissions/allow")
+        .expect("rules")
+        .as_array()
+        .expect("list");
+    assert_eq!(rules.len(), 3);
+    for rule in ["Read(a)", "Edit(b)", "Bash(npm test)"] {
+        assert!(rules.contains(&json!(rule)));
+    }
+    assert_eq!(settings.get("/model"), Some(&json!("m")));
+    assert_eq!(
+        settings.get("/permissions/ask"),
+        Some(&json!(["some rule"]))
+    );
+    let original = std::fs::read(f.local()).expect("original");
+    let result = append_local_permissions(
+        &f.table(),
+        &[(Category::AllowRule, "Bash(no)"), (Category::Hook, "hook")],
+    );
+    assert!(result.is_err());
+    assert_eq!(std::fs::read(f.local()).expect("after failure"), original);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_linked_settings_directory_cannot_redirect_persistent_permissions() {
+    use piarc_config::{Category, append_local_permissions};
+
+    let f = Fixture::new("local-link");
+    let project_dir = f.workspace.join(".piarc");
+    std::fs::remove_dir(&project_dir).expect("remove empty fixture directory");
+    std::os::unix::fs::symlink(&f.data, &project_dir).expect("create fixture link");
+    assert!(append_local_permissions(&f.table(), &[(Category::AllowRule, "Bash(x)")]).is_err());
+    assert!(!f.data.join("settings.local.json").exists());
+}

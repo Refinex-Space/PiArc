@@ -46,6 +46,8 @@ pub struct CreateSessionOptions {
     pub cwd: Option<String>,
     /// The model to start with; the Agent Host's default when absent.
     pub model: Option<SessionModel>,
+    /// Optional explicit M1 permission mode.
+    pub permission_mode: Option<String>,
 }
 
 #[napi]
@@ -83,18 +85,58 @@ impl CoreRuntime {
         let options = options.unwrap_or(CreateSessionOptions {
             cwd: None,
             model: None,
+            permission_mode: None,
         });
+        let mode = options
+            .permission_mode
+            .map(|v| permission_mode(env, &v))
+            .transpose()?;
         self.queue(env, "CoreRuntime.createSession", |core, done| {
-            core.create_session(
+            core.create_session_with_mode(
                 PathBuf::from(workspace),
                 options.cwd.map(PathBuf::from),
                 options.model.map(|m| ModelRef {
                     provider: m.provider,
                     id: m.id,
                 }),
+                mode,
                 done,
             )
         })
+    }
+
+    /// Answers a pending permission request and returns its status as JSON.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn answer_approval<'env>(
+        &self,
+        env: &'env Env,
+        answer: String,
+    ) -> napi::Result<Object<'env>> {
+        let parsed = boundary::call(env, "CoreRuntime.answerApproval", || {
+            serde_json::from_str(&answer).map_err(|e| piarc_core::Error::InvalidArgument {
+                field: "answer",
+                reason: e.to_string(),
+            })
+        })?;
+        self.queue(env, "CoreRuntime.answerApproval", |core, done| {
+            core.answer_approval(parsed, done)
+        })
+    }
+
+    /// Changes the mode and appends its entry to the session before resolving.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn set_permission_mode<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        mode: String,
+    ) -> napi::Result<Object<'env>> {
+        self.op(
+            env,
+            "CoreRuntime.setPermissionMode",
+            id,
+            Op::SetPermissionMode(permission_mode(env, &mode)?),
+        )
     }
 
     /// Reopens a session from its file (its workspace is opened when needed).
@@ -452,4 +494,15 @@ impl CoreRuntime {
     ) -> napi::Result<Object<'env>> {
         self.queue(env, location, |core, done| core.session_op(id, op, done))
     }
+}
+
+fn permission_mode(env: &Env, mode: &str) -> napi::Result<piarc_protocol::policy::PermissionMode> {
+    boundary::call(env, "permissionMode", || {
+        serde_json::from_value(serde_json::Value::String(mode.into())).map_err(|_| {
+            piarc_core::Error::InvalidArgument {
+                field: "permissionMode",
+                reason: "expected default or acceptEdits".into(),
+            }
+        })
+    })
 }

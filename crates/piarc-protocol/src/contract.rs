@@ -22,7 +22,7 @@ use crate::history::{HarnessEntry, SessionGetEntries, SessionHistory};
 use crate::host::{HostPing, HostShutdown};
 use crate::jsonrpc::{ErrorResponse, Notification, Request, SuccessResponse};
 use crate::method::{Method, NotificationMessage, RequestMessage, ResultMessage};
-use crate::policy::{PolicyCancel, PolicyEvaluate, PolicyPending};
+use crate::policy::{PolicyCancel, PolicyEvaluate, PolicyInputChunk, PolicyPending};
 use crate::queue::{QueueChanged, QueueDelete, QueueEdit, QueueReorder};
 use crate::secrets::{
     SecretsChanged, SecretsDelete, SecretsGet, SecretsGetAll, SecretsLock, SecretsSet,
@@ -165,6 +165,8 @@ pub static CONTRACTS: &[Contract] = &[
     response::<SessionAbort>("session/abort/result"),
     request::<SessionPrompt>(SessionPrompt::NAME),
     response::<SessionPrompt>("session/prompt/result"),
+    request::<PolicyInputChunk>("policy/inputChunk"),
+    response::<PolicyInputChunk>("policy/inputChunk/result"),
     notification::<PolicyPending>(),
     request::<PolicyCancel>("policy/cancel"),
     response::<PolicyCancel>("policy/cancel/result"),

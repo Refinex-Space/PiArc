@@ -3365,6 +3365,12 @@
           "description": "Owning session.",
           "type": "string"
         },
+        "stagedInputBytes": {
+          "description": "Bytes previously supplied through policy/inputChunk for this session, connection,\ntool and call. For Write the chunks carry the raw content; for other tools they\ncarry the JSON input object and the inline input must be empty.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
         "tool": {
           "description": "Canonical tool name.",
           "type": "string"
@@ -3427,6 +3433,76 @@
         }
       },
       "required": ["allowed"],
+      "type": "object"
+    },
+    "PolicyInputChunkParams": {
+      "description": "Part of a preflight too large for a single AHP frame.",
+      "properties": {
+        "offset": {
+          "description": "Starting UTF-8 byte offset, zero for the first chunk.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "description": "Owning session.",
+          "type": "string"
+        },
+        "text": {
+          "description": "Unicode text, complete code points only.",
+          "type": "string"
+        },
+        "tool": {
+          "description": "Canonical tool for this transfer.",
+          "type": "string"
+        },
+        "toolCallId": {
+          "description": "Pi call identifier.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "toolCallId", "tool", "offset", "text"],
+      "type": "object"
+    },
+    "PolicyInputChunkRequest": {
+      "description": "Request for `policy/inputChunk`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "policy/inputChunk",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/PolicyInputChunkParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "PolicyInputChunkResponse": {
+      "description": "Successful response to `policy/inputChunk`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/PolicyInputChunkResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "PolicyInputChunkResult": {
+      "description": "The chunk was accepted at the requested offset.",
       "type": "object"
     },
     "PolicyPendingNotification": {
@@ -5612,6 +5688,12 @@
     },
     {
       "$ref": "#/$defs/SessionPromptResponse"
+    },
+    {
+      "$ref": "#/$defs/PolicyInputChunkRequest"
+    },
+    {
+      "$ref": "#/$defs/PolicyInputChunkResponse"
     },
     {
       "$ref": "#/$defs/PolicyPendingNotification"

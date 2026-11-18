@@ -32,6 +32,8 @@ tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true
 
+unicode-normalization.workspace = true
+
 [dev-dependencies]
 encoding_rs.workspace = true
 rusqlite.workspace = true

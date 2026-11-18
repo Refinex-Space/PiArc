@@ -75,4 +75,6 @@ pub use scope::{Scope, display};
 pub use spill::create as create_spill;
 pub use spill::{SPILL_DIR, Spilled, model_path, spill};
 pub use state::{FileStates, Freshness, PathGuard, PathLocks, Snapshot};
-pub use write::{WriteSpec, Written, check_fresh, reported_encoding, stat_for_read, write};
+pub use write::{
+    WriteSpec, Written, check_fresh, reported_encoding, stat_for_read, write, write_checked,
+};

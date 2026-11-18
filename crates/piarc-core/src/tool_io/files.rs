@@ -11,7 +11,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use piarc_fs::{Access, ApprovalReason, PathLocks, WriteSpec};
+use piarc_fs::{Access, ApprovalReason, PathLocks, Scope, WriteSpec};
 use piarc_protocol::fs::{
     FsPdfParams, FsReadParams, FsSpillParams, FsSpillResult, FsStatParams, FsWriteParams,
     FsWriteResult, LineEndings, MAX_UPLOAD_BYTES, ReadMode, UploadPart,
@@ -80,45 +80,45 @@ fn collect(
     }
 }
 
-pub(super) fn stat(session: &SessionIo, p: &FsStatParams) -> Result<Value, ErrorObject> {
+pub(super) fn stat(
+    scope: &Scope,
+    session: &SessionIo,
+    p: &FsStatParams,
+) -> Result<Value, ErrorObject> {
     let detect = p.detect_image.unwrap_or(false);
     let stat = match &p.read {
-        Some(range) => piarc_fs::stat_for_read(
-            &session.scope,
-            &session.files,
-            &p.path,
-            detect,
-            range.clone(),
-        ),
-        None => piarc_fs::stat(&session.scope, &p.path, detect),
+        Some(range) => {
+            piarc_fs::stat_for_read(scope, &session.files, &p.path, detect, range.clone())
+        }
+        None => piarc_fs::stat(scope, &p.path, detect),
     };
     to_value(&stat.map_err(adjudicate)?)
 }
 
-pub(super) fn read(session: &SessionIo, p: &FsReadParams) -> Result<Value, ErrorObject> {
+pub(super) fn read(
+    scope: &Scope,
+    session: &SessionIo,
+    p: &FsReadParams,
+) -> Result<Value, ErrorObject> {
     let offset = p.offset.unwrap_or(0);
     if p.require_fresh == Some(true) && offset == 0 {
-        piarc_fs::check_fresh(&session.scope, &session.files, &p.path).map_err(adjudicate)?;
+        piarc_fs::check_fresh(scope, &session.files, &p.path).map_err(adjudicate)?;
     }
     let result = match p.mode.unwrap_or(ReadMode::Text) {
-        ReadMode::Text => piarc_fs::read_text(
-            &session.scope,
-            &session.encodings,
-            &p.path,
-            offset,
-            p.length,
-        ),
-        ReadMode::Blob => piarc_fs::read_blob(&session.scope, &p.path, &session.blob_dir),
+        ReadMode::Text => piarc_fs::read_text(scope, &session.encodings, &p.path, offset, p.length),
+        ReadMode::Blob => piarc_fs::read_blob(scope, &p.path, &session.blob_dir),
     };
     to_value(&result.map_err(adjudicate)?)
 }
 
 pub(super) fn write(
+    permit: Option<super::policy::FilePermit>,
     session: &SessionIo,
     locks: &PathLocks,
     p: FsWriteParams,
 ) -> Result<Value, ErrorObject> {
-    let target = format!("write:{}", p.path);
+    let call = p.origin.as_ref().map_or("", |o| o.tool_call_id.as_str());
+    let target = format!("write:{call}:{}", p.path);
     let Some(text) = collect(session, p.upload.as_ref(), target, p.content)? else {
         return to_value(&FsWriteResult {
             path: p.path,
@@ -134,8 +134,15 @@ pub(super) fn write(
         append: p.append.unwrap_or(false),
         line_endings: p.line_endings.unwrap_or(LineEndings::AsWritten),
     };
-    let written =
-        piarc_fs::write(&session.scope, &session.files, locks, &spec).map_err(adjudicate)?;
+    let scope = permit.as_ref().map_or(&session.scope, |p| &p.scope);
+    let written = piarc_fs::write_checked(scope, &session.files, locks, &spec, |before, new| {
+        permit.as_ref().is_none_or(|p| {
+            p.write
+                .as_ref()
+                .is_some_and(|g| g.matches_write(before, new))
+        })
+    })
+    .map_err(adjudicate)?;
     let diff = piarc_diff::file_diff(&written.label, written.before.as_deref(), &written.after);
     to_value(&FsWriteResult {
         path: piarc_fs::display(&written.path),
@@ -163,8 +170,12 @@ pub(super) fn spill(session: &SessionIo, p: FsSpillParams) -> Result<Value, Erro
     })
 }
 
-pub(super) fn pdf(session: &SessionIo, p: &FsPdfParams) -> Result<Value, ErrorObject> {
-    let result = piarc_fs::read_pdf(&session.scope, &p.path, p.pages.as_deref());
+pub(super) fn pdf(
+    scope: &Scope,
+    _session: &SessionIo,
+    p: &FsPdfParams,
+) -> Result<Value, ErrorObject> {
+    let result = piarc_fs::read_pdf(scope, &p.path, p.pages.as_deref());
     to_value(&result.map_err(adjudicate)?)
 }
 
@@ -208,3 +219,21 @@ pub(super) fn adjudicate(error: piarc_fs::Error) -> ErrorObject {
 
 /// Shares the path locks of every session's writes.
 pub(super) type Locks = Arc<PathLocks>;
+
+pub(super) fn grep(
+    scope: &Scope,
+    p: &piarc_protocol::fs::FsGrepParams,
+) -> piarc_fs::Result<piarc_protocol::fs::FsGrepResult> {
+    piarc_fs::grep(
+        scope,
+        &p.path,
+        &piarc_fs::GrepQuery {
+            pattern: &p.pattern,
+            glob: p.glob.as_deref(),
+            ignore_case: p.ignore_case.unwrap_or(false),
+            literal: p.literal.unwrap_or(false),
+            context: p.context.unwrap_or(0),
+            limit: p.limit,
+        },
+    )
+}

@@ -22,6 +22,11 @@ pub struct PolicyEvaluateParams {
     pub tool: String,
     /// Tool arguments before execution.
     pub input: Map<String, Value>,
+    /// Bytes previously supplied through policy/inputChunk for this session, connection,
+    /// tool and call. For Write the chunks carry the raw content; for other tools they
+    /// carry the JSON input object and the inline input must be empty.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub staged_input_bytes: Option<u64>,
 }
 
 /// Final decision. The Agent Host refuses on any bridge or decoding error.
@@ -172,4 +177,29 @@ pub struct PolicyCancelled {}
 crate::method::request!(
     /// Cancel a waiting approval whose Agent Host preflight already timed out.
     PolicyCancel, "policy/cancel", PolicyPendingParams, PolicyCancelled
+);
+
+/// Part of a preflight too large for a single AHP frame.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PolicyInputChunkParams {
+    /// Owning session.
+    pub session_id: String,
+    /// Pi call identifier.
+    pub tool_call_id: String,
+    /// Canonical tool for this transfer.
+    pub tool: String,
+    /// Starting UTF-8 byte offset, zero for the first chunk.
+    pub offset: u64,
+    /// Unicode text, complete code points only.
+    pub text: String,
+}
+
+/// The chunk was accepted at the requested offset.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct PolicyInputChunkResult {}
+
+crate::method::request!(
+    /// Stage part of a large tool preflight in bounded session memory.
+    PolicyInputChunk, "policy/inputChunk", PolicyInputChunkParams, PolicyInputChunkResult
 );

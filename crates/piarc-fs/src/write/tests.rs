@@ -196,10 +196,17 @@ fn a_failure_during_the_write_leaves_the_file_whole() {
         append: false,
         line_endings: LineEndings::AsWritten,
     };
-    let error = write_with(&f.scope, &f.states, &f.locks, &spec, |file, bytes| {
-        file.write_all(&bytes[..4])?;
-        Err(io::Error::from(io::ErrorKind::StorageFull))
-    })
+    let error = write_with(
+        &f.scope,
+        &f.states,
+        &f.locks,
+        &spec,
+        |_, _| true,
+        |file, bytes| {
+            file.write_all(&bytes[..4])?;
+            Err(io::Error::from(io::ErrorKind::StorageFull))
+        },
+    )
     .expect_err("disk full");
     assert_eq!(error.code(), Some("ENOSPC"));
     assert_eq!(f.bytes("a.txt"), b"keep me\n");

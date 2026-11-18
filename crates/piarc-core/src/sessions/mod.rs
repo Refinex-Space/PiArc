@@ -61,7 +61,7 @@ use crate::tool_io::ToolIo;
 use crate::trust::TrustService;
 
 pub use session::{Op, QueueOp};
-pub(crate) use snapshot::Snapshots;
+pub(crate) use snapshot::{SnapshotMsg, Snapshots};
 
 pub use piarc_store::SessionPrefsChange;
 pub use snapshot::{HostState, SessionStatus, SessionView, WorkspaceView};
@@ -199,6 +199,7 @@ impl Hub {
         workspace: PathBuf,
         cwd: Option<PathBuf>,
         model: Option<ModelRef>,
+        mode: Option<piarc_protocol::policy::PermissionMode>,
     ) -> Result<Value> {
         let workspace = self.workspace(workspace).await?;
         let cwd = match cwd {
@@ -214,7 +215,7 @@ impl Hub {
         let id = new_session_id()?;
         let handle = session::SessionHandle::spawn(&self.ctx, &workspace, id.clone(), cwd)?;
         self.register(handle.clone())?;
-        match handle.create(model).await {
+        match handle.create(model, mode).await {
             Ok(opened) => Ok(opened),
             Err(error) => {
                 lock(&self.routes).sessions.remove(&id);
@@ -223,6 +224,17 @@ impl Hub {
                 Err(error)
             }
         }
+    }
+
+    pub async fn answer_approval(
+        &self,
+        answer: piarc_protocol::policy::ApprovalAnswer,
+    ) -> Result<Value> {
+        self.ctx
+            .tool_io
+            .answer_approval(answer)
+            .await
+            .map_err(|e| Error::feature(&e))
     }
 
     /// Reopens a session from its file, opening its workspace when needed.
@@ -253,10 +265,11 @@ impl Hub {
             None => self.indexed_location(&id).await?,
         };
         let workspace = self.workspace(workspace).await?;
-        let new_id = workspace.fork(&id, &cwd, entry_id).await?;
+        let opened = workspace.fork(&id, &cwd, entry_id).await?;
+        let new_id = opened.session_id.0;
         let handle = session::SessionHandle::spawn(&self.ctx, &workspace, new_id, cwd)?;
         self.register(handle.clone())?;
-        handle.adopt().await
+        handle.adopt(opened.permission_mode).await
     }
 
     /// Closes an open session: it leaves the Agent Host and the session list's open ones.

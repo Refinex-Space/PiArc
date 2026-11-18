@@ -190,7 +190,7 @@ impl WorkspaceHandle {
         id: &str,
         cwd: &std::path::Path,
         entry_id: Option<String>,
-    ) -> Result<String> {
+    ) -> Result<piarc_protocol::session::SessionOpened> {
         let supervisor = self.acquire().await?;
         let opened = supervisor
             .fork_session(SessionForkParams {
@@ -200,7 +200,7 @@ impl WorkspaceHandle {
             })
             .await
             .map_err(host_error)?;
-        Ok(opened.session_id.0)
+        Ok(opened)
     }
 
     /// Stops the Agent Host and the actor.
@@ -436,6 +436,9 @@ impl WorkspaceActor {
                 }
             }
             HostEvent::Restarting { .. } | HostEvent::Exited { .. } => {
+                for id in lock(&self.handle.members).iter() {
+                    self.ctx.tool_io.cancel_approvals(id, true);
+                }
                 if let Host::Ready(supervisor) | Host::Starting(supervisor) = &self.host {
                     self.host = Host::Restarting(supervisor.clone());
                     self.publish(HostState::Restarting, true);

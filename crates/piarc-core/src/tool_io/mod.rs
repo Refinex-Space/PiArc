@@ -31,10 +31,11 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 mod exec;
 mod files;
+pub(crate) mod policy;
 
 pub use exec::{CommandEnv, DISPLAY_WINDOW};
 use piarc_exec::{ExecLimits, Launcher};
-use piarc_fs::{EncodingCache, FileStates, GrepQuery, Scope};
+use piarc_fs::{EncodingCache, FileStates, Scope};
 use piarc_host::{InboundHandler, Peer};
 use piarc_ports::BoxFuture;
 use piarc_protocol::exec::{ExecKillParams, ExecKillResult, ExecRunParams, ExecShellsParams};
@@ -107,6 +108,7 @@ impl ToolIoConfig {
 /// A session's scope, file state and running commands.
 struct SessionIo {
     scope: Scope,
+    policy: Mutex<policy::State>,
     blob_dir: PathBuf,
     /// `<data dir>/sessions/<id>/tmp/`: long tool results (`fs/spill`), readable by the tools.
     tmp_dir: PathBuf,
@@ -143,6 +145,7 @@ pub struct ToolIo {
     locks: files::Locks,
     /// Shells, environment and runner of commands.
     exec: Arc<exec::Exec>,
+    policy: Option<policy::Services>,
 }
 
 impl std::fmt::Debug for ToolIo {
@@ -173,13 +176,19 @@ impl ToolIo {
             config: Arc::new(config),
             locks: Arc::default(),
             exec: Arc::new(exec),
+            policy: None,
         }
     }
 
     /// Whether `method` is one this dispatcher answers.
     #[must_use]
     pub fn handles(method: &str) -> bool {
-        method.starts_with("fs/") || method.starts_with("exec/")
+        method.starts_with("fs/")
+            || method.starts_with("exec/")
+            || matches!(
+                method,
+                "policy/evaluate" | "policy/recover" | "policy/cancel" | "policy/inputChunk"
+            )
     }
 
     /// Registers `session_id` with its workspace root and working directory, and creates its
@@ -281,6 +290,7 @@ impl ToolIo {
             session_id.to_owned(),
             Arc::new(SessionIo {
                 scope,
+                policy: Mutex::default(),
                 blob_dir,
                 tmp_dir,
                 files: Mutex::default(),
@@ -303,6 +313,7 @@ impl ToolIo {
 
     /// Forgets the session and terminates its running commands.
     pub fn close_session(&self, session_id: &str) {
+        self.cancel_approvals(session_id, false);
         if let Some(session) = lock(&self.sessions).remove(session_id) {
             for token in lock(&session.running).values() {
                 token.cancel();
@@ -347,20 +358,55 @@ impl ToolIo {
             observer.before(text("sessionId"), method, call).await;
         }
         match method {
+            "policy/inputChunk" => return self.stage_input(parse(method, params)?, &peer),
+            "policy/evaluate" => return self.evaluate(parse(method, params)?, peer).await,
+            "policy/cancel" => {
+                let p: piarc_protocol::policy::PolicyPendingParams = parse(method, params)?;
+                return self.cancel_wait(&p.session_id, &p.tool_call_id, &peer);
+            }
+            "policy/recover" => {
+                let text = |key: &str| params.get(key).and_then(Value::as_str).unwrap_or("");
+                return self.recover(text("sessionId"), text("toolCallId"));
+            }
+            "exec/run" | "exec/shells" | "exec/kill" | "fs/spill" => {}
+            _ if self.policy.is_some() => {
+                let s = self.session(
+                    params
+                        .get("sessionId")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default(),
+                )?;
+                let scope = policy::file_permit(&s, method, &params, &peer)?;
+                return self.dispatch_io(method, params, peer, Some(scope)).await;
+            }
+            _ => {}
+        }
+        self.dispatch_io(method, params, peer, None).await
+    }
+
+    async fn dispatch_io(
+        &self,
+        method: &str,
+        params: Map<String, Value>,
+        peer: Peer,
+        permit: Option<policy::FilePermit>,
+    ) -> Result<Value, ErrorObject> {
+        let scope = permit.as_ref().map(|p| p.scope.clone());
+        match method {
             "fs/stat" => {
                 let p: FsStatParams = parse(method, params)?;
                 let s = self.session(&p.session_id.0)?;
-                answer(move || files::stat(&s, &p)).await
+                answer(move || files::stat(scope.as_ref().unwrap_or(&s.scope), &s, &p)).await
             }
             "fs/read" => {
                 let p: FsReadParams = parse(method, params)?;
                 let s = self.session(&p.session_id.0)?;
-                answer(move || files::read(&s, &p)).await
+                answer(move || files::read(scope.as_ref().unwrap_or(&s.scope), &s, &p)).await
             }
             "fs/write" => {
                 let p: FsWriteParams = parse(method, params)?;
                 let (s, locks) = (self.session(&p.session_id.0)?, Arc::clone(&self.locks));
-                answer(move || files::write(&s, &locks, p)).await
+                answer(move || files::write(permit, &s, &locks, p)).await
             }
             "fs/spill" => {
                 let p: FsSpillParams = parse(method, params)?;
@@ -370,42 +416,40 @@ impl ToolIo {
             "fs/pdf" => {
                 let p: FsPdfParams = parse(method, params)?;
                 let s = self.session(&p.session_id.0)?;
-                answer(move || files::pdf(&s, &p)).await
+                answer(move || files::pdf(scope.as_ref().unwrap_or(&s.scope), &s, &p)).await
             }
             "fs/mkdir" => {
                 let p: FsMkdirParams = parse(method, params)?;
                 let s = self.session(&p.session_id.0)?;
-                blocking(move || piarc_fs::mkdir(&s.scope, &p.path)).await
+                blocking(move || piarc_fs::mkdir(scope.as_ref().unwrap_or(&s.scope), &p.path)).await
             }
             "fs/list" => {
                 let p: FsListParams = parse(method, params)?;
                 let s = self.session(&p.session_id.0)?;
-                blocking(move || piarc_fs::list(&s.scope, &p.path, p.limit)).await
+                blocking(move || {
+                    piarc_fs::list(scope.as_ref().unwrap_or(&s.scope), &p.path, p.limit)
+                })
+                .await
             }
             "fs/glob" => {
                 let p: FsGlobParams = parse(method, params)?;
                 let s = self.session(&p.session_id.0)?;
                 blocking(move || {
                     let exclude = p.exclude.unwrap_or_default();
-                    piarc_fs::glob(&s.scope, &p.path, &p.pattern, &exclude, p.limit)
+                    piarc_fs::glob(
+                        scope.as_ref().unwrap_or(&s.scope),
+                        &p.path,
+                        &p.pattern,
+                        &exclude,
+                        p.limit,
+                    )
                 })
                 .await
             }
             "fs/grep" => {
                 let p: FsGrepParams = parse(method, params)?;
                 let s = self.session(&p.session_id.0)?;
-                blocking(move || {
-                    let query = GrepQuery {
-                        pattern: &p.pattern,
-                        glob: p.glob.as_deref(),
-                        ignore_case: p.ignore_case.unwrap_or(false),
-                        literal: p.literal.unwrap_or(false),
-                        context: p.context.unwrap_or(0),
-                        limit: p.limit,
-                    };
-                    piarc_fs::grep(&s.scope, &p.path, &query)
-                })
-                .await
+                blocking(move || files::grep(scope.as_ref().unwrap_or(&s.scope), &p)).await
             }
             "exec/run" | "exec/shells" | "exec/kill" => {
                 self.dispatch_exec(method, params, peer).await
@@ -438,6 +482,9 @@ impl ToolIo {
     async fn exec_run(&self, p: ExecRunParams, peer: Peer) -> Result<Value, ErrorObject> {
         let session = self.session(&p.session_id.0)?;
         let launch = exec::launch_dir(&session, p.cwd.as_deref())?;
+        if self.policy.is_some() {
+            policy::claim_command(&session, &p, &peer, &launch.dir)?;
+        }
         let token = CancellationToken::new();
         {
             let mut running = lock(&session.running);

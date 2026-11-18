@@ -73,7 +73,24 @@ pub fn write(
     locks: &PathLocks,
     spec: &WriteSpec<'_>,
 ) -> Result<Written> {
-    write_with(scope, states, locks, spec, |file, bytes| {
+    write_checked(scope, states, locks, spec, |_, _| true)
+}
+
+/// Writes only if `matches` accepts the old decoded content and proposed text while holding
+/// the file's mutation lock. See [`write`] for the other file invariants.
+///
+/// # Errors
+///
+/// [`Error::ApprovalMismatch`] if the change differs from what the user approved, and the
+/// errors from [`write`].
+pub fn write_checked(
+    scope: &Scope,
+    states: &Mutex<FileStates>,
+    locks: &PathLocks,
+    spec: &WriteSpec<'_>,
+    matches: impl FnOnce(Option<&str>, &str) -> bool,
+) -> Result<Written> {
+    write_with(scope, states, locks, spec, matches, |file, bytes| {
         file.write_all(bytes)
     })
 }
@@ -84,6 +101,7 @@ pub(crate) fn write_with(
     states: &Mutex<FileStates>,
     locks: &PathLocks,
     spec: &WriteSpec<'_>,
+    matches: impl FnOnce(Option<&str>, &str) -> bool,
     put: impl FnOnce(&mut File, &[u8]) -> io::Result<()>,
 ) -> Result<Written> {
     let path = scope.check(spec.requested, Access::Write)?;
@@ -101,6 +119,11 @@ pub(crate) fn write_with(
         }
         None => (TextEncoding::NEW_FILE, None),
     };
+    if !matches(before.as_deref(), spec.text) {
+        return Err(Error::ApprovalMismatch {
+            path: display(&path),
+        });
+    }
     let ending = match spec.line_endings {
         LineEndings::MatchFile => before.as_deref().and_then(dominant_line_ending),
         LineEndings::AsWritten => None,

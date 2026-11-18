@@ -45,6 +45,7 @@ pub struct Scope {
     /// directory, where long tool results go).
     read_only: Vec<PathBuf>,
     case_insensitive: bool,
+    approved: Option<(PathBuf, Access)>,
 }
 
 impl Scope {
@@ -71,6 +72,7 @@ impl Scope {
             extra: Vec::new(),
             read_only: Vec::new(),
             case_insensitive,
+            approved: None,
         })
     }
 
@@ -92,6 +94,14 @@ impl Scope {
     pub fn with_read_only_dir(mut self, dir: &Path) -> Result<Self> {
         self.read_only.push(canonical_dir(dir)?);
         Ok(self)
+    }
+
+    /// Authorizes exactly one resolved path for this copy of the scope. Callers keep it
+    /// only for the low-level operation belonging to the approved tool call.
+    #[must_use]
+    pub fn for_approved_path(mut self, canonical: PathBuf, access: Access) -> Self {
+        self.approved = Some((canonical, access));
+        self
     }
 
     /// The canonical workspace root.
@@ -154,6 +164,15 @@ impl Scope {
     /// protected path; an I/O error when a component cannot be inspected.
     pub fn check(&self, requested: &str, access: Access) -> Result<PathBuf> {
         let resolved = self.locate(requested)?;
+        if let Some((path, allowed)) = &self.approved {
+            return if path == &resolved && *allowed == access {
+                Ok(resolved)
+            } else {
+                Err(Error::ApprovalMismatch {
+                    path: display(&resolved),
+                })
+            };
+        }
         let needs = |reason| Error::NeedsApproval {
             path: display(&resolved),
             access,

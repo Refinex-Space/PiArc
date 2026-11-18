@@ -12,6 +12,7 @@
 
 use std::collections::BTreeMap;
 
+use piarc_protocol::policy::{ApprovalRequest, PermissionMode};
 use serde::Serialize;
 use tokio::sync::mpsc;
 
@@ -108,6 +109,12 @@ pub struct SessionView {
     /// Its working directory.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cwd: Option<String>,
+    /// Current permission mode.
+    pub permission_mode: PermissionMode,
+    /// Requests awaiting the user's answer, in arrival order.
+    pub approvals: Vec<ApprovalRequest>,
+    /// Number of pending approvals.
+    pub pending_approvals: usize,
     /// Its name, else its first message.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -144,6 +151,7 @@ pub(crate) enum SnapshotMsg {
     Workspace(WorkspaceView),
     Session(LiveSession),
     SessionClosed(String),
+    Policy(String, PermissionMode, Vec<ApprovalRequest>),
     /// Read the database again (after an index sync or a write).
     Reload,
     /// Send both lists again (a client subscribed anew).
@@ -165,6 +173,7 @@ impl Snapshots {
             storage,
             workspaces: BTreeMap::new(),
             live: BTreeMap::new(),
+            policies: BTreeMap::new(),
             recent: Vec::new(),
             indexed: Vec::new(),
             workspace_revision: 0,
@@ -190,6 +199,7 @@ struct SnapshotTask {
     workspaces: BTreeMap<String, WorkspaceView>,
     /// Open sessions, by id.
     live: BTreeMap<String, LiveSession>,
+    policies: BTreeMap<String, (PermissionMode, Vec<ApprovalRequest>)>,
     recent: Vec<piarc_store::WorkspaceRecord>,
     indexed: Vec<piarc_store::SessionRecord>,
     workspace_revision: u64,
@@ -215,7 +225,12 @@ impl SnapshotTask {
                         sessions = true;
                     }
                     SnapshotMsg::SessionClosed(id) => {
+                        self.policies.remove(&id);
                         self.live.remove(&id);
+                        sessions = true;
+                    }
+                    SnapshotMsg::Policy(id, mode, requests) => {
+                        self.policies.insert(id, (mode, requests));
                         sessions = true;
                     }
                     SnapshotMsg::Reload => reload = true,
@@ -309,6 +324,13 @@ impl SnapshotTask {
                 list.push(view);
             }
         }
+        for view in &mut list {
+            if let Some((mode, requests)) = self.policies.get(&view.id) {
+                view.permission_mode = *mode;
+                view.pending_approvals = requests.len();
+                view.approvals.clone_from(requests);
+            }
+        }
         let payload = serde_json::json!({
             "revision": self.session_revision,
             "sessions": list,
@@ -343,6 +365,9 @@ fn indexed_view(record: &piarc_store::SessionRecord) -> SessionView {
         pinned: record.pinned,
         archived: record.archived,
         open: false,
+        permission_mode: PermissionMode::Default,
+        approvals: Vec::new(),
+        pending_approvals: 0,
         model: meta
             .model_provider
             .as_ref()
@@ -367,6 +392,9 @@ fn empty_view(id: &str) -> SessionView {
         pinned: false,
         archived: false,
         open: true,
+        permission_mode: PermissionMode::Default,
+        approvals: Vec::new(),
+        pending_approvals: 0,
         model: None,
         message_count: 0,
         created_at: None,

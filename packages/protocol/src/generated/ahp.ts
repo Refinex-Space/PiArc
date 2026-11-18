@@ -26,6 +26,8 @@ export type AhpMessage =
   | SessionAbortResponse
   | SessionPromptRequest
   | SessionPromptResponse
+  | PolicyInputChunkRequest
+  | PolicyInputChunkResponse
   | PolicyPendingNotification
   | PolicyCancelRequest
   | PolicyCancelResponse
@@ -1155,6 +1157,53 @@ export interface PromptAccepted {
   turnId: TurnId;
 }
 /**
+ * Request for `policy/inputChunk`.
+ */
+export interface PolicyInputChunkRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'policy/inputChunk';
+  params: PolicyInputChunkParams;
+}
+/**
+ * Part of a preflight too large for a single AHP frame.
+ */
+export interface PolicyInputChunkParams {
+  /**
+   * Starting UTF-8 byte offset, zero for the first chunk.
+   */
+  offset: number;
+  /**
+   * Owning session.
+   */
+  sessionId: string;
+  /**
+   * Unicode text, complete code points only.
+   */
+  text: string;
+  /**
+   * Canonical tool for this transfer.
+   */
+  tool: string;
+  /**
+   * Pi call identifier.
+   */
+  toolCallId: string;
+}
+/**
+ * Successful response to `policy/inputChunk`.
+ */
+export interface PolicyInputChunkResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: PolicyInputChunkResult;
+}
+/**
+ * The chunk was accepted at the requested offset.
+ */
+export interface PolicyInputChunkResult {}
+/**
  * Notification `policy/pending`.
  */
 export interface PolicyPendingNotification {
@@ -1789,6 +1838,12 @@ export interface PolicyEvaluateParams {
    * Owning session.
    */
   sessionId: string;
+  /**
+   * Bytes previously supplied through policy/inputChunk for this session, connection,
+   * tool and call. For Write the chunks carry the raw content; for other tools they
+   * carry the JSON input object and the inline input must be empty.
+   */
+  stagedInputBytes?: number | null;
   /**
    * Canonical tool name.
    */

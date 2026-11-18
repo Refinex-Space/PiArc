@@ -215,14 +215,25 @@ impl Store {
     ///
     /// [`Error::Sqlite`] when the table cannot be read.
     pub fn audit_events(&self, limit: u32) -> Result<Vec<AuditEvent>> {
+        self.read_audit("SELECT at, kind, session_id, workspace, detail FROM audit_events ORDER BY at DESC, id DESC LIMIT ?1", [limit])
+    }
+
+    /// The latest audit events of one session, newest first.
+    ///
+    /// # Errors
+    ///
+    /// A database read failed.
+    pub fn session_audit_events(&self, session: &str, limit: u32) -> Result<Vec<AuditEvent>> {
+        self.read_audit("SELECT at, kind, session_id, workspace, detail FROM audit_events WHERE session_id = ?1 ORDER BY at DESC, id DESC LIMIT ?2", params![session, limit])
+    }
+
+    fn read_audit(&self, sql: &str, params: impl rusqlite::Params) -> Result<Vec<AuditEvent>> {
         let mut statement = self
             .conn
-            .prepare(
-                "SELECT at, kind, session_id, workspace, detail FROM audit_events ORDER BY at DESC, id DESC LIMIT ?1",
-            )
+            .prepare(sql)
             .map_err(Error::sqlite("cannot read audit_events"))?;
         let rows = statement
-            .query_map([limit], |row| {
+            .query_map(params, |row| {
                 Ok(AuditEvent {
                     at: row.get(0)?,
                     kind: row.get(1)?,
