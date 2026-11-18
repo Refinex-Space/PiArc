@@ -143,7 +143,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T16 | [文件工具与编辑不变量](tasks/T16-file-tools-invariants.md) | 2 | T15 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | ea75a25 |
 | T17 | [Bash / PowerShell 执行与进程管理](tasks/T17-bash-powershell-execution.md) | 2 | T16 | macOS | high / 高 | 大 | 无 | 已完成 | d154ab3 |
 | T18 | [客户端外壳、会话列表、设置窗口与信任对话框](tasks/T18-client-shell-and-session-list.md) | 2 | T17；D3 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 6b1d5f0 |
-| T19 | [Transcript 与 composer 正式版](tasks/T19-transcript-and-composer.md) | 2 | T18 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
+| T19 | [Transcript 与 composer 正式版](tasks/T19-transcript-and-composer.md) | 2 | T18 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 0b72964 |
 | T20 | [基础权限与审批](tasks/T20-basic-permissions-and-approvals.md) | 2 | T19 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T21 | [模型、服务商与凭据设置](tasks/T21-models-providers-and-credentials.md) | 2 | T20 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T22 | [System prompt 组装与 memory 文件](tasks/T22-system-prompt-and-memory-files.md) | 2 | T21 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -309,21 +309,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-T19 Transcript 与 composer 正式版（2026-11-18 开工；基线 `npm run verify` 15/15 通过）
-
-- [x] 协议与 Core：用户输入的提及与附件（AHP、Core API、Agent Host 的图片与 PDF 文本）、错误分类（`kind`、`retryable`）、模糊文件匹配 API（遵守 `.gitignore`、上限、可取消）、内置命令列表、附件存储（f4f62d5；`turn/usage`、`session/compact`、mock 的 thinking / 分段速率 / 401）
-- [x] transcript 接入真实事件流与历史窗口、会话缓存；同一套归约器与行组件（e081f8e，渲染进程单测已复跑，万条真实数据的分窗加载已验证）
-- [x] 已恢复 T14 NAPI 纯文本语义，T19 结构化输入使用独立方法；归档按用户决定保留附件，删除会话清除副本。失败在先的回归已通过（sessions 20/20，NAPI 集成 1/1）
-- [x] P0 九种行类型组件（用户消息、回复、思考块、工具组、bash 卡、文件改动卡、压缩提示、错误卡、working 行）与 `uncertain` 提示；行级错误边界（I50）
-- [x] composer 正式版（dev 形态五个输入流程已通过，含 mock 请求断言）：`@` 提及（Core 模糊匹配）、`/` 命令面板、图片与 PDF 附件（拖放、粘贴、类型与大小上限）、steer / 排队 / Esc、排队项编辑删除、输入法守卫
-- [x] 切换会话后保留未送达输入及已存附件，相同请求键重发；窗口缓存按会话隔离。复制本条 Markdown / 纯文本、同一回合的 steer 与跨页选择已通过定向回归。Host 恢复按会话门控，A08 的立即重试已在 dev 与 packaged 通过
-- [x] 贴底回归（I32、I59）：120 Hz、4 倍 CPU 降速下 8 次共 1,938 帧最大离底 0 px；两形态滚动 10/10；节奏定稿见真实事件流基准
-- [x] 四项 T19 Harness 能力已接入 L2（37 passed、1 Windows 专用；MISSING 0）
-- [x] A01–A10、A13：T19 专项 Playwright 两种形态 24/24，九种行亮暗截图、mock 请求与安全检查均已核实
-- [x] A11、A12：打包实测 103.66 token/s，p99 8.768 ms，长任务 0；万条 59.996 fps，缓存/冷加载最大 29.1/63.9 ms
-- [x] A14：修复配置目录的监听注册后 npm run verify 15/15，Rust sessions 20/20，L2 37 passed / 1 平台跳过；完整输出 tmp/evidence/T19/verify.log
-- [x] ADR-0030、架构 v2.24、通用能力复用表、transcript 和 composer 的 AGENTS.md 与 CLAUDE.md 均已同步
-- [x] 最终产物：相关 Electron L4 108/108（dev 与 packaged）；再次执行 bench:t19 通过。
+（无进行中的任务。）
 
 ## 登记事项
 
@@ -685,6 +671,15 @@ T19 Transcript 与 composer 正式版（2026-11-18 开工；基线 `npm run veri
 - 结果：verify 两个平台通过；`desktop L4 (windows-latest)` 通过（155 passed，两种形态，含 `smoke.e2e.ts` 以 Mica 配置启动与全部 `t18-*`）；`desktop L4 (macos-latest)` 只有 `transcript-scroll` "keeps the bottom in view while a reply streams"（dev，离底 36 px）失败，即 I32（已补记录）
 - T18-A04 改为 passing（evidence 写 run 链接），T18 从"部分完成"改为"已完成"（按协议开工检查中"等待 Windows CI"的规则）
 - I32 仍交 T19；macOS CI 在它修复前会继续间歇失败
+
+### 2026-11-18 T19 已完成（验收提交 0b72964）
+
+- 14/14 项通过。历史窗口与 Core 实时事件使用同一组行组件，覆盖九种 P0 行、思考状态、错误、工作状态和连接中断；支持复制 Markdown / 纯文本，以及整回合选择（含 steer、跨页与历史）。
+- Composer 支持工作区文件提及、内置命令、图片与 PDF 附件、插话、排队、编辑删除、停止与未送达重发。用户确认归档保留附件副本，只清理临时输出；删除会话时一并清除附件。pi-ai 1.5.2 支持图像块，PDF 经 Core 提取文本。详见 ADR-0030、架构 v2.24 和两个模块的 AGENTS.md。
+- 续做时修复了会话切换后重发丢失、相同历史条目 ID 在不同会话串用缓存、steer 切断回合选区、Agent Host 重启期间立即重试先于会话恢复，以及归档清掉附件副本的问题。T14 的 NAPI 纯文本调用继续可用。全量验证还定位到并发打开工作区时重复注册 FSEvents 的等待，改为批量注册后默认并发的 Rust sessions 20/20。
+- 验证：`npm run verify` 15/15；Vitest 952 passed、1 skipped；L2 37 passed、1 个 Windows 专用、MISSING 0；`npm run package:desktop -- --flavor development` 后相关 Electron L4 108/108 通过。证据在 `tmp/evidence/T19/`（`verify.log`、`regression.log`、亮暗截图及本地 ego-browser 提及实测截图）。用户确认 S01 第 7 节的 macOS M1–M10 已实测通过。
+- `npm run bench:t19`：M1 Max、60 Hz，真实路径 7,005 个 mock token / 67.58 s；帧主线程工作 p99 8.768 ms，超过 50 ms 的任务 0；万条滚动 59.996 fps；五次千条冷加载与已缓存切换最大分别为 63.9、29.1 ms。原始数据在 `tmp/evidence/T19/bench/t19.bench.ts-real-Core-transcript-budgets/timings.json`。120 Hz、4 倍 CPU 降速下 8 次测量最大离底 0 px。
+- 只在 macOS 实施与验收；Windows CI 等用户推送，Windows 输入法实测属 W1。I67 的失败回合历史语义留 T27。下一个任务是 macOS 上的 T20。
 
 ## 计划变更记录
 
