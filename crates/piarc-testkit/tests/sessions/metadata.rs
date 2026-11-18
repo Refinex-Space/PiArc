@@ -177,3 +177,31 @@ async fn deleting_an_open_session_closes_it_first() {
     );
     shutdown(core).await;
 }
+
+/// A session created right after a trust decision lands on the restarted Agent Host instead of
+/// failing on the one that is shutting down (T18: the trust dialog is answered, then the session
+/// is created at once).
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_session_created_right_after_a_trust_decision_starts() {
+    let env = Env::new("trust then create").await;
+    let (core, events) = env.start(env.config(&[]));
+    let (done, rx) = reply();
+    core.open_workspace(env.ws.clone(), done).expect("queued");
+    answer(rx).await.expect("the workspace opens");
+    for trusted in [true, false, true] {
+        let (decided_tx, decided_rx) = tokio::sync::oneshot::channel();
+        core.trust_view(env.ws.clone(), Some(trusted), move |result| {
+            let _ = decided_tx.send(result.map(|view| view.trusted));
+        })
+        .expect("queued");
+        assert_eq!(decided_rx.await.expect("answered").expect("decided"), trusted);
+        let (done, rx) = reply();
+        core.create_session(env.ws.clone(), None, crate::support::mock_model(), done)
+            .expect("queued");
+        let created = answer(rx).await.expect("the session starts on the restarted host");
+        let id = created["sessionId"].as_str().expect("an id").to_owned();
+        let turn = prompt(&core, &id, &prompt_text("Question one.", "chat")).await;
+        assert_eq!(events.turn_completed(&id, &turn).await["status"], "completed");
+    }
+    shutdown(core).await;
+}

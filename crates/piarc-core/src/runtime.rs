@@ -657,17 +657,23 @@ impl CoreRuntime {
         on_done: impl FnOnce(Result<TrustView>) + Send + 'static,
     ) -> Result<()> {
         let trust = self.trust_for(&path)?;
+        let hub = self.services()?.sessions;
         self.shared.handle.spawn(async move {
-            on_done(match decide {
+            let result = match decide {
                 None => trust.view(&path).await,
                 Some(trusted) => trust.decide(&path, trusted).await,
-            });
+            };
+            if let (Some(_), Ok(view)) = (decide, &result) {
+                hub.trust_changed(std::path::Path::new(&view.checkout))
+                    .await;
+            }
+            on_done(result);
         });
         Ok(())
     }
 
-    /// Revokes the trust decision of the project containing `path`; the workspace's Agent
-    /// Host restarts without project resources ([`crate::agent_host::restart_on_trust_change`]).
+    /// Revokes the trust decision of the project containing `path`; the open workspaces of the
+    /// project restart their Agent Host without project resources before this answers.
     ///
     /// # Errors
     ///
@@ -678,8 +684,14 @@ impl CoreRuntime {
         on_done: impl FnOnce(Result<TrustView>) + Send + 'static,
     ) -> Result<()> {
         let trust = self.trust_for(&path)?;
+        let hub = self.services()?.sessions;
         self.shared.handle.spawn(async move {
-            on_done(trust.revoke(&path).await);
+            let result = trust.revoke(&path).await;
+            if let Ok(view) = &result {
+                hub.trust_changed(std::path::Path::new(&view.checkout))
+                    .await;
+            }
+            on_done(result);
         });
         Ok(())
     }

@@ -17,7 +17,6 @@ use piarc_host::{HostEvent, HostEvents, HostSupervisor};
 use piarc_protocol::ErrorKind;
 use piarc_protocol::session::{SessionForkParams, SessionId};
 use tokio::sync::{mpsc, oneshot};
-use tokio::task::JoinHandle;
 
 use super::inbound::{SessionSet, WorkspaceInbound};
 use super::session::SessionMsg;
@@ -42,10 +41,25 @@ enum WsMsg {
     Acquire(oneshot::Sender<Result<HostSupervisor>>),
     Peek(oneshot::Sender<Option<HostSupervisor>>),
     View(oneshot::Sender<WorkspaceView>),
-    Busy { session: String, busy: bool },
-    Host { generation: u64, event: HostEvent },
-    Restored { generation: u64 },
-    IdleTimeout { generation: u64 },
+    Busy {
+        session: String,
+        busy: bool,
+    },
+    Host {
+        generation: u64,
+        event: HostEvent,
+    },
+    Restored {
+        generation: u64,
+    },
+    IdleTimeout {
+        generation: u64,
+    },
+    /// The trust decision of a main checkout changed (answered once handled).
+    TrustChanged {
+        checkout: PathBuf,
+        done: oneshot::Sender<()>,
+    },
     Close(oneshot::Sender<()>),
 }
 
@@ -107,7 +121,6 @@ impl WorkspaceHandle {
             busy: HashSet::new(),
             idle_generation: 0,
             settings,
-            trust_task: None,
         };
         ctx.handle.spawn(actor.run(rx));
         Ok(handle)
@@ -134,6 +147,15 @@ impl WorkspaceHandle {
             return closed_view(&self.path);
         }
         rx.await.unwrap_or_else(|_| closed_view(&self.path))
+    }
+
+    /// Tells the actor the trust of `checkout` changed; resolves once it acted on it.
+    pub async fn trust_changed(&self, checkout: PathBuf) {
+        let (done, rx) = oneshot::channel();
+        if self.send(WsMsg::TrustChanged { checkout, done }).is_ok() {
+            // A closed actor has no Agent Host to restart.
+            let _ = rx.await;
+        }
     }
 
     /// The session's activity changed: the Agent Host stays while any session is busy.
@@ -230,7 +252,6 @@ struct WorkspaceActor {
         reason = "held for its file watcher, which stops when it is dropped"
     )]
     settings: Option<WorkspaceSettings>,
-    trust_task: Option<JoinHandle<()>>,
 }
 
 impl WorkspaceActor {
@@ -263,6 +284,12 @@ impl WorkspaceActor {
                 }
                 WsMsg::Restored { .. } => {}
                 WsMsg::IdleTimeout { generation } => self.on_idle(generation),
+                WsMsg::TrustChanged { checkout, done } => {
+                    if checkout.as_path() == std::path::Path::new(&self.view.main_checkout) {
+                        self.restart_for_trust();
+                    }
+                    let _ = done.send(());
+                }
                 WsMsg::Close(done) => {
                     self.stop_host().await;
                     self.publish(HostState::Closed, false);
@@ -332,23 +359,29 @@ impl WorkspaceActor {
                     self.handle.clone(),
                     self.tx.clone(),
                 ));
-                self.trust_task = match crate::agent_host::restart_on_trust_change(
-                    supervisor.clone(),
-                    &self.handle.path,
-                    &self.ctx.trust,
-                ) {
-                    Ok(task) => Some(task),
-                    Err(error) => {
-                        tracing::warn!(target: "piarc_core::sessions", workspace = %self.handle.path.display(),
-                            "trust changes will not restart this Agent Host: {error}");
-                        None
-                    }
-                };
                 self.host = Host::Starting(supervisor);
                 self.publish(HostState::Starting, true);
             }
             Err(error) => self.fail(error),
         }
+    }
+
+    /// The project's trust changed: the Agent Host restarts so the new process loads (or no
+    /// longer loads) project-level resources. Requests from now on wait for the new process,
+    /// so a session created right after the decision starts on it (T18).
+    fn restart_for_trust(&mut self) {
+        let supervisor = match &self.host {
+            Host::Ready(supervisor) | Host::Starting(supervisor) => supervisor.clone(),
+            // A process that starts later asks for the trust itself.
+            Host::Restarting(_) | Host::Stopped | Host::Failed(_) => return,
+        };
+        tracing::info!(target: "piarc_core::trust", workspace = %self.handle.path.display(),
+            "project trust changed; restarting the workspace's Agent Host");
+        self.host = Host::Restarting(supervisor.clone());
+        self.publish(HostState::Restarting, true);
+        self.ctx
+            .handle
+            .spawn(async move { supervisor.restart().await });
     }
 
     fn on_host_event(&mut self, event: HostEvent) {
@@ -474,9 +507,6 @@ impl WorkspaceActor {
         };
         tracing::info!(target: "piarc_core::sessions", workspace = %self.handle.path.display(),
             "every session stayed idle; stopping the Agent Host until it is needed");
-        if let Some(task) = self.trust_task.take() {
-            task.abort();
-        }
         self.ctx
             .handle
             .spawn(async move { supervisor.shutdown().await });
@@ -484,9 +514,6 @@ impl WorkspaceActor {
     }
 
     async fn stop_host(&mut self) {
-        if let Some(task) = self.trust_task.take() {
-            task.abort();
-        }
         match std::mem::replace(&mut self.host, Host::Stopped) {
             Host::Starting(s) | Host::Ready(s) | Host::Restarting(s) => s.shutdown().await,
             Host::Stopped | Host::Failed(_) => {}

@@ -421,6 +421,17 @@ impl Hub {
         remove_path(self.ctx.storage.dirs().sessions().join(id), true).await
     }
 
+    /// The trust decision of the project at `checkout` changed: its open workspaces restart
+    /// their Agent Host. Returns once every workspace marked its host as restarting, so
+    /// requests made after this wait for the new process.
+    pub async fn trust_changed(&self, checkout: &Path) {
+        let workspaces: Vec<workspace::WorkspaceHandle> =
+            lock(&self.routes).workspaces.values().cloned().collect();
+        for workspace in workspaces {
+            workspace.trust_changed(checkout.to_owned()).await;
+        }
+    }
+
     /// Sends both snapshots again (a client subscribed or reloaded).
     pub fn resend_snapshots(&self) {
         self.ctx.snapshots.send(snapshot::SnapshotMsg::Resend);
