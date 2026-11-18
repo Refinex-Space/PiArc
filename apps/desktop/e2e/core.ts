@@ -12,7 +12,16 @@ import type {} from '../src/shared/test-hooks.js';
 
 /** Fails clearly when the app was not packaged with a development build of Core. */
 export async function expectTestHooks(app: ElectronApplication): Promise<void> {
-  const present = await app.evaluate(() => globalThis.__piarcTestHooks !== undefined);
+  // The hooks are installed once Core started (in `app.whenReady`), which can be after the
+  // launch resolved on a slow machine.
+  const deadline = Date.now() + 15_000;
+  let present = false;
+  while (!present && Date.now() < deadline) {
+    present = await app.evaluate(() => globalThis.__piarcTestHooks !== undefined);
+    if (!present) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
   if (!present) {
     throw new Error(
       'The app has no Core test hooks: it did not load a development build of Core. ' +

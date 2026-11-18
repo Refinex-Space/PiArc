@@ -114,7 +114,8 @@ test('review screenshots: modes, densities, dialogs and the native window', asyn
     await prefer(page, { key: 'appearance.density', value: 'comfortable' });
 
     // The trust dialog, opened for review from the folder's menu.
-    const group = page.locator(`[data-testid="workspace-group"][data-path="${web}"]`);
+    // By name: a Windows path in a CSS attribute selector would need its backslashes escaped.
+    const group = page.getByTestId('workspace-group').filter({ hasText: 'piarc-web 前端' });
     await group.locator('.workspace-header').hover();
     await group.getByTestId('workspace-actions').click();
     await page.getByTestId('menu-trust').click();

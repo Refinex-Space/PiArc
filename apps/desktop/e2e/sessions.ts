@@ -63,11 +63,14 @@ export const test = base.extend<SessionFixtures>({
     await seedModels(userDataDir, mock.baseUrl);
     await use(userDataDir);
   },
-  // eslint-disable-next-line no-empty-pattern -- Playwright requires a destructuring pattern here.
-  workspaces: async ({}, use) => {
+  workspaces: async ({ app }, use) => {
     const dir = await realpath(await mkdtemp(path.join(os.tmpdir(), 'piarc t18 工作区-')));
     await use(dir);
-    await rm(dir, { recursive: true, force: true });
+    // The app keeps the workspaces open (the Agent Host's working directory, Core's settings
+    // watcher), and Windows cannot delete a directory in use: close it first. Closing twice is
+    // harmless, so the app fixture's own close still works.
+    await app.close();
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   },
 });
 
