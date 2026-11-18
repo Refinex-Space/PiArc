@@ -317,7 +317,7 @@ T19 Transcript 与 composer 正式版（2026-11-18 开工；基线 `npm run veri
 - [ ] P0 九种行类型组件（用户消息、回复、思考块、工具组、bash 卡、文件改动卡、压缩提示、错误卡、working 行）与 `uncertain` 提示；行级错误边界（I50）
 - [x] composer 正式版（dev 形态五个输入流程已通过，含 mock 请求断言）：`@` 提及（Core 模糊匹配）、`/` 命令面板、图片与 PDF 附件（拖放、粘贴、类型与大小上限）、steer / 排队 / Esc、排队项编辑删除、输入法守卫
 - [ ] 错误、重试与重发未送达消息；复制本条消息（Markdown / 纯文本）与选中本回合
-- [ ] 节奏与滚动参数定稿；贴底在高刷新率与 CPU 降速下稳定（I32、I59）
+- [x] 贴底回归（I32、I59）：120 Hz、4 倍 CPU 降速下 8 次共 1,938 帧最大离底 0 px；两形态滚动 10/10；节奏定稿见真实事件流基准
 - [x] 四项 T19 Harness 能力已接入 L2（37 passed、1 Windows 专用；MISSING 0）
 - [ ] 验收：A01 组件测试与亮暗截图、A02、A03、A04、A05、A06、A07、A08、A09、A10、A11、A12、A13、A14
 - [ ] 收尾：transcript 与 composer 的 CLAUDE.md、`coding-standards.md` 通用能力复用表、架构与 ADR 同步、PLAN 与 acceptance
