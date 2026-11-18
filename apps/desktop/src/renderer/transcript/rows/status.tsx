@@ -9,7 +9,7 @@ import type { MessageId } from '../../../shared/i18n/index.js';
 import type { TranscriptRow, TurnInfo } from '../../store/transcript.js';
 import { useExpanded, useTranscriptView, useTurn } from '../services.js';
 import { useElapsedText, useNow } from './common.js';
-import { useToolLabel } from './tools.js';
+import { targetOf } from './summary.js';
 
 type CompactionItem = Extract<Item, { type: 'contextCompaction' }>;
 
@@ -168,7 +168,11 @@ export function WorkingRow() {
   const turn: TurnInfo = useTurn();
   const now = useNow(1000, turn.running);
   const elapsedText = useElapsedText();
-  const label = useToolLabel();
+  const label = (item: Item): string =>
+    t('transcript.working.tool', {
+      tool: 'tool' in item ? item.tool : item.type,
+      target: targetOf(item),
+    });
   const currentId = turn.openTools.at(-1);
   const current = currentId === undefined ? undefined : transcript.row(currentId);
   const activity = turn.compacting

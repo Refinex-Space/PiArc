@@ -94,6 +94,7 @@ export const en = {
   'transcript.label': 'Conversation',
   'transcript.backToBottom': 'Back to bottom',
   'transcript.loadEarlier': 'Loading earlier messages…',
+  'shell.pageFailed': 'This page could not be shown. Select a session or start a new one.',
   'transcript.rowFailed': 'This part of the conversation could not be shown.',
   'transcript.copyMarkdown': 'Copy Markdown',
   'transcript.copyText': 'Copy text',
@@ -175,7 +176,7 @@ export const en = {
   'transcript.uncertain.hint':
     'The agent restarted while this turn ran. Retry sends the message again.',
   'transcript.working': 'Working',
-  'transcript.working.tool': '{verb}',
+  'transcript.working.tool': '{tool} · {target}',
   'transcript.working.tokens': '{count, plural, one {# token} other {# tokens}}',
   'transcript.working.retry': 'Retrying {attempt}/{max}',
   'transcript.working.compacting': 'Compacting the conversation',

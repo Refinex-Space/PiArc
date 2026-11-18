@@ -90,6 +90,8 @@ export function targetOf(item: Item): string {
       return `${item.server} · ${item.serverTool}`;
     case 'subagent':
       return item.description ?? item.tool;
+    case 'commandExecution':
+      return item.command;
     default:
       break;
   }

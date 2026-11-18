@@ -103,9 +103,12 @@
 }
 
 .row-actions.is-hover {
-  justify-content: flex-end;
   opacity: 0;
   transition: opacity var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+.row-user > .row-actions {
+  justify-content: flex-end;
 }
 
 .row:hover > .row-actions.is-hover,
@@ -771,6 +774,11 @@
 
 .composer-editor p {
   margin: 0;
+}
+
+/* The box around the editor shows the focus (`.composer-box:focus-within`). */
+:root[data-app] .composer-editor:focus-visible {
+  outline: none;
 }
 
 .composer-actions {

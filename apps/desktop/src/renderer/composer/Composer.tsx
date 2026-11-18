@@ -420,6 +420,10 @@ export function Composer({
         }
       }}
       onDrop={(event) => {
+        // A drop on the editor itself was taken by ProseMirror already.
+        if (event.defaultPrevented) {
+          return;
+        }
         const files = filesOf(event.dataTransfer);
         if (files.length > 0) {
           event.preventDefault();

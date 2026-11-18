@@ -14,6 +14,7 @@ import { Conversation } from './Conversation.js';
 import { Home } from './Home.js';
 import { clampSidebar, loadLayout, localStore, saveLayout, type Layout } from './layout.js';
 import { NoticeBar } from './NoticeBar.js';
+import { PageBoundary } from './PageBoundary.js';
 import { DockArea, RailArea } from './PanelAreas.js';
 import { ShortcutsDialog } from './ShortcutsDialog.js';
 import { Sidebar } from './Sidebar.js';
@@ -326,16 +327,16 @@ export function Shell() {
                   </button>
                 )}
                 <NoticeBar />
-                {view.kind === 'home' ? (
-                  <Home
-                    key={viewNonce}
-                    workspace={view.workspace}
-                    draft={view.draft}
-                    failure={view.error}
-                  />
-                ) : (
-                  <Conversation key={view.id} id={view.id} />
-                )}
+                <PageBoundary
+                  key={view.kind === 'home' ? `home:${String(viewNonce)}` : view.id}
+                  message={t('shell.pageFailed')}
+                >
+                  {view.kind === 'home' ? (
+                    <Home workspace={view.workspace} draft={view.draft} failure={view.error} />
+                  ) : (
+                    <Conversation id={view.id} />
+                  )}
+                </PageBoundary>
               </main>
               <RailArea
                 context={context}

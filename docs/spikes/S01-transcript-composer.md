@@ -1,7 +1,7 @@
 # S1 渲染进程 transcript 与 composer（macOS）
 
 - 任务：T09（2026-11-15）。Windows 部分（微软拼音、Windows 上的性能测量）由 W0 完成。
-- 结论（macOS）：**通过**。第 11 章的流式、滚动、冷加载与渲染进程内存四项预算全部满足；跨块选择复制、XSS 载荷、输入法守卫的自动化用例全部通过。真实输入法（macOS 拼音、日文）的人工核对列在第 7 节，待用户完成后补记。
+- 结论（macOS）：**通过**。第 11 章的流式、滚动、冷加载与渲染进程内存四项预算全部满足；跨块选择复制、XSS 载荷、输入法守卫的自动化用例全部通过。第 7 节的 macOS 拼音、日文输入法与触控板人工清单由用户在 T19 确认通过。
 - 结论（Windows，W0）：**通过**。L4 的 transcript 与 composer 用例两种形态通过；流式、滚动、冷加载、渲染进程内存四项预算满足；微软拼音实机核对全部符合预期（第 8 节）。全部进程合计 450 MiB，与 macOS 同样超出第 11 章的 450 MB（I26）；日文输入法未验证。
 - 库选型：ADR-0022（@tanstack/react-virtual、marked 词法器、shiki JavaScript 正则引擎；composer 为 ProseMirror）。
 
@@ -97,9 +97,9 @@ Playwright 没有输入法接口，用 CDP 驱动：`Input.imeSetComposition` �
 
 实现中发现并修正一处：守卫最初放在 `handleKeyDown`，ProseMirror 随后的 `baseKeymap` 仍会把 229 Enter 当作换行；改为在 `handleDOMEvents.keydown` 中拦截，ProseMirror 的按键处理整个跳过且不 `preventDefault`，按键完整交给输入法。
 
-## 7. 待用户核对（真实输入法与触控板）
+## 7. macOS 真实输入法与触控板（用户实测）
 
-本机已启用"简体拼音"，未启用日文输入法；切换输入法和模拟系统按键需要辅助功能授权，按执行协议不自行更改，以下各项由你操作后告诉我结果，我补记到本节。准备：
+2026-11-18，用户在 T19 续做时确认下列 M1–M10 均已实测，结果符合预期。覆盖 macOS 简体拼音、日文候选确认与取消、触控板跟随，以及跨块选择与复制。以下保留原始复测步骤。
 
 ```bash
 npm run package:desktop -- --flavor development

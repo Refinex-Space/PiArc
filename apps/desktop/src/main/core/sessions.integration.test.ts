@@ -238,13 +238,8 @@ describe('Core sessions over NAPI (T14)', () => {
       const literal = JSON.stringify({ text: 'Question two.' });
       const again = json(await core.prompt(id, literal));
       await events.until(completed(id, again.turnId));
-      expect(JSON.parse(await core.transcriptWindow(id, 0, 50))).toMatchObject({
-        items: expect.arrayContaining([
-          expect.objectContaining({
-            item: expect.objectContaining({ type: 'userMessage', text: literal }),
-          }),
-        ]),
-      });
+      const last = json(await core.transcriptWindow(id, 2, 1));
+      expect(last.items).toMatchObject([{ item: { type: 'userMessage', text: literal } }]);
       expect(events.all.some((e) => e.route === 'core/sessions')).toBe(true);
       expect(events.all.some((e) => e.route === 'core/workspaces')).toBe(true);
       await core.closeWorkspace(workspace);
