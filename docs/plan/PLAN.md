@@ -128,7 +128,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T16 | [文件工具与编辑不变量](tasks/T16-file-tools-invariants.md) | 2 | T15 | macOS | xhigh | 大 | 无 | 已完成 | ea75a25 |
 | T17 | [Bash / PowerShell 执行与进程管理](tasks/T17-bash-powershell-execution.md) | 2 | T16 | macOS | high | 大 | 无 | 已完成 | d154ab3 |
 | T18 | [客户端外壳、会话列表、设置窗口与信任对话框](tasks/T18-client-shell-and-session-list.md) | 2 | T17；D3 | macOS | xhigh | 大 | 无 | 已完成 | 6b1d5f0 |
-| T19 | [Transcript 与 composer 正式版](tasks/T19-transcript-and-composer.md) | 2 | T18 | macOS | xhigh | 大 | 无 | 未开始 | — |
+| T19 | [Transcript 与 composer 正式版](tasks/T19-transcript-and-composer.md) | 2 | T18 | macOS | xhigh | 大 | 无 | 进行中 | — |
 | T20 | [基础权限与审批](tasks/T20-basic-permissions-and-approvals.md) | 2 | T19 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T21 | [模型、服务商与凭据设置](tasks/T21-models-providers-and-credentials.md) | 2 | T20 | macOS | high | 大 | 无 | 未开始 | — |
 | T22 | [System prompt 组装与 memory 文件](tasks/T22-system-prompt-and-memory-files.md) | 2 | T21 | macOS | high | 中 | 无 | 未开始 | — |
@@ -293,6 +293,17 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+T19 Transcript 与 composer 正式版（2026-11-18 开工；基线 `npm run verify` 15/15 通过）
+
+- [ ] 协议与 Core：用户输入的提及与附件（AHP、Core API、Agent Host 的图片与 PDF 文本）、错误分类（`kind`、`retryable`）、模糊文件匹配 API（遵守 `.gitignore`、上限、可取消）、内置命令列表、附件存储
+- [ ] transcript 接入真实事件流与历史窗口、会话缓存；同一套归约器与行组件
+- [ ] P0 九种行类型组件（用户消息、回复、思考块、工具组、bash 卡、文件改动卡、压缩提示、错误卡、working 行）与 `uncertain` 提示；行级错误边界（I50）
+- [ ] composer 正式版：`@` 提及（Core 模糊匹配）、`/` 命令面板、图片与 PDF 附件（拖放、粘贴、类型与大小上限）、steer / 排队 / Esc、排队项编辑删除、输入法守卫
+- [ ] 错误、重试与重发未送达消息；复制本条消息（Markdown / 纯文本）与选中本回合
+- [ ] 节奏与滚动参数定稿；贴底在高刷新率与 CPU 降速下稳定（I32、I59）
+- [ ] 验收：A01 组件测试与亮暗截图、A02、A03、A04、A05、A06、A07、A08、A09、A10、A11、A12、A13、A14
+- [ ] 收尾：transcript 与 composer 的 CLAUDE.md、`coding-standards.md` 通用能力复用表、架构与 ADR 同步、PLAN 与 acceptance
 
 ## 登记事项
 
