@@ -13,7 +13,7 @@ use std::time::Duration;
 use piarc_core::agent_host::AgentHostLaunch;
 use piarc_core::composer::UserInput;
 use piarc_core::secrets::{MemorySecretStore, test_master_key_name};
-use piarc_core::sessions::{Op, QueueOp, SessionsConfig};
+use piarc_core::sessions::{ModelOp, Op, QueueOp, SessionsConfig};
 use piarc_core::{
     CoreConfig, CoreRuntime, DataDirs, DeliveryDone, EventBatch, EventSink, SecretStoreSetup,
     SinkClosed,
@@ -22,8 +22,9 @@ use serde_json::{Value, json};
 use tokio::sync::{Notify, oneshot};
 
 use super::checks::{check_files, check_fixture_files, check_requests};
-use super::format::{Action, InputAction, ScenarioSpec, Wire};
+use super::format::{Action, EndpointSetup, InputAction, ScenarioSpec, Wire};
 use super::gate::Gate;
+use super::matcher::subset_mismatch;
 use super::matcher::{ObservedEvent, check_events, compact, describe, matches, without_noise};
 use crate::record::RequestRecord;
 use crate::scenario::{Scenario, ScenarioLibrary};
@@ -34,6 +35,8 @@ pub const WAIT: Duration = Duration::from_secs(30);
 
 /// The Pi model id every endpoint offers.
 pub const MOCK_MODEL: &str = "mock-model";
+
+const L2_CREDENTIAL: &str = "piarc-l2-fake-vault-credential";
 
 /// How to start the Agent Host.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -228,10 +231,18 @@ impl Env {
             let mock = MockProvider::start(library)
                 .await
                 .map_err(|e| format!("mock `{name}`: {e}"))?;
-            providers.insert(
-                pi_provider(name),
-                pi_provider_entry(&mock, endpoint.wire, endpoint.vision, &id),
-            );
+            if endpoint.configure_as.is_none() {
+                providers.insert(
+                    pi_provider(name),
+                    pi_provider_entry(
+                        &mock,
+                        endpoint.wire,
+                        endpoint.vision,
+                        endpoint.reasoning,
+                        &id,
+                    ),
+                );
+            }
             mocks.insert(name.clone(), mock);
         }
         let pi = data.join("pi");
@@ -299,7 +310,13 @@ fn pi_provider(name: &str) -> String {
     format!("mock-{name}")
 }
 
-fn pi_provider_entry(mock: &MockProvider, wire: Wire, vision: bool, scenario: &str) -> Value {
+fn pi_provider_entry(
+    mock: &MockProvider,
+    wire: Wire,
+    vision: bool,
+    reasoning: bool,
+    scenario: &str,
+) -> Value {
     let (base_url, api) = match wire {
         Wire::Anthropic => (mock.anthropic_base_url(), "anthropic-messages"),
         Wire::Openai => (mock.openai_base_url(), "openai-completions"),
@@ -313,9 +330,10 @@ fn pi_provider_entry(mock: &MockProvider, wire: Wire, vision: bool, scenario: &s
         json!(["text"])
     };
     json!({
-        "baseUrl": base_url, "api": api, "apiKey": "piarc-mock-test-key",
+        "baseUrl": base_url, "api": api, "apiKey": "piarc-no-key",
         "models": [{
-            "id": MOCK_MODEL, "name": MOCK_MODEL, "reasoning": false, "input": input,
+            "id": MOCK_MODEL, "name": MOCK_MODEL, "reasoning": reasoning, "input": input,
+            "compat": if reasoning && wire==Wire::Openai {json!({"supportsReasoningEffort":true})} else {json!({})},
             "contextWindow": 200_000, "maxTokens": 4096,
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
             "headers": headers
@@ -458,6 +476,7 @@ struct Driver<'a> {
 
 impl Driver<'_> {
     async fn drive(&mut self) -> Result<(), String> {
+        self.configure_providers().await?;
         self.open().await?;
         for (n, action) in self.spec.actions.iter().enumerate() {
             self.act(action)
@@ -474,6 +493,83 @@ impl Driver<'_> {
                     .any(|e| e.method == "turn/completed" && e.params["turnId"] == turn.as_str())
             })
             .await?;
+        }
+        self.check_provider_settings().await
+    }
+
+    async fn configure_providers(&self) -> Result<(), String> {
+        let mut configs: Vec<_> = self
+            .spec
+            .cloud_providers
+            .iter()
+            .map(|id| (json!({"kind":"cloud","id":id}), true))
+            .collect();
+        for (name, spec) in &self.spec.providers {
+            let Some(setup) = spec.configure_as else {
+                continue;
+            };
+            let mock = &self.env.mocks[name];
+            let (base, api) = match spec.wire {
+                Wire::Anthropic => (mock.anthropic_base_url(), "anthropic-messages"),
+                Wire::Openai => (mock.openai_base_url(), "openai-completions"),
+            };
+            let kind = match setup {
+                EndpointSetup::Local => "local",
+                EndpointSetup::Custom => "custom",
+            };
+            configs.push((json!({"kind":kind,"id":pi_provider(name),"api":api,"baseUrl":base,"models":[MOCK_MODEL]}),setup==EndpointSetup::Custom));
+        }
+        for (config, keyed) in configs {
+            let key = keyed.then(|| json!({"key":L2_CREDENTIAL}).to_string());
+            let op = piarc_core::providers::Operation::save(&config.to_string(), key.as_deref())
+                .map_err(|e| e.to_string())?;
+            call(
+                |done| self.core.provider_op(op, done),
+                "configuring provider",
+            )
+            .await?;
+        }
+        Ok(())
+    }
+
+    async fn check_provider_settings(&self) -> Result<(), String> {
+        if self.spec.expect.configured_providers.is_empty() {
+            return Ok(());
+        }
+        let settings = call(
+            |done| {
+                self.core
+                    .provider_op(piarc_core::providers::Operation::List, done)
+            },
+            "reading providers",
+        )
+        .await?;
+        let catalog = call(
+            |done| self.core.workspace_models(self.env.workspace.clone(), done),
+            "checking available models",
+        )
+        .await?;
+        for (id, expected) in &self.spec.expect.configured_providers {
+            let actual = settings["providers"]
+                .as_array()
+                .and_then(|p| p.iter().find(|p| p["id"] == id.as_str()))
+                .ok_or_else(|| format!("provider {id} missing"))?;
+            if let Some(mismatch) = subset_mismatch(expected, actual, id) {
+                return Err(mismatch);
+            }
+            if !catalog["models"]
+                .as_array()
+                .is_some_and(|rows| rows.iter().any(|m| m["provider"] == id.as_str()))
+            {
+                return Err(format!("provider {id} has no available model"));
+            }
+        }
+        let scan = crate::plaintext::scan(&[&self.env.data], &[L2_CREDENTIAL.as_bytes()], None);
+        if !scan.findings.is_empty() || !scan.unreadable.is_empty() {
+            return Err(format!(
+                "credential scan findings: {:?}, unreadable: {:?}",
+                scan.findings, scan.unreadable
+            ));
         }
         Ok(())
     }
@@ -558,25 +654,24 @@ impl Driver<'_> {
                     .await
                     .map(drop)
             }
+            Action::SetModel {
+                session,
+                provider,
+                preview,
+            } => {
+                self.switch_model(session.as_deref(), provider, preview)
+                    .await
+            }
+            Action::SetEffort { session, effort } => self
+                .op(session.as_deref(), Op::Model(ModelOp::Effort(*effort)))
+                .await
+                .map(drop),
             Action::SetMode { session, mode } => self
                 .op(session.as_deref(), Op::SetPermissionMode(*mode))
                 .await
                 .map(drop),
             Action::Abort { session } => self.op(session.as_deref(), Op::Abort).await.map(drop),
-            Action::Wait(wait) => {
-                let matcher = wait.matcher();
-                let session = self.label(wait.session.as_deref())?;
-                let count = wait.count.unwrap_or(1);
-                let turns = self.turns.clone();
-                self.wait_until(&format!("{count} × {}", describe(&matcher)), |events| {
-                    events
-                        .iter()
-                        .filter(|e| matches(&matcher, &session, e, &turns))
-                        .count()
-                        >= count
-                })
-                .await
-            }
+            Action::Wait(wait) => self.wait_for_event(wait).await,
             Action::WriteFile { path, content } => write_file(&self.env.workspace, path, content),
             Action::RestartCore {} => self.restart().await,
             Action::Resume { session } => {
@@ -589,6 +684,42 @@ impl Driver<'_> {
                 .map(drop)
             }
         }
+    }
+
+    async fn wait_for_event(&mut self, wait: &super::format::WaitAction) -> Result<(), String> {
+        let matcher = wait.matcher();
+        let session = self.label(wait.session.as_deref())?;
+        let count = wait.count.unwrap_or(1);
+        let turns = self.turns.clone();
+        self.wait_until(&format!("{count} × {}", describe(&matcher)), |events| {
+            events
+                .iter()
+                .filter(|e| matches(&matcher, &session, e, &turns))
+                .count()
+                >= count
+        })
+        .await
+    }
+
+    async fn switch_model(
+        &self,
+        session: Option<&str>,
+        provider: &str,
+        expected: &Value,
+    ) -> Result<(), String> {
+        let model = piarc_protocol::session::ModelRef {
+            provider: pi_provider(provider),
+            id: MOCK_MODEL.into(),
+        };
+        let preview = self
+            .op(session, Op::Model(ModelOp::Preview(model.clone())))
+            .await?;
+        if let Some(why) = subset_mismatch(expected, &preview, "preview") {
+            return Err(why);
+        }
+        self.op(session, Op::Model(ModelOp::Set(model, None)))
+            .await
+            .map(drop)
     }
 
     async fn input(&mut self, input: &InputAction, op: fn(UserInput) -> Op) -> Result<(), String> {

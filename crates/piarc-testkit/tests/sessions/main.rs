@@ -5,7 +5,9 @@
 mod input;
 mod lifecycle;
 mod metadata;
+mod models;
 mod permissions;
+mod provider_settings;
 mod queue;
 mod support;
 mod turns;

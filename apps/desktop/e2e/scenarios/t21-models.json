@@ -1,0 +1,9 @@
+{
+  "id": "t21-models",
+  "steps": [
+    { "tool_calls": [{ "id": "read_one", "name": "Read", "input": { "path": "note.txt" } }] },
+    { "text": "First protocol read the note." },
+    { "tool_calls": [{ "id": "read_two", "name": "Read", "input": { "path": "note.txt" } }] },
+    { "text": "Second protocol read the note." }
+  ]
+}

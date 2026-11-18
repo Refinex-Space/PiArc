@@ -504,7 +504,7 @@ impl Inner {
     ) -> Result<Value> {
         let link = self.current_link()?;
         link.check_method(method)?;
-        if method.starts_with("session/")
+        if (method.starts_with("session/") || method == "models/list")
             && method != SessionResume::NAME
             && method != SessionCreate::NAME
             && let Some(id) = params.get("sessionId").and_then(Value::as_str)

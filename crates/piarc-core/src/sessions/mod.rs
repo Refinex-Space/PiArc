@@ -551,6 +551,8 @@ impl Hub {
             workspace.close().await;
         }
         self.ctx.cancel.cancel();
+        // Await the separately supervised settings Host's credential flush and shutdown.
+        drop(self.ctx.provider_writer.lock().await);
     }
 
     fn live(&self, id: &str) -> Option<session::SessionHandle> {
@@ -568,6 +570,9 @@ impl Hub {
 
     /// The open workspace at `path`, opening it (and starting its Agent Host) when needed.
     async fn workspace(&self, path: PathBuf) -> Result<workspace::WorkspaceHandle> {
+        // Register a new workspace before a simultaneous settings update enumerates Hosts.
+        // Its handshake and any subsequent reload then observe the same committed preference.
+        let _provider_writer = self.ctx.provider_writer.lock().await;
         self.recover_provider_settings().await?;
         let path = canonical_dir(path, "workspace").await?;
         if let Some(open) = lock(&self.routes).workspaces.get(&path).cloned() {

@@ -58,6 +58,12 @@
         }
       }
     },
+    "cloud_providers": {
+      "description": "Configure a cloud API key through the real settings path; model requests remain on loopback mocks.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["amazon-bedrock", "google-vertex"] }
+    },
     "providers": {
       "description": "Mock provider endpoints by name; each is its own Pi provider with one model.",
       "type": "object",
@@ -100,6 +106,14 @@
       "required": ["wire", "steps"],
       "properties": {
         "wire": { "description": "Wire format of the endpoint.", "enum": ["anthropic", "openai"] },
+        "configure_as": {
+          "description": "Configure this mock through the Core settings API.",
+          "enum": ["custom", "local"]
+        },
+        "reasoning": {
+          "description": "The imported mock model supports thinking levels.",
+          "type": "boolean"
+        },
         "validation": { "$ref": "#/$defs/validation" },
         "vision": {
           "description": "The endpoint's model takes images as input; text only when absent.",
@@ -243,6 +257,25 @@
           "properties": { "session": { "$ref": "#/$defs/label" } }
         },
         "wait": { "$ref": "#/$defs/waitAction" },
+        "set_model": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["provider", "preview"],
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "provider": { "$ref": "#/$defs/label" },
+            "preview": { "type": "object", "minProperties": 1 }
+          }
+        },
+        "set_effort": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["effort"],
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "effort": { "enum": ["off", "low", "medium", "high", "xhigh", "max"] }
+          }
+        },
         "set_mode": {
           "type": "object",
           "additionalProperties": false,
@@ -425,6 +458,11 @@
           "additionalProperties": { "type": ["string", "null"] }
         },
         "requests": { "type": "array", "items": { "$ref": "#/$defs/requestExpect" } },
+        "configured_providers": {
+          "description": "Assert public fields and chat model availability for each configured provider.",
+          "type": "object",
+          "additionalProperties": { "type": "object", "minProperties": 1 }
+        },
         "request_counts": {
           "description": "Exact number of requests each endpoint received.",
           "type": "object",

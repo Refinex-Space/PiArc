@@ -64,11 +64,13 @@
 - `ToolIoConfig.observer` 记录同时进行的 `fs/*` 调用数（A06 的批次上限）；`--test-drop-seq <n>` 让 Agent Host 不写出第 n 条通知（A08 的缺口补齐）。
 - 场景在 `tests/sessions/scenarios/`；等事件一律经 `Events::wait`，合并器按 16 ms 刷出。
 
+- `provider_settings_crud_keeps_credentials_in_the_vault` 通过公开设置 API 增改删四类提供商，扫描数据目录与进程环境，另起 Host 验证删除结果。跨平台进程环境检查与 T08 共用 `tests/support/process_environment.rs`。
+
 ## L2 场景运行器（`src/l2/`，T15）
 
 - 夹具：`workspace.fixtures` 把 `tests/scenarios/fixtures/` 下的文件按字节复制进工作区，`expect.fixtures` 按字节比对（CRLF、BOM、GBK、图片、PDF；该目录在 `.gitattributes` 里设为 `-text`）。端点的 `vision: true` 让模型接受图片输入。PDF 夹具用 `piarc-fs` 的 `make_pdf` 生成（手写的 PDF 可能取不到文字，见 `crates/piarc-fs/AGENTS.md`）。
 - 场景格式的唯一描述是 `tests/scenarios/schema.json`（`format.rs` 以 `include_str!` 嵌入）：改格式时同时改 schema、`format.rs` 的类型与引用检查、`testing.md` 第 12 节。加载分三遍：schema（报字段的 JSON Pointer）→ serde → 引用检查（id 与文件名、会话与端点、标签先定义后使用、路径不出工作区、mock 脚本自检）。
-- 运行器只经 `CoreRuntime` 的公开方法驱动、只读 sink 送达的事件与 `ToolIoObserver`（`gate.rs`）；不复制 Core 的逻辑。每个端点一个 `MockProvider` 与一个 Pi provider（`mock-<端点名>`，模型 `mock-model`），场景经模型的 `x-piarc-scenario` 请求头选择，提示词里没有场景标记。
+- 运行器只经 `CoreRuntime` 的公开方法驱动、只读 sink 送达的事件与 `ToolIoObserver`（`gate.rs`）；不复制 Core 的逻辑。每个端点一个 `MockProvider` 与一个 Pi provider（`mock-<端点名>`，模型 `mock-model`），预置端点经模型的 `x-piarc-scenario` 请求头选择脚本，`configure_as` 端点经首条用户消息的场景标记选择。
 - 每次运行一个新的临时根（含空格与中文，带进程号与计数）和一个新 Core；结束后删除并在结果里报告。并行的场景各起一个 Agent Host（默认半数核心、至多 4 个）。
 - 命令环境（T17，`runner.rs` 的 `command_env`）：L2 的 Core 用登录 shell，但从测试进程环境加 `INTERNAL_PROBES`（`ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`PI_CODING_AGENT_DIR`、`PIARC_L2_INTERNAL`，模拟应用里 Core 的环境）与 `L2_USER_VAR=kept` 起步；Unix 上 `SHELL=/bin/bash`、`HOME` 为本次运行的 `home 家/`，其 `.bash_profile` 把 `home 家/bin`（含 `l2-login-tool`）放进 `PATH` 并设 `L2_LOGIN_PROFILE=loaded`。`exec-env-*` 场景依赖这些名字，改动时同步。
 - Composer 输入可声明提及、客户端幂等键与附件夹具。运行器经 Core 的 `store_attachment` 存入附件，输入携带返回的引用。见 `chat-composer-input.yaml`（含手动压缩）与 `turn-classified-errors.yaml`。

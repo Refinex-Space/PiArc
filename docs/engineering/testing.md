@@ -299,7 +299,8 @@ providers:                        # mock 端点，可定义多个；名称为小
   main:
     wire: anthropic               # 或 openai
     validation: { rules: { role_order: false } }   # 可选，与第 10.3 节相同
-    vision: true                  # 可选：模型接受图片输入（缺省只有文本）
+    vision: true                  # 可选：导入的模型夹具接受图片输入（缺省只有文本）
+    reasoning: true               # 可选：导入的模型夹具支持 effort
     steps: [...]                  # 与第 10.3 节的 steps 相同
 sessions:                         # 可选；缺省为一个会话 main，使用唯一的端点、工作目录为工作区
   a: { provider: one, cwd: 'alpha dir' }
@@ -308,7 +309,9 @@ approvals: []                     # 见 12.3
 expect: { events, files, fixtures, requests, request_counts, tool_batches, core_io }   # 见 12.4
 ```
 
-- 每个端点有自己的 `MockProvider` 与自己的 Pi provider（`mock-<端点名>`，唯一的模型 `mock-model`）；场景经模型配置里的 `x-piarc-scenario` 请求头选择脚本，提示词里没有场景标记。两个会话要并发请求时用两个端点，各自的步数互不影响。
+- 每个端点有自己的 `MockProvider` 与自己的 Pi provider（`mock-<端点名>`，唯一的模型 `mock-model`）；预置模型夹具经 `x-piarc-scenario` 请求头选择脚本。两个会话要并发请求时用两个端点，各自的步数互不影响。
+- 提供商设置场景在端点下写 `configure_as: custom` 或 `local`，运行器通过 `CoreRuntime.provider_op` 提交本机 mock URL、线协议和模型 ID。自定义端点使用保险箱中的测试密钥，本地端点无需密钥。这些端点使用首条用户消息中的 `[[piarc-scenario:<场景 id>]]` 选择脚本，切换后同一段历史仍可重放。
+- 顶层 `cloud_providers` 接受 `amazon-bedrock` 和 `google-vertex`，仅配置测试凭据。所有会话仍指定 mock 端点。用 `expect.configured_providers` 按 id 校验公开设置字段与模型目录可用性，同时扫描该场景数据目录中的测试密钥明文。
 - `workspace.files` 与 `expect.files` 的路径都相对工作区；工作区本身在临时根下的 `work space 工作区`，会话的 `cwd` 相对它。
 - 按字节的夹具放在 `tests/scenarios/fixtures/`（`.gitattributes` 设为 `-text`，换行与编码不被 Git 改动）；加载时检查夹具存在。PDF 夹具用 `piarc-fs` 测试里的 `make_pdf` 生成，手写的 PDF 可能取不到文字。
 
@@ -322,6 +325,8 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | `steer`、`follow_up` | `text`、`item`（标签）、`turn` | 运行中进入排队表（`item` 记下排队项 id）；空闲时直接开始回合（`turn` 记下回合 id） |
 | `queue_edit`、`queue_delete`、`queue_reorder` | `item`/`text`；`items`（全部标签的新顺序） | 改排队表 |
 | `compact` | — | 经 Core 执行内置 `/compact`，记录这次压缩启动的回合并等待完成 |
+| `set_model` | `provider`、`preview` | 预览切换，断言预览字段符合 `preview`，然后经会话 API 确认切换 |
+| `set_effort` | `effort` | 经会话 API 设置当前模型支持的档位 |
 | `abort` | — | 中断当前回合 |
 | `wait` | 事件匹配字段（12.4）+ `count` | 等到至少 `count` 个（缺省 1）匹配的事件已送达 |
 | `write_file` | `path`、`content` | 写工作区文件（例如给等待中的命令发信号） |

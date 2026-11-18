@@ -1,0 +1,37 @@
+id: provider-settings-models
+description: Configure a keyed relay, a keyless local model and a Bedrock bearer credential through settings. Switch the session from the relay to the local endpoint.
+capabilities: [CAP-PROVIDER-CONFIG-001, CAP-PROVIDER-CLOUD-001, CAP-MODEL-SWITCH-001]
+cloud_providers: [amazon-bedrock]
+providers:
+  relay:
+    wire: anthropic
+    configure_as: custom
+    steps: [{ text: Answer from the relay. }]
+  local:
+    wire: openai
+    configure_as: local
+    steps: [{ text: Answer from the local model. }]
+sessions:
+  main: { provider: relay }
+actions:
+  - prompt: { text: 'First [[piarc-scenario:provider-settings-models]]', turn: first }
+  - wait: { method: turn/completed, turn: first }
+  - set_model: { provider: local, preview: { cacheInvalidated: true, cacheWriteUsd: null } }
+  - prompt: { text: Continue., turn: second }
+expect:
+  configured_providers:
+    amazon-bedrock: { kind: cloud, hasCredential: true }
+    mock-relay: { kind: custom, hasCredential: true, api: anthropic-messages }
+    mock-local: { kind: local, hasCredential: false, api: openai-completions }
+  events:
+    - { method: turn/completed, turn: first, params: { status: completed } }
+    - { method: turn/completed, turn: second, params: { status: completed } }
+  requests:
+    - { provider: relay, index: 0, roles: [user] }
+    - {
+        provider: local,
+        index: 0,
+        roles: [system, user, assistant, user],
+        last_user_text: Continue.,
+      }
+  request_counts: { relay: 1, local: 1 }

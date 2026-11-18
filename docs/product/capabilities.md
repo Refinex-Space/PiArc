@@ -8,7 +8,7 @@
 
 | 里程碑 | 能力数 | 已实现 | 计划中 | BLOCKED |
 |---|---|---|---|---|
-| M1 | 61 | 53 | 8 | 0 |
+| M1 | 61 | 57 | 4 | 0 |
 | M2 | 30 | 0 | 30 | 0 |
 | M3 | 21 | 0 | 21 | 0 |
 | M4 | 10 | 0 | 10 | 0 |
@@ -32,12 +32,12 @@
 | CAP-EXEC-STREAM-001 | 命令输出在结束前以条目增量到达客户端；完成的条目带 bash 卡的结构化字段 | FR-TL-02、ARCH-5.3、ARCH-6.1.3 | T17 | `exec-streaming-output` | 已实现 |
 | CAP-EXEC-TIMEOUT-001 | 命令超时（默认 2 分钟、上限 10 分钟）后整棵进程树被终止，结果带已有输出与超时说明 | FR-TL-01、ARCH-6.11 | T17 | `exec-timeout-kills-tree` | 已实现 |
 | CAP-EXT-PI-001 | 信任的项目 Pi 扩展被加载，其注册的工具可被模型调用 | ARCH-5.5、ARCH-10.2 | T13 | `trust-trusted-loads-project-extension` | 已实现 |
-| CAP-MODEL-SWITCH-001 | 会话内切换模型与 effort，提示切换代价 | FR-MD-03、ARCH-6.13 | T21 | — | 计划中 |
+| CAP-MODEL-SWITCH-001 | 会话内切换模型与 effort，提示切换代价 | FR-MD-03、ARCH-6.13 | T21 | `provider-settings-models`<br>`turn-model-effort` | 已实现 |
 | CAP-PERM-APPROVAL-001 | 结构化审批：仅本次、本会话、总是允许、拒绝并反馈 | FR-PM-02、ARCH-6.2.3 | T20 | `policy-extra-directory`<br>`policy-save-rule`<br>`policy-session-rule` | 已实现 |
 | CAP-PERM-MODE-001 | 手动与自动接受编辑两种权限模式 | FR-PM-01、ARCH-6.2.1 | T20 | `policy-accept-edits`<br>`policy-accept-edits-powershell`<br>`policy-manual`<br>`policy-manual-powershell`<br>`policy-mode-restore`<br>`policy-shell-boundary`<br>`policy-untrusted` | 已实现 |
 | CAP-PROVIDER-ANTHROPIC-001 | Anthropic Messages 线格式的服务商 | FR-MD-01、ARCH-6.13 | T06 | `chat-basic` | 已实现 |
-| CAP-PROVIDER-CLOUD-001 | 云厂商凭证与本地模型服务商 | FR-MD-01 | T21 | — | 计划中 |
-| CAP-PROVIDER-CONFIG-001 | 配置服务商与 API key；凭据只存在 Core 的保险箱并经 AHP 交给 Agent Host | FR-MD-01、ARCH-5.4 | T21 | — | 计划中 |
+| CAP-PROVIDER-CLOUD-001 | 云厂商凭证与本地模型服务商 | FR-MD-01 | T21 | `provider-settings-models` | 已实现 |
+| CAP-PROVIDER-CONFIG-001 | 配置服务商与 API key；凭据只存在 Core 的保险箱并经 AHP 交给 Agent Host | FR-MD-01、ARCH-5.4 | T21 | `provider-settings-models` | 已实现 |
 | CAP-PROVIDER-OPENAI-001 | OpenAI 兼容端点的服务商（流式正文、工具调用与工具结果） | FR-MD-01、ARCH-6.13 | T06 | `provider-openai-wire` | 已实现 |
 | CAP-SESSION-MANAGE-001 | 新建、重命名、置顶、归档、删除会话 | FR-WS-03 | T18 | — | 计划中 |
 | CAP-SESSION-MULTI-001 | 同一工作区的多个会话同时运行，各自的工作目录与请求互不串扰 | ARCH-5.2、ARCH-5.3 | T14 | `sessions-two-cwds-isolated` | 已实现 |
@@ -75,7 +75,7 @@
 | CAP-TURN-FOLLOWUP-001 | 运行中排队的 follow-up 在回合结束后作为新回合执行 | FR-CH-03 | T14 | `turn-follow-up` | 已实现 |
 | CAP-TURN-INTERRUPT-001 | 停止回合时为未完成的工具调用补齐结果，下一次请求配对完整、角色交替 | FR-CH-03、ARCH-6.15 | T14 | `turn-interrupt-pairs-tool-calls` | 已实现 |
 | CAP-TURN-QUEUE-001 | 排队项可编辑、删除、重排，按新顺序各执行一次 | FR-CH-03 | T14 | `turn-queue-edit-reorder` | 已实现 |
-| CAP-TURN-REASONING-001 | 思考内容以 reasoning 条目流式送达，effort 映射到服务商参数 | FR-CH-01、FR-MD-03、ARCH-6.13 | T21 | — | 计划中 |
+| CAP-TURN-REASONING-001 | 思考内容以 reasoning 条目流式送达，effort 映射到服务商参数 | FR-CH-01、FR-MD-03、ARCH-6.13 | T21 | `turn-model-effort` | 已实现 |
 | CAP-TURN-RETRY-001 | 限流、过载与 5xx 自动重试，每次重试报给客户端，失败的尝试不进入上下文 | FR-CH-04、FR-CH-06、ARCH-6.15 | T14 | `turn-retry-recoverable-errors` | 已实现 |
 | CAP-TURN-STATUS-001 | 回合进行中提供当前工具、计时、token、重试次数与压缩状态 | FR-CH-04 | T19 | `chat-composer-input`<br>`turn-classified-errors` | 已实现 |
 | CAP-TURN-STEER-001 | 运行中 steer：消息在当前步骤之后进入本回合的下一次请求 | FR-CH-03、ARCH-5.3 | T14 | `turn-steer` | 已实现 |

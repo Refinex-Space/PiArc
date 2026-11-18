@@ -28,7 +28,6 @@ impl Hub {
     /// A pending public change is resolved against the committed vault credential before a
     /// workspace Host is launched, or before another edit can replace the journal.
     pub(super) async fn recover_provider_settings(&self) -> Result<()> {
-        let _writer = self.ctx.provider_writer.lock().await;
         let dir = self.ctx.storage.dirs().data();
         crate::providers::ensure_pi_defaults(dir)?;
         if !Settings::journal(dir).try_exists().map_err(io_error)? {
@@ -173,12 +172,23 @@ impl Hub {
         let workspaces: Vec<_> = lock(&self.routes).workspaces.values().cloned().collect();
         let mut first_error = None;
         for ws in workspaces {
-            if let Some(host) = ws.peek().await
-                && let Err(error) = host
-                    .call::<ModelsReload>(ModelsReloadParams { allow_network })
-                    .await
-            {
-                first_error.get_or_insert_with(|| host_error(error));
+            if matches!(
+                ws.view().await.host,
+                super::HostState::Starting | super::HostState::Ready | super::HostState::Restarting
+            ) {
+                // A handshake already sent just before the setting changed may still be
+                // initializing. Wait for that process and reload it before confirming the edit.
+                let reload = async {
+                    ws.acquire()
+                        .await?
+                        .call::<ModelsReload>(ModelsReloadParams { allow_network })
+                        .await
+                        .map_err(host_error)
+                }
+                .await;
+                if let Err(error) = reload {
+                    first_error.get_or_insert(error);
+                }
             }
         }
         first_error.map_or(Ok(()), Err)

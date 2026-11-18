@@ -31,6 +31,8 @@
 - `Settings` 在项目不受信任时把项目范围各层的 `executable` 指针（PiArc 层为 `/hooks`、`/permissions/allow`、`/permissions/additionalDirectories`）排除在合并之外。项目要求的 `acceptEdits` 同样需要信任，项目设置的 `bypassPermissions` 和 `auto` 在合并前移除，让较低层的选择继续生效。deny、ask 照常生效。T24 加 `.claude/` 层时给出它们自己的可执行指针（`enabledPlugins` 等）。
 - `executables::enumerate` 只读键名与条目名，不做语义加载；扫描范围见模块文档。新增项 = 当前条目减去信任时的快照（`new_items`），删除的条目不需要再确认。
 
+- 用户级 `modelProviders` 的字段由 `piarc_core::providers` 校验。工作区层设置不参与服务商发现。服务商写入复用 `write_value` 的用户设置互斥和 `write::replace_file` 的同目录原子替换。
+
 ## 易错点
 
 - `serde_json` 没开 `preserve_order`：对象按键排序，问题列表与变化键的顺序随之确定，测试按排序断言。

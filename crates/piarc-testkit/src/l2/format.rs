@@ -90,6 +90,9 @@ pub struct ScenarioSpec {
     pub workspace: WorkspaceSpec,
     /// Mock endpoints by name.
     pub providers: BTreeMap<String, ProviderSpec>,
+    /// SDK cloud providers to configure with an isolated fake API key; never used for inference.
+    #[serde(default)]
+    pub cloud_providers: Vec<String>,
     /// Sessions by label; see [`ScenarioSpec::sessions`].
     #[serde(default, rename = "sessions")]
     pub declared_sessions: Option<BTreeMap<String, SessionSpec>>,
@@ -140,12 +143,28 @@ pub enum Wire {
     Openai,
 }
 
+/// How a scenario provisions a mock through PiArc's provider settings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EndpointSetup {
+    /// Custom endpoint with a fake vault key.
+    Custom,
+    /// Keyless local endpoint.
+    Local,
+}
+
 /// One mock endpoint: its own mock provider, Pi provider and model.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProviderSpec {
     /// Its wire format.
     pub wire: Wire,
+    /// Use a settings operation instead of a pre-existing models.json definition.
+    #[serde(default)]
+    pub configure_as: Option<EndpointSetup>,
+    /// Include thinking in the capabilities of an imported model fixture.
+    #[serde(default)]
+    pub reasoning: bool,
     /// Request validation; every rule on by default.
     #[serde(default)]
     pub validation: ValidationConfig,
@@ -273,6 +292,24 @@ pub enum Action {
         /// New mode.
         mode: piarc_protocol::policy::PermissionMode,
     },
+    /// Previews and confirms a model switch, checking the preview against a field subset.
+    SetModel {
+        /// Target session.
+        #[serde(default)]
+        session: Option<String>,
+        /// Endpoint of the new model.
+        provider: String,
+        /// Fields required in the preview.
+        preview: Value,
+    },
+    /// Sets the current session's thinking effort.
+    SetEffort {
+        /// Target session.
+        #[serde(default)]
+        session: Option<String>,
+        /// The chosen effort.
+        effort: piarc_protocol::models::EffortLevel,
+    },
     /// Waits for events.
     Wait(WaitAction),
     /// Writes a workspace file (a signal for a waiting command).
@@ -307,6 +344,8 @@ impl Action {
             Self::QueueReorder { .. } => "queue_reorder",
             Self::Abort { .. } => "abort",
             Self::SetMode { .. } => "set_mode",
+            Self::SetModel { .. } => "set_model",
+            Self::SetEffort { .. } => "set_effort",
             Self::Wait(_) => "wait",
             Self::WriteFile { .. } => "write_file",
             Self::RestartCore {} => "restart_core",
@@ -323,6 +362,8 @@ impl Action {
             | Self::QueueDelete { session, .. }
             | Self::QueueReorder { session, .. }
             | Self::Compact { session }
+            | Self::SetModel { session, .. }
+            | Self::SetEffort { session, .. }
             | Self::SetMode { session, .. }
             | Self::Abort { session }
             | Self::Resume { session } => Some(session),
@@ -438,6 +479,9 @@ pub enum ApprovalDecision {
 #[derive(Debug, Clone, Default, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Expect {
+    /// Configured provider ids and the public settings fields expected for each.
+    #[serde(default)]
+    pub configured_providers: BTreeMap<String, Value>,
     /// Ordered subsequence of events per session.
     #[serde(default)]
     pub events: Vec<EventExpect>,
@@ -589,6 +633,14 @@ impl ScenarioSpec {
     /// The mock scenario id of endpoint `provider`.
     #[must_use]
     pub fn mock_scenario_id(&self, provider: &str) -> String {
+        if self
+            .providers
+            .get(provider)
+            .is_some_and(|p| p.configure_as.is_some())
+        {
+            // A managed endpoint uses the first-message marker, which survives a provider switch.
+            return self.id.clone();
+        }
         format!("{}.{provider}", self.id)
     }
 }
@@ -690,6 +742,11 @@ fn check(spec: &ScenarioSpec, stem: &str) -> Vec<String> {
         problems.push("/platform_reason: required when `platforms` leaves a platform out".into());
     }
     for (provider, endpoint) in &spec.providers {
+        if endpoint.configure_as.is_some() && (endpoint.vision || endpoint.reasoning) {
+            problems.push(format!(
+                "/providers/{provider}: explicit capability overrides require an imported fixture"
+            ));
+        }
         if let Err(e) = Scenario::new(spec.mock_scenario_id(provider), endpoint.script()) {
             problems.push(format!("/providers/{provider}: {e}"));
         }
@@ -799,7 +856,13 @@ fn check_actions(spec: &ScenarioSpec, problems: &mut Vec<String>) {
                     problems.push(format!("{field}/turn: no earlier turn `{turn}`"));
                 }
             }
-            Action::Compact { .. }
+            Action::SetModel { provider, .. } => {
+                if !spec.providers.contains_key(provider) {
+                    problems.push(format!("{field}/provider: no such endpoint"))
+                }
+            }
+            Action::SetEffort { .. }
+            | Action::Compact { .. }
             | Action::SetMode { .. }
             | Action::Abort { .. }
             | Action::RestartCore {}

@@ -1,0 +1,31 @@
+id: turn-model-effort
+description: Switch to an imported reasoning model, select high effort and stream its reasoning before the final answer.
+capabilities: [CAP-TURN-REASONING-001, CAP-MODEL-SWITCH-001]
+providers:
+  first:
+    wire: anthropic
+    steps: [{ text: First answer. }]
+  reasoner:
+    wire: openai
+    reasoning: true
+    steps: [{ thinking: Weigh the alternatives., text: Pick one. }]
+sessions:
+  main: { provider: first }
+actions:
+  - prompt: { text: Begin., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - set_model: { provider: reasoner, preview: { cacheInvalidated: true, dropsThinking: false } }
+  - set_effort: { effort: high }
+  - prompt: { text: Choose., turn: two }
+expect:
+  events:
+    - { method: item/reasoning/delta, turn: two }
+    - {
+        method: item/completed,
+        turn: two,
+        params: { item: { type: reasoning, text: Weigh the alternatives. } },
+      }
+    - { method: turn/completed, turn: two, params: { status: completed } }
+  requests:
+    - { provider: reasoner, index: 0, body: { reasoning_effort: high, model: mock-model } }
+  request_counts: { first: 1, reasoner: 1 }

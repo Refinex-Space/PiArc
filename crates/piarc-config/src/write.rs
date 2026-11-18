@@ -255,7 +255,9 @@ fn apply(document: &mut Value, tokens: &[String], value: Option<Value>) {
 
 /// Writes `bytes` to a temporary file next to `target`, flushes it and renames it over
 /// `target`. On failure the temporary file is removed and `target` is unchanged.
-/// Atomically replaces a Core-owned generated settings file.
+///
+/// # Errors
+/// Returns [`WriteError::Io`] when the temporary file cannot be created, synced or renamed.
 pub fn replace_file(target: &Path, bytes: &[u8]) -> Result<(), WriteError> {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let name = target

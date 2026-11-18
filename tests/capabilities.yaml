@@ -92,7 +92,7 @@ capabilities:
     milestone: M1
     refs: [FR-CH-01, FR-MD-03, ARCH-6.13]
     task: T21
-    status: planned
+    status: active
   - id: CAP-TURN-STEER-001
     title: '运行中 steer：消息在当前步骤之后进入本回合的下一次请求'
     milestone: M1
@@ -178,19 +178,19 @@ capabilities:
     milestone: M1
     refs: [FR-MD-01, ARCH-5.4]
     task: T21
-    status: planned
+    status: active
   - id: CAP-PROVIDER-CLOUD-001
     title: '云厂商凭证与本地模型服务商'
     milestone: M1
     refs: [FR-MD-01]
     task: T21
-    status: planned
+    status: active
   - id: CAP-MODEL-SWITCH-001
     title: '会话内切换模型与 effort，提示切换代价'
     milestone: M1
     refs: [FR-MD-03, ARCH-6.13]
     task: T21
-    status: planned
+    status: active
   - id: CAP-PROVIDER-OAUTH-001
     title: '服务商的 OAuth 与设备码登录（不含 Anthropic 订阅登录）'
     milestone: M2

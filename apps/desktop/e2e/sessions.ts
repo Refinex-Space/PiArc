@@ -15,6 +15,8 @@ import type {} from '../src/shared/test-hooks.js';
 const SCENARIOS = path.join(import.meta.dirname, 'scenarios');
 
 export interface SessionFixtures {
+  /** Legacy flows seed one mock. Provider settings tests start with an empty catalog configuration. */
+  seedMockModel: boolean;
   mock: MockProcess;
   /** A directory for workspaces (path with a space and Chinese characters). */
   workspaces: string;
@@ -53,14 +55,15 @@ export async function seedModels(dataDir: string, baseUrl: string): Promise<void
 }
 
 export const test = base.extend<SessionFixtures>({
+  seedMockModel: [true, { option: true }],
   // eslint-disable-next-line no-empty-pattern -- Playwright requires a destructuring pattern here.
   mock: async ({}, use) => {
     const mock = await startMock(SCENARIOS);
     await use(mock);
     mock.stop();
   },
-  userDataDir: async ({ userDataDir, mock }, use) => {
-    await seedModels(userDataDir, mock.baseUrl);
+  userDataDir: async ({ userDataDir, mock, seedMockModel }, use) => {
+    if (seedMockModel) await seedModels(userDataDir, mock.baseUrl);
     await use(userDataDir);
   },
   workspaces: async ({ app }, use) => {

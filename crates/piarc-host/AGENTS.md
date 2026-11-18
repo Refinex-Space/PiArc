@@ -34,6 +34,8 @@ Core 侧的 Agent Host 监管：启动、握手、stdio 读写、背压、心跳
 - 读：stdout 持续解帧。响应直接交给调用方；会话通知与 `FrameError` 各占一个许可（`event_queue`，默认 1,024），`HostEvents::recv` 取走后释放；许可用完时读取停住，压力传给 Agent Host。生命周期事件不占许可，所以重启、关闭不等消费者。
 - 心跳超时只在"没有新帧且读取没有停在投递上"时计为失败，连续 `heartbeat_failures`（2）次判为挂死。
 
+- 模型设置方法依赖握手能力 `models`。工作区的 `allowModelNetwork` 每次握手时从 Core 当前偏好读取，包括同一监管器崩溃重启后的握手。
+
 ## 调用对账
 
 - `CallState`：`Sent` → `Terminal`；`session/prompt` 为 `Sent` → `Acknowledged`（回复带 `turnId`）→ `Terminal`（收到同一 `turnId` 的 `turn/completed`）。终态立即移出账本，账本只含在途调用。
