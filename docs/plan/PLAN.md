@@ -127,7 +127,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T15 | [无头驱动、L2 场景运行器与能力清单](tasks/T15-devcli-l2-scenarios-and-capabilities.md) | 2 | T14 | macOS | high | 中 | 无 | 已完成 | 5546027 |
 | T16 | [文件工具与编辑不变量](tasks/T16-file-tools-invariants.md) | 2 | T15 | macOS | xhigh | 大 | 无 | 已完成 | ea75a25 |
 | T17 | [Bash / PowerShell 执行与进程管理](tasks/T17-bash-powershell-execution.md) | 2 | T16 | macOS | high | 大 | 无 | 已完成 | d154ab3 |
-| T18 | [客户端外壳、会话列表、设置窗口与信任对话框](tasks/T18-client-shell-and-session-list.md) | 2 | T17；D3 | macOS | xhigh | 大 | 无 | 未开始 | — |
+| T18 | [客户端外壳、会话列表、设置窗口与信任对话框](tasks/T18-client-shell-and-session-list.md) | 2 | T17；D3 | macOS | xhigh | 大 | 无 | 进行中 | — |
 | T19 | [Transcript 与 composer 正式版](tasks/T19-transcript-and-composer.md) | 2 | T18 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T20 | [基础权限与审批](tasks/T20-basic-permissions-and-approvals.md) | 2 | T19 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T21 | [模型、服务商与凭据设置](tasks/T21-models-providers-and-credentials.md) | 2 | T20 | macOS | high | 大 | 无 | 未开始 | — |
@@ -293,6 +293,22 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+### T18（开工 2026-11-18，基线 verify 14/14）
+
+D3 只定了图标，主色与字标未定：用中性临时令牌，视觉关口请用户确认。
+
+- [ ] 1 Core 会话元数据命令：重命名、置顶、归档（清会话临时目录）、删除（先关闭，再删 JSONL 与临时目录）；快照带 `pinned`、`archived`；NAPI 导出与快照
+- [ ] 2 信任闸门（I63）：有未确认的新增项时 `trusted` 为 false；Core 用户设置读写（语言、外观、快捷键覆盖、通知）
+- [ ] 3 设计令牌管线：`design/tokens/*.json` → CSS 与 TS，漂移检查、对比度检查、品牌检查并入 verify（A01、A02）
+- [ ] 4 i18n（ICU MessageFormat，中英两套，主进程与渲染进程共用）
+- [ ] 5 主进程：窗口外观（隐藏标题栏 + vibrancy / Mica + 覆盖层）、原生菜单（i18n + 快捷键）、设置窗口、打开文件夹、删除确认、通知与 Dock 角标、会话 IPC 白名单（A04、A11）
+- [ ] 6 渲染进程 store（`useSyncExternalStore`，revision 门控、clientId 对账、item 粒度订阅）（A09）
+- [ ] 7 窗口骨架（三栏 + 注册式右栏与面板区、尺寸记忆）、侧栏会话列表与徽标（A05、A06）
+- [ ] 8 新建会话流程（乐观消息、失败回滚）与信任对话框（A07、A08）
+- [ ] 9 设置窗口三页、快捷键注册表与自定义（A10）、语言切换（A12）
+- [ ] 10 Playwright 流程用例、亮暗 × 两档密度评审截图、冷启动 100 会话测量（A13）
+- [ ] 11 文档：架构、ADR、CLAUDE.md、复用表；verify；视觉关口（A03、A14）
 
 ## 登记事项
 
