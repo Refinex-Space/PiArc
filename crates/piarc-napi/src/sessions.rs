@@ -119,7 +119,7 @@ impl CoreRuntime {
         &self,
         env: &'env Env,
         config_json: String,
-        secret_json: Option<String>,
+        #[napi(ts_arg_type = "string | null")] secret_json: Option<String>,
     ) -> napi::Result<Object<'env>> {
         let op = boundary::call(env, "CoreRuntime.saveProvider", || {
             piarc_core::providers::Operation::save(&config_json, secret_json.as_deref())
@@ -200,7 +200,7 @@ impl CoreRuntime {
         id: String,
         provider: String,
         model: String,
-        effort: Option<String>,
+        #[napi(ts_arg_type = "string | null")] effort: Option<String>,
     ) -> napi::Result<Object<'env>> {
         let effort = effort.map(|v| effort_level(env, v)).transpose()?;
         self.op(

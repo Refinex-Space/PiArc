@@ -32,7 +32,7 @@ export declare class CoreRuntime {
   /** Lists non-secret provider settings and the built-in provider choices. */
   providerSettings(): Promise<string>;
   /** Saves a provider. Omit the secret to retain its existing key. */
-  saveProvider(configJson: string, secretJson?: string | undefined | null): Promise<string>;
+  saveProvider(configJson: string, secretJson?: string | null): Promise<string>;
   /** Deletes a provider with its stored credentials. */
   deleteProvider(id: string): Promise<string>;
   /** Changes the user's catalog refresh preference. */
@@ -48,7 +48,7 @@ export declare class CoreRuntime {
     id: string,
     provider: string,
     model: string,
-    effort?: string | undefined | null,
+    effort?: string | null,
   ): Promise<string>;
   /** Sets the session's effort. */
   setSessionEffort(id: string, effort: string): Promise<string>;
