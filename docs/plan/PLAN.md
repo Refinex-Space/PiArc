@@ -127,7 +127,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T15 | [无头驱动、L2 场景运行器与能力清单](tasks/T15-devcli-l2-scenarios-and-capabilities.md) | 2 | T14 | macOS | high | 中 | 无 | 已完成 | 5546027 |
 | T16 | [文件工具与编辑不变量](tasks/T16-file-tools-invariants.md) | 2 | T15 | macOS | xhigh | 大 | 无 | 已完成 | ea75a25 |
 | T17 | [Bash / PowerShell 执行与进程管理](tasks/T17-bash-powershell-execution.md) | 2 | T16 | macOS | high | 大 | 无 | 已完成 | d154ab3 |
-| T18 | [客户端外壳、会话列表、设置窗口与信任对话框](tasks/T18-client-shell-and-session-list.md) | 2 | T17；D3 | macOS | xhigh | 大 | 无 | 阻塞（等待用户确认视觉方向） | — |
+| T18 | [客户端外壳、会话列表、设置窗口与信任对话框](tasks/T18-client-shell-and-session-list.md) | 2 | T17；D3 | macOS | xhigh | 大 | 无 | 部分完成 | 6b1d5f0 |
 | T19 | [Transcript 与 composer 正式版](tasks/T19-transcript-and-composer.md) | 2 | T18 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T20 | [基础权限与审批](tasks/T20-basic-permissions-and-approvals.md) | 2 | T19 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T21 | [模型、服务商与凭据设置](tasks/T21-models-providers-and-credentials.md) | 2 | T20 | macOS | high | 大 | 无 | 未开始 | — |
@@ -293,16 +293,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-### T18（开工 2026-11-18，基线 verify 14/14）
-
-D3 只定了图标，主色与字标未定：用中性临时令牌，视觉关口请用户确认。
-
-- [x] 1–9 Core 命令与信任闸门、设计令牌管线、i18n、主进程、store、窗口骨架与侧栏、新建会话与信任对话框、设置窗口与快捷键（提交 9770bc8 … 1898503）
-- [x] 10 Playwright 流程（L4 全量 154 passed、1 skipped，两种形态）、评审截图 `tmp/evidence/T18/review/`、冷启动 100 会话最大 463 ms
-- [x] 11 文档（架构 v2.23、ADR-0029、S10、CLAUDE.md、复用表）；verify 15/15；acceptance.json（12 项 passing）
-- [ ] 视觉关口：等用户确认视觉方向（T18-A03）。确认或给出修改意见后：只改 `design/tokens/`（主色色族在 `ramps.json` / `palette.json`），`npm run gen:tokens`，重跑 `PIARC_EVIDENCE_TASK=T18 npx playwright test t18-review --project dev` 刷新截图并复制到 `tmp/evidence/T18/review/`，A03 标 passing，看板改为"部分完成"（A04 等 Windows CI）或"已完成"
-- [ ] T18-A04 的 Windows 部分：用户推送后看 CI 的 `desktop L4 (windows-latest)`
 
 ## 登记事项
 
@@ -629,6 +619,12 @@ D3 只定了图标，主色与字标未定：用中性临时令牌，视觉关�
 - 验收：12 项通过；A03 阻塞（视觉关口），A04 阻塞（Windows 部分等 CI）
 - 决策：ADR-0029（补充）：令牌管线、偏好存储、快捷键、本地化、信任闸门、信任重启在应答前生效、会话元数据；架构 v2.23
 - 遗留：I79（信任决定没有原生确认，T45）、I80（信任变化可能漏掉刚打开、未登记路由的工作区）、I81（`runtime.rs` 超过 1,000 行，R2）；L4 用 `PIARC_TEST_MEMORY_KEYCHAIN` 让开发构建的保险箱主密钥放在内存（每次重新打包的 ad-hoc 签名都会触发钥匙串授权弹窗）；未推送
+
+### 2026-11-18 T18 部分完成（提交 6b1d5f0）
+
+- 用户在视觉关口确认视觉方向（中性冷灰 + indigo 主色、系统字体）：T18-A03 改为 passing，D3 的主色落实（需求规格第 7 节、架构 8.6、ADR-0029 同步），名称字标仍待定
+- 验收：13 项通过，1 项阻塞（A04 的 Windows 部分：推送后看 CI 的 `desktop L4 (windows-latest)` 冒烟；实机外观在 W1）
+- 未推送
 
 ## 计划变更记录
 
