@@ -1,0 +1,44 @@
+id: policy-session-rule
+description: A session rule permits only the matching command in that session. Another session asks, and the model sees the refusal.
+capabilities: [CAP-PERM-APPROVAL-001, CAP-SESSION-STATUS-001, CAP-SYS-NOTIFY-001]
+providers:
+  one:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: first, name: Bash, input: { command: echo hello } }]
+      - tool_calls: [{ id: repeat, name: Bash, input: { command: echo hello } }]
+      - text: Done.
+  two:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: other, name: Bash, input: { command: echo hello } }]
+      - text: Done.
+sessions:
+  a: { provider: one }
+  b: { provider: two }
+approvals:
+  - { tool: Bash, decision: session }
+  - { tool: Bash, decision: deny, feedback: Review the script first. }
+actions:
+  - prompt: { session: a, text: Start., turn: ta }
+  - wait: { session: a, method: turn/completed, turn: ta }
+  - prompt: { session: b, text: Start., turn: tb }
+expect:
+  events:
+    - { session: b, method: item/completed, params: { item: { itemId: other, status: declined } } }
+  requests:
+    - {
+        provider: one,
+        index: 2,
+        tool_results:
+          [
+            { id: first, is_error: false, contains: hello },
+            { id: repeat, is_error: false, contains: hello },
+          ],
+      }
+    - {
+        provider: two,
+        index: 1,
+        tool_results: [{ id: other, is_error: true, contains: Review the script first. }],
+      }
+  request_counts: { one: 3, two: 2 }

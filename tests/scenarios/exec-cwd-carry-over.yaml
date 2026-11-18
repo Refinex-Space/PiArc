@@ -14,6 +14,11 @@ providers:
       - tool_calls:
           - { id: toolu_pwd_root, name: Bash, input: { command: 'pwd -P' } }
       - text: 'Moved around.'
+approvals:
+  - { tool: Bash, decision: allow }
+  - { tool: Bash, decision: allow }
+  - { tool: Bash, decision: allow }
+  - { tool: Bash, decision: allow }
 actions:
   - prompt: { text: 'Change directories.', turn: t }
 expect:

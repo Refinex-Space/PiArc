@@ -22,6 +22,8 @@ providers:
           - { id: toolu_g_d, name: Grep, input: { pattern: match, path: d.txt } }
           - { id: toolu_g_e, name: Grep, input: { pattern: match, path: e.txt } }
       - text: 'Searched.'
+approvals:
+  - { tool: Bash, decision: allow }
 actions:
   - prompt: { text: 'Search the files.', turn: t }
 expect:

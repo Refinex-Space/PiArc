@@ -30,6 +30,10 @@ providers:
                 { path: app.py, edits: [{ oldText: 'log(', newText: 'print(' }], replaceAll: true },
             }
       - text: 'Replaced every call.'
+approvals:
+  - { tool: Edit, decision: allow }
+  - { tool: Edit, decision: allow }
+  - { tool: Edit, decision: allow }
 actions:
   - prompt: { text: 'Use print instead of log.', turn: t }
 expect:

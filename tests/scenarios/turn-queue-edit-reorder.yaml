@@ -18,6 +18,8 @@ providers:
       - text: 'Follow-up D done.'
       - text: 'Follow-up C done.'
       - text: 'Follow-up B2 done.'
+approvals:
+  - { tool: Bash, decision: allow }
 actions:
   - prompt: { text: 'Wait for the signal.', turn: t }
   - wait: { method: item/started, params: { item: { itemId: toolu_wait } } }

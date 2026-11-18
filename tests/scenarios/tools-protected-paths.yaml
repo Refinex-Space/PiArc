@@ -1,5 +1,5 @@
 id: tools-protected-paths
-description: Writing below .git/, .claude/ or .pi/ or to a shell configuration file needs the user's approval even inside the workspace; until approvals exist the write fails with the reason and the files stay as they were, while reading them works.
+description: Writing below .git/, .claude/ or .pi/ or to a shell configuration file needs the user's approval even inside the workspace; when the user declines, the write fails with the reason and the files stay as they were, while reading them works.
 capabilities: [CAP-TOOL-PATH-PROTECTED-001]
 workspace:
   files:
@@ -36,6 +36,11 @@ providers:
       - tool_calls:
           - { id: toolu_write_zshrc, name: Write, input: { path: .zshrc, content: "alias x=y\n" } }
       - text: 'Those are protected.'
+approvals:
+  - { tool: Edit, decision: deny }
+  - { tool: Write, decision: deny }
+  - { tool: Write, decision: deny }
+  - { tool: Write, decision: deny }
 actions:
   - prompt: { text: 'Change the configuration.', turn: t }
 expect:

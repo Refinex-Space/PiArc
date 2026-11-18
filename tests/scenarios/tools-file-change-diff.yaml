@@ -23,6 +23,9 @@ providers:
               input: { path: 'docs/新.md', content: "# New\n\ntext" },
             }
       - text: 'Changed.'
+approvals:
+  - { tool: Edit, decision: allow }
+  - { tool: Write, decision: allow }
 actions:
   - prompt: { text: 'Bump x and add a note.', turn: t }
 expect:

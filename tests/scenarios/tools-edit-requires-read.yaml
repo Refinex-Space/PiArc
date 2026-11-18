@@ -35,6 +35,11 @@ providers:
               input: { path: 'src/new.ts', content: "export {};\n" },
             }
       - text: 'Read first, then edited.'
+approvals:
+  - { tool: Edit, decision: allow }
+  - { tool: Write, decision: allow }
+  - { tool: Edit, decision: allow }
+  - { tool: Write, decision: allow }
 actions:
   - prompt: { text: 'Change the port to 9090.', turn: t }
 expect:

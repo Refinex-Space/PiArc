@@ -1,0 +1,32 @@
+id: policy-extra-directory
+description: Approve a new directory for an outside Write, repeat that same write, and read the added file without another prompt. A protected write under the added directory still needs approval.
+capabilities: [CAP-PERM-APPROVAL-001, CAP-TOOL-PATH-BOUNDARY-001]
+workspace:
+  trusted: true
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: create, name: Write, input: { path: ../approved/note, content: first } }
+      - tool_calls:
+          - { id: repeat, name: Write, input: { path: ../approved/note, content: second } }
+      - tool_calls:
+          - { id: read, name: Read, input: { path: ../approved/note } }
+      - tool_calls:
+          - { id: guarded, name: Write, input: { path: ../approved/.pi/config, content: blocked } }
+      - text: Finished.
+approvals:
+  - { tool: Write, decision: always }
+  - { tool: Write, decision: deny }
+actions:
+  - prompt: { text: Write and read the approved note. }
+expect:
+  request_counts: { main: 5 }
+  requests:
+    - index: 4
+      tool_results:
+        - { id: create, is_error: false }
+        - { id: repeat, is_error: false }
+        - { id: read, is_error: false, contains: second }
+        - { id: guarded, is_error: true, contains: protected path }

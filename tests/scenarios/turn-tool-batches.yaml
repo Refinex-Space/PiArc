@@ -38,6 +38,8 @@ providers:
           - { id: r14, name: Read, input: { path: 'files/13.txt' } }
           - { id: r15, name: Read, input: { path: 'files/14.txt' } }
       - text: 'Read and wrote everything.'
+approvals:
+  - { tool: Write, decision: allow }
 actions:
   - prompt: { text: 'Read, write, read.', turn: t }
 expect:

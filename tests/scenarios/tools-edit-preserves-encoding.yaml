@@ -39,6 +39,11 @@ providers:
               input: { path: write-crlf.txt, content: "uno\ndos\ntres\n" },
             }
       - text: 'Edited all four files.'
+approvals:
+  - { tool: Edit, decision: allow }
+  - { tool: Edit, decision: allow }
+  - { tool: Edit, decision: allow }
+  - { tool: Write, decision: allow }
 actions:
   - prompt: { text: 'Update the values.', turn: t }
 expect:

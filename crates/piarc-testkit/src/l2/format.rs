@@ -173,6 +173,9 @@ impl ProviderSpec {
 pub struct SessionSpec {
     /// The endpoint its model talks to.
     pub provider: String,
+    /// Explicit starting permission mode.
+    #[serde(default)]
+    pub mode: Option<piarc_protocol::policy::PermissionMode>,
     /// Working directory relative to the workspace.
     #[serde(default)]
     pub cwd: Option<String>,
@@ -262,6 +265,14 @@ pub enum Action {
         #[serde(default)]
         session: Option<String>,
     },
+    /// Change mode through the public session API.
+    SetMode {
+        /// Target session.
+        #[serde(default)]
+        session: Option<String>,
+        /// New mode.
+        mode: piarc_protocol::policy::PermissionMode,
+    },
     /// Waits for events.
     Wait(WaitAction),
     /// Writes a workspace file (a signal for a waiting command).
@@ -295,6 +306,7 @@ impl Action {
             Self::QueueDelete { .. } => "queue_delete",
             Self::QueueReorder { .. } => "queue_reorder",
             Self::Abort { .. } => "abort",
+            Self::SetMode { .. } => "set_mode",
             Self::Wait(_) => "wait",
             Self::WriteFile { .. } => "write_file",
             Self::RestartCore {} => "restart_core",
@@ -311,6 +323,7 @@ impl Action {
             | Self::QueueDelete { session, .. }
             | Self::QueueReorder { session, .. }
             | Self::Compact { session }
+            | Self::SetMode { session, .. }
             | Self::Abort { session }
             | Self::Resume { session } => Some(session),
             Self::Wait(wait) => Some(&wait.session),
@@ -402,12 +415,19 @@ pub struct Approval {
     /// The tool the request must be for.
     #[serde(default)]
     pub tool: Option<String>,
+    /// User feedback returned with a refusal.
+    #[serde(default)]
+    pub feedback: Option<String>,
 }
 
 /// Approval decisions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ApprovalDecision {
+    /// Allow the same invocation for this session.
+    Session,
+    /// Persist a confirmed permission.
+    Always,
     /// Allow.
     Allow,
     /// Deny.
@@ -521,6 +541,7 @@ impl ScenarioSpec {
             DEFAULT_SESSION.to_owned(),
             SessionSpec {
                 provider,
+                mode: None,
                 cwd: None,
             },
         )])
@@ -779,6 +800,7 @@ fn check_actions(spec: &ScenarioSpec, problems: &mut Vec<String>) {
                 }
             }
             Action::Compact { .. }
+            | Action::SetMode { .. }
             | Action::Abort { .. }
             | Action::RestartCore {}
             | Action::Resume { .. } => {}

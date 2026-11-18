@@ -189,6 +189,7 @@
       "required": ["provider"],
       "properties": {
         "provider": { "$ref": "#/$defs/label" },
+        "mode": { "enum": ["default", "acceptEdits"] },
         "cwd": {
           "description": "Working directory relative to the workspace; the workspace when absent.",
           "$ref": "#/$defs/relativePath"
@@ -242,6 +243,15 @@
           "properties": { "session": { "$ref": "#/$defs/label" } }
         },
         "wait": { "$ref": "#/$defs/waitAction" },
+        "set_mode": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "mode": { "enum": ["default", "acceptEdits"] }
+          }
+        },
         "restart_core": {
           "description": "Shut Core down, start it again on the same data directory and reopen the workspace; sessions stay closed until resumed.",
           "type": "object",
@@ -349,7 +359,8 @@
       "additionalProperties": false,
       "required": ["decision"],
       "properties": {
-        "decision": { "enum": ["allow", "deny"] },
+        "feedback": { "type": "string" },
+        "decision": { "enum": ["allow", "deny", "always", "session"] },
         "tool": {
           "description": "The canonical tool name the request must be for.",
           "type": "string"

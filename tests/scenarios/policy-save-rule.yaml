@@ -1,0 +1,49 @@
+id: policy-save-rule
+description: A natively confirmed exact command rule survives subsequent calls in the trusted project.
+capabilities:
+  - CAP-PERM-APPROVAL-001
+workspace:
+  trusted: true
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: first
+            name: Bash
+            input:
+              command: echo saved
+      - tool_calls:
+          - id: again
+            name: Bash
+            input:
+              command: echo saved
+      - tool_calls:
+          - id: other
+            name: Bash
+            input:
+              command: echo other
+      - text: Finished.
+actions:
+  - prompt:
+      text: Check permissions.
+      turn: first
+approvals:
+  - tool: Bash
+    decision: always
+  - tool: Bash
+    decision: deny
+    feedback: Use the saved command.
+expect:
+  request_counts:
+    main: 4
+  requests:
+    - index: 3
+      tool_results:
+        - id: first
+          is_error: false
+        - id: again
+          is_error: false
+        - id: other
+          is_error: true
+          contains: Use the saved command.

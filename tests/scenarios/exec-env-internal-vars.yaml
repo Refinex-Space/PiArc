@@ -8,6 +8,8 @@ providers:
       - tool_calls:
           - { id: toolu_env, name: Bash, input: { command: 'env' } }
       - text: 'Listed.'
+approvals:
+  - { tool: Bash, decision: allow }
 actions:
   - prompt: { text: 'Show the environment.', turn: t }
 expect:

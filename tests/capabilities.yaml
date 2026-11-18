@@ -48,7 +48,7 @@ capabilities:
     milestone: M1
     refs: [FR-WS-02]
     task: T20
-    status: planned
+    status: active
   - id: CAP-SESSION-FORK-001
     title: '从某条消息分出会话分支并在分支间切换'
     milestone: M2
@@ -470,13 +470,13 @@ capabilities:
     milestone: M1
     refs: [FR-PM-01, ARCH-6.2.1]
     task: T20
-    status: planned
+    status: active
   - id: CAP-PERM-APPROVAL-001
     title: '结构化审批：仅本次、本会话、总是允许、拒绝并反馈'
     milestone: M1
     refs: [FR-PM-02, ARCH-6.2.3]
     task: T20
-    status: planned
+    status: active
   - id: CAP-PERM-MODE-002
     title: '计划与跳过权限模式（跳过权限需显式开启并二次确认）'
     milestone: M2
@@ -800,7 +800,7 @@ capabilities:
     milestone: M1
     refs: [FR-SY-01]
     task: T20
-    status: planned
+    status: active
   - id: CAP-SYS-NOTIFY-002
     title: '在通知中直接允许或拒绝'
     milestone: M4

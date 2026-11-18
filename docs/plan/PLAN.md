@@ -316,7 +316,8 @@ T20 基础权限与审批，macOS arm64。基线 `1c8ad0e`，`npm run verify` 15
 - [x] Core 审批账本、裁决、审计、失效与 I/O 绑定（Core 权限测试 6/6，1000 次真实自动裁决 p95 0.528 ms；A07 的桌面流程单列）
 - [x] Agent Host 阻断、反馈、模式 entry 与恢复（真实 Host 故障注入、强杀后恢复、模式重启恢复和跨帧 Write 已通过）
 - [x] 客户端四类审批卡、模式菜单、原生确认与热键（定向 Vitest 46/46；dev 与 packaged Electron 34/34；本地 ego-browser 已操作）
-- [ ] L2 场景、L4、截图、基准与全量门禁（A01–A14）
+- [x] L2 场景、L4、截图与基准（48 个 L2 中本机 47 通过、Windows 专有 1 项由 CI 执行；Electron 34/34）
+- [ ] 收尾 `npm run verify` 15 项（A14）
 - [ ] 文档、验收与收尾
 
 ## 登记事项
@@ -393,7 +394,7 @@ T20 基础权限与审批，macOS arm64。基线 `1c8ad0e`，`npm run verify` 15
 | I66 | T14 开工检查 | Windows CI（运行 43879135441）中 `core.integration.test.ts` 的 T13 用例清理临时目录时 EPERM：`CoreRuntime.shutdown()` 之后 Core 仍持有数据目录里的文件（数据库连接随 NAPI 对象存活到 GC），Windows 不能删除打开的文件；macOS 上不报错。同一运行的 `cargo test`、`data-dirs.test.ts` 与 Windows L4 均通过 | T14：有序关闭最后一步关闭数据库，补测试；推送后看 Windows CI；已落地（T14，提交 8a95b84）：有序关闭最后关闭数据库（`Storage::close`），测试 `crates/piarc-core/tests/state.rs` 与 `apps/desktop/src/main/core/core.integration.test.ts`；Windows CI 尚未运行（推送后看） |
 | I67 | T14 | 回合以失败（非中断）结束时不补中断标记：pi-ai 丢弃出错的 assistant 消息，下一条输入会紧跟上一条 user 消息（Anthropic API 合并，严格 mock 的 `role_order` 拒绝）。中断的回合已由 ADR-0026 补齐 | T27 与压缩、中断标记一起决定失败回合的对话形态 |
 | I68 | T14 | 实时条目与历史条目的 id 不同：文本与 reasoning 实时为 `<投影器生成的 messageId>#<序号>`，历史为 `<entry id>#<序号>`；用户消息实时为 `<turnId>:user:<n>`，历史为 entry id；工具调用两边相同（`agent-host/CLAUDE.md`）。客户端不能按 id 把重新加载的窗口与流式条目合并 | T19 的 transcript 重载以 `transcript_window` 整段替换，或由 T19 决定在 `turn/completed` 后补发 entry id 的映射；**T19 已落地**，重同步整窗替换，历史条目携带可选 turnId |
-| I69 | T15 | L2 运行器还没有审批请求的观测点：T20 之前 Core 不发审批请求，场景声明的 `approvals` 一律判失败（`piarc_testkit::l2::runner` 的 `assert_all`）。审批落地后场景要能按顺序应答审批，并在请求没被应答或应答没被用上时失败 | T20 经 Core 的公开接口（事件或回调）把审批请求交给运行器，改 `runner.rs` 与 `testing.md` 第 12.3 节，把审批场景写成 L2 |
+| I69 | T15 | L2 运行器还没有审批请求的观测点：T20 之前 Core 不发审批请求，场景声明的 `approvals` 一律判失败（`piarc_testkit::l2::runner` 的 `assert_all`）。审批落地后场景要能按顺序应答审批，并在请求没被应答或应答没被用上时失败 | T20 经 Core 的公开接口（事件或回调）把审批请求交给运行器，改 `runner.rs` 与 `testing.md` 第 12.3 节，把审批场景写成 L2；**T20 已落地**，运行器按快照顺序应答，检查应答数量、工具名与待审数量 |
 | I70 | T16 开工检查 | T15 推送后的 CI 运行 44031571343（T14 的运行 44021743399 已出现）：① Windows `cargo test` 中 `tests/sessions/lifecycle.rs` 用 `canonicalize` 的结果（带 `\\?\` 前缀）与 Core 报告的工作区路径比较，永远找不到工作区；② 两个平台 L4 的 `agent-host.e2e.ts` 仍按 T14 之前的条目类型筛选（Bash 与 MCP 调用已改为 `commandExecution`、`mcpToolCall`）。都是测试缺陷，产品行为无误 | 已落地（T16）：比较前去掉 `\\?\` 前缀；L4 按条目的 `tool` 字段筛选并断言各自的条目类型；CI 运行 44069688031 确认：Windows 的 `lifecycle` 测试与两个平台 L4 的 `agent-host.e2e.ts` 均通过 |
 | I71 | T16 | PDF 文本用 lopdf 0.46 的 `extract_text`：资源以内联字典写在页树节点上（被页面继承）时取不到文字，空格与换行也不如 `pdf-extract`；`pdf-extract` 0.12 锁 lopdf 0.42，引入已停止维护的 `ttf-parser`（RUSTSEC-2026-0192），cargo-deny 拒绝 | 有服务商原生 PDF 输入的任务（T29 模型设置或 M2 之后）评估把 PDF 作为文档块交给支持的模型；`pdf-extract` 升级到新 lopdf 后换回（ADR-0027 触发条件） |
 | I72 | T16 | 重复读取的存根依赖"上一次 Read 的结果还在上下文里"：压缩（T27）删掉旧结果后，存根会指向模型已经看不到的内容 | T27 在压缩完成时清掉会话状态表里的读取范围（保留哈希，先读后改仍然成立），在 `piarc_fs::FileStates` 上加一个方法并经 AHP 或会话层调用 |

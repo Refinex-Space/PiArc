@@ -23,6 +23,8 @@ providers:
       - tool_calls:
           - { id: toolu_probe, name: fixture_probe, input: {} }
       - text: 'The probe answered.'
+approvals:
+  - { tool: fixture_probe, decision: allow }
 actions:
   - prompt: { text: 'Call the probe.', turn: t }
 expect:

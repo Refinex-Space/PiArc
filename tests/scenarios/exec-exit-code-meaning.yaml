@@ -20,6 +20,10 @@ providers:
               input: { command: 'grep missing no-such-file.txt' },
             }
       - text: 'Compared.'
+approvals:
+  - { tool: Bash, decision: allow }
+  - { tool: Bash, decision: allow }
+  - { tool: Bash, decision: allow }
 actions:
   - prompt: { text: 'Search and compare.', turn: t }
 expect:

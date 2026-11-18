@@ -199,6 +199,7 @@ fn declared_approvals_without_approval_requests_fail() {
     let mut spec = scenario("chat-basic");
     spec.approvals = vec![Approval {
         decision: ApprovalDecision::Allow,
+        feedback: None,
         tool: Some("Bash".into()),
     }];
     let failures = failures_of(&spec);

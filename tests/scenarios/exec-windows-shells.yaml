@@ -22,6 +22,10 @@ providers:
               input: { command: "Write-Output '中文输出 PowerShell'" },
             }
       - text: 'Both shells ran.'
+approvals:
+  - { tool: Bash, decision: allow }
+  - { tool: Bash, decision: allow }
+  - { tool: PowerShell, decision: allow }
 actions:
   - prompt: { text: 'Use both shells.', turn: t }
 expect:

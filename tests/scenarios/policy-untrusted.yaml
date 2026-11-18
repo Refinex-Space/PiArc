@@ -1,0 +1,51 @@
+id: policy-untrusted
+description: A project cannot authorize itself through its rule, starting mode, or additional directory.
+capabilities:
+  - CAP-PERM-MODE-001
+workspace:
+  files:
+    .piarc/settings.json: '{"permissions":{"allow":["Bash(echo hidden)"],"defaultMode":"acceptEdits","additionalDirectories":[".."]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: run
+            name: Bash
+            input:
+              command: echo hidden
+      - tool_calls:
+          - id: write
+            name: Write
+            input:
+              path: file
+              content: x
+      - tool_calls:
+          - id: outside
+            name: Read
+            input:
+              path: ../other
+      - text: Finished.
+actions:
+  - prompt:
+      text: Check permissions.
+      turn: first
+approvals:
+  - tool: Bash
+    decision: deny
+  - tool: Write
+    decision: deny
+  - tool: Read
+    decision: deny
+expect:
+  request_counts:
+    main: 4
+  requests:
+    - index: 3
+      tool_results:
+        - id: run
+          is_error: true
+        - id: write
+          is_error: true
+        - id: outside
+          is_error: true

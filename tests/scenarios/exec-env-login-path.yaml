@@ -14,6 +14,8 @@ providers:
               input: { command: 'l2-login-tool; echo "profile: $L2_LOGIN_PROFILE"' },
             }
       - text: 'Ran it.'
+approvals:
+  - { tool: Bash, decision: allow }
 actions:
   - prompt: { text: 'Run the tool from my PATH.', turn: t }
 expect:

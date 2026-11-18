@@ -14,6 +14,10 @@ providers:
             }
           - { id: toolu_w2, name: Write, input: { path: log.txt, content: "third\n" } }
       - text: 'Written three times.'
+approvals:
+  - { tool: Write, decision: allow }
+  - { tool: Edit, decision: allow }
+  - { tool: Write, decision: allow }
 actions:
   - prompt: { text: 'Write the log.', turn: t }
 expect:

@@ -8,7 +8,7 @@
 
 | 里程碑 | 能力数 | 已实现 | 计划中 | BLOCKED |
 |---|---|---|---|---|
-| M1 | 61 | 49 | 12 | 0 |
+| M1 | 61 | 53 | 8 | 0 |
 | M2 | 30 | 0 | 30 | 0 |
 | M3 | 21 | 0 | 21 | 0 |
 | M4 | 10 | 0 | 10 | 0 |
@@ -33,8 +33,8 @@
 | CAP-EXEC-TIMEOUT-001 | 命令超时（默认 2 分钟、上限 10 分钟）后整棵进程树被终止，结果带已有输出与超时说明 | FR-TL-01、ARCH-6.11 | T17 | `exec-timeout-kills-tree` | 已实现 |
 | CAP-EXT-PI-001 | 信任的项目 Pi 扩展被加载，其注册的工具可被模型调用 | ARCH-5.5、ARCH-10.2 | T13 | `trust-trusted-loads-project-extension` | 已实现 |
 | CAP-MODEL-SWITCH-001 | 会话内切换模型与 effort，提示切换代价 | FR-MD-03、ARCH-6.13 | T21 | — | 计划中 |
-| CAP-PERM-APPROVAL-001 | 结构化审批：仅本次、本会话、总是允许、拒绝并反馈 | FR-PM-02、ARCH-6.2.3 | T20 | — | 计划中 |
-| CAP-PERM-MODE-001 | 手动与自动接受编辑两种权限模式 | FR-PM-01、ARCH-6.2.1 | T20 | — | 计划中 |
+| CAP-PERM-APPROVAL-001 | 结构化审批：仅本次、本会话、总是允许、拒绝并反馈 | FR-PM-02、ARCH-6.2.3 | T20 | `policy-extra-directory`<br>`policy-save-rule`<br>`policy-session-rule` | 已实现 |
+| CAP-PERM-MODE-001 | 手动与自动接受编辑两种权限模式 | FR-PM-01、ARCH-6.2.1 | T20 | `policy-accept-edits`<br>`policy-accept-edits-powershell`<br>`policy-manual`<br>`policy-manual-powershell`<br>`policy-mode-restore`<br>`policy-shell-boundary`<br>`policy-untrusted` | 已实现 |
 | CAP-PROVIDER-ANTHROPIC-001 | Anthropic Messages 线格式的服务商 | FR-MD-01、ARCH-6.13 | T06 | `chat-basic` | 已实现 |
 | CAP-PROVIDER-CLOUD-001 | 云厂商凭证与本地模型服务商 | FR-MD-01 | T21 | — | 计划中 |
 | CAP-PROVIDER-CONFIG-001 | 配置服务商与 API key；凭据只存在 Core 的保险箱并经 AHP 交给 Agent Host | FR-MD-01、ARCH-5.4 | T21 | — | 计划中 |
@@ -42,9 +42,9 @@
 | CAP-SESSION-MANAGE-001 | 新建、重命名、置顶、归档、删除会话 | FR-WS-03 | T18 | — | 计划中 |
 | CAP-SESSION-MULTI-001 | 同一工作区的多个会话同时运行，各自的工作目录与请求互不串扰 | ARCH-5.2、ARCH-5.3 | T14 | `sessions-two-cwds-isolated` | 已实现 |
 | CAP-SESSION-PERSIST-001 | 会话持久化，Core 重启后可恢复并带着完整历史继续 | FR-WS-03、ARCH-9 | T14 | `sessions-persist-across-restart` | 已实现 |
-| CAP-SESSION-STATUS-001 | Core 计算会话状态（错误 > 等待审批 > 运行中 > 未读 > 空闲）并随会话列表快照送达 | FR-WS-02 | T20 | — | 计划中 |
+| CAP-SESSION-STATUS-001 | Core 计算会话状态（错误 > 等待审批 > 运行中 > 未读 > 空闲）并随会话列表快照送达 | FR-WS-02 | T20 | `policy-session-rule` | 已实现 |
 | CAP-SESSION-TURN-001 | 输入开始一个回合，正文与工具调用以条目事件流式送达客户端 | FR-CH-01、ARCH-5.3 | T14 | `chat-basic` | 已实现 |
-| CAP-SYS-NOTIFY-001 | 会话完成或等待审批时发出通知事件 | FR-SY-01 | T20 | — | 计划中 |
+| CAP-SYS-NOTIFY-001 | 会话完成或等待审批时发出通知事件 | FR-SY-01 | T20 | `policy-session-rule` | 已实现 |
 | CAP-TOOL-BASH-001 | Bash 经 Core 执行命令并返回输出 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
 | CAP-TOOL-BASH-002 | Bash 超时终止整个进程树，输出给出语义成败 | FR-TL-01、FR-TL-02、ARCH-6.11 | T17 | `exec-exit-code-meaning`<br>`exec-timeout-kills-tree` | 已实现 |
 | CAP-TOOL-CORE-001 | 工具的文件与命令 I/O 全部经 Core 的 AHP fs/exec 方法执行 | FR-TL-01、ARCH-6.1.3 | T07 | `tools-canonical-via-core` | 已实现 |
@@ -57,7 +57,7 @@
 | CAP-TOOL-GLOB-001 | Glob 由 Core 按模式列出文件 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
 | CAP-TOOL-GREP-001 | Grep 由 Core 搜索文件内容 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
 | CAP-TOOL-OUTPUT-001 | 超长工具结果落盘，模型收到预览与路径；单条消息的工具结果有总上限 | FR-TL-02、ARCH-6.15 | T16 | `tools-output-spill` | 已实现 |
-| CAP-TOOL-PATH-BOUNDARY-001 | 会话目录之外的读写需要询问；审批落地（T20）之前按拒绝处理并说明理由 | FR-TL-01、ARCH-6.1.2 | T16 | `tools-path-boundary` | 已实现 |
+| CAP-TOOL-PATH-BOUNDARY-001 | 会话目录之外的读写需要询问；审批落地（T20）之前按拒绝处理并说明理由 | FR-TL-01、ARCH-6.1.2 | T16 | `policy-extra-directory`<br>`tools-path-boundary` | 已实现 |
 | CAP-TOOL-PATH-PROTECTED-001 | 受保护路径（.git/、.piarc/、.claude/、.pi/、shell 配置文件）的写入需要询问，T20 之前按拒绝处理 | FR-TL-01、ARCH-6.1.2 | T16 | `tools-protected-paths` | 已实现 |
 | CAP-TOOL-POWERSHELL-001 | Windows 上的 PowerShell 工具 | ARCH-6.1.4、ARCH-6.2.2 | T17 | `exec-shell-tools-macos`（仅 macos）<br>`exec-windows-shells`（仅 windows） | 已实现 |
 | CAP-TOOL-PROFILE-001 | 模型看到的工具名是规范名，不出现 Pi 原生工具名 | ARCH-6.1.1 | T07 | `tools-model-sees-canonical-names` | 已实现 |

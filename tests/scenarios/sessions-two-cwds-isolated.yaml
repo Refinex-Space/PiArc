@@ -25,6 +25,9 @@ providers:
 sessions:
   a: { provider: one, cwd: 'alpha dir' }
   b: { provider: two, cwd: 'beta 目录' }
+approvals:
+  - { tool: Write, decision: allow }
+  - { tool: Write, decision: allow }
 actions:
   - prompt: { session: a, text: 'Copy the note.', turn: ta }
   - prompt: { session: b, text: 'Copy the note.', turn: tb }

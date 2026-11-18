@@ -44,6 +44,8 @@
 
 ## Agent Host 端到端测试
 
+- `cargo test -p piarc-testkit --test agent_host policy_faults` 注入 Core 错误、超时与非法回复，检查真实模型请求中的错误结果和工作区副作用。`cargo test -p piarc-testkit --test sessions permissions::` 使用真实 Core 审批账本检查双窗口答复、Host 进程被杀后的恢复、模式切换条目与整进程重启。
+
 - `tests/agent_host/harness.rs`：每个测试一个临时根目录（含空格与中文），`data/pi/models.json` 定义 provider `piarc-mock` 与 `mock-large`（200k）、`mock-small`（32k）两个模型。`mock-small` 的请求一律以请求头选择场景 `small-window`：压缩会替换首条 user 消息，消息里的场景标记随之消失。
 - 等待一律等事件或条件（`Recorder::until`、`turn_completed`），超时只作安全网。
 - 中断或杀进程的时点靠场景步骤的 `stall_after_events`。中断后的对话由 Harness Kit 补齐（ADR-0026），这类场景开着 `role_order`；只有含 steer 的场景关闭它（steer 按 Pi 的做法紧跟工具结果，形成相邻的 user 消息）。
@@ -72,7 +74,7 @@
 - Composer 输入可声明提及、客户端幂等键与附件夹具。运行器经 Core 的 `store_attachment` 存入附件，输入携带返回的引用。见 `chat-composer-input.yaml`（含手动压缩）与 `turn-classified-errors.yaml`。
 - 会话建立时 Agent Host 发一次 `exec/shells`（没有工具调用 id）：`ToolIoObserver` 的计数与批次 Gate 要忽略没有 `tool_call_id` 的请求（`tests/sessions/turns.rs` 的 `Rounds` 已这样做）。
 - 动作结束后先等每个被启动的回合 `turn/completed`，再一次性检查全部断言；没有 sleep，等待只有 30 s 安全网。
-- 每个请求都必须通过严格 mock 的校验（总是检查）；`approvals` 在 T20 之前一律判失败（Core 不发审批请求，声明的应答必然用不上）。T20 接入审批请求的观测点时改 `runner.rs` 的 `assert_all`。
+- 每个请求都必须通过严格 mock 的校验（总是检查）；`approvals` 按声明顺序答复会话快照里的新请求；多出的应答、无人答复的请求或工具名不符都使场景失败。
 
 ## 易错点
 

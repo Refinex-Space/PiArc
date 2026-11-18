@@ -16,6 +16,10 @@ providers:
       - tool_calls:
           - { id: toolu_short, name: Bash, input: { command: 'echo short output' } }
       - text: 'Printed.'
+approvals:
+  - { tool: Bash, decision: allow }
+  - { tool: Bash, decision: allow }
+  - { tool: Bash, decision: allow }
 actions:
   - prompt: { text: 'Print a lot.', turn: t }
 expect:

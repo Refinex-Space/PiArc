@@ -26,6 +26,9 @@ providers:
               input: { path: notes.md, edits: [{ oldText: 'review', newText: 'final' }] },
             }
       - text: 'Now final.'
+approvals:
+  - { tool: Edit, decision: allow }
+  - { tool: Edit, decision: allow }
 actions:
   - prompt: { text: 'What is the status?', turn: first }
   - wait: { method: turn/completed, turn: first }

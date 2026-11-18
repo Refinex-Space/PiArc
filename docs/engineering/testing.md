@@ -334,7 +334,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 
 ### 12.3 审批应答
 
-`approvals` 按顺序回答 Core 发出的审批请求（`decision: allow|deny`，可选 `tool` 限定工具规范名）。T20 之前 Core 不产生审批请求：声明了应答的场景一律失败（"N answer(s) declared, but Core issued 0 approval requests"），不静默通过。T20 接入审批请求的观测点时同步本节。
+`approvals` 按顺序回答 `core/sessions` 快照中的新请求（`decision: allow|session|always|deny`，可指定 `tool` 和拒绝的 `feedback`）。应答经 Core 公开命令；未声明的请求、工具不匹配、重复或过期答复、未用上的应答都使场景失败。`sessions.<label>.mode` 显式选择起始模式，`set_mode` 操作向当前会话发送模式变更。
 
 ### 12.4 断言与匹配规则
 

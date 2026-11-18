@@ -1,0 +1,124 @@
+id: policy-accept-edits
+description: Exercise the full read, write, edit and shell matrix in acceptEdits mode.
+capabilities:
+  - CAP-PERM-MODE-001
+sessions:
+  main:
+    provider: main
+    mode: acceptEdits
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: write
+            name: Write
+            input:
+              path: file.txt
+              content: one
+      - tool_calls:
+          - id: edit
+            name: Edit
+            input:
+              path: file.txt
+              edits:
+                - oldText: one
+                  newText: two
+      - tool_calls:
+          - id: read
+            name: Read
+            input:
+              path: file.txt
+      - tool_calls:
+          - id: find
+            name: Glob
+            input:
+              pattern: '*.txt'
+      - tool_calls:
+          - id: grep
+            name: Grep
+            input:
+              pattern: two
+      - tool_calls:
+          - id: mkdir
+            name: Bash
+            input:
+              command: mkdir dir
+      - tool_calls:
+          - id: touch
+            name: Bash
+            input:
+              command: touch dir/file
+      - tool_calls:
+          - id: copy
+            name: Bash
+            input:
+              command: cp file.txt dir/copy
+      - tool_calls:
+          - id: move
+            name: Bash
+            input:
+              command: mv dir/copy moved
+      - tool_calls:
+          - id: cmd
+            name: Bash
+            input:
+              command: echo prompted
+      - tool_calls:
+          - id: protected
+            name: Write
+            input:
+              path: .pi/config.json
+              content: '{}'
+      - tool_calls:
+          - id: outside
+            name: Write
+            input:
+              path: ../other.txt
+              content: outside
+      - text: Finished.
+actions:
+  - prompt:
+      text: Check permissions.
+      turn: first
+approvals:
+  - tool: Bash
+    decision: allow
+  - tool: Write
+    decision: deny
+  - tool: Write
+    decision: deny
+expect:
+  request_counts:
+    main: 13
+  requests:
+    - index: 12
+      tool_results:
+        - id: write
+          is_error: false
+        - id: edit
+          is_error: false
+        - id: read
+          is_error: false
+        - id: find
+          is_error: false
+        - id: grep
+          is_error: false
+        - id: mkdir
+          is_error: false
+        - id: touch
+          is_error: false
+        - id: copy
+          is_error: false
+        - id: move
+          is_error: false
+        - id: cmd
+          is_error: false
+        - id: protected
+          is_error: true
+        - id: outside
+          is_error: true
+  files:
+    file.txt: two
+    moved: two
+    .pi/config.json: null

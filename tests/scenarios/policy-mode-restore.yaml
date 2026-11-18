@@ -1,0 +1,36 @@
+id: policy-mode-restore
+description: Switch mode, restart Core and restore the session. The next write uses the recorded mode.
+capabilities:
+  - CAP-PERM-MODE-001
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: Ready.
+      - tool_calls:
+          - id: write
+            name: Write
+            input:
+              path: ok
+              content: restored
+      - text: Finished.
+actions:
+  - prompt:
+      text: Start.
+      turn: t
+  - wait:
+      method: turn/completed
+      turn: t
+  - set_mode:
+      mode: acceptEdits
+  - restart_core: {}
+  - resume: {}
+  - prompt:
+      text: Write now.
+      turn: u
+approvals: []
+expect:
+  request_counts:
+    main: 3
+  files:
+    ok: restored

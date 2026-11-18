@@ -160,6 +160,8 @@ async fn run_in(spec: &ScenarioSpec, config: &RunnerConfig, root: &Path) -> Vec<
         turns: BTreeMap::new(),
         unlabeled_turns: Vec::new(),
         items: BTreeMap::new(),
+        answered: BTreeSet::new(),
+        approval_cursor: 0,
     };
     let mut failures = match driver.drive().await {
         Ok(()) => driver.assert_all(),
@@ -450,6 +452,8 @@ struct Driver<'a> {
     turns: BTreeMap<String, String>,
     unlabeled_turns: Vec<String>,
     items: BTreeMap<String, String>,
+    answered: BTreeSet<String>,
+    approval_cursor: usize,
 }
 
 impl Driver<'_> {
@@ -499,7 +503,10 @@ impl Driver<'_> {
             });
             let ws = workspace.clone();
             let created = call(
-                |done| self.core.create_session(ws, cwd, model, done),
+                |done| {
+                    self.core
+                        .create_session_with_mode(ws, cwd, model, session.mode, done)
+                },
                 &format!("creating session `{label}`"),
             )
             .await?;
@@ -551,6 +558,10 @@ impl Driver<'_> {
                     .await
                     .map(drop)
             }
+            Action::SetMode { session, mode } => self
+                .op(session.as_deref(), Op::SetPermissionMode(*mode))
+                .await
+                .map(drop),
             Action::Abort { session } => self.op(session.as_deref(), Op::Abort).await.map(drop),
             Action::Wait(wait) => {
                 let matcher = wait.matcher();
@@ -694,22 +705,102 @@ impl Driver<'_> {
     }
 
     async fn wait_until(
-        &self,
+        &mut self,
         what: &str,
         done: impl Fn(&[ObservedEvent]) -> bool,
     ) -> Result<(), String> {
         let wait = async {
             loop {
-                let notified = self.events.arrived.notified();
+                let events = Arc::clone(self.events);
+                let notified = events.arrived.notified();
+                self.answer_visible().await?;
                 if done(&self.observed()) {
-                    return;
+                    return Ok(());
                 }
                 notified.await;
             }
         };
         tokio::time::timeout(WAIT, wait)
             .await
-            .map_err(|_| format!("no {what} within {WAIT:?}"))
+            .map_err(|_| format!("no {what} within {WAIT:?}"))?
+    }
+
+    async fn answer_visible(&mut self) -> Result<(), String> {
+        use super::format::ApprovalDecision as Choice;
+        use piarc_protocol::policy::{
+            ApprovalAnswer, ApprovalDecision as Decision, ApprovalRequest,
+        };
+
+        let snapshots: Vec<Value> = {
+            let all = self
+                .events
+                .all
+                .lock()
+                .map_err(|_| "event log unavailable")?;
+            let new = all[self.approval_cursor..]
+                .iter()
+                .filter(|(route, _)| route == "core/sessions")
+                .map(|(_, v)| v.clone())
+                .collect();
+            self.approval_cursor = all.len();
+            new
+        };
+        for event in snapshots {
+            for session in event["sessions"].as_array().into_iter().flatten() {
+                let cards = session["approvals"]
+                    .as_array()
+                    .ok_or("session snapshot lacks approvals")?;
+                if session["pendingApprovals"].as_u64() != Some(cards.len() as u64) {
+                    return Err(format!(
+                        "pendingApprovals disagrees with the {} cards in the snapshot",
+                        cards.len()
+                    ));
+                }
+                for raw in cards {
+                    let card: ApprovalRequest =
+                        serde_json::from_value(raw.clone()).map_err(|e| e.to_string())?;
+                    if self.answered.contains(&card.request_id) {
+                        continue;
+                    }
+                    let expected = self
+                        .spec
+                        .approvals
+                        .get(self.answered.len())
+                        .ok_or_else(|| format!("unexpected approval for {}", card.tool))?;
+                    if expected.tool.as_ref().is_some_and(|t| t != &card.tool) {
+                        return Err(format!(
+                            "approval expected {:?}, got {}",
+                            expected.tool, card.tool
+                        ));
+                    }
+                    let answer = ApprovalAnswer {
+                        request_id: card.request_id.clone(),
+                        session_id: card.session_id,
+                        revision: card.revision,
+                        connection_epoch: card.connection_epoch,
+                        feedback: expected.feedback.clone(),
+                        rule: card.rule,
+                        directory: card.directory,
+                        decision: match expected.decision {
+                            Choice::Allow => Decision::AllowOnce,
+                            Choice::Session => Decision::AllowSession,
+                            Choice::Always => Decision::AllowAlways,
+                            Choice::Deny => Decision::Deny,
+                        },
+                    };
+                    let result = call(
+                        |done| self.core.answer_approval(answer, done),
+                        "answering an approval",
+                    )
+                    .await?;
+                    if result["status"] != "applied" {
+                        return Err(format!("approval was not applied: {result}"));
+                    }
+                    self.answered.insert(card.request_id);
+                }
+            }
+        }
+        Ok(())
     }
 
     /// The last events and the requests so far, for a failed action.
@@ -775,14 +866,13 @@ impl Driver<'_> {
                 ));
             }
         }
-        if !self.spec.approvals.is_empty() {
-            // No approval requests exist before T20: every declared answer stays unused, and an
-            // unused answer is a failure, never a silent pass.
+        if self.spec.approvals.len() != self.answered.len() {
             failures.push(failure(
                 "approvals",
                 format!(
-                    "approvals: {} answer(s) declared, but Core issued 0 approval requests",
-                    self.spec.approvals.len()
+                    "approvals: {} answer(s) declared, but Core issued {} approval requests",
+                    self.spec.approvals.len(),
+                    self.answered.len()
                 ),
             ));
         }
