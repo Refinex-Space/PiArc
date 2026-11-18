@@ -40,6 +40,8 @@ if (hash.startsWith(EVENT_PROBE_HASH)) {
     </StrictMode>,
   );
 } else {
+  // The app's own stylesheet rules apply from the first paint (app.css), not to the test pages.
+  document.documentElement.dataset.app = 'piarc';
   const settings = hash.startsWith('#/settings');
   if (settings) {
     registerBuiltInSettingsPages();

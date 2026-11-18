@@ -1,10 +1,11 @@
 /* PiArc's window styles. Colors, fonts and sizes come only from the design tokens
    (theme/tokens.generated.css, generated from design/tokens/): a change of visual direction
-   changes tokens, never these rules. */
+   changes tokens, never these rules. Element rules apply only to the app's own windows
+   (`data-app` on <html>, set by main.tsx), not to the prototype test pages. */
 
-*,
-*::before,
-*::after {
+:root[data-app] *,
+:root[data-app] *::before,
+:root[data-app] *::after {
   box-sizing: border-box;
 }
 
@@ -15,7 +16,7 @@ body,
   margin: 0;
 }
 
-body {
+:root[data-app] body {
   font-family: var(--piarc-font-ui);
   font-size: var(--piarc-font-size-body);
   line-height: 1.45;
@@ -34,39 +35,39 @@ body {
 
 /* The platform's material (macOS vibrancy, Windows Mica) shows behind the sidebar; content
    areas stay opaque. High-contrast modes are opaque everywhere. */
-:root[data-platform='mac']:not([data-color-mode$='HighContrast']) body,
-:root[data-platform='windows']:not([data-color-mode$='HighContrast']) body {
+:root[data-app][data-platform='mac']:not([data-color-mode$='HighContrast']) body,
+:root[data-app][data-platform='windows']:not([data-color-mode$='HighContrast']) body {
   background: transparent;
 }
 
-:root[data-reduce-motion='true'] *,
-:root[data-reduce-motion='true'] *::before,
-:root[data-reduce-motion='true'] *::after {
+:root[data-app][data-reduce-motion='true'] *,
+:root[data-app][data-reduce-motion='true'] *::before,
+:root[data-app][data-reduce-motion='true'] *::after {
   animation-duration: 0s !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0s !important;
 }
 
-:focus-visible {
+:root[data-app] :focus-visible {
   outline: 2px solid var(--piarc-c-focus-ring);
   outline-offset: 1px;
 }
 
-button,
-input,
-select,
-textarea {
+:root[data-app] button,
+:root[data-app] input,
+:root[data-app] select,
+:root[data-app] textarea {
   font: inherit;
   color: inherit;
 }
 
-code,
-kbd {
+:root[data-app] code,
+:root[data-app] kbd {
   font-family: var(--piarc-font-mono);
   font-size: var(--piarc-font-size-small);
 }
 
-kbd {
+:root[data-app] kbd {
   padding: 1px 6px;
   border: 1px solid var(--piarc-border-default);
   border-radius: var(--piarc-radius-sm);
