@@ -588,6 +588,14 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 本机：`npm run verify` 14/14；L4 全部 138 passed、1 skipped（含 packaged 的 `agent-host.e2e.ts`）
 - T17-A01、A11、A12、A13 仍为 blocked，等下一次推送的 Windows CI；未推送
 
+### 2026-11-18 T17 的第二次 CI 核对（提交 0aae401 的运行 44133509553）
+
+- 结果：`desktop L4 (windows-latest)` 通过（含上次失败的 packaged `agent-host.e2e.ts`），Windows 的 core build 与打包通过；`verify (windows-latest)` 失败 2 步，其余 macOS 作业因此被取消
+- Windows 上已通过：`piarc-exec` 全部测试（含改用注入时钟的超时测试）、`exec_commands` 8/8，L2 中 T17 的 8 个场景全部通过（`exec-windows-shells` 的 Git Bash 与 PowerShell 中文输出、`/c/` 路径转换后 cd 保留；`exec-timeout-kills-tree`、`exec-abort-kills-tree` 的子孙进程终止；`exec-cwd-carry-over`、`exec-output-budget`、`exec-exit-code-meaning`、`exec-env-internal-vars`、`exec-streaming-output`）
+- 失败原因：T17 起 Windows 会话多一个 `PowerShell` 工具，四个旧 L2 场景（`provider-openai-wire`、`tools-model-sees-canonical-names`、两个 `trust-*`）与 `agent_host` 的 `tools.rs` 两个用例把工具列表写死为六个；`capabilities.md` 的差异只是这些失败场景让能力显示为"失败"。154c5ea 改为按包含检查规范名、按排除检查 Pi 原生名，端到端的工具列表随平台
+- 本机：`npm run verify` 14/14
+- T17-A01、A11、A12、A13 仍为 blocked，等下一次推送的 Windows CI；未推送
+
 ## 计划变更记录
 
 | 日期 | 版本 | 变更 |
