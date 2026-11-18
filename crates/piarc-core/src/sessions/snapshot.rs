@@ -91,6 +91,9 @@ pub(crate) struct LiveSession {
     /// Metadata the client changed while the session is open; written to the index once it
     /// has the session's row.
     pub prefs: piarc_store::SessionPrefsChange,
+    /// The first message sent in this session, for its title until the index has one (Pi
+    /// writes the file only with the first reply).
+    pub first_message: Option<String>,
 }
 
 /// One session of `core/sessions`.
@@ -382,8 +385,14 @@ fn apply_live(view: &mut SessionView, live: &LiveSession, derived: Option<&Strin
     view.unread = live.unread;
     view.open = true;
     view.error.clone_from(&live.error);
+    if view.title.is_none() {
+        view.title.clone_from(&live.first_message);
+    }
     if let Some(title) = &live.prefs.custom_title {
-        view.title = title.clone().or_else(|| derived.cloned());
+        view.title = title
+            .clone()
+            .or_else(|| derived.cloned())
+            .or_else(|| live.first_message.clone());
     }
     if let Some(pinned) = live.prefs.pinned {
         view.pinned = pinned;

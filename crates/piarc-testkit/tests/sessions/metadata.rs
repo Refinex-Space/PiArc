@@ -283,3 +283,25 @@ async fn sessions_indexed_at_startup_reach_the_list() {
     listed(&events, &id, "the session from its file", |_| true).await;
     shutdown(core).await;
 }
+
+/// A new session is listed under its first message while its first turn still runs (Pi writes
+/// the file, and the index learns the title, only after the first reply): the sidebar and the
+/// notifications name it from the start.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_new_session_is_listed_under_its_first_message_while_it_runs() {
+    let env = Env::new("live title").await;
+    let (core, events) = env.start(env.config(&[]));
+    let id = open_session(&core, &env).await;
+    let text = prompt_text("Run the three tools.", "abort-tools");
+    prompt(&core, &id, &text).await;
+    let running = listed(&events, &id, "the running session with its title", |s| {
+        s["status"] == "running" && s["title"].is_string()
+    })
+    .await;
+    assert_eq!(running["title"], text.as_str());
+    let (done, rx) = reply();
+    core.session_op(id.clone(), Op::Abort, done)
+        .expect("queued");
+    answer(rx).await.expect("aborted");
+    shutdown(core).await;
+}

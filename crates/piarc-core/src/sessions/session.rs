@@ -143,6 +143,7 @@ impl SessionHandle {
             error: None,
             unread: false,
             prefs: piarc_store::SessionPrefsChange::default(),
+            first_message: None,
             ops: 0,
             busy: false,
             cancel: ctx.cancel.child_token(),
@@ -250,6 +251,8 @@ struct SessionActor {
     /// Metadata changed while open, kept until the session closes (the index may not have the
     /// session's row yet: Pi writes the file with the first reply).
     prefs: piarc_store::SessionPrefsChange,
+    /// The first message this actor sent (the title until the index has the session).
+    first_message: Option<String>,
     /// Requests in flight.
     ops: u32,
     busy: bool,
@@ -492,6 +495,17 @@ impl SessionActor {
             }
             _ => {}
         }
+        if let Op::Prompt(text) | Op::Steer(text) | Op::FollowUp(text) = &op
+            && self.first_message.is_none()
+            && !text.trim().is_empty()
+        {
+            self.first_message = Some(
+                text.chars()
+                    .take(piarc_store::pi_session::FIRST_MESSAGE_CHARS)
+                    .collect(),
+            );
+            self.publish();
+        }
         self.ops += 1;
         self.report_busy();
         let request = Request {
@@ -575,6 +589,7 @@ impl SessionActor {
             unread: self.unread,
             error: self.error.clone(),
             prefs: self.prefs.clone(),
+            first_message: self.first_message.clone(),
         }));
     }
 
