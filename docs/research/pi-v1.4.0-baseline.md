@@ -672,3 +672,15 @@ agent-core 1.5.1–1.5.2、pi-mcp 1.5.0–1.5.2 没有 Breaking Changes。
 | `ModelRuntime.create()` 默认不联网刷新模型目录（`allowModelNetwork` 默认 false）；不传 `credentials` 时读写 `<authPath>`，默认 `~/.pi/agent/auth.json` | `coding-agent/src/core/model-runtime.ts:110-126,218-266` | Agent Host 传入 pi-ai 的 `InMemoryCredentialStore` 与 `<agentDir>/models.json`，`pi/` 下不出现 `auth.json`；凭据保险箱由 T08 接入 |
 | 扩展加载器有模块级缓存 `extensionCache`，按 cwd 失效：两个不同 cwd 的会话交替加载文件型扩展会互相清空缓存 | `coding-agent/src/core/extensions/loader.ts:136-157`、`resource-loader.ts:545` | 只影响 jiti 加载的文件型扩展的加载耗时，不影响正确性；Harness Kit 用内联工厂，不经过它 |
 | `ModelRuntime.create({ credentials })` 接受 pi-ai 的 `CredentialStore`，`read`、`list`、`modify`、`delete` 都是异步的；同步的 `AuthStorageBackend.withLock` 只属于 coding-agent 的 `AuthStorage`（`auth.json` 后端）。OAuth 刷新在 `modify` 内进行：剩余有效期不到 5 分钟时刷新，刷新超时 15 秒，进锁后复查，释放锁前持久化（T08 核对） | `coding-agent/src/core/model-runtime.ts:112`、`ai/src/auth/types.ts:65-94`、`ai/src/auth/resolve.ts:102-191` | Agent Host 注入 Core 保险箱支撑的 `CredentialStore`（`agent-host/src/runtime/credentials.ts`），读从内存返回，读改写在 Core 的键锁内（ADR-0021）；第 9 节第 16 行的"可能需要改核心"不成立 |
+
+### T21 自定义提供商、线协议与可用模型（v1.5.2）
+
+Pi 的连接由三部分决定：提供商 ID 区分配置和凭据，`api` 选择请求与流式响应的格式，`baseUrl` 决定请求发往哪里。模型 ID 是服务端实际接收的字符串。Pi 的 `models.json` 在 `providers.<id>.models` 中接受多个 `{ "id": "…" }`；新提供商须有 base URL 和协议。PiArc 应把用户新建的连接与内置提供商区分开，以免将已有凭据发送到另一个地址。见锁定包的 `pi-coding-agent/docs/models-configuration.md` 与 `src/core/provider-composer.ts`。[Pi 官方配置参考](https://docs.pi.dev/latest/models-configuration)
+
+| 使用场景 | 协议及目录 |
+|---|---|
+| 内置百炼 Token Plan | pi-ai v1.5.2 自带 `qwen-token-plan`、`qwen-token-plan-cn`、`qwen-token-plan-individual`、`qwen-token-plan-individual-cn`。四者采用 OpenAI Chat Completions，按套餐与地域选对应目录。定义见 `packages/ai/src/providers/qwen-token-plan*.ts`。 |
+| 百炼 Token Plan 北京端点 | OpenAI Chat Completions 使用 `https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1`；Anthropic Messages 使用 `https://token-plan.cn-beijing.maas.aliyuncs.com/apps/anthropic`。使用相应套餐的密钥和文本生成模型 ID。套餐端点与按量付费端点分别配置。[百炼通用接入指南](https://help.aliyun.com/zh/model-studio/more-tools) |
+| 中转服务、本地推理服务 | 按服务方公布的接口选择 `openai-completions`、`openai-responses` 或 `anthropic-messages`，录入允许使用的模型 ID。Pi 的 pi.dev 目录刷新与第三方账号的模型授权列表彼此独立。 |
+
+仅有 ID 时，Pi 的 `provider-composer.ts` 给模型补上文本输入、关闭 reasoning 和全零价格。全零占位值不能用来向用户承诺免费。模型切换估算需要区分已知价格与缺失价格。对用户录入的端点，生成文件只取声明字段，密钥经注入的 CredentialStore 交给 Pi。Pi 的 `apiKey`、`headers` 支持环境变量展开和命令求值，设置界面不应把密钥输入写成此类表达式。
