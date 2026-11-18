@@ -1,6 +1,13 @@
 // Helpers for L4 tests of the transcript prototype page (`#/transcript-lab`, T09): opening it,
 // calling `window.__piarcTranscriptLab`, and saving the system clipboard around copy tests.
 import type { ElectronApplication, Page } from '@playwright/test';
+import { expect } from '@playwright/test';
+
+import {
+  FORBIDDEN_TAGS,
+  XSS_PAYLOADS,
+  XSS_SENTINEL_UNTOUCHED,
+} from '../src/shared/xss-payloads.js';
 
 import {
   TRANSCRIPT_LAB_HASH,
@@ -132,5 +139,81 @@ export async function withSavedClipboard(
     await body();
   } finally {
     await app.evaluate(({ clipboard }, text) => clipboard.writeText(text), saved);
+  }
+}
+
+declare global {
+  var __piarcCspViolations: string[] | undefined;
+}
+
+/** Records CSP violations and initializes the shared sentinel before displaying fixture data. */
+export async function watchMarkup(page: Page): Promise<void> {
+  await page.evaluate((untouched) => {
+    globalThis.__piarcXssSentinel = untouched;
+    globalThis.__piarcCspViolations = [];
+    document.addEventListener('securitypolicyviolation', (event) => {
+      globalThis.__piarcCspViolations?.push(`${event.effectiveDirective} ${event.blockedURI}`);
+    });
+  }, XSS_SENTINEL_UNTOUCHED);
+}
+
+/** What an XSS check finds in the rendered transcript. */
+export interface Inspection {
+  sentinel: string | undefined;
+  violations: string[];
+  forbidden: string[];
+  eventAttributes: string[];
+  hrefs: string[];
+  text: string;
+  remoteRequests: string[];
+}
+
+/** Inspects the transcript after XSS payloads were rendered (T09-A07, T19-A10). */
+export async function inspect(page: Page): Promise<Inspection> {
+  return page.evaluate((tags) => {
+    const transcript = document.querySelector('[data-testid="transcript"]');
+    if (transcript === null) {
+      throw new Error('no transcript');
+    }
+    const elements = [...transcript.querySelectorAll('*')];
+    return {
+      sentinel: globalThis.__piarcXssSentinel,
+      violations: globalThis.__piarcCspViolations ?? [],
+      forbidden: tags.filter((tag) => transcript.querySelector(tag) !== null),
+      eventAttributes: elements.flatMap((element) =>
+        element
+          .getAttributeNames()
+          .filter((name) => name.toLowerCase().startsWith('on'))
+          .map((name) => `${element.tagName}[${name}]`),
+      ),
+      hrefs: [...transcript.querySelectorAll('a[href]')].map(
+        (anchor) => anchor.getAttribute('href') ?? '',
+      ),
+      text: transcript.textContent,
+      remoteRequests: performance
+        .getEntriesByType('resource')
+        .map((entry) => entry.name)
+        .filter((name) => !name.startsWith('app://')),
+    };
+  }, FORBIDDEN_TAGS);
+}
+
+/** Checks the renderer and resource observations after untrusted text is shown. */
+export function expectInertDom(result: Inspection): void {
+  expect(result.sentinel).toBe(XSS_SENTINEL_UNTOUCHED);
+  expect(result.violations).toEqual([]);
+  expect(result.forbidden).toEqual([]);
+  expect(result.eventAttributes).toEqual([]);
+  for (const href of result.hrefs) {
+    expect(href).toMatch(/^(https?|mailto):/u);
+  }
+  expect(result.remoteRequests).toEqual([]);
+}
+
+/** Nothing ran, loaded or became markup; every payload shows as text. */
+export function expectInert(result: Inspection): void {
+  expectInertDom(result);
+  for (const payload of XSS_PAYLOADS) {
+    expect(result.text, payload.id).toContain(payload.visibleText);
   }
 }

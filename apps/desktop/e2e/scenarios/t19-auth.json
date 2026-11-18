@@ -1,0 +1,11 @@
+{
+  "id": "t19-auth",
+  "steps": [
+    {
+      "error": {
+        "kind": "unauthorized",
+        "message": "invalid x-api-key"
+      }
+    }
+  ]
+}

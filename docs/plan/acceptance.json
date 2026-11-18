@@ -2092,71 +2092,71 @@
       "id": "T19-A01",
       "task": "T19",
       "description": "九种 P0 行类型各有组件测试，亮暗两套截图存于 `tmp/evidence/T19/`。验证：测试输出与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npx vitest run apps/desktop/src/renderer/transcript/rows；Playwright t19-transcript、t19-errors：九类组件与亮暗双主题截图见 tmp/evidence/T19/l4/（user-row、agent-message、thinking-block、tool-group、bash-card、file-change-card、compaction、error-auth、working-tool）。"
     },
     {
       "id": "T19-A02",
       "task": "T19",
       "description": "思考块在生成中保持展开且折叠操作无效，结束后折叠为\"思考了 N 秒\"。验证：组件测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "rows.test.tsx 验证生成中的点击不折叠、结束后折叠并显示实际秒数；t19-transcript.e2e.ts 在真实会话中断言完成标签与再次展开。"
     },
     {
       "id": "T19-A03",
       "task": "T19",
       "description": "working 行在 mock 脚本运行中依次显示当前工具、计时、token 数、重试次数（n / max）与压缩状态。验证：Playwright 流程与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "t19-transcript.e2e.ts：真实 Read/Grep/Bash/Edit 回合显示工具、耗时、token 数、Retrying 1/3 与压缩状态。working-tool、working-retry、working-compaction 截图位于 tmp/evidence/T19/l4/。"
     },
     {
       "id": "T19-A04",
       "task": "T19",
       "description": "`@` 提及的模糊匹配遵守 `.gitignore`、结果数不超过上限；选中后显示为胶囊，发送给模型的文本与胶囊存储数据分开且内容正确。验证：Core 单测、Playwright 流程与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core composer::file_search；npx playwright test t19-composer：忽略 build、模糊过滤、结果上限和取消；胶囊保存 src/mention/MainView.tsx，mock 收到完整 @ 相对路径。ego-browser 本地渲染实测见 tmp/evidence/T19/ego-mention.png。"
     },
     {
       "id": "T19-A05",
       "task": "T19",
       "description": "`/` 命令面板列出内置命令并支持模糊过滤；输入法合成期间输入 `/`、`@`、Enter、Esc 不触发面板、提及、发送或停止。验证：单测与 Playwright 流程。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "composer.test.ts、t19-composer.e2e.ts：Core 的 /clear、/compact、/help 均可见，hl 只匹配 /help；通过 CDP 合成 /、@、Enter、Esc 未触发业务。用户于 2026-11-18 确认 macOS M1–M10 实测通过，见 docs/spikes/S01-transcript-composer.md 第 7 节。"
     },
     {
       "id": "T19-A06",
       "task": "T19",
       "description": "拖放与粘贴图片、PDF 后附件出现在消息中，模型请求中带有对应内容（图片为图像内容，PDF 按交付物 2 的方式）；超过大小上限或类型不支持时给出提示且不发送。验证：Playwright 流程与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "t19-composer.e2e.ts：拖放 PNG、粘贴 PDF，mock 收到 PNG 原始字节及 PDF 第 12 页文本，超大与不支持的文件均拒绝；L2 chat-composer-input 与 piarc-testkit sessions/input.rs 覆盖附件落盘、历史胶囊、归档保留与删除。"
     },
     {
       "id": "T19-A07",
       "task": "T19",
       "description": "运行中 Enter 发送的内容作为 steer 进入当前回合，Mod+Enter 进入排队并可编辑、删除，Esc 停止回合。验证：Playwright 端到端与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "t19-composer.e2e.ts：Enter 插入本回合、Mod+Enter 排队、编辑和删除后检查 mock 请求正文与顺序；Esc 中断回复。L2 turn-steer 与 turn-follow-up 场景、Rust sessions/queue.rs 对照真实回合 ID。"
     },
     {
       "id": "T19-A08",
       "task": "T19",
       "description": "注入认证失败、限流用尽、Agent Host 中断三类错误时，错误卡分类正确，重试按钮与 `uncertain` 提示可用；未送达消息重发后只出现一次。验证：Playwright 流程（故障注入）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "t19-errors.e2e.ts：401 不显示重试，四次 429 后手动重试成功，杀测试 Agent Host 后立即重试成功，丢弃 IPC 后重发只见一条消息。session-input.test.ts 覆盖切换会话及并发重发；Host 门控见 resilience.rs。"
     },
     {
       "id": "T19-A09",
       "task": "T19",
       "description": "复制本条消息的 Markdown 与纯文本两种结果正确；\"选中本回合\"选中范围正确。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "transcript-copy.e2e.ts、t19-transcript.e2e.ts 验证系统剪贴板 Markdown 与纯文本，原生选区包含本回合并排除下一回合。store/transcript.test.ts、copy.test.ts 与 sessions/queue.rs 覆盖 steer、历史和跨页选取。"
     },
     {
       "id": "T19-A10",
       "task": "T19",
       "description": "XSS 载荷出现在回复正文、工具输出、bash 输出、文件路径中时都以文本呈现。验证：安全回归测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "t19-security.e2e.ts：既有 T09 语料经真实会话、Read、Bash 输出及 Edit 文件路径进入行组件；检查可见文本、DOM、哨兵、CSP 及外部请求。截图 inert-reply.png 位于 tmp/evidence/T19/l4/。"
     },
     {
       "id": "T19-A11",
@@ -2176,8 +2176,8 @@
       "id": "T19-A13",
       "task": "T19",
       "description": "滚动跟随的解除、恢复与\"回到底部\"按钮按定稿常量工作。验证：单测与 Playwright 流程。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "scroll-follow.test.ts 8/8；transcript-scroll.e2e.ts 两种形态 10/10，4 倍 CPU 降速、120 Hz 的贴底用例另重复 6/6，8 轮、1,938 个采样帧最大离底 0 px。2/40/200 px 的边界均验证。见 tmp/evidence/T19/scroll/。"
     },
     {
       "id": "T19-A14",

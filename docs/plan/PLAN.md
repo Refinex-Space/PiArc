@@ -319,7 +319,8 @@ T19 Transcript 与 composer 正式版（2026-11-18 开工；基线 `npm run veri
 - [x] 切换会话后保留未送达输入及已存附件，相同请求键重发；窗口缓存按会话隔离。复制本条 Markdown / 纯文本、同一回合的 steer 与跨页选择已通过定向回归。Host 恢复按会话门控，A08 的立即重试已在 dev 与 packaged 通过
 - [x] 贴底回归（I32、I59）：120 Hz、4 倍 CPU 降速下 8 次共 1,938 帧最大离底 0 px；两形态滚动 10/10；节奏定稿见真实事件流基准
 - [x] 四项 T19 Harness 能力已接入 L2（37 passed、1 Windows 专用；MISSING 0）
-- [ ] 验收：A01 组件测试与亮暗截图、A02、A03、A04、A05、A06、A07、A08、A09、A10、A11、A12、A13、A14
+- [x] A01–A10、A13：T19 专项 Playwright 两种形态 24/24，九种行亮暗截图、mock 请求与安全检查均已核实
+- [ ] A11、A12：最终打包基准；A14：全量 verify
 - [ ] 收尾：transcript 与 composer 的 CLAUDE.md、`coding-standards.md` 通用能力复用表、架构与 ADR 同步、PLAN 与 acceptance
 
 ## 登记事项

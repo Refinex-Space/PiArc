@@ -1,0 +1,12 @@
+{
+  "id": "t19-stop",
+  "steps": [
+    {
+      "text": "A long answer that never ends",
+      "stall_after_events": 4
+    },
+    {
+      "text": "After the stop."
+    }
+  ]
+}
