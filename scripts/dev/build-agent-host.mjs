@@ -8,7 +8,7 @@
 // v1.5.2, MIT): ESM, node22.19, the `createRequire` banner for bundled CommonJS code,
 // `PI_BUNDLED_NODE`, and photon-node left external because it loads its wasm file from its
 // package directory. Everything else is inlined; the build fails if any other package stays
-// external. The list of externals is documented in agent-host/CLAUDE.md.
+// external. The list of externals is documented in agent-host/AGENTS.md.
 import { cpSync, mkdirSync, rmSync } from 'node:fs';
 import { isBuiltin } from 'node:module';
 import path from 'node:path';

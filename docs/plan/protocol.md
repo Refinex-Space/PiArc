@@ -16,7 +16,7 @@
 
 1. `pwd` 确认当前目录是仓库根目录 `PiArc`；用 `node -p "process.platform"` 确认当前平台与任务头部的"执行平台"一致（`darwin` 对应 macOS，`win32` 对应 Windows）。不一致就停止，提醒用户换到对应的电脑。
 2. 读完以下文档：
-   - 根目录 `CLAUDE.md`（存在时）、本协议、`docs/plan/PLAN.md`；
+   - 根目录 `AGENTS.md`（存在时）、本协议、`docs/plan/PLAN.md`；
    - 任务提示词"必读"中列出的文档与章节。
    - 必读中标为"实现时查阅"的源码，开工时不通读：做到对应部分时，再带着具体问题定位阅读。
 3. 判断是新开工还是续做：
@@ -196,7 +196,7 @@
 ## 收尾
 
 1. 运行全部质量门禁。
-2. 更新受影响目录的 `CLAUDE.md`（不存在则按 `docs/engineering/claude-md.md` 的模板创建）。命令、目录结构、不变量、易错点有变化的，一并更新根目录 `CLAUDE.md`。
+2. 更新受影响目录的 `AGENTS.md`（不存在则按 `docs/engineering/claude-md.md` 的模板创建，并在同目录建只含 `@AGENTS.md` 的 `CLAUDE.md`）。命令、目录结构、不变量、易错点有变化的，一并更新根目录 `AGENTS.md`。
 3. 更新文档：实现与架构设计、ADR、工程规范的任何不一致都要处理。补充型直接更新文档；变更型按决策分级处理。M0 验证项写报告到 `docs/spikes/`，并更新 `docs/spikes/README.md`。
 4. 更新 `docs/plan/acceptance.json`。
 5. 更新 `docs/plan/PLAN.md`：

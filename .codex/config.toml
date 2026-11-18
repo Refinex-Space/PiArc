@@ -1,0 +1,35 @@
+# Codex project config, the counterpart of .claude/. Codex loads it only after the project is trusted.
+# Project instructions live in AGENTS.md, shared with Claude Code (each CLAUDE.md only imports it).
+# Root AGENTS.md plus one module AGENTS.md exceed the 32 KiB default, so the limit is raised.
+project_doc_max_bytes = 65536
+
+# Codex-only notes. Claude Code never sees this, so the shared AGENTS.md stays tool-neutral.
+developer_instructions = """
+本仓库在 Codex 中的用法（与 Claude Code 的 .claude/ 等效）：
+- 子目录的 AGENTS.md 只在从该目录启动时自动加载：读写某个目录下的文件前，先读该目录及上级目录里还没读过的 AGENTS.md。CLAUDE.md 只是给 Claude Code 的导入入口，不用读。
+- .claude/rules/ 的规则按路径生效，Codex 不会自动加载。改 crates/** 前读 .claude/rules/rust.md；改 apps/**、agent-host/**、packages/**、scripts/** 前读 .claude/rules/typescript.md；改 docs/**/*.md、任何 AGENTS.md、README*.md 前读 .claude/rules/docs.md。
+- /task <编号> 在 Codex 中写作 $task <编号>（.agents/skills/task/）。
+- 协议里的 TodoWrite 对应 Codex 的计划工具 update_plan；需要用户做决定时，在回复里列出编号选项并停下等待。
+- packages/protocol/src/generated/ 是生成物，只能经 npm run gen:protocol 更新，不手改。
+- git push、git reset --hard、git clean 已被 .codex/rules/piarc.rules 禁止；只提交，不推送。
+"""
+
+# Read denies from .claude/settings.json, enforced by the OS sandbox for every sandboxed command.
+# Commands allowed in .codex/rules/piarc.rules (node, npm, cargo, ...) run outside the sandbox, as they
+# do in Claude Code. Edit/Write deny on packages/protocol/src/generated/ is not mapped here: a sandbox
+# deny would also stop `npm run gen:protocol`; verify's "protocol drift" step catches hand edits.
+default_permissions = "piarc"
+
+[permissions.piarc]
+description = "Workspace writable; secrets unreadable (mirrors .claude/settings.json)"
+extends = ":workspace"
+
+[permissions.piarc.filesystem]
+"~/.ssh" = "deny"
+"~/.npmrc" = "deny"
+# Windows and Linux expand ** before the sandbox starts; bound the scan.
+glob_scan_max_depth = 4
+
+[permissions.piarc.filesystem.":workspace_roots"]
+"**/.env" = "deny"
+"**/.env.*" = "deny"

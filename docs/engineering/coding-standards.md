@@ -240,7 +240,7 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | JSONL 流式解析 | `piarc_store::jsonl::{LineReader, Parsed}`；Pi 会话元数据 `piarc_store::pi_session::SessionMeta`；索引 `Store::{sync_file, sync_dir, rebuild_index}` | 从字节偏移逐行读，未写完的末行不消费、下次从行首继续；1 MiB 以上的行流式解析不整行缓存；坏行单独报告。读 Pi 会话或其他追加写的 JSONL 都用它 | T13 |
 | 数据目录 | 主进程 `apps/desktop/src/main/platform/data-dirs.ts`（`resolveDataDirs`、`applyDataDirs`）；Core `piarc_core::DataDirs`（`create_layout`、`pi_sessions`、`logs` 等） | 两个平台的数据与缓存目录、`--user-data-dir` 覆盖、`ready` 前 `setPath`；Core 内按第 9.1 节取子目录，不在别处拼路径 | T13 |
 | 日志文件 | `piarc_telemetry::{install, DailyLog, Calendar}` | 按 UTC 天轮转、保留 7 天、Core 与 Agent Host 分文件；时钟可注入 | T13 |
-| SQLite 迁移 | `piarc_store::migrate::{MIGRATIONS, Migration, apply}` | 按版本号顺序、每个迁移一个事务并记录在 `schema_migrations`；新表新字段只追加迁移，写法见 `crates/piarc-store/CLAUDE.md` | T13 |
+| SQLite 迁移 | `piarc_store::migrate::{MIGRATIONS, Migration, apply}` | 按版本号顺序、每个迁移一个事务并记录在 `schema_migrations`；新表新字段只追加迁移，写法见 `crates/piarc-store/AGENTS.md` | T13 |
 | 目录监听 | `piarc_fs::watch::Watcher` | notify 封装，非递归监听目录，回调给出路径；调用方去抖并重读 | T13 |
 | L2 场景运行器 | `piarc_testkit::l2`（`load`、`run`、`run_suite`、`RunnerConfig::build`）；`cargo test -p piarc-testkit --test scenarios`；`piarc-devcli run` | 加载并校验场景文件（`tests/scenarios/schema.json`），在含空格与中文的临时根中驱动 Core 无头运行时 + 真实 Agent Host + 每个端点一个严格 mock，断言事件、文件、请求、工具批次与 Core I/O，输出可读差异与 JSON 报告；新增 Harness 行为写一个场景，见 `testing.md` 第 12 节 | T15 |
 | 事件部分匹配断言 | `piarc_testkit::l2::matcher`（`is_subset`、`subset_mismatch`、`check_events`） | 字段子集匹配（对象按键子集、数组逐元素同长度、标量相等）与按会话的有序子序列（含 `any_order` 组）；失败时给出第一个未匹配的期望、乱序位置与附近的实际事件 | T15 |

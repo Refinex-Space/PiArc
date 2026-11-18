@@ -1,0 +1,49 @@
+# Codex counterpart of the permissions in .claude/settings.json. Loaded only when the project is trusted.
+# deny  -> decision = "forbidden"
+# allow -> decision = "allow": the command runs outside the sandbox without asking, which is what an
+#          allow entry means in Claude Code (no sandbox there). The sandbox would otherwise block these
+#          commands: git add/commit write .git (read-only in the workspace profile), npm and cargo need
+#          the network and caches outside the workspace.
+# Not mapped: Bash(git -C reference/* *) (a prefix rule cannot match a path wildcard; read-only git
+# commands on reference/ run inside the sandbox anyway). Read/Edit/Write denies are in .codex/config.toml
+# and CLAUDE.md, see the notes there.
+# Self-test: codex execpolicy check --pretty --rules .codex/rules/piarc.rules -- git push origin main
+
+# ---------- deny ----------
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "forbidden",
+    justification = "Commit only, never push (docs/plan/protocol.md). The user pushes.",
+    match = ["git push", "git push origin main"],
+)
+prefix_rule(
+    pattern = ["git", "reset", "--hard"],
+    decision = "forbidden",
+    justification = "Discards uncommitted work. Use git stash or ask the user.",
+)
+prefix_rule(
+    pattern = ["git", "clean"],
+    decision = "forbidden",
+    justification = "Deletes untracked files. Ask the user.",
+    match = ["git clean -fdx", "git clean -n"],
+)
+prefix_rule(
+    pattern = ["security", ["find-generic-password", "find-internet-password", "dump-keychain"]],
+    decision = "forbidden",
+    justification = "Never read credentials from the keychain (CLAUDE.md invariants, ADR-0021).",
+)
+
+# ---------- allow ----------
+prefix_rule(pattern = ["npm", ["run", "test", "ci", "view"]], decision = "allow",
+    match = ["npm run verify", "npm test", "npm ci --ignore-scripts", "npm view electron version"],
+    not_match = ["npm install left-pad", "npm publish"])
+prefix_rule(pattern = ["npx"], decision = "allow")
+prefix_rule(pattern = ["node"], decision = "allow")
+prefix_rule(pattern = ["cargo"], decision = "allow")
+prefix_rule(pattern = ["rustc", "--version"], decision = "allow")
+prefix_rule(pattern = ["rustup", "show"], decision = "allow")
+prefix_rule(pattern = ["git", ["status", "diff", "log", "show", "add", "commit", "grep", "mv", "rm", "describe"]], decision = "allow",
+    match = ["git status --short", "git commit -m x", "git add -A"],
+    not_match = ["git push", "git checkout main", "git rebase main"])
+prefix_rule(pattern = ["jq"], decision = "allow")
+prefix_rule(pattern = [".tools/bin/cargo-deny", "check"], decision = "allow")

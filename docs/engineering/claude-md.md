@@ -1,24 +1,24 @@
-# CLAUDE.md 规范
+# 项目说明文件规范（AGENTS.md）
 
-`CLAUDE.md` 是每个智能体会话自动加载的项目上下文。每一行都会占用每次会话的上下文，所以只写"读代码看不出来、每次都需要"的信息。
+`AGENTS.md` 是每个智能体会话自动加载的项目上下文，Claude Code 与 Codex 共用。每个 `AGENTS.md` 的同目录有一个只含 `@AGENTS.md` 的 `CLAUDE.md`，供 Claude Code 导入；内容只写在 `AGENTS.md`。每一行都会占用每次会话的上下文，所以只写"读代码看不出来、每次都需要"的信息。
 
 ## 1. 分层
 
 | 层 | 位置 | 何时加载 | 写什么 |
 |---|---|---|---|
-| 根 | `CLAUDE.md` | 每次会话 | 项目是什么、交付流程、命令、全局不变量、全局易错点 |
-| 子目录 | `apps/desktop/CLAUDE.md`、`agent-host/CLAUDE.md`、`packages/protocol/CLAUDE.md`、`crates/<crate>/CLAUDE.md` | 在该目录下读写文件时 | 该包或 crate 的职责边界、本地命令、不变量、易错点 |
+| 根 | `AGENTS.md` | 每次会话 | 项目是什么、交付流程、命令、全局不变量、全局易错点 |
+| 子目录 | `apps/desktop/AGENTS.md`、`agent-host/AGENTS.md`、`packages/protocol/AGENTS.md`、`crates/<crate>/AGENTS.md` | Claude Code：在该目录下读写文件时；Codex：从该目录启动时，否则按 `.codex/config.toml` 的说明在读写前主动读取 | 该包或 crate 的职责边界、本地命令、不变量、易错点 |
 | 路径规则 | `.claude/rules/*.md`（frontmatter `paths:`） | 读写匹配路径的文件时 | 某类文件的精要规则，指向完整规范 |
 | 完整规范 | `docs/engineering/*.md`、架构设计、ADR | 按需阅读 | 全部规则、理由与背景 |
 
-子目录 `CLAUDE.md` 在该目录第一次出现非显而易见的不变量或易错点时创建，由对应任务在收尾时写（执行协议"收尾"第 2 步）；没有这类信息的目录不建。
+子目录 `AGENTS.md`（连同只含 `@AGENTS.md` 的 `CLAUDE.md`）在该目录第一次出现非显而易见的不变量或易错点时创建，由对应任务在收尾时写（执行协议"收尾"第 2 步）；没有这类信息的目录不建。
 
 ## 2. 长度上限
 
 | 文件 | 上限 |
 |---|---|
-| 根 `CLAUDE.md` | 200 行 |
-| 子目录 `CLAUDE.md` | 120 行 |
+| 根 `AGENTS.md` | 200 行 |
+| 子目录 `AGENTS.md` | 120 行 |
 | `.claude/rules/*.md` | 40 行 |
 
 超过上限时删去能从代码、`--help` 或规范文档得到的内容，改为指向它们的一行链接。
@@ -42,13 +42,13 @@
 
 ## 4. 维护
 
-- 每个任务收尾时检查受影响目录的 `CLAUDE.md`：命令、目录结构、不变量、易错点有变化就更新，没有就不动。
+- 每个任务收尾时检查受影响目录的 `AGENTS.md`：命令、目录结构、不变量、易错点有变化就更新，没有就不动。
 - 删除过时内容和新增内容同等重要。改动命令前先实际运行一次。
-- 根 `CLAUDE.md` 的"交付流程"与"命令"两节由 T01 建立；其余各节由后续任务按需补充。
+- 根 `AGENTS.md` 的"交付流程"与"命令"两节由 T01 建立；其余各节由后续任务按需补充。
 
 ## 5. 模板
 
-### 5.1 根 `CLAUDE.md`
+### 5.1 根 `AGENTS.md`
 
 ```markdown
 # PiArc
@@ -78,7 +78,7 @@
 - 现象 → 原因 → 正确做法。
 ```
 
-### 5.2 子目录 `CLAUDE.md`
+### 5.2 子目录 `AGENTS.md`
 
 ```markdown
 # <包或 crate 名>

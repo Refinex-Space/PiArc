@@ -351,7 +351,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 - **自定义 test harness**（`crates/piarc-testkit/tests/scenarios.rs`，`harness = false`）：每个场景文件是一个测试，按 id 筛选（`-- <id>`、`--exact`、`--list`、`--test-threads <n>`），输出 `test <id> ... ok|FAILED|ignored, 跳过（平台）: <原因>` 与汇总；`--results <文件>` 写 JSON 报告（相对路径按仓库根解析）。不引入数据驱动测试库：需要的只是筛选、并行与报告。该目标设了 `test = false`，不在 `cargo test --workspace` 中重复运行，由 verify 第 14 步运行。
 - **进程不复用**：每个场景一个新的临时根（路径含空格与中文）、一个新的 `CoreRuntime` 与 Agent Host，结束后删除临时根。实测单个场景（含 Core 与 Agent Host 冷启动）0.4–4 s，并行时偏长；换来会话、工作区、保险箱与 mock 步数的完全隔离；场景之间按线程并行（缺省半数核心、至多 4 个）补回总时长。
 - 场景一个失败不影响其他场景的执行与报告；同一场景连续运行两次结果相同（`l2_runner.rs` 检查），没有 sleep，等待只有 30 s 安全网。
-- `piarc-devcli` 用同一个运行器：`run <文件或目录> [--json <文件>]`（见 `crates/piarc-devcli/CLAUDE.md`）。
+- `piarc-devcli` 用同一个运行器：`run <文件或目录> [--json <文件>]`（见 `crates/piarc-devcli/AGENTS.md`）。
 
 - **命令环境**（T17）：L2 的 Core 以准备好的登录 shell 起命令环境：测试进程环境加上应用里 Core 会带的内部变量（`ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`PI_CODING_AGENT_DIR`、`PIARC_L2_INTERNAL`）与 `L2_USER_VAR=kept`，Unix 上 `/bin/bash` 加本次运行的 `HOME`（`.bash_profile` 往 `PATH` 加含 `l2-login-tool` 的目录）。环境剔除与登录 `PATH` 的场景因此不依赖开发机的 shell 配置（`crates/piarc-testkit/src/l2/runner.rs` 的 `command_env`）。
 
