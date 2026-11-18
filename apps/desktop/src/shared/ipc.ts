@@ -298,14 +298,14 @@ export interface PiarcApi {
   /** Closes an open session. */
   closeSession(id: string): Promise<string>;
   /** Starts a turn; resolves with `{ turnId }` as JSON. */
-  prompt(id: string, input: OutgoingInput): Promise<string>;
+  prompt(id: string, input: string | OutgoingInput): Promise<string>;
   /**
    * A steering message for the running turn (a new turn when idle); resolves with
    * `{ disposition: "queued", itemId }` or `{ disposition: "started", turnId }` as JSON.
    */
-  steer(id: string, input: OutgoingInput): Promise<string>;
+  steer(id: string, input: string | OutgoingInput): Promise<string>;
   /** A follow-up queued for after the running turn (a new turn when idle); like `steer`. */
-  followUp(id: string, input: OutgoingInput): Promise<string>;
+  followUp(id: string, input: string | OutgoingInput): Promise<string>;
   /** Stops the running turn; resolves with the returned queue as JSON. */
   abort(id: string): Promise<string>;
   /** Compacts the conversation as a turn of its own (`/compact`); resolves with `{ turnId }`. */

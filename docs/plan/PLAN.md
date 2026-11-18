@@ -313,6 +313,7 @@ T19 Transcript 与 composer 正式版（2026-11-18 开工；基线 `npm run veri
 
 - [x] 协议与 Core：用户输入的提及与附件（AHP、Core API、Agent Host 的图片与 PDF 文本）、错误分类（`kind`、`retryable`）、模糊文件匹配 API（遵守 `.gitignore`、上限、可取消）、内置命令列表、附件存储（f4f62d5；`turn/usage`、`session/compact`、mock 的 thinking / 分段速率 / 401）
 - [x] transcript 接入真实事件流与历史窗口、会话缓存；同一套归约器与行组件（e081f8e，渲染进程单测已复跑，万条真实数据的分窗加载已验证）
+- [x] 已恢复 T14 NAPI 纯文本语义，T19 结构化输入使用独立方法；归档按用户决定保留附件，删除会话清除副本。失败在先的回归已通过（sessions 20/20，NAPI 集成 1/1）
 - [ ] P0 九种行类型组件（用户消息、回复、思考块、工具组、bash 卡、文件改动卡、压缩提示、错误卡、working 行）与 `uncertain` 提示；行级错误边界（I50）
 - [x] composer 正式版（dev 形态五个输入流程已通过，含 mock 请求断言）：`@` 提及（Core 模糊匹配）、`/` 命令面板、图片与 PDF 附件（拖放、粘贴、类型与大小上限）、steer / 排队 / Esc、排队项编辑删除、输入法守卫
 - [ ] 错误、重试与重发未送达消息；复制本条消息（Markdown / 纯文本）与选中本回合

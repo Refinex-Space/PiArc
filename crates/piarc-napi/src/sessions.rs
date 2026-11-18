@@ -126,32 +126,37 @@ impl CoreRuntime {
         })
     }
 
-    /// Starts a turn on an idle session; resolves with `{ turnId }`. `input` is JSON:
-    /// `{ requestId?, text, mentions?, attachments? }` (ADR-0030); the same `requestId` sent
-    /// again returns the turn it already started.
+    /// Starts a turn on an idle session; resolves with `{ turnId }`.
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]
     pub fn prompt<'env>(
         &self,
         env: &'env Env,
         id: String,
-        input: String,
+        text: String,
     ) -> napi::Result<Object<'env>> {
-        let input = boundary::call(env, "CoreRuntime.prompt", || UserInput::from_json(&input))?;
-        self.op(env, "CoreRuntime.prompt", id, Op::Prompt(input))
+        self.op(
+            env,
+            "CoreRuntime.prompt",
+            id,
+            Op::Prompt(UserInput::text(text)),
+        )
     }
 
-    /// A steering message for the running turn (a new turn when idle); `input` as for
-    /// `prompt`. Resolves with `{ disposition: "queued", itemId }` or `{ disposition:
-    /// "started", turnId }`.
+    /// A steering message for the running turn (a new turn when idle); resolves with
+    /// `{ disposition: "queued", itemId }` or `{ disposition: "started", turnId }`.
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]
     pub fn steer<'env>(
         &self,
         env: &'env Env,
         id: String,
-        input: String,
+        text: String,
     ) -> napi::Result<Object<'env>> {
-        let input = boundary::call(env, "CoreRuntime.steer", || UserInput::from_json(&input))?;
-        self.op(env, "CoreRuntime.steer", id, Op::Steer(input))
+        self.op(
+            env,
+            "CoreRuntime.steer",
+            id,
+            Op::Steer(UserInput::text(text)),
+        )
     }
 
     /// A follow-up for after the running turn (a new turn when idle); resolves like `steer`.
@@ -160,10 +165,60 @@ impl CoreRuntime {
         &self,
         env: &'env Env,
         id: String,
+        text: String,
+    ) -> napi::Result<Object<'env>> {
+        self.op(
+            env,
+            "CoreRuntime.followUp",
+            id,
+            Op::FollowUp(UserInput::text(text)),
+        )
+    }
+
+    /// Starts a turn on an idle session; resolves with `{ turnId }`. `input` is JSON:
+    /// `{ requestId?, text, mentions?, attachments? }` (ADR-0030); the same `requestId` sent
+    /// again returns the turn it already started.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn prompt_input<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
         input: String,
     ) -> napi::Result<Object<'env>> {
-        let input = boundary::call(env, "CoreRuntime.followUp", || UserInput::from_json(&input))?;
-        self.op(env, "CoreRuntime.followUp", id, Op::FollowUp(input))
+        let input = boundary::call(env, "CoreRuntime.promptInput", || {
+            UserInput::from_json(&input)
+        })?;
+        self.op(env, "CoreRuntime.promptInput", id, Op::Prompt(input))
+    }
+
+    /// A steering message for the running turn (a new turn when idle); `input` as for
+    /// `prompt`. Resolves with `{ disposition: "queued", itemId }` or `{ disposition:
+    /// "started", turnId }`.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn steer_input<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        input: String,
+    ) -> napi::Result<Object<'env>> {
+        let input = boundary::call(env, "CoreRuntime.steerInput", || {
+            UserInput::from_json(&input)
+        })?;
+        self.op(env, "CoreRuntime.steerInput", id, Op::Steer(input))
+    }
+
+    /// A follow-up for after the running turn (a new turn when idle); resolves like `steer`.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn follow_up_input<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        input: String,
+    ) -> napi::Result<Object<'env>> {
+        let input = boundary::call(env, "CoreRuntime.followUpInput", || {
+            UserInput::from_json(&input)
+        })?;
+        self.op(env, "CoreRuntime.followUpInput", id, Op::FollowUp(input))
     }
 
     /// Compacts the conversation as a turn of its own (`/compact`); resolves with `{ turnId }`.

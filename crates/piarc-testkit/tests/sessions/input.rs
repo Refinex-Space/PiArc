@@ -134,7 +134,44 @@ async fn an_input_reaches_the_model_with_its_attachments_and_shows_as_written() 
     assert_eq!(stored["item"]["text"], item["text"]);
     assert_eq!(stored["item"]["mentions"], item["mentions"]);
     assert_eq!(stored["item"]["attachments"], item["attachments"]);
+    verify_attachment_lifetime(&env, &core, &id, &blob).await;
     shutdown(core).await;
+}
+
+async fn verify_attachment_lifetime(
+    env: &Env,
+    core: &piarc_core::CoreRuntime,
+    id: &str,
+    blob: &Path,
+) {
+    // Archiving clears generated output but keeps the attachment referenced by the JSONL.
+    let scratch = env
+        .data
+        .join("sessions")
+        .join(id)
+        .join("scratch-output.txt");
+    std::fs::write(&scratch, b"temporary output").expect("write output");
+    for archived in [true, false] {
+        run(
+            core,
+            id,
+            Op::Prefs(piarc_core::sessions::SessionPrefsChange {
+                archived: Some(archived),
+                ..Default::default()
+            }),
+        )
+        .await
+        .expect("change archive state");
+        assert_eq!(
+            std::fs::read(blob).expect("archived attachment"),
+            fixture("report.pdf")
+        );
+        assert!(!scratch.exists());
+    }
+    let (done, rx) = reply();
+    core.delete_session(id.to_owned(), done).expect("queued");
+    answer(rx).await.expect("deleted");
+    assert!(!blob.exists());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

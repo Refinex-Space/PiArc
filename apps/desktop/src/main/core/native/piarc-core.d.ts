@@ -35,20 +35,29 @@ export declare class CoreRuntime {
   forkSession(id: string, entryId?: string | null): Promise<string>;
   /** Closes an open session. */
   closeSession(id: string): Promise<string>;
+  /** Starts a turn on an idle session; resolves with `{ turnId }`. */
+  prompt(id: string, text: string): Promise<string>;
+  /**
+   * A steering message for the running turn (a new turn when idle); resolves with
+   * `{ disposition: "queued", itemId }` or `{ disposition: "started", turnId }`.
+   */
+  steer(id: string, text: string): Promise<string>;
+  /** A follow-up for after the running turn (a new turn when idle); resolves like `steer`. */
+  followUp(id: string, text: string): Promise<string>;
   /**
    * Starts a turn on an idle session; resolves with `{ turnId }`. `input` is JSON:
    * `{ requestId?, text, mentions?, attachments? }` (ADR-0030); the same `requestId` sent
    * again returns the turn it already started.
    */
-  prompt(id: string, input: string): Promise<string>;
+  promptInput(id: string, input: string): Promise<string>;
   /**
    * A steering message for the running turn (a new turn when idle); `input` as for
    * `prompt`. Resolves with `{ disposition: "queued", itemId }` or `{ disposition:
    * "started", turnId }`.
    */
-  steer(id: string, input: string): Promise<string>;
+  steerInput(id: string, input: string): Promise<string>;
   /** A follow-up for after the running turn (a new turn when idle); resolves like `steer`. */
-  followUp(id: string, input: string): Promise<string>;
+  followUpInput(id: string, input: string): Promise<string>;
   /** Compacts the conversation as a turn of its own (`/compact`); resolves with `{ turnId }`. */
   compact(id: string): Promise<string>;
   /**

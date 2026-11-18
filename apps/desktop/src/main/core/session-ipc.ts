@@ -25,8 +25,11 @@ export type SessionCore = Pick<
   | 'resumeSession'
   | 'closeSession'
   | 'prompt'
+  | 'promptInput'
   | 'steer'
+  | 'steerInput'
   | 'followUp'
+  | 'followUpInput'
   | 'abort'
   | 'compact'
   | 'editQueueItem'
@@ -187,15 +190,20 @@ export function registerSessionHandlers(
   registerHandler(IPC_CHANNELS.sessionResume, (_event, [id]) => core.resumeSession(sessionId(id)));
   registerHandler(IPC_CHANNELS.sessionClose, (_event, [id]) => core.closeSession(sessionId(id)));
   registerHandler(IPC_CHANNELS.sessionPrompt, (_event, [id, message]) => {
-    const json = input(message);
     faults.check(IPC_CHANNELS.sessionPrompt);
-    return core.prompt(sessionId(id), json);
+    return typeof message === 'string'
+      ? core.prompt(sessionId(id), text(message, 'text'))
+      : core.promptInput(sessionId(id), input(message));
   });
   registerHandler(IPC_CHANNELS.sessionSteer, (_event, [id, message]) =>
-    core.steer(sessionId(id), input(message)),
+    typeof message === 'string'
+      ? core.steer(sessionId(id), text(message, 'text'))
+      : core.steerInput(sessionId(id), input(message)),
   );
   registerHandler(IPC_CHANNELS.sessionFollowUp, (_event, [id, message]) =>
-    core.followUp(sessionId(id), input(message)),
+    typeof message === 'string'
+      ? core.followUp(sessionId(id), text(message, 'text'))
+      : core.followUpInput(sessionId(id), input(message)),
   );
   registerHandler(IPC_CHANNELS.sessionAbort, (_event, [id]) => core.abort(sessionId(id)));
   registerHandler(IPC_CHANNELS.sessionCompact, (_event, [id]) => core.compact(sessionId(id)));

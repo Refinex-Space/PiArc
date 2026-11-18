@@ -438,7 +438,11 @@ impl Hub {
             .run(move |store| store.set_session_prefs(&key, &change))
             .await??;
         if archiving {
-            self.remove_session_dir(&id).await?;
+            remove_path(
+                self.ctx.storage.dirs().sessions().join(&id),
+                clear_generated_files,
+            )
+            .await?;
         }
         self.ctx.snapshots.send(snapshot::SnapshotMsg::Reload);
         if stored || archiving {
@@ -476,7 +480,7 @@ impl Hub {
                     reason: format!("{} is outside the session directory", file.display()),
                 });
             }
-            remove_path(file, false).await?;
+            remove_path(file, |path| std::fs::remove_file(path)).await?;
             let key = id.clone();
             self.ctx
                 .storage
@@ -491,7 +495,10 @@ impl Hub {
 
     /// Removes `<data>/sessions/<id>/` (tool output, blobs, the session's temporary files).
     async fn remove_session_dir(&self, id: &str) -> Result<()> {
-        remove_path(self.ctx.storage.dirs().sessions().join(id), true).await
+        remove_path(self.ctx.storage.dirs().sessions().join(id), |path| {
+            std::fs::remove_dir_all(path)
+        })
+        .await
     }
 
     /// The trust decision of the project at `checkout` changed: its open workspaces restart
@@ -595,15 +602,37 @@ impl Hub {
     }
 }
 
-/// Removes a file or a directory tree on the blocking pool; a missing one is fine.
-async fn remove_path(path: PathBuf, dir: bool) -> Result<()> {
+/// Removes generated files while keeping the attachments referenced by the Pi session file.
+fn clear_generated_files(path: &Path) -> std::io::Result<()> {
+    use std::io::ErrorKind;
+    if !std::fs::symlink_metadata(path)?.is_dir() {
+        return std::fs::remove_file(path);
+    }
+    let mut retained = false;
+    for entry in std::fs::read_dir(path)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_dir() {
+            std::fs::remove_file(entry.path())?;
+        } else if entry.file_name() == ATTACHMENTS_DIR {
+            match std::fs::remove_dir(entry.path()) {
+                Err(e) if e.kind() == ErrorKind::DirectoryNotEmpty => retained = true,
+                other => other?,
+            }
+        } else {
+            std::fs::remove_dir_all(entry.path())?;
+        }
+    }
+    if !retained {
+        std::fs::remove_dir(path)?;
+    }
+    Ok(())
+}
+
+/// Removes a path on the blocking pool; a missing one is fine.
+async fn remove_path(path: PathBuf, remove: fn(&Path) -> std::io::Result<()>) -> Result<()> {
     let shown = path.display().to_string();
     let removed = tokio::task::spawn_blocking(move || {
-        let result = if dir {
-            std::fs::remove_dir_all(&path)
-        } else {
-            std::fs::remove_file(&path)
-        };
+        let result = remove(&path);
         match result {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
             other => other,
