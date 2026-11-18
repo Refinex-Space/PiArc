@@ -2358,8 +2358,8 @@
       "id": "T21-A11",
       "task": "T21",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "提交 7981d66 的 npm run verify 通过全部 15 项；Vitest 87 个文件通过（1062 项通过、1 项既有跳过），L2 49 项通过、1 项仅适用 Windows。完整输出见 tmp/evidence/T21/verify.log。"
     },
     {
       "id": "T22-A01",

@@ -318,7 +318,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] Agent Host 能力目录、刷新、effort、切换预览、凭据收敛与排队图片检查，Host 25 文件 163 项通过。
 - [x] 设置页、首页与环境栏选型、effort 和图片输入提示；ego-browser 证据位于 tmp/evidence/T21/。
 - [x] 两种协议各完成工具回合；Core 重启恢复、凭据扫描和模型能力 L2 通过；两种 Electron 形态的 T21 与 preload 共 18/18。
-- [ ] 全量验证、证据、文档与收尾。
+- [x] 收尾全量门禁 15/15，T21-A01 至 A11 全部通过，证据在 tmp/evidence/T21/。
 
 ## 登记事项
 
