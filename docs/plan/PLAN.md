@@ -296,7 +296,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 T19 Transcript 与 composer 正式版（2026-11-18 开工；基线 `npm run verify` 15/15 通过）
 
-- [ ] 协议与 Core：用户输入的提及与附件（AHP、Core API、Agent Host 的图片与 PDF 文本）、错误分类（`kind`、`retryable`）、模糊文件匹配 API（遵守 `.gitignore`、上限、可取消）、内置命令列表、附件存储
+- [x] 协议与 Core：用户输入的提及与附件（AHP、Core API、Agent Host 的图片与 PDF 文本）、错误分类（`kind`、`retryable`）、模糊文件匹配 API（遵守 `.gitignore`、上限、可取消）、内置命令列表、附件存储（f4f62d5；`turn/usage`、`session/compact`、mock 的 thinking / 分段速率 / 401）
 - [ ] transcript 接入真实事件流与历史窗口、会话缓存；同一套归约器与行组件
 - [ ] P0 九种行类型组件（用户消息、回复、思考块、工具组、bash 卡、文件改动卡、压缩提示、错误卡、working 行）与 `uncertain` 提示；行级错误边界（I50）
 - [ ] composer 正式版：`@` 提及（Core 模糊匹配）、`/` 命令面板、图片与 PDF 附件（拖放、粘贴、类型与大小上限）、steer / 排队 / Esc、排队项编辑删除、输入法守卫
