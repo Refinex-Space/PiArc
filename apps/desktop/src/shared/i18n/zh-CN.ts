@@ -114,7 +114,8 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'transcript.tool.edit': '{count, plural, one {编辑 {target}} other {编辑了 # 个文件}}',
   'transcript.tool.fetch': '{count, plural, one {获取 {target}} other {获取了 # 个网页}}',
   'transcript.tool.mcp': '{count, plural, one {调用 {target}} other {调用了 # 个 MCP 工具}}',
-  'transcript.tool.agent': '{count, plural, one {运行子智能体：{target}} other {运行了 # 个子智能体}}',
+  'transcript.tool.agent':
+    '{count, plural, one {运行子智能体：{target}} other {运行了 # 个子智能体}}',
   'transcript.tool.other': '{count, plural, one {使用 {target}} other {使用了 # 个工具}}',
   'transcript.tool.lines': '+{added} −{removed}',
   'transcript.tool.status.inProgress': '运行中',
@@ -135,14 +136,16 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'transcript.bash.duration': '{seconds} 秒',
   'transcript.bash.timedOut': '超过 {seconds} 秒的时限后被停止',
   'transcript.bash.truncated': '给模型的输出已截断，完整输出在 {path}',
-  'transcript.bash.cwdReset': '下一条命令从 {path} 开始（{reason, select, missing {原目录已不存在} other {原目录在工作区之外}}）',
+  'transcript.bash.cwdReset':
+    '下一条命令从 {path} 开始（{reason, select, missing {原目录已不存在} other {原目录在工作区之外}}）',
   'transcript.bash.showOutput': '显示输出',
   'transcript.bash.hideOutput': '隐藏输出',
   'transcript.file.created': '新文件',
   'transcript.file.degraded': '改动太大，无法预览。',
   'transcript.file.noDiff': '没有记录到改动。',
   'transcript.compaction.running': '正在压缩对话…',
-  'transcript.compaction.done': '对话已压缩（{reason, select, manual {手动} threshold {上下文将满} overflow {上下文超长} other {}}）：{before, number} → {after, number} tokens',
+  'transcript.compaction.done':
+    '对话已压缩（{reason, select, manual {手动} threshold {上下文将满} overflow {上下文超长} other {}}）：{before, number} → {after, number} tokens',
   'transcript.compaction.doneShort': '对话已压缩',
   'transcript.compaction.failed': '压缩失败：{message}',
   'transcript.compaction.interrupted': '压缩已停止。',
