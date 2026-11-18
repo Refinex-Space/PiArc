@@ -1,0 +1,4 @@
+{
+  "id": "t18-stall",
+  "steps": [{ "text": "Working on it for a long time", "stall_after_events": 4 }]
+}

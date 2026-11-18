@@ -1,0 +1,9 @@
+{
+  "id": "t18-slow",
+  "steps": [
+    {
+      "tool_calls": [{ "name": "Bash", "input": { "command": "sleep 3", "description": "Wait" } }]
+    },
+    { "text": "Finished after a while." }
+  ]
+}

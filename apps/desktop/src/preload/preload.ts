@@ -275,6 +275,10 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.sessionDelete, id, title)
       .then((value: unknown) => expectBoolean(value)),
+  transcriptWindow: (id, limit) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionTranscript, id, limit)
+      .then((value: unknown) => expectString(value)),
   resendSnapshots: async () => {
     await ipcRenderer.invoke(IPC_CHANNELS.snapshotsResend);
   },

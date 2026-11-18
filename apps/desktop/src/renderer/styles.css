@@ -1,10 +1,5 @@
-/* Neutral placeholder styles for the window skeleton; design tokens arrive with T18. */
-:root {
-  color-scheme: light dark;
-  font-family: system-ui, sans-serif;
-  font-size: 14px;
-}
-
+/* Styles of the prototype test pages (event probe T04, transcript lab T09, terminal lab T10).
+   The app's own styles are app.css, built on the design tokens. */
 html,
 body,
 #root {
@@ -12,33 +7,7 @@ body,
   margin: 0;
 }
 
-.shell {
-  display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) 320px;
-  height: 100%;
-}
-
-.shell-sidebar,
-.shell-panel {
-  display: flex;
-  flex-direction: column;
-  padding: 12px;
-  background: color-mix(in srgb, canvas 92%, canvastext);
-}
-
-.shell-sidebar {
-  border-right: 1px solid color-mix(in srgb, canvas 80%, canvastext);
-}
-
-.shell-panel {
-  border-left: 1px solid color-mix(in srgb, canvas 80%, canvastext);
-}
-
-.shell-main {
-  padding: 12px 24px;
-  overflow: auto;
-}
-
+/* Event probe test page (T04). */
 .shell-heading {
   margin: 0 0 8px;
   font-size: 13px;
@@ -50,13 +19,6 @@ body,
   color: color-mix(in srgb, canvastext 60%, canvas);
 }
 
-.shell-footer {
-  margin-top: auto;
-  font-size: 12px;
-  color: color-mix(in srgb, canvastext 60%, canvas);
-}
-
-/* Event probe test page (T04). */
 .probe {
   padding: 12px 24px;
 }

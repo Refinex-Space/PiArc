@@ -25,10 +25,32 @@ export type SessionCore = Pick<
   | 'setSessionPinned'
   | 'setSessionArchived'
   | 'deleteSession'
+  | 'transcriptWindow'
   | 'resendSnapshots'
   | 'projectTrust'
   | 'decideProjectTrust'
 >;
+
+/**
+ * Failures a test asks for (development builds' test hooks only): the next call on a channel
+ * fails with the given message instead of reaching Core (T18-A07).
+ */
+export class FaultInjector {
+  private readonly pending = new Map<string, string>();
+
+  failNext(channel: string, message: string): void {
+    this.pending.set(channel, message);
+  }
+
+  /** Throws the failure planned for `channel`, if any. */
+  check(channel: string): void {
+    const message = this.pending.get(channel);
+    if (message !== undefined) {
+      this.pending.delete(channel);
+      throw new Error(message);
+    }
+  }
+}
 
 /** Longest session title, in characters (Core's limit). */
 const MAX_TITLE = 200;
@@ -76,6 +98,7 @@ export function registerSessionHandlers(
   registerHandler: RegisterHandler,
   core: SessionCore,
   translator: () => Translator,
+  faults: FaultInjector,
 ): void {
   registerHandler(IPC_CHANNELS.folderDialog, async (event) => {
     const t = translator();
@@ -94,9 +117,11 @@ export function registerSessionHandlers(
   registerHandler(IPC_CHANNELS.workspaceOpen, (_event, [dir]) =>
     core.openWorkspace(absolutePath(dir)),
   );
-  registerHandler(IPC_CHANNELS.sessionCreate, (_event, [workspace]) =>
-    core.createSession(absolutePath(workspace), null),
-  );
+  registerHandler(IPC_CHANNELS.sessionCreate, (_event, [workspace]) => {
+    const dir = absolutePath(workspace);
+    faults.check(IPC_CHANNELS.sessionCreate);
+    return core.createSession(dir, null);
+  });
   registerHandler(IPC_CHANNELS.sessionResume, (_event, [id]) => core.resumeSession(sessionId(id)));
   registerHandler(IPC_CHANNELS.sessionClose, (_event, [id]) => core.closeSession(sessionId(id)));
   registerHandler(IPC_CHANNELS.sessionPrompt, (_event, [id, text]) => {
@@ -140,6 +165,12 @@ export function registerSessionHandlers(
     }
     await core.deleteSession(target);
     return true;
+  });
+  registerHandler(IPC_CHANNELS.sessionTranscript, (_event, [id, limit]) => {
+    if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > 1000) {
+      throw new TypeError('limit must be an integer from 1 to 1000');
+    }
+    return core.transcriptWindow(sessionId(id), null, limit);
   });
   registerHandler(IPC_CHANNELS.snapshotsResend, () => {
     core.resendSnapshots();

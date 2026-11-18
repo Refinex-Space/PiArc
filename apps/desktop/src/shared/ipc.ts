@@ -32,6 +32,7 @@ export const IPC_CHANNELS = {
   sessionSetPinned: 'piarc:session.setPinned',
   sessionSetArchived: 'piarc:session.setArchived',
   sessionDelete: 'piarc:session.delete',
+  sessionTranscript: 'piarc:session.transcript',
   snapshotsResend: 'piarc:snapshots.resend',
   trustGet: 'piarc:trust.get',
   trustDecide: 'piarc:trust.decide',
@@ -271,6 +272,11 @@ export interface PiarcApi {
    * (`title` is what the dialog names). Resolves `false` when the user cancelled.
    */
   deleteSession(id: string, title: string): Promise<boolean>;
+  /**
+   * The last `limit` items of a session's persisted conversation (open or not) as JSON:
+   * `{ start, total, items: [{ entryId, item }] }`.
+   */
+  transcriptWindow(id: string, limit: number): Promise<string>;
   /** Asks Core to send the workspace and session snapshots again. */
   resendSnapshots(): Promise<void>;
   /** The trust view of a directory as JSON (`TrustView`). */

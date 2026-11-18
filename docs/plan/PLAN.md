@@ -302,13 +302,18 @@ D3 只定了图标，主色与字标未定：用中性临时令牌，视觉关�
 - [x] 2 信任闸门（I63）：有未确认的新增项时 `trusted` 为 false；Core 用户设置读写（语言、外观、快捷键覆盖、通知）
 - [x] 3 设计令牌管线：`design/tokens/*.json` → CSS 与 TS，漂移检查、对比度检查、品牌检查并入 verify（A01、A02）
 - [x] 4 i18n（ICU MessageFormat，中英两套，主进程与渲染进程共用）
-- [ ] 5 主进程：窗口外观（隐藏标题栏 + vibrancy / Mica + 覆盖层）、原生菜单（i18n + 快捷键）、设置窗口、打开文件夹、删除确认、通知与 Dock 角标、会话 IPC 白名单（A04、A11）
+- [x] 5 主进程：窗口外观（隐藏标题栏 + vibrancy / Mica + 覆盖层）、原生菜单（i18n + 快捷键）、设置窗口、打开文件夹、删除确认、通知与 Dock 角标、会话 IPC 白名单（A04、A11）
 - [x] 6 渲染进程 store（`useSyncExternalStore`，revision 门控、clientId 对账、item 粒度订阅）（A09）
 - [ ] 7 窗口骨架（三栏 + 注册式右栏与面板区、尺寸记忆）、侧栏会话列表与徽标（A05、A06）
 - [ ] 8 新建会话流程（乐观消息、失败回滚）与信任对话框（A07、A08）
 - [ ] 9 设置窗口三页、快捷键注册表与自定义（A10）、语言切换（A12）
 - [ ] 10 Playwright 流程用例、亮暗 × 两档密度评审截图、冷启动 100 会话测量（A13）
 - [ ] 11 文档：架构、ADR、CLAUDE.md、复用表；verify；视觉关口（A03、A14）
+
+续做要点（2026-11-18 会话因用量上限中断）：
+- 渲染进程（第 7–9 项）代码已写完并提交，L4 `t18-sessions`、`t18-settings` 在 dev 形态通过；`t18-trust` 刚修了点击隐藏的菜单按钮（hover 表头）未重跑；`t18-attention` 失败：设置窗口在前台时 main 页面 `document.hasFocus()` 仍为真，Conversation 立即标记已读，徽标变 idle——改为主进程告知焦点（或用 `BrowserWindow.isFocused` 经 app 事件）后再判断
+- 还没做：评审截图脚本（亮暗 × 两档密度）、macOS 窗口外观截图（A04）、冷启动 100 会话测量（A13）、`npm run package:desktop -- --flavor development` 后跑全部 L4 两种形态、S10 报告与 preload 白名单说明、架构 7.6/8.x/10.2 与 ADR-0025 增补、CLAUDE.md 与复用表、acceptance.json、全量 verify、视觉关口
+- Core 侧本任务另修了两个竞态（信任决定后立即建会话、首个 Agent Host 连上时恢复正在创建的会话），各有 testkit 用例
 
 ## 登记事项
 

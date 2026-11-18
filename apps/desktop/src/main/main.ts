@@ -12,7 +12,7 @@ import { registerEventHandlers } from './core/event-ipc.js';
 import { hasTestingExports } from './core/load.js';
 import { EventRouter } from './core/router.js';
 import { registerTerminalHandlers, TerminalOwners } from './core/terminal-ipc.js';
-import { registerSessionHandlers } from './core/session-ipc.js';
+import { FaultInjector, registerSessionHandlers } from './core/session-ipc.js';
 import { installTestHooks } from './core/test-hooks.js';
 import { applyDevServerCsp, resolveDevServer } from './dev-server.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
@@ -37,6 +37,7 @@ const trustedOrigins: readonly string[] =
 let shell: AppShell | undefined;
 const eventRouter = new EventRouter();
 const terminalStats = { requests: 0, frames: 0, bytes: 0, errors: 0 };
+const faults = new FaultInjector();
 
 function bundlePath(...segments: string[]): string {
   return path.join(app.getAppPath(), '.vite', ...segments);
@@ -82,6 +83,9 @@ function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners, app: App
   }
   installTestHooks({
     attention: () => app.attention.observed(),
+    failNext: (channel, message) => {
+      faults.failNext(channel, message);
+    },
     modulePath: core.modulePath,
     core: core.runtime,
     router: eventRouter,
@@ -139,7 +143,7 @@ function start(dirs: DataDirs): void {
     const registerHandler = createIpcRegistrar(trustedOrigins);
     registerIpcHandlers(registerHandler);
     appShell.registerHandlers(registerHandler);
-    registerSessionHandlers(registerHandler, core.runtime, () => appShell.t());
+    registerSessionHandlers(registerHandler, core.runtime, () => appShell.t(), faults);
     const terminalOwners = new TerminalOwners(core.runtime);
     registerEventHandlers(registerHandler, eventRouter, (windowId, route) =>
       terminalOwners.mayObserve(windowId, route),

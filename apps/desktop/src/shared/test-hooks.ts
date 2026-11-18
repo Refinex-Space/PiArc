@@ -170,6 +170,8 @@ export interface PiarcTestHooks {
   ): Promise<{ supported: boolean; events: NotificationProbeEvent[] }>;
   /** What the attention module did (T18): notifications, Dock bounces, the badge count. */
   attention(): AttentionObservation;
+  /** Makes the next call on IPC `channel` fail with `message` before it reaches Core (T18). */
+  failNext(channel: string, message: string): void;
 }
 
 /** See `src/main/platform/attention.ts`. */
