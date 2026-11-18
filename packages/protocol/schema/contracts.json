@@ -171,6 +171,90 @@
     },
     {
       "kind": "request",
+      "method": "models/list",
+      "name": "models/list",
+      "schema": "ModelsListRequest"
+    },
+    {
+      "kind": "response",
+      "method": "models/list",
+      "name": "models/list/result",
+      "schema": "ModelsListResponse"
+    },
+    {
+      "kind": "request",
+      "method": "models/reload",
+      "name": "models/reload",
+      "schema": "ModelsReloadRequest"
+    },
+    {
+      "kind": "response",
+      "method": "models/reload",
+      "name": "models/reload/result",
+      "schema": "ModelsReloadResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/previewModelSwitch",
+      "name": "session/previewModelSwitch",
+      "schema": "SessionPreviewModelSwitchRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/previewModelSwitch",
+      "name": "session/previewModelSwitch/result",
+      "schema": "SessionPreviewModelSwitchResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/setModel",
+      "name": "session/setModel",
+      "schema": "SessionSetModelRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/setModel",
+      "name": "session/setModel/result",
+      "schema": "SessionSetModelResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/setEffort",
+      "name": "session/setEffort",
+      "schema": "SessionSetEffortRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/setEffort",
+      "name": "session/setEffort/result",
+      "schema": "SessionSetEffortResponse"
+    },
+    {
+      "kind": "request",
+      "method": "models/credential",
+      "name": "models/credential",
+      "schema": "ModelsCredentialRequest"
+    },
+    {
+      "kind": "response",
+      "method": "models/credential",
+      "name": "models/credential/result",
+      "schema": "ModelsCredentialResponse"
+    },
+    {
+      "kind": "request",
+      "method": "models/credentialStatus",
+      "name": "models/credentialStatus",
+      "schema": "ModelsCredentialStatusRequest"
+    },
+    {
+      "kind": "response",
+      "method": "models/credentialStatus",
+      "name": "models/credentialStatus/result",
+      "schema": "ModelsCredentialStatusResponse"
+    },
+    {
+      "kind": "request",
       "method": "session/setPermissionMode",
       "name": "session/setPermissionMode",
       "schema": "SessionSetPermissionModeRequest"
@@ -522,6 +606,18 @@
       "method": "secrets/lock",
       "name": "secrets/lock/result",
       "schema": "SecretsLockResponse"
+    },
+    {
+      "kind": "request",
+      "method": "secrets/renew",
+      "name": "secrets/renew",
+      "schema": "SecretsRenewRequest"
+    },
+    {
+      "kind": "response",
+      "method": "secrets/renew",
+      "name": "secrets/renew/result",
+      "schema": "SecretsRenewResponse"
     },
     {
       "kind": "request",

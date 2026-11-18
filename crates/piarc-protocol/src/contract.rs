@@ -22,11 +22,15 @@ use crate::history::{HarnessEntry, SessionGetEntries, SessionHistory};
 use crate::host::{HostPing, HostShutdown};
 use crate::jsonrpc::{ErrorResponse, Notification, Request, SuccessResponse};
 use crate::method::{Method, NotificationMessage, RequestMessage, ResultMessage};
+use crate::models::{
+    ModelsCredential, ModelsCredentialStatus, ModelsList, ModelsReload, SessionPreviewModelSwitch,
+    SessionSetEffort, SessionSetModel,
+};
 use crate::policy::{PolicyCancel, PolicyEvaluate, PolicyInputChunk, PolicyPending};
 use crate::queue::{QueueChanged, QueueDelete, QueueEdit, QueueReorder};
 use crate::secrets::{
-    SecretsChanged, SecretsDelete, SecretsGet, SecretsGetAll, SecretsLock, SecretsSet,
-    SecretsUnlock,
+    SecretsChanged, SecretsDelete, SecretsGet, SecretsGetAll, SecretsLock, SecretsRenew,
+    SecretsSet, SecretsUnlock,
 };
 use crate::session::{
     PolicyRecover, SessionAbort, SessionClose, SessionCompact, SessionCreate,
@@ -172,6 +176,20 @@ pub static CONTRACTS: &[Contract] = &[
     response::<PolicyCancel>("policy/cancel/result"),
     request::<PolicyRecover>("policy/recover"),
     response::<PolicyRecover>("policy/recover/result"),
+    request::<ModelsList>(ModelsList::NAME),
+    response::<ModelsList>("models/list/result"),
+    request::<ModelsReload>(ModelsReload::NAME),
+    response::<ModelsReload>("models/reload/result"),
+    request::<SessionPreviewModelSwitch>(SessionPreviewModelSwitch::NAME),
+    response::<SessionPreviewModelSwitch>("session/previewModelSwitch/result"),
+    request::<SessionSetModel>(SessionSetModel::NAME),
+    response::<SessionSetModel>("session/setModel/result"),
+    request::<SessionSetEffort>(SessionSetEffort::NAME),
+    response::<SessionSetEffort>("session/setEffort/result"),
+    request::<ModelsCredential>(ModelsCredential::NAME),
+    response::<ModelsCredential>("models/credential/result"),
+    request::<ModelsCredentialStatus>(ModelsCredentialStatus::NAME),
+    response::<ModelsCredentialStatus>("models/credentialStatus/result"),
     request::<SessionSetPermissionMode>("session/setPermissionMode"),
     response::<SessionSetPermissionMode>("session/setPermissionMode/result"),
     request::<SessionCompact>(SessionCompact::NAME),
@@ -231,6 +249,8 @@ pub static CONTRACTS: &[Contract] = &[
     response::<SecretsDelete>("secrets/delete/result"),
     request::<SecretsLock>(SecretsLock::NAME),
     response::<SecretsLock>("secrets/lock/result"),
+    request::<SecretsRenew>(SecretsRenew::NAME),
+    response::<SecretsRenew>("secrets/renew/result"),
     request::<SecretsUnlock>(SecretsUnlock::NAME),
     response::<SecretsUnlock>("secrets/unlock/result"),
     notification::<SecretsChanged>(),

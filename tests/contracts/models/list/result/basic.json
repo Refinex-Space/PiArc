@@ -1,0 +1,27 @@
+{
+  "jsonrpc": "2.0",
+  "id": 21,
+  "result": {
+    "models": [
+      {
+        "provider": "shop",
+        "id": "example",
+        "name": "Example",
+        "contextWindow": 4096,
+        "maxOutput": 1024,
+        "vision": false,
+        "efforts": [
+          "off"
+        ],
+        "promptCache": false,
+        "toolReliability": "unknown"
+      }
+    ],
+    "providers": [
+      {
+        "id": "anthropic",
+        "name": "Anthropic"
+      }
+    ]
+  }
+}

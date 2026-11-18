@@ -223,6 +223,81 @@
       "description": "A named optional protocol feature, for example `planMode`.\n\nCapabilities are open strings rather than an enum: a peer must accept capability names\nit does not know, because that is how newer minor versions announce additions.",
       "type": "string"
     },
+    "CatalogModel": {
+      "description": "A selectable chat model and its negotiated capabilities.",
+      "properties": {
+        "contextWindow": {
+          "description": "Context window in tokens.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "efforts": {
+          "description": "Selectable efforts.",
+          "items": {
+            "$ref": "#/$defs/EffortLevel"
+          },
+          "type": "array"
+        },
+        "id": {
+          "description": "Model id within its provider.",
+          "type": "string"
+        },
+        "maxOutput": {
+          "description": "Maximum response tokens.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "description": "Display name.",
+          "type": "string"
+        },
+        "promptCache": {
+          "description": "Supports prompt caching.",
+          "type": "boolean"
+        },
+        "provider": {
+          "description": "Provider id.",
+          "type": "string"
+        },
+        "toolReliability": {
+          "$ref": "#/$defs/ToolReliability",
+          "description": "Tool calling assessment."
+        },
+        "vision": {
+          "description": "Accepts image input.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "provider",
+        "id",
+        "name",
+        "contextWindow",
+        "maxOutput",
+        "vision",
+        "efforts",
+        "promptCache",
+        "toolReliability"
+      ],
+      "type": "object"
+    },
+    "CatalogProvider": {
+      "description": "A built-in provider accepting API key credentials.",
+      "properties": {
+        "id": {
+          "description": "Pi provider id.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Display name.",
+          "type": "string"
+        }
+      },
+      "required": ["id", "name"],
+      "type": "object"
+    },
     "CommandExecutionInfo": {
       "description": "How a shell command ran: what the client shows on its card, as Core reported it.",
       "properties": {
@@ -360,6 +435,10 @@
     "CoreWelcome": {
       "description": "Result of `host/hello` (`core/welcome`).",
       "properties": {
+        "allowModelNetwork": {
+          "description": "Whether Pi may refresh catalogs from the network.",
+          "type": ["boolean", "null"]
+        },
         "connectionEpoch": {
           "description": "Incremented every time Core (re)starts an Agent Host for the workspace; lets both\nsides tell connections apart after a restart.",
           "format": "uint64",
@@ -383,6 +462,32 @@
         }
       },
       "required": ["protocol", "enabled", "workspace", "connectionEpoch"],
+      "type": "object"
+    },
+    "CredentialStatusParams": {
+      "description": "Reads non-secret credential status.",
+      "properties": {
+        "provider": {
+          "description": "Provider id.",
+          "type": "string"
+        }
+      },
+      "required": ["provider"],
+      "type": "object"
+    },
+    "CredentialStatusResult": {
+      "description": "Non-secret status for settings and crash recovery.",
+      "properties": {
+        "changeId": {
+          "description": "Id of the last settings write, when available.",
+          "type": ["string", "null"]
+        },
+        "hasCredential": {
+          "description": "A credential exists in the vault.",
+          "type": "boolean"
+        }
+      },
+      "required": ["hasCredential"],
       "type": "object"
     },
     "CwdReset": {
@@ -510,6 +615,41 @@
       },
       "required": ["name", "kind"],
       "type": "object"
+    },
+    "EffortLevel": {
+      "description": "Selectable Pi thinking level (PiArc omits minimal).",
+      "oneOf": [
+        {
+          "const": "off",
+          "description": "Off.",
+          "type": "string"
+        },
+        {
+          "const": "low",
+          "description": "Low.",
+          "type": "string"
+        },
+        {
+          "const": "medium",
+          "description": "Medium.",
+          "type": "string"
+        },
+        {
+          "const": "high",
+          "description": "High.",
+          "type": "string"
+        },
+        {
+          "const": "xhigh",
+          "description": "Xhigh.",
+          "type": "string"
+        },
+        {
+          "const": "max",
+          "description": "Max.",
+          "type": "string"
+        }
+      ]
     },
     "ErrorData": {
       "description": "Structured part of an [`ErrorObject`].",
@@ -3245,6 +3385,296 @@
       "required": ["provider", "id"],
       "type": "object"
     },
+    "ModelSwitchParams": {
+      "description": "Estimates a model switch in an open session.",
+      "properties": {
+        "model": {
+          "$ref": "#/$defs/ModelRef",
+          "description": "Target model."
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "Session."
+        }
+      },
+      "required": ["sessionId", "model"],
+      "type": "object"
+    },
+    "ModelSwitchPreviewResult": {
+      "description": "Cost of switching before committing it.",
+      "properties": {
+        "cacheInvalidated": {
+          "description": "Cached input loses its identity.",
+          "type": "boolean"
+        },
+        "cacheWriteUsd": {
+          "description": "Estimated USD to write the cache, null when unpriced.",
+          "format": "double",
+          "type": ["number", "null"]
+        },
+        "contextTokens": {
+          "description": "Estimated context tokens, null when unknown.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "dropsThinking": {
+          "description": "Thinking content may be discarded during conversion.",
+          "type": "boolean"
+        }
+      },
+      "required": ["cacheInvalidated", "dropsThinking"],
+      "type": "object"
+    },
+    "ModelsCredentialParams": {
+      "description": "Stores or deletes a credential using the settings Host.",
+      "properties": {
+        "credential": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProviderCredential"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Credential to store; absent to delete."
+        },
+        "keepKey": {
+          "description": "Preserve the stored key when updating metadata.",
+          "type": ["boolean", "null"]
+        },
+        "provider": {
+          "description": "Provider id.",
+          "type": "string"
+        }
+      },
+      "required": ["provider"],
+      "type": "object"
+    },
+    "ModelsCredentialRequest": {
+      "description": "Request for `models/credential`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "models/credential",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ModelsCredentialParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "ModelsCredentialResponse": {
+      "description": "Successful response to `models/credential`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/ModelsUpdated"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "ModelsCredentialStatusRequest": {
+      "description": "Request for `models/credentialStatus`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "models/credentialStatus",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/CredentialStatusParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "ModelsCredentialStatusResponse": {
+      "description": "Successful response to `models/credentialStatus`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/CredentialStatusResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "ModelsListParams": {
+      "description": "Lists available models, optionally for a session.",
+      "properties": {
+        "sessionId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Session to report current selection for."
+        }
+      },
+      "type": "object"
+    },
+    "ModelsListRequest": {
+      "description": "Request for `models/list`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "models/list",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ModelsListParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "ModelsListResponse": {
+      "description": "Successful response to `models/list`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/ModelsListResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "ModelsListResult": {
+      "description": "Available models and built-in providers.",
+      "properties": {
+        "effort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EffortLevel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Current effort for the session."
+        },
+        "model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Current model for the session."
+        },
+        "models": {
+          "description": "Models for which authentication is available.",
+          "items": {
+            "$ref": "#/$defs/CatalogModel"
+          },
+          "type": "array"
+        },
+        "providers": {
+          "description": "Built-in provider catalog.",
+          "items": {
+            "$ref": "#/$defs/CatalogProvider"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["providers", "models"],
+      "type": "object"
+    },
+    "ModelsReloadParams": {
+      "description": "Reloads Pi configuration and controls catalog refresh.",
+      "properties": {
+        "allowNetwork": {
+          "description": "Enable catalog network requests.",
+          "type": "boolean"
+        }
+      },
+      "required": ["allowNetwork"],
+      "type": "object"
+    },
+    "ModelsReloadRequest": {
+      "description": "Request for `models/reload`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "models/reload",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ModelsReloadParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "ModelsReloadResponse": {
+      "description": "Successful response to `models/reload`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/ModelsUpdated"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "ModelsUpdated": {
+      "description": "Acknowledges a successful provider operation.",
+      "type": "object"
+    },
     "Notification": {
       "description": "A notification (no `id`, no response) whose method is not interpreted.",
       "properties": {
@@ -3614,6 +4044,28 @@
       "description": "Protocol version as \"major.minor\", for example \"1.0\".",
       "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
       "type": "string"
+    },
+    "ProviderCredential": {
+      "description": "An API credential transported in memory only.",
+      "properties": {
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Request-scoped cloud fields and destination binding.",
+          "type": ["object", "null"]
+        },
+        "key": {
+          "description": "API key when supplied.",
+          "type": ["string", "null"]
+        },
+        "type": {
+          "description": "Pi credential type (api_key).",
+          "type": "string"
+        }
+      },
+      "required": ["type"],
+      "type": "object"
     },
     "QueueChangedNotification": {
       "description": "Notification `session/queueChanged`.",
@@ -4219,6 +4671,12 @@
     "SecretsLockParams": {
       "description": "Parameters of `secrets/lock`.",
       "properties": {
+        "deadlineMs": {
+          "description": "Latest time (Unix milliseconds) at which the caller can accept a grant.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
         "keys": {
           "description": "The keys the holder may write, for example `provider/<id>` and `oauth/<id>` of one\nmodel provider. Taken together; the request waits while any of them is locked.",
           "items": {
@@ -4289,6 +4747,56 @@
         }
       },
       "required": ["lockId", "entries", "expiresInMs"],
+      "type": "object"
+    },
+    "SecretsRenewRequest": {
+      "description": "Request for `secrets/renew`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "secrets/renew",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SecretsUnlockParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SecretsRenewResponse": {
+      "description": "Successful response to `secrets/renew`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SecretsRenewResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SecretsRenewResult": {
+      "description": "New duration of a renewed lease.",
+      "properties": {
+        "expiresInMs": {
+          "description": "Remaining lease from this acknowledgement, in milliseconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["expiresInMs"],
       "type": "object"
     },
     "SecretsSetParams": {
@@ -4881,6 +5389,21 @@
       "required": ["sessionId", "requestId", "text"],
       "type": "object"
     },
+    "SessionModelSelection": {
+      "description": "Model and effort now in effect in Pi.",
+      "properties": {
+        "effort": {
+          "$ref": "#/$defs/EffortLevel",
+          "description": "Active effort."
+        },
+        "model": {
+          "$ref": "#/$defs/ModelRef",
+          "description": "Active model."
+        }
+      },
+      "required": ["model", "effort"],
+      "type": "object"
+    },
     "SessionOpened": {
       "description": "Result of `session/create` and `session/resume`.",
       "properties": {
@@ -4907,6 +5430,43 @@
         }
       },
       "required": ["sessionId", "restoredMessages"],
+      "type": "object"
+    },
+    "SessionPreviewModelSwitchRequest": {
+      "description": "Request for `session/previewModelSwitch`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/previewModelSwitch",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ModelSwitchParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionPreviewModelSwitchResponse": {
+      "description": "Successful response to `session/previewModelSwitch`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/ModelSwitchPreviewResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
       "type": "object"
     },
     "SessionPromptParams": {
@@ -5037,6 +5597,80 @@
       "required": ["jsonrpc", "id", "result"],
       "type": "object"
     },
+    "SessionSetEffortRequest": {
+      "description": "Request for `session/setEffort`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/setEffort",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SetEffortParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionSetEffortResponse": {
+      "description": "Successful response to `session/setEffort`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SessionModelSelection"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SessionSetModelRequest": {
+      "description": "Request for `session/setModel`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/setModel",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SetModelParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionSetModelResponse": {
+      "description": "Successful response to `session/setModel`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SessionModelSelection"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
     "SessionSetPermissionModeRequest": {
       "description": "Request for `session/setPermissionMode`.",
       "properties": {
@@ -5151,6 +5785,47 @@
       "required": ["sessionId"],
       "type": "object"
     },
+    "SetEffortParams": {
+      "description": "Changes effort for the current model.",
+      "properties": {
+        "effort": {
+          "$ref": "#/$defs/EffortLevel",
+          "description": "Supported target effort."
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "Session."
+        }
+      },
+      "required": ["sessionId", "effort"],
+      "type": "object"
+    },
+    "SetModelParams": {
+      "description": "Changes the session model after confirmation.",
+      "properties": {
+        "effort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EffortLevel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Explicit effort for the target model."
+        },
+        "model": {
+          "$ref": "#/$defs/ModelRef",
+          "description": "Target model."
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "Session."
+        }
+      },
+      "required": ["sessionId", "model"],
+      "type": "object"
+    },
     "SetPermissionModeParams": {
       "description": "The user's selected permission mode for this session.",
       "properties": {
@@ -5203,6 +5878,21 @@
       },
       "required": ["tool", "toolCallId"],
       "type": "object"
+    },
+    "ToolReliability": {
+      "description": "How thoroughly the model has been exercised with tools.",
+      "oneOf": [
+        {
+          "const": "verified",
+          "description": "Verified.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "Unknown.",
+          "type": "string"
+        }
+      ]
     },
     "TrustGetParams": {
       "description": "Parameters of `trust/get`.",
@@ -5711,6 +6401,48 @@
       "$ref": "#/$defs/PolicyRecoverResponse"
     },
     {
+      "$ref": "#/$defs/ModelsListRequest"
+    },
+    {
+      "$ref": "#/$defs/ModelsListResponse"
+    },
+    {
+      "$ref": "#/$defs/ModelsReloadRequest"
+    },
+    {
+      "$ref": "#/$defs/ModelsReloadResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionPreviewModelSwitchRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionPreviewModelSwitchResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionSetModelRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionSetModelResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionSetEffortRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionSetEffortResponse"
+    },
+    {
+      "$ref": "#/$defs/ModelsCredentialRequest"
+    },
+    {
+      "$ref": "#/$defs/ModelsCredentialResponse"
+    },
+    {
+      "$ref": "#/$defs/ModelsCredentialStatusRequest"
+    },
+    {
+      "$ref": "#/$defs/ModelsCredentialStatusResponse"
+    },
+    {
       "$ref": "#/$defs/SessionSetPermissionModeRequest"
     },
     {
@@ -5886,6 +6618,12 @@
     },
     {
       "$ref": "#/$defs/SecretsLockResponse"
+    },
+    {
+      "$ref": "#/$defs/SecretsRenewRequest"
+    },
+    {
+      "$ref": "#/$defs/SecretsRenewResponse"
     },
     {
       "$ref": "#/$defs/SecretsUnlockRequest"

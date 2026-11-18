@@ -49,4 +49,7 @@ pub struct CoreWelcome {
     /// Incremented every time Core (re)starts an Agent Host for the workspace; lets both
     /// sides tell connections apart after a restart.
     pub connection_epoch: u64,
+    /// Whether Pi may refresh catalogs from the network.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allow_model_network: Option<bool>,
 }

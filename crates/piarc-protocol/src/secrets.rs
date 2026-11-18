@@ -129,6 +129,9 @@ pub struct SecretsLockParams {
     /// The keys the holder may write, for example `provider/<id>` and `oauth/<id>` of one
     /// model provider. Taken together; the request waits while any of them is locked.
     pub keys: Vec<String>,
+    /// Latest time (Unix milliseconds) at which the caller can accept a grant.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deadline_ms: Option<u64>,
 }
 
 /// Result of `secrets/lock`.
@@ -140,6 +143,14 @@ pub struct SecretsLockResult {
     /// The current entries of the locked keys that exist.
     pub entries: Vec<SecretEntry>,
     /// Core releases the lock on its own after this many milliseconds.
+    pub expires_in_ms: u64,
+}
+
+/// New duration of a renewed lease.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SecretsRenewResult {
+    /// Remaining lease from this acknowledgement, in milliseconds.
     pub expires_in_ms: u64,
 }
 
@@ -191,6 +202,10 @@ request!(
 request!(
     /// Method marker for `secrets/lock` (Agent Host → Core).
     SecretsLock, "secrets/lock", SecretsLockParams, SecretsLockResult
+);
+request!(
+    /// Only the connection that owns the lock can extend its lease.
+    SecretsRenew, "secrets/renew", SecretsUnlockParams, SecretsRenewResult
 );
 request!(
     /// Method marker for `secrets/unlock` (Agent Host → Core).

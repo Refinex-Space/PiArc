@@ -33,6 +33,20 @@ export type AhpMessage =
   | PolicyCancelResponse
   | PolicyRecoverRequest
   | PolicyRecoverResponse
+  | ModelsListRequest
+  | ModelsListResponse
+  | ModelsReloadRequest
+  | ModelsReloadResponse
+  | SessionPreviewModelSwitchRequest
+  | SessionPreviewModelSwitchResponse
+  | SessionSetModelRequest
+  | SessionSetModelResponse
+  | SessionSetEffortRequest
+  | SessionSetEffortResponse
+  | ModelsCredentialRequest
+  | ModelsCredentialResponse
+  | ModelsCredentialStatusRequest
+  | ModelsCredentialStatusResponse
   | SessionSetPermissionModeRequest
   | SessionSetPermissionModeResponse
   | SessionCompactRequest
@@ -92,6 +106,8 @@ export type AhpMessage =
   | SecretsDeleteResponse
   | SecretsLockRequest
   | SecretsLockResponse
+  | SecretsRenewRequest
+  | SecretsRenewResponse
   | SecretsUnlockRequest
   | SecretsUnlockResponse
   | SecretsChangedNotification
@@ -186,6 +202,18 @@ export type PolicyInputChunkResult = Record<string, never>;
  * Core finished cancelling the expired preflight, or it was already gone.
  */
 export type PolicyCancelled = Record<string, never>;
+/**
+ * Selectable Pi thinking level (PiArc omits minimal).
+ */
+export type EffortLevel = 'off' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+/**
+ * How thoroughly the model has been exercised with tools.
+ */
+export type ToolReliability = 'verified' | 'unknown';
+/**
+ * Acknowledges a successful provider operation.
+ */
+export type ModelsUpdated = Record<string, never>;
 /**
  * Acknowledgement that the mode entry is in the session.
  */
@@ -753,6 +781,10 @@ export interface HostHelloResponse {
  */
 export interface CoreWelcome {
   /**
+   * Whether Pi may refresh catalogs from the network.
+   */
+  allowModelNetwork?: boolean | null;
+  /**
    * Incremented every time Core (re)starts an Agent Host for the workspace; lets both
    * sides tell connections apart after a restart.
    */
@@ -1289,6 +1321,360 @@ export interface PolicyRecoverResult {
    * The error result the restored conversation must give the model.
    */
   reason?: string | null;
+}
+/**
+ * Request for `models/list`.
+ */
+export interface ModelsListRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'models/list';
+  params: ModelsListParams;
+}
+/**
+ * Lists available models, optionally for a session.
+ */
+export interface ModelsListParams {
+  /**
+   * Session to report current selection for.
+   */
+  sessionId?: SessionId | null;
+}
+/**
+ * Successful response to `models/list`.
+ */
+export interface ModelsListResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: ModelsListResult;
+}
+/**
+ * Available models and built-in providers.
+ */
+export interface ModelsListResult {
+  /**
+   * Current effort for the session.
+   */
+  effort?: EffortLevel | null;
+  /**
+   * Current model for the session.
+   */
+  model?: ModelRef | null;
+  /**
+   * Models for which authentication is available.
+   */
+  models: CatalogModel[];
+  /**
+   * Built-in provider catalog.
+   */
+  providers: CatalogProvider[];
+}
+/**
+ * A selectable chat model and its negotiated capabilities.
+ */
+export interface CatalogModel {
+  /**
+   * Context window in tokens.
+   */
+  contextWindow: number;
+  /**
+   * Selectable efforts.
+   */
+  efforts: EffortLevel[];
+  /**
+   * Model id within its provider.
+   */
+  id: string;
+  /**
+   * Maximum response tokens.
+   */
+  maxOutput: number;
+  /**
+   * Display name.
+   */
+  name: string;
+  /**
+   * Supports prompt caching.
+   */
+  promptCache: boolean;
+  /**
+   * Provider id.
+   */
+  provider: string;
+  /**
+   * Tool calling assessment.
+   */
+  toolReliability: ToolReliability;
+  /**
+   * Accepts image input.
+   */
+  vision: boolean;
+}
+/**
+ * A built-in provider accepting API key credentials.
+ */
+export interface CatalogProvider {
+  /**
+   * Pi provider id.
+   */
+  id: string;
+  /**
+   * Display name.
+   */
+  name: string;
+}
+/**
+ * Request for `models/reload`.
+ */
+export interface ModelsReloadRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'models/reload';
+  params: ModelsReloadParams;
+}
+/**
+ * Reloads Pi configuration and controls catalog refresh.
+ */
+export interface ModelsReloadParams {
+  /**
+   * Enable catalog network requests.
+   */
+  allowNetwork: boolean;
+}
+/**
+ * Successful response to `models/reload`.
+ */
+export interface ModelsReloadResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: ModelsUpdated;
+}
+/**
+ * Request for `session/previewModelSwitch`.
+ */
+export interface SessionPreviewModelSwitchRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/previewModelSwitch';
+  params: ModelSwitchParams;
+}
+/**
+ * Estimates a model switch in an open session.
+ */
+export interface ModelSwitchParams {
+  /**
+   * Target model.
+   */
+  model: ModelRef;
+  /**
+   * Session.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `session/previewModelSwitch`.
+ */
+export interface SessionPreviewModelSwitchResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: ModelSwitchPreviewResult;
+}
+/**
+ * Cost of switching before committing it.
+ */
+export interface ModelSwitchPreviewResult {
+  /**
+   * Cached input loses its identity.
+   */
+  cacheInvalidated: boolean;
+  /**
+   * Estimated USD to write the cache, null when unpriced.
+   */
+  cacheWriteUsd?: number | null;
+  /**
+   * Estimated context tokens, null when unknown.
+   */
+  contextTokens?: number | null;
+  /**
+   * Thinking content may be discarded during conversion.
+   */
+  dropsThinking: boolean;
+}
+/**
+ * Request for `session/setModel`.
+ */
+export interface SessionSetModelRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/setModel';
+  params: SetModelParams;
+}
+/**
+ * Changes the session model after confirmation.
+ */
+export interface SetModelParams {
+  /**
+   * Explicit effort for the target model.
+   */
+  effort?: EffortLevel | null;
+  /**
+   * Target model.
+   */
+  model: ModelRef;
+  /**
+   * Session.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `session/setModel`.
+ */
+export interface SessionSetModelResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SessionModelSelection;
+}
+/**
+ * Model and effort now in effect in Pi.
+ */
+export interface SessionModelSelection {
+  /**
+   * Active effort.
+   */
+  effort: EffortLevel;
+  /**
+   * Active model.
+   */
+  model: ModelRef;
+}
+/**
+ * Request for `session/setEffort`.
+ */
+export interface SessionSetEffortRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/setEffort';
+  params: SetEffortParams;
+}
+/**
+ * Changes effort for the current model.
+ */
+export interface SetEffortParams {
+  /**
+   * Supported target effort.
+   */
+  effort: EffortLevel;
+  /**
+   * Session.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `session/setEffort`.
+ */
+export interface SessionSetEffortResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SessionModelSelection;
+}
+/**
+ * Request for `models/credential`.
+ */
+export interface ModelsCredentialRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'models/credential';
+  params: ModelsCredentialParams;
+}
+/**
+ * Stores or deletes a credential using the settings Host.
+ */
+export interface ModelsCredentialParams {
+  /**
+   * Credential to store; absent to delete.
+   */
+  credential?: ProviderCredential | null;
+  /**
+   * Preserve the stored key when updating metadata.
+   */
+  keepKey?: boolean | null;
+  /**
+   * Provider id.
+   */
+  provider: string;
+}
+/**
+ * An API credential transported in memory only.
+ */
+export interface ProviderCredential {
+  /**
+   * Request-scoped cloud fields and destination binding.
+   */
+  env?: {
+    [k: string]: string;
+  } | null;
+  /**
+   * API key when supplied.
+   */
+  key?: string | null;
+  /**
+   * Pi credential type (api_key).
+   */
+  type: string;
+}
+/**
+ * Successful response to `models/credential`.
+ */
+export interface ModelsCredentialResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: ModelsUpdated;
+}
+/**
+ * Request for `models/credentialStatus`.
+ */
+export interface ModelsCredentialStatusRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'models/credentialStatus';
+  params: CredentialStatusParams;
+}
+/**
+ * Reads non-secret credential status.
+ */
+export interface CredentialStatusParams {
+  /**
+   * Provider id.
+   */
+  provider: string;
+}
+/**
+ * Successful response to `models/credentialStatus`.
+ */
+export interface ModelsCredentialStatusResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: CredentialStatusResult;
+}
+/**
+ * Non-secret status for settings and crash recovery.
+ */
+export interface CredentialStatusResult {
+  /**
+   * Id of the last settings write, when available.
+   */
+  changeId?: string | null;
+  /**
+   * A credential exists in the vault.
+   */
+  hasCredential: boolean;
 }
 /**
  * Request for `session/setPermissionMode`.
@@ -3085,6 +3471,10 @@ export interface SecretsLockRequest {
  */
 export interface SecretsLockParams {
   /**
+   * Latest time (Unix milliseconds) at which the caller can accept a grant.
+   */
+  deadlineMs?: number | null;
+  /**
    * The keys the holder may write, for example `provider/<id>` and `oauth/<id>` of one
    * model provider. Taken together; the request waits while any of them is locked.
    */
@@ -3117,12 +3507,12 @@ export interface SecretsLockResult {
   lockId: string;
 }
 /**
- * Request for `secrets/unlock`.
+ * Request for `secrets/renew`.
  */
-export interface SecretsUnlockRequest {
+export interface SecretsRenewRequest {
   id: RequestId;
   jsonrpc: JsonRpcVersion;
-  method: 'secrets/unlock';
+  method: 'secrets/renew';
   params: SecretsUnlockParams;
 }
 /**
@@ -3133,6 +3523,33 @@ export interface SecretsUnlockParams {
    * The lock to release.
    */
   lockId: string;
+}
+/**
+ * Successful response to `secrets/renew`.
+ */
+export interface SecretsRenewResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SecretsRenewResult;
+}
+/**
+ * New duration of a renewed lease.
+ */
+export interface SecretsRenewResult {
+  /**
+   * Remaining lease from this acknowledgement, in milliseconds.
+   */
+  expiresInMs: number;
+}
+/**
+ * Request for `secrets/unlock`.
+ */
+export interface SecretsUnlockRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'secrets/unlock';
+  params: SecretsUnlockParams;
 }
 /**
  * Successful response to `secrets/unlock`.
