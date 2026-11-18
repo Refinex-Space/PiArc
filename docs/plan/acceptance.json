@@ -2190,99 +2190,99 @@
       "id": "T20-A01",
       "task": "T20",
       "description": "交付物 1 表中的每个单元格都有对应场景，两种模式下的结论与表一致。验证：L2 场景输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test scenarios -- --results target/l2/t20.json：policy-manual、policy-accept-edits、两种模式的 PowerShell 询问、policy-extra-directory 与 policy-untrusted 通过。48 个场景中本机 47 通过；macOS 的 PowerShell 工具夹具检验真实 Core 拒绝，Windows 场景使用原生工具。详见 tmp/evidence/T20/policy-l2.log。"
     },
     {
       "id": "T20-A02",
       "task": "T20",
       "description": "含 shell 元字符的 `mkdir`/`cp` 命令在自动接受编辑模式下询问；参数指向工作区外时询问。验证：单测与场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-policy：simple_paths 拒绝元字符及不明确的操作数；L2 policy-shell-boundary 对包含分号、命令替换和工作区外路径的调用逐一要求答复。policy-accept-edits 证明四种正常简单命令可执行。Core 的 simple_commands_with_custom_shell_resolution_require_review 另覆盖自定义 shell 环境。"
     },
     {
       "id": "T20-A03",
       "task": "T20",
       "description": "Core 返回错误、`policy/evaluate` 超时、响应无法解析时，工具调用都被拒绝且模型收到拒绝理由。验证：故障注入测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test agent_host：policy_faults_decline_the_call_and_give_the_model_a_reason 注入错误、超时、畸形成功响应，检查未写文件和下一次 mock 请求。agent-host/src/harness/policy.test.ts 另验证实际计时器、迟到通知、用户等待与取消。"
     },
     {
       "id": "T20-A04",
       "task": "T20",
       "description": "两个窗口同时答复同一请求时只有第一个生效，第二个收到\"已处理\"；`revision` 不匹配的答复被拒绝。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --lib tool_io::policy::tests：concurrent_answers_apply_once_and_each_decision_is_audited_by_session 验证错误 revision 得到 stale，两次并发答复得到 applied 和 alreadyHandled。真实会话集成 tests/sessions/permissions.rs 也通过。"
     },
     {
       "id": "T20-A05",
       "task": "T20",
       "description": "Agent Host 重连后，重连前未答复的审批请求全部作废并按拒绝回给模型，界面上的旧卡片消失。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test sessions permissions::：crashed_host_expires_the_card_and_the_next_model_request_contains_the_refusal 强杀真实 Agent Host，观察旧审批从快照移除，恢复后 mock 请求带过期拒绝，历史条目为 declined。"
     },
     {
       "id": "T20-A06",
       "task": "T20",
       "description": "本会话允许只在本会话内对同一调用免审批，新会话中仍询问；拒绝附带的反馈出现在下一次模型请求的工具结果中，item 状态为 `declined`。验证：场景测试与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 policy-session-rule：同会话的重复 Bash 不再收到审批，另一会话再次审批；拒绝反馈 Review the script first. 进入 mock 工具结果，item/completed 为 declined。tmp/evidence/T20/policy-l2.log。 审批中断的严格 mock 回归连续 6 次验证，全部会话集成 24/24。"
     },
     {
       "id": "T20-A07",
       "task": "T20",
       "description": "总是允许的规则可在卡片中编辑，经主进程原生确认后写入 `.piarc/settings.local.json`；之后同一调用不再询问；受保护路径的卡片上没有\"总是允许\"。验证：Playwright 流程、文件内容与场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Electron t20-approvals.e2e.ts 在 dev、packaged 验证编辑、取消和确认原生对话框、settings.local.json 文件内容、规则复用与保护路径按钮。L2 policy-save-rule、policy-extra-directory 通过；原生确认字段缺失时 Core 拒绝持久化。tmp/evidence/T20/desktop-verified.log。 c24a7f2 重新打包后审批专项 dev/packaged 4/4，tmp/evidence/T20/final-l4/approvals.log。"
     },
     {
       "id": "T20-A08",
       "task": "T20",
       "description": "起始模式按\"会话 → 设置 → default\"解析；项目级配置把 `defaultMode` 设为 `bypassPermissions` 或 `auto` 时不生效。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-policy -p piarc-config：显式模式、设置与内置默认的优先级，项目 bypassPermissions/auto 回退，项目 acceptEdits 与 additionalDirectories 须经信任。L2 policy-untrusted；Core 回归测试确认设置编辑不会自动切换已打开的手动会话。"
     },
     {
       "id": "T20-A09",
       "task": "T20",
       "description": "切换模式后 transcript 中出现模式切换行，重启应用并恢复会话后模式保持。验证：场景测试与 Playwright 流程。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 policy-mode-restore、cargo test -p piarc-testkit --test sessions permissions::、真实 Electron t20-approvals.e2e.ts：切换后实时行和历史行均可见，整个应用重启后恢复的菜单仍为自动接受编辑。tmp/evidence/T20/desktop-verified.log。"
     },
     {
       "id": "T20-A10",
       "task": "T20",
       "description": "每次裁决都写入审计表，可按会话查询到工具、模式、命中步骤与结论。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --lib tool_io::policy：按会话查询 SQLite，核对工具、参数摘要、模式、具体步骤/匹配规则、决定和来源，其他会话无记录。a_preflight_configuration_error_is_audited_as_a_refusal 验证配置故障也记录拒绝。"
     },
     {
       "id": "T20-A11",
       "task": "T20",
       "description": "四类审批卡按类型渲染，提问表单类型显示不支持提示并按拒绝回复。验证：组件测试与截图（`tmp/evidence/T20/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "定向 Vitest 46/46 和 Electron L4 的 dev、packaged 两种形态通过，提问表单展示不支持并回复拒绝。四类卡截图见 tmp/evidence/T20/l4/t20-approvals.e2e.ts-guard-59ce2-used-card-and-visible-order-packaged/ 和同级 t20-approvals.e2e.ts-edits-a9e2e-nd-restores-the-chosen-mode-packaged/protected-file.png。"
     },
     {
       "id": "T20-A12",
       "task": "T20",
       "description": "新卡 400 ms 内热键无效；多张卡时只有第一张响应；composer 非空且焦点不在卡片上时 Esc 不拒绝；输入法合成期间热键无效；长参数未展开时\"总是允许\"不可用。验证：单测与 Playwright 流程。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "approval-keys.test.ts 纯函数与 Electron guards approval shortcuts 流程验证 400 ms、首张可见、composer 非空、IME 和阅读闸门。ego-browser 在本地假 Core 页面另验证展开、编辑规则、允许和模式快捷键。tmp/evidence/T20/desktop-verified.log、tmp/evidence/T20/ego-approval-reviewed.png。"
     },
     {
       "id": "T20-A13",
       "task": "T20",
       "description": "无需用户参与的裁决 p95 ≤ 2 ms。验证：Core 基准测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --lib tool_io::policy -- --test-threads=1 --nocapture：100 次预热后，1,000 次真实 Core 自动裁决（含配置、信任、路径、SQLite 审计），p50 0.364 ms、p95 0.526 ms、p99 0.636 ms，满足 2 ms 预算。tmp/evidence/T20/core-policy.log。"
     },
     {
       "id": "T20-A14",
       "task": "T20",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "2026-11-19 macOS arm64，提交 2730864：npm run verify 退出 0，All 15 steps passed。Vitest 83 个文件、995 通过、1 个既有平台跳过；Rust sessions 默认并发 24/24；101 个契约有正反样本；L2 47 通过、1 个 Windows 专有场景按平台跳过，MISSING 0。完整汇总 tmp/evidence/T20/verify.log。"
     },
     {
       "id": "T21-A01",
