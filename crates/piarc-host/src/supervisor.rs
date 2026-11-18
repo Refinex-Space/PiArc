@@ -18,7 +18,7 @@ use piarc_protocol::session::{
     SessionResumeParams, SessionStopped, SessionTarget,
 };
 use serde_json::Value;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
 
 use crate::config::HostConfig;
@@ -65,6 +65,13 @@ pub enum SupervisorState {
     ShuttingDown,
     /// Stopped for good.
     Stopped,
+}
+
+/// One session to resume before sending its first request on this connection.
+struct Restore {
+    id: String,
+    tracked: TrackedSession,
+    done: watch::Sender<Result<()>>,
 }
 
 enum Command {
@@ -452,6 +459,21 @@ impl Inner {
         timeout: Duration,
     ) -> Result<Value> {
         let link = self.current_link()?;
+        if method.starts_with("session/")
+            && method != SessionResume::NAME
+            && method != SessionCreate::NAME
+            && let Some(id) = params.get("sessionId").and_then(Value::as_str)
+        {
+            let waiting = lock(&link.restoring).get(id).cloned();
+            if let Some(mut ready) = waiting {
+                ready.changed().await.map_err(|_| Error::HostUnavailable {
+                    state: "connection ended during session restoration".into(),
+                })?;
+                if method != SessionClose::NAME {
+                    ready.borrow().clone()?;
+                }
+            }
+        }
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         let Some(reply) = lock(&link.pending).register(id) else {
             return Err(Error::HostUnavailable {
@@ -579,6 +601,9 @@ impl Inner {
         commands: &mut mpsc::Receiver<Command>,
     ) -> (ExitReason, Option<ExitStatus>, Option<oneshot::Sender<()>>) {
         let epoch = connection.link.epoch;
+        // Install every pending session before exposing the new link, even for sessions
+        // whose resume has not reached the wire yet.
+        let sessions = self.pending_restores(&connection.link);
         *lock(&self.link) = Some(connection.link.clone());
         self.set_state(SupervisorState::Connected { epoch });
         tracing::info!(target: "piarc_host", workspace = %self.shared.workspace, epoch, pid = ?connection.pid,
@@ -593,8 +618,8 @@ impl Inner {
         let heartbeat = self.spawn_heartbeat(connection.link.clone());
         // Reopen the sessions while staying responsive: a restore that hangs must not keep
         // shutdown or a kill waiting (R1-A4).
-        let mut restoring = epoch > 1;
-        let restore = self.restore_sessions(epoch);
+        let mut restoring = !sessions.is_empty();
+        let restore = self.restore_sessions(connection.link.clone(), sessions);
         tokio::pin!(restore);
         let mut reason = ExitReason::Crashed;
         let mut stop = None;
@@ -730,28 +755,50 @@ impl Inner {
         })
     }
 
-    async fn restore_sessions(&self, epoch: u64) {
-        let sessions: Vec<(String, TrackedSession)> = lock(&self.shared.sessions)
+    fn pending_restores(&self, link: &Link) -> Vec<Restore> {
+        if link.epoch == 1 {
+            return Vec::new();
+        }
+        let mut waiting = lock(&link.restoring);
+        lock(&self.shared.sessions)
             .iter()
-            .map(|(id, tracked)| (id.clone(), tracked.clone()))
-            .collect();
-        for (session_id, tracked) in sessions {
+            .map(|(id, tracked)| {
+                let (done, ready) = watch::channel(Ok(()));
+                waiting.insert(id.clone(), ready);
+                Restore {
+                    id: id.clone(),
+                    tracked: tracked.clone(),
+                    done,
+                }
+            })
+            .collect()
+    }
+
+    async fn restore_sessions(&self, link: Link, sessions: Vec<Restore>) {
+        let epoch = link.epoch;
+        for Restore {
+            id: session_id,
+            tracked,
+            done,
+        } in sessions
+        {
             let params = SessionResumeParams {
                 session_id: SessionId(session_id.clone()),
                 cwd: tracked.cwd,
                 last_seq: Some(tracked.last_seq),
             };
-            match self
+            let outcome = match self
                 .call::<SessionResume>(params, Tracking::untracked(), self.config.call_timeout)
                 .await
             {
                 Ok(opened) => {
                     self.emit(HostEvent::SessionRestored {
                         epoch,
-                        session_id,
+                        session_id: session_id.clone(),
                         restored_messages: opened.restored_messages,
                     })
                     .await;
+                    Ok(())
                 }
                 // The connection ended mid-restore: this is not the session's failure. Keep
                 // it and the ones not tried yet for the next connection.
@@ -764,12 +811,17 @@ impl Inner {
                     }
                     self.emit(HostEvent::SessionRestoreFailed {
                         epoch,
-                        session_id,
+                        session_id: session_id.clone(),
                         error: error.to_error_object(),
                     })
                     .await;
+                    Err(error)
                 }
-            }
+            };
+            // Release this connection's callers only after publishing the lifecycle event.
+            // On disconnection remaining senders drop; those calls never reached the wire.
+            let _ = done.send(outcome);
+            lock(&link.restoring).remove(&session_id);
         }
     }
 

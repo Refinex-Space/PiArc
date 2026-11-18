@@ -891,6 +891,96 @@ async fn a_requested_restart_is_not_a_failure_and_restores_the_sessions() {
     supervisor.shutdown().await;
 }
 
+/// T19-A08: a retry issued as soon as the replacement process connects must wait for its
+/// session. Other sessions can use the same connection while that resume is outstanding.
+#[tokio::test]
+async fn a_prompt_waits_for_its_own_session_to_be_restored() {
+    check_prompt_during_restore(false).await;
+}
+
+#[tokio::test]
+async fn a_failed_restore_returns_its_error_to_a_waiting_prompt() {
+    check_prompt_during_restore(true).await;
+}
+
+async fn check_prompt_during_restore(reject: bool) {
+    let (started, restoring) = oneshot::channel();
+    let (release, released) = oneshot::channel();
+    let first = script(|mut host| async move {
+        host.hello("1.0", &[]).await;
+        host.accept_session("s1").await;
+        host.until_stdin_closes().await;
+        0
+    });
+    let second = script(move |mut host| async move {
+        host.hello("1.0", &[]).await;
+        let (resume, _) = host.request("session/resume").await;
+        let _ = started.send(());
+        host.accept_session("s2").await;
+        released.await.expect("allow the resume");
+        if reject {
+            host.send(&json!({ "jsonrpc": "2.0", "id": resume, "error": {
+                "code": -32000, "message": "the session could not be restored",
+                "data": { "kind": "sessionNotFound", "retryable": false }
+            }}))
+            .await;
+        } else {
+            host.respond(resume, json!({ "sessionId": "s1", "restoredMessages": 1 }))
+                .await;
+            let (id, input) = host.request("session/prompt").await;
+            assert_eq!(input["sessionId"], "s1");
+            host.respond(id, json!({ "turnId": "retry" })).await;
+        }
+        host.until_stdin_closes().await;
+        0
+    });
+    let spawner = FakeSpawner::new(vec![first, second]);
+    let (supervisor, mut events) = HostSupervisor::start(config(), deps(spawner, TestClock::new()));
+    until(&mut events, |e| matches!(e, HostEvent::Connected { .. })).await;
+    let s1 = supervisor
+        .create_session(SessionCreateParams::new("workspace"))
+        .await
+        .expect("s1")
+        .session_id;
+    supervisor.restart().await;
+    restoring
+        .await
+        .expect("session/resume reached the new process");
+    let retry = supervisor.prompt(&s1, "retry", "Try again");
+    tokio::pin!(retry);
+    // Poll until the call has either sent its frame or suspended on session restoration.
+    tokio::select! {
+        biased;
+        result = &mut retry => panic!("the pending restore allowed a prompt: {result:?}"),
+        () = std::future::ready(()) => {}
+    }
+    assert!(
+        !supervisor
+            .calls()
+            .iter()
+            .any(|call| call.method == "session/prompt"),
+        "a pending restore must keep this session's input out of the wire ledger"
+    );
+    supervisor
+        .create_session(SessionCreateParams::new("workspace"))
+        .await
+        .expect("other session");
+    release.send(()).expect("release the restore");
+    let outcome = retry.await;
+    if reject {
+        let error = outcome.expect_err("failed resume must reject the unsent prompt");
+        assert_eq!(error.kind(), ErrorKind::SessionNotFound);
+        assert!(
+            error
+                .to_string()
+                .contains("the session could not be restored")
+        );
+    } else {
+        assert_eq!(outcome.expect("prompt after restore").turn_id.0, "retry");
+    }
+    supervisor.shutdown().await;
+}
+
 /// R1-A4: the sessions are reopened inside the command loop, so a restore the new process never
 /// answers does not keep `shutdown()` waiting for the call timeout.
 #[tokio::test]
@@ -923,9 +1013,21 @@ async fn a_restore_that_hangs_does_not_hold_back_shutdown() {
         .expect("s1");
     let _ = crash_tx.send(());
     resumed_rx.await.expect("the restore started");
+    let session = SessionId("s1".into());
+    let waiting = supervisor.prompt(&session, "retry", "Try again.");
+    tokio::pin!(waiting);
+    tokio::select! {
+        biased;
+        result = &mut waiting => panic!("the prompt did not wait: {result:?}"),
+        () = std::future::ready(()) => {}
+    }
     tokio::time::timeout(Duration::from_secs(20), supervisor.shutdown())
         .await
         .expect("shutdown does not wait for the pending restore");
+    assert_eq!(
+        waiting.await.expect_err("never sent").kind(),
+        ErrorKind::HostUnavailable
+    );
     assert_eq!(supervisor.state(), SupervisorState::Stopped);
 }
 

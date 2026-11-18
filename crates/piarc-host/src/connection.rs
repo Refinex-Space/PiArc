@@ -26,7 +26,7 @@ use piarc_protocol::turn::TurnCompleted;
 use piarc_protocol::{ErrorKind, ErrorObject, FrameDecoder, encode_frame, negotiate};
 use serde_json::Value;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use tokio::sync::{Notify, Semaphore, mpsc, oneshot};
+use tokio::sync::{Notify, Semaphore, mpsc, oneshot, watch};
 
 use crate::config::HostConfig;
 use crate::events::{EventSender, HostEvent};
@@ -113,6 +113,10 @@ impl Activity {
     }
 }
 
+/// Each receiver belongs to this connection. The restore task owns the sender and reports
+/// its outcome or drops it if the process exits before the session is ready.
+pub(crate) type Restores = Mutex<BTreeMap<String, watch::Receiver<crate::Result<()>>>>;
+
 /// What calls need to reach the current connection. Cheap to clone.
 #[derive(Clone)]
 pub(crate) struct Link {
@@ -123,6 +127,7 @@ pub(crate) struct Link {
     pub close_stdin: Arc<Notify>,
     pub pending: Arc<Mutex<Pending>>,
     pub activity: Arc<Activity>,
+    pub restoring: Arc<Restores>,
     /// Set once Core accepted the handshake: requests from the Agent Host are dispatched only
     /// on an accepted connection, never before `core/welcome` or after a refusal (R1-A7).
     pub accepted: Arc<AtomicBool>,
@@ -192,6 +197,7 @@ pub(crate) async fn start(
         close_stdin,
         pending: Arc::new(Mutex::new(Pending::default())),
         activity: Arc::new(Activity::default()),
+        restoring: Arc::default(),
         accepted: Arc::new(AtomicBool::new(false)),
     };
     let (hello_rx, reader_done) = spawn_reader(config, shared, &link, stdout);

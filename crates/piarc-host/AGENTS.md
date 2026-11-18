@@ -26,6 +26,8 @@ Core 侧的 Agent Host 监管：启动、握手、stdio 读写、背压、心跳
 - 跟踪表：`create_session`、`resume_session`、`fork_session` 成功的会话都进入跟踪表；`create_session` 带 Core 选定的 id 而结果未知（`Error::outcome_unknown()`：超时或连接中断）时同样按该 id 跟踪，下一次连接以 `session/resume` 收敛（R1-A3）。`resume_session` 的 `last_seq` 取跟踪值与传入值的较大者。
 - 重启后对跟踪表中的会话依次 `session/resume`（带 `lastSeq`）：Agent Host 拒绝或答非所问的会话从跟踪表移除并发 `SessionRestoreFailed`；超时、写队列满的会话保留并发 `SessionRestoreFailed`；连接中途结束时停止本轮，未恢复的会话留到下一次连接（R1-A1）。恢复在命令循环里与关闭、Kill、连接结束一起 `select`：新进程不回答恢复请求时 `shutdown()` 不必等调用超时（R1-A4）。`Kill` 带目标连接的 epoch（心跳判定挂死时），只结束那一次连接，不会误杀之后的新进程（R1-A10）。
 
+- 新连接完成握手时，跟踪的会话可能仍在恢复。会话请求在进入调用账本和写队列之前等待该会话的恢复结果。创建其他会话、心跳和宿主关闭可直接使用连接。恢复中断时仍在等待的请求按未送达处理。
+
 ## 背压
 
 - 写：请求经有界队列（`write_queue_frames`，默认 256）写 stdin；满时 `call` 立即返回可重试的 `Error::Busy`，请求不进账本。
