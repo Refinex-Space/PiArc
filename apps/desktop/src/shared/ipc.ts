@@ -1,6 +1,9 @@
 // The IPC contract between the preload script and the main process: channel names and the
 // shape of `window.piarc`. Every channel is registered in the main process through
 // `registerHandler` (src/main/ipc/register.ts), which checks the sender's origin first.
+import type { CommandId } from './keybindings.js';
+import type { Locale } from './i18n/index.js';
+import type { PreferenceChange, Preferences } from './preferences.js';
 
 /** Channel names, one per `window.piarc` command. */
 export const IPC_CHANNELS = {
@@ -15,7 +18,70 @@ export const IPC_CHANNELS = {
   terminalKey: 'piarc:terminal.key',
   terminalResize: 'piarc:terminal.resize',
   terminalRequestFrame: 'piarc:terminal.requestFrame',
+  appState: 'piarc:app.state',
+  preferencesSet: 'piarc:preferences.set',
+  settingsOpen: 'piarc:settings.open',
+  folderDialog: 'piarc:workspace.folderDialog',
+  workspaceOpen: 'piarc:workspace.open',
+  sessionCreate: 'piarc:session.create',
+  sessionResume: 'piarc:session.resume',
+  sessionClose: 'piarc:session.close',
+  sessionPrompt: 'piarc:session.prompt',
+  sessionMarkRead: 'piarc:session.markRead',
+  sessionRename: 'piarc:session.rename',
+  sessionSetPinned: 'piarc:session.setPinned',
+  sessionSetArchived: 'piarc:session.setArchived',
+  sessionDelete: 'piarc:session.delete',
+  snapshotsResend: 'piarc:snapshots.resend',
+  trustGet: 'piarc:trust.get',
+  trustDecide: 'piarc:trust.decide',
+  attentionNotify: 'piarc:attention.notify',
+  attentionCount: 'piarc:attention.count',
 } as const;
+
+/**
+ * Main → preload messages about the app (`webContents.send`): preference changes, commands
+ * from the menu, focus changes. Not an invoke channel.
+ */
+export const APP_EVENT_CHANNEL = 'piarc:app.event';
+
+/** Commands the main process sends to a window: shortcuts plus menu-only commands. */
+export type AppCommand = CommandId | 'workspace.openFolder' | 'view.toggleSidebar';
+
+/** What a window learns about the app when it starts. */
+export interface AppState {
+  /** `process.platform` of the main process. */
+  readonly platform: string;
+  readonly preferences: Preferences;
+  /** The locale the preferences and the system languages resolve to. */
+  readonly locale: Locale;
+}
+
+/** Messages on `APP_EVENT_CHANNEL`. */
+export type AppEvent =
+  | { readonly type: 'preferences'; readonly preferences: Preferences; readonly locale: Locale }
+  | { readonly type: 'command'; readonly command: AppCommand }
+  | { readonly type: 'openSession'; readonly sessionId: string };
+
+/** Something the user should look at (architecture section 8.8): the main process notifies. */
+export interface AttentionNotice {
+  readonly kind: 'completed' | 'awaiting' | 'failed';
+  readonly sessionId: string;
+  /** The session's title as the sidebar shows it. */
+  readonly title: string;
+}
+
+/** Longest text the renderer may send as one prompt (bytes of UTF-16 code units). */
+export const MAX_PROMPT_LENGTH = 1_000_000;
+
+/** Session ids as Core accepts them (`piarc_core::sessions::check_session_id`). */
+export function isSessionId(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length <= 128 &&
+    /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(value)
+  );
+}
 
 /**
  * Main → preload message that carries the window's event port (`webContents.postMessage`
@@ -169,4 +235,54 @@ export interface PiarcApi {
    * Pull one frame per animation frame, never for a hidden terminal.
    */
   requestTerminalFrame(id: number, full: boolean): Promise<Uint8Array>;
+
+  /** Platform, preferences and locale, for the first render. */
+  getAppState(): Promise<AppState>;
+  /**
+   * Changes one preference: written to the user's settings file through Core; every window
+   * then receives the new preferences as an app event. Resolves with them.
+   */
+  setPreference(change: PreferenceChange): Promise<Preferences>;
+  /** Receives app events; returns the function that stops them. */
+  onAppEvent(listener: (event: AppEvent) => void): () => void;
+  /** Opens the settings window (or focuses it) on `page`. */
+  openSettings(page?: string): Promise<void>;
+
+  /** Shows the system folder picker; resolves with the chosen directory, or `null`. */
+  chooseFolder(): Promise<string | null>;
+  /** Opens a directory as a workspace (starts its Agent Host); resolves with Core's JSON. */
+  openWorkspace(path: string): Promise<string>;
+  /** Creates a session in a workspace; resolves with `{ sessionId, ... }` as JSON. */
+  createSession(workspace: string): Promise<string>;
+  /** Reopens a session from its file. */
+  resumeSession(id: string): Promise<string>;
+  /** Closes an open session. */
+  closeSession(id: string): Promise<string>;
+  /** Starts a turn; resolves with `{ turnId }` as JSON. */
+  prompt(id: string, text: string): Promise<string>;
+  /** Clears a session's unread flag. */
+  markSessionRead(id: string): Promise<void>;
+  /** Gives a session a title, or removes it (`null`). */
+  renameSession(id: string, title: string | null): Promise<void>;
+  setSessionPinned(id: string, pinned: boolean): Promise<void>;
+  setSessionArchived(id: string, archived: boolean): Promise<void>;
+  /**
+   * Deletes a session after the user confirms in a native dialog shown by the main process
+   * (`title` is what the dialog names). Resolves `false` when the user cancelled.
+   */
+  deleteSession(id: string, title: string): Promise<boolean>;
+  /** Asks Core to send the workspace and session snapshots again. */
+  resendSnapshots(): Promise<void>;
+  /** The trust view of a directory as JSON (`TrustView`). */
+  projectTrust(path: string): Promise<string>;
+  /** Records the user's trust decision; resolves with the new `TrustView` as JSON. */
+  decideProjectTrust(path: string, trusted: boolean): Promise<string>;
+
+  /**
+   * Tells the main process a session needs the user: a system notification (when the window
+   * is not in front and notifications are on), the Dock bounce or taskbar flash.
+   */
+  notifyAttention(notice: AttentionNotice): Promise<void>;
+  /** The number of sessions that need the user (Dock badge, taskbar overlay icon). */
+  setAttentionCount(count: number): Promise<void>;
 }

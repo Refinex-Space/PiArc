@@ -6,16 +6,19 @@ import { app, BrowserWindow, dialog, protocol, session } from 'electron';
 
 import { APP_ENTRY_URL, APP_ORIGIN } from './app-scheme.js';
 import { APP_SCHEME_REGISTRATION, registerAppProtocol } from './app-protocol.js';
+import { AppShell } from './app-shell.js';
 import { shutdownCoreBeforeQuit, startCore, type CoreHost } from './core/core-host.js';
 import { registerEventHandlers } from './core/event-ipc.js';
 import { hasTestingExports } from './core/load.js';
 import { EventRouter } from './core/router.js';
 import { registerTerminalHandlers, TerminalOwners } from './core/terminal-ipc.js';
+import { registerSessionHandlers } from './core/session-ipc.js';
 import { installTestHooks } from './core/test-hooks.js';
 import { applyDevServerCsp, resolveDevServer } from './dev-server.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
 import { createIpcRegistrar } from './ipc/register.js';
 import { applyDataDirs, type DataDirs } from './platform/data-dirs.js';
+import { PreferenceStore } from './preferences.js';
 import { applyAppIdentity, quitsWhenAllWindowsClosed } from './platform/index.js';
 import { runVelopackStartup } from './platform/velopack.js';
 import { PRODUCTION_CSP } from './security/csp.js';
@@ -31,7 +34,7 @@ const devServer = import.meta.env.DEV
 const trustedOrigins: readonly string[] =
   devServer === undefined ? [APP_ORIGIN] : [APP_ORIGIN, devServer.origin];
 
-let mainWindow: BrowserWindow | null = null;
+let shell: AppShell | undefined;
 const eventRouter = new EventRouter();
 const terminalStats = { requests: 0, frames: 0, bytes: 0, errors: 0 };
 
@@ -39,20 +42,15 @@ function bundlePath(...segments: string[]): string {
   return path.join(app.getAppPath(), '.vite', ...segments);
 }
 
-function openWindow(hash = ''): BrowserWindow {
+/** A window on another page of the app (test pages through the test hooks). */
+function openWindow(hash: string): BrowserWindow {
   const window = createMainWindow(bundlePath('build', 'preload.cjs'));
-  void window.loadURL(`${devServer?.url ?? APP_ENTRY_URL}${hash}`);
+  void window.loadURL(`${entryUrl()}${hash}`);
   return window;
 }
 
-function openMainWindow(): void {
-  const window = openWindow();
-  mainWindow = window;
-  window.on('closed', () => {
-    if (mainWindow === window) {
-      mainWindow = null;
-    }
-  });
+function entryUrl(): string {
+  return devServer?.url ?? APP_ENTRY_URL;
 }
 
 /** Loads and starts Core; on failure tells the user and exits. */
@@ -78,11 +76,12 @@ function startCoreOrExit(dirs: DataDirs): CoreHost | undefined {
   }
 }
 
-function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners): void {
+function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners, app: AppShell): void {
   if (!hasTestingExports(core.runtime)) {
     return;
   }
   installTestHooks({
+    attention: () => app.attention.observed(),
     modulePath: core.modulePath,
     core: core.runtime,
     router: eventRouter,
@@ -96,18 +95,6 @@ function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners): void {
   });
 }
 
-function focusMainWindow(): void {
-  if (mainWindow === null) {
-    openMainWindow();
-    return;
-  }
-  if (mainWindow.isMinimized()) {
-    mainWindow.restore();
-  }
-  mainWindow.show();
-  mainWindow.focus();
-}
-
 function start(dirs: DataDirs): void {
   app.on('session-created', (created) => {
     applyPermissionPolicy(created, trustedOrigins);
@@ -117,7 +104,7 @@ function start(dirs: DataDirs): void {
   });
   app.on('second-instance', () => {
     console.info('[app] second instance started; focusing the existing window');
-    focusMainWindow();
+    shell?.focusMain();
   });
   app.on('window-all-closed', () => {
     if (quitsWhenAllWindowsClosed) {
@@ -126,7 +113,7 @@ function start(dirs: DataDirs): void {
   });
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      openMainWindow();
+      shell?.openMain();
     }
   });
 
@@ -141,15 +128,29 @@ function start(dirs: DataDirs): void {
       return;
     }
     shutdownCoreBeforeQuit(app, core.runtime);
+    const preferences = new PreferenceStore(core.runtime, () => app.getPreferredSystemLanguages());
+    const appShell = new AppShell({
+      preloadPath: bundlePath('build', 'preload.cjs'),
+      entryUrl: entryUrl(),
+      preferences,
+      developer: import.meta.env.DEV || hasTestingExports(core.runtime),
+    });
+    shell = appShell;
     const registerHandler = createIpcRegistrar(trustedOrigins);
     registerIpcHandlers(registerHandler);
+    appShell.registerHandlers(registerHandler);
+    registerSessionHandlers(registerHandler, core.runtime, () => appShell.t());
     const terminalOwners = new TerminalOwners(core.runtime);
     registerEventHandlers(registerHandler, eventRouter, (windowId, route) =>
       terminalOwners.mayObserve(windowId, route),
     );
     registerTerminalHandlers(registerHandler, core.runtime, terminalOwners, terminalStats);
-    startTestHooks(core, terminalOwners);
-    openMainWindow();
+    startTestHooks(core, terminalOwners, appShell);
+    // The preferences come first: the window's language, theme and menu depend on them.
+    void preferences.load().then(() => {
+      appShell.start();
+      appShell.openMain();
+    });
   });
 }
 

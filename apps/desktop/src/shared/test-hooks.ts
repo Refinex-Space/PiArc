@@ -168,6 +168,15 @@ export interface PiarcTestHooks {
     body: string,
     waitMs: number,
   ): Promise<{ supported: boolean; events: NotificationProbeEvent[] }>;
+  /** What the attention module did (T18): notifications, Dock bounces, the badge count. */
+  attention(): AttentionObservation;
+}
+
+/** See `src/main/platform/attention.ts`. */
+export interface AttentionObservation {
+  readonly notified: readonly { kind: string; title: string; body: string; shown: boolean }[];
+  readonly bounces: number;
+  readonly count: number;
 }
 
 declare global {

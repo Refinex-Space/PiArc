@@ -19,6 +19,7 @@
     "@shikijs/themes": "4.6.0",
     "@tanstack/react-virtual": "3.14.26",
     "character-entities": "2.0.2",
+    "intl-messageformat": "12.1.4",
     "marked": "18.2.0",
     "prosemirror-commands": "1.7.2",
     "prosemirror-history": "1.5.1",

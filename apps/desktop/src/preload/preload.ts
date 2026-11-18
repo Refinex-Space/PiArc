@@ -5,12 +5,16 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import {
+  APP_EVENT_CHANNEL,
   EVENTS_PORT_CHANNEL,
   IPC_CHANNELS,
+  type AppEvent,
+  type AppState,
   type EventBatch,
   type EventListener,
   type PiarcApi,
 } from '../shared/ipc.js';
+import type { Preferences } from '../shared/preferences.js';
 
 function expectString(value: unknown): string {
   if (typeof value !== 'string') {
@@ -44,6 +48,58 @@ function isIncomingPort(value: unknown): value is IncomingPort {
     'start' in value &&
     typeof value.start === 'function'
   );
+}
+
+function expectStringOrNull(value: unknown): string | null {
+  if (value !== null && typeof value !== 'string') {
+    throw new TypeError('Unexpected IPC result: expected a string or null');
+  }
+  return value;
+}
+
+/** The main process builds these objects itself; the renderer validates what it reads. */
+function expectAppState(value: unknown): AppState {
+  if (typeof value !== 'object' || value === null || !('preferences' in value)) {
+    throw new TypeError('Unexpected IPC result: expected the app state');
+  }
+  return value as AppState;
+}
+
+function expectPreferences(value: unknown): Preferences {
+  if (typeof value !== 'object' || value === null || !('appearance' in value)) {
+    throw new TypeError('Unexpected IPC result: expected preferences');
+  }
+  return value as Preferences;
+}
+
+const appListeners = new Set<(event: AppEvent) => void>();
+let appChannelOpen = false;
+
+function onAppEvent(listener: (event: AppEvent) => void): () => void {
+  if (typeof listener !== 'function') {
+    throw new TypeError('listener must be a function');
+  }
+  if (!appChannelOpen) {
+    appChannelOpen = true;
+    // The Electron event object is dropped: pages get the message only.
+    ipcRenderer.on(APP_EVENT_CHANNEL, (_event, message: unknown) => {
+      if (typeof message !== 'object' || message === null || !('type' in message)) {
+        console.error('[piarc] ignored a malformed app event');
+        return;
+      }
+      for (const each of appListeners) {
+        try {
+          each(message as AppEvent);
+        } catch (error) {
+          console.error('[piarc] app event listener threw', error);
+        }
+      }
+    });
+  }
+  appListeners.add(listener);
+  return () => {
+    appListeners.delete(listener);
+  };
 }
 
 /** One listener per route key, called for each batch the main process posts. */
@@ -171,6 +227,69 @@ const api: PiarcApi = {
       }
       return value;
     }),
+  getAppState: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.appState).then((value: unknown) => expectAppState(value)),
+  setPreference: (change) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.preferencesSet, change)
+      .then((value: unknown) => expectPreferences(value)),
+  onAppEvent,
+  openSettings: async (page) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.settingsOpen, page);
+  },
+  chooseFolder: () =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.folderDialog)
+      .then((value: unknown) => expectStringOrNull(value)),
+  openWorkspace: (path) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.workspaceOpen, path)
+      .then((value: unknown) => expectString(value)),
+  createSession: (workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionCreate, workspace)
+      .then((value: unknown) => expectString(value)),
+  resumeSession: (id) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionResume, id)
+      .then((value: unknown) => expectString(value)),
+  closeSession: (id) =>
+    ipcRenderer.invoke(IPC_CHANNELS.sessionClose, id).then((value: unknown) => expectString(value)),
+  prompt: (id, text) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionPrompt, id, text)
+      .then((value: unknown) => expectString(value)),
+  markSessionRead: async (id) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.sessionMarkRead, id);
+  },
+  renameSession: async (id, title) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.sessionRename, id, title);
+  },
+  setSessionPinned: async (id, pinned) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.sessionSetPinned, id, pinned);
+  },
+  setSessionArchived: async (id, archived) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.sessionSetArchived, id, archived);
+  },
+  deleteSession: (id, title) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionDelete, id, title)
+      .then((value: unknown) => expectBoolean(value)),
+  resendSnapshots: async () => {
+    await ipcRenderer.invoke(IPC_CHANNELS.snapshotsResend);
+  },
+  projectTrust: (path) =>
+    ipcRenderer.invoke(IPC_CHANNELS.trustGet, path).then((value: unknown) => expectString(value)),
+  decideProjectTrust: (path, trusted) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.trustDecide, path, trusted)
+      .then((value: unknown) => expectString(value)),
+  notifyAttention: async (notice) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.attentionNotify, notice);
+  },
+  setAttentionCount: async (count) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.attentionCount, count);
+  },
 };
 
 contextBridge.exposeInMainWorld('piarc', api);

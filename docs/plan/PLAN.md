@@ -301,7 +301,7 @@ D3 只定了图标，主色与字标未定：用中性临时令牌，视觉关�
 - [x] 1 Core 会话元数据命令：重命名、置顶、归档（清会话临时目录）、删除（先关闭，再删 JSONL 与临时目录）；快照带 `pinned`、`archived`；NAPI 导出与快照
 - [x] 2 信任闸门（I63）：有未确认的新增项时 `trusted` 为 false；Core 用户设置读写（语言、外观、快捷键覆盖、通知）
 - [x] 3 设计令牌管线：`design/tokens/*.json` → CSS 与 TS，漂移检查、对比度检查、品牌检查并入 verify（A01、A02）
-- [ ] 4 i18n（ICU MessageFormat，中英两套，主进程与渲染进程共用）
+- [x] 4 i18n（ICU MessageFormat，中英两套，主进程与渲染进程共用）
 - [ ] 5 主进程：窗口外观（隐藏标题栏 + vibrancy / Mica + 覆盖层）、原生菜单（i18n + 快捷键）、设置窗口、打开文件夹、删除确认、通知与 Dock 角标、会话 IPC 白名单（A04、A11）
 - [ ] 6 渲染进程 store（`useSyncExternalStore`，revision 门控、clientId 对账、item 粒度订阅）（A09）
 - [ ] 7 窗口骨架（三栏 + 注册式右栏与面板区、尺寸记忆）、侧栏会话列表与徽标（A05、A06）

@@ -7,6 +7,7 @@ import { monitorEventLoopDelay, performance, type ELDHistogram } from 'node:perf
 import { Notification, webContents } from 'electron';
 
 import type {
+  AttentionObservation,
   ForwardObservation,
   NotificationProbeEvent,
   TerminalForwardStats,
@@ -28,6 +29,7 @@ export function installTestHooks(options: {
   readonly openWindow: (hash: string) => Promise<number>;
   readonly terminalOwners: TerminalOwners;
   readonly terminalStats: TerminalForwardStats;
+  readonly attention: () => AttentionObservation;
 }): void {
   const { router } = options;
   let histogram: ELDHistogram | undefined;
@@ -88,6 +90,7 @@ export function installTestHooks(options: {
       return id;
     },
     terminalForwardStats: () => ({ ...options.terminalStats }),
+    attention: options.attention,
     showNotification: (title, body, waitMs) =>
       new Promise((resolve) => {
         const supported = Notification.isSupported();
