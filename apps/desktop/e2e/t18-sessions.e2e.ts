@@ -11,6 +11,7 @@ import { expectTestHooks } from './core.js';
 import {
   expect,
   filesNamed,
+  focusMain,
   makeWorkspace,
   openFolder,
   optimisticSeen,
@@ -169,6 +170,7 @@ test('status badges follow Core: running, unread, error', async ({
   await page.getByTestId('new-session').click();
   const done = await startSession(page, 'This one finishes', 't18-chat#badges', 'none');
   await expect(page.getByTestId('agent-message')).toHaveText(/Done\./, { timeout: 30_000 });
+  await focusMain(app);
   await row(page, running).getByTestId('session-title').click();
   await expect(row(page, done)).toHaveAttribute('data-badge', 'idle');
   const unread = await startSessionElsewhere(page, ws);

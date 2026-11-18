@@ -3,7 +3,15 @@
 // the sessions that need the user. On macOS the program cannot see whether a banner appeared
 // (S6, I43), so the test checks what PiArc asked for; the banner itself is checked by hand.
 import { expectTestHooks } from './core.js';
-import { expect, makeWorkspace, openFolder, row, startSession, test } from './sessions.js';
+import {
+  expect,
+  focusMain,
+  makeWorkspace,
+  openFolder,
+  row,
+  startSession,
+  test,
+} from './sessions.js';
 
 test('a session finishing in the background notifies and counts on the Dock badge', async ({
   app,
@@ -49,10 +57,7 @@ test('a session finishing in the background notifies and counts on the Dock badg
 
   // Back in front and shown: read, the count goes back to 0.
   await front.close();
-  await page.bringToFront();
-  await app.evaluate(({ BrowserWindow }) => {
-    BrowserWindow.getAllWindows()[0]?.focus();
-  });
+  await focusMain(app);
   await row(page, id).getByTestId('session-title').click();
   await expect(row(page, id)).toHaveAttribute('data-badge', 'idle', { timeout: 10_000 });
   await expect

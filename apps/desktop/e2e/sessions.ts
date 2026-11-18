@@ -208,6 +208,28 @@ export async function filesNamed(dir: string, needle: string): Promise<string[]>
   return found;
 }
 
+/**
+ * Brings the app and its main window to the front (other apps may be active while tests run):
+ * shown sessions are marked read only while their window is really in front.
+ */
+export async function focusMain(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ app: electronApp, BrowserWindow }) => {
+    electronApp.focus({ steal: true });
+    BrowserWindow.getAllWindows()
+      .find((w) => !w.webContents.getURL().includes('#/settings'))
+      ?.focus();
+  });
+  await expect
+    .poll(() =>
+      app.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().some(
+          (w) => w.isFocused() && !w.webContents.getURL().includes('#/settings'),
+        ),
+      ),
+    )
+    .toBe(true);
+}
+
 /** Launches the app again on the same data directory (a restart). */
 export async function relaunch(
   form: 'dev' | 'packaged',

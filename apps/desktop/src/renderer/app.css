@@ -22,6 +22,12 @@ body {
   color: var(--piarc-text-primary);
   background: var(--piarc-c-window-background);
   -webkit-font-smoothing: antialiased;
+}
+
+/* The app's windows are not documents: chrome text is not selectable (content areas opt back
+   in) and the window itself never scrolls. */
+.shell,
+.settings {
   user-select: none;
   overflow: hidden;
 }
