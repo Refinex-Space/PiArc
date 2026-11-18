@@ -93,6 +93,13 @@ export function prepareForTypeScript(node) {
   }
   if (!TYPE_KEYWORDS.some((keyword) => keyword in out)) {
     out.tsType = 'unknown';
+  } else if (
+    out.type === 'object' &&
+    Object.keys(out).every((key) => ['type', 'description', 'title'].includes(key))
+  ) {
+    // Acknowledgements are objects with no declared members. An empty TS interface
+    // would also accept numbers and strings.
+    out.tsType = 'Record<string, never>';
   }
   return out;
 }

@@ -20,6 +20,7 @@ Core 层的集成测试在 `crates/piarc-core/tests/exec_commands.rs`（cwd、�
 
 ## cwd 跟踪（`cwd.rs`）
 
+- 自动接受编辑放行的系统文件命令由 `CwdProbe::pin_utility` 在启动时核对 Bash 实际解析的文件并锁定物理程序。Core 发现项目可控的 PATH、用户覆盖或启动脚本时由审批卡决定，人工批准后按原有 shell 环境执行。
 - 不改命令文本：`BASH_ENV` 指向会话临时目录 `exec/<requestId>.bash-env`，内容是 `trap 'builtin pwd -P >| <answer>' EXIT` 加 `unset BASH_ENV`（用户原有的 `BASH_ENV` 则先 `export` 回去再 source）。退出码在 `EXIT` trap 中保持；子 bash 看不到 `BASH_ENV`，不会覆盖答案。
 - 没有答案（命令 `exec` 换掉了 shell、自己装了 `EXIT` trap、被杀）时 Core 保持原目录。Windows 上答案是 `/c/…`，`msys_to_windows` 转换；`/tmp`、`/usr` 等 Git 自己的目录转换不了，按越界处理。
 

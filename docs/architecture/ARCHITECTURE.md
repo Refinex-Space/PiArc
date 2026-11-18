@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.24（2026-11-18） |
+| 版本 | 2.25（2026-11-19） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -249,6 +249,7 @@ PiArc/
 | [0028](../adr/0028-shell-command-execution.md) | 命令的进程树终止、超时、cwd 跟踪、输出预算与落盘、语义退出码、登录 shell 环境都在 Core（`exec/run` 返回结构化结果）；Bash 与 PowerShell 为 PiArc 自写工具，按 `exec/shells` 决定工具集 | Pi 的 bash 工具自己截断输出（末尾 2,000 行）、非 0 一律失败、超时无默认，`BashOperations` 改不了；进程只有 Core 能管 |
 | [0029](../adr/0029-client-shell-foundations.md) | 设计令牌单一来源（`design/tokens/`，生成 CSS 与 TS，verify 检查漂移、对比度与品牌）；客户端偏好写在用户级 `settings.json`、Core 为唯一写入方；intl-messageformat；快捷键注册表；有未确认新增项时项目不受信任；信任变化的重启在决定应答前生效；会话标题、置顶、归档、删除由 Core 管 | 第 8 章只写了规则；I63 的闸门空白；信任决定后立即建会话会落到正在关闭的旧进程上 |
 | [0030](../adr/0030-transcript-and-composer.md) | 滚动历史与实时事件使用同一份行模型。输入附带提及区间、会话附件引用及可选幂等键，历史用 Pi 自定义条目恢复胶囊。归档保留附件 | 保存用户看到的输入，支持重发和恢复，并保持 AHP 帧大小有界 |
+| [0031](../adr/0031-basic-permissions.md) | Core 绑定审批和实际 I/O，客户端以会话快照呈现请求 | 保证同一审批只能答复一次，并使重连后的模型看到拒绝理由 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -445,7 +446,7 @@ T16 落地（ADR-0027），每条不变量的 L2 场景在 `tests/scenarios/tool
 | 保真写入 | `piarc_fs::write`：路径锁内检查新鲜度，按旧文件的编码（`encoding_rs`，非 UTF-8 时才用 `chardetng` 检测）与 BOM 编码，Write 用旧文件的主要换行风格，同目录临时文件 + `fsync` + rename；新文件 UTF-8 无 BOM；编码表示不了的字符整次拒绝；大文本经 `upload` 分段，最后一段到达才写 |
 | 结构化 diff | `piarc-diff`（similar）随 `fs/write` 结果返回 `FileDiff`，经工具结果的 `details.fileDiff` 进入 `fileChange` 条目的 `diff` |
 | 输出截断 | Harness Kit 的 `tool-results.ts`：单个结果超过 50K 字符经 `fs/spill` 写入会话临时目录，模型收到约 2KB 头尾预览与路径（家目录下以 `~` 开头）；一次回复的结果合计超过 200K 字符时从最大的开始换成预览，按调用 id 记住；Read 不参与 |
-| 路径边界、受保护路径 | `piarc-fs` 把会话目录之外的读写、受保护路径的写入标记为需要询问，会话临时目录可读不可写；Core 的 `adjudicate` 在 T20 之前拒绝（`permissionDenied`，消息写明原因与下一步） |
+| 路径边界、受保护路径 | `piarc-fs` 把会话目录之外的读写、受保护路径的写入标记为需要询问，会话临时目录可读不可写；Core 的权限预检按规范路径分类，审批后将对应 I/O 限于该调用（ADR-0031） |
 | 并发 | Harness Kit 的队列之外，Core 以所有会话共享的路径锁串行同一文件的写入 |
 
 #### 6.1.3 Operations 委托
@@ -535,6 +536,8 @@ Harness Kit tool_call ──► Core policy/evaluate
 - **审批账本**（Core）：每个审批请求有 `requestId`、所属会话/子 agent、`revision`、`connectionEpoch`。多窗口同时显示时只接受第一个有效答复；Agent Host 重连后旧请求全部作废。
 - **审批选项**：仅本次允许 / 本会话允许 / 总是允许（写入 `.piarc/settings.local.json`，Bash 按子命令前缀生成规则，用户可在保存前编辑）/ 拒绝（可附反馈，作为拒绝理由回给模型）。
 - 审批结果、规则命中、hooks 决定都写入审计表（SQLite），设置界面可查。
+
+M1 实现见 ADR-0031。两种模式均对受保护路径写入逐次审批。会话与持久规则按完整文本匹配，简单文件命令只接受字面操作数，核对实际工作目录、文件边界和工具来源，并把自动批准的调用绑定到已核实的系统工具或 Git Bash 安装中的工具。客户端通过会话快照的 `approvals`、`pendingApprovals` 和 `permissionMode` 同步窗口，使用 `answerApproval` 答复，使用 `setPermissionMode` 记录模式切换。
 
 ### 6.3 Hooks
 
@@ -1186,6 +1189,8 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 - T13 落地（ADR-0025）：主 checkout 规则见 `crates/piarc-git/CLAUDE.md`（linked worktree 经 `gitdir` 与 `commondir` 找到主仓库；submodule 没有 `commondir`，按独立项目；非 git 目录取自身规范路径）。可执行项枚举只读键名与条目：`.piarc/settings*.json`、`.claude/settings*.json` 的 hooks、allow 规则、`enabledPlugins`，`.mcp.json` 与 `.pi/mcp.json` 的 server，`.claude-plugin/` 的插件，`.pi/extensions/` 的条目与 `.pi/settings.json` 的 `extensions`、`packages`；信任时的条目存为快照，之后多出的条目是"新增项"。撤销删除决定并重启该工作区的 Agent Host。所有消费者经 `piarc_config::project_trust` 查询；项目不受信任时，设置合并排除项目层的 hooks 与 allow 规则，deny 与 ask 照常生效。
 - T18 落地（ADR-0029）：信任决定为"信任"、且当前没有快照之外的新增可执行项时，项目才受信任（I63）：`trust/get` 与客户端的信任视图在用户确认之前都答"不信任"，删除的条目不需要再确认。客户端在工作区的第一个会话之前（没有决定时）、或有新增项时显示信任对话框：前者按类别与来源文件列出全部可执行项，后者只列新增项；对话框说明 memory 文件不受信任影响。"暂不信任"同样写入决定，之后不再询问，可从文件夹菜单的"项目信任…"修改。决定与撤销在应答之前让同一主 checkout 的打开工作区进入重启，客户端随后可以立即创建会话。信任决定由渲染进程发出、没有原生确认，登记为 I79，由 T45 评估。
 
+T20 起，项目层的 `acceptEdits` 和 `additionalDirectories` 也纳入信任快照。新项目项需要确认，原生审批保存的精确授权只扩展原有信任记录。会话显式模式优先于设置；项目层声明的 `bypassPermissions` 或 `auto` 始终跳过。
+
 ### 10.3 进程加固
 
 **渲染进程**（按 Electron 官方安全清单逐项落实，清单原文见 `docs/research/electron-stack.md` 第 3 节）：
@@ -1254,7 +1259,7 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 | 主进程事件循环延迟 | p99 ≤ 16 ms | 10 万事件/分钟 3.58 ms；终端 100 MB 输出 2.04 ms | 原始值 16.81 ms，同机空闲 16.58 ms，超出空闲 0.23 ms；终端 100 MB 输出 14.34 ms | `monitorEventLoopDelay`（1 ms 采样）；计时器粒度粗于 1 ms 的平台（Windows 约 15.6 ms）取"满载 p99 − 同机同轮空闲 p99" |
 | Core 事件到渲染进程（主进程转发） | p95 ≤ 1.1 ms（原：≤ 5 ms） | 0.50 ms | ≤ 0.21 ms（p99） | 打点，每次投递，常规批次（≤ 1 MiB） |
 | AHP 往返（小文件 fs 操作） | p95 ≤ 5 ms | 0.19–0.22 ms | ≤ 5 ms（断言通过，数值未记录） | 契约测试中计时 |
-| 无需用户参与的权限裁决 | p95 ≤ 2 ms | 未测 | 未测 | Core 基准测试 |
+| 无需用户参与的权限裁决 | p95 ≤ 2 ms | p95 0.526 ms，1,000 次（T20，含路径、配置、信任及 SQLite 审计） | 未测 | Core 基准测试 `tool_io::policy::tests::automatic_decision_latency` |
 | 终端键入回显的额外延迟（相对直接写 PTY） | p95 ≤ 5 ms | 0.76 ms（逐对相减 0.79 ms） | −0.85 ms（逐对相减 6.86 ms） | 两组样本各 ≥ 1,000 个，取"完整路径 p95 − 直接写 PTY p95"；逐对相减在 ConPTY 下会叠加两次独立往返的抖动 |
 | 安装包体积（macOS arm64 DMG / Windows x64 安装包） | ≤ 200 MB | 168.8 MB | **超出**：225.3 MB（开发构建） | 构建产物 |
 | 安装后体积 | ≤ 450 MB | 449.0 MB（余约 1 MB） | **超出**：521.3 MB | 构建产物 |
@@ -1513,6 +1518,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.25 | 2026-11-19 | T20（ADR-0031）补充第 6.2 节权限裁决与第 10.2 节配置授权边界 |
 | 2.24 | 2026-11-18 | T19（ADR-0030）补充 7.4–7.6、8.2、8.4 的输入协议、错误分类、历史窗口与虚拟列表贴底方式，修订 9.3 的归档清理范围以保留附件 |
 | 2.23 | 2026-11-18 | T18 补充（ADR-0029）：第 4 章加入 ADR-0029；7.6 写明会话元数据与客户端偏好的导出、信任决定在重启生效后才应答、启动同步后重发快照；8.2、8.3、8.5–8.8 写明窗口骨架与注册式容器、store、快捷键注册表、令牌管线与平台外观、本地化、通知与计数的落地；9.2 写明 schema v2 的 `custom_title`，9.3 写明归档与删除；10.2 写明信任闸门（I63）与对话框；10.3 写明新命令的校验与删除确认；第 11 章填入冷启动实测；8.6 写明主色经视觉关口确认 |
 | 2.22 | 2026-11-17 | T17 补充（ADR-0028）：第 4 章加入 ADR-0028 并注明 ADR-0020 第 1 条的 bash 部分被修订；6.1.3 的工具表 Bash 改为 PiArc 自写、增加 PowerShell；6.2.2 写明 Git Bash 的探测顺序与缺失时只提供 PowerShell；6.11 写明 Bash 行为的落地（进程树终止、超时、cwd 跟踪、输出预算、语义退出码、命令环境、实时输出窗口）；7.4 写明 `exec/run` 的新成员、`exec/shells` 与 `core/notices` |

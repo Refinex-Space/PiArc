@@ -3,10 +3,9 @@
 //! uploads of large texts, the diff of every write, and the decision on operations that need
 //! the user's approval.
 //!
-//! Approval: `piarc-fs` marks reads outside the session's directories and writes outside them
-//! or to protected paths ([`piarc_fs::Error::NeedsApproval`]); [`adjudicate`] decides. Until
-//! approvals exist (T20) it refuses them with `permissionDenied` and a message that says why
-//! and what to do instead.
+//! Core issues an exact path permit after preflight. [`adjudicate`] refuses any remaining
+//! [`piarc_fs::Error::NeedsApproval`]. The checked write binds the final decoded text and,
+//! for Edit, its original content to that permit under the shared mutation lock.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -29,9 +28,23 @@ pub(super) struct Uploads {
 
 #[derive(Debug)]
 struct Upload {
-    /// What the pieces are for: `write:<path>` or `spill:<name>`.
-    target: String,
+    target: UploadTarget,
     text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum UploadTarget {
+    Write { call: Option<String>, path: String },
+    Spill(String),
+}
+
+impl Uploads {
+    pub(super) fn cancel_writes(&mut self, call: Option<&str>) {
+        self.pending.retain(|_, upload| match &upload.target {
+            UploadTarget::Write { call: owner, .. } => call.is_some() && call != owner.as_deref(),
+            UploadTarget::Spill(_) => true,
+        });
+    }
 }
 
 /// The text of a request with an optional upload: `Some` once complete, `None` while pieces
@@ -39,7 +52,7 @@ struct Upload {
 fn collect(
     session: &SessionIo,
     part: Option<&UploadPart>,
-    target: String,
+    target: UploadTarget,
     content: String,
 ) -> Result<Option<String>, ErrorObject> {
     let Some(part) = part else {
@@ -54,10 +67,7 @@ fn collect(
             text: String::new(),
         });
     if upload.target != target {
-        let message = format!(
-            "upload {} belongs to {}, not {target}",
-            part.id, upload.target
-        );
+        let message = format!("upload {} belongs to a different operation", part.id);
         uploads.pending.remove(&part.id);
         return Err(ErrorObject::new(ErrorKind::InvalidParams, message, false));
     }
@@ -117,8 +127,10 @@ pub(super) fn write(
     locks: &PathLocks,
     p: FsWriteParams,
 ) -> Result<Value, ErrorObject> {
-    let call = p.origin.as_ref().map_or("", |o| o.tool_call_id.as_str());
-    let target = format!("write:{call}:{}", p.path);
+    let target = UploadTarget::Write {
+        call: p.origin.as_ref().map(|o| o.tool_call_id.clone()),
+        path: p.path.clone(),
+    };
     let Some(text) = collect(session, p.upload.as_ref(), target, p.content)? else {
         return to_value(&FsWriteResult {
             path: p.path,
@@ -154,7 +166,7 @@ pub(super) fn write(
 }
 
 pub(super) fn spill(session: &SessionIo, p: FsSpillParams) -> Result<Value, ErrorObject> {
-    let target = format!("spill:{}", p.name);
+    let target = UploadTarget::Spill(p.name.clone());
     let Some(text) = collect(session, p.upload.as_ref(), target, p.content)? else {
         return to_value(&FsSpillResult {
             path: String::new(),

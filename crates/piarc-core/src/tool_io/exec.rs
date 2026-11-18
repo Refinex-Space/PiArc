@@ -22,6 +22,8 @@
 //!    so a slow connection skips old output instead of slowing the command.
 //! 6. **Outcome.** [`piarc_exec::interpret`] for bash; PowerShell by its exit code.
 
+mod utility;
+
 use std::collections::VecDeque;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -95,6 +97,8 @@ pub(super) struct Exec {
     env: CommandEnv,
     resolved: tokio::sync::OnceCell<Arc<Vec<(OsString, OsString)>>>,
     shells: OnceLock<Shells>,
+    #[cfg(windows)]
+    git_utilities: tokio::sync::OnceCell<Vec<String>>,
     data_dir: PathBuf,
     notices: Option<EventSender>,
     notified: AtomicBool,
@@ -113,6 +117,8 @@ impl Exec {
             env,
             resolved: tokio::sync::OnceCell::new(),
             shells: OnceLock::new(),
+            #[cfg(windows)]
+            git_utilities: tokio::sync::OnceCell::new(),
             data_dir,
             notices,
             notified: AtomicBool::new(false),
@@ -303,6 +309,16 @@ impl Exec {
                 user.as_deref(),
             )
             .map_err(|e| piarc_fs::Error::io(&session.tmp_dir, e).to_error_object())?;
+            if let Some(utility) = &launch.pinned_utility {
+                if user.as_deref().is_some_and(|v| !v.is_empty()) {
+                    return Err(super::policy::denied(
+                        "Bash startup changed since automatic approval. Request approval again.",
+                    ));
+                }
+                probe
+                    .pin_utility(utility)
+                    .map_err(|e| piarc_fs::Error::io(utility, e).to_error_object())?;
+            }
             env = super::overlay_env(env, vec![variable]);
             Some(probe)
         } else {
@@ -379,6 +395,8 @@ pub(super) struct Wrap {
 pub(super) struct Launch {
     pub dir: PathBuf,
     pub tracked: bool,
+    /// Physical utility selected by automatic preflight, pinned in the bash startup file.
+    pub pinned_utility: Option<PathBuf>,
     /// The remembered directory was gone and the command starts at the root instead.
     pub reset: Option<CwdReset>,
 }
@@ -402,6 +420,7 @@ pub(super) fn launch_dir(
         return Ok(Launch {
             dir,
             tracked: false,
+            pinned_utility: None,
             reset: None,
         });
     }
@@ -419,6 +438,7 @@ pub(super) fn launch_dir(
     Ok(Launch {
         dir: remembered.clone(),
         tracked: true,
+        pinned_utility: None,
         reset,
     })
 }

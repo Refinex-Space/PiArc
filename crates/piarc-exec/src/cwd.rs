@@ -65,6 +65,31 @@ impl CwdProbe {
         Ok((Self { init, answer }, variable))
     }
 
+    /// Bind one verified utility to its physical executable in this command's bash process.
+    /// A changed lookup fails closed before the command runs. Its text and exit trap stay intact.
+    ///
+    /// # Errors
+    ///
+    /// The executable has no utility name, or the startup file cannot be updated.
+    pub fn pin_utility(&self, path: &Path) -> io::Result<()> {
+        use std::io::Write;
+        let name = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .ok_or(io::ErrorKind::InvalidInput)?;
+        if !matches!(name, "mkdir" | "touch" | "mv" | "cp") {
+            return Err(io::ErrorKind::InvalidInput.into());
+        }
+        let utility = quote(&bash_path(path));
+        let mut file = std::fs::OpenOptions::new().append(true).open(&self.init)?;
+        let refused = "{ builtin printf '%s\\n' 'Command resolution changed. Request a new approval.' >&2; exit 126; }";
+        writeln!(
+            file,
+            "[[ $(builtin type -t {name}) == file && $(builtin type -P {name}) -ef {utility} ]] || {refused}"
+        )?;
+        writeln!(file, "builtin hash -p {utility} {name} || {refused}")
+    }
+
     /// The directory the shell ended in, as the shell printed it; removes both files.
     #[must_use]
     pub fn finish(self) -> Option<String> {

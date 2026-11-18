@@ -179,6 +179,18 @@ export type AttachmentKind = 'image' | 'pdf';
  */
 export type QueueKind = 'steer' | 'followUp';
 /**
+ * The chunk was accepted at the requested offset.
+ */
+export type PolicyInputChunkResult = Record<string, never>;
+/**
+ * Core finished cancelling the expired preflight, or it was already gone.
+ */
+export type PolicyCancelled = Record<string, never>;
+/**
+ * Acknowledgement that the mode entry is in the session.
+ */
+export type SetPermissionModeResult = Record<string, never>;
+/**
  * Result of `session/steer` and `session/followUp`.
  */
 export type InputAccepted =
@@ -1200,10 +1212,6 @@ export interface PolicyInputChunkResponse {
   result: PolicyInputChunkResult;
 }
 /**
- * The chunk was accepted at the requested offset.
- */
-export interface PolicyInputChunkResult {}
-/**
  * Notification `policy/pending`.
  */
 export interface PolicyPendingNotification {
@@ -1242,10 +1250,6 @@ export interface PolicyCancelResponse {
   jsonrpc: JsonRpcVersion;
   result: PolicyCancelled;
 }
-/**
- * Core finished cancelling the expired preflight, or it was already gone.
- */
-export interface PolicyCancelled {}
 /**
  * Request for `policy/recover`.
  */
@@ -1317,10 +1321,6 @@ export interface SessionSetPermissionModeResponse {
   jsonrpc: JsonRpcVersion;
   result: SetPermissionModeResult;
 }
-/**
- * Acknowledgement that the mode entry is in the session.
- */
-export interface SetPermissionModeResult {}
 /**
  * Request for `session/compact`.
  */

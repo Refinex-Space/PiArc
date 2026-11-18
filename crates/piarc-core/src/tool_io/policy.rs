@@ -184,12 +184,14 @@ impl ToolIo {
     pub(crate) fn cancel_approvals(&self, id: &str, disconnected: bool) {
         if let (Some(services), Ok(s)) = (&self.policy, self.session(id)) {
             lock(&s.policy).cancel(id, services, disconnected);
+            lock(&s.uploads).cancel_writes(None);
         }
     }
 
     pub(crate) fn finish_tool(&self, id: &str, call: &str) {
         if let Ok(s) = self.session(id) {
             lock(&s.policy).grants.remove(call);
+            lock(&s.uploads).cancel_writes(Some(call));
         }
     }
 
@@ -312,88 +314,101 @@ impl ToolIo {
 
     pub(super) async fn evaluate(
         &self,
-        mut p: PolicyEvaluateParams,
+        p: PolicyEvaluateParams,
         peer: Peer,
     ) -> Result<Value, ErrorObject> {
         let s = self.session(&p.session_id)?;
         let services = self.services()?;
-        let generation = {
-            let mut state = lock(&s.policy);
-            let staged = state.inputs.take(&p, &peer)?;
-            let generation = state.generation.clone();
-            drop(state);
-            if let Some(text) = staged {
-                inputs::restore(&mut p, text)?;
-            }
-            generation
-        };
+        let mut p = p;
+        let result = self.evaluate_call(&s, services, &mut p, &peer).await;
+        if let Err(error) = &result {
+            let mode = lock(&s.policy).mode;
+            let detail = json!({"tool":p.tool,"toolCallId":p.tool_call_id,"arguments":argument_summary(&p),"mode":mode,
+                "step":"preflightError","errorKind":error.data.kind,"source":"automatic","conclusion":"deny"});
+            services
+                .audit(&p.session_id, s.scope.root(), &detail)
+                .await?;
+        }
+        result
+    }
+
+    async fn evaluate_call(
+        &self,
+        s: &Arc<SessionIo>,
+        services: &Services,
+        p: &mut PolicyEvaluateParams,
+        peer: &Peer,
+    ) -> Result<Value, ErrorObject> {
+        let generation = inputs::begin(s, p, peer).await?;
         let settings = services.settings(s.scope.root()).await?;
-        let prepared = prepare(Arc::clone(&s), p.clone(), &settings, peer.clone()).await?;
-        let (mode, ruling) = {
-            let mut state = lock(&s.policy);
-            if peer.is_closed() || generation.is_cancelled() {
-                return Err(denied(LOST));
-            }
-            state.ruling(
-                services,
-                &settings,
-                &prepared.card,
-                prepared.boundary,
-                prepared.simple,
-            )
-        };
+        let mut prepared = prepare(
+            Arc::clone(s),
+            p.clone(),
+            &settings,
+            peer.clone(),
+            &self.exec,
+        )
+        .await?;
+        let (mode, ruling) = prepared.decide(s, services, &settings, peer, &generation)?;
         let choice = if ruling.allow {
             None
         } else {
-            wait_for_user(&s, services, &p, &prepared.card, &peer, &generation).await?
+            prepared.add_preview(p).await?;
+            wait_for_user(s, services, p, &prepared.card, peer, &generation).await?
         };
-        let mut result = PolicyEvaluateResult {
-            allowed: ruling.allow,
-            reason: None,
+        let (answer, ack) = choice.unzip();
+        let source = if answer.is_some() {
+            "user"
+        } else {
+            "automatic"
         };
-        let mut remember = None;
-        let mut ack = None;
-        let mut source = "automatic";
-        if let Some((answer, done)) = choice {
-            source = "user";
-            ack = Some(done);
-            result.allowed = answer.decision != ApprovalDecision::Deny;
-            match answer.decision {
-                ApprovalDecision::AllowAlways => services.persist(s.scope.root(), &answer).await?,
-                ApprovalDecision::AllowSession if prepared.boundary != Boundary::Protected => {
-                    remember = prepared.card.rule.clone()
-                }
-                ApprovalDecision::Deny => {
-                    result.reason = Some(refusal(
-                        &prepared,
-                        s.scope.case_insensitive(),
-                        answer.feedback.as_deref(),
-                    ))
-                }
-                _ => {}
-            }
-        } else if !ruling.allow {
-            result.reason = Some(LOST.into());
-        }
-        let detail = json!({"tool":p.tool,"arguments":argument_summary(&p), "mode":mode,"step":ruling.step,
-            "rule": if ruling.step=="exactRule" { prepared.card.rule.as_ref() } else { None },
+        let decision = answer.as_ref().map(|a| a.decision);
+        let reason = match &answer {
+            Some(a) if a.decision == ApprovalDecision::Deny => Some(refusal(
+                &prepared,
+                s.scope.case_insensitive(),
+                a.feedback.as_deref(),
+            )),
+            None if !ruling.allow => Some(LOST.into()),
+            _ => None,
+        };
+        let result = PolicyEvaluateResult {
+            allowed: reason.is_none(),
+            reason,
+        };
+        let detail = json!({"tool":p.tool,"toolCallId":p.tool_call_id,"arguments":argument_summary(p), "mode":mode,"step":ruling.step,
+            "rule": if ruling.step=="exactRule" { audit_rule(&prepared.card) } else { None },
             "conclusion": if result.allowed {"allow"} else {"deny"}, "source":source});
-        services
-            .audit(&p.session_id, s.scope.root(), &detail)
-            .await?;
-        if result.allowed {
-            let mut state = lock(&s.policy);
-            if generation.is_cancelled() || peer.is_closed() {
-                return Err(denied(LOST));
+        let commit = async {
+            services
+                .audit(&p.session_id, s.scope.root(), &detail)
+                .await?;
+            if let Some(answer) = answer.filter(|a| a.decision == ApprovalDecision::AllowAlways) {
+                if generation.is_cancelled() || peer.is_closed() {
+                    return Err(denied(LOST));
+                }
+                services.persist(s.scope.root(), &answer).await?;
             }
-            if let Some(rule) = remember {
-                state.rules.insert(rule);
+            if result.allowed {
+                let mut state = lock(&s.policy);
+                if generation.is_cancelled() || peer.is_closed() {
+                    return Err(denied(LOST));
+                }
+                if decision == Some(ApprovalDecision::AllowSession)
+                    && prepared.boundary != Boundary::Protected
+                    && let Some(rule) = prepared.card.rule
+                {
+                    state.rules.insert(rule);
+                }
+                state.grants.insert(p.tool_call_id.clone(), prepared.grant);
             }
-            state.grants.insert(p.tool_call_id.clone(), prepared.grant);
+            Ok::<(), ErrorObject>(())
         }
+        .await;
         if let Some(ack) = ack {
-            let _ = ack.send(Ok(()));
+            let _ = ack.send(commit.clone());
         }
+        commit?;
         to_value(&result)
     }
 }
@@ -478,9 +493,30 @@ fn refusal(prepared: &Prepared, case_insensitive: bool, feedback: Option<&str>) 
     )
 }
 
+fn audit_rule(card: &ApprovalRequest) -> Option<String> {
+    let rule = card.rule.as_ref()?;
+    if matches!(
+        card.tool.as_str(),
+        "Read" | "Edit" | "Write" | "Glob" | "Grep"
+    ) {
+        return Some(rule.clone());
+    }
+    // Exact command and extension rules can embed credentials. A digest identifies the
+    // matching setting without copying its arguments into the audit database.
+    use sha2::{Digest, Sha256};
+    let digest: String = Sha256::digest(rule.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    Some(format!("{}:sha256:{digest}", card.tool))
+}
+
 fn argument_summary(p: &PolicyEvaluateParams) -> Value {
     // Do not store model-supplied text or shell arguments, which can contain secrets.
-    json!({"keys": p.input.keys().collect::<Vec<_>>(), "bytes":Value::Object(p.input.clone()).to_string().len()})
+    json!({"keys":p.input.keys().collect::<Vec<_>>(), "path":p.input.get("path").and_then(Value::as_str),
+        "commandBytes":p.input.get("command").and_then(Value::as_str).map(str::len),
+        "contentBytes":p.input.get("content").and_then(Value::as_str).map(str::len),
+        "editCount":p.input.get("edits").and_then(Value::as_array).map(Vec::len)})
 }
 
 struct Prepared {
@@ -488,6 +524,61 @@ struct Prepared {
     boundary: Boundary,
     simple: bool,
     grant: Grant,
+    preview: Option<(PathBuf, String)>,
+}
+
+impl Prepared {
+    fn decide(
+        &mut self,
+        s: &SessionIo,
+        services: &Services,
+        settings: &Settings,
+        peer: &Peer,
+        generation: &CancellationToken,
+    ) -> Result<(PermissionMode, piarc_policy::Ruling), ErrorObject> {
+        let (mode, ruling) = {
+            let mut state = lock(&s.policy);
+            if peer.is_closed() || generation.is_cancelled() {
+                return Err(denied(LOST));
+            }
+            state.ruling(services, settings, &self.card, self.boundary, self.simple)
+        };
+        if ruling.step != "simpleCommand" {
+            self.grant.utility = None;
+        }
+        Ok((mode, ruling))
+    }
+
+    async fn add_preview(&mut self, p: &PolicyEvaluateParams) -> Result<(), ErrorObject> {
+        if let Some((path, label)) = self.preview.take() {
+            let input = p.input.clone();
+            let tool = p.tool.clone();
+            self.card.diff = Some(
+                tokio::task::spawn_blocking(move || file_preview(&tool, &input, &path, &label))
+                    .await
+                    .map_err(|e| denied(format!("Preview unavailable: {e}")))??,
+            );
+        }
+        Ok(())
+    }
+}
+
+fn new_request(p: &PolicyEvaluateParams, peer: &Peer) -> Result<ApprovalRequest, ErrorObject> {
+    Ok(ApprovalRequest {
+        request_id: crate::sessions::new_session_id().map_err(|e| e.to_error_object())?,
+        session_id: p.session_id.clone(),
+        revision: 1,
+        connection_epoch: peer.epoch(),
+        tool: p.tool.clone(),
+        kind: ApprovalKind::Command,
+        command: None,
+        cwd: None,
+        path: None,
+        diff: None,
+        rule: None,
+        directory: None,
+        protected_path: None,
+    })
 }
 
 async fn prepare(
@@ -495,7 +586,16 @@ async fn prepare(
     p: PolicyEvaluateParams,
     settings: &Settings,
     peer: Peer,
+    exec: &exec::Exec,
 ) -> Result<Prepared, ErrorObject> {
+    let utility = if p.tool == "Bash"
+        && let Some(command) = p.input.get("command").and_then(Value::as_str)
+        && piarc_policy::simple_paths(command).is_some()
+    {
+        exec.simple_utility(&s.scope, command).await
+    } else {
+        None
+    };
     let dirs: Vec<PathBuf> = settings
         .get("/permissions/additionalDirectories")
         .and_then(Value::as_array)
@@ -505,28 +605,10 @@ async fn prepare(
         .map(|d| s.scope.root().join(d))
         .collect();
     tokio::task::spawn_blocking(move || {
-        let mut scope = s.scope.clone();
-        for dir in dirs {
-            scope = scope
-                .with_added_dir(&dir)
-                .map_err(|e| e.to_error_object())?;
-        }
-        let mut card = ApprovalRequest {
-            request_id: crate::sessions::new_session_id().map_err(|e| e.to_error_object())?,
-            session_id: p.session_id.clone(),
-            revision: 1,
-            connection_epoch: peer.epoch(),
-            tool: p.tool.clone(),
-            kind: ApprovalKind::Command,
-            command: None,
-            cwd: None,
-            path: None,
-            diff: None,
-            rule: None,
-            directory: None,
-            protected_path: None,
-        };
+        let scope = with_directories(s.scope.clone(), &dirs)?;
+        let mut card = new_request(&p, &peer)?;
         let mut grant = Grant::new(&p, peer);
+        let mut preview = None;
         let mut boundary = Boundary::Inside;
         let mut simple = false;
         let field = |key: &str| p.input.get(key).and_then(Value::as_str);
@@ -546,6 +628,11 @@ async fn prepare(
             "Read" | "Glob" | "Grep" | "Write" | "Edit" => {
                 let (file_boundary, target) = prepare_file(&scope, &p, &mut card)?;
                 boundary = file_boundary;
+                if matches!(p.tool.as_str(), "Write" | "Edit")
+                    && scope.check(&display(&target), Access::Read).is_ok()
+                {
+                    preview = Some((target.clone(), scope.label(&target)));
+                }
                 grant.path = Some(target);
             }
             "AskUserQuestion" => card.kind = ApprovalKind::Question,
@@ -557,17 +644,62 @@ async fn prepare(
                 ));
             }
         }
+        simple &= utility.is_some();
         grant.simple_command = simple;
+        grant.utility = utility;
         card.protected_path = Some(boundary == Boundary::Protected);
         Ok(Prepared {
             card,
             boundary,
             simple,
             grant,
+            preview,
         })
     })
     .await
     .map_err(|e| denied(format!("Permission preflight failed: {e}")))?
+}
+
+fn with_directories(mut scope: Scope, dirs: &[PathBuf]) -> Result<Scope, ErrorObject> {
+    for dir in dirs {
+        // A repository-controlled link is not a durable identity for an external directory.
+        // Store physical paths from native confirmations; review a redirected target anew.
+        let resolved = scope
+            .locate(&display(dir))
+            .map_err(|e| e.to_error_object())?;
+        if dir.starts_with(scope.root()) && scope.key(&resolved) != scope.key(&lexical_dir(dir)) {
+            continue;
+        }
+        match std::fs::metadata(&resolved) {
+            Ok(meta) if meta.is_dir() => {
+                scope = scope
+                    .with_added_dir(&resolved)
+                    .map_err(|e| e.to_error_object())?
+            }
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => {
+                return Err(denied(format!(
+                    "Cannot inspect a configured permission directory: {e}"
+                )));
+            }
+        }
+    }
+    Ok(scope)
+}
+
+fn lexical_dir(path: &Path) -> PathBuf {
+    let mut result = PathBuf::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::ParentDir => {
+                result.pop();
+            }
+            std::path::Component::CurDir => {}
+            part => result.push(part.as_os_str()),
+        }
+    }
+    result
 }
 
 fn prepare_file(
@@ -594,9 +726,6 @@ fn prepare_file(
             target.parent().map(display)
         };
     }
-    if write && scope.check(raw, Access::Read).is_ok() {
-        card.diff = Some(file_preview(&p.tool, &p.input, &target, &label)?);
-    }
     Ok((boundary, target))
 }
 
@@ -612,23 +741,7 @@ fn file_preview(
                 .get("content")
                 .and_then(Value::as_str)
                 .ok_or_else(|| denied("The proposed file content is missing."))?;
-            let old = match std::fs::metadata(target) {
-                Ok(m) if m.is_file() && m.len() <= piarc_protocol::fs::MAX_UPLOAD_BYTES => {
-                    let bytes = std::fs::read(target)
-                        .map_err(|e| denied(format!("Cannot preview the file: {e}")))?;
-                    Some(piarc_fs::encoding::decode(
-                        piarc_fs::encoding::detect(&bytes),
-                        &bytes,
-                    ))
-                }
-                Ok(_) => {
-                    return Err(denied("This target cannot be previewed as a regular file."));
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
-                Err(e) => {
-                    return Err(denied(format!("Cannot inspect the file: {e}")));
-                }
-            };
+            let old = original_text(target)?;
             piarc_diff::file_diff(label, old.as_deref(), new)
         }
         _ => {
@@ -636,6 +749,16 @@ fn file_preview(
                 .get("edits")
                 .and_then(Value::as_array)
                 .ok_or_else(|| denied("Missing proposed edits."))?;
+            if let Some(old) = original_text(target)?
+                && let Some(new) = edit::proposed(
+                    &old,
+                    edits,
+                    input.get("replaceAll").and_then(Value::as_bool) == Some(true),
+                )
+            {
+                return Ok(piarc_diff::file_diff(label, Some(&old), &new));
+            }
+            // Invalid edits retain Pi's detailed matching error when the user permits the attempt.
             let mut before = Vec::new();
             let mut after = Vec::new();
             for edit in edits {
@@ -651,6 +774,26 @@ fn file_preview(
                 );
             }
             piarc_diff::file_diff(label, Some(&before.join("\n")), &after.join("\n"))
+        }
+    })
+}
+
+fn original_text(target: &Path) -> Result<Option<String>, ErrorObject> {
+    Ok(match std::fs::metadata(target) {
+        Ok(m) if m.is_file() && m.len() <= piarc_protocol::fs::MAX_UPLOAD_BYTES => {
+            let bytes = std::fs::read(target)
+                .map_err(|e| denied(format!("Cannot preview the file: {e}")))?;
+            Some(piarc_fs::encoding::decode(
+                piarc_fs::encoding::detect(&bytes),
+                &bytes,
+            ))
+        }
+        Ok(_) => {
+            return Err(denied("This target cannot be previewed as a regular file."));
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => {
+            return Err(denied(format!("Cannot inspect the file: {e}")));
         }
     })
 }

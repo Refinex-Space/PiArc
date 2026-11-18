@@ -126,9 +126,9 @@
         "repository": "https://github.com/earendil-works/pi",
         "tag": "v1.5.2",
         "commit": "b4afdddf44e059c67ccf5097e5317d913521b470",
-        "path": "packages/coding-agent/src/utils/paths.ts, src/core/tools/path-utils.ts, src/core/tools/grep.ts (output formatting), src/utils/mime.ts, src/core/tools/powershell.ts (UTF-8 output prefix and Windows PowerShell 5.1 exit code suffix)"
+        "path": "packages/coding-agent/src/utils/paths.ts, src/core/tools/path-utils.ts, src/core/tools/grep.ts (output formatting), src/core/tools/edit-diff.ts (matching and preservation of unchanged lines), src/utils/mime.ts, src/core/tools/powershell.ts (UTF-8 output prefix and Windows PowerShell 5.1 exit code suffix)"
       },
-      "usedBy": "agent-host/src/tools/paths.ts and grep.ts (bundled into agent-host.mjs); crates/piarc-fs/src/image.rs and crates/piarc-exec/src/shells.rs (compiled into the Core module). Each file's header names the functions it ports and what changed.",
+      "usedBy": "agent-host/src/tools/paths.ts and grep.ts (bundled into agent-host.mjs); crates/piarc-fs/src/image.rs, crates/piarc-exec/src/shells.rs and crates/piarc-core/src/tool_io/policy/edit.rs (compiled into the Core module). Each file's header names the functions it ports and what changed.",
       "addedBy": "T07 (registered in R1)",
       "notes": "Pi itself is an npm dependency and is listed from the npm tree; this entry covers only the code ported at source level. agent-host/src/runtime/credentials.test.ts adapts Pi's tests but does not ship."
     },

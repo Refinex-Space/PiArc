@@ -52,6 +52,7 @@ describe('i18n', () => {
             before: 2_000,
             after: 100,
             tool: 'Read',
+            mode: 'Manual',
             attempt: 1,
             max: 3,
             queue: 'Mod+Enter',

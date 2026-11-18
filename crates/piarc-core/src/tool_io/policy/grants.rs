@@ -11,6 +11,7 @@ pub(in crate::tool_io) struct Grant {
     pub(super) cwd: Option<PathBuf>,
     pub(super) command: Option<String>,
     pub(super) simple_command: bool,
+    pub(super) utility: Option<PathBuf>,
     input: Map<String, Value>,
     peer: Peer,
     made_parent: bool,
@@ -27,6 +28,7 @@ impl Grant {
             cwd: None,
             command: None,
             simple_command: false,
+            utility: None,
             input: p.input.clone(),
             peer,
             made_parent: false,
@@ -272,7 +274,7 @@ pub(in crate::tool_io) fn claim_command(
     p: &ExecRunParams,
     peer: &Peer,
     cwd: &Path,
-) -> Result<(), ErrorObject> {
+) -> Result<Option<PathBuf>, ErrorObject> {
     let origin = p.origin.as_ref().ok_or_else(mismatch)?;
     let mut state = lock(&s.policy);
     let grant = state
@@ -300,8 +302,10 @@ pub(in crate::tool_io) fn claim_command(
     {
         return Err(mismatch());
     }
-    state.grants.remove(&origin.tool_call_id);
-    Ok(())
+    Ok(state
+        .grants
+        .remove(&origin.tool_call_id)
+        .and_then(|g| g.utility))
 }
 
 fn timeout_matches(expected: Option<f64>, wire: Option<u64>) -> bool {

@@ -481,9 +481,9 @@ impl ToolIo {
 
     async fn exec_run(&self, p: ExecRunParams, peer: Peer) -> Result<Value, ErrorObject> {
         let session = self.session(&p.session_id.0)?;
-        let launch = exec::launch_dir(&session, p.cwd.as_deref())?;
+        let mut launch = exec::launch_dir(&session, p.cwd.as_deref())?;
         if self.policy.is_some() {
-            policy::claim_command(&session, &p, &peer, &launch.dir)?;
+            launch.pinned_utility = policy::claim_command(&session, &p, &peer, &launch.dir)?;
         }
         let token = CancellationToken::new();
         {

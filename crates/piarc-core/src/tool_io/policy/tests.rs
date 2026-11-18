@@ -28,6 +28,10 @@ struct Fixture {
 
 impl Fixture {
     async fn new() -> Self {
+        Self::with_env(super::super::CommandEnv::process()).await
+    }
+
+    async fn with_env(command_env: super::super::CommandEnv) -> Self {
         let root = std::env::temp_dir().join(crate::sessions::new_session_id().expect("unique id"));
         let work = root.join("workspace");
         let data = root.join("data");
@@ -49,7 +53,11 @@ impl Fixture {
         );
         tokio::spawn(coalescer.run());
         let snapshots = Snapshots::spawn(&Handle::current(), events, storage.clone());
-        let io = ToolIo::new(ToolIoConfig::new(data)).policy_services(Services {
+        let io = ToolIo::new(ToolIoConfig {
+            command_env,
+            ..ToolIoConfig::new(data)
+        })
+        .policy_services(Services {
             storage: storage.clone(),
             trust,
             snapshots,
@@ -346,4 +354,66 @@ async fn editing_user_settings_does_not_silently_switch_an_open_session() {
     f.evaluate("read", "Read", json!({"path":"known"})).await;
     let s = f.io.session(SESSION).expect("session");
     assert_eq!(lock(&s.policy).mode, PermissionMode::Default);
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn simple_commands_with_custom_shell_resolution_require_review() {
+    let f = Fixture::with_env(super::super::CommandEnv::Fixed(vec![
+        ("PATH".into(), "/usr/bin:/bin".into()),
+        ("BASH_ENV".into(), "custom-init".into()),
+    ]))
+    .await;
+    f.io.changed_mode(SESSION, PermissionMode::AcceptEdits)
+        .expect("auto edits");
+    let run = f.evaluate("custom", "Bash", json!({"command":"touch note.txt"}));
+    let answer_user = async {
+        let card = f.pending().await;
+        f.io.answer_approval(answer(&card, ApprovalDecision::Deny))
+            .await
+            .expect("decline");
+    };
+    let (result, ()) = tokio::join!(run, answer_user);
+    assert_eq!(result["allowed"], false);
+}
+
+#[tokio::test]
+async fn a_preflight_configuration_error_is_audited_as_a_refusal() {
+    let f = Fixture::new().await;
+    std::fs::write(f.root.join("workspace/.piarc/settings.json"), "{")
+        .expect("invalid configuration");
+    let params =
+        json!({"sessionId":SESSION,"toolCallId":"read","tool":"Read","input":{"path":"file"}});
+    let error =
+        f.io.dispatch(
+            "policy/evaluate",
+            params.as_object().expect("map").clone(),
+            f.peer.clone(),
+        )
+        .await
+        .expect_err("fail closed");
+    assert_eq!(error.data.kind, ErrorKind::PermissionDenied);
+    let rows = f
+        .storage
+        .with(|s| s.session_audit_events(SESSION, 10))
+        .expect("database")
+        .expect("audit");
+    assert_eq!(rows.len(), 1);
+    let detail: Value = serde_json::from_str(&rows[0].detail).expect("audit details");
+    assert_eq!(detail["conclusion"], "deny");
+    assert_eq!(detail["step"], "preflightError");
+}
+
+#[tokio::test]
+async fn permission_lookup_requires_a_working_trust_store() {
+    let f = Fixture::new().await;
+    f.storage.close();
+    assert!(
+        f.io.services()
+            .expect("policy")
+            .trust
+            .permission_settings(&f.root.join("workspace"))
+            .await
+            .is_err()
+    );
 }

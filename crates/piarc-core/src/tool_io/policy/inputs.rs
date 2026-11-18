@@ -99,12 +99,30 @@ impl Inputs {
     }
 }
 
-pub(super) fn restore(p: &mut PolicyEvaluateParams, text: String) -> Result<(), ErrorObject> {
+/// Consume the staged data and capture the cancellation token under the same lock.
+pub(super) async fn begin(
+    session: &super::SessionIo,
+    p: &mut PolicyEvaluateParams,
+    peer: &Peer,
+) -> Result<super::CancellationToken, ErrorObject> {
+    let (staged, generation) = {
+        let mut state = lock(&session.policy);
+        (state.inputs.take(p, peer)?, state.generation.clone())
+    };
+    if let Some(text) = staged {
+        restore(p, text).await?;
+    }
+    Ok(generation)
+}
+
+async fn restore(p: &mut PolicyEvaluateParams, text: String) -> Result<(), ErrorObject> {
     if p.tool == "Write" && !p.input.contains_key("content") {
         p.input.insert("content".into(), Value::String(text));
     } else if p.tool != "Write" && p.input.is_empty() {
-        p.input =
-            serde_json::from_str(&text).map_err(|_| denied("Invalid staged tool input JSON."))?;
+        p.input = tokio::task::spawn_blocking(move || serde_json::from_str(&text))
+            .await
+            .map_err(|error| denied(format!("Decoding staged permission input failed: {error}")))?
+            .map_err(|_| denied("Invalid staged tool input JSON."))?;
     } else {
         return Err(denied("Ambiguous staged and inline tool input."));
     }
@@ -137,8 +155,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn chunks_and_their_consumer_are_bound_to_the_peer_tool_call_and_byte_offset() {
+    #[tokio::test]
+    async fn chunks_and_their_consumer_are_bound_to_the_peer_tool_call_and_byte_offset() {
         let mut inputs = Inputs::default();
         let (peer, _receiver) = Peer::channel(1);
         let (other, _other_receiver) = Peer::channel(1);
@@ -165,7 +183,7 @@ mod tests {
             .take(&request, &peer)
             .expect("valid")
             .expect("staged text");
-        restore(&mut request, text).expect("complete content");
+        restore(&mut request, text).await.expect("complete content");
         assert_eq!(request.input["content"], "文!");
         assert!(inputs.take(&request, &peer).is_err(), "one use");
     }

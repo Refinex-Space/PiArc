@@ -140,8 +140,7 @@ impl TrustService {
     ///
     /// # Errors
     ///
-    /// A path or settings task could not be resolved. A failed trust lookup excludes all
-    /// project-level authorizations as usual.
+    /// A path, trust lookup or settings task failed. A preflight cannot allow on an error.
     pub async fn permission_settings(&self, dir: &Path) -> Result<piarc_config::Settings> {
         let dir = dir.to_owned();
         let storage = self.storage.clone();
@@ -150,13 +149,23 @@ impl TrustService {
             let checkout = piarc_git::resolve(&workspace)?;
             let table = piarc_config::LayerTable::piarc(storage.dirs().data(), &workspace);
             let mut settings = piarc_config::Settings::load(table, TrustState::Untrusted);
-            let lookup = StoreLookup { storage, loaded: settings.project_items(&checkout.root) };
+            let lookup = StoreLookup {
+                storage,
+                loaded: settings.project_items(&checkout.root),
+            };
+            let mut failure = None;
             let trust = piarc_config::project_trust(&lookup, &workspace, &mut |reason| {
-                tracing::warn!(target: "piarc_core::trust", "permission settings trust lookup failed: {reason}");
+                failure = Some(reason.to_owned());
             });
+            if let Some(reason) = failure {
+                return Err(Error::Internal {
+                    reason: format!("permission trust lookup failed: {reason}"),
+                });
+            }
             settings.set_trust(trust);
             Ok(settings)
-        }).await
+        })
+        .await
     }
 
     /// Extend a prior trust decision with only the entries from the native confirmation.
