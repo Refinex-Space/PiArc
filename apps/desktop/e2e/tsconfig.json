@@ -3,6 +3,7 @@
   // L4 Playwright tests: Node for the runner, DOM for callbacks evaluated in the page.
   "compilerOptions": {
     "composite": true,
+    "allowJs": true,
     "emitDeclarationOnly": true,
     "rootDir": ".",
     "outDir": "../dist/e2e",
@@ -11,5 +12,9 @@
     "types": ["node"]
   },
   "include": ["**/*.ts"],
-  "references": [{ "path": "../src/shared" }, { "path": "../src/main" }]
+  "references": [
+    { "path": "../src/shared" },
+    { "path": "../src/main" },
+    { "path": "../../../scripts" }
+  ]
 }

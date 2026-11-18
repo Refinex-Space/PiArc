@@ -24,13 +24,14 @@ export const BUDGET_MS = 1000;
 const START_MS = Date.UTC(2026, 10, 18, 9, 0, 0);
 
 /**
- * Writes `count` Pi session files (format version 3: header, a user message and a reply) for
- * the workspace `cwd` under `<dataDir>/pi/sessions/`.
+ * Writes one Pi v3 session with alternating user/assistant messages (T18 startup and T19
+ * transcript fixtures). Entry ids are distinct across sessions, as in Pi's own files.
  * @param {string} dataDir
  * @param {string} cwd
- * @param {number} count
+ * @param {number} index
+ * @param {number} [itemCount]
  */
-export async function writeSessionFixture(dataDir, cwd, count) {
+export async function writeHistoryFixture(dataDir, cwd, index, itemCount = 2) {
   const dir = path.join(
     dataDir,
     'pi',
@@ -38,50 +39,62 @@ export async function writeSessionFixture(dataDir, cwd, count) {
     `--${cwd.replace(/^[/\\]+/, '').replace(/[/\\:]/g, '-')}--`,
   );
   await mkdir(dir, { recursive: true });
-  for (let n = 0; n < count; n += 1) {
-    const id = `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-    const at = START_MS + n * 60_000;
-    const iso = (/** @type {number} */ ms) => new Date(ms).toISOString();
-    const lines = [
-      { type: 'session', version: 3, id, timestamp: iso(at), cwd },
-      {
+  const id = `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`;
+  const at = START_MS + index * 60_000;
+  const iso = new Date(at).toISOString();
+  const lines = [JSON.stringify({ type: 'session', version: 3, id, timestamp: iso, cwd })];
+  let parentId = null;
+  for (let item = 0; item < itemCount; item += 1) {
+    const timestamp = at + (item + 1) * 1000;
+    const entryId = `${index.toString(16).padStart(4, '0')}${item.toString(16).padStart(4, '0')}`;
+    const message =
+      item % 2 === 0
+        ? {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Task ${String(index + 1)}: update build script ${String(item)}`,
+              },
+            ],
+            timestamp,
+          }
+        : {
+            role: 'assistant',
+            content: [
+              {
+                type: 'text',
+                text: `Updated **build script** ${String(item - 1)}.\n\n- Parsed the input.\n- Wrote the build description.`,
+              },
+            ],
+            api: 'anthropic-messages',
+            provider: 'piarc-mock',
+            model: 'mock-large',
+            usage: {
+              input: 10,
+              output: 24,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 34,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: 'stop',
+            timestamp,
+          };
+    lines.push(
+      JSON.stringify({
         type: 'message',
-        id: 'e000001',
-        parentId: null,
-        timestamp: iso(at + 1000),
-        message: {
-          role: 'user',
-          content: [{ type: 'text', text: `Task ${String(n + 1)}: update the build scripts` }],
-          timestamp: at + 1000,
-        },
-      },
-      {
-        type: 'message',
-        id: 'e000002',
-        parentId: 'e000001',
-        timestamp: iso(at + 2000),
-        message: {
-          role: 'assistant',
-          content: [{ type: 'text', text: 'Done.' }],
-          api: 'anthropic-messages',
-          provider: 'piarc-mock',
-          model: 'mock-large',
-          usage: {
-            input: 10,
-            output: 2,
-            cacheRead: 0,
-            cacheWrite: 0,
-            totalTokens: 12,
-            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-          },
-          stopReason: 'stop',
-          timestamp: at + 2000,
-        },
-      },
-    ];
-    const name = `${iso(at).replace(/[:.]/g, '-')}_${id}.jsonl`;
-    await writeFile(path.join(dir, name), `${lines.map((l) => JSON.stringify(l)).join('\n')}\n`);
+        id: entryId,
+        parentId,
+        timestamp: new Date(timestamp).toISOString(),
+        message,
+      }),
+    );
+    parentId = entryId;
   }
+  const name = `${iso.replace(/[:.]/g, '-')}_${id}.jsonl`;
+  await writeFile(path.join(dir, name), `${lines.join('\n')}\n`);
+  return id;
 }
 
 /**
@@ -156,7 +169,9 @@ async function main() {
     const dataDir = path.join(root, 'data');
     const cwd = path.join(root, 'workspace 工作区');
     await mkdir(cwd, { recursive: true });
-    await writeSessionFixture(dataDir, cwd, count);
+    for (let index = 0; index < count; index += 1) {
+      await writeHistoryFixture(dataDir, cwd, index);
+    }
     const launch = await appCommand(form, [`--user-data-dir=${dataDir}`]);
     // The first launch indexes the files; the measured launches start cold with the index.
     const warmUp = await measure(launch, count, true);

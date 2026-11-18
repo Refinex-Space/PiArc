@@ -320,7 +320,8 @@ T19 Transcript 与 composer 正式版（2026-11-18 开工；基线 `npm run veri
 - [x] 贴底回归（I32、I59）：120 Hz、4 倍 CPU 降速下 8 次共 1,938 帧最大离底 0 px；两形态滚动 10/10；节奏定稿见真实事件流基准
 - [x] 四项 T19 Harness 能力已接入 L2（37 passed、1 Windows 专用；MISSING 0）
 - [x] A01–A10、A13：T19 专项 Playwright 两种形态 24/24，九种行亮暗截图、mock 请求与安全检查均已核实
-- [ ] A11、A12：最终打包基准；A14：全量 verify
+- [x] A11、A12：打包实测 103.68 token/s，p99 8.702 ms，长任务 0；万条 59.996 fps，缓存/冷加载最大 30.0/64.4 ms
+- [ ] A14：全量 verify
 - [ ] 收尾：transcript 与 composer 的 CLAUDE.md、`coding-standards.md` 通用能力复用表、架构与 ADR 同步、PLAN 与 acceptance
 
 ## 登记事项
