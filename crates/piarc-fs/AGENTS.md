@@ -33,6 +33,8 @@ Core 层的集成测试在 `crates/piarc-core/tests/tool_io.rs`（越界、会�
 
 ## 易错点
 
+- 同一监听器一次注册多个根时使用 `Watcher::watch_dirs`。notify 8.2.1 的 macOS 后端每次单独 `watch` 都会停止并重新启动 FSEvents 流。批量更新必须 `commit`，原有根全部已在监听时无需更新。
+
 - `fuzzy::list_files` 与 `rank` 为工作区文件提及提供相对路径。文件名排序的 `positions` 按 Unicode 字符计数，和输入消息中提及的 UTF-16 区间单位不同。Core 负责结果缓存和取消（ADR-0030）。
 
 - Windows 上 `std::fs::rename` 覆盖已存在的文件：Win10 1607 以上用 `FileRenameInfoEx`（POSIX 语义），否则 `MoveFileExW`。目标被别的进程以不共享删除的方式打开（杀毒、索引）时短暂拒绝访问，`atomic::rename` 在 Windows 上重试 5 次。替换不保留 ACL 与备用数据流，只带上隐藏、系统属性；Unix 上带上原权限位。只读文件一律 `EACCES`（Unix 的 rename 本可以覆盖它）。

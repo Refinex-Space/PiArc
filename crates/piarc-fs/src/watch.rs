@@ -87,11 +87,68 @@ impl Watcher {
         Ok(())
     }
 
+    /// Adds the new directories as one non-recursive batch. A path that cannot be added
+    /// does not prevent valid paths from being watched. Returns the individual failures.
+    #[must_use]
+    pub fn watch_dirs(&mut self, dirs: &[PathBuf]) -> Vec<WatchError> {
+        register_dirs(&mut self.inner, &mut self.watched, dirs)
+    }
+
     /// Whether `dir` is watched.
     #[must_use]
     pub fn is_watching(&self, dir: &Path) -> bool {
         self.watched.iter().any(|d| d == dir)
     }
+}
+
+/// Registers all new roots for the settings files and reports each path that failed.
+fn register_dirs(
+    inner: &mut impl notify::Watcher,
+    watched: &mut Vec<PathBuf>,
+    dirs: &[PathBuf],
+) -> Vec<WatchError> {
+    let mut pending = Vec::new();
+    for dir in dirs {
+        if !watched.contains(dir) && !pending.contains(&dir) {
+            pending.push(dir);
+        }
+    }
+    let Some(first) = pending.first().copied() else {
+        return Vec::new();
+    };
+    let error_for = |dir: &Path, error: notify::Error| WatchError {
+        path: dir.to_owned(),
+        reason: error.to_string(),
+    };
+    let mut errors = Vec::new();
+    let mut added = Vec::new();
+    let mut changes = inner.paths_mut();
+    for dir in pending {
+        match changes.add(dir, RecursiveMode::NonRecursive) {
+            Ok(()) => added.push(dir),
+            Err(error) => errors.push(error_for(dir, error)),
+        }
+    }
+
+    // paths_mut on macOS stops the stream; commit must restart it even if each add failed.
+    if let Err(error) = changes.commit() {
+        errors.push(error_for(first, error));
+        // notify keeps the proposed paths after a failed stream start. Restore the previous
+        // set so adding a bad root cannot silently disable the working roots.
+        let mut rollback = inner.paths_mut();
+        for dir in added {
+            if let Err(error) = rollback.remove(dir) {
+                errors.push(error_for(dir, error));
+            }
+        }
+        if let Err(error) = rollback.commit() {
+            errors.push(error_for(first, error));
+            watched.clear();
+        }
+    } else {
+        watched.extend(added.into_iter().cloned());
+    }
+    errors
 }
 
 /// Access events (opening, reading) do not change anything.
@@ -104,6 +161,84 @@ mod tests {
     use super::*;
     use std::sync::mpsc;
     use std::time::Duration;
+
+    // Mimics the FSEvents backend: a direct watch or a committed batch starts a stream.
+    #[derive(Default)]
+    struct Probe {
+        starts: usize,
+        reject_commit: bool,
+        paths: Vec<PathBuf>,
+    }
+
+    impl notify::Watcher for Probe {
+        fn new<F: notify::EventHandler>(_: F, _: notify::Config) -> notify::Result<Self> {
+            Ok(Self::default())
+        }
+        fn watch(&mut self, path: &Path, _: RecursiveMode) -> notify::Result<()> {
+            self.starts += 1;
+            self.paths.push(path.to_owned());
+            Ok(())
+        }
+        fn unwatch(&mut self, path: &Path) -> notify::Result<()> {
+            self.paths.retain(|p| p != path);
+            Ok(())
+        }
+        fn kind() -> notify::WatcherKind {
+            notify::WatcherKind::NullWatcher
+        }
+        fn paths_mut(&mut self) -> Box<dyn notify::PathsMut + '_> {
+            Box::new(Change(self))
+        }
+    }
+
+    struct Change<'a>(&'a mut Probe);
+    impl notify::PathsMut for Change<'_> {
+        fn add(&mut self, path: &Path, _: RecursiveMode) -> notify::Result<()> {
+            if path == Path::new("missing") {
+                return Err(notify::Error::path_not_found());
+            }
+            self.0.paths.push(path.to_owned());
+            Ok(())
+        }
+        fn remove(&mut self, path: &Path) -> notify::Result<()> {
+            self.0.unwatch(path)
+        }
+        fn commit(self: Box<Self>) -> notify::Result<()> {
+            self.0.starts += 1;
+            if std::mem::take(&mut self.0.reject_commit) {
+                Err(notify::Error::generic("could not start stream"))
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    #[test]
+    fn registers_settings_roots_in_one_stream_and_restores_prior_roots_on_failure() {
+        let mut probe = Probe::default();
+        let mut watched = Vec::new();
+        let roots = ["user", "workspace", "user", "missing"].map(PathBuf::from);
+        let errors = register_dirs(&mut probe, &mut watched, &roots);
+        assert_eq!(probe.starts, 1, "one batch for all roots");
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].path, Path::new("missing"));
+        assert_eq!(watched, roots[..2]);
+        assert!(register_dirs(&mut probe, &mut watched, &roots[..2]).is_empty());
+        assert_eq!(
+            probe.starts, 1,
+            "no stream restart during a settings reload"
+        );
+
+        probe.reject_commit = true;
+        let errors = register_dirs(&mut probe, &mut watched, &[PathBuf::from("new")]);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.reason.contains("could not start stream"))
+        );
+        assert_eq!(watched, roots[..2]);
+        assert_eq!(probe.paths, watched, "old roots still active");
+    }
 
     #[test]
     fn reports_changes_in_a_watched_directory() {

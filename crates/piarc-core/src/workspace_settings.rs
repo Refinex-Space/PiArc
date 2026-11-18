@@ -239,18 +239,18 @@ fn watch_dirs(watcher: &Mutex<Watcher>, settings: &Mutex<Settings>, workspace: &
             .map(Path::to_owned)
             .collect()
     };
-    let mut watcher = lock(watcher);
-    for dir in dirs {
-        let target = if dir.is_dir() {
-            dir
-        } else {
-            workspace.to_owned()
-        };
-        if !watcher.is_watching(&target)
-            && let Err(error) = watcher.watch_dir(&target)
-        {
-            tracing::warn!(target: "piarc_core::settings", "{error}");
-        }
+    let roots: Vec<_> = dirs
+        .into_iter()
+        .map(|dir| {
+            if dir.is_dir() {
+                dir
+            } else {
+                workspace.to_owned()
+            }
+        })
+        .collect();
+    for error in lock(watcher).watch_dirs(&roots) {
+        tracing::warn!(target: "piarc_core::settings", "{error}");
     }
 }
 
