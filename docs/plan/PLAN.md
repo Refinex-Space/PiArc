@@ -145,7 +145,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T18 | [客户端外壳、会话列表、设置窗口与信任对话框](tasks/T18-client-shell-and-session-list.md) | 2 | T17；D3 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 6b1d5f0 |
 | T19 | [Transcript 与 composer 正式版](tasks/T19-transcript-and-composer.md) | 2 | T18 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 0b72964 |
 | T20 | [基础权限与审批](tasks/T20-basic-permissions-and-approvals.md) | 2 | T19 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | ee03128 |
-| T21 | [模型、服务商与凭据设置](tasks/T21-models-providers-and-credentials.md) | 2 | T20 | macOS | high / 高 | 大 | 无 | 进行中 | — |
+| T21 | [模型、服务商与凭据设置](tasks/T21-models-providers-and-credentials.md) | 2 | T20 | macOS | high / 高 | 大 | 无 | 已完成 | e5f3b65 |
 | T22 | [System prompt 组装与 memory 文件](tasks/T22-system-prompt-and-memory-files.md) | 2 | T21 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | R2 | [M1 评审](tasks/R2-m1-review.md) | 2 | T22 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 未开始 | — |
@@ -309,16 +309,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-**T21 模型、服务商与凭据设置（macOS）**
-- [x] 开工基线重新运行 `npm run verify`，15/15 通过，T20 权限裁决预算保持 2 ms。
-- [x] 自定义提供商、协议及套餐模型列表调研，见 Pi 基线文档 T21 节。
-- [x] 凭据锁绑定连接、续期与过期授予回收；Core 锁测试 9/9，Host 凭据测试 21/21。
-- [x] 新增模型目录、会话选型、凭据更新与租约契约及正反样本。
-- [x] Core 服务商配置、变更恢复、模型与会话 API、两种 NAPI 快照。真实设置 Host 的 CRUD 与进程环境扫描通过。
-- [x] Agent Host 能力目录、刷新、effort、切换预览、凭据收敛与排队图片检查，Host 25 文件 163 项通过。
-- [x] 设置页、首页与环境栏选型、effort 和图片输入提示；ego-browser 证据位于 tmp/evidence/T21/。
-- [x] 两种协议各完成工具回合；Core 重启恢复、凭据扫描和模型能力 L2 通过；两种 Electron 形态的 T21 与 preload 共 18/18。
-- [x] 收尾全量门禁 15/15，T21-A01 至 A11 全部通过，证据在 tmp/evidence/T21/。
+（无进行中的任务。）
 
 ## 登记事项
 
@@ -698,6 +689,14 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 收尾修复：macOS 的设置监听首次注册与 Host 启动并行，注册后重读以覆盖启动期间的改动。预检中断时保留尚待补齐的工具项，在模型转换前过滤已丢弃的中断回复。严格 mock 的配对回归连续 6 次通过，默认并发 Rust 会话集成 24/24。
 - 自动裁决 1,000 次 p95 0.526 ms（预算 2 ms）。Electron dev/packaged 相关 L4 共 34/34，重新打包后的审批专项 4/4；ego-browser 在本地假 Core 实际验证了阅读闸门、规则编辑与快捷键。仅使用测试数据。Windows 目标 Core/exec Clippy 已通过，原生 Windows 行为留 CI；macOS 的 PowerShell 场景通过测试工具验证 Core 的询问决定。
 - 下一项为 macOS 上的 T21。本地提交，未推送。
+
+### 2026-11-19 T21 已完成（验收提交 e5f3b65）
+
+- 11/11 项通过。设置页支持内置服务商、Bedrock/Vertex、自定义端点与本地模型。自定义端点可选三种线协议，模型列表每行一个 ID。凭据经设置 Host 更新保险箱，异常退出后按变更记录恢复。模型选择、缓存代价、effort、图片降级与合规策略见 ADR-0032、架构 v2.26。
+- 两种 mock 线格式各完成一次含工具的对话；切换模型与 effort 后用实际请求验证重启恢复。四项 T21 能力已接入 L2。真实付费服务商未调用。
+- 开工与收尾 `npm run verify` 均通过全部 15 项。修正 NAPI 声明与一个样本的格式后最终门禁全绿；L2 49 项通过、1 项仅适用 Windows。T20 自动权限裁决 1,000 次独立复测 p95 为 0.429416 ms，预算保持 2 ms。
+- Electron 开发和打包形态的 T21 与 preload 专项 18/18；扩展回归 32 项中一项在 mock 编译等待时超时，构建完成后原用例独立通过。ego-browser 使用本地测试数据实际操作，证据在 `tmp/evidence/T21/`。Windows 目标 Core/Host/NAPI/testkit 交叉 Clippy 通过，Windows 凭据管理器实测交 W1。
+- 下一项为 macOS 上的 T22。本地提交，未推送。
 
 ## 计划变更记录
 
