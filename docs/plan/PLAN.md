@@ -127,7 +127,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T15 | [无头驱动、L2 场景运行器与能力清单](tasks/T15-devcli-l2-scenarios-and-capabilities.md) | 2 | T14 | macOS | high | 中 | 无 | 已完成 | 5546027 |
 | T16 | [文件工具与编辑不变量](tasks/T16-file-tools-invariants.md) | 2 | T15 | macOS | xhigh | 大 | 无 | 已完成 | ea75a25 |
 | T17 | [Bash / PowerShell 执行与进程管理](tasks/T17-bash-powershell-execution.md) | 2 | T16 | macOS | high | 大 | 无 | 已完成 | d154ab3 |
-| T18 | [客户端外壳、会话列表、设置窗口与信任对话框](tasks/T18-client-shell-and-session-list.md) | 2 | T17；D3 | macOS | xhigh | 大 | 无 | 部分完成 | 6b1d5f0 |
+| T18 | [客户端外壳、会话列表、设置窗口与信任对话框](tasks/T18-client-shell-and-session-list.md) | 2 | T17；D3 | macOS | xhigh | 大 | 无 | 已完成 | 6b1d5f0 |
 | T19 | [Transcript 与 composer 正式版](tasks/T19-transcript-and-composer.md) | 2 | T18 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T20 | [基础权限与审批](tasks/T20-basic-permissions-and-approvals.md) | 2 | T19 | macOS | xhigh | 大 | 无 | 未开始 | — |
 | T21 | [模型、服务商与凭据设置](tasks/T21-models-providers-and-credentials.md) | 2 | T20 | macOS | high | 大 | 无 | 未开始 | — |
@@ -331,7 +331,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I29 | T10 | `cat` 以约 190 MB/s 输出时主进程 CPU（含 Core 全部线程）约为一个核的 74%，主要是 IO 线程读 PTY 与解析；第 11 章没有对应预算 | T44 把终端吞吐纳入性能回归时评估（例如增大读块、合并读） |
 | I30 | T10 | `#/terminal-lab` 原型页随发布构建的渲染包分发；发布构建的 `window.piarc` 也有七个终端函数（`createTerminal` 只能启动登录 shell），与 I13、I24 同类 | T34 接入正式终端面板时收口；T45 与 I13、I24 一起评估剔除原型页 |
 | I31 | T10 | 真实拼音输入法的候选框位置未核对，清单见 `docs/spikes/S07-terminal.md` 第 8 节（T1–T4） | 已落地（2026-11-16）：智能体经 computer-use 在本机用系统"简体拼音"实测，T1–T4 全部符合预期，结果见 S7 报告第 8 节；T10-A11 改为通过 |
-| I32 | T10 | T09 的 L4 `transcript-scroll.e2e.ts` 中 "the wheel releases and resumes following" 在一次全量运行中失败（dev 形态，内容增长时离底 31 px，期望 ≤ 1 px），单独重跑 10 次（两种形态各 5 次）都通过；本机此时的主屏是 120 Hz | T19 接手 transcript 时检查贴底在高刷新率下的时序；T44 把 L4 的偶发失败纳入统计；2026-11-16 在 CI 的 `desktop L4 (macos-latest)`（packaged，https://github.com/Refinex-Space/PiArc/actions/runs/43855932047）再次失败，离底同为 31 px；2026-11-18 再次出现在 CI 的 `desktop L4 (macos-latest)`（packaged，"keeps the bottom in view while a reply streams" 离底 21 px，https://github.com/Refinex-Space/PiArc/actions/runs/44214484957），同一提交前一次运行中通过；2026-11-18 第三次出现在 CI 的 `desktop L4 (macos-latest)`（packaged，同一用例离底 32 px，https://github.com/Refinex-Space/PiArc/actions/runs/44255962868） |
+| I32 | T10 | T09 的 L4 `transcript-scroll.e2e.ts` 中 "the wheel releases and resumes following" 在一次全量运行中失败（dev 形态，内容增长时离底 31 px，期望 ≤ 1 px），单独重跑 10 次（两种形态各 5 次）都通过；本机此时的主屏是 120 Hz | T19 接手 transcript 时检查贴底在高刷新率下的时序；T44 把 L4 的偶发失败纳入统计；2026-11-16 在 CI 的 `desktop L4 (macos-latest)`（packaged，https://github.com/Refinex-Space/PiArc/actions/runs/43855932047）再次失败，离底同为 31 px；2026-11-18 再次出现在 CI 的 `desktop L4 (macos-latest)`（packaged，"keeps the bottom in view while a reply streams" 离底 21 px，https://github.com/Refinex-Space/PiArc/actions/runs/44214484957），同一提交前一次运行中通过；2026-11-18 第三次出现在 CI 的 `desktop L4 (macos-latest)`（packaged，同一用例离底 32 px，https://github.com/Refinex-Space/PiArc/actions/runs/44255962868）；2026-11-18 第四次（dev，同一用例离底 36 px，https://github.com/Refinex-Space/PiArc/actions/runs/44264407935），macOS CI 已连续三次运行失败，不再是偶发。初步判断（未验证）：贴底只在 sizer 的 ResizeObserver 回调里做，而 sizer 的高度要等虚拟列表测量行高之后的 React 重渲染才更新；浏览器在同一帧内不再投递比上一轮更浅的元素（sizer 是行的父元素），流式行变高的那一帧可能先画出来再贴底。T19 先用 CPU 降速（CDP `Emulation.setCPUThrottlingRate`）在本机稳定复现，再在提交后的布局阶段贴底 |
 | I33 | T11 | 进程树终止的接口已就绪：`piarc_exec::ProcessTreeSpawner`（`ProcessSpawner` 的实现；macOS 新进程组 + `killpg`，Windows 挂起创建后加入 `KILL_ON_JOB_CLOSE`、不许 breakaway 的 Job 再恢复；`kill` 与丢弃句柄都结束整棵树，丢弃也会结束命令留在后台的进程）。目前只有沙箱会话的 `exec/run` 用它 | 部分落地（T12）：`piarc_core::agent_host::start` 与 `start_bundled` 改用 `ProcessTreeSpawner`（W0 实机核对 Agent Host 被杀时子进程随之结束）；T17 让 `ToolIo` 的普通命令也用它，并决定后台进程在命令结束时是否保留（与 T32 的后台任务一起）。W0 补充：Windows 的 Git Bash 没有真正的 `exec`，命令总是 bash.exe 的子进程，所以现在取消或超时一个委托的 Bash 命令时，命令本身（不只是它的后台进程）都继续运行（`piarc-exec` 的 `cancelling_kills_the_command` 中 `sleep.exe` 活满 30 s），T17 在 Windows 上必须改用 `ProcessTreeSpawner`；**已落地（T17）**：`ToolIo` 的全部命令用它，命令结束时留在后台的进程随之结束（`run_in_background` 由 T32 提供）；Windows 取消与超时结束整棵树由 `piarc-exec` 的终止测试在 Windows CI 上验证 |
 | I34 | T11 | 沙箱把 `CARGO_HOME` 指向会话临时目录（防止缓存投毒，S8 报告第 4 节），沙箱内读不到 `~/.cargo/config.toml` 的镜像源设置；每个会话第一次安装或构建是冷缓存 | T39 决定是否把用户的 Cargo 配置（不含凭据）复制进会话，以及是否提供共享只读缓存 |
 | I35 | T11 | 沙箱内不能绑定端口、不能连 Unix socket（本地测试服务器、Docker、ssh-agent 不可用），`git init`/`clone`/`config` 因 `.git/config`、`.git/hooks` 受保护而失败；`GIT_CONFIG_COUNT` 被沙箱用来指定代理，命令继承的同类变量失效 | T39 评估"允许本机绑定""允许写 `.git/config`"两个选项与 Unix socket 白名单，设置页写明这些限制 |
@@ -648,6 +648,12 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
   - macOS L4 `transcript-scroll` "keeps the bottom in view while a reply streams"（packaged，离底 32 px）：已登记的 I32，本次未改
 - 本机：L4 全量 154 passed、1 skipped（两种形态，重新打包开发构建之后）；`cargo test -p piarc-core --test secrets` 6 passed；ESLint、`tsc --build`、Prettier、`cargo fmt --check`、设计令牌检查、`npx vitest run apps/desktop`（215 passed、1 skipped）通过。未重跑完整的 `npm run verify`
 - T18-A04 仍为 blocked；未推送
+
+### 2026-11-18 T18 的第三次 CI 核对（提交 6b323e0 的运行 44264407935）
+
+- 结果：verify 两个平台通过；`desktop L4 (windows-latest)` 通过（155 passed，两种形态，含 `smoke.e2e.ts` 以 Mica 配置启动与全部 `t18-*`）；`desktop L4 (macos-latest)` 只有 `transcript-scroll` "keeps the bottom in view while a reply streams"（dev，离底 36 px）失败，即 I32（已补记录）
+- T18-A04 改为 passing（evidence 写 run 链接），T18 从"部分完成"改为"已完成"（按协议开工检查中"等待 Windows CI"的规则）
+- I32 仍交 T19；macOS CI 在它修复前会继续间歇失败
 
 ## 计划变更记录
 

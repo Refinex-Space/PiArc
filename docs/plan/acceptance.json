@@ -2015,8 +2015,8 @@
       "id": "T18-A04",
       "task": "T18",
       "description": "macOS 上隐藏式标题栏与侧栏 vibrancy 生效；Windows 上应用能启动并加载 Mica 配置。验证：macOS 截图与 Windows CI 冒烟输出（实机外观在 W1）。",
-      "status": "blocked",
-      "evidence": "macOS 部分已验证：tmp/evidence/T18/review/native-window.png（screencapture -l 捕获的真实窗口：隐藏式标题栏保留红绿灯、侧栏 vibrancy 材质，正文不透明），暗色与高对比度见同目录 main-*.png；窗口选项在 apps/desktop/src/main/platform/window-chrome.ts（darwin：titleBarStyle hidden、trafficLightPosition、vibrancy sidebar；win32：titleBarStyle hidden、titleBarOverlay、backgroundMaterial mica）。Windows 部分等用户推送后由 CI 的 desktop L4 (windows-latest) 冒烟（smoke.e2e.ts 启动应用并加载该配置）确认；实机外观在 W1。"
+      "status": "passing",
+      "evidence": "macOS：tmp/evidence/T18/review/native-window.png（screencapture -l 捕获的真实窗口：隐藏式标题栏保留红绿灯、侧栏 vibrancy 材质，正文不透明），暗色与高对比度见同目录 main-*.png。Windows：CI 运行 https://github.com/Refinex-Space/PiArc/actions/runs/44264407935（提交 6b323e0）的 desktop L4 (windows-latest) 通过，155 passed（两种形态）：smoke.e2e.ts 以 Mica 配置启动应用并打开主窗口（dev 与 packaged），t18-* 全部通过。窗口选项在 apps/desktop/src/main/platform/window-chrome.ts（darwin：titleBarStyle hidden、trafficLightPosition、vibrancy sidebar；win32：titleBarStyle hidden、titleBarOverlay、backgroundMaterial mica）。实机外观在 W1。"
     },
     {
       "id": "T18-A05",
