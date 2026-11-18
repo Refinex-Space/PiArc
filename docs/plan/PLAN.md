@@ -321,7 +321,7 @@ T19 Transcript 与 composer 正式版（2026-11-18 开工；基线 `npm run veri
 - [x] 四项 T19 Harness 能力已接入 L2（37 passed、1 Windows 专用；MISSING 0）
 - [x] A01–A10、A13：T19 专项 Playwright 两种形态 24/24，九种行亮暗截图、mock 请求与安全检查均已核实
 - [x] A11、A12：打包实测 103.68 token/s，p99 8.702 ms，长任务 0；万条 59.996 fps，缓存/冷加载最大 30.0/64.4 ms
-- [ ] A14：全量 verify
+- [ ] A14：首次收尾 verify 14/15，正在定位默认并发下真实会话测试的应答超时；原超时和断言保持
 - [x] ADR-0030、架构 v2.24、通用能力复用表、transcript 和 composer 的 AGENTS.md 与 CLAUDE.md 均已同步
 - [ ] 全量检查通过后填写最终验收与会话日志
 

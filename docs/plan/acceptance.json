@@ -2183,8 +2183,8 @@
       "id": "T19-A14",
       "task": "T19",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "failing",
+      "evidence": "首次收尾 npm run verify 为 14/15：默认并发下 piarc-testkit sessions 的多组 Core 操作超时，其他 14 步通过；见 tmp/evidence/T19/verify-first.log。"
     },
     {
       "id": "T20-A01",
