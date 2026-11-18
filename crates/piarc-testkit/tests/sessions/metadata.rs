@@ -192,6 +192,18 @@ async fn a_trust_decision_while_the_agent_host_starts_still_lets_a_session_start
         events.turn_completed(&id, &turn).await["status"],
         "completed"
     );
+    // The session being created is not reopened on the first process (it does not exist
+    // there yet), so it never shows as failed.
+    let errors: Vec<Value> = events
+        .on("core/sessions")
+        .into_iter()
+        .flat_map(|snapshot| snapshot["sessions"].as_array().cloned().unwrap_or_default())
+        .filter(|session| session["id"] == id.as_str() && session["status"] == "error")
+        .collect();
+    assert!(
+        errors.is_empty(),
+        "the new session showed an error: {errors:?}"
+    );
     shutdown(core).await;
 }
 

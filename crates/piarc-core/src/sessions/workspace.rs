@@ -10,7 +10,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use piarc_host::{HostEvent, HostEvents, HostSupervisor};
@@ -33,6 +33,9 @@ pub(crate) struct SessionLink {
     /// The highest `seq` the session delivered in order: a reopened session continues after it.
     pub last_seq: Arc<AtomicU64>,
     pub cwd: String,
+    /// Set once the session was opened in an Agent Host (created, resumed or forked): only such
+    /// sessions are reopened on a fresh process. One still being created does not exist there.
+    pub in_host: Arc<AtomicBool>,
 }
 
 type Links = Arc<Mutex<HashMap<String, SessionLink>>>;
@@ -462,6 +465,7 @@ impl WorkspaceActor {
     fn restore(&self, supervisor: HostSupervisor) {
         let links: Vec<(String, SessionLink)> = lock(&self.handle.links)
             .iter()
+            .filter(|(_, link)| link.in_host.load(Ordering::Acquire))
             .map(|(id, link)| (id.clone(), link.clone()))
             .collect();
         let generation = self.generation;

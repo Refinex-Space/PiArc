@@ -14,7 +14,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use piarc_host::{CallRecord, HostSupervisor};
 use piarc_protocol::history::{GetEntriesParams, SessionEntries, SessionGetEntries};
@@ -101,6 +101,8 @@ pub(crate) struct SessionHandle {
     pub cwd: PathBuf,
     tx: mpsc::Sender<SessionMsg>,
     ws: WorkspaceHandle,
+    /// Shared with the workspace's link: the session exists in the Agent Host.
+    in_host: Arc<AtomicBool>,
 }
 
 impl SessionHandle {
@@ -117,12 +119,14 @@ impl SessionHandle {
             .map_err(|e| Error::feature(&e))?;
         let (tx, rx) = mpsc::channel(MAILBOX);
         let last_seq = Arc::new(AtomicU64::new(0));
+        let in_host = Arc::new(AtomicBool::new(false));
         workspace.attach(
             &id,
             SessionLink {
                 tx: tx.clone(),
                 last_seq: Arc::clone(&last_seq),
                 cwd: path_text(&cwd),
+                in_host: Arc::clone(&in_host),
             },
         );
         let actor = SessionActor {
@@ -151,6 +155,7 @@ impl SessionHandle {
             cwd,
             tx,
             ws: workspace.clone(),
+            in_host,
         })
     }
 
@@ -168,6 +173,7 @@ impl SessionHandle {
                 .map_err(host_error)?,
             Err(error) => return Err(host_error(error)),
         };
+        self.in_host.store(true, Ordering::Release);
         Ok(self.opened(opened.restored_messages))
     }
 
@@ -178,11 +184,13 @@ impl SessionHandle {
             .resume_session(&SessionId(self.id.clone()), &path_text(&self.cwd), None)
             .await
             .map_err(host_error)?;
+        self.in_host.store(true, Ordering::Release);
         Ok(self.opened(opened.restored_messages))
     }
 
     /// The session was opened by someone else (a fork): only report it.
     pub async fn adopt(&self) -> Result<Value> {
+        self.in_host.store(true, Ordering::Release);
         self.info().await
     }
 
