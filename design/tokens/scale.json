@@ -1,0 +1,59 @@
+{
+  "$description": "Mode-independent values: system font stacks (no bundled fonts, architecture section 8.6), type sizes, radii, motion; and the values that change with density.",
+  "font": {
+    "ui": "-apple-system, BlinkMacSystemFont, \"SF Pro Text\", \"Segoe UI Variable Text\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei UI\", system-ui, sans-serif",
+    "mono": "ui-monospace, \"SF Mono\", \"Cascadia Mono\", Menlo, Consolas, \"PingFang SC\", \"Microsoft YaHei UI\", monospace"
+  },
+  "fontSize": {
+    "caption": "11px",
+    "small": "12px",
+    "body": "13px",
+    "title": "15px",
+    "heading": "20px"
+  },
+  "fontWeight": {
+    "regular": "400",
+    "medium": "500",
+    "semibold": "600"
+  },
+  "radius": {
+    "sm": "4px",
+    "md": "6px",
+    "lg": "10px",
+    "pill": "999px"
+  },
+  "motion": {
+    "fast": "120ms",
+    "normal": "200ms",
+    "easing": "cubic-bezier(0.2, 0, 0, 1)"
+  },
+  "shadow": {
+    "overlay": "0 8px 28px rgb(0 0 0 / 0.18), 0 1px 3px rgb(0 0 0 / 0.12)"
+  },
+  "size": {
+    "titlebarHeight": "40px",
+    "sidebarMin": "200px",
+    "sidebarMax": "420px",
+    "badge": "8px"
+  },
+  "density": {
+    "comfortable": {
+      "space.1": "4px",
+      "space.2": "8px",
+      "space.3": "12px",
+      "space.4": "16px",
+      "space.5": "24px",
+      "size.rowHeight": "32px",
+      "size.controlHeight": "30px"
+    },
+    "compact": {
+      "space.1": "3px",
+      "space.2": "6px",
+      "space.3": "8px",
+      "space.4": "12px",
+      "space.5": "18px",
+      "size.rowHeight": "26px",
+      "size.controlHeight": "26px"
+    }
+  }
+}

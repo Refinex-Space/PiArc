@@ -13,6 +13,7 @@
   "scripts": {
     "verify": "node scripts/dev/verify.mjs",
     "gen:protocol": "node scripts/dev/gen-protocol.mjs",
+    "gen:tokens": "node scripts/dev/gen-design-tokens.mjs",
     "build:core": "node scripts/dev/build-core.mjs",
     "build:agent-host": "node scripts/dev/build-agent-host.mjs",
     "format": "prettier --write .",

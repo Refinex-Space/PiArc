@@ -1,0 +1,159 @@
+{
+  "$description": "Raw colors (layer 1). Each family has a 12-step light ladder and a 12-step dark ladder: 1 app background, 2 subtle background, 3 element, 4 hover, 5 pressed, 6 subtle border, 7 border, 8 strong border, 9 solid, 10 solid hover, 11 low-contrast text, 12 high-contrast text. Values are PiArc's own; the accent must stay away from orange and terracotta hues (scripts/lib/design-tokens.mjs, BRAND_RULES).",
+  "slate": {
+    "light": [
+      "#fcfcfd",
+      "#f8f9fa",
+      "#f0f1f3",
+      "#e8e9ec",
+      "#e0e2e6",
+      "#d8dbe0",
+      "#cdd0d6",
+      "#b8bcc4",
+      "#858a94",
+      "#7b808a",
+      "#5d626c",
+      "#1d2027"
+    ],
+    "dark": [
+      "#111214",
+      "#17181b",
+      "#1e2024",
+      "#25272c",
+      "#2b2e34",
+      "#33363d",
+      "#3e424a",
+      "#50555f",
+      "#6b707c",
+      "#787d89",
+      "#a9adb7",
+      "#eceef2"
+    ]
+  },
+  "indigo": {
+    "light": [
+      "#fbfcff",
+      "#f4f6ff",
+      "#e9edfe",
+      "#dde3fd",
+      "#cfd7fb",
+      "#bdc8f6",
+      "#a4b3ef",
+      "#8197e6",
+      "#3b5bdb",
+      "#3450c8",
+      "#3049b8",
+      "#1a2559"
+    ],
+    "dark": [
+      "#10131f",
+      "#151a2b",
+      "#1b2442",
+      "#202c56",
+      "#273566",
+      "#2f3f78",
+      "#3a4c8f",
+      "#4659ac",
+      "#4568e6",
+      "#5070e6",
+      "#9db0ff",
+      "#d6deff"
+    ]
+  },
+  "red": {
+    "light": [
+      "#fffcfc",
+      "#fff7f7",
+      "#feebeb",
+      "#ffdddd",
+      "#fdcfcf",
+      "#f8bfc0",
+      "#f0a8aa",
+      "#e78a8d",
+      "#d93d42",
+      "#c93439",
+      "#c0262d",
+      "#5c1418"
+    ],
+    "dark": [
+      "#1b1112",
+      "#221416",
+      "#3a1719",
+      "#4f191c",
+      "#5e1f22",
+      "#6e282b",
+      "#853336",
+      "#ad4044",
+      "#e5484d",
+      "#ec5d61",
+      "#ff8c8c",
+      "#ffd1d1"
+    ]
+  },
+  "amber": {
+    "light": [
+      "#fefdfa",
+      "#fffaeb",
+      "#fff2c9",
+      "#ffe9a8",
+      "#ffdf8a",
+      "#f8d071",
+      "#ebbc5c",
+      "#d8a23d",
+      "#b97a00",
+      "#a86f00",
+      "#8d5a00",
+      "#4a2f00"
+    ],
+    "dark": [
+      "#17130b",
+      "#1d180f",
+      "#30230b",
+      "#3d2b06",
+      "#4a3507",
+      "#594211",
+      "#6e531d",
+      "#8f6b26",
+      "#e2a336",
+      "#ebb04a",
+      "#f1c164",
+      "#fbe7c1"
+    ]
+  },
+  "green": {
+    "light": [
+      "#fbfefc",
+      "#f3fbf6",
+      "#e4f6ea",
+      "#d4f0dd",
+      "#c2e8cf",
+      "#ace0bd",
+      "#8ed3a5",
+      "#5fbf82",
+      "#2f9e5a",
+      "#288e50",
+      "#1d7a43",
+      "#123d24"
+    ],
+    "dark": [
+      "#0e1511",
+      "#131c16",
+      "#15291d",
+      "#173523",
+      "#1b422b",
+      "#204f33",
+      "#275e3e",
+      "#2f7449",
+      "#3dbb72",
+      "#4ac67e",
+      "#6fd69a",
+      "#c8f2d8"
+    ]
+  },
+  "base": {
+    "white": "#ffffff",
+    "black": "#000000",
+    "scrimLight": "#1d202733",
+    "scrimDark": "#00000080"
+  }
+}

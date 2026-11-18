@@ -1,0 +1,45 @@
+{
+  "$description": "Component tokens (layer 4): what a component uses, as references to semantic colors (`surface.app`) or scale values (`size.rowHeight`). Emitted as `--piarc-c-<component>-<name>`.",
+  "window": {
+    "background": "surface.app",
+    "titlebarHeight": "size.titlebarHeight"
+  },
+  "sidebar": {
+    "background": "surface.sidebar",
+    "rowHeight": "size.rowHeight",
+    "rowHover": "surface.hover",
+    "rowSelected": "surface.selected",
+    "groupLabel": "text.secondary",
+    "minWidth": "size.sidebarMin",
+    "maxWidth": "size.sidebarMax"
+  },
+  "button": {
+    "primaryBackground": "accent.solid",
+    "primaryBackgroundHover": "accent.solidHover",
+    "primaryText": "text.onAccent",
+    "secondaryBackground": "surface.raised",
+    "secondaryBorder": "border.strong",
+    "height": "size.controlHeight"
+  },
+  "dialog": {
+    "background": "surface.raised",
+    "border": "border.default",
+    "scrim": "overlay.scrim"
+  },
+  "input": {
+    "background": "surface.input",
+    "border": "border.strong",
+    "text": "text.primary",
+    "height": "size.controlHeight"
+  },
+  "badge": {
+    "error": "agentStatus.error",
+    "awaiting": "agentStatus.awaiting",
+    "running": "agentStatus.running",
+    "unread": "agentStatus.unread",
+    "size": "size.badge"
+  },
+  "focus": {
+    "ring": "border.focus"
+  }
+}
