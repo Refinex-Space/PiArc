@@ -33,7 +33,9 @@ mod store;
 pub mod time;
 
 pub use error::{Error, Result};
-pub use index::{FileOutcome, IndexStatus, SessionRecord, SkippedLine, SyncReport};
+pub use index::{
+    FileOutcome, IndexStatus, SessionPrefsChange, SessionRecord, SkippedLine, SyncReport,
+};
 pub use migrate::{MIGRATIONS, Migration};
 pub use pi_session::{SessionMeta, Usage};
 pub use records::{AuditEvent, TrustDecision, TrustRecord, WorkspaceRecord};

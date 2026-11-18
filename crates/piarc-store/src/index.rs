@@ -78,17 +78,31 @@ pub struct SessionRecord {
     pub archived: bool,
     /// Core's own state: unread.
     pub unread: bool,
+    /// Core's own state: the title the user gave the session in PiArc.
+    pub custom_title: Option<String>,
 }
 
 impl SessionRecord {
-    /// The display title: the session name, else the first user message.
+    /// The display title: the user's title, else the session name, else the first user
+    /// message.
     #[must_use]
     pub fn title(&self) -> Option<&str> {
-        self.meta
-            .name
+        self.custom_title
             .as_deref()
+            .or(self.meta.name.as_deref())
             .or(self.meta.first_message.as_deref())
     }
+}
+
+/// A change to Core's own metadata of a session; `None` fields stay as they are.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SessionPrefsChange {
+    /// The user's title; `Some(None)` removes it (the derived title shows again).
+    pub custom_title: Option<Option<String>>,
+    /// Pinned to the top of its workspace.
+    pub pinned: Option<bool>,
+    /// Archived (hidden from the default list).
+    pub archived: Option<bool>,
 }
 
 /// What a sync of one file did.
@@ -388,6 +402,71 @@ impl Store {
         Ok(changed > 0)
     }
 
+    /// Applies `change` to session `id`. Returns false when the index has no row for it yet.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Sqlite`] when the row cannot be written.
+    pub fn set_session_prefs(&self, id: &str, change: &SessionPrefsChange) -> Result<bool> {
+        let exists: bool = self
+            .conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sessions WHERE id = ?1)",
+                [id],
+                |row| row.get(0),
+            )
+            .map_err(Error::sqlite("cannot read sessions"))?;
+        if !exists {
+            return Ok(false);
+        }
+        let write = |sql: &str, value: &dyn rusqlite::ToSql| {
+            self.conn
+                .execute(sql, params![id, value])
+                .map(|_| ())
+                .map_err(Error::sqlite("cannot write the session metadata"))
+        };
+        if let Some(title) = &change.custom_title {
+            write("UPDATE sessions SET custom_title = ?2 WHERE id = ?1", title)?;
+        }
+        if let Some(pinned) = change.pinned {
+            write("UPDATE sessions SET pinned = ?2 WHERE id = ?1", &pinned)?;
+        }
+        if let Some(archived) = change.archived {
+            write("UPDATE sessions SET archived = ?2 WHERE id = ?1", &archived)?;
+        }
+        Ok(true)
+    }
+
+    /// Forgets session `id`: its row and its file's sync state. Returns its file (to be
+    /// deleted by the caller), or `None` when the index does not know it.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Sqlite`] when the rows cannot be deleted.
+    pub fn remove_session(&mut self, id: &str) -> Result<Option<String>> {
+        let tx = self
+            .conn
+            .transaction()
+            .map_err(Error::sqlite("cannot start the index transaction"))?;
+        let file: Option<String> = tx
+            .query_row(
+                "SELECT file_path FROM sessions WHERE id = ?1",
+                [id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(Error::sqlite("cannot read sessions"))?;
+        if let Some(file) = &file {
+            tx.execute("DELETE FROM sessions WHERE id = ?1", [id])
+                .map_err(Error::sqlite("cannot delete from sessions"))?;
+            tx.execute("DELETE FROM session_files WHERE file_path = ?1", [file])
+                .map_err(Error::sqlite("cannot delete from session_files"))?;
+        }
+        tx.commit()
+            .map_err(Error::sqlite("cannot commit the index transaction"))?;
+        Ok(file)
+    }
+
     /// One session by id.
     ///
     /// # Errors
@@ -485,7 +564,7 @@ impl Store {
 const SESSION_COLUMNS: &str = "id, file_path, cwd, parent_session, name, first_message, \
     model_provider, model_id, message_count, input_tokens, output_tokens, cache_read_tokens, \
     cache_write_tokens, cost_total, created_at, updated_at, format_version, index_status, \
-    index_error, workspace_path, pinned, archived, unread, status";
+    index_error, workspace_path, pinned, archived, unread, status, custom_title";
 
 fn session_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SessionRecord> {
     let status: String = row.get(17)?;
@@ -520,6 +599,7 @@ fn session_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SessionRecord> 
         archived: row.get(21)?,
         unread: row.get(22)?,
         status: row.get(23)?,
+        custom_title: row.get(24)?,
     })
 }
 

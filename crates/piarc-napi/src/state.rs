@@ -1,6 +1,7 @@
-//! Exports over Core's state (T13): rebuilding the session index and project trust. Results
-//! are JSON text; their shapes are `piarc_core::storage::report_json` and
-//! `piarc_core::trust::TrustView` (camelCase).
+//! Exports over Core's state (T13): rebuilding the session index and project trust; the
+//! client's preferences in the user's settings file (T18). Results are JSON text; their
+//! shapes are `piarc_core::storage::report_json`, `piarc_core::trust::TrustView` (camelCase)
+//! and the settings file's object.
 
 use std::path::PathBuf;
 
@@ -72,6 +73,51 @@ impl CoreRuntime {
             self.core.revoke_trust(PathBuf::from(path), move |result| {
                 deferred.resolve(settle_json(result));
             })
+        })?;
+        Ok(promise)
+    }
+}
+
+#[napi]
+impl CoreRuntime {
+    /// The user's settings file (`<data>/settings.json`) as JSON; `{}` when it does not exist.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn user_settings<'env>(&self, env: &'env Env) -> napi::Result<Object<'env>> {
+        let (deferred, promise) = env.create_deferred::<String, Settle>()?;
+        boundary::call(env, "CoreRuntime.userSettings", || {
+            self.core
+                .user_settings(move |result| deferred.resolve(settle_json(result)))
+        })?;
+        Ok(promise)
+    }
+
+    /// Sets one client preference in the user's settings file: `pointer` lies under
+    /// `/language`, `/appearance`, `/keybindings` or `/notifications`; `value` is JSON text,
+    /// `null` removes the key. Resolves with the file's new content as JSON.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn write_client_setting<'env>(
+        &self,
+        env: &'env Env,
+        pointer: String,
+        #[napi(ts_arg_type = "string | null")] value: Option<String>,
+    ) -> napi::Result<Object<'env>> {
+        let value = match value.map(|text| serde_json::from_str::<serde_json::Value>(&text)) {
+            None => None,
+            Some(Ok(value)) => Some(value),
+            Some(Err(_)) => {
+                let error = piarc_core::Error::InvalidArgument {
+                    field: "value",
+                    reason: "must be JSON text".into(),
+                };
+                return Err(boundary::js_error(env, &error.to_error_object()));
+            }
+        };
+        let (deferred, promise) = env.create_deferred::<String, Settle>()?;
+        boundary::call(env, "CoreRuntime.writeClientSetting", || {
+            self.core
+                .write_client_setting(pointer, value, move |result| {
+                    deferred.resolve(settle_json(result));
+                })
         })?;
         Ok(promise)
     }

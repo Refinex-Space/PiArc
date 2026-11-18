@@ -3,6 +3,7 @@
 //! are in `scenarios/`.
 
 mod lifecycle;
+mod metadata;
 mod queue;
 mod support;
 mod turns;

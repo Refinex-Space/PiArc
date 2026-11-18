@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use napi::Env;
 use napi::bindgen_prelude::Object;
 use napi_derive::napi;
+use piarc_core::sessions::SessionPrefsChange;
 use piarc_core::sessions::{Op, QueueOp};
 use piarc_protocol::session::ModelRef;
 
@@ -214,6 +215,63 @@ impl CoreRuntime {
         id: String,
     ) -> napi::Result<Object<'env>> {
         self.op(env, "CoreRuntime.markSessionRead", id, Op::MarkRead)
+    }
+
+    /// Gives a session a title (`null` removes it: the derived title shows again); resolves
+    /// with `null`. Works on sessions that are not open.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn rename_session<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        #[napi(ts_arg_type = "string | null")] title: Option<String>,
+    ) -> napi::Result<Object<'env>> {
+        let change = SessionPrefsChange {
+            custom_title: Some(title),
+            ..SessionPrefsChange::default()
+        };
+        self.op(env, "CoreRuntime.renameSession", id, Op::Prefs(change))
+    }
+
+    /// Pins or unpins a session; resolves with `null`.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn set_session_pinned<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        pinned: bool,
+    ) -> napi::Result<Object<'env>> {
+        let change = SessionPrefsChange {
+            pinned: Some(pinned),
+            ..SessionPrefsChange::default()
+        };
+        self.op(env, "CoreRuntime.setSessionPinned", id, Op::Prefs(change))
+    }
+
+    /// Archives a session (closing it when open and removing its temporary directory) or
+    /// brings it back; resolves with `null`.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn set_session_archived<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        archived: bool,
+    ) -> napi::Result<Object<'env>> {
+        let change = SessionPrefsChange {
+            archived: Some(archived),
+            ..SessionPrefsChange::default()
+        };
+        self.op(env, "CoreRuntime.setSessionArchived", id, Op::Prefs(change))
+    }
+
+    /// Deletes a session: closes it when open, then removes its Pi session file, its temporary
+    /// directory and its index rows. Irreversible; the caller confirms with the user first.
+    /// Resolves with `null`.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn delete_session<'env>(&self, env: &'env Env, id: String) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.deleteSession", |core, done| {
+            core.delete_session(id, done)
+        })
     }
 
     /// Items of a session's conversation (open or not): `start .. start + limit`, or the last

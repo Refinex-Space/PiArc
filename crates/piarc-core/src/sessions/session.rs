@@ -57,6 +57,8 @@ pub enum Op {
     Queue(QueueOp),
     /// Clears the unread flag.
     MarkRead,
+    /// Changes Core's metadata of the session (title, pinned, archived).
+    Prefs(piarc_store::SessionPrefsChange),
 }
 
 /// A change to a session's input queue.
@@ -136,6 +138,7 @@ impl SessionHandle {
             status: SessionStatus::Idle,
             error: None,
             unread: false,
+            prefs: piarc_store::SessionPrefsChange::default(),
             ops: 0,
             busy: false,
             cancel: ctx.cancel.child_token(),
@@ -236,6 +239,9 @@ struct SessionActor {
     status: SessionStatus,
     error: Option<String>,
     unread: bool,
+    /// Metadata changed while open, kept until the session closes (the index may not have the
+    /// session's row yet: Pi writes the file with the first reply).
+    prefs: piarc_store::SessionPrefsChange,
     /// Requests in flight.
     ops: u32,
     busy: bool,
@@ -461,12 +467,22 @@ impl SessionActor {
     // ---- requests ----
 
     fn start_op(&mut self, op: Op, reply: oneshot::Sender<Result<Value>>) {
-        if op == Op::MarkRead {
-            self.unread = false;
-            self.publish();
-            self.persist();
-            let _ = reply.send(Ok(Value::Null));
-            return;
+        match op {
+            Op::MarkRead => {
+                self.unread = false;
+                self.publish();
+                self.persist();
+                let _ = reply.send(Ok(Value::Null));
+                return;
+            }
+            Op::Prefs(change) => {
+                merge_prefs(&mut self.prefs, change);
+                self.publish();
+                self.persist();
+                let _ = reply.send(Ok(Value::Null));
+                return;
+            }
+            _ => {}
         }
         self.ops += 1;
         self.report_busy();
@@ -550,6 +566,7 @@ impl SessionActor {
             status: self.status,
             unread: self.unread,
             error: self.error.clone(),
+            prefs: self.prefs.clone(),
         }));
     }
 
@@ -566,13 +583,16 @@ impl SessionActor {
         let storage = self.ctx.storage.clone();
         let snapshots = self.ctx.snapshots.clone();
         let (id, workspace) = (self.id.clone(), path_text(&self.ws.path));
-        let (status, unread) = (self.status, self.unread);
+        let (status, unread, prefs) = (self.status, self.unread, self.prefs.clone());
         self.ctx.handle.spawn(async move {
             if let Err(error) = storage.sync_sessions().await {
                 tracing::warn!(target: "piarc_core::sessions", session = %id, "syncing the index failed: {error}");
             }
             let stored = storage
-                .run(move |store| store.set_session_state(&id, &workspace, status.as_str(), unread))
+                .run(move |store| {
+                    store.set_session_state(&id, &workspace, status.as_str(), unread)?;
+                    store.set_session_prefs(&id, &prefs)
+                })
                 .await;
             if let Ok(Err(error)) = stored {
                 tracing::warn!(target: "piarc_core::sessions", "storing the session state failed: {error}");
@@ -616,7 +636,8 @@ impl Request {
                 stopped
             }
             Op::Queue(change) => self.queue(&supervisor, change).await,
-            Op::MarkRead => Ok(Value::Null),
+            // Answered by the actor itself.
+            Op::MarkRead | Op::Prefs(_) => Ok(Value::Null),
         }
     }
 
@@ -672,6 +693,22 @@ impl Request {
             .await
             .map(to_value)
             .map_err(host_error)
+    }
+}
+
+/// Later changes win field by field.
+fn merge_prefs(
+    into: &mut piarc_store::SessionPrefsChange,
+    change: piarc_store::SessionPrefsChange,
+) {
+    if change.custom_title.is_some() {
+        into.custom_title = change.custom_title;
+    }
+    if change.pinned.is_some() {
+        into.pinned = change.pinned;
+    }
+    if change.archived.is_some() {
+        into.archived = change.archived;
     }
 }
 

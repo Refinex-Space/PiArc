@@ -24,11 +24,18 @@ pub struct Migration {
 }
 
 /// The migrations of this build, oldest first.
-pub const MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    name: "initial",
-    sql: include_str!("sql/0001_initial.sql"),
-}];
+pub const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        name: "initial",
+        sql: include_str!("sql/0001_initial.sql"),
+    },
+    Migration {
+        version: 2,
+        name: "session_titles",
+        sql: include_str!("sql/0002_session_titles.sql"),
+    },
+];
 
 /// The highest version in `migrations`.
 #[must_use]

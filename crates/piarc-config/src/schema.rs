@@ -258,6 +258,45 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
             shape: Shape::String,
         }]),
     },
+    // The desktop client's preferences (T18), read and written in the user's file only
+    // (`piarc_core::client_settings`); a project file setting them has no effect.
+    Field {
+        name: "language",
+        shape: Shape::OneOf(&["system", "en", "zh-CN"]),
+    },
+    Field {
+        name: "appearance",
+        shape: Shape::Object(&[
+            Field {
+                name: "theme",
+                shape: Shape::OneOf(&["system", "light", "dark"]),
+            },
+            Field {
+                name: "contrast",
+                shape: Shape::OneOf(&["system", "standard", "high"]),
+            },
+            Field {
+                name: "density",
+                shape: Shape::OneOf(&["comfortable", "compact"]),
+            },
+            Field {
+                name: "reduceMotion",
+                shape: Shape::OneOf(&["system", "on", "off"]),
+            },
+        ]),
+    },
+    // Command id → key in `Mod` notation; an empty string unbinds the command.
+    Field {
+        name: "keybindings",
+        shape: Shape::MapOf(&STRINGS),
+    },
+    Field {
+        name: "notifications",
+        shape: Shape::Object(&[Field {
+            name: "enabled",
+            shape: Shape::Bool,
+        }]),
+    },
 ]);
 
 #[cfg(test)]

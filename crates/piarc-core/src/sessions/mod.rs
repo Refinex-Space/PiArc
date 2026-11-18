@@ -61,6 +61,7 @@ use crate::trust::TrustService;
 pub use session::{Op, QueueOp};
 pub(crate) use snapshot::Snapshots;
 
+pub use piarc_store::SessionPrefsChange;
 pub use snapshot::{HostState, SessionStatus, SessionView, WorkspaceView};
 
 /// How long every session of a workspace stays idle before its Agent Host is stopped.
@@ -334,6 +335,92 @@ impl Hub {
         Ok(())
     }
 
+    /// Changes Core's metadata of session `id` (title, pinned, archived). Archiving closes the
+    /// session when it is open and removes its temporary directory (architecture section 9.3).
+    pub async fn set_prefs(
+        &self,
+        id: String,
+        change: piarc_store::SessionPrefsChange,
+    ) -> Result<()> {
+        check_session_id(&id)?;
+        if let Some(Some(title)) = &change.custom_title {
+            check_title(title)?;
+        }
+        let archiving = change.archived == Some(true);
+        if let Some(session) = self.live(&id) {
+            session.op(Op::Prefs(change.clone())).await?;
+            if !archiving {
+                return Ok(());
+            }
+            // The actor stores the change with its next index sync; a closed session has none.
+            let removed = lock(&self.routes).sessions.remove(&id);
+            if let Some(session) = removed {
+                session.close().await?;
+            }
+        }
+        let key = id.clone();
+        let stored = self
+            .ctx
+            .storage
+            .run(move |store| store.set_session_prefs(&key, &change))
+            .await??;
+        if archiving {
+            self.remove_session_dir(&id).await?;
+        }
+        self.ctx.snapshots.send(snapshot::SnapshotMsg::Reload);
+        if stored || archiving {
+            Ok(())
+        } else {
+            Err(session_not_found(&id))
+        }
+    }
+
+    /// Deletes session `id` (architecture section 9.3): closes it when open, so its Agent Host
+    /// stops writing the file, then removes its Pi session file, its temporary directory and
+    /// its index rows.
+    pub async fn delete_session(&self, id: String) -> Result<()> {
+        check_session_id(&id)?;
+        let removed = lock(&self.routes).sessions.remove(&id);
+        let was_open = removed.is_some();
+        if let Some(session) = removed {
+            session.close().await?;
+        }
+        let key = id.clone();
+        let record = self
+            .ctx
+            .storage
+            .run(move |store| store.session(&key))
+            .await??;
+        if record.is_none() && !was_open {
+            return Err(session_not_found(&id));
+        }
+        if let Some(record) = record {
+            let pi_sessions = self.ctx.storage.dirs().pi_sessions();
+            let file = PathBuf::from(&record.file_path);
+            // The index only holds files under `pi/sessions/`; anything else is not ours to delete.
+            if !file.starts_with(&pi_sessions) {
+                return Err(Error::Internal {
+                    reason: format!("{} is outside the session directory", file.display()),
+                });
+            }
+            remove_path(file, false).await?;
+            let key = id.clone();
+            self.ctx
+                .storage
+                .run(move |store| store.remove_session(&key))
+                .await??;
+        }
+        self.remove_session_dir(&id).await?;
+        self.ctx.snapshots.send(snapshot::SnapshotMsg::Reload);
+        tracing::info!(target: "piarc_core::sessions", session = %id, "session deleted");
+        Ok(())
+    }
+
+    /// Removes `<data>/sessions/<id>/` (tool output, blobs, the session's temporary files).
+    async fn remove_session_dir(&self, id: &str) -> Result<()> {
+        remove_path(self.ctx.storage.dirs().sessions().join(id), true).await
+    }
+
     /// Sends both snapshots again (a client subscribed or reloaded).
     pub fn resend_snapshots(&self) {
         self.ctx.snapshots.send(snapshot::SnapshotMsg::Resend);
@@ -416,6 +503,54 @@ impl Hub {
         };
         let workspace = record.workspace_path.unwrap_or_else(|| cwd.clone());
         Ok((PathBuf::from(workspace), PathBuf::from(cwd)))
+    }
+}
+
+/// Removes a file or a directory tree on the blocking pool; a missing one is fine.
+async fn remove_path(path: PathBuf, dir: bool) -> Result<()> {
+    let shown = path.display().to_string();
+    let removed = tokio::task::spawn_blocking(move || {
+        let result = if dir {
+            std::fs::remove_dir_all(&path)
+        } else {
+            std::fs::remove_file(&path)
+        };
+        match result {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            other => other,
+        }
+    })
+    .await
+    .map_err(|e| Error::Internal {
+        reason: format!("a removal task failed: {e}"),
+    })?;
+    removed.map_err(|e| Error::Feature {
+        kind: piarc_protocol::ErrorKind::IoError,
+        retryable: true,
+        message: format!("cannot remove {shown}: {e}"),
+        details: None,
+    })
+}
+
+/// The longest title a user can give a session, in characters.
+pub const MAX_TITLE_CHARS: usize = 200;
+
+/// A user title: 1 to 200 characters after trimming, no control characters.
+fn check_title(title: &str) -> Result<()> {
+    let count = title.chars().count();
+    let valid = count > 0
+        && count <= MAX_TITLE_CHARS
+        && title.trim() == title
+        && !title.chars().any(char::is_control);
+    if valid {
+        Ok(())
+    } else {
+        Err(Error::InvalidArgument {
+            field: "title",
+            reason: format!(
+                "must be 1 to {MAX_TITLE_CHARS} characters without surrounding spaces or control characters"
+            ),
+        })
     }
 }
 

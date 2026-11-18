@@ -47,7 +47,8 @@ pub struct TrustView {
     pub decision: Option<&'static str>,
     /// When the decision was made (Unix ms).
     pub decided_at: Option<i64>,
-    /// Whether project-level executable configuration may be used now.
+    /// Whether project-level executable configuration may be used now: trusted, and no item
+    /// waits for confirmation.
     pub trusted: bool,
     /// Every executable item the project would enable.
     pub items: Vec<Item>,
@@ -70,7 +71,9 @@ impl std::fmt::Debug for TrustService {
     }
 }
 
-/// The store-backed [`TrustLookup`]: main checkout, then the recorded decision.
+/// The store-backed [`TrustLookup`]: main checkout, then the recorded decision. A trusted
+/// project with executable items the user has not seen yet (added after the decision, for
+/// example by `git pull`) is not trusted until the user confirms them (I63).
 struct StoreLookup(Storage);
 
 impl TrustLookup for StoreLookup {
@@ -82,8 +85,19 @@ impl TrustLookup for StoreLookup {
             .with(|store| store.trust(&key))
             .map_err(|e| e.to_string())?
             .map_err(|e| e.to_string())?;
-        Ok(record.is_some_and(|r| r.decision == TrustDecision::Trusted))
+        let Some(record) = record.filter(|r| r.decision == TrustDecision::Trusted) else {
+            return Ok(false);
+        };
+        let items = piarc_config::enumerate(&checkout.root).items;
+        Ok(unconfirmed(&items, &record.snapshot).is_empty())
     }
+}
+
+/// Items of `items` missing from a decision's snapshot. A snapshot that cannot be read
+/// confirms nothing.
+fn unconfirmed(items: &[Item], snapshot: &str) -> Vec<Item> {
+    let snapshot: Vec<Item> = serde_json::from_str(snapshot).unwrap_or_default();
+    piarc_config::new_items(items, &snapshot)
 }
 
 impl TrustService {
@@ -246,16 +260,15 @@ fn build_view(storage: &Storage, dir: &Path) -> Result<TrustView> {
     let key = checkout_key(&checkout.main)?;
     let record = storage.with(|store| store.trust(&key))??;
     let Inventory { items, unreadable } = piarc_config::enumerate(&checkout.root);
-    let trusted = record
+    let decided_trusted = record
         .as_ref()
         .is_some_and(|r| r.decision == TrustDecision::Trusted);
     let new_items = match &record {
-        Some(record) if trusted => {
-            let snapshot: Vec<Item> = serde_json::from_str(&record.snapshot).unwrap_or_default();
-            piarc_config::new_items(&items, &snapshot)
-        }
+        Some(record) if decided_trusted => unconfirmed(&items, &record.snapshot),
         _ => Vec::new(),
     };
+    // The same answer as `StoreLookup`: new items wait for the user's confirmation.
+    let trusted = decided_trusted && new_items.is_empty();
     Ok(TrustView {
         path: dir.to_string_lossy().into_owned(),
         checkout: key,

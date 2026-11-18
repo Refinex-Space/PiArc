@@ -88,6 +88,9 @@ pub(crate) struct LiveSession {
     pub status: SessionStatus,
     pub unread: bool,
     pub error: Option<String>,
+    /// Metadata the client changed while the session is open; written to the index once it
+    /// has the session's row.
+    pub prefs: piarc_store::SessionPrefsChange,
 }
 
 /// One session of `core/sessions`.
@@ -109,6 +112,10 @@ pub struct SessionView {
     pub status: SessionStatus,
     /// A turn completed since the client last showed it.
     pub unread: bool,
+    /// Pinned to the top of its workspace.
+    pub pinned: bool,
+    /// Archived: hidden from the default list.
+    pub archived: bool,
     /// Open in its workspace's Agent Host (or waiting for it).
     pub open: bool,
     /// `provider/id` of its model.
@@ -282,7 +289,12 @@ impl SnapshotTask {
             .map(|record| {
                 let mut view = indexed_view(record);
                 if let Some(live) = self.live.get(&record.id) {
-                    apply_live(&mut view, live);
+                    let derived = record
+                        .meta
+                        .name
+                        .as_ref()
+                        .or(record.meta.first_message.as_ref());
+                    apply_live(&mut view, live, derived);
                 }
                 view
             })
@@ -290,7 +302,7 @@ impl SnapshotTask {
         for live in self.live.values() {
             if !self.indexed.iter().any(|record| record.id == live.id) {
                 let mut view = empty_view(&live.id);
-                apply_live(&mut view, live);
+                apply_live(&mut view, live, None);
                 list.push(view);
             }
         }
@@ -325,6 +337,8 @@ fn indexed_view(record: &piarc_store::SessionRecord) -> SessionView {
             SessionStatus::Idle
         },
         unread: record.unread,
+        pinned: record.pinned,
+        archived: record.archived,
         open: false,
         model: meta
             .model_provider
@@ -347,6 +361,8 @@ fn empty_view(id: &str) -> SessionView {
         title: None,
         status: SessionStatus::Idle,
         unread: false,
+        pinned: false,
+        archived: false,
         open: true,
         model: None,
         message_count: 0,
@@ -357,11 +373,22 @@ fn empty_view(id: &str) -> SessionView {
     }
 }
 
-fn apply_live(view: &mut SessionView, live: &LiveSession) {
+/// Live state over the indexed view; `derived` is the title without the user's (to show when
+/// the user removes theirs).
+fn apply_live(view: &mut SessionView, live: &LiveSession, derived: Option<&String>) {
     view.workspace = Some(live.workspace.clone());
     view.cwd = Some(live.cwd.clone());
     view.status = live.status;
     view.unread = live.unread;
     view.open = true;
     view.error.clone_from(&live.error);
+    if let Some(title) = &live.prefs.custom_title {
+        view.title = title.clone().or_else(|| derived.cloned());
+    }
+    if let Some(pinned) = live.prefs.pinned {
+        view.pinned = pinned;
+    }
+    if let Some(archived) = live.prefs.archived {
+        view.archived = archived;
+    }
 }

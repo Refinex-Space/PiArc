@@ -154,7 +154,10 @@ fn the_data_directory_gets_its_layout_and_database() {
         .with(|s| s.schema_version())
         .expect("open")
         .expect("version");
-    assert_eq!(version, 1);
+    assert_eq!(
+        version,
+        piarc_store::migrate::latest_version(piarc_store::MIGRATIONS)
+    );
     let storage = core.storage().expect("storage");
     core.shutdown_blocking().expect("shutdown");
     // The ordered shutdown closes the database: a JavaScript `CoreRuntime` lives on until it
@@ -396,6 +399,20 @@ fn a_trust_view_lists_the_items_and_what_is_new_since_the_decision() {
         let json = serde_json::to_value(&after).expect("serializes");
         assert_eq!(json["newItems"][0]["category"], "allowRule");
         assert_eq!(json["newItems"][0]["source"], ".piarc/settings.json");
+        // I63: an item the user has not confirmed keeps the whole project untrusted, in the
+        // view and in the one trust query, until the user confirms again.
+        assert!(!after.trusted);
+        assert_eq!(after.decision, Some("trusted"));
+        assert!(
+            !asked(&trust, &ws).await,
+            "unconfirmed items are not trusted"
+        );
+        let confirmed = trust.decide(&ws, true).await.expect("confirm");
+        assert!(confirmed.trusted && confirmed.new_items.is_empty());
+        assert!(asked(&trust, &ws).await, "confirmed items are trusted");
+        // Removing an item needs no confirmation.
+        std::fs::remove_file(ws.join(".mcp.json")).expect("remove");
+        assert!(asked(&trust, &ws).await);
     });
     core.shutdown_blocking().expect("shutdown");
 }

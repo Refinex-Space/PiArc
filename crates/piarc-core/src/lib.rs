@@ -69,6 +69,7 @@
 //! [`CoreRuntime::terminal_frame`] ([`terminal`]).
 
 pub mod agent_host;
+pub mod client_settings;
 pub mod clock;
 pub mod demo;
 pub mod dirs;

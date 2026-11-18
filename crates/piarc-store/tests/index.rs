@@ -313,3 +313,46 @@ fn core_state_is_written_per_session_and_survives_a_rebuild() {
         (Some("/w 工作区"), Some("error"), true)
     );
 }
+
+#[test]
+fn user_titles_pins_and_archives_survive_a_rebuild_and_removal_forgets_the_session() {
+    let dir = TempDir::new("prefs 元数据");
+    let sessions = dir.path().join("sessions");
+    let mut store = Store::open_in_memory(0).expect("store");
+    let mut writer = SessionWriter::create(&sessions, "/w", "s-prefs", Some(3));
+    let line = writer.user("first question");
+    writer.append_raw(&line);
+    store.sync_dir(&sessions).expect("sync");
+
+    let change = piarc_store::SessionPrefsChange {
+        custom_title: Some(Some("重命名的会话".into())),
+        pinned: Some(true),
+        archived: Some(true),
+    };
+    assert!(
+        !store
+            .set_session_prefs("s-unknown", &change)
+            .expect("write")
+    );
+    assert!(store.set_session_prefs("s-prefs", &change).expect("write"));
+    store.rebuild_index(&sessions).expect("rebuild");
+    let record = store.session("s-prefs").expect("read").expect("indexed");
+    assert_eq!(record.title(), Some("重命名的会话"));
+    assert!(record.pinned && record.archived);
+
+    // Partial changes leave the other fields alone; removing the title shows the derived one.
+    let unpin = piarc_store::SessionPrefsChange {
+        custom_title: Some(None),
+        pinned: Some(false),
+        archived: None,
+    };
+    assert!(store.set_session_prefs("s-prefs", &unpin).expect("write"));
+    let record = store.session("s-prefs").expect("read").expect("indexed");
+    assert_eq!(record.title(), Some("first question"));
+    assert!(!record.pinned && record.archived);
+
+    let file = store.remove_session("s-prefs").expect("remove");
+    assert_eq!(file.as_deref(), Some(record.file_path.as_str()));
+    assert!(store.session("s-prefs").expect("read").is_none());
+    assert_eq!(store.remove_session("s-prefs").expect("remove again"), None);
+}

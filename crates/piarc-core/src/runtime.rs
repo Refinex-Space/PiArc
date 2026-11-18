@@ -572,6 +572,53 @@ impl CoreRuntime {
             })?
     }
 
+    /// The user's settings file as JSON (the client reads its preferences from it).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NoDataDirectory`], [`Error::ShuttingDown`]; reading errors go to `on_done`.
+    pub fn user_settings(
+        &self,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.client_settings_job(on_done, crate::client_settings::read)
+    }
+
+    /// Writes one client preference (`pointer` under [`crate::client_settings::CLIENT_KEYS`];
+    /// `None` removes it) and answers with the file's new content.
+    ///
+    /// # Errors
+    ///
+    /// As [`user_settings`](Self::user_settings).
+    pub fn write_client_setting(
+        &self,
+        pointer: String,
+        value: Option<serde_json::Value>,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.client_settings_job(on_done, move |dir| {
+            crate::client_settings::write(dir, &pointer, value)
+        })
+    }
+
+    fn client_settings_job(
+        &self,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+        job: impl FnOnce(&std::path::Path) -> Result<serde_json::Value> + Send + 'static,
+    ) -> Result<()> {
+        self.ensure_running()?;
+        let data = self.storage()?.dirs().data().to_owned();
+        self.shared.handle.spawn(async move {
+            let result = tokio::task::spawn_blocking(move || job(&data))
+                .await
+                .map_err(|e| Error::Internal {
+                    reason: format!("a settings task failed: {e}"),
+                });
+            on_done(result.and_then(|r| r));
+        });
+        Ok(())
+    }
+
     /// Rebuilds the session index from Pi's files (the "rebuild index" diagnostic action)
     /// and calls `on_done` with the report as JSON.
     ///
@@ -773,11 +820,32 @@ impl CoreRuntime {
     ) -> Result<()> {
         crate::sessions::check_session_id(&id)?;
         self.on_sessions(on_done, move |hub| async move {
-            if op == Op::MarkRead {
-                hub.mark_read(id).await?;
-                return Ok(serde_json::Value::Null);
+            match op {
+                Op::MarkRead => hub.mark_read(id).await?,
+                // Open or not: the hub writes the index for sessions that are not open.
+                Op::Prefs(change) => hub.set_prefs(id, change).await?,
+                op => return hub.op(id, op).await,
             }
-            hub.op(id, op).await
+            Ok(serde_json::Value::Null)
+        })
+    }
+
+    /// Deletes a session: closes it when open, then removes its Pi session file, its
+    /// temporary directory and its index rows (architecture section 9.3). The client confirms
+    /// first; Core does not ask.
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn delete_session(
+        &self,
+        id: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        crate::sessions::check_session_id(&id)?;
+        self.on_sessions(on_done, move |hub| async move {
+            hub.delete_session(id).await?;
+            Ok(serde_json::Value::Null)
         })
     }
 

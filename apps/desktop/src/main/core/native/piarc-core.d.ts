@@ -58,6 +58,24 @@ export declare class CoreRuntime {
   /** Clears a session's unread flag; resolves with `null`. */
   markSessionRead(id: string): Promise<string>;
   /**
+   * Gives a session a title (`null` removes it: the derived title shows again); resolves
+   * with `null`. Works on sessions that are not open.
+   */
+  renameSession(id: string, title?: string | null): Promise<string>;
+  /** Pins or unpins a session; resolves with `null`. */
+  setSessionPinned(id: string, pinned: boolean): Promise<string>;
+  /**
+   * Archives a session (closing it when open and removing its temporary directory) or
+   * brings it back; resolves with `null`.
+   */
+  setSessionArchived(id: string, archived: boolean): Promise<string>;
+  /**
+   * Deletes a session: closes it when open, then removes its Pi session file, its temporary
+   * directory and its index rows. Irreversible; the caller confirms with the user first.
+   * Resolves with `null`.
+   */
+  deleteSession(id: string): Promise<string>;
+  /**
    * Items of a session's conversation (open or not): `start .. start + limit`, or the last
    * `limit` without `start`. Resolves with `{ start, total, items: [{ entryId, item }] }`.
    */
@@ -90,6 +108,14 @@ export declare class CoreRuntime {
    * resources.
    */
   revokeProjectTrust(path: string): Promise<string>;
+  /** The user's settings file (`<data>/settings.json`) as JSON; `{}` when it does not exist. */
+  userSettings(): Promise<string>;
+  /**
+   * Sets one client preference in the user's settings file: `pointer` lies under
+   * `/language`, `/appearance`, `/keybindings` or `/notifications`; `value` is JSON text,
+   * `null` removes the key. Resolves with the file's new content as JSON.
+   */
+  writeClientSetting(pointer: string, value?: string | null): Promise<string>;
   /**
    * Starts a terminal and returns its id. Its title, bell and exit events arrive on the
    * route `term/<id>`; frames are pulled with `terminalFrame`.
