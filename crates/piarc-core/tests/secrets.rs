@@ -192,7 +192,9 @@ async fn vault_failures_are_structured_and_the_next_request_retries() {
 
 #[tokio::test]
 async fn locks_serialize_writers_until_unlocked() {
-    let f = Fixture::new("locks", Duration::from_millis(300));
+    // The lock must stay held for the whole test: a short lease ran out on a slow Windows
+    // runner before the unlock. Expiry has its own test below.
+    let f = Fixture::new("locks", Duration::from_secs(30));
     let (a, _fa) = Peer::channel(16);
     let (b, _fb) = Peer::channel(16);
     f.call(
@@ -213,7 +215,7 @@ async fn locks_serialize_writers_until_unlocked() {
         .expect("lock");
     let lock_id = locked["lockId"].as_str().expect("lock id").to_owned();
     assert_eq!(locked["entries"][0]["value"], oauth("v1"));
-    assert_eq!(locked["expiresInMs"], 300);
+    assert_eq!(locked["expiresInMs"], 30_000);
 
     // B's unlocked write of a locked key waits; an unrelated key does not.
     let service = f.service.clone();
