@@ -42,6 +42,7 @@ class FakeCore {
   #nextRevision = 1;
   readonly #locks = new Map<string, string>();
   #lockSeq = 0;
+  leaseMs = 30_000;
   #waiters: (() => void)[] = [];
   readonly #subscribers: CoreCredentialStore[] = [];
   /** Methods that fail with the given error until cleared. */
@@ -87,8 +88,10 @@ class FakeCore {
               const e = this.entries.get(key);
               return e === undefined ? [] : [{ key, ...e }];
             });
-            return { lockId, entries, expiresInMs: 30_000 };
+            return { lockId, entries, expiresInMs: this.leaseMs };
           }
+          case 'secrets/renew':
+            return { expiresInMs: this.leaseMs };
           case 'secrets/unlock': {
             const lockId = p.lockId as string;
             let released = false;
@@ -404,8 +407,7 @@ describe('CoreCredentialStore', () => {
         resolved = true;
         return value;
       });
-    await new Promise((resolve) => setTimeout(resolve, 5));
-    expect(core.requests).toContain('secrets/set');
+    await expect.poll(() => core.requests).toContain('secrets/set');
     expect(core.entries.has('provider/p1')).toBe(false);
     expect(await store.read('p1')).toEqual({ type: 'api_key', key: 'new' });
     expect(resolved).toBe(false);
@@ -490,10 +492,9 @@ describe('CoreCredentialStore', () => {
   it('applies changes pushed by Core and ignores stale ones', async () => {
     const { store, core } = await coreStore();
     const r1 = core.write('provider/p1', { type: 'api_key', key: 'one' });
-    await new Promise((resolve) => setTimeout(resolve, 5));
-    expect(await store.read('p1')).toEqual({ type: 'api_key', key: 'one' });
+    await expect.poll(() => store.read('p1')).toEqual({ type: 'api_key', key: 'one' });
     core.write('provider/p1', { type: 'api_key', key: 'two' });
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    await expect.poll(() => store.read('p1')).toEqual({ type: 'api_key', key: 'two' });
     expect(
       store.applyChange({
         key: 'provider/p1',
@@ -506,6 +507,16 @@ describe('CoreCredentialStore', () => {
     // MCP tokens are not model credentials.
     store.applyChange({ key: 'mcp/server', revision: 99, value: { token: 't' } });
     expect(await store.list()).toEqual([{ providerId: 'p1', type: 'api_key' }]);
+  });
+
+  it('renews a lease while waiting for a credential rotation', async () => {
+    const { store, core } = await coreStore();
+    core.leaseMs = 30;
+    await store.modify('p', async () => {
+      await expect.poll(() => core.requests.includes('secrets/renew')).toBe(true);
+      return { type: 'api_key', key: 'rotated' };
+    });
+    expect(core.requests.at(-1)).toBe('secrets/unlock');
   });
 
   it('two Agent Hosts refresh one expiring token once and end with the same token', async () => {
@@ -544,9 +555,8 @@ describe('CoreCredentialStore', () => {
     expect(refreshes).toBe(1);
     expect(used).toEqual(['refresh-1']);
     expect(auths.map((a) => a?.auth.apiKey)).toEqual(Array<string>(6).fill('gen-2'));
-    await new Promise((resolve) => setTimeout(resolve, 5));
     for (const { store } of hosts) {
-      expect(accessOf(await store.read('p1'))).toBe('gen-2');
+      await expect.poll(async () => accessOf(await store.read('p1'))).toBe('gen-2');
     }
     expect(accessOf(core.entries.get('oauth/p1')?.value as Credential)).toBe('gen-2');
   });
@@ -563,9 +573,8 @@ describe('CoreCredentialStore', () => {
       });
     await Promise.all(hosts.flatMap(({ store }) => Array.from({ length: 20 }, () => bump(store))));
     expect(core.entries.get('provider/p1')?.value).toEqual({ type: 'api_key', key: '40' });
-    await new Promise((resolve) => setTimeout(resolve, 5));
     for (const { store } of hosts) {
-      expect(await store.read('p1')).toEqual({ type: 'api_key', key: '40' });
+      await expect.poll(() => store.read('p1')).toEqual({ type: 'api_key', key: '40' });
     }
   });
 });

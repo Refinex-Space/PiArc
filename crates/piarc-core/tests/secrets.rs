@@ -403,3 +403,73 @@ async fn get_all_returns_only_the_requested_prefixes() {
         .expect("getAll");
     assert_eq!(keys(all), vec!["mcp/s", "oauth/p", "provider/p"]);
 }
+
+#[tokio::test]
+async fn credential_lock_operations_are_scoped_to_the_connection() {
+    let f = Fixture::new("owner", Duration::from_secs(30));
+    let (a, _a) = Peer::channel(16);
+    let (b, _b) = Peer::channel(16);
+    let locked = f
+        .call(&a, "secrets/lock", json!({"keys":["provider/p"]}))
+        .await
+        .expect("grant");
+    let id = &locked["lockId"];
+    for (method, params) in [
+        (
+            "secrets/set",
+            json!({"key":"provider/p", "value":{}, "lockId":id}),
+        ),
+        ("secrets/delete", json!({"key":"provider/p", "lockId":id})),
+        ("secrets/renew", json!({"lockId":id})),
+        ("secrets/unlock", json!({"lockId":id})),
+    ] {
+        let error = f
+            .call(&b, method, params)
+            .await
+            .expect_err("different connection");
+        assert_eq!(error.data.kind, ErrorKind::SecretLockLost);
+    }
+    assert_eq!(
+        f.call(&a, "secrets/renew", json!({"lockId":id}))
+            .await
+            .expect("renew")["expiresInMs"],
+        30_000
+    );
+}
+
+#[tokio::test]
+async fn an_expired_request_is_never_granted_a_credential_lock() {
+    let f = Fixture::new("deadline", Duration::from_secs(30));
+    let (a, _a) = Peer::channel(16);
+    let error = f
+        .call(
+            &a,
+            "secrets/lock",
+            json!({"keys":["provider/p"], "deadlineMs":1}),
+        )
+        .await
+        .expect_err("deadline elapsed");
+    assert_eq!(error.data.kind, ErrorKind::Timeout);
+}
+
+#[tokio::test(start_paused = true)]
+async fn renewing_extends_the_lease_beyond_its_original_deadline() {
+    let f = Fixture::new("renew", Duration::from_secs(30));
+    let (a, _frames) = Peer::channel(16);
+    let lock_id = f
+        .call(&a, "secrets/lock", json!({"keys":["provider/p"]}))
+        .await
+        .expect("lock")["lockId"]
+        .clone();
+    tokio::time::advance(Duration::from_secs(20)).await;
+    f.call(&a, "secrets/renew", json!({"lockId":lock_id}))
+        .await
+        .expect("renew");
+    tokio::time::advance(Duration::from_secs(20)).await;
+    assert_eq!(
+        f.call(&a, "secrets/unlock", json!({"lockId":lock_id}))
+            .await
+            .expect("still held")["released"],
+        true
+    );
+}

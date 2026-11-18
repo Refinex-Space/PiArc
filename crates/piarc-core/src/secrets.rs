@@ -23,15 +23,15 @@
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use piarc_host::{InboundHandler, Peer};
 use piarc_ports::{BoxFuture, SecretName, SecretStore};
 use piarc_protocol::secrets::{
     SecretEntry, SecretsChanged, SecretsChangedParams, SecretsDeleteParams, SecretsDeleteResult,
     SecretsGetAllParams, SecretsGetAllResult, SecretsGetParams, SecretsGetResult,
-    SecretsLockParams, SecretsLockResult, SecretsSetParams, SecretsSetResult, SecretsUnlockParams,
-    SecretsUnlockResult,
+    SecretsLockParams, SecretsLockResult, SecretsRenewResult, SecretsSetParams, SecretsSetResult,
+    SecretsUnlockParams, SecretsUnlockResult,
 };
 use piarc_protocol::{ErrorKind, ErrorObject};
 use piarc_secrets::EntryView;
@@ -41,8 +41,8 @@ pub use piarc_secrets::{
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
-use tokio::sync::{Notify, broadcast};
-use tokio_util::sync::CancellationToken;
+use tokio::sync::{Notify, broadcast, watch};
+use tokio::time::Instant;
 
 /// Default lease of a credential lock: longer than pi-ai's 15 s OAuth refresh timeout plus the
 /// write that follows it.
@@ -120,12 +120,32 @@ pub struct SecretChange {
     pub deleted: bool,
 }
 
+struct HeldLock {
+    keys: Vec<String>,
+    owner: Peer,
+    deadline: watch::Sender<Instant>,
+    writes: usize,
+    closing: bool,
+}
+
+fn lost() -> ErrorObject {
+    ErrorObject::new(
+        ErrorKind::SecretLockLost,
+        "credential lock is absent, expired or owned by another connection",
+        false,
+    )
+}
+
+fn deadline_elapsed() -> ErrorObject {
+    ErrorObject::new(ErrorKind::Timeout, "credential lock deadline elapsed", true)
+}
+
 #[derive(Default)]
 struct Locks {
     /// key → lock id.
     held: HashMap<String, String>,
-    /// lock id → keys and the token ending its lease task.
-    by_id: HashMap<String, (Vec<String>, CancellationToken)>,
+    /// lock id → owner, lease and writes already admitted.
+    by_id: HashMap<String, HeldLock>,
 }
 
 struct Inner {
@@ -227,10 +247,32 @@ impl SecretsService {
                 let p: SecretsLockParams = parse(method, params)?;
                 self.lock(p, peer).await
             }
+            "secrets/renew" => {
+                let p: SecretsUnlockParams = parse(method, params)?;
+                let mut locks = lock(&self.inner.locks);
+                let held = locks.by_id.get_mut(&p.lock_id).ok_or_else(lost)?;
+                if !held.owner.same_connection(&peer)
+                    || held.closing
+                    || *held.deadline.borrow() <= Instant::now()
+                {
+                    return Err(lost());
+                }
+                held.deadline
+                    .send_replace(Instant::now() + self.inner.config.lock_lease);
+                to_value(&SecretsRenewResult {
+                    expires_in_ms: self.lease_ms(),
+                })
+            }
             "secrets/unlock" => {
                 let p: SecretsUnlockParams = parse(method, params)?;
                 to_value(&SecretsUnlockResult {
-                    released: self.release(&p.lock_id),
+                    released: self.release_if(&p.lock_id, |held| {
+                        if held.owner.same_connection(&peer) {
+                            Ok(true)
+                        } else {
+                            Err(lost())
+                        }
+                    })?,
                 })
             }
             _ => Err(ErrorObject::new(
@@ -248,9 +290,11 @@ impl SecretsService {
         let pushed = value.clone();
         let written_key = key.clone();
         let result = self
-            .with_vault(move |v| v.set(&written_key, &Value::Object(value)))
+            .with_vault(move |v| {
+                let _guard = guard;
+                v.set(&written_key, &Value::Object(value))
+            })
             .await;
-        drop(guard);
         let revision = result?;
         self.publish(key, revision, Some(pushed));
         to_value(&SecretsSetResult { revision })
@@ -260,8 +304,12 @@ impl SecretsService {
         piarc_secrets::validate_key(&p.key).map_err(|e| e.to_error_object())?;
         let guard = self.write_guard(&p.key, p.lock_id.as_deref(), peer).await?;
         let key = p.key.clone();
-        let result = self.with_vault(move |v| v.delete(&key)).await;
-        drop(guard);
+        let result = self
+            .with_vault(move |v| {
+                let _guard = guard;
+                v.delete(&key)
+            })
+            .await;
         let revision = result?;
         if let Some(revision) = revision {
             self.publish(p.key, revision, None);
@@ -280,25 +328,50 @@ impl SecretsService {
         for key in &p.keys {
             piarc_secrets::validate_key(key).map_err(|e| e.to_error_object())?;
         }
-        let lock_id = self.acquire(&p.keys, &peer).await?;
-        let keys = p.keys.clone();
-        let entries = self
-            .with_vault(move |v| Ok(keys.iter().filter_map(|k| v.get(k)).map(entry).collect()))
-            .await;
-        let entries = match entries.and_then(|e: Vec<_>| e.into_iter().collect()) {
-            Ok(entries) => entries,
-            Err(error) => {
-                self.release(&lock_id);
-                return Err(error);
-            }
+        let grant = async {
+            let id = self.acquire(&p.keys, &peer).await?;
+            // Dropping a timed-out grant releases it, including while the keychain is opening.
+            let mut grant = WriteGuard {
+                service: self.clone(),
+                id,
+                kind: GuardKind::Temporary,
+            };
+            let entries = self
+                .with_vault(move |v| {
+                    Ok(p.keys
+                        .iter()
+                        .filter_map(|k| v.get(k))
+                        .map(entry)
+                        .collect::<Vec<_>>())
+                })
+                .await?;
+            let entries = entries.into_iter().collect::<Result<Vec<_>, _>>()?;
+            let lock_id = grant.id.clone();
+            self.watch_lease(&lock_id, peer)?;
+            grant.kind = GuardKind::Granted;
+            to_value(&SecretsLockResult {
+                lock_id,
+                entries,
+                expires_in_ms: self.lease_ms(),
+            })
         };
-        self.watch_lease(lock_id.clone(), peer);
-        to_value(&SecretsLockResult {
-            lock_id,
-            entries,
-            expires_in_ms: u64::try_from(self.inner.config.lock_lease.as_millis())
-                .unwrap_or(u64::MAX),
-        })
+        if let Some(deadline_ms) = p.deadline_ms {
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_err(|_| deadline_elapsed())?;
+            let remaining = Duration::from_millis(deadline_ms)
+                .checked_sub(now)
+                .ok_or_else(deadline_elapsed)?;
+            tokio::time::timeout(remaining.min(DEFAULT_LOCK_LEASE), grant)
+                .await
+                .map_err(|_| deadline_elapsed())?
+        } else {
+            grant.await
+        }
+    }
+
+    fn lease_ms(&self) -> u64 {
+        u64::try_from(self.inner.config.lock_lease.as_millis()).unwrap_or(u64::MAX)
     }
 
     /// Before a write: with a lock id, checks that the lock covers `key`; without one, takes a
@@ -308,28 +381,32 @@ impl SecretsService {
         key: &str,
         lock_id: Option<&str>,
         peer: &Peer,
-    ) -> Result<Option<TransientLock>, ErrorObject> {
-        if let Some(lock_id) = lock_id {
-            let locks = lock(&self.inner.locks);
-            return match locks.by_id.get(lock_id) {
-                Some((keys, _)) if keys.iter().any(|k| k == key) => Ok(None),
-                Some(_) => Err(ErrorObject::new(
-                    ErrorKind::SecretLockLost,
-                    format!("lock {lock_id} does not cover {key}"),
-                    false,
-                )),
-                None => Err(ErrorObject::new(
-                    ErrorKind::SecretLockLost,
-                    format!("lock {lock_id} is no longer held (expired or released)"),
-                    false,
-                )),
-            };
-        }
-        let id = self.acquire(&[key.to_owned()], peer).await?;
-        Ok(Some(TransientLock {
+    ) -> Result<WriteGuard, ErrorObject> {
+        let (id, kind) = if let Some(id) = lock_id {
+            let mut locks = lock(&self.inner.locks);
+            let held = locks.by_id.get_mut(id).ok_or_else(lost)?;
+            if !held.owner.same_connection(peer)
+                || held.closing
+                || *held.deadline.borrow() <= Instant::now()
+                || !held.keys.iter().any(|k| k == key)
+            {
+                return Err(lost());
+            }
+            // A started write remains exclusive until its durable write finishes, even if the
+            // connection closes or a lease expires while the vault is on the blocking pool.
+            held.writes += 1;
+            (id.to_owned(), GuardKind::Writing)
+        } else {
+            (
+                self.acquire(&[key.to_owned()], peer).await?,
+                GuardKind::Temporary,
+            )
+        };
+        Ok(WriteGuard {
             service: self.clone(),
             id,
-        }))
+            kind,
+        })
     }
 
     /// Waits until none of `keys` is locked, then locks them all.
@@ -345,9 +422,17 @@ impl SecretsService {
                     for key in keys {
                         locks.held.insert(key.clone(), id.clone());
                     }
-                    locks
-                        .by_id
-                        .insert(id.clone(), (keys.to_vec(), CancellationToken::new()));
+                    locks.by_id.insert(
+                        id.clone(),
+                        HeldLock {
+                            keys: keys.to_vec(),
+                            owner: peer.clone(),
+                            deadline: watch::channel(Instant::now() + self.inner.config.lock_lease)
+                                .0,
+                            writes: 0,
+                            closing: false,
+                        },
+                    );
                     return Ok(id);
                 }
             }
@@ -365,44 +450,58 @@ impl SecretsService {
     }
 
     /// Releases the lock after its lease or when `peer`'s connection ends.
-    fn watch_lease(&self, lock_id: String, peer: Peer) {
-        let Some(token) = lock(&self.inner.locks)
-            .by_id
-            .get(&lock_id)
-            .map(|(_, token)| token.clone())
-        else {
-            return;
+    fn watch_lease(&self, id: &str, peer: Peer) -> Result<(), ErrorObject> {
+        let mut deadline = {
+            let locks = lock(&self.inner.locks);
+            let held = locks.by_id.get(id).ok_or_else(lost)?;
+            held.deadline
+                .send_replace(Instant::now() + self.inner.config.lock_lease);
+            held.deadline.subscribe()
         };
         let service = self.clone();
-        let lease = self.inner.config.lock_lease;
+        let id = id.to_owned();
         tokio::spawn(async move {
-            tokio::select! {
-                () = token.cancelled() => {}
-                () = tokio::time::sleep(lease) => { service.release(&lock_id); }
-                () = peer.closed() => { service.release(&lock_id); }
+            loop {
+                let until = *deadline.borrow_and_update();
+                tokio::select! {
+                    change = deadline.changed() => if change.is_err() { break; },
+                    () = tokio::time::sleep_until(until) => {
+                        // A renewal may have arrived in the same poll as the old timeout.
+                        if service.close_when(&id, |held| *held.deadline.borrow() <= Instant::now()) { break; }
+                    }
+                    () = peer.closed() => { service.close_when(&id, |_| true); break; }
+                }
             }
         });
+        Ok(())
     }
 
-    /// Releases `lock_id`; false when it was not held.
-    fn release(&self, lock_id: &str) -> bool {
-        let released = {
-            let mut locks = lock(&self.inner.locks);
-            match locks.by_id.remove(lock_id) {
-                Some((keys, token)) => {
-                    for key in keys {
-                        locks.held.remove(&key);
-                    }
-                    token.cancel();
-                    true
-                }
-                None => false,
-            }
+    fn close_when(&self, id: &str, condition: impl FnOnce(&mut HeldLock) -> bool) -> bool {
+        self.release_if(id, |held| Ok(condition(held)))
+            .expect("infallible condition")
+    }
+
+    fn release_if(
+        &self,
+        id: &str,
+        condition: impl FnOnce(&mut HeldLock) -> Result<bool, ErrorObject>,
+    ) -> Result<bool, ErrorObject> {
+        let mut locks = lock(&self.inner.locks);
+        let Some(held) = locks.by_id.get_mut(id) else {
+            return Ok(false);
         };
-        if released {
+        if !condition(held)? {
+            return Ok(false);
+        }
+        held.closing = true;
+        if held.writes == 0 {
+            let held = locks.by_id.remove(id).expect("entry under the same mutex");
+            for key in held.keys {
+                locks.held.remove(&key);
+            }
             self.inner.released.notify_waiters();
         }
-        released
+        Ok(true)
     }
 
     fn subscribe(&self, peer: Peer) {
@@ -488,15 +587,32 @@ impl InboundHandler for SecretsService {
     }
 }
 
-/// A lock taken for one unlocked write; released on drop.
-struct TransientLock {
-    service: SecretsService,
-    id: String,
+enum GuardKind {
+    Temporary,
+    Writing,
+    Granted,
 }
 
-impl Drop for TransientLock {
+struct WriteGuard {
+    service: SecretsService,
+    id: String,
+    kind: GuardKind,
+}
+
+impl Drop for WriteGuard {
     fn drop(&mut self) {
-        self.service.release(&self.id);
+        match self.kind {
+            GuardKind::Temporary => {
+                self.service.close_when(&self.id, |_| true);
+            }
+            GuardKind::Writing => {
+                self.service.close_when(&self.id, |held| {
+                    held.writes -= 1;
+                    held.closing
+                });
+            }
+            GuardKind::Granted => {}
+        }
     }
 }
 

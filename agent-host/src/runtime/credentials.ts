@@ -32,7 +32,7 @@ import type {
 } from '@earendil-works/pi-ai';
 
 import { AhpError, describeError } from '../protocol/errors.js';
-import type { RequestOptions } from './core-bridge.js';
+import { DEFAULT_BRIDGE_TIMEOUT_MS, type RequestOptions } from './core-bridge.js';
 
 /** The part of `CoreBridge` the store uses. */
 export interface SecretsRequester {
@@ -360,16 +360,74 @@ export class CoreCredentialStore implements CredentialStore {
   ): Promise<T> {
     await this.#ready();
     const keys = keysOf(providerId);
-    const result = await this.#core.request(
+    const signal = options?.signal;
+    signal?.throwIfAborted();
+    // Keep receiving the grant even if Pi cancels: Core can then release it immediately.
+    const pending = this.#core.request(
       'secrets/lock',
-      { keys },
-      options?.signal === undefined ? {} : { signal: options.signal },
+      {
+        keys,
+        deadlineMs: Date.now() + DEFAULT_BRIDGE_TIMEOUT_MS,
+      },
+      { timeoutMs: DEFAULT_BRIDGE_TIMEOUT_MS + 1000 },
     );
+    let onAbort: (() => void) | undefined;
+    const cancelled = new Promise<never>((_, reject) => {
+      if (signal === undefined) return;
+      onAbort = () => {
+        reject(new AhpError('cancelled', 'credential operation cancelled'));
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
+    let result: unknown;
+    try {
+      result = await Promise.race([pending, cancelled]);
+    } catch (error) {
+      if (signal?.aborted === true) {
+        void pending.then(
+          async (grant) => {
+            if (isRecord(grant) && typeof grant.lockId === 'string')
+              await this.#unlock(grant.lockId);
+          },
+          () => undefined,
+        ); // A failed grant has no lock to release.
+      }
+      throw error;
+    } finally {
+      if (onAbort !== undefined) signal?.removeEventListener('abort', onAbort);
+    }
     if (!isRecord(result) || typeof result.lockId !== 'string') {
       throw new AhpError('invalidRequest', 'secrets/lock returned a malformed result');
     }
     const lockId = result.lockId;
+    let timer: NodeJS.Timeout | undefined;
+    let renewing: Promise<void> | undefined;
+    let renewalFailure: Error | undefined;
     try {
+      signal?.throwIfAborted();
+      const lease = result.expiresInMs;
+      if (typeof lease !== 'number' || !Number.isSafeInteger(lease) || lease <= 0) {
+        throw new AhpError('invalidRequest', 'secrets/lock returned an invalid lease');
+      }
+      timer = setInterval(
+        () => {
+          if (renewing !== undefined || renewalFailure !== undefined) return;
+          renewing = this.#core
+            .request('secrets/renew', { lockId }, { timeoutMs: lease })
+            .then(() => undefined)
+            .catch(() => {
+              renewalFailure = new AhpError(
+                'secretLockLost',
+                'credential lock could not be renewed',
+              );
+            })
+            .finally(() => {
+              renewing = undefined;
+            });
+        },
+        Math.max(1, Math.floor(lease / 3)),
+      );
+      timer.unref();
       const entries = entriesOf('secrets/lock', result);
       for (const key of keys) {
         const entry = entries.find((e) => e.key === key);
@@ -380,14 +438,23 @@ export class CoreCredentialStore implements CredentialStore {
           this.#entries.delete(key);
         }
       }
-      return await task(lockId);
+      const value = await task(lockId);
+      await renewing;
+      if (renewalFailure !== undefined) throw renewalFailure;
+      return value;
     } finally {
-      try {
-        await this.#core.request('secrets/unlock', { lockId });
-      } catch (error) {
-        // Core releases the lock after its lease or when the connection ends.
-        this.#log(`releasing credential lock ${lockId} failed: ${describeError(error)}`);
-      }
+      clearInterval(timer);
+      await renewing;
+      await this.#unlock(lockId);
+    }
+  }
+
+  async #unlock(lockId: string): Promise<void> {
+    try {
+      await this.#core.request('secrets/unlock', { lockId });
+    } catch (error) {
+      // Core also releases locks on expiry and when this connection closes.
+      this.#log(`releasing credential lock failed: ${describeError(error)}`);
     }
   }
 }
