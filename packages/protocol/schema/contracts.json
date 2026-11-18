@@ -128,6 +128,48 @@
       "schema": "SessionPromptResponse"
     },
     {
+      "kind": "notification",
+      "method": "policy/pending",
+      "name": "policy/pending",
+      "schema": "PolicyPendingNotification"
+    },
+    {
+      "kind": "request",
+      "method": "policy/cancel",
+      "name": "policy/cancel",
+      "schema": "PolicyCancelRequest"
+    },
+    {
+      "kind": "response",
+      "method": "policy/cancel",
+      "name": "policy/cancel/result",
+      "schema": "PolicyCancelResponse"
+    },
+    {
+      "kind": "request",
+      "method": "policy/recover",
+      "name": "policy/recover",
+      "schema": "PolicyRecoverRequest"
+    },
+    {
+      "kind": "response",
+      "method": "policy/recover",
+      "name": "policy/recover/result",
+      "schema": "PolicyRecoverResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/setPermissionMode",
+      "name": "session/setPermissionMode",
+      "schema": "SessionSetPermissionModeRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/setPermissionMode",
+      "name": "session/setPermissionMode/result",
+      "schema": "SessionSetPermissionModeResponse"
+    },
+    {
       "kind": "request",
       "method": "session/compact",
       "name": "session/compact",
@@ -234,6 +276,18 @@
       "method": "session/history",
       "name": "session/history/result",
       "schema": "SessionHistoryResponse"
+    },
+    {
+      "kind": "request",
+      "method": "policy/evaluate",
+      "name": "policy/evaluate",
+      "schema": "PolicyEvaluateRequest"
+    },
+    {
+      "kind": "response",
+      "method": "policy/evaluate",
+      "name": "policy/evaluate/result",
+      "schema": "PolicyEvaluateResponse"
     },
     {
       "kind": "request",

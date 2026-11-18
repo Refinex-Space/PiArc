@@ -38,7 +38,7 @@ pub use executables::{Category, Inventory, Item, enumerate, new_items};
 pub use layers::{LayerSpec, LayerTable, PROJECT_DIR, Scope, Source, ids, precedence};
 pub use settings::{Change, Issue, LayerStatus, Settings};
 pub use trust::{TrustLookup, TrustState, project_trust};
-pub use write::{WriteError, write_value};
+pub use write::{WriteError, append_local_permissions, write_value};
 
 /// The built-in defaults layer.
 #[must_use]

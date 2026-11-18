@@ -22,14 +22,16 @@ use crate::history::{HarnessEntry, SessionGetEntries, SessionHistory};
 use crate::host::{HostPing, HostShutdown};
 use crate::jsonrpc::{ErrorResponse, Notification, Request, SuccessResponse};
 use crate::method::{Method, NotificationMessage, RequestMessage, ResultMessage};
+use crate::policy::{PolicyCancel, PolicyEvaluate, PolicyPending};
 use crate::queue::{QueueChanged, QueueDelete, QueueEdit, QueueReorder};
 use crate::secrets::{
     SecretsChanged, SecretsDelete, SecretsGet, SecretsGetAll, SecretsLock, SecretsSet,
     SecretsUnlock,
 };
 use crate::session::{
-    SessionAbort, SessionClose, SessionCompact, SessionCreate, SessionEventNotification,
-    SessionFollowUp, SessionFork, SessionPrompt, SessionResume, SessionSteer,
+    PolicyRecover, SessionAbort, SessionClose, SessionCompact, SessionCreate,
+    SessionEventNotification, SessionFollowUp, SessionFork, SessionPrompt, SessionResume,
+    SessionSetPermissionMode, SessionSteer,
 };
 use crate::trust::TrustGet;
 use crate::turn::{
@@ -163,6 +165,13 @@ pub static CONTRACTS: &[Contract] = &[
     response::<SessionAbort>("session/abort/result"),
     request::<SessionPrompt>(SessionPrompt::NAME),
     response::<SessionPrompt>("session/prompt/result"),
+    notification::<PolicyPending>(),
+    request::<PolicyCancel>("policy/cancel"),
+    response::<PolicyCancel>("policy/cancel/result"),
+    request::<PolicyRecover>("policy/recover"),
+    response::<PolicyRecover>("policy/recover/result"),
+    request::<SessionSetPermissionMode>("session/setPermissionMode"),
+    response::<SessionSetPermissionMode>("session/setPermissionMode/result"),
     request::<SessionCompact>(SessionCompact::NAME),
     response::<SessionCompact>("session/compact/result"),
     request::<SessionFork>(SessionFork::NAME),
@@ -181,6 +190,8 @@ pub static CONTRACTS: &[Contract] = &[
     response::<SessionGetEntries>("session/getEntries/result"),
     request::<SessionHistory>(SessionHistory::NAME),
     response::<SessionHistory>("session/history/result"),
+    request::<PolicyEvaluate>(PolicyEvaluate::NAME),
+    response::<PolicyEvaluate>("policy/evaluate/result"),
     request::<TrustGet>(TrustGet::NAME),
     response::<TrustGet>("trust/get/result"),
     request::<FsStat>(FsStat::NAME),

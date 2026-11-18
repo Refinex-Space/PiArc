@@ -29,6 +29,11 @@ pub fn export_schema() -> Vec<(&'static str, Value)> {
         // The returned `$ref` is not needed: registering puts the definition in `$defs`.
         let _reference = contract.register(&mut generator);
     }
+    // Also publish the Core API types consumed by desktop clients.
+    generator.subschema_for::<crate::policy::ApprovalRequest>();
+    generator.subschema_for::<crate::policy::ApprovalAnswer>();
+    generator.subschema_for::<crate::policy::AnswerStatus>();
+    generator.subschema_for::<crate::policy::PermissionMode>();
     let definitions = generator.take_definitions(true);
     let any_message: Vec<Value> = CONTRACTS
         .iter()

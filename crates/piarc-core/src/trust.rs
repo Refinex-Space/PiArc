@@ -74,21 +74,28 @@ impl std::fmt::Debug for TrustService {
 /// The store-backed [`TrustLookup`]: main checkout, then the recorded decision. A trusted
 /// project with executable items the user has not seen yet (added after the decision, for
 /// example by `git pull`) is not trusted until the user confirms them (I63).
-struct StoreLookup(Storage);
+struct StoreLookup {
+    storage: Storage,
+    /// Project settings items read by the caller, also bound to the stored snapshot.
+    loaded: Vec<Item>,
+}
 
 impl TrustLookup for StoreLookup {
     fn lookup(&self, dir: &Path) -> std::result::Result<bool, String> {
         let checkout = piarc_git::resolve(dir).map_err(|e| e.to_string())?;
         let key = checkout_key(&checkout.main).map_err(|e| e.to_string())?;
         let record = self
-            .0
+            .storage
             .with(|store| store.trust(&key))
             .map_err(|e| e.to_string())?
             .map_err(|e| e.to_string())?;
         let Some(record) = record.filter(|r| r.decision == TrustDecision::Trusted) else {
             return Ok(false);
         };
-        let items = piarc_config::enumerate(&checkout.root).items;
+        let directory = piarc_git::canonical(dir).map_err(|e| e.to_string())?;
+        let inventory = inventory_at(&checkout.root, &directory);
+        let mut items = inventory.items;
+        items.extend_from_slice(&self.loaded);
         Ok(unconfirmed(&items, &record.snapshot).is_empty())
     }
 }
@@ -111,7 +118,10 @@ impl TrustService {
     /// The lookup that [`piarc_config::project_trust`] consults.
     #[must_use]
     pub fn lookup(&self) -> Arc<dyn TrustLookup> {
-        Arc::new(StoreLookup(self.storage.clone()))
+        Arc::new(StoreLookup {
+            storage: self.storage.clone(),
+            loaded: Vec::new(),
+        })
     }
 
     /// Change notifications (for restarting a workspace's Agent Host, re-merging settings).
@@ -123,6 +133,72 @@ impl TrustService {
     /// The trust state of `dir` through the one trust query; failures are untrusted.
     pub async fn state(&self, dir: &Path) -> TrustState {
         query(self.lookup(), dir.to_owned()).await
+    }
+
+    /// Load one consistent permission input: the trust check covers the actual values
+    /// used for this decision as well as the project's current executable inventory.
+    ///
+    /// # Errors
+    ///
+    /// A path or settings task could not be resolved. A failed trust lookup excludes all
+    /// project-level authorizations as usual.
+    pub async fn permission_settings(&self, dir: &Path) -> Result<piarc_config::Settings> {
+        let dir = dir.to_owned();
+        let storage = self.storage.clone();
+        blocking(move || {
+            let workspace = piarc_git::canonical(&dir)?;
+            let checkout = piarc_git::resolve(&workspace)?;
+            let table = piarc_config::LayerTable::piarc(storage.dirs().data(), &workspace);
+            let mut settings = piarc_config::Settings::load(table, TrustState::Untrusted);
+            let lookup = StoreLookup { storage, loaded: settings.project_items(&checkout.root) };
+            let trust = piarc_config::project_trust(&lookup, &workspace, &mut |reason| {
+                tracing::warn!(target: "piarc_core::trust", "permission settings trust lookup failed: {reason}");
+            });
+            settings.set_trust(trust);
+            Ok(settings)
+        }).await
+    }
+
+    /// Extend a prior trust decision with only the entries from the native confirmation.
+    /// Never upgrade an undecided or denied checkout or confirm unrelated edits on disk.
+    ///
+    /// # Errors
+    ///
+    /// A checkout, database, or snapshot error. A malformed snapshot cannot be extended.
+    pub async fn confirm_items(&self, dir: &Path, mut items: Vec<Item>) -> Result<()> {
+        let dir = dir.to_owned();
+        let storage = self.storage.clone();
+        blocking(move || {
+            let directory = piarc_git::canonical(&dir)?;
+            let checkout = piarc_git::resolve(&directory)?;
+            let key = checkout_key(&checkout.main)?;
+            let prefix = workspace_prefix(&checkout.root, &directory);
+            for item in &mut items {
+                item.source.insert_str(0, &prefix);
+            }
+            storage.with(|store| -> Result<()> {
+                let Some(mut record) = store
+                    .trust(&key)?
+                    .filter(|r| r.decision == TrustDecision::Trusted)
+                else {
+                    return Ok(());
+                };
+                let mut snapshot: Vec<Item> =
+                    serde_json::from_str(&record.snapshot).map_err(|e| Error::Internal {
+                        reason: format!("invalid project trust snapshot: {e}"),
+                    })?;
+                snapshot.extend(items);
+                snapshot.sort();
+                snapshot.dedup();
+                record.snapshot =
+                    serde_json::to_string(&snapshot).map_err(|e| Error::Internal {
+                        reason: format!("cannot encode trust snapshot: {e}"),
+                    })?;
+                store.set_trust(&record)?;
+                Ok(())
+            })?
+        })
+        .await
     }
 
     /// What the client shows about `dir`.
@@ -148,7 +224,7 @@ impl TrustService {
         let (view, checkout) = blocking(move || {
             let checkout = piarc_git::resolve(&dir_owned)?;
             let key = checkout_key(&checkout.main)?;
-            let inventory = piarc_config::enumerate(&checkout.root);
+            let inventory = inventory_at(&checkout.root, &piarc_git::canonical(&dir_owned)?);
             let snapshot =
                 serde_json::to_string(&inventory.items).map_err(|e| Error::Internal {
                     reason: format!("cannot encode the trust snapshot: {e}"),
@@ -255,11 +331,44 @@ async fn query(lookup: Arc<dyn TrustLookup>, dir: PathBuf) -> TrustState {
     })
 }
 
+// A subdirectory can itself be opened as a workspace. Bind its settings to their path
+// inside the checkout; a grant for the root must not silently approve a sibling file.
+fn workspace_prefix(root: &Path, dir: &Path) -> String {
+    let mut prefix = String::new();
+    for component in dir.strip_prefix(root).unwrap_or(dir).components() {
+        prefix.push_str(&component.as_os_str().to_string_lossy());
+        prefix.push('/');
+    }
+    prefix
+}
+
+fn inventory_at(root: &Path, dir: &Path) -> Inventory {
+    let mut inventory = piarc_config::enumerate(root);
+    if dir != root {
+        let prefix = workspace_prefix(root, dir);
+        let workspace = piarc_config::enumerate(dir);
+        inventory
+            .items
+            .extend(workspace.items.into_iter().map(|mut item| {
+                item.source.insert_str(0, &prefix);
+                item
+            }));
+        inventory.items.sort();
+        inventory
+            .unreadable
+            .extend(workspace.unreadable.into_iter().map(|mut file| {
+                file.source.insert_str(0, &prefix);
+                file
+            }));
+    }
+    inventory
+}
+
 fn build_view(storage: &Storage, dir: &Path) -> Result<TrustView> {
     let checkout = piarc_git::resolve(dir)?;
     let key = checkout_key(&checkout.main)?;
     let record = storage.with(|store| store.trust(&key))??;
-    let Inventory { items, unreadable } = piarc_config::enumerate(&checkout.root);
+    let Inventory { items, unreadable } = inventory_at(&checkout.root, &piarc_git::canonical(dir)?);
     let decided_trusted = record
         .as_ref()
         .is_some_and(|r| r.decision == TrustDecision::Trusted);

@@ -1,5 +1,188 @@
 {
   "$defs": {
+    "AnswerStatus": {
+      "description": "Result of answering the approval ledger.",
+      "oneOf": [
+        {
+          "const": "applied",
+          "description": "The first valid answer was applied.",
+          "type": "string"
+        },
+        {
+          "const": "alreadyHandled",
+          "description": "The request is no longer pending.",
+          "type": "string"
+        },
+        {
+          "const": "stale",
+          "description": "The supplied request state is no longer applicable.",
+          "type": "string"
+        }
+      ]
+    },
+    "ApprovalAnswer": {
+      "description": "Answer bound to the request as displayed.",
+      "properties": {
+        "connectionEpoch": {
+          "description": "Agent Host connection that made the call.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "decision": {
+          "$ref": "#/$defs/ApprovalDecision",
+          "description": "Choice made on the card."
+        },
+        "directory": {
+          "description": "Directory shown in the native confirmation dialog.",
+          "type": ["string", "null"]
+        },
+        "feedback": {
+          "description": "Feedback to return on refusal.",
+          "type": ["string", "null"]
+        },
+        "requestId": {
+          "description": "Opaque identifier allocated by Core.",
+          "type": "string"
+        },
+        "revision": {
+          "description": "Revision of this request.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rule": {
+          "description": "Rule shown in the native confirmation dialog.",
+          "type": ["string", "null"]
+        },
+        "sessionId": {
+          "description": "Owning session.",
+          "type": "string"
+        }
+      },
+      "required": ["requestId", "sessionId", "revision", "connectionEpoch", "decision"],
+      "type": "object"
+    },
+    "ApprovalDecision": {
+      "description": "User choice for a pending request.",
+      "oneOf": [
+        {
+          "const": "allowOnce",
+          "description": "Allow only this invocation.",
+          "type": "string"
+        },
+        {
+          "const": "allowSession",
+          "description": "Allow this invocation and remember its exact rule for the session.",
+          "type": "string"
+        },
+        {
+          "const": "allowAlways",
+          "description": "Allow this invocation and save the natively confirmed permission.",
+          "type": "string"
+        },
+        {
+          "const": "deny",
+          "description": "Refuse and return the feedback to the model.",
+          "type": "string"
+        }
+      ]
+    },
+    "ApprovalKind": {
+      "description": "Presentation of a pending approval.",
+      "oneOf": [
+        {
+          "const": "command",
+          "description": "Shell command.",
+          "type": "string"
+        },
+        {
+          "const": "fileChange",
+          "description": "File write or edit.",
+          "type": "string"
+        },
+        {
+          "const": "permissionExpansion",
+          "description": "Access outside the allowed directories.",
+          "type": "string"
+        },
+        {
+          "const": "question",
+          "description": "A structured question. M1 clients decline this kind.",
+          "type": "string"
+        }
+      ]
+    },
+    "ApprovalRequest": {
+      "description": "Immutable approval card from the Core ledger.",
+      "properties": {
+        "command": {
+          "description": "Full command text.",
+          "type": ["string", "null"]
+        },
+        "connectionEpoch": {
+          "description": "Agent Host connection that made the call.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cwd": {
+          "description": "Working directory of the command.",
+          "type": ["string", "null"]
+        },
+        "diff": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FileDiff"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Preview of the file change."
+        },
+        "directory": {
+          "description": "Suggested directory to add.",
+          "type": ["string", "null"]
+        },
+        "kind": {
+          "$ref": "#/$defs/ApprovalKind",
+          "description": "Which card to show."
+        },
+        "path": {
+          "description": "Path of the file being accessed.",
+          "type": ["string", "null"]
+        },
+        "protectedPath": {
+          "description": "Whether the target must always be reviewed.",
+          "type": ["boolean", "null"]
+        },
+        "requestId": {
+          "description": "Opaque identifier allocated by Core.",
+          "type": "string"
+        },
+        "revision": {
+          "description": "Revision of this request.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rule": {
+          "description": "Suggested exact rule.",
+          "type": ["string", "null"]
+        },
+        "sessionId": {
+          "description": "Owning session.",
+          "type": "string"
+        },
+        "tool": {
+          "description": "Canonical tool name.",
+          "type": "string"
+        }
+      },
+      "required": ["requestId", "sessionId", "revision", "connectionEpoch", "tool", "kind"],
+      "type": "object"
+    },
     "AttachmentKind": {
       "description": "What an attachment is.",
       "oneOf": [
@@ -2773,6 +2956,29 @@
           "type": "object"
         },
         {
+          "description": "A permission mode selected by the user on this branch.",
+          "properties": {
+            "itemId": {
+              "$ref": "#/$defs/ItemId",
+              "description": "The custom entry id in the session file."
+            },
+            "mode": {
+              "$ref": "#/$defs/PermissionMode",
+              "description": "The selected mode."
+            },
+            "status": {
+              "$ref": "#/$defs/ItemStatus",
+              "description": "Completed once the change was recorded."
+            },
+            "type": {
+              "const": "permissionModeChanged",
+              "type": "string"
+            }
+          },
+          "required": ["type", "itemId", "status", "mode"],
+          "type": "object"
+        },
+        {
           "description": "The conversation was compacted: older messages were replaced by a summary.",
           "properties": {
             "errorMessage": {
@@ -3089,6 +3295,232 @@
         }
       },
       "required": ["number", "text"],
+      "type": "object"
+    },
+    "PermissionMode": {
+      "description": "Permission modes available in M1.",
+      "oneOf": [
+        {
+          "const": "default",
+          "description": "Ask about changes and commands.",
+          "type": "string"
+        },
+        {
+          "const": "acceptEdits",
+          "description": "Accept ordinary edits inside the workspace.",
+          "type": "string"
+        }
+      ]
+    },
+    "PolicyCancelRequest": {
+      "description": "Request for `policy/cancel`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "policy/cancel",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/PolicyPendingParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "PolicyCancelResponse": {
+      "description": "Successful response to `policy/cancel`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/PolicyCancelled"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "PolicyCancelled": {
+      "description": "Core finished cancelling the expired preflight, or it was already gone.",
+      "type": "object"
+    },
+    "PolicyEvaluateParams": {
+      "description": "Parameters of the preflight for one tool call.",
+      "properties": {
+        "input": {
+          "additionalProperties": true,
+          "description": "Tool arguments before execution.",
+          "type": "object"
+        },
+        "sessionId": {
+          "description": "Owning session.",
+          "type": "string"
+        },
+        "tool": {
+          "description": "Canonical tool name.",
+          "type": "string"
+        },
+        "toolCallId": {
+          "description": "Pi tool call identifier.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "toolCallId", "tool", "input"],
+      "type": "object"
+    },
+    "PolicyEvaluateRequest": {
+      "description": "Request for `policy/evaluate`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "policy/evaluate",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/PolicyEvaluateParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "PolicyEvaluateResponse": {
+      "description": "Successful response to `policy/evaluate`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/PolicyEvaluateResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "PolicyEvaluateResult": {
+      "description": "Final decision. The Agent Host refuses on any bridge or decoding error.",
+      "properties": {
+        "allowed": {
+          "description": "Whether this call may execute.",
+          "type": "boolean"
+        },
+        "reason": {
+          "description": "Reason visible to the model, including feedback on refusal.",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["allowed"],
+      "type": "object"
+    },
+    "PolicyPendingNotification": {
+      "description": "Notification `policy/pending`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "policy/pending",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/PolicyPendingParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "PolicyPendingParams": {
+      "description": "Correlates an approval wait on the current Agent Host connection.",
+      "properties": {
+        "sessionId": {
+          "description": "Owning session.",
+          "type": "string"
+        },
+        "toolCallId": {
+          "description": "The tool call waiting for approval.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "toolCallId"],
+      "type": "object"
+    },
+    "PolicyRecoverParams": {
+      "description": "Lookup during recovery for each incomplete tool call in the last model response.",
+      "properties": {
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "Session being resumed."
+        },
+        "toolCallId": {
+          "description": "The call whose result is missing.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "toolCallId"],
+      "type": "object"
+    },
+    "PolicyRecoverRequest": {
+      "description": "Request for `policy/recover`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "policy/recover",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/PolicyRecoverParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "PolicyRecoverResponse": {
+      "description": "Successful response to `policy/recover`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/PolicyRecoverResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "PolicyRecoverResult": {
+      "description": "An invalidated approval's reason, absent for ordinary interruptions.",
+      "properties": {
+        "reason": {
+          "description": "The error result the restored conversation must give the model.",
+          "type": ["string", "null"]
+        }
+      },
       "type": "object"
     },
     "PromptAccepted": {
@@ -4376,6 +4808,17 @@
     "SessionOpened": {
       "description": "Result of `session/create` and `session/resume`.",
       "properties": {
+        "permissionMode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PermissionMode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Last mode explicitly selected on this session branch, when one was recorded."
+        },
         "restoredMessages": {
           "description": "Number of conversation messages restored from the session file (0 for a new session).",
           "format": "uint64",
@@ -4518,6 +4961,43 @@
       "required": ["jsonrpc", "id", "result"],
       "type": "object"
     },
+    "SessionSetPermissionModeRequest": {
+      "description": "Request for `session/setPermissionMode`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/setPermissionMode",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SetPermissionModeParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionSetPermissionModeResponse": {
+      "description": "Successful response to `session/setPermissionMode`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SetPermissionModeResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
     "SessionSteerRequest": {
       "description": "Request for `session/steer`.",
       "properties": {
@@ -4593,6 +5073,25 @@
         }
       },
       "required": ["sessionId"],
+      "type": "object"
+    },
+    "SetPermissionModeParams": {
+      "description": "The user's selected permission mode for this session.",
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/PermissionMode",
+          "description": "The new mode."
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "Session whose branch records the change."
+        }
+      },
+      "required": ["sessionId", "mode"],
+      "type": "object"
+    },
+    "SetPermissionModeResult": {
+      "description": "Acknowledgement that the mode entry is in the session.",
       "type": "object"
     },
     "SuccessResponse": {
@@ -5115,6 +5614,27 @@
       "$ref": "#/$defs/SessionPromptResponse"
     },
     {
+      "$ref": "#/$defs/PolicyPendingNotification"
+    },
+    {
+      "$ref": "#/$defs/PolicyCancelRequest"
+    },
+    {
+      "$ref": "#/$defs/PolicyCancelResponse"
+    },
+    {
+      "$ref": "#/$defs/PolicyRecoverRequest"
+    },
+    {
+      "$ref": "#/$defs/PolicyRecoverResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionSetPermissionModeRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionSetPermissionModeResponse"
+    },
+    {
       "$ref": "#/$defs/SessionCompactRequest"
     },
     {
@@ -5167,6 +5687,12 @@
     },
     {
       "$ref": "#/$defs/SessionHistoryResponse"
+    },
+    {
+      "$ref": "#/$defs/PolicyEvaluateRequest"
+    },
+    {
+      "$ref": "#/$defs/PolicyEvaluateResponse"
     },
     {
       "$ref": "#/$defs/TrustGetRequest"

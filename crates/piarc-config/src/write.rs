@@ -5,11 +5,13 @@
 use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde_json::{Map, Value};
 
-use crate::layers::LayerTable;
+use crate::executables::{Category, Item};
+use crate::layers::{LayerTable, ids};
 
 /// Why a write was refused or failed.
 #[derive(Debug, thiserror::Error)]
@@ -29,6 +31,9 @@ pub enum WriteError {
         /// The file.
         path: PathBuf,
     },
+    /// The local permission update could not be applied without changing other data.
+    #[error("invalid settings update: {0}")]
+    InvalidUpdate(String),
     /// A file system step failed; the file keeps its previous content.
     #[error("{op} {}: {source}", path.display())]
     Io {
@@ -53,6 +58,83 @@ pub fn write_value(
     pointer: &str,
     value: Option<Value>,
 ) -> Result<PathBuf, WriteError> {
+    let tokens = parse_pointer(pointer)?;
+    update_file(table, layer, |document| {
+        apply(document, &tokens, value);
+        Ok(())
+    })
+}
+
+/// Append natively confirmed permissions to the project-local settings in a single
+/// read-modify-write. The returned items are the only additions confirmed by this action.
+///
+/// # Errors
+///
+/// Reject malformed permissions, unexpected categories, redirected configuration paths or
+/// a failed write. The same process lock protects this operation and ordinary settings edits.
+pub fn append_local_permissions(
+    table: &LayerTable,
+    permissions: &[(Category, &str)],
+) -> Result<Vec<Item>, WriteError> {
+    let mut items = Vec::with_capacity(permissions.len());
+    update_file(table, ids::PROJECT_LOCAL, |document| {
+        for &(category, name) in permissions {
+            let key = match category {
+                Category::AllowRule => "allow",
+                Category::AdditionalDirectory => "additionalDirectories",
+                _ => {
+                    return Err(WriteError::InvalidUpdate(
+                        "expected an allow rule or directory".to_owned(),
+                    ));
+                }
+            };
+            if name.trim().is_empty()
+                || name.chars().any(char::is_control) && category == Category::AdditionalDirectory
+            {
+                return Err(WriteError::InvalidUpdate(format!("invalid {key} entry")));
+            }
+            let permissions = document
+                .as_object_mut()
+                .expect("validated object")
+                .entry("permissions")
+                .or_insert_with(|| Value::Object(Map::new()))
+                .as_object_mut()
+                .ok_or_else(|| {
+                    WriteError::InvalidUpdate("permissions must be an object".to_owned())
+                })?;
+            let list = permissions
+                .entry(key)
+                .or_insert_with(|| Value::Array(Vec::new()))
+                .as_array_mut()
+                .filter(|list| list.iter().all(Value::is_string))
+                .ok_or_else(|| {
+                    WriteError::InvalidUpdate(format!("permissions.{key} must be a string list"))
+                })?;
+            if !list.iter().any(|v| v.as_str() == Some(name)) {
+                list.push(Value::String(name.to_owned()));
+            }
+            items.push(Item {
+                category,
+                source: ".piarc/settings.local.json".to_owned(),
+                name: name.to_owned(),
+            });
+        }
+        Ok(())
+    })?;
+    Ok(items)
+}
+
+// One writer in Core, including simultaneous confirmations from different windows.
+static SETTINGS_WRITE: Mutex<()> = Mutex::new(());
+
+fn update_file(
+    table: &LayerTable,
+    layer: &str,
+    update: impl FnOnce(&mut Value) -> Result<(), WriteError>,
+) -> Result<PathBuf, WriteError> {
+    let _writer = SETTINGS_WRITE
+        .lock()
+        .map_err(|_| WriteError::InvalidUpdate("settings writer is unavailable".to_owned()))?;
     let spec = table
         .get(layer)
         .ok_or_else(|| WriteError::UnknownLayer(layer.to_owned()))?;
@@ -60,7 +142,28 @@ pub fn write_value(
         (true, Some(path)) => path.to_owned(),
         _ => return Err(WriteError::ReadOnly(layer.to_owned())),
     };
-    let tokens = parse_pointer(pointer)?;
+    if layer == ids::PROJECT_LOCAL {
+        // A repository must not redirect a native confirmation to another project or user file.
+        for component in path.parent().into_iter().chain([path.as_path()]) {
+            match fs::symlink_metadata(component) {
+                Ok(meta) if redirected(&meta) => {
+                    return Err(WriteError::InvalidUpdate(format!(
+                        "settings path is a link: {}",
+                        component.display()
+                    )));
+                }
+                Ok(_) => {}
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(source) => {
+                    return Err(WriteError::Io {
+                        op: "cannot inspect",
+                        path: component.to_owned(),
+                        source,
+                    });
+                }
+            }
+        }
+    }
     let mut document = match fs::read(&path) {
         Ok(bytes) if bytes.iter().all(u8::is_ascii_whitespace) => Value::Object(Map::new()),
         Ok(bytes) => serde_json::from_slice(&bytes)
@@ -77,8 +180,9 @@ pub fn write_value(
     if !document.is_object() {
         return Err(WriteError::NotAnObject { path });
     }
-    apply(&mut document, &tokens, value);
-    let mut text = serde_json::to_string_pretty(&document).unwrap_or_else(|_| "{}".to_owned());
+    update(&mut document)?;
+    let mut text = serde_json::to_string_pretty(&document)
+        .map_err(|error| WriteError::InvalidUpdate(error.to_string()))?;
     text.push('\n');
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir).map_err(|source| WriteError::Io {
@@ -89,6 +193,18 @@ pub fn write_value(
     }
     replace_file(&path, text.as_bytes())?;
     Ok(path)
+}
+
+#[cfg(windows)]
+fn redirected(meta: &fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    // FILE_ATTRIBUTE_REPARSE_POINT, including directory junctions.
+    meta.file_attributes() & 0x400 != 0
+}
+
+#[cfg(not(windows))]
+fn redirected(meta: &fs::Metadata) -> bool {
+    meta.is_symlink()
 }
 
 fn parse_pointer(pointer: &str) -> Result<Vec<String>, WriteError> {

@@ -8,6 +8,7 @@
 //! - Project-scope layers lose their executable values (hooks, allow rules) while the
 //!   project is not trusted.
 
+use std::collections::BTreeSet;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -149,7 +150,17 @@ impl Settings {
             .zip(&self.states)
             .filter_map(|(spec, state)| {
                 let mut value = state.value.clone()?;
-                if spec.scope == Scope::Project && !trusted {
+                let project = spec.scope == Scope::Project;
+                let mode = value
+                    .pointer("/permissions/defaultMode")
+                    .and_then(Value::as_str);
+                if project
+                    && (matches!(mode, Some("auto" | "bypassPermissions"))
+                        || (!trusted && mode == Some("acceptEdits")))
+                {
+                    remove_pointer(&mut value, "/permissions/defaultMode");
+                }
+                if project && !trusted {
                     for pointer in spec.executable {
                         remove_pointer(&mut value, pointer);
                     }
@@ -161,6 +172,30 @@ impl Settings {
         let changed = changed_keys(&self.merged, &merged);
         self.merged = merged;
         changed
+    }
+
+    /// Executable items in the actual bytes loaded from project files. Use this alongside
+    /// the live inventory when authorizing a merge, so a concurrent file replacement cannot
+    /// apply a different rule from the one that was inspected.
+    #[must_use]
+    pub fn project_items(&self, checkout: &Path) -> Vec<crate::Item> {
+        let mut items = BTreeSet::new();
+        for (layer, state) in self.table.layers().iter().zip(&self.states) {
+            if layer.scope != Scope::Project {
+                continue;
+            }
+            if let (Some(path), Some(value)) = (layer.file(), state.value.as_ref()) {
+                let source = path
+                    .strip_prefix(checkout)
+                    .unwrap_or(path)
+                    .components()
+                    .map(|c| c.as_os_str().to_string_lossy())
+                    .collect::<Vec<_>>()
+                    .join("/");
+                crate::executables::settings_items(&source, value, &mut items);
+            }
+        }
+        items.into_iter().collect()
     }
 
     /// The merged settings.

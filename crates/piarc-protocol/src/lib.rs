@@ -66,6 +66,7 @@ pub mod host;
 pub mod input;
 pub mod jsonrpc;
 pub mod method;
+pub mod policy;
 pub mod queue;
 pub mod rpc_error;
 mod schema;

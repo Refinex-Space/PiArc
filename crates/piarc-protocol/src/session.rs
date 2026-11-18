@@ -155,6 +155,9 @@ pub struct SessionOpened {
     pub session_id: SessionId,
     /// Number of conversation messages restored from the session file (0 for a new session).
     pub restored_messages: u64,
+    /// Last mode explicitly selected on this session branch, when one was recorded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permission_mode: Option<crate::policy::PermissionMode>,
 }
 
 /// Parameters of `session/close` and `session/abort`.
@@ -303,4 +306,46 @@ request!(
 request!(
     /// Method marker for `session/followUp` (Core → Agent Host).
     SessionFollowUp, "session/followUp", SessionInputParams, InputAccepted
+);
+
+/// The user's selected permission mode for this session.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SetPermissionModeParams {
+    /// Session whose branch records the change.
+    pub session_id: SessionId,
+    /// The new mode.
+    pub mode: crate::policy::PermissionMode,
+}
+
+/// Acknowledgement that the mode entry is in the session.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SetPermissionModeResult {}
+
+request!(
+    /// Record a mode change, publish its item and acknowledge it.
+    SessionSetPermissionMode, "session/setPermissionMode", SetPermissionModeParams, SetPermissionModeResult
+);
+
+/// Lookup during recovery for each incomplete tool call in the last model response.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PolicyRecoverParams {
+    /// Session being resumed.
+    pub session_id: SessionId,
+    /// The call whose result is missing.
+    pub tool_call_id: String,
+}
+
+/// An invalidated approval's reason, absent for ordinary interruptions.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct PolicyRecoverResult {
+    /// The error result the restored conversation must give the model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+request!(
+    /// Look up a pending approval invalidated by a lost connection.
+    PolicyRecover, "policy/recover", PolicyRecoverParams, PolicyRecoverResult
 );

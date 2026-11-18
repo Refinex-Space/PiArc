@@ -26,6 +26,10 @@ pub enum Category {
     McpServer,
     /// A permission allow rule.
     AllowRule,
+    /// A directory admitted to the workspace permission boundary.
+    AdditionalDirectory,
+    /// A project setting that requests automatic acceptance of edits.
+    PermissionMode,
     /// A plugin.
     Plugin,
     /// A Pi extension or package.
@@ -179,7 +183,7 @@ fn pi_settings_items(pi: &Value, items: &mut BTreeSet<Item>) {
     }
 }
 
-fn settings_items(source: &str, settings: &Value, items: &mut BTreeSet<Item>) {
+pub(crate) fn settings_items(source: &str, settings: &Value, items: &mut BTreeSet<Item>) {
     let hooks = settings.get("hooks").and_then(Value::as_object);
     for (event, groups) in hooks.into_iter().flatten() {
         for group in groups.as_array().into_iter().flatten() {
@@ -203,11 +207,24 @@ fn settings_items(source: &str, settings: &Value, items: &mut BTreeSet<Item>) {
             }
         }
     }
-    let allow = settings
-        .pointer("/permissions/allow")
-        .and_then(Value::as_array);
-    for rule in allow.into_iter().flatten().filter_map(Value::as_str) {
-        items.insert(item(Category::AllowRule, source, rule));
+    for (pointer, category) in [
+        ("/permissions/allow", Category::AllowRule),
+        (
+            "/permissions/additionalDirectories",
+            Category::AdditionalDirectory,
+        ),
+    ] {
+        let values = settings.pointer(pointer).and_then(Value::as_array);
+        for name in values.into_iter().flatten().filter_map(Value::as_str) {
+            items.insert(item(category, source, name));
+        }
+    }
+    if settings
+        .pointer("/permissions/defaultMode")
+        .and_then(Value::as_str)
+        == Some("acceptEdits")
+    {
+        items.insert(item(Category::PermissionMode, source, "acceptEdits"));
     }
     let plugins = settings.get("enabledPlugins").and_then(Value::as_object);
     for (name, enabled) in plugins.into_iter().flatten() {

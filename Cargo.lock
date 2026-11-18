@@ -1471,6 +1471,7 @@ dependencies = [
  "piarc-fs",
  "piarc-git",
  "piarc-host",
+ "piarc-policy",
  "piarc-ports",
  "piarc-protocol",
  "piarc-sandbox",
@@ -1586,6 +1587,9 @@ dependencies = [
 [[package]]
 name = "piarc-policy"
 version = "0.0.0"
+dependencies = [
+ "piarc-protocol",
+]
 
 [[package]]
 name = "piarc-ports"

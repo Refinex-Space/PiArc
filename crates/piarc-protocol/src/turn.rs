@@ -242,6 +242,15 @@ pub enum Item {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         output: Option<String>,
     },
+    /// A permission mode selected by the user on this branch.
+    PermissionModeChanged {
+        /// The custom entry id in the session file.
+        item_id: ItemId,
+        /// Completed once the change was recorded.
+        status: ItemStatus,
+        /// The selected mode.
+        mode: crate::policy::PermissionMode,
+    },
     /// The conversation was compacted: older messages were replaced by a summary.
     ContextCompaction {
         /// The item's identifier.
@@ -311,6 +320,7 @@ impl Item {
             | Self::Subagent { item_id, .. }
             | Self::WebFetch { item_id, .. }
             | Self::DynamicToolCall { item_id, .. }
+            | Self::PermissionModeChanged { item_id, .. }
             | Self::ContextCompaction { item_id, .. } => item_id,
         }
     }
@@ -328,6 +338,7 @@ impl Item {
             | Self::Subagent { status, .. }
             | Self::WebFetch { status, .. }
             | Self::DynamicToolCall { status, .. }
+            | Self::PermissionModeChanged { status, .. }
             | Self::ContextCompaction { status, .. } => *status,
         }
     }

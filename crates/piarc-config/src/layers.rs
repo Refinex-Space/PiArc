@@ -81,7 +81,11 @@ pub struct LayerSpec {
 }
 
 /// The executable values of PiArc's settings files.
-pub const PIARC_EXECUTABLE: &[&str] = &["/hooks", "/permissions/allow"];
+pub const PIARC_EXECUTABLE: &[&str] = &[
+    "/hooks",
+    "/permissions/allow",
+    "/permissions/additionalDirectories",
+];
 
 impl LayerSpec {
     /// The file of a file layer.

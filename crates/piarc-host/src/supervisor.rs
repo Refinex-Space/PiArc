@@ -285,6 +285,28 @@ impl HostSupervisor {
             .await
     }
 
+    /// Records a permission-mode entry in the Agent Host's session.
+    ///
+    /// # Errors
+    ///
+    /// As [`HostSupervisor::session_call`].
+    pub async fn set_permission_mode(
+        &self,
+        session_id: &SessionId,
+        mode: piarc_protocol::policy::PermissionMode,
+    ) -> Result<()> {
+        self.session_call::<piarc_protocol::session::SessionSetPermissionMode>(
+            session_id,
+            None,
+            piarc_protocol::session::SetPermissionModeParams {
+                session_id: session_id.clone(),
+                mode,
+            },
+        )
+        .await?;
+        Ok(())
+    }
+
     /// Starts a turn. The result only acknowledges it: the turn's end arrives as a
     /// `turn/completed` notification, and the call stays `acknowledged` in [`HostSupervisor::calls`]
     /// until then.

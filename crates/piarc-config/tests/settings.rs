@@ -352,3 +352,63 @@ fn writes_go_only_to_writable_layers_and_replace_the_file_whole() {
         "[1, 2]"
     );
 }
+
+#[test]
+fn project_mode_and_directories_require_confirmation_and_preserve_lower_layers() {
+    let f = Fixture::new("permission-trust");
+    write(
+        &f.user(),
+        r#"{"permissions":{"additionalDirectories":["user-directory"]}}"#,
+    );
+    write(
+        &f.project(),
+        r#"{"permissions":{"defaultMode":"acceptEdits","additionalDirectories":["project-directory"]}}"#,
+    );
+    let mut settings = Settings::load(f.table(), TrustState::Untrusted);
+    assert_eq!(
+        settings.get("/permissions/defaultMode"),
+        Some(&json!("default"))
+    );
+    assert_eq!(
+        settings.get("/permissions/additionalDirectories"),
+        Some(&json!(["user-directory"]))
+    );
+    let items = piarc_config::enumerate(&f.workspace).items;
+    assert_eq!(
+        items
+            .iter()
+            .map(|i| i.name.as_str())
+            .collect::<std::collections::BTreeSet<_>>(),
+        ["acceptEdits", "project-directory"].into()
+    );
+    settings.set_trust(TrustState::Trusted);
+    assert_eq!(
+        settings.get("/permissions/defaultMode"),
+        Some(&json!("acceptEdits"))
+    );
+    assert_eq!(
+        settings.get("/permissions/additionalDirectories"),
+        Some(&json!(["user-directory", "project-directory"]))
+    );
+    for mode in ["auto", "bypassPermissions"] {
+        write(
+            &f.local(),
+            &json!({"permissions":{"defaultMode":mode}}).to_string(),
+        );
+        settings.reload();
+        assert_eq!(
+            settings.get("/permissions/defaultMode"),
+            Some(&json!("acceptEdits"))
+        );
+    }
+    write(
+        &f.user(),
+        r#"{"permissions":{"defaultMode":"acceptEdits"}}"#,
+    );
+    settings.reload();
+    settings.set_trust(TrustState::Untrusted);
+    assert_eq!(
+        settings.get("/permissions/defaultMode"),
+        Some(&json!("acceptEdits"))
+    );
+}

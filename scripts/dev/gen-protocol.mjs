@@ -129,7 +129,19 @@ async function buildFiles() {
   if (!isRecord(prepared)) {
     throw new Error('prepared schema is not an object');
   }
-  const types = await compile(prepared, 'AhpMessage', {
+  // Core API payloads share definitions with AHP without becoming AHP messages.
+  const { $defs, ...ahp } = prepared;
+  if (!isRecord($defs)) {
+    throw new Error('prepared schema has no definitions');
+  }
+  const surface = {
+    title: 'ProtocolValue',
+    anyOf: ['AhpMessage', 'ApprovalRequest', 'ApprovalAnswer', 'AnswerStatus'].map((name) => ({
+      $ref: `#/$defs/${name}`,
+    })),
+    $defs: { ...$defs, AhpMessage: ahp },
+  };
+  const types = await compile(surface, 'ProtocolValue', {
     additionalProperties: false,
     unreachableDefinitions: true,
     bannerComment: BANNER,

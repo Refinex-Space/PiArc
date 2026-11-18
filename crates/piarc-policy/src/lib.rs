@@ -18,3 +18,9 @@
 //!
 //! The authoritative rules are in `crates/deps-rules.json`, enforced by
 //! `scripts/ci/check-crate-deps.mjs` (architecture section 7.1).
+
+mod decision;
+mod ledger;
+
+pub use decision::{Boundary, Ruling, evaluate, exact_rule, simple_paths, starting_mode};
+pub use ledger::Ledger;
