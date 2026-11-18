@@ -596,6 +596,15 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 本机：`npm run verify` 14/14
 - T17-A01、A11、A12、A13 仍为 blocked，等下一次推送的 Windows CI；未推送
 
+### 2026-11-18 T17 的第三次 CI 核对（提交 ca229c2 的运行 44209310729）
+
+- 结果：两个平台的 `desktop L4`、全部 core build / core load / 打包通过；`verify (windows-latest)` 只有 `cargo test` 一步失败，L2 34 passed、2 skipped（T17 的 8 个适用场景全部通过）；`verify (macos-latest)` 只有 `cargo test` 一步失败
+- 原因与修复（e11f37d，都是测试环境问题，T17 的功能代码不变）：
+  - macOS `sandbox_commands` 的 `cargo_build_with_a_crates_io_dependency`：T17 起命令拿到调用方的环境，CI 作业设的 `CARGO_TERM_COLOR=always` 让 cargo 输出带颜色转义，"Downloaded itoa" 的子串检查落空（本机设同一变量复现）。测试的命令环境固定 `CARGO_TERM_COLOR=never`
+  - Windows `parity`：对照测试的 Pi 原生 Agent Host 只有透传环境，没有 `ProgramFiles`，Pi 自己的 bash 查找退回 5 s 超时的 `where bash.exe`，繁忙的 runner 上偶尔超时（步骤 12、13 报 "No bash shell found"，步骤 14 正常）。原生一侧补上 `ProgramFiles`、`ProgramFiles(x86)`
+- 本机：`CARGO_TERM_COLOR=always npm run verify` 14/14
+- T17-A01、A11、A12、A13 仍为 blocked，等下一次推送的 Windows CI；未推送
+
 ## 计划变更记录
 
 | 日期 | 版本 | 变更 |
