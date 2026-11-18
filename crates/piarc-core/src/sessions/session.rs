@@ -722,11 +722,13 @@ impl Request {
                 Ok(Value::Null)
             }
             Op::Abort => {
-                self.tool_io.cancel_approvals(&self.id.0, false);
                 let target = SessionTarget {
                     session_id: self.id.clone(),
                 };
                 let stopped = self.call::<SessionAbort>(&supervisor, None, target).await;
+                // Pi sets the turn signal before its preflight returns. Releasing the ledger
+                // first would race the host marking these tool items as interrupted.
+                self.tool_io.cancel_approvals(&self.id.0, false);
                 // The turn is over: commands it left running stop too.
                 self.tool_io.cancel_running(&self.id.0);
                 stopped

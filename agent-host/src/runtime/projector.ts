@@ -278,8 +278,10 @@ export class Projector {
     turn.usage = addUsage(turn.usage, message.usage);
     this.#sink.event('turn/usage', { turnId: turn.turnId, usage: turn.usage });
     this.#closeStreams(turn, statusForStop(stopReason));
-    // Only a complete tool-use response makes calls; an aborted or failed one never runs them
-    // (Pi drops it from the model's context).
+    // Pi may emit a final aborted response after an interrupted tool preflight. Its empty
+    // content must not erase the completed response whose remaining calls still need items.
+    if (stopReason === 'aborted' || stopReason === 'error') return;
+    // Only a complete tool-use response makes calls.
     turn.calls =
       stopReason === 'toolUse' && Array.isArray(message.content)
         ? message.content.flatMap((part: unknown) =>

@@ -41,7 +41,11 @@ import type {
 } from '@piarc/protocol';
 
 import { policyGate } from '../harness/policy.js';
-import { missingToolCalls, repairInterruptedTurn } from '../harness/interruption.js';
+import {
+  interruptedContext,
+  missingToolCalls,
+  repairInterruptedTurn,
+} from '../harness/interruption.js';
 import { takeOverProjectTrust, type TrustTakeover } from '../harness/project-trust.js';
 import { CONCURRENCY_SAFE_TOOLS, ToolBatches } from '../harness/tool-batches.js';
 import {
@@ -561,6 +565,7 @@ export class SessionRegistry {
               : []),
             createMcpExtension(),
             ...budget,
+            interruptedContext,
           ],
           // Extension tools (MCP, project extensions) run under the same batches.
           extensionsOverride: (result) => batches.wrapExtensions(result),

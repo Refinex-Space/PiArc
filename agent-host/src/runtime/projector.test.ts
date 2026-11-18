@@ -114,6 +114,38 @@ describe('Projector', () => {
     expect(projector.activeTurnId).toBeUndefined();
   });
 
+  it('closes unstarted calls when an aborted response follows an interrupted preflight', () => {
+    const { sink, out } = recorder();
+    const projector = new Projector(sink);
+    projector.beginTurn('t');
+    const calls = ['one', 'two', 'three'].map((id) => ({
+      type: 'toolCall',
+      id,
+      name: 'Read',
+      arguments: { path: id },
+    }));
+    projector.handle(
+      ev({ type: 'message_end', message: assistant({ stopReason: 'toolUse', content: calls }) }),
+    );
+    projector.handle(
+      ev({
+        type: 'tool_execution_start',
+        toolCallId: 'one',
+        toolName: 'Read',
+        args: { path: 'one' },
+      }),
+    );
+    projector.markAborting();
+    projector.handle(
+      ev({ type: 'message_end', message: assistant({ stopReason: 'aborted', content: [] }) }),
+    );
+    projector.handle(ev({ type: 'agent_settled', aborted: true }));
+    const completed = out
+      .filter((event) => event.method === 'item/completed')
+      .map((event) => event.payload.item);
+    expect(completed).toMatchObject(calls.map(({ id }) => ({ itemId: id, status: 'interrupted' })));
+  });
+
   it('marks open items and the turn interrupted when the run is aborted', () => {
     const { sink, out } = recorder();
     const projector = new Projector(sink);

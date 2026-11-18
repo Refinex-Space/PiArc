@@ -71,7 +71,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - 关闭会话要走 `AgentSessionRuntime.dispose()`：单独的 `session.dispose()` 不发 `session_shutdown`，MCP 不会断开。
 - MCP 扩展按会话实例化：同一个 server 被两个会话配置时会起两份进程（共享池是 T36）。
 - 扩展加载器的模块级缓存按 cwd 失效，不同 cwd 的会话交替加载文件型扩展会互相清空它；Harness Kit 用内联工厂不受影响。
-- Pi 丢弃被中断的 assistant 消息；中断后的对话靠 Harness Kit 补写的结果与中断标记保持角色交替（I18 已处理，ADR-0026）。不要在别处再补一份。
+- Pi 丢弃被中断的 assistant 消息；中断后的对话靠 Harness Kit 补写的结果与中断标记保持角色交替（I18 已处理，ADR-0026）。预检期间中断时，Pi 可能在真实工具结果与补齐结果之间写一条 aborted 回复。模型上下文在 pi-ai 的配对转换之前先移除其本来就会丢弃的失败或中断回复，避免为同一调用发送两次结果。
 
 ## 回合、排队与投影（T14，ADR-0026）
 

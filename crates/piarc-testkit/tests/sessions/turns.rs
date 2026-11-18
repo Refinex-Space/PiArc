@@ -71,9 +71,16 @@ async fn an_abort_completes_every_tool_call_as_interrupted_and_the_next_request_
     );
 
     let next = prompt(&core, &id, "Go on.").await;
+    let resumed = events.turn_completed(&id, &next).await;
+    let requests = env.requests("abort-tools");
     assert_eq!(
-        events.turn_completed(&id, &next).await["status"],
-        "completed"
+        resumed["status"],
+        "completed",
+        "turn {resumed}; mock requests: {:?}",
+        requests
+            .iter()
+            .map(|r| (&r.violations, roles(&r.body)))
+            .collect::<Vec<_>>()
     );
     check_request_after_abort(&env);
     shutdown(core).await;

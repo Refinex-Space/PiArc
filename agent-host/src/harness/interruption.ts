@@ -13,8 +13,24 @@
 // The marker carries the session's current provider and model (Pi derives a resumed session's
 // model from the last assistant message) and `rawStopReason` `piarc-interrupted`, a field Pi
 // keeps for debugging only; the history projection leaves the marker out.
-import type { AgentSession } from '@earendil-works/pi-coding-agent';
+import type { AgentSession, ExtensionFactory } from '@earendil-works/pi-coding-agent';
 import type { AssistantMessage, ToolResultMessage } from '@earendil-works/pi-ai';
+
+/**
+ * pi-ai 1.5.2 closes pending tool calls before filtering an aborted/errored assistant
+ * message (api/transform-messages.js). During preflight cancellation that message can sit
+ * between a real result and the results appended by repairInterruptedTurn. Filter the
+ * discarded response before provider conversion so each call reaches the model once.
+ */
+export const interruptedContext: ExtensionFactory = (pi) => {
+  pi.on('context', ({ messages }) => {
+    const visible = messages.filter(
+      (m) => m.role !== 'assistant' || (m.stopReason !== 'aborted' && m.stopReason !== 'error'),
+    );
+    if (visible.length !== messages.length) return { messages: visible };
+    return undefined;
+  });
+};
 
 /** What a tool call the interruption cut off returns to the model. */
 export const INTERRUPTED_TOOL_RESULT = 'Interrupted by the user before this tool call finished.';

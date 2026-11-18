@@ -247,3 +247,44 @@ async fn a_write_larger_than_an_ahp_frame_is_approved_before_all_bytes_are_writt
     assert_eq!(completed["status"], "completed", "{completed}");
     shutdown(core).await;
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn interrupting_a_pending_approval_closes_the_card_and_marks_the_tool_interrupted() {
+    let env = Env::new("interrupted approval").await;
+    let (core, events) = env.start(env.config(&[]));
+    let id = open_session(&core, &env).await;
+    let turn = prompt(&core, &id, &prompt_text("Write.", "pending-approval")).await;
+    let (card, revision) = pending(&events, &id).await;
+    let (done, rx) = reply();
+    core.session_op(id.clone(), Op::Abort, done).expect("abort");
+    answer(rx)
+        .await
+        .expect("abort completes without a user answer");
+    assert_eq!(
+        events.turn_completed(&id, &turn).await["status"],
+        "interrupted"
+    );
+    events
+        .until("card closed", |r, v| {
+            r == "core/sessions"
+                && v["revision"].as_u64().is_some_and(|n| n > revision)
+                && view(v, &id).is_some_and(|s| s["pendingApprovals"] == 0)
+        })
+        .await;
+    let items = events.of(&id, "item/completed");
+    let item = items
+        .iter()
+        .map(|p| &p["item"])
+        .find(|i| i["itemId"] == "waiting")
+        .expect("completed tool");
+    assert_eq!(item["status"], "interrupted");
+    assert!(!env.ws.join("pending.txt").exists());
+    let (done, rx) = reply();
+    core.answer_approval(allow(&card), done)
+        .expect("stale card");
+    assert_eq!(
+        answer(rx).await.expect("status")["status"],
+        "alreadyHandled"
+    );
+    shutdown(core).await;
+}
