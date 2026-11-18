@@ -144,7 +144,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T17 | [Bash / PowerShell 执行与进程管理](tasks/T17-bash-powershell-execution.md) | 2 | T16 | macOS | high / 高 | 大 | 无 | 已完成 | d154ab3 |
 | T18 | [客户端外壳、会话列表、设置窗口与信任对话框](tasks/T18-client-shell-and-session-list.md) | 2 | T17；D3 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 6b1d5f0 |
 | T19 | [Transcript 与 composer 正式版](tasks/T19-transcript-and-composer.md) | 2 | T18 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 0b72964 |
-| T20 | [基础权限与审批](tasks/T20-basic-permissions-and-approvals.md) | 2 | T19 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
+| T20 | [基础权限与审批](tasks/T20-basic-permissions-and-approvals.md) | 2 | T19 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
 | T21 | [模型、服务商与凭据设置](tasks/T21-models-providers-and-credentials.md) | 2 | T20 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T22 | [System prompt 组装与 memory 文件](tasks/T22-system-prompt-and-memory-files.md) | 2 | T21 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | R2 | [M1 评审](tasks/R2-m1-review.md) | 2 | T22 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -309,7 +309,15 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（无进行中的任务。）
+T20 基础权限与审批，macOS arm64。基线 `1c8ad0e`，`npm run verify` 15/15。
+用户确认：未信任项目的自动接受编辑与额外目录都受信任快照约束；会话显式选择与用户设置继续生效。
+
+- [ ] 权限契约、模式矩阵、精确规则与配置层信任（A01、A02、A08）
+- [ ] Core 审批账本、裁决、审计、失效与 I/O 绑定（A03–A07、A10、A13）
+- [ ] Agent Host 阻断、反馈、模式 entry 与恢复（A03、A05、A06、A09）
+- [ ] 客户端四类审批卡、模式菜单、原生确认与热键（A07、A09、A11、A12）
+- [ ] L2 场景、L4、截图、基准与全量门禁（A01–A14）
+- [ ] 文档、验收与收尾
 
 ## 登记事项
 
