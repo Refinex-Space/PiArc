@@ -59,6 +59,12 @@ pub fn write(data_dir: &Path, pointer: &str, value: Option<Value>) -> Result<Val
             reason: format!("must start with one of /{}", CLIENT_KEYS.join(", /")),
         });
     }
+    write_user_value(data_dir, pointer, value)?;
+    read(data_dir)
+}
+
+/// Applies a validated setting from a Core feature (not a renderer-supplied pointer).
+pub(crate) fn write_user_value(data_dir: &Path, pointer: &str, value: Option<Value>) -> Result<()> {
     let mut table = LayerTable::default();
     table.insert(LayerSpec {
         id: ids::USER,
@@ -77,7 +83,7 @@ pub fn write(data_dir: &Path, pointer: &str, value: Option<Value>) -> Result<Val
         },
         other => io_error(&other.to_string()),
     })?;
-    read(data_dir)
+    Ok(())
 }
 
 fn io_error(message: &str) -> Error {

@@ -213,6 +213,10 @@ const HOOK_GROUPS: Shape = Shape::ListOf(&HOOK_MATCHER);
 /// their meaning is T25's, permission rules are T20's and T23's.
 pub const PIARC_SETTINGS: Shape = Shape::Object(&[
     Field {
+        name: "modelProviders",
+        shape: Shape::Any,
+    },
+    Field {
         name: "$schema",
         shape: Shape::String,
     },

@@ -365,6 +365,7 @@ impl WorkspaceActor {
                 self.ctx.storage.dirs().data().to_owned(),
                 inbound,
                 &|config| {
+                    config.allow_model_network = Some(self.ctx.catalog_network.clone());
                     if let Some(tune) = &tune {
                         tune(config);
                     }

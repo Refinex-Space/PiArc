@@ -1464,6 +1464,7 @@ version = "0.0.0"
 dependencies = [
  "encoding_rs",
  "getrandom 0.4.3",
+ "http",
  "minisign-verify",
  "piarc-config",
  "piarc-diff",

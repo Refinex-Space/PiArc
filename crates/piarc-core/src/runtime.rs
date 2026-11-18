@@ -751,6 +751,34 @@ impl CoreRuntime {
         })
     }
 
+    /// Runs a provider setting operation through the dedicated settings Agent Host.
+    ///
+    /// # Errors
+    /// As [`Self::open_workspace`].
+    pub fn provider_op(
+        &self,
+        operation: crate::providers::Operation,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.provider_op(operation).await
+        })
+    }
+
+    /// Lists models for a workspace, even before its first session.
+    ///
+    /// # Errors
+    /// As [`Self::open_workspace`].
+    pub fn workspace_models(
+        &self,
+        path: PathBuf,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.workspace_models(path).await
+        })
+    }
+
     /// Creates a session in `workspace` (opened when needed), working in `cwd` (default: the
     /// workspace), optionally with a model.
     ///
@@ -1148,6 +1176,10 @@ fn open_state(
         storage: storage.clone(),
         trust: trust.clone(),
         secrets,
+        catalog_network: Arc::new(std::sync::atomic::AtomicBool::new(
+            crate::providers::network_preference(&data, config.secret_store.is_none()),
+        )),
+        provider_writer: tokio::sync::Mutex::new(()),
         tool_io: ToolIo::with_notices(
             ToolIoConfig {
                 observer: config.tool_observer.clone(),

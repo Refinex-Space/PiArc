@@ -429,6 +429,28 @@ impl Tracking {
     }
 }
 
+impl Link {
+    fn check_method(&self, method: &str) -> Result<()> {
+        if !self.models_enabled
+            && (method.starts_with("models/")
+                || matches!(
+                    method,
+                    "session/previewModelSwitch" | "session/setModel" | "session/setEffort"
+                ))
+        {
+            return Err(Error::Remote {
+                method: method.to_owned(),
+                error: piarc_protocol::ErrorObject::new(
+                    ErrorKind::MethodNotFound,
+                    "the connected Agent Host does not support model settings",
+                    false,
+                ),
+            });
+        }
+        Ok(())
+    }
+}
+
 impl Inner {
     async fn emit(&self, event: HostEvent) {
         self.shared.events.lifecycle(event);
@@ -481,6 +503,7 @@ impl Inner {
         timeout: Duration,
     ) -> Result<Value> {
         let link = self.current_link()?;
+        link.check_method(method)?;
         if method.starts_with("session/")
             && method != SessionResume::NAME
             && method != SessionCreate::NAME

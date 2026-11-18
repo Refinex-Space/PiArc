@@ -121,6 +121,7 @@ pub(crate) type Restores = Mutex<BTreeMap<String, watch::Receiver<crate::Result<
 #[derive(Clone)]
 pub(crate) struct Link {
     pub epoch: u64,
+    pub models_enabled: bool,
     pub writer: mpsc::Sender<Vec<u8>>,
     /// Closes the Agent Host's stdin once the queued frames are written: the signal for an
     /// orderly exit.
@@ -191,7 +192,8 @@ pub(crate) async fn start(
     let close_stdin = Arc::new(Notify::new());
     tokio::spawn(write_frames(stdin, queue, Arc::clone(&close_stdin)));
     tokio::spawn(log_stderr(stderr, shared.workspace.clone(), epoch));
-    let link = Link {
+    let mut link = Link {
+        models_enabled: false,
         epoch,
         writer,
         close_stdin,
@@ -214,6 +216,7 @@ pub(crate) async fn start(
     };
     match accept_hello(config, epoch, &hello) {
         Ok((params, welcome)) => {
+            link.models_enabled = welcome.enabled.iter().any(|c| c.as_str() == "models");
             let frame = encode(&ResultMessage::<HostHello>::new(
                 hello.id.clone(),
                 welcome.clone(),
@@ -304,6 +307,10 @@ fn accept_hello(
         enabled,
         workspace: config.workspace.to_string_lossy().into_owned(),
         connection_epoch: epoch,
+        allow_model_network: config
+            .allow_model_network
+            .as_ref()
+            .map(|v| v.load(Ordering::Acquire)),
     };
     Ok((params, welcome))
 }

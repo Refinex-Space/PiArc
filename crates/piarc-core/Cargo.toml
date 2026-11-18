@@ -9,6 +9,7 @@ publish.workspace = true
 
 [dependencies]
 getrandom.workspace = true
+http.workspace = true
 minisign-verify.workspace = true
 piarc-config.workspace = true
 piarc-diff.workspace = true

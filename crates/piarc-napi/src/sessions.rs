@@ -13,7 +13,7 @@ use napi::bindgen_prelude::{Object, Uint8Array};
 use napi_derive::napi;
 use piarc_core::composer::UserInput;
 use piarc_core::sessions::SessionPrefsChange;
-use piarc_core::sessions::{Op, QueueOp};
+use piarc_core::sessions::{ModelOp, Op, QueueOp};
 use piarc_protocol::session::ModelRef;
 
 use crate::boundary;
@@ -103,6 +103,134 @@ impl CoreRuntime {
                 done,
             )
         })
+    }
+
+    /// Lists non-secret provider settings and the built-in provider choices.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn provider_settings<'env>(&self, env: &'env Env) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.providerSettings", |core, done| {
+            core.provider_op(piarc_core::providers::Operation::List, done)
+        })
+    }
+
+    /// Saves a provider. Omit the secret to retain its existing key.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn save_provider<'env>(
+        &self,
+        env: &'env Env,
+        config_json: String,
+        secret_json: Option<String>,
+    ) -> napi::Result<Object<'env>> {
+        let op = boundary::call(env, "CoreRuntime.saveProvider", || {
+            piarc_core::providers::Operation::save(&config_json, secret_json.as_deref())
+        })?;
+        self.queue(env, "CoreRuntime.saveProvider", |core, done| {
+            core.provider_op(op, done)
+        })
+    }
+
+    /// Deletes a provider with its stored credentials.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn delete_provider<'env>(&self, env: &'env Env, id: String) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.deleteProvider", |core, done| {
+            core.provider_op(piarc_core::providers::Operation::Delete(id), done)
+        })
+    }
+
+    /// Changes the user's catalog refresh preference.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn set_catalog_refresh<'env>(
+        &self,
+        env: &'env Env,
+        enabled: bool,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.setCatalogRefresh", |core, done| {
+            core.provider_op(piarc_core::providers::Operation::Refresh(enabled), done)
+        })
+    }
+
+    /// Lists models before a session is created.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn workspace_models<'env>(
+        &self,
+        env: &'env Env,
+        workspace: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.workspaceModels", |core, done| {
+            core.workspace_models(workspace.into(), done)
+        })
+    }
+
+    /// Lists the models and current session selection.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn session_models<'env>(&self, env: &'env Env, id: String) -> napi::Result<Object<'env>> {
+        self.op(
+            env,
+            "CoreRuntime.sessionModels",
+            id,
+            Op::Model(ModelOp::List),
+        )
+    }
+
+    /// Estimates context and cache effects without changing the session.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn preview_model_switch<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        provider: String,
+        model: String,
+    ) -> napi::Result<Object<'env>> {
+        self.op(
+            env,
+            "CoreRuntime.previewModelSwitch",
+            id,
+            Op::Model(ModelOp::Preview(ModelRef {
+                provider,
+                id: model,
+            })),
+        )
+    }
+
+    /// Applies a confirmed switch, optionally with a specific target effort.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn set_session_model<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        provider: String,
+        model: String,
+        effort: Option<String>,
+    ) -> napi::Result<Object<'env>> {
+        let effort = effort.map(|v| effort_level(env, v)).transpose()?;
+        self.op(
+            env,
+            "CoreRuntime.setSessionModel",
+            id,
+            Op::Model(ModelOp::Set(
+                ModelRef {
+                    provider,
+                    id: model,
+                },
+                effort,
+            )),
+        )
+    }
+
+    /// Sets the session's effort.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn set_session_effort<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        effort: String,
+    ) -> napi::Result<Object<'env>> {
+        self.op(
+            env,
+            "CoreRuntime.setSessionEffort",
+            id,
+            Op::Model(ModelOp::Effort(effort_level(env, effort)?)),
+        )
     }
 
     /// Answers a pending permission request and returns its status as JSON.
@@ -502,6 +630,17 @@ fn permission_mode(env: &Env, mode: &str) -> napi::Result<piarc_protocol::policy
             piarc_core::Error::InvalidArgument {
                 field: "permissionMode",
                 reason: "expected default or acceptEdits".into(),
+            }
+        })
+    })
+}
+
+fn effort_level(env: &Env, level: String) -> napi::Result<piarc_protocol::models::EffortLevel> {
+    boundary::call(env, "effort", || {
+        serde_json::from_value(serde_json::Value::String(level)).map_err(|_| {
+            piarc_core::Error::InvalidArgument {
+                field: "effort",
+                reason: "unsupported effort level".into(),
             }
         })
     })

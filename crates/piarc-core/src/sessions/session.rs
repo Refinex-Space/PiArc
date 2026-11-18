@@ -19,6 +19,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use piarc_host::{CallRecord, HostSupervisor};
 use piarc_protocol::history::{GetEntriesParams, SessionEntries, SessionGetEntries};
 use piarc_protocol::method::RequestMethod;
+use piarc_protocol::models::{self, EffortLevel};
 use piarc_protocol::queue::{
     QueueDelete, QueueDeleteParams, QueueEdit, QueueEditParams, QueueReorder, QueueReorderParams,
 };
@@ -57,6 +58,8 @@ pub enum Op {
     Compact,
     /// Switches the session permission mode and records a transcript entry.
     SetPermissionMode(piarc_protocol::policy::PermissionMode),
+    /// Reads or changes the model and effort selection.
+    Model(ModelOp),
     /// Interrupts the running turn; the queue comes back.
     Abort,
     /// Edits the queue.
@@ -65,6 +68,19 @@ pub enum Op {
     MarkRead,
     /// Changes Core's metadata of the session (title, pinned, archived).
     Prefs(piarc_store::SessionPrefsChange),
+}
+
+/// Model-related requests on an open session.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ModelOp {
+    /// List the available models with the current model and effort.
+    List,
+    /// Preview the context and cost of a switch.
+    Preview(ModelRef),
+    /// Apply a confirmed model switch.
+    Set(ModelRef, Option<EffortLevel>),
+    /// Change the effort of the selected model.
+    Effort(EffortLevel),
 }
 
 /// A change to a session's input queue.
@@ -721,6 +737,7 @@ impl Request {
                     .map_err(|e| Error::feature(&e))?;
                 Ok(Value::Null)
             }
+            Op::Model(change) => self.model(&supervisor, change).await,
             Op::Abort => {
                 let target = SessionTarget {
                     session_id: self.id.clone(),
@@ -736,6 +753,55 @@ impl Request {
             Op::Queue(change) => self.queue(&supervisor, change).await,
             // Answered by the actor itself.
             Op::MarkRead | Op::Prefs(_) => Ok(Value::Null),
+        }
+    }
+
+    async fn model(&self, supervisor: &HostSupervisor, change: ModelOp) -> Result<Value> {
+        match change {
+            ModelOp::List => {
+                self.call::<models::ModelsList>(
+                    supervisor,
+                    None,
+                    models::ModelsListParams {
+                        session_id: Some(self.id.clone()),
+                    },
+                )
+                .await
+            }
+            ModelOp::Preview(model) => {
+                self.call::<models::SessionPreviewModelSwitch>(
+                    supervisor,
+                    None,
+                    models::ModelSwitchParams {
+                        session_id: self.id.clone(),
+                        model,
+                    },
+                )
+                .await
+            }
+            ModelOp::Set(model, effort) => {
+                self.call::<models::SessionSetModel>(
+                    supervisor,
+                    None,
+                    models::SetModelParams {
+                        session_id: self.id.clone(),
+                        model,
+                        effort,
+                    },
+                )
+                .await
+            }
+            ModelOp::Effort(effort) => {
+                self.call::<models::SessionSetEffort>(
+                    supervisor,
+                    None,
+                    models::SetEffortParams {
+                        session_id: self.id.clone(),
+                        effort,
+                    },
+                )
+                .await
+            }
         }
     }
 

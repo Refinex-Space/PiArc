@@ -33,6 +33,7 @@
 //! from the index and `resume` reopens a session from its file.
 
 mod inbound;
+mod provider_settings;
 mod session;
 mod snapshot;
 mod workspace;
@@ -60,7 +61,7 @@ use crate::storage::Storage;
 use crate::tool_io::ToolIo;
 use crate::trust::TrustService;
 
-pub use session::{Op, QueueOp};
+pub use session::{ModelOp, Op, QueueOp};
 pub(crate) use snapshot::{SnapshotMsg, Snapshots};
 
 pub use piarc_store::SessionPrefsChange;
@@ -124,6 +125,8 @@ pub(crate) struct Ctx {
     pub storage: Storage,
     pub trust: TrustService,
     pub secrets: SecretsService,
+    pub catalog_network: Arc<std::sync::atomic::AtomicBool>,
+    pub provider_writer: tokio::sync::Mutex<()>,
     pub tool_io: ToolIo,
     pub config: SessionsConfig,
     pub snapshots: Snapshots,
@@ -565,6 +568,7 @@ impl Hub {
 
     /// The open workspace at `path`, opening it (and starting its Agent Host) when needed.
     async fn workspace(&self, path: PathBuf) -> Result<workspace::WorkspaceHandle> {
+        self.recover_provider_settings().await?;
         let path = canonical_dir(path, "workspace").await?;
         if let Some(open) = lock(&self.routes).workspaces.get(&path).cloned() {
             return Ok(open);

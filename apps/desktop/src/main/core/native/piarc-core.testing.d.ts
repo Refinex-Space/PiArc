@@ -29,6 +29,29 @@ export declare class CoreRuntime {
    * `{ sessionId, workspace, cwd, restoredMessages }`.
    */
   createSession(workspace: string, options?: CreateSessionOptions | null): Promise<string>;
+  /** Lists non-secret provider settings and the built-in provider choices. */
+  providerSettings(): Promise<string>;
+  /** Saves a provider. Omit the secret to retain its existing key. */
+  saveProvider(configJson: string, secretJson?: string | undefined | null): Promise<string>;
+  /** Deletes a provider with its stored credentials. */
+  deleteProvider(id: string): Promise<string>;
+  /** Changes the user's catalog refresh preference. */
+  setCatalogRefresh(enabled: boolean): Promise<string>;
+  /** Lists models before a session is created. */
+  workspaceModels(workspace: string): Promise<string>;
+  /** Lists the models and current session selection. */
+  sessionModels(id: string): Promise<string>;
+  /** Estimates context and cache effects without changing the session. */
+  previewModelSwitch(id: string, provider: string, model: string): Promise<string>;
+  /** Applies a confirmed switch, optionally with a specific target effort. */
+  setSessionModel(
+    id: string,
+    provider: string,
+    model: string,
+    effort?: string | undefined | null,
+  ): Promise<string>;
+  /** Sets the session's effort. */
+  setSessionEffort(id: string, effort: string): Promise<string>;
   /** Answers a pending permission request and returns its status as JSON. */
   answerApproval(answer: string): Promise<string>;
   /** Changes the mode and appends its entry to the session before resolving. */

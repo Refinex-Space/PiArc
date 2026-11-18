@@ -57,6 +57,8 @@ pub struct HostConfig {
     pub protocol: ProtocolVersion,
     /// Capabilities Core supports; the connection enables the intersection.
     pub capabilities: Vec<Capability>,
+    /// The live user preference read at each handshake, including restarts.
+    pub allow_model_network: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
     /// How long to wait for `host/hello` after starting the process.
     pub handshake_timeout: Duration,
     /// Interval between `host/ping` heartbeats.
@@ -98,7 +100,8 @@ impl HostConfig {
             env_passthrough: DEFAULT_ENV_PASSTHROUGH.iter().map(OsString::from).collect(),
             extra_env: Vec::new(),
             protocol: PROTOCOL_VERSION,
-            capabilities: Vec::new(),
+            capabilities: vec![Capability::new("models")],
+            allow_model_network: None,
             handshake_timeout: Duration::from_secs(10),
             heartbeat_interval: Duration::from_secs(30),
             heartbeat_timeout: Duration::from_secs(10),
