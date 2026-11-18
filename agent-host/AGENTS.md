@@ -47,6 +47,12 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - 模型可见名只出现在发给模型的工具定义里；投影的 `item/*`、发往 Core 的 `origin.tool`、规则与 hooks 都用规范名（`ToolNameMap`）。Profile 不能用 Pi 原生工具名（会话把它们排除了）。
 - Read、Write、Edit 交给 Pi 的 `path` 是替身：结果与错误里的替身必须换回模型写的路径（`StandIn.restore`/`restoreError`）；Pi 新增对传入路径的 Operation 时，`StandIn.resolve` 抛出"unexpected path"。
 
+## 会话输入（ADR-0030）
+
+- 锁定的 pi-ai 1.5.2 在 `UserMessage.content` 接受字符串或文本与图像块。图片读取 blob 后作为图像块交给 Pi。PDF 经 `fs/pdf` 读取前 20 页以内的文本，后续页可按路径用 Read 的 `pages` 参数读取。升级 pi-ai 时复核 `types.d.ts` 是否支持文档输入。
+- 每次交付用户消息前写 `piarc.input` 记录 `turnId`，带提及或附件时还记录原始正文和元数据。手动压缩前记录 `{turnId, action: "compact"}`。历史窗口输出 `turnId`，旧文件按最近用户消息的 entry id 分组。编辑排队文本会清除失效的提及区间，保留已经准备好的附件。
+- 每条模型回复结束时投影 `turn/usage`（本回合累计量）。`turn/completed` 的错误分类在 `runtime/turn-errors.ts` 计算，客户端按 `errorKind`、`retryable` 呈现。
+
 ## 多会话的易错点
 
 - 不要调用 `process.chdir`，也不要读 `process.cwd()` 推断会话目录：Pi 按每个会话的 `cwd` 解析工具路径。

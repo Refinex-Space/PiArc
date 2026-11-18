@@ -322,7 +322,8 @@ T19 Transcript 与 composer 正式版（2026-11-18 开工；基线 `npm run veri
 - [x] A01–A10、A13：T19 专项 Playwright 两种形态 24/24，九种行亮暗截图、mock 请求与安全检查均已核实
 - [x] A11、A12：打包实测 103.68 token/s，p99 8.702 ms，长任务 0；万条 59.996 fps，缓存/冷加载最大 30.0/64.4 ms
 - [ ] A14：全量 verify
-- [ ] 收尾：transcript 与 composer 的 CLAUDE.md、`coding-standards.md` 通用能力复用表、架构与 ADR 同步、PLAN 与 acceptance
+- [x] ADR-0030、架构 v2.24、通用能力复用表、transcript 和 composer 的 AGENTS.md 与 CLAUDE.md 均已同步
+- [ ] 全量检查通过后填写最终验收与会话日志
 
 ## 登记事项
 

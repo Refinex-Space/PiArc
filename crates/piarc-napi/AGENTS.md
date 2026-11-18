@@ -23,6 +23,7 @@ NAPI-RS 导出层（薄）：把 `piarc_core::CoreRuntime` 暴露为主进程里
 - Promise 用 `JsDeferred` 由 Core 自己的运行时结算，不用 `#[napi] async fn`（它会另起 NAPI-RS 的全局 tokio 运行时）。
 - `testing` feature 只给开发构建：演示事件源、`echo`、`eventStats`、`triggerPanic`、`spawnPanickingTask`。发布构建不带。
 - `.d.ts` 快照在 `apps/desktop/src/main/core/native/`：`piarc-core.d.ts`（发布）与 `piarc-core.testing.d.ts`（开发），由构建脚本经 Prettier 格式化写入，不手改。字符串枚举生成为类型联合（`constEnum: false`）。
+- 会话的文本入口始终把字符串当作用户正文（包括 JSON 文本）。主进程将带提及、附件或指定幂等键的输入交给 `promptInput`、`steerInput`、`followUpInput`（ADR-0030）。
 
 ## 易错点
 

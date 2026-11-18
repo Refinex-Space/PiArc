@@ -28,6 +28,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 | `npx vite build -c apps/desktop/vite.renderer.config.ts` | 只重建渲染进程的 `.vite/renderer/`（在 `apps/desktop` 下运行）：只改了 `src/renderer/` 时，`dev` 形态 L4 不必重新打包 |
 | `PIARC_EVIDENCE_TASK=T18 npx playwright test t18- --project dev` | T18 的 L4 流程（会话、信任、设置与快捷键、语言、通知、评审截图），mock provider 的脚本在 `e2e/scenarios/` |
 | `npm run bench:t18` | 冷启动到侧栏（100 个会话）就绪的 10 次测量（打包产物），JSON 写到 `tmp/evidence/T18/bench/` |
+| `npm run bench:t19` | 在前台测开发打包产物的真实会话，使用本地 mock provider。结果写入 `tmp/evidence/T19/bench/` |
 
 ## 结构
 
@@ -36,6 +37,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - Core 只在 `src/main/core/` 加载与转发（ADR-0014）：`.node` 路径的唯一解析处是 `native-path.ts`；`router.ts` 按路由键转发事件批次；`terminal-ipc.ts` 管终端归属；`test-hooks.ts` 只在加载开发版 Core 时安装。`native/*.d.ts` 是 NAPI-RS 生成的 L1 快照，不手改。
 - 渲染进程：transcript 在 `src/renderer/transcript/`（常量只在 `constants.ts`），Worker 在 `src/renderer/workers/`（ES module，受同一 CSP 约束），composer 在 `src/renderer/composer/`，终端在 `src/renderer/terminal/`（`vendor/ghostty-web/` 是 fork 的 MIT 代码，改动清单在其 README）。消息形状与守卫在各目录的 `protocol.ts`。
 - 原型页 `#/event-probe`、`#/transcript-lab`、`#/terminal-lab` 经 `globalThis.__piarc*` 给 L4 与基准用（类型在 `src/shared/`），目前也随发布构建分发（I13、I24、I30）。
+- 正式会话与原型共用 transcript 和 composer。行类型、历史窗口与滚动参数见 [transcript/AGENTS.md](src/renderer/transcript/AGENTS.md)，提及、附件与键盘约定见 [composer/AGENTS.md](src/renderer/composer/AGENTS.md)。
 - 窗口（T18，ADR-0029）：主窗口的根是 `src/renderer/shell/Shell.tsx`（侧栏、主区、注册式右栏与面板区、对话框、提醒），设置窗口是 `#/settings` 的 `src/renderer/settings/SettingsApp.tsx`；两者共用 `src/renderer/app/app-context.tsx`（平台、偏好、翻译）与 `app.css`（只读令牌；元素级规则写在 `:root[data-app]` 之下，`main.tsx` 只给这两个窗口设 `data-app`，原型页不受影响）。主进程的窗口、菜单、偏好、通知在 `src/main/app-shell.ts`、`menu.ts`、`preferences.ts`、`platform/attention.ts`、`platform/window-chrome.ts`；会话、工作区与信任命令在 `src/main/core/session-ipc.ts`。
 - 注册点：右栏与面板区 `registerPanel`（`src/renderer/shell/registry.ts`，area 为 `rail` 或 `dock`，没有注册内容的区域不渲染）；设置页 `registerSettingsPage`（`src/renderer/settings/registry.ts`）；快捷键在 `src/shared/keybindings.ts` 的 `COMMANDS` 追加一行（id、`Mod` 记法默认键、标签消息 id），渲染进程的 `use-commands.ts` 与主进程菜单自动跟随；界面字符串在 `src/shared/i18n/en.ts` 与 `zh-CN.ts` 各加一条（类型检查保证两边键相同），用 `useT()`（渲染进程）或 `AppShell.t()`（主进程）。
 - 打包在 `packaging/`（`Resources/agent-host/` 布局、分层签名、DMG maker、Velopack 绑定，架构第 5.6、13.2 节）；图标取 `design/brand/`，bundle id 与 AppUserModelID 取应用标识（`app-identity.mjs` 与 Rust 的定义由测试保持一致）。
@@ -55,9 +57,9 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 安全渲染（架构第 10.3 节）：渲染进程不从 HTML 字符串建 DOM，ESLint 禁止 `innerHTML`、`outerHTML`、`dangerouslySetInnerHTML`、`insertAdjacentHTML`、`createContextualFragment`、`setHTMLUnsafe`、`document.write`；模型输出里的原始 HTML 作为 `html` 节点按文本显示；链接只保留 `safeHref` 通过的 `https:`、`http:`、`mailto:`，点击经 `window.piarc.openExternal`（主进程确认框）；图片不加载，显示为链接；代码高亮只输出 token 与颜色。
 - 高亮不放宽 CSP：shiki 用 `@shikijs/engine-javascript`，不用需要 `wasm-unsafe-eval` 的 Oniguruma 引擎；语法按需加载，每种一个 chunk，`GRAMMARS` 与 `languages.ts` 的别名表一起改。
 - 输入法守卫：所有键盘处理先过 `isImeComposing`（`isComposing`、`keyCode === 229`、`view.composing`）。composer 在 `handleDOMEvents.keydown` 里先拦，ProseMirror 的按键处理整个跳过且不 `preventDefault`；`handleTextInput` 里的 `@`、`/` 触发也先查 `view.composing`。
-- 滚动跟随只认用户输入（滚轮、触摸、键盘、按住滚动条）引起的滚动；贴底在 ResizeObserver 回调里做（布局后、绘制前），阈值只改 `constants.ts`。
+- 滚动跟随只认用户输入（滚轮、触摸、键盘、按住滚动条）引起的滚动；行或虚拟列表提交后在布局阶段对齐底部，尺寸变化再经 ResizeObserver 对齐。阈值只改 `transcript/constants.ts`。
 - 组件只读语义令牌与组件令牌（`var(--piarc-…)`，或 TS 的 `tokenVar`），不写颜色字面量；改视觉方向只改 `design/tokens/` 再 `npm run gen:tokens`。主题、对比度、密度、减少动效经 `<html>` 的 `data-color-mode`、`data-density`、`data-reduce-motion` 切换（`app/appearance.ts`），组件不读这些属性。
-- store（`src/renderer/store/`）：业务状态只来自 Core 的事件；组件用 `hooks.ts` 的细粒度订阅（列表、单个会话条目、单行），不要订阅整个 store；快照按 `revision` 门控；乐观行只经 `SessionTranscript.addOptimistic`、`confirm`、`rollback`。"需要处理"的定义与徽标优先级只在 `store/status.ts`。
+- store（`src/renderer/store/`）：业务状态只来自 Core 的事件；组件用 `hooks.ts` 的细粒度订阅（列表、单个会话条目、单行），不要订阅整个 store；快照按 `revision` 门控；乐观行以 `clientId` 对账，Core 未确认时显示未送达，重发复用原键。"需要处理"的定义与徽标优先级只在 `store/status.ts`。
 - 窗口是否在前台以主进程的应用事件为准（`app/window-focus.ts`），不要用 `document.hasFocus()`：自动化下它恒为真。
 - 流式期间只有流式那一行重新渲染：行组件按 id 订阅 store 与解析结果，块组件按对象身份记忆化；改动时用 L4 的渲染计数用例（`transcript-render.e2e.ts`）验证。
 
@@ -96,7 +98,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 不要在 `postPackage` 之前把内置 node 放进 bundle：fuses 插件与 `resealElectron` 的 `--deep` 会把它改成 ad-hoc 签名。新增随包的 Mach-O 文件放在 Resources 下即可，`signResourcesAndBundle` 会扫描签名；要保留原签名的目录加进 `keepSigned`。
 - 本机 Gatekeeper 评估被关闭时（`spctl --status` 为 `assessments disabled`），`spctl --assess` 一律显示 accepted，不能作为首次打开的证据；首次运行检查要在开启 Gatekeeper 的机器上做。
 - MCP 夹具要先 `npm pack` 再经 `npx --package <tgz>` 启动：`npx <目录>` 会链接目录并 chmod 其中的 bin，在 Agent Host 的 Seatbelt 下被拒绝（真实 MCP 包来自 registry 的 tarball，不受影响）。
-- 贴底依赖 ResizeObserver 观察列表的尺寸容器（`TranscriptList` 的 sizer）：换虚拟列表实现时要保证内容增长能在同一帧报告尺寸变化，react-virtuoso 做不到（ADR-0022）。
+- 更换虚拟列表时要重测内容增长到贴底的帧时序。行变高与 `TranscriptList` 更新 sizer 尺寸可能分两次提交，回归用例逐帧检查离底距离（ADR-0022、ADR-0030）。
 
 ## 参考
 

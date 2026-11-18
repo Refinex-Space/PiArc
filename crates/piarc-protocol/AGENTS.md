@@ -23,6 +23,7 @@ AHP 与 Core API 数据类型的唯一来源：Rust 类型 → JSON Schema → `
 - `PROTOCOL_VERSION` 只在 `src/version.rs` 定义；TS 侧的常量由生成器写出。
 - 成员 camelCase，枚举值 camelCase 字符串；不用 `deny_unknown_fields`，schema 不出现 `additionalProperties: false`：接收方忽略未知成员。兼容规则全文在 `src/lib.rs` 的 crate 文档。
 - ADR-0009 的会话事件 `{sessionId, seq, ts, type, payload}`：`type` 是 JSON-RPC `method`，`sessionId`、`seq`、`ts` 在 `params` 中（`SessionEventHeader`，用 `#[serde(flatten)]` 并入各方法的参数），`payload` 是 `params` 的其余成员。
+- AHP 的 `InputMention` 区间使用 UTF-16 码元，和 ProseMirror 序列化后的 JS 字符串偏移一致。输入、队列与用户条目都以 `InputAttachment` 引用描述图片和 PDF。可选元数据缺失的纯文本消息沿用 T14 行为（ADR-0030）。
 - 导出必须确定：`export_schema` 递归排序对象键；不要写入时间、路径、用户名。
 - `contracts` 名中 `jsonrpc/`、`envelope/` 留给顶层消息类型，`framing/` 留给帧用例目录，方法不得使用。
 - 错误：crate 内 `Error`（`kind()`、`retryable()`、`to_error_object()`）；线上形状是 `rpc_error::ErrorObject`，应用错误码取 `-32099..=-32000`。

@@ -39,6 +39,7 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 输出：每块同时进 `OutputCapture`（结果的 `output`，超出预算全文写 `<会话临时目录>/tool-results/<工具调用 id>.txt`）与显示窗口 `Display`（`exec/output`，待发超过 `DISPLAY_WINDOW` 256 KiB 时丢最旧的块并报 `skipped`），转发任务发完才回响应；连接断开（`Peer::closed`）或 `exec/kill` 停止命令。
 - 命令环境 = `ToolIoConfig.command_env`（`CommandEnv`）：`ToolIoConfig::new` 用 Core 自己的环境（`CommandEnv::process`），运行时（`CoreConfig.command_env` 为 `None`）用登录 shell（`CommandEnv::login_shell`，首次命令时解析并缓存）；两者都经 `piarc_exec::env::strip_internal`；再叠加请求的 `env`（同名覆盖，Windows 不区分大小写）。凭据从不进入。`ToolIoConfig` 不能带 `notices`（crate 私有类型），要发通知用 `ToolIo::with_notices`。
 - blob 放在 `<数据目录>/sessions/<会话 id>/blobs/`；会话 id 只允许 `[A-Za-z0-9._-]`，不能是 `.`、`..`。
+- Composer 的类型、数量、大小和搜索上限由 `composer::info()` 提供。附件只经 `store_attachment` 写入本会话的 `attachments/`，会话的工具 scope 将该目录登记为只读。归档保留附件，删除会话清理整个会话目录（ADR-0030）。
 - 沙箱会话（T11）：`open_sandboxed_session` 建 `<数据目录>/sessions/<会话 id>/tmp/`、启动会话代理（`piarc_sandbox::SessionSandbox`）；`exec/run` 加上 `sandbox-exec` 包装与沙箱变量（同名覆盖请求的 `env`），用 `ProcessTreeSpawner` 运行。非 macOS 返回 `internalError`。代理随 `SessionIo` 释放而停止（`close_session` 后、最后一个运行中的命令结束时）。
 
 ## 凭据（`secrets`）
@@ -85,7 +86,7 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 取消：根 token → 会话 token（关闭时取消，进行中的请求停止等待）→ 回合中断时 `ToolIo::cancel_running` → 命令自己的 token 结束进程。
 - 快照 revision：每个列表一个计数器，只在快照任务里递增并发出，所以按发出顺序严格递增；一批同时到达的变化合成一个快照。列表 = 数据库（最近的工作区、会话索引）+ actor 报告的实时状态（实时字段优先）。
 - 会话 id：`create` 用 Core 生成的 UUID；创建超时或连接中断时以 `session/resume` 收敛。工作区路径与 cwd 先规范化并确认是已存在的目录，cwd 必须在工作区内（I20）。
-- 会话元数据（T18，ADR-0029）：`Op::Prefs`（标题、置顶、归档）经 `CoreRuntime::session_op` 走 `Hub::set_prefs`：打开的会话先记在 actor 里（`LiveSession.prefs` 覆盖快照，随下次索引同步写入），未打开的直接写索引；归档时关闭会话并删除 `<data>/sessions/<id>/`。`Hub::delete_session` 先关闭会话，再删 `pi/sessions/` 下的 JSONL（不在其下的拒绝）、临时目录与索引行。会话链接带 `in_host`：工作区首个进程连上时只恢复已在 Agent Host 中打开过的会话，正在创建的不恢复。启动时的索引同步结束后 `reload_snapshots`。
+- 会话元数据（T18，ADR-0029）：`Op::Prefs`（标题、置顶、归档）经 `CoreRuntime::session_op` 走 `Hub::set_prefs`：打开的会话先记在 actor 里（`LiveSession.prefs` 覆盖快照，随下次索引同步写入），未打开的直接写索引；归档时关闭会话并清理临时输出，保留历史 JSONL 和 `attachments/`（ADR-0030）。`Hub::delete_session` 先关闭会话，再删 `pi/sessions/` 下的 JSONL（不在其下的拒绝）、临时目录与索引行。会话链接带 `in_host`：工作区首个进程连上时只恢复已在 Agent Host 中打开过的会话，正在创建的不恢复。启动时的索引同步结束后 `reload_snapshots`。
 - 客户端偏好（`client_settings`）：只写 `language`、`appearance`、`keybindings`、`notifications` 四个顶层键，经 `piarc_config::write_value`；读取返回整份文件（不存在为 `{}`）。
 - I62 已接上：工作区 actor 打开时启动设置监听（`WorkspaceSettings`），回合结束时同步索引。信任变化重启（T18 起）：`CoreRuntime::trust_view`（决定）与 `revoke_trust` 在应答前调 `Hub::trust_changed`，同一主 checkout 的工作区 actor 先把状态置为 `Restarting`（之后的请求等新进程就绪）再调 `HostSupervisor::restart`，所以信任对话框之后立即创建的会话落在新进程上；`agent_host::restart_on_trust_change` 只剩监管器层面的测试使用。
 

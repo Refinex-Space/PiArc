@@ -49,6 +49,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `npm run bench:s2 -- --form packaged` | S2 基准：事件吞吐、主进程事件循环延迟、同步调用、大批次、空闲内存（先打开发构建） |
 | `npm run bench:s7 -- --form packaged` | S7 基准：终端中 `cat` 大文件（`--megabytes`、`--repeat`）与键入回显配对测量（先打开发构建） |
 | `npm run bench:t18` | T18 冷启动：打包产物以 100 个会话的数据目录冷启动 10 次，测到侧栏就绪（预算 1.0 s，先打开发构建） |
+| `npm run bench:t19` | 正式会话的流式渲染、万条滚动、缓存切换与千条冷加载基准。先打开发构建，在前台运行 |
 | `npm run bench:s1 -- --form packaged` | S1 基准：transcript 流式 60 s、万条滚动、千条冷加载、渲染进程内存（CDP 追踪，先打开发构建） |
 | `cargo run -p piarc-sandbox --release --example s8-bench` | S8 测量：`sandbox-exec` 每条命令额外耗时、沙箱代理延迟与吞吐（macOS） |
 | `node scripts/ci/load-core.mjs --module <file.node>` | 在 Node 与 Electron 中加载一个 Core 模块并跑一次事件通道 |

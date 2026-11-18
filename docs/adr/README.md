@@ -44,4 +44,5 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0026](0026-turns-queue-and-interrupted-transcript.md) | 回合、排队与中断后的对话形态（补充 ADR-0009、ADR-0010、ADR-0011） | 已接受 |
 | [0027](0027-file-tool-invariants.md) | 文件工具不变量的落点：Core 的状态表与写入，Harness Kit 的匹配与结果预算（补充 ADR-0004 第 3 条、ADR-0020） | 已接受 |
 | [0028](0028-shell-command-execution.md) | Shell 命令的执行：Core 管进程、输出与语义，Bash 与 PowerShell 为 PiArc 自写工具（补充 ADR-0004 第 3 条，修订 ADR-0020 第 1 条） | 已接受 |
-| [0029](0029-client-shell-foundations.md) | 客户端外壳的基础设施：令牌管线、偏好存储、快捷键、本地化、信任闸门与会话元数据（补充 ADR-0013、ADR-0025） | 已接受 |
+| [0029](0029-client-shell-foundations.md) | 客户端外壳的基础设施：令牌管线、偏好存储、快捷键、本地化、信任闸门与会话元数据（补充 ADR-0013、ADR-0025） | 已接受（第 7 条归档清理由 0030 修订） |
+| [0030](0030-transcript-and-composer.md) | 会话输入、附件和 transcript 的呈现（补充 ADR-0009、ADR-0013、ADR-0026，修订 ADR-0029 第 7 条） | 已接受 |
