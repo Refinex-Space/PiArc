@@ -3,9 +3,27 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::*;
 
+// Fields drop in declaration order: the scope's directory handles close before the tree is
+// removed. Windows refuses to delete a directory that is open without shared delete.
 struct Tree {
-    root: PathBuf,
     scope: Scope,
+    root: TempRoot,
+}
+
+struct TempRoot(PathBuf);
+
+impl std::ops::Deref for TempRoot {
+    type Target = Path;
+
+    fn deref(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for TempRoot {
+    fn drop(&mut self) {
+        fs::remove_dir_all(&self.0).expect("remove temporary tree");
+    }
 }
 
 impl Tree {
@@ -15,7 +33,10 @@ impl Tree {
         let cwd = ws.join("current");
         fs::create_dir_all(&cwd).expect("workspace");
         let scope = Scope::new(&ws, &cwd).expect("scope");
-        Self { root, scope }
+        Self {
+            scope,
+            root: TempRoot(root),
+        }
     }
 
     fn file(&self, name: &str, text: impl AsRef<[u8]>) {
@@ -44,12 +65,6 @@ impl Tree {
             .find(|f| f.path == path)
             .expect("source")
             .content
-    }
-}
-
-impl Drop for Tree {
-    fn drop(&mut self) {
-        fs::remove_dir_all(&self.root).expect("remove temporary tree");
     }
 }
 
