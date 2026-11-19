@@ -1,0 +1,27 @@
+{
+  "id": "w1-shells",
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "bash",
+          "name": "Bash",
+          "input": { "command": "echo 中文输出 && pwd -W", "description": "Print through Git Bash" }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "powershell",
+          "name": "PowerShell",
+          "input": {
+            "command": "Write-Output '中文输出'",
+            "description": "Print through PowerShell"
+          }
+        }
+      ]
+    },
+    { "text": "Both shells answered." }
+  ]
+}
