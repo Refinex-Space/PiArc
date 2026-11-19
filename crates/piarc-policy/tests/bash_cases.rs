@@ -47,16 +47,16 @@ impl Facts for World {
         } else {
             text.clone()
         };
-        let text = text.replacen('~', "/h", usize::from(text.starts_with('~')));
+        let text = text.replacen('~', "/home/u", usize::from(text.starts_with('~')));
         let path = if text.starts_with('/') {
             World::normalize(&text)
         } else {
             let Cwd::Known(rel) = &operand.cwd else {
                 return None;
             };
-            World::normalize(&format!("/w/{rel}/{text}"))
+            World::normalize(&format!("/work/{rel}/{text}"))
         };
-        let inside = path == "/w" || path.starts_with("/w/");
+        let inside = path == "/work" || path.starts_with("/work/");
         let protected = write
             && path
                 .split('/')
@@ -74,18 +74,18 @@ impl Facts for World {
 
     fn path_context(&self) -> PathContext<'_> {
         PathContext {
-            home: "/h",
-            cwd: "/w",
-            anchor: "/w",
+            home: "/home/u",
+            cwd: "/work",
+            anchor: "/work",
             fold_case: false,
         }
     }
 
     fn critical_context(&self) -> CriticalContext<'_> {
         CriticalContext {
-            home: "/h",
-            root: "/w",
-            cwd: "/w",
+            home: "/home/u",
+            root: "/work",
+            cwd: "/work",
             fold_case: false,
         }
     }
@@ -112,7 +112,7 @@ fn rules(case: &Value) -> RuleSet {
     set.add_source(
         Source {
             id: "projectLocal".into(),
-            anchor: "/w".into(),
+            anchor: "/work".into(),
         },
         lists,
     );
