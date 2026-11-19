@@ -10,7 +10,7 @@
 
 另在打包应用配置关闭云端的本机 Ollama，使用已安装的 deepseek-r1:7b（OpenAI Chat Completions）执行相同初始项目和用户指令。服务端记录 1 次推理请求，HTTP 200，费用 0。模型直接输出文字建议，未发起 Edit 或 Bash，等待真实审批卡超时。该运行未达到退出标准。证据见 `tmp/evidence/R2/local-run.log`、`local/l4/`。
 
-维护者随后授权百炼北京端点最多 8 次调用、预算人民币 0.10 元。打包应用在隔离的 Git 夹具中从设置页配置 qwen-flash，经保险箱取得凭据，依次执行 Read、Read、Edit、Bash，测试由 ERR_ASSERTION 变为通过。最后一轮给出结果。转发器限制请求次数、输入字节和最大输出，仅记录 HTTP 状态、工具名与用量。5 次请求均为 HTTP 200，合计输入 11,868、输出 254 tokens；按每百万输入 0.15 元、输出 1.50 元计，估算 0.0021612 元，优惠和账单结算以服务商为准。证据在 `tmp/evidence/R2/paid/` 的 usage.json、before.txt、after.txt 和三张截图。[百炼 qwen-flash 官方定价](https://help.aliyun.com/zh/model-studio/qwen-flash)
+维护者随后授权百炼北京端点最多 8 次调用、预算人民币 0.10 元。打包应用在隔离的 Git 夹具中从设置页配置 qwen-flash，经保险箱取得凭据，依次执行 Read、Read、Edit、Bash，测试由 ERR_ASSERTION 变为通过。最后一轮给出结果。转发器限制请求次数、输入字节和最大输出，仅记录 HTTP 状态、工具名与用量。5 次请求均为 HTTP 200，合计输入 11,868、输出 254 tokens；按每百万输入 0.15 元、输出 1.50 元计，估算 0.0021612 元，优惠和账单结算以服务商为准。证据在 `tmp/evidence/R2/paid/` 的 usage.json、before.txt、after.txt 和三张截图。本次付费调用发生在目录句柄改动合入前，最终构建用相同夹具重跑两种协议。累计计费调用仍为 5 次。[百炼 qwen-flash 官方定价](https://help.aliyun.com/zh/model-studio/qwen-flash)
 
 ## M1 目标与证据
 
@@ -57,7 +57,7 @@
 | L2 与 L4 | 本机跑 `npm run verify` 和全套打包形态 L4；L2 至少 20 个通过，记录全部失败及平台跳过。复跑 I19 的突发通知后读取，记录 Windows 的 fs/stat 到 fs/read 间隔。 |
 | Git Bash 与 PowerShell | 在安装与无 Git Bash 的隔离环境分别检查工具列表、缺失提示和回退；Manual 批准后执行 PowerShell，Git Bash 下的中文输出保持完整。 |
 | 进程树 | 分别取消、超时，用 Job Object、测试 PID 与 tasklist 检查父进程和后代均已结束。验证输出流中断导致命令失败。 |
-| 路径与文件 | 盘符、UNC、长路径、空格与中文、大小写、CON/NUL；CRLF、BOM、有损坏码元的 UTF-16 均按约定处理。以真实 Git worktree 核对反向注册。复核目录变更、重解析点和外部目标的审批边界（ADR-0036）。 |
+| 路径与文件 | 盘符、UNC、长路径、空格与中文、大小写、CON/NUL；CRLF、BOM、有损坏码元的 UTF-16 均按约定处理。以真实 Git worktree 核对反向注册。在真实 UNC 共享和 NTFS junction 上复核目录变更、共享删除、外部目标的审批边界，以及大目录取消（ADR-0036）。 |
 | 数据与凭据 | 验证 %LOCALAPPDATA%\PiArc、隔离目录、Credential Manager 的测试主密钥与重启读取；用合成标记扫描数据、日志和子进程环境。核对 v3 → v4 索引迁移、同长度重写和 Windows 文件替换。 |
 | 原生人工交互 | 微软拼音与日文 IME 在 composer 和审批卡的候选、Enter、Esc、/、@；窗口在后台时的结束与审批 Toast、点击归属、任务栏覆盖计数；检查 Mica、右上窗口控件、标题栏覆盖层及明暗外观。真实通知点击、首次 SmartScreen 放行由用户操作。 |
 | 评审发现 | 原生删除确认显示实际目标标题、ID 和工作区，取消保留文件。无效 PDF 不留副本。核对环境继承决策、工作树登记及审批清单版本。Unix 临时文件模式对应 W1 检查 Windows 的既有 ACL/属性约定，记录实际行为。 |
@@ -76,11 +76,11 @@
 | F03 暂存保密性 | piarc-fs/src/atomic.rs:44；私有文件的 Unix 临时副本曾晚于写入才恢复模式 | 确认。暂存从创建起使用 0600；持有文件句柄完成权限恢复、同步与原子发布。6e95bd5；regression-red.log / regression-green.log。 |
 | F04 命令环境 | piarc-exec/src/env.rs:68；登录环境已有的私密字段随工具继承 | 确认。决策采用 OS、locale 和工具链字段准入；登录失败回退、Windows 及 Git Bash 探测遵守同一边界。依赖自定义变量的构建可能需要调整。cb840ae、ADR-0035，env-red.log / env-l2-final.log、env-command-integration.log。 |
 | F05 编码 | piarc-fs/src/encoding.rs:157、write.rs:118；受损 UTF-16 在无关编辑中丢失原字节 | 确认。检测有损 UTF-16 转换并拒绝写回，保留原文件。6e95bd5；regression-red.log / regression-green.log。 |
-| F06 索引 | piarc-store/src/index.rs:201；早期行等长重写，尾行不变 | 确认。schema v4 保存文件身份与修改时间；缺失基线或标记变化时重扫。macOS 用设备/inode，Windows 以创建时间识别替换；同时伪造文件时间与内容超出增量标记保证，可执行全量重建。be3462c；index-red.log / index-green.log。 |
+| F06 索引 | piarc-store/src/index.rs:201；早期行等长重写，尾行不变 | 确认。schema v4 保存文件身份与修改时间；缺失基线或标记变化时重扫。macOS 用设备/inode，Windows 以创建时间识别替换；低时间分辨率或保留原文件时间的等长重写可能无法区分，可执行全量重建。be3462c；index-red.log / index-green.log。 |
 | F07 diff | piarc-diff/src/lib.rs:61、81；大差异在截断前分配完整文本和行副本 | 确认。按字节预算写预览并统计遗漏字节，在降级路径上停止保留 hunk 行；完整 diff 行数仍精确。2bce778；diff-red.log / diff-green.log。 |
 | U01 删除会话 | session-ipc.ts:400；原生弹窗标题由 UI 提供，与实际删除 ID 独立 | 确认。主进程向 Core 查询标题与工作区并显示目标 ID，缺少索引标题时显示 ID。b426028；delete-red.log、t18-sessions 两种形态和 ego-session-menu.png。 |
 | U02 附件 | composer/attachments.rs:94；PDF 解析失败，但最终存储位置已有副本 | 确认。先对输入字节解析并验证页数，再发布内容寻址文件。6e95bd5；regression-red.log / regression-green.log。 |
-| Q01 命令错误 | piarc-exec/src/command.rs:289；进程退出 0 掩盖了部分输出读取错误 | 确认。保留第一个带流名的 I/O 错误，触发进程树清理后报告失败；完整 crate 的统一类型化边界仍属 I61。ee48bc0；pipe-red.log / pipe-green.log。 |
+| Q01 命令错误 | piarc-exec/src/command.rs:289；进程退出 0 掩盖了部分输出读取错误 | 确认。保留第一个带流名的 I/O 错误，触发进程树清理后报告失败；完整 crate 的统一类型化边界经 I61 指派 T32。ee48bc0；pipe-red.log / pipe-green.log。 |
 | Q02 覆盖真实性 | policy-session-rule.yaml:3、26；未断言 Core 状态或通知输入 | 确认。L2 明确校验审批中、结束未读的真实 Core 快照；优先级与通知呈现经 t18-sessions / t18-attention。d9b661f。 |
 | Q03 M1 门禁 | tests/capabilities.yaml:22、40；T18 完成而两项能力仍为 planned | 确认。补充可执行信任清单和重启后会话元数据、删除的 L2 断言；M1 planned 2 → 0，MISSING 0。d9b661f、8c8bfb1。 |
 | Q04 模块长度 | runtime.rs:1、piarc-host/tests/resilience.rs:1 | 确认。I81 已拆为状态和会话门面，公开入口保持。b426028。韧性测试保留为单一集成测试目标，共用握手、重启和背压夹具；L2 runner 保留单个 Driver 的事件与时序实现，超长按工程规范 2.7 记录。 |
