@@ -46,8 +46,10 @@ function cargoDeny() {
 /** @type {Step[]} */
 export const STEPS = [
   { name: 'Prettier --check', command: nodeBin('prettier', ['--check', '.']) },
-  { name: 'ESLint', command: nodeBin('eslint', ['.']) },
+  // Before ESLint: type-aware lint reads workspace packages (`@piarc/protocol`) from their
+  // built declarations, which are stale or missing until the build refreshes them.
   { name: 'tsc --build', command: nodeBin('typescript', ['--build'], 'tsc') },
+  { name: 'ESLint', command: nodeBin('eslint', ['.']) },
   // Builds the Core module the Vitest integration tests load, and checks its .d.ts snapshot.
   { name: 'Core module + API snapshot', command: nodeScript('scripts/ci/check-core-types.mjs') },
   { name: 'Vitest', command: nodeBin('vitest', ['run']) },
