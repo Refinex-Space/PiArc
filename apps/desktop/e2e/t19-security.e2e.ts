@@ -86,6 +86,10 @@ test('renders reply, tool output, command output and file paths as inert text', 
   await read.getByTestId('tool-group-toggle').click();
 
   await send(page, 'Print the same file.');
+  const approval = page.getByTestId('approval-card');
+  await expect(approval).toHaveAttribute('data-approval-card', 'command');
+  await expect(approval.locator('.bash-command')).toHaveText('cat samples.txt');
+  await approval.getByRole('button', { name: 'Allow once', exact: true }).click();
   await expect(page.getByTestId('agent-message').last()).toContainText('Command finished.');
   await idle(page);
   const bash = page.getByTestId('bash-card');
@@ -98,6 +102,10 @@ test('renders reply, tool output, command output and file paths as inert text', 
   await bash.getByTestId('bash-output-toggle').click();
 
   await send(page, 'Try editing the missing target.');
+  await expect(approval).toHaveAttribute('data-approval-card', 'fileChange');
+  await expect(approval).toContainText('Edit');
+  await expect(approval.locator('.approval-path').last()).toContainText('missing');
+  await approval.getByRole('button', { name: 'Allow once', exact: true }).click();
   await expect(page.getByTestId('agent-message').last()).toContainText('The target was missing.');
   await idle(page);
   await page
