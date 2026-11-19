@@ -316,7 +316,7 @@ T26（开工基线 c163249，`npm run verify` 15/15）：
 - [x] 3. Agent Host：五个宿主工具、`reminders` 模块、模式追加消息、计划 entry 与 `harness/plan`、任务清单 `harness/todo` 与未更新提醒、注入接口、历史中的 harness 状态
 - [x] 4. 客户端：计划卡与计划面板（行内评论）、任务卡与右栏任务卡片、提问表单（替换 T20 占位）、下一步建议
 - [x] 5. L2：运行器扩展与 `plan-*`、`todo-*`、`ask-*`、`next-*` 场景，能力清单（A01、A02、A05、A06、A08、A09）
-- [ ] 6. L4：Playwright 流程与截图（A03、A04、A07、A09、A10）——dev 形态 5/5 已通过，待重新打包后跑 packaged 与回归
+- [x] 6. L4：Playwright 流程与截图（A03、A04、A07、A09、A10）：dev 与 packaged 各 5/5，全量 L4 回归见收尾
 - [x] 7. 文档：ADR、架构第 6.5 节、Agent Host 与渲染进程 AGENTS.md
 - [ ] 8. 收尾：`npm run verify`（A11）、验收清单、看板
 

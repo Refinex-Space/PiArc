@@ -2722,15 +2722,15 @@
       "id": "T26-A03",
       "task": "T26",
       "description": "计划卡的\"批准并自动接受编辑\"\"批准并手动审批\"切换到对应模式并在转录中留下模式切换记录；\"继续规划\"保持 plan 模式。验证：Playwright 流程与截图（`tmp/evidence/T26/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Playwright `t26-harness.e2e.ts` 计划卡用例（dev、packaged 均通过）：继续规划后环境栏仍为 Plan、计划行为\"Sent back to keep planning\"；\"批准并手动审批\"后为 Manual 并多出模式变更行；再次规划后\"批准并自动接受编辑\"为 Accept edits，最后两条模式变更行为 Plan、Accept edits，工具结果告诉模型新模式。截图 `tmp/evidence/T26/screens/{dev,packaged}-plan-approved-manual.png`、`-plan-approved-accept-edits.png`。命令 `PIARC_EVIDENCE_TASK=T26 npx playwright test -c apps/desktop/playwright.config.ts t26-harness t20-approvals`：14 passed。"
     },
     {
       "id": "T26-A04",
       "task": "T26",
       "description": "计划面板中的行内评论随\"继续规划\"送达模型，内容与锚点正确。验证：Playwright 流程与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "同一 Playwright 用例在计划面板选中\"Fix the off-by-one in the loop\"加评论、填反馈后继续规划；mock 第 3 个请求的工具结果含 \"Feedback from the user:\\nStart with the test.\" 与 `1. On \"Fix the off-by-one in the loop\" (offsets 33-63): Which loop? Add a failing test first.`（偏移由测试按 UTF-16 计算比对）。L2 `plan-keep-planning` 用含中文的计划断言 offsets 19-37；Core 单测拒绝引文与区间不符的评论；ego-browser 本地实测中文计划的评论偏移 9–25。截图 `screens/*-plan-card-with-comment.png`、`ego-plan-comment-zh-CN.png`。"
     },
     {
       "id": "T26-A05",
@@ -2750,8 +2750,8 @@
       "id": "T26-A07",
       "task": "T26",
       "description": "任务卡与右栏任务卡片随 `TodoWrite` 调用更新，进行中项与完成计数显示正确。验证：Playwright 截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Playwright 任务清单用例（dev、packaged）：两次 TodoWrite 生成两张任务卡，第一张\"1/3 done\"、进行中项显示 activeForm 并高亮；右栏任务卡片\"2/3 done\"，前两项 completed、第三项 inProgress（\"Adding a regression test\"）。截图 `tmp/evidence/T26/screens/{dev,packaged}-task-card-and-rail.png`；ego-browser 中文界面截图 `ego-plan-card-zh-CN.png`。"
     },
     {
       "id": "T26-A08",
@@ -2764,15 +2764,15 @@
       "id": "T26-A09",
       "task": "T26",
       "description": "AskUserQuestion 的单选、多选、自由输入三种题型都能作答并以结构化结果返回模型；超时后按默认选项继续，无默认选项时返回\"用户未作答\"。验证：测试（时钟可注入）与 Playwright 流程。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "测试：Core `tool_io::policy::tests::t26`（`ManualClock` 注入：29 s 仍等待、30 s 超时，默认选项取 SQLite、无默认为 unanswered；作答三种题型；不回答为 declined）；L2 `ask-answers`（plan 模式下仍显示表单，三种题型的 JSON 结果）、`ask-timeout`（0.5 s 超时）。Playwright（dev、packaged）：表单单选、多选、自由回答后 mock 请求含逐题 `outcome: answered` 的 JSON；2 s 超时后卡片消失、结果为 default 与 unanswered。截图 `screens/*-question-form.png`、`-question-answered.png`、`-question-timed-out.png`、`ego-question-form-zh-CN.png`。"
     },
     {
       "id": "T26-A10",
       "task": "T26",
       "description": "下一步建议的\"在此执行\"把建议作为本会话下一条输入发送，\"开始新会话\"新建会话并以建议为首条输入。验证：Playwright 流程与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Playwright 下一步用例（dev、packaged）：\"在此执行\"后 mock 第 3 个请求的最后一条 user 消息正文即建议的 prompt；\"开始新会话\"切到新会话（session id 不同），新会话的首个 mock 请求含建议文本，回复正常显示。L2 `next-steps` 断言工具立即返回、回合继续完成。截图 `screens/*-next-steps.png`、`-next-step-new-session.png`。"
     },
     {
       "id": "T26-A11",
