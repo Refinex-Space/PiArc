@@ -616,6 +616,88 @@ mod windows_paths {
         assert!(left.is_empty(), "{left:?}");
     }
 
+    fn junction(link: &Path, target: &Path) {
+        let out = std::process::Command::new("cmd")
+            .args(["/d", "/c", "mklink", "/J"])
+            .arg(link)
+            .arg(target)
+            .output()
+            .expect("cmd runs");
+        assert!(out.status.success(), "mklink /J: {out:?}");
+    }
+
+    fn outside(f: &Fixture) -> PathBuf {
+        let dir = f.root.join("outside 外部");
+        std::fs::create_dir_all(&dir).expect("outside");
+        std::fs::write(dir.join("secret.txt"), "outside").expect("secret");
+        dir
+    }
+
+    /// A junction is a directory reparse point: a path through it leaves the workspace and asks.
+    #[tokio::test]
+    async fn a_junction_to_another_directory_asks_like_any_outside_path() {
+        let f = Fixture::new().await;
+        f.io.changed_mode(SESSION, PermissionMode::AcceptEdits)
+            .expect("mode");
+        junction(&f.root.join("workspace").join("link"), &outside(&f));
+        for (call, tool, input) in [
+            ("read", "Read", json!({"path": "link/secret.txt"})),
+            (
+                "write",
+                "Write",
+                json!({"path": "link/new.txt", "content": "x"}),
+            ),
+        ] {
+            let run = f.evaluate(call, tool, input);
+            let refuse = async {
+                let card = f.pending().await;
+                assert_eq!(card.kind, ApprovalKind::PermissionExpansion, "{call}");
+                f.io.answer_approval(answer(&card, ApprovalDecision::Deny))
+                    .await
+                    .expect("decline");
+            };
+            let (result, ()) = tokio::join!(run, refuse);
+            assert_eq!(result["allowed"], false, "{call}");
+        }
+        assert!(!f.root.join("outside 外部/new.txt").exists());
+    }
+
+    /// ADR-0036 on Windows: an approved directory is held without delete sharing, so it cannot
+    /// be swapped for a junction; if the volume allowed the move, the bound read must fail.
+    #[tokio::test]
+    async fn an_approved_directory_cannot_be_swapped_for_a_junction() {
+        let f = Fixture::new().await;
+        let target = outside(&f);
+        let sub = f.root.join("workspace").join("sub");
+        std::fs::create_dir_all(&sub).expect("sub");
+        std::fs::write(sub.join("secret.txt"), "inside").expect("inside");
+        let call = "swap";
+        assert_eq!(
+            f.evaluate(call, "Read", json!({"path": "sub/secret.txt"}))
+                .await["allowed"],
+            true
+        );
+        let moved = std::fs::rename(&sub, f.root.join("workspace").join("sub-old"));
+        println!("moving the approved directory: {moved:?}");
+        if moved.is_ok() {
+            junction(&sub, &target);
+        }
+        let origin = json!({"tool": "Read", "toolCallId": call});
+        let read = f
+            .io_call(
+                "fs/read",
+                json!({"sessionId": SESSION, "path": "sub/secret.txt", "origin": origin}),
+            )
+            .await;
+        match moved {
+            Err(e) => {
+                assert!(matches!(e.raw_os_error(), Some(5 | 32)), "{e:?}");
+                assert_eq!(read.expect("unchanged directory")["text"], "inside");
+            }
+            Ok(()) => assert!(read.is_err(), "read through the swapped junction: {read:?}"),
+        }
+    }
+
     /// A real share: `PIARC_TEST_UNC_SHARE` (`\\host\share`) must expose the test's temporary
     /// directory, where the fixture makes the workspace; point `TMP` at the shared folder.
     /// Without it this prints NOT RUN: W1 ran it on a folder the user shared for the check;
