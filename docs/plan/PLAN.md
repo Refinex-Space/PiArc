@@ -319,10 +319,10 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] Git Bash 探测与隐藏后的提示、PowerShell 与 Manual 询问（A04）：新 L4 `w1-windows-shells.e2e.ts` 两种形态 4/4（beb41a4），L2 `exec-windows-shells` 通过
 - [ ] 路径、CRLF、BOM、UTF-16、中文输出、UNC、junction、目录共享删除（A05）：长路径、保留名（修复 017b20b）、junction 与换目录（b75d2bf）、Git Bash 挂载目录 cwd（d9ee057）已完成；UNC 等用户建临时共享
 - [x] 进程树：取消、超时与 tasklist（A06）：`piarc-exec` 终止测试 6/6，8 个 PID 经 `tasklist` 确认不存在（`tmp/evidence/W1/process-tree.log`）
-- [ ] 凭据管理器、数据目录、明文扫描、索引迁移（A07）
+- [x] 凭据管理器、数据目录、明文扫描、索引迁移（A07）：用户同意后，打包应用以正式方式启动（`tmp/evidence/W1/a07-run.log`）：数据在 `%LOCALAPPDATA%\PiArc`，凭据管理器条目 `master-key.cn.piarc.desktop.credential-vault`，重启后凭据可读，87 个文件无明文；`system_store` 测试条目、凭据与索引用例在 Windows 通过
 - [ ] 输入法：CDP 自动化 + 用户实机（A08）
 - [ ] 通知与任务栏覆盖图标（A09）
-- [ ] Mica、标题栏覆盖层、亮暗（A10）
+- [x] Mica、标题栏覆盖层、亮暗（A10）：`t18-review` 在 Windows 截取真实窗口（c6cc25f），`tmp/evidence/W1/A10-mica-*.png`
 - [ ] L4 本机全部通过（A11）
 - [ ] R2 平台发现逐条复核；问题修复或登记（A12）
 - [ ] 收尾 verify（A13）、报告 `docs/reviews/W1-windows-m1-parity.md`、acceptance、PLAN
