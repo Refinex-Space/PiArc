@@ -58,3 +58,5 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0040](0040-windows-automatic-permission-budget.md) | Windows 上无需用户参与的权限裁决预算 | 已接受 |
 | [0041](0041-windows-ahp-round-trip-budget.md) | Windows 上小文件 fs 操作的 AHP 往返预算 | 已接受 |
 | [0042](0042-plan-todo-ask-next-steps.md) | 计划模式、任务清单、提问与下一步的宿主工具（补充 ADR-0009、0031、0033、0037） | 已接受 |
+| [0043](0043-reminders-compaction-usage.md) | System reminder 通道、压缩与上下文用量（补充 ADR-0009、0027、0033、0038、0039、0042） | 已接受 |
+| [0044](0044-checkpoints-rewind-changes.md) | 检查点、回退、Changes 面板与会话分支的落地（补充 ADR-0009、0011、0026、0027、0030） | 已接受 |
