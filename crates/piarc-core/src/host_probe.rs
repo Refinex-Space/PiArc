@@ -10,8 +10,9 @@
 //! answers like production: `trust/get` (the workspace is trusted, so project resources load),
 //! delegated tool I/O through [`ToolIo`], credentials through a [`SecretsService`] whose master
 //! key lives in memory. There is no user to ask, so the probe approves every tool preflight
-//! (`policy/evaluate`) itself, as the Agent Host test harness of `piarc-testkit` does; the
-//! production approval ledger is covered by the session tests and the L2 scenarios.
+//! (`policy/evaluate`) and denies no tool as a whole (`policy/tools`) itself, as the Agent Host
+//! test harness of `piarc-testkit` does; the production approval ledger and rules are covered by
+//! the session tests and the L2 scenarios.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -102,6 +103,9 @@ impl InboundHandler for ProbeCore {
         }
         if method == "policy/recover" {
             return Box::pin(async { Ok(json!({})) });
+        }
+        if method == "policy/tools" {
+            return Box::pin(async { Ok(json!({ "denied": [] })) });
         }
         if SecretsService::handles(&method) {
             let secrets = self.secrets.clone();
@@ -255,4 +259,33 @@ async fn converse(
         methods,
         tool_io,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The Agent Host asks `policy/tools` before every run (T23). The probe has no rules, so it
+    /// removes no tool instead of failing the call.
+    #[tokio::test]
+    async fn the_probe_denies_no_tool_as_a_whole() {
+        let data = std::env::temp_dir().join(crate::sessions::new_session_id().expect("id"));
+        let core = ProbeCore {
+            workspace: String::new(),
+            io: ToolIo::new(ToolIoConfig::new(data.clone())),
+            secrets: SecretsService::new(
+                SecretsConfig::with_master_key(&data, test_master_key_name("probe-tools")),
+                Arc::new(MemorySecretStore::new()),
+            ),
+            calls: Arc::default(),
+        };
+        let (peer, _frames) = Peer::channel(1);
+        let mut params = Map::new();
+        params.insert("sessionId".into(), json!("main"));
+        params.insert("tools".into(), json!(["Read", "Bash"]));
+        let answer = core.handle("policy/tools".into(), params, peer).await;
+        assert_eq!(answer.expect("answered"), json!({ "denied": [] }));
+        let calls = core.calls.lock().expect("calls");
+        assert!(calls.iter().all(|call| call.error.is_none()), "{calls:?}");
+    }
 }
