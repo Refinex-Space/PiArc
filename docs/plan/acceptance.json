@@ -2365,71 +2365,71 @@
       "id": "T22-A01",
       "task": "T22",
       "description": "模型请求中的 system prompt 按第 6.6.1 节顺序包含第 1、2、4、7 段，第 3、5、6 段在 M1 省略；不含 Pi 默认 preamble 与 Pi 文档路径。验证：场景测试中的 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test scenarios -- context-system-sections --exact：严格 Anthropic mock 验证 identity、tool_guidance、project_context、environment 顺序与实际开场 git 状态；省略段和 Pi 默认文本均缺席。两个 system 缓存块沿用 ephemeral。报告 tmp/evidence/T22/context-scenarios.json。"
     },
     {
       "id": "T22-A02",
       "task": "T22",
       "description": "同一会话的多个回合，以及回合之间 memory 文件被修改时，发送的 system 字节完全相同。验证：场景测试（逐字节比较）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "context-system-stable 与 context-memory-updated 实际比较 OpenAI、Anthropic 多次请求的完整 system；普通回合、memory 修改、Core 重启后恢复均保持相同。context-system-sections 还验证首个 prompt 前修改只作为追加消息送达。"
     },
     {
       "id": "T22-A03",
       "task": "T22",
       "description": "多级目录的 `CLAUDE.md`、`.claude/CLAUDE.md`、`CLAUDE.local.md` 与用户级 memory 按规定顺序拼接；`CLAUDE.md` 与 `AGENTS.md` 并存时默认只取前者，改设置后两者都取。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "context-memory-hierarchy、context-memory-read-both：临时用户和数据目录、祖先与 cwd 的来源和优先顺序通过；默认取舍、开启 memory.readBoth 后双读均符合预期。Electron 开发与打包形态验证设置持久化，tmp/evidence/T22/l4-t22.log。"
     },
     {
       "id": "T22-A04",
       "task": "T22",
       "description": "块级 HTML 注释被去掉；超过 4 MiB 的 memory 文件被跳过并记录。验证：单测。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --lib memory：块级和相邻 HTML 注释会移除，代码示例保留；4 MiB 文件正常读取，多 1 字节跳过并捕获包含路径及上限的日志事件。tmp/evidence/T22/core-memory.log。"
     },
     {
       "id": "T22-A05",
       "task": "T22",
       "description": "`@path` 导入按相对路径解析，第 5 层不再展开，代码块与行内代码中的 `@` 不解析，循环导入只展开一次。验证：单测。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --lib memory：相对导入在原位置带来源展开，四层深度、循环、带空格路径、围栏与行内代码均通过；context-memory-imports 在实际请求复核。"
     },
     {
       "id": "T22-A06",
       "task": "T22",
       "description": "工作区外的导入首次出现\"权限扩展\"审批卡；允许后展开并在之后的会话中不再询问；拒绝时不展开并留下说明。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "context-memory-external-approval、context-memory-external-deny：权限扩展首次等待，永久允许后重启 Core 并新建会话只展开已确认目标，拒绝保留说明且请求不含外部正文。Electron dev、packaged 均验证卡片待处理时没有模型请求、拒绝后对话继续，截图在 tmp/evidence/T22/l4/。"
     },
     {
       "id": "T22-A07",
       "task": "T22",
       "description": "首次读取子目录中的文件后，该子目录的 `CLAUDE.md` 以带标记的消息注入一次；再次读写同一子目录不重复注入。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "context-memory-lazy、context-memory-file-tools：实际 Read、Write、Edit 与并行 Glob/Grep 触发来源消息；相同目录不重复，拒绝的写入不载入 memory。tmp/evidence/T22/context-scenarios.json。"
     },
     {
       "id": "T22-A08",
       "task": "T22",
       "description": "会话中途修改 `CLAUDE.md` 后，下一回合的请求中出现包含新内容的追加消息。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "context-memory-updated、context-system-stable、context-system-sections：回合间及首个 prompt 前修改文件后，下一次真实请求中出现 [PiArc memory] 与新版内容，开场 system 保留原文。"
     },
     {
       "id": "T22-A09",
       "task": "T22",
       "description": "同一个 `CLAUDE.md` 的内容在请求中只出现一次（Pi 自带加载保持关闭）；未信任工作区的 memory 照常出现。验证：mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "context-memory-hierarchy 在未授信工作区逐项断言请求正文出现次数；同一 CLAUDE.md 正文一次。Pi 资源加载仍配置 noContextFiles: true。"
     },
     {
       "id": "T22-A10",
       "task": "T22",
       "description": "提示词原创性自查脚本在本机运行，连续 10 词以上相同片段为零，结果记录在 `docs/engineering/prompt-originality.md`。验证：脚本输出与记录文件。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "node scripts/dev/check-prompt-originality.mjs：referenceFiles=3533 promptWords=253 window=10 matchingWindows=0。结果与方法见 docs/engineering/prompt-originality.md。"
     },
     {
       "id": "T22-A11",

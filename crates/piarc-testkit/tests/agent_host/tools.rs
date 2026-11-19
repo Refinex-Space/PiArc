@@ -166,7 +166,13 @@ fn check_core_calls(calls: &[crate::harness::Call]) {
     let shells: Vec<_> = calls.iter().filter(|c| c.method == "exec/shells").collect();
     assert_eq!(shells.len(), 1, "{shells:?}");
     assert!(shells[0].error.is_none(), "{:?}", shells[0]);
+    let mut memory_scans = 0;
     for call in calls.iter().filter(|c| c.method != "exec/shells") {
+        if call.method == "fs/memory" {
+            assert!(call.tool.is_none() && call.error.is_none(), "{call:?}");
+            memory_scans += 1;
+            continue;
+        }
         let tool = call.tool.as_deref().expect("every request names its tool");
         by_tool
             .entry(tool)
@@ -174,6 +180,8 @@ fn check_core_calls(calls: &[crate::harness::Call]) {
             .insert(call.method.as_str());
         assert!(call.error.is_none(), "{call:?}");
     }
+    // Opening context, then a single refresh when Write enters src for the first time.
+    assert_eq!(memory_scans, 2);
     println!("Core-side calls by tool: {by_tool:?}");
     let expected: BTreeMap<&str, BTreeSet<&str>> = [
         ("Read", vec!["fs/stat", "fs/read"]),

@@ -504,8 +504,18 @@ pub async fn open(
     cwd: &str,
     model_id: &str,
 ) -> SessionId {
+    open_with_model(supervisor, core, cwd, model(model_id)).await
+}
+
+/// Register the same Core scope when a test selects a non-default provider.
+pub async fn open_with_model(
+    supervisor: &HostSupervisor,
+    core: &Core,
+    cwd: &str,
+    model: Option<ModelRef>,
+) -> SessionId {
     let id = supervisor
-        .create_session(SessionCreateParams::new(cwd).with_model(model(model_id)))
+        .create_session(SessionCreateParams::new(cwd).with_model(model))
         .await
         .expect("session opens")
         .session_id;

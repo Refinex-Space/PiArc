@@ -13,28 +13,13 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 | `cargo test -p piarc-testkit --test agent_host -- --nocapture` | 端到端：Core 监管真实 bundle、mock provider 应答（S3、S4、S5 与进程级 S9；`trust.rs` 是 T13 的项目扩展随信任加载与撤销）；测试会先自己打包 |
 | `node agent-host/dist/bundle/agent-host.mjs --data-dir <dir>` | 手动运行；需设 `PI_PACKAGE_DIR=<bundle>/pi-assets`，stdout 只走 AHP 帧。`--tool-profile <json>` 覆盖默认 Profile 的名称与描述、`--pi-native-tools` 换回 Pi 原生工具、`--test-oauth-provider <json>` 注册接本地 token 端点的 OAuth provider、`--test-record-events <dir>` 把每个会话的原始 Pi 事件与注册表的步骤写成 `<dir>/<sessionId>.jsonl`、`--test-drop-seq <n>` 让 seq 为 n 的会话通知不写出（仍进回放缓冲），都只给测试用，Core 不传 |
 
-## 入口与结构
+## 入口与进程边界
 
-- `src/main.ts`：进程入口。解析 `--data-dir`、`--bridge-timeout-ms`；设置 `PI_CODING_AGENT_DIR`；接管 stdout（第三方的 `console.log` 改写到 stderr）；SIGTERM/SIGINT 有序退出，第二个信号立即退出。
-- `src/host.ts`：与进程无关的主体：握手（`host/hello` → `core/welcome`）、请求分派、`host/shutdown`、stdin 关闭即退出。退出码见 `EXIT`（3 = 协议主版本不符，70 = 出站积压超限）。
-- `src/runtime/`：会话注册表（`session-registry.ts`：回合、steer 与 follow-up、fork、history、并发 resume 合并）、投影（`projector.ts` 实时、`history.ts` 会话文件，共用 `items.ts` 的条目构造；规则表在 `projector.ts` 文件头，与架构第 5.3 节一致）、排队表（`queue.ts`）、blob 读取（只接受数据目录 `sessions/` 下的路径）。
-- `src/harness/tool-batches.ts`、`src/harness/interruption.ts`：回合不变量的 Harness Kit 部分（工具批次、中断补齐），见下文"回合不变量"。
-- `test/golden/`：投影 golden 测试的输入（录制或构造的 Pi 事件，`*.events.json`）与期望输出（`*.expected.json`）；Prettier 不处理这个目录。
-- `src/runtime/core-bridge.ts`：向 Core 发请求的唯一入口（统一超时，默认 30 s；`policy/evaluate` 收到匹配的 `policy/pending` 才停止计时，用户等待由会话中断或连接关闭取消）。
-- `src/protocol/outbound.ts`：写 stdout 的唯一路径：等 `drain`、合并增量、`item/updated` 只保留最新、写出时分配 `seq`；每个会话保留最近 4,096 条或 8 MiB 已写出的通知供 `session/getEntries` 回放；超过 8 MiB 单帧上限的会话通知不写出、不占 `seq`。
-- `src/tools/`：工具层（架构第 6.1 节、ADR-0020、ADR-0027）。`profile.ts` 规范名、默认 Profile（描述原创，ADR-0006）与 `ToolNameMap`；`core-io.ts` 经 Core 桥接发 `fs/*`、`exec/*`（结果在此校验，错误重建为 Node 风格；写给模型的 Core 错误去掉 `<method> failed:` 前缀）；`read.ts`、`write.ts`、`edit.ts` 在替身路径（`stand-in.ts`）上运行 Pi 的工具定义（T16 的扩展：`line-numbers.ts` 行号、`documents.ts` PDF 与 notebook、`replace-all.ts`）；`glob.ts` 用 Pi 工厂加 Operations；`grep.ts` 自写；`shell.ts` 自写 Bash 与 PowerShell（T17，ADR-0028：Core 的 `exec/run` 管超时、进程树、cwd、输出预算与语义，工具只组织文本与 `details.commandExecution`），会话的工具集按 `exec/shells`（`session-registry.ts` 的 `shellsFor`）；`ls.ts` 只提供 `LsOperations`，不暴露。
-- `src/harness/tool-results.ts`（T16）：工具结果预算，作为内联扩展挂在每个会话上（`tool_result` 单个 50K 落盘、`context` 单条消息 200K），阈值只改 `TOOL_RESULT_LIMITS` 或注册表选项 `toolResultLimits`。
-- `src/harness/project-trust.ts`：Harness Kit 接管 Pi 的项目信任（T13）。`askCoreTrust` 发 `trust/get`，超时、错误响应、结果无法解析、连接已断都按不信任；`takeOverProjectTrust` 给 `createAgentSessionServices` 的 `resourceLoaderReloadOptions.resolveProjectTrust`，会话的 `SettingsManager` 一律以 `projectTrusted: false` 创建，项目级资源（`.pi/extensions/`、`.pi/settings.json`、`.pi/mcp.json` 等）在钩子拿到 Core 的回答后才加载。
-- `src/runtime/credentials.ts`：`CoreCredentialStore`，pi-ai 的 `CredentialStore`，经 `secrets/*` 由 Core 的保险箱支撑（ADR-0021）；`host.ts` 在握手后 `load()`，再交给 `ModelRuntime.create({ credentials })`。
-
-## 打包的外部依赖
-
-| 包 | 原因 |
-|---|---|
-| `@silvia-odwyer/photon-node` | 从自己的包目录加载 `photon_rs_bg.wasm`（图片缩放） |
-| `bufferutil`、`utf-8-validate`、`kerberos`、`supports-color` | 可选原生加速或输出着色，导入失败时调用方自行降级 |
-
-其余全部内联（含 jiti）；`scripts/dev/build-agent-host.mjs` 发现其他外部导入就失败。尚未打包：codemode worker、图片缩放 worker、pi-ai 的 OAuth 懒加载模块（Bedrock 在创建工作区时用 pi-ai 的公开加载器注册并打入 bundle；用到 OAuth 的任务负责补上，参考 Pi 自己的 `scripts/build-coding-agent-bundle.mjs`）。
+- `src/main.ts` 设置 Pi 数据目录并把第三方 stdout 日志改写到 stderr。首次退出信号启动有序关闭，第二次立即退出。`src/host.ts` 处理握手、分派与关闭，主版本不兼容退出码为 3，出站积压超限为 70。
+- `runtime/session-registry.ts` 管理会话与恢复。实时投影和历史回放共用 `items.ts`；投影规则见 `projector.ts` 文件头和 `test/golden/`。工具批次、中断补齐与结果预算在 `harness/`，50K/200K 阈值统一由 `TOOL_RESULT_LIMITS` 提供。
+- `CoreBridge` 默认等待 30 秒。审批请求只有收到匹配的 `policy/pending` 后才停表，中断或断连会取消等待。`OutboundQueue` 写出时分配 seq，每会话保留最近 4,096 条或 8 MiB 通知供回放；超 8 MiB 的单条通知不占 seq。
+- `tools/profile.ts` 负责规范名与模型可见名的映射，`tools/core-io.ts` 负责委托 I/O。文件工具的替身路径、shell 探测及结果格式见下文。项目资源必须等待 `harness/project-trust.ts` 的 Core 信任答复；凭据只经 `runtime/credentials.ts` 的 `CoreCredentialStore`。
+- `scripts/dev/build-agent-host.mjs` 只允许外置 `@silvia-odwyer/photon-node`（从包目录加载 WASM）及可选的 `bufferutil`、`utf-8-validate`、`kerberos`、`supports-color`。其余导入内联。codemode worker、图片缩放 worker 和 pi-ai 的 OAuth 懒加载模块尚未打包，Bedrock 经公开加载器纳入 bundle。
 
 ## 不变量
 
@@ -131,7 +116,4 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - Bash 的结果文本在与 Pi 含义相同处用 Pi 的措辞（"Command exited with code N" 等，`parity.rs` 的 Bash 步骤与 L2 断言依赖）；输出保留原样的末尾换行。改措辞时同步对照测试与 `tests/scenarios/exec-*.yaml`。
 - 命令的 `details.commandExecution` 由 `shell.ts` 写、`items.ts` 的 `resultExecution` 校验后放进条目的 `execution`（实时与历史都经它）；改形状时两边与协议类型一起改。
 
-## 参考
-
-- 架构第 5 章、第 7.4–7.5 节；ADR-0002、ADR-0009、ADR-0010、ADR-0015。
-- `docs/research/pi-v1.4.0-baseline.md` 文末"版本差异：v1.5.2"；`docs/spikes/S03-multi-session.md`、`S04-operations-delegation.md`、`S09-ahp-resilience.md`；ADR-0020。
+相关基线见架构第 5、7 章、ADR-0002、0009、0010、0015、0020、Pi 调研的 v1.5.2 差异，以及 S03、S04、S09 报告。

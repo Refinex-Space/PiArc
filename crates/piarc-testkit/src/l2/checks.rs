@@ -4,7 +4,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::path::Path;
 
+use serde::Deserialize;
 use serde_json::Value;
+use serde_json::value::RawValue;
 
 use super::format::{RequestExpect, ScenarioSpec};
 use super::matcher::{compact, subset_mismatch};
@@ -34,18 +36,35 @@ impl RequestView {
         })
     }
 
-    /// Preserve the wire's system block boundaries, metadata, roles and exact text bytes.
-    fn system(&self) -> Vec<&Value> {
-        let messages = self.body["messages"]
-            .as_array()
+    /// Keep the exact JSON received by the endpoint, including escapes, whitespace and key order.
+    fn system(&self) -> Result<Vec<&str>, String> {
+        #[derive(Deserialize)]
+        struct Wire<'a> {
+            #[serde(borrow)]
+            system: Option<&'a RawValue>,
+            #[serde(borrow)]
+            messages: Vec<&'a RawValue>,
+        }
+        let wire: Wire<'_> = serde_json::from_str(&self.raw)
+            .map_err(|e| format!("cannot extract raw system bytes: {e}"))?;
+        // Both format parsers retain one role per wire message in the same order.
+        let system_messages = wire
+            .messages
             .into_iter()
-            .flatten()
-            .filter(|message| matches!(message["role"].as_str(), Some("system" | "developer")));
-        self.body
-            .get("system")
+            .zip(&self.request.messages)
+            .filter_map(|(raw, message)| (message.role == Role::System).then_some(raw));
+        Ok(wire
+            .system
             .into_iter()
-            .chain(messages)
-            .collect()
+            .chain(system_messages)
+            .map(RawValue::get)
+            .collect())
+    }
+
+    fn same_system_as(&self, earlier: &RequestRecord) -> Result<bool, String> {
+        let previous = Self::of(earlier)?;
+        let system = previous.system()?;
+        Ok(!system.is_empty() && system == self.system()?)
     }
 
     fn roles(&self) -> Vec<String> {
@@ -220,14 +239,16 @@ fn check_context(
         ));
     }
     if let Some(index) = expect.same_system_as {
-        match records.get(index).map(RequestView::of) {
-            Some(Ok(earlier))
-                if !earlier.system().is_empty() && earlier.system() == view.system() => {}
-            Some(Ok(_)) => out.push(format!(
+        match records
+            .get(index)
+            .map(|earlier| view.same_system_as(earlier))
+        {
+            Some(Ok(true)) => {}
+            Some(Ok(false)) => out.push(format!(
                 "same_system_as: system content is missing or differs from request #{index}"
             )),
             Some(Err(why)) => out.push(format!(
-                "same_system_as: cannot parse request #{index}: {why}"
+                "same_system_as: could not compare with request #{index}: {why}"
             )),
             None => out.push(format!(
                 "same_system_as: request #{index} was never received"
@@ -380,6 +401,56 @@ pub fn text_diff(expected: &str, actual: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn differences(format: crate::request::WireFormat, first: &str, later: &str) -> Vec<String> {
+        let record = |body: &str| RequestRecord {
+            seq: 0,
+            method: "POST".into(),
+            path: "/model".into(),
+            format: Some(format),
+            scenario: None,
+            step_index: None,
+            headers: BTreeMap::new(),
+            body: body.into(),
+            violations: Vec::new(),
+            outcome: crate::record::Outcome::Streamed,
+        };
+        let expect = serde_json::from_value(serde_json::json!({"index":1,"same_system_as":0}))
+            .expect("request assertion");
+        let view = RequestView::of(&record(later)).expect("valid model request");
+        check_request(&expect, &view, &[record(first)])
+    }
+
+    #[test]
+    fn same_system_as_compares_the_original_anthropic_json_bytes() {
+        let first = r#"{"system":[{"type":"text","text":"é"}],"messages":[{"role":"user","content":"first"}]}"#;
+        let changed_user = first.replace("first", "second");
+        let wire = crate::request::WireFormat::AnthropicMessages;
+        assert!(differences(wire, first, &changed_user).is_empty());
+        let escaped = changed_user.replace('é', r"\u00e9");
+        assert_eq!(
+            differences(wire, first, &escaped).len(),
+            1,
+            "JSON escape spelling changed"
+        );
+    }
+
+    #[test]
+    fn same_system_as_compares_the_original_openai_message_bytes() {
+        let first = r#"{"messages":[{"role":"system","content":"identity"},{"role":"developer","content":"rules"},{"role":"user","content":"first"}]}"#;
+        let wire = crate::request::WireFormat::OpenaiChatCompletions;
+        let changed_user = first.replace("first", "second");
+        assert!(differences(wire, first, &changed_user).is_empty());
+        let reordered = changed_user.replace(
+            r#""role":"developer","content":"rules""#,
+            r#""content":"rules", "role":"developer""#,
+        );
+        assert_eq!(
+            differences(wire, first, &reordered).len(),
+            1,
+            "JSON member order changed"
+        );
+    }
 
     #[test]
     fn a_text_diff_names_the_first_differing_line() {

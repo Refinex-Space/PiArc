@@ -1,5 +1,5 @@
 id: context-memory-lazy
-description: Reading a nested file delivers its ancestors' memory as a marked message once, even after another read in the same directory.
+description: Reading a nested file delivers its ancestors' memory as a marked message once, through later reads and edits in the same directory.
 capabilities: [CAP-CTX-MEMORY-001]
 workspace:
   files:
@@ -15,11 +15,18 @@ providers:
     steps:
       - tool_calls: [{ id: first, name: Read, input: { path: lib/util/a.txt } }]
       - tool_calls: [{ id: next, name: Read, input: { path: lib/util/b.txt } }]
-      - text: Both files read.
+      - tool_calls:
+          - id: change
+            name: Edit
+            input:
+              { path: lib/util/a.txt, edits: [{ oldText: first sample, newText: edited sample }] }
+      - text: Finished.
+approvals:
+  - { tool: Edit, decision: allow }
 actions:
   - prompt: { text: Inspect these files. }
 expect:
-  request_counts: { main: 3 }
+  request_counts: { main: 4 }
   requests:
     - { index: 0, not_contains: [Library directory policy., Utility directory policy.] }
     - index: 1
@@ -37,3 +44,11 @@ expect:
       tool_results:
         - { id: first, is_error: false, contains: first sample }
         - { id: next, is_error: false, contains: second sample }
+    - index: 3
+      same_system_as: 0
+      occurrences: { Library directory policy.: 1, Utility directory policy.: 1 }
+      tool_results:
+        - { id: first, is_error: false, contains: first sample }
+        - { id: next, is_error: false, contains: second sample }
+        - { id: change, is_error: false }
+  files: { lib/util/a.txt: edited sample }

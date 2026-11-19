@@ -10,7 +10,7 @@ use std::time::{Duration, SystemTime};
 
 use piarc_core::agent_host::{HostConfig, HostEvent, HostSupervisor, Peer};
 use piarc_ports::SecretStoreError;
-use piarc_protocol::session::{ModelRef, SessionCreateParams, SessionId};
+use piarc_protocol::session::{ModelRef, SessionId};
 use piarc_testkit::plaintext;
 use serde_json::{Map, Value, json};
 
@@ -80,15 +80,17 @@ async fn connected_pid(events: &mut Recorder) -> u32 {
     }
 }
 
-async fn oauth_session(supervisor: &HostSupervisor, cwd: &str) -> SessionId {
-    supervisor
-        .create_session(SessionCreateParams::new(cwd).with_model(Some(ModelRef {
+async fn oauth_session(supervisor: &HostSupervisor, core: &harness::Core, cwd: &str) -> SessionId {
+    harness::open_with_model(
+        supervisor,
+        core,
+        cwd,
+        Some(ModelRef {
             provider: PROVIDER.into(),
             id: "mock-oauth".into(),
-        })))
-        .await
-        .expect("session opens")
-        .session_id
+        }),
+    )
+    .await
 }
 
 /// Login in Agent Host A, then two sessions of A and one of Agent Host B use the expiring token
@@ -120,11 +122,17 @@ async fn login_and_one_refresh_reach_the_vault_and_every_session() {
         .expect("the login reaches the vault")
         .expect("change");
     assert_eq!(change.key, format!("oauth/{PROVIDER}"));
-    let (host_b, mut events_b, _core_b) =
+    let (host_b, mut events_b, core_b) =
         env.start_with(oauth_config(&env, &tokens, false, "oauth-b"), &[]);
     let pid_b = connected_pid(&mut events_b).await;
 
-    run_three_sessions(&env, [&host_a, &host_b], [&mut events_a, &mut events_b]).await;
+    run_three_sessions(
+        &env,
+        [&host_a, &host_b],
+        [&core_a, &core_b],
+        [&mut events_a, &mut events_b],
+    )
+    .await;
     let issued = check_single_refresh(&env, &tokens).await;
 
     let env_session = open(&host_a, &core_a, &env.cwd(0), "mock-large").await;
@@ -160,11 +168,12 @@ async fn login_and_one_refresh_reach_the_vault_and_every_session() {
 async fn run_three_sessions(
     env: &Env,
     [host_a, host_b]: [&HostSupervisor; 2],
+    [core_a, core_b]: [&harness::Core; 2],
     [events_a, events_b]: [&mut Recorder; 2],
 ) {
-    let a1 = oauth_session(host_a, &env.cwd(0)).await;
-    let a2 = oauth_session(host_a, &env.cwd(0)).await;
-    let b1 = oauth_session(host_b, &env.cwd(1)).await;
+    let a1 = oauth_session(host_a, core_a, &env.cwd(0)).await;
+    let a2 = oauth_session(host_a, core_a, &env.cwd(0)).await;
+    let b1 = oauth_session(host_b, core_b, &env.cwd(1)).await;
     let texts = ["oauth-a1", "oauth-a2", "oauth-b1"].map(|s| prompt_text("Hello.", s));
     let (t1, t2, t3) = tokio::join!(
         host_a.prompt(&a1, "a1", &texts[0]),
