@@ -1,6 +1,6 @@
 // The same fixture and approvals are used on macOS and Windows (W1).
 import { spawnSync } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, makeWorkspace, openFolder, startSession, test } from './sessions.js';
 import { idle } from './t19.js';
@@ -39,12 +39,14 @@ for (const [id, api, format] of [
     await settings.screenshot({ path: info.outputPath('settings.png') });
     await settings.close();
     const ws = await makeWorkspace(workspaces, '加法 regression', files);
+    const init = spawnSync('git', ['init', '--quiet'], { cwd: ws, encoding: 'utf8' });
+    expect(init.status, init.stderr).toBe(0);
     const run = () =>
       spawnSync(process.execPath, ['--test', 'sum.test.cjs'], { cwd: ws, encoding: 'utf8' });
     const before = run();
     expect(before.status).toBe(1);
     expect(before.stdout).toContain('ERR_ASSERTION');
-    await info.attach('before', { body: before.stdout, contentType: 'text/plain' });
+    await writeFile(info.outputPath('before.txt'), before.stdout);
     await openFolder(page, app, ws);
     await page.getByTestId('home-model').selectOption(id + '/fixture');
     await startSession(page, task, 'r2-workflow');
@@ -80,6 +82,6 @@ for (const [id, api, format] of [
     expect(await readFile(path.join(ws, 'sum.test.cjs'), 'utf8')).toBe(files['sum.test.cjs']);
     const after = run();
     expect(after.status).toBe(0);
-    await info.attach('after', { body: after.stdout, contentType: 'text/plain' });
+    await writeFile(info.outputPath('after.txt'), after.stdout);
   });
 }

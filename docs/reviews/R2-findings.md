@@ -1,6 +1,6 @@
 # R2 · M1 macOS 阶段评审
 
-**阶段门暂缓。** 两种严格 mock 协议在开发版和打包版均完成真实文件编辑、手动审批和 Bash 测试。真实模型尚未完成工作流。读取状态和项目信任存在已核实的接口语义问题，见 [ADR-0034](../adr/0034-bind-read-and-trust-confirmation.md)。M2 的前提是关闭阶段门所列问题并复核。W1 重点是 Windows shell、进程树、凭据和桌面实机交互。
+**阶段门暂缓。** 两种严格 mock 协议在开发版和打包版均完成真实文件编辑、手动审批和 Bash 测试。百炼 qwen-flash 已经通过真实工作流。读取状态和项目信任存在已核实的接口语义问题，见 [ADR-0034](../adr/0034-bind-read-and-trust-confirmation.md)。M2 的前提是关闭阶段门所列问题并复核。W1 重点是 Windows shell、进程树、凭据和桌面实机交互。
 
 ## 双协议与真实模型
 
@@ -8,7 +8,9 @@
 
 在含空格和中文的工作区创建 sum.cjs、sum.test.cjs。初始 3 + 2 返回 1，Node 单元测试报 ERR_ASSERTION。会话通过 Read 取得两份源文件，在 Manual 卡片允许一次 Edit，再允许一次 Bash 执行 `node --test sum.test.cjs`。逐请求检查实际线格式、模型收到的源代码和测试输出，独立重跑通过，测试文件逐字节保持原内容。各次真实网络交换 4 次，端点均为本地测试服务器。夹具和 W1 可复用入口在 `apps/desktop/e2e/r2-workflow.e2e.ts`，截图在 `tmp/evidence/R2/l4/`。
 
-另在打包应用配置关闭云端的本机 Ollama，使用已安装的 deepseek-r1:7b（OpenAI Chat Completions）执行相同初始项目和用户指令。服务端记录 1 次推理请求，HTTP 200，费用 0。模型直接输出文字建议，未发起 Edit 或 Bash，等待真实审批卡超时。该运行未达到退出标准。证据见 `tmp/evidence/R2/local-run.log`、`local/l4/`。真实服务商未验证；本次没有使用付费远程凭据。
+另在打包应用配置关闭云端的本机 Ollama，使用已安装的 deepseek-r1:7b（OpenAI Chat Completions）执行相同初始项目和用户指令。服务端记录 1 次推理请求，HTTP 200，费用 0。模型直接输出文字建议，未发起 Edit 或 Bash，等待真实审批卡超时。该运行未达到退出标准。证据见 `tmp/evidence/R2/local-run.log`、`local/l4/`。
+
+维护者随后授权百炼北京端点最多 8 次调用、预算人民币 0.10 元。打包应用在隔离的 Git 夹具中从设置页配置 qwen-flash，经保险箱取得凭据，依次执行 Read、Read、Edit、Bash，测试由 ERR_ASSERTION 变为通过。最后一轮给出结果。转发器限制请求次数、输入字节和最大输出，仅记录 HTTP 状态、工具名与用量。5 次请求均为 HTTP 200，合计输入 11,868、输出 254 tokens；按每百万输入 0.15 元、输出 1.50 元计，估算 0.0021612 元，优惠和账单结算以服务商为准。证据在 `tmp/evidence/R2/paid/` 的 usage.json、before.txt、after.txt 和三张截图。[百炼 qwen-flash 官方定价](https://help.aliyun.com/zh/model-studio/qwen-flash)
 
 ## M1 目标与证据
 
