@@ -8,14 +8,14 @@
 //!
 //! # Not responsible for
 //!
-//! - Snapshot storage and rewind (`piarc-checkpoint`), which it calls before writing.
+//! - Snapshot storage and rewind (`piarc-checkpoint`), planned before writes in M2.
 //! - Diff computation (`piarc-diff`).
 //! - Permission decisions (`piarc-policy`).
 //!
 //! # Allowed workspace dependencies
 //!
 //! The foundation crates `piarc-protocol` and `piarc-ports`, plus the registered one-way exception
-//! `piarc-checkpoint`: every write must save the original file content to a checkpoint first
+//! `piarc-checkpoint`: in M2 every write must save the original file content to a checkpoint first
 //! (architecture section 6.9). `piarc-checkpoint` never depends on `piarc-fs`.
 //!
 //! The authoritative rules are in `crates/deps-rules.json`, enforced by

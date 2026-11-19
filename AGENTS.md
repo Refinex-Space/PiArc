@@ -28,7 +28,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `npm run build:core` | 用 `@napi-rs/cli` 构建本机的 Core 开发版 `.node`（`target/piarc-core/development/`）并更新 `.d.ts` 快照；`-- --flavor all` 两种构建都出 |
 | `npm run format` | Prettier 写入格式（不处理 Markdown） |
 | `npm run lint` | ESLint（类型感知） |
-| `npm run typecheck` | `tsc --build`：三个工作区与 `scripts/` |
+| `npm run typecheck` | `tsc --build`：四个工作区与 `scripts/` |
 | `npm test` | Vitest 全部 TS/JS 测试 |
 | `npx vitest run <路径>` | 只跑某个目录或文件的测试 |
 | `cargo test -p <crate>` | 只跑某个 crate 的测试（检查点提交用） |
