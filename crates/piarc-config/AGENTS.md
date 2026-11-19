@@ -30,7 +30,7 @@
 ## Claude Code 配置（T24，ADR-0038）
 
 - **键映射表**在 `src/claude.rs` 的 `SETTINGS_KEYS`（`settings.json` 的键）与 `STATE_KEYS`（`~/.claude.json`）：每行是键（嵌套键用点）、状态（`Active` 以同一 JSON Pointer 并入、`Planned(任务)`、`Ignored`）与对应的 PiArc 设置或忽略原因。它是唯一判断：合并只保留 `Active` 的键（`claude::project`，读文件时投影），诊断用 `claude::classify` 分类，表外的键为"未知"。某个键的功能落地时：把这一行改为 `active("…", "/…")`，把键加进 `schema::PIARC_SETTINGS`（测试检查生效的键都是 PiArc 已知的设置），需要信任的值加进 `layers::CLAUDE_EXECUTABLE`。不要在别处另写"这个键算不算"的判断。行的来源是官方 settings 索引，Claude Code 增删键时同步。
-- M2 生效的键：`permissions.allow`、`ask`、`deny`、`defaultMode`、`additionalDirectories`。项目层的 allow、`additionalDirectories`、`acceptEdits` 在信任前移除，`bypassPermissions` 与 `auto` 始终移除（与 PiArc 项目层同一套过滤）；生效键类型错误时整份文件跳过，被忽略的键不校验。
+- M2 生效的键：`permissions.allow`、`ask`、`deny`、`defaultMode`、`additionalDirectories`，以及 T25 的 `hooks`（可执行值，信任前移除）、`disableAllHooks`。hooks 的 handler 形状在 `schema.rs` 的 `HOOK_HANDLER`：只检查已知字段的类型，语义与不支持的字段由 `piarc-hooks` 报告。项目层的 allow、`additionalDirectories`、`acceptEdits` 在信任前移除，`bypassPermissions` 与 `auto` 始终移除（与 PiArc 项目层同一套过滤）；生效键类型错误时整份文件跳过，被忽略的键不校验。
 - **不写 `.claude/`**：`write.rs` 的所有写入（含 `replace_file`）对路径含 `.claude` 目录或名为 `.claude.json` 的目标返回 `WriteError::ClaudeConfig`（Core 映射为 `permissionDenied`），与层是否标为可写无关。"总是允许"、模式记忆、设置页只写 `.piarc/` 与用户级 PiArc 设置。
 - **rules**（`src/rules.rs`）：`rule_files` 递归列出 `*.md`（跟随符号链接，同一目录只访问一次，跳过隐藏项）；`parse` 拆出 frontmatter 的 `paths:`（列表或逗号分隔的字符串，YAML 无效时整个文件按无条件处理）；`PathMatcher` 按 gitignore 语义相对工作区根匹配，Windows 不区分大小写。读取与送达在 `piarc-core::tool_io::memory_reader`。
 - **诊断**（`src/diagnostics.rs`）：`Settings::diagnostics()` 按文件（高到低）给出加载状态、生效键（标量带决定它的层，列表为合并）、被覆盖键与覆盖层、忽略键与原因（`unknown`、`ignored`、`planned` + 任务、`untrusted`、`projectMode`）、带行列的问题；`claude_state_report(home, workspace)` 只读 `~/.claude.json` 的键名（值在解析时跳过）。

@@ -26,6 +26,7 @@ AHP 与 Core API 数据类型的唯一来源：Rust 类型 → JSON Schema → `
 - AHP 的 `InputMention` 区间使用 UTF-16 码元，和 ProseMirror 序列化后的 JS 字符串偏移一致。输入、队列与用户条目都以 `InputAttachment` 引用描述图片和 PDF。可选元数据缺失的纯文本消息沿用 T14 行为（ADR-0030）。
 - `policy/evaluate` 的参数与结果是 AHP 契约，审批卡、答复与结果类型随 Core API 的 schema 生成，定义在 `policy.rs`。
 - `fs/memory` 的分页结果承载编码为 JSON 的 `MemorySnapshot`。修改内层结构也要生成 schema 与 TS 类型。
+- `hooks.rs`（T25）：`hooks/run` 的 `input` 用 Claude Code 的蛇形字段名（`tool_name` 等），这是 hook 的输入格式而不是 AHP 成员，不改 camelCase；事件枚举照常 camelCase。
 - 导出必须确定：`export_schema` 递归排序对象键；不要写入时间、路径、用户名。
 - `contracts` 名中 `jsonrpc/`、`envelope/` 留给顶层消息类型，`framing/` 留给帧用例目录，方法不得使用。
 - 错误：crate 内 `Error`（`kind()`、`retryable()`、`to_error_object()`）；线上形状是 `rpc_error::ErrorObject`，应用错误码取 `-32099..=-32000`。

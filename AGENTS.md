@@ -61,6 +61,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `node scripts/plan/check-capabilities.mjs [--milestone M2]` | 检查能力清单；`--milestone` 列出该里程碑及之前未完成的能力；`--results <报告> --doc write` 重新生成 `capabilities.md` |
 | `cargo test -p piarc-policy --test bash_cases -- --nocapture` | T23 的 Bash 分析数据驱动用例（`crates/piarc-policy/tests/bash_cases.json`，打印条数与类别）与随机输入测试 |
 | `cargo test -p piarc-testkit --test sessions` | 会话层端到端：Core 的工作区与会话 actor 驱动真实 Agent Host 与 mock（排队、中断、工具批次、重试、缺口补齐、空闲回收、重启恢复） |
+| `cargo test -p piarc-core --lib tool_io::hooks` | hooks 经真实 Core：裁决第 2、8 步、`hooks/run`、信任、审计与落盘、并行与去重、超时与中断后整棵进程树结束（T25）；L2 为 `cargo test -p piarc-testkit --test scenarios -- hooks-` |
 | `PIARC_UPDATE_GOLDEN=1 cargo test -p piarc-testkit --test agent_host golden` | 重新录制投影 golden 的 Pi 事件序列（`agent-host/test/golden/`）；之后 `npx vitest run agent-host -u` 更新投影快照。不带变量时只做漂移检查 |
 | `cargo run --release -p piarc-testkit --example t14-warmup` | 工作区预热测量：打开到 Agent Host 就绪、打开并恢复会话，10 次取最大值（预算 1 s） |
 
@@ -119,3 +120,4 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - 权限规则与 Bash 分析在 `piarc-policy`（规则语法、阶梯、只读白名单、关键路径删除与"总是允许"前缀见其 AGENTS.md），Core 侧组装在 `tool_io::policy::assess`（ADR-0037）。只读白名单里的命令（`echo`、`ls`、`cat`、`git status`…）在手动模式下免审批：要求审批的 L2/L4 夹具用不在白名单的命令（`env echo`、`sed`、`printenv`）。项目文件里新加的 allow 规则是未确认的可执行项，信任重新确认前不生效；跳过权限的开关只读用户级 `settings.json` 的 `permissions.enableBypassPermissions`。
 - Bash 与 PowerShell 是 PiArc 自写的工具，命令的进程树终止、超时（默认 2 分钟、上限 10 分钟）、cwd 跟踪、输出预算与落盘、语义退出码都在 Core 的 `exec/run`（`piarc-exec` + `piarc-core::tool_io::exec`，ADR-0028）；阈值只改 `piarc_exec::ExecLimits`。命令环境来自用户登录 shell（每个 Core 首次执行命令时解析），仅向命令传入 ADR-0035 准入的系统、locale、工具链变量。
 - Agent Host 的工具不碰文件系统与子进程：`agent-host/src/tools/`、`src/harness/` 禁止导入 `fs`、`child_process`，I/O 一律经 AHP `fs/*`、`exec/*` 由 Core 执行（ADR-0004、ADR-0020）；端到端测试的 I/O spy 会抓到绕过。
+- Hooks（T25，ADR-0039）：hook 命令只在 Core 运行（`piarc-hooks` 解析、匹配、执行、合并，`piarc-core::hooks` 读设置与信任、写审计），Agent Host 只经 `hooks/run` 报告 Pi 事件并应用结果；新增事件在 `HookEvent` 加一项、在挂载处调 `HooksService::run`，不另写执行器。Stop 续跑上限只在 `piarc_hooks::STOP_CONTINUATION_LIMIT`。L2 的 hook 夹具是 `tests/scenarios/fixtures/hooks/hook.mjs.txt`（复制成 `hook.mjs` 运行）。

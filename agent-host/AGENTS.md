@@ -53,6 +53,11 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - 每次运行前（`before_agent_start`）把当前工具的规范名经 `policy/tools` 交给 Core，Core 返回被不带 specifier 的 deny 规则覆盖的工具，`nextActiveTools` 用 `setActiveTools` 移除它们，规则撤销后恢复；请求失败时保持原列表（每次调用仍经 `policy/evaluate`，ADR-0037）。
 - Host 重连恢复时，最后一个模型回复中尚无结果的调用经 `policy/recover` 查询审批失效原因。只给失效调用写入拒绝结果，其余缺失结果按 ADR-0026 补齐。`cargo test -p piarc-testkit --test sessions permissions::` 覆盖真实进程终止、恢复后的模型请求、审批快照与模式历史。
 
+## Hooks（T25，ADR-0039）
+
+- `harness/hooks.ts` 的 `SessionHooks`（Core 启用 `hooks` 能力时每会话一个，排在结果预算之后）把 Pi 的 `session_start`、`session_shutdown`、`tool_result`、`agent_before_settle`、`session_before_compact`、`session_compact` 经 `hooks/run` 交给 Core（不在本进程执行命令，失败照常进行）；上下文是不显示的 `piarc.hookContext` 消息（首行 `[PiArc hook context]`，`memory-wire.ts` 在 Anthropic 线格式上合并）。SessionStart 不阻塞会话打开，首个 `before_agent_start` 等它。
+- `preflight` 的 `updatedInput` 原地替换 `event.input`，`context`、`stop` 记在 `SessionHooks.notes` 到 `tool_result` 处理；Core 在 hooks 前发 `policy/pending` 停住期限，不要去掉 `policy/evaluate` 的期限。`hooks/run` 无期限，超帧输入由 `fitFrame` 截断（否则 Core 丢帧、回合永远等）。PreCompact 有指令时用 Pi 导出的 `compact()` 生成摘要（Pi 1.5.2 不回读指令）。
+
 ## 多会话的易错点
 
 - 不要调用 `process.chdir`，也不要读 `process.cwd()` 推断会话目录：Pi 按每个会话的 `cwd` 解析工具路径。

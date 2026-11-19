@@ -24,7 +24,7 @@ Core 的权限裁决（T20 起，T23 完整版）：Claude Code 格式的规则�
 | 7 | 越界 → 询问；只读且在会话目录内 → 允许；Accept edits 的编辑与文件命令 → 允许 | |
 | 8 | PermissionRequest 插槽（T25，`after_permission_request`），不能批准关键路径删除与需要用户交互的工具 | 询问用户 |
 
-- 插槽在 Core 的 `tool_io::policy::hooks::PolicyHooks`，现在是 `NoHooks`；`decision/tests.rs` 用替身值验证 allow 只"继续走后续步骤"。
+- 插槽的结果由 Core 的 `tool_io::policy::hooks` 填入（T25，PreToolUse 与 PermissionRequest hooks）；`decision/tests.rs` 用替身值验证 allow 只"继续走后续步骤"。`after_permission_request` 不让 hook 批准关键路径删除与需要用户交互的工具。
 - `Input.tainted`（命令改 `PATH`、`IFS` 等或带不安全的前置赋值）：第 6、7 步不自动允许，bypass 仍允许。
 - 起始模式：会话显式 → 工作区记忆（`workspaces.default_mode`）→ `permissions.defaultMode` → Manual；`bypassPermissions` 只有用户文件里 `permissions.enableBypassPermissions: true` 时可用（`starting_mode`）。
 

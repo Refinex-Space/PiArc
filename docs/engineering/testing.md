@@ -307,7 +307,7 @@ sessions:                         # 可选；缺省为一个会话 main，使用
   a: { provider: one, cwd: 'alpha dir' }
 actions: [...]                    # 见 12.2
 approvals: []                     # 见 12.3
-expect: { events, files, fixtures, requests, request_counts, tool_batches, core_io, config_diagnostics }   # 见 12.4
+expect: { events, files, fixtures, requests, request_counts, tool_batches, core_io, config_diagnostics, json_lines }   # 见 12.4
 ```
 
 - 每个端点有自己的 `MockProvider` 与自己的 Pi provider（`mock-<端点名>`，唯一的模型 `mock-model`）；预置模型夹具经 `x-piarc-scenario` 请求头选择脚本。两个会话要并发请求时用两个端点，各自的步数互不影响。
@@ -336,7 +336,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | `restart_core` | — | 关闭 Core，在同一数据目录上重新启动并打开工作区；会话保持关闭直到 `resume` |
 | `resume` | — | `resume_session` 重新打开会话 |
 
-`prompt`、`steer`、`follow_up` 都可带客户端的 `request_id`（重发时沿用），以及 `mentions` 和 `attachments`。提及按 Core 输入格式写 `{path, start, end}`，两个偏移是发送文本中 `@path` 的 UTF-16 起止位置。附件写 `{fixture, mime_type}`；运行器读取 `fixtures/` 中对应文件并调用 Core 的 `store_attachment`，将返回的引用随输入发送。面板的键盘交互在 L4 验证。
+`prompt`、`steer`、`follow_up` 都可带客户端的 `request_id`（重发时沿用），以及 `mentions` 和 `attachments`；`rejected: <文本>` 要求 Core 拒绝这条输入、错误消息含该文本（UserPromptSubmit hook 阻断，T25），不记回合。提及按 Core 输入格式写 `{path, start, end}`，两个偏移是发送文本中 `@path` 的 UTF-16 起止位置。附件写 `{fixture, mime_type}`；运行器读取 `fixtures/` 中对应文件并调用 Core 的 `store_attachment`，将返回的引用随输入发送。面板的键盘交互在 L4 验证。
 
 动作全部完成后，运行器先等每个被动作启动的回合的 `turn/completed`，再检查全部断言。follow-up 自己启动的回合没有标签，用 `wait: { method: turn/completed, count: N }` 等它们。
 
@@ -348,7 +348,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 
 | 字段 | 规则 |
 |---|---|
-| `events` | 每项是 `{ session, method, params, turn }`，或 `{ any_order: [...] }`。按会话分别做**有序子序列**匹配：每项匹配的事件必须在上一项之后；`any_order` 组内的事件顺序任意（每个成员取第一个未用的匹配），组整体在上一项之后、下一项之前；组内成员必须属于同一会话。不同会话之间不比较顺序 |
+| `events` | 每项是 `{ session, method, params, turn }`，或 `{ any_order: [...] }`；带 `sessionId` 的 `core/notices`（hook 提示，T25）以 `method: core/notices` 计入该会话的事件。按会话分别做**有序子序列**匹配：每项匹配的事件必须在上一项之后；`any_order` 组内的事件顺序任意（每个成员取第一个未用的匹配），组整体在上一项之后、下一项之前；组内成员必须属于同一会话。不同会话之间不比较顺序 |
 | 事件的字段匹配 | `params` 是**字段子集**：对象只比较写出的键（id、`seq`、时间戳不写就不比较），数组长度必须相同并逐元素按子集比较，标量相等；`turn` 要求 `params.turnId` 等于该标签记下的回合 id |
 | `files` | 路径 → 完整内容（UTF-8，逐字节相等），或 `null` 表示文件不存在；没写的文件不检查 |
 | `fixtures` | 路径 → `tests/scenarios/fixtures/` 下的文件名：工作区文件与它逐字节相等（非 UTF-8 编码、BOM、CRLF 用它断言），失败时给出第一处不同的字节偏移与前后的字节 |
@@ -358,6 +358,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | （总是检查） | 每个请求都通过严格 mock 的校验；被拒的请求列出规则 ID。运行根下 Claude Code 的配置（任何 `.claude/` 目录内的条目与 `.claude.json`）在 Core 启动前与关闭后逐字节相同，否则以 `claude_config` 失败列出新增、修改、删除的路径（T24，ADR-0005 第 2 条） |
 | `tool_batches` | 工具调用 id 的分批：Core 收到的委托请求按这些批次成组到达。运行器经 Core 的 `ToolIoObserver` 扣住下一批的请求，整批到齐才一起放行；另一批的调用提前到达即失败。不靠计时 |
 | `core_io` | `{ call, method }`：Core 为该工具调用回答过这个 AHP 方法（例如 `fs/read`、`exec/run`），证明工具经 Core 执行 |
+| `json_lines` | 工作区路径 → 期望的行：文件每行一个 JSON 值，行数恰好相等，逐行按字段子集比较（T25 的 hook 夹具把收到的 stdin 记成 `{types, input}`，`types` 是每个字段值的类型，用来断言值无法预知的字段存在）；断言前等文件写满期望的行数（30 s 安全网），后台运行的 hook 由此不必另加等待 |
 | `config_diagnostics` | 回合结束后 Core 对该工作区的配置诊断（T24）：`trusted` 与按层 id 索引的 `files`，每个文件是报告的子集（`status`、`effective`、`overridden`、`ignored`、`issues`；列表逐项比较，长度必须相等，元素取子集） |
 
 失败输出：事件给出第一个未匹配的期望项、上一个匹配的位置、乱序时匹配事件的实际位置、同方法事件中第一个不符的字段，以及该会话附近的实际事件（去掉 `seq`、`sessionId`、`ts`）；文件给出第一处不同的行号与两边的全文（带行号）；请求给出端点、序号与不符的字段。一个场景的全部失败一起报告。

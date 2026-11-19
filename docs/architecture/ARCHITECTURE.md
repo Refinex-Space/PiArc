@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.30（2026-11-18） |
+| 版本 | 2.31（2026-11-19） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -565,6 +565,17 @@ M1 实现见 ADR-0031。两种模式均对受保护路径写入逐次审批。�
 - **执行全部在 Core**：command 类型通过 stdin 传入 JSON、读取 exit code 与 stdout；默认超时 600 秒（UserPromptSubmit 30 秒）；超时或取消时杀整棵进程树；同一事件命中的多个 handler 并行执行。
 - 项目级 hooks 在项目被信任之前不执行；企业策略可设置"只允许托管 hooks"。
 - 决策协议兼容：exit 0 + JSON（`decision`、`hookSpecificOutput.permissionDecision`、`updatedInput`、`additionalContext`、`continue`、`systemMessage` 等），exit 2 阻断并把 stderr 作为理由，其他退出码视为非阻断错误。
+- Stop 续跑上限：同一回合内 Stop hooks 连续续跑至多 **8** 次（`piarc_hooks::STOP_CONTINUATION_LIMIT`，与 Claude Code 相同），模型调用工具或新的运行开始时计数归零；第 9 次的 block 被覆盖，回合结束并提示用户。
+
+T25 落地（ADR-0039）：
+
+| 部分 | 实现 |
+|---|---|
+| 配置 | `piarc_hooks::HookConfig` 读各设置层的 `hooks`（高到低，与权限裁决同一次加载，所以未信任项目的两类项目文件不生效），同一 handler 跨文件只运行一次，`disableAllHooks` 全部关闭；matcher 按 Claude Code 规则，正则用 `regex` crate，环视、反向引用报出原因；后续里程碑的事件与 handler 类型、`async`/`asyncRewake`、非工具事件上的 `if` 不运行并列入配置诊断 |
+| 执行 | `piarc_hooks::Runner` 经注入的 `ProcessSpawner`（`ProcessTreeSpawner`）并行运行；shell 形式 macOS 为 `/bin/sh -c`，Windows 为 Git Bash（没有时 PowerShell），`shell: "powershell"` 用 PowerShell，`args` 为 exec 形式；环境为工具命令的环境（ADR-0035）加 `CLAUDE_PROJECT_DIR`；超时默认 600 s、UserPromptSubmit 30 s、SessionEnd 1.5 s（自定上限 60 s），超时或回合中断时 terminate、2 s 后 kill，进程退出后结束整棵进程树 |
+| 挂载 | Core：UserPromptSubmit（输入发给 Agent Host 之前，阻断时请求以 `permissionDenied` 失败，上下文随 `hookContext` 送达）、PreToolUse 与 PermissionRequest（第 6.2.3 节第 2、8 步）、Notification（审批卡 `permission_prompt`、回合结束 `idle_prompt`）。Agent Host 经 AHP `hooks/run`：SessionStart（会话打开与压缩后）、SessionEnd、PostToolUse、PostToolUseFailure、Stop、PreCompact、PostCompact |
+| 决策 | `piarc_hooks::Decision` 按事件合并：PreToolUse deny > ask > allow（`defer` 按 ask），`updatedInput` 在规则之前替换参数；PermissionRequest deny 优先，allow 的 `updatedInput` 重新经过裁决，`updatedPermissions` 支持 `addRules`（会话与 `.piarc/` 文件）和 `setMode`（会话）；PostToolUse 可替换输出并追加上下文与反馈，PostToolUseFailure 只追加；PreCompact 的纯文本 stdout 作为摘要指令 |
+| 呈现与审计 | 每个 handler 一行 `audit_events`（`kind: "hook"`）；`systemMessage`、`stopReason` 与错误经 `core/notices`（`type: "hook"`）显示在客户端的提示行；超过 10,000 字符的上下文写入会话临时目录 `hooks/`，只送 2,000 字符预览与路径 |
 
 #### 6.3.2 事件映射与分期
 
@@ -759,7 +770,7 @@ T21 的 `models/list` 返回可用模型的 `provider`、`id`、`name`、`contex
 T24 落地（ADR-0038）：
 
 - 读取的文件与层级：`~/.claude/settings.json`（`claudeUser`）、`.claude/settings.json`（`claudeProject`）、`.claude/settings.local.json`（`claudeProjectLocal`）按 ADR-0005 第 3 条与 PiArc 的三个文件同表合并；`~/.claude.json` 不是设置层，配置诊断只列出它的键名。家目录由 Core 注入（`CoreConfig.home`），测试一律用临时目录。
-- 键映射表是唯一判断（`piarc_config::claude::SETTINGS_KEYS`，按官方 settings 索引逐键归类）。M2 实际生效的键：`permissions.allow`、`permissions.ask`、`permissions.deny`、`permissions.defaultMode`、`permissions.additionalDirectories`。由后续任务支持的键：`hooks`、`disableAllHooks`（T25）；`plansDirectory`（T26）；`autoCompactEnabled`、`autoCompactWindow`（T27）；`fileCheckpointingEnabled`（T28）；`model`、`effortLevel`（T29）；`agent`、`advisorModel`（T31）；`worktree`（T35）；`enableAllProjectMcpServers`、`enabledMcpjsonServers`、`disabledMcpjsonServers`、`allowedMcpServers`、`deniedMcpServers` 与 `~/.claude.json` 的 MCP 段（T36）；`outputStyle`、`disableBundledSkills`、`skillOverrides`、`disableSkillShellExecution`（T37）；`allowedHttpHookUrls`、`httpHookAllowedEnvVars`（T38）；`sandbox`（T39）；`enabledPlugins`、`extraKnownMarketplaces`（T40）；`autoMode`、`disableAutoMode`、`useAutoModeDuringPlan`（T46）；`autoMemoryEnabled`、`autoMemoryDirectory`（T47）。其余键（含 `env`、`theme`、`language` 等终端偏好、账号与遥测、只在托管设置中有效的键）标为"已忽略"，表外的键为"未知"，都在诊断中逐个列出。
+- 键映射表是唯一判断（`piarc_config::claude::SETTINGS_KEYS`，按官方 settings 索引逐键归类）。M2 实际生效的键：`permissions.allow`、`permissions.ask`、`permissions.deny`、`permissions.defaultMode`、`permissions.additionalDirectories`，T25 起加上 `hooks`、`disableAllHooks`（ADR-0039）。由后续任务支持的键：`plansDirectory`（T26）；`autoCompactEnabled`、`autoCompactWindow`（T27）；`fileCheckpointingEnabled`（T28）；`model`、`effortLevel`（T29）；`agent`、`advisorModel`（T31）；`worktree`（T35）；`enableAllProjectMcpServers`、`enabledMcpjsonServers`、`disabledMcpjsonServers`、`allowedMcpServers`、`deniedMcpServers` 与 `~/.claude.json` 的 MCP 段（T36）；`outputStyle`、`disableBundledSkills`、`skillOverrides`、`disableSkillShellExecution`（T37）；`allowedHttpHookUrls`、`httpHookAllowedEnvVars`（T38）；`sandbox`（T39）；`enabledPlugins`、`extraKnownMarketplaces`（T40）；`autoMode`、`disableAutoMode`、`useAutoModeDuringPlan`（T46）；`autoMemoryEnabled`、`autoMemoryDirectory`（T47）。其余键（含 `env`、`theme`、`language` 等终端偏好、账号与遥测、只在托管设置中有效的键）标为"已忽略"，表外的键为"未知"，都在诊断中逐个列出。
 - 信任约束与 PiArc 项目层相同：信任前项目层的 allow、`additionalDirectories`、`acceptEdits` 不生效，deny 与 ask 照常生效；项目层的 `bypassPermissions`、`auto` 始终不生效，诊断注明原因。生效键类型错误时整份文件跳过并给出 JSON Pointer，JSON 语法错误给出行列，其他文件照常加载。
 - `.claude/` 文件与 PiArc 设置一起被监听，变化后重新加载并发 `core/settings`；新增的可执行项沿用第 10.2 节的快照确认。PiArc 的写接口拒绝 `.claude/` 下与 `.claude.json` 的任何路径（`permissionDenied`），L2 运行器在每个场景前后比对 Claude Code 配置的快照。
 - 配置诊断的 Core API 为 `config_diagnostics`（NAPI `configDiagnostics`），与权限裁决用同一次加载；设置窗口"配置诊断"页按文件列出并可展开每个键的本文件取值、最终取值与来源。T41 在此基础上补全插件与企业来源。
@@ -897,6 +908,8 @@ T21 增加 `session/previewModelSwitch`、`session/setModel`、`session/setEffor
 T19（ADR-0030）为 `session/prompt`、`session/steer`、`session/followUp` 添加可选的提及区间与附件引用，`session/queueChanged` 和 `userMessage` 可带相同元数据。每次模型回复结束时 `turn/usage` 发本回合的累计用量，失败的 `turn/completed` 提供 `errorKind`、`retryable`。`session/compact` 在空闲会话中开始独立回合。
 
 **Core → Agent Host 通知**：`exec/output`（T07）、`secrets/changed`（T08）。
+
+T25 已实现（ADR-0039）：Agent Host → Core 的 `hooks/run`（能力 `hooks`）报告 SessionStart、SessionEnd、PostToolUse、PostToolUseFailure、Stop、PreCompact、PostCompact，参数为会话、事件、`cwd`（须在该连接的工作区内）、可选的 `transcriptPath`、事件特有字段 `input`（Claude Code 的字段名，Core 按事件白名单取用并自己填通用字段）与 Stop 的 `continuations`；结果的成员都可选：`block`、`context`、`feedback`、`updatedOutput`、`instructions`、`stop`。`hooks/run` 不设传输期限，输入超过一个帧时 Agent Host 截断长字符串。`policy/evaluate` 的结果新增可选的 `updatedInput`、`context`、`stop`；Core 在运行 PreToolUse 或 PermissionRequest hooks 之前发 `policy/pending`，停止该调用的传输期限。`session/prompt`、`session/steer`、`session/followUp` 新增可选的 `hookContext`（UserPromptSubmit 的上下文）。
 
 每条会话通知带 `{sessionId, seq, ts}`；Core 发现 `seq` 缺口时用 `session/getEntries(since)` 补齐。Agent Host 重启后，Core 在 `session/resume` 中带上它收到的最大 `seq`（`lastSeq`），新进程从下一个数继续编号，同一会话的 `seq` 跨重启保持递增。
 
@@ -1180,6 +1193,8 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 索引可以从 Pi JSONL 完整重建；应用提供"重建索引"诊断操作。
 
 T23（ADR-0037）：`workspaces.default_mode` 记录用户在该工作区最后选择的权限模式；`audit_events` 的权限记录带步骤、命中规则与来源层，设置页按会话、工具、结论、时间筛选。
+
+T25（ADR-0039）：每次 hook 运行每个 handler 写一行 `audit_events`（`kind: "hook"`），记录事件、matcher 看到的值、来源层与文件、JSON Pointer、程序名与命令的 SHA-256（不存命令原文）、退出码、耗时、是否超时或被取消、判定。
 
 T18（schema v2，ADR-0029）：`sessions` 增加 `custom_title`（用户给的标题，属于 Core 自己的列，重建时保留）。
 
@@ -1563,6 +1578,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.31 | 2026-11-19 | T25（ADR-0039）补充第 6.3.1 节 hooks 的落地与 Stop 续跑上限 8、6.14 节 `hooks`/`disableAllHooks` 生效、7.4 节 `hooks/run` 与 `policy/evaluate`、会话输入的新增成员、9.2 节 hook 审计记录 |
 | 2.30 | 2026-11-18 | T24（ADR-0038）补充第 6.14 节 Claude Code 配置兼容的落地与 M2 生效键清单、6.6.2 节 rules 的顺序与条件注入、7.4 节 `fs/memory` 的新增成员 |
 | 2.29 | 2026-11-18 | T23（ADR-0037）补充第 6.2 节规则、Bash 分析、阶梯、模式与管理的落地，7.4 增加 `policy/tools`，9.2 写明模式记忆与审计字段，10.3 写明权限页命令与跳过权限的原生确认；第 11 章写入含 Bash 分析的裁决实测 |
 | 2.28 | 2026-11-19 | R2 记录 macOS 阶段门；更新 6.0 的 M1 能力、读取成功登记、文件授权与目录句柄、命令环境准入、信任与删除确认、索引 schema v4（ADR-0034–0036）。 |

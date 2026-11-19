@@ -320,7 +320,7 @@ T25（开工基线 aae28a4，`npm run verify` 15/15；依赖 T24 已完成；T23
 - [x] 7. Agent Host：SessionStart/SessionEnd、PostToolUse/PostToolUseFailure、Stop、PreCompact/PostCompact 挂载
 - [x] 8. 客户端：`systemMessage` 与非阻断错误经事件上报并用现有提示行显示
 - [x] 9. L2 场景 `hooks-*.yaml`（11 个事件，Node 夹具脚本记录 stdin）与能力 ID `CAP-HOOK-*`
-- [ ] 10. 文档：架构 6.3（续跑上限等）、ADR、`crates/piarc-hooks` AGENTS.md、`coding-standards.md` 复用表、用户文档
+- [x] 10. 文档：架构 6.3（续跑上限等）、ADR、`crates/piarc-hooks` AGENTS.md、`coding-standards.md` 复用表、用户文档
 - [ ] 11. 验收 A01–A13 与收尾 `npm run verify`
 
 ## 登记事项
@@ -416,7 +416,13 @@ T25（开工基线 aae28a4，`npm run verify` 15/15；依赖 T24 已完成；T23
 | I85 | T23 | T20 时期"总是允许"为 Write 保存的 `Write(路径)` 规则在 T23 语义下不匹配（Claude Code 只认 `Edit(路径)`）；现有用户文件里的这类规则会被设置页列出但不起作用 | T24 的配置诊断提示改写为 `Edit(…)`；正式发布前的用户数据只有测试数据，不做迁移；**已落地（T24）**：权限页对 `Write(…)`、`NotebookEdit(…)`、`Glob(…)`、`Grep(…)` 规则显示"永不匹配，请改写为 Edit(…)/Read(…)"（`settings_view::check_rule` 的 `suggestion`，L4 `t24-diagnostics.e2e.ts`） |
 | I86 | T24 | `~/.claude/` 不存在时设置监听退到最近的已存在祖先（通常是家目录本身，非递归）：家目录里任何文件的变化都会触发一次去抖后的七层重读 | T44 测量空闲时的重读频率；需要时改为只在 `.claude` 条目出现时重读 |
 | I87 | T24 | 键映射表（`piarc_config::claude::SETTINGS_KEYS`）是 2026-11-18 官方 settings 索引的快照；Claude Code 新增的键在更新表之前按"未知"列为忽略 | 各评审任务对照官方索引复查一次；实现对应功能的任务（ADR-0038 后果一节列出）把行改为生效 |
-| I88 | T24 | `crates/piarc-testkit/src/l2/runner.rs` 在 T24 之前已超过 1,000 行（1,070），T24 加入 `.claude` 快照比对与诊断断言后约 1,110 行，超出 `coding-standards.md` 的单文件上限 | R3 把运行器按驱动、断言、Core 调用拆成子模块 |
+| I88 | T24 | `crates/piarc-testkit/src/l2/runner.rs` 在 T24 之前已超过 1,000 行（1,070），T24 加入 `.claude` 快照比对与诊断断言后约 1,110 行，超出 `coding-standards.md` 的单文件上限；T25 加入 `rejected`、`core/notices` 事件与 `json_lines` 后 runner.rs 1,151 行、`format.rs` 1,004 行 | R3 把运行器按驱动、断言、Core 调用拆成子模块，`format.rs` 一并拆分 |
+| I89 | T25 | `agent-host/AGENTS.md`（126 行）与 `crates/piarc-core/AGENTS.md`（128 行）超过子目录 120 行上限（T25 之前已是 121、123 行），T25 各加了一节 hooks | R3 精简两份文件，把能从代码或 ADR 得到的段落改为链接 |
+| I90 | T25 | 没有配置 hooks 时，每次工具结果、回合结束、会话打开、压缩仍各有一次 `hooks/run` 往返，Core 每次重读设置文件判断有无 handler | T44 测量对工具密集回合的影响；需要时 Core 在 `hooks/run` 结果里给出配置了 handler 的事件，Agent Host 缓存到设置变化 |
+| I91 | T25 | hook 的审计记录（`audit_events`，`kind: "hook"`）没有界面：权限页的审计视图只查 `kind: "permission"` | T41（配置诊断完善）或 T45（诊断包）提供查看 |
+| I92 | T25 | PreCompact 带摘要指令时 Agent Host 用 Pi 导出的 `compact()` 自己生成摘要，绕过 Pi 默认路径中的虚拟模型路由与重试回调（Pi 1.5.2 不回读 `customInstructions`） | T27 接管压缩时复核；Pi 支持回读后改回默认路径 |
+| I93 | T25 | hook 命令只继承 ADR-0035 准入的环境加 `CLAUDE_PROJECT_DIR`，与 Claude Code 继承完整环境不同：依赖自定义变量（通知 webhook 地址、令牌）的 hook 拿不到它们 | R3 请用户决定是否增加用户级的 hooks 环境变量白名单设置 |
+| I94 | T25 | Agent Host 能以伪造的输入调用 `hooks/run`（限 7 个事件与本工作区），触发用户已配置的 hook | T45 评估把 PostToolUse 绑定到 Core 已授权的工具调用、把 Stop 绑定到进行中的回合 |
 
 ## 技术债
 
