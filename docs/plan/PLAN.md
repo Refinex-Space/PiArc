@@ -151,7 +151,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 8a1f38b |
 | T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 已完成 | ae5c8e6 |
-| T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
+| T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
 | T26 | [计划模式、任务清单、AskUserQuestion 与下一步](tasks/T26-plan-mode-todo-ask-next-steps.md) | 3 | T25 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T27 | [上下文工程：system reminder、压缩与用量](tasks/T27-context-reminders-compaction-usage.md) | 3 | T26 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T28 | [检查点、回退与 Changes 面板](tasks/T28-checkpoints-rewind-changes.md) | 3 | T27 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -308,6 +308,20 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+T25（开工基线 aae28a4，`npm run verify` 15/15；依赖 T24 已完成；T23 的 A05 等 Windows CI，分支尚未推送，无 CI 可核对）：
+
+- [ ] 1. piarc-hooks：配置解析与多来源合并（跨文件去重、`disableAllHooks`、不支持的字段与事件进诊断）、matcher（正则库不支持的语法报错）
+- [ ] 2. piarc-hooks：command 执行器（`ProcessSpawner` 注入、并行、管道并发读完、超时与取消时终止进程树、超时可注入）
+- [ ] 3. piarc-hooks：决策协议与合并（exit 0/2/其他、JSON 与纯文本、通用字段、PreToolUse deny > ask > allow、Stop 续跑上限、10,000 字符落盘与预览）
+- [ ] 4. 协议：AHP `hooks/run`、`policy/evaluate` 新增字段、`session/prompt` 等的 hook 上下文、契约样本与 `gen:protocol`
+- [ ] 5. Core：hooks 服务（设置来源与项目信任、审计、键映射表 `hooks`/`disableAllHooks` 生效）、PreToolUse 与 PermissionRequest 接入裁决第 2、8 步
+- [ ] 6. Core：UserPromptSubmit（发给 Agent Host 之前）与 Notification（等待审批、回合完成）
+- [ ] 7. Agent Host：SessionStart/SessionEnd、PostToolUse/PostToolUseFailure、Stop、PreCompact/PostCompact 挂载
+- [ ] 8. 客户端：`systemMessage` 与非阻断错误经事件上报并用现有提示行显示
+- [ ] 9. L2 场景 `hooks-*.yaml`（11 个事件，Node 夹具脚本记录 stdin）与能力 ID `CAP-HOOK-*`
+- [ ] 10. 文档：架构 6.3（续跑上限等）、ADR、`crates/piarc-hooks` AGENTS.md、`coding-standards.md` 复用表、用户文档
+- [ ] 11. 验收 A01–A13 与收尾 `npm run verify`
 
 ## 登记事项
 
