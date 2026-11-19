@@ -11,8 +11,8 @@
 //!    A bash command without `cwd` carries a [`CwdProbe`]; where it ended becomes the
 //!    remembered directory when it lies inside the workspace or an added directory, else the
 //!    workspace root (`cwdReset` says so). PowerShell commands do not move it.
-//! 3. **Environment.** The login shell's environment without PiArc's variables
-//!    ([`CommandEnv`]), resolved on first use and kept; the request's overlay on top; on
+//! 3. **Environment.** Inherit the approved OS and toolchain variables from the login shell
+//!    ([`CommandEnv`], ADR-0035). On
 //!    Windows `LANG=C.UTF-8` for Git Bash when no locale is set (UTF-8 output, section 15.2).
 //! 4. **Run.** [`ProcessTreeSpawner`], the timeout from [`ExecLimits`], stopped with its whole
 //!    process tree on timeout, `exec/kill`, interruption or the connection's end.
@@ -95,13 +95,20 @@ pub(super) struct Exec {
     runner: CommandRunner,
     limits: ExecLimits,
     env: CommandEnv,
-    resolved: tokio::sync::OnceCell<Arc<Vec<(OsString, OsString)>>>,
+    resolved: tokio::sync::OnceCell<ResolvedEnv>,
     shells: OnceLock<Shells>,
     #[cfg(windows)]
     git_utilities: tokio::sync::OnceCell<Vec<String>>,
     data_dir: PathBuf,
     notices: Option<EventSender>,
     notified: AtomicBool,
+}
+
+/// Keep only the environment that child processes may inherit. Approval still needs to
+/// know if the original environment customized shell command resolution.
+struct ResolvedEnv {
+    inherited: Vec<(OsString, OsString)>,
+    custom_resolution: bool,
 }
 
 impl Exec {
@@ -125,10 +132,9 @@ impl Exec {
         }
     }
 
-    /// The base environment of every command, resolved once.
-    pub(super) async fn base_env(&self) -> Arc<Vec<(OsString, OsString)>> {
-        let resolved = self
-            .resolved
+    /// Resolve once and discard unrelated variables from the login-shell response.
+    async fn base_env(&self) -> &ResolvedEnv {
+        self.resolved
             .get_or_init(|| async {
                 let env = match &self.env {
                     CommandEnv::Fixed(env) => env.clone(),
@@ -148,10 +154,13 @@ impl Exec {
                         }
                     }
                 };
-                Arc::new(strip_internal(env))
+                let env = strip_internal(env);
+                ResolvedEnv {
+                    custom_resolution: utility::has_custom_resolution(&env),
+                    inherited: piarc_exec::env::command_environment(&env),
+                }
             })
-            .await;
-        Arc::clone(resolved)
+            .await
     }
 
     fn shells(&self) -> &Shells {
@@ -296,7 +305,8 @@ impl Exec {
         launch: &Launch,
         sandbox_env: Vec<(OsString, OsString)>,
     ) -> Result<(Vec<(OsString, OsString)>, Option<CwdProbe>), ErrorObject> {
-        let mut env = super::command_env(&self.base_env().await, p.env.clone().unwrap_or_default());
+        let resolved = self.base_env().await;
+        let mut env = super::command_env(&resolved.inherited, p.env.clone().unwrap_or_default());
         env = super::overlay_env(env, sandbox_env);
         let probe = if launch.tracked && kind == ExecShell::Bash {
             let user = env

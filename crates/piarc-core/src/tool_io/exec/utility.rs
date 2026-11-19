@@ -1,5 +1,5 @@
 //! Resolve the four M1 filesystem utilities without running anything from the workspace.
-//! These checks are for automatic approval only. Prompted commands retain the user's shell.
+//! These checks are for automatic approval only. All commands inherit the same allowed fields.
 use super::*;
 
 impl Exec {
@@ -10,9 +10,13 @@ impl Exec {
     ) -> Option<PathBuf> {
         let name = command.split_ascii_whitespace().next()?;
         let shell = self.shells().bash.as_deref()?;
-        let env = self.base_env().await;
+        let resolved = self.base_env().await;
+        if resolved.custom_resolution {
+            return None;
+        }
+        let env = &resolved.inherited;
         let expected = installed_utility(shell, name)?;
-        if !safe_search(&env, scope, name, &expected) {
+        if !safe_search(env, scope, name, &expected) {
             return None;
         }
         #[cfg(windows)]
@@ -21,7 +25,7 @@ impl Exec {
             // Check its actual resolution against the installed coreutils in a clean cwd.
             let known = self
                 .git_utilities
-                .get_or_init(|| self.probe_git_utilities(shell, &env))
+                .get_or_init(|| self.probe_git_utilities(shell, env))
                 .await;
             if !known.iter().any(|s| s == name) {
                 return None;
@@ -117,13 +121,8 @@ fn installed_utility(shell: &Path, name: &str) -> Option<PathBuf> {
     None
 }
 
-fn safe_search(
-    env: &[(OsString, OsString)],
-    scope: &piarc_fs::Scope,
-    name: &str,
-    expected: &Path,
-) -> bool {
-    if env.iter().any(|(key, v)| {
+pub(super) fn has_custom_resolution(env: &[(OsString, OsString)]) -> bool {
+    env.iter().any(|(key, v)| {
         let key = key.to_string_lossy().to_ascii_uppercase();
         !v.is_empty()
             && (matches!(
@@ -141,9 +140,15 @@ fn safe_search(
                 || key.starts_with("DYLD_")
                 || key.starts_with("LD_")
                 || v.to_string_lossy().starts_with("() {"))
-    }) {
-        return false;
-    }
+    })
+}
+
+fn safe_search(
+    env: &[(OsString, OsString)],
+    scope: &piarc_fs::Scope,
+    name: &str,
+    expected: &Path,
+) -> bool {
     let Some((_, path)) = env.iter().find(|(k, _)| {
         if cfg!(windows) {
             k.eq_ignore_ascii_case("PATH")

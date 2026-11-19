@@ -20,20 +20,20 @@ Core 层的集成测试在 `crates/piarc-core/tests/exec_commands.rs`（cwd、�
 
 ## cwd 跟踪（`cwd.rs`）
 
-- 自动接受编辑放行的系统文件命令由 `CwdProbe::pin_utility` 在启动时核对 Bash 实际解析的文件并锁定物理程序。Core 发现项目可控的 PATH、用户覆盖或启动脚本时由审批卡决定，人工批准后按原有 shell 环境执行。
-- 不改命令文本：`BASH_ENV` 指向会话临时目录 `exec/<requestId>.bash-env`，内容是 `trap 'builtin pwd -P >| <answer>' EXIT` 加 `unset BASH_ENV`（用户原有的 `BASH_ENV` 则先 `export` 回去再 source）。退出码在 `EXIT` trap 中保持；子 bash 看不到 `BASH_ENV`，不会覆盖答案。
+- 自动接受编辑放行的系统文件命令由 `CwdProbe::pin_utility` 在启动时核对 Bash 实际解析的文件并锁定物理程序。Core 发现项目可控的 PATH、用户覆盖或启动脚本时由审批卡决定，人工批准后的命令同样只继承 ADR-0035 所列的字段。
+- 不改命令文本：`BASH_ENV` 指向会话临时目录 `exec/<requestId>.bash-env`，内容是 `trap 'builtin pwd -P >| <answer>' EXIT` 加 `unset BASH_ENV`，模型命令不继承用户的 `BASH_ENV`。退出码在 `EXIT` trap 中保持；子 bash 看不到 `BASH_ENV`，不会覆盖答案。
 - 没有答案（命令 `exec` 换掉了 shell、自己装了 `EXIT` trap、被杀）时 Core 保持原目录。Windows 上答案是 `/c/…`，`msys_to_windows` 转换；`/tmp`、`/usr` 等 Git 自己的目录转换不了，按越界处理。
 
 ## 阈值与清单的位置
 
 - `limits.rs` 的 `ExecLimits::default()` 是全部阈值的唯一定义：默认超时 120 s、上限 600 s、内联 30,000 字符、预览 2,000、失败头 10,000 / 尾 20,000、终止宽限 2 s。Core 经 `ToolIoConfig.exec_limits` 传入；Agent Host 的工具描述里写的 120/600 与之对应，改值时一起改。
 - 语义退出码表 `semantic::EXIT_ONE_MEANINGS`：`grep`/`egrep`/`fgrep`/`rg` → no matches，`diff`/`cmp` → files differ，`test`/`[` → condition is false。只对单个简单命令（未加引号的 `| & ; \n ( ) ` 与命令替换都算复合）；允许前置 `NAME=value` 与带目录的程序名。
-- 环境剔除清单 `env::{INTERNAL_PREFIXES, INTERNAL_NAMES, SHELL_STATE}`：`ELECTRON_*`、`PIARC_*`、`PI_*`，`NODE_OPTIONS` 等 Node/Electron 变量，`_`、`SHLVL`、`PWD`、`OLDPWD`。Windows 上不区分大小写。
+- `env::command_environment` 是 Bash、PowerShell 和 Git Bash 定位探测的继承清单（ADR-0035）。登录 shell 解析与回退均经此筛选。原始环境只用于计算自动审批所需的自定义 shell 标志。Windows 按大小写不敏感匹配字段。
 
 ## Windows 差异
 
 - Git Bash 探测顺序见 `shells.rs` 模块文档；不用 `PATH` 上的 `bash.exe`（WSL）。PowerShell 参数沿用 Pi 的 UTF-8 前缀与 5.1 退出码后缀（MIT，`third-party/sources.json` 已登记），前缀占一行，错误位置的行号因此加 1。
-- Windows 没有登录 shell：环境就是进程环境（Core 加 `LANG=C.UTF-8` 给没有 locale 的 Git Bash）。`ProcessTreeSpawner` 的 `terminate` 与 `kill` 相同（Job 没有温和终止），退出码为 1，没有 signal。
+- Windows 没有登录 shell：命令继承准入清单筛选后的进程环境（Core 加 `LANG=C.UTF-8` 给没有 locale 的 Git Bash）。`ProcessTreeSpawner` 的 `terminate` 与 `kill` 相同（Job 没有温和终止），退出码为 1，没有 signal。
 - Git Bash 的 `$!` 是 MSYS 的 pid；Windows pid 在 `/proc/<pid>/winpid`（`termination_tests.rs` 的 `LAST_PID`）。
 - PowerShell 输出编码、Git Bash 路径转换与中文输出只能在 Windows 上验证：CI 跑 `exec_commands.rs` 的 Windows 用例与 L2 的 `exec-windows-shells`，实机核对留给 W1。
 

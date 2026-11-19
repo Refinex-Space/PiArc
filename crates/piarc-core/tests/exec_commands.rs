@@ -281,7 +281,8 @@ async fn the_environment_has_no_internal_variables() {
         ("NODE_OPTIONS", "--require /x.js"),
         ("PI_CODING_AGENT_DIR", "/data/pi"),
         ("PIARC_INTERNAL_PROBE", "1"),
-        ("USER_OWN_VAR", "kept"),
+        ("USER_OWN_VAR", "synthetic-secret"),
+        ("LC_NUMERIC", "C"),
     ] {
         env.push((k.into(), v.into()));
     }
@@ -295,7 +296,37 @@ async fn the_environment_has_no_internal_variables() {
     ] {
         assert!(!printed.contains(name), "{name} in {printed}");
     }
-    assert!(printed.contains("USER_OWN_VAR=kept"));
+    assert!(!printed.contains("USER_OWN_VAR="));
+    assert!(!printed.contains("synthetic-secret"));
+    assert!(printed.contains("LC_NUMERIC=C"));
+}
+
+/// An unsupported login shell forces the fallback on Unix. Windows directly uses the same
+/// input as its process environment. The user's build locale survives either path.
+#[tokio::test]
+async fn inherited_private_variables_are_filtered_on_process_environment_fallback() {
+    let mut base = base_env();
+    base.extend([
+        ("SHELL".into(), "unsupported-login-shell".into()),
+        ("LC_NUMERIC".into(), "C".into()),
+        ("R2_PRIVATE_SETTING".into(), "fixture-only".into()),
+    ]);
+    let f = Fixture::new("env-fallback", CommandEnv::LoginShell { base });
+    let bash = f
+        .bash(r#"printf '%s/%s' "$LC_NUMERIC" "${R2_PRIVATE_SETTING-unset}""#)
+        .await;
+    assert_eq!(head(&bash).trim(), "C/unset");
+
+    #[cfg(windows)]
+    {
+        let powershell = f
+            .run(json!({
+                "shell":"powershell",
+                "command":"Write-Output ($env:LC_NUMERIC + '/' + [bool]$env:R2_PRIVATE_SETTING)"
+            }))
+            .await;
+        assert_eq!(head(&powershell).trim(), "C/False");
+    }
 }
 
 /// The Agent Host asks while a session is still being created, before Core registered its

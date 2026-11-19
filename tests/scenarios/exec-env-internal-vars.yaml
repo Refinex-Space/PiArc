@@ -1,5 +1,5 @@
 id: exec-env-internal-vars
-description: Commands see the user's variables but none of Electron's, Node's, Pi's or PiArc's internal ones (the L2 Core carries them, as the application does), and no provider key.
+description: Commands inherit the user's locale, while exported test credentials and internal runtime settings stay out.
 capabilities: [CAP-EXEC-ENV-001]
 providers:
   main:
@@ -19,9 +19,11 @@ expect:
   requests:
     - index: 1
       tool_results:
-        - { id: toolu_env, is_error: false, contains: 'L2_USER_VAR=kept' }
+        - { id: toolu_env, is_error: false, contains: 'LC_NUMERIC=C' }
       not_contains:
         - 'ELECTRON_RUN_AS_NODE'
+        - 'synthetic-exported-secret'
+        - 'L2_USER_VAR='
         - 'NODE_OPTIONS'
         - 'PI_CODING_AGENT_DIR'
         - 'PIARC_L2_INTERNAL'

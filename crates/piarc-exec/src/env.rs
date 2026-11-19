@@ -13,8 +13,8 @@
 //!   ones PiArc and Pi use to talk to their own processes ([`INTERNAL_PREFIXES`],
 //!   [`INTERNAL_NAMES`]), and the shell bookkeeping of the login shell ([`SHELL_STATE`]).
 //! - **No credentials are added.** Provider keys live in Core's vault and reach the Agent Host
-//!   over AHP only; nothing here reads the vault. Variables the user exports in their own shell
-//!   files stay, as they would in their terminal.
+//!   over AHP only. Executable children receive only the explicit OS and toolchain fields
+//!   in [`command_environment`]; unrelated user variables stay out.
 
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
@@ -68,6 +68,63 @@ pub fn is_internal(name: &OsStr) -> bool {
 pub fn strip_internal(env: Vec<(OsString, OsString)>) -> Vec<(OsString, OsString)> {
     env.into_iter()
         .filter(|(name, _)| !is_internal(name))
+        .collect()
+}
+
+/// Variables inherited by model-invoked commands (ADR-0035). Keep this a positive list:
+/// variable names and secret formats are open-ended, including credentials inside URLs.
+#[must_use]
+pub fn command_environment(env: &[(OsString, OsString)]) -> Vec<(OsString, OsString)> {
+    const ALLOWED: &[&str] = &[
+        "PATH",
+        "HOME",
+        "SHELL",
+        "TMPDIR",
+        "TMP",
+        "TEMP",
+        "LANG",
+        "LANGUAGE",
+        "LC_ALL",
+        "LC_CTYPE",
+        "LC_COLLATE",
+        "LC_TIME",
+        "LC_NUMERIC",
+        "LC_MONETARY",
+        "LC_MESSAGES",
+        "USERPROFILE",
+        "HOMEDRIVE",
+        "HOMEPATH",
+        "SYSTEMROOT",
+        "WINDIR",
+        "COMSPEC",
+        "PATHEXT",
+        "APPDATA",
+        "LOCALAPPDATA",
+        "PROGRAMDATA",
+        "PROGRAMFILES",
+        "PROGRAMFILES(X86)",
+        "PROGRAMW6432",
+        "CARGO_HOME",
+        "RUSTUP_HOME",
+        "JAVA_HOME",
+        "GOPATH",
+        "GOROOT",
+        "SDKROOT",
+        "DEVELOPER_DIR",
+    ];
+    env.iter()
+        .filter(|(name, _)| {
+            name.to_str().is_some_and(|k| {
+                ALLOWED.iter().any(|allowed| {
+                    if cfg!(windows) {
+                        k.eq_ignore_ascii_case(allowed)
+                    } else {
+                        k == *allowed
+                    }
+                })
+            })
+        })
+        .cloned()
         .collect()
 }
 
@@ -126,8 +183,8 @@ pub async fn login_shell_env(
     };
     let shown = shell.display().to_string();
     let marker = format!("__PIARC_ENV_{}__", std::process::id());
-    // `command env` skips aliases and functions named env; `-0` keeps values with line breaks.
-    let script = format!("printf '%s' '{marker}'; command env -0; printf '%s' '{marker}'");
+    // Read the environment with the OS utility even when the profile changes PATH.
+    let script = format!("printf '%s' '{marker}'; /usr/bin/env -0; printf '%s' '{marker}'");
     let spec = CommandSpec {
         program: shell,
         args: ["-i", "-l", "-c", script.as_str()]
@@ -229,6 +286,24 @@ mod tests {
             .map(|(k, _)| k.to_string_lossy().into_owned())
             .collect();
         assert_eq!(kept, ["PATH", "HOME", "NODE_ENV", "PIP_INDEX_URL"]);
+    }
+
+    #[test]
+    fn command_fields_use_the_platforms_environment_name_rules() {
+        let base = os(&[
+            ("Path", "fixture-path"),
+            ("LC_NUMERIC", "C"),
+            ("BASH_ENV", "custom-startup"),
+            ("PIP_INDEX_URL", "https://fixture.invalid/simple"),
+            ("CUSTOM_CREDENTIAL", "fixture-secret"),
+        ]);
+        let inherited = command_environment(&base);
+        let mut expected = Vec::new();
+        if cfg!(windows) {
+            expected.push(("Path", "fixture-path"));
+        }
+        expected.push(("LC_NUMERIC", "C"));
+        assert_eq!(inherited, os(&expected));
     }
 
     #[test]

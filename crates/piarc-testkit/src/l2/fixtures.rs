@@ -15,7 +15,7 @@ pub(super) fn resolve(workspace: &Path, relative: &str) -> PathBuf {
 }
 
 /// Variables PiArc's processes carry that commands must not see (T17): what Electron, Node and
-/// PiArc set in the real application, here added to the test process's environment.
+/// PiArc set in the real application, here added to the isolated tool environment.
 pub const INTERNAL_PROBES: [(&str, &str); 4] = [
     ("ELECTRON_RUN_AS_NODE", "1"),
     ("NODE_OPTIONS", "--no-deprecation"),
@@ -25,21 +25,42 @@ pub const INTERNAL_PROBES: [(&str, &str); 4] = [
 
 /// The command environment of a run's Core: the login shell (on Unix `/bin/bash` with a home
 /// directory of the run, whose `.bash_profile` puts `<home>/bin` with the program
-/// `l2-login-tool` on `PATH` and sets `L2_LOGIN_PROFILE`) started from the test process's
-/// environment plus [`INTERNAL_PROBES`] and `L2_USER_VAR=kept`. Windows has no login shell:
-/// the same environment, stripped.
+/// `l2-login-tool` on `PATH` and sets `LC_TIME`). Only OS tool paths come from the test
+/// process; all private variables here are synthetic, even when an isolation assertion fails.
 pub(super) fn command_env(home: &Path) -> Result<piarc_core::tool_io::CommandEnv, String> {
     let bin = home.join("bin");
     std::fs::create_dir_all(&bin).map_err(|e| format!("{}: {e}", bin.display()))?;
     let mut base: Vec<(std::ffi::OsString, std::ffi::OsString)> = std::env::vars_os()
-        .filter(|(k, _)| k != "HOME" && k != "SHELL" && k != "BASH_ENV")
+        .filter(|(key, _)| {
+            [
+                "PATH",
+                "SystemRoot",
+                "WINDIR",
+                "COMSPEC",
+                "PATHEXT",
+                "ProgramFiles",
+                "ProgramFiles(x86)",
+                "ProgramW6432",
+                "TEMP",
+                "TMP",
+                "TMPDIR",
+                "LOCALAPPDATA",
+            ]
+            .iter()
+            .any(|name| key.eq_ignore_ascii_case(name))
+        })
         .collect();
     base.extend(
         INTERNAL_PROBES
             .iter()
             .map(|(k, v)| (std::ffi::OsString::from(k), std::ffi::OsString::from(v))),
     );
-    base.push(("L2_USER_VAR".into(), "kept".into()));
+    base.push(("L2_USER_VAR".into(), "synthetic-exported-secret".into()));
+    base.push(("LC_NUMERIC".into(), "C".into()));
+    base.push(("HOME".into(), home.as_os_str().to_owned()));
+    if cfg!(windows) {
+        base.push(("USERPROFILE".into(), home.as_os_str().to_owned()));
+    }
     if cfg!(unix) {
         let tool = bin.join("l2-login-tool");
         std::fs::write(&tool, "#!/bin/sh\necho 'login PATH works'\n")
@@ -48,10 +69,9 @@ pub(super) fn command_env(home: &Path) -> Result<piarc_core::tool_io::CommandEnv
         let quoted = bin.display().to_string().replace('\'', r"'\''");
         std::fs::write(
             home.join(".bash_profile"),
-            format!("export PATH='{quoted}':\"$PATH\"\nexport L2_LOGIN_PROFILE=loaded\n"),
+            format!("export PATH='{quoted}':\"$PATH\"\nexport LC_TIME=C\nexport L2_LOGIN_PROFILE=synthetic-profile-secret\n"),
         )
         .map_err(|e| format!("{}: {e}", home.display()))?;
-        base.push(("HOME".into(), home.as_os_str().to_owned()));
         base.push(("SHELL".into(), "/bin/bash".into()));
     }
     Ok(piarc_core::tool_io::CommandEnv::LoginShell { base })
