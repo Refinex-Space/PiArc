@@ -146,7 +146,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T19 | [Transcript 与 composer 正式版](tasks/T19-transcript-and-composer.md) | 2 | T18 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 0b72964 |
 | T20 | [基础权限与审批](tasks/T20-basic-permissions-and-approvals.md) | 2 | T19 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | ee03128 |
 | T21 | [模型、服务商与凭据设置](tasks/T21-models-providers-and-credentials.md) | 2 | T20 | macOS | high / 高 | 大 | 无 | 已完成 | e5f3b65 |
-| T22 | [System prompt 组装与 memory 文件](tasks/T22-system-prompt-and-memory-files.md) | 2 | T21 | macOS | high / 高 | 中 | 无 | 未开始 | — |
+| T22 | [System prompt 组装与 memory 文件](tasks/T22-system-prompt-and-memory-files.md) | 2 | T21 | macOS | high / 高 | 中 | 无 | 进行中 | — |
 | R2 | [M1 评审](tasks/R2-m1-review.md) | 2 | T22 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -309,7 +309,13 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（无进行中的任务。）
+T22（macOS，基线 `b845378`，`npm run verify` 15/15，前序无待关闭的 Windows CI 项）：
+
+- [ ] Core 收集分层 memory 并处理 Markdown 导入、来源、大小与去重（A03–A05、A09）。
+- [ ] 工作区外导入经权限扩展审批，Core 保存精确的工作区决定（A06）。
+- [ ] Harness Kit 组装会话提示词，按实际文件访问懒加载，通过追加消息送达变化（A01、A02、A07、A08）。
+- [ ] 接入严格 mock 的 context 场景与 M1 能力覆盖（A01–A03、A06–A09）。
+- [ ] 本机原创性比对、架构及维护说明、全量门禁与验收记录（A10、A11）。
 
 ## 登记事项
 
