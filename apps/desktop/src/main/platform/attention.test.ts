@@ -28,9 +28,11 @@ const { FakeNotification } = vi.hoisted(() => {
   return { FakeNotification };
 });
 
+const { createFromBitmap } = vi.hoisted(() => ({ createFromBitmap: vi.fn(() => ({})) }));
+
 vi.mock('electron', () => ({
   app: { dock: undefined, setBadgeCount: vi.fn() },
-  nativeImage: { createFromBitmap: vi.fn() },
+  nativeImage: { createFromBitmap },
   Notification: FakeNotification,
 }));
 
@@ -80,5 +82,23 @@ describe('Attention', () => {
       );
     }
     expect(attention.heldNotifications()).toBe(32);
+  });
+
+  it('draws the taskbar count as a smooth dot that Windows scales down', () => {
+    const attention = new Attention('win32', () => undefined);
+    const window = {
+      isDestroyed: () => false,
+      setOverlayIcon: vi.fn(),
+    } as unknown as BrowserWindow;
+    attention.setCount(window, 2, new Translator('en'));
+    const [pixels, options] = createFromBitmap.mock.calls[0] as unknown as [
+      Buffer,
+      { width: number; height: number; scaleFactor?: number },
+    ];
+    // W1: a 16 px dot without edge coverage showed as a jagged block on a scaled display.
+    expect(options).toEqual({ width: 32, height: 32, scaleFactor: 2 });
+    const alphas = new Set<number>();
+    for (let i = 3; i < pixels.length; i += 4) alphas.add(pixels[i] ?? 0);
+    expect([...alphas].some((a) => a > 0 && a < 255)).toBe(true);
   });
 });
