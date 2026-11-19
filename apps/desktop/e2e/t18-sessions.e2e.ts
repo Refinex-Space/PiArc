@@ -128,6 +128,8 @@ test('rename, pin, filter, archive and delete sessions; the result survives a re
     () => (globalThis as { __piarcMessageBoxes?: string[] }).__piarcMessageBoxes ?? [],
   );
   expect(asked).toHaveLength(1);
+  expect(asked[0]).toContain(beta);
+  expect(asked[0]).toContain('Beta task');
   expect(betaFiles.every((file) => !existsSync(file))).toBe(true);
   expect(existsSync(path.join(userDataDir, 'sessions', beta))).toBe(false);
   // Cancelling the dialog keeps the session.

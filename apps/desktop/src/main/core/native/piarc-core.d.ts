@@ -129,6 +129,8 @@ export declare class CoreRuntime {
    * brings it back; resolves with `null`.
    */
   setSessionArchived(id: string, archived: boolean): Promise<string>;
+  /** The indexed title and workspace of the session shown in a native deletion dialog. */
+  sessionDeletionTarget(id: string): Promise<string>;
   /**
    * Deletes a session: closes it when open, then removes its Pi session file, its temporary
    * directory and its index rows. Irreversible; the caller confirms with the user first.

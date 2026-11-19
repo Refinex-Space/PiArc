@@ -54,6 +54,7 @@ export type SessionCore = Pick<
   | 'renameSession'
   | 'setSessionPinned'
   | 'setSessionArchived'
+  | 'sessionDeletionTarget'
   | 'deleteSession'
   | 'transcriptWindow'
   | 'resendSnapshots'
@@ -397,15 +398,21 @@ export function registerSessionHandlers(
   registerHandler(IPC_CHANNELS.sessionSetArchived, async (_event, [id, archived]) => {
     await core.setSessionArchived(sessionId(id), flag(archived, 'archived'));
   });
-  registerHandler(IPC_CHANNELS.sessionDelete, async (event, [id, shown]) => {
+  registerHandler(IPC_CHANNELS.sessionDelete, async (event, [id]) => {
     const target = sessionId(id);
-    const name = title(shown) ?? target;
+    const details: unknown = JSON.parse(await core.sessionDeletionTarget(target));
+    if (typeof details !== 'object' || details === null)
+      throw new TypeError('invalid deletion target');
+    const recorded = 'title' in details && typeof details.title === 'string' ? details.title : '';
+    const workspace =
+      'workspace' in details && typeof details.workspace === 'string' ? details.workspace : '';
+    const name = recorded ? `${recorded} (${target})` : target;
     const t = translator();
     const window = BrowserWindow.fromWebContents(event.sender);
     const options: Electron.MessageBoxOptions = {
       type: 'warning',
       message: t.t('dialog.delete.message', { title: name }),
-      detail: t.t('dialog.delete.detail'),
+      detail: [workspace, t.t('dialog.delete.detail')].filter(Boolean).join('\n'),
       buttons: [t.t('dialog.delete.confirm'), t.t('dialog.cancel')],
       defaultId: 1,
       cancelId: 1,

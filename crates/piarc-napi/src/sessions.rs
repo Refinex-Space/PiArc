@@ -558,6 +558,18 @@ impl CoreRuntime {
         self.op(env, "CoreRuntime.setSessionArchived", id, Op::Prefs(change))
     }
 
+    /// The indexed title and workspace of the session shown in a native deletion dialog.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn session_deletion_target<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.sessionDeletionTarget", |core, done| {
+            core.session_deletion_target(id, done)
+        })
+    }
+
     /// Deletes a session: closes it when open, then removes its Pi session file, its temporary
     /// directory and its index rows. Irreversible; the caller confirms with the user first.
     /// Resolves with `null`.
