@@ -18,6 +18,7 @@ const STRICT: &str = r#"
 id: strict
 validation:
   required_system_sections: ["<environment>"]
+  ordered_system_sections: ["You are a coding agent.", "<environment>"]
   cache_breakpoints: { last_message_only: true }
 steps:
   - text: "ok"
@@ -330,6 +331,26 @@ async fn system_sections_lists_every_missing_section() {
             .contains("\"<environment>\""),
         "{error}"
     );
+}
+
+#[tokio::test]
+async fn system_sections_rejects_reversed_markers_on_both_wires() {
+    let reversed = json!("<environment>macOS</environment>\nYou are a coding agent.");
+    let mut anthropic = anthropic_compliant();
+    anthropic["system"][0]["text"] = reversed.clone();
+    let mut openai = openai_compliant();
+    openai["messages"][0]["content"] = reversed;
+    openai["messages"][1]["content"] = json!("second system message");
+    for (path, body) in [(ANTHROPIC, anthropic), (OPENAI, openai)] {
+        let error = expect_rejection(path, "strict", &body, Rule::SystemSections).await;
+        assert!(
+            error["message"]
+                .as_str()
+                .expect("message")
+                .contains("out of order"),
+            "{error}"
+        );
+    }
 }
 
 #[tokio::test]

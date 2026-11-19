@@ -638,13 +638,13 @@ capabilities:
     milestone: M1
     refs: [ARCH-6.6.1, ARCH-6.15]
     task: T22
-    status: planned
+    status: active
   - id: CAP-CTX-MEMORY-001
     title: 'CLAUDE.md、AGENTS.md、CLAUDE.local.md 层级，`@import` 与子目录懒加载'
     milestone: M1
     refs: [FR-CX-01, ARCH-6.6.2, ARCH-6.14]
     task: T22
-    status: planned
+    status: active
   - id: CAP-CTX-RULES-001
     title: '`.claude/rules` 与 `paths:` 条件加载'
     milestone: M2

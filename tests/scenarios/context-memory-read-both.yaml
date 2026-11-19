@@ -1,0 +1,29 @@
+id: context-memory-read-both
+description: With both memory filenames selected, the model receives both sibling files in a newly opened session.
+capabilities: [CAP-CTX-MEMORY-001]
+workspace:
+  files:
+    .piarc/settings.json: '{"memory":{"readBoth":true}}'
+    AGENTS.md: Enabled companion memory.
+    CLAUDE.md: Shared team memory.
+    .claude/CLAUDE.md: Compatibility folder memory.
+    CLAUDE.local.md: Personal local memory.
+providers:
+  main:
+    wire: openai
+    validation:
+      ordered_system_sections:
+        [
+          Shared team memory.,
+          Compatibility folder memory.,
+          Enabled companion memory.,
+          Personal local memory.,
+        ]
+    steps: [{ text: Checked. }]
+actions:
+  - prompt: { text: Start this session. }
+expect:
+  request_counts: { main: 1 }
+  requests:
+    - index: 0
+      occurrences: { Enabled companion memory.: 1, Shared team memory.: 1 }

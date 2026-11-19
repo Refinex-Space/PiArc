@@ -46,6 +46,16 @@
           "propertyNames": { "$ref": "#/$defs/relativePath" },
           "additionalProperties": { "type": "string" }
         },
+        "run_files": {
+          "description": "Initial UTF-8 files relative to the scenario's isolated temporary root.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/relativePath" },
+          "additionalProperties": { "type": "string" }
+        },
+        "git": {
+          "description": "Initialize the workspace as a Git repository.",
+          "type": "boolean"
+        },
         "fixtures": {
           "description": "Files copied byte for byte from the scenarios' fixtures/ directory: relative path in the workspace to the fixture's name (relative, forward slashes). For CRLF, byte order marks, legacy encodings, images and PDFs.",
           "type": "object",
@@ -138,6 +148,10 @@
             "cache_breakpoint_position": { "type": "boolean" }
           }
         },
+        "ordered_system_sections": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
         "required_system_sections": { "type": "array", "items": { "type": "string" } },
         "cache_breakpoints": {
           "type": "object",
@@ -204,6 +218,7 @@
       "properties": {
         "provider": { "$ref": "#/$defs/label" },
         "mode": { "enum": ["default", "acceptEdits"] },
+        "deferred": { "description": "Create the session on its first input.", "type": "boolean" },
         "cwd": {
           "description": "Working directory relative to the workspace; the workspace when absent.",
           "$ref": "#/$defs/relativePath"
@@ -392,6 +407,7 @@
       "additionalProperties": false,
       "required": ["decision"],
       "properties": {
+        "kind": { "enum": ["command", "fileChange", "permissionExpansion", "question"] },
         "feedback": { "type": "string" },
         "decision": { "enum": ["allow", "deny", "always", "session"] },
         "tool": {
@@ -423,6 +439,17 @@
         "last_user_text": { "type": "string" },
         "contains": { "type": "array", "items": { "type": "string" } },
         "not_contains": { "type": "array", "items": { "type": "string" } },
+        "occurrences": {
+          "type": "object",
+          "propertyNames": { "minLength": 1 },
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "user_message_contains": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "same_system_as": { "type": "integer", "minimum": 0 },
         "tool_results": {
           "type": "array",
           "items": {

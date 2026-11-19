@@ -8,7 +8,7 @@
 
 | 里程碑 | 能力数 | 已实现 | 计划中 | BLOCKED |
 |---|---|---|---|---|
-| M1 | 61 | 57 | 4 | 0 |
+| M1 | 61 | 59 | 2 | 0 |
 | M2 | 30 | 0 | 30 | 0 |
 | M3 | 21 | 0 | 21 | 0 |
 | M4 | 10 | 0 | 10 | 0 |
@@ -20,8 +20,8 @@
 |---|---|---|---|---|---|
 | CAP-CHAT-ATTACH-001 | 图片与 PDF 附件送达模型 | FR-CH-02 | T19 | `chat-composer-input` | 已实现 |
 | CAP-CHAT-MENTION-001 | 输入中的 `@` 文件提及与 `/` 命令解析后送达模型 | FR-CH-02 | T19 | `chat-composer-input` | 已实现 |
-| CAP-CTX-MEMORY-001 | CLAUDE.md、AGENTS.md、CLAUDE.local.md 层级，`@import` 与子目录懒加载 | FR-CX-01、ARCH-6.6.2、ARCH-6.14 | T22 | — | 计划中 |
-| CAP-CTX-PROMPT-001 | 分段 system prompt（静态段与动态段分别缓存，每个请求一个消息级缓存断点） | ARCH-6.6.1、ARCH-6.15 | T22 | — | 计划中 |
+| CAP-CTX-MEMORY-001 | CLAUDE.md、AGENTS.md、CLAUDE.local.md 层级，`@import` 与子目录懒加载 | FR-CX-01、ARCH-6.6.2、ARCH-6.14 | T22 | `context-memory-external-approval`<br>`context-memory-external-deny`<br>`context-memory-file-tools`<br>`context-memory-hierarchy`<br>`context-memory-imports`<br>`context-memory-lazy`<br>`context-memory-read-both`<br>`context-memory-updated`<br>`context-system-sections`<br>`context-system-stable` | 已实现 |
+| CAP-CTX-PROMPT-001 | 分段 system prompt（静态段与动态段分别缓存，每个请求一个消息级缓存断点） | ARCH-6.6.1、ARCH-6.15 | T22 | `context-memory-updated`<br>`context-system-sections`<br>`context-system-stable` | 已实现 |
 | CAP-EXEC-ABORT-001 | 中断回合时正在执行的命令连同子孙进程一起终止，条目为 interrupted | FR-TL-01、ARCH-6.11、ARCH-15.2 | T17 | `exec-abort-kills-tree` | 已实现 |
 | CAP-EXEC-CWD-001 | cd 在工作区内跨命令保留；越出工作区时下一条命令回到工作区根并说明原因 | FR-TL-01、ARCH-6.11 | T17 | `exec-cwd-carry-over` | 已实现 |
 | CAP-EXEC-ENV-001 | 命令环境不含 Electron、Node、Pi、PiArc 的内部变量与任何凭据 | ARCH-5.4、ARCH-6.11 | T17 | `exec-env-internal-vars` | 已实现 |

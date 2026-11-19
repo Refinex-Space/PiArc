@@ -490,6 +490,18 @@ fn check_system_sections(request: &Request, config: &ValidationConfig, out: &mut
             Some("system".to_owned()),
         ));
     }
+    let mut remaining = system.as_str();
+    for section in &config.ordered_system_sections {
+        let Some((_, after)) = remaining.split_once(section) else {
+            out.push(Violation::new(
+                Rule::SystemSections,
+                format!("required section {section:?} is missing or out of order"),
+                Some("system".into()),
+            ));
+            break;
+        };
+        remaining = after;
+    }
 }
 
 // ---- cache breakpoints (Anthropic only) --------------------------------------------------

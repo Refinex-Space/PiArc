@@ -14,6 +14,7 @@
 //! section 12.
 
 pub mod checks;
+mod fixtures;
 pub mod format;
 pub mod gate;
 pub mod matcher;

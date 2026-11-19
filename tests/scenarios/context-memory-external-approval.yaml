@@ -1,0 +1,31 @@
+id: context-memory-external-approval
+description: Persisting one outside import expands only that file, and a fresh session after a Core restart uses the workspace's saved decision.
+capabilities: [CAP-CTX-MEMORY-001]
+workspace:
+  run_files:
+    shared/team.md: Approved external instruction.
+  files:
+    CLAUDE.md: |
+      Project owned instruction.
+      @../shared/team.md
+providers:
+  main:
+    wire: anthropic
+    validation:
+      ordered_system_sections: [Project owned instruction., Approved external instruction.]
+    steps: [{ text: First. }, { text: Second. }]
+sessions:
+  first: { provider: main }
+  next: { provider: main, deferred: true }
+approvals:
+  - { tool: MemoryImport, kind: permissionExpansion, decision: always }
+actions:
+  - prompt: { session: first, text: Begin., turn: first }
+  - wait: { session: first, method: turn/completed, turn: first }
+  - restart_core: {}
+  - prompt: { session: next, text: Begin again., turn: second }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - { index: 0, occurrences: { Approved external instruction.: 1 } }
+    - { index: 1, occurrences: { Approved external instruction.: 1 } }

@@ -1,0 +1,58 @@
+id: context-memory-imports
+description: Imports expand at their position through depth four while cycles, HTML comments and code examples never load extra instructions.
+capabilities: [CAP-CTX-MEMORY-001]
+workspace:
+  files:
+    CLAUDE.md: |
+      Before nested imports.
+      @docs/first.md
+      After nested imports.
+      Example: `@docs/code.md`.
+      ```md
+      @docs/fenced.md
+      ```
+      <!-- A private comment. -->
+    docs/first.md: |
+      Imported at level one.
+      @more/second.md
+      @../CLAUDE.md
+    docs/more/second.md: |
+      Imported at level two.
+      @third.md
+    docs/more/third.md: |
+      Imported at level three.
+      @fourth.md
+    docs/more/fourth.md: |
+      Imported at level four.
+      @fifth.md
+    docs/more/fifth.md: Unreachable fifth level.
+    docs/code.md: Inline example was expanded.
+    docs/fenced.md: Fenced example was expanded.
+providers:
+  main:
+    wire: anthropic
+    validation:
+      ordered_system_sections:
+        [
+          Before nested imports.,
+          Imported at level one.,
+          Imported at level two.,
+          Imported at level three.,
+          Imported at level four.,
+          After nested imports.,
+        ]
+    steps: [{ text: Read. }]
+actions:
+  - prompt: { text: Use the project instructions. }
+expect:
+  request_counts: { main: 1 }
+  requests:
+    - index: 0
+      occurrences: { Before nested imports.: 1, Imported at level one.: 1 }
+      not_contains:
+        [
+          A private comment.,
+          Unreachable fifth level.,
+          Inline example was expanded.,
+          Fenced example was expanded.,
+        ]

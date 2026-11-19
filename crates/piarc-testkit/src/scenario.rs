@@ -194,6 +194,9 @@ pub struct ValidationConfig {
     /// marker), checked by the `system_sections` rule.
     #[serde(default)]
     pub required_system_sections: Vec<String>,
+    /// Markers that must occur in this order in the system prompt.
+    #[serde(default)]
+    pub ordered_system_sections: Vec<String>,
     /// Where Anthropic cache breakpoints may sit, checked by `cache_breakpoint_position`.
     #[serde(default)]
     pub cache_breakpoints: CachePlacement,
@@ -386,6 +389,14 @@ impl Script {
             .any(String::is_empty)
         {
             return Err("required_system_sections must not contain empty strings".to_owned());
+        }
+        if self
+            .validation
+            .ordered_system_sections
+            .iter()
+            .any(String::is_empty)
+        {
+            return Err("ordered_system_sections must not contain empty strings".into());
         }
         Ok(())
     }

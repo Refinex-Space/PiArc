@@ -1,0 +1,57 @@
+id: context-system-sections
+description: The strict provider sees PiArc identity, active tool guidance, project memory and the opening Git status in order.
+capabilities: [CAP-CTX-PROMPT-001, CAP-CTX-MEMORY-001]
+workspace:
+  git: true
+  files:
+    CLAUDE.md: Treat unreviewed changes as provisional.
+    initial-worktree-marker.txt: present at session creation
+providers:
+  main:
+    wire: anthropic
+    validation:
+      cache_breakpoints: { max_message_level: 1, last_message_only: true }
+      ordered_system_sections:
+        - '<identity>'
+        - PiArc
+        - '<tool_guidance>'
+        - Read
+        - '<project_context>'
+        - Treat unreviewed changes as provisional.
+        - '<environment>'
+        - 'Working directory:'
+        - work space 工作区
+        - 'Platform:'
+        - 'Session date:'
+        - 'Git status at session start:'
+        - initial-worktree-marker.txt
+    steps: [{ text: Ready. }]
+actions:
+  - write_file: { path: created-after-opening.txt, content: late }
+  - write_file: { path: CLAUDE.md, content: New instruction before the first prompt. }
+  - prompt: { text: Inspect the workspace. }
+expect:
+  request_counts: { main: 1 }
+  requests:
+    - index: 0
+      # Keep block boundaries exact without embedding the generated prompt or the temporary path.
+      body:
+        system:
+          - { type: text, cache_control: { type: ephemeral } }
+          - { type: text, cache_control: { type: ephemeral } }
+      contains:
+        - '"<identity>\n'
+        - '</tool_guidance>\n\n"'
+        - '"<project_context>\n'
+        - '</environment>"'
+      not_contains:
+        - 'running inside pi, a coding agent harness'
+        - 'Pi documentation (read only'
+        - '<docs>'
+        - '<output_style>'
+        - '<skills>'
+        - '<mcp_servers>'
+        - created-after-opening.txt
+      user_message_contains: ['[PiArc memory]', New instruction before the first prompt.]
+      occurrences:
+        { Treat unreviewed changes as provisional.: 1, New instruction before the first prompt.: 1 }

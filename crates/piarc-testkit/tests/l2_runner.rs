@@ -99,6 +99,14 @@ fn invalid_scenario_files_are_rejected_with_the_file_and_the_field() {
             "/id: `minimal` differs from the file name `bad-id`",
         ),
         (
+            "bad-run-path",
+            VALID.replace(
+                "providers:",
+                "workspace: { run_files: { '../outside.txt': 'x' } }\nproviders:",
+            ),
+            "/workspace/run_files/../outside.txt",
+        ),
+        (
             "bad-path",
             VALID.replace(
                 "expect:\n",
@@ -199,6 +207,7 @@ fn declared_approvals_without_approval_requests_fail() {
     let mut spec = scenario("chat-basic");
     spec.approvals = vec![Approval {
         decision: ApprovalDecision::Allow,
+        kind: None,
         feedback: None,
         tool: Some("Bash".into()),
     }];

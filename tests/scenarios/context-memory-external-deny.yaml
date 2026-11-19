@@ -1,0 +1,26 @@
+id: context-memory-external-deny
+description: Refusing a file outside the workspace leaves an explanation at the import site and keeps its contents out of the request.
+capabilities: [CAP-CTX-MEMORY-001]
+workspace:
+  run_files:
+    shared/private.md: Refused external instruction.
+  files:
+    AGENTS.md: |
+      Before outside import.
+      @../shared/private.md
+      After outside import.
+providers:
+  main:
+    wire: openai
+    validation:
+      ordered_system_sections:
+        [Before outside import., '[Memory import denied:', After outside import.]
+    steps: [{ text: Understood. }]
+approvals:
+  - { tool: MemoryImport, kind: permissionExpansion, decision: deny }
+actions:
+  - prompt: { text: Start with the available instructions. }
+expect:
+  request_counts: { main: 1 }
+  requests:
+    - { index: 0, not_contains: [Refused external instruction.] }

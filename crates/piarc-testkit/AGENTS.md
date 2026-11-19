@@ -72,9 +72,10 @@
 - 场景格式的唯一描述是 `tests/scenarios/schema.json`（`format.rs` 以 `include_str!` 嵌入）：改格式时同时改 schema、`format.rs` 的类型与引用检查、`testing.md` 第 12 节。加载分三遍：schema（报字段的 JSON Pointer）→ serde → 引用检查（id 与文件名、会话与端点、标签先定义后使用、路径不出工作区、mock 脚本自检）。
 - 运行器只经 `CoreRuntime` 的公开方法驱动、只读 sink 送达的事件与 `ToolIoObserver`（`gate.rs`）；不复制 Core 的逻辑。每个端点一个 `MockProvider` 与一个 Pi provider（`mock-<端点名>`，模型 `mock-model`），预置端点经模型的 `x-piarc-scenario` 请求头选择脚本，`configure_as` 端点经首条用户消息的场景标记选择。
 - 每次运行一个新的临时根（含空格与中文，带进程号与计数）和一个新 Core；结束后删除并在结果里报告。并行的场景各起一个 Agent Host（默认半数核心、至多 4 个）。
-- 命令环境（T17，`runner.rs` 的 `command_env`）：L2 的 Core 用登录 shell，但从测试进程环境加 `INTERNAL_PROBES`（`ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`PI_CODING_AGENT_DIR`、`PIARC_L2_INTERNAL`，模拟应用里 Core 的环境）与 `L2_USER_VAR=kept` 起步；Unix 上 `SHELL=/bin/bash`、`HOME` 为本次运行的 `home 家/`，其 `.bash_profile` 把 `home 家/bin`（含 `l2-login-tool`）放进 `PATH` 并设 `L2_LOGIN_PROFILE=loaded`。`exec-env-*` 场景依赖这些名字，改动时同步。
+- 命令环境（T17，`fixtures.rs` 的 `command_env`）：L2 的 Core 用登录 shell，但从测试进程环境加 `INTERNAL_PROBES`（`ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`PI_CODING_AGENT_DIR`、`PIARC_L2_INTERNAL`，模拟应用里 Core 的环境）与 `L2_USER_VAR=kept` 起步；Unix 上 `SHELL=/bin/bash`、`HOME` 为本次运行的 `home 家/`，其 `.bash_profile` 把 `home 家/bin`（含 `l2-login-tool`）放进 `PATH` 并设 `L2_LOGIN_PROFILE=loaded`。`exec-env-*` 场景依赖这些名字，改动时同步。
 - Composer 输入可声明提及、客户端幂等键与附件夹具。运行器经 Core 的 `store_attachment` 存入附件，输入携带返回的引用。见 `chat-composer-input.yaml`（含手动压缩）与 `turn-classified-errors.yaml`。
 - 会话建立时 Agent Host 发一次 `exec/shells`（没有工具调用 id）：`ToolIoObserver` 的计数与批次 Gate 要忽略没有 `tool_call_id` 的请求（`tests/sessions/turns.rs` 的 `Rounds` 已这样做）。
+- T22 的 `context-*.yaml` 用真实请求比较 system 与追加消息。Core 的 `memory_home` 指向同一次运行的 `home 家/`，`workspace.run_files` 可在隔离的临时根准备用户 memory 和外部导入。
 - 动作结束后先等每个被启动的回合 `turn/completed`，再一次性检查全部断言；没有 sleep，等待只有 30 s 安全网。
 - 每个请求都必须通过严格 mock 的校验（总是检查）；`approvals` 按声明顺序答复会话快照里的新请求；多出的应答、无人答复的请求或工具名不符都使场景失败。
 

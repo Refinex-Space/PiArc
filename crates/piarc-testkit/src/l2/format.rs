@@ -124,6 +124,12 @@ pub struct WorkspaceSpec {
     /// Relative path (forward slashes) to content.
     #[serde(default)]
     pub files: BTreeMap<String, String>,
+    /// UTF-8 files relative to this scenario's isolated temporary root (including its home).
+    #[serde(default)]
+    pub run_files: BTreeMap<String, String>,
+    /// Initialize the workspace as a Git repository before opening any sessions.
+    #[serde(default)]
+    pub git: bool,
     /// Relative path to a fixture file copied byte for byte (CRLF, byte order marks, legacy
     /// encodings, images, PDFs): its name below the scenarios' `fixtures/` directory.
     #[serde(default)]
@@ -195,6 +201,9 @@ pub struct SessionSpec {
     /// Explicit starting permission mode.
     #[serde(default)]
     pub mode: Option<piarc_protocol::policy::PermissionMode>,
+    /// Create this session on its first input instead of at startup.
+    #[serde(default)]
+    pub deferred: bool,
     /// Working directory relative to the workspace.
     #[serde(default)]
     pub cwd: Option<String>,
@@ -456,6 +465,9 @@ pub struct Approval {
     /// The tool the request must be for.
     #[serde(default)]
     pub tool: Option<String>,
+    /// The presentation kind the approval card must have.
+    #[serde(default)]
+    pub kind: Option<piarc_protocol::policy::ApprovalKind>,
     /// User feedback returned with a refusal.
     #[serde(default)]
     pub feedback: Option<String>,
@@ -538,6 +550,15 @@ pub struct RequestExpect {
     /// Strings the raw body must not contain.
     #[serde(default)]
     pub not_contains: Option<Vec<String>>,
+    /// Number of occurrences of each literal substring in the raw request body.
+    #[serde(default)]
+    pub occurrences: BTreeMap<String, usize>,
+    /// One user message must contain all these literal strings.
+    #[serde(default)]
+    pub user_message_contains: Option<Vec<String>>,
+    /// Compare the complete system content with an earlier request on the same endpoint.
+    #[serde(default)]
+    pub same_system_as: Option<usize>,
     /// Every tool result, in order.
     #[serde(default)]
     pub tool_results: Option<Vec<ToolResultExpect>>,
@@ -586,6 +607,7 @@ impl ScenarioSpec {
             SessionSpec {
                 provider,
                 mode: None,
+                deferred: false,
                 cwd: None,
             },
         )])
@@ -768,6 +790,9 @@ fn check(spec: &ScenarioSpec, stem: &str) -> Vec<String> {
     for path in spec.workspace.files.keys() {
         check_path(&format!("/workspace/files/{path}"), path, &mut problems);
     }
+    for path in spec.workspace.run_files.keys() {
+        check_path(&format!("/workspace/run_files/{path}"), path, &mut problems);
+    }
     for path in spec.expect.files.keys() {
         check_path(&format!("/expect/files/{path}"), path, &mut problems);
     }
@@ -903,6 +928,14 @@ fn check_expect(spec: &ScenarioSpec, problems: &mut Vec<String>) {
         }
     }
     for (n, request) in spec.expect.requests.iter().enumerate() {
+        if request
+            .same_system_as
+            .is_some_and(|index| index >= request.index)
+        {
+            problems.push(format!(
+                "/expect/requests/{n}/same_system_as: must name an earlier request"
+            ));
+        }
         if let Err(e) = spec.provider_label(request.provider.as_deref()) {
             problems.push(format!("/expect/requests/{n}/provider: {e}"));
         }

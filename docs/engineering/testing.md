@@ -208,6 +208,7 @@ id: read-then-answer               # ASCII 字母、数字与 . _ -
 validation:                        # 可省略，默认全部规则开启
   rules: { cache_breakpoint_position: false }   # 逐条关闭
   required_system_sections: ["<environment>"]  # system 必须包含的文本
+  ordered_system_sections: ["<identity>", "<environment>"]  # system 中依次出现的标记
   cache_breakpoints:               # 仅 Anthropic
     max_message_level: 1           # messages 内最多几个断点，默认 1（架构第 6.15 节）
     last_message_only: false       # 消息级断点必须在最后一条消息
@@ -246,7 +247,7 @@ steps:
 | `tool_pairing` | 每个工具调用在下一条消息中都有同 id 的结果；无孤立、多余或重复的 id；Anthropic 的 `tool_result` 块排在该消息其他内容之前 |
 | `role_order` | Anthropic：user 与 assistant 严格交替，首条与末条为 user（当前模型不支持 assistant 预填），`system` 角色消息不参与交替；OpenAI：`tool` 消息紧跟带 `tool_calls` 的 assistant 消息；两者都拒绝未知角色与空消息列表 |
 | `tool_schema` | 名称符合 `^[a-zA-Z0-9_-]{1,128}$`（Anthropic）或 `{1,64}`（OpenAI）且不重复；参数 schema 是对象、顶层 `"type": "object"`、通过 JSON Schema 元 schema 校验；Anthropic 自定义工具必须有 `input_schema`，带 `type` 的内置工具不查 schema |
-| `system_sections` | system（Anthropic 的 `system` 与 `system` 角色消息，OpenAI 的 `system`/`developer` 消息）包含场景要求的每段文本 |
+| `system_sections` | system（Anthropic 的 `system` 与 `system` 角色消息，OpenAI 的 `system`/`developer` 消息）包含场景要求的每段文本，并按顺序匹配 `ordered_system_sections` 中的标记 |
 | `cache_breakpoint_count` | Anthropic 的 `cache_control`（含顶层自动缓存）不超过 4 个 |
 | `cache_breakpoint_position` | 消息级断点数量与位置符合场景配置；thinking 块与空文本块不能带断点 |
 
@@ -313,6 +314,8 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 - 提供商设置场景在端点下写 `configure_as: custom` 或 `local`，运行器通过 `CoreRuntime.provider_op` 提交本机 mock URL、线协议和模型 ID。自定义端点使用保险箱中的测试密钥，本地端点无需密钥。这些端点使用首条用户消息中的 `[[piarc-scenario:<场景 id>]]` 选择脚本，切换后同一段历史仍可重放。
 - 顶层 `cloud_providers` 接受 `amazon-bedrock` 和 `google-vertex`，仅配置测试凭据。所有会话仍指定 mock 端点。用 `expect.configured_providers` 按 id 校验公开设置字段与模型目录可用性，同时扫描该场景数据目录中的测试密钥明文。
 - `workspace.files` 与 `expect.files` 的路径都相对工作区；工作区本身在临时根下的 `work space 工作区`，会话的 `cwd` 相对它。
+- `workspace.run_files` 在该次运行的临时根下建立夹具，可设置祖先目录的 memory、模拟家目录 `home 家/`、数据目录 `data 数据/` 或用于审批的相邻文件。`workspace.git: true` 在工作区创建空仓库，便于验证初始 Git 状态。
+- 会话通常在动作开始前建立。`sessions.<label>.deferred: true` 将该会话的创建推迟到第一次输入，可验证跨会话的授权与配置。
 - 按字节的夹具放在 `tests/scenarios/fixtures/`（`.gitattributes` 设为 `-text`，换行与编码不被 Git 改动）；加载时检查夹具存在。PDF 夹具用 `piarc-fs` 测试里的 `make_pdf` 生成，手写的 PDF 可能取不到文字。
 
 ### 12.2 动作
@@ -339,7 +342,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 
 ### 12.3 审批应答
 
-`approvals` 按顺序回答 `core/sessions` 快照中的新请求（`decision: allow|session|always|deny`，可指定 `tool` 和拒绝的 `feedback`）。应答经 Core 公开命令；未声明的请求、工具不匹配、重复或过期答复、未用上的应答都使场景失败。`sessions.<label>.mode` 显式选择起始模式，`set_mode` 操作向当前会话发送模式变更。
+`approvals` 按顺序回答 `core/sessions` 快照中的新请求（`decision: allow|session|always|deny`，可指定 `tool`、审批卡的 `kind` 和拒绝的 `feedback`）。应答经 Core 公开命令；未声明的请求、工具不匹配、重复或过期答复、未用上的应答都使场景失败。`sessions.<label>.mode` 显式选择起始模式，`set_mode` 操作向当前会话发送模式变更。
 
 ### 12.4 断言与匹配规则
 
@@ -350,6 +353,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | `files` | 路径 → 完整内容（UTF-8，逐字节相等），或 `null` 表示文件不存在；没写的文件不检查 |
 | `fixtures` | 路径 → `tests/scenarios/fixtures/` 下的文件名：工作区文件与它逐字节相等（非 UTF-8 编码、BOM、CRLF 用它断言），失败时给出第一处不同的字节偏移与前后的字节 |
 | `requests` | 按端点名（只有一个端点时可省略）与请求序号（`index`，从 0 开始）断言：`roles`（消息角色顺序）、`tools`（工具名集合，恰好相等）、`tools_include`、`tools_exclude`、`user_texts`（每条有文本的 user 消息的文本，按顺序）、`last_user_text`、`contains`、`not_contains`（原始请求体子串）、`tool_results`（全部工具结果按顺序：`id`，可选 `is_error`（仅 Anthropic）与 `contains`）、`body`（请求体的字段子集） |
+| `requests` 中的上下文断言 | `same_system_as` 填同一端点较早的请求序号，比较完整 system 块或 system/developer 消息的文本字节、分块与字段。用 `occurrences` 指定子串在原始请求体中的出现次数，用 `user_message_contains` 检查同一条 user 消息含有列出的全部文本 |
 | `request_counts` | 每个端点收到的请求数，恰好相等 |
 | （总是检查） | 每个请求都通过严格 mock 的校验；被拒的请求列出规则 ID |
 | `tool_batches` | 工具调用 id 的分批：Core 收到的委托请求按这些批次成组到达。运行器经 Core 的 `ToolIoObserver` 扣住下一批的请求，整批到齐才一起放行；另一批的调用提前到达即失败。不靠计时 |
@@ -364,7 +368,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 - 场景一个失败不影响其他场景的执行与报告；同一场景连续运行两次结果相同（`l2_runner.rs` 检查），没有 sleep，等待只有 30 s 安全网。
 - `piarc-devcli` 用同一个运行器：`run <文件或目录> [--json <文件>]`（见 `crates/piarc-devcli/AGENTS.md`）。
 
-- **命令环境**（T17）：L2 的 Core 以准备好的登录 shell 起命令环境：测试进程环境加上应用里 Core 会带的内部变量（`ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`PI_CODING_AGENT_DIR`、`PIARC_L2_INTERNAL`）与 `L2_USER_VAR=kept`，Unix 上 `/bin/bash` 加本次运行的 `HOME`（`.bash_profile` 往 `PATH` 加含 `l2-login-tool` 的目录）。环境剔除与登录 `PATH` 的场景因此不依赖开发机的 shell 配置（`crates/piarc-testkit/src/l2/runner.rs` 的 `command_env`）。
+- **命令环境**（T17）：L2 的 Core 以准备好的登录 shell 起命令环境：测试进程环境加上应用里 Core 会带的内部变量（`ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`PI_CODING_AGENT_DIR`、`PIARC_L2_INTERNAL`）与 `L2_USER_VAR=kept`，Unix 上 `/bin/bash` 加本次运行的 `HOME`（`.bash_profile` 往 `PATH` 加含 `l2-login-tool` 的目录）。环境剔除与登录 `PATH` 的场景因此不依赖开发机的 shell 配置（`crates/piarc-testkit/src/l2/fixtures.rs` 的 `command_env`）。
 
 ### 12.6 新增一个 L2 场景
 

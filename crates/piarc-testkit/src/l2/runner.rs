@@ -22,6 +22,8 @@ use serde_json::{Value, json};
 use tokio::sync::{Notify, oneshot};
 
 use super::checks::{check_files, check_fixture_files, check_requests};
+pub use super::fixtures::INTERNAL_PROBES;
+use super::fixtures::{command_env, prepare_workspace, resolve, write_file, write_json};
 use super::format::{Action, EndpointSetup, InputAction, ScenarioSpec, Wire};
 use super::gate::Gate;
 use super::matcher::subset_mismatch;
@@ -181,6 +183,7 @@ struct Env {
     workspace: PathBuf,
     data: PathBuf,
     cache: PathBuf,
+    home: PathBuf,
     mocks: BTreeMap<String, MockProvider>,
     gate: Arc<Gate>,
     /// Kept across Core restarts, so a restarted Core finds its vault's master key.
@@ -203,24 +206,7 @@ impl Env {
         for dir in [&workspace, &data.join("pi"), &cache] {
             std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         }
-        for (path, content) in &spec.workspace.files {
-            write_file(&workspace, path, content)?;
-        }
-        for (path, name) in &spec.workspace.fixtures {
-            let target = resolve(&workspace, path);
-            if let Some(parent) = target.parent() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|e| format!("{}: {e}", parent.display()))?;
-            }
-            std::fs::copy(spec.fixture(name), &target)
-                .map_err(|e| format!("fixture {name} → {}: {e}", target.display()))?;
-        }
-        for session in spec.sessions().values() {
-            if let Some(cwd) = &session.cwd {
-                let dir = resolve(&workspace, cwd);
-                std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-            }
-        }
+        prepare_workspace(spec, root, &workspace)?;
         let mut mocks = BTreeMap::new();
         let mut providers = serde_json::Map::new();
         for (name, endpoint) in &spec.providers {
@@ -253,11 +239,13 @@ impl Env {
             &json!({ "retry": { "baseDelayMs": 5 } }),
         )?;
         let gate = Arc::new(Gate::new(spec.expect.tool_batches.clone()));
-        let command_env = command_env(root)?;
+        let home = root.join("home 家");
+        let command_env = command_env(&home)?;
         Ok(Self {
             workspace,
             data,
             cache,
+            home,
             mocks,
             gate,
             key_store: Arc::new(MemorySecretStore::new()),
@@ -271,6 +259,7 @@ impl Env {
         let dirs = DataDirs::new(self.data.clone(), self.cache.clone()).ok();
         CoreConfig {
             dirs,
+            memory_home: Some(self.home.clone()),
             sessions: SessionsConfig {
                 launch: Some(AgentHostLaunch::Custom {
                     node: self.config.node.clone(),
@@ -339,82 +328,6 @@ fn pi_provider_entry(
             "headers": headers
         }]
     })
-}
-
-fn resolve(workspace: &Path, relative: &str) -> PathBuf {
-    relative
-        .split('/')
-        .filter(|part| *part != ".")
-        .fold(workspace.to_path_buf(), |path, part| path.join(part))
-}
-
-/// Variables PiArc's processes carry that commands must not see (T17): what Electron, Node and
-/// PiArc set in the real application, here added to the test process's environment.
-pub const INTERNAL_PROBES: [(&str, &str); 4] = [
-    ("ELECTRON_RUN_AS_NODE", "1"),
-    ("NODE_OPTIONS", "--no-deprecation"),
-    ("PI_CODING_AGENT_DIR", "/l2/pi"),
-    ("PIARC_L2_INTERNAL", "1"),
-];
-
-/// The command environment of a run's Core: the login shell (on Unix `/bin/bash` with a home
-/// directory of the run, whose `.bash_profile` puts `<home>/bin` with the program
-/// `l2-login-tool` on `PATH` and sets `L2_LOGIN_PROFILE`) started from the test process's
-/// environment plus [`INTERNAL_PROBES`] and `L2_USER_VAR=kept`. Windows has no login shell:
-/// the same environment, stripped.
-fn command_env(root: &Path) -> Result<piarc_core::tool_io::CommandEnv, String> {
-    let home = root.join("home 家");
-    let bin = home.join("bin");
-    std::fs::create_dir_all(&bin).map_err(|e| format!("{}: {e}", bin.display()))?;
-    let mut base: Vec<(std::ffi::OsString, std::ffi::OsString)> = std::env::vars_os()
-        .filter(|(k, _)| k != "HOME" && k != "SHELL" && k != "BASH_ENV")
-        .collect();
-    base.extend(
-        INTERNAL_PROBES
-            .iter()
-            .map(|(k, v)| (std::ffi::OsString::from(k), std::ffi::OsString::from(v))),
-    );
-    base.push(("L2_USER_VAR".into(), "kept".into()));
-    if cfg!(unix) {
-        let tool = bin.join("l2-login-tool");
-        std::fs::write(&tool, "#!/bin/sh\necho 'login PATH works'\n")
-            .map_err(|e| format!("{}: {e}", tool.display()))?;
-        make_executable(&tool)?;
-        let quoted = bin.display().to_string().replace('\'', r"'\''");
-        std::fs::write(
-            home.join(".bash_profile"),
-            format!("export PATH='{quoted}':\"$PATH\"\nexport L2_LOGIN_PROFILE=loaded\n"),
-        )
-        .map_err(|e| format!("{}: {e}", home.display()))?;
-        base.push(("HOME".into(), home.into_os_string()));
-        base.push(("SHELL".into(), "/bin/bash".into()));
-    }
-    Ok(piarc_core::tool_io::CommandEnv::LoginShell { base })
-}
-
-#[cfg(unix)]
-fn make_executable(path: &Path) -> Result<(), String> {
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
-        .map_err(|e| format!("{}: {e}", path.display()))
-}
-
-#[cfg(not(unix))]
-fn make_executable(_path: &Path) -> Result<(), String> {
-    Ok(())
-}
-
-fn write_file(workspace: &Path, relative: &str, content: &str) -> Result<(), String> {
-    let path = resolve(workspace, relative);
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
-    }
-    std::fs::write(&path, content).map_err(|e| format!("{}: {e}", path.display()))
-}
-
-fn write_json(path: &Path, value: &Value) -> Result<(), String> {
-    let text = serde_json::to_vec_pretty(value).map_err(|e| e.to_string())?;
-    std::fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 /// Everything Core delivered, as `(route, event)`, with a way to wait for more.
@@ -592,25 +505,37 @@ impl Driver<'_> {
         )
         .await?;
         for (label, session) in self.spec.sessions() {
-            let cwd = session.cwd.as_deref().map(|c| resolve(&workspace, c));
-            let model = Some(piarc_protocol::session::ModelRef {
-                provider: pi_provider(&session.provider),
-                id: MOCK_MODEL.into(),
-            });
-            let ws = workspace.clone();
-            let created = call(
-                |done| {
-                    self.core
-                        .create_session_with_mode(ws, cwd, model, session.mode, done)
-                },
-                &format!("creating session `{label}`"),
-            )
-            .await?;
-            let id = created["sessionId"]
-                .as_str()
-                .ok_or_else(|| format!("session `{label}`: no id in {created}"))?;
-            self.sessions.insert(label, id.to_owned());
+            if !session.deferred {
+                self.create_session(&label, &session).await?;
+            }
         }
+        Ok(())
+    }
+
+    async fn create_session(
+        &mut self,
+        label: &str,
+        session: &super::format::SessionSpec,
+    ) -> Result<(), String> {
+        let workspace = &self.env.workspace;
+        let cwd = session.cwd.as_deref().map(|c| resolve(workspace, c));
+        let model = Some(piarc_protocol::session::ModelRef {
+            provider: pi_provider(&session.provider),
+            id: MOCK_MODEL.into(),
+        });
+        let ws = workspace.to_owned();
+        let created = call(
+            |done| {
+                self.core
+                    .create_session_with_mode(ws, cwd, model, session.mode, done)
+            },
+            &format!("creating session `{label}`"),
+        )
+        .await?;
+        let id = created["sessionId"]
+            .as_str()
+            .ok_or_else(|| format!("session `{label}`: no id in {created}"))?;
+        self.sessions.insert(label.to_owned(), id.to_owned());
         Ok(())
     }
 
@@ -723,6 +648,14 @@ impl Driver<'_> {
     }
 
     async fn input(&mut self, input: &InputAction, op: fn(UserInput) -> Op) -> Result<(), String> {
+        let label = self.label(input.session.as_deref())?;
+        if !self.sessions.contains_key(&label) {
+            let sessions = self.spec.sessions();
+            let spec = sessions
+                .get(&label)
+                .ok_or_else(|| format!("no session {label}"))?;
+            self.create_session(&label, spec).await?;
+        }
         let mut outgoing = UserInput {
             request_id: input.request_id.clone(),
             text: input.text.clone(),
@@ -791,7 +724,10 @@ impl Driver<'_> {
 
     fn session_id(&self, session: Option<&str>) -> Result<String, String> {
         let label = self.label(session)?;
-        Ok(self.sessions.get(&label).cloned().unwrap_or_default())
+        self.sessions
+            .get(&label)
+            .cloned()
+            .ok_or_else(|| format!("session {label} has not been created"))
     }
 
     async fn op(&self, session: Option<&str>, op: Op) -> Result<Value, String> {
@@ -857,10 +793,7 @@ impl Driver<'_> {
     }
 
     async fn answer_visible(&mut self) -> Result<(), String> {
-        use super::format::ApprovalDecision as Choice;
-        use piarc_protocol::policy::{
-            ApprovalAnswer, ApprovalDecision as Decision, ApprovalRequest,
-        };
+        use piarc_protocol::policy::ApprovalRequest;
 
         let snapshots: Vec<Value> = {
             let all = self
@@ -890,47 +823,63 @@ impl Driver<'_> {
                 for raw in cards {
                     let card: ApprovalRequest =
                         serde_json::from_value(raw.clone()).map_err(|e| e.to_string())?;
-                    if self.answered.contains(&card.request_id) {
-                        continue;
-                    }
-                    let expected = self
-                        .spec
-                        .approvals
-                        .get(self.answered.len())
-                        .ok_or_else(|| format!("unexpected approval for {}", card.tool))?;
-                    if expected.tool.as_ref().is_some_and(|t| t != &card.tool) {
-                        return Err(format!(
-                            "approval expected {:?}, got {}",
-                            expected.tool, card.tool
-                        ));
-                    }
-                    let answer = ApprovalAnswer {
-                        request_id: card.request_id.clone(),
-                        session_id: card.session_id,
-                        revision: card.revision,
-                        connection_epoch: card.connection_epoch,
-                        feedback: expected.feedback.clone(),
-                        rule: card.rule,
-                        directory: card.directory,
-                        decision: match expected.decision {
-                            Choice::Allow => Decision::AllowOnce,
-                            Choice::Session => Decision::AllowSession,
-                            Choice::Always => Decision::AllowAlways,
-                            Choice::Deny => Decision::Deny,
-                        },
-                    };
-                    let result = call(
-                        |done| self.core.answer_approval(answer, done),
-                        "answering an approval",
-                    )
-                    .await?;
-                    if result["status"] != "applied" {
-                        return Err(format!("approval was not applied: {result}"));
-                    }
-                    self.answered.insert(card.request_id);
+                    self.answer_card(card).await?;
                 }
             }
         }
+        Ok(())
+    }
+
+    async fn answer_card(
+        &mut self,
+        card: piarc_protocol::policy::ApprovalRequest,
+    ) -> Result<(), String> {
+        use super::format::ApprovalDecision as Choice;
+        use piarc_protocol::policy::{ApprovalAnswer, ApprovalDecision as Decision};
+        if self.answered.contains(&card.request_id) {
+            return Ok(());
+        }
+        let expected = self
+            .spec
+            .approvals
+            .get(self.answered.len())
+            .ok_or_else(|| format!("unexpected approval for {}", card.tool))?;
+        if expected.tool.as_ref().is_some_and(|t| t != &card.tool) {
+            return Err(format!(
+                "approval expected {:?}, got {}",
+                expected.tool, card.tool
+            ));
+        }
+        if expected.kind.is_some_and(|kind| kind != card.kind) {
+            return Err(format!(
+                "approval expected {:?}, got {:?}",
+                expected.kind, card.kind
+            ));
+        }
+        let answer = ApprovalAnswer {
+            request_id: card.request_id.clone(),
+            session_id: card.session_id,
+            revision: card.revision,
+            connection_epoch: card.connection_epoch,
+            feedback: expected.feedback.clone(),
+            rule: card.rule,
+            directory: card.directory,
+            decision: match expected.decision {
+                Choice::Allow => Decision::AllowOnce,
+                Choice::Session => Decision::AllowSession,
+                Choice::Always => Decision::AllowAlways,
+                Choice::Deny => Decision::Deny,
+            },
+        };
+        let result = call(
+            |done| self.core.answer_approval(answer, done),
+            "answering an approval",
+        )
+        .await?;
+        if result["status"] != "applied" {
+            return Err(format!("approval was not applied: {result}"));
+        }
+        self.answered.insert(card.request_id);
         Ok(())
     }
 

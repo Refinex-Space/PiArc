@@ -34,6 +34,20 @@ impl RequestView {
         })
     }
 
+    /// Preserve the wire's system block boundaries, metadata, roles and exact text bytes.
+    fn system(&self) -> Vec<&Value> {
+        let messages = self.body["messages"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|message| matches!(message["role"].as_str(), Some("system" | "developer")));
+        self.body
+            .get("system")
+            .into_iter()
+            .chain(messages)
+            .collect()
+    }
+
     fn roles(&self) -> Vec<String> {
         self.request
             .messages
@@ -107,7 +121,7 @@ pub fn check_requests(
         };
         match RequestView::of(record) {
             Ok(view) => failures.extend(
-                check_request(expect, &view)
+                check_request(expect, &view, list)
                     .into_iter()
                     .map(|f| format!("{name}.{f}")),
             ),
@@ -118,7 +132,11 @@ pub fn check_requests(
 }
 
 /// Mismatches of one request, each starting with the field.
-fn check_request(expect: &RequestExpect, view: &RequestView) -> Vec<String> {
+fn check_request(
+    expect: &RequestExpect,
+    view: &RequestView,
+    records: &[RequestRecord],
+) -> Vec<String> {
     let mut out = Vec::new();
     let mut compare =
         |field: &str, expected: &dyn std::fmt::Debug, actual: &dyn std::fmt::Debug| {
@@ -165,6 +183,7 @@ fn check_request(expect: &RequestExpect, view: &RequestView) -> Vec<String> {
             out.push(format!("not_contains: the body contains {text:?}"));
         }
     }
+    check_context(expect, view, records, &mut out);
     if let Some(results) = &expect.tool_results {
         check_tool_results(results, view, &mut out);
     }
@@ -174,6 +193,47 @@ fn check_request(expect: &RequestExpect, view: &RequestView) -> Vec<String> {
         out.push(why);
     }
     out
+}
+
+fn check_context(
+    expect: &RequestExpect,
+    view: &RequestView,
+    records: &[RequestRecord],
+    out: &mut Vec<String>,
+) {
+    for (text, expected) in &expect.occurrences {
+        let count = view.raw.matches(text).count();
+        if count != *expected {
+            out.push(format!(
+                "occurrences: expected {text:?} {expected} time(s), found {count}"
+            ));
+        }
+    }
+    if let Some(parts) = &expect.user_message_contains
+        && !view
+            .user_texts()
+            .iter()
+            .any(|message| parts.iter().all(|part| message.contains(part)))
+    {
+        out.push(format!(
+            "user_message_contains: no user message contains all of {parts:?}"
+        ));
+    }
+    if let Some(index) = expect.same_system_as {
+        match records.get(index).map(RequestView::of) {
+            Some(Ok(earlier))
+                if !earlier.system().is_empty() && earlier.system() == view.system() => {}
+            Some(Ok(_)) => out.push(format!(
+                "same_system_as: system content is missing or differs from request #{index}"
+            )),
+            Some(Err(why)) => out.push(format!(
+                "same_system_as: cannot parse request #{index}: {why}"
+            )),
+            None => out.push(format!(
+                "same_system_as: request #{index} was never received"
+            )),
+        }
+    }
 }
 
 fn check_tool_results(
