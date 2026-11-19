@@ -2361,6 +2361,11 @@ export interface FsMemoryParams {
    */
   directories?: string[] | null;
   /**
+   * Files the agent just read or wrote: conditional rules whose `paths:` match one of
+   * them are loaded.
+   */
+  files?: string[] | null;
+  /**
    * Include the git status captured when Core opened the session.
    */
   includeGit?: boolean | null;
@@ -2368,6 +2373,11 @@ export interface FsMemoryParams {
    * Byte offset returned by the preceding page.
    */
   offset?: number | null;
+  /**
+   * Conditional rules already delivered in this session (their `MemoryFile.path`); they
+   * stay loaded.
+   */
+  rules?: string[] | null;
   /**
    * Session whose working directory and workspace govern discovery.
    */
@@ -4165,6 +4175,11 @@ export interface MemorySnapshot {
    * Session opening status when requested.
    */
   gitStatus?: string | null;
+  /**
+   * Some conditional rule is not loaded yet: reading or writing a matching file would
+   * load it. Absent when every rule is loaded.
+   */
+  inactiveRules?: boolean | null;
 }
 /**
  * One memory document with expanded imports.
@@ -4178,4 +4193,9 @@ export interface MemoryFile {
    * Source path.
    */
   path: string;
+  /**
+   * For a rule with `paths:` frontmatter, its globs: the rule was loaded because the agent
+   * read or wrote a matching file (or did so earlier in the session).
+   */
+  paths?: string[] | null;
 }

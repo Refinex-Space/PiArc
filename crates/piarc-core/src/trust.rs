@@ -155,7 +155,7 @@ impl TrustService {
         blocking(move || {
             let workspace = piarc_git::canonical(&dir)?;
             let checkout = piarc_git::resolve(&workspace)?;
-            let table = piarc_config::LayerTable::piarc(storage.dirs().data(), &workspace);
+            let table = storage.dirs().layers(&workspace);
             let mut settings = piarc_config::Settings::load(table, TrustState::Untrusted);
             let lookup = StoreLookup {
                 storage,

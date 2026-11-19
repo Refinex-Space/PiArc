@@ -66,12 +66,12 @@ fn rows(lists: &PermissionLists, active: Option<&PermissionLists>) -> Vec<Value>
 
 /// Every settings layer, files that do not exist yet included, so rules can be added.
 fn layer_sources(
-    data: &Path,
+    dirs: &crate::dirs::DataDirs,
     root: &Path,
     all: &[PermissionLists],
     applied: &[PermissionLists],
 ) -> Vec<Value> {
-    let table = LayerTable::piarc(data, root);
+    let table = dirs.layers(root);
     table
         .layers()
         .iter()
@@ -131,18 +131,16 @@ impl ToolIo {
             )
         })?;
         let active = services.settings(&root).await?;
-        let data = services.storage.dirs().data().to_owned();
-        let all_root = root.clone();
+        let table = services.storage.dirs().layers(&root);
         let all = tokio::task::spawn_blocking(move || {
-            Settings::load(LayerTable::piarc(&data, &all_root), TrustState::Trusted)
-                .permission_lists()
+            Settings::load(table, TrustState::Trusted).permission_lists()
         })
         .await
         .map_err(|e| denied(e.to_string()))?;
         let applied = active.permission_lists();
         let mut sources = self.session_sources(&root);
         sources.extend(layer_sources(
-            services.storage.dirs().data(),
+            services.storage.dirs(),
             &root,
             &all,
             &applied,
@@ -212,7 +210,7 @@ impl ToolIo {
             .workspace
             .canonicalize()
             .map_err(|e| invalid(format!("Unknown workspace: {e}")))?;
-        let table = LayerTable::piarc(services.storage.dirs().data(), &root);
+        let table = services.storage.dirs().layers(&root);
         let (old, rule, key) = (
             change.old.clone(),
             change.rule.clone(),

@@ -1,5 +1,10 @@
 //! Blocking memory discovery for one session. Only fixed memory filenames have implicit
 //! authority outside the workspace. An import or a redirected filename needs its own decision.
+//!
+//! Claude Code rules (T24, [`rules`]) are memory documents too: `~/.claude/rules/` follows
+//! `~/.claude/CLAUDE.md`, the workspace root's `.claude/rules/` follows its
+//! `.claude/CLAUDE.md`. A rule with `paths:` is included only once a matching file was read
+//! or written in the session; its frontmatter is not part of the delivered text.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -11,8 +16,11 @@ use piarc_fs::{DirectoryBinding, Scope, display, encoding};
 use piarc_protocol::memory::MemoryFile;
 
 mod markdown;
+mod rules;
 #[cfg(test)]
 mod tests;
+
+pub(super) use rules::RuleQuery;
 
 const FILE_LIMIT: u64 = 4 * 1024 * 1024;
 const IMPORT_DEPTH: usize = 4;
@@ -28,6 +36,8 @@ pub(super) enum ImportAccess {
 #[derive(Clone, Default)]
 pub(super) struct Inputs {
     sources: Vec<PathBuf>,
+    /// Rule sources and their `paths:` globs (`None` for an unconditional rule).
+    rules: HashMap<PathBuf, Option<Vec<String>>>,
     targets: HashMap<PathBuf, Option<(PathBuf, DirectoryBinding)>>,
     contents: HashMap<PathBuf, Option<Arc<str>>>,
 }
@@ -37,6 +47,8 @@ pub(super) struct Collection {
     pub(super) files: Vec<MemoryFile>,
     pub(super) pending: Vec<PathBuf>,
     pub(super) inputs: Option<Inputs>,
+    /// A conditional rule is not included yet.
+    pub(super) inactive_rules: bool,
 }
 
 pub(super) fn collect(
@@ -45,11 +57,21 @@ pub(super) fn collect(
     data: &Path,
     directories: &[String],
     read_both: bool,
+    query: &RuleQuery,
     decide: impl FnMut(&Path) -> Option<ImportAccess>,
 ) -> io::Result<Collection> {
     let mut sources = Vec::new();
+    let mut rules = rules::Selection::default();
     if let Some(home) = home {
         user_source(home, ".claude/CLAUDE.md", &mut sources)?;
+        if let Ok(home) = home.canonicalize() {
+            rules.add(
+                scope,
+                &home.join(".claude").join("rules"),
+                query,
+                &mut sources,
+            )?;
+        }
     }
     user_source(data, "MEMORY.md", &mut sources)?;
     let mut ancestors: Vec<_> = scope.cwd().ancestors().collect();
@@ -61,6 +83,17 @@ pub(super) fn collect(
     for dir in ancestors {
         if system_home.as_deref() != Some(dir) || configured_home == system_home {
             directory_sources(dir, read_both, &mut sources)?;
+        }
+        if dir == scope.root() {
+            // Same precedence as the root's `.claude/CLAUDE.md`, right after it.
+            let nested = dir.join(".claude").join("CLAUDE.md");
+            let at = sources
+                .iter()
+                .position(|s| *s == nested)
+                .map_or(sources.len(), |i| i + 1);
+            let mut found = Vec::new();
+            rules.add(scope, &nested.with_file_name("rules"), query, &mut found)?;
+            sources.splice(at..at, found);
         }
     }
     let mut visited = HashSet::new();
@@ -76,11 +109,15 @@ pub(super) fn collect(
             }
         }
     }
-    Inputs {
+    let inactive_rules = rules.inactive;
+    let mut collection = Inputs {
         sources,
+        rules: rules.globs,
         ..Inputs::default()
     }
-    .expand(scope, home, decide)
+    .expand(scope, home, decide)?;
+    collection.inactive_rules = inactive_rules;
+    Ok(collection)
 }
 
 impl Inputs {
@@ -93,6 +130,7 @@ impl Inputs {
         let mut reader = Reader {
             scope,
             home,
+            rules: &self.rules,
             decide,
             seen: HashSet::new(),
             pending: Vec::new(),
@@ -110,6 +148,7 @@ impl Inputs {
             files,
             inputs: (!pending.is_empty()).then_some(self),
             pending,
+            inactive_rules: false,
         })
     }
 }
@@ -160,6 +199,7 @@ fn exists(path: &Path) -> io::Result<bool> {
 struct Reader<'a, F> {
     scope: &'a Scope,
     home: Option<&'a Path>,
+    rules: &'a HashMap<PathBuf, Option<Vec<String>>>,
     decide: F,
     targets: &'a mut HashMap<PathBuf, Option<(PathBuf, DirectoryBinding)>>,
     contents: &'a mut HashMap<PathBuf, Option<Arc<str>>>,
@@ -168,6 +208,27 @@ struct Reader<'a, F> {
 }
 
 impl<F: FnMut(&Path) -> Option<ImportAccess>> Reader<'_, F> {
+    /// The notice that replaces an out-of-workspace document without an approval.
+    fn unapproved(&mut self, target: &Path, path: &str) -> Option<String> {
+        match (self.decide)(target) {
+            Some(ImportAccess::Allowed) => None,
+            Some(ImportAccess::Denied(feedback)) => {
+                let mut note = format!("[Memory import denied: {path}]");
+                if let Some(feedback) = feedback.filter(|text| !text.trim().is_empty()) {
+                    note.push_str("\nUser feedback: ");
+                    note.push_str(&feedback);
+                }
+                Some(note)
+            }
+            None => {
+                if !self.pending.iter().any(|p| p == target) {
+                    self.pending.push(target.to_owned());
+                }
+                Some(format!("[Memory import not approved: {path}]"))
+            }
+        }
+    }
+
     fn document(&mut self, requested: &Path, depth: usize) -> io::Result<Option<MemoryFile>> {
         let target = match self.targets.entry(requested.to_owned()) {
             std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
@@ -189,30 +250,24 @@ impl<F: FnMut(&Path) -> Option<ImportAccess>> Reader<'_, F> {
             return Ok(None);
         };
         let path = display(&target);
+        let rule = if depth == 0 {
+            self.rules.get(requested)
+        } else {
+            None
+        };
+        let paths = rule.cloned().flatten();
         // Ancestors and the two user files are named by Core. A symlink from those filenames
         // to a different out-of-workspace target has the same boundary as an explicit import.
         let fixed = depth == 0 && requested == target;
-        if !fixed && !target.starts_with(self.scope.root()) {
-            let notice = match (self.decide)(&target) {
-                Some(ImportAccess::Allowed) => None,
-                Some(ImportAccess::Denied(feedback)) => {
-                    let mut note = format!("[Memory import denied: {path}]");
-                    if let Some(feedback) = feedback.filter(|text| !text.trim().is_empty()) {
-                        note.push_str("\nUser feedback: ");
-                        note.push_str(&feedback);
-                    }
-                    Some(note)
-                }
-                None => {
-                    if !self.pending.contains(&target) {
-                        self.pending.push(target.clone());
-                    }
-                    Some(format!("[Memory import not approved: {path}]"))
-                }
-            };
-            if let Some(content) = notice {
-                return Ok(Some(MemoryFile { path, content }));
-            }
+        if !fixed
+            && !target.starts_with(self.scope.root())
+            && let Some(content) = self.unapproved(&target, &path)
+        {
+            return Ok(Some(MemoryFile {
+                path,
+                content,
+                paths,
+            }));
         }
         // An imported file can live on a volume with different case rules from the
         // workspace. Canonical paths already carry the on-disk spelling.
@@ -231,7 +286,9 @@ impl<F: FnMut(&Path) -> Option<ImportAccess>> Reader<'_, F> {
         let dir = target
             .parent()
             .ok_or_else(|| io::Error::other("Memory file has no parent"))?;
-        let content = markdown::expand(source.trim_start_matches('\u{feff}'), |reference| {
+        let text = source.trim_start_matches('\u{feff}');
+        let body = rule.map(|_| piarc_config::rules::parse(text).body);
+        let content = markdown::expand(body.as_deref().unwrap_or(text), |reference| {
             if depth == IMPORT_DEPTH {
                 return Ok(Some(format!("[Memory import depth limit: {reference}]")));
             }
@@ -250,11 +307,15 @@ impl<F: FnMut(&Path) -> Option<ImportAccess>> Reader<'_, F> {
                 file.path, file.content
             )))
         })?;
-        Ok(Some(MemoryFile { path, content }))
+        Ok(Some(MemoryFile {
+            path,
+            content,
+            paths,
+        }))
     }
 }
 
-fn read_limited(path: &Path, binding: &DirectoryBinding) -> io::Result<Option<String>> {
+pub(super) fn read_limited(path: &Path, binding: &DirectoryBinding) -> io::Result<Option<String>> {
     let file = match binding.open_file(path) {
         Ok(file) => file,
         Err(error)

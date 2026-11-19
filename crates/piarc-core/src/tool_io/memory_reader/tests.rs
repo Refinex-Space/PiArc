@@ -25,12 +25,23 @@ impl Tree {
     }
 
     fn collect(&self, dirs: &[String], both: bool, decision: Option<ImportAccess>) -> Collection {
+        self.collect_rules(dirs, both, decision, &RuleQuery::default())
+    }
+
+    fn collect_rules(
+        &self,
+        dirs: &[String],
+        both: bool,
+        decision: Option<ImportAccess>,
+        query: &RuleQuery,
+    ) -> Collection {
         collect(
             &self.scope,
             Some(&self.root.join("home")),
             &self.root.join("data"),
             dirs,
             both,
+            query,
             |_| decision.clone(),
         )
         .expect("collect fixture memory")
@@ -303,5 +314,118 @@ fn a_moved_import_directory_requires_a_new_decision() {
                 ImportAccess::Allowed
             ))
             .is_err()
+    );
+}
+
+/// T24-A07 (Core half): unconditional rules follow the user and root `.claude/CLAUDE.md`
+/// without their frontmatter; a conditional rule is included once a matching file was
+/// touched, and stays included when the Host names it.
+#[test]
+fn rules_follow_their_claude_md_and_paths_select_conditional_ones() {
+    let tree = Tree::new();
+    tree.file("home/.claude/CLAUDE.md", "user memory");
+    tree.file(
+        "home/.claude/rules/style.md",
+        "---\ndescription: x\n---\nuser rule",
+    );
+    tree.file(
+        "home/.claude/rules/docs.md",
+        "---\npaths: [\"docs/**\"]\n---\nuser docs rule",
+    );
+    tree.file("data/MEMORY.md", "piarc memory");
+    tree.file("ws/CLAUDE.md", "root memory");
+    tree.file("ws/.claude/CLAUDE.md", "nested memory");
+    tree.file("ws/.claude/rules/always.md", "project rule");
+    tree.file(
+        "ws/.claude/rules/api/ts.md",
+        "---\npaths:\n  - \"src/**/*.ts\"\n---\nts rule",
+    );
+    tree.file(
+        "ws/.claude/rules/bad.md",
+        "---\npaths: [\"src/{a,b\"]\n---\nnever",
+    );
+    tree.file("ws/CLAUDE.local.md", "local memory");
+    tree.file("ws/current/src/a.ts", "x");
+    tree.file("ws/current/src/b.js", "x");
+    let order = |result: &Collection| -> Vec<String> {
+        result.files.iter().map(|f| f.content.clone()).collect()
+    };
+    let none = tree.collect(&[], false, None);
+    assert_eq!(
+        order(&none),
+        [
+            "user memory",
+            "user rule",
+            "piarc memory",
+            "root memory",
+            "nested memory",
+            "project rule",
+            "local memory"
+        ]
+    );
+    assert!(none.inactive_rules);
+    assert!(none.files.iter().all(|f| f.paths.is_none()));
+
+    // The session cwd is `ws/current`; globs are relative to the workspace root `ws`.
+    let root_relative = |name: &str| tree.root.join("ws").join(name);
+    let unrelated = tree.collect_rules(
+        &[],
+        false,
+        None,
+        &RuleQuery {
+            files: vec![root_relative("current/src/b.js")],
+            active: Vec::new(),
+        },
+    );
+    assert_eq!(unrelated.files.len(), 7);
+    let touched = RuleQuery {
+        files: vec![tree.root.join("ws/current/../src/a.ts")],
+        active: Vec::new(),
+    };
+    tree.file("ws/src/a.ts", "x");
+    let matched = tree.collect_rules(&[], false, None, &touched);
+    let ts = matched
+        .files
+        .iter()
+        .find(|f| f.content == "ts rule")
+        .expect("conditional rule included");
+    assert_eq!(ts.paths.as_deref(), Some(&["src/**/*.ts".to_owned()][..]));
+    assert!(!ts.content.contains("paths:"));
+    assert!(matched.inactive_rules, "the docs rule is still inactive");
+    let position = |result: &Collection, text: &str| {
+        result
+            .files
+            .iter()
+            .position(|f| f.content == text)
+            .expect(text)
+    };
+    assert!(position(&matched, "ts rule") > position(&matched, "project rule"));
+    assert!(position(&matched, "ts rule") < position(&matched, "local memory"));
+
+    // Named by the Host as delivered: included without a touched file.
+    let active = tree.collect_rules(
+        &[],
+        false,
+        None,
+        &RuleQuery {
+            files: Vec::new(),
+            active: vec![ts.path.clone()],
+        },
+    );
+    assert!(active.files.iter().any(|f| f.content == "ts rule"));
+    // A user-level conditional rule matches against the workspace root as well.
+    let docs = tree.collect_rules(
+        &[],
+        false,
+        None,
+        &RuleQuery {
+            files: vec![root_relative("docs/guide/x.md"), root_relative("src/a.ts")],
+            active: Vec::new(),
+        },
+    );
+    assert!(docs.files.iter().any(|f| f.content == "user docs rule"));
+    assert!(
+        !docs.inactive_rules,
+        "the invalid glob never loads and is not pending"
     );
 }

@@ -259,7 +259,7 @@ impl Env {
         let dirs = DataDirs::new(self.data.clone(), self.cache.clone()).ok();
         CoreConfig {
             dirs,
-            memory_home: Some(self.home.clone()),
+            home: Some(self.home.clone()),
             sessions: SessionsConfig {
                 launch: Some(AgentHostLaunch::Custom {
                     node: self.config.node.clone(),

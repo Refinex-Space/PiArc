@@ -366,8 +366,22 @@ async fn settings_page_lists_edits_and_audits_rules() {
         .iter()
         .map(|s| s["id"].as_str().expect("id"))
         .collect();
-    assert_eq!(sources, ["projectLocal", "project", "user"]);
-    let user = &view["sources"][2];
+    // T24: Claude Code's project files are listed (read-only) between PiArc's; the fixture
+    // has no home directory, so there is no user-level Claude Code file.
+    assert_eq!(
+        sources,
+        [
+            "projectLocal",
+            "project",
+            "claudeProjectLocal",
+            "claudeProject",
+            "user"
+        ]
+    );
+    for claude in [2, 3] {
+        assert_eq!(view["sources"][claude]["writable"], false);
+    }
+    let user = &view["sources"][4];
     assert_eq!(user["writable"], true);
     assert!(user["rules"][0]["error"].is_string(), "{user}");
     assert_eq!(user["rules"][1]["broad"], true);

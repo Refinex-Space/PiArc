@@ -107,7 +107,7 @@ async fn setup() -> Setup {
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 } }] } } });
     std::fs::write(data.join("pi").join("models.json"), models.to_string()).expect("models");
     let config = CoreConfig {
-        memory_home: Some(base.join("home")),
+        home: Some(base.join("home")),
         dirs: Some(DataDirs::new(data, cache).expect("dirs")),
         sessions: SessionsConfig {
             launch: Some(AgentHostLaunch::Custom {

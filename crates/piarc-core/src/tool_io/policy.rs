@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use piarc_config::{Category, LayerTable, Settings};
+use piarc_config::{Category, Settings};
 use piarc_fs::{Access, Scope, display};
 use piarc_host::Peer;
 use piarc_policy::rules::{Hit, RuleSet};
@@ -178,7 +178,7 @@ impl Services {
 
     async fn persist(&self, root: &Path, answer: &ApprovalAnswer) -> Result<(), ErrorObject> {
         let root = root.to_owned();
-        let table = LayerTable::piarc(self.storage.dirs().data(), &root);
+        let table = self.storage.dirs().layers(&root);
         let rules = answer.rules.clone();
         let directory = answer.directory.clone();
         let items = tokio::task::spawn_blocking(move || {

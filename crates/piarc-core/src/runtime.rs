@@ -86,8 +86,11 @@ pub struct CoreConfig {
     pub secret_store: Option<SecretStoreSetup>,
     /// Sees every delegated tool request first (tests only, T14-A06).
     pub tool_observer: Option<Arc<dyn crate::tool_io::ToolIoObserver>>,
-    /// Home directory for user memory. Embedders and tests can isolate it.
-    pub memory_home: Option<PathBuf>,
+    /// The user's home directory: Claude Code's user files are read from it
+    /// (`~/.claude/CLAUDE.md`, `~/.claude/settings.json`, `~/.claude/rules/`,
+    /// `~/.claude.json`). The process's home by default; tests inject a temporary one so they
+    /// never read the machine's own files, `None` reads none of them.
+    pub home: Option<PathBuf>,
     /// Where shell commands get their environment; the user's login shell of Core's own
     /// environment when absent (T17). Tests pass a fixed or prepared environment.
     pub command_env: Option<crate::tool_io::CommandEnv>,
@@ -121,7 +124,7 @@ impl Default for CoreConfig {
             secret_store: None,
             tool_observer: None,
             command_env: None,
-            memory_home: std::env::home_dir(),
+            home: std::env::home_dir(),
         }
     }
 }
@@ -689,7 +692,7 @@ fn open_state(
         }
         Err(error) => return Err(io("cannot open the log directory", error)),
     }
-    let storage = Storage::open(dirs)?;
+    let storage = Storage::open(dirs.with_home(config.home.clone()))?;
     let trust = TrustService::new(storage.clone());
     let data = storage.dirs().data().to_owned();
     let secrets = match &config.secret_store {
@@ -713,7 +716,7 @@ fn open_state(
         tool_io: ToolIo::with_notices(
             ToolIoConfig {
                 observer: config.tool_observer.clone(),
-                memory_home: config.memory_home.clone(),
+                home: config.home.clone(),
                 command_env: config
                     .command_env
                     .clone()

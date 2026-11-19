@@ -16,6 +16,8 @@ import { assembleSystem, IDENTITY, sourced, type FrozenSystem } from './prompts/
 const INITIAL = 'piarc.systemPrompt';
 const VISITED = 'piarc.memoryDirectories';
 const UPDATE = 'piarc.memory';
+// Conditional rules (`paths:`) loaded in this branch: they stay loaded (T24).
+const RULES = 'piarc.memoryRules';
 
 function localDate(date: Date): string {
   const number = (n: number): string => String(n).padStart(2, '0');
@@ -36,6 +38,7 @@ export class SessionMemory {
   readonly #canonical: (name: string) => string;
   readonly #started: string;
   readonly #directories = new Set<string>();
+  readonly #rules = new Set<string>();
   readonly #versions = new Map<string, string>();
   readonly #searches = new Map<string, string[]>();
   #date: string;
@@ -44,6 +47,8 @@ export class SessionMemory {
   #turnId: string | undefined;
   #preparing: AbortController | undefined;
   #lazy: Promise<void> = Promise.resolve();
+  /** Core's last answer: some conditional rule could still load on a file access. */
+  #inactiveRules = false;
 
   constructor(
     manager: SessionManager,
@@ -78,6 +83,12 @@ export class SessionMemory {
         Array.isArray(entry.data)
       ) {
         for (const dir of entry.data) if (typeof dir === 'string') this.#directories.add(dir);
+      } else if (
+        entry.type === 'custom' &&
+        entry.customType === RULES &&
+        Array.isArray(entry.data)
+      ) {
+        for (const rule of entry.data) if (typeof rule === 'string') this.#rules.add(rule);
       }
     }
   }
@@ -115,11 +126,26 @@ export class SessionMemory {
     this.#snapshot = undefined;
   }
 
-  #load(includeGit: boolean, signal?: AbortSignal, turnId?: string): Promise<MemorySnapshot> {
-    return (
-      this.#read?.([...this.#directories], includeGit, signal, turnId) ??
-      Promise.resolve({ files: [] })
-    );
+  async #load(
+    includeGit: boolean,
+    signal?: AbortSignal,
+    turnId?: string,
+    files: string[] = [],
+  ): Promise<MemorySnapshot> {
+    if (!this.#read) return { files: [] };
+    const snapshot = await this.#read([...this.#directories], includeGit, signal, turnId, {
+      files,
+      rules: [...this.#rules],
+    });
+    this.#inactiveRules = snapshot.inactiveRules === true;
+    const loaded = (snapshot.currentFiles ?? snapshot.files)
+      .filter((file) => file.paths != null && !this.#rules.has(file.path))
+      .map((file) => file.path);
+    if (loaded.length) {
+      for (const rule of loaded) this.#rules.add(rule);
+      this.#manager.appendCustomEntry(RULES, loaded);
+    }
+    return snapshot;
   }
 
   /** Search tools report Core's structured matches before the formatted result is truncated. */
@@ -127,13 +153,22 @@ export class SessionMemory {
     this.#searches.set(id, directories);
   };
 
-  #visit(tool: string, input: Record<string, unknown>, id: string): boolean {
+  /** Records newly visited directories; returns them and the file a file tool touched. */
+  #visit(
+    tool: string,
+    input: Record<string, unknown>,
+    id: string,
+  ): { added: boolean; file?: string } {
     let directories = this.#searches.get(id);
     this.#searches.delete(id);
+    let file: string | undefined;
     if (directories === undefined) {
-      if (!['Read', 'Write', 'Edit'].includes(tool) || typeof input.path !== 'string') return false;
-      directories = [path.dirname(resolveToolPath(input.path, this.#cwd))];
+      if (!['Read', 'Write', 'Edit'].includes(tool) || typeof input.path !== 'string')
+        return { added: false };
+      file = resolveToolPath(input.path, this.#cwd);
+      directories = [path.dirname(file)];
     }
+    const touched = file === undefined ? {} : { file };
     const added: string[] = [];
     for (const dir of directories) {
       const relative = path.relative(this.#cwd, dir);
@@ -148,9 +183,9 @@ export class SessionMemory {
       this.#directories.add(dir);
       added.push(dir);
     }
-    if (!added.length) return false;
+    if (!added.length) return { added: false, ...touched };
     this.#manager.appendCustomEntry(VISITED, added);
-    return true;
+    return { added: true, ...touched };
   }
 
   #update(files: readonly MemoryFile[], lazy: boolean) {
@@ -239,8 +274,16 @@ export class SessionMemory {
       // publication, and never mark another call's files as already delivered.
       const turnId = this.#turnId;
       const publish = async (): Promise<void> => {
-        if (!this.#visit(this.#canonical(event.toolName), event.input, event.toolCallId)) return;
-        const snapshot = await this.#load(false, ctx.signal, turnId);
+        const visit = this.#visit(this.#canonical(event.toolName), event.input, event.toolCallId);
+        // A file access matters to Core when it could load a conditional rule.
+        const file = this.#inactiveRules ? visit.file : undefined;
+        if (!visit.added && file === undefined) return;
+        const snapshot = await this.#load(
+          false,
+          ctx.signal,
+          turnId,
+          file === undefined ? [] : [file],
+        );
         ctx.signal?.throwIfAborted();
         const message = this.#update(snapshot.files, true);
         // Pi 1.5.2 flushes these messages immediately after the complete tool-result batch,

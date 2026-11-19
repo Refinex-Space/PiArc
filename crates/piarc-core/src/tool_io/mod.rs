@@ -75,8 +75,9 @@ pub struct ToolIoConfig {
     /// PiArc's data directory: blobs go to `sessions/<sessionId>/blobs/` below it, the
     /// user's settings (`shell.gitBashPath`) are read from `settings.json` in it.
     pub data_dir: PathBuf,
-    /// Home for user memory, supplied by the embedding runtime.
-    pub memory_home: Option<PathBuf>,
+    /// The user's home directory for Claude Code's user files (`CoreConfig::home`); `None`
+    /// reads none of them.
+    pub home: Option<PathBuf>,
     /// Where commands get their environment.
     pub command_env: CommandEnv,
     /// Timeouts and output budgets of commands.
@@ -102,7 +103,7 @@ impl ToolIoConfig {
     #[must_use]
     pub fn new(data_dir: PathBuf) -> Self {
         Self {
-            memory_home: None,
+            home: None,
             data_dir,
             command_env: CommandEnv::process(),
             exec_limits: ExecLimits::default(),

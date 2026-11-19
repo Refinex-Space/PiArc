@@ -194,6 +194,7 @@ impl From<piarc_config::WriteError> for Error {
     fn from(error: piarc_config::WriteError) -> Self {
         let kind = match &error {
             piarc_config::WriteError::Io { .. } => ErrorKind::IoError,
+            piarc_config::WriteError::ClaudeConfig { .. } => ErrorKind::PermissionDenied,
             _ => ErrorKind::InvalidParams,
         };
         Self::Feature {

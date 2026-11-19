@@ -63,7 +63,7 @@ impl CoreRuntime {
     ) -> napi::Result<Self> {
         boundary::call(&env, "CoreRuntime.createForTests", move || {
             let mut config = crate::runtime::config_of(options)?;
-            config.memory_home = config
+            config.home = config
                 .dirs
                 .as_ref()
                 .map(|dirs| dirs.data().join("test-home"));

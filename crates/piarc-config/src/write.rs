@@ -1,6 +1,8 @@
-//! Writing settings: only to the layers marked writable (`.piarc/` files and the user file;
-//! never `.claude/`, ADR-0005), through a temporary file in the same directory renamed over
-//! the target, so a reader never sees half a file.
+//! Writing settings: only to the layers marked writable (`.piarc/` files and the user file),
+//! through a temporary file in the same directory renamed over the target, so a reader never
+//! sees half a file. Any path inside a `.claude` directory or named `.claude.json` is refused
+//! with [`WriteError::ClaudeConfig`] before anything is touched (ADR-0005 rule 2), whatever
+//! the layer table says.
 
 use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
@@ -22,6 +24,12 @@ pub enum WriteError {
     /// The layer is read-only for PiArc.
     #[error("the settings layer {0:?} is not writable")]
     ReadOnly(String),
+    /// The target is Claude Code configuration, which PiArc only reads.
+    #[error("{} is Claude Code configuration; PiArc does not write it", path.display())]
+    ClaudeConfig {
+        /// The refused file.
+        path: PathBuf,
+    },
     /// The pointer is empty or not of the `/key/key` form.
     #[error("invalid settings key {0:?}")]
     InvalidPointer(String),
@@ -207,6 +215,11 @@ fn update_file(
         .get(layer)
         .ok_or_else(|| WriteError::UnknownLayer(layer.to_owned()))?;
     let path = match (spec.writable, spec.file()) {
+        (_, Some(path)) if crate::claude::is_claude_path(path) => {
+            return Err(WriteError::ClaudeConfig {
+                path: path.to_owned(),
+            });
+        }
         (true, Some(path)) => path.to_owned(),
         _ => return Err(WriteError::ReadOnly(layer.to_owned())),
     };
@@ -325,8 +338,14 @@ fn apply(document: &mut Value, tokens: &[String], value: Option<Value>) {
 /// `target`. On failure the temporary file is removed and `target` is unchanged.
 ///
 /// # Errors
-/// Returns [`WriteError::Io`] when the temporary file cannot be created, synced or renamed.
+/// Returns [`WriteError::ClaudeConfig`] for a target in Claude Code's configuration, and
+/// [`WriteError::Io`] when the temporary file cannot be created, synced or renamed.
 pub fn replace_file(target: &Path, bytes: &[u8]) -> Result<(), WriteError> {
+    if crate::claude::is_claude_path(target) {
+        return Err(WriteError::ClaudeConfig {
+            path: target.to_owned(),
+        });
+    }
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let name = target
         .file_name()
@@ -390,6 +409,63 @@ mod tests {
         assert!(edit(Some("missing"), None).is_err());
         assert!(edit_permission_rule(&table, ids::DEFAULTS, "deny", None, Some("x")).is_err());
         assert!(edit_permission_rule(&table, ids::USER, "other", None, Some("x")).is_err());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn claude_code_paths_are_refused_by_every_write() {
+        let dir = std::env::temp_dir().join(format!("piarc-config-claude {}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let home = dir.join("home");
+        let workspace = dir.join("ws");
+        let table = LayerTable::workspace(&dir.join("data"), &workspace, Some(&home));
+        for layer in [
+            ids::CLAUDE_USER,
+            ids::CLAUDE_PROJECT,
+            ids::CLAUDE_PROJECT_LOCAL,
+        ] {
+            let error = write_value(&table, layer, "/model", Some(json!("x"))).unwrap_err();
+            assert!(
+                matches!(error, WriteError::ClaudeConfig { .. }),
+                "{layer}: {error}"
+            );
+            let error =
+                edit_permission_rule(&table, layer, "allow", None, Some("Read")).unwrap_err();
+            assert!(
+                matches!(error, WriteError::ClaudeConfig { .. }),
+                "{layer}: {error}"
+            );
+        }
+        // Even a writable layer whose file was redirected into `.claude/` is refused.
+        let mut redirected = LayerTable::piarc(&workspace.join(".claude"), &workspace);
+        redirected.insert(crate::LayerSpec {
+            id: ids::PROJECT_LOCAL,
+            precedence: crate::precedence::PROJECT_LOCAL,
+            scope: crate::Scope::Project,
+            source: crate::Source::File(workspace.join(".claude").join("settings.local.json")),
+            format: crate::Format::Piarc,
+            schema: &crate::schema::PIARC_SETTINGS,
+            writable: true,
+            executable: crate::layers::PIARC_EXECUTABLE,
+        });
+        for layer in [ids::USER, ids::PROJECT_LOCAL] {
+            let error = write_value(&redirected, layer, "/model", Some(json!("x"))).unwrap_err();
+            assert!(
+                matches!(error, WriteError::ClaudeConfig { .. }),
+                "{layer}: {error}"
+            );
+        }
+        let error =
+            append_local_permissions(&redirected, &[(Category::AllowRule, "Read")]).unwrap_err();
+        assert!(matches!(error, WriteError::ClaudeConfig { .. }), "{error}");
+        for target in [
+            home.join(".claude.json"),
+            home.join(".claude").join("x.json"),
+        ] {
+            let error = replace_file(&target, b"{}").unwrap_err();
+            assert!(matches!(error, WriteError::ClaudeConfig { .. }), "{error}");
+        }
+        assert!(!home.exists() && !workspace.join(".claude").exists());
         let _ = fs::remove_dir_all(&dir);
     }
 

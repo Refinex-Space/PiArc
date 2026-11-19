@@ -105,7 +105,7 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 错误映射为 `piarc_protocol::ErrorObject`：`ShuttingDown` → `shuttingDown`，`QueueFull` → `busy`，参数错误 → `invalidParams`，功能 crate 的错误（`Feature`）保留它们自己的 kind 与 `retryable`，其余 → `internalError`。
 - 演示事件源（`demo.rs`）只给测试与基准用；发布构建的 `piarc-napi` 不导出启动它的函数。
 
-- Memory 由 `tool_io/memory.rs` 组装快照，文件发现和导入在 `memory_reader.rs`。外部导入经同一会话的审批账本，由 `policy/memory.rs` 按工作区及规范目标匹配。测试设置 `CoreConfig.memory_home`，避免读取用户的 memory。见 ADR-0033。
+- Memory 由 `tool_io/memory.rs` 组装快照，文件发现和导入在 `memory_reader.rs`。外部导入经同一会话的审批账本，由 `policy/memory.rs` 按工作区及规范目标匹配。测试设置 `CoreConfig.home`，避免读取用户的 memory。见 ADR-0033。
 
 ## 易错点
 

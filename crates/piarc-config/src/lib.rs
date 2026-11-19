@@ -5,11 +5,14 @@
 //! - Loads and merges layered settings ([`layers`], [`merge`], [`settings`]): an ordered
 //!   table of sources and precedences, schema checks with file, JSON Pointer and reason
 //!   ([`schema`]), reload with the last valid content kept, writes to `.piarc/` and the user
-//!   file ([`write`]). The Claude Code compatibility layers are added to the same table (T24).
+//!   file ([`write`]). The Claude Code layers (`.claude/settings*.json`,
+//!   `~/.claude/settings.json`) are in the same table, filtered by the key mapping table
+//!   ([`claude`]); `.claude/rules/` files are parsed and matched by [`rules`].
 //! - Project trust: the one query consumers of executable project configuration use
 //!   ([`trust`]), the executable items a project would enable ([`executables`]), and
 //!   leaving project hooks and allow rules out of the merge until the project is trusted.
-//! - Configuration diagnostics.
+//! - Configuration diagnostics ([`diagnostics`]): every file's load state, applied,
+//!   overridden and ignored keys.
 //!
 //! # Not responsible for
 //!
@@ -26,16 +29,20 @@
 //! The authoritative rules are in `crates/deps-rules.json`, enforced by
 //! `scripts/ci/check-crate-deps.mjs` (architecture section 7.1).
 
+pub mod claude;
+pub mod diagnostics;
 pub mod executables;
 pub mod layers;
 pub mod merge;
+pub mod rules;
 pub mod schema;
 pub mod settings;
 pub mod trust;
 pub mod write;
 
+pub use diagnostics::{FileReport, FileStatus, claude_state_report};
 pub use executables::{Category, Inventory, Item, enumerate, new_items};
-pub use layers::{LayerSpec, LayerTable, PROJECT_DIR, Scope, Source, ids, precedence};
+pub use layers::{Format, LayerSpec, LayerTable, PROJECT_DIR, Scope, Source, ids, precedence};
 pub use settings::{Change, Issue, LayerStatus, PermissionLists, Settings};
 pub use trust::{TrustLookup, TrustState, project_trust};
 pub use write::{WriteError, append_local_permissions, edit_permission_rule, write_value};

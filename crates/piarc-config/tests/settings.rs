@@ -263,6 +263,7 @@ fn layers_can_be_inserted_without_changing_the_merge() {
         precedence: precedence::CLAUDE_PROJECT,
         scope: Scope::Project,
         source: Source::File(claude),
+        format: piarc_config::Format::Piarc,
         schema: &piarc_config::schema::PIARC_SETTINGS,
         writable: false,
         executable: piarc_config::layers::PIARC_EXECUTABLE,
@@ -288,6 +289,7 @@ fn layers_can_be_inserted_without_changing_the_merge() {
         precedence: precedence::SESSION,
         scope: Scope::Session,
         source: Source::Value(json!({ "model": "session" })),
+        format: piarc_config::Format::Piarc,
         schema: &piarc_config::schema::PIARC_SETTINGS,
         writable: false,
         executable: &[],
@@ -335,14 +337,20 @@ fn writes_go_only_to_writable_layers_and_replace_the_file_whole() {
         precedence: precedence::CLAUDE_PROJECT,
         scope: Scope::Project,
         source: Source::File(f.workspace.join(".claude").join("settings.json")),
+        format: piarc_config::Format::ClaudeCode,
         schema: &piarc_config::schema::PIARC_SETTINGS,
         writable: false,
         executable: &[],
     });
-    for layer in ["claudeProject", ids::DEFAULTS] {
-        let error = write_value(&table, layer, "/model", Some(json!("x"))).expect_err("read-only");
-        assert!(error.to_string().contains("not writable"), "{error}");
-    }
+    let error =
+        write_value(&table, "claudeProject", "/model", Some(json!("x"))).expect_err("read-only");
+    assert!(
+        error.to_string().contains("PiArc does not write it"),
+        "{error}"
+    );
+    let error =
+        write_value(&table, ids::DEFAULTS, "/model", Some(json!("x"))).expect_err("defaults");
+    assert!(error.to_string().contains("not writable"), "{error}");
     write(&f.project(), "[1, 2]");
     let error =
         write_value(&table, ids::PROJECT, "/model", Some(json!("x"))).expect_err("not an object");

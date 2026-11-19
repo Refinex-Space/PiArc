@@ -1691,6 +1691,13 @@
           },
           "type": ["array", "null"]
         },
+        "files": {
+          "description": "Files the agent just read or wrote: conditional rules whose `paths:` match one of\nthem are loaded.",
+          "items": {
+            "type": "string"
+          },
+          "type": ["array", "null"]
+        },
         "includeGit": {
           "description": "Include the git status captured when Core opened the session.",
           "type": ["boolean", "null"]
@@ -1700,6 +1707,13 @@
           "format": "uint64",
           "minimum": 0,
           "type": ["integer", "null"]
+        },
+        "rules": {
+          "description": "Conditional rules already delivered in this session (their `MemoryFile.path`); they\nstay loaded.",
+          "items": {
+            "type": "string"
+          },
+          "type": ["array", "null"]
         },
         "sessionId": {
           "description": "Session whose working directory and workspace govern discovery.",
@@ -3480,6 +3494,13 @@
         "path": {
           "description": "Source path.",
           "type": "string"
+        },
+        "paths": {
+          "description": "For a rule with `paths:` frontmatter, its globs: the rule was loaded because the agent\nread or wrote a matching file (or did so earlier in the session).",
+          "items": {
+            "type": "string"
+          },
+          "type": ["array", "null"]
         }
       },
       "required": ["path", "content"],
@@ -3505,6 +3526,10 @@
         "gitStatus": {
           "description": "Session opening status when requested.",
           "type": ["string", "null"]
+        },
+        "inactiveRules": {
+          "description": "Some conditional rule is not loaded yet: reading or writing a matching file would\nload it. Absent when every rule is loaded.",
+          "type": ["boolean", "null"]
         }
       },
       "required": ["files"],

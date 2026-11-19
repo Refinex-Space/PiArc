@@ -9,11 +9,13 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{Error, Result};
 
-/// The directories Core keeps its state in.
+/// The directories Core keeps its state in, and the home directory it reads Claude Code's user
+/// files from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataDirs {
     data: PathBuf,
     cache: PathBuf,
+    home: Option<PathBuf>,
 }
 
 impl DataDirs {
@@ -31,7 +33,32 @@ impl DataDirs {
                 });
             }
         }
-        Ok(Self { data, cache })
+        Ok(Self {
+            data,
+            cache,
+            home: None,
+        })
+    }
+
+    /// The same directories with the home directory Claude Code's user files are read from
+    /// (`CoreConfig::home`, set when Core starts).
+    #[must_use]
+    pub fn with_home(mut self, home: Option<PathBuf>) -> Self {
+        self.home = home;
+        self
+    }
+
+    /// The home directory; `None` reads no user-level Claude Code file.
+    #[must_use]
+    pub fn home(&self) -> Option<&Path> {
+        self.home.as_deref()
+    }
+
+    /// The settings layers of `workspace`: PiArc's and Claude Code's (ADR-0005). Every Core
+    /// consumer of settings uses this table.
+    #[must_use]
+    pub fn layers(&self, workspace: &Path) -> piarc_config::LayerTable {
+        piarc_config::LayerTable::workspace(&self.data, workspace, self.home())
     }
 
     /// The data directory.

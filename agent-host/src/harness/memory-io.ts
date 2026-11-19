@@ -6,38 +6,63 @@ import type { CoreBridge } from '../runtime/core-bridge.js';
 import { isObject } from '../runtime/items.js';
 import type { FsMemoryParams, MemoryFile, MemorySnapshot } from '@piarc/protocol';
 
+/** Conditional rules (T24): files just read or written, and the rules already delivered. */
+export interface RuleScan {
+  files?: string[];
+  rules?: string[];
+}
+
 export type ReadMemory = (
   directories: string[],
   includeGit: boolean,
   signal?: AbortSignal,
   turnId?: string,
+  scan?: RuleScan,
 ) => Promise<MemorySnapshot>;
+
+function isStrings(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
 
 function parseFiles(value: unknown): MemoryFile[] {
   if (!Array.isArray(value))
     throw new AhpError('invalidRequest', 'fs/memory returned an invalid file list');
   return value.map((file: unknown) => {
-    if (!isObject(file) || typeof file.path !== 'string' || typeof file.content !== 'string') {
+    if (
+      !isObject(file) ||
+      typeof file.path !== 'string' ||
+      typeof file.content !== 'string' ||
+      (file.paths != null && !isStrings(file.paths))
+    ) {
       throw new AhpError('invalidRequest', 'fs/memory returned an invalid file');
     }
-    return { path: file.path, content: file.content };
+    return {
+      path: file.path,
+      content: file.content,
+      ...(file.paths == null ? {} : { paths: file.paths }),
+    };
   });
 }
 
 function parseSnapshot(raw: string): MemorySnapshot {
   const value: unknown = JSON.parse(raw);
-  if (!isObject(value) || (value.gitStatus != null && typeof value.gitStatus !== 'string')) {
+  if (
+    !isObject(value) ||
+    (value.gitStatus != null && typeof value.gitStatus !== 'string') ||
+    (value.inactiveRules != null && typeof value.inactiveRules !== 'boolean')
+  ) {
     throw new AhpError('invalidRequest', 'fs/memory returned an invalid snapshot');
   }
   return {
     files: parseFiles(value.files),
     ...(value.currentFiles == null ? {} : { currentFiles: parseFiles(value.currentFiles) }),
     ...(value.gitStatus == null ? {} : { gitStatus: value.gitStatus }),
+    ...(value.inactiveRules === true ? { inactiveRules: true } : {}),
   };
 }
 
 export function memoryReader(bridge: CoreBridge, sessionId: string): ReadMemory {
-  return async (directories, includeGit, signal, turnId) => {
+  return async (directories, includeGit, signal, turnId, scan) => {
     const toolCallId = `memory-${randomUUID()}`;
     const id = { sessionId, toolCallId };
     const options = { approval: id, ...(signal === undefined ? {} : { signal }) };
@@ -46,7 +71,14 @@ export function memoryReader(bridge: CoreBridge, sessionId: string): ReadMemory 
     for (;;) {
       const params: FsMemoryParams =
         offset === 0
-          ? { ...id, directories, includeGit, ...(turnId === undefined ? {} : { turnId }) }
+          ? {
+              ...id,
+              directories,
+              includeGit,
+              ...(turnId === undefined ? {} : { turnId }),
+              ...(scan?.files?.length ? { files: scan.files } : {}),
+              ...(scan?.rules?.length ? { rules: scan.rules } : {}),
+            }
           : { ...id, offset };
       const page = await bridge.requestTyped(
         'fs/memory',

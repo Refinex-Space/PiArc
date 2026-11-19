@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
-use piarc_config::{Issue, LayerTable, Settings, TrustState};
+use piarc_config::{Issue, Settings, TrustState};
 use piarc_fs::watch::{WatchEvent, Watcher};
 use serde_json::Value;
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -66,7 +66,7 @@ impl WorkspaceSettings {
     ) -> Result<Self> {
         let trust_changes = trust.subscribe();
         let state = trust.state(&workspace).await;
-        let table = LayerTable::piarc(dirs.data(), &workspace);
+        let table = dirs.layers(&workspace);
         let settings = tokio::task::spawn_blocking(move || Settings::load(table, state))
             .await
             .map_err(|e| Error::Internal {
@@ -258,8 +258,9 @@ impl Loop {
     }
 }
 
-/// Watches the directories of the layer files that exist; for a missing `.piarc/`, the
-/// workspace itself, so its creation is noticed.
+/// Watches the directories of the layer files; for a directory that does not exist yet
+/// (`.piarc/`, `.claude/`, `~/.claude/`), its nearest existing ancestor, so its creation is
+/// noticed.
 fn watch_dirs(watcher: &Mutex<Watcher>, settings: &Mutex<Settings>, workspace: &Path) {
     let dirs: Vec<PathBuf> = {
         let settings = lock(settings);
@@ -270,16 +271,17 @@ fn watch_dirs(watcher: &Mutex<Watcher>, settings: &Mutex<Settings>, workspace: &
             .map(Path::to_owned)
             .collect()
     };
-    let roots: Vec<_> = dirs
-        .into_iter()
+    let mut roots: Vec<PathBuf> = dirs
+        .iter()
         .map(|dir| {
-            if dir.is_dir() {
-                dir
-            } else {
-                workspace.to_owned()
-            }
+            dir.ancestors()
+                .find(|d| d.is_dir())
+                .unwrap_or(workspace)
+                .to_owned()
         })
         .collect();
+    roots.sort();
+    roots.dedup();
     for error in lock(watcher).watch_dirs(&roots) {
         tracing::warn!(target: "piarc_core::settings", "{error}");
     }

@@ -7,6 +7,8 @@
 //!   content in the merge (and is reported); a file that disappeared becomes empty.
 //! - Project-scope layers lose their executable values (hooks, allow rules) while the
 //!   project is not trusted.
+//! - A Claude Code layer contributes only the keys the mapping table marks active
+//!   ([`crate::claude`]); the whole file is kept for the diagnostics.
 
 use std::collections::BTreeSet;
 use std::io;
@@ -14,7 +16,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
-use crate::layers::{LayerSpec, LayerTable, Scope, Source};
+use crate::layers::{Format, LayerSpec, LayerTable, Scope, Source};
 use crate::merge::{changed_keys, merge_all};
 use crate::schema::{Severity, validate};
 use crate::trust::TrustState;
@@ -33,6 +35,12 @@ pub struct Issue {
     pub message: String,
     /// An error skips the file; a warning only ignores the key.
     pub severity: Severity,
+    /// 1-based line of a JSON syntax error.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line: Option<usize>,
+    /// 1-based column of a JSON syntax error.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub column: Option<usize>,
 }
 
 /// How a layer stands after the last load.
@@ -50,10 +58,13 @@ pub enum LayerStatus {
 }
 
 #[derive(Debug, Clone)]
-struct LayerState {
-    status: LayerStatus,
-    /// The content used in the merge (the last valid one).
-    value: Option<Value>,
+pub(crate) struct LayerState {
+    pub(crate) status: LayerStatus,
+    /// The content used in the merge (the last valid one; for a Claude Code file, its
+    /// projection).
+    pub(crate) value: Option<Value>,
+    /// The whole file as read with `value` (equal to it for PiArc files).
+    pub(crate) raw: Option<Value>,
 }
 
 /// The result of [`Settings::reload`] and [`Settings::set_trust`].
@@ -88,15 +99,15 @@ pub struct PermissionLists {
 /// The settings of one workspace.
 #[derive(Debug)]
 pub struct Settings {
-    table: LayerTable,
-    states: Vec<LayerState>,
-    trust: TrustState,
-    merged: Value,
-    issues: Vec<Issue>,
+    pub(crate) table: LayerTable,
+    pub(crate) states: Vec<LayerState>,
+    pub(crate) trust: TrustState,
+    pub(crate) merged: Value,
+    pub(crate) issues: Vec<Issue>,
     /// Each layer's value as merged (after the trust and mode filters), by layer index.
-    effective: Vec<Option<Value>>,
+    pub(crate) effective: Vec<Option<Value>>,
     /// Project layers whose `bypassPermissions` or `auto` default mode was left out.
-    ignored_modes: Vec<(&'static str, String)>,
+    pub(crate) ignored_modes: Vec<(&'static str, String)>,
 }
 
 impl Settings {
@@ -108,6 +119,7 @@ impl Settings {
                 LayerState {
                     status: LayerStatus::Missing,
                     value: None,
+                    raw: None,
                 };
                 table.layers().len()
             ],
@@ -131,13 +143,19 @@ impl Settings {
                     *state = LayerState {
                         status: LayerStatus::Missing,
                         value: None,
+                        raw: None,
                     };
                 }
-                Read::Valid(value, warnings) => {
+                Read::Valid {
+                    value,
+                    raw,
+                    warnings,
+                } => {
                     issues.extend(warnings);
                     *state = LayerState {
                         status: LayerStatus::Loaded,
                         value: Some(value),
+                        raw: Some(raw),
                     };
                 }
                 Read::Invalid(errors) => {
@@ -333,7 +351,11 @@ impl Settings {
 
 enum Read {
     Missing,
-    Valid(Value, Vec<Issue>),
+    Valid {
+        value: Value,
+        raw: Value,
+        warnings: Vec<Issue>,
+    },
     Invalid(Vec<Issue>),
 }
 
@@ -357,21 +379,39 @@ fn read_layer(spec: &LayerSpec) -> Read {
     let text = text.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(&text);
     if text.iter().all(u8::is_ascii_whitespace) {
         // An empty file is an empty layer, as a missing one.
-        return Read::Valid(Value::Object(serde_json::Map::new()), Vec::new());
+        let empty = Value::Object(serde_json::Map::new());
+        return Read::Valid {
+            value: empty.clone(),
+            raw: empty,
+            warnings: Vec::new(),
+        };
     }
     match serde_json::from_slice::<Value>(text) {
         Ok(value) => check(spec, Some(file), value),
-        Err(error) => Read::Invalid(vec![issue(
-            spec,
-            Some(file),
-            "",
-            format!("not valid JSON: {error}"),
-            Severity::Error,
-        )]),
+        Err(error) => {
+            let mut found = issue(
+                spec,
+                Some(file),
+                "",
+                format!("not valid JSON: {error}"),
+                Severity::Error,
+            );
+            if error.line() > 0 {
+                found.line = Some(error.line());
+                found.column = Some(error.column());
+            }
+            Read::Invalid(vec![found])
+        }
     }
 }
 
-fn check(spec: &LayerSpec, file: Option<&Path>, value: Value) -> Read {
+fn check(spec: &LayerSpec, file: Option<&Path>, raw: Value) -> Read {
+    let value = match spec.format {
+        Format::Piarc => raw.clone(),
+        // The other keys are classified by the diagnostics, not validated.
+        Format::ClaudeCode if raw.is_object() => crate::claude::project(&raw),
+        Format::ClaudeCode => raw.clone(),
+    };
     let findings = validate(&value, spec.schema);
     let issues: Vec<Issue> = findings
         .into_iter()
@@ -380,7 +420,11 @@ fn check(spec: &LayerSpec, file: Option<&Path>, value: Value) -> Read {
     if issues.iter().any(|i| i.severity == Severity::Error) {
         Read::Invalid(issues)
     } else {
-        Read::Valid(value, issues)
+        Read::Valid {
+            value,
+            raw,
+            warnings: issues,
+        }
     }
 }
 
@@ -397,6 +441,8 @@ fn issue(
         pointer: pointer.to_owned(),
         message,
         severity,
+        line: None,
+        column: None,
     }
 }
 

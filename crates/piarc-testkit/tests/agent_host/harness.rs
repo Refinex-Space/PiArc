@@ -347,7 +347,7 @@ impl Env {
             asked: Mutex::default(),
             policy_answers: Mutex::default(),
             io: ToolIo::new(ToolIoConfig {
-                memory_home: Some(self.root.join("test-home")),
+                home: Some(self.root.join("test-home")),
                 ..ToolIoConfig::new(self.data_dir.clone())
             }),
             secrets,

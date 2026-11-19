@@ -86,6 +86,7 @@ pub(crate) fn write_user_value(data_dir: &Path, pointer: &str, value: Option<Val
         precedence: precedence::USER,
         scope: Scope::User,
         source: Source::File(data_dir.join("settings.json")),
+        format: piarc_config::Format::Piarc,
         schema: &piarc_config::schema::PIARC_SETTINGS,
         writable: true,
         executable: piarc_config::layers::PIARC_EXECUTABLE,

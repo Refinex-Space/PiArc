@@ -168,6 +168,47 @@ describe('session memory', () => {
     const read = memoryReader(bridge, 'session');
     await expect(read([], true)).resolves.toEqual({ files: [{ path: '文件', content: 'ok' }] });
   });
+  it('loads a conditional rule on the first matching file access, once, and keeps it after a reload', async () => {
+    const rule = path.join(cwd, '.claude', 'rules', 'ts.md');
+    const calls: { files: string[]; rules: string[] }[] = [];
+    const read: ReadMemory = (_dirs, _git, _signal, _turn, scan) => {
+      const files = scan?.files ?? [];
+      const rules = scan?.rules ?? [];
+      calls.push({ files, rules });
+      const active = rules.includes(rule) || files.some((f) => f.endsWith('.ts'));
+      return Promise.resolve({
+        files: [
+          { path: source, content: 'Project memory.' },
+          ...(active ? [{ path: rule, content: 'TypeScript rule.', paths: ['**/*.ts'] }] : []),
+        ],
+        ...(active ? {} : { inactiveRules: true }),
+      });
+    };
+    const manager = SessionManager.inMemory(cwd);
+    const session = harness(manager, read);
+    const first = await session.start();
+    expect(first.systemPrompt).not.toContain('TypeScript rule.');
+    // A file in an already visited directory that does not match: asked, nothing new.
+    await session.tool('view_file', 'a', 'notes.md');
+    await session.tool('view_file', 'b', 'src/app.ts');
+    await session.tool('Edit', 'c', 'src/other.ts');
+    const rules = session.messages.filter((m) => m.content.includes('TypeScript rule.'));
+    expect(rules).toHaveLength(1);
+    expect(rules[0]?.content).toContain('[PiArc memory]');
+    expect(rules[0]?.content).toContain(`Source: ${rule}`);
+    // Once every rule is loaded, file accesses in known directories do not ask Core.
+    const asked = calls.length;
+    await session.tool('view_file', 'd', 'src/third.ts');
+    expect(calls).toHaveLength(asked);
+    // The next turn keeps it without a message, and the opening system is unchanged.
+    const next = await session.start();
+    expect(next.systemPrompt).toBe(first.systemPrompt);
+    expect(next.message).toBeUndefined();
+    expect(calls.at(-1)).toEqual({ files: [], rules: [rule] });
+    const reopened = harness(manager, read);
+    expect(await reopened.start()).toEqual({ systemPrompt: first.systemPrompt });
+    expect(calls.at(-1)?.rules).toEqual([rule]);
+  });
 });
 
 it('keeps tool results ahead of Anthropic memory blocks, preserving cache metadata and the transcript', () => {

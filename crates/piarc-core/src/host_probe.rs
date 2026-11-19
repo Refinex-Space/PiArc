@@ -148,7 +148,7 @@ pub async fn run(options: ProbeOptions) -> Result<ProbeReport> {
     let core = Arc::new(ProbeCore {
         workspace: options.workspace.to_string_lossy().into_owned(),
         io: ToolIo::new(ToolIoConfig {
-            memory_home: Some(options.data_dir.join("test-home")),
+            home: Some(options.data_dir.join("test-home")),
             ..ToolIoConfig::new(options.data_dir.clone())
         }),
         secrets: SecretsService::new(

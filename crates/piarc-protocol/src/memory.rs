@@ -21,6 +21,14 @@ pub struct FsMemoryParams {
     /// Include the git status captured when Core opened the session.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_git: Option<bool>,
+    /// Files the agent just read or wrote: conditional rules whose `paths:` match one of
+    /// them are loaded.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub files: Option<Vec<String>>,
+    /// Conditional rules already delivered in this session (their `MemoryFile.path`); they
+    /// stay loaded.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rules: Option<Vec<String>>,
     /// Byte offset returned by the preceding page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub offset: Option<u64>,
@@ -33,6 +41,10 @@ pub struct MemoryFile {
     pub path: String,
     /// Visible Markdown, with source labels on expanded imports.
     pub content: String,
+    /// For a rule with `paths:` frontmatter, its globs: the rule was loaded because the agent
+    /// read or wrote a matching file (or did so earlier in the session).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub paths: Option<Vec<String>>,
 }
 
 /// The JSON document transferred by fs/memory.
@@ -47,6 +59,10 @@ pub struct MemorySnapshot {
     /// Session opening status when requested.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub git_status: Option<String>,
+    /// Some conditional rule is not loaded yet: reading or writing a matching file would
+    /// load it. Absent when every rule is loaded.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inactive_rules: Option<bool>,
 }
 
 /// A frame-sized UTF-8 slice of the encoded snapshot.

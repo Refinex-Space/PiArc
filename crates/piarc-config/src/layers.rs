@@ -1,8 +1,8 @@
 //! The settings layers: an ordered table of sources and precedences.
 //!
 //! The merge code iterates the table from the lowest precedence to the highest and never
-//! names a layer, so a new layer (T24's two `.claude/` layers, the session and enterprise
-//! layers) is one [`LayerSpec`] inserted with [`LayerTable::insert`].
+//! names a layer, so a new layer (the three Claude Code layers of T24, the session and
+//! enterprise layers) is one [`LayerSpec`] inserted with [`LayerTable::insert`].
 
 use std::path::{Path, PathBuf};
 
@@ -10,18 +10,17 @@ use serde_json::Value;
 
 use crate::schema::{PIARC_SETTINGS, Shape};
 
-/// Precedences (higher wins) in the order of ADR-0005 rule 3, with gaps for the Claude Code
-/// layers T24 adds.
+/// Precedences (higher wins) in the order of ADR-0005 rule 3.
 pub mod precedence {
     /// Built-in defaults.
     pub const DEFAULTS: u16 = 0;
-    /// `~/.claude/settings.json` (T24).
+    /// `~/.claude/settings.json`.
     pub const CLAUDE_USER: u16 = 10;
     /// PiArc's user settings, `<data>/settings.json`.
     pub const USER: u16 = 20;
-    /// `.claude/settings.json` (T24).
+    /// `.claude/settings.json`.
     pub const CLAUDE_PROJECT: u16 = 30;
-    /// `.claude/settings.local.json` (T24).
+    /// `.claude/settings.local.json`.
     pub const CLAUDE_PROJECT_LOCAL: u16 = 40;
     /// `.piarc/settings.json`.
     pub const PROJECT: u16 = 50;
@@ -58,6 +57,17 @@ pub enum Source {
     Value(Value),
 }
 
+/// The format of a layer's file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Format {
+    /// PiArc's own settings.
+    Piarc,
+    /// A Claude Code `settings.json`: only the keys the mapping table marks active are merged
+    /// ([`crate::claude::project`]); the file is never written.
+    ClaudeCode,
+}
+
 /// One layer.
 #[derive(Debug)]
 pub struct LayerSpec {
@@ -69,7 +79,9 @@ pub struct LayerSpec {
     pub scope: Scope,
     /// Where its value comes from.
     pub source: Source,
-    /// The schema its value is checked against.
+    /// The file's format.
+    pub format: Format,
+    /// The schema its (projected) value is checked against.
     pub schema: &'static Shape,
     /// Whether PiArc may write it ([`crate::write`]): only `.piarc/` and the user file.
     pub writable: bool,
@@ -85,6 +97,15 @@ pub const PIARC_EXECUTABLE: &[&str] = &[
     "/hooks",
     "/permissions/allow",
     "/permissions/additionalDirectories",
+];
+
+/// The executable values of a Claude Code settings file. Only the active keys reach the merge;
+/// the planned ones are listed so they stay behind trust once their task makes them active.
+pub const CLAUDE_EXECUTABLE: &[&str] = &[
+    "/hooks",
+    "/permissions/allow",
+    "/permissions/additionalDirectories",
+    "/enabledPlugins",
 ];
 
 impl LayerSpec {
@@ -112,6 +133,12 @@ pub mod ids {
     pub const SESSION: &str = "session";
     /// Enterprise policy.
     pub const ENTERPRISE: &str = "enterprise";
+    /// `~/.claude/settings.json`.
+    pub const CLAUDE_USER: &str = "claudeUser";
+    /// `.claude/settings.json`.
+    pub const CLAUDE_PROJECT: &str = "claudeProject";
+    /// `.claude/settings.local.json`.
+    pub const CLAUDE_PROJECT_LOCAL: &str = "claudeProjectLocal";
 }
 
 /// The layers, sorted by precedence.
@@ -134,6 +161,7 @@ impl LayerTable {
             precedence: precedence::DEFAULTS,
             scope: Scope::Defaults,
             source: Source::Value(crate::defaults()),
+            format: Format::Piarc,
             schema: &PIARC_SETTINGS,
             writable: false,
             executable: PIARC_EXECUTABLE,
@@ -143,6 +171,7 @@ impl LayerTable {
             precedence: precedence::USER,
             scope: Scope::User,
             source: Source::File(data_dir.join("settings.json")),
+            format: Format::Piarc,
             schema: &PIARC_SETTINGS,
             writable: true,
             executable: PIARC_EXECUTABLE,
@@ -153,6 +182,7 @@ impl LayerTable {
             precedence: precedence::PROJECT,
             scope: Scope::Project,
             source: Source::File(dir.join("settings.json")),
+            format: Format::Piarc,
             schema: &PIARC_SETTINGS,
             writable: true,
             executable: PIARC_EXECUTABLE,
@@ -162,10 +192,56 @@ impl LayerTable {
             precedence: precedence::PROJECT_LOCAL,
             scope: Scope::Project,
             source: Source::File(dir.join("settings.local.json")),
+            format: Format::Piarc,
             schema: &PIARC_SETTINGS,
             writable: true,
             executable: PIARC_EXECUTABLE,
         });
+        table
+    }
+
+    /// A workspace's layers: PiArc's four ([`Self::piarc`]) and Claude Code's
+    /// `<workspace>/.claude/settings.json`, `<workspace>/.claude/settings.local.json` and, with
+    /// a home directory, `<home>/.claude/settings.json`. Core always uses this table; tests
+    /// inject a temporary `home` (`None` reads no user-level Claude Code file).
+    #[must_use]
+    pub fn workspace(data_dir: &Path, workspace: &Path, home: Option<&Path>) -> Self {
+        let mut table = Self::piarc(data_dir, workspace);
+        let claude = workspace.join(crate::claude::CLAUDE_DIR);
+        let mut layers = vec![
+            (
+                ids::CLAUDE_PROJECT,
+                precedence::CLAUDE_PROJECT,
+                Scope::Project,
+                claude.join("settings.json"),
+            ),
+            (
+                ids::CLAUDE_PROJECT_LOCAL,
+                precedence::CLAUDE_PROJECT_LOCAL,
+                Scope::Project,
+                claude.join("settings.local.json"),
+            ),
+        ];
+        if let Some(home) = home {
+            layers.push((
+                ids::CLAUDE_USER,
+                precedence::CLAUDE_USER,
+                Scope::User,
+                home.join(crate::claude::CLAUDE_DIR).join("settings.json"),
+            ));
+        }
+        for (id, precedence, scope, file) in layers {
+            table.insert(LayerSpec {
+                id,
+                precedence,
+                scope,
+                source: Source::File(file),
+                format: Format::ClaudeCode,
+                schema: &PIARC_SETTINGS,
+                writable: false,
+                executable: CLAUDE_EXECUTABLE,
+            });
+        }
         table
     }
 

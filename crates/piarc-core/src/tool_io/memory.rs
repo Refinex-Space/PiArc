@@ -87,7 +87,12 @@ impl ToolIo {
     pub(crate) async fn capture_opening_memory(&self, id: &str) -> Result<(), ErrorObject> {
         let session = self.session(id)?;
         let (files, _) = tokio::join!(
-            self.collect_memory(&session, Vec::new(), HashMap::new()),
+            self.collect_memory(
+                &session,
+                Vec::new(),
+                memory_reader::RuleQuery::default(),
+                HashMap::new()
+            ),
             session.memory.git_status(&session)
         );
         *lock(&session.memory.opening) = Some(files?);
@@ -98,21 +103,27 @@ impl ToolIo {
         &self,
         session: &SessionIo,
         dirs: Vec<String>,
+        rules: memory_reader::RuleQuery,
         choices: HashMap<PathBuf, ImportAccess>,
     ) -> Result<memory_reader::Collection, ErrorObject> {
         let config = Arc::clone(&self.config);
         let scope = session.scope.clone();
         tokio::task::spawn_blocking(move || {
-            let table = piarc_config::LayerTable::piarc(&config.data_dir, scope.root());
+            let table = piarc_config::LayerTable::workspace(
+                &config.data_dir,
+                scope.root(),
+                config.home.as_deref(),
+            );
             // This setting governs the choice of two documents; project code is never enabled.
             let settings = piarc_config::Settings::load(table, piarc_config::TrustState::Untrusted);
             let both = settings.get("/memory/readBoth").and_then(Value::as_bool) == Some(true);
             memory_reader::collect(
                 &scope,
-                config.memory_home.as_deref(),
+                config.home.as_deref(),
                 &config.data_dir,
                 &dirs,
                 both,
+                &rules,
                 |path| choices.get(path).cloned(),
             )
         })
@@ -152,9 +163,19 @@ impl ToolIo {
             Some(opening) => Some(scan.resolve(opening, &mut choices).await?),
             None => None,
         };
+        let rules = memory_reader::RuleQuery {
+            files: p
+                .files
+                .iter()
+                .flatten()
+                .map(|f| session.scope.cwd().join(f))
+                .collect(),
+            active: p.rules.clone().unwrap_or_default(),
+        };
         let latest = self
-            .collect_memory(&session, dirs.to_vec(), choices.clone())
+            .collect_memory(&session, dirs.to_vec(), rules, choices.clone())
             .await?;
+        let inactive_rules = latest.inactive_rules;
         let latest = scan.resolve(latest, &mut choices).await?;
         let (files, current_files) = match initial {
             Some(original) if original != latest => (original, Some(latest)),
@@ -169,6 +190,7 @@ impl ToolIo {
             files,
             current_files,
             git_status,
+            inactive_rules: inactive_rules.then_some(true),
         })
         .map_err(|e| ErrorObject::new(ErrorKind::InternalError, e.to_string(), false))?;
         if scan.generation.is_cancelled() || peer.is_closed() {
@@ -242,7 +264,7 @@ impl Scan<'_> {
                 choices.insert(path, access);
             }
             let scope = self.session.scope.clone();
-            let home = self.io.config.memory_home.clone();
+            let home = self.io.config.home.clone();
             let decisions = choices.clone();
             current = tokio::task::spawn_blocking(move || {
                 inputs.expand(&scope, home.as_deref(), |path| decisions.get(path).cloned())
