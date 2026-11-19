@@ -52,7 +52,7 @@
 | CAP-TOOL-EDIT-001 | Edit 按文本替换修改文件 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
 | CAP-TOOL-EDIT-002 | 编辑不变量：先读后写、外部修改检测、多处匹配拒绝、编码与换行保持 | FR-TL-01、ARCH-6.1.2 | T16 | `tools-edit-detects-external-change`<br>`tools-edit-preserves-encoding`<br>`tools-edit-requires-read`<br>`tools-edit-unique-match` | 已实现 |
 | CAP-TOOL-EDIT-EXTERNAL-001 | 读取后文件被外部修改，Edit 报错并要求重新读取，文件保持外部修改后的内容 | FR-TL-01、ARCH-6.1.2 | T16 | `tools-edit-detects-external-change` | 已实现 |
-| CAP-TOOL-EDIT-READFIRST-001 | 对已存在的文件 Edit 或 Write 前，本会话必须读过它，否则报错并要求先 Read，文件不变 | FR-TL-01、ARCH-6.1.2 | T16 | `tools-edit-requires-read` | 已实现 |
+| CAP-TOOL-EDIT-READFIRST-001 | 对已存在的文件 Edit 或 Write 前，本会话必须读过它，否则报错并要求先 Read，文件不变 | FR-TL-01、ARCH-6.1.2 | T16 | `tools-edit-requires-read`<br>`tools-read-failed-retry` | 已实现 |
 | CAP-TOOL-EDIT-UNIQUE-001 | Edit 的旧文本必须唯一出现或显式 replaceAll；多处匹配报出次数、零匹配报错，都不改文件 | FR-TL-01、ARCH-6.1.2 | T16 | `tools-edit-unique-match` | 已实现 |
 | CAP-TOOL-GLOB-001 | Glob 由 Core 按模式列出文件 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
 | CAP-TOOL-GREP-001 | Grep 由 Core 搜索文件内容 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
@@ -63,7 +63,7 @@
 | CAP-TOOL-PROFILE-001 | 模型看到的工具名是规范名，不出现 Pi 原生工具名 | ARCH-6.1.1 | T07 | `tools-model-sees-canonical-names` | 已实现 |
 | CAP-TOOL-READ-001 | Read 读取工作区文本文件 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
 | CAP-TOOL-READ-002 | Read 带行号分页、图片、PDF 分页与 ipynb | FR-TL-01、ARCH-6.1.4 | T16 | `tools-read-formats` | 已实现 |
-| CAP-TOOL-REREAD-001 | 文件自上次读取后未变化时 Read 返回简短存根 | ARCH-6.15 | T16 | `tools-read-repeat-stub` | 已实现 |
+| CAP-TOOL-REREAD-001 | 文件自上次读取后未变化时 Read 返回简短存根 | ARCH-6.15 | T16 | `tools-read-failed-retry`<br>`tools-read-repeat-stub` | 已实现 |
 | CAP-TOOL-SEARCH-LIMITS-001 | Grep 与 Glob 遵守 .gitignore，Grep 跳过二进制文件，结果超过上限时截断并说明 | FR-TL-01、ARCH-6.1.3 | T16 | `tools-search-ignore-and-limits` | 已实现 |
 | CAP-TOOL-WRITE-001 | Write 创建与覆盖文件 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
 | CAP-TOOL-WRITE-FIDELITY-001 | Edit 与 Write 保留文件的换行风格、BOM 与编码，只改目标文本，原子替换 | FR-TL-01、ARCH-6.1.2 | T16 | `tools-edit-preserves-encoding` | 已实现 |

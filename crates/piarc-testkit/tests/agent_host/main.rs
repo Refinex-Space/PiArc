@@ -566,7 +566,8 @@ fn check_own_core_calls(env: &Env, core: &harness::Core, a: &SessionId, b: &Sess
                 ("fs/read", Some("Edit")),
                 ("fs/write", Some("Edit")),
                 ("fs/stat", Some("Read")),
-                ("fs/read", Some("Read"))
+                ("fs/read", Some("Read")),
+                ("fs/stat", Some("Read"))
             ],
             "{calls:#?}"
         );

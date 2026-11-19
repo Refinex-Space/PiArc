@@ -33,6 +33,15 @@ const EXTENSION: &str = r#"export default function (pi: any) {
 }
 "#;
 
+async fn confirm_project(service: &TrustService, path: &std::path::Path) {
+    let view = service.view(path).await.expect("displayed inventory");
+    let decision = service
+        .decide(path, true, &view.version)
+        .await
+        .expect("confirm");
+    assert!(decision.applied && decision.trusted);
+}
+
 const PROBE_TOOL: &str = "fixture_probe";
 
 fn offers_probe(body: &str) -> bool {
@@ -74,18 +83,7 @@ async fn project_extensions_load_only_while_core_trusts_the_project() {
     );
 
     // Trusted: Core restarts the Agent Host, the session is reopened and the tool is offered.
-    trust
-        .decide(
-            &env.ws[0],
-            true,
-            &trust
-                .view(&env.ws[0])
-                .await
-                .expect("displayed trust view")
-                .version,
-        )
-        .await
-        .expect("trust");
+    confirm_project(&trust, &env.ws[0]).await;
     let restored = events
         .until(|e| matches!(e, HostEvent::SessionRestored { epoch: 2, .. }))
         .await;
