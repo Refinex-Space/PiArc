@@ -162,6 +162,17 @@ fn keeps_crlf_bom_and_legacy_encodings() {
 }
 
 #[test]
+fn malformed_utf16_is_preserved_on_disk() {
+    let f = Fixture::new("damaged-utf16");
+    let original = [0xff, 0xfe, b'a', 0, 0x00, 0xd8];
+    f.put("note.txt", &original);
+    f.read("note.txt");
+    f.write("note.txt", "b�", LineEndings::AsWritten)
+        .expect_err("lossy source");
+    assert_eq!(f.bytes("note.txt"), original);
+}
+
+#[test]
 fn text_the_encoding_cannot_hold_is_refused_and_the_file_kept() {
     let f = Fixture::new("write-unencodable");
     let gbk = TextEncoding::Legacy(encoding_rs::GBK);

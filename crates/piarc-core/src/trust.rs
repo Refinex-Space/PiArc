@@ -94,17 +94,20 @@ impl TrustLookup for StoreLookup {
         };
         let directory = piarc_git::canonical(dir).map_err(|e| e.to_string())?;
         let inventory = inventory_at(&checkout.root, &directory);
+        if !inventory.unreadable.is_empty() {
+            return Ok(false);
+        }
         let mut items = inventory.items;
         items.extend_from_slice(&self.loaded);
-        Ok(unconfirmed(&items, &record.snapshot).is_empty())
+        Ok(unconfirmed(&items, &record.snapshot).is_some_and(|new| new.is_empty()))
     }
 }
 
 /// Items of `items` missing from a decision's snapshot. A snapshot that cannot be read
 /// confirms nothing.
-fn unconfirmed(items: &[Item], snapshot: &str) -> Vec<Item> {
-    let snapshot: Vec<Item> = serde_json::from_str(snapshot).unwrap_or_default();
-    piarc_config::new_items(items, &snapshot)
+fn unconfirmed(items: &[Item], snapshot: &str) -> Option<Vec<Item>> {
+    let snapshot: Vec<Item> = serde_json::from_str(snapshot).ok()?;
+    Some(piarc_config::new_items(items, &snapshot))
 }
 
 impl TrustService {
@@ -383,10 +386,18 @@ fn build_view(storage: &Storage, dir: &Path) -> Result<TrustView> {
         .is_some_and(|r| r.decision == TrustDecision::Trusted);
     let new_items = match &record {
         Some(record) if decided_trusted => unconfirmed(&items, &record.snapshot),
-        _ => Vec::new(),
+        _ => None,
     };
     // The same answer as `StoreLookup`: new items wait for the user's confirmation.
-    let trusted = decided_trusted && new_items.is_empty();
+    let trusted =
+        decided_trusted && unreadable.is_empty() && new_items.as_ref().is_some_and(Vec::is_empty);
+    let new_items = new_items.unwrap_or_else(|| {
+        if decided_trusted {
+            items.clone()
+        } else {
+            Vec::new()
+        }
+    });
     Ok(TrustView {
         path: dir.to_string_lossy().into_owned(),
         checkout: key,

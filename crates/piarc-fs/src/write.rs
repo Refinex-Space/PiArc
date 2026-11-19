@@ -115,7 +115,18 @@ pub(crate) fn write_with(
     let (encoding, before) = match &existing {
         Some((_, bytes)) => {
             let encoding = detect(bytes);
-            (encoding, Some(decode(encoding, bytes)))
+            let text = decode(encoding, bytes);
+            if matches!(encoding, TextEncoding::Utf16 { .. })
+                && text.contains(char::REPLACEMENT_CHARACTER)
+                && encode(encoding, &text).as_deref() != Ok(bytes.as_slice())
+            {
+                return Err(Error::coded(
+                    &path,
+                    "EILSEQ",
+                    "cannot safely rewrite malformed UTF-16 text",
+                ));
+            }
+            (encoding, Some(text))
         }
         None => (TextEncoding::NEW_FILE, None),
     };

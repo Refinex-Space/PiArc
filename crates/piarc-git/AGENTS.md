@@ -20,7 +20,7 @@ git 的状态、diff、worktree、分支。T13 起只有一项：目录所属仓
 | 一直找不到 | 非 git 目录 | 目录自身 |
 
 - 路径一律经 `canonical`：解析符号链接、取磁盘上的大小写、去掉 Windows `\\?\` 前缀（`strip_verbatim`）。比较与存储都用规范路径。
-- 只读 `.git` 文件与 `commondir`，不启动 git 进程。
+- 读取 `.git`、`commondir` 并校验主仓库 worktrees 登记的 `gitdir` 反向指针，不启动 git 进程。
 
 ## 易错点
 

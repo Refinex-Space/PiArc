@@ -135,6 +135,10 @@ fn worktrees_share_the_main_checkout_and_submodules_do_not() {
 
     let canonical_text = main_key.to_string_lossy();
     assert!(!canonical_text.starts_with(r"\\?\"), "{canonical_text}");
+    // A checkout moved without git worktree repair has stale registration.
+    let moved = root.join("moved checkout");
+    std::fs::rename(&linked, &moved).expect("move checkout");
+    assert_ne!(resolve(&moved).ok().map(|c| c.main), Some(main_key));
     std::fs::remove_dir_all(root).expect("cleanup");
 }
 

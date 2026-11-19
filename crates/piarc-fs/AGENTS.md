@@ -38,9 +38,9 @@ Core 层的集成测试在 `crates/piarc-core/tests/tool_io.rs`（越界、会�
 
 - `fuzzy::list_files` 与 `rank` 为工作区文件提及提供相对路径。文件名排序的 `positions` 按 Unicode 字符计数，和输入消息中提及的 UTF-16 区间单位不同。Core 负责结果缓存和取消（ADR-0030）。
 
-- Windows 上 `std::fs::rename` 覆盖已存在的文件：Win10 1607 以上用 `FileRenameInfoEx`（POSIX 语义），否则 `MoveFileExW`。目标被别的进程以不共享删除的方式打开（杀毒、索引）时短暂拒绝访问，`atomic::rename` 在 Windows 上重试 5 次。替换不保留 ACL 与备用数据流，只带上隐藏、系统属性；Unix 上带上原权限位。只读文件一律 `EACCES`（Unix 的 rename 本可以覆盖它）。
+- Windows 上 `std::fs::rename` 覆盖已存在的文件：Win10 1607 以上用 `FileRenameInfoEx`（POSIX 语义），否则 `MoveFileExW`。目标被别的进程以不共享删除的方式打开（杀毒、索引）时短暂拒绝访问，`atomic::rename` 在 Windows 上重试 5 次。替换不保留 ACL 与备用数据流，只带上隐藏、系统属性；Unix 上暂存文件以私有权限创建，写入后通过文件句柄恢复原权限位。只读文件一律 `EACCES`（Unix 的 rename 本可以覆盖它）。
 - rename 会断开硬链接：其他名字仍是旧内容。
-- 含非法序列的 UTF-8 文件经编辑后，这些字节变成 U+FFFD（整文件按 UTF-8 解码再编码）。
+- 含损坏码元的 UTF-16 文件拒绝写回，保留原字节。含非法序列的 UTF-8 文件经编辑后，这些字节变成 U+FFFD（整文件按 UTF-8 解码再编码）。
 - PDF 用 lopdf 0.46 的 `extract_text_with_limit`：资源以内联字典写在页树节点上（被页面继承）时取不到文字（I71）。`pdf-extract` 不能用：它锁 lopdf 0.42，引入已停止维护的 `ttf-parser`，cargo-deny 拒绝。测试 PDF 用 `pdf/tests.rs` 的 `make_pdf` 生成。
 - glob 的 `.gitignore` 在 Git 仓库外也生效（Pi 给 fd 传 `--no-require-git`），grep 的只在仓库内生效（ripgrep 默认）：两者故意不同，对照测试依赖这一点。L2 场景用 `.git/HEAD` 标出仓库。
 - `io::ErrorKind::FilesystemLoop` 在稳定版还不能具名使用，`ELOOP` 按其 `Debug` 名识别。

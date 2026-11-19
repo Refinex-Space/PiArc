@@ -93,17 +93,18 @@ pub fn store(dir: &Path, name: &str, mime_type: &str, bytes: &[u8]) -> Result<In
     }
     let sha256 = hex(&Sha256::digest(bytes));
     let path = dir.join(format!("{sha256}.{extension}"));
-    if !path.exists() {
-        write_new(dir, &path, bytes)?;
-    }
     let page_count = match kind {
-        AttachmentKind::Pdf => {
-            Some(piarc_fs::pdf_page_count(&path).map_err(|e| refused("content", &e.to_string()))?)
-        }
+        AttachmentKind::Pdf => Some(
+            piarc_fs::pdf_page_count_bytes(&path, bytes)
+                .map_err(|e| refused("content", &e.to_string()))?,
+        ),
         AttachmentKind::Image => None,
     };
     if page_count == Some(0) {
         return Err(refused("content", &format!("{name} has no pages")));
+    }
+    if !path.exists() {
+        write_new(dir, &path, bytes)?;
     }
     Ok(InputAttachment {
         kind,
@@ -279,6 +280,10 @@ mod tests {
         assert_eq!(reason(&too_large).as_deref(), Some("size"));
         let broken = store(&dir, "x.pdf", "application/pdf", b"%PDF-1.4 nothing").expect_err("pdf");
         assert_eq!(reason(&broken).as_deref(), Some("content"));
+        assert!(
+            !dir.exists() || dir.read_dir().expect("directory").next().is_none(),
+            "a refused PDF must leave no copy"
+        );
         let _ = std::fs::remove_dir_all(dir);
     }
 

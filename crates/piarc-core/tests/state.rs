@@ -414,6 +414,10 @@ fn a_trust_view_lists_the_items_and_what_is_new_since_the_decision() {
         // Removing an item needs no confirmation.
         std::fs::remove_file(ws.join(".mcp.json")).expect("remove");
         assert!(asked(&trust, &ws).await);
+        std::fs::write(ws.join(".mcp.json"), "{").expect("interrupted configuration save");
+        let incomplete = trust.view(&ws).await.expect("view");
+        assert!(!incomplete.unreadable.is_empty());
+        assert!(!incomplete.trusted && !asked(&trust, &ws).await);
     });
     core.shutdown_blocking().expect("shutdown");
 }

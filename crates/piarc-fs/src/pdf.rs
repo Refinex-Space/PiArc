@@ -95,10 +95,22 @@ pub fn pdf_page_count(path: &Path) -> Result<u64> {
         return Err(too_large(path, size));
     }
     let bytes = std::fs::read(path).map_err(|e| Error::io(path, e))?;
+    pdf_page_count_bytes(path, &bytes)
+}
+
+/// Counts pages before publishing a validated attachment.
+///
+/// # Errors
+///
+/// Returns the same size and document errors as [`pdf_page_count`].
+pub fn pdf_page_count_bytes(path: &Path, bytes: &[u8]) -> Result<u64> {
+    if bytes.len() as u64 > MAX_BLOB_BYTES {
+        return Err(too_large(path, bytes.len() as u64));
+    }
     let unreadable =
         |detail: &str| Error::coded(path, "EINVAL", &format!("not a readable PDF: {detail}"));
     let counted = catch_unwind(AssertUnwindSafe(|| -> Result<u64> {
-        let mut document = Document::load_mem(&bytes).map_err(|e| unreadable(&e.to_string()))?;
+        let mut document = Document::load_mem(bytes).map_err(|e| unreadable(&e.to_string()))?;
         if document.is_encrypted() && document.decrypt("").is_err() {
             return Err(unreadable("it is encrypted with a password"));
         }

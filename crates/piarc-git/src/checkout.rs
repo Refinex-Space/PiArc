@@ -171,6 +171,23 @@ fn from_git_file(root: &Path, file: &Path) -> Result<Checkout> {
         }
     };
     let common = canonical(&gitdir.join(common.trim()))?;
+    // Git records the checkout on both sides. A moved checkout must be repaired
+    // before it can share its main checkout's trust.
+    let backlink = gitdir.join("gitdir");
+    let registered = fs::read_to_string(&backlink).map_err(|source| Error::Io {
+        op: "cannot read",
+        path: backlink,
+        source,
+    })?;
+    if gitdir.parent() != Some(common.join("worktrees").as_path())
+        || canonical(&gitdir.join(registered.trim()))? != file
+    {
+        return Ok(Checkout {
+            main: root.to_owned(),
+            root: root.to_owned(),
+            kind: CheckoutKind::Independent,
+        });
+    }
     let main = match (common.file_name(), common.parent()) {
         (Some(name), Some(parent)) if name == ".git" => parent.to_owned(),
         _ => common,

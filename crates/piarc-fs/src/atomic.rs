@@ -42,11 +42,11 @@ pub(crate) fn replace_with(
 ) -> io::Result<()> {
     let temp = temp_path(target)?;
     let mut file = create_temp(&temp, original)?;
-    let written = write(&mut file).and_then(|()| file.sync_all());
+    let written = write(&mut file)
+        .and_then(|()| keep_permissions(&file, original))
+        .and_then(|()| file.sync_all());
     drop(file);
-    let result = written
-        .and_then(|()| keep_permissions(&temp, original))
-        .and_then(|()| rename(&temp, target));
+    let result = written.and_then(|()| rename(&temp, target));
     if result.is_err() {
         // Best effort: the error that matters is the one returned.
         let _ = std::fs::remove_file(&temp);
@@ -81,19 +81,22 @@ fn create_temp(temp: &Path, original: Option<&Metadata>) -> io::Result<File> {
             options.attributes(metadata.file_attributes() & (HIDDEN | SYSTEM));
         }
     }
-    #[cfg(not(windows))]
-    let _ = original;
+    #[cfg(unix)]
+    if original.is_some() {
+        use std::os::unix::fs::OpenOptionsExt as _;
+        options.mode(0o600);
+    }
     options.open(temp)
 }
 
 /// Unix: the old file's permission bits, exactly (creation applies the umask).
-fn keep_permissions(temp: &Path, original: Option<&Metadata>) -> io::Result<()> {
+fn keep_permissions(file: &File, original: Option<&Metadata>) -> io::Result<()> {
     #[cfg(unix)]
     if let Some(metadata) = original {
-        std::fs::set_permissions(temp, metadata.permissions())?;
+        file.set_permissions(metadata.permissions())?;
     }
     #[cfg(not(unix))]
-    let _ = (temp, original);
+    let _ = (file, original);
     Ok(())
 }
 
@@ -130,6 +133,22 @@ mod tests {
             .map(|e| e.file_name().to_string_lossy().into_owned())
             .filter(|n| n.ends_with(".tmp"))
             .collect()
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn replacement_stages_private_contents_privately() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let tree = TempTree::new("private-staging");
+        tree.file("private", "original");
+        let target = tree.path("private");
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).expect("mode");
+        let original = target.metadata().expect("metadata");
+        replace_with(&target, Some(&original), |file| {
+            assert_eq!(file.metadata()?.permissions().mode() & 0o077, 0);
+            Ok(())
+        })
+        .expect("replace");
     }
 
     #[test]
