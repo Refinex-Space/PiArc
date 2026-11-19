@@ -153,7 +153,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 已完成 | ae5c8e6 |
 | T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 30a4f17 |
 | T26 | [计划模式、任务清单、AskUserQuestion 与下一步](tasks/T26-plan-mode-todo-ask-next-steps.md) | 3 | T25 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 23630e3 |
-| T27 | [上下文工程：system reminder、压缩与用量](tasks/T27-context-reminders-compaction-usage.md) | 3 | T26 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
+| T27 | [上下文工程：system reminder、压缩与用量](tasks/T27-context-reminders-compaction-usage.md) | 3 | T26 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
 | T28 | [检查点、回退与 Changes 面板](tasks/T28-checkpoints-rewind-changes.md) | 3 | T27 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T29 | [WebFetch、登录与模型设置补全、三档视图](tasks/T29-webfetch-login-model-settings-views.md) | 3 | T28 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T30 | [L3 行为对齐基座](tasks/T30-l3-behavior-alignment.md) | 3 | T29 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,6 +308,20 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+### T27 上下文工程：system reminder、压缩与用量（开工 2026-11-19，基线 d808f82，verify 15/15）
+
+- [ ] 1. 设计与 ADR：reminder 通道、外部修改检测方式、压缩阈值的 Pi 配置、熔断、重注入、用量口径、缓存断点
+- [ ] 2. system reminder 通道：七类类型、来源与正文；迁入 T22 懒加载、T24 rules、T25 `additionalContext`，删除旧注入代码；投影为带 `reminder` 标记的 item（A06）
+- [ ] 3. 外部修改提醒：Core 文件状态表比对 + AHP；I72 压缩后清读取范围（A07）
+- [ ] 4. 压缩：自写分节摘要提示、`/compact [重点]`、PreCompact/PostCompact 衔接（A02、A03）
+- [ ] 5. 阈值纯函数与 `autoCompactWindow`/`autoCompactEnabled` 设置，熔断与提示行（A01、A04）
+- [ ] 6. 压缩后重注入：memory、计划、任务清单、skill 正文槽位、最近文件（上限常量，A05）
+- [ ] 7. 上下文用量：分类统计、`session/usage`、`session/getContextUsage`、未分类差额（A08）
+- [ ] 8. 缓存断点：Anthropic 线格式布局与 mock 断言（A10）
+- [ ] 9. L2 场景 `ctx-*` 与能力 ID（A01–A07、A10）
+- [ ] 10. 客户端：用量环（75%/90%）、右栏上下文卡片与压缩按钮，L4 与截图（A09）
+- [ ] 11. 原创性自查（A11）、文档与 AGENTS.md、收尾 verify（A12）
 
 
 ## 登记事项
