@@ -151,7 +151,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 8a1f38b |
 | T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 已完成 | ae5c8e6 |
-| T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
+| T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 30a4f17 |
 | T26 | [计划模式、任务清单、AskUserQuestion 与下一步](tasks/T26-plan-mode-todo-ask-next-steps.md) | 3 | T25 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T27 | [上下文工程：system reminder、压缩与用量](tasks/T27-context-reminders-compaction-usage.md) | 3 | T26 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T28 | [检查点、回退与 Changes 面板](tasks/T28-checkpoints-rewind-changes.md) | 3 | T27 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -308,20 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-T25（开工基线 aae28a4，`npm run verify` 15/15；依赖 T24 已完成；T23 的 A05 等 Windows CI，分支尚未推送，无 CI 可核对）：
-
-- [x] 1. piarc-hooks：配置解析与多来源合并（跨文件去重、`disableAllHooks`、不支持的字段与事件进诊断）、matcher（正则库不支持的语法报错）
-- [x] 2. piarc-hooks：command 执行器（`ProcessSpawner` 注入、并行、管道并发读完、超时与取消时终止进程树、超时可注入）
-- [x] 3. piarc-hooks：决策协议与合并（exit 0/2/其他、JSON 与纯文本、通用字段、PreToolUse deny > ask > allow、Stop 续跑上限、10,000 字符落盘与预览）
-- [x] 4. 协议：AHP `hooks/run`、`policy/evaluate` 新增字段、`session/prompt` 等的 hook 上下文、契约样本与 `gen:protocol`
-- [x] 5. Core：hooks 服务（设置来源与项目信任、审计、键映射表 `hooks`/`disableAllHooks` 生效）、PreToolUse 与 PermissionRequest 接入裁决第 2、8 步
-- [x] 6. Core：UserPromptSubmit（发给 Agent Host 之前）与 Notification（等待审批、回合完成）
-- [x] 7. Agent Host：SessionStart/SessionEnd、PostToolUse/PostToolUseFailure、Stop、PreCompact/PostCompact 挂载
-- [x] 8. 客户端：`systemMessage` 与非阻断错误经事件上报并用现有提示行显示
-- [x] 9. L2 场景 `hooks-*.yaml`（11 个事件，Node 夹具脚本记录 stdin）与能力 ID `CAP-HOOK-*`
-- [x] 10. 文档：架构 6.3（续跑上限等）、ADR、`crates/piarc-hooks` AGENTS.md、`coding-standards.md` 复用表、用户文档
-- [ ] 11. 验收 A01–A13 与收尾 `npm run verify`
 
 ## 登记事项
 
@@ -756,6 +742,16 @@ T25（开工基线 aae28a4，`npm run verify` 15/15；依赖 T24 已完成；T23
 - 范围外修复：T23 改了审批卡标签后 `t22-memory.e2e.ts` 仍用旧标签，已改为新标签（行为未变）。
 - 登记 I86（家目录监听的重读频率）、I87（键映射表随官方索引更新）、I88（L2 运行器超过 1,000 行）。
 - 下一项：macOS 上的 T25（hooks，把映射表中的 `hooks`、`disableAllHooks` 改为生效）；Windows 上的 W1 同时核对 T23-A05 与 I84。本地提交，未推送。
+
+### 2026-11-19 T25 部分完成（验收提交 30a4f17）
+
+- 交付：新 crate `piarc-hooks`（配置合并与跨文件去重、matcher、经注入 `ProcessSpawner` 的并行执行器、退出码与 JSON 的逐事件合并、长输出落盘、Stop 续跑上限 8）；Core 的 `HooksService`（与权限裁决同一份设置与信任、每个 handler 一行审计、`core/notices` 提示）接入裁决第 2、8 步（`updatedInput` 在规则之前替换参数，PermissionRequest 的改写重新裁决，`updatedPermissions` 只写会话与 `.piarc/`）、UserPromptSubmit 与 Notification；AHP `hooks/run`（能力 `hooks`）让 Agent Host 报告 SessionStart、SessionEnd、PostToolUse、PostToolUseFailure、Stop、PreCompact、PostCompact；`policy/evaluate` 结果与会话输入的新成员；键映射表 `hooks`、`disableAllHooks` 生效；客户端提示行显示 hook 消息与错误，配置诊断列出不运行的 hooks。见 ADR-0039、架构 v2.31、`docs/product/hooks.md`。
+- 验收：12 项通过，1 项阻塞（A09 的 Windows 部分：进程树测试已过 Windows 目标交叉 Clippy，需推送后由 Windows CI 运行；macOS 已通过）。开工基线 aae28a4 与收尾 `npm run verify` 均 15/15；L2 81 通过、2 个按平台跳过，新增 11 个 `hooks-*.yaml`，8 个 CAP-HOOK 能力改为 active，MISSING 0。
+- Electron dev 与 packaged 的 T25、T24、T23、T22、T20、preload L4 通过（packaged 跑 T25、T24、preload 9/9）；ego-browser 用本地渲染器与假 Core 数据操作了提示行（关闭、语言切换、5 条上限）与配置诊断页。证据在 `tmp/evidence/T25/`。
+- 实现中的修正：Agent Host 的 `hooks/run` 遇到超过一个 AHP 帧的输入（大 Write）会让回合挂住，改为截断长字符串；PreToolUse hooks 可能运行超过 30 秒的传输期限，Core 改为运行前发 `policy/pending`（保留 T20 对无应答 Core 的期限）。
+- 范围外调整：T24 的 L4 与 `piarc-config` 测试原先断言 `hooks` 为"待支持（T25）"，改为生效后的表现。
+- 登记 I89–I94；I88 补充 `format.rs` 与 runner 的行数。
+- 下一项：macOS 上的 T26（计划模式、任务清单、AskUserQuestion 与下一步）；Windows 上的 W1 同时核对 T23-A05、T25-A09 与 I84。本地提交，未推送。
 
 ## 计划变更记录
 
