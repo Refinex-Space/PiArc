@@ -462,7 +462,12 @@ async fn every_run_is_audited_and_long_context_goes_to_a_file() {
     .await;
     std::fs::write(f.work.join("a.txt"), "a").expect("file");
     let result = f.evaluate("c", "Read", json!({"path": "a.txt"})).await;
-    let context = result["context"].as_str().expect("context");
+    let Some(context) = result["context"].as_str() else {
+        // Say why: the hooks' exit codes and the notices (a hook error names its cause).
+        let audit = f.hook_audit().await;
+        let notices = f.notices().await;
+        panic!("no context in {result}; hook audit {audit:?}; notices {notices:?}");
+    };
     assert!(context.starts_with(&long[..2000]));
     assert!(context.len() < 3000, "only a preview: {}", context.len());
     let path = context
