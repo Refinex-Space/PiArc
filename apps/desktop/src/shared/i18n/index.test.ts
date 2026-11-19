@@ -70,6 +70,10 @@ describe('i18n', () => {
             issues: 0,
             limit: '5 MiB',
             event: 'Stop',
+            percent: 75,
+            tokens: 150_000,
+            window: 200_000,
+            threshold: 182_904,
           }),
         ).not.toThrow();
       }

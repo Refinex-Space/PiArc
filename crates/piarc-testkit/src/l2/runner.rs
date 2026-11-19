@@ -242,10 +242,7 @@ impl Env {
                 .await
                 .map_err(|e| format!("mock `{name}`: {e}"))?;
             if endpoint.configure_as.is_none() {
-                providers.insert(
-                    pi_provider(name),
-                    pi_provider_entry(&mock, endpoint, &id),
-                );
+                providers.insert(pi_provider(name), pi_provider_entry(&mock, endpoint, &id));
             }
             mocks.insert(name.clone(), mock);
         }
@@ -580,6 +577,10 @@ impl Driver<'_> {
         Ok(())
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one arm per scenario action; each arm only delegates"
+    )]
     async fn act(&mut self, action: &Action) -> Result<(), String> {
         match action {
             Action::Prompt(input) => self.input(input, Op::Prompt).await,

@@ -6,12 +6,12 @@
 
 use std::io::Write;
 
-use piarc_core::agent_host::HostEvent;
+use piarc_core::agent_host::{HostEvent, HostSupervisor};
 use piarc_protocol::context::{ReminderType, SessionRemind, SessionRemindParams};
 use piarc_protocol::session::{SessionCompact, SessionCompactParams, SessionId};
 use serde_json::{Value, json};
 
-use crate::harness::{Env, SMALL_WINDOW_SCENARIO, open};
+use crate::harness::{Env, Recorder, SMALL_WINDOW_SCENARIO, open};
 
 const SCRIPT: &str = r#"
 id: small-window
@@ -36,9 +36,7 @@ fn append_entry(env: &Env, session: &SessionId, custom_type: &str, data: &Value)
         .flatten()
         .flat_map(|dir| std::fs::read_dir(dir.path()).expect("group").flatten())
         .map(|f| f.path())
-        .find(|path| {
-            std::fs::read_to_string(path).is_ok_and(|text| text.contains(&session.0))
-        })
+        .find(|path| std::fs::read_to_string(path).is_ok_and(|text| text.contains(&session.0)))
         .expect("the session file");
     let id = format!("{:08x}", rand_id());
     let entry = json!({
@@ -63,10 +61,10 @@ fn rand_id() -> u32 {
     nanos ^ std::process::id()
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn background_task_reminders_and_restored_skills() {
+/// A started Agent Host with one `mock-small` session that has answered one prompt.
+async fn started(name: &str) -> (Env, HostSupervisor, Recorder, SessionId) {
     let env = Env::new(
-        "context",
+        name,
         &[SCRIPT],
         json!({ "compaction": { "keepRecentTokens": 1 } }),
     )
@@ -75,15 +73,19 @@ async fn background_task_reminders_and_restored_skills() {
     events
         .until(|e| matches!(e, HostEvent::Connected { epoch: 1, .. }))
         .await;
-    let cwd = env.cwd(0);
-    let session = open(&supervisor, &core, &cwd, "mock-small").await;
+    let session = open(&supervisor, &core, &env.cwd(0), "mock-small").await;
     let turn = supervisor
         .prompt(&session, "r1", "Hello.")
         .await
         .expect("accepted")
         .turn_id;
     assert_eq!(events.turn_completed(&turn.0).await["status"], "completed");
+    (env, supervisor, events, session)
+}
 
+#[tokio::test(flavor = "multi_thread")]
+async fn background_task_reminders_reach_the_next_request() {
+    let (env, supervisor, mut events, session) = started("context remind").await;
     // Only background task reminders are accepted.
     let wrong = supervisor
         .session_call::<SessionRemind>(
@@ -127,8 +129,13 @@ async fn background_task_reminders_and_restored_skills() {
     assert!(requests[1].body.contains("[PiArc reminder]"));
     assert!(!requests[0].body.contains("Background task"));
     assert_eq!(system_of(&requests[0].body), system_of(&requests[1].body));
+    supervisor.shutdown().await;
+}
 
-    // Two invoked skills, one over the 5K-token limit: both come back after a compaction.
+#[tokio::test(flavor = "multi_thread")]
+async fn invoked_skills_come_back_after_a_compaction_within_their_limits() {
+    let (env, supervisor, mut events, session) = started("context skills").await;
+    // Two invoked skills, one over the 5K-token limit.
     supervisor.close_session(&session).await.expect("closed");
     append_entry(
         &env,
@@ -143,7 +150,7 @@ async fn background_task_reminders_and_restored_skills() {
         &json!({ "name": "huge", "content": "h".repeat(30_000) }),
     );
     supervisor
-        .resume_session(&session, &cwd, None)
+        .resume_session(&session, &env.cwd(0), None)
         .await
         .expect("resumed");
     let accepted = supervisor
@@ -163,21 +170,37 @@ async fn background_task_reminders_and_restored_skills() {
         "completed"
     );
     let turn = supervisor
-        .prompt(&session, "r3", "Go on.")
+        .prompt(&session, "r2", "Go on.")
         .await
         .expect("accepted")
         .turn_id;
     assert_eq!(events.turn_completed(&turn.0).await["status"], "completed");
     let requests = env.requests(SMALL_WINDOW_SCENARIO);
-    assert_eq!(requests.len(), 4);
-    assert!(requests[2].body.contains("Focus requested by the user: Keep the test results."));
-    let after = &requests[3].body;
-    assert!(after.contains("Instructions of the skill \\\"huge\\\""), "{after}");
-    assert!(after.contains("Instructions of the skill \\\"lint\\\""), "{after}");
+    assert_eq!(requests.len(), 3);
+    assert!(
+        requests[1]
+            .body
+            .contains("Focus requested by the user: Keep the test results.")
+    );
+    let after = &requests[2].body;
+    assert!(
+        after.contains("Instructions of the skill \\\"huge\\\""),
+        "{after}"
+    );
+    assert!(
+        after.contains("Instructions of the skill \\\"lint\\\""),
+        "{after}"
+    );
     assert!(after.contains("Run the linter before every commit."));
-    assert!(after.contains("more tokens left out]"), "the huge skill is cut");
+    assert!(
+        after.contains("more tokens left out]"),
+        "the huge skill is cut"
+    );
     let huge = after.matches('h').count();
-    assert!(huge < 20_000 + 2_000, "{huge} h characters: at most about 5K tokens");
+    assert!(
+        huge < 20_000 + 2_000,
+        "{huge} h characters: at most about 5K tokens"
+    );
     assert_eq!(system_of(&requests[0].body), system_of(after));
     supervisor.shutdown().await;
 }
