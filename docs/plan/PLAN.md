@@ -152,7 +152,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 8a1f38b |
 | T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 已完成 | ae5c8e6 |
 | T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 30a4f17 |
-| T26 | [计划模式、任务清单、AskUserQuestion 与下一步](tasks/T26-plan-mode-todo-ask-next-steps.md) | 3 | T25 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
+| T26 | [计划模式、任务清单、AskUserQuestion 与下一步](tasks/T26-plan-mode-todo-ask-next-steps.md) | 3 | T25 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
 | T27 | [上下文工程：system reminder、压缩与用量](tasks/T27-context-reminders-compaction-usage.md) | 3 | T26 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T28 | [检查点、回退与 Changes 面板](tasks/T28-checkpoints-rewind-changes.md) | 3 | T27 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T29 | [WebFetch、登录与模型设置补全、三档视图](tasks/T29-webfetch-login-model-settings-views.md) | 3 | T28 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,6 +308,17 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+T26（开工基线 c163249，`npm run verify` 15/15）：
+
+- [ ] 1. 协议：harness 类型（任务清单、计划）、`ui/ask`、审批卡的 plan 与 questions、答复的 mode/comments/answers、`policy/evaluate` 结果的 mode、`session/history` 的 harness 状态；契约样本
+- [ ] 2. Core：plan 模式拒绝理由；宿主工具的裁决（EnterPlanMode 切换模式、ExitPlanMode 计划卡与后续模式、继续规划的反馈与评论）；`ui/ask` 表单、超时（可注入时钟）与设置项
+- [ ] 3. Agent Host：五个宿主工具、`reminders` 模块、模式追加消息、计划 entry 与 `harness/plan`、任务清单 `harness/todo` 与未更新提醒、注入接口、历史中的 harness 状态
+- [ ] 4. 客户端：计划卡与计划面板（行内评论）、任务卡与右栏任务卡片、提问表单（替换 T20 占位）、下一步建议
+- [ ] 5. L2：运行器扩展与 `plan-*`、`todo-*`、`ask-*`、`next-*` 场景，能力清单（A01、A02、A05、A06、A08、A09）
+- [ ] 6. L4：Playwright 流程与截图（A03、A04、A07、A09、A10）
+- [ ] 7. 文档：ADR、架构第 6.5 节、Agent Host 与渲染进程 AGENTS.md
+- [ ] 8. 收尾：`npm run verify`（A11）、验收清单、看板
 
 ## 登记事项
 
