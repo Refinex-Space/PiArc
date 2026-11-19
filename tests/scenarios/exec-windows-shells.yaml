@@ -23,7 +23,7 @@ providers:
             }
       - text: 'Both shells ran.'
 approvals:
-  - { tool: Bash, decision: allow }
+  # `mkdir` asks; `pwd` is a read-only builtin (T23).
   - { tool: Bash, decision: allow }
   - { tool: PowerShell, decision: allow }
 actions:

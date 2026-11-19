@@ -1,0 +1,42 @@
+id: perm-bash-compound
+description: A compound command is judged per subcommand; a deny on any part refuses it, an allow needs every part, and "always allow" saves one prefix rule per remaining subcommand (T23).
+capabilities: [CAP-PERM-BASH-001, CAP-PERM-AUDIT-001]
+workspace:
+  trusted: true
+  files:
+    a.txt: "alpha\n"
+    .piarc/settings.local.json: '{"permissions":{"deny":["Bash(rm *)"]}}'
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"allow":["Bash(sed -n *)"]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: hidden, name: Bash, input: { command: 'echo start && (cd . ; rm -rf build)' } }
+      - tool_calls:
+          - { id: mixed, name: Bash, input: { command: 'cat a.txt | wc -l && sed -n 1p a.txt' } }
+      - tool_calls:
+          - {
+              id: save,
+              name: Bash,
+              input: { command: 'head -1 a.txt && tr a b < a.txt | sed -e s/b/c/' },
+            }
+      - tool_calls:
+          - { id: again, name: Bash, input: { command: 'sed -e s/a/z/ a.txt' } }
+      - text: Finished.
+actions:
+  - prompt: { text: Run the commands., turn: t }
+approvals:
+  - { tool: Bash, decision: always }
+expect:
+  request_counts: { main: 5 }
+  requests:
+    - index: 4
+      tool_results:
+        - { id: hidden, is_error: true, contains: 'Bash(rm *)' }
+        - { id: mixed, is_error: false, contains: alpha }
+        - { id: save, is_error: false, contains: clphb }
+        - { id: again, is_error: false, contains: zlpha }
+  files:
+    .piarc/settings.local.json: "{\n  \"permissions\": {\n    \"allow\": [\n      \"Bash(sed *)\"\n    ],\n    \"deny\": [\n      \"Bash(rm *)\"\n    ]\n  }\n}\n"

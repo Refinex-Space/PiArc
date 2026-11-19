@@ -299,6 +299,18 @@ const api: PiarcApi = {
   cancelFileSearch: async (searchId) => {
     await ipcRenderer.invoke(IPC_CHANNELS.filesCancel, searchId);
   },
+  permissionRules: (workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.permissionRules, workspace)
+      .then((v: unknown) => expectString(v)),
+  checkPermissionRule: (rule, behavior) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.permissionCheck, rule, behavior)
+      .then((v: unknown) => expectString(v)),
+  updatePermissionRule: (change) =>
+    ipcRenderer.invoke(IPC_CHANNELS.permissionUpdate, change).then((v: unknown) => expectString(v)),
+  auditEvents: (query) =>
+    ipcRenderer.invoke(IPC_CHANNELS.auditEvents, query).then((v: unknown) => expectString(v)),
   providerSettings: () =>
     ipcRenderer.invoke(IPC_CHANNELS.providerSettings).then((v: unknown) => expectString(v)),
   saveProvider: (config, secret) =>

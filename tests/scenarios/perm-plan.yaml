@@ -1,0 +1,34 @@
+id: perm-plan
+description: Plan mode refuses writes and commands that are not read-only at step 5 and tells the model to present its plan; reads and read-only commands run (T23).
+capabilities: [CAP-PERM-MODE-002]
+sessions:
+  main: { provider: main, mode: plan }
+workspace:
+  files:
+    a.txt: "alpha\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: read, name: Read, input: { path: a.txt } }
+      - tool_calls:
+          - { id: look, name: Bash, input: { command: 'cat a.txt | wc -l' } }
+      - tool_calls:
+          - { id: write, name: Write, input: { path: plan.txt, content: x } }
+      - tool_calls:
+          - { id: cmd, name: Bash, input: { command: 'sed -n 1p a.txt' } }
+      - text: Here is my plan.
+actions:
+  - prompt: { text: Plan the change., turn: t }
+expect:
+  request_counts: { main: 5 }
+  requests:
+    - index: 4
+      tool_results:
+        - { id: read, is_error: false, contains: alpha }
+        - { id: look, is_error: false }
+        - { id: write, is_error: true, contains: present your plan to the user }
+        - { id: cmd, is_error: true, contains: plan mode is on }
+  files:
+    plan.txt: null

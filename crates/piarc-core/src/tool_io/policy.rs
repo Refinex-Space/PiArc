@@ -1,4 +1,5 @@
-//! Connects a tool preflight, its approval and the actual I/O on the same connection.
+//! Connects a tool preflight, its approval and the actual I/O on the same connection. The
+//! decision is `piarc_policy::decide` over the facts `assess` collects (T23, ADR-0031).
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -6,10 +7,11 @@ use std::sync::Arc;
 use piarc_config::{Category, LayerTable, Settings};
 use piarc_fs::{Access, Scope, display};
 use piarc_host::Peer;
-use piarc_policy::{Boundary, Ledger};
+use piarc_policy::rules::{Hit, RuleSet};
+use piarc_policy::{Boundary, Ledger, Outcome, Ruling};
 use piarc_protocol::policy::{
     AnswerStatus, ApprovalAnswer, ApprovalDecision, ApprovalKind, ApprovalRequest, PermissionMode,
-    PolicyEvaluateParams, PolicyEvaluateResult,
+    PolicyEvaluateParams, PolicyEvaluateResult, PolicyToolsParams, PolicyToolsResult,
 };
 use piarc_protocol::{ErrorKind, ErrorObject};
 use serde_json::{Value, json};
@@ -26,6 +28,7 @@ pub(crate) struct Services {
     pub storage: Storage,
     pub trust: TrustService,
     pub snapshots: Snapshots,
+    pub hooks: Arc<dyn hooks::PolicyHooks>,
 }
 
 struct Pending {
@@ -34,15 +37,26 @@ struct Pending {
     peer: Peer,
 }
 
+mod assess;
+mod edit;
+mod grants;
+pub(crate) mod hooks;
 mod inputs;
 pub(super) mod memory;
+mod modes;
+mod preview;
+pub(crate) mod settings_view;
+use grants::Grant;
+pub(super) use grants::{FilePermit, claim_command, file_permit};
 
 #[derive(Default)]
 pub(super) struct State {
     inputs: inputs::Inputs,
     mode: PermissionMode,
     project_auto: bool,
-    rules: HashSet<String>,
+    /// Rules the user allowed for this session, in order.
+    rules: Vec<String>,
+    rule_cache: Option<(u64, Arc<RuleSet>)>,
     ledger: Ledger<Pending>,
     grants: HashMap<String, Grant>,
     expired: HashSet<String>,
@@ -57,11 +71,6 @@ pub(crate) enum Cleanup<'a> {
     Interrupted,
     Disconnected,
 }
-
-mod edit;
-mod grants;
-use grants::Grant;
-pub(super) use grants::{FilePermit, claim_command, file_permit};
 
 pub(super) fn denied(reason: impl Into<String>) -> ErrorObject {
     ErrorObject::new(ErrorKind::PermissionDenied, reason, false)
@@ -80,10 +89,9 @@ impl State {
         &mut self,
         services: &Services,
         settings: &Settings,
-        card: &ApprovalRequest,
-        boundary: Boundary,
-        simple: bool,
-    ) -> (PermissionMode, piarc_policy::m1::Ruling) {
+        id: &str,
+        input: &mut piarc_policy::Input,
+    ) -> (PermissionMode, Ruling) {
         // Keep the starting choice. Revoke a project-supplied automatic mode once its
         // source is untrusted or removed, without promoting a running manual session.
         if self.project_auto
@@ -95,20 +103,10 @@ impl State {
         {
             self.project_auto = false;
             self.mode = PermissionMode::Default;
-            self.publish(&card.session_id, services);
+            self.publish(id, services);
         }
-        let mode = self.mode;
-        let matched = card.rule.as_ref().is_some_and(|rule| {
-            self.rules.contains(rule)
-                || settings
-                    .get("/permissions/allow")
-                    .and_then(Value::as_array)
-                    .is_some_and(|list| list.iter().any(|v| v.as_str() == Some(rule)))
-        });
-        (
-            mode,
-            piarc_policy::m1::evaluate(mode, &card.tool, boundary, matched, simple),
-        )
+        input.mode = self.mode;
+        (self.mode, piarc_policy::decide(input))
     }
 
     fn cancel(&mut self, id: &str, services: &Services, cause: Cleanup<'_>) {
@@ -181,14 +179,14 @@ impl Services {
     async fn persist(&self, root: &Path, answer: &ApprovalAnswer) -> Result<(), ErrorObject> {
         let root = root.to_owned();
         let table = LayerTable::piarc(self.storage.dirs().data(), &root);
-        let rule = answer.rule.clone();
+        let rules = answer.rules.clone();
         let directory = answer.directory.clone();
         let items = tokio::task::spawn_blocking(move || {
             let mut values = Vec::new();
             if let Some(dir) = &directory {
                 values.push((Category::AdditionalDirectory, dir.as_str()));
             }
-            if let Some(rule) = &rule {
+            for rule in &rules {
                 values.push((Category::AllowRule, rule.as_str()));
             }
             piarc_config::append_local_permissions(&table, &values)
@@ -223,44 +221,6 @@ impl ToolIo {
             lock(&s.policy).grants.remove(call);
             lock(&s.uploads).cancel_writes(Some(call));
         }
-    }
-
-    pub(crate) async fn set_initial_mode(
-        &self,
-        id: &str,
-        explicit: Option<PermissionMode>,
-    ) -> Result<(), ErrorObject> {
-        let s = self.session(id)?;
-        let services = self.services()?;
-        let mut settings = services
-            .trust
-            .permission_settings(s.scope.root())
-            .await
-            .map_err(|e| e.to_error_object())?;
-        let mode = |settings: &Settings| {
-            piarc_policy::m1::starting_mode(
-                explicit,
-                settings
-                    .get("/permissions/defaultMode")
-                    .and_then(Value::as_str),
-            )
-        };
-        let initial = mode(&settings);
-        settings.set_trust(piarc_config::TrustState::Untrusted);
-        let mut state = lock(&s.policy);
-        state.project_auto = initial == PermissionMode::AcceptEdits && mode(&settings) != initial;
-        state.mode = initial;
-        state.publish(id, services);
-        Ok(())
-    }
-
-    pub(crate) fn changed_mode(&self, id: &str, mode: PermissionMode) -> Result<(), ErrorObject> {
-        let s = self.session(id)?;
-        let mut state = lock(&s.policy);
-        state.project_auto = false;
-        state.mode = mode;
-        state.publish(id, self.services()?);
-        Ok(())
     }
 
     fn services(&self) -> Result<&Services, ErrorObject> {
@@ -299,6 +259,24 @@ impl ToolIo {
         })
     }
 
+    /// `policy/tools`: tools a deny rule without a specifier removes from the model's list.
+    pub(super) async fn denied_tools(&self, p: PolicyToolsParams) -> Result<Value, ErrorObject> {
+        let s = self.session(&p.session_id)?;
+        let services = self.services()?;
+        let settings = services.settings(s.scope.root()).await?;
+        let rules = rules_of(&s, &settings);
+        let denied = p
+            .tools
+            .into_iter()
+            .filter(|t| {
+                rules
+                    .whole_tool(piarc_policy::rules::Behavior::Deny, t)
+                    .is_some()
+            })
+            .collect();
+        to_value(&PolicyToolsResult { denied })
+    }
+
     pub(crate) async fn answer_approval(
         &self,
         answer: ApprovalAnswer,
@@ -316,13 +294,8 @@ impl ToolIo {
                 {
                     return Err(denied("This client cannot answer questions."));
                 }
-                if answer.decision == ApprovalDecision::AllowAlways
-                    && (request.protected_path == Some(true)
-                        || (request.rule.is_none() && request.directory.is_none())
-                        || (answer.directory.is_some() != request.directory.is_some())
-                        || (answer.rule.is_some() != request.rule.is_some()))
-                {
-                    return Err(denied("This permission cannot be saved."));
+                if answer.decision == ApprovalDecision::AllowAlways {
+                    check_permanent(request, &answer)?;
                 }
             }
             let (request, pending) = match state.ledger.claim(&answer) {
@@ -371,76 +344,134 @@ impl ToolIo {
     ) -> Result<Value, ErrorObject> {
         let generation = inputs::begin(s, p, peer).await?;
         let settings = services.settings(s.scope.root()).await?;
+        let hook = services.hooks.pre_tool_use(p).await;
+        let rules = rules_of(s, &settings);
+        let programs = if p.tool == "Bash" {
+            Some(self.exec.programs().await)
+        } else {
+            None
+        };
         let mut prepared = prepare(
             Arc::clone(s),
             p.clone(),
             &settings,
             peer.clone(),
-            &self.exec,
+            programs,
+            rules,
         )
         .await?;
-        let (mode, ruling) = prepared.decide(s, services, &settings, peer, &generation)?;
-        let choice = if ruling.allow {
-            None
-        } else {
+        prepared.assessment.input.hook = hook;
+        let (mode, mut ruling) = prepared.decide(s, services, &settings, peer, &generation)?;
+        if ruling.outcome == Outcome::Ask {
+            let verdict = services.hooks.permission_request(p).await;
+            ruling = piarc_policy::after_permission_request(ruling, &verdict);
+        }
+        let choice = if ruling.outcome == Outcome::Ask {
             prepared.add_preview(p).await?;
             wait_for_user(s, services, p, &prepared.card, peer, &generation).await?
+        } else {
+            None
         };
         let (answer, ack) = choice.unzip();
-        let source = if answer.is_some() {
-            "user"
-        } else {
-            "automatic"
-        };
-        let decision = answer.as_ref().map(|a| a.decision);
-        let reason = match &answer {
-            Some(a) if a.decision == ApprovalDecision::Deny => Some(refusal(
+        let reason = match (&answer, ruling.outcome) {
+            (Some(a), _) if a.decision == ApprovalDecision::Deny => Some(refusal(
                 &prepared,
                 s.scope.case_insensitive(),
                 a.feedback.as_deref(),
             )),
-            None if !ruling.allow => Some(LOST.into()),
-            _ => None,
+            (Some(_), _) | (None, Outcome::Allow) => None,
+            (None, Outcome::Deny) => Some(ruling_reason(&ruling)),
+            (None, Outcome::Ask) => Some(LOST.into()),
         };
         let result = PolicyEvaluateResult {
             allowed: reason.is_none(),
             reason,
         };
-        let detail = json!({"tool":p.tool,"toolCallId":p.tool_call_id,"arguments":argument_summary(p), "mode":mode,"step":ruling.step,
-            "rule": if ruling.step=="exactRule" { audit_rule(&prepared.card) } else { None },
-            "conclusion": if result.allowed {"allow"} else {"deny"}, "source":source});
-        let commit = async {
-            services
-                .audit(&p.session_id, s.scope.root(), &detail)
-                .await?;
-            if let Some(answer) = answer.filter(|a| a.decision == ApprovalDecision::AllowAlways) {
-                if generation.is_cancelled() || peer.is_closed() {
-                    return Err(denied(LOST));
-                }
-                services.persist(s.scope.root(), &answer).await?;
-            }
-            if result.allowed {
-                let mut state = lock(&s.policy);
-                if generation.is_cancelled() || peer.is_closed() {
-                    return Err(denied(LOST));
-                }
-                if decision == Some(ApprovalDecision::AllowSession)
-                    && prepared.boundary != Boundary::Protected
-                    && let Some(rule) = prepared.card.rule
-                {
-                    state.rules.insert(rule);
-                }
-                state.grants.insert(p.tool_call_id.clone(), prepared.grant);
-            }
-            Ok::<(), ErrorObject>(())
-        }
-        .await;
+        let source = match (&answer, ruling.step) {
+            (Some(_), _) => "user",
+            (None, "hookDeny" | "hookAllow" | "permissionRequestHook") => "hook",
+            _ => "automatic",
+        };
+        let detail = audit_detail(p, mode, &ruling, &prepared.card, result.allowed, source);
+        let prepared = result.allowed.then_some(prepared);
+        let commit = commit(s, services, p, peer, &generation, &detail, answer, prepared).await;
         if let Some(ack) = ack {
             let _ = ack.send(commit.clone());
         }
         commit?;
         to_value(&result)
     }
+}
+
+/// Record the decision, save a permanent answer and issue the grant of an allowed call.
+#[expect(clippy::too_many_arguments, reason = "the parts of one decision")]
+async fn commit(
+    s: &SessionIo,
+    services: &Services,
+    p: &PolicyEvaluateParams,
+    peer: &Peer,
+    generation: &CancellationToken,
+    detail: &Value,
+    answer: Option<ApprovalAnswer>,
+    allowed: Option<Prepared>,
+) -> Result<(), ErrorObject> {
+    services
+        .audit(&p.session_id, s.scope.root(), detail)
+        .await?;
+    let decision = answer.as_ref().map(|a| a.decision);
+    if let Some(answer) = answer.filter(|a| a.decision == ApprovalDecision::AllowAlways) {
+        if generation.is_cancelled() || peer.is_closed() {
+            return Err(denied(LOST));
+        }
+        services.persist(s.scope.root(), &answer).await?;
+    }
+    if let Some(prepared) = allowed {
+        let mut state = lock(&s.policy);
+        if generation.is_cancelled() || peer.is_closed() {
+            return Err(denied(LOST));
+        }
+        if decision == Some(ApprovalDecision::AllowSession)
+            && prepared.boundary != Boundary::Protected
+        {
+            for rule in &prepared.card.rules {
+                if !state.rules.contains(rule) {
+                    state.rules.push(rule.clone());
+                }
+            }
+        }
+        state.grants.insert(p.tool_call_id.clone(), prepared.grant);
+    }
+    Ok(())
+}
+
+/// The session's rule set for the current settings (cached while nothing changed).
+fn rules_of(s: &SessionIo, settings: &Settings) -> Arc<RuleSet> {
+    let mut state = lock(&s.policy);
+    let state = &mut *state;
+    assess::rule_set(
+        &settings.permission_lists(),
+        &state.rules,
+        s.scope.root(),
+        &mut state.rule_cache,
+    )
+}
+
+/// A permanent answer must carry every value the card offered, each a valid allow rule.
+fn check_permanent(request: &ApprovalRequest, answer: &ApprovalAnswer) -> Result<(), ErrorObject> {
+    let refused = || denied("This permission cannot be saved.");
+    if request.protected_path == Some(true)
+        || (request.rules.is_empty() && request.directory.is_none())
+        || answer.directory.is_some() != request.directory.is_some()
+        || answer.rules.is_empty() != request.rules.is_empty()
+        || answer.rules.len() > piarc_policy::bash::MAX_RULES
+    {
+        return Err(refused());
+    }
+    for rule in &answer.rules {
+        piarc_policy::rules::parse(rule, piarc_policy::rules::Behavior::Allow)
+            .map_err(|e| denied(format!("Invalid rule {rule:?}: {e}")))?;
+    }
+    Ok(())
 }
 
 const LOST: &str = "Permission denied because the pending approval expired. Request a new approval before retrying.";
@@ -523,22 +554,58 @@ fn refusal(prepared: &Prepared, case_insensitive: bool, feedback: Option<&str>) 
     )
 }
 
-fn audit_rule(card: &ApprovalRequest) -> Option<String> {
-    let rule = card.rule.as_ref()?;
-    if matches!(
-        card.tool.as_str(),
-        "Read" | "Edit" | "Write" | "Glob" | "Grep"
-    ) {
-        return Some(rule.clone());
+/// What the model reads when the ladder refuses without asking.
+fn ruling_reason(ruling: &Ruling) -> String {
+    match ruling.step {
+        "planMode" => piarc_policy::PLAN_MODE_REFUSAL.to_owned(),
+        "hookDeny" | "permissionRequestHook" => ruling
+            .reason
+            .clone()
+            .unwrap_or_else(|| "Permission denied by a hook.".to_owned()),
+        _ => match ruling.hits.first() {
+            Some(hit) => format!(
+                "Permission denied by the rule {} in the {} settings. Do not retry this action; if it is needed, ask the user to change the rule.",
+                hit.rule, hit.source
+            ),
+            None => "Permission denied.".to_owned(),
+        },
     }
-    // Exact command and extension rules can embed credentials. A digest identifies the
-    // matching setting without copying its arguments into the audit database.
+}
+
+/// The rule as stored in the audit. Exact command rules can embed credentials: a digest
+/// identifies the setting without copying its arguments into the database.
+fn audit_rule(hit: &Hit) -> String {
+    let command = hit.rule.starts_with("Bash(") || hit.rule.starts_with("PowerShell(");
+    if !command || hit.rule.contains('*') {
+        return hit.rule.clone();
+    }
     use sha2::{Digest, Sha256};
-    let digest: String = Sha256::digest(rule.as_bytes())
+    let digest: String = Sha256::digest(hit.rule.as_bytes())
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect();
-    Some(format!("{}:sha256:{digest}", card.tool))
+    let tool = hit.rule.split('(').next().unwrap_or_default();
+    format!("{tool}:sha256:{digest}")
+}
+
+fn audit_detail(
+    p: &PolicyEvaluateParams,
+    mode: PermissionMode,
+    ruling: &Ruling,
+    card: &ApprovalRequest,
+    allowed: bool,
+    source: &str,
+) -> Value {
+    let hits: Vec<Value> = ruling
+        .hits
+        .iter()
+        .map(|h| json!({"rule": audit_rule(h), "source": h.source, "behavior": h.behavior}))
+        .collect();
+    let first = ruling.hits.first();
+    json!({"tool":p.tool,"toolCallId":p.tool_call_id,"arguments":argument_summary(p),"mode":mode,
+        "step":ruling.step,"rule":first.map(audit_rule),"ruleSource":first.map(|h| &h.source),
+        "rules":hits,"offered":card.rules.len(),
+        "conclusion": if allowed {"allow"} else {"deny"}, "source":source})
 }
 
 fn argument_summary(p: &PolicyEvaluateParams) -> Value {
@@ -552,7 +619,7 @@ fn argument_summary(p: &PolicyEvaluateParams) -> Value {
 struct Prepared {
     card: ApprovalRequest,
     boundary: Boundary,
-    simple: bool,
+    assessment: assess::Assessment,
     grant: Grant,
     preview: Option<(PathBuf, String)>,
 }
@@ -565,16 +632,23 @@ impl Prepared {
         settings: &Settings,
         peer: &Peer,
         generation: &CancellationToken,
-    ) -> Result<(PermissionMode, piarc_policy::m1::Ruling), ErrorObject> {
+    ) -> Result<(PermissionMode, Ruling), ErrorObject> {
         let (mode, ruling) = {
             let mut state = lock(&s.policy);
             if peer.is_closed() || generation.is_cancelled() {
                 return Err(denied(LOST));
             }
-            state.ruling(services, settings, &self.card, self.boundary, self.simple)
+            state.ruling(
+                services,
+                settings,
+                &self.card.session_id,
+                &mut self.assessment.input,
+            )
         };
-        if ruling.step != "simpleCommand" {
-            self.grant.utility = None;
+        // Only an automatic Bash allowance relies on resolved programs and checked paths.
+        if matches!(ruling.step, "readOnly" | "acceptEdits") && self.grant.tool == "Bash" {
+            self.grant.programs = std::mem::take(&mut self.assessment.programs);
+            self.grant.targets = std::mem::take(&mut self.assessment.targets);
         }
         Ok((mode, ruling))
     }
@@ -590,7 +664,7 @@ impl Prepared {
                 .ok_or_else(|| denied("Missing file approval directory."))?;
             self.card.diff = Some(
                 tokio::task::spawn_blocking(move || {
-                    file_preview(&tool, &input, &path, &label, &binding)
+                    preview::file_preview(&tool, &input, &path, &label, &binding)
                 })
                 .await
                 .map_err(|e| denied(format!("Preview unavailable: {e}")))??,
@@ -612,27 +686,24 @@ fn new_request(p: &PolicyEvaluateParams, peer: &Peer) -> Result<ApprovalRequest,
         cwd: None,
         path: None,
         diff: None,
-        rule: None,
+        rules: Vec::new(),
         directory: None,
         protected_path: None,
     })
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "one arm per tool family, kept together"
+)]
 async fn prepare(
     s: Arc<SessionIo>,
     p: PolicyEvaluateParams,
     settings: &Settings,
     peer: Peer,
-    exec: &exec::Exec,
+    programs: Option<exec::utility::Programs>,
+    rules: Arc<RuleSet>,
 ) -> Result<Prepared, ErrorObject> {
-    let utility = if p.tool == "Bash"
-        && let Some(command) = p.input.get("command").and_then(Value::as_str)
-        && piarc_policy::m1::simple_paths(command).is_some()
-    {
-        exec.simple_utility(&s.scope, command).await
-    } else {
-        None
-    };
     let dirs: Vec<PathBuf> = settings
         .get("/permissions/additionalDirectories")
         .and_then(Value::as_array)
@@ -643,26 +714,40 @@ async fn prepare(
         .collect();
     tokio::task::spawn_blocking(move || {
         let scope = with_directories(s.scope.clone(), &dirs)?;
+        let places = assess::Places::new(&scope);
         let mut card = new_request(&p, &peer)?;
         let mut grant = Grant::new(&p, peer);
         let mut preview = None;
         let mut boundary = Boundary::Inside;
-        let mut simple = false;
         let field = |key: &str| p.input.get(key).and_then(Value::as_str);
-        match p.tool.as_str() {
+        let assessment = match p.tool.as_str() {
             "Bash" | "PowerShell" => {
                 let cmd = field("command").ok_or_else(|| denied("The command text is missing."))?;
                 let cwd = exec::launch_dir(&s, None)?.dir;
-                if p.tool == "Bash" {
-                    (simple, boundary) = command_boundary(&scope, cmd, &cwd)?;
-                }
+                let assessment = match &programs {
+                    Some(programs) if p.tool == "Bash" => {
+                        let facts = assess::BashFacts {
+                            scope: &scope,
+                            shell_cwd: &cwd,
+                            shell_cwd_posix: piarc_policy::paths::posix(&cwd),
+                            places: &places,
+                            programs,
+                            resolved: std::cell::RefCell::default(),
+                            targets: std::cell::RefCell::default(),
+                        };
+                        assess::bash_call(&rules, &facts, cmd)
+                    }
+                    _ => assess::powershell_call(&rules, &places, cmd),
+                };
                 card.command = Some(cmd.to_owned());
-                card.rule = Some(piarc_policy::m1::exact_rule(&p.tool, cmd));
                 card.cwd = Some(display(&cwd));
                 grant.cwd = Some(cwd);
                 grant.command = Some(cmd.to_owned());
+                grant.scope = Some(scope.clone());
+                assessment
             }
             "Read" | "Glob" | "Grep" | "Write" | "Edit" => {
+                let raw = field("path").unwrap_or(".");
                 let (file_boundary, target) = prepare_file(&scope, &p, &mut card)?;
                 boundary = file_boundary;
                 let binding = piarc_fs::DirectoryBinding::capture(&target)
@@ -677,25 +762,30 @@ async fn prepare(
                     preview = Some((target.clone(), scope.label(&target)));
                 }
                 grant.binding = Some(binding);
-                grant.path = Some(target);
+                grant.path = Some(target.clone());
+                let named = assess::lexical(&scope.cwd().join(raw));
+                assess::file_call(&rules, &places, &p.tool, &named, &target, boundary)
             }
-            "AskUserQuestion" => card.kind = ApprovalKind::Question,
-            _ => {
-                card.command = Some(format!("{} {}", p.tool, Value::Object(p.input.clone())));
-                card.rule = Some(piarc_policy::m1::exact_rule(
-                    &p.tool,
-                    &Value::Object(p.input).to_string(),
-                ));
+            tool => {
+                if tool == "AskUserQuestion" {
+                    card.kind = ApprovalKind::Question;
+                } else {
+                    card.command = Some(format!("{} {}", p.tool, Value::Object(p.input.clone())));
+                }
+                assess::other_call(&rules, &places, tool, &p.input)
             }
+        };
+        if assessment.input.protected {
+            boundary = Boundary::Protected;
         }
-        simple &= utility.is_some();
-        grant.simple_command = simple;
-        grant.utility = utility;
         card.protected_path = Some(boundary == Boundary::Protected);
+        if boundary != Boundary::Protected {
+            card.rules.clone_from(&assessment.rules);
+        }
         Ok(Prepared {
             card,
             boundary,
-            simple,
+            assessment,
             grant,
             preview,
         })
@@ -711,14 +801,15 @@ fn with_directories(mut scope: Scope, dirs: &[PathBuf]) -> Result<Scope, ErrorOb
         let resolved = scope
             .locate(&display(dir))
             .map_err(|e| e.to_error_object())?;
-        if dir.starts_with(scope.root()) && scope.key(&resolved) != scope.key(&lexical_dir(dir)) {
+        if dir.starts_with(scope.root()) && scope.key(&resolved) != scope.key(&assess::lexical(dir))
+        {
             continue;
         }
         match std::fs::metadata(&resolved) {
             Ok(meta) if meta.is_dir() => {
                 scope = scope
                     .with_added_dir(&resolved)
-                    .map_err(|e| e.to_error_object())?
+                    .map_err(|e| e.to_error_object())?;
             }
             Ok(_) => {}
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
@@ -732,20 +823,6 @@ fn with_directories(mut scope: Scope, dirs: &[PathBuf]) -> Result<Scope, ErrorOb
     Ok(scope)
 }
 
-fn lexical_dir(path: &Path) -> PathBuf {
-    let mut result = PathBuf::new();
-    for component in path.components() {
-        match component {
-            std::path::Component::ParentDir => {
-                result.pop();
-            }
-            std::path::Component::CurDir => {}
-            part => result.push(part.as_os_str()),
-        }
-    }
-    result
-}
-
 fn prepare_file(
     scope: &Scope,
     p: &PolicyEvaluateParams,
@@ -753,7 +830,6 @@ fn prepare_file(
 ) -> Result<(Boundary, PathBuf), ErrorObject> {
     let raw = p.input.get("path").and_then(Value::as_str).unwrap_or(".");
     let target = scope.locate(raw).map_err(|e| e.to_error_object())?;
-    let label = scope.label(&target);
     let write = matches!(p.tool.as_str(), "Write" | "Edit");
     let boundary = path_boundary(scope, raw, write)?;
     card.kind = if boundary == Boundary::Outside {
@@ -762,7 +838,6 @@ fn prepare_file(
         ApprovalKind::FileChange
     };
     card.path = Some(display(&target));
-    card.rule = Some(piarc_policy::m1::exact_rule(&p.tool, &label));
     if boundary == Boundary::Outside {
         card.directory = if target.is_dir() {
             Some(display(&target))
@@ -771,86 +846,6 @@ fn prepare_file(
         };
     }
     Ok((boundary, target))
-}
-
-fn file_preview(
-    tool: &str,
-    input: &serde_json::Map<String, Value>,
-    target: &Path,
-    label: &str,
-    binding: &piarc_fs::DirectoryBinding,
-) -> Result<piarc_protocol::diff::FileDiff, ErrorObject> {
-    Ok(match tool {
-        "Write" => {
-            let new = input
-                .get("content")
-                .and_then(Value::as_str)
-                .ok_or_else(|| denied("The proposed file content is missing."))?;
-            let old = original_text(target, binding)?;
-            piarc_diff::file_diff(label, old.as_deref(), new)
-        }
-        _ => {
-            let edits = input
-                .get("edits")
-                .and_then(Value::as_array)
-                .ok_or_else(|| denied("Missing proposed edits."))?;
-            if let Some(old) = original_text(target, binding)?
-                && let Some(new) = edit::proposed(
-                    &old,
-                    edits,
-                    input.get("replaceAll").and_then(Value::as_bool) == Some(true),
-                )
-            {
-                return Ok(piarc_diff::file_diff(label, Some(&old), &new));
-            }
-            // Invalid edits retain Pi's detailed matching error when the user permits the attempt.
-            let mut before = Vec::new();
-            let mut after = Vec::new();
-            for edit in edits {
-                before.push(
-                    edit["oldText"]
-                        .as_str()
-                        .ok_or_else(|| denied("Missing original text."))?,
-                );
-                after.push(
-                    edit["newText"]
-                        .as_str()
-                        .ok_or_else(|| denied("Missing replacement text."))?,
-                );
-            }
-            piarc_diff::file_diff(label, Some(&before.join("\n")), &after.join("\n"))
-        }
-    })
-}
-
-fn original_text(
-    target: &Path,
-    binding: &piarc_fs::DirectoryBinding,
-) -> Result<Option<String>, ErrorObject> {
-    use std::io::Read as _;
-    let file = match binding.open_file(target) {
-        Ok(file) => file,
-        Err(piarc_fs::Error::NotFound { .. }) => return Ok(None),
-        Err(error) => return Err(denied(format!("Cannot inspect the file: {error}"))),
-    };
-    let metadata = file
-        .metadata()
-        .map_err(|e| denied(format!("Cannot inspect the file: {e}")))?;
-    let max = piarc_protocol::fs::MAX_UPLOAD_BYTES;
-    if !metadata.is_file() || metadata.len() > max {
-        return Err(denied("This target cannot be previewed as a regular file."));
-    }
-    let mut bytes = Vec::new();
-    file.take(max + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|e| denied(format!("Cannot preview the file: {e}")))?;
-    if bytes.len() as u64 > max {
-        return Err(denied("The target grew beyond the preview limit."));
-    }
-    Ok(Some(piarc_fs::encoding::decode(
-        piarc_fs::encoding::detect(&bytes),
-        &bytes,
-    )))
 }
 
 fn path_boundary(scope: &Scope, path: &str, write: bool) -> Result<Boundary, ErrorObject> {
@@ -873,32 +868,6 @@ fn path_boundary(scope: &Scope, path: &str, write: bool) -> Result<Boundary, Err
         Err(piarc_fs::Error::NeedsApproval { .. }) => Ok(Boundary::Outside),
         Err(e) => Err(e.to_error_object()),
     }
-}
-
-fn command_boundary(scope: &Scope, cmd: &str, cwd: &Path) -> Result<(bool, Boundary), ErrorObject> {
-    let Some(operands) = piarc_policy::m1::simple_paths(cmd) else {
-        return Ok((false, Boundary::Inside));
-    };
-    let mut targets: Vec<_> = operands.iter().map(|arg| cwd.join(arg)).collect();
-    if matches!(cmd.split_ascii_whitespace().next(), Some("cp" | "mv")) {
-        if targets[0].is_dir() {
-            return Ok((false, Boundary::Inside));
-        }
-        if targets[1].is_dir()
-            && let Some(name) = targets[0].file_name()
-        {
-            targets.push(targets[1].join(name));
-        }
-    }
-    let mut boundary = Boundary::Inside;
-    for target in targets {
-        match path_boundary(scope, &display(&target), true)? {
-            Boundary::Protected => return Ok((false, Boundary::Protected)),
-            Boundary::Outside => boundary = Boundary::Outside,
-            Boundary::Inside => {}
-        }
-    }
-    Ok((boundary == Boundary::Inside, boundary))
 }
 
 #[cfg(test)]

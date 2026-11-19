@@ -22,7 +22,6 @@
 pub mod bash;
 mod decision;
 mod ledger;
-pub mod m1;
 pub mod paths;
 pub mod pattern;
 pub mod rules;

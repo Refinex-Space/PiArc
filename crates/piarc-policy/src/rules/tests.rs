@@ -455,3 +455,17 @@ fn broad_rules_are_flagged() {
         assert!(!RuleSet::is_broad(rule), "{rule}");
     }
 }
+
+#[test]
+fn powershell_segments_respect_quotes() {
+    assert_eq!(
+        powershell_segments("Get-Item a; Remove-Item b | Out-Null && echo 'x;y' \"p|q\""),
+        [
+            "Get-Item a",
+            "Remove-Item b",
+            "Out-Null",
+            "echo 'x;y' \"p|q\""
+        ]
+    );
+    assert_eq!(powershell_segments("a`;b"), ["a`;b"]);
+}

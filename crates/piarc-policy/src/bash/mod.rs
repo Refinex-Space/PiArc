@@ -23,8 +23,8 @@ mod wrappers;
 pub use critical::{CriticalContext, is_critical_delete};
 pub use judge::{AskCause, Facts, Judgment, Located, judge};
 pub use prefix::{MAX_RULES, rule_for, rule_prefix, suggestions};
-pub use readonly::{BUILTINS, Class, Operand, classify};
-pub use wrappers::{EXEC_WRAPPERS, SAFE_ENV, WRAPPERS};
+pub use readonly::{BUILTINS, Class, Operand, PROGRAMS, WRAPPED, classify};
+pub use wrappers::{EXEC_RUNNERS, EXEC_WRAPPERS, SAFE_ENV, WRAPPERS};
 
 use crate::pattern::DYNAMIC;
 

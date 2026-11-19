@@ -51,9 +51,12 @@
           "minimum": 0,
           "type": "integer"
         },
-        "rule": {
-          "description": "Rule shown in the native confirmation dialog.",
-          "type": ["string", "null"]
+        "rules": {
+          "description": "Rules shown in the native confirmation dialog.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "sessionId": {
           "description": "Owning session.",
@@ -167,9 +170,12 @@
           "minimum": 0,
           "type": "integer"
         },
-        "rule": {
-          "description": "Suggested exact rule.",
-          "type": ["string", "null"]
+        "rules": {
+          "description": "Rules \"always allow\" would save, one per subcommand that needed approval; editable\nbefore saving. Empty when the call cannot be allowed permanently (a critical deletion,\na command that cannot be analyzed).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "sessionId": {
           "description": "Owning session.",
@@ -4173,6 +4179,75 @@
       },
       "type": "object"
     },
+    "PolicyToolsParams": {
+      "description": "The canonical names of the tools a session offers the model.",
+      "properties": {
+        "sessionId": {
+          "description": "Owning session.",
+          "type": "string"
+        },
+        "tools": {
+          "description": "Canonical tool names.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["sessionId", "tools"],
+      "type": "object"
+    },
+    "PolicyToolsRequest": {
+      "description": "Request for `policy/tools`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "policy/tools",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/PolicyToolsParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "PolicyToolsResponse": {
+      "description": "Successful response to `policy/tools`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/PolicyToolsResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "PolicyToolsResult": {
+      "description": "The tools a deny rule without a specifier removes from the model's tool list.",
+      "properties": {
+        "denied": {
+          "description": "Canonical names to leave out of the next model request.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["denied"],
+      "type": "object"
+    },
     "PromptAccepted": {
       "description": "Result of `session/prompt`: the turn was accepted and will report `turn/started` and\n`turn/completed` with this id.",
       "properties": {
@@ -6549,6 +6624,12 @@
     },
     {
       "$ref": "#/$defs/PolicyRecoverResponse"
+    },
+    {
+      "$ref": "#/$defs/PolicyToolsRequest"
+    },
+    {
+      "$ref": "#/$defs/PolicyToolsResponse"
     },
     {
       "$ref": "#/$defs/ModelsListRequest"

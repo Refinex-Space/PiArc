@@ -16,8 +16,7 @@ providers:
               input: { command: 'while [ ! -f go ]; do sleep 0.05; done; echo go' },
             }
       - text: 'Steered answer.'
-approvals:
-  - { tool: Bash, decision: allow }
+# The command only uses read-only commands: no approval (T23).
 actions:
   - prompt: { text: 'Wait for the signal.', turn: t }
   - wait: { method: item/started, params: { item: { itemId: toolu_wait } } }

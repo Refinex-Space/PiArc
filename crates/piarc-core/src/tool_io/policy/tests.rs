@@ -40,7 +40,7 @@ impl Fixture {
         std::fs::create_dir_all(work.join(".piarc")).expect("workspace");
         std::fs::write(
             work.join(".piarc/settings.json"),
-            r#"{"permissions":{"allow":["Read(known)"]}}"#,
+            r#"{"permissions":{"allow":["Read(known)","Bash(cargo check *)","Bash(npm run lint *)"]}}"#,
         )
         .expect("settings");
         let storage = Storage::open(dirs).expect("open database");
@@ -72,6 +72,7 @@ impl Fixture {
             storage: storage.clone(),
             trust,
             snapshots,
+            hooks: Arc::new(hooks::NoHooks),
         });
         io.open_session(SESSION, &work, &work).expect("session");
         let (peer, frames) = Peer::channel(4);
@@ -128,7 +129,7 @@ fn answer(r: &ApprovalRequest, decision: ApprovalDecision) -> ApprovalAnswer {
         connection_epoch: r.connection_epoch,
         decision,
         feedback: None,
-        rule: None,
+        rules: Vec::new(),
         directory: None,
     }
 }
@@ -217,7 +218,8 @@ async fn concurrent_answers_apply_once_and_each_decision_is_audited_by_session()
     assert_eq!(states[1]["tool"], "Read");
     assert_eq!(states[1]["source"], "automatic");
     assert_eq!(states[1]["rule"], "Read(known)");
-    assert_eq!(states[1]["step"], "exactRule");
+    assert_eq!(states[1]["ruleSource"], "project");
+    assert_eq!(states[1]["step"], "allowRule");
     assert!(
         f.storage
             .with(|s| s.session_audit_events("other", 100))
@@ -233,7 +235,7 @@ async fn disconnect_expires_pending_cards_and_records_refusal_for_recovery() {
     let io = f.io.clone();
     let peer = f.peer.clone();
     let run = tokio::spawn(async move {
-        io.dispatch("policy/evaluate", json!({"sessionId":SESSION,"toolCallId":"gone","tool":"Bash","input":{"command":"echo hi"}}).as_object().expect("object").clone(),peer).await
+        io.dispatch("policy/evaluate", json!({"sessionId":SESSION,"toolCallId":"gone","tool":"Bash","input":{"command":"npm run build"}}).as_object().expect("object").clone(),peer).await
     });
     let card = f.pending().await;
     f.frames.close();
@@ -263,18 +265,43 @@ async fn disconnect_expires_pending_cards_and_records_refusal_for_recovery() {
     );
 }
 
-/// T20-A13. Run alone on the benchmark host with --nocapture for the release-gate measurement.
+/// T20-A13 and T23-A13: automatic decisions, including rule matching and Bash analysis. Run
+/// alone on the benchmark host with --nocapture for the release-gate measurement.
 #[tokio::test]
 async fn automatic_decision_latency() {
     const COUNT: usize = 1000;
-    let f = Fixture::new().await;
+    // A fixed PATH keeps the program lookup independent of the developer's shell.
+    let f = Fixture::with_env(super::super::CommandEnv::Fixed(vec![(
+        "PATH".into(),
+        "/usr/bin:/bin".into(),
+    )]))
+    .await;
+    let read_only = if cfg!(windows) {
+        "echo \"done $(pwd)\" && cd src && pwd"
+    } else {
+        "git status && ls -la src | grep -c ts; echo \"done $(pwd)\""
+    };
+    let calls = [
+        ("Read", json!({"path":"known"})),
+        ("Read", json!({"path":"file.txt"})),
+        ("Bash", json!({"command": read_only})),
+        (
+            "Bash",
+            json!({"command":"cargo check --workspace && npm run lint -- --fix"}),
+        ),
+    ];
     let mut samples = Vec::with_capacity(COUNT);
     for i in 0..COUNT + 100 {
-        let input = json!({"path":if i%2 == 0 {"known"} else {"file.txt"}});
+        let (tool, input) = &calls[i % calls.len()];
         let started = Instant::now();
-        let decision = f.evaluate("auto", "Read", input).await;
+        let decision = tokio::time::timeout(
+            Duration::from_secs(10),
+            f.evaluate("auto", tool, input.clone()),
+        )
+        .await
+        .unwrap_or_else(|_| panic!("{tool} {input} asked the user"));
         let elapsed = started.elapsed();
-        assert_eq!(decision["allowed"], true);
+        assert_eq!(decision["allowed"], true, "{tool} {input}");
         f.io.finish_tool(SESSION, "auto");
         if i >= 100 {
             samples.push(elapsed);
@@ -283,18 +310,21 @@ async fn automatic_decision_latency() {
     samples.sort_unstable();
     let p95 = samples[COUNT * 95 / 100 - 1];
     println!(
-        "policy/evaluate automatic, matched rule and mode default, including settings, canonical paths and SQLite audit: {COUNT} decisions; p50 {:?}, p95 {p95:?}, p99 {:?}",
+        "policy/evaluate automatic (allow rule, read-only file, read-only compound Bash, Bash allow rules), including settings, rules, Bash analysis, program lookup, canonical paths and SQLite audit: {COUNT} decisions; p50 {:?}, p95 {p95:?}, p99 {:?}",
         samples[COUNT / 2 - 1],
         samples[COUNT * 99 / 100 - 1]
     );
-    assert_eq!(
-        f.storage
-            .with(|s| s.session_audit_events(SESSION, 1200))
-            .expect("open")
-            .expect("audit")
-            .len(),
-        COUNT + 100
-    );
+    let rows = f
+        .storage
+        .with(|s| s.session_audit_events(SESSION, 1200))
+        .expect("open")
+        .expect("audit");
+    assert_eq!(rows.len(), COUNT + 100);
+    let steps: HashSet<String> = rows
+        .iter()
+        .map(|r| serde_json::from_str::<Value>(&r.detail).expect("detail")["step"].to_string())
+        .collect();
+    assert_eq!(steps.len(), 2, "{steps:?}");
     assert!(
         p95 <= Duration::from_millis(2),
         "automatic permission budget exceeded: {p95:?}"
@@ -304,7 +334,7 @@ async fn automatic_decision_latency() {
 #[tokio::test]
 async fn permanent_answers_must_include_every_value_shown_for_confirmation() {
     let f = Fixture::new().await;
-    let wait = f.evaluate("cmd", "Bash", json!({"command":"echo hello"}));
+    let wait = f.evaluate("cmd", "Bash", json!({"command":"npm test"}));
     let responder = async {
         let r = f.pending().await;
         assert!(
@@ -324,6 +354,7 @@ async fn permanent_answers_must_include_every_value_shown_for_confirmation() {
 async fn file_grants_bind_the_reviewed_change_and_are_consumed_by_one_write() {
     let f = Fixture::new().await;
     f.io.changed_mode(SESSION, PermissionMode::AcceptEdits)
+        .await
         .expect("mode");
     let request = |id: &str, content: &str| {
         json!({"path":"note.txt","content":content,
@@ -415,6 +446,7 @@ async fn simple_commands_with_custom_shell_resolution_require_review() {
     ]))
     .await;
     f.io.changed_mode(SESSION, PermissionMode::AcceptEdits)
+        .await
         .expect("auto edits");
     let run = f.evaluate("custom", "Bash", json!({"command":"touch note.txt"}));
     let answer_user = async {
@@ -497,3 +529,5 @@ async fn completion_only_retires_memory_for_its_own_turn() {
         "a finished turn must not receive an approved file"
     );
 }
+
+mod t23;

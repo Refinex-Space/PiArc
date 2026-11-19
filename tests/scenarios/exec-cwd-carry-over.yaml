@@ -14,9 +14,8 @@ providers:
       - tool_calls:
           - { id: toolu_pwd_root, name: Bash, input: { command: 'pwd -P' } }
       - text: 'Moved around.'
+# `pwd` is on the read-only list; `mkdir` and a `cd` out of the workspace ask (T23).
 approvals:
-  - { tool: Bash, decision: allow }
-  - { tool: Bash, decision: allow }
   - { tool: Bash, decision: allow }
   - { tool: Bash, decision: allow }
 actions:

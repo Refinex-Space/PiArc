@@ -229,6 +229,41 @@ impl Hub {
         }
     }
 
+    /// The permission settings page's view of a workspace's rules (T23).
+    pub async fn permission_view(&self, workspace: Option<PathBuf>) -> Result<Value> {
+        self.ctx
+            .tool_io
+            .permission_view(workspace)
+            .await
+            .map_err(|e| Error::feature(&e))
+    }
+
+    /// Change one rule from the permission settings page.
+    pub async fn update_permission_rule(&self, change_json: String) -> Result<Value> {
+        let change = serde_json::from_str(&change_json).map_err(|e| Error::InvalidArgument {
+            field: "change",
+            reason: format!("invalid rule change: {e}"),
+        })?;
+        self.ctx
+            .tool_io
+            .update_permission_rule(change)
+            .await
+            .map_err(|e| Error::feature(&e))
+    }
+
+    /// Permission audit events for the settings page.
+    pub async fn audit_events(&self, query_json: String) -> Result<Value> {
+        let query = serde_json::from_str(&query_json).map_err(|e| Error::InvalidArgument {
+            field: "query",
+            reason: format!("invalid audit query: {e}"),
+        })?;
+        self.ctx
+            .tool_io
+            .audit_events(query)
+            .await
+            .map_err(|e| Error::feature(&e))
+    }
+
     pub async fn answer_approval(
         &self,
         answer: piarc_protocol::policy::ApprovalAnswer,

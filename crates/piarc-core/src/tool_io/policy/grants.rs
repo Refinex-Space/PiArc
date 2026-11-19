@@ -11,8 +11,12 @@ pub(in crate::tool_io) struct Grant {
     pub(super) binding: Option<piarc_fs::DirectoryBinding>,
     pub(super) cwd: Option<PathBuf>,
     pub(super) command: Option<String>,
-    pub(super) simple_command: bool,
-    pub(super) utility: Option<PathBuf>,
+    /// The scope the preflight judged in (with configured directories).
+    pub(super) scope: Option<Scope>,
+    /// Programs an automatic Bash allowance relies on, pinned at execution.
+    pub(super) programs: Vec<(String, PathBuf)>,
+    /// Paths an automatic Bash allowance checked; checked again at execution.
+    pub(super) targets: Vec<(PathBuf, bool)>,
     input: Map<String, Value>,
     peer: Peer,
     made_parent: bool,
@@ -29,8 +33,9 @@ impl Grant {
             binding: None,
             cwd: None,
             command: None,
-            simple_command: false,
-            utility: None,
+            scope: None,
+            programs: Vec::new(),
+            targets: Vec::new(),
             input: p.input.clone(),
             peer,
             made_parent: false,
@@ -293,7 +298,7 @@ pub(in crate::tool_io) fn claim_command(
     p: &ExecRunParams,
     peer: &Peer,
     cwd: &Path,
-) -> Result<Option<PathBuf>, ErrorObject> {
+) -> Result<Vec<(String, PathBuf)>, ErrorObject> {
     let origin = p.origin.as_ref().ok_or_else(mismatch)?;
     let mut state = lock(&s.policy);
     let grant = state
@@ -317,14 +322,23 @@ pub(in crate::tool_io) fn claim_command(
         || p.env.as_ref().is_some_and(|v| !v.is_empty())
         || p.cwd.is_some()
         || !timeout_matches(timeout, p.timeout_ms)
-        || grant.simple_command && !super::command_boundary(&s.scope, &p.command, cwd)?.0
     {
         return Err(mismatch());
+    }
+    // An automatic allowance relied on these paths staying inside: a link created since the
+    // preflight must not redirect them.
+    if let Some(scope) = &grant.scope {
+        for (path, write) in &grant.targets {
+            if super::path_boundary(scope, &display(path), *write)? != Boundary::Inside {
+                return Err(mismatch());
+            }
+        }
     }
     Ok(state
         .grants
         .remove(&origin.tool_call_id)
-        .and_then(|g| g.utility))
+        .map(|g| g.programs)
+        .unwrap_or_default())
 }
 
 fn timeout_matches(expected: Option<f64>, wire: Option<u64>) -> bool {

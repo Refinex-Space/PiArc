@@ -194,7 +194,11 @@ impl ToolIo {
             || method.starts_with("exec/")
             || matches!(
                 method,
-                "policy/evaluate" | "policy/recover" | "policy/cancel" | "policy/inputChunk"
+                "policy/evaluate"
+                    | "policy/recover"
+                    | "policy/cancel"
+                    | "policy/inputChunk"
+                    | "policy/tools"
             )
     }
 
@@ -369,6 +373,7 @@ impl ToolIo {
             "fs/memory" => return self.memory_snapshot(parse(method, params)?, &peer).await,
             "policy/inputChunk" => return self.stage_input(parse(method, params)?, &peer),
             "policy/evaluate" => return self.evaluate(parse(method, params)?, peer).await,
+            "policy/tools" => return self.denied_tools(parse(method, params)?).await,
             "policy/cancel" => {
                 let p: piarc_protocol::policy::PolicyPendingParams = parse(method, params)?;
                 return self.cancel_wait(&p.session_id, &p.tool_call_id, &peer);
@@ -492,7 +497,7 @@ impl ToolIo {
         let session = self.session(&p.session_id.0)?;
         let mut launch = exec::launch_dir(&session, p.cwd.as_deref())?;
         if self.policy.is_some() {
-            launch.pinned_utility = policy::claim_command(&session, &p, &peer, &launch.dir)?;
+            launch.pinned = policy::claim_command(&session, &p, &peer, &launch.dir)?;
         }
         let token = CancellationToken::new();
         {

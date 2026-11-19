@@ -726,6 +726,7 @@ fn open_state(
             storage: storage.clone(),
             trust: trust.clone(),
             snapshots: snapshots.clone(),
+            hooks: Arc::new(crate::tool_io::policy::hooks::NoHooks),
         }),
         config: config.sessions.clone(),
         snapshots,

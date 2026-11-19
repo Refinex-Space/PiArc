@@ -38,7 +38,7 @@ pub(in crate::tool_io) async fn approve(
     let mut card = new_request(&p, peer)?;
     card.kind = ApprovalKind::PermissionExpansion;
     card.path = Some(display(target));
-    card.rule = Some(piarc_policy::m1::exact_rule(&p.tool, &display(target)));
+    card.rules = vec![format!("MemoryImport({})", display(target))];
     let Some((answer, ack)) = wait_for_user(session, services, &p, &card, peer, generation).await?
     else {
         return Err(denied(LOST));
@@ -48,7 +48,7 @@ pub(in crate::tool_io) async fn approve(
         if peer.is_closed() || generation.is_cancelled() {
             return Err(denied(LOST));
         }
-        if decision == ApprovalDecision::AllowAlways && answer.rule != card.rule {
+        if decision == ApprovalDecision::AllowAlways && answer.rules != card.rules {
             return Err(denied("Permanent memory consent must name the requested file exactly."));
         }
         services.audit(id, session.scope.root(), &json!({

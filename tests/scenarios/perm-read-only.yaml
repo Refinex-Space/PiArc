@@ -1,0 +1,41 @@
+id: perm-read-only
+description: Read-only commands run without approval in Manual mode when their paths stay inside the workspace; anything else on the line, or a path outside, asks (T23).
+capabilities: [CAP-PERM-READONLY-001]
+workspace:
+  files:
+    a.txt: "alpha\nbeta\n"
+    src/b.txt: "gamma\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - {
+              id: list,
+              name: Bash,
+              input: { command: 'ls src && cat a.txt | grep -c a; cd src && cat b.txt' },
+            }
+      - tool_calls:
+          - { id: outside, name: Bash, input: { command: 'cat ../../outside.txt' } }
+      - tool_calls:
+          - { id: write, name: Bash, input: { command: 'ls > listing.txt' } }
+      - tool_calls:
+          - { id: other, name: Bash, input: { command: 'ls && sed -n 1p a.txt' } }
+      - text: Finished.
+actions:
+  - prompt: { text: Look around., turn: t }
+approvals:
+  - { tool: Bash, decision: deny }
+  - { tool: Bash, decision: deny }
+  - { tool: Bash, decision: deny }
+expect:
+  request_counts: { main: 5 }
+  requests:
+    - index: 4
+      tool_results:
+        - { id: list, is_error: false, contains: gamma }
+        - { id: outside, is_error: true }
+        - { id: write, is_error: true }
+        - { id: other, is_error: true }
+  files:
+    listing.txt: null

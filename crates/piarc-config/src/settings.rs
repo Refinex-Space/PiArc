@@ -66,6 +66,25 @@ pub struct Change {
     pub issues: Vec<Issue>,
 }
 
+/// One layer's permission rules (see [`Settings::permission_lists`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PermissionLists {
+    /// The layer id.
+    pub layer: &'static str,
+    /// Who it belongs to.
+    pub scope: Scope,
+    /// Its file, for file layers.
+    pub file: Option<PathBuf>,
+    /// Whether PiArc may write it.
+    pub writable: bool,
+    /// `permissions.deny`.
+    pub deny: Vec<String>,
+    /// `permissions.ask`.
+    pub ask: Vec<String>,
+    /// `permissions.allow` (empty while an untrusted project's).
+    pub allow: Vec<String>,
+}
+
 /// The settings of one workspace.
 #[derive(Debug)]
 pub struct Settings {
@@ -74,6 +93,10 @@ pub struct Settings {
     trust: TrustState,
     merged: Value,
     issues: Vec<Issue>,
+    /// Each layer's value as merged (after the trust and mode filters), by layer index.
+    effective: Vec<Option<Value>>,
+    /// Project layers whose `bypassPermissions` or `auto` default mode was left out.
+    ignored_modes: Vec<(&'static str, String)>,
 }
 
 impl Settings {
@@ -92,6 +115,8 @@ impl Settings {
             trust,
             merged: Value::Object(serde_json::Map::new()),
             issues: Vec::new(),
+            effective: Vec::new(),
+            ignored_modes: Vec::new(),
         };
         settings.reload();
         settings
@@ -143,20 +168,25 @@ impl Settings {
 
     fn remerge(&mut self) -> Vec<String> {
         let trusted = self.trust.is_trusted();
-        let values: Vec<Value> = self
+        let mut ignored = Vec::new();
+        let effective: Vec<Option<Value>> = self
             .table
             .layers()
             .iter()
             .zip(&self.states)
-            .filter_map(|(spec, state)| {
+            .map(|(spec, state)| {
                 let mut value = state.value.clone()?;
                 let project = spec.scope == Scope::Project;
                 let mode = value
                     .pointer("/permissions/defaultMode")
-                    .and_then(Value::as_str);
+                    .and_then(Value::as_str)
+                    .map(str::to_owned);
+                if project && matches!(mode.as_deref(), Some("auto" | "bypassPermissions")) {
+                    ignored.push((spec.id, mode.clone().unwrap_or_default()));
+                }
                 if project
-                    && (matches!(mode, Some("auto" | "bypassPermissions"))
-                        || (!trusted && mode == Some("acceptEdits")))
+                    && (matches!(mode.as_deref(), Some("auto" | "bypassPermissions"))
+                        || (!trusted && mode.as_deref() == Some("acceptEdits")))
                 {
                     remove_pointer(&mut value, "/permissions/defaultMode");
                 }
@@ -168,10 +198,65 @@ impl Settings {
                 Some(value)
             })
             .collect();
+        let values: Vec<Value> = effective.iter().flatten().cloned().collect();
         let merged = merge_all(&values);
         let changed = changed_keys(&self.merged, &merged);
         self.merged = merged;
+        self.effective = effective;
+        self.ignored_modes = ignored;
         changed
+    }
+
+    /// The permission rule lists of every layer, highest precedence first, as they apply:
+    /// an untrusted project's allow rules are left out (deny and ask always apply).
+    #[must_use]
+    pub fn permission_lists(&self) -> Vec<PermissionLists> {
+        let strings = |value: &Value, key: &str| -> Vec<String> {
+            value
+                .pointer(&format!("/permissions/{key}"))
+                .and_then(Value::as_array)
+                .map(|list| {
+                    list.iter()
+                        .filter_map(|v| v.as_str().map(str::to_owned))
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        self.table
+            .layers()
+            .iter()
+            .zip(&self.effective)
+            .rev()
+            .filter_map(|(spec, value)| {
+                let value = value.as_ref()?;
+                Some(PermissionLists {
+                    layer: spec.id,
+                    scope: spec.scope,
+                    file: spec.file().map(Path::to_owned),
+                    writable: spec.writable,
+                    deny: strings(value, "deny"),
+                    ask: strings(value, "ask"),
+                    allow: strings(value, "allow"),
+                })
+            })
+            .collect()
+    }
+
+    /// One layer's value as it applies (after the trust and mode filters).
+    #[must_use]
+    pub fn layer(&self, id: &str) -> Option<&Value> {
+        self.table
+            .layers()
+            .iter()
+            .zip(&self.effective)
+            .find(|(spec, _)| spec.id == id)
+            .and_then(|(_, value)| value.as_ref())
+    }
+
+    /// Project layers that asked for `bypassPermissions` or `auto`, which never apply.
+    #[must_use]
+    pub fn ignored_modes(&self) -> &[(&'static str, String)] {
+        &self.ignored_modes
     }
 
     /// Executable items in the actual bytes loaded from project files. Use this alongside

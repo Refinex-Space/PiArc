@@ -5,13 +5,13 @@ providers:
   one:
     wire: anthropic
     steps:
-      - tool_calls: [{ id: first, name: Bash, input: { command: echo hello } }]
-      - tool_calls: [{ id: repeat, name: Bash, input: { command: echo hello } }]
+      - tool_calls: [{ id: first, name: Bash, input: { command: env echo hello } }]
+      - tool_calls: [{ id: repeat, name: Bash, input: { command: env echo hello } }]
       - text: Done.
   two:
     wire: anthropic
     steps:
-      - tool_calls: [{ id: other, name: Bash, input: { command: echo hello } }]
+      - tool_calls: [{ id: other, name: Bash, input: { command: env echo hello } }]
       - text: Done.
 sessions:
   a: { provider: one }

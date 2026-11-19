@@ -1,0 +1,32 @@
+id: perm-powershell-whole
+description: PowerShell commands are not split; only a rule that allows the whole text lets one run without approval (T23).
+capabilities: [CAP-PERM-RULE-001]
+platforms: [windows]
+platform_reason: The PowerShell tool exists on Windows only.
+workspace:
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"allow":["PowerShell(Write-Output tested)","PowerShell(Write-Output *)"]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: exact, name: PowerShell, input: { command: 'Write-Output tested' } }
+      - tool_calls:
+          - {
+              id: compound,
+              name: PowerShell,
+              input: { command: 'Write-Output a; Remove-Item missing.txt' },
+            }
+      - text: Finished.
+actions:
+  - prompt: { text: Run PowerShell., turn: t }
+approvals:
+  - { tool: PowerShell, decision: deny }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - index: 2
+      tool_results:
+        - { id: exact, is_error: false, contains: tested }
+        - { id: compound, is_error: true }

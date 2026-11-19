@@ -13,8 +13,7 @@ providers:
           - { id: toolu_read, name: Read, input: { path: 'notes/a.txt' } }
           - { id: toolu_grep, name: Grep, input: { pattern: 'alpha' } }
       - text: 'Answered after the interruption.'
-approvals:
-  - { tool: Bash, decision: allow }
+# The command only uses read-only commands: no approval (T23).
 actions:
   - prompt: { text: 'Run the three tools.', turn: first }
   - wait: { method: item/updated, params: { item: { itemId: toolu_hang, output: "ready\n" } } }

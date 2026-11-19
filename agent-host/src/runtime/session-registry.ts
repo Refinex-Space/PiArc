@@ -687,6 +687,11 @@ export class SessionRegistry {
                     (id) => {
                       projector.markDeclined(id);
                     },
+                    (line) => {
+                      this.#options.log(
+                        `[session ${target.sessionManager.getSessionId()}] ${line}`,
+                      );
+                    },
                   ),
                 ]
               : []),

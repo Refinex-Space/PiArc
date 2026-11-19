@@ -251,6 +251,53 @@ impl CoreRuntime {
         })
     }
 
+    /// The permission rules of a workspace by source, the most recent workspace when null
+    /// (T23).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn permission_rules<'env>(
+        &self,
+        env: &'env Env,
+        #[napi(ts_arg_type = "string | null")] workspace: Option<String>,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.permissionRules", |core, done| {
+            core.permission_rules(workspace.map(Into::into), done)
+        })
+    }
+
+    /// Whether a rule parses for `allow`, `ask` or `deny`, and whether it is broad (JSON).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn check_permission_rule<'env>(
+        &self,
+        env: &'env Env,
+        rule: String,
+        behavior: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.checkPermissionRule", |core, done| {
+            done(core.check_permission_rule(&rule, &behavior));
+            Ok(())
+        })
+    }
+
+    /// Changes one rule of a writable settings file and returns the new view (JSON).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn update_permission_rule<'env>(
+        &self,
+        env: &'env Env,
+        change: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.updatePermissionRule", |core, done| {
+            core.update_permission_rule(change, done)
+        })
+    }
+
+    /// Permission audit events matching the JSON query, newest first (JSON).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn audit_events<'env>(&self, env: &'env Env, query: String) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.auditEvents", |core, done| {
+            core.audit_events(query, done)
+        })
+    }
+
     /// Changes the mode and appends its entry to the session before resolving.
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]
     pub fn set_permission_mode<'env>(
@@ -641,7 +688,7 @@ fn permission_mode(env: &Env, mode: &str) -> napi::Result<piarc_protocol::policy
         serde_json::from_value(serde_json::Value::String(mode.into())).map_err(|_| {
             piarc_core::Error::InvalidArgument {
                 field: "permissionMode",
-                reason: "expected default or acceptEdits".into(),
+                reason: "expected default, acceptEdits, plan or bypassPermissions".into(),
             }
         })
     })

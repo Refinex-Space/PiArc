@@ -50,6 +50,10 @@ pub const SAFE_ENV: &[&str] = &[
     "GO111MODULE",
 ];
 
+/// Stripped wrappers that are programs and run the command with `exec`: the command's own
+/// name is then looked up on PATH even when bash has a builtin of that name.
+pub const EXEC_RUNNERS: &[&str] = &["timeout", "nice", "nohup", "stdbuf", "env", "xargs"];
+
 /// The wrappers stripped before matching.
 pub const WRAPPERS: &[&str] = &[
     "timeout", "time", "nice", "nohup", "stdbuf", "command", "builtin", "noglob", "xargs", "env",
@@ -198,7 +202,7 @@ fn strip_one(argv: &[Word]) -> Result<Option<Vec<Word>>, Unresolved> {
                         .split_once('=')
                         .is_some_and(|(k, _)| SAFE_ENV.contains(&k))
             });
-            if n < args.len() && safe && !args[n].text.starts_with('-') {
+            if n > 0 && n < args.len() && safe && !args[n].text.starts_with('-') {
                 &args[n..]
             } else {
                 return Ok(None);

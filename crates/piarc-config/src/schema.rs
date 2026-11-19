@@ -254,6 +254,11 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
                 name: "additionalDirectories",
                 shape: Shape::ListOf(&STRINGS),
             },
+            // Read from the user's own file only: shows bypassPermissions in the mode menu.
+            Field {
+                name: "enableBypassPermissions",
+                shape: Shape::Bool,
+            },
         ]),
     },
     Field {

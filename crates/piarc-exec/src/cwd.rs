@@ -65,29 +65,30 @@ impl CwdProbe {
         Ok((Self { init, answer }, variable))
     }
 
-    /// Bind one verified utility to its physical executable in this command's bash process.
+    /// Bind one verified program to its physical executable in this command's bash process.
     /// A changed lookup fails closed before the command runs. Its text and exit trap stay intact.
     ///
     /// # Errors
     ///
-    /// The executable has no utility name, or the startup file cannot be updated.
-    pub fn pin_utility(&self, path: &Path) -> io::Result<()> {
+    /// The name is not a plain command name, or the startup file cannot be updated.
+    pub fn pin_program(&self, name: &str, path: &Path) -> io::Result<()> {
         use std::io::Write;
-        let name = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .ok_or(io::ErrorKind::InvalidInput)?;
-        if !matches!(name, "mkdir" | "touch" | "mv" | "cp") {
+        let plain = !name.is_empty()
+            && !name.starts_with('-')
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '+' | '-'));
+        if !plain {
             return Err(io::ErrorKind::InvalidInput.into());
         }
-        let utility = quote(&bash_path(path));
+        let program = quote(&bash_path(path));
         let mut file = std::fs::OpenOptions::new().append(true).open(&self.init)?;
         let refused = "{ builtin printf '%s\\n' 'Command resolution changed. Request a new approval.' >&2; exit 126; }";
         writeln!(
             file,
-            "[[ $(builtin type -t {name}) == file && $(builtin type -P {name}) -ef {utility} ]] || {refused}"
+            "[[ $(builtin type -t {name}) == file && $(builtin type -P {name}) -ef {program} ]] || {refused}"
         )?;
-        writeln!(file, "builtin hash -p {utility} {name} || {refused}")
+        writeln!(file, "builtin hash -p {program} {name} || {refused}")
     }
 
     /// The directory the shell ended in, as the shell printed it; removes both files.
@@ -121,6 +122,52 @@ fn quote(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn pinned_programs_refuse_a_different_resolution() {
+        let dir = std::env::temp_dir().join(format!("piarc-exec-pin {}", std::process::id()));
+        let bin = dir.join("bin");
+        std::fs::create_dir_all(&bin).expect("dirs");
+        let run = |path: &str, pins: &[(&str, &Path)]| {
+            let (probe, (name, value)) = CwdProbe::prepare(&dir, "req-pin", None).expect("probe");
+            for (n, p) in pins {
+                probe.pin_program(n, p).expect("pin");
+            }
+            let out = std::process::Command::new("/bin/bash")
+                .args(["-c", "ls -d . && cat /dev/null && echo done"])
+                .current_dir(&dir)
+                .env_clear()
+                .env("PATH", path)
+                .env(name, value)
+                .output()
+                .expect("bash runs");
+            let _ = probe.finish();
+            out
+        };
+        let ls = Path::new("/bin/ls");
+        let cat = Path::new("/bin/cat");
+        let ok = run("/usr/bin:/bin", &[("ls", ls), ("cat", cat)]);
+        assert!(ok.status.success(), "{ok:?}");
+        // A workspace program shadowing the verified one stops the command before it runs.
+        let fake = bin.join("cat");
+        std::fs::write(&fake, "#!/bin/sh\necho fake\n").expect("fake");
+        std::process::Command::new("chmod")
+            .args(["+x"])
+            .arg(&fake)
+            .status()
+            .expect("chmod");
+        let path = format!("{}:/usr/bin:/bin", bin.display());
+        let refused = run(&path, &[("ls", ls), ("cat", cat)]);
+        assert_eq!(refused.status.code(), Some(126));
+        assert!(!String::from_utf8_lossy(&refused.stdout).contains("done"));
+        for bad in ["", "-x", "a b", "a;b", "$(x)"] {
+            let (probe, _) = CwdProbe::prepare(&dir, "req-bad", None).expect("probe");
+            assert!(probe.pin_program(bad, ls).is_err(), "{bad:?}");
+            let _ = probe.finish();
+        }
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
 
     #[test]
     fn quotes_single_quotes() {

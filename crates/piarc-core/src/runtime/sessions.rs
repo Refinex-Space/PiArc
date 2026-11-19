@@ -122,6 +122,63 @@ impl CoreRuntime {
     ///
     /// # Errors
     /// As [`Self::session_op`].
+    /// The permission rules of a workspace by source (T23).
+    ///
+    /// # Errors
+    /// As [`Self::session_op`].
+    pub fn permission_rules(
+        &self,
+        workspace: Option<PathBuf>,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.permission_view(workspace).await
+        })
+    }
+
+    /// Change one permission rule of a writable settings file (T23).
+    ///
+    /// # Errors
+    /// As [`Self::session_op`].
+    pub fn update_permission_rule(
+        &self,
+        change_json: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.update_permission_rule(change_json).await
+        })
+    }
+
+    /// Permission audit events (T23).
+    ///
+    /// # Errors
+    /// As [`Self::session_op`].
+    pub fn audit_events(
+        &self,
+        query_json: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.audit_events(query_json).await
+        })
+    }
+
+    /// Whether `rule` parses for `behavior` (`allow`, `ask`, `deny`) and whether it is broad.
+    ///
+    /// # Errors
+    /// [`Error::InvalidArgument`] for an unknown list.
+    pub fn check_permission_rule(&self, rule: &str, behavior: &str) -> Result<serde_json::Value> {
+        let behavior = serde_json::from_value(serde_json::Value::String(behavior.to_owned()))
+            .map_err(|_| Error::InvalidArgument {
+                field: "behavior",
+                reason: "behavior must be allow, ask or deny".into(),
+            })?;
+        Ok(crate::tool_io::policy::settings_view::check_rule(
+            rule, behavior,
+        ))
+    }
+
     pub fn answer_approval(
         &self,
         answer: piarc_protocol::policy::ApprovalAnswer,

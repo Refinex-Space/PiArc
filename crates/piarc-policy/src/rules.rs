@@ -495,6 +495,37 @@ impl RuleSet {
     }
 }
 
+/// Rough statement segments of a PowerShell command: split at `;`, `|`, `&` and line breaks
+/// outside quotes. PowerShell is not parsed (architecture section 6.2.2); deny and ask rules
+/// that match a segment only make the call ask.
+#[must_use]
+pub fn powershell_segments(text: &str) -> Vec<&str> {
+    let mut segments = Vec::new();
+    let mut start = 0;
+    let mut quote: Option<char> = None;
+    let mut escaped = false;
+    for (i, c) in text.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match (quote, c) {
+            (_, '`') => escaped = true,
+            (Some(q), c) if c == q => quote = None,
+            (Some(_), _) => {}
+            (None, '\'' | '"') => quote = Some(c),
+            (None, ';' | '|' | '&' | '\n' | '\r') => {
+                segments.push(text[start..i].trim());
+                start = i + c.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    segments.push(text[start..].trim());
+    segments.retain(|s| !s.is_empty());
+    segments
+}
+
 /// WebFetch hosts: case-insensitive, trailing dot ignored; `*.example.com` covers every
 /// subdomain but not the apex; `*` covers every host; elsewhere `*` stays within a label.
 #[must_use]

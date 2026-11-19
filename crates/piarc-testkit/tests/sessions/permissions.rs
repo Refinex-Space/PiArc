@@ -37,7 +37,7 @@ fn allow(card: &ApprovalRequest) -> ApprovalAnswer {
         revision: card.revision,
         connection_epoch: card.connection_epoch,
         decision: ApprovalDecision::AllowOnce,
-        rule: None,
+        rules: Vec::new(),
         directory: None,
         feedback: None,
     }

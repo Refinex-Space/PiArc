@@ -16,10 +16,7 @@ providers:
       - tool_calls:
           - { id: toolu_short, name: Bash, input: { command: 'echo short output' } }
       - text: 'Printed.'
-approvals:
-  - { tool: Bash, decision: allow }
-  - { tool: Bash, decision: allow }
-  - { tool: Bash, decision: allow }
+# seq, printf, exit and echo are read-only commands: no approval (T23).
 actions:
   - prompt: { text: 'Print a lot.', turn: t }
 expect:

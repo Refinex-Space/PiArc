@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 15,
+  "method": "policy/tools",
+  "params": {
+    "sessionId": "s",
+    "tools": ["Read", "Bash", "mcp__github__get_issue"]
+  }
+}

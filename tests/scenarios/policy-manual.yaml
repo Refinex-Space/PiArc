@@ -63,7 +63,7 @@ providers:
           - id: cmd
             name: Bash
             input:
-              command: echo prompted
+              command: env echo prompted
       - tool_calls:
           - id: protected
             name: Write

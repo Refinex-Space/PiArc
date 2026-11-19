@@ -485,3 +485,63 @@ fn a_linked_settings_directory_cannot_redirect_persistent_permissions() {
     assert!(append_local_permissions(&f.table(), &[(Category::AllowRule, "Bash(x)")]).is_err());
     assert!(!f.data.join("settings.local.json").exists());
 }
+
+/// T23-A07: rule lists come per source in ADR-0005 order; an untrusted project's allow rules
+/// are left out while its deny and ask rules stay; project `bypassPermissions`/`auto` never
+/// apply and are reported for the audit.
+#[test]
+fn permission_lists_follow_precedence_and_trust() {
+    let f = Fixture::new("permission lists");
+    write(
+        &f.user(),
+        r#"{"permissions":{"allow":["Bash(npm *)"],"deny":["Bash(rm *)"]}}"#,
+    );
+    write(
+        &f.project(),
+        r#"{"permissions":{"allow":["Bash(make *)"],"ask":["Bash(git push *)"],"defaultMode":"bypassPermissions"}}"#,
+    );
+    write(
+        &f.local(),
+        r#"{"permissions":{"allow":["Read(//etc/**)"],"deny":["Read(.env)"],"defaultMode":"auto"}}"#,
+    );
+    type Lists = (&'static str, Vec<String>, Vec<String>, Vec<String>);
+    let summary = |s: &Settings| -> Vec<Lists> {
+        s.permission_lists()
+            .into_iter()
+            .map(|l| (l.layer, l.deny, l.ask, l.allow))
+            .collect()
+    };
+    let mut settings = Settings::load(f.table(), TrustState::Untrusted);
+    let untrusted = summary(&settings);
+    let ids: Vec<&str> = untrusted.iter().map(|l| l.0).collect();
+    assert_eq!(
+        ids,
+        [ids::PROJECT_LOCAL, ids::PROJECT, ids::USER, ids::DEFAULTS]
+    );
+    assert_eq!(untrusted[0].1, ["Read(.env)"]);
+    assert!(untrusted[0].3.is_empty() && untrusted[1].3.is_empty());
+    assert_eq!(untrusted[1].2, ["Bash(git push *)"]);
+    assert_eq!(untrusted[2].3, ["Bash(npm *)"]);
+    settings.set_trust(TrustState::Trusted);
+    let trusted = summary(&settings);
+    assert_eq!(trusted[0].3, ["Read(//etc/**)"]);
+    assert_eq!(trusted[1].3, ["Bash(make *)"]);
+    // The merged lists keep every source; deny wins at evaluation (piarc-policy).
+    assert_eq!(
+        settings.get("/permissions/deny"),
+        Some(&json!(["Bash(rm *)", "Read(.env)"]))
+    );
+    assert_eq!(
+        settings.get("/permissions/defaultMode"),
+        Some(&json!("default"))
+    );
+    let mut ignored = settings.ignored_modes().to_vec();
+    ignored.sort();
+    assert_eq!(
+        ignored,
+        [
+            (ids::PROJECT, "bypassPermissions".to_owned()),
+            (ids::PROJECT_LOCAL, "auto".to_owned())
+        ]
+    );
+}

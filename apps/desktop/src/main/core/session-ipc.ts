@@ -133,6 +133,16 @@ function token(value: unknown, name: string): string {
   return value;
 }
 
+/** Rules to save: one to five non-empty lines of at most 4,096 characters each. */
+function ruleList(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length > 5) throw new TypeError('invalid rules');
+  return value.map((rule) => {
+    const checked = text(rule, 'rule');
+    if (checked.length > 4096 || /[\r\n]/.test(checked)) throw new TypeError('invalid rule');
+    return checked;
+  });
+}
+
 function text(value: unknown, name: string, allowEmpty = false): string {
   if (
     typeof value !== 'string' ||
@@ -199,12 +209,13 @@ function approvalAnswer(value: unknown): ApprovalAnswer {
     decision,
   } satisfies ApprovalAnswer;
   if (decision === 'allowAlways') {
-    if (a.directory === undefined && a.rule === undefined) {
+    const rules = a.rules === undefined ? [] : ruleList(a.rules);
+    if (a.directory === undefined && rules.length === 0) {
       throw new TypeError('always allow needs a rule or directory');
     }
     return {
       ...fields,
-      ...(a.rule === undefined ? {} : { rule: text(a.rule, 'rule') }),
+      ...(rules.length === 0 ? {} : { rules }),
       ...(a.directory === undefined ? {} : { directory: absolutePath(a.directory) }),
     };
   }
@@ -268,8 +279,28 @@ export function registerSessionHandlers(
       : core.followUpInput(sessionId(id), input(message)),
   );
   registerHandler(IPC_CHANNELS.sessionAbort, (_event, [id]) => core.abort(sessionId(id)));
-  registerHandler(IPC_CHANNELS.sessionPermissionMode, async (_event, [id, mode]) => {
+  registerHandler(IPC_CHANNELS.sessionPermissionMode, async (event, [id, mode]) => {
     if (!isPermissionMode(mode)) throw new TypeError('unknown permission mode');
+    if (mode === 'bypassPermissions') {
+      // The second confirmation (the first is enabling the mode in settings); Core also
+      // refuses the switch unless the user's own settings enable it.
+      const t = translator();
+      const window = BrowserWindow.fromWebContents(event.sender);
+      const options: Electron.MessageBoxOptions = {
+        type: 'warning',
+        message: t.t('permissions.bypass.confirm'),
+        detail: t.t('permissions.bypass.detail'),
+        buttons: [t.t('permissions.bypass.switch'), t.t('dialog.cancel')],
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true,
+      };
+      const result =
+        window === null
+          ? await dialog.showMessageBox(options)
+          : await dialog.showMessageBox(window, options);
+      if (result.response !== 0) return;
+    }
     await core.setPermissionMode(sessionId(id), mode);
   });
   registerHandler(IPC_CHANNELS.approvalAnswer, async (event, [raw]) => {
@@ -283,7 +314,9 @@ export function registerSessionHandlers(
           answer.directory === undefined ? 'approval.confirmRule' : 'approval.confirmDirectory',
         ),
         detail: [
-          ...(answer.rule == null ? [] : [t.t('approval.rule') + '\n' + answer.rule]),
+          ...(answer.rules === undefined || answer.rules.length === 0
+            ? []
+            : [t.t('approval.rule') + '\n' + answer.rules.join('\n')]),
           ...(answer.directory == null
             ? []
             : [t.t('approval.directory') + '\n' + answer.directory]),

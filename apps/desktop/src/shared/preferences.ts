@@ -33,6 +33,8 @@ export interface Preferences {
   readonly keybindings: Readonly<Record<string, string>>;
   readonly notifications: { readonly enabled: boolean };
   readonly memory: { readonly readBoth: boolean };
+  /** T23: offer Bypass permissions in the mode menu (the user's own file only). */
+  readonly permissions: { readonly enableBypassPermissions: boolean };
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -46,6 +48,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   keybindings: {},
   notifications: { enabled: true },
   memory: { readBoth: false },
+  permissions: { enableBypassPermissions: false },
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -91,6 +94,10 @@ export function preferencesFrom(settings: unknown): Preferences {
           : DEFAULT_PREFERENCES.notifications.enabled,
     },
     memory: { readBoth: isRecord(file.memory) && file.memory.readBoth === true },
+    permissions: {
+      enableBypassPermissions:
+        isRecord(file.permissions) && file.permissions.enableBypassPermissions === true,
+    },
   };
 }
 
@@ -103,6 +110,7 @@ export type PreferenceChange =
   | { readonly key: 'appearance.reduceMotion'; readonly value: ReduceMotionPreference }
   | { readonly key: 'notifications.enabled'; readonly value: boolean }
   | { readonly key: 'memory.readBoth'; readonly value: boolean }
+  | { readonly key: 'permissions.enableBypassPermissions'; readonly value: boolean }
   /** `value` `null` restores the default key. */
   | { readonly key: 'keybinding'; readonly command: string; readonly value: string | null };
 
@@ -140,6 +148,10 @@ export function pointerOf(change: unknown): { pointer: string; value: unknown } 
       return typeof value === 'boolean' ? { pointer: '/notifications/enabled', value } : undefined;
     case 'memory.readBoth':
       return typeof value === 'boolean' ? { pointer: '/memory/readBoth', value } : undefined;
+    case 'permissions.enableBypassPermissions':
+      return typeof value === 'boolean'
+        ? { pointer: '/permissions/enableBypassPermissions', value }
+        : undefined;
     case 'keybinding': {
       const { command } = change;
       if (!isCommandId(command)) {

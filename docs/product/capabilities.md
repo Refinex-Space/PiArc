@@ -9,7 +9,7 @@
 | 里程碑 | 能力数 | 已实现 | 计划中 | BLOCKED |
 |---|---|---|---|---|
 | M1 | 61 | 61 | 0 | 0 |
-| M2 | 30 | 0 | 30 | 0 |
+| M2 | 33 | 7 | 26 | 0 |
 | M3 | 21 | 0 | 21 | 0 |
 | M4 | 10 | 0 | 10 | 0 |
 | M5 | 7 | 0 | 7 | 0 |
@@ -103,10 +103,13 @@
 | CAP-HOOK-STOP-001 | Stop hook（block 时续跑一轮，带防循环计数） | FR-HN-05、ARCH-6.3.2 | T25 | — | 计划中 |
 | CAP-MODEL-SETTINGS-001 | 每个模型的显示名、上下文窗口、图片输入与默认 effort | FR-MD-04 | T29 | — | 计划中 |
 | CAP-NEXT-001 | 回合结束时的"下一步"建议 | FR-HN-06、ARCH-6.5 | T26 | — | 计划中 |
-| CAP-PERM-AUDIT-001 | 规则管理与审计记录 | FR-PM-04 | T23 | — | 计划中 |
-| CAP-PERM-BASH-001 | Bash 复合命令逐个子命令判定 | FR-PM-03、ARCH-6.2.2 | T23 | — | 计划中 |
-| CAP-PERM-MODE-002 | 计划与跳过权限模式（跳过权限需显式开启并二次确认） | FR-PM-01、ARCH-6.2.1 | T23 | — | 计划中 |
-| CAP-PERM-RULE-001 | 兼容 Claude Code 的规则语法，按 deny → ask → allow 裁决 | FR-PM-03、ARCH-6.2.2 | T23 | — | 计划中 |
+| CAP-PERM-AUDIT-001 | 规则管理与审计记录 | FR-PM-04 | T23 | `perm-bash-compound` | 已实现 |
+| CAP-PERM-BASH-001 | Bash 复合命令逐个子命令判定 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-bash-compound` | 已实现 |
+| CAP-PERM-CRITICAL-001 | 关键路径删除在任何模式下都询问，包括跳过权限与存在匹配的 allow 规则 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-critical-delete` | 已实现 |
+| CAP-PERM-MODE-002 | 计划与跳过权限模式（跳过权限需显式开启并二次确认） | FR-PM-01、ARCH-6.2.1 | T23 | `perm-bypass`<br>`perm-critical-delete`<br>`perm-plan` | 已实现 |
+| CAP-PERM-READONLY-001 | 内置只读命令白名单在手动模式下免审批，路径越界或夹带其他命令时询问 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-read-only` | 已实现 |
+| CAP-PERM-RULE-001 | 兼容 Claude Code 的规则语法，按 deny → ask → allow 裁决 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-powershell-whole`（仅 windows）<br>`perm-rule-match` | 已实现 |
+| CAP-PERM-TOOLS-001 | 不带 specifier 的 deny 规则把工具从模型请求的工具列表中移除 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-rule-match` | 已实现 |
 | CAP-PLAN-MODE-001 | 计划模式：写工具与非只读命令被硬拦截，提交计划，批准时选择后续模式 | FR-HN-01、ARCH-6.5、ARCH-6.15 | T26 | — | 计划中 |
 | CAP-PROVIDER-OAUTH-001 | 服务商的 OAuth 与设备码登录（不含 Anthropic 订阅登录） | FR-MD-02、ARCH-5.4 | T29 | — | 计划中 |
 | CAP-RV-CHANGES-001 | 会话改动按文件给出统一 diff，大 diff 降级 | FR-RV-01、ARCH-7.7 | T28 | — | 计划中 |

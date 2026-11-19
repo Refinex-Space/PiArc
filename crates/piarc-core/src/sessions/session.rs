@@ -738,12 +738,17 @@ impl Request {
                     .await
             }
             Op::SetPermissionMode(mode) => {
+                self.tool_io
+                    .check_mode(&self.id.0, mode)
+                    .await
+                    .map_err(|e| Error::feature(&e))?;
                 supervisor
                     .set_permission_mode(&self.id, mode)
                     .await
                     .map_err(host_error)?;
                 self.tool_io
                     .changed_mode(&self.id.0, mode)
+                    .await
                     .map_err(|e| Error::feature(&e))?;
                 Ok(Value::Null)
             }

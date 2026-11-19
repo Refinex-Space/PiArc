@@ -1,9 +1,9 @@
 import type { Ref } from 'react';
 import type { PermissionMode } from '../../shared/ipc.js';
-import { useT } from '../app/app-context.js';
+import { useApp } from '../app/app-context.js';
 import { MenuPopup, useMenu } from './Menu.js';
 
-const MODES = ['default', 'acceptEdits'] as const;
+const MODES = ['default', 'acceptEdits', 'plan'] as const;
 
 export function PermissionModeMenu({
   id,
@@ -16,8 +16,13 @@ export function PermissionModeMenu({
   readonly buttonRef: Ref<HTMLButtonElement>;
   readonly onError: (error: unknown) => void;
 }) {
-  const t = useT();
+  const { t, preferences } = useApp();
   const menu = useMenu();
+  // Bypass is offered only after the user enabled it in settings; the main process asks once
+  // more before switching (T23).
+  const modes: readonly PermissionMode[] = preferences.permissions.enableBypassPermissions
+    ? [...MODES, 'bypassPermissions']
+    : MODES;
   return (
     <>
       <button
@@ -41,7 +46,7 @@ export function PermissionModeMenu({
           at={menu.open}
           numbered
           onClose={menu.close}
-          items={MODES.map((next) => ({
+          items={modes.map((next) => ({
             id: next,
             label: t(`approval.mode.${next}`),
             run: () => {

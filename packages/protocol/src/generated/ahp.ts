@@ -34,6 +34,8 @@ export type AhpMessage =
   | PolicyCancelResponse
   | PolicyRecoverRequest
   | PolicyRecoverResponse
+  | PolicyToolsRequest
+  | PolicyToolsResponse
   | ModelsListRequest
   | ModelsListResponse
   | ModelsReloadRequest
@@ -1325,6 +1327,46 @@ export interface PolicyRecoverResult {
    * The error result the restored conversation must give the model.
    */
   reason?: string | null;
+}
+/**
+ * Request for `policy/tools`.
+ */
+export interface PolicyToolsRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'policy/tools';
+  params: PolicyToolsParams;
+}
+/**
+ * The canonical names of the tools a session offers the model.
+ */
+export interface PolicyToolsParams {
+  /**
+   * Owning session.
+   */
+  sessionId: string;
+  /**
+   * Canonical tool names.
+   */
+  tools: string[];
+}
+/**
+ * Successful response to `policy/tools`.
+ */
+export interface PolicyToolsResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: PolicyToolsResult;
+}
+/**
+ * The tools a deny rule without a specifier removes from the model's tool list.
+ */
+export interface PolicyToolsResult {
+  /**
+   * Canonical names to leave out of the next model request.
+   */
+  denied: string[];
 }
 /**
  * Request for `models/list`.
@@ -4056,9 +4098,11 @@ export interface ApprovalRequest {
    */
   revision: number;
   /**
-   * Suggested exact rule.
+   * Rules "always allow" would save, one per subcommand that needed approval; editable
+   * before saving. Empty when the call cannot be allowed permanently (a critical deletion,
+   * a command that cannot be analyzed).
    */
-  rule?: string | null;
+  rules?: string[];
   /**
    * Owning session.
    */
@@ -4097,9 +4141,9 @@ export interface ApprovalAnswer {
    */
   revision: number;
   /**
-   * Rule shown in the native confirmation dialog.
+   * Rules shown in the native confirmation dialog.
    */
-  rule?: string | null;
+  rules?: string[];
   /**
    * Owning session.
    */

@@ -1,5 +1,6 @@
 //! The client's preferences in the user's settings file (`<data>/settings.json`, T18):
-//! language, appearance, keyboard shortcut overrides, notifications and the memory file choice. The desktop client
+//! language, appearance, keyboard shortcut overrides, notifications, the memory file choice
+//! and whether the mode menu offers Bypass permissions (T23). The desktop client
 //! reads the whole file and writes these keys only; writes go through
 //! [`piarc_config::write_value`] (temporary file and rename), so Core stays the one writer of
 //! settings files.
@@ -42,8 +43,11 @@ pub fn read(data_dir: &Path) -> Result<Value> {
     }
 }
 
+/// Boolean preferences outside [`CLIENT_KEYS`] the client may set.
+pub const CLIENT_SWITCHES: &[&str] = &["/memory/readBoth", "/permissions/enableBypassPermissions"];
+
 /// Sets (`Some`) or removes (`None`) the value at `pointer`, which must lie under one of
-/// [`CLIENT_KEYS`] or be exactly `/memory/readBoth`. Returns the file's new content.
+/// [`CLIENT_KEYS`] or be one of [`CLIENT_SWITCHES`]. Returns the file's new content.
 ///
 /// # Errors
 ///
@@ -53,18 +57,19 @@ pub fn write(data_dir: &Path, pointer: &str, value: Option<Value>) -> Result<Val
     let top = pointer
         .strip_prefix('/')
         .and_then(|rest| rest.split('/').next());
-    if pointer == "/memory/readBoth" {
+    if CLIENT_SWITCHES.contains(&pointer) {
         if value.as_ref().is_some_and(|v| !v.is_boolean()) {
             return Err(Error::InvalidArgument {
                 field: "value",
-                reason: "memory.readBoth requires a boolean".into(),
+                reason: format!("{pointer} requires a boolean"),
             });
         }
     } else if !top.is_some_and(|key| CLIENT_KEYS.contains(&key)) {
         return Err(Error::InvalidArgument {
             field: "pointer",
             reason: format!(
-                "must be /memory/readBoth or start with one of /{}",
+                "must be one of {} or start with one of /{}",
+                CLIENT_SWITCHES.join(", "),
                 CLIENT_KEYS.join(", /")
             ),
         });
@@ -134,7 +139,16 @@ mod tests {
         let after = write(&dir, "/memory/readBoth", Some(json!(true))).expect("set memory choice");
         assert_eq!(after["memory"]["readBoth"], true);
         assert!(write(&dir, "/memory/readBoth", Some(json!("true"))).is_err());
+        let after = write(
+            &dir,
+            "/permissions/enableBypassPermissions",
+            Some(json!(true)),
+        )
+        .expect("enable bypass in the mode menu");
+        assert_eq!(after["permissions"]["enableBypassPermissions"], true);
+        assert!(write(&dir, "/permissions/enableBypassPermissions", Some(json!(1))).is_err());
         for refused in [
+            "/permissions/defaultMode",
             "/memory",
             "/memory/readBoth/other",
             "/memory/other",

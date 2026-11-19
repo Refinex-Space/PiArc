@@ -28,6 +28,19 @@ describe('preferences', () => {
     expect(prefs.notifications.enabled).toBe(false);
     expect(prefs.memory.readBoth).toBe(true);
     expect(preferencesFrom({ memory: { readBoth: 'true' } }).memory.readBoth).toBe(false);
+    expect(
+      preferencesFrom({ permissions: { enableBypassPermissions: true } }).permissions
+        .enableBypassPermissions,
+    ).toBe(true);
+    expect(
+      preferencesFrom({ permissions: { enableBypassPermissions: 'yes' } }).permissions
+        .enableBypassPermissions,
+    ).toBe(false);
+    expect(pointerOf({ key: 'permissions.enableBypassPermissions', value: true })).toEqual({
+      pointer: '/permissions/enableBypassPermissions',
+      value: true,
+    });
+    expect(pointerOf({ key: 'permissions.enableBypassPermissions', value: 'on' })).toBe(undefined);
   });
 
   it('maps only valid changes to settings pointers', () => {

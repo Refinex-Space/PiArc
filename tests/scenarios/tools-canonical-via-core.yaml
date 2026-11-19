@@ -30,8 +30,8 @@ providers:
             }
           - { id: toolu_write, name: Write, input: { path: 'notes/new.txt', content: "created\n" } }
       - text: 'All six tools ran.'
+# echo is a read-only command (T23).
 approvals:
-  - { tool: Bash, decision: allow }
   - { tool: Edit, decision: allow }
   - { tool: Write, decision: allow }
 actions:

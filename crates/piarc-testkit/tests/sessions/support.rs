@@ -204,12 +204,13 @@ impl Env {
         }}});
         write_json(&data.join("pi").join("models.json"), &models);
         // These orchestration fixtures exercise tool execution after approval. Their user
-        // preapproves only the three exact calls used as barriers or batch boundaries.
+        // preapproves only the calls used as barriers or batch boundaries (an `Edit` rule
+        // covers Write, T23).
         write_json(
             &data.join("settings.json"),
             &json!({ "permissions": { "allow": [
                 "Bash(while [ ! -f go ]; do sleep 0.05; done; echo go)",
-                "Bash(sleep 30)", "Write(files/out.txt)"
+                "Bash(sleep 30)", "Edit(files/out.txt)"
             ]}}),
         );
         // Retries wait milliseconds, not seconds.

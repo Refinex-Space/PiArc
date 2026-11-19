@@ -8,7 +8,9 @@ import { expect, test } from './fixtures.js';
 const PIARC_API_SNAPSHOT = [
   'abort',
   'answerApproval',
+  'auditEvents',
   'cancelFileSearch',
+  'checkPermissionRule',
   'chooseFolder',
   'closeSession',
   'closeTerminal',
@@ -30,6 +32,7 @@ const PIARC_API_SNAPSHOT = [
   'openExternal',
   'openSettings',
   'openWorkspace',
+  'permissionRules',
   'previewModelSwitch',
   'projectTrust',
   'prompt',
@@ -57,6 +60,7 @@ const PIARC_API_SNAPSHOT = [
   'terminalResize',
   'transcriptWindow',
   'unsubscribeEvents',
+  'updatePermissionRule',
   'workspaceModels',
 ];
 

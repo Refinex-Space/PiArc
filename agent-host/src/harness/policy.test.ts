@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CoreBridge } from '../runtime/core-bridge.js';
-import { refusal } from './policy.js';
+import { nextActiveTools, refusal } from './policy.js';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -41,5 +41,26 @@ describe('permission preflight', () => {
       result: { allowed: false, reason: 'Please use the test fixture.' },
     });
     await expect(wait).resolves.toBe('Please use the test fixture.');
+  });
+});
+
+describe('tools denied as a whole', () => {
+  const canonical = (name: string) => (name === 'bash_tool' ? 'Bash' : name);
+
+  it('removes denied tools and restores them when the rule goes away', () => {
+    const removed = new Set<string>();
+    expect(
+      nextActiveTools(['read', 'bash_tool', 'mcp__a__b'], removed, new Set(['Bash']), canonical),
+    ).toEqual(['read', 'mcp__a__b']);
+    expect([...removed]).toEqual(['bash_tool']);
+    expect(nextActiveTools(['read', 'mcp__a__b'], removed, new Set(['Bash']), canonical)).toBe(
+      undefined,
+    );
+    expect(nextActiveTools(['read', 'mcp__a__b'], removed, new Set(), canonical)).toEqual([
+      'read',
+      'mcp__a__b',
+      'bash_tool',
+    ]);
+    expect(removed.size).toBe(0);
   });
 });

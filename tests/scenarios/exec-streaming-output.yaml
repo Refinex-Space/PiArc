@@ -8,8 +8,7 @@ providers:
       - tool_calls:
           - { id: toolu_slow, name: Bash, input: { command: 'echo first; sleep 1; echo second' } }
       - text: 'Done.'
-approvals:
-  - { tool: Bash, decision: allow }
+# echo and sleep are read-only commands: no approval (T23).
 actions:
   - prompt: { text: 'Print slowly.', turn: t }
 expect:

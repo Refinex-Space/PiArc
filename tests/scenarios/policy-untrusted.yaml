@@ -4,7 +4,7 @@ capabilities:
   - CAP-PERM-MODE-001
 workspace:
   files:
-    .piarc/settings.json: '{"permissions":{"allow":["Bash(echo hidden)"],"defaultMode":"acceptEdits","additionalDirectories":[".."]}}'
+    .piarc/settings.json: '{"permissions":{"allow":["Bash(make hidden)"],"defaultMode":"acceptEdits","additionalDirectories":[".."]}}'
 providers:
   main:
     wire: anthropic
@@ -13,7 +13,7 @@ providers:
           - id: run
             name: Bash
             input:
-              command: echo hidden
+              command: make hidden
       - tool_calls:
           - id: write
             name: Write

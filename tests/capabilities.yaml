@@ -482,25 +482,43 @@ capabilities:
     milestone: M2
     refs: [FR-PM-01, ARCH-6.2.1]
     task: T23
-    status: planned
+    status: active
   - id: CAP-PERM-RULE-001
     title: '兼容 Claude Code 的规则语法，按 deny → ask → allow 裁决'
     milestone: M2
     refs: [FR-PM-03, ARCH-6.2.2]
     task: T23
-    status: planned
+    status: active
   - id: CAP-PERM-BASH-001
     title: 'Bash 复合命令逐个子命令判定'
     milestone: M2
     refs: [FR-PM-03, ARCH-6.2.2]
     task: T23
-    status: planned
+    status: active
   - id: CAP-PERM-AUDIT-001
     title: '规则管理与审计记录'
     milestone: M2
     refs: [FR-PM-04]
     task: T23
-    status: planned
+    status: active
+  - id: CAP-PERM-TOOLS-001
+    title: '不带 specifier 的 deny 规则把工具从模型请求的工具列表中移除'
+    milestone: M2
+    refs: [FR-PM-03, ARCH-6.2.2]
+    task: T23
+    status: active
+  - id: CAP-PERM-READONLY-001
+    title: '内置只读命令白名单在手动模式下免审批，路径越界或夹带其他命令时询问'
+    milestone: M2
+    refs: [FR-PM-03, ARCH-6.2.2]
+    task: T23
+    status: active
+  - id: CAP-PERM-CRITICAL-001
+    title: '关键路径删除在任何模式下都询问，包括跳过权限与存在匹配的 allow 规则'
+    milestone: M2
+    refs: [FR-PM-03, ARCH-6.2.2]
+    task: T23
+    status: active
   - id: CAP-PERM-AUTO-001
     title: '自动审查模式：可配置的审查模型代替人审批，决策可审计'
     milestone: M5

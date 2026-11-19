@@ -53,6 +53,27 @@ pub struct TrustRecord {
     pub snapshot: String,
 }
 
+/// Which audit events to read ([`crate::Store::filter_audit_events`]); `None` matches all.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AuditFilter {
+    /// The session.
+    pub session_id: Option<String>,
+    /// The workspace path.
+    pub workspace: Option<String>,
+    /// The category (`permission`, ...).
+    pub kind: Option<String>,
+    /// The tool in the details.
+    pub tool: Option<String>,
+    /// `allow` or `deny` in the details.
+    pub conclusion: Option<String>,
+    /// From this Unix ms.
+    pub since: Option<i64>,
+    /// Up to this Unix ms.
+    pub until: Option<i64>,
+    /// At most this many rows.
+    pub limit: u32,
+}
+
 /// One row of `audit_events`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuditEvent {
@@ -121,6 +142,38 @@ impl Store {
             })
             .map_err(Error::sqlite("cannot read workspaces"))?;
         rows.collect::<rusqlite::Result<_>>()
+            .map_err(Error::sqlite("cannot read workspaces"))
+    }
+
+    /// Remember the permission mode chosen in a workspace; false when the workspace has no row.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Sqlite`] when the row cannot be written.
+    pub fn set_workspace_mode(&self, path: &str, mode: Option<&str>) -> Result<bool> {
+        self.conn
+            .execute(
+                "UPDATE workspaces SET default_mode = ?2 WHERE path = ?1",
+                params![path, mode],
+            )
+            .map(|n| n > 0)
+            .map_err(Error::sqlite("cannot write workspaces"))
+    }
+
+    /// The permission mode remembered for a workspace.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Sqlite`] when the table cannot be read.
+    pub fn workspace_mode(&self, path: &str) -> Result<Option<String>> {
+        self.conn
+            .query_row(
+                "SELECT default_mode FROM workspaces WHERE path = ?1",
+                [path],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .optional()
+            .map(Option::flatten)
             .map_err(Error::sqlite("cannot read workspaces"))
     }
 
@@ -227,6 +280,36 @@ impl Store {
         self.read_audit("SELECT at, kind, session_id, workspace, detail FROM audit_events WHERE session_id = ?1 ORDER BY at DESC, id DESC LIMIT ?2", params![session, limit])
     }
 
+    /// Audit events matching `filter`, newest first. The tool and conclusion are read from the
+    /// event's JSON details.
+    ///
+    /// # Errors
+    ///
+    /// A database read failed.
+    pub fn filter_audit_events(&self, filter: &AuditFilter) -> Result<Vec<AuditEvent>> {
+        self.read_audit(
+            "SELECT at, kind, session_id, workspace, detail FROM audit_events
+             WHERE (?1 IS NULL OR session_id = ?1)
+               AND (?2 IS NULL OR json_extract(detail, '$.tool') = ?2)
+               AND (?3 IS NULL OR json_extract(detail, '$.conclusion') = ?3)
+               AND (?4 IS NULL OR at >= ?4)
+               AND (?5 IS NULL OR at <= ?5)
+               AND (?6 IS NULL OR workspace = ?6)
+               AND (?7 IS NULL OR kind = ?7)
+             ORDER BY at DESC, id DESC LIMIT ?8",
+            params![
+                filter.session_id,
+                filter.tool,
+                filter.conclusion,
+                filter.since,
+                filter.until,
+                filter.workspace,
+                filter.kind,
+                filter.limit
+            ],
+        )
+    }
+
     fn read_audit(&self, sql: &str, params: impl rusqlite::Params) -> Result<Vec<AuditEvent>> {
         let mut statement = self
             .conn
@@ -245,5 +328,105 @@ impl Store {
             .map_err(Error::sqlite("cannot read audit_events"))?;
         rows.collect::<rusqlite::Result<_>>()
             .map_err(Error::sqlite("cannot read audit_events"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn workspace_modes_are_remembered() {
+        let store = Store::open_in_memory(0).expect("store");
+        assert!(
+            !store
+                .set_workspace_mode("/w", Some("plan"))
+                .expect("update")
+        );
+        store
+            .upsert_workspace(&WorkspaceRecord {
+                path: "/w".into(),
+                display_name: "w".into(),
+                main_checkout: "/w".into(),
+                last_opened_at: 1,
+                default_mode: None,
+                default_model: None,
+            })
+            .expect("workspace");
+        assert!(
+            store
+                .set_workspace_mode("/w", Some("plan"))
+                .expect("update")
+        );
+        assert_eq!(
+            store.workspace_mode("/w").expect("read").as_deref(),
+            Some("plan")
+        );
+        assert_eq!(store.workspace_mode("/other").expect("read"), None);
+    }
+
+    #[test]
+    fn audit_events_filter_by_session_tool_conclusion_and_time() {
+        let store = Store::open_in_memory(0).expect("store");
+        for (at, session, tool, conclusion) in [
+            (10, "a", "Bash", "deny"),
+            (20, "a", "Read", "allow"),
+            (30, "b", "Bash", "allow"),
+        ] {
+            store
+                .append_audit(&AuditEvent {
+                    at,
+                    kind: "permission".into(),
+                    session_id: Some(session.into()),
+                    workspace: Some("/w".into()),
+                    detail: format!(r#"{{"tool":"{tool}","conclusion":"{conclusion}"}}"#),
+                })
+                .expect("audit");
+        }
+        let times = |filter: AuditFilter| -> Vec<i64> {
+            store
+                .filter_audit_events(&AuditFilter {
+                    limit: 10,
+                    ..filter
+                })
+                .expect("query")
+                .iter()
+                .map(|e| e.at)
+                .collect()
+        };
+        assert_eq!(times(AuditFilter::default()), [30, 20, 10]);
+        assert_eq!(
+            times(AuditFilter {
+                tool: Some("Bash".into()),
+                ..Default::default()
+            }),
+            [30, 10]
+        );
+        assert_eq!(
+            times(AuditFilter {
+                session_id: Some("a".into()),
+                conclusion: Some("deny".into()),
+                ..Default::default()
+            }),
+            [10]
+        );
+        assert_eq!(
+            times(AuditFilter {
+                since: Some(15),
+                until: Some(25),
+                ..Default::default()
+            }),
+            [20]
+        );
+        assert_eq!(
+            store
+                .filter_audit_events(&AuditFilter {
+                    limit: 1,
+                    ..Default::default()
+                })
+                .expect("q")
+                .len(),
+            1
+        );
     }
 }

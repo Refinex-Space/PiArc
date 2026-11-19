@@ -1,72 +1,89 @@
-//! Resolve the four M1 filesystem utilities without running anything from the workspace.
-//! These checks are for automatic approval only. All commands inherit the same allowed fields.
+//! Resolve the programs an automatic approval relies on without running anything from the
+//! workspace (ADR-0031, T23). A command allowed by the read-only list or by Accept edits runs
+//! only when every external program in it resolves outside the directories the session can
+//! write; the physical files are then pinned in the command's bash process.
 use super::*;
 
+/// The Accept edits file commands: their programs must also be system utilities.
+const FILE_UTILITIES: &[&str] = &["mkdir", "touch", "mv", "cp"];
+
+/// What a preflight needs to resolve program names the way the command's bash will.
+pub(in crate::tool_io) struct Programs {
+    env: Vec<(OsString, OsString)>,
+    custom: bool,
+    shell: Option<PathBuf>,
+    #[cfg(windows)]
+    git: Vec<(String, PathBuf)>,
+}
+
 impl Exec {
-    pub(in crate::tool_io) async fn simple_utility(
-        &self,
-        scope: &piarc_fs::Scope,
-        command: &str,
-    ) -> Option<PathBuf> {
-        let name = command.split_ascii_whitespace().next()?;
-        let shell = self.shells().bash.as_deref()?;
+    pub(in crate::tool_io) async fn programs(&self) -> Programs {
         let resolved = self.base_env().await;
-        if resolved.custom_resolution {
-            return None;
-        }
-        let env = &resolved.inherited;
-        let expected = installed_utility(shell, name)?;
-        if !safe_search(env, scope, name, &expected) {
-            return None;
-        }
+        let shell = self.shells().bash.clone();
         #[cfg(windows)]
-        {
-            // The Git Bash launcher can prepend its own directories to the Windows PATH.
-            // Check its actual resolution against the installed coreutils in a clean cwd.
-            let known = self
-                .git_utilities
-                .get_or_init(|| self.probe_git_utilities(shell, env))
-                .await;
-            if !known.iter().any(|s| s == name) {
-                return None;
-            }
+        let git = match &shell {
+            Some(shell) => self
+                .git_programs
+                .get_or_init(|| self.probe_git_programs(shell, &resolved.inherited))
+                .await
+                .clone(),
+            None => Vec::new(),
+        };
+        Programs {
+            env: resolved.inherited.clone(),
+            custom: resolved.custom_resolution,
+            shell,
+            #[cfg(windows)]
+            git,
         }
-        Some(expected)
     }
 
+    /// Ask Git Bash which listed programs resolve to Git's own executables, from a clean
+    /// directory. Git's launcher puts its own directories first on the Windows PATH.
     #[cfg(windows)]
-    async fn probe_git_utilities(&self, shell: &Path, env: &[(OsString, OsString)]) -> Vec<String> {
-        let Some(dir) =
-            installed_utility(shell, "touch").and_then(|p| p.parent().map(Path::to_owned))
-        else {
+    async fn probe_git_programs(
+        &self,
+        shell: &Path,
+        env: &[(OsString, OsString)],
+    ) -> Vec<(String, PathBuf)> {
+        let Some(root) = git_root(shell) else {
             return Vec::new();
         };
-        // All names are constants; the native directory is passed as an argument to bash.
-        let script = r#"for n in mkdir touch mv cp; do
-            f=$(builtin type -P "$n")
-            [[ -n "$f" && "$f" -ef "$1/$n.exe" ]] && builtin printf '%s\n' "$n"
+        // All names are constants; the installation is passed as an argument to bash.
+        let script = r#"root=$1; shift
+        for n in "$@"; do
+            f=$(builtin type -P "$n") || continue
+            if [[ "$f" -ef "$root/usr/bin/$n.exe" ]]; then builtin printf 'usr %s\n' "$n"
+            elif [[ "$f" -ef "$root/mingw64/bin/$n.exe" ]]; then builtin printf 'mingw64 %s\n' "$n"
+            fi
         done
         exit 0"#;
-        let args = vec![
+        let mut args: Vec<OsString> = vec![
             "-c".into(),
             script.into(),
             "piarc".into(),
-            piarc_fs::display(&dir).replace('\\', "/").into(),
+            piarc_fs::display(&root).replace('\\', "/").into(),
         ];
+        let names = FILE_UTILITIES
+            .iter()
+            .chain(piarc_policy::bash::PROGRAMS)
+            .chain(piarc_policy::bash::WRAPPED)
+            .copied();
+        args.extend(names.map(OsString::from));
         let spec = CommandSpec {
             program: shell.to_owned(),
             args,
-            cwd: dir,
+            cwd: root.clone(),
             env: env.to_vec(),
             launcher: None,
-            timeout: Some(Duration::from_secs(2)),
+            timeout: Some(Duration::from_secs(5)),
             kill_grace: Duration::from_millis(100),
         };
         let (tx, mut rx) = mpsc::channel::<OutputChunk>(8);
         let read = async {
             let mut bytes = Vec::new();
             while let Some(chunk) = rx.recv().await {
-                if chunk.stream == Stream::Stdout && bytes.len() + chunk.bytes.len() <= 256 {
+                if chunk.stream == Stream::Stdout && bytes.len() + chunk.bytes.len() <= 16_384 {
                     bytes.extend(chunk.bytes);
                 }
             }
@@ -74,22 +91,63 @@ impl Exec {
         };
         let (result, bytes) =
             tokio::join!(self.runner.run(spec, tx, CancellationToken::new()), read);
-        if result.is_ok_and(|r| r.status.success() && !r.timed_out && !r.killed) {
-            String::from_utf8_lossy(&bytes)
-                .lines()
-                .map(str::to_owned)
-                .collect()
-        } else {
-            Vec::new()
+        if !result.is_ok_and(|r| r.status.success() && !r.timed_out && !r.killed) {
+            return Vec::new();
+        }
+        String::from_utf8_lossy(&bytes)
+            .lines()
+            .filter_map(|line| {
+                let (dir, name) = line.split_once(' ')?;
+                let program = root.join(dir).join("bin").join(format!("{name}.exe"));
+                let canonical = piarc_git::strip_verbatim(program.canonicalize().ok()?);
+                (canonical == program).then(|| (name.to_owned(), program))
+            })
+            .collect()
+    }
+}
+
+impl Programs {
+    /// The physical program `name` resolves to, `None` when an automatic approval cannot rely
+    /// on it: the shell's startup or functions are customized, the PATH reaches into the
+    /// workspace, or the program lives where the session can write.
+    pub(in crate::tool_io) fn resolve(
+        &self,
+        scope: &piarc_fs::Scope,
+        name: &str,
+    ) -> Option<PathBuf> {
+        if self.custom {
+            return None;
+        }
+        let shell = self.shell.as_deref()?;
+        #[cfg(windows)]
+        {
+            let _ = (shell, scope);
+            self.git
+                .iter()
+                .find(|(n, _)| n == name)
+                .map(|(_, p)| p.clone())
+        }
+        #[cfg(not(windows))]
+        {
+            if shell != Path::new("/bin/bash") {
+                return None;
+            }
+            if FILE_UTILITIES.contains(&name) {
+                let expected = installed_utility(name)?;
+                return (first_on_path(&self.env, scope, name).ok()?.as_ref() == Some(&expected))
+                    .then_some(expected);
+            }
+            let found = first_on_path(&self.env, scope, name).ok()??;
+            let writable = scope
+                .check(&piarc_fs::display(&found), piarc_fs::Access::Read)
+                .is_ok();
+            (!writable).then_some(found)
         }
     }
 }
 
 #[cfg(not(windows))]
-fn installed_utility(shell: &Path, name: &str) -> Option<PathBuf> {
-    if shell != Path::new("/bin/bash") || !matches!(name, "mkdir" | "touch" | "mv" | "cp") {
-        return None;
-    }
+fn installed_utility(name: &str) -> Option<PathBuf> {
     ["/bin", "/usr/bin"]
         .iter()
         .map(|d| Path::new(d).join(name))
@@ -98,27 +156,15 @@ fn installed_utility(shell: &Path, name: &str) -> Option<PathBuf> {
         .ok()
 }
 
+/// The Git installation that owns `shell`, when it is the verified Program Files one.
 #[cfg(windows)]
-fn installed_utility(shell: &Path, name: &str) -> Option<PathBuf> {
-    if !matches!(name, "mkdir" | "touch" | "mv" | "cp") {
-        return None;
-    }
-    let actual = shell.canonicalize().ok()?;
-    for base in ["ProgramFiles", "ProgramFiles(x86)"]
+fn git_root(shell: &Path) -> Option<PathBuf> {
+    let actual = piarc_git::strip_verbatim(shell.canonicalize().ok()?);
+    ["ProgramFiles", "ProgramFiles(x86)"]
         .iter()
         .filter_map(std::env::var_os)
-    {
-        let git = PathBuf::from(base).join("Git");
-        let expected = git.join("bin/bash.exe");
-        let program = git.join("usr/bin").join(format!("{name}.exe"));
-        if piarc_git::strip_verbatim(actual.clone()) == expected
-            && program.is_file()
-            && piarc_git::strip_verbatim(program.canonicalize().ok()?) == program
-        {
-            return Some(program);
-        }
-    }
-    None
+        .map(|base| PathBuf::from(base).join("Git"))
+        .find(|git| actual == git.join("bin/bash.exe"))
 }
 
 pub(super) fn has_custom_resolution(env: &[(OsString, OsString)]) -> bool {
@@ -143,56 +189,37 @@ pub(super) fn has_custom_resolution(env: &[(OsString, OsString)]) -> bool {
     })
 }
 
-fn safe_search(
+/// The first executable named `name` on PATH, physical. An error when PATH has a relative or
+/// `..` entry, or an entry inside the workspace, before the program is found.
+#[cfg(not(windows))]
+fn first_on_path(
     env: &[(OsString, OsString)],
     scope: &piarc_fs::Scope,
     name: &str,
-    expected: &Path,
-) -> bool {
-    let Some((_, path)) = env.iter().find(|(k, _)| {
-        if cfg!(windows) {
-            k.eq_ignore_ascii_case("PATH")
-        } else {
-            k == "PATH"
-        }
-    }) else {
-        return false;
-    };
-    let mut first = None;
-    let filename = if cfg!(windows) {
-        format!("{name}.exe")
-    } else {
-        name.to_owned()
-    };
+) -> Result<Option<PathBuf>, ()> {
+    use std::os::unix::fs::PermissionsExt;
+    let (_, path) = env.iter().find(|(k, _)| k == "PATH").ok_or(())?;
     for dir in std::env::split_paths(path) {
         if !dir.is_absolute()
             || dir
                 .components()
                 .any(|part| part == std::path::Component::ParentDir)
         {
-            return false;
+            return Err(());
         }
-        let Some(raw) = dir.to_str() else {
-            return false;
-        };
-        let Ok(physical) = scope.locate(raw) else {
-            return false;
-        };
+        let raw = dir.to_str().ok_or(())?;
+        let physical = scope.locate(raw).map_err(|_| ())?;
         if physical.starts_with(scope.root()) || dir.starts_with(scope.root()) {
-            return false;
+            return Err(());
         }
-        let candidate = physical.join(&filename);
-        if first.is_none() && candidate.exists() {
-            let Some(found) = candidate.canonicalize().ok() else {
-                return false;
-            };
-            first = Some(piarc_git::strip_verbatim(found));
+        let candidate = physical.join(name);
+        let executable = std::fs::metadata(&candidate)
+            .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0);
+        if executable {
+            return candidate.canonicalize().map(Some).map_err(|_| ());
         }
     }
-    match first {
-        Some(found) => found == piarc_git::strip_verbatim(expected.to_owned()),
-        None => cfg!(windows), // Git's own PATH addition is checked by the shell probe.
-    }
+    Ok(None)
 }
 
 #[cfg(all(test, unix))]
@@ -204,22 +231,61 @@ mod tests {
         let ws = root.join("workspace");
         std::fs::create_dir_all(&ws).expect("dir");
         let scope = piarc_fs::Scope::new(&ws, &ws).expect("scope");
-        let expected = installed_utility(Path::new("/bin/bash"), "touch").expect("system touch");
-        let check = |dirs: Vec<&Path>| {
-            safe_search(
-                &[("PATH".into(), std::env::join_paths(dirs).expect("path"))],
-                &scope,
-                "touch",
-                &expected,
-            )
+        let programs = |dirs: Vec<&Path>| Programs {
+            env: vec![("PATH".into(), std::env::join_paths(dirs).expect("path"))],
+            custom: false,
+            shell: Some(PathBuf::from("/bin/bash")),
         };
-        assert!(check(vec![Path::new("/usr/bin"), Path::new("/bin")]));
-        assert!(!check(vec![&ws, Path::new("/usr/bin")]));
-        assert!(!check(vec![Path::new(""), Path::new("/usr/bin")]));
+        let system = programs(vec![Path::new("/usr/bin"), Path::new("/bin")]);
+        assert_eq!(system.resolve(&scope, "touch"), installed_utility("touch"));
+        assert!(system.resolve(&scope, "ls").is_some());
+        assert!(system.resolve(&scope, "no-such-program-piarc").is_none());
+        assert!(
+            programs(vec![&ws, Path::new("/usr/bin")])
+                .resolve(&scope, "touch")
+                .is_none()
+        );
+        assert!(
+            programs(vec![Path::new(""), Path::new("/usr/bin")])
+                .resolve(&scope, "ls")
+                .is_none()
+        );
         let bin = root.join("custom");
         std::fs::create_dir_all(&bin).expect("bin");
         std::fs::write(bin.join("touch"), "fixture").expect("file");
-        assert!(!check(vec![&bin, Path::new("/usr/bin")]));
+        std::process::Command::new("chmod")
+            .arg("+x")
+            .arg(bin.join("touch"))
+            .status()
+            .expect("chmod");
+        assert!(
+            programs(vec![&bin, Path::new("/usr/bin")])
+                .resolve(&scope, "touch")
+                .is_none()
+        );
+        // A program inside a directory the session can write is not relied on.
+        let added = scope.clone().with_added_dir(&bin).expect("added");
+        std::fs::write(bin.join("cat"), "fixture").expect("file");
+        std::process::Command::new("chmod")
+            .arg("+x")
+            .arg(bin.join("cat"))
+            .status()
+            .expect("chmod");
+        assert!(
+            programs(vec![&bin, Path::new("/bin")])
+                .resolve(&added, "cat")
+                .is_none()
+        );
+        assert!(
+            programs(vec![&bin, Path::new("/bin")])
+                .resolve(&scope, "cat")
+                .is_some()
+        );
+        let custom = Programs {
+            custom: true,
+            ..programs(vec![Path::new("/bin")])
+        };
+        assert!(custom.resolve(&scope, "ls").is_none());
         std::fs::remove_dir_all(root).expect("clean");
     }
 }

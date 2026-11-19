@@ -54,6 +54,17 @@ export declare class CoreRuntime {
   setSessionEffort(id: string, effort: string): Promise<string>;
   /** Answers a pending permission request and returns its status as JSON. */
   answerApproval(answer: string): Promise<string>;
+  /**
+   * The permission rules of a workspace by source, the most recent workspace when null
+   * (T23).
+   */
+  permissionRules(workspace?: string | null): Promise<string>;
+  /** Whether a rule parses for `allow`, `ask` or `deny`, and whether it is broad (JSON). */
+  checkPermissionRule(rule: string, behavior: string): Promise<string>;
+  /** Changes one rule of a writable settings file and returns the new view (JSON). */
+  updatePermissionRule(change: string): Promise<string>;
+  /** Permission audit events matching the JSON query, newest first (JSON). */
+  auditEvents(query: string): Promise<string>;
   /** Changes the mode and appends its entry to the session before resolving. */
   setPermissionMode(id: string, mode: string): Promise<string>;
   /** Reopens a session from its file (its workspace is opened when needed). */

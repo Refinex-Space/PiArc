@@ -125,9 +125,11 @@ pub struct ApprovalRequest {
     /// Preview of the file change.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub diff: Option<FileDiff>,
-    /// Suggested exact rule.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rule: Option<String>,
+    /// Rules "always allow" would save, one per subcommand that needed approval; editable
+    /// before saving. Empty when the call cannot be allowed permanently (a critical deletion,
+    /// a command that cannot be analyzed).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rules: Vec<String>,
     /// Suggested directory to add.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub directory: Option<String>,
@@ -153,9 +155,9 @@ pub struct ApprovalAnswer {
     /// Feedback to return on refusal.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub feedback: Option<String>,
-    /// Rule shown in the native confirmation dialog.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rule: Option<String>,
+    /// Rules shown in the native confirmation dialog.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rules: Vec<String>,
     /// Directory shown in the native confirmation dialog.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub directory: Option<String>,
@@ -208,4 +210,26 @@ pub struct PolicyInputChunkResult {}
 crate::method::request!(
     /// Stage part of a large tool preflight in bounded session memory.
     PolicyInputChunk, "policy/inputChunk", PolicyInputChunkParams, PolicyInputChunkResult
+);
+
+/// The canonical names of the tools a session offers the model.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PolicyToolsParams {
+    /// Owning session.
+    pub session_id: String,
+    /// Canonical tool names.
+    pub tools: Vec<String>,
+}
+
+/// The tools a deny rule without a specifier removes from the model's tool list.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct PolicyToolsResult {
+    /// Canonical names to leave out of the next model request.
+    pub denied: Vec<String>,
+}
+
+crate::method::request!(
+    /// Ask Core which tools are denied as a whole before each agent run.
+    PolicyTools, "policy/tools", PolicyToolsParams, PolicyToolsResult
 );

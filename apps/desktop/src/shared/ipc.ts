@@ -69,7 +69,37 @@ export const IPC_CHANNELS = {
   trustDecide: 'piarc:trust.decide',
   attentionNotify: 'piarc:attention.notify',
   attentionCount: 'piarc:attention.count',
+  permissionRules: 'piarc:permissions.rules',
+  permissionCheck: 'piarc:permissions.check',
+  permissionUpdate: 'piarc:permissions.update',
+  auditEvents: 'piarc:permissions.audit',
 } as const;
+
+/** The list a permission rule is in. */
+export type RuleBehavior = 'allow' | 'ask' | 'deny';
+
+/** Writable settings files the permission page may change (T23). */
+export const RULE_LAYERS = ['projectLocal', 'project', 'user'] as const;
+export type RuleLayer = (typeof RULE_LAYERS)[number];
+
+/** Add (no `old`), replace, or remove (no `rule`) one rule of a writable source. */
+export interface PermissionRuleChange {
+  readonly workspace: string;
+  readonly layer: RuleLayer;
+  readonly behavior: RuleBehavior;
+  readonly old?: string;
+  readonly rule?: string;
+}
+
+/** Filters of the permission audit view; absent fields match everything. */
+export interface AuditQuery {
+  readonly workspace?: string;
+  readonly sessionId?: string;
+  readonly tool?: string;
+  readonly conclusion?: 'allow' | 'deny';
+  readonly since?: number;
+  readonly limit?: number;
+}
 
 /**
  * Main → preload messages about the app (`webContents.send`): preference changes, commands
@@ -343,6 +373,14 @@ export interface PiarcApi {
   /** Stops the running turn; resolves with the returned queue as JSON. */
   abort(id: string): Promise<string>;
   setPermissionMode(id: string, mode: PermissionMode): Promise<void>;
+  /** The permission rules of a workspace by source (JSON), the most recent one when null. */
+  permissionRules(workspace: string | null): Promise<string>;
+  /** Whether a rule parses for a list, and whether it is broad (JSON). */
+  checkPermissionRule(rule: string, behavior: RuleBehavior): Promise<string>;
+  /** Change one rule; new or changed allow rules need the native confirmation (JSON). */
+  updatePermissionRule(change: PermissionRuleChange): Promise<string>;
+  /** Permission audit events, newest first (JSON). */
+  auditEvents(query: AuditQuery): Promise<string>;
   answerApproval(answer: ApprovalAnswer): Promise<string>;
   /** Compacts the conversation as a turn of its own (`/compact`); resolves with `{ turnId }`. */
   compact(id: string): Promise<string>;

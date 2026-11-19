@@ -27,7 +27,7 @@ use crate::models::{
     ModelsCredential, ModelsCredentialStatus, ModelsList, ModelsReload, SessionPreviewModelSwitch,
     SessionSetEffort, SessionSetModel,
 };
-use crate::policy::{PolicyCancel, PolicyEvaluate, PolicyInputChunk, PolicyPending};
+use crate::policy::{PolicyCancel, PolicyEvaluate, PolicyInputChunk, PolicyPending, PolicyTools};
 use crate::queue::{QueueChanged, QueueDelete, QueueEdit, QueueReorder};
 use crate::secrets::{
     SecretsChanged, SecretsDelete, SecretsGet, SecretsGetAll, SecretsLock, SecretsRenew,
@@ -177,6 +177,8 @@ pub static CONTRACTS: &[Contract] = &[
     response::<PolicyCancel>("policy/cancel/result"),
     request::<PolicyRecover>("policy/recover"),
     response::<PolicyRecover>("policy/recover/result"),
+    request::<PolicyTools>(PolicyTools::NAME),
+    response::<PolicyTools>("policy/tools/result"),
     request::<ModelsList>(ModelsList::NAME),
     response::<ModelsList>("models/list/result"),
     request::<ModelsReload>(ModelsReload::NAME),

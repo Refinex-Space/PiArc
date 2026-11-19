@@ -107,14 +107,69 @@ async function stageInput(
   return { ...target, input: write ? other : {}, stagedInputBytes: offset };
 }
 
+/**
+ * The model-visible tool names to declare, given the active ones, the ones this gate removed
+ * earlier and the canonical names Core denies as a whole. Returns undefined when nothing changes.
+ */
+export function nextActiveTools(
+  active: readonly string[],
+  removed: Set<string>,
+  denied: ReadonlySet<string>,
+  canonical: (tool: string) => string,
+): string[] | undefined {
+  const next = new Set(active);
+  let changed = false;
+  for (const name of [...removed]) {
+    if (!denied.has(canonical(name))) {
+      removed.delete(name);
+      next.add(name);
+      changed = true;
+    }
+  }
+  for (const name of active) {
+    if (denied.has(canonical(name))) {
+      next.delete(name);
+      removed.add(name);
+      changed = true;
+    }
+  }
+  return changed ? [...next] : undefined;
+}
+
 /** The same gate covers PiArc, MCP and project tools. */
 export function policyGate(
   bridge: CoreBridge,
   sessionId: string,
   canonical: (tool: string) => string,
   markDeclined: (id: string) => void,
+  log: (line: string) => void = () => undefined,
 ): ExtensionFactory {
   return (pi) => {
+    // A deny rule without a specifier removes the tool from the model's list (architecture
+    // section 6.2.2). Asked before every run, so rule edits apply to the next request.
+    const removed = new Set<string>();
+    pi.on('before_agent_start', async () => {
+      const active = pi.getActiveTools();
+      const names = [...new Set([...active, ...removed])];
+      try {
+        const denied = await bridge.requestTyped(
+          'policy/tools',
+          { sessionId, tools: names.map(canonical) },
+          (value) =>
+            isObject(value) &&
+            Array.isArray(value.denied) &&
+            value.denied.every((t) => typeof t === 'string')
+              ? new Set<string>(value.denied)
+              : undefined,
+        );
+        const next = nextActiveTools(active, removed, denied, canonical);
+        if (next !== undefined) pi.setActiveTools(next);
+      } catch (error) {
+        // Keep the list: every call still goes through policy/evaluate.
+        log(`policy/tools failed: ${describeError(error)}`);
+      }
+      return undefined;
+    });
     pi.on('tool_call', async (event, ctx) => {
       const reason = await refusal(
         bridge,

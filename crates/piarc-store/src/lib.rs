@@ -39,5 +39,5 @@ pub use index::{
 };
 pub use migrate::{MIGRATIONS, Migration};
 pub use pi_session::{SessionMeta, Usage};
-pub use records::{AuditEvent, TrustDecision, TrustRecord, WorkspaceRecord};
+pub use records::{AuditEvent, AuditFilter, TrustDecision, TrustRecord, WorkspaceRecord};
 pub use store::{BUSY_TIMEOUT, CACHE_KIB, Store};

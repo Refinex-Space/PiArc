@@ -9,6 +9,7 @@
 //!   literal `mkdir`, `touch`, `mv`, `cp` commands.
 
 use super::readonly::BUILTINS;
+use super::wrappers::EXEC_RUNNERS;
 use super::{
     Analysis, Class, Command, CriticalContext, Operand, Unresolved, classify, is_critical_delete,
 };
@@ -254,18 +255,27 @@ fn allowance(
             .find(Behavior::Allow, "Bash", Subject::Command(&text), None)
             .map(|(hit, _)| hit)
     };
+    // Every program the command runs: stripped wrappers that exec, and the command itself
+    // unless bash runs it as a builtin.
+    let runners: Vec<&str> = command
+        .wrappers
+        .iter()
+        .map(String::as_str)
+        .filter(|w| EXEC_RUNNERS.contains(w))
+        .collect();
     let name = command.program();
+    let mut needed = runners.clone();
+    if !BUILTINS.contains(&name) || !runners.is_empty() {
+        needed.push(name);
+    }
     let mut verified = || {
-        if BUILTINS.contains(&name) {
-            true
-        } else if facts.program_ok(name) {
-            if !programs.iter().any(|p| p == name) {
-                programs.push(name.to_owned());
+        needed.iter().all(|n| {
+            let ok = facts.program_ok(n);
+            if ok && !programs.iter().any(|p| p == n) {
+                programs.push((*n).to_owned());
             }
-            true
-        } else {
-            false
-        }
+            ok
+        })
     };
     let (read_only, file_edit) = match class {
         _ if rule.is_some() => (false, false),

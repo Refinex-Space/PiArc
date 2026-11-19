@@ -12,17 +12,17 @@ providers:
           - id: first
             name: Bash
             input:
-              command: echo saved
+              command: env echo saved
       - tool_calls:
           - id: again
             name: Bash
             input:
-              command: echo saved
+              command: env echo saved
       - tool_calls:
           - id: other
             name: Bash
             input:
-              command: echo other
+              command: env echo other
       - text: Finished.
 actions:
   - prompt:

@@ -171,6 +171,18 @@
     },
     {
       "kind": "request",
+      "method": "policy/tools",
+      "name": "policy/tools",
+      "schema": "PolicyToolsRequest"
+    },
+    {
+      "kind": "response",
+      "method": "policy/tools",
+      "name": "policy/tools/result",
+      "schema": "PolicyToolsResponse"
+    },
+    {
+      "kind": "request",
       "method": "models/list",
       "name": "models/list",
       "schema": "ModelsListRequest"

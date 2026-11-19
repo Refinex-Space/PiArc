@@ -1,0 +1,36 @@
+id: perm-critical-delete
+description: Deleting the home directory, the workspace root or the filesystem root asks even with a matching allow rule and in Bypass permissions (T23).
+capabilities: [CAP-PERM-CRITICAL-001, CAP-PERM-MODE-002]
+sessions:
+  main: { provider: main, mode: bypassPermissions }
+workspace:
+  files:
+    build/out.txt: "old\n"
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"enableBypassPermissions":true,"allow":["Bash(rm *)"]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: home, name: Bash, input: { command: 'rm -rf ~' } }
+      - tool_calls:
+          - { id: root, name: Bash, input: { command: 'rm -r -f .' } }
+      - tool_calls:
+          - { id: build, name: Bash, input: { command: 'rm -rf build' } }
+      - text: Finished.
+actions:
+  - prompt: { text: Clean up., turn: t }
+approvals:
+  - { tool: Bash, decision: deny, feedback: Never delete home. }
+  - { tool: Bash, decision: deny }
+expect:
+  request_counts: { main: 4 }
+  requests:
+    - index: 3
+      tool_results:
+        - { id: home, is_error: true, contains: Never delete home. }
+        - { id: root, is_error: true }
+        - { id: build, is_error: false }
+  files:
+    build/out.txt: null

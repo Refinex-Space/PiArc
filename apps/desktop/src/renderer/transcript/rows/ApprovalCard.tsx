@@ -28,7 +28,12 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
   const card = useRef<HTMLElement>(null);
   const mountedAt = useRef(performance.now());
   const [feedback, setFeedback] = useState('');
-  const [rule, setRule] = useState(request.rule ?? '');
+  const offered = request.rules ?? [];
+  const [rules, setRules] = useState(offered.join('\n'));
+  const edited = rules
+    .split('\n')
+    .map((r) => r.trim())
+    .filter(Boolean);
   const [directory, setDirectory] = useState(request.directory ?? '');
   const [expanded, setExpanded] = useState(false);
   const busy = useRef(false);
@@ -37,7 +42,7 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
   const content = [request.command, request.diff?.unified].filter(Boolean).join('\n');
   const long = content.length > PREVIEW_CHARS || content.split('\n').length > PREVIEW_LINES;
   const allowPersistent =
-    request.protectedPath !== true && (request.rule != null || request.directory != null);
+    request.protectedPath !== true && (offered.length > 0 || request.directory != null);
   function answer(decision: ApprovalAnswer['decision']) {
     if (busy.current) return;
     busy.current = true;
@@ -52,7 +57,7 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
         connectionEpoch,
         decision,
         ...(decision === 'deny' && feedback ? { feedback } : {}),
-        ...(decision === 'allowAlways' && request.rule != null ? { rule } : {}),
+        ...(decision === 'allowAlways' && offered.length > 0 ? { rules: edited } : {}),
         ...(decision === 'allowAlways' && request.directory != null ? { directory } : {}),
       })
       .then(async (raw) => {
@@ -193,14 +198,16 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
               }}
             />
           </label>
-          {allowPersistent && request.rule != null && (
+          {allowPersistent && offered.length > 0 && (
             <label>
               {t('approval.rule')}
-              <input
-                value={rule}
+              <textarea
+                value={rules}
+                rows={Math.min(Math.max(offered.length, 1), 5)}
+                data-testid="approval-rules"
                 readOnly={request.kind === 'permissionExpansion' && request.tool === 'MemoryImport'}
                 onChange={(e) => {
-                  setRule(e.target.value);
+                  setRules(e.target.value);
                 }}
               />
             </label>
@@ -256,7 +263,7 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
                 disabled={
                   waiting ||
                   !canAlwaysAllow(false, long, expanded) ||
-                  (request.rule != null && !rule.trim()) ||
+                  (offered.length > 0 && edited.length === 0) ||
                   (request.directory != null && !directory.trim())
                 }
                 onClick={() => {

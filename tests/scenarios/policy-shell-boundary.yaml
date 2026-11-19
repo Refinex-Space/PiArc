@@ -14,7 +14,7 @@ providers:
           - id: meta
             name: Bash
             input:
-              command: mkdir one; mkdir two
+              command: mkdir one; eval "mkdir two"
       - tool_calls:
           - id: escape
             name: Bash

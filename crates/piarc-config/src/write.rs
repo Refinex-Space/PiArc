@@ -124,6 +124,74 @@ pub fn append_local_permissions(
     Ok(items)
 }
 
+/// Add, replace or remove one rule of `permissions.<key>` (`allow`, `ask` or `deny`) in a
+/// writable layer: `old` names the rule to replace or remove; without it `new` is appended
+/// (once). Returns the file.
+///
+/// # Errors
+///
+/// The layer is read-only, the key is not a rule list, the file's list is not a string list,
+/// `old` is not in it, or the write fails; the file is then unchanged.
+pub fn edit_permission_rule(
+    table: &LayerTable,
+    layer: &str,
+    key: &str,
+    old: Option<&str>,
+    new: Option<&str>,
+) -> Result<PathBuf, WriteError> {
+    if !matches!(key, "allow" | "ask" | "deny") {
+        return Err(WriteError::InvalidUpdate(format!(
+            "unknown rule list {key:?}"
+        )));
+    }
+    if new.is_some_and(|r| r.trim().is_empty() || r.chars().any(char::is_control)) {
+        return Err(WriteError::InvalidUpdate(
+            "empty or invalid rule".to_owned(),
+        ));
+    }
+    update_file(table, layer, |document| {
+        let permissions = document
+            .as_object_mut()
+            .ok_or_else(|| WriteError::InvalidUpdate("settings must be an object".to_owned()))?
+            .entry("permissions")
+            .or_insert_with(|| Value::Object(Map::new()))
+            .as_object_mut()
+            .ok_or_else(|| WriteError::InvalidUpdate("permissions must be an object".to_owned()))?;
+        let list = permissions
+            .entry(key)
+            .or_insert_with(|| Value::Array(Vec::new()))
+            .as_array_mut()
+            .filter(|list| list.iter().all(Value::is_string))
+            .ok_or_else(|| {
+                WriteError::InvalidUpdate(format!("permissions.{key} must be a string list"))
+            })?;
+        match old {
+            Some(old) => {
+                let at = list
+                    .iter()
+                    .position(|v| v.as_str() == Some(old))
+                    .ok_or_else(|| {
+                        WriteError::InvalidUpdate(format!("{old:?} is not in permissions.{key}"))
+                    })?;
+                match new {
+                    Some(new) => list[at] = Value::String(new.to_owned()),
+                    None => {
+                        list.remove(at);
+                    }
+                }
+            }
+            None => {
+                if let Some(new) = new
+                    && !list.iter().any(|v| v.as_str() == Some(new))
+                {
+                    list.push(Value::String(new.to_owned()));
+                }
+            }
+        }
+        Ok(())
+    })
+}
+
 // One writer in Core, including simultaneous confirmations from different windows.
 static SETTINGS_WRITE: Mutex<()> = Mutex::new(());
 
@@ -294,6 +362,36 @@ pub fn replace_file(target: &Path, bytes: &[u8]) -> Result<(), WriteError> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn rules_are_added_replaced_and_removed_in_writable_layers_only() {
+        let dir = std::env::temp_dir().join(format!("piarc-config-rules {}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let table = LayerTable::piarc(&dir.join("data"), &dir.join("ws"));
+        let read = || -> Value {
+            serde_json::from_slice(
+                &fs::read(dir.join("ws/.piarc/settings.local.json")).expect("file"),
+            )
+            .expect("json")
+        };
+        let edit = |old: Option<&str>, new: Option<&str>| {
+            edit_permission_rule(&table, ids::PROJECT_LOCAL, "deny", old, new)
+        };
+        edit(None, Some("Bash(rm *)")).expect("add");
+        edit(None, Some("Bash(rm *)")).expect("add once");
+        edit(None, Some("Read(.env)")).expect("add");
+        assert_eq!(
+            read()["permissions"]["deny"],
+            json!(["Bash(rm *)", "Read(.env)"])
+        );
+        edit(Some("Bash(rm *)"), Some("Bash(rm -rf *)")).expect("replace");
+        edit(Some("Read(.env)"), None).expect("remove");
+        assert_eq!(read()["permissions"]["deny"], json!(["Bash(rm -rf *)"]));
+        assert!(edit(Some("missing"), None).is_err());
+        assert!(edit_permission_rule(&table, ids::DEFAULTS, "deny", None, Some("x")).is_err());
+        assert!(edit_permission_rule(&table, ids::USER, "other", None, Some("x")).is_err());
+        let _ = fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn pointers_create_and_remove_nested_keys() {

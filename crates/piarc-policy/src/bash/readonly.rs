@@ -40,7 +40,85 @@ pub struct Operand {
 /// Shell builtins on the list: no program to verify.
 pub const BUILTINS: &[&str] = &[
     "echo", "printf", "pwd", "true", "false", ":", "test", "[", "[[", "((", "cd", "pushd", "type",
-    "command",
+    "command", "exit",
+];
+
+/// External programs on the read-only list (Core verifies and pins them).
+pub const PROGRAMS: &[&str] = &[
+    "seq",
+    "expr",
+    "sleep",
+    "whoami",
+    "id",
+    "uname",
+    "basename",
+    "dirname",
+    "tr",
+    "locale",
+    "tty",
+    "nproc",
+    "arch",
+    "sw_vers",
+    "getconf",
+    "date",
+    "hostname",
+    "which",
+    "head",
+    "tail",
+    "cut",
+    "cat",
+    "wc",
+    "stat",
+    "du",
+    "df",
+    "ls",
+    "nl",
+    "od",
+    "hexdump",
+    "strings",
+    "cmp",
+    "diff",
+    "comm",
+    "column",
+    "tac",
+    "rev",
+    "fold",
+    "fmt",
+    "paste",
+    "join",
+    "expand",
+    "unexpand",
+    "realpath",
+    "readlink",
+    "md5sum",
+    "sha1sum",
+    "sha256sum",
+    "sha512sum",
+    "shasum",
+    "md5",
+    "cksum",
+    "b2sum",
+    "file",
+    "tree",
+    "sort",
+    "uniq",
+    "xxd",
+    "grep",
+    "egrep",
+    "fgrep",
+    "rg",
+    "jq",
+    "find",
+    "tee",
+    "git",
+    "ps",
+];
+
+/// Programs that may run under a wrapper on the list: the exec-ing wrappers and the builtins
+/// that also exist as programs (Windows probes these too).
+pub const WRAPPED: &[&str] = &[
+    "timeout", "nice", "nohup", "stdbuf", "env", "echo", "printf", "pwd", "test", "[", "true",
+    "false",
 ];
 
 enum Paths {
@@ -73,8 +151,8 @@ const fn spec(paths: Paths) -> Spec {
 #[expect(clippy::too_many_lines, reason = "one table entry per listed command")]
 fn spec_of(name: &str) -> Option<Spec> {
     Some(match name {
-        "echo" | "pwd" | "true" | "false" | ":" | "test" | "[" | "[[" | "((" | "seq" | "expr"
-        | "sleep" | "whoami" | "id" | "uname" | "basename" | "dirname" | "tr" | "type"
+        "echo" | "pwd" | "true" | "false" | ":" | "test" | "[" | "[[" | "((" | "exit" | "seq"
+        | "expr" | "sleep" | "whoami" | "id" | "uname" | "basename" | "dirname" | "tr" | "type"
         | "locale" | "tty" | "nproc" | "arch" | "sw_vers" | "getconf" => spec(Paths::None),
         "printf" => Spec {
             forbidden: &["-v"],
@@ -477,6 +555,25 @@ fn file_edit(cmd: &Command) -> Class {
         Class::FileEdit {
             reads: Vec::new(),
             writes: all,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_listed_program_has_a_specification() {
+        for name in PROGRAMS {
+            assert!(
+                spec_of(name).is_some() || matches!(*name, "git" | "ps"),
+                "{name}"
+            );
+            assert!(!BUILTINS.contains(name), "{name}");
+        }
+        for name in BUILTINS {
+            assert!(spec_of(name).is_some(), "{name}");
         }
     }
 }

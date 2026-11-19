@@ -217,7 +217,7 @@
       "required": ["provider"],
       "properties": {
         "provider": { "$ref": "#/$defs/label" },
-        "mode": { "enum": ["default", "acceptEdits"] },
+        "mode": { "enum": ["default", "acceptEdits", "plan", "bypassPermissions"] },
         "deferred": { "description": "Create the session on its first input.", "type": "boolean" },
         "cwd": {
           "description": "Working directory relative to the workspace; the workspace when absent.",
@@ -297,7 +297,7 @@
           "required": ["mode"],
           "properties": {
             "session": { "$ref": "#/$defs/label" },
-            "mode": { "enum": ["default", "acceptEdits"] }
+            "mode": { "enum": ["default", "acceptEdits", "plan", "bypassPermissions"] }
           }
         },
         "delete_session": {

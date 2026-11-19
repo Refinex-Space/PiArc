@@ -312,13 +312,13 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 T23 权限规则完整版与 Bash 命令分析（macOS，开工 2026-11-18，基线 b654341 的 `npm run verify` 15/15）：
 
 - [x] 1. 规则语法与全部 specifier 匹配、工具名通配、无法解析规则的处理（A01）：`piarc-policy` 的 `rules`、`pattern`、`paths`
-- [ ] 2. 规则来源合并（ADR-0005 顺序、信任前不应用项目 allow）、裁决流水线第 3–7 步与第 1、2、8 步插槽、审计命中规则与来源（A02、A07）
+- [x] 2. 规则来源合并（ADR-0005 顺序、信任前不应用项目 allow）、裁决流水线第 3–7 步与第 1、2、8 步插槽、审计命中规则与来源（A02、A07）：`piarc_config::Settings::permission_lists`、`tool_io::policy::{assess,hooks}`
 - [x] 3. tree-sitter-bash 命令分析、包装与环境变量剥离、只读白名单、关键路径删除、≥ 40 条数据驱动用例与随机输入测试（A03、A04、A06）：`piarc-policy::bash`，73 条用例；裁决阶梯 `decide` 已写，Core 仍走 `m1`（第 4 项替换）
-- [ ] 4. Core 接入：Bash 子命令裁决、PowerShell 整条匹配、文件规则、裸工具名 deny 移出模型工具列表（A02、A05）
-- [ ] 5. 模式：plan 第 5 步拒绝、bypass 开启与二次确认、项目级 bypass/auto 忽略并审计、模式按工作区记忆（A08、A09、A10）
-- [ ] 6. "总是允许"按子命令前缀生成规则并在编辑框展示、写入 `.piarc/settings.local.json`（A11）
-- [ ] 7. 设置窗口"权限"页：规则管理（原生确认）与审计查看（A12）
-- [ ] 8. L2 场景 `perm-*.yaml` 与能力 ID；裁决基准 p95 ≤ 2 ms（A05、A09、A13）
+- [x] 4. Core 接入：Bash 子命令裁决、PowerShell 整条匹配、文件规则、裸工具名 deny 移出模型工具列表（A02、A05）：AHP `policy/tools`，程序钉住推广到全部自动允许的程序
+- [x] 5. 模式：plan 第 5 步拒绝、bypass 开启与二次确认、项目级 bypass/auto 忽略并审计、模式按工作区记忆（A08、A09、A10）：Core 与主进程原生确认已完成，L4 待第 7 项
+- [x] 6. "总是允许"按子命令前缀生成规则并在编辑框展示、写入 `.piarc/settings.local.json`（A11）：审批卡/答复改为 `rules` 列表
+- [ ] 7. 设置窗口"权限"页：规则管理（原生确认）与审计查看（A12）：Core/NAPI/IPC/页面已写，待 L4 与截图
+- [x] 8. L2 场景 `perm-*.yaml` 与能力 ID；裁决基准 p95 ≤ 2 ms（A05、A09、A13）：7 个场景（1 个仅 Windows），L2 67/67；调试构建 p95 0.70 ms
 - [ ] 9. 收尾：文档（piarc-policy AGENTS.md、coding-standards 复用表、架构）、`npm run verify`、验收记录（A14）
 
 ## 登记事项

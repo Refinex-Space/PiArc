@@ -90,7 +90,7 @@ test('guards approval shortcuts with the actual composer, focused card and visib
       ...base,
       requestId: 'one',
       command: 'echo ' + 'A'.repeat(520),
-      rule: 'Bash(echo A)',
+      rules: ['Bash(echo A)'],
       cwd: '/example',
     },
     {

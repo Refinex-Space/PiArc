@@ -1008,3 +1008,73 @@ textarea.input {
   flex-wrap: wrap;
   align-items: center;
 }
+
+/* Permissions settings page (T23). */
+.permission-rules {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.permission-rule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  padding-block: var(--piarc-space-2);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+  overflow-wrap: anywhere;
+}
+.permission-rule code {
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+}
+.permission-badge {
+  padding-inline: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  font-size: var(--piarc-font-size-caption);
+  font-weight: var(--piarc-font-weight-medium);
+  background: var(--piarc-accent-subtle);
+}
+.permission-badge.is-deny {
+  background: var(--piarc-state-danger-subtle);
+  color: var(--piarc-text-danger);
+}
+.permission-badge.is-ask {
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+}
+.permission-actions {
+  margin-inline-start: auto;
+  display: flex;
+  gap: var(--piarc-space-1);
+}
+.permission-editor,
+.permission-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+.permission-editor .input[aria-label] {
+  min-width: 0;
+}
+.permission-editor input.input {
+  flex: 1 1 16rem;
+}
+.permission-audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--piarc-font-size-small);
+}
+.permission-audit-table th,
+.permission-audit-table td {
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+  text-align: start;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.permission-audit-table th {
+  color: var(--piarc-text-secondary);
+  font-weight: var(--piarc-font-weight-medium);
+}

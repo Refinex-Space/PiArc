@@ -933,7 +933,7 @@ impl Driver<'_> {
             revision: card.revision,
             connection_epoch: card.connection_epoch,
             feedback: expected.feedback.clone(),
-            rule: card.rule,
+            rules: card.rules,
             directory: card.directory,
             decision: match expected.decision {
                 Choice::Allow => Decision::AllowOnce,

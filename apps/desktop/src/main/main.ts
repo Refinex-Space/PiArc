@@ -17,6 +17,7 @@ import { registerEventHandlers } from './core/event-ipc.js';
 import { hasTestingExports } from './core/load.js';
 import { EventRouter } from './core/router.js';
 import { registerTerminalHandlers, TerminalOwners } from './core/terminal-ipc.js';
+import { registerPermissionHandlers } from './core/permissions-ipc.js';
 import { FaultInjector, registerSessionHandlers } from './core/session-ipc.js';
 import { installTestHooks } from './core/test-hooks.js';
 import { applyDevServerCsp, resolveDevServer } from './dev-server.js';
@@ -158,6 +159,7 @@ function start(dirs: DataDirs): void {
         appShell.providersChanged();
       },
     );
+    registerPermissionHandlers(registerHandler, core.runtime, () => appShell.t());
     const terminalOwners = new TerminalOwners(core.runtime);
     registerEventHandlers(registerHandler, eventRouter, (windowId, route) =>
       terminalOwners.mayObserve(windowId, route),
