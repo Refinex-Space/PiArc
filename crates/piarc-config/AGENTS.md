@@ -23,6 +23,7 @@
 - 加一层 = `LayerTable::insert(LayerSpec { id, precedence, scope, source, schema, writable, executable })`，合并代码不改。优先级常量在 `layers::precedence`，顺序即 ADR-0005 第 3 条。
 - 合并：标量高层覆盖，对象逐键深合并，列表从低到高拼接去重（先出现的保留）；类型不同时高层替换。deny 优先由 `piarc-policy` 求值时保证。
 - 校验用 `schema::Shape`（结构化描述，不是 JSON Schema 引擎）：错误带文件、JSON Pointer、原因；有错误的文件整份跳过，未知键只是警告。重载时变无效的文件保留上一份有效内容（`LayerStatus::Stale`），删除的文件变为空层。
+- 权限规则按层取：`Settings::permission_lists()`（高到低，项目未受信任时不含项目 allow）、`layer(id)`（某层生效后的值）、`ignored_modes()`（被忽略的项目级 `bypassPermissions`/`auto`，供审计）。设置页的规则编辑经 `edit_permission_rule`（增、改、删一条，只写可写层）。`permissions.enableBypassPermissions` 只由 Core 从用户层读取（T23）。
 - 普通设置写入经 `write_value`，审批的规则与目录经 `append_local_permissions` 同次读改写；并发修改由同一进程锁串行。只写 `writable` 的层（`.piarc/` 与用户文件，永不写 `.claude/`）；同目录临时文件 + `sync_all` + rename，现有文件不是 JSON 对象时拒绝且不改动。
 
 ## 信任查询的唯一入口

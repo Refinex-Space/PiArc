@@ -77,6 +77,7 @@
 - 会话建立时 Agent Host 发一次 `exec/shells`（没有工具调用 id）：`ToolIoObserver` 的计数与批次 Gate 要忽略没有 `tool_call_id` 的请求（`tests/sessions/turns.rs` 的 `Rounds` 已这样做）。
 - T22 的 `context-*.yaml` 用真实请求比较 system 与追加消息。Core 的 `memory_home` 指向同一次运行的 `home 家/`，`workspace.run_files` 可在隔离的临时根准备用户 memory 和外部导入。
 - 动作结束后先等每个被启动的回合 `turn/completed`，再一次性检查全部断言；没有 sleep，等待只有 30 s 安全网。
+- 会话的 `mode` 与 `set_mode` 接受四种模式（T23）；跳过权限要用户级开关，场景用 `workspace.run_files` 写 `data 数据/settings.json`（运行器的数据目录）。只读白名单命令不再发审批，要审批的命令用 `env echo`、`sed`、`printenv`。
 - 每个请求都必须通过严格 mock 的校验（总是检查）；`approvals` 按声明顺序答复会话快照里的新请求；多出的应答、无人答复的请求或工具名不符都使场景失败。
 
 ## 易错点

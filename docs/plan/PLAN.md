@@ -404,10 +404,14 @@ T23 权限规则完整版与 Bash 命令分析（macOS，开工 2026-11-18，基
 | I75 | T17 | PowerShell 命令在会话的 shell 目录中执行，但 `Set-Location` 不跨命令保留（只有 bash 带目录探针，ADR-0028）；PowerShell 的前缀独占一行，错误信息中的行号比用户命令多 1 | W1 在 Windows 实机看是否影响使用；需要时为 PowerShell 加 `try/finally` 包装的目录探针 |
 | I76 | T17 | Core 在 `core/notices` 发 `gitBashMissing`（Windows 缺 Git Bash 时），客户端还没有显示它；`commandExecution.execution`（bash 卡数据）也还没有界面 | T18 显示 `core/notices`（含下载链接），T19 用 `execution` 画 bash 卡；**T18 已落地 `core/notices` 的显示**（主区顶部的提示条，带下载按钮，经外链确认打开）；bash 卡仍交 T19；**T19 已落地**，BashCard 展示 execution 字段 |
 | I77 | T17 | 登录 shell 的环境在每个 Core 第一次执行命令时解析（`$SHELL -i -l -c`，最多 10 s）：用户配置很重时第一条命令会多等这段时间；解析失败只记警告并退回 Core 的环境 | T44 的性能任务测启动后首条命令的耗时，必要时改为 Core 启动后后台预解析；设置诊断（T40）显示解析失败的原因 |
-| I78 | T17 | 语义退出码只认单个简单命令：`cd src && grep x f` 这类常见写法按退出码判失败（ADR-0028 第 1 条） | T23 用 tree-sitter-bash 的语法树判定最后执行的命令后细化 |
+| I78 | T17 | 语义退出码只认单个简单命令：`cd src && grep x f` 这类常见写法按退出码判失败（ADR-0028 第 1 条） | T23 用 tree-sitter-bash 的语法树判定最后执行的命令后细化；**T23 未处理**（任务范围不含退出码），`piarc_policy::bash::analyze` 已可给出各子命令，交 T30 或 T48 细化（`&&` 链中前段的退出码 1 也可能来自 `cd`，需要按执行顺序判断） |
 | I79 | T18 | 信任决定（`decideProjectTrust`）由渲染进程发出、没有主进程的原生确认：渲染进程被注入时可以静默信任项目、启用其 hooks 与 MCP。审批卡（T20）同样在渲染进程作答；第 10.3 节只要求"总是允许"类规则的修改走原生确认 | T45 评估信任决定是否也走主进程原生确认（ADR-0029 备选方案） |
 | I80 | T18 | 信任变化只重启 Hub 路由表里已有的工作区：工作区刚打开、Agent Host 已启动但还没登记进路由表的极短窗口内做出的决定，不会让它重启（新进程启动时自己查信任，只有那一刻之前已经查过的进程会沿用旧答案） | R2 核实 workspace actor 在路由登记前开始预热。T35 在多窗口验收中验证并消除这一窗口，重启须覆盖已开始预热的工作区 |
 | I81 | T18 | `crates/piarc-core/src/runtime.rs` 已超过 1,000 行（T17 时 1,080 行，T18 增加会话元数据、客户端设置与信任重启的薄包装后约 1,150 行），超出 `coding-standards.md` 的单文件上限 | R2 已拆分 runtime/state.rs 与 runtime/sessions.rs，runtime.rs 808 行（b426028） |
+| I82 | T23 | 按参数匹配的规则（`Agent(model:opus)`、`Bash(run_in_background:true)`）没有实现：现在分别解析为 Agent 类型名与命令模式，永不匹配，deny 意图会落空 | T31 接入 Agent 工具时按 Claude Code 语义实现（只用于 deny/ask，不匹配主内容字段），并在设置页标出 |
+| I83 | T23 | PowerShell 只做整条匹配与粗分段（不解析 AST、不规范化别名，`Get-ChildItem` 规则不覆盖 `gci`）；Windows 上 PowerShell 没有只读白名单 | M4 评估 PowerShell 语法级分析（架构第 6.2.2 节），同时决定别名表 |
+| I84 | T23 | Windows 上只读白名单与文件命令的自动允许依赖 Git Bash 探测（`usr/bin`、`mingw64/bin` 中的同名程序），macOS 只能交叉 clippy；`perm-read-only` 等场景在 Windows CI 首次运行 | W1 在 Windows 11 上核对探测结果、钉住与 `perm-*` 场景，必要时调整 `PROGRAMS`/`WRAPPED` |
+| I85 | T23 | T20 时期"总是允许"为 Write 保存的 `Write(路径)` 规则在 T23 语义下不匹配（Claude Code 只认 `Edit(路径)`）；现有用户文件里的这类规则会被设置页列出但不起作用 | T24 的配置诊断提示改写为 `Edit(…)`；正式发布前的用户数据只有测试数据，不做迁移 |
 
 ## 技术债
 

@@ -33,7 +33,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `npx vitest run <路径>` | 只跑某个目录或文件的测试 |
 | `cargo test -p <crate>` | 只跑某个 crate 的测试（检查点提交用） |
 | `cargo clippy -p <crate> --all-targets -- -D warnings` | 只检查某个 crate |
-| `LIBSQLITE3_SYS_USE_PKG_CONFIG=1 SQLITE3_LIB_DIR=/nonexistent cargo clippy --target x86_64-pc-windows-msvc --workspace --all-targets -- -D warnings` | 在 macOS 上类型检查与 lint Windows 代码（`cfg(windows)`）；需先 `rustup target add x86_64-pc-windows-msvc`（经用户同意安装），只编译不运行。两个环境变量让 rusqlite 跳过 SQLite C 源码的编译（macOS 上没有 Windows SDK 头文件） |
+| `LIBSQLITE3_SYS_USE_PKG_CONFIG=1 SQLITE3_LIB_DIR=/nonexistent CC_x86_64_pc_windows_msvc=$PWD/scripts/dev/c-placeholder.mjs AR_x86_64_pc_windows_msvc=$PWD/scripts/dev/c-placeholder.mjs cargo clippy --target x86_64-pc-windows-msvc --workspace --all-targets -- -D warnings` | 在 macOS 上类型检查与 lint Windows 代码（`cfg(windows)`）；需先 `rustup target add x86_64-pc-windows-msvc`（经用户同意安装），只编译不运行。macOS 上没有 Windows SDK 头文件：前两个变量让 rusqlite 跳过 SQLite，后两个让 tree-sitter 等 C 依赖只生成占位目标文件（clippy 不链接） |
 | `.tools/bin/cargo-deny check` | 许可证、安全公告、来源检查 |
 | `PIARC_REQUIRE_KEYCHAIN=1 cargo test -p piarc-secrets --test system_store -- --nocapture` | 真实系统凭据库（macOS 登录钥匙串）中创建、读取、删除测试主密钥；不设该变量时凭据库不可用只打印 NOT RUN |
 | `node scripts/ci/check-crate-deps.mjs` | crate 依赖方向检查（规则在 `crates/deps-rules.json`） |
@@ -59,6 +59,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `cargo test -p piarc-testkit --test scenarios -- <id> --exact` | 只跑一个 L2 场景（`tests/scenarios/<id>.yaml`）；不加筛选跑全部，`-- --results <文件>` 写报告 |
 | `cargo run -q -p piarc-devcli -- run tests/scenarios [--json <文件>]` | 不经 UI 运行一个场景文件或整个目录，输出 JSON 报告 |
 | `node scripts/plan/check-capabilities.mjs [--milestone M2]` | 检查能力清单；`--milestone` 列出该里程碑及之前未完成的能力；`--results <报告> --doc write` 重新生成 `capabilities.md` |
+| `cargo test -p piarc-policy --test bash_cases -- --nocapture` | T23 的 Bash 分析数据驱动用例（`crates/piarc-policy/tests/bash_cases.json`，打印条数与类别）与随机输入测试 |
 | `cargo test -p piarc-testkit --test sessions` | 会话层端到端：Core 的工作区与会话 actor 驱动真实 Agent Host 与 mock（排队、中断、工具批次、重试、缺口补齐、空闲回收、重启恢复） |
 | `PIARC_UPDATE_GOLDEN=1 cargo test -p piarc-testkit --test agent_host golden` | 重新录制投影 golden 的 Pi 事件序列（`agent-host/test/golden/`）；之后 `npx vitest run agent-host -u` 更新投影快照。不带变量时只做漂移检查 |
 | `cargo run --release -p piarc-testkit --example t14-warmup` | 工作区预热测量：打开到 Agent Host 就绪、打开并恢复会话，10 次取最大值（预算 1 s） |
@@ -114,5 +115,6 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - L2 场景目标（`--test scenarios`）设了 `test = false`，`cargo test --workspace` 不跑它，只有 verify 第 14 步与显式 `--test scenarios` 跑。新增或改动场景、改能力状态后重新生成 `docs/product/capabilities.md`（手改会被漂移检查拒绝）；`active` 能力没有场景时报 MISSING。
 - 升级 Pi 前后跑 golden 录制与漂移检查（见命令表）：投影、排队、中断补齐与工具批次都依赖 Pi 的事件顺序与队列语义（ADR-0026）。
 - 文件工具的不变量（先读后改、外部修改、编码与换行保持、原子替换、diff、越界与受保护路径）在 Core 的 `piarc-fs` 与 `tool_io/files.rs`，结果预算在 Agent Host 的 `harness/tool-results.ts`（ADR-0027）。Read 完成内容解析后才按调用提交快照（ADR-0034）。文件工具和预览均通过获准的目录句柄读写（ADR-0036）。替换已存在的文件只经 `piarc_fs::write`；会话目录外与受保护路径的操作只标记需要询问，由 Core 的 `tool_io::policy` 裁决，只有绑定到同一调用的 I/O 可使用审批结果（ADR-0031）。
+- 权限规则与 Bash 分析在 `piarc-policy`（规则语法、阶梯、只读白名单、关键路径删除与"总是允许"前缀见其 AGENTS.md），Core 侧组装在 `tool_io::policy::assess`（ADR-0037）。只读白名单里的命令（`echo`、`ls`、`cat`、`git status`…）在手动模式下免审批：要求审批的 L2/L4 夹具用不在白名单的命令（`env echo`、`sed`、`printenv`）。项目文件里新加的 allow 规则是未确认的可执行项，信任重新确认前不生效；跳过权限的开关只读用户级 `settings.json` 的 `permissions.enableBypassPermissions`。
 - Bash 与 PowerShell 是 PiArc 自写的工具，命令的进程树终止、超时（默认 2 分钟、上限 10 分钟）、cwd 跟踪、输出预算与落盘、语义退出码都在 Core 的 `exec/run`（`piarc-exec` + `piarc-core::tool_io::exec`，ADR-0028）；阈值只改 `piarc_exec::ExecLimits`。命令环境来自用户登录 shell（每个 Core 首次执行命令时解析），仅向命令传入 ADR-0035 准入的系统、locale、工具链变量。
 - Agent Host 的工具不碰文件系统与子进程：`agent-host/src/tools/`、`src/harness/` 禁止导入 `fs`、`child_process`，I/O 一律经 AHP `fs/*`、`exec/*` 由 Core 执行（ADR-0004、ADR-0020）；端到端测试的 I/O spy 会抓到绕过。

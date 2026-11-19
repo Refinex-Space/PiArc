@@ -27,7 +27,7 @@ Core 的数据库 `<数据目录>/core.sqlite`（rusqlite，SQLite 随 `bundled`
 - 已知格式版本 1–3（`pi_session::KNOWN_VERSIONS`，Pi 1.5.2 写 3）。其他版本或首行不是 header：该会话 `index_status = unavailable`、`index_error` 写原因，同步不失败。升级 Pi 时先核对 `session-manager.ts` 的 `CURRENT_SESSION_VERSION` 与 entry 类型。
 - 折叠必须对文件顺序满足结合律（求和、后写覆盖、只设一次），增量结果才与全量重建逐列相同（`tests/index.rs` 随机追加对比）。新增派生列时同步 `rebuild_index` 的清空语句与 `session_from_row`。
 
-按会话读权限审计用 `Store::session_audit_events`，通过会话索引取最近记录并保持时间和行 id 的倒序。
+按会话读权限审计用 `Store::session_audit_events`，通过会话索引取最近记录并保持时间和行 id 的倒序。设置页的审计用 `filter_audit_events`（会话、工作区、类别，以及 detail JSON 里的工具与结论，`json_extract`）。`set_workspace_mode`、`workspace_mode` 读写工作区记住的权限模式（T23）。
 
 ## 内存
 

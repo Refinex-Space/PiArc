@@ -20,7 +20,7 @@ Core 层的集成测试在 `crates/piarc-core/tests/exec_commands.rs`（cwd、�
 
 ## cwd 跟踪（`cwd.rs`）
 
-- 自动接受编辑放行的系统文件命令由 `CwdProbe::pin_utility` 在启动时核对 Bash 实际解析的文件并锁定物理程序。Core 发现项目可控的 PATH、用户覆盖或启动脚本时由审批卡决定，人工批准后的命令同样只继承 ADR-0035 所列的字段。
+- 自动允许（只读白名单、自动接受编辑的文件命令，T23）依赖的每个外部程序由 `CwdProbe::pin_program(名称, 路径)` 在启动时核对 Bash 实际解析的文件并锁定物理程序（`hash -p`），解析变化时以 126 退出、不运行命令；名称只接受字母、数字与 `._+-`。Core 发现项目可控的 PATH、用户覆盖或启动脚本时由审批卡决定，人工批准后的命令同样只继承 ADR-0035 所列的字段。
 - 不改命令文本：`BASH_ENV` 指向会话临时目录 `exec/<requestId>.bash-env`，内容是 `trap 'builtin pwd -P >| <answer>' EXIT` 加 `unset BASH_ENV`，模型命令不继承用户的 `BASH_ENV`。退出码在 `EXIT` trap 中保持；子 bash 看不到 `BASH_ENV`，不会覆盖答案。
 - 没有答案（命令 `exec` 换掉了 shell、自己装了 `EXIT` trap、被杀）时 Core 保持原目录。Windows 上答案是 `/c/…`，`msys_to_windows` 转换；`/tmp`、`/usr` 等 Git 自己的目录转换不了，按越界处理。
 

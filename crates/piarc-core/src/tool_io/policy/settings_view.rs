@@ -64,6 +64,46 @@ fn rows(lists: &PermissionLists, active: Option<&PermissionLists>) -> Vec<Value>
         .collect()
 }
 
+/// Every settings layer, files that do not exist yet included, so rules can be added.
+fn layer_sources(
+    data: &Path,
+    root: &Path,
+    all: &[PermissionLists],
+    applied: &[PermissionLists],
+) -> Vec<Value> {
+    let table = LayerTable::piarc(data, root);
+    table
+        .layers()
+        .iter()
+        .rev()
+        .filter(|l| l.id != ids::DEFAULTS)
+        .map(|spec| {
+            let empty = PermissionLists {
+                layer: spec.id,
+                scope: spec.scope,
+                file: spec.file().map(Path::to_owned),
+                writable: spec.writable,
+                deny: Vec::new(),
+                ask: Vec::new(),
+                allow: Vec::new(),
+            };
+            let lists = all.iter().find(|l| l.layer == spec.id).unwrap_or(&empty);
+            let active = applied.iter().find(|a| a.layer == spec.id);
+            json!({
+                "id": spec.id,
+                "file": spec.file().map(display),
+                "writable": spec.writable,
+                "scope": match spec.scope {
+                    LayerScope::Project => "project",
+                    LayerScope::User => "user",
+                    _ => "other",
+                },
+                "rules": rows(lists, active),
+            })
+        })
+        .collect()
+}
+
 impl ToolIo {
     /// The rules of `workspace` (the most recently opened one when `None`) by source.
     pub(crate) async fn permission_view(
@@ -100,60 +140,41 @@ impl ToolIo {
         .await
         .map_err(|e| denied(e.to_string()))?;
         let applied = active.permission_lists();
-        let mut sources = Vec::new();
-        for (id, session) in self.sessions_in(&root) {
-            let rules: Vec<Value> = lock(&session.policy)
-                .rules
-                .iter()
-                .map(|rule| {
-                    let mut row = check_rule(rule, Behavior::Allow);
-                    row["behavior"] = json!("allow");
-                    row["rule"] = json!(rule);
-                    row["inactive"] = json!(false);
-                    row
-                })
-                .collect();
-            if !rules.is_empty() {
-                sources.push(json!({"id":"session","sessionId":id,"writable":false,"rules":rules}));
-            }
-        }
-        // Every layer is listed, files that do not exist yet included, so rules can be added.
-        let table = LayerTable::piarc(services.storage.dirs().data(), &root);
-        for spec in table
-            .layers()
-            .iter()
-            .rev()
-            .filter(|l| l.id != ids::DEFAULTS)
-        {
-            let empty = PermissionLists {
-                layer: spec.id,
-                scope: spec.scope,
-                file: spec.file().map(Path::to_owned),
-                writable: spec.writable,
-                deny: Vec::new(),
-                ask: Vec::new(),
-                allow: Vec::new(),
-            };
-            let lists = all.iter().find(|l| l.layer == spec.id).unwrap_or(&empty);
-            let active = applied.iter().find(|a| a.layer == spec.id);
-            sources.push(json!({
-                "id": spec.id,
-                "file": spec.file().map(display),
-                "writable": spec.writable,
-                "scope": match spec.scope {
-                    LayerScope::Project => "project",
-                    LayerScope::User => "user",
-                    _ => "other",
-                },
-                "rules": rows(lists, active),
-            }));
-        }
+        let mut sources = self.session_sources(&root);
+        sources.extend(layer_sources(
+            services.storage.dirs().data(),
+            &root,
+            &all,
+            &applied,
+        ));
         let shown = display(&root);
         let mut workspaces = known;
         if !workspaces.contains(&shown) {
             workspaces.insert(0, shown.clone());
         }
         Ok(json!({"workspaces": workspaces, "workspace": shown, "sources": sources}))
+    }
+
+    /// Rules allowed in the open sessions of `root`.
+    fn session_sources(&self, root: &Path) -> Vec<Value> {
+        self.sessions_in(root)
+            .into_iter()
+            .filter_map(|(id, session)| {
+                let rules: Vec<Value> = lock(&session.policy)
+                    .rules
+                    .iter()
+                    .map(|rule| {
+                        let mut row = check_rule(rule, Behavior::Allow);
+                        row["behavior"] = json!("allow");
+                        row["rule"] = json!(rule);
+                        row["inactive"] = json!(false);
+                        row
+                    })
+                    .collect();
+                (!rules.is_empty())
+                    .then(|| json!({"id":"session","sessionId":id,"writable":false,"rules":rules}))
+            })
+            .collect()
     }
 
     fn sessions_in(&self, root: &Path) -> Vec<(String, Arc<SessionIo>)> {

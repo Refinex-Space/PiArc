@@ -342,7 +342,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 
 ### 12.3 审批应答
 
-`approvals` 按顺序回答 `core/sessions` 快照中的新请求（`decision: allow|session|always|deny`，可指定 `tool`、审批卡的 `kind` 和拒绝的 `feedback`）。应答经 Core 公开命令；未声明的请求、工具不匹配、重复或过期答复、未用上的应答都使场景失败。`sessions.<label>.mode` 显式选择起始模式，`set_mode` 操作向当前会话发送模式变更。
+`approvals` 按顺序回答 `core/sessions` 快照中的新请求（`decision: allow|session|always|deny`，可指定 `tool`、审批卡的 `kind` 和拒绝的 `feedback`）。应答经 Core 公开命令；未声明的请求、工具不匹配、重复或过期答复、未用上的应答都使场景失败。`sessions.<label>.mode` 显式选择起始模式（`default`、`acceptEdits`、`plan`、`bypassPermissions`；跳过权限需要用 `workspace.run_files` 在 `data 数据/settings.json` 写入用户级开关），`set_mode` 操作向当前会话发送模式变更。
 
 ### 12.4 断言与匹配规则
 

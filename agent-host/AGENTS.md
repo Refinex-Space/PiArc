@@ -49,6 +49,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - 参数超过 8 MiB 帧预算时，Host 用 `policy/inputChunk` 逐块送给 Core，再带 `stagedInputBytes` 裁决。Write 分块传原始 content，沿用文件工具的 UTF-16 分片边界，避免 JSON 转义缩小 64 MiB 的文件上限。Core 校验会话、连接、调用、工具、UTF-8 偏移与总长度，重组后的参数同时用于预览与裁决。
 - Core 要询问时发送 `policy/pending`。过期通知让 Host 用 `policy/cancel` 撤下旧请求。拒绝反馈通过 Pi 的 `{block:true,reason}` 进入模型下一次请求，实时投影用 `markDeclined`，历史从 `piarc.toolDeclined` 条目恢复状态。
 - `session/setPermissionMode` 写入所选分支的 `piarc.permissionMode` 条目，实时与历史都投影为 `permissionModeChanged`。会话打开结果的可选 `permissionMode` 传回该分支最后的显式选择，起始模式的配置优先级由 Core 解析。
+- 每次运行前（`before_agent_start`）把当前工具的规范名经 `policy/tools` 交给 Core，Core 返回被不带 specifier 的 deny 规则覆盖的工具，`nextActiveTools` 用 `setActiveTools` 移除它们，规则撤销后恢复；请求失败时保持原列表（每次调用仍经 `policy/evaluate`，ADR-0037）。
 - Host 重连恢复时，最后一个模型回复中尚无结果的调用经 `policy/recover` 查询审批失效原因。只给失效调用写入拒绝结果，其余缺失结果按 ADR-0026 补齐。`cargo test -p piarc-testkit --test sessions permissions::` 覆盖真实进程终止、恢复后的模型请求、审批快照与模式历史。
 
 ## 多会话的易错点

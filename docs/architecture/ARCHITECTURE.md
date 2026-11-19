@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.28（2026-11-19） |
+| 版本 | 2.29（2026-11-18） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -253,6 +253,7 @@ PiArc/
 | [0034](../adr/0034-bind-read-and-trust-confirmation.md) | 只提交成功读取的文件版本，肯定信任决定核对已展示清单版本 | 避免失败读取授权写回或未展示的新条目随确认生效 |
 | [0035](../adr/0035-command-environment.md) | Bash 和 PowerShell 仅继承已审核的系统、locale、工具链变量 | 用户已导出的第三方凭据不会随通用环境进入命令 |
 | [0036](../adr/0036-bind-file-operations-to-directory-handles.md) | 文件审批、搜索、打开与原子提交绑定目录对象 | 外部目录发生变化时，重新按路径打开可能命中另一个对象 |
+| [0037](../adr/0037-permission-rules-and-bash-analysis.md) | 无效 deny/ask 规则使所点名工具询问；运行期值保守匹配，不可判定的命令在任何模式下询问；自动允许的程序在执行时钉住；"总是允许"携带规则列表；`policy/tools` 移除整体拒绝的工具；跳过权限由用户级开关开启 | 架构只给出规则形式与阶梯，这些细节决定安全边界与 AHP、Core API 的形状 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -541,6 +542,18 @@ Harness Kit tool_call ──► Core policy/evaluate
 - **审批账本**（Core）：每个审批请求有 `requestId`、所属会话/子 agent、`revision`、`connectionEpoch`。多窗口同时显示时只接受第一个有效答复；Agent Host 重连后旧请求全部作废。
 - **审批选项**：仅本次允许 / 本会话允许 / 总是允许（写入 `.piarc/settings.local.json`，Bash 按子命令前缀生成规则，用户可在保存前编辑）/ 拒绝（可附反馈，作为拒绝理由回给模型）。
 - 审批结果、规则命中、hooks 决定都写入审计表（SQLite），设置界面可查。
+
+T23 落地（ADR-0037）：
+
+| 部分 | 实现 |
+|---|---|
+| 规则 | `piarc_policy::rules`：命令通配（末尾 ` *` 兼配裸命令、`:*` 等价）、gitignore 路径与 `//`、`~/`、`/`（规则来源目录）、相对四种锚点、WebFetch 域名、Agent/Skill 名称、MCP 工具与 server、工具名通配（allow 只接受 `mcp__<server>__` 之后）；无效的 deny/ask 规则使所点名工具的调用询问 |
+| 来源 | 企业（M5）> 会话 > `.piarc/settings.local.json` > `.piarc/settings.json` > `.claude/` 两层（T24）> 用户 PiArc > `~/.claude`；`piarc_config::Settings::permission_lists` 按层给出，项目未受信任时不含项目 allow |
+| Bash | `piarc_policy::bash`：tree-sitter-bash 0.25.1 拆分子命令与影子命令，剥离包装与安全前置赋值；只读白名单与 Accept edits 文件命令的路径在会话目录内、程序经 PATH 解析且在执行时钉住才自动允许；关键路径删除在任何模式询问；解析失败与不可判定的命令在任何模式询问 |
+| 阶梯 | `piarc_policy::decide`：第 1 步取来源为企业的 deny，第 2、8 步是 Core 的 `PolicyHooks` 插槽（T25 填入），插槽的 allow 不越过 deny、ask 与计划模式；plan 拒绝写工具与非只读命令并让模型先提交计划 |
+| 模式 | 跳过权限需用户级 `permissions.enableBypassPermissions` 并经主进程原生确认；项目级 `bypassPermissions`/`auto` 忽略并审计；所选模式记入 `workspaces.default_mode` |
+| 总是允许 | 每个仍需批准的子命令一条 `Bash(<命令名 子命令> *)`，审批卡逐行可编辑，原生确认列出全部规则 |
+| 管理与审计 | 设置窗口"权限"页按来源增删改 PiArc 可写文件中的规则（新增或修改 allow 规则经原生确认），审计按会话、工具、结论、时间筛选 |
 
 M1 实现见 ADR-0031。两种模式均对受保护路径写入逐次审批。会话与持久规则按完整文本匹配，简单文件命令只接受字面操作数，核对实际工作目录、文件边界和工具来源，并把自动批准的调用绑定到已核实的系统工具或 Git Bash 安装中的工具。客户端通过会话快照的 `approvals`、`pendingApprovals` 和 `permissionMode` 同步窗口，使用 `answerApproval` 答复，使用 `setPermissionMode` 记录模式切换。
 
@@ -858,6 +871,7 @@ crates/
 | 方法族 | 方法 | 超时与失败语义 |
 |---|---|---|
 | `policy/evaluate` | 工具调用裁决（含审批等待） | 无固定超时（等待用户），会话中断时取消；失败即拒绝 |
+| `policy/tools` | 每次运行前取被不带 specifier 的 deny 规则覆盖的工具，从模型工具列表移除（T23） | 默认超时；失败时保持原列表 |
 | `hooks/run` | 在指定事件点执行 hooks，返回合并后的决策 | 按 handler 超时；失败按事件语义处理 |
 | `fs/*` | `read`、`stat`、`write`、`mkdir`、`grep`、`glob`、`list` | 本地操作，p95 < 5 ms（小文件） |
 | `exec/*` | `run`（流式）、`kill`、`background/list`、`background/read` | 按命令超时 |
@@ -1157,6 +1171,8 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 
 索引可以从 Pi JSONL 完整重建；应用提供"重建索引"诊断操作。
 
+T23（ADR-0037）：`workspaces.default_mode` 记录用户在该工作区最后选择的权限模式；`audit_events` 的权限记录带步骤、命中规则与来源层，设置页按会话、工具、结论、时间筛选。
+
 T18（schema v2，ADR-0029）：`sessions` 增加 `custom_title`（用户给的标题，属于 Core 自己的列，重建时保留）。
 
 T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失败整体回滚；`workspaces` 记主 checkout 而不另存信任状态（信任看 `project_trust`）；`sessions` 中从 JSONL 派生的列（标题来源、模型、用量、时间、格式版本、索引状态）重建时清空重读，置顶、归档、未读、所属工作区、状态、worktree 保留。解析器流式读取，末行未写完时下次从行首继续；未知格式版本标为"索引不可用"，坏行跳过并记录。`session_fts`（T35）与 `checkpoints`（T28）尚未建表。
@@ -1229,6 +1245,7 @@ T20 起，项目层的 `acceptEdits` 和 `additionalDirectories` 也纳入信任
 - 即使渲染进程被攻破，它能调用的也只是 preload 白名单中的命令；有副作用的操作（执行命令、写文件、改权限规则）仍要经 Core 的权限裁决，"总是允许"类规则的修改需要在主进程弹出的原生确认框中确认。
 - 现状与这条的差距（R1）：终端面板的输入（`terminalInput`、`terminalKey`）是用户在自己的 shell 里打字，不经 Core 的权限裁决，渲染进程被注入时可以借它执行命令；发布构建目前也带着原型终端的函数。防线与每窗口上限由 T34 决定并写入本节，以文档例外接受时先写 ADR（登记事项 I51、I30）。
 - 外链确认框每个窗口同一时刻最多一个，带用户信息的地址（`https://a@b/`）直接拒绝（R1）。
+- T23 新增权限页的四个命令（`permissionRules`、`checkPermissionRule`、`updatePermissionRule`、`auditEvents`）：主进程校验参数，新增或修改 allow 规则先弹原生确认；切换到跳过权限模式前同样弹原生确认，Core 另核对用户级开关。
 - T18 新增的命令（会话、工作区、信任、偏好、设置窗口、通知与计数）都在主进程校验参数：会话 id 按 Core 的规则校验，路径必须是绝对路径，标题不超过 200 字符，偏好只接受白名单内的键与值。删除会话由主进程弹原生确认框，页面无法绕过。主进程经 `piarc:app.event` 推送应用事件（偏好、菜单命令、打开会话、窗口焦点），preload 去掉 Electron 的 event 对象后再交给页面。
 
 **应用二进制**：
@@ -1279,7 +1296,7 @@ T20 起，项目层的 `acceptEdits` 和 `additionalDirectories` 也纳入信任
 | 主进程事件循环延迟 | p99 ≤ 16 ms | 10 万事件/分钟 3.58 ms；终端 100 MB 输出 2.04 ms | 原始值 16.81 ms，同机空闲 16.58 ms，超出空闲 0.23 ms；终端 100 MB 输出 14.34 ms | `monitorEventLoopDelay`（1 ms 采样）；计时器粒度粗于 1 ms 的平台（Windows 约 15.6 ms）取"满载 p99 − 同机同轮空闲 p99" |
 | Core 事件到渲染进程（主进程转发） | p95 ≤ 1.1 ms（原：≤ 5 ms） | 0.50 ms | ≤ 0.21 ms（p99） | 打点，每次投递，常规批次（≤ 1 MiB） |
 | AHP 往返（小文件 fs 操作） | p95 ≤ 5 ms | 0.19–0.22 ms | ≤ 5 ms（断言通过，数值未记录） | 契约测试中计时 |
-| 无需用户参与的权限裁决 | p95 ≤ 2 ms | p95 0.526 ms，1,000 次（T20，含路径、配置、信任及 SQLite 审计） | 未测 | Core 基准测试 `tool_io::policy::tests::automatic_decision_latency` |
+| 无需用户参与的权限裁决 | p95 ≤ 2 ms | p95 0.526 ms，1,000 次（T20，含路径、配置、信任及 SQLite 审计）；T23 加入规则集、复合 Bash 分析与程序解析后 p95 0.70 ms（调试构建，1,000 次） | 未测 | Core 基准测试 `tool_io::policy::tests::automatic_decision_latency` |
 | 终端键入回显的额外延迟（相对直接写 PTY） | p95 ≤ 5 ms | 0.76 ms（逐对相减 0.79 ms） | −0.85 ms（逐对相减 6.86 ms） | 两组样本各 ≥ 1,000 个，取"完整路径 p95 − 直接写 PTY p95"；逐对相减在 ConPTY 下会叠加两次独立往返的抖动 |
 | 安装包体积（macOS arm64 DMG / Windows x64 安装包） | ≤ 200 MB | 168.8 MB | **超出**：225.3 MB（开发构建） | 构建产物 |
 | 安装后体积 | ≤ 450 MB | 449.0 MB（余约 1 MB） | **超出**：521.3 MB | 构建产物 |
@@ -1538,6 +1555,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.29 | 2026-11-18 | T23（ADR-0037）补充第 6.2 节规则、Bash 分析、阶梯、模式与管理的落地，7.4 增加 `policy/tools`，9.2 写明模式记忆与审计字段，10.3 写明权限页命令与跳过权限的原生确认；第 11 章写入含 Bash 分析的裁决实测 |
 | 2.28 | 2026-11-19 | R2 记录 macOS 阶段门；更新 6.0 的 M1 能力、读取成功登记、文件授权与目录句柄、命令环境准入、信任与删除确认、索引 schema v4（ADR-0034–0036）。 |
 | 2.27 | 2026-11-19 | T22（ADR-0033）补充提示词冻结与恢复、memory 顺序、导入审批与消息送达、AHP 与用户级文件位置 |
 | 2.26 | 2026-11-19 | T21（ADR-0032）补充服务商配置投影、凭据更新、模型目录与会话选择 |

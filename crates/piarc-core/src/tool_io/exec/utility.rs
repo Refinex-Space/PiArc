@@ -9,6 +9,7 @@ const FILE_UTILITIES: &[&str] = &["mkdir", "touch", "mv", "cp"];
 
 /// What a preflight needs to resolve program names the way the command's bash will.
 pub(in crate::tool_io) struct Programs {
+    #[cfg(not(windows))]
     env: Vec<(OsString, OsString)>,
     custom: bool,
     shell: Option<PathBuf>,
@@ -30,6 +31,7 @@ impl Exec {
             None => Vec::new(),
         };
         Programs {
+            #[cfg(not(windows))]
             env: resolved.inherited.clone(),
             custom: resolved.custom_resolution,
             shell,
