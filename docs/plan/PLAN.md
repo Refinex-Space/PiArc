@@ -149,9 +149,9 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T22 | [System prompt 组装与 memory 文件](tasks/T22-system-prompt-and-memory-files.md) | 2 | T21 | macOS | high / 高 | 中 | 无 | 已完成 | 9843eb5 |
 | R2 | [M1 评审](tasks/R2-m1-review.md) | 2 | T22 | macOS | high / 高 | 中 | 无 | 已完成 | f63ac3d |
 | W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 部分完成 | b0a510f |
-| T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 8a1f38b |
+| T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 8a1f38b |
 | T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 已完成 | ae5c8e6 |
-| T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 30a4f17 |
+| T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 30a4f17 |
 | T26 | [计划模式、任务清单、AskUserQuestion 与下一步](tasks/T26-plan-mode-todo-ask-next-steps.md) | 3 | T25 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T27 | [上下文工程：system reminder、压缩与用量](tasks/T27-context-reminders-compaction-usage.md) | 3 | T26 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T28 | [检查点、回退与 Changes 面板](tasks/T28-checkpoints-rewind-changes.md) | 3 | T27 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -398,7 +398,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I81 | T18 | `crates/piarc-core/src/runtime.rs` 已超过 1,000 行（T17 时 1,080 行，T18 增加会话元数据、客户端设置与信任重启的薄包装后约 1,150 行），超出 `coding-standards.md` 的单文件上限 | R2 已拆分 runtime/state.rs 与 runtime/sessions.rs，runtime.rs 808 行（b426028） |
 | I82 | T23 | 按参数匹配的规则（`Agent(model:opus)`、`Bash(run_in_background:true)`）没有实现：现在分别解析为 Agent 类型名与命令模式，永不匹配，deny 意图会落空 | T31 接入 Agent 工具时按 Claude Code 语义实现（只用于 deny/ask，不匹配主内容字段），并在设置页标出 |
 | I83 | T23 | PowerShell 只做整条匹配与粗分段（不解析 AST、不规范化别名，`Get-ChildItem` 规则不覆盖 `gci`）；Windows 上 PowerShell 没有只读白名单 | M4 评估 PowerShell 语法级分析（架构第 6.2.2 节），同时决定别名表 |
-| I84 | T23 | Windows 上只读白名单与文件命令的自动允许依赖 Git Bash 探测（`usr/bin`、`mingw64/bin` 中的同名程序），macOS 只能交叉 clippy；`perm-read-only` 等场景在 Windows CI 首次运行 | W1 在 Windows 11 上核对探测结果、钉住与 `perm-*` 场景，必要时调整 `PROGRAMS`/`WRAPPED` |
+| I84 | T23 | Windows 上只读白名单与文件命令的自动允许依赖 Git Bash 探测（`usr/bin`、`mingw64/bin` 中的同名程序），macOS 只能交叉 clippy；`perm-read-only` 等场景在 Windows CI 首次运行 | W1 在 Windows 11 上核对探测结果、钉住与 `perm-*` 场景，必要时调整 `PROGRAMS`/`WRAPPED`；**CI 已核对**：运行 44522160246 的 Windows L2 `perm-read-only`、`perm-powershell-whole` 通过，实机核对仍留给 W2 |
 | I85 | T23 | T20 时期"总是允许"为 Write 保存的 `Write(路径)` 规则在 T23 语义下不匹配（Claude Code 只认 `Edit(路径)`）；现有用户文件里的这类规则会被设置页列出但不起作用 | T24 的配置诊断提示改写为 `Edit(…)`；正式发布前的用户数据只有测试数据，不做迁移；**已落地（T24）**：权限页对 `Write(…)`、`NotebookEdit(…)`、`Glob(…)`、`Grep(…)` 规则显示"永不匹配，请改写为 Edit(…)/Read(…)"（`settings_view::check_rule` 的 `suggestion`，L4 `t24-diagnostics.e2e.ts`） |
 | I86 | T24 | `~/.claude/` 不存在时设置监听退到最近的已存在祖先（通常是家目录本身，非递归）：家目录里任何文件的变化都会触发一次去抖后的七层重读 | T44 测量空闲时的重读频率；需要时改为只在 `.claude` 条目出现时重读 |
 | I87 | T24 | 键映射表（`piarc_config::claude::SETTINGS_KEYS`）是 2026-11-18 官方 settings 索引的快照；Claude Code 新增的键在更新表之前按"未知"列为忽略 | 各评审任务对照官方索引复查一次；实现对应功能的任务（ADR-0038 后果一节列出）把行改为生效 |
@@ -415,6 +415,9 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I98 | W1 | 系统通知的点击：横幅仍在屏幕上时点击，PiArc 打开对应会话（W1 修复通知对象被回收的问题后实测）；Toast 进入通知中心后点击走 COM 激活，只聚焦窗口、不打开会话。开发构建（L4 `dev` 形态直接运行 `node_modules` 的 electron.exe、本机打包产物）与正式版共用 AUMID `cn.piarc.desktop`，Electron 为每个程序各注册一个 Toast 激活器，W1 中点击通知中心的 Toast 启动了空白的 electron.exe | T42（可操作通知）：激活参数带会话 id、经 `second-instance` 打开；开发构建用独立 AUMID，避免开发机上的串用 |
 | I99 | W1 | 通知实测中有两次运行在 30–60 s 内没有任何通知请求（窗口已最小化、会话已在等待审批），之后同样的操作立即发出；原因未查明 | T42 复核通知触发条件（窗口最小化、渲染进程节流） |
 | I100 | W1 | 设置页"刷新模型目录"勾选框是受控组件，要等设置 Host 启动（正式路径首次约 1 s）答复后才改变状态，期间点击看起来没有反应 | T29 补全模型设置时给出进行中状态 |
+| I101 | 合并 W1 后的 CI | Windows CI 的 L4 `r2-workflow`（dev 形态）偶发：运行 44522160246 中应用在 60 s 内没有启动完成，清理时 Chromium 仍占着数据目录的 `lockfile`（EBUSY），没有应用日志；同一用例的 packaged 形态与另一协议通过，R2 的运行 44453549786 中它以另一断言失败 | T44（L4 稳定性）：启动失败时保留主进程输出与 Chromium 日志，再定位 |
+| I102 | 合并 W1 后的 CI | Windows 上 bash 命令经环境变量 `PIARC_COMMAND` 与 `eval` 执行（Git Bash 截断过 12,000 字符的 `-c` 参数）：语法错误报 `eval: line N`，退出码可能是 1 而不是 2；截断的确切位置未在 Windows 上定位，只有 CI 覆盖 | W2 实机核对长命令、heredoc 与语法错误的表现 |
+| I103 | 合并 W1 后的 CI | 权限裁决计时在 CI 上与同一测试二进制的其他测试混跑时只是在测 runner：同一断言相邻两次运行 p50 0.84 / 1.44 ms。verify 第 8 步改为先跳过它跑全部测试、再单独运行（`scripts/ci/cargo-test.mjs`），预算不变 | 单独运行后仍超预算时，按 I95 评审缓存设置的 ADR；T44 把计时纳入性能回归 |
 
 ## 技术债
 
@@ -777,6 +780,16 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
   - 虚拟列表变窄后行重叠：W1 的重测因比较旧尺寸、且滚动中 `measureElement` 不测量而无效，本机滚动条占宽度时 `t19-security` 偶发（撤掉 W1 改动 4 次 2 败、保留时 4 次 4 败）；新增确定性的 L4 变窄用例后修复（c2ae5c0，修复后 3/3 与 4/4 通过）。
 - 修复后全量 L4 202 通过、5 个按平台跳过，`t18-review` 两个形态失败：本机运行测试的终端没有"屏幕录制"权限，`screencapture -l` 对任意窗口都报 `could not create image from window`（已写入 `apps/desktop/AGENTS.md`）。证据在 `tmp/evidence/merge-W1/`。
 - W1 的起点 b654341 早于 T23–T25：T23-A05、T25-A09、I84 的 Windows 部分仍要推送后由 Windows CI 或下一次 Windows 会话核对。本地提交，未推送。
+
+### 2026-11-19 推送后的两轮 CI（macOS 会话）
+
+- 运行 44514850116（b6405ce）：打包与 L4 全部卡在 Vite 解析不到 `@piarc/protocol`（T23 在主进程、渲染进程加了值导入，CI 打包前不跑 `tsc --build`），改为从源码打包（7c34902）；两个平台的权限裁决计时超预算；Windows 上 T25 长 context 的 hook 用例失败，补了诊断（78badbc）。
+- 本地优化（不改"每次裁决读最新磁盘状态"）：hooks 的第 2、8 步复用本次裁决已读的设置（fccf1f2，生产路径 p50 725→560 µs），信任查找复用已解析的 checkout（1891d90，→515 µs）。
+- 运行 44522160246（1891d90）：打包 4 个作业通过；L4 首次跑完（macOS 203/1 失败，Windows 207/2 失败）；T23-A05、T25-A09 的 Windows 部分通过，两任务改为已完成。仍失败的处理：
+  - Windows hook 诊断显示 12,000 字符的 `-c` 被 Git Bash 截断（bash 报未闭合引号，exit 2 被当作阻断）。Bash 工具同样受影响；Windows 上改为经环境变量传命令（0e02852，I102）。
+  - 计时：CI 上 p50 两次相差近一倍，四类调用同步变慢，判定为 runner 噪声；verify 第 8 步单独运行计时测试（8299a6f，I103）。
+  - L4：首页在文件夹打开完成时重新挂载、清掉了回滚的草稿（真实竞态，294b76b，带确定性 L4）；Windows 徽标用例在渲染进程收到焦点前离开会话（f689ba1）；`r2-workflow` 启动超时登记 I101。
+- 本机：verify 15/15，计时单独运行 p50 501 µs、p95 693 µs；Windows 目标交叉 clippy 通过。
 
 ## 计划变更记录
 

@@ -2470,8 +2470,8 @@
       "id": "T23-A05",
       "task": "T23",
       "description": "只读白名单命令在 Manual 下免审批、白名单外命令询问；PowerShell 命令不拆分，只有整条被规则允许时免审批。验证：场景测试（PowerShell 场景在 Windows CI 上运行）。",
-      "status": "blocked",
-      "evidence": "只读白名单部分已在 macOS 通过：L2 `perm-read-only` 断言 Manual 下工作区内的只读命令免审批、白名单外命令与越界路径询问。PowerShell 部分的 L2 `perm-powershell-whole`（platforms: windows）在 macOS 按平台跳过，需 Windows CI 运行；PowerShell 整条匹配的单测 `rules::tests::powershell_rules_match_the_whole_command_without_case` 已通过。"
+      "status": "passing",
+      "evidence": "只读白名单部分已在 macOS 通过：L2 `perm-read-only` 断言 Manual 下工作区内的只读命令免审批、白名单外命令与越界路径询问。PowerShell 部分的 L2 `perm-powershell-whole`（platforms: windows）在 macOS 按平台跳过，需 Windows CI 运行；PowerShell 整条匹配的单测 `rules::tests::powershell_rules_match_the_whole_command_without_case` 已通过。；Windows 部分通过：CI 运行 44522160246（提交 1891d90）verify 第 14 步 L2 `perm-powershell-whole` ok（1762 ms）、`perm-read-only` ok（2722 ms），Windows L2 81 通过、2 个按平台跳过"
     },
     {
       "id": "T23-A06",
@@ -2673,8 +2673,8 @@
       "id": "T25-A09",
       "task": "T25",
       "description": "handler 超时或会话取消时整棵进程树被终止，默认超时为 600 秒、UserPromptSubmit 为 30 秒（测试中时长可注入）。验证：macOS 本机测试与 Windows CI 测试输出。",
-      "status": "blocked",
-      "evidence": "macOS 已通过：Core 测试 `a_timeout_or_an_interrupted_turn_ends_the_hooks_process_tree`（ProcessTreeSpawner；handler timeout 0.5 s 时后台 sleep 的 pid 在超时后消失，回合中断时另一个 hook 的后台 sleep 消失）、`the_default_timeouts_are_600_seconds_and_30_for_user_prompt_submit`（默认 600 s、UserPromptSubmit 30 s，`CoreConfig.hooks` 注入）与 `piarc-hooks` runner 超时、取消测试。Windows 部分（同一测试经 Git Bash 与 Job Object，`alive` 用 tasklist）已通过 Windows 目标交叉 Clippy（tmp/evidence/T25/windows-clippy.log），需推送后由 Windows CI 运行。"
+      "status": "passing",
+      "evidence": "macOS 已通过：Core 测试 `a_timeout_or_an_interrupted_turn_ends_the_hooks_process_tree`（ProcessTreeSpawner；handler timeout 0.5 s 时后台 sleep 的 pid 在超时后消失，回合中断时另一个 hook 的后台 sleep 消失）、`the_default_timeouts_are_600_seconds_and_30_for_user_prompt_submit`（默认 600 s、UserPromptSubmit 30 s，`CoreConfig.hooks` 注入）与 `piarc-hooks` runner 超时、取消测试。Windows 部分（同一测试经 Git Bash 与 Job Object，`alive` 用 tasklist）已通过 Windows 目标交叉 Clippy（tmp/evidence/T25/windows-clippy.log），需推送后由 Windows CI 运行。；Windows 部分通过：CI 运行 44522160246（提交 1891d90）`a_timeout_or_an_interrupted_turn_ends_the_hooks_process_tree` 与 `the_default_timeouts_are_600_seconds_and_30_for_user_prompt_submit` 在 windows-latest 上 ok（经 Git Bash 与 Job Object）"
     },
     {
       "id": "T25-A10",
