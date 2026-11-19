@@ -319,6 +319,7 @@ export const en = {
   'trust.newTitle': 'New configuration in “{name}”',
   'trust.newIntro':
     'These items were added after you trusted the project. The project stays restricted until you confirm them.',
+  'trust.changed': 'The project configuration changed. Review the updated list before confirming.',
   'trust.none': 'The project has no hooks, MCP servers, allow rules, plugins or extensions.',
   'trust.memory':
     'Memory files such as AGENTS.md and CLAUDE.md are read whether or not you trust the project: they are instructions, not code, and PiArc shows where each one comes from.',

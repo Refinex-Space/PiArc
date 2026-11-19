@@ -97,6 +97,7 @@ test('the trust dialog lists the items; the decision decides what the model gets
   await writeFile(settingsFile, JSON.stringify(settings));
   await page.getByTestId('trust-accept').click();
   await expect(dialog.getByTestId('trust-item')).toHaveCount(2);
+  await expect(dialog.getByRole('status')).toHaveText(/configuration changed|配置已变化/);
   await expect(dialog).toContainText('Bash(node --version)');
   await page.getByTestId('trust-accept').click();
   await expect(page.getByTestId('agent-message')).toHaveText(/Done\./, { timeout: 30_000 });

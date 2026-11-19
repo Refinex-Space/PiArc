@@ -104,6 +104,7 @@ export function TrustDialog({
   const titleId = useId();
   const [view, setView] = useState<TrustView | 'loading' | { failed: string }>('loading');
   const [busy, setBusy] = useState(false);
+  const [changed, setChanged] = useState(false);
   const deny = useRef<HTMLButtonElement>(null);
   const loaded = typeof view === 'object' && 'items' in view;
   // Once the items are on screen, the safe choice has the focus.
@@ -144,6 +145,7 @@ export function TrustDialog({
         if (updated?.applied && (!trusted || updated.trusted)) onDone(trusted);
         else {
           setBusy(false);
+          setChanged(updated !== undefined);
           setView(updated ?? { failed: 'malformed trust view' });
           deny.current?.focus();
         }
@@ -178,6 +180,7 @@ export function TrustDialog({
       )}
       {typeof view === 'object' && 'items' in view && (
         <>
+          {changed && <p role="status">{t('trust.changed')}</p>}
           <p>{onlyNew ? t('trust.newIntro') : t('trust.intro')}</p>
           {mode === 'review' && (
             <p className="muted" data-testid="trust-current">

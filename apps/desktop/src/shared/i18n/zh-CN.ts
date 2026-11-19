@@ -307,6 +307,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'trust.intro': '这个项目包含会在你的电脑上运行代码的配置。只有信任项目后，PiArc 才会启用它们。',
   'trust.newTitle': '“{name}”中有新增的配置',
   'trust.newIntro': '以下条目是信任项目之后新增的。确认之前，项目保持受限。',
+  'trust.changed': '项目配置已变化，请核对更新后的清单再确认。',
   'trust.none': '这个项目没有 hooks、MCP server、允许规则、插件或扩展。',
   'trust.memory':
     '无论是否信任，AGENTS.md、CLAUDE.md 等 memory 文件都会读取：它们是指令而不是代码，PiArc 会标注每个文件的来源。',
