@@ -5,6 +5,7 @@
 //! 1. enterprise deny (slot, M5)                     → deny
 //! 2. PreToolUse hooks (slot, T25): deny → deny; ask → step 4; allow → step 6
 //! 3. deny rules                                     → deny
+//!    ExitPlanMode: plan mode → ask (the plan card); any other mode → deny
 //! 4. ask rules, critical deletion, unresolved command, requiresUserInteraction → ask
 //! 5. mode: plan + a write → deny with "present the plan"; bypassPermissions → allow
 //!    then protected path writes (Manual, Accept edits) → ask
@@ -79,6 +80,9 @@ pub struct Input {
     pub ask: Option<MustAsk>,
     /// A write tool or a command that is not read-only (plan mode).
     pub write: bool,
+    /// `ExitPlanMode`: the user approves the plan in plan mode; there is none to approve in
+    /// another mode (T26).
+    pub exit_plan: bool,
     /// Writes a protected path.
     pub protected: bool,
     /// An assignment changes command resolution: no automatic allow.
@@ -140,6 +144,13 @@ pub fn decide(input: &Input) -> Ruling {
     if let Some(hit) = &input.deny {
         return Ruling::new(Deny, "denyRule", vec![hit.clone()]);
     }
+    if input.exit_plan {
+        return if input.mode == PermissionMode::Plan {
+            Ruling::new(Ask, "planApproval", Vec::new())
+        } else {
+            Ruling::new(Deny, "notInPlanMode", Vec::new())
+        };
+    }
     if let Some(ask) = &input.ask {
         return Ruling::new(Ask, ask.step, ask.hit.iter().cloned().collect());
     }
@@ -179,11 +190,15 @@ pub fn decide(input: &Input) -> Ruling {
 }
 
 /// Step 8: the PermissionRequest slot answers before the user sees the card. It cannot
-/// approve a critical deletion or a tool that needs the user's own input.
+/// approve a critical deletion, a tool that needs the user's own input or a plan (the user
+/// chooses the mode to continue in).
 #[must_use]
 pub fn after_permission_request(ruling: Ruling, verdict: &HookVerdict) -> Ruling {
     if ruling.outcome != Outcome::Ask
-        || matches!(ruling.step, "criticalPath" | "requiresUserInteraction")
+        || matches!(
+            ruling.step,
+            "criticalPath" | "requiresUserInteraction" | "planApproval"
+        )
     {
         return ruling;
     }
@@ -224,7 +239,11 @@ pub fn starting_mode(
 }
 
 /// The reason the model receives when plan mode refuses a call.
-pub const PLAN_MODE_REFUSAL: &str = "Permission denied: plan mode is on, so files cannot be changed and only read-only commands can run. Keep investigating with read-only tools, then present your plan to the user and wait for approval before making any change.";
+pub const PLAN_MODE_REFUSAL: &str = "Permission denied: plan mode is on, so files cannot be changed and only read-only commands can run. Keep investigating with read-only tools, then submit your plan with ExitPlanMode and wait for the user to approve it before changing anything.";
+
+/// The reason the model receives for `ExitPlanMode` outside plan mode.
+pub const NOT_IN_PLAN_MODE: &str =
+    "Plan mode is off, so there is no plan to approve. Continue with the task in the current mode.";
 
 #[cfg(test)]
 mod tests;

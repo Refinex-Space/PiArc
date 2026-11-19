@@ -34,20 +34,21 @@ impl Fixture {
     }
 
     async fn with_env(command_env: super::super::CommandEnv) -> Self {
-        Self::build(command_env, Path::to_path_buf, false).await
+        Self::build(command_env, Path::to_path_buf, false, system_clock()).await
     }
 
     /// As Core runs: with the hooks service, whose steps run even when no hook is configured.
     async fn with_hooks(command_env: super::super::CommandEnv) -> Self {
-        Self::build(command_env, Path::to_path_buf, true).await
+        Self::build(command_env, Path::to_path_buf, true, system_clock()).await
     }
 
     /// `spell` names the workspace directory the way the session opens it; `hooks` adds the
-    /// hooks service (the ladder alone otherwise).
+    /// hooks service (the ladder alone otherwise); `clock` times question forms.
     async fn build(
         command_env: super::super::CommandEnv,
         spell: impl FnOnce(&Path) -> PathBuf,
         hooks: bool,
+        clock: Arc<dyn piarc_ports::Clock>,
     ) -> Self {
         let root = std::env::temp_dir().join(crate::sessions::new_session_id().expect("unique id"));
         let local = root.join("workspace");
@@ -94,6 +95,7 @@ impl Fixture {
         });
         let io = ToolIo::new(ToolIoConfig {
             command_env,
+            clock,
             ..ToolIoConfig::new(data)
         })
         .policy_services(Services {
@@ -150,6 +152,10 @@ impl Drop for Fixture {
     }
 }
 
+fn system_clock() -> Arc<dyn piarc_ports::Clock> {
+    Arc::new(crate::clock::SystemClock)
+}
+
 fn answer(r: &ApprovalRequest, decision: ApprovalDecision) -> ApprovalAnswer {
     ApprovalAnswer {
         request_id: r.request_id.clone(),
@@ -160,6 +166,9 @@ fn answer(r: &ApprovalRequest, decision: ApprovalDecision) -> ApprovalAnswer {
         feedback: None,
         rules: Vec::new(),
         directory: None,
+        mode: None,
+        comments: Vec::new(),
+        answers: Vec::new(),
     }
 }
 
@@ -581,6 +590,7 @@ async fn completion_only_retires_memory_for_its_own_turn() {
 }
 
 mod t23;
+mod t26;
 
 /// W1 (architecture 15.2): Windows paths through the whole production path, preflight, grant
 /// and directory-bound I/O. Long paths and reserved names are made here, never committed.
@@ -789,6 +799,7 @@ mod windows_paths {
                 share.join(below)
             },
             false,
+            system_clock(),
         )
         .await;
         f.io.changed_mode(SESSION, PermissionMode::AcceptEdits)

@@ -215,6 +215,7 @@ export const en = {
   'approval.kind.fileChange': 'Allow file change?',
   'approval.kind.permissionExpansion': 'Allow access outside the workspace?',
   'approval.kind.question': 'Question',
+  'approval.kind.plan': 'Review the plan',
   'approval.unsupported': 'This version does not support question forms. The request was declined.',
   'approval.cwd': 'Working directory · {path}',
   'approval.feedback': 'Feedback for the model (optional)',

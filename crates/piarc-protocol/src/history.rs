@@ -79,6 +79,9 @@ pub struct HistoryWindow {
     pub total: u64,
     /// The items, in conversation order.
     pub items: Vec<HistoryItem>,
+    /// The plan and task list at the head of the branch (T26).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub harness: Option<crate::harness::HarnessState>,
 }
 
 /// Parameters of `harness/entry`.

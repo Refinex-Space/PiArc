@@ -27,7 +27,7 @@ pub mod pattern;
 pub mod rules;
 
 pub use decision::{
-    Boundary, HookVerdict, Input, MustAsk, Outcome, PLAN_MODE_REFUSAL, Ruling,
+    Boundary, HookVerdict, Input, MustAsk, NOT_IN_PLAN_MODE, Outcome, PLAN_MODE_REFUSAL, Ruling,
     after_permission_request, decide, starting_mode,
 };
 pub use ledger::Ledger;

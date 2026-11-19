@@ -317,6 +317,15 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
         name: "disableAllHooks",
         shape: Shape::Bool,
     },
+    // `AskUserQuestion`'s form (T26): after this many seconds the questions' default options
+    // stand, or the model hears that the user did not answer. Absent: no timeout.
+    Field {
+        name: "askUserQuestion",
+        shape: Shape::Object(&[Field {
+            name: "timeoutSeconds",
+            shape: Shape::Number,
+        }]),
+    },
     // Read by Core from the user's file only (`<data>/settings.json`): which executable runs
     // commands is not a project's choice (T17).
     Field {

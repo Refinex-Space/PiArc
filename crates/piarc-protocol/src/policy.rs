@@ -50,6 +50,10 @@ pub struct PolicyEvaluateResult {
     /// deny with `interrupt`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stop: Option<crate::hooks::HookStop>,
+    /// Allowing the call switched the session to this mode (`EnterPlanMode`, an approved
+    /// plan, T26): the Agent Host records the change on the branch and tells the model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<PermissionMode>,
 }
 
 /// Permission modes (architecture section 6.2.1). `auto` (M5) and `dontAsk` (headless) are
@@ -79,8 +83,11 @@ pub enum ApprovalKind {
     FileChange,
     /// Access outside the allowed directories.
     PermissionExpansion,
-    /// A structured question. M1 clients decline this kind.
+    /// `AskUserQuestion`'s form (`ui/ask`, T26): answered with `answers`.
     Question,
+    /// A plan submitted with `ExitPlanMode` (T26): approved with the mode to continue in, or
+    /// declined with feedback and comments to keep planning.
+    Plan,
 }
 
 /// User choice for a pending request.
@@ -148,6 +155,12 @@ pub struct ApprovalRequest {
     /// Whether the target must always be reviewed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub protected_path: Option<bool>,
+    /// The plan of a `plan` card (Markdown).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan: Option<String>,
+    /// The questions of a `question` card.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub questions: Vec<crate::harness::Question>,
 }
 
 /// Answer bound to the request as displayed.
@@ -173,6 +186,15 @@ pub struct ApprovalAnswer {
     /// Directory shown in the native confirmation dialog.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub directory: Option<String>,
+    /// The mode an approved plan continues in: `acceptEdits` or `default`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<PermissionMode>,
+    /// Inline comments on a plan, returned to the model with a refusal (keep planning).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub comments: Vec<crate::harness::PlanComment>,
+    /// One answer per question of a `question` card, with `allowOnce`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub answers: Vec<crate::harness::QuestionAnswer>,
 }
 
 /// Correlates an approval wait on the current Agent Host connection.

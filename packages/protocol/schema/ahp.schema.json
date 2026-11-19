@@ -23,6 +23,20 @@
     "ApprovalAnswer": {
       "description": "Answer bound to the request as displayed.",
       "properties": {
+        "answers": {
+          "description": "One answer per question of a `question` card, with `allowOnce`.",
+          "items": {
+            "$ref": "#/$defs/QuestionAnswer"
+          },
+          "type": "array"
+        },
+        "comments": {
+          "description": "Inline comments on a plan, returned to the model with a refusal (keep planning).",
+          "items": {
+            "$ref": "#/$defs/PlanComment"
+          },
+          "type": "array"
+        },
         "connectionEpoch": {
           "description": "Agent Host connection that made the call.",
           "format": "uint64",
@@ -40,6 +54,17 @@
         "feedback": {
           "description": "Feedback to return on refusal.",
           "type": ["string", "null"]
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PermissionMode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The mode an approved plan continues in: `acceptEdits` or `default`."
         },
         "requestId": {
           "description": "Opaque identifier allocated by Core.",
@@ -111,7 +136,12 @@
         },
         {
           "const": "question",
-          "description": "A structured question. M1 clients decline this kind.",
+          "description": "`AskUserQuestion`'s form (`ui/ask`, T26): answered with `answers`.",
+          "type": "string"
+        },
+        {
+          "const": "plan",
+          "description": "A plan submitted with `ExitPlanMode` (T26): approved with the mode to continue in, or\ndeclined with feedback and comments to keep planning.",
           "type": "string"
         }
       ]
@@ -156,9 +186,20 @@
           "description": "Path of the file being accessed.",
           "type": ["string", "null"]
         },
+        "plan": {
+          "description": "The plan of a `plan` card (Markdown).",
+          "type": ["string", "null"]
+        },
         "protectedPath": {
           "description": "Whether the target must always be reviewed.",
           "type": ["boolean", "null"]
+        },
+        "questions": {
+          "description": "The questions of a `question` card.",
+          "items": {
+            "$ref": "#/$defs/Question"
+          },
+          "type": "array"
         },
         "requestId": {
           "description": "Opaque identifier allocated by Core.",
@@ -2499,6 +2540,137 @@
       "required": ["sessionId", "seq", "ts", "entryId", "customType"],
       "type": "object"
     },
+    "HarnessPlanNotification": {
+      "description": "Notification `harness/plan`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "harness/plan",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/HarnessPlanParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "HarnessPlanParams": {
+      "description": "Parameters of `harness/plan`.",
+      "properties": {
+        "entryId": {
+          "description": "Pi's id of the `piarc.plan` custom entry.",
+          "type": "string"
+        },
+        "mode": {
+          "$ref": "#/$defs/PermissionMode",
+          "description": "The mode the user chose to continue in."
+        },
+        "plan": {
+          "description": "The plan as the model wrote it (Markdown).",
+          "type": "string"
+        },
+        "seq": {
+          "description": "Sequence number, monotonically increasing within the session.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session the event belongs to."
+        },
+        "toolCallId": {
+          "description": "The `ExitPlanMode` call that submitted it.",
+          "type": "string"
+        },
+        "ts": {
+          "description": "Time the event was produced, in milliseconds since the Unix epoch (UTC).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["sessionId", "seq", "ts", "plan", "toolCallId", "entryId", "mode"],
+      "type": "object"
+    },
+    "HarnessState": {
+      "description": "The plan and task list at the head of a branch.",
+      "properties": {
+        "plan": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlanRecord"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The last plan the user approved on the branch."
+        },
+        "todos": {
+          "description": "The task list of the branch's last `TodoWrite` result.",
+          "items": {
+            "$ref": "#/$defs/TodoItem"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "HarnessTodoNotification": {
+      "description": "Notification `harness/todo`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "harness/todo",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/HarnessTodoParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "HarnessTodoParams": {
+      "description": "Parameters of `harness/todo`.",
+      "properties": {
+        "itemId": {
+          "$ref": "#/$defs/ItemId",
+          "description": "The `TodoWrite` call whose result holds the list."
+        },
+        "seq": {
+          "description": "Sequence number, monotonically increasing within the session.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session the event belongs to."
+        },
+        "todos": {
+          "description": "The whole list, in order.",
+          "items": {
+            "$ref": "#/$defs/TodoItem"
+          },
+          "type": "array"
+        },
+        "ts": {
+          "description": "Time the event was produced, in milliseconds since the Unix epoch (UTC).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["sessionId", "seq", "ts", "itemId", "todos"],
+      "type": "object"
+    },
     "HistoryItem": {
       "description": "One item of the history.",
       "properties": {
@@ -2555,6 +2727,17 @@
     "HistoryWindow": {
       "description": "Result of `session/history`: items `start .. start + items.len()` of `total`.",
       "properties": {
+        "harness": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HarnessState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The plan and task list at the head of the branch (T26)."
+        },
         "items": {
           "description": "The items, in conversation order.",
           "items": {
@@ -4074,6 +4257,56 @@
         }
       ]
     },
+    "PlanComment": {
+      "description": "An inline comment on a plan: a range of the plan text and what the user wrote about it.",
+      "properties": {
+        "end": {
+          "description": "End of the range (exclusive).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "quote": {
+          "description": "The commented text, `plan[start..end]`.",
+          "type": "string"
+        },
+        "start": {
+          "description": "Start of the commented range, in UTF-16 code units of the plan (architecture 7.7).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "text": {
+          "description": "The comment.",
+          "type": "string"
+        }
+      },
+      "required": ["start", "end", "quote", "text"],
+      "type": "object"
+    },
+    "PlanRecord": {
+      "description": "A plan the user approved.",
+      "properties": {
+        "entryId": {
+          "description": "Pi's id of the `piarc.plan` custom entry.",
+          "type": "string"
+        },
+        "mode": {
+          "$ref": "#/$defs/PermissionMode",
+          "description": "The mode the user chose to continue in."
+        },
+        "plan": {
+          "description": "The plan as the model wrote it (Markdown).",
+          "type": "string"
+        },
+        "toolCallId": {
+          "description": "The `ExitPlanMode` call that submitted it.",
+          "type": "string"
+        }
+      },
+      "required": ["plan", "toolCallId", "entryId", "mode"],
+      "type": "object"
+    },
     "PolicyCancelRequest": {
       "description": "Request for `policy/cancel`.",
       "properties": {
@@ -4192,6 +4425,17 @@
         "context": {
           "description": "Hook context for the model (`PreToolUse` `additionalContext`), delivered with the\ncall's result.",
           "type": ["string", "null"]
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PermissionMode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Allowing the call switched the session to this mode (`EnterPlanMode`, an approved\nplan, T26): the Agent Host records the change on the branch and tells the model."
         },
         "reason": {
           "description": "Reason visible to the model, including feedback on refusal.",
@@ -4486,6 +4730,119 @@
         }
       },
       "required": ["type"],
+      "type": "object"
+    },
+    "Question": {
+      "description": "One question of `AskUserQuestion`. The user may always write an answer of their own\nbesides the options.",
+      "properties": {
+        "header": {
+          "description": "A short label for it.",
+          "type": ["string", "null"]
+        },
+        "multiSelect": {
+          "description": "Whether several options may be picked.",
+          "type": ["boolean", "null"]
+        },
+        "options": {
+          "description": "The choices.",
+          "items": {
+            "$ref": "#/$defs/QuestionOption"
+          },
+          "type": "array"
+        },
+        "question": {
+          "description": "The question.",
+          "type": "string"
+        }
+      },
+      "required": ["question", "options"],
+      "type": "object"
+    },
+    "QuestionAnswer": {
+      "description": "The user's answer to one question, in the order of the questions.",
+      "properties": {
+        "other": {
+          "description": "An answer in the user's own words.",
+          "type": ["string", "null"]
+        },
+        "selected": {
+          "description": "Labels of the picked options.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "QuestionOption": {
+      "description": "One choice of a question.",
+      "properties": {
+        "default": {
+          "description": "Chosen when the question times out without an answer.",
+          "type": ["boolean", "null"]
+        },
+        "description": {
+          "description": "What picking it means.",
+          "type": ["string", "null"]
+        },
+        "label": {
+          "description": "What the user picks (short).",
+          "type": "string"
+        }
+      },
+      "required": ["label"],
+      "type": "object"
+    },
+    "QuestionOutcome": {
+      "description": "How a question was settled.",
+      "oneOf": [
+        {
+          "const": "answered",
+          "description": "The user answered.",
+          "type": "string"
+        },
+        {
+          "const": "default",
+          "description": "The time ran out; the question's default options stand.",
+          "type": "string"
+        },
+        {
+          "const": "unanswered",
+          "description": "The time ran out and the question has no default.",
+          "type": "string"
+        },
+        {
+          "const": "declined",
+          "description": "The user closed the form without answering.",
+          "type": "string"
+        }
+      ]
+    },
+    "QuestionResult": {
+      "description": "The result of one question.",
+      "properties": {
+        "other": {
+          "description": "The user's own answer.",
+          "type": ["string", "null"]
+        },
+        "outcome": {
+          "$ref": "#/$defs/QuestionOutcome",
+          "description": "How it was settled."
+        },
+        "question": {
+          "description": "The question it answers.",
+          "type": "string"
+        },
+        "selected": {
+          "description": "Labels of the picked options (the defaults for `default`).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["question", "outcome"],
       "type": "object"
     },
     "QueueChangedNotification": {
@@ -6299,6 +6656,45 @@
       "required": ["jsonrpc", "id", "result"],
       "type": "object"
     },
+    "TodoItem": {
+      "description": "One task of the list.",
+      "properties": {
+        "activeForm": {
+          "description": "The same task as it reads while in progress (\"Running the tests\").",
+          "type": ["string", "null"]
+        },
+        "content": {
+          "description": "What the task is, in the imperative (\"Run the tests\").",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/TodoStatus",
+          "description": "Where it stands."
+        }
+      },
+      "required": ["content", "status"],
+      "type": "object"
+    },
+    "TodoStatus": {
+      "description": "Where a task stands.",
+      "oneOf": [
+        {
+          "const": "pending",
+          "description": "Not started.",
+          "type": "string"
+        },
+        {
+          "const": "inProgress",
+          "description": "Being worked on.",
+          "type": "string"
+        },
+        {
+          "const": "completed",
+          "description": "Done.",
+          "type": "string"
+        }
+      ]
+    },
     "ToolOrigin": {
       "description": "The tool call a delegated request serves.",
       "properties": {
@@ -6733,6 +7129,83 @@
       "required": ["jsonrpc", "method", "params"],
       "type": "object"
     },
+    "UiAskParams": {
+      "description": "Parameters of `ui/ask`.",
+      "properties": {
+        "questions": {
+          "description": "The questions, 1 to 4.",
+          "items": {
+            "$ref": "#/$defs/Question"
+          },
+          "type": "array"
+        },
+        "sessionId": {
+          "description": "The asking session.",
+          "type": "string"
+        },
+        "toolCallId": {
+          "description": "The `AskUserQuestion` call.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "toolCallId", "questions"],
+      "type": "object"
+    },
+    "UiAskRequest": {
+      "description": "Request for `ui/ask`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "ui/ask",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/UiAskParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "UiAskResponse": {
+      "description": "Successful response to `ui/ask`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/UiAskResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "UiAskResult": {
+      "description": "Result of `ui/ask`.",
+      "properties": {
+        "feedback": {
+          "description": "What the user wrote when closing the form without answering.",
+          "type": ["string", "null"]
+        },
+        "results": {
+          "description": "One result per question, in order.",
+          "items": {
+            "$ref": "#/$defs/QuestionResult"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["results"],
+      "type": "object"
+    },
     "UploadPart": {
       "description": "One piece of a text sent in several requests.",
       "properties": {
@@ -7119,6 +7592,18 @@
     },
     {
       "$ref": "#/$defs/HarnessEntryNotification"
+    },
+    {
+      "$ref": "#/$defs/HarnessTodoNotification"
+    },
+    {
+      "$ref": "#/$defs/HarnessPlanNotification"
+    },
+    {
+      "$ref": "#/$defs/UiAskRequest"
+    },
+    {
+      "$ref": "#/$defs/UiAskResponse"
     }
   ],
   "description": "Any message covered by the Agent Host Protocol 1.0 contracts. Generated from the piarc-protocol crate by `npm run gen:protocol`; do not edit.",

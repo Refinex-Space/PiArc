@@ -28,7 +28,7 @@ expect:
       tool_results:
         - { id: read, is_error: false, contains: alpha }
         - { id: look, is_error: false }
-        - { id: write, is_error: true, contains: present your plan to the user }
+        - { id: write, is_error: true, contains: submit your plan with ExitPlanMode }
         - { id: cmd, is_error: true, contains: plan mode is on }
   files:
     plan.txt: null

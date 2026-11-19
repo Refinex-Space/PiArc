@@ -212,6 +212,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'approval.kind.fileChange': '允许修改文件？',
   'approval.kind.permissionExpansion': '允许访问工作区外的路径？',
   'approval.kind.question': '提问表单',
+  'approval.kind.plan': '审阅计划',
   'approval.unsupported': '当前版本不支持提问表单，已拒绝本次请求。',
   'approval.cwd': '工作目录 · {path}',
   'approval.feedback': '给模型的反馈（可选）',

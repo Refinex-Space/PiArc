@@ -61,6 +61,7 @@ pub mod exec;
 pub mod framing;
 pub mod fs;
 pub mod handshake;
+pub mod harness;
 pub mod history;
 pub mod hooks;
 pub mod host;

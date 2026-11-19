@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "id": 31,
+  "result": {
+    "results": [
+      { "question": "Which database?", "outcome": "answered", "other": "DuckDB" },
+      {
+        "question": "哪些平台？",
+        "outcome": "answered",
+        "selected": ["macOS", "Windows"]
+      }
+    ]
+  }
+}

@@ -997,6 +997,9 @@ impl Driver<'_> {
             feedback: expected.feedback.clone(),
             rules: card.rules,
             directory: card.directory,
+            mode: None,
+            comments: Vec::new(),
+            answers: Vec::new(),
             decision: match expected.decision {
                 Choice::Allow => Decision::AllowOnce,
                 Choice::Session => Decision::AllowSession,

@@ -86,6 +86,8 @@ pub struct ToolIoConfig {
     pub exec_limits: ExecLimits,
     /// Sees every request first (tests only).
     pub observer: Option<Arc<dyn ToolIoObserver>>,
+    /// Times the timeout of `AskUserQuestion`'s form (`ui/ask`, T26); tests move it by hand.
+    pub clock: Arc<dyn piarc_ports::Clock>,
 }
 
 impl std::fmt::Debug for ToolIoConfig {
@@ -110,6 +112,7 @@ impl ToolIoConfig {
             command_env: CommandEnv::process(),
             exec_limits: ExecLimits::default(),
             observer: None,
+            clock: Arc::new(crate::clock::SystemClock),
         }
     }
 }
@@ -202,6 +205,7 @@ impl ToolIo {
                     | "policy/cancel"
                     | "policy/inputChunk"
                     | "policy/tools"
+                    | "ui/ask"
             )
     }
 
@@ -377,6 +381,7 @@ impl ToolIo {
             "policy/inputChunk" => return self.stage_input(parse(method, params)?, &peer),
             "policy/evaluate" => return self.evaluate(parse(method, params)?, peer).await,
             "policy/tools" => return self.denied_tools(parse(method, params)?).await,
+            "ui/ask" => return self.ask(parse(method, params)?, peer).await,
             "policy/cancel" => {
                 let p: piarc_protocol::policy::PolicyPendingParams = parse(method, params)?;
                 return self.cancel_wait(&p.session_id, &p.tool_call_id, &peer);

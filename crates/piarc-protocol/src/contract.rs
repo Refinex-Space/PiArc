@@ -18,6 +18,7 @@ use serde_json::Value;
 use crate::exec::{ExecKill, ExecOutput, ExecRun, ExecShells};
 use crate::fs::{FsGlob, FsGrep, FsList, FsMkdir, FsPdf, FsRead, FsSpill, FsStat, FsWrite};
 use crate::handshake::HostHello;
+use crate::harness::{HarnessPlan, HarnessTodo, UiAsk};
 use crate::history::{HarnessEntry, SessionGetEntries, SessionHistory};
 use crate::hooks::HooksRun;
 use crate::host::{HostPing, HostShutdown};
@@ -273,6 +274,10 @@ pub static CONTRACTS: &[Contract] = &[
     notification::<TurnUsageReport>(),
     notification::<QueueChanged>(),
     notification::<HarnessEntry>(),
+    notification::<HarnessTodo>(),
+    notification::<HarnessPlan>(),
+    request::<UiAsk>(UiAsk::NAME),
+    response::<UiAsk>("ui/ask/result"),
 ];
 
 /// Looks up a contract by name.

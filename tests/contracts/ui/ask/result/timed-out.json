@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 31,
+  "result": {
+    "results": [
+      { "question": "Which database?", "outcome": "default", "selected": ["SQLite"] },
+      { "question": "哪些平台？", "outcome": "unanswered" }
+    ]
+  }
+}

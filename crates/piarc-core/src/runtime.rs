@@ -724,6 +724,7 @@ fn open_state(
                     .command_env
                     .clone()
                     .unwrap_or_else(crate::tool_io::CommandEnv::login_shell),
+                clock: config.sessions.clock.clone(),
                 ..ToolIoConfig::new(data)
             },
             Some(events.clone()),

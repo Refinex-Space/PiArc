@@ -299,12 +299,18 @@ pub(super) fn other_call(
         _ => (Subject::Tool, tool.to_owned()),
     };
     let mut ladder = plain(rules, tool, subject, &places.context());
-    if tool == "AskUserQuestion" {
-        ladder.ask = Some(MustAsk {
-            step: "requiresUserInteraction",
-            hit: None,
-        });
-        return Assessment::new(ladder, Vec::new());
+    match tool {
+        // The Harness Kit's host tools (T26) change no file and run no command. The question
+        // form of AskUserQuestion is shown by the tool itself (`ui/ask`) in every mode.
+        "TodoWrite" | "EnterPlanMode" | "SuggestNextSteps" | "AskUserQuestion" => {
+            ladder.read_only = true;
+            return Assessment::new(ladder, Vec::new());
+        }
+        "ExitPlanMode" => {
+            ladder.exit_plan = true;
+            return Assessment::new(ladder, Vec::new());
+        }
+        _ => {}
     }
     let offered = if ladder.ask.is_none()
         && piarc_policy::rules::parse(&suggestion, Behavior::Allow).is_ok()

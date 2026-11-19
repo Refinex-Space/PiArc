@@ -45,7 +45,11 @@ pub(crate) mod hooks;
 mod inputs;
 pub(super) mod memory;
 mod modes;
+mod plan;
 mod preview;
+mod questions;
+mod waits;
+use waits::{post_card, wait_for_user, withdraw_card};
 pub(crate) mod settings_view;
 use grants::Grant;
 pub(super) use grants::{FilePermit, claim_command, file_permit};
@@ -306,10 +310,10 @@ impl ToolIo {
                 .pending()
                 .find(|r| r.request_id == answer.request_id)
             {
-                if request.kind == ApprovalKind::Question
-                    && answer.decision != ApprovalDecision::Deny
-                {
-                    return Err(denied("This client cannot answer questions."));
+                match request.kind {
+                    ApprovalKind::Question => questions::check_answer(request, &answer)?,
+                    ApprovalKind::Plan => plan::check_answer(request, &answer)?,
+                    _ => {}
                 }
                 if answer.decision == ApprovalDecision::AllowAlways {
                     check_permanent(request, &answer)?;
@@ -388,31 +392,26 @@ impl ToolIo {
                 .await?;
         }
         let choice = if ruling.outcome == Outcome::Ask {
-            prepared.add_preview(p).await?;
-            // `Notification` hooks: an approval waits for the user.
-            let (io, id) = (self.clone(), p.session_id.clone());
-            let message = format!("PiArc needs your permission to use {}", p.tool);
-            tokio::spawn(async move {
-                io.notification_hooks(&id, "permission_prompt", &message)
-                    .await;
-            });
-            wait_for_user(s, services, p, &prepared.card, peer, &generation).await?
+            self.ask_user(s, services, p, &mut prepared, peer, &generation)
+                .await?
         } else {
             None
         };
         let (answer, ack) = choice.unzip();
-        let reason = match (&answer, ruling.outcome) {
-            (Some(a), _) if a.decision == ApprovalDecision::Deny => Some(refusal(
-                &prepared,
-                s.scope.case_insensitive(),
-                a.feedback.as_deref(),
-            )),
-            (Some(_), _) | (None, Outcome::Allow) => None,
-            (None, Outcome::Deny) => Some(ruling_reason(&ruling)),
-            (None, Outcome::Ask) => Some(LOST.into()),
-        };
+        let reason = refusal_of(
+            answer.as_ref(),
+            &ruling,
+            &prepared,
+            s.scope.case_insensitive(),
+        );
         let allowed = reason.is_none();
-        let result = PolicyEvaluateResult {
+        // EnterPlanMode and an approved plan switch the session's mode (T26).
+        let switch = if allowed {
+            plan::mode_switch(&p.tool, mode, answer.as_ref())
+        } else {
+            None
+        };
+        let mut result = PolicyEvaluateResult {
             allowed,
             reason,
             updated_input: (allowed && updated).then(|| {
@@ -422,6 +421,7 @@ impl ToolIo {
             }),
             context: pre.context,
             stop: stop.map(|reason| piarc_protocol::hooks::HookStop { reason }),
+            mode: None,
         };
         let source = match (&answer, ruling.step) {
             (Some(_), _) => "user",
@@ -435,7 +435,32 @@ impl ToolIo {
             let _ = ack.send(commit.clone());
         }
         commit?;
+        if let Some(switch) = switch {
+            self.switch_mode(&p.session_id, switch).await?;
+            result.mode = Some(switch.mode);
+        }
         to_value(&result)
+    }
+
+    /// Shows the card (with its preview) and waits for the user's answer.
+    async fn ask_user(
+        &self,
+        s: &SessionIo,
+        services: &Services,
+        p: &PolicyEvaluateParams,
+        prepared: &mut Prepared,
+        peer: &Peer,
+        generation: &CancellationToken,
+    ) -> Result<Option<waits::Answered>, ErrorObject> {
+        prepared.add_preview(p).await?;
+        // `Notification` hooks: an approval waits for the user.
+        let (io, id) = (self.clone(), p.session_id.clone());
+        let message = format!("PiArc needs your permission to use {}", p.tool);
+        tokio::spawn(async move {
+            io.notification_hooks(&id, "permission_prompt", &message)
+                .await;
+        });
+        wait_for_user(s, services, p, &prepared.card, peer, generation).await
     }
 
     /// The facts of the call as it stands (rules, programs, paths).
@@ -472,6 +497,7 @@ const RULE_ASKS: &[&str] = &[
     "unresolved",
     "invalidRule",
     "requiresUserInteraction",
+    "planApproval",
     "protectedPath",
     "hookAsk",
 ];
@@ -549,60 +575,6 @@ fn check_permanent(request: &ApprovalRequest, answer: &ApprovalAnswer) -> Result
 
 const LOST: &str = "Permission denied because the pending approval expired. Request a new approval before retrying.";
 
-type Answered = (ApprovalAnswer, oneshot::Sender<Result<(), ErrorObject>>);
-
-async fn wait_for_user(
-    s: &SessionIo,
-    services: &Services,
-    p: &PolicyEvaluateParams,
-    card: &ApprovalRequest,
-    peer: &Peer,
-    generation: &CancellationToken,
-) -> Result<Option<Answered>, ErrorObject> {
-    use piarc_protocol::policy::{PolicyPending, PolicyPendingParams};
-    let (tx, rx) = oneshot::channel();
-    {
-        let mut state = lock(&s.policy);
-        if generation.is_cancelled() || peer.is_closed() {
-            return Err(denied(LOST));
-        }
-        if !state.ledger.insert(
-            card.clone(),
-            Pending {
-                call: p.tool_call_id.clone(),
-                reply: tx,
-                peer: peer.clone(),
-            },
-        ) {
-            return Err(denied("Duplicate approval request."));
-        }
-        state.publish(&p.session_id, services);
-    }
-    let pending = PolicyPendingParams {
-        session_id: p.session_id.clone(),
-        tool_call_id: p.tool_call_id.clone(),
-    };
-    let result = if peer.notify::<PolicyPending>(pending).await.is_ok() {
-        tokio::select! {
-            biased;
-            ()=peer.closed()=>None,
-            ()=generation.cancelled()=>None,
-            reply=rx=>reply.ok(),
-        }
-    } else {
-        None
-    };
-    if result.is_none() {
-        let mut state = lock(&s.policy);
-        if peer.is_closed() {
-            state.expired.insert(p.tool_call_id.clone());
-        }
-        state.ledger.take_if(|r, _| r.request_id == card.request_id);
-        state.publish(&p.session_id, services);
-    }
-    Ok(result)
-}
-
 fn refusal(prepared: &Prepared, case_insensitive: bool, feedback: Option<&str>) -> String {
     let boundary = match prepared.boundary {
         Boundary::Outside => {
@@ -627,10 +599,33 @@ fn refusal(prepared: &Prepared, case_insensitive: bool, feedback: Option<&str>) 
     )
 }
 
+/// Why the call may not run, or `None` when it may: the user's refusal (keep planning for a
+/// plan), the ladder's, or a lost approval.
+fn refusal_of(
+    answer: Option<&ApprovalAnswer>,
+    ruling: &Ruling,
+    prepared: &Prepared,
+    case_insensitive: bool,
+) -> Option<String> {
+    match (answer, ruling.outcome) {
+        (Some(a), _) if a.decision == ApprovalDecision::Deny => {
+            Some(if prepared.card.kind == ApprovalKind::Plan {
+                plan::keep_planning(a)
+            } else {
+                refusal(prepared, case_insensitive, a.feedback.as_deref())
+            })
+        }
+        (Some(_), _) | (None, Outcome::Allow) => None,
+        (None, Outcome::Deny) => Some(ruling_reason(ruling)),
+        (None, Outcome::Ask) => Some(LOST.into()),
+    }
+}
+
 /// What the model reads when the ladder refuses without asking.
 fn ruling_reason(ruling: &Ruling) -> String {
     match ruling.step {
         "planMode" => piarc_policy::PLAN_MODE_REFUSAL.to_owned(),
+        "notInPlanMode" => piarc_policy::NOT_IN_PLAN_MODE.to_owned(),
         "hookDeny" | "permissionRequestHook" => ruling
             .reason
             .clone()
@@ -762,6 +757,8 @@ fn new_request(p: &PolicyEvaluateParams, peer: &Peer) -> Result<ApprovalRequest,
         rules: Vec::new(),
         directory: None,
         protected_path: None,
+        plan: None,
+        questions: Vec::new(),
     })
 }
 
@@ -840,8 +837,9 @@ async fn prepare(
                 assess::file_call(&rules, &places, &p.tool, &named, &target, boundary)
             }
             tool => {
-                if tool == "AskUserQuestion" {
-                    card.kind = ApprovalKind::Question;
+                if tool == "ExitPlanMode" {
+                    card.kind = ApprovalKind::Plan;
+                    card.plan = Some(field("plan").unwrap_or_default().to_owned());
                 } else {
                     card.command = Some(format!("{} {}", p.tool, Value::Object(p.input.clone())));
                 }

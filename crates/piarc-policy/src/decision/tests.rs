@@ -334,3 +334,40 @@ fn starting_mode_order() {
         BypassPermissions
     );
 }
+
+/// T26: ExitPlanMode asks in plan mode whatever rules and hooks allow, is refused in every other
+/// mode, and a PermissionRequest hook cannot approve the plan for the user.
+#[test]
+fn exit_plan_mode_asks_only_in_plan_mode() {
+    for mode in MODES {
+        let call = Input {
+            exit_plan: true,
+            hook: HookVerdict::Allow,
+            allow: vec![hit(Behavior::Allow)],
+            allowed: true,
+            read_only: true,
+            ..input(mode)
+        };
+        let ruling = decide(&call);
+        let expected = if mode == Plan {
+            (Outcome::Ask, "planApproval")
+        } else {
+            (Outcome::Deny, "notInPlanMode")
+        };
+        assert_eq!((ruling.outcome, ruling.step), expected, "{mode:?}");
+        let after = after_permission_request(ruling.clone(), &HookVerdict::Allow);
+        assert_eq!(after, ruling, "{mode:?}");
+    }
+    let denied = Input {
+        exit_plan: true,
+        deny: Some(hit(Behavior::Deny)),
+        ..input(Plan)
+    };
+    assert_eq!(decide(&denied).step, "denyRule");
+}
+
+#[test]
+fn plan_mode_refusal_points_at_exit_plan_mode() {
+    assert!(PLAN_MODE_REFUSAL.contains("plan mode is on"));
+    assert!(PLAN_MODE_REFUSAL.contains("ExitPlanMode"));
+}

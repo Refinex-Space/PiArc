@@ -40,6 +40,9 @@ fn allow(card: &ApprovalRequest) -> ApprovalAnswer {
         rules: Vec::new(),
         directory: None,
         feedback: None,
+        mode: None,
+        comments: Vec::new(),
+        answers: Vec::new(),
     }
 }
 

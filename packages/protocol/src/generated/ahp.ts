@@ -128,7 +128,11 @@ export type AhpMessage =
   | TurnRetryingNotification
   | TurnUsageReportNotification
   | QueueChangedNotification
-  | HarnessEntryNotification;
+  | HarnessEntryNotification
+  | HarnessTodoNotification
+  | HarnessPlanNotification
+  | UiAskRequest
+  | UiAskResponse;
 /**
  * A request id: an integer or a string. `null` and fractional numbers are not accepted.
  */
@@ -244,6 +248,10 @@ export type InputAccepted =
        */
       turnId: TurnId;
     };
+/**
+ * Where a task stands.
+ */
+export type TodoStatus = 'pending' | 'inProgress' | 'completed';
 /**
  * An item in its current state, discriminated by the `type` member. Every variant carries
  * `itemId` and `status`.
@@ -599,9 +607,13 @@ export type TurnErrorKind =
  */
 export type TurnStatus = 'completed' | 'failed' | 'interrupted';
 /**
+ * How a question was settled.
+ */
+export type QuestionOutcome = 'answered' | 'default' | 'unanswered' | 'declined';
+/**
  * Presentation of a pending approval.
  */
-export type ApprovalKind = 'command' | 'fileChange' | 'permissionExpansion' | 'question';
+export type ApprovalKind = 'command' | 'fileChange' | 'permissionExpansion' | 'question' | 'plan';
 /**
  * User choice for a pending request.
  */
@@ -2099,6 +2111,10 @@ export interface SessionHistoryResponse {
  */
 export interface HistoryWindow {
   /**
+   * The plan and task list at the head of the branch (T26).
+   */
+  harness?: HarnessState | null;
+  /**
    * The items, in conversation order.
    */
   items: HistoryItem[];
@@ -2110,6 +2126,57 @@ export interface HistoryWindow {
    * How many items the history has.
    */
   total: number;
+}
+/**
+ * The plan and task list at the head of a branch.
+ */
+export interface HarnessState {
+  /**
+   * The last plan the user approved on the branch.
+   */
+  plan?: PlanRecord | null;
+  /**
+   * The task list of the branch's last `TodoWrite` result.
+   */
+  todos?: TodoItem[];
+}
+/**
+ * A plan the user approved.
+ */
+export interface PlanRecord {
+  /**
+   * Pi's id of the `piarc.plan` custom entry.
+   */
+  entryId: string;
+  /**
+   * The mode the user chose to continue in.
+   */
+  mode: PermissionMode;
+  /**
+   * The plan as the model wrote it (Markdown).
+   */
+  plan: string;
+  /**
+   * The `ExitPlanMode` call that submitted it.
+   */
+  toolCallId: string;
+}
+/**
+ * One task of the list.
+ */
+export interface TodoItem {
+  /**
+   * The same task as it reads while in progress ("Running the tests").
+   */
+  activeForm?: string | null;
+  /**
+   * What the task is, in the imperative ("Run the tests").
+   */
+  content: string;
+  /**
+   * Where it stands.
+   */
+  status: TodoStatus;
 }
 /**
  * One item of the history.
@@ -2330,6 +2397,11 @@ export interface PolicyEvaluateResult {
    * call's result.
    */
   context?: string | null;
+  /**
+   * Allowing the call switched the session to this mode (`EnterPlanMode`, an approved
+   * plan, T26): the Agent Host records the change on the branch and tells the model.
+   */
+  mode?: PermissionMode | null;
   /**
    * Reason visible to the model, including feedback on refusal.
    */
@@ -4194,6 +4266,188 @@ export interface HarnessEntryParams {
   ts: number;
 }
 /**
+ * Notification `harness/todo`.
+ */
+export interface HarnessTodoNotification {
+  jsonrpc: JsonRpcVersion;
+  method: 'harness/todo';
+  params: HarnessTodoParams;
+}
+/**
+ * Parameters of `harness/todo`.
+ */
+export interface HarnessTodoParams {
+  /**
+   * The `TodoWrite` call whose result holds the list.
+   */
+  itemId: ItemId;
+  /**
+   * Sequence number, monotonically increasing within the session.
+   */
+  seq: number;
+  /**
+   * The session the event belongs to.
+   */
+  sessionId: SessionId;
+  /**
+   * The whole list, in order.
+   */
+  todos: TodoItem[];
+  /**
+   * Time the event was produced, in milliseconds since the Unix epoch (UTC).
+   */
+  ts: number;
+}
+/**
+ * Notification `harness/plan`.
+ */
+export interface HarnessPlanNotification {
+  jsonrpc: JsonRpcVersion;
+  method: 'harness/plan';
+  params: HarnessPlanParams;
+}
+/**
+ * Parameters of `harness/plan`.
+ */
+export interface HarnessPlanParams {
+  /**
+   * Pi's id of the `piarc.plan` custom entry.
+   */
+  entryId: string;
+  /**
+   * The mode the user chose to continue in.
+   */
+  mode: PermissionMode;
+  /**
+   * The plan as the model wrote it (Markdown).
+   */
+  plan: string;
+  /**
+   * Sequence number, monotonically increasing within the session.
+   */
+  seq: number;
+  /**
+   * The session the event belongs to.
+   */
+  sessionId: SessionId;
+  /**
+   * The `ExitPlanMode` call that submitted it.
+   */
+  toolCallId: string;
+  /**
+   * Time the event was produced, in milliseconds since the Unix epoch (UTC).
+   */
+  ts: number;
+}
+/**
+ * Request for `ui/ask`.
+ */
+export interface UiAskRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'ui/ask';
+  params: UiAskParams;
+}
+/**
+ * Parameters of `ui/ask`.
+ */
+export interface UiAskParams {
+  /**
+   * The questions, 1 to 4.
+   */
+  questions: Question[];
+  /**
+   * The asking session.
+   */
+  sessionId: string;
+  /**
+   * The `AskUserQuestion` call.
+   */
+  toolCallId: string;
+}
+/**
+ * One question of `AskUserQuestion`. The user may always write an answer of their own
+ * besides the options.
+ */
+export interface Question {
+  /**
+   * A short label for it.
+   */
+  header?: string | null;
+  /**
+   * Whether several options may be picked.
+   */
+  multiSelect?: boolean | null;
+  /**
+   * The choices.
+   */
+  options: QuestionOption[];
+  /**
+   * The question.
+   */
+  question: string;
+}
+/**
+ * One choice of a question.
+ */
+export interface QuestionOption {
+  /**
+   * Chosen when the question times out without an answer.
+   */
+  default?: boolean | null;
+  /**
+   * What picking it means.
+   */
+  description?: string | null;
+  /**
+   * What the user picks (short).
+   */
+  label: string;
+}
+/**
+ * Successful response to `ui/ask`.
+ */
+export interface UiAskResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: UiAskResult;
+}
+/**
+ * Result of `ui/ask`.
+ */
+export interface UiAskResult {
+  /**
+   * What the user wrote when closing the form without answering.
+   */
+  feedback?: string | null;
+  /**
+   * One result per question, in order.
+   */
+  results: QuestionResult[];
+}
+/**
+ * The result of one question.
+ */
+export interface QuestionResult {
+  /**
+   * The user's own answer.
+   */
+  other?: string | null;
+  /**
+   * How it was settled.
+   */
+  outcome: QuestionOutcome;
+  /**
+   * The question it answers.
+   */
+  question: string;
+  /**
+   * Labels of the picked options (the defaults for `default`).
+   */
+  selected?: string[];
+}
+/**
  * Immutable approval card from the Core ledger.
  */
 export interface ApprovalRequest {
@@ -4226,9 +4480,17 @@ export interface ApprovalRequest {
    */
   path?: string | null;
   /**
+   * The plan of a `plan` card (Markdown).
+   */
+  plan?: string | null;
+  /**
    * Whether the target must always be reviewed.
    */
   protectedPath?: boolean | null;
+  /**
+   * The questions of a `question` card.
+   */
+  questions?: Question[];
   /**
    * Opaque identifier allocated by Core.
    */
@@ -4257,6 +4519,14 @@ export interface ApprovalRequest {
  */
 export interface ApprovalAnswer {
   /**
+   * One answer per question of a `question` card, with `allowOnce`.
+   */
+  answers?: QuestionAnswer[];
+  /**
+   * Inline comments on a plan, returned to the model with a refusal (keep planning).
+   */
+  comments?: PlanComment[];
+  /**
    * Agent Host connection that made the call.
    */
   connectionEpoch: number;
@@ -4273,6 +4543,10 @@ export interface ApprovalAnswer {
    */
   feedback?: string | null;
   /**
+   * The mode an approved plan continues in: `acceptEdits` or `default`.
+   */
+  mode?: PermissionMode | null;
+  /**
    * Opaque identifier allocated by Core.
    */
   requestId: string;
@@ -4288,6 +4562,40 @@ export interface ApprovalAnswer {
    * Owning session.
    */
   sessionId: string;
+}
+/**
+ * The user's answer to one question, in the order of the questions.
+ */
+export interface QuestionAnswer {
+  /**
+   * An answer in the user's own words.
+   */
+  other?: string | null;
+  /**
+   * Labels of the picked options.
+   */
+  selected?: string[];
+}
+/**
+ * An inline comment on a plan: a range of the plan text and what the user wrote about it.
+ */
+export interface PlanComment {
+  /**
+   * End of the range (exclusive).
+   */
+  end: number;
+  /**
+   * The commented text, `plan[start..end]`.
+   */
+  quote: string;
+  /**
+   * Start of the commented range, in UTF-16 code units of the plan (architecture 7.7).
+   */
+  start: number;
+  /**
+   * The comment.
+   */
+  text: string;
 }
 /**
  * The JSON document transferred by fs/memory.

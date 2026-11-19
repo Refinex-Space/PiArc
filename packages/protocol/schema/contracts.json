@@ -738,6 +738,30 @@
       "method": "harness/entry",
       "name": "harness/entry",
       "schema": "HarnessEntryNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "harness/todo",
+      "name": "harness/todo",
+      "schema": "HarnessTodoNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "harness/plan",
+      "name": "harness/plan",
+      "schema": "HarnessPlanNotification"
+    },
+    {
+      "kind": "request",
+      "method": "ui/ask",
+      "name": "ui/ask",
+      "schema": "UiAskRequest"
+    },
+    {
+      "kind": "response",
+      "method": "ui/ask",
+      "name": "ui/ask/result",
+      "schema": "UiAskResponse"
     }
   ],
   "protocolVersion": "1.0"

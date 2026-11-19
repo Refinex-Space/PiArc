@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 31,
+  "result": {
+    "results": [{ "question": "Which database?", "outcome": "declined" }],
+    "feedback": "Ask me later"
+  }
+}

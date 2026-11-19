@@ -1,0 +1,40 @@
+{
+  "jsonrpc": "2.0",
+  "id": 30,
+  "result": {
+    "start": 0,
+    "total": 1,
+    "items": [
+      {
+        "entryId": "e1",
+        "item": {
+          "type": "dynamicToolCall",
+          "itemId": "call-todo-1",
+          "status": "completed",
+          "tool": "TodoWrite",
+          "arguments": {
+            "todos": [
+              {
+                "content": "Fix the parser",
+                "status": "in_progress",
+                "activeForm": "Fixing the parser"
+              }
+            ]
+          },
+          "output": "Task list updated: 0 of 1 done."
+        }
+      }
+    ],
+    "harness": {
+      "plan": {
+        "plan": "1. Fix the parser",
+        "toolCallId": "call-exit-1",
+        "entryId": "e0",
+        "mode": "default"
+      },
+      "todos": [
+        { "content": "Fix the parser", "status": "inProgress", "activeForm": "Fixing the parser" }
+      ]
+    }
+  }
+}
