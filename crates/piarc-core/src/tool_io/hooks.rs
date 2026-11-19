@@ -125,13 +125,12 @@ impl ToolIo {
     }
 
     /// The facts of an open session's hooks.
-    pub(super) async fn session_facts(
+    pub(super) fn session_facts(
         &self,
         s: &SessionIo,
         id: &str,
         cancel: CancellationToken,
     ) -> Facts {
-        let launch = self.exec.hook_launch().await;
         let mode = lock(&s.policy).mode();
         Facts {
             session_id: id.to_owned(),
@@ -140,8 +139,24 @@ impl ToolIo {
             tmp_dir: s.tmp_dir.clone(),
             mode: Some(mode),
             fold_case: s.scope.case_insensitive(),
-            launch,
             cancel,
+        }
+    }
+
+    /// Runs `request`'s hooks; nothing configured or matched is an empty [`Answer`] and does
+    /// not resolve the command environment (the login shell, the first time).
+    pub(super) async fn run_hooks(
+        &self,
+        hooks: &HooksService,
+        facts: &Facts,
+        request: &Request,
+    ) -> Answer {
+        match hooks.plan(facts, request).await {
+            Some(plan) => {
+                let launch = self.exec.hook_launch().await;
+                hooks.execute(facts, request, plan, launch).await
+            }
+            None => Answer::default(),
         }
     }
 
@@ -200,8 +215,8 @@ impl ToolIo {
         let answer = match self.session(&p.session_id) {
             Ok(s) => {
                 let _running = Running::new(&s, &token);
-                let facts = self.session_facts(&s, &p.session_id, token.clone()).await;
-                hooks.run(&facts, &request).await
+                let facts = self.session_facts(&s, &p.session_id, token.clone());
+                self.run_hooks(hooks, &facts, &request).await
             }
             Err(_) => {
                 let facts = Facts {
@@ -211,10 +226,9 @@ impl ToolIo {
                     tmp_dir: self.session_dir(&p.session_id).join("tmp"),
                     mode: None,
                     fold_case: cfg!(any(windows, target_os = "macos")),
-                    launch: self.exec.hook_launch().await,
                     cancel: token.clone(),
                 };
-                hooks.run(&facts, &request).await
+                self.run_hooks(hooks, &facts, &request).await
             }
         };
         let result = self
@@ -242,7 +256,7 @@ impl ToolIo {
                 let continues = d.block.is_some() || answer.context.is_some();
                 if continues && continuations.unwrap_or(0) >= u64::from(STOP_CONTINUATION_LIMIT) {
                     if let Ok(s) = self.session(id) {
-                        let facts = self.session_facts(&s, id, CancellationToken::new()).await;
+                        let facts = self.session_facts(&s, id, CancellationToken::new());
                         let message = format!(
                             "Stop hooks continued the turn {STOP_CONTINUATION_LIMIT} times in a row; PiArc ended the turn."
                         );
@@ -255,7 +269,7 @@ impl ToolIo {
             }
             HookEvent::PreCompact => {
                 if let (Some(reason), Ok(s)) = (&d.block, self.session(id)) {
-                    let facts = self.session_facts(&s, id, CancellationToken::new()).await;
+                    let facts = self.session_facts(&s, id, CancellationToken::new());
                     let message = format!("Compaction blocked: {reason}");
                     hooks.notify(&facts, event, "message", &message).await;
                 }
@@ -288,7 +302,7 @@ impl ToolIo {
         };
         let token = cancel.child_token();
         let _running = Running::new(&s, &token);
-        let facts = self.session_facts(&s, id, token.clone()).await;
+        let facts = self.session_facts(&s, id, token.clone());
         let mut fields = Map::new();
         fields.insert("prompt".into(), json!(text));
         let request = Request {
@@ -297,7 +311,7 @@ impl ToolIo {
             fields,
             tool: None,
         };
-        let answer = hooks.run(&facts, &request).await;
+        let answer = self.run_hooks(hooks, &facts, &request).await;
         match answer.decision.block {
             Some(reason) => Err(reason),
             None => Ok(answer.context),
@@ -311,7 +325,7 @@ impl ToolIo {
         };
         let token = CancellationToken::new();
         let _running = Running::new(&s, &token);
-        let facts = self.session_facts(&s, id, token.clone()).await;
+        let facts = self.session_facts(&s, id, token.clone());
         let mut fields = Map::new();
         fields.insert("message".into(), json!(message));
         fields.insert("title".into(), json!("PiArc"));
@@ -322,7 +336,7 @@ impl ToolIo {
             fields,
             tool: None,
         };
-        hooks.run(&facts, &request).await;
+        self.run_hooks(hooks, &facts, &request).await;
     }
 }
 

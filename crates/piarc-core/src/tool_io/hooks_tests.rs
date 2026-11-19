@@ -57,6 +57,8 @@ struct Setup {
     project: Value,
     permissions: Value,
     runner: RunnerConfig,
+    /// Where commands get their environment; a fixed `PATH` when `None`.
+    command_env: Option<CommandEnv>,
 }
 
 impl Default for Setup {
@@ -70,6 +72,7 @@ impl Default for Setup {
                 kill_grace: Duration::from_millis(300),
                 ..RunnerConfig::default()
             },
+            command_env: None,
         }
     }
 }
@@ -145,10 +148,10 @@ impl Fixture {
         );
         let io = ToolIo::new(ToolIoConfig {
             // Cargo's `DYLD_*` variables would turn off rule-based allows (T23).
-            command_env: if cfg!(windows) {
-                CommandEnv::process()
-            } else {
-                CommandEnv::Fixed(vec![("PATH".into(), "/usr/bin:/bin".into())])
+            command_env: match setup.command_env {
+                Some(env) => env,
+                None if cfg!(windows) => CommandEnv::process(),
+                None => CommandEnv::Fixed(vec![("PATH".into(), "/usr/bin:/bin".into())]),
             },
             ..ToolIoConfig::new(data)
         })
@@ -754,4 +757,39 @@ async fn user_prompt_submit_blocks_or_adds_context_and_notifications_run() {
         "PiArc needs your permission to use Bash"
     );
     assert!(notices[0].get("permission_mode").is_none());
+}
+
+/// Without a matching handler an input goes on at once: the hooks' environment comes from the
+/// user's login shell, which can take seconds, and is resolved only when a handler runs.
+#[cfg(unix)]
+#[tokio::test]
+async fn an_input_without_hooks_does_not_wait_for_the_login_shell() {
+    let home = std::env::temp_dir().join(format!(
+        "piarc slow login 登录 {}",
+        crate::sessions::new_session_id().expect("unique id")
+    ));
+    std::fs::create_dir_all(&home).expect("home");
+    std::fs::write(home.join(".bash_profile"), "sleep 3\n").expect("profile");
+    let base = vec![
+        ("SHELL".into(), "/bin/bash".into()),
+        ("HOME".into(), home.clone().into_os_string()),
+        ("PATH".into(), "/usr/bin:/bin".into()),
+    ];
+    let f = Fixture::new(Setup {
+        command_env: Some(CommandEnv::LoginShell { base }),
+        ..Setup::default()
+    })
+    .await;
+    let started = Instant::now();
+    let context =
+        f.io.user_prompt_submit(SESSION, "hello", &CancellationToken::new())
+            .await
+            .expect("nothing blocks it");
+    let waited = started.elapsed();
+    std::fs::remove_dir_all(&home).expect("clean");
+    assert_eq!(context, None);
+    assert!(
+        waited < Duration::from_secs(1),
+        "the input waited {waited:?}"
+    );
 }

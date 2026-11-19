@@ -178,13 +178,14 @@ impl ToolIo {
         let Some(hooks) = self.hook_service() else {
             return PreAnswer::default();
         };
-        let facts = self.session_facts(s, &p.session_id, cancel).await;
+        let facts = self.session_facts(s, &p.session_id, cancel);
         let request = tool_request(HookEvent::PreToolUse, p);
         let Some(plan) = hooks.plan(&facts, &request).await else {
             return PreAnswer::default();
         };
         working(peer, p).await;
-        let answer = hooks.execute(&facts, &request, plan).await;
+        let launch = self.exec.hook_launch().await;
+        let answer = hooks.execute(&facts, &request, plan, launch).await;
         let d = answer.decision;
         let verdict = match d.permission {
             None => HookVerdict::None,
@@ -216,14 +217,19 @@ impl ToolIo {
         cancel: CancellationToken,
     ) -> Option<RequestAnswer> {
         let hooks = self.hook_service()?;
-        let facts = self.session_facts(s, &p.session_id, cancel).await;
+        let facts = self.session_facts(s, &p.session_id, cancel);
         let mut request = tool_request(HookEvent::PermissionRequest, p);
         request
             .fields
             .insert("permission_suggestions".into(), suggestions(card));
         let plan = hooks.plan(&facts, &request).await?;
         working(peer, p).await;
-        hooks.execute(&facts, &request, plan).await.decision.request
+        let launch = self.exec.hook_launch().await;
+        hooks
+            .execute(&facts, &request, plan, launch)
+            .await
+            .decision
+            .request
     }
 
     /// Applies a `PermissionRequest` allow's `updatedPermissions`: `addRules` to the session
@@ -243,9 +249,7 @@ impl ToolIo {
             }
         }
         if let (Some(hooks), false) = (self.hook_service(), refused.is_empty()) {
-            let facts = self
-                .session_facts(s, &p.session_id, CancellationToken::new())
-                .await;
+            let facts = self.session_facts(s, &p.session_id, CancellationToken::new());
             let message = format!(
                 "PermissionRequest hook: some permission updates were not applied: {}",
                 refused.join("; ")

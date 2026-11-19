@@ -46,7 +46,6 @@ pub(crate) struct Facts {
     pub mode: Option<PermissionMode>,
     /// Whether paths compare without case (for `if` conditions).
     pub fold_case: bool,
-    pub launch: Launch,
     pub cancel: CancellationToken,
 }
 
@@ -180,14 +179,6 @@ impl HooksService {
             .unwrap_or_default()
     }
 
-    /// Runs `request`'s hooks; nothing configured or matched is an empty [`Answer`].
-    pub(crate) async fn run(&self, facts: &Facts, request: &Request) -> Answer {
-        match self.plan(facts, request).await {
-            Some(plan) => self.execute(facts, request, plan).await,
-            None => Answer::default(),
-        }
-    }
-
     /// The handlers `request` would run, or `None`. Settings that cannot be read run nothing
     /// and tell the user.
     pub(crate) async fn plan(&self, facts: &Facts, request: &Request) -> Option<Plan> {
@@ -214,8 +205,15 @@ impl HooksService {
         (!handlers.is_empty()).then_some(Plan(handlers))
     }
 
-    /// Runs a [`Plan`] of `request`.
-    pub(crate) async fn execute(&self, facts: &Facts, request: &Request, plan: Plan) -> Answer {
+    /// Runs a [`Plan`] of `request` with the shells and environment of `launch`. Callers resolve
+    /// `launch` only once a plan exists: it can come from the user's login shell.
+    pub(crate) async fn execute(
+        &self,
+        facts: &Facts,
+        request: &Request,
+        plan: Plan,
+        launch: Launch,
+    ) -> Answer {
         let handlers = plan.0;
         let input = self.input(facts, request);
         let cwd = if facts.cwd.is_dir() {
@@ -226,7 +224,7 @@ impl HooksService {
         let runner = Runner::new(
             Arc::clone(&self.inner.spawner),
             Arc::new(launcher::CoreLauncher {
-                launch: facts.launch.clone(),
+                launch,
                 project_dir: facts.root.clone(),
             }),
             self.inner.runner,
