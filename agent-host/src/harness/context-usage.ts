@@ -5,6 +5,7 @@
 // difference to the estimate is "unclassified"; an estimate above the report is scaled down to
 // it. `session/usage` reports it after each response and each compaction;
 // `session/getContextUsage` returns the latest.
+import { getCurrentTools, type SystemMessage } from '@earendil-works/pi-ai';
 import type { ExtensionFactory } from '@earendil-works/pi-coding-agent';
 import type {
   AutoCompactState,
@@ -71,10 +72,20 @@ function toolChars(tool: unknown): number {
   }).length;
 }
 
-/** What the system prompt and tool definitions are when the messages do not carry them. */
+/** What the request's system prompt and tool definitions are. Pi 1.5.2 replaces the
+ * transcript's system messages with the forced (frozen) prompt after `context_with_system`, so
+ * the frozen text is what the provider gets; the tools are the transcript's current loadout. */
 export interface Loadout {
   readonly system?: string;
   readonly tools?: readonly unknown[];
+}
+
+/** The current tool loadout declared by the system messages of `messages`. */
+export function currentTools(messages: readonly unknown[]): readonly unknown[] {
+  const system = messages.filter(
+    (message): message is SystemMessage => isObject(message) && message.role === 'system',
+  );
+  return system.length === 0 ? [] : getCurrentTools(system);
 }
 
 /** The context of `messages` by category, in tokens (`unclassified` is 0). Tool names in
@@ -85,39 +96,21 @@ export function estimateCategories(
   loadout: Loadout = {},
 ): ContextCategories {
   const chars = emptyChars();
-  let system = false;
-  let tools = false;
-  const addTools = (list: readonly unknown[]): void => {
-    for (const tool of list) {
-      const name = isObject(tool) && typeof tool.name === 'string' ? tool.name : '';
-      chars[mcpTools.has(name) ? 'mcpTools' : 'tools'] += toolChars(tool);
-    }
-  };
+  const systemTexts: string[] = [];
   for (const message of messages) {
     if (!isObject(message)) continue;
     switch (message.role) {
       case 'system': {
-        const text =
-          typeof message.content === 'string'
-            ? message.content
-            : Array.isArray(message.content)
-              ? message.content
-                  .map((block) =>
-                    isObject(block) && typeof block.text === 'string' ? block.text : '',
-                  )
-                  .join('')
-              : '';
-        if (system) chars.systemPrompt += text.length;
-        else systemChars(text, chars);
-        system = true;
-        if (isObject(message.sections)) {
-          for (const section of Object.values(message.sections)) {
-            if (typeof section === 'string') chars.systemPrompt += section.length;
+        if (typeof message.content === 'string') systemTexts.push(message.content);
+        else if (Array.isArray(message.content)) {
+          for (const block of message.content) {
+            if (isObject(block) && typeof block.text === 'string') systemTexts.push(block.text);
           }
         }
-        if (Array.isArray(message.toolsAdded)) {
-          tools = true;
-          addTools(message.toolsAdded);
+        if (isObject(message.sections)) {
+          for (const section of Object.values(message.sections)) {
+            if (typeof section === 'string') systemTexts.push(section);
+          }
         }
         break;
       }
@@ -156,8 +149,11 @@ export function estimateCategories(
         break;
     }
   }
-  if (!system && loadout.system !== undefined) systemChars(loadout.system, chars);
-  if (!tools && loadout.tools !== undefined) addTools(loadout.tools);
+  systemChars(loadout.system ?? systemTexts.join(''), chars);
+  for (const tool of loadout.tools ?? currentTools(messages)) {
+    const name = isObject(tool) && typeof tool.name === 'string' ? tool.name : '';
+    chars[mcpTools.has(name) ? 'mcpTools' : 'tools'] += toolChars(tool);
+  }
   const categories: ContextCategories = { ...chars, unclassified: 0 };
   for (const category of CATEGORIES) categories[category] = tokensOfChars(chars[category]);
   return categories;
@@ -206,8 +202,12 @@ export interface ContextUsageOptions {
   readonly limits: () => UsageLimits;
   /** Names of the session's MCP tools. */
   readonly mcpTools: () => ReadonlySet<string>;
-  /** The conversation as the next request would send it, and the loadout. */
-  readonly current: () => { readonly messages: readonly unknown[]; readonly loadout: Loadout };
+  /** The conversation as the next request would send it. */
+  readonly messages: () => readonly unknown[];
+  /** The frozen system prompt the provider gets, once assembled. */
+  readonly system: () => string | undefined;
+  /** The session's active tools, for a transcript that declares none yet. */
+  readonly tools: () => readonly unknown[];
 }
 
 /** One session's context usage. */
@@ -243,8 +243,16 @@ export class ContextUsageTracker {
 
   /** The estimate of the context as it is now. */
   estimate(): ContextUsage {
-    const { messages, loadout } = this.#o.current();
-    return this.#usage(estimateCategories(messages, this.#o.mcpTools(), loadout), 'estimate');
+    return this.#usage(this.#estimate(this.#o.messages()), 'estimate');
+  }
+
+  #estimate(messages: readonly unknown[]): ContextCategories {
+    const system = this.#o.system();
+    const declared = currentTools(messages);
+    return estimateCategories(messages, this.#o.mcpTools(), {
+      ...(system === undefined ? {} : { system }),
+      tools: declared.length > 0 ? declared : this.#o.tools(),
+    });
   }
 
   /** The latest usage, or the estimate when no request was made yet. */
@@ -277,7 +285,7 @@ export class ContextUsageTracker {
 
   extension: ExtensionFactory = (pi) => {
     pi.on('context_with_system', (event) => {
-      this.#request = estimateCategories(event.messages, this.#o.mcpTools());
+      this.#request = this.#estimate(event.messages);
       return undefined;
     });
   };

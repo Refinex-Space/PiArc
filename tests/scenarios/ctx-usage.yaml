@@ -1,0 +1,33 @@
+id: ctx-usage
+description: The context usage is estimated by category; once the provider reports a request's input (input, cache read and cache write tokens) that is the total, the rest is unclassified, and an estimate above a small report is scaled down to it; the categories always add up to the total (T27).
+capabilities: [CAP-CTX-USAGE-001]
+workspace:
+  files:
+    CLAUDE.md: Project memory for the usage scenario.
+    a.txt: "some file content\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: r, name: Read, input: { path: a.txt } }]
+      - text: First.
+        usage: { input_tokens: 50000, cache_read_tokens: 1000, cache_write_tokens: 500 }
+      - text: Second.
+        usage: { input_tokens: 10 }
+actions:
+  - check_usage:
+      fields: { source: estimate, contextWindow: 200000, autoCompactThreshold: 182904 }
+      positive: [tools]
+  - prompt: { text: Start., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - check_usage:
+      fields: { tokens: 51500, source: provider, autoCompact: 'on' }
+      positive: [systemPrompt, tools, memory, conversation, toolResults, unclassified]
+  - prompt: { text: Again., turn: two }
+  - wait: { method: turn/completed, turn: two }
+  - check_usage: { fields: { tokens: 10, source: provider, categories: { unclassified: 0 } } }
+expect:
+  request_counts: { main: 3 }
+  events:
+    - method: session/usage
+      params: { usage: { tokens: 51500, source: provider } }

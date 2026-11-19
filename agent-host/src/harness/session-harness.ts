@@ -120,16 +120,9 @@ export class SessionHarness {
             .filter((tool) => tool.namespace !== undefined)
             .map((tool) => tool.name),
         ),
-      current: () => {
-        const session = options.session();
-        return {
-          messages: session?.sessionManager.buildSessionProjection().messages ?? [],
-          loadout: {
-            ...(this.#memory?.systemText === undefined ? {} : { system: this.#memory.systemText }),
-            ...(session === undefined ? {} : { tools: session.agent.state.tools }),
-          },
-        };
-      },
+      messages: () => options.session()?.sessionManager.buildSessionProjection().messages ?? [],
+      system: () => this.#memory?.systemText,
+      tools: () => options.session()?.agent.state.tools ?? [],
     });
   }
 

@@ -1,0 +1,71 @@
+id: ctx-reminders
+description: Runtime notices of five kinds (a UserPromptSubmit hook's context, a subdirectory's memory, a matched paths rule, plan mode switched on from the menu, a file changed outside the session) reach the model as appended reminder messages while the system prompt and the tool definitions stay byte-identical (T27).
+capabilities: [CAP-CTX-REMINDER-001, CAP-CTX-CHANGED-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .claude/settings.json: |
+      {"hooks": {"UserPromptSubmit": [{"hooks": [{"type": "command", "command": "node hook.mjs prompt"}]}]}}
+    hook-plans/prompt.json: '{"json": {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": "Hook context for every prompt."}}}'
+    .claude/rules/typescript.md: "---\npaths:\n  - \"src/**/*.ts\"\n---\nTypeScript rule body.\n"
+    sub/CLAUDE.md: Subdirectory memory body.
+    sub/x.txt: "x\n"
+    src/app.ts: "export const app = 1;\n"
+    a.txt: "first version\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: r-sub, name: Read, input: { path: sub/x.txt } }
+          - { id: r-a, name: Read, input: { path: a.txt } }
+      - tool_calls: [{ id: r-ts, name: Read, input: { path: src/app.ts } }]
+      - text: Read.
+      - text: Noted.
+actions:
+  - prompt: { text: Start., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - set_mode: { mode: plan }
+  - write_file: { path: a.txt, content: "second version\n" }
+  - prompt: { text: Again., turn: two }
+expect:
+  request_counts: { main: 4 }
+  requests:
+    - index: 0
+      occurrences: { '[PiArc reminder]': 1 }
+      user_message_contains:
+        - '[PiArc reminder]'
+        - 'Context from a UserPromptSubmit hook:'
+        - 'Hook context for every prompt.'
+      not_contains: [Subdirectory memory body., TypeScript rule body., Plan mode is on.]
+    - index: 1
+      same_system_as: 0
+      same_tools_as: 0
+      user_message_contains: ['[PiArc reminder]', Subdirectory memory body.]
+      not_contains: [TypeScript rule body.]
+    - index: 2
+      same_system_as: 0
+      same_tools_as: 0
+      user_message_contains: ['[PiArc reminder]', TypeScript rule body.]
+      not_contains: [Plan mode is on., changed outside this session]
+    - index: 3
+      same_system_as: 0
+      same_tools_as: 0
+      user_message_contains:
+        - '[PiArc reminder]'
+        - Plan mode is on.
+        - 'a.txt was changed outside this session after you last read or wrote it.'
+        - 'Hook context for every prompt.'
+  events:
+    - method: item/completed
+      turn: one
+      params:
+        { item: { type: reminder, reminders: [{ type: hookContext, source: UserPromptSubmit }] } }
+    - method: item/completed
+      turn: one
+      params: { item: { type: reminder, reminders: [{ type: memoryLazyLoad }] } }
+    - method: item/completed
+      turn: one
+      params: { item: { type: reminder, reminders: [{ type: rulesMatched }] } }
