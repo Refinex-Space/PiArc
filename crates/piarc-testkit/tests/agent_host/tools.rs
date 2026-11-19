@@ -15,12 +15,22 @@ use crate::harness::{
 
 const CANONICAL: [&str; 6] = ["Read", "Write", "Edit", "Bash", "Glob", "Grep"];
 
+/// The Harness Kit's host tools after them (T26): no file or command I/O of their own.
+const HOST_TOOLS: [&str; 5] = [
+    "EnterPlanMode",
+    "ExitPlanMode",
+    "TodoWrite",
+    "AskUserQuestion",
+    "SuggestNextSteps",
+];
+
 /// The tools a session offers on this platform: Windows adds PowerShell after Bash (T17).
 fn offered_canonical() -> Vec<&'static str> {
     let mut names = CANONICAL.to_vec();
     if cfg!(windows) {
         names.insert(4, "PowerShell");
     }
+    names.extend(HOST_TOOLS);
     names
 }
 
@@ -120,7 +130,8 @@ async fn the_six_canonical_tools_delegate_every_operation_to_core() {
     );
 }
 
-/// T07-A04: exactly the six canonical tools, with the default profile's descriptions.
+/// T07-A04: exactly the six canonical tools (then T26's host tools), with the default profile's
+/// descriptions.
 fn check_offered_tools(body: &str) {
     let offered = offered_tools(body);
     println!("tools offered to the model:");
@@ -296,7 +307,13 @@ async fn a_tool_profile_renames_tools_for_the_model_only() {
             )
         })
         .collect();
-    // The profile renames the six tools; Windows also offers PowerShell under its own name.
+    // The profile renames the six tools; Windows also offers PowerShell under its own name, and
+    // the host tools (T26) keep theirs.
+    let (host, offered): (Vec<_>, Vec<_>) = offered
+        .into_iter()
+        .partition(|(name, _)| HOST_TOOLS.contains(&name.as_str()));
+    let host: Vec<&str> = host.iter().map(|(name, _)| name.as_str()).collect();
+    assert_eq!(host, HOST_TOOLS);
     let (powershell, renamed_tools): (Vec<_>, Vec<_>) = offered
         .into_iter()
         .partition(|(name, _)| name == "PowerShell");

@@ -1,6 +1,6 @@
 // Pi 1.5.2 calls tool_call after validating arguments and before any tool executes.
 // A blocked call's reason is the error tool result in Pi's next model request.
-import { DEFAULT_MAX_FRAME_BYTES } from '@piarc/protocol';
+import { DEFAULT_MAX_FRAME_BYTES, isPermissionMode, type PermissionMode } from '@piarc/protocol';
 import { uploadChunkEnd } from '../tools/core-io.js';
 import type { ExtensionFactory } from '@earendil-works/pi-coding-agent';
 
@@ -29,6 +29,8 @@ export interface Preflight {
   readonly context?: string;
   /** A hook stops the agent after this call. */
   readonly stop?: { readonly reason?: string };
+  /** Allowing the call switched the session's permission mode (T26). */
+  readonly mode?: PermissionMode;
 }
 
 /** The arguments Core and hooks see: file paths resolved against the session's cwd. */
@@ -55,7 +57,8 @@ function parseResult(value: unknown): Preflight | { allowed: true; result: Prefl
     !(value.reason === undefined || value.reason === null || typeof value.reason === 'string') ||
     !(value.updatedInput === undefined || isObject(value.updatedInput)) ||
     !(value.context === undefined || typeof value.context === 'string') ||
-    !(value.stop === undefined || isObject(value.stop))
+    !(value.stop === undefined || isObject(value.stop)) ||
+    !(value.mode === undefined || isPermissionMode(value.mode))
   ) {
     return undefined;
   }
@@ -68,6 +71,7 @@ function parseResult(value: unknown): Preflight | { allowed: true; result: Prefl
     ...(isObject(value.updatedInput) ? { updatedInput: value.updatedInput } : {}),
     ...(typeof value.context === 'string' ? { context: value.context } : {}),
     ...(stop === undefined ? {} : { stop }),
+    ...(isPermissionMode(value.mode) ? { mode: value.mode } : {}),
   };
   if (value.allowed) return { allowed: true, result: extras };
   return {
@@ -194,7 +198,31 @@ export function nextActiveTools(
   return changed ? [...next] : undefined;
 }
 
-/** The same gate covers PiArc, MCP and project tools. */
+/** Asks Core which of a recovered turn's calls lost their approval (`policy/recover`):
+ * call id → the reason, for the calls that did. */
+export async function expiredApprovals(
+  bridge: CoreBridge,
+  sessionId: string,
+  calls: readonly { readonly id: string }[],
+): Promise<Map<string, string>> {
+  const expired = new Map<string, string>();
+  for (const call of calls) {
+    const result = await bridge.requestTyped(
+      'policy/recover',
+      { sessionId, toolCallId: call.id },
+      (value) =>
+        isObject(value) &&
+        (value.reason === undefined || value.reason === null || typeof value.reason === 'string')
+          ? { reason: value.reason }
+          : undefined,
+    );
+    if (typeof result.reason === 'string') expired.set(call.id, result.reason);
+  }
+  return expired;
+}
+
+/** The same gate covers PiArc, MCP and project tools. `onMode` hears the mode an allowed
+ * call switched to (EnterPlanMode, an approved plan) before the call runs. */
 export function policyGate(
   bridge: CoreBridge,
   sessionId: string,
@@ -202,6 +230,7 @@ export function policyGate(
   markDeclined: (id: string) => void,
   log: (line: string) => void = () => undefined,
   hookNotes?: Map<string, HookNote>,
+  onMode?: (mode: PermissionMode) => void,
 ): ExtensionFactory {
   return (pi) => {
     // A deny rule without a specifier removes the tool from the model's list (architecture
@@ -249,6 +278,7 @@ export function policyGate(
       }
       const { reason } = decided;
       if (reason === undefined) {
+        if (decided.mode !== undefined) onMode?.(decided.mode);
         if (decided.updatedInput !== undefined) {
           // Pi 1.5.2 runs the tool with event.input as mutated here (no re-validation).
           const input = event.input as Record<string, unknown>;

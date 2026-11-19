@@ -19,12 +19,7 @@ import type { CoreIo, Shells } from './core-io.js';
 import { createEditTool } from './edit.js';
 import { createGlobTool } from './glob.js';
 import { createGrepTool } from './grep.js';
-import {
-  CANONICAL_TOOLS,
-  PI_BUILTIN_TOOL_NAMES,
-  type CanonicalTool,
-  type ToolProfile,
-} from './profile.js';
+import { CORE_TOOLS, PI_BUILTIN_TOOL_NAMES, type CoreTool, type ToolProfile } from './profile.js';
 import { createReadTool } from './read.js';
 import type { ToolSetup } from './presentation.js';
 import { createBashTool, createPowerShellTool } from './shell.js';
@@ -40,7 +35,9 @@ export {
 } from './core-io.js';
 export {
   CANONICAL_TOOLS,
+  CORE_TOOLS,
   DEFAULT_PROFILE,
+  HOST_TOOLS,
   PI_BUILTIN_TOOL_NAMES,
   profileWithOverrides,
   ToolNameMap,
@@ -50,7 +47,7 @@ export {
 } from './profile.js';
 export { lsOperations } from './ls.js';
 
-const FACTORIES: Record<CanonicalTool, (setup: ToolSetup) => ToolDefinition> = {
+const FACTORIES: Record<CoreTool, (setup: ToolSetup) => ToolDefinition> = {
   Read: createReadTool,
   Write: createWriteTool,
   Edit: createEditTool,
@@ -69,7 +66,7 @@ export function createToolSet(
   autoResizeImages = true,
   searched?: ToolSetup['searched'],
 ): ToolDefinition[] {
-  return CANONICAL_TOOLS.filter(
+  return CORE_TOOLS.filter(
     (tool) => (tool !== 'Bash' || shells.bash) && (tool !== 'PowerShell' || shells.powershell),
   ).map((tool) =>
     FACTORIES[tool]({
@@ -83,8 +80,9 @@ export function createToolSet(
 
 /**
  * Session options that give the model exactly the canonical tool set: the definitions as custom
- * tools, Pi's built-in tools excluded entirely (not merely inactive, so no extension can turn
- * them back on). MCP and extension tools are unaffected.
+ * tools (the Core tools, then the session's host tools), Pi's built-in tools excluded entirely
+ * (not merely inactive, so no extension can turn them back on). MCP and extension tools are
+ * unaffected.
  */
 export function toolOptions(
   io: CoreIo,
@@ -92,13 +90,14 @@ export function toolOptions(
   shells: Shells,
   autoResizeImages = true,
   searched?: ToolSetup['searched'],
+  hostTools: readonly ToolDefinition[] = [],
 ): {
   customTools: ToolDefinition[];
   noTools: 'builtin';
   excludeTools: string[];
 } {
   return {
-    customTools: createToolSet(io, profile, shells, autoResizeImages, searched),
+    customTools: [...createToolSet(io, profile, shells, autoResizeImages, searched), ...hostTools],
     noTools: 'builtin',
     excludeTools: [...PI_BUILTIN_TOOL_NAMES],
   };

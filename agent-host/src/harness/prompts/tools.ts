@@ -45,4 +45,30 @@ export const TOOL_GUIDANCE = {
       'Set literal mode when punctuation should match itself. Use surrounding lines to interpret a match.',
     ],
   },
+  EnterPlanMode: {
+    snippet: 'EnterPlanMode: switch to read-only planning before a larger change',
+    guidelines: [
+      'Plan first when a change is broad or its approach is unclear; small, clear edits need no plan.',
+    ],
+  },
+  ExitPlanMode: {
+    snippet: 'ExitPlanMode: submit the finished plan for approval',
+    guidelines: [
+      'Submit once exploration is done, with enough detail that the steps can be followed as written.',
+    ],
+  },
+  TodoWrite: {
+    snippet: 'TodoWrite: record and update the task list of multi-step work',
+    guidelines: ['Update the list as each task starts and finishes, not in one batch at the end.'],
+  },
+  AskUserQuestion: {
+    snippet: 'AskUserQuestion: ask the user structured questions',
+    guidelines: [
+      'Ask only what the other tools cannot establish, and list the recommended option first.',
+    ],
+  },
+  SuggestNextSteps: {
+    snippet: 'SuggestNextSteps: offer follow-ups at the end of a turn',
+    guidelines: ['Offer next steps only when there are clear and useful follow-ups.'],
+  },
 } satisfies Record<CanonicalTool, Pick<ToolPresentation, 'snippet' | 'guidelines'>>;

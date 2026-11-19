@@ -10,18 +10,25 @@
 
 import { TOOL_GUIDANCE } from '../harness/prompts/tools.js';
 
-/** The tools the default profile describes, in the order the model sees them. A session gets
- * `Bash` when Core found bash (Git Bash on Windows) and `PowerShell` on Windows only
- * (`exec/shells`, T17). */
-export const CANONICAL_TOOLS = [
-  'Read',
-  'Write',
-  'Edit',
-  'Bash',
-  'PowerShell',
-  'Glob',
-  'Grep',
+/** The tools whose file and command I/O Core performs, in the order the model sees them. A
+ * session gets `Bash` when Core found bash (Git Bash on Windows) and `PowerShell` on Windows
+ * only (`exec/shells`, T17). */
+export const CORE_TOOLS = ['Read', 'Write', 'Edit', 'Bash', 'PowerShell', 'Glob', 'Grep'] as const;
+
+/** The Harness Kit's host tools (T26, `harness/session-harness.ts`), after the Core tools. */
+export const HOST_TOOLS = [
+  'EnterPlanMode',
+  'ExitPlanMode',
+  'TodoWrite',
+  'AskUserQuestion',
+  'SuggestNextSteps',
 ] as const;
+
+/** The tools the default profile describes, in the order the model sees them. */
+export const CANONICAL_TOOLS = [...CORE_TOOLS, ...HOST_TOOLS] as const;
+
+/** A tool whose I/O Core performs. */
+export type CoreTool = (typeof CORE_TOOLS)[number];
 
 /** A canonical tool name of this tool set. */
 export type CanonicalTool = (typeof CANONICAL_TOOLS)[number];
@@ -136,6 +143,54 @@ export const DEFAULT_PROFILE: ToolProfile = {
       '.gitignore are skipped. At most `limit` matches (default 100) or 50 KB are returned, ' +
       'and very long lines are shortened.',
     ...TOOL_GUIDANCE.Grep,
+  },
+  EnterPlanMode: {
+    name: 'EnterPlanMode',
+    description:
+      'Turn on plan mode before work that deserves a plan the user can review first: changes ' +
+      'across several files, an approach with real alternatives, or a request to plan. In plan ' +
+      'mode files cannot change and only read-only commands run. Explore, then submit the plan ' +
+      'with ExitPlanMode. Takes no arguments.',
+    ...TOOL_GUIDANCE.EnterPlanMode,
+  },
+  ExitPlanMode: {
+    name: 'ExitPlanMode',
+    description:
+      "In plan mode, submit the plan for the user's approval. `plan` is the complete plan in " +
+      'Markdown: the steps in order, the files to change and how the result will be checked. ' +
+      'The user approves it, choosing how later edits are approved, or returns it with ' +
+      'feedback and comments on passages; then revise the plan and submit it again. Outside ' +
+      'plan mode there is nothing to submit.',
+    ...TOOL_GUIDANCE.ExitPlanMode,
+  },
+  TodoWrite: {
+    name: 'TodoWrite',
+    description:
+      'Keep the task list of the current work, which the user sees. Each call replaces the ' +
+      'whole list: `todos` holds every task with its `content` (in the imperative), `status` ' +
+      '(pending, in_progress or completed) and `activeForm` (the task as it reads while in ' +
+      'progress). Use it for work with several steps; keep one task in_progress while ' +
+      'working and mark each task completed as soon as it is done.',
+    ...TOOL_GUIDANCE.TodoWrite,
+  },
+  AskUserQuestion: {
+    name: 'AskUserQuestion',
+    description:
+      'Ask the user one to four multiple-choice questions when a decision is theirs: a ' +
+      'preference, an ambiguous requirement, a choice between approaches. Each question has 2 ' +
+      'to 4 `options` (a `label`, an optional `description`, and `default` for the option ' +
+      'taken if the form times out) and `multiSelect` when several may be picked; the user can ' +
+      'always answer in their own words instead. The answers come back as JSON.',
+    ...TOOL_GUIDANCE.AskUserQuestion,
+  },
+  SuggestNextSteps: {
+    name: 'SuggestNextSteps',
+    description:
+      'At the end of a turn, offer the user up to four follow-ups that naturally come next. ' +
+      'Each suggestion has a short `title` and the `prompt` that carries it out, written as ' +
+      'the user would send it. The user can run one in this session or start a new session ' +
+      'with it. The call returns at once; finish the turn after it.',
+    ...TOOL_GUIDANCE.SuggestNextSteps,
   },
 };
 

@@ -30,7 +30,6 @@ import {
   type AgentSession,
   type AgentSessionRuntime,
   type CreateAgentSessionRuntimeFactory,
-  type ToolDefinition,
 } from '@earendil-works/pi-coding-agent';
 import type {
   HistoryWindow,
@@ -40,7 +39,6 @@ import type {
   SessionModelSelection,
   PermissionMode,
   PromptAccepted,
-  QueueItem,
   QueueState,
   SessionOpened,
   SessionStopped,
@@ -50,7 +48,12 @@ import { memoryReader } from '../harness/memory-io.js';
 import { IDENTITY } from '../harness/prompts/system.js';
 import { SessionMemory } from '../harness/session-memory.js';
 import { SessionHooks } from '../harness/hooks.js';
-import { policyGate, preflightInput } from '../harness/policy.js';
+import { expiredApprovals, policyGate, preflightInput } from '../harness/policy.js';
+import {
+  harnessState,
+  SessionHarness,
+  type HostToolCapabilities,
+} from '../harness/session-harness.js';
 import {
   interruptedContext,
   missingToolCalls,
@@ -65,10 +68,10 @@ import {
 } from '../harness/tool-results.js';
 import { AhpError, describeError } from '../protocol/errors.js';
 import {
+  DEFAULT_PROFILE,
   ToolNameMap,
   toolOptions,
   type CoreIo,
-  type Shells,
   type ToolProfile,
 } from '../tools/index.js';
 import { historyWindow, MAX_HISTORY_LIMIT, projectHistory } from './history.js';
@@ -81,10 +84,17 @@ import {
   type UserInput,
 } from './input.js';
 import type { CoreBridge } from './core-bridge.js';
-import { MODE_ENTRY, modeItem, modeRecord } from './permission-mode.js';
-import { contentText, isObject } from './items.js';
+import { modeRecord } from './permission-mode.js';
+import { contentText } from './items.js';
 import { Projector, type ProjectionSink } from './projector.js';
 import { InputQueue } from './queue.js';
+import {
+  checkSessionId,
+  scheduled,
+  shellsFor,
+  stopped,
+  withHookContext,
+} from './session-helpers.js';
 import type { Workspace } from './workspace.js';
 
 /** Emits the projected notifications of one session. */
@@ -106,9 +116,6 @@ export type ToolBackend =
 
 /** Pi's tools the `pi-native` backend activates: the counterparts of the canonical six. */
 const PI_NATIVE_TOOLS = ['read', 'write', 'edit', 'bash', 'find', 'grep'];
-
-/** Session ids Core may choose: Pi's own rule is stricter about nothing but length. */
-const SESSION_ID = /^[A-Za-z0-9._-]{1,128}$/;
 
 export interface RegistryOptions {
   readonly workspace: Workspace;
@@ -134,6 +141,8 @@ export interface RegistryOptions {
   readonly toolResultLimits?: ToolResultLimits;
   /** Core runs hooks (`hooks` capability): sessions report their events over it. */
   readonly hooksBridge?: CoreBridge;
+  /** What Core enabled for the host tools (`planMode`, `todo`, `ask`; T26). */
+  readonly hostTools?: HostToolCapabilities;
 }
 
 /** What a turn runs: an input, or a compaction (`/compact`). */
@@ -156,6 +165,8 @@ interface HostedSession {
   readonly toCanonical: (tool: string) => string;
   /** Hook events reported to Core (absent without the `hooks` capability). */
   readonly hooks: SessionHooks | undefined;
+  /** Host tools, plan mode and reminders (T26). */
+  readonly harness: SessionHarness;
   unsubscribe: () => void;
   /** Idempotency keys of accepted prompts → their turn ids. */
   readonly prompts: Map<string, string>;
@@ -500,7 +511,9 @@ export class SessionRegistry {
         toCanonical = (tool) => names.toCanonical(tool);
       }
     }
-    return historyWindow(projectHistory(branch, toCanonical), start, limit);
+    const window = historyWindow(projectHistory(branch, toCanonical), start, limit);
+    const harness = harnessState(branch, toCanonical);
+    return harness === undefined ? window : { ...window, harness };
   }
 
   #once(sessionId: string, open: () => Promise<SessionOpened>): Promise<SessionOpened> {
@@ -590,12 +603,7 @@ export class SessionRegistry {
 
   /** Record before notifying Core or publishing the row. */
   setPermissionMode(sessionId: string, mode: PermissionMode): void {
-    const { runtime, projector } = this.#get(sessionId);
-    const turnId = projector.activeTurnId;
-    const itemId = runtime.session.sessionManager.appendCustomEntry(MODE_ENTRY, { mode, turnId });
-    this.#options
-      .sinkFor(sessionId)
-      .event('item/completed', { turnId: turnId ?? itemId, item: modeItem(itemId, mode) });
+    this.#get(sessionId).harness.recordMode(mode);
   }
 
   #startTurn(sessionId: string, hosted: HostedSession, job: Job): string {
@@ -640,7 +648,16 @@ export class SessionRegistry {
     );
     const batches = new ToolBatches((tool) => CONCURRENCY_SAFE_TOOLS.has(toCanonical(tool)));
     // The session object exists once the runtime is created; hooks read it lazily.
-    const opened: { session?: AgentSession } = {};
+    const opened: { session?: AgentSession; projector?: Projector } = {};
+    const harness = new SessionHarness({
+      sessionId: manager.getSessionId(),
+      manager,
+      sink: this.#options.sinkFor(manager.getSessionId()),
+      profile: tools.kind === 'core' ? tools.profile : DEFAULT_PROFILE,
+      canonical: toCanonical,
+      activeTurn: () => opened.projector?.activeTurnId,
+      core: tools.kind === 'core' ? this.#options.hostTools : undefined,
+    });
     const hooksBridge = tools.kind === 'core' ? this.#options.hooksBridge : undefined;
     const hooks =
       hooksBridge === undefined
@@ -684,6 +701,7 @@ export class SessionRegistry {
                 await shellsFor(io, this.#options.log),
                 settingsManager.getImageAutoResize(),
                 this.#options.memoryBridge ? memory.searched : undefined,
+                harness.tools(),
               ),
               batches,
             )
@@ -730,6 +748,9 @@ export class SessionRegistry {
                       );
                     },
                     hooks?.notes,
+                    (mode) => {
+                      harness.recordMode(mode);
+                    },
                   ),
                 ]
               : []),
@@ -739,6 +760,7 @@ export class SessionRegistry {
             ...(hooks === undefined ? [] : [hooks.extension]),
             interruptedContext,
             memory.extension,
+            ...(tools.kind === 'core' ? harness.extensions() : []),
           ],
           // Extension tools (MCP, project extensions) run under the same batches.
           extensionsOverride: (result) => batches.wrapExtensions(result),
@@ -774,6 +796,7 @@ export class SessionRegistry {
     }
     const sink = this.#options.sinkFor(sessionId);
     const projector = new Projector(sink, toCanonical);
+    opened.projector = projector;
     const delivering: PreparedInput[] = [];
     const queue = new InputQueue(
       sessionId,
@@ -793,6 +816,7 @@ export class SessionRegistry {
       batches,
       toCanonical,
       hooks,
+      harness,
       unsubscribe: () => undefined,
       prompts: new Map(),
       inputs: new Map(),
@@ -807,23 +831,10 @@ export class SessionRegistry {
     try {
       // A turn the previous process left unfinished (it crashed or was killed) is closed like an
       // interrupted one; a conversation that ends with a response stays as it is.
-      const expired = new Map<string, string>();
-      if (recovering && tools.kind === 'core') {
-        for (const call of missingToolCalls(session)) {
-          const result = await tools.bridge.requestTyped(
-            'policy/recover',
-            { sessionId, toolCallId: call.id },
-            (value) =>
-              isObject(value) &&
-              (value.reason === undefined ||
-                value.reason === null ||
-                typeof value.reason === 'string')
-                ? { reason: value.reason }
-                : undefined,
-          );
-          if (typeof result.reason === 'string') expired.set(call.id, result.reason);
-        }
-      }
+      const expired =
+        recovering && tools.kind === 'core'
+          ? await expiredApprovals(tools.bridge, sessionId, missingToolCalls(session))
+          : new Map<string, string>();
       const repair = repairInterruptedTurn(session, expired);
       if (repair.toolResults > 0 || repair.marker) {
         log(
@@ -889,6 +900,7 @@ export class SessionRegistry {
         break;
     }
     projector.handle(event);
+    hosted.harness.onEvent(event);
     if (event.type === 'agent_settled') {
       queue.settle();
       hosted.delivering.length = 0;
@@ -983,59 +995,5 @@ export class SessionRegistry {
       });
     }
     return hosted;
-  }
-}
-
-/** The canonical tools with their executions held by `batches`. */
-function scheduled(
-  options: ReturnType<typeof toolOptions>,
-  batches: ToolBatches,
-): ReturnType<typeof toolOptions> {
-  return {
-    ...options,
-    customTools: options.customTools.map((tool: ToolDefinition) => batches.wrap(tool)),
-  };
-}
-
-/** `prepared` with the context its `UserPromptSubmit` hooks added. */
-function withHookContext(prepared: PreparedInput, hookContext: string | undefined): PreparedInput {
-  return hookContext === undefined ? prepared : { ...prepared, hookContext };
-}
-
-function checkSessionId(sessionId: string): void {
-  if (!SESSION_ID.test(sessionId)) {
-    throw new AhpError(
-      'invalidParams',
-      'sessionId must be 1 to 128 letters, digits, ".", "_" or "-"',
-      { details: { member: 'sessionId' } },
-    );
-  }
-}
-
-function stopped(
-  sessionId: string,
-  turnId: string | undefined,
-  returned: readonly QueueItem[],
-): SessionStopped {
-  return {
-    sessionId,
-    ...(turnId === undefined ? {} : { interruptedTurnId: turnId }),
-    ...(returned.length === 0 ? {} : { returnedQueue: [...returned] }),
-  };
-}
-
-/**
- * The shells for a session's command tools. When Core cannot say (the request failed), the
- * platform's usual answer: bash everywhere but Windows, PowerShell on Windows only.
- */
-async function shellsFor(io: CoreIo, log: (line: string) => void): Promise<Shells> {
-  try {
-    return await io.shells();
-  } catch (error) {
-    log(
-      `[session ${io.sessionId}] exec/shells failed, assuming the platform's shells: ${String(error)}`,
-    );
-    const windows = process.platform === 'win32';
-    return { bash: !windows, powershell: windows };
   }
 }

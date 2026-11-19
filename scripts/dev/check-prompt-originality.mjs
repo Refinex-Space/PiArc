@@ -10,15 +10,21 @@ import { capture, repoRoot } from '../lib/repo.mjs';
 
 const width = 10;
 
-/** Render all tool guidance, including tools available on just one platform, from source. */
+/** Render all tool guidance, including tools available on just one platform, the tool
+ * descriptions and the reminder texts, from source. */
 function render() {
   const bundled = buildSync({
     stdin: {
       contents: `
         import { assembleSystem } from './agent-host/src/harness/prompts/system.ts';
+        import { PLAN_ON, planOff, staleListNotice } from './agent-host/src/harness/prompts/notices.ts';
         import { CANONICAL_TOOLS, DEFAULT_PROFILE } from './agent-host/src/tools/profile.ts';
-        process.stdout.write(assembleSystem(CANONICAL_TOOLS, DEFAULT_PROFILE, [],
-          {cwd: '', platform: '', date: '', gitStatus: ''}).text);`,
+        const system = assembleSystem(CANONICAL_TOOLS, DEFAULT_PROFILE, [],
+          {cwd: '', platform: '', date: '', gitStatus: ''}).text;
+        const descriptions = CANONICAL_TOOLS.map((tool) => DEFAULT_PROFILE[tool].description);
+        const notices = [PLAN_ON, ...['default', 'acceptEdits', 'bypassPermissions'].map(planOff),
+          staleListNotice([{ content: '', status: 'pending' }], 0)];
+        process.stdout.write([system, ...descriptions, ...notices].join(String.fromCharCode(10)));`,
       resolveDir: repoRoot,
     },
     platform: 'node',

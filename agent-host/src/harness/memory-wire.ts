@@ -1,11 +1,12 @@
 import type { FrozenSystem } from './prompts/system.js';
 import { isObject } from '../runtime/items.js';
 import { HOOK_MARKER } from './hooks.js';
+import { REMINDER_MARKER } from './reminders.js';
 
 export const MEMORY_MARKER = '[PiArc memory]';
 
 /** Pi 1.5.2 converts a custom message to a separate user message. Anthropic also represents
- * tool results as user messages. Deliver the notice (memory or hook context) as a sibling
+ * tool results as user messages. Deliver the notice (memory, hook context or a reminder) as a sibling
  * text block on that wire, after any tool results; keep the original messages and cache
  * metadata in the session. */
 export function anthropicMemoryPayload(payload: unknown, frozen?: FrozenSystem): unknown {
@@ -22,8 +23,7 @@ export function anthropicMemoryPayload(payload: unknown, frozen?: FrozenSystem):
             isObject(block) &&
             block.type === 'text' &&
             typeof block.text === 'string' &&
-            (block.text.startsWith(MEMORY_MARKER + '\n') ||
-              block.text.startsWith(HOOK_MARKER + '\n')),
+            isNotice(block.text),
         ),
       )
     ) {
@@ -46,6 +46,13 @@ export function anthropicMemoryPayload(payload: unknown, frozen?: FrozenSystem):
   const system = splitCachedSystem(payload, frozen);
   if (messages.length === payload.messages.length && system === undefined) return undefined;
   return { ...payload, messages, ...(system === undefined ? {} : { system }) };
+}
+
+/** Text that PiArc adds for the model: memory, hook context or a reminder. */
+function isNotice(text: string): boolean {
+  return [MEMORY_MARKER, HOOK_MARKER, REMINDER_MARKER].some((marker) =>
+    text.startsWith(marker + '\n'),
+  );
 }
 
 function blocks(content: unknown): unknown[] {
