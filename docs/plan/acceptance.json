@@ -90,8 +90,8 @@
       "id": "R2-A01",
       "task": "R2",
       "description": "两种线格式的服务商在应用界面中各完成一次\"读代码 → 改代码 → 跑测试\"，夹具测试由失败变为通过，过程中至少一次 Bash 与一次 Edit 经审批卡批准。验证：Playwright 流程、测试输出与截图（`tmp/evidence/R2/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "打包开发版和 dev 各自通过设置页配置 Anthropic Messages、OpenAI Chat Completions，4/4。在含空格与中文的 Git 夹具中，先读两文件、Manual 卡批准一次 Edit 和 Bash；同一单测从 ERR_ASSERTION 到 pass 1，测试源未修改。见 tmp/evidence/R2/accepted/l4/ 下四个 r2-workflow 目录的 settings、fileChange、command、completed 截图与 before.txt / after.txt。"
     },
     {
       "id": "R2-A02",
@@ -153,8 +153,8 @@
       "id": "R2-A10",
       "task": "R2",
       "description": "架构第 16 章与第 6.0 节已按实际更新，版本号递增并有修订记录；评审文件开头给出明确结论与进入 M2 的前提条件。验证：文档 diff 与评审文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "架构 v2.28，6.0 矩阵、6.1/6.11 的文件与命令边界、10.2 信任、16 章状态及 18 章修订记录已更新。docs/reviews/R2-findings.md 首段和评审索引给出 macOS 达标、W1 在 R3 前完成及已登记的后续条件。"
     },
     {
       "id": "R2-A11",
