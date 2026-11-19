@@ -31,5 +31,9 @@ windows-sys = { workspace = true, features = [
 [dev-dependencies]
 tokio = { workspace = true, features = ["process", "io-util"] }
 
+[target.'cfg(windows)'.dev-dependencies]
+# Tests detach from their console to start children the way a GUI process does.
+windows-sys = { workspace = true, features = ["Win32_System_Console"] }
+
 [lints]
 workspace = true
