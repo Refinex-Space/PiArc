@@ -83,11 +83,22 @@ struct StoreLookup {
     storage: Storage,
     /// Project settings items read by the caller, also bound to the stored snapshot.
     loaded: Vec<Item>,
+    /// The caller's canonical directory and its checkout, resolved just before: a lookup of
+    /// that directory does not resolve them again.
+    resolved: Option<(PathBuf, piarc_git::Checkout)>,
 }
 
 impl TrustLookup for StoreLookup {
     fn lookup(&self, dir: &Path) -> std::result::Result<bool, String> {
-        let checkout = piarc_git::resolve(dir).map_err(|e| e.to_string())?;
+        let (directory, checkout) = match &self.resolved {
+            Some((directory, checkout)) if directory == dir => {
+                (directory.clone(), checkout.clone())
+            }
+            _ => (
+                piarc_git::canonical(dir).map_err(|e| e.to_string())?,
+                piarc_git::resolve(dir).map_err(|e| e.to_string())?,
+            ),
+        };
         let key = checkout_key(&checkout.main).map_err(|e| e.to_string())?;
         let record = self
             .storage
@@ -97,7 +108,6 @@ impl TrustLookup for StoreLookup {
         let Some(record) = record.filter(|r| r.decision == TrustDecision::Trusted) else {
             return Ok(false);
         };
-        let directory = piarc_git::canonical(dir).map_err(|e| e.to_string())?;
         let inventory = inventory_at(&checkout.root, &directory);
         if !inventory.unreadable.is_empty() {
             return Ok(false);
@@ -129,6 +139,7 @@ impl TrustService {
         Arc::new(StoreLookup {
             storage: self.storage.clone(),
             loaded: Vec::new(),
+            resolved: None,
         })
     }
 
@@ -160,6 +171,7 @@ impl TrustService {
             let lookup = StoreLookup {
                 storage,
                 loaded: settings.project_items(&checkout.root),
+                resolved: Some((workspace.clone(), checkout)),
             };
             let mut failure = None;
             let trust = piarc_config::project_trust(&lookup, &workspace, &mut |reason| {
