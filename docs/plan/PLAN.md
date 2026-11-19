@@ -112,7 +112,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | 0 工程基座 | 脚手架、质量门禁、工程规范、协议与契约测试 | T01–T02 | — | 已完成 |
 | 1 M0 技术验证 | Electron 安全基线、NAPI 事件通道、mock provider、Agent Host 多会话与 AHP、Operations 委托、凭据保险箱、transcript 渲染、终端、沙箱、打包与首次运行；S1–S10 两个平台的结论 | T03–T12、W0 | R1 | 已完成（有条件进入 M1） |
 | 2 M1 可行走骨架 | 存储与信任、会话编排与投影、L2 场景、文件工具与 Bash、客户端外壳、transcript 与 composer、基础审批、模型与凭据、system prompt 与 memory | T13–T22 | R2 | 已完成（macOS 达标，Windows 留 W1） |
-| 3 M2 Harness 核心 | 权限规则与 Bash 分析、配置兼容层、hooks、计划模式与任务清单、压缩与用量、检查点与回退、WebFetch 与登录、L3 对齐；Windows 达到 M1 | W1、T23–T30 | R3 | 未开始 |
+| 3 M2 Harness 核心 | 权限规则与 Bash 分析、配置兼容层、hooks、计划模式与任务清单、压缩与用量、检查点与回退、WebFetch 与登录、L3 对齐；Windows 达到 M1 | W1、T23–T30 | R3 | 进行中 |
 | 4 M3 多会话与生态 | 子 agent、后台任务、终端、worktree 与并行会话、MCP、skills 与命令、WebSearch 与 hooks 扩展；Windows 达到 M2 | W2、T31–T38 | R4 | 未开始 |
 | 5 M4 安全与打磨 | 沙箱、插件、配置诊断与用量、NotebookEdit 与通知、无障碍与本地化、性能预算、安全收口；Windows 达到 M3 | W3、T39–T45 | R5 | 未开始 |
 | 6 M5 Beta | Auto 模式、自动记忆与托管配置、M5 补全、侧边对话与平台快捷操作、发布流水线；Windows 达到 M4 并与 Beta 同步；两平台端到端验收 | T46–T50、W4、T51 | R6 | 未开始 |
@@ -149,7 +149,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T22 | [System prompt 组装与 memory 文件](tasks/T22-system-prompt-and-memory-files.md) | 2 | T21 | macOS | high / 高 | 中 | 无 | 已完成 | 9843eb5 |
 | R2 | [M1 评审](tasks/R2-m1-review.md) | 2 | T22 | macOS | high / 高 | 中 | 无 | 已完成 | f63ac3d |
 | W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 未开始 | — |
-| T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
+| T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 8a1f38b |
 | T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T26 | [计划模式、任务清单、AskUserQuestion 与下一步](tasks/T26-plan-mode-todo-ask-next-steps.md) | 3 | T25 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -308,18 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-T23 权限规则完整版与 Bash 命令分析（macOS，开工 2026-11-18，基线 b654341 的 `npm run verify` 15/15）：
-
-- [x] 1. 规则语法与全部 specifier 匹配、工具名通配、无法解析规则的处理（A01）：`piarc-policy` 的 `rules`、`pattern`、`paths`
-- [x] 2. 规则来源合并（ADR-0005 顺序、信任前不应用项目 allow）、裁决流水线第 3–7 步与第 1、2、8 步插槽、审计命中规则与来源（A02、A07）：`piarc_config::Settings::permission_lists`、`tool_io::policy::{assess,hooks}`
-- [x] 3. tree-sitter-bash 命令分析、包装与环境变量剥离、只读白名单、关键路径删除、≥ 40 条数据驱动用例与随机输入测试（A03、A04、A06）：`piarc-policy::bash`，73 条用例；裁决阶梯 `decide` 已写，Core 仍走 `m1`（第 4 项替换）
-- [x] 4. Core 接入：Bash 子命令裁决、PowerShell 整条匹配、文件规则、裸工具名 deny 移出模型工具列表（A02、A05）：AHP `policy/tools`，程序钉住推广到全部自动允许的程序
-- [x] 5. 模式：plan 第 5 步拒绝、bypass 开启与二次确认、项目级 bypass/auto 忽略并审计、模式按工作区记忆（A08、A09、A10）：Core 与主进程原生确认已完成，L4 待第 7 项
-- [x] 6. "总是允许"按子命令前缀生成规则并在编辑框展示、写入 `.piarc/settings.local.json`（A11）：审批卡/答复改为 `rules` 列表
-- [x] 7. 设置窗口"权限"页：规则管理（原生确认）与审计查看（A12）：`t23-permissions.e2e.ts` 2/2、`t20-approvals.e2e.ts` 2/2（dev），截图与 ego-browser 实测在 `tmp/evidence/T23/`
-- [x] 8. L2 场景 `perm-*.yaml` 与能力 ID；裁决基准 p95 ≤ 2 ms（A05、A09、A13）：7 个场景（1 个仅 Windows），L2 67/67；调试构建 p95 0.70 ms
-- [ ] 9. 收尾：文档（piarc-policy AGENTS.md、coding-standards 复用表、架构）、`npm run verify`、验收记录（A14）
 
 ## 登记事项
 
@@ -727,6 +715,15 @@ T23 权限规则完整版与 Bash 命令分析（macOS，开工 2026-11-18，基
 - 四项独立只读审查和全部原文已归档。修复 13 项运行时问题，接受并实施 ADR-0034、0035、0036。I19 实测、I81 门面拆分、L2 能力映射和 W1 检查表见评审文件。
 - 开工与最终 verify 均 15/15；最终 Electron L4 52/52，L2 61 passed、0 failed、1 Windows 专属，M1 planned 0、blocked 0、MISSING 0。两次 ego-browser 操作使用本地渲染器与测试数据；Windows x64 交叉 Clippy 通过，原生验收由 W1 执行。
 - 可开始 W1（Windows 11）或 T23（macOS）。建议先 W1 核对 UNC、目录共享删除、Job Object、凭据与桌面交互，再回到 T23；W1 最迟在 R3 前完成。仅本地提交。
+
+### 2026-11-18 T23 部分完成（验收提交 8a1f38b）
+
+- 交付：`piarc-policy` 的 Claude Code 规则语法与全部 specifier、裁决阶梯（第 3–7 步与第 1、2、8 步插槽）、tree-sitter-bash 命令分析（拆分、包装与安全环境变量剥离、只读白名单、关键路径删除、按子命令的"总是允许"前缀）；Core 组装规则来源与信任、程序钉住、模式（plan 第 5 步拒绝、bypass 用户开关与原生二次确认、项目级 bypass/auto 忽略并审计、按工作区记忆）、AHP `policy/tools` 移除整体 deny 的工具；设置窗口"权限"页与审计筛选。见 ADR-0037、架构 v2.29。
+- 验收：13 项通过，1 项阻塞（A05 的 PowerShell 场景 `perm-powershell-whole` 只在 Windows CI 运行；只读白名单部分已在 macOS 通过）。开工基线 b654341 与收尾 `npm run verify` 均 15/15；L2 67 通过、2 个按平台跳过，能力覆盖 MISSING 0。
+- Bash 用例 73 条（12 类），随机输入 6,000 条无 panic；release 构建自动裁决 1,000 次 p95 388 µs（预算 2 ms）。Electron dev 与 packaged 的 T23、T20、preload L4 22/22；ego-browser 用本地假 Core 与测试数据操作了权限页与审计。证据在 `tmp/evidence/T23/`。
+- 收尾修复：Agent Host 端到端 harness 应答 `policy/tools`（不接入 Core 权限服务）；A10 增加重新打开数据库后读回模式的断言。macOS 上用占位 C 工具链（`scripts/dev/c-placeholder.mjs`）完成 Windows 目标的整个 workspace 交叉 Clippy。
+- 登记 I82–I85（按参数匹配的规则、PowerShell 语法分析与别名、Windows 只读白名单依赖 Git Bash 探测、T20 时期的 `Write(路径)` 规则）；I78 不在本任务范围，保持登记。
+- 下一项：macOS 上的 T24；Windows 上的 W1 同时核对 A05 与 I84。本地提交，未推送。
 
 ## 计划变更记录
 
