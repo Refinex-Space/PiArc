@@ -165,7 +165,37 @@ struct SyncState {
     byte_offset: u64,
     tail_start: u64,
     tail_hash: Vec<u8>,
+    identity: Option<String>,
+    modified: Option<String>,
     skipped: i64,
+}
+
+/// File identity distinguishes atomic replacements. Modification time also detects
+/// edits to earlier lines when the length and the last complete entry stay equal.
+struct Stamp {
+    identity: Option<String>,
+    modified: Option<String>,
+}
+
+impl From<&std::fs::Metadata> for Stamp {
+    fn from(metadata: &std::fs::Metadata) -> Self {
+        let timestamp = |time: std::time::SystemTime| {
+            time.duration_since(std::time::UNIX_EPOCH)
+                .ok()
+                .map(|t| t.as_nanos().to_string())
+        };
+        #[cfg(unix)]
+        let identity = {
+            use std::os::unix::fs::MetadataExt as _;
+            Some(format!("{}:{}", metadata.dev(), metadata.ino()))
+        };
+        #[cfg(not(unix))]
+        let identity = metadata.created().ok().and_then(timestamp);
+        Self {
+            identity,
+            modified: metadata.modified().ok().and_then(timestamp),
+        }
+    }
 }
 
 struct Scan {
@@ -191,14 +221,21 @@ impl Store {
     ) -> Result<FileOutcome> {
         let key = path_text(path)?.to_owned();
         let mut file = File::open(path).map_err(Error::io("cannot open", path))?;
-        let len = file
+        let metadata = file
             .metadata()
-            .map_err(Error::io("cannot read the metadata of", path))?
-            .len();
+            .map_err(Error::io("cannot read the metadata of", path))?;
+        let len = metadata.len();
+        let stamp = Stamp::from(&metadata);
         let state = self.sync_state(&key)?;
         let stored = self.session_by_file(&key)?;
         let resume = match (&state, &stored) {
-            (Some(state), Some(record)) if len >= state.byte_offset => {
+            (Some(state), Some(record))
+                if len >= state.byte_offset
+                    && stamp.identity.is_some()
+                    && stamp.identity == state.identity
+                    && (len > state.byte_offset
+                        || (stamp.modified.is_some() && stamp.modified == state.modified)) =>
+            {
                 let hash = hash_range(&mut file, state.tail_start, state.byte_offset)
                     .map_err(Error::io("cannot read", path))?;
                 if hash != state.tail_hash {
@@ -240,20 +277,21 @@ impl Store {
             .as_ref()
             .filter(|_| appending)
             .map_or(0, |s| s.skipped);
-        let outcome = self.store_scan(&key, path, &mut file, &scan, prior_skips, appending)?;
+        let outcome = self.store_scan(path, &mut file, &scan, prior_skips, appending, &stamp)?;
         skipped.extend(scan.skipped);
         Ok(outcome)
     }
 
     fn store_scan(
         &mut self,
-        key: &str,
         path: &Path,
         file: &mut File,
         scan: &Scan,
         prior_skips: i64,
         appending: bool,
+        stamp: &Stamp,
     ) -> Result<FileOutcome> {
+        let key = path_text(path)?;
         if scan.offset == 0 {
             return Ok(FileOutcome::Empty);
         }
@@ -271,12 +309,12 @@ impl Store {
             .map_err(Error::sqlite("cannot start the index transaction"))?;
         write_session(&tx, &id, key, &scan.meta, status, error.as_deref())?;
         tx.execute(
-            "INSERT INTO session_files (file_path, session_id, byte_offset, tail_start, tail_hash, last_entry_id, skipped_lines)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            "INSERT INTO session_files (file_path, session_id, byte_offset, tail_start, tail_hash, last_entry_id, skipped_lines, file_identity, modified_ns)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
              ON CONFLICT(file_path) DO UPDATE SET session_id = excluded.session_id,
                 byte_offset = excluded.byte_offset, tail_start = excluded.tail_start,
                 tail_hash = excluded.tail_hash, last_entry_id = excluded.last_entry_id,
-                skipped_lines = excluded.skipped_lines",
+                skipped_lines = excluded.skipped_lines, file_identity = excluded.file_identity, modified_ns = excluded.modified_ns",
             params![
                 key,
                 id,
@@ -284,7 +322,7 @@ impl Store {
                 to_i64(scan.tail_start),
                 tail_hash,
                 scan.meta.last_entry_id,
-                skipped_total
+                skipped_total, stamp.identity, stamp.modified
             ],
         )
         .map_err(Error::sqlite("cannot write session_files"))?;
@@ -497,7 +535,7 @@ impl Store {
     fn sync_state(&self, key: &str) -> Result<Option<SyncState>> {
         self.conn
             .query_row(
-                "SELECT byte_offset, tail_start, tail_hash, skipped_lines FROM session_files WHERE file_path = ?1",
+                "SELECT byte_offset, tail_start, tail_hash, skipped_lines, file_identity, modified_ns FROM session_files WHERE file_path = ?1",
                 [key],
                 |row| {
                     Ok(SyncState {
@@ -505,6 +543,7 @@ impl Store {
                         tail_start: from_i64(row.get(1)?),
                         tail_hash: row.get(2)?,
                         skipped: row.get(3)?,
+                        identity: row.get(4)?,modified: row.get(5)?,
                     })
                 },
             )

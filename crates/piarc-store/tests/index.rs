@@ -188,6 +188,24 @@ fn a_shorter_or_replaced_file_is_read_again_from_the_start() {
         Some("ONLY")
     );
 
+    // A rewrite can preserve both the size and the final complete entry.
+    let changed = std::fs::read_to_string(&writer.path)
+        .expect("file")
+        .replace("ONLY", "Only");
+    std::fs::write(&writer.path, changed).expect("edit earlier entry");
+    assert_eq!(
+        store.sync_file(&writer.path, &mut skipped).expect("sync"),
+        FileOutcome::Rescanned { entries: 2 }
+    );
+    assert_eq!(
+        store
+            .session("s-r")
+            .expect("lookup")
+            .expect("indexed")
+            .title(),
+        Some("Only")
+    );
+
     // A file that now holds another session id replaces the old row.
     let mut third = SessionWriter::create(&dir.path().join("tmp3"), "/w", "s-other", Some(3));
     let line = third.user("x");
