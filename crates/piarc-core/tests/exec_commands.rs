@@ -114,7 +114,10 @@ async fn cd_carries_over_inside_the_workspace_and_resets_outside() {
     let first = f.bash("cd src && echo moved").await;
     assert_eq!(first["cwd"], shown(&ws));
     assert!(first.get("cwdReset").is_none());
-    let second = f.bash("pwd -P").await;
+    // Git Bash's `pwd -P` may name a mount (`/tmp` is `%TEMP%`); `pwd -W` prints `C:/…`.
+    let second = f
+        .bash(if cfg!(windows) { "pwd -W" } else { "pwd -P" })
+        .await;
     assert_eq!(second["cwd"], shown(&ws.join("src")));
     assert_eq!(head(&second).trim_end(), bash_pwd(&ws.join("src")));
     // Leaving the workspace: the next command starts at the root, and the result says why.
@@ -150,8 +153,7 @@ async fn cd_carries_over_inside_the_workspace_and_resets_outside() {
 fn bash_pwd(dir: &std::path::Path) -> String {
     let text = shown(dir);
     if cfg!(windows) {
-        let (drive, rest) = text.split_at(1);
-        format!("/{}{}", drive.to_lowercase(), rest[1..].replace('\\', "/"))
+        text.replace('\\', "/")
     } else {
         text
     }

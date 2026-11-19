@@ -140,10 +140,12 @@ mod tests {
         let path = tree.path("workspace");
         let scope = Scope::new(&path, &path).expect("scope");
         let moved = std::fs::rename(&path, tree.path("archived-workspace"));
+        // The scope holds the directory without shared delete (ADR-0036): Windows refuses the
+        // move with access denied (5) or, on W1's Windows 11 25H2, a sharing violation (32).
         #[cfg(windows)]
         if moved
             .as_ref()
-            .is_err_and(|e| e.kind() == std::io::ErrorKind::PermissionDenied)
+            .is_err_and(|e| matches!(e.raw_os_error(), Some(5 | 32)))
         {
             assert!(
                 stat(&scope, "first.txt", false)
