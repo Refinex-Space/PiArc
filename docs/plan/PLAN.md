@@ -150,7 +150,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | R2 | [M1 评审](tasks/R2-m1-review.md) | 2 | T22 | macOS | high / 高 | 中 | 无 | 已完成 | f63ac3d |
 | W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 8a1f38b |
-| T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 已完成 | TBD |
+| T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 已完成 | ae5c8e6 |
 | T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T26 | [计划模式、任务清单、AskUserQuestion 与下一步](tasks/T26-plan-mode-todo-ask-next-steps.md) | 3 | T25 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T27 | [上下文工程：system reminder、压缩与用量](tasks/T27-context-reminders-compaction-usage.md) | 3 | T26 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -728,7 +728,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 登记 I82–I85（按参数匹配的规则、PowerShell 语法分析与别名、Windows 只读白名单依赖 Git Bash 探测、T20 时期的 `Write(路径)` 规则）；I78 不在本任务范围，保持登记。
 - 下一项：macOS 上的 T24；Windows 上的 W1 同时核对 A05 与 I84。本地提交，未推送。
 
-### 2026-11-18 T24 已完成（验收提交 TBD）
+### 2026-11-18 T24 已完成（验收提交 ae5c8e6）
 
 - 交付：`piarc-config` 加入 `~/.claude/settings.json`、`.claude/settings.json`、`.claude/settings.local.json` 三层（ADR-0005 顺序，同一套信任与项目模式过滤），键映射表 `claude::SETTINGS_KEYS` 是合并与诊断共用的唯一判断（M2 生效 `permissions.allow/ask/deny/defaultMode/additionalDirectories`），写入一律拒绝 `.claude/` 与 `.claude.json`；`CoreConfig.home` 取代 `memory_home` 并经 `DataDirs::layers` 到达所有设置读取；`.claude/rules/` 与 `~/.claude/rules/` 作为 memory 文档载入，`paths:` 条件 rules 经 `fs/memory` 新增的 `files`/`rules`/`inactiveRules` 在首次读写匹配文件时以 `piarc.memory` 消息送达、`piarc.memoryRules` 记账；配置诊断 Core API、NAPI `configDiagnostics`、设置窗口"配置诊断"页；权限页提示永不匹配的 `Write(…)` 等规则（I85 落地）。见 ADR-0038、架构 v2.30。
 - 验收：11/11 通过。开工基线 363b0d6 与收尾 `npm run verify` 均 15/15；L2 70 通过、2 个按平台跳过，新增 `config-merge-order`、`config-untrusted-project`、`config-rules-paths`，每个场景前后比对 Claude Code 配置快照；能力 CAP-CONFIG-COMPAT-001、CAP-CONFIG-DIAG-001、CAP-CTX-RULES-001 改为 active，MISSING 0。Electron dev 与 packaged 的 T24、T23、T22、preload L4 24/24；ego-browser 用本地渲染器与测试数据操作了诊断页。Windows 目标整个 workspace 的交叉 Clippy 通过。证据在 `tmp/evidence/T24/`。
