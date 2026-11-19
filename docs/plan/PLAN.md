@@ -152,7 +152,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 8a1f38b |
 | T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 已完成 | ae5c8e6 |
 | T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 30a4f17 |
-| T26 | [计划模式、任务清单、AskUserQuestion 与下一步](tasks/T26-plan-mode-todo-ask-next-steps.md) | 3 | T25 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
+| T26 | [计划模式、任务清单、AskUserQuestion 与下一步](tasks/T26-plan-mode-todo-ask-next-steps.md) | 3 | T25 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 23630e3 |
 | T27 | [上下文工程：system reminder、压缩与用量](tasks/T27-context-reminders-compaction-usage.md) | 3 | T26 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T28 | [检查点、回退与 Changes 面板](tasks/T28-checkpoints-rewind-changes.md) | 3 | T27 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T29 | [WebFetch、登录与模型设置补全、三档视图](tasks/T29-webfetch-login-model-settings-views.md) | 3 | T28 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -309,16 +309,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-T26（开工基线 c163249，`npm run verify` 15/15）：
-
-- [x] 1. 协议：harness 类型（任务清单、计划）、`ui/ask`、审批卡的 plan 与 questions、答复的 mode/comments/answers、`policy/evaluate` 结果的 mode、`session/history` 的 harness 状态；契约样本
-- [x] 2. Core：plan 模式拒绝理由；宿主工具的裁决（EnterPlanMode 切换模式、ExitPlanMode 计划卡与后续模式、继续规划的反馈与评论）；`ui/ask` 表单、超时（可注入时钟）与设置项
-- [x] 3. Agent Host：五个宿主工具、`reminders` 模块、模式追加消息、计划 entry 与 `harness/plan`、任务清单 `harness/todo` 与未更新提醒、注入接口、历史中的 harness 状态
-- [x] 4. 客户端：计划卡与计划面板（行内评论）、任务卡与右栏任务卡片、提问表单（替换 T20 占位）、下一步建议
-- [x] 5. L2：运行器扩展与 `plan-*`、`todo-*`、`ask-*`、`next-*` 场景，能力清单（A01、A02、A05、A06、A08、A09）
-- [x] 6. L4：Playwright 流程与截图（A03、A04、A07、A09、A10）：dev 与 packaged 各 5/5，全量 L4 回归见收尾
-- [x] 7. 文档：ADR、架构第 6.5 节、Agent Host 与渲染进程 AGENTS.md
-- [ ] 8. 收尾：`npm run verify`（A11）、验收清单、看板
 
 ## 登记事项
 
@@ -805,6 +795,15 @@ T26（开工基线 c163249，`npm run verify` 15/15）：
 - 本机：verify 15/15，计时单独运行 p50 501 µs、p95 693 µs；Windows 目标交叉 clippy 通过。
 - 运行 44533872761（03f42ae）：Windows 计时单独运行 p95 1.38 ms 通过，macOS runner 仍 2.67 ms（debug）；cargo 不再停在 piarc-core 后暴露两项：Windows 上 Bash 用例的虚构根 `/w` 被当作盘符（1afc48b），macOS runner 保留 `DYLD_*` 使 sessions 的 `sleep` 等审批（2406257）；计时按 T23-A13 改用 release 构建（41b5408）；Windows L4 的 `r2-workflow` 是第一个用 mock 的用例、在时限内现编 mock provider（05d226b，I101 已查明）。
 - 运行 44542131720（05d226b）全部通过：两平台 verify 15/15（计时 release 单独运行 macOS p95 0.43 ms、Windows 1.19 ms），Windows L4 211/211，macOS L4 206 通过、5 个按平台跳过（macOS arm64 runner 容量不足，作业两次排队 15 分钟未分到机器被取消，第三次重跑完成），打包与 Core 构建、加载全部通过。
+
+### 2026-11-19 T26 已完成（验收提交 23630e3）
+
+- 交付：五个宿主工具（`EnterPlanMode`、`ExitPlanMode`、`TodoWrite`、`AskUserQuestion`、`SuggestNextSteps`）按握手能力 `planMode`、`todo`、`ask` 注册；Core 持有模式，ExitPlanMode 在 plan 模式必问（计划卡）、其他模式拒绝，批准时带后续模式切换并记入工作区，继续规划把反馈与 UTF-16 锚定的行内评论作为拒绝理由；`ui/ask` 把提问表单放进同一审批账本，超时取 `askUserQuestion.timeoutSeconds`（注入时钟）；批准的计划写 `piarc.plan`、任务清单存在 TodoWrite 结果的 `details`，注入接口 `currentPlan`、`currentTodos`，`session/history` 带 `harness`；`reminders` 模块（`piarc.reminder`，模式开关与 8 轮未更新清单）；客户端计划审批卡、计划面板（行内评论）、提问表单（替换 T20 占位）、任务卡与右栏任务卡片、下一步建议。见 ADR-0042、架构 v2.33。
+- 验收：11/11 通过。开工基线 c163249 与收尾 `npm run verify` 均 15/15；L2 91 通过、2 个按平台跳过，新增 10 个 `plan-*`、`todo-*`、`ask-*`、`next-*` 场景（运行器加计划与提问答复、`fork`、`check_harness`、`same_tools_as`），CAP-PLAN-MODE-001、CAP-TODO-001、CAP-ASK-001、CAP-NEXT-001 改为 active，新增 CAP-PLAN-ENTRY-001、CAP-TODO-BRANCH-001、CAP-TODO-REMIND-001，MISSING 0。
+- L4：T26 五个流程 dev 与 packaged 各 5/5；全量 L4 212 通过、5 个按平台跳过，`t18-review` 两个形态因本机终端没有"屏幕录制"权限失败（已知），`t19-errors` 两例因与 Windows 交叉 Clippy 同时运行、mock 编译等 cargo 锁超时，单独重跑 4/4 通过。ego-browser 用本地渲染器与假 Core 操作了中文界面的计划面板评论（偏移 9–25）与提问表单（Mod+Enter 提交）。Windows 目标整个 workspace 的交叉 Clippy 通过。证据在 `tmp/evidence/T26/`。
+- 实现中的修正：T19 的滚动跟随把窗口内任何一次 `pointerup` 都当作 150 ms 的滚动输入，卡片按钮答复后的内容变化因此不贴底，停靠面板出现时尤其明显；改为只有按住滚动条后的松开才算（先写失败的单测）。`hooks-pre-tool-use` 的 `not_contains: three` 与新工具描述撞词，改了描述措辞。原创性检查扩大到工具描述与提醒文案（1,498 词，0 匹配窗口）。
+- 登记 I104（`plansDirectory` 未在 T26 支持，R3 决定）、I105（注册表与 Core policy.rs 接近 1,000 行）；I01 评估为不加 TaskCreate 映射；I88、I89 补充行数。
+- 下一项：macOS 上的 T27（上下文工程：system reminder、压缩与用量）。本地提交，未推送。
 
 ## 计划变更记录
 
