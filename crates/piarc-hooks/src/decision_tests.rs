@@ -171,7 +171,7 @@ fn other_exit_codes_are_errors_and_on_failure_block_denies() {
     assert_eq!(d.permission, None);
     assert_eq!(
         d.errors,
-        ["PreToolUse hook error (exited with code 1): boom"]
+        ["PreToolUse hook error: exited with code 1: boom"]
     );
     assert_eq!(d.verdicts, ["error"]);
     let strict = Outcome {

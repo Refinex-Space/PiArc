@@ -154,7 +154,7 @@ impl Outcome {
 /// The first line of stderr, after what happened.
 fn error_text(event: &str, what: &str, stderr: &str) -> String {
     match stderr.lines().map(str::trim).find(|l| !l.is_empty()) {
-        Some(line) => format!("{event} hook error ({what}): {line}"),
+        Some(line) => format!("{event} hook error: {what}: {line}"),
         None => format!("{event} hook error: {what}"),
     }
 }
@@ -277,7 +277,7 @@ mod tests {
         let one = Outcome::read(HookEvent::PostToolUse, exited(1, "", "\nlint failed\nmore"));
         assert_eq!(
             one.kind,
-            Kind::Error("PostToolUse hook error (exited with code 1): lint failed".into())
+            Kind::Error("PostToolUse hook error: exited with code 1: lint failed".into())
         );
         let timeout = Outcome::read(
             HookEvent::UserPromptSubmit,

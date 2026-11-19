@@ -78,6 +78,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'diagnostics.summary':
     '生效 {effective} · 被覆盖 {overridden} · 已忽略 {ignored} · 问题 {issues}',
   'diagnostics.effective': '生效的键',
+  'diagnostics.hooks': 'PiArc 不运行的 hooks',
   'diagnostics.overridden': '被更高优先级的文件覆盖',
   'diagnostics.ignored': '已忽略的键',
   'diagnostics.none': '无',
@@ -480,6 +481,8 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
 
   'notice.gitBashMissing': '没有找到 Git Bash，会话只能用 PowerShell 运行命令。',
   'notice.download': '下载 Git for Windows',
+  'notice.hookMessage': '{event} hook 消息',
+  'notice.hookError': '{event} hook 出错',
 
   'error.generic': '出错了：{reason}',
 };

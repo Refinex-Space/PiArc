@@ -256,7 +256,7 @@ impl ToolIo {
             HookEvent::PreCompact => {
                 if let (Some(reason), Ok(s)) = (&d.block, self.session(id)) {
                     let facts = self.session_facts(&s, id, CancellationToken::new()).await;
-                    let message = format!("PreCompact hook blocked compaction: {reason}");
+                    let message = format!("Compaction blocked: {reason}");
                     hooks.notify(&facts, event, "message", &message).await;
                 }
                 result.block = d.block;

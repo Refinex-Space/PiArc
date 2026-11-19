@@ -1,5 +1,6 @@
 // Core's notices for the user (`core/notices`, I76): for example Git Bash missing on Windows,
-// with its download link (opened in the system browser after the main process's confirmation).
+// with its download link (opened in the system browser after the main process's confirmation),
+// and hooks' `systemMessage`s and errors (T25), labelled with their event.
 import { isMessageId } from '../../shared/i18n/index.js';
 import { useT } from '../app/app-context.js';
 import { useNotices, useStore } from '../store/hooks.js';
@@ -16,8 +17,15 @@ export function NoticeBar() {
       {notices.map((notice) => {
         const id = `notice.${notice.type}`;
         return (
-          <div key={notice.type} className="notice" role="alert">
-            <span>{isMessageId(id) ? t(id) : notice.message}</span>
+          <div key={notice.key} className="notice" role="alert">
+            {notice.hook !== undefined && (
+              <strong>
+                {t(notice.hook.error ? 'notice.hookError' : 'notice.hookMessage', {
+                  event: notice.hook.event,
+                })}
+              </strong>
+            )}
+            <span>{notice.hook === undefined && isMessageId(id) ? t(id) : notice.message}</span>
             {notice.downloadUrl !== undefined && (
               <button
                 type="button"
@@ -36,7 +44,7 @@ export function NoticeBar() {
               className="icon-button"
               aria-label={t('toast.dismiss')}
               onClick={() => {
-                store.dismissNotice(notice.type);
+                store.dismissNotice(notice.key);
               }}
             >
               ×

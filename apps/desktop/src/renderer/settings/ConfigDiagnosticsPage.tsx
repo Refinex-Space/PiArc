@@ -2,7 +2,9 @@
 // file PiArc reads for a workspace, PiArc's and Claude Code's, with its load state, the keys
 // it applies, the keys a higher file overrides (and which file), the keys PiArc ignores and
 // why, and its parse errors. Core builds the report from the same load a permission decision
-// uses; the page asks again whenever `core/settings` reports a change.
+// uses; the page asks again whenever `core/settings` reports a change. Parts of the hooks
+// configuration PiArc does not run (later events and handler types, `async`, matchers its
+// regular expressions reject) are listed after the files (T25).
 import { useCallback, useEffect, useId, useState } from 'react';
 
 import type { MessageId } from '../../shared/i18n/index.js';
@@ -57,11 +59,20 @@ export interface FileView {
   readonly issues: readonly IssueRow[];
 }
 
+/** A part of the hooks configuration PiArc does not run as written. */
+export interface HookIssue {
+  readonly layer: string;
+  readonly file: string | undefined;
+  readonly pointer: string;
+  readonly message: string;
+}
+
 export interface DiagnosticsView {
   readonly workspaces: readonly string[];
   readonly workspace: string | null;
   readonly trusted: boolean;
   readonly files: readonly FileView[];
+  readonly hooks: readonly HookIssue[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -137,6 +148,13 @@ export function parseDiagnostics(raw: string): DiagnosticsView {
     workspace: str(value.workspace) ?? null,
     trusted: value.trusted === true,
     files,
+    hooks: list(value.hooks).flatMap((h): HookIssue[] => {
+      const layer = str(h.layer);
+      const pointer = str(h.pointer);
+      const message = str(h.message);
+      if (layer === undefined || pointer === undefined || message === undefined) return [];
+      return [{ layer, file: str(h.file), pointer, message }];
+    }),
   };
 }
 
@@ -273,6 +291,31 @@ function FileSection({ file }: { file: FileView }) {
   );
 }
 
+function HookIssues({ issues }: { issues: readonly HookIssue[] }) {
+  const { t } = useApp();
+  return (
+    <section className="diagnostics-file" data-testid="diagnostics-hooks">
+      <h3 className="permission-source-title">{t('diagnostics.hooks')}</h3>
+      <ul className="diagnostics-issues">
+        {issues.map((issue) => {
+          const title = layerTitle(issue.layer);
+          return (
+            <li
+              key={`${issue.layer}${issue.pointer}`}
+              data-testid="diagnostics-hook"
+              data-pointer={issue.pointer}
+            >
+              <span className="muted">{title === undefined ? issue.layer : t(title)} </span>
+              <span className="diagnostics-code">{issue.pointer} </span>
+              {issue.message}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 export function ConfigDiagnosticsPage() {
   const { t } = useApp();
   const selectId = useId();
@@ -346,6 +389,7 @@ export function ConfigDiagnosticsPage() {
           {view.files.map((file) => (
             <FileSection key={file.layer} file={file} />
           ))}
+          {view.hooks.length > 0 && <HookIssues issues={view.hooks} />}
         </>
       )}
     </div>

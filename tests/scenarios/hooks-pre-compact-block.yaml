@@ -26,7 +26,7 @@ expect:
       params:
         type: hook
         event: PreCompact
-        message: 'PreCompact hook blocked compaction: Not now: a review is open.'
+        message: 'Compaction blocked: Not now: a review is open.'
   json_lines:
     hook-log/pre.jsonl:
       - input: { hook_event_name: PreCompact, trigger: manual }

@@ -310,10 +310,20 @@ impl HooksService {
         }
     }
 
-    /// A notice for the user on `core/notices`.
+    /// A notice for the user on `core/notices`. The client labels it with the event, so a
+    /// leading "`<Event>` hook error:" or "`<Event>` hook:" is left out of `message`.
     pub(crate) async fn notify(&self, facts: &Facts, event: HookEvent, level: &str, message: &str) {
         tracing::info!(target: "piarc_core::hooks", session = %facts.session_id,
             event = event.name(), level, "{message}");
+        let name = event.name();
+        let message = [
+            format!("{name} hook error: "),
+            format!("{name} hook stopped: "),
+            format!("{name} hook: "),
+        ]
+        .iter()
+        .find_map(|prefix| message.strip_prefix(prefix.as_str()))
+        .unwrap_or(message);
         let Some(events) = &self.inner.notices else {
             return;
         };

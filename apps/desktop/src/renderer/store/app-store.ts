@@ -15,10 +15,17 @@ import { SessionTranscript } from './transcript.js';
 
 /** A notice for the user from Core (`core/notices`, for example a missing Git Bash). */
 export interface Notice {
+  /** Unique among the shown notices: the type, or `hook:<id>` for a hook's notice. */
+  readonly key: string;
   readonly type: string;
   readonly message: string;
   readonly downloadUrl: string | undefined;
+  /** A hook's `systemMessage` or error (T25): its event, and whether it is an error. */
+  readonly hook?: { readonly event: string; readonly error: boolean };
 }
+
+/** Hook notices kept on screen; older ones give way to new ones. */
+const MAX_HOOK_NOTICES = 5;
 
 export class AppStore {
   private workspaceRevision = -1;
@@ -137,23 +144,37 @@ export class AppStore {
     if (typeof value !== 'object' || value === null) {
       return;
     }
-    const { type, message, downloadUrl } = value as Record<string, unknown>;
+    const { type, message, downloadUrl, id, event, level } = value as Record<string, unknown>;
     if (typeof type !== 'string' || typeof message !== 'string') {
       return;
     }
-    if (this.noticeList.some((notice) => notice.type === type)) {
+    const hook =
+      type === 'hook' && typeof id === 'string'
+        ? { event: typeof event === 'string' ? event : 'Hook', error: level === 'error' }
+        : undefined;
+    const key = hook !== undefined && typeof id === 'string' ? `hook:${id}` : type;
+    if (this.noticeList.some((notice) => notice.key === key)) {
       return;
     }
     const url =
       typeof downloadUrl === 'string' && downloadUrl.startsWith('https://')
         ? downloadUrl
         : undefined;
-    this.noticeList = [...this.noticeList, { type, message, downloadUrl: url }];
+    let list = [
+      ...this.noticeList,
+      { key, type, message, downloadUrl: url, ...(hook === undefined ? {} : { hook }) },
+    ];
+    const hooks = list.filter((notice) => notice.hook !== undefined);
+    if (hooks.length > MAX_HOOK_NOTICES) {
+      const dropped = new Set(hooks.slice(0, hooks.length - MAX_HOOK_NOTICES));
+      list = list.filter((notice) => !dropped.has(notice));
+    }
+    this.noticeList = list;
     emit(this.noticeListeners);
   }
 
-  dismissNotice(type: string): void {
-    this.noticeList = this.noticeList.filter((notice) => notice.type !== type);
+  dismissNotice(key: string): void {
+    this.noticeList = this.noticeList.filter((notice) => notice.key !== key);
     emit(this.noticeListeners);
   }
 

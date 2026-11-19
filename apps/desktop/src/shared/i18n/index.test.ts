@@ -67,6 +67,7 @@ describe('i18n', () => {
             ignored: 2,
             issues: 0,
             limit: '5 MiB',
+            event: 'Stop',
           }),
         ).not.toThrow();
       }

@@ -77,9 +77,9 @@ test('configuration diagnostics explain every file and follow a Claude Code edit
   await expect(project).toContainText('Read only');
   await project.getByTestId('diagnostics-details').locator('summary').click();
   const ignored = project.getByTestId('diagnostics-ignored-key');
+  // `hooks` applies since T25; the empty object has no leaf to list.
   await expect(ignored).toHaveText([
     '/env PiArc does not use this setting',
-    '/hooks Not supported yet (planned in T25)',
     '/permissions/allow Waits until you trust this project',
     '/permissions/defaultMode Waits until you trust this project',
   ]);

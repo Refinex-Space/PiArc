@@ -493,7 +493,7 @@ async fn every_run_is_audited_and_long_context_goes_to_a_file() {
     let notices = f.notices().await;
     assert!(notices.iter().any(|n| n["type"] == "hook"
         && n["level"] == "error"
-        && n["message"] == "PreToolUse hook error (exited with code 1): lint failed"));
+        && n["message"] == "exited with code 1: lint failed"));
 }
 
 /// A hook that starts a long `sleep` in the background, writes its OS pid to `pid`, then waits.

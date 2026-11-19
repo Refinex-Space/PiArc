@@ -79,6 +79,7 @@ export const en = {
   'diagnostics.summary':
     '{effective} applied · {overridden} overridden · {ignored} ignored · {issues} problems',
   'diagnostics.effective': 'Applied',
+  'diagnostics.hooks': 'Hooks PiArc does not run',
   'diagnostics.overridden': 'Overridden by a higher file',
   'diagnostics.ignored': 'Ignored',
   'diagnostics.none': 'None',
@@ -495,6 +496,8 @@ export const en = {
 
   'notice.gitBashMissing': 'Git Bash was not found, so sessions run commands with PowerShell only.',
   'notice.download': 'Download Git for Windows',
+  'notice.hookMessage': '{event} hook',
+  'notice.hookError': '{event} hook error',
 
   'error.generic': 'Something went wrong: {reason}',
 } as const;

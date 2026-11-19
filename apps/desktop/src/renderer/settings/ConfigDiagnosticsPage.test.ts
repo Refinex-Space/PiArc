@@ -50,6 +50,47 @@ describe('configuration diagnostics', () => {
     expect(file?.overridden[0]?.source).toBe('claudeProjectLocal');
     expect(file?.ignored).toEqual([{ pointer: '/hooks', reason: 'planned', task: 'T25' }]);
     expect(file?.issues).toEqual([{ message: 'not valid JSON', pointer: '', line: 3, column: 25 }]);
+    expect(view.hooks).toEqual([]);
     expect(() => parseDiagnostics('[]')).toThrow('Invalid configuration diagnostics');
+  });
+
+  it('lists the hooks PiArc does not run', () => {
+    const view = parseDiagnostics(
+      JSON.stringify({
+        workspaces: ['/w'],
+        workspace: '/w',
+        trusted: true,
+        files: [],
+        hooks: [
+          {
+            layer: 'claudeProject',
+            file: '/w/.claude/settings.json',
+            pointer: '/hooks/PreToolUse/0/hooks/0/async',
+            kind: 'unsupportedField',
+            message: 'async hooks are not supported; this hook does not run',
+          },
+          {
+            layer: 'user',
+            pointer: '/hooks/SubagentStop',
+            message: 'SubagentStop hooks are not run yet (T38)',
+          },
+          { pointer: '/x' },
+        ],
+      }),
+    );
+    expect(view.hooks).toEqual([
+      {
+        layer: 'claudeProject',
+        file: '/w/.claude/settings.json',
+        pointer: '/hooks/PreToolUse/0/hooks/0/async',
+        message: 'async hooks are not supported; this hook does not run',
+      },
+      {
+        layer: 'user',
+        file: undefined,
+        pointer: '/hooks/SubagentStop',
+        message: 'SubagentStop hooks are not run yet (T38)',
+      },
+    ]);
   });
 });
