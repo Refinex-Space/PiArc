@@ -9,7 +9,7 @@
 | 里程碑 | 能力数 | 已实现 | 计划中 | BLOCKED |
 |---|---|---|---|---|
 | M1 | 61 | 61 | 0 | 0 |
-| M2 | 33 | 10 | 23 | 0 |
+| M2 | 33 | 18 | 15 | 0 |
 | M3 | 21 | 0 | 21 | 0 |
 | M4 | 10 | 0 | 10 | 0 |
 | M5 | 7 | 0 | 7 | 0 |
@@ -93,14 +93,14 @@
 | CAP-CTX-REMINDER-001 | 动态信息经 system reminder 送达，不破坏缓存 | ARCH-6.6.3 | T27 | — | 计划中 |
 | CAP-CTX-RULES-001 | `.claude/rules` 与 `paths:` 条件加载 | FR-CX-02、ARCH-6.14 | T24 | `config-rules-paths` | 已实现 |
 | CAP-CTX-USAGE-001 | 上下文用量与分类明细 | FR-CX-04、ARCH-6.6.5 | T27 | — | 计划中 |
-| CAP-HOOK-COMPACT-001 | PreCompact 与 PostCompact hooks | FR-HN-05、ARCH-6.3.2 | T25 | — | 计划中 |
-| CAP-HOOK-NOTIFY-001 | Notification hook | FR-HN-05、ARCH-6.3.2 | T25 | — | 计划中 |
-| CAP-HOOK-PERM-001 | PermissionRequest hook | FR-HN-05、ARCH-6.3.2 | T25 | — | 计划中 |
-| CAP-HOOK-POST-001 | PostToolUse 与 PostToolUseFailure hooks（可改写输出、追加上下文） | FR-HN-05、ARCH-6.3.2 | T25 | — | 计划中 |
-| CAP-HOOK-PRE-001 | PreToolUse hook 参与权限裁决 | FR-HN-05、ARCH-6.3.2、ARCH-6.2.3 | T25 | — | 计划中 |
-| CAP-HOOK-PROMPT-001 | UserPromptSubmit hook | FR-HN-05、ARCH-6.3.2 | T25 | — | 计划中 |
-| CAP-HOOK-SESSION-001 | SessionStart 与 SessionEnd hooks | FR-HN-05、ARCH-6.3.2 | T25 | — | 计划中 |
-| CAP-HOOK-STOP-001 | Stop hook（block 时续跑一轮，带防循环计数） | FR-HN-05、ARCH-6.3.2 | T25 | — | 计划中 |
+| CAP-HOOK-COMPACT-001 | PreCompact 与 PostCompact hooks | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-compact`<br>`hooks-pre-compact-block` | 已实现 |
+| CAP-HOOK-NOTIFY-001 | Notification hook | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-notification` | 已实现 |
+| CAP-HOOK-PERM-001 | PermissionRequest hook | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-permission-request` | 已实现 |
+| CAP-HOOK-POST-001 | PostToolUse 与 PostToolUseFailure hooks（可改写输出、追加上下文） | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-post-tool-use` | 已实现 |
+| CAP-HOOK-PRE-001 | PreToolUse hook 参与权限裁决 | FR-HN-05、ARCH-6.3.2、ARCH-6.2.3 | T25 | `hooks-pre-tool-use` | 已实现 |
+| CAP-HOOK-PROMPT-001 | UserPromptSubmit hook | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-user-prompt-submit` | 已实现 |
+| CAP-HOOK-SESSION-001 | SessionStart 与 SessionEnd hooks | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-session-end`<br>`hooks-session-start` | 已实现 |
+| CAP-HOOK-STOP-001 | Stop hook（block 时续跑一轮，带防循环计数） | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-stop`<br>`hooks-stop-limit` | 已实现 |
 | CAP-MODEL-SETTINGS-001 | 每个模型的显示名、上下文窗口、图片输入与默认 effort | FR-MD-04 | T29 | — | 计划中 |
 | CAP-NEXT-001 | 回合结束时的"下一步"建议 | FR-HN-06、ARCH-6.5 | T26 | — | 计划中 |
 | CAP-PERM-AUDIT-001 | 规则管理与审计记录 | FR-PM-04 | T23 | `perm-bash-compound` | 已实现 |

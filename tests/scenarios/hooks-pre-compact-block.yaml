@@ -1,0 +1,32 @@
+id: hooks-pre-compact-block
+description: A PreCompact hook that exits 2 cancels the compaction (no summary request) and the user sees its reason (T25).
+capabilities: [CAP-HOOK-COMPACT-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .pi/settings.json: '{"compaction":{"keepRecentTokens":1}}'
+    .claude/settings.json: |
+      {"hooks": {"PreCompact": [{"hooks": [{"type": "command", "command": "node hook.mjs pre"}]}]}}
+    hook-plans/pre.json: '{"exit": 2, "stderr": "Not now: a review is open."}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: 'Answer.'
+actions:
+  - prompt: { text: 'Hello.', turn: t }
+  - wait: { method: turn/completed, turn: t }
+  - compact: {}
+expect:
+  request_counts: { main: 1 }
+  events:
+    - method: core/notices
+      params:
+        type: hook
+        event: PreCompact
+        message: 'PreCompact hook blocked compaction: Not now: a review is open.'
+  json_lines:
+    hook-log/pre.jsonl:
+      - input: { hook_event_name: PreCompact, trigger: manual }

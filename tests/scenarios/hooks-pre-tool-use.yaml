@@ -1,0 +1,81 @@
+id: hooks-pre-tool-use
+description: PreToolUse hooks decide before the rules - a JSON deny and an exit 2 refuse the call with their reason in the next model request, an allow with updatedInput runs the rewritten command and adds context, and allow plus ask from two hooks merge to ask (T25).
+capabilities: [CAP-HOOK-PRE-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    notes.txt: "one\ntwo\nthree\n"
+    .claude/settings.json: |
+      {"hooks": {"PreToolUse": [
+        {"matcher": "Bash", "hooks": [{"type": "command", "command": "node hook.mjs bash"}]},
+        {"matcher": "Write", "hooks": [{"type": "command", "command": "node hook.mjs allow"}, {"type": "command", "command": "node hook.mjs ask"}]}
+      ]}}
+    hook-plans/bash.json: |
+      {"sequence": [
+        {"json": {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Use the fixture file instead."}}},
+        {"exit": 2, "stderr": "sed is not allowed here."},
+        {"json": {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow", "updatedInput": {"command": "printf 'rewritten by hook'"}, "additionalContext": "Commands run in CI mode."}}}
+      ]}
+    hook-plans/allow.json: '{"json": {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow"}}}'
+    hook-plans/ask.json: '{"json": {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask"}}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: denied, name: Bash, input: { command: sed -n 1p notes.txt } }]
+      - tool_calls: [{ id: blocked, name: Bash, input: { command: sed -n 2p notes.txt } }]
+      - tool_calls: [{ id: rewritten, name: Bash, input: { command: sed -n 3p notes.txt } }]
+      - tool_calls: [{ id: merged, name: Write, input: { path: out.txt, content: written } }]
+      - text: 'Done.'
+actions:
+  - prompt: { text: 'Read the notes.', turn: t }
+approvals:
+  - { tool: Write, decision: allow }
+expect:
+  request_counts: { main: 5 }
+  requests:
+    - index: 1
+      tool_results: [{ id: denied, is_error: true, contains: 'Use the fixture file instead.' }]
+    - index: 2
+      tool_results:
+        - { id: denied }
+        - { id: blocked, is_error: true, contains: 'sed is not allowed here.' }
+    - index: 3
+      tool_results:
+        - { id: denied }
+        - { id: blocked }
+        - { id: rewritten, is_error: false, contains: 'rewritten by hook' }
+      contains: ['Commands run in CI mode.']
+      not_contains: ['three']
+    - index: 4
+      tool_results:
+        [{ id: denied }, { id: blocked }, { id: rewritten }, { id: merged, is_error: false }]
+  files: { out.txt: written }
+  json_lines:
+    hook-log/bash.jsonl:
+      - types:
+          {
+            session_id: string,
+            transcript_path: string,
+            cwd: string,
+            permission_mode: string,
+            hook_event_name: string,
+            tool_name: string,
+            tool_input: object,
+            tool_use_id: string,
+          }
+        input:
+          {
+            hook_event_name: PreToolUse,
+            tool_name: Bash,
+            tool_use_id: denied,
+            tool_input: { command: sed -n 1p notes.txt },
+          }
+      - input: { tool_use_id: blocked }
+      - input: { tool_use_id: rewritten }
+    hook-log/allow.jsonl:
+      - input: { tool_name: Write, tool_use_id: merged }
+    hook-log/ask.jsonl:
+      - input: { tool_name: Write, tool_use_id: merged }

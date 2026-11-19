@@ -412,7 +412,12 @@
           }
         },
         "turn": { "description": "Label for the turn the input started.", "$ref": "#/$defs/label" },
-        "item": { "description": "Label for the queue item it became.", "$ref": "#/$defs/label" }
+        "item": { "description": "Label for the queue item it became.", "$ref": "#/$defs/label" },
+        "rejected": {
+          "description": "Core must refuse the input with an error containing this text (a UserPromptSubmit hook, T25).",
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "waitAction": {
@@ -576,6 +581,12 @@
             "required": ["call", "method"],
             "properties": { "call": { "type": "string" }, "method": { "type": "string" } }
           }
+        },
+        "json_lines": {
+          "description": "Workspace files of JSON lines after the run (hook fixtures record their stdin, T25): exactly this many lines, each a field subset.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/relativePath" },
+          "additionalProperties": { "type": "array", "items": { "type": "object" } }
         }
       }
     }

@@ -9,6 +9,7 @@ import { wellFormedJson } from '../protocol/well-formed.js';
 import type { CoreBridge } from '../runtime/core-bridge.js';
 import { isObject } from '../runtime/items.js';
 import { readPathCandidates, resolveToolPath } from '../tools/paths.js';
+import type { HookNote } from './hooks.js';
 
 export const DECLINED_ENTRY = 'piarc.toolDeclined';
 
@@ -18,29 +19,78 @@ interface ToolCall {
   input: Record<string, unknown>;
 }
 
-/** The reason to block, or undefined only after an explicit, well-formed allow. */
-export async function refusal(
+/** Core's decision on a call: a refusal reason, or the hooks' additions to an allowed call. */
+export interface Preflight {
+  /** Set when the call must not run. */
+  readonly reason?: string;
+  /** Arguments a hook gave the call instead (the whole object). */
+  readonly updatedInput?: Record<string, unknown>;
+  /** `PreToolUse` context for the model, delivered with the call's result. */
+  readonly context?: string;
+  /** A hook stops the agent after this call. */
+  readonly stop?: { readonly reason?: string };
+}
+
+/** The arguments Core and hooks see: file paths resolved against the session's cwd. */
+export function preflightInput(
+  tool: string,
+  input: Record<string, unknown>,
+  cwd: string,
+): Record<string, unknown> {
+  if (!['Read', 'Edit', 'Write', 'Glob', 'Grep'].includes(tool)) return input;
+  const requested = input.path ?? (tool === 'Glob' || tool === 'Grep' ? '.' : undefined);
+  if (typeof requested !== 'string') throw new Error('missing file path');
+  const resolved = resolveToolPath(requested, cwd);
+  return {
+    ...input,
+    path: resolved,
+    ...(tool === 'Read' ? { readPathCandidates: readPathCandidates(resolved) } : {}),
+  };
+}
+
+function parseResult(value: unknown): Preflight | { allowed: true; result: Preflight } | undefined {
+  if (
+    !isObject(value) ||
+    typeof value.allowed !== 'boolean' ||
+    !(value.reason === undefined || value.reason === null || typeof value.reason === 'string') ||
+    !(value.updatedInput === undefined || isObject(value.updatedInput)) ||
+    !(value.context === undefined || typeof value.context === 'string') ||
+    !(value.stop === undefined || isObject(value.stop))
+  ) {
+    return undefined;
+  }
+  const stop = isObject(value.stop)
+    ? typeof value.stop.reason === 'string'
+      ? { reason: value.stop.reason }
+      : {}
+    : undefined;
+  const extras: Preflight = {
+    ...(isObject(value.updatedInput) ? { updatedInput: value.updatedInput } : {}),
+    ...(typeof value.context === 'string' ? { context: value.context } : {}),
+    ...(stop === undefined ? {} : { stop }),
+  };
+  if (value.allowed) return { allowed: true, result: extras };
+  return {
+    ...extras,
+    reason:
+      typeof value.reason === 'string' && value.reason.trim()
+        ? value.reason
+        : 'Core denied permission for this tool call.',
+  };
+}
+
+/** Core's decision; any failure is a refusal. Only an explicit, well-formed allow lets the call run. */
+export async function preflight(
   bridge: CoreBridge,
   sessionId: string,
   cwd: string,
   call: ToolCall,
   signal?: AbortSignal,
-): Promise<string | undefined> {
+): Promise<Preflight> {
   let staging = false;
   try {
     const { tool, toolCallId } = call;
-    let input = call.input;
-    if (['Read', 'Edit', 'Write', 'Glob', 'Grep'].includes(tool)) {
-      const requested = input.path ?? (tool === 'Glob' || tool === 'Grep' ? '.' : undefined);
-      if (typeof requested !== 'string') throw new Error('missing file path');
-      const resolved = resolveToolPath(requested, cwd);
-      input = {
-        ...input,
-        path: resolved,
-        ...(tool === 'Read' ? { readPathCandidates: readPathCandidates(resolved) } : {}),
-      };
-    }
-    input = wellFormedJson(input);
+    const input = wellFormedJson(preflightInput(tool, call.input, cwd));
     const target = { sessionId, tool, toolCallId };
     let params: Record<string, unknown> = { ...target, input };
     const envelope = {
@@ -53,31 +103,39 @@ export async function refusal(
       staging = true;
       params = await stageInput(bridge, target, input, signal);
     }
-    const result = await bridge.requestTyped(
-      'policy/evaluate',
-      params,
-      (value) =>
-        isObject(value) &&
-        typeof value.allowed === 'boolean' &&
-        (value.reason === undefined || value.reason === null || typeof value.reason === 'string')
-          ? { allowed: value.allowed, reason: value.reason }
-          : undefined,
-      { approval: { sessionId, toolCallId }, ...(signal === undefined ? {} : { signal }) },
-    );
-    if (!result.allowed)
-      return result.reason?.trim() ? result.reason : 'Core denied permission for this tool call.';
-    return undefined;
+    // Core sends policy/pending before preflight hooks or an approval, which stops the
+    // transport deadline; a Core that never answers still times out.
+    const result = await bridge.requestTyped('policy/evaluate', params, parseResult, {
+      approval: { sessionId, toolCallId },
+      ...(signal === undefined ? {} : { signal }),
+    });
+    return 'allowed' in result ? result.result : result;
   } catch (error) {
     if (staging) {
       // If a transfer failed before evaluate consumed it, release this call's chunks.
       try {
         await bridge.request('policy/cancel', { sessionId, toolCallId: call.toolCallId });
       } catch (cleanupError) {
-        return `Permission denied: ${describeError(error)}. Could not cancel the preflight: ${describeError(cleanupError)}.`;
+        return {
+          reason: `Permission denied: ${describeError(error)}. Could not cancel the preflight: ${describeError(cleanupError)}.`,
+        };
       }
     }
-    return `Permission denied: Core could not authorize this tool call (${describeError(error)}). Ask the user before retrying.`;
+    return {
+      reason: `Permission denied: Core could not authorize this tool call (${describeError(error)}). Ask the user before retrying.`,
+    };
   }
+}
+
+/** The reason to block, or undefined only after an explicit, well-formed allow. */
+export async function refusal(
+  bridge: CoreBridge,
+  sessionId: string,
+  cwd: string,
+  call: ToolCall,
+  signal?: AbortSignal,
+): Promise<string | undefined> {
+  return (await preflight(bridge, sessionId, cwd, call, signal)).reason;
 }
 
 /** Write content crosses the wire raw, so JSON escaping does not reduce its 64 MiB limit. */
@@ -143,6 +201,7 @@ export function policyGate(
   canonical: (tool: string) => string,
   markDeclined: (id: string) => void,
   log: (line: string) => void = () => undefined,
+  hookNotes?: Map<string, HookNote>,
 ): ExtensionFactory {
   return (pi) => {
     // A deny rule without a specifier removes the tool from the model's list (architecture
@@ -171,7 +230,7 @@ export function policyGate(
       return undefined;
     });
     pi.on('tool_call', async (event, ctx) => {
-      const reason = await refusal(
+      const decided = await preflight(
         bridge,
         sessionId,
         ctx.cwd,
@@ -182,7 +241,23 @@ export function policyGate(
         },
         ctx.signal,
       );
-      if (reason === undefined) return;
+      if (decided.context !== undefined || decided.stop !== undefined) {
+        hookNotes?.set(event.toolCallId, {
+          ...(decided.context === undefined ? {} : { context: decided.context }),
+          ...(decided.stop === undefined ? {} : { stop: decided.stop }),
+        });
+      }
+      const { reason } = decided;
+      if (reason === undefined) {
+        if (decided.updatedInput !== undefined) {
+          // Pi 1.5.2 runs the tool with event.input as mutated here (no re-validation).
+          const input = event.input as Record<string, unknown>;
+          for (const key of Object.keys(input)) Reflect.deleteProperty(input, key);
+          Object.assign(input, decided.updatedInput);
+        }
+        return;
+      }
+      if (decided.stop !== undefined) ctx.abort();
       if (!ctx.signal?.aborted) {
         markDeclined(event.toolCallId);
         pi.appendEntry(DECLINED_ENTRY, { toolCallId: event.toolCallId });

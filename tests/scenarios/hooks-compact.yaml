@@ -1,0 +1,50 @@
+id: hooks-compact
+description: A PreCompact hook's plain stdout becomes instructions in the compaction summary request, and a PostCompact hook receives the summary (manual /compact, T25).
+capabilities: [CAP-HOOK-COMPACT-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .pi/settings.json: '{"compaction":{"keepRecentTokens":1}}'
+    .claude/settings.json: |
+      {"hooks": {
+        "PreCompact": [{"matcher": "manual", "hooks": [{"type": "command", "command": "node hook.mjs pre"}]}],
+        "PostCompact": [{"matcher": "manual", "hooks": [{"type": "command", "command": "node hook.mjs post"}]}]
+      }}
+    hook-plans/pre.json: '{"stdout": "Keep the API decisions.\n"}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: 'We agreed to keep the REST API.'
+      - text: 'Summary: the REST API stays.'
+actions:
+  - prompt: { text: 'Decide on the API.', turn: t }
+  - wait: { method: turn/completed, turn: t }
+  - compact: {}
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - index: 1
+      contains: ['Keep the API decisions.']
+  events:
+    - {
+        method: item/completed,
+        params: { item: { type: contextCompaction, status: completed, reason: manual } },
+      }
+  json_lines:
+    hook-log/pre.jsonl:
+      - types:
+          {
+            session_id: string,
+            transcript_path: string,
+            cwd: string,
+            hook_event_name: string,
+            trigger: string,
+            custom_instructions: 'null',
+          }
+        input: { hook_event_name: PreCompact, trigger: manual }
+    hook-log/post.jsonl:
+      - types: { session_id: string, compact_summary: string, trigger: string }
+        input: { hook_event_name: PostCompact, trigger: manual }

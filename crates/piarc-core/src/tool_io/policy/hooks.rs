@@ -32,6 +32,18 @@ pub(super) struct PreAnswer {
     pub stop: Option<Option<String>>,
 }
 
+/// Tells the Agent Host that Core works on the call (`policy/pending`): hooks can run for
+/// minutes, longer than the request's transport deadline, which the notification stops.
+async fn working(peer: &Peer, p: &PolicyEvaluateParams) {
+    use piarc_protocol::policy::{PolicyPending, PolicyPendingParams};
+    let pending = PolicyPendingParams {
+        session_id: p.session_id.clone(),
+        tool_call_id: p.tool_call_id.clone(),
+    };
+    // A closed connection cancels the hooks through their token.
+    let _ = peer.notify::<PolicyPending>(pending).await;
+}
+
 /// The arguments hooks see: the call's own, without the Agent Host's internal fields.
 fn tool_input(p: &PolicyEvaluateParams) -> Map<String, Value> {
     let mut input = p.input.clone();
@@ -108,7 +120,7 @@ impl ToolIo {
         stop: &mut Option<Option<String>>,
     ) -> Result<Ruling, ErrorObject> {
         let Some(answer) = self
-            .permission_request(step.s, p, &prepared.card, step.token.clone())
+            .permission_request(step.s, p, &prepared.card, step.peer, step.token.clone())
             .await
         else {
             return Ok(ruling);
@@ -160,15 +172,19 @@ impl ToolIo {
         &self,
         s: &SessionIo,
         p: &PolicyEvaluateParams,
+        peer: &Peer,
         cancel: CancellationToken,
     ) -> PreAnswer {
         let Some(hooks) = self.hook_service() else {
             return PreAnswer::default();
         };
         let facts = self.session_facts(s, &p.session_id, cancel).await;
-        let answer = hooks
-            .run(&facts, &tool_request(HookEvent::PreToolUse, p))
-            .await;
+        let request = tool_request(HookEvent::PreToolUse, p);
+        let Some(plan) = hooks.plan(&facts, &request).await else {
+            return PreAnswer::default();
+        };
+        working(peer, p).await;
+        let answer = hooks.execute(&facts, &request, plan).await;
         let d = answer.decision;
         let verdict = match d.permission {
             None => HookVerdict::None,
@@ -196,6 +212,7 @@ impl ToolIo {
         s: &SessionIo,
         p: &PolicyEvaluateParams,
         card: &ApprovalRequest,
+        peer: &Peer,
         cancel: CancellationToken,
     ) -> Option<RequestAnswer> {
         let hooks = self.hook_service()?;
@@ -204,7 +221,9 @@ impl ToolIo {
         request
             .fields
             .insert("permission_suggestions".into(), suggestions(card));
-        hooks.run(&facts, &request).await.decision.request
+        let plan = hooks.plan(&facts, &request).await?;
+        working(peer, p).await;
+        hooks.execute(&facts, &request, plan).await.decision.request
     }
 
     /// Applies a `PermissionRequest` allow's `updatedPermissions`: `addRules` to the session

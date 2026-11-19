@@ -79,6 +79,9 @@ pub(crate) struct Answer {
 pub(crate) type Condition =
     fn(rule: &str, tool: &str, input: &Map<String, Value>, facts: &Facts) -> bool;
 
+/// The handlers one event will run.
+pub(crate) struct Plan(Vec<Arc<piarc_hooks::Handler>>);
+
 /// Runs hooks for every session of a Core. Cheap to clone.
 #[derive(Clone)]
 pub(crate) struct HooksService {
@@ -177,9 +180,17 @@ impl HooksService {
             .unwrap_or_default()
     }
 
-    /// Runs `request`'s hooks; nothing configured or matched is an empty [`Answer`]. Settings
-    /// that cannot be read run nothing and tell the user.
+    /// Runs `request`'s hooks; nothing configured or matched is an empty [`Answer`].
     pub(crate) async fn run(&self, facts: &Facts, request: &Request) -> Answer {
+        match self.plan(facts, request).await {
+            Some(plan) => self.execute(facts, request, plan).await,
+            None => Answer::default(),
+        }
+    }
+
+    /// The handlers `request` would run, or `None`. Settings that cannot be read run nothing
+    /// and tell the user.
+    pub(crate) async fn plan(&self, facts: &Facts, request: &Request) -> Option<Plan> {
         let settings = match self.inner.trust.permission_settings(&facts.root).await {
             Ok(settings) => settings,
             Err(error) => {
@@ -188,7 +199,7 @@ impl HooksService {
                     request.event.name()
                 );
                 self.notify(facts, request.event, "error", &message).await;
-                return Answer::default();
+                return None;
             }
         };
         let config = config_of(&settings);
@@ -200,9 +211,12 @@ impl HooksService {
                     .is_none_or(|rule| (self.inner.condition)(rule, tool, input, facts))
             });
         }
-        if handlers.is_empty() {
-            return Answer::default();
-        }
+        (!handlers.is_empty()).then_some(Plan(handlers))
+    }
+
+    /// Runs a [`Plan`] of `request`.
+    pub(crate) async fn execute(&self, facts: &Facts, request: &Request, plan: Plan) -> Answer {
+        let handlers = plan.0;
         let input = self.input(facts, request);
         let cwd = if facts.cwd.is_dir() {
             facts.cwd.clone()

@@ -1,0 +1,68 @@
+id: hooks-post-tool-use
+description: A PostToolUse hook replaces the output the model reads and adds context and feedback; a PostToolUseFailure hook adds context to a failed call but cannot rewrite its output (T25).
+capabilities: [CAP-HOOK-POST-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    notes.txt: "secret-line\n"
+    .claude/settings.json: |
+      {"hooks": {
+        "PostToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "node hook.mjs post"}]}],
+        "PostToolUseFailure": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "node hook.mjs failure"}]}]
+      }}
+    hook-plans/post.json: |
+      {"json": {"decision": "block", "reason": "Lint found 2 warnings.", "hookSpecificOutput": {"hookEventName": "PostToolUse", "updatedToolOutput": "[output redacted by hook]", "additionalContext": "Output was redacted."}}}
+    hook-plans/failure.json: |
+      {"json": {"hookSpecificOutput": {"hookEventName": "PostToolUseFailure", "additionalContext": "Try again with the file name fixed.", "updatedToolOutput": "should not apply"}}}
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: ok, name: Bash, input: { command: cat notes.txt } }]
+      - tool_calls: [{ id: fail, name: Bash, input: { command: cat missing.txt } }]
+      - text: 'Done.'
+actions:
+  - prompt: { text: 'Show the notes.', turn: t }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - index: 1
+      tool_results: [{ id: ok, is_error: false, contains: '[output redacted by hook]' }]
+      contains: ['Output was redacted.', 'Lint found 2 warnings.']
+      not_contains: ['secret-line']
+    - index: 2
+      tool_results: [{ id: ok }, { id: fail, is_error: true, contains: 'missing.txt' }]
+      contains: ['Try again with the file name fixed.']
+      not_contains: ['should not apply']
+  json_lines:
+    hook-log/post.jsonl:
+      - types:
+          {
+            session_id: string,
+            transcript_path: string,
+            cwd: string,
+            permission_mode: string,
+            tool_input: object,
+            tool_response: object,
+            tool_use_id: string,
+            duration_ms: number,
+          }
+        input:
+          {
+            hook_event_name: PostToolUse,
+            tool_name: Bash,
+            tool_use_id: ok,
+            tool_input: { command: cat notes.txt },
+          }
+    hook-log/failure.jsonl:
+      - types:
+          { error: string, is_interrupt: boolean, permission_mode: string, duration_ms: number }
+        input:
+          {
+            hook_event_name: PostToolUseFailure,
+            tool_name: Bash,
+            tool_use_id: fail,
+            is_interrupt: false,
+          }

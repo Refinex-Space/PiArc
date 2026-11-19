@@ -582,49 +582,49 @@ capabilities:
     milestone: M2
     refs: [FR-HN-05, ARCH-6.3.2]
     task: T25
-    status: planned
+    status: active
   - id: CAP-HOOK-PROMPT-001
     title: 'UserPromptSubmit hook'
     milestone: M2
     refs: [FR-HN-05, ARCH-6.3.2]
     task: T25
-    status: planned
+    status: active
   - id: CAP-HOOK-PRE-001
     title: 'PreToolUse hook 参与权限裁决'
     milestone: M2
     refs: [FR-HN-05, ARCH-6.3.2, ARCH-6.2.3]
     task: T25
-    status: planned
+    status: active
   - id: CAP-HOOK-PERM-001
     title: 'PermissionRequest hook'
     milestone: M2
     refs: [FR-HN-05, ARCH-6.3.2]
     task: T25
-    status: planned
+    status: active
   - id: CAP-HOOK-POST-001
     title: 'PostToolUse 与 PostToolUseFailure hooks（可改写输出、追加上下文）'
     milestone: M2
     refs: [FR-HN-05, ARCH-6.3.2]
     task: T25
-    status: planned
+    status: active
   - id: CAP-HOOK-STOP-001
     title: 'Stop hook（block 时续跑一轮，带防循环计数）'
     milestone: M2
     refs: [FR-HN-05, ARCH-6.3.2]
     task: T25
-    status: planned
+    status: active
   - id: CAP-HOOK-COMPACT-001
     title: 'PreCompact 与 PostCompact hooks'
     milestone: M2
     refs: [FR-HN-05, ARCH-6.3.2]
     task: T25
-    status: planned
+    status: active
   - id: CAP-HOOK-NOTIFY-001
     title: 'Notification hook'
     milestone: M2
     refs: [FR-HN-05, ARCH-6.3.2]
     task: T25
-    status: planned
+    status: active
   - id: CAP-HOOK-SUBAGENT-001
     title: 'SubagentStart、SubagentStop 与 PostToolBatch hooks'
     milestone: M3

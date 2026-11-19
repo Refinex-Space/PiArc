@@ -1,0 +1,50 @@
+id: hooks-notification
+description: Notification hooks run when an approval waits for the user (permission_prompt) and when a turn finishes (idle_prompt), matched by notification type (T25).
+capabilities: [CAP-HOOK-NOTIFY-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    notes.txt: "one\n"
+    .claude/settings.json: |
+      {"hooks": {"Notification": [
+        {"matcher": "permission_prompt", "hooks": [{"type": "command", "command": "node hook.mjs permission"}]},
+        {"matcher": "idle_prompt", "hooks": [{"type": "command", "command": "node hook.mjs idle"}]}
+      ]}}
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: read, name: Bash, input: { command: sed -n 1p notes.txt } }]
+      - text: 'Done.'
+actions:
+  - prompt: { text: 'Read the notes.', turn: t }
+approvals:
+  - { tool: Bash, decision: allow }
+expect:
+  request_counts: { main: 2 }
+  json_lines:
+    hook-log/permission.jsonl:
+      - types:
+          {
+            session_id: string,
+            transcript_path: string,
+            cwd: string,
+            hook_event_name: string,
+            message: string,
+            notification_type: string,
+          }
+        input:
+          {
+            hook_event_name: Notification,
+            notification_type: permission_prompt,
+            message: 'PiArc needs your permission to use Bash',
+          }
+    hook-log/idle.jsonl:
+      - input:
+          {
+            hook_event_name: Notification,
+            notification_type: idle_prompt,
+            message: 'PiArc is waiting for your input',
+          }

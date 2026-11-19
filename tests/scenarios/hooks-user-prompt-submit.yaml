@@ -1,0 +1,36 @@
+id: hooks-user-prompt-submit
+description: A UserPromptSubmit hook sees each prompt before the Agent Host; exit 2 refuses the input with its stderr and nothing reaches the model, plain stdout adds context to the accepted prompt (T25).
+capabilities: [CAP-HOOK-PROMPT-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .claude/settings.json: |
+      {"hooks": {"UserPromptSubmit": [{"hooks": [{"type": "command", "command": "node hook.mjs prompt"}]}]}}
+    hook-plans/prompt.json: |
+      {"sequence": [{"exit": 2, "stderr": "Prompts must not contain secrets."}, {"stdout": "Ticket: PIA-42"}]}
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: 'Working on PIA-42.'
+actions:
+  - prompt: { text: 'My secret token is 42.', rejected: 'Prompts must not contain secrets.' }
+  - prompt: { text: 'Fix the build.', turn: t }
+expect:
+  request_counts: { main: 1 }
+  requests:
+    - index: 0
+      user_message_contains: ['Fix the build.', 'Ticket: PIA-42']
+      not_contains: ['My secret token is 42.']
+  json_lines:
+    hook-log/prompt.jsonl:
+      - types: { session_id: string, transcript_path: string, cwd: string, permission_mode: string }
+        input:
+          {
+            hook_event_name: UserPromptSubmit,
+            prompt: 'My secret token is 42.',
+            permission_mode: default,
+          }
+      - input: { hook_event_name: UserPromptSubmit, prompt: 'Fix the build.' }

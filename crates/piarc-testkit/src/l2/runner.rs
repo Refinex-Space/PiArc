@@ -21,7 +21,7 @@ use piarc_core::{
 use serde_json::{Value, json};
 use tokio::sync::{Notify, oneshot};
 
-use super::checks::{check_files, check_fixture_files, check_requests};
+use super::checks::{check_files, check_fixture_files, check_json_lines, check_requests};
 pub use super::fixtures::INTERNAL_PROBES;
 use super::fixtures::{
     claude_changes, claude_snapshot, command_env, prepare_workspace, resolve, write_file,
@@ -174,7 +174,10 @@ async fn run_in(spec: &ScenarioSpec, config: &RunnerConfig, root: &Path) -> Vec<
         approval_cursor: 0,
     };
     let mut failures = match driver.drive().await {
-        Ok(()) => driver.assert_all(),
+        Ok(()) => {
+            driver.json_lines_written().await;
+            driver.assert_all()
+        }
         Err(e) => vec![failure("action", format!("{e}\n{}", driver.context()))],
     };
     if let Err(e) = shutdown(&driver.core).await {
@@ -785,7 +788,16 @@ impl Driver<'_> {
                     .map_err(|e| format!("invalid attachment returned by Core: {e}"))?,
             );
         }
-        let accepted = self.op(input.session.as_deref(), op(outgoing)).await?;
+        let answer = self.op(input.session.as_deref(), op(outgoing)).await;
+        let accepted = match (&input.rejected, answer) {
+            (None, answer) => answer?,
+            (Some(want), Err(error)) if error.contains(want.as_str()) => return Ok(()),
+            (Some(want), answer) => {
+                return Err(format!(
+                    "expected a refusal containing {want:?}, got {answer:?}"
+                ));
+            }
+        };
         if let Some(turn) = accepted["turnId"].as_str() {
             match &input.turn {
                 Some(label) => {
@@ -868,6 +880,18 @@ impl Driver<'_> {
                             params: row.clone(),
                         });
                     }
+                }
+            } else if route == "core/notices" {
+                // Notices of a session (hooks, T25) count among its events.
+                if let Some(label) = event["sessionId"]
+                    .as_str()
+                    .and_then(|id| labels.get(&format!("session/{id}")))
+                {
+                    result.push(ObservedEvent {
+                        session: (*label).clone(),
+                        method: route.clone(),
+                        params: event.clone(),
+                    });
                 }
             } else if let Some(label) = labels.get(&route) {
                 result.push(ObservedEvent {
@@ -1017,6 +1041,22 @@ impl Driver<'_> {
         out
     }
 
+    /// Hooks that run in the background (`Notification`) may still be writing their records:
+    /// waits until every `expect.json_lines` file has its lines (30 s safety net).
+    async fn json_lines_written(&self) {
+        let want = &self.spec.expect.json_lines;
+        let ready = || {
+            want.iter().all(|(path, lines)| {
+                std::fs::read_to_string(resolve(&self.env.workspace, path))
+                    .is_ok_and(|text| text.lines().count() >= lines.len())
+            })
+        };
+        let deadline = tokio::time::Instant::now() + WAIT;
+        while !ready() && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    }
+
     fn assert_all(&self) -> Vec<Failure> {
         let mut failures = Vec::new();
         let events = self.observed();
@@ -1031,6 +1071,9 @@ impl Driver<'_> {
         }
         for f in check_fixture_files(self.spec, &self.env.workspace) {
             failures.push(failure("files", f));
+        }
+        for f in check_json_lines(&self.spec.expect.json_lines, &self.env.workspace) {
+            failures.push(failure("json_lines", f));
         }
         for f in check_requests(self.spec, &self.env.records()) {
             failures.push(failure("requests", f));

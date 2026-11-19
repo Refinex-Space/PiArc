@@ -243,6 +243,9 @@ pub struct InputAction {
     /// Label for the queue item it became.
     #[serde(default)]
     pub item: Option<String>,
+    /// Core must refuse the input with an error containing this text (T25).
+    #[serde(default)]
+    pub rejected: Option<String>,
 }
 
 /// Client edits to session metadata.
@@ -551,6 +554,9 @@ pub struct Expect {
     /// `files` keyed by layer id (T24).
     #[serde(default)]
     pub config_diagnostics: Option<Value>,
+    /// Workspace files of JSON lines (hook fixtures' records): each line a field subset (T25).
+    #[serde(default)]
+    pub json_lines: BTreeMap<String, Vec<Value>>,
 }
 
 /// One request assertion; every field present must hold.

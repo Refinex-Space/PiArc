@@ -36,6 +36,8 @@ export interface PreparedInput {
   readonly sections: string;
   /** Image content of the user message. */
   readonly images: readonly ImageContent[];
+  /** Context `UserPromptSubmit` hooks added (Core), delivered with the input. */
+  readonly hookContext?: string;
 }
 
 /** What reading the attachments needs. */

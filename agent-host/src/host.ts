@@ -32,7 +32,7 @@ import { agentDirOf, openWorkspace } from './runtime/workspace.js';
 import { CoreIo, DEFAULT_PROFILE, ExecOutputRouter, type ToolProfile } from './tools/index.js';
 
 /** Capabilities this Agent Host announces in `host/hello`. The models capability includes session selection and provider settings. */
-export const HOST_CAPABILITIES: readonly string[] = ['models', 'memory'];
+export const HOST_CAPABILITIES: readonly string[] = ['models', 'memory', 'hooks'];
 
 /** Exit codes, for Core's log and restart decisions. */
 export const EXIT = {
@@ -268,7 +268,8 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     const input = inputFields('session/prompt', fields);
     const sessionId = stringField('session/prompt', fields, 'sessionId');
     const requestId = stringField('session/prompt', fields, 'requestId');
-    return (await sessions('session/prompt')).prompt(sessionId, requestId, input);
+    const hookContext = optionalString('session/prompt', fields, 'hookContext');
+    return (await sessions('session/prompt')).prompt(sessionId, requestId, input, hookContext);
   });
   connection.handle('session/setPermissionMode', async (params) => {
     const method = 'session/setPermissionMode';
@@ -295,7 +296,8 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
       const input = inputFields(method, fields);
       const sessionId = stringField(method, fields, 'sessionId');
       const requestId = stringField(method, fields, 'requestId');
-      return (await sessions(method)).input(sessionId, requestId, input, kind);
+      const hookContext = optionalString(method, fields, 'hookContext');
+      return (await sessions(method)).input(sessionId, requestId, input, kind, hookContext);
     });
   }
   connection.handle('session/queue/edit', async (params) => {
@@ -395,6 +397,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
         workspace,
         tools,
         ...(welcome.enabled.includes('memory') ? { memoryBridge: connection.bridge } : {}),
+        ...(welcome.enabled.includes('hooks') ? { hooksBridge: connection.bridge } : {}),
         log,
         sinkFor: (sessionId) => ({
           event: (method, payload) => {

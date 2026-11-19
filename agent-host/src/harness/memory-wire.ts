@@ -1,11 +1,13 @@
 import type { FrozenSystem } from './prompts/system.js';
 import { isObject } from '../runtime/items.js';
+import { HOOK_MARKER } from './hooks.js';
 
 export const MEMORY_MARKER = '[PiArc memory]';
 
 /** Pi 1.5.2 converts a custom message to a separate user message. Anthropic also represents
- * tool results as user messages. Deliver the notice as a sibling text block on that wire,
- * after any tool results; keep the original messages and cache metadata in the session. */
+ * tool results as user messages. Deliver the notice (memory or hook context) as a sibling
+ * text block on that wire, after any tool results; keep the original messages and cache
+ * metadata in the session. */
 export function anthropicMemoryPayload(payload: unknown, frozen?: FrozenSystem): unknown {
   if (!isObject(payload) || !Array.isArray(payload.messages)) return undefined;
   const messages: unknown[] = [];
@@ -20,7 +22,8 @@ export function anthropicMemoryPayload(payload: unknown, frozen?: FrozenSystem):
             isObject(block) &&
             block.type === 'text' &&
             typeof block.text === 'string' &&
-            block.text.startsWith(MEMORY_MARKER + '\n'),
+            (block.text.startsWith(MEMORY_MARKER + '\n') ||
+              block.text.startsWith(HOOK_MARKER + '\n')),
         ),
       )
     ) {

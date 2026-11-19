@@ -27,6 +27,7 @@ import {
   SessionManager,
   SettingsManager,
   type AgentSessionEvent,
+  type AgentSession,
   type AgentSessionRuntime,
   type CreateAgentSessionRuntimeFactory,
   type ToolDefinition,
@@ -48,7 +49,8 @@ import type {
 import { memoryReader } from '../harness/memory-io.js';
 import { IDENTITY } from '../harness/prompts/system.js';
 import { SessionMemory } from '../harness/session-memory.js';
-import { policyGate } from '../harness/policy.js';
+import { SessionHooks } from '../harness/hooks.js';
+import { policyGate, preflightInput } from '../harness/policy.js';
 import {
   interruptedContext,
   missingToolCalls,
@@ -130,6 +132,8 @@ export interface RegistryOptions {
   readonly onClosed?: (sessionId: string) => void;
   /** How much of a tool result reaches the model; `TOOL_RESULT_LIMITS` when absent. */
   readonly toolResultLimits?: ToolResultLimits;
+  /** Core runs hooks (`hooks` capability): sessions report their events over it. */
+  readonly hooksBridge?: CoreBridge;
 }
 
 /** What a turn runs: an input, or a compaction (`/compact`). */
@@ -150,6 +154,8 @@ interface HostedSession {
   readonly queue: InputQueue;
   readonly batches: ToolBatches;
   readonly toCanonical: (tool: string) => string;
+  /** Hook events reported to Core (absent without the `hooks` capability). */
+  readonly hooks: SessionHooks | undefined;
   unsubscribe: () => void;
   /** Idempotency keys of accepted prompts → their turn ids. */
   readonly prompts: Map<string, string>;
@@ -287,7 +293,7 @@ export class SessionRegistry {
         file === undefined
           ? SessionManager.create(cwd, undefined, { id: sessionId })
           : SessionManager.open(file);
-      return this.#open(cwd, manager, undefined, true);
+      return this.#open(cwd, manager, undefined, 'resume');
     });
   }
 
@@ -318,21 +324,26 @@ export class SessionRegistry {
     if (forked === undefined) {
       throw new AhpError('internalError', `forking session ${sessionId} wrote no file`);
     }
-    return this.#open(cwd, SessionManager.open(forked), undefined);
+    return this.#open(cwd, SessionManager.open(forked), undefined, 'fork');
   }
 
   /**
    * Accepts a prompt; the turn runs after the response is queued. Attachments are read first
    * (input.ts), so an unreadable attachment fails the request rather than the turn.
    */
-  async prompt(sessionId: string, requestId: string, input: UserInput): Promise<PromptAccepted> {
+  async prompt(
+    sessionId: string,
+    requestId: string,
+    input: UserInput,
+    hookContext?: string,
+  ): Promise<PromptAccepted> {
     const hosted = this.#get(sessionId);
     const known = hosted.prompts.get(requestId);
     if (known !== undefined) {
       return { turnId: known };
     }
     return this.#onceFor(hosted, requestId, async () => {
-      const prepared = await this.#prepare(sessionId, input);
+      const prepared = withHookContext(await this.#prepare(sessionId, input), hookContext);
       const again = hosted.prompts.get(requestId);
       if (again !== undefined) {
         return { turnId: again };
@@ -366,6 +377,7 @@ export class SessionRegistry {
     requestId: string,
     input: UserInput,
     kind: 'steer' | 'followUp',
+    hookContext?: string,
   ): Promise<InputAccepted> {
     const hosted = this.#get(sessionId);
     const known = hosted.inputs.get(requestId);
@@ -373,7 +385,7 @@ export class SessionRegistry {
       return known;
     }
     return this.#onceFor(hosted, requestId, async () => {
-      const prepared = await this.#prepare(sessionId, input);
+      const prepared = withHookContext(await this.#prepare(sessionId, input), hookContext);
       const again = hosted.inputs.get(requestId);
       if (again !== undefined) {
         return again;
@@ -390,6 +402,7 @@ export class SessionRegistry {
       } else if (kind === 'steer') {
         this.#options.onPiEvent?.(sessionId, { control: 'steer', text });
         answer = { disposition: 'queued', itemId: await hosted.queue.steer(prepared) };
+        hosted.hooks?.addContext(prepared.hookContext, true);
       } else {
         this.#options.onPiEvent?.(sessionId, { control: 'followUp', text });
         answer = { disposition: 'queued', itemId: hosted.queue.followUp(prepared) };
@@ -601,8 +614,9 @@ export class SessionRegistry {
     cwd: string,
     manager: SessionManager,
     model: ModelRef | undefined,
-    recovering = false,
+    source: 'startup' | 'resume' | 'fork' = 'startup',
   ): Promise<SessionOpened> {
+    const recovering = source === 'resume';
     const { workspace } = this.#options;
     let trust: TrustTakeover | undefined;
     const selected =
@@ -625,6 +639,29 @@ export class SessionRegistry {
       toCanonical,
     );
     const batches = new ToolBatches((tool) => CONCURRENCY_SAFE_TOOLS.has(toCanonical(tool)));
+    // The session object exists once the runtime is created; hooks read it lazily.
+    const opened: { session?: AgentSession } = {};
+    const hooksBridge = tools.kind === 'core' ? this.#options.hooksBridge : undefined;
+    const hooks =
+      hooksBridge === undefined
+        ? undefined
+        : new SessionHooks({
+            bridge: hooksBridge,
+            sessionId: manager.getSessionId(),
+            cwd,
+            source,
+            canonical: toCanonical,
+            transcript: () => opened.session?.sessionFile ?? manager.getSessionFile(),
+            session: () => opened.session,
+            hookInput: (tool, input) => {
+              const resolved = preflightInput(tool, input, cwd);
+              delete resolved.readPathCandidates;
+              return resolved;
+            },
+            log: (line) => {
+              this.#options.log(`[session ${manager.getSessionId()}] ${line}`);
+            },
+          });
     const factory: CreateAgentSessionRuntimeFactory = async (target) => {
       const settingsManager = SettingsManager.create(target.cwd, target.agentDir, {
         projectTrusted: false,
@@ -692,11 +729,14 @@ export class SessionRegistry {
                         `[session ${target.sessionManager.getSessionId()}] ${line}`,
                       );
                     },
+                    hooks?.notes,
                   ),
                 ]
               : []),
             createMcpExtension(),
             ...budget,
+            // After the budget: hooks see (and may replace) what the model would read.
+            ...(hooks === undefined ? [] : [hooks.extension]),
             interruptedContext,
             memory.extension,
           ],
@@ -721,6 +761,7 @@ export class SessionRegistry {
       sessionManager: manager,
     });
     const { session } = runtime;
+    opened.session = session;
     const sessionId = session.sessionId;
     const log = (line: string): void => {
       this.#options.log(`[session ${sessionId}] ${line}`);
@@ -751,6 +792,7 @@ export class SessionRegistry {
       queue,
       batches,
       toCanonical,
+      hooks,
       unsubscribe: () => undefined,
       prompts: new Map(),
       inputs: new Map(),
@@ -897,6 +939,7 @@ export class SessionRegistry {
           )
             return;
           hosted.delivering.push(prepared);
+          hosted.hooks?.addContext(prepared.hookContext);
           await session.prompt(
             composedText(prepared),
             prepared.images.length === 0 ? undefined : { images: [...prepared.images] },
@@ -952,6 +995,11 @@ function scheduled(
     ...options,
     customTools: options.customTools.map((tool: ToolDefinition) => batches.wrap(tool)),
   };
+}
+
+/** `prepared` with the context its `UserPromptSubmit` hooks added. */
+function withHookContext(prepared: PreparedInput, hookContext: string | undefined): PreparedInput {
+  return hookContext === undefined ? prepared : { ...prepared, hookContext };
 }
 
 function checkSessionId(sessionId: string): void {

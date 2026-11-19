@@ -326,6 +326,38 @@ pub fn check_files(expected: &BTreeMap<String, Option<String>>, workspace: &Path
     failures
 }
 
+/// Checks `expect.json_lines`: the file has one JSON value per line, as many as expected,
+/// each containing its expected fields.
+#[must_use]
+pub fn check_json_lines(expected: &BTreeMap<String, Vec<Value>>, workspace: &Path) -> Vec<String> {
+    let mut failures = Vec::new();
+    for (path, lines) in expected {
+        let file = path
+            .split('/')
+            .fold(workspace.to_path_buf(), |p, part| p.join(part));
+        let text = std::fs::read_to_string(&file).unwrap_or_default();
+        let actual: Vec<Value> = text
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap_or(Value::String(line.to_owned())))
+            .collect();
+        if actual.len() != lines.len() {
+            failures.push(format!(
+                "json_lines.{path}: expected {} lines, found {}: {}",
+                lines.len(),
+                actual.len(),
+                compact(&Value::Array(actual.clone()), 400)
+            ));
+            continue;
+        }
+        for (n, (want, have)) in lines.iter().zip(&actual).enumerate() {
+            if let Some(why) = subset_mismatch(want, have, &format!("json_lines.{path}[{n}]")) {
+                failures.push(why);
+            }
+        }
+    }
+    failures
+}
+
 /// Checks `expect.fixtures`: each workspace file has exactly the bytes of its fixture.
 #[must_use]
 pub fn check_fixture_files(spec: &ScenarioSpec, workspace: &Path) -> Vec<String> {
