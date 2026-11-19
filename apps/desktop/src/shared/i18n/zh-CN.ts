@@ -340,6 +340,8 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'settings.language.zh-CN': '简体中文',
   'settings.notifications': '通知',
   'settings.notifications.enabled': 'PiArc 在后台时，会话完成或需要审批时通知我',
+  'settings.memory': '项目指令',
+  'settings.memory.readBoth': '当 CLAUDE.md 与 AGENTS.md 位于同一目录时，读取两个文件',
   'settings.theme': '主题',
   'settings.theme.system': '跟随系统',
   'settings.theme.light': '浅色',

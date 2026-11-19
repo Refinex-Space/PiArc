@@ -46,6 +46,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 
 - 新增 IPC 命令：在 `src/shared/ipc.ts` 加通道与 `PiarcApi` 成员，处理函数经 `registerHandler` 注册（ESLint 禁止直接 `ipcMain.handle`），参数当作 `unknown` 校验；同步更新 `e2e/preload.e2e.ts` 的键快照与 S10 报告。
 - T21 的设置页 `#/settings/providers` 经 `providerSettings` 读取公开参数、内置提供商目录和凭据存在标志。密钥输入是写入专用的，`saveProvider` 将密钥与公开配置分开交给 Core；删除服务商及凭据由主进程原生确认。新会话的 `workspaceModels`、环境栏的 `sessionModels` 都读 Agent Host 的可用模型和能力，切换前用 `previewModelSwitch` 取得代价，用户确认的模型与档位一起传入 `setSessionModel`。快捷键为 Mod+Shift+I（模型）和 Mod+Shift+E（推理强度）。
+- 通用设置的「项目指令」复选框写用户级 `/memory/readBoth`。Core 负责 memory 文件取舍和外部导入审批；窗口只在 Core 确认写入后更新勾选状态。真实设置和首次导入审批见 `e2e/t22-memory.e2e.ts`。
 - T20 审批卡来自 `core/sessions` 的 `approvals` 实体快照，以 `requestId`、`connectionEpoch`、`revision` 绑定答复。审批入口是 `window.piarc.answerApproval`；`allowAlways` 必须由主进程用原生确认框显示准备保存的每条规则和目录，用户确认后才交给 Core。模式菜单使用注册表命令 `session.permissionMode`，模式与变更记录以 Core 为准。运行 `PIARC_EVIDENCE_TASK=T20 npm run test:e2e -w @piarc/desktop -- t20-approvals.e2e.ts` 覆盖端到端流程。
 - preload 不暴露 `ipcRenderer`，只能 `require('electron')`（ESLint 禁止 Node 内置模块）；以后的事件 API 必须剥掉 Electron 的 event 对象再交给页面回调。
 - 新增权限放行：在 `PERMISSION_ALLOWLIST` 加条目并写 `reason`，补 L4 用例，记入 S10 报告。

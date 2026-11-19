@@ -353,6 +353,8 @@ export const en = {
   'settings.notifications': 'Notifications',
   'settings.notifications.enabled':
     'Notify me when a session finishes or needs approval while PiArc is in the background',
+  'settings.memory': 'Project instructions',
+  'settings.memory.readBoth': 'Read both CLAUDE.md and AGENTS.md when they share a directory',
   'settings.theme': 'Theme',
   'settings.theme.system': 'System',
   'settings.theme.light': 'Light',

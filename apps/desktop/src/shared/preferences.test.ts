@@ -14,6 +14,7 @@ describe('preferences', () => {
         'session.close': 'bad',
       },
       notifications: { enabled: false },
+      memory: { readBoth: true },
       permissions: { allow: ['Bash'] },
     });
     expect(prefs.language).toBe('zh-CN');
@@ -25,12 +26,18 @@ describe('preferences', () => {
     });
     expect(prefs.keybindings).toEqual({ 'session.new': 'Mod+Shift+N' });
     expect(prefs.notifications.enabled).toBe(false);
+    expect(prefs.memory.readBoth).toBe(true);
+    expect(preferencesFrom({ memory: { readBoth: 'true' } }).memory.readBoth).toBe(false);
   });
 
   it('maps only valid changes to settings pointers', () => {
     expect(pointerOf({ key: 'language', value: 'en' })).toEqual({
       pointer: '/language',
       value: 'en',
+    });
+    expect(pointerOf({ key: 'memory.readBoth', value: false })).toEqual({
+      pointer: '/memory/readBoth',
+      value: false,
     });
     expect(pointerOf({ key: 'keybinding', command: 'session.new', value: null })).toEqual({
       pointer: '/keybindings/session.new',
@@ -41,6 +48,8 @@ describe('preferences', () => {
       { key: 'keybinding', command: '../permissions', value: 'Mod+N' },
       { key: 'keybinding', command: 'session.new', value: 'Hyper+N' },
       { key: 'permissions.allow', value: ['Bash'] },
+      { key: 'memory.readBoth', value: 1 },
+      { key: 'memory.other', value: true },
       'language',
     ]) {
       expect(pointerOf(bad)).toBeUndefined();

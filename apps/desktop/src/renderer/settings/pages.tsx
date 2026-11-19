@@ -1,4 +1,4 @@
-// The settings pages of T18: General (language, notifications), Appearance (theme, contrast,
+// The settings pages: General (language, notifications, memory), Appearance (theme, contrast,
 // density, motion) and Keyboard Shortcuts (every registered command; changes take effect at
 // once in every window and in the menu; conflicts are refused with a message).
 import { useId, useState } from 'react';
@@ -128,6 +128,20 @@ function GeneralPage() {
             }}
           />
           {t('settings.notifications.enabled')}
+        </label>
+      </div>
+      <div className="setting">
+        <span className="setting-label">{t('settings.memory')}</span>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={preferences.memory.readBoth}
+            data-testid="setting-memory-read-both"
+            onChange={(event) => {
+              save({ key: 'memory.readBoth', value: event.currentTarget.checked });
+            }}
+          />
+          {t('settings.memory.readBoth')}
         </label>
       </div>
       {error !== undefined && <p className="error-text">{error}</p>}

@@ -91,8 +91,8 @@ impl CoreRuntime {
         Ok(promise)
     }
 
-    /// Sets one client preference in the user's settings file: `pointer` lies under
-    /// `/language`, `/appearance`, `/keybindings` or `/notifications`; `value` is JSON text,
+    /// Sets one client preference in the user's settings file: `pointer` is `/memory/readBoth`
+    /// or lies under `/language`, `/appearance`, `/keybindings` or `/notifications`; `value` is JSON text,
     /// `null` removes the key. Resolves with the file's new content as JSON.
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]
     pub fn write_client_setting<'env>(

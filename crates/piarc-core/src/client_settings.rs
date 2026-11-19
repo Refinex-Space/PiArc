@@ -1,5 +1,5 @@
 //! The client's preferences in the user's settings file (`<data>/settings.json`, T18):
-//! language, appearance, keyboard shortcut overrides and notifications. The desktop client
+//! language, appearance, keyboard shortcut overrides, notifications and the memory file choice. The desktop client
 //! reads the whole file and writes these keys only; writes go through
 //! [`piarc_config::write_value`] (temporary file and rename), so Core stays the one writer of
 //! settings files.
@@ -43,7 +43,7 @@ pub fn read(data_dir: &Path) -> Result<Value> {
 }
 
 /// Sets (`Some`) or removes (`None`) the value at `pointer`, which must lie under one of
-/// [`CLIENT_KEYS`]. Returns the file's new content.
+/// [`CLIENT_KEYS`] or be exactly `/memory/readBoth`. Returns the file's new content.
 ///
 /// # Errors
 ///
@@ -53,10 +53,20 @@ pub fn write(data_dir: &Path, pointer: &str, value: Option<Value>) -> Result<Val
     let top = pointer
         .strip_prefix('/')
         .and_then(|rest| rest.split('/').next());
-    if !top.is_some_and(|key| CLIENT_KEYS.contains(&key)) {
+    if pointer == "/memory/readBoth" {
+        if value.as_ref().is_some_and(|v| !v.is_boolean()) {
+            return Err(Error::InvalidArgument {
+                field: "value",
+                reason: "memory.readBoth requires a boolean".into(),
+            });
+        }
+    } else if !top.is_some_and(|key| CLIENT_KEYS.contains(&key)) {
         return Err(Error::InvalidArgument {
             field: "pointer",
-            reason: format!("must start with one of /{}", CLIENT_KEYS.join(", /")),
+            reason: format!(
+                "must be /memory/readBoth or start with one of /{}",
+                CLIENT_KEYS.join(", /")
+            ),
         });
     }
     write_user_value(data_dir, pointer, value)?;
@@ -121,9 +131,23 @@ mod tests {
         assert_eq!(after["shell"]["gitBashPath"], "C:\\bash.exe");
         let after = write(&dir, "/keybindings/session.new", None).expect("remove");
         assert_eq!(after["keybindings"], json!({}));
-        for refused in ["/shell/gitBashPath", "/permissions/allow", "", "language"] {
+        let after = write(&dir, "/memory/readBoth", Some(json!(true))).expect("set memory choice");
+        assert_eq!(after["memory"]["readBoth"], true);
+        assert!(write(&dir, "/memory/readBoth", Some(json!("true"))).is_err());
+        for refused in [
+            "/memory",
+            "/memory/readBoth/other",
+            "/memory/other",
+            "/shell/gitBashPath",
+            "/permissions/allow",
+            "",
+            "language",
+        ] {
             assert!(write(&dir, refused, Some(json!("x"))).is_err(), "{refused}");
         }
+        let after = write(&dir, "/memory/readBoth", None).expect("restore default");
+        assert_eq!(after["memory"], json!({}));
+        assert_eq!(after["shell"]["gitBashPath"], "C:\\bash.exe");
         std::fs::remove_dir_all(&dir).expect("cleanup");
         assert_eq!(read(&dir).expect("missing file"), json!({}));
     }

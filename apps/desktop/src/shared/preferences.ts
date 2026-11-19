@@ -32,6 +32,7 @@ export interface Preferences {
   /** Command id → key in `Mod` notation; `''` unbinds. Only overrides are stored. */
   readonly keybindings: Readonly<Record<string, string>>;
   readonly notifications: { readonly enabled: boolean };
+  readonly memory: { readonly readBoth: boolean };
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -44,6 +45,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   },
   keybindings: {},
   notifications: { enabled: true },
+  memory: { readBoth: false },
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -88,6 +90,7 @@ export function preferencesFrom(settings: unknown): Preferences {
           ? notifications.enabled
           : DEFAULT_PREFERENCES.notifications.enabled,
     },
+    memory: { readBoth: isRecord(file.memory) && file.memory.readBoth === true },
   };
 }
 
@@ -99,6 +102,7 @@ export type PreferenceChange =
   | { readonly key: 'appearance.density'; readonly value: DensityPreference }
   | { readonly key: 'appearance.reduceMotion'; readonly value: ReduceMotionPreference }
   | { readonly key: 'notifications.enabled'; readonly value: boolean }
+  | { readonly key: 'memory.readBoth'; readonly value: boolean }
   /** `value` `null` restores the default key. */
   | { readonly key: 'keybinding'; readonly command: string; readonly value: string | null };
 
@@ -134,6 +138,8 @@ export function pointerOf(change: unknown): { pointer: string; value: unknown } 
         : undefined;
     case 'notifications.enabled':
       return typeof value === 'boolean' ? { pointer: '/notifications/enabled', value } : undefined;
+    case 'memory.readBoth':
+      return typeof value === 'boolean' ? { pointer: '/memory/readBoth', value } : undefined;
     case 'keybinding': {
       const { command } = change;
       if (!isCommandId(command)) {
