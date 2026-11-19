@@ -265,6 +265,21 @@ async fn the_chosen_mode_is_remembered_per_workspace() {
     f.io.changed_mode(SESSION, PermissionMode::Plan)
         .await
         .expect("plan");
+    // A restarted Core opens the same database file; every session start reads the mode from
+    // it (below), with no copy kept in memory.
+    let reopened = Storage::open(
+        DataDirs::new(f.root.join("data"), f.root.join("cache")).expect("directories"),
+    )
+    .expect("reopen the database");
+    assert_eq!(
+        reopened
+            .with(|s| s.workspace_mode(&path))
+            .expect("open")
+            .expect("read")
+            .as_deref(),
+        Some("plan")
+    );
+    reopened.close();
     f.io.open_session("second", &f.work(), &f.work())
         .expect("second session");
     f.io.set_initial_mode("second", None).await.expect("start");
