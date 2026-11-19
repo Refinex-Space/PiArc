@@ -3,7 +3,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { ElectronApplication, Page } from '@playwright/test';
+import { addEndpoint, settingsWindow } from './provider-settings.js';
 import {
   expect,
   makeWorkspace,
@@ -12,31 +12,9 @@ import {
   stubMessageBox,
   test,
 } from './sessions.js';
-import { idle, prefer, send } from './t19.js';
+import { idle, send } from './t19.js';
 
 test.use({ seedMockModel: false });
-
-async function settingsWindow(app: ElectronApplication, main: Page) {
-  await prefer(main, { key: 'language', value: 'en' });
-  const opening = app.waitForEvent('window');
-  await main.getByTestId('open-settings').click();
-  const settings = await opening;
-  await settings.getByTestId('settings-nav-providers').click();
-  await settings.getByTestId('catalog-refresh').uncheck();
-  return settings;
-}
-
-async function addEndpoint(settings: Page, id: string, url: string, api: string, models: string) {
-  await settings.getByTestId('provider-add').click();
-  await settings.getByTestId('provider-kind').selectOption('custom');
-  await settings.getByTestId('provider-id').fill(id);
-  await settings.getByTestId('provider-url').fill(url);
-  await settings.getByTestId('provider-api').selectOption(api);
-  await settings.getByTestId('provider-models').fill(models);
-  await settings.getByTestId('provider-key').fill(randomUUID());
-  await settings.getByTestId('provider-save').click();
-  await expect(settings.getByTestId(`provider-edit-${id}`)).toBeVisible();
-}
 
 test('two configured endpoints complete tool turns; a text-only model refuses an image', async ({
   app,
