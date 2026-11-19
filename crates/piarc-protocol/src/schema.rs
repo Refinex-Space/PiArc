@@ -34,6 +34,7 @@ pub fn export_schema() -> Vec<(&'static str, Value)> {
     generator.subschema_for::<crate::policy::ApprovalAnswer>();
     generator.subschema_for::<crate::policy::AnswerStatus>();
     generator.subschema_for::<crate::policy::PermissionMode>();
+    generator.subschema_for::<crate::memory::MemorySnapshot>();
     let definitions = generator.take_definitions(true);
     let any_message: Vec<Value> = CONTRACTS
         .iter()

@@ -1675,6 +1675,92 @@
       "required": ["path", "entries", "truncated"],
       "type": "object"
     },
+    "FsMemoryParams": {
+      "description": "Start a snapshot or continue transferring its immutable UTF-8 representation.",
+      "properties": {
+        "directories": {
+          "description": "Additional visited directories below the session cwd.",
+          "items": {
+            "type": "string"
+          },
+          "type": ["array", "null"]
+        },
+        "includeGit": {
+          "description": "Include the git status captured when Core opened the session.",
+          "type": ["boolean", "null"]
+        },
+        "offset": {
+          "description": "Byte offset returned by the preceding page.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "sessionId": {
+          "description": "Session whose working directory and workspace govern discovery.",
+          "type": "string"
+        },
+        "toolCallId": {
+          "description": "Correlates approval waits and pages on this connection.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "toolCallId"],
+      "type": "object"
+    },
+    "FsMemoryRequest": {
+      "description": "Request for `fs/memory`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "fs/memory",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/FsMemoryParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "FsMemoryResponse": {
+      "description": "Successful response to `fs/memory`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/FsMemoryResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "FsMemoryResult": {
+      "description": "A frame-sized UTF-8 slice of the encoded snapshot.",
+      "properties": {
+        "chunk": {
+          "description": "A slice ending at a character boundary.",
+          "type": "string"
+        },
+        "nextOffset": {
+          "description": "Absent after the last byte.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        }
+      },
+      "required": ["chunk"],
+      "type": "object"
+    },
     "FsMkdirParams": {
       "description": "Parameters of `fs/mkdir`.",
       "properties": {
@@ -3369,6 +3455,39 @@
           "type": "string"
         }
       ]
+    },
+    "MemoryFile": {
+      "description": "One memory document with expanded imports.",
+      "properties": {
+        "content": {
+          "description": "Visible Markdown, with source labels on expanded imports.",
+          "type": "string"
+        },
+        "path": {
+          "description": "Source path.",
+          "type": "string"
+        }
+      },
+      "required": ["path", "content"],
+      "type": "object"
+    },
+    "MemorySnapshot": {
+      "description": "The JSON document transferred by fs/memory.",
+      "properties": {
+        "files": {
+          "description": "Documents in precedence order.",
+          "items": {
+            "$ref": "#/$defs/MemoryFile"
+          },
+          "type": "array"
+        },
+        "gitStatus": {
+          "description": "Session opening status when requested.",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["files"],
+      "type": "object"
     },
     "ModelRef": {
       "description": "Selects a model by provider id and model id, for example `anthropic` / `claude-opus-5-5`.",
@@ -6519,6 +6638,12 @@
     },
     {
       "$ref": "#/$defs/TrustGetResponse"
+    },
+    {
+      "$ref": "#/$defs/FsMemoryRequest"
+    },
+    {
+      "$ref": "#/$defs/FsMemoryResponse"
     },
     {
       "$ref": "#/$defs/FsStatRequest"

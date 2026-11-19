@@ -71,6 +71,8 @@ export type AhpMessage =
   | PolicyEvaluateResponse
   | TrustGetRequest
   | TrustGetResponse
+  | FsMemoryRequest
+  | FsMemoryResponse
   | FsStatRequest
   | FsStatResponse
   | FsReadRequest
@@ -2296,6 +2298,62 @@ export interface TrustStatus {
    * Whether project-level resources in that directory may be loaded.
    */
   trusted: boolean;
+}
+/**
+ * Request for `fs/memory`.
+ */
+export interface FsMemoryRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'fs/memory';
+  params: FsMemoryParams;
+}
+/**
+ * Start a snapshot or continue transferring its immutable UTF-8 representation.
+ */
+export interface FsMemoryParams {
+  /**
+   * Additional visited directories below the session cwd.
+   */
+  directories?: string[] | null;
+  /**
+   * Include the git status captured when Core opened the session.
+   */
+  includeGit?: boolean | null;
+  /**
+   * Byte offset returned by the preceding page.
+   */
+  offset?: number | null;
+  /**
+   * Session whose working directory and workspace govern discovery.
+   */
+  sessionId: string;
+  /**
+   * Correlates approval waits and pages on this connection.
+   */
+  toolCallId: string;
+}
+/**
+ * Successful response to `fs/memory`.
+ */
+export interface FsMemoryResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: FsMemoryResult;
+}
+/**
+ * A frame-sized UTF-8 slice of the encoded snapshot.
+ */
+export interface FsMemoryResult {
+  /**
+   * A slice ending at a character boundary.
+   */
+  chunk: string;
+  /**
+   * Absent after the last byte.
+   */
+  nextOffset?: number | null;
 }
 /**
  * Request for `fs/stat`.

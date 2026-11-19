@@ -65,6 +65,7 @@ pub mod history;
 pub mod host;
 pub mod input;
 pub mod jsonrpc;
+pub mod memory;
 pub mod method;
 pub mod models;
 pub mod policy;

@@ -311,6 +311,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 T22（macOS，基线 `b845378`，`npm run verify` 15/15，前序无待关闭的 Windows CI 项）：
 
+- [x] 新增 `fs/memory` 分页契约、双文件设置与按工作区及文件保存永久许可的 SQLite 迁移。协议 Vitest 567/567，三个受影响 crate 的测试通过。
 - [ ] Core 收集分层 memory 并处理 Markdown 导入、来源、大小与去重（A03–A05、A09）。
 - [ ] 工作区外导入经权限扩展审批，Core 保存精确的工作区决定（A06）。
 - [ ] Harness Kit 组装会话提示词，按实际文件访问懒加载，通过追加消息送达变化（A01、A02、A07、A08）。

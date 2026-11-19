@@ -21,6 +21,7 @@ use crate::handshake::HostHello;
 use crate::history::{HarnessEntry, SessionGetEntries, SessionHistory};
 use crate::host::{HostPing, HostShutdown};
 use crate::jsonrpc::{ErrorResponse, Notification, Request, SuccessResponse};
+use crate::memory::FsMemory;
 use crate::method::{Method, NotificationMessage, RequestMessage, ResultMessage};
 use crate::models::{
     ModelsCredential, ModelsCredentialStatus, ModelsList, ModelsReload, SessionPreviewModelSwitch,
@@ -214,6 +215,8 @@ pub static CONTRACTS: &[Contract] = &[
     response::<PolicyEvaluate>("policy/evaluate/result"),
     request::<TrustGet>(TrustGet::NAME),
     response::<TrustGet>("trust/get/result"),
+    request::<FsMemory>(FsMemory::NAME),
+    response::<FsMemory>("fs/memory/result"),
     request::<FsStat>(FsStat::NAME),
     response::<FsStat>("fs/stat/result"),
     request::<FsRead>(FsRead::NAME),

@@ -399,6 +399,18 @@
     },
     {
       "kind": "request",
+      "method": "fs/memory",
+      "name": "fs/memory",
+      "schema": "FsMemoryRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/memory",
+      "name": "fs/memory/result",
+      "schema": "FsMemoryResponse"
+    },
+    {
+      "kind": "request",
       "method": "fs/stat",
       "name": "fs/stat",
       "schema": "FsStatRequest"

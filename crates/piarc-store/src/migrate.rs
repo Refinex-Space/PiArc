@@ -35,6 +35,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "session_titles",
         sql: include_str!("sql/0002_session_titles.sql"),
     },
+    Migration {
+        version: 3,
+        name: "memory_imports",
+        sql: include_str!("sql/0003_memory_imports.sql"),
+    },
 ];
 
 /// The highest version in `migrations`.
