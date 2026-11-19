@@ -247,6 +247,10 @@ impl Env {
                 master_key: self.master_key.clone(),
                 store: Arc::clone(&self.key_store) as _,
             }),
+            // A fixed command environment: the runner's login shell is not part of these tests,
+            // and cargo's `DYLD_*` (kept where SIP is off, as on CI's macOS) correctly turns off
+            // the automatic allows that rely on resolving programs (T23).
+            command_env: Some(piarc_core::tool_io::CommandEnv::Fixed(command_env())),
             ..CoreConfig::default()
         }
     }
@@ -357,5 +361,16 @@ pub fn roles(body: &str) -> Vec<String> {
         .into_iter()
         .flatten()
         .filter_map(|m| m["role"].as_str().map(str::to_owned))
+        .collect()
+}
+
+/// The variables commands get in these tests (as `exec_commands.rs` does).
+fn command_env() -> Vec<(std::ffi::OsString, std::ffi::OsString)> {
+    std::env::vars_os()
+        .filter(|(k, _)| {
+            ["PATH", "HOME", "SystemRoot", "ProgramFiles", "TEMP", "TMP"]
+                .iter()
+                .any(|name| k.to_string_lossy().eq_ignore_ascii_case(name))
+        })
         .collect()
 }
