@@ -265,3 +265,6 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | Transcript 行组件分派 | `apps/desktop/src/renderer/store/transcript.ts`（`SessionTranscript`）与 `transcript/rows/RowView.tsx` | 在同一个 store 生成行或组 ID，在 `RowView` 按行类型、协议 item 类型分派。历史与实时共用各行组件、记忆化与行级错误边界，新行补一项组件测试 | T19 |
 | 工作区模糊文件匹配 | `CoreRuntime.searchFiles(searchId, root, query, limit)`、`cancelFileSearch(searchId)`、`piarc_fs::fuzzy` | 检查搜索根所属工作区、按忽略规则列文件、对子序列匹配排序，返回相对路径和匹配位置。每个搜索框分配独立 ID，由 Core 取消已过期查询并限定结果数量 | T19 |
 | 会话附件存储 | `CoreRuntime.storeAttachment(id, name, mimeType, bytes)`、`piarc_core::composer::attachments`、`piarc_protocol::input::InputAttachment` | UI 经 `composerInfo()` 取 MIME、数量和大小上限，Core 校验内容、以散列存入该会话的 `attachments/`，返回可用于 prompt、steer、follow-up 的引用 | T19 |
+| Memory 发现与读取 | Core `tool_io::memory_reader::collect`、AHP `fs/memory` | 从会话范围、用户目录与已访问目录收集来源，处理单文件上限和外部导入决定 | T22 |
+| Markdown 中的 `@path` | `memory_reader/markdown.rs` 的 `expand` 与 `Reader::document` | 统一处理代码边界、块注释、相对导入、深度和循环；Core 负责实际打开文件 | T22 |
+| 会话上下文追加消息 | Agent Host `harness/session-memory.ts` 的 `SessionMemory` | 由分支记录和内容摘要决定追加内容，送达时保留既有 system 和工具结果；T27 接入统一提醒通道时复用 | T22 |

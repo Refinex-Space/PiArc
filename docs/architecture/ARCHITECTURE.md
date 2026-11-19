@@ -605,6 +605,8 @@ Harness Kit 在 `before_agent_start` 中通过 Pi 的结构化 prompt 段（`sys
 
 会话中途的变化（切换 output style、加载 skill、进入 plan 模式、工具集变化）以追加消息的形式送达，不改写已发送的 system prompt。这同时满足 Claude 的 preserved thinking 约束：历史只追加，system 与工具定义保持稳定（`docs/research/claude-official-capabilities.md` C 节）。
 
+T22 通过 `harness/session-memory.ts` 组装，由 `prompts/` 提供原创文本。Pi 的 `before_agent_start` 安装冻结的 system，`piarc.systemPrompt` 分支条目支持恢复和分叉。创建会话时取得的 git 状态、日期与 memory 形成开场上下文；首次输入前已发生的变化同样走追加消息。见 ADR-0033。
+
 #### 6.6.2 Memory 文件
 
 - 读取 `CLAUDE.md`、`AGENTS.md`、`CLAUDE.local.md`，从工作区根向上逐级拼接（越靠近 cwd 越靠后），加上用户级 `~/.claude/CLAUDE.md` 与 PiArc 用户级 memory。两者同时存在时的取舍与 Claude Code 一致（默认只读 `CLAUDE.md`，可配置为两者都读）。
@@ -613,6 +615,8 @@ Harness Kit 在 `before_agent_start` 中通过 Pi 的结构化 prompt 段（`sys
 - 子目录中的 memory 文件在 agent 首次读写该目录文件时懒加载（以 system-reminder 注入）。
 - Pi 自带的上下文文件加载被关闭（SDK 选项），统一由 Harness Kit 处理，避免重复。
 - 自动记忆（agent 自己维护的跨会话笔记，`MEMORY.md` 索引 + 主题文件）列为 M5。
+
+T22 的具体顺序为用户 `~/.claude/CLAUDE.md`、PiArc 数据目录的 `MEMORY.md`、文件系统根至 cwd 各级。每级按 `CLAUDE.md`、`.claude/CLAUDE.md`、适用时的 `AGENTS.md`、`CLAUDE.local.md` 排列。`memory.readBoth` 可在常规设置或 PiArc 分层设置文件中设置。Core 按规范目标检查导入及重定向到外部的符号链接，通过权限扩展卡取得同意。首次成功访问子目录时，Harness 以带来源的 `piarc.memory` 消息追加新文档；后续回合按内容摘要判断更新或移除。
 
 #### 6.6.3 System reminder
 
@@ -854,6 +858,7 @@ crates/
 | `exec/*` | `run`（流式）、`kill`、`background/list`、`background/read` | 按命令超时 |
 | `secrets/*` | `getAll`、`get`、`set`、`delete`、`lock`、`renew`、`unlock` | 失败时会话报错，不回退到明文 |
 | `ui/*` | `ask`（AskUserQuestion）、`loginInteraction`、`notify` | 等待用户 |
+| `fs/memory` | 按会话收集 memory、审批外部导入、分帧获取冻结的 UTF-8 快照（能力 `memory`，ADR-0033） | 等待审批沿用 `policy/pending` |
 | `trust/get` | 查询项目信任状态 | 失败按"不信任" |
 
 **Agent Host → Core 通知**
@@ -1104,6 +1109,7 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 ```
 ~/Library/Application Support/PiArc/
 ├── core.sqlite                # 索引、审计、应用状态（schema 带版本与迁移）
+├── MEMORY.md                  # 用户编写的全局 memory（可选，T22）
 ├── settings.json              # 用户级 PiArc 设置
 ├── agents/ skills/ commands/  # 用户级资源（PiArc 自有）
 ├── pi/                        # Pi 的 agent 目录（经 SDK agentDir 指定）
@@ -1133,6 +1139,7 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 
 | 表 | 内容 |
 |---|---|
+| `memory_imports` | schema v3；工作区与规范目标的组合主键，记录经原生确认的外部 memory 导入许可 |
 | `workspaces` | 路径、显示名、信任状态、最近打开时间、默认模式与模型 |
 | `sessions` | id、工作区、Pi 会话文件路径、标题、状态、模型、用量累计、父会话（子 agent）、worktree、置顶、归档、未读 |
 | `session_fts` | FTS5：用户消息与助手正文（从 JSONL 增量同步） |
@@ -1524,6 +1531,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.27 | 2026-11-19 | T22（ADR-0033）补充提示词冻结与恢复、memory 顺序、导入审批与消息送达、AHP 与用户级文件位置 |
 | 2.26 | 2026-11-19 | T21（ADR-0032）补充服务商配置投影、凭据更新、模型目录与会话选择 |
 | 2.25 | 2026-11-19 | T20（ADR-0031）补充第 6.2 节权限裁决与第 10.2 节配置授权边界 |
 | 2.24 | 2026-11-18 | T19（ADR-0030）补充 7.4–7.6、8.2、8.4 的输入协议、错误分类、历史窗口与虚拟列表贴底方式，修订 9.3 的归档清理范围以保留附件 |
