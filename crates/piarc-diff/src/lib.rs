@@ -58,38 +58,56 @@ pub fn file_diff(label: &str, old: Option<&str>, new: &str) -> FileDiff {
             ChangeTag::Equal => {}
         }
     }
-    let hunks: Vec<DiffHunk> = diff
-        .grouped_ops(CONTEXT_LINES)
-        .iter()
-        .map(|group| {
-            let lines = group
-                .iter()
-                .flat_map(|op| diff.iter_changes(op))
-                .map(|change| DiffLine {
-                    kind: match change.tag() {
-                        ChangeTag::Equal => DiffLineKind::Context,
-                        ChangeTag::Insert => DiffLineKind::Added,
-                        ChangeTag::Delete => DiffLineKind::Removed,
-                    },
-                    text: without_line_break(change.value()).to_owned(),
+    let mut hunks = Vec::new();
+    let mut preview = Preview::default();
+    let keep_lines = added + removed <= MAX_HUNK_LINES;
+    let groups = diff.grouped_ops(CONTEXT_LINES);
+    if !groups.is_empty() {
+        if old.is_none() {
+            let _ = writeln!(preview, "--- /dev/null");
+        } else {
+            let _ = writeln!(preview, "--- a/{label}");
+        }
+        let _ = writeln!(preview, "+++ b/{label}");
+    }
+    for group in &groups {
+        let mut hunk = hunk(group, Vec::new());
+        let _ = writeln!(
+            preview,
+            "@@ -{} +{} @@",
+            range(hunk.old_start, hunk.old_lines),
+            range(hunk.new_start, hunk.new_lines)
+        );
+        for change in group.iter().flat_map(|op| diff.iter_changes(op)) {
+            let (sign, kind) = match change.tag() {
+                ChangeTag::Equal => (' ', DiffLineKind::Context),
+                ChangeTag::Insert => ('+', DiffLineKind::Added),
+                ChangeTag::Delete => ('-', DiffLineKind::Removed),
+            };
+            let line = without_line_break(change.value());
+            let _ = writeln!(preview, "{sign}{line}");
+            if change.missing_newline() {
+                let _ = writeln!(preview, "\\ No newline at end of file");
+            }
+            if keep_lines && preview.omitted == 0 {
+                hunk.lines.push(DiffLine {
+                    kind,
+                    text: line.to_owned(),
                     no_newline: change.missing_newline().then_some(true),
-                })
-                .collect();
-            hunk(group, lines)
-        })
-        .collect();
-    let unified = unified(label, old.is_none(), &hunks);
-    let degraded = added + removed > MAX_HUNK_LINES || unified.len() > MAX_UNIFIED_BYTES;
+                });
+            }
+        }
+        if keep_lines && preview.omitted == 0 {
+            hunks.push(hunk);
+        }
+    }
+    let degraded = !keep_lines || preview.omitted > 0;
     FileDiff {
         path: label.to_owned(),
         created: old.is_none().then_some(true),
         added,
         removed,
-        unified: if degraded {
-            cut(unified, MAX_UNIFIED_BYTES)
-        } else {
-            unified
-        },
+        unified: preview.finish(),
         hunks: if degraded { Vec::new() } else { hunks },
         degraded: degraded.then_some(true),
     }
@@ -123,39 +141,33 @@ fn without_line_break(line: &str) -> &str {
     line.strip_suffix('\r').unwrap_or(line)
 }
 
-/// The hunks as unified diff text, headers included; empty without hunks.
-fn unified(label: &str, created: bool, hunks: &[DiffHunk]) -> String {
-    let mut text = String::new();
-    if hunks.is_empty() {
-        return text;
+/// Keeps the prefix while counting the exact UTF-8 bytes omitted from the preview.
+#[derive(Default)]
+struct Preview {
+    text: String,
+    omitted: usize,
+}
+
+impl std::fmt::Write for Preview {
+    fn write_str(&mut self, value: &str) -> std::fmt::Result {
+        let keep = if self.omitted == 0 {
+            value.floor_char_boundary((MAX_UNIFIED_BYTES - self.text.len()).min(value.len()))
+        } else {
+            0
+        };
+        self.text.push_str(&value[..keep]);
+        self.omitted += value.len() - keep;
+        Ok(())
     }
-    let old_label = if created {
-        "/dev/null".to_owned()
-    } else {
-        format!("a/{label}")
-    };
-    // Writing to a String cannot fail.
-    let _ = writeln!(text, "--- {old_label}\n+++ b/{label}");
-    for hunk in hunks {
-        let _ = writeln!(
-            text,
-            "@@ -{} +{} @@",
-            range(hunk.old_start, hunk.old_lines),
-            range(hunk.new_start, hunk.new_lines)
-        );
-        for line in &hunk.lines {
-            let sign = match line.kind {
-                DiffLineKind::Context => ' ',
-                DiffLineKind::Added => '+',
-                DiffLineKind::Removed => '-',
-            };
-            let _ = writeln!(text, "{sign}{}", line.text);
-            if line.no_newline == Some(true) {
-                text.push_str("\\ No newline at end of file\n");
-            }
+}
+
+impl Preview {
+    fn finish(mut self) -> String {
+        if self.omitted > 0 {
+            let _ = writeln!(self.text, "\n[diff cut: {} more bytes]", self.omitted);
         }
+        self.text
     }
-    text
 }
 
 /// A hunk range as unified diff writes it: `start` alone for one line.
@@ -165,22 +177,6 @@ fn range(start: u64, lines: u64) -> String {
     } else {
         format!("{start},{lines}")
     }
-}
-
-/// `text` cut to at most `limit` bytes at a character boundary, with a note of what was left
-/// out.
-fn cut(mut text: String, limit: usize) -> String {
-    if text.len() <= limit {
-        return text;
-    }
-    let mut end = limit;
-    while !text.is_char_boundary(end) {
-        end -= 1;
-    }
-    let omitted = text.len() - end;
-    text.truncate(end);
-    let _ = write!(text, "\n[diff cut: {omitted} more bytes]\n");
-    text
 }
 
 #[cfg(test)]
@@ -303,10 +299,14 @@ mod tests {
 
     #[test]
     fn a_long_unified_text_is_cut_at_a_character_boundary() {
-        let line = "中".repeat(100_000);
+        let line = "中".repeat(MAX_UNIFIED_BYTES);
         let diff = file_diff("wide.txt", Some("a\n"), &format!("{line}\n{line}\n"));
         assert_eq!(diff.degraded, Some(true));
         assert!(diff.unified.contains("[diff cut: "));
+        assert!(
+            diff.unified.capacity() <= MAX_UNIFIED_BYTES * 2 + 128,
+            "bounded preview allocation"
+        );
         assert!(diff.hunks.is_empty());
     }
 }
