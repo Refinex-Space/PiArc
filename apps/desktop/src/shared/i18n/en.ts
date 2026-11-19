@@ -116,6 +116,8 @@ export const en = {
   'approval.modeMenu': 'Permission mode',
   'approval.mode.default': 'Manual',
   'approval.mode.acceptEdits': 'Accept edits',
+  'approval.mode.plan': 'Plan',
+  'approval.mode.bypassPermissions': 'Bypass permissions',
   'approval.modeChanged': 'Permission mode changed to {mode}',
   'approval.kind.command': 'Run command?',
   'approval.kind.fileChange': 'Allow file change?',

@@ -38,7 +38,7 @@ pub(in crate::tool_io) async fn approve(
     let mut card = new_request(&p, peer)?;
     card.kind = ApprovalKind::PermissionExpansion;
     card.path = Some(display(target));
-    card.rule = Some(piarc_policy::exact_rule(&p.tool, &display(target)));
+    card.rule = Some(piarc_policy::m1::exact_rule(&p.tool, &display(target)));
     let Some((answer, ack)) = wait_for_user(session, services, &p, &card, peer, generation).await?
     else {
         return Err(denied(LOST));

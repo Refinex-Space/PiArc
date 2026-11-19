@@ -3862,7 +3862,7 @@
       "type": "object"
     },
     "PermissionMode": {
-      "description": "Permission modes available in M1.",
+      "description": "Permission modes (architecture section 6.2.1). `auto` (M5) and `dontAsk` (headless) are\nnot available.",
       "oneOf": [
         {
           "const": "default",
@@ -3872,6 +3872,16 @@
         {
           "const": "acceptEdits",
           "description": "Accept ordinary edits inside the workspace.",
+          "type": "string"
+        },
+        {
+          "const": "plan",
+          "description": "Read-only exploration: writes and non-read-only commands are refused.",
+          "type": "string"
+        },
+        {
+          "const": "bypassPermissions",
+          "description": "Run everything except what deny and ask rules, critical deletions and questions stop.\nAvailable after the user enables it in settings and confirms the switch.",
           "type": "string"
         }
       ]

@@ -40,8 +40,9 @@ pub struct PolicyEvaluateResult {
     pub reason: Option<String>,
 }
 
-/// Permission modes available in M1.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+/// Permission modes (architecture section 6.2.1). `auto` (M5) and `dontAsk` (headless) are
+/// not available.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum PermissionMode {
     /// Ask about changes and commands.
@@ -49,6 +50,11 @@ pub enum PermissionMode {
     Default,
     /// Accept ordinary edits inside the workspace.
     AcceptEdits,
+    /// Read-only exploration: writes and non-read-only commands are refused.
+    Plan,
+    /// Run everything except what deny and ask rules, critical deletions and questions stop.
+    /// Available after the user enables it in settings and confirms the switch.
+    BypassPermissions,
 }
 
 /// Presentation of a pending approval.

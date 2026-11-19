@@ -3,6 +3,7 @@
 // (I50: an error boundary per row).
 import { Component, memo, useLayoutEffect, useRef, type ErrorInfo, type ReactNode } from 'react';
 
+import type { PermissionMode } from '@piarc/protocol';
 import { useT } from '../../app/app-context.js';
 import { useTranscriptRow, useTranscriptServices } from '../services.js';
 import { useListActions } from './list-actions.js';
@@ -56,7 +57,7 @@ export class RowBoundary extends Component<
   }
 }
 
-function ModeChangeRow({ mode }: { readonly mode: 'default' | 'acceptEdits' }) {
+function ModeChangeRow({ mode }: { readonly mode: PermissionMode }) {
   const t = useT();
   return (
     <div className="row muted" data-testid="mode-change-row">

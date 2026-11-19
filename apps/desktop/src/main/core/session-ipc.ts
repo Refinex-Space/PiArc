@@ -6,6 +6,7 @@
 import path from 'node:path';
 
 import { BrowserWindow, dialog } from 'electron';
+import { isPermissionMode } from '@piarc/protocol';
 
 import {
   type ApprovalAnswer,
@@ -268,8 +269,7 @@ export function registerSessionHandlers(
   );
   registerHandler(IPC_CHANNELS.sessionAbort, (_event, [id]) => core.abort(sessionId(id)));
   registerHandler(IPC_CHANNELS.sessionPermissionMode, async (_event, [id, mode]) => {
-    if (mode !== 'default' && mode !== 'acceptEdits')
-      throw new TypeError('unknown permission mode');
+    if (!isPermissionMode(mode)) throw new TypeError('unknown permission mode');
     await core.setPermissionMode(sessionId(id), mode);
   });
   registerHandler(IPC_CHANNELS.approvalAnswer, async (event, [raw]) => {

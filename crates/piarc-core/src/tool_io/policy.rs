@@ -83,7 +83,7 @@ impl State {
         card: &ApprovalRequest,
         boundary: Boundary,
         simple: bool,
-    ) -> (PermissionMode, piarc_policy::Ruling) {
+    ) -> (PermissionMode, piarc_policy::m1::Ruling) {
         // Keep the starting choice. Revoke a project-supplied automatic mode once its
         // source is untrusted or removed, without promoting a running manual session.
         if self.project_auto
@@ -107,7 +107,7 @@ impl State {
         });
         (
             mode,
-            piarc_policy::evaluate(mode, &card.tool, boundary, matched, simple),
+            piarc_policy::m1::evaluate(mode, &card.tool, boundary, matched, simple),
         )
     }
 
@@ -238,7 +238,7 @@ impl ToolIo {
             .await
             .map_err(|e| e.to_error_object())?;
         let mode = |settings: &Settings| {
-            piarc_policy::starting_mode(
+            piarc_policy::m1::starting_mode(
                 explicit,
                 settings
                     .get("/permissions/defaultMode")
@@ -565,7 +565,7 @@ impl Prepared {
         settings: &Settings,
         peer: &Peer,
         generation: &CancellationToken,
-    ) -> Result<(PermissionMode, piarc_policy::Ruling), ErrorObject> {
+    ) -> Result<(PermissionMode, piarc_policy::m1::Ruling), ErrorObject> {
         let (mode, ruling) = {
             let mut state = lock(&s.policy);
             if peer.is_closed() || generation.is_cancelled() {
@@ -627,7 +627,7 @@ async fn prepare(
 ) -> Result<Prepared, ErrorObject> {
     let utility = if p.tool == "Bash"
         && let Some(command) = p.input.get("command").and_then(Value::as_str)
-        && piarc_policy::simple_paths(command).is_some()
+        && piarc_policy::m1::simple_paths(command).is_some()
     {
         exec.simple_utility(&s.scope, command).await
     } else {
@@ -657,7 +657,7 @@ async fn prepare(
                     (simple, boundary) = command_boundary(&scope, cmd, &cwd)?;
                 }
                 card.command = Some(cmd.to_owned());
-                card.rule = Some(piarc_policy::exact_rule(&p.tool, cmd));
+                card.rule = Some(piarc_policy::m1::exact_rule(&p.tool, cmd));
                 card.cwd = Some(display(&cwd));
                 grant.cwd = Some(cwd);
                 grant.command = Some(cmd.to_owned());
@@ -682,7 +682,7 @@ async fn prepare(
             "AskUserQuestion" => card.kind = ApprovalKind::Question,
             _ => {
                 card.command = Some(format!("{} {}", p.tool, Value::Object(p.input.clone())));
-                card.rule = Some(piarc_policy::exact_rule(
+                card.rule = Some(piarc_policy::m1::exact_rule(
                     &p.tool,
                     &Value::Object(p.input).to_string(),
                 ));
@@ -762,7 +762,7 @@ fn prepare_file(
         ApprovalKind::FileChange
     };
     card.path = Some(display(&target));
-    card.rule = Some(piarc_policy::exact_rule(&p.tool, &label));
+    card.rule = Some(piarc_policy::m1::exact_rule(&p.tool, &label));
     if boundary == Boundary::Outside {
         card.directory = if target.is_dir() {
             Some(display(&target))
@@ -876,7 +876,7 @@ fn path_boundary(scope: &Scope, path: &str, write: bool) -> Result<Boundary, Err
 }
 
 fn command_boundary(scope: &Scope, cmd: &str, cwd: &Path) -> Result<(bool, Boundary), ErrorObject> {
-    let Some(operands) = piarc_policy::simple_paths(cmd) else {
+    let Some(operands) = piarc_policy::m1::simple_paths(cmd) else {
         return Ok((false, Boundary::Inside));
     };
     let mut targets: Vec<_> = operands.iter().map(|arg| cwd.join(arg)).collect();

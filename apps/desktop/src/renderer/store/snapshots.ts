@@ -2,7 +2,7 @@
 // and the session list on `core/sessions`, each with a `revision`. They arrive over the event
 // channel as JSON, so every field is checked before the store uses it.
 
-import type { ApprovalRequest } from '@piarc/protocol';
+import { isPermissionMode, type ApprovalRequest } from '@piarc/protocol';
 import type { PermissionMode } from '../../shared/ipc.js';
 import { isApproval } from './approvals.js';
 const NO_APPROVALS: readonly ApprovalRequest[] = [];
@@ -112,7 +112,7 @@ function sessionEntry(value: unknown): SessionEntry | undefined {
     createdAt: optionalNumber(value.createdAt),
     updatedAt: optionalNumber(value.updatedAt),
     error: optionalString(value.error),
-    permissionMode: value.permissionMode === 'acceptEdits' ? 'acceptEdits' : 'default',
+    permissionMode: isPermissionMode(value.permissionMode) ? value.permissionMode : 'default',
     approvals:
       Array.isArray(value.approvals) && value.approvals.length > 0
         ? value.approvals.filter((a: unknown): a is ApprovalRequest =>

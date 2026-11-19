@@ -182,9 +182,10 @@ export type Capability = string;
  */
 export type ProtocolVersion = string;
 /**
- * Permission modes available in M1.
+ * Permission modes (architecture section 6.2.1). `auto` (M5) and `dontAsk` (headless) are
+ * not available.
  */
-export type PermissionMode = 'default' | 'acceptEdits';
+export type PermissionMode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions';
 /**
  * Turn identifier, unique within a session.
  */

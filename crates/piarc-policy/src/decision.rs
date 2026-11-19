@@ -1,6 +1,21 @@
-//! M1 preflight decisions. Core supplies canonical path checks and the exact rule match.
+//! The decision ladder of architecture section 6.2.3, as a pure function over facts Core
+//! computed for one tool call.
+//!
+//! ```text
+//! 1. enterprise deny (slot, M5)                     → deny
+//! 2. PreToolUse hooks (slot, T25): deny → deny; ask → step 4; allow → step 6
+//! 3. deny rules                                     → deny
+//! 4. ask rules, critical deletion, unresolved command, requiresUserInteraction → ask
+//! 5. mode: plan + a write → deny with "present the plan"; bypassPermissions → allow
+//!    then protected path writes (Manual, Accept edits) → ask
+//! 6. allow rules (all parts), hook allow             → allow
+//! 7. mode defaults: outside → ask; read-only → allow; Accept edits edits → allow
+//! 8. PermissionRequest hooks (slot, T25) → user
+//! ```
 
 use piarc_protocol::policy::PermissionMode;
+
+use crate::rules::Hit;
 
 /// Core's classification of the effective target(s), including symlink resolution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -13,169 +28,203 @@ pub enum Boundary {
     Protected,
 }
 
-/// An automatic allowance or a request for user review, with the step recorded in the audit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Ruling {
-    /// Whether Core can let the call continue immediately.
-    pub allow: bool,
-    /// Stable description of the step that decided the call.
+/// The answer of a hook slot. Slots that are not configured answer [`HookVerdict::None`].
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum HookVerdict {
+    /// No opinion: continue.
+    #[default]
+    None,
+    /// Allow, subject to deny and ask rules and plan mode.
+    Allow,
+    /// Ask the user.
+    Ask,
+    /// Refuse with the hook's reason.
+    Deny(String),
+}
+
+/// How a call proceeds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Outcome {
+    /// Run without asking.
+    Allow,
+    /// Ask the user (after the PermissionRequest slot).
+    Ask,
+    /// Refuse.
+    Deny,
+}
+
+/// Why a call must ask whatever the mode (step 4).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MustAsk {
+    /// The audit step: `askRule`, `criticalPath`, `unresolved`, `invalidRule`,
+    /// `requiresUserInteraction`.
     pub step: &'static str,
+    /// The rule involved.
+    pub hit: Option<Hit>,
 }
 
-/// The M1 mode for a session. The settings layer already removed disallowed project values.
-#[must_use]
-pub fn starting_mode(explicit: Option<PermissionMode>, setting: Option<&str>) -> PermissionMode {
-    explicit.unwrap_or(match setting {
-        Some("acceptEdits") => PermissionMode::AcceptEdits,
-        _ => PermissionMode::Default,
-    })
+/// Facts about one call. Core fills it; tests use doubles.
+#[derive(Debug, Clone, Default)]
+pub struct Input {
+    /// The session's mode.
+    pub mode: PermissionMode,
+    /// Step 1: an enterprise deny (M5).
+    pub enterprise: Option<Hit>,
+    /// Step 2: the PreToolUse slot.
+    pub hook: HookVerdict,
+    /// Step 3.
+    pub deny: Option<Hit>,
+    /// Step 4.
+    pub ask: Option<MustAsk>,
+    /// A write tool or a command that is not read-only (plan mode).
+    pub write: bool,
+    /// Writes a protected path.
+    pub protected: bool,
+    /// An assignment changes command resolution: no automatic allow.
+    pub tainted: bool,
+    /// Step 6: every part allowed by these rules (or read-only parts).
+    pub allow: Vec<Hit>,
+    /// Step 6 applies (`allow` may be empty when the other parts are read-only).
+    pub allowed: bool,
+    /// Accesses paths outside the session's directories.
+    pub outside: bool,
+    /// Step 7: read-only and inside.
+    pub read_only: bool,
+    /// Step 7: what Accept edits takes.
+    pub accept_edit: bool,
 }
 
-/// The literal text compared for a session or persistent permission in M1.
-#[must_use]
-pub fn exact_rule(tool: &str, specifier: &str) -> String {
-    format!("{tool}({specifier})")
+/// The decision, with the step and rules recorded in the audit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Ruling {
+    /// What happens.
+    pub outcome: Outcome,
+    /// Stable step name.
+    pub step: &'static str,
+    /// Rules that decided it.
+    pub hits: Vec<Hit>,
+    /// A hook's refusal reason.
+    pub reason: Option<String>,
 }
 
-/// Decide before a tool executes. Core matches rules from the session and trusted settings.
-/// A simple Bash command must have passed both lexical and effective path checks.
-#[must_use]
-pub fn evaluate(
-    mode: PermissionMode,
-    tool: &str,
-    boundary: Boundary,
-    matched_rule: bool,
-    simple_command: bool,
-) -> Ruling {
-    let (allow, step) = match (boundary, tool) {
-        (Boundary::Protected, _) => (false, "protectedPath"),
-        (_, "AskUserQuestion") => (false, "requiresUserInteraction"),
-        (_, _) if matched_rule => (true, "exactRule"),
-        (Boundary::Outside, _) => (false, "outsideWorkspace"),
-        (_, "Read" | "Glob" | "Grep") => (true, "readOnly"),
-        (_, "Write" | "Edit") if mode == PermissionMode::AcceptEdits => (true, "acceptEdits"),
-        (_, "Bash") if simple_command && mode == PermissionMode::AcceptEdits => {
-            (true, "simpleCommand")
+impl Ruling {
+    fn new(outcome: Outcome, step: &'static str, hits: Vec<Hit>) -> Self {
+        Self {
+            outcome,
+            step,
+            hits,
+            reason: None,
         }
-        _ => (false, "ask"),
-    };
-    Ruling { allow, step }
+    }
+
+    /// Whether the call may run now.
+    #[must_use]
+    pub fn allow(&self) -> bool {
+        self.outcome == Outcome::Allow
+    }
 }
 
-/// Return the literal path operands of an unambiguous filesystem command. This is the M1
-/// subset replaced by the Bash parser in T23. Treat unfamiliar syntax and options as a
-/// prompt. In particular, path normalization cannot safely cancel a symlink followed by
-/// `..` when the actual operator will be a shell utility.
+/// Steps 1–7, ending in [`Outcome::Ask`] for step 8.
 #[must_use]
-pub fn simple_paths(command: &str) -> Option<Vec<&str>> {
-    if !command
-        .chars()
-        .all(|ch| ch.is_alphanumeric() || matches!(ch, ' ' | '/' | '.' | '_' | '-'))
-    {
-        return None;
+pub fn decide(input: &Input) -> Ruling {
+    use Outcome::{Allow, Ask, Deny};
+    if let Some(hit) = &input.enterprise {
+        return Ruling::new(Deny, "enterpriseDeny", vec![hit.clone()]);
     }
-    let mut words = command.split_ascii_whitespace();
-    let program = words.next()?;
-    let mut args = words.peekable();
-    if program == "mkdir" && args.peek() == Some(&"-p") {
-        args.next();
+    if let HookVerdict::Deny(reason) = &input.hook {
+        let mut r = Ruling::new(Deny, "hookDeny", Vec::new());
+        r.reason = Some(reason.clone());
+        return r;
     }
-    let paths: Vec<_> = args.collect();
-    let valid_count = match program {
-        "mkdir" | "touch" => !paths.is_empty(),
-        "mv" | "cp" => paths.len() == 2,
-        _ => false,
-    };
-    if !valid_count
-        || paths
-            .iter()
-            .any(|p| p.starts_with('-') || p.split('/').any(|c| c == ".."))
-    {
-        return None;
+    if let Some(hit) = &input.deny {
+        return Ruling::new(Deny, "denyRule", vec![hit.clone()]);
     }
-    Some(paths)
+    if let Some(ask) = &input.ask {
+        return Ruling::new(Ask, ask.step, ask.hit.iter().cloned().collect());
+    }
+    if input.hook == HookVerdict::Ask {
+        return Ruling::new(Ask, "hookAsk", Vec::new());
+    }
+    match input.mode {
+        PermissionMode::Plan if input.write => return Ruling::new(Deny, "planMode", Vec::new()),
+        PermissionMode::BypassPermissions => {
+            return Ruling::new(Allow, "bypassPermissions", Vec::new());
+        }
+        _ => {}
+    }
+    if input.protected {
+        return Ruling::new(Ask, "protectedPath", Vec::new());
+    }
+    if !input.tainted {
+        if input.allowed && !input.allow.is_empty() {
+            return Ruling::new(Allow, "allowRule", input.allow.clone());
+        }
+        if input.hook == HookVerdict::Allow {
+            return Ruling::new(Allow, "hookAllow", Vec::new());
+        }
+    }
+    if input.outside {
+        return Ruling::new(Ask, "outsideWorkspace", Vec::new());
+    }
+    if !input.tainted {
+        if input.read_only || input.allowed {
+            return Ruling::new(Allow, "readOnly", Vec::new());
+        }
+        if input.mode == PermissionMode::AcceptEdits && input.accept_edit {
+            return Ruling::new(Allow, "acceptEdits", Vec::new());
+        }
+    }
+    Ruling::new(Ask, "ask", Vec::new())
 }
+
+/// Step 8: the PermissionRequest slot answers before the user sees the card. It cannot
+/// approve a critical deletion or a tool that needs the user's own input.
+#[must_use]
+pub fn after_permission_request(ruling: Ruling, verdict: &HookVerdict) -> Ruling {
+    if ruling.outcome != Outcome::Ask
+        || matches!(ruling.step, "criticalPath" | "requiresUserInteraction")
+    {
+        return ruling;
+    }
+    match verdict {
+        HookVerdict::Allow => Ruling::new(Outcome::Allow, "permissionRequestHook", ruling.hits),
+        HookVerdict::Deny(reason) => {
+            let mut r = Ruling::new(Outcome::Deny, "permissionRequestHook", ruling.hits);
+            r.reason = Some(reason.clone());
+            r
+        }
+        HookVerdict::None | HookVerdict::Ask => ruling,
+    }
+}
+
+/// The starting mode: the session's explicit choice, then the mode remembered for the
+/// workspace, then `permissions.defaultMode`, then Manual. `bypassPermissions` needs the user
+/// to have enabled it; `auto` and `dontAsk` are not available (M5, headless only).
+#[must_use]
+pub fn starting_mode(
+    explicit: Option<PermissionMode>,
+    remembered: Option<PermissionMode>,
+    setting: Option<&str>,
+    bypass_enabled: bool,
+) -> PermissionMode {
+    let usable = |m: PermissionMode| m != PermissionMode::BypassPermissions || bypass_enabled;
+    if let Some(mode) = explicit.filter(|m| usable(*m)) {
+        return mode;
+    }
+    if let Some(mode) = remembered.filter(|m| usable(*m)) {
+        return mode;
+    }
+    match setting {
+        Some("acceptEdits") => PermissionMode::AcceptEdits,
+        Some("plan") => PermissionMode::Plan,
+        Some("bypassPermissions") if bypass_enabled => PermissionMode::BypassPermissions,
+        _ => PermissionMode::Default,
+    }
+}
+
+/// The reason the model receives when plan mode refuses a call.
+pub const PLAN_MODE_REFUSAL: &str = "Permission denied: plan mode is on, so files cannot be changed and only read-only commands can run. Keep investigating with read-only tools, then present your plan to the user and wait for approval before making any change.";
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use PermissionMode::{AcceptEdits, Default};
-
-    #[test]
-    fn matrix_and_exact_rule_precedence() {
-        for mode in [Default, AcceptEdits] {
-            for tool in ["Read", "Grep", "Glob"] {
-                assert!(evaluate(mode, tool, Boundary::Inside, false, false).allow);
-                assert!(!evaluate(mode, tool, Boundary::Outside, false, false).allow);
-            }
-            for tool in ["Edit", "Write"] {
-                assert_eq!(
-                    evaluate(mode, tool, Boundary::Inside, false, false).allow,
-                    mode == AcceptEdits
-                );
-                assert!(!evaluate(mode, tool, Boundary::Protected, true, false).allow);
-                assert!(!evaluate(mode, tool, Boundary::Outside, false, false).allow);
-            }
-            assert_eq!(
-                evaluate(mode, "Bash", Boundary::Inside, false, true).allow,
-                mode == AcceptEdits
-            );
-            for tool in ["Bash", "PowerShell", "CustomTool"] {
-                assert!(!evaluate(mode, tool, Boundary::Inside, false, false).allow);
-                assert!(evaluate(mode, tool, Boundary::Inside, true, false).allow);
-            }
-            assert!(!evaluate(mode, "PowerShell", Boundary::Inside, false, true).allow);
-        }
-    }
-
-    #[test]
-    fn lexical_subset_contains_only_literal_paths() {
-        for (cmd, expected) in [
-            ("mkdir -p one/two", vec!["one/two"]),
-            ("touch 文件.txt", vec!["文件.txt"]),
-            ("cp a.txt b.txt", vec!["a.txt", "b.txt"]),
-            ("mv dir/a dir/b", vec!["dir/a", "dir/b"]),
-        ] {
-            assert_eq!(simple_paths(cmd), Some(expected));
-        }
-        for cmd in [
-            "",
-            "cp",
-            "mkdir",
-            "env touch a",
-            "cp -R a b",
-            "cp a -t b",
-            "mkdir a;ls",
-            "cp a b\nc",
-            "touch a&&b",
-            "mkdir a$var",
-            "mkdir (a)",
-            "touch *",
-            "touch a?",
-            "touch `ls`",
-            "mkdir \"a\"",
-            "cp a b|c",
-            "touch ../file",
-            "touch x/../a",
-            "touch a>b",
-            "mkdir ~/here",
-            "touch a\\b",
-            "touch -",
-        ] {
-            assert!(simple_paths(cmd).is_none(), "{cmd:?}");
-        }
-    }
-
-    #[test]
-    fn explicit_mode_then_supported_setting_then_manual() {
-        assert_eq!(starting_mode(Some(Default), Some("acceptEdits")), Default);
-        assert_eq!(starting_mode(None, Some("acceptEdits")), AcceptEdits);
-        for v in [None, Some("auto"), Some("plan"), Some("bypassPermissions")] {
-            assert_eq!(starting_mode(None, v), Default);
-        }
-        assert_ne!(
-            exact_rule("Bash", "npm test"),
-            exact_rule("Bash", "npm test --x")
-        );
-    }
-}
+mod tests;

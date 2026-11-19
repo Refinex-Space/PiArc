@@ -2,6 +2,7 @@
 // protocol version, and the LF frame codec.
 export type * from './generated/ahp.js';
 export { PROTOCOL_VERSION } from './generated/version.js';
+export { PERMISSION_MODES, isPermissionMode } from './modes.js';
 export {
   DEFAULT_MAX_FRAME_BYTES,
   FrameDecoder,

@@ -1,6 +1,6 @@
 // The Agent Host program, independent of the real process: wires the AHP connection, the
 // handshake, the request handlers and the orderly shutdown. main.ts runs it on stdio.
-import { PROTOCOL_VERSION } from '@piarc/protocol';
+import { PROTOCOL_VERSION, isPermissionMode } from '@piarc/protocol';
 import type { HostShutdownResult, HostStatus } from '@piarc/protocol';
 
 import { credentialStatus, saveCredential } from './providers/settings.js';
@@ -274,7 +274,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     const method = 'session/setPermissionMode';
     const fields = paramsObject(method, params);
     const mode = fields.mode;
-    if (mode !== 'default' && mode !== 'acceptEdits') {
+    if (!isPermissionMode(mode)) {
       throw new AhpError('invalidParams', 'Unsupported permission mode');
     }
     (await sessions(method)).setPermissionMode(stringField(method, fields, 'sessionId'), mode);
