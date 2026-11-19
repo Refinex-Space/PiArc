@@ -123,6 +123,45 @@ fn answer(r: &ApprovalRequest, decision: ApprovalDecision) -> ApprovalAnswer {
 }
 
 #[tokio::test]
+async fn memory_refusal_delivers_card_feedback_at_the_import_site() {
+    let f = Fixture::new().await;
+    std::fs::write(f.root.join("workspace/CLAUDE.md"), "@../private.md").unwrap();
+    std::fs::write(f.root.join("private.md"), "External file marker.").unwrap();
+    let params = json!({"sessionId": SESSION, "toolCallId": "memory-test"});
+    let read = f.io.dispatch(
+        "fs/memory",
+        params.as_object().unwrap().clone(),
+        f.peer.clone(),
+    );
+    let feedback = "Use only the project notes.";
+    let decline = async {
+        let card = f.pending().await;
+        let mut reply = answer(&card, ApprovalDecision::Deny);
+        reply.feedback = Some(feedback.into());
+        assert_eq!(
+            f.io.answer_approval(reply).await.unwrap()["status"],
+            "applied"
+        );
+    };
+    let (snapshot, ()) = tokio::join!(read, decline);
+    let snapshot = snapshot.unwrap();
+    let memory: piarc_protocol::memory::MemorySnapshot =
+        serde_json::from_str(snapshot["chunk"].as_str().unwrap()).unwrap();
+    let source = memory
+        .files
+        .iter()
+        .find(|file| {
+            file.path.ends_with("CLAUDE.md") && file.content.contains("Memory import denied")
+        })
+        .unwrap();
+    assert!(
+        source.content.contains(feedback),
+        "the refusal omitted the user's feedback"
+    );
+    assert!(!source.content.contains("External file marker."));
+}
+
+#[tokio::test]
 async fn concurrent_answers_apply_once_and_each_decision_is_audited_by_session() {
     let f = Fixture::new().await;
     assert_eq!(
@@ -415,5 +454,35 @@ async fn permission_lookup_requires_a_working_trust_store() {
             .permission_settings(&f.root.join("workspace"))
             .await
             .is_err()
+    );
+}
+
+#[tokio::test]
+async fn completion_only_retires_memory_for_its_own_turn() {
+    let f = Fixture::new().await;
+    std::fs::write(f.root.join("workspace/CLAUDE.md"), "@../guide.md").unwrap();
+    std::fs::write(f.root.join("guide.md"), "Outside guide").unwrap();
+    let params = json!({"sessionId": SESSION,"toolCallId":"memory-followup","turnId":"follow-up"});
+    let scan = f.io.dispatch(
+        "fs/memory",
+        params.as_object().unwrap().clone(),
+        f.peer.clone(),
+    );
+    let retire = async {
+        let card = f.pending().await;
+        f.io.clear_approvals(SESSION, Cleanup::Completed("previous"));
+        assert_eq!(f.pending().await.request_id, card.request_id);
+        f.io.clear_approvals(SESSION, Cleanup::Completed("follow-up"));
+        assert_ne!(
+            f.io.answer_approval(answer(&card, ApprovalDecision::AllowOnce))
+                .await
+                .unwrap()["status"],
+            "applied"
+        );
+    };
+    let (snapshot, ()) = tokio::join!(scan, retire);
+    assert!(
+        snapshot.is_err(),
+        "a finished turn must not receive an approved file"
     );
 }

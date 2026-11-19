@@ -441,7 +441,9 @@ impl WorkspaceActor {
             }
             HostEvent::Restarting { .. } | HostEvent::Exited { .. } => {
                 for id in lock(&self.handle.members).iter() {
-                    self.ctx.tool_io.cancel_approvals(id, true);
+                    self.ctx
+                        .tool_io
+                        .clear_approvals(id, crate::tool_io::policy::Cleanup::Disconnected);
                 }
                 if let Host::Ready(supervisor) | Host::Starting(supervisor) = &self.host {
                     self.host = Host::Restarting(supervisor.clone());

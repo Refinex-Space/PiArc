@@ -1702,6 +1702,10 @@
         "toolCallId": {
           "description": "Correlates approval waits and pages on this connection.",
           "type": "string"
+        },
+        "turnId": {
+          "description": "Owning turn, so delayed completion of its predecessor cannot cancel this scan.",
+          "type": ["string", "null"]
         }
       },
       "required": ["sessionId", "toolCallId"],

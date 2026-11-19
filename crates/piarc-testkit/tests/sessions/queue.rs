@@ -66,7 +66,9 @@ async fn queued_inputs_are_edited_deleted_and_reordered_and_run_in_the_new_order
         .await;
     let completed = events.of(&id, "turn/completed");
     assert_eq!(completed.len(), 4);
-    assert!(completed.iter().all(|c| c["status"] == "completed"));
+    for turn in completed {
+        assert_eq!(turn["status"], "completed", "{turn}");
+    }
 
     check_follow_up_requests(&env);
     let last_queue = events.of(&id, "session/queueChanged");
@@ -193,7 +195,8 @@ async fn steering_joins_the_running_turn_and_a_follow_up_waits_for_the_next() {
         })
         .await;
     let next_turn = next["params"]["turnId"].as_str().expect("id").to_owned();
-    events.turn_completed(&id, &next_turn).await;
+    let outcome = events.turn_completed(&id, &next_turn).await;
+    assert_eq!(outcome["status"], "completed", "{outcome}");
 
     let requests = env.requests("steer");
     assert_eq!(requests.len(), 3);

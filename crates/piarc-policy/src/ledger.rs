@@ -67,8 +67,17 @@ impl<T> Ledger<T> {
 
     /// Take all the interrupted session's requests; Core answers each one with a refusal.
     pub fn cancel_session(&mut self, id: &str) -> Vec<(ApprovalRequest, T)> {
+        self.cancel_session_if(id, |_| true)
+    }
+
+    /// Remove only matching requests when work for a following turn has already begun.
+    pub fn cancel_session_if(
+        &mut self,
+        id: &str,
+        mut matches: impl FnMut(&ApprovalRequest) -> bool,
+    ) -> Vec<(ApprovalRequest, T)> {
         self.pending
-            .extract_if(.., |(r, _)| r.session_id == id)
+            .extract_if(.., |(r, _)| r.session_id == id && matches(r))
             .collect()
     }
 

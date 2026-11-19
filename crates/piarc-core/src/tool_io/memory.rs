@@ -10,19 +10,22 @@ use piarc_protocol::policy::ApprovalDecision;
 use piarc_protocol::{ErrorKind, ErrorObject};
 use serde_json::Value;
 use tokio::sync::{Mutex as AsyncMutex, OnceCell};
+use tokio_util::sync::CancellationToken;
 
 use super::{SessionIo, ToolIo, git_status, lock, memory_reader, policy, to_value};
+use memory_reader::ImportAccess;
 
 #[derive(Default)]
 pub(super) struct State {
     git: OnceCell<String>,
     opening: Mutex<Option<memory_reader::Collection>>,
-    choices: Mutex<HashMap<PathBuf, bool>>,
+    choices: Mutex<HashMap<PathBuf, ImportAccess>>,
     scan: AsyncMutex<()>,
     transfer: Mutex<Option<Transfer>>,
 }
 
 struct Transfer {
+    generation: CancellationToken,
     peer: Peer,
     call: String,
     text: String,
@@ -48,6 +51,9 @@ impl Transfer {
 impl State {
     fn next_page(&self, peer: &Peer, call: &str, offset: u64) -> Result<Value, ErrorObject> {
         let mut stored = lock(&self.transfer);
+        if stored.as_ref().is_some_and(|t| t.generation.is_cancelled()) {
+            *stored = None;
+        }
         let transfer = stored
             .as_mut()
             .filter(|t| {
@@ -92,7 +98,7 @@ impl ToolIo {
         &self,
         session: &SessionIo,
         dirs: Vec<String>,
-        choices: HashMap<PathBuf, bool>,
+        choices: HashMap<PathBuf, ImportAccess>,
     ) -> Result<memory_reader::Collection, ErrorObject> {
         let config = Arc::clone(&self.config);
         let scope = session.scope.clone();
@@ -107,7 +113,7 @@ impl ToolIo {
                 &config.data_dir,
                 &dirs,
                 both,
-                |path| choices.get(path).copied(),
+                |path| choices.get(path).cloned(),
             )
         })
         .await
@@ -126,6 +132,7 @@ impl ToolIo {
         }
         let generation = policy::memory::generation(&session);
         let _guard = session.memory.scan.lock().await;
+        policy::memory::begin(&session, p.turn_id.clone(), &generation);
         let mut choices = lock(&session.memory.choices).clone();
         let dirs = p.directories.as_deref().unwrap_or_default();
         let opening = if p.include_git == Some(true) && dirs.is_empty() {
@@ -164,7 +171,11 @@ impl ToolIo {
             git_status,
         })
         .map_err(|e| ErrorObject::new(ErrorKind::InternalError, e.to_string(), false))?;
+        if scan.generation.is_cancelled() || peer.is_closed() {
+            return Err(policy::denied("Memory import cancelled."));
+        }
         let mut transfer = Transfer {
+            generation: scan.generation,
             peer: peer.clone(),
             call: p.tool_call_id,
             text,
@@ -182,14 +193,14 @@ struct Scan<'a> {
     session: &'a SessionIo,
     params: &'a FsMemoryParams,
     peer: &'a Peer,
-    generation: tokio_util::sync::CancellationToken,
+    generation: CancellationToken,
 }
 
 impl Scan<'_> {
     async fn resolve(
         &self,
         mut current: memory_reader::Collection,
-        choices: &mut HashMap<PathBuf, bool>,
+        choices: &mut HashMap<PathBuf, ImportAccess>,
     ) -> Result<Vec<MemoryFile>, ErrorObject> {
         loop {
             if self.generation.is_cancelled() || self.peer.is_closed() {
@@ -202,7 +213,7 @@ impl Scan<'_> {
                 if choices.contains_key(&path) {
                     continue;
                 }
-                let decision = match &self.io.policy {
+                let (decision, feedback) = match &self.io.policy {
                     Some(svc) => {
                         policy::memory::approve(
                             svc,
@@ -215,22 +226,26 @@ impl Scan<'_> {
                         )
                         .await?
                     }
-                    None => ApprovalDecision::Deny,
+                    None => (ApprovalDecision::Deny, None),
                 };
-                let allow = decision != ApprovalDecision::Deny;
-                choices.insert(path.clone(), allow);
+                let access = if decision == ApprovalDecision::Deny {
+                    ImportAccess::Denied(feedback)
+                } else {
+                    ImportAccess::Allowed
+                };
                 if matches!(
                     decision,
                     ApprovalDecision::AllowSession | ApprovalDecision::Deny
                 ) {
-                    lock(&self.session.memory.choices).insert(path, allow);
+                    lock(&self.session.memory.choices).insert(path.clone(), access.clone());
                 }
+                choices.insert(path, access);
             }
             let scope = self.session.scope.clone();
             let home = self.io.config.memory_home.clone();
             let decisions = choices.clone();
             current = tokio::task::spawn_blocking(move || {
-                inputs.expand(&scope, home.as_deref(), |path| decisions.get(path).copied())
+                inputs.expand(&scope, home.as_deref(), |path| decisions.get(path).cloned())
             })
             .await
             .map_err(|e| ErrorObject::new(ErrorKind::InternalError, e.to_string(), false))?
@@ -252,6 +267,7 @@ mod tests {
             "x".repeat(piarc_protocol::fs::MAX_READ_CHUNK as usize - 1)
         );
         let mut transfer = Transfer {
+            generation: CancellationToken::new(),
             peer: peer.clone(),
             call: "snapshot".into(),
             text: text.clone(),

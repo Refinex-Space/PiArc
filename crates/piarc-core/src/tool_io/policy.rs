@@ -47,6 +47,15 @@ pub(super) struct State {
     grants: HashMap<String, Grant>,
     expired: HashSet<String>,
     generation: CancellationToken,
+    memory_epoch: CancellationToken,
+    memory_scan: Option<(Option<String>, CancellationToken)>,
+}
+
+pub(crate) enum Cleanup<'a> {
+    /// The notification may arrive while the Host is preparing an automatic follow-up.
+    Completed(&'a str),
+    Interrupted,
+    Disconnected,
 }
 
 mod edit;
@@ -102,12 +111,30 @@ impl State {
         )
     }
 
-    fn cancel(&mut self, id: &str, services: &Services, disconnected: bool) {
+    fn cancel(&mut self, id: &str, services: &Services, cause: Cleanup<'_>) {
         self.inputs.clear();
         self.generation.cancel();
         self.generation = CancellationToken::new();
-        for (_, pending) in self.ledger.cancel_session(id) {
-            if disconnected || pending.peer.is_closed() {
+        let keep_memory = match cause {
+            Cleanup::Completed(turn) => self
+                .memory_scan
+                .as_ref()
+                .is_some_and(|(owner, _)| owner.as_deref() != Some(turn)),
+            Cleanup::Interrupted | Cleanup::Disconnected => {
+                self.memory_epoch.cancel();
+                self.memory_epoch = CancellationToken::new();
+                false
+            }
+        };
+        if !keep_memory && let Some((_, scan)) = self.memory_scan.take() {
+            scan.cancel();
+        }
+        for (_, pending) in self.ledger.cancel_session_if(id, |r| {
+            !(keep_memory
+                && r.kind == ApprovalKind::PermissionExpansion
+                && r.tool == "MemoryImport")
+        }) {
+            if matches!(cause, Cleanup::Disconnected) || pending.peer.is_closed() {
                 self.expired.insert(pending.call);
             }
         }
@@ -182,9 +209,9 @@ impl ToolIo {
         self
     }
 
-    pub(crate) fn cancel_approvals(&self, id: &str, disconnected: bool) {
+    pub(crate) fn clear_approvals(&self, id: &str, cause: Cleanup<'_>) {
         if let (Some(services), Ok(s)) = (&self.policy, self.session(id)) {
-            lock(&s.policy).cancel(id, services, disconnected);
+            lock(&s.policy).cancel(id, services, cause);
             lock(&s.uploads).cancel_writes(None);
         }
     }

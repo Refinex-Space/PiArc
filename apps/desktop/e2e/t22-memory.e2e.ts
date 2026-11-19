@@ -71,6 +71,9 @@ sessionTest(
     await expect(card).toHaveAttribute('data-approval-card', 'permissionExpansion');
     await expect(card).toContainText('MemoryImport');
     await expect(card).toContainText(name);
+    await expect(card.getByLabel('Rule to save')).toHaveJSProperty('readOnly', true);
+    const feedback = 'Use only the project notes.';
+    await card.getByLabel('Feedback for the model (optional)').fill(feedback);
     expect(await requests(mock, 't18-chat')).toHaveLength(0);
     await card.screenshot({ path: info.outputPath('external-memory-approval.png') });
     await card.getByRole('button', { name: 'Decline' }).click();
@@ -80,6 +83,7 @@ sessionTest(
     expect(sent).toHaveLength(1);
     const system = JSON.stringify(sent[0]?.body.system);
     expect(system).toContain('Memory import denied');
+    expect(system).toContain(feedback);
     expect(system).not.toContain(marker);
     await page.screenshot({ path: info.outputPath('external-memory-declined.png') });
   },

@@ -24,14 +24,14 @@ impl Tree {
         fs::write(path, text).unwrap();
     }
 
-    fn collect(&self, dirs: &[String], both: bool, decision: Option<bool>) -> Collection {
+    fn collect(&self, dirs: &[String], both: bool, decision: Option<ImportAccess>) -> Collection {
         collect(
             &self.scope,
             Some(&self.root.join("home")),
             &self.root.join("data"),
             dirs,
             both,
-            |_| decision,
+            |_| decision.clone(),
         )
         .expect("collect fixture memory")
     }
@@ -158,7 +158,7 @@ fn external_import_decisions_are_bound_to_the_resolved_file() {
         tree.source(&pending, "ws/CLAUDE.md")
             .contains("Memory import not approved")
     );
-    let denied = tree.collect(&[], false, Some(false));
+    let denied = tree.collect(&[], false, Some(ImportAccess::Denied(None)));
     assert!(denied.pending.is_empty());
     assert!(
         tree.source(&denied, "ws/CLAUDE.md")
@@ -171,7 +171,7 @@ fn external_import_decisions_are_bound_to_the_resolved_file() {
                 .contains("outside-only-marker")
         );
     }
-    let allowed = tree.collect(&[], false, Some(true));
+    let allowed = tree.collect(&[], false, Some(ImportAccess::Allowed));
     assert!(
         tree.source(&allowed, "ws/CLAUDE.md")
             .contains("outside-only-marker")
@@ -278,7 +278,9 @@ fn pending_consent_preserves_sources_already_read_at_session_open() {
     let frozen = initial
         .inputs
         .expect("a deferred import")
-        .expand(&tree.scope, Some(&tree.root.join("home")), |_| Some(true))
+        .expand(&tree.scope, Some(&tree.root.join("home")), |_| {
+            Some(ImportAccess::Allowed)
+        })
         .unwrap();
     let text = tree.source(&frozen, "ws/current/CLAUDE.md");
     assert!(text.contains("Opening instructions.") && text.contains("Approved guide."));

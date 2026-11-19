@@ -17,6 +17,12 @@ mod tests;
 const FILE_LIMIT: u64 = 4 * 1024 * 1024;
 const IMPORT_DEPTH: usize = 4;
 
+#[derive(Clone)]
+pub(super) enum ImportAccess {
+    Allowed,
+    Denied(Option<String>),
+}
+
 /// Keep already-observed sources when an approval interrupts expansion. The authorized
 /// target is opened only after the user answers, even when it needs a nested import.
 #[derive(Clone, Default)]
@@ -39,7 +45,7 @@ pub(super) fn collect(
     data: &Path,
     directories: &[String],
     read_both: bool,
-    decide: impl FnMut(&Path) -> Option<bool>,
+    decide: impl FnMut(&Path) -> Option<ImportAccess>,
 ) -> io::Result<Collection> {
     let mut sources = Vec::new();
     if let Some(home) = home {
@@ -82,7 +88,7 @@ impl Inputs {
         mut self,
         scope: &Scope,
         home: Option<&Path>,
-        decide: impl FnMut(&Path) -> Option<bool>,
+        decide: impl FnMut(&Path) -> Option<ImportAccess>,
     ) -> io::Result<Collection> {
         let mut reader = Reader {
             scope,
@@ -161,7 +167,7 @@ struct Reader<'a, F> {
     pending: Vec<PathBuf>,
 }
 
-impl<F: FnMut(&Path) -> Option<bool>> Reader<'_, F> {
+impl<F: FnMut(&Path) -> Option<ImportAccess>> Reader<'_, F> {
     fn document(&mut self, requested: &Path, depth: usize) -> io::Result<Option<MemoryFile>> {
         let target = match self.targets.entry(requested.to_owned()) {
             std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
@@ -186,20 +192,25 @@ impl<F: FnMut(&Path) -> Option<bool>> Reader<'_, F> {
         // to a different out-of-workspace target has the same boundary as an explicit import.
         let fixed = depth == 0 && requested == target;
         if !fixed && !target.starts_with(self.scope.root()) {
-            let decision = (self.decide)(&target);
-            if decision != Some(true) {
-                let status = if decision.is_none() {
-                    if !self.pending.contains(&target) {
-                        self.pending.push(target);
+            let notice = match (self.decide)(&target) {
+                Some(ImportAccess::Allowed) => None,
+                Some(ImportAccess::Denied(feedback)) => {
+                    let mut note = format!("[Memory import denied: {path}]");
+                    if let Some(feedback) = feedback.filter(|text| !text.trim().is_empty()) {
+                        note.push_str("\nUser feedback: ");
+                        note.push_str(&feedback);
                     }
-                    "not approved"
-                } else {
-                    "denied"
-                };
-                return Ok(Some(MemoryFile {
-                    content: format!("[Memory import {status}: {path}]"),
-                    path,
-                }));
+                    Some(note)
+                }
+                None => {
+                    if !self.pending.contains(&target) {
+                        self.pending.push(target.clone());
+                    }
+                    Some(format!("[Memory import not approved: {path}]"))
+                }
+            };
+            if let Some(content) = notice {
+                return Ok(Some(MemoryFile { path, content }));
             }
         }
         // An imported file can live on a volume with different case rules from the

@@ -2333,6 +2333,10 @@ export interface FsMemoryParams {
    * Correlates approval waits and pages on this connection.
    */
   toolCallId: string;
+  /**
+   * Owning turn, so delayed completion of its predecessor cannot cancel this scan.
+   */
+  turnId?: string | null;
 }
 /**
  * Successful response to `fs/memory`.

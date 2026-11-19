@@ -11,10 +11,10 @@ pub(in crate::tool_io) async fn approve(
     target: &Path,
     peer: &Peer,
     generation: &CancellationToken,
-) -> Result<ApprovalDecision, ErrorObject> {
+) -> Result<(ApprovalDecision, Option<String>), ErrorObject> {
     if target.to_str().is_none() {
         // A lossy label could name two different files in the approval UI and database.
-        return Ok(ApprovalDecision::Deny);
+        return Ok((ApprovalDecision::Deny, None));
     }
     let workspace = session.scope.key(session.scope.root());
     let key = display(target);
@@ -26,7 +26,7 @@ pub(in crate::tool_io) async fn approve(
         .map_err(|e| e.to_error_object())?
         .map_err(|e| e.to_error_object())?
     {
-        return Ok(ApprovalDecision::AllowAlways);
+        return Ok((ApprovalDecision::AllowAlways, None));
     }
     let p = PolicyEvaluateParams {
         session_id: id.to_owned(),
@@ -63,9 +63,13 @@ pub(in crate::tool_io) async fn approve(
     }.await;
     let _ = ack.send(commit.clone());
     commit?;
-    Ok(decision)
+    Ok((decision, answer.feedback))
 }
 
 pub(in crate::tool_io) fn generation(s: &SessionIo) -> CancellationToken {
-    lock(&s.policy).generation.clone()
+    lock(&s.policy).memory_epoch.child_token()
+}
+
+pub(in crate::tool_io) fn begin(s: &SessionIo, turn: Option<String>, token: &CancellationToken) {
+    lock(&s.policy).memory_scan = Some((turn, token.clone()));
 }

@@ -51,8 +51,8 @@ function harness(manager: SessionManager, read?: ReadMemory) {
   return {
     memory,
     messages,
-    start: async () => {
-      await memory.prepare();
+    start: async (turnId?: string) => {
+      await memory.prepare(turnId);
       const result = (await trigger('before_agent_start', {
         systemPromptOptions: {
           selectedTools: ['view_file', 'Edit', 'PowerShell'],
@@ -216,4 +216,21 @@ it('splits the frozen Anthropic system at the project section without changing t
   ).toBeUndefined();
   expect(await session.wire(payload, 'openai-completions')).toBeUndefined();
   expect(await session.wire({ ...payload, cache_control: cache })).toBeUndefined();
+});
+
+it('binds initial and lazy memory calls to their turn and rotates the id for a follow-up', async () => {
+  const turns: (string | undefined)[] = [];
+  const bridge = new CoreBridge((raw) => {
+    const request = raw as { id: number; params: { turnId?: string } };
+    turns.push(request.params.turnId);
+    queueMicrotask(() => {
+      bridge.handleResponse({ jsonrpc: '2.0', id: request.id, result: { chunk: '{"files":[]}' } });
+    });
+  });
+  const session = harness(SessionManager.inMemory(cwd), memoryReader(bridge, 'session'));
+  await session.start('original');
+  await session.tool('view_file', 'read', path.join(cwd, 'sub', 'notes.txt'));
+  await session.start('next');
+  await session.start();
+  expect(turns).toEqual(['original', 'original', 'next', undefined]);
 });

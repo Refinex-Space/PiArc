@@ -10,6 +10,7 @@ export type ReadMemory = (
   directories: string[],
   includeGit: boolean,
   signal?: AbortSignal,
+  turnId?: string,
 ) => Promise<MemorySnapshot>;
 
 function parseFiles(value: unknown): MemoryFile[] {
@@ -36,7 +37,7 @@ function parseSnapshot(raw: string): MemorySnapshot {
 }
 
 export function memoryReader(bridge: CoreBridge, sessionId: string): ReadMemory {
-  return async (directories, includeGit, signal) => {
+  return async (directories, includeGit, signal, turnId) => {
     const toolCallId = `memory-${randomUUID()}`;
     const id = { sessionId, toolCallId };
     const options = { approval: id, ...(signal === undefined ? {} : { signal }) };
@@ -44,7 +45,9 @@ export function memoryReader(bridge: CoreBridge, sessionId: string): ReadMemory 
     let offset = 0;
     for (;;) {
       const params: FsMemoryParams =
-        offset === 0 ? { ...id, directories, includeGit } : { ...id, offset };
+        offset === 0
+          ? { ...id, directories, includeGit, ...(turnId === undefined ? {} : { turnId }) }
+          : { ...id, offset };
       const page = await bridge.requestTyped(
         'fs/memory',
         params,

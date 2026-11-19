@@ -41,6 +41,7 @@ export class SessionMemory {
   #date: string;
   #system: FrozenSystem | undefined;
   #snapshot: MemorySnapshot | undefined;
+  #turnId: string | undefined;
   #preparing: AbortController | undefined;
   #lazy: Promise<void> = Promise.resolve();
 
@@ -91,11 +92,12 @@ export class SessionMemory {
     }
   }
 
-  async prepare(): Promise<boolean> {
+  async prepare(turnId?: string): Promise<boolean> {
+    this.#turnId = turnId;
     const controller = new AbortController();
     this.#preparing = controller;
     try {
-      const snapshot = await this.#load(this.#system === undefined, controller.signal);
+      const snapshot = await this.#load(this.#system === undefined, controller.signal, turnId);
       if (controller.signal.aborted) return false;
       this.#snapshot = snapshot;
       return true;
@@ -109,12 +111,14 @@ export class SessionMemory {
 
   cancel(): void {
     this.#preparing?.abort();
+    this.#turnId = undefined;
     this.#snapshot = undefined;
   }
 
-  #load(includeGit: boolean, signal?: AbortSignal): Promise<MemorySnapshot> {
+  #load(includeGit: boolean, signal?: AbortSignal, turnId?: string): Promise<MemorySnapshot> {
     return (
-      this.#read?.([...this.#directories], includeGit, signal) ?? Promise.resolve({ files: [] })
+      this.#read?.([...this.#directories], includeGit, signal, turnId) ??
+      Promise.resolve({ files: [] })
     );
   }
 
@@ -193,7 +197,10 @@ export class SessionMemory {
       let snapshot = this.#snapshot;
       this.#snapshot = undefined;
       // An extension can start its own turn without going through the registry.
-      snapshot ??= await this.#load(this.#system === undefined, ctx.signal);
+      if (snapshot === undefined) {
+        this.#turnId = undefined;
+        snapshot = await this.#load(this.#system === undefined, ctx.signal);
+      }
       if (this.#system === undefined) {
         const tools = options.selectedTools.filter((tool) => !options.hiddenTools.includes(tool));
         this.#system = assembleSystem(tools, this.#profile, snapshot.files, {
@@ -230,9 +237,10 @@ export class SessionMemory {
       }
       // Calls in a read-only tool batch can finish together. Serialize discovery and
       // publication, and never mark another call's files as already delivered.
+      const turnId = this.#turnId;
       const publish = async (): Promise<void> => {
         if (!this.#visit(this.#canonical(event.toolName), event.input, event.toolCallId)) return;
-        const snapshot = await this.#load(false, ctx.signal);
+        const snapshot = await this.#load(false, ctx.signal, turnId);
         ctx.signal?.throwIfAborted();
         const message = this.#update(snapshot.files, true);
         // Pi 1.5.2 flushes these messages immediately after the complete tool-result batch,

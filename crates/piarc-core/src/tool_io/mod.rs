@@ -321,7 +321,7 @@ impl ToolIo {
 
     /// Forgets the session and terminates its running commands.
     pub fn close_session(&self, session_id: &str) {
-        self.cancel_approvals(session_id, false);
+        self.clear_approvals(session_id, policy::Cleanup::Interrupted);
         if let Some(session) = lock(&self.sessions).remove(session_id) {
             for token in lock(&session.running).values() {
                 token.cancel();

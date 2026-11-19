@@ -198,6 +198,7 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
               {t('approval.rule')}
               <input
                 value={rule}
+                readOnly={request.kind === 'permissionExpansion' && request.tool === 'MemoryImport'}
                 onChange={(e) => {
                   setRule(e.target.value);
                 }}

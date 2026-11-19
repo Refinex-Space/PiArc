@@ -496,7 +496,13 @@ impl SessionActor {
                 return;
             }
             "turn/completed" => {
-                self.ctx.tool_io.cancel_approvals(&self.id, false);
+                self.ctx.tool_io.clear_approvals(
+                    &self.id,
+                    turn.as_deref().map_or(
+                        crate::tool_io::policy::Cleanup::Interrupted,
+                        crate::tool_io::policy::Cleanup::Completed,
+                    ),
+                );
                 self.active_turn = None;
                 let failed = notification.params.payload.get("status") == Some(&json!("failed"));
                 self.status = if failed {
@@ -749,7 +755,8 @@ impl Request {
                 let stopped = self.call::<SessionAbort>(&supervisor, None, target).await;
                 // Pi sets the turn signal before its preflight returns. Releasing the ledger
                 // first would race the host marking these tool items as interrupted.
-                self.tool_io.cancel_approvals(&self.id.0, false);
+                self.tool_io
+                    .clear_approvals(&self.id.0, crate::tool_io::policy::Cleanup::Interrupted);
                 // The turn is over: commands it left running stop too.
                 self.tool_io.cancel_running(&self.id.0);
                 stopped

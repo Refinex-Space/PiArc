@@ -2401,7 +2401,7 @@
       "task": "T22",
       "description": "工作区外的导入首次出现\"权限扩展\"审批卡；允许后展开并在之后的会话中不再询问；拒绝时不展开并留下说明。验证：场景测试。",
       "status": "passing",
-      "evidence": "context-memory-external-approval、context-memory-external-deny：权限扩展首次等待，永久允许后重启 Core 并新建会话只展开已确认目标，拒绝保留说明且请求不含外部正文。Electron dev、packaged 均验证卡片待处理时没有模型请求、拒绝后对话继续，截图在 tmp/evidence/T22/l4/。"
+      "evidence": "context-memory-external-approval、context-memory-external-deny：权限扩展首次等待，永久允许后重启 Core 并新建会话只展开已确认目标，拒绝附带用户反馈且请求不含外部正文。Electron dev、packaged 均验证卡片待处理时没有模型请求、拒绝后对话继续，截图在 tmp/evidence/T22/l4/。"
     },
     {
       "id": "T22-A07",

@@ -886,7 +886,10 @@ export class SessionRegistry {
           this.#checkImageInput(sessionId, prepared.input);
           // An interrupt while an external memory import awaits approval ends this turn
           // before Pi owns it. The abort handler publishes the interrupted outcome.
-          if (!(await hosted.memory.prepare()) || hosted.projector.activeTurnId !== next.turnId)
+          if (
+            !(await hosted.memory.prepare(next.turnId)) ||
+            hosted.projector.activeTurnId !== next.turnId
+          )
             return;
           hosted.delivering.push(prepared);
           await session.prompt(

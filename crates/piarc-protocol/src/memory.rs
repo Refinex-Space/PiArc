@@ -12,6 +12,9 @@ pub struct FsMemoryParams {
     pub session_id: String,
     /// Correlates approval waits and pages on this connection.
     pub tool_call_id: String,
+    /// Owning turn, so delayed completion of its predecessor cannot cancel this scan.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub turn_id: Option<String>,
     /// Additional visited directories below the session cwd.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub directories: Option<Vec<String>>,
