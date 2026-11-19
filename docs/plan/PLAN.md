@@ -146,7 +146,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T19 | [Transcript 与 composer 正式版](tasks/T19-transcript-and-composer.md) | 2 | T18 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 0b72964 |
 | T20 | [基础权限与审批](tasks/T20-basic-permissions-and-approvals.md) | 2 | T19 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | ee03128 |
 | T21 | [模型、服务商与凭据设置](tasks/T21-models-providers-and-credentials.md) | 2 | T20 | macOS | high / 高 | 大 | 无 | 已完成 | e5f3b65 |
-| T22 | [System prompt 组装与 memory 文件](tasks/T22-system-prompt-and-memory-files.md) | 2 | T21 | macOS | high / 高 | 中 | 无 | 进行中 | — |
+| T22 | [System prompt 组装与 memory 文件](tasks/T22-system-prompt-and-memory-files.md) | 2 | T21 | macOS | high / 高 | 中 | 无 | 已完成 | 9843eb5 |
 | R2 | [M1 评审](tasks/R2-m1-review.md) | 2 | T22 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -309,18 +309,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-T22（macOS，基线 `b845378`，`npm run verify` 15/15，前序无待关闭的 Windows CI 项）：
-
-- [x] 新增 `fs/memory` 分页契约、双文件设置与按工作区及文件保存永久许可的 SQLite 迁移。协议 Vitest 567/567，三个受影响 crate 的测试通过。
-- [x] Core 收集分层 memory 并处理 Markdown 导入、来源、大小与去重（A03–A05、A09）。
-- [x] 工作区外导入经权限扩展审批，Core 保存精确的工作区决定（A06）。
-- [x] 常规设置提供双读开关，开发版和打包版的真实审批与设置流程 4/4 通过。
-- [x] Harness Kit 组装会话提示词，按实际文件访问懒加载，通过追加消息送达变化（A01、A02、A07、A08）。
-- [x] 接入严格 mock 的 context 场景与 M1 能力覆盖（A01–A03、A06–A09）。
-- [x] 本机原创性比对与维护说明（A10）：3533 份参考文本、253 词、10 词滑窗 0 项匹配。
-- [x] 写入 A01–A10 验收证据，修正 OAuth 测试会话的作用域登记。原 OAuth 多会话刷新用例通过，旧文件工具断言保留，追加校验开场与首次进入子目录的 memory 请求。
-- [x] 修复排队后续回合的 memory 审批失效竞态，确认拒绝反馈进入模型上下文；Core 专项 11/11，原队列用例连跑 20/20，完整 sessions 26/26。
-- [x] 全量质量门禁与正式验收记录（A11）：verify 15/15，T22 L2 10/10，最终开发版与打包版 L4 共 4/4。
+（无进行中的任务。）
 
 ## 登记事项
 
@@ -708,6 +697,14 @@ T22（macOS，基线 `b845378`，`npm run verify` 15/15，前序无待关闭的 
 - 开工与收尾 `npm run verify` 均通过全部 15 项。修正 NAPI 声明与一个样本的格式后最终门禁全绿；L2 49 项通过、1 项仅适用 Windows。T20 自动权限裁决 1,000 次独立复测 p95 为 0.429416 ms，预算保持 2 ms。
 - Electron 开发和打包形态的 T21 与 preload 专项 18/18；扩展回归 32 项中一项在 mock 编译等待时超时，构建完成后原用例独立通过。ego-browser 使用本地测试数据实际操作，证据在 `tmp/evidence/T21/`。Windows 目标 Core/Host/NAPI/testkit 交叉 Clippy 通过，Windows 凭据管理器实测交 W1。
 - 下一项为 macOS 上的 T22。本地提交，未推送。
+
+### 2026-11-19 T22 已完成（验收提交 9843eb5）
+
+- 11 项验收全部通过。开工和收尾 `npm run verify` 均为 15/15；macOS 完整 L2 59 通过、1 个 Windows 专用场景按平台跳过。T22 两种线格式的 10 个场景全部通过，覆盖清单 MISSING 0。
+- Core 收集用户、祖先和首次访问目录中的 memory，外部导入通过 T20 卡片取得精确许可。用户拒绝时模型收到说明与反馈。设置窗口可同时启用两个主文件。Agent Host 从分支恢复冻结的 system，文件及日期变化通过追加消息送达。见 ADR-0033。
+- 实际请求验证开场到首条输入之间的编辑、跨回合与恢复后的原始 system 字节、Anthropic 两个缓存块，以及懒加载与去重。原创性检查比对 3533 份参考文本，253 词提示词的连续 10 词匹配为零。
+- 回归修复包括 OAuth 测试会话的 Core 范围登记，以及上一回合完成通知误取消下一回合 memory 扫描。后者用确定性审批账本测试覆盖，队列用例连跑 20/20，完整 sessions 26/26。
+- Electron 开发和打包两种形态的 T22 L4 为 4/4。用 ego-browser 操作了设置与审批卡。证据在 `tmp/evidence/T22/`。相关 crate 的 Windows 目标交叉 Clippy 通过，Windows 原生执行留待 CI。下一个任务为 macOS 上的 R2。
 
 ## 计划变更记录
 
