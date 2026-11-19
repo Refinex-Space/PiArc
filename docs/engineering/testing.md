@@ -29,7 +29,7 @@
 | 5 | Vitest | `npm test`（含 `core.integration.test.ts`：真实 Core 在 Node 中跑事件通道的短时正确性版本） |
 | 6 | `cargo fmt --check` | `cargo fmt --all --check` |
 | 7 | `cargo clippy` | `cargo clippy --workspace --all-targets --locked -- -D warnings` |
-| 8 | `cargo test` | `cargo test --workspace --locked` |
+| 8 | `cargo test` | `node scripts/ci/cargo-test.mjs`：`cargo test --workspace --locked` 跳过计时测试，再逐个单独运行它们（`TIMED`，现为 `automatic_decision_latency`）；计时期间不跑别的测试，与 AHP 往返计时同理（第 11 节）。直接 `cargo test` 时计时测试照常随套件运行，没有跳过条件 |
 | 9 | 协议漂移 | `node scripts/ci/check-protocol-drift.mjs` |
 | 10 | 契约样本完整性 | `node scripts/ci/check-contract-samples.mjs` |
 | 11 | cargo-deny | `.tools/bin/cargo-deny check`（先运行 `node scripts/dev/install-tools.mjs`） |

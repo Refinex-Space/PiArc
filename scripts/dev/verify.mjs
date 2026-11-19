@@ -58,7 +58,8 @@ export const STEPS = [
     name: 'cargo clippy',
     command: cargo(['clippy', '--workspace', '--all-targets', '--locked', '--', '-D', 'warnings']),
   },
-  { name: 'cargo test', command: cargo(['test', '--workspace', '--locked']) },
+  // Timing tests run alone after the others (scripts/ci/cargo-test.mjs).
+  { name: 'cargo test', command: nodeScript('scripts/ci/cargo-test.mjs') },
   { name: 'protocol drift', command: nodeScript('scripts/ci/check-protocol-drift.mjs') },
   { name: 'contract samples', command: nodeScript('scripts/ci/check-contract-samples.mjs') },
   { name: 'cargo-deny', command: cargoDeny },
