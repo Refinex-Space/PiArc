@@ -307,7 +307,7 @@ sessions:                         # 可选；缺省为一个会话 main，使用
   a: { provider: one, cwd: 'alpha dir' }
 actions: [...]                    # 见 12.2
 approvals: []                     # 见 12.3
-expect: { events, files, fixtures, requests, request_counts, tool_batches, core_io }   # 见 12.4
+expect: { events, files, fixtures, requests, request_counts, tool_batches, core_io, config_diagnostics }   # 见 12.4
 ```
 
 - 每个端点有自己的 `MockProvider` 与自己的 Pi provider（`mock-<端点名>`，唯一的模型 `mock-model`）；预置模型夹具经 `x-piarc-scenario` 请求头选择脚本。两个会话要并发请求时用两个端点，各自的步数互不影响。
@@ -358,6 +358,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | （总是检查） | 每个请求都通过严格 mock 的校验；被拒的请求列出规则 ID。运行根下 Claude Code 的配置（任何 `.claude/` 目录内的条目与 `.claude.json`）在 Core 启动前与关闭后逐字节相同，否则以 `claude_config` 失败列出新增、修改、删除的路径（T24，ADR-0005 第 2 条） |
 | `tool_batches` | 工具调用 id 的分批：Core 收到的委托请求按这些批次成组到达。运行器经 Core 的 `ToolIoObserver` 扣住下一批的请求，整批到齐才一起放行；另一批的调用提前到达即失败。不靠计时 |
 | `core_io` | `{ call, method }`：Core 为该工具调用回答过这个 AHP 方法（例如 `fs/read`、`exec/run`），证明工具经 Core 执行 |
+| `config_diagnostics` | 回合结束后 Core 对该工作区的配置诊断（T24）：`trusted` 与按层 id 索引的 `files`，每个文件是报告的子集（`status`、`effective`、`overridden`、`ignored`、`issues`；列表逐项比较，长度必须相等，元素取子集） |
 
 失败输出：事件给出第一个未匹配的期望项、上一个匹配的位置、乱序时匹配事件的实际位置、同方法事件中第一个不符的字段，以及该会话附近的实际事件（去掉 `seq`、`sessionId`、`ts`）；文件给出第一处不同的行号与两边的全文（带行号）；请求给出端点、序号与不符的字段。一个场景的全部失败一起报告。
 

@@ -78,7 +78,7 @@
 - T22 的 `context-*.yaml` 用真实请求比较 system 与追加消息。Core 的 `home` 指向同一次运行的 `home 家/`，`workspace.run_files` 可在隔离的临时根准备用户 memory 和外部导入。
 - 动作结束后先等每个被启动的回合 `turn/completed`，再一次性检查全部断言；没有 sleep，等待只有 30 s 安全网。
 - 会话的 `mode` 与 `set_mode` 接受四种模式（T23）；跳过权限要用户级开关，场景用 `workspace.run_files` 写 `data 数据/settings.json`（运行器的数据目录）。只读白名单命令不再发审批，要审批的命令用 `env echo`、`sed`、`printenv`。
-- T24：每个场景在 Core 启动前与关闭后比对运行根下的 Claude Code 配置快照（`fixtures.rs` 的 `claude_snapshot`），有变化即以 `claude_config` 失败；`config-*.yaml` 用 `run_files` 的 `home 家/.claude/…` 准备用户级文件。Bash 分析会剥掉裸 `env` 包装，规则匹配的是剥离后的命令：要证明某个 allow 规则生效，用 `sed`、`awk` 这类不被剥离又不在只读白名单里的命令。规则断言的 glob 文字要避开工具描述里出现的示例（Grep 的描述含 `src/**/*.ts`）。
+- T24：每个场景在 Core 启动前与关闭后比对运行根下的 Claude Code 配置快照（`fixtures.rs` 的 `claude_snapshot`），有变化即以 `claude_config` 失败；`config-*.yaml` 用 `run_files` 的 `home 家/.claude/…` 准备用户级文件，`expect.config_diagnostics` 在回合结束后取 Core 的配置诊断做子集比较（`checks.rs` 先把 `files` 列表按层 id 转成对象）。Bash 分析会剥掉裸 `env` 包装，规则匹配的是剥离后的命令：要证明某个 allow 规则生效，用 `sed`、`awk` 这类不被剥离又不在只读白名单里的命令。规则断言的 glob 文字要避开工具描述里出现的示例（Grep 的描述含 `src/**/*.ts`）。
 - 每个请求都必须通过严格 mock 的校验（总是检查）；`approvals` 按声明顺序答复会话快照里的新请求；多出的应答、无人答复的请求或工具名不符都使场景失败。
 
 ## 易错点

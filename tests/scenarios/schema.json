@@ -558,6 +558,15 @@
           "propertyNames": { "$ref": "#/$defs/relativePath" },
           "additionalProperties": { "$ref": "#/$defs/relativePath" }
         },
+        "config_diagnostics": {
+          "description": "Subset of Core's configuration diagnostics of the workspace after the run (T24): `trusted`, and `files` keyed by layer id, each a subset of that file's report (status, effective, overridden, ignored, issues; lists compare element by element).",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "trusted": { "type": "boolean" },
+            "files": { "type": "object", "additionalProperties": { "type": "object" } }
+          }
+        },
         "core_io": {
           "description": "Core answered a request with this method for this tool call.",
           "type": "array",

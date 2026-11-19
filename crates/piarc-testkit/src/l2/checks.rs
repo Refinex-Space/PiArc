@@ -398,6 +398,20 @@ pub fn text_diff(expected: &str, actual: &str) -> String {
     out
 }
 
+/// `expected` (`trusted`, `files` keyed by layer id) against Core's configuration diagnostics,
+/// whose `files` are a list; `None` when it holds.
+pub(super) fn config_diagnostics_mismatch(expected: &Value, report: &Value) -> Option<String> {
+    let files: serde_json::Map<String, Value> = report["files"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|f| Some((f["layer"].as_str()?.to_owned(), f.clone())))
+        .collect();
+    let mut actual = report.clone();
+    actual["files"] = Value::Object(files);
+    subset_mismatch(expected, &actual, "config_diagnostics")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

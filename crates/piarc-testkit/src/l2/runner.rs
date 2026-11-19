@@ -426,7 +426,26 @@ impl Driver<'_> {
             })
             .await?;
         }
-        self.check_provider_settings().await
+        self.check_provider_settings().await?;
+        self.check_config_diagnostics().await
+    }
+
+    async fn check_config_diagnostics(&self) -> Result<(), String> {
+        let Some(expected) = &self.spec.expect.config_diagnostics else {
+            return Ok(());
+        };
+        let report = call(
+            |done| {
+                self.core
+                    .config_diagnostics(Some(self.env.workspace.clone()), done)
+            },
+            "reading the configuration diagnostics",
+        )
+        .await?;
+        match super::checks::config_diagnostics_mismatch(expected, &report) {
+            Some(mismatch) => Err(mismatch),
+            None => Ok(()),
+        }
     }
 
     async fn configure_providers(&self) -> Result<(), String> {

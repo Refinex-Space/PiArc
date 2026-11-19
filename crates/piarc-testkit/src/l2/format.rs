@@ -547,6 +547,10 @@ pub struct Expect {
     /// Core requests per tool call.
     #[serde(default)]
     pub core_io: Vec<CoreIoExpect>,
+    /// A subset of Core's configuration diagnostics of the workspace after the run, with
+    /// `files` keyed by layer id (T24).
+    #[serde(default)]
+    pub config_diagnostics: Option<Value>,
 }
 
 /// One request assertion; every field present must hold.

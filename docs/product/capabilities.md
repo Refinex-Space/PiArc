@@ -9,7 +9,7 @@
 | 里程碑 | 能力数 | 已实现 | 计划中 | BLOCKED |
 |---|---|---|---|---|
 | M1 | 61 | 61 | 0 | 0 |
-| M2 | 33 | 7 | 26 | 0 |
+| M2 | 33 | 10 | 23 | 0 |
 | M3 | 21 | 0 | 21 | 0 |
 | M4 | 10 | 0 | 10 | 0 |
 | M5 | 7 | 0 | 7 | 0 |
@@ -87,11 +87,11 @@
 | CAP-ASK-001 | AskUserQuestion 结构化提问 | FR-HN-03、ARCH-6.5 | T26 | — | 计划中 |
 | CAP-CKPT-001 | 每次写入前保存快照，形成检查点 | FR-RV-03、ARCH-6.9 | T28 | — | 计划中 |
 | CAP-CKPT-REWIND-001 | 回退：恢复代码与对话、只恢复对话或只恢复代码，冲突时提示 | FR-RV-03、ARCH-6.9 | T28 | — | 计划中 |
-| CAP-CONFIG-COMPAT-001 | 读取 Claude Code 的 `.claude/settings*.json`（permissions 等与 PiArc 功能对应的键） | ARCH-6.14 | T24 | — | 计划中 |
-| CAP-CONFIG-DIAG-001 | 配置诊断：每个配置文件的加载状态与生效、覆盖、忽略的键（基础） | FR-EX-05、ARCH-6.14 | T24 | — | 计划中 |
+| CAP-CONFIG-COMPAT-001 | 读取 Claude Code 的 `.claude/settings*.json`（permissions 等与 PiArc 功能对应的键） | ARCH-6.14 | T24 | `config-merge-order`<br>`config-untrusted-project` | 已实现 |
+| CAP-CONFIG-DIAG-001 | 配置诊断：每个配置文件的加载状态与生效、覆盖、忽略的键（基础） | FR-EX-05、ARCH-6.14 | T24 | `config-merge-order`<br>`config-untrusted-project` | 已实现 |
 | CAP-CTX-COMPACT-001 | 自动压缩与手动 `/compact`，熔断与压缩后恢复关键上下文 | FR-CX-03、ARCH-6.6.4、ARCH-6.15 | T27 | — | 计划中 |
 | CAP-CTX-REMINDER-001 | 动态信息经 system reminder 送达，不破坏缓存 | ARCH-6.6.3 | T27 | — | 计划中 |
-| CAP-CTX-RULES-001 | `.claude/rules` 与 `paths:` 条件加载 | FR-CX-02、ARCH-6.14 | T24 | — | 计划中 |
+| CAP-CTX-RULES-001 | `.claude/rules` 与 `paths:` 条件加载 | FR-CX-02、ARCH-6.14 | T24 | `config-rules-paths` | 已实现 |
 | CAP-CTX-USAGE-001 | 上下文用量与分类明细 | FR-CX-04、ARCH-6.6.5 | T27 | — | 计划中 |
 | CAP-HOOK-COMPACT-001 | PreCompact 与 PostCompact hooks | FR-HN-05、ARCH-6.3.2 | T25 | — | 计划中 |
 | CAP-HOOK-NOTIFY-001 | Notification hook | FR-HN-05、ARCH-6.3.2 | T25 | — | 计划中 |

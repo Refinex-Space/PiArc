@@ -1,6 +1,6 @@
 id: config-untrusted-project
 description: Before the project is trusted, its .claude allow rules and additional directories do not apply while its deny and ask rules do, and a project-level bypassPermissions or auto mode never applies (T24).
-capabilities: [CAP-CONFIG-COMPAT-001]
+capabilities: [CAP-CONFIG-COMPAT-001, CAP-CONFIG-DIAG-001]
 workspace:
   trusted: false
   files:
@@ -40,3 +40,15 @@ expect:
         - { id: forbidden, is_error: true, contains: 'Bash(sed *)' }
         - { id: asked, is_error: false, contains: plain notes }
         - { id: outside, is_error: true }
+  config_diagnostics:
+    trusted: false
+    files:
+      claudeProject:
+        status: untrusted
+        ignored:
+          - { pointer: /permissions/additionalDirectories, reason: untrusted }
+          - { pointer: /permissions/allow, reason: untrusted }
+          - { pointer: /permissions/defaultMode, reason: projectMode }
+      claudeProjectLocal:
+        status: loaded
+        ignored: [{ pointer: /permissions/defaultMode, reason: projectMode }]

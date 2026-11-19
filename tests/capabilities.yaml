@@ -712,7 +712,7 @@ capabilities:
     milestone: M2
     refs: [FR-EX-05, ARCH-6.14]
     task: T24
-    status: planned
+    status: active
   - id: CAP-CONFIG-DIAG-002
     title: '配置诊断完善（全部配置来源）'
     milestone: M4
