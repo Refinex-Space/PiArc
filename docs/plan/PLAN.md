@@ -150,7 +150,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | R2 | [M1 评审](tasks/R2-m1-review.md) | 2 | T22 | macOS | high / 高 | 中 | 无 | 已完成 | f63ac3d |
 | W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 8a1f38b |
-| T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 未开始 | — |
+| T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 进行中 | — |
 | T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T26 | [计划模式、任务清单、AskUserQuestion 与下一步](tasks/T26-plan-mode-todo-ask-next-steps.md) | 3 | T25 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T27 | [上下文工程：system reminder、压缩与用量](tasks/T27-context-reminders-compaction-usage.md) | 3 | T26 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -308,6 +308,17 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+T24（开工基线 363b0d6，`npm run verify` 15/15；T23 部分完成的遗留项 A05 只涉及 Windows 的 PowerShell 场景，不影响本任务；T23 尚未推送，无 Windows CI 可核对）：
+
+- [ ] 1. 家目录注入（`CoreConfig.home`）与 `.claude/` 三个设置层 + `~/.claude.json` 只读加载，接入 ADR-0005 顺序与信任约束（A01、A02、A03、A05、A06）
+- [ ] 2. 键映射表（单一来源）与合并按表投影（A04）
+- [ ] 3. `.claude/rules/` 加载：无 `paths:` 进项目上下文、有 `paths:` 首次读写匹配文件时懒注入（A07）
+- [ ] 4. 不写 `.claude/`：写接口拒绝 + L2 目录快照比对（A08）
+- [ ] 5. 变更监听：`.claude/` 文件变化后重载并刷新诊断（A09）
+- [ ] 6. 配置诊断 Core API + NAPI + IPC + 设置页"配置诊断"（A10）
+- [ ] 7. L2 场景 `config-*.yaml` 与能力 ID
+- [ ] 8. 文档（piarc-config AGENTS.md、架构 6.14）、验收、收尾 verify（A11）
 
 ## 登记事项
 
