@@ -317,6 +317,17 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
         name: "disableAllHooks",
         shape: Shape::Bool,
     },
+    // Automatic compaction (T27, ADR-0043), same names and meaning as Claude Code's keys:
+    // `false` turns it off (`/compact` still works); the window caps the context the
+    // threshold is computed from (Core clamps it to 100,000–1,000,000 tokens).
+    Field {
+        name: "autoCompactEnabled",
+        shape: Shape::Bool,
+    },
+    Field {
+        name: "autoCompactWindow",
+        shape: Shape::Number,
+    },
     // `AskUserQuestion`'s form (T26): after this many seconds the questions' default options
     // stand, or the model hears that the user did not answer. Absent: no timeout.
     Field {

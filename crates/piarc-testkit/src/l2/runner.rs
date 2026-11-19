@@ -672,7 +672,7 @@ impl Driver<'_> {
     }
 
     async fn compact_session(&mut self, session: Option<&str>) -> Result<(), String> {
-        let accepted = self.op(session, Op::Compact).await?;
+        let accepted = self.op(session, Op::Compact(None)).await?;
         let turn = accepted["turnId"]
             .as_str()
             .ok_or_else(|| format!("no compaction turn was started: {accepted}"))?;

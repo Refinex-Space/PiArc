@@ -346,3 +346,81 @@ async fn legacy_encodings_are_read_and_written_back() {
         .expect_err("emoji");
     assert_eq!(error.data.kind, ErrorKind::UnencodableText);
 }
+
+/// T27-A07 (Core side): `fs/changes` reports a file this session read once it changes outside
+/// the session, once per version and per session; deletions too. The session's own writes are
+/// not changes. `fs/forgetReads` ends repeated-read stubs and keeps read-before-edit (I72).
+#[tokio::test]
+async fn external_changes_and_forgotten_reads() {
+    let f = Fixture::new("changes");
+    f.put("seen.txt", b"one\n");
+    f.put("gone.txt", b"x\n");
+    f.put("other.txt", b"o\n");
+    let whole = json!({});
+    for path in ["seen.txt", "gone.txt"] {
+        f.read("a", path, whole.clone()).await;
+    }
+    f.read("b", "other.txt", whole.clone()).await;
+    let changes = |session: &'static str| {
+        let f = &f;
+        async move {
+            f.call("fs/changes", json!({ "sessionId": session }))
+                .await
+                .expect("changes")["files"]
+                .clone()
+        }
+    };
+    assert_eq!(changes("a").await, json!([]));
+
+    f.put("seen.txt", b"two, longer\n");
+    std::fs::remove_file(f.file("gone.txt")).expect("removed");
+    f.put("other.txt", b"changed for b\n");
+    let a = changes("a").await;
+    let paths: Vec<&str> = a
+        .as_array()
+        .expect("list")
+        .iter()
+        .map(|c| c["path"].as_str().expect("path"))
+        .collect();
+    assert_eq!(paths.len(), 2, "{a}");
+    assert!(
+        paths[0].ends_with("gone.txt") && paths[1].ends_with("seen.txt"),
+        "{a}"
+    );
+    assert_eq!(a[0]["change"], "deleted");
+    assert_eq!(a[1]["change"], "modified");
+    assert_eq!(changes("a").await, json!([]), "each version once");
+    assert_eq!(changes("b").await.as_array().map(Vec::len), Some(1));
+
+    // The changed file still needs a new read before it is replaced.
+    assert_eq!(
+        kind(f.write("a", "seen.txt", "mine\n").await),
+        ErrorKind::FileModified
+    );
+    f.read("a", "seen.txt", whole.clone()).await;
+    f.write("a", "seen.txt", "mine\n").await.expect("written");
+    assert_eq!(changes("a").await, json!([]), "own writes are not changes");
+
+    // After a compaction the next read is full content again; the write needs no new read.
+    f.read("a", "seen.txt", whole.clone()).await;
+    assert_eq!(
+        f.read("a", "seen.txt", whole.clone()).await["unchanged"],
+        true
+    );
+    let forgotten = f
+        .call("fs/forgetReads", json!({ "sessionId": "a" }))
+        .await
+        .expect("forget");
+    // seen.txt and the deleted gone.txt (still in the table) had read ranges.
+    assert_eq!(forgotten["files"], 2);
+    assert_eq!(
+        f.read("a", "seen.txt", whole.clone()).await["unchanged"],
+        false
+    );
+    f.call("fs/forgetReads", json!({ "sessionId": "a" }))
+        .await
+        .expect("forget");
+    f.write("a", "seen.txt", "again\n")
+        .await
+        .expect("fresh after forgetting");
+}

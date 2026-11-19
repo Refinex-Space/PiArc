@@ -9,7 +9,13 @@
 //!   and the content still has the hash it saw;
 //! - is a `Read` a repeat ([`FileStates::record_read`]): the previous entry was a read of the
 //!   same range and the content has not changed;
+//! - which files changed outside the session since it saw them ([`FileStates::external_changes`],
+//!   T27): the metadata first, the hash only when the metadata differs, each new version once;
 //! - nothing else: the table never holds content.
+//!
+//! After a compaction the read ranges are forgotten ([`FileStates::forget_read_ranges`]): the
+//! model no longer sees the earlier results, so the next `Read` must not be a stub, while the
+//! hashes keep read-before-edit in force.
 //!
 //! The hash decides; a changed modification time with the same content (`touch`) is not a
 //! change. A session has one table; a subagent gets its own (T31) by being its own session.
@@ -24,6 +30,7 @@ use std::path::Path;
 use std::sync::{Condvar, Mutex, MutexGuard, PoisonError};
 use std::time::SystemTime;
 
+use piarc_protocol::context::ExternalChange;
 use piarc_protocol::fs::ReadRange;
 use sha2::{Digest, Sha256};
 
@@ -95,7 +102,32 @@ struct Entry {
     snapshot: Snapshot,
     /// The `Read` call's range; `None` after the session's own write.
     read: Option<ReadRange>,
+    /// What the last [`FileStates::external_changes`] found when the metadata differed from
+    /// the snapshot.
+    observed: Option<Observed>,
 }
+
+impl Entry {
+    fn new(snapshot: Snapshot, read: Option<ReadRange>) -> Self {
+        Self {
+            snapshot,
+            read,
+            observed: None,
+        }
+    }
+}
+
+/// A version of a file found outside the session's own reads and writes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Observed {
+    size: u64,
+    modified: Option<SystemTime>,
+    /// The content's hash; `None` when the file was gone.
+    sha256: Option<[u8; 32]>,
+}
+
+/// A file's size and modification time, as the platform reports them.
+pub type Metadata = (u64, Option<SystemTime>);
 
 /// One session's file state table.
 #[derive(Debug, Default)]
@@ -181,26 +213,82 @@ impl FileStates {
         let repeat = self.entries.get(&key).is_some_and(|entry| {
             entry.read.as_ref() == Some(&range) && entry.snapshot.sha256 == snapshot.sha256
         });
-        self.entries.insert(
-            key,
-            Entry {
-                snapshot,
-                read: Some(range),
-            },
-        );
+        self.entries.insert(key, Entry::new(snapshot, Some(range)));
         repeat
     }
 
     /// Records that the session wrote `snapshot` to the file `key`: it may change it again
     /// without reading it, and its next `Read` returns the content.
     pub fn record_write(&mut self, key: String, snapshot: Snapshot) {
-        self.entries.insert(
-            key,
-            Entry {
-                snapshot,
-                read: None,
-            },
-        );
+        self.entries.insert(key, Entry::new(snapshot, None));
+    }
+
+    /// The files whose content changed outside the session since it last read or wrote them,
+    /// sorted by key. `stat` gives a file's metadata (an `io::ErrorKind::NotFound` error means
+    /// it is gone); `hash` its content's hash, asked only when the metadata differs from what
+    /// the session saw. A version is reported once; the recorded snapshots do not change, so
+    /// replacing a changed file still needs a new read. Files `stat` or `hash` cannot read are
+    /// skipped.
+    pub fn external_changes(
+        &mut self,
+        mut stat: impl FnMut(&str) -> io::Result<Metadata>,
+        mut hash: impl FnMut(&str) -> io::Result<[u8; 32]>,
+    ) -> Vec<(String, ExternalChange)> {
+        let mut changes = Vec::new();
+        for (key, entry) in &mut self.entries {
+            let previous = entry.observed.as_ref().map(|o| o.sha256);
+            let (size, modified) = match stat(key) {
+                Ok(metadata) => metadata,
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                    if previous != Some(None) {
+                        changes.push((key.clone(), ExternalChange::Deleted));
+                        entry.observed = Some(Observed {
+                            size: 0,
+                            modified: None,
+                            sha256: None,
+                        });
+                    }
+                    continue;
+                }
+                Err(_) => continue,
+            };
+            let known = |m: Option<SystemTime>| m.is_some() && m == modified;
+            if size == entry.snapshot.size && known(entry.snapshot.modified) {
+                entry.observed = None;
+                continue;
+            }
+            if let Some(seen) = &entry.observed
+                && seen.sha256.is_some()
+                && seen.size == size
+                && known(seen.modified)
+            {
+                continue;
+            }
+            let Ok(sha256) = hash(key) else { continue };
+            entry.observed = Some(Observed {
+                size,
+                modified,
+                sha256: Some(sha256),
+            });
+            if sha256 != entry.snapshot.sha256 && previous != Some(Some(sha256)) {
+                changes.push((key.clone(), ExternalChange::Modified));
+            }
+        }
+        changes.sort_by(|a, b| a.0.cmp(&b.0));
+        changes
+    }
+
+    /// Forgets the read range of every file (after a compaction, I72): the next `Read` returns
+    /// the content again. Hashes stay, so replacing a file still needs no new read when it has
+    /// not changed. Returns how many files had a range.
+    pub fn forget_read_ranges(&mut self) -> usize {
+        let mut forgotten = 0;
+        for entry in self.entries.values_mut() {
+            if entry.read.take().is_some() {
+                forgotten += 1;
+            }
+        }
+        forgotten
     }
 
     /// Whether the file `key`, whose content now hashes to `current`, may be replaced.
@@ -322,6 +410,93 @@ mod tests {
             states.freshness("a", &snapshot("y").sha256),
             Freshness::Fresh
         );
+    }
+
+    #[test]
+    fn external_changes_report_each_new_version_once() {
+        use std::collections::HashMap;
+        use std::time::Duration;
+
+        let at = |s: u64| Some(SystemTime::UNIX_EPOCH + Duration::from_secs(s));
+        let mut states = FileStates::default();
+        let mut seen = snapshot("one");
+        seen.modified = at(1);
+        states.record_read("a".into(), seen.clone(), range(None, None));
+        let mut other = snapshot("x");
+        other.modified = at(1);
+        states.record_write("b".into(), other);
+
+        // (size, modified, content) of each file now; `None` means deleted.
+        type Disk<'a> = HashMap<&'a str, Option<(u64, Option<SystemTime>, &'a str)>>;
+        let mut disk: Disk = HashMap::new();
+        disk.insert("a", Some((3, at(1), "one")));
+        disk.insert("b", Some((1, at(1), "x")));
+        let mut hashes = 0;
+        let check = |states: &mut FileStates, disk: &Disk, hashes: &mut usize| {
+            states.external_changes(
+                |key| match disk.get(key).copied().flatten() {
+                    Some((size, modified, _)) => Ok((size, modified)),
+                    None => Err(io::Error::from(io::ErrorKind::NotFound)),
+                },
+                |key| {
+                    *hashes += 1;
+                    let text = disk.get(key).copied().flatten().map_or("", |f| f.2);
+                    Ok(snapshot(text).sha256)
+                },
+            )
+        };
+        assert!(check(&mut states, &disk, &mut hashes).is_empty());
+        assert_eq!(hashes, 0, "same metadata: no hashing");
+
+        // `touch`: new time, same content: not a change, hashed once.
+        disk.insert("a", Some((3, at(2), "one")));
+        assert!(check(&mut states, &disk, &mut hashes).is_empty());
+        assert!(check(&mut states, &disk, &mut hashes).is_empty());
+        assert_eq!(hashes, 1);
+
+        // A real change is reported once, again only for a newer version.
+        disk.insert("a", Some((3, at(3), "two")));
+        assert_eq!(
+            check(&mut states, &disk, &mut hashes),
+            vec![("a".to_owned(), ExternalChange::Modified)]
+        );
+        assert!(check(&mut states, &disk, &mut hashes).is_empty());
+        disk.insert("a", Some((5, at(4), "three")));
+        assert_eq!(
+            check(&mut states, &disk, &mut hashes),
+            vec![("a".to_owned(), ExternalChange::Modified)]
+        );
+        // The snapshot stays: replacing it still needs a read.
+        assert_eq!(
+            states.freshness("a", &snapshot("three").sha256),
+            Freshness::Modified
+        );
+
+        // Deleted, reported once; the session's own write starts over.
+        disk.insert("b", None);
+        assert_eq!(
+            check(&mut states, &disk, &mut hashes),
+            vec![("b".to_owned(), ExternalChange::Deleted)]
+        );
+        assert!(check(&mut states, &disk, &mut hashes).is_empty());
+        let mut again = snapshot("three");
+        again.modified = at(4);
+        states.record_read("a".into(), again, range(None, None));
+        assert!(check(&mut states, &disk, &mut hashes).is_empty());
+    }
+
+    #[test]
+    fn forgetting_read_ranges_keeps_freshness_and_ends_repeats() {
+        let mut states = FileStates::default();
+        states.record_read("a".into(), snapshot("x"), range(None, None));
+        states.record_write("b".into(), snapshot("y"));
+        assert_eq!(states.forget_read_ranges(), 1);
+        assert_eq!(
+            states.freshness("a", &snapshot("x").sha256),
+            Freshness::Fresh
+        );
+        assert!(!states.record_read("a".into(), snapshot("x"), range(None, None)));
+        assert!(states.record_read("a".into(), snapshot("x"), range(None, None)));
     }
 
     #[test]

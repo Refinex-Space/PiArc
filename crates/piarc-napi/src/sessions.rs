@@ -452,10 +452,22 @@ impl CoreRuntime {
         self.op(env, "CoreRuntime.followUpInput", id, Op::FollowUp(input))
     }
 
-    /// Compacts the conversation as a turn of its own (`/compact`); resolves with `{ turnId }`.
+    /// Compacts the conversation as a turn of its own (`/compact [focus]`); `instructions` is
+    /// what the summary should focus on. Resolves with `{ turnId }`.
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]
-    pub fn compact<'env>(&self, env: &'env Env, id: String) -> napi::Result<Object<'env>> {
-        self.op(env, "CoreRuntime.compact", id, Op::Compact)
+    pub fn compact<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        instructions: Option<String>,
+    ) -> napi::Result<Object<'env>> {
+        self.op(env, "CoreRuntime.compact", id, Op::Compact(instructions))
+    }
+
+    /// The session's context usage by category (T27); resolves with the `ContextUsage` JSON.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn context_usage<'env>(&self, env: &'env Env, id: String) -> napi::Result<Object<'env>> {
+        self.op(env, "CoreRuntime.contextUsage", id, Op::ContextUsage)
     }
 
     /// Stores an attachment (image or PDF bytes) for an open session; resolves with the

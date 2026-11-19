@@ -17,6 +17,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use piarc_host::{CallRecord, HostSupervisor};
+use piarc_protocol::context::SessionGetContextUsage;
 use piarc_protocol::history::{GetEntriesParams, SessionEntries, SessionGetEntries};
 use piarc_protocol::method::RequestMethod;
 use piarc_protocol::models::{self, EffortLevel};
@@ -54,8 +55,11 @@ pub enum Op {
     Steer(UserInput),
     /// A follow-up for after the running turn (starts a turn when idle).
     FollowUp(UserInput),
-    /// Compacts the conversation as a turn of its own (`/compact`; the session must be idle).
-    Compact,
+    /// Compacts the conversation as a turn of its own (`/compact [focus]`; the session must be
+    /// idle), with what the summary should focus on.
+    Compact(Option<String>),
+    /// The session's context usage (`session/getContextUsage`, T27).
+    ContextUsage,
     /// Switches the session permission mode and records a transcript entry.
     SetPermissionMode(piarc_protocol::policy::PermissionMode),
     /// Reads or changes the model and effort selection.
@@ -748,13 +752,21 @@ impl Request {
                 self.input::<SessionFollowUp>(&supervisor, input, hook_context)
                     .await
             }
-            Op::Compact => {
+            Op::Compact(instructions) => {
                 let request_id = new_session_id()?;
                 let params = SessionCompactParams {
                     session_id: self.id.clone(),
                     request_id: request_id.clone(),
+                    instructions: instructions.filter(|text| !text.trim().is_empty()),
                 };
                 self.call::<SessionCompact>(&supervisor, Some(&request_id), params)
+                    .await
+            }
+            Op::ContextUsage => {
+                let params = SessionTarget {
+                    session_id: self.id.clone(),
+                };
+                self.call::<SessionGetContextUsage>(&supervisor, None, params)
                     .await
             }
             Op::SetPermissionMode(mode) => {

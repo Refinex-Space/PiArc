@@ -107,6 +107,7 @@ impl HostConfig {
                 Capability::new("planMode"),
                 Capability::new("todo"),
                 Capability::new("ask"),
+                Capability::new("context"),
             ],
             allow_model_network: None,
             handshake_timeout: Duration::from_secs(10),

@@ -29,6 +29,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
+mod context;
 mod exec;
 mod files;
 mod git_status;
@@ -206,6 +207,7 @@ impl ToolIo {
                     | "policy/inputChunk"
                     | "policy/tools"
                     | "ui/ask"
+                    | "context/settings"
             )
     }
 
@@ -382,6 +384,9 @@ impl ToolIo {
             "policy/evaluate" => return self.evaluate(parse(method, params)?, peer).await,
             "policy/tools" => return self.denied_tools(parse(method, params)?).await,
             "ui/ask" => return self.ask(parse(method, params)?, peer).await,
+            "context/settings" => return self.context_settings(&parse(method, params)?).await,
+            "fs/changes" => return self.external_changes(&parse(method, params)?).await,
+            "fs/forgetReads" => return self.forget_reads(&parse(method, params)?),
             "policy/cancel" => {
                 let p: piarc_protocol::policy::PolicyPendingParams = parse(method, params)?;
                 return self.cancel_wait(&p.session_id, &p.tool_call_id, &peer);

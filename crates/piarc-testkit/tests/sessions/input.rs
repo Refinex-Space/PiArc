@@ -227,7 +227,7 @@ async fn compact_runs_as_a_turn_of_its_own() {
     )
     .await;
     events.turn_completed(&id, &turn).await;
-    let accepted = run(&core, &id, Op::Compact).await.expect("accepted");
+    let accepted = run(&core, &id, Op::Compact(None)).await.expect("accepted");
     let turn = accepted["turnId"].as_str().expect("turn").to_owned();
     let completed = events.turn_completed(&id, &turn).await;
     assert_eq!(completed["status"], "completed", "{completed}");
