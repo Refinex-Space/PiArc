@@ -6,11 +6,13 @@ import { TaskPanel } from '../transcript/TaskPanel.js';
 import { ContextPanel } from './ContextUsage.js';
 import { registerPanel } from './registry.js';
 
+// After the task card: the rail shows its first panel, and the task list (when there is one)
+// is what changes during a turn; the usage ring opens this card (`showPanel('context')`).
 registerPanel({
   id: 'context',
   area: 'rail',
   title: 'panel.context',
-  order: 30,
+  order: 50,
   when: (context) => context.sessionId !== undefined,
   render: (context) =>
     context.sessionId === undefined ? null : <ContextPanel sessionId={context.sessionId} />,
