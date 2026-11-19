@@ -11,7 +11,10 @@ providers:
           - {
               id: toolu_tool,
               name: Bash,
-              input: { command: 'l2-login-tool; echo "profile: $LC_TIME; private: ${L2_LOGIN_PROFILE-unset}"' },
+              input:
+                {
+                  command: 'l2-login-tool; echo "profile: $LC_TIME; private: ${L2_LOGIN_PROFILE-unset}"',
+                },
             }
       - text: 'Ran it.'
 approvals:
@@ -25,5 +28,9 @@ expect:
   requests:
     - index: 1
       tool_results:
-        - { id: toolu_tool, is_error: false, contains: "login PATH works\nprofile: C; private: unset\n" }
+        - {
+            id: toolu_tool,
+            is_error: false,
+            contains: "login PATH works\nprofile: C; private: unset\n",
+          }
   request_counts: { main: 2 }
