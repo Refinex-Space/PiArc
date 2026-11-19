@@ -302,6 +302,8 @@ providers:                        # mock 端点，可定义多个；名称为小
     validation: { rules: { role_order: false } }   # 可选，与第 10.3 节相同
     vision: true                  # 可选：导入的模型夹具接受图片输入（缺省只有文本）
     reasoning: true               # 可选：导入的模型夹具支持 effort
+    context_window: 32000         # 可选（T27）：模型的上下文窗口，缺省 200000
+    max_tokens: 4096              # 可选（T27）：模型的最大输出，缺省 4096
     steps: [...]                  # 与第 10.3 节的 steps 相同
 sessions:                         # 可选；缺省为一个会话 main，使用唯一的端点、工作目录为工作区
   a: { provider: one, cwd: 'alpha dir' }
@@ -317,6 +319,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 - `workspace.run_files` 在该次运行的临时根下建立夹具，可设置祖先目录的 memory、模拟家目录 `home 家/`、数据目录 `data 数据/` 或用于审批的相邻文件。`workspace.git: true` 在工作区创建空仓库，便于验证初始 Git 状态。
 - 会话通常在动作开始前建立。`sessions.<label>.deferred: true` 将该会话的创建推迟到第一次输入，可验证跨会话的授权与配置。
 - 按字节的夹具放在 `tests/scenarios/fixtures/`（`.gitattributes` 设为 `-text`，换行与编码不被 Git 改动）；加载时检查夹具存在。PDF 夹具用 `piarc-fs` 测试里的 `make_pdf` 生成，手写的 PDF 可能取不到文字。
+- 压缩场景（T27，`ctx-*.yaml`）：用 `context_window`、`max_tokens` 与步骤的 `usage` 精确触发阈值（Pi 以回复报告的 `input + output + cacheRead + cacheWrite` 判断）；要让短对话有可摘要的内容，在信任的工作区写 `.pi/settings.json: '{"compaction":{"keepRecentTokens":1}}'`。项目层的 `autoCompactWindow` 写在 `.piarc/settings.json` 或 `.claude/settings.json`。
 
 ### 12.2 动作
 
@@ -327,7 +330,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | `prompt` | `text`、`turn`（标签） | `session_op(Prompt)`，记下回合 id |
 | `steer`、`follow_up` | `text`、`item`（标签）、`turn` | 运行中进入排队表（`item` 记下排队项 id）；空闲时直接开始回合（`turn` 记下回合 id） |
 | `queue_edit`、`queue_delete`、`queue_reorder` | `item`/`text`；`items`（全部标签的新顺序） | 改排队表 |
-| `compact` | — | 经 Core 执行内置 `/compact`，记录这次压缩启动的回合并等待完成 |
+| `compact` | `instructions`（可选） | 经 Core 执行内置 `/compact`（T27 起可带重点说明，等同 `/compact <重点>`），记录这次压缩启动的回合并等待完成 |
 | `set_model` | `provider`、`preview` | 预览切换，断言预览字段符合 `preview`，然后经会话 API 确认切换 |
 | `set_effort` | `effort` | 经会话 API 设置当前模型支持的档位 |
 | `abort` | — | 中断当前回合 |
@@ -337,6 +340,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | `resume` | — | `resume_session` 重新打开会话 |
 | `fork` | `at_text`、`as` | 读会话历史，在文本等于 `at_text` 的回复所在 entry 处 fork（T26）；新会话记在 `as` 标签下，该标签必须是 `sessions` 中 `deferred: true` 的会话 |
 | `check_harness` | `fields` | 读会话历史的 `harness`（分支上的当前计划与任务清单，T26）做字段子集比较；`null` 表示两者都没有 |
+| `check_usage` | `fields`、`positive` | 读 Core 的 `contextUsage`（T27）：各类别之和必须等于 `tokens`（总是检查），`fields` 做字段子集比较，`positive` 列出必须大于零的类别 |
 
 `prompt`、`steer`、`follow_up` 都可带客户端的 `request_id`（重发时沿用），以及 `mentions` 和 `attachments`；`rejected: <文本>` 要求 Core 拒绝这条输入、错误消息含该文本（UserPromptSubmit hook 阻断，T25），不记回合。提及按 Core 输入格式写 `{path, start, end}`，两个偏移是发送文本中 `@path` 的 UTF-16 起止位置。附件写 `{fixture, mime_type}`；运行器读取 `fixtures/` 中对应文件并调用 Core 的 `store_attachment`，将返回的引用随输入发送。面板的键盘交互在 L4 验证。
 

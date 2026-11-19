@@ -19,6 +19,11 @@ Core 层的集成测试在 `crates/piarc-core/tests/tool_io.rs`（越界、会�
 4. `Scope::check(path, Access)`：读允许工作区根、已添加目录（`with_added_dir`）与只读目录（`with_read_only_dir`，会话临时目录）；写只允许前两者，且路径的任一组件不能是 `.git`、`.piarc`、`.claude`、`.pi`，文件名不能是 shell 配置文件（`access::SHELL_CONFIG_FILES`）。否则 `Error::NeedsApproval`，不触碰目标。`Scope::resolve` 保留命令工作目录的边界（`OutsideWorkspace`）。
 5. 状态表的键 `Scope::key`：`display()` 后的路径，根所在的卷大小写不敏感时整体转小写。是否不敏感在 `Scope::new` 时探测一次：把根路径中最深的含 ASCII 字母的组件换大小写，看是否指向同一目录。
 
+## 文件状态表的 T27 扩展
+
+- `FileStates::external_changes(stat, hash)`：按记录比对磁盘，大小与修改时间相同即未变（不读内容），不同才算哈希；哈希不同或文件已删除才报告，同一版本只报告一次（`Entry.observed`），记录的快照不变。I/O 以闭包注入，单元测试用内存里的"磁盘"。
+- `FileStates::forget_read_ranges()`：压缩后清掉读取范围，下一次 Read 返回全文而不是存根；哈希保留，先读后改仍成立。`contains(key)` 供 Core 判断能否做 `restore` 读。
+
 ## 阈值与常量
 
 `MAX_READ_CHUNK`、`MAX_BLOB_BYTES`（32 MiB）、`MAX_UPLOAD_BYTES`（64 MiB）在 `piarc_protocol::fs`；`DETECT_BYTES`（编码检测看前 8 MiB）在 `content.rs`；PDF 的 `MAX_PAGES_WITHOUT_RANGE`（10）、`MAX_PAGES_PER_READ`（20）在 `pdf.rs`。工具结果的 50K/200K 不在这里，在 `agent-host/src/harness/tool-results.ts`。

@@ -1,6 +1,9 @@
 // T27 without a live session: the compaction threshold, what a compaction gives back and its
 // limits, the circuit breaker, the summary prompt and the context usage by category.
-import { SessionManager } from '@earendil-works/pi-coding-agent';
+import path from 'node:path';
+import os from 'node:os';
+
+import { SessionManager, SettingsManager } from '@earendil-works/pi-coding-agent';
 import type { AssistantMessage } from '@earendil-works/pi-ai';
 import { describe, expect, it } from 'vitest';
 
@@ -325,5 +328,42 @@ describe('context usage', () => {
     const smaller = withReportedTotal(estimate, 50);
     expect(totalOf(smaller)).toBe(50);
     expect(smaller.unclassified).toBe(0);
+  });
+});
+
+describe('session settings overrides', () => {
+  it("survive Pi's settings reload because they are applied before every run", async () => {
+    const dir = path.join(os.tmpdir(), `piarc-t27-settings-${String(process.pid)}`);
+    const settings = SettingsManager.create(dir, dir, { projectTrusted: false });
+    // What T14 did: an override before the session's resources load is lost on reload.
+    settings.applyOverrides({ retry: { provider: { maxRetries: 0 } } });
+    await settings.reload();
+    expect(settings.getSettings().retry).toBeUndefined();
+    const model = { contextWindow: 32_000, maxTokens: 4096, provider: 'p', id: 'm' };
+    const manager = SessionManager.inMemory('/w');
+    const reminders = new Reminders();
+    const compaction: SessionCompaction = new SessionCompaction({
+      sessionId: 's',
+      manager,
+      cwd: '/w',
+      session: () => ({ model, settingsManager: settings }) as never,
+      reminders,
+      memory: new SessionMemory(manager, '/w', DEFAULT_PROFILE, undefined, same, reminders),
+      canonical: same,
+      usage: () => {
+        throw new Error('not used');
+      },
+      bridge: undefined,
+      io: undefined,
+      hooks: undefined,
+      appended: () => undefined,
+      log: () => undefined,
+    });
+    compaction.apply();
+    const applied = settings.getCompactionSettings(model);
+    expect(settings.getProviderRetrySettings().maxRetries).toBe(0);
+    expect(applied.enabled).toBe(true);
+    // Pi compacts when tokens > window − reserve: exactly from the threshold 14,904.
+    expect(32_000 - applied.reserveTokens).toBe(14_904 - 1);
   });
 });
