@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.32（2026-11-19） |
+| 版本 | 2.33（2026-11-19） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -495,6 +495,7 @@ T07 实测（S4，ADR-0020）：Pi 1.5.2 的 Operations 覆盖 bash、find（给
 | TodoWrite | 任务清单（6.5） | 否 | M2 |
 | AskUserQuestion | 结构化多选/输入，UI 表单 | 否 | M2 |
 | EnterPlanMode / ExitPlanMode | 6.5 | 否 / 是 | M2 |
+| SuggestNextSteps | 回合末的下一步建议（6.5） | 否 | M2 |
 | Agent | 子 agent（6.4） | 否 | M3 |
 | Skill | 6.7 | 视 skill | M3 |
 | ToolSearch | 延迟加载工具检索（复用 Pi `tool_search`） | 否 | M3 |
@@ -552,7 +553,7 @@ T23 落地（ADR-0037）：
 | 规则 | `piarc_policy::rules`：命令通配（末尾 ` *` 兼配裸命令、`:*` 等价）、gitignore 路径与 `//`、`~/`、`/`（规则来源目录）、相对四种锚点、WebFetch 域名、Agent/Skill 名称、MCP 工具与 server、工具名通配（allow 只接受 `mcp__<server>__` 之后）；无效的 deny/ask 规则使所点名工具的调用询问 |
 | 来源 | 企业（M5）> 会话 > `.piarc/settings.local.json` > `.piarc/settings.json` > `.claude/` 两层（T24）> 用户 PiArc > `~/.claude`；`piarc_config::Settings::permission_lists` 按层给出，项目未受信任时不含项目 allow |
 | Bash | `piarc_policy::bash`：tree-sitter-bash 0.25.1 拆分子命令与影子命令，剥离包装与安全前置赋值；只读白名单与 Accept edits 文件命令的路径在会话目录内、程序经 PATH 解析且在执行时钉住才自动允许；关键路径删除在任何模式询问；解析失败与不可判定的命令在任何模式询问 |
-| 阶梯 | `piarc_policy::decide`：第 1 步取来源为企业的 deny，第 2、8 步是 Core 的 `PolicyHooks` 插槽（T25 填入），插槽的 allow 不越过 deny、ask 与计划模式；plan 拒绝写工具与非只读命令并让模型先提交计划 |
+| 阶梯 | `piarc_policy::decide`：第 1 步取来源为企业的 deny，第 2、8 步是 Core 的 `PolicyHooks` 插槽（T25 填入），插槽的 allow 不越过 deny、ask 与计划模式；plan 拒绝写工具与非只读命令并让模型用 ExitPlanMode 提交计划；T26 在第 3 步之后加 `ExitPlanMode`：plan 模式必问（`planApproval`，PermissionRequest hook 不能代答），其他模式拒绝（ADR-0042） |
 | 模式 | 跳过权限需用户级 `permissions.enableBypassPermissions` 并经主进程原生确认；项目级 `bypassPermissions`/`auto` 忽略并审计；所选模式记入 `workspaces.default_mode` |
 | 总是允许 | 每个仍需批准的子命令一条 `Bash(<命令名 子命令> *)`，审批卡逐行可编辑，原生确认列出全部规则 |
 | 管理与审计 | 设置窗口"权限"页按来源增删改 PiArc 可写文件中的规则（新增或修改 allow 规则经原生确认），审计按会话、工具、结论、时间筛选 |
@@ -616,6 +617,18 @@ handler 类型：`command`（M2）→ `http`、`prompt`（M3）→ `mcp_tool`（
 - **下一步框**：Harness Kit 注册宿主工具（例如 `SuggestNextSteps`），模型在回合结束时调用，客户端渲染为可点击的建议（开始新会话 / 在此执行）。这类"宿主注入的工具"对所有服务商一致生效，借鉴自 OpenClaudeDesktop 的做法。
 - **AskUserQuestion**：结构化问题（单选、多选、自由输入）经 AHP 到客户端表单；可设置超时后按默认继续。
 
+T26 落地（ADR-0042）：
+
+| 部分 | 实现 |
+|---|---|
+| 模式切换 | 模式由 Core 持有；`EnterPlanMode` 按只读工具裁决，允许时 Core 切到 plan（不记工作区）；`ExitPlanMode` 在 plan 模式必问（计划卡），其他模式拒绝；允许后的新模式随 `policy/evaluate` 结果的 `mode` 交回，Agent Host 写 `piarc.permissionMode` 并投影 `permissionModeChanged` |
+| 计划卡与面板 | 审批卡 `kind: "plan"`（`plan`）；批准时答复带 `mode`（`acceptEdits`、`default`，记入工作区），继续规划以 `deny` 带反馈与行内评论（UTF-16 偏移锚定、引文须与原文一致）作为拒绝理由回给模型；计划面板是停靠 tile，以原文显示并在选区上加评论 |
+| 计划 entry | 批准后执行 `ExitPlanMode`，写 `piarc.plan` 并发 `harness/plan`；`currentPlan(entries)` 取分支上最后一条，是 T27 的注入接口 |
+| 任务清单 | `TodoWrite` 用 Claude Code 的参数，`details.todos` 以协议形状保存；`currentTodos` 取分支上最后一个成功结果（随 fork 与回退回溯）；调用完成后发 `harness/todo`；有未完成项且 8 轮工具调用（`TODO_REMINDER_ROUNDS`）未更新时提醒 |
+| 提问 | 工具执行时发 `ui/ask`，Core 以 `kind: "question"`（`questions`）的卡片放入同一账本；`allowOnce` 带 `answers` 作答，`deny` 不回答；超时取 `askUserQuestion.timeoutSeconds`，按选项的 `default` 继续或报告未作答，计时用注入的时钟；结果是逐题带 `outcome` 的 JSON |
+| 下一步 | `SuggestNextSteps` 立即返回；客户端"在此执行"作为本会话下一条输入，"开始新会话"在同一工作区以它为首条输入 |
+| 重新加载 | `session/history` 结果带 `harness`（`plan`、`todos`），客户端据此恢复任务卡片与计划面板 |
+
 ### 6.6 上下文工程
 
 #### 6.6.1 System prompt 组装
@@ -652,6 +665,8 @@ T22 的具体顺序为用户 `~/.claude/CLAUDE.md`、PiArc 数据目录的 `MEMO
 #### 6.6.3 System reminder
 
 Harness Kit 以带标记的自定义消息（Pi `sendMessage` 的 custom message）注入运行时提示：任务清单长期未更新、文件被外部修改、plan 模式约束、后台任务完成、懒加载的 memory、hooks 追加的上下文。客户端默认不显示这些消息，详细视图下可见。
+
+T26 建立 `agent-host/src/harness/reminders.ts`（ADR-0042 第 6 条）：按键排队、同键替换、可撤回，以 `piarc.reminder`（首行 `[PiArc reminder]`）在运行开始或一轮工具调用之后送达并持久化；目前承载 plan 模式开关与任务清单未更新两类提醒，T27 在它上面扩展统一通道。
 
 #### 6.6.4 压缩
 
@@ -772,7 +787,7 @@ T21 的 `models/list` 返回可用模型的 `provider`、`id`、`name`、`contex
 T24 落地（ADR-0038）：
 
 - 读取的文件与层级：`~/.claude/settings.json`（`claudeUser`）、`.claude/settings.json`（`claudeProject`）、`.claude/settings.local.json`（`claudeProjectLocal`）按 ADR-0005 第 3 条与 PiArc 的三个文件同表合并；`~/.claude.json` 不是设置层，配置诊断只列出它的键名。家目录由 Core 注入（`CoreConfig.home`），测试一律用临时目录。
-- 键映射表是唯一判断（`piarc_config::claude::SETTINGS_KEYS`，按官方 settings 索引逐键归类）。M2 实际生效的键：`permissions.allow`、`permissions.ask`、`permissions.deny`、`permissions.defaultMode`、`permissions.additionalDirectories`，T25 起加上 `hooks`、`disableAllHooks`（ADR-0039）。由后续任务支持的键：`plansDirectory`（T26）；`autoCompactEnabled`、`autoCompactWindow`（T27）；`fileCheckpointingEnabled`（T28）；`model`、`effortLevel`（T29）；`agent`、`advisorModel`（T31）；`worktree`（T35）；`enableAllProjectMcpServers`、`enabledMcpjsonServers`、`disabledMcpjsonServers`、`allowedMcpServers`、`deniedMcpServers` 与 `~/.claude.json` 的 MCP 段（T36）；`outputStyle`、`disableBundledSkills`、`skillOverrides`、`disableSkillShellExecution`（T37）；`allowedHttpHookUrls`、`httpHookAllowedEnvVars`（T38）；`sandbox`（T39）；`enabledPlugins`、`extraKnownMarketplaces`（T40）；`autoMode`、`disableAutoMode`、`useAutoModeDuringPlan`（T46）；`autoMemoryEnabled`、`autoMemoryDirectory`（T47）。其余键（含 `env`、`theme`、`language` 等终端偏好、账号与遥测、只在托管设置中有效的键）标为"已忽略"，表外的键为"未知"，都在诊断中逐个列出。
+- 键映射表是唯一判断（`piarc_config::claude::SETTINGS_KEYS`，按官方 settings 索引逐键归类）。M2 实际生效的键：`permissions.allow`、`permissions.ask`、`permissions.deny`、`permissions.defaultMode`、`permissions.additionalDirectories`，T25 起加上 `hooks`、`disableAllHooks`（ADR-0039）。由后续任务支持的键：`plansDirectory`（原定 T26；T26 按任务要求把计划存为会话 entry，未支持计划文件目录，I104 交 R3 决定）；`autoCompactEnabled`、`autoCompactWindow`（T27）；`fileCheckpointingEnabled`（T28）；`model`、`effortLevel`（T29）；`agent`、`advisorModel`（T31）；`worktree`（T35）；`enableAllProjectMcpServers`、`enabledMcpjsonServers`、`disabledMcpjsonServers`、`allowedMcpServers`、`deniedMcpServers` 与 `~/.claude.json` 的 MCP 段（T36）；`outputStyle`、`disableBundledSkills`、`skillOverrides`、`disableSkillShellExecution`（T37）；`allowedHttpHookUrls`、`httpHookAllowedEnvVars`（T38）；`sandbox`（T39）；`enabledPlugins`、`extraKnownMarketplaces`（T40）；`autoMode`、`disableAutoMode`、`useAutoModeDuringPlan`（T46）；`autoMemoryEnabled`、`autoMemoryDirectory`（T47）。其余键（含 `env`、`theme`、`language` 等终端偏好、账号与遥测、只在托管设置中有效的键）标为"已忽略"，表外的键为"未知"，都在诊断中逐个列出。
 - 信任约束与 PiArc 项目层相同：信任前项目层的 allow、`additionalDirectories`、`acceptEdits` 不生效，deny 与 ask 照常生效；项目层的 `bypassPermissions`、`auto` 始终不生效，诊断注明原因。生效键类型错误时整份文件跳过并给出 JSON Pointer，JSON 语法错误给出行列，其他文件照常加载。
 - `.claude/` 文件与 PiArc 设置一起被监听，变化后重新加载并发 `core/settings`；新增的可执行项沿用第 10.2 节的快照确认。PiArc 的写接口拒绝 `.claude/` 下与 `.claude.json` 的任何路径（`permissionDenied`），L2 运行器在每个场景前后比对 Claude Code 配置的快照。
 - 配置诊断的 Core API 为 `config_diagnostics`（NAPI `configDiagnostics`），与权限裁决用同一次加载；设置窗口"配置诊断"页按文件列出并可展开每个键的本文件取值、最终取值与来源。T41 在此基础上补全插件与企业来源。
@@ -910,6 +925,8 @@ T21 增加 `session/previewModelSwitch`、`session/setModel`、`session/setEffor
 T19（ADR-0030）为 `session/prompt`、`session/steer`、`session/followUp` 添加可选的提及区间与附件引用，`session/queueChanged` 和 `userMessage` 可带相同元数据。每次模型回复结束时 `turn/usage` 发本回合的累计用量，失败的 `turn/completed` 提供 `errorKind`、`retryable`。`session/compact` 在空闲会话中开始独立回合。
 
 **Core → Agent Host 通知**：`exec/output`（T07）、`secrets/changed`（T08）。
+
+T26 已实现（ADR-0042）：Agent Host → Core 的请求 `ui/ask`（能力 `ask`）与通知 `harness/todo`（能力 `todo`）、`harness/plan`（能力 `planMode`）；`policy/evaluate` 结果新增可选的 `mode`（允许的调用切换到的权限模式）；`session/history` 结果新增可选的 `harness`（分支上的当前计划与任务清单）。Core API 的审批卡新增 `kind: "plan"` 与成员 `plan`、`questions`，答复新增 `mode`、`comments`、`answers`。
 
 T25 已实现（ADR-0039）：Agent Host → Core 的 `hooks/run`（能力 `hooks`）报告 SessionStart、SessionEnd、PostToolUse、PostToolUseFailure、Stop、PreCompact、PostCompact，参数为会话、事件、`cwd`（须在该连接的工作区内）、可选的 `transcriptPath`、事件特有字段 `input`（Claude Code 的字段名，Core 按事件白名单取用并自己填通用字段）与 Stop 的 `continuations`；结果的成员都可选：`block`、`context`、`feedback`、`updatedOutput`、`instructions`、`stop`。`hooks/run` 不设传输期限，输入超过一个帧时 Agent Host 截断长字符串。`policy/evaluate` 的结果新增可选的 `updatedInput`、`context`、`stop`；Core 在运行 PreToolUse 或 PermissionRequest hooks 之前发 `policy/pending`，停止该调用的传输期限。`session/prompt`、`session/steer`、`session/followUp` 新增可选的 `hookContext`（UserPromptSubmit 的上下文）。
 
@@ -1056,6 +1073,7 @@ diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高�
 - **设置**（独立窗口）：通用、模型与服务商（每模型显示名、上下文窗口、图片输入、默认 effort；密钥加密存储）、权限（规则可视化管理、审计记录）、hooks、MCP、skills 与插件、memory 文件、沙箱、外观、快捷键、配置诊断、关于与更新。
 - **系统集成**：见第 8.8 节。
 - T18 落地（ADR-0029）：窗口为侧栏 | 主区（+ 右栏）在上、停靠面板区在下；右栏与面板区是注册式容器（`src/renderer/shell/registry.ts` 的 `registerPanel`），没有注册内容时不渲染，尺寸存于窗口的 localStorage。侧栏按工作区分组，组内置顶在前、其余按最近更新；徽标形状各不相同（出错为圆形加叹号、等待审批为方形加问号、运行中为旋转的环、未读为圆点），不只靠颜色区分。新建会话的顺序是：需要时先显示信任对话框，再立即显示乐观消息（`flushSync`），然后创建会话、发送首条输入；任一步失败，回到新建视图并把文字放回输入框；会话已创建但首条输入失败时关闭该会话（Pi 没有回复就不写文件，不留痕迹）。设置窗口是独立的 `BrowserWindow`（`#/settings`），页面经 `src/renderer/settings/registry.ts` 的 `registerSettingsPage` 注册，T18 注册通用、外观、快捷键三页。
+- T26（ADR-0042）：transcript 中 `TodoWrite` 是任务卡（进行中项高亮、完成计数），`ExitPlanMode` 是计划卡（摘要与状态，可在计划面板中打开），`AskUserQuestion` 的结果按题列出，`SuggestNextSteps` 是下一步建议（每条"在此执行""开始新会话"）；待批的计划与提问在审批卡位置显示为计划审批卡与提问表单，沿用审批热键、400 ms 防误触与输入法守卫；右栏注册任务卡片（会话有任务清单时），停靠区注册计划面板（会话有待批或已批准的计划时）。
 - T19 的会话主区使用第 8.4 节的行组件与 ProseMirror 输入。提及胶囊显示文件名，发送时按相对路径展开。附件经主进程存入 Core 的会话附件目录，模型收到图像块或 PDF 提取文本。内置命令由 Core 提供，运行中的 steer、follow-up 与队列编辑都经会话 API 执行。
 
 ### 8.3 状态与数据流
@@ -1580,6 +1598,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.33 | 2026-11-19 | T26（ADR-0042）补充第 6.1.4 节 SuggestNextSteps、6.2.3 节 ExitPlanMode 的裁决步、6.5 节计划模式、任务清单、提问与下一步的落地、6.6.3 节 `reminders` 模块、6.14 节 `plansDirectory` 未在 T26 支持（I104）、7.4 节 `ui/ask`、`harness/todo`、`harness/plan` 与新增成员、8.2 节计划卡、提问表单、任务卡片与下一步建议 |
 | 2.32 | 2026-11-19 | W1（ADR-0040、0041）：第 11 章无需用户参与的权限裁决（Windows p95 ≤ 10 ms）与小文件 AHP 往返（Windows p95 ≤ 15 ms）按平台给预算，填入 Windows 实测；6.11 写明 Git Bash 用 `pwd -W` 报告最终目录；15.2 路径一行写明保留名的处理；第 16 章记录 M1 的 Windows 结论。 |
 | 2.31 | 2026-11-19 | T25（ADR-0039）补充第 6.3.1 节 hooks 的落地与 Stop 续跑上限 8、6.14 节 `hooks`/`disableAllHooks` 生效、7.4 节 `hooks/run` 与 `policy/evaluate`、会话输入的新增成员、9.2 节 hook 审计记录 |
 | 2.30 | 2026-11-18 | T24（ADR-0038）补充第 6.14 节 Claude Code 配置兼容的落地与 M2 生效键清单、6.6.2 节 rules 的顺序与条件注入、7.4 节 `fs/memory` 的新增成员 |

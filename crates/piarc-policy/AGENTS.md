@@ -17,6 +17,7 @@ Core 的权限裁决（T20 起，T23 完整版）：Claude Code 格式的规则�
 | 1 | 企业策略 deny（来源 id 为 `enterprise` 的 deny 命中，M5 才有该层） | 拒绝 |
 | 2 | PreToolUse 插槽（T25）：deny → 拒绝；ask → 询问；allow → 跳到第 6 步，但不越过 3、4、5 | |
 | 3 | deny 规则（Bash 任一子命令、路径、名称） | 拒绝 |
+| 3b | `ExitPlanMode`（T26）：plan 模式询问（`planApproval`，第 8 步插槽不能代答），其他模式拒绝（`NOT_IN_PLAN_MODE`） | |
 | 4 | ask 规则、可能命中的 deny（含运行期值的命令）、关键路径删除、无法静态判定、无效的 deny/ask 规则、`requiresUserInteraction` | 询问 |
 | 5 | plan：写工具与非只读命令拒绝（`PLAN_MODE_REFUSAL`）；bypass：允许 | |
 | 5b | 受保护路径写入（Manual、Accept edits） | 询问 |

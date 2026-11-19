@@ -31,6 +31,7 @@ AHP 与 Core API 数据类型的唯一来源：Rust 类型 → JSON Schema → `
 - `contracts` 名中 `jsonrpc/`、`envelope/` 留给顶层消息类型，`framing/` 留给帧用例目录，方法不得使用。
 - 错误：crate 内 `Error`（`kind()`、`retryable()`、`to_error_object()`）；线上形状是 `rpc_error::ErrorObject`，应用错误码取 `-32099..=-32000`。
 
+- `harness.rs`（T26）：任务清单、计划、提问的类型与 `harness/todo`、`harness/plan`、`ui/ask`；审批卡的 `plan`、`questions` 与答复的 `mode`、`comments`、`answers` 在 `policy.rs` 引用它们。评论偏移是计划原文的 UTF-16 码元。
 - `models.rs` 定义目录、设置 Host 写入与公开状态、会话切换与代价预览。可空价格字段用 JSON `null` 表达未知；切换输入明确区分目标模型和当前 effort。
 
 ## 易错点

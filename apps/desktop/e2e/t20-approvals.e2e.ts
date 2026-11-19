@@ -164,10 +164,23 @@ test('guards approval shortcuts with the actual composer, focused card and visib
         connectionEpoch: 2,
         tool: 'AskUserQuestion',
         kind: 'question',
+        questions: [
+          { question: 'Which database?', options: [{ label: 'SQLite' }, { label: 'Postgres' }] },
+        ],
       },
     ]);
   });
+  // T26 replaced the M1 placeholder (which declined every question) with the form.
   const question = page.locator('[data-approval-card="question"]');
-  await expect(question).toContainText('does not support');
+  await expect(question).toContainText('Which database?');
+  await question.getByLabel('Postgres').check();
+  await question.getByTestId('question-submit').click();
+  await expect.poll(answers).toContainEqual(
+    expect.objectContaining({
+      requestId: 'ask',
+      decision: 'allowOnce',
+      answers: [{ selected: ['Postgres'] }],
+    }),
+  );
   await question.screenshot({ path: info.outputPath('question.png'), animations: 'disabled' });
 });

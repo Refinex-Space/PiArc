@@ -58,6 +58,13 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - `harness/hooks.ts` 的 `SessionHooks`（Core 启用 `hooks` 能力时每会话一个，排在结果预算之后）把 Pi 的 `session_start`、`session_shutdown`、`tool_result`、`agent_before_settle`、`session_before_compact`、`session_compact` 经 `hooks/run` 交给 Core（不在本进程执行命令，失败照常进行）；上下文是不显示的 `piarc.hookContext` 消息（首行 `[PiArc hook context]`，`memory-wire.ts` 在 Anthropic 线格式上合并）。SessionStart 不阻塞会话打开，首个 `before_agent_start` 等它。
 - `preflight` 的 `updatedInput` 原地替换 `event.input`，`context`、`stop` 记在 `SessionHooks.notes` 到 `tool_result` 处理；Core 在 hooks 前发 `policy/pending` 停住期限，不要去掉 `policy/evaluate` 的期限。`hooks/run` 无期限，超帧输入由 `fitFrame` 截断（否则 Core 丢帧、回合永远等）。PreCompact 有指令时用 Pi 导出的 `compact()` 生成摘要（Pi 1.5.2 不回读指令）。
 
+## 宿主工具（T26，ADR-0042）
+
+- `harness/session-harness.ts` 按 Core 启用的能力（`planMode`、`todo`、`ask`）注册 `EnterPlanMode`、`ExitPlanMode`（`plan-mode.ts`）、`TodoWrite`（`todos.ts`）、`AskUserQuestion`（`questions.ts`，经 `ui/ask`）与 `SuggestNextSteps`（`next-steps.ts`），排在 Core 工具之后；描述在 `tools/profile.ts`，工具指引与提醒文案在 `harness/prompts/`（改后跑原创性检查）。
+- 模式切换只走 `PlanMode.record`：模式菜单（`session/setPermissionMode`）与 `policy/evaluate` 结果的 `mode`（EnterPlanMode、批准的计划，在调用执行前）都写 `piarc.permissionMode` 并投影；进出 plan 时排队 `mode` 提醒，模型自己调用的工具结果就是告知（`acknowledge` 撤回提醒）。
+- `reminders.ts` 是提醒的唯一通道：`piarc.reminder` 自定义消息在 `before_agent_start` 与带工具结果的 `turn_end` 送达（`memory-wire.ts` 在 Anthropic 线格式上合并），T27 在此扩展。任务清单提醒的阈值 `TODO_REMINDER_ROUNDS` = 8（`todos.ts`），从最后一次成功的 TodoWrite 或上一条 `todo` 提醒按分支计数。
+- 注入接口：`currentPlan(entries)`、`currentTodos(entries, canonical)`；`session/history` 结果的 `harness` 由它们计算，`harness/todo` 在 TodoWrite 的 `item/completed` 之后发出。
+
 ## 多会话的易错点
 
 - 不要调用 `process.chdir`，也不要读 `process.cwd()` 推断会话目录：Pi 按每个会话的 `cwd` 解析工具路径。

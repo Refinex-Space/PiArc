@@ -317,7 +317,7 @@ T26（开工基线 c163249，`npm run verify` 15/15）：
 - [x] 4. 客户端：计划卡与计划面板（行内评论）、任务卡与右栏任务卡片、提问表单（替换 T20 占位）、下一步建议
 - [x] 5. L2：运行器扩展与 `plan-*`、`todo-*`、`ask-*`、`next-*` 场景，能力清单（A01、A02、A05、A06、A08、A09）
 - [ ] 6. L4：Playwright 流程与截图（A03、A04、A07、A09、A10）——dev 形态 5/5 已通过，待重新打包后跑 packaged 与回归
-- [ ] 7. 文档：ADR、架构第 6.5 节、Agent Host 与渲染进程 AGENTS.md
+- [x] 7. 文档：ADR、架构第 6.5 节、Agent Host 与渲染进程 AGENTS.md
 - [ ] 8. 收尾：`npm run verify`（A11）、验收清单、看板
 
 ## 登记事项
@@ -326,7 +326,7 @@ T26（开工基线 c163249，`npm run verify` 15/15）：
 
 | 编号 | 发现于 | 内容 | 建议处理 |
 |---|---|---|---|
-| I01 | 制定计划 | Claude Code 当前默认使用 TaskCreate / TaskUpdate 等任务工具，TodoWrite 已是旧版（`claude-official-capabilities.md`）。PiArc 的规范名仍是 TodoWrite，权限规则与 L3 比对会出现差异 | T26 评估是否增加兼容映射；T30 先把差异写入 L3 allowlist |
+| I01 | 制定计划 | Claude Code 当前默认使用 TaskCreate / TaskUpdate 等任务工具，TodoWrite 已是旧版（`claude-official-capabilities.md`）。PiArc 的规范名仍是 TodoWrite，权限规则与 L3 比对会出现差异 | T26 评估是否增加兼容映射；T30 先把差异写入 L3 allowlist；**T26 评估：不加映射**。PiArc 的清单工具只有 `TodoWrite`（规范名，参数与 Claude Code 一致），`TaskCreate`/`TaskUpdate` 是拆成多次调用的另一种接口，模型可见名之间映射会让规则与 hooks 的 matcher 对不上；写 `TaskCreate(…)` 规则或 matcher 的用户需要改写为 `TodoWrite`，T30 仍把差异写入 L3 allowlist |
 | I02 | 制定计划 | FR-MD-05 要求 skills 能引用模型别名，但架构第 6.7 节的 skill frontmatter 没有 `model` 字段 | T37 评估：支持则补架构与实现，不支持则改需求描述 |
 | I03 | 制定计划 | Monitor 在会话空闲时唤醒会话（按 Claude Code 官方行为）会自动产生模型费用 | T32 实现时提供开关与限速，R4 请用户确认默认值 |
 | I04 | 制定计划 | macOS App Intents 在 ad-hoc 签名下能否工作，M0 没有验证（需要 Xcode 生成的元数据随包分发） | T49 先做可行性原型；不可行时写 ADR 提议。若想提前知道结论，可在 R1 时追加一次快速验证；R1 决定：不在 R1 追加验证，T49 先做可行性原型（不影响 M1） |
@@ -413,8 +413,8 @@ T26（开工基线 c163249，`npm run verify` 15/15）：
 | I85 | T23 | T20 时期"总是允许"为 Write 保存的 `Write(路径)` 规则在 T23 语义下不匹配（Claude Code 只认 `Edit(路径)`）；现有用户文件里的这类规则会被设置页列出但不起作用 | T24 的配置诊断提示改写为 `Edit(…)`；正式发布前的用户数据只有测试数据，不做迁移；**已落地（T24）**：权限页对 `Write(…)`、`NotebookEdit(…)`、`Glob(…)`、`Grep(…)` 规则显示"永不匹配，请改写为 Edit(…)/Read(…)"（`settings_view::check_rule` 的 `suggestion`，L4 `t24-diagnostics.e2e.ts`） |
 | I86 | T24 | `~/.claude/` 不存在时设置监听退到最近的已存在祖先（通常是家目录本身，非递归）：家目录里任何文件的变化都会触发一次去抖后的七层重读 | T44 测量空闲时的重读频率；需要时改为只在 `.claude` 条目出现时重读 |
 | I87 | T24 | 键映射表（`piarc_config::claude::SETTINGS_KEYS`）是 2026-11-18 官方 settings 索引的快照；Claude Code 新增的键在更新表之前按"未知"列为忽略 | 各评审任务对照官方索引复查一次；实现对应功能的任务（ADR-0038 后果一节列出）把行改为生效 |
-| I88 | T24 | `crates/piarc-testkit/src/l2/runner.rs` 在 T24 之前已超过 1,000 行（1,070），T24 加入 `.claude` 快照比对与诊断断言后约 1,110 行，超出 `coding-standards.md` 的单文件上限；T25 加入 `rejected`、`core/notices` 事件与 `json_lines` 后 runner.rs 1,151 行、`format.rs` 1,004 行 | R3 把运行器按驱动、断言、Core 调用拆成子模块，`format.rs` 一并拆分 |
-| I89 | T25 | `agent-host/AGENTS.md`（126 行）与 `crates/piarc-core/AGENTS.md`（128 行）超过子目录 120 行上限（T25 之前已是 121、123 行），T25 各加了一节 hooks | R3 精简两份文件，把能从代码或 ADR 得到的段落改为链接 |
+| I88 | T24 | `crates/piarc-testkit/src/l2/runner.rs` 在 T24 之前已超过 1,000 行（1,070），T24 加入 `.claude` 快照比对与诊断断言后约 1,110 行，超出 `coding-standards.md` 的单文件上限；T25 加入 `rejected`、`core/notices` 事件与 `json_lines` 后 runner.rs 1,151 行、`format.rs` 1,004 行 | R3 把运行器按驱动、断言、Core 调用拆成子模块，`format.rs` 一并拆分；T26 的新格式放进 `l2/harness_spec.rs` 与 `l2/runner/harness.rs`，`runner.rs` 仍增至约 1,170 行、`format.rs` 1,035 行 |
+| I89 | T25 | `agent-host/AGENTS.md`（126 行）与 `crates/piarc-core/AGENTS.md`（128 行）超过子目录 120 行上限（T25 之前已是 121、123 行），T25 各加了一节 hooks | R3 精简两份文件，把能从代码或 ADR 得到的段落改为链接；T26 各加一节宿主工具后为 133、131 行 |
 | I90 | T25 | 没有配置 hooks 时，每次工具结果、回合结束、会话打开、压缩仍各有一次 `hooks/run` 往返，Core 每次重读设置文件判断有无 handler | T44 测量对工具密集回合的影响；需要时 Core 在 `hooks/run` 结果里给出配置了 handler 的事件，Agent Host 缓存到设置变化 |
 | I91 | T25 | hook 的审计记录（`audit_events`，`kind: "hook"`）没有界面：权限页的审计视图只查 `kind: "permission"` | T41（配置诊断完善）或 T45（诊断包）提供查看 |
 | I92 | T25 | PreCompact 带摘要指令时 Agent Host 用 Pi 导出的 `compact()` 自己生成摘要，绕过 Pi 默认路径中的虚拟模型路由与重试回调（Pi 1.5.2 不回读 `customInstructions`） | T27 接管压缩时复核；Pi 支持回读后改回默认路径 |
@@ -429,6 +429,8 @@ T26（开工基线 c163249，`npm run verify` 15/15）：
 | I101 | 合并 W1 后的 CI | Windows CI 的 L4 `r2-workflow`（dev 形态）偶发：运行 44522160246 中应用在 60 s 内没有启动完成，清理时 Chromium 仍占着数据目录的 `lockfile`（EBUSY），没有应用日志；同一用例的 packaged 形态与另一协议通过，R2 的运行 44453549786 中它以另一断言失败 | **已查明并修复**：它是 dev 项目里第一个用 `mock` 夹具的用例，mock provider 在测试里首次编译，Windows runner 上用完了 60 s（运行 44533872761 的 trace：`mock` 夹具 60 s）；Playwright 的 `globalSetup` 先编译它（`e2e/global-setup.ts`） |
 | I102 | 合并 W1 后的 CI | Windows 上 bash 命令经环境变量 `PIARC_COMMAND` 与 `eval` 执行（Git Bash 截断过 12,000 字符的 `-c` 参数）：语法错误报 `eval: line N`，退出码可能是 1 而不是 2；截断的确切位置未在 Windows 上定位，只有 CI 覆盖 | W2 实机核对长命令、heredoc 与语法错误的表现 |
 | I103 | 合并 W1 后的 CI | 权限裁决计时在 CI 上与同一测试二进制的其他测试混跑时只是在测 runner：同一断言相邻两次运行 p50 0.84 / 1.44 ms。verify 第 8 步改为先跳过它跑全部测试、再单独运行（`scripts/ci/cargo-test.mjs`），预算不变。运行 44533872761 单独运行后 Windows p95 1.38 ms（预算 10 ms），macOS runner 仍 2.67 ms（debug，本机 0.67 ms）；随后改为按 T23-A13 的验收方式用 release 构建（本机 p95 390 µs） | release 下仍超预算时，按 I95 评审缓存设置的 ADR；T44 把计时纳入性能回归，并在架构第 11 章写明构建配置 |
+| I104 | T26 | 架构第 6.14 节原把 Claude Code 的 `plansDirectory`（计划文件目录）列为 T26 支持的键；T26 按任务要求把批准的计划存为会话 entry（`piarc.plan`），没有写计划文件，键映射表仍为 `planned(T26)` | R3 决定：由后续任务支持（批准时把计划另存到该目录）并改映射表的任务号，或改为忽略并注明原因 |
+| I105 | T26 | `agent-host/src/runtime/session-registry.ts` 999 行、`crates/piarc-core/src/tool_io/policy.rs` 943 行，接近单文件 1,000 行上限（T26 已把注册表的辅助函数移到 `session-helpers.ts`、审批等待移到 `policy/waits.rs`） | T27 扩展提醒通道时把逻辑放在 `harness/reminders.ts` 与 `SessionHarness`，不再往注册表里加；R3 复核 |
 
 ## 技术债
 

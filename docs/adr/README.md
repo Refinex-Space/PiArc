@@ -57,3 +57,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0039](0039-hooks-m2.md) | Hooks 的落地：M2 事件集与 command 类型（补充 ADR-0004、0005、0037） | 已接受 |
 | [0040](0040-windows-automatic-permission-budget.md) | Windows 上无需用户参与的权限裁决预算 | 已接受 |
 | [0041](0041-windows-ahp-round-trip-budget.md) | Windows 上小文件 fs 操作的 AHP 往返预算 | 已接受 |
+| [0042](0042-plan-todo-ask-next-steps.md) | 计划模式、任务清单、提问与下一步的宿主工具（补充 ADR-0009、0031、0033、0037） | 已接受 |

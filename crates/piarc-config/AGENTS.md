@@ -44,6 +44,7 @@
 - 用户级 `modelProviders` 的字段由 `piarc_core::providers` 校验。工作区层设置不参与服务商发现。服务商写入复用 `write_value` 的用户设置互斥和 `write::replace_file` 的同目录原子替换。
 
 - 非执行配置 `memory.readBoth` 控制同一目录是否同时加载两个主 memory 文件，随普通标量合并。
+- 非执行配置 `askUserQuestion.timeoutSeconds`（T26）是提问表单的超时秒数，随普通标量合并；Claude Code 的 `askUserQuestionTimeout` 仍标为忽略。`plansDirectory` 仍是 `planned(T26)`：T26 把计划存为会话 entry，未支持计划文件目录（I104，R3 决定）。
 
 ## 易错点
 

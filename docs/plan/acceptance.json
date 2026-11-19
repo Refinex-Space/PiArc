@@ -2708,15 +2708,15 @@
       "id": "T26-A01",
       "task": "T26",
       "description": "plan 模式下写工具调用与非只读 Bash 命令都在裁决处被拒绝，拒绝理由提示先提交计划；进入与退出 plan 模式前后请求中的 system 与工具定义逐字节不变。验证：场景测试中的 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `plan-mode-gate`：EnterPlanMode 后 Write 的结果含 \"submit your plan with ExitPlanMode\"、`sed -n 1p a.txt` 含 \"plan mode is on\"，Read 照常；请求 1–4 的 `same_system_as: 0` 与新增 `same_tools_as: 0`（原始请求体字节）均通过。`plan-mode-menu-reminder`：模式菜单开、关 plan 后下一请求各含一条 `[PiArc reminder]`，system 与工具定义逐字节同请求 0。`perm-plan` 同步新措辞。改坏断言（\"Plan mode is ON\"）后场景失败，已还原。命令 `cargo test -p piarc-testkit --test scenarios -- plan-mode-gate --exact` 等。"
     },
     {
       "id": "T26-A02",
       "task": "T26",
       "description": "模型调用 `EnterPlanMode` 后进入 plan 模式且不需审批；`ExitPlanMode` 生成计划卡并等待用户决定。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `plan-mode-gate`：EnterPlanMode 无审批应答即切到 plan（事件 `permissionModeChanged` plan），`approvals` 只声明 ExitPlanMode 的 `kind: plan` 一张卡；`plan-keep-planning`：ExitPlanMode 生成计划卡并等待答复。Core 单测 `tool_io::policy::tests::t26` 10 个（EnterPlanMode 不入账本、ExitPlanMode 卡片带计划原文、非 plan 模式拒绝）通过。"
     },
     {
       "id": "T26-A03",
@@ -2736,15 +2736,15 @@
       "id": "T26-A05",
       "task": "T26",
       "description": "计划文本保存为会话 entry，应用重启后可读回，注入接口返回同一内容。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `plan-entry-restart`：批准后 `check_harness` 读到 plan，`restart_core` + `resume` 后 `session/history` 的 `harness.plan`（由注入接口 `currentPlan` 计算）为同一文本；Agent Host 单测 `host-tools.test.ts` 用会话文件 entries 重新打开后 `currentPlan` 返回同一记录。"
     },
     {
       "id": "T26-A06",
       "task": "T26",
       "description": "任务清单状态随分支回溯：在较早的 entry 处 fork 后，当前清单等于该处的状态。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `todo-branch-fork`：两次 TodoWrite 后在\"First list saved.\"所在 entry 处 fork，新会话 `harness.todos` 为第一张清单（Investigate 进行中），原会话为第二张；改坏期望后失败。Agent Host 单测：`currentTodos` 按 `getBranch(早期 leaf)` 返回该处清单。"
     },
     {
       "id": "T26-A07",
@@ -2757,8 +2757,8 @@
       "id": "T26-A08",
       "task": "T26",
       "description": "存在未完成项且连续达到阈值轮数未更新清单时，下一次模型请求中出现提醒消息，system prompt 字节不变。验证：场景测试中的 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `todo-stale-reminder`：TodoWrite（有未完成项）后连续 8 轮 Glob，第 10 个请求（index 9）含一条 `[PiArc reminder]` 与 \"has not changed for 8 rounds\"、列出未完成项，`same_system_as: 0`、`same_tools_as: 0`；index 8 不含提醒（改为 index 9 后失败，已还原）。阈值 `TODO_REMINDER_ROUNDS` = 8；单测覆盖提醒后重新计数与已完成清单不提醒。"
     },
     {
       "id": "T26-A09",

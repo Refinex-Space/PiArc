@@ -15,6 +15,7 @@
 | 压缩提示 | 使用 `contextCompaction` 中可用的原因和 token 计数。 |
 | 错误卡 | 读取 `turn/completed` 的 `errorKind` 与 `retryable`。`session/uncertain` 有独立提示与重试按钮。 |
 | Working 行 | 当前工具、计时、用量、自动重试次数和压缩状态由同一回合的事件驱动。 |
+| 宿主工具（T26） | `rows/harness.tsx`：`TodoWrite` 是任务卡（从参数读清单，Claude Code 的 `in_progress` 换成 `inProgress`），`ExitPlanMode` 是计划卡（状态取条目状态），`AskUserQuestion` 列出结果首行之后的 JSON，`SuggestNextSteps` 是下一步建议（"在此执行"经 `SessionInput`，运行中为 follow-up；"开始新会话"走 `startSession`；没有窗口外壳的原型页不显示按钮）。这四个工具不进工具组（`store/transcript.ts` 的 `OWN_ROW_TOOLS`）。 |
 
 - 行只订阅自己的 ID，工具组额外订阅成员。行级错误边界把单条渲染失败限制在该行。会话页与新建页另由主区的页面边界保护，切换页面后重新挂载，侧栏仍可导航。显示模型文本、命令输出或路径一律用文本节点。
 - Pi 历史 entry id 只在所属会话内唯一。窗口共享的 Markdown 结果、流式进度、行高与展开状态使用 `SessionTranscript.cacheKey(id)` 隔离各会话。
@@ -36,4 +37,6 @@
 
 行内容和虚拟列表提交后在布局阶段检查贴底。`ResizeObserver` 处理尺寸变化。可见内容先增高、列表随后更新尺寸时，这两次提交都可能影响同一帧的滚动位置。
 
-- 审批是 `SessionTranscript.setApprovals` 从 Core 实体快照追加的临时行，历史重载仍显示未处理的请求，重连后的新快照移除旧行。`rows/RowView.tsx` 把审批路由到 `ApprovalCard`、把 `permissionModeChanged` 显示为模式变更记录。快捷键与阅读闸门在 `rows/approval-keys.ts`，仅首个与滚动窗口相交的审批卡可响应。提问表单由 `shell/use-unsupported-questions.ts` 在窗口层拒绝，切换会话不影响答复。
+- 审批是 `SessionTranscript.setApprovals` 从 Core 实体快照追加的临时行，历史重载仍显示未处理的请求，重连后的新快照移除旧行。`rows/RowView.tsx` 把审批路由到 `ApprovalCard`、把 `permissionModeChanged` 显示为模式变更记录。快捷键与阅读闸门在 `rows/approval-keys.ts`，由 `approvals/use-approval-keys.ts` 接到各审批卡，仅首个与滚动窗口相交的审批卡可响应。计划卡与提问表单见 [approvals/AGENTS.md](../approvals/AGENTS.md)。
+- 会话的计划与任务清单在 `SessionTranscript.harness`（`store/harness.ts`）：历史窗口的 `harness` 给初值，之后跟随 `harness/todo`、`harness/plan`；右栏任务卡片（`TaskPanel.tsx`）与计划面板只读这里。
+- 滚动跟随只把按住滚动条后的松开算作用户输入：卡片按钮的点击不能挡住其结果引起的贴底（T26，`scroll-follow.test.ts`）。
