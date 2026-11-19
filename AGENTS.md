@@ -22,6 +22,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `node scripts/dev/gen-ghostty-bindings.mjs [--check]` | 重新生成（或比对）`crates/piarc-ghostty-sys/src/bindings.rs`；只在升级 libghostty-vt 时需要 |
 | `npm run verify` | 全部 15 项检查，结束时打印汇总表；开工与收尾各跑一次 |
 | `npm run gen:tokens` | 由 `design/tokens/` 生成渲染进程的 CSS 自定义属性与共享的 TS 常量；改令牌后运行并提交（verify 第 15 步检查漂移、对比度与品牌，ADR-0029） |
+| `node scripts/dev/check-prompt-originality.mjs` | 修改 Harness 英文提示词或工具指引后，在含本地参考副本的机器上做连续 10 词比对，更新 `docs/engineering/prompt-originality.md` |
 | `npm run gen:protocol` | 由 `piarc-protocol` 重新生成 `packages/protocol/schema/` 与 `src/generated/`；改了协议类型后运行并提交 |
 | `npm run build:agent-host` | esbuild 把 Agent Host 打成 `agent-host/dist/bundle/agent-host.mjs`（另写 `pi-assets/package.json`，运行时以 `PI_PACKAGE_DIR` 指向它） |
 | `npm run build:core` | 用 `@napi-rs/cli` 构建本机的 Core 开发版 `.node`（`target/piarc-core/development/`）并更新 `.d.ts` 快照；`-- --flavor all` 两种构建都出 |

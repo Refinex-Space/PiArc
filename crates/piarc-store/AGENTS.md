@@ -16,6 +16,8 @@ Core 的数据库 `<数据目录>/core.sqlite`（rusqlite，SQLite 随 `bundled`
 - 数据库记录的版本比本构建知道的新（新版本写过）时，`Store::open` 返回 `SchemaTooNew`，不降级。
 - 表用 `STRICT`；时间是 Unix 毫秒；路径列存 UTF-8 文本（非 UTF-8 路径拒绝为 `NonUtf8Path`）。
 
+- schema v3 的 `memory_imports` 以工作区和规范文件路径为组合主键。永久 memory 导入许可独立于工具规则和 checkout 的项目信任。
+
 ## 会话索引（`src/index.rs`）
 
 - `sessions` 前半是从 JSONL 派生的列（标题来源 `name`/`first_message`、模型、用量累计、时间、格式版本、`index_status`），后半（`workspace_path`、`status`、`worktree`、`pinned`、`archived`、`unread`，schema v2 起还有 `custom_title`）是 Core 自己的状态。`set_session_prefs` 只改给出的字段（索引还没有该行时返回 false），`remove_session` 删除行与同步状态并返回文件路径（文件由调用方删除）；`SessionRecord::title` 的优先级是 `custom_title` > `name` > `first_message`。重建只清派生列与 `session_files`，Core 的列保留；文件不在了的行删除。

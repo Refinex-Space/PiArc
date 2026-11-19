@@ -33,6 +33,8 @@
 
 - 用户级 `modelProviders` 的字段由 `piarc_core::providers` 校验。工作区层设置不参与服务商发现。服务商写入复用 `write_value` 的用户设置互斥和 `write::replace_file` 的同目录原子替换。
 
+- 非执行配置 `memory.readBoth` 控制同一目录是否同时加载两个主 memory 文件，随普通标量合并。
+
 ## 易错点
 
 - `serde_json` 没开 `preserve_order`：对象按键排序，问题列表与变化键的顺序随之确定，测试按排序断言。

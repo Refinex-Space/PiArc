@@ -11,7 +11,7 @@ PiArc 的设计、决策与交付文档都在这里。动手写代码前先读�
 | [spikes/](spikes/README.md) | M0 技术验证的跟踪表与报告 | M0 期间；评审验证结论时 |
 | [reviews/](reviews/README.md) | 阶段评审的发现与处理 | 评审任务；回顾某阶段的问题时 |
 | [research/](research/README.md) | 调研快照与参考源清单 | 需要原始依据时（注意时效） |
-| [engineering/](engineering/coding-standards.md) | [编码规范](engineering/coding-standards.md)、[测试规范](engineering/testing.md)、[CLAUDE.md 规范](engineering/claude-md.md) | 写任何代码前 |
+| [engineering/](engineering/coding-standards.md) | [编码规范](engineering/coding-standards.md)、[测试规范](engineering/testing.md)、[提示词原创性检查](engineering/prompt-originality.md)、[CLAUDE.md 规范](engineering/claude-md.md) | 写任何代码前 |
 
 ## 文档约定
 
