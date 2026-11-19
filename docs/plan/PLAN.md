@@ -149,7 +149,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T22 | [System prompt 组装与 memory 文件](tasks/T22-system-prompt-and-memory-files.md) | 2 | T21 | macOS | high / 高 | 中 | 无 | 已完成 | 9843eb5 |
 | R2 | [M1 评审](tasks/R2-m1-review.md) | 2 | T22 | macOS | high / 高 | 中 | 无 | 已完成 | f63ac3d |
 | W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 未开始 | — |
-| T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
+| T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
 | T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T26 | [计划模式、任务清单、AskUserQuestion 与下一步](tasks/T26-plan-mode-todo-ask-next-steps.md) | 3 | T25 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -309,7 +309,17 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（无进行中的任务。）
+T23 权限规则完整版与 Bash 命令分析（macOS，开工 2026-11-18，基线 b654341 的 `npm run verify` 15/15）：
+
+- [ ] 1. 规则语法与全部 specifier 匹配、工具名通配、无法解析规则的处理（A01）
+- [ ] 2. 规则来源合并（ADR-0005 顺序、信任前不应用项目 allow）、裁决流水线第 3–7 步与第 1、2、8 步插槽、审计命中规则与来源（A02、A07）
+- [ ] 3. tree-sitter-bash 命令分析、包装与环境变量剥离、只读白名单、关键路径删除、≥ 40 条数据驱动用例与随机输入测试（A03、A04、A06）
+- [ ] 4. Core 接入：Bash 子命令裁决、PowerShell 整条匹配、文件规则、裸工具名 deny 移出模型工具列表（A02、A05）
+- [ ] 5. 模式：plan 第 5 步拒绝、bypass 开启与二次确认、项目级 bypass/auto 忽略并审计、模式按工作区记忆（A08、A09、A10）
+- [ ] 6. "总是允许"按子命令前缀生成规则并在编辑框展示、写入 `.piarc/settings.local.json`（A11）
+- [ ] 7. 设置窗口"权限"页：规则管理（原生确认）与审计查看（A12）
+- [ ] 8. L2 场景 `perm-*.yaml` 与能力 ID；裁决基准 p95 ≤ 2 ms（A05、A09、A13）
+- [ ] 9. 收尾：文档（piarc-policy AGENTS.md、coding-standards 复用表、架构）、`npm run verify`、验收记录（A14）
 
 ## 登记事项
 
