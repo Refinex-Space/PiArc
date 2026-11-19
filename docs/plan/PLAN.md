@@ -147,7 +147,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T20 | [基础权限与审批](tasks/T20-basic-permissions-and-approvals.md) | 2 | T19 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | ee03128 |
 | T21 | [模型、服务商与凭据设置](tasks/T21-models-providers-and-credentials.md) | 2 | T20 | macOS | high / 高 | 大 | 无 | 已完成 | e5f3b65 |
 | T22 | [System prompt 组装与 memory 文件](tasks/T22-system-prompt-and-memory-files.md) | 2 | T21 | macOS | high / 高 | 中 | 无 | 已完成 | 9843eb5 |
-| R2 | [M1 评审](tasks/R2-m1-review.md) | 2 | T22 | macOS | high / 高 | 中 | 无 | 未开始 | — |
+| R2 | [M1 评审](tasks/R2-m1-review.md) | 2 | T22 | macOS | high / 高 | 中 | 无 | 进行中 | — |
 | W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -309,7 +309,18 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（无进行中的任务。）
+R2（macOS），基线 `d57c72e`，`npm run verify` 15/15。
+- [ ] A01 双协议设置、Manual 审批与夹具红转绿
+- [ ] A02 真实服务商的结果或限制
+- [ ] A03 L2、能力清单与 M1 门禁
+- [ ] A04 M1 目标、能力与 L4 映射
+- [ ] A05 T13–T22 验收状态
+- [ ] A06 四个独立只读审查的输入与原始输出
+- [ ] A07 逐条核实并处理发现
+- [ ] A08 修复与先红后绿的证据
+- [ ] A09 W1 实机清单
+- [ ] A10 架构与评审结论
+- [ ] A11 收尾全量验证
 
 ## 登记事项
 
