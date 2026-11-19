@@ -228,7 +228,9 @@ test('rows on screen keep their heights when the list gets narrower', async ({ p
     scroller.style.borderRight = '12px solid transparent';
     for (let frame = 0; frame < 10; frame += 1) await painted();
     if (scroller.clientWidth >= width) {
-      throw new Error(`the list did not get narrower: ${width} → ${scroller.clientWidth}`);
+      throw new Error(
+        `the list did not get narrower: ${String(width)} → ${String(scroller.clientWidth)}`,
+      );
     }
     const boxes = [...scroller.querySelectorAll<HTMLElement>('.transcript-row')]
       .map((row) => ({ id: row.dataset.rowId ?? '', box: row.getBoundingClientRect() }))
@@ -238,7 +240,7 @@ test('rows on screen keep their heights when the list gets narrower', async ({ p
       const previous = boxes[i - 1];
       if (previous !== undefined && row.box.top < previous.box.bottom - 0.5) {
         found.push(
-          `${previous.id} ends at ${previous.box.bottom}, ${row.id} starts at ${row.box.top}`,
+          `${previous.id} ends at ${String(previous.box.bottom)}, ${row.id} starts at ${String(row.box.top)}`,
         );
       }
     });
