@@ -17,8 +17,16 @@ import type { Translator } from '../../shared/i18n/index.js';
 /** What a test can observe (development builds' test hooks). */
 export type AttentionRecord = AttentionObservation;
 
+/** Notifications kept for their `click`: more than this many are let go, oldest first. */
+const HELD_NOTIFICATIONS = 32;
+
 export class Attention {
   private overlay: NativeImage | undefined;
+  /**
+   * Shown notifications. A notification that is garbage collected no longer receives `click`
+   * on Windows, where a toast stays clickable in the notification center after it closes (W1).
+   */
+  private readonly held = new Set<Notification>();
   private readonly record: {
     notified: { kind: string; title: string; body: string; shown: boolean }[];
     bounces: number;
@@ -56,8 +64,17 @@ export class Attention {
     if (shown) {
       const notification = new Notification({ title, body });
       notification.on('click', () => {
+        this.held.delete(notification);
         this.openSession(notice.sessionId);
       });
+      notification.on('failed', () => {
+        this.held.delete(notification);
+      });
+      this.held.add(notification);
+      for (const oldest of this.held) {
+        if (this.held.size <= HELD_NOTIFICATIONS) break;
+        this.held.delete(oldest);
+      }
       notification.show();
     }
     this.record.notified.push({ kind: notice.kind, title, body, shown });
@@ -88,6 +105,11 @@ export class Attention {
     }
     this.overlay ??= badgeImage();
     window.setOverlayIcon(this.overlay, translator.t('workspace.count', { count }));
+  }
+
+  /** How many shown notifications are kept for their `click` (unit tests). */
+  heldNotifications(): number {
+    return this.held.size;
   }
 
   /** For the test hooks. */
