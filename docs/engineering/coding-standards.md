@@ -123,7 +123,7 @@ Markdown 不进 Prettier：文档中的宽表格每次编辑都会被重新填�
 
 ### 3.1 编译选项
 
-所有工作区继承 `tsconfig.base.json`：`strict`、`noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`、`noImplicitOverride`、`verbatimModuleSyntax`，`module` 与 `moduleResolution` 为 `NodeNext`。工作区不得放宽这些选项。根 `tsconfig.json` 是 solution 文件，`tsc --build` 构建全部工作区与 `scripts/`（verify 第 3 步）。
+所有工作区继承 `tsconfig.base.json`：`strict`、`noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`、`noImplicitOverride`、`verbatimModuleSyntax`，`module` 与 `moduleResolution` 为 `NodeNext`。工作区不得放宽这些选项。根 `tsconfig.json` 是 solution 文件，`tsc --build` 构建全部工作区与 `scripts/`（verify 第 2 步，先于 ESLint：类型感知检查经 `dist/` 的声明读取工作区包）。
 
 ### 3.2 类型安全
 
@@ -137,7 +137,7 @@ Markdown 不进 Prettier：文档中的宽表格每次编辑都会被重新填�
 - 只用 ESM（`"type": "module"`）；相对导入写 `.js` 扩展名（NodeNext 要求）。
 - 每个工作区经 `src/index.ts` 暴露公开 API；跨工作区只按包名导入（例如 `@piarc/protocol`），不导入另一个工作区的内部文件。
 - 进程边界（ADR-0013）：
-  - 渲染进程不导入 Node 内置模块、Electron、主进程代码或原生模块，只能调用 preload 暴露的白名单 API；preload 不导入 Node 内置模块（沙箱中的 preload 只能 `require("electron")`，其余依赖由打包工具内联）；`new BrowserWindow` 只在窗口工厂、`ipcMain.handle` 只在 IPC 注册函数中出现（`eslint.config.mjs` 的 `desktopProcessBoundaries`，verify 第 2 步）；
+  - 渲染进程不导入 Node 内置模块、Electron、主进程代码或原生模块，只能调用 preload 暴露的白名单 API；preload 不导入 Node 内置模块（沙箱中的 preload 只能 `require("electron")`，其余依赖由打包工具内联）；`new BrowserWindow` 只在窗口工厂、`ipcMain.handle` 只在 IPC 注册函数中出现（`eslint.config.mjs` 的 `desktopProcessBoundaries`，verify 第 3 步）；
   - 主进程只做平台集成与转发，不承载业务逻辑；两个平台都需要的逻辑放进 Core 或 Agent Host。
 - `packages/protocol/src/generated/` 由 `piarc-protocol` 的 JSON Schema 生成，不手工编辑（T02）。
 
@@ -148,7 +148,7 @@ Markdown 不进 Prettier：文档中的宽表格每次编辑都会被重新填�
 
 ### 3.5 lint
 
-- ESLint 使用 typescript-eslint 的 `strictTypeChecked` 与 `stylisticTypeChecked`，对全部 TS 与 JS 文件做类型感知检查（verify 第 2 步）；`eslint-config-prettier` 关闭与 Prettier 冲突的规则。
+- ESLint 使用 typescript-eslint 的 `strictTypeChecked` 与 `stylisticTypeChecked`，对全部 TS 与 JS 文件做类型感知检查（verify 第 3 步）；`eslint-config-prettier` 关闭与 Prettier 冲突的规则。
 - `packages/protocol/src/generated/` 是生成代码，只关闭 `consistent-type-definitions` 与 `consistent-indexed-object-style` 两条风格规则（生成器输出的形状），其余规则照常检查（`eslint.config.mjs`）。
 - 禁用某条规则时写在最小范围内并说明理由：`// eslint-disable-next-line <rule> -- <reason>`。不再需要的禁用注释会报错（`reportUnusedDisableDirectives`）。
 

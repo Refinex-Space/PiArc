@@ -17,8 +17,16 @@ import type { Translator } from '../../shared/i18n/index.js';
 /** What a test can observe (development builds' test hooks). */
 export type AttentionRecord = AttentionObservation;
 
+/** Notifications kept for their `click`: more than this many are let go, oldest first. */
+const HELD_NOTIFICATIONS = 32;
+
 export class Attention {
   private overlay: NativeImage | undefined;
+  /**
+   * Shown notifications. A notification that is garbage collected no longer receives `click`
+   * on Windows, where a toast stays clickable in the notification center after it closes (W1).
+   */
+  private readonly held = new Set<Notification>();
   private readonly record: {
     notified: { kind: string; title: string; body: string; shown: boolean }[];
     bounces: number;
@@ -56,8 +64,17 @@ export class Attention {
     if (shown) {
       const notification = new Notification({ title, body });
       notification.on('click', () => {
+        this.held.delete(notification);
         this.openSession(notice.sessionId);
       });
+      notification.on('failed', () => {
+        this.held.delete(notification);
+      });
+      this.held.add(notification);
+      for (const oldest of this.held) {
+        if (this.held.size <= HELD_NOTIFICATIONS) break;
+        this.held.delete(oldest);
+      }
       notification.show();
     }
     this.record.notified.push({ kind: notice.kind, title, body, shown });
@@ -90,29 +107,48 @@ export class Attention {
     window.setOverlayIcon(this.overlay, translator.t('workspace.count', { count }));
   }
 
+  /** How many shown notifications are kept for their `click` (unit tests). */
+  heldNotifications(): number {
+    return this.held.size;
+  }
+
   /** For the test hooks. */
   observed(): AttentionRecord {
     return { ...this.record, notified: [...this.record.notified] };
   }
 }
 
-/** A 16×16 dot in the "running" status color for the Windows taskbar overlay (BGRA pixels). */
+/**
+ * The dot in the "running" status color for the Windows taskbar overlay (BGRA pixels): drawn at
+ * twice the 16 px overlay size with smooth edges, so Windows scales it down on any display. A
+ * 16 px dot with hard edges showed as a jagged block on a scaled display (W1).
+ */
 function badgeImage(): NativeImage {
-  const size = 16;
+  const size = 32;
+  const samples = 4;
+  const radius = size / 2 - 1;
   const pixels = Buffer.alloc(size * size * 4);
   const color = COLORS.light['agentStatus.running'];
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
-      const dx = x - 7.5;
-      const dy = y - 7.5;
-      const inside = dx * dx + dy * dy <= 7.5 * 7.5;
+      // The share of the pixel inside the circle, from samples × samples points.
+      let inside = 0;
+      for (let sy = 0; sy < samples; sy += 1) {
+        for (let sx = 0; sx < samples; sx += 1) {
+          const dx = x + (sx + 0.5) / samples - size / 2;
+          const dy = y + (sy + 0.5) / samples - size / 2;
+          if (dx * dx + dy * dy <= radius * radius) inside += 1;
+        }
+      }
+      const alpha = inside / (samples * samples);
       const at = (y * size + x) * 4;
-      pixels[at] = inside ? (b ?? 0) : 0;
-      pixels[at + 1] = inside ? (g ?? 0) : 0;
-      pixels[at + 2] = inside ? (r ?? 0) : 0;
-      pixels[at + 3] = inside ? 0xff : 0;
+      // Premultiplied, as Chromium's bitmaps are.
+      pixels[at] = Math.round((b ?? 0) * alpha);
+      pixels[at + 1] = Math.round((g ?? 0) * alpha);
+      pixels[at + 2] = Math.round((r ?? 0) * alpha);
+      pixels[at + 3] = Math.round(0xff * alpha);
     }
   }
-  return nativeImage.createFromBitmap(pixels, { width: size, height: size });
+  return nativeImage.createFromBitmap(pixels, { width: size, height: size, scaleFactor: 2 });
 }

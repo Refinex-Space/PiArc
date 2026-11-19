@@ -55,3 +55,5 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0037](0037-permission-rules-and-bash-analysis.md) | 权限规则、Bash 命令分析与模式的落地（补充 ADR-0004、0005、0031） | 已接受 |
 | [0038](0038-claude-code-config-compat.md) | Claude Code 配置兼容层与配置诊断的落地（补充 ADR-0005、0033） | 已接受 |
 | [0039](0039-hooks-m2.md) | Hooks 的落地：M2 事件集与 command 类型（补充 ADR-0004、0005、0037） | 已接受 |
+| [0040](0040-windows-automatic-permission-budget.md) | Windows 上无需用户参与的权限裁决预算 | 已接受 |
+| [0041](0041-windows-ahp-round-trip-budget.md) | Windows 上小文件 fs 操作的 AHP 往返预算 | 已接受 |

@@ -37,6 +37,10 @@ pub(crate) fn command(spec: &SpawnSpec) -> Command {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
+    // PiArc is a GUI process: without this a console program gets a console window of its own
+    // (W1). `ProcessTreeSpawner` sets its flags again, with this one included.
+    #[cfg(windows)]
+    command.creation_flags(crate::job::CREATE_NO_WINDOW);
     command
 }
 

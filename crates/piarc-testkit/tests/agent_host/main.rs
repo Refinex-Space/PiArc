@@ -452,8 +452,11 @@ async fn a_slow_core_reader_makes_the_agent_host_queue_with_bounded_memory() {
     let env = Env::new("backpressure", &[&scenario], json!({})).await;
     let mut config = env.config();
     config.event_queue = 1;
+    // Two missed heartbeats take about 1.1 s, well inside the 2 s stall checked below, so the
+    // detector stays armed while Core does not read. A 50 ms timeout also flagged a busy but
+    // healthy Agent Host on a loaded Windows machine after Core read again (W1, 3 of 9 runs).
     config.heartbeat_interval = std::time::Duration::from_millis(50);
-    config.heartbeat_timeout = std::time::Duration::from_millis(50);
+    config.heartbeat_timeout = std::time::Duration::from_millis(500);
     let (supervisor, mut events, core) = env.start_with(config, &[]);
     events
         .until(|e| matches!(e, HostEvent::Connected { .. }))

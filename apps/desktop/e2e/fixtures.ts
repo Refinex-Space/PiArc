@@ -25,6 +25,8 @@ export interface Fixtures {
   userDataDir: string;
   /** Extra command-line arguments for the app, set per test file with `test.use`. */
   appArgs: string[];
+  /** Environment variables to set or replace for the app, set per test with `test.use`. */
+  appEnv: Record<string, string>;
   running: { app: ElectronApplication; log: AppLog };
   app: ElectronApplication;
   appLog: AppLog;
@@ -73,20 +75,21 @@ function createLog(app: ElectronApplication): AppLog {
 export const test = base.extend<Fixtures, WorkerFixtures>({
   appForm: ['dev', { option: true, scope: 'worker' }],
   appArgs: [[], { option: true }],
+  appEnv: [{}, { option: true }],
   // eslint-disable-next-line no-empty-pattern -- Playwright requires a destructuring pattern here.
   userDataDir: async ({}, use) => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'piarc e2e 测试-'));
     await use(dir);
     await rm(dir, { recursive: true, force: true });
   },
-  running: async ({ appForm, appArgs, userDataDir }, use, testInfo) => {
+  running: async ({ appForm, appArgs, appEnv, userDataDir }, use, testInfo) => {
     const { command, args } = appCommand(appForm, [`--user-data-dir=${userDataDir}`, ...appArgs]);
     // A development build keeps the vault's master key in memory: a rebuilt package would
     // otherwise wait for the login keychain password (src/main/core/core-host.ts).
     const app = await electron.launch({
       executablePath: command,
       args,
-      env: { ...process.env, PIARC_TEST_MEMORY_KEYCHAIN: '1' },
+      env: { ...process.env, ...appEnv, PIARC_TEST_MEMORY_KEYCHAIN: '1' },
     });
     const log = createLog(app);
     await use({ app, log });

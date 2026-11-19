@@ -100,5 +100,11 @@ async fn small_fs_reads_round_trip_within_the_budget() {
         stats["count"].as_u64(),
         Some(u64::try_from(COUNT).expect("fits"))
     );
-    assert!(ms("p95") <= 5.0, "p95 {} ms exceeds 5 ms", ms("p95"));
+    // Architecture chapter 11, ADR-0041: each access binds its directory from the volume root.
+    let budget = if cfg!(windows) { 15.0 } else { 5.0 };
+    assert!(
+        ms("p95") <= budget,
+        "p95 {} ms exceeds {budget} ms",
+        ms("p95")
+    );
 }

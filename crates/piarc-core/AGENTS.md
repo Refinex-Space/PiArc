@@ -121,6 +121,8 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 不要在异步任务里持有 `Arc<Shared>`：`Shared` 的 `Drop` 会停运行时，在运行时线程里丢弃会出问题。
 - 会话层的回调（`on_done`）在 Core 的运行时线程上调用；`open_workspace` 等方法本身只入队，等结果用回调或 NAPI 的 Promise。
 - 不要在 `Hub` 的路由锁里 await（`std::sync::Mutex` 的守卫跨 await 会让 future 不是 `Send`）：先在块里取出要的句柄，再 await。
+- 当前用户无权访问的 PATH 条目（Windows 的 PATH 常有 `C:\Windows\system32\config\systemprofile\…`）不取消自动允许（W1）：macOS 的 `tool_io/exec/utility.rs` `first_on_path` 跳过工作区外的这类条目，其余无法检查的条目和工作区内的条目一律改为询问；Windows 由 Git Bash 解析（`probe_git_programs`），bash 自己跳过它们。
+- Windows 测试持有 `piarc_fs::Scope` 时删不掉它打开的目录（ADR-0036 不共享删除）：先 `drop` scope 再清理临时目录。
 - 测试里的保险箱主密钥名（`test_master_key_name`）带随机后缀：同一个数据目录上重启 Core 时要复用同一个名字，否则保险箱返回 `masterKeyMissing`，Agent Host 拿不到凭据。
 
 ## 参考

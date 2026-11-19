@@ -22,7 +22,7 @@ Core 层的集成测试在 `crates/piarc-core/tests/exec_commands.rs`（cwd、�
 
 - 自动允许（只读白名单、自动接受编辑的文件命令，T23）依赖的每个外部程序由 `CwdProbe::pin_program(名称, 路径)` 在启动时核对 Bash 实际解析的文件并锁定物理程序（`hash -p`），解析变化时以 126 退出、不运行命令；名称只接受字母、数字与 `._+-`。Core 发现项目可控的 PATH、用户覆盖或启动脚本时由审批卡决定，人工批准后的命令同样只继承 ADR-0035 所列的字段。
 - 不改命令文本：`BASH_ENV` 指向会话临时目录 `exec/<requestId>.bash-env`，内容是 `trap 'builtin pwd -P >| <answer>' EXIT` 加 `unset BASH_ENV`，模型命令不继承用户的 `BASH_ENV`。退出码在 `EXIT` trap 中保持；子 bash 看不到 `BASH_ENV`，不会覆盖答案。
-- 没有答案（命令 `exec` 换掉了 shell、自己装了 `EXIT` trap、被杀）时 Core 保持原目录。Windows 上答案是 `/c/…`，`msys_to_windows` 转换；`/tmp`、`/usr` 等 Git 自己的目录转换不了，按越界处理。
+- 没有答案（命令 `exec` 换掉了 shell、自己装了 `EXIT` trap、被杀）时 Core 保持原目录。Windows 上 trap 用 `pwd -W`（不支持时退回 `pwd -P`），答案是 `C:/…`，`msys_to_windows` 转换。不要改回 `pwd -P`：Git Bash 把 `%TEMP%` 挂载为 `/tmp`、把 Git 目录挂载为 `/usr`，这些名字转换不回 Windows 路径，工作区在 `%TEMP%` 下时 `cd` 会被当成越界（W1）。
 
 ## 阈值与清单的位置
 
@@ -34,6 +34,7 @@ Core 层的集成测试在 `crates/piarc-core/tests/exec_commands.rs`（cwd、�
 
 - Git Bash 探测顺序见 `shells.rs` 模块文档；不用 `PATH` 上的 `bash.exe`（WSL）。PowerShell 参数沿用 Pi 的 UTF-8 前缀与 5.1 退出码后缀（MIT，`third-party/sources.json` 已登记），前缀占一行，错误位置的行号因此加 1。
 - Windows 没有登录 shell：命令继承准入清单筛选后的进程环境（Core 加 `LANG=C.UTF-8` 给没有 locale 的 Git Bash）。`ProcessTreeSpawner` 的 `terminate` 与 `kill` 相同（Job 没有温和终止），退出码为 1，没有 signal。
+- 两个启动器在 Windows 上都带 `CREATE_NO_WINDOW`（`spawner::command`，`ProcessTreeSpawner` 再与 `CREATE_SUSPENDED` 合并）：PiArc 是图形界面进程，不加时 git、bash.exe、PowerShell 与 Agent Host 的 node 各自弹出控制台窗口，默认终端为 Windows Terminal 时还会报 `0x800700e8`（W1）。测试 `children_run_without_a_console_window` 先 `FreeConsole` 再启动子进程，模拟图形界面父进程。
 - Git Bash 的 `$!` 是 MSYS 的 pid；Windows pid 在 `/proc/<pid>/winpid`（`termination_tests.rs` 的 `LAST_PID`）。
 - PowerShell 输出编码、Git Bash 路径转换与中文输出只能在 Windows 上验证：CI 跑 `exec_commands.rs` 的 Windows 用例与 L2 的 `exec-windows-shells`，实机核对留给 W1。
 

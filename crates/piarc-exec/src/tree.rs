@@ -120,7 +120,7 @@ mod platform {
     use piarc_ports::SpawnSpec;
     use tokio::process::Child;
 
-    use crate::job::{CREATE_SUSPENDED, Job, resume_process};
+    use crate::job::{CREATE_NO_WINDOW, CREATE_SUSPENDED, Job, resume_process};
     use crate::spawner::command;
 
     /// The Job Object holding the child and everything it starts.
@@ -128,8 +128,13 @@ mod platform {
 
     pub(super) fn spawn(spec: &SpawnSpec) -> io::Result<(Child, Tree)> {
         let job = Job::new()?;
-        // Suspended: the child runs no instruction before it is in the job.
-        let child = command(spec).creation_flags(CREATE_SUSPENDED).spawn()?;
+        // Suspended: the child runs no instruction before it is in the job. No console window:
+        // PiArc is a GUI process, so a console program would otherwise get a window of its own
+        // (a Windows Terminal window when that is the default terminal, W1); its own children
+        // share the hidden console.
+        let child = command(spec)
+            .creation_flags(CREATE_SUSPENDED | CREATE_NO_WINDOW)
+            .spawn()?;
         let joined = child
             .raw_handle()
             .ok_or_else(|| io::Error::other("the new process has no handle"))
@@ -335,6 +340,45 @@ mod tests {
             let pids = three_levels(&process).await;
             drop(process);
             wait_gone(&pids).await;
+        }
+
+        /// W1: PiArc is a GUI process, so a console program it starts (git for the opening
+        /// status, bash.exe, PowerShell, the Agent Host's node) got a console window of its own;
+        /// with Windows Terminal as the default terminal each one popped up. The child, and what
+        /// it starts in turn, must run without a console window.
+        #[tokio::test]
+        async fn children_run_without_a_console_window() {
+            use tokio::io::AsyncReadExt;
+            crate::job::detach_from_console();
+            let system_root = std::env::var_os("SystemRoot").expect("SystemRoot");
+            let powershell = std::path::Path::new(&system_root)
+                .join("System32")
+                .join("WindowsPowerShell")
+                .join("v1.0")
+                .join("powershell.exe");
+            let script = "$k = Add-Type -Name Console -Namespace PiarcW1 -PassThru -MemberDefinition \
+                '[DllImport(\"kernel32.dll\")] public static extern System.IntPtr GetConsoleWindow();'; \
+                [Console]::Out.Write($k::GetConsoleWindow().ToInt64())";
+            let mut spec = tree_spec();
+            spec.program = powershell;
+            // Add-Type compiles in TEMP and loads modules from the profile directories.
+            spec.env = std::env::vars_os().collect();
+            spec.args = ["-NoProfile", "-NonInteractive", "-Command", script]
+                .iter()
+                .map(OsString::from)
+                .collect();
+            let SpawnedProcess {
+                stdin,
+                mut stdout,
+                mut control,
+                ..
+            } = ProcessTreeSpawner.spawn(spec).expect("starts");
+            drop(stdin);
+            let mut out = String::new();
+            stdout.read_to_string(&mut out).await.expect("reads");
+            let status = control.wait().await.expect("waits");
+            assert_eq!(status.code, Some(0), "{status:?} {out}");
+            assert_eq!(out.trim(), "0", "the child has a console window");
         }
 
         #[tokio::test]

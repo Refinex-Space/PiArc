@@ -5067,92 +5067,92 @@
       "id": "W1-A01",
       "task": "W1",
       "description": "报告记录了平台（`win32`）、Windows 版本、架构与验收时的提交号。验证：报告内容与命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "报告\"环境\"：`node -p \"process.platform + ' ' + process.arch\"` 输出 `win32 x64`；Windows 11 专业版 25H2 10.0.26200.9974；起点 b654341，验收提交见报告与 PLAN（docs/reviews/W1-windows-m1-parity.md）"
     },
     {
       "id": "W1-A02",
       "task": "W1",
       "description": "与 R2 相同的服务商组合在 Windows 上完成\"读代码 → 改代码 → 跑测试\"完整任务，工作区路径含空格与中文。验证：会话记录、测试通过输出与截图（`tmp/evidence/W1/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `r2-workflow.e2e.ts` 两种协议（anthropic-messages、openai-completions）× dev 与 packaged 4/4（tmp/evidence/W1/l4-final.log）：工作区\"加法 regression\"位于\"piarc t18 工作区-…\"临时目录，初始 node --test 报 ERR_ASSERTION，Manual 下批准 Edit 与 Bash，测试变绿，测试文件逐字节不变，每次 4 个严格校验请求无违规；before/after 与截图在 tmp/evidence/W1/l4/r2-workflow*/。用户决定不调用真实服务商"
     },
     {
       "id": "W1-A03",
       "task": "W1",
       "description": "本机运行的 L2 场景不少于 20 个且全部通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "收尾 `npm run verify` 第 14 步：L2 result: ok. 60 passed; 0 failed; 2 skipped (platform)；能力覆盖 MISSING 0（tmp/evidence/W1/verify-final.log）"
     },
     {
       "id": "W1-A04",
       "task": "W1",
       "description": "Git Bash 被探测并用于 `Bash` 工具；隐藏 Git Bash 后出现安装提示且只提供 `PowerShell`；`PowerShell` 工具可执行且 Manual 下询问。验证：测试输出与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "新 L4 `w1-windows-shells.e2e.ts` dev 与 packaged 4/4：Bash 经 Git Bash 执行、PowerShell 在 Manual 下出审批卡、两者中文输出完整；把 Git 安装位置与 PATH 指向空处后模型只拿到 PowerShell、主区显示\"没有找到 Git Bash\"与下载按钮（截图 tmp/evidence/W1/l4/w1-windows-shells*/）；L2 `exec-windows-shells` 通过"
     },
     {
       "id": "W1-A05",
       "task": "W1",
       "description": "盘符、UNC、含空格与中文、超过 260 字符的路径和保留文件名在文件工具中行为正确；CRLF 文件经 Edit 后换行风格不变；命令输出中的中文不乱码。验证：测试输出与核对记录。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "除 UNC 外通过：超过 260 字符（499 字符含中文）路径经完整预检写读、保留名与以点或空格结尾的名字被拒且不留文件（修复 017b20b）、junction 越界询问与已获准目录不可替换（b75d2bf）、盘符与含空格中文路径（全部 L2/L4）、大小写（piarc-fs 用例）、CRLF/BOM/GBK/损坏 UTF-16（L2 tools-edit-preserves-encoding 与 piarc-fs 写入用例）、子进程中文（exec_commands、w1-windows-shells）（tmp/evidence/W1/windows-paths.log）。阻塞：UNC 共享在本机不可用（net view \\localhost 报系统错误 1702），测试 windows_paths::a_workspace_on_a_unc_share_is_written_read_and_searched 需设 PIARC_TEST_UNC_SHARE，登记 I96"
     },
     {
       "id": "W1-A06",
       "task": "W1",
       "description": "命令超时与停止时整棵进程树被终止，无残留进程。验证：测试输出与 `tasklist` 核对结果。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-exec termination -- --nocapture --test-threads 1` 6/6，8 个子孙 PID 经 `tasklist /FI \"PID eq …\"` 确认不存在（tmp/evidence/W1/process-tree.log）；Job Object 三级树用例、L4 `agent-host-kill.e2e.ts`（结束主进程后 Agent Host 子树退出）通过"
     },
     {
       "id": "W1-A07",
       "task": "W1",
       "description": "主密钥存于凭据管理器，重启应用后凭据可读；数据目录位于 `%LOCALAPPDATA%\\PiArc\\`；数据目录与日志中无明文凭据。验证：测试、目录检查与明文扫描输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "用户同意后打包应用以正式方式启动（tmp/evidence/W1/a07-run.log、a07/scan.json）：userData 为 %LOCALAPPDATA%PiArc；cmdkey 列出 master-key.cn.piarc.desktop.credential-vault；重启后第二个会话拿到回复；87 个文件（含 2 个日志）无合成密钥的 UTF-8/UTF-16 明文。另 `PIARC_REQUIRE_KEYCHAIN=1 cargo test -p piarc-secrets --test system_store` 通过（tmp/evidence/W1/credential-manager.log）"
     },
     {
       "id": "W1-A08",
       "task": "W1",
       "description": "微软拼音输入法合成期间 Enter、Esc、`/`、`@` 不触发业务，候选上屏正确。验证：CDP 合成事件的自动化测试与用户实机操作记录（截图）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "CDP 合成：composer.e2e.ts 与 t20-approvals.e2e.ts 的输入法用例在全量 L4 通过；实机：用户用微软拼音在 composer 中、审批卡待处理时逐项操作 7 项，回复\"全部符合预期\"，mock 只收到 3 个请求、无误发送（tmp/evidence/W1/A08-ime-hand-check.md、ime-run.log）。日文输入法未验证（用户决定，I25）"
     },
     {
       "id": "W1-A09",
       "task": "W1",
       "description": "窗口不在前台时回合完成与等待审批都弹出系统通知，任务栏覆盖图标显示计数。验证：截图与用户确认记录。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "用户打开系统通知后，窗口最小化时\"需要你审批\"与\"已完成\"两条 Toast 都弹出（主进程 shown: true，用户确认看到），任务栏覆盖图标显示计数（用户截图 tmp/evidence/W1/A09-taskbar-overlay-before.png；锯齿已修 b0a510f）。点击 Toast：修复通知对象被回收（5f2e1b7）后，横幅在屏时点击打开目标会话（notify-click-run1.log MATCH）；从通知中心点击不打开会话，登记 I98"
     },
     {
       "id": "W1-A10",
       "task": "W1",
       "description": "Mica 背景与标题栏覆盖层在亮色与暗色下显示正确。验证：截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`t18-review` packaged 在 Windows 截取真实窗口（c6cc25f）：Mica 侧栏、右上窗口控件、标题栏覆盖层的按钮颜色随亮暗切换（tmp/evidence/W1/A10-mica-light.png、A10-mica-dark.png、A10-dark-high-contrast.png）"
     },
     {
       "id": "W1-A11",
       "task": "W1",
       "description": "Electron 应用的 Playwright 流程用例在 Windows 本机全部通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`PIARC_EVIDENCE_TASK=W1 npm run test:e2e -w @piarc/desktop`：修复控制台窗口前的构建 199/199（10.2 m）；最终构建 b0a510f 198/199，唯一失败 t18-review（悬停按钮被实机鼠标打断）单独复跑通过（tmp/evidence/W1/l4-final.log）"
     },
     {
       "id": "W1-A12",
       "task": "W1",
       "description": "发现的平台问题已修复并带回归测试，或已登记；`docs/reviews/W1-windows-m1-parity.md` 逐条给出 M1 退出标准的 Windows 证据与结论。验证：报告与登记事项内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "10 个 Windows 平台缺陷已修复并带回归测试（F1–F10，见报告\"发现的问题与处理\"），无法在本任务修复的登记 I95–I100；报告逐条给出 M1 退出标准的 Windows 证据与 R2 清单复核（docs/reviews/W1-windows-m1-parity.md）"
     },
     {
       "id": "W1-A13",
       "task": "W1",
       "description": "Windows 上 `npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "最终提交 b0a510f 上 `npm run verify`：All 15 steps passed（tmp/evidence/W1/verify-final.log）；此前一次在全量 L4 刚结束时因权限裁决 p95 11.17 ms 失败（verify-after-l4-latency-fail.log），见 I95"
     },
     {
       "id": "W2-A01",

@@ -27,6 +27,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 | `node scripts/ci/check-design-tokens.mjs [--tokens <目录>]` | 单独跑令牌检查；`--tokens` 检查另一份令牌目录（试改不动仓库，跳过漂移） |
 | `npx vite build -c apps/desktop/vite.renderer.config.ts` | 只重建渲染进程的 `.vite/renderer/`（在 `apps/desktop` 下运行）：只改了 `src/renderer/` 时，`dev` 形态 L4 不必重新打包 |
 | `PIARC_EVIDENCE_TASK=T18 npx playwright test t18- --project dev` | T18 的 L4 流程（会话、信任、设置与快捷键、语言、通知、评审截图），mock provider 的脚本在 `e2e/scenarios/` |
+| `PIARC_EVIDENCE_TASK=W1 npm run test:e2e -w @piarc/desktop -- w1-windows-shells` | Windows：Git Bash 与 PowerShell 两个工具、Manual 下询问、中文输出；隐藏 Git 后只剩 PowerShell 并显示安装提示（夹具选项 `appEnv` 覆盖应用的环境变量） |
 | `npm run bench:t18` | 冷启动到侧栏（100 个会话）就绪的 10 次测量（打包产物），JSON 写到 `tmp/evidence/T18/bench/` |
 | `npm run bench:t19` | 在前台测开发打包产物的真实会话，使用本地 mock provider。结果写入 `tmp/evidence/T19/bench/` |
 
@@ -96,6 +97,9 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 帧时间的口径：rAF 间隔与 `AnimationFrame`（LoAF 口径）在 60 Hz 屏上空闲时也约 16.7 ms，不能拿来和"p99 ≤ 16 ms"比；S1 基准用两次 `BeginMainThreadFrame` 之间主线程任务的总耗时（每帧工作量）。
 - 复制相关的 L4 会写系统剪贴板：用例经 `withSavedClipboard` 读出原内容、结束后写回（只恢复文本）。Windows 上 Chromium 以 CRLF 写纯文本，`readClipboard` 已规范为 LF。
 - Windows 上的系统通知：Electron 先发 `show`，系统拒绝（未经安装、没有带 AUMID 的开始菜单快捷方式，或用户关了通知）时再发 `failed`；以最后一个事件为准。
+- Windows 不让 Playwright 启动的窗口稳定留在前台（W1 实机与 CI 都出现）：依赖"窗口在前台"的断言要容忍窗口在后台时多出的提醒；遍历窗口时同时排除 `webContents.isDestroyed()` 的窗口（关闭中的窗口先销毁 `webContents`）。`t18-review` 在 Windows 上截取窗口所在的屏幕区域（Mica 与窗口控件由系统绘制），截取时临时置顶。
+- 用例按界面文案断言时同时匹配英文与简体中文（界面语言跟随系统，W1 的机器是中文）。
+- Windows 的经典滚动条占约 12 px 宽度：transcript 出现或去掉滚动条会改变列表宽度，见 `src/renderer/transcript/AGENTS.md`。
 - L4 里 `app.process().pid` 不一定是主进程（Windows 上可能是 Playwright 前面的启动器）：要主进程 pid 用 `app.evaluate(() => process.pid)`。
 - 从 Node 调 PowerShell 时关掉它的 stdin（`stdio: ['ignore', …]`），否则命令打印完结果还会一直等 stdin。
 - ProseMirror 自己在合成期间不分发按键，所以只测合成中的按键测不出守卫是否生效；`composer.e2e.ts` 另有"合成开始前到达的 229 按键"和"合成文本恰为 `@`、`/`"两类用例，去掉守卫时它们会失败。

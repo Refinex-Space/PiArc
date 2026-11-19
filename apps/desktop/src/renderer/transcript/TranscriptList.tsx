@@ -124,8 +124,15 @@ export function TranscriptList({
   useLayoutEffect(() => {
     if (width > 0) {
       virtualizer.measure();
+      // measure() forgets every size, and a row's observer reports only its own resizes (often
+      // just before the width change, as when expanded output brings Windows' classic scrollbar,
+      // which takes width). Measure the rows in the DOM again, or they keep estimates and
+      // overlap (W1).
+      for (const row of scroller?.querySelectorAll<HTMLDivElement>('.transcript-row') ?? []) {
+        virtualizer.measureElement(row);
+      }
     }
-  }, [virtualizer, width]);
+  }, [virtualizer, width, scroller]);
 
   // The selected exchange's rows are rendered now: select them in the DOM.
   useLayoutEffect(() => {

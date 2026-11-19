@@ -37,7 +37,12 @@ test('a session finishing in the background notifies and counts on the Dock badg
     .poll(() =>
       app.evaluate(({ BrowserWindow }) =>
         BrowserWindow.getAllWindows()
-          .filter((w) => !w.isDestroyed() && !w.webContents.getURL().includes('#/settings'))
+          .filter(
+            (w) =>
+              !w.isDestroyed() &&
+              !w.webContents.isDestroyed() &&
+              !w.webContents.getURL().includes('#/settings'),
+          )
           .some((w) => w.isFocused()),
       ),
     )
@@ -45,18 +50,23 @@ test('a session finishing in the background notifies and counts on the Dock badg
 
   await expect(row(page, id)).toHaveAttribute('data-badge', 'unread', { timeout: 30_000 });
   const observed = await app.evaluate(() => globalThis.__piarcTestHooks?.attention());
-  expect(observed?.notified).toEqual([
+  // Whether the window still had the foreground when the approval card came is up to the
+  // desktop: Windows did not keep it for a window launched by Playwright (CI run 44453549786,
+  // W1), so that card may have notified too. The completion is the one this test is about.
+  const completed = (observed?.notified ?? []).filter((n) => n.kind === 'completed');
+  expect(completed).toEqual([
     expect.objectContaining({
-      kind: 'completed',
       title: expect.stringContaining('Take a while'),
     }),
   ]);
-  expect(observed?.bounces).toBe(1);
+  expect((observed?.notified ?? []).every((n) => n.kind !== 'failed')).toBe(true);
+  // One bounce (Dock) or taskbar flash for each notification.
+  expect(observed?.bounces).toBe(observed?.notified.length);
   expect(observed?.count).toBe(1);
   if (process.platform === 'darwin') {
     expect(await app.evaluate(({ app: electronApp }) => electronApp.getBadgeCount())).toBe(1);
   }
-  await expect(page.getByTestId('toast')).toBeVisible();
+  await expect(page.getByTestId('toast').filter({ hasText: /finished|已完成/u })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('reminder.png') });
 
   // Back in front and shown: read, the count goes back to 0.

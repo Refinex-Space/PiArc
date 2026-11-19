@@ -61,9 +61,11 @@ for (const [id, api, format] of [
       await card.screenshot({ path: info.outputPath(kind + '.png') });
       await card.getByRole('button', { name: 'Allow once', exact: true }).click();
     }
+    // The approved Bash runs a real `node --test`; through Git Bash on a Windows runner it took
+    // more than the default 5 s (CI run 44453549786).
     await expect(
       page.getByTestId('agent-message').filter({ hasText: 'The sum test passed.' }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 60_000 });
     await idle(page);
     await page.screenshot({ path: info.outputPath('completed.png') });
     const records = (await (await fetch(mock.baseUrl + '/_piarc/requests')).json()) as {

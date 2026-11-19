@@ -8,7 +8,15 @@ import { existsSync, statSync } from 'node:fs';
 import type { ElectronApplication, Page } from '@playwright/test';
 
 import type { PreferenceChange } from '../src/shared/preferences.js';
-import { expect, makeWorkspace, openFolder, row, startSession, test } from './sessions.js';
+import {
+  expect,
+  focusMain,
+  makeWorkspace,
+  openFolder,
+  row,
+  startSession,
+  test,
+} from './sessions.js';
 
 async function prefer(page: Page, change: PreferenceChange): Promise<void> {
   await page.evaluate((c) => window.piarc.setPreference(c), change);
@@ -20,6 +28,10 @@ async function prefer(page: Page, change: PreferenceChange): Promise<void> {
  * page screenshot would composite onto white. Elsewhere the page is captured.
  */
 async function captureMain(app: ElectronApplication, page: Page, file: string): Promise<void> {
+  if (process.platform === 'win32') {
+    await captureWindowsScreen(app, page, file);
+    return;
+  }
   if (process.platform !== 'darwin') {
     await page.screenshot({ path: file });
     return;
@@ -38,6 +50,46 @@ async function captureMain(app: ElectronApplication, page: Page, file: string): 
   // Let a theme or density change reach the screen.
   await page.waitForTimeout(400);
   execFileSync('screencapture', ['-x', '-o', `-l${windowId}`, file]);
+  expect(existsSync(file) && statSync(file).size > 10_000).toBe(true);
+}
+
+/**
+ * Windows: the screen area of the main window, brought to the front (W1). Mica and the window
+ * controls overlay are drawn by the system around the page, so only the screen shows them.
+ */
+async function captureWindowsScreen(
+  app: ElectronApplication,
+  page: Page,
+  file: string,
+): Promise<void> {
+  await focusMain(app);
+  const rect = await app.evaluate(({ BrowserWindow, screen }) => {
+    const window = BrowserWindow.getAllWindows().find(
+      (w) => !w.isDestroyed() && !w.webContents.getURL().includes('#/settings'),
+    );
+    if (window === undefined) throw new Error('no main window');
+    // Windows may keep other windows above one a test brings forward: lift it for the capture.
+    window.setAlwaysOnTop(true);
+    return screen.dipToScreenRect(window, window.getBounds());
+  });
+  // Let a theme or density change reach the screen.
+  await page.waitForTimeout(600);
+  const script = [
+    'Add-Type -AssemblyName System.Drawing',
+    `$b = New-Object System.Drawing.Bitmap ${String(rect.width)}, ${String(rect.height)}`,
+    '$g = [System.Drawing.Graphics]::FromImage($b)',
+    `$g.CopyFromScreen(${String(rect.x)}, ${String(rect.y)}, 0, 0, $b.Size)`,
+    '$b.Save($env:PIARC_CAPTURE, [System.Drawing.Imaging.ImageFormat]::Png)',
+  ].join('; ');
+  execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], {
+    env: { ...process.env, PIARC_CAPTURE: file },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  await app.evaluate(({ BrowserWindow }) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.setAlwaysOnTop(false);
+    }
+  });
   expect(existsSync(file) && statSync(file).size > 10_000).toBe(true);
 }
 

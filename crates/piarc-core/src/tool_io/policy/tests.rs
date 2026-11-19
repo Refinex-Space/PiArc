@@ -20,6 +20,8 @@ const SESSION: &str = "main";
 
 struct Fixture {
     root: PathBuf,
+    /// The workspace as the session names it (W1 uses a UNC spelling of the same directory).
+    work: PathBuf,
     io: ToolIo,
     storage: Storage,
     peer: Peer,
@@ -32,17 +34,26 @@ impl Fixture {
     }
 
     async fn with_env(command_env: super::super::CommandEnv) -> Self {
+        Self::build(command_env, Path::to_path_buf).await
+    }
+
+    /// `spell` names the workspace directory the way the session opens it.
+    async fn build(
+        command_env: super::super::CommandEnv,
+        spell: impl FnOnce(&Path) -> PathBuf,
+    ) -> Self {
         let root = std::env::temp_dir().join(crate::sessions::new_session_id().expect("unique id"));
-        let work = root.join("workspace");
+        let local = root.join("workspace");
         let data = root.join("data");
         let dirs = DataDirs::new(data.clone(), root.join("cache")).expect("directories");
         dirs.create_layout().expect("layout");
-        std::fs::create_dir_all(work.join(".piarc")).expect("workspace");
+        std::fs::create_dir_all(local.join(".piarc")).expect("workspace");
         std::fs::write(
-            work.join(".piarc/settings.json"),
+            local.join(".piarc/settings.json"),
             r#"{"permissions":{"allow":["Read(known)","Bash(cargo check *)","Bash(npm run lint *)"]}}"#,
         )
         .expect("settings");
+        let work = spell(&local);
         let storage = Storage::open(dirs).expect("open database");
         let trust = TrustService::new(storage.clone());
         trust
@@ -78,6 +89,7 @@ impl Fixture {
         let (peer, frames) = Peer::channel(4);
         Self {
             root,
+            work,
             io,
             storage,
             peer,
@@ -325,9 +337,11 @@ async fn automatic_decision_latency() {
         .map(|r| serde_json::from_str::<Value>(&r.detail).expect("detail")["step"].to_string())
         .collect();
     assert_eq!(steps.len(), 2, "{steps:?}");
+    // Architecture chapter 11, ADR-0040: NTFS metadata calls cost several times more.
+    let budget = Duration::from_millis(if cfg!(windows) { 10 } else { 2 });
     assert!(
-        p95 <= Duration::from_millis(2),
-        "automatic permission budget exceeded: {p95:?}"
+        p95 <= budget,
+        "automatic permission budget {budget:?} exceeded: {p95:?}"
     );
 }
 
@@ -531,3 +545,239 @@ async fn completion_only_retires_memory_for_its_own_turn() {
 }
 
 mod t23;
+
+/// W1 (architecture 15.2): Windows paths through the whole production path, preflight, grant
+/// and directory-bound I/O. Long paths and reserved names are made here, never committed.
+#[cfg(windows)]
+mod windows_paths {
+    use super::*;
+
+    impl Fixture {
+        async fn io_call(&self, method: &str, params: Value) -> Result<Value, ErrorObject> {
+            let params = params.as_object().expect("object").clone();
+            self.io.dispatch(method, params, self.peer.clone()).await
+        }
+
+        /// What the Agent Host's Write does after its preflight.
+        async fn write_new(
+            &self,
+            call: &str,
+            path: &str,
+            content: &str,
+        ) -> Result<Value, ErrorObject> {
+            let input = json!({"path": path, "content": content});
+            let preflight =
+                json!({"sessionId": SESSION, "toolCallId": call, "tool": "Write", "input": input});
+            let decision = self.io_call("policy/evaluate", preflight).await?;
+            assert_eq!(decision["allowed"], true, "{decision}");
+            let origin = json!({"tool": "Write", "toolCallId": call});
+            self.io_call(
+                "fs/write",
+                json!({"sessionId": SESSION, "path": path, "content": content, "origin": origin, "lineEndings": "matchFile"}),
+            )
+            .await
+        }
+
+        /// What the Agent Host's Read does after its preflight; the text read.
+        async fn read_text(&self, call: &str, path: &str) -> String {
+            assert_eq!(
+                self.evaluate(call, "Read", json!({"path": path})).await["allowed"],
+                true
+            );
+            let origin = json!({"tool": "Read", "toolCallId": call});
+            let read = json!({"sessionId": SESSION, "path": path, "read": {}, "origin": origin});
+            self.io_call("fs/stat", read.clone()).await.expect("stat");
+            let content = self
+                .io_call(
+                    "fs/read",
+                    json!({"sessionId": SESSION, "path": path, "origin": origin}),
+                )
+                .await
+                .expect("read");
+            let mut done = read;
+            done["completeRead"] = true.into();
+            self.io_call("fs/stat", done).await.expect("complete read");
+            content["text"].as_str().expect("text").to_owned()
+        }
+    }
+
+    #[tokio::test]
+    async fn paths_longer_than_260_characters_are_written_and_read() {
+        let f = Fixture::new().await;
+        f.io.changed_mode(SESSION, PermissionMode::AcceptEdits)
+            .await
+            .expect("mode");
+        let deep: String = (0..6)
+            .map(|i| format!("{i} 长路径 {}/", "segment".repeat(6)))
+            .collect();
+        std::fs::create_dir_all(f.root.join("workspace").join(&deep)).expect("long directories");
+        let file = format!("{deep}file 文件.txt");
+        let full = f.root.join("workspace").join(&file);
+        assert!(full.display().to_string().len() > 260, "{}", full.display());
+        f.write_new("long-write", &file, "deep\r\n")
+            .await
+            .expect("written");
+        assert_eq!(std::fs::read(&full).expect("on disk"), b"deep\r\n");
+        assert_eq!(f.read_text("long-read", &file).await, "deep\r\n");
+    }
+
+    #[tokio::test]
+    async fn reserved_and_trimmed_names_are_refused_before_anything_is_written() {
+        let f = Fixture::new().await;
+        f.io.changed_mode(SESSION, PermissionMode::AcceptEdits)
+            .await
+            .expect("mode");
+        for name in [
+            "CON",
+            "nul",
+            "aux.txt",
+            "COM1.log",
+            "LPT9",
+            "note.",
+            "note.txt ",
+        ] {
+            let error = f.write_new(name, name, "x").await.expect_err(name);
+            assert_eq!(error.data.kind, ErrorKind::IoError, "{name}: {error:?}");
+            assert!(
+                error.message.contains("Windows"),
+                "{name}: {}",
+                error.message
+            );
+        }
+        let left: Vec<_> = std::fs::read_dir(f.root.join("workspace"))
+            .expect("list")
+            .map(|e| e.expect("entry").file_name())
+            .filter(|n| n != ".piarc")
+            .collect();
+        assert!(left.is_empty(), "{left:?}");
+    }
+
+    fn junction(link: &Path, target: &Path) {
+        let out = std::process::Command::new("cmd")
+            .args(["/d", "/c", "mklink", "/J"])
+            .arg(link)
+            .arg(target)
+            .output()
+            .expect("cmd runs");
+        assert!(out.status.success(), "mklink /J: {out:?}");
+    }
+
+    fn outside(f: &Fixture) -> PathBuf {
+        let dir = f.root.join("outside 外部");
+        std::fs::create_dir_all(&dir).expect("outside");
+        std::fs::write(dir.join("secret.txt"), "outside").expect("secret");
+        dir
+    }
+
+    /// A junction is a directory reparse point: a path through it leaves the workspace and asks.
+    #[tokio::test]
+    async fn a_junction_to_another_directory_asks_like_any_outside_path() {
+        let f = Fixture::new().await;
+        f.io.changed_mode(SESSION, PermissionMode::AcceptEdits)
+            .await
+            .expect("mode");
+        junction(&f.root.join("workspace").join("link"), &outside(&f));
+        for (call, tool, input) in [
+            ("read", "Read", json!({"path": "link/secret.txt"})),
+            (
+                "write",
+                "Write",
+                json!({"path": "link/new.txt", "content": "x"}),
+            ),
+        ] {
+            let run = f.evaluate(call, tool, input);
+            let refuse = async {
+                let card = f.pending().await;
+                assert_eq!(card.kind, ApprovalKind::PermissionExpansion, "{call}");
+                f.io.answer_approval(answer(&card, ApprovalDecision::Deny))
+                    .await
+                    .expect("decline");
+            };
+            let (result, ()) = tokio::join!(run, refuse);
+            assert_eq!(result["allowed"], false, "{call}");
+        }
+        assert!(!f.root.join("outside 外部/new.txt").exists());
+    }
+
+    /// ADR-0036 on Windows: an approved directory is held without delete sharing, so it cannot
+    /// be swapped for a junction; if the volume allowed the move, the bound read must fail.
+    #[tokio::test]
+    async fn an_approved_directory_cannot_be_swapped_for_a_junction() {
+        let f = Fixture::new().await;
+        let target = outside(&f);
+        let sub = f.root.join("workspace").join("sub");
+        std::fs::create_dir_all(&sub).expect("sub");
+        std::fs::write(sub.join("secret.txt"), "inside").expect("inside");
+        let call = "swap";
+        assert_eq!(
+            f.evaluate(call, "Read", json!({"path": "sub/secret.txt"}))
+                .await["allowed"],
+            true
+        );
+        let moved = std::fs::rename(&sub, f.root.join("workspace").join("sub-old"));
+        println!("moving the approved directory: {moved:?}");
+        if moved.is_ok() {
+            junction(&sub, &target);
+        }
+        let origin = json!({"tool": "Read", "toolCallId": call});
+        let read = f
+            .io_call(
+                "fs/read",
+                json!({"sessionId": SESSION, "path": "sub/secret.txt", "origin": origin}),
+            )
+            .await;
+        match moved {
+            Err(e) => {
+                assert!(matches!(e.raw_os_error(), Some(5 | 32)), "{e:?}");
+                assert_eq!(read.expect("unchanged directory")["text"], "inside");
+            }
+            Ok(()) => assert!(read.is_err(), "read through the swapped junction: {read:?}"),
+        }
+    }
+
+    /// A real share: `PIARC_TEST_UNC_SHARE` (`\\host\share`) must expose the test's temporary
+    /// directory, where the fixture makes the workspace; point `TMP` at the shared folder.
+    /// Without it this prints NOT RUN: W1 ran it on a folder the user shared for the check;
+    /// nothing here creates or changes shares.
+    #[tokio::test]
+    async fn a_workspace_on_a_unc_share_is_written_read_and_searched() {
+        let Some(share) = std::env::var_os("PIARC_TEST_UNC_SHARE") else {
+            println!("NOT RUN: set PIARC_TEST_UNC_SHARE to a share of the temporary directory");
+            return;
+        };
+        let share = PathBuf::from(share);
+        let f = Fixture::build(super::super::super::CommandEnv::process(), |dir| {
+            let below = dir.strip_prefix(std::env::temp_dir()).expect("below temp");
+            share.join(below)
+        })
+        .await;
+        f.io.changed_mode(SESSION, PermissionMode::AcceptEdits)
+            .await
+            .expect("mode");
+        println!("UNC workspace {}", f.work.display());
+        f.write_new("unc-write", "共享 note.txt", "over unc\r\n")
+            .await
+            .expect("written");
+        assert_eq!(
+            std::fs::read(f.root.join("workspace/共享 note.txt")).expect("local view"),
+            b"over unc\r\n"
+        );
+        assert_eq!(
+            f.read_text("unc-read", "共享 note.txt").await,
+            "over unc\r\n"
+        );
+        let glob = f
+            .evaluate("unc-glob", "Glob", json!({"pattern": "*.txt"}))
+            .await;
+        assert_eq!(glob["allowed"], true);
+        let origin = json!({"tool": "Glob", "toolCallId": "unc-glob"});
+        let found = f
+            .io_call(
+                "fs/glob",
+                json!({"sessionId": SESSION, "path": ".", "pattern": "*.txt", "origin": origin}),
+            )
+            .await
+            .expect("glob");
+        assert!(found.to_string().contains("共享 note.txt"), "{found}");
+    }
+}

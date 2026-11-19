@@ -210,7 +210,15 @@ fn first_on_path(
             return Err(());
         }
         let raw = dir.to_str().ok_or(())?;
-        let physical = scope.locate(raw).map_err(|_| ())?;
+        let physical = match scope.locate(raw) {
+            Ok(physical) => physical,
+            // A directory this user cannot search supplies no command, and bash skips it too
+            // (W1 met such entries on Windows PATHs); one inside the workspace is still refused.
+            Err(piarc_fs::Error::Io { code: "EACCES", .. }) if !dir.starts_with(scope.root()) => {
+                continue;
+            }
+            Err(_) => return Err(()),
+        };
         if physical.starts_with(scope.root()) || dir.starts_with(scope.root()) {
             return Err(());
         }
@@ -289,5 +297,69 @@ mod tests {
         };
         assert!(custom.resolve(&scope, "ls").is_none());
         std::fs::remove_dir_all(root).expect("clean");
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use super::*;
+
+    /// W1: an entry the user may not search must not withdraw automatic permission. On
+    /// Windows the programs come from asking Git Bash, which skips such an entry.
+    #[tokio::test]
+    async fn a_path_entry_the_user_cannot_search_is_skipped() {
+        let env: Vec<_> = std::env::vars_os().collect();
+        let bash = piarc_exec::shells::detect(&piarc_exec::shells::Probe::system(&env), None)
+            .bash
+            .expect("Git for Windows is installed");
+        let Some(root_git) = git_root(&bash) else {
+            // Git is not in Program Files: nothing gets automatic permission anyway.
+            return;
+        };
+        let root = std::env::temp_dir().join(crate::sessions::new_session_id().expect("unique"));
+        let locked = root.join("locked");
+        let inner = locked.join("inner");
+        std::fs::create_dir_all(&inner).expect("dir");
+        let user = std::env::var("USERNAME").expect("USERNAME");
+        let icacls = |args: &[&str]| {
+            let status = std::process::Command::new("icacls")
+                .arg(&locked)
+                .args(args)
+                .stdout(std::process::Stdio::null())
+                .status()
+                .expect("icacls");
+            assert!(status.success(), "icacls {args:?}");
+        };
+        icacls(&["/deny", &format!("{user}:(OI)(CI)F")]);
+        let unreadable = std::fs::canonicalize(&inner).map_err(|e| e.kind());
+        let mut path = vec![inner.clone()];
+        path.extend(
+            env.iter()
+                .filter(|(k, _)| k.eq_ignore_ascii_case("PATH"))
+                .flat_map(|(_, v)| std::env::split_paths(v).collect::<Vec<_>>()),
+        );
+        let mut probe_env: Vec<_> = env
+            .iter()
+            .filter(|(k, _)| !k.eq_ignore_ascii_case("PATH"))
+            .cloned()
+            .collect();
+        probe_env.push(("PATH".into(), std::env::join_paths(path).expect("path")));
+        let exec = super::super::Exec::new(
+            piarc_exec::ExecLimits::default(),
+            super::super::CommandEnv::Fixed(probe_env.clone()),
+            root.clone(),
+            None,
+        );
+        let found = exec.probe_git_programs(&bash, &probe_env).await;
+        icacls(&["/remove:d", &user]);
+        std::fs::remove_dir_all(&root).expect("clean");
+        assert_eq!(unreadable, Err(std::io::ErrorKind::PermissionDenied));
+        let touch = root_git.join("usr").join("bin").join("touch.exe");
+        assert!(
+            found
+                .iter()
+                .any(|(name, program)| name == "touch" && *program == touch),
+            "touch should still resolve to Git's own program: {found:?}"
+        );
     }
 }

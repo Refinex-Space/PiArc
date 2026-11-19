@@ -19,7 +19,7 @@ use windows_sys::Win32::System::JobObjects::{
 };
 use windows_sys::Win32::System::Threading::{OpenThread, ResumeThread, THREAD_SUSPEND_RESUME};
 
-pub(crate) use windows_sys::Win32::System::Threading::CREATE_SUSPENDED;
+pub(crate) use windows_sys::Win32::System::Threading::{CREATE_NO_WINDOW, CREATE_SUSPENDED};
 
 /// Exit code of processes ended by [`Job::terminate`].
 const TERMINATED_EXIT_CODE: u32 = 1;
@@ -203,6 +203,17 @@ pub(crate) fn process_table() -> io::Result<Vec<ProcessEntry>> {
         more = unsafe { Process32NextW(snapshot.0, &raw mut entry) } != 0;
     }
     Ok(table)
+}
+
+/// Detaches the test process from its console, so children start the way they do from a GUI
+/// process such as PiArc (which has no console).
+#[cfg(test)]
+pub(crate) fn detach_from_console() {
+    // SAFETY: FreeConsole takes no arguments and only ends this process's console attachment;
+    // standard handles already opened stay valid.
+    unsafe {
+        windows_sys::Win32::System::Console::FreeConsole();
+    }
 }
 
 /// Whether no running process has `pid`.

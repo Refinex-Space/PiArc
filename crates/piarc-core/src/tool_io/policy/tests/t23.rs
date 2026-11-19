@@ -14,7 +14,7 @@ impl Fixture {
     }
 
     fn work(&self) -> PathBuf {
-        self.root.join("workspace")
+        self.work.clone()
     }
 
     fn write_settings(&self, file: &str, text: &str) {
