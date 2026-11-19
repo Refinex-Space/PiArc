@@ -37,7 +37,8 @@ test.describe('with Git for Windows', () => {
     await expect(page.getByTestId('notices')).toHaveCount(0);
     const card = page.getByTestId('approval-card');
     for (const [shell, command] of [
-      ['bash', 'echo 中文输出 && pwd -W'],
+      // `env` keeps the command off the read-only list (T23), so Manual mode asks for it.
+      ['bash', 'env echo 中文输出 && pwd -W'],
       ['powershell', "Write-Output '中文输出'"],
     ] as const) {
       await expect(card).toHaveAttribute('data-approval-card', 'command');

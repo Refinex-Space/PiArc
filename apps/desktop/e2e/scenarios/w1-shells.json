@@ -6,7 +6,10 @@
         {
           "id": "bash",
           "name": "Bash",
-          "input": { "command": "echo 中文输出 && pwd -W", "description": "Print through Git Bash" }
+          "input": {
+            "command": "env echo 中文输出 && pwd -W",
+            "description": "Print through Git Bash"
+          }
         }
       ]
     },

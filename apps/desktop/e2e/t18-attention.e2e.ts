@@ -22,7 +22,8 @@ test('a session finishing in the background notifies and counts on the Dock badg
   await expectTestHooks(app);
   const ws = await makeWorkspace(workspaces, 'notify 通知');
   await openFolder(page, app, ws);
-  // The model runs `sleep 3` before answering: time to put another window in front.
+  // The model runs `env sleep 3` before answering: time to put another window in front. The
+  // command asks first (`sleep` alone is read-only and would run without a card, T23).
   const id = await startSession(page, 'Take a while', 't18-slow#notify');
   await page
     .locator('[data-approval-card=command] button')

@@ -34,7 +34,7 @@ const test = base.extend({
             { text: 'Read finished.' },
             {
               tool_calls: [
-                { id: 'toolu_bash', name: 'Bash', input: { command: 'cat samples.txt' } },
+                { id: 'toolu_bash', name: 'Bash', input: { command: 'env cat samples.txt' } },
               ],
             },
             { text: 'Command finished.' },
@@ -88,7 +88,7 @@ test('renders reply, tool output, command output and file paths as inert text', 
   await send(page, 'Print the same file.');
   const approval = page.getByTestId('approval-card');
   await expect(approval).toHaveAttribute('data-approval-card', 'command');
-  await expect(approval.locator('.bash-command')).toHaveText('cat samples.txt');
+  await expect(approval.locator('.bash-command')).toHaveText('env cat samples.txt');
   await approval.getByRole('button', { name: 'Allow once', exact: true }).click();
   await expect(page.getByTestId('agent-message').last()).toContainText('Command finished.');
   await idle(page);

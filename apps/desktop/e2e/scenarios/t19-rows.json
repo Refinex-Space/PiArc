@@ -33,7 +33,7 @@
           "id": "toolu_bash",
           "name": "Bash",
           "input": {
-            "command": "sleep 2; echo checked",
+            "command": "sleep 2; env echo checked",
             "description": "Check"
           }
         }

@@ -36,7 +36,9 @@ test('the P0 rows of a real turn, and the working row through its phases', async
   await expect(page.getByTestId('working-elapsed')).toHaveText(/\d+ s/u);
   await page.getByRole('button', { name: 'Allow once', exact: true }).click();
   // The command runs about two seconds: the working row names it.
-  await expect(activity).toHaveText('Bash · sleep 2; echo checked', { timeout: 20_000 });
+  await expect(activity).toHaveText('Bash · sleep 2; env echo checked', {
+    timeout: 20_000,
+  });
   await screenshots(page, testInfo, 'working-tool');
   await expect(page.getByTestId('working-tokens')).toHaveText(/\d[\d,]* tokens/u);
   // The third response is a 429: Pi retries it, the working row counts.
@@ -59,7 +61,7 @@ test('the P0 rows of a real turn, and the working row through its phases', async
   await expect(groups.first()).toContainText('Read main.ts · Searched “TODO”');
   const bash = page.getByTestId('bash-card');
   await expect(bash).toHaveAttribute('data-outcome', 'success');
-  await expect(bash.getByTestId('bash-command')).toHaveText('$ sleep 2; echo checked');
+  await expect(bash.getByTestId('bash-command')).toHaveText('$ sleep 2; env echo checked');
   await expect(bash.getByTestId('bash-exit')).toHaveText('exit 0');
   // The edit is a group of one; opening it shows the file change card with Core's diff.
   const edit = groups.filter({ hasText: 'Edited main.ts' });
