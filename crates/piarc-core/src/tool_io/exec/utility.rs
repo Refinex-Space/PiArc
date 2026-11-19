@@ -175,8 +175,15 @@ fn safe_search(
         let Some(raw) = dir.to_str() else {
             return false;
         };
-        let Ok(physical) = scope.locate(raw) else {
-            return false;
+        let physical = match scope.locate(raw) {
+            Ok(physical) => physical,
+            // This user cannot search the directory (Windows PATHs often list
+            // `C:\Windows\system32\config\systemprofile\…`), so no command resolves from it:
+            // bash skips it as well. On Windows the shell probe still confirms the resolution.
+            Err(piarc_fs::Error::Io { code: "EACCES", .. }) if !dir.starts_with(scope.root()) => {
+                continue;
+            }
+            Err(_) => return false,
         };
         if physical.starts_with(scope.root()) || dir.starts_with(scope.root()) {
             return false;
@@ -221,5 +228,60 @@ mod tests {
         std::fs::write(bin.join("touch"), "fixture").expect("file");
         assert!(!check(vec![&bin, Path::new("/usr/bin")]));
         std::fs::remove_dir_all(root).expect("clean");
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use super::*;
+
+    /// W1: an entry the user may not search must not withdraw automatic permission.
+    #[test]
+    fn a_path_entry_the_user_cannot_search_is_skipped() {
+        let env: Vec<_> = std::env::vars_os().collect();
+        let bash = piarc_exec::shells::detect(&piarc_exec::shells::Probe::system(&env), None)
+            .bash
+            .expect("Git for Windows is installed");
+        let Some(expected) = installed_utility(&bash, "touch") else {
+            // Git is not in Program Files: nothing gets automatic permission anyway.
+            return;
+        };
+        let root = std::env::temp_dir().join(crate::sessions::new_session_id().expect("unique"));
+        let ws = root.join("workspace");
+        let locked = root.join("locked");
+        let inner = locked.join("inner");
+        std::fs::create_dir_all(&ws).expect("dir");
+        std::fs::create_dir_all(&inner).expect("dir");
+        let user = std::env::var("USERNAME").expect("USERNAME");
+        let icacls = |args: &[&str]| {
+            let status = std::process::Command::new("icacls")
+                .arg(&locked)
+                .args(args)
+                .stdout(std::process::Stdio::null())
+                .status()
+                .expect("icacls");
+            assert!(status.success(), "icacls {args:?}");
+        };
+        icacls(&["/deny", &format!("{user}:(OI)(CI)F")]);
+        let unreadable = std::fs::canonicalize(&inner).map_err(|e| e.kind());
+        let scope = piarc_fs::Scope::new(&ws, &ws).expect("scope");
+        let git_bin = expected.parent().expect("dir").to_owned();
+        let check = |dirs: Vec<&Path>| {
+            safe_search(
+                &[("PATH".into(), std::env::join_paths(dirs).expect("path"))],
+                &scope,
+                "touch",
+                &expected,
+            )
+        };
+        let skipped = check(vec![&inner, &git_bin]);
+        let inside = check(vec![&ws, &git_bin]);
+        // The scope holds the workspace open without shared delete (ADR-0036).
+        drop(scope);
+        icacls(&["/remove:d", &user]);
+        std::fs::remove_dir_all(&root).expect("clean");
+        assert_eq!(unreadable, Err(std::io::ErrorKind::PermissionDenied));
+        assert!(skipped);
+        assert!(!inside);
     }
 }
