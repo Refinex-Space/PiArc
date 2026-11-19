@@ -202,6 +202,12 @@ fn check_core_calls(calls: &[crate::harness::Call]) {
             tool_lists += 1;
             continue;
         }
+        // T27: the compaction settings before each run and the files changed outside before
+        // each model request belong to no tool call either.
+        if call.method == "context/settings" || call.method == "fs/changes" {
+            assert!(call.tool.is_none() && call.error.is_none(), "{call:?}");
+            continue;
+        }
         let tool = call.tool.as_deref().expect("every request names its tool");
         by_tool
             .entry(tool)

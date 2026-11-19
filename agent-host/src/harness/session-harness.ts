@@ -28,7 +28,7 @@ import type { CoreIo } from '../tools/core-io.js';
 import type { ToolProfile } from '../tools/profile.js';
 import { SessionCompaction } from './compaction.js';
 import { ContextUsageTracker } from './context-usage.js';
-import { fileChanges } from './file-changes.js';
+import { FILE_STATE_TOOLS, fileChanges } from './file-changes.js';
 import type { SessionHooks } from './hooks.js';
 import {
   createEnterPlanModeTool,
@@ -95,6 +95,8 @@ export class SessionHarness {
   readonly #o: SessionHarnessOptions;
   #compaction: SessionCompaction | undefined;
   #memory: SessionMemory | undefined;
+  /** The branch has a successful Read, Write or Edit: Core has files to compare. */
+  #touchedFiles: boolean;
 
   constructor(options: SessionHarnessOptions) {
     this.#o = options;
@@ -104,10 +106,25 @@ export class SessionHarness {
       reminders: this.reminders,
       activeTurn: options.activeTurn,
     });
+    this.#touchedFiles = options.manager
+      .getBranch()
+      .some(
+        (entry) =>
+          entry.type === 'message' &&
+          entry.message.role === 'toolResult' &&
+          !entry.message.isError &&
+          FILE_STATE_TOOLS.has(options.canonical(entry.message.toolName)),
+      );
     const context = options.core?.context === true ? options.core.bridge : undefined;
     if (context !== undefined && options.io !== undefined) {
       this.reminders.addCollector(
-        fileChanges(context, options.sessionId, this.reminders, options.log),
+        fileChanges(
+          context,
+          options.sessionId,
+          this.reminders,
+          () => this.#touchedFiles,
+          options.log,
+        ),
       );
     }
     this.usage = new ContextUsageTracker({
@@ -219,6 +236,13 @@ export class SessionHarness {
     if (event.type === 'message_end' && event.message.role === 'assistant') {
       this.usage.responded(event.message);
       return;
+    }
+    if (
+      event.type === 'tool_execution_end' &&
+      !event.isError &&
+      FILE_STATE_TOOLS.has(this.#o.canonical(event.toolName))
+    ) {
+      this.#touchedFiles = true;
     }
     if (
       event.type !== 'tool_execution_end' ||

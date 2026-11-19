@@ -3,6 +3,7 @@
 //! `--nocapture` to print the observations recorded in `docs/spikes/S03-multi-session.md`
 //! and `docs/spikes/S09-ahp-resilience.md`.
 
+mod context;
 mod credentials;
 mod golden;
 mod harness;
@@ -549,10 +550,11 @@ fn check_own_notes(env: &Env, events: &harness::Recorder, a: &SessionId, b: &Ses
 fn check_own_core_calls(env: &Env, core: &harness::Core, a: &SessionId, b: &SessionId) {
     for (index, session) in [a, b].into_iter().enumerate() {
         // `exec/shells` (T17) asks for the session's command tools, not a file.
+        // `fs/changes` (T27) asks before a model request which files changed outside.
         let (memory, calls): (Vec<_>, Vec<_>) = core
             .calls_of(&session.0)
             .into_iter()
-            .filter(|c| c.method.starts_with("fs/"))
+            .filter(|c| c.method.starts_with("fs/") && c.method != "fs/changes")
             .partition(|c| c.method == "fs/memory");
         assert!(!memory.is_empty(), "each session loads its own memory");
         assert!(memory.iter().all(|c| c.tool.is_none() && c.error.is_none()));
