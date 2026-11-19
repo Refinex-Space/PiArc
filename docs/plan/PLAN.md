@@ -316,9 +316,9 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [ ] 打包开发构建与 Velopack 安装包（或 CI 产物），安装并首次运行
 - [ ] 完整任务：双协议 r2-workflow，含空格与中文的工作区（A02）；真实服务商需另行同意
 - [ ] L2 本机全量 ≥ 20 通过（A03）；I19 的 fs/stat → fs/read 间隔
-- [ ] Git Bash 探测与隐藏后的提示、PowerShell 与 Manual 询问（A04）
-- [ ] 路径、CRLF、BOM、UTF-16、中文输出、UNC、junction、目录共享删除（A05）
-- [ ] 进程树：取消、超时与 tasklist（A06）
+- [x] Git Bash 探测与隐藏后的提示、PowerShell 与 Manual 询问（A04）：新 L4 `w1-windows-shells.e2e.ts` 两种形态 4/4（beb41a4），L2 `exec-windows-shells` 通过
+- [ ] 路径、CRLF、BOM、UTF-16、中文输出、UNC、junction、目录共享删除（A05）：长路径、保留名（修复 017b20b）、junction 与换目录（b75d2bf）、Git Bash 挂载目录 cwd（d9ee057）已完成；UNC 等用户建临时共享
+- [x] 进程树：取消、超时与 tasklist（A06）：`piarc-exec` 终止测试 6/6，8 个 PID 经 `tasklist` 确认不存在（`tmp/evidence/W1/process-tree.log`）
 - [ ] 凭据管理器、数据目录、明文扫描、索引迁移（A07）
 - [ ] 输入法：CDP 自动化 + 用户实机（A08）
 - [ ] 通知与任务栏覆盖图标（A09）
