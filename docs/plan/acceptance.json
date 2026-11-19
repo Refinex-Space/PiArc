@@ -97,57 +97,57 @@
       "id": "R2-A02",
       "task": "R2",
       "description": "真实服务商的完整任务在用户同意后执行并记录调用次数与费用；未执行时评审文件写明原因，结论中列为前提条件或风险。验证：评审文件内容与会话记录。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "用户授权百炼北京 qwen-flash 最多 8 次、预算 ¥0.10。打包应用真实工作流通过，5 次 HTTP 200，读、读、编辑、测试，11,868/254 输入/输出 tokens，按原价估算 ¥0.0021612。见 tmp/evidence/R2/paid/usage.json、before.txt、after.txt、result.png。离线 deepseek-r1:7b 仅返回文字，报告单列。"
     },
     {
       "id": "R2-A03",
       "task": "R2",
       "description": "L2 场景通过数不少于 20，`docs/product/capabilities.md` 重新生成且没有 MISSING，`--milestone M1` 不列出 `planned` 能力。验证：L2 运行输出与两条命令的输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test scenarios -- --results target/l2/results.json：61 passed、0 failed、1 Windows-only（62 scenarios）。node scripts/plan/check-capabilities.mjs --results target/l2/results.json --doc write：MISSING 0；--milestone M1：planned 0；M1 blocked 0。tmp/evidence/R2/coverage-final.log。"
     },
     {
       "id": "R2-A04",
       "task": "R2",
       "description": "第 16 章 M1 目标中的每一项都有能力 ID 或 L4 用例作为证据，缺口已补齐。验证：评审文件中的映射表。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/reviews/R2-findings.md 的 M1 目标映射逐项对应 L2 与真实 Electron 用例。新增 session-manage、信任清单与 core/sessions 断言、读取失败重试，补齐 M1 证据。PowerShell 对应 Windows 专属场景及 W1 清单。"
     },
     {
       "id": "R2-A05",
       "task": "R2",
       "description": "T13–T22 的验收项全部为 `passing`，或为 `blocked` 且原因在评审文件中被接受。验证：`acceptance.json` 检查输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "按 task 精确筛选 T13–T22 共 126 项，126 passing，其他状态均为 0。docs/reviews/R2-findings.md 按任务列计数；本次保留全部前序验收记录。"
     },
     {
       "id": "R2-A06",
       "task": "R2",
       "description": "四个审查子代理并行运行且相互独立，各自的范围与输入记录在评审文件中。验证：评审文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "四个独立只读 explorer 以 d57c72e 为输入并行调度，权限、工具、IPC、工程质量范围互不共享上下文。上限 3 个并发子代理，首个完成后第四个进入。各自输入和原文见 docs/reviews/R2-findings.md。"
     },
     {
       "id": "R2-A07",
       "task": "R2",
       "description": "每条审查发现都有核实结论与处理（修复、不同意并给理由、登记到具体任务）。验证：`docs/reviews/R2-findings.md`。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/reviews/R2-findings.md 逐项核实 P01–P03、F01–F07、U01–U02、Q01–Q05，合并一条重复发现；列修复提交、证据、既有 I30/I36/I51/I61/I79/I80 的责任人任务；ADR-0034–0036 已接受。"
     },
     {
       "id": "R2-A08",
       "task": "R2",
       "description": "每个修复都附带先失败后通过的回归测试。验证：提交记录与测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "tmp/evidence/R2/ 的 regression-red/green、read-state-red/green、memory-binding-red/green、directory-red/green、walk-red/green-final、pipe-red/green、index-red/green、diff-red/green、env-red/env-l2-final、trust-version-red 及删除和信任 L4 记录；评审处理表逐项关联行为和提交。"
     },
     {
       "id": "R2-A09",
       "task": "R2",
       "description": "W1 检查清单覆盖交付物 5 的五类内容，并逐条列出 Windows 相关的 `blocked` 验收项编号。验证：评审文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/reviews/R2-findings.md 的 W1 表列相同双协议夹具、L2/L4、Windows shell、Job Object、路径换行与凭据、实机通知/输入法/Mica 和平台发现。T13–T22 因 Windows 实机而 blocked 的条目为 0，已明确列出。"
     },
     {
       "id": "R2-A10",
@@ -160,8 +160,8 @@
       "id": "R2-A11",
       "task": "R2",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify：All 15 steps passed。含 Prettier、ESLint、tsc、开发/发布 Core API 快照、Rust/TS 测试、契约、依赖审计与 L2/能力漂移。tmp/evidence/R2/verify-accepted.log。"
     },
     {
       "id": "R3-A01",
