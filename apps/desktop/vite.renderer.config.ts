@@ -12,6 +12,20 @@ export default defineConfig({
     emptyOutDir: true,
   },
   plugins: [react()],
+  // Bundle the protocol package from source (see vite.main.config.ts).
+  resolve: {
+    alias: {
+      '@piarc/protocol': path.join(
+        import.meta.dirname,
+        '..',
+        '..',
+        'packages',
+        'protocol',
+        'src',
+        'index.ts',
+      ),
+    },
+  },
   // Workers are ES modules served from the app scheme like every other script (the CSP's
   // `script-src 'self'` covers them); the module format lets the highlight worker load each
   // grammar as its own chunk.
