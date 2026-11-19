@@ -1,0 +1,68 @@
+id: plan-mode-gate
+description: EnterPlanMode switches to plan mode without approval; writes and non-read-only commands are refused at the gate with a pointer to ExitPlanMode; the approved plan continues in Accept edits; system and tool definitions stay byte-identical across the switches (T26).
+capabilities: [CAP-PLAN-MODE-001]
+workspace:
+  files:
+    a.txt: "alpha\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: Planning first.
+        tool_calls: [{ id: enter, name: EnterPlanMode, input: {} }]
+      - tool_calls:
+          - { id: look, name: Read, input: { path: a.txt } }
+          - { id: write, name: Write, input: { path: b.txt, content: early } }
+          - { id: cmd, name: Bash, input: { command: 'sed -n 1p a.txt' } }
+      - tool_calls:
+          - id: exit
+            name: ExitPlanMode
+            input: { plan: "1. Write b.txt\n2. Report" }
+      - tool_calls: [{ id: write2, name: Write, input: { path: b.txt, content: planned } }]
+      - text: Done.
+actions:
+  - prompt: { text: Plan and then change it., turn: t }
+approvals:
+  - { tool: ExitPlanMode, kind: plan, decision: allow, mode: acceptEdits }
+expect:
+  request_counts: { main: 5 }
+  events:
+    - method: item/completed
+      turn: t
+      params: { item: { type: permissionModeChanged, mode: plan } }
+    - method: item/completed
+      turn: t
+      params: { item: { type: dynamicToolCall, tool: EnterPlanMode, status: completed } }
+    - method: item/completed
+      turn: t
+      params: { item: { type: permissionModeChanged, mode: acceptEdits } }
+    - method: harness/plan
+      params: { toolCallId: exit, plan: "1. Write b.txt\n2. Report", mode: acceptEdits }
+  requests:
+    - index: 1
+      same_system_as: 0
+      same_tools_as: 0
+      tool_results: [{ id: enter, is_error: false, contains: Plan mode is on }]
+    - index: 2
+      same_system_as: 0
+      same_tools_as: 0
+      tool_results:
+        - { id: enter }
+        - { id: look, is_error: false, contains: alpha }
+        - { id: write, is_error: true, contains: submit your plan with ExitPlanMode }
+        - { id: cmd, is_error: true, contains: plan mode is on }
+    - index: 3
+      same_system_as: 0
+      same_tools_as: 0
+      tool_results:
+        - { id: enter }
+        - { id: look }
+        - { id: write }
+        - { id: cmd }
+        - { id: exit, is_error: false, contains: The user approved the plan. Plan mode is off. }
+    - index: 4
+      same_system_as: 0
+      same_tools_as: 0
+      not_contains: ['[PiArc reminder]']
+  files:
+    b.txt: planned

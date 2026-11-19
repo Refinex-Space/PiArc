@@ -1,0 +1,40 @@
+id: ask-timeout
+description: With askUserQuestion.timeoutSeconds set, an unanswered form times out - a question with a default option takes it, one without is reported as unanswered, both as structured results (T26).
+capabilities: [CAP-ASK-001]
+workspace:
+  files:
+    .piarc/settings.json: '{"askUserQuestion":{"timeoutSeconds":0.5}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: ask
+            name: AskUserQuestion
+            input:
+              questions:
+                - question: Which database?
+                  options: [{ label: SQLite, default: true }, { label: Postgres }]
+                - question: Which port?
+                  options: [{ label: '5432' }, { label: '6543' }]
+      - text: Going with the defaults.
+actions:
+  - prompt: { text: Ask me., turn: t }
+approvals:
+  - { tool: AskUserQuestion, kind: question, decision: wait }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - index: 1
+      tool_results:
+        - id: ask
+          is_error: false
+          contains: 'The form timed out'
+    - index: 1
+      tool_results:
+        - id: ask
+          contains: '{"question":"Which database?","outcome":"default","selected":["SQLite"]}'
+    - index: 1
+      tool_results:
+        - id: ask
+          contains: '{"question":"Which port?","outcome":"unanswered","selected":[]}'

@@ -149,6 +149,16 @@ fn check_offered_tools(body: &str) {
     }
 }
 
+/// The offered tools other than the host tools (T26), which must all be offered, in order.
+fn without_host_tools(offered: Vec<(String, String)>) -> Vec<(String, String)> {
+    let (host, rest): (Vec<_>, Vec<_>) = offered
+        .into_iter()
+        .partition(|(name, _)| HOST_TOOLS.contains(&name.as_str()));
+    let host: Vec<&str> = host.iter().map(|(name, _)| name.as_str()).collect();
+    assert_eq!(host, HOST_TOOLS);
+    rest
+}
+
 /// What the model got back from each tool.
 fn check_results(results: &[(String, String, bool)]) {
     for (tool, text, is_error) in results {
@@ -309,12 +319,7 @@ async fn a_tool_profile_renames_tools_for_the_model_only() {
         .collect();
     // The profile renames the six tools; Windows also offers PowerShell under its own name, and
     // the host tools (T26) keep theirs.
-    let (host, offered): (Vec<_>, Vec<_>) = offered
-        .into_iter()
-        .partition(|(name, _)| HOST_TOOLS.contains(&name.as_str()));
-    let host: Vec<&str> = host.iter().map(|(name, _)| name.as_str()).collect();
-    assert_eq!(host, HOST_TOOLS);
-    let (powershell, renamed_tools): (Vec<_>, Vec<_>) = offered
+    let (powershell, renamed_tools): (Vec<_>, Vec<_>) = without_host_tools(offered)
         .into_iter()
         .partition(|(name, _)| name == "PowerShell");
     assert_eq!(renamed_tools, expected);

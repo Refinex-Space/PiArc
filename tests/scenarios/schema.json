@@ -369,6 +369,27 @@
             "path": { "$ref": "#/$defs/relativePath" },
             "content": { "type": "string" }
           }
+        },
+        "fork": {
+          "description": "Forks a session at the entry of one of its agent messages; the new session takes a deferred session label (T26).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["at_text", "as"],
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "at_text": { "type": "string", "minLength": 1 },
+            "as": { "$ref": "#/$defs/label" }
+          }
+        },
+        "check_harness": {
+          "description": "Checks a field subset of the plan and task list of the session's branch (session/history harness), or their absence when fields is null (T26).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fields"],
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "fields": { "type": ["object", "null"] }
+          }
         }
       },
       "additionalProperties": false
@@ -463,9 +484,41 @@
       "additionalProperties": false,
       "required": ["decision"],
       "properties": {
-        "kind": { "enum": ["command", "fileChange", "permissionExpansion", "question"] },
+        "kind": { "enum": ["command", "fileChange", "permissionExpansion", "question", "plan"] },
         "feedback": { "type": "string" },
-        "decision": { "enum": ["allow", "deny", "always", "session"] },
+        "mode": {
+          "description": "The mode an approved plan continues in (T26).",
+          "enum": ["default", "acceptEdits"]
+        },
+        "comments": {
+          "description": "Inline comments sent with a declined plan, anchored at the first occurrence of quote (T26).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["quote", "text"],
+            "properties": {
+              "quote": { "type": "string", "minLength": 1 },
+              "text": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "answers": {
+          "description": "One answer per question of a question card (T26).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "selected": { "type": "array", "items": { "type": "string" } },
+              "other": { "type": "string" }
+            }
+          }
+        },
+        "decision": {
+          "description": "wait leaves the card unanswered: a question form whose timeout answers it (T26).",
+          "enum": ["allow", "deny", "always", "session", "wait"]
+        },
         "tool": {
           "description": "The canonical tool name the request must be for.",
           "type": "string"
@@ -506,6 +559,11 @@
           "items": { "type": "string", "minLength": 1 }
         },
         "same_system_as": { "type": "integer", "minimum": 0 },
+        "same_tools_as": {
+          "description": "Compare the tool definitions byte for byte with an earlier request on the same endpoint (T26).",
+          "type": "integer",
+          "minimum": 0
+        },
         "tool_results": {
           "type": "array",
           "items": {

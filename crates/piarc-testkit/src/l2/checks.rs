@@ -67,6 +67,24 @@ impl RequestView {
         Ok(!system.is_empty() && system == self.system()?)
     }
 
+    /// The tool definitions exactly as sent (T26: plan mode keeps them byte for byte).
+    fn tools_raw(&self) -> Result<Option<&str>, String> {
+        #[derive(Deserialize)]
+        struct Wire<'a> {
+            #[serde(borrow)]
+            tools: Option<&'a RawValue>,
+        }
+        let wire: Wire<'_> = serde_json::from_str(&self.raw)
+            .map_err(|e| format!("cannot extract raw tool definitions: {e}"))?;
+        Ok(wire.tools.map(RawValue::get))
+    }
+
+    fn same_tools_as(&self, earlier: &RequestRecord) -> Result<bool, String> {
+        let previous = Self::of(earlier)?;
+        let tools = previous.tools_raw()?;
+        Ok(tools.is_some() && tools == self.tools_raw()?)
+    }
+
     fn roles(&self) -> Vec<String> {
         self.request
             .messages
@@ -238,24 +256,35 @@ fn check_context(
             "user_message_contains: no user message contains all of {parts:?}"
         ));
     }
-    if let Some(index) = expect.same_system_as {
-        match records
-            .get(index)
-            .map(|earlier| view.same_system_as(earlier))
-        {
+    let comparisons: [(&str, Option<usize>, Same); 2] = [
+        (
+            "same_system_as",
+            expect.same_system_as,
+            RequestView::same_system_as,
+        ),
+        (
+            "same_tools_as",
+            expect.same_tools_as,
+            RequestView::same_tools_as,
+        ),
+    ];
+    for (key, earlier, same) in comparisons {
+        let Some(index) = earlier else { continue };
+        match records.get(index).map(|earlier| same(view, earlier)) {
             Some(Ok(true)) => {}
             Some(Ok(false)) => out.push(format!(
-                "same_system_as: system content is missing or differs from request #{index}"
+                "{key}: the content is missing or differs from request #{index}"
             )),
             Some(Err(why)) => out.push(format!(
-                "same_system_as: could not compare with request #{index}: {why}"
+                "{key}: could not compare with request #{index}: {why}"
             )),
-            None => out.push(format!(
-                "same_system_as: request #{index} was never received"
-            )),
+            None => out.push(format!("{key}: request #{index} was never received")),
         }
     }
 }
+
+/// Compares a part of two requests' raw bodies.
+type Same = fn(&RequestView, &RequestRecord) -> Result<bool, String>;
 
 fn check_tool_results(
     expected: &[super::format::ToolResultExpect],
@@ -449,6 +478,15 @@ mod tests {
     use super::*;
 
     fn differences(format: crate::request::WireFormat, first: &str, later: &str) -> Vec<String> {
+        compare(format, first, later, "same_system_as")
+    }
+
+    fn compare(
+        format: crate::request::WireFormat,
+        first: &str,
+        later: &str,
+        key: &str,
+    ) -> Vec<String> {
         let record = |body: &str| RequestRecord {
             seq: 0,
             method: "POST".into(),
@@ -461,10 +499,26 @@ mod tests {
             violations: Vec::new(),
             outcome: crate::record::Outcome::Streamed,
         };
-        let expect = serde_json::from_value(serde_json::json!({"index":1,"same_system_as":0}))
+        let expect = serde_json::from_value(serde_json::json!({"index":1, key:0}))
             .expect("request assertion");
         let view = RequestView::of(&record(later)).expect("valid model request");
         check_request(&expect, &view, &[record(first)])
+    }
+
+    #[test]
+    fn same_tools_as_compares_the_original_tool_definition_bytes() {
+        let first = r#"{"tools":[{"name":"Read","description":"é","input_schema":{}}],"messages":[{"role":"user","content":"first"}]}"#;
+        let wire = crate::request::WireFormat::AnthropicMessages;
+        let later = first.replace("first", "second");
+        assert!(compare(wire, first, &later, "same_tools_as").is_empty());
+        let escaped = later.replace('é', r"\u00e9");
+        assert_eq!(compare(wire, first, &escaped, "same_tools_as").len(), 1);
+        let none = r#"{"messages":[{"role":"user","content":"x"}]}"#;
+        assert_eq!(
+            compare(wire, none, none, "same_tools_as").len(),
+            1,
+            "no tools"
+        );
     }
 
     #[test]

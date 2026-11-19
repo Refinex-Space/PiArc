@@ -1,0 +1,50 @@
+id: todo-list
+description: TodoWrite takes Claude Code's parameters, answers at once, reports the list as harness/todo right after its item, and the branch keeps the list after a manual compaction (T26).
+capabilities: [CAP-TODO-001]
+workspace:
+  trusted: true
+  files:
+    '.pi/settings.json': '{"compaction":{"keepRecentTokens":1}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: todo
+            name: TodoWrite
+            input:
+              todos:
+                - { content: Read the parser, status: completed, activeForm: Reading the parser }
+                - { content: Fix the bug, status: in_progress, activeForm: Fixing the bug }
+                - { content: 写测试, status: pending, activeForm: 正在写测试 }
+      - text: List saved.
+      - text: Summary of the work so far.
+actions:
+  - prompt: { text: Track the work., turn: t }
+  - wait: { method: turn/completed, turn: t }
+  - compact: {}
+  - check_harness:
+      fields:
+        todos:
+          - { content: Read the parser, status: completed }
+          - { content: Fix the bug, status: inProgress, activeForm: Fixing the bug }
+          - { content: 写测试, status: pending, activeForm: 正在写测试 }
+expect:
+  request_counts: { main: 3 }
+  events:
+    - method: item/completed
+      turn: t
+      params: { item: { type: dynamicToolCall, itemId: todo, tool: TodoWrite, status: completed } }
+    - method: harness/todo
+      params:
+        itemId: todo
+        todos:
+          - { content: Read the parser, status: completed, activeForm: Reading the parser }
+          - { content: Fix the bug, status: inProgress, activeForm: Fixing the bug }
+          - { content: 写测试, status: pending, activeForm: 正在写测试 }
+  requests:
+    - index: 1
+      tool_results:
+        - id: todo
+          is_error: false
+          contains: 'Task list saved: 3 tasks, 1 completed, 1 in progress, 1 pending. Current task: Fixing the bug.'

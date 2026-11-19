@@ -1,0 +1,40 @@
+id: next-steps
+description: SuggestNextSteps returns at once without holding the turn; its item carries the suggestions (title and input) for the client (T26).
+capabilities: [CAP-NEXT-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: The fix is in.
+        tool_calls:
+          - id: next
+            name: SuggestNextSteps
+            input:
+              suggestions:
+                - { title: Run the tests, prompt: Run the whole test suite and report failures. }
+                - { title: 写变更说明, prompt: 为这次修复写一段变更说明。 }
+      - text: Pick one if you like.
+actions:
+  - prompt: { text: Fix it., turn: t }
+expect:
+  request_counts: { main: 2 }
+  events:
+    - method: item/completed
+      turn: t
+      params:
+        item:
+          type: dynamicToolCall
+          itemId: next
+          tool: SuggestNextSteps
+          status: completed
+          arguments:
+            suggestions:
+              - { title: Run the tests, prompt: Run the whole test suite and report failures. }
+              - { title: 写变更说明, prompt: 为这次修复写一段变更说明。 }
+    - method: turn/completed
+      turn: t
+      params: { status: completed }
+  requests:
+    - index: 1
+      tool_results:
+        - { id: next, is_error: false, contains: 'Showed 2 suggested next step(s) to the user.' }

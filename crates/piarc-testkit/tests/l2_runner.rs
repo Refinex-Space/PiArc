@@ -210,6 +210,9 @@ fn declared_approvals_without_approval_requests_fail() {
         kind: None,
         feedback: None,
         tool: Some("Bash".into()),
+        mode: None,
+        comments: Vec::new(),
+        answers: Vec::new(),
     }];
     let failures = failures_of(&spec);
     println!("{failures:#?}");

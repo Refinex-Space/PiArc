@@ -17,6 +17,7 @@ pub mod checks;
 mod fixtures;
 pub mod format;
 pub mod gate;
+pub mod harness_spec;
 pub mod matcher;
 pub mod runner;
 pub mod suite;

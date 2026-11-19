@@ -35,6 +35,8 @@ use crate::record::RequestRecord;
 use crate::scenario::{Scenario, ScenarioLibrary};
 use crate::server::MockProvider;
 
+mod harness;
+
 /// Safety net for every wait; no assertion depends on timing.
 pub const WAIT: Duration = Duration::from_secs(30);
 
@@ -664,6 +666,8 @@ impl Driver<'_> {
                 .await
                 .map(drop)
             }
+            Action::Fork(fork) => self.fork(fork).await,
+            Action::CheckHarness(check) => self.check_harness(check).await,
         }
     }
 
@@ -989,6 +993,12 @@ impl Driver<'_> {
                 expected.kind, card.kind
             ));
         }
+        if expected.decision == Choice::Wait {
+            // The form's timeout answers it; the result reaches the model as a tool result.
+            self.answered.insert(card.request_id);
+            return Ok(());
+        }
+        let comments = harness::plan_comments(&card, expected)?;
         let answer = ApprovalAnswer {
             request_id: card.request_id.clone(),
             session_id: card.session_id,
@@ -997,14 +1007,14 @@ impl Driver<'_> {
             feedback: expected.feedback.clone(),
             rules: card.rules,
             directory: card.directory,
-            mode: None,
-            comments: Vec::new(),
-            answers: Vec::new(),
+            mode: expected.mode,
+            comments,
+            answers: harness::question_answers(expected),
             decision: match expected.decision {
                 Choice::Allow => Decision::AllowOnce,
                 Choice::Session => Decision::AllowSession,
                 Choice::Always => Decision::AllowAlways,
-                Choice::Deny => Decision::Deny,
+                Choice::Deny | Choice::Wait => Decision::Deny,
             },
         };
         let result = call(

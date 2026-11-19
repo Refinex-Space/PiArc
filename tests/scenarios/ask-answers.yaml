@@ -1,0 +1,53 @@
+id: ask-answers
+description: AskUserQuestion shows its form in every mode (here plan mode), and single choice, multiple choice and a free answer come back to the model as structured results (T26).
+capabilities: [CAP-ASK-001]
+sessions:
+  main: { provider: main, mode: plan }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: ask
+            name: AskUserQuestion
+            input:
+              questions:
+                - question: Which database?
+                  header: Database
+                  options: [{ label: SQLite, description: One file }, { label: Postgres }]
+                - question: Which platforms?
+                  options: [{ label: macOS }, { label: Windows }, { label: Linux }]
+                  multiSelect: true
+                - question: 项目名称？
+                  options: [{ label: piarc }, { label: arc }]
+      - text: Thanks.
+actions:
+  - prompt: { text: Ask me first., turn: t }
+approvals:
+  - tool: AskUserQuestion
+    kind: question
+    decision: allow
+    answers:
+      - { selected: [Postgres] }
+      - { selected: [macOS, Windows] }
+      - { other: PiArc Desktop }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - index: 1
+      tool_results:
+        - id: ask
+          is_error: false
+          contains: 'The user answered.'
+    - index: 1
+      tool_results:
+        - id: ask
+          contains: '{"question":"Which database?","outcome":"answered","selected":["Postgres"]}'
+    - index: 1
+      tool_results:
+        - id: ask
+          contains: '{"question":"Which platforms?","outcome":"answered","selected":["macOS","Windows"]}'
+    - index: 1
+      tool_results:
+        - id: ask
+          contains: '{"question":"项目名称？","outcome":"answered","selected":[],"other":"PiArc Desktop"}'

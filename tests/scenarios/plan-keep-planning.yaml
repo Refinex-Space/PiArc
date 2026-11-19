@@ -1,0 +1,45 @@
+id: plan-keep-planning
+description: ExitPlanMode shows a plan card and waits; "keep planning" returns the feedback and an inline comment anchored by UTF-16 offsets to the model, and the session stays in plan mode (T26).
+capabilities: [CAP-PLAN-MODE-001]
+sessions:
+  main: { provider: main, mode: plan }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: exit
+            name: ExitPlanMode
+            input: { plan: "1. 读取 parser.ts\n2. Fix the off-by-one" }
+      - tool_calls: [{ id: write, name: Write, input: { path: d.txt, content: x } }]
+      - text: Revising the plan.
+actions:
+  - prompt: { text: Plan the fix., turn: t }
+approvals:
+  - tool: ExitPlanMode
+    kind: plan
+    decision: deny
+    feedback: Add a test first.
+    comments: [{ quote: Fix the off-by-one, text: Which loop? }]
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - index: 1
+      tool_results:
+        - id: exit
+          is_error: true
+          contains: 'Plan mode stays on'
+    - index: 1
+      tool_results:
+        - id: exit
+          contains: "Feedback from the user:\nAdd a test first."
+    - index: 1
+      tool_results:
+        - id: exit
+          contains: '1. On "Fix the off-by-one" (offsets 19-37): Which loop?'
+    - index: 2
+      tool_results:
+        - { id: exit }
+        - { id: write, is_error: true, contains: plan mode is on }
+  files:
+    d.txt: null

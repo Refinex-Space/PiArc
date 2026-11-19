@@ -532,25 +532,43 @@ capabilities:
     milestone: M2
     refs: [FR-HN-01, ARCH-6.5, ARCH-6.15]
     task: T26
-    status: planned
+    status: active
   - id: CAP-TODO-001
     title: '任务清单由模型维护，结构化送达客户端，压缩后保留'
     milestone: M2
     refs: [FR-HN-02, ARCH-6.5]
     task: T26
-    status: planned
+    status: active
+  - id: CAP-PLAN-ENTRY-001
+    title: '批准的计划保存为会话 entry，重启与恢复后经注入接口读回'
+    milestone: M2
+    refs: [FR-HN-01, ARCH-6.5]
+    task: T26
+    status: active
+  - id: CAP-TODO-BRANCH-001
+    title: '任务清单随分支回溯：在较早 entry 处 fork 后，清单等于该处的状态'
+    milestone: M2
+    refs: [FR-HN-02, ARCH-6.5]
+    task: T26
+    status: active
+  - id: CAP-TODO-REMIND-001
+    title: '存在未完成项且连续若干轮工具调用未更新清单时，以追加消息提醒模型'
+    milestone: M2
+    refs: [FR-HN-02, ARCH-6.6.3]
+    task: T26
+    status: active
   - id: CAP-ASK-001
     title: 'AskUserQuestion 结构化提问'
     milestone: M2
     refs: [FR-HN-03, ARCH-6.5]
     task: T26
-    status: planned
+    status: active
   - id: CAP-NEXT-001
     title: '回合结束时的"下一步"建议'
     milestone: M2
     refs: [FR-HN-06, ARCH-6.5]
     task: T26
-    status: planned
+    status: active
   - id: CAP-AGENT-DEF-001
     title: '读取 `.claude/agents` 与 `.piarc/agents` 的子 agent 定义，内置 general-purpose、Explore、Plan'
     milestone: M3

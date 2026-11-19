@@ -365,6 +365,10 @@ pub enum Action {
         #[serde(default)]
         session: Option<String>,
     },
+    /// Forks a session at an agent message (T26).
+    Fork(super::harness_spec::ForkAction),
+    /// Checks a session's plan and task list (T26).
+    CheckHarness(super::harness_spec::CheckHarnessAction),
 }
 
 impl Action {
@@ -391,6 +395,8 @@ impl Action {
             Self::WriteFile { .. } => "write_file",
             Self::RestartCore {} => "restart_core",
             Self::Resume { .. } => "resume",
+            Self::Fork(_) => "fork",
+            Self::CheckHarness(_) => "check_harness",
         }
     }
 
@@ -412,6 +418,8 @@ impl Action {
             | Self::DeleteSession { session }
             | Self::Resume { session } => Some(session),
             Self::Wait(wait) => Some(&wait.session),
+            Self::Fork(fork) => Some(&fork.session),
+            Self::CheckHarness(check) => Some(&check.session),
             Self::CheckTrust { .. } | Self::WriteFile { .. } | Self::RestartCore {} => None,
         }
     }
@@ -506,6 +514,15 @@ pub struct Approval {
     /// User feedback returned with a refusal.
     #[serde(default)]
     pub feedback: Option<String>,
+    /// The mode an approved plan continues in (T26).
+    #[serde(default)]
+    pub mode: Option<piarc_protocol::policy::PermissionMode>,
+    /// Inline comments sent with a declined plan (T26).
+    #[serde(default)]
+    pub comments: Vec<super::harness_spec::PlanCommentSpec>,
+    /// One answer per question of a question card (T26).
+    #[serde(default)]
+    pub answers: Vec<super::harness_spec::QuestionAnswerSpec>,
 }
 
 /// Approval decisions.
@@ -520,6 +537,8 @@ pub enum ApprovalDecision {
     Allow,
     /// Deny.
     Deny,
+    /// Leave the card unanswered: a question form whose timeout answers it (T26).
+    Wait,
 }
 
 /// What must hold after the run.
@@ -601,6 +620,9 @@ pub struct RequestExpect {
     /// Compare the complete system content with an earlier request on the same endpoint.
     #[serde(default)]
     pub same_system_as: Option<usize>,
+    /// Compare the tool definitions byte for byte with an earlier request (T26).
+    #[serde(default)]
+    pub same_tools_as: Option<usize>,
     /// Every tool result, in order.
     #[serde(default)]
     pub tool_results: Option<Vec<ToolResultExpect>>,
@@ -937,7 +959,16 @@ fn check_actions(spec: &ScenarioSpec, problems: &mut Vec<String>) {
             | Action::SetMode { .. }
             | Action::Abort { .. }
             | Action::RestartCore {}
-            | Action::Resume { .. } => {}
+            | Action::Resume { .. }
+            | Action::CheckHarness(_) => {}
+            Action::Fork(fork) => {
+                if !spec.sessions().get(&fork.label).is_some_and(|s| s.deferred) {
+                    problems.push(format!(
+                        "{field}/as: `{}` must be a deferred session",
+                        fork.label
+                    ));
+                }
+            }
             Action::WriteFile { path, .. } => check_path(&format!("{field}/path"), path, problems),
         }
     }
@@ -974,13 +1005,15 @@ fn check_expect(spec: &ScenarioSpec, problems: &mut Vec<String>) {
         }
     }
     for (n, request) in spec.expect.requests.iter().enumerate() {
-        if request
-            .same_system_as
-            .is_some_and(|index| index >= request.index)
-        {
-            problems.push(format!(
-                "/expect/requests/{n}/same_system_as: must name an earlier request"
-            ));
+        for (key, earlier) in [
+            ("same_system_as", request.same_system_as),
+            ("same_tools_as", request.same_tools_as),
+        ] {
+            if earlier.is_some_and(|index| index >= request.index) {
+                problems.push(format!(
+                    "/expect/requests/{n}/{key}: must name an earlier request"
+                ));
+            }
         }
         if let Err(e) = spec.provider_label(request.provider.as_deref()) {
             problems.push(format!("/expect/requests/{n}/provider: {e}"));
