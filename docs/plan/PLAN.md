@@ -312,7 +312,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 **W1 Windows：M1 达标**（Windows 11 专业版 25H2 26200.9974，x64；起点 b654341）
 
 - 起点基线是红的（本机与 CI 运行 44453549786）：verify 的 ESLint（两平台）、Windows `cargo test` 7 项、L4 的 `agent-host.e2e.ts` 等。用户在 W1 会话中决定并入 W1 修复。本机内存紧张（16 GB），第一次基线 verify 被系统终止，用户释放内存后重跑。
-- [ ] 准备：平台、版本、架构、提交号（A01）；修复红基线；基线 verify
+- [x] 准备：win32 x64、Windows 11 专业版 25H2 26200.9974、起点 b654341（A01）。红基线已修：verify 先 tsc 后 ESLint（77ea56c）、memory 测试先关目录句柄（2f21a6c）、S6 探针批准预检（33e3190）；本机另发现并修复 Git Bash 挂载目录的 cwd（d9ee057）与 PATH 中无权访问的条目（09c63c3）。基线 verify 13/15：`cargo test` 卡在权限裁决延迟（Windows p95 3.4–8.9 ms > 2 ms，ADR-0037 提议，等待用户确认），L2 的 4 个本机失败已由上面两项修复
 - [ ] 打包开发构建与 Velopack 安装包（或 CI 产物），安装并首次运行
 - [ ] 完整任务：双协议 r2-workflow，含空格与中文的工作区（A02）；真实服务商需另行同意
 - [ ] L2 本机全量 ≥ 20 通过（A03）；I19 的 fs/stat → fs/read 间隔
