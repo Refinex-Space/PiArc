@@ -34,13 +34,20 @@ impl Fixture {
     }
 
     async fn with_env(command_env: super::super::CommandEnv) -> Self {
-        Self::build(command_env, Path::to_path_buf).await
+        Self::build(command_env, Path::to_path_buf, false).await
     }
 
-    /// `spell` names the workspace directory the way the session opens it.
+    /// As Core runs: with the hooks service, whose steps run even when no hook is configured.
+    async fn with_hooks(command_env: super::super::CommandEnv) -> Self {
+        Self::build(command_env, Path::to_path_buf, true).await
+    }
+
+    /// `spell` names the workspace directory the way the session opens it; `hooks` adds the
+    /// hooks service (the ladder alone otherwise).
     async fn build(
         command_env: super::super::CommandEnv,
         spell: impl FnOnce(&Path) -> PathBuf,
+        hooks: bool,
     ) -> Self {
         let root = std::env::temp_dir().join(crate::sessions::new_session_id().expect("unique id"));
         let local = root.join("workspace");
@@ -74,7 +81,17 @@ impl Fixture {
             CancellationToken::new(),
         );
         tokio::spawn(coalescer.run());
-        let snapshots = Snapshots::spawn(&Handle::current(), events, storage.clone());
+        let snapshots = Snapshots::spawn(&Handle::current(), events.clone(), storage.clone());
+        let hooks = hooks.then(|| {
+            crate::hooks::HooksService::new(
+                storage.clone(),
+                trust.clone(),
+                Some(events),
+                Arc::new(piarc_exec::ProcessTreeSpawner),
+                piarc_hooks::RunnerConfig::default(),
+                crate::tool_io::hook_condition,
+            )
+        });
         let io = ToolIo::new(ToolIoConfig {
             command_env,
             ..ToolIoConfig::new(data)
@@ -83,7 +100,7 @@ impl Fixture {
             storage: storage.clone(),
             trust,
             snapshots,
-            hooks: None,
+            hooks,
         });
         io.open_session(SESSION, &work, &work).expect("session");
         let (peer, frames) = Peer::channel(4);
@@ -277,13 +294,14 @@ async fn disconnect_expires_pending_cards_and_records_refusal_for_recovery() {
     );
 }
 
-/// T20-A13 and T23-A13: automatic decisions, including rule matching and Bash analysis. Run
-/// alone on the benchmark host with --nocapture for the release-gate measurement.
+/// T20-A13 and T23-A13: automatic decisions, including rule matching and Bash analysis, with
+/// the hooks service as Core runs it (no hook configured). Run alone on the benchmark host with
+/// --nocapture for the release-gate measurement.
 #[tokio::test]
 async fn automatic_decision_latency() {
     const COUNT: usize = 1000;
     // A fixed PATH keeps the program lookup independent of the developer's shell.
-    let f = Fixture::with_env(super::super::CommandEnv::Fixed(vec![(
+    let f = Fixture::with_hooks(super::super::CommandEnv::Fixed(vec![(
         "PATH".into(),
         "/usr/bin:/bin".into(),
     )]))
@@ -303,6 +321,7 @@ async fn automatic_decision_latency() {
         ),
     ];
     let mut samples = Vec::with_capacity(COUNT);
+    let mut by_call: [Vec<Duration>; 4] = Default::default();
     for i in 0..COUNT + 100 {
         let (tool, input) = &calls[i % calls.len()];
         let started = Instant::now();
@@ -317,8 +336,24 @@ async fn automatic_decision_latency() {
         f.io.finish_tool(SESSION, "auto");
         if i >= 100 {
             samples.push(elapsed);
+            by_call[i % calls.len()].push(elapsed);
         }
     }
+    // Which kind of call a slow percentile comes from (printed with the result).
+    let by_call: Vec<String> = by_call
+        .iter_mut()
+        .zip([
+            "allow rule",
+            "read-only file",
+            "read-only Bash",
+            "Bash allow rules",
+        ])
+        .map(|(kind, name)| {
+            kind.sort_unstable();
+            let p95 = kind[kind.len() * 95 / 100 - 1];
+            format!("{name} p50 {:?} p95 {p95:?}", kind[kind.len() / 2 - 1])
+        })
+        .collect();
     samples.sort_unstable();
     let p95 = samples[COUNT * 95 / 100 - 1];
     println!(
@@ -326,6 +361,7 @@ async fn automatic_decision_latency() {
         samples[COUNT / 2 - 1],
         samples[COUNT * 99 / 100 - 1]
     );
+    println!("by call: {}", by_call.join("; "));
     let rows = f
         .storage
         .with(|s| s.session_audit_events(SESSION, 1200))
@@ -746,10 +782,14 @@ mod windows_paths {
             return;
         };
         let share = PathBuf::from(share);
-        let f = Fixture::build(super::super::super::CommandEnv::process(), |dir| {
-            let below = dir.strip_prefix(std::env::temp_dir()).expect("below temp");
-            share.join(below)
-        })
+        let f = Fixture::build(
+            super::super::super::CommandEnv::process(),
+            |dir| {
+                let below = dir.strip_prefix(std::env::temp_dir()).expect("below temp");
+                share.join(below)
+            },
+            false,
+        )
         .await;
         f.io.changed_mode(SESSION, PermissionMode::AcceptEdits)
             .await

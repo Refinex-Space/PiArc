@@ -362,7 +362,9 @@ impl ToolIo {
         let generation = inputs::begin(s, p, peer).await?;
         let settings = services.settings(s.scope.root()).await?;
         let (hook_token, _hook_guard) = super::hooks::linked(peer, Some(&generation));
-        let pre = self.pre_tool_use(s, p, peer, hook_token.clone()).await;
+        let pre = self
+            .pre_tool_use(s, p, &settings, peer, hook_token.clone())
+            .await;
         let mut updated = false;
         if let Some(input) = pre.updated_input {
             p.input = input;

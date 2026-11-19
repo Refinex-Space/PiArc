@@ -193,7 +193,18 @@ impl HooksService {
                 return None;
             }
         };
-        let config = config_of(&settings);
+        self.plan_in(&settings, facts, request)
+    }
+
+    /// [`Self::plan`] under `settings` already loaded for the same work: a permission decision
+    /// reads its settings once for the rules and its hook steps.
+    pub(crate) fn plan_in(
+        &self,
+        settings: &piarc_config::Settings,
+        facts: &Facts,
+        request: &Request,
+    ) -> Option<Plan> {
+        let config = config_of(settings);
         let mut handlers = config.select(request.event, request.subject.as_deref());
         if let Some((tool, input)) = &request.tool {
             handlers.retain(|h| {

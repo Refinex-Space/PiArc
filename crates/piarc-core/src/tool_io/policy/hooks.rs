@@ -120,7 +120,14 @@ impl ToolIo {
         stop: &mut Option<Option<String>>,
     ) -> Result<Ruling, ErrorObject> {
         let Some(answer) = self
-            .permission_request(step.s, p, &prepared.card, step.peer, step.token.clone())
+            .permission_request(
+                step.s,
+                p,
+                &prepared.card,
+                step.settings,
+                step.peer,
+                step.token.clone(),
+            )
             .await
         else {
             return Ok(ruling);
@@ -167,11 +174,12 @@ impl ToolIo {
         Ok(ruling)
     }
 
-    /// Step 2.
+    /// Step 2, under the settings the decision loaded for its rules.
     pub(super) async fn pre_tool_use(
         &self,
         s: &SessionIo,
         p: &PolicyEvaluateParams,
+        settings: &piarc_config::Settings,
         peer: &Peer,
         cancel: CancellationToken,
     ) -> PreAnswer {
@@ -180,7 +188,7 @@ impl ToolIo {
         };
         let facts = self.session_facts(s, &p.session_id, cancel);
         let request = tool_request(HookEvent::PreToolUse, p);
-        let Some(plan) = hooks.plan(&facts, &request).await else {
+        let Some(plan) = hooks.plan_in(settings, &facts, &request) else {
             return PreAnswer::default();
         };
         working(peer, p).await;
@@ -207,12 +215,14 @@ impl ToolIo {
         }
     }
 
-    /// Step 8: the hooks' answer before the user is asked, or `None`.
+    /// Step 8: the hooks' answer before the user is asked, or `None`; under the settings the
+    /// decision loaded for its rules.
     pub(super) async fn permission_request(
         &self,
         s: &SessionIo,
         p: &PolicyEvaluateParams,
         card: &ApprovalRequest,
+        settings: &piarc_config::Settings,
         peer: &Peer,
         cancel: CancellationToken,
     ) -> Option<RequestAnswer> {
@@ -222,7 +232,7 @@ impl ToolIo {
         request
             .fields
             .insert("permission_suggestions".into(), suggestions(card));
-        let plan = hooks.plan(&facts, &request).await?;
+        let plan = hooks.plan_in(settings, &facts, &request)?;
         working(peer, p).await;
         let launch = self.exec.hook_launch().await;
         hooks
