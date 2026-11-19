@@ -111,7 +111,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 |---|---|---|---|---|
 | 0 工程基座 | 脚手架、质量门禁、工程规范、协议与契约测试 | T01–T02 | — | 已完成 |
 | 1 M0 技术验证 | Electron 安全基线、NAPI 事件通道、mock provider、Agent Host 多会话与 AHP、Operations 委托、凭据保险箱、transcript 渲染、终端、沙箱、打包与首次运行；S1–S10 两个平台的结论 | T03–T12、W0 | R1 | 已完成（有条件进入 M1） |
-| 2 M1 可行走骨架 | 存储与信任、会话编排与投影、L2 场景、文件工具与 Bash、客户端外壳、transcript 与 composer、基础审批、模型与凭据、system prompt 与 memory | T13–T22 | R2 |进行中 |
+| 2 M1 可行走骨架 | 存储与信任、会话编排与投影、L2 场景、文件工具与 Bash、客户端外壳、transcript 与 composer、基础审批、模型与凭据、system prompt 与 memory | T13–T22 | R2 | 已完成（macOS 达标，Windows 留 W1） |
 | 3 M2 Harness 核心 | 权限规则与 Bash 分析、配置兼容层、hooks、计划模式与任务清单、压缩与用量、检查点与回退、WebFetch 与登录、L3 对齐；Windows 达到 M1 | W1、T23–T30 | R3 | 未开始 |
 | 4 M3 多会话与生态 | 子 agent、后台任务、终端、worktree 与并行会话、MCP、skills 与命令、WebSearch 与 hooks 扩展；Windows 达到 M2 | W2、T31–T38 | R4 | 未开始 |
 | 5 M4 安全与打磨 | 沙箱、插件、配置诊断与用量、NotebookEdit 与通知、无障碍与本地化、性能预算、安全收口；Windows 达到 M3 | W3、T39–T45 | R5 | 未开始 |
@@ -147,7 +147,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T20 | [基础权限与审批](tasks/T20-basic-permissions-and-approvals.md) | 2 | T19 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | ee03128 |
 | T21 | [模型、服务商与凭据设置](tasks/T21-models-providers-and-credentials.md) | 2 | T20 | macOS | high / 高 | 大 | 无 | 已完成 | e5f3b65 |
 | T22 | [System prompt 组装与 memory 文件](tasks/T22-system-prompt-and-memory-files.md) | 2 | T21 | macOS | high / 高 | 中 | 无 | 已完成 | 9843eb5 |
-| R2 | [M1 评审](tasks/R2-m1-review.md) | 2 | T22 | macOS | high / 高 | 中 | 无 | 进行中 | — |
+| R2 | [M1 评审](tasks/R2-m1-review.md) | 2 | T22 | macOS | high / 高 | 中 | 无 | 已完成 | f63ac3d |
 | W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -309,18 +309,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-R2（macOS），基线 `d57c72e`，`npm run verify` 15/15。
-- [x] A01 双协议设置、Manual 审批与夹具红转绿
-- [x] A02 真实服务商的结果或限制
-- [x] A03 L2、能力清单与 M1 门禁
-- [x] A04 M1 目标、能力与 L4 映射已取证；ADR-0034–0036 已接受并实施
-- [x] A05 T13–T22 验收状态
-- [x] A06 四个独立只读审查的输入与原始输出
-- [x] A07 逐条核实并处理发现
-- [x] A08 修复与先红后绿证据见 R2-findings.md 的 P01–Q05
-- [x] A09 W1 实机清单
-- [x] A10 架构与评审结论
-- [x] A11 收尾全量验证
+（无进行中的任务。）
 
 ## 登记事项
 
@@ -716,6 +705,14 @@ R2（macOS），基线 `d57c72e`，`npm run verify` 15/15。
 - 实际请求验证开场到首条输入之间的编辑、跨回合与恢复后的原始 system 字节、Anthropic 两个缓存块，以及懒加载与去重。原创性检查比对 3533 份参考文本，253 词提示词的连续 10 词匹配为零。
 - 回归修复包括 OAuth 测试会话的 Core 范围登记，以及上一回合完成通知误取消下一回合 memory 扫描。后者用确定性审批账本测试覆盖，队列用例连跑 20/20，完整 sessions 26/26。
 - Electron 开发和打包两种形态的 T22 L4 为 4/4。用 ego-browser 操作了设置与审批卡。证据在 `tmp/evidence/T22/`。相关 crate 的 Windows 目标交叉 Clippy 通过，Windows 原生执行留待 CI。下一个任务为 macOS 上的 R2。
+
+### 2026-11-19 · R2 M1 阶段评审（macOS arm64）
+
+- M1（macOS）按 R2 口径达标。基线 d57c72e，验收提交 f63ac3d；11/11 项 passing。详见 [R2 评审](../reviews/R2-findings.md)。
+- 两种严格 mock 线格式在 dev 与 packaged 的 Git 夹具中均通过；真实百炼 qwen-flash 5 次请求，按公布原价估算 ¥0.0021612。本地 deepseek-r1:7b 未发工具调用。仅使用隔离数据与获准的测试凭据。
+- 四项独立只读审查和全部原文已归档。修复 13 项运行时问题，接受并实施 ADR-0034、0035、0036。I19 实测、I81 门面拆分、L2 能力映射和 W1 检查表见评审文件。
+- 开工与最终 verify 均 15/15；最终 Electron L4 52/52，L2 61 passed、0 failed、1 Windows 专属，M1 planned 0、blocked 0、MISSING 0。两次 ego-browser 操作使用本地渲染器与测试数据；Windows x64 交叉 Clippy 通过，原生验收由 W1 执行。
+- 可开始 W1（Windows 11）或 T23（macOS）。建议先 W1 核对 UNC、目录共享删除、Job Object、凭据与桌面交互，再回到 T23；W1 最迟在 R3 前完成。仅本地提交。
 
 ## 计划变更记录
 
