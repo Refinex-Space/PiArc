@@ -159,6 +159,22 @@ impl InboundHandler for Core {
         if method == "policy/recover" {
             return Box::pin(async { Ok(json!({})) });
         }
+        if method == "policy/tools" {
+            // No deny rule removes a tool here; the Core policy tests cover the rules.
+            self.calls.lock().expect("lock").push(Call {
+                method,
+                session: params
+                    .get("sessionId")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned(),
+                tool: None,
+                path: None,
+                resolved: None,
+                error: None,
+            });
+            return Box::pin(async { Ok(json!({"denied": []})) });
+        }
         if method == "trust/get" {
             let path = params
                 .get("path")

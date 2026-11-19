@@ -167,10 +167,18 @@ fn check_core_calls(calls: &[crate::harness::Call]) {
     assert_eq!(shells.len(), 1, "{shells:?}");
     assert!(shells[0].error.is_none(), "{:?}", shells[0]);
     let mut memory_scans = 0;
+    // `policy/tools` (T23) asks once before every run which tools the deny rules remove; it
+    // belongs to no tool call and must succeed, or the model keeps a tool a rule denied.
+    let mut tool_lists = 0;
     for call in calls.iter().filter(|c| c.method != "exec/shells") {
         if call.method == "fs/memory" {
             assert!(call.tool.is_none() && call.error.is_none(), "{call:?}");
             memory_scans += 1;
+            continue;
+        }
+        if call.method == "policy/tools" {
+            assert!(call.tool.is_none() && call.error.is_none(), "{call:?}");
+            tool_lists += 1;
             continue;
         }
         let tool = call.tool.as_deref().expect("every request names its tool");
@@ -182,6 +190,8 @@ fn check_core_calls(calls: &[crate::harness::Call]) {
     }
     // Opening context, then a single refresh when Write enters src for the first time.
     assert_eq!(memory_scans, 2);
+    // One prompt, one run.
+    assert_eq!(tool_lists, 1);
     println!("Core-side calls by tool: {by_tool:?}");
     let expected: BTreeMap<&str, BTreeSet<&str>> = [
         ("Read", vec!["fs/stat", "fs/read"]),
