@@ -190,6 +190,10 @@ impl SessionHandle {
         model: Option<ModelRef>,
         mode: Option<piarc_protocol::policy::PermissionMode>,
     ) -> Result<Value> {
+        self.io
+            .capture_opening_memory(&self.id)
+            .await
+            .map_err(|e| Error::feature(&e))?;
         let supervisor = self.ws.acquire().await?;
         let mut params = SessionCreateParams::new(path_text(&self.cwd)).with_model(model);
         params.session_id = Some(SessionId(self.id.clone()));

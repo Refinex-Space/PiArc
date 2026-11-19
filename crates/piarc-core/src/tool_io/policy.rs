@@ -35,6 +35,7 @@ struct Pending {
 }
 
 mod inputs;
+pub(super) mod memory;
 
 #[derive(Default)]
 pub(super) struct State {

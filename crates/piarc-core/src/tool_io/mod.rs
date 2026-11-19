@@ -31,6 +31,9 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 mod exec;
 mod files;
+mod git_status;
+mod memory;
+mod memory_reader;
 pub(crate) mod policy;
 
 pub use exec::{CommandEnv, DISPLAY_WINDOW};
@@ -72,6 +75,8 @@ pub struct ToolIoConfig {
     /// PiArc's data directory: blobs go to `sessions/<sessionId>/blobs/` below it, the
     /// user's settings (`shell.gitBashPath`) are read from `settings.json` in it.
     pub data_dir: PathBuf,
+    /// Home directory for user memory, isolated by default in standalone embeddings.
+    pub memory_home: Option<PathBuf>,
     /// Where commands get their environment.
     pub command_env: CommandEnv,
     /// Timeouts and output budgets of commands.
@@ -97,6 +102,7 @@ impl ToolIoConfig {
     #[must_use]
     pub fn new(data_dir: PathBuf) -> Self {
         Self {
+            memory_home: Some(data_dir.join("test-home")),
             data_dir,
             command_env: CommandEnv::process(),
             exec_limits: ExecLimits::default(),
@@ -108,6 +114,7 @@ impl ToolIoConfig {
 /// A session's scope, file state and running commands.
 struct SessionIo {
     scope: Scope,
+    memory: memory::State,
     policy: Mutex<policy::State>,
     blob_dir: PathBuf,
     /// `<data dir>/sessions/<id>/tmp/`: long tool results (`fs/spill`), readable by the tools.
@@ -290,6 +297,7 @@ impl ToolIo {
             session_id.to_owned(),
             Arc::new(SessionIo {
                 scope,
+                memory: memory::State::default(),
                 policy: Mutex::default(),
                 blob_dir,
                 tmp_dir,
@@ -358,6 +366,7 @@ impl ToolIo {
             observer.before(text("sessionId"), method, call).await;
         }
         match method {
+            "fs/memory" => return self.memory_snapshot(parse(method, params)?, &peer).await,
             "policy/inputChunk" => return self.stage_input(parse(method, params)?, &peer),
             "policy/evaluate" => return self.evaluate(parse(method, params)?, peer).await,
             "policy/cancel" => {

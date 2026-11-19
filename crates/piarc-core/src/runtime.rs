@@ -84,6 +84,8 @@ pub struct CoreConfig {
     pub secret_store: Option<SecretStoreSetup>,
     /// Sees every delegated tool request first (tests only, T14-A06).
     pub tool_observer: Option<Arc<dyn crate::tool_io::ToolIoObserver>>,
+    /// Home directory for user memory. Embedders and tests can isolate it.
+    pub memory_home: Option<PathBuf>,
     /// Where shell commands get their environment; the user's login shell of Core's own
     /// environment when absent (T17). Tests pass a fixed or prepared environment.
     pub command_env: Option<crate::tool_io::CommandEnv>,
@@ -117,6 +119,7 @@ impl Default for CoreConfig {
             secret_store: None,
             tool_observer: None,
             command_env: None,
+            memory_home: None,
         }
     }
 }
@@ -1183,6 +1186,13 @@ fn open_state(
         tool_io: ToolIo::with_notices(
             ToolIoConfig {
                 observer: config.tool_observer.clone(),
+                memory_home: config.memory_home.clone().or_else(|| {
+                    if config.secret_store.is_some() {
+                        Some(data.join("test-home"))
+                    } else {
+                        std::env::home_dir()
+                    }
+                }),
                 command_env: config
                     .command_env
                     .clone()
