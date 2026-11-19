@@ -125,11 +125,21 @@ export function TranscriptList({
     if (width > 0) {
       virtualizer.measure();
       // measure() forgets every size, and a row's observer reports only its own resizes (often
-      // just before the width change, as when expanded output brings Windows' classic scrollbar,
-      // which takes width). Measure the rows in the DOM again, or they keep estimates and
-      // overlap (W1).
+      // just before the width change, as when expanded output brings a classic scrollbar, which
+      // takes width). Measure the rows in the DOM again, or they keep estimates and overlap
+      // (W1). getTotalSize() first rebuilds the measurements from the estimates: resizing
+      // compares against them, and a row compared with its old size would change nothing.
+      // resizeItem() also measures while the list scrolls, which measureElement() skips: at the
+      // bottom, a width change comes with the scroll that keeps the bottom in view.
+      virtualizer.getTotalSize();
       for (const row of scroller?.querySelectorAll<HTMLDivElement>('.transcript-row') ?? []) {
-        virtualizer.measureElement(row);
+        const index = Number(row.dataset.index);
+        if (Number.isInteger(index)) {
+          virtualizer.resizeItem(
+            index,
+            virtualizer.options.measureElement(row, undefined, virtualizer),
+          );
+        }
       }
     }
   }, [virtualizer, width, scroller]);

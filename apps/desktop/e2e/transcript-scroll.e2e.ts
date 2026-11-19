@@ -210,3 +210,39 @@ test('release, resume and button thresholds', async ({ page }) => {
   await addMessage(page, 'Grows while following.');
   expect((await scrollState(page)).distanceFromBottom).toBeLessThanOrEqual(1);
 });
+
+// A narrower list (a classic scrollbar appearing takes about 12 px, W1) re-measures the rows on
+// screen. Rows whose height did not change keep their measured height instead of falling back
+// to the estimate, so no row overlaps the next.
+test('rows on screen keep their heights when the list gets narrower', async ({ page }) => {
+  const overlaps = await page.evaluate(async () => {
+    const scroller = document.querySelector<HTMLElement>('[data-testid="transcript-scroller"]');
+    if (scroller === null) {
+      throw new Error('no scroller');
+    }
+    const painted = (): Promise<void> =>
+      new Promise((resolve) => {
+        requestAnimationFrame(() => setTimeout(resolve, 0));
+      });
+    const width = scroller.clientWidth;
+    scroller.style.borderRight = '12px solid transparent';
+    for (let frame = 0; frame < 10; frame += 1) await painted();
+    if (scroller.clientWidth >= width) {
+      throw new Error(`the list did not get narrower: ${width} → ${scroller.clientWidth}`);
+    }
+    const boxes = [...scroller.querySelectorAll<HTMLElement>('.transcript-row')]
+      .map((row) => ({ id: row.dataset.rowId ?? '', box: row.getBoundingClientRect() }))
+      .sort((a, b) => a.box.top - b.box.top);
+    const found: string[] = [];
+    boxes.forEach((row, i) => {
+      const previous = boxes[i - 1];
+      if (previous !== undefined && row.box.top < previous.box.bottom - 0.5) {
+        found.push(
+          `${previous.id} ends at ${previous.box.bottom}, ${row.id} starts at ${row.box.top}`,
+        );
+      }
+    });
+    return found;
+  });
+  expect(overlaps).toEqual([]);
+});

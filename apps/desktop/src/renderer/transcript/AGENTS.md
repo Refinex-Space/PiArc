@@ -32,7 +32,7 @@
 | `SCROLL_FOLLOW.buttonPx = 200`、`userInputWindowMs = 150` | 离底超过 200 px 显示“回到底部”，用户输入后的 150 ms 内保留视口。 |
 | `VIRTUAL_LIST.overscanViewports = 1` | 可见区上下各多挂载约一屏，尺寸按会话、行 ID 与宽度缓存。 |
 
-宽度变化（Windows 的经典滚动条出现或消失时占去或让出约 12 px）后 `virtualizer.measure()` 会清空全部行高，`TranscriptList` 随即对 DOM 中的行逐一 `measureElement`：行自己的 ResizeObserver 不会再报告，否则这些行停在估算高度上互相重叠（W1，`t19-security.e2e.ts` 展开命令输出时复现）。macOS 的浮动滚动条不占宽度，测不出这类问题。
+宽度变化（经典滚动条出现或消失时占去或让出约 12 px：Windows，以及“显示滚动条”为“始终”或接了鼠标的 macOS）后 `virtualizer.measure()` 会清空全部行高，`TranscriptList` 随即先 `getTotalSize()` 按估算值重算测量结果，再对 DOM 中的行逐一 `resizeItem`：行自己的 ResizeObserver 不会再报告，与旧尺寸比较得不出差值，`measureElement` 又在列表滚动时跳过测量（贴底时宽度变化总伴随一次滚动），任何一步缺了这些行都停在估算高度上互相重叠（W1；`transcript-scroll.e2e.ts` 的变窄用例与 `t19-security.e2e.ts` 展开命令输出时复现）。
 
 行内容和虚拟列表提交后在布局阶段检查贴底。`ResizeObserver` 处理尺寸变化。可见内容先增高、列表随后更新尺寸时，这两次提交都可能影响同一帧的滚动位置。
 
