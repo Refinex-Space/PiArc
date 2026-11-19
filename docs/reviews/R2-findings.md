@@ -26,3 +26,71 @@
 | T20 | 14 |
 | T21 | 11 |
 | T22 | 11 |
+
+## 独立审查的输入与调度
+
+四个独立 explorer 均从空上下文只读审查 d57c72e，均提供架构 10.1 威胁模型和第 16 章。权限审查另给 6.2、10.2、T13、T20 与 ADR-0031；工具审查给 6.1、6.11、9、15.2 和 T13/16/17/21；客户端审查给第 8 章、10.3、T18/T19 和 ADR-0022；工程质量审查给第 7、12 章及工程规范。各自只收到 R2 对应范围和文件入口。平台同时允许三个子代理，第四项在首个槽位释放后启动，与剩余审查重叠。
+
+## 附录 · 审查原文
+
+### 权限与审批
+
+对 `d57c72e` 的只读审查发现三项与 M1 项目信任边界相关的问题。
+
+| 严重度 | 失效条件与影响 | 修复方向 |
+|---|---|---|
+| 高 | 信任对话框打开后、用户确认前，项目新增可执行项。客户端只提交工作区和布尔值，Core 在确认时重新枚举并保存全部条目。用户没看到的扩展或 allow 规则可随本次确认生效。见 `apps/desktop/src/renderer/shell/TrustDialog.tsx:112`、`:135`，`crates/piarc-core/src/trust.rs:236`。 | 由 Core 为展示的清单生成版本标识。确认时若清单已变，返回最新清单供重新确认。 |
+| 高 | Core 仅根据工作目录中 Git 元数据指向的位置确定 linked worktree 的主 checkout，未核对主仓库登记的工作树是否指回当前目录。在元数据错误或不可信、所列条目又与已有快照相容时，独立目录可能继承其他项目的信任，跳过首次确认。见 `crates/piarc-git/src/checkout.rs:154`、`:173`，`crates/piarc-core/src/trust.rs:85`。 | 共享信任前验证主仓库的工作树登记与当前工作目录双向一致。无法验证时按独立项目或未信任处理。 |
+| 中 | 已信任项目的配置无法解析或扩展目录无法列举时，枚举器将失败记入 `unreadable`，信任查询和界面却仅比较成功列出的条目。数据库中的快照损坏且当前清单为空时，也会得到 `trusted: true`。这使 Agent Host 在无法确认清单完整性的情况下收到肯定答复。见 `crates/piarc-config/src/executables.rs:86`、`:129`，`crates/piarc-core/src/trust.rs:96`、`:106`、`:389`。 | 清单不完整或快照解析失败时返回未信任，让界面区分读取失败与新增项，并保留上次有效记录。 |
+
+已覆盖的路径包括 `policy/evaluate` 与 `trust/get` 的传输失败和畸形回复、按会话与连接代次核对审批、首个有效答复生效、重连清卡、受保护路径逐次审批，以及项目层 `bypassPermissions` 和 `auto` 的过滤。桌面端在持久修改前展示最终规则和目录，默认按钮为取消。既有 L4 用例覆盖 400 ms 热键延迟、首张可见卡、输入法合成、Esc 焦点条件与长命令展开门槛。见 `agent-host/src/harness/policy.ts:56`、`agent-host/src/harness/project-trust.ts:25`、`crates/piarc-policy/src/ledger.rs:40`、`crates/piarc-policy/src/decision.rs:50`、`crates/piarc-config/src/settings.rs:157`、`apps/desktop/src/main/core/session-ipc.ts:274`、`apps/desktop/e2e/t20-approvals.e2e.ts:76`。
+
+以上结论来自指定提交的源码与既有测试定义。本次未运行测试或漏洞复现，未修改文件。
+
+### 工具不变量与数据安全
+
+基于 `d57c72e` 的只读审查发现 7 项问题。前三项直接影响路径授权、先读后改和文件保密性，建议优先处理。
+
+| 优先级 | 位置 | 失效条件与影响 | 修复方向 |
+|---|---|---|---|
+| P1 | `crates/piarc-fs/src/scope.rs:165`、`crates/piarc-fs/src/content.rs:74`、`crates/piarc-fs/src/write.rs:107` | 路径核验与实际打开、替换分开进行。如果父目录在其间被换成链接，最终 I/O 目标可能位于授权目录之外。同一 Core 的路径锁无法约束外部目录变动。 | 将核准的目录身份绑定到实际操作，在受信目录句柄上打开、替换，遇到链接或目录身份变化时中止。Windows 单独核验目录重解析点。 |
+| P1 | `crates/piarc-fs/src/write.rs:190`、`agent-host/src/tools/read.ts:65` | `fs/stat` 已登记读取，之后 PDF 页范围校验、内容解析或读取仍可能失败。相同范围重试会收到“未变化”存根，Write 也可能在模型没有取得内容时通过先读检查。 | 将重复读取查询与成功登记分开，成功后提交对应版本与范围，错误或取消时丢弃待登记状态。 |
+| P1 | `crates/piarc-fs/src/atomic.rs:44`、`:48`、`:74` | Unix 上替换私有文件时，临时文件先按默认 umask 创建并写入全文，之后才恢复原文件权限。在可遍历的共享目录，其他用户可能读取暂存内容；中途崩溃会延长暴露时间。 | 替换现有文件时从创建起就限制临时文件权限，再通过持有的文件句柄设置最终模式。 |
+| P1 | `crates/piarc-exec/src/env.rs:68`、`crates/piarc-core/src/tool_io/exec.rs:151` | 用户登录 shell 或父进程已导出的服务商、云凭据可进入工具命令。保险箱路径没有注入密钥，但 T17-A08 声明的“命令环境没有任何凭据”超出了实际保证。 | 明确允许继承的命令环境并用假凭据覆盖登录、回退和 Windows 路径。若继续保留用户导出的凭据，应同步验收口径并登记风险。 |
+| P2 | `crates/piarc-fs/src/encoding.rs:157`、`crates/piarc-fs/src/write.rs:118` | 解码忽略替换标记。带 BOM 的 UTF-16 文件若含无效码元，Edit 修改其他行也会将原字节永久变成 U+FFFD，文本 diff 不显示这项损失。ADR-0027 只明确记录了非法 UTF-8 的同类限制。 | 编辑或追加前验证原文可以无损解码、回编码；无法保持原字节时拒绝覆盖。 |
+| P2 | `crates/piarc-store/src/index.rs:201` | 增量同步只比较长度和上次末行哈希。等长替换保留末行但改变较早消息时，直接返回 `Unchanged`，标题或用量会与全量重建不同。 | 记录文件身份与变更信息，单独处理等长修改和文件替换，对不确定的前缀重新扫描。 |
+| P2 | `crates/piarc-diff/src/lib.rs:61`、`:81` | 大改动先复制所有 hunk 行，再构造完整 unified diff，最后才应用 5,000 行和 512 KiB 上限。长文件的预览虽被截断，计算期间的额外内存仍随完整差异增长。 | 计数时先判断行数阈值，构造文本时执行字节预算，进入降级模式后停止保存行副本。 |
+
+核对过的正常路径包括跨会话写锁与内容哈希检查、唯一匹配与 `replaceAll`、有效编码和 BOM 保留、同目录写入与原子 rename、工具结果及命令输出的预览落盘、JSONL 只读流式解析和未完成末行重读，以及保险箱加密、系统主密钥、AHP 凭据传输和公开配置分离。普通命令通过 macOS 进程组或 Windows Job Object 清理。macOS 已脱离进程组的后代仍受既有登记项 I36 限制。
+
+本审查未改文件、未运行测试或复现攻击。Windows 平台行为仅核对了源码，需由 W1 实机确认。
+
+### 渲染进程与 IPC
+
+以 `d57c72e` 为基线，静态审查发现 3 项需要处理的问题。
+
+| 优先级 | 发现与影响 | 修复方向 |
+|---|---|---|
+| P1 | **项目信任确认没有绑定用户看到的清单。** 对话框先读取可执行项，确认时只提交工作区路径和布尔值。Core 随后重新枚举并保存当前清单。如果对话框打开期间项目新增可执行项，该项会随用户本次确认进入可信快照。这种情况无需渲染进程被注入，区别于已登记的 I79。`apps/desktop/src/renderer/shell/TrustDialog.tsx:112,135`，`crates/piarc-core/src/trust.rs:236–250`。 | Core 为展示的清单签发版本，处理确认时核对工作区及版本。清单变化时保持未信任，展示新增项并重新确认。 |
+| P2 | **删除会话的原生确认框可能显示错误目标。** 目标 ID 与弹窗标题分别来自渲染进程。界面状态过期或页面被注入时，弹窗可以显示另一会话的标题，用户确认后仍按原 ID 删除 JSONL、附件和索引。现有 L4 断言弹窗数量、确认删除与取消保留，未核对标题与 ID 的绑定。`apps/desktop/src/main/core/session-ipc.ts:400–421`，`apps/desktop/e2e/t18-sessions.e2e.ts:123–137`。 | IPC 只接收目标 ID，由主进程向 Core 查询标题与工作区，在原生弹窗显示可信目标信息。 |
+| P2 | **校验失败的 PDF 会留在会话目录。** Core 在验证可读性、密码保护与页数前已将文件写入最终位置。被拒绝的 PDF 仍留下副本，不同文件还会持续占用磁盘。`crates/piarc-core/src/composer/attachments.rs:94–106`，`crates/piarc-fs/src/pdf.rs:100–107`。 | 先在本次操作独占的临时文件中完成解析，成功后再提交最终文件。失败时清理临时文件，并覆盖重复提交、并发去重及拒绝后无残留的情况。 |
+
+**已知风险仍存在。** 普通窗口的发布版 preload 和主进程仍开放终端，窗口所有权校验不能防止已被注入的同一窗口向自己的用户 shell 写入。R1 已登记 I30、I51，由 T34/T45 收口，不重复计为新增发现。信任决定缺少主进程原生确认另有 I79 跟踪。见 `apps/desktop/src/main/main.ts:165`、`apps/desktop/src/main/core/terminal-ipc.ts:137–153`、`docs/architecture/ARCHITECTURE.md:1205,1225`。
+
+**已有保障。** preload 使用固定通道，主进程统一精确比较 `senderFrame.origin`。窗口启用 sandbox、context isolation，关闭 Node 集成；生产 CSP 限制外部资源与脚本。Markdown 原始 HTML、工具输出、命令输出及 diff 行按文本渲染，远程图片不自动加载。外链由主进程二次检查协议和用户信息，原生确认显示与实际打开相同的规范化 URL，默认取消，每窗口只允许一个待答外链确认。附件另有每文件大小、类型、内容前缀和会话目录边界检查。见 `apps/desktop/src/main/ipc/register.ts:13`、`apps/desktop/src/main/web-preferences.ts:9`、`apps/desktop/src/main/external-links.ts:25`、`apps/desktop/src/renderer/transcript/markdown/MarkdownView.tsx:83`、`crates/piarc-core/src/composer/attachments.rs:127`。
+
+**覆盖范围。** 现有 18 个 XSS 样本覆盖实验页完成与流式回复，以及正式会话的回复、Read 和 Bash 输出。正式文件路径使用其中一个代表样本。断言检查可见文本、执行标记、禁止元素、事件属性、CSP 违规和远程请求。另有来源混淆、外部导航、重定向、新窗口、外链确认及取消的 L4 用例。本次仅核对代码与测试断言，未运行测试或实施攻击。
+
+### 工程质量
+
+基线 `d57c72e` 有两项影响运行结果或验收可信度的问题，另有一个尚未通过的 M1 门禁。此次只读核查未修改文件或运行测试。
+
+| 优先级 | 发现与影响 | 既有覆盖与建议 |
+|---|---|---|
+| P2 | `crates/piarc-exec/src/command.rs:289` 把 stdout、stderr 的读取错误当作 EOF。若读取中途失败而进程退出 0，Core 会返回成功，模型拿到不完整的命令输出。`crates/piarc-core/src/tool_io/exec.rs:248` 还把执行错误统一归到 shell 文件路径，对应 I61。 | `command.rs:365` 和 `:385` 覆盖正常输出与流式送达，`capture.rs:392` 覆盖落盘失败。先注入失败的 `AsyncRead` 与成功退出状态，再让执行器返回注明输出流及失败阶段的错误，并保持进程清理。 |
+| P2 | `tests/scenarios/policy-session-rule.yaml:3` 是 `CAP-SESSION-STATUS-001` 和 `CAP-SYS-NOTIFY-001` 唯一覆盖来源。其 `:26` 开始只断言拒绝条目、工具结果和请求数。会话状态或通知回归时，该场景仍可通过。`tests/capabilities.yaml:47` 还把徽标优先级归给 Core，实际计算在 `apps/desktop/src/renderer/store/status.ts:11`。 | `apps/desktop/e2e/t18-sessions.e2e.ts:156` 和 `t18-attention.e2e.ts:23` 已验证客户端行为。补充 Core 快照状态的 L2 断言，将客户端通知与优先级关联对应 L4 证据。 |
+| 门禁 | `tests/capabilities.yaml:22` 的 `CAP-TRUST-DIALOG-001` 与 `:40` 的 `CAP-SESSION-MANAGE-001` 仍为 `planned`，所属 T18 已完成，R2-A03 要求 M1 的 `planned` 数为零。 | 已有 `t18-trust.e2e.ts`、`t18-sessions.e2e.ts`。补证信任决定、会话元数据及其持久化后再更新能力状态。 |
+| 维护 | `crates/piarc-core/src/runtime.rs` 有 1,281 行，I81 已指派 R2 拆分。`crates/piarc-host/tests/resilience.rs` 有 1,194 行。Rust 函数 80 行限制已由 `clippy.toml:1` 与 `Cargo.toml:112` 强制。 | 按领域移动 Core 门面方法并保留 API。对于韧性测试文件，按编码规范记录保留长文件的理由或按测试主题拆分。 |
+| 文档 | 24 对 `AGENTS.md` 与 `CLAUDE.md` 均存在，20 个 `CLAUDE.md` 多出 HTML 注释。`AGENTS.md:31` 把四个 TypeScript 工作区写成三个。通用能力复用表 `docs/engineering/coding-standards.md:268` 从 T19 跳至 T22，缺少 T21 的设置 Host 和模型目录入口。 | 统一单行导入，按 `tsconfig.json` 修正计数，登记 `crates/piarc-core/src/sessions/provider_settings.rs:46` 与 `agent-host/AGENTS.md:88` 对应入口。 |
+
+按基线 Cargo 清单核对，21 个 crate、34 条内部依赖全部符合分层规则。`crates/deps-rules.json:71` 为后续 checkpoint 保留了例外，当前 `piarc-fs` 未使用该依赖。`crates/piarc-fs/src/lib.rs:11` 已写成每次写入前都调用 checkpoint，建议注明该行为由 M2 交付。
