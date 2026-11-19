@@ -9,7 +9,9 @@
 //! session's notifications until `turn/completed` and shuts the Agent Host down. Core's side
 //! answers like production: `trust/get` (the workspace is trusted, so project resources load),
 //! delegated tool I/O through [`ToolIo`], credentials through a [`SecretsService`] whose master
-//! key lives in memory.
+//! key lives in memory. There is no user to ask, so the probe approves every tool preflight
+//! (`policy/evaluate`) itself, as the Agent Host test harness of `piarc-testkit` does; the
+//! production approval ledger is covered by the session tests and the L2 scenarios.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -94,6 +96,12 @@ impl InboundHandler for ProbeCore {
         if method == "trust/get" {
             let trusted = params.get("path").and_then(Value::as_str) == Some(&self.workspace);
             return Box::pin(async move { Ok(json!({ "trusted": trusted })) });
+        }
+        if method == "policy/evaluate" {
+            return Box::pin(async { Ok(json!({ "allowed": true })) });
+        }
+        if method == "policy/recover" {
+            return Box::pin(async { Ok(json!({})) });
         }
         if SecretsService::handles(&method) {
             let secrets = self.secrets.clone();
