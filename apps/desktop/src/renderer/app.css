@@ -1241,3 +1241,93 @@ textarea.input {
 :root[data-app] .plan-comments .row-action {
   justify-self: start;
 }
+
+/* T27: context usage, the environment bar's ring (75 % hint, 90 % warning) and the rail's
+   context card. */
+.usage-ring {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  margin-inline-start: auto;
+  font-variant-numeric: tabular-nums;
+}
+.usage-ring-track {
+  fill: none;
+  stroke: var(--piarc-border-subtle);
+}
+.usage-ring-value {
+  fill: none;
+  stroke: var(--piarc-text-accent);
+  stroke-linecap: round;
+}
+[data-level='warning'] .usage-ring-value {
+  stroke: var(--piarc-state-warning);
+}
+[data-level='critical'] .usage-ring-value {
+  stroke: var(--piarc-state-danger);
+}
+.usage-ring[data-level='warning'] .usage-ring-text {
+  color: var(--piarc-text-warning);
+}
+.usage-ring[data-level='critical'] .usage-ring-text {
+  color: var(--piarc-text-danger);
+}
+:root[data-app] .context-panel {
+  display: grid;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-3);
+}
+:root[data-app] .context-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .context-tokens,
+:root[data-app] .context-auto {
+  margin: 0;
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .context-auto.is-stopped,
+:root[data-app] .context-error {
+  margin: 0;
+  color: var(--piarc-text-warning);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .context-categories {
+  display: grid;
+  gap: var(--piarc-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .context-category {
+  display: grid;
+  grid-template-columns: minmax(0, 7.5em) minmax(0, 1fr) 5.5em;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .context-category-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-app] .context-category-bar {
+  block-size: 6px;
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-surface-active);
+  overflow: hidden;
+}
+:root[data-app] .context-category-bar > span {
+  display: block;
+  block-size: 100%;
+  background: var(--piarc-text-accent);
+}
+:root[data-app] .context-category-tokens {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  color: var(--piarc-text-secondary);
+}
+:root[data-app] .context-panel > .button {
+  justify-self: start;
+}

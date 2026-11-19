@@ -459,7 +459,7 @@ impl CoreRuntime {
         &self,
         env: &'env Env,
         id: String,
-        instructions: Option<String>,
+        #[napi(ts_arg_type = "string | null")] instructions: Option<String>,
     ) -> napi::Result<Object<'env>> {
         self.op(env, "CoreRuntime.compact", id, Op::Compact(instructions))
     }

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { PiarcApi } from '../../shared/ipc.js';
 import { AppStore } from '../store/app-store.js';
-import { SessionInput, type Draft } from './session-input.js';
+import { compactFocus, SessionInput, type Draft } from './session-input.js';
 
 function setup() {
   const store = new AppStore();
@@ -140,5 +140,31 @@ describe('session input delivery', () => {
     expect(retry.requestId).not.toBe('client-1');
     expect({ ...retry, requestId: original.requestId }).toEqual(original);
     expect(api.storeAttachment).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('compactFocus', () => {
+  const draft = (text: string, extra: Partial<Draft> = {}): Draft => ({
+    text,
+    mentions: [],
+    pending: [],
+    stored: [],
+    ...extra,
+  });
+
+  it('takes the text after /compact as written, nothing for a bare command', () => {
+    expect(compactFocus(draft('/compact'))).toBe('');
+    expect(compactFocus(draft('  /compact  '))).toBe('');
+    expect(compactFocus(draft('/compact Keep the API decisions.\nAnd the test names.'))).toBe(
+      'Keep the API decisions.\nAnd the test names.',
+    );
+  });
+
+  it('leaves other input alone', () => {
+    expect(compactFocus(draft('/compaction please'))).toBeUndefined();
+    expect(compactFocus(draft('please /compact'))).toBeUndefined();
+    expect(
+      compactFocus(draft('/compact', { mentions: [{ path: 'a', start: 0, end: 1 }] })),
+    ).toBeUndefined();
   });
 });

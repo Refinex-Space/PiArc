@@ -22,6 +22,19 @@ export interface Draft extends DraftFiles {
   readonly mentions: readonly InputMention[];
 }
 
+/**
+ * The focus of a `/compact <focus>` typed into the composer and sent (the palette runs a bare
+ * `/compact`; T27): the text after the command as written, `''` without one, undefined when
+ * the draft is not this command (other text, mentions or attachments).
+ */
+export function compactFocus(draft: Draft): string | undefined {
+  if (draft.mentions.length > 0 || draft.pending.length > 0 || draft.stored.length > 0) {
+    return undefined;
+  }
+  const match = /^\s*\/compact(?:\s+([\s\S]*?))?\s*$/u.exec(draft.text);
+  return match === null ? undefined : (match[1] ?? '');
+}
+
 function field(text: string, name: string): string | undefined {
   try {
     const value: unknown = JSON.parse(text);

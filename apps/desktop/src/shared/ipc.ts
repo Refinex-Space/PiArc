@@ -43,6 +43,7 @@ export const IPC_CHANNELS = {
   sessionPermissionMode: 'piarc:session.permissionMode',
   approvalAnswer: 'piarc:approval.answer',
   sessionCompact: 'piarc:session.compact',
+  sessionContextUsage: 'piarc:session.contextUsage',
   queueEdit: 'piarc:session.queueEdit',
   queueDelete: 'piarc:session.queueDelete',
   attachmentStore: 'piarc:session.attachmentStore',
@@ -388,8 +389,13 @@ export interface PiarcApi {
    */
   configDiagnostics(workspace: string | null): Promise<string>;
   answerApproval(answer: ApprovalAnswer): Promise<string>;
-  /** Compacts the conversation as a turn of its own (`/compact`); resolves with `{ turnId }`. */
-  compact(id: string): Promise<string>;
+  /**
+   * Compacts the conversation as a turn of its own (`/compact [focus]`); `instructions` is what
+   * the summary should focus on. Resolves with `{ turnId }`.
+   */
+  compact(id: string, instructions?: string): Promise<string>;
+  /** The session's context usage by category (`ContextUsage` JSON, T27). */
+  contextUsage(id: string): Promise<string>;
   /** Changes the text of a queued input; resolves with the queue as JSON. */
   editQueueItem(id: string, itemId: string, text: string): Promise<string>;
   /** Removes a queued input; resolves with the queue as JSON. */

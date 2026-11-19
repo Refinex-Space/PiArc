@@ -36,6 +36,7 @@ export type SessionCore = Pick<
   | 'answerApproval'
   | 'setPermissionMode'
   | 'compact'
+  | 'contextUsage'
   | 'editQueueItem'
   | 'deleteQueueItem'
   | 'storeAttachment'
@@ -401,7 +402,15 @@ export function registerSessionHandlers(
     }
     return core.answerApproval(JSON.stringify(answer));
   });
-  registerHandler(IPC_CHANNELS.sessionCompact, (_event, [id]) => core.compact(sessionId(id)));
+  registerHandler(IPC_CHANNELS.sessionCompact, (_event, [id, instructions]) =>
+    core.compact(
+      sessionId(id),
+      instructions === undefined ? undefined : text(instructions, 'instructions'),
+    ),
+  );
+  registerHandler(IPC_CHANNELS.sessionContextUsage, (_event, [id]) =>
+    core.contextUsage(sessionId(id)),
+  );
   registerHandler(IPC_CHANNELS.queueEdit, (_event, [id, itemId, value]) =>
     core.editQueueItem(sessionId(id), token(itemId, 'itemId'), text(value, 'text')),
   );

@@ -17,6 +17,7 @@ const PIARC_API_SNAPSHOT = [
   'compact',
   'composerInfo',
   'configDiagnostics',
+  'contextUsage',
   'createSession',
   'createTerminal',
   'decideProjectTrust',

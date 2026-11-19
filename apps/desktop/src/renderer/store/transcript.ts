@@ -27,6 +27,7 @@ import type {
 } from '@piarc/protocol';
 
 import { sameRequest } from './approvals.js';
+import { SessionContextUsage } from './context-usage.js';
 import { SessionHarness } from './harness.js';
 import type { PendingAttachment } from '../composer/attachments.js';
 
@@ -173,8 +174,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** An item as Core sends it: an object with string `itemId` and `type`. */
+/** Items the default view does not show: system reminders (T27; the detailed view of T29
+ * shows them). */
+const HIDDEN_ITEMS: ReadonlySet<string> = new Set(['reminder']);
+
+/** An item the transcript shows. */
 function isItem(value: unknown): value is Item {
-  return isRecord(value) && typeof value.itemId === 'string' && typeof value.type === 'string';
+  return (
+    isRecord(value) &&
+    typeof value.itemId === 'string' &&
+    typeof value.type === 'string' &&
+    !HIDDEN_ITEMS.has(value.type)
+  );
 }
 
 function numberOr(value: unknown): number | undefined {
@@ -278,6 +289,7 @@ export class SessionTranscript {
   private approvalIds: string[] = [];
   /** The branch's plan and task list (T26). */
   readonly harness = new SessionHarness();
+  readonly usage = new SessionContextUsage();
   private turn: TurnInfo = IDLE;
   private queueItems: readonly QueuedInput[] = [];
   private reload = false;
@@ -626,7 +638,7 @@ export class SessionTranscript {
         batch.state = true;
         break;
       default:
-        this.harness.apply(method, params);
+        if (!this.harness.apply(method, params)) this.usage.apply(method, params);
         break;
     }
   }

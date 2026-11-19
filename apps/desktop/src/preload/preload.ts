@@ -276,9 +276,13 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.approvalAnswer, answer)
       .then((value: unknown) => expectString(value)),
-  compact: (id) =>
+  compact: (id, instructions) =>
     ipcRenderer
-      .invoke(IPC_CHANNELS.sessionCompact, id)
+      .invoke(IPC_CHANNELS.sessionCompact, id, instructions)
+      .then((value: unknown) => expectString(value)),
+  contextUsage: (id) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionContextUsage, id)
       .then((value: unknown) => expectString(value)),
   editQueueItem: (id, itemId, text) =>
     ipcRenderer

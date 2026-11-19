@@ -25,8 +25,9 @@ import { reason } from './errors.js';
 import { keyOf, useModelCatalog } from './model-catalog.js';
 import { ModelMenus } from './ModelMenus.js';
 import { PermissionModeMenu } from './PermissionModeMenu.js';
+import { UsageRing } from './ContextUsage.js';
 import { QueueList } from './QueueList.js';
-import { SessionInput, type Draft } from './session-input.js';
+import { compactFocus, SessionInput, type Draft } from './session-input.js';
 import { sessionTitle } from './SessionRow.js';
 import { StatusBadge } from './StatusBadge.js';
 import { useUi } from './ui.js';
@@ -267,6 +268,13 @@ export function Conversation({
       submit(intent, submission) {
         setError(undefined);
         const draft = draftOf(submission);
+        const focus = compactFocus(draft);
+        if (focus !== undefined) {
+          window.piarc.compact(id, focus === '' ? undefined : focus).catch((failure: unknown) => {
+            setError(t('composer.failed', { reason: reason(failure) }));
+          });
+          return;
+        }
         if (intent === 'send') {
           void input.send(draft);
           return;
@@ -357,6 +365,7 @@ export function Conversation({
               setError(t('composer.failed', { reason: reason(failure) }));
             }}
           />
+          <UsageRing sessionId={id} />
         </div>
       </div>
     </section>

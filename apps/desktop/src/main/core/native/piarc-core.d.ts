@@ -102,8 +102,13 @@ export declare class CoreRuntime {
   steerInput(id: string, input: string): Promise<string>;
   /** A follow-up for after the running turn (a new turn when idle); resolves like `steer`. */
   followUpInput(id: string, input: string): Promise<string>;
-  /** Compacts the conversation as a turn of its own (`/compact`); resolves with `{ turnId }`. */
-  compact(id: string): Promise<string>;
+  /**
+   * Compacts the conversation as a turn of its own (`/compact [focus]`); `instructions` is
+   * what the summary should focus on. Resolves with `{ turnId }`.
+   */
+  compact(id: string, instructions?: string | null): Promise<string>;
+  /** The session's context usage by category (T27); resolves with the `ContextUsage` JSON. */
+  contextUsage(id: string): Promise<string>;
   /**
    * Stores an attachment (image or PDF bytes) for an open session; resolves with the
    * attachment to put in an input (`{ kind, name, mimeType, blob, pageCount? }`). The bytes

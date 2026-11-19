@@ -51,7 +51,14 @@ export function CompactionRow({
       role="status"
     >
       <span className="row-rule" aria-hidden="true" />
-      <span className="row-compaction-text">{text}</span>
+      <span className="row-compaction-text">
+        {text}
+        {item.autoCompactStopped == null ? null : (
+          <span className="row-compaction-stopped" data-testid="compaction-stopped">
+            {t('transcript.compaction.stopped', { reason: item.autoCompactStopped })}
+          </span>
+        )}
+      </span>
       <span className="row-rule" aria-hidden="true" />
     </div>
   );

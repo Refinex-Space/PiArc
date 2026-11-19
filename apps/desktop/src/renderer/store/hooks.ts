@@ -1,6 +1,7 @@
 // React bindings of the store: every hook subscribes to exactly the part it reads
 // (`useSyncExternalStore`), so a change re-renders only the components that show it.
-import { createContext, useCallback, useContext, useSyncExternalStore } from 'react';
+import type { ContextUsage } from '@piarc/protocol';
+import { createContext, useCallback, useContext, useEffect, useSyncExternalStore } from 'react';
 
 import type { AppStore, Notice } from './app-store.js';
 import type { HarnessSnapshot } from './harness.js';
@@ -105,6 +106,25 @@ export function useHarnessOf(
   return useSyncExternalStore(
     subscribe,
     useCallback(() => harness?.state(), [harness]),
+  );
+}
+
+/** The session's context usage (T27); asks Core for it the first time the session shows. */
+export function useContextUsage(sessionId: string | undefined): ContextUsage | undefined {
+  const store = useStore();
+  const usage = sessionId === undefined ? undefined : store.transcript(sessionId).usage;
+  useEffect(() => {
+    if (usage !== undefined && sessionId !== undefined) {
+      usage.request(() => window.piarc.contextUsage(sessionId));
+    }
+  }, [usage, sessionId]);
+  const subscribe = useCallback(
+    (l: () => void) => usage?.subscribe(l) ?? (() => undefined),
+    [usage],
+  );
+  return useSyncExternalStore(
+    subscribe,
+    useCallback(() => usage?.state(), [usage]),
   );
 }
 
