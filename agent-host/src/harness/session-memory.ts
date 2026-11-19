@@ -1,6 +1,9 @@
 // Pi 1.5.2 persists custom entries as branch metadata and custom messages as model input.
-// Keep the first prompt with its branch. Content revisions are recorded with the message
-// that actually delivers them, so restarting the Host or forking the branch replays both.
+// Keep the first prompt with its branch. Content revisions are recorded with the reminder
+// that actually delivers them (`piarc.reminder` details, T27; `piarc.memory` before it), so
+// restarting the Host or forking the branch replays both. Memory loaded after the system
+// prompt goes through the reminder channel: `memoryLazyLoad` (a subdirectory's file, a
+// changed or removed file, the date) and `rulesMatched` (a `paths:` rule).
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import type { ExtensionFactory, SessionManager } from '@earendil-works/pi-coding-agent';
@@ -8,13 +11,20 @@ import type { ExtensionFactory, SessionManager } from '@earendil-works/pi-coding
 import { isObject } from '../runtime/items.js';
 import { resolveToolPath } from '../tools/paths.js';
 import type { ToolProfile } from '../tools/profile.js';
-import { anthropicMemoryPayload, MEMORY_MARKER } from './memory-wire.js';
+import { anthropicMemoryPayload } from './memory-wire.js';
 import type { MemoryFile, MemorySnapshot } from '@piarc/protocol';
 import type { ReadMemory } from './memory-io.js';
 import { assembleSystem, IDENTITY, sourced, type FrozenSystem } from './prompts/system.js';
+import {
+  REMINDER_ENTRY,
+  reminderRecords,
+  type KeyedReminder,
+  type Reminders,
+} from './reminders.js';
 
 const INITIAL = 'piarc.systemPrompt';
 const VISITED = 'piarc.memoryDirectories';
+// Memory updates before T27 (`[PiArc memory]` messages); read for their versions only.
 const UPDATE = 'piarc.memory';
 // Conditional rules (`paths:`) loaded in this branch: they stay loaded (T24).
 const RULES = 'piarc.memoryRules';
@@ -36,7 +46,10 @@ export class SessionMemory {
   readonly #profile: ToolProfile | undefined;
   readonly #read: ReadMemory | undefined;
   readonly #canonical: (name: string) => string;
+  readonly #reminders: Reminders;
   readonly #started: string;
+  /** The memory files of the frozen system prompt and their digests. */
+  readonly #initial = new Map<string, string>();
   readonly #directories = new Set<string>();
   readonly #rules = new Set<string>();
   readonly #versions = new Map<string, string>();
@@ -56,12 +69,14 @@ export class SessionMemory {
     profile: ToolProfile | undefined,
     read: ReadMemory | undefined,
     canonical: (name: string) => string,
+    reminders: Reminders,
   ) {
     this.#manager = manager;
     this.#cwd = cwd;
     this.#profile = profile;
     this.#read = read;
     this.#canonical = canonical;
+    this.#reminders = reminders;
     this.#started = localDate(new Date(manager.getHeader()?.timestamp ?? Date.now()));
     this.#date = this.#started;
     for (const entry of manager.getBranch()) {
@@ -75,8 +90,11 @@ export class SessionMemory {
             typeof cacheBoundary === 'number' ? cacheBoundary : system.indexOf('<project_context>'),
         };
         this.#apply(entry.data);
+        this.#remember(entry.data);
       } else if (entry.type === 'custom_message' && entry.customType === UPDATE) {
         this.#apply(entry.details);
+      } else if (entry.type === 'custom_message' && entry.customType === REMINDER_ENTRY) {
+        for (const record of reminderRecords(entry.details)) this.#apply(record.data);
       } else if (
         entry.type === 'custom' &&
         entry.customType === VISITED &&
@@ -100,6 +118,19 @@ export class SessionMemory {
     for (const [name, hash] of Object.entries(data.versions)) {
       if (hash === null) this.#versions.delete(name);
       else if (typeof hash === 'string') this.#versions.set(name, hash);
+    }
+  }
+
+  /** The frozen system prompt, once the first run assembled it. */
+  get systemText(): string | undefined {
+    return this.#system?.text;
+  }
+
+  /** The versions the frozen system prompt was built from. */
+  #remember(data: unknown): void {
+    if (!isObject(data) || !isObject(data.versions)) return;
+    for (const [name, hash] of Object.entries(data.versions)) {
+      if (typeof hash === 'string') this.#initial.set(name, hash);
     }
   }
 
@@ -188,9 +219,9 @@ export class SessionMemory {
     return { added: true, ...touched };
   }
 
-  #update(files: readonly MemoryFile[], lazy: boolean) {
-    const contents: string[] = [];
-    const changes = new Map<string, string | null>();
+  /** Queues the memory that changed since it was last delivered; whether anything did. */
+  #update(files: readonly MemoryFile[], lazy: boolean): boolean {
+    const queued: KeyedReminder[] = [];
     const seen = new Set<string>();
     for (const file of files) {
       seen.add(file.path);
@@ -198,28 +229,96 @@ export class SessionMemory {
       if (lazy && previous !== undefined) continue;
       const hash = digest(file);
       if (hash !== previous) {
-        changes.set(file.path, hash);
-        contents.push(sourced(file));
+        queued.push({
+          key: `memory:${file.path}`,
+          type: file.paths == null ? 'memoryLazyLoad' : 'rulesMatched',
+          source: file.path,
+          text: sourced(file),
+          category: 'memory',
+          data: { versions: { [file.path]: hash } },
+        });
       }
     }
     if (!lazy) {
       for (const name of this.#versions.keys()) {
         if (seen.has(name)) continue;
-        changes.set(name, null);
-        contents.push(`No longer loaded: ${name}`);
+        queued.push({
+          key: `memory:${name}`,
+          type: 'memoryLazyLoad',
+          source: name,
+          text: `No longer loaded: ${name}`,
+          category: 'memory',
+          data: { versions: { [name]: null } },
+        });
       }
     }
     const date = lazy ? this.#date : localDate(new Date());
-    if (date !== this.#date) contents.push(`Current date: ${date}`);
-    if (!contents.length) return undefined;
-    const details = { date, versions: Object.fromEntries(changes) };
-    this.#apply(details);
-    return {
-      customType: UPDATE,
-      display: false,
-      content: [MEMORY_MARKER, ...contents].join('\n\n'),
-      details,
-    };
+    if (date !== this.#date) {
+      queued.push({
+        key: 'memory:date',
+        type: 'memoryLazyLoad',
+        source: 'date',
+        text: `Current date: ${date}`,
+        data: { date },
+      });
+    }
+    for (const { key, ...reminder } of queued) {
+      this.#apply(reminder.data);
+      this.#reminders.enqueue(key, reminder);
+    }
+    return queued.length > 0;
+  }
+
+  /**
+   * After a compaction (T27): the memory the system prompt does not hold as it is now, read
+   * from disk again (subdirectory files, `paths:` rules, files changed since the prompt was
+   * frozen, removed files) as `contextRestore` reminders; the earlier reminders were
+   * summarized away.
+   */
+  async restore(signal?: AbortSignal): Promise<KeyedReminder[]> {
+    if (!this.#read) return [];
+    const snapshot = await this.#load(false, signal);
+    const files = snapshot.currentFiles ?? snapshot.files;
+    const restored: KeyedReminder[] = [];
+    const present = new Set<string>();
+    for (const file of files) {
+      present.add(file.path);
+      const hash = digest(file);
+      if (this.#initial.get(file.path) === hash) continue;
+      restored.push({
+        key: `memory:${file.path}`,
+        type: 'contextRestore',
+        source: file.path,
+        text: sourced(file),
+        category: 'memory',
+        data: { versions: { [file.path]: hash } },
+      });
+    }
+    for (const name of this.#initial.keys()) {
+      if (present.has(name)) continue;
+      restored.push({
+        key: `memory:${name}`,
+        type: 'contextRestore',
+        source: name,
+        text: `No longer loaded: ${name}`,
+        category: 'memory',
+        data: { versions: { [name]: null } },
+      });
+    }
+    if (this.#date !== this.#started) {
+      restored.push({
+        key: 'memory:date',
+        type: 'contextRestore',
+        source: 'date',
+        text: `Current date: ${this.#date}`,
+      });
+    }
+    return restored;
+  }
+
+  /** Records the versions a restore delivered. */
+  restored(reminders: readonly KeyedReminder[]): void {
+    for (const reminder of reminders) this.#apply(reminder.data);
   }
 
   extension: ExtensionFactory = (pi) => {
@@ -254,9 +353,11 @@ export class SessionMemory {
           versions,
         });
         this.#apply({ versions });
+        this.#remember({ versions });
       }
-      const message = this.#update(snapshot.currentFiles ?? snapshot.files, false);
-      return { systemPrompt: this.#system.text, ...(message === undefined ? {} : { message }) };
+      // The reminders extension, registered after this one, delivers what this queues.
+      this.#update(snapshot.currentFiles ?? snapshot.files, false);
+      return { systemPrompt: this.#system.text };
     });
 
     pi.on('before_provider_request', ({ payload }, ctx) =>
@@ -285,10 +386,8 @@ export class SessionMemory {
           file === undefined ? [] : [file],
         );
         ctx.signal?.throwIfAborted();
-        const message = this.#update(snapshot.files, true);
-        // Pi 1.5.2 flushes these messages immediately after the complete tool-result batch,
-        // before constructing the next provider request. The user's steer queue is separate.
-        if (message) pi.sendMessage(message, { triggerTurn: false });
+        // Delivered with this round's other reminders after its tool results (`turn_end`).
+        this.#update(snapshot.files, true);
       };
       this.#lazy = this.#lazy.then(publish, publish);
       await this.#lazy;

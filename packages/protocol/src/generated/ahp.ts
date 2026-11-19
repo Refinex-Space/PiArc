@@ -615,7 +615,8 @@ export type ReminderType =
   | 'backgroundTask'
   | 'memoryLazyLoad'
   | 'rulesMatched'
-  | 'hookContext';
+  | 'hookContext'
+  | 'contextRestore';
 /**
  * The events the Agent Host reports.
  */

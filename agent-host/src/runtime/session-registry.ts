@@ -14,10 +14,6 @@
 // (`getAgentDir()`) are pinned to PiArc's directory once, in main.ts.
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { getBuiltinProviders } from '@earendil-works/pi-ai/providers/all';
-
-import { capabilities, supportedEffort, switchPreview } from '../providers/catalog.js';
-
 import {
   createAgentSessionFromServices,
   createAgentSessionRuntime,
@@ -87,6 +83,7 @@ import type { CoreBridge } from './core-bridge.js';
 import { modeRecord } from './permission-mode.js';
 import { contentText } from './items.js';
 import { Projector, type ProjectionSink } from './projector.js';
+import { listModels, previewSwitch, selectEffort, selectModel } from './session-models.js';
 import { InputQueue } from './queue.js';
 import {
   checkSessionId,
@@ -145,9 +142,10 @@ export interface RegistryOptions {
   readonly hostTools?: HostToolCapabilities;
 }
 
-/** What a turn runs: an input, or a compaction (`/compact`). */
+/** What a turn runs: an input, or a compaction (`/compact [focus]`). */
 type Job =
-  { readonly kind: 'prompt'; readonly prepared: PreparedInput } | { readonly kind: 'compact' };
+  | { readonly kind: 'prompt'; readonly prepared: PreparedInput }
+  | { readonly kind: 'compact'; readonly instructions: string | undefined };
 
 /** A registry step in a recording (`onPiEvent`). */
 export type RecordedControl =
@@ -205,38 +203,12 @@ export class SessionRegistry {
   }
 
   async models(sessionId?: string): Promise<ModelsListResult> {
-    const runtime = this.workspace.modelRuntime;
-    const providers = getBuiltinProviders().flatMap((id) => {
-      const provider = runtime.getProvider(id);
-      return provider?.auth.apiKey ? [{ id, name: provider.name }] : [];
-    });
-    const models = (await runtime.getAvailable()).map(capabilities);
     const session = sessionId === undefined ? undefined : this.#get(sessionId).runtime.session;
-    const model = session?.model;
-    return {
-      providers,
-      models,
-      ...(session && model
-        ? {
-            model: { provider: model.provider, id: model.id },
-            ...(session.thinkingLevel === 'minimal' ? {} : { effort: session.thinkingLevel }),
-          }
-        : {}),
-    };
-  }
-
-  #target(ref: ModelRef) {
-    const model = this.workspace.modelRuntime.getModel(ref.provider, ref.id);
-    if (!model) throw new AhpError('notFound', 'The selected model is unavailable');
-    return model;
+    return listModels(this.workspace, session);
   }
 
   previewModelSwitch(sessionId: string, ref: ModelRef) {
-    return switchPreview(
-      this.#get(sessionId).runtime.session,
-      this.#target(ref),
-      this.workspace.unpriced,
-    );
+    return previewSwitch(this.workspace, this.#get(sessionId).runtime.session, ref);
   }
 
   async setModel(
@@ -246,14 +218,12 @@ export class SessionRegistry {
   ): Promise<SessionModelSelection> {
     const hosted = this.#get(sessionId);
     this.#checkIdle(sessionId, hosted);
-    const { session } = hosted.runtime;
-    const model = this.#target(ref);
-    const effort = supportedEffort(model, requested ?? session.thinkingLevel);
     hosted.changingModel = true;
     try {
-      await session.setModel(model);
-      session.setThinkingLevel(effort);
-      return { model: ref, effort };
+      const selection = await selectModel(this.workspace, hosted.runtime.session, ref, requested);
+      // The compaction threshold follows the model's window and output.
+      hosted.harness.compaction.apply();
+      return selection;
     } finally {
       hosted.changingModel = false;
     }
@@ -262,15 +232,7 @@ export class SessionRegistry {
   setEffort(sessionId: string, requested: string): SessionModelSelection {
     const hosted = this.#get(sessionId);
     this.#checkIdle(sessionId, hosted);
-    const { session } = hosted.runtime;
-    const model = session.model;
-    if (!model) throw new AhpError('notFound', 'Select a model first');
-    const effort = supportedEffort(
-      this.#target({ provider: model.provider, id: model.id }),
-      requested,
-    );
-    session.setThinkingLevel(effort);
-    return { model: { provider: model.provider, id: model.id }, effort };
+    return selectEffort(this.workspace, hosted.runtime.session, requested);
   }
 
   /** Creates a session in `cwd`, under `sessionId` when Core chose one. */
@@ -366,15 +328,16 @@ export class SessionRegistry {
     });
   }
 
-  /** Compacts the conversation as a turn of its own (`/compact`); the session must be idle. */
-  compact(sessionId: string, requestId: string): PromptAccepted {
+  /** Compacts the conversation as a turn of its own (`/compact [focus]`); the session must be
+   * idle. */
+  compact(sessionId: string, requestId: string, instructions?: string): PromptAccepted {
     const hosted = this.#get(sessionId);
     const known = hosted.prompts.get(requestId);
     if (known !== undefined) {
       return { turnId: known };
     }
     this.#checkIdle(sessionId, hosted);
-    const turnId = this.#startTurn(sessionId, hosted, { kind: 'compact' });
+    const turnId = this.#startTurn(sessionId, hosted, { kind: 'compact', instructions });
     hosted.prompts.set(requestId, turnId);
     return { turnId };
   }
@@ -413,7 +376,7 @@ export class SessionRegistry {
       } else if (kind === 'steer') {
         this.#options.onPiEvent?.(sessionId, { control: 'steer', text });
         answer = { disposition: 'queued', itemId: await hosted.queue.steer(prepared) };
-        hosted.hooks?.addContext(prepared.hookContext, true);
+        hosted.hooks?.addContext(prepared.hookContext);
       } else {
         this.#options.onPiEvent?.(sessionId, { control: 'followUp', text });
         answer = { disposition: 'queued', itemId: hosted.queue.followUp(prepared) };
@@ -511,7 +474,11 @@ export class SessionRegistry {
         toCanonical = (tool) => names.toCanonical(tool);
       }
     }
-    const window = historyWindow(projectHistory(branch, toCanonical), start, limit);
+    const window = historyWindow(
+      projectHistory(branch, toCanonical, this.#options.hostTools?.context === true),
+      start,
+      limit,
+    );
     const harness = harnessState(branch, toCanonical);
     return harness === undefined ? window : { ...window, harness };
   }
@@ -606,6 +573,11 @@ export class SessionRegistry {
     this.#get(sessionId).harness.recordMode(mode);
   }
 
+  /** The session's Harness Kit (`session/remind`, `session/getContextUsage`). */
+  harness(sessionId: string): SessionHarness {
+    return this.#get(sessionId).harness;
+  }
+
   #startTurn(sessionId: string, hosted: HostedSession, job: Job): string {
     const turnId = `turn-${randomUUID()}`;
     this.#options.onPiEvent?.(sessionId, { control: 'beginTurn', turnId });
@@ -637,18 +609,12 @@ export class SessionRegistry {
     const { tools } = this.#options;
     const names = tools.kind === 'core' ? new ToolNameMap(tools.profile) : undefined;
     const toCanonical = (tool: string): string => names?.toCanonical(tool) ?? tool;
-    const memory = new SessionMemory(
-      manager,
-      cwd,
-      tools.kind === 'core' ? tools.profile : undefined,
-      this.#options.memoryBridge
-        ? memoryReader(this.#options.memoryBridge, manager.getSessionId())
-        : undefined,
-      toCanonical,
-    );
     const batches = new ToolBatches((tool) => CONCURRENCY_SAFE_TOOLS.has(toCanonical(tool)));
     // The session object exists once the runtime is created; hooks read it lazily.
     const opened: { session?: AgentSession; projector?: Projector } = {};
+    const sessionLog = (line: string): void => {
+      this.#options.log(`[session ${manager.getSessionId()}] ${line}`);
+    };
     const harness = new SessionHarness({
       sessionId: manager.getSessionId(),
       manager,
@@ -657,7 +623,22 @@ export class SessionRegistry {
       canonical: toCanonical,
       activeTurn: () => opened.projector?.activeTurnId,
       core: tools.kind === 'core' ? this.#options.hostTools : undefined,
+      cwd,
+      session: () => opened.session,
+      io: tools.kind === 'core' ? tools.ioFor(manager.getSessionId()) : undefined,
+      appended: (message) => opened.projector?.reminder(message),
+      log: sessionLog,
     });
+    const memory = new SessionMemory(
+      manager,
+      cwd,
+      tools.kind === 'core' ? tools.profile : undefined,
+      this.#options.memoryBridge
+        ? memoryReader(this.#options.memoryBridge, manager.getSessionId())
+        : undefined,
+      toCanonical,
+      harness.reminders,
+    );
     const hooksBridge = tools.kind === 'core' ? this.#options.hooksBridge : undefined;
     const hooks =
       hooksBridge === undefined
@@ -669,25 +650,20 @@ export class SessionRegistry {
             source,
             canonical: toCanonical,
             transcript: () => opened.session?.sessionFile ?? manager.getSessionFile(),
-            session: () => opened.session,
+            reminders: harness.reminders,
             hookInput: (tool, input) => {
               const resolved = preflightInput(tool, input, cwd);
               delete resolved.readPathCandidates;
               return resolved;
             },
-            log: (line) => {
-              this.#options.log(`[session ${manager.getSessionId()}] ${line}`);
-            },
+            log: sessionLog,
           });
+    harness.connect(memory, hooks);
     const factory: CreateAgentSessionRuntimeFactory = async (target) => {
+      // In-memory overrides (no silent provider retries, the compaction threshold) are
+      // applied by `harness.compaction` once the session exists and before every run.
       const settingsManager = SettingsManager.create(target.cwd, target.agentDir, {
         projectTrusted: false,
-      });
-      // Recoverable model errors are retried by Pi's agent loop, which reports each retry
-      // (`turn/retrying`) and keeps the failed attempt out of the context; the provider SDK
-      // would retry rate limits and overloads silently (architecture section 6.15).
-      settingsManager.applyOverrides({
-        retry: { provider: { maxRetries: 0 } },
       });
       const io =
         tools.kind === 'core' ? tools.ioFor(target.sessionManager.getSessionId()) : undefined;
@@ -784,6 +760,7 @@ export class SessionRegistry {
     });
     const { session } = runtime;
     opened.session = session;
+    harness.compaction.apply();
     const sessionId = session.sessionId;
     const log = (line: string): void => {
       this.#options.log(`[session ${sessionId}] ${line}`);
@@ -795,7 +772,10 @@ export class SessionRegistry {
       log(runtime.modelFallbackMessage);
     }
     const sink = this.#options.sinkFor(sessionId);
-    const projector = new Projector(sink, toCanonical);
+    const projector = new Projector(sink, toCanonical, {
+      reminders: this.#options.hostTools?.context === true,
+      compactionNote: () => harness.compaction.takeNote(),
+    });
     opened.projector = projector;
     const delivering: PreparedInput[] = [];
     const queue = new InputQueue(
@@ -899,6 +879,7 @@ export class SessionRegistry {
       default:
         break;
     }
+    hosted.harness.observe(event);
     projector.handle(event);
     hosted.harness.onEvent(event);
     if (event.type === 'agent_settled') {
@@ -934,12 +915,13 @@ export class SessionRegistry {
       }
       try {
         const { session } = hosted.runtime;
+        await hosted.harness.compaction.prepare();
         if (next.job.kind === 'compact') {
           session.sessionManager.appendCustomEntry(INPUT_ENTRY, {
             turnId: next.turnId,
             action: 'compact',
           });
-          await session.compact();
+          await session.compact(next.job.instructions);
         } else {
           const { prepared } = next.job;
           this.#checkImageInput(sessionId, prepared.input);
@@ -959,10 +941,12 @@ export class SessionRegistry {
         }
         hosted.projector.finishTurn(next.turnId, 'completed');
       } catch (error) {
-        this.#options.log(
-          `[session ${sessionId}] ${next.job.kind} failed: ${describeError(error)}`,
-        );
-        hosted.projector.finishTurn(next.turnId, 'failed', describeError(error));
+        // A compaction whose summary failed was cancelled: its reason is the error.
+        const reason =
+          (next.job.kind === 'compact' ? hosted.harness.compaction.lastFailure : undefined) ??
+          describeError(error);
+        this.#options.log(`[session ${sessionId}] ${next.job.kind} failed: ${reason}`);
+        hosted.projector.finishTurn(next.turnId, 'failed', reason);
       }
       next = this.#nextFollowUp(sessionId, hosted);
     }

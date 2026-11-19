@@ -38,6 +38,9 @@ pub enum ReminderType {
     RulesMatched,
     /// Context a hook added (`additionalContext`, plain stdout, a Stop hook's reason).
     HookContext,
+    /// State given back after a compaction: memory, the plan, the task list, invoked skills,
+    /// recently used files.
+    ContextRestore,
 }
 
 /// One reminder of a reminder message: its type and where it came from.

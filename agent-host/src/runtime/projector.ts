@@ -14,6 +14,10 @@
 // | `tool_execution_start/update/end`          | `item/started`, `item/updated`,               |
 // |                                            | `item/completed` (tool item types, items.ts)  |
 // | `compaction_start/end`                     | contextCompaction `item/started`/`completed`  |
+// |                                            | (with the Harness Kit's note: a failed        |
+// |                                            | summary, the context after, a stop)           |
+// | `message_end` of a `piarc.reminder` custom | reminder `item/started` + `item/completed`    |
+// |   message (capability `context`)           | (`reminder` for one appended directly)        |
 // | `auto_retry_start`                         | `turn/retrying`                               |
 // | `queue_update`                             | `session/queueChanged` (queue.ts, ids added)  |
 // | `entry_appended` of a `piarc.*` custom     | `harness/entry`                               |
@@ -52,6 +56,8 @@ import {
   userMessage,
 } from './items.js';
 import { classifyTurnError } from './turn-errors.js';
+import type { CompactionNote } from '../harness/compaction.js';
+import { REMINDER_ENTRY, reminderRefs } from '../harness/reminders.js';
 
 /** Where projected notifications go (the outbound queue, bound to one session). */
 export interface ProjectionSink {
@@ -86,6 +92,7 @@ interface Turn {
   messageId: string | undefined;
   userMessages: number;
   compactions: number;
+  reminders: number;
   readonly streams: Map<number, OpenStream>;
   readonly tools: Map<string, OpenTool>;
   /** Tool calls the latest assistant message made, in order: calls Pi never started are
@@ -100,18 +107,52 @@ interface Turn {
   lastResponse: AssistantMessage | undefined;
 }
 
+/** What the Harness Kit adds to the projection (T27). */
+export interface ProjectorOptions {
+  /** Project reminder messages as items (Core enabled `context`). */
+  readonly reminders?: boolean;
+  /** The note of the compaction that just ended. */
+  readonly compactionNote?: () => CompactionNote | undefined;
+}
+
 export class Projector {
   readonly #sink: ProjectionSink;
   readonly #toCanonical: (tool: string) => string;
+  readonly #options: ProjectorOptions;
   readonly #declined = new Set<string>();
   #turn: Turn | undefined;
   #nextInput: UserInput | undefined;
 
   /** `toCanonical` maps the model-visible tool names of the session's Tool Profile to canonical
    * names: Core sees canonical names only (architecture section 6.1.1). */
-  constructor(sink: ProjectionSink, toCanonical: (tool: string) => string = (tool) => tool) {
+  constructor(
+    sink: ProjectionSink,
+    toCanonical: (tool: string) => string = (tool) => tool,
+    options: ProjectorOptions = {},
+  ) {
     this.#sink = sink;
     this.#toCanonical = toCanonical;
+    this.#options = options;
+  }
+
+  /** A reminder message the Harness Kit appended without Pi's message events. */
+  reminder(message: { readonly content: string; readonly details: unknown }): void {
+    const turn = this.#turn;
+    if (turn !== undefined) this.#onReminder(turn, message.content, message.details);
+  }
+
+  #onReminder(turn: Turn, content: string, details: unknown): void {
+    if (this.#options.reminders !== true) return;
+    turn.reminders += 1;
+    const item: Item = {
+      type: 'reminder',
+      itemId: `${turn.turnId}:reminder:${String(turn.reminders)}`,
+      status: 'completed',
+      reminders: reminderRefs(details),
+      text: content.toWellFormed(),
+    };
+    this.#itemEvent(turn, 'item/started', item);
+    this.#itemEvent(turn, 'item/completed', item);
   }
 
   /** The turn accepted for the current input, until it completes. */
@@ -128,6 +169,7 @@ export class Projector {
       messageId: undefined,
       userMessages: 0,
       compactions: 0,
+      reminders: 0,
       streams: new Map(),
       tools: new Map(),
       calls: [],
@@ -268,6 +310,15 @@ export class Projector {
   }
 
   #onMessageEnd(turn: Turn, message: unknown): void {
+    if (
+      isObject(message) &&
+      message.role === 'custom' &&
+      message.customType === REMINDER_ENTRY &&
+      typeof message.content === 'string'
+    ) {
+      this.#onReminder(turn, message.content, message.details);
+      return;
+    }
     if (!isObject(message) || message.role !== 'assistant') {
       return;
     }
@@ -450,24 +501,31 @@ export class Projector {
     }
     turn.openCompaction = undefined;
     const { result } = event;
+    const note = this.#options.compactionNote?.();
     let status: ItemStatus = 'completed';
-    if (event.aborted) {
+    if (note?.failure !== undefined) {
+      // The Harness Kit's summary failed and cancelled the compaction.
+      status = 'failed';
+    } else if (event.aborted) {
       status = 'interrupted';
     } else if (result === undefined) {
       status = 'failed';
     }
+    const after = note?.tokensAfter ?? result?.estimatedTokensAfter;
     this.#itemEvent(
       turn,
       'item/completed',
       contextCompaction(itemId, status, {
         reason: event.reason,
         ...(result === undefined ? {} : { tokensBefore: result.tokensBefore }),
-        ...(result?.estimatedTokensAfter === undefined
-          ? {}
-          : { tokensAfter: result.estimatedTokensAfter }),
+        ...(after === undefined ? {} : { tokensAfter: after }),
         ...(status === 'failed'
-          ? { errorMessage: event.errorMessage ?? 'the compaction produced no summary' }
+          ? {
+              errorMessage:
+                note?.failure ?? event.errorMessage ?? 'the compaction produced no summary',
+            }
           : {}),
+        ...(note?.stopped === undefined ? {} : { autoCompactStopped: note.stopped }),
       }),
     );
   }

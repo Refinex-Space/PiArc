@@ -95,9 +95,13 @@ export class PlanMode {
       this.#reminders.withdraw(MODE_REMINDER);
       return;
     }
-    this.#reminders.enqueue(MODE_REMINDER, plan ? PLAN_ON : planOff(mode), () => {
-      this.#told = plan;
-    });
+    this.#reminders.enqueue(
+      MODE_REMINDER,
+      { type: 'planMode', source: mode, text: plan ? PLAN_ON : planOff(mode) },
+      () => {
+        this.#told = plan;
+      },
+    );
   }
 
   /** A tool result tells the model the current mode itself: no reminder is needed. */

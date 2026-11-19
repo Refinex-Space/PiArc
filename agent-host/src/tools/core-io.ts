@@ -271,6 +271,37 @@ export class CoreIo {
     return Buffer.concat(parts);
   }
 
+  /**
+   * The whole text of a file the session already read or wrote, without a tool call: what a
+   * compaction gives back (T27); undefined once it is longer than `maxChars` UTF-16 code units.
+   * Core refuses other files and files that need approval.
+   */
+  async restoreText(
+    path: string,
+    maxChars: number,
+    signal?: AbortSignal,
+  ): Promise<string | undefined> {
+    const parts: string[] = [];
+    let length = 0;
+    let offset = 0;
+    for (;;) {
+      signal?.throwIfAborted();
+      const chunk = await this.#request(
+        'fs/read',
+        { path, restore: true, offset },
+        parseRead,
+        signal,
+      );
+      if (chunk.text !== undefined) {
+        parts.push(chunk.text);
+        length += chunk.text.length;
+        if (length > maxChars) return undefined;
+      }
+      offset += chunk.bytesRead;
+      if (chunk.eof || chunk.bytesRead === 0) return parts.join('');
+    }
+  }
+
   /** The file's exact bytes, through a blob Core copies (ADR-0009 rule 8). */
   async readBytes(path: string, origin: Origin): Promise<Buffer> {
     const result = await this.#request('fs/read', { path, origin, mode: 'blob' }, parseRead);

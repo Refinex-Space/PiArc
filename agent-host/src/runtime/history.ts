@@ -13,6 +13,8 @@
 // | compaction                                | contextCompaction (no reason: Pi keeps none)  |
 // | `piarc.input` custom entry                | turn ID and any input data for the next user  |
 // |                                           | message, or the following manual compaction   |
+// | `piarc.reminder` custom message (with     | reminder (id: entry id)                       |
+// |   `reminders`, capability `context`)      |                                               |
 // | everything else                           | nothing                                       |
 //
 // A tool call without a result was interrupted; one in an aborted response never ran and is
@@ -23,6 +25,7 @@ import type { SessionEntry } from '@earendil-works/pi-coding-agent';
 import type { HistoryItem, HistoryWindow, ItemStatus } from '@piarc/protocol';
 
 import { isInterruptionMarker } from '../harness/interruption.js';
+import { REMINDER_ENTRY, reminderRefs } from '../harness/reminders.js';
 import { DECLINED_ENTRY } from '../harness/policy.js';
 import { modeItem, modeRecord } from './permission-mode.js';
 import { INPUT_ENTRY, parseInputRecord, type UserInput } from './input.js';
@@ -55,6 +58,7 @@ interface InputRecord {
 export function projectHistory(
   branch: readonly SessionEntry[],
   toCanonical: (tool: string) => string,
+  reminders = false,
 ): HistoryItem[] {
   const results = new Map<string, ToolResult>();
   const declined = new Set<string>();
@@ -94,6 +98,25 @@ export function projectHistory(
         entryId: entry.id,
         turnId: record.turnId ?? entry.id,
         item: modeItem(entry.id, record.mode),
+      });
+      continue;
+    }
+    if (
+      reminders &&
+      entry.type === 'custom_message' &&
+      entry.customType === REMINDER_ENTRY &&
+      typeof entry.content === 'string'
+    ) {
+      items.push({
+        entryId: entry.id,
+        turnId: currentTurn ?? entry.id,
+        item: {
+          type: 'reminder',
+          itemId: entry.id,
+          status: 'completed',
+          reminders: reminderRefs(entry.details),
+          text: entry.content.toWellFormed(),
+        },
       });
       continue;
     }

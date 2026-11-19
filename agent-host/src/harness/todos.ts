@@ -173,7 +173,11 @@ export function todoWatch(
       if (!todos.some((todo) => todo.status !== 'completed')) return;
       const rounds = roundsSinceUpdate(branch, canonical);
       if (rounds >= TODO_REMINDER_ROUNDS) {
-        reminders.enqueue(TODO_REMINDER, staleListNotice(todos, rounds));
+        reminders.enqueue(TODO_REMINDER, {
+          type: 'todoStale',
+          source: 'TodoWrite',
+          text: staleListNotice(todos, rounds),
+        });
       }
     });
   };

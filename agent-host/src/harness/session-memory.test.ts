@@ -6,6 +6,7 @@ import { CoreBridge } from '../runtime/core-bridge.js';
 import { profileWithOverrides } from '../tools/profile.js';
 import { memoryReader, type ReadMemory } from './memory-io.js';
 import { anthropicMemoryPayload } from './memory-wire.js';
+import { reminderRecords, Reminders } from './reminders.js';
 import { SessionMemory } from './session-memory.js';
 
 const cwd = path.resolve('example');
@@ -24,8 +25,15 @@ interface Started {
 
 function harness(manager: SessionManager, read?: ReadMemory) {
   const profile = profileWithOverrides({ Read: { name: 'view_file' } });
-  const memory = new SessionMemory(manager, cwd, profile, read, (name) =>
-    name === 'view_file' ? 'Read' : name,
+  // The reminders extension delivers what memory queues (T27); here the test does.
+  const reminders = new Reminders();
+  const memory = new SessionMemory(
+    manager,
+    cwd,
+    profile,
+    read,
+    (name) => (name === 'view_file' ? 'Read' : name),
+    reminders,
   );
   const hooks = new Map<string, (event: unknown, ctx: object) => Promise<unknown>>();
   const messages: Notice[] = [];
@@ -59,13 +67,22 @@ function harness(manager: SessionManager, read?: ReadMemory) {
           hiddenTools: ['PowerShell'],
         },
       })) as Started;
-      if (result.message) deliver(result.message);
-      return result;
+      const message = reminders.take();
+      if (message) deliver(message);
+      return message === undefined ? result : { ...result, message };
     },
     wire: (payload: unknown, api = 'anthropic-messages') =>
       trigger('before_provider_request', { payload }, { model: { api } }),
-    tool: (name: string, id: string, file: string, isError = false) =>
-      trigger('tool_result', { toolName: name, toolCallId: id, input: { path: file }, isError }),
+    tool: async (name: string, id: string, file: string, isError = false) => {
+      await trigger('tool_result', {
+        toolName: name,
+        toolCallId: id,
+        input: { path: file },
+        isError,
+      });
+      const message = reminders.take();
+      if (message) deliver(message);
+    },
   };
 }
 
@@ -143,7 +160,10 @@ describe('session memory', () => {
     ]);
     expect(read).toHaveBeenCalledTimes(2);
     expect(session.messages.map((m) => m.content)).toEqual([
-      `[PiArc memory]\n\nSource: ${nested}\nNested conventions.`,
+      `[PiArc reminder]\n\nSource: ${nested}\nNested conventions.`,
+    ]);
+    expect(reminderRecords(session.messages[0]?.details)).toMatchObject([
+      { type: 'memoryLazyLoad', source: nested, category: 'memory' },
     ]);
     await expect(harness(manager, read).start()).resolves.not.toHaveProperty('message');
   });
@@ -194,7 +214,10 @@ describe('session memory', () => {
     await session.tool('Edit', 'c', 'src/other.ts');
     const rules = session.messages.filter((m) => m.content.includes('TypeScript rule.'));
     expect(rules).toHaveLength(1);
-    expect(rules[0]?.content).toContain('[PiArc memory]');
+    expect(rules[0]?.content).toContain('[PiArc reminder]');
+    expect(reminderRecords(rules[0]?.details)).toMatchObject([
+      { type: 'rulesMatched', source: rule, category: 'memory' },
+    ]);
     expect(rules[0]?.content).toContain(`Source: ${rule}`);
     // Once every rule is loaded, file accesses in known directories do not ask Core.
     const asked = calls.length;

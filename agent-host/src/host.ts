@@ -39,6 +39,7 @@ export const HOST_CAPABILITIES: readonly string[] = [
   'planMode',
   'todo',
   'ask',
+  'context',
 ];
 
 /** Exit codes, for Core's log and restart decisions. */
@@ -292,7 +293,29 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     const fields = paramsObject('session/compact', params);
     const sessionId = stringField('session/compact', fields, 'sessionId');
     const requestId = stringField('session/compact', fields, 'requestId');
-    return (await sessions('session/compact')).compact(sessionId, requestId);
+    const instructions = optionalString('session/compact', fields, 'instructions');
+    return (await sessions('session/compact')).compact(sessionId, requestId, instructions);
+  });
+  connection.handle('session/getContextUsage', async (params) => {
+    const method = 'session/getContextUsage';
+    const sessionId = stringField(method, paramsObject(method, params), 'sessionId');
+    return (await sessions(method)).harness(sessionId).contextUsage();
+  });
+  connection.handle('session/remind', async (params) => {
+    const method = 'session/remind';
+    const fields = paramsObject(method, params);
+    const sessionId = stringField(method, fields, 'sessionId');
+    if (fields.type !== 'backgroundTask') {
+      throw new AhpError('invalidParams', `${method}: type must be backgroundTask`, {
+        details: { member: 'type' },
+      });
+    }
+    (await sessions(method)).harness(sessionId).remind({
+      type: 'backgroundTask',
+      source: stringField(method, fields, 'source'),
+      text: stringField(method, fields, 'text'),
+    });
+    return {};
   });
   for (const [method, kind] of [
     ['session/steer', 'steer'],
@@ -410,6 +433,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
           planMode: welcome.enabled.includes('planMode'),
           todo: welcome.enabled.includes('todo'),
           ask: welcome.enabled.includes('ask'),
+          context: welcome.enabled.includes('context'),
         },
         log,
         sinkFor: (sessionId) => ({

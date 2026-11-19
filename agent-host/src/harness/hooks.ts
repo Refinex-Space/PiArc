@@ -6,26 +6,28 @@
 // | ----------------------- | --------------------- | --------------------------------------------- |
 // | `session_start`         | SessionStart          | context for the next run (not awaited)        |
 // | `session_shutdown`      | SessionEnd            | nothing (awaited, Core bounds it)             |
-// | `tool_result` (success) | PostToolUse           | replaced output, feedback and context appended |
-// | `tool_result` (error)   | PostToolUseFailure    | feedback and context appended                 |
+// | `tool_result` (success) | PostToolUse           | replaced output and feedback; context         |
+// | `tool_result` (error)   | PostToolUseFailure    | feedback; context                             |
 // | `agent_before_settle`   | Stop                  | continue with the reason, at most 8 in a row  |
-// | `session_before_compact`| PreCompact            | cancel, or summary instructions               |
-// | `session_compact`       | PostCompact, then SessionStart (`compact`) | context for the next run |
+// | `session_before_compact`| PreCompact            | cancel, or summary instructions (compaction.ts)|
+// | `session_compact`       | PostCompact, then SessionStart (`compact`) (compaction.ts)  |
 //
-// A failed `hooks/run` (Core gone, unknown method) changes nothing: the action goes on.
-import { compact } from '@earendil-works/pi-coding-agent';
+// Context hooks add (`additionalContext`, plain stdout) is a `hookContext` reminder (T27,
+// ADR-0043): delivered with the next run or after the round's tool results, never inside a
+// tool result. A failed `hooks/run` (Core gone, unknown method) changes nothing: the action goes
+// on.
 import { DEFAULT_MAX_FRAME_BYTES } from '@piarc/protocol';
-import type { AgentSession, ExtensionAPI, ExtensionFactory } from '@earendil-works/pi-coding-agent';
+import type { ExtensionFactory } from '@earendil-works/pi-coding-agent';
 
 import { describeError } from '../protocol/errors.js';
 import { wellFormedJson } from '../protocol/well-formed.js';
 import type { CoreBridge } from '../runtime/core-bridge.js';
 import { isObject } from '../runtime/items.js';
+import { hookContextNotice } from './prompts/notices.js';
+import { reminderMessage, type Reminders } from './reminders.js';
 
-/** Custom message type of hook context in the conversation. */
-export const HOOK_CONTEXT = 'piarc.hookContext';
-
-/** First line of every hook context message (Anthropic wire merges it with its user message). */
+/** First line of a hook's feedback in a tool result (before T27 also of hook context
+ * messages, which older sessions still hold). */
 export const HOOK_MARKER = '[PiArc hook context]';
 
 type HostEvent =
@@ -149,8 +151,8 @@ export interface SessionHooksOptions {
   readonly canonical: (tool: string) => string;
   /** Pi's session file, once the session exists. */
   readonly transcript: () => string | undefined;
-  /** The session, once it exists (compaction with instructions needs its stream function). */
-  readonly session: () => AgentSession | undefined;
+  /** The session's reminder channel: hook context goes there. */
+  readonly reminders: Reminders;
   /** Resolves a file tool's `path` the way the preflight does. */
   readonly hookInput: (tool: string, input: Record<string, unknown>) => Record<string, unknown>;
   readonly log: (line: string) => void;
@@ -160,14 +162,11 @@ export class SessionHooks {
   readonly #o: SessionHooksOptions;
   /** `PreToolUse` context and stops, by tool call id. */
   readonly notes = new Map<string, HookNote>();
-  /** Context for the next run. */
-  #pending: string[] = [];
   #starting: Promise<void> = Promise.resolve();
   readonly #startedAt = new Map<string, number>();
   /** `Stop` continuations in a row; a tool call resets them. */
   #continuations = 0;
   #active = false;
-  #pi: ExtensionAPI | undefined;
 
   constructor(options: SessionHooksOptions) {
     this.#o = options;
@@ -203,15 +202,32 @@ export class SessionHooks {
     }
   }
 
-  /** `UserPromptSubmit` context of an input: with the next run, or now during a run. */
-  addContext(text: string | undefined, running = false): void {
+  /** Context a hook added, for the model's next request. */
+  #remind(event: string, text: string | undefined): void {
     if (text === undefined || text.length === 0) return;
-    if (running && this.#pi !== undefined) {
-      // Pi 1.5.2 appends it after the current step's tool results, before the next request.
-      this.#pi.sendMessage(message(text), { triggerTurn: false });
-      return;
-    }
-    this.#pending.push(text);
+    this.#o.reminders.enqueue(this.#o.reminders.uniqueKey(`hook:${event}`), {
+      type: 'hookContext',
+      source: event,
+      text: hookContextNotice(event, text),
+    });
+  }
+
+  /** `UserPromptSubmit` context of an input: with the next run, or after the current round's
+   * tool results during a run. */
+  addContext(text: string | undefined): void {
+    this.#remind('UserPromptSubmit', text);
+  }
+
+  /** `PreCompact`: Core's merged answer (a block, or summary instructions). */
+  async preCompact(trigger: 'manual' | 'auto', instructions: string | undefined) {
+    return this.run('preCompact', { trigger, custom_instructions: instructions ?? null });
+  }
+
+  /** `PostCompact` with the summary, then `SessionStart` (`compact`) whose context is queued. */
+  async postCompact(trigger: 'manual' | 'auto', summary: string): Promise<void> {
+    await this.run('postCompact', { trigger, compact_summary: summary });
+    const start = await this.run('sessionStart', { source: 'compact' });
+    this.#remind('SessionStart', start.context);
   }
 
   #toolInput(tool: string, input: Record<string, unknown>): Record<string, unknown> {
@@ -223,24 +239,21 @@ export class SessionHooks {
   }
 
   extension: ExtensionFactory = (pi) => {
-    this.#pi = pi;
     pi.on('session_start', (_event, ctx) => {
       // Not awaited: a slow hook must not hold up opening the session; the first run waits.
       this.#starting = this.run('sessionStart', {
         source: this.#o.source,
         ...(ctx.model === undefined ? {} : { model: ctx.model.id }),
       }).then((result) => {
-        if (result.context !== undefined) this.#pending.push(result.context);
+        this.#remind('SessionStart', result.context);
       });
     });
 
     pi.on('before_agent_start', async () => {
+      // The reminders extension, registered after this one, delivers what is queued.
       await this.#starting;
       this.#continuations = 0;
       this.#active = false;
-      const texts = this.#pending;
-      this.#pending = [];
-      return texts.length === 0 ? undefined : { message: message(texts.join('\n\n')) };
     });
 
     pi.on('tool_execution_start', (event) => {
@@ -277,13 +290,12 @@ export class SessionHooks {
         content = outputContent(result.updatedOutput);
         changed = true;
       }
-      const added = [note?.context, result.feedback, result.context].filter(
-        (text): text is string => text !== undefined && text.length > 0,
-      );
-      if (added.length > 0) {
-        content = [...content, { type: 'text', text: `${HOOK_MARKER}\n${added.join('\n\n')}` }];
+      if (result.feedback !== undefined && result.feedback.length > 0) {
+        content = [...content, { type: 'text', text: `${HOOK_MARKER}\n${result.feedback}` }];
         changed = true;
       }
+      this.#remind('PreToolUse', note?.context);
+      this.#remind(event.isError ? 'PostToolUseFailure' : 'PostToolUse', result.context);
       if (note?.stop !== undefined || result.stop !== undefined) {
         this.#o.log(`a hook stopped the turn after ${event.toolCallId}`);
         ctx.abort();
@@ -310,67 +322,22 @@ export class SessionHooks {
       if (reasons.length === 0) return undefined;
       this.#continuations += 1;
       this.#active = true;
+      const reminder = reminderMessage([
+        {
+          key: this.#o.reminders.uniqueKey('hook:Stop'),
+          type: 'hookContext',
+          source: 'Stop',
+          text: hookContextNotice('Stop', reasons.join('\n\n')),
+        },
+      ]);
       return {
-        entries: [
-          {
-            type: 'custom_message' as const,
-            customType: HOOK_CONTEXT,
-            content: `${HOOK_MARKER}\nA Stop hook asked to continue:\n${reasons.join('\n\n')}`,
-            display: false,
-          },
-        ],
+        entries: [{ type: 'custom_message' as const, ...reminder }],
         continue: true,
       };
-    });
-
-    pi.on('session_before_compact', async (event, ctx) => {
-      const trigger = event.reason === 'manual' ? 'manual' : 'auto';
-      const result = await this.run('preCompact', {
-        trigger,
-        custom_instructions: event.customInstructions ?? null,
-      });
-      if (result.block !== undefined) return { cancel: true };
-      if (result.instructions === undefined) return undefined;
-      const session = this.#o.session();
-      const model = ctx.model;
-      if (session === undefined || model === undefined) return undefined;
-      // Pi does not read instructions back from this event: summarize here with them.
-      const instructions = [event.customInstructions, result.instructions]
-        .filter((t): t is string => t !== undefined && t.length > 0)
-        .join('\n\n');
-      const compaction = await compact(
-        event.preparation,
-        model,
-        undefined,
-        undefined,
-        instructions,
-        event.signal,
-        session.thinkingLevel,
-        session.agent.streamFunction,
-      );
-      return { compaction };
-    });
-
-    pi.on('session_compact', async (event) => {
-      const trigger = event.reason === 'manual' ? 'manual' : 'auto';
-      await this.run('postCompact', {
-        trigger,
-        compact_summary: event.compactionEntry.summary,
-      });
-      const start = await this.run('sessionStart', { source: 'compact' });
-      if (start.context !== undefined) this.#pending.push(start.context);
     });
 
     pi.on('session_shutdown', async () => {
       await this.run('sessionEnd', { reason: 'other' });
     });
-  };
-}
-
-function message(text: string) {
-  return {
-    customType: HOOK_CONTEXT,
-    display: false,
-    content: `${HOOK_MARKER}\n${text}`,
   };
 }

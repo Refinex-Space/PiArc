@@ -9,7 +9,7 @@ import { DEFAULT_PROFILE } from '../tools/profile.js';
 import { anthropicMemoryPayload } from './memory-wire.js';
 import { currentPlan, PlanMode, PLAN_ON, planOff } from './plan-mode.js';
 import { askResultText, parseAskResult } from './questions.js';
-import { REMINDER_ENTRY, REMINDER_MARKER, Reminders } from './reminders.js';
+import { REMINDER_ENTRY, REMINDER_MARKER, reminderRecords, Reminders } from './reminders.js';
 import { harnessState, SessionHarness } from './session-harness.js';
 import {
   createTodoWriteTool,
@@ -79,43 +79,69 @@ const LIST = {
 };
 
 describe('reminders', () => {
+  const note = (text: string) => ({ type: 'planMode' as const, source: 'test', text });
+
   it('replaces by key, withdraws and delivers one marked message', () => {
     const reminders = new Reminders();
     let delivered = 0;
-    reminders.enqueue('mode', 'first');
-    reminders.enqueue('todo', 'list', () => delivered++);
-    reminders.enqueue('mode', 'second');
-    reminders.enqueue('gone', 'x');
+    reminders.enqueue('mode', note('first'));
+    reminders.enqueue('todo', { type: 'todoStale', source: 'TodoWrite', text: 'list' }, () => {
+      delivered++;
+    });
+    reminders.enqueue('mode', note('second'));
+    reminders.enqueue('gone', note('x'));
     reminders.withdraw('gone');
     const message = reminders.take();
     expect(message).toEqual({
       customType: REMINDER_ENTRY,
       display: false,
       content: `${REMINDER_MARKER}\n\nlist\n\nsecond`,
-      details: { keys: ['todo', 'mode'] },
+      details: {
+        keys: ['todo', 'mode'],
+        reminders: [
+          {
+            key: 'todo',
+            type: 'todoStale',
+            source: 'TodoWrite',
+            chars: 4,
+            category: 'conversation',
+          },
+          { key: 'mode', type: 'planMode', source: 'test', chars: 6, category: 'conversation' },
+        ],
+      },
     });
+    expect(reminderRecords(message?.details)).toHaveLength(2);
     expect(delivered).toBe(1);
     expect(reminders.take()).toBeUndefined();
   });
 
   it('delivers at the start of a run and after a round of tool calls only', async () => {
     const reminders = new Reminders();
-    const handlers = new Map<string, (event: unknown) => unknown>();
+    const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
     const sent: unknown[] = [];
+    let collected = 0;
+    reminders.addCollector(() => {
+      collected++;
+      return Promise.resolve();
+    });
     void reminders.extension({
-      on: (name: string, handler: (event: unknown) => unknown) => handlers.set(name, handler),
+      on: (name: string, handler: (event: unknown, ctx: unknown) => unknown) =>
+        handlers.set(name, handler),
       sendMessage: (message: unknown, options: unknown) => sent.push([message, options]),
     } as unknown as ExtensionAPI);
-    reminders.enqueue('mode', PLAN_ON);
-    await handlers.get('turn_end')?.({ toolResults: [] });
+    reminders.enqueue('mode', note(PLAN_ON));
+    await handlers.get('turn_end')?.({ toolResults: [] }, {});
     expect(sent).toEqual([]);
-    await handlers.get('turn_end')?.({ toolResults: [{}] });
+    expect(collected).toBe(0);
+    await handlers.get('turn_end')?.({ toolResults: [{}] }, {});
     expect(sent).toHaveLength(1);
+    expect(collected).toBe(1);
     expect(sent[0]).toMatchObject([{ customType: REMINDER_ENTRY }, { triggerTurn: false }]);
-    reminders.enqueue('mode', planOff('default'));
-    expect(await handlers.get('before_agent_start')?.({})).toMatchObject({
+    reminders.enqueue('mode', note(planOff('default')));
+    expect(await handlers.get('before_agent_start')?.({}, {})).toMatchObject({
       message: { content: `${REMINDER_MARKER}\n\n${planOff('default')}` },
     });
+    expect(collected).toBe(2);
   });
 
   it('joins the adjacent user turn on the Anthropic wire', () => {
@@ -311,6 +337,11 @@ describe('task list', () => {
       canonical: same,
       activeTurn: () => undefined,
       core: undefined,
+      cwd: '/w',
+      session: () => undefined,
+      io: undefined,
+      appended: () => undefined,
+      log: () => undefined,
     });
     harness.onEvent({
       type: 'tool_execution_end',

@@ -3,6 +3,7 @@
 // same way in both (architecture section 5.3).
 import type {
   CommandExecutionInfo,
+  AutoCompactStop,
   CompactionReason,
   FileDiff,
   InputAttachment,
@@ -161,6 +162,7 @@ export function contextCompaction(
     tokensBefore?: number;
     tokensAfter?: number;
     errorMessage?: string;
+    autoCompactStopped?: AutoCompactStop;
   },
 ): Item {
   return {
@@ -173,6 +175,9 @@ export function contextCompaction(
     ...(fields.errorMessage === undefined
       ? {}
       : { errorMessage: fields.errorMessage.toWellFormed() }),
+    ...(fields.autoCompactStopped === undefined
+      ? {}
+      : { autoCompactStopped: fields.autoCompactStopped }),
   };
 }
 

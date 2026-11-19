@@ -36,3 +36,63 @@ export function staleListNotice(todos: readonly TodoItem[], rounds: number): str
       'not for the user.',
   ].join('\n');
 }
+
+/** Context a hook added (T27); a Stop hook's reasons ask the model to go on. */
+export function hookContextNotice(event: string, text: string): string {
+  return event === 'Stop'
+    ? `A Stop hook asked to continue:\n${text}`
+    : `Context from a ${event} hook:\n${text}`;
+}
+
+/** A file the session read or wrote changed outside it (T27). */
+export function fileChangedNotice(path: string, change: 'modified' | 'deleted'): string {
+  return change === 'deleted'
+    ? `${path} was deleted outside this session after you last read or wrote it.`
+    : `${path} was changed outside this session after you last read or wrote it. ` +
+        'Read it again before you rely on its content or edit it.';
+}
+
+/** A background task reported back (T27 entry point, T32 source). */
+export function backgroundTaskNotice(source: string, text: string): string {
+  return `Background task ${source}:\n${text}`;
+}
+
+/** The first section of what a compaction gives back. */
+export const RESTORE_INTRO =
+  'The conversation above was compacted into a summary. The state below was read again ' +
+  'after the summary was written; it is current.';
+
+/** The approved plan, given back after a compaction. */
+export function restoredPlan(plan: string, mode: PermissionMode): string {
+  return `The plan the user approved (the permission mode then became ${MODE_NAMES[mode]}):\n${plan}`;
+}
+
+/** The task list, given back after a compaction. */
+export function restoredTodos(todos: readonly TodoItem[]): string {
+  return ['The task list as it stands:', ...todos.map((t) => `- [${label(t)}] ${t.content}`)].join(
+    '\n',
+  );
+}
+
+/** A skill's instructions, given back after a compaction. */
+export function restoredSkill(name: string, body: string): string {
+  return `Instructions of the skill "${name}", invoked earlier in this session:\n${body}`;
+}
+
+/** A recently used file, given back after a compaction. */
+export function restoredFile(path: string, content: string): string {
+  return `Current content of ${path}, a file used recently in this session:\n${content}`;
+}
+
+/** Recently used files left out to keep within the limits. */
+export function omittedFiles(paths: readonly string[]): string {
+  return [
+    'Also used recently, left out to save context (read them again if you need them):',
+    ...paths.map((path) => `- ${path}`),
+  ].join('\n');
+}
+
+/** What a text cut to its limit says about the rest. */
+export function cutNote(tokens: number): string {
+  return `[about ${String(tokens)} more tokens left out]`;
+}
