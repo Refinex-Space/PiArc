@@ -189,12 +189,16 @@ impl Scope {
     ///
     /// # Errors
     ///
-    /// A component cannot be inspected (for example a symlink loop).
+    /// A component cannot be inspected (for example a symlink loop); on Windows, `EINVAL` for a
+    /// name Windows treats as a device or trims (see [`windows_name_problem`]).
     pub fn locate(&self, requested: &str) -> Result<PathBuf> {
         // Joined onto the cwd's usual spelling: below a `\\?\` prefix Windows would not treat
         // `/` as a separator.
-        let joined = PathBuf::from(display(&self.cwd)).join(requested);
-        canonicalize_lenient(&normalize(&joined), MAX_SYMLINK_HOPS)
+        let joined = normalize(&PathBuf::from(display(&self.cwd)).join(requested));
+        if cfg!(windows) {
+            refuse_windows_names(&joined)?;
+        }
+        canonicalize_lenient(&joined, MAX_SYMLINK_HOPS)
     }
 
     /// Resolves `requested` to a canonical path inside the root or an added directory (the
@@ -369,6 +373,53 @@ fn normalize(path: &Path) -> PathBuf {
 /// Canonicalizes `path` whether or not it exists: the existing part is resolved by the
 /// operating system, a dangling symlink is followed through its target, and missing trailing
 /// components are appended unchanged. `path` must be absolute and normalized.
+/// File tools open names relative to directory handles, below Win32's name rules: there a
+/// reserved device name becomes a real file that Windows programs, and later lookups by path,
+/// cannot open, and a trailing period or space is kept. Such names are refused up front, as Git
+/// for Windows does (`core.protectNTFS`).
+fn refuse_windows_names(path: &Path) -> Result<()> {
+    for part in path.components() {
+        if let Component::Normal(name) = part
+            && let Some(problem) = windows_name_problem(&name.to_string_lossy())
+        {
+            return Err(Error::coded(
+                path,
+                "EINVAL",
+                &format!("{problem}; choose another name"),
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Why Windows cannot use `name` as an ordinary file name: a device name (`CON`, `NUL`,
+/// `COM1`, ... with or without an extension) or a trailing period or space.
+fn windows_name_problem(name: &str) -> Option<String> {
+    if name.ends_with(['.', ' ']) {
+        return Some(format!(
+            "Windows drops the trailing period or space of `{name}`"
+        ));
+    }
+    let stem = name
+        .split('.')
+        .next()
+        .unwrap_or(name)
+        .trim_end_matches(' ')
+        .to_uppercase();
+    let mut chars = stem.chars();
+    let prefix: String = chars.by_ref().take(3).collect();
+    let number = chars.next();
+    let numbered = matches!(prefix.as_str(), "COM" | "LPT")
+        && chars.next().is_none()
+        && number
+            .is_some_and(|d| d.is_ascii_digit() || matches!(d, '\u{b9}' | '\u{b2}' | '\u{b3}'));
+    let device = matches!(
+        stem.as_str(),
+        "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$"
+    );
+    (numbered || device).then(|| format!("`{name}` is a reserved device name on Windows"))
+}
+
 fn canonicalize_lenient(path: &Path, hops: u32) -> Result<PathBuf> {
     match std::fs::canonicalize(path) {
         Ok(canonical) => return Ok(canonical),
@@ -606,5 +657,44 @@ mod tests {
         tree.dir("other");
         let error = Scope::new(&tree.path("ws"), &tree.path("other")).expect_err("outside");
         assert!(matches!(error, Error::OutsideWorkspace { .. }), "{error}");
+    }
+
+    /// W1: Windows opens these names as devices or trims them, so a file created under such a
+    /// name through a directory handle cannot be read back by path (or opened by most programs).
+    #[cfg(windows)]
+    #[test]
+    fn windows_reserved_and_trimmed_names_are_refused() {
+        let tree = TempTree::new("scope-reserved");
+        tree.dir("ws");
+        let scope = Scope::new(&tree.path("ws"), &tree.path("ws")).expect("scope");
+        for name in [
+            "CON",
+            "aux.txt",
+            "sub/Com1.log",
+            "nul.tar.gz",
+            "lpt9",
+            "COM\u{b9}",
+            "CONIN$",
+            "CON.",
+            "note.txt ",
+            "dir./a.txt",
+        ] {
+            let error = scope.locate(name).expect_err(name);
+            assert!(
+                matches!(&error, Error::Io { code: "EINVAL", .. }),
+                "{name}: {error}"
+            );
+            assert!(error.to_string().contains("Windows"), "{name}: {error}");
+        }
+        for name in [
+            "console.txt",
+            "CONx",
+            "a.CON",
+            "nullable",
+            "LPT10",
+            "a b/c.txt",
+        ] {
+            scope.locate(name).unwrap_or_else(|e| panic!("{name}: {e}"));
+        }
     }
 }

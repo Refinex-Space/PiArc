@@ -1457,7 +1457,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | PTY | Unix PTY | ConPTY（用系统自带的，不随附 conpty.dll；程序退出由单独的等待线程报告；启动前清除继承的"忽略 Ctrl+C"状态，W0） | piarc-term | M3 |
 | 凭据主密钥 | 钥匙串 | 凭据管理器（保险箱方案避开了单条 2,560 字节上限） | piarc-secrets | M1 |
 | 沙箱 | Seatbelt + 网络代理 | 第一版不提供（需求 D7） | piarc-sandbox | M4 |
-| 路径 | `/`；默认卷大小写不敏感 | `\` 与盘符、UNC、超过 260 字符的长路径、保留文件名（`CON`、`NUL` 等）；大小写不敏感 | piarc-fs | M1 |
+| 路径 | `/`；默认卷大小写不敏感 | `\` 与盘符、UNC、超过 260 字符的长路径、保留文件名（`CON`、`NUL` 等）；大小写不敏感。文件工具拒绝保留设备名与以点或空格结尾的名字（W1） | piarc-fs | M1 |
 | 换行与编码 | LF 为主 | CRLF 常见（保真写入已覆盖）；子进程控制台使用 UTF-8 | piarc-fs、piarc-exec | M1 |
 | 文件监听 | FSEvents | ReadDirectoryChangesW（经 notify 封装） | piarc-fs | M2 |
 | 数据目录 | `~/Library/Application Support/PiArc/` | `%LOCALAPPDATA%\PiArc\`（第 9.1 节） | 主进程、Core | M1 |
