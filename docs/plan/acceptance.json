@@ -2435,8 +2435,8 @@
       "id": "T22-A11",
       "task": "T22",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify：All 15 steps passed。完整 L2 60 项在 macOS 上 59 通过、1 个 Windows 专用项按平台跳过；T22 的 10 项全部通过，能力覆盖 MISSING 0。日志 tmp/evidence/T22/verify.log。"
     },
     {
       "id": "T23-A01",
