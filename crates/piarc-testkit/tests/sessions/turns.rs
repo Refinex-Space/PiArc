@@ -312,3 +312,61 @@ async fn a_lost_notification_is_backfilled_and_the_client_sees_every_one_in_orde
     );
     shutdown(core).await;
 }
+
+/// I19: measure a real delegated read following a burst on the same AHP connection.
+/// Report the stat-to-next-read interval (including the stat round trip); scheduling and
+/// host speed vary, so the assertion is completion and data delivery, not a fixed latency.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_read_completes_after_a_notification_burst() {
+    use std::time::Instant;
+    #[derive(Default)]
+    struct Arrivals(Mutex<Vec<(String, Instant)>>);
+    impl ToolIoObserver for Arrivals {
+        fn before(&self, _: &str, method: &str, call: Option<&str>) -> BoxFuture<'static, ()> {
+            if call == Some("read") && method.starts_with("fs/") {
+                self.0
+                    .lock()
+                    .expect("timestamps")
+                    .push((method.to_owned(), Instant::now()));
+            }
+            Box::pin(async {})
+        }
+    }
+    let scenario = serde_json::json!({"id":"notify-burst","steps":[
+        {"text":"a".repeat(2048),"chunk_chars":1,"tool_calls":[{"id":"read","name":"Read","input":{"path":"note.txt"}}]},
+        {"text":"Done."}
+    ]});
+    let scenario = piarc_testkit::Scenario::from_json_str("notify-burst", &scenario.to_string())
+        .expect("scenario");
+    let env = Env::with_scenario("notify burst", Some(scenario)).await;
+    std::fs::write(env.ws.join("note.txt"), "R2 burst fixture").expect("fixture");
+    let arrivals = Arc::new(Arrivals::default());
+    let mut config = env.config(&[]);
+    config.tool_observer = Some(Arc::clone(&arrivals) as _);
+    let (core, events) = env.start(config);
+    let id = open_session(&core, &env).await;
+    let started = Instant::now();
+    let turn = prompt(&core, &id, &prompt_text("Read the note.", "notify-burst")).await;
+    assert_eq!(
+        events.turn_completed(&id, &turn).await["status"],
+        "completed"
+    );
+    let deltas = events.of(&id, "item/agentMessage/delta").len();
+    assert!(deltas > 0);
+    assert!(
+        env.requests("notify-burst")[1]
+            .body
+            .contains("R2 burst fixture")
+    );
+    {
+        let times = arrivals.0.lock().expect("timestamps");
+        let stat = times.iter().find(|(m, _)| m == "fs/stat").expect("stat").1;
+        let read = times.iter().find(|(m, _)| m == "fs/read").expect("read").1;
+        println!(
+            "I19 wire deltas=2048 delivered deltas={deltas} prompt-to-stat={:?} stat-to-read={:?}",
+            stat - started,
+            read - stat
+        );
+    }
+    shutdown(core).await;
+}

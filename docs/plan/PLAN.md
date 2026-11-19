@@ -313,7 +313,7 @@ R2（macOS），基线 `d57c72e`，`npm run verify` 15/15。
 - [x] A01 双协议设置、Manual 审批与夹具红转绿
 - [x] A02 真实服务商的结果或限制
 - [x] A03 L2、能力清单与 M1 门禁
-- [ ] A04 M1 目标、能力与 L4 映射
+- [x] A04 M1 目标、能力与 L4 映射已取证；完整关闭取决于 ADR
 - [x] A05 T13–T22 验收状态
 - [x] A06 四个独立只读审查的输入与原始输出
 - [ ] A07 逐条核实并处理发现
@@ -346,7 +346,7 @@ R2（macOS），基线 `d57c72e`，`npm run verify` 15/15。
 | I16 | T06 | Pi 1.5.1 起 `cacheWarming` 默认为 `"idle"`：会话空闲时最多 30 分钟内自动发请求保温提示缓存（模型配置了 `promptCache` 才会触发），会产生模型费用；Agent Host 目前沿用 Pi 默认值 | T21 生成 `pi/settings.json` 时显式设定，T27 的用量与成本界面说明这类请求；默认值请用户在 R2 确认；T21 已落地：Core 为缺省配置写入 off 并保留显式值，R2 可复核默认选择 |
 | I17 | T06 | `piarc-exec` 的 `TokioProcessSpawner` 只终止直接子进程：Agent Host 被杀时，它启动的子进程（bash 命令、MCP server）不随之结束；架构第 5.6 节要求的进程组（macOS）与 Job Object（`KILL_ON_JOB_CLOSE`，Windows）尚未实现。需要 `killpg` 或 Win32 API，而 `unsafe` 只允许在 sys 与 NAPI crate | 部分落地（T11）：`piarc_exec::ProcessTreeSpawner` 实现了进程组（nix 的 `killpg`）与 Job Object（`piarc-exec` 的 `job` 模块），沙箱命令已用它；T12、T17 的接入见 I33；**已落地（T17）**：Core 的全部命令改用 `ProcessTreeSpawner` |
 | I18 | T06 | Pi 1.5.2 中断一个回合后，下一次请求丢弃被中断的 assistant 消息，出现两条相邻的 user 消息（Anthropic API 会合并它们，严格 mock 的 `role_order` 拒绝）。PiArc 需要决定中断后的对话形态（例如像 Claude Code 那样补一条中断标记），S3/S9 的中断场景暂时关闭了 `role_order` | T14 定义中断后的 transcript 形态并恢复 `role_order`；T27 对齐压缩与中断标记；已落地（T14，ADR-0026）：中断后 Harness Kit 补写已中断的工具结果与 assistant 中断标记（`agent-host/src/harness/interruption.ts`），重新打开会话时同样收尾；S3、S9 的中断场景与 T14-A05 开着 `role_order`。steer 紧跟工具结果仍是相邻 user 消息（ADR-0026 后果一节），含 steer 的场景关闭 `role_order` |
-| I19 | T07 | 工具的 `fs/*`、`exec/*` 请求与会话通知共用 Agent Host 的 stdout：Core 的事件消费者停住、读取停在投递上时，后面的工具请求也读不到，工具随之等待（背压，不丢失）。T06 的慢读者测试因此改为用不存在的工具制造通知 | T14 的事件消费者持续取走事件，不在消费路径上做阻塞等待；R1 评估是否需要让请求帧绕开通知背压（例如单独的通道）；R1 决定：不新增独立的请求通道（改变 AHP 传输属变更型）；T14 的事件消费者持续取走事件、不在消费路径阻塞，R2 用 T14 的场景测通知洪峰下的工具 I/O 延迟，超标时再写 ADR；已落地（T14）：每次启动监管器配一个消费任务持续取走 `HostEvents`，会话 actor 不在处理路径上等待 Agent Host（`crates/piarc-core/src/sessions/workspace.rs`）；会话邮箱（1,024）满时消费任务等待，是有意的背压。R2 的测量仍待做 |
+| I19 | T07 | 工具的 `fs/*`、`exec/*` 请求与会话通知共用 Agent Host 的 stdout：Core 的事件消费者停住、读取停在投递上时，后面的工具请求也读不到，工具随之等待（背压，不丢失）。T06 的慢读者测试因此改为用不存在的工具制造通知 | T14 的事件消费者持续取走事件，不在消费路径上做阻塞等待；R1 评估是否需要让请求帧绕开通知背压（例如单独的通道）；R1 决定：不新增独立的请求通道（改变 AHP 传输属变更型）；T14 的事件消费者持续取走事件、不在消费路径阻塞，R2 用 T14 的场景测通知洪峰下的工具 I/O 延迟，超标时再写 ADR；已落地（T14）：每次启动监管器配一个消费任务持续取走 `HostEvents`，会话 actor 不在处理路径上等待 Agent Host（`crates/piarc-core/src/sessions/workspace.rs`）；会话邮箱（1,024）满时消费任务等待，是有意的背压。R2 实测 2,048 个 wire delta 后同连接 Read 返回夹具内容，Core 收到 fs/stat 到收到 fs/read 间隔 2.058 ms（单次，非预算）。W1 重测 Windows 背压 |
 | I20 | T07 | Pi 1.5.2 的 `createAgentSessionRuntime` 在会话创建时于 Agent Host 本进程 `existsSync(cwd)`（`assertSessionCwdExists`），是 Agent Host 对工作区路径唯一的直接访问（只读元数据，场景期间为 0） | T14 决定接受（写入架构）或由 Core 在 `session/create` 前检查；T39 的 Agent Host Seatbelt 配置允许对工作区的元数据读取；已落地（T14）：接受 Pi 的 `existsSync(cwd)`，Core 在 `session/create` 前规范化并确认 cwd 是工作区内已存在的目录（架构 7.4 节，`crates/piarc-core/src/sessions/mod.rs`） |
 | I21 | T07 | 委托工具不读 Pi 设置中的 `shellPath`、`shellCommandPrefix`（Bash）与 `images.autoResize`（Read），取默认值；命令环境是 Core 的白名单环境加 Pi 的会话变量，不含 Agent Host 内部的 `PI_*` 变量 | T17 接上 shell 相关设置（与 Git Bash 探测一起），T21 生成 Pi 设置时决定图片缩放并让 Read 读取；**已落地（T17）**：Bash 改为 PiArc 自写（ADR-0028），Windows 的 Git Bash 路径由 PiArc 设置 `shell.gitBashPath` 指定，Pi 的 `shellPath`、`shellCommandPrefix` 不再适用；命令环境改为登录 shell 环境去掉内部变量，不再传 Pi 的 `PI_*` 会话变量；T21 已接入 Pi 设置中的 images.autoResize，缺省 true |
 | I22 | T08 | D2（应用标识）尚未落实，`piarc-core::identity::APP_IDENTIFIER` 是占位值 `PiArc.pending-D2`，凭据库服务名 `PiArc.pending-D2.credential-vault` 由它生成。改成正式标识后，用占位标识存过凭据的构建找不到主密钥，保险箱返回 `masterKeyMissing` | 已落地（2026-11-15）：D2 定为域名 `piarc.cn`、应用标识 `cn.piarc.desktop`，`APP_IDENTIFIER` 已替换，T08-A12 通过。占位标识只用于未发布的开发构建，无需迁移；T12 用同一常量设置 bundle id 与 AppUserModelID |
@@ -407,8 +407,8 @@ R2（macOS），基线 `d57c72e`，`npm run verify` 15/15。
 | I77 | T17 | 登录 shell 的环境在每个 Core 第一次执行命令时解析（`$SHELL -i -l -c`，最多 10 s）：用户配置很重时第一条命令会多等这段时间；解析失败只记警告并退回 Core 的环境 | T44 的性能任务测启动后首条命令的耗时，必要时改为 Core 启动后后台预解析；设置诊断（T40）显示解析失败的原因 |
 | I78 | T17 | 语义退出码只认单个简单命令：`cd src && grep x f` 这类常见写法按退出码判失败（ADR-0028 第 1 条） | T23 用 tree-sitter-bash 的语法树判定最后执行的命令后细化 |
 | I79 | T18 | 信任决定（`decideProjectTrust`）由渲染进程发出、没有主进程的原生确认：渲染进程被注入时可以静默信任项目、启用其 hooks 与 MCP。审批卡（T20）同样在渲染进程作答；第 10.3 节只要求"总是允许"类规则的修改走原生确认 | T45 评估信任决定是否也走主进程原生确认（ADR-0029 备选方案） |
-| I80 | T18 | 信任变化只重启 Hub 路由表里已有的工作区：工作区刚打开、Agent Host 已启动但还没登记进路由表的极短窗口内做出的决定，不会让它重启（新进程启动时自己查信任，只有那一刻之前已经查过的进程会沿用旧答案） | T35（多窗口与并行会话）或 R2 评估先登记路由再启动 Agent Host |
-| I81 | T18 | `crates/piarc-core/src/runtime.rs` 已超过 1,000 行（T17 时 1,080 行，T18 增加会话元数据、客户端设置与信任重启的薄包装后约 1,150 行），超出 `coding-standards.md` 的单文件上限 | R2 评审时按领域拆分（例如会话层与状态的包装各成一个模块） |
+| I80 | T18 | 信任变化只重启 Hub 路由表里已有的工作区：工作区刚打开、Agent Host 已启动但还没登记进路由表的极短窗口内做出的决定，不会让它重启（新进程启动时自己查信任，只有那一刻之前已经查过的进程会沿用旧答案） | R2 核实 workspace actor 在路由登记前开始预热。T35 在多窗口验收中验证并消除这一窗口，重启须覆盖已开始预热的工作区 |
+| I81 | T18 | `crates/piarc-core/src/runtime.rs` 已超过 1,000 行（T17 时 1,080 行，T18 增加会话元数据、客户端设置与信任重启的薄包装后约 1,150 行），超出 `coding-standards.md` 的单文件上限 | R2 已拆分 runtime/state.rs 与 runtime/sessions.rs，runtime.rs 808 行（b426028） |
 
 ## 技术债
 

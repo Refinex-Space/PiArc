@@ -544,14 +544,7 @@ impl Driver<'_> {
             Action::Prompt(input) => self.input(input, Op::Prompt).await,
             Action::Steer(input) => self.input(input, Op::Steer).await,
             Action::FollowUp(input) => self.input(input, Op::FollowUp).await,
-            Action::Compact { session } => {
-                let accepted = self.op(session.as_deref(), Op::Compact).await?;
-                let turn = accepted["turnId"]
-                    .as_str()
-                    .ok_or_else(|| format!("no compaction turn was started: {accepted}"))?;
-                self.unlabeled_turns.push(turn.to_owned());
-                Ok(())
-            }
+            Action::Compact { session } => self.compact_session(session.as_deref()).await,
             Action::QueueEdit {
                 session,
                 item,
@@ -596,22 +589,7 @@ impl Driver<'_> {
                 .await
                 .map(drop),
             Action::Abort { session } => self.op(session.as_deref(), Op::Abort).await.map(drop),
-            Action::SetPrefs {
-                session,
-                title,
-                pinned,
-                archived,
-            } => self
-                .op(
-                    session.as_deref(),
-                    Op::Prefs(piarc_core::sessions::SessionPrefsChange {
-                        custom_title: title.clone().map(Some),
-                        pinned: *pinned,
-                        archived: *archived,
-                    }),
-                )
-                .await
-                .map(drop),
+            Action::SetPrefs(prefs) => self.set_prefs(prefs).await,
             Action::DeleteSession { session } => {
                 let id = self.session_id(session.as_deref())?;
                 call(
@@ -622,27 +600,9 @@ impl Driver<'_> {
                 .map(drop)
             }
             Action::CheckStoredSession { session, fields } => {
-                let id = self.session_id(session.as_deref())?;
-                let storage = self.core.storage().map_err(|e| e.to_string())?;
-                let record = storage
-                    .with(|db| db.session(&id))
-                    .map_err(|e| e.to_string())?
-                    .map_err(|e| e.to_string())?;
-                let actual = record.map_or(
-                    Value::Null,
-                    |r| json!({"title":r.title(),"pinned":r.pinned,"archived":r.archived}),
-                );
-                subset_mismatch(fields, &actual, "stored session").map_or(Ok(()), Err)
+                self.check_stored_session(session.as_deref(), fields)
             }
-            Action::CheckTrust { fields } => {
-                let service = self.core.trust().map_err(|e| e.to_string())?;
-                let view = service
-                    .view(&self.env.workspace)
-                    .await
-                    .map_err(|e| e.to_string())?;
-                let actual = serde_json::to_value(view).map_err(|e| e.to_string())?;
-                subset_mismatch(fields, &actual, "trust view").map_or(Ok(()), Err)
-            }
+            Action::CheckTrust { fields } => self.check_trust(fields).await,
             Action::Wait(wait) => self.wait_for_event(wait).await,
             Action::WriteFile { path, content } => write_file(&self.env.workspace, path, content),
             Action::RestartCore {} => self.restart().await,
@@ -656,6 +616,50 @@ impl Driver<'_> {
                 .map(drop)
             }
         }
+    }
+
+    async fn compact_session(&mut self, session: Option<&str>) -> Result<(), String> {
+        let accepted = self.op(session, Op::Compact).await?;
+        let turn = accepted["turnId"]
+            .as_str()
+            .ok_or_else(|| format!("no compaction turn was started: {accepted}"))?;
+        self.unlabeled_turns.push(turn.to_owned());
+        Ok(())
+    }
+
+    async fn set_prefs(&self, prefs: &super::format::PrefsAction) -> Result<(), String> {
+        let change = piarc_core::sessions::SessionPrefsChange {
+            custom_title: prefs.title.clone().map(Some),
+            pinned: prefs.pinned,
+            archived: prefs.archived,
+        };
+        self.op(prefs.session.as_deref(), Op::Prefs(change))
+            .await
+            .map(drop)
+    }
+
+    fn check_stored_session(&self, session: Option<&str>, fields: &Value) -> Result<(), String> {
+        let id = self.session_id(session)?;
+        let storage = self.core.storage().map_err(|e| e.to_string())?;
+        let record = storage
+            .with(|db| db.session(&id))
+            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())?;
+        let actual = record.map_or(
+            Value::Null,
+            |r| json!({"title":r.title(),"pinned":r.pinned,"archived":r.archived}),
+        );
+        subset_mismatch(fields, &actual, "stored session").map_or(Ok(()), Err)
+    }
+
+    async fn check_trust(&self, fields: &Value) -> Result<(), String> {
+        let service = self.core.trust().map_err(|e| e.to_string())?;
+        let view = service
+            .view(&self.env.workspace)
+            .await
+            .map_err(|e| e.to_string())?;
+        let actual = serde_json::to_value(view).map_err(|e| e.to_string())?;
+        subset_mismatch(fields, &actual, "trust view").map_or(Ok(()), Err)
     }
 
     async fn wait_for_event(&mut self, wait: &super::format::WaitAction) -> Result<(), String> {

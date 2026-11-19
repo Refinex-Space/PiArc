@@ -10,6 +10,24 @@
 
 另在打包应用配置关闭云端的本机 Ollama，使用已安装的 deepseek-r1:7b（OpenAI Chat Completions）执行相同初始项目和用户指令。服务端记录 1 次推理请求，HTTP 200，费用 0。模型直接输出文字建议，未发起 Edit 或 Bash，等待真实审批卡超时。该运行未达到退出标准。证据见 `tmp/evidence/R2/local-run.log`、`local/l4/`。真实服务商未验证；本次没有使用付费远程凭据。
 
+## M1 目标与证据
+
+全部 61 个 L2 场景在本机运行，60 个通过、0 个失败，exec-windows-shells 按平台留给 W1。重新生成能力文档后 MISSING 0，M1 planned 0。报告在 `target/l2/results.json`，命令输出在 `tmp/evidence/R2/scenarios.log` 及 `coverage.log`。本次 dev 和 packaged 的 40 个 Electron 用例全部通过，见 `final-ui.log`。
+
+| 第 16 章目标 | 能力或 L4 | 核实的结果 |
+|---|---|---|
+| 单工作区、多会话列表 | CAP-SESSION-MULTI-001、CAP-SESSION-MANAGE-001，t18-sessions | 会话隔离；实际重命名、置顶、归档、删除与重启；新增 session-manage 从数据库复查状态。 |
+| 流式对话 | chat-basic、t19-transcript | 工作行、增量回答、最终回复均经真实 Host；I19 另测同连接的突发通知及后续工具 I/O。 |
+| Read、Write、Edit、Bash、Glob、Grep 经 Core | CAP-TOOL-CORE-001，policy-manual，r2-workflow | 六工具有实际执行和结果；双协议 L4 核对 Edit 和 Bash 的审批及最终文件。读取失败后的状态、外部目录并发变化见 F02、F01。 |
+| Windows PowerShell | CAP-TOOL-POWERSHELL-001、exec-windows-shells | 有场景和前序记录；本次 macOS 未执行 Windows 专属工具。 |
+| Manual、Accept edits | CAP-PERM-MODE-001、CAP-PERM-APPROVAL-001，t20-approvals | 两种模式的基础矩阵、精确规则、拒绝反馈、规则原生确认与键盘保护有证据。 |
+| 模型与保险箱 | CAP-PROVIDER-CONFIG-001、CAP-MODEL-SWITCH-001，t21-models | 通过设置页写入合成凭据和端点，会话实际切换协议；本地真实模型的结果见前节。 |
+| 会话持久化与恢复 | CAP-SESSION-PERSIST-001，sessions-persist-across-restart | Core 重启后第二次请求带回第一轮历史；R2 新增等长重写索引回归。 |
+| transcript P0 行类型 | t19-transcript、t20-approvals、t22-memory | 按用例核对真实回合的 P0 行、审批卡、模式变更与 memory 消息。 |
+| M1 上下文与项目信任 | CAP-CTX-PROMPT-001、CAP-CTX-MEMORY-001、CAP-TRUST-DIALOG-001 | 系统段与 memory，项目清单和信任决定；展示期间变更清单仍需 ADR-0034。 |
+
+本次新增 `core/sessions` 快照的逐会话断言，覆盖审批中以及结束后未读。徽标排序与原生通知效果见 `t18-sessions` 和 `t18-attention`。I19 的 2,048 个 SSE 文本分片在此运行中投影成 1,313 个客户端 delta。提交 prompt 到 Core 收到 fs/stat 为 103.399 ms，从 fs/stat 到随后的 fs/read 为 2.058 ms，下一次模型请求收到正确的文件内容。该区间含 stat 往返，只有单次观测；依据不支持改变 AHP 通道。复跑命令为 `cargo test -p piarc-testkit --test sessions a_read_completes_after_a_notification_burst -- --nocapture`。I16 确认实现的默认 cacheWarming 为 off，显式配置保留。
+
 ## 前序验收状态
 
 按 task 精确筛选 acceptance.json，T13–T22 共 126 项，全部 passing，blocked、failing、not_started 各 0。各任务已登记的通过数如下。

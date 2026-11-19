@@ -245,6 +245,20 @@ pub struct InputAction {
     pub item: Option<String>,
 }
 
+/// Client edits to session metadata.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PrefsAction {
+    /// Optional target label for a multi-session scenario.
+    pub session: Option<String>,
+    /// New session title, if requested.
+    pub title: Option<String>,
+    /// New pinned state, if requested.
+    pub pinned: Option<bool>,
+    /// New archived state, if requested.
+    pub archived: Option<bool>,
+}
+
 /// One thing the runner does.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
@@ -320,14 +334,7 @@ pub enum Action {
         effort: piarc_protocol::models::EffortLevel,
     },
     /// Changes the same metadata as the sidebar actions.
-    SetPrefs {
-        /// Target session.
-        session: Option<String>,
-        /// Title, pin and archive changes.
-        title: Option<String>,
-        pinned: Option<bool>,
-        archived: Option<bool>,
-    },
+    SetPrefs(PrefsAction),
     /// Deletes the target session through Core.
     DeleteSession { session: Option<String> },
     /// Checks persisted sidebar metadata, or absence when fields is null.
@@ -373,7 +380,7 @@ impl Action {
             Self::SetMode { .. } => "set_mode",
             Self::SetModel { .. } => "set_model",
             Self::SetEffort { .. } => "set_effort",
-            Self::SetPrefs { .. } => "set_prefs",
+            Self::SetPrefs(_) => "set_prefs",
             Self::DeleteSession { .. } => "delete_session",
             Self::CheckStoredSession { .. } => "check_stored_session",
             Self::CheckTrust { .. } => "check_trust",
@@ -397,7 +404,7 @@ impl Action {
             | Self::SetEffort { session, .. }
             | Self::SetMode { session, .. }
             | Self::Abort { session }
-            | Self::SetPrefs { session, .. }
+            | Self::SetPrefs(PrefsAction { session, .. })
             | Self::CheckStoredSession { session, .. }
             | Self::DeleteSession { session }
             | Self::Resume { session } => Some(session),
@@ -911,7 +918,7 @@ fn check_actions(spec: &ScenarioSpec, problems: &mut Vec<String>) {
                     problems.push(format!("{field}/provider: no such endpoint"))
                 }
             }
-            Action::SetPrefs { .. }
+            Action::SetPrefs(_)
             | Action::DeleteSession { .. }
             | Action::CheckStoredSession { .. }
             | Action::CheckTrust { .. }
