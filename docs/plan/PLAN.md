@@ -781,7 +781,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 修复后全量 L4 202 通过、5 个按平台跳过，`t18-review` 两个形态失败：本机运行测试的终端没有"屏幕录制"权限，`screencapture -l` 对任意窗口都报 `could not create image from window`（已写入 `apps/desktop/AGENTS.md`）。证据在 `tmp/evidence/merge-W1/`。
 - W1 的起点 b654341 早于 T23–T25：T23-A05、T25-A09、I84 的 Windows 部分仍要推送后由 Windows CI 或下一次 Windows 会话核对。本地提交，未推送。
 
-### 2026-11-19 推送后的两轮 CI（macOS 会话）
+### 2026-11-19 推送后的 CI（macOS 会话）
 
 - 运行 44514850116（b6405ce）：打包与 L4 全部卡在 Vite 解析不到 `@piarc/protocol`（T23 在主进程、渲染进程加了值导入，CI 打包前不跑 `tsc --build`），改为从源码打包（7c34902）；两个平台的权限裁决计时超预算；Windows 上 T25 长 context 的 hook 用例失败，补了诊断（78badbc）。
 - 本地优化（不改"每次裁决读最新磁盘状态"）：hooks 的第 2、8 步复用本次裁决已读的设置（fccf1f2，生产路径 p50 725→560 µs），信任查找复用已解析的 checkout（1891d90，→515 µs）。
@@ -790,6 +790,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
   - 计时：CI 上 p50 两次相差近一倍，四类调用同步变慢，判定为 runner 噪声；verify 第 8 步单独运行计时测试（8299a6f，I103）。
   - L4：首页在文件夹打开完成时重新挂载、清掉了回滚的草稿（真实竞态，294b76b，带确定性 L4）；Windows 徽标用例在渲染进程收到焦点前离开会话（f689ba1）；`r2-workflow` 启动超时登记 I101。
 - 本机：verify 15/15，计时单独运行 p50 501 µs、p95 693 µs；Windows 目标交叉 clippy 通过。
+- 运行 44533872761（03f42ae）：Windows 计时单独运行 p95 1.38 ms 通过，macOS runner 仍 2.67 ms（debug）；cargo 不再停在 piarc-core 后暴露两项：Windows 上 Bash 用例的虚构根 `/w` 被当作盘符（1afc48b），macOS runner 保留 `DYLD_*` 使 sessions 的 `sleep` 等审批（2406257）；计时按 T23-A13 改用 release 构建（41b5408）；Windows L4 的 `r2-workflow` 是第一个用 mock 的用例、在时限内现编 mock provider（05d226b，I101 已查明）。
+- 运行 44542131720（05d226b）全部通过：两平台 verify 15/15（计时 release 单独运行 macOS p95 0.43 ms、Windows 1.19 ms），Windows L4 211/211，macOS L4 206 通过、5 个按平台跳过（macOS arm64 runner 容量不足，作业两次排队 15 分钟未分到机器被取消，第三次重跑完成），打包与 Core 构建、加载全部通过。
 
 ## 计划变更记录
 
