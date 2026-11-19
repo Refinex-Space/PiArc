@@ -148,7 +148,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T21 | [模型、服务商与凭据设置](tasks/T21-models-providers-and-credentials.md) | 2 | T20 | macOS | high / 高 | 大 | 无 | 已完成 | e5f3b65 |
 | T22 | [System prompt 组装与 memory 文件](tasks/T22-system-prompt-and-memory-files.md) | 2 | T21 | macOS | high / 高 | 中 | 无 | 已完成 | 9843eb5 |
 | R2 | [M1 评审](tasks/R2-m1-review.md) | 2 | T22 | macOS | high / 高 | 中 | 无 | 已完成 | f63ac3d |
-| W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 未开始 | — |
+| W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 进行中 | — |
 | T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -309,7 +309,23 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（无进行中的任务。）
+**W1 Windows：M1 达标**（Windows 11 专业版 25H2 26200.9974，x64；起点 b654341）
+
+- 起点基线是红的（本机与 CI 运行 44453549786）：verify 的 ESLint（两平台）、Windows `cargo test` 7 项、L4 的 `agent-host.e2e.ts` 等。用户在 W1 会话中决定并入 W1 修复。本机内存紧张（16 GB），第一次基线 verify 被系统终止，用户释放内存后重跑。
+- [ ] 准备：平台、版本、架构、提交号（A01）；修复红基线；基线 verify
+- [ ] 打包开发构建与 Velopack 安装包（或 CI 产物），安装并首次运行
+- [ ] 完整任务：双协议 r2-workflow，含空格与中文的工作区（A02）；真实服务商需另行同意
+- [ ] L2 本机全量 ≥ 20 通过（A03）；I19 的 fs/stat → fs/read 间隔
+- [ ] Git Bash 探测与隐藏后的提示、PowerShell 与 Manual 询问（A04）
+- [ ] 路径、CRLF、BOM、UTF-16、中文输出、UNC、junction、目录共享删除（A05）
+- [ ] 进程树：取消、超时与 tasklist（A06）
+- [ ] 凭据管理器、数据目录、明文扫描、索引迁移（A07）
+- [ ] 输入法：CDP 自动化 + 用户实机（A08）
+- [ ] 通知与任务栏覆盖图标（A09）
+- [ ] Mica、标题栏覆盖层、亮暗（A10）
+- [ ] L4 本机全部通过（A11）
+- [ ] R2 平台发现逐条复核；问题修复或登记（A12）
+- [ ] 收尾 verify（A13）、报告 `docs/reviews/W1-windows-m1-parity.md`、acceptance、PLAN
 
 ## 登记事项
 
