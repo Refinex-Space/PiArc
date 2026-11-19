@@ -71,7 +71,10 @@ sessionTest(
     await expect(card).toHaveAttribute('data-approval-card', 'permissionExpansion');
     await expect(card).toContainText('MemoryImport');
     await expect(card).toContainText(name);
-    await expect(card.getByLabel('Rules to save (one per line)')).toHaveJSProperty('readOnly', true);
+    await expect(card.getByLabel('Rules to save (one per line)')).toHaveJSProperty(
+      'readOnly',
+      true,
+    );
     const feedback = 'Use only the project notes.';
     await card.getByLabel('Feedback for the model (optional)').fill(feedback);
     expect(await requests(mock, 't18-chat')).toHaveLength(0);
