@@ -18,6 +18,7 @@ piarc-fs.workspace = true
 piarc-git.workspace = true
 piarc-host.workspace = true
 piarc-policy.workspace = true
+piarc-hooks.workspace = true
 piarc-ports.workspace = true
 piarc-protocol.workspace = true
 piarc-sandbox.workspace = true

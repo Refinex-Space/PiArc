@@ -1,7 +1,8 @@
 //! The configuration diagnostics of a workspace (T24, architecture section 6.14): every
 //! settings file PiArc reads for it, PiArc's and Claude Code's, with its load state and
 //! the keys it applies, the keys a higher file overrides and the keys PiArc ignores, plus
-//! `~/.claude.json` (key names only).
+//! `~/.claude.json` (key names only), and the parts of the hooks configuration PiArc does not
+//! run (T25: later events and handler types, `async`, matchers its regular expressions reject).
 //!
 //! The settings are loaded the way a permission decision loads them
 //! ([`TrustService::permission_settings`]): same layers, same trust, so the report shows
@@ -48,6 +49,26 @@ pub async fn report(
         let state = piarc_config::claude_state_report(home, &root);
         list.push(serde_json::to_value(state).map_err(internal)?);
     }
+    let hooks: Vec<Value> = crate::hooks::config_of(&settings)
+        .diagnostics()
+        .iter()
+        .map(|d| {
+            json!({
+                "layer": d.source.layer,
+                "file": d.source.file.as_deref().map(piarc_fs::display),
+                "pointer": d.pointer,
+                "kind": match d.kind {
+                    piarc_hooks::DiagnosticKind::LaterEvent => "laterEvent",
+                    piarc_hooks::DiagnosticKind::UnknownEvent => "unknownEvent",
+                    piarc_hooks::DiagnosticKind::UnsupportedType => "unsupportedType",
+                    piarc_hooks::DiagnosticKind::UnsupportedField => "unsupportedField",
+                    piarc_hooks::DiagnosticKind::InvalidMatcher => "invalidMatcher",
+                    piarc_hooks::DiagnosticKind::Invalid => "invalid",
+                },
+                "message": d.message,
+            })
+        })
+        .collect();
     let shown = piarc_fs::display(&root);
     let mut workspaces = known;
     if !workspaces.contains(&shown) {
@@ -58,6 +79,7 @@ pub async fn report(
         "workspace": shown,
         "trusted": settings.trust().is_trusted(),
         "files": files,
+        "hooks": hooks,
     }))
 }
 

@@ -167,14 +167,34 @@ const STRINGS: Shape = Shape::String;
 const HOOK_HANDLER: Shape = Shape::Object(&[
     Field {
         name: "type",
-        shape: Shape::OneOf(&["command", "prompt", "agent", "http"]),
+        shape: Shape::OneOf(&["command", "prompt", "agent", "http", "mcp_tool"]),
     },
     Field {
         name: "command",
         shape: Shape::String,
     },
     Field {
+        name: "args",
+        shape: Shape::ListOf(&STRINGS),
+    },
+    Field {
+        name: "shell",
+        shape: Shape::OneOf(&["bash", "powershell"]),
+    },
+    Field {
+        name: "if",
+        shape: Shape::String,
+    },
+    Field {
+        name: "onFailure",
+        shape: Shape::OneOf(&["continue", "block"]),
+    },
+    Field {
         name: "prompt",
+        shape: Shape::String,
+    },
+    Field {
+        name: "model",
         shape: Shape::String,
     },
     Field {
@@ -182,11 +202,39 @@ const HOOK_HANDLER: Shape = Shape::Object(&[
         shape: Shape::String,
     },
     Field {
+        name: "headers",
+        shape: Shape::Any,
+    },
+    Field {
+        name: "allowedEnvVars",
+        shape: Shape::ListOf(&STRINGS),
+    },
+    Field {
+        name: "server",
+        shape: Shape::String,
+    },
+    Field {
+        name: "tool",
+        shape: Shape::String,
+    },
+    Field {
+        name: "input",
+        shape: Shape::Any,
+    },
+    Field {
         name: "timeout",
         shape: Shape::Number,
     },
     Field {
         name: "async",
+        shape: Shape::Bool,
+    },
+    Field {
+        name: "asyncRewake",
+        shape: Shape::Bool,
+    },
+    Field {
+        name: "once",
         shape: Shape::Bool,
     },
     Field {
@@ -264,6 +312,10 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
     Field {
         name: "hooks",
         shape: Shape::MapOf(&HOOK_GROUPS),
+    },
+    Field {
+        name: "disableAllHooks",
+        shape: Shape::Bool,
     },
     // Read by Core from the user's file only (`<data>/settings.json`): which executable runs
     // commands is not a project's choice (T17).

@@ -1572,6 +1572,7 @@ dependencies = [
  "piarc-exec",
  "piarc-fs",
  "piarc-git",
+ "piarc-hooks",
  "piarc-host",
  "piarc-policy",
  "piarc-ports",

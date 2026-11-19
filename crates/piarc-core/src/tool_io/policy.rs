@@ -28,7 +28,8 @@ pub(crate) struct Services {
     pub storage: Storage,
     pub trust: TrustService,
     pub snapshots: Snapshots,
-    pub hooks: Arc<dyn hooks::PolicyHooks>,
+    /// Runs hooks; `None` runs none (tests of the ladder alone).
+    pub hooks: Option<crate::hooks::HooksService>,
 }
 
 struct Pending {
@@ -48,6 +49,11 @@ mod preview;
 pub(crate) mod settings_view;
 use grants::Grant;
 pub(super) use grants::{FilePermit, claim_command, file_permit};
+
+/// `path` without `.` and `..` components (no file system access).
+pub(super) fn lexical(path: &Path) -> PathBuf {
+    assess::lexical(path)
+}
 
 #[derive(Default)]
 pub(super) struct State {
@@ -77,6 +83,17 @@ pub(super) fn denied(reason: impl Into<String>) -> ErrorObject {
 }
 
 impl State {
+    /// The session's current permission mode.
+    pub(super) fn mode(&self) -> PermissionMode {
+        self.mode
+    }
+
+    /// The first approval waiting for the user.
+    #[cfg(test)]
+    pub(super) fn first_pending(&self) -> Option<ApprovalRequest> {
+        self.ledger.pending().next().cloned()
+    }
+
     fn publish(&self, id: &str, services: &Services) {
         services.snapshots.send(SnapshotMsg::Policy(
             id.to_owned(),
@@ -344,30 +361,39 @@ impl ToolIo {
     ) -> Result<Value, ErrorObject> {
         let generation = inputs::begin(s, p, peer).await?;
         let settings = services.settings(s.scope.root()).await?;
-        let hook = services.hooks.pre_tool_use(p).await;
-        let rules = rules_of(s, &settings);
-        let programs = if p.tool == "Bash" {
-            Some(self.exec.programs().await)
-        } else {
-            None
-        };
-        let mut prepared = prepare(
-            Arc::clone(s),
-            p.clone(),
-            &settings,
-            peer.clone(),
-            programs,
-            rules,
-        )
-        .await?;
-        prepared.assessment.input.hook = hook;
+        let (hook_token, _hook_guard) = super::hooks::linked(peer, Some(&generation));
+        let pre = self.pre_tool_use(s, p, hook_token.clone()).await;
+        let mut updated = false;
+        if let Some(input) = pre.updated_input {
+            p.input = input;
+            updated = true;
+        }
+        let mut prepared = self.prepared(s, p, &settings, peer).await?;
+        prepared.assessment.input.hook = pre.verdict;
         let (mode, mut ruling) = prepared.decide(s, services, &settings, peer, &generation)?;
+        let mut stop = pre.stop;
         if ruling.outcome == Outcome::Ask {
-            let verdict = services.hooks.permission_request(p).await;
-            ruling = piarc_policy::after_permission_request(ruling, &verdict);
+            let step = hooks::Ladder {
+                s,
+                services,
+                settings: &settings,
+                peer,
+                generation: &generation,
+                token: hook_token.clone(),
+            };
+            ruling = self
+                .permission_step(&step, p, &mut prepared, ruling, &mut updated, &mut stop)
+                .await?;
         }
         let choice = if ruling.outcome == Outcome::Ask {
             prepared.add_preview(p).await?;
+            // `Notification` hooks: an approval waits for the user.
+            let (io, id) = (self.clone(), p.session_id.clone());
+            let message = format!("PiArc needs your permission to use {}", p.tool);
+            tokio::spawn(async move {
+                io.notification_hooks(&id, "permission_prompt", &message)
+                    .await;
+            });
             wait_for_user(s, services, p, &prepared.card, peer, &generation).await?
         } else {
             None
@@ -383,12 +409,17 @@ impl ToolIo {
             (None, Outcome::Deny) => Some(ruling_reason(&ruling)),
             (None, Outcome::Ask) => Some(LOST.into()),
         };
+        let allowed = reason.is_none();
         let result = PolicyEvaluateResult {
-            allowed: reason.is_none(),
+            allowed,
             reason,
-            updated_input: None,
-            context: None,
-            stop: None,
+            updated_input: (allowed && updated).then(|| {
+                let mut input = p.input.clone();
+                input.remove("readPathCandidates");
+                input
+            }),
+            context: pre.context,
+            stop: stop.map(|reason| piarc_protocol::hooks::HookStop { reason }),
         };
         let source = match (&answer, ruling.step) {
             (Some(_), _) => "user",
@@ -404,7 +435,44 @@ impl ToolIo {
         commit?;
         to_value(&result)
     }
+
+    /// The facts of the call as it stands (rules, programs, paths).
+    async fn prepared(
+        &self,
+        s: &Arc<SessionIo>,
+        p: &PolicyEvaluateParams,
+        settings: &Settings,
+        peer: &Peer,
+    ) -> Result<Prepared, ErrorObject> {
+        let rules = rules_of(s, settings);
+        let programs = if p.tool == "Bash" {
+            Some(self.exec.programs().await)
+        } else {
+            None
+        };
+        prepare(
+            Arc::clone(s),
+            p.clone(),
+            settings,
+            peer.clone(),
+            programs,
+            rules,
+        )
+        .await
+    }
 }
+
+/// Steps whose question a `PermissionRequest` hook's rewritten input cannot skip: rules and
+/// checks that ask whatever the mode.
+const RULE_ASKS: &[&str] = &[
+    "askRule",
+    "criticalPath",
+    "unresolved",
+    "invalidRule",
+    "requiresUserInteraction",
+    "protectedPath",
+    "hookAsk",
+];
 
 /// Record the decision, save a permanent answer and issue the grant of an allowed call.
 #[expect(clippy::too_many_arguments, reason = "the parts of one decision")]

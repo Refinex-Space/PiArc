@@ -174,6 +174,16 @@ impl Exec {
         })
     }
 
+    /// What hook commands start with: the commands' inherited environment and shells.
+    pub(super) async fn hook_launch(&self) -> crate::hooks::Launch {
+        let shells = self.shells();
+        crate::hooks::Launch {
+            env: self.base_env().await.inherited.clone(),
+            bash: shells.bash.clone(),
+            powershell: shells.powershell.clone(),
+        }
+    }
+
     /// `exec/shells`; tells the user once per Core when Windows has no Git Bash.
     pub(super) async fn answer_shells(&self) -> ExecShellsResult {
         let shells = self.shells();

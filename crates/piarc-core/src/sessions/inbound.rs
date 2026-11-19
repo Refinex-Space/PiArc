@@ -1,5 +1,6 @@
 //! What answers one workspace's Agent Host: `trust/get` from the trust store, `secrets/*` from
-//! Core's single vault service, and `fs/*`, `exec/*` from the tool I/O, but only for the
+//! Core's single vault service, `hooks/run` for working directories in this workspace, and
+//! `fs/*`, `exec/*` from the tool I/O, but only for the
 //! sessions that belong to this workspace (R1-A13): an Agent Host cannot reach another
 //! workspace's session scope by naming its id.
 
@@ -19,6 +20,8 @@ use crate::trust::TrustService;
 pub(crate) type SessionSet = Arc<Mutex<HashSet<String>>>;
 
 pub(crate) struct WorkspaceInbound {
+    /// The workspace's root: `hooks/run` accepts working directories inside it only.
+    pub workspace: std::path::PathBuf,
     pub trust: TrustService,
     pub secrets: SecretsService,
     pub tool_io: ToolIo,
@@ -39,6 +42,13 @@ impl InboundHandler for WorkspaceInbound {
         if SecretsService::handles(&method) {
             let secrets = self.secrets.clone();
             return Box::pin(async move { secrets.dispatch(&method, params, peer).await });
+        }
+        if method == "hooks/run" {
+            // Also for a session Core already closed (its `SessionEnd`): the working directory
+            // is checked against this workspace instead.
+            let io = self.tool_io.clone();
+            let workspace = self.workspace.clone();
+            return Box::pin(async move { io.hooks_run(&workspace, params, &peer).await });
         }
         if method == "exec/shells" {
             // Machine-wide, and asked while a session is being created (before it is ours).

@@ -72,7 +72,7 @@ impl Fixture {
             storage: storage.clone(),
             trust,
             snapshots,
-            hooks: Arc::new(hooks::NoHooks),
+            hooks: None,
         });
         io.open_session(SESSION, &work, &work).expect("session");
         let (peer, frames) = Peer::channel(4);

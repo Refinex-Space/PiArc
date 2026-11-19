@@ -136,7 +136,7 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     ignored("dialogExpiry", UI),
     ignored("diffTool", GLOBAL),
     ignored("disableAgentView", UI),
-    planned("disableAllHooks", "T25", "hooks"),
+    active("disableAllHooks", "/disableAllHooks"),
     ignored("disableArtifact", NONE),
     planned("disableAutoMode", "T46", "auto mode"),
     ignored("disableBrowserExternalNavigation", MANAGED),
@@ -181,7 +181,7 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     ignored("forceRemoteSettingsRefresh", MANAGED),
     ignored("gatewayInternalNetworks", MANAGED),
     ignored("gcpAuthRefresh", ACCOUNT),
-    planned("hooks", "T25", "hooks"),
+    active("hooks", "/hooks"),
     planned("httpHookAllowedEnvVars", "T38", "http hooks"),
     ignored("idleCompaction", NONE),
     ignored("includeCoAuthoredBy", NONE),
@@ -448,7 +448,7 @@ mod tests {
         assert_eq!(
             classes,
             [
-                ("/hooks".to_owned(), KeyStatus::Planned("T25"), true),
+                ("/hooks".to_owned(), KeyStatus::Active, true),
                 ("/notAKey".to_owned(), KeyStatus::Ignored, false),
                 ("/permissions/allow".to_owned(), KeyStatus::Active, true),
                 ("/permissions/deny".to_owned(), KeyStatus::Active, true),
@@ -464,7 +464,7 @@ mod tests {
         );
         assert_eq!(
             project(&value),
-            json!({ "permissions": { "allow": ["Bash(ls)"], "deny": ["Read(.env)"] } })
+            json!({ "hooks": { "PreToolUse": [] }, "permissions": { "allow": ["Bash(ls)"], "deny": ["Read(.env)"] } })
         );
         // A wrongly typed parent is one ignored entry and contributes nothing.
         let wrong = json!({ "permissions": ["Bash(ls)"] });

@@ -149,9 +149,9 @@ fn seven_layers_merge_in_adr_0005_order_and_lists_combine() {
         settings.get("/permissions/defaultMode"),
         Some(&json!("acceptEdits"))
     );
-    // Ignored keys never reach the merge.
+    // Ignored keys never reach the merge; hooks apply since T25 (the project is trusted).
     assert_eq!(settings.get("/theme"), None);
-    assert_eq!(settings.get("/hooks"), None);
+    assert_eq!(settings.get("/hooks"), Some(&json!({})));
     // Policy evaluates deny before allow per layer, highest first (T23): the deny of the
     // lowest layer is still there next to every allow.
     let lists = settings.permission_lists();
@@ -213,10 +213,8 @@ fn diagnostics_name_the_file_that_overrides_each_key() {
     assert_eq!(allow.source, None);
     assert_eq!(allow.final_value.as_array().map(Vec::len), Some(6));
     assert_eq!(ignored(user), [("/theme", IgnoreReason::Ignored, None)]);
-    assert_eq!(
-        ignored(report(&reports, ids::CLAUDE_PROJECT)),
-        [("/hooks", IgnoreReason::Planned, Some("T25"))]
-    );
+    // Hooks apply since T25 (an empty object has no leaf to list as effective).
+    assert!(ignored(report(&reports, ids::CLAUDE_PROJECT)).is_empty());
     assert!(!report(&reports, ids::CLAUDE_PROJECT).writable);
     assert!(report(&reports, ids::PROJECT).writable);
 }

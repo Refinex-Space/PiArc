@@ -94,6 +94,8 @@ pub struct CoreConfig {
     /// Where shell commands get their environment; the user's login shell of Core's own
     /// environment when absent (T17). Tests pass a fixed or prepared environment.
     pub command_env: Option<crate::tool_io::CommandEnv>,
+    /// Hook timeouts and limits (architecture section 6.3.1); tests shorten them.
+    pub hooks: piarc_hooks::RunnerConfig,
 }
 
 /// A credential store for the vault's master key and the key's name in it.
@@ -125,6 +127,7 @@ impl Default for CoreConfig {
             tool_observer: None,
             command_env: None,
             home: std::env::home_dir(),
+            hooks: piarc_hooks::RunnerConfig::default(),
         }
     }
 }
@@ -729,7 +732,14 @@ fn open_state(
             storage: storage.clone(),
             trust: trust.clone(),
             snapshots: snapshots.clone(),
-            hooks: Arc::new(crate::tool_io::policy::hooks::NoHooks),
+            hooks: Some(crate::hooks::HooksService::new(
+                storage.clone(),
+                trust.clone(),
+                Some(events.clone()),
+                Arc::new(piarc_exec::ProcessTreeSpawner),
+                config.hooks,
+                crate::tool_io::hook_condition,
+            )),
         }),
         config: config.sessions.clone(),
         snapshots,

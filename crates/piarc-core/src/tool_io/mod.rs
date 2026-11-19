@@ -32,6 +32,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 mod exec;
 mod files;
 mod git_status;
+mod hooks;
 mod memory;
 mod memory_reader;
 pub(crate) mod policy;
@@ -49,6 +50,7 @@ use piarc_protocol::fs::{
 use piarc_protocol::{ErrorKind, ErrorObject};
 use piarc_sandbox::proxy::{Allowlist, SystemNetwork};
 use piarc_sandbox::{SandboxPolicy, SessionSandbox};
+pub(crate) use policy::hooks::condition as hook_condition;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};

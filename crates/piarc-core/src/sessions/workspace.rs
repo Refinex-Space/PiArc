@@ -351,6 +351,7 @@ impl WorkspaceActor {
             return;
         };
         let inbound = Arc::new(WorkspaceInbound {
+            workspace: self.handle.path.clone(),
             trust: self.ctx.trust.clone(),
             secrets: self.ctx.secrets.clone(),
             tool_io: self.ctx.tool_io.clone(),

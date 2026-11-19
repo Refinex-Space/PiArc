@@ -315,8 +315,8 @@ T25（开工基线 aae28a4，`npm run verify` 15/15；依赖 T24 已完成；T23
 - [x] 2. piarc-hooks：command 执行器（`ProcessSpawner` 注入、并行、管道并发读完、超时与取消时终止进程树、超时可注入）
 - [x] 3. piarc-hooks：决策协议与合并（exit 0/2/其他、JSON 与纯文本、通用字段、PreToolUse deny > ask > allow、Stop 续跑上限、10,000 字符落盘与预览）
 - [x] 4. 协议：AHP `hooks/run`、`policy/evaluate` 新增字段、`session/prompt` 等的 hook 上下文、契约样本与 `gen:protocol`
-- [ ] 5. Core：hooks 服务（设置来源与项目信任、审计、键映射表 `hooks`/`disableAllHooks` 生效）、PreToolUse 与 PermissionRequest 接入裁决第 2、8 步
-- [ ] 6. Core：UserPromptSubmit（发给 Agent Host 之前）与 Notification（等待审批、回合完成）
+- [x] 5. Core：hooks 服务（设置来源与项目信任、审计、键映射表 `hooks`/`disableAllHooks` 生效）、PreToolUse 与 PermissionRequest 接入裁决第 2、8 步
+- [x] 6. Core：UserPromptSubmit（发给 Agent Host 之前）与 Notification（等待审批、回合完成）
 - [ ] 7. Agent Host：SessionStart/SessionEnd、PostToolUse/PostToolUseFailure、Stop、PreCompact/PostCompact 挂载
 - [ ] 8. 客户端：`systemMessage` 与非阻断错误经事件上报并用现有提示行显示
 - [ ] 9. L2 场景 `hooks-*.yaml`（11 个事件，Node 夹具脚本记录 stdin）与能力 ID `CAP-HOOK-*`

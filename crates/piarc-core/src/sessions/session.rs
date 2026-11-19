@@ -521,6 +521,12 @@ impl SessionActor {
                 });
                 self.unread = true;
                 self.persist();
+                // `Notification` hooks: the turn is over and the session waits for input.
+                let (io, id) = (self.ctx.tool_io.clone(), self.id.clone());
+                self.ctx.handle.spawn(async move {
+                    io.notification_hooks(&id, "idle_prompt", "PiArc is waiting for your input")
+                        .await;
+                });
             }
             _ => return,
         }
@@ -709,6 +715,13 @@ struct Request {
 
 impl Request {
     async fn run(&self, op: Op) -> Result<Value> {
+        // `UserPromptSubmit` sees the input before the Agent Host does.
+        let hook_context = match &op {
+            Op::Prompt(input) | Op::Steer(input) | Op::FollowUp(input) => {
+                self.prompt_hooks(&input.text).await?
+            }
+            _ => None,
+        };
         let supervisor = self.ws.acquire().await?;
         match op {
             Op::Prompt(input) => {
@@ -722,13 +735,19 @@ impl Request {
                     text: input.text,
                     mentions: input.mentions,
                     attachments: input.attachments,
-                    hook_context: None,
+                    hook_context,
                 };
                 self.call::<SessionPrompt>(&supervisor, Some(&request_id), params)
                     .await
             }
-            Op::Steer(input) => self.input::<SessionSteer>(&supervisor, input).await,
-            Op::FollowUp(input) => self.input::<SessionFollowUp>(&supervisor, input).await,
+            Op::Steer(input) => {
+                self.input::<SessionSteer>(&supervisor, input, hook_context)
+                    .await
+            }
+            Op::FollowUp(input) => {
+                self.input::<SessionFollowUp>(&supervisor, input, hook_context)
+                    .await
+            }
             Op::Compact => {
                 let request_id = new_session_id()?;
                 let params = SessionCompactParams {
@@ -822,7 +841,28 @@ impl Request {
         }
     }
 
-    async fn input<M>(&self, supervisor: &HostSupervisor, input: UserInput) -> Result<Value>
+    /// Runs `UserPromptSubmit` hooks; a block refuses the input with the hook's reason.
+    async fn prompt_hooks(&self, text: &str) -> Result<Option<String>> {
+        self.tool_io
+            .user_prompt_submit(&self.id.0, text, &self.cancel)
+            .await
+            .map_err(|reason| {
+                let mut error = piarc_protocol::ErrorObject::new(
+                    piarc_protocol::ErrorKind::PermissionDenied,
+                    format!("A UserPromptSubmit hook blocked this input: {reason}"),
+                    false,
+                );
+                error.data.details = Some(json!({ "reason": "hookBlocked", "hookReason": reason }));
+                Error::feature(&error)
+            })
+    }
+
+    async fn input<M>(
+        &self,
+        supervisor: &HostSupervisor,
+        input: UserInput,
+        hook_context: Option<String>,
+    ) -> Result<Value>
     where
         M: RequestMethod<Params = SessionInputParams>,
     {
@@ -836,7 +876,7 @@ impl Request {
             text: input.text,
             mentions: input.mentions,
             attachments: input.attachments,
-            hook_context: None,
+            hook_context,
         };
         self.call::<M>(supervisor, Some(&request_id), params).await
     }
