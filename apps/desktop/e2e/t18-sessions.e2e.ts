@@ -190,7 +190,11 @@ test('status badges follow Core: running, unread, error', async ({
   await page.getByTestId('new-session').click();
   const done = await startSession(page, 'This one finishes', 't18-chat#badges', 'none');
   await expect(page.getByTestId('agent-message')).toHaveText(/Done\./, { timeout: 30_000 });
+  // A window launched by Playwright may lose the foreground on Windows (W1), and a turn that
+  // completes then is unread: shown in a focused window, it becomes read. Wait for that before
+  // leaving it, or the click can unmount it before the renderer sees the focus.
   await focusMain(app);
+  await expect(row(page, done)).toHaveAttribute('data-badge', 'idle', { timeout: 10_000 });
   await row(page, running).getByTestId('session-title').click();
   await expect(row(page, done)).toHaveAttribute('data-badge', 'idle');
   const unread = await startSessionElsewhere(page, ws);
