@@ -771,6 +771,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 - 把远程分支上的 W1 提交合并到本地 T23–T25 之后（merge，保留双方提交号）。W1 的编号与本地撞号，按用户决定改 W1 一侧：ADR-0037、0038 → ADR-0040、0041，登记事项 I82–I87 → I95–I100，架构 v2.29 → v2.32；本地 T23–T25 的编号不变。
 - 冲突处理：W1 在 Windows `safe_search` 中跳过无权访问的 PATH 条目，T23 已改为 Git Bash 探测与程序钉住，该函数不存在；同样的语义移到 `tool_io/exec/utility.rs` 的 `first_on_path`，W1 的 Windows 回归测试改为经 `probe_git_programs` 断言。权限裁决的延迟测试保留 T23 的步骤检查与 W1 的 Windows 预算（ADR-0040）。
+- 合并后 verify 15/15；macOS 全量 L4 首次 15 个失败，均早于本次合并或由两边衔接产生，已修复：
+  - T25：每个 Core 的第一次输入都先等 hooks 的登录 shell 环境（没有 hooks 也等），这期间第二次 Enter 与第一条竞争被拒为 busy（`t19-composer`、`t19-errors`）；改为 `plan` 选出 handler 后才解析（b44bcee，先红后绿的 Core 测试）。
+  - T23：只读白名单让 `sleep`、`cat`、`echo` 在手动模式免审批，等审批卡的 L4 夹具改用 `env …`（`t18-attention`、`t19-composer`、`t19-security`、`t19-transcript`；W1 的 `w1-windows-shells` 同改，只能在 Windows 上验证）；探针补答 `policy/tools`（`agent-host.e2e` packaged）。
+  - 虚拟列表变窄后行重叠：W1 的重测因比较旧尺寸、且滚动中 `measureElement` 不测量而无效，本机滚动条占宽度时 `t19-security` 偶发（撤掉 W1 改动 4 次 2 败、保留时 4 次 4 败）；新增确定性的 L4 变窄用例后修复（c2ae5c0，修复后 3/3 与 4/4 通过）。
+- 修复后全量 L4 202 通过、5 个按平台跳过，`t18-review` 两个形态失败：本机运行测试的终端没有"屏幕录制"权限，`screencapture -l` 对任意窗口都报 `could not create image from window`（已写入 `apps/desktop/AGENTS.md`）。证据在 `tmp/evidence/merge-W1/`。
 - W1 的起点 b654341 早于 T23–T25：T23-A05、T25-A09、I84 的 Windows 部分仍要推送后由 Windows CI 或下一次 Windows 会话核对。本地提交，未推送。
 
 ## 计划变更记录
