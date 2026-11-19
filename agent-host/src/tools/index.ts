@@ -67,10 +67,18 @@ export function createToolSet(
   profile: ToolProfile,
   shells: Shells,
   autoResizeImages = true,
+  searched?: ToolSetup['searched'],
 ): ToolDefinition[] {
   return CANONICAL_TOOLS.filter(
     (tool) => (tool !== 'Bash' || shells.bash) && (tool !== 'PowerShell' || shells.powershell),
-  ).map((tool) => FACTORIES[tool]({ io, presentation: profile[tool], autoResizeImages }));
+  ).map((tool) =>
+    FACTORIES[tool]({
+      io,
+      presentation: profile[tool],
+      autoResizeImages,
+      ...(searched ? { searched } : {}),
+    }),
+  );
 }
 
 /**
@@ -83,13 +91,14 @@ export function toolOptions(
   profile: ToolProfile,
   shells: Shells,
   autoResizeImages = true,
+  searched?: ToolSetup['searched'],
 ): {
   customTools: ToolDefinition[];
   noTools: 'builtin';
   excludeTools: string[];
 } {
   return {
-    customTools: createToolSet(io, profile, shells, autoResizeImages),
+    customTools: createToolSet(io, profile, shells, autoResizeImages, searched),
     noTools: 'builtin',
     excludeTools: [...PI_BUILTIN_TOOL_NAMES],
   };

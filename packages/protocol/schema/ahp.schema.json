@@ -3474,6 +3474,13 @@
     "MemorySnapshot": {
       "description": "The JSON document transferred by fs/memory.",
       "properties": {
+        "currentFiles": {
+          "description": "Updated documents if memory changed between opening and first delivery.",
+          "items": {
+            "$ref": "#/$defs/MemoryFile"
+          },
+          "type": ["array", "null"]
+        },
         "files": {
           "description": "Documents in precedence order.",
           "items": {

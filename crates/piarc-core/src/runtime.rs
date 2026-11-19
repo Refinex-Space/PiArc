@@ -119,7 +119,7 @@ impl Default for CoreConfig {
             secret_store: None,
             tool_observer: None,
             command_env: None,
-            memory_home: None,
+            memory_home: std::env::home_dir(),
         }
     }
 }
@@ -1186,13 +1186,7 @@ fn open_state(
         tool_io: ToolIo::with_notices(
             ToolIoConfig {
                 observer: config.tool_observer.clone(),
-                memory_home: config.memory_home.clone().or_else(|| {
-                    if config.secret_store.is_some() {
-                        Some(data.join("test-home"))
-                    } else {
-                        std::env::home_dir()
-                    }
-                }),
+                memory_home: config.memory_home.clone(),
                 command_env: config
                     .command_env
                     .clone()

@@ -8,6 +8,8 @@
 // The descriptions are PiArc's own text (ADR-0006): they describe the behavior of these tools
 // (Pi's tool implementations behind Core's I/O), not Claude Code's.
 
+import { TOOL_GUIDANCE } from '../harness/prompts/tools.js';
+
 /** The tools the default profile describes, in the order the model sees them. A session gets
  * `Bash` when Core found bash (Git Bash on Windows) and `PowerShell` on Windows only
  * (`exec/shells`, T17). */
@@ -65,11 +67,7 @@ export const DEFAULT_PROFILE: ToolProfile = {
       'call); Jupyter notebooks as their cells and outputs. Reading the same range of an ' +
       'unchanged file again returns a short note instead of the content. `path` is absolute or ' +
       'relative to the working directory.',
-    snippet: 'Read: show a text file, image, PDF or notebook',
-    guidelines: [
-      'Look at files with Read rather than printing them through Bash.',
-      'Read a file before changing it with Edit or Write.',
-    ],
+    ...TOOL_GUIDANCE.Read,
   },
   Write: {
     name: 'Write',
@@ -78,8 +76,7 @@ export const DEFAULT_PROFILE: ToolProfile = {
       '(with any missing parent directories), an existing one is replaced. An existing file ' +
       'must have been read with Read first and not changed since; it keeps its encoding and ' +
       'line ending style. To change part of an existing file, Edit is safer.',
-    snippet: 'Write: create a file or replace all of its text',
-    guidelines: [],
+    ...TOOL_GUIDANCE.Write,
   },
   Edit: {
     name: 'Edit',
@@ -91,10 +88,7 @@ export const DEFAULT_PROFILE: ToolProfile = {
       'that takes its place; with `replaceAll: true` every occurrence of each `oldText` is ' +
       'replaced instead. All entries refer to the file as it is before the call and must not ' +
       'overlap; put several changes to one file into one call.',
-    snippet: 'Edit: replace exact passages of an existing file',
-    guidelines: [
-      'Keep each oldText short but unique; merge changes that sit close together into one entry.',
-    ],
+    ...TOOL_GUIDANCE.Edit,
   },
   Bash: {
     name: 'Bash',
@@ -108,8 +102,7 @@ export const DEFAULT_PROFILE: ToolProfile = {
       'and its end, with the full text saved to a file named in the result (read it with ' +
       'Read). Exit code 1 of grep, rg, diff, cmp and test is an answer (no match, a ' +
       'difference, a false condition), not a failure.',
-    snippet: 'Bash: run a shell command',
-    guidelines: [],
+    ...TOOL_GUIDANCE.Bash,
   },
   PowerShell: {
     name: 'PowerShell',
@@ -121,8 +114,7 @@ export const DEFAULT_PROFILE: ToolProfile = {
       'command and every process it started are stopped. Long output comes back as its start ' +
       'and its end, with the full text saved to a file named in the result (read it with ' +
       'Read).',
-    snippet: 'PowerShell: run a PowerShell command',
-    guidelines: [],
+    ...TOOL_GUIDANCE.PowerShell,
   },
   Glob: {
     name: 'Glob',
@@ -132,8 +124,7 @@ export const DEFAULT_PROFILE: ToolProfile = {
       'with `/` it matches paths relative to `path` (`src/**/*.test.ts`). Entries ignored by ' +
       '.gitignore are left out, directories end with `/`. At most `limit` entries (default ' +
       '1000) or 50 KB are returned.',
-    snippet: 'Glob: find files by name or path pattern',
-    guidelines: [],
+    ...TOOL_GUIDANCE.Glob,
   },
   Grep: {
     name: 'Grep',
@@ -144,8 +135,7 @@ export const DEFAULT_PROFILE: ToolProfile = {
       '(`*.py`, `src/**/*.ts`); `context` adds lines around each match. Files ignored by ' +
       '.gitignore are skipped. At most `limit` matches (default 100) or 50 KB are returned, ' +
       'and very long lines are shortened.',
-    snippet: 'Grep: search file contents with a regular expression',
-    guidelines: ['Search with Grep and Glob rather than grep, rg or find in Bash.'],
+    ...TOOL_GUIDANCE.Grep,
   },
 };
 

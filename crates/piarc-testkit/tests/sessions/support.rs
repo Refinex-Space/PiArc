@@ -230,6 +230,7 @@ impl Env {
     pub fn config(&self, extra_args: &[&str]) -> CoreConfig {
         let (bundle, pi_assets) = bundle();
         CoreConfig {
+            memory_home: Some(self.root.join("home")),
             dirs: Some(DataDirs::new(self.data.clone(), self.cache.clone()).expect("absolute")),
             sessions: SessionsConfig {
                 launch: Some(AgentHostLaunch::Custom {

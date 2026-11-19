@@ -75,7 +75,7 @@ pub struct ToolIoConfig {
     /// PiArc's data directory: blobs go to `sessions/<sessionId>/blobs/` below it, the
     /// user's settings (`shell.gitBashPath`) are read from `settings.json` in it.
     pub data_dir: PathBuf,
-    /// Home directory for user memory, isolated by default in standalone embeddings.
+    /// Home for user memory, supplied by the embedding runtime.
     pub memory_home: Option<PathBuf>,
     /// Where commands get their environment.
     pub command_env: CommandEnv,
@@ -102,7 +102,7 @@ impl ToolIoConfig {
     #[must_use]
     pub fn new(data_dir: PathBuf) -> Self {
         Self {
-            memory_home: Some(data_dir.join("test-home")),
+            memory_home: None,
             data_dir,
             command_env: CommandEnv::process(),
             exec_limits: ExecLimits::default(),

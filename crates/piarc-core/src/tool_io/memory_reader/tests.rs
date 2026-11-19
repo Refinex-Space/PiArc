@@ -244,3 +244,43 @@ fn four_mib_is_read_and_one_extra_byte_skips_the_file_and_logs_its_path() {
     );
     assert_eq!(logged.load(Ordering::Relaxed), 1);
 }
+
+#[test]
+fn adjacent_block_comments_do_not_load_their_imports() {
+    let tree = Tree::new();
+    tree.file(
+        "ws/current/CLAUDE.md",
+        "<!-- first --> <!-- @hidden.md -->Visible.\n",
+    );
+    tree.file("ws/current/hidden.md", "Hidden comment import");
+    let result = tree.collect(&[], false, None);
+    assert_eq!(
+        tree.source(&result, "ws/current/CLAUDE.md").trim(),
+        "Visible."
+    );
+}
+
+#[test]
+fn pending_consent_preserves_sources_already_read_at_session_open() {
+    let tree = Tree::new();
+    tree.file(
+        "ws/current/CLAUDE.md",
+        "Opening instructions. @../../guide.md",
+    );
+    tree.file("guide.md", "Approved guide.");
+    let initial = tree.collect(&[], false, None);
+    assert!(
+        !tree
+            .source(&initial, "ws/current/CLAUDE.md")
+            .contains("Approved guide.")
+    );
+    tree.file("ws/current/CLAUDE.md", "Changed during approval.");
+    let frozen = initial
+        .inputs
+        .expect("a deferred import")
+        .expand(&tree.scope, Some(&tree.root.join("home")), |_| Some(true))
+        .unwrap();
+    let text = tree.source(&frozen, "ws/current/CLAUDE.md");
+    assert!(text.contains("Opening instructions.") && text.contains("Approved guide."));
+    assert!(!text.contains("Changed during approval."));
+}

@@ -147,7 +147,10 @@ pub async fn run(options: ProbeOptions) -> Result<ProbeReport> {
     let runtime = BundledRuntime::locate(&options.resources_dir)?;
     let core = Arc::new(ProbeCore {
         workspace: options.workspace.to_string_lossy().into_owned(),
-        io: ToolIo::new(ToolIoConfig::new(options.data_dir.clone())),
+        io: ToolIo::new(ToolIoConfig {
+            memory_home: Some(options.data_dir.join("test-home")),
+            ..ToolIoConfig::new(options.data_dir.clone())
+        }),
         secrets: SecretsService::new(
             SecretsConfig::with_master_key(&options.data_dir, test_master_key_name("s6-probe")),
             Arc::new(MemorySecretStore::new()),

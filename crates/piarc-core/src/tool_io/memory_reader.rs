@@ -1,10 +1,11 @@
 //! Blocking memory discovery for one session. Only fixed memory filenames have implicit
 //! authority outside the workspace. An import or a redirected filename needs its own decision.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use piarc_fs::{Scope, display, encoding};
 use piarc_protocol::memory::MemoryFile;
@@ -16,9 +17,20 @@ mod tests;
 const FILE_LIMIT: u64 = 4 * 1024 * 1024;
 const IMPORT_DEPTH: usize = 4;
 
+/// Keep already-observed sources when an approval interrupts expansion. The authorized
+/// target is opened only after the user answers, even when it needs a nested import.
+#[derive(Clone, Default)]
+pub(super) struct Inputs {
+    sources: Vec<PathBuf>,
+    targets: HashMap<PathBuf, Option<PathBuf>>,
+    contents: HashMap<PathBuf, Option<Arc<str>>>,
+}
+
+#[derive(Clone)]
 pub(super) struct Collection {
     pub(super) files: Vec<MemoryFile>,
     pub(super) pending: Vec<PathBuf>,
+    pub(super) inputs: Option<Inputs>,
 }
 
 pub(super) fn collect(
@@ -29,13 +41,6 @@ pub(super) fn collect(
     read_both: bool,
     decide: impl FnMut(&Path) -> Option<bool>,
 ) -> io::Result<Collection> {
-    let mut reader = Reader {
-        scope,
-        home,
-        decide,
-        seen: HashSet::new(),
-        pending: Vec::new(),
-    };
     let mut sources = Vec::new();
     if let Some(home) = home {
         user_source(home, ".claude/CLAUDE.md", &mut sources)?;
@@ -65,16 +70,42 @@ pub(super) fn collect(
             }
         }
     }
-    let mut files = Vec::new();
-    for source in sources {
-        if let Some(file) = reader.document(&source, 0)? {
-            files.push(file);
-        }
+    Inputs {
+        sources,
+        ..Inputs::default()
     }
-    Ok(Collection {
-        files,
-        pending: reader.pending,
-    })
+    .expand(scope, home, decide)
+}
+
+impl Inputs {
+    pub(super) fn expand(
+        mut self,
+        scope: &Scope,
+        home: Option<&Path>,
+        decide: impl FnMut(&Path) -> Option<bool>,
+    ) -> io::Result<Collection> {
+        let mut reader = Reader {
+            scope,
+            home,
+            decide,
+            seen: HashSet::new(),
+            pending: Vec::new(),
+            targets: &mut self.targets,
+            contents: &mut self.contents,
+        };
+        let mut files = Vec::new();
+        for source in &self.sources {
+            if let Some(file) = reader.document(source, 0)? {
+                files.push(file);
+            }
+        }
+        let pending = reader.pending;
+        Ok(Collection {
+            files,
+            inputs: (!pending.is_empty()).then_some(self),
+            pending,
+        })
+    }
 }
 
 fn user_source(base: &Path, relative: &str, out: &mut Vec<PathBuf>) -> io::Result<()> {
@@ -124,19 +155,32 @@ struct Reader<'a, F> {
     scope: &'a Scope,
     home: Option<&'a Path>,
     decide: F,
+    targets: &'a mut HashMap<PathBuf, Option<PathBuf>>,
+    contents: &'a mut HashMap<PathBuf, Option<Arc<str>>>,
     seen: HashSet<PathBuf>,
     pending: Vec<PathBuf>,
 }
 
 impl<F: FnMut(&Path) -> Option<bool>> Reader<'_, F> {
     fn document(&mut self, requested: &Path, depth: usize) -> io::Result<Option<MemoryFile>> {
-        if depth == 0 && !exists(requested)? {
+        let target = match self.targets.entry(requested.to_owned()) {
+            std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
+            std::collections::hash_map::Entry::Vacant(e) => {
+                let target = if depth == 0 && !exists(requested)? {
+                    None
+                } else {
+                    Some(
+                        self.scope
+                            .locate(&display(requested))
+                            .map_err(io::Error::other)?,
+                    )
+                };
+                e.insert(target)
+            }
+        };
+        let Some(target) = target.clone() else {
             return Ok(None);
-        }
-        let target = self
-            .scope
-            .locate(&display(requested))
-            .map_err(io::Error::other)?;
+        };
         let path = display(&target);
         // Ancestors and the two user files are named by Core. A symlink from those filenames
         // to a different out-of-workspace target has the same boundary as an explicit import.
@@ -163,7 +207,13 @@ impl<F: FnMut(&Path) -> Option<bool>> Reader<'_, F> {
         if !self.seen.insert(target.clone()) {
             return Ok(None);
         }
-        let Some(source) = read_limited(&target)? else {
+        let source = match self.contents.entry(target.clone()) {
+            std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
+            std::collections::hash_map::Entry::Vacant(e) => {
+                e.insert(read_limited(&target)?.map(Arc::from))
+            }
+        };
+        let Some(source) = source.clone() else {
             return Ok(None);
         };
         let dir = target

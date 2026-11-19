@@ -546,11 +546,13 @@ fn check_own_notes(env: &Env, events: &harness::Recorder, a: &SessionId, b: &Ses
 fn check_own_core_calls(env: &Env, core: &harness::Core, a: &SessionId, b: &SessionId) {
     for (index, session) in [a, b].into_iter().enumerate() {
         // `exec/shells` (T17) asks for the session's command tools, not a file.
-        let calls: Vec<_> = core
+        let (memory, calls): (Vec<_>, Vec<_>) = core
             .calls_of(&session.0)
             .into_iter()
             .filter(|c| c.method.starts_with("fs/"))
-            .collect();
+            .partition(|c| c.method == "fs/memory");
+        assert!(!memory.is_empty(), "each session loads its own memory");
+        assert!(memory.iter().all(|c| c.tool.is_none() && c.error.is_none()));
         let methods: Vec<(&str, Option<&str>)> = calls
             .iter()
             .map(|c| (c.method.as_str(), c.tool.as_deref()))

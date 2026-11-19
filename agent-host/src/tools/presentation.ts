@@ -11,6 +11,8 @@ export interface ToolSetup {
   readonly autoResizeImages?: boolean;
   /** Name, description and prompt lines from the session's Tool Profile. */
   readonly presentation: ToolPresentation;
+  /** Report directories actually searched, using the structured Core result. */
+  readonly searched?: (id: string, directories: string[]) => void;
 }
 
 /** The presentation members of a tool definition. */

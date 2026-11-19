@@ -24,7 +24,7 @@ pub struct FsMemoryParams {
 }
 
 /// One memory document with expanded imports.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct MemoryFile {
     /// Source path.
     pub path: String,
@@ -38,6 +38,9 @@ pub struct MemoryFile {
 pub struct MemorySnapshot {
     /// Documents in precedence order.
     pub files: Vec<MemoryFile>,
+    /// Updated documents if memory changed between opening and first delivery.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_files: Option<Vec<MemoryFile>>,
     /// Session opening status when requested.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub git_status: Option<String>,

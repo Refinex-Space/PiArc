@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.26（2026-11-19） |
+| 版本 | 2.27（2026-11-19） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -606,6 +606,8 @@ Harness Kit 在 `before_agent_start` 中通过 Pi 的结构化 prompt 段（`sys
 会话中途的变化（切换 output style、加载 skill、进入 plan 模式、工具集变化）以追加消息的形式送达，不改写已发送的 system prompt。这同时满足 Claude 的 preserved thinking 约束：历史只追加，system 与工具定义保持稳定（`docs/research/claude-official-capabilities.md` C 节）。
 
 T22 通过 `harness/session-memory.ts` 组装，由 `prompts/` 提供原创文本。Pi 的 `before_agent_start` 安装冻结的 system，`piarc.systemPrompt` 分支条目支持恢复和分叉。创建会话时取得的 git 状态、日期与 memory 形成开场上下文；首次输入前已发生的变化同样走追加消息。见 ADR-0033。
+
+PiArc 在开启缓存的 Anthropic Messages 请求中以两个 system 文本块承载静态前缀和会话上下文，沿用原缓存 TTL 与消息级断点。若扩展已占满该请求四个断点，保留现有布局。其他协议采用 pi-ai 原有的缓存策略。
 
 #### 6.6.2 Memory 文件
 

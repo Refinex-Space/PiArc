@@ -63,6 +63,10 @@ impl CoreRuntime {
     ) -> napi::Result<Self> {
         boundary::call(&env, "CoreRuntime.createForTests", move || {
             let mut config = crate::runtime::config_of(options)?;
+            config.memory_home = config
+                .dirs
+                .as_ref()
+                .map(|dirs| dirs.data().join("test-home"));
             config.secret_store = Some(piarc_core::SecretStoreSetup {
                 master_key: piarc_core::secrets::test_master_key_name("napi"),
                 store: std::sync::Arc::new(piarc_core::secrets::MemorySecretStore::new()),

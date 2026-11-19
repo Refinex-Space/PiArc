@@ -45,6 +45,9 @@ import type {
   SessionStopped,
 } from '@piarc/protocol';
 
+import { memoryReader } from '../harness/memory-io.js';
+import { IDENTITY } from '../harness/prompts/system.js';
+import { SessionMemory } from '../harness/session-memory.js';
 import { policyGate } from '../harness/policy.js';
 import {
   interruptedContext,
@@ -108,6 +111,8 @@ const SESSION_ID = /^[A-Za-z0-9._-]{1,128}$/;
 export interface RegistryOptions {
   readonly workspace: Workspace;
   readonly tools: ToolBackend;
+  /** Available when Core negotiated session memory in the handshake. */
+  readonly memoryBridge?: CoreBridge;
   readonly sinkFor: SessionSinkFactory;
   /**
    * Asks Core whether `cwd` is a trusted project (`askCoreTrust`); must resolve `false` on any
@@ -141,6 +146,7 @@ export type RecordedControl =
 interface HostedSession {
   readonly runtime: AgentSessionRuntime;
   readonly projector: Projector;
+  readonly memory: SessionMemory;
   readonly queue: InputQueue;
   readonly batches: ToolBatches;
   readonly toCanonical: (tool: string) => string;
@@ -411,6 +417,7 @@ export class SessionRegistry {
     const turnId = hosted.projector.activeTurnId;
     this.#options.onPiEvent?.(sessionId, { control: 'markAborting' });
     hosted.projector.markAborting();
+    hosted.memory.cancel();
     const returned = hosted.queue.takeAll();
     await hosted.runtime.session.abort();
     if (turnId !== undefined) {
@@ -425,6 +432,7 @@ export class SessionRegistry {
     const turnId = hosted.projector.activeTurnId;
     hosted.closed = true;
     hosted.projector.markAborting();
+    hosted.memory.cancel();
     const returned = hosted.queue.takeAll();
     this.#sessions.delete(sessionId);
     try {
@@ -607,6 +615,15 @@ export class SessionRegistry {
     const { tools } = this.#options;
     const names = tools.kind === 'core' ? new ToolNameMap(tools.profile) : undefined;
     const toCanonical = (tool: string): string => names?.toCanonical(tool) ?? tool;
+    const memory = new SessionMemory(
+      manager,
+      cwd,
+      tools.kind === 'core' ? tools.profile : undefined,
+      this.#options.memoryBridge
+        ? memoryReader(this.#options.memoryBridge, manager.getSessionId())
+        : undefined,
+      toCanonical,
+    );
     const batches = new ToolBatches((tool) => CONCURRENCY_SAFE_TOOLS.has(toCanonical(tool)));
     const factory: CreateAgentSessionRuntimeFactory = async (target) => {
       const settingsManager = SettingsManager.create(target.cwd, target.agentDir, {
@@ -629,6 +646,7 @@ export class SessionRegistry {
                 tools.profile,
                 await shellsFor(io, this.#options.log),
                 settingsManager.getImageAutoResize(),
+                this.#options.memoryBridge ? memory.searched : undefined,
               ),
               batches,
             )
@@ -657,6 +675,8 @@ export class SessionRegistry {
         resourceLoaderOptions: {
           // PiArc assembles project context itself (T22).
           noContextFiles: true,
+          systemPromptOverride: () => IDENTITY,
+          appendSystemPromptOverride: () => [],
           extensionFactories: [
             ...(tools.kind === 'core'
               ? [
@@ -673,6 +693,7 @@ export class SessionRegistry {
             createMcpExtension(),
             ...budget,
             interruptedContext,
+            memory.extension,
           ],
           // Extension tools (MCP, project extensions) run under the same batches.
           extensionsOverride: (result) => batches.wrapExtensions(result),
@@ -721,6 +742,7 @@ export class SessionRegistry {
     const hosted: HostedSession = {
       runtime,
       projector,
+      memory,
       queue,
       batches,
       toCanonical,
@@ -862,6 +884,10 @@ export class SessionRegistry {
         } else {
           const { prepared } = next.job;
           this.#checkImageInput(sessionId, prepared.input);
+          // An interrupt while an external memory import awaits approval ends this turn
+          // before Pi owns it. The abort handler publishes the interrupted outcome.
+          if (!(await hosted.memory.prepare()) || hosted.projector.activeTurnId !== next.turnId)
+            return;
           hosted.delivering.push(prepared);
           await session.prompt(
             composedText(prepared),

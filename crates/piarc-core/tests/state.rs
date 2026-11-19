@@ -52,6 +52,7 @@ impl Fixture {
         let (tx, rx) = channel();
         let core = CoreRuntime::start(
             CoreConfig {
+                memory_home: Some(self.root.join("home")),
                 dirs: Some(self.dirs()),
                 ..CoreConfig::default()
             },

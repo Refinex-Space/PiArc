@@ -24,11 +24,19 @@ pub(super) fn expand(
             }
         } else if comment || body.starts_with("<!--") {
             flush(&mut out, &mut prose, &mut import)?;
-            if let Some((_, tail)) = line.split_once("-->") {
-                comment = false;
-                prose.push_str(tail);
-            } else {
-                comment = true;
+            let mut remaining = line;
+            loop {
+                let Some((_, tail)) = remaining.split_once("-->") else {
+                    comment = true;
+                    break;
+                };
+                if tail.trim_start().starts_with("<!--") {
+                    remaining = tail;
+                } else {
+                    comment = false;
+                    prose.push_str(tail);
+                    break;
+                }
             }
         } else if let Some((ch, n, rest)) = delimiter(body)
             && (ch != b'`' || !rest.contains('`'))

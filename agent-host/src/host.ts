@@ -32,7 +32,7 @@ import { agentDirOf, openWorkspace } from './runtime/workspace.js';
 import { CoreIo, DEFAULT_PROFILE, ExecOutputRouter, type ToolProfile } from './tools/index.js';
 
 /** Capabilities this Agent Host announces in `host/hello`. The models capability includes session selection and provider settings. */
-export const HOST_CAPABILITIES: readonly string[] = ['models'];
+export const HOST_CAPABILITIES: readonly string[] = ['models', 'memory'];
 
 /** Exit codes, for Core's log and restart decisions. */
 export const EXIT = {
@@ -394,6 +394,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
       registry = new SessionRegistry({
         workspace,
         tools,
+        ...(welcome.enabled.includes('memory') ? { memoryBridge: connection.bridge } : {}),
         log,
         sinkFor: (sessionId) => ({
           event: (method, payload) => {

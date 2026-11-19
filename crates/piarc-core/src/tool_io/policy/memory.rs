@@ -12,6 +12,10 @@ pub(in crate::tool_io) async fn approve(
     peer: &Peer,
     generation: &CancellationToken,
 ) -> Result<ApprovalDecision, ErrorObject> {
+    if target.to_str().is_none() {
+        // A lossy label could name two different files in the approval UI and database.
+        return Ok(ApprovalDecision::Deny);
+    }
     let workspace = session.scope.key(session.scope.root());
     let key = display(target);
     let lookup = (workspace.clone(), key.clone());

@@ -330,7 +330,10 @@ impl Env {
                 .collect(),
             asked: Mutex::default(),
             policy_answers: Mutex::default(),
-            io: ToolIo::new(ToolIoConfig::new(self.data_dir.clone())),
+            io: ToolIo::new(ToolIoConfig {
+                memory_home: Some(self.root.join("test-home")),
+                ..ToolIoConfig::new(self.data_dir.clone())
+            }),
             secrets,
             calls: Arc::default(),
         });

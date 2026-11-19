@@ -5,6 +5,7 @@
 // the search. This tool keeps Pi's parameter schema and output: the formatting below follows
 // `packages/coding-agent/src/core/tools/grep.ts` of Pi v1.5.2, MIT License, Copyright (c) 2025
 // Mario Zechner. Core implements the search with ripgrep's libraries and Pi's match-limit rule.
+import path from 'node:path';
 import {
   defineTool,
   createGrepToolDefinition,
@@ -26,7 +27,7 @@ const DEFAULT_LIMIT = 100;
 /** Pi's `GREP_MAX_LINE_LENGTH`, the default of `truncateLine`. */
 const MAX_LINE_LENGTH = 500;
 
-export function createGrepTool({ io, presentation }: ToolSetup): ToolDefinition {
+export function createGrepTool({ io, presentation, searched }: ToolSetup): ToolDefinition {
   const template = createGrepToolDefinition('.');
   return defineTool<GrepDefinition['parameters'], GrepToolDetails | undefined>({
     ...presentationOf(presentation),
@@ -65,6 +66,12 @@ export function createGrepTool({ io, presentation }: ToolSetup): ToolDefinition 
         throw errorCode(error) === 'ENOENT'
           ? new Error(`Path not found: ${searchPath}`, { cause: error })
           : error;
+      }
+      if (searched) {
+        const base = result.isDirectory ? result.path : path.dirname(result.path);
+        const dirs = new Set([base]);
+        for (const line of result.lines) dirs.add(path.dirname(path.resolve(base, line.path)));
+        searched(toolCallId, [...dirs]);
       }
       if (result.matchCount === 0) {
         return { content: [{ type: 'text', text: 'No matches found' }], details: undefined };

@@ -53,6 +53,11 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - 每次交付用户消息前写 `piarc.input` 记录 `turnId`，带提及或附件时还记录原始正文和元数据。手动压缩前记录 `{turnId, action: "compact"}`。历史窗口输出 `turnId`，旧文件按最近用户消息的 entry id 分组。编辑排队文本会清除失效的提及区间，保留已经准备好的附件。
 - 每条模型回复结束时投影 `turn/usage`（本回合累计量）。`turn/completed` 的错误分类在 `runtime/turn-errors.ts` 计算，客户端按 `errorKind`、`retryable` 呈现。
 
+## System prompt 与 memory（T22，ADR-0033）
+
+- `runtime/session-registry.ts` 给每个分支创建 `SessionMemory`，在 `before_agent_start` 挂载七段。英文提示词与默认工具指引在 `src/harness/prompts/`，修改后必须运行 `node scripts/dev/check-prompt-originality.mjs` 并更新 [原创性记录](../docs/engineering/prompt-originality.md)。
+- `noContextFiles: true` 保留。Core 先加载用户文件，再从根到 cwd 逐级加载；`fs/memory` 返回标明来源的快照。成功的 Read、Write、Edit 和 Glob/Grep 的查询及命中目录触发子目录加载。每次回合从分支记录恢复开场 system，以 `piarc.memory` custom message 追加文件变化及跨日日期。Anthropic 的分段缓存与消息块转换在 `memory-wire.ts`。
+
 ## 权限预检与历史
 
 - `src/harness/policy.ts` 使用 Pi 1.5.2 的 `tool_call`。Pi 校验工具参数后调用处理器。处理器把规范工具名、会话、工具调用 id 和参数发给 Core，文件路径与工具执行使用同一套解析规则。只有结构正确的 `allowed: true` 放行。

@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use piarc_host::Peer;
-use piarc_protocol::memory::{FsMemoryParams, FsMemoryResult, MemorySnapshot};
+use piarc_protocol::memory::{FsMemoryParams, FsMemoryResult, MemoryFile, MemorySnapshot};
 use piarc_protocol::policy::ApprovalDecision;
 use piarc_protocol::{ErrorKind, ErrorObject};
 use serde_json::Value;
@@ -127,41 +127,91 @@ impl ToolIo {
         let generation = policy::memory::generation(&session);
         let _guard = session.memory.scan.lock().await;
         let mut choices = lock(&session.memory.choices).clone();
-        let dirs = p.directories.unwrap_or_default();
-        let first = p.include_git == Some(true) && dirs.is_empty();
-        let mut opening = if first {
-            lock(&session.memory.opening).take()
+        let dirs = p.directories.as_deref().unwrap_or_default();
+        let opening = if p.include_git == Some(true) && dirs.is_empty() {
+            lock(&session.memory.opening).clone()
+        } else {
+            lock(&session.memory.opening).take();
+            None
+        };
+        let scan = Scan {
+            io: self,
+            session: &session,
+            params: &p,
+            peer,
+            generation,
+        };
+        let initial = match opening {
+            Some(opening) => Some(scan.resolve(opening, &mut choices).await?),
+            None => None,
+        };
+        let latest = self
+            .collect_memory(&session, dirs.to_vec(), choices.clone())
+            .await?;
+        let latest = scan.resolve(latest, &mut choices).await?;
+        let (files, current_files) = match initial {
+            Some(original) if original != latest => (original, Some(latest)),
+            _ => (latest, None),
+        };
+        let git_status = if p.include_git == Some(true) {
+            Some(session.memory.git_status(&session).await.to_owned())
         } else {
             None
         };
-        let files = loop {
-            if generation.is_cancelled() || peer.is_closed() {
+        let text = serde_json::to_string(&MemorySnapshot {
+            files,
+            current_files,
+            git_status,
+        })
+        .map_err(|e| ErrorObject::new(ErrorKind::InternalError, e.to_string(), false))?;
+        let mut transfer = Transfer {
+            peer: peer.clone(),
+            call: p.tool_call_id,
+            text,
+            offset: 0,
+        };
+        let page = transfer.page();
+        *lock(&session.memory.transfer) = page.next_offset.is_some().then_some(transfer);
+        to_value(&page)
+    }
+}
+
+/// One logical read, including any nested imports discovered after confirmation.
+struct Scan<'a> {
+    io: &'a ToolIo,
+    session: &'a SessionIo,
+    params: &'a FsMemoryParams,
+    peer: &'a Peer,
+    generation: tokio_util::sync::CancellationToken,
+}
+
+impl Scan<'_> {
+    async fn resolve(
+        &self,
+        mut current: memory_reader::Collection,
+        choices: &mut HashMap<PathBuf, bool>,
+    ) -> Result<Vec<MemoryFile>, ErrorObject> {
+        loop {
+            if self.generation.is_cancelled() || self.peer.is_closed() {
                 return Err(policy::denied("Memory import cancelled."));
             }
-            let current = match opening.take() {
-                Some(snapshot) => snapshot,
-                None => {
-                    self.collect_memory(&session, dirs.clone(), choices.clone())
-                        .await?
-                }
+            let Some(inputs) = current.inputs else {
+                return Ok(current.files);
             };
-            if current.pending.is_empty() {
-                break current.files;
-            }
             for path in current.pending {
                 if choices.contains_key(&path) {
                     continue;
                 }
-                let decision = match &self.policy {
+                let decision = match &self.io.policy {
                     Some(svc) => {
                         policy::memory::approve(
                             svc,
-                            &session,
-                            &p.session_id,
-                            &p.tool_call_id,
+                            self.session,
+                            &self.params.session_id,
+                            &self.params.tool_call_id,
                             &path,
-                            peer,
-                            &generation,
+                            self.peer,
+                            &self.generation,
                         )
                         .await?
                     }
@@ -173,26 +223,19 @@ impl ToolIo {
                     decision,
                     ApprovalDecision::AllowSession | ApprovalDecision::Deny
                 ) {
-                    lock(&session.memory.choices).insert(path, allow);
+                    lock(&self.session.memory.choices).insert(path, allow);
                 }
             }
-        };
-        let git_status = if p.include_git == Some(true) {
-            Some(session.memory.git_status(&session).await.to_owned())
-        } else {
-            None
-        };
-        let text = serde_json::to_string(&MemorySnapshot { files, git_status })
-            .map_err(|e| ErrorObject::new(ErrorKind::InternalError, e.to_string(), false))?;
-        let mut transfer = Transfer {
-            peer: peer.clone(),
-            call: p.tool_call_id,
-            text,
-            offset: 0,
-        };
-        let page = transfer.page();
-        *lock(&session.memory.transfer) = page.next_offset.is_some().then_some(transfer);
-        to_value(&page)
+            let scope = self.session.scope.clone();
+            let home = self.io.config.memory_home.clone();
+            let decisions = choices.clone();
+            current = tokio::task::spawn_blocking(move || {
+                inputs.expand(&scope, home.as_deref(), |path| decisions.get(path).copied())
+            })
+            .await
+            .map_err(|e| ErrorObject::new(ErrorKind::InternalError, e.to_string(), false))?
+            .map_err(|e| ErrorObject::new(ErrorKind::IoError, e.to_string(), false))?;
+        }
     }
 }
 

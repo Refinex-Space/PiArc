@@ -143,7 +143,13 @@ async function buildFiles() {
   }
   const surface = {
     title: 'ProtocolValue',
-    anyOf: ['AhpMessage', 'ApprovalRequest', 'ApprovalAnswer', 'AnswerStatus'].map((name) => ({
+    anyOf: [
+      'AhpMessage',
+      'ApprovalRequest',
+      'ApprovalAnswer',
+      'AnswerStatus',
+      'MemorySnapshot',
+    ].map((name) => ({
       $ref: `#/$defs/${name}`,
     })),
     $defs: { ...$defs, AhpMessage: ahp },
