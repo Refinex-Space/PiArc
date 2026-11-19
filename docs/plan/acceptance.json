@@ -2778,8 +2778,8 @@
       "id": "T26-A11",
       "task": "T26",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "收尾 `npm run verify`：All 15 steps passed（Vitest 1149 passed、1 skipped；cargo test 通过；L2 91 passed、2 个按平台跳过，MISSING 0），日志 tmp/evidence/T26/verify-final.log。"
     },
     {
       "id": "T27-A01",
