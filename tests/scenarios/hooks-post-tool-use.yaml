@@ -1,5 +1,5 @@
 id: hooks-post-tool-use
-description: A PostToolUse hook replaces the output the model reads and adds context and feedback; a PostToolUseFailure hook adds context to a failed call but cannot rewrite its output (T25).
+description: A PostToolUse hook replaces the output the model reads and adds context and feedback while another one that exits 1 only tells the user; a PostToolUseFailure hook adds context to a failed call but cannot rewrite its output (T25).
 capabilities: [CAP-HOOK-POST-001]
 workspace:
   trusted: true
@@ -9,11 +9,12 @@ workspace:
     notes.txt: "secret-line\n"
     .claude/settings.json: |
       {"hooks": {
-        "PostToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "node hook.mjs post"}]}],
+        "PostToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "node hook.mjs post"}, {"type": "command", "command": "node hook.mjs crash"}]}],
         "PostToolUseFailure": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "node hook.mjs failure"}]}]
       }}
     hook-plans/post.json: |
       {"json": {"decision": "block", "reason": "Lint found 2 warnings.", "hookSpecificOutput": {"hookEventName": "PostToolUse", "updatedToolOutput": "[output redacted by hook]", "additionalContext": "Output was redacted."}}}
+    hook-plans/crash.json: '{"exit": 1, "stderr": "formatter crashed\nstack line"}'
     hook-plans/failure.json: |
       {"json": {"hookSpecificOutput": {"hookEventName": "PostToolUseFailure", "additionalContext": "Try again with the file name fixed.", "updatedToolOutput": "should not apply"}}}
 providers:
@@ -36,7 +37,17 @@ expect:
       tool_results: [{ id: ok }, { id: fail, is_error: true, contains: 'missing.txt' }]
       contains: ['Try again with the file name fixed.']
       not_contains: ['should not apply']
+  events:
+    - method: core/notices
+      params:
+        type: hook
+        event: PostToolUse
+        level: error
+        message: 'exited with code 1: formatter crashed'
+    - { method: turn/completed, turn: t, params: { status: completed } }
   json_lines:
+    hook-log/crash.jsonl:
+      - input: { hook_event_name: PostToolUse, tool_use_id: ok }
     hook-log/post.jsonl:
       - types:
           {
