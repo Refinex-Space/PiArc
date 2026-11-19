@@ -42,6 +42,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 
 - `runtime/session-registry.ts` 给每个分支创建 `SessionMemory`，在 `before_agent_start` 挂载七段。英文提示词与默认工具指引在 `src/harness/prompts/`，修改后必须运行 `node scripts/dev/check-prompt-originality.mjs` 并更新 [原创性记录](../docs/engineering/prompt-originality.md)。
 - `noContextFiles: true` 保留。Core 先加载用户文件，再从根到 cwd 逐级加载；`fs/memory` 返回标明来源的快照。成功的 Read、Write、Edit 和 Glob/Grep 的查询及命中目录触发子目录加载。每次回合从分支记录恢复开场 system，以 `piarc.memory` custom message 追加文件变化及跨日日期。Anthropic 的分段缓存与消息块转换在 `memory-wire.ts`。
+- 条件 rules（T24，ADR-0038）：Core 上次快照带 `inactiveRules` 时，Read、Write、Edit 成功后即使目录已访问过，也带上该文件（`files`）再请求一次快照；快照里带 `paths` 的文件是条件 rules，首次出现时随 `piarc.memory` 消息送达并写入分支条目 `piarc.memoryRules`，之后每次请求都在 `rules` 中带上它们（每会话一次，恢复与分叉沿用分支）。
 
 ## 权限预检与历史
 

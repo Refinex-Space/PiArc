@@ -53,3 +53,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0035](0035-command-environment.md) | 工具命令可继承的环境 | 已接受 |
 | [0036](0036-bind-file-operations-to-directory-handles.md) | 文件访问与获准目录身份绑定 | 已接受 |
 | [0037](0037-permission-rules-and-bash-analysis.md) | 权限规则、Bash 命令分析与模式的落地（补充 ADR-0004、0005、0031） | 已接受 |
+| [0038](0038-claude-code-config-compat.md) | Claude Code 配置兼容层与配置诊断的落地（补充 ADR-0005、0033） | 已接受 |

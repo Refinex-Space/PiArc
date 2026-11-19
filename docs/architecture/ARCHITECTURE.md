@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.29（2026-11-18） |
+| 版本 | 2.30（2026-11-18） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -634,7 +634,7 @@ PiArc 在开启缓存的 Anthropic Messages 请求中以两个 system 文本块�
 - Pi 自带的上下文文件加载被关闭（SDK 选项），统一由 Harness Kit 处理，避免重复。
 - 自动记忆（agent 自己维护的跨会话笔记，`MEMORY.md` 索引 + 主题文件）列为 M5。
 
-T22 的具体顺序为用户 `~/.claude/CLAUDE.md`、PiArc 数据目录的 `MEMORY.md`、文件系统根至 cwd 各级。每级按 `CLAUDE.md`、`.claude/CLAUDE.md`、适用时的 `AGENTS.md`、`CLAUDE.local.md` 排列。`memory.readBoth` 可在常规设置或 PiArc 分层设置文件中设置。Core 按规范目标检查导入及重定向到外部的符号链接，通过权限扩展卡取得同意。首次成功访问子目录时，Harness 以带来源的 `piarc.memory` 消息追加新文档；后续回合按内容摘要判断更新或移除。
+T22 的具体顺序为用户 `~/.claude/CLAUDE.md`、PiArc 数据目录的 `MEMORY.md`、文件系统根至 cwd 各级。T24 起用户级 `~/.claude/rules/` 紧跟 `~/.claude/CLAUDE.md`，工作区根的 `.claude/rules/` 紧跟根目录的 `.claude/CLAUDE.md`（ADR-0038）；rules 正文去掉 frontmatter，带 `paths:` 的在首次成功读写匹配文件后以同一 `piarc.memory` 追加消息送达，分支条目 `piarc.memoryRules` 记下已注入的条件 rules，每会话一次。每级按 `CLAUDE.md`、`.claude/CLAUDE.md`、适用时的 `AGENTS.md`、`CLAUDE.local.md` 排列。`memory.readBoth` 可在常规设置或 PiArc 分层设置文件中设置。Core 按规范目标检查导入及重定向到外部的符号链接，通过权限扩展卡取得同意。首次成功访问子目录时，Harness 以带来源的 `piarc.memory` 消息追加新文档；后续回合按内容摘要判断更新或移除。
 
 #### 6.6.3 System reminder
 
@@ -755,6 +755,14 @@ T21 的 `models/list` 返回可用模型的 `provider`、`id`、`name`、`contex
 | 企业托管配置（`managed-settings.json`） | M5 | PiArc 自有托管配置格式另行设计，兼容读取 Claude Code 的托管文件 |
 
 设置界面提供"配置诊断"：列出每个配置文件的加载状态、生效的键、被覆盖的键、被忽略的键（借鉴 claw-code 的 ConfigInspection）。
+
+T24 落地（ADR-0038）：
+
+- 读取的文件与层级：`~/.claude/settings.json`（`claudeUser`）、`.claude/settings.json`（`claudeProject`）、`.claude/settings.local.json`（`claudeProjectLocal`）按 ADR-0005 第 3 条与 PiArc 的三个文件同表合并；`~/.claude.json` 不是设置层，配置诊断只列出它的键名。家目录由 Core 注入（`CoreConfig.home`），测试一律用临时目录。
+- 键映射表是唯一判断（`piarc_config::claude::SETTINGS_KEYS`，按官方 settings 索引逐键归类）。M2 实际生效的键：`permissions.allow`、`permissions.ask`、`permissions.deny`、`permissions.defaultMode`、`permissions.additionalDirectories`。由后续任务支持的键：`hooks`、`disableAllHooks`（T25）；`plansDirectory`（T26）；`autoCompactEnabled`、`autoCompactWindow`（T27）；`fileCheckpointingEnabled`（T28）；`model`、`effortLevel`（T29）；`agent`、`advisorModel`（T31）；`worktree`（T35）；`enableAllProjectMcpServers`、`enabledMcpjsonServers`、`disabledMcpjsonServers`、`allowedMcpServers`、`deniedMcpServers` 与 `~/.claude.json` 的 MCP 段（T36）；`outputStyle`、`disableBundledSkills`、`skillOverrides`、`disableSkillShellExecution`（T37）；`allowedHttpHookUrls`、`httpHookAllowedEnvVars`（T38）；`sandbox`（T39）；`enabledPlugins`、`extraKnownMarketplaces`（T40）；`autoMode`、`disableAutoMode`、`useAutoModeDuringPlan`（T46）；`autoMemoryEnabled`、`autoMemoryDirectory`（T47）。其余键（含 `env`、`theme`、`language` 等终端偏好、账号与遥测、只在托管设置中有效的键）标为"已忽略"，表外的键为"未知"，都在诊断中逐个列出。
+- 信任约束与 PiArc 项目层相同：信任前项目层的 allow、`additionalDirectories`、`acceptEdits` 不生效，deny 与 ask 照常生效；项目层的 `bypassPermissions`、`auto` 始终不生效，诊断注明原因。生效键类型错误时整份文件跳过并给出 JSON Pointer，JSON 语法错误给出行列，其他文件照常加载。
+- `.claude/` 文件与 PiArc 设置一起被监听，变化后重新加载并发 `core/settings`；新增的可执行项沿用第 10.2 节的快照确认。PiArc 的写接口拒绝 `.claude/` 下与 `.claude.json` 的任何路径（`permissionDenied`），L2 运行器在每个场景前后比对 Claude Code 配置的快照。
+- 配置诊断的 Core API 为 `config_diagnostics`（NAPI `configDiagnostics`），与权限裁决用同一次加载；设置窗口"配置诊断"页按文件列出并可展开每个键的本文件取值、最终取值与来源。T41 在此基础上补全插件与企业来源。
 
 ### 6.15 工程不变量与初始校准值
 
@@ -877,7 +885,7 @@ crates/
 | `exec/*` | `run`（流式）、`kill`、`background/list`、`background/read` | 按命令超时 |
 | `secrets/*` | `getAll`、`get`、`set`、`delete`、`lock`、`renew`、`unlock` | 失败时会话报错，不回退到明文 |
 | `ui/*` | `ask`（AskUserQuestion）、`loginInteraction`、`notify` | 等待用户 |
-| `fs/memory` | 按会话收集 memory、审批外部导入、分帧获取冻结的 UTF-8 快照（能力 `memory`，ADR-0033） | 等待审批沿用 `policy/pending` |
+| `fs/memory` | 按会话收集 memory、审批外部导入、分帧获取冻结的 UTF-8 快照（能力 `memory`，ADR-0033）；T24 起可带刚读写的文件与已注入的条件 rules，结果标出条件 rules 与是否还有未加载的条件 rules（ADR-0038） | 等待审批沿用 `policy/pending` |
 | `trust/get` | 查询项目信任状态 | 失败按"不信任" |
 
 **Agent Host → Core 通知**
@@ -1555,6 +1563,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.30 | 2026-11-18 | T24（ADR-0038）补充第 6.14 节 Claude Code 配置兼容的落地与 M2 生效键清单、6.6.2 节 rules 的顺序与条件注入、7.4 节 `fs/memory` 的新增成员 |
 | 2.29 | 2026-11-18 | T23（ADR-0037）补充第 6.2 节规则、Bash 分析、阶梯、模式与管理的落地，7.4 增加 `policy/tools`，9.2 写明模式记忆与审计字段，10.3 写明权限页命令与跳过权限的原生确认；第 11 章写入含 Bash 分析的裁决实测 |
 | 2.28 | 2026-11-19 | R2 记录 macOS 阶段门；更新 6.0 的 M1 能力、读取成功登记、文件授权与目录句柄、命令环境准入、信任与删除确认、索引 schema v4（ADR-0034–0036）。 |
 | 2.27 | 2026-11-19 | T22（ADR-0033）补充提示词冻结与恢复、memory 顺序、导入审批与消息送达、AHP 与用户级文件位置 |

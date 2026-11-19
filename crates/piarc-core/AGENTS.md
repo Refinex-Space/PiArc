@@ -105,7 +105,10 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 错误映射为 `piarc_protocol::ErrorObject`：`ShuttingDown` → `shuttingDown`，`QueueFull` → `busy`，参数错误 → `invalidParams`，功能 crate 的错误（`Feature`）保留它们自己的 kind 与 `retryable`，其余 → `internalError`。
 - 演示事件源（`demo.rs`）只给测试与基准用；发布构建的 `piarc-napi` 不导出启动它的函数。
 
-- Memory 由 `tool_io/memory.rs` 组装快照，文件发现和导入在 `memory_reader.rs`。外部导入经同一会话的审批账本，由 `policy/memory.rs` 按工作区及规范目标匹配。测试设置 `CoreConfig.home`，避免读取用户的 memory。见 ADR-0033。
+- Memory 由 `tool_io/memory.rs` 组装快照，文件发现和导入在 `memory_reader.rs`。外部导入经同一会话的审批账本，由 `policy/memory.rs` 按工作区及规范目标匹配。见 ADR-0033。
+- 家目录（T24）：`CoreConfig.home` 默认是进程家目录，`open_state` 经 `DataDirs::with_home` 放进 `Storage` 的目录；凡是读设置的地方都用 `DataDirs::layers(workspace)`（PiArc 与 Claude Code 七层），不要直接调 `LayerTable::piarc`。测试、L2、`createForTests` 都注入临时目录，从不读本机 `~/.claude`。
+- Claude Code rules（T24，ADR-0038）：`memory_reader/rules.rs` 选出 `~/.claude/rules/` 与工作区根 `.claude/rules/` 中要载入的文件（排在各自的 `.claude/CLAUDE.md` 之后），无条件的总是载入，带 `paths:` 的在 `fs/memory` 的 `files` 有匹配文件或 `rules` 点名时载入；快照的 `inactiveRules` 告诉 Agent Host 还有没载入的条件 rules。frontmatter 只用于选择，送达的正文不含它。
+- 配置诊断（T24）：`config_diagnostics::report` 用 `TrustService::permission_settings` 加载（与权限裁决同一份），附上 `~/.claude.json` 的键名报告；经 `Hub::config_diagnostics` 与 `CoreRuntime::config_diagnostics`（NAPI `configDiagnostics`）对外。写 `.claude/` 的任何尝试返回 `permissionDenied`（`piarc_config::WriteError::ClaudeConfig`）。
 
 ## 易错点
 
