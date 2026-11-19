@@ -14,7 +14,7 @@ Core 层的集成测试在 `crates/piarc-core/tests/exec_commands.rs`（cwd、�
 
 ## 终止流程
 
-- 停止 = `ProcessControl::terminate`（Unix 向进程组发 `SIGTERM`；Windows 直接 `TerminateJobObject`）→ 等 `kill_grace`（默认 2 s）→ `kill`（`SIGKILL`）。触发：超时、取消令牌（`exec/kill`、回合中断、连接断开、会话关闭）、输出通道关闭、`run` 的 future 被丢弃（drop guard）。
+- 停止 = `ProcessControl::terminate`（Unix 向进程组发 `SIGTERM`；Windows 直接 `TerminateJobObject`）→ 等 `kill_grace`（默认 2 s）→ `kill`（`SIGKILL`）。触发：超时、取消令牌（`exec/kill`、回合中断、连接断开、会话关闭）、输出管道读取错误（标记具体流并报告失败）、输出通道关闭、`run` 的 future 被丢弃（drop guard）。
 - 等到 shell 退出后 `watch` 丢弃 `ProcessControl`：`ProcessTreeSpawner` 的句柄丢弃即 `killpg(SIGKILL)` / 关闭 Job，命令留在后台的进程随之结束。所以 shell 先退出时，忽略 `SIGTERM` 的孙进程立刻收到 `SIGKILL`，不再等宽限。
 - `TokioProcessSpawner` 只杀直接子进程，Core 的命令不再用它（只剩 T06 的测试与兼容）。
 

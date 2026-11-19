@@ -262,6 +262,7 @@ impl Pump {
         let mut err_buf = vec![0_u8; READ_CHUNK];
         let (mut out_open, mut err_open) = (true, true);
         let mut exit: Option<io::Result<CommandExit>> = None;
+        let mut pipe_error = None;
         loop {
             if !out_open && !err_open && exit.is_some() {
                 break;
@@ -271,22 +272,42 @@ impl Pump {
                     exit = Some(result.unwrap_or_else(|_| Err(io::Error::other("the process watcher stopped"))));
                 }
                 read = stdout.read(&mut out_buf), if out_open => {
-                    out_open = self.forward(Stream::Stdout, read, &out_buf).await;
+                    out_open = self.forward(Stream::Stdout, read, &out_buf, &mut pipe_error).await;
                 }
                 read = stderr.read(&mut err_buf), if err_open => {
-                    err_open = self.forward(Stream::Stderr, read, &err_buf).await;
+                    err_open = self.forward(Stream::Stderr, read, &err_buf, &mut pipe_error).await;
                 }
                 // Re-armed on every chunk: only quiet pipes end the wait after the exit.
                 () = tokio::time::sleep(EXIT_GRACE), if exit.is_some() => break,
             }
         }
+        if let Some(error) = pipe_error {
+            return Err(error);
+        }
         exit.unwrap_or_else(|| Err(io::Error::other("the process watcher stopped")))
     }
 
     /// Sends one read on; returns whether the pipe stays open.
-    async fn forward(&self, stream: Stream, read: io::Result<usize>, buffer: &[u8]) -> bool {
+    async fn forward(
+        &self,
+        stream: Stream,
+        read: io::Result<usize>,
+        buffer: &[u8],
+        pipe_error: &mut Option<io::Error>,
+    ) -> bool {
         match read {
-            Ok(0) | Err(_) => false,
+            Ok(0) => false,
+            Err(error) => {
+                let name = match stream {
+                    Stream::Stdout => "stdout",
+                    Stream::Stderr => "stderr",
+                };
+                pipe_error.get_or_insert_with(|| {
+                    io::Error::new(error.kind(), format!("cannot read {name}: {error}"))
+                });
+                self.stop.cancel();
+                false
+            }
             Ok(n) => {
                 let chunk = OutputChunk {
                     stream,
@@ -308,6 +329,41 @@ mod tests {
 
     use super::*;
     use crate::{ProcessTreeSpawner, TokioProcessSpawner};
+
+    #[tokio::test]
+    async fn a_failed_output_pipe_is_reported_even_when_the_command_succeeds() {
+        struct FailedReader;
+        impl AsyncRead for FailedReader {
+            fn poll_read(
+                self: std::pin::Pin<&mut Self>,
+                _: &mut std::task::Context<'_>,
+                _: &mut tokio::io::ReadBuf<'_>,
+            ) -> std::task::Poll<io::Result<()>> {
+                std::task::Poll::Ready(Err(io::Error::other("test pipe failure")))
+            }
+        }
+        let (output, _receiver) = mpsc::channel(1);
+        let pump = Pump {
+            output,
+            stop: CancellationToken::new(),
+        };
+        let (tx, rx) = oneshot::channel();
+        tx.send(Ok(CommandExit {
+            status: ExitStatus {
+                code: Some(0),
+                signal: None,
+            },
+            killed: false,
+            timed_out: false,
+        }))
+        .expect("watcher");
+        let error = pump
+            .run(Box::pin(FailedReader), Box::pin(tokio::io::empty()), rx)
+            .await
+            .expect_err("failed pipe");
+        assert!(error.to_string().contains("stdout"));
+        assert!(pump.stop.is_cancelled());
+    }
 
     fn bash() -> PathBuf {
         crate::shells::detect(&crate::shells::Probe::system(&env()), None)
