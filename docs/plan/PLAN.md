@@ -311,13 +311,13 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 T24（开工基线 363b0d6，`npm run verify` 15/15；T23 部分完成的遗留项 A05 只涉及 Windows 的 PowerShell 场景，不影响本任务；T23 尚未推送，无 Windows CI 可核对）：
 
-- [ ] 1. 家目录注入（`CoreConfig.home`）与 `.claude/` 三个设置层 + `~/.claude.json` 只读加载，接入 ADR-0005 顺序与信任约束（A01、A02、A03、A05、A06）
-- [ ] 2. 键映射表（单一来源）与合并按表投影（A04）
-- [ ] 3. `.claude/rules/` 加载：无 `paths:` 进项目上下文、有 `paths:` 首次读写匹配文件时懒注入（A07）
-- [ ] 4. 不写 `.claude/`：写接口拒绝 + L2 目录快照比对（A08）
-- [ ] 5. 变更监听：`.claude/` 文件变化后重载并刷新诊断（A09）
-- [ ] 6. 配置诊断 Core API + NAPI + IPC + 设置页"配置诊断"（A10）
-- [ ] 7. L2 场景 `config-*.yaml` 与能力 ID
+- [x] 1. 家目录注入（`CoreConfig.home`）与 `.claude/` 三个设置层 + `~/.claude.json` 只读加载，接入 ADR-0005 顺序与信任约束（A01、A02、A03、A05、A06）
+- [x] 2. 键映射表（单一来源）与合并按表投影（A04）
+- [x] 3. `.claude/rules/` 加载：无 `paths:` 进项目上下文、有 `paths:` 首次读写匹配文件时懒注入（A07）
+- [x] 4. 不写 `.claude/`：写接口拒绝 + L2 目录快照比对（A08）
+- [x] 5. 变更监听：`.claude/` 文件变化后重载并刷新诊断（A09）
+- [ ] 6. 配置诊断 Core API + NAPI + IPC + 设置页"配置诊断"（A10）：Core API 与 NAPI 已完成，IPC 与设置页待做
+- [x] 7. L2 场景 `config-*.yaml` 与能力 ID
 - [ ] 8. 文档（piarc-config AGENTS.md、架构 6.14）、验收、收尾 verify（A11）
 
 ## 登记事项

@@ -540,6 +540,137 @@ fn editing_settings_while_running_emits_changed_keys_and_invalid_files_keep_the_
     core.shutdown_blocking().expect("shutdown");
 }
 
+fn diagnostics(core: &CoreRuntime, ws: &Path) -> Value {
+    let (tx, rx) = std::sync::mpsc::channel();
+    core.config_diagnostics(Some(ws.to_owned()), move |result| {
+        let _ = tx.send(result);
+    })
+    .expect("queued");
+    rx.recv_timeout(WAIT).expect("answer").expect("diagnostics")
+}
+
+fn file_report<'a>(report: &'a Value, layer: &str) -> &'a Value {
+    report["files"]
+        .as_array()
+        .expect("files")
+        .iter()
+        .find(|f| f["layer"] == layer)
+        .unwrap_or_else(|| panic!("no {layer} in {report}"))
+}
+
+/// The end of the A09 test: a broken Claude Code file, and Core's refusal to write one.
+fn broken_file_keeps_content_and_writes_are_refused(
+    rt: &tokio::runtime::Runtime,
+    core: &CoreRuntime,
+    rx: &Receiver<EventBatch>,
+    settings: &piarc_core::workspace_settings::WorkspaceSettings,
+    ws: &Path,
+) {
+    let project = ws.join(".claude").join("settings.json");
+    // A broken file is reported with its position and keeps its last valid content.
+    std::fs::write(&project, "{\n  \"permissions\": {\n").expect("write");
+    let event = wait_for(rx, "broken claude file", |e| {
+        !e["issues"].as_array().is_none_or(Vec::is_empty)
+    });
+    assert_eq!(event["issues"][0]["layer"], "claudeProject");
+    assert_eq!(event["issues"][0]["line"], 3);
+    let report = diagnostics(core, ws);
+    assert_eq!(file_report(&report, "claudeProject")["status"], "invalid");
+
+    // Core never writes Claude Code's files.
+    let error = rt
+        .block_on(settings.write("claudeProject", "/permissions/allow", Some(json!(["Read"]))))
+        .expect_err("read only");
+    assert_eq!(
+        error.to_error_object().data.kind,
+        piarc_protocol::ErrorKind::PermissionDenied
+    );
+    assert_eq!(
+        std::fs::read_to_string(&project).expect("read"),
+        "{\n  \"permissions\": {\n"
+    );
+}
+
+/// T24-A09: Claude Code's files are watched like PiArc's; a change reloads the settings,
+/// is reported on `core/settings` and shows in the next diagnostics. A10's Core half: the
+/// report lists every file with its state, applied, overridden and ignored keys.
+#[test]
+fn editing_claude_code_settings_while_running_reloads_and_refreshes_the_diagnostics() {
+    let f = Fixture::new("claude settings");
+    let ws = f.root.join("ws 设置");
+    let home = f.root.join("home");
+    std::fs::create_dir_all(&ws).expect("ws");
+    std::fs::create_dir_all(home.join(".claude")).expect("home");
+    std::fs::write(
+        home.join(".claude").join("settings.json"),
+        r#"{"permissions":{"deny":["Bash(home *)"],"defaultMode":"plan"}}"#,
+    )
+    .expect("write");
+    std::fs::write(home.join(".claude.json"), r#"{"numStartups":1}"#).expect("state");
+    let rt = runtime();
+    let (core, rx) = f.start();
+    let settings = rt
+        .block_on(core.open_settings(ws.clone()))
+        .expect("settings open");
+    assert_eq!(
+        settings.merged()["permissions"],
+        json!({ "deny": ["Bash(home *)"], "defaultMode": "plan" })
+    );
+    let report = diagnostics(&core, &ws);
+    assert_eq!(report["trusted"], false);
+    assert_eq!(file_report(&report, "claudeProject")["status"], "missing");
+    assert_eq!(file_report(&report, "claudeUser")["status"], "loaded");
+    assert_eq!(file_report(&report, "claudeState")["status"], "loaded");
+
+    // `.claude/` does not exist yet: creating it and its file is noticed.
+    std::fs::create_dir_all(ws.join(".claude")).expect("dir");
+    let project = ws.join(".claude").join("settings.json");
+    std::fs::write(
+        &project,
+        r#"{"permissions":{"deny":["Bash(curl *)"],"defaultMode":"default"},"theme":"dark"}"#,
+    )
+    .expect("write");
+    let event = wait_for(&rx, "claude project file", |e| {
+        e["changed"].as_array().is_some_and(|c| !c.is_empty())
+    });
+    assert_eq!(
+        event["changed"],
+        json!(["/permissions/defaultMode", "/permissions/deny"])
+    );
+    let report = diagnostics(&core, &ws);
+    let claude = file_report(&report, "claudeProject");
+    assert_eq!(claude["status"], "loaded");
+    assert_eq!(claude["writable"], false);
+    assert_eq!(
+        claude["ignored"],
+        json!([{ "pointer": "/theme", "reason": "ignored", "note": "PiArc has its own theme preference" }])
+    );
+    let user = file_report(&report, "claudeUser");
+    assert_eq!(user["overridden"][0]["pointer"], "/permissions/defaultMode");
+    assert_eq!(user["overridden"][0]["source"], "claudeProject");
+    assert_eq!(user["overridden"][0]["finalValue"], "default");
+
+    // The user-level file is watched as well.
+    std::fs::write(
+        home.join(".claude").join("settings.json"),
+        r#"{"permissions":{"deny":["Bash(home *)","Bash(rm *)"]}}"#,
+    )
+    .expect("write");
+    wait_for(&rx, "claude user file", |e| {
+        e["changed"]
+            .as_array()
+            .is_some_and(|c| c.contains(&json!("/permissions/deny")))
+    });
+    assert_eq!(
+        settings.merged()["permissions"]["deny"],
+        json!(["Bash(home *)", "Bash(rm *)", "Bash(curl *)"])
+    );
+
+    broken_file_keeps_content_and_writes_are_refused(&rt, &core, &rx, &settings, &ws);
+    drop(settings);
+    core.shutdown_blocking().expect("shutdown");
+}
+
 #[test]
 fn approval_extends_only_the_selected_entries_of_an_existing_trust_snapshot() {
     use piarc_config::{Category, LayerTable, TrustState, append_local_permissions};

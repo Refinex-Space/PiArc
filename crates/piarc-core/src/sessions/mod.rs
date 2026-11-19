@@ -229,6 +229,11 @@ impl Hub {
         }
     }
 
+    /// The configuration diagnostics of a workspace (T24).
+    pub async fn config_diagnostics(&self, workspace: Option<PathBuf>) -> Result<Value> {
+        crate::config_diagnostics::report(&self.ctx.storage, &self.ctx.trust, workspace).await
+    }
+
     /// The permission settings page's view of a workspace's rules (T23).
     pub async fn permission_view(&self, workspace: Option<PathBuf>) -> Result<Value> {
         self.ctx

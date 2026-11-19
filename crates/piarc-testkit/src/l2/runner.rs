@@ -23,7 +23,10 @@ use tokio::sync::{Notify, oneshot};
 
 use super::checks::{check_files, check_fixture_files, check_requests};
 pub use super::fixtures::INTERNAL_PROBES;
-use super::fixtures::{command_env, prepare_workspace, resolve, write_file, write_json};
+use super::fixtures::{
+    claude_changes, claude_snapshot, command_env, prepare_workspace, resolve, write_file,
+    write_json,
+};
 use super::format::{Action, EndpointSetup, InputAction, ScenarioSpec, Wire};
 use super::gate::Gate;
 use super::matcher::subset_mismatch;
@@ -97,7 +100,7 @@ pub struct RunOutcome {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Failure {
     /// `setup`, `action`, `events`, `files`, `requests`, `approvals`, `tool_batches`,
-    /// `core_io`, `cleanup`.
+    /// `core_io`, `claude_config`, `cleanup`.
     pub kind: &'static str,
     /// Readable report.
     pub message: String,
@@ -151,6 +154,8 @@ async fn run_in(spec: &ScenarioSpec, config: &RunnerConfig, root: &Path) -> Vec<
         Ok(env) => env,
         Err(e) => return vec![failure("setup", e)],
     };
+    // T24-A08: Claude Code's configuration is read only, in every scenario.
+    let claude_before = claude_snapshot(root);
     let events = Arc::new(Events::default());
     let core = match env.start_core(&events) {
         Ok(core) => core,
@@ -174,6 +179,20 @@ async fn run_in(spec: &ScenarioSpec, config: &RunnerConfig, root: &Path) -> Vec<
     };
     if let Err(e) = shutdown(&driver.core).await {
         failures.push(failure("cleanup", e));
+    }
+    let changes = claude_changes(&claude_before, &claude_snapshot(root));
+    if !changes.is_empty() {
+        failures.push(failure(
+            "claude_config",
+            format!(
+                "PiArc changed Claude Code configuration:
+{}",
+                changes.join(
+                    "
+"
+                )
+            ),
+        ));
     }
     failures
 }

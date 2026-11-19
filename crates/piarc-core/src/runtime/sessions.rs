@@ -122,6 +122,20 @@ impl CoreRuntime {
     ///
     /// # Errors
     /// As [`Self::session_op`].
+    /// The configuration diagnostics of a workspace, the most recent one when `None` (T24).
+    ///
+    /// # Errors
+    /// As [`Self::session_op`].
+    pub fn config_diagnostics(
+        &self,
+        workspace: Option<PathBuf>,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.config_diagnostics(workspace).await
+        })
+    }
+
     /// The permission rules of a workspace by source (T23).
     ///
     /// # Errors

@@ -317,11 +317,7 @@ fn a_moved_import_directory_requires_a_new_decision() {
     );
 }
 
-/// T24-A07 (Core half): unconditional rules follow the user and root `.claude/CLAUDE.md`
-/// without their frontmatter; a conditional rule is included once a matching file was
-/// touched, and stays included when the Host names it.
-#[test]
-fn rules_follow_their_claude_md_and_paths_select_conditional_ones() {
+fn rule_tree() -> Tree {
     let tree = Tree::new();
     tree.file("home/.claude/CLAUDE.md", "user memory");
     tree.file(
@@ -347,6 +343,15 @@ fn rules_follow_their_claude_md_and_paths_select_conditional_ones() {
     tree.file("ws/CLAUDE.local.md", "local memory");
     tree.file("ws/current/src/a.ts", "x");
     tree.file("ws/current/src/b.js", "x");
+    tree
+}
+
+/// T24-A07 (Core half): unconditional rules follow the user and root `.claude/CLAUDE.md`
+/// without their frontmatter; a conditional rule is included once a matching file was
+/// touched, and stays included when the Host names it.
+#[test]
+fn rules_follow_their_claude_md_and_paths_select_conditional_ones() {
+    let tree = rule_tree();
     let order = |result: &Collection| -> Vec<String> {
         result.files.iter().map(|f| f.content.clone()).collect()
     };
@@ -365,7 +370,12 @@ fn rules_follow_their_claude_md_and_paths_select_conditional_ones() {
     );
     assert!(none.inactive_rules);
     assert!(none.files.iter().all(|f| f.paths.is_none()));
+}
 
+/// T24-A07 (Core half): conditional rules follow touched files and the Host's list.
+#[test]
+fn conditional_rules_load_for_matching_files_and_stay_when_named() {
+    let tree = rule_tree();
     // The session cwd is `ws/current`; globs are relative to the workspace root `ws`.
     let root_relative = |name: &str| tree.root.join("ws").join(name);
     let unrelated = tree.collect_rules(

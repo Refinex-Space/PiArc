@@ -55,6 +55,12 @@ export declare class CoreRuntime {
   /** Answers a pending permission request and returns its status as JSON. */
   answerApproval(answer: string): Promise<string>;
   /**
+   * The configuration diagnostics of a workspace (JSON), the most recent workspace when
+   * null (T24): every settings file with its load state and applied, overridden and
+   * ignored keys.
+   */
+  configDiagnostics(workspace?: string | null): Promise<string>;
+  /**
    * The permission rules of a workspace by source, the most recent workspace when null
    * (T23).
    */

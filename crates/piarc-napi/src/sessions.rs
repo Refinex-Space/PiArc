@@ -251,6 +251,20 @@ impl CoreRuntime {
         })
     }
 
+    /// The configuration diagnostics of a workspace (JSON), the most recent workspace when
+    /// null (T24): every settings file with its load state and applied, overridden and
+    /// ignored keys.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn config_diagnostics<'env>(
+        &self,
+        env: &'env Env,
+        #[napi(ts_arg_type = "string | null")] workspace: Option<String>,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.configDiagnostics", |core, done| {
+            core.config_diagnostics(workspace.map(Into::into), done)
+        })
+    }
+
     /// The permission rules of a workspace by source, the most recent workspace when null
     /// (T23).
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]

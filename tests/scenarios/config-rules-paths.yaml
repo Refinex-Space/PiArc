@@ -1,0 +1,61 @@
+id: config-rules-paths
+description: Rules without paths join the project context after their CLAUDE.md; a rule with paths arrives as a marked memory message on the first read or write of a matching file, once per session, never for other files, and the system prompt does not change (T24).
+capabilities: [CAP-CTX-RULES-001]
+workspace:
+  files:
+    CLAUDE.md: Root workspace memory.
+    .claude/CLAUDE.md: Nested workspace memory.
+    .claude/rules/general.md: General project rule.
+    .claude/rules/typescript.md: "---\npaths:\n  - \"src/**/*.{ts,tsx}\"\n---\nTypeScript rule body.\n"
+    CLAUDE.local.md: Local workspace memory.
+    notes.md: plain notes
+    src/a.ts: export const a = 1;
+    src/b.ts: export const b = 2;
+  run_files:
+    'home 家/.claude/CLAUDE.md': User memory.
+    'home 家/.claude/rules/user.md': User rule.
+providers:
+  main:
+    wire: anthropic
+    validation:
+      ordered_system_sections:
+        - '<project_context>'
+        - User memory.
+        - User rule.
+        - Root workspace memory.
+        - Nested workspace memory.
+        - General project rule.
+        - Local workspace memory.
+        - '<environment>'
+    steps:
+      - tool_calls: [{ id: notes, name: Read, input: { path: notes.md } }]
+      - tool_calls: [{ id: first, name: Read, input: { path: src/a.ts } }]
+      - tool_calls:
+          - id: edit
+            name: Edit
+            input: { path: src/a.ts, edits: [{ oldText: a = 1, newText: a = 3 }] }
+      - tool_calls: [{ id: second, name: Read, input: { path: src/b.ts } }]
+      - text: Finished.
+approvals:
+  - { tool: Edit, decision: allow }
+actions:
+  - prompt: { text: Look at the sources. }
+expect:
+  request_counts: { main: 5 }
+  requests:
+    - { index: 0, not_contains: [TypeScript rule body., 'paths:'] }
+    - { index: 1, same_system_as: 0, occurrences: { TypeScript rule body.: 0 } }
+    - index: 2
+      same_system_as: 0
+      user_message_contains: ['[PiArc memory]', TypeScript rule body.]
+      occurrences: { TypeScript rule body.: 1, '*.{ts,tsx}': 0 }
+    - { index: 3, same_system_as: 0, occurrences: { TypeScript rule body.: 1 } }
+    - index: 4
+      same_system_as: 0
+      occurrences: { TypeScript rule body.: 1, General project rule.: 1 }
+      tool_results:
+        - { id: notes, is_error: false, contains: plain notes }
+        - { id: first, is_error: false }
+        - { id: edit, is_error: false }
+        - { id: second, is_error: false }
+  files: { src/a.ts: export const a = 3; }

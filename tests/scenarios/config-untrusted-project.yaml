@@ -1,0 +1,42 @@
+id: config-untrusted-project
+description: Before the project is trusted, its .claude allow rules and additional directories do not apply while its deny and ask rules do, and a project-level bypassPermissions or auto mode never applies (T24).
+capabilities: [CAP-CONFIG-COMPAT-001]
+workspace:
+  trusted: false
+  files:
+    notes.txt: "plain notes\n"
+    .claude/settings.json: '{"permissions":{"allow":["Bash(awk *)","Read(../outside/**)"],"deny":["Bash(sed *)"],"ask":["Read(notes.txt)"],"additionalDirectories":["../outside"],"defaultMode":"bypassPermissions"}}'
+    .claude/settings.local.json: '{"permissions":{"defaultMode":"auto"}}'
+  run_files:
+    outside/secret.txt: "outside the workspace\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: self, name: Bash, input: { command: "awk 'NR==1' notes.txt" } }
+      - tool_calls:
+          - { id: forbidden, name: Bash, input: { command: sed -n 1p notes.txt } }
+      - tool_calls:
+          - { id: asked, name: Read, input: { path: notes.txt } }
+      - tool_calls:
+          - { id: outside, name: Read, input: { path: ../outside/secret.txt } }
+      - text: Finished.
+actions:
+  - prompt: { text: Check what the project may do., turn: t }
+# Neither bypass nor auto applies, and the allow rule is not trusted: the command asks. The
+# forbidden command is refused without asking; the ask rule of the untrusted project asks;
+# the additional directory is not admitted, so the read outside asks.
+approvals:
+  - { tool: Bash, decision: deny, feedback: Not trusted yet. }
+  - { tool: Read, decision: allow }
+  - { tool: Read, decision: deny }
+expect:
+  request_counts: { main: 5 }
+  requests:
+    - index: 4
+      tool_results:
+        - { id: self, is_error: true, contains: Not trusted yet. }
+        - { id: forbidden, is_error: true, contains: 'Bash(sed *)' }
+        - { id: asked, is_error: false, contains: plain notes }
+        - { id: outside, is_error: true }

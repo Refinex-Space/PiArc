@@ -142,3 +142,117 @@ pub(super) fn write_json(path: &Path, value: &Value) -> Result<(), String> {
     let text = serde_json::to_vec_pretty(value).map_err(|e| e.to_string())?;
     std::fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))
 }
+
+/// Every entry of Claude Code's configuration below a run's root (inside any `.claude`
+/// directory, or named `.claude.json`): the relative path and its content (file bytes, a
+/// link's target, or nothing for a directory). Links are not followed. T24-A08 compares the
+/// snapshot before Core starts with the one after it stopped: PiArc never writes there.
+pub(super) fn claude_snapshot(root: &Path) -> std::collections::BTreeMap<String, Vec<u8>> {
+    fn walk(
+        root: &Path,
+        dir: &Path,
+        inside: bool,
+        out: &mut std::collections::BTreeMap<String, Vec<u8>>,
+    ) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry.file_name();
+            let claude = inside || name == ".claude" || name == ".claude.json";
+            let Ok(meta) = std::fs::symlink_metadata(&path) else {
+                continue;
+            };
+            let key = path
+                .strip_prefix(root)
+                .unwrap_or(&path)
+                .to_string_lossy()
+                .replace('\\', "/");
+            if meta.is_dir() {
+                if claude {
+                    out.insert(key + "/", Vec::new());
+                }
+                walk(root, &path, claude, out);
+            } else if claude {
+                let content = if meta.is_symlink() {
+                    std::fs::read_link(&path)
+                        .map(|t| t.to_string_lossy().into_owned().into_bytes())
+                        .unwrap_or_default()
+                } else {
+                    std::fs::read(&path).unwrap_or_default()
+                };
+                out.insert(key, content);
+            }
+        }
+    }
+    let mut out = std::collections::BTreeMap::new();
+    walk(root, root, false, &mut out);
+    out
+}
+
+/// What differs between two [`claude_snapshot`]s, one line per path.
+pub(super) fn claude_changes(
+    before: &std::collections::BTreeMap<String, Vec<u8>>,
+    after: &std::collections::BTreeMap<String, Vec<u8>>,
+) -> Vec<String> {
+    let mut changes = Vec::new();
+    for (path, content) in after {
+        match before.get(path) {
+            None => changes.push(format!("added {path}")),
+            Some(old) if old != content => changes.push(format!("modified {path}")),
+            Some(_) => {}
+        }
+    }
+    for path in before.keys().filter(|p| !after.contains_key(*p)) {
+        changes.push(format!("removed {path}"));
+    }
+    changes
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_claude_snapshot_sees_additions_edits_and_removals_only_in_claude_paths() {
+        let root =
+            std::env::temp_dir().join(format!("piarc l2 snapshot 中文 {}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let write = |name: &str, text: &str| {
+            let path = resolve(&root, name);
+            std::fs::create_dir_all(path.parent().expect("parent")).expect("dir");
+            std::fs::write(path, text).expect("write");
+        };
+        write("work space/.claude/settings.json", "{}");
+        write("home 家/.claude/rules/a.md", "a");
+        write("home 家/.claude.json", "{}");
+        write("work space/.piarc/settings.json", "{}");
+        let before = claude_snapshot(&root);
+        assert_eq!(
+            before.keys().map(String::as_str).collect::<Vec<_>>(),
+            [
+                "home 家/.claude.json",
+                "home 家/.claude/",
+                "home 家/.claude/rules/",
+                "home 家/.claude/rules/a.md",
+                "work space/.claude/",
+                "work space/.claude/settings.json"
+            ]
+        );
+        assert!(claude_changes(&before, &claude_snapshot(&root)).is_empty());
+        write("work space/.piarc/settings.local.json", "{}");
+        write("work space/.claude/settings.json", "{\"x\":1}");
+        write("work space/.claude/settings.local.json", "{}");
+        std::fs::remove_file(resolve(&root, "home 家/.claude/rules/a.md")).expect("remove");
+        assert_eq!(
+            claude_changes(&before, &claude_snapshot(&root)),
+            [
+                "modified work space/.claude/settings.json",
+                "added work space/.claude/settings.local.json",
+                "removed home 家/.claude/rules/a.md"
+            ]
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}
