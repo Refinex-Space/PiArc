@@ -1,6 +1,6 @@
 # piarc-fs
 
-Core 侧的文件操作：AHP `fs/*` 背后的实现（架构第 6.1.2、6.1.3 节，ADR-0027），以会话 `Scope` 为单位的阻塞函数，由 `piarc-core::tool_io` 放到 tokio 的阻塞线程池上调用。本 crate 就是文件 I/O 的实现，所以直接用 `std::fs`。负责：路径边界与受保护路径的标记（`access`）、文件状态表与路径锁（`state`）、编码检测与编解码（`encoding`）、保真的原子写入（`write`、`atomic`）、过长结果落盘（`spill`）、PDF 文本（`pdf`）、glob 与 grep、`watch`（notify 的目录监听，T13）。不负责权限裁决（需要询问的操作只标记，Core 的 `tool_io::policy` 裁决）、快照（`piarc-checkpoint`）、diff（`piarc-diff`）。
+Core 侧的文件操作：AHP `fs/*` 背后的实现（架构第 6.1.2、6.1.3 节，ADR-0027），以会话 `Scope` 为单位的阻塞函数，由 `piarc-core::tool_io` 放到 tokio 的阻塞线程池上调用。文件工具经 `bound` 持有获准目录，使用 `cap-std` 与 `cap-fs-ext` 的句柄 API（ADR-0036）。负责：路径边界与受保护路径的标记（`access`）、文件状态表与路径锁（`state`）、编码检测与编解码（`encoding`）、保真的原子写入（`write`、`atomic`）、过长结果落盘（`spill`）、PDF 文本（`pdf`）、glob 与 grep、`watch`（notify 的目录监听，T13）。不负责权限裁决（需要询问的操作只标记，Core 的 `tool_io::policy` 裁决）、快照（`piarc-checkpoint`）、diff（`piarc-diff`）。
 
 ## 命令
 
@@ -25,14 +25,16 @@ Core 层的集成测试在 `crates/piarc-core/tests/tool_io.rs`（越界、会�
 
 ## 不变量
 
-- 每个公开操作先 `scope.check`（命令的工作目录用 `scope.resolve`），再碰文件系统；新增操作照此办理。
-- Core 审批产生的临时 `Scope::for_approved_path` 精确绑定规范路径与读写方向；执行时解析出任何其他目标都拒绝。
-- 替换已存在的文件通过 `write` 与其共享实现 `write_checked`：路径锁内检查新鲜度 → 解码旧文本 → 核对批准的内容 → 编码新文本 → `atomic::replace` → 登记写入。新鲜度以内容哈希判断，不看 mtime。不要另写直接 `std::fs::write` 的路径。
+- 文件工具调用 `Scope::bind` 核对授权并取得目录句柄。规范路径供策略与界面使用；实际打开、遍历和原子提交必须使用绑定的目录。命令的工作目录使用 `Scope::resolve`。
+- Core 在文件审批前用 `DirectoryBinding::capture` 持有目标最深的现存目录；每项获准操作通过 `Scope::for_bound_path` 绑定具体目标和读写方向。目录迁移或身份变化使旧授权失效。
+- 替换已存在的文件通过 `write` 与其共享实现 `write_checked`：路径锁内检查新鲜度 → 解码旧文本 → 核对批准的内容 → 编码新文本 → `atomic::replace_bound` → 登记写入。新鲜度以内容哈希判断，不看 mtime。不要另写直接 `std::fs::write` 的路径。
 - 写回用旧文件的编码与 BOM（`encoding::encode` 去掉文本开头的 U+FEFF，换成该编码的 BOM）；`LineEndings::MatchFile` 才改换行。新文件 UTF-8 无 BOM。编码检测只在不是 UTF-8 时启用；含 NUL 的内容按二进制，以 UTF-8 加 U+FFFD 读。
 - 按范围读不切断字符：UTF-8 按 `piarc_protocol::text`，其他编码按 `encoding::decode_range`（比较 `last` 与否的解码结果找出被切断的字符）。
 - 结果里的路径用 `display()`（去掉 `\\?\`）；错误码用 POSIX 风格的名字，各平台一致。`NotRead`、`Modified`、`NeedsApproval`、`Unencodable` 的消息写给模型看：发生了什么、下一步做什么。
 
 ## 易错点
+
+- Windows 上 `cap-primitives` 4.0.3 的若干目录操作会从句柄还原路径，并把 `\\?\UNC\` 错误地裁剪成相对名称。需要 Win32 路径的操作统一经 `bound::with_pinned_windows_path` 使用原规范路径，并在整个操作内保留各级目录句柄。UNC、长路径和重解析点须在 W1 实机复核。
 
 - 同一监听器一次注册多个根时使用 `Watcher::watch_dirs`。notify 8.2.1 的 macOS 后端每次单独 `watch` 都会停止并重新启动 FSEvents 流。批量更新必须 `commit`，原有根全部已在监听时无需更新。
 

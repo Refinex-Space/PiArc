@@ -13,11 +13,9 @@
 //! about [`MAX_OUTPUT_BYTES`]: Pi's tool shows far less than either.
 
 use std::io;
-use std::path::Path;
 
 use grep_regex::{RegexMatcher, RegexMatcherBuilder};
 use grep_searcher::{BinaryDetection, Searcher, SearcherBuilder, Sink, SinkContext, SinkMatch};
-use ignore::WalkBuilder;
 use ignore::overrides::OverrideBuilder;
 use piarc_protocol::fs::{FsGrepResult, GrepLine};
 
@@ -56,8 +54,9 @@ pub struct GrepQuery<'a> {
 /// The path is outside the scope or does not exist; the pattern or glob does not compile
 /// (`invalidParams`).
 pub fn grep(scope: &Scope, requested: &str, query: &GrepQuery<'_>) -> Result<FsGrepResult> {
-    let target = scope.check(requested, crate::access::Access::Read)?;
-    let metadata = std::fs::metadata(&target).map_err(|e| Error::io(&target, e))?;
+    let bound = scope.bind(requested, crate::access::Access::Read)?;
+    let target = bound.path();
+    let metadata = bound.metadata()?;
     let matcher = RegexMatcherBuilder::new()
         .case_insensitive(query.ignore_case)
         .fixed_strings(query.literal)
@@ -73,17 +72,21 @@ pub fn grep(scope: &Scope, requested: &str, query: &GrepQuery<'_>) -> Result<FsG
     };
     let is_directory = metadata.is_dir();
     if is_directory {
-        search_directory(&target, &matcher, query, &mut collector)?;
+        search_directory(scope, &bound, &matcher, query, &mut collector)?;
     } else {
         collector.file = target
             .file_name()
             .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
         let mut searcher = searcher(query.context, BinaryDetection::convert(b'\0'));
-        // An unreadable file yields no lines, as ripgrep reports and skips it.
-        let _ = searcher.search_path(&matcher, &target, &mut collector);
+        // Propagate failures when the user specifically selected this file.
+        let file = bound.open_file()?;
+        searcher
+            .search_file(&matcher, &file, &mut collector)
+            .map_err(|e| Error::io(target, e))?;
+        bound.verify()?;
     }
     Ok(FsGrepResult {
-        path: display(&target),
+        path: display(target),
         is_directory,
         match_count: collector.match_count,
         limit_reached: collector.limit_reached,
@@ -92,16 +95,14 @@ pub fn grep(scope: &Scope, requested: &str, query: &GrepQuery<'_>) -> Result<FsG
 }
 
 fn search_directory(
-    root: &Path,
+    scope: &Scope,
+    bound: &crate::bound::BoundPath,
     matcher: &RegexMatcher,
     query: &GrepQuery<'_>,
     collector: &mut Collector,
 ) -> Result<()> {
-    let mut walk = WalkBuilder::new(root);
-    walk.hidden(false)
-        .add_custom_ignore_filename(".rgignore")
-        .sort_by_file_name(Ord::cmp);
-    if let Some(glob) = query.glob {
+    let root = bound.path();
+    let overrides = if let Some(glob) = query.glob {
         let (negate, rest) = glob
             .strip_prefix('!')
             .map_or((false, glob), |rest| (true, rest));
@@ -118,22 +119,32 @@ fn search_directory(
         overrides.add(&glob).map_err(|e| Error::InvalidPattern {
             message: e.to_string(),
         })?;
-        walk.overrides(overrides.build().map_err(|e| Error::InvalidPattern {
+        Some(overrides.build().map_err(|e| Error::InvalidPattern {
             message: e.to_string(),
-        })?);
-    }
+        })?)
+    } else {
+        None
+    };
     let mut searcher = searcher(query.context, BinaryDetection::quit(b'\0'));
-    // Unreadable entries are skipped, as ripgrep reports and skips them.
-    for entry in walk.build().filter_map(std::result::Result::ok) {
-        if !entry.file_type().is_some_and(|t| t.is_file()) {
-            continue;
-        }
-        collector.file = relative(root, entry.path());
-        let _ = searcher.search_path(matcher, entry.path(), &mut *collector);
-        if collector.done {
-            break;
-        }
-    }
+    crate::walk::visit(
+        scope,
+        bound,
+        crate::walk::Search::Grep(overrides.as_ref()),
+        |entry| {
+            if entry.kind.is_file() {
+                collector.file = relative(root, &entry.path);
+                // Like rg, directory searches skip unreadable files.
+                if let Ok(file) = entry.open_file() {
+                    let _ = searcher.search_file(matcher, &file, &mut *collector);
+                }
+            }
+            Ok(if collector.done {
+                crate::walk::Visit::Stop
+            } else {
+                crate::walk::Visit::Continue
+            })
+        },
+    )?;
     Ok(())
 }
 

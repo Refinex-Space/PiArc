@@ -10,8 +10,6 @@
 
 use std::path::Path;
 
-use ignore::WalkBuilder;
-
 use crate::error::{Error, Result};
 use crate::scope::Scope;
 
@@ -47,27 +45,31 @@ pub struct FileMatch {
 ///
 /// The directory cannot be read ([`Error::Io`]); the search was cancelled (`ECANCELED`).
 pub fn list_files(scope: &Scope, cancelled: &dyn Fn() -> bool) -> Result<FileList> {
-    let root = scope.check(&scope.cwd().to_string_lossy(), crate::access::Access::Read)?;
-    let mut walk = WalkBuilder::new(&root);
-    walk.hidden(false)
-        .require_git(false)
-        .add_custom_ignore_filename(".fdignore")
-        .filter_entry(|entry| entry.file_name() != ".git");
-    let mut files = Vec::new();
-    let mut truncated = false;
-    for (seen, entry) in walk.build().filter_map(std::result::Result::ok).enumerate() {
-        if seen % CANCEL_CHECK_EVERY == 0 && cancelled() {
-            return Err(cancelled_error(&root));
-        }
-        if !entry.file_type().is_some_and(|t| t.is_file()) {
-            continue;
-        }
-        if files.len() == MAX_LISTED_FILES {
-            truncated = true;
-            break;
-        }
-        files.push(relative(&root, entry.path()));
+    let bound = scope.bind(&scope.cwd().to_string_lossy(), crate::access::Access::Read)?;
+    let root = bound.path();
+    if cancelled() {
+        return Err(cancelled_error(root));
     }
+    let mut files = Vec::new();
+    let mut seen = 0;
+    let mut truncated = false;
+    crate::walk::visit(scope, &bound, crate::walk::Search::Mentions, |entry| {
+        seen += 1;
+        if seen % CANCEL_CHECK_EVERY == 0 && cancelled() {
+            return Err(cancelled_error(root));
+        }
+        if entry.name == ".git" {
+            return Ok(crate::walk::Visit::Prune);
+        }
+        if entry.kind.is_file() {
+            if files.len() == MAX_LISTED_FILES {
+                truncated = true;
+                return Ok(crate::walk::Visit::Stop);
+            }
+            files.push(crate::glob::relative(root, &entry.path));
+        }
+        Ok(crate::walk::Visit::Continue)
+    })?;
     Ok(FileList { files, truncated })
 }
 
@@ -188,14 +190,6 @@ fn is_word_start(chars: &[char], at: usize) -> bool {
                 || (before.is_lowercase() && chars[at].is_uppercase())
         }
     }
-}
-
-fn relative(root: &Path, path: &Path) -> String {
-    let rel = path.strip_prefix(root).unwrap_or(path);
-    rel.components()
-        .map(|c| c.as_os_str().to_string_lossy())
-        .collect::<Vec<_>>()
-        .join("/")
 }
 
 fn cancelled_error(path: &Path) -> Error {

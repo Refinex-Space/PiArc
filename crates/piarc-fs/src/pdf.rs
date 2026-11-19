@@ -11,6 +11,7 @@
 //! unmaintained `ttf-parser` (RUSTSEC-2026-0192); lopdf 0.46 without default features does
 //! not.
 
+use std::io::Read as _;
 use std::ops::RangeInclusive;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
@@ -41,24 +42,30 @@ const MAX_PAGE_INFLATED_BYTES: usize = 64 * 1024 * 1024;
 /// a readable PDF (`EINVAL`); the page range is malformed, out of range, too long, or missing
 /// for a large document ([`Error::InvalidRequest`]).
 pub fn read_pdf(scope: &Scope, requested: &str, pages: Option<&str>) -> Result<FsPdfResult> {
-    let path = scope.check(requested, Access::Read)?;
-    let size = open_file(&path)?
-        .metadata()
-        .map_err(|e| Error::io(&path, e))?
-        .len();
+    let bound = scope.bind(requested, Access::Read)?;
+    let path = bound.path();
+    let file = bound.open_file()?;
+    let size = file.metadata().map_err(|e| Error::io(path, e))?.len();
     if size > MAX_BLOB_BYTES {
-        return Err(too_large(&path, size));
+        return Err(too_large(path, size));
     }
-    let bytes = std::fs::read(&path).map_err(|e| Error::io(&path, e))?;
+    let mut bytes = Vec::new();
+    file.take(MAX_BLOB_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| Error::io(path, e))?;
+    if bytes.len() as u64 > MAX_BLOB_BYTES {
+        return Err(too_large(path, bytes.len() as u64));
+    }
+    bound.verify()?;
     let unreadable =
-        |detail: &str| Error::coded(&path, "EINVAL", &format!("not a readable PDF: {detail}"));
+        |detail: &str| Error::coded(path, "EINVAL", &format!("not a readable PDF: {detail}"));
     let extracted = catch_unwind(AssertUnwindSafe(|| -> Result<FsPdfResult> {
         let mut document = Document::load_mem(&bytes).map_err(|e| unreadable(&e.to_string()))?;
         if document.is_encrypted() && document.decrypt("").is_err() {
             return Err(unreadable("it is encrypted with a password"));
         }
         let page_count = document.get_pages().len() as u64;
-        let range = page_range(&path, pages, page_count)?;
+        let range = page_range(path, pages, page_count)?;
         let mut texts = Vec::new();
         for number in range {
             let page = u32::try_from(number).map_err(|_| unreadable("too many pages"))?;
@@ -71,7 +78,7 @@ pub fn read_pdf(scope: &Scope, requested: &str, pages: Option<&str>) -> Result<F
             });
         }
         Ok(FsPdfResult {
-            path: display(&path),
+            path: display(path),
             page_count,
             pages: texts,
         })

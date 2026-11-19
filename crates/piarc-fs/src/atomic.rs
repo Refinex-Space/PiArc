@@ -16,9 +16,12 @@
 //!   moment, so it is retried a few times there.
 //! - Renaming breaks hard links: the other names keep the old content.
 
-use std::fs::{File, Metadata, OpenOptions};
+use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
+use cap_std::fs::{Dir, OpenOptions};
+use std::ffi::OsStr;
+use std::fs::{File, Metadata};
 use std::io::{self, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Distinguishes the temporary files of this process.
@@ -40,41 +43,80 @@ pub(crate) fn replace_with(
     original: Option<&Metadata>,
     write: impl FnOnce(&mut File) -> io::Result<()>,
 ) -> io::Result<()> {
-    let temp = temp_path(target)?;
-    let mut file = create_temp(&temp, original)?;
-    let written = write(&mut file)
-        .and_then(|()| keep_permissions(&file, original))
-        .and_then(|()| file.sync_all());
-    drop(file);
-    let result = written.and_then(|()| rename(&temp, target));
-    if result.is_err() {
-        // Best effort: the error that matters is the one returned.
-        let _ = std::fs::remove_file(&temp);
-    }
-    result
+    // This entry point also serves Core-owned spill files. Workspace writes start from the
+    // directory that was bound before the original file was opened.
+    let parent = target
+        .parent()
+        .ok_or_else(|| io::Error::other("missing target parent"))?
+        .canonicalize()?;
+    let name = target
+        .file_name()
+        .ok_or_else(|| io::Error::other("missing target name"))?;
+    let dir = Dir::open_ambient_dir(&parent, cap_std::ambient_authority())?;
+    replace_in(&dir, &parent, name, original, write, || Ok(())).map(drop)
 }
 
-fn temp_path(target: &Path) -> io::Result<PathBuf> {
-    let (Some(dir), Some(name)) = (target.parent(), target.file_name()) else {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "the target has no parent directory or file name",
-        ));
-    };
-    Ok(dir.join(format!(
+pub(crate) fn replace_bound(
+    target: &crate::bound::BoundPath,
+    original: Option<&Metadata>,
+    write: impl FnOnce(&mut File) -> io::Result<()>,
+) -> crate::Result<Metadata> {
+    let (dir, name) = target.parent()?;
+    target.verify()?;
+    let parent = target
+        .path()
+        .parent()
+        .ok_or_else(|| crate::Error::coded(target.path(), "EINVAL", "no parent"))?;
+    replace_in(dir, parent, name, original, write, || target.verify_io())
+        .map_err(|e| crate::Error::io(target.path(), e))
+}
+
+fn replace_in(
+    dir: &Dir,
+    parent: &Path,
+    name: &OsStr,
+    original: Option<&Metadata>,
+    write: impl FnOnce(&mut File) -> io::Result<()>,
+    verify: impl Fn() -> io::Result<()>,
+) -> io::Result<Metadata> {
+    let temp = format!(
         ".{}.piarc-{}-{}.tmp",
         name.to_string_lossy(),
         std::process::id(),
         TEMP_SEQ.fetch_add(1, Ordering::Relaxed)
-    )))
+    );
+    let mut file = create_temp(dir, &temp, original)?;
+    let written = write(&mut file)
+        .and_then(|()| keep_permissions(&file, original))
+        .and_then(|()| file.sync_all())
+        .and_then(|()| file.metadata());
+    drop(file);
+    let result = written.and_then(|metadata| {
+        rename(dir, parent, &temp, name, &verify)?;
+        Ok(metadata)
+    });
+    if result.is_err() {
+        // The original directory also owns cleanup after it was moved.
+        #[cfg(windows)]
+        let _ = crate::bound::with_pinned_windows_path(dir, parent, |p| {
+            std::fs::remove_file(p.join(&temp))
+        });
+        #[cfg(not(windows))]
+        let _ = dir.remove_file(&temp);
+    }
+    result
 }
 
-fn create_temp(temp: &Path, original: Option<&Metadata>) -> io::Result<File> {
+fn create_temp(dir: &Dir, temp: &str, original: Option<&Metadata>) -> io::Result<File> {
     let mut options = OpenOptions::new();
-    options.write(true).create_new(true);
+    options
+        .write(true)
+        .create_new(true)
+        .follow(FollowSymlinks::No);
     #[cfg(windows)]
     {
-        use std::os::windows::fs::{MetadataExt as _, OpenOptionsExt as _};
+        use cap_std::fs::OpenOptionsExt as _;
+        use std::os::windows::fs::MetadataExt as _;
         const HIDDEN: u32 = 0x2;
         const SYSTEM: u32 = 0x4;
         if let Some(metadata) = original {
@@ -83,10 +125,11 @@ fn create_temp(temp: &Path, original: Option<&Metadata>) -> io::Result<File> {
     }
     #[cfg(unix)]
     if original.is_some() {
-        use std::os::unix::fs::OpenOptionsExt as _;
+        use cap_std::fs::OpenOptionsExt as _;
         options.mode(0o600);
     }
-    options.open(temp)
+    dir.open_with(temp, &options)
+        .map(cap_std::fs::File::into_std)
 }
 
 /// Unix: the old file's permission bits, exactly (creation applies the umask).
@@ -100,13 +143,22 @@ fn keep_permissions(file: &File, original: Option<&Metadata>) -> io::Result<()> 
     Ok(())
 }
 
-fn rename(temp: &Path, target: &Path) -> io::Result<()> {
+fn rename(
+    dir: &Dir,
+    parent: &Path,
+    temp: &str,
+    target: &OsStr,
+    verify: &impl Fn() -> io::Result<()>,
+) -> io::Result<()> {
     #[cfg(windows)]
     {
         const ATTEMPTS: u32 = 5;
         let mut attempt = 1;
         loop {
-            match std::fs::rename(temp, target) {
+            verify()?;
+            match crate::bound::with_pinned_windows_path(dir, parent, |p| {
+                std::fs::rename(p.join(temp), p.join(target))
+            }) {
                 Err(error)
                     if error.kind() == io::ErrorKind::PermissionDenied && attempt < ATTEMPTS =>
                 {
@@ -118,7 +170,11 @@ fn rename(temp: &Path, target: &Path) -> io::Result<()> {
         }
     }
     #[cfg(not(windows))]
-    std::fs::rename(temp, target)
+    {
+        let _ = parent;
+        verify()?;
+        dir.rename(temp, dir, target)
+    }
 }
 
 #[cfg(test)]
@@ -133,6 +189,35 @@ mod tests {
             .map(|e| e.file_name().to_string_lossy().into_owned())
             .filter(|n| n.ends_with(".tmp"))
             .collect()
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn moving_the_directory_during_save_keeps_the_original_and_removes_staging() {
+        let tree = TempTree::new("archive-during-save");
+        tree.file("workspace/doc/number.txt", "1");
+        let root = tree.path("workspace");
+        let scope = crate::Scope::new(&root, &root).expect("scope");
+        let target = scope
+            .bind("doc/number.txt", crate::Access::Write)
+            .expect("directory");
+        let old = target
+            .open_file()
+            .expect("original")
+            .metadata()
+            .expect("metadata");
+        let dir = root.join("doc");
+        let archived = root.join("previous");
+        replace_bound(&target, Some(&old), |file| {
+            file.write_all(b"2")?;
+            std::fs::rename(&dir, &archived)
+        })
+        .expect_err("moved before commit");
+        assert_eq!(
+            std::fs::read(archived.join("number.txt")).expect("original"),
+            b"1"
+        );
+        assert!(leftovers(&archived).is_empty());
     }
 
     #[cfg(unix)]

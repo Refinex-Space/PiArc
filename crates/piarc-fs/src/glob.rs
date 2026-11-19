@@ -16,10 +16,8 @@
 //! matched against the relative path; one ending in `/**` also prunes the directory itself.
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use globset::{Glob, GlobBuilder, GlobMatcher, GlobSet, GlobSetBuilder};
-use ignore::WalkBuilder;
 use piarc_protocol::fs::FsGlobResult;
 
 use crate::error::{Error, Result};
@@ -48,56 +46,44 @@ pub fn glob(
     exclude: &[String],
     limit: Option<u64>,
 ) -> Result<FsGlobResult> {
-    let root = scope.check(requested, crate::access::Access::Read)?;
-    let metadata = std::fs::metadata(&root).map_err(|e| Error::io(&root, e))?;
+    let bound = scope.bind(requested, crate::access::Access::Read)?;
+    let root = bound.path();
+    let metadata = bound.metadata()?;
     if !metadata.is_dir() {
-        return Err(Error::coded(&root, "ENOTDIR", "not a directory"));
+        return Err(Error::coded(root, "ENOTDIR", "not a directory"));
     }
     let (matcher, target) = compile_pattern(pattern)?;
-    let excluded = Arc::new(compile_exclusions(exclude)?);
+    let excluded = compile_exclusions(exclude)?;
     let limit = usize::try_from(limit.unwrap_or(MAX_GLOB_MATCHES).min(MAX_GLOB_MATCHES))
         .unwrap_or(usize::MAX);
 
-    let mut walk = WalkBuilder::new(&root);
-    walk.hidden(false)
-        .require_git(false)
-        .add_custom_ignore_filename(".fdignore")
-        .sort_by_file_name(Ord::cmp);
-    let prune_root = root.clone();
-    let prune = Arc::clone(&excluded);
-    walk.filter_entry(move |entry| {
-        let is_dir = entry.file_type().is_some_and(|t| t.is_dir());
-        !(is_dir && prune.dirs.is_match(relative(&prune_root, entry.path())))
-    });
-
     let mut matches = Vec::new();
     let mut truncated = false;
-    // Unreadable entries are skipped, as fd skips them.
-    for entry in walk.build().filter_map(std::result::Result::ok) {
-        if entry.depth() == 0 {
-            continue;
-        }
-        let rel = relative(&root, entry.path());
-        if excluded.paths.is_match(&rel) {
-            continue;
+    crate::walk::visit(scope, &bound, crate::walk::Search::Glob, |entry| {
+        let rel = relative(root, &entry.path);
+        if entry.kind.is_dir() && excluded.dirs.is_match(&rel) {
+            return Ok(crate::walk::Visit::Prune);
         }
         let hit = match target {
-            Target::Name => matcher.is_match(entry.file_name()),
+            Target::Name => matcher.is_match(&entry.name),
             Target::RelativePath => matcher.is_match(&rel),
-            Target::AbsolutePath => matcher.is_match(display(entry.path())),
+            Target::AbsolutePath => matcher.is_match(display(&entry.path)),
         };
-        if !hit {
-            continue;
+        if hit && !excluded.paths.is_match(&rel) {
+            if matches.len() == limit {
+                truncated = true;
+                return Ok(crate::walk::Visit::Stop);
+            }
+            matches.push(if entry.kind.is_dir() {
+                format!("{rel}/")
+            } else {
+                rel
+            });
         }
-        if matches.len() == limit {
-            truncated = true;
-            break;
-        }
-        let is_dir = entry.file_type().is_some_and(|t| t.is_dir());
-        matches.push(if is_dir { format!("{rel}/") } else { rel });
-    }
+        Ok(crate::walk::Visit::Continue)
+    })?;
     Ok(FsGlobResult {
-        path: display(&root),
+        path: display(root),
         matches,
         truncated,
     })
@@ -239,6 +225,18 @@ mod tests {
         assert!(found.truncated);
         let all = glob(&scope, "src", "*.ts", &exclude, None).expect("glob");
         assert_eq!(all.matches, ["a.ts", "sub/B.TS", "中文 名.ts"]);
+    }
+
+    #[test]
+    fn project_ignore_files_are_inherited_only_inside_the_workspace() {
+        let tree = TempTree::new("search-ignore-boundary");
+        tree.file(".ignore", "owned.txt\n");
+        tree.file("workspace/.ignore", "ignored.txt\n");
+        tree.file("workspace/child/owned.txt", "fixture");
+        tree.file("workspace/child/ignored.txt", "fixture");
+        let scope = Scope::new(&tree.path("workspace"), &tree.path("workspace")).expect("scope");
+        let found = glob(&scope, "child", "*.txt", &[], None).expect("glob");
+        assert_eq!(found.matches, ["owned.txt"]);
     }
 
     #[test]

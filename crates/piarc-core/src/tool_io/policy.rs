@@ -583,10 +583,17 @@ impl Prepared {
         if let Some((path, label)) = self.preview.take() {
             let input = p.input.clone();
             let tool = p.tool.clone();
+            let binding = self
+                .grant
+                .binding
+                .clone()
+                .ok_or_else(|| denied("Missing file approval directory."))?;
             self.card.diff = Some(
-                tokio::task::spawn_blocking(move || file_preview(&tool, &input, &path, &label))
-                    .await
-                    .map_err(|e| denied(format!("Preview unavailable: {e}")))??,
+                tokio::task::spawn_blocking(move || {
+                    file_preview(&tool, &input, &path, &label, &binding)
+                })
+                .await
+                .map_err(|e| denied(format!("Preview unavailable: {e}")))??,
             );
         }
         Ok(())
@@ -658,11 +665,18 @@ async fn prepare(
             "Read" | "Glob" | "Grep" | "Write" | "Edit" => {
                 let (file_boundary, target) = prepare_file(&scope, &p, &mut card)?;
                 boundary = file_boundary;
+                let binding = piarc_fs::DirectoryBinding::capture(&target)
+                    .map_err(|e| e.to_error_object())?;
                 if matches!(p.tool.as_str(), "Write" | "Edit")
                     && scope.check(&display(&target), Access::Read).is_ok()
                 {
+                    scope
+                        .clone()
+                        .for_bound_path(&binding, target.clone(), Access::Read)
+                        .map_err(|e| e.to_error_object())?;
                     preview = Some((target.clone(), scope.label(&target)));
                 }
+                grant.binding = Some(binding);
                 grant.path = Some(target);
             }
             "AskUserQuestion" => card.kind = ApprovalKind::Question,
@@ -764,6 +778,7 @@ fn file_preview(
     input: &serde_json::Map<String, Value>,
     target: &Path,
     label: &str,
+    binding: &piarc_fs::DirectoryBinding,
 ) -> Result<piarc_protocol::diff::FileDiff, ErrorObject> {
     Ok(match tool {
         "Write" => {
@@ -771,7 +786,7 @@ fn file_preview(
                 .get("content")
                 .and_then(Value::as_str)
                 .ok_or_else(|| denied("The proposed file content is missing."))?;
-            let old = original_text(target)?;
+            let old = original_text(target, binding)?;
             piarc_diff::file_diff(label, old.as_deref(), new)
         }
         _ => {
@@ -779,7 +794,7 @@ fn file_preview(
                 .get("edits")
                 .and_then(Value::as_array)
                 .ok_or_else(|| denied("Missing proposed edits."))?;
-            if let Some(old) = original_text(target)?
+            if let Some(old) = original_text(target, binding)?
                 && let Some(new) = edit::proposed(
                     &old,
                     edits,
@@ -808,24 +823,34 @@ fn file_preview(
     })
 }
 
-fn original_text(target: &Path) -> Result<Option<String>, ErrorObject> {
-    Ok(match std::fs::metadata(target) {
-        Ok(m) if m.is_file() && m.len() <= piarc_protocol::fs::MAX_UPLOAD_BYTES => {
-            let bytes = std::fs::read(target)
-                .map_err(|e| denied(format!("Cannot preview the file: {e}")))?;
-            Some(piarc_fs::encoding::decode(
-                piarc_fs::encoding::detect(&bytes),
-                &bytes,
-            ))
-        }
-        Ok(_) => {
-            return Err(denied("This target cannot be previewed as a regular file."));
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
-        Err(e) => {
-            return Err(denied(format!("Cannot inspect the file: {e}")));
-        }
-    })
+fn original_text(
+    target: &Path,
+    binding: &piarc_fs::DirectoryBinding,
+) -> Result<Option<String>, ErrorObject> {
+    use std::io::Read as _;
+    let file = match binding.open_file(target) {
+        Ok(file) => file,
+        Err(piarc_fs::Error::NotFound { .. }) => return Ok(None),
+        Err(error) => return Err(denied(format!("Cannot inspect the file: {error}"))),
+    };
+    let metadata = file
+        .metadata()
+        .map_err(|e| denied(format!("Cannot inspect the file: {e}")))?;
+    let max = piarc_protocol::fs::MAX_UPLOAD_BYTES;
+    if !metadata.is_file() || metadata.len() > max {
+        return Err(denied("This target cannot be previewed as a regular file."));
+    }
+    let mut bytes = Vec::new();
+    file.take(max + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| denied(format!("Cannot preview the file: {e}")))?;
+    if bytes.len() as u64 > max {
+        return Err(denied("The target grew beyond the preview limit."));
+    }
+    Ok(Some(piarc_fs::encoding::decode(
+        piarc_fs::encoding::detect(&bytes),
+        &bytes,
+    )))
 }
 
 fn path_boundary(scope: &Scope, path: &str, write: bool) -> Result<Boundary, ErrorObject> {

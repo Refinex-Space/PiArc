@@ -2,12 +2,12 @@
 //! authority outside the workspace. An import or a redirected filename needs its own decision.
 
 use std::collections::{HashMap, HashSet};
-use std::fs::{self, File};
+use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use piarc_fs::{Scope, display, encoding};
+use piarc_fs::{DirectoryBinding, Scope, display, encoding};
 use piarc_protocol::memory::MemoryFile;
 
 mod markdown;
@@ -28,7 +28,7 @@ pub(super) enum ImportAccess {
 #[derive(Clone, Default)]
 pub(super) struct Inputs {
     sources: Vec<PathBuf>,
-    targets: HashMap<PathBuf, Option<PathBuf>>,
+    targets: HashMap<PathBuf, Option<(PathBuf, DirectoryBinding)>>,
     contents: HashMap<PathBuf, Option<Arc<str>>>,
 }
 
@@ -161,7 +161,7 @@ struct Reader<'a, F> {
     scope: &'a Scope,
     home: Option<&'a Path>,
     decide: F,
-    targets: &'a mut HashMap<PathBuf, Option<PathBuf>>,
+    targets: &'a mut HashMap<PathBuf, Option<(PathBuf, DirectoryBinding)>>,
     contents: &'a mut HashMap<PathBuf, Option<Arc<str>>>,
     seen: HashSet<PathBuf>,
     pending: Vec<PathBuf>,
@@ -175,16 +175,17 @@ impl<F: FnMut(&Path) -> Option<ImportAccess>> Reader<'_, F> {
                 let target = if depth == 0 && !exists(requested)? {
                     None
                 } else {
-                    Some(
-                        self.scope
-                            .locate(&display(requested))
-                            .map_err(io::Error::other)?,
-                    )
+                    let path = self
+                        .scope
+                        .locate(&display(requested))
+                        .map_err(io::Error::other)?;
+                    let binding = DirectoryBinding::capture(&path).map_err(io::Error::other)?;
+                    Some((path, binding))
                 };
                 e.insert(target)
             }
         };
-        let Some(target) = target.clone() else {
+        let Some((target, binding)) = target.clone() else {
             return Ok(None);
         };
         let path = display(&target);
@@ -221,7 +222,7 @@ impl<F: FnMut(&Path) -> Option<ImportAccess>> Reader<'_, F> {
         let source = match self.contents.entry(target.clone()) {
             std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
             std::collections::hash_map::Entry::Vacant(e) => {
-                e.insert(read_limited(&target)?.map(Arc::from))
+                e.insert(read_limited(&target, &binding)?.map(Arc::from))
             }
         };
         let Some(source) = source.clone() else {
@@ -253,28 +254,19 @@ impl<F: FnMut(&Path) -> Option<ImportAccess>> Reader<'_, F> {
     }
 }
 
-fn read_limited(path: &Path) -> io::Result<Option<String>> {
-    let metadata = match fs::metadata(path) {
-        Ok(m) => m,
-        Err(e)
-            if matches!(
-                e.kind(),
-                io::ErrorKind::NotFound | io::ErrorKind::NotADirectory
-            ) =>
+fn read_limited(path: &Path, binding: &DirectoryBinding) -> io::Result<Option<String>> {
+    let file = match binding.open_file(path) {
+        Ok(file) => file,
+        Err(error)
+            if matches!(error, piarc_fs::Error::NotFound { .. })
+                || matches!(error.code(), Some("ENOTDIR" | "EISDIR")) =>
         {
             return Ok(None);
         }
-        Err(e) => return Err(e),
+        Err(error) => return Err(io::Error::other(error)),
     };
-    if !metadata.is_file() {
-        return Ok(None);
-    }
-    if metadata.len() <= FILE_LIMIT {
+    if file.metadata()?.len() <= FILE_LIMIT {
         let mut bytes = Vec::new();
-        let file = File::open(path)?;
-        if !file.metadata()?.is_file() || path.canonicalize()? != path {
-            return Err(io::Error::other("Memory file changed during discovery"));
-        }
         file.take(FILE_LIMIT + 1).read_to_end(&mut bytes)?;
         if bytes.len() as u64 <= FILE_LIMIT {
             return Ok(Some(encoding::decode(encoding::detect(&bytes), &bytes)));

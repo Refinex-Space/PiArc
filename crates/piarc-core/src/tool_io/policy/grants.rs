@@ -8,6 +8,7 @@ use super::*;
 pub(in crate::tool_io) struct Grant {
     pub(super) tool: String,
     pub(super) path: Option<PathBuf>,
+    pub(super) binding: Option<piarc_fs::DirectoryBinding>,
     pub(super) cwd: Option<PathBuf>,
     pub(super) command: Option<String>,
     pub(super) simple_command: bool,
@@ -25,6 +26,7 @@ impl Grant {
         Self {
             tool: p.tool.clone(),
             path: None,
+            binding: None,
             cwd: None,
             command: None,
             simple_command: false,
@@ -248,12 +250,11 @@ pub(in crate::tool_io) fn file_permit(
         && !params.contains_key("origin")
         && target.starts_with(internal.join("attachments"))
     {
-        let original = s
-            .scope
+        s.scope
             .check(requested, Access::Read)
             .map_err(|e| e.to_error_object())?;
         return Ok(FilePermit {
-            scope: s.scope.clone().for_approved_path(original, Access::Read),
+            scope: s.scope.clone(),
             write: None,
         });
     }
@@ -271,12 +272,18 @@ pub(in crate::tool_io) fn file_permit(
         .filter(|g| g.belongs(tool, peer))
         .ok_or_else(mismatch)?;
     let terminal = grant.file_op(s, method, params, &target)?;
+    let binding = grant.binding.as_ref().ok_or_else(mismatch)?.clone();
     let consumed = terminal.then(|| state.grants.remove(call)).flatten();
     Ok(FilePermit {
         scope: s
             .scope
             .clone()
-            .for_approved_path(target, if write { Access::Write } else { Access::Read }),
+            .for_bound_path(
+                &binding,
+                target,
+                if write { Access::Write } else { Access::Read },
+            )
+            .map_err(|e| e.to_error_object())?,
         write: consumed.filter(|_| method == "fs/write"),
     })
 }

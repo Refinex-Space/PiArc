@@ -1,11 +1,11 @@
 //! What a path names: `fs/stat` and `fs/list`.
 
-use std::fs::Metadata;
+use cap_std::fs::Metadata;
+use std::io::Read as _;
 use std::time::UNIX_EPOCH;
 
 use piarc_protocol::fs::{DirEntry, FileKind, FileStat, FsListResult};
 
-use crate::content::read_head;
 use crate::error::{Error, Result};
 use crate::image;
 use crate::scope::{Scope, display};
@@ -20,17 +20,27 @@ pub const MAX_LIST_ENTRIES: u64 = 10_000;
 ///
 /// The path needs approval, does not exist or cannot be inspected.
 pub fn stat(scope: &Scope, requested: &str, detect_image: bool) -> Result<FileStat> {
-    let path = scope.check(requested, crate::access::Access::Read)?;
-    let metadata = std::fs::metadata(&path).map_err(|e| Error::io(&path, e))?;
+    let bound = scope.bind(requested, crate::access::Access::Read)?;
+    stat_bound(&bound, detect_image)
+}
+
+pub(crate) fn stat_bound(bound: &crate::bound::BoundPath, detect_image: bool) -> Result<FileStat> {
+    let path = bound.path();
+    let metadata = bound.metadata()?;
     let kind = kind_of(&metadata);
     let image_mime_type = if detect_image && kind == FileKind::File {
-        let head = read_head(&path, image::SNIFF_BYTES).map_err(|e| Error::io(&path, e))?;
+        let mut head = Vec::new();
+        bound
+            .open_file()?
+            .take(image::SNIFF_BYTES)
+            .read_to_end(&mut head)
+            .map_err(|e| Error::io(path, e))?;
         image::detect(&head).map(str::to_owned)
     } else {
         None
     };
     Ok(FileStat {
-        path: display(&path),
+        path: display(path),
         kind,
         size: metadata.len(),
         modified_ms: modified_ms(&metadata),
@@ -48,18 +58,40 @@ pub fn stat(scope: &Scope, requested: &str, detect_image: bool) -> Result<FileSt
 /// The path is outside the scope, does not exist, is not a directory (`ENOTDIR`) or cannot be
 /// read.
 pub fn list(scope: &Scope, requested: &str, limit: Option<u64>) -> Result<FsListResult> {
-    let path = scope.check(requested, crate::access::Access::Read)?;
-    if path.is_file() {
+    let bound = scope.bind(requested, crate::access::Access::Read)?;
+    let path = bound.path();
+    if bound.metadata()?.is_file() {
         // Windows reports this differently; the code is the same everywhere.
-        return Err(Error::coded(&path, "ENOTDIR", "not a directory"));
+        return Err(Error::coded(path, "ENOTDIR", "not a directory"));
     }
+    let dir = bound.open_dir()?;
+    #[cfg(not(windows))]
+    let names = dir.entries().and_then(|entries| {
+        entries
+            .map(|e| e.map(|entry| entry.file_name()))
+            .collect::<std::io::Result<Vec<_>>>()
+    });
+    #[cfg(windows)]
+    let names = crate::bound::with_pinned_windows_path(&dir, path, |p| {
+        std::fs::read_dir(p)?
+            .map(|e| e.map(|entry| entry.file_name()))
+            .collect::<std::io::Result<Vec<_>>>()
+    });
     let mut entries = Vec::new();
-    for entry in std::fs::read_dir(&path).map_err(|e| Error::io(&path, e))? {
-        let entry = entry.map_err(|e| Error::io(&path, e))?;
-        // A dangling symlink or an entry removed meanwhile is listed as `other`.
-        let kind = std::fs::metadata(entry.path()).map_or(FileKind::Other, |m| kind_of(&m));
+    for name in names.map_err(|e| Error::io(path, e))? {
+        let kind = match dir.symlink_metadata(&name) {
+            Ok(m) if m.file_type().is_symlink() => {
+                let child = display(&path.join(&name));
+                scope
+                    .bind(&child, crate::Access::Read)
+                    .and_then(|target| target.metadata())
+                    .map_or(FileKind::Other, |m| kind_of(&m))
+            }
+            Ok(m) => kind_of(&m),
+            Err(_) => FileKind::Other,
+        };
         entries.push(DirEntry {
-            name: entry.file_name().to_string_lossy().into_owned(),
+            name: name.to_string_lossy().into_owned(),
             kind,
         });
     }
@@ -68,8 +100,9 @@ pub fn list(scope: &Scope, requested: &str, limit: Option<u64>) -> Result<FsList
         .unwrap_or(usize::MAX);
     let truncated = entries.len() > limit;
     entries.truncate(limit);
+    bound.verify()?;
     Ok(FsListResult {
-        path: display(&path),
+        path: display(path),
         entries,
         truncated,
     })
@@ -86,7 +119,12 @@ fn kind_of(metadata: &Metadata) -> FileKind {
 }
 
 fn modified_ms(metadata: &Metadata) -> Option<u64> {
-    let since_epoch = metadata.modified().ok()?.duration_since(UNIX_EPOCH).ok()?;
+    let since_epoch = metadata
+        .modified()
+        .ok()?
+        .into_std()
+        .duration_since(UNIX_EPOCH)
+        .ok()?;
     u64::try_from(since_epoch.as_millis()).ok()
 }
 
@@ -94,6 +132,41 @@ fn modified_ms(metadata: &Metadata) -> Option<u64> {
 mod tests {
     use super::*;
     use crate::testing::TempTree;
+
+    #[test]
+    fn a_reopened_workspace_needs_a_new_scope_after_a_directory_move() {
+        let tree = TempTree::new("moved-workspace");
+        tree.file("workspace/first.txt", "first");
+        let path = tree.path("workspace");
+        let scope = Scope::new(&path, &path).expect("scope");
+        let moved = std::fs::rename(&path, tree.path("archived-workspace"));
+        #[cfg(windows)]
+        if moved
+            .as_ref()
+            .is_err_and(|e| e.kind() == std::io::ErrorKind::PermissionDenied)
+        {
+            assert!(
+                stat(&scope, "first.txt", false)
+                    .expect("unchanged directory")
+                    .size
+                    > 0
+            );
+            return;
+        }
+        moved.expect("archive workspace");
+        tree.file("workspace/second.txt", "second");
+        assert!(
+            stat(&scope, "second.txt", false).is_err(),
+            "an old scope cannot authorize a new workspace"
+        );
+        let reopened = Scope::new(&path, &path).expect("reopened scope");
+        assert_eq!(
+            stat(&reopened, "second.txt", false)
+                .expect("new scope")
+                .size,
+            6
+        );
+    }
 
     #[test]
     fn stats_files_directories_and_images() {

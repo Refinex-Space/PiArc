@@ -22,13 +22,13 @@
 //! case is probed once ([`Scope::case_insensitive`]); [`Scope::key`] folds case on such volumes,
 //! so the file state table finds a file under any spelling.
 //!
-//! The check happens before the operation, not atomically with it: a symlink swapped in between
-//! is not caught (the sandbox narrows this for commands).
+//! File tools bind the checked name to directory objects before I/O (ADR-0036).
 
 use std::io;
 use std::path::{Component, Path, PathBuf};
 
 use crate::access::{Access, ApprovalReason, protected_component};
+use crate::bound::{BoundPath, DirectoryBinding};
 use crate::error::{Error, Result};
 
 /// How many symlinks one resolution follows before giving up (as `ELOOP`).
@@ -38,14 +38,15 @@ const MAX_SYMLINK_HOPS: u32 = 40;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Scope {
     root: PathBuf,
+    root_binding: DirectoryBinding,
     cwd: PathBuf,
     /// Added directories: read and written like the root.
-    extra: Vec<PathBuf>,
+    extra: Vec<DirectoryBinding>,
     /// Directories that are read without asking but never written (the session's temporary
     /// directory, where long tool results go).
-    read_only: Vec<PathBuf>,
+    read_only: Vec<DirectoryBinding>,
     case_insensitive: bool,
-    approved: Option<(PathBuf, Access)>,
+    approved: Option<(PathBuf, Access, DirectoryBinding)>,
 }
 
 impl Scope {
@@ -67,6 +68,7 @@ impl Scope {
         }
         let case_insensitive = probe_case_insensitive(&root);
         Ok(Self {
+            root_binding: DirectoryBinding::existing_directory(&root)?,
             root,
             cwd: canonical_cwd,
             extra: Vec::new(),
@@ -82,7 +84,8 @@ impl Scope {
     ///
     /// The directory cannot be canonicalized.
     pub fn with_added_dir(mut self, dir: &Path) -> Result<Self> {
-        self.extra.push(canonical_dir(dir)?);
+        self.extra
+            .push(DirectoryBinding::existing_directory(&canonical_dir(dir)?)?);
         Ok(self)
     }
 
@@ -92,16 +95,75 @@ impl Scope {
     ///
     /// The directory cannot be canonicalized.
     pub fn with_read_only_dir(mut self, dir: &Path) -> Result<Self> {
-        self.read_only.push(canonical_dir(dir)?);
+        self.read_only
+            .push(DirectoryBinding::existing_directory(&canonical_dir(dir)?)?);
         Ok(self)
     }
 
-    /// Authorizes exactly one resolved path for this copy of the scope. Callers keep it
-    /// only for the low-level operation belonging to the approved tool call.
-    #[must_use]
-    pub fn for_approved_path(mut self, canonical: PathBuf, access: Access) -> Self {
-        self.approved = Some((canonical, access));
-        self
+    /// Binds exactly one permitted target and direction to the directory captured at preflight.
+    ///
+    /// # Errors
+    /// The target no longer belongs to the captured directory or the workspace root changed.
+    pub fn for_bound_path(
+        mut self,
+        binding: &DirectoryBinding,
+        canonical: PathBuf,
+        access: Access,
+    ) -> Result<Self> {
+        binding.verify()?;
+        if !canonical.starts_with(binding.path()) {
+            return Err(Error::ApprovalMismatch {
+                path: display(&canonical),
+            });
+        }
+        if let Some(root) = self.readable_binding(&canonical) {
+            root.verify()?;
+        }
+        self.approved = Some((canonical, access, binding.clone()));
+        Ok(self)
+    }
+
+    pub(crate) fn bind(&self, requested: &str, access: Access) -> Result<BoundPath> {
+        let path = self.check(requested, access)?;
+        let binding = self
+            .approved
+            .as_ref()
+            .map(|(_, _, binding)| binding)
+            .or_else(|| self.readable_binding(&path))
+            .ok_or_else(|| Error::ApprovalMismatch {
+                path: display(&path),
+            })?;
+        binding.bind(&path)
+    }
+
+    pub(crate) fn search_root(&self, path: &Path) -> Option<&Path> {
+        self.readable_binding(path).map(DirectoryBinding::path)
+    }
+
+    pub(crate) fn bind_search_ancestor(
+        &self,
+        search: &BoundPath,
+        ancestor: &Path,
+    ) -> Result<BoundPath> {
+        if !search.path().starts_with(ancestor) {
+            return Err(Error::ApprovalMismatch {
+                path: display(ancestor),
+            });
+        }
+        search.verify()?;
+        self.readable_binding(search.path())
+            .ok_or_else(|| Error::ApprovalMismatch {
+                path: display(ancestor),
+            })?
+            .bind(ancestor)
+    }
+
+    fn readable_binding(&self, path: &Path) -> Option<&DirectoryBinding> {
+        std::iter::once(&self.root_binding)
+            .chain(&self.extra)
+            .chain(&self.read_only)
+            .filter(|root| path.starts_with(root.path()))
+            .max_by_key(|root| root.path().components().count())
     }
 
     /// The canonical workspace root.
@@ -164,7 +226,7 @@ impl Scope {
     /// protected path; an I/O error when a component cannot be inspected.
     pub fn check(&self, requested: &str, access: Access) -> Result<PathBuf> {
         let resolved = self.locate(requested)?;
-        if let Some((path, allowed)) = &self.approved {
+        if let Some((path, allowed, _)) = &self.approved {
             return if path == &resolved && *allowed == access {
                 Ok(resolved)
             } else {
@@ -180,12 +242,15 @@ impl Scope {
         };
         let Some(root) = self.writable_root_of(&resolved) else {
             let readable = access == Access::Read
-                && self.read_only.iter().any(|dir| resolved.starts_with(dir));
+                && self
+                    .read_only
+                    .iter()
+                    .any(|dir| resolved.starts_with(dir.path()));
             return if readable {
                 Ok(resolved)
             } else {
                 Err(needs(ApprovalReason::OutsideWorkspace {
-                    allowed: self.writable_roots().map(|d| display(d)).collect(),
+                    allowed: self.writable_roots().map(display).collect(),
                 }))
             };
         };
@@ -224,14 +289,12 @@ impl Scope {
         }
     }
 
-    fn writable_roots(&self) -> impl Iterator<Item = &PathBuf> {
-        std::iter::once(&self.root).chain(&self.extra)
+    fn writable_roots(&self) -> impl Iterator<Item = &Path> {
+        std::iter::once(self.root.as_path()).chain(self.extra.iter().map(DirectoryBinding::path))
     }
 
     fn writable_root_of(&self, path: &Path) -> Option<&Path> {
-        self.writable_roots()
-            .find(|root| path.starts_with(root))
-            .map(PathBuf::as_path)
+        self.writable_roots().find(|root| path.starts_with(root))
     }
 }
 
@@ -340,6 +403,21 @@ fn canonicalize_lenient(path: &Path, hops: u32) -> Result<PathBuf> {
 mod tests {
     use super::*;
     use crate::testing::TempTree;
+
+    #[test]
+    fn a_regular_file_cannot_be_added_as_a_directory() {
+        let tree = TempTree::new("added-directory-type");
+        tree.dir("workspace");
+        tree.file("shared/note", "fixture");
+        let scope = Scope::new(&tree.path("workspace"), &tree.path("workspace")).expect("scope");
+        assert!(
+            scope
+                .clone()
+                .with_added_dir(&tree.path("shared/note"))
+                .is_err()
+        );
+        assert!(scope.with_read_only_dir(&tree.path("shared/note")).is_err());
+    }
 
     #[test]
     fn resolves_relative_and_absolute_paths_inside_the_root() {

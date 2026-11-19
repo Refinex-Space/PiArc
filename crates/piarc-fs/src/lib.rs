@@ -39,13 +39,14 @@
 //! - [`glob()`] with fd's matching rules and [`grep()`] with ripgrep's libraries, both honoring
 //!   ignore files; [`fuzzy`] lists and ranks files for the composer's `@` mentions (T19).
 //!
-//! This crate implements file I/O, so it uses `std::fs` directly.
+//! Scoped file tools operate relative to directory objects ([`DirectoryBinding`], ADR-0036).
 //!
 //! [`watch::Watcher`] (T13) watches directories for `piarc-core`, which forwards the changes
 //! of settings files to `piarc-config`; T35 builds workspace watching on it.
 
 pub mod access;
 mod atomic;
+mod bound;
 mod content;
 pub mod encoding;
 mod entry;
@@ -60,10 +61,12 @@ mod spill;
 mod state;
 #[cfg(test)]
 mod testing;
+mod walk;
 pub mod watch;
 mod write;
 
 pub use access::{Access, ApprovalReason};
+pub use bound::DirectoryBinding;
 pub use content::{DETECT_BYTES, EncodingCache, mkdir, read_blob, read_text};
 pub use entry::{MAX_LIST_ENTRIES, list, stat};
 pub use error::{Error, Result};

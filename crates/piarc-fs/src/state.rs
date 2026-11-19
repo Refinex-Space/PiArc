@@ -45,7 +45,10 @@ impl Snapshot {
     ///
     /// The file cannot be opened or read.
     pub fn of_file(path: &Path) -> io::Result<Self> {
-        let mut file = File::open(path)?;
+        Self::from_handle(File::open(path)?)
+    }
+
+    pub(crate) fn from_handle(mut file: File) -> io::Result<Self> {
         let modified = file.metadata()?.modified().ok();
         let mut hasher = Sha256::new();
         let mut buffer = vec![0_u8; 64 * 1024];

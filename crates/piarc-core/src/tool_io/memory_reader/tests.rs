@@ -286,3 +286,22 @@ fn pending_consent_preserves_sources_already_read_at_session_open() {
     assert!(text.contains("Opening instructions.") && text.contains("Approved guide."));
     assert!(!text.contains("Changed during approval."));
 }
+
+#[cfg(unix)]
+#[test]
+fn a_moved_import_directory_requires_a_new_decision() {
+    let tree = Tree::new();
+    tree.file("ws/current/CLAUDE.md", "@../../guide/note.md");
+    tree.file("guide/note.md", "original guide");
+    let initial = tree.collect(&[], false, None);
+    let pending = initial.inputs.expect("deferred consent");
+    fs::rename(tree.root.join("guide"), tree.root.join("old-guide")).expect("move directory");
+    tree.file("guide/note.md", "new guide");
+    assert!(
+        pending
+            .expand(&tree.scope, Some(&tree.root.join("home")), |_| Some(
+                ImportAccess::Allowed
+            ))
+            .is_err()
+    );
+}

@@ -36,7 +36,12 @@ pub struct EncodingCache {
 type Stamp = (u64, Option<SystemTime>);
 
 impl EncodingCache {
-    fn encoding_of(&self, path: &Path, metadata: &Metadata) -> io::Result<TextEncoding> {
+    fn encoding_of(
+        &self,
+        path: &Path,
+        file: &mut File,
+        metadata: &Metadata,
+    ) -> io::Result<TextEncoding> {
         let stamp = (metadata.len(), metadata.modified().ok());
         let lock = || self.entries.lock().unwrap_or_else(PoisonError::into_inner);
         if let Some(&(seen, encoding)) = lock().get(path)
@@ -44,7 +49,9 @@ impl EncodingCache {
         {
             return Ok(encoding);
         }
-        let encoding = detect(&read_head(path, DETECT_BYTES)?);
+        let mut head = Vec::new();
+        file.take(DETECT_BYTES).read_to_end(&mut head)?;
+        let encoding = detect(&head);
         let mut entries = lock();
         if entries.len() >= MAX_CACHED_ENCODINGS {
             entries.clear();
@@ -71,20 +78,21 @@ pub fn read_text(
     offset: u64,
     length: Option<u64>,
 ) -> Result<FsReadResult> {
-    let path = scope.check(requested, Access::Read)?;
-    let mut file = open_file(&path)?;
-    let metadata = file.metadata().map_err(|e| Error::io(&path, e))?;
+    let bound = scope.bind(requested, Access::Read)?;
+    let path = bound.path();
+    let mut file = bound.open_file()?;
+    let metadata = file.metadata().map_err(|e| Error::io(path, e))?;
     let size = metadata.len();
     let encoding = encodings
-        .encoding_of(&path, &metadata)
-        .map_err(|e| Error::io(&path, e))?;
+        .encoding_of(path, &mut file, &metadata)
+        .map_err(|e| Error::io(path, e))?;
     let want = length.map_or(MAX_READ_CHUNK, |n| n.min(MAX_READ_CHUNK));
     file.seek(SeekFrom::Start(offset))
-        .map_err(|e| Error::io(&path, e))?;
+        .map_err(|e| Error::io(path, e))?;
     let mut buffer = Vec::new();
     file.take(want)
         .read_to_end(&mut buffer)
-        .map_err(|e| Error::io(&path, e))?;
+        .map_err(|e| Error::io(path, e))?;
     let read = buffer.len() as u64;
     // A short read means the end, even if the file grew after it was opened.
     let eof = read < want || offset.saturating_add(read) >= size;
@@ -99,8 +107,9 @@ pub fn read_text(
         }
         other => decode_range(other, &buffer, eof),
     };
+    bound.verify()?;
     Ok(FsReadResult {
-        path: display(&path),
+        path: display(path),
         size,
         offset,
         bytes_read: keep as u64,
@@ -124,11 +133,12 @@ static PARTIAL_SEQ: AtomicU64 = AtomicU64::new(0);
 /// The path needs approval, does not exist, is a directory, is too large or cannot be read;
 /// the blob cannot be written.
 pub fn read_blob(scope: &Scope, requested: &str, blob_dir: &Path) -> Result<FsReadResult> {
-    let path = scope.check(requested, Access::Read)?;
-    let file = open_file(&path)?;
-    let size = file.metadata().map_err(|e| Error::io(&path, e))?.len();
+    let bound = scope.bind(requested, Access::Read)?;
+    let path = bound.path();
+    let file = bound.open_file()?;
+    let size = file.metadata().map_err(|e| Error::io(path, e))?.len();
     if size > MAX_BLOB_BYTES {
-        return Err(too_large(&path, size));
+        return Err(too_large(path, size));
     }
     std::fs::create_dir_all(blob_dir).map_err(|e| Error::io(blob_dir, e))?;
     // Copied under a temporary name first, so a reader never sees half a blob. The name is
@@ -139,7 +149,7 @@ pub fn read_blob(scope: &Scope, requested: &str, blob_dir: &Path) -> Result<FsRe
         std::process::id(),
         PARTIAL_SEQ.fetch_add(1, Ordering::Relaxed)
     ));
-    let copied = copy_hashed(file, &partial).map_err(|e| Error::io(&path, e));
+    let copied = copy_hashed(file, &partial).map_err(|e| Error::io(path, e));
     let (sha256, copied_size) = match copied {
         Ok(done) => done,
         Err(error) => {
@@ -150,12 +160,18 @@ pub fn read_blob(scope: &Scope, requested: &str, blob_dir: &Path) -> Result<FsRe
     if copied_size > MAX_BLOB_BYTES {
         // The file grew while it was copied.
         let _ = std::fs::remove_file(&partial);
-        return Err(too_large(&path, copied_size));
+        return Err(too_large(path, copied_size));
     }
     let blob = blob_dir.join(&sha256);
-    std::fs::rename(&partial, &blob).map_err(|e| Error::io(&blob, e))?;
+    let publish = bound
+        .verify()
+        .and_then(|()| std::fs::rename(&partial, &blob).map_err(|e| Error::io(&blob, e)));
+    if let Err(error) = publish {
+        let _ = std::fs::remove_file(&partial);
+        return Err(error);
+    }
     Ok(FsReadResult {
-        path: display(&path),
+        path: display(path),
         size: copied_size,
         offset: 0,
         bytes_read: copied_size,
@@ -210,14 +226,12 @@ pub(crate) fn too_large(path: &Path, size: u64) -> Error {
 /// The path needs approval, or it (or a parent) exists as a file (`EEXIST`), or the directory
 /// cannot be created.
 pub fn mkdir(scope: &Scope, requested: &str) -> Result<FsMkdirResult> {
-    let path = scope.check(requested, Access::Write)?;
-    let existed = path.is_dir();
-    if !existed {
-        std::fs::create_dir_all(&path).map_err(|e| Error::io(&path, e))?;
-    }
+    let bound = scope.bind(requested, Access::Write)?;
+    let path = bound.path();
+    let created = bound.mkdir()?;
     Ok(FsMkdirResult {
-        path: display(&path),
-        created: !existed,
+        path: display(path),
+        created,
     })
 }
 
@@ -247,13 +261,6 @@ pub(crate) fn hex(bytes: &[u8]) -> String {
         let _ = write!(out, "{byte:02x}");
         out
     })
-}
-
-/// Reads the first `n` bytes of a file (fewer if it is shorter).
-pub(crate) fn read_head(path: &Path, n: u64) -> io::Result<Vec<u8>> {
-    let mut head = Vec::new();
-    File::open(path)?.take(n).read_to_end(&mut head)?;
-    Ok(head)
 }
 
 #[cfg(test)]
