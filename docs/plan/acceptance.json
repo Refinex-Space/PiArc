@@ -91,7 +91,7 @@
       "task": "R2",
       "description": "两种线格式的服务商在应用界面中各完成一次\"读代码 → 改代码 → 跑测试\"，夹具测试由失败变为通过，过程中至少一次 Bash 与一次 Edit 经审批卡批准。验证：Playwright 流程、测试输出与截图（`tmp/evidence/R2/`）。",
       "status": "passing",
-      "evidence": "打包开发版和 dev 各自通过设置页配置 Anthropic Messages、OpenAI Chat Completions，4/4。在含空格与中文的 Git 夹具中，先读两文件、Manual 卡批准一次 Edit 和 Bash；同一单测从 ERR_ASSERTION 到 pass 1，测试源未修改。见 tmp/evidence/R2/accepted/l4/ 下四个 r2-workflow 目录的 settings、fileChange、command、completed 截图与 before.txt / after.txt。"
+      "evidence": "打包开发版和 dev 各自通过设置页配置 Anthropic Messages、OpenAI Chat Completions，4/4。在含空格与中文的 Git 夹具中，先读两文件、Manual 卡批准一次 Edit 和 Bash；同一单测从 ERR_ASSERTION 到 pass 1，测试源未修改。见 tmp/evidence/R2/delivery/l4/ 下四个 r2-workflow 目录的 settings、fileChange、command、completed 截图与 before.txt / after.txt。"
     },
     {
       "id": "R2-A02",
@@ -133,7 +133,7 @@
       "task": "R2",
       "description": "每条审查发现都有核实结论与处理（修复、不同意并给理由、登记到具体任务）。验证：`docs/reviews/R2-findings.md`。",
       "status": "passing",
-      "evidence": "docs/reviews/R2-findings.md 逐项核实 P01–P03、F01–F07、U01–U02、Q01–Q05，合并一条重复发现；列修复提交、证据、既有 I30/I36/I51/I61/I79/I80 的责任人任务；ADR-0034–0036 已接受。"
+      "evidence": "docs/reviews/R2-findings.md 逐项核实 P01–P03、F01–F07、U01–U02、Q01–Q05，合并一条重复发现；列修复提交、证据、既有 I30/I36/I51/I61/I79/I80 的后续任务；ADR-0034–0036 已接受。"
     },
     {
       "id": "R2-A08",
@@ -161,7 +161,7 @@
       "task": "R2",
       "description": "`npm run verify` 通过。验证：命令输出。",
       "status": "passing",
-      "evidence": "npm run verify：All 15 steps passed。含 Prettier、ESLint、tsc、开发/发布 Core API 快照、Rust/TS 测试、契约、依赖审计与 L2/能力漂移。tmp/evidence/R2/verify-accepted.log。"
+      "evidence": "npm run verify：All 15 steps passed。含 Prettier、ESLint、tsc、开发/发布 Core API 快照、Rust/TS 测试、契约、依赖审计与 L2/能力漂移。tmp/evidence/R2/verify-delivery.log。最终 Electron L4 52/52，两种形态连续通过（delivery-ui.log），x86_64-pc-windows-msvc 全工作区交叉 Clippy 通过（windows-final.log）。"
     },
     {
       "id": "R3-A01",
