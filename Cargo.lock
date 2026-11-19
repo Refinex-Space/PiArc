@@ -1664,7 +1664,6 @@ version = "0.0.0"
 dependencies = [
  "piarc-ports",
  "regex",
- "serde",
  "serde_json",
  "sha2",
  "tokio",

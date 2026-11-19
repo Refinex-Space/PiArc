@@ -411,6 +411,18 @@
     },
     {
       "kind": "request",
+      "method": "hooks/run",
+      "name": "hooks/run",
+      "schema": "HooksRunRequest"
+    },
+    {
+      "kind": "response",
+      "method": "hooks/run",
+      "name": "hooks/run/result",
+      "schema": "HooksRunResponse"
+    },
+    {
+      "kind": "request",
       "method": "fs/memory",
       "name": "fs/memory",
       "schema": "FsMemoryRequest"

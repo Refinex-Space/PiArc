@@ -74,6 +74,8 @@ export type AhpMessage =
   | PolicyEvaluateResponse
   | TrustGetRequest
   | TrustGetResponse
+  | HooksRunRequest
+  | HooksRunResponse
   | FsMemoryRequest
   | FsMemoryResponse
   | FsStatRequest
@@ -556,6 +558,17 @@ export type DiffLineKind = 'context' | 'added' | 'removed';
  * Why a compaction ran.
  */
 export type CompactionReason = 'manual' | 'threshold' | 'overflow';
+/**
+ * The events the Agent Host reports.
+ */
+export type HostHookEvent =
+  | 'sessionStart'
+  | 'sessionEnd'
+  | 'postToolUse'
+  | 'postToolUseFailure'
+  | 'stop'
+  | 'preCompact'
+  | 'postCompact';
 /**
  * What a path names.
  */
@@ -1170,6 +1183,11 @@ export interface SessionPromptParams {
    * Images and PDFs, by reference.
    */
   attachments?: InputAttachment[];
+  /**
+   * Context `UserPromptSubmit` hooks added for the model (`additionalContext`, plain
+   * stdout), already bounded; delivered with this input and not shown in the transcript.
+   */
+  hookContext?: string | null;
   /**
    * The files the text mentions.
    */
@@ -1837,6 +1855,11 @@ export interface SessionInputParams {
    */
   attachments?: InputAttachment[];
   /**
+   * Context `UserPromptSubmit` hooks added for the model (`additionalContext`, plain
+   * stdout), already bounded; delivered with this input and not shown in the transcript.
+   */
+  hookContext?: string | null;
+  /**
    * The files the text mentions.
    */
   mentions?: InputMention[];
@@ -2303,7 +2326,33 @@ export interface PolicyEvaluateResult {
    */
   allowed: boolean;
   /**
+   * Hook context for the model (`PreToolUse` `additionalContext`), delivered with the
+   * call's result.
+   */
+  context?: string | null;
+  /**
    * Reason visible to the model, including feedback on refusal.
+   */
+  reason?: string | null;
+  /**
+   * A hook stops the agent after this call (`continue: false`, or a `PermissionRequest`
+   * deny with `interrupt`).
+   */
+  stop?: HookStop | null;
+  /**
+   * The arguments to run the call with instead (a `PreToolUse` or `PermissionRequest`
+   * hook's `updatedInput`, decided on before the rules); the whole object, not a patch.
+   */
+  updatedInput?: {
+    [k: string]: unknown;
+  } | null;
+}
+/**
+ * `continue: false`: the agent stops.
+ */
+export interface HookStop {
+  /**
+   * `stopReason`, shown to the user and kept in the conversation.
    */
   reason?: string | null;
 }
@@ -2342,6 +2391,87 @@ export interface TrustStatus {
    * Whether project-level resources in that directory may be loaded.
    */
   trusted: boolean;
+}
+/**
+ * Request for `hooks/run`.
+ */
+export interface HooksRunRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'hooks/run';
+  params: HooksRunParams;
+}
+/**
+ * Parameters of `hooks/run`.
+ */
+export interface HooksRunParams {
+  /**
+   * `Stop`: how many times in a row hooks already continued this turn.
+   */
+  continuations?: number | null;
+  /**
+   * The session's working directory; must be inside the connection's workspace.
+   */
+  cwd: string;
+  /**
+   * The event.
+   */
+  event: HostHookEvent;
+  /**
+   * The event's own input fields with Claude Code's names (`source`, `tool_name`,
+   * `tool_input`, `tool_response`, `error`, `trigger`, `compact_summary`, …). Core adds the
+   * common fields and drops names the event does not have.
+   */
+  input: {
+    [k: string]: unknown;
+  };
+  /**
+   * The session.
+   */
+  sessionId: string;
+  /**
+   * Pi's session file (the hooks' `transcript_path`).
+   */
+  transcriptPath?: string | null;
+}
+/**
+ * Successful response to `hooks/run`.
+ */
+export interface HooksRunResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: HooksRunResult;
+}
+/**
+ * The merged decision. Every member is optional: an empty result means "go on unchanged".
+ */
+export interface HooksRunResult {
+  /**
+   * `Stop`: continue the turn with this reason for the model. `PreCompact`: do not compact
+   * (the reason went to the user).
+   */
+  block?: string | null;
+  /**
+   * Text for the model's context (`additionalContext`, plain stdout), already bounded.
+   */
+  context?: string | null;
+  /**
+   * `PostToolUse`, `PostToolUseFailure`: feedback the model reads next to the tool result.
+   */
+  feedback?: string | null;
+  /**
+   * `PreCompact`: instructions for the compaction summary.
+   */
+  instructions?: string | null;
+  /**
+   * The agent stops after this event.
+   */
+  stop?: HookStop | null;
+  /**
+   * `PostToolUse`: the tool output the model reads instead (`updatedToolOutput`).
+   */
+  updatedOutput?: unknown;
 }
 /**
  * Request for `fs/memory`.

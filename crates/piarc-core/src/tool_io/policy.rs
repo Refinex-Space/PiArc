@@ -386,6 +386,9 @@ impl ToolIo {
         let result = PolicyEvaluateResult {
             allowed: reason.is_none(),
             reason,
+            updated_input: None,
+            context: None,
+            stop: None,
         };
         let source = match (&answer, ruling.step) {
             (Some(_), _) => "user",

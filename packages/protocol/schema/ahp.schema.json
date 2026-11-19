@@ -2578,6 +2578,123 @@
       "required": ["start", "total", "items"],
       "type": "object"
     },
+    "HookStop": {
+      "description": "`continue: false`: the agent stops.",
+      "properties": {
+        "reason": {
+          "description": "`stopReason`, shown to the user and kept in the conversation.",
+          "type": ["string", "null"]
+        }
+      },
+      "type": "object"
+    },
+    "HooksRunParams": {
+      "description": "Parameters of `hooks/run`.",
+      "properties": {
+        "continuations": {
+          "description": "`Stop`: how many times in a row hooks already continued this turn.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "cwd": {
+          "description": "The session's working directory; must be inside the connection's workspace.",
+          "type": "string"
+        },
+        "event": {
+          "$ref": "#/$defs/HostHookEvent",
+          "description": "The event."
+        },
+        "input": {
+          "additionalProperties": true,
+          "description": "The event's own input fields with Claude Code's names (`source`, `tool_name`,\n`tool_input`, `tool_response`, `error`, `trigger`, `compact_summary`, …). Core adds the\ncommon fields and drops names the event does not have.",
+          "type": "object"
+        },
+        "sessionId": {
+          "description": "The session.",
+          "type": "string"
+        },
+        "transcriptPath": {
+          "description": "Pi's session file (the hooks' `transcript_path`).",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["sessionId", "event", "cwd", "input"],
+      "type": "object"
+    },
+    "HooksRunRequest": {
+      "description": "Request for `hooks/run`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "hooks/run",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/HooksRunParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "HooksRunResponse": {
+      "description": "Successful response to `hooks/run`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/HooksRunResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "HooksRunResult": {
+      "description": "The merged decision. Every member is optional: an empty result means \"go on unchanged\".",
+      "properties": {
+        "block": {
+          "description": "`Stop`: continue the turn with this reason for the model. `PreCompact`: do not compact\n(the reason went to the user).",
+          "type": ["string", "null"]
+        },
+        "context": {
+          "description": "Text for the model's context (`additionalContext`, plain stdout), already bounded.",
+          "type": ["string", "null"]
+        },
+        "feedback": {
+          "description": "`PostToolUse`, `PostToolUseFailure`: feedback the model reads next to the tool result.",
+          "type": ["string", "null"]
+        },
+        "instructions": {
+          "description": "`PreCompact`: instructions for the compaction summary.",
+          "type": ["string", "null"]
+        },
+        "stop": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HookStop"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The agent stops after this event."
+        },
+        "updatedOutput": {
+          "description": "`PostToolUse`: the tool output the model reads instead (`updatedToolOutput`)."
+        }
+      },
+      "type": "object"
+    },
     "HostHelloParams": {
       "description": "Parameters of `host/hello`.",
       "properties": {
@@ -2636,6 +2753,46 @@
       },
       "required": ["jsonrpc", "id", "result"],
       "type": "object"
+    },
+    "HostHookEvent": {
+      "description": "The events the Agent Host reports.",
+      "oneOf": [
+        {
+          "const": "sessionStart",
+          "description": "Pi's `session_start` (created, resumed, forked) or a finished compaction.",
+          "type": "string"
+        },
+        {
+          "const": "sessionEnd",
+          "description": "Pi's `session_shutdown`.",
+          "type": "string"
+        },
+        {
+          "const": "postToolUse",
+          "description": "Pi's `tool_result` of a successful call.",
+          "type": "string"
+        },
+        {
+          "const": "postToolUseFailure",
+          "description": "Pi's `tool_result` of a failed call.",
+          "type": "string"
+        },
+        {
+          "const": "stop",
+          "description": "Pi's `agent_before_settle`.",
+          "type": "string"
+        },
+        {
+          "const": "preCompact",
+          "description": "Pi's `session_before_compact`.",
+          "type": "string"
+        },
+        {
+          "const": "postCompact",
+          "description": "Pi's `session_compact`.",
+          "type": "string"
+        }
+      ]
     },
     "HostPingParams": {
       "description": "Parameters of `host/ping`.",
@@ -4032,9 +4189,29 @@
           "description": "Whether this call may execute.",
           "type": "boolean"
         },
+        "context": {
+          "description": "Hook context for the model (`PreToolUse` `additionalContext`), delivered with the\ncall's result.",
+          "type": ["string", "null"]
+        },
         "reason": {
           "description": "Reason visible to the model, including feedback on refusal.",
           "type": ["string", "null"]
+        },
+        "stop": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HookStop"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A hook stops the agent after this call (`continue: false`, or a `PermissionRequest`\ndeny with `interrupt`)."
+        },
+        "updatedInput": {
+          "additionalProperties": true,
+          "description": "The arguments to run the call with instead (a `PreToolUse` or `PermissionRequest`\nhook's `updatedInput`, decided on before the rules); the whole object, not a patch.",
+          "type": ["object", "null"]
         }
       },
       "required": ["allowed"],
@@ -5616,6 +5793,10 @@
           },
           "type": "array"
         },
+        "hookContext": {
+          "description": "Context `UserPromptSubmit` hooks added for the model (`additionalContext`, plain\nstdout), already bounded; delivered with this input and not shown in the transcript.",
+          "type": ["string", "null"]
+        },
         "mentions": {
           "description": "The files the text mentions.",
           "items": {
@@ -5728,6 +5909,10 @@
             "$ref": "#/$defs/InputAttachment"
           },
           "type": "array"
+        },
+        "hookContext": {
+          "description": "Context `UserPromptSubmit` hooks added for the model (`additionalContext`, plain\nstdout), already bounded; delivered with this input and not shown in the transcript.",
+          "type": ["string", "null"]
         },
         "mentions": {
           "description": "The files the text mentions.",
@@ -6769,6 +6954,12 @@
     },
     {
       "$ref": "#/$defs/TrustGetResponse"
+    },
+    {
+      "$ref": "#/$defs/HooksRunRequest"
+    },
+    {
+      "$ref": "#/$defs/HooksRunResponse"
     },
     {
       "$ref": "#/$defs/FsMemoryRequest"

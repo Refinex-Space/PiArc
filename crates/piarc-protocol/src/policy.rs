@@ -38,6 +38,18 @@ pub struct PolicyEvaluateResult {
     /// Reason visible to the model, including feedback on refusal.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    /// The arguments to run the call with instead (a `PreToolUse` or `PermissionRequest`
+    /// hook's `updatedInput`, decided on before the rules); the whole object, not a patch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_input: Option<Map<String, Value>>,
+    /// Hook context for the model (`PreToolUse` `additionalContext`), delivered with the
+    /// call's result.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<String>,
+    /// A hook stops the agent after this call (`continue: false`, or a `PermissionRequest`
+    /// deny with `interrupt`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stop: Option<crate::hooks::HookStop>,
 }
 
 /// Permission modes (architecture section 6.2.1). `auto` (M5) and `dontAsk` (headless) are

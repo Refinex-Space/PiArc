@@ -19,6 +19,7 @@ use crate::exec::{ExecKill, ExecOutput, ExecRun, ExecShells};
 use crate::fs::{FsGlob, FsGrep, FsList, FsMkdir, FsPdf, FsRead, FsSpill, FsStat, FsWrite};
 use crate::handshake::HostHello;
 use crate::history::{HarnessEntry, SessionGetEntries, SessionHistory};
+use crate::hooks::HooksRun;
 use crate::host::{HostPing, HostShutdown};
 use crate::jsonrpc::{ErrorResponse, Notification, Request, SuccessResponse};
 use crate::memory::FsMemory;
@@ -217,6 +218,8 @@ pub static CONTRACTS: &[Contract] = &[
     response::<PolicyEvaluate>("policy/evaluate/result"),
     request::<TrustGet>(TrustGet::NAME),
     response::<TrustGet>("trust/get/result"),
+    request::<HooksRun>(HooksRun::NAME),
+    response::<HooksRun>("hooks/run/result"),
     request::<FsMemory>(FsMemory::NAME),
     response::<FsMemory>("fs/memory/result"),
     request::<FsStat>(FsStat::NAME),

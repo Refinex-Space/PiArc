@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 13,
+  "result": {
+    "block": "Run the test suite before finishing.",
+    "instructions": "Keep the API decisions."
+  }
+}

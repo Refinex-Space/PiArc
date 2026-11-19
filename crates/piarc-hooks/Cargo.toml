@@ -10,7 +10,6 @@ publish.workspace = true
 [dependencies]
 piarc-ports.workspace = true
 regex.workspace = true
-serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 tokio = { workspace = true, features = ["io-util"] }

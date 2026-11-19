@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 12,
+  "method": "hooks/run",
+  "params": {
+    "sessionId": "s-1",
+    "event": "sessionStart",
+    "cwd": "/repo"
+  }
+}

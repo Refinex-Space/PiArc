@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 13,
+  "method": "hooks/run",
+  "params": {
+    "sessionId": "s-1",
+    "event": "stop",
+    "cwd": "/repo",
+    "input": { "stop_hook_active": true, "last_assistant_message": "Done." },
+    "continuations": 1
+  }
+}

@@ -212,6 +212,10 @@ pub struct SessionInputParams {
     /// Images and PDFs, by reference.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub attachments: Vec<InputAttachment>,
+    /// Context `UserPromptSubmit` hooks added for the model (`additionalContext`, plain
+    /// stdout), already bounded; delivered with this input and not shown in the transcript.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hook_context: Option<String>,
 }
 
 /// Result of `session/steer` and `session/followUp`.
@@ -250,6 +254,10 @@ pub struct SessionPromptParams {
     /// Images and PDFs, by reference.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub attachments: Vec<InputAttachment>,
+    /// Context `UserPromptSubmit` hooks added for the model (`additionalContext`, plain
+    /// stdout), already bounded; delivered with this input and not shown in the transcript.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hook_context: Option<String>,
 }
 
 /// Parameters of `session/compact`.

@@ -62,6 +62,7 @@ pub mod framing;
 pub mod fs;
 pub mod handshake;
 pub mod history;
+pub mod hooks;
 pub mod host;
 pub mod input;
 pub mod jsonrpc;
