@@ -10,8 +10,9 @@
 //!
 //! Exit status, output and error messages stay those of the command; `$?` survives an `EXIT`
 //! trap. When there is no answer, the command replaced the shell (`exec`), installed its own
-//! `EXIT` trap, or was killed: the previous directory stays. On Windows Git Bash prints
-//! `/c/…` paths; [`crate::msys_to_windows`] turns them into Windows paths.
+//! `EXIT` trap, or was killed: the previous directory stays. On Windows the trap asks Git Bash
+//! for the Windows form (`pwd -W`, `C:/…`), so mounted directories such as `/tmp` (the user's
+//! `%TEMP%`) resolve too; [`crate::msys_to_windows`] turns the answer into a Windows path.
 
 use std::ffi::OsString;
 use std::io;
@@ -51,7 +52,7 @@ impl CwdProbe {
         let init = dir.join(format!("{stem}.bash-env"));
         let answer = dir.join(format!("{stem}.cwd"));
         let _ = std::fs::remove_file(&answer);
-        let save = format!("builtin pwd -P >| {}", quote(&bash_path(&answer)));
+        let save = format!("{PWD} >| {}", quote(&bash_path(&answer)));
         let mut script = format!("trap {} EXIT\n", quote(&save));
         match user_bash_env {
             Some(user) => {
@@ -101,6 +102,16 @@ impl CwdProbe {
             .filter(|text| !text.is_empty())
     }
 }
+
+/// How the trap prints the directory. Git Bash's `pwd -P` answers in its own namespace, where
+/// mounted directories have POSIX names (`/tmp` is `%TEMP%`, `/usr` is Git's own) that no
+/// drive-letter conversion can map back; `pwd -W` prints the Windows path (`C:/…`). A bash
+/// without `-W` falls back to `pwd -P`.
+const PWD: &str = if cfg!(windows) {
+    "{ builtin pwd -W 2>/dev/null || builtin pwd -P; }"
+} else {
+    "builtin pwd -P"
+};
 
 /// `path` as bash reads it: forward slashes on Windows (Git Bash opens `C:/…` paths), without
 /// the `\\?\` prefix.
@@ -174,6 +185,40 @@ mod tests {
                 .to_string_lossy()
                 .starts_with("req-1")
         }));
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
+
+    /// Git Bash mounts directories under POSIX names (`/usr` is Git's own, `/tmp` is the user's
+    /// `%TEMP%`). The answer must still name the Windows directory (W1: a workspace under
+    /// `%TEMP%` lost its `cd`).
+    #[cfg(windows)]
+    #[test]
+    fn a_mounted_directory_is_answered_as_a_windows_path() {
+        let env: Vec<_> = std::env::vars_os().collect();
+        let bash = crate::shells::detect(&crate::shells::Probe::system(&env), None)
+            .bash
+            .expect("Git for Windows is installed");
+        let dir = std::env::temp_dir().join(format!("piarc-exec-cwd 目录 {}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("dir");
+        for (command, marker) in [("cd /usr/bin", "bash.exe"), ("cd /tmp", "")] {
+            let (probe, (name, value)) = CwdProbe::prepare(&dir, "req-mount", None).expect("probe");
+            let out = std::process::Command::new(&bash)
+                .args(["-c", command])
+                .current_dir(&dir)
+                .env(name, value)
+                .output()
+                .expect("bash runs");
+            assert!(out.status.success(), "{out:?}");
+            let answer = probe.finish().expect("an answer");
+            let windows = crate::msys_to_windows(&answer)
+                .unwrap_or_else(|| panic!("{command}: `{answer}` is not a Windows path"));
+            let found = Path::new(&windows);
+            assert!(found.is_dir(), "{command}: {windows}");
+            assert!(
+                marker.is_empty() || found.join(marker).is_file(),
+                "{windows}"
+            );
+        }
         std::fs::remove_dir_all(&dir).expect("cleanup");
     }
 }
