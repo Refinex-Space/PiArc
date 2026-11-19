@@ -269,3 +269,6 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | Memory 发现与读取 | Core `tool_io::memory_reader::collect`、AHP `fs/memory` | 从会话范围、用户目录与已访问目录收集来源，处理单文件上限和外部导入决定 | T22 |
 | Markdown 中的 `@path` | `memory_reader/markdown.rs` 的 `expand` 与 `Reader::document` | 统一处理代码边界、块注释、相对导入、深度和循环；Core 负责实际打开文件 | T22 |
 | 会话上下文追加消息 | Agent Host `harness/session-memory.ts` 的 `SessionMemory` | 由分支记录和内容摘要决定追加内容，送达时保留既有 system 和工具结果；T27 接入统一提醒通道时复用 | T22 |
+| 权限规则匹配 | `piarc_policy::rules`（`parse`、`RuleSet::{add_source, find, whole_tool, exact_allow, invalid_for, is_broad}`）、`pattern::Pattern`、`paths::{PathPattern, posix, escape}` | Claude Code 格式的规则：命令通配（含运行期值的确定/可能匹配）、gitignore 路径与四种锚点、WebFetch 域名、Agent/Skill 名称、MCP 与工具名通配；按来源顺序报告命中；无效的 deny/ask 规则让所点名工具的调用询问。新工具的权限匹配在这里加 specifier，不另写匹配 | T23 |
+| Bash 命令分析 | `piarc_policy::bash`（`analyze`、`judge`、`classify`、`is_critical_delete`、`suggestions`） | tree-sitter-bash 拆子命令（含替换、控制结构、heredoc）、剥离包装与安全赋值、影子命令、只读白名单、关键路径删除、"总是允许"前缀；纯函数，路径与程序经 `Facts` 由调用方提供。要理解或判定 shell 命令时复用，不用正则或按空格拆分 | T23 |
+| 权限裁决阶梯 | `piarc_policy::{decide, after_permission_request, starting_mode, Input}`；Core 侧 `tool_io::policy::assess` | 第 6.2.3 节的八步，企业策略与两个 hooks 插槽；新工具只需给出 `Input` 的事实（写、只读、越界、受保护、规则命中） | T23 |

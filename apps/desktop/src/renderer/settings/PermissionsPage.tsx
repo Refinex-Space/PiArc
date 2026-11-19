@@ -263,75 +263,77 @@ function SourceSection({
       .catch(onError);
   };
   return (
-    <section className="settings-section" data-testid={`permission-source-${source.id}`}>
-      <h2 className="setting-label">
+    <section className="permission-source" data-testid={`permission-source-${source.id}`}>
+      <h3 className="permission-source-title">
         {title === undefined ? source.id : t(title)}
         {source.sessionId !== undefined && <span className="muted"> · {source.sessionId}</span>}
         {!source.writable && <span className="muted"> · {t('permissions.readOnly')}</span>}
-      </h2>
+      </h3>
       {source.file !== undefined && <div className="muted approval-path">{source.file}</div>}
       {source.rules.length === 0 && <p className="muted">{t('permissions.empty')}</p>}
-      <ul className="permission-rules">
-        {source.rules.map((r) => {
-          const key = `${r.behavior}:${r.rule}`;
-          return (
-            <li key={key} className="permission-rule" data-testid="permission-rule">
-              {editing === key ? (
-                <RuleEditor
-                  initial={r.rule}
-                  behavior={r.behavior}
-                  fixed
-                  onCancel={() => {
-                    setEditing(undefined);
-                  }}
-                  onSave={(rule) => {
-                    change(r.behavior, r.rule, rule);
-                  }}
-                />
-              ) : (
-                <>
-                  <span className={`permission-badge is-${r.behavior}`}>
-                    {t(`permissions.behavior.${r.behavior}`)}
-                  </span>{' '}
-                  <code>{r.rule}</code>
-                  {r.error !== undefined && (
-                    <span className="error-text">
-                      {' '}
-                      {t('permissions.invalid', { reason: r.error })}
-                    </span>
-                  )}
-                  {r.broad && r.behavior === 'allow' && (
-                    <span className="muted"> {t('permissions.broad')}</span>
-                  )}
-                  {r.inactive && <span className="muted"> {t('permissions.inactive')}</span>}
-                  {source.writable && (
-                    <span className="permission-actions">
-                      <button
-                        type="button"
-                        className="row-action"
-                        onClick={() => {
-                          setEditing(key);
-                        }}
-                      >
-                        {t('permissions.edit')}
-                      </button>
-                      <button
-                        type="button"
-                        className="row-action"
-                        onClick={() => {
-                          change(r.behavior, r.rule, undefined);
-                        }}
-                      >
-                        {t('permissions.remove')}
-                      </button>
-                    </span>
-                  )}
-                </>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      {source.rules.length > 0 && (
+        <ul className="permission-rules">
+          {source.rules.map((r) => {
+            const key = `${r.behavior}:${r.rule}`;
+            return (
+              <li key={key} className="permission-rule" data-testid="permission-rule">
+                {editing === key ? (
+                  <RuleEditor
+                    initial={r.rule}
+                    behavior={r.behavior}
+                    fixed
+                    onCancel={() => {
+                      setEditing(undefined);
+                    }}
+                    onSave={(rule) => {
+                      change(r.behavior, r.rule, rule);
+                    }}
+                  />
+                ) : (
+                  <>
+                    <span className={`permission-badge is-${r.behavior}`}>
+                      {t(`permissions.behavior.${r.behavior}`)}
+                    </span>{' '}
+                    <code>{r.rule}</code>
+                    {r.error !== undefined && (
+                      <span className="error-text">
+                        {' '}
+                        {t('permissions.invalid', { reason: r.error })}
+                      </span>
+                    )}
+                    {r.broad && r.behavior === 'allow' && (
+                      <span className="muted"> {t('permissions.broad')}</span>
+                    )}
+                    {r.inactive && <span className="muted"> {t('permissions.inactive')}</span>}
+                    {source.writable && (
+                      <span className="permission-actions">
+                        <button
+                          type="button"
+                          className="row-action"
+                          onClick={() => {
+                            setEditing(key);
+                          }}
+                        >
+                          {t('permissions.edit')}
+                        </button>
+                        <button
+                          type="button"
+                          className="row-action"
+                          onClick={() => {
+                            change(r.behavior, r.rule, undefined);
+                          }}
+                        >
+                          {t('permissions.remove')}
+                        </button>
+                      </span>
+                    )}
+                  </>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
       {source.writable &&
         (adding ? (
           <RuleEditor
@@ -347,7 +349,7 @@ function SourceSection({
         ) : (
           <button
             type="button"
-            className="button"
+            className="button permission-add"
             data-testid={`permission-add-${source.id}`}
             onClick={() => {
               setAdding(true);
@@ -393,10 +395,12 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
   }, [workspace, session, tool, conclusion, since]);
   useEffect(load, [load]);
   return (
-    <section className="settings-section" data-testid="permission-audit">
-      <h2 className="setting-label">{t('permissions.audit')}</h2>
+    <section className="permission-audit" data-testid="permission-audit">
+      <h2 className="permission-heading">{t('permissions.audit')}</h2>
       <div className="permission-filters">
-        <label htmlFor={ids.session}>{t('permissions.audit.session')}</label>
+        <label htmlFor={ids.session} className="permission-filter-label">
+          {t('permissions.audit.session')}
+        </label>
         <input
           id={ids.session}
           className="input"
@@ -406,7 +410,9 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
             setSession(e.target.value);
           }}
         />
-        <label htmlFor={ids.tool}>{t('permissions.audit.tool')}</label>
+        <label htmlFor={ids.tool} className="permission-filter-label">
+          {t('permissions.audit.tool')}
+        </label>
         <input
           id={ids.tool}
           className="input"
@@ -416,7 +422,9 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
             setTool(e.target.value);
           }}
         />
-        <label htmlFor={ids.conclusion}>{t('permissions.audit.conclusion')}</label>
+        <label htmlFor={ids.conclusion} className="permission-filter-label">
+          {t('permissions.audit.conclusion')}
+        </label>
         <select
           id={ids.conclusion}
           className="input"
@@ -431,7 +439,9 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
           <option value="allow">{t('permissions.audit.allow')}</option>
           <option value="deny">{t('permissions.audit.deny')}</option>
         </select>
-        <label htmlFor={ids.since}>{t('permissions.audit.since')}</label>
+        <label htmlFor={ids.since} className="permission-filter-label">
+          {t('permissions.audit.since')}
+        </label>
         <select
           id={ids.since}
           className="input"
@@ -469,15 +479,17 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
           <tbody>
             {rows.map((r, i) => (
               <tr key={`${String(r.at)}-${String(i)}`} data-testid="audit-row">
-                <td>{new Date(r.at).toLocaleString()}</td>
-                <td>{r.sessionId ?? ''}</td>
-                <td>{r.tool ?? ''}</td>
-                <td>{r.step ?? ''}</td>
+                <td className="permission-nowrap">{new Date(r.at).toLocaleString()}</td>
+                <td className="permission-nowrap" title={r.sessionId}>
+                  {r.sessionId?.slice(0, 8) ?? ''}
+                </td>
+                <td className="permission-nowrap">{r.tool ?? ''}</td>
+                <td className="permission-nowrap">{r.step ?? ''}</td>
                 <td>
                   {r.rule === undefined ? '' : <code>{r.rule}</code>}
                   {r.ruleSource === undefined ? '' : ` · ${r.ruleSource}`}
                 </td>
-                <td>
+                <td className="permission-nowrap">
                   {r.conclusion === 'allow'
                     ? t('permissions.audit.allow')
                     : r.conclusion === 'deny'
@@ -566,7 +578,7 @@ export function PermissionsPage() {
       )}
       {view !== undefined && workspace !== null && (
         <>
-          <h2 className="setting-label">{t('permissions.rules')}</h2>
+          <h2 className="permission-heading">{t('permissions.rules')}</h2>
           {view.sources.map((source) => (
             <SourceSection
               key={`${source.id}:${source.sessionId ?? ''}`}

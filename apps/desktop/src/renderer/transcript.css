@@ -909,13 +909,19 @@
   gap: var(--piarc-space-1);
   color: var(--piarc-text-secondary);
 }
-.approval-card input {
+.approval-card input,
+.approval-card textarea {
   min-width: 0;
   padding: var(--piarc-space-1) var(--piarc-space-2);
   color: var(--piarc-text-primary);
   background: var(--piarc-surface-panel);
   border: 1px solid var(--piarc-border-default);
   border-radius: var(--piarc-radius-sm);
+}
+.approval-card textarea {
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+  resize: vertical;
 }
 .approval-actions {
   display: flex;

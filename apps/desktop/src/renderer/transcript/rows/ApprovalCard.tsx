@@ -203,7 +203,7 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
               {t('approval.rule')}
               <textarea
                 value={rules}
-                rows={Math.min(Math.max(offered.length, 1), 5)}
+                rows={Math.min(Math.max(rules.split('\n').length, 1), 6)}
                 data-testid="approval-rules"
                 readOnly={request.kind === 'permissionExpansion' && request.tool === 'MemoryImport'}
                 onChange={(e) => {

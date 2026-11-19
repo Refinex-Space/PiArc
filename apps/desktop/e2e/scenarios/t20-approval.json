@@ -6,7 +6,10 @@
         {
           "id": "first",
           "name": "Bash",
-          "input": { "command": "echo one", "description": "First command" }
+          "input": {
+            "command": "env echo one",
+            "description": "First command"
+          }
         }
       ]
     },
@@ -15,7 +18,10 @@
         {
           "id": "approved",
           "name": "Bash",
-          "input": { "command": "echo approved", "description": "Saved rule" }
+          "input": {
+            "command": "env echo approved",
+            "description": "Saved rule"
+          }
         }
       ]
     },
@@ -24,10 +30,15 @@
         {
           "id": "protected",
           "name": "Write",
-          "input": { "path": ".piarc/note.txt", "content": "a note" }
+          "input": {
+            "path": ".piarc/note.txt",
+            "content": "a note"
+          }
         }
       ]
     },
-    { "text": "Finished reviewing." }
+    {
+      "text": "Finished reviewing."
+    }
   ]
 }

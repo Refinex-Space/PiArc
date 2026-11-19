@@ -25,9 +25,10 @@ test('edits and confirms an exact rule, declines protected writes and restores t
     'Review the changes',
   );
   const card = page.getByTestId('approval-card');
-  await expect(card).toContainText('echo one');
+  // `echo` alone is a read-only command (T23); `env` makes it one that asks.
+  await expect(card).toContainText('env echo one');
   await expect(row(page, id)).toHaveAttribute('data-badge', 'awaiting');
-  await card.getByLabel('Rule to save').fill('Bash(echo approved)');
+  await card.getByLabel('Rules to save').fill('Bash(env echo approved)');
   await app.evaluate(({ dialog }) => {
     const seen: string[] = [];
     (globalThis as { approvalDialogs?: string[] }).approvalDialogs = seen;
@@ -43,11 +44,14 @@ test('edits and confirms an exact rule, declines protected writes and restores t
   await expect(card).toHaveAttribute('data-approval-card', 'fileChange');
   expect(
     await app.evaluate(() => (globalThis as { approvalDialogs?: string[] }).approvalDialogs),
-  ).toEqual(['Rule to save\nBash(echo approved)', 'Rule to save\nBash(echo approved)']);
+  ).toEqual([
+    'Rules to save (one per line)\nBash(env echo approved)',
+    'Rules to save (one per line)\nBash(env echo approved)',
+  ]);
   expect(
     JSON.parse(await readFile(path.join(ws, '.piarc', 'settings.local.json'), 'utf8')),
   ).toMatchObject({
-    permissions: { allow: ['Bash(echo approved)'] },
+    permissions: { allow: ['Bash(env echo approved)'] },
   });
   await expect(card).toContainText(/\.piarc[\\/]note\.txt/u);
   await expect(card.getByRole('button', { name: 'Always allow' })).toHaveCount(0);

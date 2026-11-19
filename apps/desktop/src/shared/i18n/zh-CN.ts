@@ -178,7 +178,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'approval.once': '仅本次允许',
   'approval.session': '本会话允许',
   'approval.always': '总是允许',
-  'approval.confirmRule': '保存这条权限规则？',
+  'approval.confirmRule': '保存下面的权限规则？',
   'approval.confirmDirectory': '保存这项目录权限？',
   'approval.handled': '此审批请求已失效。',
   'command.session.new': '新建会话',

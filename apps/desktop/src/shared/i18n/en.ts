@@ -180,7 +180,7 @@ export const en = {
   'approval.once': 'Allow once',
   'approval.session': 'Allow for session',
   'approval.always': 'Always allow',
-  'approval.confirmRule': 'Save this permission rule?',
+  'approval.confirmRule': 'Save the permission rules below?',
   'approval.confirmDirectory': 'Save this directory permission?',
   'approval.handled': 'This approval is no longer current.',
   'command.session.new': 'New Session',
