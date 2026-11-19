@@ -14,6 +14,10 @@ export type PanelArea = 'rail' | 'dock';
 export interface PanelContext {
   /** The selected session, if any. */
   readonly sessionId: string | undefined;
+  /** The selected session has a task list (T26). */
+  readonly tasks?: boolean;
+  /** The selected session has a plan, approved or waiting for review (T26). */
+  readonly plan?: boolean;
 }
 
 export interface PanelSpec {
@@ -30,6 +34,8 @@ export interface PanelSpec {
 }
 
 let panels: readonly PanelSpec[] = [];
+/** The last panel something asked to bring forward (`showPanel`). */
+let requested: { readonly id: string; readonly nonce: number } | undefined;
 const listeners = new Set<() => void>();
 
 function changed(): void {
@@ -46,6 +52,17 @@ export function registerPanel(spec: PanelSpec): () => void {
     panels = panels.filter((p) => p !== spec);
     changed();
   };
+}
+
+/** Brings panel `id` forward in its area (for example a card's "open in the plan panel"). */
+export function showPanel(id: string): void {
+  requested = { id, nonce: (requested?.nonce ?? 0) + 1 };
+  changed();
+}
+
+/** The last request of `showPanel`. */
+export function useRequestedPanel(): { readonly id: string; readonly nonce: number } | undefined {
+  return useSyncExternalStore(subscribe, () => requested);
 }
 
 function subscribe(listener: () => void): () => void {

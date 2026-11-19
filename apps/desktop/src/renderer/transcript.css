@@ -934,3 +934,128 @@
 .environment-bar {
   padding: 0 var(--piarc-space-5) var(--piarc-space-2);
 }
+
+/* T26: host tool rows (task card, plan, answered questions, next steps) and the plan and
+   question approval cards. */
+.harness-card {
+  display: grid;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-3);
+  border: 1px solid var(--piarc-border-default);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-raised);
+}
+.task-list ol {
+  display: grid;
+  gap: var(--piarc-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.task {
+  display: flex;
+  gap: var(--piarc-space-2);
+  align-items: baseline;
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border-radius: var(--piarc-radius-sm);
+}
+.task-mark {
+  flex: none;
+  width: 1em;
+  color: var(--piarc-text-secondary);
+  text-align: center;
+}
+.task-inProgress {
+  background: var(--piarc-accent-subtle);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.task-inProgress .task-mark {
+  color: var(--piarc-text-accent);
+}
+.task-completed .task-text {
+  color: var(--piarc-text-secondary);
+  text-decoration: line-through;
+}
+.task-completed .task-mark {
+  color: var(--piarc-state-success);
+}
+.task-count {
+  font-size: var(--piarc-font-size-small);
+}
+.plan-preview {
+  margin: 0;
+  padding: var(--piarc-space-2);
+  overflow-x: auto;
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--piarc-code-text);
+  background: var(--piarc-code-background);
+  border-radius: var(--piarc-radius-sm);
+}
+.plan-card-meta {
+  display: flex;
+  gap: var(--piarc-space-2);
+  align-items: center;
+  color: var(--piarc-text-secondary);
+}
+.question-row dl {
+  display: grid;
+  gap: var(--piarc-space-1);
+  margin: 0;
+}
+.question-row dt {
+  color: var(--piarc-text-secondary);
+}
+.question-row dd {
+  margin: 0;
+}
+.question-card fieldset.question {
+  display: grid;
+  gap: var(--piarc-space-1);
+  margin: 0;
+  padding: var(--piarc-space-2);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-sm);
+}
+.question-card legend {
+  padding: 0 var(--piarc-space-1);
+  color: var(--piarc-text-primary);
+}
+.question-header {
+  margin-right: var(--piarc-space-2);
+  padding: 0 var(--piarc-space-1);
+  font-size: var(--piarc-font-size-caption);
+  color: var(--piarc-text-accent);
+  background: var(--piarc-accent-subtle);
+  border-radius: var(--piarc-radius-pill);
+}
+.approval-card .question-option {
+  display: flex;
+  grid-auto-flow: column;
+  gap: var(--piarc-space-2);
+  align-items: baseline;
+  color: var(--piarc-text-primary);
+}
+.next-steps ul {
+  display: grid;
+  gap: var(--piarc-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.next-step-title {
+  font-weight: var(--piarc-font-weight-semibold);
+}
+.next-step-prompt {
+  font-size: var(--piarc-font-size-small);
+}
+.next-step-actions {
+  display: flex;
+  gap: var(--piarc-space-2);
+  margin-top: var(--piarc-space-1);
+}
+.harness-card > .row-action {
+  justify-self: start;
+}

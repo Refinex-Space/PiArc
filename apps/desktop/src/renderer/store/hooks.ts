@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useSyncExternalStore } from 'react';
 
 import type { AppStore, Notice } from './app-store.js';
+import type { HarnessSnapshot } from './harness.js';
 import type { SessionEntry, WorkspaceEntry } from './snapshots.js';
 import type { QueuedInput, TranscriptRow, TurnInfo } from './transcript.js';
 
@@ -33,7 +34,11 @@ export function useNotices(): readonly Notice[] {
 
 /** One session's entry: re-renders only when that entry changes. */
 export function useSession(id: string | undefined): SessionEntry | undefined {
-  const store = useStore();
+  return useSessionOf(useStore(), id);
+}
+
+/** `useSession` for the component that owns the store (the window shell). */
+export function useSessionOf(store: AppStore, id: string | undefined): SessionEntry | undefined {
   const subscribe = useCallback(
     (listener: () => void) =>
       id === undefined ? () => undefined : store.subscribeSession(id, listener),
@@ -79,6 +84,27 @@ export function useNeedsReload(sessionId: string): boolean {
   return useSyncExternalStore(
     subscribe,
     useCallback(() => transcript.needsReload(), [transcript]),
+  );
+}
+
+/** The session's plan and task list (T26). */
+export function useHarness(sessionId: string | undefined): HarnessSnapshot | undefined {
+  return useHarnessOf(useStore(), sessionId);
+}
+
+/** `useHarness` for the component that owns the store (the window shell). */
+export function useHarnessOf(
+  store: AppStore,
+  sessionId: string | undefined,
+): HarnessSnapshot | undefined {
+  const harness = sessionId === undefined ? undefined : store.transcript(sessionId).harness;
+  const subscribe = useCallback(
+    (l: () => void) => harness?.subscribe(l) ?? (() => undefined),
+    [harness],
+  );
+  return useSyncExternalStore(
+    subscribe,
+    useCallback(() => harness?.state(), [harness]),
   );
 }
 

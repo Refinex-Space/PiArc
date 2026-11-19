@@ -6,7 +6,7 @@
 import path from 'node:path';
 
 import { BrowserWindow, dialog } from 'electron';
-import { isPermissionMode } from '@piarc/protocol';
+import { isPermissionMode, type PlanComment, type QuestionAnswer } from '@piarc/protocol';
 
 import {
   type ApprovalAnswer,
@@ -205,6 +205,39 @@ function nonnegative(value: unknown, name: string): number {
   return value;
 }
 
+function record(value: unknown, name: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new TypeError(`${name} must be an object`);
+  }
+  return value as Record<string, unknown>;
+}
+
+/** Inline comments on a plan: UTF-16 ranges with the quoted text and the comment. */
+function planComments(value: unknown): PlanComment[] {
+  return list(value, 'comments', 200).map((entry) => {
+    const c = record(entry, 'comment');
+    return {
+      start: nonnegative(c.start, 'start'),
+      end: nonnegative(c.end, 'end'),
+      quote: text(c.quote, 'quote'),
+      text: text(c.text, 'text'),
+    };
+  });
+}
+
+/** One answer per question: picked option labels and an answer of the user's own. */
+function questionAnswers(value: unknown): QuestionAnswer[] {
+  return list(value, 'answers', 4).map((entry) => {
+    const q = record(entry, 'answer');
+    return {
+      ...(q.selected === undefined
+        ? {}
+        : { selected: list(q.selected, 'selected', 8).map((label) => text(label, 'label')) }),
+      ...(q.other === undefined ? {} : { other: text(q.other, 'other') }),
+    };
+  });
+}
+
 function approvalAnswer(value: unknown): ApprovalAnswer {
   if (typeof value !== 'object' || value === null) throw new TypeError('invalid approval answer');
   const a = value as Record<string, unknown>;
@@ -235,8 +268,24 @@ function approvalAnswer(value: unknown): ApprovalAnswer {
       ...(a.directory === undefined ? {} : { directory: absolutePath(a.directory) }),
     };
   }
-  return decision === 'deny' && a.feedback !== undefined
-    ? { ...fields, feedback: text(a.feedback, 'feedback', true) }
+  // T26: an approved plan carries its follow-up mode, a declined plan its comments, an answered
+  // question form its answers. Core checks them against the card.
+  if (decision === 'allowOnce') {
+    if (a.mode !== undefined && a.mode !== 'acceptEdits' && a.mode !== 'default') {
+      throw new TypeError('mode must be acceptEdits or default');
+    }
+    return {
+      ...fields,
+      ...(a.mode === undefined ? {} : { mode: a.mode }),
+      ...(a.answers === undefined ? {} : { answers: questionAnswers(a.answers) }),
+    };
+  }
+  return decision === 'deny'
+    ? {
+        ...fields,
+        ...(a.feedback === undefined ? {} : { feedback: text(a.feedback, 'feedback', true) }),
+        ...(a.comments === undefined ? {} : { comments: planComments(a.comments) }),
+      }
     : fields;
 }
 

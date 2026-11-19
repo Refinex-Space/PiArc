@@ -1,0 +1,61 @@
+{
+  "id": "t26-ask",
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "ask",
+          "name": "AskUserQuestion",
+          "input": {
+            "questions": [
+              {
+                "question": "Which database?",
+                "header": "Database",
+                "options": [
+                  {
+                    "label": "SQLite",
+                    "description": "One file"
+                  },
+                  {
+                    "label": "Postgres",
+                    "description": "A server"
+                  }
+                ]
+              },
+              {
+                "question": "Which platforms?",
+                "header": "Platforms",
+                "options": [
+                  {
+                    "label": "macOS"
+                  },
+                  {
+                    "label": "Windows"
+                  },
+                  {
+                    "label": "Linux"
+                  }
+                ],
+                "multiSelect": true
+              },
+              {
+                "question": "What should the project be called?",
+                "options": [
+                  {
+                    "label": "piarc"
+                  },
+                  {
+                    "label": "arc"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "text": "Thanks, noted."
+    }
+  ]
+}

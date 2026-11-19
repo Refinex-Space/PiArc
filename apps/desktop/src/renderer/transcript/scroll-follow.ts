@@ -57,10 +57,12 @@ export class ScrollFollow {
     this.lastUserInputAt = now;
   }
 
-  /** A pointer went down on the scrollbar (or up again). */
+  /** A pointer went down on the scrollbar, or a pointer went up anywhere. Only a release of
+   * the scrollbar is scroll input: a click elsewhere (a card's button) must not hold back the
+   * pins its result needs. */
   pointer(now: number, held: boolean): void {
+    if (held || this.pointerHeld) this.lastUserInputAt = now;
     this.pointerHeld = held;
-    this.lastUserInputAt = now;
   }
 
   /**

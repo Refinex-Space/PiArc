@@ -27,6 +27,7 @@ import type {
 } from '@piarc/protocol';
 
 import { sameRequest } from './approvals.js';
+import { SessionHarness } from './harness.js';
 import type { PendingAttachment } from '../composer/attachments.js';
 
 /** An attachment as the user message shows it: a stored attachment or one being sent. */
@@ -147,8 +148,20 @@ const GROUPED_TYPES = new Set([
   'fileChange',
 ]);
 
+/** Host tools with rows of their own (T26): the task card, the plan card, the answered
+ * questions and the next steps. */
+export const OWN_ROW_TOOLS: ReadonlySet<string> = new Set([
+  'TodoWrite',
+  'ExitPlanMode',
+  'AskUserQuestion',
+  'SuggestNextSteps',
+]);
+
 export function isGrouped(item: Item): boolean {
-  return GROUPED_TYPES.has(item.type);
+  return (
+    GROUPED_TYPES.has(item.type) &&
+    !(item.type === 'dynamicToolCall' && OWN_ROW_TOOLS.has(item.tool))
+  );
 }
 
 function isTool(item: Item): boolean {
@@ -263,6 +276,8 @@ export class SessionTranscript {
   private display: readonly string[] = [];
   private readonly rows = new Map<string, TranscriptRow>();
   private approvalIds: string[] = [];
+  /** The branch's plan and task list (T26). */
+  readonly harness = new SessionHarness();
   private turn: TurnInfo = IDLE;
   private queueItems: readonly QueuedInput[] = [];
   private reload = false;
@@ -611,6 +626,7 @@ export class SessionTranscript {
         batch.state = true;
         break;
       default:
+        this.harness.apply(method, params);
         break;
     }
   }

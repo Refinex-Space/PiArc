@@ -535,7 +535,7 @@ describe('P0 row types', () => {
   });
 });
 
-it('renders the four ledger card kinds, keeps approvals through a history reload, and removes invalidated requests', async () => {
+it('renders the five ledger card kinds, keeps approvals through a history reload, and removes invalidated requests', async () => {
   const store = new AppStore();
   const request = {
     sessionId: 's',
@@ -582,16 +582,30 @@ it('renders the four ledger card kinds, keeps approvals through a history reload
       path: '../a',
       directory: '/other',
     },
-    { ...request, requestId: 'form', tool: 'AskUserQuestion', kind: 'question' },
+    {
+      ...request,
+      requestId: 'form',
+      tool: 'AskUserQuestion',
+      kind: 'question',
+      questions: [
+        {
+          question: 'Which database?',
+          options: [{ label: 'SQLite', description: 'One file' }, { label: 'Postgres' }],
+        },
+      ],
+    },
+    { ...request, requestId: 'plan', tool: 'ExitPlanMode', kind: 'plan', plan: '1. Fix it' },
   ];
-  store.applySessions({ revision: 1, sessions: [{ id: 's', approvals, pendingApprovals: 4 }] });
+  store.applySessions({ revision: 1, sessions: [{ id: 's', approvals, pendingApprovals: 5 }] });
   const transcript = store.transcript('s');
   transcript.load([], 0);
   const root = await render(transcript, transcript.rowIds());
-  expect(root.querySelectorAll('[data-approval-card]')).toHaveLength(4);
-  expect(root.querySelector('[data-approval-card="question"]')?.textContent).toContain(
-    'does not support question forms',
-  );
+  expect(root.querySelectorAll('[data-approval-card]')).toHaveLength(5);
+  const form = root.querySelector('[data-approval-card="question"]');
+  expect(form?.textContent).toContain('Which database?');
+  expect(form?.querySelectorAll('input[type="radio"]')).toHaveLength(3);
+  expect(form?.textContent).toContain('Other');
+  expect(root.querySelector('[data-approval-card="plan"]')?.textContent).toContain('1. Fix it');
   expect(root.querySelector('[data-approval-card="fileChange"]')?.textContent).not.toContain(
     'Always allow',
   );
@@ -607,4 +621,62 @@ it('renders the four ledger card kinds, keeps approvals through a history reload
     });
   });
   expect(root.querySelectorAll('[data-approval-card]')).toHaveLength(0);
+});
+
+it('gives host tools rows of their own: task list, plan, answers and next steps (T26)', async () => {
+  const transcript = new SessionTranscript();
+  const call = (itemId: string, tool: string, args: Record<string, unknown>, output?: string) => ({
+    entryId: `e-${itemId}`,
+    item: {
+      type: 'dynamicToolCall' as const,
+      itemId,
+      status: 'completed' as const,
+      tool,
+      arguments: args,
+      ...(output === undefined ? {} : { output }),
+    },
+  });
+  transcript.load(
+    [
+      call('enter', 'EnterPlanMode', {}),
+      call('todo', 'TodoWrite', {
+        todos: [
+          { content: 'Read', status: 'completed' },
+          { content: 'Fix', status: 'in_progress', activeForm: 'Fixing' },
+          { content: 'Docs', status: 'pending' },
+        ],
+      }),
+      call('plan', 'ExitPlanMode', { plan: '1. Fix\n2. Test' }),
+      call(
+        'ask',
+        'AskUserQuestion',
+        { questions: [] },
+        'The user answered.\n{"answers":[{"question":"DB?","outcome":"answered","selected":["SQLite"]}]}',
+      ),
+      call('next', 'SuggestNextSteps', {
+        suggestions: [{ title: 'Run tests', prompt: 'Run the whole suite.' }],
+      }),
+    ],
+    0,
+  );
+  const root = await render(transcript, transcript.rowIds());
+  // Only EnterPlanMode stays in a tool group.
+  expect(root.querySelectorAll('[data-testid="tool-group"]')).toHaveLength(1);
+  const tasks = [...root.querySelectorAll('[data-testid="task"]')];
+  expect(tasks.map((t) => t.getAttribute('data-status'))).toEqual([
+    'completed',
+    'inProgress',
+    'pending',
+  ]);
+  expect(tasks[1]?.textContent).toContain('Fixing');
+  expect(root.querySelector('[data-testid="task-count"]')?.textContent).toBe('1/3 done');
+  expect(root.querySelector('[data-testid="plan-row"]')?.getAttribute('data-status')).toBe(
+    'approved',
+  );
+  expect(root.querySelector('[data-testid="plan-row"]')?.textContent).toContain('1. Fix');
+  expect(root.querySelector('[data-testid="question-row"]')?.textContent).toContain('SQLite');
+  const next = root.querySelector('[data-testid="next-steps"]');
+  expect(next?.textContent).toContain('Run tests');
+  // Outside the window shell (the prototype page) the suggestions have no actions.
+  expect(next?.querySelector('[data-testid="next-run-here"]')).toBeNull();
 });

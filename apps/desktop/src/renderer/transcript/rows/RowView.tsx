@@ -9,6 +9,10 @@ import { useTranscriptRow, useTranscriptServices } from '../services.js';
 import { useListActions } from './list-actions.js';
 import { AgentMessageRow, OptimisticRow, ThinkingRow, UserMessageRow } from './messages.js';
 import { ApprovalCard } from './ApprovalCard.js';
+import { PlanApprovalCard } from '../../approvals/PlanApprovalCard.js';
+import { QuestionForm } from '../../approvals/QuestionForm.js';
+import { OWN_ROW_TOOLS } from '../../store/transcript.js';
+import { HostToolRow } from './harness.js';
 import { CompactionRow, ErrorCard, UncertainCard, WorkingRow } from './status.js';
 import { BashCard, FileChangeCard, ToolGroupRow } from './tools.js';
 
@@ -81,7 +85,14 @@ const RowContent = memo(function RowContent({ id }: { readonly id: string }) {
     case 'uncertain':
       return <UncertainCard row={row} />;
     case 'approval':
-      return <ApprovalCard request={row.request} />;
+      switch (row.request.kind) {
+        case 'plan':
+          return <PlanApprovalCard request={row.request} />;
+        case 'question':
+          return <QuestionForm request={row.request} />;
+        default:
+          return <ApprovalCard request={row.request} />;
+      }
     case 'working':
       return <WorkingRow />;
     case 'item':
@@ -103,6 +114,9 @@ const RowContent = memo(function RowContent({ id }: { readonly id: string }) {
       return <ModeChangeRow mode={item.mode} />;
     case 'contextCompaction':
       return <CompactionRow id={id} item={item} />;
+    case 'dynamicToolCall':
+      if (OWN_ROW_TOOLS.has(item.tool)) return <HostToolRow item={item} />;
+      return <ToolGroupRow id={id} members={[id]} />;
     default:
       // Other tool calls are shown inside tool groups.
       return <ToolGroupRow id={id} members={[id]} />;

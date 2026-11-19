@@ -38,11 +38,13 @@ export function isApproval(value: unknown, sessionId: string): value is Approval
   )
     return false;
   if (
-    !['command', 'fileChange', 'permissionExpansion', 'question'].some(
+    !['command', 'fileChange', 'permissionExpansion', 'question', 'plan'].some(
       (kind) => kind === value.kind,
     )
   )
     return false;
+  if (value.kind === 'plan' && typeof value.plan !== 'string') return false;
+  if (value.kind === 'question' && !questionsOf(value.questions)) return false;
   if (
     !['command', 'cwd', 'path', 'rule', 'directory'].every(
       (key) => value[key] == null || typeof value[key] === 'string',
@@ -60,6 +62,30 @@ export function isApproval(value: unknown, sessionId: string): value is Approval
       integer(diff.removed) &&
       Array.isArray(diff.hunks) &&
       diff.hunks.every(hunk))
+  );
+}
+
+/** A question card's questions (T26): text, 2–4 labelled options, flags. */
+function questionsOf(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every(
+      (q: unknown) =>
+        record(q) &&
+        typeof q.question === 'string' &&
+        (q.header == null || typeof q.header === 'string') &&
+        (q.multiSelect == null || typeof q.multiSelect === 'boolean') &&
+        Array.isArray(q.options) &&
+        q.options.length > 0 &&
+        q.options.every(
+          (o: unknown) =>
+            record(o) &&
+            typeof o.label === 'string' &&
+            (o.description == null || typeof o.description === 'string') &&
+            (o.default == null || typeof o.default === 'boolean'),
+        ),
+    )
   );
 }
 

@@ -74,6 +74,15 @@ describe('ScrollFollow', () => {
     follow.pointer(5_100, false);
   });
 
+  it('does not hold pins back after a click outside the scrollbar (T26)', () => {
+    // A button of a card (an approval) answers; its result changes the content right after.
+    const follow = new ScrollFollow();
+    follow.scrolled(at(bottom()), 0);
+    follow.pointer(1_000, false);
+    expect(follow.resized(at(bottom(), 5_300), 1_020)).toBe(true);
+    expect(follow.state.showButton).toBe(false);
+  });
+
   it('shows the button beyond the button distance and hides it after a jump', () => {
     const follow = new ScrollFollow();
     const seen: boolean[] = [];

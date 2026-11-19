@@ -1177,3 +1177,67 @@ textarea.input {
   color: var(--piarc-text-secondary);
   font-size: var(--piarc-font-size-small);
 }
+
+/* T26: the plan panel (dock) and the task panel (rail). */
+:root[data-app] .plan-panel,
+:root[data-app] .task-panel {
+  display: grid;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-3);
+}
+:root[data-app] .plan-panel-title {
+  margin: 0;
+  font-size: var(--piarc-font-size-body);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+:root[data-app] .plan-text {
+  padding: var(--piarc-space-2);
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--piarc-code-text);
+  background: var(--piarc-code-background);
+  border-radius: var(--piarc-radius-sm);
+  user-select: text;
+}
+:root[data-app] .plan-comment-mark {
+  color: inherit;
+  background: var(--piarc-state-warning-subtle);
+  border-bottom: 1px solid var(--piarc-state-warning);
+}
+:root[data-app] .plan-comment-ref::after {
+  content: attr(data-index);
+  margin-left: 1px;
+  font-size: var(--piarc-font-size-caption);
+  color: var(--piarc-text-warning);
+}
+:root[data-app] .plan-comment-editor,
+:root[data-app] .plan-comments li {
+  display: grid;
+  gap: var(--piarc-space-1);
+}
+:root[data-app] .plan-comment-editor textarea {
+  min-width: 0;
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  color: var(--piarc-text-primary);
+  background: var(--piarc-surface-panel);
+  border: 1px solid var(--piarc-border-default);
+  border-radius: var(--piarc-radius-sm);
+}
+:root[data-app] .plan-panel blockquote {
+  margin: 0;
+  padding-left: var(--piarc-space-2);
+  color: var(--piarc-text-secondary);
+  border-left: 2px solid var(--piarc-state-warning);
+  white-space: pre-wrap;
+}
+:root[data-app] .plan-comments {
+  display: grid;
+  gap: var(--piarc-space-2);
+  margin: 0;
+  padding-left: var(--piarc-space-4);
+}
+:root[data-app] .plan-comments .row-action {
+  justify-self: start;
+}

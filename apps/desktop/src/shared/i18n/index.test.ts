@@ -43,6 +43,8 @@ describe('i18n', () => {
             pages: 3,
             path: 'sample.txt',
             seconds: 5,
+            done: 1,
+            total: 3,
             minutes: 1,
             target: 'sample.txt',
             added: 1,

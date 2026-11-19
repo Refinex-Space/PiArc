@@ -36,7 +36,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** Core's `transcript_window` answer: `{ start, items: [{ entryId, item }] }`. */
-function parseWindow(text: string): { start: number; items: TranscriptEntry[] } {
+function parseWindow(text: string): {
+  start: number;
+  items: TranscriptEntry[];
+  harness?: unknown;
+} {
   const value: unknown = JSON.parse(text);
   if (!isRecord(value) || !Array.isArray(value.items)) {
     return { start: 0, items: [] };
@@ -52,7 +56,11 @@ function parseWindow(text: string): { start: number; items: TranscriptEntry[] } 
         ]
       : [],
   );
-  return { start: typeof value.start === 'number' ? value.start : 0, items };
+  return {
+    start: typeof value.start === 'number' ? value.start : 0,
+    items,
+    harness: value.harness,
+  };
 }
 
 /** Core's file search as the composer's `@` source, below the session's working directory. */
@@ -118,6 +126,7 @@ function useHistory(
         const window = parseWindow(text);
         if (!transcript.hasContent() || transcript.needsReload()) {
           transcript.load(window.items, window.start);
+          transcript.harness.load(window.harness);
         }
       },
       (failure: unknown) => {

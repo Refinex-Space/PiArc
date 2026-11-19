@@ -8,7 +8,7 @@ import { isImeComposing } from '../composer/ime-guard.js';
 import { useApp } from '../app/app-context.js';
 import { AppStore } from '../store/app-store.js';
 import { StoreConnection } from '../store/connection.js';
-import { StoreContext } from '../store/hooks.js';
+import { StoreContext, useHarnessOf, useSessionOf } from '../store/hooks.js';
 import { createTranscriptServices } from '../transcript/services.js';
 import { Conversation } from './Conversation.js';
 import { Home } from './Home.js';
@@ -16,13 +16,14 @@ import { clampSidebar, loadLayout, localStore, saveLayout, type Layout } from '.
 import { NoticeBar } from './NoticeBar.js';
 import { PageBoundary } from './PageBoundary.js';
 import { DockArea, RailArea } from './PanelAreas.js';
+import type { PanelContext } from './registry.js';
+import './harness-panels.js';
 import { ShortcutsDialog } from './ShortcutsDialog.js';
 import { Sidebar } from './Sidebar.js';
 import { groupSessions } from './Sidebar.js';
 import { Toasts } from './Toasts.js';
 import { TrustDialog, needsDecision, parseTrustView } from './TrustDialog.js';
 import { UiContext, type Toast, type TrustMode, type Ui, type View } from './ui.js';
-import { useUnsupportedQuestions } from './use-unsupported-questions.js';
 import { useAttention } from './use-attention.js';
 import { useCommands } from './use-commands.js';
 
@@ -32,8 +33,21 @@ interface TrustRequest {
   readonly resolve: (proceed: boolean) => void;
 }
 
+/** What the panels show about: the selected session and whether it has a task list or a plan. */
+function usePanelContext(store: AppStore, sessionId: string | undefined): PanelContext {
+  const harness = useHarnessOf(store, sessionId);
+  const pendingPlan = useSessionOf(store, sessionId)?.approvals.some((r) => r.kind === 'plan');
+  return useMemo(
+    () => ({
+      sessionId,
+      tasks: (harness?.todos.length ?? 0) > 0,
+      plan: harness?.plan !== undefined || pendingPlan === true,
+    }),
+    [sessionId, harness, pendingPlan],
+  );
+}
+
 function Attention() {
-  useUnsupportedQuestions();
   useAttention();
   return null;
 }
@@ -282,7 +296,7 @@ export function Shell() {
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
   };
-  const context = { sessionId: view.kind === 'session' ? view.id : undefined };
+  const context = usePanelContext(store, view.kind === 'session' ? view.id : undefined);
   return (
     <StoreContext.Provider value={store}>
       <UiContext.Provider value={ui}>

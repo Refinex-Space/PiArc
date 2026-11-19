@@ -1,10 +1,16 @@
 // The right rail and the dock (architecture section 8.2): containers for the panels other tasks
 // register (`registry.ts`). An area with nothing registered renders nothing; one with panels
 // shows tabs, remembers its size and can be resized.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useT } from '../app/app-context.js';
-import { panelsFor, usePanels, type PanelArea, type PanelContext } from './registry.js';
+import {
+  panelsFor,
+  usePanels,
+  useRequestedPanel,
+  type PanelArea,
+  type PanelContext,
+} from './registry.js';
 
 function Area({
   area,
@@ -20,6 +26,11 @@ function Area({
   const t = useT();
   const panels = panelsFor(usePanels(), area, context);
   const [active, setActive] = useState<string | undefined>(undefined);
+  const requested = useRequestedPanel();
+  const requestedHere = requested !== undefined && panels.some((p) => p.id === requested.id);
+  useEffect(() => {
+    if (requested !== undefined && requestedHere) setActive(requested.id);
+  }, [requested, requestedHere]);
   if (panels.length === 0) {
     return null;
   }
@@ -60,6 +71,7 @@ function Area({
             role="tab"
             aria-selected={panel === shown}
             className={`panel-tab${panel === shown ? ' is-active' : ''}`}
+            data-testid={`panel-tab-${panel.id}`}
             onClick={() => {
               setActive(panel.id);
             }}
