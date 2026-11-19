@@ -150,7 +150,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | R2 | [M1 评审](tasks/R2-m1-review.md) | 2 | T22 | macOS | high / 高 | 中 | 无 | 已完成 | f63ac3d |
 | W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 8a1f38b |
-| T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 进行中 | — |
+| T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 已完成 | TBD |
 | T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T26 | [计划模式、任务清单、AskUserQuestion 与下一步](tasks/T26-plan-mode-todo-ask-next-steps.md) | 3 | T25 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T27 | [上下文工程：system reminder、压缩与用量](tasks/T27-context-reminders-compaction-usage.md) | 3 | T26 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -309,17 +309,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-T24（开工基线 363b0d6，`npm run verify` 15/15；T23 部分完成的遗留项 A05 只涉及 Windows 的 PowerShell 场景，不影响本任务；T23 尚未推送，无 Windows CI 可核对）：
-
-- [x] 1. 家目录注入（`CoreConfig.home`）与 `.claude/` 三个设置层 + `~/.claude.json` 只读加载，接入 ADR-0005 顺序与信任约束（A01、A02、A03、A05、A06）
-- [x] 2. 键映射表（单一来源）与合并按表投影（A04）
-- [x] 3. `.claude/rules/` 加载：无 `paths:` 进项目上下文、有 `paths:` 首次读写匹配文件时懒注入（A07）
-- [x] 4. 不写 `.claude/`：写接口拒绝 + L2 目录快照比对（A08）
-- [x] 5. 变更监听：`.claude/` 文件变化后重载并刷新诊断（A09）
-- [ ] 6. 配置诊断 Core API + NAPI + IPC + 设置页"配置诊断"（A10）：Core API 与 NAPI 已完成，IPC 与设置页待做
-- [x] 7. L2 场景 `config-*.yaml` 与能力 ID
-- [ ] 8. 文档（piarc-config AGENTS.md、架构 6.14）、验收、收尾 verify（A11）
-
 ## 登记事项
 
 任务执行中发现、但不属于本任务范围的问题，在这里登记：编号（I01 起）、发现于哪个任务、内容、建议由哪个任务处理。处理完成后在"建议处理"一列注明"已落地"与位置。
@@ -410,7 +399,10 @@ T24（开工基线 363b0d6，`npm run verify` 15/15；T23 部分完成的遗留�
 | I82 | T23 | 按参数匹配的规则（`Agent(model:opus)`、`Bash(run_in_background:true)`）没有实现：现在分别解析为 Agent 类型名与命令模式，永不匹配，deny 意图会落空 | T31 接入 Agent 工具时按 Claude Code 语义实现（只用于 deny/ask，不匹配主内容字段），并在设置页标出 |
 | I83 | T23 | PowerShell 只做整条匹配与粗分段（不解析 AST、不规范化别名，`Get-ChildItem` 规则不覆盖 `gci`）；Windows 上 PowerShell 没有只读白名单 | M4 评估 PowerShell 语法级分析（架构第 6.2.2 节），同时决定别名表 |
 | I84 | T23 | Windows 上只读白名单与文件命令的自动允许依赖 Git Bash 探测（`usr/bin`、`mingw64/bin` 中的同名程序），macOS 只能交叉 clippy；`perm-read-only` 等场景在 Windows CI 首次运行 | W1 在 Windows 11 上核对探测结果、钉住与 `perm-*` 场景，必要时调整 `PROGRAMS`/`WRAPPED` |
-| I85 | T23 | T20 时期"总是允许"为 Write 保存的 `Write(路径)` 规则在 T23 语义下不匹配（Claude Code 只认 `Edit(路径)`）；现有用户文件里的这类规则会被设置页列出但不起作用 | T24 的配置诊断提示改写为 `Edit(…)`；正式发布前的用户数据只有测试数据，不做迁移 |
+| I85 | T23 | T20 时期"总是允许"为 Write 保存的 `Write(路径)` 规则在 T23 语义下不匹配（Claude Code 只认 `Edit(路径)`）；现有用户文件里的这类规则会被设置页列出但不起作用 | T24 的配置诊断提示改写为 `Edit(…)`；正式发布前的用户数据只有测试数据，不做迁移；**已落地（T24）**：权限页对 `Write(…)`、`NotebookEdit(…)`、`Glob(…)`、`Grep(…)` 规则显示"永不匹配，请改写为 Edit(…)/Read(…)"（`settings_view::check_rule` 的 `suggestion`，L4 `t24-diagnostics.e2e.ts`） |
+| I86 | T24 | `~/.claude/` 不存在时设置监听退到最近的已存在祖先（通常是家目录本身，非递归）：家目录里任何文件的变化都会触发一次去抖后的七层重读 | T44 测量空闲时的重读频率；需要时改为只在 `.claude` 条目出现时重读 |
+| I87 | T24 | 键映射表（`piarc_config::claude::SETTINGS_KEYS`）是 2026-11-18 官方 settings 索引的快照；Claude Code 新增的键在更新表之前按"未知"列为忽略 | 各评审任务对照官方索引复查一次；实现对应功能的任务（ADR-0038 后果一节列出）把行改为生效 |
+| I88 | T24 | `crates/piarc-testkit/src/l2/runner.rs` 在 T24 之前已超过 1,000 行（1,070），T24 加入 `.claude` 快照比对与诊断断言后约 1,110 行，超出 `coding-standards.md` 的单文件上限 | R3 把运行器按驱动、断言、Core 调用拆成子模块 |
 
 ## 技术债
 
@@ -735,6 +727,15 @@ T24（开工基线 363b0d6，`npm run verify` 15/15；T23 部分完成的遗留�
 - 收尾修复：Agent Host 端到端 harness 应答 `policy/tools`（不接入 Core 权限服务）；A10 增加重新打开数据库后读回模式的断言。macOS 上用占位 C 工具链（`scripts/dev/c-placeholder.mjs`）完成 Windows 目标的整个 workspace 交叉 Clippy。
 - 登记 I82–I85（按参数匹配的规则、PowerShell 语法分析与别名、Windows 只读白名单依赖 Git Bash 探测、T20 时期的 `Write(路径)` 规则）；I78 不在本任务范围，保持登记。
 - 下一项：macOS 上的 T24；Windows 上的 W1 同时核对 A05 与 I84。本地提交，未推送。
+
+### 2026-11-18 T24 已完成（验收提交 TBD）
+
+- 交付：`piarc-config` 加入 `~/.claude/settings.json`、`.claude/settings.json`、`.claude/settings.local.json` 三层（ADR-0005 顺序，同一套信任与项目模式过滤），键映射表 `claude::SETTINGS_KEYS` 是合并与诊断共用的唯一判断（M2 生效 `permissions.allow/ask/deny/defaultMode/additionalDirectories`），写入一律拒绝 `.claude/` 与 `.claude.json`；`CoreConfig.home` 取代 `memory_home` 并经 `DataDirs::layers` 到达所有设置读取；`.claude/rules/` 与 `~/.claude/rules/` 作为 memory 文档载入，`paths:` 条件 rules 经 `fs/memory` 新增的 `files`/`rules`/`inactiveRules` 在首次读写匹配文件时以 `piarc.memory` 消息送达、`piarc.memoryRules` 记账；配置诊断 Core API、NAPI `configDiagnostics`、设置窗口"配置诊断"页；权限页提示永不匹配的 `Write(…)` 等规则（I85 落地）。见 ADR-0038、架构 v2.30。
+- 验收：11/11 通过。开工基线 363b0d6 与收尾 `npm run verify` 均 15/15；L2 70 通过、2 个按平台跳过，新增 `config-merge-order`、`config-untrusted-project`、`config-rules-paths`，每个场景前后比对 Claude Code 配置快照；能力 CAP-CONFIG-COMPAT-001、CAP-CONFIG-DIAG-001、CAP-CTX-RULES-001 改为 active，MISSING 0。Electron dev 与 packaged 的 T24、T23、T22、preload L4 24/24；ego-browser 用本地渲染器与测试数据操作了诊断页。Windows 目标整个 workspace 的交叉 Clippy 通过。证据在 `tmp/evidence/T24/`。
+- 第 10.2 节"新增可执行项再次确认"：T13/T18 的快照机制本来就扫描 `.claude/settings*.json` 的 allow、hooks、`enabledPlugins`，本任务未扩展。
+- 范围外修复：T23 改了审批卡标签后 `t22-memory.e2e.ts` 仍用旧标签，已改为新标签（行为未变）。
+- 登记 I86（家目录监听的重读频率）、I87（键映射表随官方索引更新）、I88（L2 运行器超过 1,000 行）。
+- 下一项：macOS 上的 T25（hooks，把映射表中的 `hooks`、`disableAllHooks` 改为生效）；Windows 上的 W1 同时核对 T23-A05 与 I84。本地提交，未推送。
 
 ## 计划变更记录
 

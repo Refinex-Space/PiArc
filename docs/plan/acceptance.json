@@ -2540,78 +2540,78 @@
       "id": "T24-A01",
       "task": "T24",
       "description": "四个 Claude Code 配置文件与 PiArc 配置按 ADR-0005 的顺序合并，列表类键合并、deny 优先。验证：用真实文件夹具的集成测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-config --test claude：seven_layers_merge_in_adr_0005_order_and_lists_combine（真实文件夹具，含 BOM、CRLF；allow 按 claudeUser→user→claudeProject→claudeProjectLocal→project→projectLocal 顺序合并去重，defaultMode 取最高层，permission_lists 高到低且 claudeUser 的 deny 保留）通过；L2 config-merge-order：~/.claude 的 allow 自动放行 sed、.claude/settings.json 的 allow 放行 awk、其 deny 压过用户 allow（is_error 含 'Bash(sed -n 3p *)'）、.claude/settings.local.json 的 default 压过 acceptEdits/plan（Write 询问），ok。"
     },
     {
       "id": "T24-A02",
       "task": "T24",
       "description": "项目级 `.claude/settings*.json` 的 allow 规则与 `additionalDirectories` 在信任前不生效，deny 与 ask 照常生效。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-config --test claude：an_untrusted_project_keeps_deny_and_ask_but_not_its_allow_rules_or_directories 通过（未信任时只剩用户层 allow 与目录，deny/ask 生效，诊断 status=untrusted、忽略原因 untrusted；信任后合并）；L2 config-untrusted-project：awk 的项目 allow 不生效而询问、sed 被项目 deny 直接拒绝、ask 规则使 Read 询问、additionalDirectories 不放行外部读取，ok。"
     },
     {
       "id": "T24-A03",
       "task": "T24",
       "description": "项目级 `.claude/settings*.json` 中 `defaultMode` 为 `bypassPermissions` 或 `auto` 时不生效，诊断注明原因。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-config --test claude：project_files_cannot_select_bypass_or_auto_and_the_diagnostics_say_why（信任与未信任下 bypassPermissions/auto 均不生效，取 claudeUser 的 plan；ignored_modes 列出两层；诊断原因 projectMode）通过；L2 config-untrusted-project 的 config_diagnostics 断言 /permissions/defaultMode reason=projectMode，且 bypass 未生效（命令询问），ok。"
     },
     {
       "id": "T24-A04",
       "task": "T24",
       "description": "键映射表之外的键与标为\"已忽略\"的键逐个出现在诊断的忽略列表中。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-config --test claude：unknown_planned_and_ignored_keys_are_each_listed（$schema、env、statusLine、disableBypassPermissionsMode 为 ignored，enabledPlugins/model/sandbox 为 planned 并带 T40/T29/T39，madeUpKey 与 permissions.futureKey 为 unknown，PiArc 文件的未知键同样列出）；the_claude_state_file_lists_key_names_and_its_mcp_sections；claude::tests 的映射表唯一性与生效键均为 PiArc 设置；L2 config-merge-order 断言 /theme、/model、/mcpServers、/numStartups 的忽略原因，均通过。"
     },
     {
       "id": "T24-A05",
       "task": "T24",
       "description": "一个配置文件 JSON 损坏时其他文件照常加载，诊断给出文件、行列与错误信息。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-config --test claude：a_broken_file_reports_line_and_column_while_the_others_load（.claude/settings.json 尾逗号：status=invalid，issue 带文件、line 3 column 25 与 'not valid JSON'，claudeUser 与 claudeProjectLocal 照常加载；生效键类型错误报 JSON Pointer）通过；L4 t24-diagnostics 显示 'Line 1, column 44: not valid JSON: trailing comma…'（tmp/evidence/T24/diagnostics-en-local-broken.png）。"
     },
     {
       "id": "T24-A06",
       "task": "T24",
       "description": "测试全程使用注入的临时家目录，不读取本机 `~/.claude`。验证：测试代码审阅与家目录注入的单测。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "代码审阅：CoreConfig.home（取代 memory_home）经 DataDirs::with_home → DataDirs::layers 传到所有设置读取；Rust 测试（state.rs、sessions/support.rs、agent_host/harness.rs、t14-warmup）、L2 runner（home 家/）、NAPI createForTests（<data>/test-home，L4 使用）都注入临时目录；不设 home 的测试 CoreConfig 均为 dirs: None（无设置读取），ToolIoConfig::new 的 home 为 None，Vitest 中用生产 create 的调用（trust view/decide）不加载设置。单测 the_home_directory_is_injected_and_only_the_injected_one_is_read（注入路径、None 不建 claudeUser 层、层文件不在本机家目录下）通过。"
     },
     {
       "id": "T24-A07",
       "task": "T24",
       "description": "无 `paths:` 的 rules 进入项目上下文段；有 `paths:` 的 rules 在首次读写匹配文件时以 system-reminder 注入、每会话一次，读写不匹配的文件时不注入，system prompt 字节不变。验证：场景测试中的 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 config-rules-paths ok：ordered_system_sections 断言用户 rules 紧跟 ~/.claude/CLAUDE.md、项目 rules 紧跟 .claude/CLAUDE.md；Read notes.md 后请求不含条件 rule；首次 Read src/a.ts 后的请求 same_system_as 0 且同一 user 消息含 '[PiArc memory]' 与 rule 正文（frontmatter 不出现）；Edit 同文件与 Read src/b.ts 后正文出现次数仍为 1。另有 memory_reader 单测（rules 顺序、条件选择、Host 点名保持）与 agent-host session-memory.test.ts（每会话一次、piarc.memoryRules 恢复后保持、system 不变）通过。"
     },
     {
       "id": "T24-A08",
       "task": "T24",
       "description": "跑完全部 L2 场景后，各工作区与临时家目录中的 `.claude/` 没有任何新增或修改；piarc-config 写接口拒绝 `.claude/` 路径。验证：测试（目录快照比对与写接口单测）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 运行器在每个场景 Core 启动前后比对运行根下全部 .claude/ 与 .claude.json 的字节快照（变化即 claude_config 失败）：node scripts/ci/run-l2.mjs → 70 passed、0 failed、2 个 Windows 专用；快照比对单测 the_claude_snapshot_sees_additions_edits_and_removals_only_in_claude_paths 通过；写接口单测 claude_code_paths_are_refused_by_every_write（三个 Claude 层、被改指向 .claude/ 的可写层、append_local_permissions、replace_file 均返回 WriteError::ClaudeConfig 且不建目录）与 state.rs 中 Core 写 claudeProject 返回 permissionDenied、文件不变，通过。"
     },
     {
       "id": "T24-A09",
       "task": "T24",
       "description": "运行中修改 `.claude/settings.json` 后配置重新加载，诊断随之更新。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --test state editing_claude_code_settings_while_running_reloads_and_refreshes_the_diagnostics 通过：运行中创建 .claude/ 与 settings.json → core/settings 报 /permissions/defaultMode、/permissions/deny，诊断变为 loaded、claudeUser 的 defaultMode 被 claudeProject 覆盖；修改 ~/.claude/settings.json 同样重载；写坏后事件带 line 3，诊断 status=invalid。L4 t24-diagnostics 中修好 .claude/settings.local.json 后页面经 core/settings 自动更新为 Loaded（diagnostics-after-edit.png）。"
     },
     {
       "id": "T24-A10",
       "task": "T24",
       "description": "配置诊断页按文件显示加载状态、生效键、被覆盖键（含覆盖来源）、忽略键与解析错误。验证：Playwright 流程与截图（`tmp/evidence/T24/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PIARC_EVIDENCE_TASK=T24 npx playwright test -c apps/desktop/playwright.config.ts t24-diagnostics --project dev 与 --project packaged 通过：按文件显示状态（Not present / Loaded / Could not be read / Partly applied until you trust this project）、生效键（含 Merged from every file）、被覆盖键与覆盖来源（.piarc/settings.json）、忽略原因（含 planned in T25/T36）与解析错误行列；截图 tmp/evidence/T24/diagnostics-en*.png、diagnostics-after-edit.png、diagnostics-zh-CN*.png、permissions-suggestion-zh-CN.png；ego-browser 用本地渲染器与测试数据实际展开与刷新（ego-diagnostics-*.png）。"
     },
     {
       "id": "T24-A11",
       "task": "T24",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify（收尾，tmp/evidence/T24/verify.log）：All 15 steps passed；Vitest 1092 passed、1 skipped；cargo test 110.6 s；L2 70 passed、0 failed、2 个 Windows 专用，能力覆盖 MISSING 0。第一次收尾运行发现 Prettier（t22-memory.e2e.ts）与 i18n 占位符样例两处问题，修复后重跑通过。开工基线（363b0d6）同为 15/15。"
     },
     {
       "id": "T25-A01",
