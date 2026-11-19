@@ -2390,6 +2390,10 @@
           "description": "Fail with `fileNotRead` or `fileModified` unless the session read or wrote this file\nand its content has not changed since (the `Edit` tool reads this way).",
           "type": ["boolean", "null"]
         },
+        "restore": {
+          "description": "Without `origin`: reads a file the session already read or wrote, to give its current\ncontent back after a compaction (T27, ADR-0043). Only files in the session's file state\ntable that it may read without approval; it changes nothing in the table.",
+          "type": ["boolean", "null"]
+        },
         "sessionId": {
           "$ref": "#/$defs/SessionId",
           "description": "The session whose workspace and working directory apply."

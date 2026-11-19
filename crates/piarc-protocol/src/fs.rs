@@ -175,6 +175,11 @@ pub struct FsReadParams {
     /// The tool call this request serves.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ToolOrigin>,
+    /// Without `origin`: reads a file the session already read or wrote, to give its current
+    /// content back after a compaction (T27, ADR-0043). Only files in the session's file state
+    /// table that it may read without approval; it changes nothing in the table.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restore: Option<bool>,
 }
 
 /// A copy of a file's content kept by Core (ADR-0009 rule 8).

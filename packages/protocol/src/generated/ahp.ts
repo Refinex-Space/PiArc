@@ -2850,6 +2850,12 @@ export interface FsReadParams {
    */
   requireFresh?: boolean | null;
   /**
+   * Without `origin`: reads a file the session already read or wrote, to give its current
+   * content back after a compaction (T27, ADR-0043). Only files in the session's file state
+   * table that it may read without approval; it changes nothing in the table.
+   */
+  restore?: boolean | null;
+  /**
    * The session whose workspace and working directory apply.
    */
   sessionId: SessionId;

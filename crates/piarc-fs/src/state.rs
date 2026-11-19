@@ -301,6 +301,12 @@ impl FileStates {
         }
     }
 
+    /// Whether the session read or wrote the file `key`.
+    #[must_use]
+    pub fn contains(&self, key: &str) -> bool {
+        self.entries.contains_key(key)
+    }
+
     /// Number of files in the table.
     #[must_use]
     pub fn len(&self) -> usize {

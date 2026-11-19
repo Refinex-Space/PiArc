@@ -263,6 +263,25 @@ pub(in crate::tool_io) fn file_permit(
             write: None,
         });
     }
+    if method == "fs/read"
+        && !params.contains_key("origin")
+        && params.get("restore").and_then(Value::as_bool) == Some(true)
+    {
+        // A file the session already saw, read again after a compaction (T27): readable
+        // without approval and in the session's file state table.
+        s.scope
+            .check(requested, Access::Read)
+            .map_err(|e| e.to_error_object())?;
+        if !lock(&s.files).contains(&s.scope.key(&target)) {
+            return Err(denied(
+                "Only files the session already read or wrote can be restored.",
+            ));
+        }
+        return Ok(FilePermit {
+            scope: s.scope.clone(),
+            write: None,
+        });
+    }
     let origin = params.get("origin").ok_or_else(mismatch)?;
     let call = origin["toolCallId"].as_str().ok_or_else(mismatch)?;
     let tool = origin["tool"].as_str().ok_or_else(mismatch)?;
