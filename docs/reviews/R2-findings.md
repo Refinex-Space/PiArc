@@ -14,19 +14,19 @@
 
 ## M1 目标与证据
 
-全部 61 个 L2 场景在本机运行，60 个通过、0 个失败，exec-windows-shells 按平台留给 W1。重新生成能力文档后 MISSING 0，M1 planned 0。报告在 `target/l2/results.json`，命令输出在 `tmp/evidence/R2/scenarios.log` 及 `coverage.log`。本次 dev 和 packaged 的 40 个 Electron 用例全部通过，见 `final-ui.log`。
+全部 62 个 L2 场景在本机运行，61 个通过、0 个失败，exec-windows-shells 按平台留给 W1。重新生成能力文档后 MISSING 0，M1 planned 0。报告在 `target/l2/results.json`，命令输出在 `tmp/evidence/R2/scenarios-final.log` 及 `coverage-final.log`。本次 dev 和 packaged 的 40 个 Electron 用例全部通过，见 `final-ui.log`。
 
 | 第 16 章目标 | 能力或 L4 | 核实的结果 |
 |---|---|---|
 | 单工作区、多会话列表 | CAP-SESSION-MULTI-001、CAP-SESSION-MANAGE-001，t18-sessions | 会话隔离；实际重命名、置顶、归档、删除与重启；新增 session-manage 从数据库复查状态。 |
 | 流式对话 | chat-basic、t19-transcript | 工作行、增量回答、最终回复均经真实 Host；I19 另测同连接的突发通知及后续工具 I/O。 |
-| Read、Write、Edit、Bash、Glob、Grep 经 Core | CAP-TOOL-CORE-001，policy-manual，r2-workflow | 六工具有实际执行和结果；双协议 L4 核对 Edit 和 Bash 的审批及最终文件。读取失败后的状态、外部目录并发变化见 F02、F01。 |
+| Read、Write、Edit、Bash、Glob、Grep 经 Core | CAP-TOOL-CORE-001，policy-manual，r2-workflow | 六工具有实际执行和结果；双协议 L4 核对 Edit 和 Bash 的审批及最终文件。失败重试见 tools-read-failed-retry，目录身份回归见 F01。 |
 | Windows PowerShell | CAP-TOOL-POWERSHELL-001、exec-windows-shells | 有场景和前序记录；本次 macOS 未执行 Windows 专属工具。 |
 | Manual、Accept edits | CAP-PERM-MODE-001、CAP-PERM-APPROVAL-001，t20-approvals | 两种模式的基础矩阵、精确规则、拒绝反馈、规则原生确认与键盘保护有证据。 |
 | 模型与保险箱 | CAP-PROVIDER-CONFIG-001、CAP-MODEL-SWITCH-001，t21-models | 通过设置页写入合成凭据和端点，会话实际切换协议；本地真实模型的结果见前节。 |
 | 会话持久化与恢复 | CAP-SESSION-PERSIST-001，sessions-persist-across-restart | Core 重启后第二次请求带回第一轮历史；R2 新增等长重写索引回归。 |
 | transcript P0 行类型 | t19-transcript、t20-approvals、t22-memory | 按用例核对真实回合的 P0 行、审批卡、模式变更与 memory 消息。 |
-| M1 上下文与项目信任 | CAP-CTX-PROMPT-001、CAP-CTX-MEMORY-001、CAP-TRUST-DIALOG-001 | 系统段与 memory，项目清单和信任决定；展示期间变更清单仍需 ADR-0034。 |
+| M1 上下文与项目信任 | CAP-CTX-PROMPT-001、CAP-CTX-MEMORY-001、CAP-TRUST-DIALOG-001 | 系统段与 memory，项目清单和信任决定；展示期间出现新增项须重新确认（ADR-0034）。 |
 
 本次新增 `core/sessions` 快照的逐会话断言，覆盖审批中以及结束后未读。徽标排序与原生通知效果见 `t18-sessions` 和 `t18-attention`。I19 的 2,048 个 SSE 文本分片在此运行中投影成 1,313 个客户端 delta。提交 prompt 到 Core 收到 fs/stat 为 103.399 ms，从 fs/stat 到随后的 fs/read 为 2.058 ms，下一次模型请求收到正确的文件内容。该区间含 stat 往返，只有单次观测；依据不支持改变 AHP 通道。复跑命令为 `cargo test -p piarc-testkit --test sessions a_read_completes_after_a_notification_burst -- --nocapture`。I16 确认实现的默认 cacheWarming 为 off，显式配置保留。
 
@@ -61,6 +61,32 @@
 | 数据与凭据 | 验证 %LOCALAPPDATA%\PiArc、隔离目录、Credential Manager 的测试主密钥与重启读取；用合成标记扫描数据、日志和子进程环境。核对 v3 → v4 索引迁移、同长度重写和 Windows 文件替换。 |
 | 原生人工交互 | 微软拼音与日文 IME 在 composer 和审批卡的候选、Enter、Esc、/、@；窗口在后台时的结束与审批 Toast、点击归属、任务栏覆盖计数；检查 Mica、右上窗口控件、标题栏覆盖层及明暗外观。真实通知点击、首次 SmartScreen 放行由用户操作。 |
 | 评审发现 | 原生删除确认显示实际目标标题、ID 和工作区，取消保留文件。无效 PDF 不留副本。核对环境继承决策、工作树登记及审批清单版本。Unix 临时文件模式对应 W1 检查 Windows 的既有 ACL/属性约定，记录实际行为。 |
+
+## 逐项核实与裁决
+
+位置和行号指审查基线 `d57c72e`。四份审查中，项目信任清单变化被两名审查者分别指出；下表合并为 P01。下列先红后绿记录位于 `tmp/evidence/R2/`。目录和命令环境的实施另行并行，原四名审查者均只读。
+
+| 编号 / 维度 | 基线位置、失败条件 | 核实结论与处理 |
+|---|---|---|
+| P01 权限 / IPC | trust.rs:236、TrustDialog.tsx:135；用户阅读期间清单变化 | 确认。Core 对目录、完整清单和原决定签发版本，持锁核对后保存。过期肯定答复返回最新清单，UI 提示重审。a58198d、8f516e8，ADR-0034；trust-version-red.log、t18-trust 两种形态和 ego-trust-refresh.png。 |
+| P02 权限 | piarc-git/src/checkout.rs:173；移动或失效的 linked worktree 登记仍能沿用原主库决定 | 确认。校验 worktrees 位置及反向 gitdir；真实 Git 工作树移动测试由失败转为通过。6e95bd5，regression-red.log / regression-green.log。 |
+| P03 权限 | piarc-core/src/trust.rs:96、106、389；读取清单失败或快照损坏 | 确认。Core 和视图均保持未信任；中断的配置保存由状态测试覆盖。6e95bd5，同上。 |
+| F01 文件边界 | piarc-fs/src/scope.rs:165、write.rs:107；目录在授权与使用之间移动 | 确认。预检、预览、读写、搜索、memory 外部导入使用稳定目录身份。Unix 的 rename 保证提交到同一目录对象；最终复核与 rename 之间仍有命名空间时间窗。Windows 特性见 W1 清单。d997de9、ADR-0036，directory-red.log / directory-green.log、walk-red.log / walk-green-final.log、memory-binding-red.log / memory-binding-green.log。 |
+| F02 读取状态 | piarc-fs/src/write.rs:190、agent-host/src/tools/read.ts:65；内容已开始读取但解析失败 | 确认。查询统计不授予写入新鲜度；实际成功、同一调用、同一范围及文件版本才提交。损坏 notebook 连续两次返回解析错误。69916a6、ADR-0034，read-state-red.log / read-state-green.log、read-l2.log。 |
+| F03 暂存保密性 | piarc-fs/src/atomic.rs:44；私有文件的 Unix 临时副本曾晚于写入才恢复模式 | 确认。暂存从创建起使用 0600；持有文件句柄完成权限恢复、同步与原子发布。6e95bd5；regression-red.log / regression-green.log。 |
+| F04 命令环境 | piarc-exec/src/env.rs:68；登录环境已有的私密字段随工具继承 | 确认。决策采用 OS、locale 和工具链字段准入；登录失败回退、Windows 及 Git Bash 探测遵守同一边界。依赖自定义变量的构建可能需要调整。cb840ae、ADR-0035，env-red.log / env-l2-final.log、env-command-integration.log。 |
+| F05 编码 | piarc-fs/src/encoding.rs:157、write.rs:118；受损 UTF-16 在无关编辑中丢失原字节 | 确认。检测有损 UTF-16 转换并拒绝写回，保留原文件。6e95bd5；regression-red.log / regression-green.log。 |
+| F06 索引 | piarc-store/src/index.rs:201；早期行等长重写，尾行不变 | 确认。schema v4 保存文件身份与修改时间；缺失基线或标记变化时重扫。macOS 用设备/inode，Windows 以创建时间识别替换；同时伪造文件时间与内容超出增量标记保证，可执行全量重建。be3462c；index-red.log / index-green.log。 |
+| F07 diff | piarc-diff/src/lib.rs:61、81；大差异在截断前分配完整文本和行副本 | 确认。按字节预算写预览并统计遗漏字节，在降级路径上停止保留 hunk 行；完整 diff 行数仍精确。2bce778；diff-red.log / diff-green.log。 |
+| U01 删除会话 | session-ipc.ts:400；原生弹窗标题由 UI 提供，与实际删除 ID 独立 | 确认。主进程向 Core 查询标题与工作区并显示目标 ID，缺少索引标题时显示 ID。b426028；delete-red.log、t18-sessions 两种形态和 ego-session-menu.png。 |
+| U02 附件 | composer/attachments.rs:94；PDF 解析失败，但最终存储位置已有副本 | 确认。先对输入字节解析并验证页数，再发布内容寻址文件。6e95bd5；regression-red.log / regression-green.log。 |
+| Q01 命令错误 | piarc-exec/src/command.rs:289；进程退出 0 掩盖了部分输出读取错误 | 确认。保留第一个带流名的 I/O 错误，触发进程树清理后报告失败；完整 crate 的统一类型化边界仍属 I61。ee48bc0；pipe-red.log / pipe-green.log。 |
+| Q02 覆盖真实性 | policy-session-rule.yaml:3、26；未断言 Core 状态或通知输入 | 确认。L2 明确校验审批中、结束未读的真实 Core 快照；优先级与通知呈现经 t18-sessions / t18-attention。d9b661f。 |
+| Q03 M1 门禁 | tests/capabilities.yaml:22、40；T18 完成而两项能力仍为 planned | 确认。补充可执行信任清单和重启后会话元数据、删除的 L2 断言；M1 planned 2 → 0，MISSING 0。d9b661f、8c8bfb1。 |
+| Q04 模块长度 | runtime.rs:1、piarc-host/tests/resilience.rs:1 | 确认。I81 已拆为状态和会话门面，公开入口保持。b426028。韧性测试保留为单一集成测试目标，共用握手、重启和背压夹具；L2 runner 保留单个 Driver 的事件与时序实现，超长按工程规范 2.7 记录。 |
+| Q05 文档 | AGENTS.md:31、coding-standards.md:268、piarc-fs/src/lib.rs:11 等 | 确认。24 对目录说明的导入文件统一为单行，修正四个工作区及 checkpoint 分期，补 T21 共用入口。5a8b23e。 |
+
+R1 已登记的终端暴露与原生信任确认分别保留 I30/I51（T34/T45）和 I79（T45）；macOS 脱离原进程组的后代限制见 I36。I80 对应 workspace actor 预热早于路由登记，T35 在多窗口验收中复核；I25 的真实输入法仍由 W1 补 Windows 证据。本轮未复制外部参考实现；目录能力依赖精确锁定的 cap-std / cap-fs-ext 4.0.3，许可审计与来源检查通过。
 
 ## 独立审查的输入与调度
 
