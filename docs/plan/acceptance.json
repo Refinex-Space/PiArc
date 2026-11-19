@@ -2442,99 +2442,99 @@
       "id": "T23-A01",
       "task": "T23",
       "description": "每种 specifier（Bash、PowerShell、Read 与 Edit 路径 glob、WebFetch domain、Agent、Skill、`mcp__` 及 server 通配）和工具名通配都有匹配与不匹配的单测，且全部通过。验证：测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-policy`：单元测试 34 通过。`rules::tests` 对 Bash、PowerShell（整条匹配、不区分大小写）、Read/Edit 路径（`//`、`~/`、`/` 与相对锚点）、WebFetch domain、Agent、Skill、`mcp__` 及 server 通配、工具名通配各有匹配与不匹配断言；`paths`、`pattern` 覆盖深度、否定与 `*` 形状。tmp/evidence/T23/policy-tests.log。"
     },
     {
       "id": "T23-A02",
       "task": "T23",
       "description": "求值顺序为 deny → ask → allow、首个命中即决定，allow 不能覆盖 deny；裸工具名 deny 后该工具不出现在模型请求的工具列表中。验证：单测与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`decision::tests::deny_then_ask_then_allow_and_allow_never_beats_deny`、Core `t23::whole_tool_denials_and_deny_over_allow` 通过；L2 `perm-rule-match` 由严格 mock 断言第 1 与第 6 次模型请求的 tools 不含被整体 deny 的 Glob（AHP `policy/tools` → Pi `setActiveTools`），且 deny 先于 allow 生效。target/l2/results.json。"
     },
     {
       "id": "T23-A03",
       "task": "T23",
       "description": "Bash 拆分用例集不少于 40 条、覆盖交付物 3 的全部类别并通过；任一子命令命中 deny 或 ask 即生效，allow 要求全部子命令被允许。验证：测试输出（列出条数与类别）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-policy --test bash_cases -- --nocapture`：73 条用例全部通过，按类别 control 4、critical 6、env 4、groups 4、operators 7、pipes 4、readonly 9、redirects 6、simple 7、substitution 5、unresolved 6、wrappers 11。L2 `perm-bash-compound` 断言任一子命令命中 deny 即拒绝、allow 需全部子命令被允许。tmp/evidence/T23/policy-tests.log。"
     },
     {
       "id": "T23-A04",
       "task": "T23",
       "description": "解析失败或无法静态判定的命令按询问处理；随机输入测试中解析器不 panic。验证：单测与随机输入测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`bash_cases` 的 unresolved 类 6 条通过：未闭合引号、`eval`、变量作程序名、`bash -c \"$SCRIPT\"` 判为询问（含有 `Bash` allow 规则与 bypassPermissions 时），`git $SUBCOMMAND` 遇可能命中的 deny 规则时询问，`sh -c` 内能解析的命令仍按 deny 拒绝；无法解析的规则见 `rules::tests::invalid_rules_are_reported_and_deny_asks_for_its_tool`。随机输入测试输出 \"6000 random inputs, 2755 unresolved, no panic\"。tmp/evidence/T23/policy-tests.log。"
     },
     {
       "id": "T23-A05",
       "task": "T23",
       "description": "只读白名单命令在 Manual 下免审批、白名单外命令询问；PowerShell 命令不拆分，只有整条被规则允许时免审批。验证：场景测试（PowerShell 场景在 Windows CI 上运行）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "只读白名单部分已在 macOS 通过：L2 `perm-read-only` 断言 Manual 下工作区内的只读命令免审批、白名单外命令与越界路径询问。PowerShell 部分的 L2 `perm-powershell-whole`（platforms: windows）在 macOS 按平台跳过，需 Windows CI 运行；PowerShell 整条匹配的单测 `rules::tests::powershell_rules_match_the_whole_command_without_case` 已通过。"
     },
     {
       "id": "T23-A06",
       "task": "T23",
       "description": "关键路径删除在所有模式下都询问，包括 `bypassPermissions` 与存在匹配 allow 规则的情况。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`decision::tests::mandatory_asks_hold_in_every_mode`、`bash::tests::critical_targets`、Core `t23::critical_deletions_ask_even_in_bypass_with_an_allow_rule` 通过；L2 `perm-critical-delete` 在存在匹配 allow 规则与 bypassPermissions 下删除家目录、工作区根、文件系统根均询问。"
     },
     {
       "id": "T23-A07",
       "task": "T23",
       "description": "规则来源按 ADR-0005 的顺序合并，列表类键合并、deny 优先；项目级 allow 规则在项目信任前不生效。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-config --test settings permission_lists_follow_precedence_and_trust`（ADR-0005 顺序、列表合并、未受信任时不含项目 allow）与 Core `t23::project_allow_rules_wait_for_trust`（信任重新确认前新增的项目 allow 不生效）通过；deny 优先见 A02。tmp/evidence/T23/t23-unit-tests.log。"
     },
     {
       "id": "T23-A08",
       "task": "T23",
       "description": "`bypassPermissions` 需在设置中开启并二次确认后才能选用；项目级配置中的 `bypassPermissions` 与 `auto` 不生效且写入审计。验证：测试与 Playwright 流程。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Core `t23::bypass_needs_the_user_setting_and_project_modes_are_ignored`（只读用户层开关；项目级 bypassPermissions、auto 被忽略并写审计）与 L2 `perm-bypass` 通过；Playwright `t23-permissions.e2e.ts` \"bypass needs settings and a native confirmation\" 在 dev 与 packaged 形态通过（开启设置后模式菜单才列出、主进程原生二次确认）。tmp/evidence/T23/l4-final.log、bypass-setting.png、bypass-mode.png。"
     },
     {
       "id": "T23-A09",
       "task": "T23",
       "description": "plan 模式下写工具与非只读 Bash 命令在裁决第 5 步被拒绝，模型收到\"先提交计划\"的拒绝理由。验证：场景测试中的 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `perm-plan`：严格 mock 断言 Write 的结果为错误且包含 \"present your plan to the user\"、非只读 Bash 包含 \"plan mode is on\"，plan.txt 未创建，Read 与只读命令正常运行；`decision::tests::plan_refuses_writes_and_bypass_allows_the_rest`、Core `t23::plan_mode_refuses_writes_with_the_plan_reason` 通过。"
     },
     {
       "id": "T23-A10",
       "task": "T23",
       "description": "所选模式按工作区记忆，重启应用后恢复。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Core `t23::the_chosen_mode_is_remembered_per_workspace`：选择写入 `workspaces.default_mode`，重新打开同一数据库文件读回 plan，新会话起始模式取该值、会话自己的显式选择优先；`piarc-store` `records::tests::workspace_modes_are_remembered` 通过；Playwright `t20-approvals.e2e.ts` 关闭并重新启动应用后模式恢复（dev、packaged）。tmp/evidence/T23/t23-unit-tests.log、l4-final.log。"
     },
     {
       "id": "T23-A11",
       "task": "T23",
       "description": "\"总是允许\"按子命令前缀生成规则：复合命令生成多条、已允许的子命令不重复、关键路径删除不提供该选项；保存前可编辑，写入 `.piarc/settings.local.json`。验证：单测与 Playwright 流程。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`bash::tests::prefixes_for_always_allow` 与 Core `t23::always_allow_saves_one_rule_per_subcommand`（`ls && npm test && git commit` 只给出 npm test、git commit 两条，已允许的子命令不重复，确认后写入 `.piarc/settings.local.json`，编辑后无效的规则被拒绝）、`t23::critical_deletions_ask_even_in_bypass_with_an_allow_rule`（关键删除的卡片规则为空）通过；Playwright `t23-permissions.e2e.ts` 在审批卡逐行编辑规则后保存、关键删除卡片没有规则编辑区（dev、packaged）。tmp/evidence/T23/always-allow-rules.png、critical-delete.png。"
     },
     {
       "id": "T23-A12",
       "task": "T23",
       "description": "权限设置页可增删改可写来源的规则，新增或修改 allow 类规则时出现主进程原生确认；审计页可按会话、工具、结论筛选。验证：Playwright 流程与截图（`tmp/evidence/T23/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Playwright `t23-permissions.e2e.ts` \"the Permissions page edits rules by source behind a native confirmation and filters the audit\" 在 dev 与 packaged 形态通过（增删改可写来源规则，新增或修改 allow 规则出现主进程原生确认，审计按会话、工具、结论筛选）；Core `t23::settings_page_lists_edits_and_audits_rules` 通过。截图 tmp/evidence/T23/permissions-rules.png、permissions-audit.png、permissions-broad-hint.png，ego-browser 本地操作截图 ego-permissions-*.png。"
     },
     {
       "id": "T23-A13",
       "task": "T23",
       "description": "无需用户参与的裁决（含 Bash 分析）p95 ≤ 2 ms。验证：Core 基准测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test --release -p piarc-core --lib automatic_decision_latency -- --nocapture`：1000 次自动裁决（allow 规则、只读文件、只读复合 Bash、Bash allow 规则，含设置、规则、Bash 分析、程序查找、路径规范化与 SQLite 审计）p50 303 µs、p95 388 µs、p99 433 µs（预算 2 ms）。tmp/evidence/T23/latency-release.log。"
     },
     {
       "id": "T23-A14",
       "task": "T23",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run verify`：All 15 steps passed（L2 67 通过、2 个按平台跳过，cargo test、clippy、Vitest、ESLint、Prettier 等全部 PASS）。tmp/evidence/T23/verify-final.log。"
     },
     {
       "id": "T24-A01",
