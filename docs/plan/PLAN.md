@@ -311,9 +311,9 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 T25（开工基线 aae28a4，`npm run verify` 15/15；依赖 T24 已完成；T23 的 A05 等 Windows CI，分支尚未推送，无 CI 可核对）：
 
-- [ ] 1. piarc-hooks：配置解析与多来源合并（跨文件去重、`disableAllHooks`、不支持的字段与事件进诊断）、matcher（正则库不支持的语法报错）
-- [ ] 2. piarc-hooks：command 执行器（`ProcessSpawner` 注入、并行、管道并发读完、超时与取消时终止进程树、超时可注入）
-- [ ] 3. piarc-hooks：决策协议与合并（exit 0/2/其他、JSON 与纯文本、通用字段、PreToolUse deny > ask > allow、Stop 续跑上限、10,000 字符落盘与预览）
+- [x] 1. piarc-hooks：配置解析与多来源合并（跨文件去重、`disableAllHooks`、不支持的字段与事件进诊断）、matcher（正则库不支持的语法报错）
+- [x] 2. piarc-hooks：command 执行器（`ProcessSpawner` 注入、并行、管道并发读完、超时与取消时终止进程树、超时可注入）
+- [x] 3. piarc-hooks：决策协议与合并（exit 0/2/其他、JSON 与纯文本、通用字段、PreToolUse deny > ask > allow、Stop 续跑上限、10,000 字符落盘与预览）
 - [ ] 4. 协议：AHP `hooks/run`、`policy/evaluate` 新增字段、`session/prompt` 等的 hook 上下文、契约样本与 `gen:protocol`
 - [ ] 5. Core：hooks 服务（设置来源与项目信任、审计、键映射表 `hooks`/`disableAllHooks` 生效）、PreToolUse 与 PermissionRequest 接入裁决第 2、8 步
 - [ ] 6. Core：UserPromptSubmit（发给 Agent Host 之前）与 Notification（等待审批、回合完成）
