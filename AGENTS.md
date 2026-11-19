@@ -113,6 +113,6 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - Windows 安装包由 CI 的 `package-windows` 作业产出（`scripts/release/pack-windows.mjs`，需要 .NET SDK）；Velopack 的 pack id 是应用标识，不能用 `PiArc`（会与数据目录 `%LOCALAPPDATA%\PiArc\` 重合）。
 - L2 场景目标（`--test scenarios`）设了 `test = false`，`cargo test --workspace` 不跑它，只有 verify 第 14 步与显式 `--test scenarios` 跑。新增或改动场景、改能力状态后重新生成 `docs/product/capabilities.md`（手改会被漂移检查拒绝）；`active` 能力没有场景时报 MISSING。
 - 升级 Pi 前后跑 golden 录制与漂移检查（见命令表）：投影、排队、中断补齐与工具批次都依赖 Pi 的事件顺序与队列语义（ADR-0026）。
-- 文件工具的不变量（先读后改、外部修改、编码与换行保持、原子替换、diff、越界与受保护路径）在 Core 的 `piarc-fs` 与 `tool_io/files.rs`，结果预算在 Agent Host 的 `harness/tool-results.ts`（ADR-0027）。替换已存在的文件只经 `piarc_fs::write`；会话目录外与受保护路径的操作只标记需要询问，由 Core 的 `tool_io::policy` 裁决，只有绑定到同一调用的 I/O 可使用审批结果（ADR-0031）。
-- Bash 与 PowerShell 是 PiArc 自写的工具，命令的进程树终止、超时（默认 2 分钟、上限 10 分钟）、cwd 跟踪、输出预算与落盘、语义退出码都在 Core 的 `exec/run`（`piarc-exec` + `piarc-core::tool_io::exec`，ADR-0028）；阈值只改 `piarc_exec::ExecLimits`。命令环境来自用户登录 shell（每个 Core 首次执行命令时解析），剔除 PiArc、Electron、Node 的内部变量。
+- 文件工具的不变量（先读后改、外部修改、编码与换行保持、原子替换、diff、越界与受保护路径）在 Core 的 `piarc-fs` 与 `tool_io/files.rs`，结果预算在 Agent Host 的 `harness/tool-results.ts`（ADR-0027）。Read 完成内容解析后才按调用提交快照（ADR-0034）。文件工具和预览均通过获准的目录句柄读写（ADR-0036）。替换已存在的文件只经 `piarc_fs::write`；会话目录外与受保护路径的操作只标记需要询问，由 Core 的 `tool_io::policy` 裁决，只有绑定到同一调用的 I/O 可使用审批结果（ADR-0031）。
+- Bash 与 PowerShell 是 PiArc 自写的工具，命令的进程树终止、超时（默认 2 分钟、上限 10 分钟）、cwd 跟踪、输出预算与落盘、语义退出码都在 Core 的 `exec/run`（`piarc-exec` + `piarc-core::tool_io::exec`，ADR-0028）；阈值只改 `piarc_exec::ExecLimits`。命令环境来自用户登录 shell（每个 Core 首次执行命令时解析），仅向命令传入 ADR-0035 准入的系统、locale、工具链变量。
 - Agent Host 的工具不碰文件系统与子进程：`agent-host/src/tools/`、`src/harness/` 禁止导入 `fs`、`child_process`，I/O 一律经 AHP `fs/*`、`exec/*` 由 Core 执行（ADR-0004、ADR-0020）；端到端测试的 I/O spy 会抓到绕过。

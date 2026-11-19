@@ -106,3 +106,5 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 ## 参考
 
 - 架构第 3.4、6.11、7.6、8.1–8.8、10.2、10.3、11 章；ADR-0013、ADR-0014、ADR-0017、ADR-0018 第 1、6 条、ADR-0022、ADR-0023、ADR-0029；`docs/spikes/S10-electron-security.md`、`S02-napi-event-channel.md`、`S01-transcript-composer.md`、`S07-terminal.md`；`docs/engineering/testing.md` 第 9 节。
+
+- 信任对话框提交 Core 返回的清单版本。收到过期视图时显示新增项、说明变化并再次确认。原生删除确认只从 Core 索引读取标题与工作区，并显示本次实际删除的会话 ID。
