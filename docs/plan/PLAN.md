@@ -311,15 +311,15 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 ### T27 上下文工程：system reminder、压缩与用量（开工 2026-11-19，基线 d808f82，verify 15/15）
 
-- [ ] 1. 设计与 ADR：reminder 通道、外部修改检测方式、压缩阈值的 Pi 配置、熔断、重注入、用量口径、缓存断点
-- [ ] 2. system reminder 通道：七类类型、来源与正文；迁入 T22 懒加载、T24 rules、T25 `additionalContext`，删除旧注入代码；投影为带 `reminder` 标记的 item（A06）
-- [ ] 3. 外部修改提醒：Core 文件状态表比对 + AHP；I72 压缩后清读取范围（A07）
-- [ ] 4. 压缩：自写分节摘要提示、`/compact [重点]`、PreCompact/PostCompact 衔接（A02、A03）
-- [ ] 5. 阈值纯函数与 `autoCompactWindow`/`autoCompactEnabled` 设置，熔断与提示行（A01、A04）
-- [ ] 6. 压缩后重注入：memory、计划、任务清单、skill 正文槽位、最近文件（上限常量，A05）
-- [ ] 7. 上下文用量：分类统计、`session/usage`、`session/getContextUsage`、未分类差额（A08）
-- [ ] 8. 缓存断点：Anthropic 线格式布局与 mock 断言（A10）
-- [ ] 9. L2 场景 `ctx-*` 与能力 ID（A01–A07、A10）
+- [x] 1. 设计与 ADR：reminder 通道、外部修改检测方式、压缩阈值的 Pi 配置、熔断、重注入、用量口径、缓存断点
+- [x] 2. system reminder 通道：七类类型、来源与正文；迁入 T22 懒加载、T24 rules、T25 `additionalContext`，删除旧注入代码；投影为带 `reminder` 标记的 item（A06）
+- [x] 3. 外部修改提醒：Core 文件状态表比对 + AHP；I72 压缩后清读取范围（A07）
+- [x] 4. 压缩：自写分节摘要提示、`/compact [重点]`、PreCompact/PostCompact 衔接（A02、A03）
+- [x] 5. 阈值纯函数与 `autoCompactWindow`/`autoCompactEnabled` 设置，熔断与提示行（A01、A04）
+- [x] 6. 压缩后重注入：memory、计划、任务清单、skill 正文槽位、最近文件（上限常量，A05）
+- [x] 7. 上下文用量：分类统计、`session/usage`、`session/getContextUsage`、未分类差额（A08）
+- [x] 8. 缓存断点：Anthropic 线格式布局与 mock 断言（A10）
+- [x] 9. L2 场景 `ctx-*` 与能力 ID（A01–A07、A10）
 - [ ] 10. 客户端：用量环（75%/90%）、右栏上下文卡片与压缩按钮，L4 与截图（A09）
 - [ ] 11. 原创性自查（A11）、文档与 AGENTS.md、收尾 verify（A12）
 
