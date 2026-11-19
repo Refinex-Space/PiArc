@@ -1,0 +1,21 @@
+id: tools-read-failed-retry
+description: Retrying a notebook whose bytes arrived but could not be interpreted reports the same error.
+capabilities: [CAP-TOOL-EDIT-READFIRST-001, CAP-TOOL-REREAD-001]
+workspace:
+  files: { 'notes.ipynb': '{' }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: initial, name: Read, input: { path: notes.ipynb } }]
+      - tool_calls: [{ id: retry, name: Read, input: { path: notes.ipynb } }]
+      - text: 'The notebook needs repair.'
+actions:
+  - prompt: { text: 'Read the notebook twice.', turn: t }
+expect:
+  requests:
+    - index: 2
+      tool_results:
+        - { id: initial, is_error: true, contains: 'not a valid notebook' }
+        - { id: retry, is_error: true, contains: 'not a valid notebook' }
+  request_counts: { main: 3 }

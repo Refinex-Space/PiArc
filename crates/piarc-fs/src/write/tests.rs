@@ -34,7 +34,22 @@ impl Fixture {
     }
 
     fn read(&self, rel: &str) {
-        stat_for_read(&self.scope, &self.states, rel, false, ReadRange::default()).expect("read");
+        let range = ReadRange::default();
+        let stat = stat_for_read(
+            &self.scope,
+            &self.states,
+            rel,
+            false,
+            range.clone(),
+            "call",
+            false,
+        )
+        .expect("inspect");
+        if stat.unchanged == Some(false) {
+            lock(&self.states).delivered_read("call");
+            stat_for_read(&self.scope, &self.states, rel, false, range, "call", true)
+                .expect("read");
+        }
     }
 
     fn write(&self, rel: &str, text: &str, line_endings: LineEndings) -> Result<Written> {

@@ -2374,6 +2374,10 @@ export interface FsStatRequest {
  */
 export interface FsStatParams {
   /**
+   * Commit the pending observation after successful content delivery and interpretation.
+   */
+  completeRead?: boolean | null;
+  /**
    * Also sniff the first bytes of a regular file for a supported image type.
    */
   detectImage?: boolean | null;
@@ -2386,8 +2390,7 @@ export interface FsStatParams {
    */
   path: string;
   /**
-   * The `Read` tool reads this regular file now, with this range: Core records the read in
-   * the session's file state table and sets `unchanged` in the result.
+   * Begin observing this file version and range for the Read tool.
    */
   read?: ReadRange | null;
   /**

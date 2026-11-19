@@ -98,9 +98,79 @@ struct Entry {
 #[derive(Debug, Default)]
 pub struct FileStates {
     entries: HashMap<String, Entry>,
+    pending: HashMap<String, PendingRead>,
+}
+
+#[derive(Debug)]
+struct PendingRead {
+    key: String,
+    snapshot: Snapshot,
+    range: ReadRange,
+    delivered: bool,
 }
 
 impl FileStates {
+    /// Start a tool observation without granting write freshness.
+    pub fn begin_read(
+        &mut self,
+        call: &str,
+        key: String,
+        snapshot: Snapshot,
+        range: ReadRange,
+    ) -> bool {
+        let repeated = self.entries.get(&key).is_some_and(|entry| {
+            entry.read.as_ref() == Some(&range) && entry.snapshot.sha256 == snapshot.sha256
+        });
+        self.pending.remove(call);
+        if !repeated {
+            self.pending.insert(
+                call.to_owned(),
+                PendingRead {
+                    key,
+                    snapshot,
+                    range,
+                    delivered: false,
+                },
+            );
+        }
+        repeated
+    }
+
+    /// Content arrived successfully for this call.
+    pub fn delivered_read(&mut self, call: &str) {
+        if let Some(pending) = self.pending.get_mut(call) {
+            pending.delivered = true;
+        }
+    }
+
+    /// Publish only the version and range that this call actually observed.
+    pub fn complete_read(
+        &mut self,
+        call: &str,
+        key: &str,
+        snapshot: &Snapshot,
+        range: &ReadRange,
+    ) -> bool {
+        let Some(p) = self.pending.remove(call) else {
+            return false;
+        };
+        if !p.delivered || p.key != key || p.snapshot.sha256 != snapshot.sha256 || &p.range != range
+        {
+            return false;
+        }
+        self.record_read(p.key, p.snapshot, p.range);
+        true
+    }
+
+    /// Abandon pending observations when a call, turn, or connection ends.
+    pub fn discard_pending(&mut self, call: Option<&str>) {
+        if let Some(call) = call {
+            self.pending.remove(call);
+        } else {
+            self.pending.clear();
+        }
+    }
+
     /// Records that the session's `Read` saw `snapshot` of the file `key` with `range`.
     /// Returns whether the read repeats the previous one: a read of the same range of the same
     /// content.

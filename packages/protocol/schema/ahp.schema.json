@@ -2178,6 +2178,10 @@
     "FsStatParams": {
       "description": "Parameters of `fs/stat`.",
       "properties": {
+        "completeRead": {
+          "description": "Commit the pending observation after successful content delivery and interpretation.",
+          "type": ["boolean", "null"]
+        },
         "detectImage": {
           "description": "Also sniff the first bytes of a regular file for a supported image type.",
           "type": ["boolean", "null"]
@@ -2206,7 +2210,7 @@
               "type": "null"
             }
           ],
-          "description": "The `Read` tool reads this regular file now, with this range: Core records the read in\nthe session's file state table and sets `unchanged` in the result."
+          "description": "Begin observing this file version and range for the Read tool."
         },
         "sessionId": {
           "$ref": "#/$defs/SessionId",

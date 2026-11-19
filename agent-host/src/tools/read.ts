@@ -3,7 +3,7 @@
 // sections 6.1.2 and 6.1.4):
 //
 // - text comes back with line numbers (`line-numbers.ts`), numbered before Pi selects lines;
-// - the lookup records the read in Core's file state table with the call's range; a read that
+// - successful interpretation commits the staged read with the call's range; a read that
 //   repeats the previous one (same range, unchanged content) returns a short stub instead;
 // - `.pdf` files return the text of their pages (`pages` parameter, Core's `fs/pdf`), `.ipynb`
 //   files their cells with output summaries (`documents.ts`);
@@ -69,14 +69,19 @@ export function createReadTool({
             'result still holds, so it is not repeated here.',
         );
       }
+      const finish = async (result: ReadResult) => {
+        signal?.throwIfAborted();
+        if (lookup.stat?.kind === 'file') await io.stat(lookup.path, origin, false, range, true);
+        return result;
+      };
       const document = lookup.stat?.kind === 'file' ? documentKind(lookup.path) : undefined;
       if (document === 'pdf') {
         const pdf = await io.pdf(lookup.path, params.pages, origin);
-        return text(formatPdf(params.path, pdf));
+        return finish(text(formatPdf(params.path, pdf)));
       }
       if (document === 'notebook') {
         const json = (await io.readText(lookup.path, origin, signal)).toString('utf8');
-        return text(formatNotebook(params.path, json));
+        return finish(text(formatNotebook(params.path, json)));
       }
       const standIn = new StandIn(lookup.path);
       const pi = createReadToolDefinition(ctx.cwd, {
@@ -97,7 +102,7 @@ export function createReadTool({
           ctx,
         );
         const restored = standIn.restore(result, params.path);
-        return forModel(restored, ctx.model?.input.includes('image') !== false);
+        return await finish(forModel(restored, ctx.model?.input.includes('image') !== false));
       } catch (error) {
         throw standIn.restoreError(error, params.path);
       }

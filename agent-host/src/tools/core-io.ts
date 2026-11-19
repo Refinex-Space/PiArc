@@ -204,17 +204,24 @@ export class CoreIo {
 
   /**
    * Inspects a path. With `read`, the `Read` tool reads the file now with that range: Core
-   * records it, and `unchanged` says whether it repeats the session's previous read.
+   * stages it until completeRead; unchanged means the previous successful read still applies.
    */
   async stat(
     path: string,
     origin: Origin,
     detectImage = false,
     read?: ReadRange,
+    completeRead = false,
   ): Promise<FileStat> {
     return this.#request(
       'fs/stat',
-      { path, origin, ...(detectImage ? { detectImage } : {}), ...(read ? { read } : {}) },
+      {
+        path,
+        origin,
+        ...(detectImage ? { detectImage } : {}),
+        ...(read ? { read } : {}),
+        ...(completeRead ? { completeRead: true } : {}),
+      },
       parseStat,
     );
   }

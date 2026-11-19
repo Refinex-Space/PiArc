@@ -181,8 +181,8 @@ pub fn check_fresh(scope: &Scope, states: &Mutex<FileStates>, requested: &str) -
     )
 }
 
-/// `fs/stat` for the `Read` tool: [`crate::stat`], and for a regular file the read is recorded
-/// with `range`; `unchanged` says whether it repeats the session's previous read.
+/// Inspect or commit the version of a regular file observed by one Read call.
+/// Beginning an observation never establishes write freshness.
 ///
 /// # Errors
 ///
@@ -193,13 +193,23 @@ pub fn stat_for_read(
     requested: &str,
     detect_image: bool,
     range: ReadRange,
+    call: &str,
+    complete: bool,
 ) -> Result<FileStat> {
     let mut stat = crate::stat(scope, requested, detect_image)?;
     if stat.kind == piarc_protocol::fs::FileKind::File {
         let path = scope.check(requested, Access::Read)?;
         let snapshot = Snapshot::of_file(&path).map_err(|e| Error::io(&path, e))?;
-        let repeat = lock(states).record_read(scope.key(&path), snapshot, range);
-        stat.unchanged = Some(repeat);
+        let key = scope.key(&path);
+        if complete {
+            if !lock(states).complete_read(call, &key, &snapshot, &range) {
+                return Err(Error::Modified {
+                    path: display(&path),
+                });
+            }
+        } else {
+            stat.unchanged = Some(lock(states).begin_read(call, key, snapshot, range));
+        }
     }
     Ok(stat)
 }

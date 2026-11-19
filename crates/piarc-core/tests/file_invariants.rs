@@ -53,12 +53,24 @@ impl Fixture {
     }
 
     async fn read(&self, session: &str, path: &str, range: Value) -> Value {
-        self.call(
-            "fs/stat",
-            json!({ "sessionId": session, "path": path, "read": range }),
-        )
-        .await
-        .expect("stat for read")
+        let origin = json!({"tool":"Read","toolCallId":"fixture-read"});
+        let params = json!({"sessionId":session,"path":path,"read":range,"origin":origin});
+        let stat = self
+            .call("fs/stat", params.clone())
+            .await
+            .expect("stat for read");
+        if stat["unchanged"] == false {
+            self.call(
+                "fs/read",
+                json!({"sessionId":session,"path":path,"origin":origin}),
+            )
+            .await
+            .expect("content");
+            let mut done = params;
+            done["completeRead"] = true.into();
+            self.call("fs/stat", done).await.expect("complete read");
+        }
+        stat
     }
 
     async fn write(&self, session: &str, path: &str, content: &str) -> Result<Value, ErrorObject> {
@@ -128,6 +140,21 @@ async fn writes_need_a_fresh_read_by_the_same_session() {
     assert_eq!(
         kind(f.write("b", "a.txt", "x").await),
         ErrorKind::FileModified
+    );
+}
+
+#[tokio::test]
+async fn inspecting_a_file_without_finishing_read_does_not_authorize_write() {
+    let f = Fixture::new("incomplete");
+    f.put("note", b"fixture");
+    let start = json!({"sessionId":"a","path":"note","read":{},"origin":{"tool":"Read","toolCallId":"first"}});
+    assert_eq!(
+        f.call("fs/stat", start).await.expect("inspect")["unchanged"],
+        false
+    );
+    assert_eq!(
+        kind(f.write("a", "note", "new").await),
+        ErrorKind::FileNotRead
     );
 }
 

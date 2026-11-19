@@ -90,10 +90,12 @@ pub struct FsStatParams {
     /// Also sniff the first bytes of a regular file for a supported image type.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detect_image: Option<bool>,
-    /// The `Read` tool reads this regular file now, with this range: Core records the read in
-    /// the session's file state table and sets `unchanged` in the result.
+    /// Begin observing this file version and range for the Read tool.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub read: Option<ReadRange>,
+    /// Commit the pending observation after successful content delivery and interpretation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub complete_read: Option<bool>,
     /// The tool call this request serves.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ToolOrigin>,

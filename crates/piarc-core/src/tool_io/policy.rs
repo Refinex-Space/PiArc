@@ -211,6 +211,7 @@ impl ToolIo {
 
     pub(crate) fn clear_approvals(&self, id: &str, cause: Cleanup<'_>) {
         if let (Some(services), Ok(s)) = (&self.policy, self.session(id)) {
+            lock(&s.files).discard_pending(None);
             lock(&s.policy).cancel(id, services, cause);
             lock(&s.uploads).cancel_writes(None);
         }
@@ -218,6 +219,7 @@ impl ToolIo {
 
     pub(crate) fn finish_tool(&self, id: &str, call: &str) {
         if let Ok(s) = self.session(id) {
+            lock(&s.files).discard_pending(Some(call));
             lock(&s.policy).grants.remove(call);
             lock(&s.uploads).cancel_writes(Some(call));
         }

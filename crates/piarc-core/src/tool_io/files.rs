@@ -98,7 +98,26 @@ pub(super) fn stat(
     let detect = p.detect_image.unwrap_or(false);
     let stat = match &p.read {
         Some(range) => {
-            piarc_fs::stat_for_read(scope, &session.files, &p.path, detect, range.clone())
+            let origin = p
+                .origin
+                .as_ref()
+                .filter(|o| o.tool == "Read")
+                .ok_or_else(|| {
+                    ErrorObject::new(
+                        ErrorKind::InvalidParams,
+                        "read observation needs a Read call",
+                        false,
+                    )
+                })?;
+            piarc_fs::stat_for_read(
+                scope,
+                &session.files,
+                &p.path,
+                detect,
+                range.clone(),
+                &origin.tool_call_id,
+                p.complete_read == Some(true),
+            )
         }
         None => piarc_fs::stat(scope, &p.path, detect),
     };
@@ -118,7 +137,11 @@ pub(super) fn read(
         ReadMode::Text => piarc_fs::read_text(scope, &session.encodings, &p.path, offset, p.length),
         ReadMode::Blob => piarc_fs::read_blob(scope, &p.path, &session.blob_dir),
     };
-    to_value(&result.map_err(adjudicate)?)
+    let result = result.map_err(adjudicate)?;
+    if let Some(o) = p.origin.as_ref().filter(|o| o.tool == "Read") {
+        lock(&session.files).delivered_read(&o.tool_call_id);
+    }
+    to_value(&result)
 }
 
 pub(super) fn write(
@@ -184,11 +207,14 @@ pub(super) fn spill(session: &SessionIo, p: FsSpillParams) -> Result<Value, Erro
 
 pub(super) fn pdf(
     scope: &Scope,
-    _session: &SessionIo,
+    session: &SessionIo,
     p: &FsPdfParams,
 ) -> Result<Value, ErrorObject> {
-    let result = piarc_fs::read_pdf(scope, &p.path, p.pages.as_deref());
-    to_value(&result.map_err(adjudicate)?)
+    let result = piarc_fs::read_pdf(scope, &p.path, p.pages.as_deref()).map_err(adjudicate)?;
+    if let Some(o) = p.origin.as_ref().filter(|o| o.tool == "Read") {
+        lock(&session.files).delivered_read(&o.tool_call_id);
+    }
+    to_value(&result)
 }
 
 /// The wire error of a file operation; operations that need approval are decided here.

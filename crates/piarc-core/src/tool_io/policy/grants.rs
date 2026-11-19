@@ -125,6 +125,13 @@ impl Grant {
             _ => {}
         }
         let terminal = match (method, self.tool.as_str()) {
+            ("fs/stat", "Read")
+                if params.get("completeRead") == Some(&Value::Bool(true))
+                    && self.stat_paths.iter().any(|p| p == target)
+                    && self.last_read.is_some() =>
+            {
+                true
+            }
             ("fs/stat", "Read" | "Glob" | "Edit")
                 if !self.stat_paths.iter().any(|p| p == target)
                     && (self.tool == "Read"
@@ -145,10 +152,15 @@ impl Grant {
                 {
                     return Err(mismatch());
                 }
-                self.last_read = Some(offset);
-                blob
+                self.last_read = Some(if blob { u64::MAX } else { offset });
+                blob && self.tool == "Edit"
             }
-            ("fs/pdf", "Read") if params.get("pages") == p.get("pages") => true,
+            ("fs/pdf", "Read")
+                if params.get("pages") == p.get("pages") && self.last_read.is_none() =>
+            {
+                self.last_read = Some(u64::MAX);
+                false
+            }
             ("fs/glob", "Glob") if glob_matches(p, params) => true,
             ("fs/grep", "Grep") if grep_matches(p, params) => true,
             ("fs/write", "Write" | "Edit") => self.accept_write_part(params)?,
