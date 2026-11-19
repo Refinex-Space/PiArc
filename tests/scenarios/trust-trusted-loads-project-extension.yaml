@@ -1,6 +1,6 @@
 id: trust-trusted-loads-project-extension
 description: Once Core trusts the workspace, the project's Pi extension loads, its tool is offered next to the canonical ones, and a call to it runs.
-capabilities: [CAP-TRUST-PROJECT-001, CAP-EXT-PI-001]
+capabilities: [CAP-TRUST-PROJECT-001, CAP-EXT-PI-001, CAP-TRUST-DIALOG-001]
 workspace:
   trusted: true
   files:
@@ -26,6 +26,12 @@ providers:
 approvals:
   - { tool: fixture_probe, decision: allow }
 actions:
+  - check_trust:
+      fields:
+        trusted: true
+        decision: trusted
+        items: [{ category: piExtension, name: probe-tool.ts }]
+        newItems: []
   - prompt: { text: 'Call the probe.', turn: t }
 expect:
   events:

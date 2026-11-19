@@ -1,0 +1,15 @@
+id: session-manage
+description: Sidebar metadata survives a Core restart, and deleting the session removes its index row.
+capabilities: [CAP-SESSION-MANAGE-001]
+providers:
+  main: { wire: anthropic, steps: [{ text: Done. }] }
+actions:
+  - prompt: { text: Start., turn: first }
+  - wait: { method: turn/completed, turn: first }
+  - set_prefs: { title: 'Review 中文', pinned: true, archived: true }
+  - restart_core: {}
+  - check_stored_session: { fields: { title: 'Review 中文', pinned: true, archived: true } }
+  - delete_session: {}
+  - check_stored_session: { fields: null }
+expect:
+  request_counts: { main: 1 }

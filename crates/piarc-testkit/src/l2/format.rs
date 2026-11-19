@@ -319,6 +319,24 @@ pub enum Action {
         /// The chosen effort.
         effort: piarc_protocol::models::EffortLevel,
     },
+    /// Changes the same metadata as the sidebar actions.
+    SetPrefs {
+        /// Target session.
+        session: Option<String>,
+        /// Title, pin and archive changes.
+        title: Option<String>,
+        pinned: Option<bool>,
+        archived: Option<bool>,
+    },
+    /// Deletes the target session through Core.
+    DeleteSession { session: Option<String> },
+    /// Checks persisted sidebar metadata, or absence when fields is null.
+    CheckStoredSession {
+        session: Option<String>,
+        fields: Value,
+    },
+    /// Checks Core's view of the current workspace trust inventory.
+    CheckTrust { fields: Value },
     /// Waits for events.
     Wait(WaitAction),
     /// Writes a workspace file (a signal for a waiting command).
@@ -355,6 +373,10 @@ impl Action {
             Self::SetMode { .. } => "set_mode",
             Self::SetModel { .. } => "set_model",
             Self::SetEffort { .. } => "set_effort",
+            Self::SetPrefs { .. } => "set_prefs",
+            Self::DeleteSession { .. } => "delete_session",
+            Self::CheckStoredSession { .. } => "check_stored_session",
+            Self::CheckTrust { .. } => "check_trust",
             Self::Wait(_) => "wait",
             Self::WriteFile { .. } => "write_file",
             Self::RestartCore {} => "restart_core",
@@ -375,9 +397,12 @@ impl Action {
             | Self::SetEffort { session, .. }
             | Self::SetMode { session, .. }
             | Self::Abort { session }
+            | Self::SetPrefs { session, .. }
+            | Self::CheckStoredSession { session, .. }
+            | Self::DeleteSession { session }
             | Self::Resume { session } => Some(session),
             Self::Wait(wait) => Some(&wait.session),
-            Self::WriteFile { .. } | Self::RestartCore {} => None,
+            Self::CheckTrust { .. } | Self::WriteFile { .. } | Self::RestartCore {} => None,
         }
     }
 }
@@ -886,7 +911,11 @@ fn check_actions(spec: &ScenarioSpec, problems: &mut Vec<String>) {
                     problems.push(format!("{field}/provider: no such endpoint"))
                 }
             }
-            Action::SetEffort { .. }
+            Action::SetPrefs { .. }
+            | Action::DeleteSession { .. }
+            | Action::CheckStoredSession { .. }
+            | Action::CheckTrust { .. }
+            | Action::SetEffort { .. }
             | Action::Compact { .. }
             | Action::SetMode { .. }
             | Action::Abort { .. }

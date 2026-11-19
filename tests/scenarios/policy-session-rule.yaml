@@ -25,6 +25,12 @@ actions:
   - prompt: { session: b, text: Start., turn: tb }
 expect:
   events:
+    - { session: a, method: core/sessions, params: { status: running, pendingApprovals: 1 } }
+    - {
+        session: a,
+        method: core/sessions,
+        params: { status: idle, unread: true, pendingApprovals: 0 },
+      }
     - { session: b, method: item/completed, params: { item: { itemId: other, status: declined } } }
   requests:
     - {

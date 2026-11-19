@@ -8,7 +8,7 @@
 
 | 里程碑 | 能力数 | 已实现 | 计划中 | BLOCKED |
 |---|---|---|---|---|
-| M1 | 61 | 59 | 2 | 0 |
+| M1 | 61 | 61 | 0 | 0 |
 | M2 | 30 | 0 | 30 | 0 |
 | M3 | 21 | 0 | 21 | 0 |
 | M4 | 10 | 0 | 10 | 0 |
@@ -39,10 +39,10 @@
 | CAP-PROVIDER-CLOUD-001 | 云厂商凭证与本地模型服务商 | FR-MD-01 | T21 | `provider-settings-models` | 已实现 |
 | CAP-PROVIDER-CONFIG-001 | 配置服务商与 API key；凭据只存在 Core 的保险箱并经 AHP 交给 Agent Host | FR-MD-01、ARCH-5.4 | T21 | `provider-settings-models` | 已实现 |
 | CAP-PROVIDER-OPENAI-001 | OpenAI 兼容端点的服务商（流式正文、工具调用与工具结果） | FR-MD-01、ARCH-6.13 | T06 | `provider-openai-wire` | 已实现 |
-| CAP-SESSION-MANAGE-001 | 新建、重命名、置顶、归档、删除会话 | FR-WS-03 | T18 | — | 计划中 |
+| CAP-SESSION-MANAGE-001 | 新建、重命名、置顶、归档、删除会话 | FR-WS-03 | T18 | `session-manage` | 已实现 |
 | CAP-SESSION-MULTI-001 | 同一工作区的多个会话同时运行，各自的工作目录与请求互不串扰 | ARCH-5.2、ARCH-5.3 | T14 | `sessions-two-cwds-isolated` | 已实现 |
 | CAP-SESSION-PERSIST-001 | 会话持久化，Core 重启后可恢复并带着完整历史继续 | FR-WS-03、ARCH-9 | T14 | `sessions-persist-across-restart` | 已实现 |
-| CAP-SESSION-STATUS-001 | Core 计算会话状态（错误 > 等待审批 > 运行中 > 未读 > 空闲）并随会话列表快照送达 | FR-WS-02 | T20 | `policy-session-rule` | 已实现 |
+| CAP-SESSION-STATUS-001 | Core 快照送达会话状态、待答审批数和未读标记，客户端按优先级显示徽标 | FR-WS-02 | T20 | `policy-session-rule` | 已实现 |
 | CAP-SESSION-TURN-001 | 输入开始一个回合，正文与工具调用以条目事件流式送达客户端 | FR-CH-01、ARCH-5.3 | T14 | `chat-basic` | 已实现 |
 | CAP-SYS-NOTIFY-001 | 会话完成或等待审批时发出通知事件 | FR-SY-01 | T20 | `policy-session-rule` | 已实现 |
 | CAP-TOOL-BASH-001 | Bash 经 Core 执行命令并返回输出 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
@@ -68,7 +68,7 @@
 | CAP-TOOL-WRITE-001 | Write 创建与覆盖文件 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
 | CAP-TOOL-WRITE-FIDELITY-001 | Edit 与 Write 保留文件的换行风格、BOM 与编码，只改目标文本，原子替换 | FR-TL-01、ARCH-6.1.2 | T16 | `tools-edit-preserves-encoding` | 已实现 |
 | CAP-TOOL-WRITE-SERIAL-001 | 写同一文件的工具调用串行执行，结果按调用顺序叠加 | ARCH-6.1.2、ARCH-6.15 | T16 | `tools-write-serial` | 已实现 |
-| CAP-TRUST-DIALOG-001 | 首次打开工作区时列出将启用的可执行配置并记录用户的信任决定 | FR-WS-01、ARCH-10.2 | T18 | — | 计划中 |
+| CAP-TRUST-DIALOG-001 | 首次打开工作区时列出将启用的可执行配置并记录用户的信任决定 | FR-WS-01、ARCH-10.2 | T18 | `trust-trusted-loads-project-extension` | 已实现 |
 | CAP-TRUST-PROJECT-001 | 未信任的工作区不加载项目级可执行配置（Pi 扩展等）；信任后加载 | FR-WS-01、ARCH-10.2 | T13 | `trust-trusted-loads-project-extension`<br>`trust-untrusted-skips-project-extension` | 已实现 |
 | CAP-TURN-BATCH-001 | 连续的只读工具调用成批并行（单批至多 10 个），写操作单独执行 | ARCH-6.15 | T14 | `turn-tool-batches` | 已实现 |
 | CAP-TURN-ERROR-001 | 不可恢复的错误按类别报告，可重试，未送达的消息可重发 | FR-CH-06 | T19 | `turn-classified-errors` | 已实现 |

@@ -384,6 +384,8 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 - 动作失败时报告附带最后 12 个事件与每个请求的结果类型和违规规则；mock 的完整请求体在 `MockProvider::records()`（运行器的 `RunOutcome` 不保留临时根）。
 - 格式错误在加载时报告文件与字段的 JSON Pointer，例如 `/expect/request_counts/main: "one" is not of type "integer"`。
 
+会话侧栏场景可用 `set_prefs` 修改标题、置顶与归档，`check_stored_session.fields` 检查数据库行（null 表示已删除），`delete_session` 经 Core 删除。`check_trust.fields` 检查 Core 提供给信任对话框的清单与决定。事件断言的 `method: core/sessions` 选择指定会话在实际快照中的那一行；通知呈现和用户点击由 L4 验证。
+
 ## 13. 能力清单（T15）
 
 ### 13.1 格式

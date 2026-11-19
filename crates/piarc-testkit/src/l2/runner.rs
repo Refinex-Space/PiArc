@@ -596,6 +596,53 @@ impl Driver<'_> {
                 .await
                 .map(drop),
             Action::Abort { session } => self.op(session.as_deref(), Op::Abort).await.map(drop),
+            Action::SetPrefs {
+                session,
+                title,
+                pinned,
+                archived,
+            } => self
+                .op(
+                    session.as_deref(),
+                    Op::Prefs(piarc_core::sessions::SessionPrefsChange {
+                        custom_title: title.clone().map(Some),
+                        pinned: *pinned,
+                        archived: *archived,
+                    }),
+                )
+                .await
+                .map(drop),
+            Action::DeleteSession { session } => {
+                let id = self.session_id(session.as_deref())?;
+                call(
+                    |done| self.core.delete_session(id, done),
+                    "deleting session",
+                )
+                .await
+                .map(drop)
+            }
+            Action::CheckStoredSession { session, fields } => {
+                let id = self.session_id(session.as_deref())?;
+                let storage = self.core.storage().map_err(|e| e.to_string())?;
+                let record = storage
+                    .with(|db| db.session(&id))
+                    .map_err(|e| e.to_string())?
+                    .map_err(|e| e.to_string())?;
+                let actual = record.map_or(
+                    Value::Null,
+                    |r| json!({"title":r.title(),"pinned":r.pinned,"archived":r.archived}),
+                );
+                subset_mismatch(fields, &actual, "stored session").map_or(Ok(()), Err)
+            }
+            Action::CheckTrust { fields } => {
+                let service = self.core.trust().map_err(|e| e.to_string())?;
+                let view = service
+                    .view(&self.env.workspace)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let actual = serde_json::to_value(view).map_err(|e| e.to_string())?;
+                subset_mismatch(fields, &actual, "trust view").map_or(Ok(()), Err)
+            }
             Action::Wait(wait) => self.wait_for_event(wait).await,
             Action::WriteFile { path, content } => write_file(&self.env.workspace, path, content),
             Action::RestartCore {} => self.restart().await,
@@ -757,18 +804,30 @@ impl Driver<'_> {
             .iter()
             .map(|(label, id)| (format!("session/{id}"), label))
             .collect();
-        self.events
-            .all()
-            .into_iter()
-            .filter_map(|(route, event)| {
-                let session = labels.get(&route)?;
-                Some(ObservedEvent {
-                    session: (*session).clone(),
+        let mut result = Vec::new();
+        for (route, event) in self.events.all() {
+            if route == "core/sessions" {
+                for row in event["sessions"].as_array().into_iter().flatten() {
+                    if let Some(label) = row["id"]
+                        .as_str()
+                        .and_then(|id| labels.get(&format!("session/{id}")))
+                    {
+                        result.push(ObservedEvent {
+                            session: (*label).clone(),
+                            method: route.clone(),
+                            params: row.clone(),
+                        });
+                    }
+                }
+            } else if let Some(label) = labels.get(&route) {
+                result.push(ObservedEvent {
+                    session: (*label).clone(),
                     method: event["method"].as_str().unwrap_or_default().to_owned(),
                     params: event["params"].clone(),
-                })
-            })
-            .collect()
+                });
+            }
+        }
+        result
     }
 
     async fn wait_until(

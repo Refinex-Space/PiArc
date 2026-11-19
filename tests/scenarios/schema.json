@@ -22,14 +22,18 @@
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": { "$ref": "#/$defs/capabilityId" }
+      "items": {
+        "$ref": "#/$defs/capabilityId"
+      }
     },
     "platforms": {
       "description": "Platforms the scenario runs on; both when absent.",
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": { "enum": ["macos", "windows"] }
+      "items": {
+        "enum": ["macos", "windows"]
+      }
     },
     "platform_reason": {
       "description": "Why a platform is left out; required when platforms excludes one.",
@@ -43,14 +47,22 @@
         "files": {
           "description": "Initial files: relative path (forward slashes) to UTF-8 content.",
           "type": "object",
-          "propertyNames": { "$ref": "#/$defs/relativePath" },
-          "additionalProperties": { "type": "string" }
+          "propertyNames": {
+            "$ref": "#/$defs/relativePath"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
         },
         "run_files": {
           "description": "Initial UTF-8 files relative to the scenario's isolated temporary root.",
           "type": "object",
-          "propertyNames": { "$ref": "#/$defs/relativePath" },
-          "additionalProperties": { "type": "string" }
+          "propertyNames": {
+            "$ref": "#/$defs/relativePath"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
         },
         "git": {
           "description": "Initialize the workspace as a Git repository.",
@@ -59,8 +71,12 @@
         "fixtures": {
           "description": "Files copied byte for byte from the scenarios' fixtures/ directory: relative path in the workspace to the fixture's name (relative, forward slashes). For CRLF, byte order marks, legacy encodings, images and PDFs.",
           "type": "object",
-          "propertyNames": { "$ref": "#/$defs/relativePath" },
-          "additionalProperties": { "$ref": "#/$defs/relativePath" }
+          "propertyNames": {
+            "$ref": "#/$defs/relativePath"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/relativePath"
+          }
         },
         "trusted": {
           "description": "Record a trust decision for the workspace before it opens; untrusted when absent.",
@@ -72,38 +88,60 @@
       "description": "Configure a cloud API key through the real settings path; model requests remain on loopback mocks.",
       "type": "array",
       "uniqueItems": true,
-      "items": { "enum": ["amazon-bedrock", "google-vertex"] }
+      "items": {
+        "enum": ["amazon-bedrock", "google-vertex"]
+      }
     },
     "providers": {
       "description": "Mock provider endpoints by name; each is its own Pi provider with one model.",
       "type": "object",
       "minProperties": 1,
-      "propertyNames": { "$ref": "#/$defs/label" },
-      "additionalProperties": { "$ref": "#/$defs/provider" }
+      "propertyNames": {
+        "$ref": "#/$defs/label"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/provider"
+      }
     },
     "sessions": {
       "description": "Sessions by label; a single session `main` on the only provider when absent.",
       "type": "object",
       "minProperties": 1,
-      "propertyNames": { "$ref": "#/$defs/label" },
-      "additionalProperties": { "$ref": "#/$defs/session" }
+      "propertyNames": {
+        "$ref": "#/$defs/label"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/session"
+      }
     },
     "actions": {
       "description": "What the runner does, in order.",
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/action" }
+      "items": {
+        "$ref": "#/$defs/action"
+      }
     },
     "approvals": {
       "description": "Answers to Core's approval requests, in order.",
       "type": "array",
-      "items": { "$ref": "#/$defs/approval" }
+      "items": {
+        "$ref": "#/$defs/approval"
+      }
     },
-    "expect": { "$ref": "#/$defs/expect" }
+    "expect": {
+      "$ref": "#/$defs/expect"
+    }
   },
   "$defs": {
-    "capabilityId": { "type": "string", "pattern": "^CAP-[A-Z0-9]+(-[A-Z0-9]+)*-[0-9]{3}$" },
-    "label": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "capabilityId": {
+      "type": "string",
+      "pattern": "^CAP-[A-Z0-9]+(-[A-Z0-9]+)*-[0-9]{3}$"
+    },
+    "label": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
     "relativePath": {
       "type": "string",
       "minLength": 1,
@@ -115,7 +153,10 @@
       "additionalProperties": false,
       "required": ["wire", "steps"],
       "properties": {
-        "wire": { "description": "Wire format of the endpoint.", "enum": ["anthropic", "openai"] },
+        "wire": {
+          "description": "Wire format of the endpoint.",
+          "enum": ["anthropic", "openai"]
+        },
         "configure_as": {
           "description": "Configure this mock through the Core settings API.",
           "enum": ["custom", "local"]
@@ -124,12 +165,20 @@
           "description": "The imported mock model supports thinking levels.",
           "type": "boolean"
         },
-        "validation": { "$ref": "#/$defs/validation" },
+        "validation": {
+          "$ref": "#/$defs/validation"
+        },
         "vision": {
           "description": "The endpoint's model takes images as input; text only when absent.",
           "type": "boolean"
         },
-        "steps": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/step" } }
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/step"
+          }
+        }
       }
     },
     "validation": {
@@ -140,25 +189,50 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "tool_pairing": { "type": "boolean" },
-            "role_order": { "type": "boolean" },
-            "tool_schema": { "type": "boolean" },
-            "system_sections": { "type": "boolean" },
-            "cache_breakpoint_count": { "type": "boolean" },
-            "cache_breakpoint_position": { "type": "boolean" }
+            "tool_pairing": {
+              "type": "boolean"
+            },
+            "role_order": {
+              "type": "boolean"
+            },
+            "tool_schema": {
+              "type": "boolean"
+            },
+            "system_sections": {
+              "type": "boolean"
+            },
+            "cache_breakpoint_count": {
+              "type": "boolean"
+            },
+            "cache_breakpoint_position": {
+              "type": "boolean"
+            }
           }
         },
         "ordered_system_sections": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
-        "required_system_sections": { "type": "array", "items": { "type": "string" } },
+        "required_system_sections": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "cache_breakpoints": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "max_message_level": { "type": "integer", "minimum": 0 },
-            "last_message_only": { "type": "boolean" }
+            "max_message_level": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "last_message_only": {
+              "type": "boolean"
+            }
           }
         }
       }
@@ -167,24 +241,60 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "text": { "type": "string" },
-        "thinking": { "type": "string" },
-        "chunk_chars": { "type": "integer", "minimum": 1 },
-        "chunk_delay_ms": { "type": "integer", "minimum": 0, "maximum": 10000 },
-        "tool_calls": { "type": "array", "items": { "$ref": "#/$defs/toolCall" } },
+        "text": {
+          "type": "string"
+        },
+        "thinking": {
+          "type": "string"
+        },
+        "chunk_chars": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "chunk_delay_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "tool_calls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/toolCall"
+          }
+        },
         "usage": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "input_tokens": { "type": "integer", "minimum": 0 },
-            "output_tokens": { "type": "integer", "minimum": 0 },
-            "cache_read_tokens": { "type": "integer", "minimum": 0 },
-            "cache_write_tokens": { "type": "integer", "minimum": 0 }
+            "input_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "output_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cache_read_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cache_write_tokens": {
+              "type": "integer",
+              "minimum": 0
+            }
           }
         },
-        "stop_reason": { "enum": ["end_turn", "tool_use", "max_tokens"] },
-        "disconnect_after_events": { "type": "integer", "minimum": 0 },
-        "stall_after_events": { "type": "integer", "minimum": 0 },
+        "stop_reason": {
+          "enum": ["end_turn", "tool_use", "max_tokens"]
+        },
+        "disconnect_after_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stall_after_events": {
+          "type": "integer",
+          "minimum": 0
+        },
         "error": {
           "type": "object",
           "additionalProperties": false,
@@ -193,8 +303,13 @@
             "kind": {
               "enum": ["unauthorized", "rate_limit", "overloaded", "server_error", "unavailable"]
             },
-            "retry_after_secs": { "type": "integer", "minimum": 0 },
-            "message": { "type": "string" }
+            "retry_after_secs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "message": {
+              "type": "string"
+            }
           }
         }
       }
@@ -204,11 +319,28 @@
       "additionalProperties": false,
       "required": ["name", "input"],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "name": { "type": "string", "minLength": 1 },
-        "input": { "type": "object" },
-        "fragments": { "type": "integer", "minimum": 1 },
-        "split_at": { "type": "array", "items": { "type": "integer", "minimum": 1 } }
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "input": {
+          "type": "object"
+        },
+        "fragments": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "split_at": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
       }
     },
     "session": {
@@ -216,9 +348,16 @@
       "additionalProperties": false,
       "required": ["provider"],
       "properties": {
-        "provider": { "$ref": "#/$defs/label" },
-        "mode": { "enum": ["default", "acceptEdits"] },
-        "deferred": { "description": "Create the session on its first input.", "type": "boolean" },
+        "provider": {
+          "$ref": "#/$defs/label"
+        },
+        "mode": {
+          "enum": ["default", "acceptEdits"]
+        },
+        "deferred": {
+          "description": "Create the session on its first input.",
+          "type": "boolean"
+        },
         "cwd": {
           "description": "Working directory relative to the workspace; the workspace when absent.",
           "$ref": "#/$defs/relativePath"
@@ -230,17 +369,29 @@
       "minProperties": 1,
       "maxProperties": 1,
       "properties": {
-        "prompt": { "$ref": "#/$defs/inputAction" },
-        "steer": { "$ref": "#/$defs/inputAction" },
-        "follow_up": { "$ref": "#/$defs/inputAction" },
+        "prompt": {
+          "$ref": "#/$defs/inputAction"
+        },
+        "steer": {
+          "$ref": "#/$defs/inputAction"
+        },
+        "follow_up": {
+          "$ref": "#/$defs/inputAction"
+        },
         "queue_edit": {
           "type": "object",
           "additionalProperties": false,
           "required": ["item", "text"],
           "properties": {
-            "session": { "$ref": "#/$defs/label" },
-            "item": { "$ref": "#/$defs/label" },
-            "text": { "type": "string" }
+            "session": {
+              "$ref": "#/$defs/label"
+            },
+            "item": {
+              "$ref": "#/$defs/label"
+            },
+            "text": {
+              "type": "string"
+            }
           }
         },
         "queue_delete": {
@@ -248,8 +399,12 @@
           "additionalProperties": false,
           "required": ["item"],
           "properties": {
-            "session": { "$ref": "#/$defs/label" },
-            "item": { "$ref": "#/$defs/label" }
+            "session": {
+              "$ref": "#/$defs/label"
+            },
+            "item": {
+              "$ref": "#/$defs/label"
+            }
           }
         },
         "queue_reorder": {
@@ -257,29 +412,53 @@
           "additionalProperties": false,
           "required": ["items"],
           "properties": {
-            "session": { "$ref": "#/$defs/label" },
-            "items": { "type": "array", "items": { "$ref": "#/$defs/label" } }
+            "session": {
+              "$ref": "#/$defs/label"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/label"
+              }
+            }
           }
         },
         "compact": {
           "type": "object",
           "additionalProperties": false,
-          "properties": { "session": { "$ref": "#/$defs/label" } }
+          "properties": {
+            "session": {
+              "$ref": "#/$defs/label"
+            }
+          }
         },
         "abort": {
           "type": "object",
           "additionalProperties": false,
-          "properties": { "session": { "$ref": "#/$defs/label" } }
+          "properties": {
+            "session": {
+              "$ref": "#/$defs/label"
+            }
+          }
         },
-        "wait": { "$ref": "#/$defs/waitAction" },
+        "wait": {
+          "$ref": "#/$defs/waitAction"
+        },
         "set_model": {
           "type": "object",
           "additionalProperties": false,
           "required": ["provider", "preview"],
           "properties": {
-            "session": { "$ref": "#/$defs/label" },
-            "provider": { "$ref": "#/$defs/label" },
-            "preview": { "type": "object", "minProperties": 1 }
+            "session": {
+              "$ref": "#/$defs/label"
+            },
+            "provider": {
+              "$ref": "#/$defs/label"
+            },
+            "preview": {
+              "type": "object",
+              "minProperties": 1
+            }
           }
         },
         "set_effort": {
@@ -287,8 +466,12 @@
           "additionalProperties": false,
           "required": ["effort"],
           "properties": {
-            "session": { "$ref": "#/$defs/label" },
-            "effort": { "enum": ["off", "low", "medium", "high", "xhigh", "max"] }
+            "session": {
+              "$ref": "#/$defs/label"
+            },
+            "effort": {
+              "enum": ["off", "low", "medium", "high", "xhigh", "max"]
+            }
           }
         },
         "set_mode": {
@@ -296,8 +479,12 @@
           "additionalProperties": false,
           "required": ["mode"],
           "properties": {
-            "session": { "$ref": "#/$defs/label" },
-            "mode": { "enum": ["default", "acceptEdits"] }
+            "session": {
+              "$ref": "#/$defs/label"
+            },
+            "mode": {
+              "enum": ["default", "acceptEdits"]
+            }
           }
         },
         "restart_core": {
@@ -308,16 +495,75 @@
         "resume": {
           "type": "object",
           "additionalProperties": false,
-          "properties": { "session": { "$ref": "#/$defs/label" } }
+          "properties": {
+            "session": {
+              "$ref": "#/$defs/label"
+            }
+          }
         },
         "write_file": {
           "type": "object",
           "additionalProperties": false,
           "required": ["path", "content"],
           "properties": {
-            "path": { "$ref": "#/$defs/relativePath" },
-            "content": { "type": "string" }
+            "path": {
+              "$ref": "#/$defs/relativePath"
+            },
+            "content": {
+              "type": "string"
+            }
           }
+        },
+        "delete_session": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "session": {
+              "$ref": "#/$defs/label"
+            }
+          }
+        },
+        "set_prefs": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "session": {
+              "$ref": "#/$defs/label"
+            },
+            "pinned": {
+              "type": "boolean"
+            },
+            "archived": {
+              "type": "boolean"
+            },
+            "title": {
+              "type": "string"
+            }
+          }
+        },
+        "check_stored_session": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "session": {
+              "$ref": "#/$defs/label"
+            },
+            "fields": {
+              "type": ["object", "null"]
+            }
+          },
+          "required": ["fields"]
+        },
+        "check_trust": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "fields": {
+              "type": "object",
+              "minProperties": 1
+            }
+          },
+          "required": ["fields"]
         }
       },
       "additionalProperties": false
@@ -327,8 +573,13 @@
       "additionalProperties": false,
       "required": ["text"],
       "properties": {
-        "session": { "$ref": "#/$defs/label" },
-        "text": { "type": "string", "minLength": 1 },
+        "session": {
+          "$ref": "#/$defs/label"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
         "request_id": {
           "type": "string",
           "minLength": 1,
@@ -342,9 +593,17 @@
             "additionalProperties": false,
             "required": ["path", "start", "end"],
             "properties": {
-              "path": { "$ref": "#/$defs/relativePath" },
-              "start": { "type": "integer", "minimum": 0 },
-              "end": { "type": "integer", "minimum": 1 }
+              "path": {
+                "$ref": "#/$defs/relativePath"
+              },
+              "start": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "end": {
+                "type": "integer",
+                "minimum": 1
+              }
             }
           }
         },
@@ -355,13 +614,24 @@
             "additionalProperties": false,
             "required": ["fixture", "mime_type"],
             "properties": {
-              "fixture": { "$ref": "#/$defs/relativePath" },
-              "mime_type": { "type": "string", "minLength": 1 }
+              "fixture": {
+                "$ref": "#/$defs/relativePath"
+              },
+              "mime_type": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           }
         },
-        "turn": { "description": "Label for the turn the input started.", "$ref": "#/$defs/label" },
-        "item": { "description": "Label for the queue item it became.", "$ref": "#/$defs/label" }
+        "turn": {
+          "description": "Label for the turn the input started.",
+          "$ref": "#/$defs/label"
+        },
+        "item": {
+          "description": "Label for the queue item it became.",
+          "$ref": "#/$defs/label"
+        }
       }
     },
     "waitAction": {
@@ -369,10 +639,19 @@
       "additionalProperties": false,
       "required": ["method"],
       "properties": {
-        "session": { "$ref": "#/$defs/label" },
-        "method": { "type": "string", "minLength": 1 },
-        "params": { "type": "object" },
-        "turn": { "$ref": "#/$defs/label" },
+        "session": {
+          "$ref": "#/$defs/label"
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "params": {
+          "type": "object"
+        },
+        "turn": {
+          "$ref": "#/$defs/label"
+        },
         "count": {
           "description": "Wait until this many matching events arrived.",
           "type": "integer",
@@ -385,9 +664,17 @@
       "additionalProperties": false,
       "required": ["method"],
       "properties": {
-        "session": { "$ref": "#/$defs/label" },
-        "method": { "type": "string", "minLength": 1 },
-        "params": { "description": "Field subset of the event's params.", "type": "object" },
+        "session": {
+          "$ref": "#/$defs/label"
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "params": {
+          "description": "Field subset of the event's params.",
+          "type": "object"
+        },
         "turn": {
           "description": "params.turnId is the turn with this label.",
           "$ref": "#/$defs/label"
@@ -399,7 +686,13 @@
       "additionalProperties": false,
       "required": ["any_order"],
       "properties": {
-        "any_order": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/eventMatcher" } }
+        "any_order": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/eventMatcher"
+          }
+        }
       }
     },
     "approval": {
@@ -407,9 +700,15 @@
       "additionalProperties": false,
       "required": ["decision"],
       "properties": {
-        "kind": { "enum": ["command", "fileChange", "permissionExpansion", "question"] },
-        "feedback": { "type": "string" },
-        "decision": { "enum": ["allow", "deny", "always", "session"] },
+        "kind": {
+          "enum": ["command", "fileChange", "permissionExpansion", "question"]
+        },
+        "feedback": {
+          "type": "string"
+        },
+        "decision": {
+          "enum": ["allow", "deny", "always", "session"]
+        },
         "tool": {
           "description": "The canonical tool name the request must be for.",
           "type": "string"
@@ -421,35 +720,82 @@
       "additionalProperties": false,
       "required": ["index"],
       "properties": {
-        "provider": { "$ref": "#/$defs/label" },
+        "provider": {
+          "$ref": "#/$defs/label"
+        },
         "index": {
           "description": "Request number of the endpoint, from 0.",
           "type": "integer",
           "minimum": 0
         },
-        "roles": { "type": "array", "items": { "type": "string" } },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "tools": {
           "description": "Exactly these tool names, in any order.",
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
-        "tools_include": { "type": "array", "items": { "type": "string" } },
-        "tools_exclude": { "type": "array", "items": { "type": "string" } },
-        "user_texts": { "type": "array", "items": { "type": "string" } },
-        "last_user_text": { "type": "string" },
-        "contains": { "type": "array", "items": { "type": "string" } },
-        "not_contains": { "type": "array", "items": { "type": "string" } },
+        "tools_include": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tools_exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "user_texts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "last_user_text": {
+          "type": "string"
+        },
+        "contains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "not_contains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "occurrences": {
           "type": "object",
-          "propertyNames": { "minLength": 1 },
-          "additionalProperties": { "type": "integer", "minimum": 0 }
+          "propertyNames": {
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
         },
         "user_message_contains": {
           "type": "array",
           "minItems": 1,
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
-        "same_system_as": { "type": "integer", "minimum": 0 },
+        "same_system_as": {
+          "type": "integer",
+          "minimum": 0
+        },
         "tool_results": {
           "type": "array",
           "items": {
@@ -457,13 +803,22 @@
             "additionalProperties": false,
             "required": ["id"],
             "properties": {
-              "id": { "type": "string" },
-              "is_error": { "type": "boolean" },
-              "contains": { "type": "string" }
+              "id": {
+                "type": "string"
+              },
+              "is_error": {
+                "type": "boolean"
+              },
+              "contains": {
+                "type": "string"
+              }
             }
           }
         },
-        "body": { "description": "Field subset of the request body.", "type": "object" }
+        "body": {
+          "description": "Field subset of the request body.",
+          "type": "object"
+        }
       }
     },
     "expect": {
@@ -475,37 +830,71 @@
           "description": "Ordered subsequence per session; each item a field subset.",
           "type": "array",
           "items": {
-            "oneOf": [{ "$ref": "#/$defs/eventMatcher" }, { "$ref": "#/$defs/eventGroup" }]
+            "oneOf": [
+              {
+                "$ref": "#/$defs/eventMatcher"
+              },
+              {
+                "$ref": "#/$defs/eventGroup"
+              }
+            ]
           }
         },
         "files": {
           "description": "Workspace files after the run: exact content, or null for absent.",
           "type": "object",
-          "propertyNames": { "$ref": "#/$defs/relativePath" },
-          "additionalProperties": { "type": ["string", "null"] }
+          "propertyNames": {
+            "$ref": "#/$defs/relativePath"
+          },
+          "additionalProperties": {
+            "type": ["string", "null"]
+          }
         },
-        "requests": { "type": "array", "items": { "$ref": "#/$defs/requestExpect" } },
+        "requests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/requestExpect"
+          }
+        },
         "configured_providers": {
           "description": "Assert public fields and chat model availability for each configured provider.",
           "type": "object",
-          "additionalProperties": { "type": "object", "minProperties": 1 }
+          "additionalProperties": {
+            "type": "object",
+            "minProperties": 1
+          }
         },
         "request_counts": {
           "description": "Exact number of requests each endpoint received.",
           "type": "object",
-          "propertyNames": { "$ref": "#/$defs/label" },
-          "additionalProperties": { "type": "integer", "minimum": 0 }
+          "propertyNames": {
+            "$ref": "#/$defs/label"
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
         },
         "tool_batches": {
           "description": "Tool call ids in the batches their Core requests arrive in.",
           "type": "array",
-          "items": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          }
         },
         "fixtures": {
           "description": "Workspace files after the run whose bytes equal a fixture file: relative path to the fixture's name.",
           "type": "object",
-          "propertyNames": { "$ref": "#/$defs/relativePath" },
-          "additionalProperties": { "$ref": "#/$defs/relativePath" }
+          "propertyNames": {
+            "$ref": "#/$defs/relativePath"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/relativePath"
+          }
         },
         "core_io": {
           "description": "Core answered a request with this method for this tool call.",
@@ -514,7 +903,14 @@
             "type": "object",
             "additionalProperties": false,
             "required": ["call", "method"],
-            "properties": { "call": { "type": "string" }, "method": { "type": "string" } }
+            "properties": {
+              "call": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string"
+              }
+            }
           }
         }
       }

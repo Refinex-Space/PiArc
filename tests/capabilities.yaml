@@ -24,7 +24,7 @@ capabilities:
     milestone: M1
     refs: [FR-WS-01, ARCH-10.2]
     task: T18
-    status: planned
+    status: active
   - id: CAP-SESSION-MULTI-001
     title: '同一工作区的多个会话同时运行，各自的工作目录与请求互不串扰'
     milestone: M1
@@ -42,9 +42,9 @@ capabilities:
     milestone: M1
     refs: [FR-WS-03]
     task: T18
-    status: planned
+    status: active
   - id: CAP-SESSION-STATUS-001
-    title: 'Core 计算会话状态（错误 > 等待审批 > 运行中 > 未读 > 空闲）并随会话列表快照送达'
+    title: 'Core 快照送达会话状态、待答审批数和未读标记，客户端按优先级显示徽标'
     milestone: M1
     refs: [FR-WS-02]
     task: T20
