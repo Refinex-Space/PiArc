@@ -37,7 +37,12 @@ test('a session finishing in the background notifies and counts on the Dock badg
     .poll(() =>
       app.evaluate(({ BrowserWindow }) =>
         BrowserWindow.getAllWindows()
-          .filter((w) => !w.isDestroyed() && !w.webContents.getURL().includes('#/settings'))
+          .filter(
+            (w) =>
+              !w.isDestroyed() &&
+              !w.webContents.isDestroyed() &&
+              !w.webContents.getURL().includes('#/settings'),
+          )
           .some((w) => w.isFocused()),
       ),
     )
@@ -61,7 +66,7 @@ test('a session finishing in the background notifies and counts on the Dock badg
   if (process.platform === 'darwin') {
     expect(await app.evaluate(({ app: electronApp }) => electronApp.getBadgeCount())).toBe(1);
   }
-  await expect(page.getByTestId('toast')).toBeVisible();
+  await expect(page.getByTestId('toast').filter({ hasText: /finished|已完成/u })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('reminder.png') });
 
   // Back in front and shown: read, the count goes back to 0.
