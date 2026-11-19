@@ -32,6 +32,8 @@
 | `SCROLL_FOLLOW.buttonPx = 200`、`userInputWindowMs = 150` | 离底超过 200 px 显示“回到底部”，用户输入后的 150 ms 内保留视口。 |
 | `VIRTUAL_LIST.overscanViewports = 1` | 可见区上下各多挂载约一屏，尺寸按会话、行 ID 与宽度缓存。 |
 
+宽度变化（Windows 的经典滚动条出现或消失时占去或让出约 12 px）后 `virtualizer.measure()` 会清空全部行高，`TranscriptList` 随即对 DOM 中的行逐一 `measureElement`：行自己的 ResizeObserver 不会再报告，否则这些行停在估算高度上互相重叠（W1，`t19-security.e2e.ts` 展开命令输出时复现）。macOS 的浮动滚动条不占宽度，测不出这类问题。
+
 行内容和虚拟列表提交后在布局阶段检查贴底。`ResizeObserver` 处理尺寸变化。可见内容先增高、列表随后更新尺寸时，这两次提交都可能影响同一帧的滚动位置。
 
 - 审批是 `SessionTranscript.setApprovals` 从 Core 实体快照追加的临时行，历史重载仍显示未处理的请求，重连后的新快照移除旧行。`rows/RowView.tsx` 把审批路由到 `ApprovalCard`、把 `permissionModeChanged` 显示为模式变更记录。快捷键与阅读闸门在 `rows/approval-keys.ts`，仅首个与滚动窗口相交的审批卡可响应。提问表单由 `shell/use-unsupported-questions.ts` 在窗口层拒绝，切换会话不影响答复。
