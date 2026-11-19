@@ -23,6 +23,24 @@ import {
   watchOptimistic,
 } from './sessions.js';
 
+// Core lists a folder being opened before opening finishes, and the home view shows it then:
+// text typed in that time stays when opening finishes (CI lost the rolled-back draft below).
+test('text typed while the folder opens stays in the input', async ({ app, page, workspaces }) => {
+  await expectTestHooks(app);
+  const ws = await makeWorkspace(workspaces, 'typing 输入');
+  // The answer reaches the window 1.5 s after Core opened the folder.
+  await app.evaluate((_electron, channel) => {
+    globalThis.__piarcTestHooks?.holdNext(channel, 1500);
+  }, IPC_CHANNELS.workspaceOpen);
+  await openFolder(page, app, ws);
+  const input = page.getByTestId('home-input');
+  await input.fill('Typed while the folder opens');
+  // Longer than the hold: the answer has arrived and been handled.
+  await page.waitForTimeout(2500);
+  await expect(input).toHaveValue('Typed while the folder opens');
+  await expect(page.getByTestId('home-workspace')).toHaveValue(ws);
+});
+
 test('the new message shows at once; a failed create rolls it back into the input', async ({
   app,
   page,

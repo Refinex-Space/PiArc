@@ -172,6 +172,8 @@ export interface PiarcTestHooks {
   attention(): AttentionObservation;
   /** Makes the next call on IPC `channel` fail with `message` before it reaches Core (T18). */
   failNext(channel: string, message: string): void;
+  /** Makes the next answer on IPC `channel` reach the window `ms` after Core gave it. */
+  holdNext(channel: string, ms: number): void;
 }
 
 /** See `src/main/platform/attention.ts`. */

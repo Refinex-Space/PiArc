@@ -69,9 +69,25 @@ export type SessionCore = Pick<
  */
 export class FaultInjector {
   private readonly pending = new Map<string, string>();
+  private readonly holds = new Map<string, number>();
 
   failNext(channel: string, message: string): void {
     this.pending.set(channel, message);
+  }
+
+  /** The next answer on `channel` reaches the window `ms` after Core gave it. */
+  holdNext(channel: string, ms: number): void {
+    this.holds.set(channel, ms);
+  }
+
+  /** Waits the hold planned for `channel`, if any. */
+  async hold(channel: string): Promise<void> {
+    const ms = this.holds.get(channel);
+    if (ms === undefined) {
+      return;
+    }
+    this.holds.delete(channel);
+    await new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /** Throws the failure planned for `channel`, if any. */
@@ -246,9 +262,11 @@ export function registerSessionHandlers(
         : await dialog.showOpenDialog(window, options);
     return result.canceled ? null : (result.filePaths[0] ?? null);
   });
-  registerHandler(IPC_CHANNELS.workspaceOpen, (_event, [dir]) =>
-    core.openWorkspace(absolutePath(dir)),
-  );
+  registerHandler(IPC_CHANNELS.workspaceOpen, async (_event, [dir]) => {
+    const opened = await core.openWorkspace(absolutePath(dir));
+    await faults.hold(IPC_CHANNELS.workspaceOpen);
+    return opened;
+  });
   registerHandler(IPC_CHANNELS.sessionCreate, (_event, [workspace, selected]) => {
     const dir = absolutePath(workspace);
     faults.check(IPC_CHANNELS.sessionCreate);

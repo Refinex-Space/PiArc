@@ -152,9 +152,15 @@ export function Shell() {
       typeof (opened as { path?: unknown }).path === 'string'
         ? (opened as { path: string }).path
         : path;
-    show({ kind: 'home', workspace: canonical });
+    // Core lists the folder before opening finishes and the home view shows it then: keep a
+    // home view the user may be typing in (no remount), and switch any other view to home.
+    setView((current) =>
+      current.kind === 'home'
+        ? { ...current, workspace: canonical }
+        : { kind: 'home', workspace: canonical },
+    );
     return canonical;
-  }, [show]);
+  }, []);
 
   const toggleSidebar = useCallback(() => {
     setLayout((current) => ({ ...current, sidebarCollapsed: !current.sidebarCollapsed }));

@@ -93,6 +93,9 @@ function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners, app: App
     failNext: (channel, message) => {
       faults.failNext(channel, message);
     },
+    holdNext: (channel, ms) => {
+      faults.holdNext(channel, ms);
+    },
     modulePath: core.modulePath,
     core: core.runtime,
     router: eventRouter,

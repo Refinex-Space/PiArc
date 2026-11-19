@@ -31,6 +31,7 @@ export function installTestHooks(options: {
   readonly terminalStats: TerminalForwardStats;
   readonly attention: () => AttentionObservation;
   readonly failNext: (channel: string, message: string) => void;
+  readonly holdNext: (channel: string, ms: number) => void;
 }): void {
   const { router } = options;
   let histogram: ELDHistogram | undefined;
@@ -93,6 +94,7 @@ export function installTestHooks(options: {
     terminalForwardStats: () => ({ ...options.terminalStats }),
     attention: options.attention,
     failNext: options.failNext,
+    holdNext: options.holdNext,
     showNotification: (title, body, waitMs) =>
       new Promise((resolve) => {
         const supported = Notification.isSupported();
