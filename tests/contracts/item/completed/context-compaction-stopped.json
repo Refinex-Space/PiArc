@@ -1,0 +1,19 @@
+{
+  "jsonrpc": "2.0",
+  "method": "item/completed",
+  "params": {
+    "sessionId": "019a8f3e-5b2c-7d41-9e60-3f1a2b4c5d6e",
+    "seq": 44,
+    "ts": 1763200000200,
+    "turnId": "turn-7c1f",
+    "item": {
+      "type": "contextCompaction",
+      "itemId": "compaction-3",
+      "status": "completed",
+      "reason": "threshold",
+      "tokensBefore": 30100,
+      "tokensAfter": 29500,
+      "autoCompactStopped": "ineffective"
+    }
+  }
+}

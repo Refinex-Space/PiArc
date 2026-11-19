@@ -762,6 +762,72 @@
       "method": "ui/ask",
       "name": "ui/ask/result",
       "schema": "UiAskResponse"
+    },
+    {
+      "kind": "notification",
+      "method": "session/usage",
+      "name": "session/usage",
+      "schema": "SessionUsageNotification"
+    },
+    {
+      "kind": "request",
+      "method": "session/getContextUsage",
+      "name": "session/getContextUsage",
+      "schema": "SessionGetContextUsageRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/getContextUsage",
+      "name": "session/getContextUsage/result",
+      "schema": "SessionGetContextUsageResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/remind",
+      "name": "session/remind",
+      "schema": "SessionRemindRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/remind",
+      "name": "session/remind/result",
+      "schema": "SessionRemindResponse"
+    },
+    {
+      "kind": "request",
+      "method": "context/settings",
+      "name": "context/settings",
+      "schema": "ContextSettingsGetRequest"
+    },
+    {
+      "kind": "response",
+      "method": "context/settings",
+      "name": "context/settings/result",
+      "schema": "ContextSettingsGetResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/changes",
+      "name": "fs/changes",
+      "schema": "FsChangesRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/changes",
+      "name": "fs/changes/result",
+      "schema": "FsChangesResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/forgetReads",
+      "name": "fs/forgetReads",
+      "schema": "FsForgetReadsRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/forgetReads",
+      "name": "fs/forgetReads/result",
+      "schema": "FsForgetReadsResponse"
     }
   ],
   "protocolVersion": "1.0"

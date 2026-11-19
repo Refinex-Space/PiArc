@@ -54,6 +54,7 @@
 //! - Removing or renaming a member, method or enum value, or making an optional member
 //!   required, needs a new major version.
 
+pub mod context;
 pub mod contract;
 pub mod diff;
 mod error;

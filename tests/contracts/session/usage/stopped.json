@@ -1,0 +1,27 @@
+{
+  "jsonrpc": "2.0",
+  "method": "session/usage",
+  "params": {
+    "sessionId": "019a8f3e-5b2c-7d41-9e60-3f1a2b4c5d6e",
+    "seq": 15,
+    "ts": 1763200000700,
+    "usage": {
+      "tokens": 15400,
+      "contextWindow": 200000,
+      "autoCompactThreshold": 182904,
+      "categories": {
+        "systemPrompt": 2100,
+        "tools": 4800,
+        "mcpTools": 0,
+        "memory": 900,
+        "skills": 0,
+        "conversation": 3200,
+        "toolResults": 4100,
+        "unclassified": 300
+      },
+      "source": "estimate",
+      "autoCompact": "stopped",
+      "autoCompactStopped": "ineffective"
+    }
+  }
+}

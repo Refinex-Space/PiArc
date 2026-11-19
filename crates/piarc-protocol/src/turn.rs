@@ -270,6 +270,22 @@ pub enum Item {
         /// What went wrong, when it failed.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         error_message: Option<String>,
+        /// Set on the automatic compaction after which the session stopped compacting
+        /// automatically, and why (ADR-0043).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        auto_compact_stopped: Option<crate::context::AutoCompactStop>,
+    },
+    /// A system reminder the model received (ADR-0043): runtime notices appended to the
+    /// conversation. Clients do not show it by default.
+    Reminder {
+        /// The custom entry id in the session file (the history) or a generated id (live).
+        item_id: ItemId,
+        /// Always `completed`.
+        status: ItemStatus,
+        /// The reminders of the message, in order.
+        reminders: Vec<crate::context::ReminderRef>,
+        /// The text the model received.
+        text: String,
     },
 }
 
@@ -321,7 +337,8 @@ impl Item {
             | Self::WebFetch { item_id, .. }
             | Self::DynamicToolCall { item_id, .. }
             | Self::PermissionModeChanged { item_id, .. }
-            | Self::ContextCompaction { item_id, .. } => item_id,
+            | Self::ContextCompaction { item_id, .. }
+            | Self::Reminder { item_id, .. } => item_id,
         }
     }
 
@@ -339,7 +356,8 @@ impl Item {
             | Self::WebFetch { status, .. }
             | Self::DynamicToolCall { status, .. }
             | Self::PermissionModeChanged { status, .. }
-            | Self::ContextCompaction { status, .. } => *status,
+            | Self::ContextCompaction { status, .. }
+            | Self::Reminder { status, .. } => *status,
         }
     }
 }

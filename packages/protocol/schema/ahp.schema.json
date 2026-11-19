@@ -245,6 +245,41 @@
         }
       ]
     },
+    "AutoCompactState": {
+      "description": "Whether the session compacts automatically.",
+      "oneOf": [
+        {
+          "const": "on",
+          "description": "It does.",
+          "type": "string"
+        },
+        {
+          "const": "off",
+          "description": "The settings turned it off (`autoCompactEnabled: false`).",
+          "type": "string"
+        },
+        {
+          "const": "stopped",
+          "description": "It stopped after three failed or ineffective compactions; `/compact` still works.",
+          "type": "string"
+        }
+      ]
+    },
+    "AutoCompactStop": {
+      "description": "Why automatic compaction stopped for the session.",
+      "oneOf": [
+        {
+          "const": "failed",
+          "description": "Three automatic compactions in a row failed (or were ineffective, the last failed).",
+          "type": "string"
+        },
+        {
+          "const": "ineffective",
+          "description": "The context stayed at or above the threshold after compacting, three times in a row.",
+          "type": "string"
+        }
+      ]
+    },
     "BlobRef": {
       "description": "A copy of a file's content kept by Core (ADR-0009 rule 8).",
       "properties": {
@@ -343,6 +378,21 @@
         }
       },
       "required": ["id", "name"],
+      "type": "object"
+    },
+    "ChangedFile": {
+      "description": "A file that changed outside the session.",
+      "properties": {
+        "change": {
+          "$ref": "#/$defs/ExternalChange",
+          "description": "How it changed."
+        },
+        "path": {
+          "description": "The file's absolute path.",
+          "type": "string"
+        }
+      },
+      "required": ["path", "change"],
       "type": "object"
     },
     "CommandExecutionInfo": {
@@ -478,6 +528,190 @@
           "type": "string"
         }
       ]
+    },
+    "ContextCategories": {
+      "description": "The context by category, in tokens. The categories add up to the total.",
+      "properties": {
+        "conversation": {
+          "description": "Messages: the user's, the model's, the compaction summary, other reminders.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mcpTools": {
+          "description": "Definitions of MCP tools.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "memory": {
+          "description": "Memory: the system prompt's project context and memory or rule reminders.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "skills": {
+          "description": "The skills index and skill reminders.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "systemPrompt": {
+          "description": "The system prompt without its project context and skills index sections.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "toolResults": {
+          "description": "Tool results.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tools": {
+          "description": "Definitions of the built-in and host tools.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unclassified": {
+          "description": "The provider's count minus the estimated categories.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "systemPrompt",
+        "tools",
+        "mcpTools",
+        "memory",
+        "skills",
+        "conversation",
+        "toolResults",
+        "unclassified"
+      ],
+      "type": "object"
+    },
+    "ContextSessionParams": {
+      "description": "Parameters of `context/settings`, `fs/changes` and `fs/forgetReads`.",
+      "properties": {
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session asking."
+        }
+      },
+      "required": ["sessionId"],
+      "type": "object"
+    },
+    "ContextSettings": {
+      "description": "Result of `context/settings`: the merged settings of the session's workspace.",
+      "properties": {
+        "autoCompactEnabled": {
+          "description": "Whether the session compacts automatically (`autoCompactEnabled`, default true).",
+          "type": "boolean"
+        },
+        "autoCompactWindow": {
+          "description": "The automatic compaction window in tokens (`autoCompactWindow`, clamped to\n100,000–1,000,000); absent: the model's window.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        }
+      },
+      "required": ["autoCompactEnabled"],
+      "type": "object"
+    },
+    "ContextSettingsGetRequest": {
+      "description": "Request for `context/settings`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "context/settings",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ContextSessionParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "ContextSettingsGetResponse": {
+      "description": "Successful response to `context/settings`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/ContextSettings"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "ContextUsage": {
+      "description": "How full the session's context is.",
+      "properties": {
+        "autoCompact": {
+          "$ref": "#/$defs/AutoCompactState",
+          "description": "Whether the session compacts automatically."
+        },
+        "autoCompactStopped": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AutoCompactStop"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why automatic compaction stopped, when it did."
+        },
+        "autoCompactThreshold": {
+          "description": "Automatic compaction runs when the context reaches this many tokens.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "categories": {
+          "$ref": "#/$defs/ContextCategories",
+          "description": "The context by category."
+        },
+        "contextWindow": {
+          "description": "The window the usage is measured against: the model's window or the user's\nautomatic compaction window, whichever is smaller.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source": {
+          "$ref": "#/$defs/UsageSource",
+          "description": "Where the total comes from."
+        },
+        "tokens": {
+          "description": "Tokens in the context: the sum of the categories.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tokens",
+        "contextWindow",
+        "autoCompactThreshold",
+        "categories",
+        "source",
+        "autoCompact"
+      ],
+      "type": "object"
     },
     "CoreWelcome": {
       "description": "Result of `host/hello` (`core/welcome`).",
@@ -1305,6 +1539,21 @@
       "required": ["ms"],
       "type": "object"
     },
+    "ExternalChange": {
+      "description": "How a file changed outside the session.",
+      "oneOf": [
+        {
+          "const": "modified",
+          "description": "Its content differs from what the session last saw.",
+          "type": "string"
+        },
+        {
+          "const": "deleted",
+          "description": "It no longer exists.",
+          "type": "string"
+        }
+      ]
+    },
     "FileDiff": {
       "description": "One file change as a diff.",
       "properties": {
@@ -1404,6 +1653,107 @@
         }
       },
       "required": ["path", "kind", "size", "readonly"],
+      "type": "object"
+    },
+    "FsChangesRequest": {
+      "description": "Request for `fs/changes`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "fs/changes",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ContextSessionParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "FsChangesResponse": {
+      "description": "Successful response to `fs/changes`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/FsChangesResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "FsChangesResult": {
+      "description": "Result of `fs/changes`.",
+      "properties": {
+        "files": {
+          "description": "Files changed since the session saw them (or since the last report), sorted by path.",
+          "items": {
+            "$ref": "#/$defs/ChangedFile"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["files"],
+      "type": "object"
+    },
+    "FsForgetReadsRequest": {
+      "description": "Request for `fs/forgetReads`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "fs/forgetReads",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ContextSessionParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "FsForgetReadsResponse": {
+      "description": "Successful response to `fs/forgetReads`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/FsForgetReadsResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "FsForgetReadsResult": {
+      "description": "Result of `fs/forgetReads`.",
+      "properties": {
+        "files": {
+          "description": "Number of files whose read range was forgotten.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["files"],
       "type": "object"
     },
     "FsGlobParams": {
@@ -3575,6 +3925,17 @@
         {
           "description": "The conversation was compacted: older messages were replaced by a summary.",
           "properties": {
+            "autoCompactStopped": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/AutoCompactStop"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Set on the automatic compaction after which the session stopped compacting\nautomatically, and why (ADR-0043)."
+            },
             "errorMessage": {
               "description": "What went wrong, when it failed.",
               "type": ["string", "null"]
@@ -3616,6 +3977,36 @@
             }
           },
           "required": ["type", "itemId", "status"],
+          "type": "object"
+        },
+        {
+          "description": "A system reminder the model received (ADR-0043): runtime notices appended to the\nconversation. Clients do not show it by default.",
+          "properties": {
+            "itemId": {
+              "$ref": "#/$defs/ItemId",
+              "description": "The custom entry id in the session file (the history) or a generated id (live)."
+            },
+            "reminders": {
+              "description": "The reminders of the message, in order.",
+              "items": {
+                "$ref": "#/$defs/ReminderRef"
+              },
+              "type": "array"
+            },
+            "status": {
+              "$ref": "#/$defs/ItemStatus",
+              "description": "Always `completed`."
+            },
+            "text": {
+              "description": "The text the model received.",
+              "type": "string"
+            },
+            "type": {
+              "const": "reminder",
+              "type": "string"
+            }
+          },
+          "required": ["type", "itemId", "status", "reminders", "text"],
           "type": "object"
         }
       ]
@@ -5154,6 +5545,61 @@
       },
       "type": "object"
     },
+    "ReminderRef": {
+      "description": "One reminder of a reminder message: its type and where it came from.",
+      "properties": {
+        "source": {
+          "description": "Where it came from: a file path, a hook event, a task.",
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/ReminderType",
+          "description": "What it tells the model."
+        }
+      },
+      "required": ["type", "source"],
+      "type": "object"
+    },
+    "ReminderType": {
+      "description": "What a system reminder tells the model.",
+      "oneOf": [
+        {
+          "const": "todoStale",
+          "description": "The task list has open tasks and has not been updated for a while.",
+          "type": "string"
+        },
+        {
+          "const": "fileModified",
+          "description": "A file the session read changed outside it.",
+          "type": "string"
+        },
+        {
+          "const": "planMode",
+          "description": "Plan mode turned on or off.",
+          "type": "string"
+        },
+        {
+          "const": "backgroundTask",
+          "description": "A background task finished.",
+          "type": "string"
+        },
+        {
+          "const": "memoryLazyLoad",
+          "description": "Memory loaded after the system prompt: a subdirectory's memory file, a changed memory\nfile, the date.",
+          "type": "string"
+        },
+        {
+          "const": "rulesMatched",
+          "description": "A conditional rule (`paths:`) matched a file the session touched.",
+          "type": "string"
+        },
+        {
+          "const": "hookContext",
+          "description": "Context a hook added (`additionalContext`, plain stdout, a Stop hook's reason).",
+          "type": "string"
+        }
+      ]
+    },
     "Request": {
       "description": "A request whose method is not interpreted.",
       "properties": {
@@ -5789,6 +6235,10 @@
     "SessionCompactParams": {
       "description": "Parameters of `session/compact`.",
       "properties": {
+        "instructions": {
+          "description": "What the summary should focus on (`/compact <focus>`), passed to the summary request\nas written.",
+          "type": ["string", "null"]
+        },
         "requestId": {
           "description": "Idempotency key chosen by Core; repeating it returns the turn already started.",
           "type": "string"
@@ -6057,6 +6507,43 @@
         },
         "result": {
           "$ref": "#/$defs/SessionOpened"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SessionGetContextUsageRequest": {
+      "description": "Request for `session/getContextUsage`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/getContextUsage",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SessionTarget"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionGetContextUsageResponse": {
+      "description": "Successful response to `session/getContextUsage`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/ContextUsage"
         }
       },
       "required": ["jsonrpc", "id", "result"],
@@ -6331,6 +6818,70 @@
       "required": ["jsonrpc", "id", "result"],
       "type": "object"
     },
+    "SessionRemindParams": {
+      "description": "Parameters of `session/remind`.",
+      "properties": {
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session whose model hears it."
+        },
+        "source": {
+          "description": "Where it came from (the task).",
+          "type": "string"
+        },
+        "text": {
+          "description": "The text for the model.",
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/ReminderType",
+          "description": "What it tells the model; only `backgroundTask` is accepted."
+        }
+      },
+      "required": ["sessionId", "type", "source", "text"],
+      "type": "object"
+    },
+    "SessionRemindRequest": {
+      "description": "Request for `session/remind`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/remind",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SessionRemindParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionRemindResponse": {
+      "description": "Successful response to `session/remind`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SessionRemindResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SessionRemindResult": {
+      "description": "Result of `session/remind`: the reminder is queued for the next model request.",
+      "type": "object"
+    },
     "SessionResumeParams": {
       "description": "Parameters of `session/resume`.",
       "properties": {
@@ -6575,6 +7126,50 @@
         }
       },
       "required": ["sessionId"],
+      "type": "object"
+    },
+    "SessionUsageNotification": {
+      "description": "Notification `session/usage`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/usage",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SessionUsageParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "SessionUsageParams": {
+      "description": "Parameters of `session/usage`.",
+      "properties": {
+        "seq": {
+          "description": "Sequence number, monotonically increasing within the session.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session the event belongs to."
+        },
+        "ts": {
+          "description": "Time the event was produced, in milliseconds since the Unix epoch (UTC).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "usage": {
+          "$ref": "#/$defs/ContextUsage",
+          "description": "The context usage."
+        }
+      },
+      "required": ["sessionId", "seq", "ts", "usage"],
       "type": "object"
     },
     "SetEffortParams": {
@@ -7220,6 +7815,21 @@
       },
       "required": ["id", "last"],
       "type": "object"
+    },
+    "UsageSource": {
+      "description": "Where the context's total comes from.",
+      "oneOf": [
+        {
+          "const": "estimate",
+          "description": "PiArc's estimate (no provider report for the current context yet).",
+          "type": "string"
+        },
+        {
+          "const": "provider",
+          "description": "The input tokens the provider reported for the latest request.",
+          "type": "string"
+        }
+      ]
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -7604,6 +8214,39 @@
     },
     {
       "$ref": "#/$defs/UiAskResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionUsageNotification"
+    },
+    {
+      "$ref": "#/$defs/SessionGetContextUsageRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionGetContextUsageResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionRemindRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionRemindResponse"
+    },
+    {
+      "$ref": "#/$defs/ContextSettingsGetRequest"
+    },
+    {
+      "$ref": "#/$defs/ContextSettingsGetResponse"
+    },
+    {
+      "$ref": "#/$defs/FsChangesRequest"
+    },
+    {
+      "$ref": "#/$defs/FsChangesResponse"
+    },
+    {
+      "$ref": "#/$defs/FsForgetReadsRequest"
+    },
+    {
+      "$ref": "#/$defs/FsForgetReadsResponse"
     }
   ],
   "description": "Any message covered by the Agent Host Protocol 1.0 contracts. Generated from the piarc-protocol crate by `npm run gen:protocol`; do not edit.",

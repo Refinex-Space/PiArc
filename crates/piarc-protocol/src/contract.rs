@@ -15,6 +15,10 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
+use crate::context::{
+    ContextSettingsGet, FsChanges, FsForgetReads, SessionGetContextUsage, SessionRemind,
+    SessionUsage,
+};
 use crate::exec::{ExecKill, ExecOutput, ExecRun, ExecShells};
 use crate::fs::{FsGlob, FsGrep, FsList, FsMkdir, FsPdf, FsRead, FsSpill, FsStat, FsWrite};
 use crate::handshake::HostHello;
@@ -278,6 +282,17 @@ pub static CONTRACTS: &[Contract] = &[
     notification::<HarnessPlan>(),
     request::<UiAsk>(UiAsk::NAME),
     response::<UiAsk>("ui/ask/result"),
+    notification::<SessionUsage>(),
+    request::<SessionGetContextUsage>(SessionGetContextUsage::NAME),
+    response::<SessionGetContextUsage>("session/getContextUsage/result"),
+    request::<SessionRemind>(SessionRemind::NAME),
+    response::<SessionRemind>("session/remind/result"),
+    request::<ContextSettingsGet>(ContextSettingsGet::NAME),
+    response::<ContextSettingsGet>("context/settings/result"),
+    request::<FsChanges>(FsChanges::NAME),
+    response::<FsChanges>("fs/changes/result"),
+    request::<FsForgetReads>(FsForgetReads::NAME),
+    response::<FsForgetReads>("fs/forgetReads/result"),
 ];
 
 /// Looks up a contract by name.

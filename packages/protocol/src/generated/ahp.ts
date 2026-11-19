@@ -132,7 +132,18 @@ export type AhpMessage =
   | HarnessTodoNotification
   | HarnessPlanNotification
   | UiAskRequest
-  | UiAskResponse;
+  | UiAskResponse
+  | SessionUsageNotification
+  | SessionGetContextUsageRequest
+  | SessionGetContextUsageResponse
+  | SessionRemindRequest
+  | SessionRemindResponse
+  | ContextSettingsGetRequest
+  | ContextSettingsGetResponse
+  | FsChangesRequest
+  | FsChangesResponse
+  | FsForgetReadsRequest
+  | FsForgetReadsResponse;
 /**
  * A request id: an integer or a string. `null` and fractional numbers are not accepted.
  */
@@ -516,6 +527,11 @@ export type Item =
     }
   | {
       /**
+       * Set on the automatic compaction after which the session stopped compacting
+       * automatically, and why (ADR-0043).
+       */
+      autoCompactStopped?: AutoCompactStop | null;
+      /**
        * What went wrong, when it failed.
        */
       errorMessage?: string | null;
@@ -541,6 +557,25 @@ export type Item =
        */
       tokensBefore?: number | null;
       type: 'contextCompaction';
+    }
+  | {
+      /**
+       * The custom entry id in the session file (the history) or a generated id (live).
+       */
+      itemId: ItemId;
+      /**
+       * The reminders of the message, in order.
+       */
+      reminders: ReminderRef[];
+      /**
+       * Always `completed`.
+       */
+      status: ItemStatus;
+      /**
+       * The text the model received.
+       */
+      text: string;
+      type: 'reminder';
     };
 /**
  * Item identifier, unique within a session.
@@ -563,9 +598,24 @@ export type CommandOutcome = 'success' | 'failure';
  */
 export type DiffLineKind = 'context' | 'added' | 'removed';
 /**
+ * Why automatic compaction stopped for the session.
+ */
+export type AutoCompactStop = 'failed' | 'ineffective';
+/**
  * Why a compaction ran.
  */
 export type CompactionReason = 'manual' | 'threshold' | 'overflow';
+/**
+ * What a system reminder tells the model.
+ */
+export type ReminderType =
+  | 'todoStale'
+  | 'fileModified'
+  | 'planMode'
+  | 'backgroundTask'
+  | 'memoryLazyLoad'
+  | 'rulesMatched'
+  | 'hookContext';
 /**
  * The events the Agent Host reports.
  */
@@ -610,6 +660,22 @@ export type TurnStatus = 'completed' | 'failed' | 'interrupted';
  * How a question was settled.
  */
 export type QuestionOutcome = 'answered' | 'default' | 'unanswered' | 'declined';
+/**
+ * Whether the session compacts automatically.
+ */
+export type AutoCompactState = 'on' | 'off' | 'stopped';
+/**
+ * Where the context's total comes from.
+ */
+export type UsageSource = 'estimate' | 'provider';
+/**
+ * Result of `session/remind`: the reminder is queued for the next model request.
+ */
+export type SessionRemindResult = Record<string, never>;
+/**
+ * How a file changed outside the session.
+ */
+export type ExternalChange = 'modified' | 'deleted';
 /**
  * Presentation of a pending approval.
  */
@@ -1797,6 +1863,11 @@ export interface SessionCompactRequest {
  */
 export interface SessionCompactParams {
   /**
+   * What the summary should focus on (`/compact <focus>`), passed to the summary request
+   * as written.
+   */
+  instructions?: string | null;
+  /**
    * Idempotency key chosen by Core; repeating it returns the turn already started.
    */
   requestId: string;
@@ -2336,6 +2407,19 @@ export interface DiffLine {
    * The line without its line break.
    */
   text: string;
+}
+/**
+ * One reminder of a reminder message: its type and where it came from.
+ */
+export interface ReminderRef {
+  /**
+   * Where it came from: a file path, a hook event, a task.
+   */
+  source: string;
+  /**
+   * What it tells the model.
+   */
+  type: ReminderType;
 }
 /**
  * Request for `policy/evaluate`.
@@ -4446,6 +4530,271 @@ export interface QuestionResult {
    * Labels of the picked options (the defaults for `default`).
    */
   selected?: string[];
+}
+/**
+ * Notification `session/usage`.
+ */
+export interface SessionUsageNotification {
+  jsonrpc: JsonRpcVersion;
+  method: 'session/usage';
+  params: SessionUsageParams;
+}
+/**
+ * Parameters of `session/usage`.
+ */
+export interface SessionUsageParams {
+  /**
+   * Sequence number, monotonically increasing within the session.
+   */
+  seq: number;
+  /**
+   * The session the event belongs to.
+   */
+  sessionId: SessionId;
+  /**
+   * Time the event was produced, in milliseconds since the Unix epoch (UTC).
+   */
+  ts: number;
+  /**
+   * The context usage.
+   */
+  usage: ContextUsage;
+}
+/**
+ * How full the session's context is.
+ */
+export interface ContextUsage {
+  /**
+   * Whether the session compacts automatically.
+   */
+  autoCompact: AutoCompactState;
+  /**
+   * Why automatic compaction stopped, when it did.
+   */
+  autoCompactStopped?: AutoCompactStop | null;
+  /**
+   * Automatic compaction runs when the context reaches this many tokens.
+   */
+  autoCompactThreshold: number;
+  /**
+   * The context by category.
+   */
+  categories: ContextCategories;
+  /**
+   * The window the usage is measured against: the model's window or the user's
+   * automatic compaction window, whichever is smaller.
+   */
+  contextWindow: number;
+  /**
+   * Where the total comes from.
+   */
+  source: UsageSource;
+  /**
+   * Tokens in the context: the sum of the categories.
+   */
+  tokens: number;
+}
+/**
+ * The context by category, in tokens. The categories add up to the total.
+ */
+export interface ContextCategories {
+  /**
+   * Messages: the user's, the model's, the compaction summary, other reminders.
+   */
+  conversation: number;
+  /**
+   * Definitions of MCP tools.
+   */
+  mcpTools: number;
+  /**
+   * Memory: the system prompt's project context and memory or rule reminders.
+   */
+  memory: number;
+  /**
+   * The skills index and skill reminders.
+   */
+  skills: number;
+  /**
+   * The system prompt without its project context and skills index sections.
+   */
+  systemPrompt: number;
+  /**
+   * Tool results.
+   */
+  toolResults: number;
+  /**
+   * Definitions of the built-in and host tools.
+   */
+  tools: number;
+  /**
+   * The provider's count minus the estimated categories.
+   */
+  unclassified: number;
+}
+/**
+ * Request for `session/getContextUsage`.
+ */
+export interface SessionGetContextUsageRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/getContextUsage';
+  params: SessionTarget;
+}
+/**
+ * Successful response to `session/getContextUsage`.
+ */
+export interface SessionGetContextUsageResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: ContextUsage;
+}
+/**
+ * Request for `session/remind`.
+ */
+export interface SessionRemindRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/remind';
+  params: SessionRemindParams;
+}
+/**
+ * Parameters of `session/remind`.
+ */
+export interface SessionRemindParams {
+  /**
+   * The session whose model hears it.
+   */
+  sessionId: SessionId;
+  /**
+   * Where it came from (the task).
+   */
+  source: string;
+  /**
+   * The text for the model.
+   */
+  text: string;
+  /**
+   * What it tells the model; only `backgroundTask` is accepted.
+   */
+  type: ReminderType;
+}
+/**
+ * Successful response to `session/remind`.
+ */
+export interface SessionRemindResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SessionRemindResult;
+}
+/**
+ * Request for `context/settings`.
+ */
+export interface ContextSettingsGetRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'context/settings';
+  params: ContextSessionParams;
+}
+/**
+ * Parameters of `context/settings`, `fs/changes` and `fs/forgetReads`.
+ */
+export interface ContextSessionParams {
+  /**
+   * The session asking.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `context/settings`.
+ */
+export interface ContextSettingsGetResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: ContextSettings;
+}
+/**
+ * Result of `context/settings`: the merged settings of the session's workspace.
+ */
+export interface ContextSettings {
+  /**
+   * Whether the session compacts automatically (`autoCompactEnabled`, default true).
+   */
+  autoCompactEnabled: boolean;
+  /**
+   * The automatic compaction window in tokens (`autoCompactWindow`, clamped to
+   * 100,000–1,000,000); absent: the model's window.
+   */
+  autoCompactWindow?: number | null;
+}
+/**
+ * Request for `fs/changes`.
+ */
+export interface FsChangesRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'fs/changes';
+  params: ContextSessionParams;
+}
+/**
+ * Successful response to `fs/changes`.
+ */
+export interface FsChangesResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: FsChangesResult;
+}
+/**
+ * Result of `fs/changes`.
+ */
+export interface FsChangesResult {
+  /**
+   * Files changed since the session saw them (or since the last report), sorted by path.
+   */
+  files: ChangedFile[];
+}
+/**
+ * A file that changed outside the session.
+ */
+export interface ChangedFile {
+  /**
+   * How it changed.
+   */
+  change: ExternalChange;
+  /**
+   * The file's absolute path.
+   */
+  path: string;
+}
+/**
+ * Request for `fs/forgetReads`.
+ */
+export interface FsForgetReadsRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'fs/forgetReads';
+  params: ContextSessionParams;
+}
+/**
+ * Successful response to `fs/forgetReads`.
+ */
+export interface FsForgetReadsResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: FsForgetReadsResult;
+}
+/**
+ * Result of `fs/forgetReads`.
+ */
+export interface FsForgetReadsResult {
+  /**
+   * Number of files whose read range was forgotten.
+   */
+  files: number;
 }
 /**
  * Immutable approval card from the Core ledger.

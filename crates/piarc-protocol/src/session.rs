@@ -268,6 +268,10 @@ pub struct SessionCompactParams {
     pub session_id: SessionId,
     /// Idempotency key chosen by Core; repeating it returns the turn already started.
     pub request_id: String,
+    /// What the summary should focus on (`/compact <focus>`), passed to the summary request
+    /// as written.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<String>,
 }
 
 /// Result of `session/prompt`: the turn was accepted and will report `turn/started` and
