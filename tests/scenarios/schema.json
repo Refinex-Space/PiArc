@@ -129,6 +129,16 @@
           "description": "The endpoint's model takes images as input; text only when absent.",
           "type": "boolean"
         },
+        "context_window": {
+          "description": "The model's context window in tokens (T27); 200000 when absent.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_tokens": {
+          "description": "The model's largest output in tokens (T27); 4096 when absent.",
+          "type": "integer",
+          "minimum": 1
+        },
         "steps": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/step" } }
       }
     },
@@ -264,7 +274,14 @@
         "compact": {
           "type": "object",
           "additionalProperties": false,
-          "properties": { "session": { "$ref": "#/$defs/label" } }
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "instructions": {
+              "description": "What the summary should focus on (`/compact <focus>`, T27).",
+              "type": "string",
+              "minLength": 1
+            }
+          }
         },
         "abort": {
           "type": "object",
@@ -379,6 +396,30 @@
             "session": { "$ref": "#/$defs/label" },
             "at_text": { "type": "string", "minLength": 1 },
             "as": { "$ref": "#/$defs/label" }
+          }
+        },
+        "check_usage": {
+          "description": "Checks the session's context usage from Core (T27): its categories add up to tokens (always), a field subset, and categories that must be above zero.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "fields": { "type": "object" },
+            "positive": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "systemPrompt",
+                  "tools",
+                  "mcpTools",
+                  "memory",
+                  "skills",
+                  "conversation",
+                  "toolResults",
+                  "unclassified"
+                ]
+              }
+            }
           }
         },
         "check_harness": {

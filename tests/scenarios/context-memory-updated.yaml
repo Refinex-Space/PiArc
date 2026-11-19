@@ -29,7 +29,7 @@ expect:
           - { type: text, cache_control: { type: ephemeral } }
     - index: 1
       same_system_as: 0
-      user_message_contains: ['[PiArc memory]', Revised project instruction.]
+      user_message_contains: ['[PiArc reminder]', Revised project instruction.]
       occurrences: { Original project instruction.: 1, Revised project instruction.: 1 }
       contains: [First answer.]
     - { index: 2, same_system_as: 0, occurrences: { Revised project instruction.: 1 } }

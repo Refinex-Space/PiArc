@@ -31,7 +31,7 @@ expect:
     - { index: 0, not_contains: [Library directory policy., Utility directory policy.] }
     - index: 1
       same_system_as: 0
-      user_message_contains: ['[PiArc memory]', Utility directory policy.]
+      user_message_contains: ['[PiArc reminder]', Utility directory policy.]
       occurrences: { Library directory policy.: 1, Utility directory policy.: 1 }
     - index: 2
       same_system_as: 0

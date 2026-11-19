@@ -1,0 +1,35 @@
+id: ctx-compact-window-cap
+description: The user's automatic compaction window (autoCompactWindow 100,000) caps a 1,000,000-token model window, so the threshold is 100,000 − 4,096 − 13,000 = 82,904 tokens; 82,903 does not compact and 82,904 does, and the context usage is measured against the capped window (T27).
+capabilities: [CAP-CTX-COMPACT-001]
+workspace:
+  trusted: true
+  files:
+    .pi/settings.json: '{"compaction":{"keepRecentTokens":1}}'
+    .piarc/settings.json: '{"autoCompactWindow": 100000}'
+providers:
+  main:
+    wire: openai
+    context_window: 1000000
+    max_tokens: 4096
+    steps:
+      - { text: 'First answer.', usage: { input_tokens: 82903 } }
+      - { text: 'Second answer.', usage: { input_tokens: 82904 } }
+      - { text: 'Summary of both answers.' }
+actions:
+  - prompt: { text: 'First question.', turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - check_usage:
+      fields:
+        { tokens: 82903, contextWindow: 100000, autoCompactThreshold: 82904, source: provider }
+  - prompt: { text: 'Second question.', turn: two }
+  - wait: { method: turn/completed, turn: two }
+  - check_usage: { fields: { contextWindow: 100000, source: estimate, autoCompact: 'on' } }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - { index: 1, not_contains: ['You write handover notes for a coding session.'] }
+    - { index: 2, contains: ['You write handover notes for a coding session.', '## Task goal'] }
+  events:
+    - method: item/completed
+      turn: two
+      params: { item: { type: contextCompaction, status: completed, reason: threshold } }

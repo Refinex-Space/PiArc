@@ -33,5 +33,5 @@ expect:
     - { index: 1, same_system_as: 0, not_contains: [Restored memory revision.] }
     - index: 2
       same_system_as: 0
-      user_message_contains: ['[PiArc memory]', Restored memory revision.]
+      user_message_contains: ['[PiArc reminder]', Restored memory revision.]
       occurrences: { Opening memory revision.: 1, Restored memory revision.: 1 }

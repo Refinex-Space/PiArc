@@ -692,19 +692,43 @@ capabilities:
     milestone: M2
     refs: [ARCH-6.6.3]
     task: T27
-    status: planned
+    status: active
   - id: CAP-CTX-COMPACT-001
     title: '自动压缩与手动 `/compact`，熔断与压缩后恢复关键上下文'
     milestone: M2
     refs: [FR-CX-03, ARCH-6.6.4, ARCH-6.15]
     task: T27
-    status: planned
+    status: active
   - id: CAP-CTX-USAGE-001
     title: '上下文用量与分类明细'
     milestone: M2
     refs: [FR-CX-04, ARCH-6.6.5]
     task: T27
-    status: planned
+    status: active
+  - id: CAP-CTX-COMPACT-002
+    title: '连续 3 次自动压缩失败或无效后停止自动压缩并提示，手动 `/compact` 仍可用'
+    milestone: M2
+    refs: [FR-CX-03, ARCH-6.6.4, ARCH-6.15]
+    task: T27
+    status: active
+  - id: CAP-CTX-COMPACT-003
+    title: '压缩后按上限重注入 memory、计划、任务清单、skill 正文与最近文件'
+    milestone: M2
+    refs: [FR-CX-03, ARCH-6.6.4, ARCH-6.15]
+    task: T27
+    status: active
+  - id: CAP-CTX-CHANGED-001
+    title: '读过的文件被外部修改后，下一次模型请求带修改提醒'
+    milestone: M2
+    refs: [ARCH-6.6.3]
+    task: T27
+    status: active
+  - id: CAP-CTX-CACHE-001
+    title: 'reminder 追加与压缩前后保持 Anthropic 缓存断点布局'
+    milestone: M2
+    refs: [ARCH-6.6.1, ARCH-6.15]
+    task: T27
+    status: active
   - id: CAP-MEM-AUTO-001
     title: '自动记忆（跨会话笔记）'
     milestone: M5

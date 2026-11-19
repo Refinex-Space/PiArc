@@ -14,6 +14,7 @@
 //! section 12.
 
 pub mod checks;
+pub mod context_spec;
 mod fixtures;
 pub mod format;
 pub mod gate;

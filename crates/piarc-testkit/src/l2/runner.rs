@@ -27,7 +27,7 @@ use super::fixtures::{
     claude_changes, claude_snapshot, command_env, prepare_workspace, resolve, write_file,
     write_json,
 };
-use super::format::{Action, EndpointSetup, InputAction, ScenarioSpec, Wire};
+use super::format::{Action, EndpointSetup, InputAction, ProviderSpec, ScenarioSpec, Wire};
 use super::gate::Gate;
 use super::matcher::subset_mismatch;
 use super::matcher::{ObservedEvent, check_events, compact, describe, matches, without_noise};
@@ -244,13 +244,7 @@ impl Env {
             if endpoint.configure_as.is_none() {
                 providers.insert(
                     pi_provider(name),
-                    pi_provider_entry(
-                        &mock,
-                        endpoint.wire,
-                        endpoint.vision,
-                        endpoint.reasoning,
-                        &id,
-                    ),
+                    pi_provider_entry(&mock, endpoint, &id),
                 );
             }
             mocks.insert(name.clone(), mock);
@@ -323,31 +317,27 @@ fn pi_provider(name: &str) -> String {
     format!("mock-{name}")
 }
 
-fn pi_provider_entry(
-    mock: &MockProvider,
-    wire: Wire,
-    vision: bool,
-    reasoning: bool,
-    scenario: &str,
-) -> Value {
-    let (base_url, api) = match wire {
+fn pi_provider_entry(mock: &MockProvider, endpoint: &ProviderSpec, scenario: &str) -> Value {
+    let (base_url, api) = match endpoint.wire {
         Wire::Anthropic => (mock.anthropic_base_url(), "anthropic-messages"),
         Wire::Openai => (mock.openai_base_url(), "openai-completions"),
     };
     // Header selection keeps the prompts free of scenario markers.
     let mut headers = serde_json::Map::new();
     headers.insert(crate::server::SCENARIO_HEADER.to_owned(), json!(scenario));
-    let input = if vision {
+    let input = if endpoint.vision {
         json!(["text", "image"])
     } else {
         json!(["text"])
     };
+    let reasoning = endpoint.reasoning;
     json!({
         "baseUrl": base_url, "api": api, "apiKey": "piarc-no-key",
         "models": [{
             "id": MOCK_MODEL, "name": MOCK_MODEL, "reasoning": reasoning, "input": input,
-            "compat": if reasoning && wire==Wire::Openai {json!({"supportsReasoningEffort":true})} else {json!({})},
-            "contextWindow": 200_000, "maxTokens": 4096,
+            "compat": if reasoning && endpoint.wire == Wire::Openai {json!({"supportsReasoningEffort":true})} else {json!({})},
+            "contextWindow": endpoint.context_window.unwrap_or(200_000),
+            "maxTokens": endpoint.max_tokens.unwrap_or(4096),
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
             "headers": headers
         }]
@@ -595,7 +585,13 @@ impl Driver<'_> {
             Action::Prompt(input) => self.input(input, Op::Prompt).await,
             Action::Steer(input) => self.input(input, Op::Steer).await,
             Action::FollowUp(input) => self.input(input, Op::FollowUp).await,
-            Action::Compact { session } => self.compact_session(session.as_deref()).await,
+            Action::Compact {
+                session,
+                instructions,
+            } => {
+                self.compact_session(session.as_deref(), instructions.clone())
+                    .await
+            }
             Action::QueueEdit {
                 session,
                 item,
@@ -668,11 +664,16 @@ impl Driver<'_> {
             }
             Action::Fork(fork) => self.fork(fork).await,
             Action::CheckHarness(check) => self.check_harness(check).await,
+            Action::CheckUsage(check) => self.check_usage(check).await,
         }
     }
 
-    async fn compact_session(&mut self, session: Option<&str>) -> Result<(), String> {
-        let accepted = self.op(session, Op::Compact(None)).await?;
+    async fn compact_session(
+        &mut self,
+        session: Option<&str>,
+        instructions: Option<String>,
+    ) -> Result<(), String> {
+        let accepted = self.op(session, Op::Compact(instructions)).await?;
         let turn = accepted["turnId"]
             .as_str()
             .ok_or_else(|| format!("no compaction turn was started: {accepted}"))?;

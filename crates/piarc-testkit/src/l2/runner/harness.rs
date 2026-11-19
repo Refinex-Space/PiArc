@@ -4,7 +4,10 @@ use piarc_protocol::harness::{PlanComment, QuestionAnswer};
 use piarc_protocol::policy::ApprovalRequest;
 use serde_json::Value;
 
+use piarc_core::sessions::Op;
+
 use super::{Driver, call};
+use crate::l2::context_spec::CheckUsageAction;
 use crate::l2::format::Approval;
 use crate::l2::harness_spec::{CheckHarnessAction, ForkAction};
 use crate::l2::matcher::subset_mismatch;
@@ -43,6 +46,35 @@ impl Driver<'_> {
             .ok_or_else(|| format!("fork: no session id in {opened}"))?;
         self.sessions.insert(fork.label.clone(), forked.to_owned());
         Ok(())
+    }
+
+    /// T27: the session's context usage from Core. The categories always add up to `tokens`.
+    pub(super) async fn check_usage(&self, check: &CheckUsageAction) -> Result<(), String> {
+        let id = self.session_id(check.session.as_deref())?;
+        let usage = call(
+            |done| self.core.session_op(id, Op::ContextUsage, done),
+            "reading the context usage",
+        )
+        .await?;
+        let categories = usage["categories"]
+            .as_object()
+            .ok_or_else(|| format!("context usage without categories: {usage}"))?;
+        let sum: u64 = categories.values().filter_map(Value::as_u64).sum();
+        if Some(sum) != usage["tokens"].as_u64() {
+            return Err(format!(
+                "the categories add up to {sum}, the usage says {}: {usage}",
+                usage["tokens"]
+            ));
+        }
+        for name in &check.positive {
+            if categories.get(name).and_then(Value::as_u64).unwrap_or(0) == 0 {
+                return Err(format!("category {name} is not above zero: {usage}"));
+            }
+        }
+        match &check.fields {
+            Some(fields) => subset_mismatch(fields, &usage, "context usage").map_or(Ok(()), Err),
+            None => Ok(()),
+        }
     }
 
     pub(super) async fn check_harness(&self, check: &CheckHarnessAction) -> Result<(), String> {

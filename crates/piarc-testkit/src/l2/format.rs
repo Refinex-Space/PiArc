@@ -177,6 +177,12 @@ pub struct ProviderSpec {
     /// The endpoint's model takes images as input.
     #[serde(default)]
     pub vision: bool,
+    /// The model's context window (T27); 200,000 when absent.
+    #[serde(default)]
+    pub context_window: Option<u64>,
+    /// The model's largest output (T27); 4,096 when absent.
+    #[serde(default)]
+    pub max_tokens: Option<u64>,
     /// One response per request.
     pub steps: Vec<Step>,
 }
@@ -277,6 +283,9 @@ pub enum Action {
         /// The session; the only one when absent.
         #[serde(default)]
         session: Option<String>,
+        /// What the summary should focus on (`/compact <focus>`, T27).
+        #[serde(default)]
+        instructions: Option<String>,
     },
     /// Edits a queue item.
     QueueEdit {
@@ -369,6 +378,8 @@ pub enum Action {
     Fork(super::harness_spec::ForkAction),
     /// Checks a session's plan and task list (T26).
     CheckHarness(super::harness_spec::CheckHarnessAction),
+    /// Checks a session's context usage (T27).
+    CheckUsage(super::context_spec::CheckUsageAction),
 }
 
 impl Action {
@@ -397,6 +408,7 @@ impl Action {
             Self::Resume { .. } => "resume",
             Self::Fork(_) => "fork",
             Self::CheckHarness(_) => "check_harness",
+            Self::CheckUsage(_) => "check_usage",
         }
     }
 
@@ -408,7 +420,7 @@ impl Action {
             Self::QueueEdit { session, .. }
             | Self::QueueDelete { session, .. }
             | Self::QueueReorder { session, .. }
-            | Self::Compact { session }
+            | Self::Compact { session, .. }
             | Self::SetModel { session, .. }
             | Self::SetEffort { session, .. }
             | Self::SetMode { session, .. }
@@ -420,6 +432,7 @@ impl Action {
             Self::Wait(wait) => Some(&wait.session),
             Self::Fork(fork) => Some(&fork.session),
             Self::CheckHarness(check) => Some(&check.session),
+            Self::CheckUsage(check) => Some(&check.session),
             Self::CheckTrust { .. } | Self::WriteFile { .. } | Self::RestartCore {} => None,
         }
     }
@@ -960,7 +973,8 @@ fn check_actions(spec: &ScenarioSpec, problems: &mut Vec<String>) {
             | Action::Abort { .. }
             | Action::RestartCore {}
             | Action::Resume { .. }
-            | Action::CheckHarness(_) => {}
+            | Action::CheckHarness(_)
+            | Action::CheckUsage(_) => {}
             Action::Fork(fork) => {
                 if !spec.sessions().get(&fork.label).is_some_and(|s| s.deferred) {
                     problems.push(format!(

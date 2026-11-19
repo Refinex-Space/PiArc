@@ -52,6 +52,6 @@ expect:
         - '<skills>'
         - '<mcp_servers>'
         - created-after-opening.txt
-      user_message_contains: ['[PiArc memory]', New instruction before the first prompt.]
+      user_message_contains: ['[PiArc reminder]', New instruction before the first prompt.]
       occurrences:
         { Treat unreviewed changes as provisional.: 1, New instruction before the first prompt.: 1 }
