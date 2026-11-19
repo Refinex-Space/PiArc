@@ -1,4 +1,5 @@
-// The permission settings page (T23): rule lists by source, rule edits, and the audit view.
+// The permission settings page (T23): rule lists by source, rule edits, and the audit view;
+// the configuration diagnostics page (T24) reads the same settings files.
 // A new or changed allow rule is shown in a native confirmation before Core saves it
 // (architecture section 10.3); the page cannot skip it. Core checks the syntax and writes only
 // PiArc's own files.
@@ -21,7 +22,11 @@ import type { CoreRuntime } from './native/piarc-core.js';
 /** The part of Core these commands use. */
 export type PermissionCore = Pick<
   CoreRuntime,
-  'permissionRules' | 'checkPermissionRule' | 'updatePermissionRule' | 'auditEvents'
+  | 'permissionRules'
+  | 'checkPermissionRule'
+  | 'updatePermissionRule'
+  | 'auditEvents'
+  | 'configDiagnostics'
 >;
 
 const MAX_RULE = 4096;
@@ -107,6 +112,9 @@ export function registerPermissionHandlers(
 ): void {
   registerHandler(IPC_CHANNELS.permissionRules, (_event, [dir]) =>
     core.permissionRules(dir === null ? null : workspace(dir)),
+  );
+  registerHandler(IPC_CHANNELS.configDiagnostics, (_event, [dir]) =>
+    core.configDiagnostics(dir === null ? null : workspace(dir)),
   );
   registerHandler(IPC_CHANNELS.permissionCheck, (_event, [text, list]) =>
     core.checkPermissionRule(rule(text, 'rule'), behavior(list)),

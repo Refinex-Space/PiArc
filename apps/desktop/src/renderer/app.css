@@ -1101,6 +1101,78 @@ textarea.input {
 .permission-add {
   align-self: flex-start;
 }
+.diagnostics-page,
+.diagnostics-file {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-2);
+}
+.diagnostics-page {
+  gap: var(--piarc-space-4);
+  min-width: 0;
+}
+.diagnostics-page select {
+  max-width: 100%;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+.diagnostics-status {
+  margin-inline-start: var(--piarc-space-2);
+  padding-inline: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  font-size: var(--piarc-font-size-caption);
+  font-weight: var(--piarc-font-weight-medium);
+  background: var(--piarc-accent-subtle);
+}
+.diagnostics-status.is-invalid,
+.diagnostics-status.is-stale {
+  background: var(--piarc-state-danger-subtle);
+  color: var(--piarc-text-danger);
+}
+.diagnostics-status.is-untrusted {
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+}
+.diagnostics-status.is-missing {
+  background: transparent;
+  color: var(--piarc-text-secondary);
+}
+.diagnostics-details > summary {
+  cursor: pointer;
+  color: var(--piarc-text-secondary);
+}
+.diagnostics-details h4 {
+  margin: var(--piarc-space-2) 0 var(--piarc-space-1);
+  font-size: var(--piarc-font-size-small);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+.diagnostics-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--piarc-font-size-small);
+}
+.diagnostics-table th,
+.diagnostics-table td {
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+  text-align: start;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.diagnostics-table th {
+  color: var(--piarc-text-secondary);
+  font-weight: var(--piarc-font-weight-medium);
+  white-space: nowrap;
+}
+.diagnostics-code {
+  font-family: var(--piarc-font-mono);
+}
+.diagnostics-ignored,
+.diagnostics-issues {
+  margin: 0;
+  padding-inline-start: var(--piarc-space-4);
+  font-size: var(--piarc-font-size-small);
+}
 .permission-filter-label {
   color: var(--piarc-text-secondary);
   font-size: var(--piarc-font-size-small);

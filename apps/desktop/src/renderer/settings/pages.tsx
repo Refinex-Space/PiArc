@@ -23,6 +23,7 @@ import {
   type PreferenceChange,
 } from '../../shared/preferences.js';
 import { useApp } from '../app/app-context.js';
+import { ConfigDiagnosticsPage } from './ConfigDiagnosticsPage.js';
 import { PermissionsPage } from './PermissionsPage.js';
 import { ProvidersPage } from './ProvidersPage.js';
 import { registerSettingsPage } from './registry.js';
@@ -348,6 +349,12 @@ export function registerBuiltInSettingsPages(): void {
     title: 'settings.permissions',
     order: 30,
     component: PermissionsPage,
+  });
+  registerSettingsPage({
+    id: 'diagnostics',
+    title: 'settings.configDiagnostics',
+    order: 80,
+    component: ConfigDiagnosticsPage,
   });
   registerSettingsPage({
     id: 'shortcuts',

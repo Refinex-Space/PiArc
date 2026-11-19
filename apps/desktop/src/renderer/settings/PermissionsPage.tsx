@@ -115,7 +115,10 @@ function sourceTitle(id: string): MessageId | undefined {
     case 'session':
     case 'projectLocal':
     case 'project':
+    case 'claudeProjectLocal':
+    case 'claudeProject':
     case 'user':
+    case 'claudeUser':
       return `permissions.source.${id}`;
     default:
       return undefined;

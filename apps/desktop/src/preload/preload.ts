@@ -311,6 +311,10 @@ const api: PiarcApi = {
     ipcRenderer.invoke(IPC_CHANNELS.permissionUpdate, change).then((v: unknown) => expectString(v)),
   auditEvents: (query) =>
     ipcRenderer.invoke(IPC_CHANNELS.auditEvents, query).then((v: unknown) => expectString(v)),
+  configDiagnostics: (workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.configDiagnostics, workspace)
+      .then((v: unknown) => expectString(v)),
   providerSettings: () =>
     ipcRenderer.invoke(IPC_CHANNELS.providerSettings).then((v: unknown) => expectString(v)),
   saveProvider: (config, secret) =>

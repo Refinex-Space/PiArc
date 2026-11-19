@@ -73,6 +73,7 @@ export const IPC_CHANNELS = {
   permissionCheck: 'piarc:permissions.check',
   permissionUpdate: 'piarc:permissions.update',
   auditEvents: 'piarc:permissions.audit',
+  configDiagnostics: 'piarc:config.diagnostics',
 } as const;
 
 /** The list a permission rule is in. */
@@ -381,6 +382,11 @@ export interface PiarcApi {
   updatePermissionRule(change: PermissionRuleChange): Promise<string>;
   /** Permission audit events, newest first (JSON). */
   auditEvents(query: AuditQuery): Promise<string>;
+  /**
+   * The configuration diagnostics of a workspace (JSON), the most recent one when null:
+   * every settings file with its load state and its applied, overridden and ignored keys.
+   */
+  configDiagnostics(workspace: string | null): Promise<string>;
   answerApproval(answer: ApprovalAnswer): Promise<string>;
   /** Compacts the conversation as a turn of its own (`/compact`); resolves with `{ turnId }`. */
   compact(id: string): Promise<string>;
