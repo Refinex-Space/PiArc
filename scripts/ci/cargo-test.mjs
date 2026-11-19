@@ -6,16 +6,20 @@
 // measured a permission decision p50 of 0.84 ms and 1.44 ms, every kind of call slower alike,
 // while the second commit was faster locally.
 //
+// A timing test runs as its acceptance measured it: the permission budget (architecture
+// chapter 11) was accepted on the release build (T23-A13), the build users run; the debug
+// build is 1.7 times slower here and CI's macOS runner about twice as slow again.
+//
 // Both parts run even after a failure, so one run shows every problem. A timing test keeps
 // its assertion and has no skip condition; plain `cargo test` still runs it with the others.
 // Usage: node scripts/ci/cargo-test.mjs   (exit code 1 when a part failed)
 import { isMain, run } from '../lib/repo.mjs';
 
-/** Timing tests run alone: package, test target and the test's full name. */
+/** Timing tests run alone: package, build and test target, and the test's full name. */
 export const TIMED = [
   {
     pkg: 'piarc-core',
-    target: ['--lib'],
+    target: ['--release', '--lib'],
     name: 'tool_io::policy::tests::automatic_decision_latency',
   },
 ];
