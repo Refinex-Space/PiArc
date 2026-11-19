@@ -135,10 +135,35 @@ pub fn detect(probe: &Probe<'_>, git_bash: Option<&Path>) -> Shells {
     }
 }
 
-/// `bash -c <command>`.
+/// The variable that carries a command to Git Bash on Windows (see [`bash_invocation`]).
+pub const COMMAND_VARIABLE: &str = "PIARC_COMMAND";
+
+/// How bash runs `command`: its arguments, and the variables to add to its environment.
+///
+/// Unix passes the command as `-c`'s argument. Git Bash's runtime parses its Windows command
+/// line itself and cut a 12,000-character argument with quotes short (CI), so on Windows the
+/// command travels in [`COMMAND_VARIABLE`], which the shell unsets before running it: the
+/// command and its children do not see it. Output, exit codes and runtime errors are those of
+/// `-c`; a syntax error reads `eval: line N` and may exit 1 instead of 2.
 #[must_use]
-pub fn bash_args(command: &str) -> Vec<OsString> {
-    vec![OsString::from("-c"), OsString::from(command)]
+pub fn bash_invocation(command: &str) -> (Vec<OsString>, Vec<(OsString, OsString)>) {
+    if cfg!(windows) {
+        carried_invocation(command)
+    } else {
+        (
+            vec![OsString::from("-c"), OsString::from(command)],
+            Vec::new(),
+        )
+    }
+}
+
+/// The Windows form of [`bash_invocation`], whatever the platform (tested with Unix bash).
+fn carried_invocation(command: &str) -> (Vec<OsString>, Vec<(OsString, OsString)>) {
+    let run = format!("eval \"unset {COMMAND_VARIABLE}; ${COMMAND_VARIABLE}\"");
+    (
+        vec![OsString::from("-c"), OsString::from(run)],
+        vec![(OsString::from(COMMAND_VARIABLE), OsString::from(command))],
+    )
 }
 
 /// Sets the console output to UTF-8 before the command (Pi's prefix).
@@ -368,5 +393,46 @@ mod tests {
         assert_eq!(msys_to_windows("/tmp"), None);
         assert_eq!(msys_to_windows("/usr/bin"), None);
         assert_eq!(msys_to_windows("relative"), None);
+    }
+
+    /// The Windows form run by Unix bash: the whole command, and the output, exit code and
+    /// runtime errors of plain `-c`; no trace of the carrying variable for the command or its
+    /// children. (A syntax error reads `eval: line N` and may exit 1 instead of 2.)
+    #[cfg(unix)]
+    #[test]
+    fn a_command_carried_in_the_environment_runs_as_with_dash_c() {
+        let run = |args: Vec<OsString>, carried: Vec<(OsString, OsString)>| {
+            std::process::Command::new("/bin/bash")
+                .args(args)
+                .env_clear()
+                .env("PATH", "/usr/bin:/bin")
+                .envs(carried)
+                .output()
+                .expect("bash runs")
+        };
+        let carried = |command: &str| {
+            let (args, env) = carried_invocation(command);
+            run(args, env)
+        };
+        let direct = |command: &str| run(vec!["-c".into(), command.into()], Vec::new());
+        let long = "it's [x] (y) {z} \"q\" $HOME ".repeat(800);
+        let printed = carried(&format!("printf '%s' {}", shell_quote(&long)));
+        assert_eq!(String::from_utf8_lossy(&printed.stdout), long);
+        let hidden = carried(&format!(
+            "echo \"[${{{COMMAND_VARIABLE}:-}}]\"; env | grep -c {COMMAND_VARIABLE}"
+        ));
+        assert_eq!(String::from_utf8_lossy(&hidden.stdout), "[]\n0\n");
+        for command in ["true\nexit 7", "echo a\nno_such_command_for_piarc\necho b"] {
+            let (via, plain) = (carried(command), direct(command));
+            assert_eq!(via.status.code(), plain.status.code(), "{command}");
+            assert_eq!(via.stdout, plain.stdout, "{command}");
+            assert_eq!(via.stderr, plain.stderr, "{command}");
+        }
+    }
+
+    /// `text` as one single-quoted shell word.
+    #[cfg(unix)]
+    fn shell_quote(text: &str) -> String {
+        format!("'{}'", text.replace('\'', "'\\''"))
     }
 }

@@ -32,7 +32,7 @@ Core 层的集成测试在 `crates/piarc-core/tests/exec_commands.rs`（cwd、�
 
 ## Windows 差异
 
-- Git Bash 探测顺序见 `shells.rs` 模块文档；不用 `PATH` 上的 `bash.exe`（WSL）。PowerShell 参数沿用 Pi 的 UTF-8 前缀与 5.1 退出码后缀（MIT，`third-party/sources.json` 已登记），前缀占一行，错误位置的行号因此加 1。
+- Git Bash 探测顺序见 `shells.rs` 模块文档；不用 `PATH` 上的 `bash.exe`（WSL）。启动 bash 一律用 `shells::bash_invocation`：Windows 上命令放在环境变量 `PIARC_COMMAND` 里，`-c` 只带一段先 `unset` 再 `eval` 的短脚本（输出、退出码、运行期报错与 `-c` 相同，语法错误报 `eval: line N`、退出码可能是 1 而不是 2）。Git Bash 的运行时自己解析 Windows 命令行，12,000 字符、带引号的 `-c` 参数被截断过（CI，T25 的 hook 测试与 `exec_commands` 的长命令用例）。PowerShell 参数沿用 Pi 的 UTF-8 前缀与 5.1 退出码后缀（MIT，`third-party/sources.json` 已登记），前缀占一行，错误位置的行号因此加 1。
 - Windows 没有登录 shell：命令继承准入清单筛选后的进程环境（Core 加 `LANG=C.UTF-8` 给没有 locale 的 Git Bash）。`ProcessTreeSpawner` 的 `terminate` 与 `kill` 相同（Job 没有温和终止），退出码为 1，没有 signal。
 - 两个启动器在 Windows 上都带 `CREATE_NO_WINDOW`（`spawner::command`，`ProcessTreeSpawner` 再与 `CREATE_SUSPENDED` 合并）：PiArc 是图形界面进程，不加时 git、bash.exe、PowerShell 与 Agent Host 的 node 各自弹出控制台窗口，默认终端为 Windows Terminal 时还会报 `0x800700e8`（W1）。测试 `children_run_without_a_console_window` 先 `FreeConsole` 再启动子进程，模拟图形界面父进程。
 - Git Bash 的 `$!` 是 MSYS 的 pid；Windows pid 在 `/proc/<pid>/winpid`（`termination_tests.rs` 的 `LAST_PID`）。

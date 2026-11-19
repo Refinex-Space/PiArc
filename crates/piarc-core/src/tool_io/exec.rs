@@ -32,7 +32,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use piarc_exec::env::{login_shell_env, strip_internal};
-use piarc_exec::shells::{Probe, bash_args, detect, msys_to_windows, powershell_args};
+use piarc_exec::shells::{Probe, bash_invocation, detect, msys_to_windows, powershell_args};
 use piarc_exec::{
     CapturedOutput, CommandExit, CommandRunner, CommandSpec, CwdProbe, ExecLimits, Launcher,
     OutputCapture, OutputChunk, ProcessTreeSpawner, Shells, Stream, interpret,
@@ -232,11 +232,15 @@ impl Exec {
     ) -> Result<ExecRunResult, ErrorObject> {
         let kind = p.shell.unwrap_or(ExecShell::Bash);
         let program = self.program(kind)?;
-        let (env, probe) = self
+        let (mut env, probe) = self
             .command_env(session, &p, kind, &launch, wrap.env)
             .await?;
         let args = match kind {
-            ExecShell::Bash => bash_args(&p.command),
+            ExecShell::Bash => {
+                let (args, carried) = bash_invocation(&p.command);
+                env.extend(carried);
+                args
+            }
             ExecShell::Powershell => powershell_args(&program, &p.command),
         };
         let timeout = self.limits.timeout(p.timeout_ms.map(Duration::from_millis));

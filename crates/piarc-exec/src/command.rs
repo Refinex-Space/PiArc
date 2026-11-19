@@ -388,11 +388,14 @@ mod tests {
     }
 
     pub(crate) fn spec(command: &str) -> CommandSpec {
+        let (args, carried) = crate::shells::bash_invocation(command);
+        let mut env = env();
+        env.extend(carried);
         CommandSpec {
             program: bash(),
-            args: crate::shells::bash_args(command),
+            args,
             cwd: std::env::temp_dir(),
-            env: env(),
+            env,
             launcher: None,
             timeout: None,
             kill_grace: Duration::from_secs(2),

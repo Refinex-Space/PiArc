@@ -275,6 +275,20 @@ async fn exit_codes_are_read_by_what_they_mean() {
     assert_eq!(piped["outcome"], "failure");
 }
 
+/// A command of about 21,000 characters with quotes and brackets reaches bash whole. Git
+/// Bash parses its Windows command line itself and cut a 12,000-character `-c` argument short
+/// (T25 hook, CI), so the command does not travel on the command line there.
+#[tokio::test]
+async fn a_long_command_with_quotes_and_brackets_runs_whole() {
+    let f = Fixture::new("long", CommandEnv::Fixed(base_env()));
+    let payload = format!("{{\"text\": \"{}\"}}", "quoted [x] (y) ".repeat(1400));
+    let command = format!("printf '%s' '{payload}'; echo \" [${{PIARC_COMMAND:-unset}}]\"");
+    assert!(command.len() > 20_000);
+    let result = f.bash(&command).await;
+    assert_eq!(result["exitCode"], 0, "{}", head(&result));
+    assert_eq!(head(&result).trim_end(), format!("{payload} [unset]"));
+}
+
 #[tokio::test]
 async fn the_environment_has_no_internal_variables() {
     let mut env = base_env();

@@ -68,7 +68,10 @@ impl Launcher for CoreLauncher {
                     "Git Bash was not found; set \"shell\": \"powershell\" or install Git for Windows"
                         .to_owned()
                 })?;
-                Ok(spec(bash, piarc_exec::shells::bash_args(&handler.command)))
+                let (args, carried) = piarc_exec::shells::bash_invocation(&handler.command);
+                let mut spawn = spec(bash, args);
+                spawn.env.extend(carried);
+                Ok(spawn)
             }
             Shell::PowerShell => {
                 let shell = self
