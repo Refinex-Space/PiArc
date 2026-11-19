@@ -1481,7 +1481,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | 里程碑 | 目标 | 退出标准 |
 |---|---|---|
 | **M0 技术验证**（3–5 周） | 在两个平台上验证高风险假设 | 每个 spike 的结论（通过 / 失败 / 有条件通过）记录在 `docs/spikes/`，两个平台分别给结论；失败项触发对应 ADR 复审。**已完成（R1，2026-11-16）：有条件进入 M1**，见 [M0 总结](../spikes/M0-summary.md) |
-| **M1 可行走骨架** | 单工作区、多会话列表、流式对话；Read/Write/Edit/Bash（Windows 另有 PowerShell）/Glob/Grep 经 Core 执行；Manual 与 Accept edits 模式的基础审批；模型与凭据设置（凭据保险箱）；会话持久化与恢复；transcript P0 行类型 | 能用至少 2 家服务商完成"读代码 → 改代码 → 跑测试"的完整任务；L2 场景 ≥ 20 个通过。**macOS 已达标（R2，2026-11-19）**：两种协议的打包应用工作流通过，真实百炼 qwen-flash 通过，L2 61 个通过。Windows 实机在 W1 验收，见 [R2 评审](../reviews/R2-findings.md)。 |
+| **M1 可行走骨架** | 单工作区、多会话列表、流式对话；Read/Write/Edit/Bash（Windows 另有 PowerShell）/Glob/Grep 经 Core 执行；Manual 与 Accept edits 模式的基础审批；模型与凭据设置（凭据保险箱）；会话持久化与恢复；transcript P0 行类型 | 能用至少 2 家服务商完成"读代码 → 改代码 → 跑测试"的完整任务；L2 场景 ≥ 20 个通过。**macOS 已达标（R2，2026-11-19）**：两种协议的打包应用工作流通过，真实百炼 qwen-flash 通过，L2 61 个通过。**Windows 已达标（W1，2026-11-19）**：两种协议的工作流在两种形态通过，L2 60 个通过，UNC 共享未能实机验证，见 [W1 报告](../reviews/W1-windows-m1-parity.md)。 |
 | **M2 Harness 核心** | 完整权限规则与 Bash 分析；plan 模式；任务清单；AskUserQuestion；hooks（M2 事件集，command 类型）；checkpoint 与 rewind；压缩与上下文用量；WebFetch；Changes 面板；memory 文件兼容 | 第 6 章 M2 能力全部有场景覆盖；L3 对齐在权限与 hooks 上无未解释差异 |
 | **M3 多会话与生态** | 子 agent；后台任务与 Monitor；终端面板（libghostty-vt）；worktree；MCP 共享连接池；skills 与命令；WebSearch；ToolSearch；hooks 的 http/prompt 类型 | 3 个并行会话 + 子 agent 场景满足第 11 章内存预算 |
 | **M4 安全与打磨** | macOS 沙箱；Windows 隔离方案评估；插件；NotebookEdit；可操作的系统通知；配置诊断；无障碍；本地化；性能预算全部进 CI | 安全威胁表逐条有测试；性能预算全部达标 |
@@ -1540,7 +1540,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
-| 2.29 | 2026-11-19 | W1（ADR-0037、0038）：第 11 章无需用户参与的权限裁决（Windows p95 ≤ 10 ms）与小文件 AHP 往返（Windows p95 ≤ 15 ms）按平台给预算，填入 Windows 实测；6.11 写明 Git Bash 用 `pwd -W` 报告最终目录。 |
+| 2.29 | 2026-11-19 | W1（ADR-0037、0038）：第 11 章无需用户参与的权限裁决（Windows p95 ≤ 10 ms）与小文件 AHP 往返（Windows p95 ≤ 15 ms）按平台给预算，填入 Windows 实测；6.11 写明 Git Bash 用 `pwd -W` 报告最终目录；15.2 路径一行写明保留名的处理；第 16 章记录 M1 的 Windows 结论。 |
 | 2.28 | 2026-11-19 | R2 记录 macOS 阶段门；更新 6.0 的 M1 能力、读取成功登记、文件授权与目录句柄、命令环境准入、信任与删除确认、索引 schema v4（ADR-0034–0036）。 |
 | 2.27 | 2026-11-19 | T22（ADR-0033）补充提示词冻结与恢复、memory 顺序、导入审批与消息送达、AHP 与用户级文件位置 |
 | 2.26 | 2026-11-19 | T21（ADR-0032）补充服务商配置投影、凭据更新、模型目录与会话选择 |

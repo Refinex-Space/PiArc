@@ -111,7 +111,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 |---|---|---|---|---|
 | 0 工程基座 | 脚手架、质量门禁、工程规范、协议与契约测试 | T01–T02 | — | 已完成 |
 | 1 M0 技术验证 | Electron 安全基线、NAPI 事件通道、mock provider、Agent Host 多会话与 AHP、Operations 委托、凭据保险箱、transcript 渲染、终端、沙箱、打包与首次运行；S1–S10 两个平台的结论 | T03–T12、W0 | R1 | 已完成（有条件进入 M1） |
-| 2 M1 可行走骨架 | 存储与信任、会话编排与投影、L2 场景、文件工具与 Bash、客户端外壳、transcript 与 composer、基础审批、模型与凭据、system prompt 与 memory | T13–T22 | R2 | 已完成（macOS 达标，Windows 留 W1） |
+| 2 M1 可行走骨架 | 存储与信任、会话编排与投影、L2 场景、文件工具与 Bash、客户端外壳、transcript 与 composer、基础审批、模型与凭据、system prompt 与 memory | T13–T22 | R2 | 已完成（macOS 达标；Windows 由 W1 达标，UNC 待验证） |
 | 3 M2 Harness 核心 | 权限规则与 Bash 分析、配置兼容层、hooks、计划模式与任务清单、压缩与用量、检查点与回退、WebFetch 与登录、L3 对齐；Windows 达到 M1 | W1、T23–T30 | R3 | 未开始 |
 | 4 M3 多会话与生态 | 子 agent、后台任务、终端、worktree 与并行会话、MCP、skills 与命令、WebSearch 与 hooks 扩展；Windows 达到 M2 | W2、T31–T38 | R4 | 未开始 |
 | 5 M4 安全与打磨 | 沙箱、插件、配置诊断与用量、NotebookEdit 与通知、无障碍与本地化、性能预算、安全收口；Windows 达到 M3 | W3、T39–T45 | R5 | 未开始 |
@@ -148,7 +148,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T21 | [模型、服务商与凭据设置](tasks/T21-models-providers-and-credentials.md) | 2 | T20 | macOS | high / 高 | 大 | 无 | 已完成 | e5f3b65 |
 | T22 | [System prompt 组装与 memory 文件](tasks/T22-system-prompt-and-memory-files.md) | 2 | T21 | macOS | high / 高 | 中 | 无 | 已完成 | 9843eb5 |
 | R2 | [M1 评审](tasks/R2-m1-review.md) | 2 | T22 | macOS | high / 高 | 中 | 无 | 已完成 | f63ac3d |
-| W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 进行中 | — |
+| W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 部分完成 | b0a510f |
 | T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -309,23 +309,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-**W1 Windows：M1 达标**（Windows 11 专业版 25H2 26200.9974，x64；起点 b654341）
-
-- 起点基线是红的（本机与 CI 运行 44453549786）：verify 的 ESLint（两平台）、Windows `cargo test` 7 项、L4 的 `agent-host.e2e.ts` 等。用户在 W1 会话中决定并入 W1 修复。本机内存紧张（16 GB），第一次基线 verify 被系统终止，用户释放内存后重跑。
-- [x] 准备：win32 x64、Windows 11 专业版 25H2 26200.9974、起点 b654341（A01）。红基线已修：verify 先 tsc 后 ESLint（77ea56c）、memory 测试先关目录句柄（2f21a6c）、S6 探针批准预检（33e3190）；本机另发现并修复 Git Bash 挂载目录的 cwd（d9ee057）与 PATH 中无权访问的条目（09c63c3）。基线 verify 13/15：`cargo test` 卡在权限裁决延迟（Windows p95 3.4–8.9 ms > 2 ms，ADR-0037 提议，等待用户确认），L2 的 4 个本机失败已由上面两项修复
-- [ ] 打包开发构建与 Velopack 安装包（或 CI 产物），安装并首次运行
-- [ ] 完整任务：双协议 r2-workflow，含空格与中文的工作区（A02）；真实服务商需另行同意
-- [ ] L2 本机全量 ≥ 20 通过（A03）；I19 的 fs/stat → fs/read 间隔
-- [x] Git Bash 探测与隐藏后的提示、PowerShell 与 Manual 询问（A04）：新 L4 `w1-windows-shells.e2e.ts` 两种形态 4/4（beb41a4），L2 `exec-windows-shells` 通过
-- [ ] 路径、CRLF、BOM、UTF-16、中文输出、UNC、junction、目录共享删除（A05）：长路径、保留名（修复 017b20b）、junction 与换目录（b75d2bf）、Git Bash 挂载目录 cwd（d9ee057）已完成；UNC 等用户建临时共享
-- [x] 进程树：取消、超时与 tasklist（A06）：`piarc-exec` 终止测试 6/6，8 个 PID 经 `tasklist` 确认不存在（`tmp/evidence/W1/process-tree.log`）
-- [x] 凭据管理器、数据目录、明文扫描、索引迁移（A07）：用户同意后，打包应用以正式方式启动（`tmp/evidence/W1/a07-run.log`）：数据在 `%LOCALAPPDATA%\PiArc`，凭据管理器条目 `master-key.cn.piarc.desktop.credential-vault`，重启后凭据可读，87 个文件无明文；`system_store` 测试条目、凭据与索引用例在 Windows 通过
-- [ ] 输入法：CDP 自动化 + 用户实机（A08）
-- [ ] 通知与任务栏覆盖图标（A09）
-- [x] Mica、标题栏覆盖层、亮暗（A10）：`t18-review` 在 Windows 截取真实窗口（c6cc25f），`tmp/evidence/W1/A10-mica-*.png`
-- [ ] L4 本机全部通过（A11）
-- [ ] R2 平台发现逐条复核；问题修复或登记（A12）
-- [ ] 收尾 verify（A13）、报告 `docs/reviews/W1-windows-m1-parity.md`、acceptance、PLAN
+（无进行中的任务。）
 
 ## 登记事项
 
@@ -357,7 +341,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I22 | T08 | D2（应用标识）尚未落实，`piarc-core::identity::APP_IDENTIFIER` 是占位值 `PiArc.pending-D2`，凭据库服务名 `PiArc.pending-D2.credential-vault` 由它生成。改成正式标识后，用占位标识存过凭据的构建找不到主密钥，保险箱返回 `masterKeyMissing` | 已落地（2026-11-15）：D2 定为域名 `piarc.cn`、应用标识 `cn.piarc.desktop`，`APP_IDENTIFIER` 已替换，T08-A12 通过。占位标识只用于未发布的开发构建，无需迁移；T12 用同一常量设置 bundle id 与 AppUserModelID |
 | I23 | T08 | Agent Host 的 `secrets/lock` 请求超时（桥接默认 30 s）后 Core 才授予的锁无人释放，要等 30 s 租约到期，期间同一 provider 的写入等待；pi-ai 的取消信号只取消排队，同样可能留下这种锁 | 影响限于同一 provider 的写入延迟；R1 评估是否让 Core 在授予前检查请求方是否仍在等待（例如锁请求带截止时间）；R1：与 R1-C9、A5 合并为 I57，交 T21；T21 已落地：截止时间、迟到授予回收与续约 |
 | I24 | T09 | transcript 原型页 `#/transcript-lab` 与合成夹具（`src/renderer/lab/`）随发布构建的渲染包分发，与 I13 的 `#/event-probe` 同类 | T45 与 I13 一起评估在发布构建中剔除测试页 |
-| I25 | T09 | 真实输入法（macOS 简体拼音、日文）与触控板滚动手感需要人工核对，清单见 `docs/spikes/S01-transcript-composer.md` 第 7 节（M1–M10）；自动化部分已用 CDP 合成通过 | 用户核对后把结果告诉智能体补记到 S1 报告；R1 汇总 S1 时检查；R1：macOS composer 的真实输入法与触控板核对交 T19，R2 检查；日文输入法两个平台都未验证（T19、W1）；**T19 用户确认 macOS M1–M10 人工核对通过**（S01 第 7 节），Windows 日文输入法留 W1 |
+| I25 | T09 | 真实输入法（macOS 简体拼音、日文）与触控板滚动手感需要人工核对，清单见 `docs/spikes/S01-transcript-composer.md` 第 7 节（M1–M10）；自动化部分已用 CDP 合成通过 | 用户核对后把结果告诉智能体补记到 S1 报告；R1 汇总 S1 时检查；R1：macOS composer 的真实输入法与触控板核对交 T19，R2 检查；日文输入法两个平台都未验证（T19、W1）；**T19 用户确认 macOS M1–M10 人工核对通过**（S01 第 7 节），Windows 日文输入法留 W1；W1：微软拼音实机通过，用户决定不安装日文语言包，Windows 日文仍未验证 |
 | I26 | T09 | S1 基准中应用全部进程合计 489 MiB，超出第 11 章"不含 Agent Host 的全部进程 ≤ 450 MB"；渲染进程 179 MiB 在预算内，超出主要来自主进程（179 MiB，含 Core 与测试驱动） | R1 与 I12 一起按 M0 实测校准；W0 补 Windows 数据；已落地（R1）：进程合计改为 macOS ≤ 510 MB（放宽原因见架构 v2.17）、Windows ≤ 450 MB；两平台实测仍超出，交 T44，R4 复核 |
 | I27 | T10 | 终端的 L4（`terminal.e2e.ts`、`terminal-tui.e2e.ts`）与 `crates/piarc-term/tests/pty.rs`、`crates/piarc-core/tests/terminal.rs` 使用 `/bin/sh`、`cat`、`vim`、`top`，在 Windows 上不运行；ConPTY 的 resize、Ctrl+C、kill（portable-pty 0.9.0 的 kill 返回值问题由 `wait` 兜底）与是否随附 `conpty.dll`/OpenConsole.exe 未验证 | W0 补 Windows 程序版本的用例并实测 ConPTY；S7 报告第 10 节 |
 | I28 | T10 | PTY 子进程由 portable-pty 启动，不经 `ProcessSpawner`，没有进程组或 Job Object：终端里的程序再起的子进程不随终端关闭而结束 | T33 引入终端承载的任务时决定（与 I17 一起，在 `piarc-exec` 的进程树管理落地后接入） |
@@ -407,13 +391,19 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I72 | T16 | 重复读取的存根依赖"上一次 Read 的结果还在上下文里"：压缩（T27）删掉旧结果后，存根会指向模型已经看不到的内容 | T27 在压缩完成时清掉会话状态表里的读取范围（保留哈希，先读后改仍然成立），在 `piarc_fs::FileStates` 上加一个方法并经 AHP 或会话层调用 |
 | I73 | T16 | 子 agent（T31）在 Agent Host 进程内运行，若沿用父会话的 `sessionId` 调 `fs/*`，读取会记在父会话的状态表里 | T31 给子 agent 的工具调用一个自己的会话 id，并在 Core 以同一工作区 `ToolIo::open_session` 登记（各自一张状态表），或在 `fs/*` 请求上加子 agent 标识 |
 | I74 | T16 | 工具结果阈值（50K、200K、预览 2K）集中在 `TOOL_RESULT_LIMITS` 并可经注册表选项覆盖，但没有用户可改的设置项；Bash 的内联上限（6.11 的 30K）尚未接入 | T17 接 Bash 输出落盘时复用 `fs/spill` 与同一位置；是否开放为用户设置由 T24 的配置兼容层决定；**已落地（T17）**：Bash 的输出预算在 Core（`piarc_exec::ExecLimits`，内联 30,000、预览 2,000、失败头尾），全文写在同一目录（`piarc_fs::create_spill`，`tool-results/<工具调用 id>.txt`）；用户设置仍由 T24 决定 |
-| I75 | T17 | PowerShell 命令在会话的 shell 目录中执行，但 `Set-Location` 不跨命令保留（只有 bash 带目录探针，ADR-0028）；PowerShell 的前缀独占一行，错误信息中的行号比用户命令多 1 | W1 在 Windows 实机看是否影响使用；需要时为 PowerShell 加 `try/finally` 包装的目录探针 |
+| I75 | T17 | PowerShell 命令在会话的 shell 目录中执行，但 `Set-Location` 不跨命令保留（只有 bash 带目录探针，ADR-0028）；PowerShell 的前缀独占一行，错误信息中的行号比用户命令多 1 | W1 在 Windows 实机看是否影响使用；需要时为 PowerShell 加 `try/finally` 包装的目录探针；W1：验收流程中未造成问题，保留 |
 | I76 | T17 | Core 在 `core/notices` 发 `gitBashMissing`（Windows 缺 Git Bash 时），客户端还没有显示它；`commandExecution.execution`（bash 卡数据）也还没有界面 | T18 显示 `core/notices`（含下载链接），T19 用 `execution` 画 bash 卡；**T18 已落地 `core/notices` 的显示**（主区顶部的提示条，带下载按钮，经外链确认打开）；bash 卡仍交 T19；**T19 已落地**，BashCard 展示 execution 字段 |
 | I77 | T17 | 登录 shell 的环境在每个 Core 第一次执行命令时解析（`$SHELL -i -l -c`，最多 10 s）：用户配置很重时第一条命令会多等这段时间；解析失败只记警告并退回 Core 的环境 | T44 的性能任务测启动后首条命令的耗时，必要时改为 Core 启动后后台预解析；设置诊断（T40）显示解析失败的原因 |
 | I78 | T17 | 语义退出码只认单个简单命令：`cd src && grep x f` 这类常见写法按退出码判失败（ADR-0028 第 1 条） | T23 用 tree-sitter-bash 的语法树判定最后执行的命令后细化 |
 | I79 | T18 | 信任决定（`decideProjectTrust`）由渲染进程发出、没有主进程的原生确认：渲染进程被注入时可以静默信任项目、启用其 hooks 与 MCP。审批卡（T20）同样在渲染进程作答；第 10.3 节只要求"总是允许"类规则的修改走原生确认 | T45 评估信任决定是否也走主进程原生确认（ADR-0029 备选方案） |
 | I80 | T18 | 信任变化只重启 Hub 路由表里已有的工作区：工作区刚打开、Agent Host 已启动但还没登记进路由表的极短窗口内做出的决定，不会让它重启（新进程启动时自己查信任，只有那一刻之前已经查过的进程会沿用旧答案） | R2 核实 workspace actor 在路由登记前开始预热。T35 在多窗口验收中验证并消除这一窗口，重启须覆盖已开始预热的工作区 |
 | I81 | T18 | `crates/piarc-core/src/runtime.rs` 已超过 1,000 行（T17 时 1,080 行，T18 增加会话元数据、客户端设置与信任重启的薄包装后约 1,150 行），超出 `coding-standards.md` 的单文件上限 | R2 已拆分 runtime/state.rs 与 runtime/sessions.rs，runtime.rs 808 行（b426028） |
+| I82 | W1 | Windows 上无需用户参与的权限裁决 p95 3.4–8.9 ms、小文件 AHP 往返 p95 5.0–9.3 ms，超出原 2 ms、5 ms：耗时分散在 NTFS 元数据调用与 ADR-0036 从卷根逐级绑定目录上。用户采纳 ADR-0037（Windows ≤ 10 ms）与 ADR-0038（Windows ≤ 15 ms）。W1 机器上 10 ms 余量很小：安静时 7.7–8.9 ms，全量 L4 刚结束时一次 11.2 ms 使 verify 失败、复跑通过（CI 3.35 ms） | T23：一次裁决内只规范化、解析 checkout 一次，评估按设置监听与信任广播失效的缓存；T44：从工作区根句柄开始绑定（须评审 ADR-0036 的安全论证），两平台纳入性能回归并复核能否收紧 |
+| I83 | W1 | UNC 工作区未能实机验证：用户建了临时共享，但本机 SMB 客户端不可用（`net view \localhost` 报系统错误 1702）。回归测试 `tool_io::policy::tests::windows_paths::a_workspace_on_a_unc_share_is_written_read_and_searched` 已写好，设 `PIARC_TEST_UNC_SHARE`（共享测试的临时目录，`TMP` 指向它）才运行，否则打印 NOT RUN | W2 在 SMB 正常的 Windows 上运行；或 T44 评估在 CI 设置该变量（runner 为管理员，可用管理共享；改 CI 前确认） |
+| I84 | W1 | verify 的 `cargo test --workspace` 没有 `--no-fail-fast`：Windows CI 自 R2 起在第一个失败的测试目标处停止，另外 4 个目标的 Windows 失败一直没有暴露（W1 修复，见 W1 报告） | T44 评估 verify 与 CI 改用 `--no-fail-fast`（改 CI 前确认） |
+| I85 | W1 | 系统通知的点击：横幅仍在屏幕上时点击，PiArc 打开对应会话（W1 修复通知对象被回收的问题后实测）；Toast 进入通知中心后点击走 COM 激活，只聚焦窗口、不打开会话。开发构建（L4 `dev` 形态直接运行 `node_modules` 的 electron.exe、本机打包产物）与正式版共用 AUMID `cn.piarc.desktop`，Electron 为每个程序各注册一个 Toast 激活器，W1 中点击通知中心的 Toast 启动了空白的 electron.exe | T42（可操作通知）：激活参数带会话 id、经 `second-instance` 打开；开发构建用独立 AUMID，避免开发机上的串用 |
+| I86 | W1 | 通知实测中有两次运行在 30–60 s 内没有任何通知请求（窗口已最小化、会话已在等待审批），之后同样的操作立即发出；原因未查明 | T42 复核通知触发条件（窗口最小化、渲染进程节流） |
+| I87 | W1 | 设置页"刷新模型目录"勾选框是受控组件，要等设置 Host 启动（正式路径首次约 1 s）答复后才改变状态，期间点击看起来没有反应 | T29 补全模型设置时给出进行中状态 |
 
 ## 技术债
 
@@ -729,6 +719,15 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 四项独立只读审查和全部原文已归档。修复 13 项运行时问题，接受并实施 ADR-0034、0035、0036。I19 实测、I81 门面拆分、L2 能力映射和 W1 检查表见评审文件。
 - 开工与最终 verify 均 15/15；最终 Electron L4 52/52，L2 61 passed、0 failed、1 Windows 专属，M1 planned 0、blocked 0、MISSING 0。两次 ego-browser 操作使用本地渲染器与测试数据；Windows x64 交叉 Clippy 通过，原生验收由 W1 执行。
 - 可开始 W1（Windows 11）或 T23（macOS）。建议先 W1 核对 UNC、目录共享删除、Job Object、凭据与桌面交互，再回到 T23；W1 最迟在 R3 前完成。仅本地提交。
+
+
+### 2026-11-19 W1 部分完成（验收提交 b0a510f）
+
+- Windows 11 专业版 25H2 x64，起点 b654341。起点基线红（两平台 ESLint、Windows `cargo test`、L4），用户决定并入 W1 修复；因内存不足第一次 verify 被系统终止，用户释放内存后重跑。
+- 验收：12 项通过，1 项阻塞（A05 的 UNC：本机 SMB 客户端报系统错误 1702，I83）。最终 `npm run verify` 15/15；L2 本机 60 通过；全量 L4 修复前 199/199、最终构建 198/199（`t18-review` 悬停被实机鼠标打断，复跑通过）。用户实机核对微软拼音 7 项、Toast 与任务栏计数、安装；同意在凭据管理器与 `%LOCALAPPDATA%\PiArc` 留下正式条目。
+- 修复 10 个 Windows 缺陷（均先红后绿）：verify 先 tsc 后 ESLint；Git Bash 挂载目录的 cwd（`pwd -W`）；PATH 中无权访问的条目；保留设备名与以点或空格结尾的名字；transcript 列表宽度变化后行重叠；S6 探针预检；子进程不带 `CREATE_NO_WINDOW` 弹出终端窗口；通知对象被回收导致点击无效；任务栏计数图标锯齿。另修 6 处只在 Windows 暴露的测试缺陷（Windows CI 因 fail-fast 从未跑到，I84）。
+- 决策：ADR-0037（Windows 权限裁决 p95 ≤ 10 ms）、ADR-0038（Windows 小文件 AHP 往返 p95 ≤ 15 ms），用户采纳；架构 v2.29。报告 [W1](../reviews/W1-windows-m1-parity.md)。
+- 遗留：I82–I87；I25 日文输入法、I49 SmartScreen 仍未验证。T13–T22 中没有因需要 Windows 而阻塞的验收项。下一步：用户推送后回到 macOS 做 T23。本地提交，未推送。
 
 ## 计划变更记录
 
