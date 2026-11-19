@@ -49,3 +49,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0031](0031-basic-permissions.md) | M1 权限预检、审批账本与项目信任 | 已接受 |
 | [0032](0032-provider-settings-and-model-selection.md) | 服务商设置、凭据更新与会话选型（补充 ADR-0006、0021、0026） | 已接受 |
 | [0033](0033-session-prompt-and-memory.md) | 会话提示词快照与外部 memory 导入 | 已接受 |
+| [0034](0034-bind-read-and-trust-confirmation.md) | 读取完成后登记、按已展示版本确认项目信任 | 提议 |
