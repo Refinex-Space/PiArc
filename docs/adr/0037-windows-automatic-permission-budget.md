@@ -1,6 +1,6 @@
 # 0037. Windows 上无需用户参与的权限裁决预算
 
-- 状态：提议
+- 状态：已接受（2026-11-19，用户在 W1 会话中采纳）
 - 日期：2026-11-19
 - 修订：架构第 11 章"无需用户参与的权限裁决"一行（p95 ≤ 2 ms）的 Windows 口径
 - 相关：T20-A13、W1、[ADR-0031](0031-basic-permissions.md)、[ADR-0036](0036-bind-file-operations-to-directory-handles.md)、`crates/piarc-core/src/tool_io/policy/tests.rs` 的 `automatic_decision_latency`
@@ -28,7 +28,7 @@
 
 这项测试也是 `cargo test` 的一部分，所以 Windows 上的 `npm run verify` 与 CI 的 `verify (windows-latest)` 因它失败。
 
-## 决策（提议）
+## 决策
 
 1. 第 11 章这一行按平台给预算：macOS 保持 p95 ≤ 2 ms；Windows 为 p95 ≤ 10 ms。两者都包含路径规范化、设置、信任、目录绑定与 SQLite 审计，口径不变。
 2. `automatic_decision_latency` 按运行平台断言对应预算，打印的测量值不变。不新增跳过条件。

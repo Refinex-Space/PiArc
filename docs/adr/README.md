@@ -52,4 +52,5 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0034](0034-bind-read-and-trust-confirmation.md) | 读取完成后登记、按已展示版本确认项目信任 | 已接受 |
 | [0035](0035-command-environment.md) | 工具命令可继承的环境 | 已接受 |
 | [0036](0036-bind-file-operations-to-directory-handles.md) | 文件访问与获准目录身份绑定 | 已接受 |
-| [0037](0037-windows-automatic-permission-budget.md) | Windows 上无需用户参与的权限裁决预算 | 提议 |
+| [0037](0037-windows-automatic-permission-budget.md) | Windows 上无需用户参与的权限裁决预算 | 已接受 |
+| [0038](0038-windows-ahp-round-trip-budget.md) | Windows 上小文件 fs 操作的 AHP 往返预算 | 已接受 |

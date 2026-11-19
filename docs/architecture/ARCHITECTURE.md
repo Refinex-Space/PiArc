@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.28（2026-11-19） |
+| 版本 | 2.29（2026-11-19） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -253,6 +253,8 @@ PiArc/
 | [0034](../adr/0034-bind-read-and-trust-confirmation.md) | 只提交成功读取的文件版本，肯定信任决定核对已展示清单版本 | 避免失败读取授权写回或未展示的新条目随确认生效 |
 | [0035](../adr/0035-command-environment.md) | Bash 和 PowerShell 仅继承已审核的系统、locale、工具链变量 | 用户已导出的第三方凭据不会随通用环境进入命令 |
 | [0036](../adr/0036-bind-file-operations-to-directory-handles.md) | 文件审批、搜索、打开与原子提交绑定目录对象 | 外部目录发生变化时，重新按路径打开可能命中另一个对象 |
+| [0037](../adr/0037-windows-automatic-permission-budget.md) | 无需用户参与的权限裁决按平台给预算：macOS p95 ≤ 2 ms，Windows p95 ≤ 10 ms | NTFS 与 Defender 下每次元数据调用约 50–150 µs，每次裁决都读最新磁盘状态（ADR-0031、0036），W1 实测 Windows p95 3.4–8.9 ms |
+| [0038](../adr/0038-windows-ahp-round-trip-budget.md) | 小文件 fs 操作的 AHP 往返按平台给预算：macOS p95 ≤ 5 ms，Windows p95 ≤ 15 ms | ADR-0036 的每次访问都从卷根逐级绑定目录，W1 实测 Windows p95 5.0–9.3 ms |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -1278,8 +1280,8 @@ T20 起，项目层的 `acceptEdits` 和 `additionalDirectories` 也纳入信任
 | 会话切换 | 已缓存 ≤ 100 ms；冷加载 1,000 条 item ≤ 170 ms（原：≤ 300 ms） | 已缓存未测；冷加载中位 52 ms | 已缓存未测；冷加载中位 81 ms | 打点 |
 | 主进程事件循环延迟 | p99 ≤ 16 ms | 10 万事件/分钟 3.58 ms；终端 100 MB 输出 2.04 ms | 原始值 16.81 ms，同机空闲 16.58 ms，超出空闲 0.23 ms；终端 100 MB 输出 14.34 ms | `monitorEventLoopDelay`（1 ms 采样）；计时器粒度粗于 1 ms 的平台（Windows 约 15.6 ms）取"满载 p99 − 同机同轮空闲 p99" |
 | Core 事件到渲染进程（主进程转发） | p95 ≤ 1.1 ms（原：≤ 5 ms） | 0.50 ms | ≤ 0.21 ms（p99） | 打点，每次投递，常规批次（≤ 1 MiB） |
-| AHP 往返（小文件 fs 操作） | p95 ≤ 5 ms | 0.19–0.22 ms | ≤ 5 ms（断言通过，数值未记录） | 契约测试中计时 |
-| 无需用户参与的权限裁决 | p95 ≤ 2 ms | p95 0.526 ms，1,000 次（T20，含路径、配置、信任及 SQLite 审计） | 未测 | Core 基准测试 `tool_io::policy::tests::automatic_decision_latency` |
+| AHP 往返（小文件 fs 操作） | macOS p95 ≤ 5 ms；Windows p95 ≤ 15 ms（ADR-0038，W1） | 0.19–0.22 ms | W0 ≤ 5 ms（数值未记录）；W1 在 ADR-0036 之后单独运行 5.04 ms、全量 `cargo test` 中 9.32 ms | 契约测试中计时 |
+| 无需用户参与的权限裁决 | macOS p95 ≤ 2 ms；Windows p95 ≤ 10 ms（ADR-0037，W1） | p95 0.526 ms，1,000 次（T20，含路径、配置、信任及 SQLite 审计） | p95 3.35 ms（CI 运行 44453549786）；实机 8.4–8.9 ms（W1，Defender 实时保护开启） | Core 基准测试 `tool_io::policy::tests::automatic_decision_latency` |
 | 终端键入回显的额外延迟（相对直接写 PTY） | p95 ≤ 5 ms | 0.76 ms（逐对相减 0.79 ms） | −0.85 ms（逐对相减 6.86 ms） | 两组样本各 ≥ 1,000 个，取"完整路径 p95 − 直接写 PTY p95"；逐对相减在 ConPTY 下会叠加两次独立往返的抖动 |
 | 安装包体积（macOS arm64 DMG / Windows x64 安装包） | ≤ 200 MB | 168.8 MB | **超出**：225.3 MB（开发构建） | 构建产物 |
 | 安装后体积 | ≤ 450 MB | 449.0 MB（余约 1 MB） | **超出**：521.3 MB | 构建产物 |
@@ -1538,6 +1540,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.29 | 2026-11-19 | W1（ADR-0037、0038）：第 11 章无需用户参与的权限裁决（Windows p95 ≤ 10 ms）与小文件 AHP 往返（Windows p95 ≤ 15 ms）按平台给预算，填入 Windows 实测；6.11 写明 Git Bash 用 `pwd -W` 报告最终目录。 |
 | 2.28 | 2026-11-19 | R2 记录 macOS 阶段门；更新 6.0 的 M1 能力、读取成功登记、文件授权与目录句柄、命令环境准入、信任与删除确认、索引 schema v4（ADR-0034–0036）。 |
 | 2.27 | 2026-11-19 | T22（ADR-0033）补充提示词冻结与恢复、memory 顺序、导入审批与消息送达、AHP 与用户级文件位置 |
 | 2.26 | 2026-11-19 | T21（ADR-0032）补充服务商配置投影、凭据更新、模型目录与会话选择 |

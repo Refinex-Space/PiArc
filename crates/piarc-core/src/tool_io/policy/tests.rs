@@ -295,9 +295,11 @@ async fn automatic_decision_latency() {
             .len(),
         COUNT + 100
     );
+    // Architecture chapter 11, ADR-0037: NTFS metadata calls cost several times more.
+    let budget = Duration::from_millis(if cfg!(windows) { 10 } else { 2 });
     assert!(
-        p95 <= Duration::from_millis(2),
-        "automatic permission budget exceeded: {p95:?}"
+        p95 <= budget,
+        "automatic permission budget {budget:?} exceeded: {p95:?}"
     );
 }
 
