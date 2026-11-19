@@ -154,7 +154,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 30a4f17 |
 | T26 | [计划模式、任务清单、AskUserQuestion 与下一步](tasks/T26-plan-mode-todo-ask-next-steps.md) | 3 | T25 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 23630e3 |
 | T27 | [上下文工程：system reminder、压缩与用量](tasks/T27-context-reminders-compaction-usage.md) | 3 | T26 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | b0b2641 |
-| T28 | [检查点、回退与 Changes 面板](tasks/T28-checkpoints-rewind-changes.md) | 3 | T27 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
+| T28 | [检查点、回退与 Changes 面板](tasks/T28-checkpoints-rewind-changes.md) | 3 | T27 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
 | T29 | [WebFetch、登录与模型设置补全、三档视图](tasks/T29-webfetch-login-model-settings-views.md) | 3 | T28 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T30 | [L3 行为对齐基座](tasks/T30-l3-behavior-alignment.md) | 3 | T29 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | R3 | [M2 评审](tasks/R3-m2-review.md) | 3 | T30、W1 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,6 +308,20 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+T28（开工基线 59e55a2，`npm run verify` 15/15）：
+
+- [ ] 1. 设计：ADR-0044（补充）定稿检查点键、表结构、AHP 与 Core API 增量、对话回退的实现方式
+- [ ] 2. 快照存储：`piarc-checkpoint` 的内容寻址对象库（分桶、去重、钉住、回收）、回退计划与冲突判定、保留策略；`piarc-store` schema v5（`checkpoints`、`checkpoint_files`、`checkpoint_sessions`）（A01、A10）
+- [ ] 3. 写前快照：`piarc-fs` 写入在路径锁内存原文件、结果带前后哈希；恢复与丢弃的原语（期望哈希、备份当前内容、删除新建文件、清状态表）；`piarc-diff` 的 hunk 反向应用（A01、A06、A09）
+- [ ] 4. Core：回合检查点、写入索引、回退预览与执行（逐文件结果、撤销）、Changes 列表与按文件 / hunk 丢弃、后台保留与回收；AHP `fs/write` 的 `turnId`（A01、A02、A05、A06、A09、A10）
+- [ ] 5. Agent Host：回合起点记录、`session/rewind`（分支、摘要）、`session/switchBranch`、`session/fork` 的 `beforeTurn`、历史与通知中的分支点（A03、A04、A11）
+- [ ] 6. NAPI、主进程与 preload：回退、Changes、分支切换的 Core API
+- [ ] 7. L2：`rewind-*`、`changes-*` 场景与运行器动作，能力 `CAP-REWIND-*`、`CAP-CHANGES-*`（A02、A03、A04、A05、A07）
+- [ ] 8. 客户端：消息菜单"回退到这里""从这里分支"、`/rewind`、回退对话框（冲突逐个选择、逐文件结果与撤销）、Changes 面板与右栏改动卡片（Mod+Shift+D）、分支切换控件（A04、A07、A08、A09、A11）
+- [ ] 9. L4 与截图（`tmp/evidence/T28/`），ego-browser 核对（A04、A07、A08、A09、A11）
+- [ ] 10. 文档：架构、AGENTS.md（`piarc-checkpoint`、渲染进程 `changes`）、`coding-standards.md` 复用表、能力清单
+- [ ] 11. 收尾：`npm run verify`（A12）、验收记录、看板与会话日志
 
 ## 登记事项
 
