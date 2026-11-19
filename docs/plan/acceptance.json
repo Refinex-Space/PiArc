@@ -2785,85 +2785,85 @@
       "id": "T27-A01",
       "task": "T27",
       "description": "上下文达到 W − min(O, 20K) − 13K 时触发自动压缩，少 1 token 时不触发；设置自动压缩窗口上限后 W 取较小值。验证：阈值函数单测与小窗口场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "单测 `agent-host/src/harness/context.test.ts`（\"is W − min(O, 20K) − 13K and triggers at the threshold, not one token below\"、窗口上限取较小值、Pi reserve 的 `>` 等价 `>=`、settings 覆盖在 reload 后重新施加）；L2 `ctx-compact-threshold`（32,000 窗口、4,096 输出：14,903 不压缩、14,904 以 threshold 压缩）与 `ctx-compact-window-cap`（1,000,000 窗口 + autoCompactWindow 100,000：82,903 不压缩、82,904 压缩，check_usage 的 contextWindow 100000、阈值 82904）通过。"
     },
     {
       "id": "T27-A02",
       "task": "T27",
       "description": "摘要请求使用 PiArc 自写的分节摘要提示；`/compact 重点` 的重点说明出现在摘要请求中。验证：mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `ctx-compact-threshold`（摘要请求含 \"You write handover notes for a coding session.\" 与八个分节标题）、`ctx-compact-focus`（`compact.instructions` → 摘要请求含 \"Focus requested by the user: Keep the error messages verbatim.\"）；agent_host `context::invoked_skills_come_back_after_a_compaction_within_their_limits`（\"Keep the test results.\"）；L4 `t27-context`（composer 发送 `/compact Keep the API decisions.` 后第 6 个请求含该重点且不含命令文本）。"
     },
     {
       "id": "T27-A03",
       "task": "T27",
       "description": "PreCompact 返回 block 时不压缩；其 stdout 摘要指令出现在摘要请求中；PostCompact 收到摘要。验证：场景测试与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `ctx-compact-focus`：PreCompact exit 0 的 stdout 以 \"Instructions from PreCompact hooks: Keep the API decisions.\" 出现在摘要请求中，PostCompact 的 json_lines 收到 compact_summary \"Summary: the REST API stays.\"，SessionStart(compact) 的上下文进入下一次请求；`hooks-pre-compact-block`（exit 2 不发摘要请求，request_counts 1）与 `hooks-compact` 照常通过。"
     },
     {
       "id": "T27-A04",
       "task": "T27",
       "description": "连续 3 次自动压缩失败或无效后停止自动压缩并向用户显示原因，手动 `/compact` 仍可执行。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `ctx-compact-breaker`（19,000 窗口，阈值 1,904）：三次自动压缩后上下文仍超过阈值，第三次的 contextCompaction 带 autoCompactStopped: ineffective、session/usage 为 autoCompact stopped，第四个回复不再压缩（request 6 无摘要提示），手动 compact 仍执行并恢复 autoCompact on；失败路径的计数与复位见 context.test.ts \"stops after three failed automatic compactions\"。客户端压缩提示行显示原因（`transcript.compaction.stopped`）。"
     },
     {
       "id": "T27-A05",
       "task": "T27",
       "description": "压缩后的请求中重注入了 memory、当前计划、任务清单、skill 正文（单个 ≤ 5K、合计 ≤ 25K token）和最多 5 个最近文件（合计 ≤ 50K token），超出上限的部分被截断或只给路径。验证：mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `ctx-compact-restore`：压缩后的请求含子目录 memory、批准的计划（含模式）、任务清单、a/b/c/d 四个最近文件的当前内容，第五个 big.txt（90,000 字符，超过单文件 20K token）只列路径，第六个更早的 old.txt 不出现；skill 正文由 agent_host `context::invoked_skills_come_back_after_a_compaction_within_their_limits`（模拟的 `piarc.skillInvoked` 记录，30,000 字符的 skill 截断到约 5K token 并注明）与单测（每个 ≤ 5K、合计 ≤ 25K；文件最多 5 个、合计 ≤ 50K）验证。"
     },
     {
       "id": "T27-A06",
       "task": "T27",
       "description": "七类 reminder（`backgroundTask` 经测试入口触发）都以追加消息送达，注入前后 system prompt 字节一致；T22、T24、T25 的旧注入代码已删除。验证：mock provider 请求断言与代码检索（旧注入入口无引用）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `ctx-reminders`（hookContext、memoryLazyLoad、rulesMatched、planMode、fileModified 都以 `[PiArc reminder]` 追加消息送达，same_system_as 0 与 same_tools_as 0 逐字节一致，reminder 条目的类型断言）、`todo-stale-reminder`（todoStale，same_system/tools 一致）、agent_host `context::background_task_reminders_reach_the_next_request`（backgroundTask 经 `session/remind`，system 一致，非 backgroundTask 被拒）。代码检索：`agent-host/src/harness` 中 `sendMessage` 只剩 `reminders.ts` 一处，`piarc.hookContext`/`HOOK_CONTEXT` 无引用，`piarc.memory` 只在 `session-memory.ts` 回放旧条目。"
     },
     {
       "id": "T27-A07",
       "task": "T27",
       "description": "本会话读过的文件被外部修改后，下一次模型请求中出现修改提醒。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `ctx-reminders`（Read a.txt 后 write_file 改它，下一回合首个请求含 \"a.txt was changed outside this session after you last read or wrote it.\"）与 `ctx-file-modified`（同一回合内 Bash 改了读过的 a.txt，下一次请求含提醒且只出现一次，未改的 b.txt 不报）；Core 侧 `crates/piarc-core/tests/file_invariants.rs` 的 `external_changes_and_forgotten_reads` 与 piarc-fs 单测。"
     },
     {
       "id": "T27-A08",
       "task": "T27",
       "description": "mock provider 下各类别用量合计等于请求的输入 token；真实服务商口径下差额计入\"未分类\"。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `ctx-usage`：mock 报告 input 50,000 + cache read 1,000 + cache write 500 后 check_usage 得 tokens 51,500、source provider，各类别（含 unclassified > 0）之和等于 tokens（运行器总是检查）；报告 10 时 tokens 10、unclassified 0（估算按比例缩小）；单测 `withReportedTotal` 与 `estimateCategories` 的逐类计算。"
     },
     {
       "id": "T27-A09",
       "task": "T27",
       "description": "用量环在 75% 与 90% 显示两级提示，上下文卡片显示分类明细，压缩按钮触发压缩。验证：Playwright 流程与截图（`tmp/evidence/T27/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `t27-context.e2e.ts` dev 与 packaged 均通过：10% normal → 75% warning（aria-label \"…will be compacted soon\"）→ 90% critical，点用量环打开上下文卡片（90% used、180,000 of 200,000、Reported by the provider、类别明细、阈值 182,904），\"Compact now\" 触发压缩后回到 normal，`/compact <重点>` 触发第二次压缩。截图 `tmp/evidence/T27/l4/t27-context…-dev/`（ring-75-warning、ring-90-context-card、after-compact-button、after-compact-focus）与 packaged 同名目录；ego-browser 中文界面截图 `tmp/evidence/T27/ego/`。"
     },
     {
       "id": "T27-A10",
       "task": "T27",
       "description": "Anthropic 请求的缓存断点位置与数量符合交付物 4，在 reminder 追加与压缩前后都成立。验证：mock provider 缓存断点断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `ctx-cache-breakpoints`（Anthropic，mock 校验 cache_breakpoint_count ≤ 4 与 max_message_level 1、last_message_only）：追加 plan 模式提醒前后与压缩前后的请求 system 都是两个带 cache_control 的块且 same_system_as 0，摘要请求不含 cache_control；全部 102 个 L2 场景的每个请求都经同样的断点规则校验。"
     },
     {
       "id": "T27-A11",
       "task": "T27",
       "description": "摘要提示与 reminder 文案的原创性自查已完成并记录在报告中。验证：报告内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`node scripts/dev/check-prompt-originality.mjs`（扩到摘要提示与全部提醒、重注入文案）：referenceFiles=3533 promptWords=1967 window=10 matchingWindows=0；另与 Pi 1.5.2 的压缩提示（compaction.js、utils.js、branch-summarization.js）做同样比对 0 个匹配窗口。记录在 `docs/engineering/prompt-originality.md`。"
     },
     {
       "id": "T27-A12",
       "task": "T27",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "收尾 `npm run verify`：All 15 steps passed（Vitest 1205 passed、1 skipped；cargo test 通过；L2 100 passed、2 个按平台跳过，MISSING 0），日志 tmp/evidence/T27/verify-final.log。"
     },
     {
       "id": "T28-A01",
