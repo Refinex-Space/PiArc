@@ -15,6 +15,8 @@ const evidenceDir = path.join(import.meta.dirname, '..', '..', 'tmp', 'evidence'
 export default defineConfig<{ appForm: 'dev' | 'packaged' }>({
   testDir: 'e2e',
   testMatch: '**/*.e2e.ts',
+  // Builds the mock provider the tests start, so no test pays for that build.
+  globalSetup: './e2e/global-setup.ts',
   outputDir: path.join(evidenceDir, 'l4'),
   // One app at a time: tests launch real windows and the single-instance test owns the lock.
   workers: 1,
