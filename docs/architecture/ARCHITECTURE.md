@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.33（2026-11-19） |
+| 版本 | 2.34（2026-11-19） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -256,6 +256,7 @@ PiArc/
 | [0037](../adr/0037-permission-rules-and-bash-analysis.md) | 无效 deny/ask 规则使所点名工具询问；运行期值保守匹配，不可判定的命令在任何模式下询问；自动允许的程序在执行时钉住；"总是允许"携带规则列表；`policy/tools` 移除整体拒绝的工具；跳过权限由用户级开关开启 | 架构只给出规则形式与阶梯，这些细节决定安全边界与 AHP、Core API 的形状 |
 | [0040](../adr/0040-windows-automatic-permission-budget.md) | 无需用户参与的权限裁决按平台给预算：macOS p95 ≤ 2 ms，Windows p95 ≤ 10 ms | NTFS 与 Defender 下每次元数据调用约 50–150 µs，每次裁决都读最新磁盘状态（ADR-0031、0036），W1 实测 Windows p95 3.4–8.9 ms |
 | [0041](../adr/0041-windows-ahp-round-trip-budget.md) | 小文件 fs 操作的 AHP 往返按平台给预算：macOS p95 ≤ 5 ms，Windows p95 ≤ 15 ms | ADR-0036 的每次访问都从卷根逐级绑定目录，W1 实测 Windows p95 5.0–9.3 ms |
+| [0043](../adr/0043-reminders-compaction-usage.md) | 运行时提示统一走 system reminder 通道；压缩用 PiArc 自写的分节摘要、按阈值公式配置 Pi 触发、连续 3 次失败或无效即熔断、压缩后按上限重注入；上下文用量按类别估算并以服务商报告为准 | 动态信息不改写 system prompt，长会话压缩及时且不丢关键状态，用户看得到上下文被什么占用 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -660,13 +661,15 @@ PiArc 在开启缓存的 Anthropic Messages 请求中以两个 system 文本块�
 - Pi 自带的上下文文件加载被关闭（SDK 选项），统一由 Harness Kit 处理，避免重复。
 - 自动记忆（agent 自己维护的跨会话笔记，`MEMORY.md` 索引 + 主题文件）列为 M5。
 
-T22 的具体顺序为用户 `~/.claude/CLAUDE.md`、PiArc 数据目录的 `MEMORY.md`、文件系统根至 cwd 各级。T24 起用户级 `~/.claude/rules/` 紧跟 `~/.claude/CLAUDE.md`，工作区根的 `.claude/rules/` 紧跟根目录的 `.claude/CLAUDE.md`（ADR-0038）；rules 正文去掉 frontmatter，带 `paths:` 的在首次成功读写匹配文件后以同一 `piarc.memory` 追加消息送达，分支条目 `piarc.memoryRules` 记下已注入的条件 rules，每会话一次。每级按 `CLAUDE.md`、`.claude/CLAUDE.md`、适用时的 `AGENTS.md`、`CLAUDE.local.md` 排列。`memory.readBoth` 可在常规设置或 PiArc 分层设置文件中设置。Core 按规范目标检查导入及重定向到外部的符号链接，通过权限扩展卡取得同意。首次成功访问子目录时，Harness 以带来源的 `piarc.memory` 消息追加新文档；后续回合按内容摘要判断更新或移除。
+T22 的具体顺序为用户 `~/.claude/CLAUDE.md`、PiArc 数据目录的 `MEMORY.md`、文件系统根至 cwd 各级。T24 起用户级 `~/.claude/rules/` 紧跟 `~/.claude/CLAUDE.md`，工作区根的 `.claude/rules/` 紧跟根目录的 `.claude/CLAUDE.md`（ADR-0038）；rules 正文去掉 frontmatter，带 `paths:` 的在首次成功读写匹配文件后以同一 `piarc.memory` 追加消息送达，分支条目 `piarc.memoryRules` 记下已注入的条件 rules，每会话一次。每级按 `CLAUDE.md`、`.claude/CLAUDE.md`、适用时的 `AGENTS.md`、`CLAUDE.local.md` 排列。`memory.readBoth` 可在常规设置或 PiArc 分层设置文件中设置。Core 按规范目标检查导入及重定向到外部的符号链接，通过权限扩展卡取得同意。首次成功访问子目录时，Harness 以带来源的 `piarc.memory` 消息追加新文档；后续回合按内容摘要判断更新或移除。T27 起这些追加改走 system reminder 通道（`piarc.reminder`，类型 `memoryLazyLoad` 与 `rulesMatched`，第 6.6.3 节），压缩后按当前磁盘内容重注入。
 
 #### 6.6.3 System reminder
 
 Harness Kit 以带标记的自定义消息（Pi `sendMessage` 的 custom message）注入运行时提示：任务清单长期未更新、文件被外部修改、plan 模式约束、后台任务完成、懒加载的 memory、hooks 追加的上下文。客户端默认不显示这些消息，详细视图下可见。
 
 T26 建立 `agent-host/src/harness/reminders.ts`（ADR-0042 第 6 条）：按键排队、同键替换、可撤回，以 `piarc.reminder`（首行 `[PiArc reminder]`）在运行开始或一轮工具调用之后送达并持久化；目前承载 plan 模式开关与任务清单未更新两类提醒，T27 在它上面扩展统一通道。
+
+T27 落地（ADR-0043）：`reminders.ts` 是模型可见运行时提示的唯一出口。提醒有类型、来源与正文，类型为 `todoStale`、`fileModified`、`planMode`、`backgroundTask`、`memoryLazyLoad`（子目录 memory、内容变化与日期）、`rulesMatched`（`paths:` rules）、`hookContext`（各事件的 `additionalContext` 与纯文本 stdout、Stop 的续跑理由），压缩后的重注入为 `contextRestore`。`details.reminders` 逐条记录键、类型、来源、长度、用量类别与回放数据，memory 的版本摘要随它持久化，原 `piarc.memory`、`piarc.hookContext` 消息不再写入（旧条目仍可回放）。每次送达前，分支上有成功的 Read、Write、Edit 时，Agent Host 经 `fs/changes` 请 Core 比对文件状态表（元数据不同才算哈希，同一版本只报告一次），变化的文件成为 `fileModified`。后台任务的提醒经 Core → Agent Host 的 `session/remind` 进入（T32 接入来源）。提醒投影为 `reminder` 条目（实时与历史一致），客户端默认不显示。
 
 #### 6.6.4 压缩
 
@@ -677,9 +680,21 @@ T26 建立 `agent-host/src/harness/reminders.ts`（ADR-0042 第 6 条）：按�
 - 连续多次压缩后上下文立即又满（例如单个超大工具输出）时停止自动压缩并报告，避免空转。
 - 对 Anthropic 模型，服务端 context editing / compaction 作为可选策略（M5），与客户端压缩统一抽象。
 
+T27 落地（ADR-0043）：
+
+| 部分 | 实现 |
+|---|---|
+| 触发 | 纯函数 `agent-host/src/harness/compaction-threshold.ts`：T = W − min(O, 20,000) − 13,000，W 取模型窗口（T29 的每模型窗口可覆盖）与 `autoCompactWindow`（夹在 100,000–1,000,000）中的较小值，上下文 ≥ T 时压缩。Pi 1.5.2 的判断是 `tokens > 窗口 − reserveTokens`，所以每次运行开始与切换模型后给会话设置施加 `compaction.reserveTokens = 模型窗口 − T + 1`（同时写进该模型的 `modelOverrides`），`compaction.enabled` 取 `autoCompactEnabled` 与熔断状态；Pi 的三个检查点与溢出重试原样生效。设置由 Core 的 `context/settings` 给出（与权限同一次合并的设置层） |
+| 摘要 | `session_before_compact` 中先跑 PreCompact（block 即取消），再由 Harness Kit 发自写的分节摘要请求（`harness/prompts/compaction.ts`：任务目标、用户要求与约束、关键决策、已改文件、错误与修复、待办、当前进展、继续所需的上下文），`/compact` 的重点与 PreCompact 的 stdout 原样并入；请求走会话模型与 `agent.streamFunction`，不写缓存，按重试设置重试，失败时取消压缩并把错误报给压缩条目与 `/compact` 回合。摘要末尾附从工具调用算出的已读、已改文件 |
+| 收尾 | `session_compact` 中跑 PostCompact 与 SessionStart（`compact`），Core 经 `fs/forgetReads` 清掉读取范围（保留哈希），再把一条 `contextRestore` 提醒直接追加到会话：memory（system 之外的、按当前磁盘内容）、当前计划、任务清单、已调用 skill 正文（`piarc.skillInvoked`，T37 写入）、最近读写的文件（`fs/read` 的 `restore` 读，Core 只放行会话读写过且无需审批的文件） |
+| 上限 | `harness/reinjection.ts` 的 `RESTORE_LIMITS`：memory 每个 10K、合计 20K；计划 10K；任务清单 2K；skill 每个 5K、合计 25K；文件最多 5 个、每个 20K、合计 50K token，放不下的文件只给路径 |
+| 熔断 | `harness/compaction.ts` 的 `SessionCompaction`：自动压缩失败（非中断、非 hook 取消）或压缩并重注入后估算仍 ≥ T 计一次，连续 3 次（`AUTO_COMPACT_FAILURE_LIMIT`）停止自动压缩，该次压缩条目带 `autoCompactStopped`；有效的自动压缩清零，手动压缩成功复位；状态在 Agent Host 内存中 |
+
 #### 6.6.5 上下文用量
 
 Agent Host 按类别统计上下文构成（system prompt、工具定义、MCP 工具、memory、skills、对话、工具结果），经 AHP 上报；客户端显示用量环与分类明细。
+
+T27 落地（ADR-0043）：`agent-host/src/harness/context-usage.ts` 在每次模型请求前（Pi `context_with_system`）按类别估算：冻结的 system 文本去掉 `<project_context>`（计入 memory）与 skills 索引，工具按当前声明计入工具定义或 MCP 工具（带命名空间的工具），消息按角色与提醒的用量类别计入。估算函数 `harness/tokens.ts`（字符数 / 4 向上取整，图片 4,800 字符）与 Pi 的阈值估算、重注入的上限同一口径。回复报告输入（`input + cacheRead + cacheWrite`）时以它为合计，差额为"未分类"，估算更大时按比例缩小。`session/usage` 在每次回复与压缩后上报，`session/getContextUsage` 返回最近一次；结果带有效窗口、阈值与自动压缩状态。
 
 ### 6.7 Skills、命令、插件、输出风格
 
@@ -801,10 +816,10 @@ T24 落地（ADR-0038）：
 | 回合继续条件 | 助手消息中出现工具调用是继续下一轮的唯一信号；输出被截断（stop reason 为 length）时，本条消息中的工具调用一律判为失败，不执行（Pi 已实现） |
 | 工具并发 | 连续的只读/并发安全调用成批并行，单批上限 10；遇到写操作即切回串行 |
 | 中断与降级 | 为未完成的工具调用补齐合成结果；可恢复错误（限流、过载、5xx）先重试，重试期间不向模型暴露中间错误 |
-| 自动压缩触发 | 当前上下文 ≥ 窗口 − min(最大输出, 20K) − 13K（token） |
-| 压缩熔断 | 连续 3 次自动压缩失败或无效后停止自动压缩，提示用户 |
+| 自动压缩触发 | 当前上下文 ≥ 窗口 − min(最大输出, 20K) − 13K（token）；窗口取模型窗口与 `autoCompactWindow` 的较小值（T27：`harness/compaction-threshold.ts`，经 Pi 的 `compaction.reserveTokens` 生效，L2 `ctx-compact-threshold`、`ctx-compact-window-cap` 锁定边界） |
+| 压缩熔断 | 连续 3 次自动压缩失败或无效后停止自动压缩，提示用户（T27：`AUTO_COMPACT_FAILURE_LIMIT`，L2 `ctx-compact-breaker`） |
 | 压缩摘要结构 | 固定分节（任务目标、关键决策、已改文件、错误与修复、待办、当前进展等），便于压缩后续接 |
-| 压缩后恢复 | 最多重新附带 5 个最近读写的文件，合计不超过 50K token；已调用 skill 正文单个 5K、合计 25K token |
+| 压缩后恢复 | 最多重新附带 5 个最近读写的文件，合计不超过 50K token；已调用 skill 正文单个 5K、合计 25K token（T27：`RESTORE_LIMITS`，另设单个文件 20K、memory 每个 10K 合计 20K、计划 10K、任务清单 2K） |
 | 工具结果截断 | 单个结果超过 50K 字符落盘，模型收到约 2KB 预览与路径；单条消息内工具结果合计上限 200K 字符（T16：`agent-host/src/harness/tool-results.ts` 的 `TOOL_RESULT_LIMITS`，Read 不参与） |
 | 重复读取 | 文件自上次读取后未变化、且读取范围相同时，`Read` 返回简短存根而非全文（T16：Core 的文件状态表判断） |
 | 缓存断点 | system prompt 分为静态段与动态段并分别缓存；动态信息走 system-reminder；每个请求只放一个消息级缓存断点（Anthropic）；其他服务商按 pi-ai 的缓存策略 |
@@ -925,6 +940,8 @@ T21 增加 `session/previewModelSwitch`、`session/setModel`、`session/setEffor
 T19（ADR-0030）为 `session/prompt`、`session/steer`、`session/followUp` 添加可选的提及区间与附件引用，`session/queueChanged` 和 `userMessage` 可带相同元数据。每次模型回复结束时 `turn/usage` 发本回合的累计用量，失败的 `turn/completed` 提供 `errorKind`、`retryable`。`session/compact` 在空闲会话中开始独立回合。
 
 **Core → Agent Host 通知**：`exec/output`（T07）、`secrets/changed`（T08）。
+
+T27 已实现（ADR-0043，能力 `context`）：Agent Host → Core 的请求 `context/settings`（会话工作区的 `autoCompactEnabled`、`autoCompactWindow`）、`fs/changes`（会话读写过、之后在外部变化的文件，每个版本报告一次）、`fs/forgetReads`（压缩后清掉读取范围），`fs/read` 新增可选的 `restore`（不带调用来源，读会话读写过的文件），通知 `session/usage`；Core → Agent Host 的请求 `session/getContextUsage` 与 `session/remind`（只接受 `backgroundTask`）；`session/compact` 新增可选的 `instructions`；条目新增 `reminder`，`contextCompaction` 新增 `autoCompactStopped`。Core API 新增 `contextUsage(id)`，`compact(id, instructions?)`。
 
 T26 已实现（ADR-0042）：Agent Host → Core 的请求 `ui/ask`（能力 `ask`）与通知 `harness/todo`（能力 `todo`）、`harness/plan`（能力 `planMode`）；`policy/evaluate` 结果新增可选的 `mode`（允许的调用切换到的权限模式）；`session/history` 结果新增可选的 `harness`（分支上的当前计划与任务清单）。Core API 的审批卡新增 `kind: "plan"` 与成员 `plan`、`questions`，答复新增 `mode`、`comments`、`answers`。
 
@@ -1073,6 +1090,7 @@ diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高�
 - **设置**（独立窗口）：通用、模型与服务商（每模型显示名、上下文窗口、图片输入、默认 effort；密钥加密存储）、权限（规则可视化管理、审计记录）、hooks、MCP、skills 与插件、memory 文件、沙箱、外观、快捷键、配置诊断、关于与更新。
 - **系统集成**：见第 8.8 节。
 - T18 落地（ADR-0029）：窗口为侧栏 | 主区（+ 右栏）在上、停靠面板区在下；右栏与面板区是注册式容器（`src/renderer/shell/registry.ts` 的 `registerPanel`），没有注册内容时不渲染，尺寸存于窗口的 localStorage。侧栏按工作区分组，组内置顶在前、其余按最近更新；徽标形状各不相同（出错为圆形加叹号、等待审批为方形加问号、运行中为旋转的环、未读为圆点），不只靠颜色区分。新建会话的顺序是：需要时先显示信任对话框，再立即显示乐观消息（`flushSync`），然后创建会话、发送首条输入；任一步失败，回到新建视图并把文字放回输入框；会话已创建但首条输入失败时关闭该会话（Pi 没有回复就不写文件，不留痕迹）。设置窗口是独立的 `BrowserWindow`（`#/settings`），页面经 `src/renderer/settings/registry.ts` 的 `registerSettingsPage` 注册，T18 注册通用、外观、快捷键三页。
+- T27（ADR-0043）：环境栏右端是上下文用量环（百分比 = 合计 / 有效窗口，75% 起提示、90% 起警告，颜色之外另有文字与 `data-level`），点击打开右栏的上下文卡片（每个会话都注册）：百分比、合计与窗口、来源（估算或服务商报告）、按类别的条形明细（"未分类"只在大于零时列出）、自动压缩阈值或停止原因，以及"立即压缩"（等价于不带重点的 `/compact`）。composer 中发送 `/compact <重点>` 时作为压缩重点送出，不作为消息；压缩提示行在熔断时写明原因与"仍可使用 /compact"。`reminder` 条目不进默认视图（T29 的详细视图显示）。
 - T26（ADR-0042）：transcript 中 `TodoWrite` 是任务卡（进行中项高亮、完成计数），`ExitPlanMode` 是计划卡（摘要与状态，可在计划面板中打开），`AskUserQuestion` 的结果按题列出，`SuggestNextSteps` 是下一步建议（每条"在此执行""开始新会话"）；待批的计划与提问在审批卡位置显示为计划审批卡与提问表单，沿用审批热键、400 ms 防误触与输入法守卫；右栏注册任务卡片（会话有任务清单时），停靠区注册计划面板（会话有待批或已批准的计划时）。
 - T19 的会话主区使用第 8.4 节的行组件与 ProseMirror 输入。提及胶囊显示文件名，发送时按相对路径展开。附件经主进程存入 Core 的会话附件目录，模型收到图像块或 PDF 提取文本。内置命令由 Core 提供，运行中的 steer、follow-up 与队列编辑都经会话 API 执行。
 
@@ -1598,6 +1616,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.34 | 2026-11-19 | T27（ADR-0043）补充第 4 章 ADR-0043、6.6.3 节统一提醒通道与外部修改检测、6.6.4 节压缩的触发、摘要、收尾、上限与熔断、6.6.5 节用量的口径、6.15 节三行的实现位置（数值未调整）、7.4 节 `context` 能力的方法与成员、8.2 节用量环与上下文卡片 |
 | 2.33 | 2026-11-19 | T26（ADR-0042）补充第 6.1.4 节 SuggestNextSteps、6.2.3 节 ExitPlanMode 的裁决步、6.5 节计划模式、任务清单、提问与下一步的落地、6.6.3 节 `reminders` 模块、6.14 节 `plansDirectory` 未在 T26 支持（I104）、7.4 节 `ui/ask`、`harness/todo`、`harness/plan` 与新增成员、8.2 节计划卡、提问表单、任务卡片与下一步建议 |
 | 2.32 | 2026-11-19 | W1（ADR-0040、0041）：第 11 章无需用户参与的权限裁决（Windows p95 ≤ 10 ms）与小文件 AHP 往返（Windows p95 ≤ 15 ms）按平台给预算，填入 Windows 实测；6.11 写明 Git Bash 用 `pwd -W` 报告最终目录；15.2 路径一行写明保留名的处理；第 16 章记录 M1 的 Windows 结论。 |
 | 2.31 | 2026-11-19 | T25（ADR-0039）补充第 6.3.1 节 hooks 的落地与 Stop 续跑上限 8、6.14 节 `hooks`/`disableAllHooks` 生效、7.4 节 `hooks/run` 与 `policy/evaluate`、会话输入的新增成员、9.2 节 hook 审计记录 |

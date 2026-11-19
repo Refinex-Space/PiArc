@@ -17,13 +17,25 @@ function render() {
     stdin: {
       contents: `
         import { assembleSystem } from './agent-host/src/harness/prompts/system.ts';
-        import { PLAN_ON, planOff, staleListNotice } from './agent-host/src/harness/prompts/notices.ts';
+        import * as notice from './agent-host/src/harness/prompts/notices.ts';
+        import { SUMMARY_SYSTEM, summaryPrompt, fileLists } from './agent-host/src/harness/prompts/compaction.ts';
         import { CANONICAL_TOOLS, DEFAULT_PROFILE } from './agent-host/src/tools/profile.ts';
         const system = assembleSystem(CANONICAL_TOOLS, DEFAULT_PROFILE, [],
           {cwd: '', platform: '', date: '', gitStatus: ''}).text;
         const descriptions = CANONICAL_TOOLS.map((tool) => DEFAULT_PROFILE[tool].description);
-        const notices = [PLAN_ON, ...['default', 'acceptEdits', 'bypassPermissions'].map(planOff),
-          staleListNotice([{ content: '', status: 'pending' }], 0)];
+        const todo = [{ content: '', status: 'pending' }];
+        const notices = [notice.PLAN_ON,
+          ...['default', 'acceptEdits', 'bypassPermissions'].map(notice.planOff),
+          notice.staleListNotice(todo, 0),
+          // T27: reminders, what a compaction gives back, the summary request.
+          notice.hookContextNotice('Stop', ''), notice.hookContextNotice('SessionStart', ''),
+          notice.fileChangedNotice('', 'modified'), notice.fileChangedNotice('', 'deleted'),
+          notice.backgroundTaskNotice('', ''), notice.RESTORE_INTRO,
+          notice.restoredPlan('', 'default'), notice.restoredTodos(todo),
+          notice.restoredSkill('', ''), notice.restoredFile('', ''), notice.omittedFiles(['']),
+          notice.cutNote(0), SUMMARY_SYSTEM,
+          summaryPrompt({ transcript: '', turnStart: '', previousSummary: '', focus: '',
+            hookInstructions: '' }), fileLists([''], [''])];
         process.stdout.write([system, ...descriptions, ...notices].join(String.fromCharCode(10)));`,
       resolveDir: repoRoot,
     },
