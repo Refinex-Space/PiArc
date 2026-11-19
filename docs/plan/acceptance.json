@@ -2617,92 +2617,92 @@
       "id": "T25-A01",
       "task": "T25",
       "description": "交付物 1 表中 11 个事件各有至少一个 L2 场景且通过，能力 ID 已登记，无 MISSING。验证：场景运行输出与能力清单。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-testkit --test scenarios -- hooks-`：11 个 `tests/scenarios/hooks-*.yaml`（session-start、session-end、user-prompt-submit、pre-tool-use、permission-request、post-tool-use、stop、stop-limit、compact、pre-compact-block、notification）全部 ok，覆盖交付物 1 的 11 个事件；收尾 `npm run verify` 第 14 步 L2 81 passed、0 failed、2 个按平台跳过，capabilities 132（active 79），MISSING 0；CAP-HOOK-SESSION/PROMPT/PRE/PERM/POST/STOP/COMPACT/NOTIFY-001 改为 active。"
     },
     {
       "id": "T25-A02",
       "task": "T25",
       "description": "每个事件的 hook 收到的输入 JSON 含通用字段与该事件的特有字段。验证：场景中对夹具记录的 stdin 断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "每个 hooks-*.yaml 用 `expect.json_lines` 断言夹具记录的 stdin：`types` 中有 session_id、transcript_path、cwd、hook_event_name（UserPromptSubmit、PreToolUse、PermissionRequest、PostToolUse、PostToolUseFailure、Stop 另有 permission_mode），`input` 中有事件特有字段（source、reason、prompt、tool_name/tool_input/tool_use_id、permission_suggestions、tool_response/duration_ms、error/is_interrupt、stop_hook_active/last_assistant_message/background_tasks/session_crons、trigger/custom_instructions、compact_summary、message/notification_type）；Core 测试 `untrusted_project_hooks_wait_for_trust_while_user_hooks_run` 另断言 PreToolUse 输入。"
     },
     {
       "id": "T25-A03",
       "task": "T25",
       "description": "exit 2 阻断动作，stderr 作为理由出现在下一次模型请求中；其他非 0 退出码不阻断，并向用户提示错误。验证：场景测试与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `hooks-pre-tool-use`：exit 2 的 stderr \"sed is not allowed here.\" 出现在第 3 次请求的 tool_result（is_error）；`hooks-post-tool-use`：exit 1 的 hook 不阻断（调用与另一 hook 的改写照常），会话收到 `core/notices` {type: hook, event: PostToolUse, level: error, message: \"exited with code 1: formatter crashed\"}；Core 测试 `every_run_is_audited_and_long_context_goes_to_a_file` 的 exit 1 放行并提示；L4 `t25-hooks`（dev、packaged）提示行显示 \"Stop hook error\"。"
     },
     {
       "id": "T25-A04",
       "task": "T25",
       "description": "PreToolUse 的 deny、ask、allow 与 `updatedInput` 生效；多个 handler 冲突时按 deny > ask > allow 合并。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `hooks-pre-tool-use`：JSON deny 理由进入下一次请求、exit 2 拒绝、allow + updatedInput 实际执行改写后的命令（结果含 \"rewritten by hook\"、不含原命令输出）并追加 additionalContext、两个 handler 的 allow 与 ask 合并为询问（审批卡）；Core 测试 `pre_tool_use_denies_asks_allows_and_rewrites_the_call` 覆盖 allow+ask+deny → deny；`piarc-hooks` 单元测试 `pre_tool_use_merges_deny_over_ask_over_allow` 等。"
     },
     {
       "id": "T25-A05",
       "task": "T25",
       "description": "PreToolUse 返回 allow 时，后续 deny 规则、ask 规则与 plan 模式的拒绝仍然生效。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Core 测试 `a_hook_allow_leaves_deny_rules_ask_rules_and_plan_mode_in_force`：hook allow 时 `rm -rf build` 仍被 deny 规则 Bash(rm *) 拒绝、`sed -n 1p notes` 仍按 ask 规则弹审批卡、plan 模式下 Write 仍返回 PLAN_MODE_REFUSAL，hook 用 updatedInput 改写成 `rm -rf build` 时同样被拒；`cargo test -p piarc-core --lib tool_io::hooks` 10 passed。"
     },
     {
       "id": "T25-A06",
       "task": "T25",
       "description": "PostToolUse 的 `updatedToolOutput` 替换模型看到的工具结果、`additionalContext` 被追加；PostToolUseFailure 不能改写失败输出。验证：mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `hooks-post-tool-use` 的 mock 请求断言：第 2 次请求的 tool_result 含 \"[output redacted by hook]\"、不含原输出 \"secret-line\"，并含 additionalContext \"Output was redacted.\" 与 block 理由 \"Lint found 2 warnings.\"；第 3 次请求的失败结果保留原错误（含 missing.txt）、追加 \"Try again with the file name fixed.\"、不含 PostToolUseFailure 的 updatedToolOutput \"should not apply\"。"
     },
     {
       "id": "T25-A07",
       "task": "T25",
       "description": "Stop 返回 block 时以 reason 续跑一轮；连续阻断达到上限后停止续跑并提示用户。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `hooks-stop`：两次 block（JSON 与 exit 2）各续跑一轮，理由分别出现在第 2、3 次请求，记录的 stop_hook_active 依次为 false、true、true，回合 completed；`hooks-stop-limit`：始终 block 的 hook 共 9 次请求后回合结束，会话收到提示 \"Stop hooks continued the turn 8 times in a row; PiArc ended the turn.\"（上限 `piarc_hooks::STOP_CONTINUATION_LIMIT` = 8，写入架构 6.3.1）。"
     },
     {
       "id": "T25-A08",
       "task": "T25",
       "description": "PreCompact 可以阻断压缩，exit 0 的 stdout 作为摘要指令出现在摘要请求中；PostCompact 收到摘要。验证：场景测试与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `hooks-compact`：手动 /compact 时 PreCompact 的纯文本 stdout \"Keep the API decisions.\" 出现在第 2 次请求（摘要请求），PostCompact 记录 trigger manual 与字符串 compact_summary；`hooks-pre-compact-block`：exit 2 阻断压缩，只有 1 次请求，用户收到 \"Compaction blocked: Not now: a review is open.\"。"
     },
     {
       "id": "T25-A09",
       "task": "T25",
       "description": "handler 超时或会话取消时整棵进程树被终止，默认超时为 600 秒、UserPromptSubmit 为 30 秒（测试中时长可注入）。验证：macOS 本机测试与 Windows CI 测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "macOS 已通过：Core 测试 `a_timeout_or_an_interrupted_turn_ends_the_hooks_process_tree`（ProcessTreeSpawner；handler timeout 0.5 s 时后台 sleep 的 pid 在超时后消失，回合中断时另一个 hook 的后台 sleep 消失）、`the_default_timeouts_are_600_seconds_and_30_for_user_prompt_submit`（默认 600 s、UserPromptSubmit 30 s，`CoreConfig.hooks` 注入）与 `piarc-hooks` runner 超时、取消测试。Windows 部分（同一测试经 Git Bash 与 Job Object，`alive` 用 tasklist）已通过 Windows 目标交叉 Clippy（tmp/evidence/T25/windows-clippy.log），需推送后由 Windows CI 运行。"
     },
     {
       "id": "T25-A10",
       "task": "T25",
       "description": "同一事件的多个 handler 并行执行；同一 handler 定义在多个文件中时只执行一次。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Core 测试 `handlers_run_in_parallel_and_a_handler_in_two_files_runs_once`：两个各 sleep 1 s 的 handler 总耗时 < 1.9 s，同一 handler 写在用户与项目两个文件中只运行一次（记录 1 行、审计 2 行）；`piarc-hooks` 的 `handlers_of_one_event_run_in_parallel`、`layers_merge_and_a_handler_in_two_files_runs_once`。"
     },
     {
       "id": "T25-A11",
       "task": "T25",
       "description": "未信任项目的项目级 hooks 不执行，用户级 hooks 照常执行，信任后项目级 hooks 生效。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Core 测试 `untrusted_project_hooks_wait_for_trust_while_user_hooks_run`：未信任时只运行用户级 hook，信任后项目 `.claude/settings.json` 的 hook 也运行；配置测试 `cargo test -p piarc-config` 与 L4 t25-hooks（信任后项目 hooks 生效）。"
     },
     {
       "id": "T25-A12",
       "task": "T25",
       "description": "每次 hook 执行都写入审计记录（事件、来源、exit code、耗时、决策）；超过 10,000 字符的上下文输出落盘并只送预览。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Core 测试 `every_run_is_audited_and_long_context_goes_to_a_file`：两个 handler 写两行 audit_events（kind hook，event PreToolUse、layer、source 文件、durationMs、commandSha256、exitCode 0 与 1、timedOut、decision），12,000 字符的 additionalContext 只送 2,000 字符预览与路径，文件中是全文；`piarc-hooks` spill 测试。"
     },
     {
       "id": "T25-A13",
       "task": "T25",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "收尾 `npm run verify`：All 15 steps passed（Vitest 1110 passed、1 skipped；cargo test 通过；L2 81 passed、MISSING 0），日志 tmp/evidence/T25/verify-final.log。"
     },
     {
       "id": "T26-A01",
