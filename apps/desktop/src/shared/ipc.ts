@@ -386,7 +386,7 @@ export interface PiarcApi {
   /** The trust view of a directory as JSON (`TrustView`). */
   projectTrust(path: string): Promise<string>;
   /** Records the user's trust decision; resolves with the new `TrustView` as JSON. */
-  decideProjectTrust(path: string, trusted: boolean): Promise<string>;
+  decideProjectTrust(path: string, trusted: boolean, version: string): Promise<string>;
 
   /**
    * Tells the main process a session needs the user: a system notification (when the window

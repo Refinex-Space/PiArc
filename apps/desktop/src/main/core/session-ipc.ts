@@ -441,7 +441,9 @@ export function registerSessionHandlers(
     core.resendSnapshots();
   });
   registerHandler(IPC_CHANNELS.trustGet, (_event, [dir]) => core.projectTrust(absolutePath(dir)));
-  registerHandler(IPC_CHANNELS.trustDecide, (_event, [dir, trusted]) =>
-    core.decideProjectTrust(absolutePath(dir), flag(trusted, 'trusted')),
-  );
+  registerHandler(IPC_CHANNELS.trustDecide, (_event, [dir, trusted, version]) => {
+    if (typeof version !== 'string' || !/^[0-9a-f]{64}$/u.test(version))
+      throw new TypeError('invalid trust view version');
+    return core.decideProjectTrust(absolutePath(dir), flag(trusted, 'trusted'), version);
+  });
 }

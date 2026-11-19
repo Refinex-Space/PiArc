@@ -128,17 +128,19 @@ impl CoreRuntime {
     pub fn trust_view(
         &self,
         path: PathBuf,
-        decide: Option<bool>,
+        decide: Option<(bool, String)>,
         on_done: impl FnOnce(Result<TrustView>) + Send + 'static,
     ) -> Result<()> {
         let trust = self.trust_for(&path)?;
         let hub = self.services()?.sessions;
         self.shared.handle.spawn(async move {
-            let result = match decide {
+            let result = match &decide {
                 None => trust.view(&path).await,
-                Some(trusted) => trust.decide(&path, trusted).await,
+                Some((trusted, version)) => trust.decide(&path, *trusted, version).await,
             };
-            if let (Some(_), Ok(view)) = (decide, &result) {
+            if let Ok(view) = &result
+                && view.applied
+            {
                 hub.trust_changed(std::path::Path::new(&view.checkout))
                     .await;
             }

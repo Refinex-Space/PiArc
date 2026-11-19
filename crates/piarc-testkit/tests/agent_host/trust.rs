@@ -74,7 +74,18 @@ async fn project_extensions_load_only_while_core_trusts_the_project() {
     );
 
     // Trusted: Core restarts the Agent Host, the session is reopened and the tool is offered.
-    trust.decide(&env.ws[0], true).await.expect("trust");
+    trust
+        .decide(
+            &env.ws[0],
+            true,
+            &trust
+                .view(&env.ws[0])
+                .await
+                .expect("displayed trust view")
+                .version,
+        )
+        .await
+        .expect("trust");
     let restored = events
         .until(|e| matches!(e, HostEvent::SessionRestored { epoch: 2, .. }))
         .await;

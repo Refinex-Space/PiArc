@@ -93,6 +93,11 @@ test('the trust dialog lists the items; the decision decides what the model gets
   await expect(dialog.getByTestId('trust-item')).toHaveCount(1);
   await expect(dialog.getByTestId('trust-item')).toContainText('Bash(curl *)');
   await dialog.screenshot({ path: testInfo.outputPath('trust-new-items.png') });
+  settings.permissions.allow.push('Bash(node --version)');
+  await writeFile(settingsFile, JSON.stringify(settings));
+  await page.getByTestId('trust-accept').click();
+  await expect(dialog.getByTestId('trust-item')).toHaveCount(2);
+  await expect(dialog).toContainText('Bash(node --version)');
   await page.getByTestId('trust-accept').click();
   await expect(page.getByTestId('agent-message')).toHaveText(/Done\./, { timeout: 30_000 });
   const confirmed = await mockRequests(mock, 't18-chat#confirmed');

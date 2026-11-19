@@ -358,9 +358,9 @@ const api: PiarcApi = {
   },
   projectTrust: (path) =>
     ipcRenderer.invoke(IPC_CHANNELS.trustGet, path).then((value: unknown) => expectString(value)),
-  decideProjectTrust: (path, trusted) =>
+  decideProjectTrust: (path, trusted, version) =>
     ipcRenderer
-      .invoke(IPC_CHANNELS.trustDecide, path, trusted)
+      .invoke(IPC_CHANNELS.trustDecide, path, trusted, version)
       .then((value: unknown) => expectString(value)),
   notifyAttention: async (notice) => {
     await ipcRenderer.invoke(IPC_CHANNELS.attentionNotify, notice);

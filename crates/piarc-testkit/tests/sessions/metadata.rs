@@ -175,7 +175,14 @@ async fn a_trust_decision_while_the_agent_host_starts_still_lets_a_session_start
         })
         .await;
     let (decided_tx, decided_rx) = tokio::sync::oneshot::channel();
-    core.trust_view(env.ws.clone(), Some(true), move |result| {
+    let version = core
+        .trust()
+        .expect("trust")
+        .view(&env.ws)
+        .await
+        .expect("view")
+        .version;
+    core.trust_view(env.ws.clone(), Some((true, version)), move |result| {
         let _ = decided_tx.send(result.map(|view| view.trusted));
     })
     .expect("queued");
@@ -242,7 +249,14 @@ async fn a_session_created_right_after_a_trust_decision_starts() {
     answer(rx).await.expect("the workspace opens");
     for trusted in [true, false, true] {
         let (decided_tx, decided_rx) = tokio::sync::oneshot::channel();
-        core.trust_view(env.ws.clone(), Some(trusted), move |result| {
+        let version = core
+            .trust()
+            .expect("trust")
+            .view(&env.ws)
+            .await
+            .expect("view")
+            .version;
+        core.trust_view(env.ws.clone(), Some((trusted, version)), move |result| {
             let _ = decided_tx.send(result.map(|view| view.trusted));
         })
         .expect("queued");

@@ -121,6 +121,15 @@ fn trust_get_params(path: &Path) -> Map<String, Value> {
     map
 }
 
+async fn decide_current(
+    trust: &TrustService,
+    path: &Path,
+    trusted: bool,
+) -> piarc_core::Result<piarc_core::trust::TrustView> {
+    let displayed = trust.view(path).await?;
+    trust.decide(path, trusted, &displayed.version).await
+}
+
 async fn asked(trust: &TrustService, path: &Path) -> bool {
     trust
         .trust_get(trust_get_params(path))
@@ -232,8 +241,7 @@ fn worktrees_share_trust_submodules_and_plain_directories_do_not_and_decisions_s
                 dir.display()
             );
         }
-        let view = trust
-            .decide(&linked, true)
+        let view = decide_current(&trust, &linked, true)
             .await
             .expect("decide from the worktree");
         assert_eq!(view.kind, "linkedWorktree");
@@ -252,8 +260,7 @@ fn worktrees_share_trust_submodules_and_plain_directories_do_not_and_decisions_s
         );
         assert!(!asked(&trust, &plain).await);
 
-        trust
-            .decide(&plain, true)
+        decide_current(&trust, &plain, true)
             .await
             .expect("trust the plain directory");
         assert!(asked(&trust, &plain).await);
@@ -278,7 +285,7 @@ fn worktrees_share_trust_submodules_and_plain_directories_do_not_and_decisions_s
         assert_eq!(change.checkout, piarc_git::canonical(&main).expect("main"));
         assert!(!asked(&trust, &linked).await, "revoked for every worktree");
         assert!(asked(&trust, &plain).await, "other projects keep theirs");
-        trust.decide(&plain, false).await.expect("deny");
+        decide_current(&trust, &plain, false).await.expect("deny");
         assert!(!asked(&trust, &plain).await, "a denial is not trust");
     });
     core.shutdown_blocking().expect("shutdown");
@@ -318,7 +325,9 @@ fn trust_get_answers_untrusted_on_every_failure() {
     let workspace = f.root.join("ws");
     std::fs::create_dir_all(&workspace).expect("ws");
     rt.block_on(async {
-        trust.decide(&workspace, true).await.expect("trusted");
+        decide_current(&trust, &workspace, true)
+            .await
+            .expect("trusted");
         assert!(asked(&trust, &workspace).await);
 
         // A directory that cannot be resolved.
@@ -386,7 +395,7 @@ fn a_trust_view_lists_the_items_and_what_is_new_since_the_decision() {
         assert_eq!(before.kind, "notGit");
         assert!(before.decision.is_none() && !before.trusted);
         assert_eq!(before.items.len(), 2);
-        let decided = trust.decide(&ws, true).await.expect("decide");
+        let decided = decide_current(&trust, &ws, true).await.expect("decide");
         assert!(decided.trusted && decided.new_items.is_empty());
         std::fs::write(
             ws.join(".piarc").join("settings.json"),
@@ -408,7 +417,7 @@ fn a_trust_view_lists_the_items_and_what_is_new_since_the_decision() {
             !asked(&trust, &ws).await,
             "unconfirmed items are not trusted"
         );
-        let confirmed = trust.decide(&ws, true).await.expect("confirm");
+        let confirmed = decide_current(&trust, &ws, true).await.expect("confirm");
         assert!(confirmed.trusted && confirmed.new_items.is_empty());
         assert!(asked(&trust, &ws).await, "confirmed items are trusted");
         // Removing an item needs no confirmation.
@@ -520,7 +529,8 @@ fn editing_settings_while_running_emits_changed_keys_and_invalid_files_keep_the_
 
     // Trusting the project merges its allow rules and reports the key.
     let trust = core.trust().expect("trust");
-    rt.block_on(trust.decide(&ws, true)).expect("trust");
+    rt.block_on(async { decide_current(&trust, &ws, true).await })
+        .expect("trust");
     let event = wait_for(&rx, "trust change", |e| {
         e["changed"] == json!(["/permissions/allow"])
     });
@@ -543,8 +553,7 @@ fn approval_extends_only_the_selected_entries_of_an_existing_trust_snapshot() {
     let (core, _events) = fixture.start();
     let trust = core.trust().expect("trust");
     rt.block_on(async {
-        trust
-            .decide(&nested, true)
+        decide_current(&trust, &nested, true)
             .await
             .expect("trust empty project");
         let table = LayerTable::piarc(fixture.dirs().data(), &nested);

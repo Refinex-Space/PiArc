@@ -55,8 +55,14 @@ impl CoreRuntime {
         env: &'env Env,
         path: String,
         trusted: bool,
+        version: String,
     ) -> napi::Result<Object<'env>> {
-        self.trust_call(env, "CoreRuntime.decideProjectTrust", path, Some(trusted))
+        self.trust_call(
+            env,
+            "CoreRuntime.decideProjectTrust",
+            path,
+            Some((trusted, version)),
+        )
     }
 
     /// Revokes the trust decision of the project containing an absolute directory; resolves
@@ -129,7 +135,7 @@ impl CoreRuntime {
         env: &'env Env,
         location: &'static str,
         path: String,
-        decide: Option<bool>,
+        decide: Option<(bool, String)>,
     ) -> napi::Result<Object<'env>> {
         let (deferred, promise) = env.create_deferred::<String, Settle>()?;
         boundary::call(env, location, || {

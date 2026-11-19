@@ -163,7 +163,7 @@ export declare class CoreRuntime {
    * with the executable items listed now as its snapshot; resolves with the new
    * `TrustView` as JSON.
    */
-  decideProjectTrust(path: string, trusted: boolean): Promise<string>;
+  decideProjectTrust(path: string, trusted: boolean, version: string): Promise<string>;
   /**
    * Revokes the trust decision of the project containing an absolute directory; resolves
    * with the new `TrustView` as JSON. The workspace's Agent Host restarts without project

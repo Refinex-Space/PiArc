@@ -16,6 +16,7 @@ use piarc_protocol::{ErrorKind, ErrorObject};
 use piarc_store::{TrustDecision, TrustRecord};
 use serde::Serialize;
 use serde_json::{Map, Value};
+use sha2::{Digest as _, Sha256};
 use tokio::sync::broadcast;
 
 use crate::error::{Error, Result};
@@ -34,6 +35,10 @@ pub struct TrustChange {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrustView {
+    /// Digest of this directory, inventory and previous decision, for optimistic confirmation.
+    pub version: String,
+    /// True only on the response to a decision actually recorded.
+    pub applied: bool,
     /// The directory asked about.
     pub path: String,
     /// The main checkout the decision belongs to.
@@ -230,20 +235,21 @@ impl TrustService {
     /// # Errors
     ///
     /// As [`TrustService::view`].
-    pub async fn decide(&self, dir: &Path, trusted: bool) -> Result<TrustView> {
-        let dir_owned = dir.to_owned();
+    pub async fn decide(&self, dir: &Path, trusted: bool, version: &str) -> Result<TrustView> {
+        let dir = dir.to_owned();
+        let expected = version.to_owned();
         let storage = self.storage.clone();
-        let (view, checkout) = blocking(move || {
-            let checkout = piarc_git::resolve(&dir_owned)?;
-            let key = checkout_key(&checkout.main)?;
-            let inventory = inventory_at(&checkout.root, &piarc_git::canonical(&dir_owned)?);
-            let snapshot =
-                serde_json::to_string(&inventory.items).map_err(|e| Error::Internal {
+        let view = blocking(move || {
+            storage.with(|store| -> Result<TrustView> {
+                let view = view_from_store(store, &dir)?;
+                if trusted && (view.version != expected || !view.unreadable.is_empty()) {
+                    return Ok(view);
+                }
+                let snapshot = serde_json::to_string(&view.items).map_err(|e| Error::Internal {
                     reason: format!("cannot encode the trust snapshot: {e}"),
                 })?;
-            storage.with(|store| {
                 store.set_trust(&TrustRecord {
-                    checkout: key,
+                    checkout: view.checkout.clone(),
                     decision: if trusted {
                         TrustDecision::Trusted
                     } else {
@@ -251,14 +257,18 @@ impl TrustService {
                     },
                     decided_at: now_ms(),
                     snapshot,
-                })
-            })??;
-            Ok((build_view(&storage, &dir_owned)?, checkout.main))
+                })?;
+                let mut applied = view_from_store(store, &dir)?;
+                applied.applied = true;
+                Ok(applied)
+            })?
         })
         .await?;
-        tracing::info!(target: "piarc_core::trust", checkout = %checkout.display(), trusted, "trust decided");
-        // No subscriber is fine.
-        let _ = self.changes.send(TrustChange { checkout, trusted });
+        if view.applied {
+            let checkout = PathBuf::from(&view.checkout);
+            tracing::info!(target:"piarc_core::trust", checkout=%checkout.display(),trusted,"trust decided");
+            let _ = self.changes.send(TrustChange { checkout, trusted });
+        }
         Ok(view)
     }
 
@@ -377,9 +387,13 @@ fn inventory_at(root: &Path, dir: &Path) -> Inventory {
 }
 
 fn build_view(storage: &Storage, dir: &Path) -> Result<TrustView> {
+    storage.with(|store| view_from_store(store, dir))?
+}
+
+fn view_from_store(store: &piarc_store::Store, dir: &Path) -> Result<TrustView> {
     let checkout = piarc_git::resolve(dir)?;
     let key = checkout_key(&checkout.main)?;
-    let record = storage.with(|store| store.trust(&key))??;
+    let record = store.trust(&key)?;
     let Inventory { items, unreadable } = inventory_at(&checkout.root, &piarc_git::canonical(dir)?);
     let decided_trusted = record
         .as_ref()
@@ -398,7 +412,29 @@ fn build_view(storage: &Storage, dir: &Path) -> Result<TrustView> {
             Vec::new()
         }
     });
+    let encoded = serde_json::to_vec(&(
+        &key,
+        piarc_git::canonical(dir)?,
+        &items,
+        &unreadable,
+        &new_items,
+        record.as_ref().map(|r| {
+            (
+                r.decision == TrustDecision::Trusted,
+                r.decided_at,
+                &r.snapshot,
+            )
+        }),
+    ))
+    .map_err(|e| Error::Internal {
+        reason: e.to_string(),
+    })?;
     Ok(TrustView {
+        version: Sha256::digest(encoded)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect(),
+        applied: false,
         path: dir.to_string_lossy().into_owned(),
         checkout: key,
         root: checkout.root.to_string_lossy().into_owned(),

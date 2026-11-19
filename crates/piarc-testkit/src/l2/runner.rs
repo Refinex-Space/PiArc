@@ -490,9 +490,17 @@ impl Driver<'_> {
     async fn open(&mut self) -> Result<(), String> {
         let workspace = self.env.workspace.clone();
         if self.spec.workspace.trusted {
+            let version = self
+                .core
+                .trust()
+                .map_err(|e| e.to_string())?
+                .view(&workspace)
+                .await
+                .map_err(|e| e.to_string())?
+                .version;
             let (tx, rx) = oneshot::channel();
             self.core
-                .trust_view(workspace.clone(), Some(true), move |r| {
+                .trust_view(workspace.clone(), Some((true, version)), move |r| {
                     let _ = tx.send(r.map(|_| Value::Null));
                 })
                 .map_err(|e| e.to_string())?;

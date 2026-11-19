@@ -316,7 +316,16 @@ describe('Core state over a data directory (T13)', () => {
 
       const before: unknown = JSON.parse(await core.projectTrust(workspace));
       expect(before).toMatchObject({ kind: 'notGit', trusted: false, items: [] });
-      const decided: unknown = JSON.parse(await core.decideProjectTrust(workspace, true));
+      if (
+        typeof before !== 'object' ||
+        before === null ||
+        !('version' in before) ||
+        typeof before.version !== 'string'
+      )
+        throw new Error('missing inventory version');
+      const decided: unknown = JSON.parse(
+        await core.decideProjectTrust(workspace, true, before.version),
+      );
       expect(decided).toMatchObject({ trusted: true, decision: 'trusted' });
       const revoked: unknown = JSON.parse(await core.revokeProjectTrust(workspace));
       expect(revoked).toMatchObject({ trusted: false });

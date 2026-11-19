@@ -17,6 +17,8 @@ interface TrustItem {
 
 /** The parts of Core's `TrustView` the dialog shows. */
 export interface TrustView {
+  readonly version: string;
+  readonly applied: boolean;
   readonly decision: 'trusted' | 'denied' | null;
   readonly trusted: boolean;
   readonly items: readonly TrustItem[];
@@ -61,7 +63,10 @@ export function parseTrustView(text: string): TrustView | undefined {
           : [],
       )
     : [];
+  if (typeof view.version !== 'string') return undefined;
   return {
+    version: view.version,
+    applied: view.applied === true,
     decision,
     trusted: view.trusted === true,
     items: items(view.items),
@@ -72,7 +77,7 @@ export function parseTrustView(text: string): TrustView | undefined {
 
 /** Whether the user has to decide before a session starts in the workspace. */
 export function needsDecision(view: TrustView): boolean {
-  return view.decision === null || (view.decision === 'trusted' && view.newItems.length > 0);
+  return view.decision === null || (view.decision === 'trusted' && !view.trusted);
 }
 
 const CATEGORY_ORDER = [
@@ -131,10 +136,17 @@ export function TrustDialog({
   const listed =
     typeof view === 'object' && 'items' in view ? (onlyNew ? view.newItems : view.items) : [];
   const decide = (trusted: boolean) => {
+    if (!loaded) return;
     setBusy(true);
-    window.piarc.decideProjectTrust(workspace, trusted).then(
-      () => {
-        onDone(trusted);
+    window.piarc.decideProjectTrust(workspace, trusted, view.version).then(
+      (text) => {
+        const updated = parseTrustView(text);
+        if (updated?.applied && (!trusted || updated.trusted)) onDone(trusted);
+        else {
+          setBusy(false);
+          setView(updated ?? { failed: 'malformed trust view' });
+          deny.current?.focus();
+        }
       },
       (error: unknown) => {
         setBusy(false);
@@ -242,7 +254,7 @@ export function TrustDialog({
         <button
           type="button"
           className="button button-primary"
-          disabled={busy || typeof view !== 'object' || 'failed' in view}
+          disabled={busy || !loaded || view.unreadable.length > 0}
           data-testid="trust-accept"
           onClick={() => {
             decide(true);

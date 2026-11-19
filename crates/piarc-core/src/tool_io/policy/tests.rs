@@ -45,7 +45,18 @@ impl Fixture {
         .expect("settings");
         let storage = Storage::open(dirs).expect("open database");
         let trust = TrustService::new(storage.clone());
-        trust.decide(&work, true).await.expect("trust the fixture");
+        trust
+            .decide(
+                &work,
+                true,
+                &trust
+                    .view(&work)
+                    .await
+                    .expect("displayed trust view")
+                    .version,
+            )
+            .await
+            .expect("trust the fixture");
         let (events, coalescer, _) = crate::events::channel(
             Duration::from_millis(1),
             Arc::new(Sink),
