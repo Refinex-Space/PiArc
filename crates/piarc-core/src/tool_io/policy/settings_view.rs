@@ -3,7 +3,7 @@
 //! changed allow rules natively before an edit arrives here.
 use piarc_config::executables::Item;
 use piarc_config::{Category, PermissionLists, Scope as LayerScope, TrustState, ids};
-use piarc_policy::rules::{Behavior, RuleSet, parse};
+use piarc_policy::rules::{Behavior, RuleSet, Spec, parse};
 use serde::Deserialize;
 
 use super::*;
@@ -31,13 +31,35 @@ pub(crate) struct AuditQuery {
     limit: Option<u32>,
 }
 
-/// Whether `rule` parses for `behavior`, and whether it is broad.
+/// Whether `rule` parses for `behavior`, and whether it is broad. A rule that parses but can
+/// never match (`Write(path)`, `Glob(path)`, … as in Claude Code) carries the rule to write
+/// instead (I85: T20 saved `Write(path)` rules; Claude Code only matches `Edit(path)`).
 #[must_use]
 pub(crate) fn check_rule(rule: &str, behavior: Behavior) -> Value {
     match parse(rule, behavior) {
-        Ok(_) => json!({"broad": behavior == Behavior::Allow && RuleSet::is_broad(rule)}),
+        Ok(parsed) => {
+            let mut row = json!({"broad": behavior == Behavior::Allow && RuleSet::is_broad(rule)});
+            if matches!(parsed.spec, Some(Spec::Inert))
+                && let Some(instead) = inert_replacement(rule)
+            {
+                row["suggestion"] = json!(instead);
+            }
+            row
+        }
         Err(error) => json!({"error": error, "broad": false}),
     }
+}
+
+/// `Edit(…)` for a `Write(…)` or `NotebookEdit(…)` rule, `Read(…)` for `Glob(…)` or `Grep(…)`.
+fn inert_replacement(rule: &str) -> Option<String> {
+    let (tool, rest) = rule.trim().split_once('(')?;
+    let spec = rest.strip_suffix(')')?;
+    let tool = match tool.trim() {
+        "Write" | "NotebookEdit" => "Edit",
+        "Glob" | "Grep" => "Read",
+        _ => return None,
+    };
+    Some(format!("{tool}({spec})"))
 }
 
 fn rows(lists: &PermissionLists, active: Option<&PermissionLists>) -> Vec<Value> {
@@ -282,5 +304,32 @@ impl ToolIo {
             })
             .collect();
         Ok(json!({"events": events}))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rules_that_never_match_suggest_the_rule_that_does() {
+        let row = check_rule("Write(src/**)", Behavior::Allow);
+        assert_eq!(row["suggestion"], "Edit(src/**)");
+        assert_eq!(
+            check_rule("Grep(*.rs)", Behavior::Deny)["suggestion"],
+            "Read(*.rs)"
+        );
+        assert_eq!(
+            check_rule("NotebookEdit(a.ipynb)", Behavior::Ask)["suggestion"],
+            "Edit(a.ipynb)"
+        );
+        for fine in ["Edit(src/**)", "Write", "Bash(ls *)"] {
+            assert!(
+                check_rule(fine, Behavior::Allow)
+                    .get("suggestion")
+                    .is_none(),
+                "{fine}"
+            );
+        }
     }
 }

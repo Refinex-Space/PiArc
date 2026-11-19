@@ -58,7 +58,9 @@ test('configuration diagnostics explain every file and follow a Claude Code edit
   const ws = await makeWorkspace(workspaces, 'diagnostics 诊断', {
     '.claude/settings.json': PROJECT,
     '.claude/settings.local.json': BROKEN_LOCAL,
-    '.piarc/settings.json': JSON.stringify({ permissions: { defaultMode: 'default' } }),
+    '.piarc/settings.json': JSON.stringify({
+      permissions: { defaultMode: 'default', deny: ['Write(secrets/**)'] },
+    }),
   });
   await openFolder(page, app, ws);
   // Not trusted: the project's allow rule and mode wait for trust.
@@ -142,6 +144,18 @@ test('configuration diagnostics explain every file and follow a Claude Code edit
   });
   await settings.screenshot({ path: path.join(EVIDENCE, 'diagnostics-zh-CN.png') });
   await user.screenshot({ path: path.join(EVIDENCE, 'diagnostics-zh-CN-user.png') });
+
+  // I85: a rule that never matches names the one to write; Claude Code sources are listed.
+  await settings.getByTestId('settings-nav-permissions').click();
+  await expect(settings.getByTestId('permission-source-claudeUser')).toContainText(
+    'Bash(rm -rf *)',
+  );
+  await expect(
+    settings.getByTestId('permission-source-project').getByTestId('permission-suggestion'),
+  ).toHaveText('永不匹配，请改写为 Edit(secrets/**)');
+  await settings
+    .getByTestId('permission-source-project')
+    .screenshot({ path: path.join(EVIDENCE, 'permissions-suggestion-zh-CN.png') });
 
   // PiArc read the Claude Code files and wrote none of them.
   expect(await readFile(path.join(ws, '.claude', 'settings.json'), 'utf8')).toBe(PROJECT);

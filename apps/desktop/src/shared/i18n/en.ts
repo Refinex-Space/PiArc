@@ -23,6 +23,7 @@ export const en = {
   'permissions.inactive': 'Not applied until you trust this project',
   'permissions.invalid': 'Invalid: {reason}',
   'permissions.broad': 'Broad: this rule allows many commands',
+  'permissions.neverMatches': 'Never matches; write {rule} instead',
   'permissions.add': 'Add rule',
   'permissions.edit': 'Edit',
   'permissions.remove': 'Remove',

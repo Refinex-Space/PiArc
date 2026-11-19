@@ -19,6 +19,8 @@ interface RuleRow {
   readonly behavior: RuleBehavior;
   readonly rule: string;
   readonly error?: string;
+  /** The rule that matches what this one names, when it can never match (I85). */
+  readonly suggestion?: string;
   readonly broad: boolean;
   readonly inactive: boolean;
 }
@@ -74,11 +76,13 @@ export function parseView(raw: string): PermissionView {
           const rule = str(r.rule);
           if (rule === undefined || !isBehavior(r.behavior)) return [];
           const error = str(r.error);
+          const suggestion = str(r.suggestion);
           const row = {
             behavior: r.behavior,
             rule,
             broad: r.broad === true,
             inactive: r.inactive === true,
+            ...(suggestion === undefined ? {} : { suggestion }),
           };
           return [error === undefined ? row : { ...row, error }];
         },
@@ -308,6 +312,12 @@ function SourceSection({
                       <span className="muted"> {t('permissions.broad')}</span>
                     )}
                     {r.inactive && <span className="muted"> {t('permissions.inactive')}</span>}
+                    {r.suggestion !== undefined && (
+                      <span className="muted" data-testid="permission-suggestion">
+                        {' '}
+                        {t('permissions.neverMatches', { rule: r.suggestion })}
+                      </span>
+                    )}
                     {source.writable && (
                       <span className="permission-actions">
                         <button
