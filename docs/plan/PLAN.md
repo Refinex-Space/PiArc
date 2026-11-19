@@ -153,7 +153,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 已完成 | ae5c8e6 |
 | T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 30a4f17 |
 | T26 | [计划模式、任务清单、AskUserQuestion 与下一步](tasks/T26-plan-mode-todo-ask-next-steps.md) | 3 | T25 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 23630e3 |
-| T27 | [上下文工程：system reminder、压缩与用量](tasks/T27-context-reminders-compaction-usage.md) | 3 | T26 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
+| T27 | [上下文工程：system reminder、压缩与用量](tasks/T27-context-reminders-compaction-usage.md) | 3 | T26 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | b0b2641 |
 | T28 | [检查点、回退与 Changes 面板](tasks/T28-checkpoints-rewind-changes.md) | 3 | T27 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T29 | [WebFetch、登录与模型设置补全、三档视图](tasks/T29-webfetch-login-model-settings-views.md) | 3 | T28 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T30 | [L3 行为对齐基座](tasks/T30-l3-behavior-alignment.md) | 3 | T29 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,21 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-### T27 上下文工程：system reminder、压缩与用量（开工 2026-11-19，基线 d808f82，verify 15/15）
-
-- [x] 1. 设计与 ADR：reminder 通道、外部修改检测方式、压缩阈值的 Pi 配置、熔断、重注入、用量口径、缓存断点
-- [x] 2. system reminder 通道：七类类型、来源与正文；迁入 T22 懒加载、T24 rules、T25 `additionalContext`，删除旧注入代码；投影为带 `reminder` 标记的 item（A06）
-- [x] 3. 外部修改提醒：Core 文件状态表比对 + AHP；I72 压缩后清读取范围（A07）
-- [x] 4. 压缩：自写分节摘要提示、`/compact [重点]`、PreCompact/PostCompact 衔接（A02、A03）
-- [x] 5. 阈值纯函数与 `autoCompactWindow`/`autoCompactEnabled` 设置，熔断与提示行（A01、A04）
-- [x] 6. 压缩后重注入：memory、计划、任务清单、skill 正文槽位、最近文件（上限常量，A05）
-- [x] 7. 上下文用量：分类统计、`session/usage`、`session/getContextUsage`、未分类差额（A08）
-- [x] 8. 缓存断点：Anthropic 线格式布局与 mock 断言（A10）
-- [x] 9. L2 场景 `ctx-*` 与能力 ID（A01–A07、A10）
-- [ ] 10. 客户端：用量环（75%/90%）、右栏上下文卡片与压缩按钮，L4 与截图（A09）
-- [ ] 11. 原创性自查（A11）、文档与 AGENTS.md、收尾 verify（A12）
-
 
 ## 登记事项
 
@@ -820,6 +805,15 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 实现中的修正：T19 的滚动跟随把窗口内任何一次 `pointerup` 都当作 150 ms 的滚动输入，卡片按钮答复后的内容变化因此不贴底，停靠面板出现时尤其明显；改为只有按住滚动条后的松开才算（先写失败的单测）。`hooks-pre-tool-use` 的 `not_contains: three` 与新工具描述撞词，改了描述措辞。原创性检查扩大到工具描述与提醒文案（1,498 词，0 匹配窗口）。
 - 登记 I104（`plansDirectory` 未在 T26 支持，R3 决定）、I105（注册表与 Core policy.rs 接近 1,000 行）；I01 评估为不加 TaskCreate 映射；I88、I89 补充行数。
 - 下一项：macOS 上的 T27（上下文工程：system reminder、压缩与用量）。本地提交，未推送。
+
+### 2026-11-19 T27 已完成（验收提交 b0b2641）
+
+- 交付：提醒统一通道（`agent-host/src/harness/reminders.ts`：类型 `todoStale`、`fileModified`、`planMode`、`backgroundTask`、`memoryLazyLoad`、`rulesMatched`、`hookContext` 与压缩重注入的 `contextRestore`，带来源、长度、用量类别与回放数据），T22 懒加载、T24 条件 rules、T25 的 `additionalContext` 迁入并删除旧注入（`piarc.memory`、`piarc.hookContext` 不再写入）；外部修改用送达前的 stat 比对（Core `fs/changes`）；自写分节摘要提示接管全部压缩，阈值 W − min(O, 20K) − 13K 经 Pi 的 `compaction.reserveTokens` 生效，`autoCompactEnabled`/`autoCompactWindow` 生效，连续 3 次失败或无效熔断；压缩后按上限重注入 memory、计划、任务清单、skill 正文（`piarc.skillInvoked` 槽位）与最近 5 个文件（`fs/read` 的 `restore`），`fs/forgetReads` 清读取范围（I72）；按类别的上下文用量（`session/usage`、`session/getContextUsage`）；客户端用量环（75%/90%）、右栏上下文卡片与立即压缩、`/compact <重点>`。见 ADR-0043、架构 v2.34。
+- 验收：12/12 通过。开工基线 d808f82 与收尾 `npm run verify` 均 15/15；L2 100 通过、2 个按平台跳过，新增 9 个 `ctx-*` 场景（运行器加 `context_window`、`max_tokens`、`compact.instructions`、`check_usage`），CAP-CTX-REMINDER-001、CAP-CTX-COMPACT-001、CAP-CTX-USAGE-001 改为 active，新增 CAP-CTX-COMPACT-002、003、CAP-CTX-CHANGED-001、CAP-CTX-CACHE-001，MISSING 0；agent_host 新增后台任务提醒与 skill 重注入两个端到端用例。
+- L4：`t27-context` 与受影响的 `t26-harness`、`preload` dev 与 packaged 各通过；全量 L4 214 通过、5 个按平台跳过，`t18-review` 两个形态因本机终端没有"屏幕录制"权限失败（已知），`t26-harness` 任务卡片一例因上下文卡片抢了右栏第一个标签失败，已把上下文卡片排在任务卡片之后并重跑通过。ego-browser 用本地渲染器与假 Core 操作了中文界面的用量环三级、上下文卡片、立即压缩与熔断提示。Windows 目标整个 workspace 的交叉 Clippy 通过。证据在 `tmp/evidence/T27/`。
+- 实现中的修正：T14 在 `SettingsManager.create` 之后施加的 `retry.provider.maxRetries = 0` 会被创建会话时资源加载的 `reload()` 清掉，实际没有生效；改为与压缩设置一起在每次运行前施加，并补了复现 Pi 行为的单测。Pi 在 `context_with_system` 之后才把 system 换成冻结的提示，用量改为按冻结文本计算。第一次收尾 verify 中 `piarc-core` 的 `editing_claude_code_settings_while_running…`（文件监听）在全量并行负载下超时一次，单独与整组重跑 5/5 通过，第二次 verify 全部通过。
+- 登记 I106（架构第 4 章缺 ADR-0042）、I107（压缩设置无界面控件、熔断状态不持久化）；I16、I67、I72、I92、I105 已处理或更新。
+- 下一项：macOS 上的 T28（检查点、回退与 Changes 面板）。本地提交，未推送。
 
 ## 计划变更记录
 
