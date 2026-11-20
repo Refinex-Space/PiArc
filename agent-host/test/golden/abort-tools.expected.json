@@ -59,6 +59,36 @@
     }
   },
   {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "commandExecution",
+        "itemId": "toolu_hang",
+        "status": "interrupted",
+        "tool": "Bash",
+        "arguments": {
+          "command": "sleep 30"
+        },
+        "output": "Operation aborted",
+        "command": "sleep 30"
+      }
+    }
+  },
+  {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
+    }
+  },
+  {
     "method": "item/started",
     "payload": {
       "turnId": "turn-<id:1>",
@@ -84,47 +114,7 @@
         "tool": "Read",
         "arguments": {
           "path": "notes/x.txt"
-        },
-        "output": "Operation aborted"
-      }
-    }
-  },
-  {
-    "method": "item/completed",
-    "payload": {
-      "turnId": "turn-<id:1>",
-      "item": {
-        "type": "commandExecution",
-        "itemId": "toolu_hang",
-        "status": "interrupted",
-        "tool": "Bash",
-        "arguments": {
-          "command": "sleep 30"
-        },
-        "output": "Command aborted",
-        "command": "sleep 30",
-        "execution": {
-          "cwd": "/private/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 85010/ws a 甲",
-          "outcome": "failure",
-          "durationMs": 0,
-          "timedOut": false,
-          "timeoutMs": 120000,
-          "truncated": false,
-          "signal": 15
         }
-      }
-    }
-  },
-  {
-    "method": "turn/usage",
-    "payload": {
-      "turnId": "turn-<id:1>",
-      "usage": {
-        "inputTokens": 0,
-        "outputTokens": 0,
-        "cacheReadTokens": 0,
-        "cacheWriteTokens": 0,
-        "cost": 0
       }
     }
   },

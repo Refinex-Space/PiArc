@@ -82,15 +82,13 @@
     "payload": {
       "turnId": "turn-<id:1>",
       "item": {
-        "type": "webFetch",
-        "itemId": "toolu_fetch",
+        "type": "dynamicToolCall",
+        "itemId": "toolu_search",
         "status": "inProgress",
-        "tool": "WebFetch",
+        "tool": "WebSearch",
         "arguments": {
-          "prompt": "Summarize.",
-          "url": "https://example.com/"
-        },
-        "url": "https://example.com/"
+          "query": "piarc"
+        }
       }
     }
   },
@@ -99,16 +97,14 @@
     "payload": {
       "turnId": "turn-<id:1>",
       "item": {
-        "type": "webFetch",
-        "itemId": "toolu_fetch",
+        "type": "dynamicToolCall",
+        "itemId": "toolu_search",
         "status": "failed",
-        "tool": "WebFetch",
+        "tool": "WebSearch",
         "arguments": {
-          "prompt": "Summarize.",
-          "url": "https://example.com/"
+          "query": "piarc"
         },
-        "output": "Tool WebFetch not found",
-        "url": "https://example.com/"
+        "output": "Tool WebSearch not found"
       }
     }
   },

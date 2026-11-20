@@ -167,7 +167,7 @@
         "output": "go\n",
         "command": "while [ ! -f go ]; do sleep 0.05; done; echo go",
         "execution": {
-          "cwd": "/private/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 85010/ws a 甲",
+          "cwd": "/private/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 51360/ws a 甲",
           "outcome": "success",
           "durationMs": 3,
           "timedOut": false,

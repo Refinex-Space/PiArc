@@ -206,6 +206,23 @@
     }
   },
   {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "webFetch",
+        "itemId": "toolu_fetch",
+        "status": "inProgress",
+        "tool": "WebFetch",
+        "arguments": {
+          "prompt": "Summarize.",
+          "url": "http://127.0.0.1:9/"
+        },
+        "url": "http://127.0.0.1:9/"
+      }
+    }
+  },
+  {
     "method": "item/completed",
     "payload": {
       "turnId": "turn-<id:1>",
@@ -355,7 +372,7 @@
         "output": "中文 output\n",
         "command": "echo 中文 output",
         "execution": {
-          "cwd": "/private/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 85010/ws a 甲",
+          "cwd": "/private/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 51360/ws a 甲",
           "outcome": "success",
           "durationMs": 3,
           "timedOut": false,
@@ -378,7 +395,7 @@
         "arguments": {
           "path": "missing.txt"
         },
-        "output": "ENOENT: no such file or directory, access '/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 85010/ws a 甲/missing.txt'"
+        "output": "ENOENT: no such file or directory, access '/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 51360/ws a 甲/missing.txt'"
       }
     }
   },
@@ -395,6 +412,24 @@
           "pattern": "no-such-text-anywhere"
         },
         "output": "No matches found"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "webFetch",
+        "itemId": "toolu_fetch",
+        "status": "failed",
+        "tool": "WebFetch",
+        "arguments": {
+          "prompt": "Summarize.",
+          "url": "http://127.0.0.1:9/"
+        },
+        "output": "Refused to fetch 127.0.0.1: it resolves to 127.0.0.1, a loopback address. Only public addresses can be fetched.",
+        "url": "http://127.0.0.1:9/"
       }
     }
   },

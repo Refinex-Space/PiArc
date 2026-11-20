@@ -29,6 +29,7 @@ steps:
       - { id: toolu_bash, name: Bash, input: { command: "echo 中文 output" } }
       - { id: toolu_grep, name: Grep, input: { pattern: "no-such-text-anywhere" } }
       - { id: toolu_missing, name: Read, input: { path: "missing.txt" } }
+      - { id: toolu_fetch, name: WebFetch, input: { url: "http://127.0.0.1:9/", prompt: "Summarize." } }
   - text: "Done."
 "#;
 
@@ -37,7 +38,7 @@ id: golden-unknown-tools
 steps:
   - tool_calls:
       - { id: toolu_agent, name: Agent, input: { description: "Find usages", prompt: "Find them." } }
-      - { id: toolu_fetch, name: WebFetch, input: { url: "https://example.com/", prompt: "Summarize." } }
+      - { id: toolu_search, name: WebSearch, input: { query: "piarc" } }
       - { id: toolu_mcp, name: mcp__echo__say, input: { text: "hi" } }
   - text: "Those tools are not available here."
 "#;
