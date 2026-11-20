@@ -17,7 +17,7 @@ use piarc_checkpoint::plan::{baselines, plan_restore, plan_undo};
 use piarc_checkpoint::{Hash, Operation, Pin, PlannedFile, Step, to_hex};
 use piarc_fs::{Access, Current, DirectoryBinding, Replacement, Scope, display};
 use piarc_protocol::checkpoint::{
-    ABSENT_VERSION, ChangeKind, ChangedFile, ChangesView, ConflictChoice, DiscardRequest,
+    ABSENT_VERSION, ChangeKind, ChangesFile, ChangesView, ConflictChoice, DiscardRequest,
     FileOutcome, FileResult, RewindAction, RewindFile, RewindPreview, RewindReport,
 };
 use piarc_protocol::turn::TurnId;
@@ -502,7 +502,7 @@ fn text_of(bytes: &[u8]) -> Option<String> {
 
 /// One changed file with its base and current content.
 struct Compared {
-    file: ChangedFile,
+    file: ChangesFile,
     base: Option<Vec<u8>>,
     current: Option<Vec<u8>>,
 }
@@ -544,7 +544,7 @@ fn compare(
         )
     });
     Ok(Some(Compared {
-        file: ChangedFile {
+        file: ChangesFile {
             path: path.to_owned(),
             label,
             kind,

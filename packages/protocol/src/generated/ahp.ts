@@ -5349,7 +5349,7 @@ export interface ChangesView {
   /**
    * The changed files, in the order the session first wrote them.
    */
-  files: ChangedFile2[];
+  files: ChangesFile[];
   /**
    * Lines removed across the files.
    */
@@ -5358,7 +5358,7 @@ export interface ChangesView {
 /**
  * One file of the Changes panel.
  */
-export interface ChangedFile2 {
+export interface ChangesFile {
   /**
    * Lines added since the base.
    */
@@ -5401,11 +5401,11 @@ export interface DiscardRequest {
    */
   hunk?: number | null;
   /**
-   * The file ([`ChangedFile::path`]).
+   * The file ([`ChangesFile::path`]).
    */
   path: string;
   /**
-   * The version the diff was shown for ([`ChangedFile::version`]).
+   * The version the diff was shown for ([`ChangesFile::version`]).
    */
   version: string;
 }

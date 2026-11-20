@@ -314,7 +314,7 @@ pub enum ChangeKind {
 /// One file of the Changes panel.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct ChangedFile {
+pub struct ChangesFile {
     /// The file.
     pub path: String,
     /// The file as diffs name it.
@@ -340,7 +340,7 @@ pub struct ChangedFile {
 #[serde(rename_all = "camelCase")]
 pub struct ChangesView {
     /// The changed files, in the order the session first wrote them.
-    pub files: Vec<ChangedFile>,
+    pub files: Vec<ChangesFile>,
     /// Lines added across the files.
     pub added: u64,
     /// Lines removed across the files.
@@ -355,9 +355,9 @@ pub struct ChangesView {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DiscardRequest {
-    /// The file ([`ChangedFile::path`]).
+    /// The file ([`ChangesFile::path`]).
     pub path: String,
-    /// The version the diff was shown for ([`ChangedFile::version`]).
+    /// The version the diff was shown for ([`ChangesFile::version`]).
     pub version: String,
     /// The hunk's index in the shown diff; the whole file when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]

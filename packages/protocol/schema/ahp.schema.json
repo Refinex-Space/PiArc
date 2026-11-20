@@ -472,7 +472,7 @@
       "required": ["path", "change"],
       "type": "object"
     },
-    "ChangedFile2": {
+    "ChangesFile": {
       "description": "One file of the Changes panel.",
       "properties": {
         "added": {
@@ -538,7 +538,7 @@
         "files": {
           "description": "The changed files, in the order the session first wrote them.",
           "items": {
-            "$ref": "#/$defs/ChangedFile2"
+            "$ref": "#/$defs/ChangesFile"
           },
           "type": "array"
         },
@@ -1088,11 +1088,11 @@
           "type": ["integer", "null"]
         },
         "path": {
-          "description": "The file ([`ChangedFile::path`]).",
+          "description": "The file ([`ChangesFile::path`]).",
           "type": "string"
         },
         "version": {
-          "description": "The version the diff was shown for ([`ChangedFile::version`]).",
+          "description": "The version the diff was shown for ([`ChangesFile::version`]).",
           "type": "string"
         }
       },
