@@ -86,6 +86,9 @@ pub enum CompactionReason {
     Threshold,
     /// The model rejected the context as too long; the turn continues after compaction.
     Overflow,
+    /// The user summarized the conversation from a message on (rewind's "summarize from here",
+    /// capability `checkpoints`, T28).
+    Rewind,
 }
 
 /// An item in its current state, discriminated by the `type` member. Every variant carries

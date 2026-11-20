@@ -51,6 +51,8 @@ export interface HostToolCapabilities {
   readonly ask: boolean;
   /** `context` (T27): reminders as items, file changes, compaction settings, usage. */
   readonly context?: boolean;
+  /** `checkpoints` (T28): branch points, rewinds, summaries in the history. */
+  readonly checkpoints?: boolean;
 }
 
 /** The plan and task list at the head of a branch, or undefined when it has neither. */

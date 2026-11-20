@@ -23,8 +23,11 @@
 //   successful manual one also re-enables it.
 import { randomUUID } from 'node:crypto';
 
+import type { AgentMessage } from '@earendil-works/pi-agent-core';
+
 import {
   convertToLlm,
+  prepareBranchEntries,
   serializeConversation,
   type AgentSession,
   type ExtensionFactory,
@@ -54,7 +57,12 @@ import {
 import type { ContextUsageTracker, UsageLimits } from './context-usage.js';
 import type { SessionHooks } from './hooks.js';
 import { currentPlan } from './plan-mode.js';
-import { fileLists, SUMMARY_SYSTEM, summaryPrompt } from './prompts/compaction.js';
+import {
+  fileLists,
+  SUMMARY_SYSTEM,
+  summaryPrompt,
+  type SummaryRequest,
+} from './prompts/compaction.js';
 import { invokedSkills, recentFiles, restoreSections, type RestoredRead } from './reinjection.js';
 import {
   REMINDER_ENTRY,
@@ -127,7 +135,64 @@ function fileOperations(
       for (const f of modifiedFiles) if (typeof f === 'string') modified.add(f);
   }
   const { messagesToSummarize, turnPrefixMessages } = event.preparation;
-  for (const message of [...messagesToSummarize, ...turnPrefixMessages]) {
+  const now = messageFiles([...messagesToSummarize, ...turnPrefixMessages], canonical);
+  for (const f of now.readFiles) read.add(f);
+  for (const f of now.modifiedFiles) modified.add(f);
+  return {
+    readFiles: [...read].filter((f) => !modified.has(f)).sort(),
+    modifiedFiles: [...modified].sort(),
+  };
+}
+
+/** PiArc's summary request (prompts/compaction.ts) on `session`'s model: the summary text and
+ * the request's usage. */
+async function requestSummary(session: AgentSession, request: SummaryRequest, signal: AbortSignal) {
+  const model: Model<Api> | undefined = session.model;
+  if (model === undefined) throw new Error('No model is selected');
+  const level = session.thinkingLevel;
+  const options = {
+    signal,
+    // A one-off request: no cache write, a routing id of its own.
+    cacheRetention: 'none' as const,
+    sessionId: randomUUID(),
+    ...(model.reasoning && level !== 'off' ? { reasoning: level } : {}),
+  };
+  const context = normalizeContext({
+    systemPrompt: SUMMARY_SYSTEM,
+    messages: [
+      {
+        role: 'user',
+        content: [{ type: 'text', text: summaryPrompt(request) }],
+        timestamp: Date.now(),
+      },
+    ],
+  });
+  const stream = session.agent.streamFunction;
+  const response = await retryAssistantCall(
+    async () => (await stream(model, context, options)).result(),
+    session.settingsManager.getRetrySettings(),
+    signal,
+  );
+  if (response.stopReason === 'error' || response.stopReason === 'aborted') {
+    throw new Error(response.errorMessage ?? 'the summary request failed');
+  }
+  if (response.stopReason === 'length') {
+    throw new Error('the summary reached the output limit and is incomplete');
+  }
+  if (response.content.some((block) => block.type === 'toolCall')) {
+    throw new Error('the summary request called a tool');
+  }
+  return { text: contentText(response.content).trim(), usage: response.usage };
+}
+
+/** Files read and modified by the canonical file tools in `messages`. */
+function messageFiles(
+  messages: readonly AgentMessage[],
+  canonical: (tool: string) => string,
+): { readFiles: string[]; modifiedFiles: string[] } {
+  const read = new Set<string>();
+  const modified = new Set<string>();
+  for (const message of messages) {
     if (message.role !== 'assistant') continue;
     for (const part of message.content) {
       if (part.type !== 'toolCall' || typeof part.arguments.path !== 'string') continue;
@@ -149,55 +214,30 @@ async function summarize(
   instructions: { focus?: string; hookInstructions?: string },
   canonical: (tool: string) => string,
 ) {
-  const model: Model<Api> | undefined = session.model;
-  if (model === undefined) throw new Error('No model is selected');
   const { preparation } = event;
   const transcript = serializeConversation(convertToLlm(preparation.messagesToSummarize));
   const prefix =
     preparation.isSplitTurn && preparation.turnPrefixMessages.length > 0
       ? serializeConversation(convertToLlm(preparation.turnPrefixMessages))
       : undefined;
-  const text = summaryPrompt({
-    transcript,
-    ...(prefix === undefined ? {} : { turnStart: prefix }),
-    ...(preparation.previousSummary === undefined
-      ? {}
-      : { previousSummary: preparation.previousSummary }),
-    ...instructions,
-  });
-  const level = session.thinkingLevel;
-  const options = {
-    signal: event.signal,
-    // A one-off request: no cache write, a routing id of its own.
-    cacheRetention: 'none' as const,
-    sessionId: randomUUID(),
-    ...(model.reasoning && level !== 'off' ? { reasoning: level } : {}),
-  };
-  const context = normalizeContext({
-    systemPrompt: SUMMARY_SYSTEM,
-    messages: [{ role: 'user', content: [{ type: 'text', text }], timestamp: Date.now() }],
-  });
-  const stream = session.agent.streamFunction;
-  const response = await retryAssistantCall(
-    async () => (await stream(model, context, options)).result(),
-    session.settingsManager.getRetrySettings(),
+  const { text, usage } = await requestSummary(
+    session,
+    {
+      transcript,
+      ...(prefix === undefined ? {} : { turnStart: prefix }),
+      ...(preparation.previousSummary === undefined
+        ? {}
+        : { previousSummary: preparation.previousSummary }),
+      ...instructions,
+    },
     event.signal,
   );
-  if (response.stopReason === 'error' || response.stopReason === 'aborted') {
-    throw new Error(response.errorMessage ?? 'the summary request failed');
-  }
-  if (response.stopReason === 'length') {
-    throw new Error('the summary reached the output limit and is incomplete');
-  }
-  if (response.content.some((block) => block.type === 'toolCall')) {
-    throw new Error('the summary request called a tool');
-  }
   const files = fileOperations(event, canonical);
   return {
-    summary: contentText(response.content).trim() + fileLists(files.readFiles, files.modifiedFiles),
+    summary: text + fileLists(files.readFiles, files.modifiedFiles),
     firstKeptEntryId: preparation.firstKeptEntryId,
     tokensBefore: preparation.tokensBefore,
-    usage: response.usage,
+    usage,
     details: files,
   };
 }
@@ -367,6 +407,27 @@ export class SessionCompaction {
     });
     this.#o.memory.restored(sections.filter((section) => section.category === 'memory'));
     return sections;
+  }
+
+  /**
+   * "Summarize from here" (T28, ADR-0044 rule 5): PiArc's summary of `entries` (the turn the user
+   * chose and everything after it), for Pi's `branch_summary` entry. The newest entries that fit
+   * below the compaction threshold are summarized.
+   */
+  async summarizeBranch(entries: SessionEntry[], signal: AbortSignal) {
+    const session = this.#o.session();
+    if (session === undefined) throw new Error('The session is not open');
+    const budget = this.limits().autoCompactThreshold;
+    const { messages } = prepareBranchEntries(entries, budget > 0 ? budget : undefined);
+    if (messages.length === 0) throw new Error('There is nothing to summarize from there');
+    const transcript = serializeConversation(convertToLlm(messages));
+    const { text, usage } = await requestSummary(session, { transcript }, signal);
+    const files = messageFiles(messages, this.#o.canonical);
+    return {
+      summary: text + fileLists(files.readFiles, files.modifiedFiles),
+      details: files,
+      usage,
+    };
   }
 
   extension: ExtensionFactory = (pi) => {

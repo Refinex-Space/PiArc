@@ -40,6 +40,7 @@ export const HOST_CAPABILITIES: readonly string[] = [
   'todo',
   'ask',
   'context',
+  'checkpoints',
 ];
 
 /** Exit codes, for Core's log and restart decisions. */
@@ -139,7 +140,13 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
           bridge: connection.bridge,
           profile: options.toolProfile ?? DEFAULT_PROFILE,
           ioFor: (sessionId) =>
-            new CoreIo({ bridge: connection.bridge, sessionId, execOutput, readBlob }),
+            new CoreIo({
+              bridge: connection.bridge,
+              sessionId,
+              execOutput,
+              readBlob,
+              turn: () => registry?.activeTurn(sessionId),
+            }),
         };
 
   const shutdown = (reason: string, code: number): Promise<void> => {
@@ -269,6 +276,30 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
       stringField('session/fork', fields, 'sessionId'),
       stringField('session/fork', fields, 'cwd'),
       optionalString('session/fork', fields, 'entryId'),
+      optionalString('session/fork', fields, 'beforeTurn'),
+    );
+  });
+  connection.handle('session/rewind', async (params) => {
+    const method = 'session/rewind';
+    const fields = paramsObject(method, params);
+    const mode = fields.mode;
+    if (mode !== 'branch' && mode !== 'summarize') {
+      throw new AhpError('invalidParams', 'session/rewind: mode must be branch or summarize', {
+        details: { member: 'mode' },
+      });
+    }
+    return (await sessions(method)).rewind(
+      stringField(method, fields, 'sessionId'),
+      stringField(method, fields, 'turnId'),
+      mode,
+    );
+  });
+  connection.handle('session/switchBranch', async (params) => {
+    const method = 'session/switchBranch';
+    const fields = paramsObject(method, params);
+    return (await sessions(method)).switchBranch(
+      stringField(method, fields, 'sessionId'),
+      stringField(method, fields, 'entryId'),
     );
   });
   connection.handle('session/prompt', async (params) => {
@@ -434,6 +465,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
           todo: welcome.enabled.includes('todo'),
           ask: welcome.enabled.includes('ask'),
           context: welcome.enabled.includes('context'),
+          checkpoints: welcome.enabled.includes('checkpoints'),
         },
         log,
         sinkFor: (sessionId) => ({

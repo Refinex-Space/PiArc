@@ -315,7 +315,7 @@ T28（开工基线 59e55a2，`npm run verify` 15/15）：
 - [x] 2. 快照存储：`piarc-checkpoint` 的内容寻址对象库（分桶、去重、钉住、回收）、回退计划与冲突判定、保留策略；`piarc-store` schema v5（`checkpoints`、`checkpoint_files`、`checkpoint_sessions`）（A01、A10）
 - [x] 3. 写前快照：`piarc-fs` 写入在路径锁内存原文件、结果带前后哈希；恢复与丢弃的原语（期望哈希、备份当前内容、删除新建文件、清状态表）；`piarc-diff` 的 hunk 反向应用（A01、A06、A09）
 - [x] 4. Core：回合检查点、写入索引、回退预览与执行（逐文件结果、撤销）、Changes 列表与按文件 / hunk 丢弃、后台保留与回收；AHP `fs/write` 的 `turnId`（A01、A02、A05、A06、A09、A10）
-- [ ] 5. Agent Host：回合起点记录、`session/rewind`（分支、摘要）、`session/switchBranch`、`session/fork` 的 `beforeTurn`、历史与通知中的分支点（A03、A04、A11）
+- [x] 5. Agent Host：回合起点记录、`session/rewind`（分支、摘要）、`session/switchBranch`、`session/fork` 的 `beforeTurn`、历史与通知中的分支点（A03、A04、A11）
 - [ ] 6. NAPI、主进程与 preload：回退、Changes、分支切换的 Core API
 - [ ] 7. L2：`rewind-*`、`changes-*` 场景与运行器动作，能力 `CAP-REWIND-*`、`CAP-CHANGES-*`（A02、A03、A04、A05、A07）
 - [ ] 8. 客户端：消息菜单"回退到这里""从这里分支"、`/rewind`、回退对话框（冲突逐个选择、逐文件结果与撤销）、Changes 面板与右栏改动卡片（Mod+Shift+D）、分支切换控件（A04、A07、A08、A09、A11）

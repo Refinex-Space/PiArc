@@ -94,11 +94,15 @@ pub struct BranchOption {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BranchPoint {
-    /// The current branch's turn at this place.
-    pub turn_id: TurnId,
-    /// Its position among the options (0-based, in the order the branches were written).
-    pub index: u64,
-    /// Every branch at this place, the current one included.
+    /// The current branch's turn at this place; absent when the current branch has no turn here
+    /// yet (the conversation was rewound to this place and nothing was sent since).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn_id: Option<TurnId>,
+    /// That turn's position among the options (0-based, in the order the branches were
+    /// written).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index: Option<u64>,
+    /// Every branch that has a turn at this place, the current one included.
     pub options: Vec<BranchOption>,
 }
 

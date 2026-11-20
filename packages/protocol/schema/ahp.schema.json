@@ -331,24 +331,31 @@
       "description": "A place on the current branch where other branches start: turns that begin at the same\nentry.",
       "properties": {
         "index": {
-          "description": "Its position among the options (0-based, in the order the branches were written).",
+          "description": "That turn's position among the options (0-based, in the order the branches were\nwritten).",
           "format": "uint64",
           "minimum": 0,
-          "type": "integer"
+          "type": ["integer", "null"]
         },
         "options": {
-          "description": "Every branch at this place, the current one included.",
+          "description": "Every branch that has a turn at this place, the current one included.",
           "items": {
             "$ref": "#/$defs/BranchOption"
           },
           "type": "array"
         },
         "turnId": {
-          "$ref": "#/$defs/TurnId",
-          "description": "The current branch's turn at this place."
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The current branch's turn at this place; absent when the current branch has no turn here\nyet (the conversation was rewound to this place and nothing was sent since)."
         }
       },
-      "required": ["turnId", "index", "options"],
+      "required": ["options"],
       "type": "object"
     },
     "Capability": {
@@ -675,6 +682,11 @@
         {
           "const": "overflow",
           "description": "The model rejected the context as too long; the turn continues after compaction.",
+          "type": "string"
+        },
+        {
+          "const": "rewind",
+          "description": "The user summarized the conversation from a message on (rewind's \"summarize from here\",\ncapability `checkpoints`, T28).",
           "type": "string"
         }
       ]

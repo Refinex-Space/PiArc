@@ -147,7 +147,9 @@ export interface SessionHooksOptions {
   readonly sessionId: string;
   readonly cwd: string;
   /** How the session opened: `startup` (created), `resume` or `fork`. */
-  readonly source: 'startup' | 'resume' | 'fork';
+  /** How the session opened; `branch` is the same session reopened on another branch (T28),
+   * which runs no SessionStart hooks. */
+  readonly source: 'startup' | 'resume' | 'fork' | 'branch';
   readonly canonical: (tool: string) => string;
   /** Pi's session file, once the session exists. */
   readonly transcript: () => string | undefined;
@@ -167,6 +169,8 @@ export class SessionHooks {
   /** `Stop` continuations in a row; a tool call resets them. */
   #continuations = 0;
   #active = false;
+  /** Set when the session closes to reopen on another branch: no SessionEnd. */
+  #muted = false;
 
   constructor(options: SessionHooksOptions) {
     this.#o = options;
@@ -200,6 +204,11 @@ export class SessionHooks {
       this.#o.log(`hooks/run ${event} failed: ${describeError(error)}`);
       return {};
     }
+  }
+
+  /** The session closes only to reopen on another branch (T28): it does not end. */
+  mute(): void {
+    this.#muted = true;
   }
 
   /** Context a hook added, for the model's next request. */
@@ -240,6 +249,7 @@ export class SessionHooks {
 
   extension: ExtensionFactory = (pi) => {
     pi.on('session_start', (_event, ctx) => {
+      if (this.#o.source === 'branch') return;
       // Not awaited: a slow hook must not hold up opening the session; the first run waits.
       this.#starting = this.run('sessionStart', {
         source: this.#o.source,
@@ -337,6 +347,7 @@ export class SessionHooks {
     });
 
     pi.on('session_shutdown', async () => {
+      if (this.#muted) return;
       await this.run('sessionEnd', { reason: 'other' });
     });
   };

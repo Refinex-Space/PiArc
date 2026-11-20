@@ -24,12 +24,13 @@ import {
   SettingsManager,
   type AgentSessionEvent,
   type AgentSession,
-  type AgentSessionRuntime,
   type CreateAgentSessionRuntimeFactory,
 } from '@earendil-works/pi-coding-agent';
 import type {
   HistoryWindow,
   InputAccepted,
+  RewindMode,
+  SessionRewound,
   ModelRef,
   ModelsListResult,
   SessionModelSelection,
@@ -45,11 +46,7 @@ import { IDENTITY } from '../harness/prompts/system.js';
 import { SessionMemory } from '../harness/session-memory.js';
 import { SessionHooks } from '../harness/hooks.js';
 import { expiredApprovals, policyGate, preflightInput } from '../harness/policy.js';
-import {
-  harnessState,
-  SessionHarness,
-  type HostToolCapabilities,
-} from '../harness/session-harness.js';
+import { SessionHarness } from '../harness/session-harness.js';
 import {
   interruptedContext,
   missingToolCalls,
@@ -57,126 +54,53 @@ import {
 } from '../harness/interruption.js';
 import { takeOverProjectTrust, type TrustTakeover } from '../harness/project-trust.js';
 import { CONCURRENCY_SAFE_TOOLS, ToolBatches } from '../harness/tool-batches.js';
-import {
-  createToolResultBudget,
-  TOOL_RESULT_LIMITS,
-  type ToolResultLimits,
-} from '../harness/tool-results.js';
+import { createToolResultBudget, TOOL_RESULT_LIMITS } from '../harness/tool-results.js';
 import { AhpError, describeError } from '../protocol/errors.js';
+import { DEFAULT_PROFILE, ToolNameMap, toolOptions } from '../tools/index.js';
 import {
-  DEFAULT_PROFILE,
-  ToolNameMap,
-  toolOptions,
-  type CoreIo,
-  type ToolProfile,
-} from '../tools/index.js';
-import { historyWindow, MAX_HISTORY_LIMIT, projectHistory } from './history.js';
+  branchPoints,
+  forkedManager,
+  rewindToTurn,
+  startsAtFork,
+  summarizeFromTurn,
+  switchTo,
+} from './branches.js';
+import { checkHistoryLimit, historyOf } from './history.js';
 import {
   composedText,
   INPUT_ENTRY,
   inputRecord,
-  prepareInput,
   type PreparedInput,
   type UserInput,
 } from './input.js';
-import type { CoreBridge } from './core-bridge.js';
 import { modeRecord } from './permission-mode.js';
 import { contentText } from './items.js';
-import { Projector, type ProjectionSink } from './projector.js';
+import { Projector } from './projector.js';
 import { listModels, previewSwitch, selectEffort, selectModel } from './session-models.js';
 import { InputQueue } from './queue.js';
 import {
+  checkImageInput,
   checkSessionId,
+  prepareAttachments,
   scheduled,
   shellsFor,
   stopped,
   withHookContext,
 } from './session-helpers.js';
+import {
+  PI_NATIVE_TOOLS,
+  type HostedSession,
+  type Job,
+  type RegistryOptions,
+} from './session-types.js';
 import type { Workspace } from './workspace.js';
 
-/** Emits the projected notifications of one session. */
-export type SessionSinkFactory = (sessionId: string) => ProjectionSink;
-
-/**
- * Which tools sessions get. `core`: the canonical tools of `profile` with their I/O delegated to
- * Core (the only mode Core starts the Agent Host in). `pi-native`: Pi's own tools with local I/O,
- * under their own names; only the behavior comparison test uses it (`--pi-native-tools`).
- */
-export type ToolBackend =
-  | {
-      readonly kind: 'core';
-      readonly bridge: CoreBridge;
-      readonly profile: ToolProfile;
-      readonly ioFor: (sessionId: string) => CoreIo;
-    }
-  | { readonly kind: 'pi-native' };
-
-/** Pi's tools the `pi-native` backend activates: the counterparts of the canonical six. */
-const PI_NATIVE_TOOLS = ['read', 'write', 'edit', 'bash', 'find', 'grep'];
-
-export interface RegistryOptions {
-  readonly workspace: Workspace;
-  readonly tools: ToolBackend;
-  /** Available when Core negotiated session memory in the handshake. */
-  readonly memoryBridge?: CoreBridge;
-  readonly sinkFor: SessionSinkFactory;
-  /**
-   * Asks Core whether `cwd` is a trusted project (`askCoreTrust`); must resolve `false` on any
-   * failure. Answers Pi's project trust hook (`takeOverProjectTrust`).
-   */
-  readonly isTrusted: (cwd: string) => Promise<boolean>;
-  readonly log: (line: string) => void;
-  /**
-   * Test only (`--test-record-events`): receives every raw Pi event of every session, and the
-   * registry's own steps that shape the projection (a turn accepted, an abort, a queued input),
-   * so a recording replays exactly.
-   */
-  readonly onPiEvent?: (sessionId: string, event: AgentSessionEvent | RecordedControl) => void;
-  /** A session was closed: its replay buffer can go. */
-  readonly onClosed?: (sessionId: string) => void;
-  /** How much of a tool result reaches the model; `TOOL_RESULT_LIMITS` when absent. */
-  readonly toolResultLimits?: ToolResultLimits;
-  /** Core runs hooks (`hooks` capability): sessions report their events over it. */
-  readonly hooksBridge?: CoreBridge;
-  /** What Core enabled for the host tools (`planMode`, `todo`, `ask`; T26). */
-  readonly hostTools?: HostToolCapabilities;
-}
-
-/** What a turn runs: an input, or a compaction (`/compact [focus]`). */
-type Job =
-  | { readonly kind: 'prompt'; readonly prepared: PreparedInput }
-  | { readonly kind: 'compact'; readonly instructions: string | undefined };
-
-/** A registry step in a recording (`onPiEvent`). */
-export type RecordedControl =
-  | { readonly control: 'beginTurn'; readonly turnId: string }
-  | { readonly control: 'markAborting' }
-  | { readonly control: 'takeFollowUp' }
-  | { readonly control: 'steer' | 'followUp'; readonly text: string };
-
-interface HostedSession {
-  readonly runtime: AgentSessionRuntime;
-  readonly projector: Projector;
-  readonly memory: SessionMemory;
-  readonly queue: InputQueue;
-  readonly batches: ToolBatches;
-  readonly toCanonical: (tool: string) => string;
-  /** Hook events reported to Core (absent without the `hooks` capability). */
-  readonly hooks: SessionHooks | undefined;
-  /** Host tools, plan mode and reminders (T26). */
-  readonly harness: SessionHarness;
-  unsubscribe: () => void;
-  /** Idempotency keys of accepted prompts → their turn ids. */
-  readonly prompts: Map<string, string>;
-  /** Idempotency keys of accepted steering and follow-up inputs → their answers. */
-  readonly inputs: Map<string, InputAccepted>;
-  /** Idempotency keys of requests whose attachments are still being read → their answer. */
-  readonly preparing: Map<string, Promise<unknown>>;
-  /** Inputs given to Pi whose user message has not started yet (input.ts records). */
-  readonly delivering: PreparedInput[];
-  changingModel: boolean;
-  closed: boolean;
-}
+export type {
+  RecordedControl,
+  RegistryOptions,
+  SessionSinkFactory,
+  ToolBackend,
+} from './session-types.js';
 
 export class SessionRegistry {
   readonly #options: RegistryOptions;
@@ -270,34 +194,27 @@ export class SessionRegistry {
     });
   }
 
-  /** Opens a new session whose conversation is `sessionId`'s current branch up to `entryId`. */
-  async fork(sessionId: string, cwd: string, entryId: string | undefined): Promise<SessionOpened> {
+  /**
+   * Opens a new session whose conversation is `sessionId`'s current branch up to `entryId`, or
+   * up to where turn `beforeTurn` started (T28's "branch from here"; an empty session for the
+   * first turn).
+   */
+  async fork(
+    sessionId: string,
+    cwd: string,
+    entryId: string | undefined,
+    beforeTurn?: string,
+  ): Promise<SessionOpened> {
     checkSessionId(sessionId);
     const file =
       this.#sessions.get(sessionId)?.runtime.session.sessionFile ??
       SessionManager.findById(cwd, sessionId);
-    if (file === undefined) {
-      throw new AhpError(
-        'invalidParams',
-        `session ${sessionId} has no saved conversation to fork`,
-        {
-          details: { sessionId },
-        },
-      );
-    }
-    // A separate reader of the file: the open session's own manager keeps writing its file.
-    const source = SessionManager.open(file);
-    const leaf = entryId ?? source.getLeafId();
-    if (leaf === null || source.getEntry(leaf) === undefined) {
-      throw new AhpError('invalidParams', `session ${sessionId} has no entry ${String(entryId)}`, {
-        details: { sessionId, entryId },
-      });
-    }
-    const forked = source.createBranchedSession(leaf);
-    if (forked === undefined) {
-      throw new AhpError('internalError', `forking session ${sessionId} wrote no file`);
-    }
-    return this.#open(cwd, SessionManager.open(forked), undefined, 'fork');
+    return this.#open(
+      cwd,
+      forkedManager(sessionId, cwd, file, entryId, beforeTurn),
+      undefined,
+      'fork',
+    );
   }
 
   /**
@@ -340,6 +257,39 @@ export class SessionRegistry {
     const turnId = this.#startTurn(sessionId, hosted, { kind: 'compact', instructions });
     hosted.prompts.set(requestId, turnId);
     return { turnId };
+  }
+
+  /**
+   * Moves the conversation to before turn `turnId` (T28): as a new branch, or with the turn and
+   * everything after it summarized. The session reopens on the new branch.
+   */
+  async rewind(sessionId: string, turnId: string, mode: RewindMode): Promise<SessionRewound> {
+    const hosted = this.#get(sessionId);
+    this.#checkIdle(sessionId, hosted);
+    const manager = hosted.runtime.session.sessionManager;
+    let text: string | undefined;
+    if (mode === 'summarize') {
+      await summarizeFromTurn(manager, turnId, (entries) =>
+        hosted.harness.compaction.summarizeBranch(entries, new AbortController().signal),
+      );
+    } else {
+      text = rewindToTurn(manager, turnId);
+    }
+    const opened = await this.#reopen(sessionId, hosted);
+    return { ...opened, ...(text === undefined ? {} : { text }) };
+  }
+
+  /** Continues the conversation on the branch whose last entry is `entryId` (T28). */
+  async switchBranch(sessionId: string, entryId: string): Promise<SessionRewound> {
+    const hosted = this.#get(sessionId);
+    this.#checkIdle(sessionId, hosted);
+    switchTo(hosted.runtime.session.sessionManager, entryId);
+    return this.#reopen(sessionId, hosted);
+  }
+
+  /** The running turn of `sessionId` (its writes' checkpoint). */
+  activeTurn(sessionId: string): string | undefined {
+    return this.#sessions.get(sessionId)?.projector.activeTurnId;
   }
 
   /**
@@ -452,35 +402,20 @@ export class SessionRegistry {
   /** The persisted conversation of a session (open or not) as items. */
   history(sessionId: string, cwd: string, start: number | undefined, limit: number): HistoryWindow {
     checkSessionId(sessionId);
-    if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_HISTORY_LIMIT) {
-      throw new AhpError(
-        'invalidParams',
-        `session/history: limit must be between 1 and ${String(MAX_HISTORY_LIMIT)}`,
-        { details: { member: 'limit' } },
-      );
-    }
+    checkHistoryLimit(limit);
     const hosted = this.#sessions.get(sessionId);
-    let branch;
-    let toCanonical = (tool: string): string => tool;
-    if (hosted !== undefined) {
-      branch = hosted.runtime.session.sessionManager.getBranch();
-      toCanonical = hosted.toCanonical;
-    } else {
+    let manager = hosted?.runtime.session.sessionManager;
+    let toCanonical = hosted?.toCanonical ?? ((tool: string): string => tool);
+    const { tools, hostTools } = this.#options;
+    if (hosted === undefined) {
       const file = SessionManager.findById(cwd, sessionId);
-      branch = file === undefined ? [] : SessionManager.open(file).getBranch();
-      const { tools } = this.#options;
+      manager = file === undefined ? undefined : SessionManager.open(file);
       if (tools.kind === 'core') {
         const names = new ToolNameMap(tools.profile);
         toCanonical = (tool) => names.toCanonical(tool);
       }
     }
-    const window = historyWindow(
-      projectHistory(branch, toCanonical, this.#options.hostTools?.context === true),
-      start,
-      limit,
-    );
-    const harness = harnessState(branch, toCanonical);
-    return harness === undefined ? window : { ...window, harness };
+    return historyOf(manager, toCanonical, hostTools, start, limit);
   }
 
   #once(sessionId: string, open: () => Promise<SessionOpened>): Promise<SessionOpened> {
@@ -511,37 +446,16 @@ export class SessionRegistry {
   /** Reads an input's attachments through Core (images by blob, PDFs by `fs/pdf`). */
   async #prepare(sessionId: string, input: UserInput): Promise<PreparedInput> {
     this.#checkImageInput(sessionId, input);
-    if (input.attachments.length === 0) {
-      return { input, sections: '', images: [] };
-    }
     const { tools } = this.#options;
-    if (tools.kind !== 'core') {
-      throw new AhpError('invalidParams', 'attachments need the Core tool backend', {
-        details: { sessionId },
-      });
-    }
-    const io = tools.ioFor(sessionId);
-    return prepareInput(input, {
-      readBlob: (blob) => io.readBlob(blob),
-      pdf: (path, pages) => io.pdf(path, pages),
-    });
+    return prepareAttachments(
+      tools.kind === 'core' ? tools.ioFor(sessionId) : undefined,
+      sessionId,
+      input,
+    );
   }
 
   #checkImageInput(sessionId: string, input: UserInput): void {
-    if (!input.attachments.some((attachment) => attachment.kind === 'image')) return;
-    const model = this.#get(sessionId).runtime.session.model;
-    if (
-      !model?.input.includes('image') ||
-      !this.workspace.modelRuntime.getModel(model.provider, model.id)?.input.includes('image')
-    ) {
-      throw new AhpError(
-        'invalidParams',
-        'Image attachments are not supported by the selected model',
-        {
-          details: { member: 'attachments', reason: 'visionUnsupported' },
-        },
-      );
-    }
+    checkImageInput(this.workspace, this.#get(sessionId).runtime.session.model, input);
   }
 
   #checkIdle(sessionId: string, hosted: HostedSession): void {
@@ -566,6 +480,32 @@ export class SessionRegistry {
       restoredMessages: session.messages.length,
       ...(mode === undefined ? {} : { permissionMode: mode }),
     };
+  }
+
+  /**
+   * Closes and reopens `sessionId` from its file after its branch changed (T28, ADR-0044
+   * rule 6): the plan, the mode, memory and the files read are those of the new branch. Hooks see
+   * neither an end nor a start; the replay buffer and `seq` continue.
+   */
+  async #reopen(sessionId: string, hosted: HostedSession): Promise<SessionOpened> {
+    const { session } = hosted.runtime;
+    const file = session.sessionFile;
+    if (file === undefined) {
+      throw new AhpError('internalError', `session ${sessionId} has no file to reopen`);
+    }
+    const cwd = session.sessionManager.getCwd();
+    hosted.closed = true;
+    hosted.hooks?.mute();
+    hosted.memory.cancel();
+    this.#sessions.delete(sessionId);
+    try {
+      await hosted.runtime.dispose();
+    } finally {
+      hosted.unsubscribe();
+    }
+    return this.#once(sessionId, () =>
+      this.#open(cwd, SessionManager.open(file), undefined, 'branch'),
+    );
   }
 
   /** Record before notifying Core or publishing the row. */
@@ -594,7 +534,7 @@ export class SessionRegistry {
     cwd: string,
     manager: SessionManager,
     model: ModelRef | undefined,
-    source: 'startup' | 'resume' | 'fork' = 'startup',
+    source: 'startup' | 'resume' | 'fork' | 'branch' = 'startup',
   ): Promise<SessionOpened> {
     const recovering = source === 'resume';
     const { workspace } = this.#options;
@@ -900,11 +840,26 @@ export class SessionRegistry {
     const [prepared] = hosted.delivering.splice(index, 1);
     if (prepared === undefined) return;
     const record = inputRecord(prepared);
-    hosted.runtime.session.sessionManager.appendCustomEntry(INPUT_ENTRY, {
-      turnId: hosted.projector.activeTurnId,
+    const turnId = hosted.projector.activeTurnId;
+    const { session } = hosted.runtime;
+    const from = hosted.turnFrom?.turnId === turnId ? hosted.turnFrom : undefined;
+    session.sessionManager.appendCustomEntry(INPUT_ENTRY, {
+      turnId,
+      ...(from === undefined ? {} : { from: from.from }),
       ...record,
     });
     if (record !== undefined) hosted.projector.useInput(record);
+    // The turn starts where other branches start: the client shows the switcher (T28).
+    if (
+      from !== undefined &&
+      turnId !== undefined &&
+      this.#options.hostTools?.checkpoints === true &&
+      startsAtFork(session.sessionManager, turnId)
+    ) {
+      this.#options
+        .sinkFor(session.sessionId)
+        .event('session/branches', { branches: branchPoints(session.sessionManager) });
+    }
   }
 
   async #run(sessionId: string, hosted: HostedSession, turnId: string, job: Job): Promise<void> {
@@ -915,11 +870,14 @@ export class SessionRegistry {
       }
       try {
         const { session } = hosted.runtime;
+        // Before an automatic compaction can append anything: a rewind continues from here.
+        hosted.turnFrom = { turnId: next.turnId, from: session.sessionManager.getLeafId() };
         await hosted.harness.compaction.prepare();
         if (next.job.kind === 'compact') {
           session.sessionManager.appendCustomEntry(INPUT_ENTRY, {
             turnId: next.turnId,
             action: 'compact',
+            from: hosted.turnFrom.from,
           });
           await session.compact(next.job.instructions);
         } else {

@@ -21,12 +21,15 @@
 // left out, as Pi leaves it out of the model's context. The interruption marker the Harness Kit
 // adds after an interrupted turn (harness/interruption.ts) is bookkeeping for the model and is
 // not shown.
-import type { SessionEntry } from '@earendil-works/pi-coding-agent';
+import type { SessionEntry, SessionManager } from '@earendil-works/pi-coding-agent';
 import type { HistoryItem, HistoryWindow, ItemStatus } from '@piarc/protocol';
 
 import { isInterruptionMarker } from '../harness/interruption.js';
 import { REMINDER_ENTRY, reminderRefs } from '../harness/reminders.js';
 import { DECLINED_ENTRY } from '../harness/policy.js';
+import { harnessState } from '../harness/session-harness.js';
+import { AhpError } from '../protocol/errors.js';
+import { branchPoints } from './branches.js';
 import { modeItem, modeRecord } from './permission-mode.js';
 import { INPUT_ENTRY, parseInputRecord, type UserInput } from './input.js';
 import {
@@ -59,6 +62,7 @@ export function projectHistory(
   branch: readonly SessionEntry[],
   toCanonical: (tool: string) => string,
   reminders = false,
+  summaries = false,
 ): HistoryItem[] {
   const results = new Map<string, ToolResult>();
   const declined = new Set<string>();
@@ -117,6 +121,15 @@ export function projectHistory(
           reminders: reminderRefs(entry.details),
           text: entry.content.toWellFormed(),
         },
+      });
+      continue;
+    }
+    if (summaries && entry.type === 'branch_summary') {
+      // "Summarize from here" (T28): the conversation after this point is a summary.
+      items.push({
+        entryId: entry.id,
+        turnId: currentTurn ?? entry.id,
+        item: contextCompaction(entry.id, 'completed', { reason: 'rewind' }),
       });
       continue;
     }
@@ -233,4 +246,42 @@ export function historyWindow(
   const total = items.length;
   const first = start === undefined ? Math.max(0, total - limit) : Math.min(start, total);
   return { start: first, total, items: items.slice(first, first + limit) };
+}
+
+/** Refuses a `session/history` limit outside 1 .. `MAX_HISTORY_LIMIT`. */
+export function checkHistoryLimit(limit: number): void {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_HISTORY_LIMIT) {
+    throw new AhpError(
+      'invalidParams',
+      `session/history: limit must be between 1 and ${String(MAX_HISTORY_LIMIT)}`,
+      { details: { member: 'limit' } },
+    );
+  }
+}
+
+/**
+ * `session/history` of the session `manager` reads (`undefined`: no file yet): the window of
+ * items, the branch's plan and task list, and its branch points (capability `checkpoints`).
+ */
+export function historyOf(
+  manager: SessionManager | undefined,
+  toCanonical: (tool: string) => string,
+  capabilities: { readonly context?: boolean; readonly checkpoints?: boolean } | undefined,
+  start: number | undefined,
+  limit: number,
+): HistoryWindow {
+  const branch = manager?.getBranch() ?? [];
+  const checkpoints = capabilities?.checkpoints === true;
+  const window = historyWindow(
+    projectHistory(branch, toCanonical, capabilities?.context === true, checkpoints),
+    start,
+    limit,
+  );
+  const harness = harnessState(branch, toCanonical);
+  const branches = checkpoints && manager !== undefined ? branchPoints(manager) : [];
+  return {
+    ...window,
+    ...(harness === undefined ? {} : { harness }),
+    ...(branches.length === 0 ? {} : { branches }),
+  };
 }

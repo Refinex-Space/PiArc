@@ -609,7 +609,7 @@ export type AutoCompactStop = 'failed' | 'ineffective';
 /**
  * Why a compaction ran.
  */
-export type CompactionReason = 'manual' | 'threshold' | 'overflow';
+export type CompactionReason = 'manual' | 'threshold' | 'overflow' | 'rewind';
 /**
  * What a system reminder tells the model.
  */
@@ -2223,17 +2223,19 @@ export interface HistoryWindow {
  */
 export interface BranchPoint {
   /**
-   * Its position among the options (0-based, in the order the branches were written).
+   * That turn's position among the options (0-based, in the order the branches were
+   * written).
    */
-  index: number;
+  index?: number | null;
   /**
-   * Every branch at this place, the current one included.
+   * Every branch that has a turn at this place, the current one included.
    */
   options: BranchOption[];
   /**
-   * The current branch's turn at this place.
+   * The current branch's turn at this place; absent when the current branch has no turn here
+   * yet (the conversation was rewound to this place and nothing was sent since).
    */
-  turnId: TurnId;
+  turnId?: TurnId | null;
 }
 /**
  * One branch at a branch point.

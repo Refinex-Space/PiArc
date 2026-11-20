@@ -5,7 +5,10 @@ import type { QueueItem, SessionStopped } from '@piarc/protocol';
 import type { ToolBatches } from '../harness/tool-batches.js';
 import { AhpError } from '../protocol/errors.js';
 import type { CoreIo, Shells, toolOptions } from '../tools/index.js';
-import type { PreparedInput } from './input.js';
+import type { Model, Api } from '@earendil-works/pi-ai';
+
+import { prepareInput, type PreparedInput, type UserInput } from './input.js';
+import type { Workspace } from './workspace.js';
 
 /** Session ids Core may choose: Pi's own rule is stricter about nothing but length. */
 const SESSION_ID = /^[A-Za-z0-9._-]{1,128}$/;
@@ -65,4 +68,46 @@ export async function shellsFor(io: CoreIo, log: (line: string) => void): Promis
     const windows = process.platform === 'win32';
     return { bash: !windows, powershell: windows };
   }
+}
+
+/** Refuses image attachments the session's model cannot take. */
+export function checkImageInput(
+  workspace: Workspace,
+  model: Model<Api> | undefined,
+  input: UserInput,
+): void {
+  if (!input.attachments.some((attachment) => attachment.kind === 'image')) return;
+  if (
+    !model?.input.includes('image') ||
+    !workspace.modelRuntime.getModel(model.provider, model.id)?.input.includes('image')
+  ) {
+    throw new AhpError(
+      'invalidParams',
+      'Image attachments are not supported by the selected model',
+      {
+        details: { member: 'attachments', reason: 'visionUnsupported' },
+      },
+    );
+  }
+}
+
+/** Reads an input's attachments through Core (images by blob, PDFs by `fs/pdf`); `io` is
+ * absent with Pi's own tools, which take no attachments. */
+export async function prepareAttachments(
+  io: CoreIo | undefined,
+  sessionId: string,
+  input: UserInput,
+): Promise<PreparedInput> {
+  if (input.attachments.length === 0) {
+    return { input, sections: '', images: [] };
+  }
+  if (io === undefined) {
+    throw new AhpError('invalidParams', 'attachments need the Core tool backend', {
+      details: { sessionId },
+    });
+  }
+  return prepareInput(input, {
+    readBlob: (blob) => io.readBlob(blob),
+    pdf: (path, pages) => io.pdf(path, pages),
+  });
 }

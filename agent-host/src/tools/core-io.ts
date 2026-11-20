@@ -183,6 +183,8 @@ export interface CoreIoOptions {
   readonly execOutput: ExecOutputRouter;
   /** Reads a blob Core made (`fs/read` in blob mode). */
   readonly readBlob: (blob: BlobRef) => Promise<Buffer>;
+  /** The session's running turn: its checkpoint keeps what a write replaces (T28). */
+  readonly turn?: () => string | undefined;
 }
 
 /** Typed `fs/*` and `exec/*` requests for one session. */
@@ -325,6 +327,8 @@ export class CoreIo {
   ): Promise<FileDiff | undefined> {
     const params: Record<string, unknown> = { path, origin };
     if (lineEndings !== 'asWritten') params.lineEndings = lineEndings;
+    const turnId = this.#options.turn?.();
+    if (turnId !== undefined) params.turnId = turnId;
     const result = await this.#upload('fs/write', params, content, parseWrite);
     return result.diff;
   }
