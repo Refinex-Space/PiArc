@@ -143,7 +143,15 @@ impl Terminal {
         for (call, option, callback) in callbacks() {
             self.set(call, option, callback)?;
         }
-        // Value options are passed by pointer (size_t* here).
+        // Value options are passed by pointer (size_t* here). The byte limit defaults to
+        // 10,000 bytes (one page, about 1,800 rows of 40 columns), which would cap the
+        // scrollback long before the line limit: lift it so the line limit decides.
+        let unlimited = usize::MAX;
+        self.set(
+            "ghostty_terminal_set(SCROLLBACK_MAX_BYTES)",
+            sys::GHOSTTY_TERMINAL_OPT_SCROLLBACK_MAX_BYTES,
+            (&raw const unlimited).cast(),
+        )?;
         let continuation = CONTINUATION_MAX_BYTES;
         let clipboard = CLIPBOARD_WRITE_MAX_BYTES;
         self.set(

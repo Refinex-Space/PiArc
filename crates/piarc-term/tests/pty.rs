@@ -245,3 +245,34 @@ fn vim_on_the_alternate_screen_matches_the_formatter() {
     compare(&mut screen, &mut full);
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// A terminal nobody pulls frames from (hidden) produces none, however much output arrives;
+/// its screen is kept up to date for readers all the same (T33-A07).
+#[test]
+fn a_hidden_terminal_produces_no_frames() {
+    let (session, events) = spawn(
+        "sh",
+        &[
+            "-c",
+            "i=0; while [ $i -lt 2000 ]; do echo line $i; i=$((i+1)); done",
+        ],
+    );
+    assert_eq!(wait_for_exit(&events), Some(0));
+    let stats = session.stats();
+    assert!(stats.bytes_read > 10_000, "{stats:?}");
+    assert_eq!(
+        (stats.frames, stats.frame_bytes, stats.frame_nanos),
+        (0, 0, 0)
+    );
+    let text = session
+        .text(
+            piarc_term::vt::TextRange::LastRows(1),
+            piarc_term::vt::TextOptions::default(),
+        )
+        .expect("text");
+    assert_eq!(text, "line 1999");
+    // The first pull, when the terminal is shown, resets the viewer with the current screen.
+    let frame = term_frame::decode(&session.frame(1, false).expect("frame")).expect("decode");
+    assert!(frame.reset);
+    assert_eq!(session.stats().frames, 1);
+}

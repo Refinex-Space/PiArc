@@ -15,6 +15,79 @@ fn device_attribute_queries_are_answered_through_write_pty() {
     assert_eq!(effects.replies, b"\x1b[?62;22c");
     t.write(b"\x1b[5n"); // device status report
     assert_eq!(t.take_effects().replies, b"\x1b[0n");
+    // Cursor position report: row 3, column 5 (1-based).
+    t.write(b"\x1b[3;5H\x1b[6n");
+    assert_eq!(t.take_effects().replies, b"\x1b[3;5R");
+}
+
+#[test]
+fn the_working_directory_and_a_reset_are_recorded() {
+    let mut t = terminal(80, 24);
+    t.write(b"\x1b]7;file://host/tmp/a%20b\x07");
+    assert_eq!(
+        t.take_effects().pwd.as_deref(),
+        Some("file://host/tmp/a%20b")
+    );
+    assert_eq!(t.pwd(), "file://host/tmp/a%20b");
+    t.write(b"\x1b]2;title\x07\x1bc");
+    let effects = t.take_effects();
+    assert!(effects.reset);
+    assert_eq!(effects.title, None, "a reset clears the title it set");
+    assert_eq!(t.title(), "");
+}
+
+#[test]
+fn clipboard_reads_are_denied_and_writes_follow_the_setting() {
+    let mut t = terminal(80, 24);
+    // OSC 52 read: the program gets an empty clipboard, never the user's.
+    t.write(b"\x1b]52;c;?\x07");
+    let effects = t.take_effects();
+    assert_eq!(effects.replies, b"\x1b]52;c;\x07");
+    assert_eq!(effects.clipboard_reads_denied, 1);
+    // OSC 52 write ("hello" in base64) reaches the record.
+    t.write(b"\x1b]52;c;aGVsbG8=\x07");
+    assert_eq!(t.take_effects().clipboard, ["hello"]);
+    t.set_clipboard_write(false);
+    t.write(b"\x1b]52;c;aGVsbG8=\x07");
+    assert!(t.take_effects().clipboard.is_empty());
+}
+
+#[test]
+fn osc_133_steps_carry_the_command_line_the_exit_code_and_the_cell() {
+    let mut t = terminal(40, 5);
+    t.write(b"\x1b]133;A\x07$ \x1b]133;B\x07echo hi\r\n\x1b]133;C;cmdline_url=echo%20hi\x07hi\r\n\x1b]133;D;3\x07");
+    let marks = t.take_effects().marks;
+    let kinds: Vec<SemanticKind> = marks.iter().map(|m| m.kind).collect();
+    assert_eq!(
+        kinds,
+        [
+            SemanticKind::PromptStart,
+            SemanticKind::InputStart,
+            SemanticKind::OutputStart,
+            SemanticKind::CommandEnd
+        ]
+    );
+    assert_eq!(marks[2].command.as_deref(), Some("echo hi"));
+    assert_eq!(marks[3].exit_code, Some(3));
+    let cells: Vec<Option<ScreenPoint>> = marks
+        .iter()
+        .map(|m| m.at.as_ref().and_then(|p| p.point(&mut t)))
+        .collect();
+    assert_eq!(
+        cells,
+        [
+            Some(ScreenPoint { y: 0, x: 0 }),
+            Some(ScreenPoint { y: 0, x: 2 }),
+            Some(ScreenPoint { y: 1, x: 0 }),
+            Some(ScreenPoint { y: 2, x: 0 }),
+        ]
+    );
+    // The shell-escaped form of the command line decodes too.
+    t.write(b"\x1b]133;C;cmdline=echo\\ there\x07");
+    assert_eq!(
+        t.take_effects().marks[0].command.as_deref(),
+        Some("echo there")
+    );
 }
 
 #[test]
@@ -137,54 +210,233 @@ fn a_render_hold_captures_the_frame_at_its_start() {
     assert!(t.hold_since().is_none());
 }
 
+fn press(key: sys::GhosttyKey, text: &str, mods: u16) -> KeyInput {
+    KeyInput {
+        action: KeyAction::Press,
+        key,
+        mods,
+        consumed_mods: 0,
+        composing: false,
+        text: text.into(),
+        unshifted: text.chars().next().map_or(0, u32::from),
+    }
+}
+
+fn encode_key(encoder: &mut KeyEncoder, t: &mut Terminal, input: &KeyInput) -> Vec<u8> {
+    let mut out = Vec::new();
+    encoder.sync(t).expect("sync");
+    encoder.encode(input, &mut out).expect("encode");
+    out
+}
+
 #[test]
-fn probe_semantic_prompt_and_clipboard() {
-    let mut t = terminal(40, 5);
-    t.write(b"\x1b]133;A\x07$ \x1b]133;B\x07echo hi\r\n\x1b]133;C;cmdline_url=echo%20hi\x07hi\r\n\x1b]133;D;3\x07");
-    let effects = t.take_effects();
-    for m in &effects.marks {
-        let at = m.at.as_ref().and_then(|p| p.point(&mut t));
-        eprintln!(
-            "{:?} exit={:?} cmd={:?} at={:?}",
-            m.kind, m.exit_code, m.command, at
-        );
-    }
-    t.write(b"\x1b]133;C;cmdline=echo\\ there\x07");
-    for m in t.take_effects().marks {
-        eprintln!("{:?} cmd={:?}", m.kind, m.command);
-    }
-    t.write(b"\x1b]7;file://host/tmp/a%20b\x07");
-    eprintln!("pwd={:?}", t.take_effects().pwd);
-    t.write(b"\x1b]52;c;aGVsbG8=\x07");
-    eprintln!("clip={:?}", t.take_effects().clipboard);
-    t.write(b"\x1b]52;c;?\x07");
-    let e = t.take_effects();
-    eprintln!(
-        "read replies={:?} denied={}",
-        String::from_utf8_lossy(&e.replies),
-        e.clipboard_reads_denied
+fn keys_follow_the_kitty_keyboard_protocol_when_the_program_asks() {
+    let mut t = terminal(80, 24);
+    let mut encoder = KeyEncoder::new().expect("encoder");
+    let escape = press(sys::GHOSTTY_KEY_ESCAPE, "", 0);
+    let ctrl_a = press(sys::GHOSTTY_KEY_A, "a", 2);
+    let enter = press(sys::GHOSTTY_KEY_ENTER, "", 0);
+    // Legacy encoding first.
+    assert_eq!(encode_key(&mut encoder, &mut t, &escape), b"\x1b");
+    assert_eq!(encode_key(&mut encoder, &mut t, &ctrl_a), [1]);
+    assert_eq!(encode_key(&mut encoder, &mut t, &enter), b"\r");
+    // The program pushes Kitty flag 1 (disambiguate escape codes).
+    t.write(b"\x1b[>1u");
+    assert_eq!(encode_key(&mut encoder, &mut t, &escape), b"\x1b[27u");
+    assert_eq!(encode_key(&mut encoder, &mut t, &ctrl_a), b"\x1b[97;5u");
+    assert_eq!(
+        encode_key(&mut encoder, &mut t, &enter),
+        b"\r",
+        "Enter stays legacy"
     );
+    // And pops it again.
+    t.write(b"\x1b[<u");
+    assert_eq!(encode_key(&mut encoder, &mut t, &escape), b"\x1b");
+}
+
+fn click(action: MouseAction, button: Option<u8>, x: f32, y: f32) -> MouseInput {
+    MouseInput {
+        action,
+        button,
+        mods: 0,
+        x,
+        y,
+    }
+}
+
+fn encode_mouse(encoder: &mut MouseEncoder, t: &mut Terminal, input: &MouseInput) -> Vec<u8> {
+    let geometry = MouseGeometry {
+        width: 80 * 10,
+        height: 24 * 20,
+        cell_width: 10,
+        cell_height: 20,
+    };
+    let mut out = Vec::new();
+    encoder.sync(t, geometry).expect("sync");
+    encoder.encode(input, &mut out).expect("encode");
+    out
+}
+
+#[test]
+fn mouse_events_follow_the_tracking_mode_and_format() {
+    let mut t = terminal(80, 24);
+    let mut encoder = MouseEncoder::new().expect("encoder");
+    // Cell (3, 1) in pixels: column 3 is x 30–39, row 1 is y 20–39.
+    let down = click(MouseAction::Press, Some(1), 35.0, 25.0);
+    let up = click(MouseAction::Release, Some(1), 35.0, 25.0);
+    let wheel = click(MouseAction::Press, Some(4), 35.0, 25.0);
+    assert!(
+        encode_mouse(&mut encoder, &mut t, &down).is_empty(),
+        "nothing while the program does not track the mouse"
+    );
+    // Normal tracking with SGR encoding: 1-based cell, M for press, m for release.
+    t.write(b"\x1b[?1000h\x1b[?1006h");
+    assert_eq!(encode_mouse(&mut encoder, &mut t, &down), b"\x1b[<0;4;2M");
+    assert_eq!(encode_mouse(&mut encoder, &mut t, &up), b"\x1b[<0;4;2m");
+    assert_eq!(encode_mouse(&mut encoder, &mut t, &wheel), b"\x1b[<64;4;2M");
+    let motion = click(MouseAction::Motion, None, 55.0, 25.0);
+    assert!(
+        encode_mouse(&mut encoder, &mut t, &motion).is_empty(),
+        "normal tracking reports no motion"
+    );
+    // Any-event tracking reports it.
+    t.write(b"\x1b[?1003h");
+    assert_eq!(
+        encode_mouse(&mut encoder, &mut t, &motion),
+        b"\x1b[<35;6;2M"
+    );
+    // Without SGR the X10 format: button + 32, column + 33, row + 33.
+    t.write(b"\x1b[?1006l");
+    assert_eq!(
+        encode_mouse(&mut encoder, &mut t, &down),
+        [0x1b, b'[', b'M', 32, 36, 34]
+    );
+}
+
+#[test]
+fn pastes_are_bracketed_and_unsafe_text_is_refused() {
+    let mut t = terminal(80, 24);
+    assert_eq!(t.paste("ls", false).expect("paste"), PasteOutcome::Pasted);
+    assert_eq!(t.take_effects().replies, b"ls");
+    // A line break outside bracketed paste would run the command: refused until allowed.
+    assert_eq!(
+        t.paste("rm -rf x\n", false).expect("paste"),
+        PasteOutcome::Unsafe
+    );
+    assert!(t.take_effects().replies.is_empty());
+    assert_eq!(t.paste("a\nb", true).expect("paste"), PasteOutcome::Pasted);
+    assert_eq!(t.take_effects().replies, b"a\rb");
+    // In bracketed paste mode the text is framed and line breaks are safe.
     t.write(b"\x1b[?2004h");
-    let r = t.paste("a\nb", false);
-    eprintln!(
-        "paste bracketed {:?} {:?}",
-        r,
-        String::from_utf8_lossy(&t.take_effects().replies)
+    assert!(t.mode(MODE_BRACKETED_PASTE, false));
+    assert_eq!(t.paste("a\nb", false).expect("paste"), PasteOutcome::Pasted);
+    assert_eq!(t.take_effects().replies, b"\x1b[200~a\nb\x1b[201~");
+    // The end-of-paste sequence inside the text could escape the frame.
+    assert_eq!(
+        t.paste("x\x1b[201~y", false).expect("paste"),
+        PasteOutcome::Unsafe
     );
-    t.write(b"\x1b[?2004l");
-    let r = t.paste("a\nb", false);
+    assert_eq!(t.paste("", false).expect("paste"), PasteOutcome::Empty);
+}
+
+#[test]
+fn focus_reports_follow_mode_1004() {
+    let mut t = terminal(80, 24);
+    assert!(!t.mode(MODE_FOCUS_EVENTS, false));
+    t.write(b"\x1b[?1004h");
+    assert!(t.mode(MODE_FOCUS_EVENTS, false));
+    assert_eq!(focus_report(true).expect("report"), b"\x1b[I");
+    assert_eq!(focus_report(false).expect("report"), b"\x1b[O");
+}
+
+#[test]
+fn search_finds_matches_in_ten_thousand_rows_of_scrollback() {
+    let t = std::sync::Mutex::new(Terminal::new(40, 10, 20_000).expect("terminal"));
+    {
+        let mut guard = t.lock().expect("lock");
+        let mut out = String::new();
+        for i in 0..10_000 {
+            if i % 1000 == 7 {
+                out.push_str(&format!("line {i} NEEDLE-{i}\r\n"));
+            } else {
+                out.push_str(&format!("line {i}\r\n"));
+            }
+        }
+        guard.write(out.as_bytes());
+    }
+    let (matches, stats) = search(&t, "needle-", &|| false).expect("search");
+    assert_eq!(matches.len(), 10, "ASCII letters match case-insensitively");
+    // Newest first; line i is screen row i (nothing was pruned).
+    let rows: Vec<u32> = matches.iter().map(|m| m.start.y).collect();
+    let expected: Vec<u32> = (0..10).rev().map(|k| k * 1000 + 7).collect();
+    assert_eq!(rows, expected);
+    for m in &matches {
+        let line = format!("line {} ", m.start.y);
+        let start = u16::try_from(line.len()).expect("short");
+        assert_eq!((m.start.x, m.end.x, m.end.y), (start, start + 6, m.start.y));
+    }
+    assert!(stats.feeds >= 1 && stats.ticks >= 1);
+    assert!(matches!(
+        search(&t, "", &|| false),
+        Err(crate::Error::InvalidArgument { .. })
+    ));
+    assert!(matches!(
+        search(&t, "line", &|| true),
+        Err(crate::Error::Cancelled)
+    ));
+}
+
+#[test]
+fn a_search_holds_the_terminal_only_while_it_feeds() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, Mutex};
+    use std::time::{Duration, Instant};
+
+    let t = Arc::new(Mutex::new(
+        Terminal::new(80, 24, 200_000).expect("terminal"),
+    ));
+    {
+        let mut guard = t.lock().expect("lock");
+        let block: String = (0..10_000)
+            .map(|i| format!("row {i} some text to scan\r\n"))
+            .collect();
+        for _ in 0..10 {
+            guard.write(block.as_bytes());
+        }
+    }
+    let searching = Arc::new(AtomicBool::new(true));
+    let writer = {
+        let (t, searching) = (Arc::clone(&t), Arc::clone(&searching));
+        std::thread::spawn(move || {
+            // The IO thread's part: write a line, measure how long the lock took.
+            let mut waits = Vec::new();
+            while searching.load(Ordering::Acquire) {
+                let asked = Instant::now();
+                let mut guard = t.lock().expect("lock");
+                waits.push(asked.elapsed());
+                guard.write(b"new output\r\n");
+                drop(guard);
+                std::thread::sleep(Duration::from_micros(200));
+            }
+            waits
+        })
+    };
+    let started = Instant::now();
+    let (matches, stats) = search(&t, "zzz-not-there", &|| false).expect("search");
+    let took = started.elapsed();
+    searching.store(false, Ordering::Release);
+    let waits = writer.join().expect("writer");
+    assert!(matches.is_empty());
+    let longest = waits.iter().max().copied().unwrap_or_default();
     eprintln!(
-        "paste plain {:?} {:?}",
-        r,
-        String::from_utf8_lossy(&t.take_effects().replies)
+        "search {took:?}, {} feeds, {} ticks; writer locked {} times, longest wait {longest:?}",
+        stats.feeds,
+        stats.ticks,
+        waits.len()
     );
-    let r = t.paste("a\nb", true);
-    eprintln!(
-        "paste plain unsafe {:?} {:?}",
-        r,
-        String::from_utf8_lossy(&t.take_effects().replies)
+    assert!(waits.len() > 1, "the writer kept writing during the search");
+    assert!(
+        longest < Duration::from_millis(50),
+        "the writer waited {longest:?} for the terminal"
     );
-    t.write(b"\x1bc");
-    eprintln!("reset {}", t.take_effects().reset);
-    eprintln!("version {}", snapshot::library_version());
 }

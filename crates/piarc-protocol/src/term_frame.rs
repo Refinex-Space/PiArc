@@ -403,37 +403,41 @@ pub fn encode(frame: &Frame) -> Vec<u8> {
             }
             out.extend_from_slice(&entry.style.flags.to_le_bytes());
         }
-        out.extend_from_slice(&frame.rows.to_le_bytes());
-        for row in &body.rows {
-            out.extend_from_slice(&row.id.to_le_bytes());
-            let flags = if row.cells.is_some() {
-                ROW_HAS_CELLS
-            } else {
-                0
-            } | if row.selection.is_some() {
-                ROW_HAS_SELECTION
-            } else {
-                0
-            };
-            out.push(flags);
-            if let Some(selection) = row.selection {
-                out.extend_from_slice(&selection.start.to_le_bytes());
-                out.extend_from_slice(&selection.end.to_le_bytes());
-            }
-            if let Some(cells) = &row.cells {
-                assert_eq!(
-                    cells.len(),
-                    usize::from(frame.cols),
-                    "a row has `cols` cells"
-                );
-                out.extend_from_slice(&frame.cols.to_le_bytes());
-                for cell in cells {
-                    encode_cell(&mut out, cell);
-                }
+        encode_rows(&mut out, frame, &body.rows);
+    }
+    out
+}
+
+fn encode_rows(out: &mut Vec<u8>, frame: &Frame, rows: &[Row]) {
+    out.extend_from_slice(&frame.rows.to_le_bytes());
+    for row in rows {
+        out.extend_from_slice(&row.id.to_le_bytes());
+        let flags = if row.cells.is_some() {
+            ROW_HAS_CELLS
+        } else {
+            0
+        } | if row.selection.is_some() {
+            ROW_HAS_SELECTION
+        } else {
+            0
+        };
+        out.push(flags);
+        if let Some(selection) = row.selection {
+            out.extend_from_slice(&selection.start.to_le_bytes());
+            out.extend_from_slice(&selection.end.to_le_bytes());
+        }
+        if let Some(cells) = &row.cells {
+            assert_eq!(
+                cells.len(),
+                usize::from(frame.cols),
+                "a row has `cols` cells"
+            );
+            out.extend_from_slice(&frame.cols.to_le_bytes());
+            for cell in cells {
+                encode_cell(out, cell);
             }
         }
     }
-    out
 }
 
 fn body_hint(body: &Body) -> usize {

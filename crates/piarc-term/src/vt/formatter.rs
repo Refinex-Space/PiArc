@@ -22,7 +22,8 @@ pub enum TextRange {
     Screen,
     /// The scrollback and the active area.
     All,
-    /// The last `n` rows of the scrollback and the active area.
+    /// The last `n` lines of the scrollback and the active area, counted after the blank
+    /// rows at the bottom (below the cursor, typically) are dropped.
     LastRows(u32),
     /// From `start` to `end`, both included, in screen coordinates.
     Between(ScreenPoint, ScreenPoint),
@@ -67,9 +68,13 @@ pub fn plain_text(
     range: TextRange,
     options: TextOptions,
 ) -> Result<String> {
-    if range == TextRange::LastRows(0) {
-        return Ok(String::new());
+    match range {
+        TextRange::LastRows(n) => last_lines(terminal, n, options),
+        _ => format_range(terminal, range, options),
     }
+}
+
+fn format_range(terminal: &mut Terminal, range: TextRange, options: TextOptions) -> Result<String> {
     let selection = selection(terminal, range)?;
     let formatter = Formatter::new(terminal)?;
     formatter.set_bool(
@@ -87,6 +92,32 @@ pub fn plain_text(
     }
     let bytes = formatter.format()?;
     Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+/// The last `n` lines: formats a window of the bottom rows, wide enough to hold `n` lines
+/// after the trailing blank rows the formatter drops, growing it when blank rows took more.
+fn last_lines(terminal: &mut Terminal, n: u32, options: TextOptions) -> Result<String> {
+    if n == 0 {
+        return Ok(String::new());
+    }
+    let total = u32::try_from(terminal.total_rows()).unwrap_or(u32::MAX);
+    let wanted = usize::try_from(n).unwrap_or(usize::MAX);
+    let mut window = n.saturating_add(u32::from(terminal.rows()));
+    loop {
+        let start = total.saturating_sub(window);
+        let end = ScreenPoint {
+            y: total.saturating_sub(1),
+            x: u16::MAX,
+        };
+        let range = TextRange::Between(ScreenPoint { y: start, x: 0 }, end);
+        let text = format_range(terminal, range, options)?;
+        let lines: Vec<&str> = text.split('\n').collect();
+        if lines.len() >= wanted || start == 0 {
+            let skip = lines.len().saturating_sub(wanted);
+            return Ok(lines[skip..].join("\n"));
+        }
+        window = window.saturating_mul(2);
+    }
 }
 
 /// VT sequences that recreate the active screen (scrollback, styles and every extra: cursor,
@@ -219,15 +250,7 @@ fn selection(terminal: &mut Terminal, range: TextRange) -> Result<Option<sys::Gh
                 u32::from(rows) - 1,
             )?,
         ),
-        TextRange::LastRows(n) => (
-            grid_ref(
-                raw,
-                sys::GHOSTTY_POINT_TAG_SCREEN,
-                0,
-                total.saturating_sub(n),
-            )?,
-            grid_ref(raw, sys::GHOSTTY_POINT_TAG_SCREEN, last_col, last_row)?,
-        ),
+        TextRange::LastRows(_) => return Ok(None),
         TextRange::Between(start, end) => {
             let clamp = |p: ScreenPoint| (p.x.min(last_col), p.y.min(last_row));
             let (sx, sy) = clamp(start);
