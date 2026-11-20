@@ -3,7 +3,14 @@
 // every session shown in it, so a session shown again finds its parsed messages and row heights
 // (architecture section 11: switching to a cached session). The view adds the session's
 // transcript and what the rows' buttons do.
-import { createContext, useCallback, useContext, useRef, useSyncExternalStore } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+} from 'react';
 
 import type { BranchPoint } from '@piarc/protocol';
 import type { SessionTranscript, TranscriptRow, TurnInfo } from '../store/transcript.js';
@@ -11,6 +18,7 @@ import { HighlightClient } from './highlight/highlight-client.js';
 import { MarkdownClient, type ParsedDoc } from './markdown/markdown-client.js';
 import { RowHeights } from './row-heights.js';
 import { StreamingDriver } from './streaming-driver.js';
+import { shownIn, useDetail } from './detail.js';
 
 /** Counts commits per row; the prototype page and the benchmarks use it to show what re-rendered. */
 export interface RenderCounter {
@@ -116,12 +124,18 @@ export function useTranscriptServices(): TranscriptServices {
   return useTranscriptView().services;
 }
 
-/** The shown row ids; re-renders when rows are added or removed. */
+/** The row ids the current view shows (`detail.ts`); re-renders when rows are added or removed
+ * or the view changes. */
 export function useShownRowIds(): readonly string[] {
   const { transcript } = useTranscriptView();
+  const detail = useDetail();
   const subscribe = useCallback((l: () => void) => transcript.subscribeList(l), [transcript]);
   const read = useCallback(() => transcript.rowIds(), [transcript]);
-  return useSyncExternalStore(subscribe, read);
+  const ids = useSyncExternalStore(subscribe, read);
+  return useMemo(
+    () => (detail === 'detailed' ? ids : ids.filter((id) => shownIn(transcript.row(id), detail))),
+    [ids, detail, transcript],
+  );
 }
 
 /** One row; re-renders only when that row changes. */
@@ -184,9 +198,12 @@ export function useExpanded(id: string, fallback: boolean): [boolean, (open: boo
     services: { expansion },
     transcript,
   } = useTranscriptView();
-  const key = transcript.cacheKey(id);
+  // The detailed view opens everything and keeps its own choices (T29).
+  const detailed = useDetail() === 'detailed';
+  const key = detailed ? `detailed:${transcript.cacheKey(id)}` : transcript.cacheKey(id);
+  const initial = fallback || detailed;
   const subscribe = useCallback((l: () => void) => expansion.subscribe(key, l), [expansion, key]);
-  const read = useCallback(() => expansion.get(key, fallback), [expansion, key, fallback]);
+  const read = useCallback(() => expansion.get(key, initial), [expansion, key, initial]);
   const expanded = useSyncExternalStore(subscribe, read);
   const set = useCallback(
     (open: boolean) => {

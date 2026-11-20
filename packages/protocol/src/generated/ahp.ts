@@ -711,8 +711,8 @@ export type ExternalChange = 'modified' | 'deleted';
  */
 export type WebContentFormat = 'markdown' | 'text';
 /**
- * One step of a sign-in shown to the user. A later interaction of the same sign-in replaces
- * the one on screen; a replaced prompt is answered with `cancelled`.
+ * One step of a sign-in shown to the user. A later prompt of the same sign-in replaces the
+ * prompt on screen, which is answered with `cancelled`; status lines and links do not.
  */
 export type LoginInteraction =
   | {

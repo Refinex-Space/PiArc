@@ -361,6 +361,18 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.setCatalogRefresh, enabled)
       .then((v: unknown) => expectString(v)),
+  setModelPreferences: (preferences) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.setModelPreferences, preferences)
+      .then((v: unknown) => expectString(v)),
+  startLogin: (provider) =>
+    ipcRenderer.invoke(IPC_CHANNELS.startLogin, provider).then((v: unknown) => expectString(v)),
+  answerLogin: (loginId, value) =>
+    ipcRenderer.invoke(IPC_CHANNELS.answerLogin, loginId, value).then(() => undefined),
+  logoutProvider: (provider) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.logoutProvider, provider)
+      .then((v: unknown) => (v === null ? null : expectString(v))),
   workspaceModels: (workspace) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.workspaceModels, workspace)

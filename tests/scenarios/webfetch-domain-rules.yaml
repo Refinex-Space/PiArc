@@ -1,0 +1,45 @@
+id: webfetch-domain-rules
+description: In Manual mode a WebFetch call without a rule asks; "always allow" saves a rule for its domain, after which the same domain runs without asking; a deny rule refuses without asking or fetching, and an ask rule asks for another host (T29).
+capabilities: [CAP-TOOL-WEBFETCH-001, CAP-PERM-RULE-001]
+workspace:
+  trusted: true
+  run_files:
+    data 数据/settings.json: '{"permissions":{"deny":["WebFetch(domain:*.blocked.test)"],"ask":["WebFetch(domain:localhost)"]}}'
+web:
+  pages:
+    /a: { content_type: text/plain, body: Page A says hello. }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: first, name: WebFetch, input: { url: '{{web}}/a', prompt: Greeting? } }]
+      - text: It says hello.
+      - tool_calls: [{ id: again, name: WebFetch, input: { url: '{{web}}/a', prompt: Again? } }]
+      - text: Still hello.
+      - tool_calls:
+          [{ id: blocked, name: WebFetch, input: { url: 'https://api.blocked.test/x', prompt: x } }]
+      - tool_calls: [{ id: other, name: WebFetch, input: { url: '{{web_alt}}/a', prompt: x } }]
+      - text: Done.
+actions:
+  - prompt: { text: Fetch the pages., turn: one }
+approvals:
+  - tool: WebFetch
+    decision: always
+  - tool: WebFetch
+    decision: deny
+    feedback: Not that host.
+expect:
+  request_counts: { main: 7 }
+  files:
+    .piarc/settings.local.json: "{\n  \"permissions\": {\n    \"allow\": [\n      \"WebFetch(domain:127.0.0.1)\"\n    ]\n  }\n}\n"
+  requests:
+    - index: 1
+      contains: [Page A says hello.]
+    - index: 3
+      contains: [Page A says hello.]
+    - index: 6
+      tool_results:
+        - { id: first, is_error: false, contains: It says hello. }
+        - { id: again, is_error: false, contains: Still hello. }
+        - { id: blocked, is_error: true }
+        - { id: other, is_error: true, contains: Not that host. }

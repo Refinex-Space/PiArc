@@ -1,0 +1,17 @@
+id: login-authorization-code
+description: A provider sign-in with the authorization code flow - the page opens, redirects to the loopback server and the credential reaches the vault; refusal ends with the server's reason, cancel at the first step ends as cancelled, and signing out removes the credential (T29).
+capabilities: [CAP-PROVIDER-OAUTH-001]
+oauth: { flow: authorization_code }
+providers:
+  main:
+    wire: openai
+    steps:
+      - text: Unused.
+actions:
+  - sign_in: { behavior: deny, outcome: failed, message: access_denied }
+  - sign_in: { behavior: approve, cancel: true, outcome: cancelled }
+  - sign_in: { behavior: approve, outcome: succeeded }
+  - sign_out: {}
+  - prompt: { text: Hello., turn: one }
+expect:
+  request_counts: { main: 1 }

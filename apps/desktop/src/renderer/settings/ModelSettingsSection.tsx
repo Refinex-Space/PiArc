@@ -1,0 +1,311 @@
+// Per-model settings and the auxiliary model in the settings window (T29, architecture section
+// 8.2): display name, context window, image input, default effort and Tool Profile replace the
+// catalog's values; Core saves them in the user's settings and sends them to every Agent Host.
+import { useId, useState } from 'react';
+
+import { useT } from '../app/app-context.js';
+import type { MessageId } from '../../shared/i18n/index.js';
+import type { CatalogEntry, ModelOverride, ProviderSettings } from './provider-form.js';
+
+const keyOf = (m: { provider: string; id: string }) => `${m.provider}/${m.id}`;
+
+const EFFORT_LABELS: Record<string, MessageId> = {
+  off: 'models.effort.off',
+  low: 'models.effort.low',
+  medium: 'models.effort.medium',
+  high: 'models.effort.high',
+  xhigh: 'models.effort.xhigh',
+  max: 'models.effort.max',
+};
+
+interface Draft {
+  displayName: string;
+  contextWindow: string;
+  vision: '' | 'on' | 'off';
+  defaultEffort: string;
+  toolProfile: '' | 'default' | 'conservative';
+}
+
+function draftOf(o: ModelOverride | undefined): Draft {
+  return {
+    displayName: o?.displayName ?? '',
+    contextWindow: o?.contextWindow === undefined ? '' : String(o.contextWindow),
+    vision: o?.vision === undefined ? '' : o.vision ? 'on' : 'off',
+    defaultEffort: o?.defaultEffort ?? '',
+    toolProfile: o?.toolProfile ?? '',
+  };
+}
+
+/** The override a draft stands for, or a message id when the window is invalid. */
+export function overrideOf(draft: Draft): ModelOverride | MessageId {
+  const out: ModelOverride = {};
+  const name = draft.displayName.trim();
+  if (name !== '') out.displayName = name;
+  if (draft.contextWindow.trim() !== '') {
+    const window = Number(draft.contextWindow.replaceAll(',', '').trim());
+    if (!Number.isSafeInteger(window) || window < 1024 || window > 10_000_000) {
+      return 'models.settings.invalidWindow';
+    }
+    out.contextWindow = window;
+  }
+  if (draft.vision !== '') out.vision = draft.vision === 'on';
+  if (draft.defaultEffort !== '') out.defaultEffort = draft.defaultEffort;
+  if (draft.toolProfile !== '') out.toolProfile = draft.toolProfile;
+  return out;
+}
+
+function ModelForm({
+  model,
+  current,
+  busy,
+  onSave,
+  onCancel,
+}: {
+  readonly model: CatalogEntry;
+  readonly current: ModelOverride | undefined;
+  readonly busy: boolean;
+  readonly onSave: (override: ModelOverride) => void;
+  readonly onCancel: () => void;
+}) {
+  const t = useT();
+  const base = useId();
+  const [draft, setDraft] = useState(() => draftOf(current));
+  const [invalid, setInvalid] = useState<MessageId>();
+  const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
+    setDraft({ ...draft, [key]: value });
+    setInvalid(undefined);
+  };
+  const id = (name: string) => `${base}-${name}`;
+  return (
+    <form
+      className="settings-section model-form"
+      data-testid={`model-form-${keyOf(model)}`}
+      onSubmit={(event) => {
+        event.preventDefault();
+        const result = overrideOf(draft);
+        if (typeof result === 'string') {
+          setInvalid(result);
+          return;
+        }
+        onSave(result);
+      }}
+    >
+      <fieldset className="settings-section" disabled={busy}>
+        <div className="setting">
+          <label className="setting-label" htmlFor={id('name')}>
+            {t('models.settings.displayName')}
+          </label>
+          <input
+            id={id('name')}
+            className="input"
+            data-testid="model-display-name"
+            placeholder={model.name}
+            value={draft.displayName}
+            onChange={(e) => {
+              set('displayName', e.currentTarget.value);
+            }}
+          />
+        </div>
+        <div className="setting">
+          <label className="setting-label" htmlFor={id('window')}>
+            {t('models.settings.contextWindow')}
+          </label>
+          <input
+            id={id('window')}
+            className="input"
+            inputMode="numeric"
+            data-testid="model-context-window"
+            placeholder={String(model.contextWindow)}
+            aria-invalid={invalid !== undefined}
+            value={draft.contextWindow}
+            onChange={(e) => {
+              set('contextWindow', e.currentTarget.value);
+            }}
+          />
+          {invalid === undefined ? null : (
+            <span className="error-text small" role="alert">
+              {t(invalid)}
+            </span>
+          )}
+        </div>
+        <div className="setting">
+          <label className="setting-label" htmlFor={id('vision')}>
+            {t('models.settings.vision')}
+          </label>
+          <select
+            id={id('vision')}
+            className="input"
+            data-testid="model-vision"
+            value={draft.vision}
+            onChange={(e) => {
+              set('vision', e.currentTarget.value as Draft['vision']);
+            }}
+          >
+            <option value="">
+              {t('models.settings.catalog', {
+                value: t(model.vision ? 'models.settings.on' : 'models.settings.off'),
+              })}
+            </option>
+            <option value="on">{t('models.settings.on')}</option>
+            <option value="off">{t('models.settings.off')}</option>
+          </select>
+        </div>
+        <div className="setting">
+          <label className="setting-label" htmlFor={id('effort')}>
+            {t('models.settings.effort')}
+          </label>
+          <select
+            id={id('effort')}
+            className="input"
+            data-testid="model-default-effort"
+            value={draft.defaultEffort}
+            onChange={(e) => {
+              set('defaultEffort', e.currentTarget.value);
+            }}
+          >
+            <option value="">{t('models.default')}</option>
+            {model.efforts.map((effort) => (
+              <option key={effort} value={effort}>
+                {EFFORT_LABELS[effort] === undefined ? effort : t(EFFORT_LABELS[effort])}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="setting">
+          <label className="setting-label" htmlFor={id('profile')}>
+            {t('models.settings.profile')}
+          </label>
+          <select
+            id={id('profile')}
+            className="input"
+            data-testid="model-tool-profile"
+            value={draft.toolProfile}
+            onChange={(e) => {
+              set('toolProfile', e.currentTarget.value as Draft['toolProfile']);
+            }}
+          >
+            <option value="">
+              {t('models.settings.profileAuto', { reliability: model.toolReliability })}
+            </option>
+            <option value="default">{t('models.settings.profileDefault')}</option>
+            <option value="conservative">{t('models.settings.profileConservative')}</option>
+          </select>
+        </div>
+        <div className="dialog-actions">
+          <button type="button" className="button" onClick={onCancel}>
+            {t('dialog.cancel')}
+          </button>
+          <button type="submit" className="button button-primary" data-testid="model-save">
+            {t('models.settings.save')}
+          </button>
+        </div>
+      </fieldset>
+    </form>
+  );
+}
+
+/** The auxiliary model and the per-model settings. */
+export function ModelSettingsSection({
+  settings,
+  busy,
+  save,
+}: {
+  readonly settings: ProviderSettings;
+  readonly busy: boolean;
+  /** Saves the preferences (`setModelPreferences`). */
+  readonly save: (preferencesJson: string) => void;
+}) {
+  const t = useT();
+  const auxId = useId();
+  const [editing, setEditing] = useState<string>();
+  const preferences = (
+    models: Record<string, ModelOverride>,
+    auxiliary: ProviderSettings['auxiliary'],
+  ) => JSON.stringify({ models, ...(auxiliary === null ? {} : { auxiliary }) });
+  const models = settings.catalogModels;
+  const chosen = models.find((m) => editing === keyOf(m));
+  return (
+    <section className="settings-subsection" data-testid="model-settings-section">
+      <h2 className="settings-heading">{t('models.settings.title')}</h2>
+      <div className="setting">
+        <label className="setting-label" htmlFor={auxId}>
+          {t('models.auxiliary')}
+        </label>
+        <select
+          id={auxId}
+          className="input"
+          data-testid="auxiliary-model"
+          disabled={busy}
+          value={settings.auxiliary === null ? '' : keyOf(settings.auxiliary)}
+          onChange={(e) => {
+            const value = e.currentTarget.value;
+            const model = models.find((m) => keyOf(m) === value);
+            save(
+              preferences(
+                settings.models,
+                model === undefined ? null : { provider: model.provider, id: model.id },
+              ),
+            );
+          }}
+        >
+          <option value="">{t('models.auxiliary.session')}</option>
+          {models.map((m) => (
+            <option key={keyOf(m)} value={keyOf(m)}>
+              {settings.models[keyOf(m)]?.displayName ?? m.name} ({m.provider})
+            </option>
+          ))}
+        </select>
+        <span className="muted small">{t('models.auxiliary.hint')}</span>
+      </div>
+      <p className="muted small">{t('models.settings.hint')}</p>
+      {models.length === 0 ? (
+        <p className="muted">{t('models.settings.none')}</p>
+      ) : chosen === undefined ? (
+        <ul className="provider-list">
+          {models.map((m) => {
+            const o = settings.models[keyOf(m)];
+            return (
+              <li key={keyOf(m)} data-testid={`model-row-${keyOf(m)}`}>
+                <div>
+                  <strong>{o?.displayName ?? m.name}</strong>
+                  <div className="muted small">
+                    {keyOf(m)} · {(o?.contextWindow ?? m.contextWindow).toLocaleString()}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="button"
+                  data-testid={`model-edit-${keyOf(m)}`}
+                  disabled={busy}
+                  onClick={() => {
+                    setEditing(keyOf(m));
+                  }}
+                >
+                  {t('models.settings.edit')}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <ModelForm
+          model={chosen}
+          current={settings.models[keyOf(chosen)]}
+          busy={busy}
+          onCancel={() => {
+            setEditing(undefined);
+          }}
+          onSave={(override) => {
+            const key = keyOf(chosen);
+            const next = Object.fromEntries(
+              Object.entries(settings.models).filter(([k]) => k !== key),
+            );
+            if (Object.keys(override).length > 0) next[key] = override;
+            save(preferences(next, settings.auxiliary));
+            setEditing(undefined);
+          }}
+        />
+      )}
+    </section>
+  );
+}

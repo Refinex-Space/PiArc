@@ -647,6 +647,25 @@
   background: var(--piarc-border-subtle);
 }
 
+/* system reminders (detailed view, T29) */
+
+.row-reminder {
+  border-left: 2px dashed var(--piarc-border-subtle);
+  padding-left: var(--piarc-space-3);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+}
+
+.row-reminder-head {
+  font-weight: 600;
+}
+
+.row-reminder-text {
+  margin-top: var(--piarc-space-1);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* error and uncertain cards */
 
 .row-error {

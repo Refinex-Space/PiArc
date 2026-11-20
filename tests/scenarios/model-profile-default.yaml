@@ -1,0 +1,35 @@
+id: model-profile-default
+description: Choosing the default Tool Profile in the per-model settings gives a local endpoint's model the full tool set and the default descriptions again (T29).
+capabilities: [CAP-MODEL-PROFILE-001, CAP-MODEL-SETTINGS-001]
+workspace:
+  run_files:
+    data 数据/settings.json: '{"modelProviders":{"models":{"mock-local/mock-model":{"toolProfile":"default"}}}}'
+providers:
+  local:
+    wire: openai
+    configure_as: local
+    steps:
+      - text: Full tools.
+sessions:
+  main: { provider: local }
+actions:
+  - prompt: { text: 'Hello [[piarc-scenario:model-profile-default]]', turn: one }
+expect:
+  request_counts: { local: 1 }
+  requests:
+    - index: 0
+      tools_include:
+        [
+          Read,
+          Write,
+          Edit,
+          Glob,
+          Grep,
+          TodoWrite,
+          WebFetch,
+          EnterPlanMode,
+          ExitPlanMode,
+          AskUserQuestion,
+          SuggestNextSteps,
+        ]
+      not_contains: [Make the list at the start of work with several steps]

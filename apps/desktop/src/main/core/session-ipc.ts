@@ -59,6 +59,10 @@ export type SessionCore = Pick<
   | 'saveProvider'
   | 'deleteProvider'
   | 'setCatalogRefresh'
+  | 'setModelPreferences'
+  | 'startLogin'
+  | 'answerLogin'
+  | 'logoutProvider'
   | 'workspaceModels'
   | 'sessionModels'
   | 'previewModelSwitch'
@@ -559,6 +563,34 @@ export function registerSessionHandlers(
   registerHandler(IPC_CHANNELS.setCatalogRefresh, async (_event, [enabled]) =>
     notifyProviders(await core.setCatalogRefresh(flag(enabled, 'enabled'))),
   );
+  registerHandler(IPC_CHANNELS.setModelPreferences, async (_event, [preferences]) =>
+    notifyProviders(await core.setModelPreferences(text(preferences, 'model preferences'))),
+  );
+  registerHandler(IPC_CHANNELS.startLogin, async (_event, [provider]) => {
+    const done = await core.startLogin(token(provider, 'provider'));
+    providersChanged();
+    return done;
+  });
+  registerHandler(IPC_CHANNELS.answerLogin, (_event, [loginId, value]) => {
+    core.answerLogin(token(loginId, 'loginId'), value === null ? null : text(value, 'answer'));
+  });
+  registerHandler(IPC_CHANNELS.logoutProvider, async (event, [value]) => {
+    const provider = token(value, 'provider');
+    const t = translator();
+    const window = BrowserWindow.fromWebContents(event.sender);
+    const options: Electron.MessageBoxOptions = {
+      type: 'warning',
+      message: t.t('providers.confirmLogout', { id: provider }),
+      buttons: [t.t('providers.logout'), t.t('dialog.cancel')],
+      defaultId: 1,
+      cancelId: 1,
+    };
+    const answer =
+      window === null
+        ? await dialog.showMessageBox(options)
+        : await dialog.showMessageBox(window, options);
+    return answer.response === 0 ? notifyProviders(await core.logoutProvider(provider)) : null;
+  });
   registerHandler(IPC_CHANNELS.workspaceModels, (_event, [workspace]) =>
     core.workspaceModels(absolutePath(workspace)),
   );

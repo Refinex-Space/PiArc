@@ -22,10 +22,43 @@ export interface Provider {
   hasCredential: boolean;
 }
 
+/** A provider with sign-in (T29). */
+export interface LoginProvider {
+  id: string;
+  name: string;
+  label: string;
+  subscription: boolean;
+  signedIn: boolean;
+}
+
+/** A configured model with the catalog's values (T29). */
+export interface CatalogEntry {
+  provider: string;
+  id: string;
+  name: string;
+  contextWindow: number;
+  vision: boolean;
+  efforts: string[];
+  toolReliability: string;
+}
+
+/** The user's settings for one model (T29). */
+export interface ModelOverride {
+  displayName?: string;
+  contextWindow?: number;
+  vision?: boolean;
+  defaultEffort?: string;
+  toolProfile?: 'default' | 'conservative';
+}
+
 export interface ProviderSettings {
   providers: Provider[];
   builtinProviders: { id: string; name: string }[];
   catalogRefresh: boolean;
+  loginProviders: LoginProvider[];
+  catalogModels: CatalogEntry[];
+  models: Record<string, ModelOverride>;
+  auxiliary: { provider: string; id: string } | null;
 }
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -68,7 +101,46 @@ export function parseSettings(text: string): ProviderSettings {
   ) {
     throw new Error('Invalid provider settings');
   }
-  return value as ProviderSettings;
+  const extra = value as Record<string, unknown>;
+  const list = (key: string, valid: (v: unknown) => boolean): unknown[] => {
+    const items = extra[key];
+    return Array.isArray(items) ? items.filter(valid) : [];
+  };
+  const models = record(extra.models) ? extra.models : {};
+  const auxiliary = extra.auxiliary;
+  const known = value as Pick<ProviderSettings, 'providers' | 'builtinProviders'>;
+  return {
+    providers: known.providers,
+    builtinProviders: known.builtinProviders,
+    catalogRefresh: value.catalogRefresh,
+    loginProviders: list(
+      'loginProviders',
+      (p) =>
+        record(p) &&
+        typeof p.id === 'string' &&
+        typeof p.name === 'string' &&
+        typeof p.label === 'string' &&
+        typeof p.signedIn === 'boolean',
+    ) as LoginProvider[],
+    catalogModels: list(
+      'catalogModels',
+      (m) =>
+        record(m) &&
+        typeof m.provider === 'string' &&
+        typeof m.id === 'string' &&
+        typeof m.name === 'string' &&
+        typeof m.contextWindow === 'number' &&
+        typeof m.vision === 'boolean' &&
+        Array.isArray(m.efforts),
+    ) as CatalogEntry[],
+    models: models as Record<string, ModelOverride>,
+    auxiliary:
+      record(auxiliary) &&
+      typeof auxiliary.provider === 'string' &&
+      typeof auxiliary.id === 'string'
+        ? { provider: auxiliary.provider, id: auxiliary.id }
+        : null,
+  };
 }
 
 export interface Form {

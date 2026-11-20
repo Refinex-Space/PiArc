@@ -20,9 +20,11 @@ mod fixtures;
 pub mod format;
 pub mod gate;
 pub mod harness_spec;
+pub mod login_spec;
 pub mod matcher;
 pub mod runner;
 pub mod suite;
+pub mod web;
 
 use std::path::PathBuf;
 

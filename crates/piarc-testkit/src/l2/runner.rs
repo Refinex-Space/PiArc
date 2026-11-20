@@ -37,6 +37,7 @@ use crate::server::MockProvider;
 
 mod checkpoints;
 mod harness;
+mod login;
 
 /// Safety net for every wait; no assertion depends on timing.
 pub const WAIT: Duration = Duration::from_secs(30);
@@ -218,6 +219,11 @@ struct Env {
     config: RunnerConfig,
     /// What commands start from (see [`command_env`]).
     command_env: piarc_core::tool_io::CommandEnv,
+    /// The scenario's web server (T29), which Core's WebFetch may reach.
+    web: Option<super::web::WebServer>,
+    /// The mock authorization server and the test provider's file (T29).
+    auth: Option<crate::auth_server::MockAuthServer>,
+    oauth_file: Option<PathBuf>,
 }
 
 impl Env {
@@ -233,11 +239,29 @@ impl Env {
             std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         }
         prepare_workspace(spec, root, &workspace)?;
+        let web = match &spec.web {
+            Some(pages) => Some(
+                super::web::start(pages)
+                    .await
+                    .map_err(|e| format!("web server: {e}"))?,
+            ),
+            None => None,
+        };
         let mut mocks = BTreeMap::new();
         let mut providers = serde_json::Map::new();
         for (name, endpoint) in &spec.providers {
             let id = spec.mock_scenario_id(name);
-            let library = Scenario::new(&id, endpoint.script())
+            let mut script = endpoint.script();
+            if let Some(web) = &web {
+                for call in script
+                    .steps
+                    .iter_mut()
+                    .flat_map(|s| s.tool_calls.iter_mut())
+                {
+                    super::web::fill_value(&mut call.input, web.port);
+                }
+            }
+            let library = Scenario::new(&id, script)
                 .and_then(|scenario| ScenarioLibrary::new().with(scenario))
                 .map_err(|e| e.to_string())?;
             let mock = MockProvider::start(library)
@@ -255,6 +279,37 @@ impl Env {
             &pi.join("settings.json"),
             &json!({ "retry": { "baseDelayMs": 5 } }),
         )?;
+        let (auth, oauth_file) = match spec.oauth {
+            Some(oauth) => {
+                let auth = crate::auth_server::MockAuthServer::start(
+                    crate::auth_server::AuthBehavior::Approve,
+                    0,
+                )
+                .await
+                .map_err(|e| format!("authorization server: {e}"))?;
+                let base = mocks
+                    .values()
+                    .next()
+                    .map(MockProvider::openai_base_url)
+                    .unwrap_or_default();
+                let file = root.join("oauth-provider.json");
+                let flow = match oauth.flow {
+                    super::login_spec::OAuthFlow::AuthorizationCode => "authorizationCode",
+                    super::login_spec::OAuthFlow::DeviceCode => "deviceCode",
+                };
+                write_json(
+                    &file,
+                    &json!({
+                        "id": login::OAUTH_PROVIDER, "baseUrl": base, "flow": flow,
+                        "tokenUrl": auth.token_url(), "authorizeUrl": auth.authorize_url(),
+                        "deviceUrl": auth.device_url(),
+                        "models": [{ "id": "oauth-model", "contextWindow": 32_000, "maxTokens": 1024 }],
+                    }),
+                )?;
+                (Some(auth), Some(file))
+            }
+            None => (None, None),
+        };
         let gate = Arc::new(Gate::new(spec.expect.tool_batches.clone()));
         let home = root.join("home 家");
         let command_env = command_env(&home)?;
@@ -269,6 +324,9 @@ impl Env {
             master_key: test_master_key_name("l2"),
             config: config.clone(),
             command_env,
+            web,
+            auth,
+            oauth_file,
         })
     }
 
@@ -282,7 +340,11 @@ impl Env {
                     node: self.config.node.clone(),
                     bundle: self.config.bundle.clone(),
                     pi_package_dir: Some(self.config.pi_assets.clone()),
-                    extra_args: Vec::new(),
+                    extra_args: self
+                        .oauth_file
+                        .iter()
+                        .flat_map(|f| ["--test-oauth-provider".into(), f.clone().into_os_string()])
+                        .collect(),
                     extra_env: vec![("PI_OFFLINE".into(), "1".into())],
                 }),
                 ..SessionsConfig::default()
@@ -293,6 +355,14 @@ impl Env {
             }),
             tool_observer: Some(Arc::clone(&self.gate) as _),
             command_env: Some(self.command_env.clone()),
+            web: piarc_core::tool_io::WebConfig {
+                allowlist: if self.web.is_some() {
+                    vec!["127.0.0.1".into(), "localhost".into()]
+                } else {
+                    Vec::new()
+                },
+                ..piarc_core::tool_io::WebConfig::default()
+            },
             ..CoreConfig::default()
         }
     }
@@ -677,6 +747,8 @@ impl Driver<'_> {
             Action::SwitchBranch(spec) => self.switch_branch(spec).await,
             Action::CheckBranch(spec) => self.check_branch(spec).await,
             Action::CheckFiles(spec) => self.check_files_now(spec),
+            Action::SignIn(spec) => self.sign_in(spec).await,
+            Action::SignOut {} => self.sign_out().await,
         }
     }
 

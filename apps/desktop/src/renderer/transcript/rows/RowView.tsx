@@ -13,7 +13,7 @@ import { PlanApprovalCard } from '../../approvals/PlanApprovalCard.js';
 import { QuestionForm } from '../../approvals/QuestionForm.js';
 import { OWN_ROW_TOOLS } from '../../store/transcript.js';
 import { HostToolRow } from './harness.js';
-import { CompactionRow, ErrorCard, UncertainCard, WorkingRow } from './status.js';
+import { CompactionRow, ErrorCard, ReminderRow, UncertainCard, WorkingRow } from './status.js';
 import { BashCard, FileChangeCard, ToolGroupRow } from './tools.js';
 
 function useCommitted(id: string): void {
@@ -114,6 +114,8 @@ const RowContent = memo(function RowContent({ id }: { readonly id: string }) {
       return <ModeChangeRow mode={item.mode} />;
     case 'contextCompaction':
       return <CompactionRow id={id} item={item} />;
+    case 'reminder':
+      return <ReminderRow id={id} item={item} />;
     case 'dynamicToolCall':
       if (OWN_ROW_TOOLS.has(item.tool)) return <HostToolRow item={item} />;
       return <ToolGroupRow id={id} members={[id]} />;

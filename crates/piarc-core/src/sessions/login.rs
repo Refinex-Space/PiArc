@@ -104,7 +104,7 @@ impl Logins {
     }
 
     /// `ui/loginInteraction`: shows the step; a question waits for the user's answer. A later
-    /// step of the same sign-in replaces the question on screen.
+    /// question of the same sign-in replaces the one on screen.
     async fn interact(
         &self,
         events: &EventSender,
@@ -122,10 +122,12 @@ impl Logins {
                     false,
                 ));
             };
-            if let Some(previous) = login.prompt.take() {
-                let _ = previous.send(None);
-            }
+            // A new question replaces the one on screen; status lines and links do not (a
+            // flow may race a pasted code against its loopback callback).
             let receiver = matches!(p.interaction, LoginInteraction::Prompt { .. }).then(|| {
+                if let Some(previous) = login.prompt.take() {
+                    let _ = previous.send(None);
+                }
                 let (sender, receiver) = oneshot::channel();
                 login.prompt = Some(sender);
                 receiver

@@ -32,6 +32,8 @@ import { RewindDialog, type RewindTarget } from '../changes/RewindDialog.js';
 import { useBranchActions } from '../changes/use-branch-actions.js';
 import { TranscriptContext, type TranscriptView } from '../transcript/services.js';
 import { Transcript } from '../transcript/Transcript.js';
+import { chooseDetail, DetailContext, detailOf } from '../transcript/detail.js';
+import { DetailSwitch } from '../transcript/DetailSwitch.js';
 import { reason } from './errors.js';
 import { keyOf, useModelCatalog } from './model-catalog.js';
 import { ModelMenus } from './ModelMenus.js';
@@ -331,6 +333,11 @@ export function Conversation({
     [input, id, t, runCommand],
   );
 
+  // The transcript's view (T29), remembered per session in this window.
+  const [detail, setDetail] = useState(() => detailOf(id));
+  useEffect(() => {
+    setDetail(detailOf(id));
+  }, [id]);
   const title = sessionTitle(session?.title, t('session.untitled'));
   const empty = !history.loading && !transcript.hasContent();
   return (
@@ -340,16 +347,25 @@ export function Conversation({
         <h1 className="conversation-title truncate" data-testid="conversation-title">
           {title}
         </h1>
+        <DetailSwitch
+          value={detail}
+          onChange={(next) => {
+            chooseDetail(id, next);
+            setDetail(next);
+          }}
+        />
       </header>
-      <TranscriptContext.Provider value={view}>
-        <div className="conversation-body">
-          {history.loading && !transcript.hasContent() ? (
-            <p className="muted conversation-note">{t('conversation.loading')}</p>
-          ) : null}
-          {empty ? <p className="muted conversation-note">{t('conversation.empty')}</p> : null}
-          <Transcript onReachTop={history.loadEarlier} loadingEarlier={history.loadingEarlier} />
-        </div>
-      </TranscriptContext.Provider>
+      <DetailContext.Provider value={detail}>
+        <TranscriptContext.Provider value={view}>
+          <div className="conversation-body">
+            {history.loading && !transcript.hasContent() ? (
+              <p className="muted conversation-note">{t('conversation.loading')}</p>
+            ) : null}
+            {empty ? <p className="muted conversation-note">{t('conversation.empty')}</p> : null}
+            <Transcript onReachTop={history.loadEarlier} loadingEarlier={history.loadingEarlier} />
+          </div>
+        </TranscriptContext.Provider>
+      </DetailContext.Provider>
       <div className="conversation-composer">
         <Composer
           running={turn.running}

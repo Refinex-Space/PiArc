@@ -1,0 +1,24 @@
+id: model-settings-window-vision
+description: Per-model settings replace catalog values; a 100,000-token context window moves the compaction threshold and the usage ring's window, and turning image input off makes an image attachment rejected although the endpoint takes images (T29).
+capabilities: [CAP-MODEL-SETTINGS-001]
+workspace:
+  run_files:
+    data 数据/settings.json: '{"modelProviders":{"models":{"mock-main/mock-model":{"displayName":"Main (work)","contextWindow":100000,"vision":false}}}}'
+providers:
+  main:
+    wire: anthropic
+    vision: true
+    steps:
+      - text: Text only.
+actions:
+  - check_usage:
+      fields: { contextWindow: 100000, autoCompactThreshold: 82904 }
+  - prompt:
+      text: Look at this picture.
+      attachments: [{ fixture: pixel.png, mime_type: image/png }]
+      rejected: Image attachments are not supported by the selected model
+  - prompt: { text: Then answer in text., turn: one }
+expect:
+  request_counts: { main: 1 }
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }

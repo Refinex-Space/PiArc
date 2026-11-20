@@ -4542,7 +4542,7 @@
       "type": "object"
     },
     "LoginInteraction": {
-      "description": "One step of a sign-in shown to the user. A later interaction of the same sign-in replaces\nthe one on screen; a replaced prompt is answered with `cancelled`.",
+      "description": "One step of a sign-in shown to the user. A later prompt of the same sign-in replaces the\nprompt on screen, which is answered with `cancelled`; status lines and links do not.",
       "oneOf": [
         {
           "description": "Open the authorization page in the system browser; the result comes back through the\nloopback callback.",

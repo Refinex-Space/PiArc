@@ -9,7 +9,7 @@
 | 里程碑 | 能力数 | 已实现 | 计划中 | BLOCKED |
 |---|---|---|---|---|
 | M1 | 61 | 61 | 0 | 0 |
-| M2 | 44 | 41 | 3 | 0 |
+| M2 | 46 | 46 | 0 | 0 |
 | M3 | 21 | 0 | 21 | 0 |
 | M4 | 10 | 0 | 10 | 0 |
 | M5 | 7 | 0 | 7 | 0 |
@@ -106,18 +106,20 @@
 | CAP-HOOK-PROMPT-001 | UserPromptSubmit hook | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-user-prompt-submit` | 已实现 |
 | CAP-HOOK-SESSION-001 | SessionStart 与 SessionEnd hooks | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-session-end`<br>`hooks-session-start` | 已实现 |
 | CAP-HOOK-STOP-001 | Stop hook（block 时续跑一轮，带防循环计数） | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-stop`<br>`hooks-stop-limit` | 已实现 |
-| CAP-MODEL-SETTINGS-001 | 每个模型的显示名、上下文窗口、图片输入与默认 effort | FR-MD-04 | T29 | — | 计划中 |
+| CAP-MODEL-AUXILIARY-001 | 辅助模型调用通道：设置中指定辅助模型（未设置时用会话模型），用量计入会话 | FR-TL-03、ARCH-6.13 | T29 | `webfetch-auxiliary-model` | 已实现 |
+| CAP-MODEL-PROFILE-001 | 工具调用可靠性低的模型使用保守 Tool Profile，可在每模型设置中改回默认 | FR-MD-04、ARCH-6.13、ARCH-6.1.1 | T29 | `model-profile-conservative`<br>`model-profile-default` | 已实现 |
+| CAP-MODEL-SETTINGS-001 | 每个模型的显示名、上下文窗口、图片输入与默认 effort | FR-MD-04 | T29 | `model-profile-default`<br>`model-settings-window-vision` | 已实现 |
 | CAP-NEXT-001 | 回合结束时的"下一步"建议 | FR-HN-06、ARCH-6.5 | T26 | `next-steps` | 已实现 |
 | CAP-PERM-AUDIT-001 | 规则管理与审计记录 | FR-PM-04 | T23 | `perm-bash-compound` | 已实现 |
 | CAP-PERM-BASH-001 | Bash 复合命令逐个子命令判定 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-bash-compound` | 已实现 |
 | CAP-PERM-CRITICAL-001 | 关键路径删除在任何模式下都询问，包括跳过权限与存在匹配的 allow 规则 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-critical-delete` | 已实现 |
 | CAP-PERM-MODE-002 | 计划与跳过权限模式（跳过权限需显式开启并二次确认） | FR-PM-01、ARCH-6.2.1 | T23 | `perm-bypass`<br>`perm-critical-delete`<br>`perm-plan` | 已实现 |
 | CAP-PERM-READONLY-001 | 内置只读命令白名单在手动模式下免审批，路径越界或夹带其他命令时询问 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-read-only` | 已实现 |
-| CAP-PERM-RULE-001 | 兼容 Claude Code 的规则语法，按 deny → ask → allow 裁决 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-powershell-whole`（仅 windows）<br>`perm-rule-match` | 已实现 |
+| CAP-PERM-RULE-001 | 兼容 Claude Code 的规则语法，按 deny → ask → allow 裁决 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-powershell-whole`（仅 windows）<br>`perm-rule-match`<br>`webfetch-domain-rules` | 已实现 |
 | CAP-PERM-TOOLS-001 | 不带 specifier 的 deny 规则把工具从模型请求的工具列表中移除 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-rule-match` | 已实现 |
 | CAP-PLAN-ENTRY-001 | 批准的计划保存为会话 entry，重启与恢复后经注入接口读回 | FR-HN-01、ARCH-6.5 | T26 | `plan-entry-restart` | 已实现 |
 | CAP-PLAN-MODE-001 | 计划模式：写工具与非只读命令被硬拦截，提交计划，批准时选择后续模式 | FR-HN-01、ARCH-6.5、ARCH-6.15 | T26 | `plan-keep-planning`<br>`plan-mode-gate`<br>`plan-mode-menu-reminder` | 已实现 |
-| CAP-PROVIDER-OAUTH-001 | 服务商的 OAuth 与设备码登录（不含 Anthropic 订阅登录） | FR-MD-02、ARCH-5.4 | T29 | — | 计划中 |
+| CAP-PROVIDER-OAUTH-001 | 服务商的 OAuth 与设备码登录（不含 Anthropic 订阅登录） | FR-MD-02、ARCH-5.4 | T29 | `login-authorization-code`<br>`login-device-code` | 已实现 |
 | CAP-REWIND-BASH-001 | 只被命令改动的文件不进快照，回退预览与 Changes 视图不列出，回退时保留 | FR-RV-03、ARCH-6.9 | T28 | `rewind-bash-only` | 已实现 |
 | CAP-REWIND-CODE-001 | 只恢复代码：文件回到所选回合开始前（新建的删除），对话不动，agent 改文件前重新读取，可撤销 | FR-RV-03、ARCH-6.9 | T28 | `rewind-code-only` | 已实现 |
 | CAP-REWIND-SUMMARIZE-001 | 从此处摘要：所选回合及之后的对话写成分支摘要（自写的分节摘要提示），文件不动 | FR-RV-03、ARCH-6.9、ARCH-6.6.4 | T28 | `rewind-summarize` | 已实现 |
@@ -127,7 +129,7 @@
 | CAP-TODO-001 | 任务清单由模型维护，结构化送达客户端，压缩后保留 | FR-HN-02、ARCH-6.5 | T26 | `todo-list` | 已实现 |
 | CAP-TODO-BRANCH-001 | 任务清单随分支回溯：在较早 entry 处 fork 后，清单等于该处的状态 | FR-HN-02、ARCH-6.5 | T26 | `todo-branch-fork` | 已实现 |
 | CAP-TODO-REMIND-001 | 存在未完成项且连续若干轮工具调用未更新清单时，以追加消息提醒模型 | FR-HN-02、ARCH-6.6.3 | T26 | `todo-stale-reminder` | 已实现 |
-| CAP-TOOL-WEBFETCH-001 | WebFetch 本地抓取转 Markdown，辅助模型按提示提取，受域名规则约束 | FR-TL-03、ARCH-6.1.4 | T29 | — | 计划中 |
+| CAP-TOOL-WEBFETCH-001 | WebFetch 本地抓取转 Markdown，辅助模型按提示提取，受域名规则约束 | FR-TL-03、ARCH-6.1.4 | T29 | `webfetch-auxiliary-model`<br>`webfetch-domain-rules`<br>`webfetch-extract`<br>`webfetch-redirects-limits` | 已实现 |
 
 ## M3
 

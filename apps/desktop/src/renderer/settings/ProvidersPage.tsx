@@ -1,4 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { ModelSettingsSection } from './ModelSettingsSection.js';
+import { SignInSection } from './SignInSection.js';
 import { useT } from '../app/app-context.js';
 import type { MessageId } from '../../shared/i18n/index.js';
 import { reason } from '../shell/errors.js';
@@ -33,21 +35,19 @@ export function ProvidersPage() {
   const [errors, setErrors] = useState<Partial<Record<keyof Form, MessageId>>>({});
   const [failure, setFailure] = useState('');
   const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    let active = true;
-    window.piarc
-      .providerSettings()
+  // The catalog refresh choice while Core saves it (I100: the settings Host takes a moment).
+  const [refreshing, setRefreshing] = useState<boolean>();
+  const reload = useCallback((text?: string) => {
+    (text === undefined ? window.piarc.providerSettings() : Promise.resolve(text))
       .then(parseSettings)
-      .then((next) => {
-        if (active) setSettings(next);
-      })
+      .then(setSettings)
       .catch((error: unknown) => {
-        if (active) setFailure(reason(error));
+        setFailure(reason(error));
       });
-    return () => {
-      active = false;
-    };
   }, []);
+  useEffect(() => {
+    reload();
+  }, [reload]);
   const edit = (p?: Provider) => {
     setOriginal(p);
     setForm(makeForm(p));
@@ -138,14 +138,23 @@ export function ProvidersPage() {
       <input
         type="checkbox"
         data-testid="catalog-refresh"
-        checked={settings.catalogRefresh}
+        checked={refreshing ?? settings.catalogRefresh}
         disabled={busy}
+        aria-busy={refreshing !== undefined}
         onChange={(e) => {
           const enabled = e.currentTarget.checked;
-          void mutate(() => window.piarc.setCatalogRefresh(enabled), false);
+          setRefreshing(enabled);
+          void mutate(() => window.piarc.setCatalogRefresh(enabled), false).finally(() => {
+            setRefreshing(undefined);
+          });
         }}
       />
       {t('providers.refresh')}
+      {refreshing === undefined ? null : (
+        <span className="muted small" role="status" data-testid="catalog-refresh-saving">
+          {t('providers.refreshing')}
+        </span>
+      )}
     </label>
   );
   if (!form)
@@ -202,6 +211,14 @@ export function ProvidersPage() {
           </button>
         </div>
         {failed}
+        <SignInSection providers={settings.loginProviders} busy={busy} onChanged={reload} />
+        <ModelSettingsSection
+          settings={settings}
+          busy={busy}
+          save={(preferences) => {
+            void mutate(() => window.piarc.setModelPreferences(preferences), false);
+          }}
+        />
       </div>
     );
   const selectedProviders = settings.builtinProviders.filter((p) =>

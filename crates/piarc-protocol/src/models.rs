@@ -306,8 +306,8 @@ pub struct LoginLink {
     pub label: Option<String>,
 }
 
-/// One step of a sign-in shown to the user. A later interaction of the same sign-in replaces
-/// the one on screen; a replaced prompt is answered with `cancelled`.
+/// One step of a sign-in shown to the user. A later prompt of the same sign-in replaces the
+/// prompt on screen, which is answered with `cancelled`; status lines and links do not.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum LoginInteraction {

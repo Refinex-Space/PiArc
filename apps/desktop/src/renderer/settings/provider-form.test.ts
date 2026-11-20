@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   configOf,
+  parseSettings,
   fieldErrors,
   makeForm,
   type ProviderSettings,
@@ -13,6 +14,10 @@ const settings: ProviderSettings = {
     { id: 'google-vertex', name: 'Google Vertex' },
   ],
   catalogRefresh: true,
+  loginProviders: [],
+  catalogModels: [],
+  models: {},
+  auxiliary: null,
 };
 describe('provider settings', () => {
   const custom = {
@@ -90,5 +95,49 @@ describe('provider settings', () => {
     expect(
       fieldErrors({ ...adc, auth: 'serviceAccount', credentialPath: '' }, settings),
     ).toMatchObject({ credentialPath: 'providers.required' });
+  });
+});
+
+describe('sign-in and model settings in the provider view (T29)', () => {
+  it('reads login providers, catalog models, per-model settings and the auxiliary model', () => {
+    const parsed = parseSettings(
+      JSON.stringify({
+        providers: [],
+        builtinProviders: [],
+        catalogRefresh: false,
+        loginProviders: [
+          {
+            id: 'github-copilot',
+            name: 'GitHub Copilot',
+            label: 'GitHub',
+            subscription: true,
+            signedIn: false,
+          },
+          { id: 'broken' },
+        ],
+        catalogModels: [
+          {
+            provider: 'p',
+            id: 'm',
+            name: 'M',
+            contextWindow: 1000,
+            vision: true,
+            efforts: ['off'],
+            toolReliability: 'low',
+          },
+        ],
+        models: { 'p/m': { contextWindow: 2048 } },
+        auxiliary: { provider: 'p', id: 'm' },
+      }),
+    );
+    expect(parsed.loginProviders.map((p) => p.id)).toEqual(['github-copilot']);
+    expect(parsed.catalogModels).toHaveLength(1);
+    expect(parsed.models['p/m']?.contextWindow).toBe(2048);
+    expect(parsed.auxiliary).toEqual({ provider: 'p', id: 'm' });
+    const old = parseSettings(
+      JSON.stringify({ providers: [], builtinProviders: [], catalogRefresh: true }),
+    );
+    expect(old.loginProviders).toEqual([]);
+    expect(old.auxiliary).toBeNull();
   });
 });

@@ -499,6 +499,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
           ask: welcome.enabled.includes('ask'),
           context: welcome.enabled.includes('context'),
           checkpoints: welcome.enabled.includes('checkpoints'),
+          webFetch: welcome.enabled.includes('webFetch'),
         },
         log,
         sinkFor: (sessionId) => ({

@@ -68,6 +68,36 @@
         }
       }
     },
+    "web": {
+      "description": "A local web server for WebFetch (T29). {{web}} in page bodies, redirect targets and tool call arguments becomes http://127.0.0.1:<port>, {{web_alt}} the same server as http://localhost:<port>; Core's WebFetch allowlist admits both for these scenarios only.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pages"],
+      "properties": {
+        "pages": {
+          "type": "object",
+          "propertyNames": { "type": "string", "pattern": "^/" },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "status": { "type": "integer", "minimum": 100, "maximum": 599 },
+              "content_type": { "type": "string", "minLength": 1 },
+              "body": { "type": "string" },
+              "repeat": { "type": "integer", "minimum": 1 },
+              "location": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "oauth": {
+      "description": "A mock authorization server and the test OAuth provider piarc-test-oauth on every Agent Host (T29), signing in with this flow.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flow"],
+      "properties": { "flow": { "enum": ["authorization_code", "device_code"] } }
+    },
     "cloud_providers": {
       "description": "Configure a cloud API key through the real settings path; model requests remain on loopback mocks.",
       "type": "array",
@@ -399,6 +429,23 @@
             "before_turn": { "$ref": "#/$defs/label" },
             "as": { "$ref": "#/$defs/label" }
           }
+        },
+        "sign_in": {
+          "description": "Signs in to the test OAuth provider (T29): the runner follows the authorization page's redirect like a browser, or cancels at the first step; checks the final core/login state, its message and whether the provider is signed in afterwards.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["behavior", "outcome"],
+          "properties": {
+            "behavior": { "enum": ["approve", "deny", "expire"] },
+            "cancel": { "type": "boolean" },
+            "outcome": { "enum": ["succeeded", "failed", "cancelled"] },
+            "message": { "type": "string", "minLength": 1 }
+          }
+        },
+        "sign_out": {
+          "description": "Signs out of the test OAuth provider (T29).",
+          "type": "object",
+          "additionalProperties": false
         },
         "check_usage": {
           "description": "Checks the session's context usage from Core (T27): its categories add up to tokens (always), a field subset, and categories that must be above zero.",

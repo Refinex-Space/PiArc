@@ -175,19 +175,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** An item as Core sends it: an object with string `itemId` and `type`. */
-/** Items the default view does not show: system reminders (T27; the detailed view of T29
- * shows them). */
-const HIDDEN_ITEMS: ReadonlySet<string> = new Set(['reminder']);
-
-/** An item the transcript shows. */
+/** An item as Core sends it: an object with string `itemId` and `type`. System reminders
+ * (T27) are rows too; only the detailed view shows them (`transcript/detail.ts`, T29). */
 function isItem(value: unknown): value is Item {
-  return (
-    isRecord(value) &&
-    typeof value.itemId === 'string' &&
-    typeof value.type === 'string' &&
-    !HIDDEN_ITEMS.has(value.type)
-  );
+  return isRecord(value) && typeof value.itemId === 'string' && typeof value.type === 'string';
 }
 
 function numberOr(value: unknown): number | undefined {

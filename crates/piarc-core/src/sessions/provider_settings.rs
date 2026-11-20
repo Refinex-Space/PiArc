@@ -154,6 +154,8 @@ impl Hub {
         }
         let mut view = settings.view(&builtins);
         view["loginProviders"] = json!(list.login_providers);
+        // The catalog's own values: the settings Host gets no model preferences.
+        view["catalogModels"] = json!(list.models);
         Ok(view)
     }
 

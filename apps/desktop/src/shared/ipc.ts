@@ -62,6 +62,10 @@ export const IPC_CHANNELS = {
   saveProvider: 'piarc:providers.save',
   deleteProvider: 'piarc:providers.delete',
   setCatalogRefresh: 'piarc:providers.catalogRefresh',
+  setModelPreferences: 'piarc:providers.modelPreferences',
+  startLogin: 'piarc:providers.login',
+  answerLogin: 'piarc:providers.answerLogin',
+  logoutProvider: 'piarc:providers.logout',
   workspaceModels: 'piarc:workspace.models',
   sessionModels: 'piarc:session.models',
   previewModelSwitch: 'piarc:session.previewModelSwitch',
@@ -358,6 +362,14 @@ export interface PiarcApi {
   saveProvider(configJson: string, secretJson?: string): Promise<string>;
   deleteProvider(id: string): Promise<string | null>;
   setCatalogRefresh(enabled: boolean): Promise<string>;
+  /** Saves per-model settings and the auxiliary model (T29); resolves with the settings. */
+  setModelPreferences(preferencesJson: string): Promise<string>;
+  /** Signs in to a provider (T29); steps arrive on `core/login`, resolves when it ended. */
+  startLogin(provider: string): Promise<string>;
+  /** Answers the sign-in's question; `null` cancels the sign-in. */
+  answerLogin(loginId: string, value: string | null): Promise<void>;
+  /** Signs out of a provider after a native confirmation; `null` when the user declined. */
+  logoutProvider(provider: string): Promise<string | null>;
   workspaceModels(workspace: string): Promise<string>;
   sessionModels(sessionId: string): Promise<string>;
   previewModelSwitch(sessionId: string, provider: string, model: string): Promise<string>;

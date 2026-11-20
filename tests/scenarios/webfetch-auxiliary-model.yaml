@@ -1,0 +1,48 @@
+id: webfetch-auxiliary-model
+description: With the auxiliary model set in the user's settings, WebFetch's extraction goes to that model instead of the session's, as a request without tools, and its usage counts toward the session's turn (T29).
+capabilities: [CAP-TOOL-WEBFETCH-001, CAP-MODEL-AUXILIARY-001]
+workspace:
+  run_files:
+    data 数据/settings.json: '{"permissions":{"allow":["WebFetch(domain:127.0.0.1)"]},"modelProviders":{"auxiliary":{"provider":"mock-aux","id":"mock-model"}}}'
+web:
+  pages:
+    /doc: { content_type: text/markdown, body: '# API\n\n`connect(url, retries=3)`' }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: fetch,
+              name: WebFetch,
+              input: { url: '{{web}}/doc', prompt: Signature of connect? },
+            },
+          ]
+        usage: { input_tokens: 100, output_tokens: 10 }
+      - text: connect takes url and retries.
+        usage: { input_tokens: 50, output_tokens: 5 }
+  aux:
+    wire: openai
+    steps:
+      - text: 'connect(url, retries=3)'
+        usage: { input_tokens: 300, output_tokens: 7 }
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Look up connect., turn: one }
+expect:
+  request_counts: { main: 2, aux: 1 }
+  events:
+    - method: turn/completed
+      turn: one
+      params: { status: completed, usage: { inputTokens: 450, outputTokens: 22 } }
+  requests:
+    - provider: aux
+      index: 0
+      tools: []
+      contains: ['`connect(url, retries=3)`', 'Question from the agent: Signature of connect?']
+    - provider: main
+      index: 1
+      tool_results:
+        - { id: fetch, is_error: false, contains: 'connect(url, retries=3)' }

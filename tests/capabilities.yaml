@@ -196,13 +196,25 @@ capabilities:
     milestone: M2
     refs: [FR-MD-02, ARCH-5.4]
     task: T29
-    status: planned
+    status: active
   - id: CAP-MODEL-SETTINGS-001
     title: '每个模型的显示名、上下文窗口、图片输入与默认 effort'
     milestone: M2
     refs: [FR-MD-04]
     task: T29
-    status: planned
+    status: active
+  - id: CAP-MODEL-AUXILIARY-001
+    title: '辅助模型调用通道：设置中指定辅助模型（未设置时用会话模型），用量计入会话'
+    milestone: M2
+    refs: [FR-TL-03, ARCH-6.13]
+    task: T29
+    status: active
+  - id: CAP-MODEL-PROFILE-001
+    title: '工具调用可靠性低的模型使用保守 Tool Profile，可在每模型设置中改回默认'
+    milestone: M2
+    refs: [FR-MD-04, ARCH-6.13, ARCH-6.1.1]
+    task: T29
+    status: active
   - id: CAP-MODEL-ALIAS-001
     title: '模型别名表供子 agent 与 skills 引用'
     milestone: M3
@@ -420,7 +432,7 @@ capabilities:
     milestone: M2
     refs: [FR-TL-03, ARCH-6.1.4]
     task: T29
-    status: planned
+    status: active
   - id: CAP-TOOL-WEBSEARCH-001
     title: 'WebSearch 可配置后端'
     milestone: M3

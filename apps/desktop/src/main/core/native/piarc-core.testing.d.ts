@@ -37,6 +37,20 @@ export declare class CoreRuntime {
   deleteProvider(id: string): Promise<string>;
   /** Changes the user's catalog refresh preference. */
   setCatalogRefresh(enabled: boolean): Promise<string>;
+  /**
+   * Saves the per-model settings and the auxiliary model (T29); the JSON is
+   * `{ models: { "<provider>/<model>": {...} }, auxiliary?: { provider, id } }`.
+   */
+  setModelPreferences(preferencesJson: string): Promise<string>;
+  /**
+   * Signs in to a provider (OAuth or device code, T29). Resolves when the credential is in
+   * the vault; progress and questions arrive on the `core/login` route.
+   */
+  startLogin(provider: string): Promise<string>;
+  /** Answers the current question of a sign-in; `null` cancels the sign-in. */
+  answerLogin(loginId: string, value?: string | null): void;
+  /** Signs out of a provider (removes its stored credential). */
+  logoutProvider(provider: string): Promise<string>;
   /** Lists models before a session is created. */
   workspaceModels(workspace: string): Promise<string>;
   /** Lists the models and current session selection. */
@@ -258,7 +272,9 @@ export declare class CoreRuntime {
   /**
    * Like `create`, with the vault's master key in memory under a `piarc-test.` name instead
    * of the system credential store: tests that open workspaces never touch the keychain
-   * (T14).
+   * (T14). L4 (T29) may also set `PIARC_TEST_WEB_ALLOWLIST` (comma-separated hosts or
+   * ranges WebFetch may reach, for its local test server) and `PIARC_TEST_OAUTH_PROVIDER`
+   * (a `--test-oauth-provider` file every Agent Host registers, for the mock sign-in).
    */
   static createForTests(
     options: CoreOptions,

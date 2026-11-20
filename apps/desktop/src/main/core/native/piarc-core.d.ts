@@ -37,6 +37,20 @@ export declare class CoreRuntime {
   deleteProvider(id: string): Promise<string>;
   /** Changes the user's catalog refresh preference. */
   setCatalogRefresh(enabled: boolean): Promise<string>;
+  /**
+   * Saves the per-model settings and the auxiliary model (T29); the JSON is
+   * `{ models: { "<provider>/<model>": {...} }, auxiliary?: { provider, id } }`.
+   */
+  setModelPreferences(preferencesJson: string): Promise<string>;
+  /**
+   * Signs in to a provider (OAuth or device code, T29). Resolves when the credential is in
+   * the vault; progress and questions arrive on the `core/login` route.
+   */
+  startLogin(provider: string): Promise<string>;
+  /** Answers the current question of a sign-in; `null` cancels the sign-in. */
+  answerLogin(loginId: string, value?: string | null): void;
+  /** Signs out of a provider (removes its stored credential). */
+  logoutProvider(provider: string): Promise<string>;
   /** Lists models before a session is created. */
   workspaceModels(workspace: string): Promise<string>;
   /** Lists the models and current session selection. */

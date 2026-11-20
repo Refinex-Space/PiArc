@@ -90,6 +90,12 @@ pub struct ScenarioSpec {
     pub workspace: WorkspaceSpec,
     /// Mock endpoints by name.
     pub providers: BTreeMap<String, ProviderSpec>,
+    /// A local web server for WebFetch (T29); see [`crate::l2::web`].
+    #[serde(default)]
+    pub web: Option<crate::l2::web::WebSpec>,
+    /// A mock authorization server and the test OAuth provider (T29).
+    #[serde(default)]
+    pub oauth: Option<crate::l2::login_spec::OAuthSpec>,
     /// SDK cloud providers to configure with an isolated fake API key; never used for inference.
     #[serde(default)]
     pub cloud_providers: Vec<String>,
@@ -394,6 +400,10 @@ pub enum Action {
     CheckBranch(super::checkpoint_spec::CheckBranchSpec),
     /// Checks workspace files mid-scenario (T28).
     CheckFiles(super::checkpoint_spec::CheckFilesSpec),
+    /// Signs in to the test OAuth provider (T29).
+    SignIn(crate::l2::login_spec::SignInAction),
+    /// Signs out of the test OAuth provider (T29).
+    SignOut {},
 }
 
 impl Action {
@@ -430,6 +440,8 @@ impl Action {
             Self::SwitchBranch(_) => "switch_branch",
             Self::CheckBranch(_) => "check_branch",
             Self::CheckFiles(_) => "check_files",
+            Self::SignIn(_) => "sign_in",
+            Self::SignOut {} => "sign_out",
         }
     }
 
@@ -463,7 +475,9 @@ impl Action {
             Self::CheckTrust { .. }
             | Self::WriteFile { .. }
             | Self::RestartCore {}
-            | Self::CheckFiles(_) => None,
+            | Self::CheckFiles(_)
+            | Self::SignIn(_)
+            | Self::SignOut {} => None,
         }
     }
 }
@@ -1027,6 +1041,11 @@ fn check_actions(spec: &ScenarioSpec, problems: &mut Vec<String>) {
                 }
             }
             Action::WriteFile { path, .. } => check_path(&format!("{field}/path"), path, problems),
+            Action::SignIn(_) | Action::SignOut {} => {
+                if spec.oauth.is_none() {
+                    problems.push(format!("{field}: signing in needs an `oauth` section"));
+                }
+            }
         }
     }
 }
