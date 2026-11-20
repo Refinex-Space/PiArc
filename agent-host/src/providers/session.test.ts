@@ -208,4 +208,78 @@ describe('session model selection', () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it('applies per-model settings: display name, default effort when selected, image input off (T29)', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'piarc-model-settings-'));
+    vi.stubEnv('PI_CODING_AGENT_DIR', dir);
+    const workspace = await openWorkspace(dir, dir, new InMemoryCredentialStore());
+    const faux = fauxProvider({
+      provider: 'test-prefs',
+      models: [
+        { id: 'text', reasoning: false, input: ['text'] },
+        { id: 'reasoner', reasoning: true, input: ['text', 'image'] },
+      ],
+    });
+    workspace.modelRuntime.registerNativeProvider(faux.provider);
+    const ref = (id: string) => ({ provider: faux.provider.id, id });
+    const registry = new SessionRegistry({
+      workspace,
+      tools: { kind: 'pi-native' },
+      isTrusted: () => Promise.resolve(false),
+      log: () => undefined,
+      sinkFor: () => ({
+        event: () => undefined,
+        delta: () => undefined,
+        replaceable: () => undefined,
+      }),
+    });
+    const id = 'prefs-test';
+    try {
+      await registry.setPreferences({
+        models: {
+          'test-prefs/reasoner': {
+            displayName: 'Reasoner (work)',
+            defaultEffort: 'low',
+            vision: false,
+          },
+        },
+      });
+      await registry.create(dir, ref('text'), id);
+      const listed = await registry.models(id);
+      const reasoner = listed.models.find((m) => m.id === 'reasoner');
+      expect(reasoner).toMatchObject({
+        name: 'Reasoner (work)',
+        vision: false,
+        defaultEffort: 'low',
+      });
+      // Selected without an effort: the model's default effort applies.
+      await expect(registry.setModel(id, ref('reasoner'))).resolves.toEqual({
+        model: ref('reasoner'),
+        effort: 'low',
+      });
+      // An explicit choice still wins.
+      await expect(registry.setModel(id, ref('reasoner'), 'high')).resolves.toMatchObject({
+        effort: 'high',
+      });
+      const image: UserInput = {
+        text: 'image',
+        mentions: [],
+        attachments: [
+          {
+            kind: 'image',
+            name: 'test.png',
+            mimeType: 'image/png',
+            blob: { path: 'test.png', size: 1, sha256: 'stub' },
+          },
+        ],
+      };
+      await expect(registry.prompt(id, 'image', image)).rejects.toMatchObject({
+        details: { reason: 'visionUnsupported' },
+      });
+    } finally {
+      await registry.closeAll();
+      vi.unstubAllEnvs();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });
