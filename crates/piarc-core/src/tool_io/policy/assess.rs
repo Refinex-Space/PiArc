@@ -262,6 +262,15 @@ pub(super) fn powershell_call(rules: &RuleSet, places: &Places, text: &str) -> A
         input.allow = rules.exact_allow("PowerShell", text).into_iter().collect();
         input.allowed = !input.allow.is_empty();
     }
+    // A wildcard rule takes the command text, not the paths in it (ADR-0047).
+    if input.allowed
+        && input.allow.iter().any(|hit| hit.rule.contains('*'))
+        && powershell_names_outside(places, text)
+    {
+        input.allow = rules.exact_allow("PowerShell", text).into_iter().collect();
+        input.allowed = !input.allow.is_empty();
+        input.outside = !input.allowed;
+    }
     input.write = true;
     let rules_offered = if input.ask.is_none() {
         vec![format!("PowerShell({text})")]
@@ -269,6 +278,62 @@ pub(super) fn powershell_call(rules: &RuleSet, places: &Places, text: &str) -> A
         Vec::new()
     };
     Assessment::new(input, rules_offered)
+}
+
+/// Whether a word of a PowerShell command that looks like a path (`C:\\x`, `\\\\server`, `~\\x`,
+/// `..\\x`, anything with a separator, or the value of `-Name:value`) lies outside the
+/// workspace, judged lexically (PowerShell is not parsed, architecture section 6.2.2); a word
+/// with a variable cannot be placed.
+fn powershell_names_outside(places: &Places, text: &str) -> bool {
+    text.split_whitespace().skip(1).any(|word| {
+        let word = word.trim_matches(['"', '\'']);
+        let value = match word.strip_prefix('-') {
+            Some(option) => match option.split_once(':') {
+                Some((_, value)) => value,
+                None => return false,
+            },
+            None => word,
+        };
+        if value.contains('$') {
+            return true;
+        }
+        let pathlike = value.contains(['/', '\\'])
+            || value.starts_with('~')
+            || value == ".."
+            || value.as_bytes().get(1) == Some(&b':');
+        pathlike && !lexically_inside(places, value)
+    })
+}
+
+fn lexically_inside(places: &Places, value: &str) -> bool {
+    let slashed = value.replace('\\', "/");
+    let absolute = match slashed.as_bytes() {
+        [drive, b':', rest @ ..] if drive.is_ascii_alphabetic() => format!(
+            "/{}{}",
+            char::from(*drive).to_ascii_lowercase(),
+            String::from_utf8_lossy(rest)
+        ),
+        [b'/', ..] => slashed.clone(),
+        [b'~', rest @ ..] => format!("{}{}", places.home_posix, String::from_utf8_lossy(rest)),
+        _ => format!("{}/{slashed}", places.cwd_posix),
+    };
+    let mut parts: Vec<&str> = Vec::new();
+    for part in absolute.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop();
+            }
+            part => parts.push(part),
+        }
+    }
+    let path = format!("/{}", parts.join("/"));
+    let (path, root) = if places.fold {
+        (path.to_lowercase(), places.root_posix.to_lowercase())
+    } else {
+        (path, places.root_posix.clone())
+    };
+    path == root || path.starts_with(&format!("{}/", root.trim_end_matches('/')))
 }
 
 /// Tools matched by name, domain or type (MCP, WebFetch, Agent, Skill, others).
@@ -512,6 +577,44 @@ mod tests {
         ] {
             let assessed = powershell_call(&rules, &places(), command);
             assert!(!assessed.input.allowed, "{command}: {:?}", assessed.input);
+        }
+    }
+
+    /// ADR-0047: a wildcard PowerShell allow rule does not take a path outside the
+    /// workspace; the call asks as outside. An exact rule still allows.
+    #[test]
+    fn a_wildcard_powershell_allow_does_not_take_an_outside_path() {
+        let mut rules = RuleSet::default();
+        rules.add_source(
+            Source {
+                id: "user".into(),
+                anchor: "/home/u".into(),
+            },
+            [
+                (Behavior::Allow, "PowerShell(Get-Content *)"),
+                (Behavior::Allow, r"PowerShell(Get-Content C:\notes\a.txt)"),
+            ],
+        );
+        for command in [
+            r"Get-Content src\main.rs",
+            "Get-Content ./notes.txt",
+            r"Get-Content C:\notes\a.txt",
+        ] {
+            let assessed = powershell_call(&rules, &places(), command);
+            assert!(assessed.input.allowed, "{command}: {:?}", assessed.input);
+        }
+        for command in [
+            r"Get-Content C:\Users\me\.ssh\id_rsa",
+            r"Get-Content ..\other\x",
+            r"Get-Content ~\.aws\credentials",
+            r"Get-Content -Path:C:\x",
+        ] {
+            let assessed = powershell_call(&rules, &places(), command);
+            assert!(
+                !assessed.input.allowed && assessed.input.outside,
+                "{command}: {:?}",
+                assessed.input
+            );
         }
     }
 }

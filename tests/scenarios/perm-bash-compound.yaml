@@ -1,5 +1,5 @@
 id: perm-bash-compound
-description: A compound command is judged per subcommand; a deny on any part refuses it, an allow needs every part, and "always allow" saves one prefix rule per remaining subcommand (T23).
+description: A compound command is judged per subcommand; a deny on any part refuses it, an allow needs every part, and "always allow" saves one prefix rule per remaining subcommand (T23); that wildcard rule does not take a path outside the workspace, which asks (ADR-0047, R3).
 capabilities: [CAP-PERM-BASH-001, CAP-PERM-AUDIT-001]
 workspace:
   trusted: true
@@ -24,19 +24,23 @@ providers:
             }
       - tool_calls:
           - { id: again, name: Bash, input: { command: 'sed -e s/a/z/ a.txt' } }
+      - tool_calls:
+          - { id: outside, name: Bash, input: { command: 'sed -e s/a/z/ ../outside.txt' } }
       - text: Finished.
 actions:
   - prompt: { text: Run the commands., turn: t }
 approvals:
   - { tool: Bash, decision: always }
+  - { tool: Bash, decision: deny, feedback: Not outside the workspace. }
 expect:
-  request_counts: { main: 5 }
+  request_counts: { main: 6 }
   requests:
-    - index: 4
+    - index: 5
       tool_results:
         - { id: hidden, is_error: true, contains: 'Bash(rm *)' }
         - { id: mixed, is_error: false, contains: alpha }
         - { id: save, is_error: false, contains: clphb }
         - { id: again, is_error: false, contains: zlpha }
+        - { id: outside, is_error: true, contains: Not outside the workspace. }
   files:
     .piarc/settings.local.json: "{\n  \"permissions\": {\n    \"allow\": [\n      \"Bash(sed *)\"\n    ],\n    \"deny\": [\n      \"Bash(rm *)\"\n    ]\n  }\n}\n"

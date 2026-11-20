@@ -135,16 +135,6 @@ differences:
     path: 'asks.substitution'
     claude_code: '>=2.1.318 <2.2.0'
     reason: Claude Code asks for the command substitution; PiArc does not (see the status entry).
-  - scenario: perm-compound
-    path: 'tool_calls.calls.outside.status'
-    claude_code: '>=2.1.318 <2.2.0'
-    reason: In PiArc's ladder an allow rule (step 6) decides before the out-of-workspace check (step 7, architecture section 6.2.3, ADR-0037), so `Bash(awk *)` runs `awk … ../outside.txt` without asking; Claude Code 2.1.318 asks for a path outside the working directory despite the rule. Changing the ladder order is a change to the architecture; R3 decides.
-    follow_up: R3
-  - scenario: perm-compound
-    path: 'asks.outside'
-    claude_code: '>=2.1.318 <2.2.0'
-    reason: Claude Code asks for the out-of-workspace path under the allow rule; PiArc does not (see the status entry).
-    follow_up: R3
   - scenario: perm-plan
     path: 'asks.write'
     claude_code: '>=2.1.318 <2.2.0'

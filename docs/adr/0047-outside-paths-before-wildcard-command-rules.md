@@ -1,6 +1,6 @@
 # 0047. 越界路径的询问先于带通配的命令 allow 规则
 
-- 状态：提议，修订 ADR-0037 中裁决阶梯第 6、7 步的顺序
+- 状态：已接受（用户于 R3 确认，2026-11-20），修订 ADR-0037 中裁决阶梯第 6、7 步的顺序
 - 日期：2026-11-20
 - 相关：架构第 6.2.3、10.1 节；ADR-0031、ADR-0037、ADR-0046；登记事项 I116；R3
 
@@ -16,8 +16,8 @@
 2. 不带通配、与整条命令逐字相同的 allow 规则（例如 `Bash(cat /etc/hosts)`）照旧在第 6 步放行：用户写下的就是这条命令和它的路径。
 3. 文件工具（Read、Edit、Write、Glob、Grep、NotebookEdit）的路径规则不变：规则本身写的是路径，命中即说明用户允许了该位置。
 4. PreToolUse hook 的 allow 不变（跳到第 6 步，不越过第 3、4、5 步，ADR-0039），只读白名单的判断不变（它本来就要求路径在会话目录内）。
-5. 审批卡沿用越界询问的说明；"总是允许"对这类调用仍按前缀生成规则，规则保存后同类越界调用继续询问。
-6. 实现位置：`piarc_policy::decide` 的第 6 步增加"命令规则命中且全部为精确规则，或没有越界"的条件；`Input` 增加区分精确与通配命中的事实，由 `tool_io::policy::assess` 填入；`tests/bash_cases.json` 与 L2 `perm-bash-compound` 增加越界用例；L3 `perm-compound` 的 `outside` 两条 allowlist 条目删除。
+5. 审批卡沿用越界询问的说明；"总是允许"对这类调用仍按前缀生成规则，规则保存后同类越界调用继续询问。参数是否为路径按词形判断（不知道每个程序的参数语义）：含 `/` 的模式（`s/a/b/`）按相对路径定位在工作区内，不会多问；绝对路径形式的非路径参数会多问一次。
+6. 实现（R3）：阶梯本身不变，判断放在给出阶梯事实的地方。`piarc_policy::bash::judge` 对由带通配规则放行的命令检查像路径的参数（含 `/`、`~`、`..`、盘符或 `\`，`--x=值` 的值，运行期才知道的词），经 `Facts::locate` 定位，在会话目录外或无法定位时改查精确规则，没有就不算规则放行并置 `Judgment::outside`（进入 `Input.outside`，第 7 步以 `outsideWorkspace` 询问）；进程替换 `<(…)` 不算路径。PowerShell 不做语法分析，`tool_io::policy::assess::powershell_call` 按空白拆词后词法定位。用例：`tests/bash_cases.json`（`rules` 类）、`assess.rs` 的单元测试、L2 `perm-bash-compound` 的 `outside` 调用；L3 `perm-compound` 的 `outside` 两条 allowlist 条目已删除。
 
 ## 备选方案
 

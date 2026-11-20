@@ -261,6 +261,7 @@ PiArc/
 | [0044](../adr/0044-checkpoints-rewind-changes.md) | 检查点按会话加回合 id 建索引，写前快照存内容寻址对象库；代码恢复按时间计算、冲突逐个选择、逐文件结果可撤销；对话回退在 Agent Host 移动 leaf 并以追加条目持久化，分支变化后同一 id 重建会话；Changes 面板基于最早快照并在路径锁内核对版本后丢弃 | 回退结果与对话分支经过的路径无关；回退位置跨重启保留；不在过期的 diff 上改文件 |
 | [0045](../adr/0045-webfetch-sign-in-model-settings.md) | WebFetch 由 Core 抓取（`piarc-web`：rustls + 系统信任库、SSRF 纯函数、连接钉住已检查的地址、同站重定向）并绑定已获准的调用；辅助模型通道在 Agent Host；登录在设置 Host 上运行、交互经 `core/login`；每模型设置与辅助模型存用户级设置并随握手下发；本地端点的模型为低可靠性、用保守 Tool Profile | 网络访问与文件、命令一样由 Core 授权审计；规则主机与连接主机不会不一致；凭据只在保险箱 |
 | [0046](../adr/0046-l3-behavior-alignment.md) | L3 用临时配置目录与假 key 隔离运行 `claude -p`，审批经 `--permission-prompt-tool` 夹具按工具调用 id 作答；mock 的 L3 模式只记白名单结构；只比主循环请求；allowlist 按 Claude Code 版本范围生效、失效即失败；会话的 SessionStart hooks 先于其提示的 UserPromptSubmit hooks | 与 Claude Code 黑盒比对而不让提示词落盘；L3 首批比对发现的 hooks 顺序偏差按 Claude Code 修正 |
+| [0047](../adr/0047-outside-paths-before-wildcard-command-rules.md) | 带通配的 Bash/PowerShell allow 规则不放行像路径而在会话目录外（或无法定位）的参数，调用按越界询问；精确规则、文件工具的路径规则与 PreToolUse allow 不变（修订 ADR-0037 阶梯第 6、7 步） | 一次"总是允许"不再让同类命令无询问地读写工作区外的文件，与 Claude Code 的越界询问一致 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -536,7 +537,7 @@ T29 落地（ADR-0045）：WebFetch 的网络请求由 Core 发起（AHP `web/fe
 - **Windows 上的命令**：`Bash` 工具在 Windows 上通过 Git Bash 执行（Pi 的默认行为），分析方式同上；另提供 `PowerShell` 工具，规则写作 `PowerShell(命令模式)`（与 Claude Code 一致）。第一版不对 PowerShell 做语法级拆分，也不设只读白名单：除非整条命令被规则精确允许，否则在 Manual 模式下一律询问。PowerShell 的语法级分析在 M4 评估。T17 落地（ADR-0028）：Git Bash 依次查用户设置 `shell.gitBashPath`、`%ProgramFiles%\Git`、`%ProgramFiles(x86)%\Git`、`%LOCALAPPDATA%\Programs\Git`、`PATH` 上 `git.exe` 所在的安装，不用 `PATH` 上其他的 `bash.exe`（`System32\bash.exe` 是 WSL）；找不到时会话不注册 `Bash`、只有 `PowerShell`，Core 在 `core/notices` 发一次 `gitBashMissing` 提示安装 Git for Windows。`PowerShell` 优先 PowerShell 7（`pwsh`），没有时用 Windows PowerShell 5.1。
 - 关键路径删除（`rm -rf` 指向工作区根、家目录、`/` 等）与 `requiresUserInteraction` 类工具在任何模式下都询问。
 - `WebFetch(domain:…)`（T29）：规则匹配、hooks matcher 与实际抓取都用 `piarc_web::rule_host` 解析同一个 URL（小写主机，IPv6 带方括号）；"总是允许"按该主机生成规则，URL 解析不出主机时不提供规则。
-- 已知限制（R3）：`Read(…)` 的 deny 按调用的路径参数匹配，Grep、Glob 以目录为参数时不过滤结果中的被拒文件，Bash 的递归读取（`grep -r`、`rg`）同样不受它约束，过滤由 T45 补上（I120）；带通配的 Bash/PowerShell allow 规则先于越界检查（第 6.2.3 节第 6、7 步），改为越界先询问的提议见 ADR-0047。
+- 已知限制（R3）：`Read(…)` 的 deny 按调用的路径参数匹配，Grep、Glob 以目录为参数时不过滤结果中的被拒文件，Bash 的递归读取（`grep -r`、`rg`）同样不受它约束，过滤由 T45 补上（I120）；带通配的 Bash/PowerShell allow 规则不放行越界路径（ADR-0047，R3）：像路径的参数在会话目录外或无法定位时按越界询问，精确规则照旧放行。
 
 #### 6.2.3 裁决流程
 
@@ -547,7 +548,7 @@ Harness Kit tool_call ──► Core policy/evaluate
   3. deny 规则 ─────────────────────────────────► 拒绝
   4. ask 规则 ──────────────────────────────────► 询问
   5. 模式（plan 下的写操作 → 拒绝并提示；bypass → 允许）
-  6. allow 规则 ────────────────────────────────► 允许
+  6. allow 规则（带通配的命令规则不含越界路径，ADR-0047）► 允许
   7. 模式默认（只读 → 允许；acceptEdits 下工作区内编辑 → 允许）
   8. 其余 ─────► PermissionRequest hooks ─► 审批请求（客户端）
 ```
@@ -1586,7 +1587,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 |---|---|---|
 | **M0 技术验证**（3–5 周） | 在两个平台上验证高风险假设 | 每个 spike 的结论（通过 / 失败 / 有条件通过）记录在 `docs/spikes/`，两个平台分别给结论；失败项触发对应 ADR 复审。**已完成（R1，2026-11-16）：有条件进入 M1**，见 [M0 总结](../spikes/M0-summary.md) |
 | **M1 可行走骨架** | 单工作区、多会话列表、流式对话；Read/Write/Edit/Bash（Windows 另有 PowerShell）/Glob/Grep 经 Core 执行；Manual 与 Accept edits 模式的基础审批；模型与凭据设置（凭据保险箱）；会话持久化与恢复；transcript P0 行类型 | 能用至少 2 家服务商完成"读代码 → 改代码 → 跑测试"的完整任务；L2 场景 ≥ 20 个通过。**macOS 已达标（R2，2026-11-19）**：两种协议的打包应用工作流通过，真实百炼 qwen-flash 通过，L2 61 个通过。**Windows 已达标（W1，2026-11-19）**：两种协议的工作流在两种形态通过，L2 60 个通过，UNC 共享未能实机验证，见 [W1 报告](../reviews/W1-windows-m1-parity.md)。 |
-| **M2 Harness 核心** | 完整权限规则与 Bash 分析；plan 模式；任务清单；AskUserQuestion；hooks（M2 事件集，command 类型）；checkpoint 与 rewind；压缩与上下文用量；WebFetch；Changes 面板；memory 文件兼容 | 第 6 章 M2 能力全部有场景覆盖；L3 对齐在权限与 hooks 上无未解释差异。**macOS 已达标（R3，2026-11-20）**：M2 能力 46 项全部有 L2 场景，L2 118 个通过（2 个 Windows 专属），L3 对 Claude Code 2.1.318 的 12 个权限与 hooks 场景 0 个未解释差异；评审修复 16 项缺陷，越界路径与通配命令规则的先后见 ADR-0047（提议），见 [R3 评审](../reviews/R3-findings.md)。Windows 由 W2 验收。 |
+| **M2 Harness 核心** | 完整权限规则与 Bash 分析；plan 模式；任务清单；AskUserQuestion；hooks（M2 事件集，command 类型）；checkpoint 与 rewind；压缩与上下文用量；WebFetch；Changes 面板；memory 文件兼容 | 第 6 章 M2 能力全部有场景覆盖；L3 对齐在权限与 hooks 上无未解释差异。**macOS 已达标（R3，2026-11-20）**：M2 能力 46 项全部有 L2 场景，L2 118 个通过（2 个 Windows 专属），L3 对 Claude Code 2.1.318 的 12 个权限与 hooks 场景 0 个未解释差异；评审修复 16 项缺陷，并按用户确认的 ADR-0047 让带通配的命令规则不放行越界路径（L3 少了这条差异），见 [R3 评审](../reviews/R3-findings.md)。Windows 由 W2 验收。 |
 | **M3 多会话与生态** | 子 agent；后台任务与 Monitor；终端面板（libghostty-vt）；worktree；MCP 共享连接池；skills 与命令；WebSearch；ToolSearch；hooks 的 http/prompt 类型 | 3 个并行会话 + 子 agent 场景满足第 11 章内存预算 |
 | **M4 安全与打磨** | macOS 沙箱；Windows 隔离方案评估；插件；NotebookEdit；可操作的系统通知；配置诊断；无障碍；本地化；性能预算全部进 CI | 安全威胁表逐条有测试；性能预算全部达标 |
 | **M5 Beta** | Auto 模式（可配置审查模型）；自动记忆；企业托管配置；Anthropic 服务端压缩；fork 子 agent；平台快捷操作（App Intents / 跳转列表）；完整发布流水线 | macOS 与 Windows 同时公开 Beta |
@@ -1644,7 +1645,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
-| 2.38 | 2026-11-20 | R3（M2 macOS 阶段门）：第 4 章补上 ADR-0042；6.0 节矩阵按 M2 实际交付更新权限、Hooks、Plan、任务清单、上下文工程、Checkpoint、多模型七行；6.2.2 节写明 `Read` deny 对目录搜索与 Bash 递归读取的限制（I120）并引用 ADR-0047（提议）；6.3.1 节进程树终止按平台写准；6.6.4 节熔断复位范围（I107）；6.14 节 `plansDirectory` 交 T48（I104）；6.15 节记录 R3 对校准值的核对（数值不变）与缓存断点、plan 模式两行的实现；第 16 章记录 M2 的 macOS 结论；基线决策未变 |
+| 2.38 | 2026-11-20 | R3（M2 macOS 阶段门）：第 4 章补上 ADR-0042；6.0 节矩阵按 M2 实际交付更新权限、Hooks、Plan、任务清单、上下文工程、Checkpoint、多模型七行；第 4 章加入 ADR-0047、6.2.2 与 6.2.3 节写明带通配的命令规则不放行越界路径（ADR-0047，修订 ADR-0037 的阶梯）；6.2.2 节写明 `Read` deny 对目录搜索与 Bash 递归读取的限制（I120）；6.3.1 节进程树终止按平台写准；6.6.4 节熔断复位范围（I107）；6.14 节 `plansDirectory` 交 T48（I104）；6.15 节记录 R3 对校准值的核对（数值不变）与缓存断点、plan 模式两行的实现；第 16 章记录 M2 的 macOS 结论；ADR-0047 改变了第 6.2.3 节阶梯第 6、7 步对带通配命令规则的先后 |
 | 2.37 | 2026-11-20 | T30（ADR-0046）补充第 4 章 ADR-0046、6.3.1 节 SessionStart 与 UserPromptSubmit hooks 的顺序（L3 发现的偏差）、12.5 节 L3 的落地（隔离运行、审批夹具、结构化录制与剥离检查、比对内容、allowlist、Nightly）；基线决策未变 |
 | 2.36 | 2026-11-19 | T29（ADR-0045）补充第 4 章 ADR-0045、5.4 节登录的落地、6.1.4 节 WebFetch 的落地、6.2.2 节 `WebFetch(domain:…)` 的主机解析、6.13 节每模型设置、辅助模型通道与保守 Tool Profile、6.14 节 `model`、`effortLevel` 改随 T31（I113）、7.1 节 `piarc-web`、7.4 节 `webFetch` 与 `login` 能力的方法与成员、8.2 节三档视图与设置页、10.1 节提示注入对策；基线决策未变 |
 | 2.35 | 2026-11-19 | T28（ADR-0044）补充第 4 章 ADR-0044、6.9 节检查点、代码与对话回退、分支与"从这里分支"的落地、6.14 节生效键（加入 `fileCheckpointingEnabled`，并补上 T27 已生效的 `autoCompactEnabled`、`autoCompactWindow`）、7.4 节 `checkpoints` 能力的方法与成员、7.6 节检查点导出、7.7 节 Changes 面板的 diff 与降级（词级 diff 与 UTF-16 偏移仍未实现）、8.2 节回退对话框、Changes 面板、改动卡片与分支切换、9.2 节 schema v5 的三张表、9.3 节快照的清理时机；基线决策未变 |

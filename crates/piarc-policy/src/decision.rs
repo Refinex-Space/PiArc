@@ -9,7 +9,8 @@
 //! 4. ask rules, critical deletion, unresolved command, requiresUserInteraction → ask
 //! 5. mode: plan + a write → deny with "present the plan"; bypassPermissions → allow
 //!    then protected path writes (Manual, Accept edits) → ask
-//! 6. allow rules (all parts), hook allow             → allow
+//! 6. allow rules (all parts; a wildcard command rule does not take outside paths,
+//!    ADR-0047: `bash::judge` and Core report those as outside), hook allow → allow
 //! 7. mode defaults: outside → ask; read-only → allow; Accept edits edits → allow
 //! 8. PermissionRequest hooks (slot, T25) → user
 //! ```

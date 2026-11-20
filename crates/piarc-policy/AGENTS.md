@@ -21,7 +21,7 @@ Core 的权限裁决（T20 起，T23 完整版）：Claude Code 格式的规则�
 | 4 | ask 规则、可能命中的 deny（含运行期值的命令）、关键路径删除、无法静态判定、无效的 deny/ask 规则、`requiresUserInteraction` | 询问 |
 | 5 | plan：写工具与非只读命令拒绝（`PLAN_MODE_REFUSAL`）；bypass：允许 | |
 | 5b | 受保护路径写入（Manual、Accept edits） | 询问 |
-| 6 | allow 规则（Bash 每个子命令被规则或只读白名单允许）、PreToolUse allow | 允许 |
+| 6 | allow 规则（Bash 每个子命令被规则或只读白名单允许；带通配的命令规则遇到越界或无法定位的路径参数时不算放行，ADR-0047）、PreToolUse allow | 允许 |
 | 7 | 越界 → 询问；只读且在会话目录内 → 允许；Accept edits 的编辑与文件命令 → 允许 | |
 | 8 | PermissionRequest 插槽（T25，`after_permission_request`），不能批准关键路径删除与需要用户交互的工具 | 询问用户 |
 

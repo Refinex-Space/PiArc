@@ -716,6 +716,48 @@
       "rules": { "allow": ["Bash(rm *)"] },
       "expected": "ask",
       "step": "criticalPath"
+    },
+    {
+      "category": "rules",
+      "input": "sed -i s/a/b/ /home/u/.ssh/config",
+      "rules": { "allow": ["Bash(sed *)"] },
+      "expected": "ask",
+      "step": "outsideWorkspace"
+    },
+    {
+      "category": "rules",
+      "input": "awk '{print}' ../outside.txt",
+      "rules": { "allow": ["Bash(awk *)"] },
+      "expected": "ask",
+      "step": "outsideWorkspace"
+    },
+    {
+      "category": "rules",
+      "input": "sed -i --in-place=.bak s/a/b/ ~/.zshenv",
+      "rules": { "allow": ["Bash(sed *)"] },
+      "expected": "ask",
+      "step": "outsideWorkspace"
+    },
+    {
+      "category": "rules",
+      "input": "sed -i s/a/b/ notes.txt",
+      "rules": { "allow": ["Bash(sed *)"] },
+      "expected": "allow",
+      "step": "allowRule"
+    },
+    {
+      "category": "rules",
+      "input": "sed -n 1p /etc/hosts",
+      "rules": { "allow": ["Bash(sed -n 1p /etc/hosts)"] },
+      "expected": "allow",
+      "step": "allowRule"
+    },
+    {
+      "category": "rules",
+      "input": "sed -i s/a/b/ \"$TARGET\"",
+      "rules": { "allow": ["Bash(sed *)"] },
+      "expected": "ask",
+      "step": "outsideWorkspace"
     }
   ]
 }

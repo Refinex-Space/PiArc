@@ -7,6 +7,10 @@
 //!   every redirection or `tee` target is allowed (an `Edit` rule, or Accept edits inside the
 //!   workspace for writes; inside or a `Read` rule for reads). Accept edits also takes the
 //!   literal `mkdir`, `touch`, `mv`, `cp` commands.
+//! - A wildcard allow rule takes the command text, not the paths in it: when an argument of a
+//!   command it allows names a path outside the session's directories (or one Core cannot
+//!   place), the call asks as outside the workspace (ADR-0047). An exact rule names the paths
+//!   itself and still allows.
 
 use super::readonly::BUILTINS;
 use super::wrappers::EXEC_RUNNERS;
@@ -75,6 +79,8 @@ pub struct Judgment {
     pub programs: Vec<String>,
     /// Indices into [`Analysis::commands`] of primary commands no rule or default allows.
     pub missing: Vec<usize>,
+    /// A command allowed only by a wildcard rule names a path outside (ADR-0047).
+    pub outside: bool,
 }
 
 impl Judgment {
@@ -108,6 +114,7 @@ impl Judgment {
             tainted: self.tainted,
             allow: self.manual.clone().unwrap_or_default(),
             allowed: self.manual.is_some(),
+            outside: self.outside,
             accept_edit: self.accept,
             ..Input::default()
         }
@@ -177,7 +184,15 @@ pub fn judge(analysis: &Analysis, rules: &RuleSet, facts: &dyn Facts) -> Judgmen
         }
         j.tainted |= !command.unsafe_env.is_empty();
         j.read_only &= matches!(class, Class::ReadOnly { .. }) && targets.writes.is_empty();
-        let allowed = allowance(command, &class, rules, facts, &mut j.programs);
+        let mut allowed = allowance(command, &class, rules, facts, &mut j.programs);
+        if allowed
+            .rule
+            .as_ref()
+            .is_some_and(|hit| is_wildcard(&hit.rule) && names_outside(command, facts))
+        {
+            allowed.rule = rules.exact_allow("Bash", &command.full_text());
+            j.outside |= allowed.rule.is_none();
+        }
         let (reads_ok, writes_manual, writes_accept) =
             target_status(&located, &allowed, rules, &ctx);
         let command_manual = allowed.rule.is_some() || allowed.read_only;
@@ -232,6 +247,53 @@ fn target_status(
         .iter()
         .all(|l| edit_allowed(l) || l.as_ref().is_some_and(|l| l.inside && !l.protected));
     (reads_ok, writes_manual, writes_accept)
+}
+
+/// Whether a rule matches more than one text (`*`, or the `:*` form).
+fn is_wildcard(rule: &str) -> bool {
+    rule.contains('*')
+}
+
+/// Whether an argument that looks like a path (`/x`, `~/x`, `./x`, `../x`, `..`, `C:\x`,
+/// anything with a `/`, or the value of `--option=value`) lies outside the session's
+/// directories or cannot be placed; a word computed at run time cannot be placed. Other words
+/// (patterns, scripts, names) are not checked.
+fn names_outside(command: &Command, facts: &dyn Facts) -> bool {
+    command.argv.iter().skip(1).any(|word| {
+        let text = word.text.as_str();
+        let value = match text.strip_prefix('-') {
+            Some(option) => match option.split_once('=') {
+                Some((_, value)) => value,
+                None => return false,
+            },
+            None => text,
+        };
+        let pathlike = value.contains('/')
+            || value.starts_with('~')
+            || value == ".."
+            || value.contains('\\')
+            || value.as_bytes().get(1) == Some(&b':');
+        if word.source.starts_with("<(") || word.source.starts_with(">(") {
+            // A process substitution is a pipe; its commands are judged on their own.
+            return false;
+        }
+        if !word.is_static() {
+            // `$FILE` could be any path.
+            return true;
+        }
+        if !pathlike {
+            return false;
+        }
+        let operand = Operand {
+            word: super::Word {
+                text: value.to_owned(),
+                source: word.source.clone(),
+                glob: word.glob,
+            },
+            cwd: command.cwd.clone(),
+        };
+        facts.locate(&operand, false).is_none_or(|l| !l.inside)
+    })
 }
 
 struct Allowance {
