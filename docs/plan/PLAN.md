@@ -88,7 +88,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | D3：视觉品牌的主色与字标（图标已定，见 `design/brand/`） | T18 开工前 | **主色已定**（2026-11-18，T18 视觉关口确认 indigo 方向）；名称字标仍待定；Pi logo 的使用许可在 R6 前确认 |
 | Windows 11 电脑 | W0 开工前 | 有 arm64 设备时也请准备，用于验证 win32-arm64 |
 | 一家真实模型服务商的 API key（可选） | R2 开工前 | M1 退出标准中的"真实服务商完整任务"；调用前会先说明预计费用 |
-| 本机安装 Claude Code CLI | T30 开工前 | L3 行为对齐需要运行 `claude`（只连本地 mock，不需要 Anthropic 账号） |
+| ~~本机安装 Claude Code CLI~~ | T30 开工前 | **已就绪**（T30 时本机为 2.1.318）：L3 行为对齐运行 `claude`，只连本地 mock，不需要 Anthropic 账号 |
 
 ### Windows 任务
 
@@ -156,7 +156,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T27 | [上下文工程：system reminder、压缩与用量](tasks/T27-context-reminders-compaction-usage.md) | 3 | T26 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | b0b2641 |
 | T28 | [检查点、回退与 Changes 面板](tasks/T28-checkpoints-rewind-changes.md) | 3 | T27 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | c849475 |
 | T29 | [WebFetch、登录与模型设置补全、三档视图](tasks/T29-webfetch-login-model-settings-views.md) | 3 | T28 | macOS | high / 高 | 中 | 无 | 已完成 | 7f9e79b |
-| T30 | [L3 行为对齐基座](tasks/T30-l3-behavior-alignment.md) | 3 | T29 | macOS | high / 高 | 中 | 无 | 进行中 | — |
+| T30 | [L3 行为对齐基座](tasks/T30-l3-behavior-alignment.md) | 3 | T29 | macOS | high / 高 | 中 | 无 | 已完成 | f52b5aa |
 | R3 | [M2 评审](tasks/R3-m2-review.md) | 3 | T30、W1 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | W2 | [Windows：M2 达标](tasks/W2-windows-m2-parity.md) | 4 | R3 | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T31 | [子 agent 与模型别名](tasks/T31-subagents-and-model-aliases.md) | 4 | R3 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -308,18 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-T30 L3 行为对齐基座（2026-11-20 开工；本机 `claude` 2.1.318；基线 `npm run verify -- --baseline` 通过）
-
-- [x] 1 前提检查与 Claude Code 隔离运行（临时配置目录、假 key、base URL、关闭非必要流量、夹具副本；`~/.claude` 前后快照）
-- [x] 2 mock 的 L3 模式与结构化录制（白名单结构、辅助请求分类）
-- [x] 3 双侧运行器：PiArc 侧（L2 运行器）与 Claude Code 侧（`claude -p` + `--permission-prompt-tool` 夹具 MCP server）、行为轨迹
-- [x] 4 归一化、结构化 diff、Markdown/JSON 报告（`tmp/l3/`）
-- [x] 5 `tests/l3-allowlist.yaml` 与校验（缺理由、不再匹配即失败）
-- [x] 6 提示词剥离检查脚本及单测（并入 verify）
-- [x] 7 一条命令 `npm run l3` 与 Nightly workflow
-- [x] 8 权限与 hooks 首批比对：修正 PiArc 偏差（先写失败场景）或写入 allowlist；重复运行一致
-- [ ] 9 收尾：testing.md L3 一节、AGENTS.md、登记事项、验收记录、verify
 
 ## 登记事项
 
@@ -856,6 +844,15 @@ T30 L3 行为对齐基座（2026-11-20 开工；本机 `claude` 2.1.318；基线
 - 流程调整（用户要求加快推进）：`npm run verify -- --baseline` 在上次全量通过后只改了 `docs/` 时复用其结果；全量 verify 只在收尾跑一次，过程中跑局部检查；L4 只跑本任务与受影响的规格、只用 dev 形态（`protocol.md`、`scripts/dev/verify.mjs`）。
 - 登记 I112（WebFetch 不走代理、不接受压缩编码，交 T38）、I113（`model`、`effortLevel` 键移到 T31）、I114（本机 FSEvents 投递变慢，A11 阻塞）；I100 落地，I71 复核。
 - 下一项：macOS 上的 T30（L3 行为对齐基座）。本地提交，未推送。
+
+
+### 2026-11-20 T30 已完成（提交 f52b5aa）
+
+- 交付：`npm run l3`（`scripts/l3/`）一条命令完成前提检查、`~/.claude` 前后快照、PiArc 侧（`piarc-devcli l3`，L2 运行器的 L3 采集 `runner/l3.rs`）、Claude Code 侧（临时 `CLAUDE_CONFIG_DIR`/`HOME`、假 key、mock base URL、`--permission-prompt-tool` 夹具 MCP server）、剥离检查、归一化、按字段路径的 diff、allowlist 与报告（`tmp/l3/`）；mock 的 L3 模式（`Mode::L3`、`--l3`：只保留协议规则、只记白名单结构、流式辅助请求不占步数）；L2 新增 `{{workspace}}` 占位与审批的 `call`；`tests/l3/scenarios/` 12 个场景（权限 7、hooks 5）对照 21 个 L2 场景，`tests/l3-allowlist.yaml` 列出全部有意偏离（各附理由）与 11 个无法用 `-p` 复现的场景；剥离检查脚本与单测并入 verify；Nightly 工作流 `.github/workflows/l3-nightly.yml`（锁定 Claude Code 2.1.318，不用密钥，每侧两次，上传报告）。见 ADR-0046、架构 v2.37、`testing.md` 第 14 节。
+- 首批比对发现并修正一处 PiArc 偏差：会话第一个提示的 UserPromptSubmit hooks 可能先于 SessionStart hooks 运行（重复运行时先后不定），Core 现在让 UserPromptSubmit 等该会话的 SessionStart 结束（先写失败的 L2 `hooks-session-start-order`，d353d75）。其余差异逐条写入 allowlist：工具集与参数风格（Pi 参数、延迟加载工具、Claude Code 独有工具）、请求选项与提示布局、命令替换与 allow 规则先于越界检查（R3 决定）、plan 模式与分类器、未信任项目的起始模式、hooks 输入缺 `prompt_id`/`effort`（T38）、`-p` 下 PermissionRequest hook 不生效与无 Notification。
+- 验收：10/10 通过。`npm run l3 -- --repeat 2`（f52b5aa）12 个场景 0 个未解释差异、2749 个差异被放行、0 个过期条目，两侧重复运行一致，剥离检查 48 个文件通过，`~/.claude` 5278 项前后不变；PATH 无 `claude` 时提示并以 2 退出；缺理由与过期条目使命令失败；`npm run verify` 15/15，L2 118 通过、2 个按平台跳过。证据在 `tmp/evidence/T30/`。
+- 登记 I115（hooks 输入的 `prompt_id`、`effort`，T38）、I116（命令替换与阶梯顺序，R3）、I117（工具集偏离的后续任务）、I118（L3 在 Windows 上运行，W2）、I119（`piarc-core` 的 AGENTS.md 超长，R3）；I01 落地。
+- 下一项：macOS 上的 R3（M2 评审，依赖 T30 与 W1；W1 为部分完成，只剩 UNC 路径验证，开工时按协议判断是否影响评审）。本地提交，未推送。
 
 ## 计划变更记录
 

@@ -3030,71 +3030,71 @@
       "id": "T30-A01",
       "task": "T30",
       "description": "本机 `claude` 可用时版本写入报告；PATH 中没有 `claude` 时 L3 命令给出明确提示并以非 0 退出。验证：两次运行的命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "有 claude 时：`npm run l3 -- --repeat 2`（f52b5aa）报告首行 `# L3 report: PiArc f52b5aa vs Claude Code 2.1.318`（tmp/evidence/T30/final/report.md）；PATH 中无 claude 时：`env PATH=/usr/bin:/bin node scripts/l3/run.mjs` 打印 \"The Claude Code CLI (`claude`) is not on PATH.\" 与安装提示，exit=2（tmp/evidence/T30/a01-no-claude.log）"
     },
     {
       "id": "T30-A02",
       "task": "T30",
       "description": "一条命令完成两侧运行、剥离检查、归一化、比对并生成报告。验证：命令输出与 `tmp/l3/` 下的报告。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run l3 -- --repeat 2`（f52b5aa）一条命令完成：PiArc 侧（piarc-devcli l3）→ Claude Code 侧（claude -p）→ 剥离检查 48 个文件通过 → 归一化与比对 → tmp/l3/report.md、results.json；12 个场景 0 个未解释差异，\"L3 passed\"，exit=0（tmp/evidence/T30/final/）"
     },
     {
       "id": "T30-A03",
       "task": "T30",
       "description": "Claude Code 运行使用临时配置目录、假 API key 与指向 mock 的 base URL；运行前后本机 `~/.claude` 的文件清单与修改时间不变。验证：命令输出与前后比对结果。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "scripts/l3/claude-side.mjs 每个场景在临时根中运行：CLAUDE_CONFIG_DIR、HOME 指向临时目录，ANTHROPIC_API_KEY 为假值，ANTHROPIC_BASE_URL 指向 127.0.0.1 的 mock，关闭非必要流量；报告 \"~/.claude before and after: 5278 entries, unchanged\"（文件清单 + 大小 + 修改时间，tmp/evidence/T30/final/report.md）。注：开发中一次后台运行时本会话写了自己的会话记录，检查如实报告为 changed，见 testing.md 14.1"
     },
     {
       "id": "T30-A04",
       "task": "T30",
       "description": "录制产物只含白名单结构，system 文本、工具描述与参数描述只以长度与 hash 出现。验证：检查脚本对本次录制的输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`node scripts/l3/check-recordings.mjs tmp/evidence/T30/final/recordings`：\"recording check passed: 48 file(s), whitelist structure only\"（a04-check.log）；例如 Claude Code 的 Agent 工具描述记为 {\"len\":3227,\"hash\":\"sha256:ef4c13751976b8e8\"}，system 第 3 段记为 {\"len\":5887,\"hash\":…}"
     },
     {
       "id": "T30-A05",
       "task": "T30",
       "description": "检查脚本对带提示词正文的夹具失败、对正常录制通过，其单测已并入 verify。验证：测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npx vitest run scripts/l3`：check-recordings.test.mjs 5 个用例通过，其中带 system 正文与参数描述正文的夹具失败（CLI exit 1）、正常录制通过（exit 0）；verify 第 5 步 Vitest 包含它们，`npm run verify` 15/15（tmp/evidence/T30/a05-vitest.log、verify.log）"
     },
     {
       "id": "T30-A06",
       "task": "T30",
       "description": "同一侧重复运行两次，归一化后的轨迹完全一致。验证：两次运行的 diff 为空。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run l3 -- --repeat 2`：每侧两次运行归一化后逐字段 diff 为空（报告无 \"Not repeatable\"，12 个场景全部 ✔）；此前 PiArc 的 hooks-lifecycle 两次的 hooks 顺序不同（SessionStart 与 UserPromptSubmit），已在 Core 修正（d353d75，L2 hooks-session-start-order 先失败后通过）"
     },
     {
       "id": "T30-A07",
       "task": "T30",
       "description": "hooks 场景的比对覆盖触发事件的顺序、输入字段名集合与决策结果。验证：报告中的 hooks 部分。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "报告每个 hooks 场景的 \"#### Hooks\" 一节列出两侧的触发顺序、每次调用的输入字段名集合与返回的决定（例：hooks-lifecycle 两侧均为 SessionStart → UserPromptSubmit → Stop → Stop → SessionEnd，Stop 第一次 block、第二次放行），差异按字段路径进入比对（如 hooks.calls[\"stop#0\"].fields.prompt_id）"
     },
     {
       "id": "T30-A08",
       "task": "T30",
       "description": "权限与 hooks 场景没有未解释的差异：每个差异已修正或写入 allowlist 并附理由；缺理由或不再匹配的 allowlist 条目会让命令失败。验证：L3 报告与 allowlist 校验输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "最终运行 0 个未解释差异，2749 个差异由 tests/l3-allowlist.yaml 的条目放行，每条附理由（需后续处理的登记为 I115–I118），11 个无法用 -p 复现的 L2 场景列入排除清单；人为加入缺理由与过期条目后 `npm run l3 -- --filter perm-rules` 输出 \"✖ differences[1] (files[\\\"notes.txt\\\"]): the reason is missing\"、\"✖ stale allowlist entry differences[0]: perm-rules final.status\"，exit=1（a08-allowlist-negative.log）"
     },
     {
       "id": "T30-A09",
       "task": "T30",
       "description": "Nightly workflow 语法有效，安装锁定版本的 Claude Code，不依赖任何密钥，并上传报告。验证：actionlint 或 YAML 解析输出与 workflow 内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": ".github/workflows/l3-nightly.yml：YAML 解析通过（triggers schedule、workflow_dispatch；runs-on macos-latest），`npm install --global @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}`（2.1.318），不引用任何 secrets，actions 全部钉到 SHA，上传 tmp/l3/report.md、results.json、recordings/（a09-workflow.log）；本机无 actionlint，未用它检查"
     },
     {
       "id": "T30-A10",
       "task": "T30",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run verify`（f52b5aa，工作区干净）：All 15 steps passed，L2 118 通过、2 个按平台跳过（tmp/evidence/T30/verify.log）"
     },
     {
       "id": "T31-A01",
