@@ -119,9 +119,10 @@ async fn a_running_background_subagent_keeps_the_agent_host() {
     )
     .await;
     events.turn_completed(&id, &turn).await;
+    child_request(&env).await;
     events
-        .wait("the child's request", |_| {
-            !env.requests("bg-subagent-child").is_empty()
+        .wait("the run's start", |e| {
+            !e.of(&id, "subagent/started").is_empty()
         })
         .await;
     let child = events.of(&id, "subagent/started")[0]["subagent"]["sessionId"]
@@ -176,6 +177,19 @@ async fn a_running_background_subagent_keeps_the_agent_host() {
     shutdown(core).await;
 }
 
+/// Waits until the mock received the subagent's request (`bg-subagent-child`). It sends no
+/// event, so this polls the mock's records instead of waiting on the event list.
+async fn child_request(env: &Env) {
+    let polled = async {
+        while env.requests("bg-subagent-child").is_empty() {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    };
+    tokio::time::timeout(crate::support::WAIT, polled)
+        .await
+        .expect("the subagent's request reached the mock");
+}
+
 /// Starts the Agent Host through a wrapper that writes its pid to the returned file.
 fn record_host_pid(env: &Env, config: &mut piarc_core::CoreConfig) -> std::path::PathBuf {
     let Some(AgentHostLaunch::Custom { bundle, .. }) = &mut config.sessions.launch else {
@@ -219,9 +233,10 @@ async fn a_crash_during_a_foreground_subagent_leaves_the_call_interrupted() {
     let (core, events) = env.start(config);
     let id = open_session(&core, &env).await;
     let turn = prompt(&core, &id, &prompt_text("Survey and wait.", "fg-subagent")).await;
+    child_request(&env).await;
     events
-        .wait("the child's request", |_| {
-            !env.requests("bg-subagent-child").is_empty()
+        .wait("the run's start", |e| {
+            !e.of(&id, "subagent/started").is_empty()
         })
         .await;
     let child = events.of(&id, "subagent/started")[0]["subagent"]["sessionId"]
