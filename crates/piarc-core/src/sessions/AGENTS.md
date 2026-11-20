@@ -16,6 +16,11 @@
 - 客户端偏好（`client_settings`）：可写 `language`、`appearance`、`keybindings`、`notifications`，以及布尔偏好 `/memory/readBoth`，经 `piarc_config::write_value`；读取返回整份文件（不存在为 `{}`）。
 - I62 已接上：工作区 actor 打开时启动设置监听（`WorkspaceSettings`）。macOS 的首次 FSEvents 注册在阻塞线程池进行，与 Host 握手并行。注册完成后重新读取设置，显式 `open_settings` 仍等待监听就绪。回合结束时同步索引。信任变化重启（T18 起）：`CoreRuntime::trust_view`（决定）与 `revoke_trust` 在应答前调 `Hub::trust_changed`，同一主 checkout 的工作区 actor 先把状态置为 `Restarting`（之后的请求等新进程就绪）再调 `HostSupervisor::restart`，所以信任对话框之后立即创建的会话落在新进程上；`agent_host::restart_on_trust_change` 只剩监管器层面的测试使用。
 
+## 后台任务（T32，ADR-0049）
+
+- 会话 actor 把 `turn/started`、`turn/completed` 报给任务管理器（Monitor 的唤醒判断），在 `reminder` 条目里认出 `backgroundTask`/`monitorOutput` 的来源并报告送达（`session/notices.rs` 的 `reminders_delivered`），收到 `SessionMsg::Notices` 时一轮一轮地发送挂起的通知（`send_notices`，在途时合并）；`Restored`、`create`/`resume` 之后与每个 prompt/steer/follow-up 发出前也发送（`notices::deliver`）。唤醒前读合并设置 `monitor.wakeIdleSession`（`ToolIo::monitor_wake_allowed`），关掉时以不唤醒的方式发出。
+- 归档与删除先 `TaskManager::session_removed` 再清理目录；关闭会话结束其 Monitor（后台命令照常运行）；`Hub::stop_task`/`read_task_output` 是面板的停止与读取（NAPI `stopTask`、`readTaskOutput`）；`HubOutlet` 实现 `TaskOutlet`。
+
 ## 子 agent（T31，ADR-0048）
 
 - `sessions/inbound.rs` 应答 `agents/list`、`subagent/start`、`subagent/finish`：父会话必须属于本工作区；登记后子会话 id 进入工作区的 `SessionSet`（它的 `fs/*`、`exec/*` 才能通过），并经 `Activity` 报为忙碌（运行中的后台子 agent 让空闲计时不回收 Agent Host），`subagent/finish` 或连接结束（每个子会话一个 `peer.closed()` 观察任务）时撤销并写索引。

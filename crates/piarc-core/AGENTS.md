@@ -15,6 +15,7 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 | `cargo test -p piarc-core --test state` | 数据目录布局、信任按主 checkout（真实 git 夹具）、重启后保留与撤销、`trust/get` 故障注入、信任视图与新增项、设置文件变化事件（T13） |
 | `cargo test -p piarc-testkit --test sessions` | 会话层端到端（真实 Agent Host + mock）：排队、steer 与 follow-up、中断、工具批次、重试、缺口补齐、空闲回收、快照 revision、fork 与关闭、重启恢复（T14） |
 | `cargo run --release -p piarc-testkit --example t14-warmup` | 打开工作区到 Agent Host 就绪的 10 次测量（T14-A09） |
+| `cargo test -p piarc-core --test background_tasks` | 后台命令（T32）：`background` 立即作答并写输出文件、KillShell 结束整棵进程树（含忽略 SIGTERM 的孙进程）并保留输出、其他会话停不了、Monitor 以任务运行；单测 `--lib tasks::`（通知、Monitor 节奏与手动时钟、权限范围、子 agent 状态、分段读取） |
 | `cargo test -p piarc-core --test terminal` | 终端：`term/<id>` 事件、经回调取帧、错误类别、关闭时结束终端（Unix） |
 | `cargo clippy -p piarc-core --all-targets -- -D warnings` | lint |
 
@@ -63,6 +64,14 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - `Storage` 是 `Store` 加互斥锁，经阻塞线程池使用；不要在异步任务里拿着锁等待。
 - 信任（`trust`）：`TrustService::trust_get` 应答 `trust/get`，任何失败（包括清单不完整、快照损坏、目录解析不了、数据库错、任务 panic）都答 `trusted: false`，只有参数格式错时回 `invalidParams`；查询一律经 `piarc_config::project_trust`。肯定决定须带用户看到的清单版本；遇到版本变化向客户端返回最新视图，保持原决定。同一项目的 linked worktree 需要反向登记（ADR-0034）。成功的 `decide`、`revoke` 广播 `TrustChange`；`agent_host::restart_on_trust_change` 订阅它，对同一主 checkout 调 `HostSupervisor::restart`（不计入崩溃退避，会话自动恢复）。T14 的工作区 actor 负责为每个工作区启动这个任务。
 - 设置（`workspace_settings`）：`CoreRuntime::open_settings(workspace)` 加载四层并用 `piarc_fs::watch` 监听各层文件所在目录（`.piarc/` 不存在时监听工作区本身），去抖 150 ms 后重载；有变化键或问题变化时向 `core/settings` 发 `{ workspace, changed, issues }`。信任变化同样触发重新合并。
+
+## 后台任务（`tasks`，T32，ADR-0049）
+
+- `TaskManager`（`tasks/mod.rs`）一个 Core 一份，由运行时建好经 `ToolIo::with_tasks` 交给工具 I/O，`start` 时把数据库里遗留的 `running` 改为 `interrupted`、载入最近任务并开始发 `core/tasks` 快照；`set_outlet` 接上会话层（`sessions::HubOutlet`：送通知、停子 agent，持弱引用避免环）。`ToolIo::new` 自带一个无数据库的管理器（测试）。
+- 状态机：`running` → `completed`（语义成功；Monitor 到时也是，`meaning` 写明）/ `failed` / `killed`（KillShell、面板、会话归档删除、Monitor 随会话关闭）/ `interrupted`（应用退出、承载子 agent 的连接结束）。停止原因 `StopBy` 决定状态与是否通知；结束后不再变。
+- 输出文件 `<数据目录>/sessions/<主会话 id>/tasks/<任务 id>.log`（`tasks::task_file`），子 agent 的任务也在主会话目录下。归档清理 `tasks/`，删除会话一并删 `background_tasks` 行。
+- 通知：`Notice` 挂在管理器里直到 `delivered`（会话 actor 看到 `reminder` 条目，或 `session/remind` 答 `delivered`）；`sessions/session/notices.rs` 负责发送（任务结束、会话打开或恢复、每个 prompt/steer/follow-up 之前）。Monitor 的批次与限速在 `tasks/feed.rs`、节奏在 `tasks/monitor.rs`；全部限值在 `tasks/limits.rs` 的 `TaskLimits`（`CoreConfig.tasks`），计时用 `TasksConfig.clock`（前台超时、Monitor 超时与唤醒都用它，测试与 L2 注入 `ManualClock`）。
+- 有序关闭：`Hub::shutdown` 先 `TaskManager::shutdown`（并发停止全部、等结束、把最终行写进数据库），再关工作区与数据库。
 
 ## 子目录说明
 

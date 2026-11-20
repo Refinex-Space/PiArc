@@ -35,6 +35,7 @@ AHP 与 Core API 数据类型的唯一来源：Rust 类型 → JSON Schema → `
 - `context.rs`（T27，能力 `context`）：提醒类型 `ReminderType`（成员名 `type`，Rust 里是 `kind`）、`ContextUsage` 与分类、`session/usage`、`session/getContextUsage`、`session/remind`、`context/settings`、`fs/changes`、`fs/forgetReads`。`Item::Reminder`、`ContextCompaction.autoCompactStopped`、`SessionCompactParams.instructions`、`FsReadParams.restore` 分别在 `turn.rs`、`session.rs`、`fs.rs`。
 - `models.rs` 定义目录、设置 Host 写入与公开状态、会话切换与代价预览。可空价格字段用 JSON `null` 表达未知；切换输入明确区分目标模型和当前 effort。
 
+- `tasks.rs`（T32，能力 `backgroundTasks`）：`BackgroundTask`、`TaskKind`、`TaskStatus`、`TaskStarted`（`exec/run` 的 `task`、`CommandExecutionInfo.task`）、`exec/monitor`、`exec/background/list|read|kill`、`TasksSnapshot`（Core API 的 `core/tasks`）；`session/remind` 的 `key`、`wake` 与 `ReminderType::MonitorOutput` 在 `context.rs`。
 - `web.rs`（T29，能力 `webFetch`）：`web/fetch`；`models.rs` 的 `models/login/start|cancel`、`models/logout`、`ui/loginInteraction`（能力 `login`，交互以 `type` 标记）、`ModelPreferences`/`ModelOverride`（`core/welcome.modelPreferences`、`models/reload.preferences`）与 `ToolReliability::Low`、`ToolProfileKind`。整数字段用 `u64`：schemars 给 `u16` 的 `uint16` 格式 ajv 不认识。空结构体的结果能从 `[]` 反序列化，反例用 `false`。
 
 ## 易错点

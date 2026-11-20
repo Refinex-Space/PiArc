@@ -235,6 +235,7 @@ steps:
       message: "slow down"         # 可省略
 ```
 
+- 工具参数里的 `{{result:<工具调用 id>:<正则>}}`（T32）在应答时换成本次请求中该工具结果文本的第一个捕获组（没有捕获组时为整个匹配，找不到时为 `<no match for …>`，让用到它的请求明显失败）：脚本据此使用运行时才知道的值，如后台任务的 id 与输出文件。
 - 参数按紧凑 JSON 序列化（键按字典序），按字符切分：`split_at` 可以切在字符串值内部和转义序列中间，不会切开一个 UTF-8 字符。
 - 用量在 Anthropic 中写入 `message_start` 与 `message_delta`；在 OpenAI 中只在请求带 `stream_options.include_usage` 时追加用量块，`prompt_tokens` 为三类输入之和，缓存读取在 `prompt_tokens_details.cached_tokens`，缓存写入在 `cache_write_tokens`（OpenRouter 扩展，pi-ai 读取它）。
 - OpenAI 官方没有 529；mock 仍按脚本返回 529，让两种线格式的重试路径一致。
@@ -327,6 +328,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 - 端点脚本工具参数里的 `{{workspace}}` 换成本次运行工作区的绝对路径（T30，L3 场景要用绝对路径的 `file_path`）。
 - WebFetch 场景（T29，`webfetch-*.yaml`）：`web.pages` 按路径给出状态、`content_type`、`body`（`repeat` 重复多次，用来越过正文上限）与重定向的 `location`。`{{web}}` 在页面与端点工具参数里换成 `http://127.0.0.1:<端口>`，`{{web_alt}}` 换成同一服务器的 `http://localhost:<端口>`（另一个主机，用于跨站重定向与按域名的规则）。只有带 `web` 段的场景，Core 的 WebFetch 允许列表才放行这两个主机；场景不访问外网。WebFetch 的提取是一次额外的模型请求：没有辅助模型时为它在同一端点留一步，设了 `modelProviders.auxiliary`（用 `run_files` 写 `data 数据/settings.json`）时在那个端点留一步。
 - 每模型设置与保守 Tool Profile（T29，`model-*.yaml`）：用 `run_files` 写 `data 数据/settings.json` 的 `modelProviders.models`（键 `mock-<端点>/mock-model`）；`configure_as: local` 端点的模型是低可靠性，默认得到保守 Profile。
+- 后台任务场景（T32，`bg-*.yaml`、`monitor-*.yaml`）：`core/tasks` 快照的每一行作为它所属主会话的事件参与匹配（`method: core/tasks`，`params` 是任务行），`wait` 可以等任务的状态、退出码与尾部行；顶层 `task_limits`（`monitor_batch_lines`、`monitor_batch_chars`、`monitor_total_chars`）为该场景缩小 Monitor 的限值。等命令开始输出再推进时钟（`wait: { method: item/updated, params: { item: { itemId, output } } }`），否则超时的计时还没开始。Monitor 的命令文本会出现在请求的对话历史里，`not_contains` 要用只在提醒里出现的写法（如 `1 new line.\n<行>`）。
 - 子 agent 场景（T31，`subagent-*.yaml`）：子会话的请求经它的模型选端点，定义的 `model: mock-<端点>/<模型>` 或别名表（`run_files` 写 `data 数据/settings.json` 的 `modelAliases`）把子 agent 送到另一个端点，各端点的步数互不影响；不指定模型的子 agent 与父会话共用端点，脚本按请求到达顺序排步。审批应答可写 `subagent: { type, description }`，要求卡片来自该子 agent（Core 的 `ApprovalOrigin`）。并发与深度上限用 `.piarc/settings.json` 的 `subagents` 调小。
 - 压缩场景（T27，`ctx-*.yaml`）：用 `context_window`、`max_tokens` 与步骤的 `usage` 精确触发阈值（Pi 以回复报告的 `input + output + cacheRead + cacheWrite` 判断）；要让短对话有可摘要的内容，在信任的工作区写 `.pi/settings.json: '{"compaction":{"keepRecentTokens":1}}'`。项目层的 `autoCompactWindow` 写在 `.piarc/settings.json` 或 `.claude/settings.json`。
 
@@ -359,6 +361,8 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | `check_files` | `files` | 动作中途检查工作区文件内容（`null` 表示不存在） |
 | `sign_in` | `behavior`（`approve`/`deny`/`expire`）、`cancel`、`outcome`（`succeeded`/`failed`/`cancelled`）、`message` | 经 Core 登录测试服务商（T29，需要顶层 `oauth`）：运行器代替浏览器跟随授权页的重定向到 Agent Host 的回环端口，或在第一步取消；断言 `core/login` 的结束状态与消息，以及之后是否已登录 |
 | `sign_out` | — | 退出测试服务商的登录并确认凭据已删除 |
+| `advance_clock` | `seconds` | 推进任务管理器的时钟（T32）：前台命令的超时转后台、Monitor 的超时与唤醒都按它计时，场景不靠真实等待 |
+| `stop_task` | `kind`（可选） | 停止该会话（主会话）最新的运行中后台任务，同面板的停止按钮（T32） |
 
 `prompt`、`steer`、`follow_up` 都可带客户端的 `request_id`（重发时沿用），以及 `mentions` 和 `attachments`；`rejected: <文本>` 要求 Core 拒绝这条输入、错误消息含该文本（UserPromptSubmit hook 阻断，T25），不记回合。提及按 Core 输入格式写 `{path, start, end}`，两个偏移是发送文本中 `@path` 的 UTF-16 起止位置。附件写 `{fixture, mime_type}`；运行器读取 `fixtures/` 中对应文件并调用 Core 的 `store_attachment`，将返回的引用随输入发送。面板的键盘交互在 L4 验证。
 

@@ -25,6 +25,7 @@ hooks 的通用部分（架构第 6.3 节，ADR-0039）：配置解析与合并�
 - exit 2 按 `HookEvent::exit_two`：阻断、给模型、给用户、忽略；同时读 stdout 的 JSON，其中的理由优先于 stderr。其他退出码、超时、无法启动：非阻断错误，`onFailure: "block"` 时在可阻断事件上阻断。
 - PreToolUse：deny > ask > allow，`defer` 按 ask；`updatedInput` 取获胜决定的第一个，没有决定的 handler 的输入只在无人决定时生效。PermissionRequest：deny 优先，allow 的权限更新合并。
 - `systemMessage`、`continue: false` 只对 `HookEvent::uses_common_fields` 为真的事件生效；Stop 的 `continue: false` 覆盖 block。
+- 工具事件上 matcher 为 `Bash` 的 handler 也选中 Monitor 调用（T32，同 Claude Code；`HookConfig::select`），输入里的 `tool_name` 仍是 `Monitor`。
 - 同一 handler（命令、参数、shell、`if` 相同）跨文件只运行一次，保留优先级最高的那份；顺序为设置层高到低。
 
 ## 上限与常量

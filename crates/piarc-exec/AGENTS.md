@@ -1,6 +1,6 @@
 # piarc-exec
 
-进程与 shell 命令（架构第 6.11 节，ADR-0028）：`ProcessSpawner` 的两个实现（只终止直接子进程的 `TokioProcessSpawner`，终止整棵进程树的 `ProcessTreeSpawner`）、`CommandRunner`（超时与两段终止），以及 T17 的命令行为模块：`limits`（阈值）、`capture`（输出预算与落盘）、`semantic`（语义退出码）、`env`（登录 shell 环境与剔除）、`shells`（bash / Git Bash / PowerShell 的探测与参数）、`cwd`（bash 命令的最终目录）。`piarc-core::tool_io::exec` 把它们装配成 `exec/run`。不决定命令能否运行（`piarc-policy`），不生成沙箱配置（`piarc-sandbox`），不管 PTY（`piarc-term`）。
+进程与 shell 命令（架构第 6.11 节，ADR-0028）：`ProcessSpawner` 的两个实现（只终止直接子进程的 `TokioProcessSpawner`，终止整棵进程树的 `ProcessTreeSpawner`）、`CommandRunner`（超时与两段终止），以及 T17 的命令行为模块：`limits`（阈值）、`capture`（输出预算与落盘）、`semantic`（语义退出码）、`env`（登录 shell 环境与剔除）、`shells`（bash / Git Bash / PowerShell 的探测与参数）、`cwd`（bash 命令的最终目录），以及 T32 的 `task_log`（后台任务的输出文件）与 `OutputCapture::hand_over`。`piarc-core::tool_io::exec` 把它们装配成 `exec/run`，后台任务的编排在 `piarc-core::tasks`。不决定命令能否运行（`piarc-policy`），不生成沙箱配置（`piarc-sandbox`），不管 PTY（`piarc-term`）。
 
 ## 命令
 
@@ -17,6 +17,12 @@ Core 层的集成测试在 `crates/piarc-core/tests/exec_commands.rs`（cwd、�
 - 停止 = `ProcessControl::terminate`（Unix 向进程组发 `SIGTERM`；Windows 直接 `TerminateJobObject`）→ 等 `kill_grace`（默认 2 s）→ `kill`（`SIGKILL`）。触发：超时、取消令牌（`exec/kill`、回合中断、连接断开、会话关闭）、输出管道读取错误（标记具体流并报告失败）、输出通道关闭、`run` 的 future 被丢弃（drop guard）。
 - 等到 shell 退出后 `watch` 丢弃 `ProcessControl`：`ProcessTreeSpawner` 的句柄丢弃即 `killpg(SIGKILL)` / 关闭 Job，命令留在后台的进程随之结束。所以 shell 先退出时，忽略 `SIGTERM` 的孙进程立刻收到 `SIGKILL`，不再等宽限。
 - `TokioProcessSpawner` 只杀直接子进程，Core 的命令不再用它（只剩 T06 的测试与兼容）。
+
+## 后台任务（T32，ADR-0049）
+
+- `task_log.rs` 的 `TaskLog`：按读到的顺序把两个管道的原始字节追加写入文件（不缓冲，模型边跑边 Read），计字节数，按管道切行并保留最后 `TAIL_LINES`（50）行；`write` 返回这块补全的行（Monitor 用）。未完的行超过 `MAX_PENDING_BYTES`（64 KiB）就切成一行，保留的行截到 `MAX_LINE_CHARS`。写失败只停写、不停计数（`error()`）。`read_chunk` 按字节偏移读回文本，不到文件末尾时停在字符边界之前。
+- 转后台不重启进程：Core 不把超时交给 `CommandRunner`（`CommandSpec.timeout` 为 `None`），由任务时钟计时；到时输出消费者调 `OutputCapture::hand_over`（已落盘就交出文件，否则交出文本与未完的 UTF-8 字节），Core 把落盘文件改名为任务输出文件后 `TaskLog::resume`，或新建后写入文本。`CommandRunner` 的超时仍给 hooks 等调用方用。
+- 停止后台任务就是取消 `CommandRunner::run` 的令牌：与回合中断同一条两段终止路径。Windows 上每个命令（因此每个后台任务）一个 Job Object（`ProcessTreeSpawner`），KillShell 与应用退出终止整个 Job。
 
 ## cwd 跟踪（`cwd.rs`）
 
@@ -40,6 +46,7 @@ Core 层的集成测试在 `crates/piarc-core/tests/exec_commands.rs`（cwd、�
 
 ## 易错点
 
+- 后台任务的 `TaskLog` 由 Core 以 `Arc<Mutex<_>>` 共享给消费者与快照：持锁只做一次写入或读尾部行，不要在锁里等待。
 - `ProcessControl::wait` 与 `kill`/`terminate` 都借用 `&mut self`：等待与停止分两步写（`watch` 的 `select!` 只决定原因，`stop_process` 再停）。
 - `OutputCapture::push` 在异步任务里同步写文件（`BufWriter`），只在输出超过内联预算后才写；不要在这里做阻塞更久的事。
 - 登录 shell 会执行用户的配置文件：测试里用 `/bin/bash` 加临时 `HOME` 的 `.bash_profile`（`env.rs` 的测试、L2 运行器），不要依赖开发机自己的 shell 配置；macOS 的 `/etc/profile` 会经 `path_helper` 重排 `PATH`，断言写"包含"不写"等于"。

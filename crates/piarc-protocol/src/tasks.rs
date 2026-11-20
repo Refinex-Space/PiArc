@@ -42,11 +42,13 @@ pub enum TaskKind {
 pub enum TaskStatus {
     /// Still running.
     Running,
-    /// Ended and did what it was asked (judged by what its exit code means).
+    /// Ended and did what it was asked (judged by what its exit code means); a Monitor that
+    /// reached its timeout also ends here (`meaning` says so).
     Completed,
-    /// Ended unsuccessfully, or a Monitor reached its timeout.
+    /// Ended unsuccessfully.
     Failed,
-    /// Stopped by `KillShell`, the stop button, or its session being archived or deleted.
+    /// Stopped by `KillShell`, the stop button, its session being archived or deleted, or (a
+    /// Monitor) its session closing.
     Killed,
     /// Stopped because PiArc quit (or the Agent Host running a subagent ended).
     Interrupted,

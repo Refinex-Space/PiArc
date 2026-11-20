@@ -10,6 +10,7 @@
 - T26（ADR-0042）：`policy/plan.rs` 处理计划卡（批准带 `mode` 切换并记入工作区，继续规划把反馈与 UTF-16 锚定的评论作为拒绝理由）与 EnterPlanMode 的切换（结果的 `mode`）；`policy/questions.rs` 应答 `ui/ask`（表单进同一账本，超时取 `askUserQuestion.timeoutSeconds`、计时用 `ToolIoConfig.clock`）；`policy/waits.rs` 是卡片入账、`policy/pending` 与撤下的共用部分。
 - 工具预检经 `tool_io::policy` 调用 `piarc-policy`，自动或用户决定写入审计；`core/sessions` 快照的 `approvals` 是窗口使用的待审请求。低层 I/O 需要对应调用的授权，用户中断或连接丢失会取消等待。批准规则以实际受信设置的合并结果为准（ADR-0031）。
 - 命令（T17，ADR-0028）在 `tool_io/exec.rs`：shell 每个 Core 探测一次（`exec/shells` 回答，不检查会话：Agent Host 在会话创建过程中、Core 登记它之前就问，工作区入站处理者也放行；Windows 缺 Git Bash 时在 `core/notices` 发一次 `gitBashMissing`，Git Bash 路径只读用户级 `<data>/settings.json` 的 `shell.gitBashPath`）；每个会话一个 shell 目录（`SessionIo.shell_cwd`），未给 `cwd` 的 bash 命令带 `CwdProbe`，结束后越界就回到工作区根；全部命令用 `ProcessTreeSpawner`，超时与阈值取 `ToolIoConfig.exec_limits`。
+- 后台（T32，ADR-0049）：`exec/run` 不把超时交给 `CommandRunner`，`Exec::execute` 用任务时钟等 `ExecLimits` 的超时，到时 `to_background` 经 `exec/background.rs` 的 `Switch` 让输出消费者交出捕获内容、登记任务、`watch_to_end` 记录结束；`background: true` 直接 `start_task`。`exec/run` 的令牌在转后台后从 `running` 摘下，回合中断与连接断开不再波及。`tool_io/tasks.rs` 应答 `exec/monitor`（`policy::claim_monitor` 消费同一调用的授权，命令按后台 bash 组装）、`exec/background/list|read|kill`（只认本会话与其子 agent 的任务）；`Place` 决定任务归属的主会话与输出目录。`claim_command` 还核对 `run_in_background` 与批准的参数一致。会话 scope 把主会话的 `tasks/` 登记为只读。
 - 输出：每块同时进 `OutputCapture`（结果的 `output`，超出预算全文写 `<会话临时目录>/tool-results/<工具调用 id>.txt`）与显示窗口 `Display`（`exec/output`，待发超过 `DISPLAY_WINDOW` 256 KiB 时丢最旧的块并报 `skipped`），转发任务发完才回响应；连接断开（`Peer::closed`）或 `exec/kill` 停止命令。
 - 命令环境 = `ToolIoConfig.command_env`（`CommandEnv`）：`ToolIoConfig::new` 用 Core 自己的环境（`CommandEnv::process`），运行时（`CoreConfig.command_env` 为 `None`）用登录 shell（`CommandEnv::login_shell`，首次命令时解析并缓存）；两者均经 `piarc_exec::env::command_environment`，只缓存准入的 OS、locale 与工具链字段。原环境中影响 shell 解析的变量只保留风险标志；生产审批拒绝请求附加环境（ADR-0035）。`ToolIoConfig` 不能带 `notices`（crate 私有类型），要发通知用 `ToolIo::with_notices`。
 - blob 放在 `<数据目录>/sessions/<会话 id>/blobs/`；会话 id 只允许 `[A-Za-z0-9._-]`，不能是 `.`、`..`。
@@ -49,6 +50,10 @@
 - 定义的 hooks 经 `HooksService::scope_hooks` 以 `subagent` 层登记在子会话 id 下，`unscope_hooks` 撤下；项目级定义要求项目受信任（否则 `hooksUntrusted` 警告）。
 - 设置的默认模型与 effort（`model`、`effortLevel`，I113）由 `context.rs` 的 `session_defaults` 给新会话，`model` 的别名经 `ModelAlias::target` 用合并表解析。
 - 单测：`cargo test -p piarc-core --lib tool_io::policy::tests::t31`（审批来源与会话规则、模式收紧、中断、定义列表、定义 hooks、参数规则）与 `--lib tool_io::checkpoints`（子 agent 写入归属）。
+
+## 后台任务的裁决（T32）
+
+- Monitor 走 `assess::bash_call`，`BashFacts.tool` 为 `Monitor`（`piarc-policy` 用它查规则：`Bash(…)` 覆盖 Monitor，`Monitor(…)` 只管 Monitor），之后去掉只读白名单与 Accept edits 的放行（`allow` 为空时 `allowed = false`）。KillShell 在 `other_call` 里与宿主工具一样是只读。
 
 ## 易错点
 

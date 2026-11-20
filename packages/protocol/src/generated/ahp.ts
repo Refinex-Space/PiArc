@@ -5497,7 +5497,8 @@ export interface SessionRemindRequest {
 export interface SessionRemindParams {
   /**
    * Identifies the reminder (T32, ADR-0049): a queued reminder with the same key is
-   * replaced, and one already delivered on the session's branch is not queued again.
+   * replaced, and one whose type and source were already delivered on the session's branch
+   * is not queued again (`delivered`).
    */
   key?: string | null;
   /**
@@ -5536,7 +5537,8 @@ export interface SessionRemindResponse {
  */
 export interface SessionRemindResult {
   /**
-   * The branch already holds a delivered reminder with this `key`: nothing was queued.
+   * The branch already holds a delivered reminder of this type and source: nothing was
+   * queued.
    */
   delivered?: boolean;
   /**

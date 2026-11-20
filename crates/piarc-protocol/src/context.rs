@@ -157,7 +157,8 @@ pub struct SessionRemindParams {
     /// The text for the model.
     pub text: String,
     /// Identifies the reminder (T32, ADR-0049): a queued reminder with the same key is
-    /// replaced, and one already delivered on the session's branch is not queued again.
+    /// replaced, and one whose type and source were already delivered on the session's branch
+    /// is not queued again (`delivered`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
     /// When the session is idle, start a turn whose input is this reminder (a Monitor waking
@@ -170,7 +171,8 @@ pub struct SessionRemindParams {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionRemindResult {
-    /// The branch already holds a delivered reminder with this `key`: nothing was queued.
+    /// The branch already holds a delivered reminder of this type and source: nothing was
+    /// queued.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub delivered: bool,
     /// The turn `wake` started.

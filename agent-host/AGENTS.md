@@ -54,6 +54,12 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - `maxTurns` 到达后中止并把结果标 `partial`：报告取最后一条真实回复，跳过中断补齐写的标记（`isInterruptionMarker`）。前台运行随调用的 abort 信号中止（父会话中断）；后台运行不随中断结束，`close` 与 `subagent/stop` 中止它，结束后经 `harness.remind` 的 `backgroundTask` 提醒回报；进程重启后 `recover()` 把记录中仍在运行的后台运行标为 `interrupted` 并提醒。
 - 同进程易错点：MCP 扩展按会话实例化，每个子会话各起一份 server 进程（T36 的共享池之前）；扩展加载器的模块级缓存按 cwd 失效，子会话与父会话 cwd 相同不受影响；不要在子会话代码里改 `process.env` 或读 `process.cwd()`。
 
+## 后台任务（T32，ADR-0049）
+
+- 能力 `backgroundTasks` 打开时：`Bash`/`PowerShell` 有 `run_in_background`，结果带 `task` 时文案说明转后台与输出文件（`tools/shell.ts` 的 `taskText`）；`harness/task-tools.ts` 注册 `KillShell`（`shell_id` → `exec/background/kill`，`notFound` 换成给模型的说明）与 `Monitor`（`exec/monitor`）。结果文案在 `harness/prompts/tasks.ts`（改后跑原创性检查）。
+- `session/remind` 进 `SessionRegistry.remind`：`SessionHarness.remind` 带 `key` 时文本原样、同键替换、分支上已有同类型同来源的已送达提醒就答 `delivered`；`wake` 且会话空闲时开一个 `wake` 回合：写 `piarc.input`（`action: wake`）后以排队的提醒消息 `sendCustomMessage(…, { triggerTurn: true })` 启动运行。`wake` 回合不是分支点（`branches.ts`），历史里提醒条目归入该回合（`history.ts`）。
+- 后台子 agent 的通知仍由 Agent Host 排队（ADR-0048），Core 只登记与停止它的任务。
+
 ## 子目录说明
 
 - `src/harness/AGENTS.md`：system prompt 与 memory、权限预检、hooks、宿主工具、上下文工程（提醒、压缩、重注入、熔断、用量）、回合不变量的补齐。

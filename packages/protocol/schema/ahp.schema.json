@@ -8644,7 +8644,7 @@
       "description": "Parameters of `session/remind`.",
       "properties": {
         "key": {
-          "description": "Identifies the reminder (T32, ADR-0049): a queued reminder with the same key is\nreplaced, and one already delivered on the session's branch is not queued again.",
+          "description": "Identifies the reminder (T32, ADR-0049): a queued reminder with the same key is\nreplaced, and one whose type and source were already delivered on the session's branch\nis not queued again (`delivered`).",
           "type": ["string", "null"]
         },
         "sessionId": {
@@ -8712,7 +8712,7 @@
       "description": "Result of `session/remind`: the reminder is queued for the next model request.",
       "properties": {
         "delivered": {
-          "description": "The branch already holds a delivered reminder with this `key`: nothing was queued.",
+          "description": "The branch already holds a delivered reminder of this type and source: nothing was\nqueued.",
           "type": "boolean"
         },
         "turnId": {
@@ -10023,17 +10023,17 @@
         },
         {
           "const": "completed",
-          "description": "Ended and did what it was asked (judged by what its exit code means).",
+          "description": "Ended and did what it was asked (judged by what its exit code means); a Monitor that\nreached its timeout also ends here (`meaning` says so).",
           "type": "string"
         },
         {
           "const": "failed",
-          "description": "Ended unsuccessfully, or a Monitor reached its timeout.",
+          "description": "Ended unsuccessfully.",
           "type": "string"
         },
         {
           "const": "killed",
-          "description": "Stopped by `KillShell`, the stop button, or its session being archived or deleted.",
+          "description": "Stopped by `KillShell`, the stop button, its session being archived or deleted, or (a\nMonitor) its session closing.",
           "type": "string"
         },
         {
