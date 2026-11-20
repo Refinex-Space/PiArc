@@ -552,7 +552,7 @@ impl Driver<'_> {
     ) -> Result<(), String> {
         let workspace = &self.env.workspace;
         let cwd = session.cwd.as_deref().map(|c| resolve(workspace, c));
-        let model = Some(piarc_protocol::session::ModelRef {
+        let model = (!session.settings_model).then(|| piarc_protocol::session::ModelRef {
             provider: pi_provider(&session.provider),
             id: self
                 .spec

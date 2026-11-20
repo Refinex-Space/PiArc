@@ -112,6 +112,15 @@ pub struct SessionCreateParams {
     /// Model to start with; the Agent Host's configured default when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<ModelRef>,
+    /// The settings' default model when `model` is absent (T31, Claude Code's `model` key):
+    /// `<provider>/<model id>`, or a model id the Agent Host looks up among the configured
+    /// models; an alias was already resolved by Core.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_model: Option<String>,
+    /// The settings' default effort (T31, `effortLevel`), applied when the model supports it
+    /// and the user set no default for that model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_effort: Option<crate::models::EffortLevel>,
 }
 
 impl SessionCreateParams {
@@ -122,6 +131,8 @@ impl SessionCreateParams {
             cwd: cwd.into(),
             session_id: None,
             model: None,
+            default_model: None,
+            default_effort: None,
         }
     }
 

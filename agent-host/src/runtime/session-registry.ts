@@ -66,7 +66,15 @@ import { modeRecord } from './permission-mode.js';
 import { contentText } from './items.js';
 import { Projector } from './projector.js';
 import { sessionParts } from './session-parts.js';
-import { listModels, previewSwitch, selectEffort, selectModel } from './session-models.js';
+import {
+  applyDefaultEffort,
+  defaultModel,
+  listModels,
+  previewSwitch,
+  selectEffort,
+  selectModel,
+  type SessionDefaults,
+} from './session-models.js';
 import { InputQueue } from './queue.js';
 import {
   checkImageInput,
@@ -186,14 +194,28 @@ export class SessionRegistry {
     return selectEffort(this.workspace, hosted.runtime.session, requested);
   }
 
-  /** Creates a session in `cwd`, under `sessionId` when Core chose one. */
+  /**
+   * Creates a session in `cwd`, under `sessionId` when Core chose one; without `model`, the
+   * settings' default model when it names a configured one, and the default effort (T31).
+   */
   async create(
     cwd: string,
     model: ModelRef | undefined,
     sessionId: string | undefined,
+    defaults: SessionDefaults = {},
   ): Promise<SessionOpened> {
+    const chosen = model ?? (await defaultModel(this.workspace, defaults.model, this.#options.log));
+    const open = async (manager: SessionManager) => {
+      const opened = await this.#open(cwd, manager, chosen);
+      applyDefaultEffort(
+        this.workspace,
+        this.#get(opened.sessionId).runtime.session,
+        defaults.effort,
+      );
+      return opened;
+    };
     if (sessionId === undefined) {
-      return this.#open(cwd, SessionManager.create(cwd), model);
+      return open(SessionManager.create(cwd));
     }
     checkSessionId(sessionId);
     if (this.#sessions.has(sessionId)) {
@@ -201,7 +223,7 @@ export class SessionRegistry {
       return this.#opened(sessionId);
     }
     return this.#once(sessionId, () =>
-      this.#open(cwd, SessionManager.create(cwd, undefined, { id: sessionId }), model),
+      open(SessionManager.create(cwd, undefined, { id: sessionId })),
     );
   }
 

@@ -1,6 +1,7 @@
 // The model and effort of a session (T21): the catalog, the switch preview and the selection.
 // The registry checks that the session is idle; these work on Pi's session and the workspace's
 // ModelRuntime.
+import type { Api, Model } from '@earendil-works/pi-ai';
 import { getBuiltinProviders } from '@earendil-works/pi-ai/providers/all';
 import type { AgentSession } from '@earendil-works/pi-coding-agent';
 import type { ModelRef, ModelsListResult, SessionModelSelection } from '@piarc/protocol';
@@ -83,4 +84,48 @@ export function selectEffort(
   const effort = supportedEffort(target(workspace, ref), requested);
   session.setThinkingLevel(effort);
   return { model: ref, effort };
+}
+
+/** The settings' defaults of a new session (T31, I113). */
+export interface SessionDefaults {
+  /** `<provider>/<model id>` or a model id; Core resolved an alias. */
+  readonly model?: string | undefined;
+  readonly effort?: string | undefined;
+}
+
+/** The configured model the settings' default names, if any. */
+export async function defaultModel(
+  workspace: Workspace,
+  name: string | undefined,
+  log: (line: string) => void,
+): Promise<ModelRef | undefined> {
+  if (name === undefined) return undefined;
+  const available = await workspace.modelRuntime.getAvailable();
+  const slash = name.indexOf('/');
+  const found =
+    slash > 0
+      ? available.find((m) => m.provider === name.slice(0, slash) && m.id === name.slice(slash + 1))
+      : available.filter((m) => m.id === name).length === 1
+        ? available.find((m) => m.id === name)
+        : undefined;
+  if (found === undefined) {
+    log(`the default model ${name} is not a configured model; using the default`);
+    return undefined;
+  }
+  return { provider: found.provider, id: found.id };
+}
+
+/** The settings' default effort, when the model supports it and has no default of its own. */
+export function applyDefaultEffort(
+  workspace: Workspace,
+  session: AgentSession,
+  effort: string | undefined,
+): void {
+  // Pi types the session's model loosely (`Model<any>`).
+  const model = session.model as Model<Api> | undefined;
+  if (effort === undefined || model === undefined) return;
+  const supported = supportedEfforts(model);
+  if (workspace.preferences.defaultEffort(model, supported) !== undefined) return;
+  const level = supported.find((level) => level === effort);
+  if (level !== undefined) session.setThinkingLevel(level);
 }

@@ -78,6 +78,30 @@ impl ToolIo {
         to_value(&context_settings(&settings))
     }
 
+    /// The settings' default model and effort of a new session in `root` (T31, I113): `model`
+    /// with an alias resolved through the merged `modelAliases`, and `effortLevel`.
+    pub(crate) async fn session_defaults(
+        &self,
+        root: &Path,
+    ) -> (Option<String>, Option<piarc_protocol::models::EffortLevel>) {
+        let Some(services) = &self.policy else {
+            return (None, None);
+        };
+        let Ok(settings) = services.trust.permission_settings(root).await else {
+            return (None, None);
+        };
+        let model = settings
+            .get("/model")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|m| !m.is_empty() && *m != "default" && *m != "inherit")
+            .and_then(|m| super::subagents::resolve_model_setting(m, &settings));
+        let effort = settings
+            .get("/effortLevel")
+            .and_then(|v| serde_json::from_value(v.clone()).ok());
+        (model, effort)
+    }
+
     /// `fs/changes`.
     pub(super) async fn external_changes(
         &self,

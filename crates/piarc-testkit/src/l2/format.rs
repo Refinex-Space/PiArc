@@ -228,6 +228,9 @@ pub struct SessionSpec {
     /// Working directory relative to the workspace.
     #[serde(default)]
     pub cwd: Option<String>,
+    /// Create the session without a model: the settings' defaults apply (T31).
+    #[serde(default)]
+    pub settings_model: bool,
 }
 
 /// A file the client attaches, read from the scenario fixtures and stored through Core.
@@ -757,6 +760,7 @@ impl ScenarioSpec {
                 mode: None,
                 deferred: false,
                 cwd: None,
+                settings_model: false,
             },
         )])
     }

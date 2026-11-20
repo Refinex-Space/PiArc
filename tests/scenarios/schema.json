@@ -267,6 +267,10 @@
         "cwd": {
           "description": "Working directory relative to the workspace; the workspace when absent.",
           "$ref": "#/$defs/relativePath"
+        },
+        "settings_model": {
+          "description": "Create the session without a model: the settings' default model and effort apply (T31); provider still names the endpoint the scenario expects.",
+          "type": "boolean"
         }
       }
     },

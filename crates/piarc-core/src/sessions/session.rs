@@ -228,8 +228,13 @@ impl SessionHandle {
             .await
             .map_err(|e| Error::feature(&e))?;
         let supervisor = self.ws.acquire().await?;
+        let (default_model, default_effort) = self.io.session_defaults(&self.workspace).await;
         let mut params = SessionCreateParams::new(path_text(&self.cwd)).with_model(model);
         params.session_id = Some(SessionId(self.id.clone()));
+        if params.model.is_none() {
+            params.default_model = default_model;
+        }
+        params.default_effort = default_effort;
         let opened = match supervisor.create_session(params).await {
             Ok(opened) => opened,
             // The create may have happened: converge on the id Core chose (R1-A3).

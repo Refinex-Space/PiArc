@@ -7830,6 +7830,21 @@
           "description": "Absolute working directory of the session: tools resolve relative paths against it.",
           "type": "string"
         },
+        "defaultEffort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EffortLevel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The settings' default effort (T31, `effortLevel`), applied when the model supports it\nand the user set no default for that model."
+        },
+        "defaultModel": {
+          "description": "The settings' default model when `model` is absent (T31, Claude Code's `model` key):\n`<provider>/<model id>`, or a model id the Agent Host looks up among the configured\nmodels; an alias was already resolved by Core.",
+          "type": ["string", "null"]
+        },
         "model": {
           "anyOf": [
             {

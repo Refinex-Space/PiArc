@@ -1260,6 +1260,17 @@ export interface SessionCreateParams {
    */
   cwd: string;
   /**
+   * The settings' default effort (T31, `effortLevel`), applied when the model supports it
+   * and the user set no default for that model.
+   */
+  defaultEffort?: EffortLevel | null;
+  /**
+   * The settings' default model when `model` is absent (T31, Claude Code's `model` key):
+   * `<provider>/<model id>`, or a model id the Agent Host looks up among the configured
+   * models; an alias was already resolved by Core.
+   */
+  defaultModel?: string | null;
+  /**
    * Model to start with; the Agent Host's configured default when absent.
    */
   model?: ModelRef | null;

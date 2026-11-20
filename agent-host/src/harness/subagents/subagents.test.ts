@@ -75,8 +75,8 @@ describe('definitions', () => {
 
   it('lets a file replace a built-in type and marks denied ones', () => {
     const parsed = parseCoreAgents(core);
-    expect(parsed).toBeDefined();
-    const catalog = catalogOf(parsed ?? core);
+    if (parsed === undefined) throw new Error('a valid list');
+    const catalog = catalogOf(parsed);
     expect(catalog.agents.map((a) => [a.name, a.source, a.denied === true])).toEqual([
       ['Explore', 'projectClaude', false],
       ['reviewer', 'user', true],

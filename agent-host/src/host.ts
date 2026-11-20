@@ -286,10 +286,16 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     const fields = paramsObject('session/create', params);
     const cwd = stringField('session/create', fields, 'cwd');
     const sessionId = optionalString('session/create', fields, 'sessionId');
+    // The settings' defaults (T31, Claude Code's `model` and `effortLevel`).
+    const defaults = {
+      model: optionalString('session/create', fields, 'defaultModel'),
+      effort: optionalString('session/create', fields, 'defaultEffort'),
+    };
     return (await sessions('session/create')).create(
       cwd,
       modelField('session/create', fields),
       sessionId,
+      defaults,
     );
   });
   connection.handle('session/resume', async (params) => {
