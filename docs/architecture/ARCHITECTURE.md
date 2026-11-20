@@ -696,7 +696,7 @@ T27 落地（ADR-0043）：
 | 摘要 | `session_before_compact` 中先跑 PreCompact（block 即取消），再由 Harness Kit 发自写的分节摘要请求（`harness/prompts/compaction.ts`：任务目标、用户要求与约束、关键决策、已改文件、错误与修复、待办、当前进展、继续所需的上下文），`/compact` 的重点与 PreCompact 的 stdout 原样并入；请求走会话模型与 `agent.streamFunction`，不写缓存，按重试设置重试，失败时取消压缩并把错误报给压缩条目与 `/compact` 回合。摘要末尾附从工具调用算出的已读、已改文件 |
 | 收尾 | `session_compact` 中跑 PostCompact 与 SessionStart（`compact`），Core 经 `fs/forgetReads` 清掉读取范围（保留哈希），再把一条 `contextRestore` 提醒直接追加到会话：memory（system 之外的、按当前磁盘内容）、当前计划、任务清单、已调用 skill 正文（`piarc.skillInvoked`，T37 写入）、最近读写的文件（`fs/read` 的 `restore` 读，Core 只放行会话读写过且无需审批的文件） |
 | 上限 | `harness/reinjection.ts` 的 `RESTORE_LIMITS`：memory 每个 10K、合计 20K；计划 10K；任务清单 2K；skill 每个 5K、合计 25K；文件最多 5 个、每个 20K、合计 50K token，放不下的文件只给路径 |
-| 熔断 | `harness/compaction.ts` 的 `SessionCompaction`：自动压缩失败（非中断、非 hook 取消）或压缩并重注入后估算仍 ≥ T 计一次，连续 3 次（`AUTO_COMPACT_FAILURE_LIMIT`）停止自动压缩，该次压缩条目带 `autoCompactStopped`；有效的自动压缩清零，手动压缩成功复位；状态在 Agent Host 内存中 |
+| 熔断 | `harness/compaction.ts` 的 `SessionCompaction`：自动压缩失败（非中断、非 hook 取消）或压缩并重注入后估算仍 ≥ T 计一次，连续 3 次（`AUTO_COMPACT_FAILURE_LIMIT`）停止自动压缩，该次压缩条目带 `autoCompactStopped`；有效的自动压缩清零，手动压缩成功复位；状态在 Agent Host 内存中，会话重开（回退、切换分支、Tool Profile 变化、空闲回收或 Agent Host 重启后恢复）也复位，每次复位至多再试 3 次摘要请求（ADR-0043 否决持久化，R3 维持，I107） |
 
 #### 6.6.5 上下文用量
 
