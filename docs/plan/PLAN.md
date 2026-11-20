@@ -311,14 +311,14 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 T29（开工 2026-11-19，基线 verify 15/15 通过；W1 的 blocked 项 W1-A05 等待 Windows 实机 UNC，不由 CI 关闭）：
 
-- [ ] 1. WebFetch：Core 抓取（`piarc-web`：SSRF 纯函数、钉住 IP、同域重定向、上限）+ AHP `web/fetch` + 授权绑定 + 审计（A01、A03、A04）
-- [ ] 1b. WebFetch 工具（Agent Host）+ 域名规则接入、"总是允许"按域名（A02）
-- [ ] 2. 辅助模型调用通道 + "辅助模型"设置，用量计入会话（A05）
-- [ ] 3. OAuth 与设备码登录：`models/login/*`、`ui/loginInteraction`、回环回调、mock 授权服务器、设置页登录登出（A06、A07）
-- [ ] 4. 每模型设置：显示名、上下文窗口、图片输入、默认 effort（A08）
-- [ ] 4b. 低可靠性模型的保守 Tool Profile 与改回默认（A10）
-- [ ] 5. transcript 三档视图（A09）
-- [ ] 6. L2 场景 `webfetch-*`、能力 ID、capabilities.md
+- [x] 1. WebFetch：Core 抓取（`piarc-web`：SSRF 纯函数、钉住 IP、同域重定向、上限）+ AHP `web/fetch` + 授权绑定 + 审计（A01、A03、A04）
+- [x] 1b. WebFetch 工具（Agent Host）+ 域名规则接入、"总是允许"按域名（A02）
+- [x] 2. 辅助模型调用通道 + "辅助模型"设置，用量计入会话（A05）
+- [ ] 3. OAuth 与设备码登录：`models/login/*`、`ui/loginInteraction`、回环回调、mock 授权服务器、设置页登录登出（A06、A07）——实现、Rust 集成测试与 L2 已完成，剩 Playwright 流程
+- [x] 4. 每模型设置：显示名、上下文窗口、图片输入、默认 effort（A08）
+- [x] 4b. 低可靠性模型的保守 Tool Profile 与改回默认（A10）
+- [ ] 5. transcript 三档视图（A09）——实现与单测已完成，剩 Playwright 与截图
+- [x] 6. L2 场景 `webfetch-*`、能力 ID、capabilities.md
 - [ ] 7. 文档、AGENTS.md、复用表、收尾 verify（A11）
 
 ## 登记事项
