@@ -55,6 +55,13 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 会话侧 `Op::Checkpoint(CheckpointOp)`（`sessions/session/rewind.rs`）：回退与分支切换要求会话空闲（否则 `SessionBusy`）；先恢复代码再移动对话（AHP `session/rewind`、`session/switchBranch`，`session_call_within` 等待至多 10 分钟，摘要要调用模型），之后清空会话的文件状态表并在会话路由发 `session/branchChanged`。`fork_session` 的 `ForkPoint::BeforeTurn` 是"从这里分支"；删除会话时一并删除它的检查点记录。
 - 单测：`cargo test -p piarc-core --lib tool_io::checkpoints`（A01、A05、A06、A09、A10）与 `--lib tool_io::policy::tests::t28`（设置开关）。
 
+## WebFetch、登录与模型偏好（T29，ADR-0045）
+
+- `tool_io/web.rs` 应答 `web/fetch`：`policy::claim_fetch` 消费同一调用、同一 URL 的 grant（一次批准一次抓取），`piarc_web::Fetcher` 在第一次使用时建（系统信任库），抓取登记在会话的 `running`（键 `web:<调用 id>`），回合中断与连接断开都停止它；每次写 `kind: "webFetch"` 审计。限值与允许列表在 `CoreConfig.web`（`WebConfig`），`createForTests` 读 `PIARC_TEST_WEB_ALLOWLIST`，L2 为有 `web` 段的场景放行 `127.0.0.1`、`localhost`。`assess.rs`、`policy/hooks.rs` 取 WebFetch 主机一律用 `piarc_web::rule_host`。
+- 登录（`sessions/login.rs`）：`Hub::login` 持 `provider_writer` 锁，为本次登录启动设置 Host（入站处理者 `SettingsInbound`：保险箱 + `ui/loginInteraction`），`call_within` 等 `models/login/start` 至多 15 分钟；`Logins` 一次只允许一个登录，每一步发 `core/login`（`started`、`interaction`、`succeeded`/`failed`/`cancelled` 与 `message`），`answer_login(id, None)` 取消（Core 再发 `models/login/cancel`）。新的提问顶替旧提问，进度不顶替。设置 Host 的启动经 `settings_host_with`，同样应用 `tune_host`（测试注入 `--test-oauth-provider`）。
+- 模型偏好：`providers::Settings` 的 `models`、`auxiliary` 存在用户级 `modelProviders`（`Operation::Preferences` 校验后写入，`toolReliability` 不能由用户设）；`Settings::preferences()` 给 `local` 类服务商的模型加 `toolReliability: low`。`Ctx.model_preferences` 由握手（`HostConfig.model_preferences`）与 `reload_models`（`ModelsReloadParams.preferences`）下发；服务商增删也会刷新它。设置视图另带 `loginProviders` 与 `catalogModels`（设置 Host 不带偏好，是目录原值）。
+- NAPI：`setModelPreferences`、`startLogin`、`answerLogin`、`logoutProvider`。`cargo test -p piarc-core --lib tool_io::policy::tests::t29` 覆盖授权绑定、审计、内网拒绝与域名规则；登录的端到端在 `piarc-testkit` 的 `tests/sessions/login.rs`。
+
 ## Hooks（T25，ADR-0039）
 
 - `hooks/mod.rs` 的 `HooksService` 用 `TrustService::permission_settings` 读 hooks（未信任项目的不生效），`plan`/`execute` 经 `ProcessTreeSpawner` 运行（命令环境首次要解析登录 shell，只在 `plan` 选出 handler 后解析：`ToolIo::run_hooks`、裁决第 2、8 步，`execute` 显式接收它；否则没有 hooks 的输入也要等登录 shell）、写审计（`kind: "hook"`）、发 `core/notices`（`type: "hook"`）、长文本落到 `<会话 tmp>/hooks/`，时长取 `CoreConfig.hooks`。`tool_io/hooks.rs` 应答 `hooks/run`（入站处理者只查 `cwd` 在本工作区内，已关闭会话的 SessionEnd 也能运行）、`user_prompt_submit`（阻断为 `permissionDenied`、`hookBlocked`）与 `notification_hooks`；hook 令牌登记在会话的 `running`，中断与关闭结束其进程树。

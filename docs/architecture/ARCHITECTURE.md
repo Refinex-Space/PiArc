@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.35（2026-11-19） |
+| 版本 | 2.36（2026-11-19） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -258,6 +258,7 @@ PiArc/
 | [0041](../adr/0041-windows-ahp-round-trip-budget.md) | 小文件 fs 操作的 AHP 往返按平台给预算：macOS p95 ≤ 5 ms，Windows p95 ≤ 15 ms | ADR-0036 的每次访问都从卷根逐级绑定目录，W1 实测 Windows p95 5.0–9.3 ms |
 | [0043](../adr/0043-reminders-compaction-usage.md) | 运行时提示统一走 system reminder 通道；压缩用 PiArc 自写的分节摘要、按阈值公式配置 Pi 触发、连续 3 次失败或无效即熔断、压缩后按上限重注入；上下文用量按类别估算并以服务商报告为准 | 动态信息不改写 system prompt，长会话压缩及时且不丢关键状态，用户看得到上下文被什么占用 |
 | [0044](../adr/0044-checkpoints-rewind-changes.md) | 检查点按会话加回合 id 建索引，写前快照存内容寻址对象库；代码恢复按时间计算、冲突逐个选择、逐文件结果可撤销；对话回退在 Agent Host 移动 leaf 并以追加条目持久化，分支变化后同一 id 重建会话；Changes 面板基于最早快照并在路径锁内核对版本后丢弃 | 回退结果与对话分支经过的路径无关；回退位置跨重启保留；不在过期的 diff 上改文件 |
+| [0045](../adr/0045-webfetch-sign-in-model-settings.md) | WebFetch 由 Core 抓取（`piarc-web`：rustls + 系统信任库、SSRF 纯函数、连接钉住已检查的地址、同站重定向）并绑定已获准的调用；辅助模型通道在 Agent Host；登录在设置 Host 上运行、交互经 `core/login`；每模型设置与辅助模型存用户级设置并随握手下发；本地端点的模型为低可靠性、用保守 Tool Profile | 网络访问与文件、命令一样由 Core 授权审计；规则主机与连接主机不会不一致；凭据只在保险箱 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -343,6 +344,7 @@ agent-host/
 - 凭据只经 AHP 传递，不放进环境变量（Agent Host 启动的子进程会继承环境变量）。
 - OAuth 与设备码登录调用 `ModelRuntime.login(provider, type, interaction)`，`interaction` 的回调（授权 URL、设备码、输入提示）转成 AHP 请求，由客户端呈现：授权页在系统浏览器中打开，回调经本地回环端口或 `piarc://` 深链接返回，不在应用窗口内加载第三方登录页。
 - **Anthropic 的订阅 OAuth 登录方式在 Agent Host 中被屏蔽**（ADR-0006）；CI 中有测试断言可用登录方式列表不包含它。
+- T29 落地（ADR-0045）：登录在 Core 为该操作启动的设置 Host 上运行（`models/login/start` 结束时才应答，上限 15 分钟；`models/login/cancel`、`models/logout`）。`AuthInteraction` 的授权 URL、设备码、进度、说明与提问经 `ui/loginInteraction` 交给 Core，Core 一次只运行一个登录，把每一步发到事件路由 `core/login`，客户端答复经 `answerLogin(loginId, value)`（空值即取消）；新的提问顶替屏幕上的提问，进度与说明不顶替。授权页经主进程外链确认交给系统浏览器，回调由服务商流程在 Agent Host 内的回环端口接收；本任务不注册 `piarc://`（T35）。Pi 的 OAuth 流程经 `registerLazyOAuthFlows` 打进 bundle。可登录服务商在 `models/list` 的 `loginProviders` 中列出（不含 Anthropic）。凭据经适配层只进保险箱：`tests/sessions/login.rs` 用 `piarc-testkit` 的 mock 授权服务器跑授权码、设备码、拒绝、过期与取消，并扫描数据目录确认无明文。
 
 ### 5.5 Pi 配置隔离
 
@@ -358,7 +360,7 @@ T21（ADR-0032）把非密钥配置保存在用户级设置中，由 Core 生成
 
 运行时决策见 ADR-0015：Agent Host 用单独内置的 Node LTS，由 Core 直接启动，不经过 Electron。
 
-- 构建：esbuild 把 Agent Host 打成单个 bundle（目标与 Pi 一致：node22.19+），外部依赖只保留 Pi 要求的原生/wasm 资源（photon、quickjs wasm 等）。T06 的 `npm run build:agent-host` 输出 `agent-host/dist/bundle/agent-host.mjs` 与 `pi-assets/package.json`（Pi 从中读版本与配置目录名，经 `PI_PACKAGE_DIR` 指定）；外部依赖为 `@silvia-odwyer/photon-node`（wasm）与四个可选原生加速包，清单见 `agent-host/CLAUDE.md`。Bedrock 的懒加载适配已随 T21 打入，codemode worker、图片缩放 worker 与 OAuth 的懒加载模块尚未打包，接入对应功能时补上。
+- 构建：esbuild 把 Agent Host 打成单个 bundle（目标与 Pi 一致：node22.19+），外部依赖只保留 Pi 要求的原生/wasm 资源（photon、quickjs wasm 等）。T06 的 `npm run build:agent-host` 输出 `agent-host/dist/bundle/agent-host.mjs` 与 `pi-assets/package.json`（Pi 从中读版本与配置目录名，经 `PI_PACKAGE_DIR` 指定）；外部依赖为 `@silvia-odwyer/photon-node`（wasm）与四个可选原生加速包，清单见 `agent-host/CLAUDE.md`。Bedrock 的懒加载适配已随 T21 打入，OAuth 流程模块随 T29 经 `registerLazyOAuthFlows` 打入；codemode worker 与图片缩放 worker 尚未打包，接入对应功能时补上。
 - 应用内布局（macOS；Windows 在安装目录的 `resources\` 下是同样的结构）：
 
 ```
@@ -492,7 +494,7 @@ T07 实测（S4，ADR-0020）：Pi 1.5.2 的 Operations 覆盖 bash、find（给
 | Bash | 见 6.11；Windows 上经 Git Bash 执行 | 是（只读命令白名单除外） | M1 |
 | PowerShell | 仅 Windows；见 6.2.2 | 是 | M1（Windows） |
 | Glob / Grep | Core 实现 | 否 | M1 |
-| WebFetch | 本地抓取 → Markdown → 辅助模型按提示提取；域名规则 | 是 | M2 |
+| WebFetch | 本地抓取 → Markdown → 辅助模型按提示提取；域名规则（T29 落地见下） | 是 | M2 |
 | WebSearch | 可配置后端（服务商原生搜索工具优先，其次第三方搜索 API） | 是 | M3 |
 | TodoWrite | 任务清单（6.5） | 否 | M2 |
 | AskUserQuestion | 结构化多选/输入，UI 表单 | 否 | M2 |
@@ -503,6 +505,8 @@ T07 实测（S4，ADR-0020）：Pi 1.5.2 的 Operations 覆盖 bash、find（给
 | ToolSearch | 延迟加载工具检索（复用 Pi `tool_search`） | 否 | M3 |
 | KillShell / Monitor | 后台任务（6.11） | 否 / 是 | M3 |
 | NotebookEdit | Jupyter cell 编辑 | 是 | M4 |
+
+T29 落地（ADR-0045）：WebFetch 的网络请求由 Core 发起（AHP `web/fetch`，能力 `webFetch`，功能 crate `piarc-web`）。请求必须指向一个已获准的 WebFetch 调用且 URL 与其参数相同，一次批准抓取一次；解析主机后对每个地址做 SSRF 检查（回环、私有、链路本地、组播、未指定、广播、保留网段及其 IPv6、IPv4 映射、NAT64、6to4 形式），只连接已检查的地址（防 DNS 重绑定），每次同站重定向重新检查；允许列表只来自 `CoreConfig.web`。同站重定向跟随（至多 10 次），跨站重定向把目标地址交给模型。上限在 `piarc_web::FetchLimits`：响应体 10 MiB、正文 100,000 字符、总时长 60 s。HTML 经 htmd 转 Markdown，文本类型按字符集解码，二进制拒绝，不支持压缩编码与 HTTP 代理（I112）。每次抓取写 `webFetch` 审计。Agent Host 的工具（`harness/web-fetch.ts`）再经辅助模型通道（`harness/auxiliary.ts`）按调用的 `prompt` 提取，提取提示自写，跨站重定向时不调用模型。
 
 ### 6.2 权限系统
 
@@ -529,6 +533,7 @@ T07 实测（S4，ADR-0020）：Pi 1.5.2 的 Operations 覆盖 bash、find（给
 - 内置只读命令白名单（如 `ls`、`cat`、`git status`、`git diff`、`rg`）在 Manual 模式下免审批；白名单维护在 Core，带测试。
 - **Windows 上的命令**：`Bash` 工具在 Windows 上通过 Git Bash 执行（Pi 的默认行为），分析方式同上；另提供 `PowerShell` 工具，规则写作 `PowerShell(命令模式)`（与 Claude Code 一致）。第一版不对 PowerShell 做语法级拆分，也不设只读白名单：除非整条命令被规则精确允许，否则在 Manual 模式下一律询问。PowerShell 的语法级分析在 M4 评估。T17 落地（ADR-0028）：Git Bash 依次查用户设置 `shell.gitBashPath`、`%ProgramFiles%\Git`、`%ProgramFiles(x86)%\Git`、`%LOCALAPPDATA%\Programs\Git`、`PATH` 上 `git.exe` 所在的安装，不用 `PATH` 上其他的 `bash.exe`（`System32\bash.exe` 是 WSL）；找不到时会话不注册 `Bash`、只有 `PowerShell`，Core 在 `core/notices` 发一次 `gitBashMissing` 提示安装 Git for Windows。`PowerShell` 优先 PowerShell 7（`pwsh`），没有时用 Windows PowerShell 5.1。
 - 关键路径删除（`rm -rf` 指向工作区根、家目录、`/` 等）与 `requiresUserInteraction` 类工具在任何模式下都询问。
+- `WebFetch(domain:…)`（T29）：规则匹配、hooks matcher 与实际抓取都用 `piarc_web::rule_host` 解析同一个 URL（小写主机，IPv6 带方括号）；"总是允许"按该主机生成规则，URL 解析不出主机时不提供规则。
 
 #### 6.2.3 裁决流程
 
@@ -784,6 +789,8 @@ T27 落地（ADR-0043）：`agent-host/src/harness/context-usage.ts` 在每次�
 - **切换代价提示**：会话中途切换模型会导致 prompt cache 失效、部分服务商的 thinking 块被丢弃；切换前显示预计影响（上下文 token 数、估算的缓存写入成本）。PreModelSwitch hook 可介入（M5）。
 - **消息保真**：会话历史保留各服务商返回的原始 thinking 块与签名（由 Pi 负责），不按模型维护多份历史。
 
+T29 落地（ADR-0045）：每模型设置（显示名、上下文窗口、图片输入、默认 effort、Tool Profile）与辅助模型存在用户级 `settings.json` 的 `modelProviders.models`、`modelProviders.auxiliary`，经 `setModelPreferences` 修改，Core 组装为 `ModelPreferences` 随 `core/welcome` 与 `models/reload` 交给 Agent Host（`providers/preferences.ts`）。生效点：`models/list`（名称、窗口、`vision`、`defaultEffort`、`toolProfile`）、压缩阈值与用量环（窗口）、输入检查与请求策略（图片）、`session/setModel` 未指定档位时（默认 effort）。工具调用可靠性新增 `low`：无密钥本地端点的模型由 Core 标为 `low`；`low` 的模型默认用保守 Tool Profile（Read、Write、Edit、Bash、PowerShell、Glob、Grep、TodoWrite，逐步写明参数的描述，规范名不变，任务清单提醒 3 轮起且无清单也提醒），用户可改回默认。Profile 在会话打开时按其模型决定，模型或偏好改变 Profile 时会话空闲后在同一 id 下重开；已冻结的 system prompt 不改写。辅助模型通道 `AuxiliaryModel.complete` 做一次无工具调用，未设置辅助模型或其服务商无凭据时用会话模型，用量计入当前回合并写 `piarc.auxiliaryUsage`。
+
 T21 的 `models/list` 返回可用模型的 `provider`、`id`、`name`、`contextWindow`、`maxOutput`、`vision`、`efforts`、`promptCache`、`toolReliability`。Agent Host 以锁定版本的 Pi 模型记录为基础，由 `providers/catalog.ts` 按完整提供商 ID 与模型 ID 应用覆盖。例如 `qwen-token-plan-cn/qwen3.6-plus` 根据百炼公布的额度规则标记支持缓存，Token Plan 缺少美元单价时显示费用未知。支持档位取 Pi 的有效集合并去掉 minimal。切换前核对实际历史里的 thinking 块，缓存写入单价按目标模型的价格分档选取。自定义端点可以分别选择 Anthropic Messages、OpenAI Chat Completions、OpenAI Responses 并填写多个模型 ID。
 
 ### 6.14 Claude Code 配置兼容矩阵
@@ -808,7 +815,7 @@ T21 的 `models/list` 返回可用模型的 `provider`、`id`、`name`、`contex
 T24 落地（ADR-0038）：
 
 - 读取的文件与层级：`~/.claude/settings.json`（`claudeUser`）、`.claude/settings.json`（`claudeProject`）、`.claude/settings.local.json`（`claudeProjectLocal`）按 ADR-0005 第 3 条与 PiArc 的三个文件同表合并；`~/.claude.json` 不是设置层，配置诊断只列出它的键名。家目录由 Core 注入（`CoreConfig.home`），测试一律用临时目录。
-- 键映射表是唯一判断（`piarc_config::claude::SETTINGS_KEYS`，按官方 settings 索引逐键归类）。M2 实际生效的键：`permissions.allow`、`permissions.ask`、`permissions.deny`、`permissions.defaultMode`、`permissions.additionalDirectories`，T25 起加上 `hooks`、`disableAllHooks`（ADR-0039），T27 起加上 `autoCompactEnabled`、`autoCompactWindow`（ADR-0043），T28 起加上 `fileCheckpointingEnabled`（ADR-0044）。由后续任务支持的键：`plansDirectory`（原定 T26；T26 按任务要求把计划存为会话 entry，未支持计划文件目录，I104 交 R3 决定）；`model`、`effortLevel`（T29）；`agent`、`advisorModel`（T31）；`worktree`（T35）；`enableAllProjectMcpServers`、`enabledMcpjsonServers`、`disabledMcpjsonServers`、`allowedMcpServers`、`deniedMcpServers` 与 `~/.claude.json` 的 MCP 段（T36）；`outputStyle`、`disableBundledSkills`、`skillOverrides`、`disableSkillShellExecution`（T37）；`allowedHttpHookUrls`、`httpHookAllowedEnvVars`（T38）；`sandbox`（T39）；`enabledPlugins`、`extraKnownMarketplaces`（T40）；`autoMode`、`disableAutoMode`、`useAutoModeDuringPlan`（T46）；`autoMemoryEnabled`、`autoMemoryDirectory`（T47）。其余键（含 `env`、`theme`、`language` 等终端偏好、账号与遥测、只在托管设置中有效的键）标为"已忽略"，表外的键为"未知"，都在诊断中逐个列出。
+- 键映射表是唯一判断（`piarc_config::claude::SETTINGS_KEYS`，按官方 settings 索引逐键归类）。M2 实际生效的键：`permissions.allow`、`permissions.ask`、`permissions.deny`、`permissions.defaultMode`、`permissions.additionalDirectories`，T25 起加上 `hooks`、`disableAllHooks`（ADR-0039），T27 起加上 `autoCompactEnabled`、`autoCompactWindow`（ADR-0043），T28 起加上 `fileCheckpointingEnabled`（ADR-0044）。由后续任务支持的键：`plansDirectory`（原定 T26；T26 按任务要求把计划存为会话 entry，未支持计划文件目录，I104 交 R3 决定）；`model`、`effortLevel`（原定 T29；`model` 的取值是 Claude Code 的模型别名，随 T31 的别名表一起支持，I113）；`agent`、`advisorModel`（T31）；`worktree`（T35）；`enableAllProjectMcpServers`、`enabledMcpjsonServers`、`disabledMcpjsonServers`、`allowedMcpServers`、`deniedMcpServers` 与 `~/.claude.json` 的 MCP 段（T36）；`outputStyle`、`disableBundledSkills`、`skillOverrides`、`disableSkillShellExecution`（T37）；`allowedHttpHookUrls`、`httpHookAllowedEnvVars`（T38）；`sandbox`（T39）；`enabledPlugins`、`extraKnownMarketplaces`（T40）；`autoMode`、`disableAutoMode`、`useAutoModeDuringPlan`（T46）；`autoMemoryEnabled`、`autoMemoryDirectory`（T47）。其余键（含 `env`、`theme`、`language` 等终端偏好、账号与遥测、只在托管设置中有效的键）标为"已忽略"，表外的键为"未知"，都在诊断中逐个列出。
 - 信任约束与 PiArc 项目层相同：信任前项目层的 allow、`additionalDirectories`、`acceptEdits` 不生效，deny 与 ask 照常生效；项目层的 `bypassPermissions`、`auto` 始终不生效，诊断注明原因。生效键类型错误时整份文件跳过并给出 JSON Pointer，JSON 语法错误给出行列，其他文件照常加载。
 - `.claude/` 文件与 PiArc 设置一起被监听，变化后重新加载并发 `core/settings`；新增的可执行项沿用第 10.2 节的快照确认。PiArc 的写接口拒绝 `.claude/` 下与 `.claude.json` 的任何路径（`permissionDenied`），L2 运行器在每个场景前后比对 Claude Code 配置的快照。
 - 配置诊断的 Core API 为 `config_diagnostics`（NAPI `configDiagnostics`），与权限裁决用同一次加载；设置窗口"配置诊断"页按文件列出并可展开每个键的本文件取值、最终取值与来源。T41 在此基础上补全插件与企业来源。
@@ -860,6 +867,7 @@ crates/
 ├── piarc-git          # 状态、diff、worktree、分支
 ├── piarc-secrets      # 凭据保险箱：加密文件 + 系统凭据库中的主密钥（keyring-core：登录钥匙串 / 凭据管理器；格式与状态见 ADR-0021）
 ├── piarc-telemetry    # tracing、日志轮转、本地指标、诊断包导出
+├── piarc-web          # WebFetch 的网络侧：SSRF 检查、钉住地址的抓取（hyper + rustls）、同站重定向、HTML 转 Markdown（T29，ADR-0045）
 ├── piarc-napi         # NAPI-RS 导出层（薄），产出各平台 .node 原生模块（ADR-0014）
 ├── piarc-testkit      # 严格校验的 mock provider、场景运行器、事件断言（仅测试）
 └── piarc-devcli       # 开发用无头驱动：不经 UI 运行 Core + Agent Host（不随应用发布）
@@ -867,7 +875,7 @@ crates/
 
 依赖规则：
 
-- 有向无环：`piarc-napi → piarc-core → {host, policy, hooks, config, fs, checkpoint, exec, term, sandbox, store, diff, git, secrets, telemetry} → {piarc-protocol, piarc-ports}`。功能 crate 之间需要协作时经 `piarc-core` 编排，不互相依赖。明确的单向例外逐条登记在 `crates/deps-rules.json` 并附理由，例如 `fs → checkpoint`、`term → ghostty-sys`。链外的 crate 按层放置：`piarc-napi` 除 `piarc-core` 外还可直接使用 `piarc-protocol`、`piarc-ports` 的类型；`piarc-testkit`（仅测试）可依赖 `piarc-core` 与这两个基础 crate，`piarc-devcli` 另可依赖 `piarc-testkit`，发布的 crate 不得依赖二者；`piarc-ghostty-sys` 不依赖任何 workspace crate，只有 `piarc-term` 可以依赖它。规则由 `scripts/ci/check-crate-deps.mjs` 在 `npm run verify` 中检查，对 normal、build、dev 三类依赖一视同仁。
+- 有向无环：`piarc-napi → piarc-core → {host, policy, hooks, config, fs, checkpoint, exec, term, sandbox, store, diff, git, secrets, telemetry, web} → {piarc-protocol, piarc-ports}`。功能 crate 之间需要协作时经 `piarc-core` 编排，不互相依赖。明确的单向例外逐条登记在 `crates/deps-rules.json` 并附理由，例如 `fs → checkpoint`、`term → ghostty-sys`。链外的 crate 按层放置：`piarc-napi` 除 `piarc-core` 外还可直接使用 `piarc-protocol`、`piarc-ports` 的类型；`piarc-testkit`（仅测试）可依赖 `piarc-core` 与这两个基础 crate，`piarc-devcli` 另可依赖 `piarc-testkit`，发布的 crate 不得依赖二者；`piarc-ghostty-sys` 不依赖任何 workspace crate，只有 `piarc-term` 可以依赖它。规则由 `scripts/ci/check-crate-deps.mjs` 在 `npm run verify` 中检查，对 normal、build、dev 三类依赖一视同仁。
 - 进程启动统一经 `ProcessSpawner`：`piarc-exec` 提供实现（进程组 / Job Object），`piarc-core` 把它注入 `piarc-host`（启动 Agent Host）、`piarc-hooks`（hooks 命令）与沙箱包装后的命令执行，避免各处各写一套进程树管理。
 - 平台相关代码收敛在 trait 后面，按 `cfg(target_os)` 提供实现；新增平台假设必须经 CI 的 Windows 构建检查。
 - I/O 边界用窄 trait 隔离（`ProcessSpawner`、`FileSystem`、`Clock`、`SecretStore`、`AgentHostTransport`），测试用内存实现驱动。
@@ -946,6 +954,8 @@ T21 增加 `session/previewModelSwitch`、`session/setModel`、`session/setEffor
 T19（ADR-0030）为 `session/prompt`、`session/steer`、`session/followUp` 添加可选的提及区间与附件引用，`session/queueChanged` 和 `userMessage` 可带相同元数据。每次模型回复结束时 `turn/usage` 发本回合的累计用量，失败的 `turn/completed` 提供 `errorKind`、`retryable`。`session/compact` 在空闲会话中开始独立回合。
 
 **Core → Agent Host 通知**：`exec/output`（T07）、`secrets/changed`（T08）。
+
+T29 已实现（ADR-0045）：Agent Host → Core 的请求 `web/fetch`（能力 `webFetch`，`{ sessionId, origin, url }`，结果为最终 URL、状态、内容类型、`markdown`/`text` 格式的正文、字节数、截断标记与跨站重定向的 `redirect`）与 `ui/loginInteraction`（能力 `login`，`{ loginId, provider, interaction }`，交互为 `authUrl`、`deviceCode`、`progress`、`info`、`prompt`，提问的结果带 `value`）；Core → 设置 Host 的请求 `models/login/start`、`models/login/cancel`、`models/logout`。`core/welcome` 新增可选的 `modelPreferences`，`models/reload` 新增可选的 `preferences`，`models/list` 结果新增可选的 `loginProviders`，`CatalogModel` 新增可选的 `defaultEffort`、`toolProfile`，`ToolReliability` 新增 `low`。
 
 T28 已实现（ADR-0044，能力 `checkpoints`）：Core → Agent Host 的请求 `session/rewind`（`{ sessionId, turnId, mode: "branch" | "summarize" }`）、`session/switchBranch`（`{ sessionId, entryId }`），Agent Host → Core 的通知 `session/branches`（新消息落在已有分支处时的分支点）；`fs/write` 新增可选的 `turnId`，`session/fork` 新增可选的 `beforeTurn`，`session/history` 结果新增可选的 `branches`，压缩条目的原因新增 `rewind`（分支摘要）。
 
@@ -1093,10 +1103,10 @@ diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高�
 - **新建会话**：选择工作区与分支（可选独立 worktree）→ 先显示乐观的用户消息 → 创建会话 → 发送首条输入；首条消息失败时回滚并保留输入内容。
 - **composer**：基于 ProseMirror。多行输入；`@` 文件提及（Core 提供模糊匹配，提及以胶囊显示）；`/` 命令面板；图片与 PDF 拖放 / 粘贴；运行中 Enter 为 steer、Mod+Enter 为排队、Esc 停止；排队项可编辑、删除。胶囊的存储数据、显示形态和发送时拼接的文本三者分开。
 - **环境栏**：权限模式菜单（Mod+Shift+M，数字键快选）、模型菜单与 effort 子菜单、上下文用量环（75%、90% 两级提示）。
-- **transcript 行类型**：用户消息、回复正文（Markdown）、思考块（生成中强制展开，结束后折叠为"思考了 N 秒"）、工具组摘要（动词 + 对象 + 增删计数）、bash 卡（语义状态，超过 10 秒显示计时）、文件改动卡、审批卡、子 agent 卡、压缩提示、错误卡（分类 + 重试）、计划卡、任务卡、下一步建议。三档视图：普通（工具折叠为摘要）/ 思考（加思考摘要）/ 详细（全部展开）。
+- **transcript 行类型**：用户消息、回复正文（Markdown）、思考块（生成中强制展开，结束后折叠为"思考了 N 秒"）、工具组摘要（动词 + 对象 + 增删计数）、bash 卡（语义状态，超过 10 秒显示计时）、文件改动卡、审批卡、子 agent 卡、压缩提示、错误卡（分类 + 重试）、计划卡、任务卡、下一步建议。三档视图：普通（工具折叠为摘要）/ 思考（加思考摘要）/ 详细（全部展开）。T29 落地：切换控件在会话标题栏（`transcript/DetailSwitch.tsx`），选择按会话记在渲染进程内存；普通档隐藏思考块，思考档为默认（保持 T19 起的显示），详细档展开工具组与思考块并显示 `reminder` 条目，展开状态与其他档分开保存。
 - **审批卡**：四类——命令、文件改动（带 diff 预览）、权限扩展（越界目录、网络域名）、提问表单。按钮：拒绝（可附反馈）、仅本次允许、本会话允许、总是允许（可编辑规则）。
 - **右栏卡片**：运行环境、上下文（百分比 + 分类明细 + 压缩按钮）、改动、任务、后台任务；空间不足时变为浮层。
-- **设置**（独立窗口）：通用、模型与服务商（每模型显示名、上下文窗口、图片输入、默认 effort；密钥加密存储）、权限（规则可视化管理、审计记录）、hooks、MCP、skills 与插件、memory 文件、沙箱、外观、快捷键、配置诊断、关于与更新。
+- **设置**（独立窗口）：通用、模型与服务商（每模型显示名、上下文窗口、图片输入、默认 effort；密钥加密存储；T29 起另有登录与登出、每模型的 Tool Profile 与辅助模型，见第 6.13 节）、权限（规则可视化管理、审计记录）、hooks、MCP、skills 与插件、memory 文件、沙箱、外观、快捷键、配置诊断、关于与更新。
 - **系统集成**：见第 8.8 节。
 - T18 落地（ADR-0029）：窗口为侧栏 | 主区（+ 右栏）在上、停靠面板区在下；右栏与面板区是注册式容器（`src/renderer/shell/registry.ts` 的 `registerPanel`），没有注册内容时不渲染，尺寸存于窗口的 localStorage。侧栏按工作区分组，组内置顶在前、其余按最近更新；徽标形状各不相同（出错为圆形加叹号、等待审批为方形加问号、运行中为旋转的环、未读为圆点），不只靠颜色区分。新建会话的顺序是：需要时先显示信任对话框，再立即显示乐观消息（`flushSync`），然后创建会话、发送首条输入；任一步失败，回到新建视图并把文字放回输入框；会话已创建但首条输入失败时关闭该会话（Pi 没有回复就不写文件，不留痕迹）。设置窗口是独立的 `BrowserWindow`（`#/settings`），页面经 `src/renderer/settings/registry.ts` 的 `registerSettingsPage` 注册，T18 注册通用、外观、快捷键三页。
 - T27（ADR-0043）：环境栏右端是上下文用量环（百分比 = 合计 / 有效窗口，75% 起提示、90% 起警告，颜色之外另有文字与 `data-level`），点击打开右栏的上下文卡片（每个会话都注册）：百分比、合计与窗口、来源（估算或服务商报告）、按类别的条形明细（"未分类"只在大于零时列出）、自动压缩阈值或停止原因，以及"立即压缩"（等价于不带重点的 `/compact`）。composer 中发送 `/compact <重点>` 时作为压缩重点送出，不作为消息；压缩提示行在熔断时写明原因与"仍可使用 /compact"。`reminder` 条目不进默认视图（T29 的详细视图显示）。
@@ -1271,7 +1281,7 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 
 | 威胁 | 场景 | 对策 |
 |---|---|---|
-| 提示注入导致破坏性操作 | 仓库文件、网页、MCP 返回内容诱导 agent 执行 `rm -rf`、泄露密钥 | 默认询问；deny 规则；Bash 子命令分析；关键路径删除总是询问；沙箱；审批卡展示完整命令 |
+| 提示注入导致破坏性操作 | 仓库文件、网页、MCP 返回内容诱导 agent 执行 `rm -rf`、泄露密钥 | 默认询问；deny 规则；Bash 子命令分析；关键路径删除总是询问；沙箱；审批卡展示完整命令；WebFetch 的网页只作为辅助模型提问里的材料，提取结果是工具结果，不进 system prompt，网页内容不影响权限裁决（T29） |
 | 恶意项目配置 | 克隆的仓库带 hooks、MCP、allow 规则、插件，打开即执行 | 项目信任闸门（10.2）：信任前不执行任何项目级可执行配置 |
 | 恶意插件 / MCP server / Pi 包 | 安装后获得进程权限 | 安装前展示来源与能力；启用需确认；Agent Host 的 Seatbelt 配置限制进程级写入范围 |
 | 凭据泄露 | 明文文件、环境变量继承、日志 | 加密保险箱，主密钥只在系统凭据库；不经环境变量传递；日志与诊断包自动脱敏 |
@@ -1626,6 +1636,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.36 | 2026-11-19 | T29（ADR-0045）补充第 4 章 ADR-0045、5.4 节登录的落地、6.1.4 节 WebFetch 的落地、6.2.2 节 `WebFetch(domain:…)` 的主机解析、6.13 节每模型设置、辅助模型通道与保守 Tool Profile、6.14 节 `model`、`effortLevel` 改随 T31（I113）、7.1 节 `piarc-web`、7.4 节 `webFetch` 与 `login` 能力的方法与成员、8.2 节三档视图与设置页、10.1 节提示注入对策；基线决策未变 |
 | 2.35 | 2026-11-19 | T28（ADR-0044）补充第 4 章 ADR-0044、6.9 节检查点、代码与对话回退、分支与"从这里分支"的落地、6.14 节生效键（加入 `fileCheckpointingEnabled`，并补上 T27 已生效的 `autoCompactEnabled`、`autoCompactWindow`）、7.4 节 `checkpoints` 能力的方法与成员、7.6 节检查点导出、7.7 节 Changes 面板的 diff 与降级（词级 diff 与 UTF-16 偏移仍未实现）、8.2 节回退对话框、Changes 面板、改动卡片与分支切换、9.2 节 schema v5 的三张表、9.3 节快照的清理时机；基线决策未变 |
 | 2.34 | 2026-11-19 | T27（ADR-0043）补充第 4 章 ADR-0043、6.6.3 节统一提醒通道与外部修改检测、6.6.4 节压缩的触发、摘要、收尾、上限与熔断、6.6.5 节用量的口径、6.15 节三行的实现位置（数值未调整）、7.4 节 `context` 能力的方法与成员、8.2 节用量环与上下文卡片 |
 | 2.33 | 2026-11-19 | T26（ADR-0042）补充第 6.1.4 节 SuggestNextSteps、6.2.3 节 ExitPlanMode 的裁决步、6.5 节计划模式、任务清单、提问与下一步的落地、6.6.3 节 `reminders` 模块、6.14 节 `plansDirectory` 未在 T26 支持（I104）、7.4 节 `ui/ask`、`harness/todo`、`harness/plan` 与新增成员、8.2 节计划卡、提问表单、任务卡片与下一步建议 |

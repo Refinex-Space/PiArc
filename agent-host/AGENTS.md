@@ -19,7 +19,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - `runtime/session-registry.ts` 管理会话与恢复。实时投影和历史回放共用 `items.ts`；投影规则见 `projector.ts` 文件头和 `test/golden/`。工具批次、中断补齐与结果预算在 `harness/`，50K/200K 阈值统一由 `TOOL_RESULT_LIMITS` 提供。
 - `CoreBridge` 默认等待 30 秒。审批请求只有收到匹配的 `policy/pending` 后才停表，中断或断连会取消等待。`OutboundQueue` 写出时分配 seq，每会话保留最近 4,096 条或 8 MiB 通知供回放；超 8 MiB 的单条通知不占 seq。
 - `tools/profile.ts` 负责规范名与模型可见名的映射，`tools/core-io.ts` 负责委托 I/O。文件工具的替身路径、shell 探测及结果格式见下文。项目资源必须等待 `harness/project-trust.ts` 的 Core 信任答复；凭据只经 `runtime/credentials.ts` 的 `CoreCredentialStore`。
-- `scripts/dev/build-agent-host.mjs` 只允许外置 `@silvia-odwyer/photon-node`（从包目录加载 WASM）及可选的 `bufferutil`、`utf-8-validate`、`kerberos`、`supports-color`。其余导入内联。codemode worker、图片缩放 worker 和 pi-ai 的 OAuth 懒加载模块尚未打包，Bedrock 经公开加载器纳入 bundle。
+- `scripts/dev/build-agent-host.mjs` 只允许外置 `@silvia-odwyer/photon-node`（从包目录加载 WASM）及可选的 `bufferutil`、`utf-8-validate`、`kerberos`、`supports-color`。其余导入内联。codemode worker 与图片缩放 worker 尚未打包；Bedrock 与 pi-ai 的 OAuth 流程（T29）经公开加载器（`registerLazyBedrockProvider`、`registerLazyOAuthFlows`）纳入 bundle。
 
 ## 不变量
 
@@ -79,6 +79,13 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - `runtime/branches.ts` 是分支的唯一实现：回合起点（每个回合第一条 `piarc.input` 的 `from`，旧记录取父条目）、分支点（起点落在同一锚点的回合互为分支，跳过记录、模式与模型变化、system 装载消息与分支摘要）、`rewindToTurn`（leaf 移到起点并追加 `piarc.branch`）、`summarizeFromTurn`（`compaction.ts` 的 `summarizeBranch` 用 T27 的摘要提示，再经 Pi 的 `branchWithSummary`）、`switchTo`、`forkedManager`（`session/fork` 的 `beforeTurn`）。Pi 打开文件时 leaf 在最后一条 entry，所以追加的条目就是持久化的位置；不删除任何 entry。
 - 回退与切换之后注册表在同一 id 下关闭并重新打开 Pi 运行时（`#reopen`，source `branch`：不触发 SessionStart/SessionEnd hooks，`seq` 连续），计划、模式、memory、读写记录随分支重新推导；MCP 随之重连。历史窗口与 `session/branches` 通知带分支点（`history.ts`），`branch_summary` 投影为原因 `rewind` 的压缩条目。
 - 中断补齐（`harness/interruption.ts`）只把 user、toolResult 或有回复的 assistant 当作末尾：以分支摘要或提醒结尾的对话不是被中断的回合。摘要之后的第一条输入紧跟摘要（两条相邻的 user 消息），`rewind-summarize` 场景因此关闭 `role_order` 检查。
+
+## WebFetch、辅助模型、偏好、Profile 与登录（T29，ADR-0045）
+
+- WebFetch（`harness/web-fetch.ts`，Core 启用 `webFetch` 时由 `SessionHarness.tools()` 注册）：`CoreIo.webFetch` 请 Core 抓取（不在本进程联网，SSRF 与授权绑定在 Core），再经 `harness/auxiliary.ts` 的 `AuxiliaryModel.complete` 按 `prompt` 提取；跨站重定向直接把目标地址作为结果，不调模型。提取提示在 `harness/prompts/web-fetch.ts`（改后跑原创性检查）。辅助调用的用量经 `Projector.auxiliaryUsage` 计入当前回合并写 `piarc.auxiliaryUsage`；其他一次性模型调用也走它，不另建请求。
+- 模型偏好（`providers/preferences.ts` 的 `ModelPreferencesStore`，挂在 `Workspace.preferences`）：来自 `core/welcome.modelPreferences` 与 `models/reload.preferences`（`SessionRegistry.setPreferences`）。`models/list` 经 `preferences.apply`；窗口经 `SessionCompaction` 的 `contextWindow`（`contextWindowOverride`）；图片经 `checkImageInput` 与 `installProviderPolicy` 的 `vision`；默认 effort 在 `selectModel` 未指定档位时。
+- Tool Profile：`#open` 按会话的模型（指定的，或 `buildSessionContext().model`）选 `DEFAULT`/`conservativeProfile`，保守时 `onlyConservative` 只留 `CONSERVATIVE_TOOLS`，`todoWatch` 用 3 轮且无清单也提醒；实际模型与预测不同就立即重开。`setModel` 或 `setPreferences` 改变 Profile 时空闲会话 `#reopen`，运行中的标 `profileStale`、回合结束后重开。不要在运行中改工具描述（Pi 注册时复制描述）。
+- 登录（`providers/login.ts` 的 `Logins`，设置 Host 上）：`models/login/start` 调 `ModelRuntime.login(provider, 'oauth', interaction)`，`notify`/`prompt` 转 `ui/loginInteraction`（无期限，取消经 `AbortSignal`），提问的空答复即取消；`models/logout`。`loginProviders` 列出带 `auth.oauth` 的服务商（Anthropic 的已被 policy 移除）。OAuth 流程模块经 `registerLazyOAuthFlows` 打进 bundle。`--test-oauth-provider` 的 `flow` 可选 `authorizationCode`（本地回环回调）与 `deviceCode`（轮询），对接 `piarc-testkit` 的 mock 授权服务器。
 
 ## 多会话的易错点
 

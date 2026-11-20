@@ -22,6 +22,10 @@
 - 初次打开读最近 1,000 个 item，向上滚到距顶部 400 px 内再加载一页。重同步用整段历史窗口替换已确认的行，因为同一文本块的历史 ID 与实时 ID 可能不同。
 - “选中本回合”按回合 ID 分组（含 steer），缺少标记的旧历史按用户消息分组。先让虚拟列表挂载整个选区，再创建 DOM Range。选择结束后释放额外挂载的行。
 
+## 三档视图（T29）
+
+- `detail.ts`：普通（隐藏 `reasoning` 行与 `reminder` 行）、思考（隐藏 `reminder` 行，默认档，保持 T19 起的显示）、详细（全部显示）。过滤在 `useShownRowIds`，store 里 `reminder` 条目照常归约（T27 的 `HIDDEN_ITEMS` 已去掉）。详细档里 `useExpanded` 的默认值为展开、键加 `detailed:` 前缀，所以详细档的展开选择不影响其他档。选择按会话存在渲染进程内存（`chooseDetail`），不持久化。新增行类型时在 `shownIn` 决定它属于哪一档。
+
 ## 节奏与滚动
 
 参数集中在 `constants.ts`。在真实事件流下运行 `npm run bench:t19` 复测，逐帧主线程工作量沿用 S1 的 CDP 口径。计时区间用 composer 的忙闲变化和最终 Markdown 绘制确定。Playwright 在计时后断言正文，避免其反复读取增长中的长消息影响 p99。

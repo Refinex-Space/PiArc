@@ -277,3 +277,7 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | 内容寻址存储 | `piarc_checkpoint::ObjectStore`（`put`、`get`、`pin`、`contains`、`collect_garbage`）、`hash_of`、`to_hex`/`from_hex` | 按 SHA-256 分桶存字节、相同内容一份、临时文件加 rename 写入、读时校验哈希；`Pin` 在使用期间防止回收，回收只删未引用且未钉住的对象。检查点快照用它，需要按内容去重保存文件的功能复用 | T28 |
 | hunk 反向应用 | `piarc_diff::revert_hunks`（`RevertError`） | 对当前文本反向应用 `FileDiff` 的若干 hunk：逐行核对新侧、自下而上应用、恢复的行沿用相邻换行符；不符时报错不改文本。Changes 面板按 hunk 丢弃用它，不在别处重算 diff | T28 |
 | 按期望内容写回文件 | `piarc_fs::{replace, Replacement, current_sha256, read_current}`（`restore.rs`） | 用户动作（回退、撤销、丢弃）写回记录的字节：路径锁内核对期望哈希、当前字节先存入对象库、原子替换或删除、会话文件状态表忘记该文件 | T28 |
+| SSRF 检查 | `piarc_web::ssrf::{check, classify, Allowlist, Blocked}` | 纯函数：解析出的地址只要有一个属于回环、私有、链路本地、组播、未指定、广播或保留网段（含 IPv6、IPv4 映射、NAT64、6to4 形式）就拒绝整个主机，允许列表按主机名或 IP / CIDR 放行。凡是 Core 代 agent 发起的网络连接都先经它，并只连接它返回的地址（`piarc_web::Fetcher` 的做法） | T29 |
+| 网页抓取与 URL 主机 | `piarc_web::{Fetcher, FetchLimits, Outcome, parse_target, rule_host}`、`convert::convert` | 钉住地址的 HTTP/1.1 + rustls 抓取、同站重定向、上限、HTML 转 Markdown；权限规则与 hooks matcher 取 URL 主机一律用 `rule_host`，与实际连接的主机一致 | T29 |
+| 辅助模型调用 | `agent-host/src/harness/auxiliary.ts`（`AuxiliaryModel.complete`） | 一次不带工具与对话的模型调用：用设置的辅助模型（不可用时会话模型），经会话的流函数与重试设置，用量计入当前回合并写 `piarc.auxiliaryUsage`；WebFetch 的提取与之后的审查类调用都用它，不另建请求 | T29 |
+| mock 授权服务器 | `piarc_testkit::auth_server::{MockAuthServer, AuthBehavior}`；bin `piarc-mock-auth` | OAuth 授权码（回环 redirect）与设备码（轮询）两种流程，可设同意、拒绝、过期；令牌每个实例随机，作明文扫描的针 | T29 |

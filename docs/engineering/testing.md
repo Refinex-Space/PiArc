@@ -183,6 +183,7 @@ L0–L2 的模型侧一律接 `piarc-testkit` 的严格 mock provider（架构�
 | 形态 | 用法 | 适用 |
 |---|---|---|
 | 库 | `MockProvider::start(library).await`（tokio 运行时内）；`port()`、`anthropic_base_url()`、`openai_base_url()`、`records()`、`log()` | Rust 测试 |
+| mock 授权服务器（T29） | `piarc_testkit::auth_server::MockAuthServer`；bin `piarc-mock-auth --port 0 [--behavior approve\|deny\|expire] [--pending-polls <n>]`：`/authorize` 重定向到回环 `redirect_uri`，`/device` 与 `/token` 走设备码轮询，stdin 每行改用户的决定 | 服务商登录的 Rust 集成测试、L2 的 `oauth` 场景与 L4 |
 | 独立进程 | `piarc-mock-provider --port 0 --scenarios <文件或目录>...`：stdout 第一行是实际端口；stdin 关闭后退出，终止信号按默认处置结束进程 | 跨进程测试（T06 起）；TS 侧用 `packages/testkit/src/mock-provider.ts` 的 `buildMockProvider`、`startMockProvider` |
 
 | 端点 | 作用 |
@@ -305,6 +306,9 @@ providers:                        # mock 端点，可定义多个；名称为小
     context_window: 32000         # 可选（T27）：模型的上下文窗口，缺省 200000
     max_tokens: 4096              # 可选（T27）：模型的最大输出，缺省 4096
     steps: [...]                  # 与第 10.3 节的 steps 相同
+web:                              # 可选（T29）：本地网页服务器，见下
+  pages: { /docs: { content_type: text/html, body: '<h1>Docs</h1>' }, /old: { status: 301, location: '{{web_alt}}/docs' } }
+oauth: { flow: authorization_code } # 可选（T29）：mock 授权服务器与测试服务商 piarc-test-oauth，配合 sign_in 动作
 sessions:                         # 可选；缺省为一个会话 main，使用唯一的端点、工作目录为工作区
   a: { provider: one, cwd: 'alpha dir' }
 actions: [...]                    # 见 12.2
@@ -319,6 +323,8 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 - `workspace.run_files` 在该次运行的临时根下建立夹具，可设置祖先目录的 memory、模拟家目录 `home 家/`、数据目录 `data 数据/` 或用于审批的相邻文件。`workspace.git: true` 在工作区创建空仓库，便于验证初始 Git 状态。
 - 会话通常在动作开始前建立。`sessions.<label>.deferred: true` 将该会话的创建推迟到第一次输入，可验证跨会话的授权与配置。
 - 按字节的夹具放在 `tests/scenarios/fixtures/`（`.gitattributes` 设为 `-text`，换行与编码不被 Git 改动）；加载时检查夹具存在。PDF 夹具用 `piarc-fs` 测试里的 `make_pdf` 生成，手写的 PDF 可能取不到文字。
+- WebFetch 场景（T29，`webfetch-*.yaml`）：`web.pages` 按路径给出状态、`content_type`、`body`（`repeat` 重复多次，用来越过正文上限）与重定向的 `location`。`{{web}}` 在页面与端点工具参数里换成 `http://127.0.0.1:<端口>`，`{{web_alt}}` 换成同一服务器的 `http://localhost:<端口>`（另一个主机，用于跨站重定向与按域名的规则）。只有带 `web` 段的场景，Core 的 WebFetch 允许列表才放行这两个主机；场景不访问外网。WebFetch 的提取是一次额外的模型请求：没有辅助模型时为它在同一端点留一步，设了 `modelProviders.auxiliary`（用 `run_files` 写 `data 数据/settings.json`）时在那个端点留一步。
+- 每模型设置与保守 Tool Profile（T29，`model-*.yaml`）：用 `run_files` 写 `data 数据/settings.json` 的 `modelProviders.models`（键 `mock-<端点>/mock-model`）；`configure_as: local` 端点的模型是低可靠性，默认得到保守 Profile。
 - 压缩场景（T27，`ctx-*.yaml`）：用 `context_window`、`max_tokens` 与步骤的 `usage` 精确触发阈值（Pi 以回复报告的 `input + output + cacheRead + cacheWrite` 判断）；要让短对话有可摘要的内容，在信任的工作区写 `.pi/settings.json: '{"compaction":{"keepRecentTokens":1}}'`。项目层的 `autoCompactWindow` 写在 `.piarc/settings.json` 或 `.claude/settings.json`。
 
 ### 12.2 动作
@@ -348,6 +354,8 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | `switch_branch` | `to` | 切到首条用户消息以 `to` 开头的分支 |
 | `check_branch` | `texts`、`branches` | 当前分支的用户与回复文本按序比较，分支点做字段子集比较（`null` 表示没有） |
 | `check_files` | `files` | 动作中途检查工作区文件内容（`null` 表示不存在） |
+| `sign_in` | `behavior`（`approve`/`deny`/`expire`）、`cancel`、`outcome`（`succeeded`/`failed`/`cancelled`）、`message` | 经 Core 登录测试服务商（T29，需要顶层 `oauth`）：运行器代替浏览器跟随授权页的重定向到 Agent Host 的回环端口，或在第一步取消；断言 `core/login` 的结束状态与消息，以及之后是否已登录 |
+| `sign_out` | — | 退出测试服务商的登录并确认凭据已删除 |
 
 `prompt`、`steer`、`follow_up` 都可带客户端的 `request_id`（重发时沿用），以及 `mentions` 和 `attachments`；`rejected: <文本>` 要求 Core 拒绝这条输入、错误消息含该文本（UserPromptSubmit hook 阻断，T25），不记回合。提及按 Core 输入格式写 `{path, start, end}`，两个偏移是发送文本中 `@path` 的 UTF-16 起止位置。附件写 `{fixture, mime_type}`；运行器读取 `fixtures/` 中对应文件并调用 Core 的 `store_attachment`，将返回的引用随输入发送。面板的键盘交互在 L4 验证。
 

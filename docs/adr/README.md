@@ -60,3 +60,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0042](0042-plan-todo-ask-next-steps.md) | 计划模式、任务清单、提问与下一步的宿主工具（补充 ADR-0009、0031、0033、0037） | 已接受 |
 | [0043](0043-reminders-compaction-usage.md) | System reminder 通道、压缩与上下文用量（补充 ADR-0009、0027、0033、0038、0039、0042） | 已接受 |
 | [0044](0044-checkpoints-rewind-changes.md) | 检查点、回退、Changes 面板与会话分支的落地（补充 ADR-0009、0011、0026、0027、0030） | 已接受 |
+| [0045](0045-webfetch-sign-in-model-settings.md) | WebFetch、服务商登录、每模型设置与辅助模型的落地（补充 ADR-0004、0006、0021、0032） | 已接受 |
