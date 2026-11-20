@@ -17,10 +17,7 @@
         "startedAt": 1763600000000,
         "outputPath": "~/Library/Application Support/PiArc/sessions/sess-7f3a/tasks/bg-0a1b2c3d4e5f.log",
         "outputBytes": 2048,
-        "tail": [
-          "ready in 312 ms",
-          "➜  Local:   http://localhost:5173/"
-        ]
+        "tail": ["ready in 312 ms", "➜  Local:   http://localhost:5173/"]
       },
       {
         "taskId": "bg-3a1b2c3d4e5f",
