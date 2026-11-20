@@ -238,7 +238,7 @@
       "task": "R3",
       "description": "`npm run verify` 通过。验证：命令输出。",
       "status": "passing",
-      "evidence": "`npm run verify` 于 42d1a44（工作区干净）15/15 通过，L2 118 passed、0 failed、2 skipped (platform)，MISSING 0；target/verify/last-pass.json 记录 42d1a44（tmp/evidence/R3/verify-final.log）。"
+      "evidence": "`npm run verify` 于 4879bd2（全部代码与收尾文档已提交、工作区干净）15/15 通过，L2 118 passed、0 failed、2 skipped (platform)，MISSING 0，target/verify/last-pass.json 记录 4879bd2（tmp/evidence/R3/verify-final2.log）；此前 42d1a44 也 15/15（verify-final.log）。"
     },
     {
       "id": "R4-A01",

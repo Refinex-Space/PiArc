@@ -205,7 +205,7 @@ W1-A05 为 blocked，原因接受：UNC 共享在 W1 的机器上不可用（SMB
 
 ## 质量门禁
 
-- `npm run verify` 在 `42d1a44`（全部修复已提交）15/15 通过：cargo test、Vitest、L2 118 通过 / 0 失败 / 2 平台跳过、能力覆盖 MISSING 0（`tmp/evidence/R3/verify-final.log`）。
+- `npm run verify` 在收尾提交 `4879bd2`（工作区干净）15/15 通过（`verify-final2.log`），此前在 `42d1a44` 也 15/15：cargo test、Vitest、L2 118 通过 / 0 失败 / 2 平台跳过、能力覆盖 MISSING 0（`tmp/evidence/R3/verify-final.log`）。
 - Windows x64 交叉 Clippy（工作区全部目标）通过（`windows-clippy.log`）；Windows 原生验收由 W2 执行。
 - 全量 L4（两种形态，`npm run package:desktop -- --flavor development` 后 `npm run test:e2e -w @piarc/desktop`）：224 通过、5 按平台跳过、4 失败（`tmp/evidence/R3/l4.log`）。`t18-review` 两个形态失败于 `screencapture -l`：运行测试的终端没有"屏幕录制"权限，与合并 W1 时记录的情形相同（`apps/desktop/AGENTS.md`）。`t26-harness` 的"下一步"用例两个形态失败：点击"在此执行"后，界面在新回合开始之前就满足 `idle`，断言读到的请求数还是 2；单独运行通过，`--repeat-each 4` 8 次失败 6 次，撤掉 R3 的会话改动（D2）后同样失败，所以不是 R3 的回归。用例改为等待 mock 收到第 3 个请求（提交见 git log），之后两种形态 40/40 通过（`t26-poll.log`）。
 - `~/.claude.json` 的核实：最后一次 L3 结束时它的修改时间是 1795178334，之后没有运行 L3，约 80 秒后它变为 1795178415，写入方是执行评审的 Claude Code 会话本身。
