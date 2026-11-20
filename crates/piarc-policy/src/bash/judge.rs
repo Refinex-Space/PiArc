@@ -383,7 +383,9 @@ fn check_command(
             Some((hit, Certainty::Possible)) => causes.push(AskCause::Rule(hit)),
             None => {}
         }
-        if let Some((hit, _)) = rules.find(Behavior::Ask, facts.tool(), Subject::Command(text), None) {
+        if let Some((hit, _)) =
+            rules.find(Behavior::Ask, facts.tool(), Subject::Command(text), None)
+        {
             causes.push(AskCause::Rule(hit));
         }
     }

@@ -618,6 +618,10 @@ mod tests {
             commands(&config.select(HookEvent::PreToolUse, Some("Bash"))),
             ["bash-hook"]
         );
-        assert!(config.select(HookEvent::SessionStart, Some("Monitor")).is_empty());
+        assert!(
+            config
+                .select(HookEvent::SessionStart, Some("Monitor"))
+                .is_empty()
+        );
     }
 }

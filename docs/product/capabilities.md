@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | M1 | 61 | 61 | 0 | 0 |
 | M2 | 46 | 46 | 0 | 0 |
-| M3 | 27 | 10 | 17 | 0 |
+| M3 | 34 | 19 | 15 | 0 |
 | M4 | 10 | 0 | 10 | 0 |
 | M5 | 7 | 0 | 7 | 0 |
 
@@ -30,7 +30,7 @@
 | CAP-EXEC-LOGINENV-001 | 命令环境以用户登录 shell 的环境为基础，profile 中配置的 PATH 生效 | ARCH-6.11 | T17 | `exec-env-login-path`（仅 macos） | 已实现 |
 | CAP-EXEC-OUTPUT-001 | 成功输出超过 30,000 字符时落盘并给约 2,000 字符预览与路径；失败输出给头部与尾部 | FR-TL-02、ARCH-6.11、ARCH-6.15 | T17 | `exec-output-budget` | 已实现 |
 | CAP-EXEC-STREAM-001 | 命令输出在结束前以条目增量到达客户端；完成的条目带 bash 卡的结构化字段 | FR-TL-02、ARCH-5.3、ARCH-6.1.3 | T17 | `exec-streaming-output` | 已实现 |
-| CAP-EXEC-TIMEOUT-001 | 命令超时（默认 2 分钟、上限 10 分钟）后整棵进程树被终止，结果带已有输出与超时说明 | FR-TL-01、ARCH-6.11 | T17 | `exec-timeout-kills-tree` | 已实现 |
+| CAP-EXEC-TIMEOUT-001 | 命令超时（默认 2 分钟、上限 10 分钟）后转为后台任务继续运行（T32 替换 T17 的终止），结果说明转后台、任务 id 与输出文件 | FR-TL-01、ARCH-6.11 | T17 | `exec-timeout-kills-tree` | 已实现 |
 | CAP-EXT-PI-001 | 信任的项目 Pi 扩展被加载，其注册的工具可被模型调用 | ARCH-5.5、ARCH-10.2 | T13 | `trust-trusted-loads-project-extension` | 已实现 |
 | CAP-MODEL-SWITCH-001 | 会话内切换模型与 effort，提示切换代价 | FR-MD-03、ARCH-6.13 | T21 | `provider-settings-models`<br>`turn-model-effort` | 已实现 |
 | CAP-PERM-APPROVAL-001 | 结构化审批：仅本次、本会话、总是允许、拒绝并反馈 | FR-PM-02、ARCH-6.2.3 | T20 | `policy-extra-directory`<br>`policy-save-rule`<br>`policy-session-rule`<br>`subagent-approval` | 已实现 |
@@ -46,7 +46,7 @@
 | CAP-SESSION-TURN-001 | 输入开始一个回合，正文与工具调用以条目事件流式送达客户端 | FR-CH-01、ARCH-5.3 | T14 | `chat-basic` | 已实现 |
 | CAP-SYS-NOTIFY-001 | 会话完成或等待审批时发出通知事件 | FR-SY-01 | T20 | `policy-session-rule` | 已实现 |
 | CAP-TOOL-BASH-001 | Bash 经 Core 执行命令并返回输出 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
-| CAP-TOOL-BASH-002 | Bash 超时终止整个进程树，输出给出语义成败 | FR-TL-01、FR-TL-02、ARCH-6.11 | T17 | `exec-exit-code-meaning`<br>`exec-timeout-kills-tree` | 已实现 |
+| CAP-TOOL-BASH-002 | Bash 终止整个进程树（KillShell、中断；T32 起超时转后台），输出给出语义成败 | FR-TL-01、FR-TL-02、ARCH-6.11 | T17 | `exec-exit-code-meaning`<br>`exec-timeout-kills-tree` | 已实现 |
 | CAP-TOOL-CORE-001 | 工具的文件与命令 I/O 全部经 Core 的 AHP fs/exec 方法执行 | FR-TL-01、ARCH-6.1.3 | T07 | `tools-canonical-via-core` | 已实现 |
 | CAP-TOOL-DIFF-001 | 每次文件变更的 fileChange 条目带 Core 生成的 unified diff 与 hunk | FR-TL-01、ARCH-6.1.2、ARCH-7.7 | T16 | `tools-file-change-diff` | 已实现 |
 | CAP-TOOL-EDIT-001 | Edit 按文本替换修改文件 | FR-TL-01、ARCH-6.1.4 | T07 | `tools-canonical-via-core` | 已实现 |
@@ -143,8 +143,12 @@
 | CAP-AGENT-INTERRUPT-001 | 中断主会话时进行中的子 agent 一并中止，未完成的工具调用补齐已中断结果 | FR-HN-04、ARCH-6.15 | T31 | `subagent-interrupt` | 已实现 |
 | CAP-AGENT-LIMIT-001 | 子 agent 深度上限移除 Agent 工具，并发上限立即返回说明上限的错误 | FR-HN-04、ARCH-6.4 | T31 | `subagent-concurrency`<br>`subagent-depth` | 已实现 |
 | CAP-AGENT-RUN-001 | 子 agent 使用任意服务商模型、可后台运行、最多 3 层、默认不继承父会话历史 | FR-HN-04、ARCH-6.4、ARCH-6.15 | T31 | `subagent-background`<br>`subagent-compaction`<br>`subagent-explore-fast`<br>`subagent-general-purpose`<br>`subagent-max-turns` | 已实现 |
-| CAP-BG-COMMAND-001 | 后台命令、超时转后台与 KillShell | FR-TL-04、ARCH-6.11 | T32 | — | 计划中 |
-| CAP-BG-MONITOR-001 | Monitor 监视后台任务输出并唤醒会话 | FR-TL-04、ARCH-6.11 | T32 | — | 计划中 |
+| CAP-BG-COMMAND-001 | run_in_background 启动的命令立即返回任务 id 与输出文件，模型用 Read 读取输出 | FR-TL-04、ARCH-6.11 | T32 | `bg-run-in-background` | 已实现 |
+| CAP-BG-KILL-001 | KillShell 终止整棵进程树并保留输出，只能停止本会话（含子 agent）的任务 | FR-TL-04、ARCH-6.11 | T32 | `exec-timeout-kills-tree` | 已实现 |
+| CAP-BG-MONITOR-001 | Monitor 后台运行命令，把新增输出按行回灌给模型 | FR-TL-04、ARCH-6.11 | T32 | `monitor-wake-idle` | 已实现 |
+| CAP-BG-NOTICE-001 | 后台任务结束后，任务 id、命令、退出码与语义、耗时、输出文件与尾部预览在下一回合以 system reminder 注入 | FR-TL-04、ARCH-6.6、ARCH-6.11 | T32 | `bg-completion-reminder` | 已实现 |
+| CAP-BG-SUBAGENT-001 | 后台子 agent 进入任务管理器，可从面板停止，状态记为 killed | FR-TL-04、FR-HN-04、ARCH-6.11 | T32 | `bg-subagent-stop` | 已实现 |
+| CAP-BG-TIMEOUT-001 | 前台命令超时后转为后台任务，同一进程继续运行，工具结果说明已转后台 | FR-TL-04、ARCH-6.11 | T32 | `bg-timeout-to-background` | 已实现 |
 | CAP-CMD-001 | 自定义斜杠命令（`.claude/commands`、Pi prompt templates） | FR-EX-02、ARCH-6.7 | T37 | — | 计划中 |
 | CAP-HOOK-HANDLER-001 | http 与 prompt 类型的 hook handler | FR-HN-05、ARCH-6.3.2 | T38 | — | 计划中 |
 | CAP-HOOK-SUBAGENT-001 | SubagentStart、SubagentStop 与 PostToolBatch hooks | FR-HN-05、ARCH-6.3.2 | T38 | — | 计划中 |
@@ -154,6 +158,9 @@
 | CAP-MCP-TRANSPORT-001 | MCP 的 stdio 与 Streamable HTTP 传输 | FR-EX-03、ARCH-6.8 | T36 | — | 计划中 |
 | CAP-MODEL-ALIAS-001 | 模型别名表供子 agent 与 skills 引用 | FR-MD-05 | T31 | `model-default-setting`<br>`subagent-degrade`<br>`subagent-explore-fast`<br>`subagent-model-aliases` | 已实现 |
 | CAP-MODEL-DEGRADE-001 | 按模型能力降级（例如不支持图片输入时的处理） | ARCH-6.13 | T31 | `subagent-degrade` | 已实现 |
+| CAP-MONITOR-PERM-001 | Monitor 的命令受 Bash 规则、Bash 分析与 Bash matcher 的 PreToolUse hooks 约束，Manual 模式下需要审批 | FR-TL-04、FR-PM-03、ARCH-6.2、ARCH-6.3 | T32 | `monitor-hooks-bash-matcher`<br>`monitor-permissions` | 已实现 |
+| CAP-MONITOR-RATE-001 | Monitor 单次回灌受行数与字符数上限约束，超出时说明省略行数与输出文件；总量到上限后停止回灌并告知模型 | FR-TL-04、ARCH-6.11 | T32 | `monitor-rate-limit` | 已实现 |
+| CAP-MONITOR-WAKE-001 | 会话空闲时 Monitor 的新增输出唤醒会话，唤醒频率受限速约束 | FR-TL-04、ARCH-6.11 | T32 | `monitor-wake-idle` | 已实现 |
 | CAP-SESSION-PARALLEL-001 | 跨工作区与多窗口的会话并行运行 | FR-WS-05 | T35 | — | 计划中 |
 | CAP-SESSION-SEARCH-001 | 会话全文搜索 | FR-WS-04、ARCH-9.2 | T35 | — | 计划中 |
 | CAP-SKILL-001 | Skills（Agent Skills 标准；`.claude/skills`、`.piarc/skills`、用户级），渐进加载 | FR-EX-01、ARCH-6.7 | T37 | — | 计划中 |

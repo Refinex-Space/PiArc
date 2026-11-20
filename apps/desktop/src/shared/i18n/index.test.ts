@@ -40,6 +40,7 @@ describe('i18n', () => {
             key: 'k',
             modifiers: 'm',
             size: '5 KiB',
+            bytes: '21',
             pages: 3,
             path: 'sample.txt',
             seconds: 5,
