@@ -1,0 +1,18 @@
+{
+  "id": "t32-bg",
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "bg-watch",
+          "name": "Bash",
+          "input": {
+            "command": "for i in 1 2 3; do echo \"tick $i\"; done; while [ ! -f stop.flag ]; do sleep 0.1; done",
+            "run_in_background": true
+          }
+        }
+      ]
+    },
+    { "text": "The watcher runs in the background." }
+  ]
+}

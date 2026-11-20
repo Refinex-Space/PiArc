@@ -1,0 +1,19 @@
+{
+  "id": "t32-agent",
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "agent-bg",
+          "name": "Agent",
+          "input": {
+            "description": "Survey in the background",
+            "prompt": "Survey every directory. [[piarc-scenario:t31-stall]]",
+            "run_in_background": true
+          }
+        }
+      ]
+    },
+    { "text": "The survey runs in the background." }
+  ]
+}

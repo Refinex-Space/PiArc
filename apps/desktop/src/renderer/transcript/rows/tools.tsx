@@ -196,6 +196,8 @@ export function BashCard({
   const meaning = execution?.meaning ?? undefined;
   const fullOutputPath = execution?.fullOutputPath ?? undefined;
   const cwdReset = execution?.cwdReset ?? undefined;
+  // T32: the command runs on as a background task (asked for, or moved by its timeout).
+  const task = execution?.task ?? undefined;
   const [open, setOpen] = useExpanded(id, false);
   const output = item.output ?? '';
   const outcome = execution?.outcome ?? (item.status === 'completed' ? 'success' : 'failure');
@@ -220,9 +222,11 @@ export function BashCard({
             ? elapsed >= BASH_TIMER_AFTER_MS
               ? t('transcript.bash.running', { elapsed: elapsedText(elapsed) })
               : t('transcript.tool.status.inProgress')
-            : item.status === 'completed' || item.status === 'failed'
-              ? t(outcome === 'success' ? 'transcript.bash.success' : 'transcript.bash.failure')
-              : t(STATUS_MESSAGE[item.status])}
+            : task !== undefined && item.status === 'completed'
+              ? t('transcript.bash.background')
+              : item.status === 'completed' || item.status === 'failed'
+                ? t(outcome === 'success' ? 'transcript.bash.success' : 'transcript.bash.failure')
+                : t(STATUS_MESSAGE[item.status])}
         </span>
         {exitCode === undefined ? null : (
           <span className="bash-exit" data-testid="bash-exit">
@@ -245,7 +249,16 @@ export function BashCard({
         </span>
         {item.command}
       </pre>
-      {execution?.timedOut === true ? (
+      {task !== undefined ? (
+        <div className="row-status muted" data-testid="bash-task">
+          {task.reason === 'timeout'
+            ? t('transcript.bash.movedToBackground', {
+                seconds: Math.round((execution?.timeoutMs ?? 0) / 1000),
+                task: task.taskId,
+              })
+            : t('transcript.bash.inBackground', { task: task.taskId })}
+        </div>
+      ) : execution?.timedOut === true ? (
         <div className="row-status is-warning">
           {t('transcript.bash.timedOut', { seconds: Math.round(execution.timeoutMs / 1000) })}
         </div>

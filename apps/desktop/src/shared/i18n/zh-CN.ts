@@ -462,6 +462,9 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'transcript.bash.signal': '信号 {signal}',
   'transcript.bash.duration': '{seconds} 秒',
   'transcript.bash.timedOut': '超过 {seconds} 秒的时限后被停止',
+  'transcript.bash.background': '后台运行',
+  'transcript.bash.inBackground': '作为后台任务 {task} 运行',
+  'transcript.bash.movedToBackground': '超过 {seconds} 秒超时仍在运行：已转为后台任务 {task}',
   'transcript.bash.truncated': '给模型的输出已截断，完整输出在 {path}',
   'transcript.bash.cwdReset':
     '下一条命令从 {path} 开始（{reason, select, missing {原目录已不存在} other {原目录在工作区之外}}）',

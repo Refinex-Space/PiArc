@@ -22,6 +22,7 @@ function render() {
         import { CANONICAL_TOOLS, DEFAULT_PROFILE, conservativeProfile } from './agent-host/src/tools/profile.ts';
         import * as web from './agent-host/src/harness/prompts/web-fetch.ts';
         import * as sub from './agent-host/src/harness/prompts/subagents.ts';
+        import * as tasks from './agent-host/src/harness/prompts/tasks.ts';
         const system = assembleSystem(CANONICAL_TOOLS, DEFAULT_PROFILE, [],
           {cwd: '', platform: '', date: '', gitStatus: ''}).text;
         const conservative = conservativeProfile(DEFAULT_PROFILE);
@@ -48,7 +49,10 @@ function render() {
           ...[sub.GENERAL_PURPOSE, sub.EXPLORE, sub.PLAN].flatMap((t) => [t.description, t.identity]),
           sub.withTypes('', [{ name: '', description: '' }]),
           sub.backgroundStarted('', ''), sub.backgroundFinished('', '', '', '', ''),
-          sub.partialReport(0, ''), sub.EMPTY_REPORT, sub.toolNotAvailable('')];
+          sub.partialReport(0, ''), sub.EMPTY_REPORT, sub.toolNotAvailable(''),
+          // T32: KillShell's and Monitor's results.
+          tasks.taskStopped('', '', '', ''), tasks.taskAlreadyEnded('', 'completed', ''),
+          tasks.taskUnknown(''), tasks.monitorStarted('', '', 300000, 3600000)];
         process.stdout.write([system, ...descriptions, ...notices].join(String.fromCharCode(10)));`,
       resolveDir: repoRoot,
     },
@@ -69,7 +73,8 @@ function render() {
 /** Model-visible literals that no render above reaches (R3): every `description` of a tool
  * parameter schema in the Harness Kit (its subdirectories too, T31) and the tool layer, and the
  * sentences of at least five words that session memory, the reminder channel, interruption, the
- * result budget and the subagent runs (T31) write. */
+ * result budget, the subagent runs (T31), Bash's background results and Core's background task
+ * notices (T32) write. */
 function sourceTexts() {
   const literal = /'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g;
   const texts = [];
@@ -90,16 +95,20 @@ function sourceTexts() {
     }
   }
   for (const file of [
-    'harness/session-memory.ts',
-    'harness/reminders.ts',
-    'harness/interruption.ts',
-    'harness/tool-results.ts',
-    'runtime/subagents.ts',
-    'runtime/subagent-session.ts',
+    'agent-host/src/harness/session-memory.ts',
+    'agent-host/src/harness/reminders.ts',
+    'agent-host/src/harness/interruption.ts',
+    'agent-host/src/harness/tool-results.ts',
+    'agent-host/src/runtime/subagents.ts',
+    'agent-host/src/runtime/subagent-session.ts',
+    // T32: Bash's background results, and the notices Core writes (completion, Monitor lines).
+    'agent-host/src/tools/shell.ts',
+    'crates/piarc-core/src/tasks/feed.rs',
   ]) {
-    const source = readFileSync(path.join(repoRoot, 'agent-host/src', file), 'utf8');
+    const source = readFileSync(path.join(repoRoot, file), 'utf8');
     for (const m of source.matchAll(literal)) {
-      const text = (m[1] ?? m[2] ?? m[3] ?? '').replace(/\$\{[^}]*\}/g, ' ');
+      // Interpolations: `${…}` in TypeScript, `{…}` in Rust's format strings.
+      const text = (m[1] ?? m[2] ?? m[3] ?? '').replace(/\$?\{[^}]*\}/g, ' ');
       if (words(text).length >= 5) texts.push(text);
     }
   }

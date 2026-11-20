@@ -472,6 +472,10 @@ export const en = {
   'transcript.bash.signal': 'signal {signal}',
   'transcript.bash.duration': '{seconds} s',
   'transcript.bash.timedOut': 'Stopped after its {seconds} s timeout',
+  'transcript.bash.background': 'In the background',
+  'transcript.bash.inBackground': 'Runs in the background as task {task}',
+  'transcript.bash.movedToBackground':
+    'Still running after its {seconds} s timeout: moved to the background as task {task}',
   'transcript.bash.truncated': 'The output was cut for the model. The full output is in {path}',
   'transcript.bash.cwdReset':
     'The next command starts in {path} ({reason, select, missing {the directory is gone} other {it left the workspace}})',

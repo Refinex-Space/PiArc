@@ -387,6 +387,33 @@ describe('P0 row types', () => {
     expect(byTestId(root, 'bash-truncated').textContent).toContain('b1.txt');
   });
 
+  it('bash card: a command that runs on in the background (T32)', async () => {
+    const item: Item = {
+      type: 'commandExecution',
+      itemId: 'b3',
+      status: 'completed',
+      tool: 'Bash',
+      arguments: {},
+      command: 'npm run dev',
+      output: '',
+      execution: {
+        cwd: '/work',
+        outcome: 'success',
+        durationMs: 120_004,
+        timedOut: true,
+        timeoutMs: 120_000,
+        truncated: false,
+        task: { taskId: 'bg-0a1b2c3d4e5f', outputPath: '~/t.log', reason: 'timeout' },
+      },
+    };
+    const root = await render(transcriptOf([{ item }]), ['b3']);
+    expect(byTestId(root, 'bash-state').textContent).toBe('In the background');
+    expect(byTestId(root, 'bash-task').textContent).toBe(
+      'Still running after its 120 s timeout: moved to the background as task bg-0a1b2c3d4e5f',
+    );
+    expect(root.textContent).not.toContain('Stopped after its');
+  });
+
   it('bash card: a timer once a command runs longer than ten seconds', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
     try {
