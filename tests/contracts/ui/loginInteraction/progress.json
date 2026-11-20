@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 44,
+  "method": "ui/loginInteraction",
+  "params": {
+    "loginId": "login-1",
+    "provider": "github-copilot",
+    "interaction": {
+      "type": "progress",
+      "message": "Waiting for the browser"
+    }
+  }
+}

@@ -52,7 +52,7 @@ mod waits;
 use waits::{post_card, wait_for_user, withdraw_card};
 pub(crate) mod settings_view;
 use grants::Grant;
-pub(super) use grants::{FilePermit, claim_command, file_permit};
+pub(super) use grants::{FilePermit, claim_command, claim_fetch, file_permit};
 
 /// `path` without `.` and `..` components (no file system access).
 pub(super) fn lexical(path: &Path) -> PathBuf {
@@ -182,9 +182,20 @@ impl Services {
     }
 
     async fn audit(&self, id: &str, root: &Path, detail: &Value) -> Result<(), ErrorObject> {
+        self.record("permission", id, root, detail).await
+    }
+
+    /// Appends an audit row of `kind` for session `id`.
+    pub(super) async fn record(
+        &self,
+        kind: &str,
+        id: &str,
+        root: &Path,
+        detail: &Value,
+    ) -> Result<(), ErrorObject> {
         let row = piarc_store::AuditEvent {
             at: now_ms(),
-            kind: "permission".into(),
+            kind: kind.into(),
             session_id: Some(id.into()),
             workspace: Some(display(root)),
             detail: detail.to_string(),

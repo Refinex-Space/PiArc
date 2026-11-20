@@ -98,6 +98,9 @@ pub struct CoreConfig {
     pub hooks: piarc_hooks::RunnerConfig,
     /// Snapshot retention and its clock (architecture section 9.3, T28); tests move the clock.
     pub checkpoints: crate::checkpoints::CheckpointConfig,
+    /// WebFetch's limits and the hosts it may reach although not public (T29); tests admit
+    /// their local HTTP servers.
+    pub web: crate::tool_io::WebConfig,
 }
 
 /// A credential store for the vault's master key and the key's name in it.
@@ -131,6 +134,7 @@ impl Default for CoreConfig {
             home: std::env::home_dir(),
             hooks: piarc_hooks::RunnerConfig::default(),
             checkpoints: crate::checkpoints::CheckpointConfig::default(),
+            web: crate::tool_io::WebConfig::default(),
         }
     }
 }
@@ -731,6 +735,7 @@ fn open_state(
                     .clone()
                     .unwrap_or_else(crate::tool_io::CommandEnv::login_shell),
                 clock: config.sessions.clock.clone(),
+                web: config.web.clone(),
                 ..ToolIoConfig::new(data)
             },
             Some(events.clone()),

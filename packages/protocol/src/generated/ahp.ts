@@ -153,6 +153,16 @@ export type AhpMessage =
   | FsChangesResponse
   | FsForgetReadsRequest
   | FsForgetReadsResponse
+  | WebFetchRequest
+  | WebFetchResponse
+  | ModelsLoginStartRequest
+  | ModelsLoginStartResponse
+  | ModelsLoginCancelRequest
+  | ModelsLoginCancelResponse
+  | ModelsLogoutRequest
+  | ModelsLogoutResponse
+  | UiLoginInteractionRequest
+  | UiLoginInteractionResponse
   | SessionRewindRequest
   | SessionRewindResponse
   | SessionSwitchBranchRequest
@@ -215,6 +225,19 @@ export type Capability = string;
  */
 export type ProtocolVersion = string;
 /**
+ * Selectable Pi thinking level (PiArc omits minimal).
+ */
+export type EffortLevel = 'off' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+/**
+ * The Tool Profile a model sees (architecture section 6.13): the default one, or the
+ * conservative one with fewer tools, more explicit descriptions and task list reminders.
+ */
+export type ToolProfileKind = 'default' | 'conservative';
+/**
+ * How thoroughly the model has been exercised with tools.
+ */
+export type ToolReliability = 'verified' | 'unknown' | 'low';
+/**
  * Permission modes (architecture section 6.2.1). `auto` (M5) and `dontAsk` (headless) are
  * not available.
  */
@@ -239,14 +262,6 @@ export type PolicyInputChunkResult = Record<string, never>;
  * Core finished cancelling the expired preflight, or it was already gone.
  */
 export type PolicyCancelled = Record<string, never>;
-/**
- * Selectable Pi thinking level (PiArc omits minimal).
- */
-export type EffortLevel = 'off' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
-/**
- * How thoroughly the model has been exercised with tools.
- */
-export type ToolReliability = 'verified' | 'unknown';
 /**
  * Acknowledges a successful provider operation.
  */
@@ -692,6 +707,82 @@ export type SessionRemindResult = Record<string, never>;
  */
 export type ExternalChange = 'modified' | 'deleted';
 /**
+ * How `content` was produced.
+ */
+export type WebContentFormat = 'markdown' | 'text';
+/**
+ * One step of a sign-in shown to the user. A later interaction of the same sign-in replaces
+ * the one on screen; a replaced prompt is answered with `cancelled`.
+ */
+export type LoginInteraction =
+  | {
+      /**
+       * Extra instructions.
+       */
+      instructions?: string | null;
+      type: 'authUrl';
+      /**
+       * The authorization URL.
+       */
+      url: string;
+    }
+  | {
+      /**
+       * Seconds until the code expires.
+       */
+      expiresInSeconds?: number | null;
+      type: 'deviceCode';
+      /**
+       * The code to enter.
+       */
+      userCode: string;
+      /**
+       * Where to enter it.
+       */
+      verificationUri: string;
+    }
+  | {
+      /**
+       * Message.
+       */
+      message: string;
+      type: 'progress';
+    }
+  | {
+      /**
+       * Links.
+       */
+      links?: LoginLink[];
+      /**
+       * Message.
+       */
+      message: string;
+      type: 'info';
+    }
+  | {
+      /**
+       * What is asked for.
+       */
+      kind: LoginPromptKind;
+      /**
+       * Message.
+       */
+      message: string;
+      /**
+       * Choices of a `select` prompt.
+       */
+      options?: LoginOption[];
+      /**
+       * Placeholder.
+       */
+      placeholder?: string | null;
+      type: 'prompt';
+    };
+/**
+ * What a sign-in prompt asks for.
+ */
+export type LoginPromptKind = 'text' | 'secret' | 'select' | 'manualCode';
+/**
  * How `session/rewind` moves the conversation.
  */
 export type RewindMode = 'branch' | 'summarize';
@@ -926,6 +1017,10 @@ export interface CoreWelcome {
    */
   enabled: Capability[];
   /**
+   * Per-model settings and the auxiliary model (T29).
+   */
+  modelPreferences?: ModelPreferences | null;
+  /**
    * Protocol version spoken by Core.
    */
   protocol: ProtocolVersion;
@@ -933,6 +1028,65 @@ export interface CoreWelcome {
    * Absolute path of the workspace this Agent Host serves.
    */
   workspace: string;
+}
+/**
+ * Model preferences Core gives the Agent Host (T29): per-model settings and the auxiliary
+ * model for one-off calls such as WebFetch's extraction.
+ */
+export interface ModelPreferences {
+  /**
+   * The auxiliary model; absent: the session's model.
+   */
+  auxiliary?: ModelRef | null;
+  /**
+   * Per-model settings keyed by `<provider>/<model id>`.
+   */
+  models?: {
+    [k: string]: ModelOverride;
+  };
+}
+/**
+ * Selects a model by provider id and model id, for example `anthropic` / `claude-opus-5-5`.
+ */
+export interface ModelRef {
+  /**
+   * Model id within the provider.
+   */
+  id: string;
+  /**
+   * Provider id.
+   */
+  provider: string;
+}
+/**
+ * The user's settings for one model (T29), each replacing the catalog value.
+ */
+export interface ModelOverride {
+  /**
+   * Context window in tokens.
+   */
+  contextWindow?: number | null;
+  /**
+   * Effort applied when the model is selected.
+   */
+  defaultEffort?: EffortLevel | null;
+  /**
+   * Display name.
+   */
+  displayName?: string | null;
+  /**
+   * Tool Profile; absent: chosen by the tool reliability.
+   */
+  toolProfile?: ToolProfileKind | null;
+  /**
+   * Tool reliability Core derives from the provider configuration (keyless local
+   * endpoints are `low`); not a user setting.
+   */
+  toolReliability?: ToolReliability | null;
+  /**
+   * Whether image input is accepted.
+   */
+  vision?: boolean | null;
 }
 /**
  * Request for `host/ping`.
@@ -1054,19 +1208,6 @@ export interface SessionCreateParams {
    * absent. Letters, digits, `.`, `_` and `-`, at most 128 characters.
    */
   sessionId?: SessionId | null;
-}
-/**
- * Selects a model by provider id and model id, for example `anthropic` / `claude-opus-5-5`.
- */
-export interface ModelRef {
-  /**
-   * Model id within the provider.
-   */
-  id: string;
-  /**
-   * Provider id.
-   */
-  provider: string;
 }
 /**
  * Successful response to `session/create`.
@@ -1535,6 +1676,10 @@ export interface ModelsListResult {
    */
   effort?: EffortLevel | null;
   /**
+   * Providers with sign-in (T29).
+   */
+  loginProviders?: LoginProvider[];
+  /**
    * Current model for the session.
    */
   model?: ModelRef | null;
@@ -1548,6 +1693,32 @@ export interface ModelsListResult {
   providers: CatalogProvider[];
 }
 /**
+ * A provider that offers sign-in (OAuth or device code) in the settings window (T29).
+ * Anthropic's subscription sign-in is never listed (ADR-0006).
+ */
+export interface LoginProvider {
+  /**
+   * Pi provider id.
+   */
+  id: string;
+  /**
+   * The sign-in method's label.
+   */
+  label: string;
+  /**
+   * Provider display name.
+   */
+  name: string;
+  /**
+   * Whether a signed-in credential is stored in the vault.
+   */
+  signedIn: boolean;
+  /**
+   * Whether access through it is backed by a subscription.
+   */
+  subscription: boolean;
+}
+/**
  * A selectable chat model and its negotiated capabilities.
  */
 export interface CatalogModel {
@@ -1555,6 +1726,10 @@ export interface CatalogModel {
    * Context window in tokens.
    */
   contextWindow: number;
+  /**
+   * The effort applied when the model is selected without one (per-model setting, T29).
+   */
+  defaultEffort?: EffortLevel | null;
   /**
    * Selectable efforts.
    */
@@ -1579,6 +1754,10 @@ export interface CatalogModel {
    * Provider id.
    */
   provider: string;
+  /**
+   * The Tool Profile in effect for the model (T29); absent: the default one.
+   */
+  toolProfile?: ToolProfileKind | null;
   /**
    * Tool calling assessment.
    */
@@ -1618,6 +1797,10 @@ export interface ModelsReloadParams {
    * Enable catalog network requests.
    */
   allowNetwork: boolean;
+  /**
+   * Current model preferences (T29); absent: unchanged.
+   */
+  preferences?: ModelPreferences | null;
 }
 /**
  * Successful response to `models/reload`.
@@ -4886,6 +5069,260 @@ export interface FsForgetReadsResult {
    * Number of files whose read range was forgotten.
    */
   files: number;
+}
+/**
+ * Request for `web/fetch`.
+ */
+export interface WebFetchRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'web/fetch';
+  params: WebFetchParams;
+}
+/**
+ * Parameters of `web/fetch`.
+ */
+export interface WebFetchParams {
+  /**
+   * The approved `WebFetch` call; its input's `url` must equal `url`.
+   */
+  origin: ToolOrigin;
+  /**
+   * The session of the call.
+   */
+  sessionId: SessionId;
+  /**
+   * The URL to fetch (`http:` or `https:`).
+   */
+  url: string;
+}
+/**
+ * Successful response to `web/fetch`.
+ */
+export interface WebFetchResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: WebFetchResult;
+}
+/**
+ * Result of `web/fetch`.
+ */
+export interface WebFetchResult {
+  /**
+   * The body was longer than the byte limit and was cut.
+   */
+  bodyTruncated: boolean;
+  /**
+   * Body bytes read.
+   */
+  bytes: number;
+  /**
+   * The page as Markdown or text, cut to the character limit.
+   */
+  content: string;
+  /**
+   * The converted text was longer than the character limit and was cut.
+   */
+  contentTruncated: boolean;
+  /**
+   * The response's `Content-Type`.
+   */
+  contentType?: string | null;
+  /**
+   * How `content` was produced.
+   */
+  format: WebContentFormat;
+  /**
+   * Present when the response redirected to another site; `content` is then empty.
+   */
+  redirect?: WebRedirect | null;
+  /**
+   * The HTTP status of that response.
+   */
+  status: number;
+  /**
+   * Characters of the converted text before the cut.
+   */
+  totalChars: number;
+  /**
+   * The URL the response came from (after same-site redirects), or the redirecting URL.
+   */
+  url: string;
+}
+/**
+ * A redirect to another site that Core did not follow.
+ */
+export interface WebRedirect {
+  /**
+   * The redirect status (301, 302, 303, 307, 308).
+   */
+  status: number;
+  /**
+   * The absolute target URL.
+   */
+  url: string;
+}
+/**
+ * Request for `models/login/start`.
+ */
+export interface ModelsLoginStartRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'models/login/start';
+  params: LoginStartParams;
+}
+/**
+ * Parameters of `models/login/start` (Core → settings Agent Host, T29): sign in to a
+ * provider. The request answers when the sign-in finished; interactions go through
+ * `ui/loginInteraction` tagged with `loginId`.
+ */
+export interface LoginStartParams {
+  /**
+   * Core's id of this sign-in.
+   */
+  loginId: string;
+  /**
+   * Provider id.
+   */
+  provider: string;
+}
+/**
+ * Successful response to `models/login/start`.
+ */
+export interface ModelsLoginStartResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: ModelsUpdated;
+}
+/**
+ * Request for `models/login/cancel`.
+ */
+export interface ModelsLoginCancelRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'models/login/cancel';
+  params: LoginCancelParams;
+}
+/**
+ * Parameters of `models/login/cancel`.
+ */
+export interface LoginCancelParams {
+  /**
+   * The sign-in to stop.
+   */
+  loginId: string;
+}
+/**
+ * Successful response to `models/login/cancel`.
+ */
+export interface ModelsLoginCancelResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: ModelsUpdated;
+}
+/**
+ * Request for `models/logout`.
+ */
+export interface ModelsLogoutRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'models/logout';
+  params: LogoutParams;
+}
+/**
+ * Parameters of `models/logout`: remove a provider's stored credential.
+ */
+export interface LogoutParams {
+  /**
+   * Provider id.
+   */
+  provider: string;
+}
+/**
+ * Successful response to `models/logout`.
+ */
+export interface ModelsLogoutResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: ModelsUpdated;
+}
+/**
+ * Request for `ui/loginInteraction`.
+ */
+export interface UiLoginInteractionRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'ui/loginInteraction';
+  params: LoginInteractionParams;
+}
+/**
+ * Parameters of `ui/loginInteraction` (settings Agent Host → Core, T29).
+ */
+export interface LoginInteractionParams {
+  /**
+   * What to show.
+   */
+  interaction: LoginInteraction;
+  /**
+   * The sign-in it belongs to.
+   */
+  loginId: string;
+  /**
+   * The provider signing in.
+   */
+  provider: string;
+}
+/**
+ * A link shown with an `info` interaction.
+ */
+export interface LoginLink {
+  /**
+   * Label.
+   */
+  label?: string | null;
+  /**
+   * URL, opened in the system browser after confirmation.
+   */
+  url: string;
+}
+/**
+ * A choice of a `select` prompt.
+ */
+export interface LoginOption {
+  /**
+   * Explanation.
+   */
+  description?: string | null;
+  /**
+   * Value returned when chosen.
+   */
+  id: string;
+  /**
+   * Label.
+   */
+  label: string;
+}
+/**
+ * Successful response to `ui/loginInteraction`.
+ */
+export interface UiLoginInteractionResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: LoginInteractionResult;
+}
+/**
+ * Result of `ui/loginInteraction`: the answer of a prompt, nothing for the other kinds.
+ */
+export interface LoginInteractionResult {
+  /**
+   * The prompt's answer.
+   */
+  value?: string | null;
 }
 /**
  * Request for `session/rewind`.

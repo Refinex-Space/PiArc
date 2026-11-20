@@ -367,3 +367,23 @@ fn timeout_matches(expected: Option<f64>, wire: Option<u64>) -> bool {
         _ => false,
     }
 }
+
+/// The approved `WebFetch` call `p` names, for this URL: consumed, so one approval is one
+/// fetch (T29). Same-site redirects are part of that fetch; another site is a new call.
+pub(in crate::tool_io) fn claim_fetch(
+    s: &SessionIo,
+    p: &piarc_protocol::web::WebFetchParams,
+    peer: &Peer,
+) -> Result<(), ErrorObject> {
+    let mut state = lock(&s.policy);
+    let grant = state
+        .grants
+        .get(&p.origin.tool_call_id)
+        .filter(|g| g.belongs(&p.origin.tool, peer) && g.tool == "WebFetch")
+        .ok_or_else(mismatch)?;
+    if grant.input.get("url").and_then(Value::as_str) != Some(p.url.as_str()) {
+        return Err(mismatch());
+    }
+    state.grants.remove(&p.origin.tool_call_id);
+    Ok(())
+}

@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "id": 40,
+  "result": {
+    "url": "https://example.com/",
+    "status": 200,
+    "format": "html",
+    "content": "",
+    "bytes": 0,
+    "bodyTruncated": false,
+    "totalChars": 0,
+    "contentTruncated": false
+  }
+}

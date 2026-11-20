@@ -1,4 +1,5 @@
-//! Model catalog, provider credentials and session model selection (T21).
+//! Model catalog, provider credentials and session model selection (T21); sign-in, per-model
+//! settings and the auxiliary model (T29).
 
 use std::collections::BTreeMap;
 
@@ -33,6 +34,19 @@ pub enum ToolReliability {
     Verified,
     /// Unknown.
     Unknown,
+    /// Known to call tools unreliably: the model gets the conservative Tool Profile (T29).
+    Low,
+}
+
+/// The Tool Profile a model sees (architecture section 6.13): the default one, or the
+/// conservative one with fewer tools, more explicit descriptions and task list reminders.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum ToolProfileKind {
+    /// The full tool set with the default descriptions.
+    Default,
+    /// The conservative subset.
+    Conservative,
 }
 
 /// A selectable chat model and its negotiated capabilities.
@@ -57,6 +71,67 @@ pub struct CatalogModel {
     pub prompt_cache: bool,
     /// Tool calling assessment.
     pub tool_reliability: ToolReliability,
+    /// The effort applied when the model is selected without one (per-model setting, T29).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_effort: Option<EffortLevel>,
+    /// The Tool Profile in effect for the model (T29); absent: the default one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_profile: Option<ToolProfileKind>,
+}
+
+/// The user's settings for one model (T29), each replacing the catalog value.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelOverride {
+    /// Display name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    /// Context window in tokens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_window: Option<u64>,
+    /// Whether image input is accepted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vision: Option<bool>,
+    /// Effort applied when the model is selected.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_effort: Option<EffortLevel>,
+    /// Tool Profile; absent: chosen by the tool reliability.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_profile: Option<ToolProfileKind>,
+    /// Tool reliability Core derives from the provider configuration (keyless local
+    /// endpoints are `low`); not a user setting.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_reliability: Option<ToolReliability>,
+}
+
+/// Model preferences Core gives the Agent Host (T29): per-model settings and the auxiliary
+/// model for one-off calls such as WebFetch's extraction.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelPreferences {
+    /// The auxiliary model; absent: the session's model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auxiliary: Option<ModelRef>,
+    /// Per-model settings keyed by `<provider>/<model id>`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub models: BTreeMap<String, ModelOverride>,
+}
+
+/// A provider that offers sign-in (OAuth or device code) in the settings window (T29).
+/// Anthropic's subscription sign-in is never listed (ADR-0006).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginProvider {
+    /// Pi provider id.
+    pub id: String,
+    /// Provider display name.
+    pub name: String,
+    /// The sign-in method's label.
+    pub label: String,
+    /// Whether access through it is backed by a subscription.
+    pub subscription: bool,
+    /// Whether a signed-in credential is stored in the vault.
+    pub signed_in: bool,
 }
 
 /// A built-in provider accepting API key credentials.
@@ -92,6 +167,9 @@ pub struct ModelsListResult {
     /// Current effort for the session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<EffortLevel>,
+    /// Providers with sign-in (T29).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub login_providers: Vec<LoginProvider>,
 }
 
 /// Estimates a model switch in an open session.
@@ -157,6 +235,153 @@ pub struct SessionModelSelection {
 pub struct ModelsReloadParams {
     /// Enable catalog network requests.
     pub allow_network: bool,
+    /// Current model preferences (T29); absent: unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preferences: Option<ModelPreferences>,
+}
+
+/// Parameters of `models/login/start` (Core → settings Agent Host, T29): sign in to a
+/// provider. The request answers when the sign-in finished; interactions go through
+/// `ui/loginInteraction` tagged with `loginId`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginStartParams {
+    /// Core's id of this sign-in.
+    pub login_id: String,
+    /// Provider id.
+    pub provider: String,
+}
+
+/// Parameters of `models/login/cancel`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginCancelParams {
+    /// The sign-in to stop.
+    pub login_id: String,
+}
+
+/// Parameters of `models/logout`: remove a provider's stored credential.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LogoutParams {
+    /// Provider id.
+    pub provider: String,
+}
+
+/// What a sign-in prompt asks for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum LoginPromptKind {
+    /// Free text.
+    Text,
+    /// Hidden text.
+    Secret,
+    /// One of `options`.
+    Select,
+    /// A code or redirect URL pasted by hand.
+    ManualCode,
+}
+
+/// A choice of a `select` prompt.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginOption {
+    /// Value returned when chosen.
+    pub id: String,
+    /// Label.
+    pub label: String,
+    /// Explanation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+/// A link shown with an `info` interaction.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginLink {
+    /// URL, opened in the system browser after confirmation.
+    pub url: String,
+    /// Label.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+}
+
+/// One step of a sign-in shown to the user. A later interaction of the same sign-in replaces
+/// the one on screen; a replaced prompt is answered with `cancelled`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum LoginInteraction {
+    /// Open the authorization page in the system browser; the result comes back through the
+    /// loopback callback.
+    #[serde(rename_all = "camelCase")]
+    AuthUrl {
+        /// The authorization URL.
+        url: String,
+        /// Extra instructions.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        instructions: Option<String>,
+    },
+    /// Enter `userCode` at `verificationUri`.
+    #[serde(rename_all = "camelCase")]
+    DeviceCode {
+        /// The code to enter.
+        user_code: String,
+        /// Where to enter it.
+        verification_uri: String,
+        /// Seconds until the code expires.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        expires_in_seconds: Option<u64>,
+    },
+    /// A status line.
+    #[serde(rename_all = "camelCase")]
+    Progress {
+        /// Message.
+        message: String,
+    },
+    /// Information with optional links.
+    #[serde(rename_all = "camelCase")]
+    Info {
+        /// Message.
+        message: String,
+        /// Links.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        links: Vec<LoginLink>,
+    },
+    /// A question; the result's `value` is the answer.
+    #[serde(rename_all = "camelCase")]
+    Prompt {
+        /// What is asked for.
+        kind: LoginPromptKind,
+        /// Message.
+        message: String,
+        /// Placeholder.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        placeholder: Option<String>,
+        /// Choices of a `select` prompt.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        options: Vec<LoginOption>,
+    },
+}
+
+/// Parameters of `ui/loginInteraction` (settings Agent Host → Core, T29).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginInteractionParams {
+    /// The sign-in it belongs to.
+    pub login_id: String,
+    /// The provider signing in.
+    pub provider: String,
+    /// What to show.
+    pub interaction: LoginInteraction,
+}
+
+/// Result of `ui/loginInteraction`: the answer of a prompt, nothing for the other kinds.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginInteractionResult {
+    /// The prompt's answer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
 }
 
 /// Acknowledges a successful provider operation.
@@ -234,6 +459,22 @@ request!(
 request!(
     /// Method marker for `models/credential`.
     ModelsCredential, "models/credential", ModelsCredentialParams, ModelsUpdated
+);
+request!(
+    /// Method marker for `models/login/start`.
+    ModelsLoginStart, "models/login/start", LoginStartParams, ModelsUpdated
+);
+request!(
+    /// Method marker for `models/login/cancel`.
+    ModelsLoginCancel, "models/login/cancel", LoginCancelParams, ModelsUpdated
+);
+request!(
+    /// Method marker for `models/logout`.
+    ModelsLogout, "models/logout", LogoutParams, ModelsUpdated
+);
+request!(
+    /// Method marker for `ui/loginInteraction` (Agent Host → Core).
+    UiLoginInteraction, "ui/loginInteraction", LoginInteractionParams, LoginInteractionResult
 );
 request!(
     /// Method marker for `models/credentialStatus`.

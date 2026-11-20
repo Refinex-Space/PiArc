@@ -52,4 +52,7 @@ pub struct CoreWelcome {
     /// Whether Pi may refresh catalogs from the network.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub allow_model_network: Option<bool>,
+    /// Per-model settings and the auxiliary model (T29).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_preferences: Option<crate::models::ModelPreferences>,
 }

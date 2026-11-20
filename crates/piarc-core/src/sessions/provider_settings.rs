@@ -154,6 +154,7 @@ impl Hub {
             settings.project(dir, true)?;
             host.call::<ModelsReload>(ModelsReloadParams {
                 allow_network: false,
+                preferences: None,
             })
             .await
             .map_err(host_error)?;
@@ -181,7 +182,10 @@ impl Hub {
                 let reload = async {
                     ws.acquire()
                         .await?
-                        .call::<ModelsReload>(ModelsReloadParams { allow_network })
+                        .call::<ModelsReload>(ModelsReloadParams {
+                            allow_network,
+                            preferences: None,
+                        })
                         .await
                         .map_err(host_error)
                 }

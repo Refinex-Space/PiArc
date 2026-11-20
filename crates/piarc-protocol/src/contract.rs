@@ -31,8 +31,9 @@ use crate::jsonrpc::{ErrorResponse, Notification, Request, SuccessResponse};
 use crate::memory::FsMemory;
 use crate::method::{Method, NotificationMessage, RequestMessage, ResultMessage};
 use crate::models::{
-    ModelsCredential, ModelsCredentialStatus, ModelsList, ModelsReload, SessionPreviewModelSwitch,
-    SessionSetEffort, SessionSetModel,
+    ModelsCredential, ModelsCredentialStatus, ModelsList, ModelsLoginCancel, ModelsLoginStart,
+    ModelsLogout, ModelsReload, SessionPreviewModelSwitch, SessionSetEffort, SessionSetModel,
+    UiLoginInteraction,
 };
 use crate::policy::{PolicyCancel, PolicyEvaluate, PolicyInputChunk, PolicyPending, PolicyTools};
 use crate::queue::{QueueChanged, QueueDelete, QueueEdit, QueueReorder};
@@ -50,6 +51,7 @@ use crate::turn::{
     ItemAgentMessageDelta, ItemCompleted, ItemReasoningDelta, ItemStarted, ItemUpdated,
     TurnCompleted, TurnRetrying, TurnStarted, TurnUsageReport,
 };
+use crate::web::WebFetch;
 
 /// What a contract describes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -294,6 +296,16 @@ pub static CONTRACTS: &[Contract] = &[
     response::<FsChanges>("fs/changes/result"),
     request::<FsForgetReads>(FsForgetReads::NAME),
     response::<FsForgetReads>("fs/forgetReads/result"),
+    request::<WebFetch>(WebFetch::NAME),
+    response::<WebFetch>("web/fetch/result"),
+    request::<ModelsLoginStart>(ModelsLoginStart::NAME),
+    response::<ModelsLoginStart>("models/login/start/result"),
+    request::<ModelsLoginCancel>(ModelsLoginCancel::NAME),
+    response::<ModelsLoginCancel>("models/login/cancel/result"),
+    request::<ModelsLogout>(ModelsLogout::NAME),
+    response::<ModelsLogout>("models/logout/result"),
+    request::<UiLoginInteraction>(UiLoginInteraction::NAME),
+    response::<UiLoginInteraction>("ui/loginInteraction/result"),
     request::<SessionRewind>(SessionRewind::NAME),
     response::<SessionRewind>("session/rewind/result"),
     request::<SessionSwitchBranch>(SessionSwitchBranch::NAME),

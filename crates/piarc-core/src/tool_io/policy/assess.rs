@@ -276,16 +276,8 @@ pub(super) fn other_call(
     input: &serde_json::Map<String, Value>,
 ) -> Assessment {
     let field = |k: &str| input.get(k).and_then(Value::as_str);
-    let host = field("url")
-        .and_then(|u| u.split_once("://").map(|(_, rest)| rest))
-        .map(|rest| {
-            let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
-            let host = authority.rsplit('@').next().unwrap_or_default();
-            host.rsplit_once(':')
-                .filter(|(_, port)| port.chars().all(|c| c.is_ascii_digit()))
-                .map_or(host, |(h, _)| h)
-                .to_ascii_lowercase()
-        });
+    // The parser `web/fetch` connects with (T29): the rule's host is the fetched host.
+    let host = field("url").and_then(piarc_web::rule_host);
     let name = match tool {
         "Agent" => field("subagent_type"),
         "Skill" => field("skill"),
@@ -312,7 +304,10 @@ pub(super) fn other_call(
         }
         _ => {}
     }
+    // A WebFetch call without a fetchable host offers no rule: `WebFetch` alone would allow
+    // every domain.
     let offered = if ladder.ask.is_none()
+        && !(tool == "WebFetch" && host.is_none())
         && piarc_policy::rules::parse(&suggestion, Behavior::Allow).is_ok()
     {
         vec![suggestion]

@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 41,
+  "method": "models/login/start",
+  "params": {
+    "loginId": "login-1"
+  }
+}

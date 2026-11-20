@@ -831,6 +831,66 @@
     },
     {
       "kind": "request",
+      "method": "web/fetch",
+      "name": "web/fetch",
+      "schema": "WebFetchRequest"
+    },
+    {
+      "kind": "response",
+      "method": "web/fetch",
+      "name": "web/fetch/result",
+      "schema": "WebFetchResponse"
+    },
+    {
+      "kind": "request",
+      "method": "models/login/start",
+      "name": "models/login/start",
+      "schema": "ModelsLoginStartRequest"
+    },
+    {
+      "kind": "response",
+      "method": "models/login/start",
+      "name": "models/login/start/result",
+      "schema": "ModelsLoginStartResponse"
+    },
+    {
+      "kind": "request",
+      "method": "models/login/cancel",
+      "name": "models/login/cancel",
+      "schema": "ModelsLoginCancelRequest"
+    },
+    {
+      "kind": "response",
+      "method": "models/login/cancel",
+      "name": "models/login/cancel/result",
+      "schema": "ModelsLoginCancelResponse"
+    },
+    {
+      "kind": "request",
+      "method": "models/logout",
+      "name": "models/logout",
+      "schema": "ModelsLogoutRequest"
+    },
+    {
+      "kind": "response",
+      "method": "models/logout",
+      "name": "models/logout/result",
+      "schema": "ModelsLogoutResponse"
+    },
+    {
+      "kind": "request",
+      "method": "ui/loginInteraction",
+      "name": "ui/loginInteraction",
+      "schema": "UiLoginInteractionRequest"
+    },
+    {
+      "kind": "response",
+      "method": "ui/loginInteraction",
+      "name": "ui/loginInteraction/result",
+      "schema": "UiLoginInteractionResponse"
+    },
+    {
+      "kind": "request",
       "method": "session/rewind",
       "name": "session/rewind",
       "schema": "SessionRewindRequest"

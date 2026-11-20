@@ -27,6 +27,7 @@ piarc-secrets.workspace = true
 piarc-store.workspace = true
 piarc-telemetry.workspace = true
 piarc-term.workspace = true
+piarc-web.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

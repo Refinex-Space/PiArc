@@ -50,6 +50,24 @@ impl Fixture {
         hooks: bool,
         clock: Arc<dyn piarc_ports::Clock>,
     ) -> Self {
+        Self::build_with(
+            command_env,
+            spell,
+            hooks,
+            clock,
+            super::super::WebConfig::default(),
+        )
+        .await
+    }
+
+    /// [`Fixture::build`] with WebFetch's configuration (T29).
+    async fn build_with(
+        command_env: super::super::CommandEnv,
+        spell: impl FnOnce(&Path) -> PathBuf,
+        hooks: bool,
+        clock: Arc<dyn piarc_ports::Clock>,
+        web: super::super::WebConfig,
+    ) -> Self {
         let root = std::env::temp_dir().join(crate::sessions::new_session_id().expect("unique id"));
         let local = root.join("workspace");
         let data = root.join("data");
@@ -96,6 +114,7 @@ impl Fixture {
         let io = ToolIo::new(ToolIoConfig {
             command_env,
             clock,
+            web,
             ..ToolIoConfig::new(data)
         })
         .policy_services(Services {
@@ -593,6 +612,7 @@ mod t23;
 mod t26;
 mod t27;
 mod t28;
+mod t29;
 
 /// W1 (architecture 15.2): Windows paths through the whole production path, preflight, grant
 /// and directory-bound I/O. Long paths and reserved names are made here, never committed.

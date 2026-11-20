@@ -435,11 +435,8 @@ pub(crate) fn condition(rule: &str, tool: &str, input: &Map<String, Value>, fact
             };
             hit(Subject::Paths(&[posix(&absolute)]), Some(&ctx))
         }
-        "WebFetch" => match field("url").and_then(|u| u.split_once("://")) {
-            Some((_, rest)) => {
-                let host = rest.split(['/', '?', '#', ':']).next().unwrap_or_default();
-                hit(Subject::Domain(&host.to_ascii_lowercase()), None)
-            }
+        "WebFetch" => match field("url").and_then(piarc_web::rule_host) {
+            Some(host) => hit(Subject::Domain(&host), None),
             None => true,
         },
         "Agent" => hit(

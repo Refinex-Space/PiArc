@@ -1,0 +1,26 @@
+{
+  "jsonrpc": "2.0",
+  "id": 21,
+  "method": "models/reload",
+  "params": {
+    "allowNetwork": false,
+    "preferences": {
+      "auxiliary": {
+        "provider": "shop",
+        "id": "small"
+      },
+      "models": {
+        "shop/example": {
+          "displayName": "Example (work)",
+          "contextWindow": 200000,
+          "vision": false,
+          "defaultEffort": "high",
+          "toolProfile": "default"
+        },
+        "local/qwen": {
+          "toolReliability": "low"
+        }
+      }
+    }
+  }
+}

@@ -84,6 +84,7 @@ pub mod tool_call;
 pub mod trust;
 pub mod turn;
 mod version;
+pub mod web;
 
 pub use contract::{CONTRACTS, Contract, ContractKind, contract};
 pub use error::{Error, Result};

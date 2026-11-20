@@ -311,6 +311,11 @@ fn accept_hello(
             .allow_model_network
             .as_ref()
             .map(|v| v.load(Ordering::Acquire)),
+        model_preferences: config.model_preferences.as_ref().map(|p| {
+            p.lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone()
+        }),
     };
     Ok((params, welcome))
 }

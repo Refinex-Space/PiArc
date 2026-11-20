@@ -1,0 +1,25 @@
+{
+  "jsonrpc": "2.0",
+  "id": 44,
+  "method": "ui/loginInteraction",
+  "params": {
+    "loginId": "login-1",
+    "provider": "github-copilot",
+    "interaction": {
+      "type": "prompt",
+      "kind": "select",
+      "message": "Choose an account",
+      "options": [
+        {
+          "id": "work",
+          "label": "Work"
+        },
+        {
+          "id": "home",
+          "label": "Home",
+          "description": "Personal"
+        }
+      ]
+    }
+  }
+}

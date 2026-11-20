@@ -38,6 +38,7 @@ mod hooks;
 mod memory;
 mod memory_reader;
 pub(crate) mod policy;
+mod web;
 
 pub use exec::{CommandEnv, DISPLAY_WINDOW};
 use piarc_exec::{ExecLimits, Launcher};
@@ -59,6 +60,7 @@ use serde_json::{Map, Value};
 use tokio_util::sync::CancellationToken;
 
 use crate::events::EventSender;
+pub use web::WebConfig;
 
 /// Sees every request [`ToolIo`] answers, before it is answered (tests count and hold
 /// requests to observe tool concurrency on Core's side, T14-A06). Production sets none.
@@ -90,6 +92,8 @@ pub struct ToolIoConfig {
     pub observer: Option<Arc<dyn ToolIoObserver>>,
     /// Times the timeout of `AskUserQuestion`'s form (`ui/ask`, T26); tests move it by hand.
     pub clock: Arc<dyn piarc_ports::Clock>,
+    /// Limits and allowlist of `web/fetch` (T29).
+    pub web: WebConfig,
 }
 
 impl std::fmt::Debug for ToolIoConfig {
@@ -115,6 +119,7 @@ impl ToolIoConfig {
             exec_limits: ExecLimits::default(),
             observer: None,
             clock: Arc::new(crate::clock::SystemClock),
+            web: WebConfig::default(),
         }
     }
 }
@@ -165,6 +170,8 @@ pub struct ToolIo {
     policy: Option<policy::Services>,
     /// Snapshots of writes, rewinds and the Changes panel (T28); none without a data directory.
     checkpoints: Option<crate::checkpoints::Checkpoints>,
+    /// The WebFetch fetcher (T29).
+    web: Arc<web::WebState>,
 }
 
 impl std::fmt::Debug for ToolIo {
@@ -197,6 +204,7 @@ impl ToolIo {
             exec: Arc::new(exec),
             policy: None,
             checkpoints: None,
+            web: Arc::default(),
         }
     }
 
@@ -214,6 +222,7 @@ impl ToolIo {
                     | "policy/tools"
                     | "ui/ask"
                     | "context/settings"
+                    | "web/fetch"
             )
     }
 
@@ -391,6 +400,7 @@ impl ToolIo {
             "policy/evaluate" => return self.evaluate(parse(method, params)?, peer).await,
             "policy/tools" => return self.denied_tools(parse(method, params)?).await,
             "ui/ask" => return self.ask(parse(method, params)?, peer).await,
+            "web/fetch" => return self.web_fetch(parse(method, params)?, peer).await,
             "context/settings" => return self.context_settings(&parse(method, params)?).await,
             "fs/changes" => return self.external_changes(&parse(method, params)?).await,
             "fs/forgetReads" => return self.forget_reads(&parse(method, params)?),

@@ -371,6 +371,17 @@
           "minimum": 0,
           "type": "integer"
         },
+        "defaultEffort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EffortLevel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The effort applied when the model is selected without one (per-model setting, T29)."
+        },
         "efforts": {
           "description": "Selectable efforts.",
           "items": {
@@ -399,6 +410,17 @@
         "provider": {
           "description": "Provider id.",
           "type": "string"
+        },
+        "toolProfile": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolProfileKind"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The Tool Profile in effect for the model (T29); absent: the default one."
         },
         "toolReliability": {
           "$ref": "#/$defs/ToolReliability",
@@ -913,6 +935,17 @@
             "$ref": "#/$defs/Capability"
           },
           "type": "array"
+        },
+        "modelPreferences": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelPreferences"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Per-model settings and the auxiliary model (T29)."
         },
         "protocol": {
           "$ref": "#/$defs/ProtocolVersion",
@@ -4497,6 +4530,274 @@
         }
       ]
     },
+    "LoginCancelParams": {
+      "description": "Parameters of `models/login/cancel`.",
+      "properties": {
+        "loginId": {
+          "description": "The sign-in to stop.",
+          "type": "string"
+        }
+      },
+      "required": ["loginId"],
+      "type": "object"
+    },
+    "LoginInteraction": {
+      "description": "One step of a sign-in shown to the user. A later interaction of the same sign-in replaces\nthe one on screen; a replaced prompt is answered with `cancelled`.",
+      "oneOf": [
+        {
+          "description": "Open the authorization page in the system browser; the result comes back through the\nloopback callback.",
+          "properties": {
+            "instructions": {
+              "description": "Extra instructions.",
+              "type": ["string", "null"]
+            },
+            "type": {
+              "const": "authUrl",
+              "type": "string"
+            },
+            "url": {
+              "description": "The authorization URL.",
+              "type": "string"
+            }
+          },
+          "required": ["type", "url"],
+          "type": "object"
+        },
+        {
+          "description": "Enter `userCode` at `verificationUri`.",
+          "properties": {
+            "expiresInSeconds": {
+              "description": "Seconds until the code expires.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": ["integer", "null"]
+            },
+            "type": {
+              "const": "deviceCode",
+              "type": "string"
+            },
+            "userCode": {
+              "description": "The code to enter.",
+              "type": "string"
+            },
+            "verificationUri": {
+              "description": "Where to enter it.",
+              "type": "string"
+            }
+          },
+          "required": ["type", "userCode", "verificationUri"],
+          "type": "object"
+        },
+        {
+          "description": "A status line.",
+          "properties": {
+            "message": {
+              "description": "Message.",
+              "type": "string"
+            },
+            "type": {
+              "const": "progress",
+              "type": "string"
+            }
+          },
+          "required": ["type", "message"],
+          "type": "object"
+        },
+        {
+          "description": "Information with optional links.",
+          "properties": {
+            "links": {
+              "description": "Links.",
+              "items": {
+                "$ref": "#/$defs/LoginLink"
+              },
+              "type": "array"
+            },
+            "message": {
+              "description": "Message.",
+              "type": "string"
+            },
+            "type": {
+              "const": "info",
+              "type": "string"
+            }
+          },
+          "required": ["type", "message"],
+          "type": "object"
+        },
+        {
+          "description": "A question; the result's `value` is the answer.",
+          "properties": {
+            "kind": {
+              "$ref": "#/$defs/LoginPromptKind",
+              "description": "What is asked for."
+            },
+            "message": {
+              "description": "Message.",
+              "type": "string"
+            },
+            "options": {
+              "description": "Choices of a `select` prompt.",
+              "items": {
+                "$ref": "#/$defs/LoginOption"
+              },
+              "type": "array"
+            },
+            "placeholder": {
+              "description": "Placeholder.",
+              "type": ["string", "null"]
+            },
+            "type": {
+              "const": "prompt",
+              "type": "string"
+            }
+          },
+          "required": ["type", "kind", "message"],
+          "type": "object"
+        }
+      ]
+    },
+    "LoginInteractionParams": {
+      "description": "Parameters of `ui/loginInteraction` (settings Agent Host → Core, T29).",
+      "properties": {
+        "interaction": {
+          "$ref": "#/$defs/LoginInteraction",
+          "description": "What to show."
+        },
+        "loginId": {
+          "description": "The sign-in it belongs to.",
+          "type": "string"
+        },
+        "provider": {
+          "description": "The provider signing in.",
+          "type": "string"
+        }
+      },
+      "required": ["loginId", "provider", "interaction"],
+      "type": "object"
+    },
+    "LoginInteractionResult": {
+      "description": "Result of `ui/loginInteraction`: the answer of a prompt, nothing for the other kinds.",
+      "properties": {
+        "value": {
+          "description": "The prompt's answer.",
+          "type": ["string", "null"]
+        }
+      },
+      "type": "object"
+    },
+    "LoginLink": {
+      "description": "A link shown with an `info` interaction.",
+      "properties": {
+        "label": {
+          "description": "Label.",
+          "type": ["string", "null"]
+        },
+        "url": {
+          "description": "URL, opened in the system browser after confirmation.",
+          "type": "string"
+        }
+      },
+      "required": ["url"],
+      "type": "object"
+    },
+    "LoginOption": {
+      "description": "A choice of a `select` prompt.",
+      "properties": {
+        "description": {
+          "description": "Explanation.",
+          "type": ["string", "null"]
+        },
+        "id": {
+          "description": "Value returned when chosen.",
+          "type": "string"
+        },
+        "label": {
+          "description": "Label.",
+          "type": "string"
+        }
+      },
+      "required": ["id", "label"],
+      "type": "object"
+    },
+    "LoginPromptKind": {
+      "description": "What a sign-in prompt asks for.",
+      "oneOf": [
+        {
+          "const": "text",
+          "description": "Free text.",
+          "type": "string"
+        },
+        {
+          "const": "secret",
+          "description": "Hidden text.",
+          "type": "string"
+        },
+        {
+          "const": "select",
+          "description": "One of `options`.",
+          "type": "string"
+        },
+        {
+          "const": "manualCode",
+          "description": "A code or redirect URL pasted by hand.",
+          "type": "string"
+        }
+      ]
+    },
+    "LoginProvider": {
+      "description": "A provider that offers sign-in (OAuth or device code) in the settings window (T29).\nAnthropic's subscription sign-in is never listed (ADR-0006).",
+      "properties": {
+        "id": {
+          "description": "Pi provider id.",
+          "type": "string"
+        },
+        "label": {
+          "description": "The sign-in method's label.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Provider display name.",
+          "type": "string"
+        },
+        "signedIn": {
+          "description": "Whether a signed-in credential is stored in the vault.",
+          "type": "boolean"
+        },
+        "subscription": {
+          "description": "Whether access through it is backed by a subscription.",
+          "type": "boolean"
+        }
+      },
+      "required": ["id", "name", "label", "subscription", "signedIn"],
+      "type": "object"
+    },
+    "LoginStartParams": {
+      "description": "Parameters of `models/login/start` (Core → settings Agent Host, T29): sign in to a\nprovider. The request answers when the sign-in finished; interactions go through\n`ui/loginInteraction` tagged with `loginId`.",
+      "properties": {
+        "loginId": {
+          "description": "Core's id of this sign-in.",
+          "type": "string"
+        },
+        "provider": {
+          "description": "Provider id.",
+          "type": "string"
+        }
+      },
+      "required": ["loginId", "provider"],
+      "type": "object"
+    },
+    "LogoutParams": {
+      "description": "Parameters of `models/logout`: remove a provider's stored credential.",
+      "properties": {
+        "provider": {
+          "description": "Provider id.",
+          "type": "string"
+        }
+      },
+      "required": ["provider"],
+      "type": "object"
+    },
     "MemoryFile": {
       "description": "One memory document with expanded imports.",
       "properties": {
@@ -4546,6 +4847,83 @@
         }
       },
       "required": ["files"],
+      "type": "object"
+    },
+    "ModelOverride": {
+      "description": "The user's settings for one model (T29), each replacing the catalog value.",
+      "properties": {
+        "contextWindow": {
+          "description": "Context window in tokens.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "defaultEffort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EffortLevel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Effort applied when the model is selected."
+        },
+        "displayName": {
+          "description": "Display name.",
+          "type": ["string", "null"]
+        },
+        "toolProfile": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolProfileKind"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Tool Profile; absent: chosen by the tool reliability."
+        },
+        "toolReliability": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolReliability"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Tool reliability Core derives from the provider configuration (keyless local\nendpoints are `low`); not a user setting."
+        },
+        "vision": {
+          "description": "Whether image input is accepted.",
+          "type": ["boolean", "null"]
+        }
+      },
+      "type": "object"
+    },
+    "ModelPreferences": {
+      "description": "Model preferences Core gives the Agent Host (T29): per-model settings and the auxiliary\nmodel for one-off calls such as WebFetch's extraction.",
+      "properties": {
+        "auxiliary": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The auxiliary model; absent: the session's model."
+        },
+        "models": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ModelOverride"
+          },
+          "description": "Per-model settings keyed by `<provider>/<model id>`.",
+          "type": "object"
+        }
+      },
       "type": "object"
     },
     "ModelRef": {
@@ -4772,6 +5150,13 @@
           ],
           "description": "Current effort for the session."
         },
+        "loginProviders": {
+          "description": "Providers with sign-in (T29).",
+          "items": {
+            "$ref": "#/$defs/LoginProvider"
+          },
+          "type": "array"
+        },
         "model": {
           "anyOf": [
             {
@@ -4801,12 +5186,134 @@
       "required": ["providers", "models"],
       "type": "object"
     },
+    "ModelsLoginCancelRequest": {
+      "description": "Request for `models/login/cancel`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "models/login/cancel",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/LoginCancelParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "ModelsLoginCancelResponse": {
+      "description": "Successful response to `models/login/cancel`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/ModelsUpdated"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "ModelsLoginStartRequest": {
+      "description": "Request for `models/login/start`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "models/login/start",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/LoginStartParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "ModelsLoginStartResponse": {
+      "description": "Successful response to `models/login/start`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/ModelsUpdated"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "ModelsLogoutRequest": {
+      "description": "Request for `models/logout`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "models/logout",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/LogoutParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "ModelsLogoutResponse": {
+      "description": "Successful response to `models/logout`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/ModelsUpdated"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
     "ModelsReloadParams": {
       "description": "Reloads Pi configuration and controls catalog refresh.",
       "properties": {
         "allowNetwork": {
           "description": "Enable catalog network requests.",
           "type": "boolean"
+        },
+        "preferences": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelPreferences"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Current model preferences (T29); absent: unchanged."
         }
       },
       "required": ["allowNetwork"],
@@ -7977,6 +8484,21 @@
       "required": ["tool", "toolCallId"],
       "type": "object"
     },
+    "ToolProfileKind": {
+      "description": "The Tool Profile a model sees (architecture section 6.13): the default one, or the\nconservative one with fewer tools, more explicit descriptions and task list reminders.",
+      "oneOf": [
+        {
+          "const": "default",
+          "description": "The full tool set with the default descriptions.",
+          "type": "string"
+        },
+        {
+          "const": "conservative",
+          "description": "The conservative subset.",
+          "type": "string"
+        }
+      ]
+    },
     "ToolReliability": {
       "description": "How thoroughly the model has been exercised with tools.",
       "oneOf": [
@@ -7988,6 +8510,11 @@
         {
           "const": "unknown",
           "description": "Unknown.",
+          "type": "string"
+        },
+        {
+          "const": "low",
+          "description": "Known to call tools unreliably: the model gets the conservative Tool Profile (T29).",
           "type": "string"
         }
       ]
@@ -8473,6 +9000,43 @@
       "required": ["results"],
       "type": "object"
     },
+    "UiLoginInteractionRequest": {
+      "description": "Request for `ui/loginInteraction`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "ui/loginInteraction",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/LoginInteractionParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "UiLoginInteractionResponse": {
+      "description": "Successful response to `ui/loginInteraction`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/LoginInteractionResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
     "UploadPart": {
       "description": "One piece of a text sent in several requests.",
       "properties": {
@@ -8502,6 +9066,163 @@
           "type": "string"
         }
       ]
+    },
+    "WebContentFormat": {
+      "description": "How `content` was produced.",
+      "oneOf": [
+        {
+          "const": "markdown",
+          "description": "Converted from HTML.",
+          "type": "string"
+        },
+        {
+          "const": "text",
+          "description": "Text the server sent as it was.",
+          "type": "string"
+        }
+      ]
+    },
+    "WebFetchParams": {
+      "description": "Parameters of `web/fetch`.",
+      "properties": {
+        "origin": {
+          "$ref": "#/$defs/ToolOrigin",
+          "description": "The approved `WebFetch` call; its input's `url` must equal `url`."
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session of the call."
+        },
+        "url": {
+          "description": "The URL to fetch (`http:` or `https:`).",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "origin", "url"],
+      "type": "object"
+    },
+    "WebFetchRequest": {
+      "description": "Request for `web/fetch`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "web/fetch",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/WebFetchParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "WebFetchResponse": {
+      "description": "Successful response to `web/fetch`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/WebFetchResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "WebFetchResult": {
+      "description": "Result of `web/fetch`.",
+      "properties": {
+        "bodyTruncated": {
+          "description": "The body was longer than the byte limit and was cut.",
+          "type": "boolean"
+        },
+        "bytes": {
+          "description": "Body bytes read.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "content": {
+          "description": "The page as Markdown or text, cut to the character limit.",
+          "type": "string"
+        },
+        "contentTruncated": {
+          "description": "The converted text was longer than the character limit and was cut.",
+          "type": "boolean"
+        },
+        "contentType": {
+          "description": "The response's `Content-Type`.",
+          "type": ["string", "null"]
+        },
+        "format": {
+          "$ref": "#/$defs/WebContentFormat",
+          "description": "How `content` was produced."
+        },
+        "redirect": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WebRedirect"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Present when the response redirected to another site; `content` is then empty."
+        },
+        "status": {
+          "description": "The HTTP status of that response.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "totalChars": {
+          "description": "Characters of the converted text before the cut.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "url": {
+          "description": "The URL the response came from (after same-site redirects), or the redirecting URL.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "status",
+        "format",
+        "content",
+        "bytes",
+        "bodyTruncated",
+        "totalChars",
+        "contentTruncated"
+      ],
+      "type": "object"
+    },
+    "WebRedirect": {
+      "description": "A redirect to another site that Core did not follow.",
+      "properties": {
+        "status": {
+          "description": "The redirect status (301, 302, 303, 307, 308).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "url": {
+          "description": "The absolute target URL.",
+          "type": "string"
+        }
+      },
+      "required": ["url", "status"],
+      "type": "object"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -8919,6 +9640,36 @@
     },
     {
       "$ref": "#/$defs/FsForgetReadsResponse"
+    },
+    {
+      "$ref": "#/$defs/WebFetchRequest"
+    },
+    {
+      "$ref": "#/$defs/WebFetchResponse"
+    },
+    {
+      "$ref": "#/$defs/ModelsLoginStartRequest"
+    },
+    {
+      "$ref": "#/$defs/ModelsLoginStartResponse"
+    },
+    {
+      "$ref": "#/$defs/ModelsLoginCancelRequest"
+    },
+    {
+      "$ref": "#/$defs/ModelsLoginCancelResponse"
+    },
+    {
+      "$ref": "#/$defs/ModelsLogoutRequest"
+    },
+    {
+      "$ref": "#/$defs/ModelsLogoutResponse"
+    },
+    {
+      "$ref": "#/$defs/UiLoginInteractionRequest"
+    },
+    {
+      "$ref": "#/$defs/UiLoginInteractionResponse"
     },
     {
       "$ref": "#/$defs/SessionRewindRequest"

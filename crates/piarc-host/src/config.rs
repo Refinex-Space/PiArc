@@ -59,6 +59,9 @@ pub struct HostConfig {
     pub capabilities: Vec<Capability>,
     /// The live user preference read at each handshake, including restarts.
     pub allow_model_network: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    /// The live model preferences (T29) read at each handshake, including restarts.
+    pub model_preferences:
+        Option<std::sync::Arc<std::sync::Mutex<piarc_protocol::models::ModelPreferences>>>,
     /// How long to wait for `host/hello` after starting the process.
     pub handshake_timeout: Duration,
     /// Interval between `host/ping` heartbeats.
@@ -109,8 +112,11 @@ impl HostConfig {
                 Capability::new("ask"),
                 Capability::new("context"),
                 Capability::new("checkpoints"),
+                Capability::new("webFetch"),
+                Capability::new("login"),
             ],
             allow_model_network: None,
+            model_preferences: None,
             handshake_timeout: Duration::from_secs(10),
             heartbeat_interval: Duration::from_secs(30),
             heartbeat_timeout: Duration::from_secs(10),

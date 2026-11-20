@@ -36,7 +36,8 @@
         "piarc-diff",
         "piarc-git",
         "piarc-secrets",
-        "piarc-telemetry"
+        "piarc-telemetry",
+        "piarc-web"
       ],
       "mayDependOn": ["foundation"]
     },
