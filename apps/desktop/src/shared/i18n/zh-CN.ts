@@ -24,6 +24,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'permissions.invalid': '无效：{reason}',
   'permissions.broad': '范围较宽：这条规则允许很多命令',
   'permissions.neverMatches': '永不匹配，请改写为 {rule}',
+  'permissions.parameter': '按调用的 {key} 参数匹配（只用于拒绝与询问规则）',
   'permissions.add': '添加规则',
   'permissions.edit': '编辑',
   'permissions.remove': '删除',

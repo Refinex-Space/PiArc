@@ -24,6 +24,7 @@ export const en = {
   'permissions.invalid': 'Invalid: {reason}',
   'permissions.broad': 'Broad: this rule allows many commands',
   'permissions.neverMatches': 'Never matches; write {rule} instead',
+  'permissions.parameter': "Matches the call's {key} argument (deny and ask rules only)",
   'permissions.add': 'Add rule',
   'permissions.edit': 'Edit',
   'permissions.remove': 'Remove',

@@ -21,6 +21,8 @@ interface RuleRow {
   readonly error?: string;
   /** The rule that matches what this one names, when it can never match (I85). */
   readonly suggestion?: string;
+  /** The call argument a parameter rule matches (`Agent(model:opus)`, I82). */
+  readonly parameter?: string;
   readonly broad: boolean;
   readonly inactive: boolean;
 }
@@ -77,12 +79,14 @@ export function parseView(raw: string): PermissionView {
           if (rule === undefined || !isBehavior(r.behavior)) return [];
           const error = str(r.error);
           const suggestion = str(r.suggestion);
+          const parameter = str(r.parameter);
           const row = {
             behavior: r.behavior,
             rule,
             broad: r.broad === true,
             inactive: r.inactive === true,
             ...(suggestion === undefined ? {} : { suggestion }),
+            ...(parameter === undefined ? {} : { parameter }),
           };
           return [error === undefined ? row : { ...row, error }];
         },
@@ -150,7 +154,9 @@ function RuleEditor({
   const { t } = useApp();
   const [text, setText] = useState(initial);
   const [list, setList] = useState<RuleBehavior>(behavior);
-  const [check, setCheck] = useState<{ error?: string; broad: boolean } | undefined>(undefined);
+  const [check, setCheck] = useState<
+    { error?: string; broad: boolean; parameter?: string } | undefined
+  >(undefined);
   useEffect(() => {
     const rule = text.trim();
     if (rule === '') {
@@ -165,7 +171,12 @@ function RuleEditor({
           const value: unknown = JSON.parse(raw);
           if (!live || !isRecord(value)) return;
           const error = str(value.error);
-          setCheck({ broad: value.broad === true, ...(error === undefined ? {} : { error }) });
+          const parameter = str(value.parameter);
+          setCheck({
+            broad: value.broad === true,
+            ...(error === undefined ? {} : { error }),
+            ...(parameter === undefined ? {} : { parameter }),
+          });
         })
         .catch(() => undefined);
     }, 150);
@@ -223,6 +234,11 @@ function RuleEditor({
       {check?.error !== undefined && (
         <p className="error-text" role="alert" data-testid="permission-check">
           {t('permissions.invalid', { reason: check.error })}
+        </p>
+      )}
+      {check?.error === undefined && check?.parameter !== undefined && (
+        <p className="muted" data-testid="permission-parameter">
+          {t('permissions.parameter', { key: check.parameter })}
         </p>
       )}
       {check?.error === undefined && check?.broad === true && list === 'allow' && (
@@ -310,6 +326,12 @@ function SourceSection({
                     )}
                     {r.broad && r.behavior === 'allow' && (
                       <span className="muted"> {t('permissions.broad')}</span>
+                    )}
+                    {r.parameter !== undefined && (
+                      <span className="muted" data-testid="permission-parameter">
+                        {' '}
+                        {t('permissions.parameter', { key: r.parameter })}
+                      </span>
                     )}
                     {r.inactive && <span className="muted"> {t('permissions.inactive')}</span>}
                     {r.suggestion !== undefined && (

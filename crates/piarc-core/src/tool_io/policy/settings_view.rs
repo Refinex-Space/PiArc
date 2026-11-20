@@ -33,16 +33,21 @@ pub(crate) struct AuditQuery {
 
 /// Whether `rule` parses for `behavior`, and whether it is broad. A rule that parses but can
 /// never match (`Write(path)`, `Glob(path)`, … as in Claude Code) carries the rule to write
-/// instead (I85: T20 saved `Write(path)` rules; Claude Code only matches `Edit(path)`).
+/// instead (I85: T20 saved `Write(path)` rules; Claude Code only matches `Edit(path)`). A
+/// parameter rule (`Agent(model:opus)`, I82) names the argument it matches.
 #[must_use]
 pub(crate) fn check_rule(rule: &str, behavior: Behavior) -> Value {
     match parse(rule, behavior) {
         Ok(parsed) => {
             let mut row = json!({"broad": behavior == Behavior::Allow && RuleSet::is_broad(rule)});
-            if matches!(parsed.spec, Some(Spec::Inert))
-                && let Some(instead) = inert_replacement(rule)
-            {
-                row["suggestion"] = json!(instead);
+            match parsed.spec {
+                Some(Spec::Inert) => {
+                    if let Some(instead) = inert_replacement(rule) {
+                        row["suggestion"] = json!(instead);
+                    }
+                }
+                Some(Spec::Param { key, .. }) => row["parameter"] = json!(key),
+                _ => {}
             }
             row
         }
@@ -331,5 +336,22 @@ mod tests {
                 "{fine}"
             );
         }
+    }
+
+    #[test]
+    fn parameter_rules_name_the_argument_they_match() {
+        let row = check_rule("Agent(model:opus)", Behavior::Deny);
+        assert_eq!(row["parameter"], "model");
+        assert_eq!(
+            check_rule("Bash(run_in_background:true)", Behavior::Ask)["parameter"],
+            "run_in_background"
+        );
+        for other in ["Agent(Explore)", "Bash(ls *)", "Agent"] {
+            assert!(
+                check_rule(other, Behavior::Deny).get("parameter").is_none(),
+                "{other}"
+            );
+        }
+        assert!(check_rule("Agent(model:opus)", Behavior::Allow)["error"].is_string());
     }
 }
