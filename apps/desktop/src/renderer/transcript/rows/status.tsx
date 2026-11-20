@@ -21,10 +21,14 @@ export function ReminderRow({ id, item }: { readonly id: string; readonly item: 
   const kinds = [...new Set(item.reminders.map((r) => t(`transcript.reminder.${r.type}`)))];
   return (
     <div className="row row-reminder" data-testid="reminder-row" data-row-id={id} role="note">
-      <div className="row-reminder-head">
-        {t('transcript.reminder.title', { kinds: kinds.join(t('transcript.reminder.separator')) })}
+      <div className="row-reminder-body">
+        <div className="row-reminder-head">
+          {t('transcript.reminder.title', {
+            kinds: kinds.join(t('transcript.reminder.separator')),
+          })}
+        </div>
+        <div className="row-reminder-text">{item.text}</div>
       </div>
-      <div className="row-reminder-text">{item.text}</div>
     </div>
   );
 }

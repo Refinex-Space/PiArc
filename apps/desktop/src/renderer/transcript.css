@@ -650,10 +650,13 @@
 /* system reminders (detailed view, T29) */
 
 .row-reminder {
-  border-left: 2px dashed var(--piarc-border-subtle);
-  padding-left: var(--piarc-space-3);
   color: var(--piarc-text-secondary);
   font-size: var(--piarc-font-size-small);
+}
+
+.row-reminder-body {
+  border-left: 2px dashed var(--piarc-border-subtle);
+  padding-left: var(--piarc-space-3);
 }
 
 .row-reminder-head {

@@ -279,37 +279,7 @@ impl Env {
             &pi.join("settings.json"),
             &json!({ "retry": { "baseDelayMs": 5 } }),
         )?;
-        let (auth, oauth_file) = match spec.oauth {
-            Some(oauth) => {
-                let auth = crate::auth_server::MockAuthServer::start(
-                    crate::auth_server::AuthBehavior::Approve,
-                    0,
-                )
-                .await
-                .map_err(|e| format!("authorization server: {e}"))?;
-                let base = mocks
-                    .values()
-                    .next()
-                    .map(MockProvider::openai_base_url)
-                    .unwrap_or_default();
-                let file = root.join("oauth-provider.json");
-                let flow = match oauth.flow {
-                    super::login_spec::OAuthFlow::AuthorizationCode => "authorizationCode",
-                    super::login_spec::OAuthFlow::DeviceCode => "deviceCode",
-                };
-                write_json(
-                    &file,
-                    &json!({
-                        "id": login::OAUTH_PROVIDER, "baseUrl": base, "flow": flow,
-                        "tokenUrl": auth.token_url(), "authorizeUrl": auth.authorize_url(),
-                        "deviceUrl": auth.device_url(),
-                        "models": [{ "id": "oauth-model", "contextWindow": 32_000, "maxTokens": 1024 }],
-                    }),
-                )?;
-                (Some(auth), Some(file))
-            }
-            None => (None, None),
-        };
+        let (auth, oauth_file) = login::oauth_setup(spec, &mocks, root).await?;
         let gate = Arc::new(Gate::new(spec.expect.tool_batches.clone()));
         let home = root.join("home 家");
         let command_env = command_env(&home)?;

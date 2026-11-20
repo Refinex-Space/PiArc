@@ -155,11 +155,11 @@ test('sign-in flows, refusal, expiry and cancel; model settings', async ({
     await shoot(settings, 'login-denied');
     await settings.getByTestId('login-close').click();
 
-    // Cancel while waiting for the browser.
+    // Cancel while waiting for the browser: the step takes the focus, so Escape cancels.
     auth.decide('approve');
     await signIn(settings);
-    await expect(settings.getByTestId('login-auth-url')).toBeVisible();
-    await settings.getByTestId('login-cancel').click();
+    await expect(settings.getByTestId('login-open-browser')).toBeFocused();
+    await settings.keyboard.press('Escape');
     await outcome(settings, 'cancelled');
     await settings.getByTestId('login-close').click();
 

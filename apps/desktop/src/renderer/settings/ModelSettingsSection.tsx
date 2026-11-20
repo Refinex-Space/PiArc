@@ -18,6 +18,12 @@ const EFFORT_LABELS: Record<string, MessageId> = {
   max: 'models.effort.max',
 };
 
+const RELIABILITY_LABELS: Record<string, MessageId> = {
+  verified: 'models.settings.reliabilityVerified',
+  unknown: 'models.settings.reliabilityUnknown',
+  low: 'models.settings.reliabilityLow',
+};
+
 interface Draft {
   displayName: string;
   contextWindow: string;
@@ -76,6 +82,8 @@ function ModelForm({
     setInvalid(undefined);
   };
   const id = (name: string) => `${base}-${name}`;
+  const label = RELIABILITY_LABELS[model.toolReliability];
+  const reliabilityText = label === undefined ? model.toolReliability : t(label);
   return (
     <form
       className="settings-section model-form"
@@ -90,7 +98,7 @@ function ModelForm({
         onSave(result);
       }}
     >
-      <fieldset className="settings-section" disabled={busy}>
+      <fieldset className="settings-section provider-form" disabled={busy}>
         <div className="setting">
           <label className="setting-label" htmlFor={id('name')}>
             {t('models.settings.displayName')}
@@ -185,7 +193,7 @@ function ModelForm({
             }}
           >
             <option value="">
-              {t('models.settings.profileAuto', { reliability: model.toolReliability })}
+              {t('models.settings.profileAuto', { reliability: reliabilityText })}
             </option>
             <option value="default">{t('models.settings.profileDefault')}</option>
             <option value="conservative">{t('models.settings.profileConservative')}</option>

@@ -262,6 +262,16 @@ export function SignInSection({
     void window.piarc.answerLogin(current.loginId, null);
   }, []);
   const outcome = view?.outcome;
+  // Steps arrive after the dialog opened: each one takes the focus (its main action, or the
+  // title while there is none), so the keyboard and Escape keep working inside the dialog.
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const stepKey = view === undefined ? '' : JSON.stringify([view.step ?? null, outcome ?? null]);
+  useEffect(() => {
+    const dialog = titleRef.current?.closest('[role="dialog"]');
+    if (dialog === null || dialog === undefined) return;
+    const target = dialog.querySelector<HTMLElement>('[data-autofocus]') ?? titleRef.current;
+    target?.focus();
+  }, [stepKey]);
   return (
     <section className="settings-subsection" data-testid="sign-in-section">
       <h2 className="settings-heading">{t('providers.signIn.title')}</h2>
@@ -324,7 +334,7 @@ export function SignInSection({
       )}
       {view === undefined ? null : (
         <Dialog labelledBy={titleId} onCancel={cancel} testId="login-dialog">
-          <h2 id={titleId} className="dialog-title">
+          <h2 id={titleId} className="dialog-title" ref={titleRef} tabIndex={-1}>
             {t('login.title', { name: view.provider.name })}
           </h2>
           {outcome === undefined ? (

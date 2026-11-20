@@ -6,8 +6,14 @@ use piarc_core::providers::Operation;
 use serde_json::Value;
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
-use super::{Driver, call};
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+
+use serde_json::json;
+
+use super::{Driver, MockProvider, call, write_json};
 use crate::auth_server::AuthBehavior;
+use crate::l2::format::ScenarioSpec;
 use crate::l2::login_spec::{SignInAction, SignInBehavior};
 
 /// The test provider's id (`--test-oauth-provider`).
@@ -176,4 +182,39 @@ impl Driver<'_> {
         }
         Ok(())
     }
+}
+
+/// The scenario's mock authorization server and the test provider's file, when it has an
+/// `oauth` section.
+pub(super) async fn oauth_setup(
+    spec: &ScenarioSpec,
+    mocks: &BTreeMap<String, MockProvider>,
+    root: &Path,
+) -> Result<(Option<crate::auth_server::MockAuthServer>, Option<PathBuf>), String> {
+    let Some(oauth) = spec.oauth else {
+        return Ok((None, None));
+    };
+    let auth = crate::auth_server::MockAuthServer::start(AuthBehavior::Approve, 0)
+        .await
+        .map_err(|e| format!("authorization server: {e}"))?;
+    let base = mocks
+        .values()
+        .next()
+        .map(MockProvider::openai_base_url)
+        .unwrap_or_default();
+    let file = root.join("oauth-provider.json");
+    let flow = match oauth.flow {
+        crate::l2::login_spec::OAuthFlow::AuthorizationCode => "authorizationCode",
+        crate::l2::login_spec::OAuthFlow::DeviceCode => "deviceCode",
+    };
+    write_json(
+        &file,
+        &json!({
+            "id": OAUTH_PROVIDER, "baseUrl": base, "flow": flow,
+            "tokenUrl": auth.token_url(), "authorizeUrl": auth.authorize_url(),
+            "deviceUrl": auth.device_url(),
+            "models": [{ "id": "oauth-model", "contextWindow": 32_000, "maxTokens": 1024 }],
+        }),
+    )?;
+    Ok((Some(auth), Some(file)))
 }
