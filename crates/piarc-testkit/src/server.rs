@@ -357,7 +357,72 @@ fn serve(
         step_index,
         response_number: seq,
     };
-    respond(format, step, &context, parsed.include_usage, record)
+    let step = fill_results(step, &parsed);
+    respond(format, &step, &context, parsed.include_usage, record)
+}
+
+/// Opens a placeholder in a tool call's arguments: `{{result:<tool call id>:<regex>}}`.
+const RESULT_PLACEHOLDER: &str = "{{result:";
+
+/// `step` with every `{{result:<tool call id>:<regex>}}` in its tool call arguments replaced by
+/// the first capture group of `<regex>` in that tool result's text in `request`: a script can
+/// use a value only known at run time (a background task's output file, T32). A placeholder
+/// that finds nothing becomes `<no match for …>`, so the request that uses it fails visibly.
+fn fill_results<'a>(step: &'a Step, request: &Request) -> std::borrow::Cow<'a, Step> {
+    let uses = step
+        .tool_calls
+        .iter()
+        .any(|call| call.input.to_string().contains(RESULT_PLACEHOLDER));
+    if !uses {
+        return std::borrow::Cow::Borrowed(step);
+    }
+    let mut filled = step.clone();
+    for call in &mut filled.tool_calls {
+        fill_value(&mut call.input, request);
+    }
+    std::borrow::Cow::Owned(filled)
+}
+
+fn fill_value(value: &mut Value, request: &Request) {
+    match value {
+        Value::String(text) => {
+            while let Some(start) = text.find(RESULT_PLACEHOLDER) {
+                let rest = &text[start + RESULT_PLACEHOLDER.len()..];
+                let Some(end) = rest.find("}}") else { break };
+                let replacement = resolve(&rest[..end], request);
+                text.replace_range(
+                    start..start + RESULT_PLACEHOLDER.len() + end + 2,
+                    &replacement,
+                );
+            }
+        }
+        Value::Array(items) => items.iter_mut().for_each(|v| fill_value(v, request)),
+        Value::Object(map) => map.values_mut().for_each(|v| fill_value(v, request)),
+        _ => {}
+    }
+}
+
+/// `<tool call id>:<regex>` → the first capture group in that result's text.
+fn resolve(spec: &str, request: &Request) -> String {
+    let found = spec.split_once(':').and_then(|(id, pattern)| {
+        let text = request
+            .messages
+            .iter()
+            .flat_map(|m| &m.tool_result_contents)
+            .find(|content| content.id == id)?
+            .text
+            .clone();
+        let pattern = regex::Regex::new(pattern).ok()?;
+        let captures = pattern.captures(&text)?;
+        Some(
+            captures
+                .get(1)
+                .or_else(|| captures.get(0))?
+                .as_str()
+                .to_owned(),
+        )
+    });
+    found.unwrap_or_else(|| format!("<no match for {spec}>"))
 }
 
 fn is_auxiliary(format: WireFormat, path: &str, body: &str) -> bool {

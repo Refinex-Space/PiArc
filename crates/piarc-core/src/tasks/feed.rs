@@ -215,9 +215,11 @@ impl MonitorFeed {
         // The newest lines that fit; the ones before them are summarized.
         let mut kept: Vec<&str> = Vec::new();
         let mut chars = 0;
+        let mut cut_by_chars = false;
         for (_, line) in fresh.iter().rev().take(limits.monitor_batch_lines) {
             let count = line.chars().count() + 1;
             if chars + count > budget {
+                cut_by_chars = true;
                 break;
             }
             chars += count;
@@ -238,8 +240,9 @@ impl MonitorFeed {
             ));
         }
         text.extend(kept.iter().map(|l| (*l).to_owned()));
+        // The total limit decides when it, not the batch size, cut the lines kept.
         let last = self.delivered_chars + chars >= limits.monitor_total_chars
-            || (omitted > 0 && remaining <= limits.monitor_batch_chars);
+            || (cut_by_chars && remaining < limits.monitor_batch_chars);
         let with_end = self.end.as_ref().filter(|_| !last);
         if let Some(end) = with_end {
             text.push(end_words(end));

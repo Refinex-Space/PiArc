@@ -1,0 +1,42 @@
+id: monitor-permissions
+description: Monitor's command goes through the Bash rules and analysis (T32) - a Bash deny rule refuses it without asking, a Bash allow rule lets it run, and a read-only command that Bash would run unasked still needs the user's approval in Manual mode (the user declines here).
+capabilities: [CAP-MONITOR-PERM-001]
+workspace:
+  trusted: true
+  files:
+    app.log: "booted\n"
+    .piarc/settings.json: '{"permissions":{"deny":["Bash(cat *)"]}}'
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"allow":["Bash(sleep *)"]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: denied, name: Monitor, input: { command: 'cat app.log', description: the log } }
+      - tool_calls:
+          - {
+              id: allowed,
+              name: Monitor,
+              input: { command: 'sleep 300', description: a quiet watch },
+            }
+      - tool_calls:
+          - {
+              id: asked,
+              name: Monitor,
+              input: { command: 'tail -n 1 app.log', description: the tail },
+            }
+      - text: Done.
+approvals:
+  - { tool: Monitor, decision: deny, feedback: Not now. }
+actions:
+  - prompt: { text: Set up the watchers., turn: t }
+  - wait: { method: core/tasks, params: { kind: monitor, status: running, title: a quiet watch } }
+expect:
+  requests:
+    - index: 3
+      tool_results:
+        - { id: denied, is_error: true, contains: 'Bash(cat *)' }
+        - { id: allowed, is_error: false, contains: 'Monitor started as task bg-' }
+        - { id: asked, is_error: true, contains: Not now. }
+  request_counts: { main: 4 }

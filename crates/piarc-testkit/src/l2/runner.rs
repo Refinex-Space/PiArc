@@ -251,6 +251,8 @@ struct Env {
     oauth_file: Option<PathBuf>,
     /// The task manager's clock (T32), kept across Core restarts; `advance_clock` moves it.
     clock: Arc<piarc_core::clock::ManualClock>,
+    /// The scenario's Monitor limits (T32).
+    task_limits: Option<super::format::TaskLimitsSpec>,
 }
 
 impl Env {
@@ -327,6 +329,7 @@ impl Env {
             auth,
             oauth_file,
             clock: piarc_core::clock::ManualClock::new(),
+            task_limits: spec.task_limits,
         })
     }
 
@@ -357,7 +360,9 @@ impl Env {
             command_env: Some(self.command_env.clone()),
             tasks: piarc_core::tasks::TasksConfig {
                 clock: self.clock.clone(),
-                ..piarc_core::tasks::TasksConfig::default()
+                limits: self
+                    .task_limits
+                    .map_or_else(Default::default, |spec| spec.apply(Default::default())),
             },
             web: piarc_core::tool_io::WebConfig {
                 allowlist: if self.web.is_some() {

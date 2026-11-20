@@ -44,7 +44,7 @@ expect:
       index: 1
       roles: [user]
       user_texts: [Report what the project memory says.]
-      tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite, Agent]
+      tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, KillShell, Monitor, TodoWrite, Agent]
       contains:
         ['Project memory: keep answers short.', 'Git status at session start', 'PiArc subagent']
       not_contains: ['What does the memory say?']

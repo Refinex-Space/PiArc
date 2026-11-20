@@ -1,0 +1,41 @@
+id: bg-completion-reminder
+description: When background tasks end, the session's next turn gets a system reminder per task with its id, command, exit code and what it means, how long it ran, its output file and last lines - a failing exit code and grep's 1 (no matches, a success) alike (T32).
+capabilities: [CAP-BG-NOTICE-001]
+workspace:
+  files:
+    notes.txt: "alpha\nbeta\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: toolu_fail
+            name: Bash
+            input:
+              { command: "printf 'checking\\nbroken: 3 tests\\n'; exit 3", run_in_background: true }
+          - id: toolu_grep
+            name: Bash
+            input: { command: 'grep needle notes.txt', run_in_background: true }
+      - text: 'Both run in the background.'
+      - text: 'One failed, one found nothing.'
+actions:
+  - prompt: { text: 'Start both.', turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - wait: { method: core/tasks, params: { status: failed, exitCode: 3 } }
+  - wait: { method: core/tasks, params: { status: completed, exitCode: 1, meaning: no matches } }
+  - prompt: { text: 'How did they end?', turn: two }
+expect:
+  requests:
+    - index: 1
+      not_contains: ['has ended.']
+    - index: 2
+      contains:
+        - '[PiArc reminder]'
+        - 'has ended.\nCommand: printf'
+        - 'Status: failed (exit code 3)'
+        - 'Last lines:\nchecking\nbroken: 3 tests'
+        - 'has ended.\nCommand: grep needle notes.txt\nStatus: completed successfully (exit code 1: no matches)'
+        - 'It printed nothing.'
+        - 'Ran for: '
+        - 'bytes); read it with Read.'
+  request_counts: { main: 3 }

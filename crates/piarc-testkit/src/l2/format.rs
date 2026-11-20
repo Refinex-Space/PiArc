@@ -90,6 +90,9 @@ pub struct ScenarioSpec {
     pub workspace: WorkspaceSpec,
     /// Mock endpoints by name.
     pub providers: BTreeMap<String, ProviderSpec>,
+    /// Smaller Monitor limits for this scenario (T32): Core's defaults when absent.
+    #[serde(default)]
+    pub task_limits: Option<TaskLimitsSpec>,
     /// A local web server for WebFetch (T29); see [`crate::l2::web`].
     #[serde(default)]
     pub web: Option<crate::l2::web::WebSpec>,
@@ -120,6 +123,38 @@ impl ScenarioSpec {
     pub fn fixture(&self, name: &str) -> PathBuf {
         name.split('/')
             .fold(self.fixture_dir.clone(), |path, part| path.join(part))
+    }
+}
+
+/// Monitor limits a scenario sets (T32): each one replaces Core's default.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaskLimitsSpec {
+    /// Lines one Monitor reminder carries at most.
+    pub monitor_batch_lines: Option<usize>,
+    /// Characters one Monitor reminder carries at most.
+    pub monitor_batch_chars: Option<usize>,
+    /// Characters a Monitor delivers in all.
+    pub monitor_total_chars: Option<usize>,
+}
+
+impl TaskLimitsSpec {
+    /// `limits` with these values in place.
+    #[must_use]
+    pub fn apply(
+        &self,
+        mut limits: piarc_core::tasks::TaskLimits,
+    ) -> piarc_core::tasks::TaskLimits {
+        if let Some(lines) = self.monitor_batch_lines {
+            limits.monitor_batch_lines = lines;
+        }
+        if let Some(chars) = self.monitor_batch_chars {
+            limits.monitor_batch_chars = chars;
+        }
+        if let Some(chars) = self.monitor_total_chars {
+            limits.monitor_total_chars = chars;
+        }
+        limits
     }
 }
 

@@ -12,6 +12,7 @@ mod provider_settings;
 mod queue;
 mod rewind;
 mod support;
+mod tasks;
 mod turns;
 
 use piarc_core::composer::UserInput;

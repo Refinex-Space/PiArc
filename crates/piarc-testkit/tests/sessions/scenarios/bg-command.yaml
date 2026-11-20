@@ -1,0 +1,12 @@
+# T32: a background command that waits for the test's `release` file, then the turn ends; after
+# the Agent Host crashed and came back, the next prompt's request carries the task's notice.
+id: bg-command
+steps:
+  - tool_calls:
+      - id: toolu_bg
+        name: Bash
+        input:
+          command: 'while [ ! -f release ]; do sleep 0.05; done; echo finished-bg'
+          run_in_background: true
+  - text: 'It runs in the background.'
+  - text: 'It finished.'

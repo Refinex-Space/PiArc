@@ -1,0 +1,36 @@
+id: monitor-hooks-bash-matcher
+description: A PreToolUse hook whose matcher is Bash also runs for a Monitor call (T32, Claude Code's matching) and its deny refuses it before anyone is asked; the hook sees tool_name Monitor and the call's arguments.
+capabilities: [CAP-MONITOR-PERM-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .claude/settings.json: |
+      {"hooks": {"PreToolUse": [
+        {"matcher": "Bash", "hooks": [{"type": "command", "command": "node hook.mjs bash"}]}
+      ]}}
+    hook-plans/bash.json: '{"json": {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "No watchers here."}}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: watch, name: Monitor, input: { command: 'sleep 300', description: nothing } }
+      - text: Understood.
+actions:
+  - prompt: { text: Start a watcher., turn: t }
+expect:
+  requests:
+    - index: 1
+      tool_results: [{ id: watch, is_error: true, contains: No watchers here. }]
+  json_lines:
+    hook-log/bash.jsonl:
+      - input:
+          {
+            hook_event_name: PreToolUse,
+            tool_name: Monitor,
+            tool_use_id: watch,
+            tool_input: { command: 'sleep 300', description: nothing },
+          }
+  request_counts: { main: 2 }

@@ -374,3 +374,36 @@ fn command_env() -> Vec<(std::ffi::OsString, std::ffi::OsString)> {
         })
         .collect()
 }
+
+/// Starts the Agent Host through a wrapper that writes its pid to the returned file.
+pub fn record_host_pid(env: &Env, config: &mut piarc_core::CoreConfig) -> std::path::PathBuf {
+    let Some(piarc_core::agent_host::AgentHostLaunch::Custom { bundle, .. }) =
+        &mut config.sessions.launch
+    else {
+        panic!("expected development host")
+    };
+    let wrapper = env.root.join("host.mjs");
+    let pid_file = env.root.join("host.pid");
+    std::fs::write(&wrapper, format!(
+        "import {{writeFileSync}} from 'node:fs';\nimport {{pathToFileURL}} from 'node:url';\nwriteFileSync({},String(process.pid));\nawait import(pathToFileURL({}).href);",
+        serde_json::to_string(&pid_file).expect("path"), serde_json::to_string(bundle).expect("bundle"))).expect("wrapper");
+    *bundle = wrapper;
+    pid_file
+}
+
+/// Kills the Agent Host whose pid `record_host_pid` wrote.
+pub fn kill_host(pid_file: &std::path::Path) {
+    let pid = std::fs::read_to_string(pid_file)
+        .expect("host pid")
+        .parse::<u32>()
+        .expect("pid");
+    let killed = std::process::Command::new(node())
+        .args([
+            "-e",
+            "process.kill(Number(process.argv[1]),'SIGKILL')",
+            &pid.to_string(),
+        ])
+        .status()
+        .expect("kill this host");
+    assert!(killed.success());
+}

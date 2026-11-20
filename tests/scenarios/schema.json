@@ -68,6 +68,16 @@
         }
       }
     },
+    "task_limits": {
+      "description": "Smaller Monitor limits for this scenario (T32); Core's defaults otherwise.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "monitor_batch_lines": { "type": "integer", "minimum": 1 },
+        "monitor_batch_chars": { "type": "integer", "minimum": 1 },
+        "monitor_total_chars": { "type": "integer", "minimum": 1 }
+      }
+    },
     "web": {
       "description": "A local web server for WebFetch (T29). {{web}} in page bodies, redirect targets and tool call arguments becomes http://127.0.0.1:<port>, {{web_alt}} the same server as http://localhost:<port>; Core's WebFetch allowlist admits both for these scenarios only.",
       "type": "object",

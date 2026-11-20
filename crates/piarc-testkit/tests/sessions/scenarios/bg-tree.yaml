@@ -1,0 +1,11 @@
+# T32: a background command with a child and a grandchild that ignores SIGTERM; Core quits
+# while they run. The pid files hold Windows pids on Git Bash (`/proc/<pid>/winpid`).
+id: bg-tree
+steps:
+  - tool_calls:
+      - id: toolu_tree
+        name: Bash
+        input:
+          command: 'bash -c ''trap "" TERM; sleep 120 & (cat /proc/$!/winpid 2>/dev/null || echo $!) > grand.pid; wait'' & (cat /proc/$!/winpid 2>/dev/null || echo $!) > child.pid; while [ ! -s grand.pid ]; do sleep 0.05; done; echo started; wait'
+          run_in_background: true
+  - text: 'The tree runs.'

@@ -1,17 +1,17 @@
 //! Workspace and session lifecycle: warm-up and idle reclaim (T14-A09), snapshot revisions
 //! (A10), fork and close (A12, Core side).
 
-use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
 
-use piarc_core::agent_host::AgentHostLaunch;
 use piarc_core::clock::ManualClock;
 use piarc_core::composer::UserInput;
 use piarc_core::sessions::Op;
 use serde_json::Value;
 
-use crate::support::{Env, answer, mock_model, node, prompt_text, reply, shutdown, user_texts};
+use crate::support::{
+    Env, answer, kill_host, mock_model, prompt_text, record_host_pid, reply, shutdown, user_texts,
+};
 use crate::{open_session, prompt};
 
 fn host_of(snapshot: &Value, ws: &std::path::Path) -> Option<String> {
@@ -188,37 +188,6 @@ async fn child_request(env: &Env) {
     tokio::time::timeout(crate::support::WAIT, polled)
         .await
         .expect("the subagent's request reached the mock");
-}
-
-/// Starts the Agent Host through a wrapper that writes its pid to the returned file.
-fn record_host_pid(env: &Env, config: &mut piarc_core::CoreConfig) -> std::path::PathBuf {
-    let Some(AgentHostLaunch::Custom { bundle, .. }) = &mut config.sessions.launch else {
-        panic!("expected development host")
-    };
-    let wrapper = env.root.join("host.mjs");
-    let pid_file = env.root.join("host.pid");
-    std::fs::write(&wrapper, format!(
-        "import {{writeFileSync}} from 'node:fs';\nimport {{pathToFileURL}} from 'node:url';\nwriteFileSync({},String(process.pid));\nawait import(pathToFileURL({}).href);",
-        serde_json::to_string(&pid_file).expect("path"), serde_json::to_string(bundle).expect("bundle"))).expect("wrapper");
-    *bundle = wrapper;
-    pid_file
-}
-
-/// Kills the Agent Host whose pid `record_host_pid` wrote.
-fn kill_host(pid_file: &std::path::Path) {
-    let pid = std::fs::read_to_string(pid_file)
-        .expect("host pid")
-        .parse::<u32>()
-        .expect("pid");
-    let killed = Command::new(node())
-        .args([
-            "-e",
-            "process.kill(Number(process.argv[1]),'SIGKILL')",
-            &pid.to_string(),
-        ])
-        .status()
-        .expect("kill this host");
-    assert!(killed.success());
 }
 
 /// T31: the Agent Host stops while the main session waits for a foreground subagent. The

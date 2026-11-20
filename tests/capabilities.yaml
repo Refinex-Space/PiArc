@@ -350,7 +350,7 @@ capabilities:
     task: T07
     status: active
   - id: CAP-TOOL-BASH-002
-    title: 'Bash 超时终止整个进程树，输出给出语义成败'
+    title: 'Bash 终止整个进程树（KillShell、中断；T32 起超时转后台），输出给出语义成败'
     milestone: M1
     refs: [FR-TL-01, FR-TL-02, ARCH-6.11]
     task: T17
@@ -362,7 +362,7 @@ capabilities:
     task: T17
     status: active
   - id: CAP-EXEC-TIMEOUT-001
-    title: '命令超时（默认 2 分钟、上限 10 分钟）后整棵进程树被终止，结果带已有输出与超时说明'
+    title: '命令超时（默认 2 分钟、上限 10 分钟）后转为后台任务继续运行（T32 替换 T17 的终止），结果说明转后台、任务 id 与输出文件'
     milestone: M1
     refs: [FR-TL-01, ARCH-6.11]
     task: T17
@@ -440,17 +440,59 @@ capabilities:
     task: T38
     status: planned
   - id: CAP-BG-COMMAND-001
-    title: '后台命令、超时转后台与 KillShell'
+    title: 'run_in_background 启动的命令立即返回任务 id 与输出文件，模型用 Read 读取输出'
     milestone: M3
     refs: [FR-TL-04, ARCH-6.11]
     task: T32
-    status: planned
+    status: active
+  - id: CAP-BG-TIMEOUT-001
+    title: '前台命令超时后转为后台任务，同一进程继续运行，工具结果说明已转后台'
+    milestone: M3
+    refs: [FR-TL-04, ARCH-6.11]
+    task: T32
+    status: active
+  - id: CAP-BG-NOTICE-001
+    title: '后台任务结束后，任务 id、命令、退出码与语义、耗时、输出文件与尾部预览在下一回合以 system reminder 注入'
+    milestone: M3
+    refs: [FR-TL-04, ARCH-6.6, ARCH-6.11]
+    task: T32
+    status: active
+  - id: CAP-BG-KILL-001
+    title: 'KillShell 终止整棵进程树并保留输出，只能停止本会话（含子 agent）的任务'
+    milestone: M3
+    refs: [FR-TL-04, ARCH-6.11]
+    task: T32
+    status: active
+  - id: CAP-BG-SUBAGENT-001
+    title: '后台子 agent 进入任务管理器，可从面板停止，状态记为 killed'
+    milestone: M3
+    refs: [FR-TL-04, FR-HN-04, ARCH-6.11]
+    task: T32
+    status: active
   - id: CAP-BG-MONITOR-001
-    title: 'Monitor 监视后台任务输出并唤醒会话'
+    title: 'Monitor 后台运行命令，把新增输出按行回灌给模型'
     milestone: M3
     refs: [FR-TL-04, ARCH-6.11]
     task: T32
-    status: planned
+    status: active
+  - id: CAP-MONITOR-RATE-001
+    title: 'Monitor 单次回灌受行数与字符数上限约束，超出时说明省略行数与输出文件；总量到上限后停止回灌并告知模型'
+    milestone: M3
+    refs: [FR-TL-04, ARCH-6.11]
+    task: T32
+    status: active
+  - id: CAP-MONITOR-PERM-001
+    title: 'Monitor 的命令受 Bash 规则、Bash 分析与 Bash matcher 的 PreToolUse hooks 约束，Manual 模式下需要审批'
+    milestone: M3
+    refs: [FR-TL-04, FR-PM-03, ARCH-6.2, ARCH-6.3]
+    task: T32
+    status: active
+  - id: CAP-MONITOR-WAKE-001
+    title: '会话空闲时 Monitor 的新增输出唤醒会话，唤醒频率受限速约束'
+    milestone: M3
+    refs: [FR-TL-04, ARCH-6.11]
+    task: T32
+    status: active
   - id: CAP-TERM-SCREEN-001
     title: '集成终端与会话共享目录和环境，agent 可读取后台终端的屏幕内容'
     milestone: M3
