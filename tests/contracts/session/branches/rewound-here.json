@@ -7,9 +7,7 @@
     "ts": 1763200004300,
     "branches": [
       {
-        "options": [
-          { "entryId": "a1b2c3d4", "turnId": "turn-1", "preview": "Add a CLI flag" }
-        ]
+        "options": [{ "entryId": "a1b2c3d4", "turnId": "turn-1", "preview": "Add a CLI flag" }]
       }
     ]
   }
