@@ -113,7 +113,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | 1 M0 技术验证 | Electron 安全基线、NAPI 事件通道、mock provider、Agent Host 多会话与 AHP、Operations 委托、凭据保险箱、transcript 渲染、终端、沙箱、打包与首次运行；S1–S10 两个平台的结论 | T03–T12、W0 | R1 | 已完成（有条件进入 M1） |
 | 2 M1 可行走骨架 | 存储与信任、会话编排与投影、L2 场景、文件工具与 Bash、客户端外壳、transcript 与 composer、基础审批、模型与凭据、system prompt 与 memory | T13–T22 | R2 | 已完成（macOS 达标；Windows 由 W1 达标，UNC 待验证） |
 | 3 M2 Harness 核心 | 权限规则与 Bash 分析、配置兼容层、hooks、计划模式与任务清单、压缩与用量、检查点与回退、WebFetch 与登录、L3 对齐；Windows 达到 M1 | W1、T23–T30 | R3 | 已完成（macOS 达标，R3；Windows 的 M1 由 W1 达标，UNC 与 M2 由 W2 验收） |
-| 4 M3 多会话与生态 | 子 agent、后台任务、终端、worktree 与并行会话、MCP、skills 与命令、WebSearch 与 hooks 扩展；Windows 达到 M2 | W2、T31–T38 | R4 | 未开始 |
+| 4 M3 多会话与生态 | 子 agent、后台任务、终端、worktree 与并行会话、MCP、skills 与命令、WebSearch 与 hooks 扩展；Windows 达到 M2 | W2、T31–T38 | R4 | 进行中 |
 | 5 M4 安全与打磨 | 沙箱、插件、配置诊断与用量、NotebookEdit 与通知、无障碍与本地化、性能预算、安全收口；Windows 达到 M3 | W3、T39–T45 | R5 | 未开始 |
 | 6 M5 Beta | Auto 模式、自动记忆与托管配置、M5 补全、侧边对话与平台快捷操作、发布流水线；Windows 达到 M4 并与 Beta 同步；两平台端到端验收 | T46–T50、W4、T51 | R6 | 未开始 |
 
@@ -159,7 +159,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T30 | [L3 行为对齐基座](tasks/T30-l3-behavior-alignment.md) | 3 | T29 | macOS | high / 高 | 中 | 无 | 已完成 | f52b5aa |
 | R3 | [M2 评审](tasks/R3-m2-review.md) | 3 | T30、W1 | macOS | high / 高 | 中 | 无 | 部分完成 | 8e2b4a2 |
 | W2 | [Windows：M2 达标](tasks/W2-windows-m2-parity.md) | 4 | R3 | Windows | high / 高 | 中 | 无 | 未开始 | — |
-| T31 | [子 agent 与模型别名](tasks/T31-subagents-and-model-aliases.md) | 4 | R3 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
+| T31 | [子 agent 与模型别名](tasks/T31-subagents-and-model-aliases.md) | 4 | R3 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
 | T32 | [后台任务、Monitor 与 KillShell](tasks/T32-background-tasks-and-monitor.md) | 4 | T31 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T33 | [无头终端（Core 侧）](tasks/T33-headless-terminal.md) | 4 | T32 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T34 | [终端渲染器与终端面板](tasks/T34-terminal-renderer-and-panel.md) | 4 | T33 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -308,6 +308,21 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+**T31 子 agent 与模型别名**（开工 2026-11-20，基线 abd7209；依赖 R3 为部分完成，遗留 R3-A07 只等 W2 的 UNC 验证，不影响本任务）
+
+- [ ] 1. 定义来源与解析：五个来源与优先级、frontmatter 全字段、不支持字段与解析错误（文件、行号）、项目级 `permissionMode` 限制；AHP `resources/listAgents`
+- [ ] 2. 内置类型 `general-purpose`、`Explore`、`Plan`（自写身份段与描述）
+- [ ] 3. 模型别名表：解析器（Agent Host 共享位置）、用户级与工作区设置、effort 映射；I113 的 `model`/`effortLevel` 键
+- [ ] 4. 子会话运行时：`Agent` 工具、上下文隔离、工具过滤与闸门、深度与并发上限、`maxTurns`、`permissionMode`、前台 `onUpdate` 投影
+- [ ] 5. 后台子 agent：任务 ID、完成后 `backgroundTask` 提醒、主会话关闭时 interrupted
+- [ ] 6. 中断传播与补齐、Agent Host 崩溃时的 uncertain / interrupted
+- [ ] 7. Core：子会话登记（I73 独立文件状态表）、审批来源字段与账本、"本会话允许"作用于会话树、`Agent(类型)` 规则（I82 参数规则、I128 错误枚举）
+- [ ] 8. Core：子 agent 写入计入主会话检查点；frontmatter `hooks` 作为限定作用域来源
+- [ ] 9. Core：`sessions` 表父子关系与 JSONL 路径、重建索引还原、侧栏排除；`subagent/*` 通知
+- [ ] 10. 客户端：子 agent 卡（状态、模型、耗时、工具数、token、后台、停止、警告）与子会话转录；审批卡来源；设置页别名一节与子 agent 列表
+- [ ] 11. L2 场景 `subagent-*` 与能力 ID；L3 复核 `Agent`/`ListAgents` 条目（I117）
+- [ ] 12. 验收 A01–A14、文档（AGENTS.md、架构、复用表、登记事项）与收尾
 
 ## 登记事项
 
