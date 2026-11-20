@@ -1121,6 +1121,11 @@ textarea.input {
   align-items: center;
   gap: var(--piarc-space-2);
 }
+/* A workspace path longer than the page shrinks the selector instead of widening the page. */
+.permission-filters > .input {
+  min-width: 0;
+  max-width: 100%;
+}
 .permission-editor .input[aria-label] {
   min-width: 0;
 }
