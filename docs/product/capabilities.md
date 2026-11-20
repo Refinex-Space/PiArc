@@ -103,8 +103,8 @@
 | CAP-HOOK-PERM-001 | PermissionRequest hook | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-permission-request` | 已实现 |
 | CAP-HOOK-POST-001 | PostToolUse 与 PostToolUseFailure hooks（可改写输出、追加上下文） | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-post-tool-use` | 已实现 |
 | CAP-HOOK-PRE-001 | PreToolUse hook 参与权限裁决 | FR-HN-05、ARCH-6.3.2、ARCH-6.2.3 | T25 | `hooks-pre-tool-use` | 已实现 |
-| CAP-HOOK-PROMPT-001 | UserPromptSubmit hook | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-user-prompt-submit` | 已实现 |
-| CAP-HOOK-SESSION-001 | SessionStart 与 SessionEnd hooks | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-session-end`<br>`hooks-session-start` | 已实现 |
+| CAP-HOOK-PROMPT-001 | UserPromptSubmit hook | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-session-start-order`<br>`hooks-user-prompt-submit` | 已实现 |
+| CAP-HOOK-SESSION-001 | SessionStart 与 SessionEnd hooks | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-session-end`<br>`hooks-session-start`<br>`hooks-session-start-order` | 已实现 |
 | CAP-HOOK-STOP-001 | Stop hook（block 时续跑一轮，带防循环计数） | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-stop`<br>`hooks-stop-limit` | 已实现 |
 | CAP-MODEL-AUXILIARY-001 | 辅助模型调用通道：设置中指定辅助模型（未设置时用会话模型），用量计入会话 | FR-TL-03、ARCH-6.13 | T29 | `webfetch-auxiliary-model` | 已实现 |
 | CAP-MODEL-PROFILE-001 | 工具调用可靠性低的模型使用保守 Tool Profile，可在每模型设置中改回默认 | FR-MD-04、ARCH-6.13、ARCH-6.1.1 | T29 | `model-profile-conservative`<br>`model-profile-default` | 已实现 |
