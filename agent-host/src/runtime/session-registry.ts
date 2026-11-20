@@ -16,16 +16,10 @@ import { randomUUID } from 'node:crypto';
 import type { Api, Model } from '@earendil-works/pi-ai';
 import path from 'node:path';
 import {
-  createAgentSessionFromServices,
-  createAgentSessionRuntime,
-  createAgentSessionServices,
-  createMcpExtension,
   getAgentDir,
   SessionManager,
-  SettingsManager,
   type AgentSessionEvent,
   type AgentSession,
-  type CreateAgentSessionRuntimeFactory,
 } from '@earendil-works/pi-coding-agent';
 import type {
   HistoryWindow,
@@ -44,19 +38,12 @@ import type {
   SessionStopped,
 } from '@piarc/protocol';
 
-import { IDENTITY } from '../harness/prompts/system.js';
-import { expiredApprovals, policyGate } from '../harness/policy.js';
+import { expiredApprovals } from '../harness/policy.js';
 import type { SessionHarness } from '../harness/session-harness.js';
-import {
-  interruptedContext,
-  missingToolCalls,
-  repairInterruptedTurn,
-} from '../harness/interruption.js';
-import { takeOverProjectTrust, type TrustTakeover } from '../harness/project-trust.js';
+import { missingToolCalls, repairInterruptedTurn } from '../harness/interruption.js';
 import { CONCURRENCY_SAFE_TOOLS, ToolBatches } from '../harness/tool-batches.js';
-import { createToolResultBudget, TOOL_RESULT_LIMITS } from '../harness/tool-results.js';
 import { AhpError, describeError } from '../protocol/errors.js';
-import { DEFAULT_PROFILE, ToolNameMap, toolOptions } from '../tools/index.js';
+import { DEFAULT_PROFILE, ToolNameMap } from '../tools/index.js';
 import { conservativeProfile } from '../tools/profile.js';
 import { capabilities } from '../providers/catalog.js';
 import {
@@ -84,19 +71,13 @@ import { InputQueue } from './queue.js';
 import {
   checkImageInput,
   checkSessionId,
-  onlyConservative,
   prepareAttachments,
-  scheduled,
-  shellsFor,
   stopped,
   withHookContext,
 } from './session-helpers.js';
-import {
-  PI_NATIVE_TOOLS,
-  type HostedSession,
-  type Job,
-  type RegistryOptions,
-} from './session-types.js';
+import { createSessionRuntime } from './session-runtime.js';
+import { SubagentRunner } from './subagents.js';
+import type { HostedSession, Job, RegistryOptions } from './session-types.js';
 import type { Workspace } from './workspace.js';
 
 export type {
@@ -111,6 +92,8 @@ export class SessionRegistry {
   readonly #sessions = new Map<string, HostedSession>();
   /** Opens in progress by session id: a second resume of the same id waits for the first. */
   readonly #opening = new Map<string, Promise<SessionOpened>>();
+  /** Subagent runs (T31): child sessions under these sessions, and their limits. */
+  readonly subagents: SubagentRunner;
 
   constructor(options: RegistryOptions) {
     if (path.resolve(getAgentDir()) !== path.resolve(options.workspace.agentDir)) {
@@ -120,6 +103,19 @@ export class SessionRegistry {
       );
     }
     this.#options = options;
+    this.subagents = new SubagentRunner(options, (id) => {
+      const hosted = this.#sessions.get(id);
+      if (hosted === undefined) return undefined;
+      const { session } = hosted.runtime;
+      return {
+        sessionId: id,
+        cwd: session.sessionManager.getCwd(),
+        session,
+        harness: hosted.harness,
+        sink: options.sinkFor(id),
+        tools: () => session.getActiveToolNames().map(hosted.toCanonical),
+      };
+    });
   }
 
   get size(): number {
@@ -318,9 +314,11 @@ export class SessionRegistry {
     return this.#reopen(sessionId, hosted);
   }
 
-  /** The running turn of `sessionId` (its writes' checkpoint). */
+  /** The running turn of `sessionId` (its writes' checkpoint); a subagent's writes belong to
+   * its main session's turn (T31). */
   activeTurn(sessionId: string): string | undefined {
-    return this.#sessions.get(sessionId)?.projector.activeTurnId;
+    const root = this.subagents.rootOf(sessionId);
+    return this.#sessions.get(root)?.projector.activeTurnId;
   }
 
   /**
@@ -399,6 +397,8 @@ export class SessionRegistry {
     const hosted = this.#get(sessionId);
     const turnId = hosted.projector.activeTurnId;
     hosted.closed = true;
+    // Its subagents end with it, background ones included (T31).
+    this.subagents.abortBelow(sessionId);
     hosted.projector.markAborting();
     hosted.memory.cancel();
     const returned = hosted.queue.takeAll();
@@ -570,7 +570,6 @@ export class SessionRegistry {
   ): Promise<SessionOpened> {
     const recovering = source === 'resume';
     const { workspace } = this.#options;
-    let trust: TrustTakeover | undefined;
     const selected =
       model === undefined ? undefined : workspace.modelRuntime.getModel(model.provider, model.id);
     if (model !== undefined && selected === undefined) {
@@ -605,6 +604,8 @@ export class SessionRegistry {
     const sessionLog = (line: string): void => {
       this.#options.log(`[session ${manager.getSessionId()}] ${line}`);
     };
+    // The `Agent` tool lists the types Core found from the session's directory (T31).
+    const agents = await this.subagents.hostFor(manager.getSessionId(), cwd);
     const { harness, memory, hooks } = sessionParts({
       options: this.#options,
       manager,
@@ -615,109 +616,24 @@ export class SessionRegistry {
       canonical: toCanonical,
       opened,
       log: sessionLog,
+      ...(agents === undefined ? {} : { agents }),
     });
-    const factory: CreateAgentSessionRuntimeFactory = async (target) => {
-      // In-memory overrides (no silent provider retries, the compaction threshold) are
-      // applied by `harness.compaction` once the session exists and before every run.
-      const settingsManager = SettingsManager.create(target.cwd, target.agentDir, {
-        projectTrusted: false,
-      });
-      const io =
-        tools.kind === 'core' ? tools.ioFor(target.sessionManager.getSessionId()) : undefined;
-      // Which command tools the session gets depends on the shells Core found (T17).
-      const sessionTools =
-        tools.kind === 'core' && io !== undefined
-          ? scheduled(
-              onlyConservative(
-                toolOptions(
-                  io,
-                  profile,
-                  await shellsFor(io, this.#options.log),
-                  settingsManager.getImageAutoResize(),
-                  this.#options.memoryBridge ? memory.searched : undefined,
-                  harness.tools(),
-                ),
-                conservative,
-                toCanonical,
-              ),
-              batches,
-            )
-          : { tools: PI_NATIVE_TOOLS };
-      // Long tool results go to the session's temporary directory (Harness Kit).
-      const budget =
-        io === undefined
-          ? []
-          : [
-              createToolResultBudget({
-                io,
-                isExempt: (tool) => toCanonical(tool) === 'Read',
-                limits: this.#options.toolResultLimits ?? TOOL_RESULT_LIMITS,
-              }),
-            ];
-      // Project-level Pi resources (`.pi/settings.json`, `.pi/mcp.json`, extensions) load
-      // only for directories Core trusts: nothing project-level is read until the takeover
-      // hook has Core's answer.
-      trust = takeOverProjectTrust(target.cwd, this.#options.isTrusted);
-      const services = await createAgentSessionServices({
-        cwd: target.cwd,
-        agentDir: target.agentDir,
-        modelRuntime: workspace.modelRuntime,
-        settingsManager,
-        resourceLoaderReloadOptions: trust.reloadOptions,
-        resourceLoaderOptions: {
-          // PiArc assembles project context itself (T22).
-          noContextFiles: true,
-          systemPromptOverride: () => IDENTITY,
-          appendSystemPromptOverride: () => [],
-          extensionFactories: [
-            ...(tools.kind === 'core'
-              ? [
-                  policyGate(
-                    tools.bridge,
-                    target.sessionManager.getSessionId(),
-                    toCanonical,
-                    (id) => {
-                      projector.markDeclined(id);
-                    },
-                    (line) => {
-                      this.#options.log(
-                        `[session ${target.sessionManager.getSessionId()}] ${line}`,
-                      );
-                    },
-                    hooks?.notes,
-                    (mode) => {
-                      harness.recordMode(mode);
-                    },
-                  ),
-                ]
-              : []),
-            createMcpExtension(),
-            ...budget,
-            // After the budget: hooks see (and may replace) what the model would read.
-            ...(hooks === undefined ? [] : [hooks.extension]),
-            interruptedContext,
-            memory.extension,
-            ...(tools.kind === 'core' ? harness.extensions() : []),
-          ],
-          // Extension tools (MCP, project extensions) run under the same batches.
-          extensionsOverride: (result) => batches.wrapExtensions(result),
-        },
-      });
-      const result = await createAgentSessionFromServices({
-        services,
-        sessionManager: target.sessionManager,
-        ...sessionTools,
-        ...(target.sessionStartEvent === undefined
-          ? {}
-          : { sessionStartEvent: target.sessionStartEvent }),
-        ...(selected === undefined ? {} : { model: selected }),
-      });
-      return { ...result, services, diagnostics: services.diagnostics };
-    };
-    const runtime = await createAgentSessionRuntime(factory, {
+    const { runtime, trusted } = await createSessionRuntime({
+      options: this.#options,
+      manager,
       cwd,
-      agentDir: workspace.agentDir,
-      sessionManager: manager,
+      profile,
+      conservative,
+      canonical: toCanonical,
+      batches,
+      harness,
+      memory,
+      hooks,
+      model: selected,
+      declined: (id) => {
+        opened.projector?.markDeclined(id);
+      },
+      log: sessionLog,
     });
     const { session } = runtime;
     if (tools.kind === 'core' && this.#profileKind(session.model) !== kind) {
@@ -786,6 +702,8 @@ export class SessionRegistry {
           ? await expiredApprovals(tools.bridge, sessionId, missingToolCalls(session))
           : new Map<string, string>();
       const repair = repairInterruptedTurn(session, expired);
+      // Background subagents the previous process ran are over (T31).
+      if (recovering) this.subagents.recover(session.sessionId, session.sessionManager, harness);
       if (repair.toolResults > 0 || repair.marker) {
         log(
           `closed a turn left unfinished: ${String(repair.toolResults)} interrupted tool result(s), marker ${String(repair.marker)}`,
@@ -803,7 +721,7 @@ export class SessionRegistry {
       throw error;
     }
     log(
-      `opened in ${cwd} (trusted: ${String(trust?.trusted() ?? false)}, model: ${session.model?.provider ?? '-'}/${session.model?.id ?? '-'})`,
+      `opened in ${cwd} (trusted: ${String(trusted())}, model: ${session.model?.provider ?? '-'}/${session.model?.id ?? '-'})`,
     );
     this.#sessions.set(sessionId, hosted);
     return this.#opened(sessionId);

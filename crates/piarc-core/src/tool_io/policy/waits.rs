@@ -46,8 +46,11 @@ pub(super) async fn post_card(
         if generation.is_cancelled() || peer.is_closed() {
             return Err(denied(LOST));
         }
+        // A subagent's card names it; it shows in the main session (T31).
+        let mut shown = card.clone();
+        shown.subagent = super::super::subagents::origin(s, &card.session_id);
         if !state.ledger.insert(
-            card.clone(),
+            shown,
             Pending {
                 call: call.to_owned(),
                 reply: tx,

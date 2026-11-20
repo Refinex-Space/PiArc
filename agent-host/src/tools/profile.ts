@@ -8,6 +8,7 @@
 // The descriptions are PiArc's own text (ADR-0006): they describe the behavior of these tools
 // (Pi's tool implementations behind Core's I/O), not Claude Code's.
 
+import { AGENT_DESCRIPTION } from '../harness/prompts/subagents.js';
 import { TOOL_GUIDANCE } from '../harness/prompts/tools.js';
 
 /** The tools whose file and command I/O Core performs, in the order the model sees them. A
@@ -27,8 +28,16 @@ export const HOST_TOOLS = [
 /** Tools whose network request Core makes (T29, `web/fetch`), after the Core tools. */
 export const WEB_TOOLS = ['WebFetch'] as const;
 
+/** The subagent tool (T31, `harness/subagents/agent-tool.ts`), after the host tools. */
+export const AGENT_TOOLS = ['Agent'] as const;
+
 /** The tools the default profile describes, in the order the model sees them. */
-export const CANONICAL_TOOLS = [...CORE_TOOLS, ...WEB_TOOLS, ...HOST_TOOLS] as const;
+export const CANONICAL_TOOLS = [
+  ...CORE_TOOLS,
+  ...WEB_TOOLS,
+  ...HOST_TOOLS,
+  ...AGENT_TOOLS,
+] as const;
 
 /** A tool whose I/O Core performs. */
 export type CoreTool = (typeof CORE_TOOLS)[number];
@@ -207,6 +216,12 @@ export const DEFAULT_PROFILE: ToolProfile = {
       'the user would send it. The user can run one in this session or start a new session ' +
       'with it. The call returns at once; finish the turn after it.',
     ...TOOL_GUIDANCE.SuggestNextSteps,
+  },
+  // The list of types the session may start follows this text (`withTypes`).
+  Agent: {
+    name: 'Agent',
+    description: AGENT_DESCRIPTION,
+    ...TOOL_GUIDANCE.Agent,
   },
 };
 

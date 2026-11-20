@@ -182,6 +182,9 @@ pub struct AgentsListParams {
     /// The directory project definitions are looked up from; inside the connection's
     /// workspace.
     pub cwd: String,
+    /// The Agent Host's built-in types, for `deniedBuiltIn`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub built_in: Vec<String>,
 }
 
 /// Result of `agents/list` and `resources/listAgents`.
@@ -195,6 +198,9 @@ pub struct AgentsList {
     pub issues: Vec<AgentIssue>,
     /// The limits that apply.
     pub limits: SubagentLimits,
+    /// Built-in types an `Agent(<name>)` deny rule removes (`agents/list`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub denied_built_in: Vec<String>,
     /// The model alias table (alias → `<provider>/<model id>`), as `resources/listAgents`
     /// resolved it.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]

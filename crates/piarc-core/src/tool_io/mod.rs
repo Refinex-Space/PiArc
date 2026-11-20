@@ -38,6 +38,7 @@ mod hooks;
 mod memory;
 mod memory_reader;
 pub(crate) mod policy;
+pub(crate) mod subagents;
 mod web;
 
 pub use exec::{CommandEnv, DISPLAY_WINDOW};
@@ -145,6 +146,8 @@ struct SessionIo {
     sandbox: Option<SessionSandbox>,
     /// The running (or last) turn: writes without a `turnId` go to its checkpoint (T28).
     turn: Mutex<Option<String>>,
+    /// Set for a subagent's session (T31): its main session and how it was started.
+    subagent: Option<subagents::Link>,
 }
 
 /// What a sandboxed session may reach besides its workspace (architecture section 6.10).
@@ -248,7 +251,26 @@ impl ToolIo {
             .and_then(|scope| scope.with_read_only_dir(&tmp))
             .and_then(|scope| scope.with_read_only_dir(&attachments))
             .map_err(|e| e.to_error_object())?;
-        self.register(session_id, scope, tmp, None);
+        self.register(session_id, scope, tmp, None, None);
+        Ok(())
+    }
+
+    /// Registers a subagent's session (T31) like [`ToolIo::open_session`], linked to its
+    /// main session.
+    fn open_linked(
+        &self,
+        session_id: &str,
+        root: &Path,
+        cwd: &Path,
+        link: subagents::Link,
+    ) -> Result<(), ErrorObject> {
+        let tmp = self.create_tmp(session_id)?;
+        let attachments = self.create_attachments(session_id)?;
+        let scope = Scope::new(root, cwd)
+            .and_then(|scope| scope.with_read_only_dir(&tmp))
+            .and_then(|scope| scope.with_read_only_dir(&attachments))
+            .map_err(|e| e.to_error_object())?;
+        self.register(session_id, scope, tmp, None, Some(link));
         Ok(())
     }
 
@@ -304,7 +326,7 @@ impl ToolIo {
         let sandbox = SessionSandbox::start(&policy, allowlist, Arc::new(SystemNetwork))
             .await
             .map_err(|e| sandbox_error(&e))?;
-        self.register(session_id, scope, tmp, Some(sandbox));
+        self.register(session_id, scope, tmp, Some(sandbox), None);
         Ok(())
     }
 
@@ -318,6 +340,7 @@ impl ToolIo {
         scope: Scope,
         tmp_dir: PathBuf,
         sandbox: Option<SessionSandbox>,
+        subagent: Option<subagents::Link>,
     ) {
         let blob_dir = self.session_dir(session_id).join("blobs");
         let shell_cwd = Mutex::new(scope.cwd().to_path_buf());
@@ -336,6 +359,7 @@ impl ToolIo {
                 shell_cwd,
                 sandbox,
                 turn: Mutex::default(),
+                subagent,
             }),
         );
     }
@@ -364,9 +388,13 @@ impl ToolIo {
     /// pieces finishes them, and dropping the collected start would turn the next piece into a
     /// complete, truncated text.
     pub fn cancel_running(&self, session_id: &str) {
-        if let Some(session) = lock(&self.sessions).get(session_id) {
-            for token in lock(&session.running).values() {
-                token.cancel();
+        let children = self.attached(session_id);
+        let sessions = lock(&self.sessions);
+        for id in std::iter::once(session_id).chain(children.iter().map(String::as_str)) {
+            if let Some(session) = sessions.get(id) {
+                for token in lock(&session.running).values() {
+                    token.cancel();
+                }
             }
         }
     }

@@ -551,6 +551,7 @@ fn put_back(
             before: replaced.before_sha256,
             after: replaced.after_sha256,
             operation,
+            subagent: None,
         }),
         outcome,
         pins: replaced.snapshot.into_iter().collect(),

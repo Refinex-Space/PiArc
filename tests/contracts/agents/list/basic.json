@@ -3,6 +3,11 @@
   "id": 50,
   "method": "agents/list",
   "params": {
-    "cwd": "/工作区 a/src"
+    "cwd": "/工作区 a/src",
+    "builtIn": [
+      "general-purpose",
+      "Explore",
+      "Plan"
+    ]
   }
 }

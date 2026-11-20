@@ -40,23 +40,34 @@ export interface FrozenSystem {
   cacheBoundary: number;
 }
 
+/** A subagent's prompt (T31): its definition's body as the identity; the read-only built-in
+ * types leave out the project context and the git status. */
+export interface Persona {
+  readonly identity: string;
+  readonly projectContext: boolean;
+}
+
 export function assembleSystem(
   tools: readonly string[],
   profile: ToolProfile | undefined,
   files: readonly MemoryFile[],
   environment: { cwd: string; platform: string; date: string; gitStatus?: string },
+  persona?: Persona,
 ): FrozenSystem {
+  const context = persona?.projectContext !== false;
   const sections: [string, string][] = [
-    ['identity', IDENTITY],
+    ['identity', persona?.identity ?? IDENTITY],
     ['tool_guidance', toolGuidance(tools, profile)],
-    ['project_context', files.map(sourced).join('\n\n')],
+    ...(context ? [['project_context', files.map(sourced).join('\n\n')] as [string, string]] : []),
     [
       'environment',
       [
         `Working directory: ${environment.cwd}`,
         `Platform: ${environment.platform}`,
         `Session date: ${environment.date}`,
-        `Git status at session start:\n${environment.gitStatus ?? 'Unavailable.'}`,
+        ...(context
+          ? [`Git status at session start:\n${environment.gitStatus ?? 'Unavailable.'}`]
+          : []),
       ].join('\n'),
     ],
   ];

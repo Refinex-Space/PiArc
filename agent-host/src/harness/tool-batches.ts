@@ -20,8 +20,14 @@ import type { LoadExtensionsResult, ToolDefinition } from '@earendil-works/pi-co
 /** The most calls of one parallel batch. */
 export const MAX_BATCH = 10;
 
-/** Canonical tools that only read and may run side by side. */
-export const CONCURRENCY_SAFE_TOOLS: ReadonlySet<string> = new Set(['Read', 'Glob', 'Grep']);
+/** Canonical tools that may run side by side: the read-only ones, and `Agent` (T31: each
+ * subagent's own calls go through its own session's batches and permission checks). */
+export const CONCURRENCY_SAFE_TOOLS: ReadonlySet<string> = new Set([
+  'Read',
+  'Glob',
+  'Grep',
+  'Agent',
+]);
 
 /** The batches of `calls` (in response order): ids grouped, safe calls up to `MAX_BATCH`. */
 export function planBatches(

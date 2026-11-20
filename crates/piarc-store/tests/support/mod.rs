@@ -193,6 +193,12 @@ impl SessionWriter {
     }
 
     /// One random entry.
+    /// A custom entry (`piarc.*` records the Agent Host keeps in the file).
+    pub fn custom(&mut self, custom_type: &str, data: &str) -> String {
+        let head = self.header("custom");
+        format!(r#"{{{head},"customType":"{custom_type}","data":{data}}}"#)
+    }
+
     pub fn random_entry(&mut self, rng: &mut Rng) -> String {
         match rng.below(6) {
             0 => self.user(&format!("请修复 bug {} in \"a b\"", rng.below(1000))),

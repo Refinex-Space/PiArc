@@ -415,7 +415,7 @@ fn pi_provider_entry(mock: &MockProvider, endpoint: &ProviderSpec, scenario: &st
     json!({
         "baseUrl": base_url, "api": api, "apiKey": "piarc-no-key",
         "models": [{
-            "id": MOCK_MODEL, "name": MOCK_MODEL, "reasoning": reasoning, "input": input,
+            "id": endpoint.model_id(), "name": endpoint.model_id(), "reasoning": reasoning, "input": input,
             "compat": if reasoning && endpoint.wire == Wire::Openai {json!({"supportsReasoningEffort":true})} else {json!({})},
             "contextWindow": endpoint.context_window.unwrap_or(200_000),
             "maxTokens": endpoint.max_tokens.unwrap_or(4096),
@@ -554,7 +554,12 @@ impl Driver<'_> {
         let cwd = session.cwd.as_deref().map(|c| resolve(workspace, c));
         let model = Some(piarc_protocol::session::ModelRef {
             provider: pi_provider(&session.provider),
-            id: MOCK_MODEL.into(),
+            id: self
+                .spec
+                .providers
+                .get(&session.provider)
+                .map_or(MOCK_MODEL, |endpoint| endpoint.model_id())
+                .into(),
         });
         let ws = workspace.to_owned();
         let created = call(
@@ -744,7 +749,12 @@ impl Driver<'_> {
     ) -> Result<(), String> {
         let model = piarc_protocol::session::ModelRef {
             provider: pi_provider(provider),
-            id: MOCK_MODEL.into(),
+            id: self
+                .spec
+                .providers
+                .get(provider)
+                .map_or(MOCK_MODEL, |endpoint| endpoint.model_id())
+                .into(),
         };
         let preview = self
             .op(session, Op::Model(ModelOp::Preview(model.clone())))

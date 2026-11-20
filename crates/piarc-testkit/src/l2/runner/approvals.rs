@@ -87,6 +87,24 @@ impl Driver<'_> {
                 expected.tool, card.tool
             ));
         }
+        if self.mode == Mode::Strict
+            && let Some(origin) = &expected.subagent
+        {
+            let found = card.subagent.as_ref();
+            let matches = found.is_some_and(|o| {
+                o.agent_type == origin.kind
+                    && origin
+                        .description
+                        .as_ref()
+                        .is_none_or(|d| o.description.as_ref() == Some(d))
+            });
+            if !matches {
+                return Err(format!(
+                    "approval expected from the {} subagent, got {found:?}",
+                    origin.kind
+                ));
+            }
+        }
         if self.mode == Mode::Strict && expected.kind.is_some_and(|kind| kind != card.kind) {
             return Err(format!(
                 "approval expected {:?}, got {:?}",

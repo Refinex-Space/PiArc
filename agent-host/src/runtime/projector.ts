@@ -461,6 +461,7 @@ export class Projector {
       open.tool,
       open.arguments,
       resultText(partialResult),
+      isObject(partialResult) ? partialResult.details : undefined,
     );
     this.#sink.replaceable('item/updated', toolCallId, { turnId: turn.turnId, item });
   }

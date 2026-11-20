@@ -75,6 +75,7 @@ pub(super) struct State {
     memory_scan: Option<(Option<String>, CancellationToken)>,
 }
 
+#[derive(Clone, Copy)]
 pub(crate) enum Cleanup<'a> {
     /// The notification may arrive while the Host is preparing an automatic follow-up.
     Completed(&'a str),
@@ -90,6 +91,11 @@ impl State {
     /// The session's current permission mode.
     pub(super) fn mode(&self) -> PermissionMode {
         self.mode
+    }
+
+    /// A subagent's mode follows its main session's (T31, `subagents::effective_mode`).
+    pub(super) fn follow_mode(&mut self, mode: PermissionMode) {
+        self.mode = mode;
     }
 
     /// The first approval waiting for the user.
@@ -163,7 +169,7 @@ impl State {
 }
 
 impl Services {
-    async fn settings(&self, root: &Path) -> Result<Settings, ErrorObject> {
+    pub(super) async fn settings(&self, root: &Path) -> Result<Settings, ErrorObject> {
         let settings = self
             .trust
             .permission_settings(root)
@@ -240,10 +246,17 @@ impl ToolIo {
     }
 
     pub(crate) fn clear_approvals(&self, id: &str, cause: Cleanup<'_>) {
-        if let (Some(services), Ok(s)) = (&self.policy, self.session(id)) {
-            lock(&s.files).discard_pending(None);
-            lock(&s.policy).cancel(id, services, cause);
-            lock(&s.uploads).cancel_writes(None);
+        // An interrupt also reaches the subagents the session waits for (T31).
+        let children = match cause {
+            Cleanup::Completed(_) => Vec::new(),
+            Cleanup::Interrupted | Cleanup::Disconnected => self.attached(id),
+        };
+        for id in std::iter::once(id).chain(children.iter().map(String::as_str)) {
+            if let (Some(services), Ok(s)) = (&self.policy, self.session(id)) {
+                lock(&s.files).discard_pending(None);
+                lock(&s.policy).cancel(id, services, cause);
+                lock(&s.uploads).cancel_writes(None);
+            }
         }
     }
 
@@ -255,7 +268,7 @@ impl ToolIo {
         }
     }
 
-    fn services(&self) -> Result<&Services, ErrorObject> {
+    pub(super) fn services(&self) -> Result<&Services, ErrorObject> {
         self.policy
             .as_ref()
             .ok_or_else(|| denied("Permission service is unavailable."))
@@ -374,6 +387,7 @@ impl ToolIo {
         p: &mut PolicyEvaluateParams,
         peer: &Peer,
     ) -> Result<Value, ErrorObject> {
+        super::subagents::prepare_call(s, p)?;
         let generation = inputs::begin(s, p, peer).await?;
         let settings = services.settings(s.scope.root()).await?;
         let (hook_token, _hook_guard) = super::hooks::linked(peer, Some(&generation));
@@ -439,7 +453,8 @@ impl ToolIo {
             (None, "hookDeny" | "hookAllow" | "permissionRequestHook") => "hook",
             _ => "automatic",
         };
-        let detail = audit_detail(p, mode, &ruling, &prepared.card, result.allowed, source);
+        let mut detail = audit_detail(p, mode, &ruling, &prepared.card, result.allowed, source);
+        super::subagents::annotate(&mut detail, s);
         let prepared = result.allowed.then_some(prepared);
         let commit = commit(s, services, p, peer, &generation, &detail, answer, prepared).await;
         if let Some(ack) = ack {
@@ -537,27 +552,32 @@ async fn commit(
         services.persist(s.scope.root(), &answer).await?;
     }
     if let Some(prepared) = allowed {
-        let mut state = lock(&s.policy);
         if generation.is_cancelled() || peer.is_closed() {
             return Err(denied(LOST));
         }
         if decision == Some(ApprovalDecision::AllowSession)
             && prepared.boundary != Boundary::Protected
         {
+            // A subagent's answer allows its whole tree: the rules go to the main session.
+            let mut owner = lock(&super::subagents::rule_owner(s).policy);
             for rule in &prepared.card.rules {
-                if !state.rules.contains(rule) {
-                    state.rules.push(rule.clone());
+                if !owner.rules.contains(rule) {
+                    owner.rules.push(rule.clone());
                 }
             }
         }
-        state.grants.insert(p.tool_call_id.clone(), prepared.grant);
+        lock(&s.policy)
+            .grants
+            .insert(p.tool_call_id.clone(), prepared.grant);
     }
     Ok(())
 }
 
-/// The session's rule set for the current settings (cached while nothing changed).
+/// The session's rule set for the current settings (cached while nothing changed); a
+/// subagent's is its main session's (T31).
 fn rules_of(s: &SessionIo, settings: &Settings) -> Arc<RuleSet> {
-    let mut state = lock(&s.policy);
+    let owner = super::subagents::rule_owner(s);
+    let mut state = lock(&owner.policy);
     let state = &mut *state;
     assess::rule_set(
         &settings.permission_lists(),
@@ -565,6 +585,23 @@ fn rules_of(s: &SessionIo, settings: &Settings) -> Arc<RuleSet> {
         s.scope.root(),
         &mut state.rule_cache,
     )
+}
+
+/// The workspace's rules without a session's own (`agents/list`, T31).
+pub(super) fn workspace_rules(settings: &Settings, root: &Path) -> Arc<RuleSet> {
+    assess::rule_set(&settings.permission_lists(), &[], root, &mut None)
+}
+
+/// Whether an `Agent(<name>)` deny rule (or a deny of the whole tool) removes type `name`.
+pub(super) fn denies_agent(rules: &RuleSet, name: &str) -> bool {
+    rules
+        .find(
+            piarc_policy::rules::Behavior::Deny,
+            "Agent",
+            piarc_policy::rules::Subject::Name(name),
+            None,
+        )
+        .is_some_and(|(_, certainty)| certainty == piarc_policy::rules::Certainty::Certain)
 }
 
 /// A permanent answer must carry every value the card offered, each a valid allow rule.

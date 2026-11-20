@@ -10,6 +10,8 @@ import { memoryReader } from '../harness/memory-io.js';
 import { preflightInput } from '../harness/policy.js';
 import { SessionHarness } from '../harness/session-harness.js';
 import { SessionMemory } from '../harness/session-memory.js';
+import type { Persona } from '../harness/prompts/system.js';
+import type { AgentToolHost } from '../harness/subagents/agent-tool.js';
 import type { ToolProfile } from '../tools/profile.js';
 import type { Projector } from './projector.js';
 import type { RegistryOptions } from './session-types.js';
@@ -25,6 +27,10 @@ export interface SessionPartsInput {
   /** Filled once the runtime exists; the parts read it lazily. */
   readonly opened: { session?: AgentSession; projector?: Projector };
   readonly log: (line: string) => void;
+  /** The session's `Agent` tool (T31), when it may start subagents. */
+  readonly agents?: AgentToolHost;
+  /** Set for a subagent's session (T31): its identity and context choice. */
+  readonly child?: { readonly persona: Persona };
 }
 
 export interface SessionParts {
@@ -65,6 +71,7 @@ export function sessionParts(input: SessionPartsInput): SessionParts {
     appended: (message) => opened.projector?.reminder(message),
     log: sessionLog,
     contextWindow: (model) => workspace.preferences.contextWindow(model),
+    ...(input.agents === undefined ? {} : { agents: input.agents }),
   });
   const memory = new SessionMemory(
     manager,
@@ -73,6 +80,7 @@ export function sessionParts(input: SessionPartsInput): SessionParts {
     options.memoryBridge ? memoryReader(options.memoryBridge, manager.getSessionId()) : undefined,
     toCanonical,
     harness.reminders,
+    input.child?.persona,
   );
   const hooksBridge = tools.kind === 'core' ? options.hooksBridge : undefined;
   const hooks =
@@ -92,6 +100,7 @@ export function sessionParts(input: SessionPartsInput): SessionParts {
             return resolved;
           },
           log: sessionLog,
+          ...(input.child === undefined ? {} : { subagent: true }),
         });
   harness.connect(memory, hooks);
   return { harness, memory, hooks };

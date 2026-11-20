@@ -1,6 +1,7 @@
 //! What answers one workspace's Agent Host: `trust/get` from the trust store, `secrets/*` from
 //! Core's single vault service, `hooks/run` for working directories in this workspace, and
-//! `fs/*`, `exec/*` from the tool I/O, but only for the
+//! `agents/list`, `subagent/start`, `subagent/finish` (T31), and `fs/*`, `exec/*` from the tool
+//! I/O, but only for the
 //! sessions that belong to this workspace (R1-A13): an Agent Host cannot reach another
 //! workspace's session scope by naming its id.
 
@@ -26,6 +27,77 @@ pub(crate) struct WorkspaceInbound {
     pub secrets: SecretsService,
     pub tool_io: ToolIo,
     pub sessions: SessionSet,
+}
+
+impl WorkspaceInbound {
+    fn ours(&self, id: &str) -> bool {
+        self.sessions
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .contains(id)
+    }
+
+    /// `subagent/start` and `subagent/finish` (T31): a child joins this workspace's sessions
+    /// under a parent of this workspace, and leaves when its run or its connection ends.
+    fn subagent(
+        &self,
+        method: &str,
+        params: Map<String, Value>,
+        peer: Peer,
+    ) -> BoxFuture<'static, Result<Value, ErrorObject>> {
+        let named = if method == "subagent/start" {
+            crate::tool_io::subagents::parent_of(&params)
+        } else {
+            params.get("sessionId").and_then(Value::as_str)
+        }
+        .unwrap_or_default()
+        .to_owned();
+        if !self.ours(&named) {
+            let method = method.to_owned();
+            return Box::pin(async move {
+                Err(ErrorObject::new(
+                    ErrorKind::SessionNotFound,
+                    format!("{method}: no session {named} in this workspace"),
+                    false,
+                ))
+            });
+        }
+        let (io, sessions, workspace) = (
+            self.tool_io.clone(),
+            Arc::clone(&self.sessions),
+            self.workspace.clone(),
+        );
+        if method == "subagent/finish" {
+            return Box::pin(async move {
+                let answer = io.finish_request(&workspace, params).await;
+                sessions
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .remove(&named);
+                answer
+            });
+        }
+        Box::pin(async move {
+            let (child, result) = io.start_request(params).await?;
+            sessions
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .insert(child.clone());
+            // A child whose connection ends without `subagent/finish` (the Agent Host
+            // stopped) is unregistered then; its row records the interruption.
+            tokio::spawn(async move {
+                peer.closed().await;
+                if io.finish_subagent(&child) {
+                    sessions
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner)
+                        .remove(&child);
+                    io.index_subagent(&child, &workspace, "error").await;
+                }
+            });
+            Ok(result)
+        })
+    }
 }
 
 impl InboundHandler for WorkspaceInbound {
@@ -58,6 +130,15 @@ impl InboundHandler for WorkspaceInbound {
             let io = self.tool_io.clone();
             let workspace = self.workspace.clone();
             return Box::pin(async move { io.hooks_run(&workspace, ours, params, &peer).await });
+        }
+        if method == "agents/list" {
+            // Definitions found from a directory of this workspace (T31).
+            let io = self.tool_io.clone();
+            let workspace = self.workspace.clone();
+            return Box::pin(async move { io.agents_request(&workspace, params).await });
+        }
+        if method == "subagent/start" || method == "subagent/finish" {
+            return self.subagent(&method, params, peer);
         }
         if method == "exec/shells" {
             // Machine-wide, and asked while a session is being created (before it is ours).

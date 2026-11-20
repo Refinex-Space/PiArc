@@ -5619,6 +5619,10 @@ export interface AgentsListMethodRequest {
  */
 export interface AgentsListParams {
   /**
+   * The Agent Host's built-in types, for `deniedBuiltIn`.
+   */
+  builtIn?: string[];
+  /**
    * The directory project definitions are looked up from; inside the connection's
    * workspace.
    */
@@ -5648,6 +5652,10 @@ export interface AgentsList {
   aliases?: {
     [k: string]: string;
   };
+  /**
+   * Built-in types an `Agent(<name>)` deny rule removes (`agents/list`).
+   */
+  deniedBuiltIn?: string[];
   /**
    * Files that are not valid definitions.
    */

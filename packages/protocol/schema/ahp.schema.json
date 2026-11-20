@@ -277,6 +277,13 @@
           "description": "The model alias table (alias → `<provider>/<model id>`), as `resources/listAgents`\nresolved it.",
           "type": "object"
         },
+        "deniedBuiltIn": {
+          "description": "Built-in types an `Agent(<name>)` deny rule removes (`agents/list`).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "issues": {
           "description": "Files that are not valid definitions.",
           "items": {
@@ -332,6 +339,13 @@
     "AgentsListParams": {
       "description": "Parameters of `agents/list`.",
       "properties": {
+        "builtIn": {
+          "description": "The Agent Host's built-in types, for `deniedBuiltIn`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "cwd": {
           "description": "The directory project definitions are looked up from; inside the connection's\nworkspace.",
           "type": "string"

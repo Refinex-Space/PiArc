@@ -44,6 +44,7 @@ import { Reminders, type ReminderMessage } from './reminders.js';
 import type { SessionMemory } from './session-memory.js';
 import { createTodoWriteTool, currentTodos, todosOf, todoWatch } from './todos.js';
 import type { AuxiliaryModel } from './auxiliary.js';
+import { createAgentTool, type AgentToolHost } from './subagents/agent-tool.js';
 import { createWebFetchTool } from './web-fetch.js';
 
 /** What Core enabled for the host tools in the handshake. */
@@ -58,6 +59,8 @@ export interface HostToolCapabilities {
   readonly checkpoints?: boolean;
   /** `webFetch` (T29): Core fetches pages for WebFetch (`web/fetch`). */
   readonly webFetch?: boolean;
+  /** `subagents` (T31): the `Agent` tool and child sessions Core registers. */
+  readonly subagents?: boolean;
 }
 
 /** The plan and task list at the head of a branch, or undefined when it has neither. */
@@ -99,6 +102,8 @@ export interface SessionHarnessOptions {
   readonly auxiliary?: AuxiliaryModel;
   /** The session opened with the conservative Tool Profile (T29). */
   readonly conservative?: boolean;
+  /** Runs the session's `Agent` calls (T31); absent: the session has no `Agent` tool. */
+  readonly agents?: AgentToolHost;
 }
 
 export class SessionHarness {
@@ -203,6 +208,7 @@ export class SessionHarness {
       ...(core?.webFetch === true && this.#o.io !== undefined && this.#o.auxiliary !== undefined
         ? [createWebFetchTool(profile.WebFetch, this.#o.io, this.#o.auxiliary)]
         : []),
+      ...(this.#o.agents === undefined ? [] : [createAgentTool(profile.Agent, this.#o.agents)]),
     ];
   }
 

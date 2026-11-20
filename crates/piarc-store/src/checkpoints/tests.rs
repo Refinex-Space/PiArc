@@ -11,6 +11,7 @@ fn file<'a>(
         after_hash: after,
         operation: if before.is_none() { "create" } else { "modify" },
         restore_id: None,
+        subagent_session: None,
     }
 }
 

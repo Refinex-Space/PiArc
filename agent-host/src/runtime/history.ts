@@ -28,6 +28,7 @@ import { isInterruptionMarker } from '../harness/interruption.js';
 import { REMINDER_ENTRY, reminderRefs } from '../harness/reminders.js';
 import { DECLINED_ENTRY } from '../harness/policy.js';
 import { harnessState } from '../harness/session-harness.js';
+import { SUBAGENT_STATE_ENTRY } from '../harness/subagents/definitions.js';
 import { AhpError } from '../protocol/errors.js';
 import { branchPoints } from './branches.js';
 import { modeItem, modeRecord } from './permission-mode.js';
@@ -66,7 +67,17 @@ export function projectHistory(
 ): HistoryItem[] {
   const results = new Map<string, ToolResult>();
   const declined = new Set<string>();
+  // A subagent run's last state, recorded after its `Agent` result (T31).
+  const runs = new Map<string, unknown>();
   for (const entry of branch) {
+    if (
+      entry.type === 'custom' &&
+      entry.customType === SUBAGENT_STATE_ENTRY &&
+      isObject(entry.data) &&
+      typeof entry.data.itemId === 'string'
+    ) {
+      runs.set(entry.data.itemId, entry.data.subagent);
+    }
     if (
       entry.type === 'custom' &&
       entry.customType === DECLINED_ENTRY &&
@@ -80,6 +91,15 @@ export function projectHistory(
         text: contentText(entry.message.content),
         isError: entry.message.isError,
         details: entry.message.details,
+      });
+    }
+  }
+  for (const [id, run] of runs) {
+    const result = results.get(id);
+    if (result !== undefined) {
+      results.set(id, {
+        ...result,
+        details: { ...(isObject(result.details) ? result.details : {}), subagent: run },
       });
     }
   }

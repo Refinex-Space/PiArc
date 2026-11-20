@@ -50,6 +50,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "checkpoints",
         sql: include_str!("sql/0005_checkpoints.sql"),
     },
+    Migration {
+        version: 6,
+        name: "subagents",
+        sql: include_str!("sql/0006_subagents.sql"),
+    },
 ];
 
 /// The highest version in `migrations`.

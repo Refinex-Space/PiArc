@@ -158,6 +158,9 @@ export interface SessionHooksOptions {
   /** Resolves a file tool's `path` the way the preflight does. */
   readonly hookInput: (tool: string, input: Record<string, unknown>) => Record<string, unknown>;
   readonly log: (line: string) => void;
+  /** A subagent's session (T31): it reports tool events only; its start and end are
+   * SubagentStart and SubagentStop (T38), and it never runs Stop hooks. */
+  readonly subagent?: boolean;
 }
 
 export class SessionHooks {
@@ -249,7 +252,7 @@ export class SessionHooks {
 
   extension: ExtensionFactory = (pi) => {
     pi.on('session_start', (_event, ctx) => {
-      if (this.#o.source === 'branch') return;
+      if (this.#o.source === 'branch' || this.#o.subagent === true) return;
       // Not awaited: a slow hook must not hold up opening the session; the first run waits.
       this.#starting = this.run('sessionStart', {
         source: this.#o.source,
@@ -315,7 +318,7 @@ export class SessionHooks {
 
     pi.on('agent_before_settle', async (event) => {
       // Not after an interrupt or a failed request (Claude Code's StopFailure, M4).
-      if (event.outcome !== 'completed') return undefined;
+      if (event.outcome !== 'completed' || this.#o.subagent === true) return undefined;
       const messages: readonly unknown[] = event.context.contextMessages;
       const last = messages.findLast((m) => isObject(m) && m.role === 'assistant');
       const text =
@@ -347,7 +350,7 @@ export class SessionHooks {
     });
 
     pi.on('session_shutdown', async () => {
-      if (this.#muted) return;
+      if (this.#muted || this.#o.subagent === true) return;
       await this.run('sessionEnd', { reason: 'other' });
     });
   };

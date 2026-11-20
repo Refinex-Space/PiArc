@@ -169,6 +169,11 @@
           "type": "integer",
           "minimum": 1
         },
+        "model": {
+          "description": "The endpoint's model id (T31), sent as `model` in its requests; mock-model when absent.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]{1,64}$"
+        },
         "steps": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/step" } }
       }
     },
@@ -682,6 +687,16 @@
               "quote": { "type": "string", "minLength": 1 },
               "text": { "type": "string", "minLength": 1 }
             }
+          }
+        },
+        "subagent": {
+          "description": "The card must come from a subagent of this type (and description) (T31).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": { "type": "string", "minLength": 1 },
+            "description": { "type": "string" }
           }
         },
         "answers": {

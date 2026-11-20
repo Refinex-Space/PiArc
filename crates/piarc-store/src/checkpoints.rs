@@ -36,6 +36,8 @@ pub struct CheckpointFileRow {
     pub operation: String,
     /// The rewind a `restore` row belongs to.
     pub restore_id: Option<String>,
+    /// The subagent session that made the write, under its main session's turn (T31).
+    pub subagent_session: Option<String>,
 }
 
 /// A row to add to `checkpoint_files`.
@@ -51,6 +53,8 @@ pub struct NewCheckpointFile<'a> {
     pub operation: &'a str,
     /// The rewind a `restore` row belongs to.
     pub restore_id: Option<&'a str>,
+    /// The subagent session that made the write (T31); `None` for the session itself.
+    pub subagent_session: Option<&'a str>,
 }
 
 impl Store {
@@ -151,8 +155,9 @@ impl Store {
             let mut insert = tx
                 .prepare_cached(
                     "INSERT INTO checkpoint_files
-                     (checkpoint_id, path, before_hash, after_hash, operation, restore_id)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                     (checkpoint_id, path, before_hash, after_hash, operation, restore_id,
+                      subagent_session)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 )
                 .map_err(Error::sqlite("cannot record file snapshots"))?;
             for file in files {
@@ -163,7 +168,8 @@ impl Store {
                         file.before_hash,
                         file.after_hash,
                         file.operation,
-                        file.restore_id
+                        file.restore_id,
+                        file.subagent_session
                     ])
                     .map_err(Error::sqlite("cannot record file snapshots"))?;
             }
@@ -182,7 +188,7 @@ impl Store {
             .conn
             .prepare_cached(
                 "SELECT f.id, f.checkpoint_id, f.path, f.before_hash, f.after_hash, f.operation,
-                        f.restore_id
+                        f.restore_id, f.subagent_session
                  FROM checkpoint_files f JOIN checkpoints c ON c.id = f.checkpoint_id
                  WHERE c.session_id = ?1 ORDER BY f.id",
             )
@@ -197,6 +203,7 @@ impl Store {
                     after_hash: row.get(4)?,
                     operation: row.get(5)?,
                     restore_id: row.get(6)?,
+                    subagent_session: row.get(7)?,
                 })
             })
             .and_then(Iterator::collect)

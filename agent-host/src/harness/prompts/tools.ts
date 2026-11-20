@@ -77,4 +77,10 @@ export const TOOL_GUIDANCE = {
     snippet: 'SuggestNextSteps: offer follow-ups at the end of a turn',
     guidelines: ['Offer next steps only when there are clear and useful follow-ups.'],
   },
+  Agent: {
+    snippet: 'Agent: hand a self-contained task to a subagent and get its report',
+    guidelines: [
+      'Write the task so it stands alone; the subagent sees none of this conversation. Start independent subagents in one response so they run together.',
+    ],
+  },
 } satisfies Record<CanonicalTool, Pick<ToolPresentation, 'snippet' | 'guidelines'>>;

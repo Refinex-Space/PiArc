@@ -46,6 +46,7 @@ fn migrating_twice_from_empty_and_from_migrated_gives_the_same_schema() {
         (3, "memory_imports".to_owned()),
         (4, "session_file_stamp".to_owned()),
         (5, "checkpoints".to_owned()),
+        (6, "subagents".to_owned()),
     ];
     assert_eq!(first.migrations().expect("ledger"), ledger);
     drop(first);
@@ -56,7 +57,7 @@ fn migrating_twice_from_empty_and_from_migrated_gives_the_same_schema() {
     // Opening an already migrated database applies nothing and keeps the ledger as it was.
     for _ in 0..2 {
         let again = Store::open(&path, 2000).expect("migrated database opens");
-        assert_eq!(again.schema_version().expect("version"), 5);
+        assert_eq!(again.schema_version().expect("version"), 6);
         assert_eq!(again.migrations().expect("ledger"), ledger);
         drop(again);
         assert_eq!(tables(&path), schema_after_first);
@@ -76,7 +77,7 @@ fn migrating_twice_from_empty_and_from_migrated_gives_the_same_schema() {
     let mut conn = Connection::open(&other).expect("open");
     assert_eq!(
         migrate::apply(&mut conn, MIGRATIONS, 5).expect("first"),
-        vec![1, 2, 3, 4, 5]
+        vec![1, 2, 3, 4, 5, 6]
     );
     assert_eq!(
         migrate::apply(&mut conn, MIGRATIONS, 6).expect("second"),
@@ -151,16 +152,17 @@ fn a_database_from_a_newer_build_is_refused() {
         MIGRATIONS[2],
         MIGRATIONS[3],
         MIGRATIONS[4],
+        MIGRATIONS[5],
         Migration {
-            version: 6,
+            version: 7,
             name: "future",
             sql: "CREATE TABLE future (x INTEGER) STRICT;",
         },
     ];
     Store::open_with(&path, &newer, 1).expect("newer build migrates");
-    let error = Store::open(&path, 2).expect_err("this build does not know version 6");
+    let error = Store::open(&path, 2).expect_err("this build does not know version 7");
     assert!(
-        matches!(error, Error::SchemaTooNew { found: 6, known: 5 }),
+        matches!(error, Error::SchemaTooNew { found: 7, known: 6 }),
         "{error:?}"
     );
 }

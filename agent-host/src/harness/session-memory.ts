@@ -14,7 +14,13 @@ import type { ToolProfile } from '../tools/profile.js';
 import { anthropicMemoryPayload } from './memory-wire.js';
 import type { MemoryFile, MemorySnapshot } from '@piarc/protocol';
 import type { ReadMemory } from './memory-io.js';
-import { assembleSystem, IDENTITY, sourced, type FrozenSystem } from './prompts/system.js';
+import {
+  assembleSystem,
+  IDENTITY,
+  sourced,
+  type FrozenSystem,
+  type Persona,
+} from './prompts/system.js';
 import {
   REMINDER_ENTRY,
   reminderRecords,
@@ -62,6 +68,8 @@ export class SessionMemory {
   #lazy: Promise<void> = Promise.resolve();
   /** Core's last answer: some conditional rule could still load on a file access. */
   #inactiveRules = false;
+  /** A subagent's identity and context choice (T31). */
+  readonly #persona: Persona | undefined;
 
   constructor(
     manager: SessionManager,
@@ -70,11 +78,14 @@ export class SessionMemory {
     read: ReadMemory | undefined,
     canonical: (name: string) => string,
     reminders: Reminders,
+    persona?: Persona,
   ) {
     this.#manager = manager;
     this.#cwd = cwd;
     this.#profile = profile;
-    this.#read = read;
+    // Without project context there is no memory to load, now or lazily.
+    this.#read = persona?.projectContext === false ? undefined : read;
+    this.#persona = persona;
     this.#canonical = canonical;
     this.#reminders = reminders;
     this.#started = localDate(new Date(manager.getHeader()?.timestamp ?? Date.now()));
@@ -326,8 +337,9 @@ export class SessionMemory {
       const options = event.systemPromptOptions;
       // The persisted SDK loadout stays white-labelled as well. A forced prompt is used
       // for the exact provider bytes; Pi still diffs its own structured loadout on disk.
-      options.customPrompt = IDENTITY;
-      options.forceSystemPrompt = this.#system?.text ?? IDENTITY;
+      const identity = this.#persona?.identity ?? IDENTITY;
+      options.customPrompt = identity;
+      options.forceSystemPrompt = this.#system?.text ?? identity;
       let snapshot = this.#snapshot;
       this.#snapshot = undefined;
       // An extension can start its own turn without going through the registry.
@@ -342,12 +354,18 @@ export class SessionMemory {
         const tools = options.selectedTools.filter(
           (tool) => active.has(tool) && !options.hiddenTools.includes(tool),
         );
-        this.#system = assembleSystem(tools, this.#profile, snapshot.files, {
-          cwd: this.#cwd,
-          platform: process.platform,
-          date: this.#started,
-          ...(snapshot.gitStatus == null ? {} : { gitStatus: snapshot.gitStatus }),
-        });
+        this.#system = assembleSystem(
+          tools,
+          this.#profile,
+          snapshot.files,
+          {
+            cwd: this.#cwd,
+            platform: process.platform,
+            date: this.#started,
+            ...(snapshot.gitStatus == null ? {} : { gitStatus: snapshot.gitStatus }),
+          },
+          this.#persona,
+        );
         const versions = Object.fromEntries(
           snapshot.files.map((file) => [file.path, digest(file)]),
         );

@@ -47,7 +47,15 @@ pub struct SessionMeta {
     pub updated_at: Option<i64>,
     /// Id of the last entry read.
     pub last_entry_id: Option<String>,
+    /// For a subagent's session (T31): the session that started it, from its first
+    /// `piarc.subagent` entry.
+    pub subagent_parent: Option<String>,
+    /// For a subagent's session: its type.
+    pub subagent_type: Option<String>,
 }
+
+/// The custom entry a subagent's session file starts with (T31, written by the Agent Host).
+pub const SUBAGENT_ENTRY: &str = "piarc.subagent";
 
 /// Summed token usage and cost.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
@@ -110,6 +118,70 @@ pub struct Entry {
     usage: Option<RawUsage>,
     #[serde(default)]
     message: Option<Message>,
+    #[serde(default)]
+    custom_type: Option<String>,
+    /// A custom entry's data, reduced to a subagent link; any other data is skipped.
+    #[serde(default)]
+    data: SubagentData,
+}
+
+/// The fields of a `piarc.subagent` entry's data. Other custom entries' data (text, lists,
+/// other objects) deserializes to the empty value without being kept.
+#[derive(Debug, Default)]
+struct SubagentData {
+    parent_session_id: Option<String>,
+    agent_type: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for SubagentData {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct DataVisitor;
+        impl<'de> Visitor<'de> for DataVisitor {
+            type Value = SubagentData;
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("any value")
+            }
+            fn visit_map<A: de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> Result<SubagentData, A::Error> {
+                let mut data = SubagentData::default();
+                while let Some(key) = map.next_key::<std::borrow::Cow<'de, str>>()? {
+                    match key.as_ref() {
+                        "parentSessionId" => data.parent_session_id = map.next_value()?,
+                        "agentType" => data.agent_type = map.next_value()?,
+                        _ => {
+                            map.next_value::<de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                Ok(data)
+            }
+            fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<SubagentData, A::Error> {
+                while seq.next_element::<de::IgnoredAny>()?.is_some() {}
+                Ok(SubagentData::default())
+            }
+            fn visit_str<E: de::Error>(self, _: &str) -> Result<SubagentData, E> {
+                Ok(SubagentData::default())
+            }
+            fn visit_bool<E: de::Error>(self, _: bool) -> Result<SubagentData, E> {
+                Ok(SubagentData::default())
+            }
+            fn visit_i64<E: de::Error>(self, _: i64) -> Result<SubagentData, E> {
+                Ok(SubagentData::default())
+            }
+            fn visit_u64<E: de::Error>(self, _: u64) -> Result<SubagentData, E> {
+                Ok(SubagentData::default())
+            }
+            fn visit_f64<E: de::Error>(self, _: f64) -> Result<SubagentData, E> {
+                Ok(SubagentData::default())
+            }
+            fn visit_unit<E: de::Error>(self) -> Result<SubagentData, E> {
+                Ok(SubagentData::default())
+            }
+        }
+        deserializer.deserialize_any(DataVisitor)
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -203,6 +275,13 @@ impl SessionMeta {
         }
         let mut at = entry.timestamp.as_ref().and_then(Timestamp::millis);
         match entry.kind.as_str() {
+            "custom" if entry.custom_type.as_deref() == Some(SUBAGENT_ENTRY) => {
+                // Set once: the first entry names the parent.
+                if self.subagent_parent.is_none() {
+                    self.subagent_parent = entry.data.parent_session_id;
+                    self.subagent_type = entry.data.agent_type;
+                }
+            }
             "session_info" => {
                 self.name = entry
                     .name

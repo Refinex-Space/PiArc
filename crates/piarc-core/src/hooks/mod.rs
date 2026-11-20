@@ -102,6 +102,9 @@ struct Inner {
     transcripts: Mutex<HashMap<String, String>>,
     /// Each session's `SessionStart` runs in progress.
     starts: Mutex<HashMap<String, watch::Sender<u32>>>,
+    /// Hooks of a subagent definition, by the subagent's session id, while it runs (T31): a
+    /// source above every settings file, for that session only.
+    scoped: Mutex<HashMap<String, (Option<PathBuf>, Value)>>,
 }
 
 /// Marks one `SessionStart` run in progress until it drops ([`HooksService::starting`]).
@@ -133,20 +136,46 @@ impl std::fmt::Debug for HooksService {
     }
 }
 
+/// The layer id of a subagent definition's hooks in audits and notices.
+const SUBAGENT_LAYER: &str = "subagent";
+
+fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
 /// The hooks of `settings`, highest precedence first.
 pub(crate) fn config_of(settings: &piarc_config::Settings) -> HookConfig {
-    let layers: Vec<LayerHooks<'_>> = settings
-        .table()
-        .layers()
-        .iter()
-        .rev()
-        .map(|spec| LayerHooks {
-            source: Source {
-                layer: spec.id.to_owned(),
-                file: spec.file().map(Path::to_owned),
-            },
-            hooks: settings.layer(spec.id).and_then(|v| v.get("hooks")),
-        })
+    config_with(settings, None)
+}
+
+/// [`config_of`] with a subagent definition's hooks (T31) above the settings files.
+fn config_with(
+    settings: &piarc_config::Settings,
+    scoped: Option<&(Option<PathBuf>, Value)>,
+) -> HookConfig {
+    let scoped = scoped.map(|(file, hooks)| LayerHooks {
+        source: Source {
+            layer: SUBAGENT_LAYER.to_owned(),
+            file: file.clone(),
+        },
+        hooks: Some(hooks),
+    });
+    let layers: Vec<LayerHooks<'_>> = scoped
+        .into_iter()
+        .chain(
+            settings
+                .table()
+                .layers()
+                .iter()
+                .rev()
+                .map(|spec| LayerHooks {
+                    source: Source {
+                        layer: spec.id.to_owned(),
+                        file: spec.file().map(Path::to_owned),
+                    },
+                    hooks: settings.layer(spec.id).and_then(|v| v.get("hooks")),
+                }),
+        )
         .collect();
     let disabled = settings.get("/disableAllHooks") == Some(&Value::Bool(true));
     HookConfig::parse(&layers, disabled)
@@ -184,8 +213,20 @@ impl HooksService {
                 condition,
                 transcripts: Mutex::default(),
                 starts: Mutex::default(),
+                scoped: Mutex::default(),
             }),
         }
+    }
+
+    /// Runs a subagent definition's `hooks` (from `file`) for `session_id`'s events until
+    /// [`Self::unscope_hooks`] (T31). The caller checked the project's trust.
+    pub(crate) fn scope_hooks(&self, session_id: &str, file: Option<&Path>, hooks: Value) {
+        lock(&self.inner.scoped).insert(session_id.to_owned(), (file.map(Path::to_owned), hooks));
+    }
+
+    /// The subagent ended: its definition's hooks stop applying.
+    pub(crate) fn unscope_hooks(&self, session_id: &str) {
+        lock(&self.inner.scoped).remove(session_id);
     }
 
     /// Remembers where `session_id`'s transcript is.
@@ -267,7 +308,10 @@ impl HooksService {
         facts: &Facts,
         request: &Request,
     ) -> Option<Plan> {
-        let config = config_of(settings);
+        let config = {
+            let scoped = lock(&self.inner.scoped);
+            config_with(settings, scoped.get(&facts.session_id))
+        };
         let mut handlers = config.select(request.event, request.subject.as_deref());
         if let Some((tool, input)) = &request.tool {
             handlers.retain(|h| {

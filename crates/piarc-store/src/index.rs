@@ -386,6 +386,7 @@ impl Store {
                 "BEGIN;
                  DELETE FROM session_files;
                  UPDATE sessions SET cwd = NULL, parent_session = NULL, name = NULL,
+                    subagent_parent = NULL, subagent_type = NULL,
                     first_message = NULL, model_provider = NULL, model_id = NULL,
                     message_count = 0, input_tokens = 0, output_tokens = 0,
                     cache_read_tokens = 0, cache_write_tokens = 0, cost_total = 0,
@@ -603,7 +604,8 @@ impl Store {
 const SESSION_COLUMNS: &str = "id, file_path, cwd, parent_session, name, first_message, \
     model_provider, model_id, message_count, input_tokens, output_tokens, cache_read_tokens, \
     cache_write_tokens, cost_total, created_at, updated_at, format_version, index_status, \
-    index_error, workspace_path, pinned, archived, unread, status, custom_title";
+    index_error, workspace_path, pinned, archived, unread, status, custom_title, \
+    subagent_parent, subagent_type";
 
 fn session_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SessionRecord> {
     let status: String = row.get(17)?;
@@ -630,6 +632,8 @@ fn session_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SessionRecord> 
             created_at: row.get(14)?,
             updated_at: row.get(15)?,
             last_entry_id: None,
+            subagent_parent: row.get(25)?,
+            subagent_type: row.get(26)?,
         },
         index_status: IndexStatus::parse(&status),
         index_error: row.get(18)?,
@@ -660,8 +664,9 @@ fn write_session(
         "INSERT INTO sessions (id, file_path, cwd, parent_session, name, first_message,
             model_provider, model_id, message_count, input_tokens, output_tokens,
             cache_read_tokens, cache_write_tokens, cost_total, created_at, updated_at,
-            format_version, index_status, index_error)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)
+            format_version, index_status, index_error, subagent_parent, subagent_type)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18,
+            ?19, ?20, ?21)
          ON CONFLICT(id) DO UPDATE SET file_path = excluded.file_path, cwd = excluded.cwd,
             parent_session = excluded.parent_session, name = excluded.name,
             first_message = excluded.first_message, model_provider = excluded.model_provider,
@@ -671,7 +676,8 @@ fn write_session(
             cache_write_tokens = excluded.cache_write_tokens, cost_total = excluded.cost_total,
             created_at = excluded.created_at, updated_at = excluded.updated_at,
             format_version = excluded.format_version, index_status = excluded.index_status,
-            index_error = excluded.index_error",
+            index_error = excluded.index_error, subagent_parent = excluded.subagent_parent,
+            subagent_type = excluded.subagent_type",
         params![
             id,
             key,
@@ -691,7 +697,9 @@ fn write_session(
             meta.updated_at,
             meta.version,
             status.as_str(),
-            error
+            error,
+            meta.subagent_parent,
+            meta.subagent_type
         ],
     )
     .map_err(Error::sqlite("cannot write sessions"))?;

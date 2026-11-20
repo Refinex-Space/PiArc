@@ -80,6 +80,9 @@
     "aliases": {
       "fast": "mock-child/mock-model",
       "strong": "anthropic/claude-x"
-    }
+    },
+    "deniedBuiltIn": [
+      "Plan"
+    ]
   }
 }

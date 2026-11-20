@@ -209,7 +209,9 @@ fn record_write(
     turn: Option<&piarc_protocol::turn::TurnId>,
     written: &piarc_fs::Written,
 ) {
-    let current = lock(&session.turn).clone();
+    // A subagent's write belongs to its main session's turn (T31).
+    let (session_id, owner, subagent) = super::subagents::checkpoint_owner(session, session_id);
+    let current = lock(&owner.turn).clone();
     let turn = turn.map(|t| t.0.as_str()).or(current.as_deref());
     let record = crate::checkpoints::NewRecord {
         path: piarc_fs::display(&written.path),
@@ -220,6 +222,7 @@ fn record_write(
         } else {
             piarc_checkpoint::Operation::Modify
         },
+        subagent: subagent.map(str::to_owned),
     };
     match checkpoints.record(session_id, turn, &[record], None) {
         Ok(true) => {}

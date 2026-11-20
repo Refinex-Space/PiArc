@@ -10,6 +10,7 @@ import type {
   InputMention,
   Item,
   ItemStatus,
+  SubagentState,
   TurnUsage,
 } from '@piarc/protocol';
 
@@ -113,7 +114,13 @@ export function toolItem(
     }
     case 'subagent': {
       const description = text('description');
-      return { type: 'subagent', ...common, ...(description === '' ? {} : { description }) };
+      const subagent = resultSubagent(details);
+      return {
+        type: 'subagent',
+        ...common,
+        ...(description === '' ? {} : { description }),
+        ...(subagent === undefined ? {} : { subagent }),
+      };
     }
     case 'webFetch':
       return { type: 'webFetch', ...common, url: text('url') };
@@ -251,6 +258,26 @@ export function resultDiff(details: unknown): FileDiff | undefined {
  * (`details.commandExecution`, from Core's `exec/run` result). */
 export function resultExecution(details: unknown): CommandExecutionInfo | undefined {
   return isObject(details) ? parseExecutionInfo(details.commandExecution) : undefined;
+}
+
+const RUN_STATUS = new Set(['running', 'completed', 'partial', 'failed', 'interrupted']);
+
+/** A subagent run's state as the `Agent` tool puts it in its details (`details.subagent`, T31),
+ * or a parent's `piarc.subagentState` entry records it. */
+export function resultSubagent(details: unknown): SubagentState | undefined {
+  const value: unknown = isObject(details) ? details.subagent : undefined;
+  if (
+    !isObject(value) ||
+    typeof value.sessionId !== 'string' ||
+    typeof value.agentType !== 'string' ||
+    typeof value.status !== 'string' ||
+    !RUN_STATUS.has(value.status) ||
+    typeof value.startedAt !== 'number' ||
+    typeof value.toolCalls !== 'number'
+  ) {
+    return undefined;
+  }
+  return wellFormedJson(value) as unknown as SubagentState;
 }
 
 /** Pi's per-response usage, summed into a turn's usage. */

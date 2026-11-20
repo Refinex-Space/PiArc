@@ -189,11 +189,20 @@ pub struct ProviderSpec {
     /// The model's largest output (T27); 4,096 when absent.
     #[serde(default)]
     pub max_tokens: Option<u64>,
+    /// The model id (T31); `mock-model` when absent.
+    #[serde(default)]
+    pub model: Option<String>,
     /// One response per request.
     pub steps: Vec<Step>,
 }
 
 impl ProviderSpec {
+    /// The endpoint's model id.
+    #[must_use]
+    pub fn model_id(&self) -> &str {
+        self.model.as_deref().unwrap_or(super::runner::MOCK_MODEL)
+    }
+
     /// The mock script of this endpoint.
     #[must_use]
     pub fn script(&self) -> Script {
@@ -583,6 +592,21 @@ pub struct Approval {
     /// One answer per question of a question card (T26).
     #[serde(default)]
     pub answers: Vec<super::harness_spec::QuestionAnswerSpec>,
+    /// The subagent the card must come from (T31).
+    #[serde(default)]
+    pub subagent: Option<SubagentOriginSpec>,
+}
+
+/// Where an approval card must come from (T31).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SubagentOriginSpec {
+    /// The subagent type.
+    #[serde(rename = "type")]
+    pub kind: String,
+    /// The task description the model gave.
+    #[serde(default)]
+    pub description: Option<String>,
 }
 
 /// Approval decisions.

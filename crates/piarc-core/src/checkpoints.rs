@@ -68,6 +68,8 @@ pub struct NewRecord {
     pub after: Option<Hash>,
     /// What wrote it.
     pub operation: Operation,
+    /// The subagent session that wrote it under its main session's turn (T31).
+    pub subagent: Option<String>,
 }
 
 /// What a sweep did.
@@ -207,6 +209,7 @@ impl Checkpoints {
                 after_hash: after.as_deref(),
                 operation: r.operation.as_str(),
                 restore_id,
+                subagent_session: r.subagent.as_deref(),
             })
             .collect();
         self.inner

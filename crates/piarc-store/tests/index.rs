@@ -374,3 +374,55 @@ fn user_titles_pins_and_archives_survive_a_rebuild_and_removal_forgets_the_sessi
     assert!(store.session("s-prefs").expect("read").is_none());
     assert_eq!(store.remove_session("s-prefs").expect("remove again"), None);
 }
+
+/// T31-A09: a subagent's file names its parent in its first `piarc.subagent` entry; the index
+/// keeps the link (and the file path), and a rebuild from the files restores it.
+#[test]
+fn subagent_links_come_from_the_file_and_survive_a_rebuild() {
+    let dir = TempDir::new("subagent links");
+    let sessions = dir.path().join("pi").join("sessions");
+    let mut store = Store::open(&dir.path().join("core.sqlite"), 0).expect("store");
+    let mut parent = SessionWriter::create(&sessions, "/work/父 项目", "parent-1", Some(3));
+    let line = parent.user("Investigate");
+    parent.append_raw(&line);
+    let mut child = SessionWriter::create(&sessions, "/work/父 项目", "child-1", Some(3));
+    let lines = [
+        child.custom(
+            "piarc.systemPrompt",
+            r#"{"system":"long text","versions":{}}"#,
+        ),
+        child.custom("piarc.memoryDirectories", r#"["/a","/b"]"#),
+        child.custom(
+            "piarc.subagent",
+            r#"{"parentSessionId":"parent-1","agentType":"Explore","toolCallId":"call-1"}"#,
+        ),
+        child.custom(
+            "piarc.subagent",
+            r#"{"parentSessionId":"someone-else","agentType":"Plan"}"#,
+        ),
+        child.user("Find the parser"),
+        child.assistant("It is in src/parse.rs", "mock-model", 10, 5),
+    ];
+    for line in &lines {
+        child.append_raw(line);
+    }
+    store.sync_dir(&sessions).expect("sync");
+    let link = |records: &[SessionRecord], id: &str| {
+        let record = records.iter().find(|r| r.id == id).expect("row");
+        (
+            record.meta.subagent_parent.clone(),
+            record.meta.subagent_type.clone(),
+            record.file_path.ends_with("_child-1.jsonl") || id != "child-1",
+        )
+    };
+    let synced = sessions_without_core_state(&store);
+    assert_eq!(
+        link(&synced, "child-1"),
+        (Some("parent-1".into()), Some("Explore".into()), true)
+    );
+    assert_eq!(link(&synced, "parent-1"), (None, None, true));
+    store.rebuild_index(&sessions).expect("rebuild");
+    let rebuilt = sessions_without_core_state(&store);
+    assert_eq!(link(&rebuilt, "child-1"), link(&synced, "child-1"));
+    assert_eq!(rebuilt, fresh_rebuild(&sessions));
+}

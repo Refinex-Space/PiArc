@@ -114,6 +114,7 @@ impl HostConfig {
                 Capability::new("checkpoints"),
                 Capability::new("webFetch"),
                 Capability::new("login"),
+                Capability::new("subagents"),
             ],
             allow_model_network: None,
             model_preferences: None,

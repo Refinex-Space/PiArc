@@ -26,6 +26,7 @@ struct Fixture {
     io: ToolIo,
     cp: Checkpoints,
     clock: Arc<AtomicI64>,
+    storage: Storage,
 }
 
 impl Fixture {
@@ -48,7 +49,7 @@ impl Fixture {
         let clock = Arc::new(AtomicI64::new(1_000 * DAY_MS));
         let now = Arc::clone(&clock);
         let cp = Checkpoints::open(
-            storage,
+            storage.clone(),
             CheckpointConfig {
                 retention,
                 now_ms: Arc::new(move || now.load(Ordering::SeqCst)),
@@ -64,6 +65,7 @@ impl Fixture {
             io,
             cp,
             clock,
+            storage,
         }
     }
 
@@ -571,6 +573,7 @@ async fn files_outside_the_workspace_are_marked_and_restored() {
             before: Some(before.hash()),
             after: Some(hash_of(b"after\n")),
             operation: Operation::Modify,
+            subagent: None,
         }],
         None,
     )
@@ -650,4 +653,78 @@ async fn a_hunk_discard_refuses_a_file_that_does_not_decode_cleanly() {
         .await
         .expect("the whole file");
     assert_eq!(f.bytes("mixed.txt"), Some(base.into_bytes()));
+}
+
+/// T31-A10 (Core side): a subagent's writes go to its main session's running turn, recorded
+/// with the subagent's session id, and rewinding the main session restores them.
+#[tokio::test]
+async fn a_subagents_writes_belong_to_its_main_sessions_turn() {
+    let f = Fixture::new("subagent");
+    f.put("shared.txt", b"before\n");
+    f.io.turn_started(S, "turn-1");
+    let root = f.io.session(S).expect("main");
+    let ws = f.root.join("ws 工作区");
+    let link = crate::tool_io::subagents::Link {
+        root_id: S.into(),
+        root,
+        parent_id: S.into(),
+        agent_type: "general-purpose".into(),
+        description: None,
+        mode: None,
+        detached: false,
+    };
+    f.io.open_linked("child", &ws, &ws, link).expect("child");
+    let origin = json!({"tool":"Read","toolCallId":"child-read"});
+    let read = json!({"sessionId":"child","path":"shared.txt","read":{},"origin":origin});
+    f.call("fs/stat", read.clone()).await.expect("stat");
+    f.call(
+        "fs/read",
+        json!({"sessionId":"child","path":"shared.txt","origin":origin}),
+    )
+    .await
+    .expect("read");
+    let mut done = read;
+    done["completeRead"] = true.into();
+    f.call("fs/stat", done).await.expect("complete");
+    // The child names no turn: its main session's running turn applies.
+    f.call(
+        "fs/write",
+        json!({"sessionId":"child","path":"shared.txt","content":"by the subagent\n"}),
+    )
+    .await
+    .expect("child write");
+    f.call(
+        "fs/write",
+        json!({"sessionId":"child","path":"made.txt","content":"new\n"}),
+    )
+    .await
+    .expect("child create");
+    // The main session never read the file: its own table is separate (I73).
+    let error = f
+        .write("turn-1", "shared.txt", "x")
+        .await
+        .expect_err("not read by main");
+    assert_eq!(error.data.kind, ErrorKind::FileNotRead);
+    let rows = f
+        .storage
+        .with(|s| s.checkpoint_files(S))
+        .expect("open")
+        .expect("rows");
+    assert_eq!(rows.len(), 2);
+    assert!(
+        rows.iter()
+            .all(|r| r.subagent_session.as_deref() == Some("child"))
+    );
+    assert!(
+        f.cp.checkpoint_of("child", "turn-1")
+            .expect("read")
+            .is_none()
+    );
+    let report =
+        f.io.rewind_code(S, "turn-1", Vec::new())
+            .await
+            .expect("rewind");
+    assert!(report.completed);
+    assert_eq!(f.bytes("shared.txt").as_deref(), Some(&b"before\n"[..]));
+    assert_eq!(f.bytes("made.txt"), None);
 }

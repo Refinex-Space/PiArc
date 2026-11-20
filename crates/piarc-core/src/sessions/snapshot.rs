@@ -152,6 +152,9 @@ pub(crate) enum SnapshotMsg {
     Session(LiveSession),
     SessionClosed(String),
     Policy(String, PermissionMode, Vec<ApprovalRequest>),
+    /// A subagent session started under a main session (`Some`) or ended (`None`), T31: its
+    /// approvals show in the main session's entry; it has no entry of its own.
+    Subagent(String, Option<String>),
     /// Read the database again (after an index sync or a write).
     Reload,
     /// Send both lists again (a client subscribed anew).
@@ -174,6 +177,7 @@ impl Snapshots {
             workspaces: BTreeMap::new(),
             live: BTreeMap::new(),
             policies: BTreeMap::new(),
+            subagents: BTreeMap::new(),
             recent: Vec::new(),
             indexed: Vec::new(),
             workspace_revision: 0,
@@ -200,6 +204,8 @@ struct SnapshotTask {
     /// Open sessions, by id.
     live: BTreeMap<String, LiveSession>,
     policies: BTreeMap<String, (PermissionMode, Vec<ApprovalRequest>)>,
+    /// Running subagent sessions → their main session.
+    subagents: BTreeMap<String, String>,
     recent: Vec<piarc_store::WorkspaceRecord>,
     indexed: Vec<piarc_store::SessionRecord>,
     workspace_revision: u64,
@@ -231,6 +237,15 @@ impl SnapshotTask {
                     }
                     SnapshotMsg::Policy(id, mode, requests) => {
                         self.policies.insert(id, (mode, requests));
+                        sessions = true;
+                    }
+                    SnapshotMsg::Subagent(id, Some(root)) => {
+                        self.subagents.insert(id, root);
+                        sessions = true;
+                    }
+                    SnapshotMsg::Subagent(id, None) => {
+                        self.subagents.remove(&id);
+                        self.policies.remove(&id);
                         sessions = true;
                     }
                     SnapshotMsg::Reload => reload = true,
@@ -304,6 +319,8 @@ impl SnapshotTask {
         let mut list: Vec<SessionView> = self
             .indexed
             .iter()
+            // A subagent's session is reached from its card, not the sidebar (T31).
+            .filter(|record| record.meta.subagent_parent.is_none())
             .map(|record| {
                 let mut view = indexed_view(record);
                 if let Some(live) = self.live.get(&record.id) {
@@ -329,6 +346,13 @@ impl SnapshotTask {
                 view.permission_mode = *mode;
                 view.pending_approvals = requests.len();
                 view.approvals.clone_from(requests);
+            }
+            // The approvals its subagents wait for (each card names its subagent).
+            for (child, _) in self.subagents.iter().filter(|(_, root)| **root == view.id) {
+                if let Some((_, requests)) = self.policies.get(child) {
+                    view.pending_approvals += requests.len();
+                    view.approvals.extend(requests.iter().cloned());
+                }
             }
         }
         let payload = serde_json::json!({

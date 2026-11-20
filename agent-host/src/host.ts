@@ -45,6 +45,7 @@ export const HOST_CAPABILITIES: readonly string[] = [
   'checkpoints',
   'webFetch',
   'login',
+  'subagents',
 ];
 
 /** Exit codes, for Core's log and restart decisions. */
@@ -439,6 +440,21 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     );
     return (await sessions('session/abort')).abort(sessionId);
   });
+  connection.handle('resources/listAgents', async (params) => {
+    const method = 'resources/listAgents';
+    const registry = await sessions(method);
+    const cwd = optionalString(method, paramsObject(method, params), 'cwd');
+    return registry.subagents.list(cwd ?? registry.workspace.root);
+  });
+  connection.handle('subagent/stop', async (params) => {
+    const method = 'subagent/stop';
+    const registry = await sessions(method);
+    return {
+      stopped: registry.subagents.stop(
+        stringField(method, paramsObject(method, params), 'sessionId'),
+      ),
+    };
+  });
   connection.handle('session/close', async (params) => {
     const sessionId = stringField(
       'session/close',
@@ -500,6 +516,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
           context: welcome.enabled.includes('context'),
           checkpoints: welcome.enabled.includes('checkpoints'),
           webFetch: welcome.enabled.includes('webFetch'),
+          subagents: welcome.enabled.includes('subagents'),
         },
         log,
         sinkFor: (sessionId) => ({
