@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_PROFILE } from '../../tools/profile.js';
+import { createAgentTool } from './agent-tool.js';
 import { BUILT_IN_TYPES, catalogOf, parseCoreAgents, startable } from './definitions.js';
 import { allowedTools } from './tool-filter.js';
 
@@ -107,5 +109,26 @@ describe('definitions', () => {
     }
     expect(explore?.model).toBe('fast');
     expect(plan?.model).toBe('inherit');
+  });
+});
+
+describe('Agent tool', () => {
+  it('writes its choice parameters as string enums, which every provider accepts', () => {
+    const tool = createAgentTool(DEFAULT_PROFILE.Agent, {
+      types: BUILT_IN_TYPES,
+      run: () => Promise.reject(new Error('not called')),
+    });
+    const text = JSON.stringify(tool.parameters);
+    const schema: unknown = JSON.parse(text);
+    expect(schema).toMatchObject({
+      properties: {
+        model: {
+          type: 'string',
+          enum: ['inherit', 'fast', 'balanced', 'strong', 'haiku', 'sonnet', 'opus'],
+        },
+        effort: { type: 'string', enum: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      },
+    });
+    expect(text).not.toContain('anyOf');
   });
 });

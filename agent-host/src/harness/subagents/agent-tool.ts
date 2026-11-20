@@ -12,6 +12,21 @@ import type { ToolPresentation } from '../../tools/profile.js';
 import { withTypes } from '../prompts/subagents.js';
 import { DEFAULT_TYPE } from './definitions.js';
 
+const MODEL_CHOICES = ['inherit', 'fast', 'balanced', 'strong', 'haiku', 'sonnet', 'opus'] as const;
+const EFFORT_CHOICES = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
+
+/**
+ * A string parameter limited to `values`, written as `{ type: "string", enum }` rather than an
+ * `anyOf` of constants: providers such as Google reject `anyOf`/`const` in tool schemas (Pi's
+ * `StringEnum` makes the same shape), and Claude Code's tool has this shape too.
+ */
+function stringEnum<const T extends readonly string[]>(
+  values: T,
+  options: { readonly description: string },
+) {
+  return Type.Unsafe<T[number]>({ type: 'string', enum: [...values], ...options });
+}
+
 const agentSchema = Type.Object({
   description: Type.String({ description: 'A short title of the task, three to five words.' }),
   prompt: Type.String({
@@ -21,34 +36,16 @@ const agentSchema = Type.Object({
     Type.String({ description: 'The kind of subagent to start; general-purpose when omitted.' }),
   ),
   model: Type.Optional(
-    Type.Union(
-      [
-        Type.Literal('inherit'),
-        Type.Literal('fast'),
-        Type.Literal('balanced'),
-        Type.Literal('strong'),
-        Type.Literal('haiku'),
-        Type.Literal('sonnet'),
-        Type.Literal('opus'),
-      ],
-      {
-        description:
-          "Another model for this run: a tier of the user's model table, or inherit (this " +
-          "session's model). The type's own choice when omitted.",
-      },
-    ),
+    stringEnum(MODEL_CHOICES, {
+      description:
+        "Another model for this run: a tier of the user's model table, or inherit (this " +
+        "session's model). The type's own choice when omitted.",
+    }),
   ),
   effort: Type.Optional(
-    Type.Union(
-      [
-        Type.Literal('low'),
-        Type.Literal('medium'),
-        Type.Literal('high'),
-        Type.Literal('xhigh'),
-        Type.Literal('max'),
-      ],
-      { description: "Reasoning effort for this run; the model's default when omitted." },
-    ),
+    stringEnum(EFFORT_CHOICES, {
+      description: "Reasoning effort for this run; the model's default when omitted.",
+    }),
   ),
   isolation: Type.Optional(
     Type.Literal('worktree', {

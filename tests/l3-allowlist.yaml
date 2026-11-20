@@ -11,15 +11,9 @@
 differences:
   # ── Request structure: tool set ──────────────────────────────────────────────────────────
   - scenario: '*'
-    path: 'requests.items[*].tools.Agent'
-    claude_code: '>=2.1.318 <2.2.0'
-    reason: Subagents are not part of PiArc yet; the Agent tool arrives with them.
-    follow_up: T31
-  - scenario: '*'
     path: 'requests.items[*].tools.ListAgents'
     claude_code: '>=2.1.318 <2.2.0'
-    reason: Claude Code lists its running agents and teammates with this tool; PiArc has no agent teams and lists its subagents in the client.
-    follow_up: T31
+    reason: Claude Code lists its running agents and teammates with this tool; PiArc has no agent teams (not scheduled), a background subagent reports to the model through a reminder when it finishes (T31), and the client shows each run on its card.
   - scenario: '*'
     path: 'requests.items[*].tools.Skill'
     claude_code: '>=2.1.318 <2.2.0'
