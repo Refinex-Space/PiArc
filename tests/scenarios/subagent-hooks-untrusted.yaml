@@ -1,0 +1,44 @@
+id: subagent-hooks-untrusted
+description: In a project that is not trusted, a project subagent definition's hooks do not run; the run carries the warning and its command asks like any other (T31).
+capabilities: [CAP-AGENT-HOOKS-001]
+workspace:
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .claude/agents/guarded.md: "---\nname: guarded\ndescription: Guarded.\nmodel: mock-child/mock-model\nhooks:\n  PreToolUse:\n    - matcher: Bash\n      hooks:\n        - type: command\n          command: node hook.mjs guard\n---\nRun the command.\n"
+    hook-plans/guard.json: '{"exit": 2, "stderr": "The guarded subagent may not run commands."}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: agent-1,
+              name: Agent,
+              input:
+                { description: Try a command, prompt: Run env echo child., subagent_type: guarded },
+            },
+          ]
+      - text: Done.
+  child:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: c1, name: Bash, input: { command: env echo child } }]
+      - text: The command ran.
+sessions:
+  main: { provider: main }
+approvals:
+  - { tool: Bash, decision: allow, subagent: { type: guarded } }
+actions:
+  - prompt: { text: Run a command in the subagent., turn: one }
+expect:
+  request_counts: { main: 2, child: 2 }
+  files: { hook-log/guard.jsonl: null }
+  events:
+    - method: subagent/started
+      params: { itemId: agent-1, subagent: { warnings: [{ kind: hooksUntrusted, field: hooks }] } }
+  requests:
+    - provider: child
+      index: 1
+      tool_results: [{ id: c1, is_error: false, contains: child }]

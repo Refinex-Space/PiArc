@@ -1,0 +1,56 @@
+id: subagent-hooks
+description: A trusted project's subagent definition brings its own PreToolUse hook - it refuses the subagent's command while the main session's same command goes through the usual approval (T31).
+capabilities: [CAP-AGENT-HOOKS-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .claude/agents/guarded.md: "---\nname: guarded\ndescription: Guarded.\nmodel: mock-child/mock-model\nhooks:\n  PreToolUse:\n    - matcher: Bash\n      hooks:\n        - type: command\n          command: node hook.mjs guard\n---\nRun the command.\n"
+    hook-plans/guard.json: '{"exit": 2, "stderr": "The guarded subagent may not run commands."}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: agent-1,
+              name: Agent,
+              input:
+                { description: Try a command, prompt: Run env echo child., subagent_type: guarded },
+            },
+          ]
+      - tool_calls: [{ id: own, name: Bash, input: { command: env echo main } }]
+      - text: Done.
+  child:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: c1, name: Bash, input: { command: env echo child } }]
+      - text: The hook refused my command.
+sessions:
+  main: { provider: main }
+approvals:
+  - { tool: Bash, decision: allow }
+actions:
+  - prompt: { text: Run a command here and in the subagent., turn: one }
+expect:
+  request_counts: { main: 3, child: 2 }
+  json_lines:
+    hook-log/guard.jsonl:
+      - {
+          input:
+            {
+              hook_event_name: PreToolUse,
+              tool_name: Bash,
+              tool_input: { command: env echo child },
+            },
+        }
+  requests:
+    - provider: child
+      index: 1
+      tool_results:
+        [{ id: c1, is_error: true, contains: The guarded subagent may not run commands. }]
+    - provider: main
+      index: 2
+      tool_results: [{ id: agent-1, is_error: false }, { id: own, is_error: false, contains: main }]

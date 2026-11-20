@@ -1,0 +1,49 @@
+id: subagent-interrupt
+description: Interrupting the main session while its foreground subagent runs a command stops the subagent and its command; the Agent call ends as interrupted and the next request pairs it with an error result (T31).
+capabilities: [CAP-AGENT-INTERRUPT-001]
+workspace:
+  files:
+    .claude/agents/sleeper.md: "---\nname: sleeper\ndescription: Waits.\nmodel: mock-child/mock-model\n---\nWait.\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: agent-1,
+              name: Agent,
+              input:
+                {
+                  description: Wait a while,
+                  prompt: Run the long command.,
+                  subagent_type: sleeper,
+                },
+            },
+          ]
+      - text: Answered after the interruption.
+  child:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: hang, name: Bash, input: { command: 'echo ready; sleep 30' } }]
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Start the sleeper., turn: first }
+  - wait: { method: subagent/progress, params: { itemId: agent-1, subagent: { toolCalls: 1 } } }
+  - abort: {}
+  - wait: { method: turn/completed, turn: first }
+  - prompt: { text: Go on., turn: second }
+expect:
+  request_counts: { main: 2, child: 1 }
+  events:
+    - method: subagent/completed
+      params: { itemId: agent-1, subagent: { status: interrupted } }
+    - { method: turn/completed, turn: first, params: { status: interrupted } }
+    - { method: turn/completed, turn: second, params: { status: completed } }
+  requests:
+    - provider: main
+      index: 1
+      roles: [user, assistant, user, assistant, user]
+      user_texts: [Start the sleeper., Go on.]
+      tool_results: [{ id: agent-1, is_error: true }]

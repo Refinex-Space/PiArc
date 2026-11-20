@@ -1,0 +1,49 @@
+id: subagent-denied-type
+description: An Agent(<type>) deny rule removes that type from the Agent tool's list and refuses a call that names it; a worktree isolation request fails with a clear error until worktrees exist (T31, T35).
+capabilities: [CAP-AGENT-DEF-001, CAP-PERM-RULE-001]
+workspace:
+  files:
+    .piarc/settings.json: '{"permissions":{"deny":["Agent(Explore)"]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: denied,
+              name: Agent,
+              input: { description: Explore, prompt: Look., subagent_type: Explore },
+            },
+          ]
+      - tool_calls:
+          [
+            {
+              id: tree,
+              name: Agent,
+              input:
+                { description: Isolated, prompt: Look., subagent_type: Plan, isolation: worktree },
+            },
+          ]
+      - text: Neither ran.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Try the denied type., turn: one }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - provider: main
+      index: 0
+      contains: ['- Plan: ', '- general-purpose: ']
+      not_contains: ['- Explore: ']
+    - provider: main
+      index: 1
+      tool_results: [{ id: denied, is_error: true, contains: 'Agent(Explore)' }]
+    - provider: main
+      index: 2
+      tool_results:
+        [
+          { id: denied, is_error: true },
+          { id: tree, is_error: true, contains: 'isolation: worktree' },
+        ]

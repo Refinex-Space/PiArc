@@ -18,7 +18,7 @@ import type {
   SubagentTokens,
 } from '@piarc/protocol';
 
-import { repairInterruptedTurn } from '../harness/interruption.js';
+import { isInterruptionMarker, repairInterruptedTurn } from '../harness/interruption.js';
 import type { Persona } from '../harness/prompts/system.js';
 import { EMPTY_REPORT } from '../harness/prompts/subagents.js';
 import type { AgentToolHost } from '../harness/subagents/agent-tool.js';
@@ -102,6 +102,15 @@ async function register(bridge: CoreBridge, spec: ChildSpec, file: string | unde
 
 function textOf(message: unknown): string | undefined {
   if (!isObject(message) || message.role !== 'assistant') return undefined;
+  // The marker Harness Kit adds after an interrupt is not the subagent's report.
+  if (
+    isInterruptionMarker({
+      ...(typeof message.rawStopReason === 'string'
+        ? { rawStopReason: message.rawStopReason }
+        : {}),
+    })
+  )
+    return undefined;
   const text = contentText(message.content)?.trim();
   return text === undefined || text === '' ? undefined : text;
 }
@@ -248,7 +257,7 @@ export class ChildSession {
     let turns = 0;
     let toolCalls = 0;
     // Set from the event handler (an object, so the checks below read its current value).
-    const limit = { reached: false };
+    const limit = { reached: false, turns: 0 };
     let activity = '';
     const tokens = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
     const report = () => {
@@ -290,6 +299,7 @@ export class ChildSession {
             message.content.some((part: unknown) => isObject(part) && part.type === 'toolCall');
           if (maxTurns !== undefined && turns >= maxTurns && calls) {
             limit.reached = true;
+            limit.turns = turns;
             void session.abort();
           }
           break;
@@ -331,7 +341,12 @@ export class ChildSession {
         : error !== undefined
           ? 'failed'
           : 'completed';
-    return { status, report: text, turns, ...(error === undefined ? {} : { error }) };
+    return {
+      status,
+      report: text,
+      turns: limit.reached ? limit.turns : turns,
+      ...(error === undefined ? {} : { error }),
+    };
   }
 
   /** Shuts the child session down (its MCP connections close) and tells Core it ended. */
