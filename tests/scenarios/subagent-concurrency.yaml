@@ -1,0 +1,45 @@
+id: subagent-concurrency
+description: With the concurrency limit lowered to 1, the second of two Agent calls in one response comes back at once with the limit and the count instead of waiting for a slot; the first runs to its end (T31).
+capabilities: [CAP-AGENT-LIMIT-001]
+workspace:
+  files:
+    .piarc/settings.json: '{"subagents":{"maxConcurrent":1}}'
+    .claude/agents/worker.md: "---\nname: worker\ndescription: Works.\nmodel: mock-child/mock-model\n---\nWork.\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: a1,
+              name: Agent,
+              input: { description: First, prompt: Do the first part., subagent_type: worker },
+            },
+            {
+              id: a2,
+              name: Agent,
+              input: { description: Second, prompt: Do the second part., subagent_type: worker },
+            },
+          ]
+      - text: One of two ran.
+  child:
+    wire: anthropic
+    steps:
+      - text: First part done.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Do both parts., turn: one }
+expect:
+  request_counts: { main: 2, child: 1 }
+  requests:
+    - provider: main
+      index: 1
+      tool_results:
+        - { id: a1, is_error: false, contains: First part done. }
+        - {
+            id: a2,
+            is_error: true,
+            contains: 'Subagent limit reached: 1 of 1 subagents are running for this session',
+          }
