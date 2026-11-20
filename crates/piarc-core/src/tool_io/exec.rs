@@ -22,6 +22,7 @@
 //!    so a slow connection skips old output instead of slowing the command.
 //! 6. **Outcome.** [`piarc_exec::interpret`] for bash; PowerShell by its exit code.
 
+pub(super) mod background;
 pub(super) mod utility;
 
 use std::collections::VecDeque;
@@ -42,10 +43,11 @@ use piarc_protocol::exec::{
     CommandOutcome, CommandOutput, CwdReset, CwdResetReason, ExecOutput, ExecOutputParams,
     ExecRunParams, ExecRunResult, ExecShell, ExecShellsResult, ExecTimeout, OutputStream,
 };
+use piarc_protocol::tasks::{TaskKind, TaskStartReason, TaskStarted};
 use piarc_protocol::text::incomplete_utf8_suffix;
 use piarc_protocol::{ErrorKind, ErrorObject};
 use serde_json::json;
-use tokio::sync::{Notify, mpsc};
+use tokio::sync::{Notify, mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
 use super::{SessionIo, lock};
@@ -53,7 +55,7 @@ use crate::events::{Event, EventSender};
 use crate::route::RouteKey;
 
 /// Output chunks waiting for the capture; a full buffer pauses the command's pipes.
-const OUTPUT_BUFFER: usize = 16;
+pub(super) const OUTPUT_BUFFER: usize = 16;
 
 /// Bytes of live output waiting for the connection; beyond it the oldest are skipped.
 pub const DISPLAY_WINDOW: usize = 256 * 1024;
@@ -220,7 +222,12 @@ impl Exec {
         }
     }
 
-    /// Runs one command for `session` (see the module documentation).
+    /// Runs one command for `session` (see the module documentation). `place` says where a
+    /// command that runs on in the background goes (T32).
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the request, where it runs, its connection and its task place"
+    )]
     pub(super) async fn run(
         &self,
         session: &SessionIo,
@@ -229,71 +236,103 @@ impl Exec {
         wrap: Wrap,
         peer: Peer,
         token: CancellationToken,
+        place: Place,
     ) -> Result<ExecRunResult, ErrorObject> {
         let kind = p.shell.unwrap_or(ExecShell::Bash);
-        let program = self.program(kind)?;
-        let (mut env, probe) = self
-            .command_env(session, &p, kind, &launch, wrap.env)
-            .await?;
-        let args = match kind {
-            ExecShell::Bash => {
-                let (args, carried) = bash_invocation(&p.command);
-                env.extend(carried);
-                args
-            }
-            ExecShell::Powershell => powershell_args(&program, &p.command),
-        };
+        let tracked = launch.tracked && !p.background;
+        let (spec, probe) = self.spec(session, &p, &launch, wrap, tracked).await?;
+        let program = spec.program.clone();
         let timeout = self.limits.timeout(p.timeout_ms.map(Duration::from_millis));
-        let spec = CommandSpec {
-            program: program.clone(),
-            args,
-            cwd: launch.dir.clone(),
-            env,
-            launcher: wrap.launcher,
-            timeout: Some(timeout.duration),
-            kill_grace: self.limits.kill_grace,
+        let judge = background::Judge {
+            shell: kind,
+            command: p.command.clone(),
         };
+        let new_task = place.command_task(&p, &launch.dir);
+        if p.background {
+            let reserved =
+                background::start_task(&self.runner, &place.tasks, spec, new_task, judge, token)?;
+            return Ok(task_result(
+                &launch,
+                reserved,
+                TaskStartReason::Requested,
+                None,
+            ));
+        }
         let spill_name = p
             .origin
             .as_ref()
             .map_or_else(|| p.request_id.clone(), |o| o.tool_call_id.clone());
         let started = Instant::now();
-        let (exit, capture) = self
+        let deadline = place.tasks.clock().sleep(timeout.duration);
+        let executed = self
             .execute(
                 spec,
-                session.tmp_dir.clone(),
-                &spill_name,
+                (session.tmp_dir.clone(), spill_name),
                 &p.request_id,
                 peer,
-                token,
+                token.clone(),
+                deadline,
             )
             .await;
+        let (exit, capture) = match executed {
+            Executed::Done(exit, capture) => (exit, capture),
+            Executed::TimedOut(running) => {
+                let reserved = self
+                    .to_background(running, &place, new_task, judge, token)
+                    .await?;
+                let reset = launch.reset.clone();
+                let mut result = task_result(&launch, reserved, TaskStartReason::Timeout, reset);
+                result.timed_out = Some(true);
+                result.timeout = Some(exec_timeout(timeout));
+                result.duration_ms = Some(millis(started.elapsed()));
+                return Ok(result);
+            }
+        };
         let exit = exit.map_err(|e| piarc_fs::Error::io(&program, e).to_error_object())?;
-        let duration = started.elapsed();
+        let mut reset = launch.reset.clone();
+        if let Some(probe) = probe {
+            reset = reset.or_else(|| remember_cwd(session, probe.finish()));
+        }
+        let ran = Ran {
+            kind,
+            command: &p.command,
+            dir: &launch.dir,
+            timeout,
+            duration: started.elapsed(),
+            reset,
+        };
+        Ok(finished(&ran, exit, *capture))
+    }
+}
+
+/// A foreground command that exited, for its result.
+struct Ran<'a> {
+    kind: ExecShell,
+    command: &'a str,
+    dir: &'a Path,
+    timeout: piarc_exec::Timeout,
+    duration: Duration,
+    reset: Option<CwdReset>,
+}
+
+/// The result of a foreground command that exited.
+fn finished(ran: &Ran<'_>, exit: CommandExit, capture: OutputCapture) -> ExecRunResult {
+    {
+        let (kind, duration, timeout) = (ran.kind, ran.duration, ran.timeout);
         let reading = match kind {
-            ExecShell::Bash => interpret(&p.command, exit.status.code),
+            ExecShell::Bash => interpret(ran.command, exit.status.code),
             ExecShell::Powershell => piarc_exec::Interpretation {
                 success: exit.status.success(),
                 meaning: None,
             },
         };
         let success = !exit.killed && !exit.timed_out && reading.success;
-        let mut reset = launch.reset;
-        if let Some(probe) = probe {
-            reset = reset.or_else(|| remember_cwd(session, probe.finish()));
-        }
-        Ok(ExecRunResult {
+        ExecRunResult {
             exit_code: exit.status.code,
             signal: exit.status.signal,
             killed: exit.killed,
             timed_out: Some(exit.timed_out),
-            timeout: Some(ExecTimeout {
-                ms: millis(timeout.duration),
-                requested_ms: timeout
-                    .capped
-                    .then(|| timeout.requested.map(millis))
-                    .flatten(),
-            }),
+            timeout: Some(exec_timeout(timeout)),
             duration_ms: Some(millis(duration)),
             outcome: Some(if success {
                 CommandOutcome::Success
@@ -304,10 +343,111 @@ impl Exec {
                 .then_some(reading.meaning)
                 .flatten()
                 .map(str::to_owned),
-            cwd: Some(piarc_fs::display(&launch.dir)),
-            cwd_reset: reset,
+            cwd: Some(piarc_fs::display(ran.dir)),
+            cwd_reset: ran.reset.clone(),
             output: Some(command_output(capture.finish(success))),
-        })
+            task: None,
+        }
+    }
+}
+
+impl Exec {
+    /// What runs `p`: the shell, its arguments and environment, with the directory probe of
+    /// a `tracked` bash command. The timeout is Core's to watch: it moves the command to the
+    /// background (T32), so the runner never stops it for time.
+    async fn spec(
+        &self,
+        session: &SessionIo,
+        p: &ExecRunParams,
+        launch: &Launch,
+        wrap: Wrap,
+        tracked: bool,
+    ) -> Result<(CommandSpec, Option<CwdProbe>), ErrorObject> {
+        let kind = p.shell.unwrap_or(ExecShell::Bash);
+        let program = self.program(kind)?;
+        let (mut env, probe) = self
+            .command_env(session, p, kind, launch, wrap.env, tracked)
+            .await?;
+        let args = match kind {
+            ExecShell::Bash => {
+                let (args, carried) = bash_invocation(&p.command);
+                env.extend(carried);
+                args
+            }
+            ExecShell::Powershell => powershell_args(&program, &p.command),
+        };
+        let spec = CommandSpec {
+            program,
+            args,
+            cwd: launch.dir.clone(),
+            env,
+            launcher: wrap.launcher,
+            timeout: None,
+            kill_grace: self.limits.kill_grace,
+        };
+        Ok((spec, probe))
+    }
+
+    /// What runs a background command (a Monitor's): untracked directory.
+    pub(super) async fn background_spec(
+        &self,
+        session: &SessionIo,
+        p: &ExecRunParams,
+        launch: &Launch,
+        wrap: Wrap,
+    ) -> Result<CommandSpec, ErrorObject> {
+        Ok(self.spec(session, p, launch, wrap, false).await?.0)
+    }
+
+    /// The runner of every command.
+    pub(super) fn runner(&self) -> &CommandRunner {
+        &self.runner
+    }
+
+    /// The command reached its timeout: it becomes a task and runs on (ADR-0049 rule 2). When
+    /// its output file cannot be started it is stopped instead, as before T32.
+    async fn to_background(
+        &self,
+        running: Running,
+        place: &Place,
+        new_task: crate::tasks::NewTask,
+        judge: background::Judge,
+        token: CancellationToken,
+    ) -> Result<crate::tasks::Reserved, ErrorObject> {
+        let reserved = place.tasks.reserve(&new_task.output_dir)?;
+        let (reply, answer) = oneshot::channel();
+        let order = background::Switch {
+            reserved: reserved.clone(),
+            spilled: running.spilled,
+            tasks: place.tasks.clone(),
+            reply,
+        };
+        let log = match running.switch.send(order) {
+            Ok(()) => answer
+                .await
+                .unwrap_or_else(|_| Err(std::io::Error::other("the output stopped"))),
+            Err(_) => Err(std::io::Error::other("the output stopped")),
+        };
+        let _ = running.forward.await;
+        match log {
+            Ok(log) => {
+                place.tasks.register(&reserved, new_task, log, token);
+                background::watch_to_end(
+                    place.tasks.clone(),
+                    reserved.task_id.clone(),
+                    running.run,
+                    running.consumer,
+                    judge,
+                );
+                Ok(reserved)
+            }
+            Err(error) => {
+                token.cancel();
+                let _ = running.run.await;
+                let _ = running.consumer.await;
+                Err(piarc_fs::Error::io(&reserved.file, error).to_error_object())
+            }
+        }
     }
 
     /// The command's environment, with the directory probe of a tracked bash command.
@@ -318,11 +458,12 @@ impl Exec {
         kind: ExecShell,
         launch: &Launch,
         sandbox_env: Vec<(OsString, OsString)>,
+        tracked: bool,
     ) -> Result<(Vec<(OsString, OsString)>, Option<CwdProbe>), ErrorObject> {
         let resolved = self.base_env().await;
         let mut env = super::command_env(&resolved.inherited, p.env.clone().unwrap_or_default());
         env = super::overlay_env(env, sandbox_env);
-        let probe = if launch.tracked && kind == ExecShell::Bash {
+        let probe = if tracked && kind == ExecShell::Bash {
             let user = env
                 .iter()
                 .find(|(k, _)| k == "BASH_ENV")
@@ -369,42 +510,155 @@ impl Exec {
         found.ok_or_else(|| ErrorObject::new(ErrorKind::InvalidParams, missing, false))
     }
 
-    /// Runs `spec`, feeding the capture and the live view; returns when both are done.
+    /// Runs `spec`, feeding the capture and the live view, until it exits (both done) or
+    /// `deadline` passes first (the command still runs; the caller moves it to the
+    /// background).
     async fn execute(
         &self,
         spec: CommandSpec,
-        tmp_dir: PathBuf,
-        spill_name: &str,
+        (tmp_dir, spill_name): (PathBuf, String),
         request_id: &str,
         peer: Peer,
         token: CancellationToken,
-    ) -> (std::io::Result<CommandExit>, OutputCapture) {
-        let name = spill_name.to_owned();
-        let target: piarc_exec::SpillTarget = Box::new(move || {
-            let (file, path) = piarc_fs::create_spill(&tmp_dir, &name)
-                .map_err(|e| std::io::Error::other(e.to_string()))?;
-            Ok((
-                Box::new(file) as Box<dyn std::io::Write + Send>,
-                piarc_fs::model_path(&path),
-            ))
-        });
-        let mut capture = OutputCapture::new(self.limits, target);
-        let display = Arc::new(Display::default());
-        let (tx, mut rx) = mpsc::channel::<OutputChunk>(OUTPUT_BUFFER);
-        let consume = {
-            let display = Arc::clone(&display);
-            async move {
-                while let Some(chunk) = rx.recv().await {
-                    capture.push(chunk.stream, &chunk.bytes);
-                    display.push(chunk.stream, chunk.bytes);
-                }
-                display.close();
-                capture
-            }
+        deadline: piarc_ports::BoxFuture<'static, ()>,
+    ) -> Executed {
+        let spilled: Arc<Mutex<Option<PathBuf>>> = Arc::default();
+        let target: piarc_exec::SpillTarget = {
+            let spilled = Arc::clone(&spilled);
+            Box::new(move || {
+                let (file, path) = piarc_fs::create_spill(&tmp_dir, &spill_name)
+                    .map_err(|e| std::io::Error::other(e.to_string()))?;
+                let shown = piarc_fs::model_path(&path);
+                *lock(&spilled) = Some(path);
+                Ok((Box::new(file) as Box<dyn std::io::Write + Send>, shown))
+            })
         };
-        let forward = display.forward(peer, request_id.to_owned(), token.clone());
-        let (exit, capture, ()) = tokio::join!(self.runner.run(spec, tx, token), consume, forward);
-        (exit, capture)
+        let capture = OutputCapture::new(self.limits, target);
+        let display = Arc::new(Display::default());
+        let (tx, rx) = mpsc::channel::<OutputChunk>(OUTPUT_BUFFER);
+        let (switch, orders) = oneshot::channel();
+        let consumer = tokio::spawn(background::consume(
+            rx,
+            Some(orders),
+            background::Sink::Foreground {
+                capture: Box::new(capture),
+                display: Arc::clone(&display),
+            },
+        ));
+        let forward = tokio::spawn(display.forward(peer, request_id.to_owned(), token.clone()));
+        let runner = self.runner.clone();
+        let mut run = tokio::spawn(async move { runner.run(spec, tx, token).await });
+        tokio::select! {
+            joined = &mut run => {
+                let exit = joined.unwrap_or_else(|e| {
+                    Err(std::io::Error::other(format!("the command task failed: {e}")))
+                });
+                let capture = consumer.await.ok().flatten();
+                let _ = forward.await;
+                match capture {
+                    Some(capture) => Executed::Done(exit, Box::new(capture)),
+                    None => Executed::Done(
+                        Err(std::io::Error::other("the output capture was lost")),
+                        Box::new(OutputCapture::new(
+                            self.limits,
+                            Box::new(|| Err(std::io::Error::other("lost"))),
+                        )),
+                    ),
+                }
+            }
+            () = deadline => Executed::TimedOut(Running { run, consumer, forward, switch, spilled }),
+        }
+    }
+}
+
+/// How [`Exec::execute`] ended.
+enum Executed {
+    /// The command exited.
+    Done(std::io::Result<CommandExit>, Box<OutputCapture>),
+    /// The timeout passed first.
+    TimedOut(Running),
+}
+
+/// A foreground command that reached its timeout, still running.
+struct Running {
+    run: tokio::task::JoinHandle<std::io::Result<CommandExit>>,
+    consumer: tokio::task::JoinHandle<Option<OutputCapture>>,
+    forward: tokio::task::JoinHandle<()>,
+    switch: oneshot::Sender<background::Switch>,
+    spilled: Arc<Mutex<Option<PathBuf>>>,
+}
+
+/// Where a session's commands become tasks: the task manager, the session, its main session
+/// and workspace, and the main session's `tasks/` directory.
+pub(super) struct Place {
+    pub tasks: crate::tasks::TaskManager,
+    pub session_id: String,
+    pub owner_session_id: String,
+    pub workspace: String,
+    pub output_dir: PathBuf,
+}
+
+impl Place {
+    /// The task a command of `p` running in `dir` becomes.
+    fn command_task(&self, p: &ExecRunParams, dir: &Path) -> crate::tasks::NewTask {
+        crate::tasks::NewTask {
+            session_id: self.session_id.clone(),
+            owner_session_id: self.owner_session_id.clone(),
+            workspace: self.workspace.clone(),
+            kind: TaskKind::Command,
+            title: title_of(&p.command),
+            command: p.command.clone(),
+            cwd: piarc_fs::display(dir),
+            tool_call_id: p.origin.as_ref().map(|o| o.tool_call_id.clone()),
+            output_dir: self.output_dir.clone(),
+            timeout: None,
+        }
+    }
+}
+
+/// A command as the panel names it: its first line, at most 200 characters.
+pub(super) fn title_of(command: &str) -> String {
+    let first = command.lines().next().unwrap_or_default().trim();
+    match first.char_indices().nth(200) {
+        Some((at, _)) => format!("{}…", &first[..at]),
+        None => first.to_owned(),
+    }
+}
+
+/// The result of a command that runs on as a task.
+fn task_result(
+    launch: &Launch,
+    reserved: crate::tasks::Reserved,
+    reason: TaskStartReason,
+    reset: Option<CwdReset>,
+) -> ExecRunResult {
+    ExecRunResult {
+        exit_code: None,
+        signal: None,
+        killed: false,
+        timed_out: None,
+        timeout: None,
+        duration_ms: None,
+        outcome: None,
+        meaning: None,
+        cwd: Some(piarc_fs::display(&launch.dir)),
+        cwd_reset: reset,
+        output: None,
+        task: Some(TaskStarted {
+            task_id: reserved.task_id,
+            output_path: reserved.output_path,
+            reason,
+        }),
+    }
+}
+
+fn exec_timeout(timeout: piarc_exec::Timeout) -> ExecTimeout {
+    ExecTimeout {
+        ms: millis(timeout.duration),
+        requested_ms: timeout
+            .capped
+            .then(|| timeout.requested.map(millis))
+            .flatten(),
     }
 }
 
@@ -535,7 +789,7 @@ fn git_bash_setting(data_dir: &Path) -> Option<PathBuf> {
 /// The live view of a command's output: chunks in the order they were read, at most
 /// [`DISPLAY_WINDOW`] bytes waiting; older chunks are dropped and counted.
 #[derive(Default)]
-struct Display {
+pub(super) struct Display {
     state: Mutex<DisplayState>,
     notify: Notify,
 }

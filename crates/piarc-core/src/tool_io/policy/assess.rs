@@ -432,6 +432,8 @@ pub(super) struct BashFacts<'a> {
     pub programs: &'a exec::utility::Programs,
     pub resolved: RefCell<Vec<(String, PathBuf)>>,
     pub targets: RefCell<Vec<(PathBuf, bool)>>,
+    /// `Bash`, or `Monitor` (T32): whose rules apply.
+    pub tool: &'static str,
 }
 
 impl BashFacts<'_> {
@@ -469,6 +471,10 @@ pub(super) fn lexical(path: &Path) -> PathBuf {
 }
 
 impl Facts for BashFacts<'_> {
+    fn tool(&self) -> &str {
+        self.tool
+    }
+
     fn locate(&self, operand: &Operand, write: bool) -> Option<Located> {
         let text = &operand.word.text;
         if text.contains(DYNAMIC) || text.is_empty() {
@@ -549,11 +555,20 @@ impl Facts for BashFacts<'_> {
     }
 }
 
-/// Bash: analysis, rules, read-only list and Accept edits commands.
+/// Bash: analysis, rules, read-only list and Accept edits commands. A Monitor command (T32,
+/// ADR-0049 rule 7) gets the same analysis and rules, but neither the read-only list nor
+/// Accept edits lets it run unasked: only allow rules covering its other parts do.
 pub(super) fn bash_call(rules: &RuleSet, facts: &BashFacts<'_>, text: &str) -> Assessment {
     let analysis = bash::analyze(text);
     let judgment = bash::judge(&analysis, rules, facts);
     let mut input = judgment.input(PermissionMode::Default);
+    if facts.tool == "Monitor" {
+        input.read_only = false;
+        input.accept_edit = false;
+        if input.allow.is_empty() {
+            input.allowed = false;
+        }
+    }
     if let Some(hit) = input.deny.take() {
         (input.enterprise, input.deny) = split_hit(hit);
     }

@@ -90,6 +90,12 @@ impl RouteKey {
         Self(Arc::from("core/sessions"))
     }
 
+    /// The route of the background task snapshots (`core/tasks`, T32).
+    #[must_use]
+    pub fn tasks() -> Self {
+        Self(Arc::from("core/tasks"))
+    }
+
     /// The route of one session's events: `session/<id>` (T14).
     ///
     /// # Errors

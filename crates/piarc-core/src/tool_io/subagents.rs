@@ -243,12 +243,39 @@ impl ToolIo {
         }
         self.open_linked(&p.session_id, &workspace, &cwd, link)?;
         lock(&self.session(&p.session_id)?.policy).follow_mode(mode);
+        if p.background {
+            self.register_background(&p, &root_id, &workspace, &cwd)?;
+        }
         services
             .snapshots
             .send(SnapshotMsg::Subagent(p.session_id, Some(root_id)));
         Ok(SubagentStartResult {
             permission_mode: mode,
             warnings,
+        })
+    }
+
+    /// A background run is a task of its main session (T32, ADR-0049 rule 5).
+    fn register_background(
+        &self,
+        p: &SubagentStartParams,
+        root_id: &str,
+        workspace: &Path,
+        cwd: &Path,
+    ) -> Result<(), ErrorObject> {
+        self.tasks.register_subagent(crate::tasks::NewSubagent {
+            child_session_id: p.session_id.clone(),
+            session_id: p.parent_session_id.clone(),
+            owner_session_id: root_id.to_owned(),
+            workspace: piarc_fs::display(workspace),
+            agent_type: p.agent_type.clone(),
+            title: p
+                .description
+                .clone()
+                .filter(|d| !d.trim().is_empty())
+                .unwrap_or_else(|| p.agent_type.clone()),
+            cwd: piarc_fs::display(cwd),
+            tool_call_id: p.tool_call_id.clone(),
         })
     }
 
@@ -295,6 +322,9 @@ impl ToolIo {
         if !registered {
             return false;
         }
+        // Without `subagent/finish` first (its connection ended), a background run was
+        // interrupted; after it, the task already ended and this changes nothing.
+        self.tasks.subagent_ended(id, None);
         self.close_session(id);
         if let Ok(services) = self.services() {
             if let Some(hooks) = &services.hooks {
@@ -359,6 +389,7 @@ impl ToolIo {
     ) -> Result<Value, ErrorObject> {
         let p: piarc_protocol::subagent::SubagentFinishParams =
             super::parse("subagent/finish", params)?;
+        self.tasks.subagent_ended(&p.session_id, Some(p.status));
         self.finish_subagent(&p.session_id);
         let status = match p.status {
             piarc_protocol::subagent::SubagentStatus::Failed => "error",

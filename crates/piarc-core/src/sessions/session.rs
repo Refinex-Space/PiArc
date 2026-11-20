@@ -40,6 +40,7 @@ use crate::events::Event;
 use crate::route::RouteKey;
 
 mod changes;
+pub(crate) mod notices;
 mod rewind;
 
 pub use rewind::CheckpointOp;
@@ -121,6 +122,9 @@ pub(crate) enum SessionMsg {
     Uncertain(CallRecord),
     HostLost(String),
     Close(oneshot::Sender<Result<Value>>),
+    /// Background-task notices wait for the session (T32).
+    Notices,
+    NoticesSent,
 }
 
 /// How a request affects turns: a rewind or branch switch needs the session to itself.
@@ -200,6 +204,8 @@ impl SessionHandle {
             starting: 0,
             exclusive: false,
             busy: false,
+            notifying: false,
+            notify_again: false,
             cancel: ctx.cancel.child_token(),
         };
         actor.publish();
@@ -243,6 +249,7 @@ impl SessionHandle {
             Err(error) => return Err(host_error(error)),
         };
         self.in_host.store(true, Ordering::Release);
+        self.notices_waiting();
         if let Some(mode) = mode {
             supervisor
                 .set_permission_mode(&SessionId(self.id.clone()), mode)
@@ -264,6 +271,7 @@ impl SessionHandle {
             .await
             .map_err(host_error)?;
         self.in_host.store(true, Ordering::Release);
+        self.notices_waiting();
         self.io
             .set_initial_mode(&self.id, opened.permission_mode)
             .await
@@ -282,6 +290,11 @@ impl SessionHandle {
             .map_err(|e| Error::feature(&e))?;
         self.in_host.store(true, Ordering::Release);
         self.info().await
+    }
+
+    /// Background-task notices wait: the actor sends them (T32).
+    pub fn notices_waiting(&self) {
+        let _ = self.tx.try_send(SessionMsg::Notices);
     }
 
     pub async fn info(&self) -> Result<Value> {
@@ -349,6 +362,9 @@ struct SessionActor {
     /// A rewind or branch switch in flight: no turn may start until it ends (ADR-0044 rule 5).
     exclusive: bool,
     busy: bool,
+    /// Background-task notices are being sent; another round follows when more arrived.
+    notifying: bool,
+    notify_again: bool,
     /// Cancelled when the session closes: its requests in flight stop waiting.
     cancel: CancellationToken,
 }
@@ -376,6 +392,14 @@ impl SessionActor {
                     if self.error.take().is_some() {
                         self.status = SessionStatus::Idle;
                         self.publish();
+                    }
+                    self.send_notices();
+                }
+                SessionMsg::Notices => self.send_notices(),
+                SessionMsg::NoticesSent => {
+                    self.notifying = false;
+                    if std::mem::take(&mut self.notify_again) {
+                        self.send_notices();
                     }
                 }
                 SessionMsg::RestoreFailed(error) => self.fail(error.to_string()),
@@ -527,19 +551,18 @@ impl SessionActor {
                 if let Some(turn) = &turn {
                     self.ctx.tool_io.turn_started(&self.id, turn);
                 }
+                self.ctx.tool_io.tasks().turn_started(&self.id);
                 self.active_turn = turn;
                 self.status = SessionStatus::Running;
                 self.error = None;
             }
             "item/completed" => {
-                if let Some(id) = notification
-                    .params
-                    .payload
-                    .get("item")
-                    .and_then(|i| i.get("itemId"))
-                    .and_then(Value::as_str)
-                {
+                let item = notification.params.payload.get("item");
+                if let Some(id) = item.and_then(|i| i.get("itemId")).and_then(Value::as_str) {
                     self.ctx.tool_io.finish_tool(&self.id, id);
+                }
+                if let Some(item) = item.filter(|i| i.get("type") == Some(&json!("reminder"))) {
+                    self.reminders_delivered(item);
                 }
                 return;
             }
@@ -553,6 +576,7 @@ impl SessionActor {
                 );
                 self.active_turn = None;
                 self.ctx.tool_io.turn_completed(&self.id);
+                self.ctx.tool_io.tasks().turn_completed(&self.id);
                 let failed = notification.params.payload.get("status") == Some(&json!("failed"));
                 self.status = if failed {
                     SessionStatus::Error
@@ -704,6 +728,7 @@ impl SessionActor {
     fn close(&mut self, reply: oneshot::Sender<Result<Value>>) {
         self.cancel.cancel();
         self.ws.detach(&self.id);
+        self.ctx.tool_io.tasks().session_closed(&self.id);
         self.ctx.tool_io.close_session(&self.id);
         self.ctx
             .snapshots
@@ -801,6 +826,10 @@ impl Request {
             _ => None,
         };
         let supervisor = self.ws.acquire().await?;
+        // A turn starting now takes every finished task's notice with it (ADR-0049 rule 5).
+        if matches!(op, Op::Prompt(_) | Op::Steer(_) | Op::FollowUp(_)) {
+            notices::deliver(&supervisor, &self.id.0, &self.tool_io).await;
+        }
         match op {
             Op::Prompt(input) => {
                 let request_id = match input.request_id {

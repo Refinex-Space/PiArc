@@ -1,7 +1,8 @@
 //! T17: shell commands through `ToolIo` without an Agent Host. The working directory carried
 //! between commands and reset outside the workspace (A03), timeouts cut to the maximum (A04),
 //! the output budget with the full text on disk (A05), 50 MB per pipe (A06), the meaning of
-//! exit codes (A07), the environment without PiArc's variables (A08), and `exec/shells`.
+//! exit codes (A07), the environment without PiArc's variables (A08), and `exec/shells`. Since
+//! T32 a command that outlives its timeout moves to the background instead of being stopped.
 
 use std::ffi::OsString;
 use std::path::PathBuf;
@@ -56,6 +57,17 @@ impl Fixture {
             .expect("exec/run answers");
         drain.abort();
         result
+    }
+
+    /// Another `exec/*` request of session `s`.
+    async fn call(&self, method: &str, params: Value) -> Value {
+        let (peer, _frames) = Peer::channel(64);
+        let mut params = object(params);
+        params.insert("sessionId".into(), json!("s"));
+        self.io
+            .dispatch(method, params, peer)
+            .await
+            .unwrap_or_else(|e| panic!("{method} answers: {e:?}"))
     }
 
     async fn bash(&self, command: &str) -> Value {
@@ -171,14 +183,30 @@ async fn timeouts_report_the_limit_and_a_cut_request() {
         cut["timeout"],
         json!({ "ms": 600_000, "requestedMs": 900_000 })
     );
+    // T32: the command that outlives its timeout keeps running as a background task, with
+    // what it printed so far at the start of the task's output file.
     let started = Instant::now();
     let short = f
         .run(json!({ "command": "echo partial; sleep 30", "timeoutMs": 1000 }))
         .await;
     assert!(started.elapsed() < Duration::from_secs(15));
     assert_eq!(short["timedOut"], true);
-    assert_eq!(short["outcome"], "failure");
-    assert_eq!(head(&short), "partial\n");
+    assert_eq!(short["timeout"], json!({ "ms": 1000 }));
+    assert_eq!(short["task"]["reason"], "timeout");
+    assert!(short.get("exitCode").is_none() && short.get("outcome").is_none());
+    let task = short["task"]["taskId"].as_str().expect("task id").to_owned();
+    let listed = f.call("exec/background/list", json!({})).await;
+    assert_eq!(listed["tasks"][0]["taskId"], task.as_str());
+    assert_eq!(listed["tasks"][0]["status"], "running");
+    let read = f
+        .call("exec/background/read", json!({ "taskId": task }))
+        .await;
+    assert_eq!(read["text"], "partial\n");
+    let killed = f
+        .call("exec/background/kill", json!({ "taskId": task }))
+        .await;
+    assert_eq!(killed["task"]["status"], "killed");
+    assert_eq!(killed["stopped"], true);
 }
 
 #[tokio::test]

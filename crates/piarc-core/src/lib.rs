@@ -89,6 +89,7 @@ mod runtime;
 pub mod secrets;
 pub mod sessions;
 pub mod storage;
+pub mod tasks;
 pub mod terminal;
 pub mod tool_io;
 pub mod trust;

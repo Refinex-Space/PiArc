@@ -341,6 +341,7 @@ pub(in crate::tool_io) fn claim_command(
         || p.env.as_ref().is_some_and(|v| !v.is_empty())
         || p.cwd.is_some()
         || !timeout_matches(timeout, p.timeout_ms)
+        || background_of(&grant.input) != p.background
     {
         return Err(mismatch());
     }
@@ -352,6 +353,48 @@ pub(in crate::tool_io) fn claim_command(
                 return Err(mismatch());
             }
         }
+    }
+    Ok(state
+        .grants
+        .remove(&origin.tool_call_id)
+        .map(|g| g.programs)
+        .unwrap_or_default())
+}
+
+/// Whether the approved call asked to run in the background (T32): the request must match,
+/// so a rule on `run_in_background` decides what runs.
+fn background_of(input: &serde_json::Map<String, Value>) -> bool {
+    input
+        .get("run_in_background")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+}
+
+/// The approved `Monitor` call `p` names (T32): same command, the session's shell directory,
+/// the same timeout; consumed. Returns the programs an automatic allowance pinned.
+pub(in crate::tool_io) fn claim_monitor(
+    s: &SessionIo,
+    p: &piarc_protocol::tasks::ExecMonitorParams,
+    peer: &Peer,
+    cwd: &Path,
+) -> Result<Vec<(String, PathBuf)>, ErrorObject> {
+    let origin = p.origin.as_ref().ok_or_else(mismatch)?;
+    let mut state = lock(&s.policy);
+    let grant = state
+        .grants
+        .get(&origin.tool_call_id)
+        .filter(|g| g.belongs(&origin.tool, peer) && g.tool == "Monitor")
+        .ok_or_else(mismatch)?;
+    let timeout = grant
+        .input
+        .get("timeout")
+        .and_then(Value::as_f64)
+        .map(|t| (1000. * t).round().clamp(1., 9_007_199_254_740_991.));
+    if Some(cwd) != grant.cwd.as_deref()
+        || grant.command.as_deref() != Some(p.command.as_str())
+        || !timeout_matches(timeout, p.timeout_ms)
+    {
+        return Err(mismatch());
     }
     Ok(state
         .grants

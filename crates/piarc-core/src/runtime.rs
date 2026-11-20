@@ -101,6 +101,8 @@ pub struct CoreConfig {
     /// WebFetch's limits and the hosts it may reach although not public (T29); tests admit
     /// their local HTTP servers.
     pub web: crate::tool_io::WebConfig,
+    /// Background tasks' thresholds and timer clock (T32); tests move the clock.
+    pub tasks: crate::tasks::TasksConfig,
 }
 
 /// A credential store for the vault's master key and the key's name in it.
@@ -135,6 +137,7 @@ impl Default for CoreConfig {
             hooks: piarc_hooks::RunnerConfig::default(),
             checkpoints: crate::checkpoints::CheckpointConfig::default(),
             web: crate::tool_io::WebConfig::default(),
+            tasks: crate::tasks::TasksConfig::default(),
         }
     }
 }
@@ -716,6 +719,7 @@ fn open_state(
     let checkpoints =
         crate::checkpoints::Checkpoints::open(storage.clone(), config.checkpoints.clone())?;
     checkpoints.spawn_sweeper(handle, config.sessions.clock.clone(), cancel.child_token());
+    let tasks = crate::tasks::TaskManager::new(config.tasks.clone());
     let sessions = Hub::new(crate::sessions::Ctx {
         handle: handle.clone(),
         events: events.clone(),
@@ -728,44 +732,62 @@ fn open_state(
         model_preferences: Arc::new(std::sync::Mutex::new(crate::providers::preferences(&data))),
         logins: Arc::default(),
         provider_writer: tokio::sync::Mutex::new(()),
-        tool_io: ToolIo::with_notices(
-            ToolIoConfig {
-                observer: config.tool_observer.clone(),
-                home: config.home.clone(),
-                command_env: config
-                    .command_env
-                    .clone()
-                    .unwrap_or_else(crate::tool_io::CommandEnv::login_shell),
-                clock: config.sessions.clock.clone(),
-                web: config.web.clone(),
-                ..ToolIoConfig::new(data)
-            },
-            Some(events.clone()),
-        )
-        .policy_services(crate::tool_io::policy::Services {
-            storage: storage.clone(),
-            trust: trust.clone(),
-            snapshots: snapshots.clone(),
-            hooks: Some(crate::hooks::HooksService::new(
-                storage.clone(),
-                trust.clone(),
-                Some(events.clone()),
-                Arc::new(piarc_exec::ProcessTreeSpawner),
-                config.hooks,
-                crate::tool_io::hook_condition,
-            )),
-        })
-        .with_checkpoints(checkpoints),
+        tool_io: state_tool_io(config, data, events, &storage, &trust, &snapshots)
+            .with_checkpoints(checkpoints)
+            .with_tasks(tasks.clone()),
         config: config.sessions.clone(),
         snapshots,
         cancel: cancel.child_token(),
         files: crate::composer::file_search::FileSearch::default(),
     });
+    tasks.set_outlet(sessions.task_outlet());
+    {
+        let _entered = handle.enter();
+        tasks.start(storage.clone(), events.clone(), cancel.child_token());
+    }
     tracing::info!(target: "piarc_core", data = %storage.dirs().data().display(), "Core state opened");
     Ok(StateServices {
         storage,
         trust,
         sessions,
+    })
+}
+
+/// The tool I/O of Core's state: commands with the login shell's environment, policy, hooks.
+fn state_tool_io(
+    config: &CoreConfig,
+    data: PathBuf,
+    events: &EventSender,
+    storage: &Storage,
+    trust: &TrustService,
+    snapshots: &crate::sessions::Snapshots,
+) -> ToolIo {
+    ToolIo::with_notices(
+        ToolIoConfig {
+            observer: config.tool_observer.clone(),
+            home: config.home.clone(),
+            command_env: config
+                .command_env
+                .clone()
+                .unwrap_or_else(crate::tool_io::CommandEnv::login_shell),
+            clock: config.sessions.clock.clone(),
+            web: config.web.clone(),
+            ..ToolIoConfig::new(data)
+        },
+        Some(events.clone()),
+    )
+    .policy_services(crate::tool_io::policy::Services {
+        storage: storage.clone(),
+        trust: trust.clone(),
+        snapshots: snapshots.clone(),
+        hooks: Some(crate::hooks::HooksService::new(
+            storage.clone(),
+            trust.clone(),
+            Some(events.clone()),
+            Arc::new(piarc_exec::ProcessTreeSpawner),
+            config.hooks,
+            crate::tool_io::hook_condition,
+        )),
     })
 }
 

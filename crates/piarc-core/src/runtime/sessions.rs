@@ -417,6 +417,41 @@ impl CoreRuntime {
         })
     }
 
+    /// Stops background task `task_id` (the panel's stop button, T32): the same entry as
+    /// `KillShell`, without its session check. Answers the task as it ended.
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn stop_task(
+        &self,
+        task_id: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(
+            on_done,
+            move |hub| async move { hub.stop_task(task_id).await },
+        )
+    }
+
+    /// A byte range of background task `task_id`'s output (T32): at most 64 KiB from
+    /// `offset`, as text.
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn read_task_output(
+        &self,
+        task_id: String,
+        offset: u64,
+        length: Option<u64>,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.read_task_output(task_id, offset, length).await
+        })
+    }
+
     /// A window of subagent `child`'s transcript, read through session `parent` (T31).
     ///
     /// # Errors

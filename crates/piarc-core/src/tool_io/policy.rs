@@ -52,7 +52,7 @@ mod waits;
 use waits::{post_card, wait_for_user, withdraw_card};
 pub(crate) mod settings_view;
 use grants::Grant;
-pub(super) use grants::{FilePermit, claim_command, claim_fetch, file_permit};
+pub(super) use grants::{FilePermit, claim_command, claim_fetch, claim_monitor, file_permit};
 
 /// `path` without `.` and `..` components (no file system access).
 pub(super) fn lexical(path: &Path) -> PathBuf {
@@ -499,7 +499,7 @@ impl ToolIo {
         peer: &Peer,
     ) -> Result<Prepared, ErrorObject> {
         let rules = rules_of(s, settings);
-        let programs = if p.tool == "Bash" {
+        let programs = if p.tool == "Bash" || p.tool == "Monitor" {
             Some(self.exec.programs().await)
         } else {
             None
@@ -841,12 +841,17 @@ async fn prepare(
         let mut boundary = Boundary::Inside;
         let field = |key: &str| p.input.get(key).and_then(Value::as_str);
         let assessment = match p.tool.as_str() {
-            "Bash" | "PowerShell" => {
+            "Bash" | "PowerShell" | "Monitor" => {
                 let cmd = field("command").ok_or_else(|| denied("The command text is missing."))?;
                 let cwd = exec::launch_dir(&s, None)?.dir;
                 let assessment = match &programs {
-                    Some(programs) if p.tool == "Bash" => {
+                    Some(programs) if p.tool == "Bash" || p.tool == "Monitor" => {
                         let facts = assess::BashFacts {
+                            tool: if p.tool == "Monitor" {
+                                "Monitor"
+                            } else {
+                                "Bash"
+                            },
                             scope: &scope,
                             shell_cwd: &cwd,
                             shell_cwd_posix: piarc_policy::paths::posix(&cwd),

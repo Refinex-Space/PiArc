@@ -491,6 +491,10 @@ impl Hub {
             check_title(title)?;
         }
         let archiving = change.archived == Some(true);
+        if archiving {
+            // Its background tasks stop before their output is cleared (T32).
+            self.ctx.tool_io.tasks().session_removed(&id, false).await;
+        }
         if let Some(session) = self.live(&id) {
             session.op(Op::Prefs(change.clone())).await?;
             if !archiving {
@@ -528,6 +532,7 @@ impl Hub {
     /// its index rows.
     pub async fn delete_session(&self, id: String) -> Result<()> {
         check_session_id(&id)?;
+        self.ctx.tool_io.tasks().session_removed(&id, true).await;
         let removed = lock(&self.routes).sessions.remove(&id);
         let was_open = removed.is_some();
         if let Some(session) = removed {
@@ -594,14 +599,63 @@ impl Hub {
         self.ctx.snapshots.send(snapshot::SnapshotMsg::Reload);
     }
 
-    /// Sends both snapshots again (a client subscribed or reloaded).
+    /// Sends the snapshots again (a client subscribed or reloaded).
     pub fn resend_snapshots(&self) {
         self.ctx.snapshots.send(snapshot::SnapshotMsg::Resend);
+        self.ctx.tool_io.tasks().republish();
+    }
+
+    /// The stop button of a background task (T32).
+    pub async fn stop_task(&self, task_id: String) -> Result<Value> {
+        let (task, stopped, tail) = self
+            .ctx
+            .tool_io
+            .tasks()
+            .stop(&task_id, crate::tasks::StopBy::User)
+            .await
+            .map_err(|e| Error::feature(&e))?;
+        serde_json::to_value(piarc_protocol::tasks::TaskKillResult {
+            task,
+            stopped,
+            tail,
+        })
+        .map_err(|e| Error::Internal {
+            reason: format!("cannot encode the answer: {e}"),
+        })
+    }
+
+    /// Part of a background task's output (T32).
+    pub async fn read_task_output(
+        &self,
+        task_id: String,
+        offset: u64,
+        length: Option<u64>,
+    ) -> Result<Value> {
+        let chunk = self
+            .ctx
+            .tool_io
+            .tasks()
+            .read(None, &task_id, offset, length)
+            .await
+            .map_err(|e| Error::feature(&e))?;
+        serde_json::to_value(chunk).map_err(|e| Error::Internal {
+            reason: format!("cannot encode the answer: {e}"),
+        })
+    }
+
+    /// What the task manager reaches of the session layer (T32).
+    pub(crate) fn task_outlet(&self) -> Arc<dyn crate::tasks::TaskOutlet> {
+        Arc::new(HubOutlet {
+            ctx: Arc::downgrade(&self.ctx),
+            routes: Arc::downgrade(&self.routes),
+        })
     }
 
     /// Ordered shutdown: refuses new workspaces and sessions, then stops every Agent Host
     /// (`host/shutdown`, which closes their sessions) and waits for them.
     pub async fn shutdown(&self) {
+        // Background tasks end with PiArc and are recorded as interrupted (T32).
+        self.ctx.tool_io.tasks().shutdown().await;
         let workspaces: Vec<workspace::WorkspaceHandle> = {
             let mut routes = lock(&self.routes);
             routes.closed = true;
@@ -847,6 +901,46 @@ pub(crate) fn host_error(error: piarc_host::Error) -> Error {
 /// A path as text for the client and the database.
 pub(crate) fn path_text(path: &Path) -> String {
     path.to_string_lossy().into_owned()
+}
+
+/// The task manager's way into the session layer (T32): weak, so the manager the tool I/O
+/// holds does not keep the hub alive.
+struct HubOutlet {
+    ctx: std::sync::Weak<Ctx>,
+    routes: std::sync::Weak<Mutex<Routes>>,
+}
+
+impl crate::tasks::TaskOutlet for HubOutlet {
+    fn notices_waiting(&self, session_id: &str) {
+        let Some(routes) = self.routes.upgrade() else {
+            return;
+        };
+        let session = lock(&routes).sessions.get(session_id).cloned();
+        if let Some(session) = session {
+            session.notices_waiting();
+        }
+    }
+
+    fn stop_subagent(
+        &self,
+        owner: &str,
+        child: &str,
+    ) -> piarc_ports::BoxFuture<'static, std::result::Result<(), piarc_protocol::ErrorObject>> {
+        let hub = match (self.ctx.upgrade(), self.routes.upgrade()) {
+            (Some(ctx), Some(routes)) => Some(Hub { ctx, routes }),
+            _ => None,
+        };
+        let (owner, child) = (owner.to_owned(), child.to_owned());
+        Box::pin(async move {
+            let Some(hub) = hub else {
+                return Ok(());
+            };
+            hub.stop_subagent(owner, child)
+                .await
+                .map(drop)
+                .map_err(|e| e.to_error_object())
+        })
+    }
 }
 
 #[cfg(test)]

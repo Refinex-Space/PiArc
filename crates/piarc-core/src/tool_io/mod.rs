@@ -39,6 +39,7 @@ mod memory;
 mod memory_reader;
 pub(crate) mod policy;
 pub(crate) mod subagents;
+mod tasks;
 mod web;
 
 pub use exec::{CommandEnv, DISPLAY_WINDOW};
@@ -175,6 +176,8 @@ pub struct ToolIo {
     checkpoints: Option<crate::checkpoints::Checkpoints>,
     /// The WebFetch fetcher (T29).
     web: Arc<web::WebState>,
+    /// Background commands, subagents and Monitors (T32).
+    tasks: crate::tasks::TaskManager,
 }
 
 impl std::fmt::Debug for ToolIo {
@@ -208,7 +211,21 @@ impl ToolIo {
             policy: None,
             checkpoints: None,
             web: Arc::default(),
+            tasks: crate::tasks::TaskManager::new(crate::tasks::TasksConfig::default()),
         }
+    }
+
+    /// Uses `tasks` as the task manager (Core's runtime gives the one with the database).
+    #[must_use]
+    pub(crate) fn with_tasks(mut self, tasks: crate::tasks::TaskManager) -> Self {
+        self.tasks = tasks;
+        self
+    }
+
+    /// The task manager.
+    #[must_use]
+    pub fn tasks(&self) -> &crate::tasks::TaskManager {
+        &self.tasks
     }
 
     /// Whether `method` is one this dispatcher answers.
@@ -247,9 +264,11 @@ impl ToolIo {
         check_session_id(session_id)?;
         let tmp = self.create_tmp(session_id)?;
         let attachments = self.create_attachments(session_id)?;
+        let tasks = self.create_tasks_dir(session_id)?;
         let scope = Scope::new(root, cwd)
             .and_then(|scope| scope.with_read_only_dir(&tmp))
             .and_then(|scope| scope.with_read_only_dir(&attachments))
+            .and_then(|scope| scope.with_read_only_dir(&tasks))
             .map_err(|e| e.to_error_object())?;
         self.register(session_id, scope, tmp, None, None);
         Ok(())
@@ -266,12 +285,23 @@ impl ToolIo {
     ) -> Result<(), ErrorObject> {
         let tmp = self.create_tmp(session_id)?;
         let attachments = self.create_attachments(session_id)?;
+        // The main session's tasks hold this subagent's output too (ADR-0049 rule 2).
+        let tasks = self.create_tasks_dir(&link.root_id)?;
         let scope = Scope::new(root, cwd)
             .and_then(|scope| scope.with_read_only_dir(&tmp))
             .and_then(|scope| scope.with_read_only_dir(&attachments))
+            .and_then(|scope| scope.with_read_only_dir(&tasks))
             .map_err(|e| e.to_error_object())?;
         self.register(session_id, scope, tmp, None, Some(link));
         Ok(())
+    }
+
+    /// `<data dir>/sessions/<id>/tasks/`: background tasks' output, read without asking.
+    fn create_tasks_dir(&self, session_id: &str) -> Result<PathBuf, ErrorObject> {
+        let dir = self.session_dir(session_id).join("tasks");
+        std::fs::create_dir_all(&dir)
+            .map_err(|e| piarc_fs::Error::io(&dir, e).to_error_object())?;
+        Ok(dir)
     }
 
     fn create_tmp(&self, session_id: &str) -> Result<PathBuf, ErrorObject> {
@@ -313,9 +343,11 @@ impl ToolIo {
             .map_err(|e| ErrorObject::new(ErrorKind::InvalidParams, e.to_string(), false))?;
         let tmp = self.create_tmp(session_id)?;
         let attachments = self.create_attachments(session_id)?;
+        let tasks = self.create_tasks_dir(session_id)?;
         let mut scope = Scope::new(root, cwd)
             .and_then(|scope| scope.with_read_only_dir(&tmp))
             .and_then(|scope| scope.with_read_only_dir(&attachments))
+            .and_then(|scope| scope.with_read_only_dir(&tasks))
             .map_err(|e| e.to_error_object())?;
         for dir in &settings.extra_dirs {
             scope = scope.with_added_dir(dir).map_err(|e| e.to_error_object())?;
@@ -441,6 +473,10 @@ impl ToolIo {
                 return self.recover(text("sessionId"), text("toolCallId"));
             }
             "exec/run" | "exec/shells" | "exec/kill" | "fs/spill" => {}
+            "exec/monitor" => return self.exec_monitor(parse(method, params)?, peer).await,
+            "exec/background/list" => return self.task_list(&parse(method, params)?),
+            "exec/background/read" => return self.task_read(parse(method, params)?).await,
+            "exec/background/kill" => return self.task_kill(parse(method, params)?).await,
             _ if self.policy.is_some() => {
                 let s = self.session(
                     params
@@ -596,7 +632,11 @@ impl ToolIo {
             })
         };
         let request_id = p.request_id.clone();
-        let result = self.exec.run(&session, p, launch, wrap, peer, token).await;
+        let place = self.place(&p.session_id.0, &session);
+        let result = self
+            .exec
+            .run(&session, p, launch, wrap, peer, token, place)
+            .await;
         watcher.abort();
         lock(&session.running).remove(&request_id);
         to_value(&result?)

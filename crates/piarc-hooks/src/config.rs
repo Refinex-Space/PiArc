@@ -331,7 +331,11 @@ impl HookConfig {
         }
         let mut selected: Vec<Arc<Handler>> = Vec::new();
         for entry in self.entries.get(&event).into_iter().flatten() {
-            let matched = !event.uses_matcher() || entry.matcher.matches(value.unwrap_or(""));
+            let subject = value.unwrap_or("");
+            // A `Bash` matcher also takes Monitor's commands (T32, Claude Code's semantics).
+            let matched = !event.uses_matcher()
+                || entry.matcher.matches(subject)
+                || (event.is_tool_event() && subject == "Monitor" && entry.matcher.matches("Bash"));
             if matched
                 && !selected
                     .iter()
@@ -589,5 +593,31 @@ mod tests {
                 .iter()
                 .all(|d| d.kind == DiagnosticKind::Invalid)
         );
+    }
+
+    #[test]
+    fn a_bash_matcher_takes_monitor_commands_on_tool_events() {
+        let config = parse(&[(
+            "user",
+            json!({
+                "PreToolUse": [
+                    {"matcher": "Bash", "hooks": [{"type": "command", "command": "bash-hook"}]},
+                    {"matcher": "Monitor", "hooks": [{"type": "command", "command": "monitor-hook"}]},
+                    {"matcher": "Edit", "hooks": [{"type": "command", "command": "edit-hook"}]}
+                ],
+                "SessionStart": [
+                    {"matcher": "Bash", "hooks": [{"type": "command", "command": "start-hook"}]}
+                ]
+            }),
+        )]);
+        assert_eq!(
+            commands(&config.select(HookEvent::PreToolUse, Some("Monitor"))),
+            ["bash-hook", "monitor-hook"]
+        );
+        assert_eq!(
+            commands(&config.select(HookEvent::PreToolUse, Some("Bash"))),
+            ["bash-hook"]
+        );
+        assert!(config.select(HookEvent::SessionStart, Some("Monitor")).is_empty());
     }
 }

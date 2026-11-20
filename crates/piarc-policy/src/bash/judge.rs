@@ -43,6 +43,11 @@ pub trait Facts {
     fn path_context(&self) -> PathContext<'_>;
     /// The directories critical deletions are judged against.
     fn critical_context(&self) -> CriticalContext<'_>;
+    /// The tool whose rules apply: `Bash`, or `Monitor` (T32: `Bash(…)` rules cover Monitor
+    /// commands, `Monitor(…)` rules only Monitor).
+    fn tool(&self) -> &str {
+        "Bash"
+    }
 }
 
 /// Why a command needs the user regardless of allow rules and modes.
@@ -168,7 +173,7 @@ pub fn judge(analysis: &Analysis, rules: &RuleSet, facts: &dyn Facts) -> Judgmen
     if let Some(reason) = analysis.unresolved.first() {
         causes.push(AskCause::Unresolved(reason.clone()));
     }
-    if let Some(hit) = rules.invalid_for("Bash") {
+    if let Some(hit) = rules.invalid_for(facts.tool()) {
         causes.push(AskCause::InvalidRule(hit));
     }
     let ctx = facts.path_context();
@@ -190,7 +195,7 @@ pub fn judge(analysis: &Analysis, rules: &RuleSet, facts: &dyn Facts) -> Judgmen
             .as_ref()
             .is_some_and(|hit| is_wildcard(&hit.rule) && names_outside(command, facts))
         {
-            allowed.rule = rules.exact_allow("Bash", &command.full_text());
+            allowed.rule = rules.exact_allow(facts.tool(), &command.full_text());
             j.outside |= allowed.rule.is_none();
         }
         let (reads_ok, writes_manual, writes_accept) =
@@ -311,10 +316,10 @@ fn allowance(
 ) -> Allowance {
     let text = command.full_text();
     let rule = if command.exec_wrapper {
-        rules.exact_allow("Bash", &text)
+        rules.exact_allow(facts.tool(), &text)
     } else {
         rules
-            .find(Behavior::Allow, "Bash", Subject::Command(&text), None)
+            .find(Behavior::Allow, facts.tool(), Subject::Command(&text), None)
             .map(|(hit, _)| hit)
     };
     // Every program the command runs: stripped wrappers that exec, and the command itself
@@ -369,7 +374,7 @@ fn check_command(
         texts.push(words.join(" "));
     }
     for text in &texts {
-        match rules.find(Behavior::Deny, "Bash", Subject::Command(text), None) {
+        match rules.find(Behavior::Deny, facts.tool(), Subject::Command(text), None) {
             Some((hit, Certainty::Certain)) => {
                 if j.deny.is_none() {
                     j.deny = Some(hit);
@@ -378,7 +383,7 @@ fn check_command(
             Some((hit, Certainty::Possible)) => causes.push(AskCause::Rule(hit)),
             None => {}
         }
-        if let Some((hit, _)) = rules.find(Behavior::Ask, "Bash", Subject::Command(text), None) {
+        if let Some((hit, _)) = rules.find(Behavior::Ask, facts.tool(), Subject::Command(text), None) {
             causes.push(AskCause::Rule(hit));
         }
     }
