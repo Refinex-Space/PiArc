@@ -52,7 +52,7 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 ## 检查点、回退与 Changes（T28，ADR-0044）
 
 - `checkpoints.rs` 的 `Checkpoints`（对象库 + `piarc-store` 索引 + 保留策略，时钟 `CheckpointConfig.now_ms` 可注入）由运行时打开并启动后台清理（启动后与每 6 小时）；`tool_io/checkpoints.rs` 是文件侧：`turn_started` 建检查点、`fs/write` 记写入（AHP `turnId`，缺省用会话当前回合）、回退预览与执行、撤销、Changes 与按文件 / hunk 丢弃，全部经 `piarc_fs::replace` 在路径锁内核对后写回。设置 `fileCheckpointingEnabled: false`（合并层，`checkpoints_for`）时不建检查点、不存快照。
-- 会话侧 `Op::Checkpoint(CheckpointOp)`（`sessions/session/rewind.rs`）：回退与分支切换要求会话空闲（否则 `SessionBusy`）；先恢复代码再移动对话（AHP `session/rewind`、`session/switchBranch`，`session_call_within` 等待至多 10 分钟，摘要要调用模型），之后清空会话的文件状态表并在会话路由发 `session/branchChanged`。`fork_session` 的 `ForkPoint::BeforeTurn` 是"从这里分支"；删除会话时一并删除它的检查点记录。
+- 会话侧 `Op::Checkpoint(CheckpointOp)`（`sessions/session/rewind.rs`）：回退与分支切换要求会话空闲且没有在途的 prompt、steer、follow-up（否则 `SessionBusy`），进行期间这些输入同样返回 `SessionBusy`（`OpKind`，R3）；先恢复代码再移动对话（AHP `session/rewind`、`session/switchBranch`，`session_call_within` 等待至多 10 分钟，摘要要调用模型），之后清空会话的文件状态表并在会话路由发 `session/branchChanged`。`fork_session` 的 `ForkPoint::BeforeTurn` 是"从这里分支"；删除会话时一并删除它的检查点记录。
 - 单测：`cargo test -p piarc-core --lib tool_io::checkpoints`（A01、A05、A06、A09、A10）与 `--lib tool_io::policy::tests::t28`（设置开关）。
 
 ## WebFetch、登录与模型偏好（T29，ADR-0045）

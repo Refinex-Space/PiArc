@@ -116,13 +116,33 @@ pub(crate) enum SessionMsg {
     Notification(SessionEventNotification),
     Filled(Result<SessionEntries>),
     Op(Op, oneshot::Sender<Result<Value>>),
-    OpDone,
+    OpDone(OpKind),
     Info(oneshot::Sender<Value>),
     Restored,
     RestoreFailed(Error),
     Uncertain(CallRecord),
     HostLost(String),
     Close(oneshot::Sender<Result<Value>>),
+}
+
+/// How a request affects turns: a rewind or branch switch needs the session to itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum OpKind {
+    /// May start a turn: a prompt, steer or follow-up.
+    Starting,
+    /// Moves the session's files or conversation: no turn may run or start meanwhile.
+    Exclusive,
+    Other,
+}
+
+impl OpKind {
+    fn of(op: &Op) -> Self {
+        match op {
+            Op::Prompt(_) | Op::Steer(_) | Op::FollowUp(_) => Self::Starting,
+            Op::Checkpoint(checkpoint) if checkpoint.needs_idle() => Self::Exclusive,
+            _ => Self::Other,
+        }
+    }
 }
 
 /// The handle the hub keeps. Cheap to clone.
@@ -179,6 +199,8 @@ impl SessionHandle {
             prefs: piarc_store::SessionPrefsChange::default(),
             first_message: None,
             ops: 0,
+            starting: 0,
+            exclusive: false,
             busy: false,
             cancel: ctx.cancel.child_token(),
         };
@@ -319,6 +341,10 @@ struct SessionActor {
     first_message: Option<String>,
     /// Requests in flight.
     ops: u32,
+    /// Prompts, steers and follow-ups in flight (each may start a turn).
+    starting: u32,
+    /// A rewind or branch switch in flight: no turn may start until it ends (ADR-0044 rule 5).
+    exclusive: bool,
     busy: bool,
     /// Cancelled when the session closes: its requests in flight stop waiting.
     cancel: CancellationToken,
@@ -331,8 +357,13 @@ impl SessionActor {
                 SessionMsg::Notification(notification) => self.on_notification(notification).await,
                 SessionMsg::Filled(entries) => self.on_filled(entries).await,
                 SessionMsg::Op(op, reply) => self.start_op(op, reply),
-                SessionMsg::OpDone => {
+                SessionMsg::OpDone(kind) => {
                     self.ops = self.ops.saturating_sub(1);
+                    match kind {
+                        OpKind::Starting => self.starting = self.starting.saturating_sub(1),
+                        OpKind::Exclusive => self.exclusive = false,
+                        OpKind::Other => {}
+                    }
                     self.report_busy();
                 }
                 SessionMsg::Info(reply) => {
@@ -586,15 +617,30 @@ impl SessionActor {
                 let _ = reply.send(Ok(Value::Null));
                 return;
             }
-            Op::Checkpoint(checkpoint) if checkpoint.needs_idle() && self.active_turn.is_some() => {
-                let _ = reply.send(Err(Error::feature(&piarc_protocol::ErrorObject::new(
-                    piarc_protocol::ErrorKind::SessionBusy,
-                    "Stop the running turn before rewinding or switching branches",
-                    true,
-                ))));
-                return;
-            }
             _ => {}
+        }
+        let kind = OpKind::of(&op);
+        let refusal = match kind {
+            OpKind::Exclusive if self.active_turn.is_some() || self.starting > 0 => {
+                Some("Stop the running turn before rewinding or switching branches")
+            }
+            OpKind::Exclusive | OpKind::Starting if self.exclusive => {
+                Some("Wait for the rewind or branch switch to finish")
+            }
+            _ => None,
+        };
+        if let Some(message) = refusal {
+            let _ = reply.send(Err(Error::feature(&piarc_protocol::ErrorObject::new(
+                piarc_protocol::ErrorKind::SessionBusy,
+                message,
+                true,
+            ))));
+            return;
+        }
+        match kind {
+            OpKind::Starting => self.starting += 1,
+            OpKind::Exclusive => self.exclusive = true,
+            OpKind::Other => {}
         }
         if let Op::Prompt(input) | Op::Steer(input) | Op::FollowUp(input) = &op
             && self.first_message.is_none()
@@ -625,7 +671,7 @@ impl SessionActor {
                 () = request.cancel.cancelled() => Err(Error::ShuttingDown),
             };
             let _ = reply.send(result);
-            let _ = tx.send(SessionMsg::OpDone).await;
+            let _ = tx.send(SessionMsg::OpDone(kind)).await;
         });
     }
 

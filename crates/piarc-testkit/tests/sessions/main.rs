@@ -10,6 +10,7 @@ mod models;
 mod permissions;
 mod provider_settings;
 mod queue;
+mod rewind;
 mod support;
 mod turns;
 
