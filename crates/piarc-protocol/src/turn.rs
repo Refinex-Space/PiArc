@@ -214,6 +214,10 @@ pub enum Item {
         /// The subagent's final answer, in `item/completed`.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         output: Option<String>,
+        /// The run's state (T31): in `item/updated` while it runs, at the end, and in the
+        /// history (a background run's last state).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        subagent: Option<crate::subagent::SubagentState>,
     },
     /// A web page fetch (`WebFetch`).
     WebFetch {

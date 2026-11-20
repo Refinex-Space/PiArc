@@ -771,6 +771,7 @@ fn new_request(p: &PolicyEvaluateParams, peer: &Peer) -> Result<ApprovalRequest,
         protected_path: None,
         plan: None,
         questions: Vec::new(),
+        subagent: None,
     })
 }
 

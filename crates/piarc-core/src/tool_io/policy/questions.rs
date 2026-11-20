@@ -217,6 +217,7 @@ impl ToolIo {
             protected_path: None,
             plan: None,
             questions: p.questions.clone(),
+            subagent: None,
         };
         let (tx, mut rx) = oneshot::channel();
         if !post_card(&s, services, &p.tool_call_id, &card, &peer, &generation, tx).await? {
@@ -311,6 +312,7 @@ mod tests {
             protected_path: None,
             plan: None,
             questions,
+            subagent: None,
         }
     }
 

@@ -167,7 +167,20 @@ export type AhpMessage =
   | SessionRewindResponse
   | SessionSwitchBranchRequest
   | SessionSwitchBranchResponse
-  | SessionBranchesNotification;
+  | SessionBranchesNotification
+  | AgentsListMethodRequest
+  | AgentsListMethodResponse
+  | ResourcesListAgentsRequest
+  | ResourcesListAgentsResponse
+  | SubagentStartRequest
+  | SubagentStartResponse
+  | SubagentFinishRequest
+  | SubagentFinishResponse
+  | SubagentStopRequest
+  | SubagentStopResponse
+  | SubagentStartedNotification
+  | SubagentProgressNotification
+  | SubagentCompletedNotification;
 /**
  * A request id: an integer or a string. `null` and fractional numbers are not accepted.
  */
@@ -480,6 +493,11 @@ export type Item =
        */
       status: ItemStatus;
       /**
+       * The run's state (T31): in `item/updated` while it runs, at the end, and in the
+       * history (a background run's last state).
+       */
+      subagent?: SubagentState | null;
+      /**
        * Canonical tool name.
        */
       tool: string;
@@ -626,6 +644,22 @@ export type CommandOutcome = 'success' | 'failure';
  * What happened to a line.
  */
 export type DiffLineKind = 'context' | 'added' | 'removed';
+/**
+ * Where a subagent run stands.
+ */
+export type SubagentStatus = 'running' | 'completed' | 'partial' | 'failed' | 'interrupted';
+/**
+ * Something about a definition the user should know; the client words it.
+ */
+export type AgentWarningKind =
+  | 'ignoredField'
+  | 'inactiveField'
+  | 'projectModeIgnored'
+  | 'unsupportedMode'
+  | 'modeClamped'
+  | 'hooksUntrusted'
+  | 'aliasFallback'
+  | 'effortUnsupported';
 /**
  * Why automatic compaction stopped for the session.
  */
@@ -786,6 +820,15 @@ export type LoginPromptKind = 'text' | 'secret' | 'select' | 'manualCode';
  * How `session/rewind` moves the conversation.
  */
 export type RewindMode = 'branch' | 'summarize';
+/**
+ * Where a subagent definition came from, highest precedence first (ADR-0005).
+ */
+export type AgentSource =
+  'projectPiarc' | 'projectClaude' | 'user' | 'userClaude' | 'plugin' | 'builtIn';
+/**
+ * Result of `subagent/finish`.
+ */
+export type SubagentFinishResult = Record<string, never>;
 /**
  * Presentation of a pending approval.
  */
@@ -2673,6 +2716,117 @@ export interface DiffLine {
   text: string;
 }
 /**
+ * What the subagent card shows.
+ */
+export interface SubagentState {
+  /**
+   * What it is doing now (its latest tool call or text), while it runs.
+   */
+  activity?: string | null;
+  /**
+   * The subagent type.
+   */
+  agentType: string;
+  /**
+   * Runs in the background.
+   */
+  background?: boolean;
+  /**
+   * The type's display color.
+   */
+  color?: string | null;
+  /**
+   * The task description the model gave.
+   */
+  description?: string | null;
+  /**
+   * How long it ran, once it ended.
+   */
+  durationMs?: number | null;
+  /**
+   * The effort it runs with.
+   */
+  effort?: EffortLevel | null;
+  /**
+   * Why it failed.
+   */
+  error?: string | null;
+  /**
+   * The model it runs on.
+   */
+  model?: ModelRef | null;
+  /**
+   * The child session.
+   */
+  sessionId: string;
+  /**
+   * Unix ms it started.
+   */
+  startedAt: number;
+  /**
+   * Where it stands.
+   */
+  status: SubagentStatus;
+  /**
+   * Its token use so far.
+   */
+  tokens?: SubagentTokens | null;
+  /**
+   * Tool calls it made.
+   */
+  toolCalls: number;
+  /**
+   * Its session file.
+   */
+  transcriptPath?: string | null;
+  /**
+   * Ignored fields, fallbacks and restricted modes of this run.
+   */
+  warnings?: AgentWarning[];
+}
+/**
+ * Tokens a subagent used, summed over its model responses.
+ */
+export interface SubagentTokens {
+  /**
+   * Tokens read from the prompt cache.
+   */
+  cacheRead: number;
+  /**
+   * Tokens written to the prompt cache.
+   */
+  cacheWrite: number;
+  /**
+   * Input tokens, excluding cache reads and writes.
+   */
+  input: number;
+  /**
+   * Output tokens.
+   */
+  output: number;
+}
+/**
+ * One warning about a definition or a run.
+ */
+export interface AgentWarning {
+  /**
+   * The frontmatter field concerned.
+   */
+  field?: string | null;
+  /**
+   * What it is about.
+   */
+  kind: AgentWarningKind;
+  /**
+   * The task that makes an inactive field work.
+   */
+  task?: string | null;
+  /**
+   * The value concerned (a mode, an alias, an effort).
+   */
+  value?: string | null;
+}
+/**
  * One reminder of a reminder message: its type and where it came from.
  */
 export interface ReminderRef {
@@ -2699,11 +2853,20 @@ export interface PolicyEvaluateRequest {
  */
 export interface PolicyEvaluateParams {
   /**
+   * For a subagent's call: its type.
+   */
+  agentType?: string | null;
+  /**
    * Tool arguments before execution.
    */
   input: {
     [k: string]: unknown;
   };
+  /**
+   * For a subagent's call (T31): the session that started it. Core checks it against the
+   * subagent it registered (`subagent/start`).
+   */
+  parentSessionId?: string | null;
   /**
    * Owning session.
    */
@@ -5443,6 +5606,400 @@ export interface SessionBranchesParams {
   ts: number;
 }
 /**
+ * Request for `agents/list`.
+ */
+export interface AgentsListMethodRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'agents/list';
+  params: AgentsListParams;
+}
+/**
+ * Parameters of `agents/list`.
+ */
+export interface AgentsListParams {
+  /**
+   * The directory project definitions are looked up from; inside the connection's
+   * workspace.
+   */
+  cwd: string;
+}
+/**
+ * Successful response to `agents/list`.
+ */
+export interface AgentsListMethodResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: AgentsList;
+}
+/**
+ * Result of `agents/list` and `resources/listAgents`.
+ */
+export interface AgentsList {
+  /**
+   * The definitions in effect, by name.
+   */
+  agents: AgentDefinition[];
+  /**
+   * The model alias table (alias → `<provider>/<model id>`), as `resources/listAgents`
+   * resolved it.
+   */
+  aliases?: {
+    [k: string]: string;
+  };
+  /**
+   * Files that are not valid definitions.
+   */
+  issues?: AgentIssue[];
+  /**
+   * The limits that apply.
+   */
+  limits: SubagentLimits;
+}
+/**
+ * A subagent type: a definition file's frontmatter and body, or a built-in type.
+ */
+export interface AgentDefinition {
+  /**
+   * Always runs in the background.
+   */
+  background?: boolean;
+  /**
+   * Display color.
+   */
+  color?: string | null;
+  /**
+   * An `Agent(<name>)` deny rule removes it.
+   */
+  denied?: boolean;
+  /**
+   * When to use it, as the model reads it.
+   */
+  description: string;
+  /**
+   * Tools it may not use.
+   */
+  disallowedTools?: string[];
+  /**
+   * Effort it runs with.
+   */
+  effort?: EffortLevel | null;
+  /**
+   * Whether it defines hooks for its runs.
+   */
+  hooks?: boolean;
+  /**
+   * `worktree` (T35).
+   */
+  isolation?: string | null;
+  /**
+   * Model responses before it stops with a partial result.
+   */
+  maxTurns?: number | null;
+  /**
+   * MCP servers it names or defines (T36): their names.
+   */
+  mcpServers?: string[];
+  /**
+   * `inherit`, an alias or `<provider>/<model id>`.
+   */
+  model?: string | null;
+  /**
+   * The type's name (`subagent_type`).
+   */
+  name: string;
+  /**
+   * Built-in context choice: no memory files and no git status (`Explore`, `Plan`).
+   */
+  omitProjectContext?: boolean;
+  /**
+   * Files of lower precedence with the same name, which this one replaces.
+   */
+  overrides?: string[];
+  /**
+   * Its file; absent for built-in types.
+   */
+  path?: string | null;
+  /**
+   * The permission mode it asks for, after the project restriction.
+   */
+  permissionMode?: PermissionMode | null;
+  /**
+   * The body: the subagent's identity in its system prompt.
+   */
+  prompt: string;
+  /**
+   * The model it resolves to for the workspace's default model (`resources/listAgents`).
+   */
+  resolvedModel?: ModelRef | null;
+  /**
+   * Skills to preload (T37).
+   */
+  skills?: string[];
+  /**
+   * Where it came from.
+   */
+  source: AgentSource;
+  /**
+   * Tools it may use (canonical names, `Tool(specifier)` reduced to the tool); absent: all.
+   */
+  tools?: string[] | null;
+  /**
+   * Ignored and inactive fields, restricted modes.
+   */
+  warnings?: AgentWarning[];
+}
+/**
+ * A definition file that could not be read as one.
+ */
+export interface AgentIssue {
+  /**
+   * Its line (1-based), when the problem has one.
+   */
+  line?: number | null;
+  /**
+   * What is wrong.
+   */
+  message: string;
+  /**
+   * The file.
+   */
+  path: string;
+}
+/**
+ * Depth and concurrency limits (settings `subagents.maxDepth`, `subagents.maxConcurrent`).
+ */
+export interface SubagentLimits {
+  /**
+   * Subagents running at once in one main session and all its descendants.
+   */
+  maxConcurrent: number;
+  /**
+   * Levels below the main session; a subagent at this level has no `Agent` tool.
+   */
+  maxDepth: number;
+}
+/**
+ * Request for `resources/listAgents`.
+ */
+export interface ResourcesListAgentsRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'resources/listAgents';
+  params: ResourcesListAgentsParams;
+}
+/**
+ * Parameters of `resources/listAgents`.
+ */
+export interface ResourcesListAgentsParams {
+  /**
+   * The directory to look up from; the workspace root when absent.
+   */
+  cwd?: string | null;
+}
+/**
+ * Successful response to `resources/listAgents`.
+ */
+export interface ResourcesListAgentsResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: AgentsList;
+}
+/**
+ * Request for `subagent/start`.
+ */
+export interface SubagentStartRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'subagent/start';
+  params: SubagentStartParams;
+}
+/**
+ * Parameters of `subagent/start`.
+ */
+export interface SubagentStartParams {
+  /**
+   * The subagent type.
+   */
+  agentType: string;
+  /**
+   * Whether it runs in the background.
+   */
+  background?: boolean;
+  /**
+   * The child's working directory (the parent's).
+   */
+  cwd: string;
+  /**
+   * The task description the model gave.
+   */
+  description?: string | null;
+  /**
+   * The model it runs on.
+   */
+  model?: ModelRef | null;
+  /**
+   * The session whose `Agent` call starts it (a main session or another subagent).
+   */
+  parentSessionId: string;
+  /**
+   * The child's session file.
+   */
+  sessionFile?: string | null;
+  /**
+   * The child session's id.
+   */
+  sessionId: string;
+  /**
+   * The `Agent` call in the parent.
+   */
+  toolCallId: string;
+}
+/**
+ * Successful response to `subagent/start`.
+ */
+export interface SubagentStartResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SubagentStartResult;
+}
+/**
+ * Result of `subagent/start`.
+ */
+export interface SubagentStartResult {
+  /**
+   * The child's permission mode now: the definition's, never looser than the parent's.
+   */
+  permissionMode: PermissionMode;
+  /**
+   * What the user should know about the run (a restricted mode, untrusted hooks).
+   */
+  warnings?: AgentWarning[];
+}
+/**
+ * Request for `subagent/finish`.
+ */
+export interface SubagentFinishRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'subagent/finish';
+  params: SubagentFinishParams;
+}
+/**
+ * Parameters of `subagent/finish`.
+ */
+export interface SubagentFinishParams {
+  /**
+   * The child session.
+   */
+  sessionId: string;
+  /**
+   * How it ended.
+   */
+  status: SubagentStatus;
+  /**
+   * Its token use.
+   */
+  usage?: TurnUsage | null;
+}
+/**
+ * Successful response to `subagent/finish`.
+ */
+export interface SubagentFinishResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SubagentFinishResult;
+}
+/**
+ * Request for `subagent/stop`.
+ */
+export interface SubagentStopRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'subagent/stop';
+  params: SubagentStopParams;
+}
+/**
+ * Parameters of `subagent/stop`.
+ */
+export interface SubagentStopParams {
+  /**
+   * The child session.
+   */
+  sessionId: string;
+}
+/**
+ * Successful response to `subagent/stop`.
+ */
+export interface SubagentStopResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SubagentStopResult;
+}
+/**
+ * Result of `subagent/stop`.
+ */
+export interface SubagentStopResult {
+  /**
+   * Whether it was still running.
+   */
+  stopped: boolean;
+}
+/**
+ * Notification `subagent/started`.
+ */
+export interface SubagentStartedNotification {
+  jsonrpc: JsonRpcVersion;
+  method: 'subagent/started';
+  params: SubagentEventParams;
+}
+/**
+ * Parameters of `subagent/started`, `subagent/progress` and `subagent/completed`.
+ */
+export interface SubagentEventParams {
+  /**
+   * The parent's `Agent` call (its `subagent` item).
+   */
+  itemId: ItemId;
+  /**
+   * Sequence number, monotonically increasing within the session.
+   */
+  seq: number;
+  /**
+   * The session the event belongs to.
+   */
+  sessionId: SessionId;
+  /**
+   * The run's state.
+   */
+  subagent: SubagentState;
+  /**
+   * Time the event was produced, in milliseconds since the Unix epoch (UTC).
+   */
+  ts: number;
+}
+/**
+ * Notification `subagent/progress`.
+ */
+export interface SubagentProgressNotification {
+  jsonrpc: JsonRpcVersion;
+  method: 'subagent/progress';
+  params: SubagentEventParams;
+}
+/**
+ * Notification `subagent/completed`.
+ */
+export interface SubagentCompletedNotification {
+  jsonrpc: JsonRpcVersion;
+  method: 'subagent/completed';
+  params: SubagentEventParams;
+}
+/**
  * Immutable approval card from the Core ledger.
  */
 export interface ApprovalRequest {
@@ -5505,9 +6062,35 @@ export interface ApprovalRequest {
    */
   sessionId: string;
   /**
+   * Set when a subagent made the call (T31): the card shows in its main session, which
+   * lists it with its own approvals; the answer goes to `session_id` (the subagent).
+   */
+  subagent?: ApprovalOrigin | null;
+  /**
    * Canonical tool name.
    */
   tool: string;
+}
+/**
+ * Where an approval of a subagent's call comes from: shown on the card in the main session.
+ */
+export interface ApprovalOrigin {
+  /**
+   * Its type.
+   */
+  agentType: string;
+  /**
+   * The task description the model gave.
+   */
+  description?: string | null;
+  /**
+   * The session that started it.
+   */
+  parentSessionId: string;
+  /**
+   * The subagent's session, which made the call.
+   */
+  sessionId: string;
 }
 /**
  * Answer bound to the request as displayed.

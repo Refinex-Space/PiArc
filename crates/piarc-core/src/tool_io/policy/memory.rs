@@ -34,6 +34,8 @@ pub(in crate::tool_io) async fn approve(
         tool: "MemoryImport".to_owned(),
         input: Default::default(),
         staged_input_bytes: None,
+        parent_session_id: None,
+        agent_type: None,
     };
     let mut card = new_request(&p, peer)?;
     card.kind = ApprovalKind::PermissionExpansion;

@@ -1,0 +1,85 @@
+{
+  "jsonrpc": "2.0",
+  "id": 50,
+  "result": {
+    "agents": [
+      {
+        "name": "Explore",
+        "description": "Read-only search of the codebase.",
+        "source": "builtIn",
+        "prompt": "You explore the repository and report what you found.",
+        "tools": [
+          "Read",
+          "Glob",
+          "Grep",
+          "Bash"
+        ],
+        "model": "fast",
+        "omitProjectContext": true
+      },
+      {
+        "name": "reviewer",
+        "description": "Reviews a change for mistakes.",
+        "source": "projectClaude",
+        "path": "/工作区 a/.claude/agents/reviewer.md",
+        "prompt": "Review the diff carefully.",
+        "tools": [
+          "Read",
+          "Grep"
+        ],
+        "disallowedTools": [
+          "Bash"
+        ],
+        "model": "sonnet",
+        "permissionMode": "plan",
+        "maxTurns": 12,
+        "skills": [
+          "lint"
+        ],
+        "mcpServers": [
+          "github"
+        ],
+        "hooks": true,
+        "background": true,
+        "effort": "high",
+        "color": "purple",
+        "overrides": [
+          "/home/u/.claude/agents/reviewer.md"
+        ],
+        "warnings": [
+          {
+            "kind": "ignoredField",
+            "field": "memory"
+          },
+          {
+            "kind": "inactiveField",
+            "field": "mcpServers",
+            "task": "T36"
+          },
+          {
+            "kind": "hooksUntrusted"
+          }
+        ],
+        "resolvedModel": {
+          "provider": "mock-child",
+          "id": "mock-model"
+        }
+      }
+    ],
+    "issues": [
+      {
+        "path": "/工作区 a/.claude/agents/broken.md",
+        "line": 3,
+        "message": "invalid YAML"
+      }
+    ],
+    "limits": {
+      "maxDepth": 3,
+      "maxConcurrent": 8
+    },
+    "aliases": {
+      "fast": "mock-child/mock-model",
+      "strong": "anthropic/claude-x"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 50,
+  "result": {
+    "agents": [],
+    "limits": {
+      "maxDepth": 3,
+      "maxConcurrent": 8
+    }
+  }
+}

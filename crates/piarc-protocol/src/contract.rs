@@ -46,6 +46,10 @@ use crate::session::{
     SessionEventNotification, SessionFollowUp, SessionFork, SessionPrompt, SessionResume,
     SessionSetPermissionMode, SessionSteer,
 };
+use crate::subagent::{
+    AgentsListMethod, ResourcesListAgents, SubagentCompleted, SubagentFinish, SubagentProgress,
+    SubagentStart, SubagentStarted, SubagentStop,
+};
 use crate::trust::TrustGet;
 use crate::turn::{
     ItemAgentMessageDelta, ItemCompleted, ItemReasoningDelta, ItemStarted, ItemUpdated,
@@ -311,6 +315,19 @@ pub static CONTRACTS: &[Contract] = &[
     request::<SessionSwitchBranch>(SessionSwitchBranch::NAME),
     response::<SessionSwitchBranch>("session/switchBranch/result"),
     notification::<SessionBranches>(),
+    request::<AgentsListMethod>(AgentsListMethod::NAME),
+    response::<AgentsListMethod>("agents/list/result"),
+    request::<ResourcesListAgents>(ResourcesListAgents::NAME),
+    response::<ResourcesListAgents>("resources/listAgents/result"),
+    request::<SubagentStart>(SubagentStart::NAME),
+    response::<SubagentStart>("subagent/start/result"),
+    request::<SubagentFinish>(SubagentFinish::NAME),
+    response::<SubagentFinish>("subagent/finish/result"),
+    request::<SubagentStop>(SubagentStop::NAME),
+    response::<SubagentStop>("subagent/stop/result"),
+    notification::<SubagentStarted>(),
+    notification::<SubagentProgress>(),
+    notification::<SubagentCompleted>(),
 ];
 
 /// Looks up a contract by name.

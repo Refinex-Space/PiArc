@@ -27,6 +27,13 @@ pub struct PolicyEvaluateParams {
     /// carry the JSON input object and the inline input must be empty.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub staged_input_bytes: Option<u64>,
+    /// For a subagent's call (T31): the session that started it. Core checks it against the
+    /// subagent it registered (`subagent/start`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_session_id: Option<String>,
+    /// For a subagent's call: its type.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_type: Option<String>,
 }
 
 /// Final decision. The Agent Host refuses on any bridge or decoding error.
@@ -161,6 +168,10 @@ pub struct ApprovalRequest {
     /// The questions of a `question` card.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub questions: Vec<crate::harness::Question>,
+    /// Set when a subagent made the call (T31): the card shows in its main session, which
+    /// lists it with its own approvals; the answer goes to `session_id` (the subagent).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subagent: Option<crate::subagent::ApprovalOrigin>,
 }
 
 /// Answer bound to the request as displayed.

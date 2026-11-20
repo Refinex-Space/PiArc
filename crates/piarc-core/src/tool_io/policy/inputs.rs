@@ -166,6 +166,8 @@ mod tests {
             tool: "Write".into(),
             input: Default::default(),
             staged_input_bytes: Some(4),
+            parent_session_id: None,
+            agent_type: None,
         };
         inputs.append(chunk(0, "文"), &peer).expect("first chunk");
         assert!(inputs.append(chunk(1, "!"), &peer).is_err());

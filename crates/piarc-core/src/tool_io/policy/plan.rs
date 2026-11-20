@@ -182,6 +182,7 @@ mod tests {
             protected_path: None,
             plan: Some(plan.into()),
             questions: Vec::new(),
+            subagent: None,
         }
     }
 

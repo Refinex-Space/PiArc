@@ -918,6 +918,84 @@
       "method": "session/branches",
       "name": "session/branches",
       "schema": "SessionBranchesNotification"
+    },
+    {
+      "kind": "request",
+      "method": "agents/list",
+      "name": "agents/list",
+      "schema": "AgentsListMethodRequest"
+    },
+    {
+      "kind": "response",
+      "method": "agents/list",
+      "name": "agents/list/result",
+      "schema": "AgentsListMethodResponse"
+    },
+    {
+      "kind": "request",
+      "method": "resources/listAgents",
+      "name": "resources/listAgents",
+      "schema": "ResourcesListAgentsRequest"
+    },
+    {
+      "kind": "response",
+      "method": "resources/listAgents",
+      "name": "resources/listAgents/result",
+      "schema": "ResourcesListAgentsResponse"
+    },
+    {
+      "kind": "request",
+      "method": "subagent/start",
+      "name": "subagent/start",
+      "schema": "SubagentStartRequest"
+    },
+    {
+      "kind": "response",
+      "method": "subagent/start",
+      "name": "subagent/start/result",
+      "schema": "SubagentStartResponse"
+    },
+    {
+      "kind": "request",
+      "method": "subagent/finish",
+      "name": "subagent/finish",
+      "schema": "SubagentFinishRequest"
+    },
+    {
+      "kind": "response",
+      "method": "subagent/finish",
+      "name": "subagent/finish/result",
+      "schema": "SubagentFinishResponse"
+    },
+    {
+      "kind": "request",
+      "method": "subagent/stop",
+      "name": "subagent/stop",
+      "schema": "SubagentStopRequest"
+    },
+    {
+      "kind": "response",
+      "method": "subagent/stop",
+      "name": "subagent/stop/result",
+      "schema": "SubagentStopResponse"
+    },
+    {
+      "kind": "notification",
+      "method": "subagent/started",
+      "name": "subagent/started",
+      "schema": "SubagentStartedNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "subagent/progress",
+      "name": "subagent/progress",
+      "schema": "SubagentProgressNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "subagent/completed",
+      "name": "subagent/completed",
+      "schema": "SubagentCompletedNotification"
     }
   ],
   "protocolVersion": "1.0"

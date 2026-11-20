@@ -26,6 +26,28 @@ pub enum EffortLevel {
     Max,
 }
 
+/// A name in the model alias table (T31, architecture section 6.13): PiArc's tiers, and Claude
+/// Code's names that follow them unless set on their own (`haiku` → `fast`, `sonnet` →
+/// `balanced`, `opus` → `strong`).
+#[derive(
+    Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "camelCase")]
+pub enum ModelAlias {
+    /// A cheap, quick model (exploration).
+    Fast,
+    /// The everyday model.
+    Balanced,
+    /// The most capable model.
+    Strong,
+    /// Claude Code's `haiku`.
+    Haiku,
+    /// Claude Code's `sonnet`.
+    Sonnet,
+    /// Claude Code's `opus`.
+    Opus,
+}
+
 /// How thoroughly the model has been exercised with tools.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

@@ -1,5 +1,345 @@
 {
   "$defs": {
+    "AgentDefinition": {
+      "description": "A subagent type: a definition file's frontmatter and body, or a built-in type.",
+      "properties": {
+        "background": {
+          "description": "Always runs in the background.",
+          "type": "boolean"
+        },
+        "color": {
+          "description": "Display color.",
+          "type": ["string", "null"]
+        },
+        "denied": {
+          "description": "An `Agent(<name>)` deny rule removes it.",
+          "type": "boolean"
+        },
+        "description": {
+          "description": "When to use it, as the model reads it.",
+          "type": "string"
+        },
+        "disallowedTools": {
+          "description": "Tools it may not use.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EffortLevel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Effort it runs with."
+        },
+        "hooks": {
+          "description": "Whether it defines hooks for its runs.",
+          "type": "boolean"
+        },
+        "isolation": {
+          "description": "`worktree` (T35).",
+          "type": ["string", "null"]
+        },
+        "maxTurns": {
+          "description": "Model responses before it stops with a partial result.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "mcpServers": {
+          "description": "MCP servers it names or defines (T36): their names.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "model": {
+          "description": "`inherit`, an alias or `<provider>/<model id>`.",
+          "type": ["string", "null"]
+        },
+        "name": {
+          "description": "The type's name (`subagent_type`).",
+          "type": "string"
+        },
+        "omitProjectContext": {
+          "description": "Built-in context choice: no memory files and no git status (`Explore`, `Plan`).",
+          "type": "boolean"
+        },
+        "overrides": {
+          "description": "Files of lower precedence with the same name, which this one replaces.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "path": {
+          "description": "Its file; absent for built-in types.",
+          "type": ["string", "null"]
+        },
+        "permissionMode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PermissionMode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The permission mode it asks for, after the project restriction."
+        },
+        "prompt": {
+          "description": "The body: the subagent's identity in its system prompt.",
+          "type": "string"
+        },
+        "resolvedModel": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The model it resolves to for the workspace's default model (`resources/listAgents`)."
+        },
+        "skills": {
+          "description": "Skills to preload (T37).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "source": {
+          "$ref": "#/$defs/AgentSource",
+          "description": "Where it came from."
+        },
+        "tools": {
+          "description": "Tools it may use (canonical names, `Tool(specifier)` reduced to the tool); absent: all.",
+          "items": {
+            "type": "string"
+          },
+          "type": ["array", "null"]
+        },
+        "warnings": {
+          "description": "Ignored and inactive fields, restricted modes.",
+          "items": {
+            "$ref": "#/$defs/AgentWarning"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["name", "description", "source", "prompt"],
+      "type": "object"
+    },
+    "AgentIssue": {
+      "description": "A definition file that could not be read as one.",
+      "properties": {
+        "line": {
+          "description": "Its line (1-based), when the problem has one.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "message": {
+          "description": "What is wrong.",
+          "type": "string"
+        },
+        "path": {
+          "description": "The file.",
+          "type": "string"
+        }
+      },
+      "required": ["path", "message"],
+      "type": "object"
+    },
+    "AgentSource": {
+      "description": "Where a subagent definition came from, highest precedence first (ADR-0005).",
+      "oneOf": [
+        {
+          "const": "projectPiarc",
+          "description": "`.piarc/agents/` of the directory or one above it.",
+          "type": "string"
+        },
+        {
+          "const": "projectClaude",
+          "description": "`.claude/agents/` of the directory or one above it.",
+          "type": "string"
+        },
+        {
+          "const": "user",
+          "description": "`agents/` in PiArc's data directory.",
+          "type": "string"
+        },
+        {
+          "const": "userClaude",
+          "description": "`~/.claude/agents/`.",
+          "type": "string"
+        },
+        {
+          "const": "plugin",
+          "description": "A plugin's `agents/` (T40).",
+          "type": "string"
+        },
+        {
+          "const": "builtIn",
+          "description": "Shipped with PiArc: `general-purpose`, `Explore`, `Plan`.",
+          "type": "string"
+        }
+      ]
+    },
+    "AgentWarning": {
+      "description": "One warning about a definition or a run.",
+      "properties": {
+        "field": {
+          "description": "The frontmatter field concerned.",
+          "type": ["string", "null"]
+        },
+        "kind": {
+          "$ref": "#/$defs/AgentWarningKind",
+          "description": "What it is about."
+        },
+        "task": {
+          "description": "The task that makes an inactive field work.",
+          "type": ["string", "null"]
+        },
+        "value": {
+          "description": "The value concerned (a mode, an alias, an effort).",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["kind"],
+      "type": "object"
+    },
+    "AgentWarningKind": {
+      "description": "Something about a definition the user should know; the client words it.",
+      "oneOf": [
+        {
+          "const": "ignoredField",
+          "description": "A frontmatter field PiArc does not support; it is ignored (`field`).",
+          "type": "string"
+        },
+        {
+          "const": "inactiveField",
+          "description": "A field PiArc reads but does not apply yet (`field`, `task`).",
+          "type": "string"
+        },
+        {
+          "const": "projectModeIgnored",
+          "description": "A project definition's `bypassPermissions` or `auto` does not apply (`value`).",
+          "type": "string"
+        },
+        {
+          "const": "unsupportedMode",
+          "description": "A permission mode PiArc does not have (`value`); the parent's mode applies.",
+          "type": "string"
+        },
+        {
+          "const": "modeClamped",
+          "description": "The mode is looser than the parent session's; the parent's applies (`value`).",
+          "type": "string"
+        },
+        {
+          "const": "hooksUntrusted",
+          "description": "The definition's hooks do not run: the project is not trusted.",
+          "type": "string"
+        },
+        {
+          "const": "aliasFallback",
+          "description": "The model alias is not set or its model is unavailable; the parent's model is used\n(`value` is the alias).",
+          "type": "string"
+        },
+        {
+          "const": "effortUnsupported",
+          "description": "The model does not support the effort (`value`); its default effort is used.",
+          "type": "string"
+        }
+      ]
+    },
+    "AgentsList": {
+      "description": "Result of `agents/list` and `resources/listAgents`.",
+      "properties": {
+        "agents": {
+          "description": "The definitions in effect, by name.",
+          "items": {
+            "$ref": "#/$defs/AgentDefinition"
+          },
+          "type": "array"
+        },
+        "aliases": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "The model alias table (alias → `<provider>/<model id>`), as `resources/listAgents`\nresolved it.",
+          "type": "object"
+        },
+        "issues": {
+          "description": "Files that are not valid definitions.",
+          "items": {
+            "$ref": "#/$defs/AgentIssue"
+          },
+          "type": "array"
+        },
+        "limits": {
+          "$ref": "#/$defs/SubagentLimits",
+          "description": "The limits that apply."
+        }
+      },
+      "required": ["agents", "limits"],
+      "type": "object"
+    },
+    "AgentsListMethodRequest": {
+      "description": "Request for `agents/list`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "agents/list",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/AgentsListParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "AgentsListMethodResponse": {
+      "description": "Successful response to `agents/list`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/AgentsList"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "AgentsListParams": {
+      "description": "Parameters of `agents/list`.",
+      "properties": {
+        "cwd": {
+          "description": "The directory project definitions are looked up from; inside the connection's\nworkspace.",
+          "type": "string"
+        }
+      },
+      "required": ["cwd"],
+      "type": "object"
+    },
     "AnswerStatus": {
       "description": "Result of answering the approval ledger.",
       "oneOf": [
@@ -146,6 +486,29 @@
         }
       ]
     },
+    "ApprovalOrigin": {
+      "description": "Where an approval of a subagent's call comes from: shown on the card in the main session.",
+      "properties": {
+        "agentType": {
+          "description": "Its type.",
+          "type": "string"
+        },
+        "description": {
+          "description": "The task description the model gave.",
+          "type": ["string", "null"]
+        },
+        "parentSessionId": {
+          "description": "The session that started it.",
+          "type": "string"
+        },
+        "sessionId": {
+          "description": "The subagent's session, which made the call.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "parentSessionId", "agentType"],
+      "type": "object"
+    },
     "ApprovalRequest": {
       "description": "Immutable approval card from the Core ledger.",
       "properties": {
@@ -221,6 +584,17 @@
         "sessionId": {
           "description": "Owning session.",
           "type": "string"
+        },
+        "subagent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ApprovalOrigin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Set when a subagent made the call (T31): the card shows in its main session, which\nlists it with its own approvals; the answer goes to `session_id` (the subagent)."
         },
         "tool": {
           "description": "Canonical tool name.",
@@ -4134,6 +4508,17 @@
               "$ref": "#/$defs/ItemStatus",
               "description": "Lifecycle state."
             },
+            "subagent": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SubagentState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The run's state (T31): in `item/updated` while it runs, at the end, and in the\nhistory (a background run's last state)."
+            },
             "tool": {
               "description": "Canonical tool name.",
               "type": "string"
@@ -5531,10 +5916,18 @@
     "PolicyEvaluateParams": {
       "description": "Parameters of the preflight for one tool call.",
       "properties": {
+        "agentType": {
+          "description": "For a subagent's call: its type.",
+          "type": ["string", "null"]
+        },
         "input": {
           "additionalProperties": true,
           "description": "Tool arguments before execution.",
           "type": "object"
+        },
+        "parentSessionId": {
+          "description": "For a subagent's call (T31): the session that started it. Core checks it against the\nsubagent it registered (`subagent/start`).",
+          "type": ["string", "null"]
         },
         "sessionId": {
           "description": "Owning session.",
@@ -6431,6 +6824,53 @@
         }
       ],
       "description": "A request id: an integer or a string. `null` and fractional numbers are not accepted."
+    },
+    "ResourcesListAgentsParams": {
+      "description": "Parameters of `resources/listAgents`.",
+      "properties": {
+        "cwd": {
+          "description": "The directory to look up from; the workspace root when absent.",
+          "type": ["string", "null"]
+        }
+      },
+      "type": "object"
+    },
+    "ResourcesListAgentsRequest": {
+      "description": "Request for `resources/listAgents`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "resources/listAgents",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ResourcesListAgentsParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "ResourcesListAgentsResponse": {
+      "description": "Successful response to `resources/listAgents`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/AgentsList"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
     },
     "RewindAction": {
       "description": "What a rewind does to one file.",
@@ -8411,6 +8851,500 @@
       "description": "Acknowledgement that the mode entry is in the session.",
       "type": "object"
     },
+    "SubagentCompletedNotification": {
+      "description": "Notification `subagent/completed`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "subagent/completed",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SubagentEventParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "SubagentEventParams": {
+      "description": "Parameters of `subagent/started`, `subagent/progress` and `subagent/completed`.",
+      "properties": {
+        "itemId": {
+          "$ref": "#/$defs/ItemId",
+          "description": "The parent's `Agent` call (its `subagent` item)."
+        },
+        "seq": {
+          "description": "Sequence number, monotonically increasing within the session.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session the event belongs to."
+        },
+        "subagent": {
+          "$ref": "#/$defs/SubagentState",
+          "description": "The run's state."
+        },
+        "ts": {
+          "description": "Time the event was produced, in milliseconds since the Unix epoch (UTC).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["sessionId", "seq", "ts", "itemId", "subagent"],
+      "type": "object"
+    },
+    "SubagentFinishParams": {
+      "description": "Parameters of `subagent/finish`.",
+      "properties": {
+        "sessionId": {
+          "description": "The child session.",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/SubagentStatus",
+          "description": "How it ended."
+        },
+        "usage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnUsage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Its token use."
+        }
+      },
+      "required": ["sessionId", "status"],
+      "type": "object"
+    },
+    "SubagentFinishRequest": {
+      "description": "Request for `subagent/finish`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "subagent/finish",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SubagentFinishParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SubagentFinishResponse": {
+      "description": "Successful response to `subagent/finish`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SubagentFinishResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SubagentFinishResult": {
+      "description": "Result of `subagent/finish`.",
+      "type": "object"
+    },
+    "SubagentLimits": {
+      "description": "Depth and concurrency limits (settings `subagents.maxDepth`, `subagents.maxConcurrent`).",
+      "properties": {
+        "maxConcurrent": {
+          "description": "Subagents running at once in one main session and all its descendants.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "maxDepth": {
+          "description": "Levels below the main session; a subagent at this level has no `Agent` tool.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["maxDepth", "maxConcurrent"],
+      "type": "object"
+    },
+    "SubagentProgressNotification": {
+      "description": "Notification `subagent/progress`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "subagent/progress",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SubagentEventParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "SubagentStartParams": {
+      "description": "Parameters of `subagent/start`.",
+      "properties": {
+        "agentType": {
+          "description": "The subagent type.",
+          "type": "string"
+        },
+        "background": {
+          "description": "Whether it runs in the background.",
+          "type": "boolean"
+        },
+        "cwd": {
+          "description": "The child's working directory (the parent's).",
+          "type": "string"
+        },
+        "description": {
+          "description": "The task description the model gave.",
+          "type": ["string", "null"]
+        },
+        "model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The model it runs on."
+        },
+        "parentSessionId": {
+          "description": "The session whose `Agent` call starts it (a main session or another subagent).",
+          "type": "string"
+        },
+        "sessionFile": {
+          "description": "The child's session file.",
+          "type": ["string", "null"]
+        },
+        "sessionId": {
+          "description": "The child session's id.",
+          "type": "string"
+        },
+        "toolCallId": {
+          "description": "The `Agent` call in the parent.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "parentSessionId", "toolCallId", "agentType", "cwd"],
+      "type": "object"
+    },
+    "SubagentStartRequest": {
+      "description": "Request for `subagent/start`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "subagent/start",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SubagentStartParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SubagentStartResponse": {
+      "description": "Successful response to `subagent/start`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SubagentStartResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SubagentStartResult": {
+      "description": "Result of `subagent/start`.",
+      "properties": {
+        "permissionMode": {
+          "$ref": "#/$defs/PermissionMode",
+          "description": "The child's permission mode now: the definition's, never looser than the parent's."
+        },
+        "warnings": {
+          "description": "What the user should know about the run (a restricted mode, untrusted hooks).",
+          "items": {
+            "$ref": "#/$defs/AgentWarning"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["permissionMode"],
+      "type": "object"
+    },
+    "SubagentStartedNotification": {
+      "description": "Notification `subagent/started`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "subagent/started",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SubagentEventParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "SubagentState": {
+      "description": "What the subagent card shows.",
+      "properties": {
+        "activity": {
+          "description": "What it is doing now (its latest tool call or text), while it runs.",
+          "type": ["string", "null"]
+        },
+        "agentType": {
+          "description": "The subagent type.",
+          "type": "string"
+        },
+        "background": {
+          "description": "Runs in the background.",
+          "type": "boolean"
+        },
+        "color": {
+          "description": "The type's display color.",
+          "type": ["string", "null"]
+        },
+        "description": {
+          "description": "The task description the model gave.",
+          "type": ["string", "null"]
+        },
+        "durationMs": {
+          "description": "How long it ran, once it ended.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EffortLevel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The effort it runs with."
+        },
+        "error": {
+          "description": "Why it failed.",
+          "type": ["string", "null"]
+        },
+        "model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The model it runs on."
+        },
+        "sessionId": {
+          "description": "The child session.",
+          "type": "string"
+        },
+        "startedAt": {
+          "description": "Unix ms it started.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "#/$defs/SubagentStatus",
+          "description": "Where it stands."
+        },
+        "tokens": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SubagentTokens"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Its token use so far."
+        },
+        "toolCalls": {
+          "description": "Tool calls it made.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "transcriptPath": {
+          "description": "Its session file.",
+          "type": ["string", "null"]
+        },
+        "warnings": {
+          "description": "Ignored fields, fallbacks and restricted modes of this run.",
+          "items": {
+            "$ref": "#/$defs/AgentWarning"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["sessionId", "agentType", "status", "startedAt", "toolCalls"],
+      "type": "object"
+    },
+    "SubagentStatus": {
+      "description": "Where a subagent run stands.",
+      "oneOf": [
+        {
+          "const": "running",
+          "description": "Running.",
+          "type": "string"
+        },
+        {
+          "const": "completed",
+          "description": "Finished with a final report.",
+          "type": "string"
+        },
+        {
+          "const": "partial",
+          "description": "Stopped at `maxTurns`: the report is what it had.",
+          "type": "string"
+        },
+        {
+          "const": "failed",
+          "description": "Ended with an error.",
+          "type": "string"
+        },
+        {
+          "const": "interrupted",
+          "description": "Stopped by an interrupt, the stop button, the parent closing or the Agent Host ending.",
+          "type": "string"
+        }
+      ]
+    },
+    "SubagentStopParams": {
+      "description": "Parameters of `subagent/stop`.",
+      "properties": {
+        "sessionId": {
+          "description": "The child session.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId"],
+      "type": "object"
+    },
+    "SubagentStopRequest": {
+      "description": "Request for `subagent/stop`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "subagent/stop",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SubagentStopParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SubagentStopResponse": {
+      "description": "Successful response to `subagent/stop`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SubagentStopResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SubagentStopResult": {
+      "description": "Result of `subagent/stop`.",
+      "properties": {
+        "stopped": {
+          "description": "Whether it was still running.",
+          "type": "boolean"
+        }
+      },
+      "required": ["stopped"],
+      "type": "object"
+    },
+    "SubagentTokens": {
+      "description": "Tokens a subagent used, summed over its model responses.",
+      "properties": {
+        "cacheRead": {
+          "description": "Tokens read from the prompt cache.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cacheWrite": {
+          "description": "Tokens written to the prompt cache.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "input": {
+          "description": "Input tokens, excluding cache reads and writes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "output": {
+          "description": "Output tokens.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["input", "output", "cacheRead", "cacheWrite"],
+      "type": "object"
+    },
     "SuccessResponse": {
       "description": "A successful response. It has `result` and must not have `error`.",
       "properties": {
@@ -9685,6 +10619,45 @@
     },
     {
       "$ref": "#/$defs/SessionBranchesNotification"
+    },
+    {
+      "$ref": "#/$defs/AgentsListMethodRequest"
+    },
+    {
+      "$ref": "#/$defs/AgentsListMethodResponse"
+    },
+    {
+      "$ref": "#/$defs/ResourcesListAgentsRequest"
+    },
+    {
+      "$ref": "#/$defs/ResourcesListAgentsResponse"
+    },
+    {
+      "$ref": "#/$defs/SubagentStartRequest"
+    },
+    {
+      "$ref": "#/$defs/SubagentStartResponse"
+    },
+    {
+      "$ref": "#/$defs/SubagentFinishRequest"
+    },
+    {
+      "$ref": "#/$defs/SubagentFinishResponse"
+    },
+    {
+      "$ref": "#/$defs/SubagentStopRequest"
+    },
+    {
+      "$ref": "#/$defs/SubagentStopResponse"
+    },
+    {
+      "$ref": "#/$defs/SubagentStartedNotification"
+    },
+    {
+      "$ref": "#/$defs/SubagentProgressNotification"
+    },
+    {
+      "$ref": "#/$defs/SubagentCompletedNotification"
     }
   ],
   "description": "Any message covered by the Agent Host Protocol 1.0 contracts. Generated from the piarc-protocol crate by `npm run gen:protocol`; do not edit.",
