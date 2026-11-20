@@ -47,6 +47,7 @@ export const HOST_CAPABILITIES: readonly string[] = [
   'login',
   'subagents',
   'backgroundTasks',
+  'terminalTasks',
 ];
 
 /** Exit codes, for Core's log and restart decisions. */

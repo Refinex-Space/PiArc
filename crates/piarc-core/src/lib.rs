@@ -62,11 +62,12 @@
 //! manifest and each downloaded artefact before an update (ADR-0018 rule 4, ADR-0024); every
 //! failure is a structured `releaseIntegrity` error and the caller refuses the update.
 //!
-//! # Terminals (T10)
+//! # Terminals (T10, T33)
 //!
-//! [`CoreRuntime::create_terminal`] and its siblings run `piarc-term` sessions (ADR-0017):
-//! lifecycle events on the route `term/<id>`, frames pulled with
-//! [`CoreRuntime::terminal_frame`] ([`terminal`]).
+//! [`CoreRuntime::create_terminal`], [`CoreRuntime::open_session_terminal`] and their siblings
+//! run `piarc-term` sessions (ADR-0017): events on the route `term/<id>`, frames pulled with
+//! [`CoreRuntime::terminal_frame`], reads, input and process trees ([`terminal`]); terminals
+//! of a session are background tasks the model can read (ADR-0050).
 
 pub mod agent_host;
 pub mod checkpoints;
@@ -101,9 +102,10 @@ pub use error::{Error, Result};
 pub use events::{DeliveryDone, EventBatch, EventSink, EventStats, SinkClosed};
 pub use piarc_term::SessionStats as TerminalStats;
 pub use piarc_term::vt::KeyAction;
+pub use piarc_term::vt::MouseAction;
 pub use route::RouteKey;
 pub use runtime::{
     CoreConfig, CoreRuntime, MAX_COALESCE_INTERVAL, MAX_ECHO_BYTES, MIN_COALESCE_INTERVAL,
     RuntimeState, SecretStoreSetup,
 };
-pub use terminal::{KeyEvent, TerminalOptions};
+pub use terminal::{KeyEvent, MouseEvent, TerminalOptions};

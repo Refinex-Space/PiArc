@@ -40,4 +40,5 @@ pub mod vt;
 pub use error::{Error, Result};
 pub use session::{
     Event, EventHandler, Now, Program, Session, SessionConfig, SessionStats, TerminalInfo,
+    default_shell,
 };

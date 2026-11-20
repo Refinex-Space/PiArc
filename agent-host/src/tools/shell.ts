@@ -20,7 +20,7 @@ import { Type } from 'typebox';
 import { isAborted, type CommandResult, type Origin } from './core-io.js';
 import { presentationOf, type ToolSetup } from './presentation.js';
 
-const shellSchema = Type.Object({
+const commandParameters = {
   command: Type.String({ description: 'The command line to run' }),
   timeout: Type.Optional(
     Type.Number({ description: 'Timeout in seconds; 120 when omitted, at most 600' }),
@@ -30,6 +30,22 @@ const shellSchema = Type.Object({
       description:
         'Start the command as a background task and return at once (for servers, watchers and ' +
         'long builds); you are told when it ends',
+    }),
+  ),
+};
+
+const powerShellSchema = Type.Object(commandParameters);
+
+// PiArc's own parameter (T33, ADR-0050): the command runs in a PiArc terminal whose screen the
+// model reads as text; it implies `run_in_background`.
+const bashSchema = Type.Object({
+  ...commandParameters,
+  terminal: Type.Optional(
+    Type.Boolean({
+      description:
+        'Run the command in a PiArc terminal (a real terminal the user can open) as a ' +
+        'background task: for full-screen or interactive programs and servers whose screen ' +
+        'matters. Implies run_in_background; the result names a file with the screen as text',
     }),
   ),
 });
@@ -48,68 +64,86 @@ export interface ShellToolDetails {
 type ShellTool = 'Bash' | 'PowerShell';
 
 export function createBashTool(setup: ToolSetup): ToolDefinition {
-  return createShellTool(setup, 'Bash', 'bash');
+  return defineTool<typeof bashSchema, ShellToolDetails | undefined>({
+    ...presentationOf(setup.presentation),
+    parameters: bashSchema,
+    execute: (toolCallId, params, signal, onUpdate) =>
+      runShell(setup, 'Bash', 'bash', toolCallId, params, signal, onUpdate),
+  });
 }
 
 export function createPowerShellTool(setup: ToolSetup): ToolDefinition {
-  return createShellTool(setup, 'PowerShell', 'powershell');
+  return defineTool<typeof powerShellSchema, ShellToolDetails | undefined>({
+    ...presentationOf(setup.presentation),
+    parameters: powerShellSchema,
+    execute: (toolCallId, params, signal, onUpdate) =>
+      runShell(setup, 'PowerShell', 'powershell', toolCallId, params, signal, onUpdate),
+  });
 }
 
-function createShellTool(
-  { io, presentation }: ToolSetup,
+interface ShellParams {
+  readonly command: string;
+  readonly timeout?: number;
+  readonly run_in_background?: boolean;
+  readonly terminal?: boolean;
+}
+
+async function runShell(
+  { io }: ToolSetup,
   tool: ShellTool,
   shell: ExecShell,
-): ToolDefinition {
-  return defineTool<typeof shellSchema, ShellToolDetails | undefined>({
-    ...presentationOf(presentation),
-    parameters: shellSchema,
-    async execute(toolCallId, params, signal, onUpdate) {
-      if (isAborted(signal)) {
-        throw new Error('Command aborted');
-      }
-      const timeoutMs = timeoutMsOf(params.timeout);
-      const live = new LiveView(onUpdate);
-      const origin: Origin = { tool, toolCallId };
-      const background = params.run_in_background === true;
-      const { outcome, kill } = io.run(
-        {
-          command: params.command,
-          shell,
-          ...(timeoutMs === undefined ? {} : { timeoutMs }),
-          ...(background ? { background } : {}),
-        },
-        (_stream, data, skipped) => {
-          live.append(data, skipped);
-        },
-        origin,
-      );
-      const stop = (): void => {
-        // A failed kill means the command already ended or the connection is gone; either
-        // way `outcome` settles on its own (Core also stops a turn's commands on abort).
-        kill().catch(() => undefined);
-      };
-      signal?.addEventListener('abort', stop, { once: true });
-      try {
-        const result = await outcome;
-        return shellResult(result, isAborted(signal));
-      } finally {
-        live.close();
-        signal?.removeEventListener('abort', stop);
-      }
+  toolCallId: string,
+  params: ShellParams,
+  signal: AbortSignal | undefined,
+  onUpdate: ((partial: AgentToolResult<undefined>) => void) | undefined,
+): Promise<AgentToolResult<ShellToolDetails | undefined>> {
+  if (isAborted(signal)) {
+    throw new Error('Command aborted');
+  }
+  const timeoutMs = timeoutMsOf(params.timeout);
+  const live = new LiveView(onUpdate);
+  const origin: Origin = { tool, toolCallId };
+  const terminal = params.terminal === true;
+  const background = terminal || params.run_in_background === true;
+  const { outcome, kill } = io.run(
+    {
+      command: params.command,
+      shell,
+      ...(timeoutMs === undefined ? {} : { timeoutMs }),
+      ...(background ? { background } : {}),
+      ...(terminal ? { terminal } : {}),
     },
-  });
+    (_stream, data, skipped) => {
+      live.append(data, skipped);
+    },
+    origin,
+  );
+  const stop = (): void => {
+    // A failed kill means the command already ended or the connection is gone; either
+    // way `outcome` settles on its own (Core also stops a turn's commands on abort).
+    kill().catch(() => undefined);
+  };
+  signal?.addEventListener('abort', stop, { once: true });
+  try {
+    const result = await outcome;
+    return shellResult(result, isAborted(signal), terminal);
+  } finally {
+    live.close();
+    signal?.removeEventListener('abort', stop);
+  }
 }
 
 /** The model's text, the error flag and the item details of a finished command. */
 export function shellResult(
   result: CommandResult,
   aborted: boolean,
+  terminal = false,
 ): AgentToolResult<ShellToolDetails | undefined> & { isError: boolean } {
   const execution = executionInfo(result);
   if (result.task !== undefined && !aborted) {
     // It runs on as a background task (T32): nothing failed.
     return {
-      content: [{ type: 'text', text: taskText(result) }],
+      content: [{ type: 'text', text: taskText(result, terminal) }],
       details: execution === undefined ? undefined : { commandExecution: execution },
       isError: false,
     };
@@ -171,7 +205,7 @@ export function modelText(result: CommandResult, aborted: boolean): string {
 }
 
 /** What the model reads about a command that became a background task (T32). */
-function taskText(result: CommandResult): string {
+function taskText(result: CommandResult, terminal: boolean): string {
   const task = result.task;
   if (task === undefined) return '';
   const after =
@@ -183,6 +217,14 @@ function taskText(result: CommandResult): string {
       `The command was still running after its timeout of ${seconds} seconds, so it moved to ` +
       `the background as task ${task.taskId} instead of being stopped; it keeps running. ` +
       `What it printed so far is at the start of its output file. ${after}`
+    );
+  }
+  if (terminal) {
+    return (
+      `The command is running in a PiArc terminal as background task ${task.taskId}. The ` +
+      `terminal's screen and scrollback, as text, are in ${task.outputPath}; read it with Read ` +
+      `(Core keeps it current). You will be told when the command finishes; the terminal ` +
+      `stays open after that, and KillShell (shell_id ${task.taskId}) closes it.`
     );
   }
   return `The command is running in the background as task ${task.taskId}. ${after}`;

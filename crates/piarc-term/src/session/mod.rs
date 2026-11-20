@@ -764,6 +764,13 @@ fn initial_terminal(config: &mut SessionConfig) -> Result<(Terminal, Option<Rest
     Ok((terminal, restored))
 }
 
+/// The user's shell for [`Program::DefaultShell`]: `$SHELL` when it is set and executable,
+/// else the password database (Unix); `%COMSPEC%` or `cmd.exe` (Windows).
+#[must_use]
+pub fn default_shell() -> String {
+    CommandBuilder::new_default_prog().get_shell()
+}
+
 fn spawn_error(what: &str, error: &dyn std::fmt::Display) -> Error {
     Error::Spawn {
         reason: format!("cannot {what}: {error}"),

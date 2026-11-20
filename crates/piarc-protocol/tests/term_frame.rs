@@ -72,8 +72,8 @@ fn cursor(x: u16, y: u16) -> Cursor {
     }
 }
 
-/// The sample frames: one viewer's sequence, then frames that exercise the rest of the format.
-fn frames() -> Vec<(&'static str, Frame)> {
+/// A viewer's first frame: colors, a style, wide and combined cells.
+fn reset_frame() -> Frame {
     let red = Rgb {
         r: 205,
         g: 49,
@@ -94,7 +94,7 @@ fn frames() -> Vec<(&'static str, Frame)> {
         cell("e\u{301}", 1),
     ];
     wide.resize(8, Cell::default());
-    let reset = Frame {
+    Frame {
         seq: 1,
         reset: true,
         held: false,
@@ -141,8 +141,12 @@ fn frames() -> Vec<(&'static str, Frame)> {
                 row(3, "$ ", 8, 0),
             ],
         }),
-    };
-    let empty = Frame {
+    }
+}
+
+/// Nothing changed since the last frame.
+fn empty_frame() -> Frame {
+    Frame {
         seq: 2,
         reset: false,
         held: false,
@@ -150,8 +154,12 @@ fn frames() -> Vec<(&'static str, Frame)> {
         cols: 8,
         rows: 3,
         body: None,
-    };
-    let scrolled = Frame {
+    }
+}
+
+/// A scroll: held rows move, one is selected, one is new.
+fn scrolled_frame() -> Frame {
+    Frame {
         seq: 3,
         reset: false,
         held: false,
@@ -181,8 +189,12 @@ fn frames() -> Vec<(&'static str, Frame)> {
                 row(4, "ok", 8, 1),
             ],
         }),
-    };
-    let held = Frame {
+    }
+}
+
+/// A held frame with every flag and style field set.
+fn held_frame() -> Frame {
+    Frame {
         seq: 1,
         reset: true,
         held: true,
@@ -239,15 +251,19 @@ fn frames() -> Vec<(&'static str, Frame)> {
                 ]),
             }],
         }),
-    };
+    }
+}
+
+/// The sample frames: one viewer's sequence, then frames that exercise the rest of the format.
+fn frames() -> Vec<(&'static str, Frame)> {
     vec![
-        ("a viewer's first frame resets it", reset),
-        ("nothing changed", empty),
+        ("a viewer's first frame resets it", reset_frame()),
+        ("nothing changed", empty_frame()),
         (
             "a scroll moves held rows, selects one and adds one",
-            scrolled,
+            scrolled_frame(),
         ),
-        ("a held frame with every flag and style field", held),
+        ("a held frame with every flag and style field", held_frame()),
     ]
 }
 

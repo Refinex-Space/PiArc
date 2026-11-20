@@ -342,6 +342,7 @@ pub(in crate::tool_io) fn claim_command(
         || p.cwd.is_some()
         || !timeout_matches(timeout, p.timeout_ms)
         || background_of(&grant.input) != p.background
+        || flag(&grant.input, "terminal") != p.terminal
     {
         return Err(mismatch());
     }
@@ -361,13 +362,15 @@ pub(in crate::tool_io) fn claim_command(
         .unwrap_or_default())
 }
 
-/// Whether the approved call asked to run in the background (T32): the request must match,
-/// so a rule on `run_in_background` decides what runs.
+/// Whether the approved call asked to run in the background (T32), which running in a
+/// terminal implies (T33): the request must match, so a rule on `run_in_background` or
+/// `terminal` decides what runs.
 fn background_of(input: &serde_json::Map<String, Value>) -> bool {
-    input
-        .get("run_in_background")
-        .and_then(Value::as_bool)
-        .unwrap_or(false)
+    flag(input, "run_in_background") || flag(input, "terminal")
+}
+
+fn flag(input: &serde_json::Map<String, Value>, name: &str) -> bool {
+    input.get(name).and_then(Value::as_bool).unwrap_or(false)
 }
 
 /// The approved `Monitor` call `p` names (T32): same command, the session's shell directory,

@@ -313,12 +313,12 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 开工：2026-11-20，基线 `npm run verify -- --baseline` 通过（复用 ef39d43 的全量结果）。T32 部分完成的 A04、A13 等待 Windows CI，不影响本任务；分支尚未推送，无法关闭。S7 路线结论为正式路线，不启用 xterm.js 退路，字节流副本通道不做。
 
-- [ ] 1 终端会话与 IO 线程：注册表记所属会话与工作区，进程树终止（macOS 进程组、Windows Job Object，I28），I55 余项（IO 线程 `Interrupted`、应答队列有界、线程 panic 防护、`createTerminal` 不在 JS 线程同步 spawn）
-- [ ] 2 副作用回调：`PWD_CHANGED`、`SEMANTIC_PROMPT`、`CLIPBOARD_READ`（拒绝）、`CLIPBOARD_WRITE`（可关闭）；事件形状移入 `piarc-protocol`（A03）
-- [ ] 3 读屏 API（屏幕、scrollback、最近 N 行，unwrap/trim）、OSC 133 命令边界与等待、后台搜索（A01、A02、A05）
-- [ ] 4 帧协议定稿（schema、L1 样本、协议文档）、隐藏终端不出帧、输入编码（Kitty 键盘、鼠标、粘贴、焦点）（A04、A07、A08）
-- [ ] 5 snapshot 持久化与降级（版本头、VT 重放、纯文本），归档清理（A06）
-- [ ] 6 cwd、环境（T17 构造）与 shell integration 脚本（zsh、bash、PowerShell、Git Bash）（A09）
+- [x] 1 终端会话与 IO 线程：注册表记所属会话与工作区，进程树终止（macOS 进程组、Windows Job Object，I28），I55 余项（IO 线程 `Interrupted`、应答队列有界、线程 panic 防护、`createTerminal` 不在 JS 线程同步 spawn）
+- [x] 2 副作用回调：`PWD_CHANGED`、`SEMANTIC_PROMPT`、`CLIPBOARD_READ`（拒绝）、`CLIPBOARD_WRITE`（可关闭）；事件形状移入 `piarc-protocol`（A03）
+- [x] 3 读屏 API（屏幕、scrollback、最近 N 行，unwrap/trim）、OSC 133 命令边界与等待、后台搜索（A01、A02、A05）
+- [x] 4 帧协议定稿（schema、L1 样本、协议文档）、隐藏终端不出帧、输入编码（Kitty 键盘、鼠标、粘贴、焦点）（A04、A07、A08）
+- [x] 5 snapshot 持久化与降级（版本头、VT 重放、纯文本），归档清理（A06）
+- [x] 6 cwd、环境（T17 构造）与 shell integration 脚本（zsh、bash、PowerShell、Git Bash）（A09）
 - [ ] 7 agent 接口：补充 ADR、终端承载任务、共享校验、L2 场景与能力 ID（A10、A11）
 - [ ] 8 进程树终止测试、`cat` 100 MB 无头测量（A12、A13）
 - [ ] 9 收尾：文档（架构 6.11、协议文档、AGENTS.md、复用表）、验收记录、`npm run verify`（A14）

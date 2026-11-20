@@ -26,6 +26,7 @@ mod feed;
 mod limits;
 mod monitor;
 mod record;
+mod terminal;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -44,6 +45,7 @@ use tokio_util::sync::CancellationToken;
 pub(crate) use feed::MonitorEnd;
 use feed::MonitorFeed;
 pub use limits::{TaskLimits, TasksConfig};
+pub(crate) use terminal::{NewTerminal, TerminalViews};
 
 use crate::events::{Event, EventSender};
 use crate::route::RouteKey;
@@ -168,6 +170,8 @@ struct Inner {
     state: Mutex<State>,
     storage: OnceLock<Storage>,
     outlet: OnceLock<Arc<dyn TaskOutlet>>,
+    /// Rewrites a terminal task's screen file before it is read (T33).
+    views: OnceLock<Arc<dyn TerminalViews>>,
     publish: Notify,
 }
 
@@ -207,6 +211,7 @@ impl TaskManager {
                 state: Mutex::default(),
                 storage: OnceLock::new(),
                 outlet: OnceLock::new(),
+                views: OnceLock::new(),
                 publish: Notify::new(),
             }),
         }
@@ -560,15 +565,22 @@ impl TaskManager {
         task_id: &str,
     ) -> Result<(BackgroundTask, bool, String), ErrorObject> {
         self.check_owner(session_id, task_id)?;
+        if terminal::users(&lock(&self.inner.state), task_id) {
+            // The model cannot close the user's terminal, shared or not (ADR-0050 rule 5).
+            return Err(not_found(task_id));
+        }
         self.stop(task_id, StopBy::Model).await
     }
 
+    /// The task belongs to `session_id` (or one of its subagents) and the model may see it: a
+    /// user's terminal only while it is shared (ADR-0050 rule 5).
     fn check_owner(&self, session_id: &str, task_id: &str) -> Result<(), ErrorObject> {
         let state = lock(&self.inner.state);
         match state.tasks.get(task_id) {
             Some(entry)
-                if entry.task.session_id == session_id
-                    || entry.task.owner_session_id == session_id =>
+                if (entry.task.session_id == session_id
+                    || entry.task.owner_session_id == session_id)
+                    && terminal::visible(&entry.task) =>
             {
                 Ok(())
             }
@@ -585,6 +597,7 @@ impl TaskManager {
             .tasks
             .values()
             .filter(|e| e.task.session_id == session_id || e.task.owner_session_id == session_id)
+            .filter(|e| terminal::visible(&e.task))
             .map(|e| e.view(limits.snapshot_tail_lines, limits.snapshot_line_chars))
             .collect();
         tasks.sort_by(|a, b| {
@@ -612,6 +625,7 @@ impl TaskManager {
         if let Some(session_id) = session_id {
             self.check_owner(session_id, task_id)?;
         }
+        self.refresh_view(task_id).await;
         let (file, status) = {
             let state = lock(&self.inner.state);
             let entry = state.tasks.get(task_id).ok_or_else(|| not_found(task_id))?;

@@ -82,13 +82,16 @@ export function installTestHooks(options: {
       timings = [];
       return recorded;
     },
-    createTerminal: (webContentsId, terminal) => {
+    createTerminal: async (webContentsId, terminal) => {
       const owner = webContents.fromId(webContentsId);
       if (owner === undefined) {
         throw new Error(`No window has webContents id ${String(webContentsId)}`);
       }
-      const id = options.core.createTerminal({ ...terminal });
-      options.terminalOwners.assign(id, owner);
+      const page = options.terminalOwners.page(owner);
+      const id = await options.core.createTerminal({ ...terminal });
+      if (!options.terminalOwners.assign(id, owner, page)) {
+        throw new Error('The window navigated while its terminal started');
+      }
       return id;
     },
     terminalForwardStats: () => ({ ...options.terminalStats }),

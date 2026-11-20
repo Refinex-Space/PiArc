@@ -43,6 +43,12 @@ impl Drop for OwnedHandle {
 /// A Job Object that ends all its processes when dropped.
 pub(crate) struct Job(OwnedHandle);
 
+impl std::fmt::Debug for Job {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Job")
+    }
+}
+
 // SAFETY: a job handle is a kernel object reference; Job Object calls are thread-safe and
 // this type never hands the raw handle out.
 unsafe impl Send for Job {}

@@ -205,7 +205,13 @@ fn tool_match(name: &str, behavior: Behavior) -> Result<ToolMatch, String> {
 fn param_keys(tool: &str) -> &'static [&'static str] {
     match tool {
         "Agent" => &["model", "effort", "isolation", "run_in_background"],
-        "Bash" | "PowerShell" | "Monitor" => {
+        "Bash" => &[
+            "run_in_background",
+            "terminal",
+            "timeout",
+            "dangerouslyDisableSandbox",
+        ],
+        "PowerShell" | "Monitor" => {
             &["run_in_background", "timeout", "dangerouslyDisableSandbox"]
         }
         _ => &[],

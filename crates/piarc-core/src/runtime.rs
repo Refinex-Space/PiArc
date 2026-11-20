@@ -27,6 +27,7 @@
 
 mod sessions;
 mod state;
+mod terminals;
 
 use std::collections::HashMap;
 use std::future::Future;
@@ -50,7 +51,7 @@ use crate::route::RouteKey;
 use crate::secrets::{SecretsConfig, SecretsService};
 use crate::sessions::{Hub, SessionsConfig};
 use crate::storage::Storage;
-use crate::terminal::{KeyEvent, TerminalOptions, Terminals};
+use crate::terminal::Terminals;
 use crate::tool_io::{ToolIo, ToolIoConfig};
 use crate::trust::TrustService;
 
@@ -252,7 +253,9 @@ impl CoreRuntime {
         let terminals = Terminals::new(handle.clone(), events.clone());
         let cancel = CancellationToken::new();
         let state_dirs = match config.dirs.clone() {
-            Some(dirs) => Some(open_state(dirs, &config, &handle, &events, &cancel)?),
+            Some(dirs) => Some(open_state(
+                dirs, &config, &handle, &events, &cancel, &terminals,
+            )?),
             None => None,
         };
         let core = Self {
@@ -387,119 +390,6 @@ impl CoreRuntime {
         Ok(())
     }
 
-    /// Starts a terminal (ADR-0017) and returns its id. Its title, bell and exit events
-    /// arrive on the route `term/<id>`; frames are pulled with
-    /// [`terminal_frame`](Self::terminal_frame).
-    ///
-    /// # Errors
-    ///
-    /// [`Error::InvalidArgument`] for a bad size or a relative working directory;
-    /// [`Error::Terminal`] when the program cannot start; [`Error::ShuttingDown`].
-    pub fn create_terminal(&self, options: TerminalOptions) -> Result<u32> {
-        self.ensure_running()?;
-        self.shared.terminals.create(options)
-    }
-
-    /// Writes `bytes` to terminal `id` as they are (committed input-method text). Never
-    /// blocks.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::UnknownTerminal`], [`Error::Terminal`] once it is closed,
-    /// [`Error::ShuttingDown`].
-    pub fn terminal_write(&self, id: u32, bytes: Vec<u8>) -> Result<()> {
-        self.ensure_running()?;
-        self.shared.terminals.write(id, bytes)
-    }
-
-    /// Encodes `key` with the terminal's current modes and writes it. Never blocks.
-    ///
-    /// # Errors
-    ///
-    /// As [`terminal_write`](Self::terminal_write).
-    pub fn terminal_key(&self, id: u32, key: &KeyEvent) -> Result<()> {
-        self.ensure_running()?;
-        self.shared.terminals.key(id, key)
-    }
-
-    /// Resizes terminal `id`. Never blocks.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::InvalidArgument`] for a bad size, otherwise as
-    /// [`terminal_write`](Self::terminal_write).
-    pub fn terminal_resize(&self, id: u32, cols: u16, rows: u16, cell: (u32, u32)) -> Result<()> {
-        self.ensure_running()?;
-        self.shared.terminals.resize(id, cols, rows, cell)
-    }
-
-    /// Encodes the next frame of terminal `id` for `viewer` (`full` asks for a RESET frame)
-    /// on the blocking pool and calls `on_done` there with the bytes.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::UnknownTerminal`], [`Error::ShuttingDown`]; encoding errors go to `on_done`.
-    pub fn terminal_frame(
-        &self,
-        id: u32,
-        viewer: u32,
-        full: bool,
-        on_done: impl FnOnce(Result<Vec<u8>>) + Send + 'static,
-    ) -> Result<()> {
-        self.ensure_running()?;
-        self.shared.terminals.frame(id, viewer, full, on_done)
-    }
-
-    /// Closes terminal `id`: kills its program and forgets it.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::UnknownTerminal`], [`Error::ShuttingDown`].
-    pub fn close_terminal(&self, id: u32) -> Result<()> {
-        self.ensure_running()?;
-        self.shared.terminals.close(id)
-    }
-
-    /// The visible screen of terminal `id` as plain text (libghostty-vt's formatter), on the
-    /// blocking pool. Only the `testing` build of piarc-napi exports it (T10 measurements).
-    ///
-    /// # Errors
-    ///
-    /// [`Error::UnknownTerminal`], [`Error::ShuttingDown`].
-    pub fn terminal_text(
-        &self,
-        id: u32,
-        on_done: impl FnOnce(Result<String>) + Send + 'static,
-    ) -> Result<()> {
-        self.ensure_running()?;
-        self.shared.terminals.text(id, on_done)
-    }
-
-    /// Counters of terminal `id`.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::UnknownTerminal`].
-    pub fn terminal_stats(&self, id: u32) -> Result<piarc_term::SessionStats> {
-        self.shared.terminals.stats(id)
-    }
-
-    /// Measures the PTY's own echo time for `byte` (the baseline of the S7 echo budget), on
-    /// the blocking pool. Only the `testing` build of piarc-napi exports it.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::UnknownTerminal`], [`Error::ShuttingDown`].
-    pub fn terminal_probe_echo(
-        &self,
-        id: u32,
-        byte: u8,
-        on_done: impl FnOnce(Result<Duration>) + Send + 'static,
-    ) -> Result<()> {
-        self.ensure_running()?;
-        self.shared.terminals.probe_echo(id, byte, on_done)
-    }
-
     /// Runs [`crate::host_probe::run`] on the runtime: one mock conversation with the Agent
     /// Host of a packaged app. Only the `testing` build of piarc-napi exports it (S6).
     ///
@@ -627,8 +517,10 @@ impl Shared {
     fn run_shutdown(&self) {
         let sources: Vec<DemoSource> = lock(&self.demo).sources.drain().map(|(_, s)| s).collect();
         let coalescer = lock(&self.coalescer).take();
-        self.terminals.close_all();
         self.handle.block_on(async {
+            // Terminals first: their tasks stop as interrupted and their snapshots are saved
+            // while the database and the task manager still run.
+            self.terminals.shutdown().await;
             // Agent Hosts first: they flush their sessions and may still send notifications.
             if let Some(services) = &self.state_dirs {
                 services.sessions.shutdown().await;
@@ -689,6 +581,7 @@ fn open_state(
     handle: &Handle,
     events: &EventSender,
     cancel: &CancellationToken,
+    terminals: &Terminals,
 ) -> Result<StateServices> {
     let io = |what: &str, error: std::io::Error| Error::Feature {
         kind: piarc_protocol::ErrorKind::IoError,
@@ -732,15 +625,17 @@ fn open_state(
         model_preferences: Arc::new(std::sync::Mutex::new(crate::providers::preferences(&data))),
         logins: Arc::default(),
         provider_writer: tokio::sync::Mutex::new(()),
-        tool_io: state_tool_io(config, data, events, &storage, &trust, &snapshots)
+        tool_io: state_tool_io(config, data.clone(), events, &storage, &trust, &snapshots)
             .with_checkpoints(checkpoints)
-            .with_tasks(tasks.clone()),
+            .with_tasks(tasks.clone())
+            .with_terminals(terminals.clone()),
         config: config.sessions.clone(),
         snapshots,
         cancel: cancel.child_token(),
         files: crate::composer::file_search::FileSearch::default(),
     });
     tasks.set_outlet(sessions.task_outlet());
+    terminals.attach(data, tasks.clone());
     {
         let _entered = handle.enter();
         tasks.start(storage.clone(), events.clone(), cancel.child_token());

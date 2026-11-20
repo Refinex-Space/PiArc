@@ -68,6 +68,6 @@ describe('frameRows', () => {
   });
 
   it('refuses bytes that are not a frame', () => {
-    expect(() => frameRows(Buffer.from('not a frame'))).toThrow(/version 1 terminal frame/);
+    expect(() => frameRows(Buffer.from('not a frame'))).toThrow(/version 2 terminal frame/);
   });
 });

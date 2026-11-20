@@ -124,9 +124,13 @@ export const DEFAULT_PROFILE: ToolProfile = {
       'running then moves to the background and keeps running as a task, and ' +
       '`run_in_background` starts it there at once (servers, watchers, long builds): the ' +
       'result names the task and its output file, you are told when it ends, and KillShell ' +
-      'stops it. Long output comes back as its start and its end, with the full text saved ' +
-      'to a file named in the result (read it with Read). Exit code 1 of grep, rg, diff, cmp ' +
-      'and test is an answer (no match, a difference, a false condition), not a failure.',
+      'stops it. With `terminal: true` the command runs in a PiArc terminal instead, still ' +
+      'in the background: use it for full-screen or interactive programs and servers whose ' +
+      'screen matters; the result names a file holding the screen as text, kept current, and ' +
+      'the terminal stays open after the command. Long output comes back as its start and its ' +
+      'end, with the full text saved to a file named in the result (read it with Read). Exit ' +
+      'code 1 of grep, rg, diff, cmp and test is an answer (no match, a difference, a false ' +
+      'condition), not a failure.',
     ...TOOL_GUIDANCE.Bash,
   },
   PowerShell: {

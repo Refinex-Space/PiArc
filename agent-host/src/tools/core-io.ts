@@ -197,6 +197,8 @@ export interface CommandRequest {
   readonly env?: Record<string, string>;
   /** Runs as a background task and answers at once (T32). */
   readonly background?: boolean;
+  /** Runs in a PiArc terminal whose screen the model reads (T33, ADR-0050); with `background`. */
+  readonly terminal?: boolean;
 }
 
 /** Which shells the session's command tools can use. */
@@ -496,6 +498,7 @@ export class CoreIo {
     if (command.cwd !== undefined) params.cwd = command.cwd;
     if (command.env !== undefined) params.env = command.env;
     if (command.background === true) params.background = true;
+    if (command.terminal === true) params.terminal = true;
     const outcome = this.#request(
       'exec/run',
       params,

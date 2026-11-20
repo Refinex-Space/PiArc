@@ -20,7 +20,7 @@ const TERMINAL_MARKER = 'piarc-term-ok';
  * @typedef {{
  *   readonly state: string,
  *   shutdown(): Promise<void>,
- *   createTerminal(options: { cols: number, rows: number, program?: string, args?: string[] }): number,
+ *   createTerminal(options: { cols: number, rows: number, program?: string, args?: string[] }): Promise<number>,
  *   terminalFrame(id: number, viewer: number, full: boolean): Promise<Uint8Array>,
  *   closeTerminal(id: number): void,
  *   startDemoSource?: (options: { route: string, eventsPerSecond: number, maxEvents: number }) => number,
@@ -153,7 +153,7 @@ export async function checkCore(modulePath, host) {
  * @param {Set<string>} exitedRoutes routes whose exit event arrived
  */
 async function checkTerminal(core, exitedRoutes) {
-  const id = core.createTerminal({
+  const id = await core.createTerminal({
     cols: 40,
     rows: 5,
     ...(process.platform === 'win32'
@@ -173,30 +173,32 @@ async function checkTerminal(core, exitedRoutes) {
 }
 
 /**
- * The text of the rows a frame carries cells for (draft format 1 of
- * `piarc_protocol::term_frame`; the full decoder lives in the renderer).
+ * The text of the rows a frame carries cells for (format 2 of `piarc_protocol::term_frame`;
+ * the full decoder lives in the renderer).
  * @param {Buffer} frame
  * @returns {string[]}
  */
 export function frameRows(frame) {
-  if (frame.toString('latin1', 0, 3) !== 'PTF' || frame[3] !== 1) {
-    throw new Error('not a version 1 terminal frame');
+  if (frame.toString('latin1', 0, 3) !== 'PTF' || frame[3] !== 2) {
+    throw new Error('not a version 2 terminal frame');
   }
   const flags = frame.readUInt8(4);
   if ((flags & 0b100) !== 0) {
     return [];
   }
-  // Header (14 bytes), cursor (6), colors when flagged (778), then the style table.
-  let at = 14 + 6 + ((flags & 0b10) !== 0 ? 778 : 0);
+  // Header (14 bytes), cursor (6), colors when flagged (778), scrollbar (12), then the
+  // style table.
+  let at = 14 + 6 + ((flags & 0b10) !== 0 ? 778 : 0) + 12;
   at += 2 + frame.readUInt16LE(at) * 16;
   const rowCount = frame.readUInt16LE(at);
   at += 2;
   /** @type {string[]} */
   const rows = [];
   for (let row = 0; row < rowCount; row += 1) {
-    const hasCells = (frame.readUInt8(at + 4) & 1) !== 0;
-    at += 5;
-    if (!hasCells) {
+    const rowFlags = frame.readUInt8(at + 4);
+    // Row id and flags, then the selected columns (two u16) when bit 1 is set.
+    at += 5 + ((rowFlags & 0b10) !== 0 ? 4 : 0);
+    if ((rowFlags & 1) === 0) {
       continue;
     }
     const cellCount = frame.readUInt16LE(at);

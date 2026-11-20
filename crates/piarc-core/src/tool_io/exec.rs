@@ -399,6 +399,33 @@ impl Exec {
         Ok(self.spec(session, p, launch, wrap, false).await?.0)
     }
 
+    /// The environment of a terminal (T33): the fields commands inherit (ADR-0035), the
+    /// sandbox's variables, and on Windows a UTF-8 locale for Git Bash; nothing else.
+    pub(super) async fn terminal_env(
+        &self,
+        sandbox_env: Vec<(OsString, OsString)>,
+    ) -> Vec<(String, String)> {
+        let resolved = self.base_env().await;
+        let mut env = super::command_env(&resolved.inherited, std::collections::BTreeMap::new());
+        env = super::overlay_env(env, sandbox_env);
+        if cfg!(windows) && !has_locale(&env) {
+            env.push(("LANG".into(), "C.UTF-8".into()));
+        }
+        env.into_iter()
+            .map(|(k, v)| {
+                (
+                    k.to_string_lossy().into_owned(),
+                    v.to_string_lossy().into_owned(),
+                )
+            })
+            .collect()
+    }
+
+    /// The bash commands run with (Git Bash on Windows).
+    pub(super) fn bash(&self) -> Result<PathBuf, ErrorObject> {
+        self.program(ExecShell::Bash)
+    }
+
     /// The runner of every command.
     pub(super) fn runner(&self) -> &CommandRunner {
         &self.runner

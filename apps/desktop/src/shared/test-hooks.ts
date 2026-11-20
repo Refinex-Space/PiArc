@@ -156,7 +156,7 @@ export interface PiarcTestHooks {
    * through `window.piarc`) and resolves its id. Unlike `window.piarc.createTerminal`, the
    * program, arguments and environment are the test's choice.
    */
-  createTerminal(webContentsId: number, options: TestTerminalOptions): number;
+  createTerminal(webContentsId: number, options: TestTerminalOptions): Promise<number>;
   /** Counters of the frames the main process returned. */
   terminalForwardStats(): TerminalForwardStats;
   /**

@@ -116,6 +116,7 @@ impl HostConfig {
                 Capability::new("login"),
                 Capability::new("subagents"),
                 Capability::new("backgroundTasks"),
+                Capability::new("terminalTasks"),
             ],
             allow_model_network: None,
             model_preferences: None,

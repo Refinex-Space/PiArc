@@ -40,6 +40,7 @@ mod memory_reader;
 pub(crate) mod policy;
 pub(crate) mod subagents;
 mod tasks;
+mod terminals;
 mod web;
 
 pub use exec::{CommandEnv, DISPLAY_WINDOW};
@@ -59,6 +60,7 @@ pub(crate) use policy::hooks::condition as hook_condition;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
+pub use terminals::UserTerminal;
 use tokio_util::sync::CancellationToken;
 
 use crate::events::EventSender;
@@ -178,6 +180,8 @@ pub struct ToolIo {
     web: Arc<web::WebState>,
     /// Background commands, subagents and Monitors (T32).
     tasks: crate::tasks::TaskManager,
+    /// Terminals (T33); none without Core's state.
+    terminals: Option<crate::terminal::Terminals>,
 }
 
 impl std::fmt::Debug for ToolIo {
@@ -212,6 +216,7 @@ impl ToolIo {
             checkpoints: None,
             web: Arc::default(),
             tasks: crate::tasks::TaskManager::new(crate::tasks::TasksConfig::default()),
+            terminals: None,
         }
     }
 
@@ -594,6 +599,11 @@ impl ToolIo {
         if self.policy.is_some() {
             launch.pinned = policy::claim_command(&session, &p, &peer, &launch.dir)?;
         }
+        if p.terminal {
+            // A terminal task outlives the turn and the connection (ADR-0050).
+            let wrap = sandbox_wrap(&session)?;
+            return to_value(&self.exec_terminal(&session, &p, &launch, wrap).await?);
+        }
         let token = CancellationToken::new();
         {
             let mut running = lock(&session.running);
@@ -606,21 +616,12 @@ impl ToolIo {
             }
             running.insert(p.request_id.clone(), token.clone());
         }
-        let wrap = match &session.sandbox {
-            Some(sandbox) => match sandbox.launch() {
-                Ok(launch) => exec::Wrap {
-                    launcher: Some(Launcher {
-                        program: launch.program,
-                        args: launch.args,
-                    }),
-                    env: launch.env,
-                },
-                Err(e) => {
-                    lock(&session.running).remove(&p.request_id);
-                    return Err(sandbox_error(&e));
-                }
-            },
-            None => exec::Wrap::default(),
+        let wrap = match sandbox_wrap(&session) {
+            Ok(wrap) => wrap,
+            Err(error) => {
+                lock(&session.running).remove(&p.request_id);
+                return Err(error);
+            }
         };
         let watcher = {
             let (peer, token) = (peer.clone(), token.clone());
@@ -740,6 +741,23 @@ fn check_session_id(session_id: &str) -> Result<(), ErrorObject> {
             format!("unusable session id {session_id:?}"),
             false,
         ))
+    }
+}
+
+/// The sandbox wrapper of `session`'s commands and terminals; none outside a sandbox.
+fn sandbox_wrap(session: &SessionIo) -> Result<exec::Wrap, ErrorObject> {
+    match &session.sandbox {
+        Some(sandbox) => {
+            let launch = sandbox.launch().map_err(|e| sandbox_error(&e))?;
+            Ok(exec::Wrap {
+                launcher: Some(Launcher {
+                    program: launch.program,
+                    args: launch.args,
+                }),
+                env: launch.env,
+            })
+        }
+        None => Ok(exec::Wrap::default()),
     }
 }
 

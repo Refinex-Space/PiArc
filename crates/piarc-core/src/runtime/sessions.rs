@@ -7,7 +7,7 @@ impl CoreRuntime {
     /// Runs `job` on the session layer and calls `on_done` with its result from a runtime
     /// thread. Validation that needs no I/O happens in `job` too, but the call itself only
     /// queues the work: nothing here blocks the caller (architecture section 7.2).
-    fn on_sessions<F, Fut>(
+    pub(super) fn on_sessions<F, Fut>(
         &self,
         on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
         job: F,

@@ -272,10 +272,69 @@ export declare class CoreRuntime {
    */
   writeClientSetting(pointer: string, value?: string | null): Promise<string>;
   /**
-   * Starts a terminal and returns its id. Its title, bell and exit events arrive on the
-   * route `term/<id>`; frames are pulled with `terminalFrame`.
+   * Starts a terminal without a session and resolves with its id. Its events arrive on
+   * the route `term/<id>`; frames are pulled with `terminalFrame`. Opening the PTY and
+   * starting the program happen off the JavaScript thread.
    */
-  createTerminal(options: TerminalCreateOptions): number;
+  createTerminal(options: TerminalCreateOptions): Promise<number>;
+  /**
+   * Opens a terminal for the user in open session `sessionId` (T33): the session's shell
+   * directory and command environment, the user's shell with PiArc's shell integration,
+   * a background task of kind `terminal`. Resolves with JSON text
+   * `{ terminalId, taskId, restored }` (`restored`: `snapshot`, `replay`, `text` or null).
+   */
+  openSessionTerminal(sessionId: string, options: SessionTerminalOptions): Promise<string>;
+  /**
+   * Shares a user's terminal of a session with the agent, or stops sharing it (ADR-0050);
+   * resolves with whether anything changed.
+   */
+  setTerminalShared(id: number, shared: boolean): Promise<boolean>;
+  /**
+   * Encodes a mouse event with the terminal's mouse mode and format and writes it; nothing
+   * when the program does not track the mouse. Never blocks.
+   */
+  terminalMouse(id: number, event: TerminalMouseEvent): void;
+  /**
+   * Reports focus gained or lost to the program when it asked for focus reports (mode
+   * 1004). Never blocks.
+   */
+  terminalFocus(id: number, gained: boolean): void;
+  /**
+   * Pastes `text` as the terminal's modes require (bracketed paste, Kitty paste events);
+   * resolves with `pasted`, `empty`, or `unsafe` for text that could run commands by itself
+   * (ask the user, then paste again with `allowUnsafe`).
+   */
+  terminalPaste(
+    id: number,
+    text: string,
+    allowUnsafe?: boolean | undefined | null,
+  ): Promise<'pasted' | 'unsafe' | 'empty'>;
+  /**
+   * Plain text of the terminal from libghostty-vt's formatter: `range` is JSON text
+   * (`{"kind":"screen"}`, `viewport`, `all`, or `{"kind":"lastLines","count":n}`; the
+   * viewport when absent); `unwrap` joins rows the terminal wrapped.
+   */
+  terminalText(
+    id: number,
+    range?: string | undefined | null,
+    unwrap?: boolean | undefined | null,
+  ): Promise<string>;
+  /**
+   * The newest command of the terminal (OSC 133) as JSON text (`TerminalCommand`), or
+   * `null` before the first.
+   */
+  terminalLastCommand(id: number): Promise<string>;
+  /**
+   * Finds `query` in the terminal's screen and scrollback; resolves with JSON text of the
+   * matches (`TerminalMatch[]`), newest first.
+   */
+  terminalSearch(id: number, query: string): Promise<string>;
+  /**
+   * What the terminal shows, as JSON text (`TerminalInfo`): size, title, working
+   * directory, alternate screen, last command, and for a terminal of a session its task and
+   * sharing.
+   */
+  terminalInfo(id: number): string;
   /** Writes `text` to the terminal as UTF-8 (committed input-method text). Never blocks. */
   terminalInput(id: number, text: string): void;
   /** Encodes a key event with the terminal's current modes and writes it. Never blocks. */
@@ -289,12 +348,15 @@ export declare class CoreRuntime {
     cellHeight: number,
   ): void;
   /**
-   * Resolves with the next frame of the terminal for `viewer` (the draft binary format of
-   * `piarc_protocol::term_frame`); `full` asks for a RESET frame. An unchanged terminal
-   * gives a 14-byte empty frame.
+   * Resolves with the next frame of the terminal for `viewer` (the binary format of
+   * `piarc_protocol::term_frame`, version 2); `full` asks for a RESET frame. An unchanged
+   * terminal gives a 14-byte empty frame.
    */
   terminalFrame(id: number, viewer: number, full: boolean): Promise<Uint8Array>;
-  /** Kills the terminal's program and forgets the terminal. */
+  /**
+   * Hangs up the terminal's program, ends everything it started and forgets the terminal
+   * (a terminal of a session stops as its task).
+   */
   closeTerminal(id: number): void;
   /**
    * Like `create`, with the vault's master key in memory under a `piarc-test.` name instead
@@ -334,8 +396,6 @@ export declare class CoreRuntime {
    * `core/errors` route.
    */
   spawnPanickingTask(): void;
-  /** The visible screen of a terminal as plain text, from libghostty-vt's formatter. */
-  terminalText(id: number): Promise<string>;
   /** Counters of a terminal. */
   terminalStats(id: number): TerminalStats;
   /**
@@ -474,6 +534,20 @@ export interface SessionModel {
   id: string;
 }
 
+/** Options of `openSessionTerminal`. */
+export interface SessionTerminalOptions {
+  /** Columns (1 to 1000). */
+  cols: number;
+  /** Rows (1 to 1000). */
+  rows: number;
+  /** Cell width in device-independent pixels. Default 8. */
+  cellWidth?: number;
+  /** Cell height. Default 16. */
+  cellHeight?: number;
+  /** The task id of a terminal of this session saved earlier, to continue from its snapshot. */
+  restore?: string;
+}
+
 /** Options of `createTerminal`. */
 export interface TerminalCreateOptions {
   /** Columns (1 to 1000). */
@@ -506,6 +580,20 @@ export interface TerminalKeyEvent {
   mods: number;
   /** The event belongs to an input-method composition. */
   composing: boolean;
+}
+
+/** A mouse event in pixels of the terminal's surface. */
+export interface TerminalMouseEvent {
+  /** `press`, `release` or `motion`. */
+  action: string;
+  /** 1 left, 2 right, 3 middle, 4–7 wheel up, down, left, right, 8–11 extra buttons. */
+  button?: number;
+  /** Bits: 1 Shift, 2 Ctrl, 4 Alt/Option, 8 Meta/Command. */
+  mods: number;
+  /** Horizontal position in pixels. */
+  x: number;
+  /** Vertical position in pixels. */
+  y: number;
 }
 
 /** Counters of one terminal (T10 measurements). */

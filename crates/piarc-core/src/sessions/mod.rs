@@ -624,6 +624,35 @@ impl Hub {
         })
     }
 
+    /// Opens a terminal for the user in open session `session_id` (T33): a background task
+    /// of kind `terminal`; answers `{ terminalId, taskId, restored? }`.
+    ///
+    /// # Errors
+    ///
+    /// The session is not open; the terminal cannot start.
+    pub async fn open_terminal(
+        &self,
+        session_id: String,
+        request: crate::tool_io::UserTerminal,
+    ) -> Result<Value> {
+        let opened = self
+            .ctx
+            .tool_io
+            .open_user_terminal(&session_id, request)
+            .await
+            .map_err(|e| Error::feature(&e))?;
+        let restored = opened.restored.map(|how| match how {
+            piarc_term::snapshot::Restored::Snapshot => "snapshot",
+            piarc_term::snapshot::Restored::Replay => "replay",
+            piarc_term::snapshot::Restored::Text => "text",
+        });
+        Ok(serde_json::json!({
+            "terminalId": opened.terminal_id,
+            "taskId": opened.task_id,
+            "restored": restored,
+        }))
+    }
+
     /// Part of a background task's output (T32).
     pub async fn read_task_output(
         &self,

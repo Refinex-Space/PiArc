@@ -53,15 +53,38 @@ export type TerminalRegistrar = (
 export class TerminalOwners {
   readonly #owners = new Map<number, number>();
   readonly #watched = new WeakSet<OwnerContents>();
+  /** Per window, how many times its page went away: a terminal started before is stale. */
+  readonly #pages = new Map<number, number>();
   readonly #core: TerminalCore;
 
   constructor(core: TerminalCore) {
     this.#core = core;
   }
 
-  /** Records that `contents` owns terminal `id` and closes it when `contents` goes away. */
-  assign(id: number, contents: OwnerContents): void {
+  /**
+   * Watches `contents` and returns its current page, to pass to `assign` once a terminal it
+   * asked for has started (Core starts terminals off the caller's thread).
+   */
+  page(contents: OwnerContents): number {
+    this.#watch(contents);
+    return this.#pages.get(contents.id) ?? 0;
+  }
+
+  /**
+   * Records that `contents` owns terminal `id` and closes it when `contents` goes away. When
+   * the page that asked for it (`page`) went away meanwhile, closes the terminal instead and
+   * returns false: no page knows its id.
+   */
+  assign(id: number, contents: OwnerContents, page = this.page(contents)): boolean {
+    if (page !== this.page(contents)) {
+      this.#close(id);
+      return false;
+    }
     this.#owners.set(id, contents.id);
+    return true;
+  }
+
+  #watch(contents: OwnerContents): void {
     if (!this.#watched.has(contents)) {
       this.#watched.add(contents);
       const windowId = contents.id;
@@ -105,17 +128,22 @@ export class TerminalOwners {
   }
 
   closeAllOf(windowId: number): void {
+    this.#pages.set(windowId, (this.#pages.get(windowId) ?? 0) + 1);
     for (const [id, owner] of [...this.#owners]) {
       if (owner !== windowId) {
         continue;
       }
       this.#owners.delete(id);
-      try {
-        this.#core.closeTerminal(id);
-      } catch (error) {
-        // The program may have exited and Core shut down already.
-        console.warn(`[core] closing terminal ${String(id)} failed`, error);
-      }
+      this.#close(id);
+    }
+  }
+
+  #close(id: number): void {
+    try {
+      this.#core.closeTerminal(id);
+    } catch (error) {
+      // The program may have exited and Core shut down already.
+      console.warn(`[core] closing terminal ${String(id)} failed`, error);
     }
   }
 }
@@ -134,10 +162,13 @@ export function registerTerminalHandlers(
   owners: TerminalOwners,
   stats: TerminalForwardStats,
 ): void {
-  registerHandler(IPC_CHANNELS.terminalCreate, (event, [requested]) => {
+  registerHandler(IPC_CHANNELS.terminalCreate, async (event, [requested]) => {
     const { cols, rows, cellWidth, cellHeight } = size(requested);
-    const id = core.createTerminal({ cols, rows, cellWidth, cellHeight });
-    owners.assign(id, event.sender);
+    const page = owners.page(event.sender);
+    const id = await core.createTerminal({ cols, rows, cellWidth, cellHeight });
+    if (!owners.assign(id, event.sender, page)) {
+      throw new Error('The page that asked for the terminal went away');
+    }
     return id;
   });
   registerHandler(IPC_CHANNELS.terminalClose, (event, [id]) => {

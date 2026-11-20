@@ -198,21 +198,6 @@ pub struct TerminalStats {
 
 #[napi]
 impl CoreRuntime {
-    /// The visible screen of a terminal as plain text, from libghostty-vt's formatter.
-    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
-    pub fn terminal_text<'env>(&self, env: &'env Env, id: u32) -> napi::Result<Object<'env>> {
-        type Settle = Box<dyn FnOnce(Env) -> napi::Result<String> + Send>;
-        let (deferred, promise) = env.create_deferred::<String, Settle>()?;
-        boundary::call(env, "CoreRuntime.terminalText", || {
-            self.core.terminal_text(id, move |text| {
-                deferred.resolve(Box::new(move |env| {
-                    text.map_err(|error| boundary::js_error(&env, &error.to_error_object()))
-                }));
-            })
-        })?;
-        Ok(promise)
-    }
-
     /// Counters of a terminal.
     #[napi(catch_unwind)]
     pub fn terminal_stats(&self, env: Env, id: u32) -> napi::Result<TerminalStats> {

@@ -48,13 +48,16 @@ class FakeContents implements OwnerContents {
   }
 }
 
-function setup(frame: () => Promise<Uint8Array>) {
+/** `started` holds back every terminal start until it resolves. */
+function setup(frame: () => Promise<Uint8Array>, started: Promise<void> = Promise.resolve()) {
   const calls: string[] = [];
   let next = 1;
   const core: TerminalCore = {
-    createTerminal: (options) => {
+    createTerminal: async (options) => {
       calls.push(`create ${String(options.cols)}x${String(options.rows)}`);
-      return next++;
+      const id = next++;
+      await started;
+      return id;
     },
     closeTerminal: (id) => calls.push(`close ${String(id)}`),
     terminalInput: (id, text) => calls.push(`input ${String(id)} ${text}`),
@@ -85,16 +88,23 @@ function setup(frame: () => Promise<Uint8Array>) {
     }
     return handler({ sender: contents }, args);
   };
-  return { calls, stats, invoke };
+  const create = async (contents: OwnerContents): Promise<number> => {
+    const id: unknown = await invoke(contents, IPC_CHANNELS.terminalCreate, size);
+    if (typeof id !== 'number') {
+      throw new TypeError('terminal ids are numbers');
+    }
+    return id;
+  };
+  return { calls, stats, invoke, create };
 }
 
 const size = { cols: 80, rows: 24, cellWidth: 8, cellHeight: 16 };
 
 describe('terminal IPC', () => {
-  it('creates terminals for the calling window and checks sizes', () => {
-    const { calls, invoke } = setup(() => Promise.resolve(new Uint8Array()));
+  it('creates terminals for the calling window and checks sizes', async () => {
+    const { calls, invoke, create } = setup(() => Promise.resolve(new Uint8Array()));
     const window = new FakeContents(1);
-    expect(invoke(window, IPC_CHANNELS.terminalCreate, size)).toBe(1);
+    await expect(create(window)).resolves.toBe(1);
     expect(calls).toEqual(['create 80x24']);
     for (const bad of [
       { ...size, cols: 0 },
@@ -102,15 +112,31 @@ describe('terminal IPC', () => {
       { ...size, cellWidth: 1.5 },
       null,
     ]) {
-      expect(() => invoke(window, IPC_CHANNELS.terminalCreate, bad)).toThrow(TypeError);
+      await expect(invoke(window, IPC_CHANNELS.terminalCreate, bad)).rejects.toThrow(TypeError);
     }
+    expect(calls).toEqual(['create 80x24']);
   });
 
-  it('lets only the owning window use a terminal', () => {
-    const { calls, invoke } = setup(() => Promise.resolve(new Uint8Array()));
+  it('closes a terminal whose page went away while it started', async () => {
+    let start: () => void = () => undefined;
+    const started = new Promise<void>((resolve) => {
+      start = resolve;
+    });
+    const { calls, invoke } = setup(() => Promise.resolve(new Uint8Array()), started);
+    const window = new FakeContents(1);
+    const pending = invoke(window, IPC_CHANNELS.terminalCreate, size);
+    window.navigate({ isMainFrame: true, isSameDocument: false });
+    start();
+    await expect(pending).rejects.toThrow('went away');
+    expect(calls).toEqual(['create 80x24', 'close 1']);
+    expect(() => invoke(window, IPC_CHANNELS.terminalInput, 1, 'x')).toThrow('Unknown terminal');
+  });
+
+  it('lets only the owning window use a terminal', async () => {
+    const { calls, invoke, create } = setup(() => Promise.resolve(new Uint8Array()));
     const owner = new FakeContents(1);
     const other = new FakeContents(2);
-    const id = invoke(owner, IPC_CHANNELS.terminalCreate, size);
+    const id = await create(owner);
     invoke(owner, IPC_CHANNELS.terminalInput, id, 'ls\r');
     expect(() => invoke(other, IPC_CHANNELS.terminalInput, id, 'rm -rf ~\r')).toThrow(
       'Unknown terminal',
@@ -122,10 +148,10 @@ describe('terminal IPC', () => {
     expect(calls).toEqual(['create 80x24', 'input 1 ls\r']);
   });
 
-  it('validates keys and input', () => {
-    const { calls, invoke } = setup(() => Promise.resolve(new Uint8Array()));
+  it('validates keys and input', async () => {
+    const { calls, invoke, create } = setup(() => Promise.resolve(new Uint8Array()));
     const window = new FakeContents(1);
-    const id = invoke(window, IPC_CHANNELS.terminalCreate, size);
+    const id = await create(window);
     const key = { action: 'press', code: 'KeyA', text: 'a', mods: 0, composing: false };
     invoke(window, IPC_CHANNELS.terminalKey, id, key);
     expect(() => invoke(window, IPC_CHANNELS.terminalKey, id, { ...key, action: 'tap' })).toThrow(
@@ -144,9 +170,9 @@ describe('terminal IPC', () => {
 
   it('returns each frame unread as the reply to the request', async () => {
     const frame = new Uint8Array([0x50, 0x54, 0x46, 1]);
-    const { calls, stats, invoke } = setup(() => Promise.resolve(frame));
+    const { calls, stats, invoke, create } = setup(() => Promise.resolve(frame));
     const window = new FakeContents(7);
-    const id = invoke(window, IPC_CHANNELS.terminalCreate, size);
+    const id = await create(window);
     const reply = invoke(window, IPC_CHANNELS.terminalRequestFrame, id, true);
     await expect(reply).resolves.toBe(frame);
     expect(calls).toContain('frame 1 viewer 7 full true');
@@ -155,22 +181,22 @@ describe('terminal IPC', () => {
   });
 
   it('rejects the request when Core cannot produce a frame', async () => {
-    const { stats, invoke } = setup(() => Promise.reject(new Error('vt failed')));
+    const { stats, invoke, create } = setup(() => Promise.reject(new Error('vt failed')));
     const window = new FakeContents(3);
-    const id = invoke(window, IPC_CHANNELS.terminalCreate, size);
+    const id = await create(window);
     await expect(invoke(window, IPC_CHANNELS.terminalRequestFrame, id, false)).rejects.toThrow(
       'vt failed',
     );
     expect(stats.errors).toBe(1);
   });
 
-  it('closes the terminals of a window that goes away', () => {
-    const { calls, invoke } = setup(() => Promise.resolve(new Uint8Array()));
+  it('closes the terminals of a window that goes away', async () => {
+    const { calls, invoke, create } = setup(() => Promise.resolve(new Uint8Array()));
     const window = new FakeContents(1);
     const other = new FakeContents(2);
-    invoke(window, IPC_CHANNELS.terminalCreate, size);
-    invoke(window, IPC_CHANNELS.terminalCreate, size);
-    invoke(other, IPC_CHANNELS.terminalCreate, size);
+    await create(window);
+    await create(window);
+    await create(other);
     window.destroy();
     expect(calls.filter((c) => c.startsWith('close'))).toEqual(['close 1', 'close 2']);
     expect(() => invoke(window, IPC_CHANNELS.terminalInput, 1, 'x')).toThrow('Unknown terminal');
@@ -178,7 +204,7 @@ describe('terminal IPC', () => {
 
   it("lets a window observe only its own terminals' events", () => {
     const owners = new TerminalOwners({
-      createTerminal: () => 1,
+      createTerminal: () => Promise.resolve(1),
       closeTerminal: () => undefined,
       terminalInput: () => undefined,
       terminalKey: () => undefined,
@@ -193,11 +219,11 @@ describe('terminal IPC', () => {
     expect(owners.mayObserve(2, 'demo/1')).toBe(true);
   });
 
-  it('closes the terminals of a page that reloads or crashes, not on in-page navigation', () => {
-    const { calls, invoke } = setup(() => Promise.resolve(new Uint8Array()));
+  it('closes the terminals of a page that reloads or crashes, not on in-page navigation', async () => {
+    const { calls, invoke, create } = setup(() => Promise.resolve(new Uint8Array()));
     const window = new FakeContents(1);
     const closes = () => calls.filter((c) => c.startsWith('close'));
-    invoke(window, IPC_CHANNELS.terminalCreate, size);
+    await create(window);
     // A hash route change and a subframe navigation keep the page and its terminals.
     window.navigate({ isMainFrame: true, isSameDocument: true });
     window.navigate({ isMainFrame: false, isSameDocument: false });
@@ -206,7 +232,7 @@ describe('terminal IPC', () => {
     window.navigate({ isMainFrame: true, isSameDocument: false });
     expect(closes()).toEqual(['close 1']);
     expect(() => invoke(window, IPC_CHANNELS.terminalInput, 1, 'x')).toThrow('Unknown terminal');
-    invoke(window, IPC_CHANNELS.terminalCreate, size);
+    await create(window);
     window.crash();
     expect(closes()).toEqual(['close 1', 'close 2']);
   });

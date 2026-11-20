@@ -204,6 +204,33 @@ describe('shellResult', () => {
     expect(parseExecutionInfo(stored)).toEqual(moved.details?.commandExecution);
   });
 
+  it('tells a command that runs in a PiArc terminal where its screen is (T33)', () => {
+    const task = {
+      taskId: 'bg-0a1b2c3d4e5f',
+      outputPath: '~/d/sessions/s/tasks/bg-0a1b2c3d4e5f.log',
+      reason: 'requested' as const,
+    };
+    const started = shellResult(
+      {
+        ...base,
+        exitCode: undefined,
+        outcome: undefined,
+        output: undefined,
+        durationMs: undefined,
+        timeoutMs: undefined,
+        task,
+      },
+      false,
+      true,
+    );
+    expect(started.isError).toBe(false);
+    const text = started.content[0]?.type === 'text' ? started.content[0].text : '';
+    expect(text).toContain('in a PiArc terminal as background task bg-0a1b2c3d4e5f');
+    expect(text).toContain(task.outputPath);
+    expect(text).toContain('stays open');
+    expect(text).toContain('KillShell');
+  });
+
   it('round-trips the details through a session file', () => {
     const details = shellResult({ ...base, signal: 9, exitCode: undefined }, false).details;
     const stored: unknown = JSON.parse(JSON.stringify(details?.commandExecution));
