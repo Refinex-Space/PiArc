@@ -4,9 +4,9 @@
 
 use tree_sitter::Node;
 
-use super::Word;
 use super::walk::{Scope, Walker, named};
 use super::wrappers::Assignment;
+use super::{Command, Word};
 use crate::pattern::DYNAMIC;
 
 struct Builder {
@@ -155,13 +155,25 @@ impl Walker<'_> {
             shadow: scope.shadow,
             redirects: Vec::new(),
         };
+        let mut redirects = Vec::new();
         for child in named(node) {
             if child.kind() == "file_redirect" {
-                let mut ignored = Vec::new();
-                self.redirect(child, &mut inner, level, &mut ignored);
+                self.redirect(child, &mut inner, level, &mut redirects);
             } else {
                 self.statement(child, &mut inner, level);
             }
+        }
+        // `$(< file)` reads the file without a command: judge it as `:` with that redirect.
+        if !redirects.is_empty() {
+            self.out.commands.push(Command {
+                argv: vec![Word::literal(":")],
+                wrappers: Vec::new(),
+                unsafe_env: Vec::new(),
+                shadow: inner.shadow,
+                cwd: inner.cwd.clone(),
+                redirects,
+                exec_wrapper: false,
+            });
         }
     }
 

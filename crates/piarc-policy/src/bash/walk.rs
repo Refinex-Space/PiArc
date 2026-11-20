@@ -341,10 +341,16 @@ impl<'s> Walker<'s> {
                 };
                 let duplicate = operator.ends_with('&') && target.kind() == "number";
                 let word = self.word(target, scope, level + 1);
+                // Exact device names only: `/dev/fd/../x` is a path, and `-` closes a
+                // descriptor only after `>&` or `<&` (elsewhere it names a file).
                 let device = matches!(
                     word.text.as_str(),
-                    "/dev/null" | "/dev/stdout" | "/dev/stderr" | "/dev/stdin" | "/dev/tty" | "-"
-                ) || word.text.starts_with("/dev/fd/");
+                    "/dev/null" | "/dev/stdout" | "/dev/stderr" | "/dev/stdin" | "/dev/tty"
+                ) || word
+                    .text
+                    .strip_prefix("/dev/fd/")
+                    .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+                    || (operator.ends_with('&') && word.text == "-");
                 if !duplicate && !device && target.kind() != "process_substitution" {
                     out.push(Redirect {
                         write: operator.contains('>'),

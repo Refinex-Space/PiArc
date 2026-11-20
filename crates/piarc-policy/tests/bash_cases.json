@@ -574,6 +574,120 @@
       "rules": { "deny": ["Bash(git push *)"], "allow": ["Bash(git *)"] },
       "expected": "ask",
       "step": "askRule"
+    },
+    {
+      "category": "readonly",
+      "input": "arch -arm64 /bin/sh -c 'rm -rf src'",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "arch rm -rf src",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "sort -o/home/u/.zshrc notes.txt",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "sort -ooutput notes.txt",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "sort --out=/home/u/x notes.txt",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "sort --compress=gzip notes.txt",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "tree -o/home/u/x",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "grep -e. /home/u/.ssh/id_rsa",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "grep --regexp=. /home/u/.env",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "rg --file=pattern.txt /etc/passwd",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "grep -fpattern.txt /etc/passwd",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "find -L / -name id_rsa",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "find -P /home/u -type f",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "sort --files0-from=/etc/list",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "diff --from-file=/etc/hosts notes.txt",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "redirects",
+      "input": "echo x > /dev/fd/../../home/u/.zshrc",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "redirects",
+      "input": "echo x > -",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "substitution",
+      "input": "echo \"$(< /home/u/.ssh/id_rsa)\"",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "uniq -c /home/u/.ssh/id_rsa",
+      "expected": "ask",
+      "step": "ask"
     }
   ]
 }
