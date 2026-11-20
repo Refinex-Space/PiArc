@@ -155,7 +155,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T26 | [计划模式、任务清单、AskUserQuestion 与下一步](tasks/T26-plan-mode-todo-ask-next-steps.md) | 3 | T25 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 23630e3 |
 | T27 | [上下文工程：system reminder、压缩与用量](tasks/T27-context-reminders-compaction-usage.md) | 3 | T26 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | b0b2641 |
 | T28 | [检查点、回退与 Changes 面板](tasks/T28-checkpoints-rewind-changes.md) | 3 | T27 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | c849475 |
-| T29 | [WebFetch、登录与模型设置补全、三档视图](tasks/T29-webfetch-login-model-settings-views.md) | 3 | T28 | macOS | high / 高 | 中 | 无 | 进行中 | — |
+| T29 | [WebFetch、登录与模型设置补全、三档视图](tasks/T29-webfetch-login-model-settings-views.md) | 3 | T28 | macOS | high / 高 | 中 | 无 | 部分完成 | 0134d9d |
 | T30 | [L3 行为对齐基座](tasks/T30-l3-behavior-alignment.md) | 3 | T29 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | R3 | [M2 评审](tasks/R3-m2-review.md) | 3 | T30、W1 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | W2 | [Windows：M2 达标](tasks/W2-windows-m2-parity.md) | 4 | R3 | Windows | high / 高 | 中 | 无 | 未开始 | — |
@@ -309,18 +309,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-T29（开工 2026-11-19，基线 verify 15/15 通过；W1 的 blocked 项 W1-A05 等待 Windows 实机 UNC，不由 CI 关闭）：
-
-- [x] 1. WebFetch：Core 抓取（`piarc-web`：SSRF 纯函数、钉住 IP、同域重定向、上限）+ AHP `web/fetch` + 授权绑定 + 审计（A01、A03、A04）
-- [x] 1b. WebFetch 工具（Agent Host）+ 域名规则接入、"总是允许"按域名（A02）
-- [x] 2. 辅助模型调用通道 + "辅助模型"设置，用量计入会话（A05）
-- [ ] 3. OAuth 与设备码登录：`models/login/*`、`ui/loginInteraction`、回环回调、mock 授权服务器、设置页登录登出（A06、A07）——实现、Rust 集成测试与 L2 已完成，剩 Playwright 流程
-- [x] 4. 每模型设置：显示名、上下文窗口、图片输入、默认 effort（A08）
-- [x] 4b. 低可靠性模型的保守 Tool Profile 与改回默认（A10）
-- [ ] 5. transcript 三档视图（A09）——实现与单测已完成，剩 Playwright 与截图
-- [x] 6. L2 场景 `webfetch-*`、能力 ID、capabilities.md
-- [ ] 7. 文档、AGENTS.md、复用表、收尾 verify（A11）
-
 ## 登记事项
 
 任务执行中发现、但不属于本任务范围的问题，在这里登记：编号（I01 起）、发现于哪个任务、内容、建议由哪个任务处理。处理完成后在"建议处理"一列注明"已落地"与位置。
@@ -440,7 +428,7 @@ T29（开工 2026-11-19，基线 verify 15/15 通过；W1 的 blocked 项 W1-A05
 | I111 | T28 | 回退与分支切换在同一 id 下重建 Pi 会话，该会话的 MCP 连接随之重连（ADR-0044 第 6 条的代价） | T36 共享连接池落地后复核：重建会话不再重连 |
 | I112 | T29 | WebFetch 不走用户的 HTTP 代理（`HTTPS_PROXY` 等与系统代理都不读），也不接受 gzip 等内容编码（请求 `identity`，服务器仍压缩时报错）；需要代理才能访问外网的环境里 WebFetch 会失败 | T38（WebSearch 同样联网）一起决定代理来源与是否支持压缩；改动在 `piarc-web`，SSRF 检查仍须作用于最终连接的地址（经代理时检查目标主机解析结果） |
 | I113 | T29 | Claude Code 设置键 `model`、`effortLevel` 原定 T29（架构第 6.14 节）；`model` 的取值是 Claude Code 的模型别名，要等 T31 的别名表，本任务未接入，配置诊断中仍列为后续任务支持的键 | T31 接入模型别名时一并支持 `model` 与 `effortLevel`（作为新会话的默认模型与 effort），更新 `SETTINGS_KEYS` |
-| I114 | T29 收尾 | 本机 macOS 的 FSEvents 投递变慢：`cargo test -p piarc-core --test state` 的两个设置监听用例（`editing_settings_while_running_…`、`editing_claude_code_settings_while_running_…`）在 20 s 内收不到设置事件，T28 收尾提交 75af7b3 上同样失败（T29 开工基线时通过）；`piarc-fs` 的 `reports_changes_in_a_watched_directory` 要约 10 s 才收到第一个事件（平时不到 1 s）；`sudo killall fseventsd` 后仍如此；当时系统数据卷已用 93%，IDE 正在建索引。T29 未改动设置监听与 `piarc-fs::watch` | 环境恢复（释放磁盘、重启）后在本机重跑 `cargo test -p piarc-core --test state` 与 `npm run verify`，通过后把 T29-A11 改为 passing；仍失败则另开任务排查 notify 8.2.1 的 FSEvents 后端，不放宽等待时间 |
+| I114 | T29 收尾 | 本机 macOS 的 FSEvents 投递变慢：`cargo test -p piarc-core --test state` 的两个设置监听用例（`editing_settings_while_running_…`、`editing_claude_code_settings_while_running_…`）在 20 s 内收不到设置事件，T28 收尾提交 75af7b3 上同样失败（T29 开工基线时通过）；`piarc-fs` 的 `reports_changes_in_a_watched_directory` 要约 10 s 才收到第一个事件（平时不到 1 s）；`sudo killall fseventsd` 后仍如此；当时系统数据卷已用 93%，IDE 正在建索引。T29 未改动设置监听与 `piarc-fs::watch` | 环境恢复（释放磁盘、重启）后在本机重跑 `cargo test -p piarc-core --test state` 与 `npm run verify`，通过后把 T29-A11 改为 passing；仍失败则另开任务排查 notify 8.2.1 的 FSEvents 后端，不放宽等待时间。2026-11-20 经用户同意已 `cargo clean`（收回约 145 GB，数据卷降到 77%）、IDEA 排除构建目录，待用户重启后复测 |
 
 ## 技术债
 
@@ -842,6 +830,15 @@ T29（开工 2026-11-19，基线 verify 15/15 通过；W1 的 blocked 项 W1-A05
 - 实现中的修正：重新打开以分支摘要结尾的会话时 T14 的中断补齐误追加中断标记，`interruption.ts` 改为只把 user、toolResult 与有回复的 assistant 当作末尾（补了单测）；ego-browser 核对发现回退后输入框没有焦点（对话框关闭时把焦点还给已随回退消失的按钮），改为对话框关闭后再放回消息，先写了失败的 L4 断言；空的 Changes 面板不再显示 +0 −0；协议类型 `ChangedFile` 与 T27 同名冲突，改名 `ChangesFile`。任务文件未提 `fileCheckpointingEnabled`，按架构第 6.14 节与键映射表在本任务落地。
 - 登记 I108（三个 AGENTS.md 超过或到达行数上限）、I109（`fileCheckpointingEnabled` 无界面控件）、I110（词级 diff 与 UTF-16 偏移未实现，交 T42）、I111（回退与分支切换重连 MCP，T36 复核）；I88、I105 更新。
 - 下一项：macOS 上的 T29（WebFetch、登录与模型设置补全、三档视图）。本地提交，未推送。
+
+### 2026-11-20 T29 部分完成（提交 0134d9d）
+
+- 交付：新功能 crate `piarc-web`（SSRF 纯函数与表驱动单测、只连接检查过的地址、每次重定向复查、同站跟随跨站返回、`FetchLimits` 上限、htmd 转 Markdown、`rule_host`）；AHP `web/fetch`（绑定已获准的同一调用与 URL，一次批准一次抓取，审计 `webFetch`）与 Agent Host 的 WebFetch 工具（经辅助模型提取，结果作为工具结果）；辅助模型通道 `harness/auxiliary.ts`，用量计入回合；OAuth 授权码与设备码登录（`models/login/*`、`models/logout`、`ui/loginInteraction`，能力 `login`；Core `Logins` 单活跃登录、15 分钟超时，凭据只进保险箱；mock 授权服务器 `piarc-mock-auth`）；每模型设置（显示名、上下文窗口、图片输入、默认 effort、Tool Profile）与辅助模型，存用户级 `modelProviders`，经 `core/welcome.modelPreferences`、`models/reload.preferences` 下发；低可靠性模型（无密钥本地端点）的保守 Tool Profile；transcript 普通 / 思考 / 详细三档视图；设置页登录与模型设置区块。见 ADR-0045、架构 v2.36。
+- 验收：10 项通过，1 项阻塞（A11）。提交 0134d9d 上 `npm run verify` 14/15，第 8 步只有 `piarc-core --test state` 的两个设置监听用例因本机 FSEvents 投递变慢失败（T28 收尾提交上同样失败，T29 未改动监听），`--no-fail-fast` 补跑 86 个目标 745 通过、仅这 2 例失败；L2 119 个场景 117 通过、2 个按平台跳过、MISSING 0，新增 9 个 `webfetch-*`、`model-*`、`login-*` 场景；CAP-TOOL-WEBFETCH-001、CAP-MODEL-SETTINGS-001、CAP-PROVIDER-OAUTH-001 改为 active，新增 CAP-MODEL-AUXILIARY-001、CAP-MODEL-PROFILE-001。
+- L4（只跑本任务与受影响的规格，dev 形态）：`preload`、`t19-transcript`、`t21-models`、`t27-context`、`t29-login-models`、`t29-views`、`transcript-render`、`transcript-scroll` 共 25/25 通过。ego-browser 在回放环境中实际操作三档视图（键盘、深色）、中文界面的登录对话框（焦点、Enter、Esc 取消）、模型设置校验与保存、辅助模型；发现并修了三处：登录步骤到达后焦点不在对话框内（先写失败的 L4 断言）、reminder 行覆盖行内边距、可靠性原文未本地化。Windows 目标交叉 Clippy 通过；提示词原创性检查 0 匹配。证据在 `tmp/evidence/T29/`（`l4/`、`verify/`、截图）。
+- 流程调整（用户要求加快推进）：`npm run verify -- --baseline` 在上次全量通过后只改了 `docs/` 时复用其结果；全量 verify 只在收尾跑一次，过程中跑局部检查；L4 只跑本任务与受影响的规格、只用 dev 形态（`protocol.md`、`scripts/dev/verify.mjs`）。
+- 登记 I112（WebFetch 不走代理、不接受压缩编码，交 T38）、I113（`model`、`effortLevel` 键移到 T31）、I114（本机 FSEvents 投递变慢，A11 阻塞）；I100 落地，I71 复核。
+- 下一项：待 I114 复测通过后把 T29-A11 改为 passing、看板改为已完成；T30（L3 行为对齐基座，macOS）的依赖 T29 遗留项只是本机环境，不影响开工。本地提交，未推送。
 
 ## 计划变更记录
 

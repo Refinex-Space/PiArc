@@ -2953,78 +2953,78 @@
       "id": "T29-A01",
       "task": "T29",
       "description": "WebFetch 端到端：抓取本地测试页面、转换为 Markdown、经辅助模型提取后作为工具结果返回模型。验证：场景测试与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2（verify 第 14 步，提交 0134d9d，117 通过 / 2 按平台跳过，报告存档 tmp/evidence/T29/verify/l2-results.json）：webfetch-extract 通过（本地测试页面经 Core 抓取、转 Markdown，mock provider 断言提取请求含页面 Markdown、工具结果为提取答案）；piarc-web tests/fetch.rs fetches_and_converts_through_the_allowlist；piarc-core tool_io::policy::tests::t29::an_allowed_call_fetches_once_and_is_audited；agent-host harness/web-fetch.test.ts「fetches through Core and answers with the auxiliary model」"
     },
     {
       "id": "T29-A02",
       "task": "T29",
       "description": "`WebFetch(domain:…)` 的 allow、ask、deny 规则生效，Manual 下无规则时询问，\"总是允许\"按域名生成规则。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2（verify 第 14 步，提交 0134d9d，117 通过 / 2 按平台跳过，报告存档 tmp/evidence/T29/verify/l2-results.json）：webfetch-domain-rules 通过（allow、ask、deny 的 WebFetch(domain:…) 与 Manual 下无规则时询问、\"总是允许\"生成域名规则）；piarc-core t29::manual_mode_asks_and_offers_a_domain_rule、deny_and_ask_rules_match_the_fetched_host、a_fetch_needs_the_approved_url"
     },
     {
       "id": "T29-A03",
       "task": "T29",
       "description": "回环、私有网段、链路本地、IPv6 等价地址、解析到内网的域名、重定向到内网的地址全部被拒绝；允许列表中的地址放行。验证：SSRF 表驱动单测与集成测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "piarc-web ssrf.rs 表驱动单测 every_range_is_classified（IPv4 回环、私有、链路本地、CGNAT、组播、保留，IPv6 回环、ULA、链路本地，IPv4 映射、NAT64、6to4 等价形式）、one_internal_address_refuses_the_host、allowlisted_hosts_and_ranges_pass；集成测试 tests/fetch.rs internal_addresses_are_refused_without_the_allowlist（解析到内网的域名）、every_redirect_is_checked_again（重定向到内网）、fetches_and_converts_through_the_allowlist（允许列表放行）；piarc-core t29::internal_addresses_stay_refused_without_the_allowlist。cargo test --workspace --no-fail-fast（0134d9d）中全部通过"
     },
     {
       "id": "T29-A04",
       "task": "T29",
       "description": "跨域重定向不被跟随，目标地址返回给模型；超出大小或超时上限时截断或中止并给出明确错误。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "piarc-web tests/fetch.rs same_site_redirects_are_followed_and_cross_site_ones_returned、limits_cut_or_stop_with_clear_errors（以缩小的上限测：正文超字节上限截断并标记、内容超字符上限截断并给出总字数、超时以 Timeout 错误中止并说明未完成，压缩编码与二进制内容明确拒绝；生产上限为 FetchLimits 的 10 MiB、100K 字符、60 s）、invalid_targets_and_cancellation；agent-host web-fetch.test.ts「returns a redirect to another host unfollowed and calls no model」「tells the extraction model when the page was cut」；L2（verify 第 14 步，提交 0134d9d，117 通过 / 2 按平台跳过，报告存档 tmp/evidence/T29/verify/l2-results.json）：webfetch-redirects-limits 通过"
     },
     {
       "id": "T29-A05",
       "task": "T29",
       "description": "辅助模型可在设置中指定，未设置时使用会话模型；辅助调用的用量计入会话。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2（verify 第 14 步，提交 0134d9d，117 通过 / 2 按平台跳过，报告存档 tmp/evidence/T29/verify/l2-results.json）：webfetch-auxiliary-model 通过（用户设置 modelProviders.auxiliary 指定的模型收到无工具的提取请求，回合 turn/completed 的 usage 为 450/22，含辅助调用的 300/7）；webfetch-extract 覆盖未设置时用会话模型；设置页\"辅助模型\"选择由 L4 t29-login-models 与 ego-browser 核对（tmp/evidence/T29/ego-10-model-form-zh.png）"
     },
     {
       "id": "T29-A06",
       "task": "T29",
       "description": "OAuth 授权码流程与设备码流程在 mock 授权服务器上端到端完成，token 只写入保险箱；取消、拒绝、过期都有明确提示。验证：集成测试、磁盘明文扫描与 Playwright 流程。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test sessions login 4/4：authorization_code_sign_in_reaches_the_vault_and_signs_out、device_code_sign_in_approves_and_expires、refusal_and_cancel_end_the_sign_in_with_a_message、a_pasted_code_answers_the_prompt（每例结束对数据目录做 token 明文扫描）；L2（verify 第 14 步，提交 0134d9d，117 通过 / 2 按平台跳过，报告存档 tmp/evidence/T29/verify/l2-results.json）：login-authorization-code、login-device-code 通过；L4 t29-login-models.e2e.ts（dev）通过：授权码、设备码、拒绝、过期、取消提示与焦点，截图 tmp/evidence/T29/login-*.png"
     },
     {
       "id": "T29-A07",
       "task": "T29",
       "description": "新增登录界面后，可用登录方式中仍不含 Anthropic 订阅 OAuth。验证：CI 测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "agent-host providers/policy.test.ts「lists sign-in providers for the settings window without Anthropic subscription OAuth (T29)」与「removes Anthropic OAuth and rejects direct login before prompting, including after a reload」通过（verify 第 5 步 Vitest 1301 通过 / 1 跳过，提交 0134d9d）"
     },
     {
       "id": "T29-A08",
       "task": "T29",
       "description": "每模型设置的显示名、上下文窗口、图片输入、默认 effort 都生效：窗口改变压缩阈值与用量环，关闭图片输入后图片附件被拒绝并提示。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "agent-host providers/preferences.test.ts「apply the per-model settings over the catalog」、providers/session.test.ts「applies per-model settings: display name, default effort when selected, image input off (T29)」、harness/context.test.ts（每模型窗口替换模型窗口，改变压缩阈值与用量）；L2（verify 第 14 步，提交 0134d9d，117 通过 / 2 按平台跳过，报告存档 tmp/evidence/T29/verify/l2-results.json）：model-settings-window-vision 通过（覆盖窗口后压缩阈值与 session/usage 变化，关闭图片输入后图片附件被拒绝并提示）；L4 t29-login-models 每模型设置保存"
     },
     {
       "id": "T29-A09",
       "task": "T29",
       "description": "三档视图分别按交付物 5 显示内容，详细档能看到 reminder item。验证：Playwright 流程与三档截图（`tmp/evidence/T29/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 t29-views.e2e.ts（dev）「normal, thinking and detailed views of one turn」通过：普通隐藏思考与 reminder，思考档显示思考，详细档显示 reminder 条目；截图 tmp/evidence/T29/views-normal.png、views-thinking.png、views-detailed.png；渲染进程单测 transcript/detail.test.ts；ego-browser 核对三档、键盘切换与深色模式（tmp/evidence/T29/ego-01..04）"
     },
     {
       "id": "T29-A10",
       "task": "T29",
       "description": "可靠性等级为\"低\"的模型收到保守 Profile 的工具子集与描述，权限规则仍按规范名生效；每模型设置改回默认 Profile 后恢复完整工具集。验证：场景测试与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2（verify 第 14 步，提交 0134d9d，117 通过 / 2 按平台跳过，报告存档 tmp/evidence/T29/verify/l2-results.json）：model-profile-conservative（低可靠性本地端点的模型请求只含保守子集、改写后的描述，权限规则按规范名生效）、model-profile-default（每模型设置改回默认 Profile 后请求恢复完整工具集）通过；agent-host preferences.test.ts「choose the conservative profile for low reliability unless the user picks the default」、web-fetch.test.ts「keeps canonical names, rewrites descriptions of its subset and leaves the rest out」"
     },
     {
       "id": "T29-A11",
       "task": "T29",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "本机环境阻塞（PLAN.md 登记 I114）：提交 0134d9d 上 npm run verify 14/15 通过，第 8 步 cargo test 中只有 piarc-core --test state 的两个设置监听用例因 20 s 内收不到 FSEvents 事件失败；cargo test --workspace --no-fail-fast 补跑 86 个测试目标 745 通过、仅这 2 例失败（日志 tmp/evidence/T29/verify/）。同样的 2 例在 T28 收尾提交 75af7b3 上同样失败、T29 开工基线时通过；piarc-fs 的监听测试要约 10 s 才收到首个事件；T29 未改动设置监听。待清理磁盘、重启后在本机重跑 npm run verify 关闭"
     },
     {
       "id": "T30-A01",
