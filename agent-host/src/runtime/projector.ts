@@ -155,6 +155,15 @@ export class Projector {
     this.#itemEvent(turn, 'item/completed', item);
   }
 
+  /** An auxiliary model call made for the running turn (T29, WebFetch's extraction): its usage
+   * counts toward the turn like a response's. */
+  auxiliaryUsage(usage: unknown): void {
+    const turn = this.#turn;
+    if (turn === undefined) return;
+    turn.usage = addUsage(turn.usage, usage);
+    this.#sink.event('turn/usage', { turnId: turn.turnId, usage: turn.usage });
+  }
+
   /** The turn accepted for the current input, until it completes. */
   get activeTurnId(): string | undefined {
     return this.#turn?.turnId;

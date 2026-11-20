@@ -4,16 +4,20 @@ import path from 'node:path';
 
 import type { CredentialStore } from '@earendil-works/pi-ai';
 import { registerLazyBedrockProvider } from '@earendil-works/pi-ai/lazy-bedrock-provider';
+import { registerLazyOAuthFlows } from '@earendil-works/pi-ai/lazy-oauth';
 import { ModelRuntime } from '@earendil-works/pi-coding-agent';
 
 import { unpricedModels } from '../providers/catalog.js';
 import { installProviderPolicy } from '../providers/policy.js';
+import { ModelPreferencesStore } from '../providers/preferences.js';
 
 export interface Workspace {
   readonly root: string;
   readonly agentDir: string;
   readonly modelRuntime: ModelRuntime;
   readonly unpriced: ReadonlySet<string>;
+  /** Per-model settings and the auxiliary model from Core (T29). */
+  readonly preferences: ModelPreferencesStore;
   reload(allowNetwork: boolean): Promise<void>;
 }
 
@@ -31,6 +35,8 @@ export async function openWorkspace(
 ): Promise<Workspace> {
   mkdirSync(agentDir, { recursive: true });
   registerLazyBedrockProvider();
+  // Providers' sign-in flows, bundled (T29): esbuild follows these literal imports.
+  registerLazyOAuthFlows();
   const modelsPath = path.join(agentDir, 'models.json');
   const modelRuntime = await ModelRuntime.create({
     credentials,
@@ -38,7 +44,8 @@ export async function openWorkspace(
     refreshOnCreate: false,
     ...(catalogBaseUrl === undefined ? {} : { catalogBaseUrl }),
   });
-  installProviderPolicy(modelRuntime);
+  const preferences = new ModelPreferencesStore();
+  installProviderPolicy(modelRuntime, (model) => preferences.vision(model));
   let unpriced = new Set<string>();
   let latestRefresh: AbortController | undefined;
   const reload = async (allowNetwork: boolean): Promise<void> => {
@@ -59,6 +66,7 @@ export async function openWorkspace(
     root,
     agentDir,
     modelRuntime,
+    preferences,
     get unpriced() {
       return unpriced;
     },

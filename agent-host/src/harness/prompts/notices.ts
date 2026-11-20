@@ -37,6 +37,15 @@ export function staleListNotice(todos: readonly TodoItem[], rounds: number): str
   ].join('\n');
 }
 
+/** The conservative profile (T29): work has gone on for a while without a task list. */
+export function startListNotice(rounds: number): string {
+  return (
+    `${String(rounds)} rounds of tool calls have passed and there is no task list yet. If the ` +
+    'work has more than one step, write the steps with TodoWrite now, one in_progress, and ' +
+    'update it as each one is finished. This note is not for the user.'
+  );
+}
+
 /** Context a hook added (T27); a Stop hook's reasons ask the model to go on. */
 export function hookContextNotice(event: string, text: string): string {
   return event === 'Stop'

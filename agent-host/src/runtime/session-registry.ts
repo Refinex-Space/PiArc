@@ -13,6 +13,7 @@
 // session's cwd. The few Pi defaults that read the process-global agent directory
 // (`getAgentDir()`) are pinned to PiArc's directory once, in main.ts.
 import { randomUUID } from 'node:crypto';
+import type { Api, Model } from '@earendil-works/pi-ai';
 import path from 'node:path';
 import {
   createAgentSessionFromServices,
@@ -31,8 +32,10 @@ import type {
   InputAccepted,
   RewindMode,
   SessionRewound,
+  ModelPreferences,
   ModelRef,
   ModelsListResult,
+  ToolProfileKind,
   SessionModelSelection,
   PermissionMode,
   PromptAccepted,
@@ -57,6 +60,9 @@ import { CONCURRENCY_SAFE_TOOLS, ToolBatches } from '../harness/tool-batches.js'
 import { createToolResultBudget, TOOL_RESULT_LIMITS } from '../harness/tool-results.js';
 import { AhpError, describeError } from '../protocol/errors.js';
 import { DEFAULT_PROFILE, ToolNameMap, toolOptions } from '../tools/index.js';
+import { conservativeProfile } from '../tools/profile.js';
+import { AUXILIARY_USAGE_ENTRY, AuxiliaryModel } from '../harness/auxiliary.js';
+import { capabilities } from '../providers/catalog.js';
 import {
   branchPoints,
   forkedManager,
@@ -81,6 +87,7 @@ import { InputQueue } from './queue.js';
 import {
   checkImageInput,
   checkSessionId,
+  onlyConservative,
   prepareAttachments,
   scheduled,
   shellsFor,
@@ -147,10 +154,37 @@ export class SessionRegistry {
       const selection = await selectModel(this.workspace, hosted.runtime.session, ref, requested);
       // The compaction threshold follows the model's window and output.
       hosted.harness.compaction.apply();
+      // Another Tool Profile means other tools: the session reopens with them (T29).
+      if (this.#profileKind(hosted.runtime.session.model) !== hosted.profileKind) {
+        await this.#reopen(sessionId, hosted);
+      }
       return selection;
     } finally {
       hosted.changingModel = false;
     }
+  }
+
+  /**
+   * New model preferences from Core (T29): thresholds follow the windows at once; a session whose
+   * Tool Profile changed reopens now when idle, after its turn otherwise.
+   */
+  async setPreferences(preferences: ModelPreferences): Promise<void> {
+    this.workspace.preferences.set(preferences);
+    for (const [sessionId, hosted] of [...this.#sessions]) {
+      hosted.harness.compaction.apply();
+      if (this.#profileKind(hosted.runtime.session.model) === hosted.profileKind) continue;
+      if (hosted.projector.activeTurnId !== undefined || hosted.changingModel) {
+        hosted.profileStale = true;
+        continue;
+      }
+      await this.#reopen(sessionId, hosted);
+    }
+  }
+
+  /** The Tool Profile of `model` (T29): the user's setting, else by tool reliability. */
+  #profileKind(model: Model<Api> | undefined): ToolProfileKind {
+    if (model === undefined) return 'default';
+    return this.workspace.preferences.profile(model, capabilities(model).toolReliability);
   }
 
   setEffort(sessionId: string, requested: string): SessionModelSelection {
@@ -535,6 +569,7 @@ export class SessionRegistry {
     manager: SessionManager,
     model: ModelRef | undefined,
     source: 'startup' | 'resume' | 'fork' | 'branch' = 'startup',
+    profileKind?: ToolProfileKind,
   ): Promise<SessionOpened> {
     const recovering = source === 'resume';
     const { workspace } = this.#options;
@@ -549,17 +584,47 @@ export class SessionRegistry {
     const { tools } = this.#options;
     const names = tools.kind === 'core' ? new ToolNameMap(tools.profile) : undefined;
     const toCanonical = (tool: string): string => names?.toCanonical(tool) ?? tool;
+    // The Tool Profile follows the model the session opens with (T29): the requested one, else
+    // the one on its branch. A wrong guess (a new session on Pi's default model) reopens below.
+    const restored = manager.buildSessionContext().model;
+    const kind =
+      profileKind ??
+      this.#profileKind(
+        selected ??
+          (restored === null
+            ? undefined
+            : workspace.modelRuntime.getModel(restored.provider, restored.modelId)),
+      );
+    const conservative = tools.kind === 'core' && kind === 'conservative';
+    const profile =
+      tools.kind !== 'core'
+        ? DEFAULT_PROFILE
+        : conservative
+          ? conservativeProfile(tools.profile)
+          : tools.profile;
     const batches = new ToolBatches((tool) => CONCURRENCY_SAFE_TOOLS.has(toCanonical(tool)));
     // The session object exists once the runtime is created; hooks read it lazily.
     const opened: { session?: AgentSession; projector?: Projector } = {};
     const sessionLog = (line: string): void => {
       this.#options.log(`[session ${manager.getSessionId()}] ${line}`);
     };
+    const auxiliary = new AuxiliaryModel({
+      runtime: workspace.modelRuntime,
+      preferences: workspace.preferences,
+      session: () => opened.session,
+      onUsage: (usage, used, purpose) => {
+        opened.projector?.auxiliaryUsage(usage);
+        manager.appendCustomEntry(AUXILIARY_USAGE_ENTRY, { purpose, model: used, usage });
+      },
+      log: sessionLog,
+    });
     const harness = new SessionHarness({
       sessionId: manager.getSessionId(),
       manager,
       sink: this.#options.sinkFor(manager.getSessionId()),
-      profile: tools.kind === 'core' ? tools.profile : DEFAULT_PROFILE,
+      profile,
+      auxiliary,
+      conservative,
       canonical: toCanonical,
       activeTurn: () => opened.projector?.activeTurnId,
       core: tools.kind === 'core' ? this.#options.hostTools : undefined,
@@ -568,11 +633,12 @@ export class SessionRegistry {
       io: tools.kind === 'core' ? tools.ioFor(manager.getSessionId()) : undefined,
       appended: (message) => opened.projector?.reminder(message),
       log: sessionLog,
+      contextWindow: (model) => workspace.preferences.contextWindow(model),
     });
     const memory = new SessionMemory(
       manager,
       cwd,
-      tools.kind === 'core' ? tools.profile : undefined,
+      tools.kind === 'core' ? profile : undefined,
       this.#options.memoryBridge
         ? memoryReader(this.#options.memoryBridge, manager.getSessionId())
         : undefined,
@@ -611,13 +677,17 @@ export class SessionRegistry {
       const sessionTools =
         tools.kind === 'core' && io !== undefined
           ? scheduled(
-              toolOptions(
-                io,
-                tools.profile,
-                await shellsFor(io, this.#options.log),
-                settingsManager.getImageAutoResize(),
-                this.#options.memoryBridge ? memory.searched : undefined,
-                harness.tools(),
+              onlyConservative(
+                toolOptions(
+                  io,
+                  profile,
+                  await shellsFor(io, this.#options.log),
+                  settingsManager.getImageAutoResize(),
+                  this.#options.memoryBridge ? memory.searched : undefined,
+                  harness.tools(),
+                ),
+                conservative,
+                toCanonical,
               ),
               batches,
             )
@@ -699,6 +769,14 @@ export class SessionRegistry {
       sessionManager: manager,
     });
     const { session } = runtime;
+    if (tools.kind === 'core' && this.#profileKind(session.model) !== kind) {
+      // Pi chose another model than predicted: open again with that model's tools. Nothing has
+      // run yet (extensions bind below), so no hook saw this attempt.
+      hooks?.mute();
+      memory.cancel();
+      await runtime.dispose();
+      return this.#open(cwd, manager, model, source, this.#profileKind(session.model));
+    }
     opened.session = session;
     harness.compaction.apply();
     const sessionId = session.sessionId;
@@ -744,6 +822,7 @@ export class SessionRegistry {
       delivering,
       changingModel: false,
       closed: false,
+      profileKind: kind,
     };
     hosted.unsubscribe = session.subscribe((event) => {
       this.#onEvent(sessionId, hosted, event);
@@ -907,6 +986,16 @@ export class SessionRegistry {
         hosted.projector.finishTurn(next.turnId, 'failed', reason);
       }
       next = this.#nextFollowUp(sessionId, hosted);
+    }
+    if (
+      hosted.profileStale === true &&
+      !hosted.closed &&
+      hosted.projector.activeTurnId === undefined
+    ) {
+      // The preferences changed the model's Tool Profile during the turn (T29).
+      await this.#reopen(sessionId, hosted).catch((error: unknown) => {
+        this.#options.log(`[session ${sessionId}] reopen failed: ${describeError(error)}`);
+      });
     }
   }
 

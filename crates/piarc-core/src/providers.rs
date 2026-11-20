@@ -4,7 +4,11 @@ use std::collections::{BTreeMap, HashSet};
 use std::net::IpAddr;
 use std::path::Path;
 
-use piarc_protocol::models::{CatalogProvider, ModelsCredentialParams, ProviderCredential};
+use piarc_protocol::models::{
+    CatalogProvider, ModelOverride, ModelPreferences, ModelsCredentialParams, ProviderCredential,
+    ToolReliability,
+};
+use piarc_protocol::session::ModelRef;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -20,6 +24,8 @@ pub enum Operation {
     Delete(String),
     /// Toggle online catalog refresh.
     Refresh(bool),
+    /// Replace the per-model settings and the auxiliary model (T29).
+    Preferences(Box<ModelPreferences>),
 }
 
 impl Operation {
@@ -52,6 +58,50 @@ impl Operation {
             return Err(invalid("key", "invalid or unsupported credential"));
         }
         Ok(Self::Save(Box::new(provider), key))
+    }
+
+    /// Parses the settings window's per-model settings and auxiliary model (T29).
+    ///
+    /// # Errors
+    /// Malformed JSON or values out of range.
+    pub fn preferences(json: &str) -> Result<Self> {
+        let prefs = serde_json::from_str::<ModelPreferences>(json)
+            .map_err(|_| invalid("preferences", "invalid model settings"))?;
+        let text_ok = |s: &str, max: usize| nonempty(s) && s.chars().count() <= max;
+        for (key, o) in &prefs.models {
+            if !key
+                .split_once('/')
+                .is_some_and(|(p, m)| !p.is_empty() && !m.is_empty())
+                || !text_ok(key, 600)
+            {
+                return Err(invalid("models", "expected <provider>/<model> keys"));
+            }
+            if o.display_name.as_deref().is_some_and(|n| !text_ok(n, 200)) {
+                return Err(invalid(
+                    "displayName",
+                    "enter a name of at most 200 characters",
+                ));
+            }
+            if o.context_window
+                .is_some_and(|w| !(1_024..=10_000_000).contains(&w))
+            {
+                return Err(invalid(
+                    "contextWindow",
+                    "expected 1,024 to 10,000,000 tokens",
+                ));
+            }
+            if o.tool_reliability.is_some() {
+                return Err(invalid("toolReliability", "not a user setting"));
+            }
+        }
+        if prefs
+            .auxiliary
+            .as_ref()
+            .is_some_and(|m| !text_ok(&m.provider, 96) || !text_ok(&m.id, 512))
+        {
+            return Err(invalid("auxiliary", "choose a configured model"));
+        }
+        Ok(Self::Preferences(Box::new(prefs)))
     }
 }
 
@@ -330,6 +380,12 @@ pub(crate) struct Settings {
     providers: Vec<Stored>,
     #[serde(default = "default_refresh")]
     pub(crate) catalog_refresh: bool,
+    /// Per-model settings keyed by `<provider>/<model id>` (T29).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub(crate) models: BTreeMap<String, ModelOverride>,
+    /// The auxiliary model (T29); absent: the session's model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) auxiliary: Option<ModelRef>,
     #[serde(skip)]
     pending: Option<Pending>,
 }
@@ -338,6 +394,8 @@ impl Default for Settings {
         Self {
             providers: vec![],
             catalog_refresh: true,
+            models: BTreeMap::new(),
+            auxiliary: None,
             pending: None,
         }
     }
@@ -396,7 +454,27 @@ impl Settings {
         }
     }
     pub(crate) fn view(&self, builtins: &[CatalogProvider]) -> Value {
-        json!({"catalogRefresh":self.catalog_refresh,"providers":self.providers,"builtinProviders":builtins})
+        json!({"catalogRefresh":self.catalog_refresh,"providers":self.providers,"builtinProviders":builtins,"models":self.models,"auxiliary":self.auxiliary})
+    }
+
+    /// What the Agent Hosts get (T29): the user's per-model settings, and low tool reliability
+    /// for the models of keyless local endpoints (small local models call tools unreliably; the
+    /// user can choose the default Tool Profile for a model).
+    pub(crate) fn preferences(&self) -> ModelPreferences {
+        let mut models = self.models.clone();
+        for stored in self.providers.iter().filter(|s| s.provider.kind == "local") {
+            for model in &stored.provider.models {
+                models
+                    .entry(format!("{}/{model}", stored.provider.id))
+                    .or_default()
+                    .tool_reliability
+                    .get_or_insert(ToolReliability::Low);
+            }
+        }
+        ModelPreferences {
+            auxiliary: self.auxiliary.clone(),
+            models,
+        }
     }
     pub(crate) fn prepare(
         &mut self,
@@ -525,6 +603,13 @@ impl Settings {
         }
     }
 }
+/// The model preferences saved in the user's settings (none when they cannot be read).
+pub(crate) fn preferences(dir: &Path) -> ModelPreferences {
+    Settings::read(dir, true)
+        .map(|s| s.preferences())
+        .unwrap_or_default()
+}
+
 /// Supplies PiArc defaults without discarding other Pi SDK settings or explicit preferences.
 /// In particular, configuring an API key must not enable paid cache-warming by itself.
 pub(crate) fn ensure_pi_defaults(dir: &Path) -> Result<()> {
@@ -705,5 +790,48 @@ mod tests {
         ensure_pi_defaults(&dir).unwrap();
         assert_eq!(std::fs::read_to_string(path).unwrap(), settings.to_string());
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn model_preferences_are_validated_and_local_models_graded_low() {
+        let ok = Operation::preferences(
+            &json!({"models":{"relay/one":{"displayName":"One","contextWindow":200000,"vision":false,"defaultEffort":"high","toolProfile":"default"}},"auxiliary":{"provider":"relay","id":"one"}}).to_string(),
+        )
+        .unwrap();
+        let Operation::Preferences(prefs) = ok else {
+            panic!("preferences")
+        };
+        assert_eq!(prefs.models["relay/one"].context_window, Some(200_000));
+        for bad in [
+            json!({"models":{"noslash":{}}}),
+            json!({"models":{"a/b":{"contextWindow":10}}}),
+            json!({"models":{"a/b":{"displayName":""}}}),
+            json!({"models":{"a/b":{"toolReliability":"low"}}}),
+            json!({"models":{"a/b":{"toolProfile":"strict"}}}),
+        ] {
+            assert!(Operation::preferences(&bad.to_string()).is_err(), "{bad}");
+        }
+        let mut settings = Settings {
+            models: prefs.models.clone(),
+            auxiliary: prefs.auxiliary.clone(),
+            ..Settings::default()
+        };
+        let local: Provider = serde_json::from_value(json!({"kind":"local","id":"lan","api":"openai-completions","baseUrl":"http://127.0.0.1:11434/v1","models":["qwen","coder"]})).unwrap();
+        settings.providers.push(Stored {
+            provider: local,
+            has_credential: false,
+        });
+        let out = settings.preferences();
+        assert_eq!(
+            out.models["lan/qwen"].tool_reliability,
+            Some(ToolReliability::Low)
+        );
+        assert_eq!(
+            out.models["lan/coder"].tool_reliability,
+            Some(ToolReliability::Low)
+        );
+        assert_eq!(out.models["relay/one"].tool_reliability, None);
+        assert_eq!(out.auxiliary.as_ref().map(|m| m.id.as_str()), Some("one"));
+        assert!(settings.view(&[])["models"]["relay/one"].is_object());
     }
 }

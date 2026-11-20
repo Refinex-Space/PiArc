@@ -53,7 +53,9 @@ fn to_i64(value: u64) -> i64 {
 impl CoreRuntime {
     /// Like `create`, with the vault's master key in memory under a `piarc-test.` name instead
     /// of the system credential store: tests that open workspaces never touch the keychain
-    /// (T14).
+    /// (T14). L4 (T29) may also set `PIARC_TEST_WEB_ALLOWLIST` (comma-separated hosts or
+    /// ranges WebFetch may reach, for its local test server) and `PIARC_TEST_OAUTH_PROVIDER`
+    /// (a `--test-oauth-provider` file every Agent Host registers, for the mock sign-in).
     #[napi(factory, catch_unwind)]
     pub fn create_for_tests(
         env: Env,
@@ -71,6 +73,20 @@ impl CoreRuntime {
                 master_key: piarc_core::secrets::test_master_key_name("napi"),
                 store: std::sync::Arc::new(piarc_core::secrets::MemorySecretStore::new()),
             });
+            if let Ok(list) = std::env::var("PIARC_TEST_WEB_ALLOWLIST") {
+                config.web.allowlist = list
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_owned)
+                    .collect();
+            }
+            if let Some(file) = std::env::var_os("PIARC_TEST_OAUTH_PROVIDER") {
+                config.sessions.tune_host = Some(std::sync::Arc::new(move |host| {
+                    host.extra_args.push("--test-oauth-provider".into());
+                    host.extra_args.push(file.clone());
+                }));
+            }
             let sink = std::sync::Arc::new(crate::sink::JsEventSink::new(on_events));
             piarc_core::CoreRuntime::start(config, sink).map(|core| Self { core })
         })

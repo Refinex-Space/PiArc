@@ -33,6 +33,7 @@
 //! from the index and `resume` reopens a session from its file.
 
 mod inbound;
+mod login;
 mod provider_settings;
 mod session;
 mod snapshot;
@@ -135,6 +136,10 @@ pub(crate) struct Ctx {
     pub trust: TrustService,
     pub secrets: SecretsService,
     pub catalog_network: Arc<std::sync::atomic::AtomicBool>,
+    /// Per-model settings and the auxiliary model (T29), read at every handshake.
+    pub model_preferences: Arc<Mutex<piarc_protocol::models::ModelPreferences>>,
+    /// The provider sign-in in progress (T29).
+    pub logins: Arc<login::Logins>,
     pub provider_writer: tokio::sync::Mutex<()>,
     pub tool_io: ToolIo,
     pub config: SessionsConfig,

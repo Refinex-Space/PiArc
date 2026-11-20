@@ -1,7 +1,14 @@
 // Checks for request params and results arriving over AHP (a system boundary): values are
 // `unknown` until one of these functions has narrowed them.
-import type { CoreWelcome, InputAttachment, InputMention, ModelRef } from '@piarc/protocol';
+import type {
+  CoreWelcome,
+  InputAttachment,
+  InputMention,
+  ModelPreferences,
+  ModelRef,
+} from '@piarc/protocol';
 
+import { parsePreferences } from '../providers/preferences.js';
 import { AhpError } from './errors.js';
 
 type Fields = Record<string, unknown>;
@@ -108,7 +115,18 @@ export function parseWelcome(result: unknown): CoreWelcome | undefined {
     ...(typeof result.allowModelNetwork === 'boolean'
       ? { allowModelNetwork: result.allowModelNetwork }
       : {}),
+    ...welcomePreferences(result.modelPreferences),
   };
+}
+
+/** The welcome's model preferences (T29); malformed ones are left out, not fatal. */
+function welcomePreferences(value: unknown): { modelPreferences?: ModelPreferences } {
+  if (value == null) return {};
+  try {
+    return { modelPreferences: parsePreferences(value) };
+  } catch {
+    return {};
+  }
 }
 
 /** The `trust/get` result, or undefined when it is malformed. */

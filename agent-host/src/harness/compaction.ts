@@ -104,6 +104,8 @@ export interface SessionCompactionOptions {
   /** The restore message was appended to the session (its transcript item). */
   readonly appended: (message: ReminderMessage) => void;
   readonly log: (line: string) => void;
+  /** The context window of a model per the user's setting (T29); absent: the catalog's. */
+  readonly contextWindow?: (model: Model<Api>) => number;
 }
 
 function parseSettings(value: unknown): ContextSettings | undefined {
@@ -261,11 +263,13 @@ export class SessionCompaction {
   }
 
   #input(): ThresholdInput | undefined {
-    const model = this.#o.session()?.model;
+    const model: Model<Api> | undefined = this.#o.session()?.model;
     if (model === undefined) return undefined;
+    const window = this.#o.contextWindow?.(model) ?? model.contextWindow;
     return {
       contextWindow: model.contextWindow,
       maxOutput: model.maxTokens,
+      ...(window === model.contextWindow ? {} : { contextWindowOverride: window }),
       ...(this.#settings?.autoCompactWindow == null
         ? {}
         : { autoCompactWindow: this.#settings.autoCompactWindow }),

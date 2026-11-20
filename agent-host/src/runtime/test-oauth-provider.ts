@@ -8,8 +8,16 @@
 // `label` that requests send as `x-piarc-test-token`, so a test can tell which token a
 // request used without seeing the token (the mock redacts credential headers).
 //
+// T29 adds the two interactive flows of the settings window's sign-in, against piarc-testkit's
+// mock authorization server: the authorization code flow (the page is opened in the browser and
+// redirects to a loopback server here) and the device code flow (a code the user enters, then
+// polling). Refusal and expiry come back as errors with the server's reason.
+//
 // It is not an Anthropic subscription login and does not touch one (ADR-0006).
-import { createProvider } from '@earendil-works/pi-ai';
+import { randomUUID } from 'node:crypto';
+import { createServer } from 'node:http';
+
+import { createProvider, type ProviderAuthInteraction } from '@earendil-works/pi-ai';
 import type { Model, OAuthCredential } from '@earendil-works/pi-ai';
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy';
 import type { ModelRuntime } from '@earendil-works/pi-coding-agent';
@@ -23,6 +31,12 @@ export interface TestOAuthProviderConfig {
   readonly models: readonly { id: string; contextWindow: number; maxTokens: number }[];
   /** When present, the Agent Host logs in with this authorization code once it starts. */
   readonly loginCode?: string;
+  /** How the sign-in asks the user (T29); default: a pasted code. */
+  readonly flow?: 'manualCode' | 'authorizationCode' | 'deviceCode';
+  /** The authorization page (`authorizationCode`). */
+  readonly authorizeUrl?: string;
+  /** The device authorization endpoint (`deviceCode`). */
+  readonly deviceUrl?: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -55,13 +69,138 @@ export function parseTestOAuthProvider(value: unknown): TestOAuthProviderConfig 
   if (value.loginCode !== undefined && typeof value.loginCode !== 'string') {
     return 'loginCode must be a string';
   }
+  const flow = value.flow ?? 'manualCode';
+  if (flow !== 'manualCode' && flow !== 'authorizationCode' && flow !== 'deviceCode') {
+    return 'flow must be manualCode, authorizationCode or deviceCode';
+  }
+  if (flow === 'authorizationCode' && typeof value.authorizeUrl !== 'string') {
+    return 'authorizationCode needs authorizeUrl';
+  }
+  if (flow === 'deviceCode' && typeof value.deviceUrl !== 'string') {
+    return 'deviceCode needs deviceUrl';
+  }
   return {
     id: value.id,
     baseUrl: value.baseUrl,
     tokenUrl: value.tokenUrl,
     models,
+    flow,
     ...(typeof value.loginCode === 'string' ? { loginCode: value.loginCode } : {}),
+    ...(typeof value.authorizeUrl === 'string' ? { authorizeUrl: value.authorizeUrl } : {}),
+    ...(typeof value.deviceUrl === 'string' ? { deviceUrl: value.deviceUrl } : {}),
   };
+}
+
+/** A token endpoint refusal; `code` is the OAuth error code when the server sent one. */
+class TokenError extends Error {
+  readonly code: string | undefined;
+  constructor(code: string | undefined, status: number) {
+    super(
+      code === 'access_denied'
+        ? 'Access was denied at the authorization server (access_denied).'
+        : code === 'expired_token'
+          ? 'The device code expired before it was approved (expired_token).'
+          : `token endpoint answered ${String(status)}${code === undefined ? '' : ` (${code})`}`,
+    );
+    this.code = code;
+  }
+}
+
+/** The authorization code flow: the page redirects to a loopback server with the code. */
+async function authorizationCode(
+  config: TestOAuthProviderConfig,
+  interaction: ProviderAuthInteraction,
+): Promise<OAuthCredential> {
+  const state = randomUUID();
+  const server = createServer();
+  const code = new Promise<string>((resolve, reject) => {
+    server.on('request', (request, response) => {
+      const url = new URL(request.url ?? '/', 'http://127.0.0.1');
+      if (url.pathname !== '/callback' || url.searchParams.get('state') !== state) {
+        response.writeHead(404).end();
+        return;
+      }
+      const error = url.searchParams.get('error');
+      const received = url.searchParams.get('code');
+      response
+        .writeHead(200, { 'content-type': 'text/plain; charset=utf-8' })
+        .end(error === null ? 'Signed in. You can close this window.' : 'Sign-in refused.');
+      if (error !== null) {
+        reject(new Error(`The authorization server refused the sign-in (${error}).`));
+      } else if (received === null) {
+        reject(new Error('The authorization server sent no code.'));
+      } else {
+        resolve(received);
+      }
+    });
+    interaction.signal.addEventListener('abort', () => {
+      reject(new Error('The sign-in was cancelled'));
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = server.address();
+    const port = typeof address === 'object' && address !== null ? address.port : 0;
+    const page = new URL(config.authorizeUrl ?? '');
+    page.searchParams.set('response_type', 'code');
+    page.searchParams.set('client_id', 'piarc-test');
+    page.searchParams.set('redirect_uri', `http://127.0.0.1:${String(port)}/callback`);
+    page.searchParams.set('state', state);
+    interaction.notify({ type: 'auth_url', url: page.href });
+    interaction.notify({ type: 'progress', message: 'Waiting for the browser…' });
+    const received = await code;
+    return await exchange(
+      config.tokenUrl,
+      { grantType: 'authorization_code', code: received },
+      interaction.signal,
+    );
+  } finally {
+    server.close();
+  }
+}
+
+/** The device code flow: show the code, poll the token endpoint until it is approved. */
+async function deviceCode(
+  config: TestOAuthProviderConfig,
+  interaction: ProviderAuthInteraction,
+): Promise<OAuthCredential> {
+  const response = await fetch(config.deviceUrl ?? '', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: '{}',
+    signal: interaction.signal,
+  });
+  const device: unknown = await response.json();
+  if (
+    !isRecord(device) ||
+    typeof device.deviceCode !== 'string' ||
+    typeof device.userCode !== 'string' ||
+    typeof device.verificationUri !== 'string' ||
+    typeof device.intervalMs !== 'number' ||
+    typeof device.expiresInSeconds !== 'number'
+  ) {
+    throw new Error('device endpoint returned a malformed answer');
+  }
+  const interval = device.intervalMs;
+  interaction.notify({
+    type: 'device_code',
+    userCode: device.userCode,
+    verificationUri: device.verificationUri,
+    expiresInSeconds: device.expiresInSeconds,
+  });
+  for (;;) {
+    try {
+      return await exchange(
+        config.tokenUrl,
+        { grantType: 'device_code', deviceCode: device.deviceCode },
+        interaction.signal,
+      );
+    } catch (error) {
+      if (!(error instanceof TokenError) || error.code !== 'authorization_pending') throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, interval));
+    interaction.signal.throwIfAborted();
+  }
 }
 
 async function exchange(
@@ -76,7 +215,11 @@ async function exchange(
     ...(signal === undefined ? {} : { signal }),
   });
   if (!response.ok) {
-    throw new Error(`token endpoint answered ${String(response.status)}`);
+    const failure: unknown = await response.json().catch(() => undefined);
+    throw new TokenError(
+      isRecord(failure) && typeof failure.error === 'string' ? failure.error : undefined,
+      response.status,
+    );
   }
   const token: unknown = await response.json();
   if (
@@ -124,6 +267,8 @@ export function registerTestOAuthProvider(
           name: 'PiArc test OAuth',
           isSubscription: false,
           login: async (interaction) => {
+            if (config.flow === 'authorizationCode') return authorizationCode(config, interaction);
+            if (config.flow === 'deviceCode') return deviceCode(config, interaction);
             const code = await interaction.prompt({
               type: 'manual_code',
               message: 'Authorization code',

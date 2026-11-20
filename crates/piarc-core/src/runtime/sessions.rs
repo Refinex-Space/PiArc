@@ -71,6 +71,43 @@ impl CoreRuntime {
         })
     }
 
+    /// Signs in to `provider` (T29); settles once the credential is stored or the sign-in
+    /// failed. Progress and questions go to `core/login`.
+    ///
+    /// # Errors
+    /// As [`Self::open_workspace`].
+    pub fn login(
+        &self,
+        provider: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move { hub.login(provider).await })
+    }
+
+    /// Answers the question of sign-in `id`; `None` cancels the sign-in (T29).
+    ///
+    /// # Errors
+    /// No such sign-in in progress; Core is not running.
+    pub fn answer_login(&self, id: &str, value: Option<String>) -> Result<()> {
+        self.ensure_running()?;
+        self.services()?.sessions.answer_login(id, value)
+    }
+
+    /// Signs out of `provider`: its stored credential is removed (T29).
+    ///
+    /// # Errors
+    /// As [`Self::open_workspace`].
+    pub fn logout(
+        &self,
+        provider: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(
+            on_done,
+            move |hub| async move { hub.logout(provider).await },
+        )
+    }
+
     /// Lists models for a workspace, even before its first session.
     ///
     /// # Errors

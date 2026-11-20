@@ -4,6 +4,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import {
   lazyStream,
   type AnyModel,
+  type Api,
+  type Model,
   type AssistantMessageEvent,
   type AuthResult,
   type Context,
@@ -86,7 +88,11 @@ function newestInputHasImage(context: Context): boolean {
   return false;
 }
 
-export function installProviderPolicy(runtime: ModelRuntime): void {
+/** `vision` says whether a model accepts images (the user's per-model setting, T29). */
+export function installProviderPolicy(
+  runtime: ModelRuntime,
+  vision: (model: Model<Api>) => boolean = (model) => model.input.includes('image'),
+): void {
   const anthropic = runtime.getProvider('anthropic');
   if (!anthropic?.auth.apiKey) throw new Error('The Anthropic API key adapter is missing');
   runtime.registerNativeProvider({ ...anthropic, auth: { apiKey: anthropic.auth.apiKey } });
@@ -134,10 +140,7 @@ export function installProviderPolicy(runtime: ModelRuntime): void {
       model,
       () => {
         const live = runtime.getModel(model.provider, model.id);
-        if (
-          (!model.input.includes('image') || !live?.input.includes('image')) &&
-          newestInputHasImage(context)
-        ) {
+        if ((live === undefined || !vision(live)) && newestInputHasImage(context)) {
           return Promise.reject(
             new AhpError(
               'invalidParams',

@@ -169,6 +169,22 @@ impl HostSupervisor {
             .await
     }
 
+    /// Like [`HostSupervisor::call`] with its own timeout, for requests that wait for a person
+    /// (a provider sign-in, T29).
+    ///
+    /// # Errors
+    ///
+    /// As [`HostSupervisor::call`].
+    pub async fn call_within<M: RequestMethod>(
+        &self,
+        params: M::Params,
+        timeout: Duration,
+    ) -> Result<M::Result> {
+        self.inner
+            .call::<M>(params, Tracking::untracked(), timeout)
+            .await
+    }
+
     /// Opens a new session; it is reopened automatically after a restart.
     ///
     /// When Core chose the id (`params.session_id`) and the outcome is unknown (timeout, or

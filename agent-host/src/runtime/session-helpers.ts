@@ -5,6 +5,7 @@ import type { QueueItem, SessionStopped } from '@piarc/protocol';
 import type { ToolBatches } from '../harness/tool-batches.js';
 import { AhpError } from '../protocol/errors.js';
 import type { CoreIo, Shells, toolOptions } from '../tools/index.js';
+import { CONSERVATIVE_TOOLS, isCanonicalTool } from '../tools/profile.js';
 import type { Model, Api } from '@earendil-works/pi-ai';
 
 import { prepareInput, type PreparedInput, type UserInput } from './input.js';
@@ -21,6 +22,22 @@ export function scheduled(
   return {
     ...options,
     customTools: options.customTools.map((tool: ToolDefinition) => batches.wrap(tool)),
+  };
+}
+
+/** The conservative Tool Profile's subset of `options` (T29); everything when not conservative. */
+export function onlyConservative(
+  options: ReturnType<typeof toolOptions>,
+  conservative: boolean,
+  canonical: (tool: string) => string,
+): ReturnType<typeof toolOptions> {
+  if (!conservative) return options;
+  return {
+    ...options,
+    customTools: options.customTools.filter((tool) => {
+      const name = canonical(tool.name);
+      return isCanonicalTool(name) && CONSERVATIVE_TOOLS.has(name);
+    }),
   };
 }
 
@@ -77,10 +94,8 @@ export function checkImageInput(
   input: UserInput,
 ): void {
   if (!input.attachments.some((attachment) => attachment.kind === 'image')) return;
-  if (
-    !model?.input.includes('image') ||
-    !workspace.modelRuntime.getModel(model.provider, model.id)?.input.includes('image')
-  ) {
+  const live = model && workspace.modelRuntime.getModel(model.provider, model.id);
+  if (live === undefined || !workspace.preferences.vision(live)) {
     throw new AhpError(
       'invalidParams',
       'Image attachments are not supported by the selected model',

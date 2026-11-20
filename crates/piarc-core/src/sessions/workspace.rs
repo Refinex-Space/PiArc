@@ -372,6 +372,7 @@ impl WorkspaceActor {
                 inbound,
                 &|config| {
                     config.allow_model_network = Some(self.ctx.catalog_network.clone());
+                    config.model_preferences = Some(self.ctx.model_preferences.clone());
                     if let Some(tune) = &tune {
                         tune(config);
                     }

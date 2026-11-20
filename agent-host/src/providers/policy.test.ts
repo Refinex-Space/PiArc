@@ -9,6 +9,9 @@ import { SessionRegistry } from '../runtime/session-registry.js';
 import { supportedEfforts } from './catalog.js';
 import { openWorkspace } from '../runtime/workspace.js';
 import { credentialStatus, saveCredential } from './settings.js';
+import { loginProviders, Logins } from './login.js';
+import type { CoreBridge } from '../runtime/core-bridge.js';
+import { listModels } from '../runtime/session-models.js';
 
 let dir: string;
 const baseUrl = 'https://relay.example.test';
@@ -49,6 +52,26 @@ describe('the workspace model runtime', () => {
       runtime.login('anthropic', 'oauth', { prompt, notify: () => undefined }),
     ).rejects.toMatchObject({ kind: 'permissionDenied' });
     expect(prompt).not.toHaveBeenCalled();
+  });
+
+  it('lists sign-in providers for the settings window without Anthropic subscription OAuth (T29)', async () => {
+    const workspace = await openWorkspace(dir, dir, new InMemoryCredentialStore());
+    await workspace.reload(false);
+    const offered = await loginProviders(workspace.modelRuntime);
+    expect(offered.length).toBeGreaterThan(0);
+    expect(offered.map((p) => p.id)).not.toContain('anthropic');
+    expect(offered.every((p) => !p.signedIn)).toBe(true);
+    // The settings Host's sign-in path refuses it too, before any interaction.
+    const logins = new Logins(
+      workspace.modelRuntime,
+      { requestTyped: vi.fn() } as unknown as CoreBridge,
+      () => undefined,
+    );
+    await expect(logins.start('login-1', 'anthropic')).rejects.toMatchObject({
+      kind: 'invalidParams',
+    });
+    const listed = await listModels(workspace, undefined);
+    expect(listed.loginProviders?.map((p) => p.id)).not.toContain('anthropic');
   });
 
   it('persists literal keys through ModelRuntime, checks the actual destination, and deletes the credential', async () => {

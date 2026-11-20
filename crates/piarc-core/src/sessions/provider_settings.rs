@@ -55,7 +55,16 @@ impl Hub {
         result
     }
 
-    async fn settings_host(&self) -> Result<HostSupervisor> {
+    pub(super) async fn settings_host(&self) -> Result<HostSupervisor> {
+        self.settings_host_with(Arc::new(self.ctx.secrets.clone()))
+            .await
+    }
+
+    /// A settings Host answered by `inbound` (the vault, and during a sign-in its questions).
+    pub(super) async fn settings_host_with(
+        &self,
+        inbound: Arc<dyn piarc_host::InboundHandler>,
+    ) -> Result<HostSupervisor> {
         let launch = self
             .ctx
             .config
@@ -67,16 +76,15 @@ impl Hub {
         let dir = self.ctx.storage.dirs().data().to_owned();
         let root = dir.join("agent-host").join("settings");
         std::fs::create_dir_all(&root).map_err(io_error)?;
-        let (host, mut events) = crate::agent_host::start_for(
-            launch,
-            root,
-            dir,
-            Arc::new(self.ctx.secrets.clone()),
-            &|config| {
+        let tune = self.ctx.config.tune_host.clone();
+        let (host, mut events) =
+            crate::agent_host::start_for(launch, root, dir, inbound, &|config| {
                 // Catalog discovery for settings is local. A preference change refreshes workspaces.
                 config.allow_model_network = None;
-            },
-        )?;
+                if let Some(tune) = &tune {
+                    tune(config);
+                }
+            })?;
         let result = tokio::select! {
             event=events.recv()=>match event{
                 Some(HostEvent::Connected{..})=>Ok(()),
@@ -117,11 +125,11 @@ impl Hub {
         if settings.pending() {
             self.recover(&mut settings, host).await?;
         }
-        let builtins = host
+        let list = host
             .call::<ModelsList>(ModelsListParams { session_id: None })
             .await
-            .map_err(host_error)?
-            .providers;
+            .map_err(host_error)?;
+        let builtins = list.providers;
         match op {
             Operation::List => {}
             Operation::Refresh(enabled) => {
@@ -130,12 +138,23 @@ impl Hub {
                 self.ctx.catalog_network.store(enabled, Ordering::Release);
                 self.reload_models(enabled).await?;
             }
+            Operation::Preferences(prefs) => {
+                let prefs = *prefs;
+                settings.models = prefs.models;
+                settings.auxiliary = prefs.auxiliary;
+                settings.persist(dir)?;
+                self.publish_preferences(&settings);
+                self.reload_models(self.ctx.catalog_network.load(Ordering::Acquire))
+                    .await?;
+            }
             mutation => {
                 self.change_provider(mutation, host, &mut settings, &builtins)
                     .await?
             }
         }
-        Ok(settings.view(&builtins))
+        let mut view = settings.view(&builtins);
+        view["loginProviders"] = json!(list.login_providers);
+        Ok(view)
     }
 
     async fn change_provider(
@@ -165,12 +184,19 @@ impl Hub {
         settings.project(dir, true)?;
         settings.finish(true);
         settings.persist(dir)?;
+        // A local endpoint's models are graded by the provider kind (T29).
+        self.publish_preferences(settings);
         self.reload_models(self.ctx.catalog_network.load(Ordering::Acquire))
             .await
     }
 
-    async fn reload_models(&self, allow_network: bool) -> Result<()> {
+    fn publish_preferences(&self, settings: &Settings) {
+        *lock(&self.ctx.model_preferences) = settings.preferences();
+    }
+
+    pub(super) async fn reload_models(&self, allow_network: bool) -> Result<()> {
         let workspaces: Vec<_> = lock(&self.routes).workspaces.values().cloned().collect();
+        let preferences = lock(&self.ctx.model_preferences).clone();
         let mut first_error = None;
         for ws in workspaces {
             if matches!(
@@ -184,7 +210,7 @@ impl Hub {
                         .await?
                         .call::<ModelsReload>(ModelsReloadParams {
                             allow_network,
-                            preferences: None,
+                            preferences: Some(preferences.clone()),
                         })
                         .await
                         .map_err(host_error)

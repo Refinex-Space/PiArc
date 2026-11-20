@@ -149,6 +149,60 @@ impl CoreRuntime {
         })
     }
 
+    /// Saves the per-model settings and the auxiliary model (T29); the JSON is
+    /// `{ models: { "<provider>/<model>": {...} }, auxiliary?: { provider, id } }`.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn set_model_preferences<'env>(
+        &self,
+        env: &'env Env,
+        preferences_json: String,
+    ) -> napi::Result<Object<'env>> {
+        let op = boundary::call(env, "CoreRuntime.setModelPreferences", || {
+            piarc_core::providers::Operation::preferences(&preferences_json)
+        })?;
+        self.queue(env, "CoreRuntime.setModelPreferences", |core, done| {
+            core.provider_op(op, done)
+        })
+    }
+
+    /// Signs in to a provider (OAuth or device code, T29). Resolves when the credential is in
+    /// the vault; progress and questions arrive on the `core/login` route.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn start_login<'env>(
+        &self,
+        env: &'env Env,
+        provider: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.startLogin", |core, done| {
+            core.login(provider, done)
+        })
+    }
+
+    /// Answers the current question of a sign-in; `null` cancels the sign-in.
+    #[napi(catch_unwind)]
+    pub fn answer_login(
+        &self,
+        env: Env,
+        login_id: String,
+        #[napi(ts_arg_type = "string | null")] value: Option<String>,
+    ) -> napi::Result<()> {
+        boundary::call(&env, "CoreRuntime.answerLogin", || {
+            self.core.answer_login(&login_id, value)
+        })
+    }
+
+    /// Signs out of a provider (removes its stored credential).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn logout_provider<'env>(
+        &self,
+        env: &'env Env,
+        provider: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.logoutProvider", |core, done| {
+            core.logout(provider, done)
+        })
+    }
+
     /// Lists models before a session is created.
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]
     pub fn workspace_models<'env>(

@@ -6,6 +6,7 @@
 //   hooks, files changed outside the session and background tasks all go through.
 // - Context engineering (T27, capability `context`): compaction (settings, summary, restore,
 //   circuit breaker; compaction.ts) and context usage (context-usage.ts).
+import type { Api, Model } from '@earendil-works/pi-ai';
 import type {
   AgentSession,
   AgentSessionEvent,
@@ -42,6 +43,8 @@ import { createSuggestNextStepsTool } from './next-steps.js';
 import { Reminders, type ReminderMessage } from './reminders.js';
 import type { SessionMemory } from './session-memory.js';
 import { createTodoWriteTool, currentTodos, todosOf, todoWatch } from './todos.js';
+import type { AuxiliaryModel } from './auxiliary.js';
+import { createWebFetchTool } from './web-fetch.js';
 
 /** What Core enabled for the host tools in the handshake. */
 export interface HostToolCapabilities {
@@ -53,6 +56,8 @@ export interface HostToolCapabilities {
   readonly context?: boolean;
   /** `checkpoints` (T28): branch points, rewinds, summaries in the history. */
   readonly checkpoints?: boolean;
+  /** `webFetch` (T29): Core fetches pages for WebFetch (`web/fetch`). */
+  readonly webFetch?: boolean;
 }
 
 /** The plan and task list at the head of a branch, or undefined when it has neither. */
@@ -88,6 +93,12 @@ export interface SessionHarnessOptions {
   /** A reminder message was appended without Pi's message events (its transcript item). */
   readonly appended: (message: ReminderMessage) => void;
   readonly log: (line: string) => void;
+  /** The context window of a model per the user's setting (T29). */
+  readonly contextWindow?: (model: Model<Api>) => number;
+  /** The auxiliary model channel (T29): WebFetch's extraction. */
+  readonly auxiliary?: AuxiliaryModel;
+  /** The session opened with the conservative Tool Profile (T29). */
+  readonly conservative?: boolean;
 }
 
 export class SessionHarness {
@@ -163,6 +174,7 @@ export class SessionHarness {
       hooks,
       appended: o.appended,
       log: o.log,
+      ...(o.contextWindow === undefined ? {} : { contextWindow: o.contextWindow }),
     });
   }
 
@@ -188,6 +200,9 @@ export class SessionHarness {
         ? [createAskUserQuestionTool(profile.AskUserQuestion, core.bridge, this.#o.sessionId)]
         : []),
       createSuggestNextStepsTool(profile.SuggestNextSteps),
+      ...(core?.webFetch === true && this.#o.io !== undefined && this.#o.auxiliary !== undefined
+        ? [createWebFetchTool(profile.WebFetch, this.#o.io, this.#o.auxiliary)]
+        : []),
     ];
   }
 
@@ -195,7 +210,12 @@ export class SessionHarness {
    * observe, then the reminders deliver. */
   extensions(): ExtensionFactory[] {
     return [
-      todoWatch(this.#o.manager, this.reminders, this.#o.canonical),
+      todoWatch(
+        this.#o.manager,
+        this.reminders,
+        this.#o.canonical,
+        () => this.#o.conservative === true,
+      ),
       this.usage.extension,
       this.compaction.extension,
       this.reminders.extension,

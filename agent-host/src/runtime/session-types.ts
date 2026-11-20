@@ -1,5 +1,6 @@
 // Types of the session registry (session-registry.ts): its options, the tool backends and what
 // it keeps per hosted session.
+import type { ToolProfileKind } from '@piarc/protocol';
 import type { AgentSessionEvent, AgentSessionRuntime } from '@earendil-works/pi-coding-agent';
 import type { InputAccepted } from '@piarc/protocol';
 
@@ -99,4 +100,8 @@ export interface HostedSession {
   turnFrom?: { readonly turnId: string; readonly from: string | null };
   changingModel: boolean;
   closed: boolean;
+  /** The Tool Profile the session's tools were made with (T29). */
+  readonly profileKind: ToolProfileKind;
+  /** The model's profile changed while a turn ran: reopen once the session is idle. */
+  profileStale?: boolean;
 }

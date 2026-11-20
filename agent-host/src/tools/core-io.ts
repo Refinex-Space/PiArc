@@ -9,6 +9,7 @@
 import { randomUUID } from 'node:crypto';
 
 import type {
+  WebFetchResult,
   BlobRef,
   CommandOutcome,
   CommandOutput,
@@ -426,6 +427,26 @@ export class CoreIo {
     return this.#request('fs/grep', params, parseGrep, signal);
   }
 
+  /**
+   * Fetches `url` for an approved WebFetch call (`web/fetch`, T29). Core's message for a refused
+   * or failed fetch is written for the model and comes back without the bridge's prefix.
+   */
+  async webFetch(url: string, origin: Origin, signal?: AbortSignal): Promise<WebFetchResult> {
+    try {
+      // Core bounds the fetch (its total timeout); the request waits for it.
+      return await this.#send('web/fetch', { url, origin }, parseWebFetch, signal, null);
+    } catch (error) {
+      const prefix = 'web/fetch failed: ';
+      if (error instanceof AhpError && error.message.startsWith(prefix)) {
+        throw new AhpError(error.kind, error.message.slice(prefix.length), {
+          retryable: error.retryable,
+          details: error.details,
+        });
+      }
+      throw error;
+    }
+  }
+
   /** Which shells Core found for this session's command tools (`exec/shells`). */
   async shells(): Promise<Shells> {
     return this.#request('exec/shells', {}, parseShells);
@@ -792,5 +813,45 @@ function parseOutput(value: unknown): CommandOutput | undefined {
     ...(omittedChars === undefined ? {} : { omittedChars }),
     ...(fullOutputPath === undefined ? {} : { fullOutputPath }),
     ...(saveError === undefined ? {} : { saveError }),
+  };
+}
+
+/** A `web/fetch` result, or undefined when it is malformed. */
+export function parseWebFetch(v: unknown): WebFetchResult | undefined {
+  if (!isRecord(v)) return undefined;
+  const redirect = v.redirect;
+  if (
+    typeof v.url !== 'string' ||
+    typeof v.status !== 'number' ||
+    typeof v.content !== 'string' ||
+    (v.format !== 'markdown' && v.format !== 'text') ||
+    typeof v.bytes !== 'number' ||
+    typeof v.bodyTruncated !== 'boolean' ||
+    typeof v.totalChars !== 'number' ||
+    typeof v.contentTruncated !== 'boolean'
+  ) {
+    return undefined;
+  }
+  let target: { url: string; status: number } | undefined;
+  if (redirect != null) {
+    if (
+      !isRecord(redirect) ||
+      typeof redirect.url !== 'string' ||
+      typeof redirect.status !== 'number'
+    )
+      return undefined;
+    target = { url: redirect.url, status: redirect.status };
+  }
+  return {
+    url: v.url,
+    status: v.status,
+    content: v.content,
+    format: v.format,
+    bytes: v.bytes,
+    bodyTruncated: v.bodyTruncated,
+    totalChars: v.totalChars,
+    contentTruncated: v.contentTruncated,
+    ...(typeof v.contentType === 'string' ? { contentType: v.contentType } : {}),
+    ...(target === undefined ? {} : { redirect: target }),
   };
 }

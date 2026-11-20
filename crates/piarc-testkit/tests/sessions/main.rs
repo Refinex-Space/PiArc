@@ -4,6 +4,7 @@
 
 mod input;
 mod lifecycle;
+mod login;
 mod metadata;
 mod models;
 mod permissions;

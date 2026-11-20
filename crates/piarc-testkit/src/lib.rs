@@ -97,6 +97,7 @@
 //! `scenario_not_found`, `scenario_exhausted`, `not_found`.
 
 mod anthropic;
+pub mod auth_server;
 mod body;
 mod error;
 mod fragment;

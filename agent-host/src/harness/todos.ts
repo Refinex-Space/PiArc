@@ -22,7 +22,7 @@ import { Type } from 'typebox';
 import { isObject } from '../runtime/items.js';
 import { presentationOf } from '../tools/presentation.js';
 import type { ToolPresentation } from '../tools/profile.js';
-import { staleListNotice } from './prompts/notices.js';
+import { startListNotice, staleListNotice } from './prompts/notices.js';
 import { REMINDER_ENTRY, reminderKeys, type Reminders } from './reminders.js';
 
 export { staleListNotice };
@@ -159,24 +159,38 @@ export function createTodoWriteTool(presentation: ToolPresentation): ToolDefinit
   });
 }
 
-/** Watches one session's list: queues the stale-list reminder after a round of tool calls. */
+/** Rounds of tool calls without a list after which the conservative profile (T29) asks the
+ * model to start one, and its stale-list threshold. */
+export const CONSERVATIVE_TODO_ROUNDS = 3;
+
+/** Watches one session's list: queues the stale-list reminder after a round of tool calls.
+ * `conservative()` (the conservative Tool Profile, T29) reminds sooner and also when work goes on
+ * without a list. */
 export function todoWatch(
   manager: SessionManager,
   reminders: Reminders,
   canonical: (tool: string) => string,
+  conservative: () => boolean = () => false,
 ): ExtensionFactory {
   return (pi) => {
     pi.on('turn_end', (event) => {
       if (event.toolResults.length === 0 || reminders.has(TODO_REMINDER)) return;
       const branch = manager.getBranch();
       const todos = currentTodos(branch, canonical);
-      if (!todos.some((todo) => todo.status !== 'completed')) return;
+      const threshold = conservative() ? CONSERVATIVE_TODO_ROUNDS : TODO_REMINDER_ROUNDS;
       const rounds = roundsSinceUpdate(branch, canonical);
-      if (rounds >= TODO_REMINDER_ROUNDS) {
+      if (rounds < threshold) return;
+      if (todos.some((todo) => todo.status !== 'completed')) {
         reminders.enqueue(TODO_REMINDER, {
           type: 'todoStale',
           source: 'TodoWrite',
           text: staleListNotice(todos, rounds),
+        });
+      } else if (todos.length === 0 && conservative()) {
+        reminders.enqueue(TODO_REMINDER, {
+          type: 'todoStale',
+          source: 'TodoWrite',
+          text: startListNotice(rounds),
         });
       }
     });

@@ -72,6 +72,12 @@ impl RouteKey {
         Self(Arc::from(NOTICES_ROUTE))
     }
 
+    /// The route of provider sign-in progress and questions (`core/login`, T29).
+    #[must_use]
+    pub fn login() -> Self {
+        Self(Arc::from("core/login"))
+    }
+
     /// The route of the workspace list snapshots (`core/workspaces`, T14).
     #[must_use]
     pub fn workspaces() -> Self {

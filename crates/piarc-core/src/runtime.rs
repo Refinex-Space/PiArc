@@ -725,6 +725,8 @@ fn open_state(
         catalog_network: Arc::new(std::sync::atomic::AtomicBool::new(
             crate::providers::network_preference(&data, config.secret_store.is_none()),
         )),
+        model_preferences: Arc::new(std::sync::Mutex::new(crate::providers::preferences(&data))),
+        logins: Arc::default(),
         provider_writer: tokio::sync::Mutex::new(()),
         tool_io: ToolIo::with_notices(
             ToolIoConfig {

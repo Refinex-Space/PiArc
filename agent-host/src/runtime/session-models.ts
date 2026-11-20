@@ -5,8 +5,14 @@ import { getBuiltinProviders } from '@earendil-works/pi-ai/providers/all';
 import type { AgentSession } from '@earendil-works/pi-coding-agent';
 import type { ModelRef, ModelsListResult, SessionModelSelection } from '@piarc/protocol';
 
-import { capabilities, supportedEffort, switchPreview } from '../providers/catalog.js';
+import {
+  capabilities,
+  supportedEffort,
+  supportedEfforts,
+  switchPreview,
+} from '../providers/catalog.js';
 import { AhpError } from '../protocol/errors.js';
+import { loginProviders } from '../providers/login.js';
 import type { Workspace } from './workspace.js';
 
 /** The configured providers and models, with `session`'s selection when given. */
@@ -19,11 +25,14 @@ export async function listModels(
     const provider = runtime.getProvider(id);
     return provider?.auth.apiKey ? [{ id, name: provider.name }] : [];
   });
-  const models = (await runtime.getAvailable()).map(capabilities);
+  const models = (await runtime.getAvailable()).map((m) =>
+    workspace.preferences.apply(capabilities(m)),
+  );
   const model = session?.model;
   return {
     providers,
     models,
+    loginProviders: await loginProviders(runtime),
     ...(session && model
       ? {
           model: { provider: model.provider, id: model.id },
@@ -51,7 +60,13 @@ export async function selectModel(
   requested?: string,
 ): Promise<SessionModelSelection> {
   const model = target(workspace, ref);
-  const effort = supportedEffort(model, requested ?? session.thinkingLevel);
+  // The model's default effort (per-model setting, T29) applies when none is given.
+  const effort = supportedEffort(
+    model,
+    requested ??
+      workspace.preferences.defaultEffort(model, supportedEfforts(model)) ??
+      session.thinkingLevel,
+  );
   await session.setModel(model);
   session.setThinkingLevel(effort);
   return { model: ref, effort };

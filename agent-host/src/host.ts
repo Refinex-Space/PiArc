@@ -29,6 +29,8 @@ import {
   type TestOAuthProviderConfig,
 } from './runtime/test-oauth-provider.js';
 import { agentDirOf, openWorkspace } from './runtime/workspace.js';
+import { parsePreferences } from './providers/preferences.js';
+import { Logins } from './providers/login.js';
 import { CoreIo, DEFAULT_PROFILE, ExecOutputRouter, type ToolProfile } from './tools/index.js';
 
 /** Capabilities this Agent Host announces in `host/hello`. The models capability includes session selection and provider settings. */
@@ -41,6 +43,8 @@ export const HOST_CAPABILITIES: readonly string[] = [
   'ask',
   'context',
   'checkpoints',
+  'webFetch',
+  'login',
 ];
 
 /** Exit codes, for Core's log and restart decisions. */
@@ -202,10 +206,11 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
   });
   connection.handle('models/reload', async (params) => {
     const method = 'models/reload';
-    const { allowNetwork } = paramsObject(method, params);
+    const { allowNetwork, preferences } = paramsObject(method, params);
     if (typeof allowNetwork !== 'boolean')
       throw new AhpError('invalidParams', 'Expected allowNetwork');
     const registry = await sessions(method);
+    if (preferences != null) await registry.setPreferences(parsePreferences(preferences));
     await credentials.synchronize();
     await registry.workspace.reload(allowNetwork);
     return {};
@@ -219,6 +224,33 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
       stringField(method, fields, 'provider'),
       fields.credential,
       fields.keepKey === true,
+    );
+  });
+  // Sign-in (T29): one `Logins` per Host, made when the workspace is ready.
+  let logins: Logins | undefined;
+  const loginsFor = async (method: string): Promise<Logins> => {
+    const registry = await sessions(method);
+    logins ??= new Logins(registry.workspace.modelRuntime, connection.bridge, log);
+    return logins;
+  };
+  connection.handle('models/login/start', async (params) => {
+    const method = 'models/login/start';
+    const fields = paramsObject(method, params);
+    return (await loginsFor(method)).start(
+      stringField(method, fields, 'loginId'),
+      stringField(method, fields, 'provider'),
+    );
+  });
+  connection.handle('models/login/cancel', async (params) => {
+    const method = 'models/login/cancel';
+    return (await loginsFor(method)).cancel(
+      stringField(method, paramsObject(method, params), 'loginId'),
+    );
+  });
+  connection.handle('models/logout', async (params) => {
+    const method = 'models/logout';
+    return (await loginsFor(method)).logout(
+      stringField(method, paramsObject(method, params), 'provider'),
     );
   });
   connection.handle('models/credentialStatus', async (params) => {
@@ -450,6 +482,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
         credentials,
         welcome.allowModelNetwork === true,
       );
+      if (welcome.modelPreferences != null) workspace.preferences.set(welcome.modelPreferences);
       if (options.testOAuthProvider !== undefined) {
         registerTestOAuthProvider(workspace.modelRuntime, options.testOAuthProvider);
         await testLogin(workspace.modelRuntime, options.testOAuthProvider, log);
