@@ -1,0 +1,136 @@
+{
+  "format": "piarc-l3-recording/1",
+  "side": "claude-code",
+  "version": "2.1.318",
+  "scenario": "perm-rules",
+  "run": {
+    "exit": 0,
+    "failures": []
+  },
+  "requests": [
+    {
+      "structure": {
+        "kind": "main",
+        "endpoint": "/v1/messages",
+        "keys": ["max_tokens", "messages", "model", "stream", "system", "tools"],
+        "stream": true,
+        "tools": [
+          {
+            "name": "Bash",
+            "description": {
+              "len": 5862,
+              "hash": "sha256:0123456789abcdef"
+            },
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "command": {
+                  "type": "string",
+                  "description": {
+                    "len": 31,
+                    "hash": "sha256:fedcba9876543210"
+                  }
+                }
+              },
+              "required": ["command"]
+            },
+            "keys": ["description", "input_schema", "name"],
+            "cache": false
+          }
+        ],
+        "system": [
+          {
+            "type": "text",
+            "text": "You are a careful coding agent. Follow the instructions below and keep answers short.",
+            "cache": true
+          }
+        ],
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "len": 18,
+                "hash": "sha256:a1a2a3a4a5a6a7a8",
+                "cache": false
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "tool_use",
+                "id": "push",
+                "name": "Bash",
+                "input": {
+                  "command": "git push origin main"
+                },
+                "cache": false
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "tool_result",
+                "tool_use_id": "push",
+                "is_error": true,
+                "len": 120,
+                "cache": true
+              }
+            ]
+          }
+        ]
+      },
+      "outcome": "streamed",
+      "violations": []
+    }
+  ],
+  "trace": {
+    "tool_calls": [
+      {
+        "id": "push",
+        "tool": "Bash",
+        "status": "declined"
+      }
+    ],
+    "asks": [
+      {
+        "tool": "Bash",
+        "call": "push",
+        "decision": "deny",
+        "scripted": true
+      }
+    ],
+    "hooks": [
+      {
+        "hook": "bash",
+        "event": "PreToolUse",
+        "fields": [
+          "cwd",
+          "hook_event_name",
+          "session_id",
+          "tool_input",
+          "tool_name",
+          "tool_use_id"
+        ],
+        "tool": "Bash",
+        "tool_use_id": "push",
+        "run": 0,
+        "returned": {
+          "exit": 0,
+          "decision": "deny"
+        }
+      }
+    ],
+    "final": {
+      "status": "completed"
+    },
+    "files": {
+      "notes.txt": "sha256:a98a27ec1343bccd"
+    }
+  }
+}

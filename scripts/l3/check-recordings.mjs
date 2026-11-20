@@ -4,9 +4,9 @@
 //
 // 1. the whitelist schema below (closed objects everywhere except a tool's input schema and a
 //    scripted tool input, whose strings the scan covers);
-// 2. a scan of every string, keys included: natural-language text — more than
-//    PROSE_MIN_CHARS characters with at least PROSE_MIN_SPACES whitespace runs, or anything
-//    longer than MAX_CHARS — is an error.
+// 2. a scan of every string, keys included: natural-language text (`isProse`: mostly plain
+//    words, or anything longer than MAX_CHARS) is an error. Scripted tool inputs are commands
+//    and paths, which are not mostly words; scenarios keep them under MAX_CHARS.
 //
 // Usage: node scripts/l3/check-recordings.mjs <file or directory>...   (exit 1 on a problem)
 // `npm run l3` runs it after every recording.
@@ -19,7 +19,8 @@ import { isMain } from '../lib/repo.mjs';
 import { FORMAT } from './recording.mjs';
 
 export const PROSE_MIN_CHARS = 40;
-export const PROSE_MIN_SPACES = 5;
+export const PROSE_MIN_WORDS = 6;
+export const PROSE_WORD_SHARE = 0.8;
 export const MAX_CHARS = 160;
 
 const fingerprint = {
@@ -211,12 +212,19 @@ const ajv = new Ajv2020({ allErrors: true, strict: false });
 const validate = ajv.compile(SCHEMA);
 
 /**
- * Whether `text` reads as natural language rather than an identifier, path or command.
+ * Whether `text` reads as natural language rather than an identifier, path or command:
+ * longer than PROSE_MIN_CHARS with at least PROSE_MIN_WORDS whitespace-separated pieces, of
+ * which at least PROSE_WORD_SHARE are plain words (letters, an optional apostrophe part and
+ * trailing punctuation); or anything longer than MAX_CHARS.
  * @param {string} text
  */
 export function isProse(text) {
   if (text.length > MAX_CHARS) return true;
-  return text.length > PROSE_MIN_CHARS && (text.match(/\s+/g)?.length ?? 0) >= PROSE_MIN_SPACES;
+  if (text.length <= PROSE_MIN_CHARS) return false;
+  const pieces = text.trim().split(/\s+/);
+  if (pieces.length < PROSE_MIN_WORDS) return false;
+  const words = pieces.filter((p) => /^[("'`]?\p{L}+(['’]\p{L}+)?[)"'`]?[.,;:!?]?$/u.test(p));
+  return words.length / pieces.length >= PROSE_WORD_SHARE;
 }
 
 /**

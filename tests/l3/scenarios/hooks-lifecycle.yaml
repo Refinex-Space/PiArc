@@ -1,7 +1,7 @@
 id: hooks-lifecycle
 area: hooks
 description: SessionStart and UserPromptSubmit hooks add context, a Stop hook blocks once with a reason and then lets the turn end, and a SessionEnd hook runs when the session ends.
-mirrors: [hooks-session-start, hooks-user-prompt-submit, hooks-stop, hooks-session-end]
+mirrors: [hooks-session-start, hooks-session-start-order, hooks-user-prompt-submit, hooks-stop, hooks-session-end]
 workspace:
   files:
     .claude/settings.json: |

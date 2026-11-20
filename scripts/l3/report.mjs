@@ -15,6 +15,12 @@ import { isRecord } from '../lib/repo.mjs';
  *   home: { files: number, changes: string[] }, repeat: number }} Results
  */
 
+/** @param {Record<string, string>} byCall */
+function asks(byCall) {
+  const list = Object.entries(byCall).map(([call, answer]) => `${call}: ${answer}`);
+  return list.length === 0 ? 'none' : list.join(', ');
+}
+
 /** @param {unknown} value */
 function cell(value) {
   if (value === undefined) return '—';
@@ -50,7 +56,7 @@ function hooksSection(s) {
     };
     const fields = (/** @type {unknown} */ call) => {
       const f = get(call, 'fields');
-      return Array.isArray(f) ? f.join(', ') : undefined;
+      return isRecord(f) ? Object.keys(f).join(', ') : undefined;
     };
     lines.push(
       `| ${key} | ${String(get(p, 'event') ?? get(c, 'event'))} | ${cell(fields(p))} | ${cell(fields(c))} | ${cell(returned(p))} | ${cell(returned(c))} |`,
@@ -107,10 +113,7 @@ export function renderReport(results) {
         `| ${id} | ${String(p?.tool ?? c?.tool)} | ${p?.status ?? '—'} | ${c?.status ?? '—'} |`,
       );
     }
-    lines.push(
-      '',
-      `Approvals: PiArc ${s.piarc.asks.join(', ') || 'none'}; Claude Code ${s.claude.asks.join(', ') || 'none'}.`,
-    );
+    lines.push('', `Approvals: PiArc ${asks(s.piarc.asks)}; Claude Code ${asks(s.claude.asks)}.`);
     if (s.area === 'hooks') lines.push(...hooksSection(s));
     if (s.unexplained.length > 0) {
       lines.push(

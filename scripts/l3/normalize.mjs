@@ -8,7 +8,8 @@
 // - Tool calls: keyed by the scripted call id, with the canonical tool name, the input in
 //   Claude Code's parameters (PiArc's mapped back, scripts/l3/scenario.mjs) and the status
 //   (`completed`, `failed`, `declined`, `interrupted`, or `absent`).
-// - Approvals as `<tool> <call> <decision>` in order; hooks as their order and one record per
+// - Approvals by tool call id as `<tool> <decision>`; each hook input field name as its own
+//   key, so a difference names the field; hooks as their order and one record per
 //   invocation (`<hook>#<run>`); the final status; the workspace's file hashes.
 //
 // Ids, timestamps and absolute paths are already gone (the recorder replaced paths with
@@ -166,12 +167,14 @@ export function normalize(recording) {
       ),
     },
     tool_results: results,
-    asks: recording.trace.asks
-      .filter(isRecord)
-      .map(
-        (a) =>
-          `${String(a.tool)} ${String(a.call)} ${String(a.decision)}${a.scripted === false ? ' (unscripted)' : ''}`,
-      ),
+    asks: Object.fromEntries(
+      recording.trace.asks
+        .filter(isRecord)
+        .map((a) => [
+          String(a.call),
+          `${String(a.tool)} ${String(a.decision)}${a.scripted === false ? ' (unscripted)' : ''}`,
+        ]),
+    ),
     hooks: {
       order: hooks.map((h) => `${String(h.event)}:${String(h.hook)}`),
       calls: Object.fromEntries(
@@ -181,7 +184,9 @@ export function normalize(recording) {
             event: h.event,
             tool: h.tool,
             tool_use_id: h.tool_use_id,
-            fields: h.fields,
+            fields: Object.fromEntries(
+              (Array.isArray(h.fields) ? h.fields : []).map((f) => [String(f), true]),
+            ),
             returned: h.returned,
           },
         ]),
