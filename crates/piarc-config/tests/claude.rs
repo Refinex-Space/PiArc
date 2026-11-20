@@ -354,13 +354,16 @@ fn unknown_planned_and_ignored_keys_are_each_listed() {
             "enabledPlugins": { "x@y": true },
             "statusLine": { "type": "command", "command": "x" },
             "madeUpKey": 1,
-            "model": "claude-opus"
+            "model": "claude-opus",
+            "outputStyle": "Explanatory"
         })
         .to_string(),
     );
     let settings = Settings::load(f.table(), TrustState::Trusted);
     assert!(settings.issues().is_empty(), "{:?}", settings.issues());
-    assert_eq!(settings.get("/model"), None);
+    // `model` applies since T31 (the default model of new sessions); `outputStyle` is planned.
+    assert_eq!(settings.get("/model"), Some(&json!("claude-opus")));
+    assert_eq!(settings.get("/outputStyle"), None);
     let reports = settings.diagnostics();
     assert_eq!(
         ignored(report(&reports, ids::CLAUDE_PROJECT)),
@@ -369,7 +372,7 @@ fn unknown_planned_and_ignored_keys_are_each_listed() {
             ("/enabledPlugins", IgnoreReason::Planned, Some("T40")),
             ("/env", IgnoreReason::Ignored, None),
             ("/madeUpKey", IgnoreReason::Unknown, None),
-            ("/model", IgnoreReason::Planned, Some("T29")),
+            ("/outputStyle", IgnoreReason::Planned, Some("T37")),
             (
                 "/permissions/disableBypassPermissionsMode",
                 IgnoreReason::Ignored,

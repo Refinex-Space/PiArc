@@ -13,6 +13,8 @@
 //!   leaving project hooks and allow rules out of the merge until the project is trusted.
 //! - Configuration diagnostics ([`diagnostics`]): every file's load state, applied,
 //!   overridden and ignored keys.
+//! - Subagent definition files ([`agents`], T31): discovery from a directory upward and the
+//!   user levels, frontmatter parsing and the merge by name.
 //!
 //! # Not responsible for
 //!
@@ -29,6 +31,7 @@
 //! The authoritative rules are in `crates/deps-rules.json`, enforced by
 //! `scripts/ci/check-crate-deps.mjs` (architecture section 7.1).
 
+pub mod agents;
 pub mod claude;
 pub mod diagnostics;
 pub mod executables;

@@ -204,3 +204,30 @@ fn a_hook_whose_arguments_shell_or_condition_change_is_a_new_item() {
     assert!(new_items(&enumerate(&root).items, &trusted).is_empty());
     let _ = std::fs::remove_dir_all(&root);
 }
+
+#[test]
+fn subagent_hooks_are_executable_items() {
+    let root = std::env::temp_dir().join(format!("piarc-exec agents 中文 {}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    put(
+        &root,
+        ".claude/agents/review/reviewer.md",
+        "---\nname: reviewer\ndescription: d\nhooks:\n  PreToolUse:\n    - matcher: Bash\n      hooks:\n        - type: command\n          command: ./check.sh\n---\nbody\n",
+    );
+    put(
+        &root,
+        ".piarc/agents/plain.md",
+        "---\nname: plain\ndescription: d\n---\nbody\n",
+    );
+    put(&root, ".piarc/agents/broken.md", "no frontmatter");
+    let inventory = enumerate(&root);
+    assert_eq!(
+        inventory.items,
+        [item(
+            Category::Hook,
+            ".claude/agents/review/reviewer.md",
+            "PreToolUse[Bash] ./check.sh"
+        )]
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}

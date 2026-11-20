@@ -51,13 +51,7 @@ pub fn parse(text: &str) -> Rule {
         paths: None,
         body: text.to_owned(),
     };
-    let Some(rest) = text
-        .strip_prefix("---\n")
-        .or_else(|| text.strip_prefix("---\r\n"))
-    else {
-        return unconditional();
-    };
-    let Some((yaml, body)) = split_closing(rest) else {
+    let Some((yaml, body)) = split_frontmatter(text) else {
         return unconditional();
     };
     let Ok(front) = serde_saphyr::from_str::<Option<Frontmatter>>(yaml) else {
@@ -81,6 +75,14 @@ pub fn parse(text: &str) -> Rule {
         paths,
         body: body.to_owned(),
     }
+}
+
+/// A Markdown file's YAML frontmatter (between `---` lines at its start) and the rest.
+pub(crate) fn split_frontmatter(text: &str) -> Option<(&str, &str)> {
+    let rest = text
+        .strip_prefix("---\n")
+        .or_else(|| text.strip_prefix("---\r\n"))?;
+    split_closing(rest)
 }
 
 fn split_closing(rest: &str) -> Option<(&str, &str)> {

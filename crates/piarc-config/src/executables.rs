@@ -6,8 +6,9 @@
 //! `.piarc/settings.local.json`, `.claude/settings.json`, `.claude/settings.local.json`
 //! (`hooks`, `permissions.allow`, `enabledPlugins`), `.mcp.json` (`mcpServers`),
 //! `.claude-plugin/plugin.json` and `marketplace.json` (plugins), `.pi/extensions/` (one item
-//! per entry), `.pi/settings.json` (`extensions`, `packages`) and `.pi/mcp.json`
-//! (`mcpServers`).
+//! per entry), `.pi/settings.json` (`extensions`, `packages`), `.pi/mcp.json`
+//! (`mcpServers`) and the `hooks` of subagent definitions in `.piarc/agents/` and
+//! `.claude/agents/` (T31).
 
 use std::collections::BTreeSet;
 use std::io;
@@ -120,6 +121,7 @@ pub fn enumerate(root: &Path) -> Inventory {
     if let Some(pi) = read(".pi/settings.json") {
         pi_settings_items(&pi, &mut items);
     }
+    agent_hook_items(root, &mut items, &mut unreadable);
     match extension_entries(&root.join(".pi").join("extensions")) {
         Ok(names) => {
             for name in names {
@@ -134,6 +136,45 @@ pub fn enumerate(root: &Path) -> Inventory {
     Inventory {
         items: items.into_iter().collect(),
         unreadable,
+    }
+}
+
+/// Hooks of the workspace's subagent definitions (`.piarc/agents/`, `.claude/agents/`, T31):
+/// they run while such a subagent runs, so they are executable project configuration. Files
+/// that are not valid definitions define nothing.
+fn agent_hook_items(root: &Path, items: &mut BTreeSet<Item>, unreadable: &mut Vec<Unreadable>) {
+    use piarc_protocol::subagent::AgentSource;
+    for (source, dir) in [
+        (AgentSource::ProjectPiarc, ".piarc/agents"),
+        (AgentSource::ProjectClaude, ".claude/agents"),
+    ] {
+        let files = match crate::rules::rule_files(&root.join(dir)) {
+            Ok(files) => files,
+            Err(error) => {
+                unreadable.push(Unreadable {
+                    source: dir.to_owned(),
+                    reason: error.to_string(),
+                });
+                continue;
+            }
+        };
+        for path in files {
+            let Ok(text) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            let Ok(definition) = crate::agents::parse(&path, source, &text) else {
+                continue;
+            };
+            if let Some(hooks) = definition.hooks {
+                let relative = path.strip_prefix(root).unwrap_or(&path);
+                let source = relative
+                    .components()
+                    .map(|c| c.as_os_str().to_string_lossy())
+                    .collect::<Vec<_>>()
+                    .join("/");
+                settings_items(&source, &serde_json::json!({ "hooks": hooks }), items);
+            }
+        }
     }
 }
 

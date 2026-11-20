@@ -82,8 +82,11 @@ const NONE: &str = "no corresponding PiArc feature";
 /// `.claude/settings.json`, `.claude/settings.local.json`).
 pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     ignored("$schema", "editor schema reference"),
-    planned("advisorModel", "T31", "model aliases"),
-    planned("agent", "T31", "subagents"),
+    ignored(
+        "advisorModel",
+        "Anthropic's server-side advisor tool; PiArc has none",
+    ),
+    planned("agent", "T48", "the main session as a subagent"),
     ignored("agentPushNotifEnabled", UI),
     ignored("allowAllClaudeAiMcps", MANAGED),
     ignored("allowClaudeInChromeWithManagedMcp", MANAGED),
@@ -153,7 +156,7 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     planned("disableSkillShellExecution", "T37", "skills"),
     ignored("disableWorkflows", NONE),
     ignored("editorMode", UI),
-    planned("effortLevel", "T29", "model settings"),
+    active("effortLevel", "/effortLevel"),
     ignored("emojiCompletionEnabled", UI),
     planned("enableAllProjectMcpServers", "T36", "MCP servers"),
     ignored("enableArtifact", NONE),
@@ -196,7 +199,7 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     ignored("maxEffortLevel", NONE),
     ignored("maxProseWidth", UI),
     ignored("minimumVersion", NONE),
-    planned("model", "T29", "model settings"),
+    active("model", "/model"),
     ignored("modelOverrides", NONE),
     ignored("modelPicker", UI),
     ignored("modelPricing", MANAGED),

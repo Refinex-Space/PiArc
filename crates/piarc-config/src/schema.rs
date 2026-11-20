@@ -275,9 +275,61 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
         name: "$schema",
         shape: Shape::String,
     },
+    // The default model of new sessions: `<provider>/<model id>` or an alias (T31; Claude
+    // Code's key of the same name).
     Field {
         name: "model",
         shape: Shape::String,
+    },
+    // The default effort of new sessions (T31; Claude Code's key of the same name).
+    Field {
+        name: "effortLevel",
+        shape: Shape::OneOf(&["low", "medium", "high", "xhigh", "max"]),
+    },
+    // The model alias table (T31, architecture section 6.13): alias → `<provider>/<model id>`.
+    // `haiku`, `sonnet` and `opus` follow `fast`, `balanced` and `strong` unless set.
+    Field {
+        name: "modelAliases",
+        shape: Shape::Object(&[
+            Field {
+                name: "fast",
+                shape: Shape::String,
+            },
+            Field {
+                name: "balanced",
+                shape: Shape::String,
+            },
+            Field {
+                name: "strong",
+                shape: Shape::String,
+            },
+            Field {
+                name: "haiku",
+                shape: Shape::String,
+            },
+            Field {
+                name: "sonnet",
+                shape: Shape::String,
+            },
+            Field {
+                name: "opus",
+                shape: Shape::String,
+            },
+        ]),
+    },
+    // Subagent limits (T31): levels below the main session and runs at once per main session.
+    Field {
+        name: "subagents",
+        shape: Shape::Object(&[
+            Field {
+                name: "maxDepth",
+                shape: Shape::Number,
+            },
+            Field {
+                name: "maxConcurrent",
+                shape: Shape::Number,
+            },
+        ]),
     },
     Field {
         name: "permissions",
