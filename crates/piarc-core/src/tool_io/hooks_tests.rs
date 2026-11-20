@@ -228,9 +228,19 @@ impl Fixture {
     }
 
     async fn hooks_run(&self, params: Value) -> Result<Value, piarc_protocol::ErrorObject> {
+        self.hooks_run_from(true, params).await
+    }
+
+    /// `hooks/run` from an Agent Host whose workspace has (`ours`) or lacks the session.
+    async fn hooks_run_from(
+        &self,
+        ours: bool,
+        params: Value,
+    ) -> Result<Value, piarc_protocol::ErrorObject> {
         self.io
             .hooks_run(
                 &self.work,
+                ours,
                 params.as_object().expect("params").clone(),
                 &self.peer,
             )
@@ -797,4 +807,31 @@ async fn an_input_without_hooks_does_not_wait_for_the_login_shell() {
         waited < Duration::from_secs(1),
         "the input waited {waited:?}"
     );
+}
+
+#[tokio::test]
+async fn hooks_run_refuses_an_open_session_of_another_workspace() {
+    // R3: an Agent Host names a session that is open in Core but not in its workspace, with a
+    // working directory inside its own workspace. Core must not run that session's hooks.
+    let f = Fixture::new(Setup {
+        user: json!({ "Stop": group("", &[command(&records("stop"))]) }),
+        ..Setup::default()
+    })
+    .await;
+    let cwd = crate::tool_io::policy::lexical(&f.work);
+    let params = json!({"sessionId": SESSION, "event": "stop", "cwd": cwd.to_string_lossy(),
+        "input": {"stop_hook_active": false, "last_assistant_message": "Done."}});
+    let refused = f
+        .hooks_run_from(false, params.clone())
+        .await
+        .expect_err("another workspace's session");
+    assert_eq!(
+        refused.data.kind,
+        piarc_protocol::ErrorKind::SessionNotFound
+    );
+    assert!(f.log("stop").is_empty(), "no hook ran");
+    f.hooks_run_from(true, params)
+        .await
+        .expect("its own session");
+    assert_eq!(f.log("stop").len(), 1);
 }

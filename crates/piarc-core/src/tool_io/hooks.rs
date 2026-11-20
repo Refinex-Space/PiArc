@@ -160,12 +160,13 @@ impl ToolIo {
         }
     }
 
-    /// AHP `hooks/run` from the Agent Host of `workspace`. The session may already be closed
-    /// in Core (`SessionEnd`): its working directory then comes from the request and must lie
-    /// in the workspace.
+    /// AHP `hooks/run` from the Agent Host of `workspace`; `ours` says whether the session is
+    /// one of the workspace's. The session may already be closed in Core (`SessionEnd`): its
+    /// working directory then comes from the request and must lie in the workspace.
     pub(crate) async fn hooks_run(
         &self,
         workspace: &Path,
+        ours: bool,
         params: Map<String, Value>,
         peer: &Peer,
     ) -> Result<Value, ErrorObject> {
@@ -174,6 +175,17 @@ impl ToolIo {
         let Some(hooks) = self.hook_service() else {
             return to_value(&HooksRunResult::default());
         };
+        if !ours && self.session(&p.session_id).is_ok() {
+            // Open in Core but not in this workspace: its hooks, transcript and prompt
+            // ordering are not this Agent Host's to touch (R1-A13).
+            let mut error = ErrorObject::new(
+                ErrorKind::SessionNotFound,
+                format!("hooks/run: no session {} in this workspace", p.session_id),
+                false,
+            );
+            error.data.details = Some(json!({ "sessionId": p.session_id }));
+            return Err(error);
+        }
         let requested = PathBuf::from(&p.cwd);
         if !within(workspace, &requested) {
             return Err(ErrorObject::new(

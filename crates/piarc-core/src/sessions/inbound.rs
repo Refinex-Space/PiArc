@@ -45,10 +45,19 @@ impl InboundHandler for WorkspaceInbound {
         }
         if method == "hooks/run" {
             // Also for a session Core already closed (its `SessionEnd`): the working directory
-            // is checked against this workspace instead.
+            // is checked against this workspace instead. An open session must be ours (R3).
+            let ours = params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .is_some_and(|id| {
+                    self.sessions
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner)
+                        .contains(id)
+                });
             let io = self.tool_io.clone();
             let workspace = self.workspace.clone();
-            return Box::pin(async move { io.hooks_run(&workspace, params, &peer).await });
+            return Box::pin(async move { io.hooks_run(&workspace, ours, params, &peer).await });
         }
         if method == "exec/shells" {
             // Machine-wide, and asked while a session is being created (before it is ours).
