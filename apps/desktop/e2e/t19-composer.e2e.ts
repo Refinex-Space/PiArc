@@ -150,8 +150,14 @@ test('the / palette lists Core’s commands; an input method composition trigger
   await idle(page);
   await typeInComposer(page, '/');
   const palette = page.getByTestId('command-popup');
-  await expect(palette.getByRole('option')).toHaveCount(3);
-  await expect(palette.locator('[data-command]')).toHaveText([/\/clear/u, /\/compact/u, /\/help/u]);
+  // Core's built-in commands, in its order (`/rewind` since T28).
+  await expect(palette.getByRole('option')).toHaveCount(4);
+  await expect(palette.locator('[data-command]')).toHaveText([
+    /\/clear/u,
+    /\/compact/u,
+    /\/rewind/u,
+    /\/help/u,
+  ]);
   await page.screenshot({ path: testInfo.outputPath('command-palette.png') });
   await page.keyboard.type('hl');
   await expect(palette.locator('[data-command]')).toHaveText([/\/help/u]);
