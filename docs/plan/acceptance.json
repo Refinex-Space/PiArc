@@ -3023,8 +3023,8 @@
       "id": "T29-A11",
       "task": "T29",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "blocked",
-      "evidence": "本机环境阻塞（PLAN.md 登记 I114）：提交 0134d9d 上 npm run verify 14/15 通过，第 8 步 cargo test 中只有 piarc-core --test state 的两个设置监听用例因 20 s 内收不到 FSEvents 事件失败；cargo test --workspace --no-fail-fast 补跑 86 个测试目标 745 通过、仅这 2 例失败（日志 tmp/evidence/T29/verify/）。同样的 2 例在 T28 收尾提交 75af7b3 上同样失败、T29 开工基线时通过；piarc-fs 的监听测试要约 10 s 才收到首个事件；T29 未改动设置监听。待清理磁盘、重启后在本机重跑 npm run verify 关闭"
+      "status": "passing",
+      "evidence": "提交 7f9e79b 上 npm run verify 15/15 通过（Vitest 1301 通过 / 1 跳过；cargo test 全部通过，含 piarc-core --test state 7/7；L2 117 通过 / 2 按平台跳过、MISSING 0；日志 tmp/evidence/T29/verify/verify-7f9e79b.log）。此前 0134d9d 上第 8 步的 2 个设置监听用例因本机 FSEvents 投递变慢失败（I114，T29 未改动监听），清理磁盘、Spotlight 排除构建目录并重启后恢复：piarc-fs 监听测试 0.06 s，state 测试 0.71 s"
     },
     {
       "id": "T30-A01",
