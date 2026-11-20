@@ -237,6 +237,61 @@ impl OutputCapture {
     }
 }
 
+/// What a capture holds when its command moves to the background (T32): enough for the task's
+/// output file to start with everything printed so far.
+#[derive(Debug)]
+pub struct Handover {
+    /// Every character taken so far, when none was written to the spill file (or the file
+    /// failed: then the start and end, with a note on what is missing between).
+    pub text: Option<String>,
+    /// The spill file holds every character taken so far; it is flushed and closed. The
+    /// string is the path the model would have been told.
+    pub spilled: Option<String>,
+    /// The end of the output so far.
+    pub tail: String,
+    /// Bytes of a UTF-8 sequence not finished yet: stdout's, then stderr's.
+    pub pending: [Vec<u8>; 2],
+}
+
+impl OutputCapture {
+    /// Ends the capture without a summary and gives what it holds to the background task the
+    /// command became.
+    #[must_use]
+    pub fn hand_over(mut self) -> Handover {
+        let pending = std::mem::take(&mut self.pending);
+        if let Some((mut writer, path)) = self.spill.take() {
+            if writer.flush().is_ok() {
+                return Handover {
+                    text: None,
+                    spilled: Some(path),
+                    tail: self.tail,
+                    pending,
+                };
+            }
+            self.spill_error = Some(format!("cannot write {path}"));
+        }
+        let total = usize::try_from(self.total_chars).unwrap_or(usize::MAX);
+        let text = if total <= self.limits.inline_chars {
+            self.head
+        } else {
+            let tail = last_chars(&self.tail, self.tail_chars, self.tail_chars);
+            let missing = self
+                .total_chars
+                .saturating_sub((self.head_chars + self.tail_chars) as u64);
+            format!(
+                "{}\n[... {missing} characters were printed here but could not be saved ...]\n{tail}",
+                self.head
+            )
+        };
+        Handover {
+            text: Some(text),
+            spilled: None,
+            tail: self.tail,
+            pending,
+        }
+    }
+}
+
 fn index(stream: Stream) -> usize {
     match stream {
         Stream::Stdout => 0,
@@ -395,6 +450,26 @@ mod tests {
         assert!(out.truncated());
         assert_eq!(out.full_output_path, None);
         assert!(out.spill_error.expect("error").contains("disk full"));
+    }
+
+    #[test]
+    fn hands_over_short_output_as_text_and_long_output_as_the_spilled_file() {
+        let sink = Sink::default();
+        let mut short = capture(&sink);
+        short.push(Stream::Stdout, "前".as_bytes());
+        short.push(Stream::Stderr, &"中".as_bytes()[..1]);
+        let handed = short.hand_over();
+        assert_eq!(handed.text.as_deref(), Some("前"));
+        assert_eq!(handed.spilled, None);
+        assert_eq!(handed.pending[1], "中".as_bytes()[..1].to_vec());
+        let mut long = capture(&sink);
+        let full = "w".repeat(300);
+        long.push(Stream::Stdout, full.as_bytes());
+        let handed = long.hand_over();
+        assert_eq!(handed.text, None);
+        assert_eq!(handed.spilled.as_deref(), Some("~/out.txt"));
+        assert_eq!(text(&sink), full);
+        assert!(full.ends_with(&handed.tail));
     }
 
     #[test]

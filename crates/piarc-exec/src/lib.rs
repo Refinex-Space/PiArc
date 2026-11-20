@@ -6,7 +6,7 @@
 //!   `ProcessSpawner`.
 //! - Runs shell commands: finds the shells, builds their environment, applies timeouts, keeps
 //!   output within budget and spools the rest to disk, reads exit codes, tracks the working
-//!   directory. Moving timed-out commands to the background is T32's.
+//!   directory; writes background tasks' output files (T32).
 //!
 //! # Not responsible for
 //!
@@ -37,6 +37,9 @@
 //!   such as `grep`'s 1), [`env`] (the login shell's environment without PiArc's own variables),
 //!   [`shells`] (finding bash, Git Bash and PowerShell, and how they are invoked) and [`cwd`]
 //!   (the directory a bash command ended in).
+//! - T32: [`task_log`] (a background task's output file: bytes in read order, lines per pipe,
+//!   the last lines kept, byte ranges read back as text) and [`OutputCapture::hand_over`]
+//!   (what a foreground command printed before its timeout moved it to the background).
 //!
 //! The Windows `job` module is the crate's only unsafe code: a safe wrapper over the Job
 //! Object calls (coding standards section 2.8).
@@ -55,11 +58,12 @@ pub mod limits;
 pub mod semantic;
 pub mod shells;
 mod spawner;
+pub mod task_log;
 #[cfg(test)]
 mod termination_tests;
 mod tree;
 
-pub use capture::{CapturedOutput, OutputCapture, SpillTarget};
+pub use capture::{CapturedOutput, Handover, OutputCapture, SpillTarget};
 pub use command::{
     CommandExit, CommandRunner, CommandSpec, EXIT_GRACE, Launcher, OutputChunk, Stream,
 };
@@ -68,4 +72,5 @@ pub use limits::{ExecLimits, Timeout};
 pub use semantic::{Interpretation, interpret};
 pub use shells::{Shells, msys_to_windows};
 pub use spawner::TokioProcessSpawner;
+pub use task_log::TaskLog;
 pub use tree::ProcessTreeSpawner;
