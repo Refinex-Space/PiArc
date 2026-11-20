@@ -160,7 +160,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | R3 | [M2 评审](tasks/R3-m2-review.md) | 3 | T30、W1 | macOS | high / 高 | 中 | 无 | 部分完成 | 8e2b4a2 |
 | W2 | [Windows：M2 达标](tasks/W2-windows-m2-parity.md) | 4 | R3 | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T31 | [子 agent 与模型别名](tasks/T31-subagents-and-model-aliases.md) | 4 | R3 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 7ec1971 |
-| T32 | [后台任务、Monitor 与 KillShell](tasks/T32-background-tasks-and-monitor.md) | 4 | T31 | macOS | high / 高 | 中 | 无 | 进行中 | — |
+| T32 | [后台任务、Monitor 与 KillShell](tasks/T32-background-tasks-and-monitor.md) | 4 | T31 | macOS | high / 高 | 中 | 无 | 部分完成 | ef39d43 |
 | T33 | [无头终端（Core 侧）](tasks/T33-headless-terminal.md) | 4 | T32 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T34 | [终端渲染器与终端面板](tasks/T34-terminal-renderer-and-panel.md) | 4 | T33 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T35 | [Worktree、并行会话、多窗口、全文搜索与后台常驻](tasks/T35-worktrees-parallel-sessions-and-windows.md) | 4 | T34 | macOS | high / 高 | 大 | 无 | 未开始 | — |
@@ -309,18 +309,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-T32（后台任务、Monitor 与 KillShell），基线 9a44d7c（复用 7ec1971 的全量 verify）：
-
-- [x] 1 任务管理器（Core）：任务模型与状态机、`background_tasks` 表（schema v7）、带 `revision` 的实体快照、进程句柄归 Core、应用退出记 `interrupted`、归档清理输出（`piarc-core::tasks`，ADR-0049；单测 `--lib tasks::`，集成 `tests/background_tasks.rs`）
-- [x] 2 `Bash` 的 `run_in_background` 与前台超时转后台（同一进程句柄）、输出写 `sessions/<id>/tasks/<taskId>.log`、`exec/background/list`、`exec/background/read`
-- [x] 3 完成通知：`session/remind` 的 `backgroundTask` 提醒注入下一回合（Agent Host 重启后照常送达；`tests/sessions/tasks.rs`）
-- [x] 4 `KillShell`：整棵进程树、只限本会话（含子 agent）、尾部预览
-- [x] 5 `Monitor`：审批（Bash 规则、Bash 分析、`Bash` matcher hooks）、逐行回灌、限速与总量上限、空闲唤醒、结束条件、可注入时钟
-- [x] 6 后台子 agent 迁入任务管理器（`kind: subagent`，面板停止中止子会话）
-- [ ] 7 客户端：后台任务面板与右栏卡、分段读输出、停止按钮
-- [x] 8 L2 场景 `bg-*`、`monitor-*` 与能力 ID；更新 T17 超时场景期望（`exec-timeout-kills-tree` 改为转后台后 KillShell）
-- [ ] 9 验收 T32-A01–A13；AGENTS.md、复用表、架构与 ADR、登记事项（T17 验收项描述需用户修改）
-
 ## 登记事项
 
 任务执行中发现、但不属于本任务范围的问题，在这里登记：编号（I01 起）、发现于哪个任务、内容、建议由哪个任务处理。处理完成后在"建议处理"一列注明"已落地"与位置。
@@ -329,7 +317,7 @@ T32（后台任务、Monitor 与 KillShell），基线 9a44d7c（复用 7ec1971 
 |---|---|---|---|
 | I01 | 制定计划 | Claude Code 当前默认使用 TaskCreate / TaskUpdate 等任务工具，TodoWrite 已是旧版（`claude-official-capabilities.md`）。PiArc 的规范名仍是 TodoWrite，权限规则与 L3 比对会出现差异 | T26 评估是否增加兼容映射；T30 先把差异写入 L3 allowlist；**T26 评估：不加映射**。PiArc 的清单工具只有 `TodoWrite`（规范名，参数与 Claude Code 一致），`TaskCreate`/`TaskUpdate` 是拆成多次调用的另一种接口，模型可见名之间映射会让规则与 hooks 的 matcher 对不上；写 `TaskCreate(…)` 规则或 matcher 的用户需要改写为 `TodoWrite`，T30 仍把差异写入 L3 allowlist；**已落地（T30）**：`tests/l3-allowlist.yaml` 的 `requests.items[*].tools.TodoWrite` 条目 |
 | I02 | 制定计划 | FR-MD-05 要求 skills 能引用模型别名，但架构第 6.7 节的 skill frontmatter 没有 `model` 字段 | T37 评估：支持则补架构与实现，不支持则改需求描述 |
-| I03 | 制定计划 | Monitor 在会话空闲时唤醒会话（按 Claude Code 官方行为）会自动产生模型费用 | T32 实现时提供开关与限速，R4 请用户确认默认值 |
+| I03 | 制定计划 | Monitor 在会话空闲时唤醒会话（按 Claude Code 官方行为）会自动产生模型费用 | T32 实现时提供开关与限速，R4 请用户确认默认值；**已落地（T32）**：设置 `monitor.wakeIdleSession`（合并层，默认 true，关掉时新行只排队、不唤醒）与唤醒间隔 30 s（`piarc_core::tasks::TaskLimits::monitor_wake_interval`），单批与总量限速同在 `TaskLimits`；R4 请用户确认默认值 |
 | I04 | 制定计划 | macOS App Intents 在 ad-hoc 签名下能否工作，M0 没有验证（需要 Xcode 生成的元数据随包分发） | T49 先做可行性原型；不可行时写 ADR 提议。若想提前知道结论，可在 R1 时追加一次快速验证；R1 决定：不在 R1 追加验证，T49 先做可行性原型（不影响 M1） |
 | I05 | 制定计划 | 架构第 6.10 节说 MCP server 在沙箱外，但 stdio MCP server 由 Agent Host 启动，会继承 Agent Host 的 Seatbelt 写入限制（第 10.3 节） | T39 定稿 Agent Host 配置时澄清并更新架构；放宽写入范围属于变更型 |
 | I06 | T01 | `npm audit` 报告 8 个 moderate（GHSA-g3hv-75wg-m249，minimatch 经 eslint 10.14 与 typescript-eslint 8.72 引入，仅开发工具链，不进安装包）；架构第 13.3 节要求的 `npm audit`、`cargo-audit` 尚未接入 CI（cargo-deny 的 advisories 已覆盖 RustSec 数据库） | 上游修复后升级 eslint 与 typescript-eslint；T45 或 T50 把 `npm audit --omit=dev` 接入 CI |
@@ -457,11 +445,15 @@ T32（后台任务、Monitor 与 KillShell），基线 9a44d7c（复用 7ec1971 
 | I128 | R3 | `piarc-policy`、`piarc-hooks` 没有 `error.rs`，公开解析函数返回 `Result<_, String>`；`piarc-web` 的 `FetchError` 写在 `lib.rs`，`piarc-hooks/src/lib.rs` 含实现；审计步骤名是字符串（`policy.rs` 按字符串匹配 `hookDeny` 等）（R3 审查 Q4） | T31（`piarc-policy` 加 `Agent` 规则时）与 T38（`piarc-hooks`、`piarc-web`）按编码规范 2.1、2.3 补错误枚举并把实现移出 `lib.rs`；**T31 已落地 `piarc-policy` 部分**：`piarc_policy::Error`（`error.rs`，`kind()`、`retryable()`、`to_error_object()`），`rules::parse`、`paths::parse` 返回它；`piarc-hooks`、`piarc-web` 与审计步骤名仍归 T38 |
 | I129 | T31 | 子 agent frontmatter 的 `isolation`（T35）、`mcpServers`（T36）、`skills`（T37）只解析与校验，设置页与子 agent 卡标"暂未生效"（`inactiveField`）；带 `isolation: worktree` 的调用返回明确错误，不在主工作树中运行 | 对应任务实现时让字段生效、去掉 `inactiveField` 警告，并更新 L2 `subagent-denied-type` 的 worktree 断言 |
 | I130 | T31 | Claude Code 设置键 `agent`（主线程以某个子 agent 的身份运行）在 `SETTINGS_KEYS` 中为 `planned(T48)` | T48 与 fork 子 agent 一起实现 |
-| I131 | T31 | 子会话的条目增量不下发（架构 7.6 的 `parentSessionId`）：进度是父会话 `subagent` 条目的 `SubagentState`，卡片展开后按状态或工具调用数变化重新读取转录，子 agent 的长回复不实时显示 | R4 评估；T32 的后台任务面板需要实时显示子会话时实现带 `parentSessionId` 的增量 |
+| I131 | T31 | 子会话的条目增量不下发（架构 7.6 的 `parentSessionId`）：进度是父会话 `subagent` 条目的 `SubagentState`，卡片展开后按状态或工具调用数变化重新读取转录，子 agent 的长回复不实时显示 | R4 评估；T32 的后台任务面板需要实时显示子会话时实现带 `parentSessionId` 的增量；T32 的后台任务面板对子 agent 只显示状态与停止（转录仍在子 agent 卡里看），没有用到子会话增量，仍待 R4 评估 |
 | I132 | T31 | 每个子会话各起一份 MCP server 进程（Pi 的 MCP 扩展按会话实例化），前台多个子 agent 并行时进程数随之增加 | T36 的 MCP 连接池覆盖子会话 |
 | I133 | T31 | 子会话在 Core 的登记（`ToolIo::open_linked`）不带沙箱；目前会话层还不开沙箱会话（只有测试使用 `open_sandboxed_session`） | T39 让会话进沙箱时，子会话随主会话进入同一沙箱策略 |
 | I134 | T31 | `Agent` 工具描述里的可选类型与可派出的定义在会话打开时确定，定义文件变化后要重新打开会话才生效；新增的 `Agent(类型)` deny 规则仍由 Core 在每次调用时按最新规则裁决 | T37 的 `resources/reload` 一并刷新子 agent 列表 |
 | I135 | T31 | 辅助模型的别名（`modelProviders.auxiliaryAlias`）只按用户级 `modelAliases` 解析：模型偏好不随工作区变，工作区 `.piarc/settings.json` 的别名对辅助模型不起作用 | R4 评估是否需要按工作区解析 |
+| I136 | T32 | T17-A01 的描述仍写"命令超时后整棵进程树被终止"：T32 起超时转为后台任务（同一进程继续运行），进程树终止的覆盖转到 KillShell、回合中断与应用退出（`exec-timeout-kills-tree` 已改为转后台后 KillShell）。能力 `CAP-EXEC-TIMEOUT-001`、`CAP-TOOL-BASH-002` 的标题已按新行为更新 | 用户按新行为修改 `acceptance.json` 与 T17 任务文件中 A01 的描述（协议不允许任务自行改写验收描述） |
+| I137 | T32 | 挂起的完成通知只在 Core 内存里：应用退出前已结束但还没送达的通知、以及因退出而中断的任务，重启后不告知模型（面板显示已中断） | R4 评估是否把挂起的通知写进 `background_tasks` 并在会话打开时补送 |
+| I138 | T32 | `monitor.wakeIdleSession` 只能在设置文件里改，唤醒间隔与 Monitor 限值没有用户入口（`TaskLimits` 默认值） | R4 与 I03 一起确认默认值；需要入口时由 T41（配置与设置完善）在设置页暴露 |
+| I139 | T32 | `core/tasks` 快照是全局最近 200 个任务的整表，每次变化至多每 250 ms 推一次（带每个任务的最后几行）：任务多、输出频繁时载荷偏大 | T44 的性能预算里测一次，必要时按工作区或会话分路由 |
 ## 技术债
 
 评审任务（R1–R6）汇总的技术债，按影响排序。每条的细节、负责任务与检查时间点在对应的登记事项中。
@@ -890,6 +882,14 @@ T32（后台任务、Monitor 与 KillShell），基线 9a44d7c（复用 7ec1971 
 - 整理：L2 运行器与格式校验拆分（e264e05，I88）、注册表拆出 `session-parts.ts`（e78571c）、三份超长 AGENTS.md 拆到子目录（60eaf18）、复用表补 M2 能力（da11683）、原创性检查覆盖参数描述与提醒句（cdaea4d，3,141 词 0 匹配）；架构 v2.38；登记 I120–I128，登记事项逐条关闭或指定任务。
 - 全量 L4 224 通过、5 跳过；`t18-review` 因终端无屏幕录制权限失败（已知），`t26-harness` 的"下一步"是测试等待竞态（撤掉 D2 仍失败），改为等待实际请求后 40/40（8e2b4a2）。Windows 交叉 Clippy 通过。证据在 `tmp/evidence/R3/`。
 - 下一项：macOS 上的 T31 与 Windows 上的 W2 都可开始；建议先 W2（R4 之前必须完成，并关闭 W1-A05），T31 可同时在 macOS 推进。本地提交，未推送。
+
+### 2026-11-20 T32 部分完成（提交 ef39d43）
+
+- 交付：Core 任务管理器 `piarc-core::tasks`（`TaskManager`：任务模型与状态机、`background_tasks` schema v7、`core/tasks` 带 `revision` 的快照、停止与权限范围、分段读取、应用退出记 `interrupted`、归档与删除清理）；`piarc-exec` 的 `TaskLog` 与 `OutputCapture::hand_over`；`exec/run` 的 `background` 与前台超时转后台（任务时钟计时、同一进程继续）、`exec/monitor`、`exec/background/list|read|kill`；完成通知挂起到送达、按类型与来源去重、在 prompt 前补送；Monitor 的批次、总量限速与空闲唤醒（`session/remind` 的 `key`、`wake`）；Monitor 走 Bash 规则与分析（不享受只读白名单），`Bash` matcher 的 hooks 匹配 Monitor；后台子 agent 登记为 `kind: subagent`、面板可停；Agent Host 的 `run_in_background`、`KillShell`、`Monitor` 与 `wake` 回合；客户端右栏后台任务卡、停靠面板（分段读输出、停止）、命令卡的后台状态、Monitor 事件行，IPC `stopTask`、`readTaskOutput`；L2 `bg-*` 5 个、`monitor-*` 4 个与 `exec-timeout-kills-tree` 改写、能力 ID 9 个；运行器 `advance_clock`、`stop_task`、`task_limits` 与 mock 的 `{{result:…}}` 占位符；会话层故障注入 `tests/sessions/tasks.rs`；L4 `t32-background.e2e.ts`。
+- 验收：11 项通过，A04（进程树测试的 Windows 部分）与 A13（verify 的 Windows CI 部分）等待用户推送后的 Windows CI，标 blocked。`npm run verify` 15/15（ef39d43，Vitest 1430 passed、L2 143 passed 2 个按平台跳过）；Windows 交叉 clippy 通过；L4 t32 2/2 与受影响的 preload、t29-views、t31-subagents 13/13（dev 形态，截图在 `tmp/evidence/T32/`）；原创性检查 4,846 词 0 匹配。
+- 决策：ADR-0049（补充）；架构 2.40。后台子 agent 的报告仍由 Agent Host 在同一提醒通道送达（ADR-0048 第 8 条不变），Core 只登记、停止与展示；Monitor 到时记为 `completed`；后台命令不随会话关闭结束。
+- 登记 I136（T17-A01 描述需用户修改）、I137（挂起通知不持久化）、I138（唤醒开关与限值的入口）、I139（`core/tasks` 快照载荷）；I03 落地开关与限速，待 R4 确认默认值。
+- 下一项：macOS 上的 T33（无头终端，依赖 T32）；Windows 上的 W2 仍可进行。本地提交，未推送。
 
 ## 计划变更记录
 

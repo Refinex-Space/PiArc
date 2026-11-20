@@ -3198,92 +3198,92 @@
       "id": "T32-A01",
       "task": "T32",
       "description": "`run_in_background` 启动的命令立即返回任务 ID 与输出路径，模型随后用 Read 读到输出。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `bg-run-in-background` 通过：Bash 带 run_in_background 的结果为 \"The command is running in the background as task bg-…\"（is_error false，条目 execution.task.reason=requested），任务结束后第 4 次请求中 Read 用 `{{result:…}}` 取出的输出路径读到 \"built 中文\"、\"all done\"；Core 集成 `cargo test -p piarc-core --test background_tasks` 的 a_background_command_answers_at_once_and_writes_its_output_file（< 900 ms 作答，exec/background/read 读回全文）。提交 ef39d43"
     },
     {
       "id": "T32-A02",
       "task": "T32",
       "description": "前台命令超时后转为后台任务，进程未被终止（PID 不变），工具结果说明已转后台。验证：L2 场景（超时调小）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `bg-timeout-to-background` 通过（advance_clock 推进任务时钟，不等真实超时）：命令先写 $$ 到 shell.pid，转后台后下一步 `kill -0 $(cat shell.pid)` 输出 \"alive:same\"（同一 PID 仍在运行），工具结果含 \"still running after its timeout of 5 seconds, so it moved to the background as task bg-\" 与 \"instead of being stopped; it keeps running.\"，条目 execution {timedOut: true, timeoutMs: 5000, task.reason: timeout}，释放后任务 completed、尾部 [started, released]；`exec_commands` 的 timeouts_report_the_limit_and_a_cut_request 改为断言转后台并读到已有输出 \"partial\"。提交 ef39d43"
     },
     {
       "id": "T32-A03",
       "task": "T32",
       "description": "后台任务完成后，退出码、语义状态与输出路径在该会话下一回合以 system reminder 注入。验证：L2 场景（mock provider 请求断言）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `bg-completion-reminder` 通过（mock 请求断言）：两个后台任务结束后下一回合的请求含 \"[PiArc reminder]\"、\"has ended.\\nCommand: printf…\"、\"Status: failed (exit code 3)\"、\"Last lines:\\nchecking\\nbroken: 3 tests\"、\"Status: completed successfully (exit code 1: no matches)\"、\"Ran for: \"、\"bytes); read it with Read.\"，结束前的请求不含；单测 `--lib tasks::` 的 a_finished_command_leaves_a_notice_unless_killshell_stopped_it。提交 ef39d43"
     },
     {
       "id": "T32-A04",
       "task": "T32",
       "description": "KillShell 终止整棵进程树（含孙进程），状态为 `killed`，输出文件保留。验证：macOS 与 Windows CI 上的测试（进程表断言无残留）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "macOS 已通过，Windows CI 待推送后确认：`cargo test -p piarc-core --test background_tasks` 的 killshell_ends_the_whole_tree_and_keeps_the_output（子进程与忽略 SIGTERM 的孙进程在 KillShell 后按进程表 `kill -0` 均不存在，Windows 用 tasklist 与 /proc/<pid>/winpid；状态 killed，输出文件仍读回 \"started\"）；L2 `exec-timeout-kills-tree`（转后台后 KillShell，之后命令确认 ended:child.pid、ended:grand.pid）。Windows 用例随 verify 在 CI 运行，用户推送后由下一个任务按 CI 结果关闭。提交 ef39d43"
     },
     {
       "id": "T32-A05",
       "task": "T32",
       "description": "KillShell 无法停止其他会话启动的任务。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-core --test background_tasks` 的 killshell_cannot_stop_another_sessions_task（会话 t 停 s 的任务得到 NotFound，读取与列表同样看不到，s 自己能停）；单测 `--lib tasks::` 的 killshell_reaches_the_session_and_its_subagents_only（主会话能停自己与子 agent 的任务，子 agent 停不了主会话的任务，其他会话与不存在的 id 同样 notFound）。提交 ef39d43"
     },
     {
       "id": "T32-A06",
       "task": "T32",
       "description": "Monitor 把新增输出按行回灌给模型，超过单次限速或总量上限时截断并说明省略行数与文件路径。验证：L2 场景（mock provider 请求断言）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `monitor-wake-idle` 与 `monitor-rate-limit` 通过（mock 请求断言）：新行以 \"(errors in the log): 1 new line.\\nerror: disk full\" 进入请求；小限值场景第一批为 \"10 new lines.\\n[7 earlier lines left out; the full output is in …log.]\\nline 8\\nline 9\\nline 10\"，第二批到达总量上限时只带最新两行并写 \"[2 earlier lines left out…\" 与 \"This Monitor reached its limit of 100 characters for you; its further output is not sent.\"，之后再有输出也不再请求（请求总数 4）；单测 feed 的批次、省略与总量。提交 ef39d43"
     },
     {
       "id": "T32-A07",
       "task": "T32",
       "description": "Monitor 的命令受 Bash 规则、Bash 分析与 `Bash` matcher 的 PreToolUse hooks 约束，Manual 模式下需要审批。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `monitor-permissions`：Bash(cat *) deny 规则直接拒绝 Monitor 的 cat（结果含规则），Bash(sleep *) allow 规则让 Monitor 免审批启动，只读的 tail 在 Manual 下仍出审批卡并被拒（反馈 \"Not now.\"）；`monitor-hooks-bash-matcher`：matcher 为 Bash 的 PreToolUse hook 记录到 tool_name Monitor 与参数并以 deny 拒绝；piarc-hooks 单测 a_bash_matcher_takes_monitor_commands_on_tool_events。提交 ef39d43"
     },
     {
       "id": "T32-A08",
       "task": "T32",
       "description": "会话空闲时 Monitor 的新增输出唤醒会话，唤醒频率受限速约束。验证：L2 场景（时钟可注入）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `monitor-wake-idle` 通过（手动时钟）：会话空闲时第一行立即唤醒（第 3 次请求，转录条目为 monitorOutput 的 reminder），30 秒间隔内的第二行不唤醒、由用户下一条 prompt 带上（第 4 次请求同时含该行与 \"Anything new?\"），advance_clock 30 秒后第三行唤醒（第 5 次请求），请求总数恰为 5；单测 monitor_lines_go_out_at_once_in_a_turn_and_wake_an_idle_session_at_a_pace；agent_host 测试 a_keyed_reminder_wakes_the_idle_session_once（wake 开回合、重发答 delivered）。提交 ef39d43"
     },
     {
       "id": "T32-A09",
       "task": "T32",
       "description": "Agent Host 被杀并重启后，运行中的后台命令继续运行，完成通知照常送达。验证：故障注入测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "故障注入 `cargo test -p piarc-testkit --test sessions tasks::a_background_command_survives_an_agent_host_crash_and_its_notice_arrives`：后台命令运行中 SIGKILL Agent Host，新进程起来后任务仍 running，释放后命令打印 finished-bg 并 completed（exit 0），下一条 prompt 的请求含 \"has ended.\\nCommand: while\"、\"Status: completed successfully\"、\"Last lines:\\nfinished-bg\"。提交 ef39d43"
     },
     {
       "id": "T32-A10",
       "task": "T32",
       "description": "应用退出时全部后台进程树被终止，重启后这些任务显示为已中断。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-testkit --test sessions tasks::quitting_ends_background_trees_and_a_restart_shows_them_interrupted`：后台命令带子进程与忽略 SIGTERM 的孙进程，Core 有序关闭后两者均不存在；同一数据目录重启 Core，core/tasks 快照中该任务为 interrupted（未重跑）。提交 ef39d43"
     },
     {
       "id": "T32-A11",
       "task": "T32",
       "description": "T31 的后台子 agent 出现在任务管理器中，可从面板停止。验证：L2 场景与 Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `bg-subagent-stop`：后台子 agent 出现在 core/tasks（kind subagent、agentType scout、title、toolCallId），stop_task 后任务 killed、subagent/completed 为 interrupted，下一回合收到 \"ended (interrupted)\" 的提醒；L4 `t32-background.e2e.ts` 第二个用例在面板中看到 Subagent 任务并点停止，任务变为 Stopped、子 agent 卡 interrupted（截图 tmp/evidence/T32/l4/…subagent-running*.png、subagent-stopped*.png）。提交 ef39d43"
     },
     {
       "id": "T32-A12",
       "task": "T32",
       "description": "后台任务面板与右栏卡片显示状态、耗时与最新输出，停止按钮生效。验证：Playwright（截图存 `tmp/evidence/T32/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `PIARC_EVIDENCE_TASK=T32 npx playwright test -c apps/desktop/playwright.config.ts t32- --project dev` 2 passed：右栏卡显示 Command、Running、走动的耗时、最后三行 tick 1–3，面板读出输出 \"tick 1\\ntick 2\\ntick 3\\n\" 与 21 bytes，停止按钮后卡片与面板都为 Stopped；对话里的命令卡显示 \"In the background\" 与任务 id。截图 tmp/evidence/T32/l4/t32-background.e2e.ts-the--38d4c--show-a-command-and-stop-it-dev/（card-running、panel-output、card-stopped，明暗两套）。提交 ef39d43"
     },
     {
       "id": "T32-A13",
       "task": "T32",
       "description": "`npm run verify` 通过（含 Windows CI 上的进程树测试）。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "macOS 本机 `npm run verify` 全部通过（提交 ef39d43，见 PLAN 会话日志的步骤汇总）；Windows CI 上的进程树测试需用户推送后由下一个任务按 CI 结果关闭。"
     },
     {
       "id": "T33-A01",
