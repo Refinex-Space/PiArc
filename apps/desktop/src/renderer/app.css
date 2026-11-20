@@ -1610,3 +1610,97 @@ textarea.input {
   min-width: 0;
   flex: 1;
 }
+
+/* Background tasks (T32): the rail card and the dock panel. */
+:root[data-app] .bg-tasks-card,
+:root[data-app] .bg-tasks-panel {
+  display: grid;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-3);
+}
+:root[data-app] .bg-task-list {
+  display: grid;
+  gap: var(--piarc-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+:root[data-app] .bg-task {
+  display: grid;
+  gap: var(--piarc-space-1);
+  padding: var(--piarc-space-2);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-raised);
+}
+:root[data-app] .bg-task-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: var(--piarc-space-2);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .bg-task-kind,
+:root[data-app] .bg-task-duration {
+  color: var(--piarc-text-secondary);
+}
+:root[data-app] .bg-task-title {
+  overflow: hidden;
+  font-family: var(--piarc-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-app] .bg-task-status[data-status='running'] {
+  color: var(--piarc-text-accent);
+}
+:root[data-app] .bg-task-status[data-status='completed'] {
+  color: var(--piarc-text-success);
+}
+:root[data-app] .bg-task-status[data-status='failed'] {
+  color: var(--piarc-text-danger);
+}
+:root[data-app] .bg-task-status[data-status='killed'],
+:root[data-app] .bg-task-status[data-status='interrupted'] {
+  color: var(--piarc-text-warning);
+}
+:root[data-app] .bg-task-tail,
+:root[data-app] .bg-task-log {
+  overflow: auto;
+  margin: 0;
+  padding: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-surface-input);
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-caption);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+:root[data-app] .bg-task-log {
+  max-height: 24em;
+}
+:root[data-app] .bg-task-actions {
+  display: flex;
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .bg-task-stop {
+  justify-self: start;
+}
+:root[data-app] .bg-task-error {
+  margin: 0;
+  color: var(--piarc-text-danger);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .bg-task-group {
+  display: grid;
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .bg-task-group-title {
+  margin: 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+:root[data-app] .bg-task-output {
+  display: grid;
+  gap: var(--piarc-space-1);
+}

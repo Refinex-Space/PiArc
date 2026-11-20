@@ -2111,6 +2111,7 @@ dependencies = [
  "piarc-core",
  "piarc-ports",
  "piarc-protocol",
+ "regex",
  "serde",
  "serde-saphyr",
  "serde_json",

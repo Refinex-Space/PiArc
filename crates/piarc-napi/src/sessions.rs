@@ -860,8 +860,48 @@ impl CoreRuntime {
         })
     }
 
-    /// Sends the `core/workspaces` and `core/sessions` snapshots again (a window subscribed
-    /// anew). Only queues.
+    /// Stops background task `taskId` (the panel's stop button, T32); JSON text
+    /// `{ task, stopped, tail }`.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn stop_task<'env>(&self, env: &'env Env, task_id: String) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.stopTask", |core, done| {
+            core.stop_task(task_id, done)
+        })
+    }
+
+    /// At most 64 KiB of background task `taskId`'s output from byte `offset`, as JSON text
+    /// (`TaskOutputChunk`, T32).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn read_task_output<'env>(
+        &self,
+        env: &'env Env,
+        task_id: String,
+        offset: f64,
+        #[napi(ts_arg_type = "number | null")] length: Option<f64>,
+    ) -> napi::Result<Object<'env>> {
+        // JavaScript numbers: whole, non-negative byte counts below 2^53.
+        let bytes = |value: f64| {
+            if value.is_finite() && value >= 0.0 {
+                // The value is a whole number of bytes well inside u64.
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    clippy::cast_sign_loss,
+                    reason = "checked finite and non-negative; fractions are dropped"
+                )]
+                Some(value as u64)
+            } else {
+                None
+            }
+        };
+        let offset = bytes(offset).unwrap_or(0);
+        let length = length.and_then(bytes);
+        self.queue(env, "CoreRuntime.readTaskOutput", |core, done| {
+            core.read_task_output(task_id, offset, length, done)
+        })
+    }
+
+    /// Sends the `core/workspaces`, `core/sessions` and `core/tasks` snapshots again (a window
+    /// subscribed anew). Only queues.
     #[napi(catch_unwind)]
     pub fn resend_snapshots(&self, env: Env) -> napi::Result<()> {
         boundary::call(&env, "CoreRuntime.resendSnapshots", || {

@@ -45,6 +45,11 @@ export class StoreConnection {
           this.store.applyNotice(event);
         }
       }),
+      this.api.subscribeEvents('core/tasks', (batch) => {
+        for (const event of eventsOf(batch)) {
+          this.store.tasks.apply(event);
+        }
+      }),
     ]);
     await this.api.resendSnapshots();
   }

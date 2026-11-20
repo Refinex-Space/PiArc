@@ -11,6 +11,7 @@ import {
   type WorkspaceEntry,
 } from './snapshots.js';
 import { sameRequest } from './approvals.js';
+import { TaskList } from './tasks.js';
 import { SessionTranscript } from './transcript.js';
 
 /** A notice for the user from Core (`core/notices`, for example a missing Git Bash). */
@@ -40,6 +41,9 @@ export class AppStore {
   private readonly entryListeners = new Map<string, Set<() => void>>();
   private readonly noticeListeners = new Set<() => void>();
   private readonly transcriptListeners = new Set<(transcript: SessionTranscript) => void>();
+
+  /** Background tasks (T32): the `core/tasks` snapshot. */
+  readonly tasks = new TaskList();
 
   workspaces = (): readonly WorkspaceEntry[] => this.workspaceList;
   sessions = (): readonly SessionEntry[] => this.sessionList;

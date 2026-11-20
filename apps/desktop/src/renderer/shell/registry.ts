@@ -20,6 +20,10 @@ export interface PanelContext {
   readonly plan?: boolean;
   /** The Changes panel is open (T28: the changes card's button, Mod+Shift+D). */
   readonly changes?: boolean;
+  /** The selected session has background tasks (T32). */
+  readonly backgroundTasks?: boolean;
+  /** The selected session's workspace has background tasks (T32). */
+  readonly workspaceTasks?: boolean;
 }
 
 export interface PanelSpec {

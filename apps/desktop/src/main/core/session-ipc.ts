@@ -78,6 +78,8 @@ export type SessionCore = Pick<
   | 'transcriptWindow'
   | 'subagentTranscript'
   | 'stopSubagent'
+  | 'stopTask'
+  | 'readTaskOutput'
   | 'listAgents'
   | 'resendSnapshots'
   | 'projectTrust'
@@ -123,6 +125,14 @@ export class FaultInjector {
 
 /** Longest session title, in characters (Core's limit). */
 const MAX_TITLE = 200;
+
+/** A background task id as Core makes them (T32): `bg-` and 12 hexadecimal digits. */
+function taskId(value: unknown): string {
+  if (typeof value !== 'string' || !/^bg-[0-9a-f]{12}$/u.test(value)) {
+    throw new TypeError('invalid task id');
+  }
+  return value;
+}
 
 function sessionId(value: unknown): string {
   if (!isSessionId(value)) {
@@ -676,6 +686,19 @@ export function registerSessionHandlers(
   registerHandler(IPC_CHANNELS.subagentStop, (_event, [parent, child]) =>
     core.stopSubagent(sessionId(parent), sessionId(child)),
   );
+  registerHandler(IPC_CHANNELS.taskStop, (_event, [id]) => core.stopTask(taskId(id)));
+  registerHandler(IPC_CHANNELS.taskOutput, (_event, [id, offset, length]) => {
+    if (typeof offset !== 'number' || !Number.isSafeInteger(offset) || offset < 0) {
+      throw new TypeError('offset must be a non-negative integer');
+    }
+    if (
+      length !== null &&
+      (typeof length !== 'number' || !Number.isInteger(length) || length < 1 || length > 65536)
+    ) {
+      throw new TypeError('length must be an integer from 1 to 65536 or null');
+    }
+    return core.readTaskOutput(taskId(id), offset, length);
+  });
   registerHandler(IPC_CHANNELS.agentsList, (_event, [dir]) =>
     core.listAgents(absolutePath(dir), null),
   );

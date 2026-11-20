@@ -1,7 +1,9 @@
 // The transcript's three views (architecture section 8.2, T29): normal shows tool calls as
 // collapsed summaries and no thinking; thinking adds the thinking blocks (collapsed once done);
 // detailed expands everything and shows the system reminders the model received (T27's
-// `reminder` items). The choice is presentation state, kept per session in this window only.
+// `reminder` items). A Monitor's output (T32) shows in every view: it can wake the session, and
+// the transcript tells what the model heard. The choice is presentation state, kept per session
+// in this window only.
 import { createContext, useContext } from 'react';
 
 import type { TranscriptRow } from '../store/transcript.js';
@@ -24,7 +26,7 @@ export function shownIn(row: TranscriptRow | undefined, detail: TranscriptDetail
   if (row?.kind !== 'item') return true;
   switch (row.item.type) {
     case 'reminder':
-      return detail === 'detailed';
+      return detail === 'detailed' || row.item.reminders.some((r) => r.type === 'monitorOutput');
     case 'reasoning':
       return detail !== 'normal';
     default:

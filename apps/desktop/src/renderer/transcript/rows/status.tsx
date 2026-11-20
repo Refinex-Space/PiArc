@@ -14,18 +14,27 @@ import { targetOf } from './summary.js';
 type CompactionItem = Extract<Item, { type: 'contextCompaction' }>;
 type ReminderItem = Extract<Item, { type: 'reminder' }>;
 
-/** A system reminder the model received (T27), shown in the detailed view only (T29). Its text
- * is the model's input, shown as text. */
+/** A system reminder the model received (T27), shown in the detailed view only (T29); a
+ * Monitor's output (T32) shows in every view as a Monitor event. Its text is the model's input,
+ * shown as text. */
 export function ReminderRow({ id, item }: { readonly id: string; readonly item: ReminderItem }) {
   const t = useT();
   const kinds = [...new Set(item.reminders.map((r) => t(`transcript.reminder.${r.type}`)))];
+  const monitor = item.reminders.every((r) => r.type === 'monitorOutput');
   return (
-    <div className="row row-reminder" data-testid="reminder-row" data-row-id={id} role="note">
+    <div
+      className={monitor ? 'row row-reminder row-monitor' : 'row row-reminder'}
+      data-testid={monitor ? 'monitor-row' : 'reminder-row'}
+      data-row-id={id}
+      role="note"
+    >
       <div className="row-reminder-body">
         <div className="row-reminder-head">
-          {t('transcript.reminder.title', {
-            kinds: kinds.join(t('transcript.reminder.separator')),
-          })}
+          {monitor
+            ? t('transcript.monitor.title')
+            : t('transcript.reminder.title', {
+                kinds: kinds.join(t('transcript.reminder.separator')),
+              })}
         </div>
         <div className="row-reminder-text">{item.text}</div>
       </div>

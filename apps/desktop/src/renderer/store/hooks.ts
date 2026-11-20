@@ -1,6 +1,6 @@
 // React bindings of the store: every hook subscribes to exactly the part it reads
 // (`useSyncExternalStore`), so a change re-renders only the components that show it.
-import type { BranchPoint, ContextUsage } from '@piarc/protocol';
+import type { BackgroundTask, BranchPoint, ContextUsage } from '@piarc/protocol';
 import { createContext, useCallback, useContext, useEffect, useSyncExternalStore } from 'react';
 
 import type { AppStore, Notice } from './app-store.js';
@@ -27,6 +27,20 @@ export function useWorkspaces(): readonly WorkspaceEntry[] {
 export function useSessions(): readonly SessionEntry[] {
   const store = useStore();
   return useSyncExternalStore(store.subscribeSessions, store.sessions);
+}
+
+/** Every background task of the snapshot (T32), newest first. */
+export function useTasks(): readonly BackgroundTask[] {
+  return useTasksOf(useStore());
+}
+
+/** `useTasks` for a component that holds the store itself (the shell). */
+export function useTasksOf(store: AppStore): readonly BackgroundTask[] {
+  const subscribe = useCallback((l: () => void) => store.tasks.subscribe(l), [store]);
+  return useSyncExternalStore(
+    subscribe,
+    useCallback(() => store.tasks.all, [store]),
+  );
 }
 
 export function useNotices(): readonly Notice[] {

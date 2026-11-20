@@ -80,6 +80,8 @@ export const IPC_CHANNELS = {
   sessionTranscript: 'piarc:session.transcript',
   subagentTranscript: 'piarc:subagent.transcript',
   subagentStop: 'piarc:subagent.stop',
+  taskStop: 'piarc:task.stop',
+  taskOutput: 'piarc:task.output',
   agentsList: 'piarc:agents.list',
   snapshotsResend: 'piarc:snapshots.resend',
   trustGet: 'piarc:trust.get',
@@ -484,6 +486,16 @@ export interface PiarcApi {
   ): Promise<string>;
   /** Stops subagent `child` of session `parent` (T31); resolves with `{ stopped }` as JSON. */
   stopSubagent(parent: string, child: string): Promise<string>;
+  /**
+   * Stops background task `taskId` with its whole process tree (T32, the panel's stop button;
+   * the same Core entry as KillShell); resolves with `{ task, stopped, tail }` as JSON.
+   */
+  stopTask(taskId: string): Promise<string>;
+  /**
+   * At most 64 KiB of background task `taskId`'s output from byte `offset` (T32), as
+   * `TaskOutputChunk` JSON; the window reads the file in parts instead of receiving it whole.
+   */
+  readTaskOutput(taskId: string, offset: number, length: number | null): Promise<string>;
   /**
    * The subagent types of a workspace (T31): definition files and built-in types with their
    * source, overrides, warnings and resolved model, as `AgentsList` JSON.

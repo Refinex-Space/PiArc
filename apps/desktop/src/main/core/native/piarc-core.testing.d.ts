@@ -226,8 +226,18 @@ export declare class CoreRuntime {
     limit: number,
   ): Promise<string>;
   /**
-   * Sends the `core/workspaces` and `core/sessions` snapshots again (a window subscribed
-   * anew). Only queues.
+   * Stops background task `taskId` (the panel's stop button, T32); JSON text
+   * `{ task, stopped, tail }`.
+   */
+  stopTask(taskId: string): Promise<string>;
+  /**
+   * At most 64 KiB of background task `taskId`'s output from byte `offset`, as JSON text
+   * (`TaskOutputChunk`, T32).
+   */
+  readTaskOutput(taskId: string, offset: number, length?: number | null): Promise<string>;
+  /**
+   * Sends the `core/workspaces`, `core/sessions` and `core/tasks` snapshots again (a window
+   * subscribed anew). Only queues.
    */
   resendSnapshots(): void;
   /**

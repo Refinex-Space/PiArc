@@ -8,7 +8,7 @@ import { isImeComposing } from '../composer/ime-guard.js';
 import { useApp } from '../app/app-context.js';
 import { AppStore } from '../store/app-store.js';
 import { StoreConnection } from '../store/connection.js';
-import { StoreContext, useHarnessOf, useSessionOf } from '../store/hooks.js';
+import { StoreContext, useHarnessOf, useSessionOf, useTasksOf } from '../store/hooks.js';
 import { createTranscriptServices } from '../transcript/services.js';
 import { Conversation } from './Conversation.js';
 import { Home } from './Home.js';
@@ -18,6 +18,7 @@ import { PageBoundary } from './PageBoundary.js';
 import { DockArea, RailArea } from './PanelAreas.js';
 import type { PanelContext } from './registry.js';
 import './harness-panels.js';
+import './task-panels.js';
 import '../changes/panels.js';
 import { toggleChangesPanel, useChangesPanelOpen } from '../changes/panel-state.js';
 import { showPanel } from './registry.js';
@@ -39,16 +40,24 @@ interface TrustRequest {
 /** What the panels show about: the selected session and whether it has a task list or a plan. */
 function usePanelContext(store: AppStore, sessionId: string | undefined): PanelContext {
   const harness = useHarnessOf(store, sessionId);
-  const pendingPlan = useSessionOf(store, sessionId)?.approvals.some((r) => r.kind === 'plan');
+  const session = useSessionOf(store, sessionId);
+  const pendingPlan = session?.approvals.some((r) => r.kind === 'plan');
   const changes = useChangesPanelOpen();
+  const tasks = useTasksOf(store);
+  const backgroundTasks =
+    sessionId !== undefined && tasks.some((t) => t.ownerSessionId === sessionId);
+  const workspaceTasks =
+    session !== undefined && tasks.some((t) => t.workspace === session.workspace);
   return useMemo(
     () => ({
       sessionId,
       tasks: (harness?.todos.length ?? 0) > 0,
       plan: harness?.plan !== undefined || pendingPlan === true,
       changes,
+      backgroundTasks,
+      workspaceTasks,
     }),
-    [sessionId, harness, pendingPlan, changes],
+    [sessionId, harness, pendingPlan, changes, backgroundTasks, workspaceTasks],
   );
 }
 

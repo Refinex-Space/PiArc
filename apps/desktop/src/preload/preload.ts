@@ -421,6 +421,12 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.subagentStop, parent, child)
       .then((value: unknown) => expectString(value)),
+  stopTask: (taskId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.taskStop, taskId).then((value: unknown) => expectString(value)),
+  readTaskOutput: (taskId, offset, length) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.taskOutput, taskId, offset, length)
+      .then((value: unknown) => expectString(value)),
   listAgents: (workspace) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.agentsList, workspace)
