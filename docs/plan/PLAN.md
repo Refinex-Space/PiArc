@@ -155,7 +155,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T26 | [计划模式、任务清单、AskUserQuestion 与下一步](tasks/T26-plan-mode-todo-ask-next-steps.md) | 3 | T25 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 23630e3 |
 | T27 | [上下文工程：system reminder、压缩与用量](tasks/T27-context-reminders-compaction-usage.md) | 3 | T26 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | b0b2641 |
 | T28 | [检查点、回退与 Changes 面板](tasks/T28-checkpoints-rewind-changes.md) | 3 | T27 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | c849475 |
-| T29 | [WebFetch、登录与模型设置补全、三档视图](tasks/T29-webfetch-login-model-settings-views.md) | 3 | T28 | macOS | high / 高 | 中 | 无 | 未开始 | — |
+| T29 | [WebFetch、登录与模型设置补全、三档视图](tasks/T29-webfetch-login-model-settings-views.md) | 3 | T28 | macOS | high / 高 | 中 | 无 | 进行中 | — |
 | T30 | [L3 行为对齐基座](tasks/T30-l3-behavior-alignment.md) | 3 | T29 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | R3 | [M2 评审](tasks/R3-m2-review.md) | 3 | T30、W1 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | W2 | [Windows：M2 达标](tasks/W2-windows-m2-parity.md) | 4 | R3 | Windows | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,6 +308,18 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+T29（开工 2026-11-19，基线 verify 15/15 通过；W1 的 blocked 项 W1-A05 等待 Windows 实机 UNC，不由 CI 关闭）：
+
+- [ ] 1. WebFetch：Core 抓取（`piarc-web`：SSRF 纯函数、钉住 IP、同域重定向、上限）+ AHP `web/fetch` + 授权绑定 + 审计（A01、A03、A04）
+- [ ] 1b. WebFetch 工具（Agent Host）+ 域名规则接入、"总是允许"按域名（A02）
+- [ ] 2. 辅助模型调用通道 + "辅助模型"设置，用量计入会话（A05）
+- [ ] 3. OAuth 与设备码登录：`models/login/*`、`ui/loginInteraction`、回环回调、mock 授权服务器、设置页登录登出（A06、A07）
+- [ ] 4. 每模型设置：显示名、上下文窗口、图片输入、默认 effort（A08）
+- [ ] 4b. 低可靠性模型的保守 Tool Profile 与改回默认（A10）
+- [ ] 5. transcript 三档视图（A09）
+- [ ] 6. L2 场景 `webfetch-*`、能力 ID、capabilities.md
+- [ ] 7. 文档、AGENTS.md、复用表、收尾 verify（A11）
 
 ## 登记事项
 
