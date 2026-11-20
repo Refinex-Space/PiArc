@@ -882,3 +882,6 @@ fn exit_words(code: Option<i32>, signal: Option<i32>) -> String {
         (None, None) => "no exit status".to_owned(),
     }
 }
+
+#[cfg(test)]
+mod tests;

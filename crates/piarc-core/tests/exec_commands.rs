@@ -194,7 +194,10 @@ async fn timeouts_report_the_limit_and_a_cut_request() {
     assert_eq!(short["timeout"], json!({ "ms": 1000 }));
     assert_eq!(short["task"]["reason"], "timeout");
     assert!(short.get("exitCode").is_none() && short.get("outcome").is_none());
-    let task = short["task"]["taskId"].as_str().expect("task id").to_owned();
+    let task = short["task"]["taskId"]
+        .as_str()
+        .expect("task id")
+        .to_owned();
     let listed = f.call("exec/background/list", json!({})).await;
     assert_eq!(listed["tasks"][0]["taskId"], task.as_str());
     assert_eq!(listed["tasks"][0]["status"], "running");
