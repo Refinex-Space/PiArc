@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.37（2026-11-20） |
+| 版本 | 2.38（2026-11-20） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -256,6 +256,7 @@ PiArc/
 | [0037](../adr/0037-permission-rules-and-bash-analysis.md) | 无效 deny/ask 规则使所点名工具询问；运行期值保守匹配，不可判定的命令在任何模式下询问；自动允许的程序在执行时钉住；"总是允许"携带规则列表；`policy/tools` 移除整体拒绝的工具；跳过权限由用户级开关开启 | 架构只给出规则形式与阶梯，这些细节决定安全边界与 AHP、Core API 的形状 |
 | [0040](../adr/0040-windows-automatic-permission-budget.md) | 无需用户参与的权限裁决按平台给预算：macOS p95 ≤ 2 ms，Windows p95 ≤ 10 ms | NTFS 与 Defender 下每次元数据调用约 50–150 µs，每次裁决都读最新磁盘状态（ADR-0031、0036），W1 实测 Windows p95 3.4–8.9 ms |
 | [0041](../adr/0041-windows-ahp-round-trip-budget.md) | 小文件 fs 操作的 AHP 往返按平台给预算：macOS p95 ≤ 5 ms，Windows p95 ≤ 15 ms | ADR-0036 的每次访问都从卷根逐级绑定目录，W1 实测 Windows p95 5.0–9.3 ms |
+| [0042](../adr/0042-plan-todo-ask-next-steps.md) | 计划模式、任务清单、提问与下一步是宿主工具：模式由 Core 持有，`ExitPlanMode` 在裁决中必问（PermissionRequest hook 不能代答）；计划卡与提问表单进同一审批账本，批准的计划存为会话 entry，任务清单在工具结果里；提醒只经 `reminders.ts` | 计划与清单随分支回溯、压缩后可重注入，工具集不变以保住缓存（第 6.5、6.15 节） |
 | [0043](../adr/0043-reminders-compaction-usage.md) | 运行时提示统一走 system reminder 通道；压缩用 PiArc 自写的分节摘要、按阈值公式配置 Pi 触发、连续 3 次失败或无效即熔断、压缩后按上限重注入；上下文用量按类别估算并以服务商报告为准 | 动态信息不改写 system prompt，长会话压缩及时且不丢关键状态，用户看得到上下文被什么占用 |
 | [0044](../adr/0044-checkpoints-rewind-changes.md) | 检查点按会话加回合 id 建索引，写前快照存内容寻址对象库；代码恢复按时间计算、冲突逐个选择、逐文件结果可撤销；对话回退在 Agent Host 移动 leaf 并以追加条目持久化，分支变化后同一 id 重建会话；Changes 面板基于最早快照并在路径锁内核对版本后丢弃 | 回退结果与对话分支经过的路径无关；回退位置跨重启保留；不在过期的 diff 上改文件 |
 | [0045](../adr/0045-webfetch-sign-in-model-settings.md) | WebFetch 由 Core 抓取（`piarc-web`：rustls + 系统信任库、SSRF 纯函数、连接钉住已检查的地址、同站重定向）并绑定已获准的调用；辅助模型通道在 Agent Host；登录在设置 Host 上运行、交互经 `core/login`；每模型设置与辅助模型存用户级设置并随握手下发；本地端点的模型为低可靠性、用保守 Tool Profile | 网络访问与文件、命令一样由 Core 授权审计；规则主机与连接主机不会不一致；凭据只在保险箱 |
@@ -408,20 +409,20 @@ PiArc.app/Contents/
 | 能力 | 目标行为（摘要） | 位置 | 依托的 Pi 能力 | 里程碑 |
 |---|---|---|---|---|
 | 工具体系 | M1 已接入 Read、Write、Edit、Bash、Glob、Grep。Core 维护读取快照、目录身份、命令执行和结果落盘；PowerShell 与 Git Bash 留 W1 实机复核 | K + C | `create*Tool` + `*Operations`、`registerTool` | M1 |
-| 权限 | M1 已交付 Manual、Accept edits、精确规则与审批卡。其余交互模式、完整规则与复合命令感知按后续里程碑交付 | C + K + U | `tool_call` 闸门 | M1 基础、M2 完整 |
-| Hooks | Claude Code 兼容的事件、配置格式、exit code 与 JSON 协议 | C + K | 各生命周期事件 | M2 |
+| 权限 | Manual、Accept edits、计划与跳过权限四种模式；Claude Code 规则语法与七层来源；tree-sitter-bash 复合命令分析、只读白名单、关键路径删除；"总是允许"、规则管理与审计（M2 已交付，R3）。Auto 模式在 M5 | C + K + U | `tool_call` 闸门 | M1 基础、M2 完整 |
+| Hooks | Claude Code 兼容的事件、配置格式、exit code 与 JSON 协议；M2 事件集与 `command` handler 已交付（R3），http、prompt handler 与子 agent 事件在 M3 | C + K | 各生命周期事件 | M2 |
 | 子 agent | `.claude/agents` 定义；进程内子会话；工具子集；任意服务商模型；后台运行；最多 3 层 | K + C + U | SDK 子会话 | M3 |
-| Plan 模式 | 只读探索 → 提交计划 → 用户批准并选择后续模式 | K + C + U | `tool_call` 闸门、追加消息 | M2 |
-| 任务清单 / 下一步 | 宿主工具驱动，UI 结构化渲染，压缩后重新注入 | K + U | `registerTool`、工具 details | M2 |
-| 上下文工程 | M1 已交付分段 system prompt、会话恢复、memory 层级、懒加载和外部导入审批；统一提醒与压缩按后续里程碑交付 | K + C + U | `before_agent_start`、`context`、`session_before_compact` | M1–M3 |
+| Plan 模式 | 只读探索 → 提交计划 → 用户批准并选择后续模式（M2 已交付，R3） | K + C + U | `tool_call` 闸门、追加消息 | M2 |
+| 任务清单 / 下一步 | 宿主工具驱动，UI 结构化渲染，压缩后重新注入（M2 已交付，R3） | K + U | `registerTool`、工具 details | M2 |
+| 上下文工程 | M1 已交付分段 system prompt、会话恢复、memory 层级、懒加载和外部导入审批；M2 已交付统一提醒通道、条件 rules、自写摘要的自动与手动压缩、熔断、重注入与用量（R3）；skill 正文重注入随 M3 的 skills | K + C + U | `before_agent_start`、`context`、`session_before_compact` | M1–M3 |
 | Skills / 命令 | Agent Skills 标准；`.claude/skills`、`.claude/commands`；渐进加载 | K | Pi skills、prompt templates、`resources_discover` | M3 |
 | 插件 | 加载 Claude Code 插件目录与 Pi 包 | C + K | packages、扩展 | M4 |
 | MCP | stdio / Streamable HTTP；OAuth；工作区共享连接池；延迟加载 | K + C + U | pi-mcp、`tool_search` | M3 |
-| Checkpoint / Rewind | 写前快照；回退代码 / 对话 / 两者 | C + K | 会话树 fork/leaf | M2 |
+| Checkpoint / Rewind | 写前快照；回退代码 / 对话 / 两者、从此处摘要、分支切换、Changes 面板按文件与 hunk 丢弃（M2 已交付，R3） | C + K | 会话树 fork/leaf | M2 |
 | 沙箱 | macOS：Bash 在 Seatbelt 中执行，文件与网络白名单；Windows：第一版只做进程树管理（需求 D7） | C | BashOperations 委托 | M4 |
 | 后台任务 / 终端 | 后台命令、超时转后台、Monitor、终端面板 | C + K + U | BashOperations、`registerTool` | M3 |
 | Worktree | 每会话可选独立 worktree；子 agent 隔离 | C + K | cwd 按会话 | M3 |
-| 多模型适配 | M1 已交付服务商设置、凭据保险箱、模型与 effort 选择及切换代价提示；更完整的能力降级见 6.13 | K + C + U | pi-ai 模型目录 | M1–M3 |
+| 多模型适配 | M1 已交付服务商设置、凭据保险箱、模型与 effort 选择及切换代价提示；M2 已交付 OAuth 与设备码登录、每模型设置、辅助模型通道与保守 Tool Profile（R3）；模型别名随 M3 的子 agent | K + C + U | pi-ai 模型目录 | M1–M3 |
 | Auto 模式（分类器） | 可配置的审查模型代替人审批，决策可审计 | C + K | 辅助模型调用 | M5 |
 
 ### 6.1 工具体系
@@ -535,6 +536,7 @@ T29 落地（ADR-0045）：WebFetch 的网络请求由 Core 发起（AHP `web/fe
 - **Windows 上的命令**：`Bash` 工具在 Windows 上通过 Git Bash 执行（Pi 的默认行为），分析方式同上；另提供 `PowerShell` 工具，规则写作 `PowerShell(命令模式)`（与 Claude Code 一致）。第一版不对 PowerShell 做语法级拆分，也不设只读白名单：除非整条命令被规则精确允许，否则在 Manual 模式下一律询问。PowerShell 的语法级分析在 M4 评估。T17 落地（ADR-0028）：Git Bash 依次查用户设置 `shell.gitBashPath`、`%ProgramFiles%\Git`、`%ProgramFiles(x86)%\Git`、`%LOCALAPPDATA%\Programs\Git`、`PATH` 上 `git.exe` 所在的安装，不用 `PATH` 上其他的 `bash.exe`（`System32\bash.exe` 是 WSL）；找不到时会话不注册 `Bash`、只有 `PowerShell`，Core 在 `core/notices` 发一次 `gitBashMissing` 提示安装 Git for Windows。`PowerShell` 优先 PowerShell 7（`pwsh`），没有时用 Windows PowerShell 5.1。
 - 关键路径删除（`rm -rf` 指向工作区根、家目录、`/` 等）与 `requiresUserInteraction` 类工具在任何模式下都询问。
 - `WebFetch(domain:…)`（T29）：规则匹配、hooks matcher 与实际抓取都用 `piarc_web::rule_host` 解析同一个 URL（小写主机，IPv6 带方括号）；"总是允许"按该主机生成规则，URL 解析不出主机时不提供规则。
+- 已知限制（R3）：`Read(…)` 的 deny 按调用的路径参数匹配，Grep、Glob 以目录为参数时不过滤结果中的被拒文件，Bash 的递归读取（`grep -r`、`rg`）同样不受它约束，过滤由 T45 补上（I120）；带通配的 Bash/PowerShell allow 规则先于越界检查（第 6.2.3 节第 6、7 步），改为越界先询问的提议见 ADR-0047。
 
 #### 6.2.3 裁决流程
 
@@ -573,7 +575,7 @@ M1 实现见 ADR-0031。两种模式均对受保护路径写入逐次审批。�
 #### 6.3.1 配置与执行
 
 - 配置格式兼容 Claude Code：事件 → matcher 组 → handler 列表；从 6.2.2 所列的同一组 settings 文件读取并**合并**；插件 `hooks/hooks.json`、skill 与子 agent frontmatter 中的 hooks 在其作用期间生效。
-- **执行全部在 Core**：command 类型通过 stdin 传入 JSON、读取 exit code 与 stdout；默认超时 600 秒（UserPromptSubmit 30 秒）；超时或取消时杀整棵进程树；同一事件命中的多个 handler 并行执行。
+- **执行全部在 Core**：command 类型通过 stdin 传入 JSON、读取 exit code 与 stdout；默认超时 600 秒（UserPromptSubmit 30 秒）；超时或取消时终止进程树（macOS 按进程组：用 `setsid` 等脱离进程组的后代不在其中，I36；Windows 用 Job Object）；同一事件命中的多个 handler 并行执行。
 - 项目级 hooks 在项目被信任之前不执行；企业策略可设置"只允许托管 hooks"。
 - 决策协议兼容：exit 0 + JSON（`decision`、`hookSpecificOutput.permissionDecision`、`updatedInput`、`additionalContext`、`continue`、`systemMessage` 等），exit 2 阻断并把 stderr 作为理由，其他退出码视为非阻断错误。
 - Stop 续跑上限：同一回合内 Stop hooks 连续续跑至多 **8** 次（`piarc_hooks::STOP_CONTINUATION_LIMIT`，与 Claude Code 相同），模型调用工具或新的运行开始时计数归零；第 9 次的 block 被覆盖，回合结束并提示用户。
@@ -840,6 +842,8 @@ T24 落地（ADR-0038）：
 | 缓存断点 | system prompt 分为静态段与动态段并分别缓存；动态信息走 system-reminder；每个请求只放一个消息级缓存断点（Anthropic）；其他服务商按 pi-ai 的缓存策略 |
 | 子 agent 隔离 | 默认不继承父会话对话历史，只接收任务描述；fork 模式（继承历史、共享缓存）列为 M5 |
 | plan 模式 | 硬拦截：写工具与非只读命令在 `tool_call` 闸门处拒绝；工具列表保持不变以免缓存失效；不能只靠提示词约束 |
+
+R3 核对（2026-11-20）：表中数值与代码常量一致，M2 的 L2/L3 没有给出调整依据，本表不变——工具批次上限 `MAX_BATCH` = 10（`agent-host/src/harness/tool-batches.ts`）、阈值公式的 20,000 与 13,000（`compaction-threshold.ts` 的 `OUTPUT_RESERVE_CAP`、`SAFETY_MARGIN`）、熔断 `AUTO_COMPACT_FAILURE_LIMIT` = 3、`RESTORE_LIMITS`（文件 5 个、单个 20K、合计 50K，skill 单个 5K、合计 25K）、`TOOL_RESULT_LIMITS`（50,000 / 200,000 / 2,000 字符）。缓存断点一行的实现：Anthropic 请求的 system 两段（静态前缀、会话段）各一个断点、工具定义末尾一个、消息级只有最后一条 user 消息一个（T22、T27，L2 `ctx-cache-breakpoints`）；plan 模式一行由 T26 落地（L2 `plan-mode-menu-reminder` 的 `same_tools_as`）。
 
 T14 落地（ADR-0026）：回合继续条件与截断时判失败由 Pi 1.5.2 满足；工具并发由 Harness Kit 的调度器（`agent-host/src/harness/tool-batches.ts`）实现，Pi 只负责并行启动；中断时 Harness Kit 为没有结果的调用补写"已中断"结果并追加中断标记（`harness/interruption.ts`），会话重新打开时对崩溃留下的未完成回合做同样处理；重试由 Pi 的 agent 循环完成（失败的那次不进入上下文），Agent Host 关掉服务商 SDK 的静默重试，使每次重试都以 `turn/retrying` 报给界面。各条的"Pi 已满足 / Harness Kit 补齐"清单在 `agent-host/CLAUDE.md`。
 
@@ -1582,7 +1586,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 |---|---|---|
 | **M0 技术验证**（3–5 周） | 在两个平台上验证高风险假设 | 每个 spike 的结论（通过 / 失败 / 有条件通过）记录在 `docs/spikes/`，两个平台分别给结论；失败项触发对应 ADR 复审。**已完成（R1，2026-11-16）：有条件进入 M1**，见 [M0 总结](../spikes/M0-summary.md) |
 | **M1 可行走骨架** | 单工作区、多会话列表、流式对话；Read/Write/Edit/Bash（Windows 另有 PowerShell）/Glob/Grep 经 Core 执行；Manual 与 Accept edits 模式的基础审批；模型与凭据设置（凭据保险箱）；会话持久化与恢复；transcript P0 行类型 | 能用至少 2 家服务商完成"读代码 → 改代码 → 跑测试"的完整任务；L2 场景 ≥ 20 个通过。**macOS 已达标（R2，2026-11-19）**：两种协议的打包应用工作流通过，真实百炼 qwen-flash 通过，L2 61 个通过。**Windows 已达标（W1，2026-11-19）**：两种协议的工作流在两种形态通过，L2 60 个通过，UNC 共享未能实机验证，见 [W1 报告](../reviews/W1-windows-m1-parity.md)。 |
-| **M2 Harness 核心** | 完整权限规则与 Bash 分析；plan 模式；任务清单；AskUserQuestion；hooks（M2 事件集，command 类型）；checkpoint 与 rewind；压缩与上下文用量；WebFetch；Changes 面板；memory 文件兼容 | 第 6 章 M2 能力全部有场景覆盖；L3 对齐在权限与 hooks 上无未解释差异 |
+| **M2 Harness 核心** | 完整权限规则与 Bash 分析；plan 模式；任务清单；AskUserQuestion；hooks（M2 事件集，command 类型）；checkpoint 与 rewind；压缩与上下文用量；WebFetch；Changes 面板；memory 文件兼容 | 第 6 章 M2 能力全部有场景覆盖；L3 对齐在权限与 hooks 上无未解释差异。**macOS 已达标（R3，2026-11-20）**：M2 能力 46 项全部有 L2 场景，L2 118 个通过（2 个 Windows 专属），L3 对 Claude Code 2.1.318 的 12 个权限与 hooks 场景 0 个未解释差异；评审修复 16 项缺陷，越界路径与通配命令规则的先后见 ADR-0047（提议），见 [R3 评审](../reviews/R3-findings.md)。Windows 由 W2 验收。 |
 | **M3 多会话与生态** | 子 agent；后台任务与 Monitor；终端面板（libghostty-vt）；worktree；MCP 共享连接池；skills 与命令；WebSearch；ToolSearch；hooks 的 http/prompt 类型 | 3 个并行会话 + 子 agent 场景满足第 11 章内存预算 |
 | **M4 安全与打磨** | macOS 沙箱；Windows 隔离方案评估；插件；NotebookEdit；可操作的系统通知；配置诊断；无障碍；本地化；性能预算全部进 CI | 安全威胁表逐条有测试；性能预算全部达标 |
 | **M5 Beta** | Auto 模式（可配置审查模型）；自动记忆；企业托管配置；Anthropic 服务端压缩；fork 子 agent；平台快捷操作（App Intents / 跳转列表）；完整发布流水线 | macOS 与 Windows 同时公开 Beta |
@@ -1640,6 +1644,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.38 | 2026-11-20 | R3（M2 macOS 阶段门）：第 4 章补上 ADR-0042；6.0 节矩阵按 M2 实际交付更新权限、Hooks、Plan、任务清单、上下文工程、Checkpoint、多模型七行；6.2.2 节写明 `Read` deny 对目录搜索与 Bash 递归读取的限制（I120）并引用 ADR-0047（提议）；6.3.1 节进程树终止按平台写准；6.6.4 节熔断复位范围（I107）；6.14 节 `plansDirectory` 交 T48（I104）；6.15 节记录 R3 对校准值的核对（数值不变）与缓存断点、plan 模式两行的实现；第 16 章记录 M2 的 macOS 结论；基线决策未变 |
 | 2.37 | 2026-11-20 | T30（ADR-0046）补充第 4 章 ADR-0046、6.3.1 节 SessionStart 与 UserPromptSubmit hooks 的顺序（L3 发现的偏差）、12.5 节 L3 的落地（隔离运行、审批夹具、结构化录制与剥离检查、比对内容、allowlist、Nightly）；基线决策未变 |
 | 2.36 | 2026-11-19 | T29（ADR-0045）补充第 4 章 ADR-0045、5.4 节登录的落地、6.1.4 节 WebFetch 的落地、6.2.2 节 `WebFetch(domain:…)` 的主机解析、6.13 节每模型设置、辅助模型通道与保守 Tool Profile、6.14 节 `model`、`effortLevel` 改随 T31（I113）、7.1 节 `piarc-web`、7.4 节 `webFetch` 与 `login` 能力的方法与成员、8.2 节三档视图与设置页、10.1 节提示注入对策；基线决策未变 |
 | 2.35 | 2026-11-19 | T28（ADR-0044）补充第 4 章 ADR-0044、6.9 节检查点、代码与对话回退、分支与"从这里分支"的落地、6.14 节生效键（加入 `fileCheckpointingEnabled`，并补上 T27 已生效的 `autoCompactEnabled`、`autoCompactWindow`）、7.4 节 `checkpoints` 能力的方法与成员、7.6 节检查点导出、7.7 节 Changes 面板的 diff 与降级（词级 diff 与 UTF-16 偏移仍未实现）、8.2 节回退对话框、Changes 面板、改动卡片与分支切换、9.2 节 schema v5 的三张表、9.3 节快照的清理时机；基线决策未变 |
