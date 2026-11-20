@@ -180,6 +180,8 @@ fn check_references(spec: &ScenarioSpec, action: &Action, field: &str, problems:
         | Action::Abort { .. }
         | Action::RestartCore {}
         | Action::Resume { .. }
+        | Action::AdvanceClock { .. }
+        | Action::StopTask { .. }
         | Action::CheckHarness(_)
         | Action::CheckUsage(_)
         | Action::UndoRewind(_)

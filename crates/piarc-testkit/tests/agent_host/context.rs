@@ -1,6 +1,7 @@
 //! T27 through the real Agent Host and the mock (the paths L2 cannot drive through Core's
 //! public API): a background task's reminder (`session/remind`, T32's entry point) reaches the
-//! next model request with the system prompt unchanged, and the instructions of invoked skills
+//! next model request with the system prompt unchanged, a keyed Monitor reminder wakes an idle
+//! session once (T32), and the instructions of invoked skills
 //! (a simulated `piarc.skillInvoked` record, T37's) are given back after a compaction within
 //! their limits.
 
@@ -96,6 +97,8 @@ async fn background_task_reminders_reach_the_next_request() {
                 kind: ReminderType::FileModified,
                 source: "x".into(),
                 text: "y".into(),
+                key: None,
+                wake: false,
             },
         )
         .await
@@ -106,6 +109,8 @@ async fn background_task_reminders_reach_the_next_request() {
         kind: ReminderType::BackgroundTask,
         source: "npm test".into(),
         text: "The command exited with code 0.".into(),
+        key: None,
+        wake: false,
     };
     supervisor
         .session_call::<SessionRemind>(&session, None, remind)
@@ -129,6 +134,73 @@ async fn background_task_reminders_reach_the_next_request() {
     assert!(requests[1].body.contains("[PiArc reminder]"));
     assert!(!requests[0].body.contains("Background task"));
     assert_eq!(system_of(&requests[0].body), system_of(&requests[1].body));
+    supervisor.shutdown().await;
+}
+
+/// T32: a keyed `monitorOutput` reminder with `wake` starts a turn of the idle session whose
+/// input is the reminder; the same reminder sent again is recognized as delivered, a newer one
+/// waits for the next request and replaces nothing that was delivered.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_keyed_reminder_wakes_the_idle_session_once() {
+    let (env, supervisor, mut events, session) = started("context wake").await;
+    let monitor = |source: &str, text: &str, wake: bool| SessionRemindParams {
+        session_id: session.clone(),
+        kind: ReminderType::MonitorOutput,
+        source: source.into(),
+        text: text.into(),
+        key: Some("monitor:bg-0a1b2c3d4e5f".into()),
+        wake,
+    };
+    let first = "Monitor bg-0a1b2c3d4e5f (日志): 2 new lines.\nerror A\nerror B";
+    let woke = supervisor
+        .session_call::<SessionRemind>(&session, None, monitor("bg-0a1b2c3d4e5f@2", first, true))
+        .await
+        .expect("queued");
+    let turn = woke.turn_id.expect("the idle session woke");
+    assert!(!woke.delivered);
+    assert_eq!(events.turn_completed(&turn).await["status"], "completed");
+    let again = supervisor
+        .session_call::<SessionRemind>(&session, None, monitor("bg-0a1b2c3d4e5f@2", first, true))
+        .await
+        .expect("answered");
+    assert!(again.delivered && again.turn_id.is_none(), "{again:?}");
+    let later = supervisor
+        .session_call::<SessionRemind>(
+            &session,
+            None,
+            monitor(
+                "bg-0a1b2c3d4e5f@3",
+                "Monitor bg-0a1b2c3d4e5f (日志): 1 new line.\nerror C",
+                false,
+            ),
+        )
+        .await
+        .expect("queued");
+    assert!(!later.delivered && later.turn_id.is_none());
+    let next = supervisor
+        .prompt(&session, "r3", "And now?")
+        .await
+        .expect("accepted")
+        .turn_id;
+    assert_eq!(events.turn_completed(&next.0).await["status"], "completed");
+    let requests = env.requests(SMALL_WINDOW_SCENARIO);
+    assert_eq!(requests.len(), 3);
+    assert!(requests[1].body.contains("[PiArc reminder]"));
+    assert!(
+        requests[1]
+            .body
+            .contains("2 new lines.\\nerror A\\nerror B"),
+        "{}",
+        requests[1].body
+    );
+    assert!(!requests[1].body.contains("And now?"));
+    assert_eq!(
+        requests[2].body.matches("2 new lines.").count(),
+        1,
+        "delivered once"
+    );
+    assert!(requests[2].body.contains("1 new line.\\nerror C"));
+    assert_eq!(system_of(&requests[0].body), system_of(&requests[2].body));
     supervisor.shutdown().await;
 }
 

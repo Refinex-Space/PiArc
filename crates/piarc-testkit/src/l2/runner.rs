@@ -249,6 +249,8 @@ struct Env {
     /// The mock authorization server and the test provider's file (T29).
     auth: Option<crate::auth_server::MockAuthServer>,
     oauth_file: Option<PathBuf>,
+    /// The task manager's clock (T32), kept across Core restarts; `advance_clock` moves it.
+    clock: Arc<piarc_core::clock::ManualClock>,
 }
 
 impl Env {
@@ -324,6 +326,7 @@ impl Env {
             web,
             auth,
             oauth_file,
+            clock: piarc_core::clock::ManualClock::new(),
         })
     }
 
@@ -352,6 +355,10 @@ impl Env {
             }),
             tool_observer: Some(Arc::clone(&self.gate) as _),
             command_env: Some(self.command_env.clone()),
+            tasks: piarc_core::tasks::TasksConfig {
+                clock: self.clock.clone(),
+                ..piarc_core::tasks::TasksConfig::default()
+            },
             web: piarc_core::tool_io::WebConfig {
                 allowlist: if self.web.is_some() {
                     vec!["127.0.0.1".into(), "localhost".into()]
@@ -653,6 +660,11 @@ impl Driver<'_> {
             Action::CheckTrust { fields } => self.check_trust(fields).await,
             Action::Wait(wait) => self.wait_for_event(wait).await,
             Action::WriteFile { path, content } => write_file(&self.env.workspace, path, content),
+            Action::AdvanceClock { seconds } => {
+                self.env.clock.advance(Duration::from_secs_f64(*seconds));
+                Ok(())
+            }
+            Action::StopTask { session, kind } => self.stop_task(session.as_deref(), *kind).await,
             Action::RestartCore {} => self.restart().await,
             Action::Resume { session } => {
                 let id = self.session_id(session.as_deref())?;
@@ -868,6 +880,30 @@ impl Driver<'_> {
         .await
     }
 
+    /// `stop_task`: the newest running task of the session (and kind) in the last snapshot.
+    async fn stop_task(
+        &self,
+        session: Option<&str>,
+        kind: Option<piarc_protocol::tasks::TaskKind>,
+    ) -> Result<(), String> {
+        let label = self.label(session)?;
+        let wanted = kind.map(|k| serde_json::to_value(k).unwrap_or(Value::Null));
+        let task = self
+            .observed()
+            .into_iter()
+            .rev()
+            .filter(|e| e.method == "core/tasks" && e.session == label)
+            .map(|e| e.params)
+            .find(|row| {
+                row["status"] == "running" && wanted.as_ref().is_none_or(|k| &row["kind"] == k)
+            })
+            .and_then(|row| row["taskId"].as_str().map(str::to_owned))
+            .ok_or_else(|| format!("session `{label}` has no running task to stop"))?;
+        call(|done| self.core.stop_task(task, done), "stop_task")
+            .await
+            .map(drop)
+    }
+
     fn label(&self, session: Option<&str>) -> Result<String, String> {
         self.spec.session_label(session)
     }
@@ -891,6 +927,20 @@ impl Driver<'_> {
             if route == "core/sessions" {
                 for row in event["sessions"].as_array().into_iter().flatten() {
                     if let Some(label) = row["id"]
+                        .as_str()
+                        .and_then(|id| labels.get(&format!("session/{id}")))
+                    {
+                        result.push(ObservedEvent {
+                            session: (*label).clone(),
+                            method: route.clone(),
+                            params: row.clone(),
+                        });
+                    }
+                }
+            } else if route == "core/tasks" {
+                // Background tasks (T32) count among their main session's events.
+                for row in event["tasks"].as_array().into_iter().flatten() {
+                    if let Some(label) = row["ownerSessionId"]
                         .as_str()
                         .and_then(|id| labels.get(&format!("session/{id}")))
                     {

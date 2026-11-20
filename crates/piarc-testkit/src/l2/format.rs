@@ -416,6 +416,22 @@ pub enum Action {
     SignIn(crate::l2::login_spec::SignInAction),
     /// Signs out of the test OAuth provider (T29).
     SignOut {},
+    /// Moves the task manager's clock forward (T32): foreground timeouts, Monitor timeouts and
+    /// wakes happen without real waiting.
+    AdvanceClock {
+        /// How far, in seconds.
+        seconds: f64,
+    },
+    /// Stops the newest running background task of a session, as the panel's stop button does
+    /// (T32).
+    StopTask {
+        /// The main session the task belongs to.
+        #[serde(default)]
+        session: Option<String>,
+        /// Only a task of this kind.
+        #[serde(default)]
+        kind: Option<piarc_protocol::tasks::TaskKind>,
+    },
 }
 
 impl Action {
@@ -454,6 +470,8 @@ impl Action {
             Self::CheckFiles(_) => "check_files",
             Self::SignIn(_) => "sign_in",
             Self::SignOut {} => "sign_out",
+            Self::AdvanceClock { .. } => "advance_clock",
+            Self::StopTask { .. } => "stop_task",
         }
     }
 
@@ -473,6 +491,7 @@ impl Action {
             | Self::SetPrefs(PrefsAction { session, .. })
             | Self::CheckStoredSession { session, .. }
             | Self::DeleteSession { session }
+            | Self::StopTask { session, .. }
             | Self::Resume { session } => Some(session),
             Self::Wait(wait) => Some(&wait.session),
             Self::Fork(fork) => Some(&fork.session),
@@ -489,6 +508,7 @@ impl Action {
             | Self::RestartCore {}
             | Self::CheckFiles(_)
             | Self::SignIn(_)
+            | Self::AdvanceClock { .. }
             | Self::SignOut {} => None,
         }
     }

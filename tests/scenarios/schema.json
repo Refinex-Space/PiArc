@@ -456,6 +456,22 @@
           "type": "object",
           "additionalProperties": false
         },
+        "advance_clock": {
+          "description": "Moves the task manager's clock forward by this many seconds (T32): foreground timeouts move commands to the background, Monitor timeouts and wakes happen, without real waiting.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["seconds"],
+          "properties": { "seconds": { "type": "number", "exclusiveMinimum": 0 } }
+        },
+        "stop_task": {
+          "description": "Stops the newest running background task of the session (optionally of one kind) as the panel's stop button does (T32).",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "kind": { "enum": ["command", "subagent", "monitor"] }
+          }
+        },
         "check_usage": {
           "description": "Checks the session's context usage from Core (T27): its categories add up to tokens (always), a field subset, and categories that must be above zero.",
           "type": "object",

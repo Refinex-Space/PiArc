@@ -7,7 +7,8 @@
 // | `todoStale`      | todos.ts (`todoWatch`)                      | `todo`                 |
 // | `planMode`       | plan-mode.ts (mode menu)                    | `mode`                 |
 // | `fileModified`   | file-changes.ts (Core `fs/changes`)         | `file:<path>`          |
-// | `backgroundTask` | AHP `session/remind` (T32's tasks)          | `task:<n>`             |
+// | `backgroundTask` | AHP `session/remind` (T32's tasks)          | `task:<id>`, `task:<n>`|
+// | `monitorOutput`  | AHP `session/remind` (T32's Monitor)        | `monitor:<task id>`    |
 // | `memoryLazyLoad` | session-memory.ts (subdirectories, changes) | `memory:<path>`        |
 // | `rulesMatched`   | session-memory.ts (`paths:` rules)          | `memory:<path>`        |
 // | `hookContext`    | hooks.ts (`additionalContext`, stdout)      | `hook:<event>:<n>`     |
@@ -111,6 +112,7 @@ const TYPES: readonly ReminderType[] = [
   'fileModified',
   'planMode',
   'backgroundTask',
+  'monitorOutput',
   'memoryLazyLoad',
   'rulesMatched',
   'hookContext',
