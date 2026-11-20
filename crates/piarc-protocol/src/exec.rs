@@ -75,9 +75,15 @@ pub struct ExecRunParams {
     /// The shell; `bash` when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shell: Option<ExecShell>,
-    /// How long the command may run, in milliseconds; Core's default when absent.
+    /// How long the command may run, in milliseconds; Core's default when absent. With the
+    /// capability `backgroundTasks` a command that reaches it keeps running as a background
+    /// task (T32); without, it is stopped.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout_ms: Option<u64>,
+    /// Starts the command as a background task and answers at once (capability
+    /// `backgroundTasks`, T32).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub background: bool,
 }
 
 /// A shell commands run with.
@@ -126,6 +132,10 @@ pub struct ExecRunResult {
     /// The output the model sees.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output: Option<CommandOutput>,
+    /// The background task the command became, when it runs on (capability `backgroundTasks`,
+    /// T32): asked for, or moved there by its timeout. The exit fields are then absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task: Option<crate::tasks::TaskStarted>,
 }
 
 /// The timeout a command ran with.

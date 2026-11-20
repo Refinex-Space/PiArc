@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 43,
+  "result": {
+    "taskId": "bg-0a1b2c3d4e5f",
+    "offset": 4096,
+    "text": "编译完成\nready in 312 ms\n",
+    "nextOffset": 4130,
+    "totalBytes": 4130,
+    "status": "running"
+  }
+}

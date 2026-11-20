@@ -585,6 +585,54 @@
     },
     {
       "kind": "request",
+      "method": "exec/monitor",
+      "name": "exec/monitor",
+      "schema": "ExecMonitorRequest"
+    },
+    {
+      "kind": "response",
+      "method": "exec/monitor",
+      "name": "exec/monitor/result",
+      "schema": "ExecMonitorResponse"
+    },
+    {
+      "kind": "request",
+      "method": "exec/background/list",
+      "name": "exec/background/list",
+      "schema": "TaskListMethodRequest"
+    },
+    {
+      "kind": "response",
+      "method": "exec/background/list",
+      "name": "exec/background/list/result",
+      "schema": "TaskListMethodResponse"
+    },
+    {
+      "kind": "request",
+      "method": "exec/background/read",
+      "name": "exec/background/read",
+      "schema": "TaskReadRequest"
+    },
+    {
+      "kind": "response",
+      "method": "exec/background/read",
+      "name": "exec/background/read/result",
+      "schema": "TaskReadResponse"
+    },
+    {
+      "kind": "request",
+      "method": "exec/background/kill",
+      "name": "exec/background/kill",
+      "schema": "TaskKillRequest"
+    },
+    {
+      "kind": "response",
+      "method": "exec/background/kill",
+      "name": "exec/background/kill/result",
+      "schema": "TaskKillResponse"
+    },
+    {
+      "kind": "request",
       "method": "secrets/getAll",
       "name": "secrets/getAll",
       "schema": "SecretsGetAllRequest"

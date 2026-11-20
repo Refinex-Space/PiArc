@@ -50,6 +50,7 @@ use crate::subagent::{
     AgentsListMethod, ResourcesListAgents, SubagentCompleted, SubagentFinish, SubagentProgress,
     SubagentStart, SubagentStarted, SubagentStop,
 };
+use crate::tasks::{ExecMonitor, TaskKill, TaskListMethod, TaskRead};
 use crate::trust::TrustGet;
 use crate::turn::{
     ItemAgentMessageDelta, ItemCompleted, ItemReasoningDelta, ItemStarted, ItemUpdated,
@@ -259,6 +260,14 @@ pub static CONTRACTS: &[Contract] = &[
     request::<ExecShells>(ExecShells::NAME),
     response::<ExecShells>("exec/shells/result"),
     notification::<ExecOutput>(),
+    request::<ExecMonitor>(ExecMonitor::NAME),
+    response::<ExecMonitor>("exec/monitor/result"),
+    request::<TaskListMethod>(TaskListMethod::NAME),
+    response::<TaskListMethod>("exec/background/list/result"),
+    request::<TaskRead>(TaskRead::NAME),
+    response::<TaskRead>("exec/background/read/result"),
+    request::<TaskKill>(TaskKill::NAME),
+    response::<TaskKill>("exec/background/kill/result"),
     request::<SecretsGetAll>(SecretsGetAll::NAME),
     response::<SecretsGetAll>("secrets/getAll/result"),
     request::<SecretsGet>(SecretsGet::NAME),

@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 40,
+  "result": {
+    "taskId": "bg-2a1b2c3d4e5f",
+    "outputPath": "~/x/tasks/bg-2a1b2c3d4e5f.log",
+    "timeoutMs": 1800000,
+    "requestedTimeoutMs": 3600000
+  }
+}

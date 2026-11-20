@@ -55,6 +55,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "subagents",
         sql: include_str!("sql/0006_subagents.sql"),
     },
+    Migration {
+        version: 7,
+        name: "background_tasks",
+        sql: include_str!("sql/0007_background_tasks.sql"),
+    },
 ];
 
 /// The highest version in `migrations`.

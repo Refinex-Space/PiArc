@@ -40,6 +40,7 @@ pub fn export_schema() -> Vec<(&'static str, Value)> {
     generator.subschema_for::<crate::checkpoint::RewindReport>();
     generator.subschema_for::<crate::checkpoint::ChangesView>();
     generator.subschema_for::<crate::checkpoint::DiscardRequest>();
+    generator.subschema_for::<crate::tasks::TasksSnapshot>();
     let definitions = generator.take_definitions(true);
     let any_message: Vec<Value> = CONTRACTS
         .iter()

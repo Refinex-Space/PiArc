@@ -47,6 +47,7 @@ fn migrating_twice_from_empty_and_from_migrated_gives_the_same_schema() {
         (4, "session_file_stamp".to_owned()),
         (5, "checkpoints".to_owned()),
         (6, "subagents".to_owned()),
+        (7, "background_tasks".to_owned()),
     ];
     assert_eq!(first.migrations().expect("ledger"), ledger);
     drop(first);
@@ -57,7 +58,7 @@ fn migrating_twice_from_empty_and_from_migrated_gives_the_same_schema() {
     // Opening an already migrated database applies nothing and keeps the ledger as it was.
     for _ in 0..2 {
         let again = Store::open(&path, 2000).expect("migrated database opens");
-        assert_eq!(again.schema_version().expect("version"), 6);
+        assert_eq!(again.schema_version().expect("version"), 7);
         assert_eq!(again.migrations().expect("ledger"), ledger);
         drop(again);
         assert_eq!(tables(&path), schema_after_first);
@@ -77,7 +78,7 @@ fn migrating_twice_from_empty_and_from_migrated_gives_the_same_schema() {
     let mut conn = Connection::open(&other).expect("open");
     assert_eq!(
         migrate::apply(&mut conn, MIGRATIONS, 5).expect("first"),
-        vec![1, 2, 3, 4, 5, 6]
+        vec![1, 2, 3, 4, 5, 6, 7]
     );
     assert_eq!(
         migrate::apply(&mut conn, MIGRATIONS, 6).expect("second"),
@@ -153,16 +154,17 @@ fn a_database_from_a_newer_build_is_refused() {
         MIGRATIONS[3],
         MIGRATIONS[4],
         MIGRATIONS[5],
+        MIGRATIONS[6],
         Migration {
-            version: 7,
+            version: 8,
             name: "future",
             sql: "CREATE TABLE future (x INTEGER) STRICT;",
         },
     ];
     Store::open_with(&path, &newer, 1).expect("newer build migrates");
-    let error = Store::open(&path, 2).expect_err("this build does not know version 7");
+    let error = Store::open(&path, 2).expect_err("this build does not know version 8");
     assert!(
-        matches!(error, Error::SchemaTooNew { found: 7, known: 6 }),
+        matches!(error, Error::SchemaTooNew { found: 8, known: 7 }),
         "{error:?}"
     );
 }

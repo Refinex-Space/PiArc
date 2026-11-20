@@ -10,8 +10,8 @@
 //!   file state table are forgotten (hashes stay, so read-before-edit still holds).
 //! - `session/usage` (Agent Host → Core): the context usage after each model response and each
 //!   compaction; `session/getContextUsage` (Core → Agent Host) returns the latest.
-//! - `session/remind` (Core → Agent Host): a `backgroundTask` reminder for the model's next
-//!   request (the entry point T32's background tasks use).
+//! - `session/remind` (Core → Agent Host): a `backgroundTask` or `monitorOutput` reminder for
+//!   the model's next request, deduplicated by key, or waking an idle session (T32).
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -31,6 +31,8 @@ pub enum ReminderType {
     PlanMode,
     /// A background task finished.
     BackgroundTask,
+    /// New output lines of a `Monitor` command (T32).
+    MonitorOutput,
     /// Memory loaded after the system prompt: a subdirectory's memory file, a changed memory
     /// file, the date.
     MemoryLazyLoad,
@@ -147,19 +149,34 @@ pub struct SessionUsageParams {
 pub struct SessionRemindParams {
     /// The session whose model hears it.
     pub session_id: SessionId,
-    /// What it tells the model; only `backgroundTask` is accepted.
+    /// What it tells the model: `backgroundTask`, or `monitorOutput` (T32).
     #[serde(rename = "type")]
     pub kind: ReminderType,
     /// Where it came from (the task).
     pub source: String,
     /// The text for the model.
     pub text: String,
+    /// Identifies the reminder (T32, ADR-0049): a queued reminder with the same key is
+    /// replaced, and one already delivered on the session's branch is not queued again.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
+    /// When the session is idle, start a turn whose input is this reminder (a Monitor waking
+    /// the session, T32).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub wake: bool,
 }
 
 /// Result of `session/remind`: the reminder is queued for the next model request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct SessionRemindResult {}
+pub struct SessionRemindResult {
+    /// The branch already holds a delivered reminder with this `key`: nothing was queued.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub delivered: bool,
+    /// The turn `wake` started.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn_id: Option<String>,
+}
 
 /// Parameters of `context/settings`, `fs/changes` and `fs/forgetReads`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

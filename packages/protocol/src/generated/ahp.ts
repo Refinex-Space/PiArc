@@ -112,6 +112,14 @@ export type AhpMessage =
   | ExecShellsRequest
   | ExecShellsResponse
   | ExecOutputNotification
+  | ExecMonitorRequest
+  | ExecMonitorResponse
+  | TaskListMethodRequest
+  | TaskListMethodResponse
+  | TaskReadRequest
+  | TaskReadResponse
+  | TaskKillRequest
+  | TaskKillResponse
   | SecretsGetAllRequest
   | SecretsGetAllResponse
   | SecretsGetRequest
@@ -682,6 +690,7 @@ export type ReminderType =
   | 'fileModified'
   | 'planMode'
   | 'backgroundTask'
+  | 'monitorOutput'
   | 'memoryLazyLoad'
   | 'rulesMatched'
   | 'hookContext'
@@ -714,9 +723,21 @@ export type LineEndings = 'asWritten' | 'matchFile';
  */
 export type ExecShell = 'bash' | 'powershell';
 /**
+ * Why a command became a background task.
+ */
+export type TaskStartReason = 'requested' | 'timeout';
+/**
  * Which output stream a chunk came from.
  */
 export type OutputStream = 'stdout' | 'stderr';
+/**
+ * What a task runs.
+ */
+export type TaskKind = 'command' | 'subagent' | 'monitor';
+/**
+ * Where a task stands. Every status but `running` is final.
+ */
+export type TaskStatus = 'running' | 'completed' | 'failed' | 'killed' | 'interrupted';
 /**
  * What kind of failure ended a turn, as the client groups errors (architecture section 8.5).
  */
@@ -738,10 +759,6 @@ export type AutoCompactState = 'on' | 'off' | 'stopped';
  * Where the context's total comes from.
  */
 export type UsageSource = 'estimate' | 'provider';
-/**
- * Result of `session/remind`: the reminder is queued for the next model request.
- */
-export type SessionRemindResult = Record<string, never>;
 /**
  * How a file changed outside the session.
  */
@@ -3895,6 +3912,11 @@ export interface ExecRunRequest {
  */
 export interface ExecRunParams {
   /**
+   * Starts the command as a background task and answers at once (capability
+   * `backgroundTasks`, T32).
+   */
+  background?: boolean;
+  /**
    * The shell command line.
    */
   command: string;
@@ -3927,7 +3949,9 @@ export interface ExecRunParams {
    */
   shell?: ExecShell | null;
   /**
-   * How long the command may run, in milliseconds; Core's default when absent.
+   * How long the command may run, in milliseconds; Core's default when absent. With the
+   * capability `backgroundTasks` a command that reaches it keeps running as a background
+   * task (T32); without, it is stopped.
    */
   timeoutMs?: number | null;
 }
@@ -3981,6 +4005,11 @@ export interface ExecRunResult {
    */
   signal?: number | null;
   /**
+   * The background task the command became, when it runs on (capability `backgroundTasks`,
+   * T32): asked for, or moved there by its timeout. The exit fields are then absent.
+   */
+  task?: TaskStarted | null;
+  /**
    * Whether the command was stopped because its timeout passed.
    */
   timedOut?: boolean | null;
@@ -4018,6 +4047,23 @@ export interface CommandOutput {
    * Characters of the whole output.
    */
   totalChars: number;
+}
+/**
+ * The task a command became (`exec/run`'s `task`).
+ */
+export interface TaskStarted {
+  /**
+   * Where its output goes, as the model is told it.
+   */
+  outputPath: string;
+  /**
+   * Why it runs in the background.
+   */
+  reason: TaskStartReason;
+  /**
+   * The task's id; `KillShell` takes it.
+   */
+  taskId: string;
 }
 /**
  * The timeout a command ran with.
@@ -4149,6 +4195,322 @@ export interface ExecOutputParams {
    * The stream the chunk came from.
    */
   stream: OutputStream;
+}
+/**
+ * Request for `exec/monitor`.
+ */
+export interface ExecMonitorRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'exec/monitor';
+  params: ExecMonitorParams;
+}
+/**
+ * Parameters of `exec/monitor`.
+ */
+export interface ExecMonitorParams {
+  /**
+   * The shell command line (bash).
+   */
+  command: string;
+  /**
+   * What the Monitor watches, as the panel shows it.
+   */
+  description: string;
+  /**
+   * The `Monitor` tool call it serves; its approval is consumed.
+   */
+  origin?: ToolOrigin | null;
+  /**
+   * Chosen by the Agent Host, unique among its requests.
+   */
+  requestId: string;
+  /**
+   * The session whose model hears the output.
+   */
+  sessionId: SessionId;
+  /**
+   * How long it may run, in milliseconds; Core's default (5 minutes) when absent, at most
+   * Core's maximum (30 minutes).
+   */
+  timeoutMs?: number | null;
+}
+/**
+ * Successful response to `exec/monitor`.
+ */
+export interface ExecMonitorResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: ExecMonitorResult;
+}
+/**
+ * Result of `exec/monitor`.
+ */
+export interface ExecMonitorResult {
+  /**
+   * Where its output goes, as the model is told it.
+   */
+  outputPath: string;
+  /**
+   * The timeout asked for, when it was above the maximum and cut to it.
+   */
+  requestedTimeoutMs?: number | null;
+  /**
+   * The task's id.
+   */
+  taskId: string;
+  /**
+   * The timeout it runs with, in milliseconds.
+   */
+  timeoutMs: number;
+}
+/**
+ * Request for `exec/background/list`.
+ */
+export interface TaskListMethodRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'exec/background/list';
+  params: TaskListParams;
+}
+/**
+ * Parameters of `exec/background/list`.
+ */
+export interface TaskListParams {
+  /**
+   * The session asking.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `exec/background/list`.
+ */
+export interface TaskListMethodResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: TaskList;
+}
+/**
+ * Result of `exec/background/list`: the session's tasks and its subagents', newest first.
+ */
+export interface TaskList {
+  /**
+   * The tasks.
+   */
+  tasks: BackgroundTask[];
+}
+/**
+ * One background task as the task manager knows it.
+ */
+export interface BackgroundTask {
+  /**
+   * The subagent type (`subagent`).
+   */
+  agentType?: string | null;
+  /**
+   * The command line (`command` and `monitor`).
+   */
+  command?: string | null;
+  /**
+   * The working directory.
+   */
+  cwd: string;
+  /**
+   * When it ended, Unix milliseconds.
+   */
+  endedAt?: number | null;
+  /**
+   * The exit code, when the command exited normally.
+   */
+  exitCode?: number | null;
+  /**
+   * What it runs.
+   */
+  kind: TaskKind;
+  /**
+   * What a non-zero exit code of a successful command means (`no matches`).
+   */
+  meaning?: string | null;
+  /**
+   * Whether the command did what it was asked, judged by what its exit code means.
+   */
+  outcome?: CommandOutcome | null;
+  /**
+   * Bytes written to the output file so far.
+   */
+  outputBytes: number;
+  /**
+   * The output file, as the model is told it (`~` for the home directory).
+   */
+  outputPath?: string | null;
+  /**
+   * The main session it belongs to: `sessionId`, or the main session of the subagent that
+   * started it.
+   */
+  ownerSessionId: string;
+  /**
+   * The session that started it.
+   */
+  sessionId: string;
+  /**
+   * The terminating signal on Unix.
+   */
+  signal?: number | null;
+  /**
+   * When it started, Unix milliseconds.
+   */
+  startedAt: number;
+  /**
+   * Where it stands.
+   */
+  status: TaskStatus;
+  /**
+   * The subagent's own session (`subagent`).
+   */
+  subagentSessionId?: string | null;
+  /**
+   * The last lines of the output (a few, each shortened), newest last.
+   */
+  tail?: string[];
+  /**
+   * Its id (`bg-` and 12 hexadecimal digits).
+   */
+  taskId: string;
+  /**
+   * A Monitor's timeout, in milliseconds.
+   */
+  timeoutMs?: number | null;
+  /**
+   * What the panel calls it: the command, the Monitor's description, the subagent's task.
+   */
+  title: string;
+  /**
+   * The tool call that started it.
+   */
+  toolCallId?: string | null;
+  /**
+   * The workspace of the session.
+   */
+  workspace: string;
+}
+/**
+ * Request for `exec/background/read`.
+ */
+export interface TaskReadRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'exec/background/read';
+  params: TaskReadParams;
+}
+/**
+ * Parameters of `exec/background/read`.
+ */
+export interface TaskReadParams {
+  /**
+   * Bytes to read at most; Core's chunk size (64 KiB) when absent or larger.
+   */
+  length?: number | null;
+  /**
+   * Byte offset to read from; 0 when absent.
+   */
+  offset?: number | null;
+  /**
+   * The session asking.
+   */
+  sessionId: SessionId;
+  /**
+   * The task.
+   */
+  taskId: string;
+}
+/**
+ * Successful response to `exec/background/read`.
+ */
+export interface TaskReadResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: TaskOutputChunk;
+}
+/**
+ * A range of a task's output.
+ */
+export interface TaskOutputChunk {
+  /**
+   * Where the next read starts.
+   */
+  nextOffset: number;
+  /**
+   * Where the text starts, in bytes.
+   */
+  offset: number;
+  /**
+   * Where the task stands: once it is not `running` and `nextOffset` reached
+   * `totalBytes`, there is no more.
+   */
+  status: TaskStatus;
+  /**
+   * The task.
+   */
+  taskId: string;
+  /**
+   * The bytes read, as UTF-8 (invalid sequences replaced); ends on a character boundary.
+   */
+  text: string;
+  /**
+   * Bytes in the file now.
+   */
+  totalBytes: number;
+}
+/**
+ * Request for `exec/background/kill`.
+ */
+export interface TaskKillRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'exec/background/kill';
+  params: TaskKillParams;
+}
+/**
+ * Parameters of `exec/background/kill`.
+ */
+export interface TaskKillParams {
+  /**
+   * The session asking: it may stop its own tasks and its subagents'.
+   */
+  sessionId: SessionId;
+  /**
+   * The task.
+   */
+  taskId: string;
+}
+/**
+ * Successful response to `exec/background/kill`.
+ */
+export interface TaskKillResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: TaskKillResult;
+}
+/**
+ * Result of `exec/background/kill`.
+ */
+export interface TaskKillResult {
+  /**
+   * Whether this request stopped it (false: it had already ended).
+   */
+  stopped: boolean;
+  /**
+   * The end of its output.
+   */
+  tail: string;
+  /**
+   * The task after it stopped (or as it ended before).
+   */
+  task: BackgroundTask;
 }
 /**
  * Request for `secrets/getAll`.
@@ -5129,6 +5491,11 @@ export interface SessionRemindRequest {
  */
 export interface SessionRemindParams {
   /**
+   * Identifies the reminder (T32, ADR-0049): a queued reminder with the same key is
+   * replaced, and one already delivered on the session's branch is not queued again.
+   */
+  key?: string | null;
+  /**
    * The session whose model hears it.
    */
   sessionId: SessionId;
@@ -5141,9 +5508,14 @@ export interface SessionRemindParams {
    */
   text: string;
   /**
-   * What it tells the model; only `backgroundTask` is accepted.
+   * What it tells the model: `backgroundTask`, or `monitorOutput` (T32).
    */
   type: ReminderType;
+  /**
+   * When the session is idle, start a turn whose input is this reminder (a Monitor waking
+   * the session, T32).
+   */
+  wake?: boolean;
 }
 /**
  * Successful response to `session/remind`.
@@ -5153,6 +5525,19 @@ export interface SessionRemindResponse {
   id: RequestId;
   jsonrpc: JsonRpcVersion;
   result: SessionRemindResult;
+}
+/**
+ * Result of `session/remind`: the reminder is queued for the next model request.
+ */
+export interface SessionRemindResult {
+  /**
+   * The branch already holds a delivered reminder with this `key`: nothing was queued.
+   */
+  delivered?: boolean;
+  /**
+   * The turn `wake` started.
+   */
+  turnId?: string | null;
 }
 /**
  * Request for `context/settings`.

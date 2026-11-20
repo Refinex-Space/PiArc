@@ -26,6 +26,7 @@
 //! The authoritative rules are in `crates/deps-rules.json`, enforced by
 //! `scripts/ci/check-crate-deps.mjs` (architecture section 7.1).
 
+mod background_tasks;
 mod checkpoints;
 mod error;
 pub mod index;
@@ -37,6 +38,7 @@ pub mod records;
 mod store;
 pub mod time;
 
+pub use background_tasks::TaskRow;
 pub use checkpoints::{CheckpointFileRow, CheckpointRow, NewCheckpointFile};
 pub use error::{Error, Result};
 pub use index::{

@@ -668,6 +668,132 @@
         }
       ]
     },
+    "BackgroundTask": {
+      "description": "One background task as the task manager knows it.",
+      "properties": {
+        "agentType": {
+          "description": "The subagent type (`subagent`).",
+          "type": ["string", "null"]
+        },
+        "command": {
+          "description": "The command line (`command` and `monitor`).",
+          "type": ["string", "null"]
+        },
+        "cwd": {
+          "description": "The working directory.",
+          "type": "string"
+        },
+        "endedAt": {
+          "description": "When it ended, Unix milliseconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "exitCode": {
+          "description": "The exit code, when the command exited normally.",
+          "format": "int32",
+          "type": ["integer", "null"]
+        },
+        "kind": {
+          "$ref": "#/$defs/TaskKind",
+          "description": "What it runs."
+        },
+        "meaning": {
+          "description": "What a non-zero exit code of a successful command means (`no matches`).",
+          "type": ["string", "null"]
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CommandOutcome"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether the command did what it was asked, judged by what its exit code means."
+        },
+        "outputBytes": {
+          "description": "Bytes written to the output file so far.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outputPath": {
+          "description": "The output file, as the model is told it (`~` for the home directory).",
+          "type": ["string", "null"]
+        },
+        "ownerSessionId": {
+          "description": "The main session it belongs to: `sessionId`, or the main session of the subagent that\nstarted it.",
+          "type": "string"
+        },
+        "sessionId": {
+          "description": "The session that started it.",
+          "type": "string"
+        },
+        "signal": {
+          "description": "The terminating signal on Unix.",
+          "format": "int32",
+          "type": ["integer", "null"]
+        },
+        "startedAt": {
+          "description": "When it started, Unix milliseconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "#/$defs/TaskStatus",
+          "description": "Where it stands."
+        },
+        "subagentSessionId": {
+          "description": "The subagent's own session (`subagent`).",
+          "type": ["string", "null"]
+        },
+        "tail": {
+          "description": "The last lines of the output (a few, each shortened), newest last.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "taskId": {
+          "description": "Its id (`bg-` and 12 hexadecimal digits).",
+          "type": "string"
+        },
+        "timeoutMs": {
+          "description": "A Monitor's timeout, in milliseconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "title": {
+          "description": "What the panel calls it: the command, the Monitor's description, the subagent's task.",
+          "type": "string"
+        },
+        "toolCallId": {
+          "description": "The tool call that started it.",
+          "type": ["string", "null"]
+        },
+        "workspace": {
+          "description": "The workspace of the session.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "taskId",
+        "sessionId",
+        "ownerSessionId",
+        "workspace",
+        "kind",
+        "title",
+        "cwd",
+        "status",
+        "startedAt",
+        "outputBytes"
+      ],
+      "type": "object"
+    },
     "BlobRef": {
       "description": "A copy of a file's content kept by Core (ADR-0009 rule 8).",
       "properties": {
@@ -1833,6 +1959,110 @@
       "required": ["killed"],
       "type": "object"
     },
+    "ExecMonitorParams": {
+      "description": "Parameters of `exec/monitor`.",
+      "properties": {
+        "command": {
+          "description": "The shell command line (bash).",
+          "type": "string"
+        },
+        "description": {
+          "description": "What the Monitor watches, as the panel shows it.",
+          "type": "string"
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolOrigin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The `Monitor` tool call it serves; its approval is consumed."
+        },
+        "requestId": {
+          "description": "Chosen by the Agent Host, unique among its requests.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session whose model hears the output."
+        },
+        "timeoutMs": {
+          "description": "How long it may run, in milliseconds; Core's default (5 minutes) when absent, at most\nCore's maximum (30 minutes).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        }
+      },
+      "required": ["sessionId", "requestId", "command", "description"],
+      "type": "object"
+    },
+    "ExecMonitorRequest": {
+      "description": "Request for `exec/monitor`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "exec/monitor",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ExecMonitorParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "ExecMonitorResponse": {
+      "description": "Successful response to `exec/monitor`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/ExecMonitorResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "ExecMonitorResult": {
+      "description": "Result of `exec/monitor`.",
+      "properties": {
+        "outputPath": {
+          "description": "Where its output goes, as the model is told it.",
+          "type": "string"
+        },
+        "requestedTimeoutMs": {
+          "description": "The timeout asked for, when it was above the maximum and cut to it.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "taskId": {
+          "description": "The task's id.",
+          "type": "string"
+        },
+        "timeoutMs": {
+          "description": "The timeout it runs with, in milliseconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["taskId", "outputPath", "timeoutMs"],
+      "type": "object"
+    },
     "ExecOutputNotification": {
       "description": "Notification `exec/output`.",
       "properties": {
@@ -1884,6 +2114,10 @@
     "ExecRunParams": {
       "description": "Parameters of `exec/run`.",
       "properties": {
+        "background": {
+          "description": "Starts the command as a background task and answers at once (capability\n`backgroundTasks`, T32).",
+          "type": "boolean"
+        },
         "command": {
           "description": "The shell command line.",
           "type": "string"
@@ -1930,7 +2164,7 @@
           "description": "The shell; `bash` when absent."
         },
         "timeoutMs": {
-          "description": "How long the command may run, in milliseconds; Core's default when absent.",
+          "description": "How long the command may run, in milliseconds; Core's default when absent. With the\ncapability `backgroundTasks` a command that reaches it keeps running as a background\ntask (T32); without, it is stopped.",
           "format": "uint64",
           "minimum": 0,
           "type": ["integer", "null"]
@@ -2039,6 +2273,17 @@
           "description": "The terminating signal number on Unix, when a signal ended the command.",
           "format": "int32",
           "type": ["integer", "null"]
+        },
+        "task": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TaskStarted"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The background task the command became, when it runs on (capability `backgroundTasks`,\nT32): asked for, or moved there by its timeout. The exit fields are then absent."
         },
         "timedOut": {
           "description": "Whether the command was stopped because its timeout passed.",
@@ -6833,6 +7078,11 @@
           "type": "string"
         },
         {
+          "const": "monitorOutput",
+          "description": "New output lines of a `Monitor` command (T32).",
+          "type": "string"
+        },
+        {
           "const": "memoryLazyLoad",
           "description": "Memory loaded after the system prompt: a subdirectory's memory file, a changed memory\nfile, the date.",
           "type": "string"
@@ -8382,6 +8632,10 @@
     "SessionRemindParams": {
       "description": "Parameters of `session/remind`.",
       "properties": {
+        "key": {
+          "description": "Identifies the reminder (T32, ADR-0049): a queued reminder with the same key is\nreplaced, and one already delivered on the session's branch is not queued again.",
+          "type": ["string", "null"]
+        },
         "sessionId": {
           "$ref": "#/$defs/SessionId",
           "description": "The session whose model hears it."
@@ -8396,7 +8650,11 @@
         },
         "type": {
           "$ref": "#/$defs/ReminderType",
-          "description": "What it tells the model; only `backgroundTask` is accepted."
+          "description": "What it tells the model: `backgroundTask`, or `monitorOutput` (T32)."
+        },
+        "wake": {
+          "description": "When the session is idle, start a turn whose input is this reminder (a Monitor waking\nthe session, T32).",
+          "type": "boolean"
         }
       },
       "required": ["sessionId", "type", "source", "text"],
@@ -8441,6 +8699,16 @@
     },
     "SessionRemindResult": {
       "description": "Result of `session/remind`: the reminder is queued for the next model request.",
+      "properties": {
+        "delivered": {
+          "description": "The branch already holds a delivered reminder with this `key`: nothing was queued.",
+          "type": "boolean"
+        },
+        "turnId": {
+          "description": "The turn `wake` started.",
+          "type": ["string", "null"]
+        }
+      },
       "type": "object"
     },
     "SessionResumeParams": {
@@ -9444,6 +9712,344 @@
         }
       },
       "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "TaskKillParams": {
+      "description": "Parameters of `exec/background/kill`.",
+      "properties": {
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session asking: it may stop its own tasks and its subagents'."
+        },
+        "taskId": {
+          "description": "The task.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "taskId"],
+      "type": "object"
+    },
+    "TaskKillRequest": {
+      "description": "Request for `exec/background/kill`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "exec/background/kill",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/TaskKillParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "TaskKillResponse": {
+      "description": "Successful response to `exec/background/kill`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/TaskKillResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "TaskKillResult": {
+      "description": "Result of `exec/background/kill`.",
+      "properties": {
+        "stopped": {
+          "description": "Whether this request stopped it (false: it had already ended).",
+          "type": "boolean"
+        },
+        "tail": {
+          "description": "The end of its output.",
+          "type": "string"
+        },
+        "task": {
+          "$ref": "#/$defs/BackgroundTask",
+          "description": "The task after it stopped (or as it ended before)."
+        }
+      },
+      "required": ["task", "stopped", "tail"],
+      "type": "object"
+    },
+    "TaskKind": {
+      "description": "What a task runs.",
+      "oneOf": [
+        {
+          "const": "command",
+          "description": "A shell command started in the background or moved there by its timeout.",
+          "type": "string"
+        },
+        {
+          "const": "subagent",
+          "description": "A background subagent (the `Agent` tool's `run_in_background`).",
+          "type": "string"
+        },
+        {
+          "const": "monitor",
+          "description": "A `Monitor` command: its new output lines reach the model.",
+          "type": "string"
+        }
+      ]
+    },
+    "TaskList": {
+      "description": "Result of `exec/background/list`: the session's tasks and its subagents', newest first.",
+      "properties": {
+        "tasks": {
+          "description": "The tasks.",
+          "items": {
+            "$ref": "#/$defs/BackgroundTask"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["tasks"],
+      "type": "object"
+    },
+    "TaskListMethodRequest": {
+      "description": "Request for `exec/background/list`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "exec/background/list",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/TaskListParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "TaskListMethodResponse": {
+      "description": "Successful response to `exec/background/list`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/TaskList"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "TaskListParams": {
+      "description": "Parameters of `exec/background/list`.",
+      "properties": {
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session asking."
+        }
+      },
+      "required": ["sessionId"],
+      "type": "object"
+    },
+    "TaskOutputChunk": {
+      "description": "A range of a task's output.",
+      "properties": {
+        "nextOffset": {
+          "description": "Where the next read starts.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "offset": {
+          "description": "Where the text starts, in bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "#/$defs/TaskStatus",
+          "description": "Where the task stands: once it is not `running` and `nextOffset` reached\n`totalBytes`, there is no more."
+        },
+        "taskId": {
+          "description": "The task.",
+          "type": "string"
+        },
+        "text": {
+          "description": "The bytes read, as UTF-8 (invalid sequences replaced); ends on a character boundary.",
+          "type": "string"
+        },
+        "totalBytes": {
+          "description": "Bytes in the file now.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["taskId", "offset", "text", "nextOffset", "totalBytes", "status"],
+      "type": "object"
+    },
+    "TaskReadParams": {
+      "description": "Parameters of `exec/background/read`.",
+      "properties": {
+        "length": {
+          "description": "Bytes to read at most; Core's chunk size (64 KiB) when absent or larger.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "offset": {
+          "description": "Byte offset to read from; 0 when absent.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session asking."
+        },
+        "taskId": {
+          "description": "The task.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "taskId"],
+      "type": "object"
+    },
+    "TaskReadRequest": {
+      "description": "Request for `exec/background/read`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "exec/background/read",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/TaskReadParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "TaskReadResponse": {
+      "description": "Successful response to `exec/background/read`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/TaskOutputChunk"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "TaskStartReason": {
+      "description": "Why a command became a background task.",
+      "oneOf": [
+        {
+          "const": "requested",
+          "description": "The call asked for it (`background: true`).",
+          "type": "string"
+        },
+        {
+          "const": "timeout",
+          "description": "It reached its timeout and kept running in the background.",
+          "type": "string"
+        }
+      ]
+    },
+    "TaskStarted": {
+      "description": "The task a command became (`exec/run`'s `task`).",
+      "properties": {
+        "outputPath": {
+          "description": "Where its output goes, as the model is told it.",
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/TaskStartReason",
+          "description": "Why it runs in the background."
+        },
+        "taskId": {
+          "description": "The task's id; `KillShell` takes it.",
+          "type": "string"
+        }
+      },
+      "required": ["taskId", "outputPath", "reason"],
+      "type": "object"
+    },
+    "TaskStatus": {
+      "description": "Where a task stands. Every status but `running` is final.",
+      "oneOf": [
+        {
+          "const": "running",
+          "description": "Still running.",
+          "type": "string"
+        },
+        {
+          "const": "completed",
+          "description": "Ended and did what it was asked (judged by what its exit code means).",
+          "type": "string"
+        },
+        {
+          "const": "failed",
+          "description": "Ended unsuccessfully, or a Monitor reached its timeout.",
+          "type": "string"
+        },
+        {
+          "const": "killed",
+          "description": "Stopped by `KillShell`, the stop button, or its session being archived or deleted.",
+          "type": "string"
+        },
+        {
+          "const": "interrupted",
+          "description": "Stopped because PiArc quit (or the Agent Host running a subagent ended).",
+          "type": "string"
+        }
+      ]
+    },
+    "TasksSnapshot": {
+      "description": "The `core/tasks` snapshot: the tasks of the open workspaces' sessions, newest first.",
+      "properties": {
+        "revision": {
+          "description": "Increases with every snapshot; clients drop older ones.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tasks": {
+          "description": "The tasks.",
+          "items": {
+            "$ref": "#/$defs/BackgroundTask"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["revision", "tasks"],
       "type": "object"
     },
     "TodoItem": {
@@ -10533,6 +11139,30 @@
     },
     {
       "$ref": "#/$defs/ExecOutputNotification"
+    },
+    {
+      "$ref": "#/$defs/ExecMonitorRequest"
+    },
+    {
+      "$ref": "#/$defs/ExecMonitorResponse"
+    },
+    {
+      "$ref": "#/$defs/TaskListMethodRequest"
+    },
+    {
+      "$ref": "#/$defs/TaskListMethodResponse"
+    },
+    {
+      "$ref": "#/$defs/TaskReadRequest"
+    },
+    {
+      "$ref": "#/$defs/TaskReadResponse"
+    },
+    {
+      "$ref": "#/$defs/TaskKillRequest"
+    },
+    {
+      "$ref": "#/$defs/TaskKillResponse"
     },
     {
       "$ref": "#/$defs/SecretsGetAllRequest"

@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 44,
+  "method": "exec/background/read",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "taskId": "bg-0a1b2c3d4e5f"
+  }
+}

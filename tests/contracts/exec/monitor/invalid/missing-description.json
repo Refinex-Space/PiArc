@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 41,
+  "method": "exec/monitor",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "requestId": "mon-02",
+    "command": "gh run watch"
+  }
+}
