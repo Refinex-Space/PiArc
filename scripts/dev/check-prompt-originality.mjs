@@ -21,6 +21,7 @@ function render() {
         import { SUMMARY_SYSTEM, summaryPrompt, fileLists } from './agent-host/src/harness/prompts/compaction.ts';
         import { CANONICAL_TOOLS, DEFAULT_PROFILE, conservativeProfile } from './agent-host/src/tools/profile.ts';
         import * as web from './agent-host/src/harness/prompts/web-fetch.ts';
+        import * as sub from './agent-host/src/harness/prompts/subagents.ts';
         const system = assembleSystem(CANONICAL_TOOLS, DEFAULT_PROFILE, [],
           {cwd: '', platform: '', date: '', gitStatus: ''}).text;
         const conservative = conservativeProfile(DEFAULT_PROFILE);
@@ -42,7 +43,12 @@ function render() {
             hookInstructions: '' }), fileLists([''], ['']),
           // T29: the task list nudge of the conservative profile and WebFetch's extraction.
           notice.startListNotice(0), web.EXTRACT_SYSTEM, web.extractionPrompt('', '', '', true),
-          web.crossHostRedirect('', '', 301)];
+          web.crossHostRedirect('', '', 301),
+          // T31: the built-in subagent types, the Agent tool's type list and the run notices.
+          ...[sub.GENERAL_PURPOSE, sub.EXPLORE, sub.PLAN].flatMap((t) => [t.description, t.identity]),
+          sub.withTypes('', [{ name: '', description: '' }]),
+          sub.backgroundStarted('', ''), sub.backgroundFinished('', '', '', '', ''),
+          sub.partialReport(0, ''), sub.EMPTY_REPORT, sub.toolNotAvailable('')];
         process.stdout.write([system, ...descriptions, ...notices].join(String.fromCharCode(10)));`,
       resolveDir: repoRoot,
     },
@@ -61,12 +67,17 @@ function render() {
 }
 
 /** Model-visible literals that no render above reaches (R3): every `description` of a tool
- * parameter schema in the Harness Kit and the tool layer, and the sentences of at least five
- * words that session memory, the reminder channel, interruption and the result budget write. */
+ * parameter schema in the Harness Kit (its subdirectories too, T31) and the tool layer, and the
+ * sentences of at least five words that session memory, the reminder channel, interruption, the
+ * result budget and the subagent runs (T31) write. */
 function sourceTexts() {
   const literal = /'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g;
   const texts = [];
-  for (const dir of ['agent-host/src/harness', 'agent-host/src/tools']) {
+  for (const dir of [
+    'agent-host/src/harness',
+    'agent-host/src/harness/subagents',
+    'agent-host/src/tools',
+  ]) {
     for (const name of readdirSync(path.join(repoRoot, dir))) {
       if (!name.endsWith('.ts') || name.endsWith('.test.ts')) continue;
       const source = readFileSync(path.join(repoRoot, dir, name), 'utf8');
@@ -78,8 +89,15 @@ function sourceTexts() {
       }
     }
   }
-  for (const file of ['session-memory.ts', 'reminders.ts', 'interruption.ts', 'tool-results.ts']) {
-    const source = readFileSync(path.join(repoRoot, 'agent-host/src/harness', file), 'utf8');
+  for (const file of [
+    'harness/session-memory.ts',
+    'harness/reminders.ts',
+    'harness/interruption.ts',
+    'harness/tool-results.ts',
+    'runtime/subagents.ts',
+    'runtime/subagent-session.ts',
+  ]) {
+    const source = readFileSync(path.join(repoRoot, 'agent-host/src', file), 'utf8');
     for (const m of source.matchAll(literal)) {
       const text = (m[1] ?? m[2] ?? m[3] ?? '').replace(/\$\{[^}]*\}/g, ' ');
       if (words(text).length >= 5) texts.push(text);
