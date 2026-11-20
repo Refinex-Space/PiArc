@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | M1 | 61 | 61 | 0 | 0 |
 | M2 | 46 | 46 | 0 | 0 |
-| M3 | 21 | 0 | 21 | 0 |
+| M3 | 27 | 10 | 17 | 0 |
 | M4 | 10 | 0 | 10 | 0 |
 | M5 | 7 | 0 | 7 | 0 |
 
@@ -33,7 +33,7 @@
 | CAP-EXEC-TIMEOUT-001 | 命令超时（默认 2 分钟、上限 10 分钟）后整棵进程树被终止，结果带已有输出与超时说明 | FR-TL-01、ARCH-6.11 | T17 | `exec-timeout-kills-tree` | 已实现 |
 | CAP-EXT-PI-001 | 信任的项目 Pi 扩展被加载，其注册的工具可被模型调用 | ARCH-5.5、ARCH-10.2 | T13 | `trust-trusted-loads-project-extension` | 已实现 |
 | CAP-MODEL-SWITCH-001 | 会话内切换模型与 effort，提示切换代价 | FR-MD-03、ARCH-6.13 | T21 | `provider-settings-models`<br>`turn-model-effort` | 已实现 |
-| CAP-PERM-APPROVAL-001 | 结构化审批：仅本次、本会话、总是允许、拒绝并反馈 | FR-PM-02、ARCH-6.2.3 | T20 | `policy-extra-directory`<br>`policy-save-rule`<br>`policy-session-rule` | 已实现 |
+| CAP-PERM-APPROVAL-001 | 结构化审批：仅本次、本会话、总是允许、拒绝并反馈 | FR-PM-02、ARCH-6.2.3 | T20 | `policy-extra-directory`<br>`policy-save-rule`<br>`policy-session-rule`<br>`subagent-approval` | 已实现 |
 | CAP-PERM-MODE-001 | 手动与自动接受编辑两种权限模式 | FR-PM-01、ARCH-6.2.1 | T20 | `policy-accept-edits`<br>`policy-accept-edits-powershell`<br>`policy-manual`<br>`policy-manual-powershell`<br>`policy-mode-restore`<br>`policy-shell-boundary`<br>`policy-untrusted` | 已实现 |
 | CAP-PROVIDER-ANTHROPIC-001 | Anthropic Messages 线格式的服务商 | FR-MD-01、ARCH-6.13 | T06 | `chat-basic` | 已实现 |
 | CAP-PROVIDER-CLOUD-001 | 云厂商凭证与本地模型服务商 | FR-MD-01 | T21 | `provider-settings-models` | 已实现 |
@@ -87,15 +87,15 @@
 | CAP-ASK-001 | AskUserQuestion 结构化提问 | FR-HN-03、ARCH-6.5 | T26 | `ask-answers`<br>`ask-timeout` | 已实现 |
 | CAP-CHANGES-HUNK-001 | 按 hunk 丢弃只撤销该处改动，CRLF 与 BOM 保真，过期的 diff 被拒绝，agent 需重新读取 | FR-RV-02、ARCH-7.7 | T28 | `changes-file-and-hunk` | 已实现 |
 | CAP-CKPT-001 | 每次写入前保存快照，形成检查点 | FR-RV-03、ARCH-6.9 | T28 | `rewind-code-and-conversation`<br>`rewind-code-only` | 已实现 |
-| CAP-CKPT-REWIND-001 | 回退：恢复代码与对话、只恢复对话或只恢复代码，冲突时提示 | FR-RV-03、ARCH-6.9 | T28 | `rewind-code-and-conversation`<br>`rewind-conflict`<br>`rewind-conversation-only` | 已实现 |
-| CAP-CONFIG-COMPAT-001 | 读取 Claude Code 的 `.claude/settings*.json`（permissions 等与 PiArc 功能对应的键） | ARCH-6.14 | T24 | `config-merge-order`<br>`config-untrusted-project` | 已实现 |
+| CAP-CKPT-REWIND-001 | 回退：恢复代码与对话、只恢复对话或只恢复代码，冲突时提示 | FR-RV-03、ARCH-6.9 | T28 | `rewind-code-and-conversation`<br>`rewind-conflict`<br>`rewind-conversation-only`<br>`subagent-checkpoint` | 已实现 |
+| CAP-CONFIG-COMPAT-001 | 读取 Claude Code 的 `.claude/settings*.json`（permissions 等与 PiArc 功能对应的键） | ARCH-6.14 | T24 | `config-merge-order`<br>`config-untrusted-project`<br>`model-default-setting` | 已实现 |
 | CAP-CONFIG-DIAG-001 | 配置诊断：每个配置文件的加载状态与生效、覆盖、忽略的键（基础） | FR-EX-05、ARCH-6.14 | T24 | `config-merge-order`<br>`config-untrusted-project` | 已实现 |
 | CAP-CTX-CACHE-001 | reminder 追加与压缩前后保持 Anthropic 缓存断点布局 | ARCH-6.6.1、ARCH-6.15 | T27 | `ctx-cache-breakpoints` | 已实现 |
 | CAP-CTX-CHANGED-001 | 读过的文件被外部修改后，下一次模型请求带修改提醒 | ARCH-6.6.3 | T27 | `ctx-file-modified`<br>`ctx-reminders` | 已实现 |
 | CAP-CTX-COMPACT-001 | 自动压缩与手动 `/compact`，熔断与压缩后恢复关键上下文 | FR-CX-03、ARCH-6.6.4、ARCH-6.15 | T27 | `ctx-compact-focus`<br>`ctx-compact-threshold`<br>`ctx-compact-window-cap` | 已实现 |
 | CAP-CTX-COMPACT-002 | 连续 3 次自动压缩失败或无效后停止自动压缩并提示，手动 `/compact` 仍可用 | FR-CX-03、ARCH-6.6.4、ARCH-6.15 | T27 | `ctx-compact-breaker` | 已实现 |
 | CAP-CTX-COMPACT-003 | 压缩后按上限重注入 memory、计划、任务清单、skill 正文与最近文件 | FR-CX-03、ARCH-6.6.4、ARCH-6.15 | T27 | `ctx-compact-restore` | 已实现 |
-| CAP-CTX-REMINDER-001 | 动态信息经 system reminder 送达，不破坏缓存 | ARCH-6.6.3 | T27 | `ctx-reminders` | 已实现 |
+| CAP-CTX-REMINDER-001 | 动态信息经 system reminder 送达，不破坏缓存 | ARCH-6.6.3 | T27 | `ctx-reminders`<br>`subagent-background` | 已实现 |
 | CAP-CTX-RULES-001 | `.claude/rules` 与 `paths:` 条件加载 | FR-CX-02、ARCH-6.14 | T24 | `config-rules-paths` | 已实现 |
 | CAP-CTX-USAGE-001 | 上下文用量与分类明细 | FR-CX-04、ARCH-6.6.5 | T27 | `ctx-usage` | 已实现 |
 | CAP-HOOK-COMPACT-001 | PreCompact 与 PostCompact hooks | FR-HN-05、ARCH-6.3.2 | T25 | `ctx-compact-focus`<br>`hooks-compact`<br>`hooks-pre-compact-block` | 已实现 |
@@ -115,7 +115,7 @@
 | CAP-PERM-CRITICAL-001 | 关键路径删除在任何模式下都询问，包括跳过权限与存在匹配的 allow 规则 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-critical-delete` | 已实现 |
 | CAP-PERM-MODE-002 | 计划与跳过权限模式（跳过权限需显式开启并二次确认） | FR-PM-01、ARCH-6.2.1 | T23 | `perm-bypass`<br>`perm-critical-delete`<br>`perm-plan` | 已实现 |
 | CAP-PERM-READONLY-001 | 内置只读命令白名单在手动模式下免审批，路径越界或夹带其他命令时询问 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-read-only` | 已实现 |
-| CAP-PERM-RULE-001 | 兼容 Claude Code 的规则语法，按 deny → ask → allow 裁决 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-powershell-whole`（仅 windows）<br>`perm-rule-match`<br>`webfetch-domain-rules` | 已实现 |
+| CAP-PERM-RULE-001 | 兼容 Claude Code 的规则语法，按 deny → ask → allow 裁决 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-powershell-whole`（仅 windows）<br>`perm-rule-match`<br>`subagent-denied-type`<br>`webfetch-domain-rules` | 已实现 |
 | CAP-PERM-TOOLS-001 | 不带 specifier 的 deny 规则把工具从模型请求的工具列表中移除 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-rule-match` | 已实现 |
 | CAP-PLAN-ENTRY-001 | 批准的计划保存为会话 entry，重启与恢复后经注入接口读回 | FR-HN-01、ARCH-6.5 | T26 | `plan-entry-restart` | 已实现 |
 | CAP-PLAN-MODE-001 | 计划模式：写工具与非只读命令被硬拦截，提交计划，批准时选择后续模式 | FR-HN-01、ARCH-6.5、ARCH-6.15 | T26 | `plan-keep-planning`<br>`plan-mode-gate`<br>`plan-mode-menu-reminder` | 已实现 |
@@ -135,8 +135,14 @@
 
 | ID | 能力 | 需求与架构 | 任务 | 覆盖场景 | 状态 |
 |---|---|---|---|---|---|
-| CAP-AGENT-DEF-001 | 读取 `.claude/agents` 与 `.piarc/agents` 的子 agent 定义，内置 general-purpose、Explore、Plan | FR-HN-04、ARCH-6.4 | T31 | — | 计划中 |
-| CAP-AGENT-RUN-001 | 子 agent 使用任意服务商模型、可后台运行、最多 3 层、默认不继承父会话历史 | FR-HN-04、ARCH-6.4、ARCH-6.15 | T31 | — | 计划中 |
+| CAP-AGENT-APPROVAL-001 | 子 agent 的审批卡出现在主会话并标明来源，模式不比主会话宽松 | FR-HN-04、ARCH-6.4、ARCH-6.2.3 | T31 | `subagent-approval` | 已实现 |
+| CAP-AGENT-CHECKPOINT-001 | 子 agent 改动的文件进入主会话当前回合的检查点，回退时恢复 | FR-HN-04、ARCH-6.9 | T31 | `subagent-checkpoint` | 已实现 |
+| CAP-AGENT-DEF-001 | 读取 `.claude/agents` 与 `.piarc/agents` 的子 agent 定义，内置 general-purpose、Explore、Plan | FR-HN-04、ARCH-6.4 | T31 | `subagent-denied-type`<br>`subagent-general-purpose`<br>`subagent-tool-filter` | 已实现 |
+| CAP-AGENT-FILTER-001 | 子 agent 的工具按 tools、disallowedTools 过滤并移除提问与计划工具，调用被移除的工具在闸门处拒绝 | FR-HN-04、ARCH-6.4 | T31 | `subagent-explore-fast`<br>`subagent-tool-filter` | 已实现 |
+| CAP-AGENT-HOOKS-001 | 子 agent 定义中的 hooks 只在其运行期间生效，项目级定义的 hooks 信任前不执行 | FR-HN-04、ARCH-6.3.1 | T31 | `subagent-hooks`<br>`subagent-hooks-untrusted` | 已实现 |
+| CAP-AGENT-INTERRUPT-001 | 中断主会话时进行中的子 agent 一并中止，未完成的工具调用补齐已中断结果 | FR-HN-04、ARCH-6.15 | T31 | `subagent-interrupt` | 已实现 |
+| CAP-AGENT-LIMIT-001 | 子 agent 深度上限移除 Agent 工具，并发上限立即返回说明上限的错误 | FR-HN-04、ARCH-6.4 | T31 | `subagent-concurrency`<br>`subagent-depth` | 已实现 |
+| CAP-AGENT-RUN-001 | 子 agent 使用任意服务商模型、可后台运行、最多 3 层、默认不继承父会话历史 | FR-HN-04、ARCH-6.4、ARCH-6.15 | T31 | `subagent-background`<br>`subagent-explore-fast`<br>`subagent-general-purpose`<br>`subagent-max-turns` | 已实现 |
 | CAP-BG-COMMAND-001 | 后台命令、超时转后台与 KillShell | FR-TL-04、ARCH-6.11 | T32 | — | 计划中 |
 | CAP-BG-MONITOR-001 | Monitor 监视后台任务输出并唤醒会话 | FR-TL-04、ARCH-6.11 | T32 | — | 计划中 |
 | CAP-CMD-001 | 自定义斜杠命令（`.claude/commands`、Pi prompt templates） | FR-EX-02、ARCH-6.7 | T37 | — | 计划中 |
@@ -146,8 +152,8 @@
 | CAP-MCP-OAUTH-001 | MCP 的 OAuth | FR-EX-03、ARCH-6.8 | T36 | — | 计划中 |
 | CAP-MCP-POOL-001 | MCP 工作区共享连接池 | FR-EX-03、ARCH-6.8 | T36 | — | 计划中 |
 | CAP-MCP-TRANSPORT-001 | MCP 的 stdio 与 Streamable HTTP 传输 | FR-EX-03、ARCH-6.8 | T36 | — | 计划中 |
-| CAP-MODEL-ALIAS-001 | 模型别名表供子 agent 与 skills 引用 | FR-MD-05 | T31 | — | 计划中 |
-| CAP-MODEL-DEGRADE-001 | 按模型能力降级（例如不支持图片输入时的处理） | ARCH-6.13 | T31 | — | 计划中 |
+| CAP-MODEL-ALIAS-001 | 模型别名表供子 agent 与 skills 引用 | FR-MD-05 | T31 | `model-default-setting`<br>`subagent-degrade`<br>`subagent-explore-fast`<br>`subagent-model-aliases` | 已实现 |
+| CAP-MODEL-DEGRADE-001 | 按模型能力降级（例如不支持图片输入时的处理） | ARCH-6.13 | T31 | `subagent-degrade` | 已实现 |
 | CAP-SESSION-PARALLEL-001 | 跨工作区与多窗口的会话并行运行 | FR-WS-05 | T35 | — | 计划中 |
 | CAP-SESSION-SEARCH-001 | 会话全文搜索 | FR-WS-04、ARCH-9.2 | T35 | — | 计划中 |
 | CAP-SKILL-001 | Skills（Agent Skills 标准；`.claude/skills`、`.piarc/skills`、用户级），渐进加载 | FR-EX-01、ARCH-6.7 | T37 | — | 计划中 |
