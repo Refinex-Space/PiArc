@@ -3191,8 +3191,8 @@
       "id": "T31-A14",
       "task": "T31",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run verify` 于 7ec1971（工作区干净）15 项全部通过：Prettier、tsc、ESLint、Core 模块与 API 快照、Vitest 1384 项通过 1 项跳过、cargo fmt、clippy、cargo test 786 项通过 0 失败、协议漂移、契约样本 166 个契约、cargo-deny、crate 依赖规则、验收清单、L2 137 个场景 135 通过 2 项平台跳过与能力清单（151 项，active 117）、设计令牌（tmp/evidence/T31/verify.log）。另：Windows 交叉 clippy（`--target x86_64-pc-windows-msvc --workspace --all-targets`）通过；L4 t31 3 项通过；`npm run l3`（ba159ff）12 个场景 0 条未解释差异、0 条过时条目（tmp/evidence/T31/l3-report.md）"
     },
     {
       "id": "T32-A01",

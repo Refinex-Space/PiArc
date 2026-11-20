@@ -159,7 +159,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T30 | [L3 行为对齐基座](tasks/T30-l3-behavior-alignment.md) | 3 | T29 | macOS | high / 高 | 中 | 无 | 已完成 | f52b5aa |
 | R3 | [M2 评审](tasks/R3-m2-review.md) | 3 | T30、W1 | macOS | high / 高 | 中 | 无 | 部分完成 | 8e2b4a2 |
 | W2 | [Windows：M2 达标](tasks/W2-windows-m2-parity.md) | 4 | R3 | Windows | high / 高 | 中 | 无 | 未开始 | — |
-| T31 | [子 agent 与模型别名](tasks/T31-subagents-and-model-aliases.md) | 4 | R3 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
+| T31 | [子 agent 与模型别名](tasks/T31-subagents-and-model-aliases.md) | 4 | R3 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 7ec1971 |
 | T32 | [后台任务、Monitor 与 KillShell](tasks/T32-background-tasks-and-monitor.md) | 4 | T31 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T33 | [无头终端（Core 侧）](tasks/T33-headless-terminal.md) | 4 | T32 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T34 | [终端渲染器与终端面板](tasks/T34-terminal-renderer-and-panel.md) | 4 | T33 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -308,21 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-**T31 子 agent 与模型别名**（开工 2026-11-20，基线 abd7209；依赖 R3 为部分完成，遗留 R3-A07 只等 W2 的 UNC 验证，不影响本任务）
-
-- [x] 1. 定义来源与解析：五个来源与优先级、frontmatter 全字段、不支持字段与解析错误（文件、行号）、项目级 `permissionMode` 限制；AHP `resources/listAgents`
-- [x] 2. 内置类型 `general-purpose`、`Explore`、`Plan`（自写身份段与描述）
-- [x] 3. 模型别名表：解析器、用户级与工作区设置、effort 映射；I113 的 `model`/`effortLevel` 作为新会话默认；辅助模型指向别名
-- [x] 4. 子会话运行时：`Agent` 工具、上下文隔离、工具过滤与闸门、深度与并发上限、`maxTurns`、`permissionMode`、前台 `onUpdate` 投影
-- [x] 5. 后台子 agent：任务 ID、完成后 `backgroundTask` 提醒、主会话关闭时 interrupted、运行期间不被空闲回收
-- [x] 6. 中断传播与补齐（L2 subagent-interrupt）、Agent Host 崩溃时父回合 uncertain、后台运行 interrupted（会话层与单元测试）
-- [x] 7. Core：子会话登记（I73）、审批来源与账本、"本会话允许"作用于会话树、`Agent(类型)` 规则、I82 参数规则、I128 错误枚举
-- [x] 8. Core：子 agent 写入计入主会话检查点；frontmatter `hooks` 作为限定作用域来源
-- [x] 9. Core：`sessions` 表父子关系与 JSONL 路径、重建索引还原、侧栏排除；`subagent/*` 通知；Core API `listAgents`、`stopSubagent`、`subagentTranscript`
-- [x] 10. 客户端：子 agent 卡与子会话转录；审批卡来源；设置页别名一节与子 agent 列表（L4 t31）
-- [x] 11. L2 场景 `subagent-*`（16 个）与能力 ID；L3 复核 `Agent`/`ListAgents`（I117）
-- [ ] 12. 验收 A01–A13 已记录；文档（ADR-0048、架构 2.39、AGENTS.md、复用表、登记事项）已更新；待 `npm run verify`（A14）与收尾
 
 ## 登记事项
 
@@ -902,3 +887,9 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | 2026-11-14 | v1.1 | 应用图标资产放入 `design/brand/`（取自 PiDeck）；T12 新增图标验收项 T12-A14，T35、T50 补充托盘图标与许可证条目；共 773 个验收项 |
 | 2026-11-16 | v1.3 | 用户在 R1 中授权按第 11 章校准后的 Windows 测量口径改判 W0-A04、W0-A10（只改 `status` 与 `evidence`，描述不变），W0 由部分完成改为已完成；验收项总数不变 |
 | 2026-11-15 | v1.2 | 用户授权在 T04 中决定 ADR-0019，决定采纳；T04-A06 由"超过阈值的批次以 `ArrayBuffer` 转移、主进程侧缓冲区已分离"改为"1 MiB 以上的批次完整到达渲染进程，基准记录主进程转发耗时，同期事件循环延迟 p99 ≤ 16 ms"（任务文件与 `acceptance.json` 同步修改）；验收项总数不变 |
+
+### 2026-11-20 T31 已完成（提交 7ec1971）
+- 交付：子 agent 定义的发现、解析与合并（`piarc_config::agents`，五个来源、警告与带行号的问题、项目级模式限制）与内置 general-purpose、Explore、Plan；`Agent` 工具与同进程子会话运行时（`runtime/subagents.ts`、`subagent-session.ts`、`session-runtime.ts`：上下文隔离、隐藏声明加闸门的工具过滤、深度 3 与并发 8 的唯一计数、`maxTurns` partial、前台与后台、中断与关闭、重启恢复）；模型别名表（`modelAliases`、`providers/aliases.ts` 的 `resolveModel`、设置页别名一节、辅助模型可选别名、`model`/`effortLevel` 作为新会话默认，I113）；Core 的子会话登记与链接（`tool_io/subagents.rs`：独立文件状态表 I73、模式取更严者、会话规则与检查点归主会话、审批卡来源、定义 hooks 限定作用域与信任、运行中不被空闲回收）、参数规则 I82 与 `piarc_policy::Error` I128、schema v6 父子索引、`subagent/*` 通知、Core API `listAgents`/`stopSubagent`/`subagentTranscript`；客户端子 agent 卡与只读子会话转录、审批来源、设置页 Subagents；L2 `subagent-*` 16 个与 `model-default-setting`，能力 ID 8 个启用；L4 `t31-subagents.e2e.ts`；会话层崩溃与空闲回收用例
+- 验收：14 项通过，0 项阻塞
+- 决策：ADR-0048（补充：定义由 Core 读、子会话经 `subagent/start` 登记、隐藏声明加闸门而非 `setActiveTools`、计数只在 Agent Host、超限不排队、后台不随中断结束、别名表在设置中由 Agent Host 解析、`advisorModel` 忽略、`agent` 交 T48）；架构 2.39；`Agent` 的 `model`/`effort` 写成 string enum（L3 无差异，`Agent` allowlist 条目删除，I117）；`sessions/session.rs` 拆出 `session/changes.rs`（I105）
+- 遗留：I129–I135（暂未生效的 frontmatter 字段、`agent` 键、子会话增量、子会话 MCP 进程、子会话沙箱、类型列表刷新、辅助模型别名的工作区解析）；ego-browser 不能操作 Electron 窗口，前端改动经 Playwright 驱动开发构建验证
