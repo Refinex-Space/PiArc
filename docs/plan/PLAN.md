@@ -154,7 +154,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 30a4f17 |
 | T26 | [计划模式、任务清单、AskUserQuestion 与下一步](tasks/T26-plan-mode-todo-ask-next-steps.md) | 3 | T25 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 23630e3 |
 | T27 | [上下文工程：system reminder、压缩与用量](tasks/T27-context-reminders-compaction-usage.md) | 3 | T26 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | b0b2641 |
-| T28 | [检查点、回退与 Changes 面板](tasks/T28-checkpoints-rewind-changes.md) | 3 | T27 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
+| T28 | [检查点、回退与 Changes 面板](tasks/T28-checkpoints-rewind-changes.md) | 3 | T27 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | c849475 |
 | T29 | [WebFetch、登录与模型设置补全、三档视图](tasks/T29-webfetch-login-model-settings-views.md) | 3 | T28 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T30 | [L3 行为对齐基座](tasks/T30-l3-behavior-alignment.md) | 3 | T29 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | R3 | [M2 评审](tasks/R3-m2-review.md) | 3 | T30、W1 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,20 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-T28（开工基线 59e55a2，`npm run verify` 15/15）：
-
-- [x] 1. 设计：ADR-0044（补充）定稿检查点键、表结构、AHP 与 Core API 增量、对话回退的实现方式
-- [x] 2. 快照存储：`piarc-checkpoint` 的内容寻址对象库（分桶、去重、钉住、回收）、回退计划与冲突判定、保留策略；`piarc-store` schema v5（`checkpoints`、`checkpoint_files`、`checkpoint_sessions`）（A01、A10）
-- [x] 3. 写前快照：`piarc-fs` 写入在路径锁内存原文件、结果带前后哈希；恢复与丢弃的原语（期望哈希、备份当前内容、删除新建文件、清状态表）；`piarc-diff` 的 hunk 反向应用（A01、A06、A09）
-- [x] 4. Core：回合检查点、写入索引、回退预览与执行（逐文件结果、撤销）、Changes 列表与按文件 / hunk 丢弃、后台保留与回收；AHP `fs/write` 的 `turnId`（A01、A02、A05、A06、A09、A10）
-- [x] 5. Agent Host：回合起点记录、`session/rewind`（分支、摘要）、`session/switchBranch`、`session/fork` 的 `beforeTurn`、历史与通知中的分支点（A03、A04、A11）
-- [x] 6. NAPI、主进程与 preload：回退、Changes、分支切换的 Core API
-- [x] 7. L2：`rewind-*`、`changes-*` 场景与运行器动作，能力 `CAP-REWIND-*`、`CAP-CHANGES-*`（A02、A03、A04、A05、A07）
-- [x] 8. 客户端：消息菜单"回退到这里""从这里分支"、`/rewind`、回退对话框（冲突逐个选择、逐文件结果与撤销）、Changes 面板与右栏改动卡片（Mod+Shift+D）、分支切换控件（A04、A07、A08、A09、A11）
-- [x] 9. L4 与截图（`tmp/evidence/T28/`），ego-browser 核对（A04、A07、A08、A09、A11）
-- [x] 10. 文档：架构、AGENTS.md（`piarc-checkpoint`、渲染进程 `changes`）、`coding-standards.md` 复用表、能力清单
-- [ ] 11. 收尾：`npm run verify`（A12）、验收记录、看板与会话日志
 
 ## 登记事项
 
@@ -832,6 +818,15 @@ T28（开工基线 59e55a2，`npm run verify` 15/15）：
 - 实现中的修正：T14 在 `SettingsManager.create` 之后施加的 `retry.provider.maxRetries = 0` 会被创建会话时资源加载的 `reload()` 清掉，实际没有生效；改为与压缩设置一起在每次运行前施加，并补了复现 Pi 行为的单测。Pi 在 `context_with_system` 之后才把 system 换成冻结的提示，用量改为按冻结文本计算。第一次收尾 verify 中 `piarc-core` 的 `editing_claude_code_settings_while_running…`（文件监听）在全量并行负载下超时一次，单独与整组重跑 5/5 通过，第二次 verify 全部通过。
 - 登记 I106（架构第 4 章缺 ADR-0042）、I107（压缩设置无界面控件、熔断状态不持久化）；I16、I67、I72、I92、I105 已处理或更新。
 - 下一项：macOS 上的 T28（检查点、回退与 Changes 面板）。本地提交，未推送。
+
+### 2026-11-19 T28 已完成（验收提交 c849475）
+
+- 交付：`piarc-checkpoint`（内容寻址对象库：分桶、去重、读时校验、钉住与回收；回退 / 撤销 / Changes 基线的计划函数；保留策略），`piarc-store` schema v5（`checkpoints`、`checkpoint_files`、`checkpoint_sessions`）；`piarc-fs` 在写入的路径锁内先存旧字节、`replace` 写回原语；`piarc-diff` 的 `revert_hunks` 与面板降级阈值；Core 的回合检查点、写入记录（AHP `fs/write` 的 `turnId`）、回退预览与执行（冲突逐个选择、逐文件结果、第一个失败即停、撤销）、Changes 与按文件 / hunk 丢弃（版本核对）、后台保留与回收；Agent Host 的回合起点 `from`、`session/rewind`（分支、摘要）、`session/switchBranch`、`session/fork` 的 `beforeTurn`、历史与 `session/branches` 中的分支点，分支变化后同一 id 重建会话；客户端的"回退到这里""从这里分支"、`/rewind`、回退对话框、Changes 面板与右栏改动卡片（Mod+Shift+D）、分支切换控件。Claude Code 的 `fileCheckpointingEnabled` 生效。见 ADR-0044、架构 v2.35。
+- 验收：12/12 通过。开工基线 59e55a2 与收尾 `npm run verify` 均 15/15（收尾第一次 Prettier 报 4 个契约样本未格式化，8f339ee 后重跑通过）；L2 110 个场景（macOS 跳过 2 个）、MISSING 0，新增 8 个 `rewind-*`、`changes-*` 场景与 7 个运行器动作；CAP-CKPT-001、CAP-CKPT-REWIND-001、CAP-RV-CHANGES-001、CAP-RV-DISCARD-001、CAP-SESSION-FORK-001 改为 active，新增 CAP-REWIND-CODE-001、CAP-REWIND-SUMMARIZE-001、CAP-REWIND-BASH-001、CAP-CHANGES-HUNK-001。
+- L4：`t28-rewind` 三个流程 dev 与 packaged 各 3/3；全量 L4 221 通过、5 个按平台跳过，`t18-review` 两个形态因本机终端没有"屏幕录制"权限失败（已知），`t18-sessions` 管理会话一例在全量运行中悬停后菜单按钮不可见、单独重跑 3/3 通过；`t19-composer` 的命令面板断言因新增 `/rewind` 更新为 4 条。ego-browser 用已构建的渲染器回放真实 Core 录下的应答，在中文界面实际操作了 Changes 面板（hunk 与文件丢弃、Mod+Shift+D）、回退对话框（选项切换、Esc 取消、执行、撤销）、发送新消息后的分支切换、从这里分支与 `/rewind`，以及深色模式。Windows 目标整个 workspace 的交叉 Clippy 通过。证据在 `tmp/evidence/T28/`（`l4/`、`ego/`）。
+- 实现中的修正：重新打开以分支摘要结尾的会话时 T14 的中断补齐误追加中断标记，`interruption.ts` 改为只把 user、toolResult 与有回复的 assistant 当作末尾（补了单测）；ego-browser 核对发现回退后输入框没有焦点（对话框关闭时把焦点还给已随回退消失的按钮），改为对话框关闭后再放回消息，先写了失败的 L4 断言；空的 Changes 面板不再显示 +0 −0；协议类型 `ChangedFile` 与 T27 同名冲突，改名 `ChangesFile`。任务文件未提 `fileCheckpointingEnabled`，按架构第 6.14 节与键映射表在本任务落地。
+- 登记 I108（三个 AGENTS.md 超过或到达行数上限）、I109（`fileCheckpointingEnabled` 无界面控件）、I110（词级 diff 与 UTF-16 偏移未实现，交 T42）、I111（回退与分支切换重连 MCP，T36 复核）；I88、I105 更新。
+- 下一项：macOS 上的 T29（WebFetch、登录与模型设置补全、三档视图）。本地提交，未推送。
 
 ## 计划变更记录
 
