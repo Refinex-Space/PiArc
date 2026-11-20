@@ -96,10 +96,17 @@ export function repairInterruptedTurn(
     };
     manager.appendMessage(result);
   }
+  // Summaries and reminders are context, not input awaiting an answer: a conversation that ends
+  // with a branch summary (T28's "summarize from here") or a reminder after a response is not an
+  // interrupted turn.
   const tail = manager
     .buildSessionProjection()
-    .messages.filter((message) => message.role !== 'system')
-    .findLast((message) => message.role !== 'assistant' || isResponse(message));
+    .messages.findLast(
+      (message) =>
+        message.role === 'user' ||
+        message.role === 'toolResult' ||
+        (message.role === 'assistant' && isResponse(message)),
+    );
   const { model } = session;
   const marker = tail !== undefined && tail.role !== 'assistant' && model !== undefined;
   if (marker) {

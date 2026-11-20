@@ -4,7 +4,7 @@ use piarc_protocol::harness::{PlanComment, QuestionAnswer};
 use piarc_protocol::policy::ApprovalRequest;
 use serde_json::Value;
 
-use piarc_core::sessions::Op;
+use piarc_core::sessions::{ForkPoint, Op};
 
 use super::{Driver, call};
 use crate::l2::context_spec::CheckUsageAction;
@@ -26,24 +26,30 @@ impl Driver<'_> {
     }
 
     pub(super) async fn fork(&mut self, fork: &ForkAction) -> Result<(), String> {
-        let history = self.history(fork.session.as_deref()).await?;
-        let entry = history["items"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .find(|i| i["item"]["type"] == "agentMessage" && i["item"]["text"] == fork.at_text)
-            .and_then(|i| i["entryId"].as_str())
-            .ok_or_else(|| format!("fork: no agent message {:?}", fork.at_text))?
-            .to_owned();
+        let at = match (&fork.before_turn, &fork.at_text) {
+            (Some(label), _) => ForkPoint::BeforeTurn(
+                self.turns
+                    .get(label)
+                    .ok_or_else(|| format!("fork: no turn labeled {label}"))?
+                    .clone(),
+            ),
+            (None, Some(text)) => {
+                let history = self.history(fork.session.as_deref()).await?;
+                let entry = history["items"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .find(|i| i["item"]["type"] == "agentMessage" && i["item"]["text"] == *text)
+                    .and_then(|i| i["entryId"].as_str())
+                    .ok_or_else(|| format!("fork: no agent message {text:?}"))?
+                    .to_owned();
+                ForkPoint::Entry(Some(entry))
+            }
+            (None, None) => return Err("fork needs at_text or before_turn".to_owned()),
+        };
         let id = self.session_id(fork.session.as_deref())?;
         let opened = call(
-            |done| {
-                self.core.fork_session(
-                    id,
-                    piarc_core::sessions::ForkPoint::Entry(Some(entry)),
-                    done,
-                )
-            },
+            |done| self.core.fork_session(id, at, done),
             "forking the session",
         )
         .await?;

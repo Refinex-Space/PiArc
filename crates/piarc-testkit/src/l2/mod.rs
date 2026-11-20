@@ -13,6 +13,7 @@
 //! `piarc-devcli`. Field reference and matching rules: `docs/engineering/testing.md`
 //! section 12.
 
+pub mod checkpoint_spec;
 pub mod checks;
 pub mod context_spec;
 mod fixtures;

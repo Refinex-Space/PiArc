@@ -35,6 +35,7 @@ use crate::record::RequestRecord;
 use crate::scenario::{Scenario, ScenarioLibrary};
 use crate::server::MockProvider;
 
+mod checkpoints;
 mod harness;
 
 /// Safety net for every wait; no assertion depends on timing.
@@ -174,6 +175,7 @@ async fn run_in(spec: &ScenarioSpec, config: &RunnerConfig, root: &Path) -> Vec<
         items: BTreeMap::new(),
         answered: BTreeSet::new(),
         approval_cursor: 0,
+        restores: BTreeMap::new(),
     };
     let mut failures = match driver.drive().await {
         Ok(()) => {
@@ -396,6 +398,8 @@ struct Driver<'a> {
     items: BTreeMap<String, String>,
     answered: BTreeSet<String>,
     approval_cursor: usize,
+    /// Session id → its latest rewind's undo id (T28).
+    restores: BTreeMap<String, String>,
 }
 
 impl Driver<'_> {
@@ -666,6 +670,13 @@ impl Driver<'_> {
             Action::Fork(fork) => self.fork(fork).await,
             Action::CheckHarness(check) => self.check_harness(check).await,
             Action::CheckUsage(check) => self.check_usage(check).await,
+            Action::Rewind(spec) => self.rewind(spec).await,
+            Action::UndoRewind(spec) => self.undo_rewind(spec).await,
+            Action::CheckChanges(spec) => self.check_changes(spec).await,
+            Action::Discard(spec) => self.discard(spec).await,
+            Action::SwitchBranch(spec) => self.switch_branch(spec).await,
+            Action::CheckBranch(spec) => self.check_branch(spec).await,
+            Action::CheckFiles(spec) => self.check_files_now(spec),
         }
     }
 

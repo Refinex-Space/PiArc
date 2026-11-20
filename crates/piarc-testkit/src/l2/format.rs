@@ -380,6 +380,20 @@ pub enum Action {
     CheckHarness(super::harness_spec::CheckHarnessAction),
     /// Checks a session's context usage (T27).
     CheckUsage(super::context_spec::CheckUsageAction),
+    /// Rewinds to before a labeled turn (T28).
+    Rewind(super::checkpoint_spec::RewindSpec),
+    /// Undoes the latest rewind (T28).
+    UndoRewind(super::checkpoint_spec::UndoRewindSpec),
+    /// Checks the Changes view (T28).
+    CheckChanges(super::checkpoint_spec::CheckChangesSpec),
+    /// Discards a change in the Changes panel (T28).
+    Discard(super::checkpoint_spec::DiscardSpec),
+    /// Switches to another branch (T28).
+    SwitchBranch(super::checkpoint_spec::SwitchBranchSpec),
+    /// Checks the current branch's conversation (T28).
+    CheckBranch(super::checkpoint_spec::CheckBranchSpec),
+    /// Checks workspace files mid-scenario (T28).
+    CheckFiles(super::checkpoint_spec::CheckFilesSpec),
 }
 
 impl Action {
@@ -409,6 +423,13 @@ impl Action {
             Self::Fork(_) => "fork",
             Self::CheckHarness(_) => "check_harness",
             Self::CheckUsage(_) => "check_usage",
+            Self::Rewind(_) => "rewind",
+            Self::UndoRewind(_) => "undo_rewind",
+            Self::CheckChanges(_) => "check_changes",
+            Self::Discard(_) => "discard",
+            Self::SwitchBranch(_) => "switch_branch",
+            Self::CheckBranch(_) => "check_branch",
+            Self::CheckFiles(_) => "check_files",
         }
     }
 
@@ -433,7 +454,16 @@ impl Action {
             Self::Fork(fork) => Some(&fork.session),
             Self::CheckHarness(check) => Some(&check.session),
             Self::CheckUsage(check) => Some(&check.session),
-            Self::CheckTrust { .. } | Self::WriteFile { .. } | Self::RestartCore {} => None,
+            Self::Rewind(spec) => Some(&spec.session),
+            Self::UndoRewind(spec) => Some(&spec.session),
+            Self::CheckChanges(spec) => Some(&spec.session),
+            Self::Discard(spec) => Some(&spec.session),
+            Self::SwitchBranch(spec) => Some(&spec.session),
+            Self::CheckBranch(spec) => Some(&spec.session),
+            Self::CheckTrust { .. }
+            | Self::WriteFile { .. }
+            | Self::RestartCore {}
+            | Self::CheckFiles(_) => None,
         }
     }
 }
@@ -911,6 +941,10 @@ fn check_path(field: &str, path: &str, problems: &mut Vec<String>) {
 }
 
 /// Session references resolve, and turn and item labels are defined (once) before use.
+#[expect(
+    clippy::too_many_lines,
+    reason = "one arm per action keeps the reference checks exhaustive; R3 splits format.rs (I88)"
+)]
 fn check_actions(spec: &ScenarioSpec, problems: &mut Vec<String>) {
     let mut turns = BTreeSet::new();
     let mut items = BTreeSet::new();
@@ -921,6 +955,7 @@ fn check_actions(spec: &ScenarioSpec, problems: &mut Vec<String>) {
         {
             problems.push(format!("{field}/session: {e}"));
         }
+        check_checkpoint_action(action, &field, &turns, problems);
         let mut define = |set: &mut BTreeSet<String>, label: &Option<String>, what: &str| {
             if let Some(label) = label
                 && !set.insert(label.clone())
@@ -974,7 +1009,15 @@ fn check_actions(spec: &ScenarioSpec, problems: &mut Vec<String>) {
             | Action::RestartCore {}
             | Action::Resume { .. }
             | Action::CheckHarness(_)
-            | Action::CheckUsage(_) => {}
+            | Action::CheckUsage(_)
+            | Action::UndoRewind(_)
+            | Action::CheckChanges(_)
+            | Action::SwitchBranch(_)
+            | Action::CheckBranch(_)
+            // Checked by `check_checkpoint_action`.
+            | Action::Rewind(_)
+            | Action::Discard(_)
+            | Action::CheckFiles(_) => {}
             Action::Fork(fork) => {
                 if !spec.sessions().get(&fork.label).is_some_and(|s| s.deferred) {
                     problems.push(format!(
@@ -985,6 +1028,33 @@ fn check_actions(spec: &ScenarioSpec, problems: &mut Vec<String>) {
             }
             Action::WriteFile { path, .. } => check_path(&format!("{field}/path"), path, problems),
         }
+    }
+}
+
+/// T28's references: a rewind and a fork before a turn name an earlier turn, paths stay in the
+/// workspace.
+fn check_checkpoint_action(
+    action: &Action,
+    field: &str,
+    turns: &BTreeSet<String>,
+    problems: &mut Vec<String>,
+) {
+    match action {
+        Action::Rewind(rewind) if !turns.contains(&rewind.turn) => {
+            problems.push(format!("{field}/turn: no earlier turn `{}`", rewind.turn));
+        }
+        Action::Fork(fork) => {
+            if let Some(turn) = fork.before_turn.as_ref().filter(|t| !turns.contains(*t)) {
+                problems.push(format!("{field}/before_turn: no earlier turn `{turn}`"));
+            }
+        }
+        Action::Discard(discard) => check_path(&format!("{field}/path"), &discard.path, problems),
+        Action::CheckFiles(check) => {
+            for path in check.files.keys() {
+                check_path(&format!("{field}/files"), path, problems);
+            }
+        }
+        _ => {}
     }
 }
 

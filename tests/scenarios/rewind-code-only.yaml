@@ -1,0 +1,59 @@
+id: rewind-code-only
+description: Rewinding only the code puts every file the session wrote from the chosen turn on back as it was when the turn started (an edited file restored, a created one removed), keeps the conversation, makes the agent read again before it edits, and can be undone (T28).
+capabilities: [CAP-REWIND-CODE-001, CAP-CKPT-001]
+workspace:
+  files:
+    notes.txt: "alpha\n"
+sessions:
+  main: { provider: main, mode: acceptEdits }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: read1, name: Read, input: { path: notes.txt } }
+      - tool_calls:
+          - id: edit1
+            name: Edit
+            input: { path: notes.txt, edits: [{ oldText: alpha, newText: beta }] }
+      - tool_calls:
+          - { id: write1, name: Write, input: { path: made.txt, content: "made\n" } }
+      - text: First turn done.
+      - tool_calls:
+          - id: edit2
+            name: Edit
+            input: { path: notes.txt, edits: [{ oldText: beta, newText: gamma }] }
+      - text: Second turn done.
+      - tool_calls:
+          - id: edit3
+            name: Edit
+            input: { path: notes.txt, edits: [{ oldText: alpha, newText: delta }] }
+      - text: The edit needs a read.
+actions:
+  - prompt: { text: Edit and create., turn: t1 }
+  - wait: { method: turn/completed, turn: t1 }
+  - prompt: { text: Edit again., turn: t2 }
+  - wait: { method: turn/completed, turn: t2 }
+  - rewind:
+      turn: t1
+      scope: code
+      preview: { notes.txt: restore, made.txt: delete }
+      outcomes: { notes.txt: restored, made.txt: deleted }
+  - check_files: { files: { notes.txt: "alpha\n", made.txt: null } }
+  - check_branch:
+      texts: [Edit and create., First turn done., Edit again., Second turn done.]
+      branches: null
+  - prompt: { text: Edit once more., turn: t3 }
+  - wait: { method: turn/completed, turn: t3 }
+  - check_files: { files: { notes.txt: "alpha\n" } }
+  - undo_rewind: { outcomes: { notes.txt: restored, made.txt: restored } }
+expect:
+  request_counts: { main: 8 }
+  requests:
+    - index: 6
+      contains: [Edit and create., Second turn done., Edit once more.]
+    - index: 7
+      contains: [has not been read in this session]
+  files:
+    notes.txt: "gamma\n"
+    made.txt: "made\n"

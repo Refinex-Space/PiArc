@@ -35,7 +35,11 @@ pub struct ForkAction {
     #[serde(default)]
     pub session: Option<String>,
     /// The text of the agent message whose entry is the fork point.
-    pub at_text: String,
+    #[serde(default)]
+    pub at_text: Option<String>,
+    /// Instead of `at_text`: fork before this labeled turn ("branch from here", T28).
+    #[serde(default)]
+    pub before_turn: Option<String>,
     /// The label of the new session.
     #[serde(rename = "as")]
     pub label: String,

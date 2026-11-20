@@ -9,7 +9,7 @@
 | 里程碑 | 能力数 | 已实现 | 计划中 | BLOCKED |
 |---|---|---|---|---|
 | M1 | 61 | 61 | 0 | 0 |
-| M2 | 40 | 32 | 8 | 0 |
+| M2 | 44 | 41 | 3 | 0 |
 | M3 | 21 | 0 | 21 | 0 |
 | M4 | 10 | 0 | 10 | 0 |
 | M5 | 7 | 0 | 7 | 0 |
@@ -85,8 +85,9 @@
 | ID | 能力 | 需求与架构 | 任务 | 覆盖场景 | 状态 |
 |---|---|---|---|---|---|
 | CAP-ASK-001 | AskUserQuestion 结构化提问 | FR-HN-03、ARCH-6.5 | T26 | `ask-answers`<br>`ask-timeout` | 已实现 |
-| CAP-CKPT-001 | 每次写入前保存快照，形成检查点 | FR-RV-03、ARCH-6.9 | T28 | — | 计划中 |
-| CAP-CKPT-REWIND-001 | 回退：恢复代码与对话、只恢复对话或只恢复代码，冲突时提示 | FR-RV-03、ARCH-6.9 | T28 | — | 计划中 |
+| CAP-CHANGES-HUNK-001 | 按 hunk 丢弃只撤销该处改动，CRLF 与 BOM 保真，过期的 diff 被拒绝，agent 需重新读取 | FR-RV-02、ARCH-7.7 | T28 | `changes-file-and-hunk` | 已实现 |
+| CAP-CKPT-001 | 每次写入前保存快照，形成检查点 | FR-RV-03、ARCH-6.9 | T28 | `rewind-code-and-conversation`<br>`rewind-code-only` | 已实现 |
+| CAP-CKPT-REWIND-001 | 回退：恢复代码与对话、只恢复对话或只恢复代码，冲突时提示 | FR-RV-03、ARCH-6.9 | T28 | `rewind-code-and-conversation`<br>`rewind-conflict`<br>`rewind-conversation-only` | 已实现 |
 | CAP-CONFIG-COMPAT-001 | 读取 Claude Code 的 `.claude/settings*.json`（permissions 等与 PiArc 功能对应的键） | ARCH-6.14 | T24 | `config-merge-order`<br>`config-untrusted-project` | 已实现 |
 | CAP-CONFIG-DIAG-001 | 配置诊断：每个配置文件的加载状态与生效、覆盖、忽略的键（基础） | FR-EX-05、ARCH-6.14 | T24 | `config-merge-order`<br>`config-untrusted-project` | 已实现 |
 | CAP-CTX-CACHE-001 | reminder 追加与压缩前后保持 Anthropic 缓存断点布局 | ARCH-6.6.1、ARCH-6.15 | T27 | `ctx-cache-breakpoints` | 已实现 |
@@ -117,9 +118,12 @@
 | CAP-PLAN-ENTRY-001 | 批准的计划保存为会话 entry，重启与恢复后经注入接口读回 | FR-HN-01、ARCH-6.5 | T26 | `plan-entry-restart` | 已实现 |
 | CAP-PLAN-MODE-001 | 计划模式：写工具与非只读命令被硬拦截，提交计划，批准时选择后续模式 | FR-HN-01、ARCH-6.5、ARCH-6.15 | T26 | `plan-keep-planning`<br>`plan-mode-gate`<br>`plan-mode-menu-reminder` | 已实现 |
 | CAP-PROVIDER-OAUTH-001 | 服务商的 OAuth 与设备码登录（不含 Anthropic 订阅登录） | FR-MD-02、ARCH-5.4 | T29 | — | 计划中 |
-| CAP-RV-CHANGES-001 | 会话改动按文件给出统一 diff，大 diff 降级 | FR-RV-01、ARCH-7.7 | T28 | — | 计划中 |
-| CAP-RV-DISCARD-001 | 按文件或按 hunk 丢弃改动 | FR-RV-02 | T28 | — | 计划中 |
-| CAP-SESSION-FORK-001 | 从某条消息分出会话分支并在分支间切换 | FR-WS-07、ARCH-6.9 | T28 | — | 计划中 |
+| CAP-REWIND-BASH-001 | 只被命令改动的文件不进快照，回退预览与 Changes 视图不列出，回退时保留 | FR-RV-03、ARCH-6.9 | T28 | `rewind-bash-only` | 已实现 |
+| CAP-REWIND-CODE-001 | 只恢复代码：文件回到所选回合开始前（新建的删除），对话不动，agent 改文件前重新读取，可撤销 | FR-RV-03、ARCH-6.9 | T28 | `rewind-code-only` | 已实现 |
+| CAP-REWIND-SUMMARIZE-001 | 从此处摘要：所选回合及之后的对话写成分支摘要（自写的分节摘要提示），文件不动 | FR-RV-03、ARCH-6.9、ARCH-6.6.4 | T28 | `rewind-summarize` | 已实现 |
+| CAP-RV-CHANGES-001 | 会话改动按文件给出统一 diff，大 diff 降级 | FR-RV-01、ARCH-7.7 | T28 | `changes-file-and-hunk` | 已实现 |
+| CAP-RV-DISCARD-001 | 按文件或按 hunk 丢弃改动 | FR-RV-02 | T28 | `changes-file-and-hunk` | 已实现 |
+| CAP-SESSION-FORK-001 | 从某条消息分出会话分支并在分支间切换 | FR-WS-07、ARCH-6.9 | T28 | `rewind-branch-from-message`<br>`rewind-code-and-conversation` | 已实现 |
 | CAP-TODO-001 | 任务清单由模型维护，结构化送达客户端，压缩后保留 | FR-HN-02、ARCH-6.5 | T26 | `todo-list` | 已实现 |
 | CAP-TODO-BRANCH-001 | 任务清单随分支回溯：在较早 entry 处 fork 后，清单等于该处的状态 | FR-HN-02、ARCH-6.5 | T26 | `todo-branch-fork` | 已实现 |
 | CAP-TODO-REMIND-001 | 存在未完成项且连续若干轮工具调用未更新清单时，以追加消息提醒模型 | FR-HN-02、ARCH-6.6.3 | T26 | `todo-stale-reminder` | 已实现 |

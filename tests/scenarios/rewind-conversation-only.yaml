@@ -1,0 +1,33 @@
+id: rewind-conversation-only
+description: Rewinding only the conversation leaves the files as they are and continues before the chosen turn, whose message comes back for the input box (T28).
+capabilities: [CAP-CKPT-REWIND-001]
+sessions:
+  main: { provider: main, mode: acceptEdits }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: write1, name: Write, input: { path: kept.txt, content: "kept\n" } }
+      - text: Wrote kept.txt.
+      - text: Started over.
+actions:
+  - prompt: { text: Write kept.txt., turn: t1 }
+  - wait: { method: turn/completed, turn: t1 }
+  - rewind:
+      turn: t1
+      scope: conversation
+      preview: { kept.txt: delete }
+      outcomes: {}
+      text: Write kept.txt.
+  - check_branch: { texts: [], branches: [{ options: [{ preview: Write kept.txt. }] }] }
+  - prompt: { text: Something else., turn: t2 }
+  - wait: { method: turn/completed, turn: t2 }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - index: 2
+      user_texts: [Something else.]
+      not_contains: [Write kept.txt., Wrote kept.txt.]
+  files:
+    kept.txt: "kept\n"

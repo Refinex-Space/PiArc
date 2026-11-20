@@ -54,7 +54,7 @@ capabilities:
     milestone: M2
     refs: [FR-WS-07, ARCH-6.9]
     task: T28
-    status: planned
+    status: active
   - id: CAP-SESSION-SEARCH-001
     title: '会话全文搜索'
     milestone: M3
@@ -828,25 +828,49 @@ capabilities:
     milestone: M2
     refs: [FR-RV-03, ARCH-6.9]
     task: T28
-    status: planned
+    status: active
   - id: CAP-CKPT-REWIND-001
     title: '回退：恢复代码与对话、只恢复对话或只恢复代码，冲突时提示'
     milestone: M2
     refs: [FR-RV-03, ARCH-6.9]
     task: T28
-    status: planned
+    status: active
   - id: CAP-RV-CHANGES-001
     title: '会话改动按文件给出统一 diff，大 diff 降级'
     milestone: M2
     refs: [FR-RV-01, ARCH-7.7]
     task: T28
-    status: planned
+    status: active
   - id: CAP-RV-DISCARD-001
     title: '按文件或按 hunk 丢弃改动'
     milestone: M2
     refs: [FR-RV-02]
     task: T28
-    status: planned
+    status: active
+  - id: CAP-REWIND-CODE-001
+    title: '只恢复代码：文件回到所选回合开始前（新建的删除），对话不动，agent 改文件前重新读取，可撤销'
+    milestone: M2
+    refs: [FR-RV-03, ARCH-6.9]
+    task: T28
+    status: active
+  - id: CAP-REWIND-SUMMARIZE-001
+    title: '从此处摘要：所选回合及之后的对话写成分支摘要（自写的分节摘要提示），文件不动'
+    milestone: M2
+    refs: [FR-RV-03, ARCH-6.9, ARCH-6.6.4]
+    task: T28
+    status: active
+  - id: CAP-REWIND-BASH-001
+    title: '只被命令改动的文件不进快照，回退预览与 Changes 视图不列出，回退时保留'
+    milestone: M2
+    refs: [FR-RV-03, ARCH-6.9]
+    task: T28
+    status: active
+  - id: CAP-CHANGES-HUNK-001
+    title: '按 hunk 丢弃只撤销该处改动，CRLF 与 BOM 保真，过期的 diff 被拒绝，agent 需重新读取'
+    milestone: M2
+    refs: [FR-RV-02, ARCH-7.7]
+    task: T28
+    status: active
   - id: CAP-RV-COMMENT-001
     title: 'diff 行内评论批量发送给 agent'
     milestone: M4

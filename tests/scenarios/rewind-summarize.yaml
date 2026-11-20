@@ -1,0 +1,48 @@
+id: rewind-summarize
+description: Summarizing from a turn sends PiArc's sectioned summary request with that turn and everything after it, continues from where the turn started with the summary as Pi's branch summary, and leaves the files alone. The summary and the next input are adjacent user messages, which both wire formats accept (as after a failed turn, ADR-0043 rule 11), so role_order is off (T28).
+capabilities: [CAP-REWIND-SUMMARIZE-001]
+sessions:
+  main: { provider: main, mode: acceptEdits }
+providers:
+  main:
+    wire: anthropic
+    validation: { rules: { role_order: false } }
+    steps:
+      - text: One.
+      - tool_calls:
+          - { id: write2, name: Write, input: { path: made.txt, content: "made\n" } }
+      - text: Two.
+      - text: Three.
+      - text: 'Summary: made.txt holds the new content.'
+      - text: Four.
+actions:
+  - prompt: { text: First request., turn: t1 }
+  - wait: { method: turn/completed, turn: t1 }
+  - prompt: { text: Create made.txt., turn: t2 }
+  - wait: { method: turn/completed, turn: t2 }
+  - prompt: { text: Third request., turn: t3 }
+  - wait: { method: turn/completed, turn: t3 }
+  - rewind: { turn: t2, scope: summarize, preview: { made.txt: delete }, outcomes: {} }
+  - check_branch: { texts: [First request., One.], branches: [{ options: [{ preview: Create made.txt. }] }] }
+  - prompt: { text: Go on., turn: t4 }
+  - wait: { method: turn/completed, turn: t4 }
+expect:
+  request_counts: { main: 6 }
+  requests:
+    - index: 4
+      contains:
+        - You write handover notes for a coding session.
+        - '## Task goal'
+        - Create made.txt.
+        - Third request.
+      not_contains: [First request.]
+    - index: 5
+      contains:
+        - First request.
+        - The following is a summary of a branch that this conversation came back from
+        - 'Summary: made.txt holds the new content.'
+        - 'Files modified in the summarized part:'
+        - Go on.
+      not_contains: [Create made.txt., Third request.]
+  files:
+    made.txt: "made\n"

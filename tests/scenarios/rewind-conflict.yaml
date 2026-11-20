@@ -1,0 +1,50 @@
+id: rewind-conflict
+description: Files changed outside the session since it wrote them are conflicts in the rewind preview; cancelling changes nothing, and the user's choice per file (keep the current content or overwrite with the snapshot) is carried out (T28).
+capabilities: [CAP-CKPT-REWIND-001]
+workspace:
+  files:
+    edited.txt: "original\n"
+sessions:
+  main: { provider: main, mode: acceptEdits }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: read1, name: Read, input: { path: edited.txt } }
+      - tool_calls:
+          - id: edit1
+            name: Edit
+            input: { path: edited.txt, edits: [{ oldText: original, newText: by the agent }] }
+      - tool_calls:
+          - { id: write1, name: Write, input: { path: created.txt, content: "agent\n" } }
+      - tool_calls:
+          - { id: write2, name: Write, input: { path: plain.txt, content: "plain\n" } }
+      - text: Done.
+actions:
+  - prompt: { text: Change three files., turn: t1 }
+  - wait: { method: turn/completed, turn: t1 }
+  - write_file: { path: edited.txt, content: "edited by hand\n" }
+  - write_file: { path: created.txt, content: "changed by a command\n" }
+  - rewind:
+      turn: t1
+      scope: code
+      preview: { edited.txt: conflict, created.txt: conflict, plain.txt: delete }
+      cancel: true
+  - check_files:
+      files:
+        edited.txt: "edited by hand\n"
+        created.txt: "changed by a command\n"
+        plain.txt: "plain\n"
+  - rewind:
+      turn: t1
+      scope: code
+      preview: { edited.txt: conflict, created.txt: conflict, plain.txt: delete }
+      choices: { edited.txt: true, created.txt: false }
+      outcomes: { edited.txt: restored, created.txt: kept, plain.txt: deleted }
+expect:
+  request_counts: { main: 5 }
+  files:
+    edited.txt: "original\n"
+    created.txt: "changed by a command\n"
+    plain.txt: null

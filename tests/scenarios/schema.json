@@ -388,13 +388,15 @@
           }
         },
         "fork": {
-          "description": "Forks a session at the entry of one of its agent messages; the new session takes a deferred session label (T26).",
+          "description": "Forks a session at the entry of one of its agent messages (at_text, T26) or before one of its labeled turns (before_turn, T28's branch from here); the new session takes a deferred session label.",
           "type": "object",
           "additionalProperties": false,
-          "required": ["at_text", "as"],
+          "required": ["as"],
+          "oneOf": [{ "required": ["at_text"] }, { "required": ["before_turn"] }],
           "properties": {
             "session": { "$ref": "#/$defs/label" },
             "at_text": { "type": "string", "minLength": 1 },
+            "before_turn": { "$ref": "#/$defs/label" },
             "as": { "$ref": "#/$defs/label" }
           }
         },
@@ -430,6 +432,97 @@
           "properties": {
             "session": { "$ref": "#/$defs/label" },
             "fields": { "type": ["object", "null"] }
+          }
+        },
+        "rewind": {
+          "description": "Rewinds a session to before one of its labeled turns (T28): checks the preview (every file by its workspace-relative label), answers each conflict (choices), then checks the report; cancel stops after the preview.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["turn", "scope"],
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "turn": { "$ref": "#/$defs/label" },
+            "scope": { "enum": ["codeAndConversation", "conversation", "code", "summarize"] },
+            "preview": {
+              "type": "object",
+              "additionalProperties": { "enum": ["restore", "delete", "unchanged", "conflict"] }
+            },
+            "choices": { "type": "object", "additionalProperties": { "type": "boolean" } },
+            "cancel": { "type": "boolean" },
+            "outcomes": {
+              "type": "object",
+              "additionalProperties": {
+                "enum": ["restored", "deleted", "unchanged", "kept", "failed", "skipped"]
+              }
+            },
+            "completed": { "type": "boolean" },
+            "text": { "type": "string" }
+          }
+        },
+        "undo_rewind": {
+          "description": "Undoes the session's latest rewind (T28) and checks each file's outcome.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "outcomes": {
+              "type": "object",
+              "additionalProperties": {
+                "enum": ["restored", "deleted", "unchanged", "kept", "failed", "skipped"]
+              }
+            }
+          }
+        },
+        "check_changes": {
+          "description": "Checks a field subset of the session's Changes view (T28): files in the order the session first wrote them, line counts, degradation.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fields"],
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "fields": { "type": "object" }
+          }
+        },
+        "discard": {
+          "description": "Discards a file's change, or one hunk of it, in the Changes panel (T28); stale sends an outdated version, which must be refused.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path"],
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "path": { "$ref": "#/$defs/relativePath" },
+            "hunk": { "type": "integer", "minimum": 0 },
+            "stale": { "type": "boolean" }
+          }
+        },
+        "switch_branch": {
+          "description": "Continues the session on the branch whose first user message starts with to (T28).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["to"],
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "to": { "type": "string", "minLength": 1 }
+          }
+        },
+        "check_branch": {
+          "description": "Checks the user and agent message texts of the session's current branch in order, and a field subset of its branch points (null: none) (T28).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["texts"],
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "texts": { "type": "array", "items": { "type": "string" } },
+            "branches": { "type": ["array", "null"] }
+          }
+        },
+        "check_files": {
+          "description": "Checks workspace files in the middle of the actions (T28): content, or null for absent.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["files"],
+          "properties": {
+            "files": { "type": "object", "additionalProperties": { "type": ["string", "null"] } }
           }
         }
       },

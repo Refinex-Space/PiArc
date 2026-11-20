@@ -146,4 +146,24 @@ describe('repairInterruptedTurn', () => {
     expect(repairInterruptedTurn(fake)).toEqual({ toolResults: 0, marker: false });
     expect(fake.refreshed).toBe(0);
   });
+
+  it('takes a summary or a reminder after a response for context, not an unanswered input', () => {
+    const summarized = SessionManager.inMemory('/w');
+    summarized.appendMessage(user('Hi.'));
+    const reply = summarized.appendMessage(assistant([{ type: 'text', text: 'Hello.' }], 'stop'));
+    summarized.branchWithSummary(reply, 'The rest of the conversation, summarized.');
+    expect(repairInterruptedTurn(session(summarized))).toEqual({ toolResults: 0, marker: false });
+
+    const reminded = SessionManager.inMemory('/w');
+    reminded.appendMessage(user('Hi.'));
+    reminded.appendMessage(assistant([{ type: 'text', text: 'Hello.' }], 'stop'));
+    reminded.appendCustomMessageEntry('piarc.reminder', '[PiArc reminder]', false);
+    expect(repairInterruptedTurn(session(reminded))).toEqual({ toolResults: 0, marker: false });
+
+    // A reminder after an unanswered message still closes the turn.
+    const cut = SessionManager.inMemory('/w');
+    cut.appendMessage(user('Explain.'));
+    cut.appendCustomMessageEntry('piarc.reminder', '[PiArc reminder]', false);
+    expect(repairInterruptedTurn(session(cut))).toEqual({ toolResults: 0, marker: true });
+  });
 });
