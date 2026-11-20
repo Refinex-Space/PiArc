@@ -1573,6 +1573,7 @@ dependencies = [
  "getrandom 0.4.3",
  "http",
  "minisign-verify",
+ "piarc-checkpoint",
  "piarc-config",
  "piarc-diff",
  "piarc-exec",

@@ -97,6 +97,12 @@ impl DataDirs {
         self.data.join("sessions")
     }
 
+    /// The snapshot objects, `checkpoints/objects/` (ADR-0044).
+    #[must_use]
+    pub fn checkpoint_objects(&self) -> PathBuf {
+        self.data.join("checkpoints").join("objects")
+    }
+
     /// `logs/`.
     #[must_use]
     pub fn logs(&self) -> PathBuf {
@@ -124,7 +130,7 @@ impl DataDirs {
             self.data.join("agents"),
             self.data.join("skills"),
             self.data.join("commands"),
-            self.data.join("checkpoints").join("objects"),
+            self.checkpoint_objects(),
             agent_tmp,
             npm_cache,
             self.cache.clone(),

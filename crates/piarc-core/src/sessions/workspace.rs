@@ -192,14 +192,19 @@ impl WorkspaceHandle {
         &self,
         id: &str,
         cwd: &std::path::Path,
-        entry_id: Option<String>,
+        at: super::ForkPoint,
     ) -> Result<piarc_protocol::session::SessionOpened> {
         let supervisor = self.acquire().await?;
+        let (entry_id, before_turn) = match at {
+            super::ForkPoint::Entry(entry) => (entry, None),
+            super::ForkPoint::BeforeTurn(turn) => (None, Some(piarc_protocol::turn::TurnId(turn))),
+        };
         let opened = supervisor
             .fork_session(SessionForkParams {
                 session_id: SessionId(id.to_owned()),
                 cwd: path_text(cwd),
                 entry_id,
+                before_turn,
             })
             .await
             .map_err(host_error)?;

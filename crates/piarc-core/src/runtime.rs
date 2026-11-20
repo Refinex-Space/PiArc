@@ -96,6 +96,8 @@ pub struct CoreConfig {
     pub command_env: Option<crate::tool_io::CommandEnv>,
     /// Hook timeouts and limits (architecture section 6.3.1); tests shorten them.
     pub hooks: piarc_hooks::RunnerConfig,
+    /// Snapshot retention and its clock (architecture section 9.3, T28); tests move the clock.
+    pub checkpoints: crate::checkpoints::CheckpointConfig,
 }
 
 /// A credential store for the vault's master key and the key's name in it.
@@ -128,6 +130,7 @@ impl Default for CoreConfig {
             command_env: None,
             home: std::env::home_dir(),
             hooks: piarc_hooks::RunnerConfig::default(),
+            checkpoints: crate::checkpoints::CheckpointConfig::default(),
         }
     }
 }
@@ -706,6 +709,9 @@ fn open_state(
         None => SecretsService::new(SecretsConfig::new(&data), crate::secrets::system_store()),
     };
     let snapshots = crate::sessions::Snapshots::spawn(handle, events.clone(), storage.clone());
+    let checkpoints =
+        crate::checkpoints::Checkpoints::open(storage.clone(), config.checkpoints.clone())?;
+    checkpoints.spawn_sweeper(handle, config.sessions.clock.clone(), cancel.child_token());
     let sessions = Hub::new(crate::sessions::Ctx {
         handle: handle.clone(),
         events: events.clone(),
@@ -741,7 +747,8 @@ fn open_state(
                 config.hooks,
                 crate::tool_io::hook_condition,
             )),
-        }),
+        })
+        .with_checkpoints(checkpoints),
         config: config.sessions.clone(),
         snapshots,
         cancel: cancel.child_token(),

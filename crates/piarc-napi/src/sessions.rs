@@ -336,16 +336,22 @@ impl CoreRuntime {
         })
     }
 
-    /// Opens a copy of a session's conversation (up to `entryId`) as a new session.
+    /// Opens a copy of a session's conversation (up to `entryId`, or up to where the turn
+    /// `beforeTurn` started) as a new session.
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]
     pub fn fork_session<'env>(
         &self,
         env: &'env Env,
         id: String,
         #[napi(ts_arg_type = "string | null")] entry_id: Option<String>,
+        #[napi(ts_arg_type = "string | null | undefined")] before_turn: Option<String>,
     ) -> napi::Result<Object<'env>> {
+        let at = match before_turn {
+            Some(turn) => piarc_core::sessions::ForkPoint::BeforeTurn(turn),
+            None => piarc_core::sessions::ForkPoint::Entry(entry_id),
+        };
         self.queue(env, "CoreRuntime.forkSession", |core, done| {
-            core.fork_session(id, entry_id, done)
+            core.fork_session(id, at, done)
         })
     }
 

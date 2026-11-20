@@ -15,6 +15,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
+use crate::checkpoint::{SessionBranches, SessionRewind, SessionSwitchBranch};
 use crate::context::{
     ContextSettingsGet, FsChanges, FsForgetReads, SessionGetContextUsage, SessionRemind,
     SessionUsage,
@@ -293,6 +294,11 @@ pub static CONTRACTS: &[Contract] = &[
     response::<FsChanges>("fs/changes/result"),
     request::<FsForgetReads>(FsForgetReads::NAME),
     response::<FsForgetReads>("fs/forgetReads/result"),
+    request::<SessionRewind>(SessionRewind::NAME),
+    response::<SessionRewind>("session/rewind/result"),
+    request::<SessionSwitchBranch>(SessionSwitchBranch::NAME),
+    response::<SessionSwitchBranch>("session/switchBranch/result"),
+    notification::<SessionBranches>(),
 ];
 
 /// Looks up a contract by name.

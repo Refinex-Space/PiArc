@@ -194,6 +194,10 @@ pub struct SessionForkParams {
     /// The last entry to keep; the source's current position when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entry_id: Option<String>,
+    /// Instead of `entryId`: keep the conversation up to where this turn of the current
+    /// branch started (capability `checkpoints`, T28).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub before_turn: Option<crate::turn::TurnId>,
 }
 
 /// Parameters of `session/steer` and `session/followUp`.

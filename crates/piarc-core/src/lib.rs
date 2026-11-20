@@ -69,6 +69,7 @@
 //! [`CoreRuntime::terminal_frame`] ([`terminal`]).
 
 pub mod agent_host;
+pub mod checkpoints;
 pub mod client_settings;
 pub mod clock;
 pub mod composer;

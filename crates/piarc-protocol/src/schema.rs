@@ -35,6 +35,11 @@ pub fn export_schema() -> Vec<(&'static str, Value)> {
     generator.subschema_for::<crate::policy::AnswerStatus>();
     generator.subschema_for::<crate::policy::PermissionMode>();
     generator.subschema_for::<crate::memory::MemorySnapshot>();
+    generator.subschema_for::<crate::checkpoint::RewindPreview>();
+    generator.subschema_for::<crate::checkpoint::RewindRequest>();
+    generator.subschema_for::<crate::checkpoint::RewindReport>();
+    generator.subschema_for::<crate::checkpoint::ChangesView>();
+    generator.subschema_for::<crate::checkpoint::DiscardRequest>();
     let definitions = generator.take_definitions(true);
     let any_message: Vec<Value> = CONTRACTS
         .iter()

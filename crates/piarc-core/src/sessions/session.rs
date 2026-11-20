@@ -42,6 +42,10 @@ use crate::error::{Error, Result};
 use crate::events::Event;
 use crate::route::RouteKey;
 
+mod rewind;
+
+pub use rewind::CheckpointOp;
+
 /// Messages a session actor's mailbox holds at most; a full mailbox makes the workspace's event
 /// consumer wait, which stops reading the Agent Host (backpressure, nothing lost).
 const MAILBOX: usize = 1024;
@@ -72,6 +76,8 @@ pub enum Op {
     MarkRead,
     /// Changes Core's metadata of the session (title, pinned, archived).
     Prefs(piarc_store::SessionPrefsChange),
+    /// Checkpoints, rewind, the Changes panel and branches (T28).
+    Checkpoint(CheckpointOp),
 }
 
 /// Model-related requests on an open session.
@@ -144,6 +150,7 @@ impl SessionHandle {
         ctx.tool_io
             .open_session(&id, &workspace.path, &cwd)
             .map_err(|e| Error::feature(&e))?;
+        ctx.tool_io.session_opened(&id);
         let (tx, rx) = mpsc::channel(MAILBOX);
         let last_seq = Arc::new(AtomicU64::new(0));
         let in_host = Arc::new(AtomicBool::new(false));
@@ -483,6 +490,9 @@ impl SessionActor {
             .map(str::to_owned);
         match notification.method.as_str() {
             "turn/started" => {
+                if let Some(turn) = &turn {
+                    self.ctx.tool_io.turn_started(&self.id, turn);
+                }
                 self.active_turn = turn;
                 self.status = SessionStatus::Running;
                 self.error = None;
@@ -508,6 +518,7 @@ impl SessionActor {
                     ),
                 );
                 self.active_turn = None;
+                self.ctx.tool_io.turn_completed(&self.id);
                 let failed = notification.params.payload.get("status") == Some(&json!("failed"));
                 self.status = if failed {
                     SessionStatus::Error
@@ -575,6 +586,14 @@ impl SessionActor {
                 let _ = reply.send(Ok(Value::Null));
                 return;
             }
+            Op::Checkpoint(checkpoint) if checkpoint.needs_idle() && self.active_turn.is_some() => {
+                let _ = reply.send(Err(Error::feature(&piarc_protocol::ErrorObject::new(
+                    piarc_protocol::ErrorKind::SessionBusy,
+                    "Stop the running turn before rewinding or switching branches",
+                    true,
+                ))));
+                return;
+            }
             _ => {}
         }
         if let Op::Prompt(input) | Op::Steer(input) | Op::FollowUp(input) = &op
@@ -597,6 +616,7 @@ impl SessionActor {
             ws: self.ws.clone(),
             tool_io: self.ctx.tool_io.clone(),
             cancel: self.cancel.clone(),
+            events: self.ctx.events.clone(),
         };
         let tx = self.tx.clone();
         self.ctx.handle.spawn(async move {
@@ -715,10 +735,15 @@ struct Request {
     ws: WorkspaceHandle,
     tool_io: crate::tool_io::ToolIo,
     cancel: CancellationToken,
+    events: crate::events::EventSender,
 }
 
 impl Request {
     async fn run(&self, op: Op) -> Result<Value> {
+        // Files only need Core; the conversation steps acquire the Agent Host themselves.
+        if let Op::Checkpoint(op) = op {
+            return self.checkpoint(op).await;
+        }
         // `UserPromptSubmit` sees the input before the Agent Host does.
         let hook_context = match &op {
             Op::Prompt(input) | Op::Steer(input) | Op::FollowUp(input) => {
@@ -769,21 +794,7 @@ impl Request {
                 self.call::<SessionGetContextUsage>(&supervisor, None, params)
                     .await
             }
-            Op::SetPermissionMode(mode) => {
-                self.tool_io
-                    .check_mode(&self.id.0, mode)
-                    .await
-                    .map_err(|e| Error::feature(&e))?;
-                supervisor
-                    .set_permission_mode(&self.id, mode)
-                    .await
-                    .map_err(host_error)?;
-                self.tool_io
-                    .changed_mode(&self.id.0, mode)
-                    .await
-                    .map_err(|e| Error::feature(&e))?;
-                Ok(Value::Null)
-            }
+            Op::SetPermissionMode(mode) => self.set_mode(&supervisor, mode).await,
             Op::Model(change) => self.model(&supervisor, change).await,
             Op::Abort => {
                 let target = SessionTarget {
@@ -799,9 +810,29 @@ impl Request {
                 stopped
             }
             Op::Queue(change) => self.queue(&supervisor, change).await,
-            // Answered by the actor itself.
-            Op::MarkRead | Op::Prefs(_) => Ok(Value::Null),
+            // Answered by the actor itself, or above.
+            Op::MarkRead | Op::Prefs(_) | Op::Checkpoint(_) => Ok(Value::Null),
         }
+    }
+
+    async fn set_mode(
+        &self,
+        supervisor: &HostSupervisor,
+        mode: piarc_protocol::policy::PermissionMode,
+    ) -> Result<Value> {
+        self.tool_io
+            .check_mode(&self.id.0, mode)
+            .await
+            .map_err(|e| Error::feature(&e))?;
+        supervisor
+            .set_permission_mode(&self.id, mode)
+            .await
+            .map_err(host_error)?;
+        self.tool_io
+            .changed_mode(&self.id.0, mode)
+            .await
+            .map_err(|e| Error::feature(&e))?;
+        Ok(Value::Null)
     }
 
     async fn model(&self, supervisor: &HostSupervisor, change: ModelOp) -> Result<Value> {

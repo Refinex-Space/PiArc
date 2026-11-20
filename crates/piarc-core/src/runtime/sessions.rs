@@ -220,7 +220,7 @@ impl CoreRuntime {
         )
     }
 
-    /// Opens a copy of a session (up to `entry_id`) as a new session.
+    /// Opens a copy of a session (up to `at`) as a new session.
     ///
     /// # Errors
     ///
@@ -228,13 +228,14 @@ impl CoreRuntime {
     pub fn fork_session(
         &self,
         id: String,
-        entry_id: Option<String>,
+        at: crate::sessions::ForkPoint,
         on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
     ) -> Result<()> {
         crate::sessions::check_session_id(&id)?;
-        self.on_sessions(on_done, move |hub| async move {
-            hub.fork_session(id, entry_id).await
-        })
+        self.on_sessions(
+            on_done,
+            move |hub| async move { hub.fork_session(id, at).await },
+        )
     }
 
     /// Closes an open session.

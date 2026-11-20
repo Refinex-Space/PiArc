@@ -143,7 +143,12 @@ export type AhpMessage =
   | FsChangesRequest
   | FsChangesResponse
   | FsForgetReadsRequest
-  | FsForgetReadsResponse;
+  | FsForgetReadsResponse
+  | SessionRewindRequest
+  | SessionRewindResponse
+  | SessionSwitchBranchRequest
+  | SessionSwitchBranchResponse
+  | SessionBranchesNotification;
 /**
  * A request id: an integer or a string. `null` and fractional numbers are not accepted.
  */
@@ -677,6 +682,10 @@ export type SessionRemindResult = Record<string, never>;
  * How a file changed outside the session.
  */
 export type ExternalChange = 'modified' | 'deleted';
+/**
+ * How `session/rewind` moves the conversation.
+ */
+export type RewindMode = 'branch' | 'summarize';
 /**
  * Presentation of a pending approval.
  */
@@ -1900,6 +1909,11 @@ export interface SessionForkRequest {
  */
 export interface SessionForkParams {
   /**
+   * Instead of `entryId`: keep the conversation up to where this turn of the current
+   * branch started (capability `checkpoints`, T28).
+   */
+  beforeTurn?: TurnId | null;
+  /**
    * Its working directory, which the new session shares.
    */
   cwd: string;
@@ -2183,6 +2197,10 @@ export interface SessionHistoryResponse {
  */
 export interface HistoryWindow {
   /**
+   * The branch points on the current branch (capability `checkpoints`, T28).
+   */
+  branches?: BranchPoint[] | null;
+  /**
    * The plan and task list at the head of the branch (T26).
    */
   harness?: HarnessState | null;
@@ -2198,6 +2216,41 @@ export interface HistoryWindow {
    * How many items the history has.
    */
   total: number;
+}
+/**
+ * A place on the current branch where other branches start: turns that begin at the same
+ * entry.
+ */
+export interface BranchPoint {
+  /**
+   * Its position among the options (0-based, in the order the branches were written).
+   */
+  index: number;
+  /**
+   * Every branch at this place, the current one included.
+   */
+  options: BranchOption[];
+  /**
+   * The current branch's turn at this place.
+   */
+  turnId: TurnId;
+}
+/**
+ * One branch at a branch point.
+ */
+export interface BranchOption {
+  /**
+   * The branch's last entry: what `session/switchBranch` continues from.
+   */
+  entryId: string;
+  /**
+   * The start of the branch's first user message.
+   */
+  preview: string;
+  /**
+   * The turn that starts the branch, when it has one.
+   */
+  turnId?: TurnId | null;
 }
 /**
  * The plan and task list at the head of a branch.
@@ -2945,6 +2998,10 @@ export interface FsWriteParams {
    * The session whose workspace and working directory apply.
    */
   sessionId: SessionId;
+  /**
+   * The turn the write belongs to: its checkpoint keeps the old content (T28, ADR-0044).
+   */
+  turnId?: TurnId | null;
   /**
    * Set when the text comes in several requests: pieces before the last are collected, the
    * last writes the file.
@@ -4802,6 +4859,124 @@ export interface FsForgetReadsResult {
    * Number of files whose read range was forgotten.
    */
   files: number;
+}
+/**
+ * Request for `session/rewind`.
+ */
+export interface SessionRewindRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/rewind';
+  params: SessionRewindParams;
+}
+/**
+ * Parameters of `session/rewind`.
+ */
+export interface SessionRewindParams {
+  /**
+   * How.
+   */
+  mode: RewindMode;
+  /**
+   * The session; it must be idle.
+   */
+  sessionId: SessionId;
+  /**
+   * The turn to go back to before, on the current branch.
+   */
+  turnId: TurnId;
+}
+/**
+ * Successful response to `session/rewind`.
+ */
+export interface SessionRewindResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SessionRewound;
+}
+/**
+ * Result of `session/rewind` and `session/switchBranch`: the session as reopened on its new
+ * branch.
+ */
+export interface SessionRewound {
+  /**
+   * Last mode explicitly selected on the new branch.
+   */
+  permissionMode?: PermissionMode | null;
+  /**
+   * Conversation messages on the new branch.
+   */
+  restoredMessages: number;
+  /**
+   * The session.
+   */
+  sessionId: SessionId;
+  /**
+   * What the user wrote in the turn's first message (`session/rewind` only), for the input
+   * box.
+   */
+  text?: string | null;
+}
+/**
+ * Request for `session/switchBranch`.
+ */
+export interface SessionSwitchBranchRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/switchBranch';
+  params: SessionSwitchBranchParams;
+}
+/**
+ * Parameters of `session/switchBranch`.
+ */
+export interface SessionSwitchBranchParams {
+  /**
+   * The branch's last entry ([`BranchOption::entry_id`]).
+   */
+  entryId: string;
+  /**
+   * The session; it must be idle.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `session/switchBranch`.
+ */
+export interface SessionSwitchBranchResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SessionRewound;
+}
+/**
+ * Notification `session/branches`.
+ */
+export interface SessionBranchesNotification {
+  jsonrpc: JsonRpcVersion;
+  method: 'session/branches';
+  params: SessionBranchesParams;
+}
+/**
+ * Parameters of `session/branches`.
+ */
+export interface SessionBranchesParams {
+  /**
+   * The branch points on the current branch, oldest first.
+   */
+  branches: BranchPoint[];
+  /**
+   * Sequence number, monotonically increasing within the session.
+   */
+  seq: number;
+  /**
+   * The session the event belongs to.
+   */
+  sessionId: SessionId;
+  /**
+   * Time the event was produced, in milliseconds since the Unix epoch (UTC).
+   */
+  ts: number;
 }
 /**
  * Immutable approval card from the Core ledger.

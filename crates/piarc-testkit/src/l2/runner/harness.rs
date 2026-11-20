@@ -37,7 +37,13 @@ impl Driver<'_> {
             .to_owned();
         let id = self.session_id(fork.session.as_deref())?;
         let opened = call(
-            |done| self.core.fork_session(id, Some(entry), done),
+            |done| {
+                self.core.fork_session(
+                    id,
+                    piarc_core::sessions::ForkPoint::Entry(Some(entry)),
+                    done,
+                )
+            },
             "forking the session",
         )
         .await?;

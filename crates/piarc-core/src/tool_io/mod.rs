@@ -29,6 +29,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
+mod checkpoints;
 mod context;
 mod exec;
 mod files;
@@ -137,6 +138,8 @@ struct SessionIo {
     shell_cwd: Mutex<PathBuf>,
     /// Present when the session's commands run sandboxed; owns the session's proxy.
     sandbox: Option<SessionSandbox>,
+    /// The running (or last) turn: writes without a `turnId` go to its checkpoint (T28).
+    turn: Mutex<Option<String>>,
 }
 
 /// What a sandboxed session may reach besides its workspace (architecture section 6.10).
@@ -160,6 +163,8 @@ pub struct ToolIo {
     /// Shells, environment and runner of commands.
     exec: Arc<exec::Exec>,
     policy: Option<policy::Services>,
+    /// Snapshots of writes, rewinds and the Changes panel (T28); none without a data directory.
+    checkpoints: Option<crate::checkpoints::Checkpoints>,
 }
 
 impl std::fmt::Debug for ToolIo {
@@ -191,6 +196,7 @@ impl ToolIo {
             locks: Arc::default(),
             exec: Arc::new(exec),
             policy: None,
+            checkpoints: None,
         }
     }
 
@@ -320,6 +326,7 @@ impl ToolIo {
                 running: Mutex::default(),
                 shell_cwd,
                 sandbox,
+                turn: Mutex::default(),
             }),
         );
     }
@@ -433,7 +440,8 @@ impl ToolIo {
             "fs/write" => {
                 let p: FsWriteParams = parse(method, params)?;
                 let (s, locks) = (self.session(&p.session_id.0)?, Arc::clone(&self.locks));
-                answer(move || files::write(permit, &s, &locks, p)).await
+                let checkpoints = self.checkpoints.clone();
+                answer(move || files::write(permit, &s, &locks, checkpoints.as_ref(), p)).await
             }
             "fs/spill" => {
                 let p: FsSpillParams = parse(method, params)?;

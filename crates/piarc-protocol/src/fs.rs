@@ -264,6 +264,9 @@ pub struct FsWriteParams {
     /// The tool call this request serves.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ToolOrigin>,
+    /// The turn the write belongs to: its checkpoint keeps the old content (T28, ADR-0044).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn_id: Option<crate::turn::TurnId>,
 }
 
 /// Result of `fs/write`.

@@ -148,6 +148,7 @@ pub(super) fn write(
     permit: Option<super::policy::FilePermit>,
     session: &SessionIo,
     locks: &PathLocks,
+    checkpoints: Option<&crate::checkpoints::Checkpoints>,
     p: FsWriteParams,
 ) -> Result<Value, ErrorObject> {
     let target = UploadTarget::Write {
@@ -168,7 +169,7 @@ pub(super) fn write(
         text: &text,
         append: p.append.unwrap_or(false),
         line_endings: p.line_endings.unwrap_or(LineEndings::AsWritten),
-        snapshots: None,
+        snapshots: checkpoints.map(crate::checkpoints::Checkpoints::store),
     };
     let scope = permit.as_ref().map_or(&session.scope, |p| &p.scope);
     let written = piarc_fs::write_checked(scope, &session.files, locks, &spec, |before, new| {
@@ -179,6 +180,15 @@ pub(super) fn write(
         })
     })
     .map_err(adjudicate)?;
+    if let Some(checkpoints) = checkpoints {
+        record_write(
+            checkpoints,
+            session,
+            &p.session_id.0,
+            p.turn_id.as_ref(),
+            &written,
+        );
+    }
     let diff = piarc_diff::file_diff(&written.label, written.before.as_deref(), &written.after);
     to_value(&FsWriteResult {
         path: piarc_fs::display(&written.path),
@@ -187,6 +197,41 @@ pub(super) fn write(
         encoding: piarc_fs::reported_encoding(&written),
         diff: Some(diff),
     })
+}
+
+/// Adds the write to its turn's checkpoint (ADR-0044 rule 2: after the file was replaced, its
+/// old bytes already stored and pinned). The write itself succeeded, so a failure here is only
+/// logged: that write cannot be rewound.
+fn record_write(
+    checkpoints: &crate::checkpoints::Checkpoints,
+    session: &SessionIo,
+    session_id: &str,
+    turn: Option<&piarc_protocol::turn::TurnId>,
+    written: &piarc_fs::Written,
+) {
+    let current = lock(&session.turn).clone();
+    let turn = turn.map(|t| t.0.as_str()).or(current.as_deref());
+    let record = crate::checkpoints::NewRecord {
+        path: piarc_fs::display(&written.path),
+        before: written.before_sha256,
+        after: Some(written.after_sha256),
+        operation: if written.before_sha256.is_none() {
+            piarc_checkpoint::Operation::Create
+        } else {
+            piarc_checkpoint::Operation::Modify
+        },
+    };
+    match checkpoints.record(session_id, turn, &[record], None) {
+        Ok(true) => {}
+        Ok(false) => {
+            tracing::warn!(target: "piarc_core::checkpoints", session = %session_id,
+                "a write outside any turn was not recorded");
+        }
+        Err(error) => {
+            tracing::warn!(target: "piarc_core::checkpoints", session = %session_id,
+                "recording a write failed: {error}");
+        }
+    }
 }
 
 pub(super) fn spill(session: &SessionIo, p: FsSpillParams) -> Result<Value, ErrorObject> {

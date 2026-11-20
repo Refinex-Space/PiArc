@@ -301,6 +301,56 @@
       "required": ["path", "sha256", "size"],
       "type": "object"
     },
+    "BranchOption": {
+      "description": "One branch at a branch point.",
+      "properties": {
+        "entryId": {
+          "description": "The branch's last entry: what `session/switchBranch` continues from.",
+          "type": "string"
+        },
+        "preview": {
+          "description": "The start of the branch's first user message.",
+          "type": "string"
+        },
+        "turnId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The turn that starts the branch, when it has one."
+        }
+      },
+      "required": ["entryId", "preview"],
+      "type": "object"
+    },
+    "BranchPoint": {
+      "description": "A place on the current branch where other branches start: turns that begin at the same\nentry.",
+      "properties": {
+        "index": {
+          "description": "Its position among the options (0-based, in the order the branches were written).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "options": {
+          "description": "Every branch at this place, the current one included.",
+          "items": {
+            "$ref": "#/$defs/BranchOption"
+          },
+          "type": "array"
+        },
+        "turnId": {
+          "$ref": "#/$defs/TurnId",
+          "description": "The current branch's turn at this place."
+        }
+      },
+      "required": ["turnId", "index", "options"],
+      "type": "object"
+    },
     "Capability": {
       "description": "A named optional protocol feature, for example `planMode`.\n\nCapabilities are open strings rather than an enum: a peer must accept capability names\nit does not know, because that is how newer minor versions announce additions.",
       "type": "string"
@@ -380,6 +430,26 @@
       "required": ["id", "name"],
       "type": "object"
     },
+    "ChangeKind": {
+      "description": "How a file differs from its base in the Changes panel.",
+      "oneOf": [
+        {
+          "const": "created",
+          "description": "It did not exist before the session wrote it.",
+          "type": "string"
+        },
+        {
+          "const": "modified",
+          "description": "It exists with other content.",
+          "type": "string"
+        },
+        {
+          "const": "deleted",
+          "description": "It existed and is gone.",
+          "type": "string"
+        }
+      ]
+    },
     "ChangedFile": {
       "description": "A file that changed outside the session.",
       "properties": {
@@ -393,6 +463,86 @@
         }
       },
       "required": ["path", "change"],
+      "type": "object"
+    },
+    "ChangedFile2": {
+      "description": "One file of the Changes panel.",
+      "properties": {
+        "added": {
+          "description": "Lines added since the base.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "binary": {
+          "description": "The base or the current content is binary: only the whole file can be discarded.",
+          "type": ["boolean", "null"]
+        },
+        "diff": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FileDiff"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The diff; absent for binary files and when the panel degraded (fetch the file alone)."
+        },
+        "kind": {
+          "$ref": "#/$defs/ChangeKind",
+          "description": "How it differs."
+        },
+        "label": {
+          "description": "The file as diffs name it.",
+          "type": "string"
+        },
+        "path": {
+          "description": "The file.",
+          "type": "string"
+        },
+        "removed": {
+          "description": "Lines removed since the base.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "version": {
+          "description": "The content now: hex SHA-256, or `absent`. A discard names it.",
+          "type": "string"
+        }
+      },
+      "required": ["path", "label", "kind", "version", "added", "removed"],
+      "type": "object"
+    },
+    "ChangesView": {
+      "description": "The session's changes (Core API `sessionChanges`).",
+      "properties": {
+        "added": {
+          "description": "Lines added across the files.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "degraded": {
+          "description": "Too many files or lines: the diffs are left out and shown as plain text when a file is\nfetched alone.",
+          "type": ["boolean", "null"]
+        },
+        "files": {
+          "description": "The changed files, in the order the session first wrote them.",
+          "items": {
+            "$ref": "#/$defs/ChangedFile2"
+          },
+          "type": "array"
+        },
+        "removed": {
+          "description": "Lines removed across the files.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["files", "added", "removed"],
       "type": "object"
     },
     "CommandExecutionInfo": {
@@ -528,6 +678,25 @@
           "type": "string"
         }
       ]
+    },
+    "ConflictChoice": {
+      "description": "The user's choice for a conflicting file.",
+      "properties": {
+        "overwrite": {
+          "description": "Overwrite with the snapshot; otherwise keep the current content.",
+          "type": "boolean"
+        },
+        "path": {
+          "description": "The file ([`RewindFile::path`]).",
+          "type": "string"
+        },
+        "version": {
+          "description": "The version the user saw ([`RewindFile::version`]).",
+          "type": "string"
+        }
+      },
+      "required": ["path", "version", "overwrite"],
+      "type": "object"
     },
     "ContextCategories": {
       "description": "The context by category, in tokens. The categories add up to the total.",
@@ -895,6 +1064,27 @@
         }
       },
       "required": ["name", "kind"],
+      "type": "object"
+    },
+    "DiscardRequest": {
+      "description": "Discarding a file's change, or one hunk of it (Core API `discardChange`).",
+      "properties": {
+        "hunk": {
+          "description": "The hunk's index in the shown diff; the whole file when absent.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "path": {
+          "description": "The file ([`ChangedFile::path`]).",
+          "type": "string"
+        },
+        "version": {
+          "description": "The version the diff was shown for ([`ChangedFile::version`]).",
+          "type": "string"
+        }
+      },
+      "required": ["path", "version"],
       "type": "object"
     },
     "EffortLevel": {
@@ -1615,6 +1805,64 @@
           "type": "string"
         }
       ]
+    },
+    "FileOutcome": {
+      "description": "What happened to one file of a rewind or an undo.",
+      "oneOf": [
+        {
+          "const": "restored",
+          "description": "It got the recorded content.",
+          "type": "string"
+        },
+        {
+          "const": "deleted",
+          "description": "It was removed.",
+          "type": "string"
+        },
+        {
+          "const": "unchanged",
+          "description": "It already had the content.",
+          "type": "string"
+        },
+        {
+          "const": "kept",
+          "description": "The user chose to keep it (or it changed again since the rewind, for an undo).",
+          "type": "string"
+        },
+        {
+          "const": "failed",
+          "description": "It could not be changed; the rewind stopped here.",
+          "type": "string"
+        },
+        {
+          "const": "skipped",
+          "description": "Not reached: an earlier file failed.",
+          "type": "string"
+        }
+      ]
+    },
+    "FileResult": {
+      "description": "One file of a rewind or undo report.",
+      "properties": {
+        "error": {
+          "description": "Why it failed.",
+          "type": ["string", "null"]
+        },
+        "label": {
+          "description": "The file as diffs name it.",
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/$defs/FileOutcome",
+          "description": "What happened."
+        },
+        "path": {
+          "description": "The file.",
+          "type": "string"
+        }
+      },
+      "required": ["path", "label", "outcome"],
+      "type": "object"
     },
     "FileStat": {
       "description": "Result of `fs/stat`.",
@@ -2713,6 +2961,17 @@
           "$ref": "#/$defs/SessionId",
           "description": "The session whose workspace and working directory apply."
         },
+        "turnId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The turn the write belongs to: its checkpoint keeps the old content (T28, ADR-0044)."
+        },
         "upload": {
           "anyOf": [
             {
@@ -3081,6 +3340,13 @@
     "HistoryWindow": {
       "description": "Result of `session/history`: items `start .. start + items.len()` of `total`.",
       "properties": {
+        "branches": {
+          "description": "The branch points on the current branch (capability `checkpoints`, T28).",
+          "items": {
+            "$ref": "#/$defs/BranchPoint"
+          },
+          "type": ["array", "null"]
+        },
         "harness": {
           "anyOf": [
             {
@@ -5647,6 +5913,193 @@
       ],
       "description": "A request id: an integer or a string. `null` and fractional numbers are not accepted."
     },
+    "RewindAction": {
+      "description": "What a rewind does to one file.",
+      "oneOf": [
+        {
+          "const": "restore",
+          "description": "The file gets its content from before the turn.",
+          "type": "string"
+        },
+        {
+          "const": "delete",
+          "description": "The file was created from the turn on and is removed.",
+          "type": "string"
+        },
+        {
+          "const": "unchanged",
+          "description": "The file already has that content.",
+          "type": "string"
+        },
+        {
+          "const": "conflict",
+          "description": "The file changed outside the session (or by a command) since the session last wrote\nit: the user chooses.",
+          "type": "string"
+        }
+      ]
+    },
+    "RewindFile": {
+      "description": "One file of a rewind preview.",
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/RewindAction",
+          "description": "What happens to it."
+        },
+        "approval": {
+          "description": "Outside the workspace or a protected path: confirming the rewind approves the write.",
+          "type": ["boolean", "null"]
+        },
+        "deletes": {
+          "description": "For a conflict: overwriting removes the file (it did not exist before the turn).",
+          "type": ["boolean", "null"]
+        },
+        "label": {
+          "description": "The file as diffs name it: relative to the workspace, absolute outside it.",
+          "type": "string"
+        },
+        "path": {
+          "description": "The file.",
+          "type": "string"
+        },
+        "version": {
+          "description": "The content now: hex SHA-256, or `absent`. A request names it for a conflict.",
+          "type": "string"
+        }
+      },
+      "required": ["path", "label", "action", "version"],
+      "type": "object"
+    },
+    "RewindMode": {
+      "description": "How `session/rewind` moves the conversation.",
+      "oneOf": [
+        {
+          "const": "branch",
+          "description": "Continue from where the turn started; the turn and everything after it stay on the old\nbranch.",
+          "type": "string"
+        },
+        {
+          "const": "summarize",
+          "description": "Like `branch`, with a summary of the turn and everything after it as the new branch's\nfirst entry.",
+          "type": "string"
+        }
+      ]
+    },
+    "RewindPreview": {
+      "description": "What a rewind would do (Core API `rewindPreview`).",
+      "properties": {
+        "codeAvailable": {
+          "description": "Whether the files can go back: the turn has a checkpoint (it was not pruned, the\nsession made it).",
+          "type": "boolean"
+        },
+        "files": {
+          "description": "The files written from the turn on.",
+          "items": {
+            "$ref": "#/$defs/RewindFile"
+          },
+          "type": "array"
+        },
+        "turnId": {
+          "$ref": "#/$defs/TurnId",
+          "description": "The turn."
+        }
+      },
+      "required": ["turnId", "codeAvailable", "files"],
+      "type": "object"
+    },
+    "RewindReport": {
+      "description": "What a rewind or an undo did (Core API `rewind`, `undoRewind`).",
+      "properties": {
+        "completed": {
+          "description": "Whether every step ran: false when a file failed (the conversation did not move then) or\nthe conversation could not move.",
+          "type": "boolean"
+        },
+        "conversation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RewoundConversation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The conversation moved: what the user wrote in the turn's first message, for the input\nbox (absent for a summary)."
+        },
+        "error": {
+          "description": "Why the rewind stopped.",
+          "type": ["string", "null"]
+        },
+        "files": {
+          "description": "Every file, in order.",
+          "items": {
+            "$ref": "#/$defs/FileResult"
+          },
+          "type": "array"
+        },
+        "restoreId": {
+          "description": "Undoes the files this rewind changed (`undoRewind`); absent when it changed none.",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["completed"],
+      "type": "object"
+    },
+    "RewindRequest": {
+      "description": "A rewind (Core API `rewind`).",
+      "properties": {
+        "choices": {
+          "description": "A choice for every conflicting file of the preview.",
+          "items": {
+            "$ref": "#/$defs/ConflictChoice"
+          },
+          "type": "array"
+        },
+        "scope": {
+          "$ref": "#/$defs/RewindScope",
+          "description": "What goes back."
+        },
+        "turnId": {
+          "$ref": "#/$defs/TurnId",
+          "description": "The turn to go back to before."
+        }
+      },
+      "required": ["turnId", "scope"],
+      "type": "object"
+    },
+    "RewindScope": {
+      "description": "What a rewind restores (Core API).",
+      "oneOf": [
+        {
+          "const": "codeAndConversation",
+          "description": "The files and the conversation, back to before the turn.",
+          "type": "string"
+        },
+        {
+          "const": "conversation",
+          "description": "The conversation only.",
+          "type": "string"
+        },
+        {
+          "const": "code",
+          "description": "The files only.",
+          "type": "string"
+        },
+        {
+          "const": "summarize",
+          "description": "The conversation from the turn on becomes a summary; files stay.",
+          "type": "string"
+        }
+      ]
+    },
+    "RewoundConversation": {
+      "description": "The conversation part of a rewind.",
+      "properties": {
+        "text": {
+          "description": "What the user wrote in the turn's first message, for the input box.",
+          "type": ["string", "null"]
+        }
+      },
+      "type": "object"
+    },
     "SecretEntry": {
       "description": "One stored credential.",
       "properties": {
@@ -6204,6 +6657,53 @@
       "required": ["jsonrpc", "id", "result"],
       "type": "object"
     },
+    "SessionBranchesNotification": {
+      "description": "Notification `session/branches`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/branches",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SessionBranchesParams"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "SessionBranchesParams": {
+      "description": "Parameters of `session/branches`.",
+      "properties": {
+        "branches": {
+          "description": "The branch points on the current branch, oldest first.",
+          "items": {
+            "$ref": "#/$defs/BranchPoint"
+          },
+          "type": "array"
+        },
+        "seq": {
+          "description": "Sequence number, monotonically increasing within the session.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session the event belongs to."
+        },
+        "ts": {
+          "description": "Time the event was produced, in milliseconds since the Unix epoch (UTC).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["sessionId", "seq", "ts", "branches"],
+      "type": "object"
+    },
     "SessionCloseRequest": {
       "description": "Request for `session/close`.",
       "properties": {
@@ -6468,6 +6968,17 @@
     "SessionForkParams": {
       "description": "Parameters of `session/fork`.",
       "properties": {
+        "beforeTurn": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TurnId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Instead of `entryId`: keep the conversation up to where this turn of the current\nbranch started (capability `checkpoints`, T28)."
+        },
         "cwd": {
           "description": "Its working directory, which the new session shares.",
           "type": "string"
@@ -6949,6 +7460,94 @@
       "required": ["jsonrpc", "id", "result"],
       "type": "object"
     },
+    "SessionRewindParams": {
+      "description": "Parameters of `session/rewind`.",
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/RewindMode",
+          "description": "How."
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session; it must be idle."
+        },
+        "turnId": {
+          "$ref": "#/$defs/TurnId",
+          "description": "The turn to go back to before, on the current branch."
+        }
+      },
+      "required": ["sessionId", "turnId", "mode"],
+      "type": "object"
+    },
+    "SessionRewindRequest": {
+      "description": "Request for `session/rewind`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/rewind",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SessionRewindParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionRewindResponse": {
+      "description": "Successful response to `session/rewind`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SessionRewound"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SessionRewound": {
+      "description": "Result of `session/rewind` and `session/switchBranch`: the session as reopened on its new\nbranch.",
+      "properties": {
+        "permissionMode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PermissionMode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Last mode explicitly selected on the new branch."
+        },
+        "restoredMessages": {
+          "description": "Conversation messages on the new branch.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session."
+        },
+        "text": {
+          "description": "What the user wrote in the turn's first message (`session/rewind` only), for the input\nbox.",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["sessionId", "restoredMessages"],
+      "type": "object"
+    },
     "SessionSetEffortRequest": {
       "description": "Request for `session/setEffort`.",
       "properties": {
@@ -7124,6 +7723,58 @@
         }
       },
       "required": ["sessionId"],
+      "type": "object"
+    },
+    "SessionSwitchBranchParams": {
+      "description": "Parameters of `session/switchBranch`.",
+      "properties": {
+        "entryId": {
+          "description": "The branch's last entry ([`BranchOption::entry_id`]).",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session; it must be idle."
+        }
+      },
+      "required": ["sessionId", "entryId"],
+      "type": "object"
+    },
+    "SessionSwitchBranchRequest": {
+      "description": "Request for `session/switchBranch`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/switchBranch",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SessionSwitchBranchParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionSwitchBranchResponse": {
+      "description": "Successful response to `session/switchBranch`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SessionRewound"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
       "type": "object"
     },
     "SessionTarget": {
@@ -8256,6 +8907,21 @@
     },
     {
       "$ref": "#/$defs/FsForgetReadsResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionRewindRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionRewindResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionSwitchBranchRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionSwitchBranchResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionBranchesNotification"
     }
   ],
   "description": "Any message covered by the Agent Host Protocol 1.0 contracts. Generated from the piarc-protocol crate by `npm run gen:protocol`; do not edit.",

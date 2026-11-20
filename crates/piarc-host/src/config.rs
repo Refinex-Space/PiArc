@@ -108,6 +108,7 @@ impl HostConfig {
                 Capability::new("todo"),
                 Capability::new("ask"),
                 Capability::new("context"),
+                Capability::new("checkpoints"),
             ],
             allow_model_network: None,
             handshake_timeout: Duration::from_secs(10),

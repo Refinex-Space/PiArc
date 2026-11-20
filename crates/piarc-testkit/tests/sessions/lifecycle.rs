@@ -177,7 +177,12 @@ async fn fork_copies_the_conversation_and_close_ends_the_session() {
     events.turn_completed(&id, &turn).await;
 
     let (done, rx) = reply();
-    core.fork_session(id.clone(), None, done).expect("queued");
+    core.fork_session(
+        id.clone(),
+        piarc_core::sessions::ForkPoint::Entry(None),
+        done,
+    )
+    .expect("queued");
     let forked = answer(rx).await.expect("forked");
     let copy = forked["sessionId"].as_str().expect("id").to_owned();
     assert_ne!(copy, id);

@@ -285,6 +285,25 @@ impl HostSupervisor {
             .await
     }
 
+    /// [`HostSupervisor::session_call`] with its own timeout: a rewind that summarizes waits for
+    /// a model response, and reopening the session reconnects its MCP servers.
+    ///
+    /// # Errors
+    ///
+    /// As [`HostSupervisor::call`].
+    pub async fn session_call_within<M: RequestMethod>(
+        &self,
+        session_id: &SessionId,
+        params: M::Params,
+        timeout: Duration,
+    ) -> Result<M::Result> {
+        let tracking = Tracking {
+            session_id: Some(session_id.0.clone()),
+            request_key: None,
+        };
+        self.inner.call::<M>(params, tracking, timeout).await
+    }
+
     /// Records a permission-mode entry in the Agent Host's session.
     ///
     /// # Errors

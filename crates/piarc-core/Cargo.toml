@@ -11,6 +11,7 @@ publish.workspace = true
 getrandom.workspace = true
 http.workspace = true
 minisign-verify.workspace = true
+piarc-checkpoint.workspace = true
 piarc-config.workspace = true
 piarc-diff.workspace = true
 piarc-exec.workspace = true

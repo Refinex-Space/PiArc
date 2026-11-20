@@ -828,6 +828,36 @@
       "method": "fs/forgetReads",
       "name": "fs/forgetReads/result",
       "schema": "FsForgetReadsResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/rewind",
+      "name": "session/rewind",
+      "schema": "SessionRewindRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/rewind",
+      "name": "session/rewind/result",
+      "schema": "SessionRewindResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/switchBranch",
+      "name": "session/switchBranch",
+      "schema": "SessionSwitchBranchRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/switchBranch",
+      "name": "session/switchBranch/result",
+      "schema": "SessionSwitchBranchResponse"
+    },
+    {
+      "kind": "notification",
+      "method": "session/branches",
+      "name": "session/branches",
+      "schema": "SessionBranchesNotification"
     }
   ],
   "protocolVersion": "1.0"

@@ -82,6 +82,9 @@ pub struct HistoryWindow {
     /// The plan and task list at the head of the branch (T26).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub harness: Option<crate::harness::HarnessState>,
+    /// The branch points on the current branch (capability `checkpoints`, T28).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branches: Option<Vec<crate::checkpoint::BranchPoint>>,
 }
 
 /// Parameters of `harness/entry`.

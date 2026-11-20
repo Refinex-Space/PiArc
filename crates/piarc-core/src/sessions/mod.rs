@@ -61,7 +61,16 @@ use crate::storage::Storage;
 use crate::tool_io::ToolIo;
 use crate::trust::TrustService;
 
-pub use session::{ModelOp, Op, QueueOp};
+pub use session::{CheckpointOp, ModelOp, Op, QueueOp};
+
+/// Where a fork copies a session's conversation up to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ForkPoint {
+    /// Up to this entry; the session's current position when `None`.
+    Entry(Option<String>),
+    /// Up to where this turn of the current branch started (T28, "branch from here").
+    BeforeTurn(String),
+}
 pub(crate) use snapshot::{SnapshotMsg, Snapshots};
 
 pub use piarc_store::SessionPrefsChange;
@@ -300,15 +309,15 @@ impl Hub {
         }
     }
 
-    /// Opens a copy of session `id`'s conversation (up to `entry_id`) as a new session.
-    pub async fn fork_session(&self, id: String, entry_id: Option<String>) -> Result<Value> {
+    /// Opens a copy of session `id`'s conversation (up to `at`) as a new session.
+    pub async fn fork_session(&self, id: String, at: ForkPoint) -> Result<Value> {
         check_session_id(&id)?;
         let (workspace, cwd) = match self.live(&id) {
             Some(live) => (live.workspace.clone(), live.cwd.clone()),
             None => self.indexed_location(&id).await?,
         };
         let workspace = self.workspace(workspace).await?;
-        let opened = workspace.fork(&id, &cwd, entry_id).await?;
+        let opened = workspace.fork(&id, &cwd, at).await?;
         let new_id = opened.session_id.0;
         let handle = session::SessionHandle::spawn(&self.ctx, &workspace, new_id, cwd)?;
         self.register(handle.clone())?;
@@ -544,6 +553,12 @@ impl Hub {
                 .await??;
         }
         self.remove_session_dir(&id).await?;
+        // Its snapshots go with it; their objects with the next collection.
+        let key = id.clone();
+        self.ctx
+            .storage
+            .run(move |store| store.delete_session_checkpoints(&key))
+            .await??;
         self.ctx.snapshots.send(snapshot::SnapshotMsg::Reload);
         tracing::info!(target: "piarc_core::sessions", session = %id, "session deleted");
         Ok(())
