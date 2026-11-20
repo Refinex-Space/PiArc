@@ -21,6 +21,7 @@
 
 pub mod bash;
 mod decision;
+mod error;
 mod ledger;
 pub mod paths;
 pub mod pattern;
@@ -30,4 +31,5 @@ pub use decision::{
     Boundary, HookVerdict, Input, MustAsk, NOT_IN_PLAN_MODE, Outcome, PLAN_MODE_REFUSAL, Ruling,
     after_permission_request, decide, starting_mode,
 };
+pub use error::Error;
 pub use ledger::Ledger;

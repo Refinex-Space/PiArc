@@ -153,6 +153,42 @@ fn split_hit(hit: Hit) -> (Option<Hit>, Option<Hit>) {
     }
 }
 
+/// `Tool(key:value)` deny and ask rules (I82): matched against the call's top-level scalar
+/// arguments; they add to what the tool's own facts found and never allow.
+pub(super) fn param_rules(
+    rules: &RuleSet,
+    tool: &str,
+    input: &serde_json::Map<String, Value>,
+    ladder: &mut Input,
+) {
+    let args: Vec<(&str, String)> = input
+        .iter()
+        .filter_map(|(key, value)| {
+            let text = match value {
+                Value::String(text) => text.clone(),
+                Value::Bool(flag) => flag.to_string(),
+                Value::Number(number) => number.to_string(),
+                _ => return None,
+            };
+            Some((key.as_str(), text))
+        })
+        .collect();
+    if ladder.deny.is_none()
+        && ladder.enterprise.is_none()
+        && let Some(hit) = rules.find_param(Behavior::Deny, tool, &args)
+    {
+        (ladder.enterprise, ladder.deny) = split_hit(hit);
+    }
+    if ladder.ask.is_none()
+        && let Some(hit) = rules.find_param(Behavior::Ask, tool, &args)
+    {
+        ladder.ask = Some(MustAsk {
+            step: "askRule",
+            hit: Some(hit),
+        });
+    }
+}
+
 /// Deny, ask, invalid rules and allow for a call matched by tool name and one subject.
 fn plain(rules: &RuleSet, tool: &str, subject: Subject<'_>, ctx: &PathContext<'_>) -> Input {
     let mut input = Input::default();

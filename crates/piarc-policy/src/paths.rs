@@ -60,7 +60,11 @@ impl PathPattern {
     /// # Errors
     ///
     /// An empty pattern or one globset cannot compile.
-    pub fn parse(text: &str, deny_like: bool) -> Result<Self, String> {
+    pub fn parse(text: &str, deny_like: bool) -> Result<Self, crate::Error> {
+        Self::parse_text(text, deny_like).map_err(crate::Error::InvalidPath)
+    }
+
+    fn parse_text(text: &str, deny_like: bool) -> Result<Self, String> {
         let (negated, text) = match text.strip_prefix('!') {
             Some(rest) => (true, rest),
             None => (false, text),

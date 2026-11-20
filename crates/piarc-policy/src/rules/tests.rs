@@ -469,3 +469,67 @@ fn powershell_segments_respect_quotes() {
     );
     assert_eq!(powershell_segments("a`;b"), ["a`;b"]);
 }
+
+/// I82 (T31): `Tool(key:value)` rules match a top-level argument, deny and ask only; they never
+/// match the name, command or path a call is otherwise matched on.
+#[test]
+fn parameter_rules_match_top_level_arguments() {
+    let args = |pairs: &[(&'static str, &str)]| -> Vec<(&'static str, String)> {
+        pairs.iter().map(|(k, v)| (*k, (*v).to_owned())).collect()
+    };
+    let deny = set(
+        Behavior::Deny,
+        &["Agent(model:opus)", "Bash(run_in_background:true)"],
+    );
+    let opus = args(&[("model", "opus"), ("subagent_type", "Explore")]);
+    assert!(deny.find_param(Behavior::Deny, "Agent", &opus).is_some());
+    assert!(
+        deny.find_param(Behavior::Deny, "Agent", &args(&[("model", "fast")]))
+            .is_none()
+    );
+    assert!(
+        deny.find_param(
+            Behavior::Deny,
+            "Bash",
+            &args(&[("run_in_background", "true")])
+        )
+        .is_some()
+    );
+    assert!(
+        deny.find_param(
+            Behavior::Deny,
+            "Bash",
+            &args(&[("command", "run_in_background:true")])
+        )
+        .is_none(),
+        "the main content is not a parameter"
+    );
+    // A parameter rule is not a name or command rule.
+    assert!(!hits(
+        Behavior::Deny,
+        "Agent(model:opus)",
+        "Agent",
+        Subject::Name("model:opus")
+    ));
+    let ask = set(Behavior::Ask, &["Agent(isolation:work*)"]);
+    assert!(
+        ask.find_param(Behavior::Ask, "Agent", &args(&[("isolation", "worktree")]))
+            .is_some()
+    );
+    // Allow rules cannot use parameters; unknown keys stay what they were (a command prefix).
+    let allow = parse("Agent(model:opus)", Behavior::Allow).expect_err("allow");
+    assert!(allow.to_string().contains("only deny or ask"), "{allow}");
+    assert_eq!(allow.kind(), piarc_protocol::ErrorKind::InvalidParams);
+    assert!(matches!(
+        parse("Bash(npm:*)", Behavior::Deny)
+            .expect("legacy prefix")
+            .spec,
+        Some(Spec::Command(_))
+    ));
+    assert!(matches!(
+        parse("Bash(command:rm)", Behavior::Deny)
+            .expect("not a parameter")
+            .spec,
+        Some(Spec::Command(_))
+    ));
+}

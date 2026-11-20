@@ -46,7 +46,7 @@ pub(crate) fn check_rule(rule: &str, behavior: Behavior) -> Value {
             }
             row
         }
-        Err(error) => json!({"error": error, "broad": false}),
+        Err(error) => json!({"error": error.to_string(), "broad": false}),
     }
 }
 

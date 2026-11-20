@@ -296,3 +296,51 @@ async fn definition_hooks_apply_to_their_run_only_and_need_trust_for_projects() 
         .await;
     assert_eq!(read["allowed"], true, "{read}");
 }
+
+/// I82: parameter rules decide `Agent` calls by their arguments (deny and ask only).
+#[tokio::test]
+async fn parameter_rules_deny_and_ask_by_argument() {
+    let f = Fixture::new().await;
+    f.put(
+        ".piarc/settings.local.json",
+        r#"{"permissions":{"deny":["Agent(model:opus)"],"ask":["Agent(isolation:worktree)"]}}"#,
+    );
+    let denied = f
+        .evaluate(
+            "a1",
+            "Agent",
+            json!({"description":"d","prompt":"p","subagent_type":"Explore","model":"opus"}),
+        )
+        .await;
+    assert_eq!(denied["allowed"], false);
+    assert!(
+        denied["reason"]
+            .as_str()
+            .expect("reason")
+            .contains("Agent(model:opus)")
+    );
+    let fast = f
+        .evaluate(
+            "a2",
+            "Agent",
+            json!({"description":"d","prompt":"p","subagent_type":"Explore","model":"fast"}),
+        )
+        .await;
+    assert_eq!(fast["allowed"], true, "{fast}");
+    let (asked, card) = tokio::join!(
+        f.evaluate(
+            "a3",
+            "Agent",
+            json!({"description":"d","prompt":"p","isolation":"worktree"})
+        ),
+        async {
+            let card = f.pending().await;
+            f.io.answer_approval(answer(&card, ApprovalDecision::Deny))
+                .await
+                .expect("answer");
+            card
+        }
+    );
+    assert_eq!(card.tool, "Agent");
+    assert_eq!(asked["allowed"], false);
+}

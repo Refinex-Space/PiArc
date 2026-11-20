@@ -896,6 +896,8 @@ async fn prepare(
                 assess::other_call(&rules, &places, tool, &p.input)
             }
         };
+        let mut assessment = assessment;
+        assess::param_rules(&rules, &p.tool, &p.input, &mut assessment.input);
         if assessment.input.protected {
             boundary = Boundary::Protected;
         }

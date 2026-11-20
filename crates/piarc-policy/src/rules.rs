@@ -58,6 +58,14 @@ pub enum Spec {
     Domain(String),
     /// An `Agent` type or `Skill` name.
     Name(Pattern),
+    /// A top-level argument of the call (`Agent(model:opus)`, `Bash(run_in_background:true)`;
+    /// deny and ask only, I82).
+    Param {
+        /// The argument's name.
+        key: String,
+        /// What its value must match.
+        value: Pattern,
+    },
     /// Accepted but never matches (for example `Write(path)`; use `Edit(path)`).
     Inert,
 }
@@ -122,7 +130,11 @@ fn names_tool(rule_tool: &str, tool: &str) -> bool {
 /// # Errors
 ///
 /// The message for the settings page and the audit.
-pub fn parse(text: &str, behavior: Behavior) -> Result<Rule, String> {
+pub fn parse(text: &str, behavior: Behavior) -> Result<Rule, crate::Error> {
+    parse_rule(text, behavior).map_err(crate::Error::InvalidRule)
+}
+
+fn parse_rule(text: &str, behavior: Behavior) -> Result<Rule, String> {
     let trimmed = text.trim();
     let (name, spec) = match trimmed.find('(') {
         Some(open) => {
@@ -187,15 +199,50 @@ fn tool_match(name: &str, behavior: Behavior) -> Result<ToolMatch, String> {
     Ok(ToolMatch::Glob(Pattern::new(name, false)))
 }
 
+/// The top-level arguments a `Tool(key:value)` rule may name (I82): scalar control
+/// parameters, never the main content (`command`, `prompt`, paths), which compound commands
+/// and text could slip past.
+fn param_keys(tool: &str) -> &'static [&'static str] {
+    match tool {
+        "Agent" => &["model", "effort", "isolation", "run_in_background"],
+        "Bash" | "PowerShell" | "Monitor" => {
+            &["run_in_background", "timeout", "dangerouslyDisableSandbox"]
+        }
+        _ => &[],
+    }
+}
+
+/// `key:value` with a known parameter `key` of `tool`.
+fn param_spec(tool: &str, spec: &str) -> Option<(String, String)> {
+    let (key, value) = spec.split_once(':')?;
+    let key = key.trim();
+    let value = value.trim();
+    (param_keys(tool).contains(&key) && !value.is_empty() && value != "*")
+        .then(|| (key.to_owned(), value.to_owned()))
+}
+
 fn specifier(name: &str, spec: &str, behavior: Behavior) -> Result<Spec, String> {
     let deny_like = behavior != Behavior::Allow;
+    if let Some((key, value)) = param_spec(name, spec) {
+        if !deny_like {
+            return Err(format!(
+                "a parameter rule ({key}:…) can only deny or ask, not allow"
+            ));
+        }
+        return Ok(Spec::Param {
+            key,
+            value: Pattern::new(&value, false),
+        });
+    }
     Ok(match name {
         _ if name.starts_with("mcp__") || name.contains('*') => {
             return Err("MCP and wildcard tool rules take no specifier".into());
         }
         "Bash" | "Monitor" => Spec::Command(Pattern::new(spec, false)),
         "PowerShell" => Spec::Command(Pattern::new(spec, true)),
-        "Read" | "Edit" => Spec::Path(PathPattern::parse(spec, deny_like)?),
+        "Read" | "Edit" => {
+            Spec::Path(PathPattern::parse(spec, deny_like).map_err(|e| e.to_string())?)
+        }
         "Write" | "NotebookEdit" | "Glob" | "Grep" => Spec::Inert,
         "WebFetch" => {
             let host = spec
@@ -312,7 +359,8 @@ impl RuleSet {
                     behavior,
                     source: index,
                 }),
-                Err(message) => {
+                Err(error) => {
+                    let message = error.to_string();
                     let asks_for = (behavior != Behavior::Allow)
                         .then(|| named_tool(text).unwrap_or_else(|| "*".into()));
                     self.invalid.push(InvalidRule {
@@ -410,6 +458,27 @@ impl RuleSet {
             }
         }
         None
+    }
+
+    /// The first `Tool(key:value)` rule of `behavior` whose argument matches one of `args`
+    /// (the call's top-level scalar arguments as text, I82).
+    #[must_use]
+    pub fn find_param(
+        &self,
+        behavior: Behavior,
+        tool: &str,
+        args: &[(&str, String)],
+    ) -> Option<Hit> {
+        self.entries
+            .iter()
+            .filter(|e| e.behavior == behavior && e.rule.names(tool))
+            .find(|e| match &e.rule.spec {
+                Some(Spec::Param { key, value }) => args
+                    .iter()
+                    .any(|(name, text)| name == key && value.covers(text)),
+                _ => false,
+            })
+            .map(|e| self.hit(e))
     }
 
     /// The first allow rule that is bare or names exactly this command: the only rules that
