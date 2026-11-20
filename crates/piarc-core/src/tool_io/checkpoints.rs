@@ -47,12 +47,16 @@ fn not_found(message: impl Into<String>) -> ErrorObject {
 }
 
 /// The session's scope, or one bound to exactly `path` when the session's directories do not
-/// allow `access` without asking.
+/// allow `access` without asking. Confirming the rewind approves the recorded path itself:
+/// when links now lead it elsewhere (outside or protected), the approval does not cover that.
 fn scope_for(s: &SessionIo, path: &str, access: Access) -> Result<Scope, piarc_fs::Error> {
     match s.scope.check(path, access) {
         Ok(_) => Ok(s.scope.clone()),
-        Err(piarc_fs::Error::NeedsApproval { .. }) => {
+        Err(error @ piarc_fs::Error::NeedsApproval { .. }) => {
             let target = s.scope.locate(path)?;
+            if display(&target) != path {
+                return Err(error);
+            }
             let binding = DirectoryBinding::capture(&target)?;
             s.scope.clone().for_bound_path(&binding, target, access)
         }
@@ -68,7 +72,20 @@ fn needs_approval(s: &SessionIo, path: &str) -> bool {
 }
 
 fn current_hash(s: &SessionIo, path: &str) -> Result<Option<Hash>, piarc_fs::Error> {
-    piarc_fs::current_sha256(&scope_for(s, path, Access::Read)?, path)
+    match scope_for(s, path, Access::Read) {
+        Ok(scope) => piarc_fs::current_sha256(&scope, path),
+        // A link now leads the recorded path where the session needs approval: a conflict of
+        // its own version, which no choice resolves in place (see `scope_for`).
+        Err(piarc_fs::Error::NeedsApproval { .. })
+            if s.scope.locate(path).is_ok_and(|t| display(&t) != path) =>
+        {
+            let target = s.scope.locate(path).map(|t| display(&t))?;
+            Ok(Some(piarc_checkpoint::hash_of(
+                format!("piarc-redirected\0{target}").as_bytes(),
+            )))
+        }
+        Err(error) => Err(error),
+    }
 }
 
 fn key(s: &SessionIo, path: &str) -> String {

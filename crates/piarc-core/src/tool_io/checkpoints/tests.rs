@@ -586,3 +586,40 @@ async fn files_outside_the_workspace_are_marked_and_restored() {
     assert_eq!(std::fs::read(&outside).expect("read"), b"before\n");
     assert!(f.path("x").ends_with("x"));
 }
+
+/// R3: a recorded file replaced by a link to a file outside the workspace (by Bash, or by
+/// injected instructions) is not written through the link: the user approved the recorded
+/// path, not wherever it points now.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_rewind_does_not_write_through_a_link_that_replaced_the_file() {
+    let f = Fixture::new("link");
+    f.put("a.txt", b"original\n");
+    f.read("a.txt").await;
+    f.write("turn-1", "a.txt", "agent\n").await.expect("write");
+    let outside = f.root.join("outside.txt");
+    std::fs::write(&outside, b"not the workspace's\n").expect("outside");
+    std::fs::remove_file(f.file("a.txt")).expect("remove");
+    std::os::unix::fs::symlink(&outside, f.file("a.txt")).expect("link");
+    let preview = f.preview("turn-1").await;
+    let choices = preview
+        .files
+        .iter()
+        .filter(|p| p.action == RewindAction::Conflict)
+        .map(|p| ConflictChoice {
+            path: p.path.clone(),
+            version: p.version.clone(),
+            overwrite: true,
+        })
+        .collect();
+    let report =
+        f.io.rewind_code(S, "turn-1", choices)
+            .await
+            .expect("report");
+    assert_eq!(
+        std::fs::read(&outside).expect("outside"),
+        b"not the workspace's\n",
+        "{report:?}"
+    );
+    assert!(!report.completed, "{report:?}");
+}
