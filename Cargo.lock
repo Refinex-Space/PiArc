@@ -1918,6 +1918,7 @@ dependencies = [
 name = "piarc-exec"
 version = "0.0.0"
 dependencies = [
+ "libc",
  "nix",
  "piarc-ports",
  "piarc-protocol",

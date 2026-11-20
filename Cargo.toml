@@ -80,6 +80,7 @@ ipnet       = "=2.12.2"
 keyring-core = "=1.0.1"
 minisign-verify = "=0.3.0"
 jsonschema  = { version = "=0.61.2", default-features = false }
+libc        = { version = "=0.2.191", default-features = false }
 lopdf       = { version = "=0.46.0", default-features = false }
 notify      = { version = "=8.2.1", default-features = false, features = ["macos_fsevent"] }
 napi        = { version = "=3.16.2", features = ["napi6", "serde-json"] }
@@ -114,7 +115,8 @@ zeroize     = { version = "=1.9.1", features = ["serde", "std"] }
 
 [workspace.lints.rust]
 # `unsafe` is allowed only in -sys crates, at the NAPI boundary and in safe
-# wrapper modules over system interfaces (piarc-term's `vt`, piarc-exec's `job`);
+# wrapper modules over system interfaces (piarc-term's `vt`, piarc-exec's `job` and
+# `tty_processes`);
 # the crates opt out at the crate root, the wrappers on their module declaration,
 # each with a reason.
 unsafe_code = "deny"

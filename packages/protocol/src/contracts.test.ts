@@ -115,3 +115,27 @@ describe('the root schema', () => {
     }
   });
 });
+
+describe('terminal frame golden samples (tests/contracts/term-frame/)', () => {
+  const samples = readJson(path.join(contractsRoot, 'term-frame', 'samples.json'));
+  const cases = isRecord(samples) && Array.isArray(samples.cases) ? samples.cases : [];
+
+  it('has samples', () => {
+    expect(cases.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('describes every frame by the TermFrame schema', () => {
+    const validate = ajv.getSchema('ahp#/$defs/TermFrame');
+    if (validate === undefined) {
+      throw new Error('TermFrame is not defined');
+    }
+    for (const sample of cases) {
+      const frame: unknown = isRecord(sample) ? sample.frame : undefined;
+      expect(validate(frame), ajv.errorsText(validate.errors)).toBe(true);
+    }
+    // A palette that is not 256 colors, or a color that is not "#rrggbb", is not a frame.
+    const first: unknown = isRecord(cases[0]) ? cases[0].frame : undefined;
+    const broken = JSON.parse(JSON.stringify(first).replace('"#1e1e2e"', '"blue"')) as unknown;
+    expect(validate(broken)).toBe(false);
+  });
+});

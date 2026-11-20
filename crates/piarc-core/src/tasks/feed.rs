@@ -417,6 +417,7 @@ mod tests {
             output_path: Some("/d/tasks/bg-0a.log".into()),
             output_bytes: 12,
             tail: Vec::new(),
+            terminal: None,
         };
         let text = completion_text(&task, &["ok".into(), "boom".into()], &TaskLimits::default());
         assert_eq!(

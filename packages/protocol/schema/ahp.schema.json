@@ -761,6 +761,17 @@
           "description": "Its id (`bg-` and 12 hexadecimal digits).",
           "type": "string"
         },
+        "terminal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TerminalTask"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The terminal (`terminal`)."
+        },
         "timeoutMs": {
           "description": "A Monitor's timeout, in milliseconds.",
           "format": "uint64",
@@ -2173,6 +2184,10 @@
             }
           ],
           "description": "The shell; `bash` when absent."
+        },
+        "terminal": {
+          "description": "Runs the command in a PiArc terminal whose screen the model reads (capability\n`terminalTasks`, T33, ADR-0050); comes with `background`.",
+          "type": "boolean"
         },
         "timeoutMs": {
           "description": "How long the command may run, in milliseconds; Core's default when absent. With the\ncapability `backgroundTasks` a command that reaches it keeps running as a background\ntask (T32); without, it is stopped.",
@@ -9813,6 +9828,11 @@
           "const": "monitor",
           "description": "A `Monitor` command: its new output lines reach the model.",
           "type": "string"
+        },
+        {
+          "const": "terminal",
+          "description": "A terminal: a shell in a PTY whose screen Core keeps (T33).",
+          "type": "string"
         }
       ]
     },
@@ -10062,6 +10082,864 @@
       },
       "required": ["revision", "tasks"],
       "type": "object"
+    },
+    "TermCell": {
+      "description": "One cell.",
+      "properties": {
+        "style": {
+          "description": "Style table id; 0 is the default style.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "text": {
+          "description": "The grapheme cluster; empty for an empty cell.",
+          "type": "string"
+        },
+        "wide": {
+          "$ref": "#/$defs/TermWide",
+          "description": "Width class."
+        }
+      },
+      "required": ["wide", "style", "text"],
+      "type": "object"
+    },
+    "TermColors": {
+      "description": "Terminal colors.",
+      "properties": {
+        "background": {
+          "$ref": "#/$defs/TermRgb",
+          "description": "Default background."
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TermRgb"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cursor color set by the program, if any."
+        },
+        "foreground": {
+          "$ref": "#/$defs/TermRgb",
+          "description": "Default foreground."
+        },
+        "palette": {
+          "$ref": "#/$defs/TermPalette",
+          "description": "The 256-color palette."
+        }
+      },
+      "required": ["background", "foreground", "palette"],
+      "type": "object"
+    },
+    "TermCursor": {
+      "description": "Cursor state.",
+      "properties": {
+        "blinking": {
+          "description": "Should blink according to the terminal modes.",
+          "type": "boolean"
+        },
+        "inViewport": {
+          "description": "Inside the viewport; `x` and `y` are meaningful only then.",
+          "type": "boolean"
+        },
+        "passwordInput": {
+          "description": "At a password prompt (the shell disabled echo).",
+          "type": "boolean"
+        },
+        "style": {
+          "$ref": "#/$defs/TermCursorStyle",
+          "description": "Visual style."
+        },
+        "visible": {
+          "description": "Visible according to the terminal modes.",
+          "type": "boolean"
+        },
+        "wideTail": {
+          "description": "On the spacer tail of a wide character.",
+          "type": "boolean"
+        },
+        "x": {
+          "description": "Column in the viewport.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "y": {
+          "description": "Row in the viewport.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "visible",
+        "blinking",
+        "inViewport",
+        "wideTail",
+        "passwordInput",
+        "style",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "TermCursorStyle": {
+      "description": "Cursor shape.",
+      "oneOf": [
+        {
+          "const": "bar",
+          "description": "Vertical bar.",
+          "type": "string"
+        },
+        {
+          "const": "block",
+          "description": "Filled block.",
+          "type": "string"
+        },
+        {
+          "const": "underline",
+          "description": "Underline.",
+          "type": "string"
+        },
+        {
+          "const": "blockHollow",
+          "description": "Hollow block.",
+          "type": "string"
+        }
+      ]
+    },
+    "TermDirty": {
+      "description": "Global dirty state of the render state update.",
+      "oneOf": [
+        {
+          "const": "clean",
+          "description": "Nothing changed.",
+          "type": "string"
+        },
+        {
+          "const": "partial",
+          "description": "Some rows changed.",
+          "type": "string"
+        },
+        {
+          "const": "full",
+          "description": "Everything must be redrawn.",
+          "type": "string"
+        }
+      ]
+    },
+    "TermFrame": {
+      "description": "One frame. The JSON form (schema `TermFrame`) is for samples and diagnostics; the wire is\nthe byte layout.",
+      "properties": {
+        "body": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TermFrameBody"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What changed; `None` for an empty frame."
+        },
+        "cols": {
+          "description": "Viewport width in cells.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "dirty": {
+          "$ref": "#/$defs/TermDirty",
+          "description": "libghostty-vt's global dirty state for the update that produced the frame."
+        },
+        "held": {
+          "description": "Captured when a synchronized-output hold began.",
+          "type": "boolean"
+        },
+        "reset": {
+          "description": "The viewer drops its rows and styles first.",
+          "type": "boolean"
+        },
+        "rows": {
+          "description": "Viewport height in cells.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "seq": {
+          "description": "Per-viewer frame number, from 1.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["seq", "reset", "held", "dirty", "cols", "rows"],
+      "type": "object"
+    },
+    "TermFrameBody": {
+      "description": "The changes a non-empty frame carries.",
+      "properties": {
+        "colors": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TermColors"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Colors, when they changed or on RESET."
+        },
+        "cursor": {
+          "$ref": "#/$defs/TermCursor",
+          "description": "The cursor, always present."
+        },
+        "rows": {
+          "description": "The viewport, top to bottom; exactly `rows` entries.",
+          "items": {
+            "$ref": "#/$defs/TermRow"
+          },
+          "type": "array"
+        },
+        "scrollbar": {
+          "$ref": "#/$defs/TermScrollbar",
+          "description": "The viewport's place in the scrollback."
+        },
+        "styles": {
+          "description": "Style table entries the viewer does not have yet.",
+          "items": {
+            "$ref": "#/$defs/TermStyleEntry"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["cursor", "scrollbar", "styles", "rows"],
+      "type": "object"
+    },
+    "TermPalette": {
+      "description": "The 256-color palette.",
+      "items": {
+        "$ref": "#/$defs/TermRgb"
+      },
+      "maxItems": 256,
+      "minItems": 256,
+      "type": "array"
+    },
+    "TermRgb": {
+      "description": "An RGB color as \"#rrggbb\".",
+      "pattern": "^#[0-9a-fA-F]{6}$",
+      "type": "string"
+    },
+    "TermRow": {
+      "description": "One viewport row.",
+      "properties": {
+        "cells": {
+          "description": "The cells, when the viewer does not hold this row's current content.",
+          "items": {
+            "$ref": "#/$defs/TermCell"
+          },
+          "type": ["array", "null"]
+        },
+        "id": {
+          "description": "Core's row handle.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "selection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TermSelection"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Selected columns of this row, both included."
+        }
+      },
+      "required": ["id"],
+      "type": "object"
+    },
+    "TermScrollbar": {
+      "description": "The viewport's place in the scrollback, in rows.",
+      "properties": {
+        "len": {
+          "description": "Rows in the viewport.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "offset": {
+          "description": "First viewport row, from the top of the scrollback.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "total": {
+          "description": "Rows of scrollback plus the active area.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["total", "offset", "len"],
+      "type": "object"
+    },
+    "TermSelection": {
+      "description": "The selected columns of a row, both included.",
+      "properties": {
+        "end": {
+          "description": "Last selected column.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "start": {
+          "description": "First selected column.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["start", "end"],
+      "type": "object"
+    },
+    "TermStyle": {
+      "description": "A resolved cell style: palette indices are already turned into RGB.",
+      "properties": {
+        "bg": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TermRgb"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Background, or the default background."
+        },
+        "fg": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TermRgb"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Foreground, or the default foreground."
+        },
+        "flags": {
+          "description": "libghostty-vt style flags (see the module documentation).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "underline": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TermRgb"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Underline color, or the foreground."
+        }
+      },
+      "required": ["flags"],
+      "type": "object"
+    },
+    "TermStyleEntry": {
+      "description": "A style table entry.",
+      "properties": {
+        "id": {
+          "description": "Index the cells refer to; never 0.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "style": {
+          "$ref": "#/$defs/TermStyle",
+          "description": "The style."
+        }
+      },
+      "required": ["id", "style"],
+      "type": "object"
+    },
+    "TermWide": {
+      "description": "Width class of a cell.",
+      "oneOf": [
+        {
+          "const": "narrow",
+          "description": "One column.",
+          "type": "string"
+        },
+        {
+          "const": "wide",
+          "description": "Two columns; the next cell is its spacer tail.",
+          "type": "string"
+        },
+        {
+          "const": "spacerTail",
+          "description": "Second column of a wide character; has no text of its own.",
+          "type": "string"
+        },
+        {
+          "const": "spacerHead",
+          "description": "Placeholder at the end of a row whose wide character wrapped to the next row.",
+          "type": "string"
+        }
+      ]
+    },
+    "TerminalCommand": {
+      "description": "One command a shell ran in a terminal (OSC 133).",
+      "properties": {
+        "command": {
+          "description": "The command line.",
+          "type": "string"
+        },
+        "endedAt": {
+          "description": "When it finished, Unix milliseconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "exitCode": {
+          "description": "The exit code, when the shell reported one.",
+          "format": "int32",
+          "type": ["integer", "null"]
+        },
+        "output": {
+          "description": "The output as plain text (lines unwrapped and trimmed).",
+          "type": "string"
+        },
+        "outputComplete": {
+          "description": "The whole output is still in the terminal.",
+          "type": "boolean"
+        },
+        "outputEnd": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TerminalPoint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where its output ends; absent while it runs."
+        },
+        "outputStart": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TerminalPoint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where its output starts; absent once it left the scrollback."
+        },
+        "seq": {
+          "description": "Its number in the terminal, from 1.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "startedAt": {
+          "description": "When it started, Unix milliseconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "state": {
+          "$ref": "#/$defs/TerminalCommandState",
+          "description": "Running or finished."
+        }
+      },
+      "required": ["seq", "command", "state", "startedAt", "output", "outputComplete"],
+      "type": "object"
+    },
+    "TerminalCommandState": {
+      "description": "Running or finished.",
+      "oneOf": [
+        {
+          "const": "running",
+          "description": "Started and not finished.",
+          "type": "string"
+        },
+        {
+          "const": "finished",
+          "description": "Finished.",
+          "type": "string"
+        }
+      ]
+    },
+    "TerminalEvent": {
+      "description": "What a terminal reports on its route `term/<id>`, one JSON object per event.",
+      "oneOf": [
+        {
+          "description": "The program set the title (OSC 0/2); empty after a reset.",
+          "properties": {
+            "title": {
+              "description": "The new title.",
+              "type": "string"
+            },
+            "type": {
+              "const": "title",
+              "type": "string"
+            }
+          },
+          "required": ["type", "title"],
+          "type": "object"
+        },
+        {
+          "description": "The shell reported its working directory (OSC 7): a local path, or the URL as sent\nwhen it is not a file URL; empty after a reset.",
+          "properties": {
+            "path": {
+              "description": "The directory.",
+              "type": "string"
+            },
+            "type": {
+              "const": "pwd",
+              "type": "string"
+            }
+          },
+          "required": ["type", "path"],
+          "type": "object"
+        },
+        {
+          "description": "The program rang the bell.",
+          "properties": {
+            "count": {
+              "description": "Bells in one chunk of output.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "bell",
+              "type": "string"
+            }
+          },
+          "required": ["type", "count"],
+          "type": "object"
+        },
+        {
+          "description": "A command started (OSC 133 `C`).",
+          "properties": {
+            "command": {
+              "description": "The command line, when the shell sent it.",
+              "type": ["string", "null"]
+            },
+            "seq": {
+              "description": "Its number in this terminal, from 1.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "commandStarted",
+              "type": "string"
+            }
+          },
+          "required": ["type", "seq"],
+          "type": "object"
+        },
+        {
+          "description": "A command finished (OSC 133 `D`, or the next prompt).",
+          "properties": {
+            "exitCode": {
+              "description": "The exit code, when the shell sent it.",
+              "format": "int32",
+              "type": ["integer", "null"]
+            },
+            "seq": {
+              "description": "Its number.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "commandFinished",
+              "type": "string"
+            }
+          },
+          "required": ["type", "seq"],
+          "type": "object"
+        },
+        {
+          "description": "The program put text on the clipboard (OSC 52); the client writes the system\nclipboard. Only sent while the setting allows it.",
+          "properties": {
+            "text": {
+              "description": "The text.",
+              "type": "string"
+            },
+            "type": {
+              "const": "clipboard",
+              "type": "string"
+            }
+          },
+          "required": ["type", "text"],
+          "type": "object"
+        },
+        {
+          "description": "The program asked to read the clipboard and got an empty answer.",
+          "properties": {
+            "type": {
+              "const": "clipboardReadDenied",
+              "type": "string"
+            }
+          },
+          "required": ["type"],
+          "type": "object"
+        },
+        {
+          "description": "The program exited and its output was read.",
+          "properties": {
+            "code": {
+              "description": "The exit code, `null` when unknown.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "exited",
+              "type": "string"
+            }
+          },
+          "required": ["type", "code"],
+          "type": "object"
+        },
+        {
+          "description": "The terminal stopped working (a thread of it failed).",
+          "properties": {
+            "reason": {
+              "description": "What failed.",
+              "type": "string"
+            },
+            "type": {
+              "const": "failed",
+              "type": "string"
+            }
+          },
+          "required": ["type", "reason"],
+          "type": "object"
+        }
+      ]
+    },
+    "TerminalInfo": {
+      "description": "What a terminal shows.",
+      "properties": {
+        "alternateScreen": {
+          "description": "A full-screen program shows its alternate screen.",
+          "type": "boolean"
+        },
+        "cols": {
+          "description": "Columns.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "lastCommand": {
+          "description": "The number of the newest command, 0 before the first.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pwd": {
+          "description": "The working directory the shell reported, empty when none.",
+          "type": "string"
+        },
+        "rows": {
+          "description": "Rows.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sessionId": {
+          "description": "The session it belongs to.",
+          "type": ["string", "null"]
+        },
+        "shared": {
+          "description": "The user shares it with the model.",
+          "type": "boolean"
+        },
+        "taskId": {
+          "description": "Its background task (terminals of a session).",
+          "type": ["string", "null"]
+        },
+        "terminalId": {
+          "description": "The terminal's handle.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "title": {
+          "description": "The title the program set, empty when none.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "terminalId",
+        "cols",
+        "rows",
+        "title",
+        "pwd",
+        "alternateScreen",
+        "lastCommand",
+        "shared"
+      ],
+      "type": "object"
+    },
+    "TerminalMatch": {
+      "description": "One search match: first and last cell.",
+      "properties": {
+        "end": {
+          "$ref": "#/$defs/TerminalPoint",
+          "description": "Last cell."
+        },
+        "start": {
+          "$ref": "#/$defs/TerminalPoint",
+          "description": "First cell."
+        }
+      },
+      "required": ["start", "end"],
+      "type": "object"
+    },
+    "TerminalOrigin": {
+      "description": "Who opened a terminal task.",
+      "oneOf": [
+        {
+          "const": "agent",
+          "description": "The model (`Bash` with `terminal`).",
+          "type": "string"
+        },
+        {
+          "const": "user",
+          "description": "The user, in the terminal panel.",
+          "type": "string"
+        }
+      ]
+    },
+    "TerminalPasteOutcome": {
+      "description": "What a paste did.",
+      "oneOf": [
+        {
+          "const": "pasted",
+          "description": "The text went to the program.",
+          "type": "string"
+        },
+        {
+          "const": "unsafe",
+          "description": "The text could run commands by itself; ask the user, then paste with `allowUnsafe`.",
+          "type": "string"
+        },
+        {
+          "const": "empty",
+          "description": "Nothing to paste.",
+          "type": "string"
+        }
+      ]
+    },
+    "TerminalPoint": {
+      "description": "A position in a terminal's text: row from the top of the scrollback, column.",
+      "properties": {
+        "col": {
+          "description": "Column.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "row": {
+          "description": "Row from the top of the scrollback.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["row", "col"],
+      "type": "object"
+    },
+    "TerminalTask": {
+      "description": "The terminal of a `terminal` task.",
+      "properties": {
+        "origin": {
+          "$ref": "#/$defs/TerminalOrigin",
+          "description": "Who opened it."
+        },
+        "shared": {
+          "description": "The user shares it with the model (always true for the model's own terminals).",
+          "type": "boolean"
+        },
+        "terminalId": {
+          "description": "The terminal's handle for the client (`createTerminal`'s id) while it is open.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        }
+      },
+      "required": ["origin", "shared"],
+      "type": "object"
+    },
+    "TerminalTextRange": {
+      "description": "Which text of a terminal to read.",
+      "oneOf": [
+        {
+          "description": "The active area (the bottom rows, where the program writes).",
+          "properties": {
+            "kind": {
+              "const": "screen",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "description": "What the viewport shows (it may be scrolled into the scrollback).",
+          "properties": {
+            "kind": {
+              "const": "viewport",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "description": "The scrollback and the active area.",
+          "properties": {
+            "kind": {
+              "const": "all",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "description": "The last `count` lines, after the blank rows at the bottom.",
+          "properties": {
+            "count": {
+              "description": "How many lines.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "kind": {
+              "const": "lastLines",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "count"],
+          "type": "object"
+        }
+      ]
     },
     "TodoItem": {
       "description": "One task of the list.",

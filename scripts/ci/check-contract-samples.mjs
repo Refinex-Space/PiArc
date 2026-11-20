@@ -3,7 +3,8 @@
 // at least one valid sample in tests/contracts/<name>/ and one counter-example in
 // tests/contracts/<name>/invalid/. Also reports sample files that belong to no contract
 // (for example a misspelled directory). tests/contracts/framing/ holds the frame codec
-// cases and is not a contract.
+// cases and tests/contracts/term-frame/ the terminal frame golden samples; neither is a
+// contract.
 import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { isMain, isRecord, readJsonFile, repoRoot } from '../lib/repo.mjs';
@@ -11,6 +12,7 @@ import { isMain, isRecord, readJsonFile, repoRoot } from '../lib/repo.mjs';
 export const CONTRACTS_FILE = path.join('packages', 'protocol', 'schema', 'contracts.json');
 export const SAMPLES_DIR = path.join('tests', 'contracts');
 const FRAMING_DIR = 'framing';
+const TERM_FRAME_DIR = 'term-frame';
 
 /**
  * Reads the contract names from contracts.json.
@@ -88,7 +90,10 @@ export function findSampleProblems(contracts, samplesRoot) {
   }
   const known = new Set(contracts.flatMap((name) => [name, `${name}/invalid`]));
   for (const dir of sampleDirs(samplesRoot)) {
-    if (!known.has(dir) && dir !== FRAMING_DIR && !dir.startsWith(`${FRAMING_DIR}/`)) {
+    const shared = [FRAMING_DIR, TERM_FRAME_DIR].some(
+      (special) => dir === special || dir.startsWith(`${special}/`),
+    );
+    if (!known.has(dir) && !shared) {
       problems.push(`tests/contracts/${dir}/: samples belong to no contract`);
     }
   }

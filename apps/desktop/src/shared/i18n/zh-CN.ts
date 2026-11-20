@@ -765,6 +765,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'bgTasks.kind.command': '命令',
   'bgTasks.kind.subagent': '子 agent',
   'bgTasks.kind.monitor': 'Monitor',
+  'bgTasks.kind.terminal': '终端',
   'bgTasks.status.running': '运行中',
   'bgTasks.status.completed': '已完成',
   'bgTasks.status.failed': '失败',

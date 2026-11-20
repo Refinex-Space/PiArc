@@ -15,6 +15,11 @@
 //!
 //! A task's output file lives under `<data dir>/sessions/<main session id>/tasks/`; the
 //! session's tools read it without asking.
+//!
+//! Terminals (T33, ADR-0050, capability `terminalTasks`): `exec/run` with `terminal: true` runs
+//! the command in a PiArc terminal as a task of kind `terminal`; a user's terminal of a session
+//! is a task of that kind too, visible to the model only while the user shares it. The output
+//! file of a terminal task is its screen as text, rewritten by Core.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -34,6 +39,32 @@ pub enum TaskKind {
     Subagent,
     /// A `Monitor` command: its new output lines reach the model.
     Monitor,
+    /// A terminal: a shell in a PTY whose screen Core keeps (T33).
+    Terminal,
+}
+
+/// Who opened a terminal task.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum TerminalOrigin {
+    /// The model (`Bash` with `terminal`).
+    Agent,
+    /// The user, in the terminal panel.
+    User,
+}
+
+/// The terminal of a `terminal` task.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminalTask {
+    /// The terminal's handle for the client (`createTerminal`'s id) while it is open.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<u64>")]
+    pub terminal_id: Option<u32>,
+    /// Who opened it.
+    pub origin: TerminalOrigin,
+    /// The user shares it with the model (always true for the model's own terminals).
+    pub shared: bool,
 }
 
 /// Where a task stands. Every status but `running` is final.
@@ -115,6 +146,9 @@ pub struct BackgroundTask {
     /// The last lines of the output (a few, each shortened), newest last.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tail: Vec<String>,
+    /// The terminal (`terminal`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terminal: Option<TerminalTask>,
 }
 
 /// Why a command became a background task.

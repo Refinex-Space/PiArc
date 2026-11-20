@@ -1,7 +1,7 @@
 //! A task's record: the protocol's [`BackgroundTask`] as the database stores it.
 
 use piarc_protocol::exec::CommandOutcome;
-use piarc_protocol::tasks::{BackgroundTask, TaskKind, TaskStatus};
+use piarc_protocol::tasks::{BackgroundTask, TaskKind, TaskStatus, TerminalOrigin, TerminalTask};
 use piarc_store::TaskRow;
 use serde::{Deserialize, Serialize};
 
@@ -25,6 +25,11 @@ struct Metadata {
     meaning: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     timeout_ms: Option<u64>,
+    /// A terminal's origin and sharing (its handle is not kept: it belongs to one run).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    terminal_origin: Option<TerminalOrigin>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    terminal_shared: bool,
 }
 
 /// A new task id: `bg-` and 12 hexadecimal digits.
@@ -53,6 +58,7 @@ pub(super) fn kind_text(kind: TaskKind) -> &'static str {
         TaskKind::Command => "command",
         TaskKind::Subagent => "subagent",
         TaskKind::Monitor => "monitor",
+        TaskKind::Terminal => "terminal",
     }
 }
 
@@ -71,6 +77,7 @@ fn kind_of(text: &str) -> Option<TaskKind> {
         "command" => TaskKind::Command,
         "subagent" => TaskKind::Subagent,
         "monitor" => TaskKind::Monitor,
+        "terminal" => TaskKind::Terminal,
         _ => return None,
     })
 }
@@ -96,6 +103,8 @@ pub(super) fn to_row(task: &BackgroundTask) -> TaskRow {
         outcome: task.outcome,
         meaning: task.meaning.clone(),
         timeout_ms: task.timeout_ms,
+        terminal_origin: task.terminal.as_ref().map(|t| t.origin),
+        terminal_shared: task.terminal.as_ref().is_some_and(|t| t.shared),
     };
     TaskRow {
         id: task.task_id.clone(),
@@ -141,6 +150,11 @@ pub(super) fn from_row(row: TaskRow) -> Option<BackgroundTask> {
         output_path: row.output_path,
         output_bytes: row.output_bytes,
         tail: Vec::new(),
+        terminal: metadata.terminal_origin.map(|origin| TerminalTask {
+            terminal_id: None,
+            origin,
+            shared: metadata.terminal_shared,
+        }),
     })
 }
 
@@ -176,7 +190,18 @@ mod tests {
             output_path: Some("~/x.log".into()),
             output_bytes: 42,
             tail: Vec::new(),
+            terminal: None,
         };
-        assert_eq!(from_row(to_row(&task)), Some(task));
+        assert_eq!(from_row(to_row(&task)), Some(task.clone()));
+        let terminal = BackgroundTask {
+            kind: TaskKind::Terminal,
+            terminal: Some(TerminalTask {
+                terminal_id: None,
+                origin: TerminalOrigin::User,
+                shared: true,
+            }),
+            ..task
+        };
+        assert_eq!(from_row(to_row(&terminal)), Some(terminal));
     }
 }

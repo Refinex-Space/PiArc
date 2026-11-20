@@ -733,11 +733,15 @@ export type OutputStream = 'stdout' | 'stderr';
 /**
  * What a task runs.
  */
-export type TaskKind = 'command' | 'subagent' | 'monitor';
+export type TaskKind = 'command' | 'subagent' | 'monitor' | 'terminal';
 /**
  * Where a task stands. Every status but `running` is final.
  */
 export type TaskStatus = 'running' | 'completed' | 'failed' | 'killed' | 'interrupted';
+/**
+ * Who opened a terminal task.
+ */
+export type TerminalOrigin = 'agent' | 'user';
 /**
  * What kind of failure ended a turn, as the client groups errors (architecture section 8.5).
  */
@@ -3971,6 +3975,11 @@ export interface ExecRunParams {
    */
   shell?: ExecShell | null;
   /**
+   * Runs the command in a PiArc terminal whose screen the model reads (capability
+   * `terminalTasks`, T33, ADR-0050); comes with `background`.
+   */
+  terminal?: boolean;
+  /**
    * How long the command may run, in milliseconds; Core's default when absent. With the
    * capability `backgroundTasks` a command that reaches it keeps running as a background
    * task (T32); without, it is stopped.
@@ -4384,6 +4393,10 @@ export interface BackgroundTask {
    */
   taskId: string;
   /**
+   * The terminal (`terminal`).
+   */
+  terminal?: TerminalTask | null;
+  /**
    * A Monitor's timeout, in milliseconds.
    */
   timeoutMs?: number | null;
@@ -4399,6 +4412,23 @@ export interface BackgroundTask {
    * The workspace of the session.
    */
   workspace: string;
+}
+/**
+ * The terminal of a `terminal` task.
+ */
+export interface TerminalTask {
+  /**
+   * Who opened it.
+   */
+  origin: TerminalOrigin;
+  /**
+   * The user shares it with the model (always true for the model's own terminals).
+   */
+  shared: boolean;
+  /**
+   * The terminal's handle for the client (`createTerminal`'s id) while it is open.
+   */
+  terminalId?: number | null;
 }
 /**
  * Request for `exec/background/read`.

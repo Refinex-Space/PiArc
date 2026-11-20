@@ -12,7 +12,7 @@
 //!
 //! - Deciding whether a command may run (`piarc-policy`).
 //! - Sandbox profile generation (`piarc-sandbox`).
-//! - Interactive terminals and PTYs (`piarc-term`).
+//! - Interactive terminals and PTYs (`piarc-term`); it only ends their process trees.
 //!
 //! # Allowed workspace dependencies
 //!
@@ -41,8 +41,12 @@
 //!   the last lines kept, byte ranges read back as text) and [`OutputCapture::hand_over`]
 //!   (what a foreground command printed before its timeout moved it to the background).
 //!
-//! The Windows `job` module is the crate's only unsafe code: a safe wrapper over the Job
-//! Object calls (coding standards section 2.8).
+//! - T33: [`terminal_tree`] ends what a terminal's shell started (every process attached to
+//!   the PTY on macOS, a Job Object on Windows).
+//!
+//! The Windows `job` module (a safe wrapper over the Job Object calls) and the macOS
+//! `tty_processes` module (one `proc_listpids` call) are the crate's only unsafe code (coding
+//! standards section 2.8).
 
 pub mod capture;
 mod command;
@@ -59,9 +63,16 @@ pub mod semantic;
 pub mod shells;
 mod spawner;
 pub mod task_log;
+pub mod terminal_tree;
 #[cfg(test)]
 mod termination_tests;
 mod tree;
+#[cfg(target_os = "macos")]
+#[allow(
+    unsafe_code,
+    reason = "safe wrapper over one libproc call (coding standards section 2.8)"
+)]
+mod tty_processes;
 
 pub use capture::{CapturedOutput, Handover, OutputCapture, SpillTarget};
 pub use command::{

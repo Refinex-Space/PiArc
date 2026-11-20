@@ -4,6 +4,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { decodeFrame, FRAME_HEADER_BYTES, FrameError, type Rgb } from './decoder.js';
+import goldenInvalid from '../../../../../../tests/contracts/term-frame/invalid.json' with { type: 'json' };
+import golden from '../../../../../../tests/contracts/term-frame/samples.json' with { type: 'json' };
 import samples from './frame-samples.json' with { type: 'json' };
 import { Screen } from './screen.js';
 
@@ -120,5 +122,95 @@ describe('Screen', () => {
     expect([...change.rows].sort()).toEqual([0, 1, 2, 3]);
     expect(change.full).toBe(false);
     expect(screen.plainText()).toBe('two\nthree\nfour\nfive');
+  });
+});
+
+// The L1 golden samples (tests/contracts/term-frame/), shared with the Rust codec: the bytes
+// decode to the frame of the JSON form, and the malformed ones fail for the same reason.
+
+function fromHex(text: string): Uint8Array {
+  const bytes = new Uint8Array(text.length / 2);
+  for (let i = 0; i < bytes.length; i += 1) {
+    bytes[i] = Number.parseInt(text.slice(i * 2, i * 2 + 2), 16);
+  }
+  return bytes;
+}
+
+const hexColor = (c: Rgb) =>
+  `#${[c.r, c.g, c.b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+const WIDE_NAMES = ['narrow', 'wide', 'spacerTail', 'spacerHead'] as const;
+
+/** The JSON form of a decoded frame (`piarc_protocol::term_frame::Frame` with serde). */
+function jsonForm(frame: ReturnType<typeof decodeFrame>): unknown {
+  const optional = <T>(key: string, value: T | null, map: (v: T) => unknown) =>
+    value === null ? {} : { [key]: map(value) };
+  const body = frame.body;
+  return {
+    seq: frame.seq,
+    reset: frame.reset,
+    held: frame.held,
+    dirty: frame.dirty,
+    cols: frame.cols,
+    rows: frame.rows,
+    ...(body === null
+      ? {}
+      : {
+          body: {
+            cursor: body.cursor,
+            ...optional('colors', body.colors, (c) => ({
+              background: hexColor(c.background),
+              foreground: hexColor(c.foreground),
+              ...optional('cursor', c.cursor, hexColor),
+              palette: c.palette.map(hexColor),
+            })),
+            scrollbar: body.scrollbar,
+            styles: body.styles.map((entry) => ({
+              id: entry.id,
+              style: {
+                ...optional('fg', entry.style.fg, hexColor),
+                ...optional('bg', entry.style.bg, hexColor),
+                ...optional('underline', entry.style.underline, hexColor),
+                flags: entry.style.flags,
+              },
+            })),
+            rows: body.rows.map((row) => ({
+              id: row.id,
+              ...optional('selection', row.selection, (s) => s),
+              ...optional('cells', row.cells, (cells) =>
+                cells.map((cell) => ({
+                  wide: WIDE_NAMES[cell.wide],
+                  style: cell.style,
+                  text: cell.text,
+                })),
+              ),
+            })),
+          },
+        }),
+  };
+}
+
+describe('the L1 golden samples', () => {
+  it('decode to their JSON form', () => {
+    expect(golden.version).toBe(2);
+    expect(golden.cases.length).toBeGreaterThanOrEqual(4);
+    for (const sample of golden.cases) {
+      expect(jsonForm(decodeFrame(fromHex(sample.hex))), sample.name).toEqual(sample.frame);
+    }
+  });
+
+  it('build one screen from the first three frames', () => {
+    const screen = new Screen();
+    for (const sample of golden.cases.slice(0, 3)) {
+      screen.apply(decodeFrame(fromHex(sample.hex)));
+    }
+    expect(screen.plainText()).toBe('中👨‍👩‍👧é\n$\nok');
+    expect(screen.selection(1)).toEqual({ start: 0, end: 1 });
+    expect(screen.scrollbar.offset).toBe(1);
+  });
+
+  it('reject the malformed frames for the same reasons', () => {
+    for (const sample of goldenInvalid.cases) {
+      expect(() => decodeFrame(fromHex(sample.hex)), sample.name).toThrow(sample.reason);
+    }
   });
 });

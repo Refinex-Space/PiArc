@@ -793,6 +793,7 @@ export const en = {
   'bgTasks.kind.command': 'Command',
   'bgTasks.kind.subagent': 'Subagent',
   'bgTasks.kind.monitor': 'Monitor',
+  'bgTasks.kind.terminal': 'Terminal',
   'bgTasks.status.running': 'Running',
   'bgTasks.status.completed': 'Completed',
   'bgTasks.status.failed': 'Failed',

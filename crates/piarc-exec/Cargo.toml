@@ -15,8 +15,12 @@ tokio = { workspace = true, features = ["process", "io-util"] }
 tokio-util.workspace = true
 
 [target.'cfg(unix)'.dependencies]
-# killpg for ProcessTreeSpawner, without unsafe code in this crate.
-nix = { workspace = true, features = ["signal"] }
+# killpg for ProcessTreeSpawner and TerminalTree, getpgid for TerminalTree.
+nix = { workspace = true, features = ["signal", "process"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# proc_listpids for the processes of a terminal (the `tty_processes` module).
+libc.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 # Job Objects for ProcessTreeSpawner (the `job` module is this crate's only unsafe code).

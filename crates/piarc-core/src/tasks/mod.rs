@@ -383,6 +383,7 @@ impl TaskManager {
             output_path: Some(reserved.output_path.clone()),
             output_bytes: lock(&log).bytes(),
             tail: Vec::new(),
+            terminal: None,
         };
         let (done, _) = watch::channel(false);
         let feed = (new.kind == TaskKind::Monitor).then(|| MonitorFeed::new(new.title));
@@ -669,6 +670,7 @@ impl TaskManager {
             output_path: None,
             output_bytes: 0,
             tail: Vec::new(),
+            terminal: None,
         };
         let (done, _) = watch::channel(false);
         lock(&self.inner.state)

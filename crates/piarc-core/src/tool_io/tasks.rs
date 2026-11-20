@@ -64,6 +64,7 @@ impl ToolIo {
             shell: Some(ExecShell::Bash),
             timeout_ms: None,
             background: true,
+            terminal: false,
         };
         let spec = self.monitor_spec(&session, &run, &launch).await?;
         let place = self.place(&p.session_id.0, &session);

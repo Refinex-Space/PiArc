@@ -98,6 +98,7 @@ const ROW_HAS_SELECTION: u8 = 1 << 1;
 #[schemars(rename = "TermFrame")]
 pub struct Frame {
     /// Per-viewer frame number, from 1.
+    #[schemars(with = "u64")]
     pub seq: u32,
     /// The viewer drops its rows and styles first.
     pub reset: bool,
@@ -270,6 +271,7 @@ pub struct StyleEntry {
 #[schemars(rename = "TermRow")]
 pub struct Row {
     /// Core's row handle.
+    #[schemars(with = "u64")]
     pub id: u32,
     /// Selected columns of this row, both included.
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -41,6 +41,13 @@ pub fn export_schema() -> Vec<(&'static str, Value)> {
     generator.subschema_for::<crate::checkpoint::ChangesView>();
     generator.subschema_for::<crate::checkpoint::DiscardRequest>();
     generator.subschema_for::<crate::tasks::TasksSnapshot>();
+    generator.subschema_for::<crate::terminal::TerminalEvent>();
+    generator.subschema_for::<crate::terminal::TerminalTextRange>();
+    generator.subschema_for::<crate::terminal::TerminalInfo>();
+    generator.subschema_for::<crate::terminal::TerminalCommand>();
+    generator.subschema_for::<crate::terminal::TerminalMatch>();
+    generator.subschema_for::<crate::terminal::TerminalPasteOutcome>();
+    generator.subschema_for::<crate::term_frame::Frame>();
     let definitions = generator.take_definitions(true);
     let any_message: Vec<Value> = CONTRACTS
         .iter()

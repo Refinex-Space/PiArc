@@ -84,6 +84,10 @@ pub struct ExecRunParams {
     /// `backgroundTasks`, T32).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub background: bool,
+    /// Runs the command in a PiArc terminal whose screen the model reads (capability
+    /// `terminalTasks`, T33, ADR-0050); comes with `background`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub terminal: bool,
 }
 
 /// A shell commands run with.
