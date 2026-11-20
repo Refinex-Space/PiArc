@@ -254,7 +254,10 @@ pub(super) fn powershell_call(rules: &RuleSet, places: &Places, text: &str) -> A
             }
         }
     }
-    let compound = text.contains([';', '|', '&', '\n', '\r', '`', '(', ')', '{', '}', '$', '@']);
+    // Redirections write or read files the rule's command text does not name (R3).
+    let compound = text.contains([
+        ';', '|', '&', '\n', '\r', '`', '(', ')', '{', '}', '$', '@', '>', '<',
+    ]);
     if compound && input.allowed {
         input.allow = rules.exact_allow("PowerShell", text).into_iter().collect();
         input.allowed = !input.allow.is_empty();
@@ -468,5 +471,47 @@ pub(super) fn bash_call(rules: &RuleSet, facts: &BashFacts<'_>, text: &str) -> A
         rules: offered,
         programs,
         targets: facts.targets.take(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use piarc_policy::rules::{Behavior, RuleSet, Source};
+
+    use super::{Places, powershell_call};
+
+    fn places() -> Places {
+        Places {
+            home: "/home/u".into(),
+            home_posix: "/home/u".into(),
+            root_posix: "/home/u/proj".into(),
+            cwd_posix: "/home/u/proj".into(),
+            fold: true,
+        }
+    }
+
+    /// R3 (review P11): a wildcard PowerShell allow rule takes the whole command, so a
+    /// redirection (`>`, `>>`, `<`) must make it need an exact rule, like the other compound
+    /// characters: `Get-Content a > C:\Users\me\x` writes a file.
+    #[test]
+    fn a_wildcard_powershell_allow_does_not_take_a_redirection() {
+        let mut rules = RuleSet::default();
+        rules.add_source(
+            Source {
+                id: "user".into(),
+                anchor: "/home/u".into(),
+            },
+            [(Behavior::Allow, "PowerShell(Get-Content *)")],
+        );
+        let plain = powershell_call(&rules, &places(), "Get-Content notes.txt");
+        assert!(plain.input.allowed, "{:?}", plain.input);
+        for command in [
+            r"Get-Content a > C:\Users\me\x",
+            r"Get-Content a >> C:\Users\me\x",
+            r"Get-Content < C:\secret",
+        ] {
+            let assessed = powershell_call(&rules, &places(), command);
+            assert!(!assessed.input.allowed, "{command}: {:?}", assessed.input);
+        }
     }
 }

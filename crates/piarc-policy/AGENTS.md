@@ -32,7 +32,7 @@ Core 的权限裁决（T20 起，T23 完整版）：Claude Code 格式的规则�
 ## 规则（`rules.rs`、`pattern.rs`、`paths.rs`）
 
 - 求值 deny → ask → allow，来源只决定报告哪个命中（企业 > 会话 > `.piarc/settings.local.json` > `.piarc/settings.json` > `.claude/` 两层 > 用户 PiArc > `~/.claude`，ADR-0005）。会话规则是用户在本会话"本会话允许"的规则。
-- `Bash(…)`、`PowerShell(…)`：`*` 匹配任意文本；末尾 ` *` 且是唯一通配时也匹配裸命令；`:*` 等价。PowerShell 不区分大小写、整条匹配；带 `*` 的 allow 只在命令没有 `; | & ( ) { } $ @` 反引号与换行时生效，deny/ask 也对粗分段（`powershell_segments`）检查，命中段只询问。
+- `Bash(…)`、`PowerShell(…)`：`*` 匹配任意文本；末尾 ` *` 且是唯一通配时也匹配裸命令；`:*` 等价。PowerShell 不区分大小写、整条匹配；带 `*` 的 allow 只在命令没有 `; | & ( ) { } $ @ > <` 反引号与换行时生效，deny/ask 也对粗分段（`powershell_segments`）检查，命中段只询问。
 - 命令中运行期才知道的部分是 `pattern::DYNAMIC`：allow 必须覆盖所有取值（`covers`），deny 可能命中时询问（`may_match`）。
 - `Read(…)` 适用 Read、Glob、Grep；`Edit(…)` 适用 Edit、Write、NotebookEdit；Read 的 deny 也拦写入。`Write(path)`、`Glob(path)`、`Grep(path)` 接受但永不匹配（同 Claude Code）。路径锚点：`//` 根、`~/` 家目录、`/` 规则来源目录（项目与会话为工作区根，用户文件为其所在目录）、其余为会话 cwd；gitignore 语义（无斜杠的名字任意深度、目录命中覆盖其内容、`!` 只对同一来源同一列表的相对规则生效、不能重新包含被排除目录下的文件）；deny/ask 的单段目录模式（`src/**`）在任意深度生效。路径比较用 POSIX 形式（`C:\x` → `/c/x`），卷不区分大小写时折叠大小写。
 - `WebFetch(domain:…)`：主机名不区分大小写、去掉末尾点；`*.x` 匹配任意深度子域不含顶级；其他位置的 `*` 只在一个标签内。`Agent(类型)`、`Skill(名称)` 用通配匹配（参数形式 `Agent(model:opus)` 尚不支持，T31 处理）。
