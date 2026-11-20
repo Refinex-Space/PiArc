@@ -20,10 +20,7 @@ use piarc_host::{CallRecord, HostSupervisor};
 use piarc_protocol::context::SessionGetContextUsage;
 use piarc_protocol::history::{GetEntriesParams, SessionEntries, SessionGetEntries};
 use piarc_protocol::method::RequestMethod;
-use piarc_protocol::models::{self, EffortLevel};
-use piarc_protocol::queue::{
-    QueueDelete, QueueDeleteParams, QueueEdit, QueueEditParams, QueueReorder, QueueReorderParams,
-};
+use piarc_protocol::models::EffortLevel;
 use piarc_protocol::session::{
     ModelRef, SessionAbort, SessionCompact, SessionCompactParams, SessionCreateParams,
     SessionEventNotification, SessionFollowUp, SessionId, SessionInputParams, SessionPrompt,
@@ -42,6 +39,7 @@ use crate::error::{Error, Result};
 use crate::events::Event;
 use crate::route::RouteKey;
 
+mod changes;
 mod rewind;
 
 pub use rewind::CheckpointOp;
@@ -866,75 +864,6 @@ impl Request {
         }
     }
 
-    async fn set_mode(
-        &self,
-        supervisor: &HostSupervisor,
-        mode: piarc_protocol::policy::PermissionMode,
-    ) -> Result<Value> {
-        self.tool_io
-            .check_mode(&self.id.0, mode)
-            .await
-            .map_err(|e| Error::feature(&e))?;
-        supervisor
-            .set_permission_mode(&self.id, mode)
-            .await
-            .map_err(host_error)?;
-        self.tool_io
-            .changed_mode(&self.id.0, mode)
-            .await
-            .map_err(|e| Error::feature(&e))?;
-        Ok(Value::Null)
-    }
-
-    async fn model(&self, supervisor: &HostSupervisor, change: ModelOp) -> Result<Value> {
-        match change {
-            ModelOp::List => {
-                self.call::<models::ModelsList>(
-                    supervisor,
-                    None,
-                    models::ModelsListParams {
-                        session_id: Some(self.id.clone()),
-                    },
-                )
-                .await
-            }
-            ModelOp::Preview(model) => {
-                self.call::<models::SessionPreviewModelSwitch>(
-                    supervisor,
-                    None,
-                    models::ModelSwitchParams {
-                        session_id: self.id.clone(),
-                        model,
-                    },
-                )
-                .await
-            }
-            ModelOp::Set(model, effort) => {
-                self.call::<models::SessionSetModel>(
-                    supervisor,
-                    None,
-                    models::SetModelParams {
-                        session_id: self.id.clone(),
-                        model,
-                        effort,
-                    },
-                )
-                .await
-            }
-            ModelOp::Effort(effort) => {
-                self.call::<models::SessionSetEffort>(
-                    supervisor,
-                    None,
-                    models::SetEffortParams {
-                        session_id: self.id.clone(),
-                        effort,
-                    },
-                )
-                .await
-            }
-        }
-    }
-
     /// Runs `UserPromptSubmit` hooks; a block refuses the input with the hook's reason.
     async fn prompt_hooks(&self, text: &str) -> Result<Option<String>> {
         self.tool_io
@@ -973,34 +902,6 @@ impl Request {
             hook_context,
         };
         self.call::<M>(supervisor, Some(&request_id), params).await
-    }
-
-    async fn queue(&self, supervisor: &HostSupervisor, change: QueueOp) -> Result<Value> {
-        let session_id = self.id.clone();
-        match change {
-            QueueOp::Edit { item_id, text } => {
-                let params = QueueEditParams {
-                    session_id,
-                    item_id,
-                    text,
-                };
-                self.call::<QueueEdit>(supervisor, None, params).await
-            }
-            QueueOp::Delete { item_id } => {
-                let params = QueueDeleteParams {
-                    session_id,
-                    item_id,
-                };
-                self.call::<QueueDelete>(supervisor, None, params).await
-            }
-            QueueOp::Reorder(item_ids) => {
-                let params = QueueReorderParams {
-                    session_id,
-                    item_ids,
-                };
-                self.call::<QueueReorder>(supervisor, None, params).await
-            }
-        }
     }
 
     async fn call<M: RequestMethod>(
