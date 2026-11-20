@@ -62,6 +62,15 @@ impl MockProvider {
     ///
     /// [`Error::Bind`] when the socket cannot be bound.
     pub async fn start_on(library: ScenarioLibrary, port: u16) -> Result<Self> {
+        Self::start_with(library, port, Mode::Strict).await
+    }
+
+    /// Starts a provider on `port` (0 picks a free port) in `mode`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Bind`] when the socket cannot be bound.
+    pub async fn start_with(library: ScenarioLibrary, port: u16, mode: Mode) -> Result<Self> {
         let bind_error = |source| Error::Bind { port, source };
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, port))
             .await
@@ -70,6 +79,7 @@ impl MockProvider {
         let log = RequestLog::default();
         let state = Arc::new(State {
             library,
+            mode,
             log: log.clone(),
             next_seq: AtomicUsize::new(0),
             steps_served: Mutex::new(HashMap::new()),
@@ -145,8 +155,21 @@ impl Drop for MockProvider {
     }
 }
 
+/// How the provider validates and records requests.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Mode {
+    /// L0–L2: every rule the script enables, raw bodies in the log.
+    #[default]
+    Strict,
+    /// L3 (T30): the protocol rules only ([`crate::l3::validation`]), auxiliary requests
+    /// answered without consuming a step, and the log keeps [`crate::l3::structure`]
+    /// instead of the raw body.
+    L3,
+}
+
 struct State {
     library: ScenarioLibrary,
+    mode: Mode,
     log: RequestLog,
     next_seq: AtomicUsize,
     steps_served: Mutex<HashMap<String, usize>>,
@@ -233,6 +256,7 @@ async fn handle(
         step_index: None,
         headers: record_headers(&parts.headers),
         body,
+        structure: None,
         violations: Vec::new(),
         outcome: Outcome::Rejected,
     };
@@ -253,6 +277,11 @@ async fn handle(
             )
         }
     };
+    if state.mode == Mode::L3 {
+        // The raw body never reaches the log in L3 mode (ADR-0006).
+        record.structure = Some(crate::l3::structure(&record.path, &record.body));
+        record.body = String::new();
+    }
     state.log.push(record);
     Ok(reply)
 }
@@ -294,12 +323,19 @@ fn serve(
         );
         return fail(record, vec![violation]);
     }
+    if state.mode == Mode::L3 && is_auxiliary(format, &record.path, &record.body) {
+        return auxiliary_reply(format, &parsed, record);
+    }
     let (selector, script) = match select_scenario(&state.library, headers, &parsed) {
         Ok(found) => found,
         Err(violation) => return fail(record, vec![violation]),
     };
     record.scenario = Some(selector.clone());
-    let violations = validate(&parsed, &script.validation);
+    let validation = match state.mode {
+        Mode::Strict => script.validation.clone(),
+        Mode::L3 => crate::l3::validation(&script.validation),
+    };
+    let violations = validate(&parsed, &validation);
     if !violations.is_empty() {
         return fail(record, violations);
     }
@@ -322,6 +358,23 @@ fn serve(
         response_number: seq,
     };
     respond(format, step, &context, parsed.include_usage, record)
+}
+
+fn is_auxiliary(format: WireFormat, path: &str, body: &str) -> bool {
+    format == WireFormat::AnthropicMessages
+        && serde_json::from_str::<Value>(body)
+            .is_ok_and(|json| crate::l3::classify(path, &json) == crate::l3::Kind::Auxiliary)
+}
+
+/// Streams [`crate::l3::AUXILIARY_REPLY`] without selecting a scenario or taking a step.
+fn auxiliary_reply(format: WireFormat, parsed: &Request, record: &mut RequestRecord) -> Response {
+    let step = Step::text_only(crate::l3::AUXILIARY_REPLY);
+    let context = StreamContext {
+        model: parsed.model.clone(),
+        step_index: 0,
+        response_number: record.seq,
+    };
+    respond(format, &step, &context, parsed.include_usage, record)
 }
 
 fn parse(format: WireFormat, body: &str) -> std::result::Result<Request, Violation> {

@@ -102,6 +102,7 @@ mod body;
 mod error;
 mod fragment;
 pub mod l2;
+pub mod l3;
 mod openai;
 pub mod plaintext;
 mod record;
@@ -124,5 +125,5 @@ pub use scenario::{
     ValidationConfig, is_valid_scenario_id,
 };
 pub use server::{
-    MockProvider, REQUESTS_PATH, SCENARIO_HEADER, SCENARIO_MARKER_CLOSE, SCENARIO_MARKER_OPEN,
+    MockProvider, Mode, REQUESTS_PATH, SCENARIO_HEADER, SCENARIO_MARKER_CLOSE, SCENARIO_MARKER_OPEN,
 };

@@ -54,8 +54,11 @@ pub struct RequestRecord {
     pub step_index: Option<usize>,
     /// Request headers with lowercase names; credential values are [`REDACTED`].
     pub headers: BTreeMap<String, String>,
-    /// The raw request body.
+    /// The raw request body; empty in L3 mode, which keeps [`Self::structure`] instead.
     pub body: String,
+    /// L3 mode only: the whitelisted structure of the body ([`crate::l3::structure`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub structure: Option<Value>,
     /// Validation result: empty when the request passed every rule.
     pub violations: Vec<Violation>,
     /// What the mock answered.

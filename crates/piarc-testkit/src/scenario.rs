@@ -290,6 +290,23 @@ fn one() -> usize {
 }
 
 impl Step {
+    /// A step that only streams `text`.
+    #[must_use]
+    pub fn text_only(text: &str) -> Self {
+        Self {
+            thinking: None,
+            text: Some(text.to_owned()),
+            chunk_chars: None,
+            chunk_delay_ms: None,
+            tool_calls: Vec::new(),
+            usage: Usage::default(),
+            stop_reason: None,
+            disconnect_after_events: None,
+            stall_after_events: None,
+            error: None,
+        }
+    }
+
     /// The effective stop reason.
     #[must_use]
     pub fn effective_stop_reason(&self) -> StopReason {

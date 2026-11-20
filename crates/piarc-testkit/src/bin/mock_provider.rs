@@ -1,27 +1,31 @@
 //! `piarc-mock-provider`: the strict mock provider as a standalone process.
 //!
 //! ```text
-//! piarc-mock-provider [--port <port>] --scenarios <file-or-dir> [--scenarios ...]
+//! piarc-mock-provider [--port <port>] [--l3] --scenarios <file-or-dir> [--scenarios ...]
 //! ```
 //!
 //! Binds `127.0.0.1:<port>` (default 0, a free port), prints the bound port as the first
 //! line of stdout, and serves until stdin reaches end of file. A termination signal
 //! (SIGTERM, SIGINT, Ctrl+C) ends the process through the default signal disposition.
+//! `--l3` serves in L3 mode (`piarc_testkit::Mode::L3`): protocol rules only, auxiliary
+//! requests answered without a step, and the request log holds structures, never bodies.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use piarc_testkit::{MockProvider, ScenarioLibrary};
+use piarc_testkit::{MockProvider, Mode, ScenarioLibrary};
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
 struct Options {
     port: u16,
+    mode: Mode,
     scenarios: Vec<PathBuf>,
 }
 
 fn parse_args(mut args: impl Iterator<Item = String>) -> Result<Options, String> {
     let mut options = Options {
         port: 0,
+        mode: Mode::Strict,
         scenarios: Vec::new(),
     };
     while let Some(arg) = args.next() {
@@ -34,6 +38,7 @@ fn parse_args(mut args: impl Iterator<Item = String>) -> Result<Options, String>
                     .map_err(|_| format!("--port: {port:?} is not a port number"))?;
             }
             "--scenarios" => options.scenarios.push(PathBuf::from(value()?)),
+            "--l3" => options.mode = Mode::L3,
             other => return Err(format!("unknown argument {other:?}")),
         }
     }
@@ -46,7 +51,7 @@ fn parse_args(mut args: impl Iterator<Item = String>) -> Result<Options, String>
 async fn run(options: Options) -> Result<(), String> {
     let library =
         ScenarioLibrary::load_paths(&options.scenarios).map_err(|error| error.to_string())?;
-    let provider = MockProvider::start_on(library, options.port)
+    let provider = MockProvider::start_with(library, options.port, options.mode)
         .await
         .map_err(|error| error.to_string())?;
     let mut stdout = tokio::io::stdout();

@@ -488,6 +488,7 @@ mod tests {
         key: &str,
     ) -> Vec<String> {
         let record = |body: &str| RequestRecord {
+            structure: None,
             seq: 0,
             method: "POST".into(),
             path: "/model".into(),
