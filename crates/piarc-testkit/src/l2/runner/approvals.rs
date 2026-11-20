@@ -67,12 +67,6 @@ impl Driver<'_> {
             }
             return Err(format!("unexpected approval for {}", card.tool));
         };
-        if self.mode == Mode::Strict && expected.call.is_some() && expected.call != pending {
-            return Err(format!(
-                "approval expected for call {:?}, got {pending:?}",
-                expected.call
-            ));
-        }
         if self.mode == Mode::L3 {
             // L3 answers in order whatever the card is; the comparison reports the asks.
             self.asks.push(json!({
@@ -87,29 +81,8 @@ impl Driver<'_> {
                 expected.tool, card.tool
             ));
         }
-        if self.mode == Mode::Strict
-            && let Some(origin) = &expected.subagent
-        {
-            let found = card.subagent.as_ref();
-            let matches = found.is_some_and(|o| {
-                o.agent_type == origin.kind
-                    && origin
-                        .description
-                        .as_ref()
-                        .is_none_or(|d| o.description.as_ref() == Some(d))
-            });
-            if !matches {
-                return Err(format!(
-                    "approval expected from the {} subagent, got {found:?}",
-                    origin.kind
-                ));
-            }
-        }
-        if self.mode == Mode::Strict && expected.kind.is_some_and(|kind| kind != card.kind) {
-            return Err(format!(
-                "approval expected {:?}, got {:?}",
-                expected.kind, card.kind
-            ));
+        if self.mode == Mode::Strict {
+            check_card(expected, &card, pending.as_ref())?;
         }
         if expected.decision == Choice::Wait {
             // The form's timeout answers it; the result reaches the model as a tool result.
@@ -145,5 +118,45 @@ impl Driver<'_> {
         }
         self.answered.insert(card.request_id);
         Ok(())
+    }
+}
+
+/// What a strict run checks of a card: the call, the kind and the subagent (T31) the answer
+/// names, when it names them.
+fn check_card(
+    expected: &crate::l2::format::Approval,
+    card: &piarc_protocol::policy::ApprovalRequest,
+    pending: Option<&String>,
+) -> Result<(), String> {
+    if expected.call.is_some() && expected.call.as_ref() != pending {
+        return Err(format!(
+            "approval expected for call {:?}, got {pending:?}",
+            expected.call
+        ));
+    }
+    if expected.kind.is_some_and(|kind| kind != card.kind) {
+        return Err(format!(
+            "approval expected {:?}, got {:?}",
+            expected.kind, card.kind
+        ));
+    }
+    let Some(origin) = &expected.subagent else {
+        return Ok(());
+    };
+    let found = card.subagent.as_ref();
+    let matches = found.is_some_and(|o| {
+        o.agent_type == origin.kind
+            && origin
+                .description
+                .as_ref()
+                .is_none_or(|d| o.description.as_ref() == Some(d))
+    });
+    if matches {
+        Ok(())
+    } else {
+        Err(format!(
+            "approval expected from the {} subagent, got {found:?}",
+            origin.kind
+        ))
     }
 }
