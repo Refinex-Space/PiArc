@@ -20,7 +20,8 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `npm ci --ignore-scripts` | 按 lockfile 安装 npm 依赖（CI 同款） |
 | `node scripts/dev/install-tools.mjs` | 把锁定版本的 cargo-deny、ripgrep、fd、bindgen-cli 装进 `.tools/`（不做全局安装）；verify 第 11 步需要 cargo-deny，Agent Host 行为对照测试（Pi 原生 grep/find）需要 ripgrep 与 fd，重新生成 libghostty-vt 绑定需要 bindgen |
 | `node scripts/dev/gen-ghostty-bindings.mjs [--check]` | 重新生成（或比对）`crates/piarc-ghostty-sys/src/bindings.rs`；只在升级 libghostty-vt 时需要 |
-| `npm run verify` | 全部 15 项检查，结束时打印汇总表；开工与收尾各跑一次 |
+| `npm run verify` | 全部 15 项检查，结束时打印汇总表；收尾跑一次（先提交代码），全部通过且工作区干净时记下提交 |
+| `npm run verify -- --baseline` | 开工基线：上次全量通过之后只改了 `docs/` 时只查改动文件与验收清单，否则跑全量（`docs/plan/protocol.md`） |
 | `npm run gen:tokens` | 由 `design/tokens/` 生成渲染进程的 CSS 自定义属性与共享的 TS 常量；改令牌后运行并提交（verify 第 15 步检查漂移、对比度与品牌，ADR-0029） |
 | `node scripts/dev/check-prompt-originality.mjs` | 修改 Harness 英文提示词或工具指引后，在含本地参考副本的机器上做连续 10 词比对，更新 `docs/engineering/prompt-originality.md` |
 | `npm run gen:protocol` | 由 `piarc-protocol` 重新生成 `packages/protocol/schema/` 与 `src/generated/`；改了协议类型后运行并提交 |

@@ -1,10 +1,25 @@
 // Single entry point for every repository check (`npm run verify`).
 // Runs all steps in order even after a failure, so one run shows every
 // problem, then prints a summary table. Exit code 1 if any step failed.
+//
+// A run where every step passed on a clean tree records its commit in
+// target/verify/last-pass.json. `npm run verify -- --baseline` (a task's start check) reuses
+// that result when everything committed since touches only docs/: it then runs only the
+// steps those files can affect (Prettier on them, the acceptance list). Any other change, a
+// dirty tree or a missing record runs every step.
 import { existsSync } from 'node:fs';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { isMain, repoRoot, resolveBin, run } from '../lib/repo.mjs';
+import {
+  capture,
+  isMain,
+  isRecord,
+  readJsonFile,
+  repoRoot,
+  resolveBin,
+  run,
+} from '../lib/repo.mjs';
 import { localToolPath } from './install-tools.mjs';
 
 /**
@@ -98,11 +113,70 @@ function printSummary(results) {
   console.log(line);
 }
 
+const LAST_PASS = path.join(repoRoot, 'target', 'verify', 'last-pass.json');
+
+/**
+ * Whether the files changed since the last fully passing run allow reusing it: all under
+ * `docs/` (plans, ADRs, architecture, acceptance list), none elsewhere.
+ * @param {string[]} changed repository-relative paths with `/`
+ */
+export function canReuse(changed) {
+  return changed.every((file) => file.startsWith('docs/'));
+}
+
+/** @returns {Promise<string>} */
+async function head() {
+  return (await capture('git', ['rev-parse', 'HEAD'])).trim();
+}
+
+/** @returns {Promise<boolean>} */
+async function clean() {
+  return (await capture('git', ['status', '--porcelain'])).trim() === '';
+}
+
+/**
+ * The steps for `--baseline`: undefined runs all of them.
+ * @returns {Promise<Step[] | undefined>}
+ */
+async function baselineSteps() {
+  if (!existsSync(LAST_PASS) || !(await clean())) return undefined;
+  const record = await readJsonFile(LAST_PASS);
+  if (!isRecord(record) || typeof record.head !== 'string') return undefined;
+  const passed = record.head;
+  let changed;
+  try {
+    await capture('git', ['merge-base', '--is-ancestor', passed, 'HEAD']);
+    changed = (await capture('git', ['diff', '--name-only', passed, 'HEAD']))
+      .split('\n')
+      .filter((line) => line !== '');
+  } catch {
+    return undefined;
+  }
+  if (!canReuse(changed)) return undefined;
+  console.log(
+    `verify passed in full at ${passed.slice(0, 7)}; since then only docs/ changed (${String(changed.length)} files): reusing it`,
+  );
+  const formatted = changed.filter((file) => !file.endsWith('.md') && existsSync(file));
+  /** @type {Step[]} */
+  const steps = [];
+  if (formatted.length > 0) {
+    steps.push({
+      name: 'Prettier --check (changed)',
+      command: nodeBin('prettier', ['--check', ...formatted]),
+    });
+  }
+  const acceptance = STEPS.find((step) => step.name === 'acceptance list');
+  if (acceptance !== undefined) steps.push(acceptance);
+  return steps;
+}
+
 async function main() {
+  const steps = (process.argv.includes('--baseline') ? await baselineSteps() : undefined) ?? STEPS;
+  const full = steps === STEPS;
   /** @type {{ name: string, ok: boolean, ms: number }[]} */
   const results = [];
-  for (const [index, step] of STEPS.entries()) {
-    const label = `[${String(index + 1)}/${String(STEPS.length)}] ${step.name}`;
+  for (const [index, step] of steps.entries()) {
+    const label = `[${String(index + 1)}/${String(steps.length)}] ${step.name}`;
     console.log(`\n▶ ${label}`);
     const started = performance.now();
     let code;
@@ -130,6 +204,10 @@ async function main() {
     process.exitCode = 1;
   } else {
     console.log(`\nAll ${String(results.length)} steps passed.`);
+    if (full && (await clean())) {
+      await mkdir(path.dirname(LAST_PASS), { recursive: true });
+      await writeFile(LAST_PASS, JSON.stringify({ head: await head() }) + '\n');
+    }
   }
 }
 

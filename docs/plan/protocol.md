@@ -27,7 +27,7 @@
    - `PLAN.md` 看板中，本任务的依赖都是"已完成"；"部分完成"的依赖只有在遗留项不影响本任务时才算满足，并在报告中说明。
    - 任务头部"需要的用户决定"已经落实（见 `docs/product/REQUIREMENTS.md` 第 7 节）；没有落实时，先做不依赖它的部分，依赖它的部分按阻塞处理。
    - `git status` 干净。有未提交的改动且不属于本任务时，停止并报告，不要覆盖或丢弃。
-   - 运行基线检查（T01 之后为 `npm run verify`），确认当前主线是绿的。红的就停止并报告，不在坏的基线上开工。
+   - 运行基线检查 `npm run verify -- --baseline`，确认当前主线是绿的。上一次全量通过（工作区干净时记录在 `target/verify/last-pass.json`）之后只改了 `docs/` 时，它只检查改动的文件与验收清单并复用那次结果；否则跑全量。红的就停止并报告，不在坏的基线上开工。
    - 检查之前任务中"等待 Windows CI"而标为 `blocked` 的验收项：用户推送后，用 `gh run list` / `gh run view` 查看对应提交的 Windows job。通过的就把这些项改为 `passing`（`evidence` 写 run 链接），所属任务从"部分完成"改为"已完成"；失败的停止并报告。本机没有 `gh` 或未登录时跳过这一步，并在报告中提醒用户。
    - 在 `PLAN.md` 看板中把本任务标为"进行中"，在"当前任务检查点"中写下检查清单（来自任务提示词的交付物与验收项）。
 5. 用 TodoWrite 建立同样的检查清单（续做时只列未完成的项），开始工作。
@@ -104,7 +104,13 @@
 
 - 每完成一个检查项，就更新 `PLAN.md` 的"当前任务检查点"并提交一次。这样即使上下文被压缩，进度也在仓库里。不要留下大量未提交的工作。
 - 检查点提交只要求受影响的包或 crate 能编译、其单元测试通过。例如 `cargo test -p <crate>`、`npm test -w <workspace>`。
-- 全量检查 `npm run verify` 只在开工基线检查与收尾时各跑一次。
+- 开发过程中只做局部验证，按改动范围选：
+  - Rust：`cargo test -p <crate>`（可加测试名过滤）、`cargo clippy -p <crate> --all-targets -- -D warnings`；
+  - TS：`npx vitest run <路径>`、`npx eslint <路径>`、`npx tsc --build`；
+  - L2：只跑新增或受影响的场景（`cargo test -p piarc-testkit --test scenarios -- <id> --exact`，或按前缀过滤）；
+  - 协议：改了类型才跑 `npm run gen:protocol` 与两侧契约测试；
+  - Windows 交叉 Clippy：只在改了 `cfg(windows)` 代码、平台相关模块或新增带 C 代码的依赖时跑。
+- 全量检查 `npm run verify` 在收尾时跑一次（开工用上面的 `--baseline`）。收尾前先提交代码，再跑全量；之后只改 `docs/` 的提交（验收记录、`PLAN.md`）不需要重跑，下一个任务的基线可以复用这次结果。全量失败时只修失败的部分，修完重跑失败的步骤对应的局部命令，最后再跑一次全量。
 
 ### 回合的结束方式
 
@@ -177,6 +183,7 @@
 2. 本任务新增或修改的代码符合 `docs/engineering/coding-standards.md`。
 3. 用户可见的界面改动：
    - 用 Playwright 驱动 Electron 应用实际操作并截图，证据放在 `tmp/evidence/<任务编号>/`；
+   - L4 只跑本任务的用例和改动波及的用例（例如改了 IPC 跑 `preload.e2e.ts`，改了 transcript 跑 `transcript-*.e2e.ts`），默认只跑 `dev` 形态；只改渲染进程时用 `npx vite build -c apps/desktop/vite.renderer.config.ts` 代替重新打包。全量 L4 与 `packaged` 形态只在评审任务（R 系列）、打包或启动相关任务、改动主进程安全基线时跑；
    - 需要核对单个界面时，可以在 ego-browser 中打开渲染进程的开发页面（假 Core 数据）实际操作；
    - 只用测试数据与测试账号，不登录用户的个人账号。
 4. 本任务自己编号的 `TODO(Txx)` 已清零。
