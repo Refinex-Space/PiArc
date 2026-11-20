@@ -10,6 +10,7 @@
 | `cargo run -q -p piarc-devcli -- run tests/scenarios --json target/l2/devcli.json` | 运行目录下全部场景并写 JSON 报告（与 `scenarios` 测试的 `--results` 同一格式，可交给 `scripts/plan/check-capabilities.mjs --results`） |
 | `cargo run -q -p piarc-devcli -- run tests/scenarios --filter turn- --threads 1` | 按 id 子串筛选（`--exact` 整串匹配）、串行运行便于看日志 |
 | `cargo run -q -p piarc-devcli -- list tests/scenarios` | 只列出场景 |
+| `cargo run -q -p piarc-devcli -- l3 <场景文件或目录> --out <目录>` | L3 的 PiArc 侧（T30）：逐个以 mock 的 L3 模式运行，写 `<目录>/<id>.json`（`failures`、`capture`）；由 `scripts/l3/run.mjs` 调用，场景是它从 `tests/l3/scenarios/` 生成的 L2 文件 |
 
 每次运行先执行 `scripts/dev/build-agent-host.mjs`（需要 PATH 上的 node 或 `PIARC_TEST_NODE`）；`--repo <dir>` 指定仓库根，默认是编译它的那份检出。退出码：0 全部通过，1 有场景失败，2 用法或加载错误。
 

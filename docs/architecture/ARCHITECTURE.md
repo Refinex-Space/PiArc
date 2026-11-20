@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.36（2026-11-19） |
+| 版本 | 2.37（2026-11-20） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -259,6 +259,7 @@ PiArc/
 | [0043](../adr/0043-reminders-compaction-usage.md) | 运行时提示统一走 system reminder 通道；压缩用 PiArc 自写的分节摘要、按阈值公式配置 Pi 触发、连续 3 次失败或无效即熔断、压缩后按上限重注入；上下文用量按类别估算并以服务商报告为准 | 动态信息不改写 system prompt，长会话压缩及时且不丢关键状态，用户看得到上下文被什么占用 |
 | [0044](../adr/0044-checkpoints-rewind-changes.md) | 检查点按会话加回合 id 建索引，写前快照存内容寻址对象库；代码恢复按时间计算、冲突逐个选择、逐文件结果可撤销；对话回退在 Agent Host 移动 leaf 并以追加条目持久化，分支变化后同一 id 重建会话；Changes 面板基于最早快照并在路径锁内核对版本后丢弃 | 回退结果与对话分支经过的路径无关；回退位置跨重启保留；不在过期的 diff 上改文件 |
 | [0045](../adr/0045-webfetch-sign-in-model-settings.md) | WebFetch 由 Core 抓取（`piarc-web`：rustls + 系统信任库、SSRF 纯函数、连接钉住已检查的地址、同站重定向）并绑定已获准的调用；辅助模型通道在 Agent Host；登录在设置 Host 上运行、交互经 `core/login`；每模型设置与辅助模型存用户级设置并随握手下发；本地端点的模型为低可靠性、用保守 Tool Profile | 网络访问与文件、命令一样由 Core 授权审计；规则主机与连接主机不会不一致；凭据只在保险箱 |
+| [0046](../adr/0046-l3-behavior-alignment.md) | L3 用临时配置目录与假 key 隔离运行 `claude -p`，审批经 `--permission-prompt-tool` 夹具按工具调用 id 作答；mock 的 L3 模式只记白名单结构；只比主循环请求；allowlist 按 Claude Code 版本范围生效、失效即失败；会话的 SessionStart hooks 先于其提示的 UserPromptSubmit hooks | 与 Claude Code 黑盒比对而不让提示词落盘；L3 首批比对发现的 hooks 顺序偏差按 Claude Code 修正 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -584,6 +585,7 @@ T25 落地（ADR-0039）：
 | 配置 | `piarc_hooks::HookConfig` 读各设置层的 `hooks`（高到低，与权限裁决同一次加载，所以未信任项目的两类项目文件不生效），同一 handler 跨文件只运行一次，`disableAllHooks` 全部关闭；matcher 按 Claude Code 规则，正则用 `regex` crate，环视、反向引用报出原因；后续里程碑的事件与 handler 类型、`async`/`asyncRewake`、非工具事件上的 `if` 不运行并列入配置诊断 |
 | 执行 | `piarc_hooks::Runner` 经注入的 `ProcessSpawner`（`ProcessTreeSpawner`）并行运行；shell 形式 macOS 为 `/bin/sh -c`，Windows 为 Git Bash（没有时 PowerShell），`shell: "powershell"` 用 PowerShell，`args` 为 exec 形式；环境为工具命令的环境（ADR-0035）加 `CLAUDE_PROJECT_DIR`；超时默认 600 s、UserPromptSubmit 30 s、SessionEnd 1.5 s（自定上限 60 s），超时或回合中断时 terminate、2 s 后 kill，进程退出后结束整棵进程树 |
 | 挂载 | Core：UserPromptSubmit（输入发给 Agent Host 之前，阻断时请求以 `permissionDenied` 失败，上下文随 `hookContext` 送达）、PreToolUse 与 PermissionRequest（第 6.2.3 节第 2、8 步）、Notification（审批卡 `permission_prompt`、回合结束 `idle_prompt`）。Agent Host 经 AHP `hooks/run`：SessionStart（会话打开与压缩后）、SessionEnd、PostToolUse、PostToolUseFailure、Stop、PreCompact、PostCompact |
+| 顺序（T30，ADR-0046） | 会话的 SessionStart hooks（startup、resume、fork）结束后才运行其提示的 UserPromptSubmit hooks：Agent Host 打开会话时先写出 `hooks/run` 再应答，Core 收到时登记、UserPromptSubmit 等登记清零；SessionStart 仍不阻塞会话打开 |
 | 决策 | `piarc_hooks::Decision` 按事件合并：PreToolUse deny > ask > allow（`defer` 按 ask），`updatedInput` 在规则之前替换参数；PermissionRequest deny 优先，allow 的 `updatedInput` 重新经过裁决，`updatedPermissions` 支持 `addRules`（会话与 `.piarc/` 文件）和 `setMode`（会话）；PostToolUse 可替换输出并追加上下文与反馈，PostToolUseFailure 只追加；PreCompact 的纯文本 stdout 作为摘要指令 |
 | 呈现与审计 | 每个 handler 一行 `audit_events`（`kind: "hook"`）；`systemMessage`、`stopReason` 与错误经 `core/notices`（`type: "hook"`）显示在客户端的提示行；超过 10,000 字符的上下文写入会话临时目录 `hooks/`，只送 2,000 字符预览与路径 |
 
@@ -1441,6 +1443,8 @@ T20 起，项目层的 `acceptEdits` 和 `additionalDirectories` 也纳入信任
 - 把两边的请求与事件归一化（去掉 id、时间戳、路径）后做结构化 diff。每个差异要么修正，要么在 `tests/l3-allowlist.yaml` 中写明"有意偏离"的理由。
 - 只比对结构，不复制 Claude Code 的提示词原文（ADR-0006）。
 
+实现（T30，ADR-0046）：`npm run l3`（`scripts/l3/run.mjs`）一条命令完成前提检查、两侧运行、剥离检查、归一化、比对与报告（`tmp/l3/`，不入库）。场景在 `tests/l3/scenarios/`（格式 `tests/l3/schema.json`），用 Claude Code 的工具参数名书写，PiArc 侧转换成 L2 场景经 `piarc-devcli l3` 运行，mock 处于 L3 模式（只保留协议规则、只记白名单结构、辅助请求不消耗步数）。Claude Code 侧在临时根中运行：`CLAUDE_CONFIG_DIR`、`HOME`、假 `ANTHROPIC_API_KEY`、指向 mock 的 `ANTHROPIC_BASE_URL`、关闭非必要流量，审批经 `--permission-prompt-tool` 的夹具 MCP server 按工具调用 id 作答，运行前后比较本机 `~/.claude`。比对请求结构（工具集与参数风格、请求键、system 段、消息块序列）与行为轨迹（工具调用状态、询问、hooks 的顺序、输入字段与决定、最终状态、文件），差异按字段路径列出。`tests/l3-allowlist.yaml` 的条目按 Claude Code 版本范围生效，缺理由或不再匹配即失败，并列出 `-p` 无法复现而排除的 L2 场景。首批覆盖权限（T23）与 hooks（T25），Nightly 工作流 `.github/workflows/l3-nightly.yml` 安装锁定版本的 Claude Code、每侧运行两次并上传报告。细节见 `docs/engineering/testing.md` 第 14 节。
+
 ### 12.6 测试纪律
 
 - 禁止"找不到 fixture 就直接 return"式的静默通过：要么 skip 并说明原因，要么失败。
@@ -1636,6 +1640,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.37 | 2026-11-20 | T30（ADR-0046）补充第 4 章 ADR-0046、6.3.1 节 SessionStart 与 UserPromptSubmit hooks 的顺序（L3 发现的偏差）、12.5 节 L3 的落地（隔离运行、审批夹具、结构化录制与剥离检查、比对内容、allowlist、Nightly）；基线决策未变 |
 | 2.36 | 2026-11-19 | T29（ADR-0045）补充第 4 章 ADR-0045、5.4 节登录的落地、6.1.4 节 WebFetch 的落地、6.2.2 节 `WebFetch(domain:…)` 的主机解析、6.13 节每模型设置、辅助模型通道与保守 Tool Profile、6.14 节 `model`、`effortLevel` 改随 T31（I113）、7.1 节 `piarc-web`、7.4 节 `webFetch` 与 `login` 能力的方法与成员、8.2 节三档视图与设置页、10.1 节提示注入对策；基线决策未变 |
 | 2.35 | 2026-11-19 | T28（ADR-0044）补充第 4 章 ADR-0044、6.9 节检查点、代码与对话回退、分支与"从这里分支"的落地、6.14 节生效键（加入 `fileCheckpointingEnabled`，并补上 T27 已生效的 `autoCompactEnabled`、`autoCompactWindow`）、7.4 节 `checkpoints` 能力的方法与成员、7.6 节检查点导出、7.7 节 Changes 面板的 diff 与降级（词级 diff 与 UTF-16 偏移仍未实现）、8.2 节回退对话框、Changes 面板、改动卡片与分支切换、9.2 节 schema v5 的三张表、9.3 节快照的清理时机；基线决策未变 |
 | 2.34 | 2026-11-19 | T27（ADR-0043）补充第 4 章 ADR-0043、6.6.3 节统一提醒通道与外部修改检测、6.6.4 节压缩的触发、摘要、收尾、上限与熔断、6.6.5 节用量的口径、6.15 节三行的实现位置（数值未调整）、7.4 节 `context` 能力的方法与成员、8.2 节用量环与上下文卡片 |

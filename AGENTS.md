@@ -58,6 +58,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `cargo run -q -p piarc-testkit --bin piarc-mock-provider -- --port 0 --scenarios <文件或目录>` | 启动严格 mock provider 独立进程：stdout 第一行是端口，stdin 关闭后退出（`testing.md` 第 10 节） |
 | `cargo run -q -p piarc-testkit --bin piarc-mock-auth -- --port 0` | 启动 mock OAuth 授权服务器（授权码与设备码）：stdout 第一行是端口，stdin 每行 `approve`/`deny`/`expire` 改决定，关闭后退出 |
 | `cargo test -p piarc-testkit --test sessions login` | 服务商登录端到端（T29）：授权码、设备码、拒绝、过期、取消、手工粘贴代码，保险箱与无明文扫描 |
+| `npm run l3` | L3（T30）：同一个严格 mock 服务 PiArc 与真实的 `claude -p`，比对请求结构与行为轨迹，报告在 `tmp/l3/`；`-- --repeat 2` 检查同侧可重复，`-- --filter <id>` 只跑部分场景。需要 PATH 上有 `claude`（Nightly 锁定的版本见 `.github/workflows/l3-nightly.yml`，全局安装先征得同意），不访问真实服务商（`testing.md` 第 14 节） |
 | `node scripts/ci/run-l2.mjs` | verify 第 14 步：构建 Agent Host bundle → 全部 L2 场景（报告写到 `target/l2/results.json`）→ 能力覆盖与 `docs/product/capabilities.md` 漂移检查 |
 | `cargo test -p piarc-testkit --test scenarios -- <id> --exact` | 只跑一个 L2 场景（`tests/scenarios/<id>.yaml`）；不加筛选跑全部，`-- --results <文件>` 写报告 |
 | `cargo run -q -p piarc-devcli -- run tests/scenarios [--json <文件>]` | 不经 UI 运行一个场景文件或整个目录，输出 JSON 报告 |
@@ -74,6 +75,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - `apps/desktop/`：Electron 应用（主进程、preload、渲染进程，安全基线与 L4 见其 `AGENTS.md`）；`agent-host/`：Agent Host；`packages/protocol/`：由 `piarc-protocol` 生成的 TS 类型；`packages/testkit/`：仅测试，用 pi-ai 驱动 mock provider。四者是 npm workspaces。
 - `crates/`：Rust workspace，22 个 crate，职责见各 crate 的 `src/lib.rs` 顶部文档与架构第 7.1 节。
 - `tests/scenarios/`：L2 场景（`schema.json` 是格式）；`tests/capabilities.yaml`：M1–M5 能力清单，生成 `docs/product/capabilities.md`（`testing.md` 第 12、13 节）。
+- `tests/l3/scenarios/`：L3 场景（`tests/l3/schema.json`），`tests/l3-allowlist.yaml` 是有意偏离与排除清单；脚本在 `scripts/l3/`（`testing.md` 第 14 节）。
 - `tests/contracts/`：L1 契约样本（`<契约名>/` 与 `invalid/`）和帧编解码共享用例（`framing/`），流程见 `docs/engineering/testing.md` 第 7 节。
 - `scripts/`：跨平台 Node 脚本（`dev/` 本地入口、`ci/` 检查、`plan/` 计划文件检查、`lib/` 公共函数）。
 - `docs/engineering/`：编码规范、测试规范、AGENTS.md 规范。
@@ -126,4 +128,5 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - 上下文工程（T27，ADR-0043）：模型可见的运行时提示只经 `agent-host/src/harness/reminders.ts`（`piarc.reminder`，类型见 `agent-host/AGENTS.md`），不要另写自定义消息类型或改写已发送的 system prompt；压缩阈值只在 `harness/compaction-threshold.ts`，重注入上限只在 `harness/reinjection.ts` 的 `RESTORE_LIMITS`，熔断次数只在 `AUTO_COMPACT_FAILURE_LIMIT`。Pi 的会话设置覆盖值会被 `SettingsManager.reload()` 清掉，一律经 `SessionCompaction.apply()` 在每次运行前施加。摘要提示与提醒文案改动后跑原创性检查。
 - 检查点（T28，ADR-0044）：快照只覆盖经 Core 的文件写入（`piarc-fs` 在路径锁内先存旧字节，`fs → checkpoint` 例外），只被 Bash 改动的文件不在其中；回退、撤销、丢弃一律经 `piarc_fs::replace` 核对期望哈希后写回并留记录，规则在 `piarc_checkpoint::plan`。对话回退只在 Agent Host 的 `runtime/branches.ts` 移动 leaf 并追加条目，不删 JSONL（ADR-0011），之后在同一 id 下重建 Pi 会话。设置 `fileCheckpointingEnabled: false` 关掉快照。
 - WebFetch（T29，ADR-0045）：网络请求只在 Core（`piarc-web` 经 AHP `web/fetch`，绑定已获准的同一调用、同一 URL），SSRF 检查后只连接检查过的地址；允许列表只来自 `CoreConfig.web`（测试的 `PIARC_TEST_WEB_ALLOWLIST`、L2 的 `web` 段），不要从项目设置读。规则与 hooks 取 URL 主机一律用 `piarc_web::rule_host`。提取经 Agent Host 的辅助模型通道（`harness/auxiliary.ts`），网页只作为提问材料、结果是工具结果。登录交互经 `core/login` 到客户端，凭据只进保险箱；每模型设置与辅助模型只经 Core 的 `setModelPreferences` 写用户级 `modelProviders`。
+- L3（T30，ADR-0046）：Claude Code 只在临时 `CLAUDE_CONFIG_DIR` 与 `HOME`、假 key、指向本地 mock 的 base URL 下运行，录制只写白名单结构（`scripts/l3/check-recordings.mjs` 把关），不得把 Claude Code 的提示词或工具描述写进任何文件、日志或终端输出；调试只打印长度与 hash。命令运行前后比较本机 `~/.claude`，同时开着的 Claude Code 会话写会话记录也会被报告。allowlist 中修好的条目要删掉（不再匹配即失败）；PiArc 的偏差先写能复现的 L2 场景再修。
 - Hooks（T25，ADR-0039）：hook 命令只在 Core 运行（`piarc-hooks` 解析、匹配、执行、合并，`piarc-core::hooks` 读设置与信任、写审计），Agent Host 只经 `hooks/run` 报告 Pi 事件并应用结果；新增事件在 `HookEvent` 加一项、在挂载处调 `HooksService::run`，不另写执行器。Stop 续跑上限只在 `piarc_hooks::STOP_CONTINUATION_LIMIT`。L2 的 hook 夹具是 `tests/scenarios/fixtures/hooks/hook.mjs.txt`（复制成 `hook.mjs` 运行）。

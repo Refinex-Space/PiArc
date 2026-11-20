@@ -20,6 +20,8 @@
 
 ## 两种运行形态
 
+- L3 模式（T30）：`MockProvider::start_with(library, port, Mode::L3)`、bin 的 `--l3`。只保留协议规则（关闭 `system_sections`、`cache_breakpoint_position`），记录的 `body` 为空、`structure` 是 `l3::structure` 的白名单结构；流式的辅助请求（无工具，`l3::classify`）得到 `l3::AUXILIARY_REPLY` 且不消耗步数。不要在 L3 记录里加回原始内容（ADR-0006）。
+
 - 库：`MockProvider::start(library).await`，必须在 tokio 运行时内调用；每个测试起自己的实例，步数计数天然隔离。
 - 独立进程：`piarc-mock-provider`，`--port 0` 取空闲端口，stdout 第一行是端口；stdin 到 EOF 就退出。父进程退出前关闭它的 stdin。
 
@@ -86,6 +88,7 @@
 - `tests/agent_host/context.rs`（T27）：L2 经 Core 公开 API 驱动不到的两条路径——`session/remind`（后台任务提醒）与压缩后重注入 skill 正文（向会话 JSONL 追加模拟的 `piarc.skillInvoked` 条目后 `session/resume`）。agent_host 测试的 Core 替身对 `context/settings`、`fs/changes`、`fs/forgetReads` 由 `ToolIo` 应答（无设置服务时取缺省值）；列举 Core 调用的断言要把这些没有工具调用 id 的请求排除在外。
 - 每个请求都必须通过严格 mock 的校验（总是检查）；`approvals` 按声明顺序答复会话快照里的新请求；多出的应答、无人答复的请求或工具名不符都使场景失败。
 
+- T30：端点脚本工具参数里的 `{{workspace}}` 换成工作区绝对路径（`runner.rs` 的 `fill_workspace`）；审批应答可带 `call`（运行器取卡片所属的、已开始未结束的同名工具调用，`runner/l3.rs` 的 `pending_call`）。`run_l3` 以 L3 模式运行并在删除临时根之前采集结构（请求结构、工具条目状态、按 `call` 作答的询问、回合状态、文件 hash、`.l3/*.jsonl`），没有应答点名的卡片拒绝而不是失败；`piarc-devcli l3` 写出它。
 - T29：顶层 `web`（`src/l2/web.rs`）起本地网页服务器，`{{web}}`/`{{web_alt}}` 在页面与端点的工具参数中替换为 `http://127.0.0.1:<端口>` 与 `http://localhost:<端口>`（两个不同的主机），Core 的 WebFetch 允许列表只为这些场景放行这两个主机；WebFetch 的提取是一次额外的模型请求，脚本里要为它留一步（同一端点，或 `modelProviders.auxiliary` 指向的另一个端点）。顶层 `oauth`（`login_spec.rs`、`runner/login.rs`）起 mock 授权服务器并给每个 Agent Host 注册 `piarc-test-oauth`，动作 `sign_in`（运行器代替浏览器跟随授权页的重定向，或在第一步取消；只认 `authUrl`/`deviceCode`/`prompt` 为可操作的步，进度可能先到）与 `sign_out`。每模型设置与辅助模型用 `run_files` 写 `data 数据/settings.json` 的 `modelProviders`；`configure_as: local` 的端点模型是低可靠性（保守 Tool Profile）。
 - mock 授权服务器（`src/auth_server.rs`，bin `piarc-mock-auth`：stdout 第一行端口，stdin 每行 `approve`/`deny`/`expire` 改决定，EOF 退出；`--pending-polls` 控制设备码轮询多少次后决定，L4 用 30 次约 3 s 以便截图）。`tests/sessions/login.rs` 经 Core 公开 API 跑授权码、设备码、拒绝、过期、取消与手工粘贴代码，并扫描数据目录无明文。
 

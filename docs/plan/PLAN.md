@@ -311,14 +311,14 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 T30 L3 行为对齐基座（2026-11-20 开工；本机 `claude` 2.1.318；基线 `npm run verify -- --baseline` 通过）
 
-- [ ] 1 前提检查与 Claude Code 隔离运行（临时配置目录、假 key、base URL、关闭非必要流量、夹具副本；`~/.claude` 前后快照）
-- [ ] 2 mock 的 L3 模式与结构化录制（白名单结构、辅助请求分类）
-- [ ] 3 双侧运行器：PiArc 侧（L2 运行器）与 Claude Code 侧（`claude -p` + `--permission-prompt-tool` 夹具 MCP server）、行为轨迹
-- [ ] 4 归一化、结构化 diff、Markdown/JSON 报告（`tmp/l3/`）
-- [ ] 5 `tests/l3-allowlist.yaml` 与校验（缺理由、不再匹配即失败）
-- [ ] 6 提示词剥离检查脚本及单测（并入 verify）
-- [ ] 7 一条命令 `npm run l3` 与 Nightly workflow
-- [ ] 8 权限与 hooks 首批比对：修正 PiArc 偏差（先写失败场景）或写入 allowlist；重复运行一致
+- [x] 1 前提检查与 Claude Code 隔离运行（临时配置目录、假 key、base URL、关闭非必要流量、夹具副本；`~/.claude` 前后快照）
+- [x] 2 mock 的 L3 模式与结构化录制（白名单结构、辅助请求分类）
+- [x] 3 双侧运行器：PiArc 侧（L2 运行器）与 Claude Code 侧（`claude -p` + `--permission-prompt-tool` 夹具 MCP server）、行为轨迹
+- [x] 4 归一化、结构化 diff、Markdown/JSON 报告（`tmp/l3/`）
+- [x] 5 `tests/l3-allowlist.yaml` 与校验（缺理由、不再匹配即失败）
+- [x] 6 提示词剥离检查脚本及单测（并入 verify）
+- [x] 7 一条命令 `npm run l3` 与 Nightly workflow
+- [x] 8 权限与 hooks 首批比对：修正 PiArc 偏差（先写失败场景）或写入 allowlist；重复运行一致
 - [ ] 9 收尾：testing.md L3 一节、AGENTS.md、登记事项、验收记录、verify
 
 ## 登记事项
@@ -327,7 +327,7 @@ T30 L3 行为对齐基座（2026-11-20 开工；本机 `claude` 2.1.318；基线
 
 | 编号 | 发现于 | 内容 | 建议处理 |
 |---|---|---|---|
-| I01 | 制定计划 | Claude Code 当前默认使用 TaskCreate / TaskUpdate 等任务工具，TodoWrite 已是旧版（`claude-official-capabilities.md`）。PiArc 的规范名仍是 TodoWrite，权限规则与 L3 比对会出现差异 | T26 评估是否增加兼容映射；T30 先把差异写入 L3 allowlist；**T26 评估：不加映射**。PiArc 的清单工具只有 `TodoWrite`（规范名，参数与 Claude Code 一致），`TaskCreate`/`TaskUpdate` 是拆成多次调用的另一种接口，模型可见名之间映射会让规则与 hooks 的 matcher 对不上；写 `TaskCreate(…)` 规则或 matcher 的用户需要改写为 `TodoWrite`，T30 仍把差异写入 L3 allowlist |
+| I01 | 制定计划 | Claude Code 当前默认使用 TaskCreate / TaskUpdate 等任务工具，TodoWrite 已是旧版（`claude-official-capabilities.md`）。PiArc 的规范名仍是 TodoWrite，权限规则与 L3 比对会出现差异 | T26 评估是否增加兼容映射；T30 先把差异写入 L3 allowlist；**T26 评估：不加映射**。PiArc 的清单工具只有 `TodoWrite`（规范名，参数与 Claude Code 一致），`TaskCreate`/`TaskUpdate` 是拆成多次调用的另一种接口，模型可见名之间映射会让规则与 hooks 的 matcher 对不上；写 `TaskCreate(…)` 规则或 matcher 的用户需要改写为 `TodoWrite`，T30 仍把差异写入 L3 allowlist；**已落地（T30）**：`tests/l3-allowlist.yaml` 的 `requests.items[*].tools.TodoWrite` 条目 |
 | I02 | 制定计划 | FR-MD-05 要求 skills 能引用模型别名，但架构第 6.7 节的 skill frontmatter 没有 `model` 字段 | T37 评估：支持则补架构与实现，不支持则改需求描述 |
 | I03 | 制定计划 | Monitor 在会话空闲时唤醒会话（按 Claude Code 官方行为）会自动产生模型费用 | T32 实现时提供开关与限速，R4 请用户确认默认值 |
 | I04 | 制定计划 | macOS App Intents 在 ad-hoc 签名下能否工作，M0 没有验证（需要 Xcode 生成的元数据随包分发） | T49 先做可行性原型；不可行时写 ADR 提议。若想提前知道结论，可在 R1 时追加一次快速验证；R1 决定：不在 R1 追加验证，T49 先做可行性原型（不影响 M1） |
@@ -441,6 +441,11 @@ T30 L3 行为对齐基座（2026-11-20 开工；本机 `claude` 2.1.318；基线
 | I112 | T29 | WebFetch 不走用户的 HTTP 代理（`HTTPS_PROXY` 等与系统代理都不读），也不接受 gzip 等内容编码（请求 `identity`，服务器仍压缩时报错）；需要代理才能访问外网的环境里 WebFetch 会失败 | T38（WebSearch 同样联网）一起决定代理来源与是否支持压缩；改动在 `piarc-web`，SSRF 检查仍须作用于最终连接的地址（经代理时检查目标主机解析结果） |
 | I113 | T29 | Claude Code 设置键 `model`、`effortLevel` 原定 T29（架构第 6.14 节）；`model` 的取值是 Claude Code 的模型别名，要等 T31 的别名表，本任务未接入，配置诊断中仍列为后续任务支持的键 | T31 接入模型别名时一并支持 `model` 与 `effortLevel`（作为新会话的默认模型与 effort），更新 `SETTINGS_KEYS` |
 | I114 | T29 收尾 | 本机 macOS 的 FSEvents 投递变慢：`cargo test -p piarc-core --test state` 的两个设置监听用例（`editing_settings_while_running_…`、`editing_claude_code_settings_while_running_…`）在 20 s 内收不到设置事件，T28 收尾提交 75af7b3 上同样失败（T29 开工基线时通过）；`piarc-fs` 的 `reports_changes_in_a_watched_directory` 要约 10 s 才收到第一个事件（平时不到 1 s）；`sudo killall fseventsd` 后仍如此；当时系统数据卷已用 93%，IDE 正在建索引。T29 未改动设置监听与 `piarc-fs::watch` | 环境恢复（释放磁盘、重启）后在本机重跑 `cargo test -p piarc-core --test state` 与 `npm run verify`，通过后把 T29-A11 改为 passing；仍失败则另开任务排查 notify 8.2.1 的 FSEvents 后端，不放宽等待时间。2026-11-20 经用户同意已 `cargo clean`（收回约 145 GB，数据卷降到 77%）、IDEA 排除构建目录，用户在系统设置中把 `~/develop` 加入聚焦隐私并重启后复测：`piarc-fs` 监听测试 0.06 s、`piarc-core --test state` 7/7（0.71 s），7f9e79b 上 `npm run verify` 15/15；**已解决**（环境原因，未改代码），T29-A11 改为 passing |
+| I115 | T30 | L3 发现 hooks 输入缺 Claude Code 2.1.318 的两个通用字段：每个事件的 `prompt_id`、工具事件与 Stop 的 `effort`（`tests/l3-allowlist.yaml` 中 `follow_up: T38` 的两条） | T38 扩展 hooks 时在 Core 的 `hooks::input` 补上：会话当前提示的 id（Core 观察 UserPromptSubmit 时生成）与会话模型的 effort（无 effort 的模型省略）；补完删掉 allowlist 条目 |
+| I116 | T30 | L3 发现两处权限裁决与 Claude Code 2.1.318 不同：命令替换（`echo $(whoami)`）PiArc 按其中每个命令判断而直接运行，Claude Code 询问；allow 规则（阶梯第 6 步）先于越界检查（第 7 步），`Bash(awk *)` 让 `awk … ../outside.txt` 不询问，Claude Code 询问（`perm-compound` 的 `follow_up: R3` 条目） | R3 决定是否改阶梯顺序或对命令替换询问（改阶梯属于变更型，需 ADR）；改了就删掉对应 allowlist 条目 |
+| I117 | T30 | L3 记录的工具集与参数偏离各有后续任务：`Agent`、`ListAgents`（T31）、`Skill`（T37）、Bash 的 `run_in_background`（T32）与 `dangerouslyDisableSandbox`（T39）、`ToolSearch` 与延迟加载的工具（T36 评估 MCP 工具多时是否延迟加载）、plan 模式下非只读命令交给自动模式分类器（T46） | 各任务实现时用 `npm run l3` 复核，对应 allowlist 条目不再匹配时删除（否则命令失败）；I01 的 TodoWrite 差异已写入 allowlist |
+| I118 | T30 | L3 只在 macOS 上运行：PowerShell 场景（`perm-powershell-whole`、`policy-*-powershell`）排除；Windows 上 Node 不经 shell 启动不了 npm 安装的 `claude.cmd`，需要原生安装器的 `claude.exe` | W2 评估在 Windows 上运行 L3（安装方式、PowerShell 场景），通过后把这三个场景移出排除清单 |
+| I119 | T30 收尾 | `crates/piarc-core/AGENTS.md` 已有 150 行，超过子目录 120 行的上限（T29 收尾时已是 149 行，T30 加了一行 hooks 顺序） | R3 整理：把可从代码或 `testing.md` 得到的段落改为链接 |
 
 ## 技术债
 

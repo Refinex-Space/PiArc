@@ -10,7 +10,7 @@
 | L0 单元（TS） | 投影、工具包装、Harness Kit；渲染进程的 store 归约器、Markdown 增量解析、交互规则纯函数；仓库脚本 | 与源文件同目录：`foo.ts` ↔ `foo.test.ts`，脚本为 `foo.test.mjs` | `npm test`；单个文件：`npx vitest run <路径>` | 每次提交 | T01 |
 | L1 契约 | AHP schema 往返、录制事件样本的反序列化与再序列化、Pi 事件到 AHP 投影的 golden、NAPI 导出声明与 preload API 快照 | 样本：`tests/contracts/<契约名>/*.json`，反例在其下的 `invalid/`；Rust：`crates/piarc-protocol/tests/*.rs`；TS：`packages/protocol/src/*.test.ts`；NAPI 声明快照：`apps/desktop/src/main/core/native/*.d.ts`；见第 7 节 | `cargo test -p piarc-protocol`、`npx vitest run packages/protocol`、`node scripts/ci/check-core-types.mjs`；全部由 `npm run verify` 运行 | 每次提交 | T02、T04 |
 | L2 场景回放 | 无头运行 Core + 真实 Agent Host，模型侧接严格校验请求的 mock provider，按场景数据文件驱动 | `tests/scenarios/<场景 id>.yaml`，文件名与 `id` 一致；运行器在 `piarc-testkit`（`src/l2/`），驱动在 `piarc-devcli`；能力清单 `tests/capabilities.yaml`；见第 12、13 节 | `cargo test -p piarc-testkit --test scenarios`；全部（含能力检查）：`node scripts/ci/run-l2.mjs` | 每次提交 | T05、T15 |
-| L3 行为对齐 | 对真实 Claude Code 录制同一批场景，与 PiArc 做结构化 diff | 有意偏离写在 `tests/l3-allowlist.yaml` | T30 补充 | 每晚 / 手动 | T30 |
+| L3 行为对齐 | 同一个严格 mock 同时服务 PiArc 与真实的 `claude -p`，录制两侧的请求结构与行为轨迹，归一化后做结构化 diff | 场景 `tests/l3/scenarios/<id>.yaml`（格式 `tests/l3/schema.json`），有意偏离与排除清单 `tests/l3-allowlist.yaml`，脚本在 `scripts/l3/`；见第 14 节 | `npm run l3`（`-- --repeat 2` 检查同侧可重复）；剥离检查的单测随 `npm test` | 每晚（`.github/workflows/l3-nightly.yml`）/ 手动 | T30 |
 | L4 客户端 | Playwright 驱动 Electron 应用（开发形态与打包产物）；关键组件视觉快照；录制事件流驱动渲染进程（假 Core） | `apps/desktop/e2e/*.e2e.ts`；见第 9 节 | 先 `npm run package:desktop -- --flavor development`，再 `npm run test:e2e -w @piarc/desktop` | 每次提交（CI `desktop` 作业）/ 每晚（UI 流程） | T03、T19 |
 | 安全回归 | Markdown 与链接渲染的 XSS 载荷集、preload API 越权调用、外部导航拦截（架构第 10.3 节） | Electron 层：L4 的 `csp`、`navigation`、`external-links`、`preload`、`permissions`、`app-instance` 用例；纯函数（来源校验、外链白名单、CSP、资源路径）：`apps/desktop/src/main/**/*.test.ts`；XSS 载荷集由 T09 加入 | 纯函数部分由 `npm run verify` 运行；Electron 层同 L4 | 每次提交 | T03 起 |
 | 性能 | 架构第 11 章的预算，两个平台分别测量 | S2：`scripts/bench/s2-event-channel.mjs`；其余 T44 补充 | `npm run bench:s2`（本机，数字不在 verify 中断言）；其余 T44 补充 | 每次提交（冒烟）/ 每晚（完整） | T04、T09、T10、T44 |
@@ -38,7 +38,7 @@
 | 14 | L2 场景与能力清单 | `node scripts/ci/run-l2.mjs`：构建 Agent Host bundle → 全部场景（`cargo test -p piarc-testkit --test scenarios -- --results target/l2/results.json`）→ 能力覆盖与 `capabilities.md` 漂移检查（第 12、13 节） |
 | 15 | 设计令牌 | `node scripts/ci/check-design-tokens.mjs`：生成物与 `design/tokens/` 一致、声明的前景 / 背景对在四种颜色模式下达到 WCAG、主色色相与表面色的品牌规则、不打包字体与音频（ADR-0029；试改令牌用 `--tokens <目录>`） |
 
-CI（`.github/workflows/ci.yml`）在 `macos-latest`（arm64）与 `windows-latest`（x64）上执行 `npm ci --ignore-scripts` 与 `npm run verify`。后续任务新增的检查（L1 契约、L2 场景、schema 漂移等）都接进 verify，使本地与 CI 运行同一套检查。verify 作业结束后把 L2 报告（`target/l2/results.json`）上传为 artifact `l2-report-<os>`。
+CI（`.github/workflows/ci.yml`）在 `macos-latest`（arm64）与 `windows-latest`（x64）上执行 `npm ci --ignore-scripts` 与 `npm run verify`。L3 不在 PR CI 中，由独立的 Nightly 工作流运行（第 14 节）；它的剥离检查单测（`scripts/l3/*.test.mjs`）属于第 5 步。后续任务新增的检查（L1 契约、L2 场景、schema 漂移等）都接进 verify，使本地与 CI 运行同一套检查。verify 作业结束后把 L2 报告（`target/l2/results.json`）上传为 artifact `l2-report-<os>`。
 
 需要打包产物的检查不进 verify，由同一工作流的 `desktop` 作业在两个平台上运行：下载 Electron 二进制、打开发构建（先构建 Core）、跑 L4（第 9 节）、打发布构建、`npm run check:fuses`，证据作为 artifact 上传。四个目标的 Core 预编译由 `core-build` 作业完成，`core-load` 作业在各自架构的 runner（`macos-latest`、`macos-15-intel`、`windows-latest`、`windows-11-arm`）上用 `scripts/ci/load-core.mjs` 在 Node 与 Electron 中加载并跑一次事件通道。
 
@@ -323,6 +323,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 - `workspace.run_files` 在该次运行的临时根下建立夹具，可设置祖先目录的 memory、模拟家目录 `home 家/`、数据目录 `data 数据/` 或用于审批的相邻文件。`workspace.git: true` 在工作区创建空仓库，便于验证初始 Git 状态。
 - 会话通常在动作开始前建立。`sessions.<label>.deferred: true` 将该会话的创建推迟到第一次输入，可验证跨会话的授权与配置。
 - 按字节的夹具放在 `tests/scenarios/fixtures/`（`.gitattributes` 设为 `-text`，换行与编码不被 Git 改动）；加载时检查夹具存在。PDF 夹具用 `piarc-fs` 测试里的 `make_pdf` 生成，手写的 PDF 可能取不到文字。
+- 端点脚本工具参数里的 `{{workspace}}` 换成本次运行工作区的绝对路径（T30，L3 场景要用绝对路径的 `file_path`）。
 - WebFetch 场景（T29，`webfetch-*.yaml`）：`web.pages` 按路径给出状态、`content_type`、`body`（`repeat` 重复多次，用来越过正文上限）与重定向的 `location`。`{{web}}` 在页面与端点工具参数里换成 `http://127.0.0.1:<端口>`，`{{web_alt}}` 换成同一服务器的 `http://localhost:<端口>`（另一个主机，用于跨站重定向与按域名的规则）。只有带 `web` 段的场景，Core 的 WebFetch 允许列表才放行这两个主机；场景不访问外网。WebFetch 的提取是一次额外的模型请求：没有辅助模型时为它在同一端点留一步，设了 `modelProviders.auxiliary`（用 `run_files` 写 `data 数据/settings.json`）时在那个端点留一步。
 - 每模型设置与保守 Tool Profile（T29，`model-*.yaml`）：用 `run_files` 写 `data 数据/settings.json` 的 `modelProviders.models`（键 `mock-<端点>/mock-model`）；`configure_as: local` 端点的模型是低可靠性，默认得到保守 Profile。
 - 压缩场景（T27，`ctx-*.yaml`）：用 `context_window`、`max_tokens` 与步骤的 `usage` 精确触发阈值（Pi 以回复报告的 `input + output + cacheRead + cacheWrite` 判断）；要让短对话有可摘要的内容，在信任的工作区写 `.pi/settings.json: '{"compaction":{"keepRecentTokens":1}}'`。项目层的 `autoCompactWindow` 写在 `.piarc/settings.json` 或 `.claude/settings.json`。
@@ -363,7 +364,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 
 ### 12.3 审批应答
 
-`approvals` 按顺序回答 `core/sessions` 快照中的新请求（`decision: allow|session|always|deny`，可指定 `tool`、审批卡的 `kind` 和拒绝的 `feedback`）。T26：计划卡（`kind: plan`）批准时用 `mode` 写后续模式（`acceptEdits`、`default`），继续规划用 `deny` 加 `feedback` 与 `comments`（`{quote, text}`，运行器按 `quote` 在计划中第一次出现的位置算 UTF-16 偏移）；提问表单（`kind: question`）用 `allow` 加 `answers`（每题 `{selected, other}`），`decision: wait` 不作答、让表单按 `askUserQuestion.timeoutSeconds` 超时。应答经 Core 公开命令；未声明的请求、工具不匹配、重复或过期答复、未用上的应答都使场景失败。`sessions.<label>.mode` 显式选择起始模式（`default`、`acceptEdits`、`plan`、`bypassPermissions`；跳过权限需要用 `workspace.run_files` 在 `data 数据/settings.json` 写入用户级开关），`set_mode` 操作向当前会话发送模式变更。
+`approvals` 按顺序回答 `core/sessions` 快照中的新请求（`decision: allow|session|always|deny`，可指定 `tool`、审批卡的 `kind` 和拒绝的 `feedback`）。T26：计划卡（`kind: plan`）批准时用 `mode` 写后续模式（`acceptEdits`、`default`），继续规划用 `deny` 加 `feedback` 与 `comments`（`{quote, text}`，运行器按 `quote` 在计划中第一次出现的位置算 UTF-16 偏移）；提问表单（`kind: question`）用 `allow` 加 `answers`（每题 `{selected, other}`），`decision: wait` 不作答、让表单按 `askUserQuestion.timeoutSeconds` 超时。应答可写 `call` 指定它回答的工具调用（运行器取该卡片所属的、已开始未结束的同名工具调用比对；L3 运行按 `call` 选应答而不按顺序，没有应答点名的卡片拒绝并记为未脚本化，T30）。应答经 Core 公开命令；未声明的请求、工具不匹配、重复或过期答复、未用上的应答都使场景失败。`sessions.<label>.mode` 显式选择起始模式（`default`、`acceptEdits`、`plan`、`bypassPermissions`；跳过权限需要用 `workspace.run_files` 在 `data 数据/settings.json` 写入用户级开关），`set_mode` 操作向当前会话发送模式变更。
 
 ### 12.4 断言与匹配规则
 
@@ -452,3 +453,91 @@ client_only:                      # 行为全在客户端、由 L4 验证的需�
 | `node scripts/plan/check-capabilities.mjs --milestone M2` | 评审任务（R2–R6）用：列出 M2 及之前未完成的能力 |
 
 L2 报告来自 `cargo test -p piarc-testkit --test scenarios -- --results target/l2/results.json` 或 `cargo run -p piarc-devcli -- run tests/scenarios --json <文件>`。
+
+## 14. L3 行为对齐（T30）
+
+L2 证明 PiArc 符合我们写下的期望，L3 检查这些期望是否与 Claude Code 一致（架构第 12.5 节）。同一个严格 mock 先后服务 PiArc 与真实的 `claude -p`，两侧跑同一个场景，录制请求结构与行为轨迹，归一化后逐字段比对。只比对结构：Claude Code 的提示词、工具描述与参数描述只以长度与 hash 出现（ADR-0006）。
+
+### 14.1 运行
+
+| 命令 | 用途 |
+|---|---|
+| `npm run l3` | 全流程：前提检查 → `~/.claude` 快照 → PiArc 侧 → Claude Code 侧 → 剥离检查 → 归一化与比对 → `tmp/l3/report.md`、`tmp/l3/results.json`（不入库）→ 再比对 `~/.claude` |
+| `npm run l3 -- --repeat 2` | 每侧跑两次，两次归一化结果不同即失败（Nightly 用它） |
+| `npm run l3 -- --filter perm-` | 只跑 id 含该文本的场景；过期条目只判定所点名场景都跑过的条目 |
+| `node scripts/l3/check-recordings.mjs <文件或目录>` | 单独检查录制产物 |
+
+- 前提：PATH 上有 `claude`（版本写进报告首行）。没有时命令打印安装提示并以 2 退出。本机按 Nightly 锁定的版本安装：`npm install -g @anthropic-ai/claude-code@<版本>`（全局安装，先征得用户同意）。版本在 `.github/workflows/l3-nightly.yml` 的 `CLAUDE_CODE_VERSION`。
+- 退出码：有未解释的差异、过期或缺理由的 allowlist 条目、剥离检查失败、某侧运行失败（主循环请求被 mock 拒绝或运行器报错）、重复运行不一致、`~/.claude` 有变化时为 1。
+- `~/.claude` 比对看的是整个目录：本机同时开着别的 Claude Code 会话（例如正在用 Claude Code 开发），它写会话记录也会被报告。取证时在没有其他会话写入时运行。
+- 平台：Nightly 在 macOS 上运行。PowerShell 场景排除；Windows 上运行需要原生安装器装的 `claude.exe`（Node 不经 shell 不能启动 npm 的 `claude.cmd`）。
+
+### 14.2 隔离
+
+Claude Code 侧每个场景一个临时根（`os.tmpdir()/piarc-l3-*`，取真实路径），运行结束删除：
+
+- `work space 工作区/`：场景文件的副本（含 `.claude/settings.json`），`claude` 的工作目录；
+- `config/`：`CLAUDE_CONFIG_DIR`（设置、会话、插件都在这里；它同时让 macOS 钥匙串条目按目录区分，读不到用户的登录）。`config/.claude.json` 按场景的 `trusted` 写工作区的 `hasTrustDialogAccepted`（`-p` 不显示信任对话框），`config/settings.json` 是场景的用户级设置；
+- `home/`：`HOME`（Windows 另设 `USERPROFILE`）。
+
+环境从零构建，只带 `PATH`、临时目录与 Windows 启动进程需要的变量，加上：假的 `ANTHROPIC_API_KEY`、指向 mock 的 `ANTHROPIC_BASE_URL`、`ANTHROPIC_CUSTOM_HEADERS: x-piarc-scenario: <id>`（选择场景）、`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`、`DISABLE_AUTOUPDATER`、`DISABLE_TELEMETRY`、`DISABLE_ERROR_REPORTING`、`CLAUDE_CODE_DISABLE_TERMINAL_TITLE`（同时去掉生成标题的辅助请求）。参数：`-p <prompt> --output-format stream-json --verbose --no-session-persistence --mcp-config <夹具> --strict-mcp-config --permission-prompt-tool mcp__l3__approve`，场景有 `mode` 时加 `--permission-mode`（`bypassPermissions` 另加 `--allow-dangerously-skip-permissions`）。
+
+PiArc 侧经 L2 运行器（`piarc-devcli l3`）运行，本来就在独立临时根里，用户级 Claude Code 设置写到运行器的 `home 家/.claude/`。
+
+### 14.3 场景与两侧的运行
+
+场景放在 `tests/l3/scenarios/<id>.yaml`，格式 `tests/l3/schema.json`：
+
+```yaml
+id: perm-rules                    # 与文件名一致
+area: permissions                 # permissions | hooks（hooks 场景的报告多一节 hooks）
+description: ...
+mirrors: [perm-rule-match]        # 它对照的 L2 场景
+mode: default                     # 可省略；default | acceptEdits | plan | bypassPermissions
+trusted: true                     # 可省略，默认 true
+workspace:
+  files: { notes.txt: "...", .claude/settings.json: '{...}' }   # 两侧共用
+  user_settings: { permissions: { allow: [...] } }              # 用户级 ~/.claude/settings.json
+  plans: { bash: { json: {...} } }                              # hook 夹具的应答计划
+prompt: Check the rules.
+steps:                            # mock 脚本（第 10.3 节）；工具参数用 Claude Code 的参数名
+  - tool_calls: [{ id: secret, name: Read, input: { file_path: '{{workspace}}/secrets/key.txt' } }]
+  - text: Finished.
+approvals:                        # 按工具调用 id 作答；没有点名的询问一律拒绝
+  - { call: secret, decision: deny, feedback: Not that one. }
+```
+
+- 工具调用只用 `Read`、`Write`、`Edit`、`Bash`：`scripts/l3/scenario.mjs` 的 `PARAMETERS` 把 Claude Code 的参数换成 PiArc 的（Pi 的参数，ADR-0020），比对时再换回。不写 Bash 的 `description` 等 PiArc 没有的参数，换回后两侧才相同。路径写 `{{workspace}}/…` 的绝对路径（Claude Code 的文件工具要求绝对路径）。
+- hooks：两侧都把 `scripts/l3/fixtures/hook.mjs` 复制成工作区的 `.l3/hook.mjs`，设置里写 `node .l3/hook.mjs <名字>`。它只记结构到 `.l3/hooks.jsonl`（事件名、输入字段名、工具名与调用 id、第几次运行、返回的决定），按 `.l3/plans/<名字>.json` 应答（`json`、`stdout`、`stderr`、`exit`，或 `sequence`）。
+- 审批：`-p` 没有交互审批。Claude Code 侧的 `--permission-prompt-tool` 指向 `scripts/l3/fixtures/approval-server.mjs`（stdio MCP server），它按 `tool_use_id` 找 `approvals` 中的应答；PiArc 侧运行器按卡片所属的工具调用找同一条应答（L2 的 `call`，第 12.3 节）。两侧都把每次询问记成 `{tool, call, decision, scripted}`。
+- PiArc 侧：`run.mjs` 把场景转成 L2 场景（`tmp/l3/piarc-scenarios/`，能力取所对照 L2 场景的），动作是提示、等回合结束、归档会话（`claude -p` 在回合后结束会话，两侧的 SessionEnd 都会运行）。`piarc-devcli l3` 以 mock 的 L3 模式运行并写出结构化的采集结果（`runner/l3.rs`），`run.mjs` 转成录制产物后删除原始报告。
+
+### 14.4 录制、请求分类与剥离检查
+
+- mock 的 L3 模式（`piarc-mock-provider --l3`、`Mode::L3`）：保留协议规则（配对、角色交替、工具 schema、断点数量），关闭 PiArc 特有的 `system_sections` 与 `cache_breakpoint_position`；请求记录只留 `piarc_testkit::l3::structure`，原始请求体不落盘、不进日志。
+- 结构白名单：顶层键名与 `stream`；工具的名称、描述（长度与 hash）、输入 schema（每个 `description`、`title` 与超过 64 字符的字符串换成长度与 hash）；system 每段的长度、hash 与缓存断点；消息的角色与内容块序列（文本与 thinking 只有长度与 hash，`tool_use` 留脚本给的 id、名称与参数，`tool_result` 留所答的 id、错误标记与长度，每块注明是否带缓存断点）。
+- 请求分类：流式、声明了工具的 Messages 请求是主循环（`main`），其余是辅助请求（标题、话题、分类器、提取）。L3 模式下流式的辅助请求得到固定短文本且不消耗场景步数；非流式的（Claude Code 的自动模式分类器）照常得到 400，Claude Code 按分类器不可用处理。只比对主循环请求，辅助请求只比个数；被拒的辅助请求不算运行问题。
+- 行为轨迹：工具调用（PiArc 取 Core 的条目状态，Claude Code 取 stream-json 的 `tool_use`、`tool_result` 与 `permission_denials`：`completed`、`failed`、`declined`、`interrupted`）、询问、hooks、最终状态、工作区文件的 hash（不含 `.l3/`）。
+- 录制产物（`tmp/l3/recordings/<side>/<id>.<n>.json`，格式 `piarc-l3-recording/1`）写盘前把工作区、家目录与临时根换成 `<WS>`、`<HOME>`、`<TMP>` 并统一分隔符。
+- 剥离检查（`scripts/l3/check-recordings.mjs`，每次录制后自动运行）：按白名单 schema 校验，并扫描全部字符串（含键名）：超过 40 字符、至少 6 段且八成以上是普通单词的文本，或任何超过 160 字符的字符串，都报错。脚本化的命令与路径不是这种形状。单测（`check-recordings.test.mjs`）用 `scripts/l3/fixtures/recordings/` 的三个夹具：正常录制通过，system 带正文、参数描述带正文的都失败。
+
+### 14.5 归一化、比对与报告
+
+`normalize.mjs` 把录制产物变成与侧无关的比较文档：主循环请求的个数与每个请求的顶层键、各工具的参数类型与必填项、system 段数与断点、每条消息的 `角色: 块 块*`（文本长度与 hash 不比：两边的措辞本来就不同）；按工具调用 id 的规范工具名、参数（换回 Claude Code 的参数名）与状态；模型看到的错误标记；按调用 id 的询问；hooks 的顺序（同一事件、同一调用的并行 hook 按名字排序）与每次调用的输入字段名、返回的决定；最终状态；文件 hash。工具名先经 `TOOL_NAMES` 映射到规范名。
+
+`diff.mjs` 按字段路径列出差异：键用 `.` 连接，非标识符的键写 `["键"]`，数组下标 `[n]`，例如 `requests.items[0].tools.Agent`、`hooks.calls["bash#0"].fields.prompt_id`。报告首行写两侧版本，每个场景列出工具调用状态、询问、hooks 一节（hooks 场景）、未解释的差异与被 allowlist 放行的差异。
+
+### 14.6 allowlist
+
+`tests/l3-allowlist.yaml`：
+
+- `differences`：`scenario`（id 或带 `*` 的模式）、`path`（字段路径模式：`*` 匹配一个键内的文字、`[*]` 任意下标、`**` 任意一段路径）、`claude_code`（适用的版本范围，空格分隔的比较式如 `>=2.1.318 <2.2.0`，或 `*`）、`reason`（必填）、`follow_up`（可选，后续处理的任务，同步写进 `PLAN.md` 登记事项）。
+- `excluded`：对照领域（`perm-`、`policy-`、`hooks-`、`config-` 开头的 L2 场景）中没有 L3 场景对照的，写明 `claude -p` 无法复现的原因；也可以排除某个 L3 场景。每个这样的 L2 场景必须被对照或排除，否则命令失败。
+- 缺理由的条目、版本在范围内且所点名场景都跑过却没有匹配任何差异的条目，都让命令失败：修好的偏差要从清单删掉。Claude Code 升级后，新差异先分析，再修正或加条目（新条目的版本范围从新版本开始）。
+
+### 14.7 新增一个场景
+
+1. 选要对照的 L2 场景，确认 `-p` 能复现：一次提示、审批只有允许与拒绝、不重启、不需要第二个会话。不能复现的写进 `excluded`。
+2. 写 `tests/l3/scenarios/<id>.yaml`：工具调用只用有参数映射的工具，参数用 Claude Code 的名字，路径用 `{{workspace}}`；需要询问的命令避开两边的只读白名单（`touch`、`mkdir`）；会删除文件或联网的命令不要写，Claude Code 的回答与 PiArc 不同时它会真的执行。
+3. `npm run l3 -- --filter <id> --repeat 2`：先消除不确定性，再逐条分析差异。PiArc 的偏差先写能复现的 L2 场景再修正（例如 `hooks-session-start-order`）；有意的偏离写进 allowlist 并附理由。
+4. 新工具需要参数映射时在 `scenario.mjs` 的 `PARAMETERS` 加一项，并在 `compare.test.mjs` 加往返用例。
