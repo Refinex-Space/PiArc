@@ -2869,85 +2869,85 @@
       "id": "T28-A01",
       "task": "T28",
       "description": "每个用户回合建立检查点，写前保存原文件；内容相同的文件在对象存储中只有一份。验证：测试（对象计数）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Core 单测 `cargo test -p piarc-core --lib tool_io::checkpoints` 的 `each_turn_has_a_checkpoint_and_equal_old_contents_are_stored_once`（`turn_started` 建检查点；两个旧内容相同的文件只存一个对象，对象目录计数 1；记录带前后哈希）；`piarc-checkpoint` 单测 `equal_contents_are_stored_once_in_their_bucket`、`collection_keeps_referenced_and_pinned_objects`；`tool_io::policy::tests::t28` 覆盖 `fileCheckpointingEnabled` 关闭时不建检查点。"
     },
     {
       "id": "T28-A02",
       "task": "T28",
       "description": "回合内新建的文件在恢复代码时被删除。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `rewind-code-only`（编辑的文件恢复、新建的文件删除、可撤销）与 `rewind-code-and-conversation`（回合新建的 made.txt 被删除）通过；Core 单测 `rewinding_restores_old_bytes_deletes_created_files_and_can_be_undone`；L4 `t28-rewind` 的回退流程断言预览动作 `delete`、结果 `deleted`、文件不存在（dev 与 packaged）。"
     },
     {
       "id": "T28-A03",
       "task": "T28",
       "description": "Rewind 四个选项各有场景：文件副作用符合交付物 2 的表，对话分支与摘要内容由 mock provider 请求断言确认。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "四个选项各有 L2 场景：`rewind-code-and-conversation`、`rewind-conversation-only`（文件不动，之后的请求不含被回退回合的消息与回复）、`rewind-code-only`（对话不变）、`rewind-summarize`（mock 请求断言 PiArc 分节摘要请求含该回合及之后的对话、下一次请求带分支摘要、文件不动），文件副作用与对话分支由 `check_files`、`check_branch` 与请求断言确认，全部通过。"
     },
     {
       "id": "T28-A04",
       "task": "T28",
       "description": "恢复对话后原分支仍在，可以切换回去且内容完整。验证：场景测试与 Playwright 流程。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `rewind-code-and-conversation`：回退后 `check_branch` 只剩前一回合，`switch_branch` 切回原分支后消息与任务清单完整；L4 `t28-rewind`（dev 与 packaged）：回退后原分支显示在输入框上方，发送新消息后显示 2 / 2，切回 1 / 2 时原消息、回复与任务清单（Making the file）恢复；截图 `tmp/evidence/T28/l4/` 与 `tmp/evidence/T28/ego/13-branch-switcher.png`、`14-branch-switched.png`。"
     },
     {
       "id": "T28-A05",
       "task": "T28",
       "description": "文件在快照后被外部或 Bash 修改时，回退前列出冲突，用户的逐文件选择被正确执行，取消时没有文件改动。验证：场景测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `rewind-conflict`：外部修改与 Bash 修改的文件在预览中为 `conflict`，`cancel` 后文件不变，逐文件选择（保留 / 覆盖）被执行；Core 单测 `conflicts_follow_the_users_choice`（含过期选择失败且不覆盖）；`piarc-checkpoint` 单测 `a_file_changed_outside_the_session_is_a_conflict`。"
     },
     {
       "id": "T28-A06",
       "task": "T28",
       "description": "恢复中途某个文件失败时，回退停止并报告逐文件结果，已恢复的部分可以撤销。验证：测试（注入写入失败）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Core 单测 `a_failed_file_stops_the_rewind_and_the_restored_part_can_be_undone`：把第二个文件设为只读使写回失败，回退在该文件停止，报告逐文件结果（已恢复、失败、未执行），撤销把已恢复的文件写回；`piarc-checkpoint` 单测 `undo_puts_back_what_the_rewind_replaced_unless_it_changed_again`。"
     },
     {
       "id": "T28-A07",
       "task": "T28",
       "description": "只被 Bash 改动的文件不出现在快照中，回退界面与 Changes 面板显示相应说明。验证：场景测试与截图（`tmp/evidence/T28/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `rewind-bash-only`：只被命令改动的文件不在回退预览与 Changes 视图中，回退后保留；L4 `t28-rewind` 断言回退对话框与 Changes 面板的 Bash 说明、命令文件不在面板中；截图 `tmp/evidence/T28/l4/`（rewind-dialog、changes-panel）与 `tmp/evidence/T28/ego/02-changes-panel.png`、`08-rewind-dialog.png`。"
     },
     {
       "id": "T28-A08",
       "task": "T28",
       "description": "Changes 面板按文件显示统一 diff、增删行数与语法高亮，超过阈值时降级为纯文本。验证：Playwright 流程与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `t28-rewind`（dev 与 packaged）：Changes 面板按文件显示统一 diff、增删行数（+2 −2、hunk 2 个）、`data-highlight=ts` 与带颜色的 token；超过面板阈值时折叠并以纯文本显示（`changes-degraded`、无高亮）；Core 单测 `a_large_change_degrades_the_panel`；截图 `tmp/evidence/T28/l4/` 与 `tmp/evidence/T28/ego/02`、`05`、`19-changes-panel-dark.png`。"
     },
     {
       "id": "T28-A09",
       "task": "T28",
       "description": "按文件与按 hunk 丢弃后文件内容正确，CRLF、BOM 文件保真，文件状态表要求 agent 重新读取。验证：单测与 Playwright 流程。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Core 单测 `discards_keep_crlf_and_bom_and_need_a_new_read`（基线、按 hunk 与按文件丢弃保留 CRLF 与 BOM、过期版本被拒、文件状态表要求重新读取）；`piarc-diff` 单测 `reverting_every_hunk_gives_the_base_back_byte_for_byte`（LF 与 CRLF）、`one_hunk_at_a_time_keeps_the_others`、`adjacent_hunks_are_applied_bottom_up`、`a_hunk_that_no_longer_matches_changes_nothing`；L2 `changes-file-and-hunk`；L4 `t28-rewind` 丢弃第二个 hunk 后文件字节保留 BOM 与 CRLF、丢弃新建文件后文件被删除；ego-browser 实际操作截图 `tmp/evidence/T28/ego/03`–`06`。"
     },
     {
       "id": "T28-A10",
       "task": "T28",
       "description": "每会话超过 100 个检查点时删除最旧的，30 天未访问的会话快照被清理，无引用对象被回收。验证：测试（时钟可注入）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Core 单测 `retention_keeps_the_newest_checkpoints_and_drops_idle_sessions`（注入时钟：超过上限删最早检查点、30 天未访问的会话全部删除、未引用对象被回收）；`piarc-store` 单测 `pruning_keeps_the_newest_checkpoints_with_their_files`、`idle_sessions_lose_all_snapshots_and_access_moves_forward_only`；`piarc-checkpoint` 单测 `collection_keeps_referenced_and_pinned_objects`、`only_stale_temporary_files_are_removed`。"
     },
     {
       "id": "T28-A11",
       "task": "T28",
       "description": "从某条消息创建分支、在分支之间切换，transcript 与任务清单随之变化。验证：Playwright 流程与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `rewind-branch-from-message`（新会话的对话与任务清单停在该回合之前，原会话不变）与 `rewind-code-and-conversation`（切换分支）；L4 `t28-rewind`（dev 与 packaged）：从这里分支打开新会话、消息在输入框、只剩前一回合，切换分支时 transcript 与任务清单随之变化；截图 `tmp/evidence/T28/l4/`（branch-from-here、branch-switched）与 `tmp/evidence/T28/ego/15-branch-from-here.png`。"
     },
     {
       "id": "T28-A12",
       "task": "T28",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "收尾 `npm run verify` 15/15 通过：第一次运行时 Prettier 报 4 个 T28 契约样本未格式化（其余 14 步通过），8f339ee 格式化后全量重跑 15/15；L2 110 个场景（macOS 按平台跳过 2 个）、MISSING 0，能力 143 项（active 102）。开工基线 59e55a2 同为 15/15。"
     },
     {
       "id": "T29-A01",
