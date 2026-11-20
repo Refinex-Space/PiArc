@@ -220,7 +220,7 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
         "permissions.disableBypassPermissionsMode",
         "bypass needs PiArc's own user-level switch",
     ),
-    planned("plansDirectory", "T26", "plan mode"),
+    planned("plansDirectory", "T48", "plan files (R3: I104)"),
     ignored("pluginConfigs", NONE),
     ignored("pluginSuggestionMarketplaces", MANAGED),
     ignored("pluginTrustMessage", MANAGED),
