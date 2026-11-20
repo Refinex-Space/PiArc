@@ -311,6 +311,9 @@ impl Checkpoints {
     }
 
     fn collect(&self) -> Result<Collected> {
+        // Begun before the references are read: a write that records a row and releases its
+        // pin after this read keeps its object (R3).
+        let collection = self.inner.store.begin_collection();
         let referenced: HashSet<Hash> = self
             .inner
             .storage
@@ -318,10 +321,7 @@ impl Checkpoints {
             .iter()
             .filter_map(|text| from_hex(text))
             .collect();
-        self.inner
-            .store
-            .collect_garbage(&referenced)
-            .map_err(|e| feature(&e))
+        collection.collect(&referenced).map_err(|e| feature(&e))
     }
 
     /// Runs [`Checkpoints::sweep`] now and every [`CheckpointConfig::sweep_interval`] on

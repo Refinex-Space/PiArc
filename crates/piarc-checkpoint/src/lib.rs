@@ -37,4 +37,4 @@ mod testing;
 pub use error::{Error, Result};
 pub use plan::{Baseline, FileRecord, Operation, PlannedFile, Step};
 pub use retention::{DEFAULT_IDLE, DEFAULT_MAX_CHECKPOINTS, RetentionPolicy};
-pub use store::{Collected, Hash, ObjectStore, Pin, from_hex, hash_of, to_hex};
+pub use store::{Collected, Collection, Hash, ObjectStore, Pin, from_hex, hash_of, to_hex};

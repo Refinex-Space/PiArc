@@ -10,6 +10,11 @@
 //! pins before it checks whether the object exists, and [`ObjectStore::collect_garbage`] checks
 //! the pins and removes a file under the same lock, so an object being stored or used is never
 //! removed underneath it.
+//!
+//! The caller reads the referenced objects from the index before the walk, and a write can
+//! record a new reference and release its pin in between. [`ObjectStore::begin_collection`]
+//! therefore starts collecting before the references are read: objects whose last pin is
+//! released while a collection is open are kept by it (the next collection sees their rows).
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -62,7 +67,15 @@ pub fn from_hex(text: &str) -> Option<Hash> {
     Some(hash)
 }
 
-type Pins = Arc<Mutex<HashMap<Hash, usize>>>;
+/// Pin counts, and the objects whose last pin was released while a collection was open.
+#[derive(Debug, Default)]
+struct PinTable {
+    counts: HashMap<Hash, usize>,
+    collections: usize,
+    released: HashSet<Hash>,
+}
+
+type Pins = Arc<Mutex<PinTable>>;
 
 /// The object store. Cheap to clone; clones share the pins.
 #[derive(Debug, Clone)]
@@ -89,10 +102,13 @@ impl Pin {
 impl Drop for Pin {
     fn drop(&mut self) {
         let mut pins = lock(&self.pins);
-        if let Some(count) = pins.get_mut(&self.hash) {
+        if let Some(count) = pins.counts.get_mut(&self.hash) {
             *count -= 1;
             if *count == 0 {
-                pins.remove(&self.hash);
+                pins.counts.remove(&self.hash);
+                if pins.collections > 0 {
+                    pins.released.insert(self.hash);
+                }
             }
         }
     }
@@ -137,7 +153,7 @@ impl ObjectStore {
     /// Pins `hash` (whether or not the object exists yet).
     #[must_use]
     pub fn pin(&self, hash: Hash) -> Pin {
-        *lock(&self.pins).entry(hash).or_insert(0) += 1;
+        *lock(&self.pins).counts.entry(hash).or_insert(0) += 1;
         Pin {
             hash,
             pins: Arc::clone(&self.pins),
@@ -200,8 +216,17 @@ impl ObjectStore {
         Ok(count)
     }
 
+    /// Starts a collection. Take the set of referenced objects after this, then call
+    /// [`Collection::collect`].
+    #[must_use]
+    pub fn begin_collection(&self) -> Collection<'_> {
+        lock(&self.pins).collections += 1;
+        Collection { store: self }
+    }
+
     /// Removes every object that is neither in `referenced` nor pinned, and temporary files
-    /// left by interrupted writes.
+    /// left by interrupted writes. `referenced` must be read now; a caller that reads it before
+    /// walking uses [`ObjectStore::begin_collection`].
     ///
     /// # Errors
     ///
@@ -217,9 +242,10 @@ impl ObjectStore {
                         return Ok(());
                     }
                     // Checked and removed under the pins' lock: a `put` of the same content
-                    // either pinned first (kept) or checks for the file after it is gone.
+                    // either pinned first (kept) or checks for the file after it is gone. An
+                    // object released during an open collection may be referenced by now.
                     let pins = lock(&self.pins);
-                    if pins.contains_key(&hash) {
+                    if pins.counts.contains_key(&hash) || pins.released.contains(&hash) {
                         collected.kept += 1;
                     } else {
                         remove(&entry.path)?;
@@ -270,6 +296,34 @@ impl ObjectStore {
             }
         }
         Ok(())
+    }
+}
+
+/// A collection in progress (see [`ObjectStore::begin_collection`]).
+#[derive(Debug)]
+pub struct Collection<'a> {
+    store: &'a ObjectStore,
+}
+
+impl Drop for Collection<'_> {
+    fn drop(&mut self) {
+        let mut pins = lock(&self.store.pins);
+        pins.collections -= 1;
+        if pins.collections == 0 {
+            pins.released.clear();
+        }
+    }
+}
+
+impl Collection<'_> {
+    /// Removes every object that is neither in `referenced` nor pinned, nor released since the
+    /// collection began.
+    ///
+    /// # Errors
+    ///
+    /// The directory cannot be listed or a file cannot be removed.
+    pub fn collect(self, referenced: &HashSet<Hash>) -> Result<Collected> {
+        self.store.collect_garbage(referenced)
     }
 }
 

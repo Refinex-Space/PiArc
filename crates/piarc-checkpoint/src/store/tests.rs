@@ -110,3 +110,29 @@ fn only_stale_temporary_files_are_removed() {
         "temporary files are not objects"
     );
 }
+
+#[test]
+fn an_object_released_after_the_references_were_read_is_kept() {
+    // R3: Core reads the referenced snapshots, then walks the store. A write that stores its
+    // old bytes, records them in the index and releases its pin in between must not lose the
+    // object: the references Core read do not have the new row yet.
+    let dir = TempDir::new("race");
+    let store = ObjectStore::open(dir.path()).expect("store");
+    let collection = store.begin_collection();
+    let referenced = HashSet::new();
+    let pin = store.put(b"the file before the write").expect("put");
+    let hash = pin.hash();
+    drop(pin);
+    let collected = collection.collect(&referenced).expect("collect");
+    assert!(
+        store.contains(&hash),
+        "recorded by a write during the collection"
+    );
+    assert_eq!(collected.kept, 1);
+    // The next collection reads references that include the row (or not, if it was deleted).
+    store
+        .begin_collection()
+        .collect(&HashSet::new())
+        .expect("collect");
+    assert!(!store.contains(&hash));
+}
