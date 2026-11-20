@@ -251,6 +251,7 @@ impl ToolIo {
             Some(None) => timed_out(&p.questions),
             Some(Some((answer, ack))) => {
                 let result = answered(&p.questions, &answer);
+                // The answering window may have closed; the answer is taken either way.
                 let _ = ack.send(Ok(()));
                 result
             }

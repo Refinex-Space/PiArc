@@ -11,6 +11,7 @@ L3 行为对齐（T30，架构第 12.5 节，ADR-0046）：`npm run l3` 的实�
 | `claude-side.mjs` | 隔离运行 `claude -p`，stream-json 只在内存中读 |
 | `recording.mjs`、`check-recordings.mjs` | 录制产物格式与路径占位；白名单 schema 与自然语言扫描 |
 | `normalize.mjs`、`diff.mjs`、`allowlist.mjs`、`report.mjs` | 比较文档、字段路径 diff 与模式、allowlist、报告 |
+| `files.mjs`、`home-snapshot.mjs` | 工作区文件指纹（与 `piarc_testkit::l3::file_hash` 同一算法）与 JSON lines；运行前后 `~/.claude` 与 `~/.claude.json` 的快照比较（同时开着的 Claude Code 会话写会话记录也会被报告） |
 | `fixtures/hook.mjs`、`fixtures/approval-server.mjs` | 两侧共用的 hook 夹具（复制成工作区的 `.l3/hook.mjs`）、Claude Code 的审批 MCP server |
 
 ## 不变量

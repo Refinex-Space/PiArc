@@ -61,6 +61,7 @@ pub(in crate::tool_io) async fn approve(
         }
         Ok(())
     }.await;
+    // The answering window may have closed; the commit stands either way.
     let _ = ack.send(commit.clone());
     commit?;
     Ok((decision, answer.feedback))

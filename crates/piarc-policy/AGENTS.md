@@ -53,7 +53,7 @@ Core 的权限裁决（T20 起，T23 完整版）：Claude Code 格式的规则�
 
 ## 易错点
 
-- 新增工具要决定它在阶梯里的事实：写工具设 `write`（plan 拒绝），只读工具设 `read_only`，需要用户交互的设 `requiresUserInteraction`；规则匹配面（名称、路径、域名）在 `assess.rs`。
+- 新增工具要决定它在阶梯里的事实：写工具设 `write`（plan 拒绝），只读工具设 `read_only`，需要用户交互的在 `assess.rs` 给出 `MustAsk { step: "requiresUserInteraction" }`；规则匹配面（名称、路径、域名）在 `assess.rs`。
 - 只读白名单的 `valued`（取值选项）只列确实带值的选项：多列会把路径当成值跳过检查（不安全），少列只会把值当路径检查（多问一次）。选项词由 `option_word` 解析（R3）：短选项簇逐字母判断禁用与取值（`-ofile` 即 `-o`），长选项的前缀缩写按 getopt 视同全名，`--x=值` 的值按路径检查，`--files0-from` 一律不算只读；`find` 的起始路径跳过前置选项（`-L`、`-P`、`-f 路径`…）；重定向的设备豁免只认精确名字与 `/dev/fd/<数字>`，`$(< 文件)` 按 `:` 加输入重定向判断。
 - 改了白名单或包装名单，更新 `tests/bash_cases.json` 并核对 Windows 探测列表（`PROGRAMS`、`WRAPPED`）。
 - 测试里的命令环境要固定 PATH（`Fixture::fixed`）：cargo 在 macOS 上给测试进程设 `DYLD_*`，Core 会正确地关闭依赖程序解析的自动允许。

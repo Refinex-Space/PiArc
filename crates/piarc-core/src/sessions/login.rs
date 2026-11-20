@@ -95,6 +95,7 @@ impl Logins {
         match value {
             Some(text) => {
                 if let Some(prompt) = login.prompt.take() {
+                    // The flow may have finished meanwhile: nobody waits for the answer.
                     let _ = prompt.send(Some(text));
                 }
             }
@@ -126,6 +127,7 @@ impl Logins {
             // flow may race a pasted code against its loopback callback).
             let receiver = matches!(p.interaction, LoginInteraction::Prompt { .. }).then(|| {
                 if let Some(previous) = login.prompt.take() {
+                    // The replaced question's waiter may be gone already.
                     let _ = previous.send(None);
                 }
                 let (sender, receiver) = oneshot::channel();

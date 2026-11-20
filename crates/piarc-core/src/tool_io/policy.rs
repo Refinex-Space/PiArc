@@ -443,6 +443,7 @@ impl ToolIo {
         let prepared = result.allowed.then_some(prepared);
         let commit = commit(s, services, p, peer, &generation, &detail, answer, prepared).await;
         if let Some(ack) = ack {
+            // The answering window may have closed; the commit stands either way.
             let _ = ack.send(commit.clone());
         }
         commit?;

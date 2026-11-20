@@ -165,6 +165,7 @@ impl Request {
         });
         match RouteKey::session(&self.id.0).and_then(|route| Event::from_json(route, &payload)) {
             Ok(event) => {
+                // Fails only when Core shuts down; the rewind's result stands.
                 let _ = self.events.send(event).await;
             }
             Err(error) => {

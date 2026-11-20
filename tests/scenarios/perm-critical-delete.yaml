@@ -1,5 +1,5 @@
 id: perm-critical-delete
-description: Deleting the home directory, the workspace root or the filesystem root asks even with a matching allow rule and in Bypass permissions (T23).
+description: Deleting the home directory or the workspace root asks even with a matching allow rule and in Bypass permissions (T23); the filesystem root and other critical targets are cases of crates/piarc-policy/tests/bash_cases.json.
 capabilities: [CAP-PERM-CRITICAL-001, CAP-PERM-MODE-002]
 sessions:
   main: { provider: main, mode: bypassPermissions }
