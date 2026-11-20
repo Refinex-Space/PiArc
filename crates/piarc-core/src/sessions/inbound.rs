@@ -27,6 +27,8 @@ pub(crate) struct WorkspaceInbound {
     pub secrets: SecretsService,
     pub tool_io: ToolIo,
     pub sessions: SessionSet,
+    /// Running subagents keep the Agent Host from the idle timer (T31).
+    pub activity: super::workspace::Activity,
 }
 
 impl WorkspaceInbound {
@@ -62,10 +64,11 @@ impl WorkspaceInbound {
                 ))
             });
         }
-        let (io, sessions, workspace) = (
+        let (io, sessions, workspace, activity) = (
             self.tool_io.clone(),
             Arc::clone(&self.sessions),
             self.workspace.clone(),
+            self.activity.clone(),
         );
         if method == "subagent/finish" {
             return Box::pin(async move {
@@ -74,6 +77,7 @@ impl WorkspaceInbound {
                     .lock()
                     .unwrap_or_else(PoisonError::into_inner)
                     .remove(&named);
+                activity.busy(&named, false);
                 answer
             });
         }
@@ -83,6 +87,9 @@ impl WorkspaceInbound {
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
                 .insert(child.clone());
+            // A background run goes on after its main session's turn: while it runs, the
+            // Agent Host is busy.
+            activity.busy(&child, true);
             // A child whose connection ends without `subagent/finish` (the Agent Host
             // stopped) is unregistered then; its row records the interruption.
             tokio::spawn(async move {
@@ -92,6 +99,7 @@ impl WorkspaceInbound {
                         .lock()
                         .unwrap_or_else(PoisonError::into_inner)
                         .remove(&child);
+                    activity.busy(&child, false);
                     io.index_subagent(&child, &workspace, "error").await;
                 }
             });

@@ -1,0 +1,12 @@
+# T31: the main session starts a background subagent and its turn ends at once; the child's
+# script (`bg-subagent-child`) stalls, so the run stays in progress until the test stops it.
+id: bg-subagent
+steps:
+  - tool_calls:
+      - id: toolu_agent
+        name: Agent
+        input:
+          description: Long survey
+          prompt: 'Survey everything. [[piarc-scenario:bg-subagent-child]]'
+          run_in_background: true
+  - text: 'The survey runs in the background.'

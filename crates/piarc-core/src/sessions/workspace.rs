@@ -75,6 +75,24 @@ pub(crate) struct WorkspaceHandle {
     members: SessionSet,
 }
 
+/// Reports sessions the workspace actor did not open (subagents, T31) as busy, so the idle
+/// timer leaves their Agent Host running. Holds the actor's mailbox weakly: the inbound handler
+/// that owns it lives as long as the Agent Host, which the actor owns.
+#[derive(Clone)]
+pub(crate) struct Activity(mpsc::WeakUnboundedSender<WsMsg>);
+
+impl Activity {
+    pub fn busy(&self, session: &str, busy: bool) {
+        if let Some(tx) = self.0.upgrade() {
+            // A closed workspace no longer counts activity.
+            let _ = tx.send(WsMsg::Busy {
+                session: session.to_owned(),
+                busy,
+            });
+        }
+    }
+}
+
 impl WorkspaceHandle {
     /// Records the workspace, starts its actor, its settings watcher and its Agent Host.
     pub async fn open(ctx: &Arc<Ctx>, path: PathBuf) -> Result<Self> {
@@ -361,6 +379,7 @@ impl WorkspaceActor {
             secrets: self.ctx.secrets.clone(),
             tool_io: self.ctx.tool_io.clone(),
             sessions: Arc::clone(&self.handle.members),
+            activity: Activity(self.handle.tx.downgrade()),
         });
         let tune = self.ctx.config.tune_host.clone();
         let started = {

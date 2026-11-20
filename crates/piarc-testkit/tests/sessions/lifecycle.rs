@@ -97,6 +97,83 @@ async fn an_idle_workspace_stops_its_agent_host_and_the_next_prompt_restarts_it(
     shutdown(core).await;
 }
 
+/// T31: a running background subagent keeps its workspace's Agent Host. The main session's
+/// turn is over, but the idle timer must not stop the process (that would end the run); once
+/// the run is stopped the timer applies again. The child never shows in the session list.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_running_background_subagent_keeps_the_agent_host() {
+    let env = Env::new("reclaim-subagent").await;
+    let clock = ManualClock::new();
+    let threshold = Duration::from_secs(30 * 60);
+    let mut config = env.config(&[]);
+    config.sessions.clock = Arc::clone(&clock) as _;
+    config.sessions.idle_timeout = threshold;
+    let (core, events) = env.start(config);
+    let id = open_session(&core, &env).await;
+    let turn = prompt(
+        &core,
+        &id,
+        &prompt_text("Survey in the background.", "bg-subagent"),
+    )
+    .await;
+    events.turn_completed(&id, &turn).await;
+    events
+        .wait("the child's request", |_| {
+            !env.requests("bg-subagent-child").is_empty()
+        })
+        .await;
+    let child = events.of(&id, "subagent/started")[0]["subagent"]["sessionId"]
+        .as_str()
+        .expect("the child's id")
+        .to_owned();
+    let last_host = |e: &crate::support::Events| {
+        e.on("core/workspaces")
+            .last()
+            .and_then(|s| host_of(s, &env.ws))
+    };
+    for _ in 0..40 {
+        clock.advance(Duration::from_secs(60));
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    assert_eq!(
+        last_host(&events).as_deref(),
+        Some("ready"),
+        "the Agent Host stays while the subagent runs"
+    );
+
+    let (done, rx) = reply();
+    core.stop_subagent(id.clone(), child.clone(), done)
+        .expect("queued");
+    assert_eq!(answer(rx).await.expect("stopped")["stopped"], true);
+    events
+        .wait("the run's end", |e| {
+            !e.of(&id, "subagent/completed").is_empty()
+        })
+        .await;
+    let mut reclaimed = false;
+    for _ in 0..40 {
+        clock.advance(Duration::from_secs(60));
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        if last_host(&events).as_deref() == Some("reclaimed") {
+            reclaimed = true;
+            break;
+        }
+    }
+    assert!(reclaimed, "idle again once the run ended");
+    let listed: Vec<String> = events
+        .on("core/sessions")
+        .iter()
+        .flat_map(|s| s["sessions"].as_array().cloned().unwrap_or_default())
+        .filter_map(|s| s["id"].as_str().map(str::to_owned))
+        .collect();
+    assert!(listed.contains(&id));
+    assert!(
+        !listed.contains(&child),
+        "children stay out of the session list"
+    );
+    shutdown(core).await;
+}
+
 /// T14-A10: the workspace and session list snapshots carry strictly increasing revisions in the
 /// order they arrive, so a client that keeps the highest one never puts an older list over a
 /// newer one; the last snapshot reflects the last state.
