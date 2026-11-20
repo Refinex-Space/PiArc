@@ -91,6 +91,8 @@ export class SubagentRunner {
   readonly #options: RegistryOptions;
   readonly #main: (sessionId: string) => ParentSession | undefined;
   readonly #runs = new Map<string, Run>();
+  /** Calls past the limit check that are still choosing their model, by main session. */
+  readonly #starting = new Map<string, number>();
 
   constructor(options: RegistryOptions, main: (sessionId: string) => ParentSession | undefined) {
     this.#options = options;
@@ -117,9 +119,10 @@ export class SubagentRunner {
     return this.#runs.get(sessionId)?.depth ?? 0;
   }
 
-  /** Runs under main session `rootId`, at any depth. */
+  /** Runs under main session `rootId`, at any depth, with the ones being started. */
   running(rootId: string): number {
-    return [...this.#runs.values()].filter((run) => run.rootId === rootId).length;
+    const started = [...this.#runs.values()].filter((run) => run.rootId === rootId).length;
+    return started + (this.#starting.get(rootId) ?? 0);
   }
 
   /** The tools a subagent's session may use (its parent's `tools()`). */
@@ -257,7 +260,14 @@ export class SubagentRunner {
         `Subagent limit reached: ${String(count)} of ${String(maxConcurrent)} subagents are running for this session. Wait for one to finish, or do this work yourself.`,
       );
     }
-    const chosen = await this.#model(parent, definition, call, catalog);
+    // Hold the slot before the first await: parallel calls of one response count each other.
+    this.#starting.set(rootId, (this.#starting.get(rootId) ?? 0) + 1);
+    let chosen;
+    try {
+      chosen = await this.#model(parent, definition, call, catalog);
+    } finally {
+      this.#starting.set(rootId, (this.#starting.get(rootId) ?? 1) - 1);
+    }
     if (!chosen.ok) return refuse(chosen.message);
     const id = randomUUID();
     const background = call.background ?? definition.background === true;

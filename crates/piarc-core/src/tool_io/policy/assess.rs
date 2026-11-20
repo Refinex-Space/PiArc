@@ -361,8 +361,10 @@ pub(super) fn other_call(
     let mut ladder = plain(rules, tool, subject, &places.context());
     match tool {
         // The Harness Kit's host tools (T26) change no file and run no command. The question
-        // form of AskUserQuestion is shown by the tool itself (`ui/ask`) in every mode.
-        "TodoWrite" | "EnterPlanMode" | "SuggestNextSteps" | "AskUserQuestion" => {
+        // form of AskUserQuestion is shown by the tool itself (`ui/ask`) in every mode. `Agent`
+        // (T31) only starts a subagent, whose own calls are each decided here; `Agent(<type>)`
+        // deny and ask rules still apply to it.
+        "TodoWrite" | "EnterPlanMode" | "SuggestNextSteps" | "AskUserQuestion" | "Agent" => {
             ladder.read_only = true;
             return Assessment::new(ladder, Vec::new());
         }

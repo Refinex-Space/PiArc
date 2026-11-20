@@ -1,0 +1,53 @@
+id: subagent-general-purpose
+description: A general-purpose subagent inherits the session's model and gets the session's tools except the ones that talk to the user or switch modes (AskUserQuestion, EnterPlanMode, ExitPlanMode, SuggestNextSteps); its system prompt keeps the memory files and git status, its first request holds only the task (T31).
+capabilities: [CAP-AGENT-DEF-001, CAP-AGENT-RUN-001]
+workspace:
+  files:
+    CLAUDE.md: 'Project memory: keep answers short.'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: agent-1,
+              name: Agent,
+              input:
+                { description: Summarize the memory, prompt: Report what the project memory says. },
+            },
+          ]
+      # The subagent runs on the same model: its request comes next on this endpoint.
+      - text: It says to keep answers short.
+      - text: The memory asks for short answers.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: What does the memory say?, turn: one }
+expect:
+  request_counts: { main: 3 }
+  events:
+    - method: subagent/completed
+      params:
+        itemId: agent-1
+        subagent:
+          {
+            agentType: general-purpose,
+            status: completed,
+            model: { provider: mock-main, id: mock-model },
+          }
+  requests:
+    - provider: main
+      index: 0
+      tools_include: [Agent, AskUserQuestion, EnterPlanMode, SuggestNextSteps]
+    - provider: main
+      index: 1
+      roles: [user]
+      user_texts: [Report what the project memory says.]
+      tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite, Agent]
+      contains:
+        ['Project memory: keep answers short.', 'Git status at session start', 'PiArc subagent']
+      not_contains: ['What does the memory say?']
+    - provider: main
+      index: 2
+      tool_results: [{ id: agent-1, is_error: false, contains: It says to keep answers short. }]

@@ -593,6 +593,42 @@ capabilities:
     refs: [FR-HN-04, ARCH-6.4, ARCH-6.15]
     task: T31
     status: planned
+  - id: CAP-AGENT-FILTER-001
+    title: '子 agent 的工具按 tools、disallowedTools 过滤并移除提问与计划工具，调用被移除的工具在闸门处拒绝'
+    milestone: M3
+    refs: [FR-HN-04, ARCH-6.4]
+    task: T31
+    status: planned
+  - id: CAP-AGENT-LIMIT-001
+    title: '子 agent 深度上限移除 Agent 工具，并发上限立即返回说明上限的错误'
+    milestone: M3
+    refs: [FR-HN-04, ARCH-6.4]
+    task: T31
+    status: planned
+  - id: CAP-AGENT-APPROVAL-001
+    title: '子 agent 的审批卡出现在主会话并标明来源，模式不比主会话宽松'
+    milestone: M3
+    refs: [FR-HN-04, ARCH-6.4, ARCH-6.2.3]
+    task: T31
+    status: planned
+  - id: CAP-AGENT-CHECKPOINT-001
+    title: '子 agent 改动的文件进入主会话当前回合的检查点，回退时恢复'
+    milestone: M3
+    refs: [FR-HN-04, ARCH-6.9]
+    task: T31
+    status: planned
+  - id: CAP-AGENT-INTERRUPT-001
+    title: '中断主会话时进行中的子 agent 一并中止，未完成的工具调用补齐已中断结果'
+    milestone: M3
+    refs: [FR-HN-04, ARCH-6.15]
+    task: T31
+    status: planned
+  - id: CAP-AGENT-HOOKS-001
+    title: '子 agent 定义中的 hooks 只在其运行期间生效，项目级定义的 hooks 信任前不执行'
+    milestone: M3
+    refs: [FR-HN-04, ARCH-6.3.1]
+    task: T31
+    status: planned
   - id: CAP-AGENT-FORK-001
     title: 'fork 模式子 agent 继承父会话历史并共享缓存'
     milestone: M5
