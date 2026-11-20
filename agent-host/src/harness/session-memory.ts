@@ -336,7 +336,12 @@ export class SessionMemory {
         snapshot = await this.#load(this.#system === undefined, ctx.signal);
       }
       if (this.#system === undefined) {
-        const tools = options.selectedTools.filter((tool) => !options.hiddenTools.includes(tool));
+        // `options` is Pi's copy from before the handlers ran: a whole-tool deny that the
+        // policy gate applied with setActiveTools() is only in the live tool set (R3).
+        const active = new Set(pi.getActiveTools());
+        const tools = options.selectedTools.filter(
+          (tool) => active.has(tool) && !options.hiddenTools.includes(tool),
+        );
         this.#system = assembleSystem(tools, this.#profile, snapshot.files, {
           cwd: this.#cwd,
           platform: process.platform,

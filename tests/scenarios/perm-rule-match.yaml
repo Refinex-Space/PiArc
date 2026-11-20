@@ -1,5 +1,5 @@
 id: perm-rule-match
-description: Claude Code rules from the user and project files decide calls without asking, deny before allow; a whole-tool deny removes the tool from every model request (T23).
+description: Claude Code rules from the user and project files decide calls without asking, deny before allow; a whole-tool deny removes the tool from every model request and from the system prompt's tool guidance (T23, R3).
 capabilities: [CAP-PERM-RULE-001, CAP-PERM-TOOLS-001]
 workspace:
   trusted: true
@@ -32,6 +32,8 @@ expect:
   request_counts: { main: 6 }
   requests:
     - { index: 0, tools_include: [Read, Bash, Grep], tools_exclude: [Glob] }
+    # R3: the system prompt is frozen on the first run; it must not describe the removed tool.
+    - { index: 0, not_contains: ['Glob: find files by name or path pattern'] }
     - { index: 5, tools_exclude: [Glob] }
     - index: 5
       tool_results:

@@ -50,6 +50,8 @@ function harness(manager: SessionManager, read?: ReadMemory) {
     on: (key: string, handler: (event: unknown, ctx: object) => Promise<unknown>) =>
       hooks.set(key, handler),
     sendMessage: deliver,
+    // Pi's live tool set; no whole-tool deny in these tests (perm-rule-match covers one).
+    getActiveTools: () => ['view_file', 'Edit', 'PowerShell'],
   } as unknown as ExtensionAPI);
   const trigger = (name: string, event: object, ctx: object = {}) => {
     const hook = hooks.get(name);
