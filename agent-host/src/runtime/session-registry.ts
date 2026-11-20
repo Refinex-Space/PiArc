@@ -44,12 +44,9 @@ import type {
   SessionStopped,
 } from '@piarc/protocol';
 
-import { memoryReader } from '../harness/memory-io.js';
 import { IDENTITY } from '../harness/prompts/system.js';
-import { SessionMemory } from '../harness/session-memory.js';
-import { SessionHooks } from '../harness/hooks.js';
-import { expiredApprovals, policyGate, preflightInput } from '../harness/policy.js';
-import { SessionHarness } from '../harness/session-harness.js';
+import { expiredApprovals, policyGate } from '../harness/policy.js';
+import type { SessionHarness } from '../harness/session-harness.js';
 import {
   interruptedContext,
   missingToolCalls,
@@ -61,7 +58,6 @@ import { createToolResultBudget, TOOL_RESULT_LIMITS } from '../harness/tool-resu
 import { AhpError, describeError } from '../protocol/errors.js';
 import { DEFAULT_PROFILE, ToolNameMap, toolOptions } from '../tools/index.js';
 import { conservativeProfile } from '../tools/profile.js';
-import { AUXILIARY_USAGE_ENTRY, AuxiliaryModel } from '../harness/auxiliary.js';
 import { capabilities } from '../providers/catalog.js';
 import {
   branchPoints,
@@ -82,6 +78,7 @@ import {
 import { modeRecord } from './permission-mode.js';
 import { contentText } from './items.js';
 import { Projector } from './projector.js';
+import { sessionParts } from './session-parts.js';
 import { listModels, previewSwitch, selectEffort, selectModel } from './session-models.js';
 import { InputQueue } from './queue.js';
 import {
@@ -608,63 +605,17 @@ export class SessionRegistry {
     const sessionLog = (line: string): void => {
       this.#options.log(`[session ${manager.getSessionId()}] ${line}`);
     };
-    const auxiliary = new AuxiliaryModel({
-      runtime: workspace.modelRuntime,
-      preferences: workspace.preferences,
-      session: () => opened.session,
-      onUsage: (usage, used, purpose) => {
-        opened.projector?.auxiliaryUsage(usage);
-        manager.appendCustomEntry(AUXILIARY_USAGE_ENTRY, { purpose, model: used, usage });
-      },
-      log: sessionLog,
-    });
-    const harness = new SessionHarness({
-      sessionId: manager.getSessionId(),
+    const { harness, memory, hooks } = sessionParts({
+      options: this.#options,
       manager,
-      sink: this.#options.sinkFor(manager.getSessionId()),
+      cwd,
+      source,
       profile,
-      auxiliary,
       conservative,
       canonical: toCanonical,
-      activeTurn: () => opened.projector?.activeTurnId,
-      core: tools.kind === 'core' ? this.#options.hostTools : undefined,
-      cwd,
-      session: () => opened.session,
-      io: tools.kind === 'core' ? tools.ioFor(manager.getSessionId()) : undefined,
-      appended: (message) => opened.projector?.reminder(message),
+      opened,
       log: sessionLog,
-      contextWindow: (model) => workspace.preferences.contextWindow(model),
     });
-    const memory = new SessionMemory(
-      manager,
-      cwd,
-      tools.kind === 'core' ? profile : undefined,
-      this.#options.memoryBridge
-        ? memoryReader(this.#options.memoryBridge, manager.getSessionId())
-        : undefined,
-      toCanonical,
-      harness.reminders,
-    );
-    const hooksBridge = tools.kind === 'core' ? this.#options.hooksBridge : undefined;
-    const hooks =
-      hooksBridge === undefined
-        ? undefined
-        : new SessionHooks({
-            bridge: hooksBridge,
-            sessionId: manager.getSessionId(),
-            cwd,
-            source,
-            canonical: toCanonical,
-            transcript: () => opened.session?.sessionFile ?? manager.getSessionFile(),
-            reminders: harness.reminders,
-            hookInput: (tool, input) => {
-              const resolved = preflightInput(tool, input, cwd);
-              delete resolved.readPathCandidates;
-              return resolved;
-            },
-            log: sessionLog,
-          });
-    harness.connect(memory, hooks);
     const factory: CreateAgentSessionRuntimeFactory = async (target) => {
       // In-memory overrides (no silent provider retries, the compaction threshold) are
       // applied by `harness.compaction` once the session exists and before every run.
