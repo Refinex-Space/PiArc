@@ -5,6 +5,7 @@
 // transcript and what the rows' buttons do.
 import { createContext, useCallback, useContext, useRef, useSyncExternalStore } from 'react';
 
+import type { BranchPoint } from '@piarc/protocol';
 import type { SessionTranscript, TranscriptRow, TurnInfo } from '../store/transcript.js';
 import { HighlightClient } from './highlight/highlight-client.js';
 import { MarkdownClient, type ParsedDoc } from './markdown/markdown-client.js';
@@ -85,6 +86,12 @@ export interface TranscriptActions {
   readonly retry: (turnId: string) => void;
   /** Sends an input Core did not take again, with the same idempotency key. */
   readonly resend: (clientId: string) => void;
+  /** Opens the rewind dialog at a user message (T28); absent where nothing can be rewound. */
+  readonly rewind?: (turnId: string, text: string) => void;
+  /** Opens a new session that stops before a user message (T28). */
+  readonly branchFrom?: (turnId: string, text: string) => void;
+  /** Continues on another branch (T28). */
+  readonly switchBranch?: (entryId: string) => void;
 }
 
 /** One session's transcript as a view shows it. */
@@ -197,4 +204,12 @@ export function useParsedDoc(docKey: string): ParsedDoc | undefined {
     (listener) => markdown.subscribe(docKey, listener),
     () => markdown.get(docKey),
   );
+}
+
+/** The branch point of turn `turnId` (T28): other branches start where it starts. */
+export function useBranchPoint(turnId: string | undefined): BranchPoint | undefined {
+  const { transcript } = useTranscriptView();
+  const subscribe = useCallback((l: () => void) => transcript.branches.subscribe(l), [transcript]);
+  const read = useCallback(() => transcript.branches.forTurn(turnId), [transcript, turnId]);
+  return useSyncExternalStore(subscribe, read);
 }

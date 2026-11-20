@@ -18,6 +18,8 @@ export interface PanelContext {
   readonly tasks?: boolean;
   /** The selected session has a plan, approved or waiting for review (T26). */
   readonly plan?: boolean;
+  /** The Changes panel is open (T28: the changes card's button, Mod+Shift+D). */
+  readonly changes?: boolean;
 }
 
 export interface PanelSpec {

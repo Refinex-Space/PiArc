@@ -120,6 +120,7 @@ export function Composer({
   supportsImages = true,
   above,
   error,
+  fill,
 }: {
   running: boolean;
   disabled?: boolean;
@@ -133,6 +134,11 @@ export function Composer({
   above?: ReactNode;
   /** Why the last message was not sent. */
   error?: string | undefined;
+  /**
+   * Text to put in the input in place of what is there (a rewound message, T28); a new `nonce`
+   * puts it again.
+   */
+  fill?: { readonly text: string; readonly nonce: number } | undefined;
 }) {
   const { t, platform } = useApp();
   const mount = useRef<HTMLDivElement | null>(null);
@@ -390,6 +396,22 @@ export function Composer({
     // The editor is created once; translations of its label follow on the next mount.
   }, []);
 
+  // A message given back for the input: plain text, one paragraph per line, then focus.
+  const fillText = fill?.text;
+  const fillNonce = fill?.nonce;
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view === null || fillText === undefined || fillNonce === undefined) return;
+    const paragraphs = fillText
+      .replace(/\r\n?/gu, '\n')
+      .split('\n')
+      .map((line) =>
+        composerSchema.node('paragraph', null, line === '' ? [] : [composerSchema.text(line)]),
+      );
+    view.dispatch(view.state.tr.replaceWith(0, view.state.doc.content.size, paragraphs));
+    view.focus();
+  }, [fillText, fillNonce]);
+
   // Core's file search for the mention picker's query.
   useEffect(() => {
     if (!mention.active) {
@@ -634,8 +656,8 @@ export function Composer({
   );
 }
 
-const BUILTIN_NAMES = new Set(['clear', 'compact', 'help']);
+const BUILTIN_NAMES = new Set(['clear', 'compact', 'rewind', 'help']);
 
-function isBuiltinName(name: string): name is 'clear' | 'compact' | 'help' {
+function isBuiltinName(name: string): name is 'clear' | 'compact' | 'rewind' | 'help' {
   return BUILTIN_NAMES.has(name);
 }

@@ -18,6 +18,9 @@ import { PageBoundary } from './PageBoundary.js';
 import { DockArea, RailArea } from './PanelAreas.js';
 import type { PanelContext } from './registry.js';
 import './harness-panels.js';
+import '../changes/panels.js';
+import { toggleChangesPanel, useChangesPanelOpen } from '../changes/panel-state.js';
+import { showPanel } from './registry.js';
 import { ShortcutsDialog } from './ShortcutsDialog.js';
 import { Sidebar } from './Sidebar.js';
 import { groupSessions } from './Sidebar.js';
@@ -37,13 +40,15 @@ interface TrustRequest {
 function usePanelContext(store: AppStore, sessionId: string | undefined): PanelContext {
   const harness = useHarnessOf(store, sessionId);
   const pendingPlan = useSessionOf(store, sessionId)?.approvals.some((r) => r.kind === 'plan');
+  const changes = useChangesPanelOpen();
   return useMemo(
     () => ({
       sessionId,
       tasks: (harness?.todos.length ?? 0) > 0,
       plan: harness?.plan !== undefined || pendingPlan === true,
+      changes,
     }),
-    [sessionId, harness, pendingPlan],
+    [sessionId, harness, pendingPlan, changes],
   );
 }
 
@@ -265,6 +270,9 @@ export function Shell() {
       }
       case 'help.shortcuts':
         setShortcutsOpen(true);
+        break;
+      case 'changes.toggle':
+        if (view.kind === 'session' && toggleChangesPanel()) showPanel('changes');
         break;
       case 'app.settings':
         void window.piarc.openSettings();

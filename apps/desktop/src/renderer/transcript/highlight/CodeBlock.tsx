@@ -24,7 +24,8 @@ function tokenClass(fontStyle: number): string | undefined {
   return classes.length === 0 ? undefined : classes.join(' ');
 }
 
-function Token({ token, dark }: { token: HighlightToken; dark: boolean }) {
+/** One highlighted run of code (also used by the Changes panel's diff, T28). */
+export function Token({ token, dark }: { token: HighlightToken; dark: boolean }) {
   const color = dark ? token.dark : token.light;
   return (
     <span className={tokenClass(token.fontStyle)} style={color === null ? undefined : { color }}>

@@ -28,6 +28,8 @@ import type {
 
 import { sameRequest } from './approvals.js';
 import { SessionContextUsage } from './context-usage.js';
+import { SessionBranches } from './branches.js';
+import { SessionChanges } from './changes.js';
 import { SessionHarness } from './harness.js';
 import type { PendingAttachment } from '../composer/attachments.js';
 
@@ -290,9 +292,17 @@ export class SessionTranscript {
   /** The branch's plan and task list (T26). */
   readonly harness = new SessionHarness();
   readonly usage = new SessionContextUsage();
+  /** Where other branches start (T28). */
+  readonly branches = new SessionBranches();
+  /** The files the session changed (T28). */
+  readonly changes = new SessionChanges();
   private turn: TurnInfo = IDLE;
   private queueItems: readonly QueuedInput[] = [];
   private reload = false;
+  /** Cache of `userTurns`, cleared when rows are added or removed. */
+  private turnStarts:
+    | readonly { readonly turnId: string; readonly rowId: string; readonly text: string }[]
+    | undefined;
   private loadedFrom: number | undefined;
   private readonly rowListeners = new Map<string, Set<() => void>>();
   private readonly listListeners = new Set<() => void>();
@@ -343,6 +353,34 @@ export class SessionTranscript {
 
   queue(): readonly QueuedInput[] {
     return this.queueItems;
+  }
+
+  /** The first user message of each turn, in order (T28: rewinding and branching start there). */
+  userTurns(): readonly {
+    readonly turnId: string;
+    readonly rowId: string;
+    readonly text: string;
+  }[] {
+    if (this.turnStarts === undefined) {
+      const seen = new Set<string>();
+      const starts: { turnId: string; rowId: string; text: string }[] = [];
+      for (const id of this.order) {
+        const row = this.rows.get(id);
+        if (row?.kind !== 'item' || row.item.type !== 'userMessage' || row.turnId === undefined) {
+          continue;
+        }
+        if (seen.has(row.turnId)) continue;
+        seen.add(row.turnId);
+        starts.push({ turnId: row.turnId, rowId: id, text: row.item.text });
+      }
+      this.turnStarts = starts;
+    }
+    return this.turnStarts;
+  }
+
+  /** Whether row `id` is the first user message of its turn. */
+  isTurnStart(id: string): boolean {
+    return this.userTurns().some((turn) => turn.rowId === id);
   }
 
   /** Core said notifications were lost: the persisted conversation must be loaded again. */
@@ -633,12 +671,17 @@ export class SessionTranscript {
       case 'session/uncertain':
         this.onUncertain(params, batch);
         break;
+      // Lost notifications, or the conversation continues on another branch (T28): the rows,
+      // task list and branch points are loaded again.
       case 'session/resync':
+      case 'session/branchChanged':
         this.reload = true;
         batch.state = true;
         break;
       default:
-        if (!this.harness.apply(method, params)) this.usage.apply(method, params);
+        if (!this.harness.apply(method, params) && !this.branches.apply(method, params)) {
+          this.usage.apply(method, params);
+        }
         break;
     }
   }
@@ -858,6 +901,7 @@ export class SessionTranscript {
   private finish(batch: Batch): void {
     if (batch.list) {
       this.relist(batch);
+      this.turnStarts = undefined;
     }
     if (batch.listChanged) {
       emit(this.listListeners);

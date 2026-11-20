@@ -1,9 +1,10 @@
 // React bindings of the store: every hook subscribes to exactly the part it reads
 // (`useSyncExternalStore`), so a change re-renders only the components that show it.
-import type { ContextUsage } from '@piarc/protocol';
+import type { BranchPoint, ContextUsage } from '@piarc/protocol';
 import { createContext, useCallback, useContext, useEffect, useSyncExternalStore } from 'react';
 
 import type { AppStore, Notice } from './app-store.js';
+import type { ChangesState } from './changes.js';
 import type { HarnessSnapshot } from './harness.js';
 import type { SessionEntry, WorkspaceEntry } from './snapshots.js';
 import type { QueuedInput, TranscriptRow, TurnInfo } from './transcript.js';
@@ -135,5 +136,53 @@ export function useQueue(sessionId: string): readonly QueuedInput[] {
   return useSyncExternalStore(
     subscribe,
     useCallback(() => transcript.queue(), [transcript]),
+  );
+}
+
+/** The session's branch points (T28). */
+export function useBranches(sessionId: string | undefined): readonly BranchPoint[] {
+  const store = useStore();
+  const branches = sessionId === undefined ? undefined : store.transcript(sessionId).branches;
+  const subscribe = useCallback(
+    (l: () => void) => branches?.subscribe(l) ?? (() => undefined),
+    [branches],
+  );
+  return useSyncExternalStore(
+    subscribe,
+    useCallback(() => branches?.state() ?? NO_BRANCHES, [branches]),
+  );
+}
+
+const NO_BRANCHES: readonly BranchPoint[] = [];
+
+/**
+ * The session's changes (T28): asked for when first shown, again when a turn ends and when the
+ * conversation moves to another branch.
+ */
+export function useChanges(sessionId: string | undefined): ChangesState | undefined {
+  const store = useStore();
+  const transcript = sessionId === undefined ? undefined : store.transcript(sessionId);
+  const changes = transcript?.changes;
+  useEffect(() => {
+    if (transcript === undefined || sessionId === undefined) return;
+    const fetch = () => window.piarc.sessionChanges(sessionId);
+    if (changes?.state().view === undefined) void changes?.refresh(fetch);
+    let running = transcript.turnInfo().running;
+    let reload = transcript.needsReload();
+    return transcript.subscribeState(() => {
+      const now = transcript.turnInfo().running;
+      const again = transcript.needsReload();
+      if ((running && !now) || (!reload && again)) void changes?.refresh(fetch);
+      running = now;
+      reload = again;
+    });
+  }, [transcript, changes, sessionId]);
+  const subscribe = useCallback(
+    (l: () => void) => changes?.subscribe(l) ?? (() => undefined),
+    [changes],
+  );
+  return useSyncExternalStore(
+    subscribe,
+    useCallback(() => changes?.state(), [changes]),
   );
 }

@@ -15,6 +15,8 @@ pub enum CommandAction {
     Compact,
     /// Shows the commands and keyboard shortcuts.
     Help,
+    /// Opens the rewind dialog to choose a message to go back to (T28).
+    Rewind,
 }
 
 /// A command the palette lists.
@@ -46,6 +48,12 @@ pub fn builtin() -> Vec<Command> {
             description: "Summarize the conversation to free up context",
             source: "builtin",
             action: CommandAction::Compact,
+        },
+        Command {
+            name: "rewind",
+            description: "Go back to an earlier message: restore code, conversation or both",
+            source: "builtin",
+            action: CommandAction::Rewind,
         },
         Command {
             name: "help",

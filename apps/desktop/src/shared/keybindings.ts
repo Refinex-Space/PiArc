@@ -37,6 +37,12 @@ export const COMMANDS = [
   { id: 'session.effort', defaultKey: 'Mod+Shift+E', label: 'models.effort', scope: 'app' },
   { id: 'session.next', defaultKey: 'Ctrl+Tab', label: 'command.session.next', scope: 'app' },
   {
+    id: 'changes.toggle',
+    defaultKey: 'Mod+Shift+D',
+    label: 'command.changes.toggle',
+    scope: 'app',
+  },
+  {
     id: 'help.shortcuts',
     defaultKey: 'Mod+/',
     label: 'command.help.shortcuts',

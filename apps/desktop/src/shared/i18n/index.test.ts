@@ -74,6 +74,7 @@ describe('i18n', () => {
             tokens: 150_000,
             window: 200_000,
             threshold: 182_904,
+            index: 1,
           }),
         ).not.toThrow();
       }

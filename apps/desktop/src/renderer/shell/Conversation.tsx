@@ -15,10 +15,21 @@ import {
   type MentionSource,
 } from '../composer/Composer.js';
 import type { MentionData } from '../composer/schema.js';
-import { useNeedsReload, useQueue, useSession, useStore, useTurnInfo } from '../store/hooks.js';
+import {
+  useBranches,
+  useNeedsReload,
+  useQueue,
+  useSession,
+  useStore,
+  useTurnInfo,
+} from '../store/hooks.js';
 import { badgeOf } from '../store/status.js';
 import type { SessionTranscript, TranscriptEntry } from '../store/transcript.js';
 import { HISTORY } from '../transcript/constants.js';
+import { BranchTail } from '../changes/BranchSwitcher.js';
+import { takeDraft } from '../changes/drafts.js';
+import { RewindDialog, type RewindTarget } from '../changes/RewindDialog.js';
+import { useBranchActions } from '../changes/use-branch-actions.js';
 import { TranscriptContext, type TranscriptView } from '../transcript/services.js';
 import { Transcript } from '../transcript/Transcript.js';
 import { reason } from './errors.js';
@@ -41,6 +52,7 @@ function parseWindow(text: string): {
   start: number;
   items: TranscriptEntry[];
   harness?: unknown;
+  branches?: unknown;
 } {
   const value: unknown = JSON.parse(text);
   if (!isRecord(value) || !Array.isArray(value.items)) {
@@ -61,6 +73,7 @@ function parseWindow(text: string): {
     start: typeof value.start === 'number' ? value.start : 0,
     items,
     harness: value.harness,
+    branches: value.branches,
   };
 }
 
@@ -128,6 +141,7 @@ function useHistory(
         if (!transcript.hasContent() || transcript.needsReload()) {
           transcript.load(window.items, window.start);
           transcript.harness.load(window.harness);
+          transcript.branches.load(window.branches);
         }
       },
       (failure: unknown) => {
@@ -191,6 +205,16 @@ export function Conversation({
   const queue = useQueue(id);
   const [error, setError] = useState<string | undefined>(undefined);
   const input = useMemo(() => new SessionInput(window.piarc, store, id), [store, id]);
+  // T28: the rewind dialog (at a message, or `/rewind` listing them), text given back for the
+  // input (a rewound message, or the message a branch started from).
+  const [rewinding, setRewinding] = useState<{ target: RewindTarget | undefined }>();
+  const [fill, setFill] = useState<{ text: string; nonce: number }>();
+  useEffect(() => {
+    const draft = takeDraft(id);
+    if (draft !== undefined) setFill({ text: draft, nonce: Date.now() });
+  }, [id]);
+  const branchActions = useBranchActions(id, setError);
+  const tail = useBranches(id).find((point) => point.turnId === undefined);
 
   // Indexed sessions carry no live policy. Resume alongside the history read so the
   // environment bar reflects the latest persisted mode as soon as Core restores it.
@@ -235,9 +259,14 @@ export function Conversation({
         resend: (clientId) => {
           void input.resend(clientId);
         },
+        rewind: (turnId, text) => {
+          setRewinding({ target: { turnId, text } });
+        },
+        branchFrom: branchActions.branchFrom,
+        switchBranch: branchActions.switchBranch,
       },
     }),
-    [ui.transcriptServices, transcript, input],
+    [ui.transcriptServices, transcript, input, branchActions],
   );
   const mentions = useMemo(
     () => coreMentions(session?.cwd ?? session?.workspace, ui.composer?.maxSearchResults ?? 20),
@@ -256,6 +285,9 @@ export function Conversation({
           break;
         case 'help':
           ui.openShortcuts();
+          break;
+        case 'rewind':
+          setRewinding({ target: undefined });
           break;
         default:
           break;
@@ -326,8 +358,17 @@ export function Conversation({
           error={
             error ?? (catalogFailure ? t('models.failed', { reason: catalogFailure }) : undefined)
           }
+          fill={fill}
           above={
-            queue.length === 0 ? null : (
+            queue.length === 0 ? (
+              tail === undefined ? null : (
+                <BranchTail
+                  point={tail}
+                  onSwitch={branchActions.switchBranch}
+                  disabled={turn.running}
+                />
+              )
+            ) : (
               <QueueList
                 items={queue}
                 onEdit={(itemId, text) => {
@@ -368,6 +409,21 @@ export function Conversation({
           <UsageRing sessionId={id} />
         </div>
       </div>
+      {rewinding === undefined ? null : (
+        <RewindDialog
+          sessionId={id}
+          target={rewinding.target}
+          turns={transcript.userTurns()}
+          onDone={(report) => {
+            const text = report.conversation?.text;
+            if (text != null) setFill({ text, nonce: Date.now() });
+            void transcript.changes.refresh(() => window.piarc.sessionChanges(id));
+          }}
+          onClose={() => {
+            setRewinding(undefined);
+          }}
+        />
+      )}
     </section>
   );
 }

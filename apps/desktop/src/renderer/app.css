@@ -1331,3 +1331,204 @@ textarea.input {
 :root[data-app] .context-panel > .button {
   justify-self: start;
 }
+
+/* T28: the Changes panel and the rail's changes card, the rewind dialog, the branch switcher. */
+:root[data-app] .changes-panel,
+:root[data-app] .changes-card {
+  display: grid;
+  align-content: start;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-3);
+}
+:root[data-app] .changes-card > .button {
+  justify-self: start;
+}
+:root[data-app] .changes-head {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .changes-head > .row-action {
+  margin-inline-start: auto;
+}
+:root[data-app] .changes-note {
+  margin: 0;
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .changes-error {
+  margin: 0;
+  color: var(--piarc-text-danger);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .changes-files {
+  display: grid;
+  gap: var(--piarc-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+:root[data-app] .changes-file-head {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+}
+:root[data-app] .changes-file-path {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--piarc-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-app] .changes-discard-file {
+  margin-inline-start: auto;
+}
+:root[data-app] .changes-hunk-range {
+  font-family: var(--piarc-font-mono);
+}
+:root[data-app] .changes-hunk-discard {
+  float: inline-end;
+}
+:root[data-app] .changes-plain {
+  margin: var(--piarc-space-1) 0 0;
+  max-height: 24em;
+  overflow: auto;
+  padding: var(--piarc-space-2);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+  white-space: pre;
+}
+:root[data-app] .rewind-message {
+  margin: 0 0 var(--piarc-space-3);
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border-inline-start: 2px solid var(--piarc-border-default);
+  background: var(--piarc-surface-panel);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+:root[data-app] .rewind-scopes {
+  display: grid;
+  gap: var(--piarc-space-2);
+  margin: 0 0 var(--piarc-space-3);
+  padding: 0;
+  border: 0;
+}
+:root[data-app] .rewind-scope {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .rewind-scope > span {
+  display: grid;
+  gap: 2px;
+}
+:root[data-app] .rewind-scope-name {
+  font-weight: var(--piarc-font-weight-medium);
+}
+:root[data-app] .rewind-scope-hint {
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .rewind-section {
+  margin: 0 0 var(--piarc-space-1);
+  font-size: var(--piarc-font-size-small);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+:root[data-app] .rewind-files,
+:root[data-app] .rewind-turns {
+  display: grid;
+  gap: var(--piarc-space-1);
+  margin: 0 0 var(--piarc-space-3);
+  padding: 0;
+  list-style: none;
+}
+:root[data-app] .rewind-file {
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+}
+:root[data-app] .rewind-file-head {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .rewind-file-path {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--piarc-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-app] .rewind-file-head > .badge {
+  margin-inline-start: auto;
+}
+:root[data-app] .rewind-action.is-conflict,
+:root[data-app] .rewind-outcome.is-failed {
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+}
+:root[data-app] .rewind-file-note {
+  margin: var(--piarc-space-1) 0 0;
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .rewind-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-3);
+  margin-top: var(--piarc-space-1);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .rewind-note {
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .rewind-turn {
+  width: 100%;
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  overflow: hidden;
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-panel);
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-app] .rewind-turn:hover {
+  background: var(--piarc-surface-hover);
+}
+:root[data-app] .branch-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  align-self: flex-end;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+  font-variant-numeric: tabular-nums;
+}
+:root[data-app] .branch-tail {
+  display: grid;
+  gap: var(--piarc-space-1);
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-panel);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .branch-tail ul {
+  display: grid;
+  gap: var(--piarc-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+:root[data-app] .branch-tail li {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+}
+:root[data-app] .branch-preview {
+  min-width: 0;
+  flex: 1;
+}

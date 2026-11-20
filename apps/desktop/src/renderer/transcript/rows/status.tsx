@@ -28,6 +28,9 @@ export function CompactionRow({
     text = t('transcript.compaction.failed', { message: item.errorMessage ?? '' });
   } else if (item.status === 'interrupted') {
     text = t('transcript.compaction.interrupted');
+  } else if (item.reason === 'rewind') {
+    // T28's "summarize from here": the rest of the branch is a summary.
+    text = t('transcript.compaction.summary');
   } else if (
     item.tokensBefore !== undefined &&
     item.tokensBefore !== null &&

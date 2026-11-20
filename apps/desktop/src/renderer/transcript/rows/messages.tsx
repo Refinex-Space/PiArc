@@ -8,7 +8,14 @@ import { useT } from '../../app/app-context.js';
 import { chipOf, type ShownInput, type TranscriptRow } from '../../store/transcript.js';
 import { blocksText } from '../copy.js';
 import { MarkdownView } from '../markdown/MarkdownView.js';
-import { useExpanded, useParsedDoc, useTranscriptView } from '../services.js';
+import { BranchSwitcher } from '../../changes/BranchSwitcher.js';
+import {
+  useBranchPoint,
+  useExpanded,
+  useParsedDoc,
+  useTranscriptView,
+  useTurn,
+} from '../services.js';
 import { AttachmentChips, CopyButton, MentionText } from './common.js';
 import { useListActions, useRowCommitted } from './list-actions.js';
 
@@ -16,14 +23,22 @@ type AgentMessageItem = Extract<Item, { type: 'agentMessage' }>;
 type ReasoningItem = Extract<Item, { type: 'reasoning' }>;
 type UserMessageItem = Extract<Item, { type: 'userMessage' }>;
 
-/** A user message from Core. */
+/** A user message from Core; the first of a turn can be rewound to and branched from (T28). */
 export function UserMessageRow({
   id,
   item,
+  turnId,
 }: {
   readonly id: string;
   readonly item: UserMessageItem;
+  readonly turnId: string | undefined;
 }) {
+  const t = useT();
+  const { actions, transcript } = useTranscriptView();
+  const point = useBranchPoint(turnId);
+  const { running } = useTurn();
+  const start = turnId !== undefined && transcript.isTurnStart(id);
+  const { rewind, branchFrom, switchBranch } = actions;
   return (
     <UserBubble
       id={id}
@@ -32,6 +47,40 @@ export function UserMessageRow({
         mentions: item.mentions ?? [],
         attachments: (item.attachments ?? []).flatMap(chipOf),
       }}
+      extra={
+        <>
+          {start && rewind !== undefined ? (
+            <button
+              type="button"
+              className="row-action"
+              data-testid="rewind-here"
+              disabled={running}
+              onClick={() => {
+                rewind(turnId, item.text);
+              }}
+            >
+              {t('transcript.rewind')}
+            </button>
+          ) : null}
+          {start && branchFrom !== undefined ? (
+            <button
+              type="button"
+              className="row-action"
+              data-testid="branch-from-here"
+              onClick={() => {
+                branchFrom(turnId, item.text);
+              }}
+            >
+              {t('transcript.branchFrom')}
+            </button>
+          ) : null}
+        </>
+      }
+      branches={
+        point === undefined || switchBranch === undefined ? null : (
+          <BranchSwitcher point={point} onSwitch={switchBranch} disabled={running} />
+        )
+      }
     />
   );
 }
@@ -74,11 +123,17 @@ function UserBubble({
   input,
   state,
   children,
+  extra,
+  branches,
 }: {
   readonly id: string;
   readonly input: ShownInput;
   readonly state?: 'sending' | 'undelivered';
   readonly children?: ReactNode;
+  /** More actions after copy and select (rewind, branch). */
+  readonly extra?: ReactNode;
+  /** The branch switcher, shown at all times. */
+  readonly branches?: ReactNode;
 }) {
   const t = useT();
   const list = useListActions();
@@ -108,7 +163,9 @@ function UserBubble({
         >
           {t('transcript.selectTurn')}
         </button>
+        {extra}
       </div>
+      {branches}
     </div>
   );
 }

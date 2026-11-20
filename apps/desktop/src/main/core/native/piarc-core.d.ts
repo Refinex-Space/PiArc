@@ -79,11 +79,7 @@ export declare class CoreRuntime {
    * Opens a copy of a session's conversation (up to `entryId`, or up to where the turn
    * `beforeTurn` started) as a new session.
    */
-  forkSession(
-    id: string,
-    entryId?: string | null,
-    beforeTurn?: string | null | undefined,
-  ): Promise<string>;
+  forkSession(id: string, entryId?: string | null, beforeTurn?: string | null): Promise<string>;
   /** Closes an open session. */
   closeSession(id: string): Promise<string>;
   /** Starts a turn on an idle session; resolves with `{ turnId }`. */
@@ -132,7 +128,7 @@ export declare class CoreRuntime {
    * The session's changed files, or the file `path` alone with its diff; resolves with the
    * `ChangesView` JSON.
    */
-  sessionChanges(id: string, path?: string | null | undefined): Promise<string>;
+  sessionChanges(id: string, path?: string | null): Promise<string>;
   /**
    * Discards a file's change or one hunk: `request` is the `DiscardRequest` JSON; resolves
    * with the file's `ChangesView` afterwards.

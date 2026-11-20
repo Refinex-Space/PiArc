@@ -101,7 +101,7 @@ const RowContent = memo(function RowContent({ id }: { readonly id: string }) {
   const { item } = row;
   switch (item.type) {
     case 'userMessage':
-      return <UserMessageRow id={id} item={item} />;
+      return <UserMessageRow id={id} item={item} turnId={row.turnId} />;
     case 'agentMessage':
       return <AgentMessageRow id={id} item={item} />;
     case 'reasoning':

@@ -344,7 +344,7 @@ impl CoreRuntime {
         env: &'env Env,
         id: String,
         #[napi(ts_arg_type = "string | null")] entry_id: Option<String>,
-        #[napi(ts_arg_type = "string | null | undefined")] before_turn: Option<String>,
+        #[napi(ts_arg_type = "string | null")] before_turn: Option<String>,
     ) -> napi::Result<Object<'env>> {
         let at = match before_turn {
             Some(turn) => piarc_core::sessions::ForkPoint::BeforeTurn(turn),
@@ -527,7 +527,7 @@ impl CoreRuntime {
         &self,
         env: &'env Env,
         id: String,
-        #[napi(ts_arg_type = "string | null | undefined")] path: Option<String>,
+        #[napi(ts_arg_type = "string | null")] path: Option<String>,
     ) -> napi::Result<Object<'env>> {
         let op = Op::Checkpoint(CheckpointOp::Changes(path));
         self.op(env, "CoreRuntime.sessionChanges", id, op)
