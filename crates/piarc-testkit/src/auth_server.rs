@@ -26,7 +26,8 @@ use hyper_util::rt::TokioIo;
 use serde_json::{Value, json};
 use tokio::net::TcpListener;
 
-/// Polls answered `authorization_pending` before the device code flow decides.
+/// Polls answered `authorization_pending` before the device code flow decides (by default; see
+/// [`MockAuthServer::set_pending_polls`]).
 pub const PENDING_POLLS: usize = 2;
 
 /// How the server answers the user's decision.
@@ -61,6 +62,7 @@ struct State {
     codes: Vec<String>,
     device_codes: Vec<String>,
     polls: usize,
+    pending_polls: usize,
     /// Access and refresh tokens issued, oldest first.
     issued: Vec<(String, String)>,
 }
@@ -101,6 +103,7 @@ impl MockAuthServer {
             codes: Vec::new(),
             device_codes: Vec::new(),
             polls: 0,
+            pending_polls: PENDING_POLLS,
             issued: Vec::new(),
         }));
         let shared = Arc::clone(&state);
@@ -158,6 +161,12 @@ impl MockAuthServer {
         let mut state = self.lock();
         state.behavior = behavior;
         state.polls = 0;
+    }
+
+    /// How many polls of a device code answer `authorization_pending` (100 ms apart) before the
+    /// decision: long enough for a person, or a UI test, to see the code.
+    pub fn set_pending_polls(&self, polls: usize) {
+        self.lock().pending_polls = polls;
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, State> {
@@ -249,7 +258,7 @@ fn token(state: &mut State, request: &Value) -> hyper::Response<Full<Bytes>> {
             if !state.device_codes.iter().any(|c| c == code) {
                 return refused("invalid_grant");
             }
-            if state.polls < PENDING_POLLS {
+            if state.polls < state.pending_polls {
                 state.polls += 1;
                 return refused("authorization_pending");
             }

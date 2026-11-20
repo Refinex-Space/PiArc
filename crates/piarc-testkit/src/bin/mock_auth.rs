@@ -1,7 +1,7 @@
 //! `piarc-mock-auth`: the mock OAuth authorization server as a standalone process (T29, L4).
 //!
 //! ```text
-//! piarc-mock-auth [--port <port>] [--behavior approve|deny|expire]
+//! piarc-mock-auth [--port <port>] [--behavior approve|deny|expire] [--pending-polls <n>]
 //! ```
 //!
 //! Binds `127.0.0.1:<port>` (default 0, a free port) and prints the bound port as the first
@@ -13,8 +13,14 @@ use std::process::ExitCode;
 use piarc_testkit::auth_server::{AuthBehavior, MockAuthServer};
 use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader};
 
-fn parse_args(mut args: impl Iterator<Item = String>) -> Result<(u16, AuthBehavior), String> {
-    let (mut port, mut behavior) = (0, AuthBehavior::Approve);
+struct Options {
+    port: u16,
+    behavior: AuthBehavior,
+    pending_polls: Option<usize>,
+}
+
+fn parse_args(mut args: impl Iterator<Item = String>) -> Result<Options, String> {
+    let (mut port, mut behavior, mut pending_polls) = (0, AuthBehavior::Approve, None);
     while let Some(arg) = args.next() {
         let value = args.next().ok_or_else(|| format!("{arg} needs a value"))?;
         match arg.as_str() {
@@ -23,16 +29,30 @@ fn parse_args(mut args: impl Iterator<Item = String>) -> Result<(u16, AuthBehavi
                 behavior =
                     AuthBehavior::parse(&value).ok_or_else(|| format!("--behavior: {value:?}"))?;
             }
+            "--pending-polls" => {
+                pending_polls = Some(
+                    value
+                        .parse()
+                        .map_err(|_| format!("--pending-polls: {value:?}"))?,
+                );
+            }
             other => return Err(format!("unknown argument {other:?}")),
         }
     }
-    Ok((port, behavior))
+    Ok(Options {
+        port,
+        behavior,
+        pending_polls,
+    })
 }
 
-async fn run(port: u16, behavior: AuthBehavior) -> Result<(), String> {
-    let server = MockAuthServer::start(behavior, port)
+async fn run(options: Options) -> Result<(), String> {
+    let server = MockAuthServer::start(options.behavior, options.port)
         .await
         .map_err(|e| format!("cannot bind: {e}"))?;
+    if let Some(polls) = options.pending_polls {
+        server.set_pending_polls(polls);
+    }
     let mut stdout = tokio::io::stdout();
     stdout
         .write_all(format!("{}\n", server.port()).as_bytes())
@@ -49,7 +69,7 @@ async fn run(port: u16, behavior: AuthBehavior) -> Result<(), String> {
 }
 
 fn main() -> ExitCode {
-    let (port, behavior) = match parse_args(std::env::args().skip(1)) {
+    let options = match parse_args(std::env::args().skip(1)) {
         Ok(options) => options,
         Err(message) => {
             eprintln!("piarc-mock-auth: {message}");
@@ -66,7 +86,7 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    match runtime.block_on(run(port, behavior)) {
+    match runtime.block_on(run(options)) {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {
             eprintln!("piarc-mock-auth: {message}");

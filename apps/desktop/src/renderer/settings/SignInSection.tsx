@@ -209,7 +209,7 @@ export function SignInSection({
   readonly providers: readonly LoginProvider[];
   readonly busy: boolean;
   /** The provider settings changed (signed in or out): reload them. */
-  readonly onChanged: (settings?: string) => void;
+  readonly onChanged: () => void;
 }) {
   const t = useT();
   const titleId = useId();
@@ -288,8 +288,9 @@ export function SignInSection({
                   disabled={busy || open}
                   onClick={() => {
                     window.piarc.logoutProvider(p.id).then(
-                      (settings) => {
-                        if (settings !== null) onChanged(settings);
+                      (done) => {
+                        // Core answers the sign-out itself; read the settings again.
+                        if (done !== null) onChanged();
                       },
                       (e: unknown) => {
                         setFailure(reason(e));
