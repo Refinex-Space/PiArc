@@ -277,12 +277,18 @@ fn frontmatter<'t>(
     let front: Value = match serde_saphyr::from_str::<Option<Value>>(yaml) {
         Ok(Some(value)) => value,
         Ok(None) => Value::Null,
-        // The frontmatter starts on the file's second line.
+        // The frontmatter starts on the file's second line. One line without the parser's
+        // source snippet: the settings page and the card show it in a list.
         Err(error) => {
+            let text = error.render_with_options(serde_saphyr::render_options! {
+                snippets: serde_saphyr::SnippetMode::Off,
+                line_offset: 1,
+            });
+            let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
             return Err(issue(
                 path,
                 error.location().map(|l| l.line() + 1),
-                format!("invalid YAML: {error}"),
+                format!("invalid YAML: {text}"),
             ));
         }
     };

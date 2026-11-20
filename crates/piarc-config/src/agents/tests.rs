@@ -173,6 +173,18 @@ fn errors_name_the_file_line() {
 }
 
 #[test]
+fn invalid_yaml_is_one_line_with_the_files_line() {
+    // The parser's own text has a source snippet over several lines and counts lines from the
+    // frontmatter; the settings page shows one line with the file's line number.
+    let text = "---\nname: a\n\ndescription: [x\n---\n";
+    let error = parse(Path::new("/w/a.md"), AgentSource::User, text).expect_err("invalid");
+    assert_eq!(error.line, Some(4));
+    assert!(!error.message.contains('\n'), "{}", error.message);
+    assert!(!error.message.contains("<input>"), "{}", error.message);
+    assert!(error.message.contains("line 4"), "{}", error.message);
+}
+
+#[test]
 fn a_project_file_cannot_raise_the_mode() {
     for mode in ["bypassPermissions", "auto"] {
         let text = format!("---\nname: a\ndescription: d\npermissionMode: {mode}\n---\n");
