@@ -1,0 +1,4 @@
+{
+  "id": "t31-stall",
+  "steps": [{ "text": "Surveying the repository, directory by directory", "stall_after_events": 3 }]
+}

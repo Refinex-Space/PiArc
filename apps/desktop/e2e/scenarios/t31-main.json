@@ -1,0 +1,19 @@
+{
+  "id": "t31-main",
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "agent-review",
+          "name": "Agent",
+          "input": {
+            "description": "Check the build",
+            "prompt": "Run the build check and report. [[piarc-scenario:t31-child]]",
+            "subagent_type": "reviewer"
+          }
+        }
+      ]
+    },
+    { "text": "The reviewer says the build is fine." }
+  ]
+}

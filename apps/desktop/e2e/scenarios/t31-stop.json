@@ -1,0 +1,18 @@
+{
+  "id": "t31-stop",
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "agent-survey",
+          "name": "Agent",
+          "input": {
+            "description": "Survey the repository",
+            "prompt": "Survey every directory. [[piarc-scenario:t31-stall]]"
+          }
+        }
+      ]
+    },
+    { "text": "The survey was stopped early." }
+  ]
+}

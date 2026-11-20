@@ -1,0 +1,15 @@
+{
+  "id": "t31-child",
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "child-check",
+          "name": "Bash",
+          "input": { "command": "env echo build checked", "description": "Check the build" }
+        }
+      ]
+    },
+    { "text": "All checks passed." }
+  ]
+}
