@@ -223,8 +223,13 @@ fn update_file(
         (true, Some(path)) => path.to_owned(),
         _ => return Err(WriteError::ReadOnly(layer.to_owned())),
     };
-    if layer == ids::PROJECT_LOCAL {
-        // A repository must not redirect a native confirmation to another project or user file.
+    // Links resolved: a repository's `.piarc` linked to `~/.claude` is still Claude Code's.
+    let real = real_location(&path)?;
+    if crate::claude::is_claude_path(&real) {
+        return Err(WriteError::ClaudeConfig { path: real });
+    }
+    if layer == ids::PROJECT_LOCAL || layer == ids::PROJECT {
+        // A repository must not redirect a write to another project or user file.
         for component in path.parent().into_iter().chain([path.as_path()]) {
             match fs::symlink_metadata(component) {
                 Ok(meta) if redirected(&meta) => {
@@ -274,6 +279,31 @@ fn update_file(
     }
     replace_file(&path, text.as_bytes())?;
     Ok(path)
+}
+
+/// `path` with its deepest existing ancestor canonicalized (links resolved).
+fn real_location(path: &Path) -> Result<PathBuf, WriteError> {
+    let mut existing = path;
+    let mut rest = Vec::new();
+    loop {
+        match fs::canonicalize(existing) {
+            Ok(real) => return Ok(rest.iter().rev().fold(real, |p, name| p.join(name))),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                let (Some(parent), Some(name)) = (existing.parent(), existing.file_name()) else {
+                    return Ok(path.to_owned());
+                };
+                rest.push(name);
+                existing = parent;
+            }
+            Err(source) => {
+                return Err(WriteError::Io {
+                    op: "cannot inspect",
+                    path: existing.to_owned(),
+                    source,
+                });
+            }
+        }
+    }
 }
 
 #[cfg(windows)]
@@ -466,6 +496,38 @@ mod tests {
             assert!(matches!(error, WriteError::ClaudeConfig { .. }), "{error}");
         }
         assert!(!home.exists() && !workspace.join(".claude").exists());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_project_settings_directory_linked_into_claude_code_config_is_refused() {
+        // R3: a repository links `.piarc` to the user's `~/.claude`; a rule saved to the
+        // project file would replace `~/.claude/settings.json`.
+        let dir = std::env::temp_dir().join(format!("piarc-config-link {}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let claude = dir.join("home").join(".claude");
+        let workspace = dir.join("ws");
+        fs::create_dir_all(&claude).expect("claude dir");
+        fs::create_dir_all(&workspace).expect("workspace");
+        fs::write(claude.join("settings.json"), b"{\"model\": \"kept\"}\n").expect("file");
+        std::os::unix::fs::symlink(&claude, workspace.join(".piarc")).expect("link");
+        let table = LayerTable::piarc(&dir.join("data"), &workspace);
+        for layer in [ids::PROJECT, ids::PROJECT_LOCAL] {
+            let error = write_value(&table, layer, "/model", Some(json!("x"))).unwrap_err();
+            assert!(
+                matches!(
+                    error,
+                    WriteError::ClaudeConfig { .. } | WriteError::InvalidUpdate(_)
+                ),
+                "{layer}: {error}"
+            );
+        }
+        assert_eq!(
+            fs::read(claude.join("settings.json")).expect("file"),
+            b"{\"model\": \"kept\"}\n"
+        );
+        assert!(!claude.join("settings.local.json").exists());
         let _ = fs::remove_dir_all(&dir);
     }
 
