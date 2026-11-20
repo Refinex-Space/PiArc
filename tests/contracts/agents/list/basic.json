@@ -4,10 +4,6 @@
   "method": "agents/list",
   "params": {
     "cwd": "/工作区 a/src",
-    "builtIn": [
-      "general-purpose",
-      "Explore",
-      "Plan"
-    ]
+    "builtIn": ["general-purpose", "Explore", "Plan"]
   }
 }

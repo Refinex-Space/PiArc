@@ -8,12 +8,7 @@
         "description": "Read-only search of the codebase.",
         "source": "builtIn",
         "prompt": "You explore the repository and report what you found.",
-        "tools": [
-          "Read",
-          "Glob",
-          "Grep",
-          "Bash"
-        ],
+        "tools": ["Read", "Glob", "Grep", "Bash"],
         "model": "fast",
         "omitProjectContext": true
       },
@@ -23,29 +18,18 @@
         "source": "projectClaude",
         "path": "/工作区 a/.claude/agents/reviewer.md",
         "prompt": "Review the diff carefully.",
-        "tools": [
-          "Read",
-          "Grep"
-        ],
-        "disallowedTools": [
-          "Bash"
-        ],
+        "tools": ["Read", "Grep"],
+        "disallowedTools": ["Bash"],
         "model": "sonnet",
         "permissionMode": "dontAsk",
         "maxTurns": 12,
-        "skills": [
-          "lint"
-        ],
-        "mcpServers": [
-          "github"
-        ],
+        "skills": ["lint"],
+        "mcpServers": ["github"],
         "hooks": true,
         "background": true,
         "effort": "high",
         "color": "purple",
-        "overrides": [
-          "/home/u/.claude/agents/reviewer.md"
-        ],
+        "overrides": ["/home/u/.claude/agents/reviewer.md"],
         "warnings": [
           {
             "kind": "ignoredField",

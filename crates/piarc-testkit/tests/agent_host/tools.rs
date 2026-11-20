@@ -16,7 +16,7 @@ use crate::harness::{
 const CANONICAL: [&str; 6] = ["Read", "Write", "Edit", "Bash", "Glob", "Grep"];
 
 /// The Harness Kit's host tools after them (T26): no file or command I/O of their own.
-const HOST_TOOLS: [&str; 6] = [
+const HOST_TOOLS: [&str; 7] = [
     "EnterPlanMode",
     "ExitPlanMode",
     "TodoWrite",
@@ -24,6 +24,8 @@ const HOST_TOOLS: [&str; 6] = [
     "SuggestNextSteps",
     // T29: registered with the host tools when Core enables `webFetch`.
     "WebFetch",
+    // T31: registered after them when Core enables `subagents`.
+    "Agent",
 ];
 
 /// The tools a session offers on this platform: Windows adds PowerShell after Bash (T17).
