@@ -172,7 +172,7 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     ignored("fastModePerSessionOptIn", NONE),
     ignored("feedbackDrafts", ACCOUNT),
     ignored("feedbackSurveyRate", ACCOUNT),
-    planned("fileCheckpointingEnabled", "T28", "checkpoints"),
+    active("fileCheckpointingEnabled", "/fileCheckpointingEnabled"),
     ignored("fileSuggestion", UI),
     ignored("footerLinksRegexes", UI),
     ignored("forceLoginGatewayUrl", ACCOUNT),

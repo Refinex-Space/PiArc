@@ -328,6 +328,12 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
         name: "autoCompactWindow",
         shape: Shape::Number,
     },
+    // File checkpoints (T28, ADR-0044), Claude Code's key: `false` stores no snapshots, so
+    // later turns offer no code rewind and the Changes panel lists nothing new.
+    Field {
+        name: "fileCheckpointingEnabled",
+        shape: Shape::Bool,
+    },
     // `AskUserQuestion`'s form (T26): after this many seconds the questions' default options
     // stand, or the model hears that the user did not answer. Absent: no timeout.
     Field {

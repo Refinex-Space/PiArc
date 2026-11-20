@@ -101,6 +101,34 @@ struct Applied {
     pins: Vec<Pin>,
 }
 
+/// Where the settings turn file checkpointing off (Claude Code's `fileCheckpointingEnabled`).
+const CHECKPOINTING_POINTER: &str = "/fileCheckpointingEnabled";
+
+/// Whether `settings` keep file checkpointing on (the default).
+pub(crate) fn checkpointing_enabled(settings: &piarc_config::Settings) -> bool {
+    settings
+        .get(CHECKPOINTING_POINTER)
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(true)
+}
+
+/// Whether the merged settings of the workspace at `root` keep file checkpointing on; on without
+/// a settings service (tests of the I/O alone). Settings that cannot be read keep it on: a
+/// snapshot too many costs disk space, a missing one loses the user's content.
+async fn checkpointing_on(trust: Option<&crate::trust::TrustService>, root: &Path) -> bool {
+    let Some(trust) = trust else {
+        return true;
+    };
+    match trust.permission_settings(root).await {
+        Ok(settings) => checkpointing_enabled(&settings),
+        Err(error) => {
+            tracing::warn!(target: "piarc_core::checkpoints",
+                "reading fileCheckpointingEnabled failed, snapshots stay on: {error}");
+            true
+        }
+    }
+}
+
 impl ToolIo {
     /// Keeps snapshots of writes and answers rewinds and the Changes panel with `checkpoints`.
     pub(crate) fn with_checkpoints(mut self, checkpoints: Checkpoints) -> Self {
@@ -118,20 +146,52 @@ impl ToolIo {
         })
     }
 
-    /// A turn of `session_id` started: its writes go to that turn's checkpoint, created now.
+    /// The snapshot store for `s`'s writes: none when its workspace's settings turn file
+    /// checkpointing off.
+    pub(super) async fn checkpoints_for(&self, s: &SessionIo) -> Option<Checkpoints> {
+        let cp = self.checkpoints.clone()?;
+        let trust = self.policy.as_ref().map(|p| p.trust.clone());
+        checkpointing_on(trust.as_ref(), s.scope.root())
+            .await
+            .then_some(cp)
+    }
+
+    /// A turn of `session_id` started: its writes go to that turn's checkpoint, created now
+    /// unless the settings turn file checkpointing off (no checkpoint: no code rewind to it).
     pub(crate) fn turn_started(&self, session_id: &str, turn: &str) {
-        if let Ok(s) = self.session(session_id) {
-            *lock(&s.turn) = Some(turn.to_owned());
-        }
-        let Some(cp) = self.checkpoints.clone() else {
+        let Ok(s) = self.session(session_id) else {
             return;
         };
+        *lock(&s.turn) = Some(turn.to_owned());
+        if let Some(create) = self.checkpoint_creation(&s, session_id, turn) {
+            tokio::spawn(create);
+        }
+    }
+
+    /// What `turn_started` runs in the background: creates `turn`'s checkpoint after reading
+    /// the settings. `None` when Core keeps no snapshots.
+    pub(super) fn checkpoint_creation(
+        &self,
+        s: &SessionIo,
+        session_id: &str,
+        turn: &str,
+    ) -> Option<impl Future<Output = ()> + Send + 'static> {
+        let cp = self.checkpoints.clone()?;
+        let trust = self.policy.as_ref().map(|p| p.trust.clone());
+        let root = s.scope.root().to_owned();
         let (id, turn) = (session_id.to_owned(), turn.to_owned());
-        tokio::task::spawn_blocking(move || {
-            if let Err(error) = cp.ensure(&id, &turn) {
-                tracing::warn!(target: "piarc_core::checkpoints", session = %id, "creating a checkpoint failed: {error}");
+        Some(async move {
+            if !checkpointing_on(trust.as_ref(), &root).await {
+                return;
             }
-        });
+            let created = tokio::task::spawn_blocking(move || cp.ensure(&id, &turn).map(|_| ()))
+                .await
+                .map_err(|e| e.to_string())
+                .and_then(|r| r.map_err(|e| e.to_string()));
+            if let Err(error) = created {
+                tracing::warn!(target: "piarc_core::checkpoints", "creating a checkpoint failed: {error}");
+            }
+        })
     }
 
     /// A turn of `session_id` ended: the session keeps its newest checkpoints.

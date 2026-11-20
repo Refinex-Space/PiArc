@@ -440,7 +440,7 @@ impl ToolIo {
             "fs/write" => {
                 let p: FsWriteParams = parse(method, params)?;
                 let (s, locks) = (self.session(&p.session_id.0)?, Arc::clone(&self.locks));
-                let checkpoints = self.checkpoints.clone();
+                let checkpoints = self.checkpoints_for(&s).await;
                 answer(move || files::write(permit, &s, &locks, checkpoints.as_ref(), p)).await
             }
             "fs/spill" => {

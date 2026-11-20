@@ -45,6 +45,7 @@
 
 - 非执行配置 `memory.readBoth` 控制同一目录是否同时加载两个主 memory 文件，随普通标量合并。
 - 非执行配置 `autoCompactEnabled`、`autoCompactWindow`（T27，与 Claude Code 同名同义，`claude::SETTINGS_KEYS` 中为生效）随普通标量合并，Core 的 `tool_io::context` 读取并夹取窗口范围。
+- 非执行配置 `fileCheckpointingEnabled`（T28，与 Claude Code 同名同义，生效）随普通标量合并：`false` 时 Core 的 `tool_io::checkpoints` 不建检查点、写入不存快照，之后的回合没有代码回退。
 - 非执行配置 `askUserQuestion.timeoutSeconds`（T26）是提问表单的超时秒数，随普通标量合并；Claude Code 的 `askUserQuestionTimeout` 仍标为忽略。`plansDirectory` 仍是 `planned(T26)`：T26 把计划存为会话 entry，未支持计划文件目录（I104，R3 决定）。
 
 ## 易错点
