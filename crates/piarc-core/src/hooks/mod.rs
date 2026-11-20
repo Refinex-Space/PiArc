@@ -9,6 +9,9 @@
 //!   `hook_event_name` and, where Claude Code sends it, `permission_mode`.
 //! - Running: `piarc-hooks` with `piarc-exec`'s process-tree spawner and the tools' command
 //!   environment; the session's turn token cancels them.
+//! - Order: a session's `UserPromptSubmit` hooks wait until its `SessionStart` hooks (startup,
+//!   resume, fork) have finished, as in Claude Code ([`HooksService::starting`],
+//!   [`HooksService::started`]; found by L3, T30).
 //! - Afterwards: one `audit_events` row (`kind: "hook"`) per handler; `systemMessage`s and
 //!   errors for the user go to `core/notices` (`{ type: "hook", id, sessionId, event, level,
 //!   message }`); texts over 10,000 characters go to `<session tmp>/hooks/` and are replaced
@@ -25,6 +28,7 @@ use piarc_hooks::{Decision, HookConfig, HookEvent, LayerHooks, Ran, Runner, Runn
 use piarc_ports::ProcessSpawner;
 use piarc_protocol::policy::PermissionMode;
 use serde_json::{Map, Value, json};
+use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
 
 use crate::events::{Event, EventSender};
@@ -96,6 +100,29 @@ struct Inner {
     condition: Condition,
     /// Each session's transcript (Pi's session file), as the Agent Host last reported it.
     transcripts: Mutex<HashMap<String, String>>,
+    /// Each session's `SessionStart` runs in progress.
+    starts: Mutex<HashMap<String, watch::Sender<u32>>>,
+}
+
+/// Marks one `SessionStart` run in progress until it drops ([`HooksService::starting`]).
+pub(crate) struct StartGuard {
+    service: HooksService,
+    session_id: String,
+}
+
+impl Drop for StartGuard {
+    fn drop(&mut self) {
+        if let Some(runs) = self
+            .service
+            .inner
+            .starts
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(&self.session_id)
+        {
+            runs.send_modify(|n| *n = n.saturating_sub(1));
+        }
+    }
 }
 
 impl std::fmt::Debug for HooksService {
@@ -156,6 +183,7 @@ impl HooksService {
                 runner,
                 condition,
                 transcripts: Mutex::default(),
+                starts: Mutex::default(),
             }),
         }
     }
@@ -167,6 +195,41 @@ impl HooksService {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .insert(session_id.to_owned(), path.to_owned());
+    }
+
+    /// Marks a `SessionStart` run of `session_id` in progress until the guard drops. The Agent
+    /// Host reports `SessionStart` while it opens the session, so its `hooks/run` reaches Core
+    /// before the open's answer and is marked before any prompt of the session arrives.
+    pub(crate) fn starting(&self, session_id: &str) -> StartGuard {
+        self.inner
+            .starts
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .entry(session_id.to_owned())
+            .or_insert_with(|| watch::channel(0).0)
+            .send_modify(|n| *n += 1);
+        StartGuard {
+            service: self.clone(),
+            session_id: session_id.to_owned(),
+        }
+    }
+
+    /// Waits until no `SessionStart` run of `session_id` is in progress (or `cancel`).
+    pub(crate) async fn started(&self, session_id: &str, cancel: &CancellationToken) {
+        let runs = self
+            .inner
+            .starts
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(session_id)
+            .map(watch::Sender::subscribe);
+        if let Some(mut runs) = runs {
+            tokio::select! {
+                // The sender lives in the map for good, so the wait cannot fail.
+                _ = runs.wait_for(|n| *n == 0) => {}
+                () = cancel.cancelled() => {}
+            }
+        }
     }
 
     fn transcript(&self, session_id: &str) -> String {

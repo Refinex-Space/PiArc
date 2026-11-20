@@ -185,6 +185,10 @@ impl ToolIo {
         if let Some(path) = &p.transcript_path {
             hooks.set_transcript(&p.session_id, path);
         }
+        // Marked before anything awaits: the session's prompts wait for it.
+        let _starting = (p.event == HostHookEvent::SessionStart
+            && p.input.get("source").and_then(Value::as_str) != Some("compact"))
+        .then(|| hooks.starting(&p.session_id));
         let (event, keys, subject) = host_event(p.event);
         let mut fields: Map<String, Value> = p
             .input
@@ -302,6 +306,8 @@ impl ToolIo {
         };
         let token = cancel.child_token();
         let _running = Running::new(&s, &token);
+        // Claude Code runs a session's SessionStart hooks before its first prompt's.
+        hooks.started(id, &token).await;
         let facts = self.session_facts(&s, id, token.clone());
         let mut fields = Map::new();
         fields.insert("prompt".into(), json!(text));
