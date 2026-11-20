@@ -2,7 +2,7 @@
 // data only: none of its code is loaded, and no reference text or matching words are logged.
 import { isUtf8 } from 'node:buffer';
 import { spawnSync } from 'node:child_process';
-import { lstatSync, readFileSync } from 'node:fs';
+import { lstatSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { buildSync } from 'esbuild';
 
@@ -57,7 +57,35 @@ function render() {
     encoding: 'utf8',
   });
   if (result.status !== 0) throw new Error('Could not render the PiArc prompt');
-  return result.stdout;
+  return [result.stdout, ...sourceTexts()].join('\n');
+}
+
+/** Model-visible literals that no render above reaches (R3): every `description` of a tool
+ * parameter schema in the Harness Kit and the tool layer, and the sentences of at least five
+ * words that session memory, the reminder channel, interruption and the result budget write. */
+function sourceTexts() {
+  const literal = /'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g;
+  const texts = [];
+  for (const dir of ['agent-host/src/harness', 'agent-host/src/tools']) {
+    for (const name of readdirSync(path.join(repoRoot, dir))) {
+      if (!name.endsWith('.ts') || name.endsWith('.test.ts')) continue;
+      const source = readFileSync(path.join(repoRoot, dir, name), 'utf8');
+      const at = new RegExp(literal.source, 'y');
+      for (const m of source.matchAll(/description:\s*/g)) {
+        at.lastIndex = m.index + m[0].length;
+        const found = at.exec(source);
+        if (found) texts.push(found[1] ?? found[2] ?? found[3] ?? '');
+      }
+    }
+  }
+  for (const file of ['session-memory.ts', 'reminders.ts', 'interruption.ts', 'tool-results.ts']) {
+    const source = readFileSync(path.join(repoRoot, 'agent-host/src/harness', file), 'utf8');
+    for (const m of source.matchAll(literal)) {
+      const text = (m[1] ?? m[2] ?? m[3] ?? '').replace(/\$\{[^}]*\}/g, ' ');
+      if (words(text).length >= 5) texts.push(text);
+    }
+  }
+  return texts;
 }
 
 /** @param {string} text */
