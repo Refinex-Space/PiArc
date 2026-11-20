@@ -311,17 +311,17 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 **T31 子 agent 与模型别名**（开工 2026-11-20，基线 abd7209；依赖 R3 为部分完成，遗留 R3-A07 只等 W2 的 UNC 验证，不影响本任务）
 
-- [ ] 1. 定义来源与解析：五个来源与优先级、frontmatter 全字段、不支持字段与解析错误（文件、行号）、项目级 `permissionMode` 限制；AHP `resources/listAgents`
-- [ ] 2. 内置类型 `general-purpose`、`Explore`、`Plan`（自写身份段与描述）
-- [ ] 3. 模型别名表：解析器（Agent Host 共享位置）、用户级与工作区设置、effort 映射；I113 的 `model`/`effortLevel` 键
-- [ ] 4. 子会话运行时：`Agent` 工具、上下文隔离、工具过滤与闸门、深度与并发上限、`maxTurns`、`permissionMode`、前台 `onUpdate` 投影
-- [ ] 5. 后台子 agent：任务 ID、完成后 `backgroundTask` 提醒、主会话关闭时 interrupted
-- [ ] 6. 中断传播与补齐、Agent Host 崩溃时的 uncertain / interrupted
-- [ ] 7. Core：子会话登记（I73 独立文件状态表）、审批来源字段与账本、"本会话允许"作用于会话树、`Agent(类型)` 规则（I82 参数规则、I128 错误枚举）
-- [ ] 8. Core：子 agent 写入计入主会话检查点；frontmatter `hooks` 作为限定作用域来源
-- [ ] 9. Core：`sessions` 表父子关系与 JSONL 路径、重建索引还原、侧栏排除；`subagent/*` 通知
+- [x] 1. 定义来源与解析：五个来源与优先级、frontmatter 全字段、不支持字段与解析错误（文件、行号）、项目级 `permissionMode` 限制；AHP `resources/listAgents`
+- [x] 2. 内置类型 `general-purpose`、`Explore`、`Plan`（自写身份段与描述）
+- [ ] 3. 模型别名表：解析器（Agent Host 共享位置）、用户级与工作区设置、effort 映射（已完成）；I113 的 `model`/`effortLevel` 键作为新会话默认（待做）；辅助模型指向别名（待做）
+- [x] 4. 子会话运行时：`Agent` 工具、上下文隔离、工具过滤与闸门、深度与并发上限、`maxTurns`、`permissionMode`、前台 `onUpdate` 投影
+- [x] 5. 后台子 agent：任务 ID、完成后 `backgroundTask` 提醒、主会话关闭时 interrupted
+- [ ] 6. 中断传播与补齐（已完成，L2 subagent-interrupt）、Agent Host 崩溃时的 uncertain / interrupted（已实现，待测试）
+- [ ] 7. Core：子会话登记（已完成）（I73 独立文件状态表）、审批来源字段与账本、"本会话允许"作用于会话树、`Agent(类型)` 规则（已完成；I82 参数规则、I128 错误枚举待做）
+- [x] 8. Core：子 agent 写入计入主会话检查点；frontmatter `hooks` 作为限定作用域来源
+- [ ] 9. Core：`sessions` 表父子关系与 JSONL 路径、重建索引还原、侧栏排除；`subagent/*` 通知（已完成；Core API `listAgents`、`stopSubagent` 与子会话转录待做）
 - [ ] 10. 客户端：子 agent 卡（状态、模型、耗时、工具数、token、后台、停止、警告）与子会话转录；审批卡来源；设置页别名一节与子 agent 列表
-- [ ] 11. L2 场景 `subagent-*` 与能力 ID；L3 复核 `Agent`/`ListAgents` 条目（I117）
+- [ ] 11. L2 场景 `subagent-*` 与能力 ID（15 个场景通过，能力已启用）；L3 复核 `Agent`/`ListAgents` 条目（I117，待做）
 - [ ] 12. 验收 A01–A14、文档（AGENTS.md、架构、复用表、登记事项）与收尾
 
 ## 登记事项
