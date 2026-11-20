@@ -100,6 +100,14 @@ export interface TranscriptActions {
   readonly branchFrom?: (turnId: string, text: string) => void;
   /** Continues on another branch (T28). */
   readonly switchBranch?: (entryId: string) => void;
+  /** A subagent's transcript window as JSON (T31); absent where none can be read. */
+  readonly subagentTranscript?: (
+    child: string,
+    start: number | null,
+    limit: number,
+  ) => Promise<string>;
+  /** Stops a running subagent (T31). */
+  readonly stopSubagent?: (child: string) => void;
 }
 
 /** One session's transcript as a view shows it. */

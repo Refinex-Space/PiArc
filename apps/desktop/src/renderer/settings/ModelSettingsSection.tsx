@@ -5,7 +5,12 @@ import { useId, useState } from 'react';
 
 import { useT } from '../app/app-context.js';
 import type { MessageId } from '../../shared/i18n/index.js';
-import type { CatalogEntry, ModelOverride, ProviderSettings } from './provider-form.js';
+import {
+  MODEL_ALIASES,
+  type CatalogEntry,
+  type ModelOverride,
+  type ProviderSettings,
+} from './provider-form.js';
 
 const keyOf = (m: { provider: string; id: string }) => `${m.provider}/${m.id}`;
 
@@ -226,10 +231,17 @@ export function ModelSettingsSection({
   const t = useT();
   const auxId = useId();
   const [editing, setEditing] = useState<string>();
+  // Every save sends the whole preferences, the alias table included (T31).
   const preferences = (
     models: Record<string, ModelOverride>,
     auxiliary: ProviderSettings['auxiliary'],
-  ) => JSON.stringify({ models, ...(auxiliary === null ? {} : { auxiliary }) });
+    auxiliaryAlias: string | null = settings.auxiliaryAlias,
+  ) =>
+    JSON.stringify({
+      models,
+      ...(auxiliaryAlias === null ? (auxiliary === null ? {} : { auxiliary }) : { auxiliaryAlias }),
+      aliases: settings.aliases,
+    });
   const models = settings.catalogModels;
   const chosen = models.find((m) => editing === keyOf(m));
   return (
@@ -244,19 +256,35 @@ export function ModelSettingsSection({
           className="input"
           data-testid="auxiliary-model"
           disabled={busy}
-          value={settings.auxiliary === null ? '' : keyOf(settings.auxiliary)}
+          value={
+            settings.auxiliaryAlias !== null
+              ? `alias:${settings.auxiliaryAlias}`
+              : settings.auxiliary === null
+                ? ''
+                : keyOf(settings.auxiliary)
+          }
           onChange={(e) => {
             const value = e.currentTarget.value;
+            if (value.startsWith('alias:')) {
+              save(preferences(settings.models, null, value.slice('alias:'.length)));
+              return;
+            }
             const model = models.find((m) => keyOf(m) === value);
             save(
               preferences(
                 settings.models,
                 model === undefined ? null : { provider: model.provider, id: model.id },
+                null,
               ),
             );
           }}
         >
           <option value="">{t('models.auxiliary.session')}</option>
+          {MODEL_ALIASES.map((alias) => (
+            <option key={alias} value={`alias:${alias}`}>
+              {t('models.auxiliary.alias', { alias })}
+            </option>
+          ))}
           {models.map((m) => (
             <option key={keyOf(m)} value={keyOf(m)}>
               {settings.models[keyOf(m)]?.displayName ?? m.name} ({m.provider})

@@ -5248,6 +5248,41 @@
       "required": ["files"],
       "type": "object"
     },
+    "ModelAlias": {
+      "description": "A name in the model alias table (T31, architecture section 6.13): PiArc's tiers, and Claude\nCode's names that follow them unless set on their own (`haiku` → `fast`, `sonnet` →\n`balanced`, `opus` → `strong`).",
+      "oneOf": [
+        {
+          "const": "fast",
+          "description": "A cheap, quick model (exploration).",
+          "type": "string"
+        },
+        {
+          "const": "balanced",
+          "description": "The everyday model.",
+          "type": "string"
+        },
+        {
+          "const": "strong",
+          "description": "The most capable model.",
+          "type": "string"
+        },
+        {
+          "const": "haiku",
+          "description": "Claude Code's `haiku`.",
+          "type": "string"
+        },
+        {
+          "const": "sonnet",
+          "description": "Claude Code's `sonnet`.",
+          "type": "string"
+        },
+        {
+          "const": "opus",
+          "description": "Claude Code's `opus`.",
+          "type": "string"
+        }
+      ]
+    },
     "ModelOverride": {
       "description": "The user's settings for one model (T29), each replacing the catalog value.",
       "properties": {
@@ -5304,6 +5339,13 @@
     "ModelPreferences": {
       "description": "Model preferences Core gives the Agent Host (T29): per-model settings and the auxiliary\nmodel for one-off calls such as WebFetch's extraction.",
       "properties": {
+        "aliases": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "The user's model alias table (T31): alias → `<provider>/<model id>`. The settings window\nsends the whole table with every change.",
+          "type": "object"
+        },
         "auxiliary": {
           "anyOf": [
             {
@@ -5314,6 +5356,17 @@
             }
           ],
           "description": "The auxiliary model; absent: the session's model."
+        },
+        "auxiliaryAlias": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelAlias"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The auxiliary model as an alias (T31), instead of `auxiliary`; Core resolves it with the\nuser's alias table before the Agent Host gets the preferences."
         },
         "models": {
           "additionalProperties": {

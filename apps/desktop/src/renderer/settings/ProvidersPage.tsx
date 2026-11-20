@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { AliasSection } from './AliasSection.js';
 import { ModelSettingsSection } from './ModelSettingsSection.js';
 import { SignInSection } from './SignInSection.js';
 import { useT } from '../app/app-context.js';
@@ -213,6 +214,13 @@ export function ProvidersPage() {
         {failed}
         <SignInSection providers={settings.loginProviders} busy={busy} onChanged={reload} />
         <ModelSettingsSection
+          settings={settings}
+          busy={busy}
+          save={(preferences) => {
+            void mutate(() => window.piarc.setModelPreferences(preferences), false);
+          }}
+        />
+        <AliasSection
           settings={settings}
           busy={busy}
           save={(preferences) => {

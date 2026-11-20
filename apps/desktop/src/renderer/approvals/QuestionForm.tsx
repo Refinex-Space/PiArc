@@ -10,6 +10,7 @@ import { useT } from '../app/app-context.js';
 import { reason } from '../shell/errors.js';
 import { answerRequest } from './answer.js';
 import { useApprovalKeys } from './use-approval-keys.js';
+import { ApprovalOrigin } from './ApprovalOrigin.js';
 
 interface Draft {
   readonly selected: readonly string[];
@@ -175,6 +176,7 @@ export function QuestionForm({ request }: { readonly request: ApprovalRequest })
       <header>
         <strong>{t('approval.kind.question')}</strong>
       </header>
+      <ApprovalOrigin request={request} />
       {questions.map((question, i) => (
         <QuestionFields
           key={String(i)}

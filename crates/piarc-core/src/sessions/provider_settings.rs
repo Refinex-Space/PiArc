@@ -142,6 +142,8 @@ impl Hub {
                 let prefs = *prefs;
                 settings.models = prefs.models;
                 settings.auxiliary = prefs.auxiliary;
+                settings.auxiliary_alias = prefs.auxiliary_alias;
+                settings.aliases = prefs.aliases;
                 settings.persist(dir)?;
                 self.publish_preferences(&settings);
                 self.reload_models(self.ctx.catalog_network.load(Ordering::Acquire))

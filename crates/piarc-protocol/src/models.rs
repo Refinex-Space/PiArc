@@ -137,6 +137,14 @@ pub struct ModelPreferences {
     /// Per-model settings keyed by `<provider>/<model id>`.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub models: BTreeMap<String, ModelOverride>,
+    /// The auxiliary model as an alias (T31), instead of `auxiliary`; Core resolves it with the
+    /// user's alias table before the Agent Host gets the preferences.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auxiliary_alias: Option<ModelAlias>,
+    /// The user's model alias table (T31): alias → `<provider>/<model id>`. The settings window
+    /// sends the whole table with every change.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub aliases: BTreeMap<ModelAlias, String>,
 }
 
 /// A provider that offers sign-in (OAuth or device code) in the settings window (T29).

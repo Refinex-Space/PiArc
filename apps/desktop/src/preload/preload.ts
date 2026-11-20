@@ -413,6 +413,18 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.sessionTranscript, id, start, limit)
       .then((value: unknown) => expectString(value)),
+  subagentTranscript: (parent, child, start, limit) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.subagentTranscript, parent, child, start, limit)
+      .then((value: unknown) => expectString(value)),
+  stopSubagent: (parent, child) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.subagentStop, parent, child)
+      .then((value: unknown) => expectString(value)),
+  listAgents: (workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.agentsList, workspace)
+      .then((value: unknown) => expectString(value)),
   resendSnapshots: async () => {
     await ipcRenderer.invoke(IPC_CHANNELS.snapshotsResend);
   },

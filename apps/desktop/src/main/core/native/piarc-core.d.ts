@@ -209,6 +209,23 @@ export declare class CoreRuntime {
    */
   transcriptWindow(id: string, start: number | null, limit: number): Promise<string>;
   /**
+   * The subagent types of `workspace` from `cwd` (the workspace root when null), as JSON
+   * text (T31).
+   */
+  listAgents(workspace: string, cwd?: string | null): Promise<string>;
+  /** Stops subagent `child` of session `parent`; JSON text `{ stopped }` (T31). */
+  stopSubagent(parent: string, child: string): Promise<string>;
+  /**
+   * A window of subagent `child`'s transcript, read through session `parent`, as JSON text
+   * (T31).
+   */
+  subagentTranscript(
+    parent: string,
+    child: string,
+    start: number | null,
+    limit: number,
+  ): Promise<string>;
+  /**
    * Sends the `core/workspaces` and `core/sessions` snapshots again (a window subscribed
    * anew). Only queues.
    */

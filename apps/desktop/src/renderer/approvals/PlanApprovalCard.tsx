@@ -13,6 +13,7 @@ import { planPreview } from '../transcript/rows/harness.js';
 import { answerRequest } from './answer.js';
 import { planComments, usePlanComments } from './plan-comments.js';
 import { useApprovalKeys } from './use-approval-keys.js';
+import { ApprovalOrigin } from './ApprovalOrigin.js';
 
 type Choice = 'acceptEdits' | 'default' | 'keepPlanning';
 
@@ -85,6 +86,7 @@ export function PlanApprovalCard({ request }: { readonly request: ApprovalReques
       <header>
         <strong>{t('approval.kind.plan')}</strong> <span className="muted">{request.tool}</span>
       </header>
+      <ApprovalOrigin request={request} />
       <pre className="plan-preview" data-testid="plan-preview">
         {planPreview(plan)}
       </pre>

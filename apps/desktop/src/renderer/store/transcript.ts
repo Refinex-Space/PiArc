@@ -22,6 +22,7 @@ import type {
   InputAttachment,
   InputMention,
   Item,
+  SubagentState,
   TurnErrorKind,
   TurnUsage,
 } from '@piarc/protocol';
@@ -139,17 +140,11 @@ const IDLE: TurnInfo = {
 };
 
 /**
- * Item types folded into a tool group: every tool call but shell commands, which keep a card of
- * their own (status, exit code, timer). A group expands to its calls; file changes then show
+ * Item types folded into a tool group: every tool call but shell commands and subagents (T31),
+ * which keep a card of their own (status, exit code, timer; the run). A group expands to its calls; file changes then show
  * their diff cards.
  */
-const GROUPED_TYPES = new Set([
-  'dynamicToolCall',
-  'mcpToolCall',
-  'webFetch',
-  'subagent',
-  'fileChange',
-]);
+const GROUPED_TYPES = new Set(['dynamicToolCall', 'mcpToolCall', 'webFetch', 'fileChange']);
 
 /** Host tools with rows of their own (T26): the task card, the plan card, the answered
  * questions and the next steps. */
@@ -159,6 +154,41 @@ export const OWN_ROW_TOOLS: ReadonlySet<string> = new Set([
   'AskUserQuestion',
   'SuggestNextSteps',
 ]);
+
+const RUN_STATUS = new Set(['running', 'completed', 'partial', 'failed', 'interrupted']);
+
+/** A `subagent/*` notification's state, when it has the members the card reads. */
+function subagentStateOf(value: unknown): SubagentState | undefined {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('sessionId' in value) ||
+    !('status' in value) ||
+    !('toolCalls' in value) ||
+    typeof value.sessionId !== 'string' ||
+    typeof value.status !== 'string' ||
+    !RUN_STATUS.has(value.status) ||
+    typeof value.toolCalls !== 'number'
+  ) {
+    return undefined;
+  }
+  return value as SubagentState;
+}
+
+/** A background run's call completes with the run still going: a later item event must not
+ * take back the end the `subagent/completed` notification already showed. */
+function keepFinishedRun(previous: Item, next: Item): Item {
+  if (
+    previous.type === 'subagent' &&
+    next.type === 'subagent' &&
+    previous.subagent != null &&
+    previous.subagent.status !== 'running' &&
+    next.subagent?.status === 'running'
+  ) {
+    return { ...next, subagent: previous.subagent };
+  }
+  return next;
+}
 
 export function isGrouped(item: Item): boolean {
   return (
@@ -655,6 +685,12 @@ export class SessionTranscript {
       case 'item/reasoning/delta':
         this.appendDelta(params, batch);
         break;
+      // A subagent run's state (T31): its card follows it, background runs after their call.
+      case 'subagent/started':
+      case 'subagent/progress':
+      case 'subagent/completed':
+        this.onSubagent(params, batch);
+        break;
       case 'session/queueChanged':
         this.queueItems = Array.isArray(params.items) ? params.items.flatMap(queueItemOf) : [];
         batch.queue = true;
@@ -675,6 +711,17 @@ export class SessionTranscript {
         }
         break;
     }
+  }
+
+  private onSubagent(params: Record<string, unknown>, batch: Batch): void {
+    const id = typeof params.itemId === 'string' ? params.itemId : undefined;
+    const row = id === undefined ? undefined : this.rows.get(id);
+    const state = subagentStateOf(params.subagent);
+    if (id === undefined || row?.kind !== 'item' || row.item.type !== 'subagent' || !state) {
+      return;
+    }
+    this.rows.set(id, { ...row, item: { ...row.item, subagent: state } });
+    batch.changed.add(id);
   }
 
   private onTurnCompleted(turnId: string, params: Record<string, unknown>, batch: Batch): void {
@@ -730,7 +777,7 @@ export class SessionTranscript {
     if (existing?.kind === 'item') {
       this.rows.set(item.itemId, {
         ...existing,
-        item,
+        item: keepFinishedRun(existing.item, item),
         ...(completed && ts !== undefined ? { endedAt: ts } : {}),
       });
       batch.changed.add(item.itemId);

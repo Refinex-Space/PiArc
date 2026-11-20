@@ -238,6 +238,12 @@ export type Capability = string;
  */
 export type ProtocolVersion = string;
 /**
+ * A name in the model alias table (T31, architecture section 6.13): PiArc's tiers, and Claude
+ * Code's names that follow them unless set on their own (`haiku` → `fast`, `sonnet` →
+ * `balanced`, `opus` → `strong`).
+ */
+export type ModelAlias = 'fast' | 'balanced' | 'strong' | 'haiku' | 'sonnet' | 'opus';
+/**
  * Selectable Pi thinking level (PiArc omits minimal).
  */
 export type EffortLevel = 'off' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
@@ -1078,9 +1084,21 @@ export interface CoreWelcome {
  */
 export interface ModelPreferences {
   /**
+   * The user's model alias table (T31): alias → `<provider>/<model id>`. The settings window
+   * sends the whole table with every change.
+   */
+  aliases?: {
+    [k: string]: string;
+  };
+  /**
    * The auxiliary model; absent: the session's model.
    */
   auxiliary?: ModelRef | null;
+  /**
+   * The auxiliary model as an alias (T31), instead of `auxiliary`; Core resolves it with the
+   * user's alias table before the Agent Host gets the preferences.
+   */
+  auxiliaryAlias?: ModelAlias | null;
   /**
    * Per-model settings keyed by `<provider>/<model id>`.
    */

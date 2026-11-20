@@ -37,6 +37,7 @@ mod login;
 mod provider_settings;
 mod session;
 mod snapshot;
+mod subagents;
 mod workspace;
 
 use std::collections::HashMap;

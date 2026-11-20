@@ -59,7 +59,21 @@ export interface ProviderSettings {
   catalogModels: CatalogEntry[];
   models: Record<string, ModelOverride>;
   auxiliary: { provider: string; id: string } | null;
+  /** The auxiliary model as an alias (T31). */
+  auxiliaryAlias: string | null;
+  /** The user's model alias table: alias → `<provider>/<model id>` (T31). */
+  aliases: Record<string, string>;
 }
+
+/** The aliases in the order the settings page lists them (T31). */
+export const MODEL_ALIASES = ['fast', 'balanced', 'strong', 'haiku', 'sonnet', 'opus'] as const;
+
+/** The tier an alias follows when it is not set on its own. */
+export const ALIAS_FOLLOWS: Readonly<Partial<Record<string, string>>> = {
+  haiku: 'fast',
+  sonnet: 'balanced',
+  opus: 'strong',
+};
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -140,6 +154,20 @@ export function parseSettings(text: string): ProviderSettings {
       typeof auxiliary.id === 'string'
         ? { provider: auxiliary.provider, id: auxiliary.id }
         : null,
+    auxiliaryAlias:
+      typeof extra.auxiliaryAlias === 'string' &&
+      (MODEL_ALIASES as readonly string[]).includes(extra.auxiliaryAlias)
+        ? extra.auxiliaryAlias
+        : null,
+    aliases: record(extra.aliases)
+      ? Object.fromEntries(
+          Object.entries(extra.aliases).filter(
+            (entry): entry is [string, string] =>
+              (MODEL_ALIASES as readonly string[]).includes(entry[0]) &&
+              typeof entry[1] === 'string',
+          ),
+        )
+      : {},
   };
 }
 

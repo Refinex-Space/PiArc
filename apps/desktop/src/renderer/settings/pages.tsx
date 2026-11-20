@@ -27,6 +27,7 @@ import { ConfigDiagnosticsPage } from './ConfigDiagnosticsPage.js';
 import { PermissionsPage } from './PermissionsPage.js';
 import { ProvidersPage } from './ProvidersPage.js';
 import { registerSettingsPage } from './registry.js';
+import { AgentsPage } from './AgentsPage.js';
 
 function useSave(): { save: (change: PreferenceChange) => void; error: string | undefined } {
   const { t } = useApp();
@@ -349,6 +350,12 @@ export function registerBuiltInSettingsPages(): void {
     title: 'settings.permissions',
     order: 30,
     component: PermissionsPage,
+  });
+  registerSettingsPage({
+    id: 'agents',
+    title: 'settings.agents',
+    order: 40,
+    component: AgentsPage,
   });
   registerSettingsPage({
     id: 'diagnostics',

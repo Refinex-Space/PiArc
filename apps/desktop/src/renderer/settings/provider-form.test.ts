@@ -18,6 +18,8 @@ const settings: ProviderSettings = {
   catalogModels: [],
   models: {},
   auxiliary: null,
+  auxiliaryAlias: null,
+  aliases: {},
 };
 describe('provider settings', () => {
   const custom = {

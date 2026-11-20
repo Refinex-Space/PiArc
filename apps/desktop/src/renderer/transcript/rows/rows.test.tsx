@@ -100,6 +100,7 @@ async function render(
   transcript: SessionTranscript,
   ids: readonly string[],
   shared = services(),
+  rowActions: TranscriptActions = actions,
 ): Promise<HTMLElement> {
   const container = document.createElement('div');
   document.body.append(container);
@@ -113,7 +114,7 @@ async function render(
         focused: true,
       }}
     >
-      <TranscriptContext.Provider value={{ services: shared, transcript, actions }}>
+      <TranscriptContext.Provider value={{ services: shared, transcript, actions: rowActions }}>
         {ids.map((id) => (
           <RowView key={id} id={id} />
         ))}
@@ -679,4 +680,170 @@ it('gives host tools rows of their own: task list, plan, answers and next steps 
   expect(next?.textContent).toContain('Run tests');
   // Outside the window shell (the prototype page) the suggestions have no actions.
   expect(next?.querySelector('[data-testid="next-run-here"]')).toBeNull();
+});
+
+describe('subagent card (T31-A13)', () => {
+  const state = {
+    sessionId: 'child-1',
+    agentType: 'Explore',
+    description: 'Find the parser',
+    color: 'green',
+    model: { provider: 'mock-child', id: 'fast-model' },
+    status: 'running',
+    startedAt: 1_000,
+    toolCalls: 2,
+    tokens: { input: 900, output: 120, cacheRead: 100, cacheWrite: 0 },
+    activity: 'Grep parser',
+    warnings: [{ kind: 'aliasFallback', value: 'fast' }],
+  };
+  const call: Item = {
+    type: 'subagent',
+    itemId: 'agent-1',
+    status: 'inProgress',
+    tool: 'Agent',
+    arguments: { description: 'Find the parser', prompt: 'Where is it?' },
+    description: 'Find the parser',
+  };
+
+  it('shows the type, model, status, time, tool calls and warnings, and follows subagent/*', async () => {
+    const transcript = transcriptOf([{ item: call }]);
+    transcript.apply([note('subagent/started', { itemId: 'agent-1', subagent: state })]);
+    const stop = vi.fn();
+    const root = await render(transcript, ['agent-1'], services(), {
+      ...actions,
+      stopSubagent: stop,
+      subagentTranscript: () => Promise.resolve('{"start":0,"total":0,"items":[]}'),
+    });
+    const card = byTestId(root, 'subagent-card');
+    expect(card.dataset.status).toBe('running');
+    expect(byTestId(root, 'subagent-title').textContent).toBe('Find the parser');
+    expect(byTestId(root, 'subagent-type').textContent).toBe('Explore');
+    expect(byTestId(root, 'subagent-model').textContent).toBe('Model mock-child/fast-model');
+    expect(byTestId(root, 'subagent-tools').textContent).toBe('2 tool calls');
+    expect(byTestId(root, 'subagent-tokens').textContent).toBe('1000 tokens in · 120 out');
+    expect(byTestId(root, 'subagent-activity').textContent).toBe('Grep parser');
+    expect(byTestId(root, 'subagent-warnings').textContent).toContain('The model alias fast');
+    act(() => {
+      byTestId(root, 'subagent-stop').click();
+    });
+    expect(stop).toHaveBeenCalledWith('child-1');
+    await act(async () => {
+      transcript.apply([
+        note('subagent/completed', {
+          itemId: 'agent-1',
+          subagent: { ...state, status: 'completed', durationMs: 65_000, toolCalls: 3 },
+        }),
+      ]);
+      await Promise.resolve();
+    });
+    expect(card.dataset.status).toBe('completed');
+    expect(byTestId(root, 'subagent-status').textContent).toBe('Done');
+    expect(byTestId(root, 'subagent-tools').textContent).toBe('3 tool calls');
+    expect(byTestId(root, 'subagent-facts').textContent).toContain('1 min 5 s');
+    expect(root.querySelector('[data-testid="subagent-stop"]')).toBeNull();
+  });
+
+  it('keeps a finished background run when its call completes afterwards', async () => {
+    const transcript = transcriptOf([{ item: call }]);
+    const background = { ...state, background: true };
+    transcript.apply([
+      note('subagent/completed', {
+        itemId: 'agent-1',
+        subagent: { ...background, status: 'completed' },
+      }),
+      note('item/completed', {
+        turnId: 't1',
+        item: { ...call, status: 'completed', subagent: background },
+      }),
+    ]);
+    const root = await render(transcript, ['agent-1']);
+    expect(byTestId(root, 'subagent-card').dataset.status).toBe('completed');
+    expect(byTestId(root, 'subagent-background').textContent).toBe('Background');
+  });
+
+  it("expands to the subagent's own transcript, read-only", async () => {
+    const transcript = transcriptOf([{ item: { ...call, subagent: state } as Item }]);
+    const read = vi.fn((child: string) =>
+      Promise.resolve(
+        JSON.stringify({
+          start: 0,
+          total: 2,
+          items: [
+            {
+              entryId: 'u1',
+              item: {
+                type: 'userMessage',
+                itemId: 'u1',
+                status: 'completed',
+                text: 'Where is it?',
+              },
+            },
+            {
+              entryId: 'a1',
+              item: {
+                type: 'agentMessage',
+                itemId: 'a1',
+                status: 'completed',
+                text: `Report of ${child}`,
+              },
+            },
+          ],
+        }),
+      ),
+    );
+    const root = await render(transcript, ['agent-1'], services(), {
+      ...actions,
+      subagentTranscript: read,
+    });
+    await act(async () => {
+      byTestId(root, 'subagent-toggle').click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(read).toHaveBeenCalledWith('child-1', null, 200);
+    const child = byTestId(root, 'subagent-transcript');
+    expect(child.textContent).toContain('Where is it?');
+    expect(child.textContent).toContain('Report of child-1');
+    // Read-only: no rewind or branch actions on the child's messages.
+    expect(child.querySelector('[data-testid="user-message-actions"]')).toBeNull();
+  });
+
+  it('labels an approval card that comes from a subagent', async () => {
+    const store = new AppStore();
+    store.applySessions({
+      revision: 1,
+      sessions: [
+        {
+          id: 's',
+          pendingApprovals: 1,
+          approvals: [
+            {
+              sessionId: 'child-1',
+              requestId: 'r1',
+              revision: 1,
+              connectionEpoch: 1,
+              tool: 'Bash',
+              kind: 'command',
+              command: 'env echo hi',
+              subagent: {
+                sessionId: 'child-1',
+                parentSessionId: 's',
+                agentType: 'runner',
+                description: 'Print lines',
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const transcript = store.transcript('s');
+    const id = transcript.rowIds().find((row) => row.startsWith('approval:'));
+    expect(id).toBeDefined();
+    const root = await render(transcript, [id ?? '']);
+    expect(byTestId(root, 'approval-origin').textContent).toBe(
+      'From subagent: Print lines (runner)',
+    );
+  });
 });

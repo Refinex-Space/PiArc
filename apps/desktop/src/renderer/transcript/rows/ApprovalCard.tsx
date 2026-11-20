@@ -8,6 +8,7 @@ import { reason } from '../../shell/errors.js';
 import { useApprovalKeys } from '../../approvals/use-approval-keys.js';
 import { canAlwaysAllow } from './approval-keys.js';
 import { DiffView } from './tools.js';
+import { ApprovalOrigin } from '../../approvals/ApprovalOrigin.js';
 
 const PREVIEW_CHARS = 480;
 const PREVIEW_LINES = 8;
@@ -86,6 +87,7 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
         <strong>{t(`approval.kind.${request.kind}`)}</strong>{' '}
         <span className="muted">{request.tool}</span>
       </header>
+      <ApprovalOrigin request={request} />
       {request.cwd && (
         <div className="approval-path">{t('approval.cwd', { path: request.cwd })}</div>
       )}

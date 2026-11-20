@@ -78,6 +78,17 @@ describe('i18n', () => {
             window: 200_000,
             threshold: 182_904,
             index: 1,
+            input: 900,
+            output: 120,
+            field: 'memory',
+            type: 'Explore',
+            depth: 3,
+            concurrent: 8,
+            alias: 'fast',
+            tier: 'fast',
+            context: '200,000',
+            efforts: 'low / high',
+            tools: 'Read, Grep',
           }),
         ).not.toThrow();
       }

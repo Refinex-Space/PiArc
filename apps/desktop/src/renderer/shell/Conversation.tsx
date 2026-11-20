@@ -24,7 +24,7 @@ import {
   useTurnInfo,
 } from '../store/hooks.js';
 import { badgeOf } from '../store/status.js';
-import type { SessionTranscript, TranscriptEntry } from '../store/transcript.js';
+import type { SessionTranscript } from '../store/transcript.js';
 import { HISTORY } from '../transcript/constants.js';
 import { BranchTail } from '../changes/BranchSwitcher.js';
 import { takeDraft } from '../changes/drafts.js';
@@ -44,39 +44,10 @@ import { compactFocus, SessionInput, type Draft } from './session-input.js';
 import { sessionTitle } from './SessionRow.js';
 import { StatusBadge } from './StatusBadge.js';
 import { useUi } from './ui.js';
+import { parseWindow } from '../store/history-window.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** Core's `transcript_window` answer: `{ start, items: [{ entryId, item }] }`. */
-function parseWindow(text: string): {
-  start: number;
-  items: TranscriptEntry[];
-  harness?: unknown;
-  branches?: unknown;
-} {
-  const value: unknown = JSON.parse(text);
-  if (!isRecord(value) || !Array.isArray(value.items)) {
-    return { start: 0, items: [] };
-  }
-  const items = value.items.flatMap((entry: unknown) =>
-    isRecord(entry) && typeof entry.entryId === 'string'
-      ? [
-          {
-            entryId: entry.entryId,
-            ...(typeof entry.turnId === 'string' ? { turnId: entry.turnId } : {}),
-            item: entry.item,
-          },
-        ]
-      : [],
-  );
-  return {
-    start: typeof value.start === 'number' ? value.start : 0,
-    items,
-    harness: value.harness,
-    branches: value.branches,
-  };
 }
 
 /** Core's file search as the composer's `@` source, below the session's working directory. */
@@ -269,6 +240,14 @@ export function Conversation({
         },
         branchFrom: branchActions.branchFrom,
         switchBranch: branchActions.switchBranch,
+        // Subagent cards (T31): the child's transcript is read through this session.
+        subagentTranscript: (child, start, limit) =>
+          window.piarc.subagentTranscript(id, child, start, limit),
+        stopSubagent: (child) => {
+          window.piarc.stopSubagent(id, child).catch((failure: unknown) => {
+            console.error('[conversation] cannot stop the subagent', failure);
+          });
+        },
       },
     }),
     [ui.transcriptServices, transcript, input, branchActions],

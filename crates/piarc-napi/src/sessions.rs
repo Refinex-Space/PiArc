@@ -817,6 +817,49 @@ impl CoreRuntime {
         })
     }
 
+    /// The subagent types of `workspace` from `cwd` (the workspace root when null), as JSON
+    /// text (T31).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn list_agents<'env>(
+        &self,
+        env: &'env Env,
+        workspace: String,
+        #[napi(ts_arg_type = "string | null")] cwd: Option<String>,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.listAgents", |core, done| {
+            core.list_agents(workspace.into(), cwd.map(Into::into), done)
+        })
+    }
+
+    /// Stops subagent `child` of session `parent`; JSON text `{ stopped }` (T31).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn stop_subagent<'env>(
+        &self,
+        env: &'env Env,
+        parent: String,
+        child: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.stopSubagent", |core, done| {
+            core.stop_subagent(parent, child, done)
+        })
+    }
+
+    /// A window of subagent `child`'s transcript, read through session `parent`, as JSON text
+    /// (T31).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn subagent_transcript<'env>(
+        &self,
+        env: &'env Env,
+        parent: String,
+        child: String,
+        #[napi(ts_arg_type = "number | null")] start: Option<u32>,
+        limit: u32,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.subagentTranscript", |core, done| {
+            core.subagent_transcript(parent, child, start.map(u64::from), u64::from(limit), done)
+        })
+    }
+
     /// Sends the `core/workspaces` and `core/sessions` snapshots again (a window subscribed
     /// anew). Only queues.
     #[napi(catch_unwind)]

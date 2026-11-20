@@ -5,8 +5,8 @@ use std::net::IpAddr;
 use std::path::Path;
 
 use piarc_protocol::models::{
-    CatalogProvider, ModelOverride, ModelPreferences, ModelsCredentialParams, ProviderCredential,
-    ToolReliability,
+    CatalogProvider, ModelAlias, ModelOverride, ModelPreferences, ModelsCredentialParams,
+    ProviderCredential, ToolReliability,
 };
 use piarc_protocol::session::ModelRef;
 use serde::{Deserialize, Serialize};
@@ -100,6 +100,14 @@ impl Operation {
             .is_some_and(|m| !text_ok(&m.provider, 96) || !text_ok(&m.id, 512))
         {
             return Err(invalid("auxiliary", "choose a configured model"));
+        }
+        if prefs.aliases.values().any(|target| {
+            !text_ok(target, 600)
+                || !target
+                    .split_once('/')
+                    .is_some_and(|(p, m)| !p.is_empty() && !m.is_empty())
+        }) {
+            return Err(invalid("aliases", "expected <provider>/<model> values"));
         }
         Ok(Self::Preferences(Box::new(prefs)))
     }
@@ -386,6 +394,13 @@ pub(crate) struct Settings {
     /// The auxiliary model (T29); absent: the session's model.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) auxiliary: Option<ModelRef>,
+    /// The auxiliary model as an alias (T31), resolved with `aliases`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) auxiliary_alias: Option<ModelAlias>,
+    /// The user's model alias table: `modelAliases` of the same file (T31), written with these
+    /// settings.
+    #[serde(skip)]
+    pub(crate) aliases: BTreeMap<ModelAlias, String>,
     #[serde(skip)]
     pending: Option<Pending>,
 }
@@ -396,6 +411,8 @@ impl Default for Settings {
             catalog_refresh: true,
             models: BTreeMap::new(),
             auxiliary: None,
+            auxiliary_alias: None,
+            aliases: BTreeMap::new(),
             pending: None,
         }
     }
@@ -405,7 +422,9 @@ impl Settings {
         dir.join("agent-host").join("provider-change.json")
     }
     pub(crate) fn read(dir: &Path, default_refresh: bool) -> Result<Self> {
-        let mut settings = crate::client_settings::read(dir)?
+        let file = crate::client_settings::read(dir)?;
+        let aliases = alias_table(file.get("modelAliases"));
+        let mut settings = file
             .get("modelProviders")
             .cloned()
             .map(serde_json::from_value::<Self>)
@@ -415,6 +434,7 @@ impl Settings {
                 catalog_refresh: default_refresh,
                 ..Self::default()
             });
+        settings.aliases = aliases;
         settings.pending = match std::fs::read(Self::journal(dir)) {
             Ok(bytes) => Some(
                 serde_json::from_slice::<Pending>(&bytes)
@@ -447,6 +467,8 @@ impl Settings {
     }
     pub(crate) fn persist(&self, dir: &Path) -> Result<()> {
         crate::client_settings::write_user_value(dir, "/modelProviders", Some(json!(self)))?;
+        let aliases = (!self.aliases.is_empty()).then(|| json!(self.aliases));
+        crate::client_settings::write_user_value(dir, "/modelAliases", aliases)?;
         match std::fs::remove_file(Self::journal(dir)) {
             Ok(()) => Ok(()),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
@@ -454,7 +476,7 @@ impl Settings {
         }
     }
     pub(crate) fn view(&self, builtins: &[CatalogProvider]) -> Value {
-        json!({"catalogRefresh":self.catalog_refresh,"providers":self.providers,"builtinProviders":builtins,"models":self.models,"auxiliary":self.auxiliary})
+        json!({"catalogRefresh":self.catalog_refresh,"providers":self.providers,"builtinProviders":builtins,"models":self.models,"auxiliary":self.auxiliary,"auxiliaryAlias":self.auxiliary_alias,"aliases":self.aliases})
     }
 
     /// What the Agent Hosts get (T29): the user's per-model settings, and low tool reliability
@@ -471,9 +493,16 @@ impl Settings {
                     .get_or_insert(ToolReliability::Low);
             }
         }
+        // An auxiliary alias that is not set leaves the session's model (T31).
+        let auxiliary = match self.auxiliary_alias {
+            Some(alias) => resolve_alias(alias, &self.aliases),
+            None => self.auxiliary.clone(),
+        };
         ModelPreferences {
-            auxiliary: self.auxiliary.clone(),
+            auxiliary,
             models,
+            auxiliary_alias: None,
+            aliases: BTreeMap::new(),
         }
     }
     pub(crate) fn prepare(
@@ -656,6 +685,40 @@ pub(crate) fn io_error(error: std::io::Error) -> Error {
     }
 }
 
+/// The `modelAliases` object of the user's file, keeping only known aliases with text values.
+fn alias_table(value: Option<&Value>) -> BTreeMap<ModelAlias, String> {
+    let Some(Value::Object(table)) = value else {
+        return BTreeMap::new();
+    };
+    table
+        .iter()
+        .filter_map(|(alias, target)| {
+            let alias = serde_json::from_value(Value::String(alias.clone())).ok()?;
+            let target = target.as_str()?.trim();
+            (!target.is_empty()).then(|| (alias, target.to_owned()))
+        })
+        .collect()
+}
+
+/// The model an alias names: its own setting, else the tier it follows (`haiku` → `fast`,
+/// `sonnet` → `balanced`, `opus` → `strong`).
+fn resolve_alias(alias: ModelAlias, table: &BTreeMap<ModelAlias, String>) -> Option<ModelRef> {
+    let follows = match alias {
+        ModelAlias::Haiku => Some(ModelAlias::Fast),
+        ModelAlias::Sonnet => Some(ModelAlias::Balanced),
+        ModelAlias::Opus => Some(ModelAlias::Strong),
+        _ => None,
+    };
+    let target = table
+        .get(&alias)
+        .or_else(|| follows.and_then(|tier| table.get(&tier)))?;
+    let (provider, id) = target.split_once('/')?;
+    Some(ModelRef {
+        provider: provider.to_owned(),
+        id: id.to_owned(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -833,5 +896,58 @@ mod tests {
         assert_eq!(out.models["relay/one"].tool_reliability, None);
         assert_eq!(out.auxiliary.as_ref().map(|m| m.id.as_str()), Some("one"));
         assert!(settings.view(&[])["models"]["relay/one"].is_object());
+    }
+
+    /// T31: the alias table is saved as the user's `modelAliases`, read back with the provider
+    /// settings, and an auxiliary alias reaches the Agent Host as the model it names.
+    #[test]
+    fn aliases_are_saved_and_an_auxiliary_alias_resolves() {
+        let dir = dir();
+        let ok = Operation::preferences(
+            &json!({"auxiliaryAlias":"haiku","aliases":{"fast":"relay/one","strong":"cloud/big"}})
+                .to_string(),
+        )
+        .unwrap();
+        let Operation::Preferences(prefs) = ok else {
+            panic!("preferences")
+        };
+        let settings = Settings {
+            auxiliary_alias: prefs.auxiliary_alias,
+            aliases: prefs.aliases.clone(),
+            ..Settings::default()
+        };
+        settings.persist(&dir).unwrap();
+        let file = crate::client_settings::read(&dir).unwrap();
+        assert_eq!(
+            file["modelAliases"],
+            json!({"fast":"relay/one","strong":"cloud/big"})
+        );
+        let read = Settings::read(&dir, true).unwrap();
+        assert_eq!(read.aliases, prefs.aliases);
+        assert_eq!(read.view(&[])["auxiliaryAlias"], "haiku");
+        // haiku follows fast, which is set.
+        let out = read.preferences();
+        assert_eq!(
+            out.auxiliary,
+            Some(ModelRef {
+                provider: "relay".into(),
+                id: "one".into()
+            })
+        );
+        assert!(out.aliases.is_empty() && out.auxiliary_alias.is_none());
+        // sonnet follows balanced, which is not set: the session's model.
+        let unset = Settings {
+            auxiliary_alias: Some(ModelAlias::Sonnet),
+            ..read
+        };
+        assert_eq!(unset.preferences().auxiliary, None);
+        for bad in [
+            json!({"aliases":{"fast":"noslash"}}),
+            json!({"aliases":{"fast":""}}),
+            json!({"aliases":{"fable":"a/b"}}),
+        ] {
+            assert!(Operation::preferences(&bad.to_string()).is_err(), "{bad}");
+        }
+        let _ = std::fs::remove_dir_all(dir);
     }
 }

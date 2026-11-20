@@ -382,6 +382,61 @@ impl CoreRuntime {
         })
     }
 
+    /// The subagent types of `workspace` from `cwd` (T31): definition files and built-in types
+    /// with the model each resolves to.
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn list_agents(
+        &self,
+        workspace: std::path::PathBuf,
+        cwd: Option<std::path::PathBuf>,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.list_agents(workspace, cwd).await
+        })
+    }
+
+    /// Stops subagent `child` of session `parent` (T31).
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn stop_subagent(
+        &self,
+        parent: String,
+        child: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        crate::sessions::check_session_id(&parent)?;
+        crate::sessions::check_session_id(&child)?;
+        self.on_sessions(on_done, move |hub| async move {
+            hub.stop_subagent(parent, child).await
+        })
+    }
+
+    /// A window of subagent `child`'s transcript, read through session `parent` (T31).
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn subagent_transcript(
+        &self,
+        parent: String,
+        child: String,
+        start: Option<u64>,
+        limit: u64,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        crate::sessions::check_session_id(&parent)?;
+        crate::sessions::check_session_id(&child)?;
+        self.on_sessions(on_done, move |hub| async move {
+            hub.subagent_transcript(parent, child, start, limit).await
+        })
+    }
+
     /// Stores an attachment for open session `id` and answers with its description (ADR-0030).
     ///
     /// # Errors

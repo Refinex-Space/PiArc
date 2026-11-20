@@ -512,6 +512,115 @@
   white-space: pre-wrap;
 }
 
+/* subagent card (T31) */
+
+.row-subagent {
+  display: grid;
+  gap: var(--piarc-space-1);
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-panel);
+}
+
+.subagent-head {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+  font-size: var(--piarc-font-size-small);
+  color: var(--piarc-text-secondary);
+}
+
+.subagent-title {
+  min-width: 0;
+  color: var(--piarc-text-primary);
+  font-weight: var(--piarc-font-weight-medium);
+}
+
+.subagent-type,
+.subagent-badge {
+  padding: 0 var(--piarc-space-1);
+  border: 1px solid var(--piarc-border-default);
+  border-radius: var(--piarc-radius-sm);
+  white-space: nowrap;
+}
+
+.subagent-status {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.row-subagent.is-failed .subagent-status,
+.row-subagent.is-interrupted .subagent-status {
+  color: var(--piarc-text-danger);
+}
+
+.row-subagent.is-partial .subagent-status {
+  color: var(--piarc-text-warning);
+}
+
+.subagent-dot {
+  flex: none;
+  width: var(--piarc-space-2);
+  height: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-border-strong);
+}
+
+.subagent-dot[data-color='red'],
+.subagent-dot[data-color='pink'] {
+  background: var(--piarc-state-danger);
+}
+
+.subagent-dot[data-color='orange'],
+.subagent-dot[data-color='yellow'] {
+  background: var(--piarc-state-warning);
+}
+
+.subagent-dot[data-color='green'] {
+  background: var(--piarc-state-success);
+}
+
+.subagent-dot[data-color='blue'],
+.subagent-dot[data-color='purple'],
+.subagent-dot[data-color='cyan'] {
+  background: var(--piarc-accent-solid);
+}
+
+.subagent-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-3);
+  font-size: var(--piarc-font-size-caption);
+}
+
+.subagent-activity {
+  font-size: var(--piarc-font-size-caption);
+}
+
+.subagent-warnings {
+  margin: 0;
+  padding-left: var(--piarc-space-4);
+  font-size: var(--piarc-font-size-caption);
+}
+
+.subagent-actions {
+  display: flex;
+  gap: var(--piarc-space-2);
+}
+
+.subagent-transcript {
+  max-height: 480px;
+  overflow: auto;
+  padding: var(--piarc-space-2);
+  border-top: 1px solid var(--piarc-border-subtle);
+}
+
+.approval-origin {
+  font-size: var(--piarc-font-size-small);
+}
+
 /* bash card */
 
 .row-bash > .bash-head,

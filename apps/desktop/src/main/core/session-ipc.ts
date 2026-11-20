@@ -76,6 +76,9 @@ export type SessionCore = Pick<
   | 'sessionDeletionTarget'
   | 'deleteSession'
   | 'transcriptWindow'
+  | 'subagentTranscript'
+  | 'stopSubagent'
+  | 'listAgents'
   | 'resendSnapshots'
   | 'projectTrust'
   | 'decideProjectTrust'
@@ -661,6 +664,21 @@ export function registerSessionHandlers(
     }
     return core.transcriptWindow(sessionId(id), start, limit);
   });
+  registerHandler(IPC_CHANNELS.subagentTranscript, (_event, [parent, child, start, limit]) => {
+    if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > 1000) {
+      throw new TypeError('limit must be an integer from 1 to 1000');
+    }
+    if (start !== null && (typeof start !== 'number' || !Number.isInteger(start) || start < 0)) {
+      throw new TypeError('start must be a non-negative integer or null');
+    }
+    return core.subagentTranscript(sessionId(parent), sessionId(child), start, limit);
+  });
+  registerHandler(IPC_CHANNELS.subagentStop, (_event, [parent, child]) =>
+    core.stopSubagent(sessionId(parent), sessionId(child)),
+  );
+  registerHandler(IPC_CHANNELS.agentsList, (_event, [dir]) =>
+    core.listAgents(absolutePath(dir), null),
+  );
   registerHandler(IPC_CHANNELS.snapshotsResend, () => {
     core.resendSnapshots();
   });

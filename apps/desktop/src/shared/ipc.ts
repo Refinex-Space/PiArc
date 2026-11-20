@@ -78,6 +78,9 @@ export const IPC_CHANNELS = {
   sessionSetArchived: 'piarc:session.setArchived',
   sessionDelete: 'piarc:session.delete',
   sessionTranscript: 'piarc:session.transcript',
+  subagentTranscript: 'piarc:subagent.transcript',
+  subagentStop: 'piarc:subagent.stop',
+  agentsList: 'piarc:agents.list',
   snapshotsResend: 'piarc:snapshots.resend',
   trustGet: 'piarc:trust.get',
   trustDecide: 'piarc:trust.decide',
@@ -469,6 +472,23 @@ export interface PiarcApi {
    * last `limit` when `start` is `null`, as JSON: `{ start, total, items: [{ entryId, item }] }`.
    */
   transcriptWindow(id: string, start: number | null, limit: number): Promise<string>;
+  /**
+   * Items of subagent `child`'s transcript (T31), read through session `parent` whose card
+   * shows it; the same JSON as `transcriptWindow`.
+   */
+  subagentTranscript(
+    parent: string,
+    child: string,
+    start: number | null,
+    limit: number,
+  ): Promise<string>;
+  /** Stops subagent `child` of session `parent` (T31); resolves with `{ stopped }` as JSON. */
+  stopSubagent(parent: string, child: string): Promise<string>;
+  /**
+   * The subagent types of a workspace (T31): definition files and built-in types with their
+   * source, overrides, warnings and resolved model, as `AgentsList` JSON.
+   */
+  listAgents(workspace: string): Promise<string>;
   /** Asks Core to send the workspace and session snapshots again. */
   resendSnapshots(): Promise<void>;
   /** The trust view of a directory as JSON (`TrustView`). */

@@ -27,10 +27,23 @@ function hunk(value: unknown): value is DiffHunk {
   );
 }
 
+/** A subagent's card (T31) in its main session's entry: it is answered under the subagent's
+ * own session id, and names the subagent. */
+function subagentOrigin(value: Record<string, unknown>): boolean {
+  const origin = value.subagent;
+  return (
+    record(origin) &&
+    origin.sessionId === value.sessionId &&
+    typeof origin.parentSessionId === 'string' &&
+    typeof origin.agentType === 'string' &&
+    (origin.description == null || typeof origin.description === 'string')
+  );
+}
+
 export function isApproval(value: unknown, sessionId: string): value is ApprovalRequest {
   if (
     !record(value) ||
-    value.sessionId !== sessionId ||
+    (value.sessionId !== sessionId && !subagentOrigin(value)) ||
     typeof value.requestId !== 'string' ||
     !integer(value.revision) ||
     !integer(value.connectionEpoch) ||

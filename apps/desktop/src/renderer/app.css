@@ -985,6 +985,35 @@ textarea.input {
   overflow-wrap: anywhere;
 }
 
+/* subagent types (T31) */
+
+.agents-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-3);
+}
+.agent-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.agent-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-1);
+  padding-block: var(--piarc-space-2);
+  border-bottom: 1px solid var(--piarc-border-default);
+  overflow-wrap: anywhere;
+}
+.agent-row p {
+  margin: 0;
+}
+.agent-row-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--piarc-space-2);
+}
+
 /* sign-in and model settings (T29) */
 
 .settings-subsection {
