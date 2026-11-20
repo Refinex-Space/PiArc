@@ -623,3 +623,31 @@ async fn a_rewind_does_not_write_through_a_link_that_replaced_the_file() {
     );
     assert!(!report.completed, "{report:?}");
 }
+
+/// R3 (review D8): a hunk discard decodes the file to text and encodes it back, so bytes that
+/// do not decode (an invalid UTF-8 byte a command added far from the agent's change) must not
+/// come back as U+FFFD. The hunk discard is refused (today as `fileModified`: the version of
+/// the decoded text differs) and the whole-file discard restores the original bytes.
+#[tokio::test]
+async fn a_hunk_discard_refuses_a_file_that_does_not_decode_cleanly() {
+    let f = Fixture::new("lossy");
+    // Mostly UTF-8 Chinese, so the detector keeps UTF-8 for the stray byte.
+    let base: String = (1..=20).map(|n| format!("第 {n} 行：中文内容\n")).collect();
+    f.put("mixed.txt", base.as_bytes());
+    f.read("mixed.txt").await;
+    let edited = base.replace("第 2 行", "第二行");
+    f.write("turn-1", "mixed.txt", &edited).await.expect("edit");
+    let current = [edited.as_bytes(), b"tail \xff\n".as_slice()].concat();
+    f.put("mixed.txt", &current);
+    let view = f.io.changes(S, None).await.expect("changes");
+    let file = &view.files[0];
+    let refused = f
+        .discard(&file.path, &file.version, Some(0))
+        .await
+        .expect_err("a lossy hunk discard");
+    assert_eq!(f.bytes("mixed.txt"), Some(current), "{refused:?}");
+    f.discard(&file.path, &file.version, None)
+        .await
+        .expect("the whole file");
+    assert_eq!(f.bytes("mixed.txt"), Some(base.into_bytes()));
+}
