@@ -1,0 +1,11 @@
+# T31: the main session waits for a foreground subagent whose script (`bg-subagent-child`)
+# stalls; the test kills the Agent Host meanwhile, then asks again.
+id: fg-subagent
+steps:
+  - tool_calls:
+      - id: toolu_fg
+        name: Agent
+        input:
+          description: Long survey
+          prompt: 'Survey everything. [[piarc-scenario:bg-subagent-child]]'
+  - text: 'Recovered after the restart.'

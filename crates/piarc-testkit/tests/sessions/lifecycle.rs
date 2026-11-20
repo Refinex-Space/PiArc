@@ -1,15 +1,17 @@
 //! Workspace and session lifecycle: warm-up and idle reclaim (T14-A09), snapshot revisions
 //! (A10), fork and close (A12, Core side).
 
+use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
 
+use piarc_core::agent_host::AgentHostLaunch;
 use piarc_core::clock::ManualClock;
 use piarc_core::composer::UserInput;
 use piarc_core::sessions::Op;
 use serde_json::Value;
 
-use crate::support::{Env, answer, mock_model, prompt_text, reply, shutdown, user_texts};
+use crate::support::{Env, answer, mock_model, node, prompt_text, reply, shutdown, user_texts};
 use crate::{open_session, prompt};
 
 fn host_of(snapshot: &Value, ws: &std::path::Path) -> Option<String> {
@@ -167,6 +169,112 @@ async fn a_running_background_subagent_keeps_the_agent_host() {
         .filter_map(|s| s["id"].as_str().map(str::to_owned))
         .collect();
     assert!(listed.contains(&id));
+    assert!(
+        !listed.contains(&child),
+        "children stay out of the session list"
+    );
+    shutdown(core).await;
+}
+
+/// Starts the Agent Host through a wrapper that writes its pid to the returned file.
+fn record_host_pid(env: &Env, config: &mut piarc_core::CoreConfig) -> std::path::PathBuf {
+    let Some(AgentHostLaunch::Custom { bundle, .. }) = &mut config.sessions.launch else {
+        panic!("expected development host")
+    };
+    let wrapper = env.root.join("host.mjs");
+    let pid_file = env.root.join("host.pid");
+    std::fs::write(&wrapper, format!(
+        "import {{writeFileSync}} from 'node:fs';\nimport {{pathToFileURL}} from 'node:url';\nwriteFileSync({},String(process.pid));\nawait import(pathToFileURL({}).href);",
+        serde_json::to_string(&pid_file).expect("path"), serde_json::to_string(bundle).expect("bundle"))).expect("wrapper");
+    *bundle = wrapper;
+    pid_file
+}
+
+/// Kills the Agent Host whose pid `record_host_pid` wrote.
+fn kill_host(pid_file: &std::path::Path) {
+    let pid = std::fs::read_to_string(pid_file)
+        .expect("host pid")
+        .parse::<u32>()
+        .expect("pid");
+    let killed = Command::new(node())
+        .args([
+            "-e",
+            "process.kill(Number(process.argv[1]),'SIGKILL')",
+            &pid.to_string(),
+        ])
+        .status()
+        .expect("kill this host");
+    assert!(killed.success());
+}
+
+/// T31: the Agent Host stops while the main session waits for a foreground subagent. The
+/// main session's turn becomes uncertain (ADR-0009), Core lets go of the child's registration
+/// and keeps it out of the session list, and the next prompt carries an interrupted result for
+/// the `Agent` call (ADR-0026).
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_crash_during_a_foreground_subagent_leaves_the_call_interrupted() {
+    let env = Env::new("crash-subagent").await;
+    let mut config = env.config(&[]);
+    let pid_file = record_host_pid(&env, &mut config);
+    let (core, events) = env.start(config);
+    let id = open_session(&core, &env).await;
+    let turn = prompt(&core, &id, &prompt_text("Survey and wait.", "fg-subagent")).await;
+    events
+        .wait("the child's request", |_| {
+            !env.requests("bg-subagent-child").is_empty()
+        })
+        .await;
+    let child = events.of(&id, "subagent/started")[0]["subagent"]["sessionId"]
+        .as_str()
+        .expect("the child's id")
+        .to_owned();
+    kill_host(&pid_file);
+    events
+        .wait("the turn became uncertain", |e| {
+            e.of(&id, "session/uncertain")
+                .iter()
+                .any(|p| p["turnId"] == turn.as_str())
+        })
+        .await;
+
+    let next = prompt(&core, &id, "Did the survey finish?").await;
+    assert_eq!(
+        events.turn_completed(&id, &next).await["status"],
+        "completed"
+    );
+    let last = env
+        .requests("fg-subagent")
+        .last()
+        .expect("a request")
+        .body
+        .clone();
+    let request: Value = serde_json::from_str(&last).expect("JSON request");
+    let results: Vec<&Value> = request["messages"]
+        .as_array()
+        .expect("messages")
+        .iter()
+        .filter_map(|m| m["content"].as_array())
+        .flatten()
+        .filter(|b| b["type"] == "tool_result" && b["tool_use_id"] == "toolu_fg")
+        .collect();
+    assert_eq!(results.len(), 1, "{last}");
+    assert!(
+        results[0]["content"].to_string().contains("Interrupted"),
+        "{}",
+        results[0]
+    );
+    // The new process does not know the child: Core no longer routes it, and stopping it finds
+    // nothing.
+    let (done, rx) = reply();
+    core.stop_subagent(id.clone(), child.clone(), done)
+        .expect("queued");
+    assert_eq!(answer(rx).await.expect("answered")["stopped"], false);
+    let listed: Vec<String> = events
+        .on("core/sessions")
+        .iter()
+        .flat_map(|s| s["sessions"].as_array().cloned().unwrap_or_default())
+        .filter_map(|s| s["id"].as_str().map(str::to_owned))
+        .collect();
     assert!(
         !listed.contains(&child),
         "children stay out of the session list"
