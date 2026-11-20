@@ -92,7 +92,7 @@
 | CAP-CONFIG-DIAG-001 | 配置诊断：每个配置文件的加载状态与生效、覆盖、忽略的键（基础） | FR-EX-05、ARCH-6.14 | T24 | `config-merge-order`<br>`config-untrusted-project` | 已实现 |
 | CAP-CTX-CACHE-001 | reminder 追加与压缩前后保持 Anthropic 缓存断点布局 | ARCH-6.6.1、ARCH-6.15 | T27 | `ctx-cache-breakpoints` | 已实现 |
 | CAP-CTX-CHANGED-001 | 读过的文件被外部修改后，下一次模型请求带修改提醒 | ARCH-6.6.3 | T27 | `ctx-file-modified`<br>`ctx-reminders` | 已实现 |
-| CAP-CTX-COMPACT-001 | 自动压缩与手动 `/compact`，熔断与压缩后恢复关键上下文 | FR-CX-03、ARCH-6.6.4、ARCH-6.15 | T27 | `ctx-compact-focus`<br>`ctx-compact-threshold`<br>`ctx-compact-window-cap` | 已实现 |
+| CAP-CTX-COMPACT-001 | 自动压缩与手动 `/compact`，熔断与压缩后恢复关键上下文 | FR-CX-03、ARCH-6.6.4、ARCH-6.15 | T27 | `ctx-compact-focus`<br>`ctx-compact-threshold`<br>`ctx-compact-window-cap`<br>`subagent-compaction` | 已实现 |
 | CAP-CTX-COMPACT-002 | 连续 3 次自动压缩失败或无效后停止自动压缩并提示，手动 `/compact` 仍可用 | FR-CX-03、ARCH-6.6.4、ARCH-6.15 | T27 | `ctx-compact-breaker` | 已实现 |
 | CAP-CTX-COMPACT-003 | 压缩后按上限重注入 memory、计划、任务清单、skill 正文与最近文件 | FR-CX-03、ARCH-6.6.4、ARCH-6.15 | T27 | `ctx-compact-restore` | 已实现 |
 | CAP-CTX-REMINDER-001 | 动态信息经 system reminder 送达，不破坏缓存 | ARCH-6.6.3 | T27 | `ctx-reminders`<br>`subagent-background` | 已实现 |
@@ -142,7 +142,7 @@
 | CAP-AGENT-HOOKS-001 | 子 agent 定义中的 hooks 只在其运行期间生效，项目级定义的 hooks 信任前不执行 | FR-HN-04、ARCH-6.3.1 | T31 | `subagent-hooks`<br>`subagent-hooks-untrusted` | 已实现 |
 | CAP-AGENT-INTERRUPT-001 | 中断主会话时进行中的子 agent 一并中止，未完成的工具调用补齐已中断结果 | FR-HN-04、ARCH-6.15 | T31 | `subagent-interrupt` | 已实现 |
 | CAP-AGENT-LIMIT-001 | 子 agent 深度上限移除 Agent 工具，并发上限立即返回说明上限的错误 | FR-HN-04、ARCH-6.4 | T31 | `subagent-concurrency`<br>`subagent-depth` | 已实现 |
-| CAP-AGENT-RUN-001 | 子 agent 使用任意服务商模型、可后台运行、最多 3 层、默认不继承父会话历史 | FR-HN-04、ARCH-6.4、ARCH-6.15 | T31 | `subagent-background`<br>`subagent-explore-fast`<br>`subagent-general-purpose`<br>`subagent-max-turns` | 已实现 |
+| CAP-AGENT-RUN-001 | 子 agent 使用任意服务商模型、可后台运行、最多 3 层、默认不继承父会话历史 | FR-HN-04、ARCH-6.4、ARCH-6.15 | T31 | `subagent-background`<br>`subagent-compaction`<br>`subagent-explore-fast`<br>`subagent-general-purpose`<br>`subagent-max-turns` | 已实现 |
 | CAP-BG-COMMAND-001 | 后台命令、超时转后台与 KillShell | FR-TL-04、ARCH-6.11 | T32 | — | 计划中 |
 | CAP-BG-MONITOR-001 | Monitor 监视后台任务输出并唤醒会话 | FR-TL-04、ARCH-6.11 | T32 | — | 计划中 |
 | CAP-CMD-001 | 自定义斜杠命令（`.claude/commands`、Pi prompt templates） | FR-EX-02、ARCH-6.7 | T37 | — | 计划中 |

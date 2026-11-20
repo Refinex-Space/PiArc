@@ -3100,92 +3100,92 @@
       "id": "T31-A01",
       "task": "T31",
       "description": "定义文件的 frontmatter 字段全部正确解析，同名定义按来源优先级取整条；不支持的字段与解析错误（含文件与行号）在设置页和子 agent 卡上提示。验证：单元测试与 Playwright 截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "单元测试 `cargo test -p piarc-config`（`agents::tests`：全部 frontmatter 字段、来源按就近优先整条合并与 `overrides`、不支持字段与暂未生效字段的警告、错误带文件与行号、无效 YAML 为单行并按文件行号）；L4 `PIARC_EVIDENCE_TASK=T31 npx playwright test -c apps/desktop/playwright.config.ts t31- --project dev` 3 项通过（dev 形态，测试数据目录与 mock）：设置页 Subagents 列出来源、被替换的 `.claude` 定义、`isolation`（T35）与项目级 `bypassPermissions` 的提示、三个内置类型、`broken.md` 第 3 行的错误，子 agent 卡显示 `memory: not supported by PiArc, ignored`；截图 tmp/evidence/T31/l4/*/settings-subagents*.png、approval-from-subagent-*.png"
     },
     {
       "id": "T31-A02",
       "task": "T31",
       "description": "Explore 与 Plan 只有只读工具，首个请求不含 memory 文件与 git 状态；general-purpose 拥有除移除项之外的全部工具。验证：L2 场景的 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `subagent-explore-fast`（Explore 首个请求的工具恰为 Read、Bash、Glob、Grep、WebFetch，不含 memory 文件与 git 状态）、`subagent-general-purpose`（工具为父会话的全部工具减去 AskUserQuestion、EnterPlanMode、ExitPlanMode、SuggestNextSteps）；`npx vitest run agent-host/src/harness/subagents`（Explore、Plan 只读且不加载项目上下文）。`node scripts/ci/run-l2.mjs` 全部通过"
     },
     {
       "id": "T31-A03",
       "task": "T31",
       "description": "子 agent 的首个模型请求只含任务描述，不含父会话历史；子会话压缩后父会话历史不变。验证：L2 场景（mock 请求断言）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `subagent-explore-fast`、`subagent-general-purpose`：子会话首个请求只有一条 user 消息即任务（`roles: [user]`、`user_texts`，不含父会话的消息）；`subagent-compaction`：子会话在 32K 窗口下于两步之间压缩（其端点第 2 个请求是摘要请求），主会话下一次请求的 user 消息不变、只以工具结果带回报告、不含摘要；L4 t31 第 1 项核对子会话首个请求不含父会话文本"
     },
     {
       "id": "T31-A04",
       "task": "T31",
       "description": "`tools` 与 `disallowedTools` 生效且 disallowed 优先；`AskUserQuestion`、`EnterPlanMode`、`ExitPlanMode` 被移除；模型调用被移除的工具时在闸门处被拒绝。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `subagent-tool-filter`（`tools` 与 `disallowedTools`，disallowed 优先、`Bash(rm *)` 移除整个 Bash、AskUserQuestion 移除；首个请求工具恰为 Read、Grep；调用 Write、AskUserQuestion、Bash 在闸门处得到 \"is not available to this subagent\" 错误结果）、`subagent-general-purpose`；单元测试 `harness/subagents/subagents.test.ts` 的 `allowedTools` 3 项"
     },
     {
       "id": "T31-A05",
       "task": "T31",
       "description": "第 3 层子 agent 没有 `Agent` 工具；并发达到上限（测试中调小）时 `Agent` 立即返回说明上限的错误结果。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `subagent-depth`（第 1、2 层有 `Agent`，第 3 层 `tools_exclude: [Agent]`）、`subagent-concurrency`（`.piarc/settings.json` 把并发调为 1，同一回复的第二个调用立即得到 \"Subagent limit reached: 1 of 1 subagents are running for this session\"，第一个照常完成）"
     },
     {
       "id": "T31-A06",
       "task": "T31",
       "description": "`fast`/`balanced`/`strong`、`haiku`/`sonnet`/`opus`、`provider/model`、`inherit` 各自解析到正确的模型，未配置的别名回退为 `inherit` 并提示。验证：单元测试与 L2 场景中 mock 收到的模型 ID。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "单元测试 `npx vitest run agent-host/src/providers/aliases.test.ts`（inherit、三个档位、haiku/sonnet/opus 跟随与单独设置、provider/model 与唯一 id、未设置或不可用回退 inherit 并给警告、无法解析报错列出别名）、`cargo test -p piarc-protocol --lib models`、`cargo test -p piarc-core --lib providers`；L2 `subagent-model-aliases`（mock 收到的模型 ID：fast、strong、单独设置的 opus 各到其模型，haiku 跟随 fast，sonnet 跟随未设置的 balanced 回退父会话模型并带 aliasFallback 警告）、`subagent-explore-fast`、`model-default-setting`"
     },
     {
       "id": "T31-A07",
       "task": "T31",
       "description": "子 agent 需要审批时，审批卡出现在主会话并标明子 agent 名称与类型，拒绝只影响该次调用。验证：Playwright（截图存 `tmp/evidence/T31/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `PIARC_EVIDENCE_TASK=T31 npx playwright test -c apps/desktop/playwright.config.ts t31- --project dev` 3 项通过（dev 形态，测试数据目录与 mock） 第 1 项：子 agent 的命令审批卡出现在主会话，标明 \"From subagent: Check the build (reviewer)\"，允许后子 agent 完成；截图 tmp/evidence/T31/l4/*/approval-from-subagent-{light,dark}.png。L2 `subagent-approval`（审批来源字段、拒绝只影响该次调用、下一次调用再次询问）；`cargo test -p piarc-core --lib tool_io::policy::tests::t31`（`a_subagent_asks_in_its_main_session_and_session_rules_cover_the_tree`）"
     },
     {
       "id": "T31-A08",
       "task": "T31",
       "description": "前台子 agent 的最终报告作为 `Agent` 工具结果返回；后台子 agent 完成后，摘要在主会话下一回合以 system reminder 注入。验证：L2 场景（mock 请求断言）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `subagent-explore-fast`、`subagent-general-purpose`（前台报告即 `Agent` 工具结果）、`subagent-background`（调用立即返回含任务 id 的结果，子 agent 完成后主会话下一次请求的 user 消息带 backgroundTask 提醒、报告与转录路径）"
     },
     {
       "id": "T31-A09",
       "task": "T31",
       "description": "子会话转录写入独立 JSONL，`sessions` 表记录父子关系，重建索引后父子关系不变。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-store --test index`（`subagent_links_come_from_the_file_and_survive_a_rebuild`：父子关系来自子会话 JSONL 的 `piarc.subagent` 条目，重建索引后不变）；`cargo test -p piarc-testkit --test sessions lifecycle::`（`a_running_background_subagent_keeps_the_agent_host`、`a_crash_during_a_foreground_subagent_leaves_the_call_interrupted`：子会话不出现在会话列表）；子会话 JSONL 由 `SessionManager.create` 独立写入"
     },
     {
       "id": "T31-A10",
       "task": "T31",
       "description": "子 agent 改动的文件进入主会话检查点，回退到该回合之前时恢复原样。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `subagent-checkpoint`（子 agent 修改与新建的文件进入主会话该回合的检查点，回退到该回合之前时恢复原内容并删除新建文件）；`cargo test -p piarc-core --lib tool_io::checkpoints`（`a_subagents_writes_belong_to_its_main_sessions_turn`，记录带子会话 id）"
     },
     {
       "id": "T31-A11",
       "task": "T31",
       "description": "项目级定义中的 `bypassPermissions`、`auto` 不生效，子 agent 的模式不比主会话宽松；定义中的 `hooks` 只在该子 agent 运行期间生效，项目级定义的 hooks 在信任前不执行。验证：测试与 L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-config`（`a_project_file_cannot_raise_the_mode`）；`cargo test -p piarc-core --lib tool_io::policy::tests::t31`（`the_mode_is_never_looser_than_the_main_sessions`、`definition_hooks_apply_to_their_run_only_and_need_trust_for_projects`）；L2 `subagent-approval`（项目级定义的 bypassPermissions 按主会话模式询问）、`subagent-hooks`（受信任项目的定义 hook 只拒绝子 agent 的命令）、`subagent-hooks-untrusted`（未信任时不执行并带警告）"
     },
     {
       "id": "T31-A12",
       "task": "T31",
       "description": "中断主会话时进行中的子 agent 一并中止，未完成的工具调用都补齐\"已中断\"结果。验证：L2 场景（mock provider 配对校验通过）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `subagent-interrupt`（中断主会话时前台子 agent 与其命令停止，`subagent/completed` 为 interrupted，回合 interrupted，下一次请求以错误结果与 `Agent` 调用配对，严格 mock 的 tool_pairing 与 role_order 校验通过）；`cargo test -p piarc-core --lib tool_io::policy::tests::t31`（`an_interrupt_reaches_foreground_subagents_only`）；`cargo test -p piarc-testkit --test sessions`（`a_crash_during_a_foreground_subagent_leaves_the_call_interrupted`）"
     },
     {
       "id": "T31-A13",
       "task": "T31",
       "description": "子 agent 卡显示类型、模型、状态、耗时与工具调用数，可展开查看子会话转录、可停止。验证：组件测试与 Playwright 截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "组件测试 `npx vitest run apps/desktop/src/renderer/transcript/rows/rows.test.tsx`（`subagent card (T31-A13)` 5 项：类型、模型、状态、耗时、工具调用数、token、警告、停止，后台运行与被停止运行的状态保留，只读转录）；L4 `PIARC_EVIDENCE_TASK=T31 npx playwright test -c apps/desktop/playwright.config.ts t31- --project dev` 3 项通过（dev 形态，测试数据目录与 mock） 第 1、2 项：卡片显示 reviewer、piarc-mock/mock-large、Done、1 tool call，展开显示子会话转录，运行中可停止并显示 Interrupted；截图 tmp/evidence/T31/l4/*/subagent-card-transcript-*.png、subagent-running-*.png、subagent-stopped-*.png"
     },
     {
       "id": "T31-A14",
