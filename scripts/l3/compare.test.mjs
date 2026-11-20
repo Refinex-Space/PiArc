@@ -102,12 +102,23 @@ excluded:
       ],
       ['hooks-a', [{ path: 'tool_calls.order', piarc: [], claude: ['t'] }]],
     ]);
-    const { results, stale } = applyAllowlist(allowlist, '2.1.318', differences);
+    const { results, stale } = applyAllowlist(allowlist, '2.1.318', differences, [
+      'perm-a',
+      'hooks-a',
+    ]);
     expect(results.get('perm-a')?.unexplained).toEqual([]);
     expect(results.get('perm-a')?.allowed.map((a) => a.entry.index)).toEqual([0, 1]);
     expect(results.get('hooks-a')?.unexplained.map((d) => d.path)).toEqual(['tool_calls.order']);
     // Entry 2 applies to hooks-a, which ran, and matched nothing; entry 3 is for other versions.
     expect(stale.map((e) => e.index)).toEqual([2]);
+    // A filtered run judges only entries whose scenarios all ran: '*' and perm-* also name
+    // scenarios that did not run, and hooks-a did not run.
+    const partial = applyAllowlist(allowlist, '2.1.318', new Map([['perm-a', []]]), [
+      'perm-a',
+      'perm-b',
+      'hooks-a',
+    ]);
+    expect(partial.stale).toEqual([]);
   });
 
   it('compares versions', () => {

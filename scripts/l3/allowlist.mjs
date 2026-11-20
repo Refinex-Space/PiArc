@@ -179,12 +179,15 @@ function scenarioMatches(entry, scenario) {
 
 /**
  * Splits each scenario's differences into allowed (with the entry) and unexplained, and
- * finds the entries that applied to this run but matched nothing.
+ * finds the stale entries: in range for `version`, every scenario of `known` the entry names
+ * ran, and it matched no difference. A filtered run therefore only judges entries for the
+ * scenarios it ran.
  * @param {Allowlist} allowlist
  * @param {string} version Claude Code's version
- * @param {Map<string, import('./diff.mjs').Difference[]>} differences by scenario
+ * @param {Map<string, import('./diff.mjs').Difference[]>} differences by scenario that ran
+ * @param {string[]} known every scenario that runs when nothing is filtered
  */
-export function applyAllowlist(allowlist, version, differences) {
+export function applyAllowlist(allowlist, version, differences, known) {
   const active = allowlist.entries.filter((e) => satisfies(version, e.claude_code));
   /** @type {Set<number>} */
   const used = new Set();
@@ -207,9 +210,9 @@ export function applyAllowlist(allowlist, version, differences) {
     }
     results.set(scenario, { allowed, unexplained });
   }
-  const ran = [...differences.keys()];
-  const stale = active.filter(
-    (e) => !used.has(e.index) && ran.some((scenario) => scenarioMatches(e, scenario)),
-  );
+  const stale = active.filter((e) => {
+    const named = known.filter((scenario) => scenarioMatches(e, scenario));
+    return !used.has(e.index) && named.length > 0 && named.every((s) => differences.has(s));
+  });
   return { results, stale };
 }

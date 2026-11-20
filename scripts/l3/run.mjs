@@ -37,9 +37,9 @@ export const COMPARED_L2_PREFIXES = ['perm-', 'policy-', 'hooks-', 'config-'];
 
 export const MISSING_CLAUDE = `The Claude Code CLI (\`claude\`) is not on PATH.
 L3 runs the real Claude Code against the local mock provider (no Anthropic account needed).
-Install it (docs/engineering/testing.md section 14.1), for example:
-  npm install -g @anthropic-ai/claude-code   (asks for a global install)
-then run \`npm run l3\` again.`;
+Install the version the Nightly pins (.github/workflows/l3-nightly.yml), a global install:
+  npm install -g @anthropic-ai/claude-code@<version>
+then run \`npm run l3\` again (docs/engineering/testing.md section 14.1).`;
 
 /**
  * @param {string[]} argv
@@ -274,7 +274,8 @@ async function main() {
       repeatDifferences: [...repeatDifferences('PiArc', p), ...repeatDifferences('Claude Code', c)],
     });
   }
-  const applied = applyAllowlist(parsed.allowlist, version, differences);
+  const known = loaded.scenarios.filter((s) => !skipped.has(s.id)).map((s) => s.id);
+  const applied = applyAllowlist(parsed.allowlist, version, differences, known);
   for (const r of results) {
     const split = applied.results.get(r.id);
     r.allowed = split?.allowed ?? [];
@@ -287,7 +288,6 @@ async function main() {
     claudeVersion: version,
     scenarios: results,
     excluded: parsed.allowlist.excluded,
-    // A filtered run cannot tell a stale entry from one for a scenario that did not run.
     stale: applied.stale,
     problems,
     recordingCheck,
