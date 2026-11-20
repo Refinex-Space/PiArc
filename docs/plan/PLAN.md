@@ -318,8 +318,8 @@ T28（开工基线 59e55a2，`npm run verify` 15/15）：
 - [x] 5. Agent Host：回合起点记录、`session/rewind`（分支、摘要）、`session/switchBranch`、`session/fork` 的 `beforeTurn`、历史与通知中的分支点（A03、A04、A11）
 - [x] 6. NAPI、主进程与 preload：回退、Changes、分支切换的 Core API
 - [x] 7. L2：`rewind-*`、`changes-*` 场景与运行器动作，能力 `CAP-REWIND-*`、`CAP-CHANGES-*`（A02、A03、A04、A05、A07）
-- [ ] 8. 客户端：消息菜单"回退到这里""从这里分支"、`/rewind`、回退对话框（冲突逐个选择、逐文件结果与撤销）、Changes 面板与右栏改动卡片（Mod+Shift+D）、分支切换控件（A04、A07、A08、A09、A11）
-- [ ] 9. L4 与截图（`tmp/evidence/T28/`），ego-browser 核对（A04、A07、A08、A09、A11）
+- [x] 8. 客户端：消息菜单"回退到这里""从这里分支"、`/rewind`、回退对话框（冲突逐个选择、逐文件结果与撤销）、Changes 面板与右栏改动卡片（Mod+Shift+D）、分支切换控件（A04、A07、A08、A09、A11）
+- [x] 9. L4 与截图（`tmp/evidence/T28/`），ego-browser 核对（A04、A07、A08、A09、A11）
 - [ ] 10. 文档：架构、AGENTS.md（`piarc-checkpoint`、渲染进程 `changes`）、`coding-standards.md` 复用表、能力清单
 - [ ] 11. 收尾：`npm run verify`（A12）、验收记录、看板与会话日志
 
