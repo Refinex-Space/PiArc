@@ -156,7 +156,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T27 | [上下文工程：system reminder、压缩与用量](tasks/T27-context-reminders-compaction-usage.md) | 3 | T26 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | b0b2641 |
 | T28 | [检查点、回退与 Changes 面板](tasks/T28-checkpoints-rewind-changes.md) | 3 | T27 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | c849475 |
 | T29 | [WebFetch、登录与模型设置补全、三档视图](tasks/T29-webfetch-login-model-settings-views.md) | 3 | T28 | macOS | high / 高 | 中 | 无 | 已完成 | 7f9e79b |
-| T30 | [L3 行为对齐基座](tasks/T30-l3-behavior-alignment.md) | 3 | T29 | macOS | high / 高 | 中 | 无 | 未开始 | — |
+| T30 | [L3 行为对齐基座](tasks/T30-l3-behavior-alignment.md) | 3 | T29 | macOS | high / 高 | 中 | 无 | 进行中 | — |
 | R3 | [M2 评审](tasks/R3-m2-review.md) | 3 | T30、W1 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | W2 | [Windows：M2 达标](tasks/W2-windows-m2-parity.md) | 4 | R3 | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T31 | [子 agent 与模型别名](tasks/T31-subagents-and-model-aliases.md) | 4 | R3 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -308,6 +308,18 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+T30 L3 行为对齐基座（2026-11-20 开工；本机 `claude` 2.1.318；基线 `npm run verify -- --baseline` 通过）
+
+- [ ] 1 前提检查与 Claude Code 隔离运行（临时配置目录、假 key、base URL、关闭非必要流量、夹具副本；`~/.claude` 前后快照）
+- [ ] 2 mock 的 L3 模式与结构化录制（白名单结构、辅助请求分类）
+- [ ] 3 双侧运行器：PiArc 侧（L2 运行器）与 Claude Code 侧（`claude -p` + `--permission-prompt-tool` 夹具 MCP server）、行为轨迹
+- [ ] 4 归一化、结构化 diff、Markdown/JSON 报告（`tmp/l3/`）
+- [ ] 5 `tests/l3-allowlist.yaml` 与校验（缺理由、不再匹配即失败）
+- [ ] 6 提示词剥离检查脚本及单测（并入 verify）
+- [ ] 7 一条命令 `npm run l3` 与 Nightly workflow
+- [ ] 8 权限与 hooks 首批比对：修正 PiArc 偏差（先写失败场景）或写入 allowlist；重复运行一致
+- [ ] 9 收尾：testing.md L3 一节、AGENTS.md、登记事项、验收记录、verify
 
 ## 登记事项
 
