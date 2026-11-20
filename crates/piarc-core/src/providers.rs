@@ -703,16 +703,7 @@ fn alias_table(value: Option<&Value>) -> BTreeMap<ModelAlias, String> {
 /// The model an alias names: its own setting, else the tier it follows (`haiku` → `fast`,
 /// `sonnet` → `balanced`, `opus` → `strong`).
 fn resolve_alias(alias: ModelAlias, table: &BTreeMap<ModelAlias, String>) -> Option<ModelRef> {
-    let follows = match alias {
-        ModelAlias::Haiku => Some(ModelAlias::Fast),
-        ModelAlias::Sonnet => Some(ModelAlias::Balanced),
-        ModelAlias::Opus => Some(ModelAlias::Strong),
-        _ => None,
-    };
-    let target = table
-        .get(&alias)
-        .or_else(|| follows.and_then(|tier| table.get(&tier)))?;
-    let (provider, id) = target.split_once('/')?;
+    let (provider, id) = alias.target(table)?.split_once('/')?;
     Some(ModelRef {
         provider: provider.to_owned(),
         id: id.to_owned(),

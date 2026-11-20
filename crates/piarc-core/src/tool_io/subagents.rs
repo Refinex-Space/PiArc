@@ -436,17 +436,7 @@ pub(crate) fn resolve_model_setting(
     let Ok(alias) = serde_json::from_value::<ModelAlias>(Value::String(value.to_owned())) else {
         return Some(value.to_owned());
     };
-    let table = aliases(settings);
-    let follows = match alias {
-        ModelAlias::Haiku => Some(ModelAlias::Fast),
-        ModelAlias::Sonnet => Some(ModelAlias::Balanced),
-        ModelAlias::Opus => Some(ModelAlias::Strong),
-        _ => None,
-    };
-    table
-        .get(&alias)
-        .or_else(|| follows.and_then(|tier| table.get(&tier)))
-        .cloned()
+    alias.target(&aliases(settings)).map(str::to_owned)
 }
 
 fn mode_name(mode: PermissionMode) -> &'static str {

@@ -48,6 +48,28 @@ pub enum ModelAlias {
     Opus,
 }
 
+impl ModelAlias {
+    /// The tier a Claude Code name follows when it is not set on its own.
+    #[must_use]
+    pub const fn follows(self) -> Option<Self> {
+        match self {
+            Self::Haiku => Some(Self::Fast),
+            Self::Sonnet => Some(Self::Balanced),
+            Self::Opus => Some(Self::Strong),
+            Self::Fast | Self::Balanced | Self::Strong => None,
+        }
+    }
+
+    /// The `provider/model` an alias names in `table`: its own entry, else the tier it follows.
+    #[must_use]
+    pub fn target(self, table: &std::collections::BTreeMap<Self, String>) -> Option<&str> {
+        table
+            .get(&self)
+            .or_else(|| self.follows().and_then(|tier| table.get(&tier)))
+            .map(String::as_str)
+    }
+}
+
 /// How thoroughly the model has been exercised with tools.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -510,3 +532,22 @@ request!(
     /// Method marker for `models/credentialStatus`.
     ModelsCredentialStatus, "models/credentialStatus", CredentialStatusParams, CredentialStatusResult
 );
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::ModelAlias;
+
+    #[test]
+    fn claude_code_names_follow_their_tier_unless_set() {
+        let table = BTreeMap::from([
+            (ModelAlias::Fast, "cheap/small".to_owned()),
+            (ModelAlias::Opus, "big/large".to_owned()),
+        ]);
+        assert_eq!(ModelAlias::Haiku.target(&table), Some("cheap/small"));
+        assert_eq!(ModelAlias::Opus.target(&table), Some("big/large"));
+        assert_eq!(ModelAlias::Strong.target(&table), None);
+        assert_eq!(ModelAlias::Sonnet.target(&table), None);
+    }
+}
