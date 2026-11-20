@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.38（2026-11-20） |
+| 版本 | 2.39（2026-11-20） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -262,6 +262,7 @@ PiArc/
 | [0045](../adr/0045-webfetch-sign-in-model-settings.md) | WebFetch 由 Core 抓取（`piarc-web`：rustls + 系统信任库、SSRF 纯函数、连接钉住已检查的地址、同站重定向）并绑定已获准的调用；辅助模型通道在 Agent Host；登录在设置 Host 上运行、交互经 `core/login`；每模型设置与辅助模型存用户级设置并随握手下发；本地端点的模型为低可靠性、用保守 Tool Profile | 网络访问与文件、命令一样由 Core 授权审计；规则主机与连接主机不会不一致；凭据只在保险箱 |
 | [0046](../adr/0046-l3-behavior-alignment.md) | L3 用临时配置目录与假 key 隔离运行 `claude -p`，审批经 `--permission-prompt-tool` 夹具按工具调用 id 作答；mock 的 L3 模式只记白名单结构；只比主循环请求；allowlist 按 Claude Code 版本范围生效、失效即失败；会话的 SessionStart hooks 先于其提示的 UserPromptSubmit hooks | 与 Claude Code 黑盒比对而不让提示词落盘；L3 首批比对发现的 hooks 顺序偏差按 Claude Code 修正 |
 | [0047](../adr/0047-outside-paths-before-wildcard-command-rules.md) | 带通配的 Bash/PowerShell allow 规则不放行像路径而在会话目录外（或无法定位）的参数，调用按越界询问；精确规则、文件工具的路径规则与 PreToolUse allow 不变（修订 ADR-0037 阶梯第 6、7 步） | 一次"总是允许"不再让同类命令无询问地读写工作区外的文件，与 Claude Code 的越界询问一致 |
+| [0048](../adr/0048-subagents-and-model-aliases.md) | 子 agent 定义由 Core 读、Agent Host 加内置类型；子会话经 `subagent/start` 在 Core 登记自己的会话 id 并链接主会话（模式取更严者、会话规则与检查点归主会话、审批卡标来源）；工具过滤用隐藏声明加 `tool_call` 闸门；深度与并发只在 Agent Host 的 `SubagentRunner` 计数，超限立即报错；后台运行不随中断结束、经提醒回报；别名表是设置键 `modelAliases`，由 Agent Host 的 `resolveModel` 解析 | 子 agent 沿用同一套裁决、快照与 hooks；被移除工具的调用仍经过闸门；排队会让前台子 agent 互相等待而死锁 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -622,6 +623,8 @@ handler 类型：`command`（M2）→ `http`、`prompt`（M3）→ `mcp_tool`（
 - **结果**：前台子 agent 的最终报告作为 `Agent` 工具结果返回；后台子 agent 完成后以通知消息注入主会话下一回合。子会话转录存为独立 JSONL，并在 Core 索引中记录父子关系。
 - 子 agent 的文件编辑同样进入快照（Core 统一入口），这一点比 Claude Code 更完整。
 
+T31 落地（ADR-0048）：定义由 Core 的 `piarc_config::agents` 发现、解析与合并（来源顺序同上，项目两级从 cwd 向上、越近越优先；同名取整条；不认识的字段、`isolation`/`mcpServers`/`skills`（T35/T36/T37 前暂未生效）、项目级 `bypassPermissions`/`auto` 都作为警告列出，解析错误带行号），Agent Host 经 `agents/list` 取得并加上三个内置类型（`Explore`、`Plan` 只读、不加载 memory 与 git 状态，`Explore` 默认 `fast`）。子会话在 `agent-host/src/runtime/subagent-session.ts` 创建、`runtime/subagents.ts` 的 `SubagentRunner` 运行与计数（每棵树一份，超过并发上限立即报错，不排队），运行前经 `subagent/start` 在 Core 登记自己的会话 id（独立的文件状态表）并链接主会话：生效模式取定义与主会话当前模式中更严的一个，"本会话允许"的规则存于主会话，写入记在主会话当前回合的检查点下（带子会话 id），定义的 hooks 作为只在子会话运行期间生效的来源（项目级的要求项目受信任）。工具过滤顺序：父会话当前工具 → `tools` → `disallowedTools`（优先）→ 去掉 `AskUserQuestion`、`EnterPlanMode`、`ExitPlanMode`、`SuggestNextSteps` → 到达深度上限时去掉 `Agent`；集合外的工具经 Pi 的 `prepareLoadout` 隐藏声明从请求中隐藏，调用到达 `tool_call` 闸门被拒绝（`setActiveTools` 移除的工具在闸门前就以 "not found" 结束）。后台运行立即返回运行 id，结束后经 `backgroundTask` 提醒回报，不随主会话中断结束，关闭会话或卡片上的停止按钮结束它；运行中的子会话让工作区保持忙碌，空闲计时不回收其 Agent Host。子会话 JSONL 首条 `piarc.subagent` 记父会话与类型，`sessions` 表由它派生父子关系（schema v6），会话列表不含子会话。
+
 ### 6.5 Plan 模式、任务清单、下一步、提问
 
 - **Plan 模式**：进入后**不改动工具列表**：工具定义变化会让 prompt cache 整体失效，并可能让服务商丢弃历史 thinking 块，违反第 6.6.1 节"system 与工具定义保持稳定"的原则。约束靠两层实现：`tool_call` 闸门拒绝写工具与非只读命令，拒绝理由告诉模型当前处于计划模式；进入与退出计划模式各以一条追加消息告知模型。模型用 `ExitPlanMode` 提交计划（Markdown）。客户端显示计划卡与计划面板，用户可行内评论；批准时选择后续模式（自动接受编辑 / 手动审批 / 继续规划）。计划文本保存为会话 entry，压缩后重新注入。
@@ -796,6 +799,8 @@ T27 落地（ADR-0043）：`agent-host/src/harness/context-usage.ts` 在每次�
 
 T29 落地（ADR-0045）：每模型设置（显示名、上下文窗口、图片输入、默认 effort、Tool Profile）与辅助模型存在用户级 `settings.json` 的 `modelProviders.models`、`modelProviders.auxiliary`，经 `setModelPreferences` 修改，Core 组装为 `ModelPreferences` 随 `core/welcome` 与 `models/reload` 交给 Agent Host（`providers/preferences.ts`）。生效点：`models/list`（名称、窗口、`vision`、`defaultEffort`、`toolProfile`）、压缩阈值与用量环（窗口）、输入检查与请求策略（图片）、`session/setModel` 未指定档位时（默认 effort）。工具调用可靠性新增 `low`：无密钥本地端点的模型由 Core 标为 `low`；`low` 的模型默认用保守 Tool Profile（Read、Write、Edit、Bash、PowerShell、Glob、Grep、TodoWrite，逐步写明参数的描述，规范名不变，任务清单提醒 3 轮起且无清单也提醒），用户可改回默认。Profile 在会话打开时按其模型决定，模型或偏好改变 Profile 时会话空闲后在同一 id 下重开；已冻结的 system prompt 不改写。辅助模型通道 `AuxiliaryModel.complete` 做一次无工具调用，未设置辅助模型或其服务商无凭据时用会话模型，用量计入当前回合并写 `piarc.auxiliaryUsage`。
 
+T31 落地（ADR-0048）：别名表是设置键 `modelAliases`（`fast`、`balanced`、`strong`、`haiku`、`sonnet`、`opus` → `provider/model`），用户级 `settings.json` 与工作区 `.piarc/settings.json` 按键合并，设置窗口"模型与服务商"页的别名一节编辑用户级的表并显示每个别名的模型能力摘要。`agent-host/src/providers/aliases.ts` 的 `resolveModel` 是模型说明的唯一解析器：`inherit` → 别名（`haiku`/`sonnet`/`opus` 未单独设置时跟随 `fast`/`balanced`/`strong`）→ `provider/model` → 唯一的模型 id；别名未设置或目标不可用时回退为 `inherit` 并在子 agent 卡上提示，无法解析时报错并列出别名；effort 不受支持时用模型默认并提示。辅助模型可以指向别名（`modelProviders.auxiliaryAlias`，按用户级表解析），设置键 `model`（可为别名）与 `effortLevel` 是新会话的默认模型与 effort。
+
 T21 的 `models/list` 返回可用模型的 `provider`、`id`、`name`、`contextWindow`、`maxOutput`、`vision`、`efforts`、`promptCache`、`toolReliability`。Agent Host 以锁定版本的 Pi 模型记录为基础，由 `providers/catalog.ts` 按完整提供商 ID 与模型 ID 应用覆盖。例如 `qwen-token-plan-cn/qwen3.6-plus` 根据百炼公布的额度规则标记支持缓存，Token Plan 缺少美元单价时显示费用未知。支持档位取 Pi 的有效集合并去掉 minimal。切换前核对实际历史里的 thinking 块，缓存写入单价按目标模型的价格分档选取。自定义端点可以分别选择 Anthropic Messages、OpenAI Chat Completions、OpenAI Responses 并填写多个模型 ID。
 
 ### 6.14 Claude Code 配置兼容矩阵
@@ -820,7 +825,7 @@ T21 的 `models/list` 返回可用模型的 `provider`、`id`、`name`、`contex
 T24 落地（ADR-0038）：
 
 - 读取的文件与层级：`~/.claude/settings.json`（`claudeUser`）、`.claude/settings.json`（`claudeProject`）、`.claude/settings.local.json`（`claudeProjectLocal`）按 ADR-0005 第 3 条与 PiArc 的三个文件同表合并；`~/.claude.json` 不是设置层，配置诊断只列出它的键名。家目录由 Core 注入（`CoreConfig.home`），测试一律用临时目录。
-- 键映射表是唯一判断（`piarc_config::claude::SETTINGS_KEYS`，按官方 settings 索引逐键归类）。M2 实际生效的键：`permissions.allow`、`permissions.ask`、`permissions.deny`、`permissions.defaultMode`、`permissions.additionalDirectories`，T25 起加上 `hooks`、`disableAllHooks`（ADR-0039），T27 起加上 `autoCompactEnabled`、`autoCompactWindow`（ADR-0043），T28 起加上 `fileCheckpointingEnabled`（ADR-0044）。由后续任务支持的键：`plansDirectory`（T48：批准时把计划另存到该目录，计划仍以会话 entry 为准；T26 只存 entry，R3 决定，I104）；`model`、`effortLevel`（原定 T29；`model` 的取值是 Claude Code 的模型别名，随 T31 的别名表一起支持，I113）；`agent`、`advisorModel`（T31）；`worktree`（T35）；`enableAllProjectMcpServers`、`enabledMcpjsonServers`、`disabledMcpjsonServers`、`allowedMcpServers`、`deniedMcpServers` 与 `~/.claude.json` 的 MCP 段（T36）；`outputStyle`、`disableBundledSkills`、`skillOverrides`、`disableSkillShellExecution`（T37）；`allowedHttpHookUrls`、`httpHookAllowedEnvVars`（T38）；`sandbox`（T39）；`enabledPlugins`、`extraKnownMarketplaces`（T40）；`autoMode`、`disableAutoMode`、`useAutoModeDuringPlan`（T46）；`autoMemoryEnabled`、`autoMemoryDirectory`（T47）。其余键（含 `env`、`theme`、`language` 等终端偏好、账号与遥测、只在托管设置中有效的键）标为"已忽略"，表外的键为"未知"，都在诊断中逐个列出。
+- 键映射表是唯一判断（`piarc_config::claude::SETTINGS_KEYS`，按官方 settings 索引逐键归类）。M2 实际生效的键：`permissions.allow`、`permissions.ask`、`permissions.deny`、`permissions.defaultMode`、`permissions.additionalDirectories`，T25 起加上 `hooks`、`disableAllHooks`（ADR-0039），T27 起加上 `autoCompactEnabled`、`autoCompactWindow`（ADR-0043），T28 起加上 `fileCheckpointingEnabled`（ADR-0044），T31 起加上 `model`、`effortLevel`（新会话的默认模型与 effort，`model` 可以是别名，ADR-0048）。由后续任务支持的键：`plansDirectory`（T48：批准时把计划另存到该目录，计划仍以会话 entry 为准；T26 只存 entry，R3 决定，I104）；`agent`（T48：主线程以某个子 agent 的身份运行）；`worktree`（T35）；`enableAllProjectMcpServers`、`enabledMcpjsonServers`、`disabledMcpjsonServers`、`allowedMcpServers`、`deniedMcpServers` 与 `~/.claude.json` 的 MCP 段（T36）；`outputStyle`、`disableBundledSkills`、`skillOverrides`、`disableSkillShellExecution`（T37）；`allowedHttpHookUrls`、`httpHookAllowedEnvVars`（T38）；`sandbox`（T39）；`enabledPlugins`、`extraKnownMarketplaces`（T40）；`autoMode`、`disableAutoMode`、`useAutoModeDuringPlan`（T46）；`autoMemoryEnabled`、`autoMemoryDirectory`（T47）。其余键（含 `env`、`theme`、`language` 等终端偏好、账号与遥测、只在托管设置中有效的键，以及 T31 判定的 `advisorModel`：它是 Anthropic 服务端的 advisor 工具所用的模型，PiArc 没有这个工具）标为"已忽略"，表外的键为"未知"，都在诊断中逐个列出。
 - 信任约束与 PiArc 项目层相同：信任前项目层的 allow、`additionalDirectories`、`acceptEdits` 不生效，deny 与 ask 照常生效；项目层的 `bypassPermissions`、`auto` 始终不生效，诊断注明原因。生效键类型错误时整份文件跳过并给出 JSON Pointer，JSON 语法错误给出行列，其他文件照常加载。
 - `.claude/` 文件与 PiArc 设置一起被监听，变化后重新加载并发 `core/settings`；新增的可执行项沿用第 10.2 节的快照确认。PiArc 的写接口拒绝 `.claude/` 下与 `.claude.json` 的任何路径（`permissionDenied`），L2 运行器在每个场景前后比对 Claude Code 配置的快照。
 - 配置诊断的 Core API 为 `config_diagnostics`（NAPI `configDiagnostics`），与权限裁决用同一次加载；设置窗口"配置诊断"页按文件列出并可展开每个键的本文件取值、最终取值与来源。T41 在此基础上补全插件与企业来源。
@@ -964,6 +969,8 @@ T19（ADR-0030）为 `session/prompt`、`session/steer`、`session/followUp` 添
 
 T29 已实现（ADR-0045）：Agent Host → Core 的请求 `web/fetch`（能力 `webFetch`，`{ sessionId, origin, url }`，结果为最终 URL、状态、内容类型、`markdown`/`text` 格式的正文、字节数、截断标记与跨站重定向的 `redirect`）与 `ui/loginInteraction`（能力 `login`，`{ loginId, provider, interaction }`，交互为 `authUrl`、`deviceCode`、`progress`、`info`、`prompt`，提问的结果带 `value`）；Core → 设置 Host 的请求 `models/login/start`、`models/login/cancel`、`models/logout`。`core/welcome` 新增可选的 `modelPreferences`，`models/reload` 新增可选的 `preferences`，`models/list` 结果新增可选的 `loginProviders`，`CatalogModel` 新增可选的 `defaultEffort`、`toolProfile`，`ToolReliability` 新增 `low`。
 
+T31 已实现（ADR-0048，能力 `subagents`）：Agent Host → Core 的请求 `agents/list`（`{ cwd, builtIn }`，结果 `AgentsList`：合并后的定义与警告、解析问题、深度与并发上限、被 deny 的内置类型、合并后的别名表）、`subagent/start`（子会话 id、父会话、工具调用 id、类型、描述、cwd、JSONL 路径、模型、是否后台；结果为生效的权限模式与警告）、`subagent/finish`（状态与用量）；Core → Agent Host 的请求 `resources/listAgents`（结果同 `AgentsList`，每条带解析到的模型）与 `subagent/stop`；父会话路由上的通知 `subagent/started`、`subagent/progress`、`subagent/completed`（`{ itemId, subagent: SubagentState }`）。`policy/evaluate` 参数新增可选的 `parentSessionId`、`agentType`，审批卡新增可选的 `subagent`（`ApprovalOrigin`），`subagent` 条目新增可选的 `subagent`（`SubagentState`），`session/create` 新增可选的 `defaultModel`、`defaultEffort`，`ModelPreferences` 新增 `auxiliaryAlias`、`aliases`。Core API 新增 `listAgents(workspace, cwd)`、`stopSubagent(parent, child)`、`subagentTranscript(parent, child, start, limit)`。
+
 T28 已实现（ADR-0044，能力 `checkpoints`）：Core → Agent Host 的请求 `session/rewind`（`{ sessionId, turnId, mode: "branch" | "summarize" }`）、`session/switchBranch`（`{ sessionId, entryId }`），Agent Host → Core 的通知 `session/branches`（新消息落在已有分支处时的分支点）；`fs/write` 新增可选的 `turnId`，`session/fork` 新增可选的 `beforeTurn`，`session/history` 结果新增可选的 `branches`，压缩条目的原因新增 `rewind`（分支摘要）。
 
 T27 已实现（ADR-0043，能力 `context`）：Agent Host → Core 的请求 `context/settings`（会话工作区的 `autoCompactEnabled`、`autoCompactWindow`）、`fs/changes`（会话读写过、之后在外部变化的文件，每个版本报告一次）、`fs/forgetReads`（压缩后清掉读取范围），`fs/read` 新增可选的 `restore`（不带调用来源，读会话读写过的文件），通知 `session/usage`；Core → Agent Host 的请求 `session/getContextUsage` 与 `session/remind`（只接受 `backgroundTask`）；`session/compact` 新增可选的 `instructions`；条目新增 `reminder`，`contextCompaction` 新增 `autoCompactStopped`。Core API 新增 `contextUsage(id)`，`compact(id, instructions?)`。
@@ -1065,6 +1072,8 @@ impl Session {
 1. **实体快照**（带 `revision`）：工作区列表、会话列表、审批账本、后台任务、会话侧栏元数据。客户端丢弃旧 revision。
 2. **条目增量**：transcript 的 `item started → delta* → completed`，身份为 `sessionId / turnId / itemId`，子 agent 附带 `parentSessionId`。
 
+T31 现状（ADR-0048）：子会话的条目增量还没有下发。子 agent 的进度是父会话 `subagent` 条目的 `item/updated` 与 `subagent/*` 通知里的 `SubagentState`；子 agent 卡展开后经 `subagentTranscript` 读子会话的历史窗口，状态或工具调用数变化时重新读取。带 `parentSessionId` 的实时子会话增量登记为后续事项。
+
 diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高亮在渲染进程的 Web Worker 中完成（第 8.4 节）。
 
 ### 7.7 diff 与预处理
@@ -1113,12 +1122,13 @@ diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高�
 - **transcript 行类型**：用户消息、回复正文（Markdown）、思考块（生成中强制展开，结束后折叠为"思考了 N 秒"）、工具组摘要（动词 + 对象 + 增删计数）、bash 卡（语义状态，超过 10 秒显示计时）、文件改动卡、审批卡、子 agent 卡、压缩提示、错误卡（分类 + 重试）、计划卡、任务卡、下一步建议。三档视图：普通（工具折叠为摘要）/ 思考（加思考摘要）/ 详细（全部展开）。T29 落地：切换控件在会话标题栏（`transcript/DetailSwitch.tsx`），选择按会话记在渲染进程内存；普通档隐藏思考块，思考档为默认（保持 T19 起的显示），详细档展开工具组与思考块并显示 `reminder` 条目，展开状态与其他档分开保存。
 - **审批卡**：四类——命令、文件改动（带 diff 预览）、权限扩展（越界目录、网络域名）、提问表单。按钮：拒绝（可附反馈）、仅本次允许、本会话允许、总是允许（可编辑规则）。
 - **右栏卡片**：运行环境、上下文（百分比 + 分类明细 + 压缩按钮）、改动、任务、后台任务；空间不足时变为浮层。
-- **设置**（独立窗口）：通用、模型与服务商（每模型显示名、上下文窗口、图片输入、默认 effort；密钥加密存储；T29 起另有登录与登出、每模型的 Tool Profile 与辅助模型，见第 6.13 节）、权限（规则可视化管理、审计记录）、hooks、MCP、skills 与插件、memory 文件、沙箱、外观、快捷键、配置诊断、关于与更新。
+- **设置**（独立窗口）：通用、模型与服务商（每模型显示名、上下文窗口、图片输入、默认 effort；密钥加密存储；T29 起另有登录与登出、每模型的 Tool Profile 与辅助模型，T31 起另有模型别名表，见第 6.13 节）、子 agent（T31：按工作区列出类型、来源、覆盖关系、解析到的模型、工具与警告，以及无效的定义文件与行号）、权限（规则可视化管理、审计记录）、hooks、MCP、skills 与插件、memory 文件、沙箱、外观、快捷键、配置诊断、关于与更新。
 - **系统集成**：见第 8.8 节。
 - T18 落地（ADR-0029）：窗口为侧栏 | 主区（+ 右栏）在上、停靠面板区在下；右栏与面板区是注册式容器（`src/renderer/shell/registry.ts` 的 `registerPanel`），没有注册内容时不渲染，尺寸存于窗口的 localStorage。侧栏按工作区分组，组内置顶在前、其余按最近更新；徽标形状各不相同（出错为圆形加叹号、等待审批为方形加问号、运行中为旋转的环、未读为圆点），不只靠颜色区分。新建会话的顺序是：需要时先显示信任对话框，再立即显示乐观消息（`flushSync`），然后创建会话、发送首条输入；任一步失败，回到新建视图并把文字放回输入框；会话已创建但首条输入失败时关闭该会话（Pi 没有回复就不写文件，不留痕迹）。设置窗口是独立的 `BrowserWindow`（`#/settings`），页面经 `src/renderer/settings/registry.ts` 的 `registerSettingsPage` 注册，T18 注册通用、外观、快捷键三页。
 - T27（ADR-0043）：环境栏右端是上下文用量环（百分比 = 合计 / 有效窗口，75% 起提示、90% 起警告，颜色之外另有文字与 `data-level`），点击打开右栏的上下文卡片（每个会话都注册）：百分比、合计与窗口、来源（估算或服务商报告）、按类别的条形明细（"未分类"只在大于零时列出）、自动压缩阈值或停止原因，以及"立即压缩"（等价于不带重点的 `/compact`）。composer 中发送 `/compact <重点>` 时作为压缩重点送出，不作为消息；压缩提示行在熔断时写明原因与"仍可使用 /compact"。`reminder` 条目不进默认视图（T29 的详细视图显示）。
 - T28（ADR-0044）：用户消息的操作菜单有"回退到这里"与"从这里分支"，`/rewind` 先列出当前分支的消息；回退对话框列出四个选项、要恢复或删除的文件与冲突（逐个选择保留或覆盖），执行后显示逐文件结果与撤销，消息原文回到输入框。右栏的改动卡片显示增删合计，停靠区的 Changes 面板（Mod+Shift+D）按文件显示统一 diff、增删行数与语法高亮，可按文件或按 hunk 丢弃；两处都说明只被 Bash 改动的文件不在其中。有兄弟分支的用户消息显示"‹ 2 / 3 ›"切换控件，回退后尚未发送时输入框上方列出可切回的分支。
 - T26（ADR-0042）：transcript 中 `TodoWrite` 是任务卡（进行中项高亮、完成计数），`ExitPlanMode` 是计划卡（摘要与状态，可在计划面板中打开），`AskUserQuestion` 的结果按题列出，`SuggestNextSteps` 是下一步建议（每条"在此执行""开始新会话"）；待批的计划与提问在审批卡位置显示为计划审批卡与提问表单，沿用审批热键、400 ms 防误触与输入法守卫；右栏注册任务卡片（会话有任务清单时），停靠区注册计划面板（会话有待批或已批准的计划时）。
+- T31（ADR-0048）：子 agent 卡（`transcript/rows/subagent.tsx`）显示任务名、类型、颜色、实际模型、状态、耗时、工具调用数、token、后台标记与警告，运行中显示当前活动和停止按钮；展开后以只读方式显示子会话转录（复用行组件，不提供重试、回退与分支）。来自子 agent 的审批卡、计划卡与提问表单标明"来自子 agent：名称（类型）"。
 - T19 的会话主区使用第 8.4 节的行组件与 ProseMirror 输入。提及胶囊显示文件名，发送时按相对路径展开。附件经主进程存入 Core 的会话附件目录，模型收到图像块或 PDF 提取文本。内置命令由 Core 提供，运行中的 steer、follow-up 与队列编辑都经会话 API 执行。
 
 ### 8.3 状态与数据流
@@ -1263,7 +1273,7 @@ T25（ADR-0039）：每次 hook 运行每个 handler 写一行 `audit_events`（
 
 T18（schema v2，ADR-0029）：`sessions` 增加 `custom_title`（用户给的标题，属于 Core 自己的列，重建时保留）。
 
-T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失败整体回滚；`workspaces` 记主 checkout 而不另存信任状态（信任看 `project_trust`）；`sessions` 中从 JSONL 派生的列（标题来源、模型、用量、时间、格式版本、索引状态）重建时清空重读，置顶、归档、未读、所属工作区、状态、worktree 保留。解析器流式读取，末行未写完时下次从行首继续；未知格式版本标为"索引不可用"，坏行跳过并记录。`session_fts`（T35）尚未建表；`checkpoints` 由 T28 的 schema v5 建立（ADR-0044）。
+T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失败整体回滚；`workspaces` 记主 checkout 而不另存信任状态（信任看 `project_trust`）；`sessions` 中从 JSONL 派生的列（标题来源、模型、用量、时间、格式版本、索引状态）重建时清空重读，置顶、归档、未读、所属工作区、状态、worktree 保留。解析器流式读取，末行未写完时下次从行首继续；未知格式版本标为"索引不可用"，坏行跳过并记录。`session_fts`（T35）尚未建表；`checkpoints` 由 T28 的 schema v5 建立（ADR-0044）。T31 的 schema v6（ADR-0048）给 `sessions` 加 `subagent_parent`、`subagent_type`（从子会话 JSONL 的 `piarc.subagent` 条目派生，重建时还原），给 `checkpoint_files` 加 `subagent_session`（写入来自哪个子会话）。
 
 ### 9.3 保留与清理
 
@@ -1645,6 +1655,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.39 | 2026-11-20 | T31（ADR-0048）补充第 4 章 ADR-0048、6.4 节子 agent 的落地（定义加载、子会话登记与链接、工具过滤用隐藏声明加闸门、深度与并发计数、前后台、空闲回收）、6.13 节模型别名表与解析、6.14 节 `model`、`effortLevel` 生效、`advisorModel` 忽略、`agent` 交 T48、7.4 节 `subagents` 能力的方法与成员、7.6 节子会话条目增量的现状、8.2 节子 agent 卡与设置页、9.2 节 schema v6；基线决策未变 |
 | 2.38 | 2026-11-20 | R3（M2 macOS 阶段门）：第 4 章补上 ADR-0042；6.0 节矩阵按 M2 实际交付更新权限、Hooks、Plan、任务清单、上下文工程、Checkpoint、多模型七行；第 4 章加入 ADR-0047、6.2.2 与 6.2.3 节写明带通配的命令规则不放行越界路径（ADR-0047，修订 ADR-0037 的阶梯）；6.2.2 节写明 `Read` deny 对目录搜索与 Bash 递归读取的限制（I120）；6.3.1 节进程树终止按平台写准；6.6.4 节熔断复位范围（I107）；6.14 节 `plansDirectory` 交 T48（I104）；6.15 节记录 R3 对校准值的核对（数值不变）与缓存断点、plan 模式两行的实现；第 16 章记录 M2 的 macOS 结论；ADR-0047 改变了第 6.2.3 节阶梯第 6、7 步对带通配命令规则的先后 |
 | 2.37 | 2026-11-20 | T30（ADR-0046）补充第 4 章 ADR-0046、6.3.1 节 SessionStart 与 UserPromptSubmit hooks 的顺序（L3 发现的偏差）、12.5 节 L3 的落地（隔离运行、审批夹具、结构化录制与剥离检查、比对内容、allowlist、Nightly）；基线决策未变 |
 | 2.36 | 2026-11-19 | T29（ADR-0045）补充第 4 章 ADR-0045、5.4 节登录的落地、6.1.4 节 WebFetch 的落地、6.2.2 节 `WebFetch(domain:…)` 的主机解析、6.13 节每模型设置、辅助模型通道与保守 Tool Profile、6.14 节 `model`、`effortLevel` 改随 T31（I113）、7.1 节 `piarc-web`、7.4 节 `webFetch` 与 `login` 能力的方法与成员、8.2 节三档视图与设置页、10.1 节提示注入对策；基线决策未变 |

@@ -9,6 +9,11 @@
 - Tool Profile：`#open` 按会话的模型（指定的，或 `buildSessionContext().model`）选 `DEFAULT`/`conservativeProfile`，保守时 `onlyConservative` 只留 `CONSERVATIVE_TOOLS`，`todoWatch` 用 3 轮且无清单也提醒；实际模型与预测不同就立即重开。`setModel` 或 `setPreferences` 改变 Profile 时空闲会话 `#reopen`，运行中的标 `profileStale`、回合结束后重开。不要在运行中改工具描述（Pi 注册时复制描述）。
 - 登录（`providers/login.ts` 的 `Logins`，设置 Host 上）：`models/login/start` 调 `ModelRuntime.login(provider, 'oauth', interaction)`，`notify`/`prompt` 转 `ui/loginInteraction`（无期限，取消经 `AbortSignal`），提问的空答复即取消；`models/logout`。`loginProviders` 列出带 `auth.oauth` 的服务商（Anthropic 的已被 policy 移除）。OAuth 流程模块经 `registerLazyOAuthFlows` 打进 bundle。`--test-oauth-provider` 的 `flow` 可选 `authorizationCode`（本地回环回调）与 `deviceCode`（轮询），对接 `piarc-testkit` 的 mock 授权服务器。
 
+## 模型别名（T31，ADR-0048）
+
+- `providers/aliases.ts` 的 `resolveModel(spec, { aliases, inherit, available })` 是模型说明的唯一解析器（子 agent 的定义与调用参数；T37 的 skills、T38 的 hooks 复用）：`inherit` → 别名（`MODEL_ALIASES`，`haiku`/`sonnet`/`opus` 未单独设置时经 `aliasTarget` 跟随 `fast`/`balanced`/`strong`）→ `provider/model` → 在可用模型中唯一的模型 id。别名未设置或目标不可用时回退为 `inherit` 并返回 `aliasUnset`/`aliasUnavailable` 警告（`describeAliasWarning` 给出文字），无法解析时抛错并列出别名。表来自 Core 的 `agents/list`（用户级与工作区 `.piarc/settings.json` 合并）。
+- Core 只在下发设置值前查表（`piarc_protocol::models::ModelAlias::target`）：辅助模型的 `auxiliaryAlias`（用户级表）与设置键 `model` 的别名。不要在别处再写一份跟随规则。
+
 ## 模型与服务商（T21）
 
 - `models/list` 以 Pi 1.5.2 的 `ModelRuntime.getAvailable()` 为准，只列出已配置的聊天模型。另返回支持 API key 方式的内置服务商，供设置页使用。从 `pi/models.json` 接入兼容服务时，`api` 明确区分 `anthropic-messages`、`openai-completions` 和 `openai-responses`，`models[].id` 是用户给出的部署 ID。目录联网指 Pi 自己的目录刷新；自定义端点的模型列表只从配置读取。

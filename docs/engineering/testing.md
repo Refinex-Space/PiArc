@@ -305,12 +305,13 @@ providers:                        # mock 端点，可定义多个；名称为小
     reasoning: true               # 可选：导入的模型夹具支持 effort
     context_window: 32000         # 可选（T27）：模型的上下文窗口，缺省 200000
     max_tokens: 4096              # 可选（T27）：模型的最大输出，缺省 4096
+    model: mock-fast              # 可选（T31）：模型 id，缺省 mock-model；子 agent 与别名场景用它区分模型
     steps: [...]                  # 与第 10.3 节的 steps 相同
 web:                              # 可选（T29）：本地网页服务器，见下
   pages: { /docs: { content_type: text/html, body: '<h1>Docs</h1>' }, /old: { status: 301, location: '{{web_alt}}/docs' } }
 oauth: { flow: authorization_code } # 可选（T29）：mock 授权服务器与测试服务商 piarc-test-oauth，配合 sign_in 动作
 sessions:                         # 可选；缺省为一个会话 main，使用唯一的端点、工作目录为工作区
-  a: { provider: one, cwd: 'alpha dir' }
+  a: { provider: one, cwd: 'alpha dir' }   # settings_model: true（T31）：建会话不指定模型，设置的 model、effortLevel 生效
 actions: [...]                    # 见 12.2
 approvals: []                     # 见 12.3
 expect: { events, files, fixtures, requests, request_counts, tool_batches, core_io, config_diagnostics, json_lines }   # 见 12.4
@@ -326,6 +327,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 - 端点脚本工具参数里的 `{{workspace}}` 换成本次运行工作区的绝对路径（T30，L3 场景要用绝对路径的 `file_path`）。
 - WebFetch 场景（T29，`webfetch-*.yaml`）：`web.pages` 按路径给出状态、`content_type`、`body`（`repeat` 重复多次，用来越过正文上限）与重定向的 `location`。`{{web}}` 在页面与端点工具参数里换成 `http://127.0.0.1:<端口>`，`{{web_alt}}` 换成同一服务器的 `http://localhost:<端口>`（另一个主机，用于跨站重定向与按域名的规则）。只有带 `web` 段的场景，Core 的 WebFetch 允许列表才放行这两个主机；场景不访问外网。WebFetch 的提取是一次额外的模型请求：没有辅助模型时为它在同一端点留一步，设了 `modelProviders.auxiliary`（用 `run_files` 写 `data 数据/settings.json`）时在那个端点留一步。
 - 每模型设置与保守 Tool Profile（T29，`model-*.yaml`）：用 `run_files` 写 `data 数据/settings.json` 的 `modelProviders.models`（键 `mock-<端点>/mock-model`）；`configure_as: local` 端点的模型是低可靠性，默认得到保守 Profile。
+- 子 agent 场景（T31，`subagent-*.yaml`）：子会话的请求经它的模型选端点，定义的 `model: mock-<端点>/<模型>` 或别名表（`run_files` 写 `data 数据/settings.json` 的 `modelAliases`）把子 agent 送到另一个端点，各端点的步数互不影响；不指定模型的子 agent 与父会话共用端点，脚本按请求到达顺序排步。审批应答可写 `subagent: { type, description }`，要求卡片来自该子 agent（Core 的 `ApprovalOrigin`）。并发与深度上限用 `.piarc/settings.json` 的 `subagents` 调小。
 - 压缩场景（T27，`ctx-*.yaml`）：用 `context_window`、`max_tokens` 与步骤的 `usage` 精确触发阈值（Pi 以回复报告的 `input + output + cacheRead + cacheWrite` 判断）；要让短对话有可摘要的内容，在信任的工作区写 `.pi/settings.json: '{"compaction":{"keepRecentTokens":1}}'`。项目层的 `autoCompactWindow` 写在 `.piarc/settings.json` 或 `.claude/settings.json`。
 
 ### 12.2 动作

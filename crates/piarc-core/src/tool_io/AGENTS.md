@@ -42,6 +42,14 @@
 - 顺序（T30，ADR-0046）：`hooks_run` 收到 SessionStart（非 `compact`）时先 `HooksService::starting` 登记再运行，`user_prompt_submit` 先 `started` 等登记清零：Agent Host 打开会话时先写出这个 `hooks/run` 再应答，所以登记总在该会话的提示之前。不要在登记之前加 `await`。L2 `hooks-session-start-order` 用慢的 SessionStart hook 锁定它。
 - `tool_io/hooks_tests.rs` 用真实 Core（命令环境固定 `PATH`，否则 cargo 的 `DYLD_*` 关掉规则 allow）；Bash 规则 allow 不覆盖文件写入，测会话规则用 `sed -n` 而不是 `touch`。
 
+## 子 agent（T31，ADR-0048）
+
+- `tool_io/subagents.rs`：`agents/list`（`piarc_config::agents::load` 加信任、deny 与上限、合并后的 `modelAliases`）、`subagent/start`（`open_linked`：子会话自己的 `SessionIo`，工作区根与 cwd 同父会话，`Link` 指向主会话；登记定义的 hooks；返回生效模式与警告）、`subagent/finish`（注销、写索引）。经 `Link`：`effective_mode` 取定义与主会话当前模式中更严的一个（每次裁决重新取），`rule_owner` 让"本会话允许"存进主会话，`origin` 给审批卡标来源（快照里并入主会话的条目），`checkpoint_owner` 让写入记在主会话当前回合下，`attached` 列出主会话中断时要一起撤下审批、结束命令的前台子会话（后台的不在内）。
+- 子会话的 `policy/evaluate` 声明的 `parentSessionId`、`agentType` 必须与 `Link` 一致（`prepare_call`），否则拒绝。参数规则（`Agent(model:…)` 等，I82）在阶梯输入组装之后由 `assess::param_rules` 施加。
+- 定义的 hooks 经 `HooksService::scope_hooks` 以 `subagent` 层登记在子会话 id 下，`unscope_hooks` 撤下；项目级定义要求项目受信任（否则 `hooksUntrusted` 警告）。
+- 设置的默认模型与 effort（`model`、`effortLevel`，I113）由 `context.rs` 的 `session_defaults` 给新会话，`model` 的别名经 `ModelAlias::target` 用合并表解析。
+- 单测：`cargo test -p piarc-core --lib tool_io::policy::tests::t31`（审批来源与会话规则、模式收紧、中断、定义列表、定义 hooks、参数规则）与 `--lib tool_io::checkpoints`（子 agent 写入归属）。
+
 ## 易错点
 
 - 当前用户无权访问的 PATH 条目（Windows 的 PATH 常有 `C:\Windows\system32\config\systemprofile\…`）不取消自动允许（W1）：macOS 的 `tool_io/exec/utility.rs` `first_on_path` 跳过工作区外的这类条目，其余无法检查的条目和工作区内的条目一律改为询问；Windows 由 Git Bash 解析（`probe_git_programs`），bash 自己跳过它们。

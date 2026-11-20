@@ -32,4 +32,4 @@
 
 - 设置 `fileCheckpointingEnabled: false`（Claude Code 同名键）时 Core 不建检查点、写入不存快照：该回合的回退预览 `codeAvailable` 为假；之前记录的回合仍可恢复。
 - 只被 Bash 改动的文件没有记录：不在回退与 Changes 里，界面写明并建议配合 git，不要补扫工作区。
-- 子 agent（T31）的写入按会话 id 记录，接入时复用同一入口；跨会话合并是 ADR-0044 的重新评估条件。
+- 子 agent（T31，ADR-0048）的写入经同一入口记在主会话当前回合的检查点下（`piarc_core::tool_io::subagents::checkpoint_owner`），`checkpoint_files.subagent_session` 记子会话 id；回退主会话时一起恢复，计划规则不变。

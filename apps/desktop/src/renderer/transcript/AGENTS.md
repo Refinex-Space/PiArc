@@ -15,6 +15,7 @@
 | 压缩提示 | 使用 `contextCompaction` 中可用的原因和 token 计数；原因 `rewind` 是"从此处摘要"留下的分支摘要（T28）。 |
 | 错误卡 | 读取 `turn/completed` 的 `errorKind` 与 `retryable`。`session/uncertain` 有独立提示与重试按钮。 |
 | Working 行 | 当前工具、计时、用量、自动重试次数和压缩状态由同一回合的事件驱动。 |
+| 子 agent 卡（T31） | `rows/subagent.tsx`：`subagent` 条目的 `subagent`（`SubagentState`，由 `subagent/*` 通知经 `SessionTranscript.onSubagent` 保持最新）给出任务名、类型、颜色、实际模型、状态、耗时、工具调用数、token、后台标记与警告；运行中显示当前活动与停止（`actions.stopSubagent`）。展开后 `ChildTranscript` 经 `actions.subagentTranscript` 读子会话的历史窗口，用同样的行组件只读显示（新的 `SessionTranscript`，不提供重试与回退），状态或工具调用数变化时重新读取。子 agent 条目不进工具组。 |
 | 宿主工具（T26） | `rows/harness.tsx`：`TodoWrite` 是任务卡（从参数读清单，Claude Code 的 `in_progress` 换成 `inProgress`），`ExitPlanMode` 是计划卡（状态取条目状态），`AskUserQuestion` 列出结果首行之后的 JSON，`SuggestNextSteps` 是下一步建议（"在此执行"经 `SessionInput`，运行中为 follow-up；"开始新会话"走 `startSession`；没有窗口外壳的原型页不显示按钮）。这四个工具不进工具组（`store/transcript.ts` 的 `OWN_ROW_TOOLS`）。 |
 
 - 行只订阅自己的 ID，工具组额外订阅成员。行级错误边界把单条渲染失败限制在该行。会话页与新建页另由主区的页面边界保护，切换页面后重新挂载，侧栏仍可导航。显示模型文本、命令输出或路径一律用文本节点。

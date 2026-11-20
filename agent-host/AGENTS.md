@@ -44,6 +44,16 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - 回退与切换之后注册表在同一 id 下关闭并重新打开 Pi 运行时（`#reopen`，source `branch`：不触发 SessionStart/SessionEnd hooks，`seq` 连续），计划、模式、memory、读写记录随分支重新推导；MCP 随之重连。历史窗口与 `session/branches` 通知带分支点（`history.ts`），`branch_summary` 投影为原因 `rewind` 的压缩条目。
 - 中断补齐（`harness/interruption.ts`）只把 user、toolResult 或有回复的 assistant 当作末尾：以分支摘要或提醒结尾的对话不是被中断的回合。摘要之后的第一条输入紧跟摘要（两条相邻的 user 消息），`rewind-summarize` 场景因此关闭 `role_order` 检查。
 
+## 子 agent（T31，ADR-0048）
+
+- 位置：`harness/subagents/` 是工具侧（`agent-tool.ts` 的 `Agent` 工具、`definitions.ts` 的内置类型与 `agents/list` 解析、`tool-filter.ts` 的过滤），`runtime/subagents.ts` 的 `SubagentRunner` 是运行与计数，`runtime/subagent-session.ts` 的 `ChildSession` 是一个子会话（打开、运行、结束），`runtime/session-runtime.ts` 是主会话与子会话共用的 Pi 运行时工厂。提示词在 `harness/prompts/subagents.ts`（改后跑原创性检查）。
+- 工具过滤顺序：父会话当前工具 → 定义的 `tools` → 减去 `disallowedTools`（优先）→ 减去 `PARENT_ONLY_TOOLS`（`AskUserQuestion`、`EnterPlanMode`、`ExitPlanMode`、`SuggestNextSteps`）→ 深度到上限时减去 `Agent`。实现是每个工具的 `prepareLoadout` 返回 `hiddenDeclarations` 加 `tool_call` 闸门，不要改成 `setActiveTools`：被它移除的工具，调用在闸门之前就以 "Tool X not found" 结束，后注册的 MCP 工具默认激活。
+- 深度与并发只在 `SubagentRunner` 计数（`#runs` 树加启动中的 `#starting` 占位，同一回复里并行的 `Agent` 调用不会一起越过上限）；上限来自 Core 的 `agents/list`。超限立即返回错误结果，不排队（前台子 agent 各自等自己的子 agent，排队会死锁）。
+- 子会话先经 `subagent/start` 在 Core 登记再请求模型：没登记的会话 id 调 `fs/*`、`exec/*` 得到 `sessionNotFound`。子会话的 Pi 事件不发给 Core（Core 没有它的会话 actor）：进度汇总成 `SubagentState`，经父会话 `Agent` 调用的 `onUpdate`（`subagent` 条目的 `item/updated`）与 `subagent/*` 通知发出，最终状态另写父会话的 `piarc.subagentState` 条目供历史使用。
+- 子会话 JSONL 首条是 `piarc.subagent`（父会话、类型）；身份段换成定义正文（`Persona`），`omitProjectContext` 的类型不加载 memory 与 git 状态；Tool Profile 按子会话自己的模型选；hooks 不发 SessionStart、Stop、SessionEnd（T38 的 SubagentStart/SubagentStop 之前）。
+- `maxTurns` 到达后中止并把结果标 `partial`：报告取最后一条真实回复，跳过中断补齐写的标记（`isInterruptionMarker`）。前台运行随调用的 abort 信号中止（父会话中断）；后台运行不随中断结束，`close` 与 `subagent/stop` 中止它，结束后经 `harness.remind` 的 `backgroundTask` 提醒回报；进程重启后 `recover()` 把记录中仍在运行的后台运行标为 `interrupted` 并提醒。
+- 同进程易错点：MCP 扩展按会话实例化，每个子会话各起一份 server 进程（T36 的共享池之前）；扩展加载器的模块级缓存按 cwd 失效，子会话与父会话 cwd 相同不受影响；不要在子会话代码里改 `process.env` 或读 `process.cwd()`。
+
 ## 子目录说明
 
 - `src/harness/AGENTS.md`：system prompt 与 memory、权限预检、hooks、宿主工具、上下文工程（提醒、压缩、重注入、熔断、用量）、回合不变量的补齐。

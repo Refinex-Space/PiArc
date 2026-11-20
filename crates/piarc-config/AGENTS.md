@@ -27,6 +27,13 @@
 - 权限规则按层取：`Settings::permission_lists()`（高到低，项目未受信任时不含项目 allow）、`layer(id)`（某层生效后的值）、`ignored_modes()`（被忽略的项目级 `bypassPermissions`/`auto`，供审计）。设置页的规则编辑经 `edit_permission_rule`（增、改、删一条，只写可写层）。`permissions.enableBypassPermissions` 只由 Core 从用户层读取（T23）。
 - 普通设置写入经 `write_value`，审批的规则与目录经 `append_local_permissions` 同次读改写；并发修改由同一进程锁串行。只写 `writable` 的层（`.piarc/` 与用户文件，永不写 `.claude/`）；同目录临时文件 + `sync_all` + rename，现有文件不是 JSON 对象时拒绝且不改动。
 
+## 子 agent 定义（`src/agents.rs`，T31，ADR-0048）
+
+- `load(AgentDirs { cwd, data, home })` 按来源顺序（cwd 向上各级的 `.piarc/agents/`，再各级的 `.claude/agents/`，越近越优先、跳过家目录；PiArc 用户 `agents/`；`~/.claude/agents/`）读全部 `*.md`，以 `name` 字段而不是文件名识别类型，同名取第一份整条定义，后面的路径记进 `overrides`。插件来源留给 T40。
+- `parse` 用 `serde_saphyr` 解析 frontmatter，问题作为 `AgentIssue`（路径、行号、原因）返回，文件不进列表；单个文件上限 `MAX_DEFINITION_BYTES`（256 KiB）。不认识的字段是 `ignoredField`，`isolation`、`mcpServers`、`skills` 校验后标 `inactiveField`（T35、T36、T37），项目级的 `bypassPermissions`、`auto` 改为 `default` 并标 `projectModeIgnored`，`auto`、`dontAsk` 标 `unsupportedMode`。`tools`、`disallowedTools` 的 `Tool(specifier)` 只保留工具名。
+- 定义里的 `hooks` 是可执行项：项目级定义的 hooks 计入 `executables::enumerate`（新增即让项目回到未确认，ADR-0029），由 Core 在信任时作为限定作用域的来源登记。
+- 设置键：`modelAliases`（别名 → `provider/model`，对象逐键合并）、`subagents.maxDepth`、`subagents.maxConcurrent`（PiArc 自己的键）；Claude Code 的 `model`、`effortLevel` 生效（新会话的默认模型与 effort，`model` 可为别名，Core 的 `tool_io::context::session_defaults` 解析），`advisorModel` 忽略（Anthropic 服务端的 advisor 工具），`agent` 为 `planned(T48)`。
+
 ## Claude Code 配置（T24，ADR-0038）
 
 - **键映射表**在 `src/claude.rs` 的 `SETTINGS_KEYS`（`settings.json` 的键）与 `STATE_KEYS`（`~/.claude.json`）：每行是键（嵌套键用点）、状态（`Active` 以同一 JSON Pointer 并入、`Planned(任务)`、`Ignored`）与对应的 PiArc 设置或忽略原因。它是唯一判断：合并只保留 `Active` 的键（`claude::project`，读文件时投影），诊断用 `claude::classify` 分类，表外的键为"未知"。某个键的功能落地时：把这一行改为 `active("…", "/…")`，把键加进 `schema::PIARC_SETTINGS`（测试检查生效的键都是 PiArc 已知的设置），需要信任的值加进 `layers::CLAUDE_EXECUTABLE`。不要在别处另写"这个键算不算"的判断。行的来源是官方 settings 索引，Claude Code 增删键时同步。

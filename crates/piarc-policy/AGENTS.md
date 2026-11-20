@@ -35,10 +35,15 @@ Core 的权限裁决（T20 起，T23 完整版）：Claude Code 格式的规则�
 - `Bash(…)`、`PowerShell(…)`：`*` 匹配任意文本；末尾 ` *` 且是唯一通配时也匹配裸命令；`:*` 等价。PowerShell 不区分大小写、整条匹配；带 `*` 的 allow 只在命令没有 `; | & ( ) { } $ @ > <` 反引号与换行时生效，deny/ask 也对粗分段（`powershell_segments`）检查，命中段只询问。
 - 命令中运行期才知道的部分是 `pattern::DYNAMIC`：allow 必须覆盖所有取值（`covers`），deny 可能命中时询问（`may_match`）。
 - `Read(…)` 适用 Read、Glob、Grep；`Edit(…)` 适用 Edit、Write、NotebookEdit；Read 的 deny 也拦写入。`Write(path)`、`Glob(path)`、`Grep(path)` 接受但永不匹配（同 Claude Code）。路径锚点：`//` 根、`~/` 家目录、`/` 规则来源目录（项目与会话为工作区根，用户文件为其所在目录）、其余为会话 cwd；gitignore 语义（无斜杠的名字任意深度、目录命中覆盖其内容、`!` 只对同一来源同一列表的相对规则生效、不能重新包含被排除目录下的文件）；deny/ask 的单段目录模式（`src/**`）在任意深度生效。路径比较用 POSIX 形式（`C:\x` → `/c/x`），卷不区分大小写时折叠大小写。
-- `WebFetch(domain:…)`：主机名不区分大小写、去掉末尾点；`*.x` 匹配任意深度子域不含顶级；其他位置的 `*` 只在一个标签内。`Agent(类型)`、`Skill(名称)` 用通配匹配（参数形式 `Agent(model:opus)` 尚不支持，T31 处理）。
+- `WebFetch(domain:…)`：主机名不区分大小写、去掉末尾点；`*.x` 匹配任意深度子域不含顶级；其他位置的 `*` 只在一个标签内。`Agent(类型)`、`Skill(名称)` 用通配匹配。参数规则（T31，I82）：`工具(键:值)` 的键在 `param_keys` 表里时（Agent：`model`、`effort`、`isolation`、`run_in_background`；Bash、PowerShell、Monitor：`run_in_background`、`timeout`、`dangerouslyDisableSandbox`）解析为 `Spec::Param`，只匹配调用的同名顶层标量参数（值按通配），从不匹配主内容字段；只用于 deny 与 ask，写成 allow 是解析错误；键不在表里时照旧按类型名或命令模式解析。Core 在组装阶梯输入之后经 `assess::param_rules`（`RuleSet::find_param`）施加，设置页的规则检查返回 `parameter` 并标出。
 - MCP：`mcp__server__tool`、`mcp__server__*`、`mcp__server`；带 specifier 的 MCP 规则无效。工具名通配：deny/ask 任意位置可用 `*`；allow 只接受 `mcp__<server>__` 之后的通配。
 - 无法解析的规则：allow 忽略并报告；deny 与 ask 不丢弃，按更严格的语义对待——它点名的工具的每次调用都询问（读不出工具名时所有工具都询问），并在设置页与审计里列出。
 - 裸工具名 deny（含 `Tool(*)`、工具名通配、`mcp__server`）由 `RuleSet::whole_tool` 判断；Agent Host 每次运行前经 AHP `policy/tools` 询问并把这些工具从模型工具列表移除。
+
+## 错误与子 agent
+
+- 公开解析函数（`rules::parse`、`paths::parse`）返回 `piarc_policy::Error`（`InvalidRule`、`InvalidPath`；`kind()`、`retryable()`、`to_error_object()`，T31，I128）。新增失败原因加变体，不返回 `String`。
+- 子 agent（T31，ADR-0048）的调用走同一阶梯：Core 的 `tool_io::subagents` 决定生效模式（定义与主会话当前模式中更严的一个）与规则所属会话（主会话：子 agent 卡上的"本会话允许"作用于整棵树），审批卡带 `ApprovalOrigin`（`piarc_protocol::subagent`），审计记子会话与类型。`Agent` 在阶梯里与宿主工具一样是 `read_only`：派出本身不询问，子 agent 的每个调用各自裁决；`Agent(<类型>)` deny 让该类型不能派出，也不出现在工具描述里。
 
 ## Bash 分析（`bash/`）
 

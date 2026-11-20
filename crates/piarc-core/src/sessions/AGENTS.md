@@ -16,6 +16,12 @@
 - 客户端偏好（`client_settings`）：可写 `language`、`appearance`、`keybindings`、`notifications`，以及布尔偏好 `/memory/readBoth`，经 `piarc_config::write_value`；读取返回整份文件（不存在为 `{}`）。
 - I62 已接上：工作区 actor 打开时启动设置监听（`WorkspaceSettings`）。macOS 的首次 FSEvents 注册在阻塞线程池进行，与 Host 握手并行。注册完成后重新读取设置，显式 `open_settings` 仍等待监听就绪。回合结束时同步索引。信任变化重启（T18 起）：`CoreRuntime::trust_view`（决定）与 `revoke_trust` 在应答前调 `Hub::trust_changed`，同一主 checkout 的工作区 actor 先把状态置为 `Restarting`（之后的请求等新进程就绪）再调 `HostSupervisor::restart`，所以信任对话框之后立即创建的会话落在新进程上；`agent_host::restart_on_trust_change` 只剩监管器层面的测试使用。
 
+## 子 agent（T31，ADR-0048）
+
+- `sessions/inbound.rs` 应答 `agents/list`、`subagent/start`、`subagent/finish`：父会话必须属于本工作区；登记后子会话 id 进入工作区的 `SessionSet`（它的 `fs/*`、`exec/*` 才能通过），并经 `Activity` 报为忙碌（运行中的后台子 agent 让空闲计时不回收 Agent Host），`subagent/finish` 或连接结束（每个子会话一个 `peer.closed()` 观察任务）时撤销并写索引。
+- `sessions/subagents.rs` 是 `Hub` 的 `list_agents`（经 `resources/listAgents`）、`stop_subagent`（`subagent/stop`）、`subagent_transcript`（核对子会话属于该父会话后，按父会话的位置读子会话的历史窗口）。快照（`snapshot.rs`）把子会话排除在会话列表之外（`SnapshotMsg::Subagent`），子会话的审批卡并入主会话的条目。
+- `providers.rs` 的 `Settings` 存 `aliases`（用户级 `modelAliases`）与 `auxiliary_alias`（`modelProviders.auxiliaryAlias`），`preferences()` 把别名解析成具体模型再交给 Agent Host。NAPI：`listAgents`、`stopSubagent`、`subagentTranscript`。
+
 ## 登录与模型偏好（T29，ADR-0045）
 
 - 登录（`sessions/login.rs`）：`Hub::login` 持 `provider_writer` 锁，为本次登录启动设置 Host（入站处理者 `SettingsInbound`：保险箱 + `ui/loginInteraction`），`call_within` 等 `models/login/start` 至多 15 分钟；`Logins` 一次只允许一个登录，每一步发 `core/login`（`started`、`interaction`、`succeeded`/`failed`/`cancelled` 与 `message`），`answer_login(id, None)` 取消（Core 再发 `models/login/cancel`）。新的提问顶替旧提问，进度不顶替。设置 Host 的启动经 `settings_host_with`，同样应用 `tune_host`（测试注入 `--test-oauth-provider`）。

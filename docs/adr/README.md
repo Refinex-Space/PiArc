@@ -63,3 +63,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0045](0045-webfetch-sign-in-model-settings.md) | WebFetch、服务商登录、每模型设置与辅助模型的落地（补充 ADR-0004、0006、0021、0032） | 已接受 |
 | [0046](0046-l3-behavior-alignment.md) | L3 行为对齐基座的落地（补充 ADR-0005、0006、0039） | 已接受 |
 | [0047](0047-outside-paths-before-wildcard-command-rules.md) | 越界路径的询问先于带通配的命令 allow 规则（修订 ADR-0037 阶梯第 6、7 步的顺序） | 已接受 |
+| [0048](0048-subagents-and-model-aliases.md) | 子 agent 与模型别名的落地（补充 ADR-0005、0009、0010、0037、0039、0043、0044） | 已接受 |

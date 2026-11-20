@@ -27,6 +27,7 @@ Harness Kit：PiArc 写的 Pi 扩展（system prompt 与 memory、权限预检�
 - `harness/session-harness.ts` 按 Core 启用的能力（`planMode`、`todo`、`ask`）注册 `EnterPlanMode`、`ExitPlanMode`（`plan-mode.ts`）、`TodoWrite`（`todos.ts`）、`AskUserQuestion`（`questions.ts`，经 `ui/ask`）与 `SuggestNextSteps`（`next-steps.ts`），排在 Core 工具之后；描述在 `tools/profile.ts`，工具指引与提醒文案在 `harness/prompts/`（改后跑原创性检查）。
 - 模式切换只走 `PlanMode.record`：模式菜单（`session/setPermissionMode`）与 `policy/evaluate` 结果的 `mode`（EnterPlanMode、批准的计划，在调用执行前）都写 `piarc.permissionMode` 并投影；进出 plan 时排队 `mode` 提醒，模型自己调用的工具结果就是告知（`acknowledge` 撤回提醒）。
 - `reminders.ts` 是提醒的唯一通道：`piarc.reminder` 自定义消息在 `before_agent_start` 与带工具结果的 `turn_end` 送达（`memory-wire.ts` 在 Anthropic 线格式上合并），T27 的扩展见下节。任务清单提醒的阈值 `TODO_REMINDER_ROUNDS` = 8（`todos.ts`），从最后一次成功的 TodoWrite 或上一条 `todo` 提醒按分支计数。
+- `Agent`（T31，ADR-0048）在 Core 启用 `subagents` 时注册（`SessionHarness` 的 `agents` 宿主），描述列出可用类型（被 deny 的类型不列）；它在 `tool-batches.ts` 的 `CONCURRENCY_SAFE_TOOLS` 里，同一回复的多个调用并行。参数结构对齐 Claude Code，`model`、`effort` 写成 `{ type: "string", enum }`（`anyOf`/`const` 会被部分服务商拒绝）。子会话运行时与过滤见上级 `agent-host/AGENTS.md`。
 - 注入接口：`currentPlan(entries)`、`currentTodos(entries, canonical)`；`session/history` 结果的 `harness` 由它们计算，`harness/todo` 在 TodoWrite 的 `item/completed` 之后发出。
 
 ## 上下文工程（T27，ADR-0043）
