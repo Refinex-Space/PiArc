@@ -167,78 +167,78 @@
       "id": "R3-A01",
       "task": "R3",
       "description": "M2 能力映射表覆盖交付物 1 列出的全部能力，每项都有能力 ID 与场景；`docs/product/capabilities.md` 重新生成且没有 MISSING，`--milestone M2` 不列出 `planned` 能力。验证：映射表与两条命令的输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "评审文件\"能力覆盖\"一节的映射表覆盖第 16 章 M2 目标、第 6.0 节含 M2 的行与第 6.1.4 节 M2 工具，46 个 M2 能力 ID 全部 active 且各有 L2 场景；`node scripts/plan/check-capabilities.mjs --results target/l2/results.json --doc write` 重新生成 capabilities.md 无变化、MISSING 0；`--milestone M2` 输出 `planned capabilities of M2 and earlier: 0`（tmp/evidence/R3/capabilities-write.log、milestone-M2.log）；收尾 verify 第 14 步 MISSING 0。"
     },
     {
       "id": "R3-A02",
       "task": "R3",
       "description": "L3 命令运行结果中权限与 hooks 场景没有未解释的差异，allowlist 每条理由经复核成立。验证：L3 报告与评审文件中的复核记录。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run l3` 于 42d1a44：`L3: PiArc 42d1a44 vs Claude Code 2.1.318`，12 个权限与 hooks 场景 0 unexplained、2747 allowed、0 stale（tmp/l3/report.md、tmp/evidence/R3/l3-final.log）；评审文件\"allowlist 逐条复核\"逐条给出结论，命令替换三条按 R3 决定保留、越界两条随 ADR-0047 落地删除。命令的非零退出只来自本评审会话自身写 ~/.claude（转录与 ~/.claude.json，已核实写入方）。"
     },
     {
       "id": "R3-A03",
       "task": "R3",
       "description": "T23–T30 与 W1 的验收项全部为 `passing`，或为 `blocked` 且原因在评审文件中被接受。验证：`acceptance.json` 检查输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "acceptance.json 按 task 统计：T23 14、T24 11、T25 13、T26 11、T27 12、T28 12、T29 11、T30 10 全部 passing；W1 12 passing、1 blocked（W1-A05 UNC，本机 SMB 不可用），原因在评审文件\"前序验收\"中接受并交 W2（I96）；`node scripts/plan/check-acceptance.mjs` 通过（tmp/evidence/R3/acceptance-m2.log）。"
     },
     {
       "id": "R3-A04",
       "task": "R3",
       "description": "四个审查子代理并行运行且相互独立，各自的范围与输入记录在评审文件中。验证：评审文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "四个 read-only-reviewer 子代理在同一条消息中并行启动、基线 483413b、互不可见；各自的范围、文件、架构章节、ADR 与威胁模型记录在评审文件\"独立审查的输入与调度\"，原文要点在附录。"
     },
     {
       "id": "R3-A05",
       "task": "R3",
       "description": "每条审查发现都有核实结果与处理方式（修复、不同意并给理由、登记到具体任务）。验证：`docs/reviews/R3-findings.md`。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/reviews/R3-findings.md\"逐项核实与处理\"对 40 条发现（P1–P15、D1–D11、C1–C7、Q1–Q7）与修复中发现的 P6b 逐条给出位置、失败场景、核实结论与处理（修复提交、不同意理由或登记 I120–I128）。"
     },
     {
       "id": "R3-A06",
       "task": "R3",
       "description": "每个修复都附带先失败后通过的回归测试。验证：提交记录与测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "16 个缺陷修复各带先失败后通过的测试：D1 store 单测、D2 sessions 端到端、D3 checkpoints 单测、P1–P6 与 P6b、P14 的 bash_cases.json 用例、P7 hooks 单测、P8 write 单测、P10 executables 集成测试、P11 assess 单测、C2 L2 perm-rule-match 断言，ADR-0047 的 L2 perm-bash-compound；失败与通过输出在 tmp/evidence/R3/*-red.log、*-green.log，提交见评审文件。"
     },
     {
       "id": "R3-A07",
       "task": "R3",
       "description": "W1 状态为\"已完成\"，其报告逐条覆盖 M1 退出标准；需要用户更新的 T13–T22 验收项已汇总。验证：`PLAN.md`、W1 报告与评审文件。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "W1 在看板上为\"部分完成\"，不是\"已完成\"：W1-A05 的 UNC 共享未能在 W1 机器上验证（SMB 不可用），需由 W2 在 SMB 正常的 Windows 上运行该测试后关闭。W1 报告逐条覆盖 M1 退出标准（\"M1 退出标准的 Windows 证据\"一节）；需要用户更新的 T13–T22 验收项为 0 项，已在评审文件\"W1 确认\"汇总。"
     },
     {
       "id": "R3-A08",
       "task": "R3",
       "description": "`PLAN.md`\"登记事项\"中每一条都已关闭或指定了处理任务。验证：`PLAN.md` 内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PLAN.md 登记事项逐条检查：每条都已关闭（已落地、已解决、已关闭、已决定）或写明处理任务；R3 关闭或决定 I37、I66、I88、I89、I93（用户决定交 T38）、I101、I104、I106、I107、I108、I116、I119，指定 I78、I83、I87、I105、I117，新登记 I120–I128。"
     },
     {
       "id": "R3-A09",
       "task": "R3",
       "description": "架构文档第 16 章、第 6.0 节、第 6.15 节已按实际更新，版本号递增并有修订记录。验证：文档 diff。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "架构文档 v2.37 → v2.38：第 16 章 M2 的 macOS 结论、第 6.0 节七行按 M2 实际交付更新、第 6.15 节记录与代码常量的核对（数值不变）与缓存断点、plan 模式的实现，另有第 4 章 ADR-0042、ADR-0047，6.2.2、6.2.3、6.3.1、6.6.4、6.14；修订记录 2.38 一行（提交 a348a24、42d1a44 等）。"
     },
     {
       "id": "R3-A10",
       "task": "R3",
       "description": "评审文件开头给出明确结论：M2（macOS）是否达标、进入 M3 的前提条件、W2 重点核对项。验证：评审文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/reviews/R3-findings.md 开头：M2（macOS）达标，可以进入 M3；进入 M3 的前提条件 4 条；W2 重点核对项表（UNC、PowerShell 规则与 ADR-0047、L3 在 Windows、Git Bash 下的白名单、hooks、检查点、设置写入的链接检查、长命令与预算、M2 界面）。"
     },
     {
       "id": "R3-A11",
       "task": "R3",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run verify` 于 42d1a44（工作区干净）15/15 通过，L2 118 passed、0 failed、2 skipped (platform)，MISSING 0；target/verify/last-pass.json 记录 42d1a44（tmp/evidence/R3/verify-final.log）。"
     },
     {
       "id": "R4-A01",

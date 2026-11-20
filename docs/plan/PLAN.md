@@ -112,7 +112,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | 0 工程基座 | 脚手架、质量门禁、工程规范、协议与契约测试 | T01–T02 | — | 已完成 |
 | 1 M0 技术验证 | Electron 安全基线、NAPI 事件通道、mock provider、Agent Host 多会话与 AHP、Operations 委托、凭据保险箱、transcript 渲染、终端、沙箱、打包与首次运行；S1–S10 两个平台的结论 | T03–T12、W0 | R1 | 已完成（有条件进入 M1） |
 | 2 M1 可行走骨架 | 存储与信任、会话编排与投影、L2 场景、文件工具与 Bash、客户端外壳、transcript 与 composer、基础审批、模型与凭据、system prompt 与 memory | T13–T22 | R2 | 已完成（macOS 达标；Windows 由 W1 达标，UNC 待验证） |
-| 3 M2 Harness 核心 | 权限规则与 Bash 分析、配置兼容层、hooks、计划模式与任务清单、压缩与用量、检查点与回退、WebFetch 与登录、L3 对齐；Windows 达到 M1 | W1、T23–T30 | R3 | 进行中 |
+| 3 M2 Harness 核心 | 权限规则与 Bash 分析、配置兼容层、hooks、计划模式与任务清单、压缩与用量、检查点与回退、WebFetch 与登录、L3 对齐；Windows 达到 M1 | W1、T23–T30 | R3 | 已完成（macOS 达标，R3；Windows 的 M1 由 W1 达标，UNC 与 M2 由 W2 验收） |
 | 4 M3 多会话与生态 | 子 agent、后台任务、终端、worktree 与并行会话、MCP、skills 与命令、WebSearch 与 hooks 扩展；Windows 达到 M2 | W2、T31–T38 | R4 | 未开始 |
 | 5 M4 安全与打磨 | 沙箱、插件、配置诊断与用量、NotebookEdit 与通知、无障碍与本地化、性能预算、安全收口；Windows 达到 M3 | W3、T39–T45 | R5 | 未开始 |
 | 6 M5 Beta | Auto 模式、自动记忆与托管配置、M5 补全、侧边对话与平台快捷操作、发布流水线；Windows 达到 M4 并与 Beta 同步；两平台端到端验收 | T46–T50、W4、T51 | R6 | 未开始 |
@@ -157,7 +157,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T28 | [检查点、回退与 Changes 面板](tasks/T28-checkpoints-rewind-changes.md) | 3 | T27 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | c849475 |
 | T29 | [WebFetch、登录与模型设置补全、三档视图](tasks/T29-webfetch-login-model-settings-views.md) | 3 | T28 | macOS | high / 高 | 中 | 无 | 已完成 | 7f9e79b |
 | T30 | [L3 行为对齐基座](tasks/T30-l3-behavior-alignment.md) | 3 | T29 | macOS | high / 高 | 中 | 无 | 已完成 | f52b5aa |
-| R3 | [M2 评审](tasks/R3-m2-review.md) | 3 | T30、W1 | macOS | high / 高 | 中 | 无 | 进行中 | — |
+| R3 | [M2 评审](tasks/R3-m2-review.md) | 3 | T30、W1 | macOS | high / 高 | 中 | 无 | 部分完成 | 8e2b4a2 |
 | W2 | [Windows：M2 达标](tasks/W2-windows-m2-parity.md) | 4 | R3 | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T31 | [子 agent 与模型别名](tasks/T31-subagents-and-model-aliases.md) | 4 | R3 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T32 | [后台任务、Monitor 与 KillShell](tasks/T32-background-tasks-and-monitor.md) | 4 | T31 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,18 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-R3（M2 评审）。开工：基线 verify 通过（复用 f52b5aa 的全量结果）；W1 为"部分完成"，唯一阻塞项 W1-A05 是 UNC（Windows 实机），不影响 macOS 的 R3。
-
-- [x] 1 能力覆盖：M2 能力 → 能力 ID → 场景映射表；重新生成 capabilities.md 无 MISSING；`--milestone M2` 无 planned（A01）
-- [ ] 2 L3：运行 `npm run l3`，两侧版本写入评审文件；逐条复核 allowlist 理由，决定 I116（A02）
-- [x] 3 四个独立只读审查并行运行，范围与输入记录（A04）
-- [ ] 4 逐条核实与处理发现，修复附先失败后通过的回归测试（A05、A06）。已修：D1 b1f065d、D2 b406451、P1–P6 0257c93、P7 532820d、P8 56e2fb8、P10 d6bdefb；审查原文要点在 scratchpad，汇总时写入评审文件
-- [ ] 5 T23–T30 与 W1 验收项核对（A03）；W1 确认与 T13–T22 待更新项汇总（A07）
-- [ ] 6 登记事项逐条关闭或指定任务（A08）
-- [ ] 7 架构文档第 16 章、6.0、6.15 更新，版本号与修订记录（A09）
-- [ ] 8 `docs/reviews/R3-findings.md` 结论（A10）
-- [ ] 9 收尾：`npm run verify`（A11）、AGENTS.md、acceptance.json、PLAN.md
 
 ## 登记事项
 
@@ -873,6 +861,16 @@ R3（M2 评审）。开工：基线 verify 通过（复用 f52b5aa 的全量结�
 - 验收：10/10 通过。`npm run l3 -- --repeat 2`（f52b5aa）12 个场景 0 个未解释差异、2749 个差异被放行、0 个过期条目，两侧重复运行一致，剥离检查 48 个文件通过，`~/.claude` 5278 项前后不变；PATH 无 `claude` 时提示并以 2 退出；缺理由与过期条目使命令失败；`npm run verify` 15/15，L2 118 通过、2 个按平台跳过。证据在 `tmp/evidence/T30/`。
 - 登记 I115（hooks 输入的 `prompt_id`、`effort`，T38）、I116（命令替换与阶梯顺序，R3）、I117（工具集偏离的后续任务）、I118（L3 在 Windows 上运行，W2）、I119（`piarc-core` 的 AGENTS.md 超长，R3）；I01 落地。
 - 下一项：macOS 上的 R3（M2 评审，依赖 T30 与 W1；W1 为部分完成，只剩 UNC 路径验证，开工时按协议判断是否影响评审）。本地提交，未推送。
+
+### 2026-11-20 R3 部分完成（提交 8e2b4a2）
+
+- macOS arm64，基线 483413b（复用 f52b5aa 的全量 verify）。W1 为部分完成，只剩 UNC（W1-A05），不影响 macOS 的评审；R3-A07 因 W1 不是"已完成"而 blocked，其余 10 项通过。
+- 结论：**M2（macOS）达标，可以进入 M3**，见 [R3 评审](../reviews/R3-findings.md)。M2 能力 46 项全部有 L2 场景，L2 118 通过、2 个 Windows 专属；L3 在 42d1a44 对 Claude Code 2.1.318 的 12 个权限与 hooks 场景 0 个未解释差异，allowlist 逐条复核成立。
+- 四个独立只读审查（权限与 hooks、回退与数据完整性、上下文工程、工程质量）共 40 条发现，修复 16 项缺陷，每项先红后绿：Bash 只读白名单 7 类绕过（`arch`、短选项簇与长选项前缀、`grep -e.`、`find -L`、`/dev/fd/..`、`$(< f)`、`uniq -c`，0257c93）、关键删除漏判（941fc37）、`hooks/run` 跨工作区（532820d）、`.piarc` 链到 `.claude`（56e2fb8）、信任清单的 hook 参数（d6bdefb）、PowerShell 重定向（31107ec）、对象回收竞态（b1f065d）、回退期间开新回合（b406451）、回退经链接写出（2aa6da1）、冻结的 system prompt 列出被拒工具（3f7587a）。
+- 用户决定：接受 ADR-0047 并在 R3 实现（42d1a44，带通配的命令规则不放行越界路径，L3 少两条差异）；I93 增加用户级 hooks 环境变量白名单，交 T38。I104 交 T48，I107 维持不持久化。
+- 整理：L2 运行器与格式校验拆分（e264e05，I88）、注册表拆出 `session-parts.ts`（e78571c）、三份超长 AGENTS.md 拆到子目录（60eaf18）、复用表补 M2 能力（da11683）、原创性检查覆盖参数描述与提醒句（cdaea4d，3,141 词 0 匹配）；架构 v2.38；登记 I120–I128，登记事项逐条关闭或指定任务。
+- 全量 L4 224 通过、5 跳过；`t18-review` 因终端无屏幕录制权限失败（已知），`t26-harness` 的"下一步"是测试等待竞态（撤掉 D2 仍失败），改为等待实际请求后 40/40（8e2b4a2）。Windows 交叉 Clippy 通过。证据在 `tmp/evidence/R3/`。
+- 下一项：macOS 上的 T31 与 Windows 上的 W2 都可开始；建议先 W2（R4 之前必须完成，并关闭 W1-A05），T31 可同时在 macOS 推进。本地提交，未推送。
 
 ## 计划变更记录
 
