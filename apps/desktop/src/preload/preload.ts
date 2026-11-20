@@ -284,6 +284,34 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.sessionContextUsage, id)
       .then((value: unknown) => expectString(value)),
+  rewindPreview: (id, turnId) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionRewindPreview, id, turnId)
+      .then((value: unknown) => expectString(value)),
+  rewind: (id, request) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionRewind, id, request)
+      .then((value: unknown) => expectString(value)),
+  undoRewind: (id, restoreId) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionUndoRewind, id, restoreId)
+      .then((value: unknown) => expectString(value)),
+  sessionChanges: (id, path) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionChanges, id, path)
+      .then((value: unknown) => expectString(value)),
+  discardChange: (id, request) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionDiscardChange, id, request)
+      .then((value: unknown) => expectString(value)),
+  switchBranch: (id, entryId) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionSwitchBranch, id, entryId)
+      .then((value: unknown) => expectString(value)),
+  forkSession: (id, beforeTurn) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionFork, id, beforeTurn)
+      .then((value: unknown) => expectString(value)),
   editQueueItem: (id, itemId, text) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.queueEdit, id, itemId, text)

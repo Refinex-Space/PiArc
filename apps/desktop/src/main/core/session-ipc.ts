@@ -6,7 +6,13 @@
 import path from 'node:path';
 
 import { BrowserWindow, dialog } from 'electron';
-import { isPermissionMode, type PlanComment, type QuestionAnswer } from '@piarc/protocol';
+import {
+  isPermissionMode,
+  type DiscardRequest,
+  type PlanComment,
+  type QuestionAnswer,
+  type RewindRequest,
+} from '@piarc/protocol';
 
 import {
   type ApprovalAnswer,
@@ -37,6 +43,13 @@ export type SessionCore = Pick<
   | 'setPermissionMode'
   | 'compact'
   | 'contextUsage'
+  | 'rewindPreview'
+  | 'rewind'
+  | 'undoRewind'
+  | 'sessionChanges'
+  | 'discardChange'
+  | 'switchBranch'
+  | 'forkSession'
   | 'editQueueItem'
   | 'deleteQueueItem'
   | 'storeAttachment'
@@ -197,6 +210,55 @@ function input(value: unknown): string {
     throw new TypeError('input must have text or attachments');
   }
   return JSON.stringify(message);
+}
+
+/** A path Core named in a rewind preview or the Changes view (absolute, at most 4,096). */
+function corePath(value: unknown): string {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 4096) {
+    throw new TypeError('path must be a path Core reported');
+  }
+  return value;
+}
+
+/** A content version Core reported: 64 hex digits or `absent`. */
+function version(value: unknown): string {
+  if (typeof value !== 'string' || !/^(?:[0-9a-f]{64}|absent)$/u.test(value)) {
+    throw new TypeError('version must be a version Core reported');
+  }
+  return value;
+}
+
+const REWIND_SCOPES = new Set(['codeAndConversation', 'conversation', 'code', 'summarize']);
+
+/** A rewind request: the shape is checked here, the files and versions by Core. */
+function rewindRequest(value: unknown): RewindRequest {
+  const fields = record(value, 'request');
+  const scope = fields.scope;
+  if (typeof scope !== 'string' || !REWIND_SCOPES.has(scope)) {
+    throw new TypeError('scope must be a rewind scope');
+  }
+  const choices = list(fields.choices ?? [], 'choices', 10_000).map((choice) => {
+    const c = record(choice, 'choice');
+    return {
+      path: corePath(c.path),
+      version: version(c.version),
+      overwrite: flag(c.overwrite, 'overwrite'),
+    };
+  });
+  return {
+    turnId: token(fields.turnId, 'turnId'),
+    scope: scope as RewindRequest['scope'],
+    ...(choices.length === 0 ? {} : { choices }),
+  };
+}
+
+function discardRequest(value: unknown): DiscardRequest {
+  const fields = record(value, 'request');
+  return {
+    path: corePath(fields.path),
+    version: version(fields.version),
+    ...(fields.hunk === undefined ? {} : { hunk: nonnegative(fields.hunk, 'hunk') }),
+  };
 }
 
 function nonnegative(value: unknown, name: string): number {
@@ -410,6 +472,27 @@ export function registerSessionHandlers(
   );
   registerHandler(IPC_CHANNELS.sessionContextUsage, (_event, [id]) =>
     core.contextUsage(sessionId(id)),
+  );
+  registerHandler(IPC_CHANNELS.sessionRewindPreview, (_event, [id, turnId]) =>
+    core.rewindPreview(sessionId(id), token(turnId, 'turnId')),
+  );
+  registerHandler(IPC_CHANNELS.sessionRewind, (_event, [id, request]) =>
+    core.rewind(sessionId(id), JSON.stringify(rewindRequest(request))),
+  );
+  registerHandler(IPC_CHANNELS.sessionUndoRewind, (_event, [id, restoreId]) =>
+    core.undoRewind(sessionId(id), token(restoreId, 'restoreId')),
+  );
+  registerHandler(IPC_CHANNELS.sessionChanges, (_event, [id, file]) =>
+    core.sessionChanges(sessionId(id), file === undefined ? null : corePath(file)),
+  );
+  registerHandler(IPC_CHANNELS.sessionDiscardChange, (_event, [id, request]) =>
+    core.discardChange(sessionId(id), JSON.stringify(discardRequest(request))),
+  );
+  registerHandler(IPC_CHANNELS.sessionSwitchBranch, (_event, [id, entryId]) =>
+    core.switchBranch(sessionId(id), token(entryId, 'entryId')),
+  );
+  registerHandler(IPC_CHANNELS.sessionFork, (_event, [id, beforeTurn]) =>
+    core.forkSession(sessionId(id), null, token(beforeTurn, 'beforeTurn')),
   );
   registerHandler(IPC_CHANNELS.queueEdit, (_event, [id, itemId, value]) =>
     core.editQueueItem(sessionId(id), token(itemId, 'itemId'), text(value, 'text')),

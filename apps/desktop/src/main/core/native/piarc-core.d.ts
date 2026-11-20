@@ -75,8 +75,15 @@ export declare class CoreRuntime {
   setPermissionMode(id: string, mode: string): Promise<string>;
   /** Reopens a session from its file (its workspace is opened when needed). */
   resumeSession(id: string): Promise<string>;
-  /** Opens a copy of a session's conversation (up to `entryId`) as a new session. */
-  forkSession(id: string, entryId?: string | null): Promise<string>;
+  /**
+   * Opens a copy of a session's conversation (up to `entryId`, or up to where the turn
+   * `beforeTurn` started) as a new session.
+   */
+  forkSession(
+    id: string,
+    entryId?: string | null,
+    beforeTurn?: string | null | undefined,
+  ): Promise<string>;
   /** Closes an open session. */
   closeSession(id: string): Promise<string>;
   /** Starts a turn on an idle session; resolves with `{ turnId }`. */
@@ -109,6 +116,33 @@ export declare class CoreRuntime {
   compact(id: string, instructions?: string | null): Promise<string>;
   /** The session's context usage by category (T27); resolves with the `ContextUsage` JSON. */
   contextUsage(id: string): Promise<string>;
+  /**
+   * What rewinding the files to before turn `turnId` would do (T28); resolves with the
+   * `RewindPreview` JSON.
+   */
+  rewindPreview(id: string, turnId: string): Promise<string>;
+  /**
+   * Rewinds the session: `request` is the `RewindRequest` JSON (`{ turnId, scope, choices?
+   * }`); resolves with the `RewindReport` JSON.
+   */
+  rewind(id: string, request: string): Promise<string>;
+  /** Undoes the files of the rewind `restoreId`; resolves with the `RewindReport` JSON. */
+  undoRewind(id: string, restoreId: string): Promise<string>;
+  /**
+   * The session's changed files, or the file `path` alone with its diff; resolves with the
+   * `ChangesView` JSON.
+   */
+  sessionChanges(id: string, path?: string | null | undefined): Promise<string>;
+  /**
+   * Discards a file's change or one hunk: `request` is the `DiscardRequest` JSON; resolves
+   * with the file's `ChangesView` afterwards.
+   */
+  discardChange(id: string, request: string): Promise<string>;
+  /**
+   * Continues the session on the branch whose last entry is `entryId`; resolves with the
+   * reopened session (`SessionRewound` JSON).
+   */
+  switchBranch(id: string, entryId: string): Promise<string>;
   /**
    * Stores an attachment (image or PDF bytes) for an open session; resolves with the
    * attachment to put in an input (`{ kind, name, mimeType, blob, pageCount? }`). The bytes

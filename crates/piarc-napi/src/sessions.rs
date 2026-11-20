@@ -13,7 +13,7 @@ use napi::bindgen_prelude::{Object, Uint8Array};
 use napi_derive::napi;
 use piarc_core::composer::UserInput;
 use piarc_core::sessions::SessionPrefsChange;
-use piarc_core::sessions::{ModelOp, Op, QueueOp};
+use piarc_core::sessions::{CheckpointOp, ModelOp, Op, QueueOp};
 use piarc_protocol::session::ModelRef;
 
 use crate::boundary;
@@ -474,6 +474,95 @@ impl CoreRuntime {
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]
     pub fn context_usage<'env>(&self, env: &'env Env, id: String) -> napi::Result<Object<'env>> {
         self.op(env, "CoreRuntime.contextUsage", id, Op::ContextUsage)
+    }
+
+    /// What rewinding the files to before turn `turnId` would do (T28); resolves with the
+    /// `RewindPreview` JSON.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn rewind_preview<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        turn_id: String,
+    ) -> napi::Result<Object<'env>> {
+        let op = Op::Checkpoint(CheckpointOp::Preview(turn_id));
+        self.op(env, "CoreRuntime.rewindPreview", id, op)
+    }
+
+    /// Rewinds the session: `request` is the `RewindRequest` JSON (`{ turnId, scope, choices?
+    /// }`); resolves with the `RewindReport` JSON.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn rewind<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        request: String,
+    ) -> napi::Result<Object<'env>> {
+        let request = boundary::call(env, "CoreRuntime.rewind", || {
+            serde_json::from_str(&request).map_err(|e| piarc_core::Error::InvalidArgument {
+                field: "request",
+                reason: e.to_string(),
+            })
+        })?;
+        let op = Op::Checkpoint(CheckpointOp::Rewind(request));
+        self.op(env, "CoreRuntime.rewind", id, op)
+    }
+
+    /// Undoes the files of the rewind `restoreId`; resolves with the `RewindReport` JSON.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn undo_rewind<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        restore_id: String,
+    ) -> napi::Result<Object<'env>> {
+        let op = Op::Checkpoint(CheckpointOp::Undo(restore_id));
+        self.op(env, "CoreRuntime.undoRewind", id, op)
+    }
+
+    /// The session's changed files, or the file `path` alone with its diff; resolves with the
+    /// `ChangesView` JSON.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn session_changes<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        #[napi(ts_arg_type = "string | null | undefined")] path: Option<String>,
+    ) -> napi::Result<Object<'env>> {
+        let op = Op::Checkpoint(CheckpointOp::Changes(path));
+        self.op(env, "CoreRuntime.sessionChanges", id, op)
+    }
+
+    /// Discards a file's change or one hunk: `request` is the `DiscardRequest` JSON; resolves
+    /// with the file's `ChangesView` afterwards.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn discard_change<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        request: String,
+    ) -> napi::Result<Object<'env>> {
+        let request = boundary::call(env, "CoreRuntime.discardChange", || {
+            serde_json::from_str(&request).map_err(|e| piarc_core::Error::InvalidArgument {
+                field: "request",
+                reason: e.to_string(),
+            })
+        })?;
+        let op = Op::Checkpoint(CheckpointOp::Discard(request));
+        self.op(env, "CoreRuntime.discardChange", id, op)
+    }
+
+    /// Continues the session on the branch whose last entry is `entryId`; resolves with the
+    /// reopened session (`SessionRewound` JSON).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn switch_branch<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        entry_id: String,
+    ) -> napi::Result<Object<'env>> {
+        let op = Op::Checkpoint(CheckpointOp::SwitchBranch(entry_id));
+        self.op(env, "CoreRuntime.switchBranch", id, op)
     }
 
     /// Stores an attachment (image or PDF bytes) for an open session; resolves with the

@@ -149,6 +149,11 @@ async function buildFiles() {
       'ApprovalAnswer',
       'AnswerStatus',
       'MemorySnapshot',
+      'RewindPreview',
+      'RewindRequest',
+      'RewindReport',
+      'ChangesView',
+      'DiscardRequest',
     ].map((name) => ({
       $ref: `#/$defs/${name}`,
     })),

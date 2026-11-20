@@ -4,9 +4,11 @@
 import type {
   ModelRef,
   ApprovalAnswer,
+  DiscardRequest,
   PermissionMode,
   InputAttachment,
   InputMention,
+  RewindRequest,
 } from '@piarc/protocol';
 
 import type { CommandId } from './keybindings.js';
@@ -44,6 +46,13 @@ export const IPC_CHANNELS = {
   approvalAnswer: 'piarc:approval.answer',
   sessionCompact: 'piarc:session.compact',
   sessionContextUsage: 'piarc:session.contextUsage',
+  sessionRewindPreview: 'piarc:session.rewindPreview',
+  sessionRewind: 'piarc:session.rewind',
+  sessionUndoRewind: 'piarc:session.undoRewind',
+  sessionChanges: 'piarc:session.changes',
+  sessionDiscardChange: 'piarc:session.discardChange',
+  sessionSwitchBranch: 'piarc:session.switchBranch',
+  sessionFork: 'piarc:session.fork',
   queueEdit: 'piarc:session.queueEdit',
   queueDelete: 'piarc:session.queueDelete',
   attachmentStore: 'piarc:session.attachmentStore',
@@ -396,6 +405,23 @@ export interface PiarcApi {
   compact(id: string, instructions?: string): Promise<string>;
   /** The session's context usage by category (`ContextUsage` JSON, T27). */
   contextUsage(id: string): Promise<string>;
+  /** What rewinding the files to before a turn would do (`RewindPreview` JSON, T28). */
+  rewindPreview(id: string, turnId: string): Promise<string>;
+  /** Rewinds the files, the conversation or both (`RewindReport` JSON, T28). */
+  rewind(id: string, request: RewindRequest): Promise<string>;
+  /** Undoes the files of a rewind (`RewindReport` JSON, T28). */
+  undoRewind(id: string, restoreId: string): Promise<string>;
+  /** The session's changed files, or one file with its diff (`ChangesView` JSON, T28). */
+  sessionChanges(id: string, path?: string): Promise<string>;
+  /** Discards a file's change or one hunk; the file's `ChangesView` afterwards (T28). */
+  discardChange(id: string, request: DiscardRequest): Promise<string>;
+  /** Continues the session on another branch (`SessionRewound` JSON, T28). */
+  switchBranch(id: string, entryId: string): Promise<string>;
+  /**
+   * Opens a new session whose conversation stops where `beforeTurn` started ("branch from
+   * here", T28); resolves with the new session as JSON.
+   */
+  forkSession(id: string, beforeTurn: string): Promise<string>;
   /** Changes the text of a queued input; resolves with the queue as JSON. */
   editQueueItem(id: string, itemId: string, text: string): Promise<string>;
   /** Removes a queued input; resolves with the queue as JSON. */
