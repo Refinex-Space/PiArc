@@ -55,20 +55,34 @@ pub fn is_critical_delete(cmd: &Command, ctx: &CriticalContext<'_>) -> bool {
 
 fn critical_target(word: &Word, cwd: &Cwd, ctx: &CriticalContext<'_>) -> bool {
     if !word.is_static() {
-        // `"$HOME"`, `${HOME}/`, `$HOME/*`.
+        // `"$HOME"`, `${HOME}/..`, `$PWD/..`: the home directory and the working directory
+        // are known, so the rest of the word is judged as a path (R3). Other run-time values
+        // are not judged here.
         let source = word.source.replace(['"', '\''], "");
-        let rest = source
+        let expanded = source
             .strip_prefix("${HOME}")
-            .or_else(|| source.strip_prefix("$HOME"));
-        return rest
-            .is_some_and(|r| matches!(r.trim_end_matches(['*', '.']).trim_end_matches('/'), ""));
+            .or_else(|| source.strip_prefix("$HOME"))
+            .map(|rest| format!("~{rest}"))
+            .or_else(|| {
+                source
+                    .strip_prefix("${PWD}")
+                    .or_else(|| source.strip_prefix("$PWD"))
+                    .map(|rest| format!(".{rest}"))
+            });
+        return expanded.is_some_and(|text| {
+            !text.contains(['$', '`']) && critical_text(text, word.glob, cwd, ctx)
+        });
     }
-    let mut text = word.text.replace('\\', "/");
+    critical_text(word.text.clone(), word.glob, cwd, ctx)
+}
+
+fn critical_text(text: String, glob: bool, cwd: &Cwd, ctx: &CriticalContext<'_>) -> bool {
+    let mut text = text.replace('\\', "/");
     if text.len() >= 2 && text.as_bytes()[1] == b':' && text.as_bytes()[0].is_ascii_alphabetic() {
         text = format!("/{}{}", text[..1].to_ascii_lowercase(), &text[2..]);
     }
     // A glob deletes what is inside its directory.
-    let base = if word.glob {
+    let base = if glob {
         let cut = text.find(['*', '?', '[']).unwrap_or(text.len());
         match text[..cut].rfind('/') {
             Some(0) => "/".to_owned(),
@@ -79,8 +93,13 @@ fn critical_target(word: &Word, cwd: &Cwd, ctx: &CriticalContext<'_>) -> bool {
         text
     };
     let Some(path) = absolute(&base, cwd, ctx) else {
-        // An unknown directory with `.`, `..` or a glob could be anything.
-        return base == "." || base == ".." || base.starts_with("./") || base.starts_with("../");
+        // An unknown directory with `.`, `..` or a glob could be anything; `~user` is another
+        // user's home directory.
+        return base == "."
+            || base == ".."
+            || base.starts_with("./")
+            || base.starts_with("../")
+            || base.starts_with('~');
     };
     is_critical(&path, ctx)
 }

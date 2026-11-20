@@ -688,6 +688,34 @@
       "input": "uniq -c /home/u/.ssh/id_rsa",
       "expected": "ask",
       "step": "ask"
+    },
+    {
+      "category": "critical",
+      "input": "rm -rf $HOME/../..",
+      "rules": { "allow": ["Bash(rm *)"] },
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
+      "category": "critical",
+      "input": "rm -rf ~root",
+      "rules": { "allow": ["Bash(rm *)"] },
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
+      "category": "critical",
+      "input": "rm -rf \"$PWD/..\"",
+      "rules": { "allow": ["Bash(rm *)"] },
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
+      "category": "critical",
+      "input": "rm -rf ${HOME}/../other",
+      "rules": { "allow": ["Bash(rm *)"] },
+      "expected": "ask",
+      "step": "criticalPath"
     }
   ]
 }
