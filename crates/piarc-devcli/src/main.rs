@@ -7,6 +7,8 @@
 //!   mock provider of `piarc-testkit`, through the runner in `piarc_testkit::l2`.
 //! - One scenario file or every file of a directory; a JSON report for the capability list
 //!   (`scripts/plan/check-capabilities.mjs`).
+//! - The PiArc side of L3 (`l3`, T30): runs scenarios with the mocks in L3 mode and writes
+//!   each run's structure-only capture for `scripts/l3/run.mjs`.
 //!
 //! # Not responsible for
 //!
@@ -29,6 +31,7 @@ use piarc_testkit::l2::{self, RunnerConfig, SuiteOptions};
 const USAGE: &str = "\
 usage: piarc-devcli run <scenario file or directory>... [options]
        piarc-devcli list <scenario file or directory>...
+       piarc-devcli l3 <scenario file or directory>... --out <dir>
 
 Runs L2 scenarios headlessly: Core + the real Agent Host bundle + the strict mock provider.
 
@@ -39,12 +42,14 @@ options:
   --threads <n>       scenarios run at once (default: half the cores, at most 4)
   --repo <dir>        repository root holding scripts/dev/build-agent-host.mjs
                       (default: the checkout this binary was built from)
+  --out <dir>         l3: write <dir>/<id>.json per scenario (failures and capture)
 ";
 
 struct Args {
     command: String,
     paths: Vec<PathBuf>,
     json: Option<PathBuf>,
+    out: Option<PathBuf>,
     options: SuiteOptions,
     repo: PathBuf,
 }
@@ -52,13 +57,14 @@ struct Args {
 fn parse(args: Vec<String>) -> Result<Args, String> {
     let mut iter = args.into_iter();
     let command = iter.next().ok_or("missing command")?;
-    if command != "run" && command != "list" {
+    if !["run", "list", "l3"].contains(&command.as_str()) {
         return Err(format!("unknown command `{command}`"));
     }
     let mut parsed = Args {
         command,
         paths: Vec::new(),
         json: None,
+        out: None,
         options: SuiteOptions {
             threads: l2::default_threads(),
             ..SuiteOptions::default()
@@ -73,6 +79,7 @@ fn parse(args: Vec<String>) -> Result<Args, String> {
         let mut value = |name: &str| iter.next().ok_or(format!("{name} needs a value"));
         match arg.as_str() {
             "--json" => parsed.json = Some(PathBuf::from(value("--json")?)),
+            "--out" => parsed.out = Some(PathBuf::from(value("--out")?)),
             "--filter" => parsed.options.filters.push(value("--filter")?),
             "--exact" => parsed.options.exact = true,
             "--threads" => {
@@ -84,6 +91,9 @@ fn parse(args: Vec<String>) -> Result<Args, String> {
             other if other.starts_with('-') => return Err(format!("unknown option `{other}`")),
             path => parsed.paths.push(PathBuf::from(path)),
         }
+    }
+    if parsed.command == "l3" && parsed.out.is_none() {
+        return Err("l3 needs --out <dir>".into());
     }
     if parsed.paths.is_empty() {
         return Err("give at least one scenario file or directory".into());
@@ -116,6 +126,9 @@ fn run(args: &Args) -> Result<bool, String> {
     if entries.is_empty() {
         return Err("no scenario files found".into());
     }
+    if args.command == "l3" {
+        return run_l3(entries, args);
+    }
     let config = if args.options.list {
         RunnerConfig {
             node: PathBuf::new(),
@@ -131,4 +144,52 @@ fn run(args: &Args) -> Result<bool, String> {
         println!("JSON report: {}", path.display());
     }
     Ok(report.passed())
+}
+
+/// `l3`: runs every scenario in L3 mode, one after another, and writes `<out>/<id>.json` as
+/// `{"id", "failures": [{kind, message}], "cleaned", "capture"}`. `Ok(false)` when a scenario
+/// did not load; run failures are data for the comparison, not a command failure.
+fn run_l3(entries: Vec<l2::suite::Entry>, args: &Args) -> Result<bool, String> {
+    let out = args.out.as_deref().ok_or("l3 needs --out <dir>")?;
+    std::fs::create_dir_all(out).map_err(|e| format!("{}: {e}", out.display()))?;
+    let config = RunnerConfig::build(&args.repo)?;
+    let mut loaded = true;
+    for entry in entries {
+        let spec = match entry.spec {
+            Ok(spec) => spec,
+            Err(e) => {
+                eprintln!("{e}");
+                loaded = false;
+                continue;
+            }
+        };
+        if !args.options.filters.is_empty()
+            && !args.options.filters.iter().any(|f| {
+                if args.options.exact {
+                    spec.id == *f
+                } else {
+                    spec.id.contains(f.as_str())
+                }
+            })
+        {
+            continue;
+        }
+        let (outcome, capture) = l2::run_l3(&spec, &config);
+        let report = serde_json::json!({
+            "id": spec.id,
+            "failures": outcome.failures,
+            "cleaned": outcome.cleaned,
+            "capture": capture,
+        });
+        let file = out.join(format!("{}.json", spec.id));
+        let text = serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?;
+        std::fs::write(&file, text).map_err(|e| format!("{}: {e}", file.display()))?;
+        println!(
+            "l3 {}: {} failure(s) -> {}",
+            spec.id,
+            outcome.failures.len(),
+            file.display()
+        );
+    }
+    Ok(loaded)
 }

@@ -29,7 +29,7 @@ pub mod web;
 use std::path::PathBuf;
 
 pub use format::{FormatError, Platform, ScenarioSpec, load};
-pub use runner::{RunOutcome, RunnerConfig, run};
+pub use runner::{RunOutcome, RunnerConfig, run, run_l3};
 pub use suite::{Report, ScenarioResult, Status, SuiteOptions, load_all, run_suite, write_report};
 
 /// Scenarios run at once by default: half the cores, at most 4 (each runs an Agent Host).

@@ -703,6 +703,10 @@
         "tool": {
           "description": "The canonical tool name the request must be for.",
           "type": "string"
+        },
+        "call": {
+          "description": "The tool call id the request must be for; L3 runs answer each request with the approval naming its call (T30).",
+          "type": "string"
         }
       }
     },

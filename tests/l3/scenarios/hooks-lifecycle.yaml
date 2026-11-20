@@ -1,0 +1,24 @@
+id: hooks-lifecycle
+area: hooks
+description: SessionStart and UserPromptSubmit hooks add context, a Stop hook blocks once with a reason and then lets the turn end, and a SessionEnd hook runs when the session ends.
+mirrors: [hooks-session-start, hooks-user-prompt-submit, hooks-stop, hooks-session-end]
+workspace:
+  files:
+    .claude/settings.json: |
+      {"hooks": {
+        "SessionStart": [{"hooks": [{"type": "command", "command": "node .l3/hook.mjs start"}]}],
+        "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "node .l3/hook.mjs prompt"}]}],
+        "Stop": [{"hooks": [{"type": "command", "command": "node .l3/hook.mjs stop"}]}],
+        "SessionEnd": [{"hooks": [{"type": "command", "command": "node .l3/hook.mjs end"}]}]
+      }}
+  plans:
+    start: { stdout: Project uses tabs. }
+    prompt: { stdout: Ticket 42 is open. }
+    stop:
+      sequence:
+        - json: { decision: block, reason: Run the tests before finishing. }
+        - {}
+prompt: Finish the feature.
+steps:
+  - text: First answer.
+  - text: Tests pass.

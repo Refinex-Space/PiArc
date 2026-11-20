@@ -1,0 +1,20 @@
+id: perm-untrusted
+area: permissions
+description: In a project that is not trusted its allow rules and starting mode do not apply, while its deny rules do.
+mirrors: [config-untrusted-project, policy-untrusted]
+trusted: false
+workspace:
+  files:
+    notes.txt: "plain notes\n"
+    secrets/key.txt: "do not read\n"
+    .claude/settings.json: '{"permissions":{"allow":["Bash(awk *)"],"deny":["Read(secrets/**)"],"defaultMode":"acceptEdits"}}'
+prompt: Try the project's rules.
+steps:
+  - tool_calls: [{ id: awk, name: Bash, input: { command: awk NR==1 notes.txt } }]
+  - tool_calls: [{ id: secret, name: Read, input: { file_path: '{{workspace}}/secrets/key.txt' } }]
+  - tool_calls:
+      [{ id: write, name: Write, input: { file_path: '{{workspace}}/new.txt', content: "new\n" } }]
+  - text: Finished.
+approvals:
+  - { call: awk, decision: deny, feedback: Not trusted. }
+  - { call: write, decision: deny, feedback: Not trusted. }

@@ -1,0 +1,41 @@
+id: hooks-permission-request
+area: hooks
+description: PermissionRequest hooks answer before the permission prompt - an allow runs the call, a deny refuses it - and Notification hooks see the prompts that remain.
+mirrors: [hooks-permission-request, hooks-notification]
+workspace:
+  files:
+    .claude/settings.json: |
+      {"hooks": {
+        "PermissionRequest": [
+          {"matcher": "Bash", "hooks": [{"type": "command", "command": "node .l3/hook.mjs bash"}]},
+          {"matcher": "Write", "hooks": [{"type": "command", "command": "node .l3/hook.mjs write"}]}
+        ],
+        "Notification": [{"hooks": [{"type": "command", "command": "node .l3/hook.mjs notify"}]}]
+      }}
+  plans:
+    bash:
+      sequence:
+        - json:
+            {
+              hookSpecificOutput:
+                { hookEventName: PermissionRequest, decision: { behavior: allow } },
+            }
+        - {}
+    write:
+      json:
+        {
+          hookSpecificOutput:
+            {
+              hookEventName: PermissionRequest,
+              decision: { behavior: deny, message: Writes wait for review. },
+            },
+        }
+prompt: Make the files.
+steps:
+  - tool_calls: [{ id: first, name: Bash, input: { command: touch first.txt } }]
+  - tool_calls: [{ id: second, name: Bash, input: { command: touch second.txt } }]
+  - tool_calls:
+      [{ id: write, name: Write, input: { file_path: '{{workspace}}/out.txt', content: x } }]
+  - text: Done.
+approvals:
+  - { call: second, decision: allow }

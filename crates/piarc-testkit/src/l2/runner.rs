@@ -33,11 +33,14 @@ use super::matcher::subset_mismatch;
 use super::matcher::{ObservedEvent, check_events, compact, describe, matches, without_noise};
 use crate::record::RequestRecord;
 use crate::scenario::{Scenario, ScenarioLibrary};
-use crate::server::MockProvider;
+use crate::server::{MockProvider, Mode};
 
 mod checkpoints;
 mod harness;
+mod l3;
 mod login;
+
+pub use l3::run_l3;
 
 /// Safety net for every wait; no assertion depends on timing.
 pub const WAIT: Duration = Duration::from_secs(30);
@@ -120,6 +123,12 @@ fn failure(kind: &'static str, message: impl Into<String>) -> Failure {
 /// Runs `spec` on its own tokio runtime.
 #[must_use]
 pub fn run(spec: &ScenarioSpec, config: &RunnerConfig) -> RunOutcome {
+    run_with(spec, config, Mode::Strict).0
+}
+
+/// Runs `spec` with mocks in `mode`; in [`Mode::L3`] also returns what [`l3::capture`] took
+/// from the run before its root was removed.
+fn run_with(spec: &ScenarioSpec, config: &RunnerConfig, mode: Mode) -> (RunOutcome, Option<Value>) {
     static RUNS: AtomicU64 = AtomicU64::new(0);
     let run = RUNS.fetch_add(1, Ordering::Relaxed);
     let root = std::env::temp_dir().join(format!(
@@ -127,13 +136,16 @@ pub fn run(spec: &ScenarioSpec, config: &RunnerConfig) -> RunOutcome {
         spec.id,
         std::process::id()
     ));
-    let mut failures = match tokio::runtime::Builder::new_multi_thread()
+    let (mut failures, capture) = match tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .enable_all()
         .build()
     {
-        Ok(runtime) => runtime.block_on(run_in(spec, config, &root)),
-        Err(e) => vec![failure("setup", format!("no tokio runtime: {e}"))],
+        Ok(runtime) => runtime.block_on(run_in(spec, config, &root, mode)),
+        Err(e) => (
+            vec![failure("setup", format!("no tokio runtime: {e}"))],
+            None,
+        ),
     };
     let cleaned = match std::fs::remove_dir_all(&root) {
         Ok(()) => true,
@@ -146,24 +158,30 @@ pub fn run(spec: &ScenarioSpec, config: &RunnerConfig) -> RunOutcome {
             false
         }
     };
-    RunOutcome {
+    let outcome = RunOutcome {
         failures,
         root,
         cleaned,
-    }
+    };
+    (outcome, capture)
 }
 
-async fn run_in(spec: &ScenarioSpec, config: &RunnerConfig, root: &Path) -> Vec<Failure> {
-    let env = match Env::prepare(spec, config, root).await {
+async fn run_in(
+    spec: &ScenarioSpec,
+    config: &RunnerConfig,
+    root: &Path,
+    mode: Mode,
+) -> (Vec<Failure>, Option<Value>) {
+    let env = match Env::prepare(spec, config, root, mode).await {
         Ok(env) => env,
-        Err(e) => return vec![failure("setup", e)],
+        Err(e) => return (vec![failure("setup", e)], None),
     };
     // T24-A08: Claude Code's configuration is read only, in every scenario.
     let claude_before = claude_snapshot(root);
     let events = Arc::new(Events::default());
     let core = match env.start_core(&events) {
         Ok(core) => core,
-        Err(e) => return vec![failure("setup", e)],
+        Err(e) => return (vec![failure("setup", e)], None),
     };
     let mut driver = Driver {
         spec,
@@ -177,6 +195,8 @@ async fn run_in(spec: &ScenarioSpec, config: &RunnerConfig, root: &Path) -> Vec<
         answered: BTreeSet::new(),
         approval_cursor: 0,
         restores: BTreeMap::new(),
+        mode,
+        asks: Vec::new(),
     };
     let mut failures = match driver.drive().await {
         Ok(()) => {
@@ -185,6 +205,8 @@ async fn run_in(spec: &ScenarioSpec, config: &RunnerConfig, root: &Path) -> Vec<
         }
         Err(e) => vec![failure("action", format!("{e}\n{}", driver.context()))],
     };
+    // Taken before shutdown: Core's last events and the workspace as the run left it.
+    let capture = (mode == Mode::L3).then(|| driver.capture());
     if let Err(e) = shutdown(&driver.core).await {
         failures.push(failure("cleanup", e));
     }
@@ -202,7 +224,7 @@ async fn run_in(spec: &ScenarioSpec, config: &RunnerConfig, root: &Path) -> Vec<
             ),
         ));
     }
-    failures
+    (failures, capture)
 }
 
 /// The directories, mocks and Pi configuration of one run.
@@ -231,6 +253,7 @@ impl Env {
         spec: &ScenarioSpec,
         config: &RunnerConfig,
         root: &Path,
+        mode: Mode,
     ) -> Result<Self, String> {
         let workspace = root.join("work space 工作区");
         let data = root.join("data 数据");
@@ -252,19 +275,20 @@ impl Env {
         for (name, endpoint) in &spec.providers {
             let id = spec.mock_scenario_id(name);
             let mut script = endpoint.script();
-            if let Some(web) = &web {
-                for call in script
-                    .steps
-                    .iter_mut()
-                    .flat_map(|s| s.tool_calls.iter_mut())
-                {
+            for call in script
+                .steps
+                .iter_mut()
+                .flat_map(|s| s.tool_calls.iter_mut())
+            {
+                if let Some(web) = &web {
                     super::web::fill_value(&mut call.input, web.port);
                 }
+                fill_workspace(&mut call.input, &workspace);
             }
             let library = Scenario::new(&id, script)
                 .and_then(|scenario| ScenarioLibrary::new().with(scenario))
                 .map_err(|e| e.to_string())?;
-            let mock = MockProvider::start(library)
+            let mock = MockProvider::start_with(library, 0, mode)
                 .await
                 .map_err(|e| format!("mock `{name}`: {e}"))?;
             if endpoint.configure_as.is_none() {
@@ -350,6 +374,21 @@ impl Env {
             .collect()
     }
 }
+
+/// Replaces `{{workspace}}` in the strings of `value` with the workspace's absolute path.
+fn fill_workspace(value: &mut Value, workspace: &Path) {
+    match value {
+        Value::String(s) if s.contains(WORKSPACE_PLACEHOLDER) => {
+            *s = s.replace(WORKSPACE_PLACEHOLDER, &workspace.to_string_lossy());
+        }
+        Value::Array(items) => items.iter_mut().for_each(|v| fill_workspace(v, workspace)),
+        Value::Object(map) => map.values_mut().for_each(|v| fill_workspace(v, workspace)),
+        _ => {}
+    }
+}
+
+/// Stands for the workspace's absolute path in the tool arguments of an endpoint's script.
+pub const WORKSPACE_PLACEHOLDER: &str = "{{workspace}}";
 
 /// The Pi provider id of endpoint `name`.
 fn pi_provider(name: &str) -> String {
@@ -440,6 +479,10 @@ struct Driver<'a> {
     approval_cursor: usize,
     /// Session id → its latest rewind's undo id (T28).
     restores: BTreeMap<String, String>,
+    /// [`Mode::L3`]: approvals beyond the scripted ones are refused instead of failing.
+    mode: Mode,
+    /// Every approval answered, in order, as `{tool, call, decision, scripted}` (L3 capture).
+    asks: Vec<Value>,
 }
 
 impl Driver<'_> {
@@ -1031,18 +1074,43 @@ impl Driver<'_> {
         if self.answered.contains(&card.request_id) {
             return Ok(());
         }
-        let expected = self
-            .spec
-            .approvals
-            .get(self.answered.len())
-            .ok_or_else(|| format!("unexpected approval for {}", card.tool))?;
-        if expected.tool.as_ref().is_some_and(|t| t != &card.tool) {
+        let pending = self.pending_call(&card.tool);
+        let expected = if self.mode == Mode::L3 {
+            // L3 answers the approval that names this card's call, whatever their order.
+            self.spec
+                .approvals
+                .iter()
+                .find(|a| a.call.is_some() && a.call == pending)
+        } else {
+            self.spec.approvals.get(self.answered.len())
+        };
+        let Some(expected) = expected else {
+            if self.mode == Mode::L3 {
+                return self.refuse_unscripted(card, pending).await;
+            }
+            return Err(format!("unexpected approval for {}", card.tool));
+        };
+        if self.mode == Mode::Strict && expected.call.is_some() && expected.call != pending {
+            return Err(format!(
+                "approval expected for call {:?}, got {pending:?}",
+                expected.call
+            ));
+        }
+        if self.mode == Mode::L3 {
+            // L3 answers in order whatever the card is; the comparison reports the asks.
+            self.asks.push(json!({
+                "tool": card.tool,
+                "call": pending,
+                "decision": format!("{:?}", expected.decision).to_lowercase(),
+                "scripted": true,
+            }));
+        } else if expected.tool.as_ref().is_some_and(|t| t != &card.tool) {
             return Err(format!(
                 "approval expected {:?}, got {}",
                 expected.tool, card.tool
             ));
         }
-        if expected.kind.is_some_and(|kind| kind != card.kind) {
+        if self.mode == Mode::Strict && expected.kind.is_some_and(|kind| kind != card.kind) {
             return Err(format!(
                 "approval expected {:?}, got {:?}",
                 expected.kind, card.kind
@@ -1166,7 +1234,7 @@ impl Driver<'_> {
                 ));
             }
         }
-        if self.spec.approvals.len() != self.answered.len() {
+        if self.mode == Mode::Strict && self.spec.approvals.len() != self.answered.len() {
             failures.push(failure(
                 "approvals",
                 format!(

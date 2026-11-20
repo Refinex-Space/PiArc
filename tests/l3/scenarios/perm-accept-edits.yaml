@@ -1,0 +1,32 @@
+id: perm-accept-edits
+area: permissions
+description: Accept-edits mode writes and edits inside the workspace without asking; commands that are not read-only and writes outside the workspace still ask.
+mirrors: [policy-accept-edits]
+mode: acceptEdits
+workspace:
+  files:
+    notes.txt: "plain notes\n"
+prompt: Work through the accept-edits mode.
+steps:
+  - tool_calls:
+      [{ id: write, name: Write, input: { file_path: '{{workspace}}/new.txt', content: "new\n" } }]
+  - tool_calls: [{ id: read, name: Read, input: { file_path: '{{workspace}}/notes.txt' } }]
+  - tool_calls:
+      - {
+          id: edit,
+          name: Edit,
+          input: { file_path: '{{workspace}}/notes.txt', old_string: plain, new_string: PLAIN },
+        }
+  - tool_calls: [{ id: mkdir, name: Bash, input: { command: mkdir made } }]
+  - tool_calls: [{ id: awk, name: Bash, input: { command: awk NR==1 notes.txt } }]
+  - tool_calls:
+      - {
+          id: outside,
+          name: Write,
+          input: { file_path: '{{workspace}}/../outside.txt', content: "x\n" },
+        }
+  - text: Finished.
+approvals:
+  - { call: mkdir, decision: allow }
+  - { call: awk, decision: allow }
+  - { call: outside, decision: deny, feedback: Stay in the workspace. }

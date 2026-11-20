@@ -1,0 +1,31 @@
+id: perm-bypass
+area: permissions
+description: Bypass permissions runs writes and commands without asking while deny and ask rules still apply.
+mirrors: [perm-bypass]
+mode: bypassPermissions
+workspace:
+  files:
+    .claude/settings.json: '{"permissions":{"deny":["Bash(git push *)"],"ask":["Edit(locked.txt)"]}}'
+prompt: Run without asking.
+steps:
+  - tool_calls:
+      [
+        {
+          id: write,
+          name: Write,
+          input: { file_path: '{{workspace}}/free.txt', content: "written\n" },
+        },
+      ]
+  - tool_calls: [{ id: awk, name: Bash, input: { command: awk NR==1 free.txt } }]
+  - tool_calls: [{ id: push, name: Bash, input: { command: git push origin main } }]
+  - tool_calls:
+      [
+        {
+          id: locked,
+          name: Write,
+          input: { file_path: '{{workspace}}/locked.txt', content: "x\n" },
+        },
+      ]
+  - text: Finished.
+approvals:
+  - { call: locked, decision: deny, feedback: Locked. }

@@ -1,0 +1,23 @@
+id: perm-compound
+area: permissions
+description: Compound commands are judged per subcommand - a deny on any part refuses, an allow needs every part - and command substitution or a path outside the workspace asks.
+mirrors: [perm-bash-compound, policy-shell-boundary]
+workspace:
+  files:
+    notes.txt: "plain notes\n"
+  user_settings: { permissions: { allow: ['Bash(awk *)'], deny: ['Bash(git push *)'] } }
+prompt: Run the compound commands.
+steps:
+  - tool_calls:
+      [{ id: denied, name: Bash, input: { command: awk NR==1 notes.txt && git push origin main } }]
+  - tool_calls:
+      [{ id: allowed, name: Bash, input: { command: awk NR==1 notes.txt && wc -l notes.txt } }]
+  - tool_calls:
+      [{ id: partial, name: Bash, input: { command: awk NR==1 notes.txt; touch made.txt } }]
+  - tool_calls: [{ id: substitution, name: Bash, input: { command: echo $(whoami) } }]
+  - tool_calls: [{ id: outside, name: Bash, input: { command: awk NR==1 ../outside.txt } }]
+  - text: Finished.
+approvals:
+  - { call: partial, decision: deny, feedback: Not that part. }
+  - { call: substitution, decision: deny, feedback: No substitution. }
+  - { call: outside, decision: deny, feedback: Stay in the workspace. }

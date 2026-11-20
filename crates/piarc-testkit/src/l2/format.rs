@@ -565,6 +565,9 @@ pub struct Approval {
     /// The tool the request must be for.
     #[serde(default)]
     pub tool: Option<String>,
+    /// The tool call the request must be for; L3 runs pick the approval by it (T30).
+    #[serde(default)]
+    pub call: Option<String>,
     /// The presentation kind the approval card must have.
     #[serde(default)]
     pub kind: Option<piarc_protocol::policy::ApprovalKind>,

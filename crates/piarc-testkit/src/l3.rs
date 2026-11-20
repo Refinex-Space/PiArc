@@ -80,6 +80,18 @@ pub fn fingerprint(text: &str) -> Value {
     json!({ "len": text.chars().count(), "hash": format!("sha256:{hex}") })
 }
 
+/// `sha256:<first 16 hex digits>` of `bytes`: the file fingerprint of an L3 capture.
+#[must_use]
+pub fn file_hash(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let hex: String = digest
+        .iter()
+        .take(8)
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    format!("sha256:{hex}")
+}
+
 /// The whitelisted structure of the request body `body` that arrived on `path`.
 #[must_use]
 pub fn structure(path: &str, body: &str) -> Value {
@@ -94,7 +106,7 @@ pub fn structure(path: &str, body: &str) -> Value {
     keys.sort_unstable();
     let tools: Vec<Value> = array(&json, "tools").iter().map(tool).collect();
     let system: Vec<Value> = match json.get("system") {
-        Some(Value::String(text)) => vec![fingerprinted(text, None)],
+        Some(Value::String(text)) => vec![text_block(text, false)],
         Some(Value::Array(blocks)) => blocks.iter().map(block).collect(),
         _ => Vec::new(),
     };
