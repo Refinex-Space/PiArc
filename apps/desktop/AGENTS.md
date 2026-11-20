@@ -73,14 +73,12 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - store（`src/renderer/store/`）：业务状态只来自 Core 的事件；组件用 `hooks.ts` 的细粒度订阅（列表、单个会话条目、单行），不要订阅整个 store；快照按 `revision` 门控；乐观行以 `clientId` 对账，Core 未确认时显示未送达，重发复用原键。"需要处理"的定义与徽标优先级只在 `store/status.ts`。
 - 窗口是否在前台以主进程的应用事件为准（`app/window-focus.ts`），不要用 `document.hasFocus()`：自动化下它恒为真。
 - 流式期间只有流式那一行重新渲染：行组件按 id 订阅 store 与解析结果，块组件按对象身份记忆化；改动时用 L4 的渲染计数用例（`transcript-render.e2e.ts`）验证。
+- 信任对话框提交 Core 返回的清单版本。收到过期视图时显示新增项、说明变化并再次确认。原生删除确认只从 Core 索引读取标题与工作区，并显示本次实际删除的会话 ID。
 
-## 打包产物的测试入口（S6）
+## 打包产物与构建形态（S6）
 
 - 开发构建的 Core 导出 `agentHostProbe`（从 `process.resourcesPath` 下的 `agent-host/` 按生产方式启动 Agent Host，跑一轮对话）与 `keychainProbe`；主进程测试钩子另有 `showNotification`。模型经测试数据目录的 `pi/models.json` 指向 mock provider，不需要额外的启动参数；发布构建没有这些导出。
 - `e2e/agent-host.e2e.ts`、`e2e/agent-host-kill.e2e.ts`、`e2e/notification.e2e.ts` 只在 `packaged` 项目运行（`playwright.config.ts` 的 `testIgnore`）：`dev` 形态没有 `Resources/agent-host/`，签名也是 Electron 自己的。`agent-host-kill.e2e.ts` 只在 Windows 运行：回合进行中 `taskkill /F` 主进程，检查 Job Object 结束 Agent Host 的整棵进程树（S8）。两者共用 `e2e/agent-host.ts` 的 `startMock`。
-
-## 开发构建与发布构建
-
 - fuse 配置的单一来源是 `fuses.mjs`；`PIARC_BUILD_FLAVOR`（由 `package:desktop --flavor` 设置）选择配置，默认 `release`。开发构建只多开 `EnableNodeCliInspectArguments`，L4 的打包形态靠它被 Playwright 驱动。
 - `electron-forge start` 用 node_modules 中的 Electron，不写 fuse；界面来自 Vite 开发服务器，开发服务器 origin 加入可信 origin，CSP 放宽三项（见 `dev-server.ts`）。
 
@@ -117,5 +115,3 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 ## 参考
 
 - 架构第 3.4、6.11、7.6、8.1–8.8、10.2、10.3、11 章；ADR-0013、ADR-0014、ADR-0017、ADR-0018 第 1、6 条、ADR-0022、ADR-0023、ADR-0029；`docs/spikes/S10-electron-security.md`、`S02-napi-event-channel.md`、`S01-transcript-composer.md`、`S07-terminal.md`；`docs/engineering/testing.md` 第 9 节。
-
-- 信任对话框提交 Core 返回的清单版本。收到过期视图时显示新增项、说明变化并再次确认。原生删除确认只从 Core 索引读取标题与工作区，并显示本次实际删除的会话 ID。

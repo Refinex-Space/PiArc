@@ -30,44 +30,6 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 刷出时机：不早于首个待发事件到达，且距上次刷出至少一个间隔（默认 16 ms，1–1000 ms 可配）。无待发事件时不跑定时器。
 - 满时策略，任何情况都不丢事件：最多 1 个在途投递（sink 丢弃 `DeliveryDone` 才算完成），期间继续在待发批次里累积；待发超过 64 MiB 停止读队列，队列（65,536 个事件）满后异步生产者等待，同步调用（`echo`）返回可重试的 `QueueFull`（kind `busy`）。只有 sink 报告 `SinkClosed`（JS 环境已销毁）时才丢弃并计入 `lost`。
 
-## 委托的工具 I/O（`tool_io`）
-
-- `ToolIo` 按会话登记的 `Scope`（工作区根 + cwd + 只读的会话临时目录 `<数据目录>/sessions/<id>/tmp/`，登记时创建）应答 `fs/*`（`piarc-fs`，放在阻塞线程池）与 `exec/*`（`piarc-exec`）；未登记的会话返回 `sessionNotFound`。登记由会话层做（会话 actor 启动时 `open_session`，关闭时 `close_session`）；每个工作区的入站处理者（`sessions/inbound.rs`）只放行本工作区的会话。`cancel_running` 终止会话正在运行的命令而保留会话（回合中断）。`ToolIoConfig.observer`（`ToolIoObserver`）在每个请求执行前被调用，只给测试用（T14-A06 的并发计数）。
-- 文件工具的不变量（T16，ADR-0027）在 `tool_io/files.rs`：每个会话一张 `piarc_fs::FileStates`（随会话登记创建、`close_session` 释放；同一 id 重新登记即新表），所有会话共用一组 `PathLocks`；`fs/write`、`fs/spill` 的 `upload` 分段在会话的 `Uploads` 里收齐（同一 id 的目标必须相同，上限 `MAX_UPLOAD_BYTES`）；每次写入后用 `piarc_diff::file_diff` 生成结果的 `diff`。
-- T23（ADR-0037）：`tool_io/policy/assess.rs` 由会话规则与各设置层（`Settings::permission_lists`，按内容缓存）建规则集，为 Bash（`BashFacts` 用会话 scope 定位路径、`exec/utility.rs` 的 `Programs` 解析程序）、PowerShell、文件工具与其他工具给出阶梯输入；`hooks.rs` 是第 2、8 步（T25：PreToolUse、PermissionRequest hooks，`updatedInput` 在规则之前替换参数，PermissionRequest 的改写重新裁决，`updatedPermissions` 只写会话与 `.piarc/`，运行前发 `policy/pending`，`if` 条件的匹配 `condition`；两步用本次裁决已读的设置 `HooksService::plan_in`，不再读一遍）；`modes.rs` 管起始模式、跳过权限开关（只读用户层）与 `workspaces.default_mode`；`settings_view.rs` 应答设置页（按来源列规则、编辑 PiArc 可写文件、审计筛选）。自动允许的 Bash 授权带上依赖的程序与路径，执行时钉住程序（`CwdProbe::pin_program`）并重查路径。AHP `policy/tools` 返回整体拒绝的工具。
-- T26（ADR-0042）：`policy/plan.rs` 处理计划卡（批准带 `mode` 切换并记入工作区，继续规划把反馈与 UTF-16 锚定的评论作为拒绝理由）与 EnterPlanMode 的切换（结果的 `mode`）；`policy/questions.rs` 应答 `ui/ask`（表单进同一账本，超时取 `askUserQuestion.timeoutSeconds`、计时用 `ToolIoConfig.clock`）；`policy/waits.rs` 是卡片入账、`policy/pending` 与撤下的共用部分。
-- 工具预检经 `tool_io::policy` 调用 `piarc-policy`，自动或用户决定写入审计；`core/sessions` 快照的 `approvals` 是窗口使用的待审请求。低层 I/O 需要对应调用的授权，用户中断或连接丢失会取消等待。批准规则以实际受信设置的合并结果为准（ADR-0031）。
-- 命令（T17，ADR-0028）在 `tool_io/exec.rs`：shell 每个 Core 探测一次（`exec/shells` 回答，不检查会话：Agent Host 在会话创建过程中、Core 登记它之前就问，工作区入站处理者也放行；Windows 缺 Git Bash 时在 `core/notices` 发一次 `gitBashMissing`，Git Bash 路径只读用户级 `<data>/settings.json` 的 `shell.gitBashPath`）；每个会话一个 shell 目录（`SessionIo.shell_cwd`），未给 `cwd` 的 bash 命令带 `CwdProbe`，结束后越界就回到工作区根；全部命令用 `ProcessTreeSpawner`，超时与阈值取 `ToolIoConfig.exec_limits`。
-- 输出：每块同时进 `OutputCapture`（结果的 `output`，超出预算全文写 `<会话临时目录>/tool-results/<工具调用 id>.txt`）与显示窗口 `Display`（`exec/output`，待发超过 `DISPLAY_WINDOW` 256 KiB 时丢最旧的块并报 `skipped`），转发任务发完才回响应；连接断开（`Peer::closed`）或 `exec/kill` 停止命令。
-- 命令环境 = `ToolIoConfig.command_env`（`CommandEnv`）：`ToolIoConfig::new` 用 Core 自己的环境（`CommandEnv::process`），运行时（`CoreConfig.command_env` 为 `None`）用登录 shell（`CommandEnv::login_shell`，首次命令时解析并缓存）；两者均经 `piarc_exec::env::command_environment`，只缓存准入的 OS、locale 与工具链字段。原环境中影响 shell 解析的变量只保留风险标志；生产审批拒绝请求附加环境（ADR-0035）。`ToolIoConfig` 不能带 `notices`（crate 私有类型），要发通知用 `ToolIo::with_notices`。
-- blob 放在 `<数据目录>/sessions/<会话 id>/blobs/`；会话 id 只允许 `[A-Za-z0-9._-]`，不能是 `.`、`..`。
-- Composer 的类型、数量、大小和搜索上限由 `composer::info()` 提供。附件只经 `store_attachment` 写入本会话的 `attachments/`，会话的工具 scope 将该目录登记为只读。PDF 在发布到附件目录前通过解析和页数校验。归档保留附件，删除会话清理整个会话目录（ADR-0030）。
-- 沙箱会话（T11）：`open_sandboxed_session` 建 `<数据目录>/sessions/<会话 id>/tmp/`、启动会话代理（`piarc_sandbox::SessionSandbox`）；`exec/run` 加上 `sandbox-exec` 包装与沙箱变量（同名覆盖请求的 `env`），用 `ProcessTreeSpawner` 运行。非 macOS 返回 `internalError`。代理随 `SessionIo` 释放而停止（`close_session` 后、最后一个运行中的命令结束时）。
-
-## 上下文工程（T27，ADR-0043）
-
-- `tool_io/context.rs` 应答能力 `context` 的三个请求：`context/settings`（`TrustService::permission_settings` 合并的 `/autoCompactEnabled`、`/autoCompactWindow`，窗口夹在 100,000–1,000,000；没有设置服务时返回缺省值）、`fs/changes`（`FileStates::external_changes`：元数据与记录不同才算哈希，同一版本只报告一次，快照不变，所以先读后改照常拦住）、`fs/forgetReads`（`FileStates::forget_read_ranges`，I72）。`fs/read` 带 `restore: true` 且不带 `origin` 时，`policy/grants.rs` 只放行会话文件状态表里、无需审批即可读取的文件（压缩后重注入最近文件）。
-- `Op::Compact(Option<String>)` 把 `/compact <重点>` 作为 `session/compact` 的 `instructions` 转给 Agent Host；`Op::ContextUsage` 是 `session/getContextUsage`（NAPI `contextUsage`）。`session/usage` 与其他会话通知一样原样转发给客户端。
-
-## 检查点、回退与 Changes（T28，ADR-0044）
-
-- `checkpoints.rs` 的 `Checkpoints`（对象库 + `piarc-store` 索引 + 保留策略，时钟 `CheckpointConfig.now_ms` 可注入）由运行时打开并启动后台清理（启动后与每 6 小时）；`tool_io/checkpoints.rs` 是文件侧：`turn_started` 建检查点、`fs/write` 记写入（AHP `turnId`，缺省用会话当前回合）、回退预览与执行、撤销、Changes 与按文件 / hunk 丢弃，全部经 `piarc_fs::replace` 在路径锁内核对后写回。设置 `fileCheckpointingEnabled: false`（合并层，`checkpoints_for`）时不建检查点、不存快照。
-- 会话侧 `Op::Checkpoint(CheckpointOp)`（`sessions/session/rewind.rs`）：回退与分支切换要求会话空闲且没有在途的 prompt、steer、follow-up（否则 `SessionBusy`），进行期间这些输入同样返回 `SessionBusy`（`OpKind`，R3）；先恢复代码再移动对话（AHP `session/rewind`、`session/switchBranch`，`session_call_within` 等待至多 10 分钟，摘要要调用模型），之后清空会话的文件状态表并在会话路由发 `session/branchChanged`。`fork_session` 的 `ForkPoint::BeforeTurn` 是"从这里分支"；删除会话时一并删除它的检查点记录。
-- 单测：`cargo test -p piarc-core --lib tool_io::checkpoints`（A01、A05、A06、A09、A10）与 `--lib tool_io::policy::tests::t28`（设置开关）。
-
-## WebFetch、登录与模型偏好（T29，ADR-0045）
-
-- `tool_io/web.rs` 应答 `web/fetch`：`policy::claim_fetch` 消费同一调用、同一 URL 的 grant（一次批准一次抓取），`piarc_web::Fetcher` 在第一次使用时建（系统信任库），抓取登记在会话的 `running`（键 `web:<调用 id>`），回合中断与连接断开都停止它；每次写 `kind: "webFetch"` 审计。限值与允许列表在 `CoreConfig.web`（`WebConfig`），`createForTests` 读 `PIARC_TEST_WEB_ALLOWLIST`，L2 为有 `web` 段的场景放行 `127.0.0.1`、`localhost`。`assess.rs`、`policy/hooks.rs` 取 WebFetch 主机一律用 `piarc_web::rule_host`。
-- 登录（`sessions/login.rs`）：`Hub::login` 持 `provider_writer` 锁，为本次登录启动设置 Host（入站处理者 `SettingsInbound`：保险箱 + `ui/loginInteraction`），`call_within` 等 `models/login/start` 至多 15 分钟；`Logins` 一次只允许一个登录，每一步发 `core/login`（`started`、`interaction`、`succeeded`/`failed`/`cancelled` 与 `message`），`answer_login(id, None)` 取消（Core 再发 `models/login/cancel`）。新的提问顶替旧提问，进度不顶替。设置 Host 的启动经 `settings_host_with`，同样应用 `tune_host`（测试注入 `--test-oauth-provider`）。
-- 模型偏好：`providers::Settings` 的 `models`、`auxiliary` 存在用户级 `modelProviders`（`Operation::Preferences` 校验后写入，`toolReliability` 不能由用户设）；`Settings::preferences()` 给 `local` 类服务商的模型加 `toolReliability: low`。`Ctx.model_preferences` 由握手（`HostConfig.model_preferences`）与 `reload_models`（`ModelsReloadParams.preferences`）下发；服务商增删也会刷新它。设置视图另带 `loginProviders` 与 `catalogModels`（设置 Host 不带偏好，是目录原值）。
-- NAPI：`setModelPreferences`、`startLogin`、`answerLogin`、`logoutProvider`。`cargo test -p piarc-core --lib tool_io::policy::tests::t29` 覆盖授权绑定、审计、内网拒绝与域名规则；登录的端到端在 `piarc-testkit` 的 `tests/sessions/login.rs`。
-
-## Hooks（T25，ADR-0039）
-
-- `hooks/mod.rs` 的 `HooksService` 用 `TrustService::permission_settings` 读 hooks（未信任项目的不生效），`plan`/`execute` 经 `ProcessTreeSpawner` 运行（命令环境首次要解析登录 shell，只在 `plan` 选出 handler 后解析：`ToolIo::run_hooks`、裁决第 2、8 步，`execute` 显式接收它；否则没有 hooks 的输入也要等登录 shell）、写审计（`kind: "hook"`）、发 `core/notices`（`type: "hook"`）、长文本落到 `<会话 tmp>/hooks/`，时长取 `CoreConfig.hooks`。`tool_io/hooks.rs` 应答 `hooks/run`（入站处理者只查 `cwd` 在本工作区内，已关闭会话的 SessionEnd 也能运行）、`user_prompt_submit`（阻断为 `permissionDenied`、`hookBlocked`）与 `notification_hooks`；hook 令牌登记在会话的 `running`，中断与关闭结束其进程树。
-- 顺序（T30，ADR-0046）：`hooks_run` 收到 SessionStart（非 `compact`）时先 `HooksService::starting` 登记再运行，`user_prompt_submit` 先 `started` 等登记清零：Agent Host 打开会话时先写出这个 `hooks/run` 再应答，所以登记总在该会话的提示之前。不要在登记之前加 `await`。L2 `hooks-session-start-order` 用慢的 SessionStart hook 锁定它。
-- `tool_io/hooks_tests.rs` 用真实 Core（命令环境固定 `PATH`，否则 cargo 的 `DYLD_*` 关掉规则 allow）；Bash 规则 allow 不覆盖文件写入，测会话规则用 `sed -n` 而不是 `touch`。
-
 ## 凭据（`secrets`）
 
 - 一个 Core 只建一个 `SecretsService`，所有 Agent Host 的 `InboundHandler` 共用它（Core 是保险箱唯一写入方）。保险箱在第一次请求时打开，失败只让这次请求失败，下一次重新打开（用户授权钥匙串后不用重启）。保险箱操作放在阻塞线程池。
@@ -76,13 +38,6 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 参数错误不带 serde 的原文（它会引用出错的值，可能是凭据）。不要在日志里写值。
 - 测试与 `piarc-testkit` 经本模块的再导出使用 `MemorySecretStore`、`test_master_key_name`（testkit 不能直接依赖 `piarc-secrets`）。
 - `identity::APP_IDENTIFIER` 是 D2 决定的应用标识 `cn.piarc.desktop`（bundle id 与 AppUserModelID 也取它）。发布后不能再改：改了保险箱找不到主密钥，系统授权也要重给。
-
-## 模型与服务商设置（T21）
-
-- `providers.rs` 校验设置并生成 `pi/models.json`。公开配置写入用户级 `settings.json` 的 `modelProviders`；生成的无密钥端点使用固定的公共占位值。已经导入的同名端点会阻止新增操作。
-- `sessions/provider_settings.rs` 为每次设置操作启动受监督的专用 Host，仅向它提供保险箱服务。它在 `agent-host/settings/` 工作，通过 `ModelRuntime.login/logout` 保存凭据，操作后关闭。变更完成后向已运行的工作区发送 `models/reload`；稍后启动的工作区在握手时读取当前刷新开关。
-- 配置变更先在 `agent-host/provider-change.json` 记录公开目标和变更 ID。若设置 Host 或 Core 中断，下一次打开工作区或设置时从新 Host 查询已持久化凭据的变更 ID，恢复对应的公开配置和端点投影。恢复记录、诊断、客户端回应均不带密钥。
-- 变更端点地址或线协议时须重新提交或清除密钥。自定义凭据在保险箱内绑定端点与协议，随 AHP 交给 Host。云厂商字段放在 Pi 的单次请求 credential.env 中。进程环境使用启动器既有的白名单。
 
 ## 打包的 Agent Host 与 S6 探针（T12）
 
@@ -109,19 +64,10 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 信任（`trust`）：`TrustService::trust_get` 应答 `trust/get`，任何失败（包括清单不完整、快照损坏、目录解析不了、数据库错、任务 panic）都答 `trusted: false`，只有参数格式错时回 `invalidParams`；查询一律经 `piarc_config::project_trust`。肯定决定须带用户看到的清单版本；遇到版本变化向客户端返回最新视图，保持原决定。同一项目的 linked worktree 需要反向登记（ADR-0034）。成功的 `decide`、`revoke` 广播 `TrustChange`；`agent_host::restart_on_trust_change` 订阅它，对同一主 checkout 调 `HostSupervisor::restart`（不计入崩溃退避，会话自动恢复）。T14 的工作区 actor 负责为每个工作区启动这个任务。
 - 设置（`workspace_settings`）：`CoreRuntime::open_settings(workspace)` 加载四层并用 `piarc_fs::watch` 监听各层文件所在目录（`.piarc/` 不存在时监听工作区本身），去抖 150 ms 后重载；有变化键或问题变化时向 `core/settings` 发 `{ workspace, changed, issues }`。信任变化同样触发重新合并。
 
-## 会话编排（`sessions`，T14，ADR-0026）
+## 子目录说明
 
-- 结构：`Hub` 是 API 入口，只持路由表（工作区路径 → `WorkspaceHandle`，会话 id → `SessionHandle`），锁不跨 await。`WorkspaceActor`（`sessions/workspace.rs`）持有监管器；`SessionActor`（`sessions/session.rs`）持有会话状态；快照任务（`sessions/snapshot.rs`）发 `core/workspaces`、`core/sessions`。actor 之间只经消息通信，都不在自己的循环里等待 Agent Host：启动、恢复、请求、关闭都以任务执行，结果经邮箱回来。
-- 事件：每次启动监管器配一个消费任务，持续取走 `HostEvents`：会话通知、恢复结果、未决调用发给会话 actor 的有界邮箱（1,024，满时消费任务等待，即背压），生命周期事件发给工作区 actor（带启动代次，旧监管器的事件被忽略）。
-- seq：会话 actor 只按 `last_seq + 1` 交付；缺口后的通知暂存，`session/getEntries(last)` 补齐后先交付补到的再交付暂存的；补不齐时发 `session/resync` 并从下一条继续。重新打开会话时以 `last_seq` 作为 `session/resume` 的 `lastSeq`。
-- 状态：`turn/started` → `running`；`turn/completed` → `idle`（失败为 `error`）并置未读；恢复失败、Agent Host 放弃重启、在途回合未决都为 `error`。忙闲（有请求在途或回合进行中）报给工作区 actor。
-- 预热与回收：打开工作区即启动 Agent Host（`open_workspace` 在连接成功、已打开的会话恢复后才返回）；没有忙的会话、没有等待中的获取时按注入的 `Clock` 计时，`idle_timeout`（默认 30 分钟）到期且计时代次未变则 `host/shutdown`，状态 `reclaimed`；之后任何需要 Agent Host 的请求重新启动它并恢复打开中的会话（epoch 1 时由工作区 actor 恢复，崩溃重启时由监管器恢复）。测试用 `clock::ManualClock`。
-- 取消：根 token → 会话 token（关闭时取消，进行中的请求停止等待）→ 回合中断时 `ToolIo::cancel_running` → 命令自己的 token 结束进程。
-- 快照 revision：每个列表一个计数器，只在快照任务里递增并发出，所以按发出顺序严格递增；一批同时到达的变化合成一个快照。列表 = 数据库（最近的工作区、会话索引）+ actor 报告的实时状态（实时字段优先）。
-- 会话 id：`create` 用 Core 生成的 UUID；创建超时或连接中断时以 `session/resume` 收敛。工作区路径与 cwd 先规范化并确认是已存在的目录，cwd 必须在工作区内（I20）。
-- 会话元数据（T18，ADR-0029）：`Op::Prefs`（标题、置顶、归档）经 `CoreRuntime::session_op` 走 `Hub::set_prefs`：打开的会话先记在 actor 里（`LiveSession.prefs` 覆盖快照，随下次索引同步写入），未打开的直接写索引；归档时关闭会话并清理临时输出，保留历史 JSONL 和 `attachments/`（ADR-0030）。`Hub::delete_session` 先关闭会话，再删 `pi/sessions/` 下的 JSONL（不在其下的拒绝）、临时目录与索引行。会话链接带 `in_host`：工作区首个进程连上时只恢复已在 Agent Host 中打开过的会话，正在创建的不恢复。启动时的索引同步结束后 `reload_snapshots`。
-- 客户端偏好（`client_settings`）：可写 `language`、`appearance`、`keybindings`、`notifications`，以及布尔偏好 `/memory/readBoth`，经 `piarc_config::write_value`；读取返回整份文件（不存在为 `{}`）。
-- I62 已接上：工作区 actor 打开时启动设置监听（`WorkspaceSettings`）。macOS 的首次 FSEvents 注册在阻塞线程池进行，与 Host 握手并行。注册完成后重新读取设置，显式 `open_settings` 仍等待监听就绪。回合结束时同步索引。信任变化重启（T18 起）：`CoreRuntime::trust_view`（决定）与 `revoke_trust` 在应答前调 `Hub::trust_changed`，同一主 checkout 的工作区 actor 先把状态置为 `Restarting`（之后的请求等新进程就绪）再调 `HostSupervisor::restart`，所以信任对话框之后立即创建的会话落在新进程上；`agent_host::restart_on_trust_change` 只剩监管器层面的测试使用。
+- `src/tool_io/AGENTS.md`：委托的工具 I/O、工具预检、memory 与 rules、上下文工程、检查点与回退、WebFetch、hooks（T16–T30）。
+- `src/sessions/AGENTS.md`：会话编排、登录与模型偏好、服务商设置 Host（T14、T21、T29）。
 
 ## 不变量
 
@@ -130,9 +76,7 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 错误映射为 `piarc_protocol::ErrorObject`：`ShuttingDown` → `shuttingDown`，`QueueFull` → `busy`，参数错误 → `invalidParams`，功能 crate 的错误（`Feature`）保留它们自己的 kind 与 `retryable`，其余 → `internalError`。
 - 演示事件源（`demo.rs`）只给测试与基准用；发布构建的 `piarc-napi` 不导出启动它的函数。
 
-- Memory 由 `tool_io/memory.rs` 组装快照，文件发现和导入在 `memory_reader.rs`。外部导入经同一会话的审批账本，由 `policy/memory.rs` 按工作区及规范目标匹配。见 ADR-0033。
 - 家目录（T24）：`CoreConfig.home` 默认是进程家目录，`open_state` 经 `DataDirs::with_home` 放进 `Storage` 的目录；凡是读设置的地方都用 `DataDirs::layers(workspace)`（PiArc 与 Claude Code 七层），不要直接调 `LayerTable::piarc`。测试、L2、`createForTests` 都注入临时目录，从不读本机 `~/.claude`。
-- Claude Code rules（T24，ADR-0038）：`memory_reader/rules.rs` 选出 `~/.claude/rules/` 与工作区根 `.claude/rules/` 中要载入的文件（排在各自的 `.claude/CLAUDE.md` 之后），无条件的总是载入，带 `paths:` 的在 `fs/memory` 的 `files` 有匹配文件或 `rules` 点名时载入；快照的 `inactiveRules` 告诉 Agent Host 还有没载入的条件 rules。frontmatter 只用于选择，送达的正文不含它。
 - 配置诊断（T24）：`config_diagnostics::report` 用 `TrustService::permission_settings` 加载（与权限裁决同一份），附上 `~/.claude.json` 的键名报告；经 `Hub::config_diagnostics` 与 `CoreRuntime::config_diagnostics`（NAPI `configDiagnostics`）对外。写 `.claude/` 的任何尝试返回 `permissionDenied`（`piarc_config::WriteError::ClaudeConfig`）。
 
 ## 易错点
@@ -141,7 +85,6 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 不要在异步任务里持有 `Arc<Shared>`：`Shared` 的 `Drop` 会停运行时，在运行时线程里丢弃会出问题。
 - 会话层的回调（`on_done`）在 Core 的运行时线程上调用；`open_workspace` 等方法本身只入队，等结果用回调或 NAPI 的 Promise。
 - 不要在 `Hub` 的路由锁里 await（`std::sync::Mutex` 的守卫跨 await 会让 future 不是 `Send`）：先在块里取出要的句柄，再 await。
-- 当前用户无权访问的 PATH 条目（Windows 的 PATH 常有 `C:\Windows\system32\config\systemprofile\…`）不取消自动允许（W1）：macOS 的 `tool_io/exec/utility.rs` `first_on_path` 跳过工作区外的这类条目，其余无法检查的条目和工作区内的条目一律改为询问；Windows 由 Git Bash 解析（`probe_git_programs`），bash 自己跳过它们。
 - Windows 测试持有 `piarc_fs::Scope` 时删不掉它打开的目录（ADR-0036 不共享删除）：先 `drop` scope 再清理临时目录。
 - 测试里的保险箱主密钥名（`test_master_key_name`）带随机后缀：同一个数据目录上重启 Core 时要复用同一个名字，否则保险箱返回 `masterKeyMissing`，Agent Host 拿不到凭据。
 
