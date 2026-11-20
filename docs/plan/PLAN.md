@@ -157,7 +157,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T28 | [检查点、回退与 Changes 面板](tasks/T28-checkpoints-rewind-changes.md) | 3 | T27 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | c849475 |
 | T29 | [WebFetch、登录与模型设置补全、三档视图](tasks/T29-webfetch-login-model-settings-views.md) | 3 | T28 | macOS | high / 高 | 中 | 无 | 已完成 | 7f9e79b |
 | T30 | [L3 行为对齐基座](tasks/T30-l3-behavior-alignment.md) | 3 | T29 | macOS | high / 高 | 中 | 无 | 已完成 | f52b5aa |
-| R3 | [M2 评审](tasks/R3-m2-review.md) | 3 | T30、W1 | macOS | high / 高 | 中 | 无 | 未开始 | — |
+| R3 | [M2 评审](tasks/R3-m2-review.md) | 3 | T30、W1 | macOS | high / 高 | 中 | 无 | 进行中 | — |
 | W2 | [Windows：M2 达标](tasks/W2-windows-m2-parity.md) | 4 | R3 | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T31 | [子 agent 与模型别名](tasks/T31-subagents-and-model-aliases.md) | 4 | R3 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T32 | [后台任务、Monitor 与 KillShell](tasks/T32-background-tasks-and-monitor.md) | 4 | T31 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,6 +308,18 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+R3（M2 评审）。开工：基线 verify 通过（复用 f52b5aa 的全量结果）；W1 为"部分完成"，唯一阻塞项 W1-A05 是 UNC（Windows 实机），不影响 macOS 的 R3。
+
+- [ ] 1 能力覆盖：M2 能力 → 能力 ID → 场景映射表；重新生成 capabilities.md 无 MISSING；`--milestone M2` 无 planned（A01）
+- [ ] 2 L3：运行 `npm run l3`，两侧版本写入评审文件；逐条复核 allowlist 理由，决定 I116（A02）
+- [ ] 3 四个独立只读审查并行运行，范围与输入记录（A04）
+- [ ] 4 逐条核实与处理发现，修复附先失败后通过的回归测试（A05、A06）
+- [ ] 5 T23–T30 与 W1 验收项核对（A03）；W1 确认与 T13–T22 待更新项汇总（A07）
+- [ ] 6 登记事项逐条关闭或指定任务（A08）
+- [ ] 7 架构文档第 16 章、6.0、6.15 更新，版本号与修订记录（A09）
+- [ ] 8 `docs/reviews/R3-findings.md` 结论（A10）
+- [ ] 9 收尾：`npm run verify`（A11）、AGENTS.md、acceptance.json、PLAN.md
 
 ## 登记事项
 
