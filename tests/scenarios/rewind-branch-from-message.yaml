@@ -16,7 +16,11 @@ providers:
       - tool_calls:
           - id: todo2
             name: TodoWrite
-            input: { todos: [{ content: Plan, status: completed }, { content: Build, status: in_progress }] }
+            input:
+              {
+                todos:
+                  [{ content: Plan, status: completed }, { content: Build, status: in_progress }],
+              }
       - text: Building.
       - text: Branch reply.
 actions:

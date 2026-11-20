@@ -23,7 +23,8 @@ actions:
   - prompt: { text: Third request., turn: t3 }
   - wait: { method: turn/completed, turn: t3 }
   - rewind: { turn: t2, scope: summarize, preview: { made.txt: delete }, outcomes: {} }
-  - check_branch: { texts: [First request., One.], branches: [{ options: [{ preview: Create made.txt. }] }] }
+  - check_branch:
+      { texts: [First request., One.], branches: [{ options: [{ preview: Create made.txt. }] }] }
   - prompt: { text: Go on., turn: t4 }
   - wait: { method: turn/completed, turn: t4 }
 expect:
