@@ -338,9 +338,16 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | `write_file` | `path`、`content` | 写工作区文件（例如给等待中的命令发信号） |
 | `restart_core` | — | 关闭 Core，在同一数据目录上重新启动并打开工作区；会话保持关闭直到 `resume` |
 | `resume` | — | `resume_session` 重新打开会话 |
-| `fork` | `at_text`、`as` | 读会话历史，在文本等于 `at_text` 的回复所在 entry 处 fork（T26）；新会话记在 `as` 标签下，该标签必须是 `sessions` 中 `deferred: true` 的会话 |
+| `fork` | `at_text` 或 `before_turn`、`as` | 读会话历史，在文本等于 `at_text` 的回复所在 entry 处 fork（T26），或在标签回合开始之前 fork（"从这里分支"，T28）；新会话记在 `as` 标签下，该标签必须是 `sessions` 中 `deferred: true` 的会话 |
 | `check_harness` | `fields` | 读会话历史的 `harness`（分支上的当前计划与任务清单，T26）做字段子集比较；`null` 表示两者都没有 |
 | `check_usage` | `fields`、`positive` | 读 Core 的 `contextUsage`（T27）：各类别之和必须等于 `tokens`（总是检查），`fields` 做字段子集比较，`positive` 列出必须大于零的类别 |
+| `rewind` | `turn`、`scope`（`codeAndConversation`/`conversation`/`code`/`summarize`）、`preview`、`choices`、`cancel`、`outcomes`、`completed`、`text` | 回退到标签回合之前（T28）：`preview` 按工作区相对路径断言每个文件的动作，`choices` 逐个回答冲突（`true` 覆盖），`cancel` 只看预览不执行；之后断言逐文件结果、是否完成与放回输入框的原文 |
+| `undo_rewind` | `outcomes` | 撤销会话最近一次回退的文件恢复，断言逐文件结果 |
+| `check_changes` | `fields` | Changes 视图（文件按首次写入的顺序、行数、降级）做字段子集比较 |
+| `discard` | `path`、`hunk`、`stale` | 按文件或按 hunk 丢弃；`stale: true` 发送过期版本，必须被拒绝 |
+| `switch_branch` | `to` | 切到首条用户消息以 `to` 开头的分支 |
+| `check_branch` | `texts`、`branches` | 当前分支的用户与回复文本按序比较，分支点做字段子集比较（`null` 表示没有） |
+| `check_files` | `files` | 动作中途检查工作区文件内容（`null` 表示不存在） |
 
 `prompt`、`steer`、`follow_up` 都可带客户端的 `request_id`（重发时沿用），以及 `mentions` 和 `attachments`；`rejected: <文本>` 要求 Core 拒绝这条输入、错误消息含该文本（UserPromptSubmit hook 阻断，T25），不记回合。提及按 Core 输入格式写 `{path, start, end}`，两个偏移是发送文本中 `@path` 的 UTF-16 起止位置。附件写 `{fixture, mime_type}`；运行器读取 `fixtures/` 中对应文件并调用 Core 的 `store_attachment`，将返回的引用随输入发送。面板的键盘交互在 L4 验证。
 

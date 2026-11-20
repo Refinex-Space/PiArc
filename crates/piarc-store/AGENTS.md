@@ -16,6 +16,7 @@ Core 的数据库 `<数据目录>/core.sqlite`（rusqlite，SQLite 随 `bundled`
 - 数据库记录的版本比本构建知道的新（新版本写过）时，`Store::open` 返回 `SchemaTooNew`，不降级。
 - 表用 `STRICT`；时间是 Unix 毫秒；路径列存 UTF-8 文本（非 UTF-8 路径拒绝为 `NonUtf8Path`）。
 
+- schema v5（T28，ADR-0044）：`checkpoints`（自增 id 即回合顺序，会话与回合 id 唯一）、`checkpoint_files`（自增 id 即写入顺序，前后内容的十六进制 SHA-256，空值表示文件不存在，`operation` 为 `create`/`modify`/`restore`/`undo`/`discard`，`restore_id` 是恢复批次，随检查点级联删除）、`checkpoint_sessions`（最近访问时间，30 天清理用）。读写在 `src/checkpoints.rs`，规则在 `piarc-checkpoint`，编排在 `piarc-core::checkpoints`；`referenced_snapshots` 是回收时仍被引用的哈希集合。
 - schema v4 在 `session_files` 保存文件标识与修改时间：同长度重写或文件替换时重扫。迁移后的空值在首次同步时补齐。
 - schema v3 的 `memory_imports` 以工作区和规范文件路径为组合主键。永久 memory 导入许可独立于工具规则和 checkout 的项目信任。
 
@@ -41,4 +42,4 @@ Core 的数据库 `<数据目录>/core.sqlite`（rusqlite，SQLite 随 `bundled`
 
 ## 参考
 
-- 架构第 9.1–9.3 节；ADR-0011；`docs/research/pi-v1.4.0-baseline.md` 第 4.3 节。
+- 架构第 9.1–9.3 节；ADR-0011、ADR-0044；`docs/research/pi-v1.4.0-baseline.md` 第 4.3 节。

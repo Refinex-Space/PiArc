@@ -74,6 +74,12 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - **熔断**：`SessionCompaction.ended()` 在注册表 `#onEvent` 中先于投影器处理 `compaction_end`（`harness.observe`），压缩条目由此带上失败原因、压缩后估算与 `autoCompactStopped`；上限 `AUTO_COMPACT_FAILURE_LIMIT` = 3，状态在内存中（手动压缩成功、新进程复位）。
 - **用量**：`context-usage.ts` 在 `context_with_system` 估算（Pi 在这之后才把 system 换成冻结的 `forceSystemPrompt`，所以 system 文本取 `SessionMemory.systemText`，工具取 `getCurrentTools`），回复的 `message_end` 以服务商报告为合计；估算函数只用 `tokens.ts`。`session/usage` 只在 Core 启用 `context` 时发。
 
+## 分支与回退（T28，ADR-0044）
+
+- `runtime/branches.ts` 是分支的唯一实现：回合起点（每个回合第一条 `piarc.input` 的 `from`，旧记录取父条目）、分支点（起点落在同一锚点的回合互为分支，跳过记录、模式与模型变化、system 装载消息与分支摘要）、`rewindToTurn`（leaf 移到起点并追加 `piarc.branch`）、`summarizeFromTurn`（`compaction.ts` 的 `summarizeBranch` 用 T27 的摘要提示，再经 Pi 的 `branchWithSummary`）、`switchTo`、`forkedManager`（`session/fork` 的 `beforeTurn`）。Pi 打开文件时 leaf 在最后一条 entry，所以追加的条目就是持久化的位置；不删除任何 entry。
+- 回退与切换之后注册表在同一 id 下关闭并重新打开 Pi 运行时（`#reopen`，source `branch`：不触发 SessionStart/SessionEnd hooks，`seq` 连续），计划、模式、memory、读写记录随分支重新推导；MCP 随之重连。历史窗口与 `session/branches` 通知带分支点（`history.ts`），`branch_summary` 投影为原因 `rewind` 的压缩条目。
+- 中断补齐（`harness/interruption.ts`）只把 user、toolResult 或有回复的 assistant 当作末尾：以分支摘要或提醒结尾的对话不是被中断的回合。摘要之后的第一条输入紧跟摘要（两条相邻的 user 消息），`rewind-summarize` 场景因此关闭 `role_order` 检查。
+
 ## 多会话的易错点
 
 - 不要调用 `process.chdir`，也不要读 `process.cwd()` 推断会话目录：Pi 按每个会话的 `cwd` 解析工具路径。

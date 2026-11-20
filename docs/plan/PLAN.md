@@ -320,7 +320,7 @@ T28（开工基线 59e55a2，`npm run verify` 15/15）：
 - [x] 7. L2：`rewind-*`、`changes-*` 场景与运行器动作，能力 `CAP-REWIND-*`、`CAP-CHANGES-*`（A02、A03、A04、A05、A07）
 - [x] 8. 客户端：消息菜单"回退到这里""从这里分支"、`/rewind`、回退对话框（冲突逐个选择、逐文件结果与撤销）、Changes 面板与右栏改动卡片（Mod+Shift+D）、分支切换控件（A04、A07、A08、A09、A11）
 - [x] 9. L4 与截图（`tmp/evidence/T28/`），ego-browser 核对（A04、A07、A08、A09、A11）
-- [ ] 10. 文档：架构、AGENTS.md（`piarc-checkpoint`、渲染进程 `changes`）、`coding-standards.md` 复用表、能力清单
+- [x] 10. 文档：架构、AGENTS.md（`piarc-checkpoint`、渲染进程 `changes`）、`coding-standards.md` 复用表、能力清单
 - [ ] 11. 收尾：`npm run verify`（A12）、验收记录、看板与会话日志
 
 ## 登记事项
@@ -416,7 +416,7 @@ T28（开工基线 59e55a2，`npm run verify` 15/15）：
 | I85 | T23 | T20 时期"总是允许"为 Write 保存的 `Write(路径)` 规则在 T23 语义下不匹配（Claude Code 只认 `Edit(路径)`）；现有用户文件里的这类规则会被设置页列出但不起作用 | T24 的配置诊断提示改写为 `Edit(…)`；正式发布前的用户数据只有测试数据，不做迁移；**已落地（T24）**：权限页对 `Write(…)`、`NotebookEdit(…)`、`Glob(…)`、`Grep(…)` 规则显示"永不匹配，请改写为 Edit(…)/Read(…)"（`settings_view::check_rule` 的 `suggestion`，L4 `t24-diagnostics.e2e.ts`） |
 | I86 | T24 | `~/.claude/` 不存在时设置监听退到最近的已存在祖先（通常是家目录本身，非递归）：家目录里任何文件的变化都会触发一次去抖后的七层重读 | T44 测量空闲时的重读频率；需要时改为只在 `.claude` 条目出现时重读 |
 | I87 | T24 | 键映射表（`piarc_config::claude::SETTINGS_KEYS`）是 2026-11-18 官方 settings 索引的快照；Claude Code 新增的键在更新表之前按"未知"列为忽略 | 各评审任务对照官方索引复查一次；实现对应功能的任务（ADR-0038 后果一节列出）把行改为生效 |
-| I88 | T24 | `crates/piarc-testkit/src/l2/runner.rs` 在 T24 之前已超过 1,000 行（1,070），T24 加入 `.claude` 快照比对与诊断断言后约 1,110 行，超出 `coding-standards.md` 的单文件上限；T25 加入 `rejected`、`core/notices` 事件与 `json_lines` 后 runner.rs 1,151 行、`format.rs` 1,004 行 | R3 把运行器按驱动、断言、Core 调用拆成子模块，`format.rs` 一并拆分；T26 的新格式放进 `l2/harness_spec.rs` 与 `l2/runner/harness.rs`，`runner.rs` 仍增至约 1,170 行、`format.rs` 1,035 行 |
+| I88 | T24 | `crates/piarc-testkit/src/l2/runner.rs` 在 T24 之前已超过 1,000 行（1,070），T24 加入 `.claude` 快照比对与诊断断言后约 1,110 行，超出 `coding-standards.md` 的单文件上限；T25 加入 `rejected`、`core/notices` 事件与 `json_lines` 后 runner.rs 1,151 行、`format.rs` 1,004 行 | R3 把运行器按驱动、断言、Core 调用拆成子模块，`format.rs` 一并拆分；T26 的新格式放进 `l2/harness_spec.rs` 与 `l2/runner/harness.rs`，`runner.rs` 仍增至约 1,170 行、`format.rs` 1,035 行；T28 的新格式放进 `l2/checkpoint_spec.rs` 与 `l2/runner/checkpoints.rs`，`runner.rs` 1,177 行、`format.rs` 1,121 行（新动作的分派与校验） |
 | I89 | T25 | `agent-host/AGENTS.md`（126 行）与 `crates/piarc-core/AGENTS.md`（128 行）超过子目录 120 行上限（T25 之前已是 121、123 行），T25 各加了一节 hooks | R3 精简两份文件，把能从代码或 ADR 得到的段落改为链接；T26 各加一节宿主工具后为 133、131 行 |
 | I90 | T25 | 没有配置 hooks 时，每次工具结果、回合结束、会话打开、压缩仍各有一次 `hooks/run` 往返，Core 每次重读设置文件判断有无 handler | T44 测量对工具密集回合的影响；需要时 Core 在 `hooks/run` 结果里给出配置了 handler 的事件，Agent Host 缓存到设置变化 |
 | I91 | T25 | hook 的审计记录（`audit_events`，`kind: "hook"`）没有界面：权限页的审计视图只查 `kind: "permission"` | T41（配置诊断完善）或 T45（诊断包）提供查看 |
@@ -433,9 +433,13 @@ T28（开工基线 59e55a2，`npm run verify` 15/15）：
 | I102 | 合并 W1 后的 CI | Windows 上 bash 命令经环境变量 `PIARC_COMMAND` 与 `eval` 执行（Git Bash 截断过 12,000 字符的 `-c` 参数）：语法错误报 `eval: line N`，退出码可能是 1 而不是 2；截断的确切位置未在 Windows 上定位，只有 CI 覆盖 | W2 实机核对长命令、heredoc 与语法错误的表现 |
 | I103 | 合并 W1 后的 CI | 权限裁决计时在 CI 上与同一测试二进制的其他测试混跑时只是在测 runner：同一断言相邻两次运行 p50 0.84 / 1.44 ms。verify 第 8 步改为先跳过它跑全部测试、再单独运行（`scripts/ci/cargo-test.mjs`），预算不变。运行 44533872761 单独运行后 Windows p95 1.38 ms（预算 10 ms），macOS runner 仍 2.67 ms（debug，本机 0.67 ms）；随后改为按 T23-A13 的验收方式用 release 构建（本机 p95 390 µs） | release 下仍超预算时，按 I95 评审缓存设置的 ADR；T44 把计时纳入性能回归，并在架构第 11 章写明构建配置 |
 | I104 | T26 | 架构第 6.14 节原把 Claude Code 的 `plansDirectory`（计划文件目录）列为 T26 支持的键；T26 按任务要求把批准的计划存为会话 entry（`piarc.plan`），没有写计划文件，键映射表仍为 `planned(T26)` | R3 决定：由后续任务支持（批准时把计划另存到该目录）并改映射表的任务号，或改为忽略并注明原因 |
-| I105 | T26 | `agent-host/src/runtime/session-registry.ts` 999 行、`crates/piarc-core/src/tool_io/policy.rs` 943 行，接近单文件 1,000 行上限（T26 已把注册表的辅助函数移到 `session-helpers.ts`、审批等待移到 `policy/waits.rs`） | T27 扩展提醒通道时把逻辑放在 `harness/reminders.ts` 与 `SessionHarness`，不再往注册表里加；R3 复核；T27：逻辑放在 `harness/` 新模块，模型切换移到 `runtime/session-models.ts`，注册表 983 行 |
+| I105 | T26 | `agent-host/src/runtime/session-registry.ts` 999 行、`crates/piarc-core/src/tool_io/policy.rs` 943 行，接近单文件 1,000 行上限（T26 已把注册表的辅助函数移到 `session-helpers.ts`、审批等待移到 `policy/waits.rs`） | T27 扩展提醒通道时把逻辑放在 `harness/reminders.ts` 与 `SessionHarness`，不再往注册表里加；R3 复核；T27：逻辑放在 `harness/` 新模块，模型切换移到 `runtime/session-models.ts`，注册表 983 行；T28：分支与回退放在 `runtime/branches.ts`，会话类型移到 `session-types.ts`，注册表 941 行；Core 的回退流程放在 `sessions/session/rewind.rs`，`sessions/session.rs` 987 行 |
 | I106 | T27 | 架构第 4 章的 ADR 表没有 ADR-0042 一行（T26 未补；T27 已加 0043） | R3 复核时补齐 |
 | I107 | T27 | `autoCompactEnabled`、`autoCompactWindow` 只能写在设置文件里（PiArc 与 Claude Code 的设置层），设置窗口没有对应控件；熔断状态在 Agent Host 内存中，进程重启后复位 | T29 的每模型设置与常规设置页加控件；R3 决定熔断状态是否需要持久化 |
+| I108 | T28 | `crates/piarc-core/AGENTS.md`（142 行）与 `agent-host/AGENTS.md`（148 行）超过子目录 120 行上限（T28 之前已是 136、142 行）；`apps/desktop/AGENTS.md` 120 行到达上限 | R3 精简：能从代码或规范得到的段落改为一行链接，按任务分节的说明并入子目录 AGENTS.md |
+| I109 | T28 | `fileCheckpointingEnabled` 只能写在设置文件里（PiArc 与 Claude Code 的设置层），设置窗口没有对应控件（同 I107） | T29 的常规设置页加控件 |
+| I110 | T28 | 架构第 7.7 节原定 T28 补词级 diff 与 UTF-16 偏移；Changes 面板按行显示、按 hunk 丢弃，没有用到，未实现 | 需要的任务（T42 diff 行内评论）在 `piarc-diff` 中补，不在渲染进程另算 |
+| I111 | T28 | 回退与分支切换在同一 id 下重建 Pi 会话，该会话的 MCP 连接随之重连（ADR-0044 第 6 条的代价） | T36 共享连接池落地后复核：重建会话不再重连 |
 
 ## 技术债
 

@@ -6,13 +6,13 @@
 
 | 行 | 数据与交互 |
 |---|---|
-| 用户消息 | 用原始提及区间和附件引用显示胶囊。Core 确认前保留乐观行，未送达可原位重发。 |
+| 用户消息 | 用原始提及区间和附件引用显示胶囊。Core 确认前保留乐观行，未送达可原位重发。T28 起带"回退到这里""从这里分支"（`TranscriptServices` 的可选动作，原型页没有）与分支切换控件（`changes/`）。 |
 | 回复正文 | Worker 增量解析 Markdown，闭合的代码块才高亮。复制 Markdown 使用源文本，复制纯文本使用块的文本表示。 |
 | 思考块 | 生成中强制展开。结束后默认折叠，有起止时间才显示时长。 |
 | 工具组摘要 | 连续工具条目归为一组，按动词、对象、增删行数汇总。展开后显示成员。 |
 | Bash 卡 | 读取 `commandExecution.execution` 的 cwd、语义状态、退出码和截断落盘路径。运行满 10 秒才显示计时。 |
 | 文件改动卡 | 读取 `fileChange.diff` 的计数、hunk 与降级信息，保留 Core 提供的路径。 |
-| 压缩提示 | 使用 `contextCompaction` 中可用的原因和 token 计数。 |
+| 压缩提示 | 使用 `contextCompaction` 中可用的原因和 token 计数；原因 `rewind` 是"从此处摘要"留下的分支摘要（T28）。 |
 | 错误卡 | 读取 `turn/completed` 的 `errorKind` 与 `retryable`。`session/uncertain` 有独立提示与重试按钮。 |
 | Working 行 | 当前工具、计时、用量、自动重试次数和压缩状态由同一回合的事件驱动。 |
 | 宿主工具（T26） | `rows/harness.tsx`：`TodoWrite` 是任务卡（从参数读清单，Claude Code 的 `in_progress` 换成 `inProgress`），`ExitPlanMode` 是计划卡（状态取条目状态），`AskUserQuestion` 列出结果首行之后的 JSON，`SuggestNextSteps` 是下一步建议（"在此执行"经 `SessionInput`，运行中为 follow-up；"开始新会话"走 `startSession`；没有窗口外壳的原型页不显示按钮）。这四个工具不进工具组（`store/transcript.ts` 的 `OWN_ROW_TOOLS`）。 |

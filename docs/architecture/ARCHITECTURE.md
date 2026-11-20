@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.34（2026-11-19） |
+| 版本 | 2.35（2026-11-19） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -257,6 +257,7 @@ PiArc/
 | [0040](../adr/0040-windows-automatic-permission-budget.md) | 无需用户参与的权限裁决按平台给预算：macOS p95 ≤ 2 ms，Windows p95 ≤ 10 ms | NTFS 与 Defender 下每次元数据调用约 50–150 µs，每次裁决都读最新磁盘状态（ADR-0031、0036），W1 实测 Windows p95 3.4–8.9 ms |
 | [0041](../adr/0041-windows-ahp-round-trip-budget.md) | 小文件 fs 操作的 AHP 往返按平台给预算：macOS p95 ≤ 5 ms，Windows p95 ≤ 15 ms | ADR-0036 的每次访问都从卷根逐级绑定目录，W1 实测 Windows p95 5.0–9.3 ms |
 | [0043](../adr/0043-reminders-compaction-usage.md) | 运行时提示统一走 system reminder 通道；压缩用 PiArc 自写的分节摘要、按阈值公式配置 Pi 触发、连续 3 次失败或无效即熔断、压缩后按上限重注入；上下文用量按类别估算并以服务商报告为准 | 动态信息不改写 system prompt，长会话压缩及时且不丢关键状态，用户看得到上下文被什么占用 |
+| [0044](../adr/0044-checkpoints-rewind-changes.md) | 检查点按会话加回合 id 建索引，写前快照存内容寻址对象库；代码恢复按时间计算、冲突逐个选择、逐文件结果可撤销；对话回退在 Agent Host 移动 leaf 并以追加条目持久化，分支变化后同一 id 重建会话；Changes 面板基于最早快照并在路径锁内核对版本后丢弃 | 回退结果与对话分支经过的路径无关；回退位置跨重启保留；不在过期的 diff 上改文件 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -719,6 +720,11 @@ T27 落地（ADR-0043）：`agent-host/src/harness/context-usage.ts` 在每次�
 - 代码恢复前检查目标文件当前内容与快照记录的"之后"状态是否一致；不一致（被外部或 Bash 修改过）时列出冲突让用户选择。
 - 限制与 Claude Code 一致：只被 Bash 改动的文件不在快照内；UI 明确说明，并在会话面板提示配合 git 使用。
 - Changes 面板支持按文件、按 hunk 丢弃改动（基于快照的确定性回退，而不是让 agent "请撤销"）。
+- **T28 落地（ADR-0044）**：
+  - 检查点：键为会话加 PiArc 回合 id（`piarc.input` 记录的 `turn-<uuid>`），Core 在交付 `turn/started` 时建立；`fs/write` 带可选的 `turnId`。`piarc-fs` 在写入的路径锁内、原子替换之前把旧字节存入 `piarc_checkpoint::ObjectStore`，替换成功后 Core 写 `checkpoint_files`（操作 `create`/`modify`/`restore`/`undo`/`discard`）。设置 `fileCheckpointingEnabled: false`（Claude Code 同名键）时不建检查点、不存快照。
+  - 代码恢复按时间：取检查点 id 不小于目标回合的全部记录，每个路径恢复为第一条记录的"之前"内容（不存在则删除），当前内容既不是目标也不是会话最后写下的内容时列为冲突，由用户逐个选择覆盖或保留，取消不改任何文件。执行时逐个文件在路径锁内核对预览时的哈希，第一个失败即停止并报告逐文件结果；恢复按批次记录，撤销把仍是恢复后内容的文件写回。写回直接用快照字节，编码、BOM 与换行不变，并从会话文件状态表移除该路径。
+  - 对话：每个回合第一条 `piarc.input` 记下起点 `from`；`session/rewind` 的 `branch` 把 leaf 移到起点并追加 `piarc.branch`，`summarize` 用 T27 的摘要提示写分支摘要并经 Pi 的 `branchWithSummary` 追加；Pi 打开文件时 leaf 在最后一条 entry，追加的条目即持久化的位置。之后 Agent Host 在同一 id 下重建 Pi 会话（不触发 SessionStart/SessionEnd hooks，MCP 随之重连），Core 发 `session/branchChanged`。分支点按回合起点计算，`session/switchBranch` 切换，"从这里分支"是 `session/fork` 的 `beforeTurn`。
+  - 回退与分支切换要求会话空闲；顺序为先恢复代码、再移动对话，结果带目标消息原文供客户端放回输入框。
 
 ### 6.10 沙箱
 
@@ -802,7 +808,7 @@ T21 的 `models/list` 返回可用模型的 `provider`、`id`、`name`、`contex
 T24 落地（ADR-0038）：
 
 - 读取的文件与层级：`~/.claude/settings.json`（`claudeUser`）、`.claude/settings.json`（`claudeProject`）、`.claude/settings.local.json`（`claudeProjectLocal`）按 ADR-0005 第 3 条与 PiArc 的三个文件同表合并；`~/.claude.json` 不是设置层，配置诊断只列出它的键名。家目录由 Core 注入（`CoreConfig.home`），测试一律用临时目录。
-- 键映射表是唯一判断（`piarc_config::claude::SETTINGS_KEYS`，按官方 settings 索引逐键归类）。M2 实际生效的键：`permissions.allow`、`permissions.ask`、`permissions.deny`、`permissions.defaultMode`、`permissions.additionalDirectories`，T25 起加上 `hooks`、`disableAllHooks`（ADR-0039）。由后续任务支持的键：`plansDirectory`（原定 T26；T26 按任务要求把计划存为会话 entry，未支持计划文件目录，I104 交 R3 决定）；`autoCompactEnabled`、`autoCompactWindow`（T27）；`fileCheckpointingEnabled`（T28）；`model`、`effortLevel`（T29）；`agent`、`advisorModel`（T31）；`worktree`（T35）；`enableAllProjectMcpServers`、`enabledMcpjsonServers`、`disabledMcpjsonServers`、`allowedMcpServers`、`deniedMcpServers` 与 `~/.claude.json` 的 MCP 段（T36）；`outputStyle`、`disableBundledSkills`、`skillOverrides`、`disableSkillShellExecution`（T37）；`allowedHttpHookUrls`、`httpHookAllowedEnvVars`（T38）；`sandbox`（T39）；`enabledPlugins`、`extraKnownMarketplaces`（T40）；`autoMode`、`disableAutoMode`、`useAutoModeDuringPlan`（T46）；`autoMemoryEnabled`、`autoMemoryDirectory`（T47）。其余键（含 `env`、`theme`、`language` 等终端偏好、账号与遥测、只在托管设置中有效的键）标为"已忽略"，表外的键为"未知"，都在诊断中逐个列出。
+- 键映射表是唯一判断（`piarc_config::claude::SETTINGS_KEYS`，按官方 settings 索引逐键归类）。M2 实际生效的键：`permissions.allow`、`permissions.ask`、`permissions.deny`、`permissions.defaultMode`、`permissions.additionalDirectories`，T25 起加上 `hooks`、`disableAllHooks`（ADR-0039），T27 起加上 `autoCompactEnabled`、`autoCompactWindow`（ADR-0043），T28 起加上 `fileCheckpointingEnabled`（ADR-0044）。由后续任务支持的键：`plansDirectory`（原定 T26；T26 按任务要求把计划存为会话 entry，未支持计划文件目录，I104 交 R3 决定）；`model`、`effortLevel`（T29）；`agent`、`advisorModel`（T31）；`worktree`（T35）；`enableAllProjectMcpServers`、`enabledMcpjsonServers`、`disabledMcpjsonServers`、`allowedMcpServers`、`deniedMcpServers` 与 `~/.claude.json` 的 MCP 段（T36）；`outputStyle`、`disableBundledSkills`、`skillOverrides`、`disableSkillShellExecution`（T37）；`allowedHttpHookUrls`、`httpHookAllowedEnvVars`（T38）；`sandbox`（T39）；`enabledPlugins`、`extraKnownMarketplaces`（T40）；`autoMode`、`disableAutoMode`、`useAutoModeDuringPlan`（T46）；`autoMemoryEnabled`、`autoMemoryDirectory`（T47）。其余键（含 `env`、`theme`、`language` 等终端偏好、账号与遥测、只在托管设置中有效的键）标为"已忽略"，表外的键为"未知"，都在诊断中逐个列出。
 - 信任约束与 PiArc 项目层相同：信任前项目层的 allow、`additionalDirectories`、`acceptEdits` 不生效，deny 与 ask 照常生效；项目层的 `bypassPermissions`、`auto` 始终不生效，诊断注明原因。生效键类型错误时整份文件跳过并给出 JSON Pointer，JSON 语法错误给出行列，其他文件照常加载。
 - `.claude/` 文件与 PiArc 设置一起被监听，变化后重新加载并发 `core/settings`；新增的可执行项沿用第 10.2 节的快照确认。PiArc 的写接口拒绝 `.claude/` 下与 `.claude.json` 的任何路径（`permissionDenied`），L2 运行器在每个场景前后比对 Claude Code 配置的快照。
 - 配置诊断的 Core API 为 `config_diagnostics`（NAPI `configDiagnostics`），与权限裁决用同一次加载；设置窗口"配置诊断"页按文件列出并可展开每个键的本文件取值、最终取值与来源。T41 在此基础上补全插件与企业来源。
@@ -941,6 +947,8 @@ T19（ADR-0030）为 `session/prompt`、`session/steer`、`session/followUp` 添
 
 **Core → Agent Host 通知**：`exec/output`（T07）、`secrets/changed`（T08）。
 
+T28 已实现（ADR-0044，能力 `checkpoints`）：Core → Agent Host 的请求 `session/rewind`（`{ sessionId, turnId, mode: "branch" | "summarize" }`）、`session/switchBranch`（`{ sessionId, entryId }`），Agent Host → Core 的通知 `session/branches`（新消息落在已有分支处时的分支点）；`fs/write` 新增可选的 `turnId`，`session/fork` 新增可选的 `beforeTurn`，`session/history` 结果新增可选的 `branches`，压缩条目的原因新增 `rewind`（分支摘要）。
+
 T27 已实现（ADR-0043，能力 `context`）：Agent Host → Core 的请求 `context/settings`（会话工作区的 `autoCompactEnabled`、`autoCompactWindow`）、`fs/changes`（会话读写过、之后在外部变化的文件，每个版本报告一次）、`fs/forgetReads`（压缩后清掉读取范围），`fs/read` 新增可选的 `restore`（不带调用来源，读会话读写过的文件），通知 `session/usage`；Core → Agent Host 的请求 `session/getContextUsage` 与 `session/remind`（只接受 `backgroundTask`）；`session/compact` 新增可选的 `instructions`；条目新增 `reminder`，`contextCompaction` 新增 `autoCompactStopped`。Core API 新增 `contextUsage(id)`，`compact(id, instructions?)`。
 
 T26 已实现（ADR-0042）：Agent Host → Core 的请求 `ui/ask`（能力 `ask`）与通知 `harness/todo`（能力 `todo`）、`harness/plan`（能力 `planMode`）；`policy/evaluate` 结果新增可选的 `mode`（允许的调用切换到的权限模式）；`session/history` 结果新增可选的 `harness`（分支上的当前计划与任务清单）。Core API 的审批卡新增 `kind: "plan"` 与成员 `plan`、`questions`，答复新增 `mode`、`comments`、`answers`。
@@ -1016,7 +1024,7 @@ impl Session {
     #[napi] pub fn steer(&self, input: UserInput) -> napi::Result<()>;
     #[napi] pub fn abort(&self) -> napi::Result<()>;
     #[napi] pub fn respond_approval(&self, request_id: String, revision: u32, decision: ApprovalDecision) -> napi::Result<()>;
-    #[napi] pub async fn rewind(&self, target: RewindTarget, scope: RewindScope) -> napi::Result<RewindReport>;
+    #[napi] pub async fn rewind(&self, target: RewindTarget, scope: RewindScope) -> napi::Result<RewindReport>; // T28 的实际导出见下文
     #[napi] pub fn transcript_window(&self, range: ItemRange) -> napi::Result<TranscriptWindow>;
 }
 ```
@@ -1030,6 +1038,7 @@ impl Session {
 - 状态导出（T13）：`CoreRuntime.create` 的选项增加 `dataDir` 与 `cacheDir`（同时给或都不给；不给时没有数据库、设置、信任与日志文件，只用于事件通道的测试）；`rebuildSessionIndex()`、`projectTrust(path)`、`decideProjectTrust(path, trusted, version)`、`revokeProjectTrust(path)` 都返回 JSON 文本的 Promise（`piarc_core::storage::report_json`、`piarc_core::trust::TrustView`）。设置变化以事件发到 `core/settings`（`{ workspace, changed, issues }`）。
 - Promise 由 Core 自己的运行时经 NAPI-RS 的 `JsDeferred` 结算，不用 `#[napi] async fn`（它会另起 NAPI-RS 的全局 tokio 运行时）。
 - 会话导出（T14）：`CoreRuntime.create` 的选项增加 `agentHost`（打包产物的 `resourcesPath`，或开发时的 `node` 与 `bundle`）与 `idleTimeoutMs`；`openWorkspace`（Agent Host 就绪后才解析）、`closeWorkspace`、`createSession`、`resumeSession`、`forkSession`、`closeSession`、`prompt`、`steer`、`followUp`、`abort`、`editQueueItem`、`deleteQueueItem`、`reorderQueue`、`markSessionRead`、`transcriptWindow(id, start, limit)` 返回 JSON 文本的 Promise，`resendSnapshots` 只入队。事件路由：`core/workspaces`、`core/sessions`（实体快照，各自的 `revision` 严格递增，由同一个任务按顺序发出）与 `session/<id>`（会话通知 `{ method, params }`，按 Agent Host 的 `seq` 连续交付；Core 自己的 `session/resync`（缺口无法补齐，需重新加载 transcript）与 `session/uncertain`（Agent Host 重启时在途的调用））。开发构建另有 `createForTests`（保险箱主密钥放在内存，测试不碰钥匙串）。
+- 检查点导出（T28，ADR-0044）：`rewindPreview(id, turnId)`、`rewind(id, request)`（`turnId`、`scope` 为 `codeAndConversation`/`conversation`/`code`/`summarize`、冲突的逐个选择）、`undoRewind(id, restoreId)`、`sessionChanges(id, path?)`、`discardChange(id, { path, version, hunk? })`、`switchBranch(id, entryId)`，`forkSession` 增加可选的 `beforeTurn`；结果为 JSON 文本（`RewindPreview`、`RewindReport`、`ChangesView`），事件 `session/branchChanged`。
 - 会话元数据与客户端偏好（T18，ADR-0029）：`renameSession(id, title|null)`、`setSessionPinned`、`setSessionArchived`（归档时先关闭会话并清理临时输出，T19 起保留附件）、`deleteSession`（先关闭，再删除 Pi 的 JSONL、临时目录与索引行；原生确认的标题与工作区来自 Core 的 `sessionDeletionTarget(id)`，同时显示该 ID）对打开与未打开的会话都可用；`core/sessions` 的条目增加 `pinned`、`archived`，标题取用户标题 > 会话名 > 首条消息；新会话在 Pi 写出文件（第一条回复）之前以 Core 发出的第一条消息作标题。`userSettings()` 返回用户级 `settings.json`，`writeClientSetting(pointer, valueJson|null)` 只写 `/language`、`/appearance`、`/keybindings`、`/notifications`。`decideProjectTrust` 与 `revokeProjectTrust` 在同一主 checkout 的打开工作区都进入重启状态之后才应答，之后的请求等新进程就绪。启动时的索引同步结束后重新发出会话快照。
 - Composer 导出（T19，ADR-0030）包括 `composerInfo()`（内置命令、附件与搜索上限）、`searchFiles(searchId, root, query, limit)`、`cancelFileSearch(searchId)`、`storeAttachment(id, name, mimeType, bytes)` 和 `compact(id)`。NAPI 的文本方法 `prompt`、`steer`、`followUp` 保持 T14 语义，结构化输入经对应的 `promptInput`、`steerInput`、`followUpInput` 传入。
 - 声明快照在 `apps/desktop/src/main/core/native/`（`piarc-core.d.ts` 为发布构建，`piarc-core.testing.d.ts` 为开发构建），由 `npm run build:core` 生成，verify 比对。
@@ -1043,7 +1052,7 @@ diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高�
 
 ### 7.7 diff 与预处理
 
-- **diff**：similar 计算行级与词级 diff，输出 hunk 结构；Changes 面板、审批卡、快照回退用同一份结构。超过阈值（例如 5,000 行或 300 个文件）时降级为折叠与纯文本。T16 落地行级部分：`piarc_diff::file_diff` 给出 `FileDiff`（unified 文本、3 行上下文的 hunk、增删行数，行文本不含换行符，末行无换行时标记 `noNewline`）；增删超过 5,000 行或文本超过 512 KiB 时不给 hunk、文本截断（`degraded`）；similar 的搜索限时 2 秒，超时后给出较粗的 diff。词级 diff 与 UTF-16 偏移由用到它们的任务（T28）补上。
+- **diff**：similar 计算行级与词级 diff，输出 hunk 结构；Changes 面板、审批卡、快照回退用同一份结构。超过阈值（例如 5,000 行或 300 个文件）时降级为折叠与纯文本。T16 落地行级部分：`piarc_diff::file_diff` 给出 `FileDiff`（unified 文本、3 行上下文的 hunk、增删行数，行文本不含换行符，末行无换行时标记 `noNewline`）；增删超过 5,000 行或文本超过 512 KiB 时不给 hunk、文本截断（`degraded`）；similar 的搜索限时 2 秒，超时后给出较粗的 diff。T28 的 Changes 面板沿用行级 `FileDiff`（基线为会话最早一条快照，当前内容从磁盘读），面板超过 300 个文件或合计 5,000 行增删时整体降级为折叠与纯文本（`piarc_diff::MAX_PANEL_FILES`、`MAX_PANEL_LINES`）；按 hunk 丢弃由 `piarc_diff::revert_hunks` 对当前文本反向应用。词级 diff 与 UTF-16 偏移仍未实现，由需要它们的任务（如 T42 的 diff 行内评论）补上。
 - **文件预览分类**：二进制、图片、超大文件在 Core 中识别，渲染进程按类型选择展示方式，不读原始字节。
 - **偏移**：Core 对外给出的文本偏移统一为 UTF-16 码元，与 JavaScript 字符串索引一致。
 - **为什么 Markdown 与高亮不放在 Core**：原生方案中 Core 做 Markdown 块解析和高亮，是为了给 AppKit 直接提供 span。改用 Web 界面后，渲染进程的生态（Markdown、shiki、公式、Mermaid）更完整；放在 Core 只会多一层序列化和一套重复实现。重活放在 Web Worker 里，不占用界面线程。
@@ -1091,6 +1100,7 @@ diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高�
 - **系统集成**：见第 8.8 节。
 - T18 落地（ADR-0029）：窗口为侧栏 | 主区（+ 右栏）在上、停靠面板区在下；右栏与面板区是注册式容器（`src/renderer/shell/registry.ts` 的 `registerPanel`），没有注册内容时不渲染，尺寸存于窗口的 localStorage。侧栏按工作区分组，组内置顶在前、其余按最近更新；徽标形状各不相同（出错为圆形加叹号、等待审批为方形加问号、运行中为旋转的环、未读为圆点），不只靠颜色区分。新建会话的顺序是：需要时先显示信任对话框，再立即显示乐观消息（`flushSync`），然后创建会话、发送首条输入；任一步失败，回到新建视图并把文字放回输入框；会话已创建但首条输入失败时关闭该会话（Pi 没有回复就不写文件，不留痕迹）。设置窗口是独立的 `BrowserWindow`（`#/settings`），页面经 `src/renderer/settings/registry.ts` 的 `registerSettingsPage` 注册，T18 注册通用、外观、快捷键三页。
 - T27（ADR-0043）：环境栏右端是上下文用量环（百分比 = 合计 / 有效窗口，75% 起提示、90% 起警告，颜色之外另有文字与 `data-level`），点击打开右栏的上下文卡片（每个会话都注册）：百分比、合计与窗口、来源（估算或服务商报告）、按类别的条形明细（"未分类"只在大于零时列出）、自动压缩阈值或停止原因，以及"立即压缩"（等价于不带重点的 `/compact`）。composer 中发送 `/compact <重点>` 时作为压缩重点送出，不作为消息；压缩提示行在熔断时写明原因与"仍可使用 /compact"。`reminder` 条目不进默认视图（T29 的详细视图显示）。
+- T28（ADR-0044）：用户消息的操作菜单有"回退到这里"与"从这里分支"，`/rewind` 先列出当前分支的消息；回退对话框列出四个选项、要恢复或删除的文件与冲突（逐个选择保留或覆盖），执行后显示逐文件结果与撤销，消息原文回到输入框。右栏的改动卡片显示增删合计，停靠区的 Changes 面板（Mod+Shift+D）按文件显示统一 diff、增删行数与语法高亮，可按文件或按 hunk 丢弃；两处都说明只被 Bash 改动的文件不在其中。有兄弟分支的用户消息显示"‹ 2 / 3 ›"切换控件，回退后尚未发送时输入框上方列出可切回的分支。
 - T26（ADR-0042）：transcript 中 `TodoWrite` 是任务卡（进行中项高亮、完成计数），`ExitPlanMode` 是计划卡（摘要与状态，可在计划面板中打开），`AskUserQuestion` 的结果按题列出，`SuggestNextSteps` 是下一步建议（每条"在此执行""开始新会话"）；待批的计划与提问在审批卡位置显示为计划审批卡与提问表单，沿用审批热键、400 ms 防误触与输入法守卫；右栏注册任务卡片（会话有任务清单时），停靠区注册计划面板（会话有待批或已批准的计划时）。
 - T19 的会话主区使用第 8.4 节的行组件与 ProseMirror 输入。提及胶囊显示文件名，发送时按相对路径展开。附件经主进程存入 Core 的会话附件目录，模型收到图像块或 PDF 提取文本。内置命令由 Core 提供，运行中的 steer、follow-up 与队列编辑都经会话 API 执行。
 
@@ -1221,7 +1231,7 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 | `workspaces` | 路径、显示名、信任状态、最近打开时间、默认模式与模型 |
 | `sessions` | id、工作区、Pi 会话文件路径、标题、状态、模型、用量累计、父会话（子 agent）、worktree、置顶、归档、未读 |
 | `session_fts` | FTS5：用户消息与助手正文（从 JSONL 增量同步） |
-| `checkpoints` | 会话、回合 entry id、文件路径、前后内容 hash、操作类型 |
+| `checkpoints` | schema v5（T28）：会话、PiArc 回合 id、创建时间；`checkpoint_files` 为每次写入的路径、前后内容 SHA-256（空为不存在）、操作类型与恢复批次；`checkpoint_sessions` 为会话最近访问时间 |
 | `audit_events` | 权限裁决、审批结果、hooks 执行结果、沙箱拒绝 |
 | `background_tasks` | 后台命令与子 agent 的元数据与输出文件路径 |
 | `schema_migrations` | 迁移记录 |
@@ -1236,14 +1246,14 @@ T25（ADR-0039）：每次 hook 运行每个 handler 写一行 `audit_events`（
 
 T18（schema v2，ADR-0029）：`sessions` 增加 `custom_title`（用户给的标题，属于 Core 自己的列，重建时保留）。
 
-T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失败整体回滚；`workspaces` 记主 checkout 而不另存信任状态（信任看 `project_trust`）；`sessions` 中从 JSONL 派生的列（标题来源、模型、用量、时间、格式版本、索引状态）重建时清空重读，置顶、归档、未读、所属工作区、状态、worktree 保留。解析器流式读取，末行未写完时下次从行首继续；未知格式版本标为"索引不可用"，坏行跳过并记录。`session_fts`（T35）与 `checkpoints`（T28）尚未建表。
+T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失败整体回滚；`workspaces` 记主 checkout 而不另存信任状态（信任看 `project_trust`）；`sessions` 中从 JSONL 派生的列（标题来源、模型、用量、时间、格式版本、索引状态）重建时清空重读，置顶、归档、未读、所属工作区、状态、worktree 保留。解析器流式读取，末行未写完时下次从行首继续；未知格式版本标为"索引不可用"，坏行跳过并记录。`session_fts`（T35）尚未建表；`checkpoints` 由 T28 的 schema v5 建立（ADR-0044）。
 
 ### 9.3 保留与清理
 
 | 数据 | 默认策略 |
 |---|---|
 | 会话 JSONL | 永久保留，用户删除会话时删除 |
-| 文件快照 | 每会话最近 100 个检查点；会话 30 天未访问后清理快照 |
+| 文件快照 | 每会话最近 100 个检查点（每个回合结束后在后台删除最早的）；会话 30 天未访问（打开会话或建检查点算访问）后清理快照；Core 启动后与之后每 6 小时回收不被任何记录引用、也没有被钉住的对象（T28，`piarc_checkpoint::RetentionPolicy`） |
 | 会话临时输出 | 会话归档时清理 |
 | 会话附件 | 随归档保留，删除会话时清理 |
 | 归档会话的 worktree | 30 天后清理（有未提交改动时先询问） |
@@ -1616,6 +1626,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.35 | 2026-11-19 | T28（ADR-0044）补充第 4 章 ADR-0044、6.9 节检查点、代码与对话回退、分支与"从这里分支"的落地、6.14 节生效键（加入 `fileCheckpointingEnabled`，并补上 T27 已生效的 `autoCompactEnabled`、`autoCompactWindow`）、7.4 节 `checkpoints` 能力的方法与成员、7.6 节检查点导出、7.7 节 Changes 面板的 diff 与降级（词级 diff 与 UTF-16 偏移仍未实现）、8.2 节回退对话框、Changes 面板、改动卡片与分支切换、9.2 节 schema v5 的三张表、9.3 节快照的清理时机；基线决策未变 |
 | 2.34 | 2026-11-19 | T27（ADR-0043）补充第 4 章 ADR-0043、6.6.3 节统一提醒通道与外部修改检测、6.6.4 节压缩的触发、摘要、收尾、上限与熔断、6.6.5 节用量的口径、6.15 节三行的实现位置（数值未调整）、7.4 节 `context` 能力的方法与成员、8.2 节用量环与上下文卡片 |
 | 2.33 | 2026-11-19 | T26（ADR-0042）补充第 6.1.4 节 SuggestNextSteps、6.2.3 节 ExitPlanMode 的裁决步、6.5 节计划模式、任务清单、提问与下一步的落地、6.6.3 节 `reminders` 模块、6.14 节 `plansDirectory` 未在 T26 支持（I104）、7.4 节 `ui/ask`、`harness/todo`、`harness/plan` 与新增成员、8.2 节计划卡、提问表单、任务卡片与下一步建议 |
 | 2.32 | 2026-11-19 | W1（ADR-0040、0041）：第 11 章无需用户参与的权限裁决（Windows p95 ≤ 10 ms）与小文件 AHP 往返（Windows p95 ≤ 15 ms）按平台给预算，填入 Windows 实测；6.11 写明 Git Bash 用 `pwd -W` 报告最终目录；15.2 路径一行写明保留名的处理；第 16 章记录 M1 的 Windows 结论。 |

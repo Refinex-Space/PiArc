@@ -24,6 +24,11 @@ Core 层的集成测试在 `crates/piarc-core/tests/tool_io.rs`（越界、会�
 - `FileStates::external_changes(stat, hash)`：按记录比对磁盘，大小与修改时间相同即未变（不读内容），不同才算哈希；哈希不同或文件已删除才报告，同一版本只报告一次（`Entry.observed`），记录的快照不变。I/O 以闭包注入，单元测试用内存里的"磁盘"。
 - `FileStates::forget_read_ranges()`：压缩后清掉读取范围，下一次 Read 返回全文而不是存根；哈希保留，先读后改仍成立。`contains(key)` 供 Core 判断能否做 `restore` 读。
 
+## 检查点（T28，ADR-0044）
+
+- 写前快照：`WriteSpec.snapshots` 给出对象库时，`write_checked` 在路径锁内、原子替换之前把旧字节 `put` 进 `piarc_checkpoint::ObjectStore`（`fs → checkpoint` 例外）；`Written` 带前后内容的 SHA-256 与钉住旧对象的 `snapshot`，Core 写完索引才释放它。Core 在设置关掉 `fileCheckpointingEnabled` 时不给对象库。
+- 写回原语 `replace`（`restore.rs`，回退、撤销、丢弃用，不是工具调用，不做先读后改）：路径锁内核对 `Replacement::expected`（不符为 `Error::Changed`，什么都不动）→ 当前字节存入对象库 → 原子替换为目标字节或删除 → `FileStates::forget`。字节按快照原样写回，编码、BOM、换行不变。`current_sha256`、`read_current` 给预览与 Changes 读当前内容。
+
 ## 阈值与常量
 
 `MAX_READ_CHUNK`、`MAX_BLOB_BYTES`（32 MiB）、`MAX_UPLOAD_BYTES`（64 MiB）在 `piarc_protocol::fs`；`DETECT_BYTES`（编码检测看前 8 MiB）在 `content.rs`；PDF 的 `MAX_PAGES_WITHOUT_RANGE`（10）、`MAX_PAGES_PER_READ`（20）在 `pdf.rs`。工具结果的 50K/200K 不在这里，在 `agent-host/src/harness/tool-results.ts`。

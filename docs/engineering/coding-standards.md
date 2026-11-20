@@ -274,3 +274,6 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | 权限裁决阶梯 | `piarc_policy::{decide, after_permission_request, starting_mode, Input}`；Core 侧 `tool_io::policy::assess` | 第 6.2.3 节的八步，企业策略与两个 hooks 插槽；新工具只需给出 `Input` 的事实（写、只读、越界、受保护、规则命中） | T23 |
 | hooks 执行器 | `piarc_hooks::{HookConfig, Runner, Outcome, Decision, run}`；Core 侧 `piarc_core::hooks::HooksService`（`run`、`plan`/`execute`）与 `tool_io::hooks` | Claude Code 格式的 hooks：各设置层合并与跨文件去重、matcher、`command` handler 并行执行（stdin 输入、管道并发读完、按事件超时、取消时终止进程树）、退出码与 JSON 按事件合并、审计与 `core/notices` 提示；新事件在 `HookEvent` 加一项并在挂载处调用 `HooksService::run`，不另写执行器 | T25 |
 | 上下文输出落盘 | `piarc_hooks::spill::{bound, cut, LIMIT, PREVIEW}` | 给模型或用户的长文本超过 10,000 字符时写入会话临时目录的文件，只送 2,000 字符预览与路径（写失败时说明）；`cut` 截断并加标记。工具结果的预算另见 `fs/spill`（T16） | T25 |
+| 内容寻址存储 | `piarc_checkpoint::ObjectStore`（`put`、`get`、`pin`、`contains`、`collect_garbage`）、`hash_of`、`to_hex`/`from_hex` | 按 SHA-256 分桶存字节、相同内容一份、临时文件加 rename 写入、读时校验哈希；`Pin` 在使用期间防止回收，回收只删未引用且未钉住的对象。检查点快照用它，需要按内容去重保存文件的功能复用 | T28 |
+| hunk 反向应用 | `piarc_diff::revert_hunks`（`RevertError`） | 对当前文本反向应用 `FileDiff` 的若干 hunk：逐行核对新侧、自下而上应用、恢复的行沿用相邻换行符；不符时报错不改文本。Changes 面板按 hunk 丢弃用它，不在别处重算 diff | T28 |
+| 按期望内容写回文件 | `piarc_fs::{replace, Replacement, current_sha256, read_current}`（`restore.rs`） | 用户动作（回退、撤销、丢弃）写回记录的字节：路径锁内核对期望哈希、当前字节先存入对象库、原子替换或删除、会话文件状态表忘记该文件 | T28 |
