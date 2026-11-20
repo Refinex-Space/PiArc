@@ -11,11 +11,11 @@
 use std::collections::HashMap;
 
 use piarc_protocol::term_frame::{
-    self, Body, Cell, Colors, Cursor, Dirty, Frame, Row, Style, StyleEntry,
+    self, Body, Cell, Colors, Cursor, Dirty, Frame, Row, Scrollbar, Selection, Style, StyleEntry,
 };
 
 use crate::error::Result;
-use crate::vt::{CellData, RenderState, RowId};
+use crate::vt::{self, CellData, RenderState, RowId};
 
 /// Style table size at which the encoder starts over with a RESET frame (the wire limit is
 /// 65,535 ids).
@@ -46,6 +46,10 @@ pub struct FrameEncoder {
     sent_cursor: Option<Cursor>,
     sent_colors: Option<Colors>,
     sent_size: (u16, u16),
+    sent_scrollbar: Option<Scrollbar>,
+    /// Rows that carried a selection in the last frame (a selection that went away is a
+    /// change even when no row is dirty).
+    sent_selection: bool,
     scratch: Vec<CellData>,
 }
 
@@ -69,6 +73,8 @@ impl FrameEncoder {
             sent_cursor: None,
             sent_colors: None,
             sent_size: (0, 0),
+            sent_scrollbar: None,
+            sent_selection: false,
             scratch: Vec::new(),
         })
     }
@@ -94,21 +100,31 @@ impl FrameEncoder {
     }
 
     /// Encodes the update just completed on the render state and marks the render state clean.
-    /// `held` flags a frame captured at the start of a synchronized-output hold.
+    /// `held` flags a frame captured at the start of a synchronized-output hold; `scrollbar`
+    /// is the terminal's scroll state at the update.
     ///
     /// # Errors
     ///
     /// [`crate::Error::Vt`] when reading the render state fails; the render state stays dirty
     /// and the next frame resets the viewer.
-    pub fn encode(&mut self, held: bool) -> Result<(Vec<u8>, EncodeStats)> {
-        let result = self.encode_inner(held);
+    pub fn encode(
+        &mut self,
+        held: bool,
+        scrollbar: vt::Scrollbar,
+    ) -> Result<(Vec<u8>, EncodeStats)> {
+        let scrollbar = Scrollbar {
+            total: u32::try_from(scrollbar.total).unwrap_or(u32::MAX),
+            offset: u32::try_from(scrollbar.offset).unwrap_or(u32::MAX),
+            len: u32::try_from(scrollbar.len).unwrap_or(u32::MAX),
+        };
+        let result = self.encode_inner(held, scrollbar);
         if result.is_err() {
             self.reset_pending = true;
         }
         result
     }
 
-    fn encode_inner(&mut self, held: bool) -> Result<(Vec<u8>, EncodeStats)> {
+    fn encode_inner(&mut self, held: bool, scrollbar: Scrollbar) -> Result<(Vec<u8>, EncodeStats)> {
         let dirty = self.render.dirty()?;
         let (cols, rows) = self.render.size()?;
         let cursor = self.render.cursor()?;
@@ -126,6 +142,8 @@ impl FrameEncoder {
             && !colors_changed
             && dirty == Dirty::Clean
             && self.sent_cursor == Some(cursor)
+            && self.sent_scrollbar == Some(scrollbar)
+            && !self.sent_selection
         {
             let frame = Frame {
                 seq: self.seq,
@@ -148,6 +166,7 @@ impl FrameEncoder {
         }
         let compare_all = reset || self.compare_all || size_changed;
         let (rows_list, styles, stats) = self.encode_rows(&colors, compare_all)?;
+        let selection = rows_list.iter().any(|row| row.selection.is_some());
         let frame = Frame {
             seq: self.seq,
             reset,
@@ -158,6 +177,7 @@ impl FrameEncoder {
             body: Some(Body {
                 cursor,
                 colors: (reset || colors_changed).then(|| colors.clone()),
+                scrollbar,
                 styles,
                 rows: rows_list,
             }),
@@ -169,6 +189,8 @@ impl FrameEncoder {
         self.sent_cursor = Some(cursor);
         self.sent_colors = Some(colors);
         self.sent_size = (cols, rows);
+        self.sent_scrollbar = Some(scrollbar);
+        self.sent_selection = selection;
         Ok((bytes, stats))
     }
 
@@ -205,6 +227,9 @@ impl FrameEncoder {
                 }
             };
             handles.insert(id, handle);
+            let selection = row
+                .selection()?
+                .map(|(start, end)| Selection { start, end });
             if !compare_all
                 && !row.dirty()?
                 && let Some(cells) = old_held.remove(&handle)
@@ -212,6 +237,7 @@ impl FrameEncoder {
                 held.insert(handle, cells);
                 list.push(Row {
                     id: handle,
+                    selection,
                     cells: None,
                 });
                 stats.rows_reused += 1;
@@ -231,12 +257,14 @@ impl FrameEncoder {
             if unchanged {
                 list.push(Row {
                     id: handle,
+                    selection,
                     cells: None,
                 });
                 stats.rows_reused += 1;
             } else {
                 list.push(Row {
                     id: handle,
+                    selection,
                     cells: Some(cells.clone()),
                 });
                 stats.rows_with_cells += 1;

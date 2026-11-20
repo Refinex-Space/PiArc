@@ -130,6 +130,7 @@ impl Terminals {
                 TermEvent::Title(title) => serde_json::json!({ "type": "title", "title": title }),
                 TermEvent::Bell { count } => serde_json::json!({ "type": "bell", "count": count }),
                 TermEvent::Exited { code } => serde_json::json!({ "type": "exited", "code": code }),
+                _ => return,
             };
             if let Ok(event) = Event::from_json(route.clone(), &json) {
                 // Runs on the terminal's IO thread, outside the runtime. The queue only fails
@@ -149,6 +150,7 @@ impl Terminals {
             cwd: options.cwd,
             env: options.env,
             scrollback_lines: SCROLLBACK_LINES,
+            ..SessionConfig::default()
         };
         let session = Session::spawn(config, on_event)?;
         lock(&self.sessions).insert(id, Arc::new(session));

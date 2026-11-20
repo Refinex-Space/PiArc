@@ -10,7 +10,8 @@ fn pull(encoder: &mut FrameEncoder, terminal: &mut Terminal) -> (Frame, EncodeSt
         .begin_update(terminal)
         .expect("begin");
     encoder.render_state().end_update().expect("end");
-    let (bytes, stats) = encoder.encode(false).expect("encode");
+    let scrollbar = terminal.scrollbar();
+    let (bytes, stats) = encoder.encode(false, scrollbar).expect("encode");
     let frame = term_frame::decode(&bytes).expect("decodes");
     (frame, stats, bytes.len())
 }

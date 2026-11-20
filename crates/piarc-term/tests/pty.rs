@@ -27,6 +27,7 @@ fn config(program: &str, args: &[&str]) -> SessionConfig {
         // A plain prompt keeps screen checks independent of the user's shell setup.
         env: vec![("PS1".into(), "$ ".into()), ("ENV".into(), String::new())],
         scrollback_lines: 1000,
+        ..SessionConfig::default()
     }
 }
 
@@ -165,6 +166,7 @@ fn title_and_bell_become_events() {
             Event::Title(t) => title = Some(t),
             Event::Bell { count } => bells += count,
             Event::Exited { .. } => break,
+            _ => {}
         }
     }
     assert_eq!(title.as_deref(), Some("piarc title"));

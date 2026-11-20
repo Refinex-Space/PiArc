@@ -1,15 +1,18 @@
-//! Terminal frame format, draft version 1 (ADR-0017, T10). T33 finalizes it.
+//! Terminal frame format, version 2 (ADR-0017, ADR-0023; T10 drafted version 1, T33 finalized
+//! this one).
 //!
 //! Core keeps the only terminal state (libghostty-vt in `piarc-term`). The renderer pulls one
 //! frame per animation frame and draws it; it never parses VT. A frame is the change since the
-//! previous frame of the same viewer: the cursor, colors when they changed, new style table
-//! entries, and the viewport as a list of row ids where only rows the viewer does not hold yet
-//! (new rows or rows whose content changed) carry their cells. When output scrolls, existing
-//! rows keep their id and travel as a 5-byte reference, so a scroll by one line costs one row.
+//! previous frame of the same viewer: the cursor, colors when they changed, the scroll state,
+//! new style table entries, and the viewport as a list of row ids where only rows the viewer
+//! does not hold yet (new rows or rows whose content changed) carry their cells. When output
+//! scrolls, existing rows keep their id and travel as a 5-byte reference, so a scroll by one
+//! line costs one row. A row covered by the selection says which columns.
 //!
 //! The Rust codec here ([`encode`], [`decode`]) and the client model ([`Screen`]) have a
-//! TypeScript twin in the renderer (`apps/desktop/src/renderer/terminal/frame/`); both run the
-//! samples in `tests/fixtures/term-frame/`.
+//! TypeScript twin in the renderer (`apps/desktop/src/renderer/terminal/frame/`). Both run the
+//! golden samples in `tests/contracts/term-frame/` (L1); the decoded form of a frame has a JSON
+//! Schema (`TermFrame` in `ahp.schema.json`) that the samples' decoded side is checked against.
 //!
 //! # Byte layout
 //!
@@ -17,25 +20,29 @@
 //!
 //! ```text
 //! frame    = header [body]                      ; body absent when EMPTY is set
-//! header   = "PTF" version:u8(=1) flags:u8 dirty:u8 seq:u32 cols:u16 rows:u16   ; 14 bytes
+//! header   = "PTF" version:u8(=2) flags:u8 dirty:u8 seq:u32 cols:u16 rows:u16   ; 14 bytes
 //! flags    : bit0 RESET  the viewer drops its rows and styles before applying the frame
 //!            bit1 COLORS a colors section follows the cursor
 //!            bit2 EMPTY  nothing changed since the previous frame; no body
 //!            bit3 HELD   captured when a synchronized-output hold began (informational)
 //! dirty    : 0 clean, 1 partial, 2 full: libghostty-vt's global dirty state for the update
-//! body     = cursor [colors] styles rowlist
+//! body     = cursor [colors] scrollbar styles rowlist
 //! cursor   = flags:u8 style:u8 x:u16 y:u16                                       ; 6 bytes
 //!            flags bit0 visible, bit1 blinking, bit2 in viewport, bit3 on a wide tail,
 //!            bit4 at a password prompt; style 0 bar, 1 block, 2 underline, 3 hollow block
 //! colors   = background:rgb foreground:rgb hasCursor:u8 cursor:rgb palette:rgb*256  ; 778 bytes
 //! rgb      = r:u8 g:u8 b:u8
+//! scrollbar = total:u32 offset:u32 len:u32      ; rows of scrollback + active area, first
+//!                                                ; viewport row, viewport rows    ; 12 bytes
 //! styles   = count:u16 entry*count
 //! entry    = id:u16 fg:color bg:color underline:color flags:u16                  ; 16 bytes
 //! color    = tag:u8 r:u8 g:u8 b:u8        ; tag 0 default (rgb ignored), 1 rgb
 //!            flags: libghostty-vt style flags (bold, italic, faint, blink, inverse,
 //!            invisible, strikethrough, overline in bits 0-7; underline kind in bits 8-10)
 //! rowlist  = count:u16(=rows) row*count   ; viewport order: the n-th row is at y = n
-//! row      = id:u32 flags:u8 [cells]      ; flags bit0: cells follow
+//! row      = id:u32 flags:u8 [selection] [cells]
+//!            flags bit0: cells follow; bit1: a selection follows
+//! selection = start:u16 end:u16           ; selected columns of this row, both included
 //! cells    = count:u16(=cols) cell*count
 //! cell     = wide:u8 style:u16 len:u8 text:u8*len
 //!            wide 0 narrow, 1 wide (the next cell is its spacer tail), 2 spacer tail,
@@ -50,10 +57,16 @@
 //! - Row ids are Core's handles for libghostty-vt row identities, never reused while the
 //!   viewer holds them. A row without cells must be held by the viewer; after applying a
 //!   frame the viewer keeps only the rows of its row list.
+//! - Selections are not held: every non-empty frame lists the selected columns of each row,
+//!   and a row without a selection section has none.
 //! - A grapheme longer than 255 UTF-8 bytes is cut at the last whole code point that fits.
 
 use std::fmt;
 
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+mod json;
 mod screen;
 
 pub use screen::Screen;
@@ -61,11 +74,13 @@ pub use screen::Screen;
 /// The three magic bytes every frame starts with.
 pub const MAGIC: [u8; 3] = *b"PTF";
 /// The format version this module reads and writes.
-pub const VERSION: u8 = 1;
+pub const VERSION: u8 = 2;
 /// Size of the header, the whole of an empty frame.
 pub const HEADER_BYTES: usize = 14;
 /// Size of the colors section.
 pub const COLORS_BYTES: usize = 3 + 3 + 1 + 3 + 256 * 3;
+/// Size of the scrollbar section.
+pub const SCROLLBAR_BYTES: usize = 12;
 /// Longest cell text in bytes.
 pub const MAX_CELL_TEXT_BYTES: usize = 255;
 
@@ -74,9 +89,13 @@ const FLAG_COLORS: u8 = 1 << 1;
 const FLAG_EMPTY: u8 = 1 << 2;
 const FLAG_HELD: u8 = 1 << 3;
 const ROW_HAS_CELLS: u8 = 1;
+const ROW_HAS_SELECTION: u8 = 1 << 1;
 
-/// One frame.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One frame. The JSON form (schema `TermFrame`) is for samples and diagnostics; the wire is
+/// the byte layout.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(rename = "TermFrame")]
 pub struct Frame {
     /// Per-viewer frame number, from 1.
     pub seq: u32,
@@ -87,20 +106,28 @@ pub struct Frame {
     /// libghostty-vt's global dirty state for the update that produced the frame.
     pub dirty: Dirty,
     /// Viewport width in cells.
+    #[schemars(with = "u64")]
     pub cols: u16,
     /// Viewport height in cells.
+    #[schemars(with = "u64")]
     pub rows: u16,
     /// What changed; `None` for an empty frame.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub body: Option<Body>,
 }
 
 /// The changes a non-empty frame carries.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(rename = "TermFrameBody")]
 pub struct Body {
     /// The cursor, always present.
     pub cursor: Cursor,
     /// Colors, when they changed or on RESET.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub colors: Option<Colors>,
+    /// The viewport's place in the scrollback.
+    pub scrollbar: Scrollbar,
     /// Style table entries the viewer does not have yet.
     pub styles: Vec<StyleEntry>,
     /// The viewport, top to bottom; exactly `rows` entries.
@@ -108,7 +135,9 @@ pub struct Body {
 }
 
 /// Global dirty state of the render state update.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(rename = "TermDirty")]
 pub enum Dirty {
     /// Nothing changed.
     Clean,
@@ -119,7 +148,9 @@ pub enum Dirty {
 }
 
 /// Cursor state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(rename = "TermCursor")]
 pub struct Cursor {
     /// Visible according to the terminal modes.
     pub visible: bool,
@@ -134,13 +165,33 @@ pub struct Cursor {
     /// Visual style.
     pub style: CursorStyle,
     /// Column in the viewport.
+    #[schemars(with = "u64")]
     pub x: u16,
     /// Row in the viewport.
+    #[schemars(with = "u64")]
     pub y: u16,
 }
 
+/// The viewport's place in the scrollback, in rows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(rename = "TermScrollbar")]
+pub struct Scrollbar {
+    /// Rows of scrollback plus the active area.
+    #[schemars(with = "u64")]
+    pub total: u32,
+    /// First viewport row, from the top of the scrollback.
+    #[schemars(with = "u64")]
+    pub offset: u32,
+    /// Rows in the viewport.
+    #[schemars(with = "u64")]
+    pub len: u32,
+}
+
 /// Cursor shape.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(rename = "TermCursorStyle")]
 pub enum CursorStyle {
     /// Vertical bar.
     Bar,
@@ -153,7 +204,7 @@ pub enum CursorStyle {
     BlockHollow,
 }
 
-/// An RGB color.
+/// An RGB color; `"#rrggbb"` in the JSON form.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct Rgb {
     /// Red.
@@ -165,51 +216,86 @@ pub struct Rgb {
 }
 
 /// Terminal colors.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(rename = "TermColors")]
 pub struct Colors {
     /// Default background.
     pub background: Rgb,
     /// Default foreground.
     pub foreground: Rgb,
     /// Cursor color set by the program, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cursor: Option<Rgb>,
     /// The 256-color palette.
+    #[serde(with = "json::palette")]
+    #[schemars(with = "json::PaletteSchema")]
     pub palette: Box<[Rgb; 256]>,
 }
 
 /// A resolved cell style: palette indices are already turned into RGB.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(rename = "TermStyle")]
 pub struct Style {
     /// Foreground, or the default foreground.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fg: Option<Rgb>,
     /// Background, or the default background.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bg: Option<Rgb>,
     /// Underline color, or the foreground.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub underline: Option<Rgb>,
     /// libghostty-vt style flags (see the module documentation).
+    #[schemars(with = "u64")]
     pub flags: u16,
 }
 
 /// A style table entry.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(rename = "TermStyleEntry")]
 pub struct StyleEntry {
     /// Index the cells refer to; never 0.
+    #[schemars(with = "u64")]
     pub id: u16,
     /// The style.
     pub style: Style,
 }
 
 /// One viewport row.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(rename = "TermRow")]
 pub struct Row {
     /// Core's row handle.
     pub id: u32,
+    /// Selected columns of this row, both included.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection: Option<Selection>,
     /// The cells, when the viewer does not hold this row's current content.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cells: Option<Vec<Cell>>,
 }
 
+/// The selected columns of a row, both included.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(rename = "TermSelection")]
+pub struct Selection {
+    /// First selected column.
+    #[schemars(with = "u64")]
+    pub start: u16,
+    /// Last selected column.
+    #[schemars(with = "u64")]
+    pub end: u16,
+}
+
 /// Width class of a cell.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(rename = "TermWide")]
 pub enum Wide {
     /// One column.
     #[default]
@@ -223,11 +309,14 @@ pub enum Wide {
 }
 
 /// One cell.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(rename = "TermCell")]
 pub struct Cell {
     /// Width class.
     pub wide: Wide,
     /// Style table id; 0 is the default style.
+    #[schemars(with = "u64")]
     pub style: u16,
     /// The grapheme cluster; empty for an empty cell.
     pub text: String,
@@ -298,6 +387,13 @@ pub fn encode(frame: &Frame) -> Vec<u8> {
         if let Some(colors) = &body.colors {
             encode_colors(&mut out, colors);
         }
+        for value in [
+            body.scrollbar.total,
+            body.scrollbar.offset,
+            body.scrollbar.len,
+        ] {
+            out.extend_from_slice(&value.to_le_bytes());
+        }
         let count = u16::try_from(body.styles.len()).expect("at most 65,535 style entries");
         out.extend_from_slice(&count.to_le_bytes());
         for entry in &body.styles {
@@ -310,19 +406,29 @@ pub fn encode(frame: &Frame) -> Vec<u8> {
         out.extend_from_slice(&frame.rows.to_le_bytes());
         for row in &body.rows {
             out.extend_from_slice(&row.id.to_le_bytes());
-            match &row.cells {
-                None => out.push(0),
-                Some(cells) => {
-                    assert_eq!(
-                        cells.len(),
-                        usize::from(frame.cols),
-                        "a row has `cols` cells"
-                    );
-                    out.push(ROW_HAS_CELLS);
-                    out.extend_from_slice(&frame.cols.to_le_bytes());
-                    for cell in cells {
-                        encode_cell(&mut out, cell);
-                    }
+            let flags = if row.cells.is_some() {
+                ROW_HAS_CELLS
+            } else {
+                0
+            } | if row.selection.is_some() {
+                ROW_HAS_SELECTION
+            } else {
+                0
+            };
+            out.push(flags);
+            if let Some(selection) = row.selection {
+                out.extend_from_slice(&selection.start.to_le_bytes());
+                out.extend_from_slice(&selection.end.to_le_bytes());
+            }
+            if let Some(cells) = &row.cells {
+                assert_eq!(
+                    cells.len(),
+                    usize::from(frame.cols),
+                    "a row has `cols` cells"
+                );
+                out.extend_from_slice(&frame.cols.to_le_bytes());
+                for cell in cells {
+                    encode_cell(&mut out, cell);
                 }
             }
         }
@@ -337,7 +443,13 @@ fn body_hint(body: &Body) -> usize {
         .filter_map(|row| row.cells.as_ref())
         .map(|cells| 2 + cells.len() * 5)
         .sum();
-    6 + COLORS_BYTES + 2 + body.styles.len() * 16 + 2 + body.rows.len() * 5 + cells
+    6 + COLORS_BYTES
+        + SCROLLBAR_BYTES
+        + 2
+        + body.styles.len() * 16
+        + 2
+        + body.rows.len() * 9
+        + cells
 }
 
 fn encode_cursor(out: &mut Vec<u8>, cursor: &Cursor) {
@@ -533,6 +645,11 @@ fn decode_body(
     } else {
         None
     };
+    let scrollbar = Scrollbar {
+        total: r.u32()?,
+        offset: r.u32()?,
+        len: r.u32()?,
+    };
     let style_count = r.u16()?;
     let mut styles = Vec::with_capacity(usize::from(style_count));
     for _ in 0..style_count {
@@ -556,6 +673,17 @@ fn decode_body(
             },
         });
     }
+    let list = decode_rows(r, cols, rows)?;
+    Ok(Body {
+        cursor,
+        colors,
+        scrollbar,
+        styles,
+        rows: list,
+    })
+}
+
+fn decode_rows(r: &mut Reader<'_>, cols: u16, rows: u16) -> Result<Vec<Row>, FrameError> {
     let row_count = r.u16()?;
     if row_count != rows {
         return Err(FrameError::new(format!(
@@ -566,19 +694,33 @@ fn decode_body(
     for _ in 0..rows {
         let id = r.u32()?;
         let flags = r.u8()?;
-        let cells = match flags {
-            0 => None,
-            ROW_HAS_CELLS => Some(decode_cells(r, cols)?),
-            other => return Err(FrameError::new(format!("unknown row flags {other:#04x}"))),
+        if flags & !(ROW_HAS_CELLS | ROW_HAS_SELECTION) != 0 {
+            return Err(FrameError::new(format!("unknown row flags {flags:#04x}")));
+        }
+        let selection = if flags & ROW_HAS_SELECTION != 0 {
+            let start = r.u16()?;
+            let end = r.u16()?;
+            if start > end || end >= cols {
+                return Err(FrameError::new(format!(
+                    "selection {start}..={end} outside {cols} columns"
+                )));
+            }
+            Some(Selection { start, end })
+        } else {
+            None
         };
-        list.push(Row { id, cells });
+        let cells = if flags & ROW_HAS_CELLS != 0 {
+            Some(decode_cells(r, cols)?)
+        } else {
+            None
+        };
+        list.push(Row {
+            id,
+            selection,
+            cells,
+        });
     }
-    Ok(Body {
-        cursor,
-        colors,
-        styles,
-        rows: list,
-    })
+    Ok(list)
 }
 
 fn decode_cursor(r: &mut Reader<'_>) -> Result<Cursor, FrameError> {

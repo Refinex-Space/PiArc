@@ -24,7 +24,7 @@ fn title_and_bell_are_recorded() {
     let effects = t.take_effects();
     assert_eq!(effects.title.as_deref(), Some("build ✓"));
     assert_eq!(effects.bells, 2);
-    assert_eq!(t.take_effects(), EffectsOutput::default());
+    assert!(t.take_effects().is_empty());
 }
 
 #[test]
@@ -115,7 +115,10 @@ fn a_render_hold_captures_the_frame_at_its_start() {
     t.write(b"before");
     // Begin a hold, then keep drawing: the capture must show the screen as it was.
     t.write(b"\x1b[?2026h\r\x1b[2Kafter");
-    assert!(t.hold_since().is_some());
+    assert!(t.hold_since().is_none(), "the owner stamps the start");
+    let start = std::time::Instant::now();
+    t.stamp_hold(start);
+    assert_eq!(t.hold_since(), Some(start));
     let mut live = RenderState::new().expect("state");
     assert!(t.take_hold_capture(&mut live));
     let colors = live.colors().expect("colors");
@@ -132,4 +135,56 @@ fn a_render_hold_captures_the_frame_at_its_start() {
     assert!(!t.take_hold_capture(&mut live), "taken once");
     t.end_hold().expect("end hold");
     assert!(t.hold_since().is_none());
+}
+
+#[test]
+fn probe_semantic_prompt_and_clipboard() {
+    let mut t = terminal(40, 5);
+    t.write(b"\x1b]133;A\x07$ \x1b]133;B\x07echo hi\r\n\x1b]133;C;cmdline_url=echo%20hi\x07hi\r\n\x1b]133;D;3\x07");
+    let effects = t.take_effects();
+    for m in &effects.marks {
+        let at = m.at.as_ref().and_then(|p| p.point(&mut t));
+        eprintln!(
+            "{:?} exit={:?} cmd={:?} at={:?}",
+            m.kind, m.exit_code, m.command, at
+        );
+    }
+    t.write(b"\x1b]133;C;cmdline=echo\\ there\x07");
+    for m in t.take_effects().marks {
+        eprintln!("{:?} cmd={:?}", m.kind, m.command);
+    }
+    t.write(b"\x1b]7;file://host/tmp/a%20b\x07");
+    eprintln!("pwd={:?}", t.take_effects().pwd);
+    t.write(b"\x1b]52;c;aGVsbG8=\x07");
+    eprintln!("clip={:?}", t.take_effects().clipboard);
+    t.write(b"\x1b]52;c;?\x07");
+    let e = t.take_effects();
+    eprintln!(
+        "read replies={:?} denied={}",
+        String::from_utf8_lossy(&e.replies),
+        e.clipboard_reads_denied
+    );
+    t.write(b"\x1b[?2004h");
+    let r = t.paste("a\nb", false);
+    eprintln!(
+        "paste bracketed {:?} {:?}",
+        r,
+        String::from_utf8_lossy(&t.take_effects().replies)
+    );
+    t.write(b"\x1b[?2004l");
+    let r = t.paste("a\nb", false);
+    eprintln!(
+        "paste plain {:?} {:?}",
+        r,
+        String::from_utf8_lossy(&t.take_effects().replies)
+    );
+    let r = t.paste("a\nb", true);
+    eprintln!(
+        "paste plain unsafe {:?} {:?}",
+        r,
+        String::from_utf8_lossy(&t.take_effects().replies)
+    );
+    t.write(b"\x1bc");
+    eprintln!("reset {}", t.take_effects().reset);
+    eprintln!("version {}", snapshot::library_version());
 }

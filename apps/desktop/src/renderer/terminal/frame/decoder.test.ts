@@ -80,12 +80,12 @@ describe('decodeFrame', () => {
     magic[0] = 0x58;
     expect(() => decodeFrame(magic)).toThrow(/magic/);
     const version = Uint8Array.from(bytes);
-    version[3] = 2;
+    version[3] = 1; // T10's draft
     expect(() => decodeFrame(version)).toThrow(/version/);
   });
 
   it('decodes an empty frame', () => {
-    const empty = Uint8Array.from([0x50, 0x54, 0x46, 1, 4, 0, 7, 0, 0, 0, 80, 0, 24, 0]);
+    const empty = Uint8Array.from([0x50, 0x54, 0x46, 2, 4, 0, 7, 0, 0, 0, 80, 0, 24, 0]);
     expect(decodeFrame(empty)).toEqual({
       seq: 7,
       reset: false,

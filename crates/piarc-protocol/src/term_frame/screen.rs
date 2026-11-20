@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use super::{Cell, Colors, Cursor, Frame, FrameError, Style, Wide};
+use super::{Cell, Colors, Cursor, Frame, FrameError, Scrollbar, Selection, Style, Wide};
 
 /// The state a viewer rebuilds from frames.
 #[derive(Debug, Default)]
@@ -17,6 +17,8 @@ pub struct Screen {
     styles: HashMap<u16, Style>,
     held: HashMap<u32, Vec<Cell>>,
     viewport: Vec<u32>,
+    selections: Vec<Option<Selection>>,
+    scrollbar: Scrollbar,
 }
 
 impl Screen {
@@ -68,6 +70,7 @@ impl Screen {
         };
         let mut held = HashMap::with_capacity(body.rows.len());
         let mut viewport = Vec::with_capacity(body.rows.len());
+        let mut selections = Vec::with_capacity(body.rows.len());
         for row in &body.rows {
             let cells = match &row.cells {
                 Some(cells) => {
@@ -88,6 +91,7 @@ impl Screen {
             };
             held.insert(row.id, cells);
             viewport.push(row.id);
+            selections.push(row.selection);
         }
         self.seq = frame.seq;
         self.cols = frame.cols;
@@ -101,6 +105,8 @@ impl Screen {
         self.styles = styles;
         self.held = held;
         self.viewport = viewport;
+        self.selections = selections;
+        self.scrollbar = body.scrollbar;
         Ok(())
     }
 
@@ -142,6 +148,18 @@ impl Screen {
         } else {
             self.styles.get(&id).copied()
         }
+    }
+
+    /// The selected columns of viewport row `y`, if any.
+    #[must_use]
+    pub fn selection(&self, y: u16) -> Option<Selection> {
+        self.selections.get(usize::from(y)).copied().flatten()
+    }
+
+    /// The viewport's place in the scrollback.
+    #[must_use]
+    pub fn scrollbar(&self) -> Scrollbar {
+        self.scrollbar
     }
 
     /// Row ids of the viewport, top to bottom.

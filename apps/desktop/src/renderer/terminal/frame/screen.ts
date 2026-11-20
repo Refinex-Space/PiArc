@@ -7,6 +7,8 @@ import {
   type FrameCell,
   type FrameColors,
   type FrameCursor,
+  type FrameScrollbar,
+  type FrameSelection,
   type FrameStyle,
 } from './decoder.js';
 
@@ -40,6 +42,8 @@ export class Screen {
   #styles = new Map<number, FrameStyle>();
   #held = new Map<number, readonly FrameCell[]>();
   #viewport: number[] = [];
+  #selections: (FrameSelection | null)[] = [];
+  #scrollbar: FrameScrollbar = { total: 0, offset: 0, len: 0 };
 
   /**
    * Applies `frame` and reports what changed. Throws `FrameError` (leaving the screen as it
@@ -71,6 +75,7 @@ export class Screen {
     const old = frame.reset ? new Map<number, readonly FrameCell[]>() : this.#held;
     const held = new Map<number, readonly FrameCell[]>();
     const viewport: number[] = [];
+    const selections: (FrameSelection | null)[] = [];
     const changed = new Set<number>();
     body.rows.forEach((row, y) => {
       let cells = row.cells;
@@ -89,8 +94,13 @@ export class Screen {
           changed.add(y);
         }
       }
+      const before = this.#selections[y] ?? null;
+      if (before?.start !== row.selection?.start || before?.end !== row.selection?.end) {
+        changed.add(y);
+      }
       held.set(row.id, cells);
       viewport.push(row.id);
+      selections.push(row.selection);
     });
     const full =
       frame.reset || body.colors !== null || frame.cols !== this.#cols || frame.rows !== this.#rows;
@@ -106,6 +116,8 @@ export class Screen {
     this.#styles = styles;
     this.#held = held;
     this.#viewport = viewport;
+    this.#selections = selections;
+    this.#scrollbar = body.scrollbar;
     return { full, rows: changed };
   }
 
@@ -132,6 +144,16 @@ export class Screen {
   /** The style of a cell's style id; id 0 is the default style. */
   style(id: number): FrameStyle {
     return id === 0 ? DEFAULT_STYLE : (this.#styles.get(id) ?? DEFAULT_STYLE);
+  }
+
+  /** The viewport's place in the scrollback. */
+  get scrollbar(): FrameScrollbar {
+    return this.#scrollbar;
+  }
+
+  /** The selected columns of viewport row `y`, if any. */
+  selection(y: number): FrameSelection | null {
+    return this.#selections[y] ?? null;
   }
 
   get rowIds(): readonly number[] {

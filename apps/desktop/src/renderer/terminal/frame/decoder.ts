@@ -1,6 +1,7 @@
-// Decoder of the draft terminal frame format (ADR-0017, T10). The format and its rules are
-// documented once, in crates/piarc-protocol/src/term_frame.rs; this is the TypeScript twin of
-// its `decode`, and both run the shared samples in frame-samples.json.
+// Decoder of the terminal frame format, version 2 (ADR-0017, ADR-0023, T33). The format and its
+// rules are documented once, in crates/piarc-protocol/src/term_frame.rs; this is the TypeScript
+// twin of its `decode`. Both run the L1 golden samples in tests/contracts/term-frame/ and the
+// screens recorded from real libghostty-vt frames in frame-samples.json.
 
 export interface Rgb {
   readonly r: number;
@@ -48,14 +49,29 @@ export interface FrameCell {
   readonly text: string;
 }
 
+/** Selected columns of a row, both included. */
+export interface FrameSelection {
+  readonly start: number;
+  readonly end: number;
+}
+
 export interface FrameRow {
   readonly id: number;
+  readonly selection: FrameSelection | null;
   readonly cells: readonly FrameCell[] | null;
+}
+
+/** The viewport's place in the scrollback, in rows. */
+export interface FrameScrollbar {
+  readonly total: number;
+  readonly offset: number;
+  readonly len: number;
 }
 
 export interface FrameBody {
   readonly cursor: FrameCursor;
   readonly colors: FrameColors | null;
+  readonly scrollbar: FrameScrollbar;
   readonly styles: readonly { readonly id: number; readonly style: FrameStyle }[];
   readonly rows: readonly FrameRow[];
 }
@@ -86,13 +102,15 @@ export const STYLE_FLAGS = {
   underlineMask: 0x7 << 8,
 } as const;
 
-export const FRAME_VERSION = 1;
+export const FRAME_VERSION = 2;
 export const FRAME_HEADER_BYTES = 14;
 
 const FLAG_RESET = 1;
 const FLAG_COLORS = 1 << 1;
 const FLAG_EMPTY = 1 << 2;
 const FLAG_HELD = 1 << 3;
+const ROW_HAS_CELLS = 1;
+const ROW_HAS_SELECTION = 1 << 1;
 
 export class FrameError extends Error {
   constructor(reason: string) {
@@ -249,6 +267,7 @@ function decodeBody(r: Reader, hasColors: boolean, cols: number, rows: number): 
     }
     colors = { background, foreground, cursor: hasCursor ? cursorColor : null, palette };
   }
+  const scrollbar: FrameScrollbar = { total: r.u32(), offset: r.u32(), len: r.u32() };
   const styleCount = r.u16();
   const styles: { id: number; style: FrameStyle }[] = [];
   for (let i = 0; i < styleCount; i += 1) {
@@ -269,15 +288,24 @@ function decodeBody(r: Reader, hasColors: boolean, cols: number, rows: number): 
   for (let y = 0; y < rows; y += 1) {
     const id = r.u32();
     const rowFlags = r.u8();
-    if (rowFlags === 0) {
-      list.push({ id, cells: null });
-    } else if (rowFlags === 1) {
-      list.push({ id, cells: decodeCells(r, cols) });
-    } else {
+    if ((rowFlags & ~(ROW_HAS_CELLS | ROW_HAS_SELECTION)) !== 0) {
       throw new FrameError(`unknown row flags ${String(rowFlags)}`);
     }
+    let selection: FrameSelection | null = null;
+    if ((rowFlags & ROW_HAS_SELECTION) !== 0) {
+      const start = r.u16();
+      const end = r.u16();
+      if (start > end || end >= cols) {
+        throw new FrameError(
+          `selection ${String(start)}..=${String(end)} outside ${String(cols)} columns`,
+        );
+      }
+      selection = { start, end };
+    }
+    const cells = (rowFlags & ROW_HAS_CELLS) !== 0 ? decodeCells(r, cols) : null;
+    list.push({ id, selection, cells });
   }
-  return { cursor, colors, styles, rows: list };
+  return { cursor, colors, scrollbar, styles, rows: list };
 }
 
 function decodeCells(r: Reader, cols: number): FrameCell[] {

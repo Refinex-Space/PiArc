@@ -398,6 +398,32 @@ impl RowReader<'_> {
         }
     }
 
+    /// The selected columns of this row (both included), if the selection covers it.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Vt`] when libghostty-vt fails.
+    pub fn selection(&self) -> Result<Option<(u16, u16)>> {
+        let mut value = sys::GhosttyRenderStateRowSelection {
+            size: size_of::<sys::GhosttyRenderStateRowSelection>(),
+            start_x: 0,
+            end_x: 0,
+        };
+        // SAFETY: SELECTION fills a sized GhosttyRenderStateRowSelection for the current row.
+        let code = unsafe {
+            sys::ghostty_render_state_row_get(
+                self.rows.as_ptr(),
+                sys::GHOSTTY_RENDER_STATE_ROW_DATA_SELECTION,
+                (&raw mut value).cast(),
+            )
+        };
+        if code == sys::GHOSTTY_NO_VALUE {
+            return Ok(None);
+        }
+        check("ghostty_render_state_row_get(SELECTION)", code)?;
+        Ok(Some((value.start_x, value.end_x)))
+    }
+
     /// Reads the row's cells into `out` (cleared first), resolving colors with `palette`.
     ///
     /// # Errors

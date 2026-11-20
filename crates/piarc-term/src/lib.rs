@@ -18,6 +18,7 @@
 //! The authoritative rules are in `crates/deps-rules.json`, enforced by
 //! `scripts/ci/check-crate-deps.mjs` (architecture section 7.1).
 
+pub mod commands;
 #[cfg(windows)]
 #[allow(
     unsafe_code,
@@ -28,6 +29,8 @@ mod error;
 pub mod frame;
 pub mod keymap;
 pub mod session;
+pub mod shell;
+pub mod snapshot;
 #[allow(
     unsafe_code,
     reason = "the safe wrapper over the libghostty-vt bindings (ADR-0017); unsafe stays inside it"
@@ -35,4 +38,6 @@ pub mod session;
 pub mod vt;
 
 pub use error::{Error, Result};
-pub use session::{Event, EventHandler, Program, Session, SessionConfig, SessionStats};
+pub use session::{
+    Event, EventHandler, Now, Program, Session, SessionConfig, SessionStats, TerminalInfo,
+};

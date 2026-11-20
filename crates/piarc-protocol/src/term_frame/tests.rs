@@ -64,6 +64,11 @@ fn full_frame() -> Frame {
                 cursor: Some(red),
                 palette: palette(),
             }),
+            scrollbar: Scrollbar {
+                total: 120,
+                offset: 118,
+                len: 2,
+            },
             styles: vec![StyleEntry {
                 id: 1,
                 style: Style {
@@ -76,10 +81,12 @@ fn full_frame() -> Frame {
             rows: vec![
                 Row {
                     id: 10,
+                    selection: None,
                     cells: Some(row_of("$ ls", 6)),
                 },
                 Row {
                     id: 11,
+                    selection: None,
                     cells: Some(wide_row),
                 },
             ],
@@ -135,7 +142,7 @@ fn malformed_frames_are_rejected() {
     magic[0] = b'X';
     assert!(decode(&magic).is_err());
     let mut version = bytes.clone();
-    version[3] = 2;
+    version[3] = 1; // T10's draft
     assert!(decode(&version).is_err());
     let mut rows = bytes;
     rows[12] = 3; // rows = 3, but only two rows follow
@@ -168,14 +175,17 @@ fn the_screen_reuses_rows_by_id_when_scrolling() {
         body: Some(Body {
             cursor: Cursor::default(),
             colors: None,
+            scrollbar: Scrollbar::default(),
             styles: Vec::new(),
             rows: vec![
                 Row {
                     id: 11,
+                    selection: None,
                     cells: None,
                 },
                 Row {
                     id: 12,
+                    selection: None,
                     cells: Some(row_of("ok", 6)),
                 },
             ],
@@ -192,10 +202,12 @@ fn the_screen_reuses_rows_by_id_when_scrolling() {
             rows: vec![
                 Row {
                     id: 10,
+                    selection: None,
                     cells: None,
                 },
                 Row {
                     id: 12,
+                    selection: None,
                     cells: None,
                 },
             ],
@@ -241,4 +253,68 @@ fn the_screen_rejects_out_of_order_and_unknown_styles() {
         .expect("an empty frame only advances seq");
     assert_eq!(screen.seq(), 2);
     assert_eq!(screen.row_text(0), "$ ls");
+}
+
+#[test]
+fn selections_travel_per_row_and_are_not_held() {
+    let mut frame = full_frame();
+    if let Some(body) = &mut frame.body {
+        body.rows[1].selection = Some(Selection { start: 0, end: 3 });
+    }
+    let bytes = encode(&frame);
+    assert_eq!(
+        bytes.len(),
+        encode(&full_frame()).len() + 4,
+        "a selection costs four bytes"
+    );
+    assert_eq!(decode(&bytes), Ok(frame.clone()));
+    let mut screen = Screen::new();
+    screen.apply(&frame).expect("frame");
+    assert_eq!(screen.selection(0), None);
+    assert_eq!(screen.selection(1), Some(Selection { start: 0, end: 3 }));
+    assert_eq!(screen.scrollbar().offset, 118);
+    // The next frame lists no selection: it is gone.
+    let next = Frame {
+        seq: 2,
+        reset: false,
+        body: Some(Body {
+            colors: None,
+            styles: Vec::new(),
+            rows: vec![
+                Row {
+                    id: 10,
+                    selection: None,
+                    cells: None,
+                },
+                Row {
+                    id: 11,
+                    selection: None,
+                    cells: None,
+                },
+            ],
+            ..frame.body.clone().expect("body")
+        }),
+        ..frame.clone()
+    };
+    screen.apply(&next).expect("next");
+    assert_eq!(screen.selection(1), None);
+    // A selection past the last column is malformed.
+    let mut wide = frame;
+    if let Some(body) = &mut wide.body {
+        body.rows[0].selection = Some(Selection { start: 2, end: 6 });
+    }
+    assert!(decode(&encode(&wide)).is_err());
+}
+
+#[test]
+fn the_json_form_round_trips() {
+    let frame = full_frame();
+    let json = serde_json::to_value(&frame).expect("serialize");
+    assert_eq!(json["body"]["colors"]["background"], "#010203");
+    assert_eq!(
+        json["body"]["colors"]["palette"].as_array().map(Vec::len),
+        Some(256)
+    );
+    let back: Frame = serde_json::from_value(json).expect("deserialize");
+    assert_eq!(back, frame);
 }

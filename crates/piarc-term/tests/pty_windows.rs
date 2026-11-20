@@ -30,6 +30,7 @@ fn config(program: &str, args: &[&str]) -> SessionConfig {
         cwd: Some(std::env::temp_dir()),
         env: vec![("PROMPT".into(), "$$$S".into())],
         scrollback_lines: 1000,
+        ..SessionConfig::default()
     }
 }
 
@@ -195,6 +196,7 @@ fn title_and_bell_become_events() {
             Event::Title(t) => titles.push(t),
             Event::Bell { count } => bells += count,
             Event::Exited { .. } => break,
+            _ => {}
         }
     }
     assert!(titles.iter().any(|t| t == "piarc title"), "{titles:?}");
