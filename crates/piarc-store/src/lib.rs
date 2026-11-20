@@ -8,6 +8,9 @@
 //! - Streaming, read-only parsing of Pi session JSONL ([`jsonl`], [`pi_session`]) and the
 //!   session index kept current incrementally or rebuilt from the files ([`index`]).
 //! - Rows of workspaces, trust decisions and audit events ([`records`]).
+//! - The checkpoint index of file snapshots (`checkpoints`, `checkpoint_files`,
+//!   `checkpoint_sessions`; schema v5, ADR-0044); the snapshot objects and the rewind rules are
+//!   `piarc-checkpoint`'s.
 //!
 //! # Not responsible for
 //!
@@ -23,6 +26,7 @@
 //! The authoritative rules are in `crates/deps-rules.json`, enforced by
 //! `scripts/ci/check-crate-deps.mjs` (architecture section 7.1).
 
+mod checkpoints;
 mod error;
 pub mod index;
 pub mod jsonl;
@@ -33,6 +37,7 @@ pub mod records;
 mod store;
 pub mod time;
 
+pub use checkpoints::{CheckpointFileRow, CheckpointRow, NewCheckpointFile};
 pub use error::{Error, Result};
 pub use index::{
     FileOutcome, IndexStatus, SessionPrefsChange, SessionRecord, SkippedLine, SyncReport,

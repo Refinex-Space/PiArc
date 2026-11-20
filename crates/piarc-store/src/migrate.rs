@@ -45,6 +45,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "session_file_stamp",
         sql: include_str!("sql/0004_session_file_stamp.sql"),
     },
+    Migration {
+        version: 5,
+        name: "checkpoints",
+        sql: include_str!("sql/0005_checkpoints.sql"),
+    },
 ];
 
 /// The highest version in `migrations`.
