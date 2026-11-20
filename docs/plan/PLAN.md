@@ -160,7 +160,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | R3 | [M2 评审](tasks/R3-m2-review.md) | 3 | T30、W1 | macOS | high / 高 | 中 | 无 | 部分完成 | 8e2b4a2 |
 | W2 | [Windows：M2 达标](tasks/W2-windows-m2-parity.md) | 4 | R3 | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T31 | [子 agent 与模型别名](tasks/T31-subagents-and-model-aliases.md) | 4 | R3 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 7ec1971 |
-| T32 | [后台任务、Monitor 与 KillShell](tasks/T32-background-tasks-and-monitor.md) | 4 | T31 | macOS | high / 高 | 中 | 无 | 未开始 | — |
+| T32 | [后台任务、Monitor 与 KillShell](tasks/T32-background-tasks-and-monitor.md) | 4 | T31 | macOS | high / 高 | 中 | 无 | 进行中 | — |
 | T33 | [无头终端（Core 侧）](tasks/T33-headless-terminal.md) | 4 | T32 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T34 | [终端渲染器与终端面板](tasks/T34-terminal-renderer-and-panel.md) | 4 | T33 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T35 | [Worktree、并行会话、多窗口、全文搜索与后台常驻](tasks/T35-worktrees-parallel-sessions-and-windows.md) | 4 | T34 | macOS | high / 高 | 大 | 无 | 未开始 | — |
@@ -308,6 +308,18 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+T32（后台任务、Monitor 与 KillShell），基线 9a44d7c（复用 7ec1971 的全量 verify）：
+
+- [ ] 1 任务管理器（Core）：任务模型与状态机、`background_tasks` 表（schema v7）、带 `revision` 的实体快照、进程句柄归 Core、应用退出记 `interrupted`、归档清理输出
+- [ ] 2 `Bash` 的 `run_in_background` 与前台超时转后台（同一进程句柄）、输出写 `sessions/<id>/tasks/<taskId>.log`、`exec/background/list`、`exec/background/read`
+- [ ] 3 完成通知：`session/remind` 的 `backgroundTask` 提醒注入下一回合（Agent Host 重启后照常送达）
+- [ ] 4 `KillShell`：整棵进程树、只限本会话（含子 agent）、尾部预览
+- [ ] 5 `Monitor`：审批（Bash 规则、Bash 分析、`Bash` matcher hooks）、逐行回灌、限速与总量上限、空闲唤醒、结束条件、可注入时钟
+- [ ] 6 后台子 agent 迁入任务管理器（`kind: subagent`，面板停止中止子会话）
+- [ ] 7 客户端：后台任务面板与右栏卡、分段读输出、停止按钮
+- [ ] 8 L2 场景 `bg-*`、`monitor-*` 与能力 ID；更新 T17 超时场景期望
+- [ ] 9 验收 T32-A01–A13；AGENTS.md、复用表、架构与 ADR、登记事项（T17 验收项描述需用户修改）
 
 ## 登记事项
 
