@@ -1547,6 +1547,12 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 [[package]]
 name = "piarc-checkpoint"
 version = "0.0.0"
+dependencies = [
+ "piarc-protocol",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.21",
+]
 
 [[package]]
 name = "piarc-config"
@@ -1606,6 +1612,7 @@ version = "0.0.0"
 dependencies = [
  "piarc-protocol",
  "similar",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -1636,6 +1643,7 @@ dependencies = [
  "ignore",
  "lopdf",
  "notify",
+ "piarc-checkpoint",
  "piarc-protocol",
  "serde_json",
  "sha2",

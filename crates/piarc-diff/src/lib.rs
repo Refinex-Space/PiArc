@@ -8,8 +8,11 @@
 //! - Degradation for large changes: past [`MAX_HUNK_LINES`] changed lines or
 //!   [`MAX_UNIFIED_BYTES`] of diff text the hunks are left out and the text is cut; the line
 //!   counts stay exact.
+//! - Reverse application of hunks ([`revert_hunks`]): the Changes panel's "discard this hunk"
+//!   (T28, ADR-0044).
+//! - The Changes panel's degradation thresholds ([`MAX_PANEL_FILES`], [`MAX_PANEL_LINES`]).
 //! - Text offsets for the client are UTF-16 code units (architecture section 7.7); the line
-//!   diff has none yet.
+//!   diff has none.
 //!
 //! # Not responsible for
 //!
@@ -27,6 +30,10 @@
 use std::fmt::Write as _;
 use std::time::Duration;
 
+mod revert;
+
+pub use revert::{RevertError, revert_hunks};
+
 use piarc_protocol::diff::{DiffHunk, DiffLine, DiffLineKind, FileDiff};
 use similar::{ChangeTag, TextDiff};
 
@@ -38,6 +45,14 @@ pub const MAX_HUNK_LINES: u64 = 5_000;
 
 /// Longest unified diff text kept; a longer one is cut there and the hunks are left out.
 pub const MAX_UNIFIED_BYTES: usize = 512 * 1024;
+
+/// More changed files than this, and the Changes panel lists paths and counts only; a file's
+/// diff is fetched when it is expanded and shown as plain text (architecture 7.7).
+pub const MAX_PANEL_FILES: usize = 300;
+
+/// More added and removed lines than this across the session's files, and the Changes panel
+/// degrades as for [`MAX_PANEL_FILES`].
+pub const MAX_PANEL_LINES: u64 = 5_000;
 
 /// How long the diff algorithm may search before it settles for a coarser diff.
 const DIFF_TIME_LIMIT: Duration = Duration::from_secs(2);

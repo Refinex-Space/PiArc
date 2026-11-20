@@ -305,6 +305,26 @@ impl BoundPath {
         Ok((&self.directory.dir, name))
     }
 
+    /// Removes the regular file at the target (a rewind deleting a file the session created).
+    pub(crate) fn remove_file(&self) -> Result<()> {
+        self.verify()?;
+        let (parent, name) = self.parent()?;
+        let m = parent
+            .symlink_metadata(name)
+            .map_err(|e| Error::io(&self.path, e))?;
+        if is_redirect(&m) || !m.is_file() {
+            return Err(Error::coded(&self.path, "EISDIR", "not a regular file"));
+        }
+        #[cfg(windows)]
+        let removed = with_pinned_windows_path(parent, &self.directory.path, |p| {
+            std::fs::remove_file(p.join(name))
+        });
+        #[cfg(not(windows))]
+        let removed = parent.remove_file(name);
+        removed.map_err(|e| Error::io(&self.path, e))?;
+        self.verify()
+    }
+
     pub(crate) fn mkdir(&self) -> Result<bool> {
         self.verify()?;
         let mut dir = self

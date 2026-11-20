@@ -8,15 +8,16 @@
 //!
 //! # Not responsible for
 //!
-//! - Snapshot storage and rewind (`piarc-checkpoint`), planned before writes in M2.
+//! - Snapshot storage and the rewind rules (`piarc-checkpoint`): this crate stores the old
+//!   bytes there before each write and puts recorded content back ([`replace`]).
 //! - Diff computation (`piarc-diff`).
 //! - Permission decisions (`piarc-policy`).
 //!
 //! # Allowed workspace dependencies
 //!
 //! The foundation crates `piarc-protocol` and `piarc-ports`, plus the registered one-way exception
-//! `piarc-checkpoint`: in M2 every write must save the original file content to a checkpoint first
-//! (architecture section 6.9). `piarc-checkpoint` never depends on `piarc-fs`.
+//! `piarc-checkpoint`: every write through Core saves the original file content to the snapshot
+//! store first (architecture section 6.9). `piarc-checkpoint` never depends on `piarc-fs`.
 //!
 //! The authoritative rules are in `crates/deps-rules.json`, enforced by
 //! `scripts/ci/check-crate-deps.mjs` (architecture section 7.1).
@@ -41,6 +42,12 @@
 //!
 //! Scoped file tools operate relative to directory objects ([`DirectoryBinding`], ADR-0036).
 //!
+//! T28 (ADR-0044): [`write()`] with [`WriteSpec::snapshots`] stores the replaced bytes in the
+//! snapshot store under the path lock and reports both hashes; [`replace`] puts recorded
+//! content back for rewinds and the Changes panel (expected content checked under the lock,
+//! replaced bytes stored, the session's table forgets the file); [`current_sha256`] and
+//! [`read_current`] give the content now.
+//!
 //! [`watch::Watcher`] (T13) watches directories for `piarc-core`, which forwards the changes
 //! of settings files to `piarc-config`; T35 builds workspace watching on it.
 
@@ -56,6 +63,7 @@ mod glob;
 mod grep;
 mod image;
 mod pdf;
+mod restore;
 mod scope;
 mod spill;
 mod state;
@@ -75,6 +83,7 @@ pub use grep::{DEFAULT_MATCH_LIMIT, GrepQuery, MAX_LINE_CHARS, MAX_OUTPUT_BYTES,
 pub use pdf::{
     MAX_PAGES_PER_READ, MAX_PAGES_WITHOUT_RANGE, pdf_page_count, pdf_page_count_bytes, read_pdf,
 };
+pub use restore::{Current, Replaced, Replacement, current_sha256, read_current, replace};
 pub use scope::{Scope, display};
 /// Streaming spill files (`spill::create`).
 pub use spill::create as create_spill;

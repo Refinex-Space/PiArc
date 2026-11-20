@@ -307,6 +307,13 @@ impl FileStates {
         self.entries.contains_key(key)
     }
 
+    /// Forgets the file `key`: its content was replaced outside the session's tools (a rewind
+    /// or a discard), so the next change needs a new read ([`Freshness::NotRead`]). Returns
+    /// whether the table had it.
+    pub fn forget(&mut self, key: &str) -> bool {
+        self.entries.remove(key).is_some()
+    }
+
     /// Number of files in the table.
     #[must_use]
     pub fn len(&self) -> usize {

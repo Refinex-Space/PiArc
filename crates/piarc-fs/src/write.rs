@@ -7,11 +7,14 @@
 //! 4. the new text keeps the old file's encoding and byte order mark, and with
 //!    [`LineEndings::MatchFile`] its line ending style; a new file is UTF-8 without a byte order
 //!    mark, its line breaks as written;
-//! 5. the bytes replace the file atomically ([`crate::atomic`]); on any failure the file is
+//! 5. with a snapshot store ([`WriteSpec::snapshots`]), the old bytes are stored in it first,
+//!    still under the lock (architecture section 6.9: the checkpoint's "before" content);
+//! 6. the bytes replace the file atomically ([`crate::atomic`]); on any failure the file is
 //!    unchanged;
-//! 6. the session's table records the write.
+//! 7. the session's table records the write.
 //!
-//! The result carries the old and new text (without a byte order mark) for the diff.
+//! The result carries the old and new text (without a byte order mark) for the diff, and the
+//! hashes of the old and new bytes for the checkpoint index.
 
 use std::borrow::Cow;
 use std::fs::{File, Metadata};
@@ -19,6 +22,7 @@ use std::io::{self, Read as _, Write as _};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
+use piarc_checkpoint::{ObjectStore, Pin};
 use piarc_protocol::fs::{FileStat, LineEndings, ReadRange};
 use sha2::{Digest, Sha256};
 
@@ -41,10 +45,13 @@ pub struct WriteSpec<'a> {
     pub append: bool,
     /// How the line breaks of `text` are written into an existing file.
     pub line_endings: LineEndings,
+    /// Where the old bytes of an existing file go before it is replaced; `None` keeps no
+    /// snapshot.
+    pub snapshots: Option<&'a ObjectStore>,
 }
 
 /// A completed write.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct Written {
     /// The file, resolved.
     pub path: PathBuf,
@@ -58,6 +65,12 @@ pub struct Written {
     pub bytes_written: u64,
     /// The encoding the file was written in.
     pub encoding: TextEncoding,
+    /// SHA-256 of the replaced bytes; `None` for a new file.
+    pub before_sha256: Option<[u8; 32]>,
+    /// SHA-256 of the bytes now in the file.
+    pub after_sha256: [u8; 32],
+    /// The stored old bytes, pinned until the caller recorded them in the index.
+    pub snapshot: Option<Pin>,
 }
 
 /// Writes the file under the invariants above.
@@ -109,24 +122,16 @@ pub(crate) fn write_with(
     let key = scope.key(path);
     let _guard = locks.lock(&key);
     let existing = existing_file(&bound)?;
-    if let Some((_, bytes)) = &existing {
+    let before_sha256 = existing.as_ref().map(|(_, bytes)| {
         let current: [u8; 32] = Sha256::digest(bytes).into();
-        check(lock(states).freshness(&key, &current), path)?;
+        current
+    });
+    if let Some(current) = &before_sha256 {
+        check(lock(states).freshness(&key, current), path)?;
     }
     let (encoding, before) = match &existing {
         Some((_, bytes)) => {
-            let encoding = detect(bytes);
-            let text = decode(encoding, bytes);
-            if matches!(encoding, TextEncoding::Utf16 { .. })
-                && text.contains(char::REPLACEMENT_CHARACTER)
-                && encode(encoding, &text).as_deref() != Ok(bytes.as_slice())
-            {
-                return Err(Error::coded(
-                    path,
-                    "EILSEQ",
-                    "cannot safely rewrite malformed UTF-16 text",
-                ));
-            }
+            let (encoding, text) = decode_old(bytes, path)?;
             (encoding, Some(text))
         }
         None => (TextEncoding::NEW_FILE, None),
@@ -153,12 +158,22 @@ pub(crate) fn write_with(
         character: u.character,
         line: u.line,
     })?;
+    let snapshot = match (spec.snapshots, &existing) {
+        (Some(store), Some((_, old))) => {
+            Some(store.put(old).map_err(|source| Error::Snapshot {
+                path: display(path),
+                source,
+            })?)
+        }
+        _ => None,
+    };
     let metadata = existing.as_ref().map(|(m, _)| m);
     let written = crate::atomic::replace_bound(&bound, metadata, |file| put(file, &bytes))?;
+    let after_sha256: [u8; 32] = Sha256::digest(&bytes).into();
     lock(states).record_write(
         key,
         Snapshot {
-            sha256: Sha256::digest(&bytes).into(),
+            sha256: after_sha256,
             size: written.len(),
             modified: written.modified().ok(),
         },
@@ -170,6 +185,9 @@ pub(crate) fn write_with(
         after: without_bom(after),
         bytes_written: bytes.len() as u64,
         encoding,
+        before_sha256,
+        after_sha256,
+        snapshot,
     })
 }
 
@@ -229,6 +247,24 @@ pub fn stat_for_read(
     Ok(stat)
 }
 
+/// The encoding and text of a file about to be rewritten; malformed UTF-16 is refused so its
+/// bytes are not lost.
+fn decode_old(bytes: &[u8], path: &Path) -> Result<(TextEncoding, String)> {
+    let encoding = detect(bytes);
+    let text = decode(encoding, bytes);
+    if matches!(encoding, TextEncoding::Utf16 { .. })
+        && text.contains(char::REPLACEMENT_CHARACTER)
+        && encode(encoding, &text).as_deref() != Ok(bytes)
+    {
+        return Err(Error::coded(
+            path,
+            "EILSEQ",
+            "cannot safely rewrite malformed UTF-16 text",
+        ));
+    }
+    Ok((encoding, text))
+}
+
 fn check(freshness: Freshness, path: &Path) -> Result<()> {
     match freshness {
         Freshness::Fresh => Ok(()),
@@ -243,7 +279,9 @@ fn check(freshness: Freshness, path: &Path) -> Result<()> {
 
 /// The metadata and bytes of the regular file at `path`; `None` when it does not exist (its
 /// parent must).
-fn existing_file(bound: &crate::bound::BoundPath) -> Result<Option<(Metadata, Vec<u8>)>> {
+pub(crate) fn existing_file(
+    bound: &crate::bound::BoundPath,
+) -> Result<Option<(Metadata, Vec<u8>)>> {
     let path = bound.path();
     bound.parent()?;
     let mut file = match bound.open_file() {

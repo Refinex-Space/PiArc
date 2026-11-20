@@ -168,6 +168,7 @@ pub(super) fn write(
         text: &text,
         append: p.append.unwrap_or(false),
         line_endings: p.line_endings.unwrap_or(LineEndings::AsWritten),
+        snapshots: None,
     };
     let scope = permit.as_ref().map_or(&session.scope, |p| &p.scope);
     let written = piarc_fs::write_checked(scope, &session.files, locks, &spec, |before, new| {

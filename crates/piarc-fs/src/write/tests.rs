@@ -62,6 +62,7 @@ impl Fixture {
                 text,
                 append: false,
                 line_endings,
+                snapshots: None,
             },
         )
     }
@@ -221,6 +222,7 @@ fn a_failure_during_the_write_leaves_the_file_whole() {
         text: "replacement text\n",
         append: false,
         line_endings: LineEndings::AsWritten,
+        snapshots: None,
     };
     let error = write_with(
         &f.scope,
@@ -278,6 +280,7 @@ fn concurrent_appends_to_one_file_are_serialized() {
                             text: &line,
                             append: true,
                             line_endings: LineEndings::AsWritten,
+                            snapshots: None,
                         },
                     )
                     .expect("append");

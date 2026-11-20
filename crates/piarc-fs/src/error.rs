@@ -88,6 +88,22 @@ pub enum Error {
         /// The path as resolved.
         path: String,
     },
+    /// A rewind or a discard expected other content than the file has now (it changed since
+    /// it was shown).
+    #[error("{path} changed since it was shown. Refresh and try again; the file is unchanged.")]
+    Changed {
+        /// The path as resolved.
+        path: String,
+    },
+    /// The content about to be replaced could not be saved to the snapshot store.
+    #[error("{path}: its current content could not be saved ({source}); the file is unchanged")]
+    Snapshot {
+        /// The path as resolved.
+        path: String,
+        /// The store's error.
+        #[source]
+        source: piarc_checkpoint::Error,
+    },
     /// The new text has a character the file's encoding cannot represent.
     #[error(
         "The new text for {path} has a character ({character:?} on line {line}) that the \
@@ -148,7 +164,8 @@ impl Error {
                 ErrorKind::PermissionDenied
             }
             Self::NotRead { .. } => ErrorKind::FileNotRead,
-            Self::Modified { .. } => ErrorKind::FileModified,
+            Self::Modified { .. } | Self::Changed { .. } => ErrorKind::FileModified,
+            Self::Snapshot { .. } => ErrorKind::IoError,
             Self::Unencodable { .. } => ErrorKind::UnencodableText,
         }
     }
@@ -191,9 +208,11 @@ impl Error {
                 "reason": reason.name(),
                 "operation": access.name(),
             })),
-            Self::ApprovalMismatch { path } | Self::NotRead { path } | Self::Modified { path } => {
-                Some(json!({ "path": path }))
-            }
+            Self::ApprovalMismatch { path }
+            | Self::NotRead { path }
+            | Self::Modified { path }
+            | Self::Changed { path }
+            | Self::Snapshot { path, .. } => Some(json!({ "path": path })),
             Self::Unencodable {
                 path,
                 encoding,
