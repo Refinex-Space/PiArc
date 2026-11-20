@@ -57,8 +57,8 @@ export const AGENT_DESCRIPTION = [
   'Hand a task to a subagent: a separate agent with its own context window that works on it ' +
     'with its own tools and reports back. It starts with nothing from this conversation, so ' +
     '`prompt` must say everything it needs: the goal, what you already know, where to look ' +
-    'and what the report should contain. `description` is a short title (three to five ' +
-    'words) for the user.',
+    'and what the report should contain. `description` is a short title, in a few words, ' +
+    'for the user.',
   'Use a subagent for searches and investigations that would fill this context with ' +
     'material you only need a summary of, or for independent parts of a task. Several ' +
     'calls in one response run at the same time. For a single file or a known symbol, read ' +

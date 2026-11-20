@@ -9,7 +9,7 @@ workspace:
     .claude/settings.local.json: "{\r\n  \"permissions\": { \"defaultMode\": \"default\" }\r\n}\r\n"
     .claude/rules/house.md: Follow the house style.
   run_files:
-    'home 家/.claude/settings.json': '{"permissions":{"allow":["Bash(sed -n *)"],"defaultMode":"plan"},"model":"ignored-model"}'
+    'home 家/.claude/settings.json': '{"permissions":{"allow":["Bash(sed -n *)"],"defaultMode":"plan"},"outputStyle":"ignored-style"}'
     'home 家/.claude.json': '{"numStartups":3,"mcpServers":{}}'
 providers:
   main:
@@ -58,7 +58,7 @@ expect:
         status: loaded
         overridden:
           - { pointer: /permissions/defaultMode, value: plan, source: claudeProjectLocal }
-        ignored: [{ pointer: /model, reason: planned, task: T29 }]
+        ignored: [{ pointer: /outputStyle, reason: planned, task: T37 }]
       claudeState:
         status: loaded
         ignored:

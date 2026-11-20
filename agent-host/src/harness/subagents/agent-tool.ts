@@ -28,7 +28,7 @@ function stringEnum<const T extends readonly string[]>(
 }
 
 const agentSchema = Type.Object({
-  description: Type.String({ description: 'A short title of the task, three to five words.' }),
+  description: Type.String({ description: 'A short title of the task, in a few words.' }),
   prompt: Type.String({
     description: 'The task, with everything the subagent needs to carry it out on its own.',
   }),
