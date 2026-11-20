@@ -216,6 +216,8 @@ test('next steps: run here sends the next input, a new session starts with the s
   await expect(page.getByTestId('user-message').last()).toContainText(
     'Run the whole test suite and report failures.',
   );
+  // The composer is idle before the new turn starts too: wait for the request itself.
+  await expect.poll(async () => (await requests(mock, 't26-next')).length).toBe(3);
   await idle(page);
   const here = await requests(mock, 't26-next');
   expect(here).toHaveLength(3);
