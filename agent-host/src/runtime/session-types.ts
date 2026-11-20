@@ -67,7 +67,9 @@ export interface RegistryOptions {
 /** What a turn runs: an input, or a compaction (`/compact [focus]`). */
 export type Job =
   | { readonly kind: 'prompt'; readonly prepared: PreparedInput }
-  | { readonly kind: 'compact'; readonly instructions: string | undefined };
+  | { readonly kind: 'compact'; readonly instructions: string | undefined }
+  /** A Monitor woke the idle session (T32): the queued reminder is the turn's input. */
+  | { readonly kind: 'wake' };
 
 /** A registry step in a recording (`onPiEvent`). */
 export type RecordedControl =

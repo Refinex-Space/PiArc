@@ -53,7 +53,7 @@ interface ToolResult {
 }
 
 interface InputRecord {
-  readonly kind: 'user' | 'compact';
+  readonly kind: 'user' | 'compact' | 'wake';
   readonly turnId: string | undefined;
   readonly input: UserInput | undefined;
 }
@@ -110,7 +110,10 @@ export function projectHistory(
     if (entry.type === 'custom' && entry.customType === INPUT_ENTRY) {
       const data: unknown = entry.data;
       pending = {
-        kind: isObject(data) && data.action === 'compact' ? 'compact' : 'user',
+        kind:
+          isObject(data) && (data.action === 'compact' || data.action === 'wake')
+            ? data.action
+            : 'user',
         turnId: isObject(data) && typeof data.turnId === 'string' ? data.turnId : undefined,
         input: parseInputRecord(data),
       };
@@ -131,6 +134,11 @@ export function projectHistory(
       entry.customType === REMINDER_ENTRY &&
       typeof entry.content === 'string'
     ) {
+      // A Monitor's wake (T32): the reminder is the turn's input.
+      if (pending?.kind === 'wake') {
+        currentTurn = pending.turnId ?? entry.id;
+        pending = undefined;
+      }
       items.push({
         entryId: entry.id,
         turnId: currentTurn ?? entry.id,

@@ -11,6 +11,9 @@ import { randomUUID } from 'node:crypto';
 import type {
   WebFetchResult,
   BlobRef,
+  TaskKind,
+  TaskStarted,
+  TaskStatus,
   CommandOutcome,
   CommandOutput,
   CwdReset,
@@ -158,6 +161,28 @@ export interface CommandResult {
   readonly cwd: string | undefined;
   readonly cwdReset: CwdReset | undefined;
   readonly output: CommandOutput | undefined;
+  /** The background task it became (T32): asked for, or moved there by its timeout. */
+  readonly task: TaskStarted | undefined;
+}
+
+/** A Monitor started in Core (`exec/monitor`, T32). */
+export interface MonitorStarted {
+  readonly taskId: string;
+  readonly outputPath: string;
+  readonly timeoutMs: number;
+  readonly requestedTimeoutMs: number | undefined;
+}
+
+/** A task KillShell stopped (`exec/background/kill`, T32). */
+export interface TaskStopped {
+  readonly taskId: string;
+  readonly kind: TaskKind;
+  readonly status: TaskStatus;
+  readonly title: string;
+  readonly outputPath: string | undefined;
+  /** Whether this request stopped it; false when it had already ended. */
+  readonly stopped: boolean;
+  readonly tail: string;
 }
 
 /** A command for `exec/run`. */
@@ -170,6 +195,8 @@ export interface CommandRequest {
   /** Runs there and does not move the session's shell directory; the session's when absent. */
   readonly cwd?: string;
   readonly env?: Record<string, string>;
+  /** Runs as a background task and answers at once (T32). */
+  readonly background?: boolean;
 }
 
 /** Which shells the session's command tools can use. */
@@ -468,6 +495,7 @@ export class CoreIo {
     if (command.timeoutMs !== undefined) params.timeoutMs = command.timeoutMs;
     if (command.cwd !== undefined) params.cwd = command.cwd;
     if (command.env !== undefined) params.env = command.env;
+    if (command.background === true) params.background = true;
     const outcome = this.#request(
       'exec/run',
       params,
@@ -480,6 +508,29 @@ export class CoreIo {
       await this.#request('exec/kill', { requestId }, parseObject);
     };
     return { outcome, kill };
+  }
+
+  /** Starts a Monitor's command in Core (`exec/monitor`); its new lines come as reminders. */
+  async monitor(
+    command: string,
+    description: string,
+    timeoutMs: number | undefined,
+    origin: Origin,
+  ): Promise<MonitorStarted> {
+    const params: Record<string, unknown> = {
+      requestId: `monitor-${randomUUID()}`,
+      command,
+      description,
+      origin,
+    };
+    if (timeoutMs !== undefined) params.timeoutMs = timeoutMs;
+    return this.#request('exec/monitor', params, parseMonitorStarted);
+  }
+
+  /** Stops a background task of this session or its subagents (`exec/background/kill`). */
+  async killTask(taskId: string): Promise<TaskStopped> {
+    // Stopping waits for the process tree (or the subagent) to end.
+    return this.#request('exec/background/kill', { taskId }, parseTaskStopped, undefined, null);
   }
 
   async #request<T>(
@@ -779,6 +830,73 @@ function parseRunResult(result: unknown): CommandResult | undefined {
     cwd: text(result.cwd),
     cwdReset: parseCwdReset(result.cwdReset),
     output: parseOutput(result.output),
+    task: parseTaskStarted(result.task),
+  };
+}
+
+function parseTaskStarted(value: unknown): TaskStarted | undefined {
+  if (
+    !isRecord(value) ||
+    typeof value.taskId !== 'string' ||
+    typeof value.outputPath !== 'string' ||
+    (value.reason !== 'requested' && value.reason !== 'timeout')
+  ) {
+    return undefined;
+  }
+  return { taskId: value.taskId, outputPath: value.outputPath, reason: value.reason };
+}
+
+function parseMonitorStarted(value: unknown): MonitorStarted | undefined {
+  if (!isRecord(value) || typeof value.taskId !== 'string' || typeof value.outputPath !== 'string')
+    return undefined;
+  const timeoutMs = integer(value.timeoutMs);
+  if (timeoutMs === undefined) return undefined;
+  return {
+    taskId: value.taskId,
+    outputPath: value.outputPath,
+    timeoutMs,
+    requestedTimeoutMs: integer(value.requestedTimeoutMs),
+  };
+}
+
+const TASK_KINDS: readonly TaskKind[] = ['command', 'subagent', 'monitor'];
+const TASK_STATUSES: readonly TaskStatus[] = [
+  'running',
+  'completed',
+  'failed',
+  'killed',
+  'interrupted',
+];
+
+function isTaskKind(value: unknown): value is TaskKind {
+  return TASK_KINDS.some((kind) => kind === value);
+}
+
+function isTaskStatus(value: unknown): value is TaskStatus {
+  return TASK_STATUSES.some((status) => status === value);
+}
+
+function parseTaskStopped(value: unknown): TaskStopped | undefined {
+  if (!isRecord(value) || typeof value.stopped !== 'boolean' || typeof value.tail !== 'string')
+    return undefined;
+  const task = value.task;
+  if (
+    !isRecord(task) ||
+    typeof task.taskId !== 'string' ||
+    typeof task.title !== 'string' ||
+    !isTaskKind(task.kind) ||
+    !isTaskStatus(task.status)
+  ) {
+    return undefined;
+  }
+  return {
+    taskId: task.taskId,
+    kind: task.kind,
+    status: task.status,
+    title: task.title,
+    outputPath: text(task.outputPath),
+    stopped: value.stopped,
+    tail: value.tail,
   };
 }
 

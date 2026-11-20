@@ -46,6 +46,7 @@ export const HOST_CAPABILITIES: readonly string[] = [
   'webFetch',
   'login',
   'subagents',
+  'backgroundTasks',
 ];
 
 /** Exit codes, for Core's log and restart decisions. */
@@ -375,17 +376,22 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     const method = 'session/remind';
     const fields = paramsObject(method, params);
     const sessionId = stringField(method, fields, 'sessionId');
-    if (fields.type !== 'backgroundTask') {
-      throw new AhpError('invalidParams', `${method}: type must be backgroundTask`, {
-        details: { member: 'type' },
-      });
+    const type = fields.type;
+    if (type !== 'backgroundTask' && type !== 'monitorOutput') {
+      throw new AhpError(
+        'invalidParams',
+        `${method}: type must be backgroundTask or monitorOutput`,
+        { details: { member: 'type' } },
+      );
     }
-    (await sessions(method)).harness(sessionId).remind({
-      type: 'backgroundTask',
+    const key = optionalString(method, fields, 'key');
+    return (await sessions(method)).remind(sessionId, {
+      type,
       source: stringField(method, fields, 'source'),
       text: stringField(method, fields, 'text'),
+      ...(key === undefined ? {} : { key }),
+      wake: fields.wake === true,
     });
-    return {};
   });
   for (const [method, kind] of [
     ['session/steer', 'steer'],
@@ -523,6 +529,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
           checkpoints: welcome.enabled.includes('checkpoints'),
           webFetch: welcome.enabled.includes('webFetch'),
           subagents: welcome.enabled.includes('subagents'),
+          backgroundTasks: welcome.enabled.includes('backgroundTasks'),
         },
         log,
         sinkFor: (sessionId) => ({

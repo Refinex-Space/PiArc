@@ -1134,6 +1134,17 @@
           "format": "int32",
           "type": ["integer", "null"]
         },
+        "task": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TaskStarted"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The background task the command became (T32); the exit fields are then absent and\n`durationMs` is how long it ran in the foreground."
+        },
         "timedOut": {
           "description": "Whether it was stopped because its timeout passed.",
           "type": "boolean"

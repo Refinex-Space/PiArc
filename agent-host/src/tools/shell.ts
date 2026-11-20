@@ -1,8 +1,9 @@
 // `Bash` and `PowerShell`: PiArc's command tools (architecture section 6.11, T17, ADR-0028).
 //
 // Core does the work of a command (`exec/run`): the shell, the working directory carried from
-// one bash command to the next, the timeout (2 minutes by default, at most 10) and stopping the
-// whole process tree, the output budget with the full text saved to the session's temporary
+// one bash command to the next, the timeout (2 minutes by default, at most 10; a command that
+// reaches it moves to the background as a task, T32), `run_in_background`, stopping the whole
+// process tree, the output budget with the full text saved to the session's temporary
 // directory, and what the exit code means (`grep` exiting 1 found nothing). These tools keep
 // Pi's parameters (`command`, `timeout` in seconds), show the output live while it arrives, and
 // turn Core's structured result into the text the model reads and the details the
@@ -23,6 +24,13 @@ const shellSchema = Type.Object({
   command: Type.String({ description: 'The command line to run' }),
   timeout: Type.Optional(
     Type.Number({ description: 'Timeout in seconds; 120 when omitted, at most 600' }),
+  ),
+  run_in_background: Type.Optional(
+    Type.Boolean({
+      description:
+        'Start the command as a background task and return at once (for servers, watchers and ' +
+        'long builds); you are told when it ends',
+    }),
   ),
 });
 
@@ -62,8 +70,14 @@ function createShellTool(
       const timeoutMs = timeoutMsOf(params.timeout);
       const live = new LiveView(onUpdate);
       const origin: Origin = { tool, toolCallId };
+      const background = params.run_in_background === true;
       const { outcome, kill } = io.run(
-        { command: params.command, shell, ...(timeoutMs === undefined ? {} : { timeoutMs }) },
+        {
+          command: params.command,
+          shell,
+          ...(timeoutMs === undefined ? {} : { timeoutMs }),
+          ...(background ? { background } : {}),
+        },
         (_stream, data, skipped) => {
           live.append(data, skipped);
         },
@@ -92,6 +106,14 @@ export function shellResult(
   aborted: boolean,
 ): AgentToolResult<ShellToolDetails | undefined> & { isError: boolean } {
   const execution = executionInfo(result);
+  if (result.task !== undefined && !aborted) {
+    // It runs on as a background task (T32): nothing failed.
+    return {
+      content: [{ type: 'text', text: taskText(result) }],
+      details: execution === undefined ? undefined : { commandExecution: execution },
+      isError: false,
+    };
+  }
   const failed =
     aborted ||
     result.killed ||
@@ -148,6 +170,24 @@ export function modelText(result: CommandResult, aborted: boolean): string {
   return shown.length === 0 ? status : `${shown}\n\n${status}`;
 }
 
+/** What the model reads about a command that became a background task (T32). */
+function taskText(result: CommandResult): string {
+  const task = result.task;
+  if (task === undefined) return '';
+  const after =
+    `Its output goes to ${task.outputPath}; read it with Read. You will be told when it ends; ` +
+    `stop it earlier with KillShell (shell_id ${task.taskId}).`;
+  if (task.reason === 'timeout') {
+    const seconds = String(Math.round((result.timeoutMs ?? 0) / 1000));
+    return (
+      `The command was still running after its timeout of ${seconds} seconds, so it moved to ` +
+      `the background as task ${task.taskId} instead of being stopped; it keeps running. ` +
+      `What it printed so far is at the start of its output file. ${after}`
+    );
+  }
+  return `The command is running in the background as task ${task.taskId}. ${after}`;
+}
+
 function outputText(result: CommandResult): string {
   const output = result.output;
   if (output === undefined) {
@@ -178,6 +218,18 @@ function cwdNote(reset: CwdReset): string {
 
 /** The `commandExecution` details of a result; undefined when Core did not report them. */
 function executionInfo(result: CommandResult): CommandExecutionInfo | undefined {
+  if (result.task !== undefined && result.cwd !== undefined) {
+    return {
+      cwd: result.cwd,
+      outcome: 'success',
+      durationMs: result.durationMs ?? 0,
+      timedOut: result.timedOut,
+      timeoutMs: result.timeoutMs ?? 0,
+      truncated: false,
+      task: result.task,
+      ...(result.cwdReset === undefined ? {} : { cwdReset: result.cwdReset }),
+    };
+  }
   if (
     result.cwd === undefined ||
     result.durationMs === undefined ||
@@ -231,6 +283,7 @@ export function parseExecutionInfo(value: unknown): CommandExecutionInfo | undef
   const exitCode = isInteger(value.exitCode) ? value.exitCode : undefined;
   const signal = isInteger(value.signal) ? value.signal : undefined;
   const reset = value.cwdReset;
+  const task = value.task;
   return {
     ...info,
     ...(exitCode === undefined ? {} : { exitCode }),
@@ -248,6 +301,18 @@ export function parseExecutionInfo(value: unknown): CommandExecutionInfo | undef
             endedIn: reset.endedIn.toWellFormed(),
             resetTo: reset.resetTo.toWellFormed(),
             reason: reset.reason,
+          },
+        }
+      : {}),
+    ...(isRecord(task) &&
+    typeof task.taskId === 'string' &&
+    typeof task.outputPath === 'string' &&
+    (task.reason === 'requested' || task.reason === 'timeout')
+      ? {
+          task: {
+            taskId: task.taskId.toWellFormed(),
+            outputPath: task.outputPath.toWellFormed(),
+            reason: task.reason,
           },
         }
       : {}),

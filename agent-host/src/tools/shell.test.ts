@@ -66,6 +66,7 @@ const base: CommandResult = {
   cwd: '/w/项目',
   cwdReset: undefined,
   output: { head: 'hello\n', totalChars: 6 },
+  task: undefined,
 };
 
 describe('modelText', () => {
@@ -157,6 +158,50 @@ describe('shellResult', () => {
     expect(shellResult({ ...base, exitCode: 2, outcome: 'failure' }, false).isError).toBe(true);
     expect(shellResult({ ...base, timedOut: true, outcome: 'failure' }, false).isError).toBe(true);
     expect(shellResult(base, true).isError).toBe(true);
+  });
+
+  it('tells a command that runs on as a background task, asked for or by its timeout', () => {
+    const task = {
+      taskId: 'bg-0a1b2c3d4e5f',
+      outputPath: '~/d/sessions/s/tasks/bg-0a1b2c3d4e5f.log',
+    };
+    const asked = shellResult(
+      {
+        ...base,
+        exitCode: undefined,
+        outcome: undefined,
+        output: undefined,
+        durationMs: undefined,
+        timeoutMs: undefined,
+        task: { ...task, reason: 'requested' },
+      },
+      false,
+    );
+    expect(asked.isError).toBe(false);
+    const text = asked.content[0]?.type === 'text' ? asked.content[0].text : '';
+    expect(text).toContain('running in the background as task bg-0a1b2c3d4e5f');
+    expect(text).toContain(task.outputPath);
+    expect(text).toContain('KillShell');
+    expect(asked.details?.commandExecution.task).toEqual({ ...task, reason: 'requested' });
+    const moved = shellResult(
+      {
+        ...base,
+        exitCode: undefined,
+        outcome: undefined,
+        output: undefined,
+        timedOut: true,
+        timeoutMs: 2_000,
+        durationMs: 2_004,
+        task: { ...task, reason: 'timeout' },
+      },
+      false,
+    );
+    expect(moved.isError).toBe(false);
+    const movedText = moved.content[0]?.type === 'text' ? moved.content[0].text : '';
+    expect(movedText).toContain('still running after its timeout of 2 seconds');
+    expect(movedText).toContain('instead of being stopped');
+    const stored: unknown = JSON.parse(JSON.stringify(moved.details?.commandExecution));
+    expect(parseExecutionInfo(stored)).toEqual(moved.details?.commandExecution);
   });
 
   it('round-trips the details through a session file', () => {

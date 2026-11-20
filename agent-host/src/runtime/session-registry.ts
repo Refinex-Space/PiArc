@@ -35,6 +35,8 @@ import type {
   PromptAccepted,
   QueueState,
   SessionOpened,
+  SessionRemindParams,
+  SessionRemindResult,
   SessionStopped,
 } from '@piarc/protocol';
 
@@ -566,6 +568,30 @@ export class SessionRegistry {
     this.#get(sessionId).harness.recordMode(mode);
   }
 
+  /**
+   * `session/remind` (T32): queues the reminder; with `wake` and an idle session, starts a
+   * turn whose input is the queued reminder (a Monitor waking the session, ADR-0049 rule 6).
+   */
+  remind(
+    sessionId: string,
+    params: Pick<SessionRemindParams, 'type' | 'source' | 'text' | 'key' | 'wake'>,
+  ): SessionRemindResult {
+    const hosted = this.#get(sessionId);
+    const queued = hosted.harness.remind({
+      type: params.type,
+      source: params.source,
+      text: params.text,
+      ...(params.key == null ? {} : { key: params.key }),
+    });
+    if (queued === 'delivered') return { delivered: true };
+    const idle =
+      !hosted.closed && !hosted.changingModel && hosted.projector.activeTurnId === undefined;
+    if (params.wake === true && idle) {
+      return { turnId: this.#startTurn(sessionId, hosted, { kind: 'wake' }) };
+    }
+    return {};
+  }
+
   /** The session's Harness Kit (`session/remind`, `session/getContextUsage`). */
   harness(sessionId: string): SessionHarness {
     return this.#get(sessionId).harness;
@@ -850,6 +876,22 @@ export class SessionRegistry {
             from: hosted.turnFrom.from,
           });
           await session.compact(next.job.instructions);
+        } else if (next.job.kind === 'wake') {
+          session.sessionManager.appendCustomEntry(INPUT_ENTRY, {
+            turnId: next.turnId,
+            action: 'wake',
+            from: hosted.turnFrom.from,
+          });
+          if (
+            !(await hosted.memory.prepare(next.turnId)) ||
+            hosted.projector.activeTurnId !== next.turnId
+          )
+            return;
+          // The queued reminders start the run; Pi appends the message and runs the model.
+          const message = hosted.harness.reminders.take();
+          if (message !== undefined) {
+            await session.sendCustomMessage(message, { triggerTurn: true });
+          }
         } else {
           const { prepared } = next.job;
           this.#checkImageInput(sessionId, prepared.input);

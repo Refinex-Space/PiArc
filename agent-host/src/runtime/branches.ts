@@ -40,7 +40,8 @@ function inputOf(entry: SessionEntry): { turnId: string; from: string | null } |
     return undefined;
   }
   const { turnId, action, from } = entry.data;
-  if (typeof turnId !== 'string' || action === 'compact') return undefined;
+  // Compactions and Monitor wakes (T32) are turns without a user message: not branch points.
+  if (typeof turnId !== 'string' || action === 'compact' || action === 'wake') return undefined;
   const recorded = typeof from === 'string' || from === null ? from : undefined;
   return { turnId, from: recorded === undefined ? entry.parentId : recorded };
 }

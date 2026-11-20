@@ -327,6 +327,10 @@ pub struct CommandExecutionInfo {
     /// The next command starts somewhere else, and why.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cwd_reset: Option<CwdReset>,
+    /// The background task the command became (T32); the exit fields are then absent and
+    /// `durationMs` is how long it ran in the foreground.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task: Option<crate::tasks::TaskStarted>,
 }
 
 impl Item {

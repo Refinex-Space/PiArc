@@ -115,6 +115,7 @@ impl HostConfig {
                 Capability::new("webFetch"),
                 Capability::new("login"),
                 Capability::new("subagents"),
+                Capability::new("backgroundTasks"),
             ],
             allow_model_network: None,
             model_preferences: None,

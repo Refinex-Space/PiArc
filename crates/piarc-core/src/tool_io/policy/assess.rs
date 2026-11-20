@@ -400,7 +400,8 @@ pub(super) fn other_call(
         // form of AskUserQuestion is shown by the tool itself (`ui/ask`) in every mode. `Agent`
         // (T31) only starts a subagent, whose own calls are each decided here; `Agent(<type>)`
         // deny and ask rules still apply to it.
-        "TodoWrite" | "EnterPlanMode" | "SuggestNextSteps" | "AskUserQuestion" | "Agent" => {
+        "TodoWrite" | "EnterPlanMode" | "SuggestNextSteps" | "AskUserQuestion" | "Agent"
+        | "KillShell" => {
             ladder.read_only = true;
             return Assessment::new(ladder, Vec::new());
         }

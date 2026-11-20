@@ -19,6 +19,7 @@ import type {
   ContextUsage,
   HarnessState,
   PermissionMode,
+  ReminderType,
   SessionRemindParams,
 } from '@piarc/protocol';
 
@@ -40,11 +41,12 @@ import {
 import { backgroundTaskNotice } from './prompts/notices.js';
 import { createAskUserQuestionTool } from './questions.js';
 import { createSuggestNextStepsTool } from './next-steps.js';
-import { Reminders, type ReminderMessage } from './reminders.js';
+import { REMINDER_ENTRY, Reminders, reminderRecords, type ReminderMessage } from './reminders.js';
 import type { SessionMemory } from './session-memory.js';
 import { createTodoWriteTool, currentTodos, todosOf, todoWatch } from './todos.js';
 import type { AuxiliaryModel } from './auxiliary.js';
 import { createAgentTool, type AgentToolHost } from './subagents/agent-tool.js';
+import { createKillShellTool, createMonitorTool } from './task-tools.js';
 import { createWebFetchTool } from './web-fetch.js';
 
 /** What Core enabled for the host tools in the handshake. */
@@ -61,6 +63,8 @@ export interface HostToolCapabilities {
   readonly webFetch?: boolean;
   /** `subagents` (T31): the `Agent` tool and child sessions Core registers. */
   readonly subagents?: boolean;
+  /** `backgroundTasks` (T32): background commands, `KillShell` and `Monitor`. */
+  readonly backgroundTasks?: boolean;
 }
 
 /** The plan and task list at the head of a branch, or undefined when it has neither. */
@@ -208,6 +212,12 @@ export class SessionHarness {
       ...(core?.webFetch === true && this.#o.io !== undefined && this.#o.auxiliary !== undefined
         ? [createWebFetchTool(profile.WebFetch, this.#o.io, this.#o.auxiliary)]
         : []),
+      ...(core?.backgroundTasks === true && this.#o.io !== undefined
+        ? [
+            createKillShellTool(profile.KillShell, this.#o.io),
+            createMonitorTool(profile.Monitor, this.#o.io),
+          ]
+        : []),
       ...(this.#o.agents === undefined ? [] : [createAgentTool(profile.Agent, this.#o.agents)]),
     ];
   }
@@ -233,18 +243,49 @@ export class SessionHarness {
     this.planMode.record(mode);
   }
 
-  /** `session/remind`: a background task's reminder for the model's next request. */
-  remind(params: Pick<SessionRemindParams, 'type' | 'source' | 'text'>): void {
-    if (params.type !== 'backgroundTask') {
-      throw new AhpError('invalidParams', 'session/remind accepts backgroundTask reminders only', {
-        details: { member: 'type' },
-      });
+  /**
+   * `session/remind`: a background task's reminder for the model's next request. With a `key`
+   * (Core's task manager, T32) the text is complete as given, a queued reminder with the same
+   * key is replaced, and one with the same type and source already on the branch is not
+   * queued again (`'delivered'`): Core resends what it has not seen delivered.
+   */
+  remind(
+    params: Pick<SessionRemindParams, 'type' | 'source' | 'text'> & { readonly key?: string },
+  ): 'queued' | 'delivered' {
+    if (params.type !== 'backgroundTask' && params.type !== 'monitorOutput') {
+      throw new AhpError(
+        'invalidParams',
+        'session/remind accepts backgroundTask and monitorOutput reminders only',
+        { details: { member: 'type' } },
+      );
     }
-    this.reminders.enqueue(this.reminders.uniqueKey('task'), {
-      type: 'backgroundTask',
+    if (params.key === undefined) {
+      this.reminders.enqueue(this.reminders.uniqueKey('task'), {
+        type: params.type,
+        source: params.source,
+        text: backgroundTaskNotice(params.source, params.text),
+      });
+      return 'queued';
+    }
+    if (this.#delivered(params.type, params.source)) return 'delivered';
+    this.reminders.enqueue(params.key, {
+      type: params.type,
       source: params.source,
-      text: backgroundTaskNotice(params.source, params.text),
+      text: params.text,
     });
+    return 'queued';
+  }
+
+  /** Whether the branch holds a delivered reminder of `type` from `source`. */
+  #delivered(type: ReminderType, source: string): boolean {
+    return this.#o.manager
+      .getBranch()
+      .some(
+        (entry) =>
+          entry.type === 'custom_message' &&
+          entry.customType === REMINDER_ENTRY &&
+          reminderRecords(entry.details).some((r) => r.type === type && r.source === source),
+      );
   }
 
   /** `session/getContextUsage`. */

@@ -655,6 +655,10 @@ export type CwdResetReason = 'outsideWorkspace' | 'missing';
  */
 export type CommandOutcome = 'success' | 'failure';
 /**
+ * Why a command became a background task.
+ */
+export type TaskStartReason = 'requested' | 'timeout';
+/**
  * What happened to a line.
  */
 export type DiffLineKind = 'context' | 'added' | 'removed';
@@ -722,10 +726,6 @@ export type LineEndings = 'asWritten' | 'matchFile';
  * A shell commands run with.
  */
 export type ExecShell = 'bash' | 'powershell';
-/**
- * Why a command became a background task.
- */
-export type TaskStartReason = 'requested' | 'timeout';
 /**
  * Which output stream a chunk came from.
  */
@@ -2656,6 +2656,11 @@ export interface CommandExecutionInfo {
    */
   signal?: number | null;
   /**
+   * The background task the command became (T32); the exit fields are then absent and
+   * `durationMs` is how long it ran in the foreground.
+   */
+  task?: TaskStarted | null;
+  /**
    * Whether it was stopped because its timeout passed.
    */
   timedOut: boolean;
@@ -2684,6 +2689,23 @@ export interface CwdReset {
    * Where the next command starts: the workspace root.
    */
   resetTo: string;
+}
+/**
+ * The task a command became (`exec/run`'s `task`).
+ */
+export interface TaskStarted {
+  /**
+   * Where its output goes, as the model is told it.
+   */
+  outputPath: string;
+  /**
+   * Why it runs in the background.
+   */
+  reason: TaskStartReason;
+  /**
+   * The task's id; `KillShell` takes it.
+   */
+  taskId: string;
 }
 /**
  * One file change as a diff.
@@ -4047,23 +4069,6 @@ export interface CommandOutput {
    * Characters of the whole output.
    */
   totalChars: number;
-}
-/**
- * The task a command became (`exec/run`'s `task`).
- */
-export interface TaskStarted {
-  /**
-   * Where its output goes, as the model is told it.
-   */
-  outputPath: string;
-  /**
-   * Why it runs in the background.
-   */
-  reason: TaskStartReason;
-  /**
-   * The task's id; `KillShell` takes it.
-   */
-  taskId: string;
 }
 /**
  * The timeout a command ran with.
