@@ -209,6 +209,9 @@ export function Conversation({
   // input (a rewound message, or the message a branch started from).
   const [rewinding, setRewinding] = useState<{ target: RewindTarget | undefined }>();
   const [fill, setFill] = useState<{ text: string; nonce: number }>();
+  // The rewound message goes into the input when the dialog closes: the dialog gives focus back
+  // to what had it (the message's button, gone with the message), the input then takes it.
+  const rewoundText = useRef<string | undefined>(undefined);
   useEffect(() => {
     const draft = takeDraft(id);
     if (draft !== undefined) setFill({ text: draft, nonce: Date.now() });
@@ -416,11 +419,14 @@ export function Conversation({
           turns={transcript.userTurns()}
           onDone={(report) => {
             const text = report.conversation?.text;
-            if (text != null) setFill({ text, nonce: Date.now() });
+            if (text != null) rewoundText.current = text;
             void transcript.changes.refresh(() => window.piarc.sessionChanges(id));
           }}
           onClose={() => {
             setRewinding(undefined);
+            const text = rewoundText.current;
+            rewoundText.current = undefined;
+            if (text !== undefined) setFill({ text, nonce: Date.now() });
           }}
         />
       )}

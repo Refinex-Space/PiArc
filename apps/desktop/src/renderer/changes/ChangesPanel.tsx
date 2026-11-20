@@ -185,7 +185,7 @@ export function ChangesPanel({ sessionId }: { readonly sessionId: string }) {
   return (
     <div className="changes-panel" data-testid="changes-panel" aria-busy={state?.loading === true}>
       <div className="changes-head">
-        {view === undefined ? null : (
+        {view === undefined || view.files.length === 0 ? null : (
           <>
             <Counts added={view.added} removed={view.removed} />
             <span className="muted">{t('changes.files', { count: view.files.length })}</span>

@@ -172,9 +172,10 @@ test('rewinding, switching branches and branching from a message', async ({
   await dialog.getByTestId('rewind-close').click();
   expect(existsSync(path.join(ws, 'made.txt'))).toBe(false);
 
-  // The conversation continues before the message, which is back in the input; the original
-  // branch is offered above it and the task list is the one of this point.
+  // The conversation continues before the message, which is back in the input (focused, ready to
+  // edit); the original branch is offered above it and the task list is the one of this point.
   await expect(page.getByTestId('composer-input')).toHaveText('Make the file.');
+  await expect(page.getByTestId('composer-input')).toBeFocused();
   await expect(userRow(page, 'Make the file.')).toHaveCount(0);
   await expect(userRow(page, 'Plan the work.')).toHaveCount(1);
   const tail = page.getByTestId('branch-tail');
