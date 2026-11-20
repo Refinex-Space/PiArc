@@ -199,11 +199,15 @@ pub(crate) fn settings_items(source: &str, settings: &Value, items: &mut BTreeSe
                     .iter()
                     .find_map(|k| handler.get(*k).and_then(Value::as_str))
                     .unwrap_or("(no command)");
-                items.insert(item(
-                    Category::Hook,
-                    source,
-                    &format!("{event}[{matcher}] {what}"),
-                ));
+                // What else decides what runs (the handler's identity in `piarc-hooks`): a
+                // change of arguments, shell or condition is a new item (R3).
+                let mut name = format!("{event}[{matcher}] {what}");
+                for key in ["args", "shell", "if"] {
+                    if let Some(value) = handler.get(key) {
+                        name.push_str(&format!(" {key}={value}"));
+                    }
+                }
+                items.insert(item(Category::Hook, source, &name));
             }
         }
     }

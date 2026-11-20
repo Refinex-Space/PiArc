@@ -169,3 +169,38 @@ fn lists_every_category_with_its_source_and_detects_new_items() {
     );
     std::fs::remove_dir_all(root).expect("cleanup");
 }
+
+/// R3: a hook in exec form (`command` plus `args`) that changes its arguments, shell or `if`
+/// condition is a new item: trusting `node fmt.js` does not trust `node evil.js`.
+#[test]
+fn a_hook_whose_arguments_shell_or_condition_change_is_a_new_item() {
+    let root = std::env::temp_dir().join(format!("piarc-exec args 中文 {}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let hook = |handler: &str| {
+        format!(
+            r#"{{ "hooks": {{ "PreToolUse": [{{ "matcher": "Bash", "hooks": [{handler}] }}] }} }}"#
+        )
+    };
+    put(
+        &root,
+        ".piarc/settings.json",
+        &hook(r#"{ "type": "command", "command": "node", "args": ["fmt.js"] }"#),
+    );
+    let trusted = enumerate(&root).items;
+    for changed in [
+        r#"{ "type": "command", "command": "node", "args": ["evil.js"] }"#,
+        r#"{ "type": "command", "command": "node", "args": ["fmt.js"], "shell": "powershell" }"#,
+        r#"{ "type": "command", "command": "node", "args": ["fmt.js"], "if": "Bash(git *)" }"#,
+    ] {
+        put(&root, ".piarc/settings.json", &hook(changed));
+        let current = enumerate(&root).items;
+        assert_eq!(new_items(&current, &trusted).len(), 1, "{changed}");
+    }
+    put(
+        &root,
+        ".piarc/settings.json",
+        &hook(r#"{ "type": "command", "command": "node", "args": ["fmt.js"] }"#),
+    );
+    assert!(new_items(&enumerate(&root).items, &trusted).is_empty());
+    let _ = std::fs::remove_dir_all(&root);
+}
