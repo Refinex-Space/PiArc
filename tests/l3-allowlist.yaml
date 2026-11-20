@@ -126,18 +126,15 @@ differences:
   - scenario: perm-compound
     path: 'tool_calls.calls.substitution.status'
     claude_code: '>=2.1.318 <2.2.0'
-    reason: PiArc analyzes command substitutions and judges every command inside (`echo $(whoami)` is two read-only commands and runs; ADR-0037); Claude Code 2.1.318 asks for any command substitution. R3 decides whether PiArc should ask too.
-    follow_up: R3
+    reason: PiArc analyzes command substitutions and judges every command inside (`echo $(whoami)` is two read-only commands and runs; architecture section 6.2.2, ADR-0037); Claude Code 2.1.318 asks for any command substitution. R3 kept PiArc's analysis (I116), so a substitution whose output names the command, an eval or a substitution that reads a file through a redirect is still judged and asked for.
   - scenario: perm-compound
     path: 'tool_results.substitution.is_error'
     claude_code: '>=2.1.318 <2.2.0'
     reason: Follows from the substitution call running in PiArc (see that entry).
-    follow_up: R3
   - scenario: perm-compound
     path: 'asks.substitution'
     claude_code: '>=2.1.318 <2.2.0'
     reason: Claude Code asks for the command substitution; PiArc does not (see the status entry).
-    follow_up: R3
   - scenario: perm-compound
     path: 'tool_calls.calls.outside.status'
     claude_code: '>=2.1.318 <2.2.0'
