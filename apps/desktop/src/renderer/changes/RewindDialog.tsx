@@ -107,7 +107,7 @@ function Files({
             <span className="rewind-file-path" title={file.path}>
               {file.label}
             </span>
-            <span className={`badge rewind-action is-${file.action}`}>
+            <span className={`change-tag rewind-action is-${file.action}`}>
               {t(`rewind.action.${file.action}`)}
             </span>
           </div>
@@ -186,7 +186,7 @@ function Report({
                 <span className="rewind-file-path" title={file.path}>
                   {file.label}
                 </span>
-                <span className={`badge rewind-outcome is-${file.outcome}`}>
+                <span className={`change-tag rewind-outcome is-${file.outcome}`}>
                   {t(`rewind.outcome.${file.outcome}`)}
                 </span>
               </div>

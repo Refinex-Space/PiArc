@@ -1461,7 +1461,14 @@ textarea.input {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-:root[data-app] .rewind-file-head > .badge {
+:root[data-app] .change-tag {
+  flex: none;
+  padding: 0 var(--piarc-space-1);
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-surface-active);
+  font-size: var(--piarc-font-size-caption);
+}
+:root[data-app] .rewind-file-head > .change-tag {
   margin-inline-start: auto;
 }
 :root[data-app] .rewind-action.is-conflict,

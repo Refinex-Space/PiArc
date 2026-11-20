@@ -110,7 +110,7 @@ function FileRow({
         <span className="changes-file-path" title={file.path} data-testid="changes-file-path">
           {file.label}
         </span>
-        <span className="badge">{t(`changes.kind.${file.kind}`)}</span>
+        <span className="change-tag">{t(`changes.kind.${file.kind}`)}</span>
         <Counts added={file.added} removed={file.removed} />
         <button
           type="button"
