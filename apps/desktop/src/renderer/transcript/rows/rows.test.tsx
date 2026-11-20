@@ -761,6 +761,23 @@ describe('subagent card (T31-A13)', () => {
     expect(byTestId(root, 'subagent-background').textContent).toBe('Background');
   });
 
+  it('keeps an interrupted run when its call fails without a run state', async () => {
+    // A stopped or failed run ends its Agent call with an error result, which carries no run
+    // state: the state the notifications gave stays.
+    const transcript = transcriptOf([{ item: call }]);
+    transcript.apply([
+      note('subagent/started', { itemId: 'agent-1', subagent: state }),
+      note('subagent/completed', {
+        itemId: 'agent-1',
+        subagent: { ...state, status: 'interrupted', durationMs: 4_000 },
+      }),
+      note('item/completed', { turnId: 't1', item: { ...call, status: 'failed' } }),
+    ]);
+    const root = await render(transcript, ['agent-1']);
+    expect(byTestId(root, 'subagent-card').dataset.status).toBe('interrupted');
+    expect(byTestId(root, 'subagent-status').textContent).toBe('Interrupted');
+  });
+
   it("expands to the subagent's own transcript, read-only", async () => {
     const transcript = transcriptOf([{ item: { ...call, subagent: state } as Item }]);
     const read = vi.fn((child: string) =>

@@ -175,15 +175,16 @@ function subagentStateOf(value: unknown): SubagentState | undefined {
   return value as SubagentState;
 }
 
-/** A background run's call completes with the run still going: a later item event must not
- * take back the end the `subagent/completed` notification already showed. */
+/** A later item event must not take back the run state the `subagent/*` notifications
+ * already showed: a background run's call completes with the run still going, and a stopped or
+ * failed run ends its call with an error result that carries no run state. */
 function keepFinishedRun(previous: Item, next: Item): Item {
+  if (previous.type !== 'subagent' || next.type !== 'subagent' || previous.subagent == null) {
+    return next;
+  }
   if (
-    previous.type === 'subagent' &&
-    next.type === 'subagent' &&
-    previous.subagent != null &&
-    previous.subagent.status !== 'running' &&
-    next.subagent?.status === 'running'
+    next.subagent == null ||
+    (previous.subagent.status !== 'running' && next.subagent.status === 'running')
   ) {
     return { ...next, subagent: previous.subagent };
   }
