@@ -99,6 +99,9 @@ describe('i18n', () => {
             context: '200,000',
             efforts: 'low / high',
             tools: 'Read, Grep',
+            transport: 'SSE',
+            source: '/w/.mcp.json',
+            by: '/w/.piarc/settings.json',
           }),
         ).not.toThrow();
       }
