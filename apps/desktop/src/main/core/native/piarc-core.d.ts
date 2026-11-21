@@ -307,18 +307,14 @@ export declare class CoreRuntime {
   terminalPaste(
     id: number,
     text: string,
-    allowUnsafe?: boolean | undefined | null,
+    allowUnsafe?: boolean | null,
   ): Promise<'pasted' | 'unsafe' | 'empty'>;
   /**
    * Plain text of the terminal from libghostty-vt's formatter: `range` is JSON text
    * (`{"kind":"screen"}`, `viewport`, `all`, or `{"kind":"lastLines","count":n}`; the
    * viewport when absent); `unwrap` joins rows the terminal wrapped.
    */
-  terminalText(
-    id: number,
-    range?: string | undefined | null,
-    unwrap?: boolean | undefined | null,
-  ): Promise<string>;
+  terminalText(id: number, range?: string | null, unwrap?: boolean | null): Promise<string>;
   /**
    * The newest command of the terminal (OSC 133) as JSON text (`TerminalCommand`), or
    * `null` before the first.

@@ -296,7 +296,7 @@ impl CoreRuntime {
         env: &'env Env,
         id: u32,
         text: String,
-        allow_unsafe: Option<bool>,
+        #[napi(ts_arg_type = "boolean | null")] allow_unsafe: Option<bool>,
     ) -> napi::Result<Object<'env>> {
         type Settle = Box<dyn FnOnce(Env) -> napi::Result<String> + Send>;
         let (deferred, promise) = env.create_deferred::<String, Settle>()?;
@@ -326,8 +326,8 @@ impl CoreRuntime {
         &self,
         env: &'env Env,
         id: u32,
-        range: Option<String>,
-        unwrap: Option<bool>,
+        #[napi(ts_arg_type = "string | null")] range: Option<String>,
+        #[napi(ts_arg_type = "boolean | null")] unwrap: Option<bool>,
     ) -> napi::Result<Object<'env>> {
         type Settle = Box<dyn FnOnce(Env) -> napi::Result<String> + Send>;
         let (deferred, promise) = env.create_deferred::<String, Settle>()?;

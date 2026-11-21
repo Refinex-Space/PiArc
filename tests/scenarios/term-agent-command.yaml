@@ -11,7 +11,11 @@ providers:
       - tool_calls:
           - id: toolu_term
             name: Bash
-            input: { command: "ls; printf 'built 中文\\nall done\\n'; grep needle notes.txt", terminal: true }
+            input:
+              {
+                command: "ls; printf 'built 中文\\nall done\\n'; grep needle notes.txt",
+                terminal: true,
+              }
       - text: 'It runs in a terminal.'
       - tool_calls:
           - id: toolu_read
