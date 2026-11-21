@@ -19,6 +19,7 @@ import { Type } from 'typebox';
 
 import { isAborted, type CommandResult, type Origin } from './core-io.js';
 import { presentationOf, type ToolSetup } from './presentation.js';
+import { sandboxNote } from './sandbox-report.js';
 
 const commandParameters = {
   command: Type.String({ description: 'The command line to run' }),
@@ -37,9 +38,18 @@ const commandParameters = {
 const powerShellSchema = Type.Object(commandParameters);
 
 // PiArc's own parameter (T33, ADR-0050): the command runs in a PiArc terminal whose screen the
-// model reads as text; it implies `run_in_background`.
+// model reads as text; it implies `run_in_background`. `dangerouslyDisableSandbox` (T39) has
+// Claude Code's name, so hooks see the same `tool_input`; Core asks the user about every such
+// call and ignores it while the sandbox is off.
 const bashSchema = Type.Object({
   ...commandParameters,
+  dangerouslyDisableSandbox: Type.Optional(
+    Type.Boolean({
+      description:
+        "Run this command outside PiArc's sandbox. Use it only after the same command failed " +
+        'because the sandbox refused a path or a host; the user must approve every such run',
+    }),
+  ),
   terminal: Type.Optional(
     Type.Boolean({
       description:
@@ -153,8 +163,10 @@ export function shellResult(
     result.killed ||
     result.timedOut ||
     (result.outcome === undefined ? result.exitCode !== 0 : result.outcome === 'failure');
+  const note = sandboxNote(result.sandbox, failed && !aborted && !result.killed);
+  const text = modelText(result, aborted);
   return {
-    content: [{ type: 'text', text: modelText(result, aborted) }],
+    content: [{ type: 'text', text: note.length === 0 ? text : `${text}\n\n${note}` }],
     details: execution === undefined ? undefined : { commandExecution: execution },
     isError: failed,
   };

@@ -67,6 +67,7 @@ const base: CommandResult = {
   cwdReset: undefined,
   output: { head: 'hello\n', totalChars: 6 },
   task: undefined,
+  sandbox: undefined,
 };
 
 describe('modelText', () => {
@@ -231,6 +232,32 @@ describe('shellResult', () => {
     expect(text).toContain('KillShell');
   });
 
+  it('names what the sandbox refused and how to ask to run outside it (T39)', () => {
+    const failed: CommandResult = {
+      ...base,
+      exitCode: 1,
+      outcome: 'failure',
+      output: { head: 'touch: /x/a: Operation not permitted\n', totalChars: 37 },
+      sandbox: {
+        denials: [
+          { kind: 'write', target: '/x/a' },
+          { kind: 'network', target: 'example.com:443' },
+        ],
+      },
+    };
+    const text = textOf(shellResult(failed, false));
+    expect(text).toContain(
+      "PiArc's sandbox refused writing /x/a; connecting to example.com:443.",
+    );
+    expect(text).toContain('dangerouslyDisableSandbox: true');
+    const unexplained = textOf(shellResult({ ...failed, sandbox: {} }, false));
+    expect(unexplained).toContain('such as ssh');
+    const started = textOf(shellResult({ ...failed, sandbox: { failedToStart: true } }, false));
+    expect(started).toContain('could not start its sandbox');
+    // A command that succeeded in the sandbox needs no note.
+    expect(textOf(shellResult({ ...base, sandbox: {} }, false))).toBe('hello\n');
+  });
+
   it('round-trips the details through a session file', () => {
     const details = shellResult({ ...base, signal: 9, exitCode: undefined }, false).details;
     const stored: unknown = JSON.parse(JSON.stringify(details?.commandExecution));
@@ -307,3 +334,7 @@ describe('createToolSet', () => {
     expect(names(false, true)).toEqual(['Read', 'Write', 'Edit', 'PowerShell', 'Glob', 'Grep']);
   });
 });
+
+function textOf(result: { content: readonly { type: string; text?: string }[] }): string {
+  return result.content.map((c) => (c.type === 'text' ? (c.text ?? '') : '')).join('');
+}

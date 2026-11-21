@@ -30,12 +30,14 @@ import type {
   GrepLine,
   LineEndings,
   ReadRange,
+  SandboxReport,
 } from '@piarc/protocol';
 
 import { AhpError } from '../protocol/errors.js';
 import { wellFormedJson } from '../protocol/well-formed.js';
 import type { CoreBridge } from '../runtime/core-bridge.js';
 import type { CanonicalTool } from './profile.js';
+import { parseSandboxReport } from './sandbox-report.js';
 
 /** The tool call a request serves; sent as `origin`. */
 export interface Origin {
@@ -166,6 +168,8 @@ export interface CommandResult {
   readonly output: CommandOutput | undefined;
   /** The background task it became (T32): asked for, or moved there by its timeout. */
   readonly task: TaskStarted | undefined;
+  /** Present when it ran in the sandbox (T39): what the sandbox refused. */
+  readonly sandbox: SandboxReport | undefined;
 }
 
 /** A Monitor started in Core (`exec/monitor`, T32). */
@@ -878,6 +882,7 @@ function parseRunResult(result: unknown): CommandResult | undefined {
     cwdReset: parseCwdReset(result.cwdReset),
     output: parseOutput(result.output),
     task: parseTaskStarted(result.task),
+    sandbox: parseSandboxReport(result.sandbox),
   };
 }
 
