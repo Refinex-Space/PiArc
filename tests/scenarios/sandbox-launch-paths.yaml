@@ -15,7 +15,10 @@ providers:
       - tool_calls:
           - id: fg
             name: Bash
-            input: { command: '(printf x > "$HOME/fg.txt") 2>/dev/null && printf written > fg.txt || printf refused > fg.txt' }
+            input:
+              {
+                command: '(printf x > "$HOME/fg.txt") 2>/dev/null && printf written > fg.txt || printf refused > fg.txt',
+              }
       - tool_calls:
           - id: bg
             name: Bash

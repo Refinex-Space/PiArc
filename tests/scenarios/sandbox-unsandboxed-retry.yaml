@@ -20,11 +20,19 @@ providers:
       - tool_calls:
           - id: first
             name: Bash
-            input: { command: 'printf out > "$HOME/out.txt" && printf done > outside.txt', dangerouslyDisableSandbox: true }
+            input:
+              {
+                command: 'printf out > "$HOME/out.txt" && printf done > outside.txt',
+                dangerouslyDisableSandbox: true,
+              }
       - tool_calls:
           - id: again
             name: Bash
-            input: { command: 'printf out > "$HOME/out.txt" && printf done > outside.txt', dangerouslyDisableSandbox: true }
+            input:
+              {
+                command: 'printf out > "$HOME/out.txt" && printf done > outside.txt',
+                dangerouslyDisableSandbox: true,
+              }
       - text: Done.
 approvals:
   - { tool: Bash, decision: deny, feedback: Keep it in the sandbox. }
@@ -34,7 +42,10 @@ actions:
 expect:
   request_counts: { main: 3 }
   events:
-    - { method: core/sessions, params: { approvals: [{ tool: Bash, sandbox: unsandboxed, protectedPath: true }] } }
+    - {
+        method: core/sessions,
+        params: { approvals: [{ tool: Bash, sandbox: unsandboxed, protectedPath: true }] },
+      }
   requests:
     - index: 2
       tool_results:

@@ -246,9 +246,7 @@ describe('shellResult', () => {
       },
     };
     const text = textOf(shellResult(failed, false));
-    expect(text).toContain(
-      "PiArc's sandbox refused writing /x/a; connecting to example.com:443.",
-    );
+    expect(text).toContain("PiArc's sandbox refused writing /x/a; connecting to example.com:443.");
     expect(text).toContain('dangerouslyDisableSandbox: true');
     const unexplained = textOf(shellResult({ ...failed, sandbox: {} }, false));
     expect(unexplained).toContain('such as ssh');

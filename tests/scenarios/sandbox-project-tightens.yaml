@@ -12,7 +12,11 @@ providers:
     wire: anthropic
     steps:
       - tool_calls:
-          - { id: write, name: Bash, input: { command: 'printf p > p.txt && printf x > "$HOME/p.txt"' } }
+          - {
+              id: write,
+              name: Bash,
+              input: { command: 'printf p > p.txt && printf x > "$HOME/p.txt"' },
+            }
       - text: Done.
 approvals:
   - { tool: Bash, decision: allow }

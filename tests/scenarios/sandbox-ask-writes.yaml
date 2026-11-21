@@ -19,7 +19,11 @@ providers:
       - tool_calls:
           - { id: outside, name: Bash, input: { command: 'printf x > "$HOME/escape.txt"' } }
       - tool_calls:
-          - { id: protected, name: Bash, input: { command: 'mkdir -p .vscode && printf x > .vscode/tasks.json' } }
+          - {
+              id: protected,
+              name: Bash,
+              input: { command: 'mkdir -p .vscode && printf x > .vscode/tasks.json' },
+            }
       - tool_calls:
           - { id: secret, name: Bash, input: { command: 'cat secret.txt' } }
       - text: Done.
