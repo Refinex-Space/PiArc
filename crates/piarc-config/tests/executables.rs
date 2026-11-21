@@ -371,3 +371,46 @@ fn trust_covers_only_the_roots_own_resource_files() {
         std::path::Path::new("/w/.claude/skills/a/SKILL.md")
     ));
 }
+
+/// R4 E3: what runs and where it sends what is the hook's identity: switching a handler's type
+/// (its program becomes the URL it already carried), adding headers, environment variables a
+/// header may use, or a prompt hook's model is a new item.
+#[test]
+fn a_hook_whose_type_headers_variables_or_model_change_is_a_new_item() {
+    let root = std::env::temp_dir().join(format!("piarc-exec type 中文 {}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let hook = |handler: &str| {
+        format!(
+            r#"{{ "hooks": {{ "PostToolUse": [{{ "matcher": "*", "hooks": [{handler}] }}] }} }}"#
+        )
+    };
+    let base = r#"{ "type": "command", "command": "echo ok", "url": "https://h.example/x", "prompt": "Judge" }"#;
+    put(&root, ".piarc/settings.json", &hook(base));
+    let trusted = enumerate(&root).items;
+    for changed in [
+        r#"{ "type": "http", "command": "echo ok", "url": "https://h.example/x", "prompt": "Judge" }"#,
+        r#"{ "type": "prompt", "command": "echo ok", "url": "https://h.example/x", "prompt": "Judge" }"#,
+        r#"{ "type": "command", "command": "echo ok", "url": "https://h.example/x", "prompt": "Judge", "headers": { "X-K": "$K" } }"#,
+        r#"{ "type": "command", "command": "echo ok", "url": "https://h.example/x", "prompt": "Judge", "allowedEnvVars": ["K"] }"#,
+        r#"{ "type": "command", "command": "echo ok", "url": "https://h.example/x", "prompt": "Judge", "model": "big" }"#,
+    ] {
+        put(&root, ".piarc/settings.json", &hook(changed));
+        let current = enumerate(&root).items;
+        assert_eq!(new_items(&current, &trusted).len(), 1, "{changed}");
+    }
+    // Names of hooks without these fields do not change: no reconfirmation after upgrading.
+    put(
+        &root,
+        ".piarc/settings.json",
+        &hook(r#"{ "type": "http", "url": "https://h.example/x" }"#),
+    );
+    assert!(
+        enumerate(&root)
+            .items
+            .iter()
+            .any(|i| i.name == "PostToolUse[*] https://h.example/x"),
+        "{:?}",
+        enumerate(&root).items
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}

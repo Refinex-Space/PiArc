@@ -329,14 +329,22 @@ pub(crate) fn settings_items(source: &str, settings: &Value, items: &mut BTreeSe
                 .into_iter()
                 .flatten()
             {
-                let what = ["command", "prompt", "url"]
-                    .iter()
-                    .find_map(|k| handler.get(*k).and_then(Value::as_str))
+                // The field the handler's type runs (R4 E3: not the first one present, or a
+                // change of `type` would keep the name).
+                let field = match handler.get("type").and_then(Value::as_str) {
+                    Some("http") => "url",
+                    Some("prompt") => "prompt",
+                    _ => "command",
+                };
+                let what = handler
+                    .get(field)
+                    .and_then(Value::as_str)
                     .unwrap_or("(no command)");
-                // What else decides what runs (the handler's identity in `piarc-hooks`): a
-                // change of arguments, shell or condition is a new item (R3).
+                // What else decides what runs and what it sends (the handler's identity in
+                // `piarc-hooks`): arguments, shell, condition (R3), headers, the variables
+                // they may use and a prompt hook's model (R4 E3) make a new item.
                 let mut name = format!("{event}[{matcher}] {what}");
-                for key in ["args", "shell", "if"] {
+                for key in ["args", "shell", "if", "headers", "allowedEnvVars", "model"] {
                     if let Some(value) = handler.get(key) {
                         name.push_str(&format!(" {key}={value}"));
                     }
