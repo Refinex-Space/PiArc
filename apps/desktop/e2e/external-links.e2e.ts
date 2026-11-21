@@ -76,8 +76,11 @@ test('opens a link only after the user confirms', async ({ app, page }) => {
   expect(await page.evaluate(() => window.piarc.openExternal('https://example.com/docs?q=1'))).toBe(
     true,
   );
+  // The dialog is in the app's language (T43): English or Chinese buttons.
   expect(await recordedCalls(app)).toEqual([
-    'confirm https://example.com/docs?q=1 [Open|Cancel]',
+    expect.stringMatching(
+      /^confirm https:\/\/example\.com\/docs\?q=1 \[(Open\|Cancel|打开\|取消)\]$/u,
+    ),
     'open https://example.com/docs?q=1',
   ]);
 });
@@ -87,7 +90,9 @@ test('does not open a link the user cancels', async ({ app, page }) => {
   expect(await page.evaluate(() => window.piarc.openExternal('mailto:someone@example.com'))).toBe(
     false,
   );
-  expect(await recordedCalls(app)).toEqual(['confirm mailto:someone@example.com [Open|Cancel]']);
+  expect(await recordedCalls(app)).toEqual([
+    expect.stringMatching(/^confirm mailto:someone@example\.com \[(Open\|Cancel|打开\|取消)\]$/u),
+  ]);
 });
 
 test('rejects javascript:, file: and other schemes without asking', async ({
