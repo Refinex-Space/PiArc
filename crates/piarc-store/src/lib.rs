@@ -31,6 +31,7 @@ mod checkpoints;
 mod error;
 pub mod index;
 pub mod jsonl;
+mod mcp;
 mod memory_imports;
 pub mod migrate;
 pub mod pi_session;

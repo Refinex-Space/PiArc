@@ -2,6 +2,17 @@
 
 /** PiArc Core, loaded once in the Electron main process (ADR-0014). */
 export declare class CoreRuntime {
+  /** Every configured MCP server of `workspace` with its state, as JSON text (`McpStatus`). */
+  mcpStatus(workspace: string): Promise<string>;
+  /** Connects MCP server `name` of `workspace` anew; its state as JSON text. */
+  mcpReconnect(workspace: string, name: string): Promise<string>;
+  /** Turns MCP server `name` of `workspace` on or off; its state as JSON text. */
+  mcpSetEnabled(workspace: string, name: string, enabled: boolean): Promise<string>;
+  /**
+   * Signs in to OAuth MCP server `name` of `workspace`; its state and `loginId` as JSON
+   * text once the tokens are stored.
+   */
+  mcpLogin(workspace: string, name: string): Promise<string>;
   /**
    * Starts Core. `onEvents` receives the coalesced event batches, at most once per
    * coalescing interval, until `shutdown()` resolves.

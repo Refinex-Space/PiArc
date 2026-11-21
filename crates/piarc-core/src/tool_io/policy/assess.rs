@@ -372,6 +372,18 @@ fn lexically_inside(places: &Places, value: &str) -> bool {
     path == root || path.starts_with(&format!("{}/", root.trim_end_matches('/')))
 }
 
+/// A tool that needs the user on every call (an MCP tool's `requiresUserInteraction`, T36):
+/// step 4 asks unless a deny or ask rule already decided, and nothing is offered to save.
+pub(super) fn requires_user_interaction(assessment: &mut Assessment) {
+    if assessment.input.ask.is_none() {
+        assessment.input.ask = Some(MustAsk {
+            step: "requiresUserInteraction",
+            hit: None,
+        });
+    }
+    assessment.rules.clear();
+}
+
 /// Tools matched by name, domain or type (MCP, WebFetch, Agent, Skill, others).
 pub(super) fn other_call(
     rules: &RuleSet,

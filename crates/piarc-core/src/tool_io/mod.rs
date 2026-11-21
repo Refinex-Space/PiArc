@@ -443,6 +443,12 @@ impl ToolIo {
         self.exec.hook_launch().await.env
     }
 
+    /// What `${VAR}` in MCP server definitions expands from (T36): the user's login shell
+    /// environment without PiArc's internal variables. Read for expansion only.
+    pub(crate) async fn expansion_environment(&self) -> Vec<(OsString, OsString)> {
+        self.exec.expansion_env().await
+    }
+
     /// Runs git for worktrees of `workspace` (T35): the commands' environment, the git on its
     /// `PATH` outside the workspace, the process-tree spawner.
     ///

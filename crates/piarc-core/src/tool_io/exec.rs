@@ -111,6 +111,9 @@ pub(super) struct Exec {
 struct ResolvedEnv {
     inherited: Vec<(OsString, OsString)>,
     custom_resolution: bool,
+    /// The whole environment without PiArc's internal variables: only `${VAR}` references in
+    /// MCP server definitions read it (T36), never a child process.
+    expansion: Vec<(OsString, OsString)>,
 }
 
 impl Exec {
@@ -160,6 +163,7 @@ impl Exec {
                 ResolvedEnv {
                     custom_resolution: utility::has_custom_resolution(&env),
                     inherited: piarc_exec::env::command_environment(&env),
+                    expansion: env,
                 }
             })
             .await
@@ -184,6 +188,12 @@ impl Exec {
             bash: shells.bash.clone(),
             powershell: shells.powershell.clone(),
         }
+    }
+
+    /// The variables `${VAR}` in an MCP server definition expands from (T36): the user's login
+    /// shell environment without PiArc's internal variables.
+    pub(super) async fn expansion_env(&self) -> Vec<(OsString, OsString)> {
+        self.base_env().await.expansion.clone()
     }
 
     /// `exec/shells`; tells the user once per Core when Windows has no Git Bash.

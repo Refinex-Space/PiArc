@@ -61,6 +61,16 @@ pub enum HostEvent {
         /// The notification with its `sessionId`, `seq` and `ts`.
         notification: SessionEventNotification,
     },
+    /// A notification of the Agent Host itself, not of a session (no `sessionId`), such as
+    /// `mcp/statusChanged` (T36). Not sequenced and not replayed.
+    HostNotification {
+        /// Connection the notification arrived on.
+        epoch: u64,
+        /// The method.
+        method: String,
+        /// Its parameters.
+        params: serde_json::Map<String, serde_json::Value>,
+    },
     /// A session open before a restart was reopened.
     SessionRestored {
         /// Connection it was reopened on.

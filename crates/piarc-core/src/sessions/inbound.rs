@@ -1,8 +1,8 @@
 //! What answers one workspace's Agent Host: `trust/get` from the trust store, `secrets/*` from
-//! Core's single vault service, `hooks/run` for working directories in this workspace, and
-//! `agents/list`, `subagent/start`, `subagent/finish` (T31), and `fs/*`, `exec/*` from the tool
-//! I/O, but only for the
-//! sessions that belong to this workspace (R1-A13): an Agent Host cannot reach another
+//! Core's single vault service, `hooks/run` for working directories in this workspace,
+//! `agents/list`, `subagent/start`, `subagent/finish` (T31), `mcp/servers` and an MCP server's
+//! sign-in steps (`ui/loginInteraction`, T36), and `fs/*`, `exec/*` from the tool I/O, but only
+//! for the sessions that belong to this workspace (R1-A13): an Agent Host cannot reach another
 //! workspace's session scope by naming its id.
 
 use std::collections::HashSet;
@@ -29,6 +29,11 @@ pub(crate) struct WorkspaceInbound {
     pub sessions: SessionSet,
     /// Running subagents keep the Agent Host from the idle timer (T31).
     pub activity: super::workspace::Activity,
+    /// The workspace's MCP configuration (T36).
+    pub mcp: crate::mcp::McpConfigSource,
+    /// An MCP server's sign-in shows its steps like a provider's (T36).
+    pub logins: Arc<super::login::Logins>,
+    pub events: crate::events::EventSender,
 }
 
 impl WorkspaceInbound {
@@ -110,6 +115,39 @@ impl WorkspaceInbound {
     }
 }
 
+impl WorkspaceInbound {
+    /// `mcp/servers` and an MCP server's sign-in steps (T36). Only a sign-in Core started
+    /// (`mcp/login`) is shown: the id must be the active one.
+    fn mcp(
+        &self,
+        method: &str,
+        params: Map<String, Value>,
+    ) -> BoxFuture<'static, Result<Value, ErrorObject>> {
+        if method == "mcp/servers" {
+            let (mcp, workspace) = (self.mcp.clone(), self.workspace.clone());
+            return Box::pin(async move {
+                let result = mcp
+                    .servers(&workspace)
+                    .await
+                    .map_err(|e| e.to_error_object())?;
+                serde_json::to_value(result)
+                    .map_err(|e| ErrorObject::new(ErrorKind::InternalError, e.to_string(), false))
+            });
+        }
+        let (logins, events) = (Arc::clone(&self.logins), self.events.clone());
+        Box::pin(async move {
+            let p = serde_json::from_value(Value::Object(params)).map_err(|_| {
+                ErrorObject::new(
+                    ErrorKind::InvalidParams,
+                    "malformed ui/loginInteraction",
+                    false,
+                )
+            })?;
+            logins.interact(&events, p).await
+        })
+    }
+}
+
 impl InboundHandler for WorkspaceInbound {
     fn handle(
         &self,
@@ -149,6 +187,9 @@ impl InboundHandler for WorkspaceInbound {
         }
         if method == "subagent/start" || method == "subagent/finish" {
             return self.subagent(&method, params, peer);
+        }
+        if method == "mcp/servers" || method == "ui/loginInteraction" {
+            return self.mcp(&method, params);
         }
         if method == "exec/shells" {
             // Machine-wide, and asked while a session is being created (before it is ours).

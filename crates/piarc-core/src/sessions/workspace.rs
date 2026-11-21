@@ -380,6 +380,13 @@ impl WorkspaceActor {
             tool_io: self.ctx.tool_io.clone(),
             sessions: Arc::clone(&self.handle.members),
             activity: Activity(self.handle.tx.downgrade()),
+            mcp: crate::mcp::McpConfigSource::new(
+                self.ctx.trust.clone(),
+                self.ctx.storage.clone(),
+                self.ctx.tool_io.clone(),
+            ),
+            logins: Arc::clone(&self.ctx.logins),
+            events: self.ctx.events.clone(),
         });
         let tune = self.ctx.config.tune_host.clone();
         let started = {
@@ -475,6 +482,11 @@ impl WorkspaceActor {
                     self.host = Host::Restarting(supervisor.clone());
                     self.publish(HostState::Restarting, true);
                 }
+            }
+            HostEvent::HostNotification { method, params, .. }
+                if method == <piarc_protocol::mcp::McpStatusChanged as piarc_protocol::method::Method>::NAME =>
+            {
+                self.mcp_changed(params);
             }
             HostEvent::GaveUp { .. } | HostEvent::HandshakeRejected { .. } => {
                 self.fail(Error::Feature {
@@ -591,6 +603,25 @@ impl WorkspaceActor {
         for waiter in self.waiting.drain(..) {
             let _ = waiter.send(Err(Error::ShuttingDown));
         }
+    }
+
+    /// The pool's state changed (T36): the client's MCP page hears it on `core/mcp`.
+    fn mcp_changed(&self, mut params: serde_json::Map<String, serde_json::Value>) {
+        params.insert(
+            "workspace".into(),
+            serde_json::Value::String(self.handle.path.to_string_lossy().into_owned()),
+        );
+        let Ok(event) = crate::events::Event::from_json(
+            crate::route::RouteKey::mcp(),
+            &serde_json::Value::Object(params),
+        ) else {
+            return;
+        };
+        let events = self.ctx.events.clone();
+        self.ctx.handle.spawn(async move {
+            // Only a Core shutting down refuses it.
+            let _ = events.send(event).await;
+        });
     }
 
     fn publish(&mut self, host: HostState, open: bool) {

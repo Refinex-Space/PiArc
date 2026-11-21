@@ -51,6 +51,7 @@
 //! not used because it would start NAPI-RS's separate global tokio runtime.
 
 mod boundary;
+pub mod mcp;
 pub mod runtime;
 pub mod sessions;
 pub mod sink;

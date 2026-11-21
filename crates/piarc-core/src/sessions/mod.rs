@@ -35,6 +35,7 @@
 mod create;
 mod inbound;
 mod login;
+mod mcp;
 mod provider_settings;
 mod session;
 mod snapshot;

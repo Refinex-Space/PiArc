@@ -72,6 +72,13 @@ impl RouteKey {
         Self(Arc::from(NOTICES_ROUTE))
     }
 
+    /// The route of MCP server states (`core/mcp`, T36): `{ workspace, servers, overridden,
+    /// issues }` whenever a workspace's pool reports a change.
+    #[must_use]
+    pub fn mcp() -> Self {
+        Self(Arc::from(crate::mcp::MCP_ROUTE))
+    }
+
     /// The route of provider sign-in progress and questions (`core/login`, T29).
     #[must_use]
     pub fn login() -> Self {

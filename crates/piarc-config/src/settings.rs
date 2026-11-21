@@ -271,6 +271,18 @@ impl Settings {
             .and_then(|(_, value)| value.as_ref())
     }
 
+    /// One layer's value as its file was loaded, before the trust and mode filters: for
+    /// listing what an untrusted project defines without applying it (T36's MCP servers).
+    #[must_use]
+    pub fn loaded(&self, id: &str) -> Option<&Value> {
+        self.table
+            .layers()
+            .iter()
+            .zip(&self.states)
+            .find(|(spec, _)| spec.id == id)
+            .and_then(|(_, state)| state.value.as_ref())
+    }
+
     /// Project layers that asked for `bypassPermissions` or `auto`, which never apply.
     #[must_use]
     pub fn ignored_modes(&self) -> &[(&'static str, String)] {

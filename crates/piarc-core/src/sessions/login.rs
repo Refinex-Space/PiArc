@@ -43,7 +43,7 @@ pub(crate) struct Logins {
     active: Mutex<Option<Active>>,
 }
 
-async fn emit(events: &EventSender, payload: Value) {
+pub(crate) async fn emit(events: &EventSender, payload: Value) {
     if let Ok(event) = Event::from_json(RouteKey::login(), &payload) {
         // Only a Core shutting down refuses it.
         let _ = events.send(event).await;
@@ -55,7 +55,7 @@ fn cancelled() -> ErrorObject {
 }
 
 impl Logins {
-    fn begin(&self, provider: &str) -> Result<(String, CancellationToken)> {
+    pub(crate) fn begin(&self, provider: &str) -> Result<(String, CancellationToken)> {
         let mut active = lock(&self.active);
         if active.is_some() {
             return Err(Error::Feature {
@@ -76,7 +76,7 @@ impl Logins {
         Ok((id, cancel))
     }
 
-    fn end(&self, id: &str) {
+    pub(crate) fn end(&self, id: &str) {
         let mut active = lock(&self.active);
         if active.as_ref().is_some_and(|a| a.id == id) {
             *active = None;
@@ -106,7 +106,7 @@ impl Logins {
 
     /// `ui/loginInteraction`: shows the step; a question waits for the user's answer. A later
     /// question of the same sign-in replaces the one on screen.
-    async fn interact(
+    pub(crate) async fn interact(
         &self,
         events: &EventSender,
         p: LoginInteractionParams,
@@ -155,6 +155,32 @@ impl Logins {
             () = cancel.cancelled() => Err(cancelled()),
         }
     }
+}
+
+/// The last `core/login` event of a sign-in: `succeeded`, `cancelled` or `failed` with the
+/// message (without the method prefix the bridge adds).
+pub(crate) fn end_payload(
+    id: &str,
+    provider: &str,
+    error: Option<&Error>,
+    cancel: &CancellationToken,
+) -> Value {
+    let Some(error) = error else {
+        return json!({"loginId": id, "provider": provider, "state": "succeeded"});
+    };
+    let error = error.to_error_object();
+    let state = if error.data.kind == ErrorKind::Cancelled || cancel.is_cancelled() {
+        "cancelled"
+    } else {
+        "failed"
+    };
+    let message = error
+        .message
+        .split_once(" failed: ")
+        .filter(|(method, _)| method.contains('/'))
+        .map_or(error.message.as_str(), |(_, rest)| rest)
+        .to_owned();
+    json!({"loginId": id, "provider": provider, "state": state, "message": message})
 }
 
 /// What answers the settings Host during a sign-in: the vault and `ui/loginInteraction`.
@@ -214,24 +240,11 @@ impl Hub {
         .await;
         let result = self.run_login(&id, &provider, &cancel).await;
         self.ctx.logins.end(&id);
-        let end = match &result {
-            Ok(()) => json!({"loginId": id, "provider": provider, "state": "succeeded"}),
-            Err(e) => {
-                let error = e.to_error_object();
-                let state = if error.data.kind == ErrorKind::Cancelled || cancel.is_cancelled() {
-                    "cancelled"
-                } else {
-                    "failed"
-                };
-                let message = error
-                    .message
-                    .strip_prefix("models/login/start failed: ")
-                    .unwrap_or(&error.message)
-                    .to_owned();
-                json!({"loginId": id, "provider": provider, "state": state, "message": message})
-            }
-        };
-        emit(events, end).await;
+        emit(
+            events,
+            end_payload(&id, &provider, result.as_ref().err(), &cancel),
+        )
+        .await;
         result?;
         self.reload_models(
             self.ctx

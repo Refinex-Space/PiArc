@@ -187,9 +187,23 @@ impl ToolIo {
         let settings = services.settings(workspace).await?;
         let rules = policy::workspace_rules(&settings, workspace);
         let denied = |name: &str| policy::denies_agent(&rules, name);
-        let mut agents: Vec<_> = loaded.definitions.into_iter().map(|d| d.view).collect();
-        for agent in &mut agents {
+        let project_trusted = settings.trust().is_trusted();
+        let has_inline = loaded.definitions.iter().any(|d| !d.mcp_inline.is_empty());
+        let expansion = if has_inline {
+            self.expansion_environment().await
+        } else {
+            Vec::new()
+        };
+        let mut agents = Vec::with_capacity(loaded.definitions.len());
+        for definition in loaded.definitions {
+            let mut agent = definition.view;
             agent.denied = denied(&agent.name);
+            // Inline MCP servers (T36): a project definition's wait for the project's trust.
+            let trusted = !is_project(agent.source) || project_trusted;
+            let source = agent.path.clone().unwrap_or_default();
+            agent.mcp_inline =
+                crate::mcp::inline_servers(&source, &definition.mcp_inline, trusted, &expansion);
+            agents.push(agent);
         }
         let list = AgentsList {
             agents,

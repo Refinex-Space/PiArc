@@ -193,45 +193,13 @@ pub fn definition(
         }
         expanded
     };
-    match transport_of(entry) {
-        Err(message) => {
-            issues.push(issue(
-                at.source,
-                at.pointer,
-                &format!("{message}; the server is left out"),
-            ));
-            return None;
-        }
-        Ok(Kind::Unsupported(transport, reason)) => {
-            def.transport = transport;
-            def.availability = McpAvailability::Unsupported;
-            def.reason = Some(reason.to_owned());
-        }
-        Ok(Kind::Stdio) => match stdio(entry, &mut problems, &expand) {
-            Ok(program) => def.stdio = Some(program),
-            Err(message) => {
-                issues.push(issue(
-                    at.source,
-                    at.pointer,
-                    &format!("{message}; the server is left out"),
-                ));
-                return None;
-            }
-        },
-        Ok(Kind::Http) => {
-            def.transport = McpTransport::Http;
-            match http(entry, &mut problems, &expand) {
-                Ok(endpoint) => def.http = Some(endpoint),
-                Err(message) => {
-                    issues.push(issue(
-                        at.source,
-                        at.pointer,
-                        &format!("{message}; the server is left out"),
-                    ));
-                    return None;
-                }
-            }
-        }
+    if let Err(message) = transport(&mut def, entry, &mut problems, &expand) {
+        issues.push(issue(
+            at.source,
+            at.pointer,
+            &format!("{message}; the server is left out"),
+        ));
+        return None;
     }
     if entry.contains_key("headersHelper") {
         problems.push("headersHelper is not supported; the headers are sent as configured".into());
@@ -241,6 +209,28 @@ pub fn definition(
     }
     apply_availability(&mut def, entry, at, options);
     Some(def)
+}
+
+/// Fills the transport and its program or endpoint; an error leaves the entry out.
+fn transport(
+    def: &mut McpServerDefinition,
+    entry: &Map<String, Value>,
+    problems: &mut Vec<String>,
+    expand: &Expand<'_>,
+) -> Result<(), String> {
+    match transport_of(entry)? {
+        Kind::Unsupported(transport, reason) => {
+            def.transport = transport;
+            def.availability = McpAvailability::Unsupported;
+            def.reason = Some(reason.to_owned());
+        }
+        Kind::Stdio => def.stdio = Some(stdio(entry, problems, expand)?),
+        Kind::Http => {
+            def.transport = McpTransport::Http;
+            def.http = Some(http(entry, problems, expand)?);
+        }
+    }
+    Ok(())
 }
 
 fn apply_availability(

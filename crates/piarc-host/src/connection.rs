@@ -28,6 +28,10 @@ use serde_json::Value;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::{Notify, Semaphore, mpsc, oneshot, watch};
 
+/// Notifications of the Agent Host itself rather than of a session: no `sessionId`, `seq` or
+/// `ts` (T36). Every other notification must be a session event.
+const HOST_NOTIFICATIONS: &[&str] = &[piarc_protocol::mcp::McpStatusChanged::NAME];
+
 use crate::config::HostConfig;
 use crate::events::{EventSender, HostEvent};
 use crate::inbound::{Peer, SharedInbound};
@@ -426,6 +430,21 @@ impl Reader {
             Err(error) => self.frame_error(error.to_error_object()).await,
             Ok(Message::Request(request)) => self.request(request).await,
             Ok(Message::Notification(notification)) => {
+                let params = notification.params.clone().unwrap_or_default();
+                if HOST_NOTIFICATIONS.contains(&notification.method.as_str())
+                    && !params.contains_key("sessionId")
+                {
+                    // The Agent Host's own state (T36). Any other notification is a session's.
+                    self.shared
+                        .events
+                        .bounded(HostEvent::HostNotification {
+                            epoch: self.link.epoch,
+                            method: notification.method,
+                            params,
+                        })
+                        .await;
+                    return;
+                }
                 let value = serde_json::json!({
                     "jsonrpc": "2.0",
                     "method": notification.method,

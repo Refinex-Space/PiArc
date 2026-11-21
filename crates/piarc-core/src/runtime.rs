@@ -25,6 +25,7 @@
 //! Tasks are spawned under a supervisor. A panic is not swallowed: it is printed to stderr
 //! and reported as a structured error event on [`ERROR_ROUTE`](crate::route::ERROR_ROUTE).
 
+mod mcp;
 mod sessions;
 mod state;
 mod terminals;

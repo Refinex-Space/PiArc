@@ -903,7 +903,13 @@ async fn prepare(
             boundary = Boundary::Protected;
         }
         card.protected_path = Some(boundary == Boundary::Protected);
-        if boundary != Boundary::Protected {
+        if p.requires_user_interaction {
+            // An MCP tool marked `requiresUserInteraction` (T36): every call asks, in every
+            // mode, and the card offers no session or permanent allow.
+            assess::requires_user_interaction(&mut assessment);
+            card.protected_path = Some(true);
+        }
+        if card.protected_path != Some(true) {
             card.rules.clone_from(&assessment.rules);
         }
         Ok(Prepared {

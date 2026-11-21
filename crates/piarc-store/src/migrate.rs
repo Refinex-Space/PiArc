@@ -65,6 +65,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "worktrees_and_search",
         sql: include_str!("sql/0008_worktrees_and_search.sql"),
     },
+    Migration {
+        version: 9,
+        name: "mcp_servers",
+        sql: include_str!("sql/0009_mcp_servers.sql"),
+    },
 ];
 
 /// The highest version in `migrations`.

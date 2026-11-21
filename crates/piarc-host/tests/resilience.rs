@@ -294,6 +294,38 @@ async fn a_half_frame_followed_by_silence_is_treated_as_hung_and_core_keeps_runn
     supervisor.shutdown().await;
 }
 
+/// T36: `mcp/statusChanged` is the Agent Host's own state, without a session header; it
+/// reaches Core as a host notification. Other notifications still need one.
+#[tokio::test]
+async fn the_pools_status_arrives_as_a_host_notification() {
+    let spawner = FakeSpawner::new(vec![script(|mut host| async move {
+        host.hello("1.0", &[]).await;
+        host.send_raw(
+            b"{\"jsonrpc\":\"2.0\",\"method\":\"mcp/statusChanged\",\"params\":{\"servers\":[]}}\n",
+        )
+        .await;
+        host.until_stdin_closes().await;
+        0
+    })]);
+    let (supervisor, mut events) = HostSupervisor::start(config(), deps(spawner, TestClock::new()));
+    let (event, seen) = until(&mut events, |e| {
+        matches!(e, HostEvent::HostNotification { .. })
+    })
+    .await;
+    assert!(
+        !seen
+            .iter()
+            .any(|e| matches!(e, HostEvent::FrameError { .. })),
+        "{seen:?}"
+    );
+    let HostEvent::HostNotification { method, params, .. } = event else {
+        unreachable!("matched above");
+    };
+    assert_eq!(method, "mcp/statusChanged");
+    assert_eq!(params.get("servers"), Some(&json!([])));
+    supervisor.shutdown().await;
+}
+
 #[tokio::test]
 async fn invalid_json_oversized_frames_and_batches_are_dropped_without_ending_the_connection() {
     let spawner = FakeSpawner::new(vec![script(|mut host| async move {
