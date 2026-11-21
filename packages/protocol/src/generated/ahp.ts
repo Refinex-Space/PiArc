@@ -10,7 +10,10 @@ export type ProtocolValue =
   | RewindRequest
   | RewindReport
   | ChangesView
-  | DiscardRequest;
+  | DiscardRequest
+  | PackagesList
+  | PackageInstallRequest
+  | PackageInstallResult;
 /**
  * Any message covered by the Agent Host Protocol 1.0 contracts. Generated from the piarc-protocol crate by `npm run gen:protocol`; do not edit.
  */
@@ -1053,6 +1056,23 @@ export type FileOutcome = 'restored' | 'deleted' | 'unchanged' | 'kept' | 'faile
  * How a file differs from its base in the Changes panel.
  */
 export type ChangeKind = 'created' | 'modified' | 'deleted';
+/**
+ * What an executable item runs.
+ */
+export type PackageExecutableKind =
+  'hook' | 'mcpServer' | 'piExtension' | 'agentHook' | 'agentMcpServer';
+/**
+ * What kind of package.
+ */
+export type PackageKind = 'claudePlugin' | 'piPackage';
+/**
+ * Where a package is declared (and so where it applies).
+ */
+export type PackageScope = 'user' | 'project';
+/**
+ * Where a package was installed from.
+ */
+export type PackageSourceKind = 'directory' | 'git' | 'npm';
 
 /**
  * A request whose method is not interpreted.
@@ -8282,4 +8302,193 @@ export interface DiscardRequest {
    * The version the diff was shown for ([`ChangesFile::version`]).
    */
   version: string;
+}
+/**
+ * The packages installed, as one workspace (or no workspace) sees them.
+ */
+export interface PackagesList {
+  /**
+   * Ids declared in the settings that are not installed.
+   */
+  missing?: string[];
+  /**
+   * Installed packages, by id.
+   */
+  packages: PackageInfo[];
+}
+/**
+ * An installed package as the settings window shows it.
+ */
+export interface PackageInfo {
+  /**
+   * Whether its components apply now: on, and the project trusted for the project scope.
+   */
+  active: boolean;
+  /**
+   * What it brings.
+   */
+  components: PackageComponents;
+  /**
+   * Its description, when the manifest has one.
+   */
+  description?: string | null;
+  /**
+   * Whether it is on for the workspace asked about (declared and set to `true`).
+   */
+  enabled: boolean;
+  /**
+   * The executable items and whether each one is confirmed.
+   */
+  executables?: PackageExecutable[];
+  /**
+   * Its identifier: the plugin or package name; the key under `plugins` in settings.
+   */
+  id: string;
+  /**
+   * When it was installed (Unix ms).
+   */
+  installedAt: number;
+  /**
+   * Problems reading it (manifest errors, missing directory).
+   */
+  issues?: string[];
+  /**
+   * Plugin or Pi package.
+   */
+  kind: PackageKind;
+  /**
+   * Its directory.
+   */
+  path: string;
+  /**
+   * Where it is declared for the workspace asked about; absent when neither the user
+   * settings nor the workspace's declare it.
+   */
+  scope?: PackageScope | null;
+  /**
+   * Where it came from.
+   */
+  source: PackageSource;
+  /**
+   * Components PiArc does not support (`mods`, `themes`, `lspServers`, ...), still listed.
+   */
+  unsupported?: string[];
+  /**
+   * When it was last installed again or updated (Unix ms).
+   */
+  updatedAt: number;
+}
+/**
+ * The components a package brings.
+ */
+export interface PackageComponents {
+  /**
+   * Subagent types, with their namespace.
+   */
+  agents?: string[];
+  /**
+   * Slash commands, with their namespace (`plugin:command`) or Pi prompt templates.
+   */
+  commands?: string[];
+  /**
+   * Pi extension entry files, relative to the package.
+   */
+  extensions?: string[];
+  /**
+   * Hook events with handlers.
+   */
+  hooks?: string[];
+  /**
+   * MCP server names as the pool knows them (`plugin_<plugin>_<server>`).
+   */
+  mcpServers?: string[];
+  /**
+   * Skills, with their namespace for plugins.
+   */
+  skills?: string[];
+}
+/**
+ * One executable item: it runs only once the user confirmed it.
+ */
+export interface PackageExecutable {
+  /**
+   * Whether the user confirmed it (enabling, confirming, or trusting the project).
+   */
+  confirmed: boolean;
+  /**
+   * What it runs.
+   */
+  kind: PackageExecutableKind;
+  /**
+   * The item's identity (part of the package's fingerprint): a hook's event, matcher and
+   * command, a server's name and command line or URL, an extension's entry file.
+   */
+  name: string;
+}
+/**
+ * A package's origin and the version installed.
+ */
+export interface PackageSource {
+  /**
+   * The git commit checked out.
+   */
+  commit?: string | null;
+  /**
+   * npm's integrity value of the installed tarball.
+   */
+  integrity?: string | null;
+  /**
+   * The kind of source.
+   */
+  kind: PackageSourceKind;
+  /**
+   * The directory, git URL or npm spec as given.
+   */
+  location: string;
+  /**
+   * The package version (`plugin.json` or `package.json`; npm's resolved version).
+   */
+  version?: string | null;
+}
+/**
+ * What installing does.
+ */
+export interface PackageInstallRequest {
+  /**
+   * The kind of source.
+   */
+  kind: PackageSourceKind;
+  /**
+   * An absolute directory, a git URL, or an npm spec (name, `name@version`, a tarball path).
+   */
+  location: string;
+  /**
+   * Where to declare it.
+   */
+  scope: PackageScope;
+  /**
+   * The workspace for the project scope.
+   */
+  workspace?: string | null;
+}
+/**
+ * What installing or updating produced.
+ */
+export interface PackageInstallResult {
+  /**
+   * What the user should know (lifecycle scripts not run, packages that declared them).
+   */
+  notes?: string[];
+  /**
+   * The package (installed off; enabling asks for confirmation).
+   */
+  package: PackageInfo;
+  /**
+   * The commit before an update.
+   */
+  previousCommit?: string | null;
+  /**
+   * The version before an update.
+   */
+  previousVersion?: string | null;
 }

@@ -178,6 +178,14 @@ export interface PiarcTestHooks {
   failNext(channel: string, message: string): void;
   /** Makes the next answer on IPC `channel` reach the window `ms` after Core gave it. */
   holdNext(channel: string, ms: number): void;
+  /**
+   * Answers the next native confirmation of the extension packages (T40) instead of the dialog:
+   * `true` is its OK button. Only development builds have test hooks, so release builds always
+   * show the dialog.
+   */
+  answerConfirm(answer: boolean): void;
+  /** The native confirmations shown since `answerConfirm` was first called (T40). */
+  confirmations(): readonly { readonly message: string; readonly detail: string }[];
   /** The tray's title, tooltip, menu item ids and counts (T35); undefined before it exists. */
   tray(): TrayObservation | undefined;
   /** Routes a launch target as a link or a second start would (T35). */

@@ -536,6 +536,30 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.skillsList, workspace)
       .then((value: unknown) => expectString(value)),
+  listPackages: (workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.packagesList, workspace)
+      .then((value: unknown) => expectString(value)),
+  installPackage: (input) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.packageInstall, input)
+      .then((value: unknown) => expectString(value)),
+  updatePackage: (id, workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.packageUpdate, id, workspace)
+      .then((value: unknown) => expectString(value)),
+  setPackageEnabled: (id, enabled, scope, workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.packageEnable, id, enabled, scope, workspace)
+      .then((value: unknown) => expectString(value)),
+  confirmPackage: (id, workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.packageConfirm, id, workspace)
+      .then((value: unknown) => expectString(value)),
+  uninstallPackage: (id, workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.packageUninstall, id, workspace)
+      .then((value: unknown) => expectString(value)),
   setOutputStyle: async (workspace, name) => {
     await ipcRenderer.invoke(IPC_CHANNELS.outputStyleSet, workspace, name);
   },

@@ -34,6 +34,8 @@ export function installTestHooks(options: {
   readonly attention: () => AttentionObservation;
   readonly failNext: (channel: string, message: string) => void;
   readonly holdNext: (channel: string, ms: number) => void;
+  readonly answerConfirm: (answer: boolean) => void;
+  readonly confirmations: () => readonly { readonly message: string; readonly detail: string }[];
   readonly tray: () => TrayObservation | undefined;
   readonly launch: (target: LaunchTarget) => void;
   readonly quit: () => void;
@@ -108,6 +110,8 @@ export function installTestHooks(options: {
     attention: options.attention,
     failNext: options.failNext,
     holdNext: options.holdNext,
+    answerConfirm: options.answerConfirm,
+    confirmations: options.confirmations,
     showNotification: (title, body, waitMs) =>
       new Promise((resolve) => {
         const supported = Notification.isSupported();

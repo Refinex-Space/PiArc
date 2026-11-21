@@ -26,6 +26,7 @@ import { registerIpcHandlers } from './ipc/handlers.js';
 import { createIpcRegistrar } from './ipc/register.js';
 import { registerWorktreeHandlers } from './core/worktree-ipc.js';
 import { registerMcpHandlers } from './core/mcp-ipc.js';
+import { NativeConfirm, registerPackageHandlers } from './core/plugins-ipc.js';
 import { URL_SCHEME, launchTargets, parseLaunchUrl } from './launch.js';
 import { applyDataDirs, type DataDirs } from './platform/data-dirs.js';
 import { PreferenceStore } from './preferences.js';
@@ -61,6 +62,8 @@ function launch(target: LaunchTarget | undefined): void {
 }
 const terminalStats = { requests: 0, frames: 0, bytes: 0, errors: 0 };
 const faults = new FaultInjector();
+/** Native confirmations that development builds' test hooks may answer (T40). */
+const nativeConfirm = new NativeConfirm();
 
 function bundlePath(...segments: string[]): string {
   return path.join(app.getAppPath(), '.vite', ...segments);
@@ -121,6 +124,10 @@ function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners, app: App
     holdNext: (channel, ms) => {
       faults.holdNext(channel, ms);
     },
+    answerConfirm: (answer) => {
+      nativeConfirm.answerNext(answer);
+    },
+    confirmations: () => nativeConfirm.shown(),
     modulePath: core.modulePath,
     core: core.runtime,
     router: eventRouter,
@@ -220,6 +227,7 @@ function start(dirs: DataDirs): void {
     registerPermissionHandlers(registerHandler, core.runtime, () => appShell.t());
     registerSandboxHandlers(registerHandler, core.runtime, () => appShell.t());
     registerMcpHandlers(registerHandler, core.runtime);
+    registerPackageHandlers(registerHandler, core.runtime, () => appShell.t(), nativeConfirm);
     registerWorktreeHandlers(
       registerHandler,
       core.runtime,

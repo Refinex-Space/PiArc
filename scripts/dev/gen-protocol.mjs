@@ -154,6 +154,9 @@ async function buildFiles() {
       'RewindReport',
       'ChangesView',
       'DiscardRequest',
+      'PackagesList',
+      'PackageInstallRequest',
+      'PackageInstallResult',
     ].map((name) => ({
       $ref: `#/$defs/${name}`,
     })),

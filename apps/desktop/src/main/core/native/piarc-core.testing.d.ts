@@ -14,6 +14,39 @@ export declare class CoreRuntime {
    */
   mcpLogin(workspace: string, name: string): Promise<string>;
   /**
+   * The installed packages as `workspace` (or, when null, the user settings) sees them, as
+   * JSON text (`PackagesList`).
+   */
+  packagesList(workspace?: string | null): Promise<string>;
+  /**
+   * Installs a package (off); `request_json` is a `PackageInstallRequest`. Answers a
+   * `PackageInstallResult`.
+   */
+  packageInstall(requestJson: string): Promise<string>;
+  /** Updates package `id` to its source's newest version (`PackageInstallResult`). */
+  packageUpdate(id: string, workspace?: string | null): Promise<string>;
+  /**
+   * Turns package `id` on or off in `scope` (`user` or `project`); turning on confirms
+   * `confirm` (the executable items the native confirmation listed). Answers the list.
+   */
+  packageSetEnabled(
+    id: string,
+    enabled: boolean,
+    scope: string,
+    workspace: string | null,
+    confirm: string[],
+  ): Promise<string>;
+  /**
+   * Confirms executable items of package `id` (after the native confirmation). Answers the
+   * list.
+   */
+  packageConfirm(id: string, items: string[], workspace?: string | null): Promise<string>;
+  /**
+   * Uninstalls package `id` (its declarations in the user settings and `workspace`'s, its
+   * files unless it is a local directory). Answers the list.
+   */
+  packageUninstall(id: string, workspace?: string | null): Promise<string>;
+  /**
    * Starts Core. `onEvents` receives the coalesced event batches, at most once per
    * coalescing interval, until `shutdown()` resolves.
    *

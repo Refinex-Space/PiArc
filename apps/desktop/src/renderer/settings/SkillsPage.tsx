@@ -2,7 +2,7 @@
 // whether the model or only the user may start it, its pre-approved tools and `paths`, the
 // fields PiArc ignores or does not support yet, and the files that are not valid skills. The
 // output style section sets the user's default style (a folder's `/output-style` and its
-// settings files come first). Plugins join this page with T40.
+// settings files come first). The extension packages (T40) are `PluginsSection`.
 import type { ResourceIssue, ResourceWarning, SkillInfo } from '@piarc/protocol';
 import { useCallback, useEffect, useId, useState } from 'react';
 
@@ -12,6 +12,7 @@ import { parseCommandsList, type CommandsList } from '../composer/commands-list.
 import { sourceLabel } from '../composer/Composer.js';
 import { styleDescription } from '../shell/OutputStyleDialog.js';
 import { parseWorkspaces } from './AgentsPage.js';
+import { PluginsSection } from './PluginsSection.js';
 
 interface SkillsView {
   readonly skills: readonly SkillInfo[];
@@ -237,6 +238,7 @@ export function SkillsPage() {
       )}
       {error === '' ? null : <p className="error-text">{error}</p>}
       {chosen === null ? null : <StyleSection workspace={chosen} />}
+      <PluginsSection workspace={chosen} />
       {view === undefined ? null : (
         <>
           <h2 className="settings-heading">{t('skills.title')}</h2>

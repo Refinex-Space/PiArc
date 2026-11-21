@@ -112,6 +112,12 @@ export const IPC_CHANNELS = {
   auditEvents: 'piarc:permissions.audit',
   sandboxSettings: 'piarc:sandbox.settings',
   sandboxUpdate: 'piarc:sandbox.update',
+  packagesList: 'piarc:packages.list',
+  packageInstall: 'piarc:packages.install',
+  packageUpdate: 'piarc:packages.update',
+  packageEnable: 'piarc:packages.enable',
+  packageConfirm: 'piarc:packages.confirm',
+  packageUninstall: 'piarc:packages.uninstall',
   configDiagnostics: 'piarc:config.diagnostics',
   worktreeBranches: 'piarc:worktree.branches',
   worktreeIgnore: 'piarc:worktree.ignore',
@@ -176,6 +182,15 @@ export interface AuditQuery {
   readonly conclusion?: 'allow' | 'deny';
   readonly since?: number;
   readonly limit?: number;
+}
+
+/** What the settings page installs (T40): a directory, a git URL or an npm spec, and where it
+ * is declared (the project scope needs the workspace). */
+export interface PackageInstallInput {
+  readonly kind: 'directory' | 'git' | 'npm';
+  readonly location: string;
+  readonly scope: 'user' | 'project';
+  readonly workspace?: string;
 }
 
 /** The user's sandbox values the settings page changes (T39); absent fields stay. */
@@ -736,6 +751,33 @@ export interface PiarcApi {
   listCommands(workspace: string, cwd: string | null): Promise<string>;
   /** The skills of a workspace with source, overrides and warnings, as `SkillsList` JSON (T37). */
   listSkills(workspace: string): Promise<string>;
+  /**
+   * The installed extension packages as `workspace` (or, when null, the user settings) sees
+   * them, as `PackagesList` JSON (T40).
+   */
+  listPackages(workspace: string | null): Promise<string>;
+  /** Installs a package, off; answers `PackageInstallResult` JSON (T40). */
+  installPackage(input: PackageInstallInput): Promise<string>;
+  /** Fetches a package's newest version; answers `PackageInstallResult` JSON (T40). */
+  updatePackage(id: string, workspace: string | null): Promise<string>;
+  /**
+   * Turns a package on or off in a scope. Turning on shows the main process's native
+   * confirmation of its source and executable items first; answers the `PackagesList` JSON, or
+   * `{"status":"cancelled"}` (T40).
+   */
+  setPackageEnabled(
+    id: string,
+    enabled: boolean,
+    scope: 'user' | 'project',
+    workspace: string | null,
+  ): Promise<string>;
+  /**
+   * Confirms the executable items of a package that wait for confirmation, after the native
+   * confirmation lists them; answers the list or `{"status":"cancelled"}` (T40).
+   */
+  confirmPackage(id: string, workspace: string | null): Promise<string>;
+  /** Uninstalls a package; answers the list (T40). */
+  uninstallPackage(id: string, workspace: string | null): Promise<string>;
   /**
    * Sets the output style: the workspace's `.piarc/settings.local.json` (`/output-style`), or the
    * user's settings when `workspace` is null; a null name removes the choice (T37).
