@@ -1,13 +1,13 @@
 // The terminal prototype page (`#/terminal-lab`, T10): one terminal drawn from Core's frames,
 // a toolbar to hide it and read the frame counters, and `window.__piarcTerminalLab` for L4
-// tests and the S7 benchmark. Without `?manual` in the hash it starts the user's login shell;
-// tests create their own terminal through the main-process test hooks and `attach` it.
+// tests and the S7 benchmark. It starts nothing itself (T34: `window.piarc` has no way to
+// start a terminal without a session): tests create a terminal through the main-process test
+// hooks (development builds of Core only) and `attach` it.
 import { useEffect, useRef, useState } from 'react';
 
 import type { TerminalLabApi, TerminalLabStats } from '../../shared/terminal-lab.js';
 import { TerminalController } from './controller.js';
 
-const INITIAL = { cols: 100, rows: 30 };
 
 export function TerminalLab() {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -70,14 +70,6 @@ export function TerminalLab() {
       echoResult: () => echo ?? Promise.reject(new Error('armEcho was not called')),
     };
     globalThis.__piarcTerminalLab = api;
-    if (!window.location.hash.includes('?manual')) {
-      const { width, height } = controller.cell;
-      window.piarc
-        .createTerminal({ ...INITIAL, cellWidth: width, cellHeight: height })
-        .then(attach, (error: unknown) => {
-          console.error('[terminal-lab] cannot start a terminal', error);
-        });
-    }
     controller.focus();
     const timer = window.setInterval(() => {
       setStats(controller.stats());

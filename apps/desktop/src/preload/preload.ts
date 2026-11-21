@@ -15,6 +15,22 @@ import {
   type PiarcApi,
 } from '../shared/ipc.js';
 import type { Preferences } from '../shared/preferences.js';
+import {
+  isPasteOutcome,
+  terminalInfoOf,
+  terminalLinkOf,
+  terminalMatchesOf,
+  terminalOpenedOf,
+} from '../shared/terminal-results.js';
+
+/** `value` checked by `check`, or a TypeError naming `what`. */
+function expectShape<T>(value: unknown, check: (value: unknown) => T | undefined, what: string): T {
+  const checked = check(value);
+  if (checked === undefined) {
+    throw new TypeError(`Unexpected IPC result: expected ${what}`);
+  }
+  return checked;
+}
 
 function expectString(value: unknown): string {
   if (typeof value !== 'string') {
@@ -201,13 +217,12 @@ const api: PiarcApi = {
     listeners.delete(route);
     await ipcRenderer.invoke(IPC_CHANNELS.eventsUnsubscribe, route);
   },
-  createTerminal: (size) =>
-    ipcRenderer.invoke(IPC_CHANNELS.terminalCreate, size).then((value: unknown) => {
-      if (typeof value !== 'number') {
-        throw new TypeError('Unexpected IPC result: expected a terminal id');
-      }
-      return value;
-    }),
+  openSessionTerminal: (sessionId, size) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.terminalOpenSession, sessionId, size)
+      .then((value: unknown) => expectShape(value, terminalOpenedOf, 'an opened terminal')),
+  shareTerminal: (id, shared) =>
+    ipcRenderer.invoke(IPC_CHANNELS.terminalShare, id, shared).then(expectBoolean),
   closeTerminal: async (id) => {
     await ipcRenderer.invoke(IPC_CHANNELS.terminalClose, id);
   },
@@ -217,16 +232,52 @@ const api: PiarcApi = {
   terminalKey: async (id, key) => {
     await ipcRenderer.invoke(IPC_CHANNELS.terminalKey, id, key);
   },
+  terminalMouse: async (id, event) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.terminalMouse, id, event);
+  },
+  terminalFocus: async (id, gained) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.terminalFocus, id, gained);
+  },
+  terminalPaste: (id, text, allowUnsafe) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.terminalPaste, id, text, allowUnsafe)
+      .then((value: unknown) =>
+        expectShape(value, (v) => (isPasteOutcome(v) ? v : undefined), 'a paste outcome'),
+      ),
   terminalResize: async (id, size) => {
     await ipcRenderer.invoke(IPC_CHANNELS.terminalResize, id, size);
   },
-  requestTerminalFrame: (id, full) =>
-    ipcRenderer.invoke(IPC_CHANNELS.terminalRequestFrame, id, full).then((value: unknown) => {
-      if (!(value instanceof Uint8Array)) {
-        throw new TypeError('Unexpected IPC result: expected the frame bytes');
-      }
-      return value;
-    }),
+  requestTerminalFrame: (id, full, park) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.terminalRequestFrame, id, full, park === true)
+      .then((value: unknown) => {
+        if (!(value instanceof Uint8Array)) {
+          throw new TypeError('Unexpected IPC result: expected the frame bytes');
+        }
+        return value;
+      }),
+  terminalScroll: async (id, to) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.terminalScroll, id, to);
+  },
+  terminalClearSelection: async (id) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.terminalClearSelection, id);
+  },
+  terminalSelectionText: (id) =>
+    ipcRenderer.invoke(IPC_CHANNELS.terminalSelectionText, id).then(expectString),
+  terminalLinkAt: (id, col, row) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.terminalLinkAt, id, col, row)
+      .then((value: unknown) => expectShape(value, terminalLinkOf, 'a terminal link')),
+  terminalSearch: (id, query) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.terminalSearch, id, query)
+      .then((value: unknown) => expectShape(value, terminalMatchesOf, 'search matches')),
+  terminalScreenText: (id) =>
+    ipcRenderer.invoke(IPC_CHANNELS.terminalScreenText, id).then(expectString),
+  terminalInfo: (id) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.terminalInfo, id)
+      .then((value: unknown) => expectShape(value, terminalInfoOf, 'terminal information')),
   getAppState: () =>
     ipcRenderer.invoke(IPC_CHANNELS.appState).then((value: unknown) => expectAppState(value)),
   setPreference: (change) =>

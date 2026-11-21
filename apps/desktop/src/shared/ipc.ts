@@ -24,12 +24,23 @@ export const IPC_CHANNELS = {
   eventsConnect: 'piarc:events.connect',
   eventsSubscribe: 'piarc:events.subscribe',
   eventsUnsubscribe: 'piarc:events.unsubscribe',
-  terminalCreate: 'piarc:terminal.create',
+  terminalOpenSession: 'piarc:terminal.openSession',
+  terminalShare: 'piarc:terminal.share',
   terminalClose: 'piarc:terminal.close',
   terminalInput: 'piarc:terminal.input',
   terminalKey: 'piarc:terminal.key',
+  terminalMouse: 'piarc:terminal.mouse',
+  terminalFocus: 'piarc:terminal.focus',
+  terminalPaste: 'piarc:terminal.paste',
   terminalResize: 'piarc:terminal.resize',
   terminalRequestFrame: 'piarc:terminal.requestFrame',
+  terminalScroll: 'piarc:terminal.scroll',
+  terminalClearSelection: 'piarc:terminal.clearSelection',
+  terminalSelectionText: 'piarc:terminal.selectionText',
+  terminalLinkAt: 'piarc:terminal.linkAt',
+  terminalSearch: 'piarc:terminal.search',
+  terminalScreenText: 'piarc:terminal.screenText',
+  terminalInfo: 'piarc:terminal.info',
   appState: 'piarc:app.state',
   preferencesSet: 'piarc:preferences.set',
   settingsOpen: 'piarc:settings.open',
@@ -284,6 +295,106 @@ export function isTerminalKeyMessage(value: unknown): value is TerminalKeyMessag
   );
 }
 
+/** A pointer event in pixels of the terminal's canvas (T34). */
+export interface TerminalMouseMessage {
+  readonly action: 'press' | 'release' | 'motion';
+  /** 1 left, 2 right, 3 middle, 4–7 wheel up, down, left, right; absent for motion alone. */
+  readonly button?: number;
+  /** Bits: 1 Shift, 2 Ctrl, 4 Alt/Option, 8 Meta/Command. */
+  readonly mods: number;
+  readonly x: number;
+  readonly y: number;
+  /** For a press: clicks in a row (`MouseEvent.detail`). */
+  readonly clicks?: number;
+}
+
+/** Validates a mouse message received over IPC. */
+export function isTerminalMouseMessage(value: unknown): value is TerminalMouseMessage {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  const integer = (n: unknown, min: number, max: number) =>
+    typeof n === 'number' && Number.isInteger(n) && n >= min && n <= max;
+  const coordinate = (n: unknown) =>
+    typeof n === 'number' && Number.isFinite(n) && n >= -100_000 && n <= 100_000;
+  return (
+    (v.action === 'press' || v.action === 'release' || v.action === 'motion') &&
+    (v.button === undefined || integer(v.button, 1, 11)) &&
+    integer(v.mods, 0, 15) &&
+    coordinate(v.x) &&
+    coordinate(v.y) &&
+    (v.clicks === undefined || integer(v.clicks, 1, 3))
+  );
+}
+
+/** Where to move a terminal's viewport (`piarc_protocol::terminal::TerminalScroll`). */
+export type TerminalScrollTarget =
+  | { readonly kind: 'top' }
+  | { readonly kind: 'bottom' }
+  | { readonly kind: 'delta'; readonly rows: number }
+  | { readonly kind: 'row'; readonly row: number };
+
+export function isTerminalScrollTarget(value: unknown): value is TerminalScrollTarget {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  const integer = (n: unknown, min: number) =>
+    typeof n === 'number' && Number.isSafeInteger(n) && n >= min;
+  switch (v.kind) {
+    case 'top':
+    case 'bottom':
+      return true;
+    case 'delta':
+      return integer(v.rows, -1_000_000) && (v.rows as number) <= 1_000_000;
+    case 'row':
+      return integer(v.row, 0);
+    default:
+      return false;
+  }
+}
+
+/** A session terminal the panel opened (`openSessionTerminal`). */
+export interface TerminalOpened {
+  readonly terminalId: number;
+  readonly taskId: string;
+  /** How a saved terminal came back: `snapshot`, `replay`, `text`, or null for a new one. */
+  readonly restored: string | null;
+}
+
+/** An OSC 8 link on a viewport row (`piarc_protocol::terminal::TerminalLink`). */
+export interface TerminalLinkInfo {
+  readonly uri: string;
+  readonly row: number;
+  readonly start: number;
+  readonly end: number;
+}
+
+/** A search match, rows counted from the top of the scrollback. */
+export interface TerminalMatchInfo {
+  readonly start: { readonly row: number; readonly col: number };
+  readonly end: { readonly row: number; readonly col: number };
+}
+
+/** What a terminal shows (`piarc_protocol::terminal::TerminalInfo`, the fields the panel reads). */
+export interface TerminalInfoView {
+  readonly terminalId: number;
+  readonly cols: number;
+  readonly rows: number;
+  readonly title: string;
+  readonly pwd: string;
+  readonly alternateScreen: boolean;
+  readonly sessionId?: string;
+  readonly taskId?: string;
+  readonly shared: boolean;
+}
+
+/** What a paste did: `unsafe` text could run commands by itself (ask, then paste again). */
+export type TerminalPasteOutcome = 'pasted' | 'unsafe' | 'empty';
+
+/** Longest find-bar query. */
+export const MAX_TERMINAL_QUERY = 1000;
+
+/** Largest paste, in characters. */
+export const MAX_TERMINAL_PASTE = 1024 * 1024;
+
 /** Receives the batches of one route. */
 export type EventListener = (batch: EventBatch) => void;
 
@@ -323,27 +434,55 @@ export interface PiarcApi {
   /** Stops the batches of `route`. Resolves once the main process stopped routing them. */
   unsubscribeEvents(route: string): Promise<void>;
   /**
-   * Starts a terminal running the user's login shell in the home directory and resolves its
-   * id. Its title, bell and exit events arrive on the event route `term/<id>`. The terminal
-   * belongs to this window: other windows cannot use it, and it is closed with the window.
+   * Opens a terminal in session `sessionId` (T33, T34): the user's shell in the session's
+   * directory and command environment, a background task of kind `terminal`. Its events
+   * arrive on `term/<terminalId>`. It belongs to the session, not to this window: it survives
+   * a reload and ends when it is closed, the session is archived or deleted, or PiArc quits.
+   * Needs recent user input in this window; at most 16 per session.
    */
-  createTerminal(size: TerminalSize): Promise<number>;
-  /** Kills the terminal's program and forgets the terminal. */
+  openSessionTerminal(sessionId: string, size: TerminalSize): Promise<TerminalOpened>;
+  /** Shares a user's terminal with the agent or stops sharing it (ADR-0050). */
+  shareTerminal(id: number, shared: boolean): Promise<boolean>;
+  /** Closes the terminal: its program and everything it started end. */
   closeTerminal(id: number): Promise<void>;
   /** Writes text to the terminal as typed (committed input-method text). */
   terminalInput(id: number, text: string): Promise<void>;
   /** Sends a key event; Core encodes it with the terminal's current modes. */
   terminalKey(id: number, key: TerminalKeyMessage): Promise<void>;
+  /**
+   * A pointer event: the program gets it while it tracks the mouse; otherwise it selects
+   * (Shift extends, `clicks` 2 a word, 3 a line) and the wheel scrolls the scrollback.
+   */
+  terminalMouse(id: number, event: TerminalMouseMessage): Promise<void>;
+  /** Reports focus to the program when it asked for focus reports. */
+  terminalFocus(id: number, gained: boolean): Promise<void>;
+  /** Pastes as the program's modes require; `unsafe` asks for confirmation first. */
+  terminalPaste(id: number, text: string, allowUnsafe: boolean): Promise<TerminalPasteOutcome>;
   /** Resizes the terminal and its PTY. */
   terminalResize(id: number, size: TerminalSize): Promise<void>;
   /**
-   * Resolves with the terminal's next frame (the draft format of `piarc_protocol::term_frame`;
-   * 14 bytes when nothing changed); `full` asks for a RESET frame (after a reload or a decode
-   * error). The frame is the reply to this request, not a message on the event port: after a
-   * key, Chromium handles event-port messages only after the next rendered frame (ADR-0023).
-   * Pull one frame per animation frame, never for a hidden terminal.
+   * Resolves with the terminal's next frame (`piarc_protocol::term_frame`, version 2; 14 bytes
+   * when nothing changed); `full` asks for a RESET frame (after a reload or a decode error).
+   * With `park`, the view stops pulling when the frame is empty and Core sends an `output`
+   * event on `term/<id>` at the next output. The frame is the reply to this request, not a
+   * message on the event port: after a key, Chromium handles event-port messages only after
+   * the next rendered frame (ADR-0023). One request in flight per terminal and window.
    */
-  requestTerminalFrame(id: number, full: boolean): Promise<Uint8Array>;
+  requestTerminalFrame(id: number, full: boolean, park?: boolean): Promise<Uint8Array>;
+  /** Moves the viewport through the scrollback. */
+  terminalScroll(id: number, to: TerminalScrollTarget): Promise<void>;
+  /** Clears the selection. */
+  terminalClearSelection(id: number): Promise<void>;
+  /** The selected text, '' when nothing is selected. */
+  terminalSelectionText(id: number): Promise<string>;
+  /** The OSC 8 link at viewport cell (`col`, `row`), or null. */
+  terminalLinkAt(id: number, col: number, row: number): Promise<TerminalLinkInfo | null>;
+  /** Finds `query` in the screen and scrollback, newest match first. */
+  terminalSearch(id: number, query: string): Promise<readonly TerminalMatchInfo[]>;
+  /** The visible screen as plain text from Core's formatter (the screen reader view). */
+  terminalScreenText(id: number): Promise<string>;
+  /** Title, directory, size and sharing of the terminal. */
+  terminalInfo(id: number): Promise<TerminalInfoView>;
 
   /** Platform, preferences and locale, for the first render. */
   getAppState(): Promise<AppState>;

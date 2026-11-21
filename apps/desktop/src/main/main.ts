@@ -164,6 +164,11 @@ function start(dirs: DataDirs): void {
     );
     registerPermissionHandlers(registerHandler, core.runtime, () => appShell.t());
     const terminalOwners = new TerminalOwners(core.runtime);
+    // Every page is watched from its creation: terminal input needs the page's recent real
+    // input (I51), so the first keystroke must already be seen.
+    app.on('web-contents-created', (_event, contents) => {
+      terminalOwners.watch(contents);
+    });
     registerEventHandlers(registerHandler, eventRouter, (windowId, route) =>
       terminalOwners.mayObserve(windowId, route),
     );
