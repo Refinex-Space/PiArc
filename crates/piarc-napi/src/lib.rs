@@ -53,6 +53,7 @@
 mod boundary;
 pub mod mcp;
 pub mod runtime;
+pub mod sandbox;
 pub mod sessions;
 pub mod sink;
 pub mod state;

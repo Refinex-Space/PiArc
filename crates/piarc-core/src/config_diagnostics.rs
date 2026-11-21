@@ -45,7 +45,19 @@ pub async fn report(
         reason: format!("unknown workspace: {e}"),
     })?;
     let settings = trust.permission_settings(&root).await?;
-    let mut files = serde_json::to_value(settings.diagnostics()).map_err(internal)?;
+    let mut reports = settings.diagnostics();
+    if piarc_sandbox::platform_sandbox().is_none() {
+        // Windows has no command sandbox (requirement D7): turning it or its auto-approval on
+        // has no effect here, and the report says so (T39).
+        piarc_config::diagnostics::mark_platform_unsupported(
+            &mut reports,
+            &[
+                piarc_config::sandbox::ENABLED,
+                piarc_config::sandbox::AUTO_ALLOW,
+            ],
+        );
+    }
+    let mut files = serde_json::to_value(reports).map_err(internal)?;
     if let (Some(home), Value::Array(list)) = (storage.dirs().home(), &mut files) {
         let state = piarc_config::claude_state_report(home, &root);
         list.push(serde_json::to_value(state).map_err(internal)?);

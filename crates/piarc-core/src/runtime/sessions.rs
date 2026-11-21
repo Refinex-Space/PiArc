@@ -328,6 +328,35 @@ impl CoreRuntime {
         })
     }
 
+    /// The sandbox settings page's view of a workspace (T39).
+    ///
+    /// # Errors
+    /// As [`Self::session_op`].
+    pub fn sandbox_settings(
+        &self,
+        workspace: Option<PathBuf>,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.sandbox_settings(workspace).await
+        })
+    }
+
+    /// Writes the user's sandbox values (T39); answers the new view of `workspace`.
+    ///
+    /// # Errors
+    /// As [`Self::session_op`].
+    pub fn set_sandbox_settings(
+        &self,
+        workspace: Option<PathBuf>,
+        change_json: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.set_sandbox_settings(workspace, change_json).await
+        })
+    }
+
     /// Permission audit events (T23).
     ///
     /// # Errors

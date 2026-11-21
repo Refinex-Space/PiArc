@@ -49,6 +49,7 @@ mod web_search;
 pub(crate) use web_search::chosen_backend as chosen_search_backend;
 
 pub use exec::{CommandEnv, DISPLAY_WINDOW};
+pub use piarc_config::sandbox::Enterprise as SandboxEnterprise;
 use piarc_exec::ExecLimits;
 use piarc_fs::{EncodingCache, FileStates, Scope};
 use piarc_host::{InboundHandler, Peer};
@@ -60,6 +61,7 @@ use piarc_protocol::fs::{
 };
 use piarc_protocol::{ErrorKind, ErrorObject};
 use piarc_sandbox::proxy::Allowlist;
+pub use piarc_sandbox::proxy::MappedNetwork as SandboxTestNetwork;
 pub(crate) use policy::hooks::condition as hook_condition;
 pub use sandbox::{DEFAULT_APPROVAL_TIMEOUT, SandboxConfig};
 use serde::Serialize;

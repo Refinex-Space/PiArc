@@ -20,6 +20,7 @@
 //! `sandboxUnavailable`).
 
 mod network;
+mod view;
 
 use std::collections::VecDeque;
 use std::path::PathBuf;

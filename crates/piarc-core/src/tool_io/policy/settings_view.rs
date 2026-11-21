@@ -24,6 +24,8 @@ pub(crate) struct RuleChange {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct AuditQuery {
     workspace: Option<PathBuf>,
+    /// `permission` (default) or `sandbox` (T39: sandbox denials and network approvals).
+    kind: Option<String>,
     session_id: Option<String>,
     tool: Option<String>,
     conclusion: Option<String>,
@@ -288,7 +290,17 @@ impl ToolIo {
         let filter = piarc_store::AuditFilter {
             session_id: query.session_id,
             workspace,
-            kind: Some("permission".into()),
+            kind: Some(match query.kind.as_deref() {
+                None | Some("permission") => "permission".into(),
+                Some("sandbox") => "sandbox".into(),
+                Some(other) => {
+                    return Err(ErrorObject::new(
+                        ErrorKind::InvalidParams,
+                        format!("unknown audit kind {other:?}"),
+                        false,
+                    ));
+                }
+            }),
             tool: query.tool,
             conclusion: query.conclusion,
             since: query.since,

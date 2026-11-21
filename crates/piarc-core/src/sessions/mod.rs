@@ -266,6 +266,32 @@ impl Hub {
             .map_err(|e| Error::feature(&e))
     }
 
+    /// The sandbox settings page's view of a workspace (T39).
+    pub async fn sandbox_settings(&self, workspace: Option<PathBuf>) -> Result<Value> {
+        self.ctx
+            .tool_io
+            .sandbox_view(workspace)
+            .await
+            .map_err(|e| Error::feature(&e))
+    }
+
+    /// Writes the user's sandbox values from the settings page (T39) and answers the view.
+    pub async fn set_sandbox_settings(
+        &self,
+        workspace: Option<PathBuf>,
+        change_json: String,
+    ) -> Result<Value> {
+        let change = serde_json::from_str(&change_json).map_err(|e| Error::InvalidArgument {
+            field: "change",
+            reason: format!("invalid sandbox settings: {e}"),
+        })?;
+        self.ctx
+            .tool_io
+            .set_sandbox_settings(workspace, change)
+            .await
+            .map_err(|e| Error::feature(&e))
+    }
+
     /// Permission audit events for the settings page.
     pub async fn audit_events(&self, query_json: String) -> Result<Value> {
         let query = serde_json::from_str(&query_json).map_err(|e| Error::InvalidArgument {

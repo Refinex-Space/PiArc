@@ -90,6 +90,57 @@ impl Network for SystemNetwork {
     }
 }
 
+/// Names mapped to servers on this machine (tests and the development build's L4 only): a
+/// mapped name resolves to a documentation address (203.0.113.0/24, so the proxy's loopback
+/// check sees a public address) and connections to it go to `127.0.0.1:<port>`; every other
+/// name fails to resolve. Bytes never leave the machine.
+#[derive(Debug, Clone, Default)]
+pub struct MappedNetwork {
+    names: Vec<(String, u16)>,
+}
+
+impl MappedNetwork {
+    /// Maps each `(name, local port)`.
+    #[must_use]
+    pub fn new(names: Vec<(String, u16)>) -> Self {
+        Self { names }
+    }
+
+    fn address_of(index: usize) -> IpAddr {
+        IpAddr::from([203, 0, 113, u8::try_from(index % 250).unwrap_or(0) + 1])
+    }
+}
+
+impl Network for MappedNetwork {
+    fn resolve<'a>(
+        &'a self,
+        host: &'a str,
+        port: u16,
+    ) -> BoxFuture<'a, io::Result<Vec<SocketAddr>>> {
+        let found = self
+            .names
+            .iter()
+            .position(|(name, _)| name.eq_ignore_ascii_case(host));
+        Box::pin(async move {
+            let index = found
+                .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "unknown test host"))?;
+            Ok(vec![SocketAddr::new(Self::address_of(index), port)])
+        })
+    }
+
+    fn connect(&self, addr: SocketAddr) -> BoxFuture<'_, io::Result<TcpStream>> {
+        let port = (0..self.names.len())
+            .find(|&i| Self::address_of(i) == addr.ip())
+            .map(|i| self.names[i].1);
+        Box::pin(async move {
+            let port = port.ok_or_else(|| {
+                io::Error::new(io::ErrorKind::ConnectionRefused, "no mapped test server")
+            })?;
+            TcpStream::connect(("127.0.0.1", port)).await
+        })
+    }
+}
+
 /// Why the proxy refused a request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DenyReason {

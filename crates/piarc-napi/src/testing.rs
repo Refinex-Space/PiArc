@@ -57,7 +57,10 @@ impl CoreRuntime {
     /// ranges WebFetch may reach, for its local test server), `PIARC_TEST_OAUTH_PROVIDER`
     /// (a `--test-oauth-provider` file every Agent Host registers, for the mock sign-in) and,
     /// from T38, `PIARC_TEST_SEARCH_ENDPOINTS` (comma-separated `backend=url`: the local mock
-    /// search service that answers instead of the real one).
+    /// search service that answers instead of the real one). From T39,
+    /// `PIARC_TEST_SANDBOX_HOSTS` (comma-separated `name=port`: the sandbox's proxy reaches
+    /// these names on local ports and nothing else) and `PIARC_TEST_SANDBOX_ENTERPRISE_DOMAINS`
+    /// (comma-separated domains standing in for the enterprise's allowlist until T47).
     #[napi(factory, catch_unwind)]
     pub fn create_for_tests(
         env: Env,
@@ -89,6 +92,27 @@ impl CoreRuntime {
                     .filter_map(|pair| pair.split_once('='))
                     .map(|(id, url)| (id.trim().to_owned(), url.trim().to_owned()))
                     .collect();
+            }
+            if let Ok(list) = std::env::var("PIARC_TEST_SANDBOX_HOSTS") {
+                let names = list
+                    .split(',')
+                    .filter_map(|pair| pair.split_once('='))
+                    .filter_map(|(name, port)| {
+                        Some((name.trim().to_owned(), port.trim().parse().ok()?))
+                    })
+                    .collect();
+                config.sandbox.network =
+                    std::sync::Arc::new(piarc_core::tool_io::SandboxTestNetwork::new(names));
+            }
+            if let Ok(list) = std::env::var("PIARC_TEST_SANDBOX_ENTERPRISE_DOMAINS") {
+                config.sandbox.enterprise = Some(piarc_core::tool_io::SandboxEnterprise {
+                    allowed_domains: list
+                        .split(',')
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .map(str::to_owned)
+                        .collect(),
+                });
             }
             if let Some(file) = std::env::var_os("PIARC_TEST_OAUTH_PROVIDER") {
                 config.sessions.tune_host = Some(std::sync::Arc::new(move |host| {

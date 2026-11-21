@@ -50,6 +50,12 @@
 (deny file-write-unlink
   (regex (string-append "^" (param "WORKSPACE_RE") "/\\.piarc/worktrees/[^/]+" (param "ANCHORS_RE"))))
 
+; Pi locks its project settings file even to read it: proper-lockfile creates the directory
+; .pi/settings.json.lock next to the file (Pi 1.5.2, SettingsManager). That one name stays
+; writable; the rest of .pi/ does not.
+(allow file-write*
+  (regex (string-append "^" (param "WORKSPACE_RE") "/(.*/)?\\.pi/settings\\.json\\.lock(/.*)?$")))
+
 ;; params
 WORKSPACE=/Users/dev/项目 one
 WORKSPACE_RE=/Users/dev/项目 one
