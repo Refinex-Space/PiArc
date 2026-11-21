@@ -58,7 +58,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `cargo run -q -p piarc-testkit --bin piarc-mock-provider -- --port 0 --scenarios <文件或目录>` | 启动严格 mock provider 独立进程：stdout 第一行是端口，stdin 关闭后退出（`testing.md` 第 10 节） |
 | `cargo run -q -p piarc-testkit --bin piarc-mock-auth -- --port 0` | 启动 mock OAuth 授权服务器（授权码与设备码）：stdout 第一行是端口，stdin 每行 `approve`/`deny`/`expire` 改决定，关闭后退出 |
 | `cargo test -p piarc-testkit --test sessions login` | 服务商登录端到端（T29）：授权码、设备码、拒绝、过期、取消、手工粘贴代码，保险箱与无明文扫描 |
-| `npm run l3` | L3（T30）：同一个严格 mock 服务 PiArc 与真实的 `claude -p`，比对请求结构与行为轨迹，报告在 `tmp/l3/`；`-- --repeat 2` 检查同侧可重复，`-- --filter <id>` 只跑部分场景。需要 PATH 上有 `claude`（Nightly 锁定的版本见 `.github/workflows/l3-nightly.yml`，全局安装先征得同意），不访问真实服务商（`testing.md` 第 14 节） |
+| `npm run l3` | L3（T30）：同一个严格 mock 服务 PiArc 与真实的 `claude -p`，比对请求结构与行为轨迹，报告在 `tmp/l3/`；`-- --repeat 2` 检查同侧可重复，`-- --filter <id>` 只跑部分场景。需要 PATH 上有 `claude`（Nightly 锁定的版本见 `.github/workflows/l3-nightly.yml`，全局安装先征得同意；Windows 上用该版本 npm 平台包自带的 `claude.exe`，见 `testing.md` 第 14 节），不访问真实服务商（`testing.md` 第 14 节） |
 | `node scripts/ci/run-l2.mjs` | verify 第 14 步：构建 Agent Host bundle → 全部 L2 场景（报告写到 `target/l2/results.json`）→ 能力覆盖与 `docs/product/capabilities.md` 漂移检查 |
 | `cargo test -p piarc-testkit --test scenarios -- <id> --exact` | 只跑一个 L2 场景（`tests/scenarios/<id>.yaml`）；不加筛选跑全部，`-- --results <文件>` 写报告 |
 | `cargo run -q -p piarc-devcli -- run tests/scenarios [--json <文件>]` | 不经 UI 运行一个场景文件或整个目录，输出 JSON 报告 |

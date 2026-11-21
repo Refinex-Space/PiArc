@@ -5158,78 +5158,78 @@
       "id": "W2-A01",
       "task": "W2",
       "description": "本机运行 L2 场景全部通过（含 T23–T30 新增的场景），能力清单中 M2 能力无 MISSING。验证：命令输出与 `docs/product/capabilities.md`。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Windows 11 本机 L2 149 个场景 145 通过、0 失败、4 个 macOS 专属跳过；capabilities.md 重新生成，MISSING 0（tmp/evidence/W2/verify-3.log 第 14 步与新增 hooks-archive-during-hook 后的全量运行）。docs/reviews/W2-windows-m2-parity.md 检查表 A01。"
     },
     {
       "id": "W2-A02",
       "task": "W2",
       "description": "Git Bash 下的 Bash 规则与复合命令分析端到端符合预期：deny/ask/allow 用例、包装命令剥离、盘符根与用户目录的关键路径删除总是询问。验证：场景输出与 Playwright 截图（存 `tmp/evidence/W2/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 perm-rule-match、perm-bash-compound、perm-read-only、perm-critical-delete、perm-bypass 在 Windows 通过；bash_cases 新增盘符根 C:/、'C:\\' 与 $USERPROFILE（修复 6110364，先红后绿）；Git 程序探测修复（91f9994、c54271b）；L4 t23-permissions 2/2（tmp/evidence/W2/l4-m2.log）。"
     },
     {
       "id": "W2-A03",
       "task": "W2",
       "description": "`PowerShell(…)` 规则精确匹配生效，未被精确允许的命令在 Manual 模式下询问，\"总是允许\"写入的规则能再次命中。验证：Playwright 与场景输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 perm-powershell-whole、policy-manual-powershell、policy-accept-edits-powershell；Core 用例 powershell_rules_match_whole_commands_and_always_allow_hits_again（717efe9：整条匹配、总是允许写入后再次命中、通配规则对 %USERPROFILE%、~\\、..\\..、-Path: 询问）；L4 w1-windows-shells（powershell-approval.png）。"
     },
     {
       "id": "W2-A04",
       "task": "W2",
       "description": "hooks 超时与取消时整棵进程树被终止（含 hook 启动的孙进程），exit 2 阻断且理由回到模型。验证：实机测试输出（进程表前后对比）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --lib tool_io::hooks 12/12：超时与中断后 hook 起的孙进程（PID 6416、18812）经 tasklist 确认结束，exit 2 阻断与理由，UserPromptSubmit 30 s；L2 hooks-* 15/15（tmp/evidence/W2/hooks-windows.log）。"
     },
     {
       "id": "W2-A05",
       "task": "W2",
       "description": "回退四个选项、冲突检测与按 hunk 丢弃在 CRLF 文件、含空格与中文的路径、超过 260 字符的路径上结果正确；目标文件被占用时给出明确提示且文件不损坏。验证：场景测试与 Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "路径标签修复 cafffc1 后 L2 rewind-*、changes-*（CRLF/BOM 夹具）与 L4 t28-rewind 3/3 通过；checkpoints::tests::windows 3/3（03b28cf）：被占用文件报出文件名与 os error 32 且不写入、释放后按 CRLF 恢复，超过 260 字符与大小写不同的写法字节恢复，junction 不写穿（tmp/evidence/W2/ckpt-windows.log）。"
     },
     {
       "id": "W2-A06",
       "task": "W2",
       "description": "阈值触发压缩、`/compact` 重点、熔断与重注入在本机通过，用量环显示正确。验证：L2 场景输出与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 ctx-compact-threshold、ctx-compact-focus、ctx-compact-breaker、ctx-compact-restore、ctx-usage 通过；L4 t27-context（ring-75-warning.png、ring-90-context-card.png、after-compact-focus.png）。"
     },
     {
       "id": "W2-A07",
       "task": "W2",
       "description": "配置兼容层读取 `%USERPROFILE%\\.claude\\settings.json` 与 `%USERPROFILE%\\.claude.json`，`.claude/rules` 的 `paths:` 条件在 Windows 路径上生效，诊断页显示正确。验证：测试与 Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-config 全部通过（含 Windows junction 用例 4c9ce39）；Core 家目录为 std::env::home_dir()（Windows 即 %USERPROFILE%）；L2 config-merge-order、config-untrusted-project、config-rules-paths；L4 t24-diagnostics。"
     },
     {
       "id": "W2-A08",
       "task": "W2",
       "description": "计划模式、任务清单、AskUserQuestion、下一步建议与三档视图的界面流程在 Windows 上通过。验证：Playwright（Windows）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4（Windows dev 形态）t26-harness 5/5、t29-views、t29-login-models 通过，截图在 tmp/evidence/W2/l4/ 与 tmp/evidence/W2/views-*.png。"
     },
     {
       "id": "W2-A09",
       "task": "W2",
       "description": "WebFetch 在 Windows 上拒绝回环、内网与 IPv6 本地地址；OAuth 与设备码登录经回环端口完成（mock 授权服务器）；外部修改检测经文件监听生效。验证：测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "piarc-web SSRF 用例（127.0.0.1、10.x、::1、::ffff: 映射）与 internal_addresses_are_refused_without_the_allowlist；--test sessions login 4/4；piarc-fs 监听与 --test state 设置重载；L2 ctx-file-modified、webfetch-*、login-*（tmp/evidence/W2/a09.log）。"
     },
     {
       "id": "W2-A10",
       "task": "W2",
       "description": "权限与 hooks 场景的 L3 比对在 Windows 上无未解释差异；未安装 Claude Code CLI 且用户不同意安装时，`PLAN.md` 中记录为未验证及原因。验证：L3 命令输出或 `PLAN.md` 记录。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run l3 -- --repeat 2 对锁定的 Claude Code 2.1.318（tmp/l3-claude 本地平台包的 claude.exe）：12 个场景 0 未解释、3707 已说明、0 过期，两遍一致（edfaa51 增加 allowlist platforms）；退出码 1 仅因本会话的交互式 Claude Code 写 ~/.claude（tmp/evidence/W2/l3-repeat2.log）。"
     },
     {
       "id": "W2-A11",
       "task": "W2",
       "description": "发现的平台问题都已修复（附复现的失败测试）或登记到 `PLAN.md`\"登记事项\"；`docs/reviews/W2-windows-m2-parity.md` 逐条给出 M2 退出标准与 R3 重点核对项的 Windows 证据与结论，并列出 T23–T30 中等待 Windows 的验收项的结论。验证：报告、提交记录与登记事项内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/reviews/W2-windows-m2-parity.md：检查表、R3 重点核对项、F1–F7 与 T1–T5（每项先失败后通过的测试）、T23–T30 等待 Windows 的验收项 0 项；登记 I146、I147，关闭 I96、I102、I118。"
     },
     {
       "id": "W2-A12",

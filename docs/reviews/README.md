@@ -14,5 +14,6 @@
 Windows 达标任务（W0–W4）的报告也放在本目录，命名 `Wn-windows-<短标题>.md`，例如 `W1-windows-m1-parity.md`。
 
 - W1：[`W1-windows-m1-parity.md`](W1-windows-m1-parity.md)：**M1 在 Windows 11 x64 达标**（2026-11-19），UNC 共享未能在本机验证（I96）；修复 10 个 Windows 平台缺陷，ADR-0040、0041 给出 Windows 的两项预算口径。
+- W2：[`W2-windows-m2-parity.md`](W2-windows-m2-parity.md)：**M2 在 Windows 11 x64 达标**（2026-11-21），L3 在 Windows 上 0 个未解释差异，W1 的 UNC 补验通过；修复 7 个 Windows 平台缺陷。
 
 每条发现记录：编号、维度、文件与行号、失败场景、核实结论（确认 / 不同意及理由）、处理（已修复的提交 / 登记事项编号 / ADR）。
