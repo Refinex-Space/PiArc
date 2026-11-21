@@ -3856,106 +3856,106 @@
       "id": "T39-A01",
       "task": "T39",
       "description": "沙箱开启且为\"沙箱内仍审批\"模式时，Bash 命令照常进入审批，获批后在 Seatbelt 中执行：写工作区成功，写工作区外、受保护路径与 `denyRead` 路径失败。验证：L2 场景（能力 ID 已登记）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `sandbox-ask-writes`（CAP-SANDBOX-MACOS-001）：默认模式下 Bash 照常出卡（`core/sessions` 的审批带 `sandbox: sandbox`），获批后在 Seatbelt 中运行：写工作区成功；写 `$HOME`、写受保护的 `.vscode/tasks.json`、读 `denyRead` 的 `secret.txt` 都失败，结果写明被拒路径（\"PiArc's sandbox refused writing …\"）。另有 `cargo test -p piarc-core --test sandbox`（可写目录、受保护路径、denyRead、流式与退出码、杀进程不留进程）。`npm run verify` 第 14 步于 18e3db9 通过。"
     },
     {
       "id": "T39-A02",
       "task": "T39",
       "description": "\"沙箱内自动批准\"模式下沙箱内的 Bash 命令不弹审批，deny 规则、ask 规则、关键路径删除与 plan 模式的拦截仍然生效。验证：L2 场景，每种情况一个。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 各一个场景（CAP-SANDBOX-AUTO-001）：`sandbox-auto-allow`（非只读命令不出卡、在沙箱内运行，写工作区成功、写外部被拒）、`sandbox-auto-deny-rule`（deny 规则直接拒绝不运行）、`sandbox-auto-ask-rule`（ask 规则仍出卡，拒绝后不运行）、`sandbox-auto-critical-delete`（删除工作区根仍询问，拒绝后不删除）、`sandbox-auto-plan`（plan 模式仍拒绝并指向 ExitPlanMode）；`cargo test -p piarc-policy` 的 `sandbox_auto_approval_is_a_mode_default`（自动批准在阶梯第 7 步）。verify 于 18e3db9 通过。"
     },
     {
       "id": "T39-A03",
       "task": "T39",
       "description": "前台命令、`run_in_background` 后台命令与 Monitor 命令都在沙箱内执行，agent 启动进程的路径清单中每条路径各有测试。验证：L2 场景（三条路径各尝试写工作区外文件，均失败）与路径清单。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `sandbox-launch-paths`（CAP-SANDBOX-PATHS-001）：前台、`run_in_background` 后台、Monitor 三条路径各尝试写 `$HOME` 下文件，均被拒（工作区里的标记文件为 refused）；`sandbox-terminal`：模型以 `terminal` 运行的命令同样被拒。路径清单在 `crates/piarc-sandbox/AGENTS.md`\"agent 启动进程的路径\"表（前台、后台、Monitor、agent 终端进沙箱；用户终端、hooks、git 状态、MCP server、Agent Host 本身各写明位置与理由）。"
     },
     {
       "id": "T39-A04",
       "task": "T39",
       "description": "模型请求沙箱外重试时，所有模式（含 `bypassPermissions` 与自动批准）都弹出审批，卡片只提供\"仅本次允许\"与\"拒绝\"，PermissionRequest hooks 不能代答，拒绝理由回到模型。验证：L2 场景与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `sandbox-unsandboxed-retry`（CAP-SANDBOX-RETRY-001）：`bypassPermissions` 且开着沙箱自动批准时，带 `dangerouslyDisableSandbox` 的调用仍出卡（`sandbox: unsandboxed`、`protectedPath: true`，客户端只显示仅本次允许与拒绝），允许一切的 PermissionRequest hook 不能代答，拒绝的反馈出现在下一次 mock 请求里，获批的重试在沙箱外写成 `$HOME/out.txt`；`cargo test -p piarc-core --lib tool_io::policy::reasons`（Core 拒绝沙箱外命令的\"本会话允许\"\"总是允许\"答复）与 `piarc-policy` 的 `an_unsandboxed_command_asks_in_every_mode`。"
     },
     {
       "id": "T39-A05",
       "task": "T39",
       "description": "白名单内域名经代理可达，白名单外域名被拒，绕过代理的直连失败；修改白名单后下一条命令按新白名单执行，Agent Host 进程 id 不变。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-testkit --test sessions sandbox::hosts_outside_the_allowlist_ask_and_a_changed_allowlist_applies_to_the_next_command`：白名单内主机经代理得到 hello，白名单外得到 403，绕过代理的直连失败（\"Command exited with code\"），改用户设置的白名单后下一条命令按新白名单执行，Agent Host 的 pid 前后不变；`cargo test -p piarc-sandbox --test proxy`（`a_new_allowlist_applies_to_the_next_connection` 等 14 个）与 `piarc-core --test sandbox` 的 `connections_around_the_proxy_fail`。"
     },
     {
       "id": "T39-A06",
       "task": "T39",
       "description": "网络白名单按用户与企业来源合并；项目级配置中的白名单域名与自动批准设置不生效，并在配置诊断中标为\"项目级不生效\"。验证：测试（企业来源用测试替身）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-config --lib sandbox`（`domains_merge_user_and_enterprise_and_projects_only_tighten`、`a_project_cannot_turn_the_sandbox_off`；企业来源经 `Enterprise` 测试替身）与 `--test claude`（项目级 `/sandbox/network/allowedDomains` 标为 `ProjectSandbox`）；L2 `sandbox-project-tightens`（CAP-SANDBOX-PROJECT-001：项目的白名单与自动批准不生效，配置诊断报告\"项目级不生效\"）。"
     },
     {
       "id": "T39-A07",
       "task": "T39",
       "description": "Seatbelt 拒绝与代理拒绝写入 `audit_events`，审计页可按\"沙箱拒绝\"筛选查看。验证：测试与 Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "代理拒绝：会话层测试（同 A05）经 `auditEvents({kind: \"sandbox\"})` 查到代理拒绝与网络卡的允许、拒绝、超时记录。Seatbelt 拒绝：Playwright `t39-sandbox.e2e.ts` 第一个用例让命令写工作区外的 `escape.txt`，审计页选\"沙箱拒绝\"后出现该文件的\"Write refused\"行（Core 的 `sandbox_report` 写入 `audit_events`），截图 `tmp/evidence/T39/sandbox-audit.png`。"
     },
     {
       "id": "T39-A08",
       "task": "T39",
       "description": "沙箱设置页可开关沙箱、切换模式、编辑白名单与 `denyRead`，改动对下一条命令生效，企业来源条目不可编辑。验证：Playwright 用例与亮/暗截图（`tmp/evidence/T39/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`PIARC_EVIDENCE_TASK=T39 npx playwright test -c apps/desktop/playwright.config.ts t39- --project dev`：设置页开关沙箱、切换模式、编辑白名单与 `denyRead` 后下一条命令按新设置执行，企业来源条目没有删除按钮（`sandbox-domains-remove` 为 0）；截图 `tmp/evidence/T39/sandbox-page-light.png`、`sandbox-page-dark.png`（另有审批卡与网络卡的亮/暗截图）。2 passed，Windows 用例在 macOS 上跳过。"
     },
     {
       "id": "T39-A09",
       "task": "T39",
       "description": "Agent Host 在定稿的 Seatbelt 配置下：写工作区、数据目录、会话临时目录成功，测试扩展向用户主目录写文件失败，经内置 npx 启动的 MCP stdio server 可以完成一次工具调用。验证：macOS 集成测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-testkit --test sessions sandbox::the_agent_host_profile_keeps_extensions_and_mcp_servers_in_their_places`：真实 Agent Host 在定稿配置下写工作区、`<数据目录>/pi`、会话临时目录成功，测试扩展向主目录写文件失败，经内置 npx 从 tarball 启动的 MCP stdio server 完成一次工具调用；`cargo test -p piarc-core --test agent_host_profile`（真实 `sandbox-exec` 下的写入范围与读取）。"
     },
     {
       "id": "T39-A10",
       "task": "T39",
       "description": "全部 L2 场景在 Agent Host 定稿配置下通过，配置生成结果有 golden 测试。验证：macOS CI 输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "本机 macOS（darwin arm64）运行与 CI 相同的 `node scripts/ci/run-l2.mjs`（verify 第 14 步）：184 passed、0 failed、3 个按平台跳过，Agent Host 在定稿配置下运行（打包与开发两种启动都套用）；golden `crates/piarc-sandbox/tests/snapshots/agent-host-profile.sbpl`（`cargo test -p piarc-sandbox`）。verify 于 18e3db9 通过；分支未推送，远端 macOS CI 在用户推送后运行。"
     },
     {
       "id": "T39-A11",
       "task": "T39",
       "description": "git、npm install（白名单含 registry）、cargo build、python 脚本经 Bash 工具在沙箱内执行成功。验证：集成测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-core --test sandbox_commands`：`git_status_add_and_commit`、`a_python_script_runs`、`cargo_build_without_dependencies`、`cargo_build_with_a_crates_io_dependency`、`npm_install_from_the_registry` 在 Seatbelt 与代理下通过（连真实 registry）；`sessions sandbox::everyday_commands_run_in_the_sandbox_through_the_bash_tool` 经 Bash 工具运行同一组命令。"
     },
     {
       "id": "T39-A12",
       "task": "T39",
       "description": "Windows 上设置页与沙箱开关显示\"沙箱不可用\"提示；配置开启沙箱或自动批准时，命令仍按权限规则审批，不会被自动批准。验证：Windows CI 上的 Playwright 断言与截图、L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "需要 Windows：L2 `sandbox-windows-not-applied`（CAP-SANDBOX-WINDOWS-001，设置开启沙箱与自动批准时命令仍出卡、配置诊断标\"本平台不生效\"）与 Playwright `t39-sandbox.e2e.ts` 的 Windows 用例（\"沙箱不可用\"提示与截图）已写好，在 macOS 上按平台跳过；Windows 交叉 clippy 通过。等用户推送后看 Windows CI。"
     },
     {
       "id": "T39-A13",
       "task": "T39",
       "description": "Windows 隔离方案评估 ADR 已写入 `docs/adr/`，状态\"提议\"，比较表覆盖 AppContainer、MXC、Win32 app isolation、Windows Sandbox、受限令牌或独立账户方案、WSL2 与维持现状，事实注明来源与日期；`docs/adr/README.md` 索引已更新。验证：文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`docs/adr/0057-windows-command-isolation.md`：状态\"提议\"，比较表覆盖 AppContainer、MXC、Win32 app isolation、Windows Sandbox、受限令牌或独立账户、WSL2 与维持现状，事实注明来源与 2026-11-21 的核对日期；`docs/adr/README.md` 索引已加 0056、0057。"
     },
     {
       "id": "T39-A14",
       "task": "T39",
       "description": "沙箱内命令访问白名单外域名时出现\"权限扩展（网络域名）\"审批卡：仅本次允许后本次连接成功、下次再问；加入白名单后不再询问；拒绝或超时后连接失败且命令得到明确错误。验证：场景测试与 Playwright 流程。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "会话层测试（同 A05）：白名单外主机出\"权限扩展（网络域名）\"卡，仅本次允许后本次连接成功、下一次再问并在 3 s（测试设置的 `approval_timeout`）后超时得到 403，加入白名单后写入用户设置并不再询问，拒绝得到 403；Playwright `t39-sandbox.e2e.ts` 第二个用例：网络卡的仅本次允许、加入白名单（原生确认）与拒绝，截图 `tmp/evidence/T39/network-card-light.png`、`network-card-dark.png`。"
     },
     {
       "id": "T39-A15",
       "task": "T39",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run verify` 于 18e3db9：15/15 通过（工作区干净）。"
     },
     {
       "id": "T40-A01",
