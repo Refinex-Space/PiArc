@@ -172,7 +172,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 607809d |
 | T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 已完成 | c4e5f75 |
 | T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 已完成 | 10fbeff |
-| T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 进行中 | — |
+| T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 部分完成 | 868065b |
 | T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 未开始 | — |
@@ -308,13 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-**T42 NotebookEdit、可操作通知与 diff 行内评论**（开工 2026-11-21；基线 `npm run verify -- --baseline` 通过，复用 10fbeff 的全量结果；origin 停在 e0c41ce，没有新的 Windows CI 结果可关闭 `blocked` 项）
-
-- [x] 1 NotebookEdit：插入、替换、删除，cell id 与序号定位，保真写入，先读后改与外部修改、检查点、权限与 hooks
-- [x] 2 可操作通知：通知层窄接口与测试替身、经审批账本答复、高风险只给"打开"、macOS 按 S6 结论、Windows Toast 按钮与 CI 测试、审计来源"通知"
-- [x] 3 diff 行内评论：添加、编辑、删除、跨文件，Mod+Enter 批量发送，排队，草稿存 localStorage 与重新定位
-- [ ] 验收 A01–A12；收尾（piarc-fs、通知模块、changes 模块的 AGENTS.md，架构第 8.8 节）
 
 ## 登记事项
 
@@ -1053,3 +1046,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 决策：ADR-0059（补充）；架构 2.52；`window.piarc` 共 115 个函数。FileChanged 改为轮询而不是 notify（全量 L2 下 FSEvents 流启动阻塞几十秒，CwdChanged 后的回合会卡住）；ConfigChange 不只依赖文件事件，每个输入前核对（权限裁决每次读文件，事件迟到会让被阻断的变更先生效）；成本按请求存行、查询时计价（可改价、可分档），没有价格为"未知"
 - 登记：I176 由 T41 决定（删除 `terminalLastCommand`；`exec/background/list|read` 删除交 R5）；I183 已落地；新增 I184（目录价只在见过模型列表后才有）、I185（设置监听在高负载下的迟到对其他消费方的影响）
 - 下一项：macOS 上的 T42（NotebookEdit、可操作通知与 diff 行内评论）。本地提交，未推送。
+
+### 2026-11-21 T42 部分完成（提交 868065b）
+
+- 交付：NotebookEdit（`piarc_fs::notebook` 只改一个 cell 的字节区间、按文件风格重写被改的 cell、替换代码 cell 清空输出、旧版 notebook 按序号定位、新 cell 的 id 由调用 id 派生；Agent Host 的 `tools/notebook-text.ts` 同一算法，两边跑 `tests/notebook/` 共享向量；Core 的 `tool_io/policy/notebook.rs` 算批准结果与审批卡 diff，`Edit(...)` 规则、受保护路径、检查点与 hooks 同文件工具；Tool Profile、提示词与 5 个 L2 场景）；可操作通知（Core 的 `notificationAllow` 与通知答复检查 `tool_io/policy/notify.rs`、审计来源 `notification`，协议 `AnswerVia`；主进程 `NotificationPort` 与按钮经同一 `answerApproval`，未采用的答复以 `approvalNotice` 提示；设置页在系统不支持通知时说明原因；L2 审批应答的 `via`、`notification_allow` 与场景 `notify-approval`）；diff 行内评论（`changes/comments.ts` 与 `DiffComments.tsx`：两侧与范围、跨文件、编辑删除、`localStorage` 草稿、按摘录重新定位与"已失效"、Mod+Enter 一次发送、运行中排队；FR-RV-04 改为 `client_only`）；顺带修复：等待审批时审批卡的捕获阶段快捷键吞掉其他文本框里的 Mod+Enter（`approval-keys.ts` 的 `typedElsewhere`）
+- 验收：10 项通过，A06（macOS 通知横幅截图，缺屏幕录制权限）与 A07（Windows CI）blocked，看板为"部分完成"。`npm run verify` 15/15（868065b，Vitest 1,681 passed，L2 204 passed 3 个按平台跳过；首次全量在 e60bd4d 因 i18n 测试缺新占位符的样例值失败，已补）；L4 `t42-` 2 passed 与受影响的 `t28-rewind` 3 passed、`t20-approvals` passed（dev 形态，截图在 `tmp/evidence/T42/`）；提示词原创性检查 0 个匹配窗口
+- 决策：ADR-0060（补充）；架构 2.53；没有新增 IPC 命令（`window.piarc` 仍为 115 个函数），应用状态加 `notificationsSupported`、应用事件加 `approvalNotice`。notebook 不解析再序列化（避免整文件 diff）；通知只放行能在通知里读完的请求（短单行命令、增删不超过 12 行的改动）；评论不进 Core
+- 登记：新增 I186（代码高亮配色跟随系统而非应用主题，T43）、I187（通知横幅截图与 Windows Toast 实机核对，W4）
+- 下一项：macOS 上的 T43（无障碍与本地化）。A06 在用户给终端"屏幕录制"权限后补拍，A07 在用户推送后由下一个任务的开工检查按 Windows CI 关闭。本地提交，未推送。

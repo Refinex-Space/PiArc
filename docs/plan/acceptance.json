@@ -4129,85 +4129,85 @@
       "id": "T42-A01",
       "task": "T42",
       "description": "NotebookEdit 的插入、替换、删除各有一个场景，结果与期望 notebook 一致，未改动的 cell、元数据、缩进与换行风格逐字节不变。验证：L2 场景（能力 ID 已登记）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `notebook-edit-replace`、`notebook-edit-insert`、`notebook-edit-delete`（CAP-TOOL-NOTEBOOK-001）按字节比对期望 notebook（输出清空、id 派生、未改动部分不变）；`cargo test -p piarc-fs notebook` 与 `npx vitest run agent-host/src/notebook-vectors.test.ts` 跑同一份 `tests/notebook/` 向量（含 CRLF、四空格缩进、无 id 的旧版 notebook）；`npm run verify` 在 868065b 全部 15 步通过（工作区干净；L2 204 通过、3 个按平台跳过）"
     },
     {
       "id": "T42-A02",
       "task": "T42",
       "description": "未先 Read、读取后被外部修改、cell id 不存在时返回明确错误且文件不变；没有 cell id 的旧版 notebook 按序号定位。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `notebook-edit-errors`（CAP-TOOL-NOTEBOOK-ERRORS-001）：未先 Read、读后被外部修改、cell id 不存在各返回明确错误且文件逐字节不变，旧版 notebook 按 `cell-N` 定位；`npm run verify` 在 868065b 全部 15 步通过（工作区干净；L2 204 通过、3 个按平台跳过）"
     },
     {
       "id": "T42-A03",
       "task": "T42",
       "description": "NotebookEdit 的写入进入检查点并可回退，受 `Edit(...)` 规则、受保护路径与模式默认约束，并产生 `fileChange` diff。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `notebook-edit-permissions`（CAP-TOOL-NOTEBOOK-PERMISSIONS-001）：`Edit(...)` deny 规则、受保护路径、Manual 模式询问与 Accept edits 放行、`fileChange` diff、写入进检查点并经 rewind 回退；`npm run verify` 在 868065b 全部 15 步通过（工作区干净；L2 204 通过、3 个按平台跳过）"
     },
     {
       "id": "T42-A04",
       "task": "T42",
       "description": "从通知作出的答复经审批账本处理：与审批卡同时答复时只接受第一个有效答复，过期请求被拒绝并在应用内提示，审计记录来源为\"通知\"。验证：测试（通知层测试替身，断言 `requestId`、`revision`、`connectionEpoch`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-core --lib tool_io::policy::tests::t42`（通知先答、审批卡后答被拒，审计来源 `notification`，只接受仅本次与不带反馈的拒绝）；`npx vitest run apps/desktop/src/main/platform/attention.test.ts`（测试替身断言 `answerApproval` 的 `requestId`、`revision`、`connectionEpoch`、`via`，未采用的答复发 `approvalNotice`）；L4 `t42-notify`（dev，通知按钮经账本、卡片已答后通知答复被拒并在应用内提示，截图 `tmp/evidence/T42/notification-stale-reminder.png`）；L2 `notify-approval`（CAP-SYS-NOTIFY-002）"
     },
     {
       "id": "T42-A05",
       "task": "T42",
       "description": "关键路径删除、沙箱外重试以及参数超出通知可显示长度的请求，通知只提供\"打开\"，不提供\"允许\"。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-core --lib tool_io::policy::tests::t42` 的 `long_critical_and_protected_requests_only_open_the_card`（超长、多行、关键路径删除 `rm -rf ~`、受保护路径的卡片 `notificationAllow` 为假，从通知允许被拒、拒绝可用）；L2 `sandbox-unsandboxed-retry` 核对沙箱外重试的卡片 `notification_allow: false`、`notify-approval` 核对超长命令；`attention.test.ts` 的 \"only opens a request a notification may not allow\""
     },
     {
       "id": "T42-A06",
       "task": "T42",
       "description": "macOS 按 S6 结论走带操作或降级的路径，实际可用的路径有实测截图，另一条路径有测试；降级时设置页说明原因。验证：截图（`tmp/evidence/T42/`）与测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "测试与降级说明已完成：macOS 走带按钮的路径（Electron 45 `actions`，`attention.test.ts` 与 L4 `t42-notify` 经测试钩子按下按钮）；系统不支持通知时设置页说明原因（`settings-notifications-light/dark.png`）。缺系统横幅的实测截图：本机终端没有\"屏幕录制\"权限，`screencapture` 报 could not create image from display。登记 I187：授权后用 `PIARC_CAPTURE_NOTIFICATION=1 PIARC_EVIDENCE_TASK=T42 npx playwright test -c apps/desktop/playwright.config.ts t42-notify --project dev` 补拍"
     },
     {
       "id": "T42-A07",
       "task": "T42",
       "description": "Windows Toast 按钮的生成与激活回调路径有测试，实机验证已登记到 W4。验证：Windows CI 测试输出与 `PLAN.md` 登记事项。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "按钮的生成与 `action` 回调经同一 `NotificationPort`（Electron `actions` 即 Windows Toast 按钮），`attention.test.ts` 的 \"gives Electron the buttons and reads the pressed one (macOS buttons, Windows toasts)\" 在 macOS 通过；Windows CI 输出要在用户推送后产生，本会话不推送；实机点击登记 I187，并入 W4"
     },
     {
       "id": "T42-A08",
       "task": "T42",
       "description": "Changes 面板中可在多个文件的 diff 行上添加、编辑、删除评论，Mod+Enter 一次发送全部评论。验证：Playwright 与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `PIARC_EVIDENCE_TASK=T42 npx playwright test -c apps/desktop/playwright.config.ts t42-comments --project dev` 通过：notes.ts 新侧单行（键盘）、新侧范围（Shift+点击）、旧侧、src/made.ts 跨文件，编辑与删除，Mod+Enter 一次发送；截图 `tmp/evidence/T42/l4/t42-comments…/comments-{light,dark}.png`、`comments-saved-{light,dark}.png`"
     },
     {
       "id": "T42-A09",
       "task": "T42",
       "description": "批量发送的消息包含每条评论的文件路径、行号范围、所在侧与代码摘录。验证：mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `t42-comments` 断言 mock 收到的最后一条用户消息逐字等于期望文本：按文件分组，每条含路径、行号范围、旧 / 新版本、代码摘录与正文，删除的评论不在其中；格式只在 `changes/comments.ts` 的 `formatComments`"
     },
     {
       "id": "T42-A10",
       "task": "T42",
       "description": "会话运行中发送的评论作为排队消息，在当前回合结束后送达。验证：Playwright 与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `t42-comments`：等待审批（回合运行中）时 Mod+Enter 的评论成为 `followUp` 排队项（截图 `comments-queued.png`）；批准后 mock 先收到命令结果所在的请求（不含评论），回合结束后的下一请求最后一条用户消息才是评论"
     },
     {
       "id": "T42-A11",
       "task": "T42",
       "description": "diff 更新后未发送的评论重新定位，定位失败的评论标为\"已失效\"并保留文本。验证：组件测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npx vitest run apps/desktop/src/renderer/changes/comments.test.ts`（4 项：原位与移动后按摘录重新定位、找不到标 `stale` 并保留正文且不发送、消息格式、快捷键）"
     },
     {
       "id": "T42-A12",
       "task": "T42",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run verify` 在 868065b 全部 15 步通过（工作区干净；L2 204 通过、3 个按平台跳过）；首次全量在 e60bd4d 因 i18n 测试缺新占位符的样例值失败，868065b 补上后通过"
     },
     {
       "id": "T43-A01",
