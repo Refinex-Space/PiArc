@@ -158,7 +158,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T29 | [WebFetch、登录与模型设置补全、三档视图](tasks/T29-webfetch-login-model-settings-views.md) | 3 | T28 | macOS | high / 高 | 中 | 无 | 已完成 | 7f9e79b |
 | T30 | [L3 行为对齐基座](tasks/T30-l3-behavior-alignment.md) | 3 | T29 | macOS | high / 高 | 中 | 无 | 已完成 | f52b5aa |
 | R3 | [M2 评审](tasks/R3-m2-review.md) | 3 | T30、W1 | macOS | high / 高 | 中 | 无 | 部分完成 | 8e2b4a2 |
-| W2 | [Windows：M2 达标](tasks/W2-windows-m2-parity.md) | 4 | R3 | Windows | high / 高 | 中 | 无 | 未开始 | — |
+| W2 | [Windows：M2 达标](tasks/W2-windows-m2-parity.md) | 4 | R3 | Windows | high / 高 | 中 | 无 | 进行中 | — |
 | T31 | [子 agent 与模型别名](tasks/T31-subagents-and-model-aliases.md) | 4 | R3 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 7ec1971 |
 | T32 | [后台任务、Monitor 与 KillShell](tasks/T32-background-tasks-and-monitor.md) | 4 | T31 | macOS | high / 高 | 中 | 无 | 部分完成 | ef39d43 |
 | T33 | [无头终端（Core 侧）](tasks/T33-headless-terminal.md) | 4 | T32 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 33f4bf9 |
@@ -322,6 +322,22 @@ T35（开工 2026-11-20，基线复用 991f323 的全量 verify；T34 的遗留 
 - [ ] 9 `piarc://`、open-file、拖入文件夹、Windows 右键菜单注册与参数解析（A09、A10）
 - [ ] 10 内存测量脚本与 `docs/perf/M3-memory.md`（A11）
 - [ ] 11 文档、AGENTS.md、架构与 ADR、verify（A12）与收尾
+
+W2（开工 2026-11-21，Windows 11 x64，分支 `windows/dev` 自 e0c41ce 起，与 macOS 上进行中的 T35 并行，用户安排；R3 部分完成只因 R3-A07 等待 W1 的 UNC 项，由本任务补齐，不影响开工；本机没有全量通过记录，基线跑全量；Windows CI 运行 44731794641（483413b）的 verify 与 L4 失败于检查点路径标签，属于 M2 的平台问题，并入本任务修复）：
+
+- [x] 1 Windows CI 与本机基线失败修复：检查点路径标签（cafffc1）、Git 程序探测失败不缓存与 `ucrt64`（91f9994）、Monitor 分块输出丢失唤醒（db82eae）、三个测试与 L2 `tools_windows`（5ff57f6、82082b6）
+- [ ] 2 本机 L2 全部通过、能力清单 M2 无 MISSING（A01）
+- [ ] 3 Git Bash 的 Bash 规则、复合命令、包装剥离、只读白名单、关键路径删除（盘符根、`%USERPROFILE%`、工作区根、`/c/…` 与 `C:\…`），`Read`/`Edit` 路径规则（A02）
+- [ ] 4 PowerShell 规则精确匹配、Manual 询问、"总是允许"再次命中、ADR-0047 越界判断（A03）
+- [ ] 5 hooks：执行方式、stdin JSON、exit 2、超时与取消结束整棵进程树（进程表前后对比）、UserPromptSubmit 30 s（A04）
+- [ ] 6 回退与 Changes：四个选项、冲突、按 hunk 丢弃，CRLF、空格中文、超过 260 字符、大小写、文件被占用、junction（A05）
+- [ ] 7 压缩：阈值、`/compact` 重点、熔断、重注入、用量环（A06）
+- [ ] 8 配置兼容层：`%USERPROFILE%\.claude\settings.json`、`.claude.json`、`.claude/rules` 的 `paths:`、诊断页、`.piarc` junction 写入被拒（A07）
+- [ ] 9 界面流程：计划模式、任务清单、AskUserQuestion、下一步、三档视图，M2 的 L4 在 Windows（A08）
+- [ ] 10 WebFetch SSRF、OAuth 与设备码登录、外部修改检测（A09）
+- [ ] 11 L3 在 Windows（原生 `claude.exe`），权限与 hooks 场景，PowerShell 场景能否移出排除清单（A10、I118）
+- [ ] 12 R3 重点核对项：UNC（W1-A05、I96）、长命令与 `eval`（I102）、裁决与 AHP 往返预算（I95、I103）
+- [ ] 13 W2 报告、登记事项、AGENTS.md、verify（A11、A12）与收尾
 
 ## 登记事项
 
