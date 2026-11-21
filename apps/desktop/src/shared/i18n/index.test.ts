@@ -113,6 +113,9 @@ describe('i18n', () => {
             version: '1.0.0',
             from: 'abc1234',
             to: 'def5678',
+            side: 'new version',
+            start: 11,
+            end: 12,
           }),
         ).not.toThrow();
       }
