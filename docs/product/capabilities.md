@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | M1 | 61 | 61 | 0 | 0 |
 | M2 | 46 | 46 | 0 | 0 |
-| M3 | 41 | 35 | 6 | 0 |
+| M3 | 47 | 44 | 3 | 0 |
 | M4 | 10 | 0 | 10 | 0 |
 | M5 | 7 | 0 | 7 | 0 |
 
@@ -149,7 +149,8 @@
 | CAP-BG-NOTICE-001 | 后台任务结束后，任务 id、命令、退出码与语义、耗时、输出文件与尾部预览在下一回合以 system reminder 注入 | FR-TL-04、ARCH-6.6、ARCH-6.11 | T32 | `bg-completion-reminder` | 已实现 |
 | CAP-BG-SUBAGENT-001 | 后台子 agent 进入任务管理器，可从面板停止，状态记为 killed | FR-TL-04、FR-HN-04、ARCH-6.11 | T32 | `bg-subagent-stop` | 已实现 |
 | CAP-BG-TIMEOUT-001 | 前台命令超时后转为后台任务，同一进程继续运行，工具结果说明已转后台 | FR-TL-04、ARCH-6.11 | T32 | `bg-timeout-to-background` | 已实现 |
-| CAP-CMD-001 | 自定义斜杠命令（`.claude/commands`、Pi prompt templates） | FR-EX-02、ARCH-6.7 | T37 | — | 计划中 |
+| CAP-CMD-001 | 自定义斜杠命令（`.claude/commands`、Pi prompt templates） | FR-EX-02、ARCH-6.7 | T37 | `command-expand` | 已实现 |
+| CAP-CMD-EXPAND-001 | `/名称 参数` 由 Core 在 UserPromptSubmit 之前展开（`$ARGUMENTS`、位置参数与命名参数），转录显示用户输入的原文，可由用户调用的 skill 同样展开 | FR-EX-02、ARCH-6.7 | T37 | `command-expand` | 已实现 |
 | CAP-HOOK-HANDLER-001 | http 与 prompt 类型的 hook handler | FR-HN-05、ARCH-6.3.2 | T38 | — | 计划中 |
 | CAP-HOOK-SUBAGENT-001 | SubagentStart、SubagentStop 与 PostToolBatch hooks | FR-HN-05、ARCH-6.3.2 | T38 | — | 计划中 |
 | CAP-MCP-CHANGES-001 | server instructions 进入 system prompt 第 6 段；工具集因 `list_changed` 或连接变化而改变时以追加消息送达，system prompt 不变 | FR-EX-03、ARCH-6.6.1、ARCH-6.8 | T36 | `mcp-tools-changed` | 已实现 |
@@ -168,8 +169,13 @@
 | CAP-MONITOR-WAKE-001 | 会话空闲时 Monitor 的新增输出唤醒会话，唤醒频率受限速约束 | FR-TL-04、ARCH-6.11 | T32 | `monitor-wake-idle` | 已实现 |
 | CAP-SESSION-PARALLEL-001 | 跨工作区与多窗口的会话并行运行 | FR-WS-05 | T35 | `worktree-parallel-sessions` | 已实现 |
 | CAP-SESSION-SEARCH-001 | 会话全文搜索 | FR-WS-04、ARCH-9.2 | T35 | `worktree-session-create` | 已实现 |
-| CAP-SKILL-001 | Skills（Agent Skills 标准；`.claude/skills`、`.piarc/skills`、用户级），渐进加载 | FR-EX-01、ARCH-6.7 | T37 | — | 计划中 |
-| CAP-STYLE-001 | 输出风格切换与自定义 | FR-HN-07、ARCH-6.7 | T37 | — | 计划中 |
+| CAP-SKILL-001 | Skills（Agent Skills 标准；`.claude/skills`、`.piarc/skills`、用户级），渐进加载 | FR-EX-01、ARCH-6.7 | T37 | `skill-index` | 已实现 |
+| CAP-SKILL-ALLOWED-001 | `allowed-tools` 在调用 skill 的回合内免审批，下一回合恢复询问，deny 与 ask 规则仍然优先 | FR-EX-01、ARCH-6.2.3、ARCH-6.7 | T37 | `skill-allowed-tools` | 已实现 |
+| CAP-SKILL-INDEX-001 | system prompt 第 5 段只列模型可调用的 skill 名称与截断后的描述，`disable-model-invocation` 的不列 | FR-EX-01、ARCH-6.6.1、ARCH-6.7 | T37 | `skill-index` | 已实现 |
+| CAP-SKILL-INVOKE-001 | `Skill` 工具加载正文并完成参数替换，正文留在对话中、压缩后按上限重注入，frontmatter 的 `hooks` 从调用起生效 | FR-EX-01、ARCH-6.6.4、ARCH-6.7 | T37 | `skill-invoke` | 已实现 |
+| CAP-SKILL-PATHS-001 | 带 `paths` 的 skill 在处理匹配文件后才进入索引，以追加消息送达 | FR-EX-01、ARCH-6.7 | T37 | `skill-paths` | 已实现 |
+| CAP-STYLE-001 | 输出风格切换与自定义 | FR-HN-07、ARCH-6.7 | T37 | `style-switch` | 已实现 |
+| CAP-STYLE-SWITCH-001 | 新会话把当前输出风格放在 system prompt 第 3 段；会话中途切换以追加消息送达，已发送的 system prompt 不变 | FR-HN-07、ARCH-6.6.1、ARCH-6.7 | T37 | `style-switch` | 已实现 |
 | CAP-TERM-READ-001 | agent 用 terminal 运行的命令进入会话的终端并作为后台任务运行；命令结束后提醒退出码与屏幕末尾，Read 任务文件得到屏幕文本与最近一条命令的结果 | FR-TL-05、ARCH-6.11 | T33 | `term-agent-command` | 已实现 |
 | CAP-TERM-SCREEN-001 | 集成终端与会话共享目录和环境，agent 可读取后台终端的屏幕内容 | FR-TL-05、ARCH-6.11 | T33 | `term-agent-command`<br>`term-agent-env`（仅 macos） | 已实现 |
 | CAP-TERM-SHARE-001 | 用户在终端面板中打开的终端默认不给 agent；用户打开共享后 agent 得到屏幕的位置并能读取，取消共享后又看不到 | FR-TL-05、ARCH-6.11 | T34 | `term-user-share`（仅 macos） | 已实现 |
