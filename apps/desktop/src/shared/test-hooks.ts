@@ -174,6 +174,11 @@ export interface PiarcTestHooks {
   ): Promise<{ supported: boolean; events: NotificationProbeEvent[] }>;
   /** What the attention module did (T18): notifications, Dock bounces, the badge count. */
   attention(): AttentionObservation;
+  /**
+   * Presses action `index` of the newest shown notification, as the system would on a button
+   * (T42): Playwright cannot reach system notifications. Resolves once the answer is handled.
+   */
+  notificationAction(index: number): Promise<void>;
   /** Makes the next call on IPC `channel` fail with `message` before it reaches Core (T18). */
   failNext(channel: string, message: string): void;
   /** Makes the next answer on IPC `channel` reach the window `ms` after Core gave it. */
@@ -210,7 +215,14 @@ export interface TrayObservation {
 
 /** See `src/main/platform/attention.ts`. */
 export interface AttentionObservation {
-  readonly notified: readonly { kind: string; title: string; body: string; shown: boolean }[];
+  readonly notified: readonly {
+    kind: string;
+    title: string;
+    body: string;
+    shown: boolean;
+    /** The notification's action buttons (T42). */
+    actions: readonly string[];
+  }[];
   readonly bounces: number;
   readonly count: number;
 }

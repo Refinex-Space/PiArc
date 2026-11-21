@@ -119,6 +119,7 @@ function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners, app: App
     },
     mainWindows: () => app.mainWindows().map((w) => w.webContents.id),
     attention: () => app.attention.observed(),
+    notificationAction: (index) => app.attention.pressAction(index),
     failNext: (channel, message) => {
       faults.failNext(channel, message);
     },
@@ -226,6 +227,8 @@ function start(dirs: DataDirs): void {
       },
     );
     registerPermissionHandlers(registerHandler, core.runtime, () => appShell.t());
+    // T42: notification buttons answer through the same ledger as the card.
+    appShell.attention.connect({ answer: (json) => core.runtime.answerApproval(json) });
     registerSandboxHandlers(registerHandler, core.runtime, () => appShell.t());
     registerUsageHandlers(registerHandler, core.runtime);
     registerMcpHandlers(registerHandler, core.runtime);

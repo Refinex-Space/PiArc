@@ -7,10 +7,18 @@
 //   `show` even when the user turned PiArc's notifications off (S6), so the program cannot tell
 //   whether a banner appeared; the renderer adds its own in-app reminder for the same reason;
 // - the count as the Dock badge (macOS) or a taskbar overlay icon (Windows).
+//
+// T42 (FR-SY-03): a session waiting for approval gets action buttons. A card Core marked
+// `notificationAllow` offers "Allow once" and "Deny"; any other (critical deletion, outside the
+// sandbox, protected path, too long to read in a notification) only "Open". A button answers
+// through Core's approval ledger exactly like the card (`answerApproval`, with
+// `via: notification`); an answer that was not applied tells the window. Electron's `actions`
+// work on macOS (S6: notifications show under ad-hoc signing once allowed) and as Windows toast
+// buttons; the system notification itself sits behind `NotificationPort`, which tests replace.
 import { app, nativeImage, Notification, type BrowserWindow, type NativeImage } from 'electron';
 
 import { COLORS } from '../../shared/design-tokens.js';
-import type { AttentionNotice } from '../../shared/ipc.js';
+import type { AppEvent, AttentionNotice, NotificationApproval } from '../../shared/ipc.js';
 import type { AttentionObservation } from '../../shared/test-hooks.js';
 import type { Translator } from '../../shared/i18n/index.js';
 
@@ -20,15 +28,80 @@ export type AttentionRecord = AttentionObservation;
 /** Notifications kept for their `click`: more than this many are let go, oldest first. */
 const HELD_NOTIFICATIONS = 32;
 
+/** One shown system notification. */
+export interface ShownNotification {
+  onClick(listener: () => void): void;
+  onFailed(listener: () => void): void;
+  /** A button was pressed: its index in `actions`. */
+  onAction(listener: (index: number) => void): void;
+  show(): void;
+}
+
+/** System notifications (Electron's, or a test double). */
+export interface NotificationPort {
+  supported(): boolean;
+  create(options: {
+    readonly title: string;
+    readonly body: string;
+    readonly actions: readonly string[];
+  }): ShownNotification;
+}
+
+/** Electron's notifications: `actions` are macOS buttons and Windows toast buttons. */
+export const ELECTRON_NOTIFICATIONS: NotificationPort = {
+  supported: () => Notification.isSupported(),
+  create: ({ title, body, actions }) => {
+    const notification = new Notification({
+      title,
+      body,
+      ...(actions.length === 0
+        ? {}
+        : { actions: actions.map((text) => ({ type: 'button' as const, text })) }),
+    });
+    return {
+      onClick: (listener) => notification.on('click', listener),
+      onFailed: (listener) => notification.on('failed', listener),
+      onAction: (listener) =>
+        notification.on('action', (details) => {
+          listener(details.actionIndex);
+        }),
+      show: () => {
+        notification.show();
+      },
+    };
+  },
+};
+
+/** What the attention needs besides the notifications (T42). */
+export interface AttentionOptions {
+  readonly notifications?: NotificationPort;
+  /** Core's `answerApproval` (an `ApprovalAnswer` as JSON); resolves to `{ status }` JSON. */
+  readonly answer?: (answer: string) => Promise<string>;
+  /** Tells the main window something (an answer that was not applied). */
+  readonly tell?: (event: AppEvent) => void;
+}
+
+/** The longest command or path a notification shows. */
+const SUMMARY_CHARS = 160;
+
 export class Attention {
   private overlay: NativeImage | undefined;
   /**
    * Shown notifications. A notification that is garbage collected no longer receives `click`
    * on Windows, where a toast stays clickable in the notification center after it closes (W1).
    */
-  private readonly held = new Set<Notification>();
+  private readonly held = new Set<ShownNotification>();
+  /** Action handlers of the newest notification with buttons (test hooks). */
+  private lastActions: ((index: number) => Promise<void>) | undefined;
+  private options: AttentionOptions;
   private readonly record: {
-    notified: { kind: string; title: string; body: string; shown: boolean }[];
+    notified: {
+      kind: string;
+      title: string;
+      body: string;
+      shown: boolean;
+      actions: readonly string[];
+    }[];
     bounces: number;
     count: number;
   } = { notified: [], bounces: 0, count: 0 };
@@ -37,7 +110,20 @@ export class Attention {
     private readonly platform: string,
     /** Opens a session in the main window (a notification was clicked). */
     private readonly openSession: (sessionId: string) => void,
-  ) {}
+    options: AttentionOptions = {},
+  ) {
+    this.options = options;
+  }
+
+  /** Whether the system shows notifications at all (the settings page explains if not). */
+  notificationsSupported(): boolean {
+    return (this.options.notifications ?? ELECTRON_NOTIFICATIONS).supported();
+  }
+
+  /** Connects the approval answers once Core is up (T42). */
+  connect(options: AttentionOptions): void {
+    this.options = { ...this.options, ...options };
+  }
 
   /** Tells the user `notice` needs them, the way the platform allows. */
   notify(
@@ -57,19 +143,41 @@ export class Attention {
           : 'notify.failed',
       { title: notice.title },
     );
-    const body = translator.t(
-      notice.kind === 'awaiting' ? 'notify.awaitingBody' : 'notify.completedBody',
-    );
-    const shown = notificationsEnabled && Notification.isSupported();
+    const approval = notice.kind === 'awaiting' ? notice.approval : undefined;
+    const body =
+      approval === undefined
+        ? translator.t(notice.kind === 'awaiting' ? 'notify.awaitingBody' : 'notify.completedBody')
+        : translator.t('notify.approvalBody', {
+            tool: approval.tool,
+            summary: cut(approval.summary),
+          });
+    const actions =
+      approval === undefined
+        ? []
+        : approval.allow
+          ? [translator.t('notify.allowOnce'), translator.t('notify.deny')]
+          : [translator.t('notify.open')];
+    const port = this.options.notifications ?? ELECTRON_NOTIFICATIONS;
+    const shown = notificationsEnabled && port.supported();
     if (shown) {
-      const notification = new Notification({ title, body });
-      notification.on('click', () => {
+      const notification = port.create({ title, body, actions });
+      notification.onClick(() => {
         this.held.delete(notification);
         this.openSession(notice.sessionId);
       });
-      notification.on('failed', () => {
+      notification.onFailed(() => {
         this.held.delete(notification);
       });
+      if (approval !== undefined) {
+        const act = (index: number): Promise<void> => {
+          this.held.delete(notification);
+          return this.act(notice.sessionId, approval, index);
+        };
+        notification.onAction((index) => {
+          void act(index);
+        });
+        this.lastActions = act;
+      }
       this.held.add(notification);
       for (const oldest of this.held) {
         if (this.held.size <= HELD_NOTIFICATIONS) break;
@@ -77,7 +185,7 @@ export class Attention {
       }
       notification.show();
     }
-    this.record.notified.push({ kind: notice.kind, title, body, shown });
+    this.record.notified.push({ kind: notice.kind, title, body, shown, actions });
     if (this.platform === 'darwin') {
       app.dock?.bounce('informational');
     } else {
@@ -107,6 +215,52 @@ export class Attention {
     window.setOverlayIcon(this.overlay, translator.t('workspace.count', { count }));
   }
 
+  /**
+   * A notification button: "Allow once" (0) or "Deny" (1) answer through Core's ledger, with
+   * `via: notification`; "Open" (the only button of a card a notification may not allow) opens
+   * the session. An answer that was not applied tells the window.
+   */
+  private async act(session: string, approval: NotificationApproval, index: number): Promise<void> {
+    if (!approval.allow) {
+      this.openSession(session);
+      return;
+    }
+    const answer = this.options.answer;
+    if (answer === undefined || (index !== 0 && index !== 1)) {
+      this.openSession(session);
+      return;
+    }
+    let status = 'failed';
+    try {
+      const reply: unknown = JSON.parse(
+        await answer(
+          JSON.stringify({
+            requestId: approval.requestId,
+            sessionId: approval.sessionId,
+            revision: approval.revision,
+            connectionEpoch: approval.connectionEpoch,
+            decision: index === 0 ? 'allowOnce' : 'deny',
+            via: 'notification',
+          }),
+        ),
+      );
+      if (typeof reply === 'object' && reply !== null && 'status' in reply) {
+        status = String(reply.status);
+      }
+    } catch {
+      status = 'failed';
+    }
+    if (status !== 'applied') {
+      this.options.tell?.({ type: 'approvalNotice', sessionId: session, status });
+    }
+  }
+
+  /** Presses a button of the newest notification with buttons (test hooks). */
+  async pressAction(index: number): Promise<void> {
+    if (this.lastActions === undefined) throw new Error('no notification with actions');
+    await this.lastActions(index);
+  }
+
   /** How many shown notifications are kept for their `click` (unit tests). */
   heldNotifications(): number {
     return this.held.size;
@@ -116,6 +270,12 @@ export class Attention {
   observed(): AttentionRecord {
     return { ...this.record, notified: [...this.record.notified] };
   }
+}
+
+/** A command or path cut to what a notification shows. */
+function cut(text: string): string {
+  const line = text.split('\n')[0] ?? '';
+  return line.length > SUMMARY_CHARS || line !== text ? `${line.slice(0, SUMMARY_CHARS)}…` : line;
 }
 
 /**

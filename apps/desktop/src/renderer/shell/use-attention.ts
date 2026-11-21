@@ -1,8 +1,13 @@
 // Watches the session list for sessions that start needing the user (finished and unread, in
 // error, waiting for approval): the main process notifies when the window is not in front, the
 // window shows an in-app reminder, and the attention count goes to the Dock badge / taskbar
-// overlay (the rule is `store/status.ts`).
+// overlay (the rule is `store/status.ts`). A session waiting for approval hands its first card to
+// the notification (T42: buttons answer it through Core's ledger); an answer the ledger did not
+// apply comes back as an app event and shows as a reminder.
+import type { ApprovalRequest } from '@piarc/protocol';
 import { useEffect, useRef } from 'react';
+
+import type { NotificationApproval } from '../../shared/ipc.js';
 
 import { useT } from '../app/app-context.js';
 import { isWindowFocused } from '../app/window-focus.js';
@@ -10,6 +15,21 @@ import { useSessions } from '../store/hooks.js';
 import { attentionCount, badgeOf, needsAttention, type BadgeState } from '../store/status.js';
 import { sessionTitle } from './SessionRow.js';
 import { useUi } from './ui.js';
+
+/** What a notification shows of `card` and how it answers it. */
+export function notificationApproval(card: ApprovalRequest): NotificationApproval {
+  const summary =
+    card.command ?? card.path ?? card.domain ?? (card.kind === 'plan' ? 'plan' : card.tool);
+  return {
+    requestId: card.requestId,
+    sessionId: card.sessionId,
+    revision: card.revision,
+    connectionEpoch: card.connectionEpoch,
+    tool: card.tool,
+    summary: summary.slice(0, 4096),
+    allow: card.notificationAllow === true,
+  };
+}
 
 export function useAttention(): void {
   const t = useT();
@@ -42,6 +62,7 @@ export function useAttention(): void {
       }
       const kind = is === 'awaiting' ? 'awaiting' : is === 'error' ? 'failed' : 'completed';
       const title = sessionTitle(session.title, t('session.untitled'));
+      const card = kind === 'awaiting' ? session.approvals[0] : undefined;
       ui.addToast({
         sessionId: session.id,
         text: t(
@@ -56,10 +77,24 @@ export function useAttention(): void {
         ),
       });
       window.piarc
-        .notifyAttention({ kind, sessionId: session.id, title })
+        .notifyAttention({
+          kind,
+          sessionId: session.id,
+          title,
+          ...(card === undefined ? {} : { approval: notificationApproval(card) }),
+        })
         .catch((error: unknown) => {
           console.error('[attention] cannot notify', error);
         });
     }
   }, [sessions, ui, t]);
+  useEffect(
+    () =>
+      window.piarc.onAppEvent((event) => {
+        if (event.type === 'approvalNotice') {
+          ui.addToast({ sessionId: event.sessionId, text: t('notify.approvalStale') });
+        }
+      }),
+    [ui, t],
+  );
 }

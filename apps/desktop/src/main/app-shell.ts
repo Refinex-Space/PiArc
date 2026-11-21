@@ -20,6 +20,7 @@ import {
   type AppState,
   type AttentionNotice,
   type LaunchTarget,
+  type NotificationApproval,
 } from '../shared/ipc.js';
 import { Translator } from '../shared/i18n/index.js';
 import { effectiveBindings } from '../shared/keybindings.js';
@@ -68,10 +69,18 @@ export class AppShell {
 
   constructor(private readonly options: AppShellOptions) {
     this.translator = new Translator(options.preferences.locale());
-    this.attention = new Attention(process.platform, (sessionId) => {
-      const window = this.focusMain();
-      this.send(window, { type: 'openSession', sessionId });
-    });
+    this.attention = new Attention(
+      process.platform,
+      (sessionId) => {
+        const window = this.focusMain();
+        this.send(window, { type: 'openSession', sessionId });
+      },
+      {
+        tell: (event) => {
+          if (this.main !== null && !this.main.isDestroyed()) this.send(this.main, event);
+        },
+      },
+    );
     options.preferences.onChange(() => {
       this.applyPreferences();
     });
@@ -256,6 +265,7 @@ export class AppShell {
       preferences: this.options.preferences.get(),
       locale: this.options.preferences.locale(),
       focused: BrowserWindow.fromWebContents(event.sender)?.isFocused() ?? false,
+      notificationsSupported: this.attention.notificationsSupported(),
     }));
     registerHandler(IPC_CHANNELS.launchTargets, (event): LaunchTarget[] => {
       const id = event.sender.id;
@@ -360,6 +370,33 @@ function isAttentionNotice(value: unknown): value is AttentionNotice {
     isSessionId(value.sessionId) &&
     'title' in value &&
     typeof value.title === 'string' &&
-    value.title.length <= 400
+    value.title.length <= 400 &&
+    (!('approval' in value) ||
+      value.approval === undefined ||
+      isNotificationApproval(value.approval))
+  );
+}
+
+/**
+ * The approval of a waiting session's notification (T42). Only its shape is checked here: Core
+ * checks the identity (request, revision, connection) and whether a notification may allow it
+ * when the answer arrives, so a wrong `allow` cannot get past it.
+ */
+export function isNotificationApproval(value: unknown): value is NotificationApproval {
+  if (typeof value !== 'object' || value === null) return false;
+  const a = value as Record<string, unknown>;
+  const count = (v: unknown): boolean => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
+  return (
+    typeof a.requestId === 'string' &&
+    /^[A-Za-z0-9._:-]{1,128}$/u.test(a.requestId) &&
+    isSessionId(a.sessionId) &&
+    count(a.revision) &&
+    count(a.connectionEpoch) &&
+    typeof a.tool === 'string' &&
+    a.tool.length > 0 &&
+    a.tool.length <= 256 &&
+    typeof a.summary === 'string' &&
+    a.summary.length <= 4096 &&
+    typeof a.allow === 'boolean'
   );
 }

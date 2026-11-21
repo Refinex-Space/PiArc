@@ -651,6 +651,10 @@ export const en = {
   'settings.notifications': 'Notifications',
   'settings.notifications.enabled':
     'Notify me when a session finishes or needs approval while PiArc is in the background',
+  'settings.notifications.actions':
+    'When a session waits for your approval, its notification can allow it once or deny it. Requests that need a closer look (critical deletions, commands outside the sandbox, protected files, anything too long to read there) only open the approval card.',
+  'settings.notifications.unsupported':
+    "This system does not show PiArc's notifications, so PiArc reminds you inside the window, bounces the Dock icon or flashes the taskbar button, and shows the count on the icon instead.",
   'settings.memory': 'Project instructions',
   'settings.memory.readBoth': 'Read both CLAUDE.md and AGENTS.md when they share a directory',
   'settings.theme': 'Theme',
@@ -769,6 +773,11 @@ export const en = {
   'notify.completedBody': 'The session is ready for you.',
   'notify.awaiting': '{title} needs your approval',
   'notify.awaitingBody': 'The session is waiting for you to decide.',
+  'notify.approvalBody': '{tool}: {summary}',
+  'notify.allowOnce': 'Allow once',
+  'notify.deny': 'Deny',
+  'notify.open': 'Open',
+  'notify.approvalStale': 'That request was already answered or is no longer current.',
   'notify.failed': '{title} stopped with an error',
   'toast.dismiss': 'Dismiss',
   'toast.open': 'Open',

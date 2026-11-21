@@ -230,6 +230,11 @@ export interface AppState {
   readonly locale: Locale;
   /** Whether the asking window is the one in front (keyboard focus). */
   readonly focused: boolean;
+  /**
+   * Whether the system shows PiArc's notifications at all (T42): without them PiArc falls back to
+   * in-app reminders, the Dock bounce or taskbar flash and the badge (ADR-0018 item 6).
+   */
+  readonly notificationsSupported: boolean;
 }
 
 /** Messages on `APP_EVENT_CHANNEL`. */
@@ -247,7 +252,29 @@ export type AppEvent =
   /** The window was minimized or hidden (`false`), restored or shown (`true`) (T34). */
   | { readonly type: 'visibility'; readonly visible: boolean }
   /** A link, a dropped folder or a second start asks to open something (T35). */
-  | { readonly type: 'launch'; readonly target: LaunchTarget };
+  | { readonly type: 'launch'; readonly target: LaunchTarget }
+  /**
+   * An answer given in a system notification was not applied (T42): the request was answered
+   * elsewhere first or is no longer current.
+   */
+  | { readonly type: 'approvalNotice'; readonly sessionId: string; readonly status: string };
+
+/**
+ * The approval a waiting session's notification is about (T42): the card's identity as Core
+ * gave it (the main process answers with it through the ledger) and what the notification
+ * shows. `allow` is the card's `notificationAllow`; Core checks it again when answered.
+ */
+export interface NotificationApproval {
+  readonly requestId: string;
+  /** The ledger the answer goes to (a subagent's card answers to the subagent). */
+  readonly sessionId: string;
+  readonly revision: number;
+  readonly connectionEpoch: number;
+  readonly tool: string;
+  /** The command or the file, cut to what a notification shows. */
+  readonly summary: string;
+  readonly allow: boolean;
+}
 
 /** Something the user should look at (architecture section 8.8): the main process notifies. */
 export interface AttentionNotice {
@@ -255,6 +282,8 @@ export interface AttentionNotice {
   readonly sessionId: string;
   /** The session's title as the sidebar shows it. */
   readonly title: string;
+  /** `awaiting`: the first pending approval (T42). */
+  readonly approval?: NotificationApproval;
 }
 
 /** Longest text the renderer may send as one prompt (bytes of UTF-16 code units). */

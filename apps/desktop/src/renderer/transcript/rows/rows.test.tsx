@@ -112,6 +112,7 @@ async function render(
         preferences: { ...DEFAULT_PREFERENCES, language: 'en' },
         locale: 'en',
         focused: true,
+        notificationsSupported: true,
       }}
     >
       <TranscriptContext.Provider value={{ services: shared, transcript, actions: rowActions }}>

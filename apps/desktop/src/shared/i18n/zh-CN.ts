@@ -632,6 +632,10 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'settings.language.zh-CN': '简体中文',
   'settings.notifications': '通知',
   'settings.notifications.enabled': 'PiArc 在后台时，会话完成或需要审批时通知我',
+  'settings.notifications.actions':
+    '会话等待审批时，可以在通知里直接允许本次或拒绝。需要仔细查看的请求（关键路径删除、沙箱外的命令、受保护的文件、在通知里显示不全的内容）只能打开审批卡。',
+  'settings.notifications.unsupported':
+    '此系统不显示 PiArc 的通知，PiArc 改用窗口内的提醒、程序坞图标弹跳或任务栏按钮闪烁，以及图标上的计数。',
   'settings.memory': '项目指令',
   'settings.memory.readBoth': '当 CLAUDE.md 与 AGENTS.md 位于同一目录时，读取两个文件',
   'settings.theme': '主题',
@@ -745,6 +749,11 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'notify.completedBody': '会话已就绪。',
   'notify.awaiting': '“{title}”需要你审批',
   'notify.awaitingBody': '会话在等你做决定。',
+  'notify.approvalBody': '{tool}：{summary}',
+  'notify.allowOnce': '允许本次',
+  'notify.deny': '拒绝',
+  'notify.open': '打开',
+  'notify.approvalStale': '该请求已处理或已失效。',
   'notify.failed': '“{title}”出错停止',
   'toast.dismiss': '关闭',
   'toast.open': '打开',

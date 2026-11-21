@@ -19,6 +19,8 @@ import { setWindowVisible } from './window-visibility.js';
 export interface AppContextValue {
   readonly platform: string;
   readonly keyPlatform: KeyPlatform;
+  /** The system shows PiArc's notifications (T42). */
+  readonly notificationsSupported: boolean;
   readonly preferences: Preferences;
   readonly locale: Locale;
   readonly t: (id: MessageId, values?: MessageValues) => string;
@@ -71,10 +73,11 @@ export function AppProvider({
     return {
       platform: initial.platform,
       keyPlatform: keyPlatformOf(initial.platform),
+      notificationsSupported: initial.notificationsSupported,
       preferences: state.preferences,
       locale: state.locale,
       t: (id, values) => translator.t(id, values),
     };
-  }, [initial.platform, state]);
+  }, [initial.platform, initial.notificationsSupported, state]);
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

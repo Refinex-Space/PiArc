@@ -95,7 +95,7 @@ function Choice<T extends string>({
 }
 
 function GeneralPage() {
-  const { t, preferences } = useApp();
+  const { t, preferences, notificationsSupported } = useApp();
   const { save, error } = useSave();
   const languageId = useId();
   return (
@@ -136,6 +136,13 @@ function GeneralPage() {
           />
           {t('settings.notifications.enabled')}
         </label>
+        <p className="muted small" data-testid="setting-notifications-note">
+          {t(
+            notificationsSupported
+              ? 'settings.notifications.actions'
+              : 'settings.notifications.unsupported',
+          )}
+        </p>
       </div>
       <div className="setting">
         <span className="setting-label">{t('settings.memory')}</span>

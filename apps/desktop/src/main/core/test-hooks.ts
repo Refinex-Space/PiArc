@@ -32,6 +32,7 @@ export function installTestHooks(options: {
   readonly terminalOwners: TerminalOwners;
   readonly terminalStats: TerminalForwardStats;
   readonly attention: () => AttentionObservation;
+  readonly notificationAction: (index: number) => Promise<void>;
   readonly failNext: (channel: string, message: string) => void;
   readonly holdNext: (channel: string, ms: number) => void;
   readonly answerConfirm: (answer: boolean) => void;
@@ -108,6 +109,7 @@ export function installTestHooks(options: {
     },
     terminalForwardStats: () => ({ ...options.terminalStats }),
     attention: options.attention,
+    notificationAction: options.notificationAction,
     failNext: options.failNext,
     holdNext: options.holdNext,
     answerConfirm: options.answerConfirm,
