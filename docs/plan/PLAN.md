@@ -166,7 +166,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T35 | [Worktree、并行会话、多窗口、全文搜索与后台常驻](tasks/T35-worktrees-parallel-sessions-and-windows.md) | 4 | T34 | macOS | high / 高 | 大 | 无 | 部分完成 | c4094dd |
 | T36 | [MCP 共享连接池](tasks/T36-mcp-connection-pool.md) | 4 | T35 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | ca3d873 |
 | T37 | [Skills、斜杠命令、命令面板与输出风格](tasks/T37-skills-commands-and-output-styles.md) | 4 | T36 | macOS | high / 高 | 大 | 无 | 已完成 | b9012bb |
-| T38 | [WebSearch 与 hooks 扩展（M3）](tasks/T38-websearch-and-hooks-m3.md) | 4 | T37 | macOS | high / 高 | 中 | 无 | 未开始 | — |
+| T38 | [WebSearch 与 hooks 扩展（M3）](tasks/T38-websearch-and-hooks-m3.md) | 4 | T37 | macOS | high / 高 | 中 | 无 | 进行中 | — |
 | R4 | [M3 评审](tasks/R4-m3-review.md) | 4 | T38、W2 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | W3 | [Windows：M3 达标](tasks/W3-windows-m3-parity.md) | 5 | R4（建议在 T43、T44 之后，需要读屏清单与性能测量脚本） | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -308,6 +308,20 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+T38（WebSearch 与 hooks 扩展）开工于 2026-11-21；基线 `npm run verify -- --baseline` 通过（复用 b9012bb 的全量结果）；远端分支仍停在 e0c41ce（I153 已记录其 CI 结果），没有新的 Windows CI 结果可核对。登记事项中交给 T38 的：I93（用户级 hooks 环境变量白名单）、I112（WebFetch/WebSearch 的代理与压缩）、I115（hooks 输入的 `prompt_id`、`effort`）、I122（ask 规则语义写进 ADR-0039，撤销信任清掉项目 hook 写入的模式与规则）、I123（PermissionRequest exit 2 语义核对）、I128（`piarc-hooks`、`piarc-web` 错误枚举与实现移出 `lib.rs`）。
+
+- [ ] 1. 调研与决策：pi-ai 1.5.2 的服务端搜索、各服务商原生搜索线格式、第三方搜索 API 选型、`http`/`prompt` handler 与 M3 事件的官方语义；ADR
+- [ ] 2. `piarc-hooks`：`http` 与 `prompt` handler 配置、白名单设置、事件与 handler 组合诊断、M3 事件与决策合并、错误枚举（I128）（A06、A12）
+- [ ] 3. Core：`http` 执行（复用 `piarc-web` 客户端）、`prompt` 经 Agent Host 辅助模型判定与审计、`agent_id`/`agent_type`、`prompt_id`/`effort`（I115）、I93 环境白名单、I122（A06、A07、A11、A12）
+- [ ] 4. Agent Host：SubagentStart、SubagentStop、PostToolBatch 挂载（A08、A09、A10）
+- [ ] 5. WebSearch：工具、后端选择、原生后端（服务商适配在 `providers/`）、第三方后端适配接口与实现、保险箱 key、设置项与设置页说明（A01–A04）
+- [ ] 6. mock：mock provider 的原生搜索结果块、本地 mock 搜索服务
+- [ ] 7. 渲染进程：transcript 搜索结果的来源链接（A05）
+- [ ] 8. L2 场景 `websearch-*`、`hooks-m3-*`，能力清单与 capabilities.md
+- [ ] 9. L4 与截图证据（A03、A05）
+- [ ] 10. 文档、AGENTS.md、复用表、登记事项
+- [ ] 11. `npm run verify`（A13）、验收记录与收尾
 
 ## 登记事项
 
