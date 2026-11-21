@@ -10,6 +10,7 @@ import type { MessageId } from '../../shared/i18n/index.js';
 import { useT } from '../app/app-context.js';
 import { useSession, useSessions, useTasks } from '../store/hooks.js';
 import { formatDuration, taskDuration, tasksOfSession } from '../store/tasks.js';
+import { showTerminal } from '../terminal/panel-state.js';
 import { showPanel } from './registry.js';
 
 /** Bytes one read asks for (Core's chunk size). */
@@ -88,6 +89,27 @@ function StopButton({ task }: { readonly task: BackgroundTask }) {
   );
 }
 
+/** A running terminal task opens in the terminal panel (T34). */
+function OpenTerminalButton({ task }: { readonly task: BackgroundTask }) {
+  const t = useT();
+  if (task.kind !== 'terminal' || task.status !== 'running' || task.terminal?.terminalId == null) {
+    return null;
+  }
+  return (
+    <button
+      type="button"
+      className="button"
+      data-testid="bg-task-open-terminal"
+      onClick={() => {
+        showTerminal(task.ownerSessionId, task.taskId);
+        showPanel('terminal');
+      }}
+    >
+      {t('bgTasks.openTerminal')}
+    </button>
+  );
+}
+
 function TaskSummary({ task, now }: { readonly task: BackgroundTask; readonly now: number }) {
   const t = useT();
   const code =
@@ -130,6 +152,7 @@ export function TasksCard({ sessionId }: { readonly sessionId: string }) {
                 </pre>
               ) : null}
               <StopButton task={task} />
+              <OpenTerminalButton task={task} />
             </li>
           ))}
         </ul>
@@ -320,6 +343,7 @@ export function TasksPanel({ sessionId }: { readonly sessionId: string | undefin
                       {t(open === task.taskId ? 'bgTasks.hideOutput' : 'bgTasks.showOutput')}
                     </button>
                     <StopButton task={task} />
+                    <OpenTerminalButton task={task} />
                   </div>
                   {open === task.taskId ? <TaskOutput task={task} /> : null}
                 </li>

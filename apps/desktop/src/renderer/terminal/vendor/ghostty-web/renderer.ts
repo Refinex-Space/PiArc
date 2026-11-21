@@ -58,6 +58,24 @@ export const CELL_FLAGS = {
 
 export type CursorShape = 'block' | 'underline' | 'bar' | 'blockHollow';
 
+/** PiArc addition: columns of a row, both included. */
+export interface CellSpan {
+  readonly start: number;
+  readonly end: number;
+}
+
+/** PiArc addition: a find-bar match on a row; `current` is the one the bar points at. */
+export interface Highlight extends CellSpan {
+  readonly current: boolean;
+}
+
+/** PiArc addition: colors the viewer draws with that do not come from the terminal. */
+export interface ViewColors {
+  readonly selection: RenderRgb;
+  readonly findMatch: RenderRgb;
+  readonly findCurrent: RenderRgb;
+}
+
 /** Interface for objects that can be rendered. */
 export interface IRenderable {
   getLine(y: number): readonly RenderCell[] | null;
@@ -71,6 +89,14 @@ export interface IRenderable {
   getColors(): { background: RenderRgb; foreground: RenderRgb; cursor: RenderRgb | null };
   /** PiArc addition: input-method preedit text to draw at the cursor ('' for none). */
   getPreedit?(): string;
+  /** PiArc addition: the selected columns of row `y` (they come in the frame). */
+  getSelection?(y: number): CellSpan | null;
+  /** PiArc addition: find-bar matches on row `y`. */
+  getHighlights?(y: number): readonly Highlight[];
+  /** PiArc addition: the link under the pointer, underlined while hovered. */
+  getHoveredLink?(): (CellSpan & { readonly row: number }) | null;
+  /** PiArc addition: selection and find colors (from the design tokens). */
+  getViewColors?(): ViewColors;
 }
 
 // ============================================================================
@@ -83,11 +109,20 @@ export interface RendererOptions {
   devicePixelRatio?: number; // Default: window.devicePixelRatio
 }
 
+/**
+ * PiArc change: metrics are in device pixels, measured with the font at its device size, and
+ * the canvas draws without a scale transform. Cells then start on whole device pixels at any
+ * ratio (1.25, 1.5, ...), so backgrounds, lines and the cursor stay crisp; upstream measured
+ * in CSS pixels and scaled, which blurs at fractional ratios.
+ */
 export interface FontMetrics {
-  width: number; // Character cell width in CSS pixels
-  height: number; // Character cell height in CSS pixels
-  baseline: number; // Distance from top to text baseline
+  width: number; // Character cell width in device pixels
+  height: number; // Character cell height in device pixels
+  baseline: number; // Distance from top to text baseline, device pixels
 }
+
+/** PiArc addition: Powerline separators drawn as shapes filling their cell. */
+const POWERLINE = new Set(['\ue0b0', '\ue0b1', '\ue0b2', '\ue0b3']);
 
 function rgbToCSS(color: RenderRgb): string {
   return `rgb(${String(color.r)}, ${String(color.g)}, ${String(color.b)})`;
@@ -108,6 +143,10 @@ export class CanvasRenderer {
   private lastCursorPosition: { x: number; y: number } = { x: 0, y: 0 };
   /** PiArc addition: the preedit drawn last, to repaint the cursor line when it changes. */
   private lastPreedit = '';
+  /** PiArc addition: the cursor's look drawn last (blink phase, focus), same reason. */
+  private lastCursorLook = '';
+  /** PiArc addition: the hovered link drawn last, to repaint its row when it changes. */
+  private lastLinkRow = -1;
 
   // Current buffer being rendered
   private currentBuffer: IRenderable | null = null;
@@ -144,21 +183,24 @@ export class CanvasRenderer {
       throw new Error('Failed to get 2D rendering context');
     }
 
-    // Set font (use actual pixel size for accurate measurement)
-    ctx.font = `${String(this.fontSize)}px ${this.fontFamily}`;
+    // Set font (use actual pixel size for accurate measurement). PiArc change: the device
+    // size, so the cell is a whole number of device pixels.
+    ctx.font = this.font('');
 
     // Measure width using 'M' (typically widest character)
     const widthMetrics = ctx.measureText('M');
     const width = Math.ceil(widthMetrics.width);
 
     // Measure height using ascent + descent with padding for glyph overflow
-    const ascent = widthMetrics.actualBoundingBoxAscent || this.fontSize * 0.8;
-    const descent = widthMetrics.actualBoundingBoxDescent || this.fontSize * 0.2;
+    const size = this.fontSize * this.devicePixelRatio;
+    const ascent = widthMetrics.actualBoundingBoxAscent || size * 0.8;
+    const descent = widthMetrics.actualBoundingBoxDescent || size * 0.2;
 
     // Add 2px padding to height to account for glyphs that overflow (like 'f', 'd', 'g', 'p')
-    // and anti-aliasing pixels
-    const height = Math.ceil(ascent + descent) + 2;
-    const baseline = Math.ceil(ascent) + 1; // Offset baseline by half the padding
+    // and anti-aliasing pixels (PiArc: 2 CSS pixels, in device pixels)
+    const pad = Math.max(1, Math.round(this.devicePixelRatio));
+    const height = Math.ceil(ascent + descent) + 2 * pad;
+    const baseline = Math.ceil(ascent) + pad; // Offset baseline by half the padding
 
     return { width, height, baseline };
   }
@@ -170,6 +212,16 @@ export class CanvasRenderer {
     this.metrics = this.measureFont();
   }
 
+  /** PiArc addition: a font string at device size (`style` is '', 'bold ', 'italic ', ...). */
+  private font(style: string): string {
+    return `${style}${String(this.fontSize * this.devicePixelRatio)}px ${this.fontFamily}`;
+  }
+
+  /** PiArc addition: a line one device pixel per CSS pixel wide. */
+  private get lineWidth(): number {
+    return Math.max(1, Math.round(this.devicePixelRatio));
+  }
+
   // ==========================================================================
   // Canvas Sizing
   // ==========================================================================
@@ -178,19 +230,16 @@ export class CanvasRenderer {
    * Resize canvas to fit terminal dimensions
    */
   public resize(cols: number, rows: number): void {
-    const cssWidth = cols * this.metrics.width;
-    const cssHeight = rows * this.metrics.height;
+    const width = cols * this.metrics.width;
+    const height = rows * this.metrics.height;
 
-    // Set CSS size (what user sees)
-    this.canvas.style.width = `${String(cssWidth)}px`;
-    this.canvas.style.height = `${String(cssHeight)}px`;
+    // Set CSS size (what user sees). PiArc change: device size divided by the ratio.
+    this.canvas.style.width = `${String(width / this.devicePixelRatio)}px`;
+    this.canvas.style.height = `${String(height / this.devicePixelRatio)}px`;
 
-    // Set actual canvas size (scaled for DPI)
-    this.canvas.width = cssWidth * this.devicePixelRatio;
-    this.canvas.height = cssHeight * this.devicePixelRatio;
-
-    // Scale context to match DPI (setting canvas.width/height resets the context)
-    this.ctx.scale(this.devicePixelRatio, this.devicePixelRatio);
+    // Set actual canvas size (device pixels; PiArc: drawn without a scale transform)
+    this.canvas.width = width;
+    this.canvas.height = height;
 
     // Set text rendering properties for crisp text
     this.ctx.textBaseline = 'alphabetic';
@@ -198,7 +247,7 @@ export class CanvasRenderer {
 
     // Fill background after resize
     this.ctx.fillStyle = rgbToCSS(this.background);
-    this.ctx.fillRect(0, 0, cssWidth, cssHeight);
+    this.ctx.fillRect(0, 0, width, height);
   }
 
   // ==========================================================================
@@ -228,8 +277,8 @@ export class CanvasRenderer {
 
     // Resize canvas if dimensions changed
     const needsResize =
-      this.canvas.width !== dims.cols * this.metrics.width * this.devicePixelRatio ||
-      this.canvas.height !== dims.rows * this.metrics.height * this.devicePixelRatio;
+      this.canvas.width !== dims.cols * this.metrics.width ||
+      this.canvas.height !== dims.rows * this.metrics.height;
 
     if (needsResize) {
       this.resize(dims.cols, dims.rows);
@@ -258,16 +307,32 @@ export class CanvasRenderer {
     // Check if cursor position or preedit changed (need to redraw cursor lines)
     const cursorMoved =
       cursor.x !== this.lastCursorPosition.x || cursor.y !== this.lastCursorPosition.y;
-    if (cursorMoved || preedit !== this.lastPreedit) {
+    const look = `${String(cursor.visible)} ${cursor.shape}`;
+    if (cursorMoved || preedit !== this.lastPreedit || look !== this.lastCursorLook) {
       addRow(cursor.y);
       addRow(this.lastCursorPosition.y);
     }
+    // PiArc addition: the hovered link's underline comes and goes with the pointer.
+    const link = buffer.getHoveredLink?.() ?? null;
+    const linkRow = link?.row ?? -1;
+    if (linkRow !== this.lastLinkRow) {
+      addRow(linkRow);
+      addRow(this.lastLinkRow);
+    } else if (linkRow >= 0) {
+      addRow(linkRow);
+    }
 
     // Render each line
+    const view = buffer.getViewColors?.();
     for (const y of [...rowsToRender].sort((a, b) => a - b)) {
       const line = buffer.getLine(y);
       if (line) {
-        this.renderLine(line, y, dims.cols);
+        this.renderLine(line, y, dims.cols, {
+          selection: buffer.getSelection?.(y) ?? null,
+          highlights: buffer.getHighlights?.(y) ?? [],
+          link: link !== null && link.row === y ? link : null,
+          colors: view,
+        });
       }
     }
 
@@ -281,6 +346,8 @@ export class CanvasRenderer {
     // Update last cursor position
     this.lastCursorPosition = { x: cursor.x, y: cursor.y };
     this.lastPreedit = preedit;
+    this.lastCursorLook = look;
+    this.lastLinkRow = linkRow;
 
     // ALWAYS clear dirty flags after rendering, regardless of forceAll.
     buffer.clearDirty();
@@ -297,7 +364,17 @@ export class CanvasRenderer {
    * and text in a single pass (cell by cell), the background of cell N would
    * cover any left-extending portions of graphemes from cell N-1.
    */
-  private renderLine(line: readonly RenderCell[], y: number, cols: number): void {
+  private renderLine(
+    line: readonly RenderCell[],
+    y: number,
+    cols: number,
+    marks: {
+      readonly selection: CellSpan | null;
+      readonly highlights: readonly Highlight[];
+      readonly link: CellSpan | null;
+      readonly colors: ViewColors | undefined;
+    },
+  ): void {
     const lineY = y * this.metrics.height;
     const lineWidth = cols * this.metrics.width;
 
@@ -312,28 +389,35 @@ export class CanvasRenderer {
     for (let x = 0; x < line.length; x++) {
       const cell = line[x];
       if (cell === undefined || cell.width === 0) continue; // Skip spacer cells for wide characters
-      this.renderCellBackground(cell, x, y);
+      this.renderCellBackground(cell, x, y, markBackground(marks, x));
     }
 
     // PASS 2: Draw all cell text and decorations
     for (let x = 0; x < line.length; x++) {
       const cell = line[x];
       if (cell === undefined || cell.width === 0) continue; // Skip spacer cells for wide characters
-      this.renderCellText(cell, x, y);
+      const linked = marks.link !== null && x >= marks.link.start && x <= marks.link.end;
+      this.renderCellText(cell, x, y, undefined, linked);
     }
   }
 
   /**
    * Render a cell's background only (Pass 1 of two-pass rendering)
    */
-  private renderCellBackground(cell: RenderCell, x: number, y: number): void {
+  private renderCellBackground(
+    cell: RenderCell,
+    x: number,
+    y: number,
+    mark: RenderRgb | null,
+  ): void {
     const cellX = x * this.metrics.width;
     const cellY = y * this.metrics.height;
     const cellWidth = this.metrics.width * cell.width;
 
     // Inverse swaps foreground and background. PiArc change: a cell without a background
-    // of its own uses the terminal background, which ghostty-web approximated as black.
-    const bg = (cell.flags & CELL_FLAGS.INVERSE) !== 0 ? cell.fg : cell.bg;
+    // of its own uses the terminal background, which ghostty-web approximated as black; the
+    // selection and find matches (PiArc) paint over the cell's own background.
+    const bg = mark ?? ((cell.flags & CELL_FLAGS.INVERSE) !== 0 ? cell.fg : cell.bg);
     if (bg !== null) {
       this.ctx.fillStyle = rgbToCSS(bg);
       this.ctx.fillRect(cellX, cellY, cellWidth, this.metrics.height);
@@ -343,7 +427,13 @@ export class CanvasRenderer {
   /**
    * Render a cell's text and decorations (Pass 2 of two-pass rendering)
    */
-  private renderCellText(cell: RenderCell, x: number, y: number, colorOverride?: string): void {
+  private renderCellText(
+    cell: RenderCell,
+    x: number,
+    y: number,
+    colorOverride?: string,
+    linked = false,
+  ): void {
     const cellX = x * this.metrics.width;
     const cellY = y * this.metrics.height;
     const cellWidth = this.metrics.width * cell.width;
@@ -353,9 +443,10 @@ export class CanvasRenderer {
       return;
     }
     const decorated =
+      linked ||
       (cell.flags &
         (CELL_FLAGS.UNDERLINE_MASK | CELL_FLAGS.STRIKETHROUGH | CELL_FLAGS.OVERLINE)) !==
-      0;
+        0;
     // PiArc change: empty cells and spaces have no glyph; skip them unless decorated.
     if ((cell.text === '' || cell.text === ' ') && !decorated) {
       return;
@@ -365,7 +456,7 @@ export class CanvasRenderer {
     let fontStyle = '';
     if ((cell.flags & CELL_FLAGS.ITALIC) !== 0) fontStyle += 'italic ';
     if ((cell.flags & CELL_FLAGS.BOLD) !== 0) fontStyle += 'bold ';
-    this.ctx.font = `${fontStyle}${String(this.fontSize)}px ${this.fontFamily}`;
+    this.ctx.font = this.font(fontStyle);
 
     // Set text color - use override or normal color (inverse uses the background)
     let color: string;
@@ -385,7 +476,10 @@ export class CanvasRenderer {
 
     // Draw text. PiArc change: a wide glyph (CJK, emoji) is centered in its two cells; fonts
     // draw them narrower than two cells, which left a gap on the right.
-    if (cell.text !== '' && cell.text !== ' ') {
+    if (POWERLINE.has(cell.text)) {
+      // PiArc addition: drawn, not taken from a font (system fonts lack these glyphs).
+      this.renderPowerline(cell.text, cellX, cellY, cellWidth);
+    } else if (cell.text !== '' && cell.text !== ' ') {
       let textX = cellX;
       if (cell.width === 2) {
         const key = `${this.ctx.font}\u0000${cell.text}`;
@@ -406,7 +500,7 @@ export class CanvasRenderer {
 
     const line = (lineY: number, strokeColor: string) => {
       this.ctx.strokeStyle = strokeColor;
-      this.ctx.lineWidth = 1;
+      this.ctx.lineWidth = this.lineWidth;
       this.ctx.beginPath();
       this.ctx.moveTo(cellX, lineY);
       this.ctx.lineTo(cellX + cellWidth, lineY);
@@ -414,13 +508,13 @@ export class CanvasRenderer {
     };
 
     // Draw underline (PiArc change: every underline kind is drawn as a single line, in the
-    // cell's underline color when it has one)
-    if ((cell.flags & CELL_FLAGS.UNDERLINE_MASK) !== 0) {
+    // cell's underline color when it has one; a hovered link is underlined too)
+    if (linked || (cell.flags & CELL_FLAGS.UNDERLINE_MASK) !== 0) {
       const underlineColor =
         colorOverride === undefined && cell.underlineColor !== null
           ? rgbToCSS(cell.underlineColor)
           : color;
-      line(cellY + this.metrics.baseline + 2, underlineColor);
+      line(cellY + this.metrics.baseline + 2 * this.lineWidth, underlineColor);
     }
 
     // Draw strikethrough
@@ -430,7 +524,32 @@ export class CanvasRenderer {
 
     // Draw overline (PiArc addition)
     if ((cell.flags & CELL_FLAGS.OVERLINE) !== 0) {
-      line(cellY + 0.5, color);
+      line(cellY + this.lineWidth / 2, color);
+    }
+  }
+
+  /**
+   * PiArc addition: Powerline separators U+E0B0–E0B3 as filled or outlined triangles that
+   * cover the whole cell, so they meet the neighbouring cells' backgrounds without gaps.
+   */
+  private renderPowerline(text: string, cellX: number, cellY: number, cellWidth: number): void {
+    const right = text === '\ue0b0' || text === '\ue0b1';
+    const filled = text === '\ue0b0' || text === '\ue0b2';
+    const top = cellY;
+    const bottom = cellY + this.metrics.height;
+    const tipX = right ? cellX + cellWidth : cellX;
+    const baseX = right ? cellX : cellX + cellWidth;
+    this.ctx.beginPath();
+    this.ctx.moveTo(baseX, top);
+    this.ctx.lineTo(tipX, (top + bottom) / 2);
+    this.ctx.lineTo(baseX, bottom);
+    if (filled) {
+      this.ctx.closePath();
+      this.ctx.fill();
+    } else {
+      this.ctx.strokeStyle = this.ctx.fillStyle;
+      this.ctx.lineWidth = this.lineWidth;
+      this.ctx.stroke();
     }
   }
 
@@ -467,13 +586,14 @@ export class CanvasRenderer {
 
       case 'blockHollow': {
         // PiArc addition: an outlined block (unfocused cursor, DECSCUSR hollow).
+        const w = this.lineWidth;
         this.ctx.strokeStyle = this.ctx.fillStyle;
-        this.ctx.lineWidth = 1;
+        this.ctx.lineWidth = w;
         this.ctx.strokeRect(
-          cursorX + 0.5,
-          cursorY + 0.5,
-          this.metrics.width - 1,
-          this.metrics.height - 1,
+          cursorX + w / 2,
+          cursorY + w / 2,
+          this.metrics.width - w,
+          this.metrics.height - w,
         );
         break;
       }
@@ -511,7 +631,7 @@ export class CanvasRenderer {
   ): void {
     const startX = x * this.metrics.width;
     const startY = y * this.metrics.height;
-    this.ctx.font = `${String(this.fontSize)}px ${this.fontFamily}`;
+    this.ctx.font = this.font('');
     const width =
       Math.ceil(this.ctx.measureText(text).width / this.metrics.width) * this.metrics.width;
     this.ctx.fillStyle = rgbToCSS(colors.background);
@@ -519,10 +639,10 @@ export class CanvasRenderer {
     this.ctx.fillStyle = rgbToCSS(colors.foreground);
     this.ctx.fillText(text, startX, startY + this.metrics.baseline);
     this.ctx.strokeStyle = this.ctx.fillStyle;
-    this.ctx.lineWidth = 1;
+    this.ctx.lineWidth = this.lineWidth;
     this.ctx.beginPath();
-    this.ctx.moveTo(startX, startY + this.metrics.baseline + 2);
-    this.ctx.lineTo(startX + width, startY + this.metrics.baseline + 2);
+    this.ctx.moveTo(startX, startY + this.metrics.baseline + 2 * this.lineWidth);
+    this.ctx.lineTo(startX + width, startY + this.metrics.baseline + 2 * this.lineWidth);
     this.ctx.stroke();
   }
 
@@ -549,6 +669,22 @@ export class CanvasRenderer {
   }
 
   /**
+   * PiArc addition: the window moved to a screen with another ratio (or zoomed); metrics are
+   * measured again and the next render redraws everything.
+   */
+  public setDevicePixelRatio(ratio: number): void {
+    if (ratio === this.devicePixelRatio || !(ratio > 0)) return;
+    this.devicePixelRatio = ratio;
+    this.wideGlyphWidths.clear();
+    this.metrics = this.measureFont();
+  }
+
+  /** PiArc addition: the ratio the metrics are measured at. */
+  public get pixelRatio(): number {
+    return this.devicePixelRatio;
+  }
+
+  /**
    * Get current font metrics
    */
   public getMetrics(): FontMetrics {
@@ -563,14 +699,14 @@ export class CanvasRenderer {
   }
 
   /**
-   * Get character cell width (for coordinate conversion)
+   * Get character cell width (for coordinate conversion). PiArc: device pixels.
    */
   public get charWidth(): number {
     return this.metrics.width;
   }
 
   /**
-   * Get character cell height (for coordinate conversion)
+   * Get character cell height (for coordinate conversion). PiArc: device pixels.
    */
   public get charHeight(): number {
     return this.metrics.height;
@@ -590,4 +726,26 @@ export class CanvasRenderer {
 
 function sameRgb(a: RenderRgb, b: RenderRgb): boolean {
   return a.r === b.r && a.g === b.g && a.b === b.b;
+}
+
+/** PiArc addition: the background a selection or find match gives column `x`, if any. */
+function markBackground(
+  marks: {
+    readonly selection: CellSpan | null;
+    readonly highlights: readonly Highlight[];
+    readonly colors: ViewColors | undefined;
+  },
+  x: number,
+): RenderRgb | null {
+  const colors = marks.colors;
+  if (colors === undefined) return null;
+  if (marks.selection !== null && x >= marks.selection.start && x <= marks.selection.end) {
+    return colors.selection;
+  }
+  for (const highlight of marks.highlights) {
+    if (x >= highlight.start && x <= highlight.end) {
+      return highlight.current ? colors.findCurrent : colors.findMatch;
+    }
+  }
+  return null;
 }

@@ -21,6 +21,11 @@ export interface CommandSpec {
   /** Message id of its label (src/shared/i18n). */
   readonly label: MessageId;
   readonly scope: CommandScope;
+  /**
+   * Kept by the app while a terminal has the focus (architecture section 8.5): every other key
+   * goes to the terminal. Few commands are global, so programs in the terminal get their keys.
+   */
+  readonly global?: boolean;
 }
 
 /** Commands with shortcuts, in the order the settings page lists them. */
@@ -35,7 +40,13 @@ export const COMMANDS = [
   },
   { id: 'session.model', defaultKey: 'Mod+Shift+I', label: 'models.label', scope: 'app' },
   { id: 'session.effort', defaultKey: 'Mod+Shift+E', label: 'models.effort', scope: 'app' },
-  { id: 'session.next', defaultKey: 'Ctrl+Tab', label: 'command.session.next', scope: 'app' },
+  {
+    id: 'session.next',
+    defaultKey: 'Ctrl+Tab',
+    label: 'command.session.next',
+    scope: 'app',
+    global: true,
+  },
   {
     id: 'changes.toggle',
     defaultKey: 'Mod+Shift+D',
@@ -43,13 +54,32 @@ export const COMMANDS = [
     scope: 'app',
   },
   {
+    id: 'terminal.toggle',
+    defaultKey: 'Ctrl+`',
+    label: 'command.terminal.toggle',
+    scope: 'app',
+    global: true,
+  },
+  {
     id: 'help.shortcuts',
     defaultKey: 'Mod+/',
     label: 'command.help.shortcuts',
     scope: 'app',
   },
-  { id: 'app.settings', defaultKey: 'Mod+,', label: 'command.app.settings', scope: 'app' },
+  {
+    id: 'app.settings',
+    defaultKey: 'Mod+,',
+    label: 'command.app.settings',
+    scope: 'app',
+    global: true,
+  },
 ] as const satisfies readonly CommandSpec[];
+
+/** Whether `id` stays with the app while a terminal has the focus. */
+export function isGlobalCommand(id: CommandId): boolean {
+  const command: CommandSpec | undefined = COMMANDS.find((c) => c.id === id);
+  return command?.global === true;
+}
 
 export type CommandId = (typeof COMMANDS)[number]['id'];
 

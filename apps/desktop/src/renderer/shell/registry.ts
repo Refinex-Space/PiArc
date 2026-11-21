@@ -24,6 +24,8 @@ export interface PanelContext {
   readonly backgroundTasks?: boolean;
   /** The selected session's workspace has background tasks (T32). */
   readonly workspaceTasks?: boolean;
+  /** The terminal panel is open (T34: Ctrl+`). */
+  readonly terminal?: boolean;
 }
 
 export interface PanelSpec {

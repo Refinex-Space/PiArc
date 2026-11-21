@@ -100,6 +100,7 @@ export function buildMenuTemplate(context: MenuContext): MenuItemConstructorOpti
           run('view.toggleSidebar');
         },
       },
+      command('terminal.toggle'),
       separator,
       ...(context.developer
         ? [

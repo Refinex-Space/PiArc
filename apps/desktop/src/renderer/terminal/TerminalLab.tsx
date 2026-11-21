@@ -8,7 +8,6 @@ import { useEffect, useRef, useState } from 'react';
 import type { TerminalLabApi, TerminalLabStats } from '../../shared/terminal-lab.js';
 import { TerminalController } from './controller.js';
 
-
 export function TerminalLab() {
   const hostRef = useRef<HTMLDivElement>(null);
   const [hidden, setHidden] = useState(false);
@@ -21,7 +20,12 @@ export function TerminalLab() {
     if (host === null) {
       return;
     }
-    const controller = new TerminalController(host, window.piarc);
+    const controller = new TerminalController(host, window.piarc, {
+      platform: navigator.userAgent.includes('Mac') ? 'mac' : 'other',
+      isGlobalKey: () => false,
+      label: 'Terminal input',
+      fit: false,
+    });
     let subscribed: number | null = null;
     let echo: Promise<number> | undefined;
     const attach = (id: number) => {
@@ -37,7 +41,13 @@ export function TerminalLab() {
           if (typeof event !== 'object' || event === null || !('type' in event)) {
             continue;
           }
-          if (event.type === 'title' && 'title' in event && typeof event.title === 'string') {
+          if (event.type === 'output') {
+            controller.wake();
+          } else if (
+            event.type === 'title' &&
+            'title' in event &&
+            typeof event.title === 'string'
+          ) {
             setTitle(event.title);
           } else if (event.type === 'exited' && 'code' in event) {
             setExited(`exited with ${String(event.code)}`);

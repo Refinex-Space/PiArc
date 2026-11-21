@@ -27,6 +27,9 @@ describe('i18n', () => {
         expect(() =>
           translator.t(id, {
             title: 't',
+            n: 1,
+            current: 1,
+            lines: 2,
             id: 'provider',
             model: 'chat',
             name: 'n',

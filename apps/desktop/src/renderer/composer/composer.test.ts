@@ -117,6 +117,28 @@ describe('serializeDoc', () => {
     expect(isBlank(serializeDoc(state('   ').doc))).toBe(true);
     expect(isBlank(serializeDoc(doc))).toBe(false);
   });
+
+  it('sends a snippet chip as its source and a fence its text cannot close (T34)', () => {
+    const snippet = { label: 'zsh (2 lines)', source: 'Terminal zsh', text: 'a ``` b\nc' };
+    const doc = composerSchema.node('doc', null, [
+      composerSchema.node('paragraph', null, [
+        composerSchema.text('why?'),
+        composerSchema.node('snippet', snippet),
+      ]),
+    ]);
+    const payload = serializeDoc(doc);
+    expect(payload.text).toBe('why?\nTerminal zsh:\n````text\na ``` b\nc\n````\n');
+    expect(payload.mentions).toEqual([]);
+    expect(
+      isBlank(
+        serializeDoc(
+          composerSchema.node('doc', null, [
+            composerSchema.node('paragraph', null, [composerSchema.node('snippet', snippet)]),
+          ]),
+        ),
+      ),
+    ).toBe(false);
+  });
 });
 
 describe('command palette', () => {

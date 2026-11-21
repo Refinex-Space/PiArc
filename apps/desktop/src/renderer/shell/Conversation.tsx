@@ -14,6 +14,8 @@ import {
   type ComposerSubmission,
   type MentionSource,
 } from '../composer/Composer.js';
+import type { SnippetData } from '../composer/schema.js';
+import { onSnippet, takeSnippets } from '../composer/snippets.js';
 import type { MentionData } from '../composer/schema.js';
 import {
   useBranches,
@@ -182,6 +184,16 @@ export function Conversation({
   // input (a rewound message, or the message a branch started from).
   const [rewinding, setRewinding] = useState<{ target: RewindTarget | undefined }>();
   const [fill, setFill] = useState<{ text: string; nonce: number }>();
+  // T34: terminal selections attached from the dock become chips in the input.
+  const [insert, setInsert] = useState<{ snippets: readonly SnippetData[]; nonce: number }>();
+  useEffect(() => {
+    const take = () => {
+      const snippets = takeSnippets(id);
+      if (snippets.length > 0) setInsert({ snippets, nonce: Date.now() + Math.random() });
+    };
+    take();
+    return onSnippet(id, take);
+  }, [id]);
   // The rewound message goes into the input when the dialog closes: the dialog gives focus back
   // to what had it (the message's button, gone with the message), the input then takes it.
   const rewoundText = useRef<string | undefined>(undefined);
@@ -357,6 +369,7 @@ export function Conversation({
             error ?? (catalogFailure ? t('models.failed', { reason: catalogFailure }) : undefined)
           }
           fill={fill}
+          insert={insert}
           above={
             queue.length === 0 ? (
               tail === undefined ? null : (

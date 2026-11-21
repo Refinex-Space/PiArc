@@ -5,7 +5,7 @@
 import type { InputMention } from '@piarc/protocol';
 import type { Node } from 'prosemirror-model';
 
-import { mentionOf, type MentionData } from './schema.js';
+import { mentionOf, snippetOf, type MentionData } from './schema.js';
 
 export interface ComposerPayload {
   /** The text for the model; paragraphs joined by newlines, mentions as `@path`. */
@@ -25,7 +25,9 @@ export function serializeDoc(doc: Node): ComposerPayload {
       text += '\n';
     }
     paragraph.forEach((child) => {
-      if (child.type.name === 'mention') {
+      if (child.type.name === 'snippet') {
+        text += snippetText(snippetOf(child));
+      } else if (child.type.name === 'mention') {
         const mention = mentionOf(child);
         mentions.push(mention);
         const start = text.length;
@@ -37,6 +39,16 @@ export function serializeDoc(doc: Node): ComposerPayload {
     });
   });
   return { text, mentions, spans };
+}
+
+/**
+ * A snippet as sent: its source on a line of its own, then the text in a fenced block long
+ * enough that backticks in the text cannot close it.
+ */
+export function snippetText(snippet: { readonly source: string; readonly text: string }): string {
+  const longest = Math.max(2, ...[...snippet.text.matchAll(/`+/gu)].map((m) => m[0].length));
+  const fence = '`'.repeat(longest + 1);
+  return `\n${snippet.source}:\n${fence}text\n${snippet.text}\n${fence}\n`;
 }
 
 /** True when there is nothing to send: only whitespace and no mentions. */

@@ -41,7 +41,7 @@ import {
   openMention,
   type MentionState,
 } from './mention-plugin.js';
-import { composerSchema, type MentionData } from './schema.js';
+import { composerSchema, type MentionData, type SnippetData } from './schema.js';
 import { isBlank, serializeDoc, type ComposerPayload } from './serialize.js';
 
 /** What the composer hands over on Enter / Mod+Enter. */
@@ -121,6 +121,7 @@ export function Composer({
   above,
   error,
   fill,
+  insert,
 }: {
   running: boolean;
   disabled?: boolean;
@@ -139,6 +140,8 @@ export function Composer({
    * puts it again.
    */
   fill?: { readonly text: string; readonly nonce: number } | undefined;
+  /** Chips to insert at the cursor (T34: terminal selections); a new `nonce` inserts again. */
+  insert?: { readonly snippets: readonly SnippetData[]; readonly nonce: number } | undefined;
 }) {
   const { t, platform } = useApp();
   const mount = useRef<HTMLDivElement | null>(null);
@@ -411,6 +414,20 @@ export function Composer({
     view.dispatch(view.state.tr.replaceWith(0, view.state.doc.content.size, paragraphs));
     view.focus();
   }, [fillText, fillNonce]);
+
+  // Snippets attached elsewhere in the window (the terminal panel) go in at the cursor.
+  const insertNonce = insert?.nonce;
+  const insertSnippets = insert?.snippets;
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view === null || insertSnippets === undefined || insertNonce === undefined) return;
+    const nodes = insertSnippets.flatMap((snippet) => [
+      composerSchema.node('snippet', { ...snippet }),
+      composerSchema.text(' '),
+    ]);
+    view.dispatch(view.state.tr.replaceSelection(new Slice(Fragment.from(nodes), 0, 0)));
+    view.focus();
+  }, [insertSnippets, insertNonce]);
 
   // Core's file search for the mention picker's query.
   useEffect(() => {

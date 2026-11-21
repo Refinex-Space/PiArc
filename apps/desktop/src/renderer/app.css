@@ -1704,3 +1704,137 @@ textarea.input {
   display: grid;
   gap: var(--piarc-space-1);
 }
+
+/* Terminal panel (T34): tabs, toolbar, find bar and the canvas that fills the rest. */
+:root[data-app] .terminal-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+:root[data-app] .terminal-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: var(--piarc-space-1);
+  padding: var(--piarc-space-1) var(--piarc-space-2) 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--piarc-border-subtle);
+}
+:root[data-app] .terminal-tab {
+  display: flex;
+  align-items: center;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: var(--piarc-radius-md) var(--piarc-radius-md) 0 0;
+}
+:root[data-app] .terminal-tab.is-active {
+  border-color: var(--piarc-border-subtle);
+  background: var(--piarc-c-terminal-background);
+}
+:root[data-app] .terminal-tab-name,
+:root[data-app] .terminal-tab-close,
+:root[data-app] .terminal-new {
+  border: 0;
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-font-size-small);
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  cursor: pointer;
+}
+:root[data-app] .terminal-tab.is-active .terminal-tab-name {
+  color: var(--piarc-text-primary);
+}
+:root[data-app] .terminal-tab-name {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-app] .terminal-tab-badge {
+  margin-left: var(--piarc-space-1);
+  padding: 0 var(--piarc-space-1);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-accent-subtle);
+  color: var(--piarc-text-accent);
+  font-size: var(--piarc-font-size-caption);
+}
+:root[data-app] .terminal-tab-rename {
+  width: 160px;
+  margin: var(--piarc-space-1);
+  font: inherit;
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .terminal-toolbar,
+:root[data-app] .terminal-find {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .terminal-toolbar-gap {
+  flex: 1;
+}
+:root[data-app] .terminal-share {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+}
+:root[data-app] .terminal-find-input {
+  flex: 0 1 260px;
+  min-width: 0;
+  height: var(--piarc-c-input-height);
+  border: 1px solid var(--piarc-c-input-border);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-c-input-background);
+  color: var(--piarc-c-input-text);
+  font: inherit;
+  padding: 0 var(--piarc-space-2);
+}
+:root[data-app] .terminal-find-count {
+  min-width: 96px;
+  color: var(--piarc-text-secondary);
+}
+:root[data-app] .terminal-surface {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--piarc-c-terminal-background);
+}
+:root[data-app] .terminal-surface:focus-within {
+  outline: 2px solid var(--piarc-c-focus-ring);
+  outline-offset: -2px;
+}
+:root[data-app] .terminal-empty {
+  display: grid;
+  justify-items: start;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-3);
+}
+:root[data-app] .terminal-status:empty {
+  display: none;
+}
+:root[data-app] .terminal-status,
+:root[data-app] .terminal-error {
+  margin: 0;
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .terminal-error {
+  color: var(--piarc-text-danger);
+}
+:root[data-app] .terminal-screen-text,
+:root[data-app] .terminal-paste-preview {
+  max-height: 50vh;
+  overflow: auto;
+  margin: 0;
+  padding: var(--piarc-space-2);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-c-terminal-background);
+  color: var(--piarc-c-terminal-foreground);
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+  white-space: pre;
+}

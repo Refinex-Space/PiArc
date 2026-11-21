@@ -20,6 +20,8 @@ import type { PanelContext } from './registry.js';
 import './harness-panels.js';
 import './task-panels.js';
 import '../changes/panels.js';
+import '../terminal/panels.js';
+import { toggleTerminalPanel, useTerminalPanelOpen } from '../terminal/panel-state.js';
 import { toggleChangesPanel, useChangesPanelOpen } from '../changes/panel-state.js';
 import { showPanel } from './registry.js';
 import { ShortcutsDialog } from './ShortcutsDialog.js';
@@ -43,6 +45,7 @@ function usePanelContext(store: AppStore, sessionId: string | undefined): PanelC
   const session = useSessionOf(store, sessionId);
   const pendingPlan = session?.approvals.some((r) => r.kind === 'plan');
   const changes = useChangesPanelOpen();
+  const terminal = useTerminalPanelOpen();
   const tasks = useTasksOf(store);
   const backgroundTasks =
     sessionId !== undefined && tasks.some((t) => t.ownerSessionId === sessionId);
@@ -56,8 +59,9 @@ function usePanelContext(store: AppStore, sessionId: string | undefined): PanelC
       changes,
       backgroundTasks,
       workspaceTasks,
+      terminal,
     }),
-    [sessionId, harness, pendingPlan, changes, backgroundTasks, workspaceTasks],
+    [sessionId, harness, pendingPlan, changes, backgroundTasks, workspaceTasks, terminal],
   );
 }
 
@@ -282,6 +286,9 @@ export function Shell() {
         break;
       case 'changes.toggle':
         if (view.kind === 'session' && toggleChangesPanel()) showPanel('changes');
+        break;
+      case 'terminal.toggle':
+        if (view.kind === 'session' && toggleTerminalPanel()) showPanel('terminal');
         break;
       case 'app.settings':
         void window.piarc.openSettings();
