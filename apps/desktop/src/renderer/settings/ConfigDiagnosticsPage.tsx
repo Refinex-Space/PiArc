@@ -67,12 +67,24 @@ export interface HookIssue {
   readonly message: string;
 }
 
+/** An MCP server PiArc cannot use (T36: SSE, WebSocket), or a definition it leaves out. */
+export interface McpIssue {
+  /** The server, for an unsupported one. */
+  readonly name?: string;
+  readonly source: string;
+  /** Its transport (`sse`, `ws`), for an unsupported one. */
+  readonly transport?: string;
+  readonly pointer?: string;
+  readonly message: string;
+}
+
 export interface DiagnosticsView {
   readonly workspaces: readonly string[];
   readonly workspace: string | null;
   readonly trusted: boolean;
   readonly files: readonly FileView[];
   readonly hooks: readonly HookIssue[];
+  readonly mcp: readonly McpIssue[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -155,7 +167,29 @@ export function parseDiagnostics(raw: string): DiagnosticsView {
       if (layer === undefined || pointer === undefined || message === undefined) return [];
       return [{ layer, file: str(h.file), pointer, message }];
     }),
+    mcp: mcpIssues(value.mcp),
   };
+}
+
+/** The MCP part of the report: unsupported servers first, then the merge's issues. */
+function mcpIssues(value: unknown): McpIssue[] {
+  if (!isRecord(value)) return [];
+  const unsupported = list(value.unsupported).flatMap((u): McpIssue[] => {
+    const name = str(u.name);
+    const source = str(u.source);
+    const message = str(u.reason);
+    const transport = str(u.transport);
+    if (name === undefined || source === undefined || message === undefined) return [];
+    return [{ name, source, message, ...(transport === undefined ? {} : { transport }) }];
+  });
+  const issues = list(value.issues).flatMap((i): McpIssue[] => {
+    const source = str(i.source);
+    const message = str(i.message);
+    if (source === undefined || message === undefined) return [];
+    const pointer = str(i.pointer);
+    return [{ source, message, ...(pointer === undefined ? {} : { pointer }) }];
+  });
+  return [...unsupported, ...issues];
 }
 
 function layerTitle(layer: string): MessageId | undefined {
@@ -316,6 +350,39 @@ function HookIssues({ issues }: { issues: readonly HookIssue[] }) {
   );
 }
 
+function McpIssues({ issues }: { issues: readonly McpIssue[] }) {
+  const { t } = useApp();
+  return (
+    <section className="diagnostics-file" data-testid="diagnostics-mcp">
+      <h3 className="permission-source-title">{t('diagnostics.mcp')}</h3>
+      <ul className="diagnostics-issues">
+        {issues.map((issue, index) => (
+          <li
+            key={`${issue.source}${issue.pointer ?? issue.name ?? ''}${String(index)}`}
+            data-testid="diagnostics-mcp-issue"
+            data-server={issue.name ?? ''}
+          >
+            {issue.name === undefined ? null : (
+              <strong>
+                {t('diagnostics.mcpUnsupported', {
+                  name: issue.name,
+                  transport:
+                    issue.transport === 'ws' ? 'WebSocket' : (issue.transport ?? '').toUpperCase(),
+                })}{' '}
+              </strong>
+            )}
+            <span className="diagnostics-code">
+              {issue.source}
+              {issue.pointer === undefined || issue.pointer === '' ? '' : ` ${issue.pointer}`}{' '}
+            </span>
+            {issue.message}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function ConfigDiagnosticsPage() {
   const { t } = useApp();
   const selectId = useId();
@@ -390,6 +457,7 @@ export function ConfigDiagnosticsPage() {
             <FileSection key={file.layer} file={file} />
           ))}
           {view.hooks.length > 0 && <HookIssues issues={view.hooks} />}
+          {view.mcp.length > 0 && <McpIssues issues={view.mcp} />}
         </>
       )}
     </div>

@@ -1016,6 +1016,43 @@ textarea.input {
   gap: var(--piarc-space-2);
 }
 
+/* MCP servers (T36) */
+
+.mcp-state {
+  padding-inline: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  font-size: var(--piarc-font-size-caption);
+  font-weight: var(--piarc-font-weight-medium);
+  background: var(--piarc-accent-subtle);
+}
+.mcp-state.is-connected {
+  background: var(--piarc-state-success-subtle);
+  color: var(--piarc-text-success);
+}
+.mcp-state.is-failed {
+  background: var(--piarc-state-danger-subtle);
+  color: var(--piarc-text-danger);
+}
+.mcp-state.is-needsAuth,
+.mcp-state.is-unsupported,
+.mcp-state.is-untrusted {
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+}
+.mcp-state.is-disabled,
+.mcp-state.is-idle {
+  color: var(--piarc-text-secondary);
+}
+.mcp-error {
+  margin: 0;
+  font-family: var(--piarc-font-mono);
+  color: var(--piarc-text-danger);
+  white-space: pre-wrap;
+}
+.mcp-actions {
+  justify-content: flex-start;
+}
+
 /* sign-in and model settings (T29) */
 
 .settings-subsection {

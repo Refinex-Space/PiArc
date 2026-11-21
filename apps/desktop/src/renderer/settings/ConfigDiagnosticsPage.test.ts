@@ -93,4 +93,39 @@ describe('configuration diagnostics', () => {
       },
     ]);
   });
+  it('lists the MCP servers PiArc cannot use and the entries it left out', () => {
+    const view = parseDiagnostics(
+      JSON.stringify({
+        workspaces: ['/w'],
+        workspace: '/w',
+        trusted: true,
+        files: [],
+        mcp: {
+          unsupported: [
+            {
+              name: 'events',
+              scope: 'project',
+              source: '/w/.mcp.json',
+              transport: 'sse',
+              reason: 'SSE servers are not supported; use streamable HTTP',
+            },
+            { name: 'broken' },
+          ],
+          issues: [
+            { source: '/w/.mcp.json', pointer: '/mcpServers/bad name', message: 'invalid name' },
+            { pointer: '/x' },
+          ],
+        },
+      }),
+    );
+    expect(view.mcp).toEqual([
+      {
+        name: 'events',
+        source: '/w/.mcp.json',
+        transport: 'sse',
+        message: 'SSE servers are not supported; use streamable HTTP',
+      },
+      { source: '/w/.mcp.json', pointer: '/mcpServers/bad name', message: 'invalid name' },
+    ]);
+  });
 });

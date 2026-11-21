@@ -314,6 +314,29 @@ fn utf8_env(env: &[(OsString, OsString)]) -> BTreeMap<String, String> {
         .collect()
 }
 
+/// The configuration diagnostics' MCP part (T36): servers PiArc cannot use (SSE, WebSocket,
+/// with the reason) and the issues of the merge, read without expanding variables.
+#[must_use]
+pub fn diagnostics(
+    settings: &piarc_config::Settings,
+    workspace: &Path,
+    home: Option<&Path>,
+) -> Value {
+    let (config, _, _) = merge_for(settings, workspace, home, &[], &[]);
+    let unsupported: Vec<Value> = config
+        .servers
+        .iter()
+        .filter(|s| s.availability == McpAvailability::Unsupported)
+        .map(|s| {
+            serde_json::json!({
+                "name": s.name, "scope": s.scope, "source": s.source,
+                "transport": s.transport, "reason": s.reason,
+            })
+        })
+        .collect();
+    serde_json::json!({ "unsupported": unsupported, "issues": config.issues })
+}
+
 /// The state of every configured server when no Agent Host runs: a server that may run is
 /// `idle` (the pool connects it when a session needs it).
 #[must_use]

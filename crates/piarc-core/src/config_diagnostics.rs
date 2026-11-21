@@ -1,8 +1,9 @@
 //! The configuration diagnostics of a workspace (T24, architecture section 6.14): every
 //! settings file PiArc reads for it, PiArc's and Claude Code's, with its load state and
 //! the keys it applies, the keys a higher file overrides and the keys PiArc ignores, plus
-//! `~/.claude.json` (key names only), and the parts of the hooks configuration PiArc does not
-//! run (T25: later events and handler types, `async`, matchers its regular expressions reject).
+//! `~/.claude.json` (key names only), the parts of the hooks configuration PiArc does not
+//! run (T25: later events and handler types, `async`, matchers its regular expressions reject),
+//! and the MCP servers it cannot use (SSE, WebSocket) with the entries it leaves out (T36).
 //!
 //! The settings are loaded the way a permission decision loads them
 //! ([`TrustService::permission_settings`]): same layers, same trust, so the report shows
@@ -69,6 +70,9 @@ pub async fn report(
             })
         })
         .collect();
+    // MCP servers PiArc cannot use and entries it leaves out (T36): read without expanding
+    // variables, so no value of the user's environment reaches the report.
+    let mcp = crate::mcp::diagnostics(&settings, &root, storage.dirs().home());
     let shown = piarc_fs::display(&root);
     let mut workspaces = known;
     if !workspaces.contains(&shown) {
@@ -80,6 +84,7 @@ pub async fn report(
         "trusted": settings.trust().is_trusted(),
         "files": files,
         "hooks": hooks,
+        "mcp": mcp,
     }))
 }
 

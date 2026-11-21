@@ -2,7 +2,7 @@
 // on a settings Agent Host and reports each step on `core/login`: the authorization page (opened
 // in the system browser after the main process's confirmation; never in a PiArc window), a device
 // code, a question, progress, and how it ended. The token never reaches this window.
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import type { LoginInteraction } from '@piarc/protocol';
 
 import { useT } from '../app/app-context.js';
@@ -200,17 +200,14 @@ function StepView({
   }
 }
 
-/** The sign-in providers and the dialog of the sign-in in progress. */
-export function SignInSection({
-  providers,
-  busy,
-  onChanged,
-}: {
-  readonly providers: readonly LoginProvider[];
-  readonly busy: boolean;
-  /** The provider settings changed (signed in or out): reload them. */
-  readonly onChanged: () => void;
-}) {
+/** A sign-in in progress and its dialog: the steps Core reports on `core/login` for `provider`
+ * (a model provider, T29, or an MCP server `mcp:<name>`, T36). `start` runs the sign-in. */
+export function useSignInDialog(onChanged: () => void): {
+  readonly open: boolean;
+  readonly failure: string;
+  readonly start: (provider: LoginProvider, run: () => Promise<unknown>) => void;
+  readonly dialog: ReactNode;
+} {
   const t = useT();
   const titleId = useId();
   const [view, setView] = useState<LoginView>();
@@ -235,23 +232,26 @@ export function SignInSection({
       void window.piarc.unsubscribeEvents(route);
     };
   }, [open]);
-  const start = (provider: LoginProvider) => {
-    setFailure('');
-    setView({ provider });
-    window.piarc.startLogin(provider.id).then(
-      () => {
-        onChanged();
-      },
-      (e: unknown) => {
-        // The end state (failed, cancelled) also arrives on `core/login`; keep its message.
-        setView((current) =>
-          current === undefined || current.outcome !== undefined
-            ? current
-            : { ...current, outcome: { state: 'failed', message: reason(e) } },
-        );
-      },
-    );
-  };
+  const start = useCallback(
+    (provider: LoginProvider, run: () => Promise<unknown>) => {
+      setFailure('');
+      setView({ provider });
+      run().then(
+        () => {
+          onChanged();
+        },
+        (e: unknown) => {
+          // The end state (failed, cancelled) also arrives on `core/login`; keep its message.
+          setView((current) =>
+            current === undefined || current.outcome !== undefined
+              ? current
+              : { ...current, outcome: { state: 'failed', message: reason(e) } },
+          );
+        },
+      );
+    },
+    [onChanged],
+  );
   const cancel = useCallback(() => {
     const current = viewRef.current;
     if (current === undefined) return;
@@ -272,6 +272,88 @@ export function SignInSection({
     const target = dialog.querySelector<HTMLElement>('[data-autofocus]') ?? titleRef.current;
     target?.focus();
   }, [stepKey]);
+  const dialog =
+    view === undefined ? null : (
+      <Dialog labelledBy={titleId} onCancel={cancel} testId="login-dialog">
+        <h2 id={titleId} className="dialog-title" ref={titleRef} tabIndex={-1}>
+          {t('login.title', { name: view.provider.name })}
+        </h2>
+        {outcome === undefined ? (
+          <>
+            <StepView
+              key={JSON.stringify(view.step ?? null)}
+              view={view}
+              onAnswer={(value) => {
+                if (view.loginId !== undefined) void window.piarc.answerLogin(view.loginId, value);
+              }}
+            />
+            {view.note === undefined ? null : (
+              <p className="muted small" role="status" data-testid="login-note">
+                {view.note}
+              </p>
+            )}
+            <div className="dialog-actions">
+              <button
+                type="button"
+                className="button"
+                data-testid="login-cancel"
+                disabled={view.loginId === undefined}
+                onClick={cancel}
+              >
+                {t('login.cancel')}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p
+              role={outcome.state === 'succeeded' ? 'status' : 'alert'}
+              className={outcome.state === 'failed' ? 'error-text' : ''}
+              data-testid="login-outcome"
+              data-state={outcome.state}
+            >
+              {outcome.state === 'succeeded'
+                ? t('login.succeeded', { name: view.provider.name })
+                : outcome.state === 'cancelled'
+                  ? t('login.cancelled')
+                  : t('login.failed', { message: outcome.message ?? '' })}
+            </p>
+            <div className="dialog-actions">
+              <button
+                type="button"
+                className="button button-primary"
+                data-autofocus
+                data-testid="login-close"
+                onClick={() => {
+                  setView(undefined);
+                }}
+              >
+                {t('login.close')}
+              </button>
+            </div>
+          </>
+        )}
+      </Dialog>
+    );
+  return { open, failure, start, dialog };
+}
+
+/** The sign-in providers and the dialog of the sign-in in progress. */
+export function SignInSection({
+  providers,
+  busy,
+  onChanged,
+}: {
+  readonly providers: readonly LoginProvider[];
+  readonly busy: boolean;
+  /** The provider settings changed (signed in or out): reload them. */
+  readonly onChanged: () => void;
+}) {
+  const t = useT();
+  const signIn = useSignInDialog(onChanged);
+  const { open } = signIn;
+  const [failure, setFailure] = useState('');
+  const shown = failure === '' ? signIn.failure : failure;
   return (
     <section className="settings-subsection" data-testid="sign-in-section">
       <h2 className="settings-heading">{t('providers.signIn.title')}</h2>
@@ -317,7 +399,8 @@ export function SignInSection({
                   data-testid={`login-${p.id}`}
                   disabled={busy || open}
                   onClick={() => {
-                    start(p);
+                    setFailure('');
+                    signIn.start(p, () => window.piarc.startLogin(p.id));
                   }}
                 >
                   {t('providers.signIn.button')}
@@ -327,74 +410,12 @@ export function SignInSection({
           ))}
         </ul>
       )}
-      {failure === '' ? null : (
+      {shown === '' ? null : (
         <p className="error-text" role="alert">
-          {t('providers.failed', { reason: failure })}
+          {t('providers.failed', { reason: shown })}
         </p>
       )}
-      {view === undefined ? null : (
-        <Dialog labelledBy={titleId} onCancel={cancel} testId="login-dialog">
-          <h2 id={titleId} className="dialog-title" ref={titleRef} tabIndex={-1}>
-            {t('login.title', { name: view.provider.name })}
-          </h2>
-          {outcome === undefined ? (
-            <>
-              <StepView
-                key={JSON.stringify(view.step ?? null)}
-                view={view}
-                onAnswer={(value) => {
-                  if (view.loginId !== undefined)
-                    void window.piarc.answerLogin(view.loginId, value);
-                }}
-              />
-              {view.note === undefined ? null : (
-                <p className="muted small" role="status" data-testid="login-note">
-                  {view.note}
-                </p>
-              )}
-              <div className="dialog-actions">
-                <button
-                  type="button"
-                  className="button"
-                  data-testid="login-cancel"
-                  disabled={view.loginId === undefined}
-                  onClick={cancel}
-                >
-                  {t('login.cancel')}
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <p
-                role={outcome.state === 'succeeded' ? 'status' : 'alert'}
-                className={outcome.state === 'failed' ? 'error-text' : ''}
-                data-testid="login-outcome"
-                data-state={outcome.state}
-              >
-                {outcome.state === 'succeeded'
-                  ? t('login.succeeded', { name: view.provider.name })
-                  : outcome.state === 'cancelled'
-                    ? t('login.cancelled')
-                    : t('login.failed', { message: outcome.message ?? '' })}
-              </p>
-              <div className="dialog-actions">
-                <button
-                  type="button"
-                  className="button button-primary"
-                  data-autofocus
-                  data-testid="login-close"
-                  onClick={() => {
-                    setView(undefined);
-                  }}
-                >
-                  {t('login.close')}
-                </button>
-              </div>
-            </>
-          )}
-        </Dialog>
-      )}
+      {signIn.dialog}
     </section>
   );
 }

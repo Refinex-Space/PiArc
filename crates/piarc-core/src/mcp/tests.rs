@@ -308,3 +308,33 @@ async fn inline_subagent_servers_wait_for_the_projects_trust() {
         ["ghp-test-value"]
     );
 }
+
+#[tokio::test]
+async fn the_diagnostics_list_unsupported_servers_without_expanding_variables() {
+    let f = Fixture::new();
+    configure(&f);
+    let report = crate::config_diagnostics::report(&f.storage, &f.trust, Some(f.workspace.clone()))
+        .await
+        .expect("report");
+    let unsupported = report["mcp"]["unsupported"]
+        .as_array()
+        .expect("unsupported");
+    assert_eq!(unsupported.len(), 1, "{report}");
+    assert_eq!(unsupported[0]["name"], "legacy");
+    assert_eq!(unsupported[0]["transport"], "sse");
+    assert!(
+        unsupported[0]["source"]
+            .as_str()
+            .is_some_and(|s| s.ends_with(".mcp.json")),
+        "{report}"
+    );
+    assert!(
+        unsupported[0]["reason"]
+            .as_str()
+            .is_some_and(|r| !r.is_empty())
+    );
+    assert!(
+        !report.to_string().contains("ghp-test-value"),
+        "no value of the environment reaches the report"
+    );
+}

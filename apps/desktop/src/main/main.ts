@@ -24,6 +24,7 @@ import { applyDevServerCsp, resolveDevServer } from './dev-server.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
 import { createIpcRegistrar } from './ipc/register.js';
 import { registerWorktreeHandlers } from './core/worktree-ipc.js';
+import { registerMcpHandlers } from './core/mcp-ipc.js';
 import { URL_SCHEME, launchTargets, parseLaunchUrl } from './launch.js';
 import { applyDataDirs, type DataDirs } from './platform/data-dirs.js';
 import { PreferenceStore } from './preferences.js';
@@ -216,6 +217,7 @@ function start(dirs: DataDirs): void {
       },
     );
     registerPermissionHandlers(registerHandler, core.runtime, () => appShell.t());
+    registerMcpHandlers(registerHandler, core.runtime);
     registerWorktreeHandlers(
       registerHandler,
       core.runtime,

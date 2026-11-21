@@ -500,6 +500,22 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.taskOutput, taskId, offset, length)
       .then((value: unknown) => expectString(value)),
+  mcpStatus: (workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.mcpStatus, workspace)
+      .then((value: unknown) => expectString(value)),
+  mcpReconnect: (workspace, name) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.mcpReconnect, workspace, name)
+      .then((value: unknown) => expectString(value)),
+  mcpSetEnabled: (workspace, name, enabled) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.mcpSetEnabled, workspace, name, enabled)
+      .then((value: unknown) => expectString(value)),
+  mcpLogin: (workspace, name) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.mcpLogin, workspace, name)
+      .then((value: unknown) => expectString(value)),
   listAgents: (workspace) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.agentsList, workspace)

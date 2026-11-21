@@ -112,6 +112,10 @@ export const IPC_CHANNELS = {
   sessionSearch: 'piarc:session.search',
   sessionOpenWindow: 'piarc:session.openWindow',
   launchTargets: 'piarc:app.launchTargets',
+  mcpStatus: 'piarc:mcp.status',
+  mcpReconnect: 'piarc:mcp.reconnect',
+  mcpSetEnabled: 'piarc:mcp.setEnabled',
+  mcpLogin: 'piarc:mcp.login',
 } as const;
 
 /** The new-session form's worktree choice (T35). */
@@ -715,6 +719,21 @@ export interface PiarcApi {
   openSessionWindow(id: string): Promise<void>;
   takeLaunchTargets(): Promise<readonly LaunchTarget[]>;
   pathForFile(file: object): string;
+
+  /**
+   * The MCP servers of a workspace (T36): source, transport, state, tools and the last error,
+   * as `McpStatus` JSON; changes arrive on `core/mcp`.
+   */
+  mcpStatus(workspace: string): Promise<string>;
+  /** Connects an MCP server anew; its `McpServerStatus` as JSON. */
+  mcpReconnect(workspace: string, name: string): Promise<string>;
+  /** Turns an MCP server on or off for the workspace; its `McpServerStatus` as JSON. */
+  mcpSetEnabled(workspace: string, name: string, enabled: boolean): Promise<string>;
+  /**
+   * Signs in to an OAuth MCP server; steps on `core/login` (provider `mcp:<name>`), answered
+   * with `answerLogin`. Resolves with its `McpServerStatus` and `loginId` as JSON.
+   */
+  mcpLogin(workspace: string, name: string): Promise<string>;
 
   notifyAttention(notice: AttentionNotice): Promise<void>;
   /** The number of sessions that need the user (Dock badge, taskbar overlay icon). */
