@@ -22,6 +22,7 @@ impl Hub {
             .call::<ModelsList>(ModelsListParams { session_id: None })
             .await
             .map_err(host_error)?;
+        self.record_prices(&models).await;
         Ok(json!(models))
     }
 
@@ -129,6 +130,7 @@ impl Hub {
             .call::<ModelsList>(ModelsListParams { session_id: None })
             .await
             .map_err(host_error)?;
+        self.record_prices(&list).await;
         let builtins = list.providers;
         match op {
             Operation::List => {}

@@ -53,6 +53,7 @@ pub fn export_schema() -> Vec<(&'static str, Value)> {
     generator.subschema_for::<crate::plugins::PackagesList>();
     generator.subschema_for::<crate::plugins::PackageInstallRequest>();
     generator.subschema_for::<crate::plugins::PackageInstallResult>();
+    generator.subschema_for::<crate::usage::UsageReport>();
     let definitions = generator.take_definitions(true);
     let any_message: Vec<Value> = CONTRACTS
         .iter()

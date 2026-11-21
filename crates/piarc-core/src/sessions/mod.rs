@@ -44,6 +44,7 @@ mod skills;
 mod snapshot;
 mod subagents;
 mod tasks;
+mod usage;
 mod web_search;
 mod workspace;
 mod worktrees;

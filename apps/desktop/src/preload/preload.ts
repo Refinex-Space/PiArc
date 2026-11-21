@@ -563,6 +563,17 @@ const api: PiarcApi = {
   setOutputStyle: async (workspace, name) => {
     await ipcRenderer.invoke(IPC_CHANNELS.outputStyleSet, workspace, name);
   },
+  usageReport: (workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.usageReport, workspace)
+      .then((value: unknown) => expectString(value)),
+  sessionUsage: (sessionId) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionUsage, sessionId)
+      .then((value: unknown) => expectString(value)),
+  setModelPrice: async (provider, model, price) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.modelPriceSet, provider, model, price);
+  },
   webSearchSettings: () =>
     ipcRenderer
       .invoke(IPC_CHANNELS.webSearchSettings)

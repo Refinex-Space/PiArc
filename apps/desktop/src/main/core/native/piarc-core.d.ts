@@ -458,6 +458,21 @@ export declare class CoreRuntime {
    */
   closeTerminal(id: number): void;
   /**
+   * Usage by model and by session, for every workspace or `workspace`'s, as JSON text
+   * (`UsageReport`).
+   */
+  usageReport(workspace?: string | null): Promise<string>;
+  /**
+   * One main session's usage with its subagents and auxiliary calls, as JSON text
+   * (`SessionUsage`).
+   */
+  sessionUsage(sessionId: string): Promise<string>;
+  /**
+   * Sets the user's price of `provider/model` (`priceJson`: `{input, output, cacheRead,
+   * cacheWrite}`, USD per million tokens); null removes it.
+   */
+  setModelPrice(provider: string, model: string, priceJson?: string | null): Promise<string>;
+  /**
    * Creates a session in a new worktree `.piarc/worktrees/<name>/` of the workspace's
    * repository on the branch `piarc/<name>`. Resolves like `createSession`, with
    * `worktree: { name, path, branch, base, copied, ignored }`.

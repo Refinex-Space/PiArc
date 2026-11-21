@@ -40,6 +40,7 @@ pub mod records;
 pub mod search;
 mod store;
 pub mod time;
+mod usage;
 pub mod worktrees;
 
 pub use background_tasks::TaskRow;
@@ -50,8 +51,9 @@ pub use index::{
 };
 pub use migrate::{MIGRATIONS, Migration};
 pub use packages::PackageRecord;
-pub use pi_session::{SessionMeta, Usage};
+pub use pi_session::{RequestUsage, SessionMeta, Usage};
 pub use records::{AuditEvent, AuditFilter, TrustDecision, TrustRecord, WorkspaceRecord};
 pub use search::{SearchHit, SessionHits};
 pub use store::{BUSY_TIMEOUT, CACHE_KIB, Store};
+pub use usage::{RequestTokens, UsageGroup, UsageSession};
 pub use worktrees::{DueWorktree, WorktreeRecord};

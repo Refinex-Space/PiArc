@@ -698,6 +698,26 @@
         }
       ]
     },
+    "AuxiliaryUsage": {
+      "description": "Usage of a kind of auxiliary call (WebFetch extraction, native web search, `prompt` hooks).",
+      "properties": {
+        "cost": {
+          "description": "Estimated USD; absent when a model used has no price.",
+          "format": "double",
+          "type": ["number", "null"]
+        },
+        "purpose": {
+          "description": "`webFetch`, `webSearch`, `hookPrompt`, ...",
+          "type": "string"
+        },
+        "tokens": {
+          "$ref": "#/$defs/UsageTokens",
+          "description": "The tokens."
+        }
+      },
+      "required": ["purpose", "tokens"],
+      "type": "object"
+    },
     "BackgroundTask": {
       "description": "One background task as the task manager knows it.",
       "properties": {
@@ -925,6 +945,17 @@
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
+        },
+        "cost": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelPrice"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The catalog's prices (T41); absent when the catalog has none (all rates zero, or a\ncredit plan priced outside the catalog)."
         },
         "defaultEffort": {
           "anyOf": [
@@ -6812,6 +6843,40 @@
       },
       "type": "object"
     },
+    "ModelPrice": {
+      "description": "A model's prices (pi-ai's `ModelCost`).",
+      "properties": {
+        "cacheRead": {
+          "description": "USD per million cache-read tokens.",
+          "format": "double",
+          "type": "number"
+        },
+        "cacheWrite": {
+          "description": "USD per million cache-write tokens.",
+          "format": "double",
+          "type": "number"
+        },
+        "input": {
+          "description": "USD per million input tokens.",
+          "format": "double",
+          "type": "number"
+        },
+        "output": {
+          "description": "USD per million output tokens.",
+          "format": "double",
+          "type": "number"
+        },
+        "tiers": {
+          "description": "Rates for larger requests.",
+          "items": {
+            "$ref": "#/$defs/PriceTier"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["input", "output", "cacheRead", "cacheWrite"],
+      "type": "object"
+    },
     "ModelRef": {
       "description": "Selects a model by provider id and model id, for example `anthropic` / `claude-opus-5-5`.",
       "properties": {
@@ -6866,6 +6931,45 @@
         }
       },
       "required": ["cacheInvalidated", "dropsThinking"],
+      "type": "object"
+    },
+    "ModelUsage": {
+      "description": "One model's usage.",
+      "properties": {
+        "cost": {
+          "description": "Estimated USD; absent when the model has no price.",
+          "format": "double",
+          "type": ["number", "null"]
+        },
+        "model": {
+          "description": "Model id.",
+          "type": "string"
+        },
+        "price": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelPrice"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The price in effect."
+        },
+        "priceSource": {
+          "$ref": "#/$defs/PriceSource",
+          "description": "Where the price comes from."
+        },
+        "provider": {
+          "description": "Provider id.",
+          "type": "string"
+        },
+        "tokens": {
+          "$ref": "#/$defs/UsageTokens",
+          "description": "The tokens."
+        }
+      },
+      "required": ["provider", "model", "tokens", "priceSource"],
       "type": "object"
     },
     "ModelsCredentialParams": {
@@ -8227,6 +8331,59 @@
         }
       },
       "required": ["denied"],
+      "type": "object"
+    },
+    "PriceSource": {
+      "description": "Where a model's price comes from.",
+      "oneOf": [
+        {
+          "const": "catalog",
+          "description": "pi-ai's catalog.",
+          "type": "string"
+        },
+        {
+          "const": "user",
+          "description": "The user's `modelPrices` setting.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "Neither: the cost is unknown.",
+          "type": "string"
+        }
+      ]
+    },
+    "PriceTier": {
+      "description": "Rates above an input size (pi-ai's `ModelCostTier`).",
+      "properties": {
+        "cacheRead": {
+          "description": "USD per million cache-read tokens.",
+          "format": "double",
+          "type": "number"
+        },
+        "cacheWrite": {
+          "description": "USD per million cache-write tokens.",
+          "format": "double",
+          "type": "number"
+        },
+        "input": {
+          "description": "USD per million input tokens.",
+          "format": "double",
+          "type": "number"
+        },
+        "inputTokensAbove": {
+          "description": "The tier applies when a request's input, cache reads and cache writes exceed this.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "output": {
+          "description": "USD per million output tokens.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": ["inputTokensAbove", "input", "output", "cacheRead", "cacheWrite"],
       "type": "object"
     },
     "PromptAccepted": {
@@ -11131,6 +11288,59 @@
       "required": ["sessionId"],
       "type": "object"
     },
+    "SessionUsage": {
+      "description": "One main session's usage: its own requests, its subagents' and its auxiliary calls.",
+      "properties": {
+        "auxiliary": {
+          "description": "Its auxiliary calls.",
+          "items": {
+            "$ref": "#/$defs/AuxiliaryUsage"
+          },
+          "type": "array"
+        },
+        "cost": {
+          "description": "Estimated USD of everything with a price.",
+          "format": "double",
+          "type": ["number", "null"]
+        },
+        "models": {
+          "description": "By model, the session's own requests, its subagents' and auxiliary calls together.",
+          "items": {
+            "$ref": "#/$defs/ModelUsage"
+          },
+          "type": "array"
+        },
+        "partial": {
+          "description": "Some requests used a model without a price: `cost` leaves them out.",
+          "type": "boolean"
+        },
+        "sessionId": {
+          "description": "The session.",
+          "type": "string"
+        },
+        "subagents": {
+          "description": "Its subagents.",
+          "items": {
+            "$ref": "#/$defs/SubagentUsage"
+          },
+          "type": "array"
+        },
+        "title": {
+          "description": "Its title, when it has one.",
+          "type": ["string", "null"]
+        },
+        "tokens": {
+          "$ref": "#/$defs/UsageTokens",
+          "description": "Everything counted for the session."
+        },
+        "workspace": {
+          "description": "Its workspace.",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["sessionId", "tokens", "models"],
+      "type": "object"
+    },
     "SessionUsageNotification": {
       "description": "Notification `session/usage`.",
       "properties": {
@@ -12180,6 +12390,30 @@
         }
       },
       "required": ["input", "output", "cacheRead", "cacheWrite"],
+      "type": "object"
+    },
+    "SubagentUsage": {
+      "description": "A subagent's usage, counted in its main session too.",
+      "properties": {
+        "agentType": {
+          "description": "Its type.",
+          "type": ["string", "null"]
+        },
+        "cost": {
+          "description": "Estimated USD; absent when a model used has no price.",
+          "format": "double",
+          "type": ["number", "null"]
+        },
+        "sessionId": {
+          "description": "The subagent's session.",
+          "type": "string"
+        },
+        "tokens": {
+          "$ref": "#/$defs/UsageTokens",
+          "description": "The tokens."
+        }
+      },
+      "required": ["sessionId", "tokens"],
       "type": "object"
     },
     "SubagentWorktree": {
@@ -14139,6 +14373,40 @@
       "required": ["id", "last"],
       "type": "object"
     },
+    "UsageReport": {
+      "description": "Usage of every session (or one workspace's).",
+      "properties": {
+        "cost": {
+          "description": "Estimated USD of everything with a price.",
+          "format": "double",
+          "type": ["number", "null"]
+        },
+        "models": {
+          "description": "By model.",
+          "items": {
+            "$ref": "#/$defs/ModelUsage"
+          },
+          "type": "array"
+        },
+        "partial": {
+          "description": "Some requests used a model without a price.",
+          "type": "boolean"
+        },
+        "sessions": {
+          "description": "By main session, most recently updated first.",
+          "items": {
+            "$ref": "#/$defs/SessionUsage"
+          },
+          "type": "array"
+        },
+        "tokens": {
+          "$ref": "#/$defs/UsageTokens",
+          "description": "All of it."
+        }
+      },
+      "required": ["tokens", "models", "sessions"],
+      "type": "object"
+    },
     "UsageSource": {
       "description": "Where the context's total comes from.",
       "oneOf": [
@@ -14153,6 +14421,49 @@
           "type": "string"
         }
       ]
+    },
+    "UsageTokens": {
+      "description": "Summed tokens of some requests.",
+      "properties": {
+        "cacheRead": {
+          "description": "Tokens read from the prompt cache.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cacheWrite": {
+          "description": "Tokens written to the prompt cache.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "input": {
+          "description": "Input tokens, excluding cache reads and writes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "output": {
+          "description": "Output tokens (reasoning included).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reasoning": {
+          "description": "Reasoning tokens where the provider reports them (part of `output`).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "requests": {
+          "description": "Model requests.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["requests", "input", "output", "cacheRead", "cacheWrite", "reasoning"],
+      "type": "object"
     },
     "WebContentFormat": {
       "description": "How `content` was produced.",

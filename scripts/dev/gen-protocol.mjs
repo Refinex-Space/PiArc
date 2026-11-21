@@ -157,6 +157,7 @@ async function buildFiles() {
       'PackagesList',
       'PackageInstallRequest',
       'PackageInstallResult',
+      'UsageReport',
     ].map((name) => ({
       $ref: `#/$defs/${name}`,
     })),

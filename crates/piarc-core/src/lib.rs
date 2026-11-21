@@ -96,6 +96,7 @@ pub mod tasks;
 pub mod terminal;
 pub mod tool_io;
 pub mod trust;
+pub mod usage;
 pub mod workspace_settings;
 pub mod worktrees;
 

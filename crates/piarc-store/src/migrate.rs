@@ -75,6 +75,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "packages",
         sql: include_str!("sql/0010_packages.sql"),
     },
+    Migration {
+        version: 11,
+        name: "usage",
+        sql: include_str!("sql/0011_usage.sql"),
+    },
 ];
 
 /// The highest version in `migrations`.

@@ -3,6 +3,7 @@
 // the rail for every session.
 import { PlanPanel } from '../approvals/PlanPanel.js';
 import { TaskPanel } from '../transcript/TaskPanel.js';
+import { UsageCard } from '../usage/UsageCard.js';
 import { ContextPanel } from './ContextUsage.js';
 import { registerPanel } from './registry.js';
 
@@ -16,6 +17,17 @@ registerPanel({
   when: (context) => context.sessionId !== undefined,
   render: (context) =>
     context.sessionId === undefined ? null : <ContextPanel sessionId={context.sessionId} />,
+});
+
+// T41: the session's tokens and estimated cost, after the context card.
+registerPanel({
+  id: 'usage',
+  area: 'rail',
+  title: 'panel.usage',
+  order: 55,
+  when: (context) => context.sessionId !== undefined,
+  render: (context) =>
+    context.sessionId === undefined ? null : <UsageCard sessionId={context.sessionId} />,
 });
 
 registerPanel({

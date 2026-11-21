@@ -30,6 +30,7 @@ mod plugins;
 mod sessions;
 mod state;
 mod terminals;
+mod usage;
 
 use std::collections::HashMap;
 use std::future::Future;

@@ -31,6 +31,7 @@ import { registerSettingsPage } from './registry.js';
 import { AgentsPage } from './AgentsPage.js';
 import { McpPage } from './McpPage.js';
 import { SkillsPage } from './SkillsPage.js';
+import { UsagePage } from '../usage/UsagePage.js';
 
 function useSave(): { save: (change: PreferenceChange) => void; error: string | undefined } {
   const { t } = useApp();
@@ -377,6 +378,12 @@ export function registerBuiltInSettingsPages(): void {
     title: 'settings.mcp',
     order: 50,
     component: McpPage,
+  });
+  registerSettingsPage({
+    id: 'usage',
+    title: 'settings.usage',
+    order: 60,
+    component: UsagePage,
   });
   registerSettingsPage({
     id: 'diagnostics',

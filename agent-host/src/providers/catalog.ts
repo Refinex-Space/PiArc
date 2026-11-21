@@ -66,7 +66,39 @@ export function capabilities(model: Model<Api>): CatalogModel {
         ? ('verified' as const)
         : ('unknown' as const),
     ...nativeSearchCapability(model),
+    ...catalogPrice(model),
     ...CAPABILITY_OVERRIDES.get(`${model.provider}/${model.id}`),
+  };
+}
+
+/**
+ * The catalog's prices for usage costs (T41). A model whose rates are all zero (custom
+ * endpoints, local servers) or that a credit plan prices outside the catalog has none: its
+ * cost is unknown rather than free.
+ */
+export function catalogPrice(model: Model<Api>): Pick<CatalogModel, 'cost'> {
+  const { cost } = model;
+  const rates = [cost.input, cost.output, cost.cacheRead, cost.cacheWrite];
+  if (CREDIT_PLANS.has(model.provider) || rates.every((rate) => rate === 0)) return {};
+  if (!rates.every((rate) => Number.isFinite(rate) && rate >= 0)) return {};
+  return {
+    cost: {
+      input: cost.input,
+      output: cost.output,
+      cacheRead: cost.cacheRead,
+      cacheWrite: cost.cacheWrite,
+      ...(cost.tiers === undefined || cost.tiers.length === 0
+        ? {}
+        : {
+            tiers: cost.tiers.map((tier) => ({
+              inputTokensAbove: tier.inputTokensAbove,
+              input: tier.input,
+              output: tier.output,
+              cacheRead: tier.cacheRead,
+              cacheWrite: tier.cacheWrite,
+            })),
+          }),
+    },
   };
 }
 

@@ -13,7 +13,8 @@ export type ProtocolValue =
   | DiscardRequest
   | PackagesList
   | PackageInstallRequest
-  | PackageInstallResult;
+  | PackageInstallResult
+  | UsageReport;
 /**
  * Any message covered by the Agent Host Protocol 1.0 contracts. Generated from the piarc-protocol crate by `npm run gen:protocol`; do not edit.
  */
@@ -1078,6 +1079,10 @@ export type PackageScope = 'user' | 'project';
  * Where a package was installed from.
  */
 export type PackageSourceKind = 'directory' | 'git' | 'npm';
+/**
+ * Where a model's price comes from.
+ */
+export type PriceSource = 'catalog' | 'user' | 'unknown';
 
 /**
  * A request whose method is not interpreted.
@@ -2049,6 +2054,11 @@ export interface CatalogModel {
    */
   contextWindow: number;
   /**
+   * The catalog's prices (T41); absent when the catalog has none (all rates zero, or a
+   * credit plan priced outside the catalog).
+   */
+  cost?: ModelPrice | null;
+  /**
    * The effort applied when the model is selected without one (per-model setting, T29).
    */
   defaultEffort?: EffortLevel | null;
@@ -2092,6 +2102,56 @@ export interface CatalogModel {
    * Accepts image input.
    */
   vision: boolean;
+}
+/**
+ * A model's prices (pi-ai's `ModelCost`).
+ */
+export interface ModelPrice {
+  /**
+   * USD per million cache-read tokens.
+   */
+  cacheRead: number;
+  /**
+   * USD per million cache-write tokens.
+   */
+  cacheWrite: number;
+  /**
+   * USD per million input tokens.
+   */
+  input: number;
+  /**
+   * USD per million output tokens.
+   */
+  output: number;
+  /**
+   * Rates for larger requests.
+   */
+  tiers?: PriceTier[];
+}
+/**
+ * Rates above an input size (pi-ai's `ModelCostTier`).
+ */
+export interface PriceTier {
+  /**
+   * USD per million cache-read tokens.
+   */
+  cacheRead: number;
+  /**
+   * USD per million cache-write tokens.
+   */
+  cacheWrite: number;
+  /**
+   * USD per million input tokens.
+   */
+  input: number;
+  /**
+   * The tier applies when a request's input, cache reads and cache writes exceed this.
+   */
+  inputTokensAbove: number;
+  /**
+   * USD per million output tokens.
+   */
+  output: number;
 }
 /**
  * A built-in provider accepting API key credentials.
@@ -8552,4 +8612,166 @@ export interface PackageInstallResult {
    * The version before an update.
    */
   previousVersion?: string | null;
+}
+/**
+ * Usage of every session (or one workspace's).
+ */
+export interface UsageReport {
+  /**
+   * Estimated USD of everything with a price.
+   */
+  cost?: number | null;
+  /**
+   * By model.
+   */
+  models: ModelUsage[];
+  /**
+   * Some requests used a model without a price.
+   */
+  partial?: boolean;
+  /**
+   * By main session, most recently updated first.
+   */
+  sessions: SessionUsage[];
+  /**
+   * All of it.
+   */
+  tokens: UsageTokens;
+}
+/**
+ * One model's usage.
+ */
+export interface ModelUsage {
+  /**
+   * Estimated USD; absent when the model has no price.
+   */
+  cost?: number | null;
+  /**
+   * Model id.
+   */
+  model: string;
+  /**
+   * The price in effect.
+   */
+  price?: ModelPrice | null;
+  /**
+   * Where the price comes from.
+   */
+  priceSource: PriceSource;
+  /**
+   * Provider id.
+   */
+  provider: string;
+  /**
+   * The tokens.
+   */
+  tokens: UsageTokens;
+}
+/**
+ * Summed tokens of some requests.
+ */
+export interface UsageTokens {
+  /**
+   * Tokens read from the prompt cache.
+   */
+  cacheRead: number;
+  /**
+   * Tokens written to the prompt cache.
+   */
+  cacheWrite: number;
+  /**
+   * Input tokens, excluding cache reads and writes.
+   */
+  input: number;
+  /**
+   * Output tokens (reasoning included).
+   */
+  output: number;
+  /**
+   * Reasoning tokens where the provider reports them (part of `output`).
+   */
+  reasoning: number;
+  /**
+   * Model requests.
+   */
+  requests: number;
+}
+/**
+ * One main session's usage: its own requests, its subagents' and its auxiliary calls.
+ */
+export interface SessionUsage {
+  /**
+   * Its auxiliary calls.
+   */
+  auxiliary?: AuxiliaryUsage[];
+  /**
+   * Estimated USD of everything with a price.
+   */
+  cost?: number | null;
+  /**
+   * By model, the session's own requests, its subagents' and auxiliary calls together.
+   */
+  models: ModelUsage[];
+  /**
+   * Some requests used a model without a price: `cost` leaves them out.
+   */
+  partial?: boolean;
+  /**
+   * The session.
+   */
+  sessionId: string;
+  /**
+   * Its subagents.
+   */
+  subagents?: SubagentUsage[];
+  /**
+   * Its title, when it has one.
+   */
+  title?: string | null;
+  /**
+   * Everything counted for the session.
+   */
+  tokens: UsageTokens;
+  /**
+   * Its workspace.
+   */
+  workspace?: string | null;
+}
+/**
+ * Usage of a kind of auxiliary call (WebFetch extraction, native web search, `prompt` hooks).
+ */
+export interface AuxiliaryUsage {
+  /**
+   * Estimated USD; absent when a model used has no price.
+   */
+  cost?: number | null;
+  /**
+   * `webFetch`, `webSearch`, `hookPrompt`, ...
+   */
+  purpose: string;
+  /**
+   * The tokens.
+   */
+  tokens: UsageTokens;
+}
+/**
+ * A subagent's usage, counted in its main session too.
+ */
+export interface SubagentUsage {
+  /**
+   * Its type.
+   */
+  agentType?: string | null;
+  /**
+   * Estimated USD; absent when a model used has no price.
+   */
+  cost?: number | null;
+  /**
+   * The subagent's session.
+   */
+  sessionId: string;
+  /**
+   * The tokens.
+   */
+  tokens: UsageTokens;
 }

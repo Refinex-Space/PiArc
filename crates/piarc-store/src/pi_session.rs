@@ -34,6 +34,48 @@ pub struct EntryText {
     pub text: String,
 }
 
+/// One model request a session file records (T41): an assistant message's usage, or an
+/// auxiliary call's `piarc.auxiliaryUsage` entry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RequestUsage {
+    /// The entry's id.
+    pub entry_id: Option<String>,
+    /// When it was written (Unix ms).
+    pub at: Option<i64>,
+    /// `model` (the session's own request) or `auxiliary`.
+    pub kind: &'static str,
+    /// An auxiliary call's purpose (`webFetch`, `webSearch`, `hookPrompt`, ...).
+    pub purpose: Option<String>,
+    /// Provider id.
+    pub provider: String,
+    /// Model id.
+    pub model: String,
+    /// Input tokens, excluding cache reads and writes.
+    pub input: i64,
+    /// Output tokens.
+    pub output: i64,
+    /// Cache-read tokens.
+    pub cache_read: i64,
+    /// Cache-write tokens (one-hour writes included).
+    pub cache_write: i64,
+    /// Cache-write tokens kept for an hour (Anthropic), priced at twice the input rate.
+    pub cache_write_1h: i64,
+    /// Reasoning tokens where reported (part of `output`).
+    pub reasoning: i64,
+}
+
+/// The custom entry that records an auxiliary model call (T29, written by the Agent Host).
+pub const AUXILIARY_USAGE_ENTRY: &str = "piarc.auxiliaryUsage";
+
+/// What one entry adds besides the session's fields: searchable text, a model request.
+#[derive(Debug, Default)]
+pub struct Folded {
+    /// Its searchable text (T35).
+    pub text: Option<EntryText>,
+    /// The request it records (T41).
+    pub usage: Option<RequestUsage>,
+}
+
 /// What the index knows about one session.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SessionMeta {
@@ -130,6 +172,12 @@ pub struct Entry {
     provider: Option<String>,
     #[serde(default)]
     model_id: Option<String>,
+    /// A `usage` entry's model (T41).
+    #[serde(default)]
+    model: Option<String>,
+    /// A `usage` entry's category (`cache_warm`, ...).
+    #[serde(default, rename = "kind")]
+    usage_kind: Option<String>,
     #[serde(default)]
     usage: Option<RawUsage>,
     #[serde(default)]
@@ -138,34 +186,47 @@ pub struct Entry {
     custom_type: Option<String>,
     /// A custom entry's data, reduced to a subagent link; any other data is skipped.
     #[serde(default)]
-    data: SubagentData,
+    data: CustomData,
 }
 
-/// The fields of a `piarc.subagent` entry's data. Other custom entries' data (text, lists,
-/// other objects) deserializes to the empty value without being kept.
+/// The fields of a `piarc.subagent` entry's data and of a `piarc.auxiliaryUsage` entry's. Other
+/// custom entries' data (text, lists, other objects) deserializes to the empty value without
+/// being kept.
 #[derive(Debug, Default)]
-struct SubagentData {
+struct CustomData {
     parent_session_id: Option<String>,
     agent_type: Option<String>,
+    purpose: Option<String>,
+    model: Option<ModelRef>,
+    usage: Option<RawUsage>,
 }
 
-impl<'de> Deserialize<'de> for SubagentData {
+/// An auxiliary call's model (`{provider, id}`).
+#[derive(Debug, Default, Deserialize)]
+struct ModelRef {
+    #[serde(default)]
+    provider: Option<String>,
+    #[serde(default)]
+    id: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for CustomData {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         struct DataVisitor;
         impl<'de> Visitor<'de> for DataVisitor {
-            type Value = SubagentData;
+            type Value = CustomData;
             fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 f.write_str("any value")
             }
-            fn visit_map<A: de::MapAccess<'de>>(
-                self,
-                mut map: A,
-            ) -> Result<SubagentData, A::Error> {
-                let mut data = SubagentData::default();
+            fn visit_map<A: de::MapAccess<'de>>(self, mut map: A) -> Result<CustomData, A::Error> {
+                let mut data = CustomData::default();
                 while let Some(key) = map.next_key::<std::borrow::Cow<'de, str>>()? {
                     match key.as_ref() {
                         "parentSessionId" => data.parent_session_id = map.next_value()?,
                         "agentType" => data.agent_type = map.next_value()?,
+                        "purpose" => data.purpose = map.next_value().unwrap_or_default(),
+                        "model" => data.model = map.next_value().unwrap_or_default(),
+                        "usage" => data.usage = map.next_value().unwrap_or_default(),
                         _ => {
                             map.next_value::<de::IgnoredAny>()?;
                         }
@@ -173,27 +234,27 @@ impl<'de> Deserialize<'de> for SubagentData {
                 }
                 Ok(data)
             }
-            fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<SubagentData, A::Error> {
+            fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<CustomData, A::Error> {
                 while seq.next_element::<de::IgnoredAny>()?.is_some() {}
-                Ok(SubagentData::default())
+                Ok(CustomData::default())
             }
-            fn visit_str<E: de::Error>(self, _: &str) -> Result<SubagentData, E> {
-                Ok(SubagentData::default())
+            fn visit_str<E: de::Error>(self, _: &str) -> Result<CustomData, E> {
+                Ok(CustomData::default())
             }
-            fn visit_bool<E: de::Error>(self, _: bool) -> Result<SubagentData, E> {
-                Ok(SubagentData::default())
+            fn visit_bool<E: de::Error>(self, _: bool) -> Result<CustomData, E> {
+                Ok(CustomData::default())
             }
-            fn visit_i64<E: de::Error>(self, _: i64) -> Result<SubagentData, E> {
-                Ok(SubagentData::default())
+            fn visit_i64<E: de::Error>(self, _: i64) -> Result<CustomData, E> {
+                Ok(CustomData::default())
             }
-            fn visit_u64<E: de::Error>(self, _: u64) -> Result<SubagentData, E> {
-                Ok(SubagentData::default())
+            fn visit_u64<E: de::Error>(self, _: u64) -> Result<CustomData, E> {
+                Ok(CustomData::default())
             }
-            fn visit_f64<E: de::Error>(self, _: f64) -> Result<SubagentData, E> {
-                Ok(SubagentData::default())
+            fn visit_f64<E: de::Error>(self, _: f64) -> Result<CustomData, E> {
+                Ok(CustomData::default())
             }
-            fn visit_unit<E: de::Error>(self) -> Result<SubagentData, E> {
-                Ok(SubagentData::default())
+            fn visit_unit<E: de::Error>(self) -> Result<CustomData, E> {
+                Ok(CustomData::default())
             }
         }
         deserializer.deserialize_any(DataVisitor)
@@ -232,6 +293,10 @@ struct RawUsage {
     cache_read: f64,
     #[serde(default)]
     cache_write: f64,
+    #[serde(default, rename = "cacheWrite1h")]
+    cache_write_1h: f64,
+    #[serde(default)]
+    reasoning: Option<f64>,
     #[serde(default)]
     cost: Option<RawCost>,
 }
@@ -284,20 +349,44 @@ impl SessionMeta {
         Ok(())
     }
 
-    /// Folds one entry after the header; returns its searchable text, if it has any.
-    pub fn fold(&mut self, entry: Entry) -> Option<EntryText> {
+    /// Folds one entry after the header; returns its searchable text and the model request it
+    /// records, if any.
+    pub fn fold(&mut self, entry: Entry) -> Folded {
         let entry_id = entry.id.clone();
         if let Some(id) = entry.id {
             self.last_entry_id = Some(id);
         }
         let mut text = None;
+        let mut usage = None;
         let mut at = entry.timestamp.as_ref().and_then(Timestamp::millis);
         match entry.kind.as_str() {
+            "custom" if entry.custom_type.as_deref() == Some(AUXILIARY_USAGE_ENTRY) => {
+                let data = entry.data;
+                if let (Some(raw), Some(model)) = (&data.usage, &data.model)
+                    && let (Some(provider), Some(id)) = (&model.provider, &model.id)
+                {
+                    usage = Some(raw.request(entry_id.clone(), at, "auxiliary", provider, id));
+                    if let Some(record) = &mut usage {
+                        record.purpose = data.purpose;
+                    }
+                }
+            }
             "custom" if entry.custom_type.as_deref() == Some(SUBAGENT_ENTRY) => {
                 // Set once: the first entry names the parent.
                 if self.subagent_parent.is_none() {
                     self.subagent_parent = entry.data.parent_session_id;
                     self.subagent_type = entry.data.agent_type;
+                }
+            }
+            // Pi's `usage` entries (cache warming, ...) are requests outside the conversation.
+            "usage" => {
+                if let (Some(raw), Some(provider), Some(model)) =
+                    (&entry.usage, &entry.provider, &entry.model)
+                {
+                    let mut record =
+                        raw.request(entry_id.clone(), at, "auxiliary", provider, model);
+                    record.purpose.clone_from(&entry.usage_kind);
+                    usage = Some(record);
                 }
             }
             "session_info" => {
@@ -318,6 +407,16 @@ impl SessionMeta {
                     if let Some(ms) = message.timestamp.as_ref().and_then(Timestamp::millis) {
                         at = Some(at.map_or(ms, |a| a.max(ms)));
                     }
+                    if message.role.as_deref() == Some("assistant")
+                        && let Some(raw) = &message.usage
+                    {
+                        let provider = message.provider.as_ref().or(self.model_provider.as_ref());
+                        let model = message.model.as_ref().or(self.model_id.as_ref());
+                        if let (Some(provider), Some(model)) = (provider, model) {
+                            usage =
+                                Some(raw.request(entry_id.clone(), at, "model", provider, model));
+                        }
+                    }
                     text = self.fold_message(message).map(|(role, text)| EntryText {
                         entry_id,
                         role,
@@ -328,13 +427,13 @@ impl SessionMeta {
             }
             _ => {}
         }
-        if let Some(usage) = &entry.usage {
-            self.usage.add(usage);
+        if let Some(raw) = &entry.usage {
+            self.usage.add(raw);
         }
         if let Some(ms) = at {
             self.updated_at = Some(self.updated_at.map_or(ms, |u| u.max(ms)));
         }
-        text
+        Folded { text, usage }
     }
 
     /// Folds a message; returns its role and searchable text when it is a user message or an
@@ -361,6 +460,46 @@ impl SessionMeta {
             _ => return None,
         };
         (!content.full.is_empty()).then_some((role, content.full))
+    }
+}
+
+/// A token count from JSON (a float in the file): rounded, 0 when not finite or negative.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "token counts are integers well inside i64"
+)]
+fn tokens(value: f64) -> i64 {
+    if value.is_finite() && value > 0.0 {
+        value.round() as i64
+    } else {
+        0
+    }
+}
+
+impl RawUsage {
+    /// The request this usage records.
+    fn request(
+        &self,
+        entry_id: Option<String>,
+        at: Option<i64>,
+        kind: &'static str,
+        provider: &str,
+        model: &str,
+    ) -> RequestUsage {
+        RequestUsage {
+            entry_id,
+            at,
+            kind,
+            purpose: None,
+            provider: provider.to_owned(),
+            model: model.to_owned(),
+            input: tokens(self.input),
+            output: tokens(self.output),
+            cache_read: tokens(self.cache_read),
+            cache_write: tokens(self.cache_write),
+            cache_write_1h: tokens(self.cache_write_1h),
+            reasoning: self.reasoning.map_or(0, tokens),
+        }
     }
 }
 

@@ -2026,3 +2026,100 @@ textarea.input {
 .style-name {
   font-weight: 600;
 }
+
+/* T41: usage and cost, the rail's usage card and the settings page. */
+:root[data-app] .usage-card {
+  display: grid;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-3);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .usage-card > p {
+  margin: 0;
+}
+.usage-total,
+.usage-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--piarc-space-2);
+}
+.usage-cost {
+  font-weight: var(--piarc-font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.usage-cost.is-unknown {
+  color: var(--piarc-text-secondary);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.usage-tokens {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7.5em, 1fr));
+  gap: var(--piarc-space-1) var(--piarc-space-3);
+  flex-basis: 100%;
+  margin: 0;
+}
+.usage-token dt {
+  color: var(--piarc-text-secondary);
+}
+.usage-token dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.usage-lines {
+  display: grid;
+  gap: var(--piarc-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.usage-lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--piarc-space-2);
+}
+.usage-line-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usage-lines .usage-cost {
+  font-weight: var(--piarc-font-weight-regular);
+}
+.usage-subheading {
+  margin: var(--piarc-space-1) 0 0;
+  font-size: var(--piarc-font-size-small);
+  font-weight: var(--piarc-font-weight-medium);
+  color: var(--piarc-text-secondary);
+}
+.usage-number {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.usage-table td.usage-number,
+.usage-table th.usage-number {
+  text-align: end;
+}
+.usage-price-form {
+  display: grid;
+  gap: var(--piarc-space-2);
+  padding-block: var(--piarc-space-2);
+}
+.usage-price-form p {
+  margin: 0;
+}
+.usage-price-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 8em));
+  gap: var(--piarc-space-2);
+}
+.usage-price-field {
+  display: grid;
+  gap: var(--piarc-space-1);
+}
+.usage-price-actions {
+  display: flex;
+  gap: var(--piarc-space-2);
+}

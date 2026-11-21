@@ -275,6 +275,29 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
         name: "modelProviders",
         shape: Shape::Any,
     },
+    // Read by Core from the user's file only (T41): `<provider>/<model>` → the user's prices in
+    // USD per million tokens, replacing the catalog's for usage costs.
+    Field {
+        name: "modelPrices",
+        shape: Shape::MapOf(&Shape::Object(&[
+            Field {
+                name: "input",
+                shape: Shape::Number,
+            },
+            Field {
+                name: "output",
+                shape: Shape::Number,
+            },
+            Field {
+                name: "cacheRead",
+                shape: Shape::Number,
+            },
+            Field {
+                name: "cacheWrite",
+                shape: Shape::Number,
+            },
+        ])),
+    },
     Field {
         name: "$schema",
         shape: Shape::String,

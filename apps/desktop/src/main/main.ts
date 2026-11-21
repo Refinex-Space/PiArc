@@ -19,6 +19,7 @@ import { EventRouter } from './core/router.js';
 import { registerTerminalHandlers, TerminalOwners } from './core/terminal-ipc.js';
 import { registerPermissionHandlers } from './core/permissions-ipc.js';
 import { registerSandboxHandlers } from './core/sandbox-ipc.js';
+import { registerUsageHandlers } from './core/usage-ipc.js';
 import { FaultInjector, registerSessionHandlers } from './core/session-ipc.js';
 import { installTestHooks } from './core/test-hooks.js';
 import { applyDevServerCsp, resolveDevServer } from './dev-server.js';
@@ -226,6 +227,7 @@ function start(dirs: DataDirs): void {
     );
     registerPermissionHandlers(registerHandler, core.runtime, () => appShell.t());
     registerSandboxHandlers(registerHandler, core.runtime, () => appShell.t());
+    registerUsageHandlers(registerHandler, core.runtime);
     registerMcpHandlers(registerHandler, core.runtime);
     registerPackageHandlers(registerHandler, core.runtime, () => appShell.t(), nativeConfirm);
     registerWorktreeHandlers(

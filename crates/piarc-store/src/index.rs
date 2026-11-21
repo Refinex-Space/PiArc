@@ -26,7 +26,7 @@ use sha2::{Digest, Sha256};
 
 use crate::error::{Error, Result, path_text};
 use crate::jsonl::{LineReader, Parsed};
-use crate::pi_session::{Entry, EntryText, SessionMeta, Unindexable, Usage};
+use crate::pi_session::{Entry, EntryText, RequestUsage, SessionMeta, Unindexable, Usage};
 use crate::store::Store;
 
 /// Whether a session's metadata could be read.
@@ -325,14 +325,63 @@ impl<'t> TextSink<'t> {
         }
     }
 
-    fn insert(&mut self, session: &str, text: EntryText) -> Result<()> {
+    /// A model request of the session (T41), in the same transaction as its text.
+    fn add_usage(&mut self, session: Option<&str>, usage: &RequestUsage) {
+        if self.error.is_some() {
+            return;
+        }
+        let Some(session) = session else {
+            return;
+        };
+        if let Err(error) = self.insert_usage(session, usage) {
+            self.error = Some(error);
+        }
+    }
+
+    fn insert_usage(&mut self, session: &str, u: &RequestUsage) -> Result<()> {
+        self.clear(session)?;
+        self.tx
+            .prepare_cached(
+                "INSERT INTO usage_records (session_id, entry_id, at, kind, purpose, provider,
+                    model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
+                    cache_write_1h_tokens, reasoning_tokens)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+            )
+            .and_then(|mut s| {
+                s.execute(params![
+                    session,
+                    u.entry_id,
+                    u.at,
+                    u.kind,
+                    u.purpose,
+                    u.provider,
+                    u.model,
+                    u.input,
+                    u.output,
+                    u.cache_read,
+                    u.cache_write,
+                    u.cache_write_1h,
+                    u.reasoning
+                ])
+            })
+            .map_err(Error::sqlite("cannot write usage_records"))?;
+        Ok(())
+    }
+
+    /// Before the first row of a scan from the start of a file that now names another session
+    /// than its row did, drops that session's rows.
+    fn clear(&mut self, session: &str) -> Result<()> {
         if !self.cleared {
-            // The file now names another session than its row did.
             if self.stored.as_deref() != Some(session) {
                 delete_texts(self.tx, session)?;
             }
             self.cleared = true;
         }
+        Ok(())
+    }
+
+    fn insert(&mut self, session: &str, text: EntryText) -> Result<()> {
+        self.clear(session)?;
         self.tx
             .prepare_cached(
                 "INSERT INTO session_text (session_id, entry_id, role, at, text)
@@ -356,11 +405,13 @@ impl<'t> TextSink<'t> {
     }
 }
 
-/// Removes the searchable text of session `id`.
+/// Removes the searchable text and the usage records (T41) of session `id`.
 fn delete_texts(conn: &rusqlite::Connection, id: &str) -> Result<()> {
     conn.execute("DELETE FROM session_text WHERE session_id = ?1", [id])
+        .map_err(Error::sqlite("cannot delete from session_text"))?;
+    conn.execute("DELETE FROM usage_records WHERE session_id = ?1", [id])
         .map(drop)
-        .map_err(Error::sqlite("cannot delete from session_text"))
+        .map_err(Error::sqlite("cannot delete from usage_records"))
 }
 
 fn store_scan(
@@ -464,6 +515,7 @@ impl Store {
                 "BEGIN;
                  DELETE FROM session_files;
                  DELETE FROM session_text;
+                 DELETE FROM usage_records;
                  UPDATE sessions SET cwd = NULL, parent_session = NULL, name = NULL,
                     subagent_parent = NULL, subagent_type = NULL,
                     first_message = NULL, model_provider = NULL, model_id = NULL,
@@ -676,6 +728,12 @@ impl Store {
                 [path],
             )
             .map_err(Error::sqlite("cannot delete from session_text"))?;
+            tx.execute(
+                "DELETE FROM usage_records WHERE session_id IN
+                    (SELECT id FROM sessions WHERE file_path = ?1)",
+                [path],
+            )
+            .map_err(Error::sqlite("cannot delete from usage_records"))?;
             tx.execute("DELETE FROM sessions WHERE file_path = ?1", [path])
                 .map_err(Error::sqlite("cannot delete from sessions"))?;
             tx.execute("DELETE FROM session_files WHERE file_path = ?1", [path])
@@ -762,6 +820,12 @@ fn write_session(
         params![key, id],
     )
     .map_err(Error::sqlite("cannot write session_text"))?;
+    tx.execute(
+        "DELETE FROM usage_records WHERE session_id IN
+            (SELECT id FROM sessions WHERE file_path = ?1 AND id <> ?2)",
+        params![key, id],
+    )
+    .map_err(Error::sqlite("cannot write usage_records"))?;
     tx.execute(
         "DELETE FROM sessions WHERE file_path = ?1 AND id <> ?2",
         params![key, id],
@@ -851,8 +915,12 @@ fn scan_file(
                 }
             }
             Parsed::Value(entry) => {
-                if let Some(text) = scan.meta.fold(entry) {
+                let folded = scan.meta.fold(entry);
+                if let Some(text) = folded.text {
                     texts.add(scan.meta.id.as_deref(), text);
+                }
+                if let Some(usage) = folded.usage {
+                    texts.add_usage(scan.meta.id.as_deref(), &usage);
                 }
                 scan.entries += 1;
             }

@@ -27,6 +27,7 @@ describe('i18n', () => {
         expect(() =>
           translator.t(id, {
             title: 't',
+            cost: '$1.00',
             n: 1,
             current: 1,
             lines: 2,

@@ -124,6 +124,10 @@ pub struct CatalogModel {
     /// The provider's own web search can serve `WebSearch` (T38, ADR-0055).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub native_web_search: bool,
+    /// The catalog's prices (T41); absent when the catalog has none (all rates zero, or a
+    /// credit plan priced outside the catalog).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost: Option<crate::usage::ModelPrice>,
 }
 
 /// The user's settings for one model (T29), each replacing the catalog value.

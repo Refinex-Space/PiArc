@@ -110,6 +110,9 @@ export const IPC_CHANNELS = {
   permissionCheck: 'piarc:permissions.check',
   permissionUpdate: 'piarc:permissions.update',
   auditEvents: 'piarc:permissions.audit',
+  usageReport: 'piarc:usage.report',
+  sessionUsage: 'piarc:usage.session',
+  modelPriceSet: 'piarc:usage.price.set',
   sandboxSettings: 'piarc:sandbox.settings',
   sandboxUpdate: 'piarc:sandbox.update',
   packagesList: 'piarc:packages.list',
@@ -194,6 +197,14 @@ export interface PackageInstallInput {
 }
 
 /** The user's sandbox values the settings page changes (T39); absent fields stay. */
+/** A user's model price in USD per million tokens (T41). */
+export interface ModelPriceInput {
+  readonly input: number;
+  readonly output: number;
+  readonly cacheRead: number;
+  readonly cacheWrite: number;
+}
+
 export interface SandboxChange {
   readonly enabled?: boolean;
   readonly autoAllow?: boolean;
@@ -647,6 +658,18 @@ export interface PiarcApi {
    * do not apply, and whether the platform has a sandbox.
    */
   sandboxSettings(workspace: string | null): Promise<string>;
+  /**
+   * Usage by model and by session with estimated costs (JSON `UsageReport`, T41), for every
+   * workspace or one.
+   */
+  usageReport(workspace: string | null): Promise<string>;
+  /** One session's usage with its subagents and auxiliary calls (JSON `SessionUsage`, T41). */
+  sessionUsage(sessionId: string): Promise<string>;
+  /**
+   * Sets the user's price of a model in USD per million tokens (T41); null removes it and the
+   * catalog's price applies again.
+   */
+  setModelPrice(provider: string, model: string, price: ModelPriceInput | null): Promise<void>;
   /**
    * Writes the user's sandbox values; turning auto-approval on and adding domains need the
    * native confirmation (`{ status: 'cancelled' }`). Resolves with the new view (JSON).
