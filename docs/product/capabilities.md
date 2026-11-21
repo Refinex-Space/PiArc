@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | M1 | 61 | 61 | 0 | 0 |
 | M2 | 46 | 46 | 0 | 0 |
-| M3 | 35 | 21 | 14 | 0 |
+| M3 | 36 | 22 | 14 | 0 |
 | M4 | 10 | 0 | 10 | 0 |
 | M5 | 7 | 0 | 7 | 0 |
 
@@ -167,6 +167,7 @@
 | CAP-STYLE-001 | 输出风格切换与自定义 | FR-HN-07、ARCH-6.7 | T37 | — | 计划中 |
 | CAP-TERM-READ-001 | agent 用 terminal 运行的命令进入会话的终端并作为后台任务运行；命令结束后提醒退出码与屏幕末尾，Read 任务文件得到屏幕文本与最近一条命令的结果 | FR-TL-05、ARCH-6.11 | T33 | `term-agent-command` | 已实现 |
 | CAP-TERM-SCREEN-001 | 集成终端与会话共享目录和环境，agent 可读取后台终端的屏幕内容 | FR-TL-05、ARCH-6.11 | T33 | `term-agent-command`<br>`term-agent-env`（仅 macos） | 已实现 |
+| CAP-TERM-SHARE-001 | 用户在终端面板中打开的终端默认不给 agent；用户打开共享后 agent 得到屏幕的位置并能读取，取消共享后又看不到 | FR-TL-05、ARCH-6.11 | T34 | `term-user-share`（仅 macos） | 已实现 |
 | CAP-TOOL-WEBSEARCH-001 | WebSearch 可配置后端 | FR-TL-03、ARCH-6.1.4 | T38 | — | 计划中 |
 | CAP-WT-AGENT-001 | 子 agent 可在独立 worktree 中隔离运行 | ARCH-6.12 | T35 | — | 计划中 |
 | CAP-WT-SESSION-001 | 新建会话可选在独立 git worktree 中运行，归档时处理未提交改动 | FR-WS-06、ARCH-6.12 | T35 | — | 计划中 |
