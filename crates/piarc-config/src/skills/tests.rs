@@ -41,6 +41,7 @@ impl Tree {
             cwd: &self.path(cwd),
             data: Some(&self.path("data")),
             home: Some(&self.path("home")),
+            packages: &[],
         })
     }
 }

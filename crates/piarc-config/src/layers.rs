@@ -98,6 +98,7 @@ pub const PIARC_EXECUTABLE: &[&str] = &[
     "/permissions/allow",
     "/permissions/additionalDirectories",
     "/mcpServers",
+    "/plugins",
 ];
 
 /// The executable values of a Claude Code settings file. Only the active keys reach the merge;

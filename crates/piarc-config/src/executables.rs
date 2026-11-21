@@ -224,6 +224,7 @@ fn skill_items(root: &Path, items: &mut BTreeSet<Item>) {
         cwd: root,
         data: None,
         home: None,
+        packages: &[],
     });
     let relative = |path: &str| {
         let path = Path::new(path);
@@ -329,26 +330,7 @@ pub(crate) fn settings_items(source: &str, settings: &Value, items: &mut BTreeSe
                 .into_iter()
                 .flatten()
             {
-                // The field the handler's type runs (R4 E3: not the first one present, or a
-                // change of `type` would keep the name).
-                let field = match handler.get("type").and_then(Value::as_str) {
-                    Some("http") => "url",
-                    Some("prompt") => "prompt",
-                    _ => "command",
-                };
-                let what = handler
-                    .get(field)
-                    .and_then(Value::as_str)
-                    .unwrap_or("(no command)");
-                // What else decides what runs and what it sends (the handler's identity in
-                // `piarc-hooks`): arguments, shell, condition (R3), headers, the variables
-                // they may use and a prompt hook's model (R4 E3) make a new item.
-                let mut name = format!("{event}[{matcher}] {what}");
-                for key in ["args", "shell", "if", "headers", "allowedEnvVars", "model"] {
-                    if let Some(value) = handler.get(key) {
-                        name.push_str(&format!(" {key}={value}"));
-                    }
-                }
+                let name = hook_item_name(event, matcher, handler);
                 items.insert(item(Category::Hook, source, &name));
             }
         }
@@ -375,6 +357,15 @@ pub(crate) fn settings_items(source: &str, settings: &Value, items: &mut BTreeSe
     // PiArc's own files define MCP servers (T36); Claude Code's settings files do not.
     if source.starts_with(".piarc/") {
         mcp_items(source, settings.get(crate::mcp::SETTINGS_KEY), items);
+        // Packages a project file turns on (T40): Core lists their executable items with them.
+        let plugins = settings
+            .get(crate::plugins::SETTINGS_KEY)
+            .and_then(Value::as_object);
+        for (id, on) in plugins.into_iter().flatten() {
+            if on.as_bool() == Some(true) {
+                items.insert(item(Category::Plugin, source, id));
+            }
+        }
     }
     let plugins = settings.get("enabledPlugins").and_then(Value::as_object);
     for (name, enabled) in plugins.into_iter().flatten() {
@@ -382,6 +373,31 @@ pub(crate) fn settings_items(source: &str, settings: &Value, items: &mut BTreeSe
             items.insert(item(Category::Plugin, source, name));
         }
     }
+}
+
+/// The item name of one hook handler: its event, matcher and what it runs.
+pub(crate) fn hook_item_name(event: &str, matcher: &str, handler: &Value) -> String {
+    // The field the handler's type runs (R4 E3: not the first one present, or a change of
+    // `type` would keep the name).
+    let field = match handler.get("type").and_then(Value::as_str) {
+        Some("http") => "url",
+        Some("prompt") => "prompt",
+        _ => "command",
+    };
+    let what = handler
+        .get(field)
+        .and_then(Value::as_str)
+        .unwrap_or("(no command)");
+    // What else decides what runs and what it sends (the handler's identity in
+    // `piarc-hooks`): arguments, shell, condition (R3), headers, the variables they may use
+    // and a prompt hook's model (R4 E3) make a new item.
+    let mut name = format!("{event}[{matcher}] {what}");
+    for key in ["args", "shell", "if", "headers", "allowedEnvVars", "model"] {
+        if let Some(value) = handler.get(key) {
+            name.push_str(&format!(" {key}={value}"));
+        }
+    }
+    name
 }
 
 fn mcp_items(source: &str, map: Option<&Value>, items: &mut BTreeSet<Item>) {

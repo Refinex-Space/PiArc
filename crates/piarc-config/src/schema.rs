@@ -406,6 +406,12 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
         name: "mcpServers",
         shape: Shape::MapOf(&Shape::Any),
     },
+    // Extension packages (T40, ADR-0058): package id → on or off. The user file declares
+    // packages for every workspace, `.piarc/` files for one; executable in project files.
+    Field {
+        name: "plugins",
+        shape: Shape::MapOf(&Shape::Bool),
+    },
     // The Bash sandbox (T39, architecture section 6.10), Claude Code's keys with the same
     // meaning: on or off (default off), whether sandboxed commands skip the approval
     // (default false: they are still approved), paths no sandboxed command may read, and the

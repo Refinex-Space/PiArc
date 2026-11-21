@@ -258,6 +258,7 @@ fn sources_merge_by_name_nearest_project_first() {
         cwd: &cwd,
         data: Some(&data),
         home: Some(&home),
+        packages: &[],
     });
     let names: Vec<_> = loaded
         .definitions
@@ -318,6 +319,7 @@ fn the_home_directory_is_only_the_user_level() {
         cwd: &cwd,
         data: None,
         home: Some(&home),
+        packages: &[],
     });
     assert_eq!(loaded.definitions.len(), 1);
     let only = &loaded.definitions[0].view;
@@ -365,6 +367,7 @@ fn project_definitions_linking_out_of_the_project_are_not_read() {
         cwd: &work,
         data: None,
         home: Some(&home),
+        packages: &[],
     });
     let names: Vec<&str> = loaded
         .definitions

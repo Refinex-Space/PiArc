@@ -87,6 +87,9 @@ pub struct ResourceDirs<'a> {
     pub data: Option<&'a Path>,
     /// The home directory (`~/.claude/`, `~/.agents/`); `None` reads no user files there.
     pub home: Option<&'a Path>,
+    /// Extension packages in effect (T40): their skills and commands come after every other
+    /// source.
+    pub packages: &'a [crate::plugins::Active],
 }
 
 /// A skill in effect, with its body and hooks.
@@ -378,6 +381,16 @@ pub fn load(dirs: &ResourceDirs<'_>) -> Catalog {
             }
         }
     }
+    for package in dirs.packages {
+        let found = load_package(&package.manifest);
+        for skill in found.skills {
+            add_skill(&mut catalog.skills, skill);
+        }
+        for command in found.commands {
+            add_command(&mut catalog.commands, command);
+        }
+        catalog.issues.extend(found.issues);
+    }
     for dir in style_dirs(dirs) {
         let files = match crate::rules::rule_files(&dir.dir) {
             Ok(files) => files,
@@ -391,6 +404,86 @@ pub fn load(dirs: &ResourceDirs<'_>) -> Catalog {
         for path in files {
             match read(&path, &dir).and_then(|text| parse_style(&path, dir.source, &text)) {
                 Ok(style) => add_style(&mut catalog.styles, style),
+                Err(issue) => catalog.issues.push(issue),
+            }
+        }
+    }
+    catalog
+}
+
+/// The skills and commands of one extension package (T40): a plugin's are named
+/// `<plugin>:<name>` and have `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_PLUGIN_DATA}` replaced in
+/// their bodies; a Pi package's skills and prompt templates keep their names. Their
+/// `allowed-tools` and hooks do not apply (Core treats the `plugin` source like an untrusted
+/// one for those).
+#[must_use]
+pub fn load_package(manifest: &crate::plugins::Manifest) -> Catalog {
+    use piarc_protocol::plugins::PackageKind;
+    let pi = manifest.kind == PackageKind::PiPackage;
+    let mut catalog = Catalog::default();
+    let substitute =
+        |text: String| crate::plugins::substitute_text(&text, &manifest.root, &manifest.data);
+    let mut skill_paths = Vec::new();
+    for dir in &manifest.skill_dirs {
+        let dir = source(ResourceSource::Plugin, dir.clone(), pi);
+        skill_paths.extend(
+            skill_files(&dir, &mut catalog.issues)
+                .into_iter()
+                .map(|p| (p, dir.dir.clone())),
+        );
+    }
+    if let Some(root) = &manifest.root_skill {
+        skill_paths.push((root.join(SKILL_FILE), root.clone()));
+    }
+    for (path, dir) in skill_paths {
+        let dir = source(ResourceSource::Plugin, dir, pi);
+        let text = match read(&path, &dir) {
+            Ok(text) => substitute(text),
+            Err(issue) => {
+                catalog.issues.push(issue);
+                continue;
+            }
+        };
+        if path.file_name().is_some_and(|n| n != SKILL_FILE) && !declares_description(&text) {
+            continue;
+        }
+        match parse_skill(&path, ResourceSource::Plugin, &text) {
+            Ok(mut skill) => {
+                skill.info.name = manifest.namespaced(&skill.info.name);
+                skill.info.plugin = Some(manifest.id.clone());
+                add_skill(&mut catalog.skills, skill);
+            }
+            Err(issue) => catalog.issues.push(issue),
+        }
+    }
+    for path in &manifest.command_paths {
+        let (base, files) = if path.is_dir() {
+            match crate::rules::rule_files(path) {
+                Ok(files) => (path.clone(), files),
+                Err(error) => {
+                    catalog
+                        .issues
+                        .push(issue(path, None, format!("cannot list: {error}")));
+                    continue;
+                }
+            }
+        } else {
+            (
+                path.parent().map(Path::to_owned).unwrap_or_default(),
+                vec![path.clone()],
+            )
+        };
+        let dir = source(ResourceSource::Plugin, base.clone(), false);
+        for file in files {
+            let name = manifest.namespaced(&command_name(&base, &file, pi));
+            match read(&file, &dir)
+                .map(substitute)
+                .and_then(|text| parse_command(&file, ResourceSource::Plugin, &name, &text))
+            {
+                Ok(mut command) => {
+                    command.info.plugin = Some(manifest.id.clone());
+                    add_command(&mut catalog.commands, command);
+                }
                 Err(issue) => catalog.issues.push(issue),
             }
         }

@@ -181,6 +181,7 @@ impl ToolIo {
                 cwd: &cwd,
                 data: Some(dirs.data()),
                 home: dirs.home(),
+                packages: &[],
             })
         })
         .await
@@ -308,6 +309,7 @@ impl ToolIo {
                 cwd: &lookup,
                 data: Some(dirs.data()),
                 home: dirs.home(),
+                packages: &[],
             })
         })
         .await

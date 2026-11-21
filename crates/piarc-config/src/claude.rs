@@ -178,7 +178,10 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
         "enabledMcpjsonServers",
         "PiArc approves project MCP servers with its project trust (architecture 10.2)",
     ),
-    planned("enabledPlugins", "T40", "plugins"),
+    ignored(
+        "enabledPlugins",
+        "marketplace plugins (name@marketplace); PiArc installs plugins from a directory, git or npm and turns them on with its own `plugins` key (T40)",
+    ),
     ignored("enableWorkflows", NONE),
     ignored("enforceAnthropicSignIn", ACCOUNT),
     ignored("enforceAvailableModels", NONE),
@@ -187,7 +190,10 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
         "commands get the login shell environment admitted by ADR-0035",
     ),
     ignored("externalEditorContext", GLOBAL),
-    planned("extraKnownMarketplaces", "T40", "plugins"),
+    ignored(
+        "extraKnownMarketplaces",
+        "plugin marketplaces are out of scope (requirements section 6)",
+    ),
     ignored("fallbackModel", NONE),
     ignored("fastMode", NONE),
     ignored("fastModePerSessionOptIn", NONE),

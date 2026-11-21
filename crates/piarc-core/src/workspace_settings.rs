@@ -312,6 +312,7 @@ fn watch_dirs(
             cwd: workspace,
             data: Some(data),
             home: home.as_deref(),
+            packages: &[],
         })
         .into_iter()
         .filter(|dir| {

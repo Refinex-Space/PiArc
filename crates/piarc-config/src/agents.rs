@@ -59,6 +59,9 @@ pub struct AgentDirs<'a> {
     pub data: Option<&'a Path>,
     /// The home directory (`~/.claude/agents/`); `None` reads no user Claude Code files.
     pub home: Option<&'a Path>,
+    /// Extension packages in effect (T40): their definitions come after every other source,
+    /// named `<plugin>:<name>`, with only the confirmed hooks and inline servers.
+    pub packages: &'a [crate::plugins::Active],
 }
 
 /// A definition in effect, with the hooks it defines (Core runs them, scoped to its runs).
@@ -154,6 +157,36 @@ pub fn load(dirs: &AgentDirs<'_>) -> LoadedAgents {
             if let Some(&index) = by_name.get(&definition.view.name) {
                 if let Some(winner) = loaded.definitions.get_mut(index) {
                     winner.view.overrides.push(path.display().to_string());
+                }
+                continue;
+            }
+            by_name.insert(definition.view.name.clone(), loaded.definitions.len());
+            loaded.definitions.push(definition);
+        }
+    }
+    for package in dirs.packages {
+        for mut definition in package.manifest.agents() {
+            let name = package.manifest.namespaced(&definition.view.name);
+            let inline: Vec<String> = definition.mcp_inline.keys().cloned().collect();
+            package.restrict_agent(&name, &mut definition.hooks, &mut definition.mcp_inline);
+            definition.view.hooks = definition.hooks.is_some();
+            // Inline servers that were not confirmed are gone; named ones stay.
+            definition.view.mcp_servers.retain(|server| {
+                !inline.contains(server) || definition.mcp_inline.contains_key(server)
+            });
+            definition.view.prompt = crate::plugins::substitute_text(
+                &definition.view.prompt,
+                &package.manifest.root,
+                &package.manifest.data,
+            );
+            definition.view.name = name;
+            definition.view.plugin = Some(package.id().to_owned());
+            if let Some(&index) = by_name.get(&definition.view.name) {
+                if let (Some(winner), Some(path)) = (
+                    loaded.definitions.get_mut(index),
+                    definition.view.path.clone(),
+                ) {
+                    winner.view.overrides.push(path);
                 }
                 continue;
             }

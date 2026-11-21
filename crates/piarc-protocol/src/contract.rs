@@ -38,6 +38,7 @@ use crate::models::{
     ModelsLogout, ModelsReload, SessionPreviewModelSwitch, SessionSetEffort, SessionSetModel,
     UiLoginInteraction,
 };
+use crate::plugins::PluginsExtensionsMethod;
 use crate::policy::{PolicyCancel, PolicyEvaluate, PolicyInputChunk, PolicyPending, PolicyTools};
 use crate::queue::{QueueChanged, QueueDelete, QueueEdit, QueueReorder};
 use crate::secrets::{
@@ -49,7 +50,6 @@ use crate::session::{
     SessionEventNotification, SessionFollowUp, SessionFork, SessionPrompt, SessionResume,
     SessionSetPermissionMode, SessionSteer,
 };
-use crate::plugins::PluginsExtensionsMethod;
 use crate::skills::{
     ResourcesListCommands, ResourcesListSkills, ResourcesReload, SkillsInvoke, SkillsListMethod,
     SkillsMatch,

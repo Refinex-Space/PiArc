@@ -111,6 +111,9 @@ pub struct Settings {
     /// Sandbox values of project layers that would loosen the sandbox, left out (T39):
     /// `(layer, JSON Pointer)`.
     pub(crate) ignored_sandbox: Vec<(&'static str, String)>,
+    /// The extension packages in effect (T40), set by Core after the load
+    /// ([`Settings::set_packages`]): the settings name them, Core's records say where they are.
+    pub(crate) packages: crate::plugins::Packages,
 }
 
 impl Settings {
@@ -133,6 +136,7 @@ impl Settings {
             effective: Vec::new(),
             ignored_modes: Vec::new(),
             ignored_sandbox: Vec::new(),
+            packages: crate::plugins::Packages::default(),
         };
         settings.reload();
         settings
@@ -323,6 +327,18 @@ impl Settings {
             }
         }
         items.into_iter().collect()
+    }
+
+    /// The extension packages in effect (empty until Core sets them).
+    #[must_use]
+    pub fn packages(&self) -> &crate::plugins::Packages {
+        &self.packages
+    }
+
+    /// Sets the extension packages in effect (Core computes them with
+    /// [`crate::plugins::active`] from these settings and its install records).
+    pub fn set_packages(&mut self, packages: crate::plugins::Packages) {
+        self.packages = packages;
     }
 
     /// The merged settings.

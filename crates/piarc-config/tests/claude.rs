@@ -374,7 +374,8 @@ fn unknown_planned_and_ignored_keys_are_each_listed() {
         ignored(report(&reports, ids::CLAUDE_PROJECT)),
         [
             ("/$schema", IgnoreReason::Ignored, None),
-            ("/enabledPlugins", IgnoreReason::Planned, Some("T40")),
+            // T40: marketplace plugins are not PiArc's (it has its own `plugins` key).
+            ("/enabledPlugins", IgnoreReason::Ignored, None),
             ("/env", IgnoreReason::Ignored, None),
             ("/madeUpKey", IgnoreReason::Unknown, None),
             (
@@ -399,6 +400,7 @@ fn unknown_planned_and_ignored_keys_are_each_listed() {
         .map(|k| k.note)
         .collect();
     assert_eq!(notes[3], None, "unknown keys have no table note");
+    assert!(notes[1].is_some_and(|n| n.contains("plugins")));
     assert!(notes[2].is_some_and(|n| n.contains("ADR-0035")));
     // PiArc's own files report their unknown keys the same way.
     f.write(ids::PROJECT, r#"{"colour":"blue"}"#);
