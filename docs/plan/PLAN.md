@@ -312,7 +312,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 **T43 无障碍与本地化**（开工 2026-11-21；基线 `npm run verify -- --baseline` 通过，复用 868065b 的全量结果；依赖 T42 为"部分完成"，遗留的 A06 通知截图与 A07 Windows CI 不影响本任务；origin 停在 e0c41ce，没有新的 Windows CI 结果可关闭 `blocked` 项）
 
 - [x] 1 axe 自动化：状态清单入库、Playwright 逐条亮 / 暗检查、修复全部违规、页面注册表与清单的覆盖检查
-- [ ] 2 读屏：transcript 行的可访问名称（i18n）、流式节流播报（常量集中）、审批卡焦点与播报（输入法推迟、400 ms）
+- [x] 2 读屏：transcript 行的可访问名称（i18n）、流式节流播报（常量集中）、审批卡焦点与播报（输入法推迟、400 ms）
 - [ ] 3 键盘与系统偏好：全键盘流程、焦点顺序与焦点环、对话框焦点受限与归还、终端保留全局快捷键；reduced-motion、contrast more、forced-colors
 - [ ] 4 `docs/engineering/accessibility.md`：规则摘要、状态清单维护、读屏核对清单（VoiceOver 一列）
 - [ ] 5 本地化：`scripts/ci/check-i18n.mjs` 并入 verify（键集合、引用、ICU 与占位符、硬编码字符串）、`Intl` 格式化、中英文截图；I186 代码高亮跟随应用主题
