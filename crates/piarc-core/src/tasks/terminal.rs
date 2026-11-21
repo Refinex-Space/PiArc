@@ -197,6 +197,33 @@ impl TaskManager {
         );
     }
 
+    /// The model's command in terminal task `task_id` finished with `exit_code`: `text` waits
+    /// for session `session_id` as a `backgroundTask` reminder from `source`, then the task
+    /// shows the exit code and runs on (the terminal stays open). The notice is stored first,
+    /// so whoever sees the exit code finds the notice waiting.
+    pub(crate) fn terminal_command_finished(
+        &self,
+        task_id: &str,
+        session_id: &str,
+        source: String,
+        text: String,
+        exit_code: Option<i32>,
+    ) {
+        self.terminal_notice(session_id, format!("terminal:{task_id}"), source, text);
+        let task = {
+            let mut state = lock(&self.inner.state);
+            let Some(entry) = state.tasks.get_mut(task_id) else {
+                return;
+            };
+            if entry.task.status != TaskStatus::Running {
+                return;
+            }
+            entry.task.exit_code = exit_code;
+            entry.task.clone()
+        };
+        self.changed(Some(task));
+    }
+
     /// Why task `task_id` is being stopped, while it is.
     #[must_use]
     pub(crate) fn stop_reason(&self, task_id: &str) -> Option<super::StopBy> {

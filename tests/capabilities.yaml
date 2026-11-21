@@ -498,7 +498,13 @@ capabilities:
     milestone: M3
     refs: [FR-TL-05, ARCH-6.11]
     task: T33
-    status: planned
+    status: active
+  - id: CAP-TERM-READ-001
+    title: 'agent 用 terminal 运行的命令进入会话的终端并作为后台任务运行；命令结束后提醒退出码与屏幕末尾，Read 任务文件得到屏幕文本与最近一条命令的结果'
+    milestone: M3
+    refs: [FR-TL-05, ARCH-6.11]
+    task: T33
+    status: active
   - id: CAP-TOOL-NOTEBOOK-001
     title: 'NotebookEdit 编辑 Jupyter cell'
     milestone: M4

@@ -400,7 +400,7 @@ impl Exec {
     }
 
     /// The environment of a terminal (T33): the fields commands inherit (ADR-0035), the
-    /// sandbox's variables, and on Windows a UTF-8 locale for Git Bash; nothing else.
+    /// sandbox's variables, and a UTF-8 locale when none is set; nothing else.
     pub(super) async fn terminal_env(
         &self,
         sandbox_env: Vec<(OsString, OsString)>,
@@ -408,8 +408,18 @@ impl Exec {
         let resolved = self.base_env().await;
         let mut env = super::command_env(&resolved.inherited, std::collections::BTreeMap::new());
         env = super::overlay_env(env, sandbox_env);
-        if cfg!(windows) && !has_locale(&env) {
-            env.push(("LANG".into(), "C.UTF-8".into()));
+        if !has_locale(&env) {
+            // A terminal's line editor needs a UTF-8 character type: in the C locale bash and
+            // zsh turn typed bytes above 0x7f into Meta keys, so typed Chinese is lost. An app
+            // started from the Dock has no LANG and login profiles rarely set one. Git Bash
+            // knows C.UTF-8; macOS has en_US.UTF-8 on every version (C.UTF-8 only on recent
+            // ones), and terminal emulators fall back to it too.
+            let lang = if cfg!(windows) {
+                "C.UTF-8"
+            } else {
+                "en_US.UTF-8"
+            };
+            env.push(("LANG".into(), lang.into()));
         }
         env.into_iter()
             .map(|(k, v)| {

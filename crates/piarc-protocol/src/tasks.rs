@@ -123,7 +123,9 @@ pub struct BackgroundTask {
     /// When it ended, Unix milliseconds.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ended_at: Option<u64>,
-    /// The exit code, when the command exited normally.
+    /// The exit code, when the command exited normally. A running `terminal` task of the
+    /// model shows its command's exit code here once the command finished (the terminal stays
+    /// open).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exit_code: Option<i32>,
     /// The terminating signal on Unix.

@@ -167,12 +167,15 @@ fn mouse_event(event: TerminalMouseEvent) -> piarc_core::Result<piarc_core::Mous
 
 /// A text range from its JSON (`{ kind: "screen" | "viewport" | "all" }` or
 /// `{ kind: "lastLines", count }`); the viewport when absent.
-fn text_range(range: Option<String>) -> piarc_core::Result<piarc_protocol::terminal::TerminalTextRange> {
+fn text_range(
+    range: Option<String>,
+) -> piarc_core::Result<piarc_protocol::terminal::TerminalTextRange> {
     match range {
         None => Ok(piarc_protocol::terminal::TerminalTextRange::Viewport),
         Some(text) => serde_json::from_str(&text).map_err(|_| piarc_core::Error::InvalidArgument {
             field: "range",
-            reason: "must be { kind: screen | viewport | all } or { kind: lastLines, count }".into(),
+            reason: "must be { kind: screen | viewport | all } or { kind: lastLines, count }"
+                .into(),
         }),
     }
 }
@@ -284,7 +287,10 @@ impl CoreRuntime {
     /// Pastes `text` as the terminal's modes require (bracketed paste, Kitty paste events);
     /// resolves with `pasted`, `empty`, or `unsafe` for text that could run commands by itself
     /// (ask the user, then paste again with `allowUnsafe`).
-    #[napi(ts_return_type = "Promise<'pasted' | 'unsafe' | 'empty'>", catch_unwind)]
+    #[napi(
+        ts_return_type = "Promise<'pasted' | 'unsafe' | 'empty'>",
+        catch_unwind
+    )]
     pub fn terminal_paste<'env>(
         &self,
         env: &'env Env,
@@ -295,18 +301,19 @@ impl CoreRuntime {
         type Settle = Box<dyn FnOnce(Env) -> napi::Result<String> + Send>;
         let (deferred, promise) = env.create_deferred::<String, Settle>()?;
         boundary::call(env, "CoreRuntime.terminalPaste", || {
-            self.core.terminal_paste(id, text, allow_unsafe.unwrap_or(false), move |outcome| {
-                deferred.resolve(Box::new(move |env| {
-                    let outcome =
-                        outcome.map_err(|error| boundary::js_error(&env, &error.to_error_object()))?;
-                    Ok(match outcome {
-                        piarc_protocol::terminal::TerminalPasteOutcome::Pasted => "pasted",
-                        piarc_protocol::terminal::TerminalPasteOutcome::Unsafe => "unsafe",
-                        piarc_protocol::terminal::TerminalPasteOutcome::Empty => "empty",
-                    }
-                    .to_owned())
-                }));
-            })
+            self.core
+                .terminal_paste(id, text, allow_unsafe.unwrap_or(false), move |outcome| {
+                    deferred.resolve(Box::new(move |env| {
+                        let outcome = outcome
+                            .map_err(|error| boundary::js_error(&env, &error.to_error_object()))?;
+                        Ok(match outcome {
+                            piarc_protocol::terminal::TerminalPasteOutcome::Pasted => "pasted",
+                            piarc_protocol::terminal::TerminalPasteOutcome::Unsafe => "unsafe",
+                            piarc_protocol::terminal::TerminalPasteOutcome::Empty => "empty",
+                        }
+                        .to_owned())
+                    }));
+                })
         })?;
         Ok(promise)
     }
@@ -339,7 +346,11 @@ impl CoreRuntime {
     /// The newest command of the terminal (OSC 133) as JSON text (`TerminalCommand`), or
     /// `null` before the first.
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]
-    pub fn terminal_last_command<'env>(&self, env: &'env Env, id: u32) -> napi::Result<Object<'env>> {
+    pub fn terminal_last_command<'env>(
+        &self,
+        env: &'env Env,
+        id: u32,
+    ) -> napi::Result<Object<'env>> {
         let (deferred, promise) = env.create_deferred::<String, Json>()?;
         boundary::call(env, "CoreRuntime.terminalLastCommand", || {
             self.core

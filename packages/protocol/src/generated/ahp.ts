@@ -4336,7 +4336,9 @@ export interface BackgroundTask {
    */
   endedAt?: number | null;
   /**
-   * The exit code, when the command exited normally.
+   * The exit code, when the command exited normally. A running `terminal` task of the
+   * model shows its command's exit code here once the command finished (the terminal stays
+   * open).
    */
   exitCode?: number | null;
   /**

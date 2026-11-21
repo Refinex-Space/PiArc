@@ -98,6 +98,10 @@ differences:
     reason: PiArc's command sandbox and its per-call escape are not settled yet (macOS sandbox and Windows isolation).
     follow_up: T39
   - scenario: '*'
+    path: 'requests.items[*].tools.Bash.params.terminal'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: PiArc's own parameter (ADR-0050) runs the command in a PiArc terminal the user can open, with the terminal's screen as the background task's output file.
+  - scenario: '*'
     path: 'requests.items[*].tools.AskUserQuestion.params.*'
     claude_code: '>=2.1.318 <2.2.0'
     reason: Claude Code's answers, annotations and metadata parameters carry answers a host fills in; PiArc's model only sends questions and the user answers on the question card (ADR-0042).

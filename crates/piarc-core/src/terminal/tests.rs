@@ -51,6 +51,11 @@ struct Fixture {
 
 impl Fixture {
     fn new(name: &str) -> Self {
+        Self::with_env(name, |_| {})
+    }
+
+    /// A fixture whose command environment `edit` changed from [`base_env`].
+    fn with_env(name: &str, edit: impl FnOnce(&mut Vec<(OsString, OsString)>)) -> Self {
         let root =
             std::env::temp_dir().join(format!("piarc term {name} 中文 {}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
@@ -71,8 +76,10 @@ impl Fixture {
         let terminals = Terminals::new(Handle::current(), events);
         let tasks = TaskManager::new(TasksConfig::default());
         terminals.attach(root.join("data"), tasks.clone());
+        let mut env = base_env(&root.join("home"));
+        edit(&mut env);
         let io = ToolIo::new(ToolIoConfig {
-            command_env: CommandEnv::Fixed(base_env(&root.join("home"))),
+            command_env: CommandEnv::Fixed(env),
             ..ToolIoConfig::new(root.join("data"))
         })
         .with_tasks(tasks.clone())
@@ -129,27 +136,29 @@ impl Fixture {
     }
 
     /// Waits until terminal `id`'s whole text satisfies `test`.
+    /// The whole text of terminal `id` as its screen file holds it: lines as the programs
+    /// wrote them (a long path wraps at the terminal's width).
+    async fn all_text(&self, id: u32) -> String {
+        let session = self.terminals.session(id).expect("terminal");
+        tokio::task::spawn_blocking(move || {
+            let options = TextOptions {
+                unwrap: true,
+                ..TextOptions::default()
+            };
+            session.text(TextRange::All, options).unwrap_or_default()
+        })
+        .await
+        .expect("text")
+    }
+
     async fn wait_text(&self, id: u32, what: &str, test: impl Fn(&str) -> bool) -> String {
         let started = Instant::now();
         loop {
-            let session = self.terminals.session(id).expect("terminal");
-            let text = tokio::task::spawn_blocking(move || {
-                // Lines as the programs wrote them: a long path wraps at the terminal's width.
-                let options = TextOptions {
-                    unwrap: true,
-                    ..TextOptions::default()
-                };
-                session.text(TextRange::All, options).unwrap_or_default()
-            })
-            .await
-            .expect("text");
+            let text = self.all_text(id).await;
             if test(&text) {
                 return text;
             }
-            assert!(
-                started.elapsed() < WAIT,
-                "waiting for {what}; screen:\n{text}"
-            );
+            assert!(started.elapsed() < WAIT, "waiting for {what}; screen:\n{text}");
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
     }
@@ -274,6 +283,49 @@ async fn a_session_terminal_starts_in_the_session_directory_with_the_command_env
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn a_terminal_without_a_locale_still_takes_typed_chinese() {
+    // An app started from the Dock has no LANG, and a login profile rarely sets one: bash's
+    // line editor in the C locale turns typed bytes above 0x7f into Meta keys.
+    let f = Fixture::with_env("locale", |env| env.retain(|(name, _)| name != "LANG"));
+    let result = f
+        .call(
+            "s",
+            "exec/run",
+            json!({ "command": "printf '中文 typed\\n'", "background": true, "terminal": true }),
+        )
+        .await
+        .expect("exec/run");
+    let task_id = result["task"]["taskId"].as_str().expect("task").to_owned();
+    let notice = f
+        .wait_for("the command's notice", || {
+            f.tasks
+                .pending("s")
+                .into_iter()
+                .find(|n| n.source.starts_with(&task_id))
+        })
+        .await;
+    assert!(
+        notice.text.contains("Command: printf '中文 typed"),
+        "{}",
+        notice.text
+    );
+    assert!(
+        notice.text.lines().any(|l| l == "中文 typed"),
+        "the command ran as typed:\n{}",
+        notice.text
+    );
+    let read = f
+        .call("s", "exec/background/read", json!({ "taskId": task_id }))
+        .await
+        .expect("read");
+    let text = read["text"].as_str().expect("text");
+    assert!(
+        text.contains("Last command: `printf '中文 typed\\n'` ended with exit code 0."),
+        "{text}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn the_model_reads_its_terminal_task_and_hears_when_the_command_ends() {
     let f = Fixture::new("agent");
     let result = f
@@ -315,6 +367,9 @@ async fn the_model_reads_its_terminal_task_and_hears_when_the_command_ends() {
         .expect("listed");
     assert_eq!(task["kind"], "terminal");
     assert_eq!(task["terminal"]["origin"], "agent");
+    // The command's exit code shows on the task, which runs on: the terminal stays open.
+    assert_eq!(task["status"], "running");
+    assert_eq!(task["exitCode"], 3);
     let read = f
         .call("s", "exec/background/read", json!({ "taskId": task_id }))
         .await
@@ -331,20 +386,7 @@ async fn the_model_reads_its_terminal_task_and_hears_when_the_command_ends() {
         .as_u64()
         .and_then(|i| u32::try_from(i).ok())
         .expect("id");
-    let session = f.terminals.session(id).expect("terminal");
-    let formatted = tokio::task::spawn_blocking(move || {
-        session
-            .text(
-                TextRange::All,
-                TextOptions {
-                    unwrap: true,
-                    trim: true,
-                },
-            )
-            .expect("text")
-    })
-    .await
-    .expect("text");
+    let formatted = f.all_text(id).await;
     let body = text
         .split_once("oldest first:\n\n")
         .map(|(_, b)| b)

@@ -211,9 +211,7 @@ fn param_keys(tool: &str) -> &'static [&'static str] {
             "timeout",
             "dangerouslyDisableSandbox",
         ],
-        "PowerShell" | "Monitor" => {
-            &["run_in_background", "timeout", "dangerouslyDisableSandbox"]
-        }
+        "PowerShell" | "Monitor" => &["run_in_background", "timeout", "dangerouslyDisableSandbox"],
         _ => &[],
     }
 }

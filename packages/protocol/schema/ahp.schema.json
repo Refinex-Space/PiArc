@@ -690,7 +690,7 @@
           "type": ["integer", "null"]
         },
         "exitCode": {
-          "description": "The exit code, when the command exited normally.",
+          "description": "The exit code, when the command exited normally. A running `terminal` task of the\nmodel shows its command's exit code here once the command finished (the terminal stays\nopen).",
           "format": "int32",
           "type": ["integer", "null"]
         },

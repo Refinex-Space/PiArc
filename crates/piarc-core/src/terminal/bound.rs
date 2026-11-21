@@ -596,11 +596,12 @@ impl Bound {
             &self.output_path,
             &tail,
         );
-        self.tasks.terminal_notice(
+        self.tasks.terminal_command_finished(
+            &self.task_id,
             &self.session_id,
-            format!("terminal:{}", self.task_id),
             format!("{}#{seq}", self.task_id),
             text,
+            info.and_then(|i| i.exit_code),
         );
     }
 
