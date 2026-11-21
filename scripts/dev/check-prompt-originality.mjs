@@ -50,6 +50,8 @@ function render() {
           sub.withTypes('', [{ name: '', description: '' }]),
           sub.backgroundStarted('', ''), sub.backgroundFinished('', '', '', '', ''),
           sub.partialReport(0, ''), sub.EMPTY_REPORT, sub.toolNotAvailable(''),
+          // T35: the note after the report of a subagent whose worktree kept its changes.
+          sub.worktreeKept('', ''),
           // T32: KillShell's and Monitor's results.
           tasks.taskStopped('', '', '', ''), tasks.taskAlreadyEnded('', 'completed', ''),
           tasks.taskUnknown(''), tasks.monitorStarted('', '', 300000, 3600000)];

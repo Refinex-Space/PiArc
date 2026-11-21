@@ -50,9 +50,7 @@ const agentSchema = Type.Object({
   isolation: Type.Optional(
     Type.Literal('worktree', {
       description:
-        'Run in a temporary git worktree started from the current commit, so its edits do not ' +
-        'touch this working tree. An unchanged worktree is removed; otherwise its path and ' +
-        'branch follow the report.',
+        'Run in a temporary git worktree started from the current commit, so its edits do not touch this working tree. An unchanged worktree is removed; otherwise its path and branch follow the report.',
     }),
   ),
   run_in_background: Type.Optional(
