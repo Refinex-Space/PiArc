@@ -402,3 +402,59 @@ fn slash_commands_and_tools() {
         ["Bash(git add *)", "Read", "Edit"]
     );
 }
+
+/// R4 E2: a project's skill, command or output style file that is a link to a file outside
+/// the project's directory is not read (an untrusted project's `outputStyle` would otherwise
+/// put any local file into the system prompt); links within the project and the user's own
+/// links are read.
+#[cfg(unix)]
+#[test]
+fn project_links_out_of_the_project_are_not_read() {
+    use std::os::unix::fs::symlink;
+    let t = Tree::new("links");
+    let w = "work tree 中文";
+    t.write(
+        "secret.md",
+        "---\ndescription: outside-only-marker\n---\noutside-only-marker\n",
+    );
+    let secret = t.path("secret.md");
+    for link in [
+        format!("{w}/.claude/output-styles/leak.md"),
+        format!("{w}/.claude/skills/leak/SKILL.md"),
+        format!("{w}/.claude/commands/leak.md"),
+        "home/.claude/output-styles/mine.md".to_owned(),
+    ] {
+        let path = t.path(&link);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        symlink(&secret, path).unwrap();
+    }
+    t.write(&format!("{w}/shared/inside/SKILL.md"), &skill("inside"));
+    symlink(
+        t.path(&format!("{w}/shared/inside")),
+        t.path(&format!("{w}/.claude/skills/inside")),
+    )
+    .unwrap();
+    let catalog = t.load_from(w);
+    let text = format!(
+        "{:?}{:?}{:?}",
+        catalog.skills, catalog.commands, catalog.styles
+    );
+    assert!(
+        !catalog.styles.iter().any(|s| s.info.name == "leak")
+            && !catalog.skills.iter().any(|s| s.info.name == "leak")
+            && !catalog.commands.iter().any(|c| c.info.name == "leak"),
+        "{text}"
+    );
+    assert!(
+        catalog
+            .issues
+            .iter()
+            .filter(|i| i.message.contains("outside"))
+            .count()
+            >= 3,
+        "{:?}",
+        catalog.issues
+    );
+    assert!(catalog.skills.iter().any(|s| s.info.name == "inside"));
+    assert!(catalog.styles.iter().any(|s| s.info.name == "mine"));
+}

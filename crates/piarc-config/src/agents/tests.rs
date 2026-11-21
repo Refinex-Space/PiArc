@@ -338,3 +338,47 @@ fn crlf_files_parse() {
         Some(&["Read".to_owned()][..])
     );
 }
+
+/// R4 E2: a project definition that links to a file outside the project is not read (its
+/// body would become a subagent's system prompt); the user's own links are read.
+#[cfg(unix)]
+#[test]
+fn project_definitions_linking_out_of_the_project_are_not_read() {
+    use std::os::unix::fs::symlink;
+    let t = temp();
+    let root = t.path();
+    write(
+        &root.join("secret.md"),
+        "---\nname: leak\ndescription: outside-only-marker\n---\nouting\n",
+    );
+    write(
+        &root.join("other.md"),
+        "---\nname: mine\ndescription: the user's\n---\nmine\n",
+    );
+    let work = root.join("work");
+    fs::create_dir_all(work.join(".claude/agents")).expect("dir");
+    symlink(root.join("secret.md"), work.join(".claude/agents/leak.md")).expect("link");
+    let home = root.join("home");
+    fs::create_dir_all(home.join(".claude/agents")).expect("dir");
+    symlink(root.join("other.md"), home.join(".claude/agents/mine.md")).expect("link");
+    let loaded = load(&AgentDirs {
+        cwd: &work,
+        data: None,
+        home: Some(&home),
+    });
+    let names: Vec<&str> = loaded
+        .definitions
+        .iter()
+        .map(|d| d.view.name.as_str())
+        .collect();
+    assert!(!names.contains(&"leak"), "{names:?}");
+    assert!(names.contains(&"mine"), "{names:?}");
+    assert!(
+        loaded
+            .issues
+            .iter()
+            .any(|i| i.message.contains("outside the project")),
+        "{:?}",
+        loaded.issues
+    );
+}

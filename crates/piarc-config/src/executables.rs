@@ -102,6 +102,21 @@ pub fn covered_by_trust(root: &Path, file: &Path) -> bool {
             .any(|k| kind == *k)
 }
 
+/// Whether `file`, found in a project's resource directory `source_dir`
+/// (`<project>/<.piarc|.claude|…>/<kind>`), stays within that project directory once links are
+/// resolved. A link to a file elsewhere would put that file into a system prompt or a tool
+/// result without the approval reading it takes (R4 E2); callers skip such files.
+pub(crate) fn stays_in_project(source_dir: &Path, file: &Path) -> bool {
+    let base = source_dir
+        .parent()
+        .and_then(Path::parent)
+        .unwrap_or(source_dir);
+    match (file.canonicalize(), base.canonicalize()) {
+        (Ok(real), Ok(base)) => real.starts_with(base),
+        _ => false,
+    }
+}
+
 /// Lists the executable items of the project at `root`.
 #[must_use]
 pub fn enumerate(root: &Path) -> Inventory {

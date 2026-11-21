@@ -135,6 +135,15 @@ pub fn load(dirs: &AgentDirs<'_>) -> LoadedAgents {
             }
         };
         for path in files {
+            // A project's definition that links out of the project is not read (R4 E2).
+            if is_project(source) && !crate::executables::stays_in_project(&dir, &path) {
+                loaded.issues.push(issue(
+                    &path,
+                    None,
+                    "links to a file outside the project directory".to_owned(),
+                ));
+                continue;
+            }
             let definition = match read(&path).and_then(|text| parse(&path, source, &text)) {
                 Ok(definition) => definition,
                 Err(problem) => {

@@ -342,7 +342,7 @@ pub fn load(dirs: &ResourceDirs<'_>) -> Catalog {
             if !seen_files.insert(path.clone()) {
                 continue;
             }
-            let text = match read(&path) {
+            let text = match read(&path, &dir) {
                 Ok(text) => text,
                 Err(issue) => {
                     catalog.issues.push(issue);
@@ -371,7 +371,8 @@ pub fn load(dirs: &ResourceDirs<'_>) -> Catalog {
         };
         for path in files {
             let name = command_name(&dir.dir, &path, dir.source == ResourceSource::ProjectPi);
-            match read(&path).and_then(|text| parse_command(&path, dir.source, &name, &text)) {
+            match read(&path, &dir).and_then(|text| parse_command(&path, dir.source, &name, &text))
+            {
                 Ok(command) => add_command(&mut catalog.commands, command),
                 Err(issue) => catalog.issues.push(issue),
             }
@@ -388,7 +389,7 @@ pub fn load(dirs: &ResourceDirs<'_>) -> Catalog {
             }
         };
         for path in files {
-            match read(&path).and_then(|text| parse_style(&path, dir.source, &text)) {
+            match read(&path, &dir).and_then(|text| parse_style(&path, dir.source, &text)) {
                 Ok(style) => add_style(&mut catalog.styles, style),
                 Err(issue) => catalog.issues.push(issue),
             }
@@ -463,7 +464,18 @@ fn warning(
     }
 }
 
-fn read(path: &Path) -> Result<String, ResourceIssue> {
+/// Reads a resource file of `dir`. A project's file must stay within the project directory
+/// that holds the source (`<dir>/../..`) once links are resolved: a link to a file elsewhere
+/// would put that file into the system prompt or a `Skill` result without the approval reading
+/// it takes (R4 E2). The user's own sources may link anywhere.
+fn read(path: &Path, dir: &SourceDir) -> Result<String, ResourceIssue> {
+    if is_project(dir.source) && !crate::executables::stays_in_project(&dir.dir, path) {
+        return Err(issue(
+            path,
+            None,
+            "links to a file outside the project directory".to_owned(),
+        ));
+    }
     let size = std::fs::metadata(path)
         .map_err(|e| issue(path, None, format!("cannot read: {e}")))?
         .len();

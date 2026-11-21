@@ -41,6 +41,8 @@
 - 参数替换只用 `skills::args`（`split` 按 shell 规则切分，`substitute` 的规则见模块文档与 ADR-0054 第 5 条）；`variables` 给 `${CLAUDE_SKILL_DIR}`、`${CLAUDE_SESSION_ID}`、`${CLAUDE_PROJECT_DIR}`。合并后的命令列表只用 `commands(&catalog)`（`BUILT_IN_COMMANDS` 在前，其后按 `rank` 的来源顺序，同来源 skill 先于命令文件），输出风格只用 `styles` 与 `current_style`（`BUILT_IN_STYLES` 在前，同名的自定义风格被内置覆盖）；`skillOverrides` 经 `apply_visibility`。
 - 可执行项：`executables::enumerate` 的 `skill_items` 列出工作区根之内项目来源的 skill 与命令文件的 `allowed-tools`（每条一项，名称 `<名称>: <规则>`）与 `hooks`（与设置文件同样的 hook 条目名）。设置键 `outputStyle`、`skillOverrides` 生效（`claude::SETTINGS_KEYS` 与 `schema::PIARC_SETTINGS`），`disableBundledSkills`、`disableSkillShellExecution` 忽略。
 - `watch_dirs` 给出 Core 要监听的目录（各来源目录与其下三层子目录）；读取不需要信任，信任只影响 Core 是否施加 `allowed-tools` 与 hooks。
+- 项目来源的 skill、命令文件、输出风格与子 agent 定义解析链接后必须仍在持有该来源的项目目录内（`executables::stays_in_project`），否则跳过并报问题：链接会把任意本机文件带进 system prompt 或 `Skill` 结果（R4 E2）。用户来源不限制。
+- 信任只覆盖信任清单列出的文件：`executables::covered_by_trust(root, file)`，即 `<根>/{.piarc,.claude,.pi,.agents}/{skills,commands,output-styles,prompts,agents}/…`。worktree 里的副本（`.piarc/worktrees/`）、子目录与根以上目录的项目文件只作为指令加载，`allowed-tools`、hooks、内联 MCP 不生效（R4 E1）；Core 的技能激活、`agents/list` 与定义 hooks 都经它判断，不另写路径判断。
 
 ## MCP 配置（`src/mcp.rs`，T36，ADR-0053）
 
