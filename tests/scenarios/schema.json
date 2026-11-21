@@ -798,6 +798,11 @@
           "type": "array",
           "items": { "type": "string" }
         },
+        "tools_windows": {
+          "description": "Exactly these tool names on Windows, where sessions also get PowerShell; tools applies when absent.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
         "tools_include": { "type": "array", "items": { "type": "string" } },
         "tools_exclude": { "type": "array", "items": { "type": "string" } },
         "user_texts": { "type": "array", "items": { "type": "string" } },

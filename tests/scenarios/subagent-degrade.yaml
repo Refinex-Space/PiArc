@@ -49,4 +49,5 @@ expect:
     - provider: local
       index: 0
       tools: [Read, Bash, Glob, Grep]
+      tools_windows: [Read, Bash, PowerShell, Glob, Grep]
       contains: [Do not use it to read or edit files]
