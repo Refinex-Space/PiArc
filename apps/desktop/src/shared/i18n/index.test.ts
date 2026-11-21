@@ -105,6 +105,12 @@ describe('i18n', () => {
             by: '/w/.piarc/settings.json',
             hint: '[issue]',
             paths: 'src/**/*.rs',
+            list: 'mods, bin',
+            commit: 'abc1234',
+            integrity: 'sha512-AAAA',
+            version: '1.0.0',
+            from: 'abc1234',
+            to: 'def5678',
           }),
         ).not.toThrow();
       }

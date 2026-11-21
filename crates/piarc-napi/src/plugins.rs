@@ -59,7 +59,7 @@ impl CoreRuntime {
         enabled: bool,
         scope: String,
         #[napi(ts_arg_type = "string | null")] workspace: Option<String>,
-        confirm: Vec<String>,
+        #[napi(ts_arg_type = "string[]")] confirm: Vec<String>,
     ) -> napi::Result<Object<'env>> {
         self.queue(env, "CoreRuntime.packageSetEnabled", |core, done| {
             core.package_set_enabled(
@@ -80,7 +80,7 @@ impl CoreRuntime {
         &self,
         env: &'env Env,
         id: String,
-        items: Vec<String>,
+        #[napi(ts_arg_type = "string[]")] items: Vec<String>,
         #[napi(ts_arg_type = "string | null")] workspace: Option<String>,
     ) -> napi::Result<Object<'env>> {
         self.queue(env, "CoreRuntime.packageConfirm", |core, done| {
