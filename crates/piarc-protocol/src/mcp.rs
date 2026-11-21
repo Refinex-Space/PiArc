@@ -128,6 +128,9 @@ pub struct McpServerDefinition {
     pub scope: McpScope,
     /// The file it is defined in.
     pub source: String,
+    /// The extension package it comes from (T40), for the `plugin` scope.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin: Option<String>,
     /// Its transport.
     pub transport: McpTransport,
     /// Whether it may be connected.

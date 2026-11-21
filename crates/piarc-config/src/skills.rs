@@ -856,6 +856,7 @@ pub fn parse_skill(
     let hooks = front.hooks();
     front.remaining(SKILL_FIELDS);
     let info = SkillInfo {
+        plugin: None,
         name,
         description,
         source,
@@ -924,6 +925,7 @@ pub fn parse_command(
         ));
     }
     let info = CommandInfo {
+        plugin: None,
         name: name.to_owned(),
         kind: CommandKind::Command,
         source,
@@ -1031,6 +1033,7 @@ pub fn commands(catalog: &Catalog) -> Vec<CommandInfo> {
             source: ResourceSource::BuiltIn,
             description: String::new(),
             path: None,
+            plugin: None,
             argument_hint: hint.map(str::to_owned),
             arguments: Vec::new(),
             aliases: aliases.iter().map(|a| (*a).to_owned()).collect(),
@@ -1050,6 +1053,7 @@ pub fn commands(catalog: &Catalog) -> Vec<CommandInfo> {
                 source: skill.info.source,
                 description: skill.info.description.clone(),
                 path: Some(skill.info.path.clone()),
+                plugin: skill.info.plugin.clone(),
                 argument_hint: skill.info.argument_hint.clone(),
                 arguments: skill.info.arguments.clone(),
                 aliases: Vec::new(),

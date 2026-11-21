@@ -33,6 +33,7 @@ pub mod index;
 pub mod jsonl;
 mod mcp;
 mod memory_imports;
+mod packages;
 pub mod migrate;
 pub mod pi_session;
 pub mod records;
@@ -48,6 +49,7 @@ pub use index::{
     FileOutcome, IndexStatus, SessionPrefsChange, SessionRecord, SkippedLine, SyncReport,
 };
 pub use migrate::{MIGRATIONS, Migration};
+pub use packages::PackageRecord;
 pub use pi_session::{SessionMeta, Usage};
 pub use records::{AuditEvent, AuditFilter, TrustDecision, TrustRecord, WorkspaceRecord};
 pub use search::{SearchHit, SessionHits};

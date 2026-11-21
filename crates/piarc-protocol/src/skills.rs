@@ -138,6 +138,9 @@ pub struct SkillInfo {
     pub source: ResourceSource,
     /// Its `SKILL.md` (or Pi's single-file skill).
     pub path: String,
+    /// The extension package it comes from (T40), for `plugin` sources.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin: Option<String>,
     /// The directory holding it: readable without asking (`${CLAUDE_SKILL_DIR}`).
     pub dir: String,
     /// `argument-hint`.
@@ -185,6 +188,9 @@ pub struct CommandInfo {
     /// Its file; absent for built-in commands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    /// The extension package it comes from (T40), for `plugin` sources.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin: Option<String>,
     /// `argument-hint`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub argument_hint: Option<String>,

@@ -73,6 +73,7 @@ pub mod mcp;
 pub mod memory;
 pub mod method;
 pub mod models;
+pub mod plugins;
 pub mod policy;
 pub mod queue;
 pub mod rpc_error;

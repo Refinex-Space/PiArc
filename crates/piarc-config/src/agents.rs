@@ -243,6 +243,7 @@ pub fn parse(path: &Path, source: AgentSource, text: &str) -> Result<Definition,
         Some(_) => return Err(fields.problem("hooks", "hooks must be a mapping of events")),
     };
     let view = AgentDefinition {
+        plugin: None,
         name,
         description,
         source,

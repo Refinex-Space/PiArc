@@ -49,6 +49,7 @@ use crate::session::{
     SessionEventNotification, SessionFollowUp, SessionFork, SessionPrompt, SessionResume,
     SessionSetPermissionMode, SessionSteer,
 };
+use crate::plugins::PluginsExtensionsMethod;
 use crate::skills::{
     ResourcesListCommands, ResourcesListSkills, ResourcesReload, SkillsInvoke, SkillsListMethod,
     SkillsMatch,
@@ -373,6 +374,8 @@ pub static CONTRACTS: &[Contract] = &[
     response::<ResourcesListCommands>("resources/listCommands/result"),
     request::<ResourcesReload>(ResourcesReload::NAME),
     response::<ResourcesReload>("resources/reload/result"),
+    request::<PluginsExtensionsMethod>(PluginsExtensionsMethod::NAME),
+    response::<PluginsExtensionsMethod>("plugins/extensions/result"),
 ];
 
 /// Looks up a contract by name.

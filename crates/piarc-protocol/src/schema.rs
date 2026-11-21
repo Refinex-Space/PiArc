@@ -50,6 +50,9 @@ pub fn export_schema() -> Vec<(&'static str, Value)> {
     generator.subschema_for::<crate::terminal::TerminalScroll>();
     generator.subschema_for::<crate::terminal::TerminalLink>();
     generator.subschema_for::<crate::term_frame::Frame>();
+    generator.subschema_for::<crate::plugins::PackagesList>();
+    generator.subschema_for::<crate::plugins::PackageInstallRequest>();
+    generator.subschema_for::<crate::plugins::PackageInstallResult>();
     let definitions = generator.take_definitions(true);
     let any_message: Vec<Value> = CONTRACTS
         .iter()

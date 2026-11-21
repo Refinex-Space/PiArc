@@ -17,6 +17,7 @@ Core 的数据库 `<数据目录>/core.sqlite`（rusqlite，SQLite 随 `bundled`
 - 表用 `STRICT`；时间是 Unix 毫秒；路径列存 UTF-8 文本（非 UTF-8 路径拒绝为 `NonUtf8Path`）。
 
 - schema v5（T28，ADR-0044）：`checkpoints`（自增 id 即回合顺序，会话与回合 id 唯一）、`checkpoint_files`（自增 id 即写入顺序，前后内容的十六进制 SHA-256，空值表示文件不存在，`operation` 为 `create`/`modify`/`restore`/`undo`/`discard`，`restore_id` 是恢复批次，随检查点级联删除）、`checkpoint_sessions`（最近访问时间，30 天清理用）。读写在 `src/checkpoints.rs`，规则在 `piarc-checkpoint`，编排在 `piarc-core::checkpoints`；`referenced_snapshots` 是回收时仍被引用的哈希集合。
+- schema v10（T40，ADR-0058）：`packages`（id、类别、来源类别与地址、安装目录、git 提交、版本、npm 完整性值、已确认可执行项名称的 JSON 数组、时间），读写在 `src/packages.rs`（`put_package`、`package`、`packages`、`remove_package`）；是否启用与作用域在设置的 `plugins` 键，不在这张表。
 - schema v9（T36，ADR-0053）：`mcp_servers(workspace, name, enabled, changed_at)` 记用户对某工作区某 MCP server 的启停（`src/mcp.rs` 的 `set_mcp_enabled`、`mcp_choices`）。
 - schema v8（T35，ADR-0052）：`sessions` 加 Core 自己的 worktree 列（`worktree_branch`、`worktree_cleanup_at`、`worktree_confirm`、`worktree_removed_at`，读写在 `src/worktrees.rs`）；`session_text`（会话、entry id、角色、时间、正文）与外部内容 FTS5 表 `session_fts`（`tokenize = 'trigram'`，触发器同步）；迁移清空 `session_files`，升级后首次同步重扫全部会话以填入正文。
 - schema v7（T32，ADR-0049）：重建从未写过的 `background_tasks`（主会话、工作区、标题、cwd、输出字节数，其余在 `metadata` JSON；`kind` 不设 CHECK，T33 加终端类型），读写在 `src/background_tasks.rs`（`put_task`、`task`、`recent_tasks`、`interrupt_running_tasks`、`delete_session_tasks`），状态机与通知在 `piarc-core::tasks`。

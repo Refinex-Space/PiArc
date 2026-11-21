@@ -110,6 +110,9 @@ pub struct AgentDefinition {
     /// Its file; absent for built-in types.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    /// The extension package it comes from (T40), for `plugin` sources.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin: Option<String>,
     /// The body: the subagent's identity in its system prompt.
     pub prompt: String,
     /// Tools it may use (canonical names, `Tool(specifier)` reduced to the tool); absent: all.

@@ -185,6 +185,7 @@ pub fn definition(
         return None;
     };
     let mut def = McpServerDefinition {
+        plugin: None,
         name: name.to_owned(),
         scope: at.scope,
         source: at.source.to_owned(),
