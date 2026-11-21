@@ -437,3 +437,68 @@ async fn settings_page_lists_edits_and_audits_rules() {
             .expect("audit");
     assert!(none["events"].as_array().expect("events").is_empty());
 }
+
+/// W2-A03 on Windows: a PowerShell command is matched as a whole; "always allow" saves that
+/// exact command and the saved rule lets it run again, while another command still asks. A
+/// wildcard rule lets a command naming a file in the workspace run and asks for one naming
+/// a path outside it (ADR-0047, R3's check for W2).
+#[cfg(windows)]
+#[tokio::test]
+async fn powershell_rules_match_whole_commands_and_always_allow_hits_again() {
+    let mut f = Fixture::fixed().await;
+    let card = f
+        .asks("PowerShell", json!({"command": "Get-ChildItem -Name"}))
+        .await;
+    assert_eq!(card.rules, ["PowerShell(Get-ChildItem -Name)"]);
+    let (result, saved) = tokio::join!(
+        f.evaluate(
+            "save",
+            "PowerShell",
+            json!({"command": "Get-ChildItem -Name"})
+        ),
+        f.answer_next(ApprovalDecision::AllowAlways)
+    );
+    assert_eq!(result["allowed"], true);
+    assert_eq!(saved.rules, ["PowerShell(Get-ChildItem -Name)"]);
+    let again = f
+        .evaluate(
+            "again",
+            "PowerShell",
+            json!({"command": "Get-ChildItem -Name"}),
+        )
+        .await;
+    assert_eq!(again["allowed"], true, "the saved rule hits again");
+    f.asks("PowerShell", json!({"command": "Get-ChildItem -Force"}))
+        .await;
+
+    f.write_user_settings(r#"{"permissions":{"allow":["PowerShell(Get-Content *)"]}}"#);
+    std::fs::write(f.work().join("notes.txt"), "n").expect("file");
+    let inside = f
+        .evaluate(
+            "in",
+            "PowerShell",
+            json!({"command": "get-content notes.txt"}),
+        )
+        .await;
+    assert_eq!(
+        inside["allowed"], true,
+        "case does not matter in PowerShell"
+    );
+    let home = std::env::var("USERPROFILE").expect("USERPROFILE");
+    let sep = std::path::MAIN_SEPARATOR;
+    for outside in [
+        format!("Get-Content {home}{sep}secret.txt"),
+        format!("Get-Content ~{sep}secret.txt"),
+        format!("Get-Content ..{sep}..{sep}secret.txt"),
+        format!("Get-Content -Path:{home}{sep}secret.txt"),
+    ] {
+        // The fixture's connection holds four frames; nobody reads the cards' notifications.
+        while f.frames.try_recv().is_ok() {}
+        let card = f.asks("PowerShell", json!({"command": outside})).await;
+        assert!(
+            card.rules
+                .iter()
+                .all(|r| r.starts_with("PowerShell(Get-Content"))
+        );
+    }
+}
