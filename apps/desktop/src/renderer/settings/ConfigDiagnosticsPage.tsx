@@ -4,13 +4,24 @@
 // why, and its parse errors. Core builds the report from the same load a permission decision
 // uses; the page asks again whenever `core/settings` reports a change. Parts of the hooks
 // configuration PiArc does not run (later events and handler types, `async`, matchers its
-// regular expressions reject) are listed after the files (T25).
+// regular expressions reject) are listed after the files (T25). T41 adds every other source
+// (`.mcp.json`, memory files and imports, rules, subagent definitions, skills, commands, output
+// styles, extension packages, the enterprise place), grouped by kind after the settings files.
 import { useCallback, useEffect, useId, useState } from 'react';
 
 import type { MessageId } from '../../shared/i18n/index.js';
 import { useApp } from '../app/app-context.js';
 
-const STATUSES = ['loaded', 'missing', 'invalid', 'stale', 'untrusted'] as const;
+const STATUSES = [
+  'loaded',
+  'missing',
+  'invalid',
+  'stale',
+  'untrusted',
+  'platform',
+  'ignored',
+  'notConfigured',
+] as const;
 type FileStatus = (typeof STATUSES)[number];
 
 const REASONS = [
@@ -21,6 +32,12 @@ const REASONS = [
   'projectMode',
   'projectSandbox',
   'platform',
+  'unsupported',
+  'disabled',
+  'conditional',
+  'unconfirmed',
+  'notApproved',
+  'invalid',
 ] as const;
 type IgnoreReason = (typeof REASONS)[number];
 
@@ -34,17 +51,34 @@ const LAYERS = [
   'claudeState',
 ] as const;
 
+/** The kinds of sources besides settings files (T41), in the page's order. */
+const SOURCE_KINDS = [
+  'mcpJson',
+  'memory',
+  'rule',
+  'agent',
+  'skill',
+  'command',
+  'outputStyle',
+  'plugin',
+  'enterprise',
+] as const;
+
 export interface KeyRow {
   readonly pointer: string;
   readonly value: unknown;
   readonly finalValue: unknown;
   readonly source?: string;
+  /** The file of `source` (T41: the source that replaces this one). */
+  readonly sourceFile?: string;
 }
 
 export interface IgnoredRow {
   readonly pointer: string;
   readonly reason: IgnoreReason;
   readonly task?: string;
+  /** Details of this case (T41: a loader's reason, a rule's globs). */
+  readonly detail?: string;
 }
 
 export interface IssueRow {
@@ -55,6 +89,8 @@ export interface IssueRow {
 }
 
 export interface FileView {
+  /** `settings`, `claudeState`, or one of `SOURCE_KINDS` (T41). */
+  readonly kind: string;
   readonly layer: string;
   readonly file: string;
   readonly writable: boolean;
@@ -114,8 +150,16 @@ function keyRows(v: unknown): KeyRow[] {
     const pointer = str(k.pointer);
     if (pointer === undefined) return [];
     const source = str(k.source);
-    const row = { pointer, value: k.value, finalValue: k.finalValue };
-    return [source === undefined ? row : { ...row, source }];
+    const sourceFile = str(k.sourceFile);
+    return [
+      {
+        pointer,
+        value: k.value,
+        finalValue: k.finalValue,
+        ...(source === undefined ? {} : { source }),
+        ...(sourceFile === undefined ? {} : { sourceFile }),
+      },
+    ];
   });
 }
 
@@ -130,6 +174,7 @@ export function parseDiagnostics(raw: string): DiagnosticsView {
     if (layer === undefined || file === undefined || status === undefined) return [];
     return [
       {
+        kind: str(f.kind) ?? 'settings',
         layer,
         file,
         writable: f.writable === true,
@@ -142,7 +187,15 @@ export function parseDiagnostics(raw: string): DiagnosticsView {
           const reason = one(REASONS, k.reason);
           if (pointer === undefined || reason === undefined) return [];
           const task = str(k.task);
-          return [task === undefined ? { pointer, reason } : { pointer, reason, task }];
+          const detail = str(k.detail);
+          return [
+            {
+              pointer,
+              reason,
+              ...(task === undefined ? {} : { task }),
+              ...(detail === undefined ? {} : { detail }),
+            },
+          ];
         }),
         issues: list(f.issues).flatMap((i): IssueRow[] => {
           const message = str(i.message);
@@ -244,15 +297,38 @@ function KeyTable({ rows, kind }: { rows: readonly KeyRow[]; kind: 'effective' |
 }
 
 function reasonText(t: ReturnType<typeof useApp>['t'], row: IgnoredRow): string {
-  if (row.reason === 'planned' && row.task !== undefined) {
-    return t('diagnostics.reason.plannedTask', { task: row.task });
-  }
-  return t(`diagnostics.reason.${row.reason}`);
+  const text =
+    row.reason === 'planned' && row.task !== undefined
+      ? t('diagnostics.reason.plannedTask', { task: row.task })
+      : t(`diagnostics.reason.${row.reason}`);
+  return row.detail === undefined ? text : `${text} (${row.detail})`;
+}
+
+function isSettings(file: FileView): boolean {
+  return file.kind === 'settings' || file.kind === 'claudeState';
+}
+
+/** A source's items (T41): what it provides, and what replaces it. */
+function ItemList({ rows, kind }: { rows: readonly KeyRow[]; kind: 'effective' | 'overridden' }) {
+  const { t } = useApp();
+  return (
+    <ul className="diagnostics-ignored" data-testid={`diagnostics-${kind}`}>
+      {rows.map((row) => (
+        <li key={row.pointer} data-testid="diagnostics-key" data-pointer={row.pointer}>
+          <span className="diagnostics-code">{row.pointer}</span>{' '}
+          {kind === 'overridden' && row.sourceFile !== undefined ? (
+            <span className="muted">{t('diagnostics.replacedBy', { path: row.sourceFile })}</span>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function FileSection({ file }: { file: FileView }) {
   const { t } = useApp();
-  const title = layerTitle(file.layer);
+  const settings = isSettings(file);
+  const title = settings ? layerTitle(file.layer) : undefined;
   const counts = {
     effective: file.effective.length,
     overridden: file.overridden.length,
@@ -263,19 +339,27 @@ function FileSection({ file }: { file: FileView }) {
     <section
       className="diagnostics-file"
       data-testid={`diagnostics-file-${file.layer}`}
+      data-kind={file.kind}
+      data-file={file.file}
       data-status={file.status}
     >
       <h3 className="permission-source-title">
-        {title === undefined ? file.layer : t(title)}
+        {settings ? (title === undefined ? file.layer : t(title)) : null}
         <span className={`diagnostics-status is-${file.status}`} data-testid="diagnostics-status">
-          {t(`diagnostics.status.${file.status}`)}
+          {!settings && file.status === 'untrusted'
+            ? t('diagnostics.status.untrustedSource')
+            : t(`diagnostics.status.${file.status}`)}
         </span>
-        <span className="muted">
-          {' '}
-          · {t(file.writable ? 'diagnostics.writable' : 'diagnostics.readOnly')}
-        </span>
+        {settings ? (
+          <span className="muted">
+            {' '}
+            · {t(file.writable ? 'diagnostics.writable' : 'diagnostics.readOnly')}
+          </span>
+        ) : null}
       </h3>
-      <div className="muted approval-path">{file.file}</div>
+      <div className="muted approval-path">
+        {file.file === '' ? t('diagnostics.enterpriseNone') : file.file}
+      </div>
       {file.issues.length > 0 && (
         <ul className="diagnostics-issues" data-testid="diagnostics-issues">
           {file.issues.map((issue, index) => (
@@ -285,13 +369,16 @@ function FileSection({ file }: { file: FileView }) {
                   {t('diagnostics.position', { line: issue.line, column: issue.column })}{' '}
                 </span>
               )}
+              {issue.line !== undefined && issue.column === undefined && (
+                <span>{t('diagnostics.line', { line: issue.line })} </span>
+              )}
               {issue.pointer !== '' && <span className="diagnostics-code">{issue.pointer} </span>}
               {issue.message}
             </li>
           ))}
         </ul>
       )}
-      {file.status !== 'missing' && (
+      {file.status !== 'missing' && file.status !== 'notConfigured' && (
         <details className="diagnostics-details" data-testid="diagnostics-details">
           <summary>{t('diagnostics.summary', counts)}</summary>
           {/* `~/.claude.json` is not a settings layer, but its MCP servers apply (T36). */}
@@ -300,8 +387,10 @@ function FileSection({ file }: { file: FileView }) {
               <h4>{t('diagnostics.effective')}</h4>
               {file.effective.length === 0 ? (
                 <p className="muted">{t('diagnostics.none')}</p>
-              ) : (
+              ) : settings ? (
                 <KeyTable rows={file.effective} kind="effective" />
+              ) : (
+                <ItemList rows={file.effective} kind="effective" />
               )}
             </>
           )}
@@ -313,6 +402,12 @@ function FileSection({ file }: { file: FileView }) {
               ) : (
                 <KeyTable rows={file.overridden} kind="overridden" />
               )}
+            </>
+          )}
+          {!settings && file.overridden.length > 0 && (
+            <>
+              <h4>{t('diagnostics.replaced')}</h4>
+              <ItemList rows={file.overridden} kind="overridden" />
             </>
           )}
           <h4>{t('diagnostics.ignored')}</h4>
@@ -466,9 +561,21 @@ export function ConfigDiagnosticsPage() {
             {t(view.trusted ? 'diagnostics.trusted' : 'diagnostics.untrusted')}
           </p>
           {error !== '' && <p className="error-text">{error}</p>}
-          {view.files.map((file) => (
-            <FileSection key={file.layer} file={file} />
+          {view.files.filter(isSettings).map((file) => (
+            <FileSection key={`${file.kind}:${file.layer}`} file={file} />
           ))}
+          {SOURCE_KINDS.map((kind) => {
+            const files = view.files.filter((f) => f.kind === kind);
+            if (files.length === 0) return null;
+            return (
+              <section key={kind} data-testid={`diagnostics-kind-${kind}`}>
+                <h2 className="settings-heading">{t(`diagnostics.kind.${kind}`)}</h2>
+                {files.map((file) => (
+                  <FileSection key={`${file.kind}:${file.file}`} file={file} />
+                ))}
+              </section>
+            );
+          })}
           {view.hooks.length > 0 && <HookIssues issues={view.hooks} />}
           {view.mcp.length > 0 && <McpIssues issues={view.mcp} />}
         </>

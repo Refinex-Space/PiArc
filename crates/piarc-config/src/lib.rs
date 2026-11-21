@@ -55,7 +55,9 @@ pub mod skills;
 pub mod trust;
 pub mod write;
 
-pub use diagnostics::{FileReport, FileStatus, claude_state_report};
+pub use diagnostics::{
+    FileReport, FileStatus, IgnoreReason, IgnoredKey, KeyReport, SourceKind, claude_state_report,
+};
 pub use executables::{Category, Inventory, Item, enumerate, new_items};
 pub use layers::{Format, LayerSpec, LayerTable, PROJECT_DIR, Scope, Source, ids, precedence};
 pub use settings::{Change, Issue, LayerStatus, PermissionLists, Settings};

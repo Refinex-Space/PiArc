@@ -39,6 +39,7 @@ mod hooks;
 mod hooks_m4;
 mod memory;
 mod memory_reader;
+pub(crate) use memory::memory_documents;
 pub(crate) mod policy;
 mod sandbox;
 mod skills;

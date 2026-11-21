@@ -243,7 +243,19 @@ impl Hub {
 
     /// The configuration diagnostics of a workspace (T24).
     pub async fn config_diagnostics(&self, workspace: Option<PathBuf>) -> Result<Value> {
-        crate::config_diagnostics::report(&self.ctx.storage, &self.ctx.trust, workspace).await
+        let target = crate::config_diagnostics::target(&self.ctx.storage, workspace).await?;
+        // The packages as the workspace sees them (T41); a failure only leaves them out.
+        let packages = match &target {
+            Some(dir) => self.plugins().list(Some(dir)).await.ok(),
+            None => None,
+        };
+        crate::config_diagnostics::report_with(
+            &self.ctx.storage,
+            &self.ctx.trust,
+            target,
+            packages.as_ref(),
+        )
+        .await
     }
 
     /// The permission settings page's view of a workspace's rules (T23).

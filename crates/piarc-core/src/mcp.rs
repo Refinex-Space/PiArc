@@ -192,6 +192,16 @@ pub(crate) async fn settings_file_servers(io: &ToolIo, file: &Path) -> McpServer
 
 type Merged = (config::McpConfig, u64, u64);
 
+/// The merged MCP configuration of `workspace` without the user's choices or variable
+/// expansion: what the configuration diagnostics report per source (T41).
+pub(crate) fn merged_config(
+    settings: &piarc_config::Settings,
+    workspace: &Path,
+    home: Option<&Path>,
+) -> config::McpConfig {
+    merge_for(settings, workspace, home, &[], &[]).0
+}
+
 fn merge_for(
     settings: &piarc_config::Settings,
     workspace: &Path,

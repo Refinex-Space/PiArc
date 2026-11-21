@@ -278,8 +278,10 @@ impl Loop {
                     for issue in &change.issues {
                         log_issue(issue);
                     }
-                    self.emit(change.changed, change.issues).await;
                 }
+                // Every reload: a memory file, rule, skill or definition may have changed
+                // without a settings key (T41's diagnostics refresh on it).
+                self.emit(change.changed, change.issues).await;
             }
             Err(error) => {
                 tracing::error!(target: "piarc_core::settings", "reloading settings failed: {error}");
@@ -373,6 +375,15 @@ fn watch_dirs(
                 || home.as_deref().is_some_and(|h| dir.starts_with(h))
         }),
     );
+    // The configuration diagnostics' other sources (T41): memory files and `.mcp.json` at the
+    // workspace root, rules and subagent definitions.
+    dirs.push(workspace.to_owned());
+    for base in [Some(workspace), home.as_deref()].into_iter().flatten() {
+        dirs.push(base.join(".claude").join("rules"));
+        dirs.push(base.join(".claude").join("agents"));
+    }
+    dirs.push(workspace.join(".piarc").join("agents"));
+    dirs.push(data.join("agents"));
     let mut roots: Vec<PathBuf> = dirs
         .iter()
         .map(|dir| {

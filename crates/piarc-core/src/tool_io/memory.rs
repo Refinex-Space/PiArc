@@ -277,6 +277,28 @@ impl Scan<'_> {
     }
 }
 
+/// The memory documents a session opened at `root` starts with (T41's configuration
+/// diagnostics): the same discovery as `fs/memory`, without conditional rules; an import that
+/// needs the user's approval is not read and stays marked in the text.
+///
+/// # Errors
+///
+/// The workspace cannot be bound, or a memory file cannot be read.
+pub(crate) fn memory_documents(
+    root: &std::path::Path,
+    home: Option<&std::path::Path>,
+    data: &std::path::Path,
+    read_both: bool,
+) -> std::io::Result<Vec<piarc_protocol::memory::MemoryFile>> {
+    let scope = piarc_fs::Scope::new(root, root).map_err(std::io::Error::other)?;
+    let query = memory_reader::RuleQuery {
+        files: Vec::new(),
+        active: Vec::new(),
+    };
+    let collection = memory_reader::collect(&scope, home, data, &[], read_both, &query, |_| None)?;
+    Ok(collection.files)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

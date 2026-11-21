@@ -28,8 +28,45 @@ pub enum FileStatus {
     /// Not valid now; its last valid content is used.
     Stale,
     /// Read and valid, but the project is not trusted: its allow rules, additional
-    /// directories and similar values are left out.
+    /// directories and similar values are left out (an executable source, such as `.mcp.json`
+    /// or a project plugin, is left out whole).
     Untrusted,
+    /// Read, but it has no effect on this platform (T41).
+    Platform,
+    /// Read and valid, but not used: a source of the same name comes first, or it is turned
+    /// off (T41).
+    Ignored,
+    /// A source PiArc reserves a place for that is not set up (enterprise settings, T47).
+    NotConfigured,
+}
+
+/// What kind of source a report is about (T41): settings files and `~/.claude.json` (T24),
+/// and every other configuration PiArc reads for a workspace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SourceKind {
+    /// A settings layer's file.
+    Settings,
+    /// `~/.claude.json`.
+    ClaudeState,
+    /// The project's `.mcp.json`.
+    McpJson,
+    /// A memory file (`CLAUDE.md`, `AGENTS.md`, ...) with its `@` imports.
+    Memory,
+    /// A Claude Code rule (`.claude/rules/*.md`).
+    Rule,
+    /// A subagent definition.
+    Agent,
+    /// A skill.
+    Skill,
+    /// A command file or prompt template.
+    Command,
+    /// An output style.
+    OutputStyle,
+    /// A Claude Code plugin or Pi package.
+    Plugin,
+    /// Enterprise settings (T47).
+    Enterprise,
 }
 
 /// One key that takes part in the merge.
@@ -71,6 +108,18 @@ pub enum IgnoreReason {
     ProjectSandbox,
     /// The setting has no effect on this platform (the sandbox on Windows, requirement D7).
     Platform,
+    /// PiArc does not support it (an MCP transport, a plugin component, a field).
+    Unsupported,
+    /// Turned off by the user (an MCP server, a package).
+    Disabled,
+    /// A rule with `paths:` loads only once the agent reads or writes a matching file.
+    Conditional,
+    /// An executable item of a package nobody confirmed yet.
+    Unconfirmed,
+    /// A memory import outside the workspace waits for the user's approval, or was denied.
+    NotApproved,
+    /// The value is not valid; it is left out.
+    Invalid,
 }
 
 /// One key that is not used.
@@ -87,13 +136,19 @@ pub struct IgnoredKey {
     /// The mapping table's note: the PiArc feature, or why the key is ignored.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub note: Option<&'static str>,
+    /// Details of this case (T41: the reason a loader gave, a rule's globs).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
 }
 
 /// The report of one file.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileReport {
-    /// Layer id (`claudeState` for `~/.claude.json`, which is not a settings layer).
+    /// What kind of source it is (T41).
+    pub kind: SourceKind,
+    /// Layer id (`claudeState` for `~/.claude.json`, which is not a settings layer; the kind's
+    /// name for the other sources of T41).
     pub layer: &'static str,
     /// The file.
     pub file: PathBuf,
@@ -136,6 +191,7 @@ pub fn mark_platform_unsupported(reports: &mut [FileReport], pointers: &[&str]) 
                 reason: IgnoreReason::Platform,
                 task: None,
                 note: None,
+                detail: None,
             });
         }
         report.ignored.sort_by(|a, b| a.pointer.cmp(&b.pointer));
@@ -180,6 +236,7 @@ impl Settings {
                     reason: IgnoreReason::Unknown,
                     task: None,
                     note: None,
+                    detail: None,
                 });
             }
         }
@@ -203,6 +260,7 @@ impl Settings {
             LayerStatus::Stale => FileStatus::Stale,
         };
         FileReport {
+            kind: SourceKind::Settings,
             layer: spec.id,
             file: file.to_owned(),
             format: spec.format,
@@ -255,6 +313,7 @@ impl Settings {
                 reason,
                 task: None,
                 note: None,
+                detail: None,
             });
         }
         untrusted
@@ -301,6 +360,7 @@ fn classify_raw(spec: &LayerSpec, raw: &Value, out: &mut Vec<IgnoredKey>) {
             reason,
             task,
             note: class.row.map(|r| r.target),
+            detail: None,
         });
     }
 }
@@ -334,6 +394,7 @@ fn leaves(value: &Value) -> Vec<(String, &Value)> {
 pub fn claude_state_report(home: &Path, workspace: &Path) -> FileReport {
     let file = home.join(claude::CLAUDE_STATE_FILE);
     let mut report = FileReport {
+        kind: SourceKind::ClaudeState,
         layer: CLAUDE_STATE,
         file: file.clone(),
         format: Format::ClaudeCode,
@@ -418,6 +479,7 @@ fn state_keys(
             reason: IgnoreReason::Ignored,
             task: None,
             note: Some(row.map_or("Claude Code state", |r| r.target)),
+            detail: None,
         });
     }
     if let Some((key, local)) = &servers.local {

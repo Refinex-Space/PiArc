@@ -22,7 +22,7 @@ fn encode(value: &impl Serialize) -> Result<Value> {
 }
 
 impl Hub {
-    fn plugins(&self) -> PluginManager {
+    pub(super) fn plugins(&self) -> PluginManager {
         PluginManager::new(
             self.ctx.storage.clone(),
             self.ctx.trust.clone(),
