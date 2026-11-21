@@ -23,6 +23,7 @@ function render() {
         import * as web from './agent-host/src/harness/prompts/web-fetch.ts';
         import * as sub from './agent-host/src/harness/prompts/subagents.ts';
         import * as tasks from './agent-host/src/harness/prompts/tasks.ts';
+        import * as mcp from './agent-host/src/harness/prompts/mcp.ts';
         const system = assembleSystem(CANONICAL_TOOLS, DEFAULT_PROFILE, [],
           {cwd: '', platform: '', date: '', gitStatus: ''}).text;
         const conservative = conservativeProfile(DEFAULT_PROFILE);
@@ -54,7 +55,12 @@ function render() {
           sub.worktreeKept('', ''),
           // T32: KillShell's and Monitor's results.
           tasks.taskStopped('', '', '', ''), tasks.taskAlreadyEnded('', 'completed', ''),
-          tasks.taskUnknown(''), tasks.monitorStarted('', '', 300000, 3600000)];
+          tasks.taskUnknown(''), tasks.monitorStarted('', '', 300000, 3600000),
+          // T36: ToolSearch, the system prompt's MCP section and the change reminders.
+          mcp.TOOL_SEARCH_DESCRIPTION,
+          mcp.mcpSection([{ name: '', deferred: true }, { name: '', instructions: ' ', deferred: false }]) ?? '',
+          ...[true, false].map((deferred) =>
+            mcp.changeReminder({ name: '', added: [''], removed: [''], deferred, instructions: '' }))];
         process.stdout.write([system, ...descriptions, ...notices].join(String.fromCharCode(10)));`,
       resolveDir: repoRoot,
     },
@@ -76,8 +82,8 @@ function render() {
  * parameter schema in the Harness Kit (its subdirectories too, T31) and the tool layer, and the
  * sentences of at least five words that session memory, the reminder channel, interruption, the
  * result budget, the subagent runs (T31), Bash's background results and Core's background task
- * notices (T32), and the terminal texts Core writes (T33: the screen file's header, the
- * command-finished and sharing notices) write. */
+ * notices (T32), the terminal texts Core writes (T33: the screen file's header, the
+ * command-finished and sharing notices) and the MCP pool's results and errors (T36) write. */
 function sourceTexts() {
   const literal = /'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g;
   const texts = [];
@@ -109,6 +115,12 @@ function sourceTexts() {
     'crates/piarc-core/src/tasks/feed.rs',
     // T33: the terminal task's screen-file header and its notices.
     'crates/piarc-core/src/terminal/bound.rs',
+    // T36: what the MCP pool and extension put in tool results and errors.
+    'agent-host/src/mcp/session.ts',
+    'agent-host/src/mcp/connection.ts',
+    'agent-host/src/mcp/pool.ts',
+    'agent-host/src/mcp/stdio.ts',
+    'agent-host/src/mcp/sign-in.ts',
   ]) {
     const source = readFileSync(path.join(repoRoot, file), 'utf8');
     for (const m of source.matchAll(literal)) {

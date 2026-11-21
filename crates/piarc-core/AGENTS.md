@@ -18,6 +18,7 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 | `cargo test -p piarc-core --test background_tasks` | 后台命令（T32）：`background` 立即作答并写输出文件、KillShell 结束整棵进程树（含忽略 SIGTERM 的孙进程）并保留输出、其他会话停不了、Monitor 以任务运行；单测 `--lib tasks::`（通知、Monitor 节奏与手动时钟、权限范围、子 agent 状态、分段读取） |
 | `cargo test -p piarc-core --test terminal` | 终端：`term/<id>` 事件、经回调取帧、错误类别、关闭终端与关闭 Core 都结束整棵进程树（自成进程组的作业、忽略 HUP/TERM 的进程，Unix；Windows 版在 `tests/terminal_windows.rs`） |
 | `cargo test -p piarc-core --lib terminal::` | 会话终端（T33）：会话目录与命令环境、没有 locale 时补 UTF-8、智能体的终端任务（退出码、命令结束通知、屏幕文件与 formatter 一致）、未共享的终端模型看不到、退出时保存与关闭时丢弃 snapshot |
+| `cargo test -p piarc-core --lib mcp::` | MCP 配置（T36）：未信任项目的 server 等待信任、各来源与同名取舍、用户启停与 `disabledMcpjsonServers`、子 agent 的内联 server、配置诊断不展开变量；`--lib host_probe` 含探针的 `mcp/servers` |
 | `cargo clippy -p piarc-core --all-targets -- -D warnings` | lint |
 
 ## 运行时与关闭顺序
@@ -77,6 +78,12 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 输出文件 `<数据目录>/sessions/<主会话 id>/tasks/<任务 id>.log`（`tasks::task_file`），子 agent 的任务也在主会话目录下。归档清理 `tasks/`，删除会话一并删 `background_tasks` 行。
 - 通知：`Notice` 挂在管理器里直到 `delivered`（会话 actor 看到 `reminder` 条目，或 `session/remind` 答 `delivered`）；`sessions/session/notices.rs` 负责发送（任务结束、会话打开或恢复、每个 prompt/steer/follow-up 之前）。Monitor 的批次与限速在 `tasks/feed.rs`、节奏在 `tasks/monitor.rs`；全部限值在 `tasks/limits.rs` 的 `TaskLimits`（`CoreConfig.tasks`），计时用 `TasksConfig.clock`（前台超时、Monitor 超时与唤醒都用它，测试与 L2 注入 `ManualClock`）。
 - 有序关闭：`Hub::shutdown` 先 `TaskManager::shutdown`（并发停止全部、等结束、把最终行写进数据库），再关工作区与数据库。
+
+## MCP（`mcp`，T36，ADR-0053）
+
+- `McpConfigSource`（Core 一份，工作区入站处理器共用）应答 `mcp/servers`：用 `TrustService::permission_settings` 加载设置（与权限裁决同一份），收集 local、project、user 三个作用域的来源交给 `piarc_config::mcp::merge`，`${VAR}` 用 `ToolIo::expansion_environment`（登录 shell 环境去掉 PiArc 内部变量）展开，`env` 是命令环境（ADR-0035）。启停选择存 `core.sqlite` 的 `mcp_servers`（`set_enabled`）。子 agent 的内联 server 由 `tool_io/subagents.rs` 在 `agents/list` 中经 `inline_servers` 检查与展开。
+- 状态与操作经 `Hub::{mcp_status, mcp_reconnect, mcp_set_enabled, mcp_login}`（`sessions/mcp.rs`，NAPI `mcpStatus` 等）：工作区有运行中的 Agent Host 时转给它，没有时 `status_from_config` 按配置回答（可运行的为 `idle`）。Agent Host 的 `mcp/statusChanged` 以 `HostEvent::HostNotification` 到达工作区 actor，加上 `workspace` 发到路由 `core/mcp`（`MCP_ROUTE`）。MCP 登录沿用 T29 的登录记录与 `core/login`，provider 为 `mcp:<server>`。
+- `policy/evaluate` 的 `requiresUserInteraction` 经 `tool_io::policy` 的 `requires_user_interaction` 成为必须询问的一步并清空可保存的规则；`ToolSearch` 在只读宿主工具里。配置诊断报告的 `mcp` 由 `diagnostics()` 给出（不展开变量）。打包产物的探针（`host_probe`）只用 `<数据目录>/settings.json` 的 `mcpServers` 回答（`settings_file_servers`）。
 
 ## 子目录说明
 

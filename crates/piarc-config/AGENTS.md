@@ -30,13 +30,21 @@
 ## 子 agent 定义（`src/agents.rs`，T31，ADR-0048）
 
 - `load(AgentDirs { cwd, data, home })` 按来源顺序（cwd 向上各级的 `.piarc/agents/`，再各级的 `.claude/agents/`，越近越优先、跳过家目录；PiArc 用户 `agents/`；`~/.claude/agents/`）读全部 `*.md`，以 `name` 字段而不是文件名识别类型，同名取第一份整条定义，后面的路径记进 `overrides`。插件来源留给 T40。
-- `parse` 用 `serde_saphyr` 解析 frontmatter，问题作为 `AgentIssue`（路径、行号、原因）返回，文件不进列表；单个文件上限 `MAX_DEFINITION_BYTES`（256 KiB）。不认识的字段是 `ignoredField`，`isolation` 校验为 `worktree`（T35 起生效），`mcpServers`、`skills` 校验后标 `inactiveField`（T36、T37），项目级的 `bypassPermissions`、`auto` 改为 `default` 并标 `projectModeIgnored`，`auto`、`dontAsk` 标 `unsupportedMode`。`tools`、`disallowedTools` 的 `Tool(specifier)` 只保留工具名。
+- `parse` 用 `serde_saphyr` 解析 frontmatter，问题作为 `AgentIssue`（路径、行号、原因）返回，文件不进列表；单个文件上限 `MAX_DEFINITION_BYTES`（256 KiB）。不认识的字段是 `ignoredField`，`isolation` 校验为 `worktree`（T35 起生效），`skills` 校验后标 `inactiveField`（T37），`mcpServers` 自 T36 生效：名称引用原样返回，内联定义作为 `Definition.mcp_inline` 交给 Core 检查与展开（`servers()` 返回两者），项目级的 `bypassPermissions`、`auto` 改为 `default` 并标 `projectModeIgnored`，`auto`、`dontAsk` 标 `unsupportedMode`。`tools`、`disallowedTools` 的 `Tool(specifier)` 只保留工具名。
 - 定义里的 `hooks` 是可执行项：项目级定义的 hooks 计入 `executables::enumerate`（新增即让项目回到未确认，ADR-0029），由 Core 在信任时作为限定作用域的来源登记。
 - 设置键：`modelAliases`（别名 → `provider/model`，对象逐键合并）、`subagents.maxDepth`、`subagents.maxConcurrent`（PiArc 自己的键）；Claude Code 的 `model`、`effortLevel` 生效（新会话的默认模型与 effort，`model` 可为别名，Core 的 `tool_io::context::session_defaults` 解析），`advisorModel` 忽略（Anthropic 服务端的 advisor 工具），`agent` 为 `planned(T48)`。
+
+## MCP 配置（`src/mcp.rs`，T36，ADR-0053）
+
+- `merge(sources, &MergeOptions { trusted, disabled_mcpjson, disabled, enabled, lookup })` 是 MCP 配置唯一的合并实现：`sources` 按优先级从高到低排好（Core 的 `piarc_core::mcp` 负责收集：local、`.piarc/settings.local.json`、`.piarc/settings.json`、`.mcp.json`、用户 `settings.json`、`~/.claude.json` 顶层），同名取第一份整条定义，其余记进 `overridden`；名称须是 1–64 个 `[A-Za-z0-9_-]`（`valid_name`）。
+- 每条定义经 `definition()` 校验：`type` 为 `stdio`、`http`、`streamable-http`（`transport()`），`sse`、`ws`、`websocket` 为不支持并带原因，`headersHelper` 报问题不执行，`timeout` 为毫秒（不低于 `MIN_TIMEOUT_MS`）；`expand_vars` 在 `command`、`args`、`env`、`cwd`、`url`、`headers` 中展开 `${VAR}`、`${VAR:-default}`，没有值的引用保持原文并报问题。`apply_availability` 决定 `ready`、`disabled`（用户选择优先于 `disabledMcpjsonServers`）、`unsupported`、`untrusted`（只有 project 作用域受信任约束）；不可运行的定义不带程序、地址与展开后的值。
+- `claude_state_servers(home, workspace)` 读 `~/.claude.json` 的顶层与 `projects[<工作区>]` 段（键与工作区规范化后比较），`local_pointer` 给出后者的 JSON Pointer；`pool_settings(merged)` 读 `mcp.idleTimeoutSeconds`（默认 600）与 `mcp.deferThreshold`（默认 30）。
+- 可执行项：`executables::enumerate` 经 `mcp_items()` 列出 `.mcp.json`、`.piarc/settings*.json` 的 `mcpServers` 与项目级子 agent 定义的内联 server，条目名由 `trust_item_name` 给出（名称加程序或地址，再加 `type`、`args`、`env`、`cwd`、`headers`、`oauth`），改了运行什么就是新增项。`.pi/mcp.json` 不再枚举（Pi 的 MCP 扩展不再加载）。
 
 ## Claude Code 配置（T24，ADR-0038）
 
 - **键映射表**在 `src/claude.rs` 的 `SETTINGS_KEYS`（`settings.json` 的键）与 `STATE_KEYS`（`~/.claude.json`）：每行是键（嵌套键用点）、状态（`Active` 以同一 JSON Pointer 并入、`Planned(任务)`、`Ignored`）与对应的 PiArc 设置或忽略原因。它是唯一判断：合并只保留 `Active` 的键（`claude::project`，读文件时投影），诊断用 `claude::classify` 分类，表外的键为"未知"。某个键的功能落地时：把这一行改为 `active("…", "/…")`，把键加进 `schema::PIARC_SETTINGS`（测试检查生效的键都是 PiArc 已知的设置），需要信任的值加进 `layers::CLAUDE_EXECUTABLE`。不要在别处另写"这个键算不算"的判断。行的来源是官方 settings 索引，Claude Code 增删键时同步。
+- MCP 键（T36）：`~/.claude.json` 的 `mcpServers`（`STATE_KEYS`，诊断里只列 server 名）与 `disabledMcpjsonServers` 生效；`enableAllProjectMcpServers`、`enabledMcpjsonServers` 忽略（项目 server 由 PiArc 的信任决定）；`allowedMcpServers`、`deniedMcpServers` 为 `planned(T47)`。
 - M2 生效的键：`permissions.allow`、`ask`、`deny`、`defaultMode`、`additionalDirectories`，以及 T25 的 `hooks`（可执行值，信任前移除）、`disableAllHooks`。hooks 的 handler 形状在 `schema.rs` 的 `HOOK_HANDLER`：只检查已知字段的类型，语义与不支持的字段由 `piarc-hooks` 报告。项目层的 allow、`additionalDirectories`、`acceptEdits` 在信任前移除，`bypassPermissions` 与 `auto` 始终移除（与 PiArc 项目层同一套过滤）；生效键类型错误时整份文件跳过，被忽略的键不校验。
 - **不写 `.claude/`**：`write.rs` 的所有写入（含 `replace_file`）对路径含 `.claude` 目录或名为 `.claude.json` 的目标返回 `WriteError::ClaudeConfig`（Core 映射为 `permissionDenied`），与层是否标为可写无关。"总是允许"、模式记忆、设置页只写 `.piarc/` 与用户级 PiArc 设置。
 - **rules**（`src/rules.rs`）：`rule_files` 递归列出 `*.md`（跟随符号链接，同一目录只访问一次，跳过隐藏项）；`parse` 拆出 frontmatter 的 `paths:`（列表或逗号分隔的字符串，YAML 无效时整个文件按无条件处理）；`PathMatcher` 按 gitignore 语义相对工作区根匹配，Windows 不区分大小写。读取与送达在 `piarc-core::tool_io::memory_reader`。

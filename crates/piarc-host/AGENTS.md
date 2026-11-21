@@ -55,7 +55,7 @@ Core 侧的 Agent Host 监管：启动、握手、stdio 读写、背压、心跳
 
 - 功能 crate 不直接启动进程、不读系统时钟做判断：经 `ProcessSpawner` 与 `Clock`。超时与心跳间隔用 tokio 计时器。
 - 启动环境只含 `DEFAULT_ENV_PASSTHROUGH` 中存在的变量、`PI_SKIP_VERSION_CHECK=1`、`PI_TELEMETRY=0`、`PI_PACKAGE_DIR` 与配置的 `extra_env`；不传凭据。
-- 帧错误（非法 JSON、超长帧、批量请求、缺会话头的通知）只报告并丢弃，不断开连接（架构第 7.4 节）。
+- 帧错误（非法 JSON、超长帧、批量请求、缺会话头的通知）只报告并丢弃，不断开连接（架构第 7.4 节）。例外是 `connection.rs` 的 `HOST_NOTIFICATIONS`（T36 起只有 `mcp/statusChanged`）：这些工作区级通知没有会话头，作为 `HostEvent::HostNotification { epoch, method, params }` 交给 Core；新增这类通知要加进该列表。
 - stderr 每行一个 `tracing` 事件，target `piarc_host::agent_host`，字段 `workspace`、`session`、`epoch`；行长超过 16 KiB 截断。
 
 ## 易错点

@@ -7,7 +7,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 | 命令 | 用途 |
 |---|---|
 | `npm run build:agent-host` | esbuild 打包到 `agent-host/dist/bundle/agent-host.mjs`，并写 `pi-assets/package.json`；`@piarc/protocol` 从源码打包，不依赖 `tsc` 产物 |
-| `npx vitest run agent-host` | 单元测试：出站队列（含回放缓冲、单帧上限）、投影与 golden 测试（`projector.golden.test.ts` 打印覆盖矩阵）、排队表、工具批次、中断补齐、Core 桥接、工具层、凭据存储、信任接管 |
+| `npx vitest run agent-host` | 单元测试：出站队列（含回放缓冲、单帧上限）、投影与 golden 测试（`projector.golden.test.ts` 打印覆盖矩阵）、排队表、工具批次、中断补齐、Core 桥接、工具层、凭据存储、信任接管、MCP 连接池（`src/mcp/pool.test.ts`，手动时钟） |
 | `npx vitest run agent-host -u` | golden 录制更新后重写投影的期望输出（`test/golden/*.expected.json`，提交前逐个审阅） |
 | `PIARC_UPDATE_GOLDEN=1 cargo test -p piarc-testkit --test agent_host golden` | 用真实 Agent Host 与 mock 重新录制 golden 输入（`test/golden/*.events.json`）；不带变量时只核对 Pi 产生的事件类型没有变化 |
 | `cargo test -p piarc-testkit --test agent_host -- --nocapture` | 端到端：Core 监管真实 bundle、mock provider 应答（S3、S4、S5 与进程级 S9；`trust.rs` 是 T13 的项目扩展随信任加载与撤销）；测试会先自己打包 |
@@ -41,7 +41,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 ## 分支与回退（T28，ADR-0044）
 
 - `runtime/branches.ts` 是分支的唯一实现：回合起点（每个回合第一条 `piarc.input` 的 `from`，旧记录取父条目）、分支点（起点落在同一锚点的回合互为分支，跳过记录、模式与模型变化、system 装载消息与分支摘要）、`rewindToTurn`（leaf 移到起点并追加 `piarc.branch`）、`summarizeFromTurn`（`compaction.ts` 的 `summarizeBranch` 用 T27 的摘要提示，再经 Pi 的 `branchWithSummary`）、`switchTo`、`forkedManager`（`session/fork` 的 `beforeTurn`）。Pi 打开文件时 leaf 在最后一条 entry，所以追加的条目就是持久化的位置；不删除任何 entry。
-- 回退与切换之后注册表在同一 id 下关闭并重新打开 Pi 运行时（`#reopen`，source `branch`：不触发 SessionStart/SessionEnd hooks，`seq` 连续），计划、模式、memory、读写记录随分支重新推导；MCP 随之重连。历史窗口与 `session/branches` 通知带分支点（`history.ts`），`branch_summary` 投影为原因 `rewind` 的压缩条目。
+- 回退与切换之后注册表在同一 id 下关闭并重新打开 Pi 运行时（`#reopen`，source `branch`：不触发 SessionStart/SessionEnd hooks，`seq` 连续），计划、模式、memory、读写记录随分支重新推导；MCP 连接在池中，重开只交还再取回租约，不重连（T36，I111）。历史窗口与 `session/branches` 通知带分支点（`history.ts`），`branch_summary` 投影为原因 `rewind` 的压缩条目。
 - 中断补齐（`harness/interruption.ts`）只把 user、toolResult 或有回复的 assistant 当作末尾：以分支摘要或提醒结尾的对话不是被中断的回合。摘要之后的第一条输入紧跟摘要（两条相邻的 user 消息），`rewind-summarize` 场景因此关闭 `role_order` 检查。
 
 ## 子 agent（T31，ADR-0048）
@@ -53,7 +53,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - 子会话 JSONL 首条是 `piarc.subagent`（父会话、类型）；身份段换成定义正文（`Persona`），`omitProjectContext` 的类型不加载 memory 与 git 状态；Tool Profile 按子会话自己的模型选；hooks 不发 SessionStart、Stop、SessionEnd（T38 的 SubagentStart/SubagentStop 之前）。
 - `isolation: worktree`（T35，ADR-0052）：调用参数或定义要求时，`ChildSession.open` 先 `subagent/start`（带 `isolation`）再按 Core 答的 `cwd` 创建 Pi 会话（会话文件按 cwd 放置，所以登记在前，`sessionFile` 不再随登记发送）；结束时 `finishInCore` 返回保留下来的 worktree，`#execute` 把 `worktreeKept` 的说明接在报告后。打开失败时照常 `subagent/finish`，Core 据此清理。
 - `maxTurns` 到达后中止并把结果标 `partial`：报告取最后一条真实回复，跳过中断补齐写的标记（`isInterruptionMarker`）。前台运行随调用的 abort 信号中止（父会话中断）；后台运行不随中断结束，`close` 与 `subagent/stop` 中止它，结束后经 `harness.remind` 的 `backgroundTask` 提醒回报；进程重启后 `recover()` 把记录中仍在运行的后台运行标为 `interrupted` 并提醒。
-- 同进程易错点：MCP 扩展按会话实例化，每个子会话各起一份 server 进程（T36 的共享池之前）；扩展加载器的模块级缓存按 cwd 失效，子会话与父会话 cwd 相同不受影响；不要在子会话代码里改 `process.env` 或读 `process.cwd()`。
+- 同进程易错点：子会话与主会话共用工作区的 MCP 池（T36，见下节）；扩展加载器的模块级缓存按 cwd 失效，子会话与父会话 cwd 相同不受影响；不要在子会话代码里改 `process.env` 或读 `process.cwd()`。
 
 ## 后台任务（T32，ADR-0049）
 
@@ -61,6 +61,25 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - 能力 `terminalTasks`（T33，ADR-0050）：`Bash`（不含 PowerShell）有 PiArc 自有的 `terminal`，为真时隐含后台，命令在会话的 PiArc 终端里运行；结果文案说明屏幕文件与命令结束通知（`taskText` 的终端分支）。L3 allowlist 登记了这个有意偏离。
 - `session/remind` 进 `SessionRegistry.remind`：`SessionHarness.remind` 带 `key` 时文本原样、同键替换、分支上已有同类型同来源的已送达提醒就答 `delivered`；`wake` 且会话空闲时开一个 `wake` 回合：写 `piarc.input`（`action: wake`）后以排队的提醒消息 `sendCustomMessage(…, { triggerTurn: true })` 启动运行。`wake` 回合不是分支点（`branches.ts`），历史里提醒条目归入该回合（`history.ts`）。
 - 后台子 agent 的通知仍由 Agent Host 排队（ADR-0048），Core 只登记与停止它的任务。
+
+## MCP（T36，ADR-0053）
+
+- 位置：`src/mcp/`。`pool.ts` 是工作区连接池（每个 Agent Host 一个，`host.ts` 在 Core 开启 `mcpPool` 时创建），`session.ts` 是每个会话的 PiArc MCP 扩展（`McpSession`），`connection.ts` 是一个 server 的连接（MCP 客户端、工具缓存、OAuth），`stdio.ts` 是自写的 stdio 传输，`config.ts` 解析 Core 的 `mcp/servers`，`vault-store.ts` 是 OAuth 状态的保险箱存储，`sign-in.ts` 是 `mcp/login`。提示文本在 `harness/prompts/mcp.ts`（改后跑原创性检查）。
+- 接管内置扩展：会话运行时不再加入 Pi 的 `createMcpExtension()`，而是把 `McpSession.extension` 放在扩展列表最前（工具先注册，闸门与预算包住它们）；codemode 不加载，Pi 的 `.pi/mcp.json`、`mcp-auth.json` 不读写。`ToolSearch` 是 Pi 的 `createToolSearchExtension()`，经一个包住 `ExtensionAPI` 的 Proxy 把 `registerTool` 改成规范名与 PiArc 的描述，其余成员原样转发（`Reflect.apply`）。
+- 配置只来自 Core 的 `mcp/servers`（来源、信任、启停、`${VAR}` 展开都在 Core），`mcp/status` 先 `refresh()` 再回答：定义变化的 server 换新连接。不要在 Agent Host 读任何 MCP 配置文件。
+- 租约与空闲：会话 `session_start` 时 `attach`、`session_shutdown` 时 `detach`；空闲阈值来自 `mcp.idleTimeoutSeconds`（默认 600 s），计时用 `PoolClock`（测试经 `HostOptions.mcpClock` 注入手动时钟）。有租约时失败按 1 s 起倍增至 60 s 重试，`needsAuth` 不重试。
+- roots：工作区根加已打开会话所在的 `.piarc/worktrees/<名称>/`，不是会话的 cwd（一个连接被多个会话共用）；stdio server 的工作目录是工作区根，定义的 `cwd` 相对它解析。会话进出改变 roots 时发 `notifications/roots/list_changed`。
+- 暴露：会话的 MCP 工具数不超过 `mcp.deferThreshold`（默认 30）时直接声明，超过时注册但不激活（`alwaysLoad` 除外）并激活 `ToolSearch`，命中经 `setActiveTools` 激活（这里用 `setActiveTools` 是对的：被激活的是池注册的工具，与子 agent 过滤不同）。首个回合最多等 `STARTUP_WAIT_MS`（10 s）让连接中的 server 连上，instructions 进 system prompt 的 `mcp_servers` 段；之后的变化只经 `mcpChanged` 提醒。
+- 裁决：工具 `_meta["anthropic/requiresUserInteraction"]` 为真时 `policy/evaluate` 带 `requiresUserInteraction: true`（`McpSession.requiresUserInteraction`），Core 总是询问。
+
+易错点：
+
+- 不要用 pi-mcp 的 `StdioTransport`：它以 `detached` 启动 server，Agent Host 被杀时 server 成为孤儿。`stdio.ts` 让 server 留在 Agent Host 的进程组，关闭顺序是关 stdin（1 s）→ `SIGTERM` 进程树（2 s，macOS 先经 `/bin/ps` 收集子孙）→ `SIGKILL`；Windows 用 `taskkill /T /F`。
+- server 的环境是 Core 给的命令环境加 `serverEnv` 的补充（PATH 最前是 `dirname(process.execPath)` 即内置 Node，`TMPDIR`、`TEMP`、`TMP`、`npm_config_cache`、`npm_config_update_notifier` 取 Agent Host 的值），再加定义的 `env`；不要把 `process.env` 整个传下去（`PI_PACKAGE_DIR` 等内部变量不给 server）。`npx` 因 Seatbelt 得到 `EPERM` 时错误里有改用 registry 包或 tarball 的提示（I40）。
+- 第一次列出工具也算"工具变化"（`connection.ts` 的 `changed` 含 `!this.listed`），否则先登录后连上的 server 不会注册工具。
+- `mcp/statusChanged` 没有会话头：新增类似的工作区级通知要加进 `piarc-host` 的 `HOST_NOTIFICATIONS`，否则 Core 当作无效通知丢弃。客户端收到 `core/mcp` 后不要再请求 `mcp/status`（它会 `refresh` 再发 `statusChanged`，形成循环）。
+- OAuth 状态在保险箱键 `mcp/<server>`；刷新前取 `secrets/lock`，失效的锁写入得到 `secretLockLost`。pi-mcp 只使用 `serverUrl` 相同的状态。
+- 子 agent 的内联 server 经 `pool.addTemporary(子会话 id, defs)` 加入（键为 `owner\0name`），子会话结束即关闭；`tool-filter.ts` 的 `WithInlineServers` 让它们的 `mcp__<server>__…` 通过过滤。
 
 ## 子目录说明
 
@@ -72,11 +91,11 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 
 - 不要调用 `process.chdir`，也不要读 `process.cwd()` 推断会话目录：Pi 按每个会话的 `cwd` 解析工具路径。
 - 不要在会话代码里改 `process.env`：bash 工具的子进程继承它，所有会话共享。
-- Pi 的 MCP 扩展、默认会话目录、默认 `auth.json` 读进程级的 `getAgentDir()`，不看 SDK 的 `agentDir`。`main.ts` 把 `PI_CODING_AGENT_DIR` 固定为 `<data>/pi`，`SessionRegistry` 构造时校验；测试直接用注册表时也要先设它。
+- Pi 的默认会话目录、默认 `auth.json` 读进程级的 `getAgentDir()`，不看 SDK 的 `agentDir`（Pi 的 MCP 扩展也是，T36 起不再加载）。`main.ts` 把 `PI_CODING_AGENT_DIR` 固定为 `<data>/pi`，`SessionRegistry` 构造时校验；测试直接用注册表时也要先设它。
 - `SettingsManager.create()` 默认 `projectTrusted: true`：注册表总是传 `false`，由信任钩子改成 Core 的回答。Pi 的 `project_trust` 扩展事件、`<agentDir>/trust.json` 与 `defaultProjectTrust` 只在 Pi 的 CLI 路径生效，SDK 路径不经过它们；不要调用 Pi 的 `resolveProjectTrusted`。
 - `ModelRuntime` 是工作区共享的：扩展注册的 provider 对所有会话可见。
-- 关闭会话要走 `AgentSessionRuntime.dispose()`：单独的 `session.dispose()` 不发 `session_shutdown`，MCP 不会断开。
-- MCP 扩展按会话实例化：同一个 server 被两个会话配置时会起两份进程（共享池是 T36）。
+- 关闭会话要走 `AgentSessionRuntime.dispose()`：单独的 `session.dispose()` 不发 `session_shutdown`，会话占着的 MCP 租约不会交还，池不会空闲断开。
+- 一个 MCP server 在工作区只有一份连接（T36 的池）：不要在会话或子会话里另起 MCP 客户端。
 - 扩展加载器的模块级缓存按 cwd 失效，不同 cwd 的会话交替加载文件型扩展会互相清空它；Harness Kit 用内联工厂不受影响。
 - Pi 丢弃被中断的 assistant 消息；中断后的对话靠 Harness Kit 补写的结果与中断标记保持角色交替（I18 已处理，ADR-0026）。预检期间中断时，Pi 可能在真实工具结果与补齐结果之间写一条 aborted 回复。模型上下文在 pi-ai 的配对转换之前先移除其本来就会丢弃的失败或中断回复，避免为同一调用发送两次结果。
 

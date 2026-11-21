@@ -14,7 +14,7 @@
 - 只用自建的 pi-ai provider（`createProvider`），auth 只返回常量测试 key；不用内置 anthropic provider，也不碰任何 OAuth 登录（ADR-0006）。测试 key 不得包含 `sk-ant-oat`：pi-ai 见到它会切到 OAuth 路径。
 - API 实现从 pi-ai 的公开子路径导出 `@earendil-works/pi-ai/api/<api>.lazy` 取得（主入口不导出它们），不深度导入 `dist/`。
 - 场景文件在 `scenarios/`，一个文件一个场景，格式见 testing.md 第 10.3 节。
-- `src/mcp-echo-server.ts` 是 stdio MCP 测试夹具（S3 用），由 Node 直接运行（类型剥离，只能用可擦除的 TS 语法，只导入 Node 内置模块）：`node src/mcp-echo-server.ts <server 名>`。
+- `src/mcp-echo-server.ts` 是 stdio MCP 测试夹具（S3、T36 用，按 MCP 规范手写，不依赖 pi-mcp），由 Node 直接运行（类型剥离，只能用可擦除的 TS 语法，只导入 Node 内置模块）：`node src/mcp-echo-server.ts <server 名>`。工具 `echo`、`whoami`（pid、进程组、Node、`MCP_ECHO_SHOW` 点名的变量）、`add_tool`（发 `list_changed`）；环境变量 `MCP_ECHO_TOOLS`（多出 `extra_<n>`）、`MCP_ECHO_INTERACTIVE`（`requiresUserInteraction`）、`MCP_ECHO_INSTRUCTIONS`、`MCP_ECHO_STUBBORN`（只有 SIGKILL 能结束）、`MCP_ECHO_PID_FILE`、`MCP_ECHO_START_LOG`（每次启动追加一行 `{server, pid}`）。
 - 同样由 Node 直接运行的还有：`src/io-spy.ts`（T07-A02：经 `NODE_OPTIONS=--import=<file URL>` 预加载，记录对 `PIARC_IO_SPY_ROOTS` 下路径的 `fs` 调用与全部 `child_process` 调用，退出时写 `PIARC_IO_SPY_REPORT`）与 `src/ahp-fs-read-client.ts`（T07-A10：代替 Agent Host 计时 `fs/read` 往返）。Rust 端测试在 `crates/piarc-testkit/tests/` 中使用它们。
 
 ## 易错点

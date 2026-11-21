@@ -90,4 +90,5 @@
 - S3 在 macOS 上通过：工具副作用、中断、压缩、MCP 均按会话隔离。
 - I18：中断后的对话形态（相邻 user 消息）由 T14 定义，届时恢复中断场景的 `role_order` 校验。
 - MCP 共享连接池（同一 server 只起一份）由 T36 实现；替换内置 MCP 扩展时保留"按会话 cwd 与信任加载配置"的行为。
+  - T36 落地（ADR-0053）：配置改为按工作区由 Core 给出（信任按主 checkout），一个 server 在工作区只有一份连接，roots 是工作区根与活动 worktree，server 的工作目录是工作区根，不再按会话 cwd。第 3.4 节的用例改为 `sessions_of_a_workspace_share_one_mcp_server_process`：两个会话调用同一 server，pid 相同、结果各自返回。
 - Windows：W0 在 Windows 11 本机复跑通过（2026-11-16）：`cargo test -p piarc-testkit --test agent_host` 12 项，修复了两处只在 Windows 出现的测试问题（`canonicalize` 的 `\\?\` 路径让 Node 无法运行脚本；慢读者用例的 Windows 断言，见 S9 报告第 5 节）。CI 的 verify 在更早的 release 夹具失败处停止，下次推送后复核。

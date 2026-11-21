@@ -176,6 +176,24 @@ describe('the workspace MCP pool', () => {
     expect(textOf(again)).toContain(`(pid ${String(second)})`);
   });
 
+  it('a session reopened under the same id keeps the server process (I111)', async () => {
+    // Rewind and branch switches close and reopen the Pi session: the lease goes back and is
+    // taken again before the idle time, so the connection stays.
+    const { pool, clock } = makePool(() => config([server('kept')], 1_000));
+    await pool.refresh();
+    pool.attach('session-a', WORKSPACE);
+    await pool.call('session-a', 'kept', 'echo', { text: 'before' }, {});
+    const pid = pool.statusOf('kept').pid ?? -1;
+    await pool.detach('session-a');
+    clock.advance(500);
+    pool.attach('session-a', WORKSPACE);
+    clock.advance(999);
+    const after = await pool.call('session-a', 'kept', 'echo', { text: 'after' }, {});
+    expect(pool.statusOf('kept').pid).toBe(pid);
+    expect(textOf(after)).toContain(`(pid ${String(pid)})`);
+    expect(alive(pid)).toBe(true);
+  });
+
   it('a call in flight keeps the server connected past the idle time', async () => {
     const { pool, clock } = makePool(() => config([server('busy')], 1_000));
     await pool.refresh();
