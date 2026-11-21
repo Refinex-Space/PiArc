@@ -140,7 +140,7 @@
 | CAP-AGENT-DEF-001 | 读取 `.claude/agents` 与 `.piarc/agents` 的子 agent 定义，内置 general-purpose、Explore、Plan | FR-HN-04、ARCH-6.4 | T31 | `subagent-denied-type`<br>`subagent-general-purpose`<br>`subagent-tool-filter` | 已实现 |
 | CAP-AGENT-FILTER-001 | 子 agent 的工具按 tools、disallowedTools 过滤并移除提问与计划工具，调用被移除的工具在闸门处拒绝 | FR-HN-04、ARCH-6.4 | T31 | `subagent-explore-fast`<br>`subagent-tool-filter` | 已实现 |
 | CAP-AGENT-HOOKS-001 | 子 agent 定义中的 hooks 只在其运行期间生效，项目级定义的 hooks 信任前不执行 | FR-HN-04、ARCH-6.3.1 | T31 | `subagent-hooks`<br>`subagent-hooks-untrusted` | 已实现 |
-| CAP-AGENT-INTERRUPT-001 | 中断主会话时进行中的子 agent 一并中止，未完成的工具调用补齐已中断结果 | FR-HN-04、ARCH-6.15 | T31 | `subagent-interrupt` | 已实现 |
+| CAP-AGENT-INTERRUPT-001 | 中断主会话时进行中的子 agent 一并中止，未完成的工具调用补齐已中断结果 | FR-HN-04、ARCH-6.15 | T31 | `subagent-interrupt`<br>`subagent-interrupt-starting` | 已实现 |
 | CAP-AGENT-LIMIT-001 | 子 agent 深度上限移除 Agent 工具，并发上限立即返回说明上限的错误 | FR-HN-04、ARCH-6.4 | T31 | `subagent-concurrency`<br>`subagent-depth` | 已实现 |
 | CAP-AGENT-RUN-001 | 子 agent 使用任意服务商模型、可后台运行、最多 3 层、默认不继承父会话历史 | FR-HN-04、ARCH-6.4、ARCH-6.15 | T31 | `subagent-background`<br>`subagent-compaction`<br>`subagent-explore-fast`<br>`subagent-general-purpose`<br>`subagent-max-turns`<br>`subagent-worktree` | 已实现 |
 | CAP-BG-COMMAND-001 | run_in_background 启动的命令立即返回任务 id 与输出文件，模型用 Read 读取输出 | FR-TL-04、ARCH-6.11 | T32 | `bg-run-in-background` | 已实现 |
