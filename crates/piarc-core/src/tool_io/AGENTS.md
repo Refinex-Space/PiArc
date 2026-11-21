@@ -37,11 +37,17 @@
 
 - `tool_io/web.rs` 应答 `web/fetch`：`policy::claim_fetch` 消费同一调用、同一 URL 的 grant（一次批准一次抓取），`piarc_web::Fetcher` 在第一次使用时建（系统信任库），抓取登记在会话的 `running`（键 `web:<调用 id>`），回合中断与连接断开都停止它；每次写 `kind: "webFetch"` 审计。限值与允许列表在 `CoreConfig.web`（`WebConfig`），`createForTests` 读 `PIARC_TEST_WEB_ALLOWLIST`，L2 为有 `web` 段的场景放行 `127.0.0.1`、`localhost`。`assess.rs`、`policy/hooks.rs` 取 WebFetch 主机一律用 `piarc_web::rule_host`。
 
+## WebSearch（T38，ADR-0055）
+
+- `tool_io/web_search.rs`：`web/searchBackend`（不带会话，入站处理者与 `exec/shells` 一样放行）读用户 `settings.json` 的 `webSearch.backend` 与保险箱 `websearch/<后端>` 是否有 key；`web/search` 经 `policy::claim_search` 消费同一调用、同一 `query` 的授权，key 只从保险箱读（`SecretsService::value_of`），请求经 `piarc_web::search::search`（WebFetch 的 `Fetcher`、`Reach::Configured`；端点可由 `CoreConfig.web.search_endpoints` 换成测试服务），登记在会话的 `running`（键 `search:<调用 id>`），写 `kind: "webSearch"` 审计（查询、后端、结果数，不含 key）。设置窗口的读写在 `sessions/web_search.rs`（`Hub::web_search_settings`、`set_web_search_backend`、`set_web_search_key`）。
+
 ## Hooks（T25，ADR-0039）
 
 - `hooks/mod.rs` 的 `HooksService` 用 `TrustService::permission_settings` 读 hooks（未信任项目的不生效），`plan`/`execute` 经 `ProcessTreeSpawner` 运行（命令环境首次要解析登录 shell，只在 `plan` 选出 handler 后解析：`ToolIo::run_hooks`、裁决第 2、8 步，`execute` 显式接收它；否则没有 hooks 的输入也要等登录 shell）、写审计（`kind: "hook"`）、发 `core/notices`（`type: "hook"`）、长文本落到 `<会话 tmp>/hooks/`，时长取 `CoreConfig.hooks`。`tool_io/hooks.rs` 应答 `hooks/run`（入站处理者只查 `cwd` 在本工作区内，已关闭会话的 SessionEnd 也能运行）、`user_prompt_submit`（阻断为 `permissionDenied`、`hookBlocked`）与 `notification_hooks`；hook 令牌登记在会话的 `running`，中断与关闭结束其进程树。
 - 顺序（T30，ADR-0046）：`hooks_run` 收到 SessionStart（非 `compact`）时先 `HooksService::starting` 登记再运行，`user_prompt_submit` 先 `started` 等登记清零：Agent Host 打开会话时先写出这个 `hooks/run` 再应答，所以登记总在该会话的提示之前。不要在登记之前加 `await`。L2 `hooks-session-start-order` 用慢的 SessionStart hook 锁定它。
-- `tool_io/hooks_tests.rs` 用真实 Core（命令环境固定 `PATH`，否则 cargo 的 `DYLD_*` 关掉规则 allow）；Bash 规则 allow 不覆盖文件写入，测会话规则用 `sed -n` 而不是 `touch`。
+- `tool_io/hooks_tests.rs` 用真实 Core（命令环境固定 `PATH`，否则 cargo 的 `DYLD_*` 关掉规则 allow）；Bash 规则 allow 不覆盖文件写入，测会话规则用 `sed -n` 而不是 `touch`。T38 的用例在 `hooks_m3_tests.rs`（`hooks_tests` 的子模块，共用 fixture）。
+- T38（ADR-0055）：`HooksService::execute` 给 `Runner` 装上 `http` 端口（`WebPort`，第一次用时建 `Fetcher`）与 `prompt` 端口（`SessionJudge` → `HookOutlet`：`sessions/hooks.rs` 的 `Hub::connect_hooks` 在运行时启动时接上，按主会话 id 找到工作区的 Agent Host 发 `hooks/prompt`）；`Plan` 带上本次设置的 `allowedHttpHookUrls`、`httpHookAllowedEnvVars` 与用户层的 `hookAllowedEnvVars`，变量值取 `Launch.expansion`（登录 shell 环境）。`Facts` 有 `main_session_id` 与 `agent`（子会话从 `Link` 取）：输入的 `session_id`、`transcript_path`、`prompt_id` 用主会话的，子会话另加 `agent_id`、`agent_type`；`new_prompt` 在每次 UserPromptSubmit 生成 `prompt_id`；`effort` 只留在工具类事件、Stop、SubagentStop、PostToolBatch（`policy/evaluate` 的 `effort` 经 `tool_request` 进输入）。`hooks_run` 接受 `subagentStart`、`subagentStop`（subject 为 agent 类型）、`postToolBatch`（`host_request` 组装请求）。
+- 项目 hook 的权限更新（I122）：`policy/hooks.rs` 的 `apply_permissions` 看 `RequestAnswer.updated_by`，来源是项目设置层或项目内的 skill、子 agent 定义时，`setMode` 只经 `session_mode` 改本会话，写进 `.piarc/` 的 allow 规则不 `confirm_items`。
 
 ## 文件根与设置来源（T35，ADR-0052）
 

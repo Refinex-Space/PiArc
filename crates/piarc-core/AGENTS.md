@@ -39,6 +39,7 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 订阅：调用过 `secrets/getAll` 的连接收到每次写入的 `secrets/changed`；每个连接一个推送任务，关闭的连接在下一次推送时移除。
 - 锁：`secrets/lock` 一组键一起锁，任一被占就等待；未带 `lockId` 的写入临时锁该键；`unlock`、租约（`DEFAULT_LOCK_LEASE` 30 s）、持有者连接结束都会释放；失效的 `lockId` 写入返回 `secretLockLost`。
 - 参数错误不带 serde 的原文（它会引用出错的值，可能是凭据）。不要在日志里写值。
+- `websearch/` 键只给 Core 自己（T38，`CORE_ONLY_PREFIXES`）：Agent Host 的 `secrets/get`、`set`、`delete`、`lock` 点名它们一律 `permissionDenied`，`secrets/getAll` 不列出，写入不推送 `secrets/changed`。Core 自己读写用 `value_of`、`store_value`（后者以一个内部 peer 取同样的写锁）。
 - 测试与 `piarc-testkit` 经本模块的再导出使用 `MemorySecretStore`、`test_master_key_name`（testkit 不能直接依赖 `piarc-secrets`）。
 - `identity::APP_IDENTIFIER` 是 D2 决定的应用标识 `cn.piarc.desktop`（bundle id 与 AppUserModelID 也取它）。发布后不能再改：改了保险箱找不到主密钥，系统授权也要重给。
 

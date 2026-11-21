@@ -166,15 +166,9 @@ differences:
 
   # ── Behavior: hooks ─────────────────────────────────────────────────────────────────────
   - scenario: 'hooks-*'
-    path: 'hooks.calls["*"].fields.prompt_id'
-    claude_code: '>=2.1.318 <2.2.0'
-    reason: T25 (ADR-0039) gives hooks the common fields session_id, transcript_path, cwd, hook_event_name and permission_mode; Claude Code 2.1.318 also sends prompt_id on every event. PiArc does not track a prompt id yet.
-    follow_up: T38
-  - scenario: 'hooks-*'
     path: 'hooks.calls["*"].fields.effort'
     claude_code: '>=2.1.318 <2.2.0'
-    reason: Claude Code 2.1.318 sends the session's effort on tool events and Stop; PiArc's hook input does not carry the model's effort yet (and the mock model has none).
-    follow_up: T38
+    reason: Both send the session's effort on tool events and Stop (PiArc from T38, ADR-0055), but only for a model with effort levels; the L3 mock model has none on PiArc's side, while Claude Code 2.1.318 reports its own default.
   - scenario: hooks-lifecycle
     path: 'hooks.calls["start#0"].fields.model'
     claude_code: '>=2.1.318 <2.2.0'
@@ -205,6 +199,12 @@ differences:
     reason: The order differs only by PiArc's Notification hook (see that entry).
 
 excluded:
+  - scenario: hooks-m3-subagent
+    reason: The subagent runs on a second mock endpoint chosen by its definition's model (mock-child), and the scenario counts each endpoint's requests; `claude -p` sends a subagent's requests to the one base URL of the run, so the two request streams cannot be told apart.
+  - scenario: hooks-m3-prompt
+    reason: The prompt hook's judgement is an auxiliary request whose answer the scenario scripts as a step; the L3 mock answers auxiliary requests with a fixed reply without consuming steps (ADR-0046), so the judgement cannot be steered on either side.
+  - scenario: hooks-m3-post-tool-batch
+    reason: A PostToolBatch block ends PiArc's run by aborting it before the next request (Pi 1.5.2's turn_end cannot end a run, ADR-0055), which leaves an interruption marker and an interrupted turn by design; the turn shape cannot match Claude Code's.
   - scenario: perm-critical-delete
     reason: It runs deletions of the home directory, the workspace and the filesystem root; a difference in Claude Code's answer would delete real files outside the run's temporary root, so it is not run against Claude Code.
   - scenario: perm-powershell-whole

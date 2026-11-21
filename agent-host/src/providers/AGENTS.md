@@ -9,6 +9,11 @@
 - Tool Profile：`#open` 按会话的模型（指定的，或 `buildSessionContext().model`）选 `DEFAULT`/`conservativeProfile`，保守时 `onlyConservative` 只留 `CONSERVATIVE_TOOLS`，`todoWatch` 用 3 轮且无清单也提醒；实际模型与预测不同就立即重开。`setModel` 或 `setPreferences` 改变 Profile 时空闲会话 `#reopen`，运行中的标 `profileStale`、回合结束后重开。不要在运行中改工具描述（Pi 注册时复制描述）。
 - 登录（`providers/login.ts` 的 `Logins`，设置 Host 上）：`models/login/start` 调 `ModelRuntime.login(provider, 'oauth', interaction)`，`notify`/`prompt` 转 `ui/loginInteraction`（无期限，取消经 `AbortSignal`），提问的空答复即取消；`models/logout`。`loginProviders` 列出带 `auth.oauth` 的服务商（Anthropic 的已被 policy 移除）。OAuth 流程模块经 `registerLazyOAuthFlows` 打进 bundle。`--test-oauth-provider` 的 `flow` 可选 `authorizationCode`（本地回环回调）与 `deviceCode`（轮询），对接 `piarc-testkit` 的 mock 授权服务器。
 
+## 原生网页搜索（T38，ADR-0055）
+
+- `providers/web-search.ts` 是服务商原生搜索的线格式适配：`nativeSearch(model, filters)` 给出 `onPayload`（只加入服务商的搜索工具，Anthropic 为 `web_search_20250305`、`max_uses` 1、域名过滤二选一）与 `onEvent`（读 `server_tool_use`、整块给出的 `web_search_tool_result` 与 `citations_delta`），`outcome()` 给出来源、错误码与是否真的搜索过。pi-ai 1.5.2 的 Anthropic 适配器不为这些块建内容、也不报错。能力表的 `nativeWebSearch` 来自 `nativeSearchCapability`，用户的每模型设置 `nativeWebSearch` 覆盖（`ModelPreferencesStore.nativeWebSearch`）。OpenAI Responses、Gemini 的原生搜索未接（I164）。
+- 辅助模型通道（`harness/auxiliary.ts`）的请求可带 `model`、`onPayload`、`onProviderStreamEvent`：Pi 会话的流函数把选项原样交给 `modelRuntime.streamSimple`。
+
 ## 模型别名（T31，ADR-0048）
 
 - `providers/aliases.ts` 的 `resolveModel(spec, { aliases, inherit, available })` 是模型说明的唯一解析器（子 agent 的定义与调用参数；T37 的 skills、T38 的 hooks 复用）：`inherit` → 别名（`MODEL_ALIASES`，`haiku`/`sonnet`/`opus` 未单独设置时经 `aliasTarget` 跟随 `fast`/`balanced`/`strong`）→ `provider/model` → 在可用模型中唯一的模型 id。别名未设置或目标不可用时回退为 `inherit` 并返回 `aliasUnset`/`aliasUnavailable` 警告（`describeAliasWarning` 给出文字），无法解析时抛错并列出别名。表来自 Core 的 `agents/list`（用户级与工作区 `.piarc/settings.json` 合并）。

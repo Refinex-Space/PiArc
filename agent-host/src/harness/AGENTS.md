@@ -20,6 +20,7 @@ Harness Kit：PiArc 写的 Pi 扩展（system prompt 与 memory、权限预检�
 ## Hooks（T25，ADR-0039）
 
 - `harness/hooks.ts` 的 `SessionHooks`（Core 启用 `hooks` 能力时每会话一个，排在结果预算之后）把 Pi 的 `session_start`、`session_shutdown`、`tool_result`、`agent_before_settle` 经 `hooks/run` 交给 Core（不在本进程执行命令，失败照常进行）；PreCompact、PostCompact 由 `compaction.ts` 调 `preCompact`、`postCompact`。hook 加的上下文（`additionalContext`、纯文本 stdout）是 `hookContext` 提醒（T27，正文 "Context from a <事件> hook:"），PostToolUse 的替换输出与 `decision: block` 的反馈仍在工具结果里（反馈首行 `[PiArc hook context]`）；Stop 的续跑理由以同格式的 `piarc.reminder` 草稿条目送达。SessionStart 不阻塞会话打开，首个 `before_agent_start` 等它。
+- T38（ADR-0055）：`turn_end`（本轮有工具结果且正常完成）报告 PostToolBatch，`tool_calls` 带每个调用的规范名、输入（`preflightInput` 解析过的路径）、id 与模型收到的结果；上下文是 `hookContext` 提醒（hooks 扩展排在提醒扩展之前，所以随下一次请求送达），block 或 `stop` 时 `ctx.abort()`（Pi 的 `turn_end` 不能结束运行）并把理由作为 `hookStoppedRun` 提醒留给下一次输入。子会话（`subagent: true`）的 `agent_before_settle` 报告 SubagentStop（带 `agent_transcript_path`，续跑与提醒同 Stop），`subagentStart()` 由 `ChildSession.run` 在首次 `prompt` 前调用。工具类事件与 Stop 类事件的输入带 `effort`（`SessionHooksOptions.effort`）。这一轮多一次 `hooks/run` 往返：后台任务的完成提醒可能因此赶上同一回合的下一次请求（`bg-completion-reminder` 不再断言它只在下一回合）。
 - `preflight` 的 `updatedInput` 原地替换 `event.input`，`context`、`stop` 记在 `SessionHooks.notes` 到 `tool_result` 处理；Core 在 hooks 前发 `policy/pending` 停住期限，不要去掉 `policy/evaluate` 的期限。`hooks/run` 无期限，超帧输入由 `fitFrame` 截断（否则 Core 丢帧、回合永远等）。PreCompact 的指令并入 PiArc 自己的摘要请求（`compaction.ts`）。
 
 ## 宿主工具（T26，ADR-0042）

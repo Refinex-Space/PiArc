@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.45（2026-11-21） |
+| 版本 | 2.46（2026-11-21） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -269,6 +269,7 @@ PiArc/
 | [0052](../adr/0052-worktrees-search-windows-and-background.md) | 会话 worktree 在 `.piarc/worktrees/<名称>/`、分支 `piarc/<名称>`；worktree 会话的文件根是 worktree、设置与信任的来源是主工作区；子 agent 的 worktree 在 `subagent/start` 创建、无改动时连分支一起清理；归档询问与 30 天清理（不强删）；全文搜索用 FTS5 trigram；多窗口共用 Core，窗口状态文件；托盘计数来自 Core 的 `core/activity`；`piarc://` 与打开文件夹只做定位；Windows 注册随 Velopack 钩子 | worktree 写入不触发受保护路径审批、规则只有一份；中文可检索；关窗口不打断工作；链接不能触发执行 |
 | [0053](../adr/0053-mcp-extension-and-connection-pool.md) | PiArc 的 MCP 扩展替换 Pi 的（不加载 codemode，不读 `.pi/mcp.json`）；Core 合并 local > project > user 的来源、展开 `${VAR}`、按信任与工作区启停给出 `mcp/servers`；Agent Host 的池按租约连接、空闲断开、退避重连，roots 为工作区根与活动 worktree；自写 stdio 传输，server 留在 Agent Host 的进程组、环境取命令环境并前置内置 Node；超过阈值经 `ToolSearch`（Pi 的 `tool_search` 换规范名）延迟加载；instructions 进第 6 段、变化经 `mcpChanged` 提醒；OAuth 状态在保险箱 `mcp/<server>`；`mcp/statusChanged` 是工作区级通知 | 同一 server 一份进程且不留孤儿；token 不落盘；用户现有的 MCP 配置直接可用；工具多时 system prompt 不膨胀 |
 | [0054](../adr/0054-skills-commands-and-output-styles.md) | Core 发现并解析 skills、命令文件、Pi 模板与输出风格（项目优先于用户，同级 `.piarc` > `.claude` > Pi），Pi 自带的加载关掉；system prompt 第 3 段是输出风格、第 5 段是 skills 索引，中途变化经 `skillsChanged`、`outputStyle` 提醒；`Skill` 是只读工具，经 `skills/invoke` 加载正文；`/名称` 由 Core 在 UserPromptSubmit 之前展开；`allowed-tools` 是回合级 allow 来源、skill 的 hooks 从调用起到会话结束生效，项目来源要求信任；`$1` 起的位置参数 | 带 `.claude/skills`、`.claude/commands` 的仓库直接可用；授权与 hooks 受 Core 的信任与规则约束；system prompt 不被改写 |
+| [0055](../adr/0055-websearch-and-hooks-m3.md) | `WebSearch` 经同一闸门裁决后，模型支持原生搜索时用辅助模型通道向同一服务商发一次只带服务端搜索工具的请求（适配在 `providers/web-search.ts`），否则经 Core 的 `web/search` 用第三方后端（首个为 Brave Search，key 只在 Core 的保险箱）；都不可用时不进工具集。`http`、`prompt` handler 与 command 共用 Core 的执行框架（端口注入：`piarc-web` 发请求、Agent Host 的 `hooks/prompt` 做判定）；SubagentStart、SubagentStop、PostToolBatch 由 Agent Host 报告；子 agent 里的 hooks 输入带 `agent_id`、`agent_type`；`prompt_id`、`effort`；项目 hook 的权限更新不越出信任 | 所有搜索后端经同一审批、规则、hooks 与审计；API key 不进 Agent Host；hooks 只有一套执行器 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -520,6 +521,8 @@ T32 落地（ADR-0049）：`KillShell` 的参数是 `shell_id`，停止本会话
 
 T29 落地（ADR-0045）：WebFetch 的网络请求由 Core 发起（AHP `web/fetch`，能力 `webFetch`，功能 crate `piarc-web`）。请求必须指向一个已获准的 WebFetch 调用且 URL 与其参数相同，一次批准抓取一次；解析主机后对每个地址做 SSRF 检查（回环、私有、链路本地、组播、未指定、广播、保留网段及其 IPv6、IPv4 映射、NAT64、6to4 形式），只连接已检查的地址（防 DNS 重绑定），每次同站重定向重新检查；允许列表只来自 `CoreConfig.web`。同站重定向跟随（至多 10 次），跨站重定向把目标地址交给模型。上限在 `piarc_web::FetchLimits`：响应体 10 MiB、正文 100,000 字符、总时长 60 s。HTML 经 htmd 转 Markdown，文本类型按字符集解码，二进制拒绝，不支持压缩编码与 HTTP 代理（I112）。每次抓取写 `webFetch` 审计。Agent Host 的工具（`harness/web-fetch.ts`）再经辅助模型通道（`harness/auxiliary.ts`）按调用的 `prompt` 提取，提取提示自写，跨站重定向时不调用模型。
 
+T38 落地（ADR-0055）：`WebSearch` 的参数为 `query`、可选的 `allowed_domains`、`blocked_domains`，与其他工具一样经 `tool_call` 闸门（Manual 询问，`WebSearch` 规则与 PreToolUse、PermissionRequest hooks 生效）。会话打开时，模型支持原生搜索（能力表的 `nativeWebSearch`：服务商 `anthropic` 且线协议为 Anthropic Messages，或用户的每模型设置）或 Core 的 `web/searchBackend` 报告第三方后端可用，才注册该工具。执行时：原生后端经辅助模型通道向会话的模型发一次请求，`onPayload` 只加入 `web_search_20250305`（`max_uses` 1），`onProviderStreamEvent` 收集 `web_search_tool_result` 与引用（`agent-host/src/providers/web-search.ts`）；第三方后端经 Core 的 `web/search`（消费同一调用、同一查询的授权，`piarc_web::search` 的 `Backend` 适配，首个为 Brave Search，key 在保险箱 `websearch/<后端>`，Agent Host 读不到，写 `webSearch` 审计）。结果统一为标题、URL、摘要（至多 10 条，按域名过滤），工具结果列出地址并要求回答注明来源，transcript 的 `webSearch` 条目显示来源链接，点击经第 8.5 节的确认后打开。设置是用户级的 `webSearch.backend` 与每模型的 `nativeWebSearch`。
+
 ### 6.2 权限系统
 
 #### 6.2.1 模式
@@ -601,6 +604,18 @@ T25 落地（ADR-0039）：
 | 决策 | `piarc_hooks::Decision` 按事件合并：PreToolUse deny > ask > allow（`defer` 按 ask），`updatedInput` 在规则之前替换参数；PermissionRequest deny 优先，allow 的 `updatedInput` 重新经过裁决，`updatedPermissions` 支持 `addRules`（会话与 `.piarc/` 文件）和 `setMode`（会话）；PostToolUse 可替换输出并追加上下文与反馈，PostToolUseFailure 只追加；PreCompact 的纯文本 stdout 作为摘要指令 |
 | 呈现与审计 | 每个 handler 一行 `audit_events`（`kind: "hook"`）；`systemMessage`、`stopReason` 与错误经 `core/notices`（`type: "hook"`）显示在客户端的提示行；超过 10,000 字符的上下文写入会话临时目录 `hooks/`，只送 2,000 字符预览与路径 |
 
+T38 落地（ADR-0055）：
+
+| 部分 | 实现 |
+|---|---|
+| handler | `piarc_hooks::Handler` 的 `Action` 为 `Command`、`Http`、`Prompt`，`Runner` 并行运行三种并统一超时与取消；`http` 经注入的 `HttpPort`（Core 用 `piarc_web::Fetcher::call`，`Reach::Configured`，响应至多 1 MiB），`prompt` 经注入的 `JudgePort`（Core 经 `hooks/prompt` 请会话所在工作区的 Agent Host 用辅助模型通道判定，`model` 经 `resolveModel`）；两者的回答译成命令的输出协议后走同一个 `Outcome` 与 `Decision`。默认超时：`prompt` 30 s，`http` 同命令 |
+| 组合 | SessionStart 只运行 command；SessionEnd、Notification、PreCompact、PostCompact、SubagentStart 运行 command 与 http；其余事件三种都运行；不支持的组合列入配置诊断 |
+| 白名单 | `allowedHttpHookUrls`（`*` 通配，不在其中的 URL 不发请求）、`httpHookAllowedEnvVars`（与 handler 的 `allowedEnvVars` 同时允许的变量才插值，值取登录 shell 环境）；用户级 `hookAllowedEnvVars` 把列出的变量加进命令 hook 的环境（I93） |
+| `prompt` 判定 | `$ARGUMENTS` 换成输入 JSON；`{ok, reason, impossible}` 按事件译为 deny（PreToolUse，`continueOnBlock` 不为真时同时结束回合）、续跑（Stop、SubagentStop，`impossible` 时不续）、阻断（UserPromptSubmit、PostToolBatch）、反馈（PostToolUseFailure，PostToolUse 视 `continueOnBlock`）；无法解析、超时为非阻断错误；审计记模型与 token |
+| M3 事件 | SubagentStart 在子会话首次请求前（matcher 为 agent 类型，`additionalContext` 进首个请求）；SubagentStop 取代子会话的 Stop（`agent_transcript_path`、`last_assistant_message`，续跑上限同 Stop）；PostToolBatch 在 Pi `turn_end`（一轮有工具结果时，`tool_calls` 带每个调用的输入与模型收到的结果；block 中止本次运行并把理由留给模型的下一次输入） |
+| 通用字段 | 子会话里的事件带 `agent_id`、`agent_type`，`session_id`、`transcript_path`、`prompt_id` 取主会话的；`prompt_id` 由 Core 在每次 UserPromptSubmit 生成；`effort` 由 Agent Host 经 `hooks/run` 与 `policy/evaluate` 给出，只出现在工具类事件、Stop、SubagentStop、PostToolBatch |
+| 权限效力 | PermissionRequest 的 allow 可代答 ask 规则、受保护路径与越界询问；项目的 hook 给出的 `setMode` 只改本会话，写进 `.piarc/` 的 allow 规则不确认进信任快照（I122） |
+
 #### 6.3.2 事件映射与分期
 
 | 事件 | 挂载点 | 里程碑 |
@@ -632,6 +647,8 @@ handler 类型：`command`（M2）→ `http`、`prompt`（M3）→ `mcp_tool`（
 - 子 agent 的文件编辑同样进入快照（Core 统一入口），这一点比 Claude Code 更完整。
 
 T31 落地（ADR-0048）：定义由 Core 的 `piarc_config::agents` 发现、解析与合并（来源顺序同上，项目两级从 cwd 向上、越近越优先；同名取整条；不认识的字段、`skills`（T37 前暂未生效；`isolation` 自 T35 生效、`mcpServers` 自 T36 生效）、项目级 `bypassPermissions`/`auto` 都作为警告列出，解析错误带行号），Agent Host 经 `agents/list` 取得并加上三个内置类型（`Explore`、`Plan` 只读、不加载 memory 与 git 状态，`Explore` 默认 `fast`）。子会话在 `agent-host/src/runtime/subagent-session.ts` 创建、`runtime/subagents.ts` 的 `SubagentRunner` 运行与计数（每棵树一份，超过并发上限立即报错，不排队），运行前经 `subagent/start` 在 Core 登记自己的会话 id（独立的文件状态表）并链接主会话：生效模式取定义与主会话当前模式中更严的一个，"本会话允许"的规则存于主会话，写入记在主会话当前回合的检查点下（带子会话 id），定义的 hooks 作为只在子会话运行期间生效的来源（项目级的要求项目受信任）。工具过滤顺序：父会话当前工具 → `tools` → `disallowedTools`（优先）→ 去掉 `AskUserQuestion`、`EnterPlanMode`、`ExitPlanMode`、`SuggestNextSteps` → 到达深度上限时去掉 `Agent`；集合外的工具经 Pi 的 `prepareLoadout` 隐藏声明从请求中隐藏，调用到达 `tool_call` 闸门被拒绝（`setActiveTools` 移除的工具在闸门前就以 "not found" 结束）。后台运行立即返回运行 id，结束后经 `backgroundTask` 提醒回报，不随主会话中断结束，关闭会话或卡片上的停止按钮结束它；运行中的子会话让工作区保持忙碌，空闲计时不回收其 Agent Host。子会话 JSONL 首条 `piarc.subagent` 记父会话与类型，`sessions` 表由它派生父子关系（schema v6），会话列表不含子会话。
+
+T38（ADR-0055）：子会话的开始与结束触发 SubagentStart、SubagentStop hooks（取代 SessionStart、Stop），子会话内触发的全部 hooks（设置、子 agent 定义与 skill 的）输入带 `agent_id`、`agent_type`。
 
 ### 6.5 Plan 模式、任务清单、下一步、提问
 
@@ -860,6 +877,8 @@ T29 落地（ADR-0045）：每模型设置（显示名、上下文窗口、图�
 
 T31 落地（ADR-0048）：别名表是设置键 `modelAliases`（`fast`、`balanced`、`strong`、`haiku`、`sonnet`、`opus` → `provider/model`），用户级 `settings.json` 与工作区 `.piarc/settings.json` 按键合并，设置窗口"模型与服务商"页的别名一节编辑用户级的表并显示每个别名的模型能力摘要。`agent-host/src/providers/aliases.ts` 的 `resolveModel` 是模型说明的唯一解析器：`inherit` → 别名（`haiku`/`sonnet`/`opus` 未单独设置时跟随 `fast`/`balanced`/`strong`）→ `provider/model` → 唯一的模型 id；别名未设置或目标不可用时回退为 `inherit` 并在子 agent 卡上提示，无法解析时报错并列出别名；effort 不受支持时用模型默认并提示。辅助模型可以指向别名（`modelProviders.auxiliaryAlias`，按用户级表解析），设置键 `model`（可为别名）与 `effortLevel` 是新会话的默认模型与 effort。
 
+T38 落地（ADR-0055）：能力表新增 `nativeWebSearch`（服务端工具支持的第一项）：服务商 `anthropic` 且线协议为 Anthropic Messages 的模型为真，用户级 `modelProviders.models.<模型>.nativeWebSearch` 可覆盖；pi-ai 1.5.2 没有服务端工具的类型，由辅助请求的 `onPayload` 与 `onProviderStreamEvent` 接入。辅助模型通道可指定模型（原生搜索用会话模型，`prompt` hook 用其 `model`）。
+
 T21 的 `models/list` 返回可用模型的 `provider`、`id`、`name`、`contextWindow`、`maxOutput`、`vision`、`efforts`、`promptCache`、`toolReliability`。Agent Host 以锁定版本的 Pi 模型记录为基础，由 `providers/catalog.ts` 按完整提供商 ID 与模型 ID 应用覆盖。例如 `qwen-token-plan-cn/qwen3.6-plus` 根据百炼公布的额度规则标记支持缓存，Token Plan 缺少美元单价时显示费用未知。支持档位取 Pi 的有效集合并去掉 minimal。切换前核对实际历史里的 thinking 块，缓存写入单价按目标模型的价格分档选取。自定义端点可以分别选择 Anthropic Messages、OpenAI Chat Completions、OpenAI Responses 并填写多个模型 ID。
 
 ### 6.14 Claude Code 配置兼容矩阵
@@ -869,7 +888,7 @@ T21 的 `models/list` 返回可用模型的 `provider`、`id`、`name`、`contex
 | `CLAUDE.md` / `CLAUDE.local.md` / `AGENTS.md` 层级 | 完整 | 含 `@import`、懒加载 |
 | `.claude/rules/` | 完整 | 含 `paths:` |
 | `.claude/settings*.json` → `permissions` | 完整 | 规则语法、defaultMode（项目级不能设 bypass/auto）、additionalDirectories |
-| `.claude/settings*.json` → `hooks` | 部分 | 事件按 6.3.2 分期；handler 类型分期 |
+| `.claude/settings*.json` → `hooks` | 部分 | 事件按 6.3.2 分期；handler 类型分期（T38 起 `command`、`http`、`prompt`）；`allowedHttpHookUrls`、`httpHookAllowedEnvVars` 生效（T38） |
 | `.claude/settings*.json` 其他键 | 部分 | 只读取与 PiArc 功能对应的键，其余在设置诊断页列为"已忽略" |
 | `.claude/agents/` | 完整（字段子集） | 见 6.4 |
 | `.claude/skills/` | 完整 | `context: fork` 在 M5 |
@@ -1038,6 +1057,8 @@ T35 已实现（ADR-0052）：`subagent/start` 新增可选的 `isolation`（`wo
 T36 已实现（ADR-0053，能力 `mcpPool`）：Agent Host → Core 的请求 `mcp/servers`（`McpServersResult`：定义带作用域、来源文件、传输、可用性与原因；`env` 是 stdio server 的基础环境；`idleTimeoutMs`、`deferThreshold`；`overridden`、`issues`）；Core → Agent Host 的请求 `mcp/status`（先重读配置）、`mcp/reconnect`、`mcp/setEnabled`、`mcp/login`（带 `loginId`，经 `ui/loginInteraction` 交出授权页），后三者的结果是该 server 的 `McpServerStatus`；Agent Host → Core 的通知 `mcp/statusChanged`（`McpStatus`）没有会话头，是第一个工作区级通知：`piarc-host` 只对 `HOST_NOTIFICATIONS` 中的方法放行，Core 加上 `workspace` 发到路由 `core/mcp`。`policy/evaluate` 新增可选的 `requiresUserInteraction`，`AgentDefinition` 新增 `mcpInline`，`ReminderType` 新增 `mcpChanged`。Core API 新增 `mcpStatus(workspace)`、`mcpReconnect`、`mcpSetEnabled`、`mcpLogin`（工作区没有运行中的 Agent Host 时，`mcpStatus` 按配置回答），配置诊断报告新增 `mcp`（不支持的 server 与合并问题）。
 
 T37 已实现（ADR-0054，能力 `skills`）：Agent Host → Core 的请求 `skills/list`（`SkillsCatalog`：skills、合并后的命令、输出风格与自定义风格的指令、当前风格、问题；带会话 id 时 Core 记下该会话可读的 skill 目录）、`skills/invoke`（会话、`Skill` 调用 id、名称、参数；结果为替换后的正文、目录、本回合放行的规则、hooks 是否生效、未生效的原因）、`skills/match`（会话碰过的文件与待激活的 `paths` skill）；Core → Agent Host 的请求 `resources/listSkills`、`resources/listCommands`（Agent Host 合并自己的来源，插件与 MCP prompts 留给 T40）、`resources/reload`。`session/prompt`、`session/steer`、`session/followUp` 新增可选的 `command`（`PromptCommand`），`userMessage` 条目新增可选的 `command`，`ReminderType` 新增 `skillsChanged`、`outputStyle`。Core API 新增 `listCommands(workspace, cwd)`、`listSkills(workspace, cwd)`、`setOutputStyle(workspace?, name?)`（工作区没有运行中的 Agent Host 时由 Core 按文件回答列表）；`composerInfo` 不再带命令列表。
+
+T38 已实现（ADR-0055，能力 `webSearch`）：Agent Host → Core 的请求 `web/search`（会话、`origin`、`query`、可选的 `allowedDomains`、`blockedDomains`；结果为后端 id 与 `WebSearchSource` 列表）与 `web/searchBackend`（不带会话；结果为可用的第三方后端或原因 `notConfigured`、`noKey`）；Core → Agent Host 的请求 `hooks/prompt`（主会话、填好输入的提示、可选的 `model`、`timeoutMs`；结果为模型回答、`provider/model` 与输入输出 token）。`hooks/run` 新增事件 `subagentStart`、`subagentStop`、`postToolBatch`，输入可带 `effort`；`policy/evaluate` 新增可选的 `effort`；`Item` 新增 `webSearch`（`query`、`backend`、`sources`）；`CatalogModel` 与 `ModelOverride` 新增 `nativeWebSearch`。Core API 新增 `webSearchSettings()`、`setWebSearchBackend(backend?)`、`setWebSearchKey(backend, key?)`。
 
 T31 已实现（ADR-0048，能力 `subagents`）：Agent Host → Core 的请求 `agents/list`（`{ cwd, builtIn }`，结果 `AgentsList`：合并后的定义与警告、解析问题、深度与并发上限、被 deny 的内置类型、合并后的别名表）、`subagent/start`（子会话 id、父会话、工具调用 id、类型、描述、cwd、JSONL 路径、模型、是否后台；结果为生效的权限模式与警告）、`subagent/finish`（状态与用量）；Core → Agent Host 的请求 `resources/listAgents`（结果同 `AgentsList`，每条带解析到的模型）与 `subagent/stop`；父会话路由上的通知 `subagent/started`、`subagent/progress`、`subagent/completed`（`{ itemId, subagent: SubagentState }`）。`policy/evaluate` 参数新增可选的 `parentSessionId`、`agentType`，审批卡新增可选的 `subagent`（`ApprovalOrigin`），`subagent` 条目新增可选的 `subagent`（`SubagentState`），`session/create` 新增可选的 `defaultModel`、`defaultEffort`，`ModelPreferences` 新增 `auxiliaryAlias`、`aliases`。Core API 新增 `listAgents(workspace, cwd)`、`stopSubagent(parent, child)`、`subagentTranscript(parent, child, start, limit)`。
 
@@ -1751,6 +1772,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.42 | 2026-11-20 | T34（ADR-0051）补充第 4 章 ADR-0051、6.11 节终端面板与渲染器的落地（会话终端的归属与重载、停拉与 `output` 唤醒、选区与滚动与链接在 Core、默认颜色、键盘归属），8.2 节终端面板，8.3 节第 6 条停拉与窗口可见性事件，8.5 节终端快捷键与全局命令、复制粘贴，8.7 节终端的无障碍，10.3 节终端输入的防线与上限（I51 收口），10.4 节 fork 渲染器的登记，11 章空闲 CPU 与终端两行的 T34 实测；基线决策未变（ADR-0017、0023 已定拉帧与渲染层） |
 | 2.43 | 2026-11-20 | T35（ADR-0052）补充第 4 章 ADR-0052、6.4 节 `isolation` 生效、6.12 节 worktree 与并行会话的落地（位置与命名、文件根与设置来源、子 agent 的临时 worktree、归档与清理、`.gitignore` 提示），7.4 节 `subagent/start`/`finish` 的 worktree 字段，7.6 节 worktree、搜索与后台的导出面与 `core/activity`，8.1 节多窗口与窗口状态，8.2 节新建会话、环境栏、侧栏搜索与拖入文件夹，8.3 节主进程监听 `core/activity`，8.8 节后台常驻、托盘、退出确认、`piarc://` 与打开文件夹，9.1 节 `window-state.json`，9.2 节 schema v8，9.3 节 worktree 清理；基线决策未变（ADR-0010、0018 已定进程模型与安装形式） |
 | 2.44 | 2026-11-21 | T36（ADR-0053）补充第 4 章 ADR-0053、5.2 节 MCP 连接池的位置与 Pi MCP 扩展不再加载、5.6 节 MCP server 的环境、6.4 节子 agent 的 `mcpServers` 生效、6.6.1 节第 6 段的内容与 `mcpChanged`、6.8 节 MCP 的落地（配置来源与优先级、`${VAR}`、信任与启停、连接池、stdio 进程、暴露与 `ToolSearch`、OAuth、子 agent），6.14 节 MCP 相关的 Claude Code 键，7.4 节 `mcp/*` 方法、`mcp/statusChanged` 工作区级通知与 `requiresUserInteraction`，8.2 节 MCP 设置页，9.2 节 schema v9，10.2 节 MCP 可执行项；基线决策未变（ADR-0010 已定连接池在 Agent Host，6.8 已定替换内置扩展与 token 进保险箱） |
+| 2.46 | 2026-11-21 | T38（ADR-0055）补充第 4 章 ADR-0055、6.1.4 节 WebSearch 的落地（工具、后端选择、原生与第三方后端、结果与来源、设置）、6.3 节 hooks 的 T38 落地（`http`、`prompt` handler、事件与 handler 组合、白名单与 `hookAllowedEnvVars`、M3 事件、`agent_id`/`agent_type`/`prompt_id`/`effort`、项目 hook 的权限效力），6.4 节子 agent 的 hooks，6.13 节 `nativeWebSearch` 与辅助模型通道指定模型，6.14 节 hooks 的 handler 类型与两个白名单键，7.4 节 `web/search`、`web/searchBackend`、`hooks/prompt` 与新字段；基线决策未变（6.1.4 已定原生优先、第三方其次，6.3 已定 hooks 全部在 Core 与 M3 的分期） |
 | 2.45 | 2026-11-21 | T37（ADR-0054）补充第 4 章 ADR-0054、6.6.1 节第 3、5 段的生产者、6.7 节 skills、斜杠命令与输出风格的落地（发现与优先级、frontmatter、参数替换、索引与 `Skill`、展开位置、回合级授权与 hooks、输出风格、重新加载），6.14 节 `outputStyle`、`skillOverrides` 生效，7.4 节 `skills/*`、`resources/*` 方法与 `command` 字段，8.2 节 composer 命令面板与设置页，8.5 节 Mod+K；基线决策未变（6.7 已定 Pi 默认路径之外的发现、索引加 `Skill`、`allowed-tools` 由 Core 参考、切换以消息送达） |
 | 2.40 | 2026-11-20 | T32（ADR-0049）补充第 4 章 ADR-0049、6.1.4 节 KillShell 与 Monitor 的参数与裁决、6.6.3 节 `monitorOutput`、`key` 与 `wake`、6.11 节任务管理器、超时转后台、通知、Monitor 回灌与限速的落地、7.3 节后台任务的持久化、7.4 节 `backgroundTasks` 能力的方法与成员、8.2 节后台任务卡与面板、9.2 节 schema v7、9.3 节任务输出的清理；基线决策未变（6.11 已定超时转后台与 Monitor） |
 | 2.39 | 2026-11-20 | T31（ADR-0048）补充第 4 章 ADR-0048、6.4 节子 agent 的落地（定义加载、子会话登记与链接、工具过滤用隐藏声明加闸门、深度与并发计数、前后台、空闲回收）、6.13 节模型别名表与解析、6.14 节 `model`、`effortLevel` 生效、`advisorModel` 忽略、`agent` 交 T48、7.4 节 `subagents` 能力的方法与成员、7.6 节子会话条目增量的现状、8.2 节子 agent 卡与设置页、9.2 节 schema v6；基线决策未变 |

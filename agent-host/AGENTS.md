@@ -50,7 +50,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - 工具过滤顺序：父会话当前工具 → 定义的 `tools` → 减去 `disallowedTools`（优先）→ 减去 `PARENT_ONLY_TOOLS`（`AskUserQuestion`、`EnterPlanMode`、`ExitPlanMode`、`SuggestNextSteps`）→ 深度到上限时减去 `Agent`。实现是每个工具的 `prepareLoadout` 返回 `hiddenDeclarations` 加 `tool_call` 闸门，不要改成 `setActiveTools`：被它移除的工具，调用在闸门之前就以 "Tool X not found" 结束，后注册的 MCP 工具默认激活。
 - 深度与并发只在 `SubagentRunner` 计数（`#runs` 树加启动中的 `#starting` 占位，同一回复里并行的 `Agent` 调用不会一起越过上限）；上限来自 Core 的 `agents/list`。超限立即返回错误结果，不排队（前台子 agent 各自等自己的子 agent，排队会死锁）。
 - 子会话先经 `subagent/start` 在 Core 登记再请求模型：没登记的会话 id 调 `fs/*`、`exec/*` 得到 `sessionNotFound`。子会话的 Pi 事件不发给 Core（Core 没有它的会话 actor）：进度汇总成 `SubagentState`，经父会话 `Agent` 调用的 `onUpdate`（`subagent` 条目的 `item/updated`）与 `subagent/*` 通知发出，最终状态另写父会话的 `piarc.subagentState` 条目供历史使用。
-- 子会话 JSONL 首条是 `piarc.subagent`（父会话、类型）；身份段换成定义正文（`Persona`），`omitProjectContext` 的类型不加载 memory 与 git 状态；Tool Profile 按子会话自己的模型选；hooks 不发 SessionStart、Stop、SessionEnd（T38 的 SubagentStart/SubagentStop 之前）。
+- 子会话 JSONL 首条是 `piarc.subagent`（父会话、类型）；身份段换成定义正文（`Persona`），`omitProjectContext` 的类型不加载 memory 与 git 状态；Tool Profile 按子会话自己的模型选；hooks 不发 SessionStart、Stop、SessionEnd，改发 SubagentStart（首次 `prompt` 之前，上下文进首个请求）与 SubagentStop（T38）。
 - `isolation: worktree`（T35，ADR-0052）：调用参数或定义要求时，`ChildSession.open` 先 `subagent/start`（带 `isolation`）再按 Core 答的 `cwd` 创建 Pi 会话（会话文件按 cwd 放置，所以登记在前，`sessionFile` 不再随登记发送）；结束时 `finishInCore` 返回保留下来的 worktree，`#execute` 把 `worktreeKept` 的说明接在报告后。打开失败时照常 `subagent/finish`，Core 据此清理。
 - `maxTurns` 到达后中止并把结果标 `partial`：报告取最后一条真实回复，跳过中断补齐写的标记（`isInterruptionMarker`）。前台运行随调用的 abort 信号中止（父会话中断）；后台运行不随中断结束，`close` 与 `subagent/stop` 中止它，结束后经 `harness.remind` 的 `backgroundTask` 提醒回报；进程重启后 `recover()` 把记录中仍在运行的后台运行标为 `interrupted` 并提醒。
 - 同进程易错点：子会话与主会话共用工作区的 MCP 池（T36，见下节）；扩展加载器的模块级缓存按 cwd 失效，子会话与父会话 cwd 相同不受影响；不要在子会话代码里改 `process.env` 或读 `process.cwd()`。
@@ -88,6 +88,13 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - `Skill` 工具（`harness/skills/skill-tool.ts`）只在会话打开时模型有可调用的 skill 才注册（工具集整个会话不变）；执行经 `skills/invoke`（Core 消费同一调用的授权、替换参数、登记回合级 `allowed-tools` 与 skill 的 hooks），正文是工具结果，并写 `piarc.skillInvoked` 供 T27 的重注入；同一正文再次加载只回答已加载。描述与结果文案在 `harness/prompts/skills.ts`，内置输出风格的指令在 `harness/prompts/output-styles.ts`（改后跑原创性检查）。
 - `allowed-tools` 的传递：Agent Host 不传规则。用户的 `/名称` 由 Core 在 UserPromptSubmit 之前展开并直接登记；模型的 `Skill` 调用经 `policy/evaluate`（只读，`Skill(名称)` 规则）后由 `skills/invoke` 登记。`session/prompt`、`session/steer`、`session/followUp` 的 `command` 进 `UserInput.command`：`piarc.input` 记下用户输入的原文与命令（`inputRecord`），`userMessage` 条目显示原文并带 `command`，历史不要求消息以原文开头；skill 的 `/名称` 另写 `piarc.skillInvoked`（`SessionSkills.invokedByUser`）。
 - `resources/listSkills`、`resources/listCommands` 由注册表的 `resources(cwd)` 取 Core 的 `skills/list` 回答；插件与 MCP prompts（T40）在这里并入。
+
+## WebSearch 与 M3 hooks（T38，ADR-0055）
+
+- 后端选择：`SessionHarness.prepareWebSearch(model)` 在会话打开时（`tools()` 之前，注册表 `#open` 与 `ChildSession`）决定是否注册 `WebSearch`：Core 开了能力 `webSearch`，且会话模型能原生搜索（`ModelPreferencesStore.nativeWebSearch`：用户的每模型设置，否则 `nativeSearchKnown`，即服务商 `anthropic` 的 Anthropic Messages 模型）或 `web/searchBackend` 报告有第三方后端。Pi 选的模型与预测不同且原生能力不同时重新决定并重开（同 Profile 的做法）。执行时再按当时的会话模型选：原生 → 辅助模型通道（会话模型，`onPayload`/`onProviderStreamEvent`），否则 `CoreIo.webSearch`（`web/search`），都没有时工具结果是 `NO_SEARCH_BACKEND`。
+- 服务商适配只在 `providers/web-search.ts`（`nativeSearch` 返回加工具与读结果块的一对钩子，`nativeSearchCapability` 给能力表）；新增服务商的原生搜索加在这里，工具代码（`harness/web-search.ts`）只认 `WebSearchSource`。结果条目的 `details.webSearch`（查询、后端、来源）由 `items.ts` 投影成 `webSearch` 条目。文案在 `harness/prompts/web-search.ts`（改后跑原创性检查）。
+- `hooks/prompt`（Core → Agent Host）：`SessionRegistry.judgeHook` → `harness/hook-judge.ts` 的 `judgeHook`（`model` 经 `resolveModel`，别名表取 Core 的 `agents/list`；缺省辅助模型；`AbortSignal.timeout`），判定提示在 `harness/prompts/hook-judge.ts`。只回答模型的原文，解析与翻译在 Core。
+- M3 hooks 的挂载见 `src/harness/AGENTS.md`；`effort`（`SessionHarness.effort()`，`off` 时没有）随 `policy/evaluate` 与工具类事件、Stop/SubagentStop/PostToolBatch 的 `hooks/run` 发出。
 
 ## 子目录说明
 

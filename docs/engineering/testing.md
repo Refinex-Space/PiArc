@@ -235,6 +235,11 @@ steps:
       kind: rate_limit             # unauthorized 401 | rate_limit 429 | overloaded 529 | server_error 500 | unavailable 503
       retry_after_secs: 2          # 仅 rate_limit，默认 1
       message: "slow down"         # 可省略
+  - text: "Two pages cover it."    # T38：服务端网页搜索（仅 Anthropic 线格式）
+    web_search:
+      query: "piarc release"       # server_tool_use 的输入
+      results:                     # 整块的 web_search_tool_result；或 error: max_uses_exceeded 之类的错误码
+        - { title: "PiArc 1.0", url: "https://piarc.example/1-0", page_age: "2 days ago", cited_text: "进正文的 citations_delta" }
 ```
 
 - 工具参数里的 `{{result:<工具调用 id>:<正则>}}`（T32）在应答时换成本次请求中该工具结果文本的第一个捕获组（没有捕获组时为整个匹配，找不到时为 `<no match for …>`，让用到它的请求明显失败）：脚本据此使用运行时才知道的值，如后台任务的 id 与输出文件。
@@ -318,7 +323,7 @@ sessions:                         # 可选；缺省为一个会话 main，使用
   a: { provider: one, cwd: 'alpha dir' }   # settings_model: true（T31）：建会话不指定模型，设置的 model、effortLevel 生效
 actions: [...]                    # 见 12.2
 approvals: []                     # 见 12.3
-expect: { events, files, fixtures, requests, request_counts, tool_batches, core_io, config_diagnostics, json_lines }   # 见 12.4
+expect: { events, files, fixtures, requests, request_counts, tool_batches, core_io, config_diagnostics, json_lines, absent_on_disk }   # 见 12.4
 ```
 
 - 每个端点有自己的 `MockProvider` 与自己的 Pi provider（`mock-<端点名>`，唯一的模型 `mock-model`）；预置模型夹具经 `x-piarc-scenario` 请求头选择脚本。两个会话要并发请求时用两个端点，各自的步数互不影响。
@@ -367,6 +372,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | `sign_out` | — | 退出测试服务商的登录并确认凭据已删除 |
 | `mcp_sign_in` | `server`、`outcome`（`succeeded`/`failed`/`cancelled`） | 经 Core 的 `mcp_login` 登录 `mcp_http` 中带 OAuth 的 server（T36）：运行器代替浏览器跟随授权页，按 `core/login` 的结束状态比对 |
 | `set_output_style` | `name`（可省略） | 经 Core 的 `set_output_style` 设置工作区的输出风格（写 `.piarc/settings.local.json`，省略即删除该键），运行中的 Agent Host 随即重新取 skills 与风格（T37） |
+| `set_web_search_key` | `backend`（`brave`）、`key`（可省略） | 经 Core 的 `set_web_search_key` 把 WebSearch 第三方后端的 API key 存进保险箱（省略即删除）；`WebSearch` 是否提供在会话打开时决定，所以用到它的会话设为 `deferred`（T38）。场景有 `web` 段时 Brave Search 的端点指向本地网页服务器，`/res/v1/web/search` 页面就是搜索回答 |
 | `advance_clock` | `seconds` | 推进任务管理器的时钟（T32）：前台命令的超时转后台、Monitor 的超时与唤醒都按它计时，场景不靠真实等待 |
 | `stop_task` | `kind`（可选） | 停止该会话（主会话）最新的运行中后台任务，同面板的停止按钮（T32） |
 | `open_terminal` | — | 为用户在该会话打开一个终端（Core 的 `open_session_terminal`，同终端面板），不共享（T34） |
@@ -401,6 +407,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | （总是检查） | 每个请求都通过严格 mock 的校验；被拒的请求列出规则 ID。运行根下 Claude Code 的配置（任何 `.claude/` 目录内的条目与 `.claude.json`）在 Core 启动前与关闭后逐字节相同，否则以 `claude_config` 失败列出新增、修改、删除的路径（T24，ADR-0005 第 2 条） |
 | `tool_batches` | 工具调用 id 的分批：Core 收到的委托请求按这些批次成组到达。运行器经 Core 的 `ToolIoObserver` 扣住下一批的请求，整批到齐才一起放行；另一批的调用提前到达即失败。不靠计时 |
 | `core_io` | `{ call, method }`：Core 为该工具调用回答过这个 AHP 方法（例如 `fs/read`、`exec/run`），证明工具经 Core 执行 |
+| `absent_on_disk` | 字符串列表（每个至少 8 个字符）：运行结束后用 `plaintext::scan` 逐字节扫描数据目录、工作区、家目录与缓存目录，任何文件含有其中之一即失败，一个文件都没读到也失败（T38：只该在保险箱里的 key） |
 | `json_lines` | 工作区路径 → 期望的行：文件每行一个 JSON 值，行数恰好相等，逐行按字段子集比较（T25 的 hook 夹具把收到的 stdin 记成 `{types, input}`，`types` 是每个字段值的类型，用来断言值无法预知的字段存在）；断言前等文件写满期望的行数（30 s 安全网），后台运行的 hook 由此不必另加等待 |
 | `config_diagnostics` | 回合结束后 Core 对该工作区的配置诊断（T24）：`trusted` 与按层 id 索引的 `files`，每个文件是报告的子集（`status`、`effective`、`overridden`、`ignored`、`issues`；列表逐项比较，长度必须相等，元素取子集） |
 
