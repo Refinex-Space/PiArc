@@ -44,6 +44,7 @@ mod harness;
 mod l3;
 mod login;
 mod mcp;
+mod packages;
 mod settings;
 mod terminals;
 mod worktrees;
@@ -344,6 +345,7 @@ impl Driver<'_> {
                 .map_err(|e| e.to_string())?;
             answer("trusting the workspace", rx).await?;
         }
+        self.install_packages().await?;
         let ws = workspace.clone();
         call(
             |done| self.core.open_workspace(ws, done),
@@ -478,6 +480,7 @@ impl Driver<'_> {
             )
             .await
             .map(drop),
+            Action::CheckCommands { present, absent } => self.check_commands(present, absent).await,
             Action::SetOutputStyle { name } => {
                 let ws = self.env.workspace.clone();
                 call(

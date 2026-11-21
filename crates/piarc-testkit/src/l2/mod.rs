@@ -22,6 +22,7 @@ pub mod gate;
 pub mod harness_spec;
 pub mod login_spec;
 pub mod matcher;
+pub mod package_spec;
 pub mod runner;
 pub mod suite;
 pub mod web;

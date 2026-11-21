@@ -1,0 +1,25 @@
+id: plugin-mcp
+description: An enabled plugin's .mcp.json server joins the workspace's MCP servers at the lowest scope, named plugin_<plugin>_<server> with ${CLAUDE_PLUGIN_ROOT} replaced; it connects and its tools are offered and run (T40).
+capabilities: [CAP-PLUGIN-MCP-001]
+workspace:
+  trusted: true
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"allow":["mcp__plugin_demo_echo__*"]}}'
+    pkgs/demo/.claude-plugin/plugin.json: '{"name": "demo"}'
+    pkgs/demo/.mcp.json: '{"mcpServers":{"echo":{"command":"node","args":["{{mcp_echo}}","${CLAUDE_PLUGIN_ROOT}"]}}}'
+packages:
+  - { path: pkgs/demo }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: e1, name: mcp__plugin_demo_echo__echo, input: { text: hi } }]
+      - text: The plugin's server answered.
+actions:
+  - prompt: { text: Use the plugin's server., turn: t }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - { index: 0, tools_include: [mcp__plugin_demo_echo__echo] }
+    - index: 1
+      tool_results: [{ id: e1, is_error: false, contains: 'pkgs/demo echoes "hi"' }]

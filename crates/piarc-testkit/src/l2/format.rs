@@ -103,6 +103,9 @@ pub struct ScenarioSpec {
     /// files is the server's URL.
     #[serde(default)]
     pub mcp_http: BTreeMap<String, McpHttpSpec>,
+    /// Extension packages installed before the workspace opens (T40).
+    #[serde(default)]
+    pub packages: Vec<crate::l2::package_spec::PackageSpec>,
     /// SDK cloud providers to configure with an isolated fake API key; never used for inference.
     #[serde(default)]
     pub cloud_providers: Vec<String>,
@@ -450,6 +453,16 @@ pub enum Action {
         /// Content.
         content: String,
     },
+    /// Lists the workspace's slash commands through Core (`listCommands`, T37) until the named
+    /// ones are present and the others absent (T40: package commands, MCP prompts).
+    CheckCommands {
+        /// Command names that must be listed.
+        #[serde(default)]
+        present: Vec<String>,
+        /// Command names that must not be listed.
+        #[serde(default)]
+        absent: Vec<String>,
+    },
     /// Sets the workspace's output style through Core (`setOutputStyle`, T37): its
     /// `.piarc/settings.local.json`; no name removes the choice.
     SetOutputStyle {
@@ -578,6 +591,7 @@ impl Action {
             Self::Wait(_) => "wait",
             Self::WriteFile { .. } => "write_file",
             Self::SetOutputStyle { .. } => "set_output_style",
+            Self::CheckCommands { .. } => "check_commands",
             Self::SetWebSearchKey { .. } => "set_web_search_key",
             Self::RestartCore {} => "restart_core",
             Self::Resume { .. } => "resume",
@@ -648,6 +662,7 @@ impl Action {
             | Self::Search(_)
             | Self::WriteFile { .. }
             | Self::SetOutputStyle { .. }
+            | Self::CheckCommands { .. }
             | Self::SetWebSearchKey { .. }
             | Self::RestartCore {}
             | Self::CheckFiles(_)

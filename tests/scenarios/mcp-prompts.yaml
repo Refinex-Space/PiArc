@@ -1,0 +1,36 @@
+id: mcp-prompts
+description: A connected server that declares prompts offers each one as the slash command mcp__<server>__<prompt>; typed with arguments, prompts/get's text is the input the model gets (positional arguments, a missing required one refused, non-text content refused), and after notifications/prompts/list_changed the command list has the new prompt (T40).
+capabilities: [CAP-MCP-PROMPTS-001]
+workspace:
+  trusted: true
+  files:
+    .mcp.json: '{"mcpServers":{"docs":{"command":"node","args":["{{mcp_echo}}","docs"],"env":{"MCP_ECHO_PROMPTS":"1"}}}}'
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"allow":["mcp__docs__*"]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: Hello Ada, warmly.
+      - tool_calls: [{ id: add, name: mcp__docs__add_prompt, input: { name: recap } }]
+      - text: Added.
+actions:
+  - check_commands: { present: [mcp__docs__greet, mcp__docs__picture], absent: [mcp__docs__recap] }
+  - prompt: { text: '/mcp__docs__greet', rejected: 'needs <name>' }
+  - prompt: { text: '/mcp__docs__picture', rejected: 'returned image content' }
+  - prompt: { text: '/mcp__docs__greet Ada warm', turn: a }
+  - wait: { method: turn/completed, turn: a }
+  - prompt: { text: Add a recap prompt., turn: b }
+  - wait: { method: turn/completed, turn: b }
+  - check_commands: { present: [mcp__docs__recap] }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - { index: 0, last_user_text: 'Please greet Ada in a warm tone (docs).' }
+  events:
+    - method: item/completed
+      params:
+        item:
+          type: userMessage
+          text: '/mcp__docs__greet Ada warm'
+          command: { name: mcp__docs__greet, kind: mcpPrompt, source: mcp }

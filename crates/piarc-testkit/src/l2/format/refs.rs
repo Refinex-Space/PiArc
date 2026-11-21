@@ -203,6 +203,7 @@ fn check_references(spec: &ScenarioSpec, action: &Action, field: &str, problems:
         | Action::Rewind(_)
         | Action::Discard(_)
         | Action::SetOutputStyle { .. }
+        | Action::CheckCommands { .. }
         | Action::SetWebSearchKey { .. }
         | Action::CheckFiles(_) => {}
         Action::Fork(fork) => {

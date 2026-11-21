@@ -1002,17 +1002,59 @@ capabilities:
     task: T36
     status: active
   - id: CAP-MCP-PROMPTS-001
-    title: 'MCP prompts'
+    title: 'MCP prompts 作为斜杠命令 `mcp__<server>__<prompt>`：位置参数、必填检查、只送文本内容，`prompts/list_changed` 后命令列表更新'
     milestone: M4
-    refs: [ARCH-6.8]
+    refs: [ARCH-6.7, ARCH-6.8]
     task: T40
-    status: planned
+    status: active
   - id: CAP-PLUGIN-001
     title: '插件：Claude Code 插件目录与 Pi 包，启用前展示来源与能力'
     milestone: M4
     refs: [FR-EX-04, ARCH-6.7, ARCH-6.14]
     task: T40
-    status: planned
+    status: active
+  - id: CAP-PLUGIN-COMMANDS-001
+    title: '插件的命令文件是 `<plugin>:<路径>` 斜杠命令，展开时替换参数与 `${CLAUDE_PLUGIN_ROOT}`，不覆盖项目与用户的同名命令'
+    milestone: M4
+    refs: [FR-EX-04, ARCH-6.7]
+    task: T40
+    status: active
+  - id: CAP-PLUGIN-AGENTS-001
+    title: '插件的子 agent 定义是 `<plugin>:<名称>` 类型，可由 Agent 工具调用'
+    milestone: M4
+    refs: [FR-EX-04, ARCH-6.4, ARCH-6.7]
+    task: T40
+    status: active
+  - id: CAP-PLUGIN-SKILLS-001
+    title: '插件的 skill 以 `<plugin>:<名称>` 进入索引并可由 Skill 工具加载'
+    milestone: M4
+    refs: [FR-EX-04, ARCH-6.7]
+    task: T40
+    status: active
+  - id: CAP-PLUGIN-HOOKS-001
+    title: '插件的 `hooks/hooks.json` 在启用且确认后于对应事件运行；未确认的 hook 不运行'
+    milestone: M4
+    refs: [FR-EX-04, ARCH-6.3, ARCH-6.7]
+    task: T40
+    status: active
+  - id: CAP-PLUGIN-MCP-001
+    title: '插件的 `.mcp.json` server 以 `plugin_<plugin>_<server>` 加入连接池（优先级最低）并暴露工具'
+    milestone: M4
+    refs: [FR-EX-04, ARCH-6.7, ARCH-6.8]
+    task: T40
+    status: active
+  - id: CAP-PLUGIN-TRUST-001
+    title: '未信任项目的项目作用域插件与 Pi 包不加载：无 hook、无 MCP 连接、无扩展、无命令'
+    milestone: M4
+    refs: [FR-EX-04, ARCH-10.2]
+    task: T40
+    status: active
+  - id: CAP-PIPKG-GIT-001
+    title: 'Pi 包从 git 安装并锁定提交，确认后 `pi` 字段声明的扩展、skills、prompt templates 生效，themes 不加载'
+    milestone: M4
+    refs: [FR-EX-04, ARCH-6.7]
+    task: T40
+    status: active
 
   # Review and rewind
   - id: CAP-CKPT-001

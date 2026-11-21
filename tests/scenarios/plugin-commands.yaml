@@ -1,0 +1,40 @@
+id: plugin-commands
+description: An installed and enabled Claude Code plugin's command files are slash commands named <plugin>:<path>, listed with the plugin; Core expands /demo:hello with its arguments and ${CLAUDE_PLUGIN_ROOT} before the Agent Host gets the text, and a project command of the same bare name keeps its own (T40).
+capabilities: [CAP-PLUGIN-COMMANDS-001, CAP-PLUGIN-001]
+workspace:
+  trusted: true
+  files:
+    .claude/commands/hello.md: "---\ndescription: The project's own hello\n---\nProject hello.\n"
+  run_files:
+    pkgs/demo/.claude-plugin/plugin.json: '{"name": "demo", "version": "1.0.0"}'
+    pkgs/demo/commands/hello.md: "---\ndescription: Say hello\nargument-hint: '[who]'\n---\nSay hello to $ARGUMENTS using the notes in ${CLAUDE_PLUGIN_ROOT}/notes.\n"
+    pkgs/demo/commands/db/migrate.md: "---\ndescription: Migrate\n---\nMigrate the database.\n"
+packages:
+  - { path: pkgs/demo }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: Hello, Ada.
+      - text: Project hello done.
+actions:
+  - check_commands: { present: ['demo:hello', 'demo:db:migrate', hello] }
+  - prompt: { text: '/demo:hello Ada', turn: a }
+  - wait: { method: turn/completed, turn: a }
+  - prompt: { text: '/hello', turn: b }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - {
+        index: 0,
+        user_message_contains: ['Say hello to Ada using the notes in', 'pkgs/demo/notes.'],
+      }
+    - { index: 0, not_contains: ['${CLAUDE_PLUGIN_ROOT}'] }
+    - { index: 1, last_user_text: Project hello. }
+  events:
+    - method: item/completed
+      params:
+        item:
+          type: userMessage
+          text: '/demo:hello Ada'
+          command: { name: 'demo:hello', kind: command, source: plugin }

@@ -319,6 +319,7 @@ web:                              # 可选（T29）：本地网页服务器，�
   pages: { /docs: { content_type: text/html, body: '<h1>Docs</h1>' }, /old: { status: 301, location: '{{web_alt}}/docs' } }
 oauth: { flow: authorization_code } # 可选（T29）：mock 授权服务器与测试服务商 piarc-test-oauth，配合 sign_in 动作
 mcp_http: { docs: { oauth: true } } # 可选（T36）：按名字起 Streamable HTTP 的 MCP 夹具 server，配合 mcp_sign_in 动作
+packages: [{ path: pkgs/demo, source: git, scope: project, enable: true, confirm: true }] # 可选（T40）：打开工作区前经 Core 安装的扩展包
 sessions:                         # 可选；缺省为一个会话 main，使用唯一的端点、工作目录为工作区
   a: { provider: one, cwd: 'alpha dir' }   # settings_model: true（T31）：建会话不指定模型，设置的 model、effortLevel 生效
 actions: [...]                    # 见 12.2
@@ -335,6 +336,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 - 按字节的夹具放在 `tests/scenarios/fixtures/`（`.gitattributes` 设为 `-text`，换行与编码不被 Git 改动）；加载时检查夹具存在。PDF 夹具用 `piarc-fs` 测试里的 `make_pdf` 生成，手写的 PDF 可能取不到文字。
 - 端点脚本工具参数里的 `{{workspace}}` 换成本次运行工作区的绝对路径（T30，L3 场景要用绝对路径的 `file_path`）。
 - WebFetch 场景（T29，`webfetch-*.yaml`）：`web.pages` 按路径给出状态、`content_type`、`body`（`repeat` 重复多次，用来越过正文上限）与重定向的 `location`。`{{web}}` 在页面与端点工具参数里换成 `http://127.0.0.1:<端口>`，`{{web_alt}}` 换成同一服务器的 `http://localhost:<端口>`（另一个主机，用于跨站重定向与按域名的规则）。只有带 `web` 段的场景，Core 的 WebFetch 允许列表才放行这两个主机；场景不访问外网。WebFetch 的提取是一次额外的模型请求：没有辅助模型时为它在同一端点留一步，设了 `modelProviders.auxiliary`（用 `run_files` 写 `data 数据/settings.json`）时在那个端点留一步。
+- 扩展包场景（T40，`plugin-*.yaml`、`pi-package-git.yaml`）：包目录用 `run_files` 写在运行根下，顶层 `packages` 在打开工作区之前经 Core 的 `package_install` 安装（`source: git` 时运行器先把目录做成一个提交的 git 仓库，再以 `file://` 地址安装），缺省开启并确认全部可执行项（`confirm: false` 只开启不确认，`enable: false` 只安装）。`mcp-prompts.yaml` 的夹具 server 带 `MCP_ECHO_PROMPTS=1`。
 - MCP 场景（T36，`mcp-*.yaml`）：stdio server 写在工作区的 `.mcp.json` 或 `run_files` 的 `data 数据/settings.json` 里，`{{mcp_echo}}` 换成 `packages/testkit/src/mcp-echo-server.ts` 的绝对路径（`node {{mcp_echo}} <名字>`，环境变量见 `packages/testkit/AGENTS.md`）；顶层 `mcp_http` 的每个名字起一个 `MockMcpServer`（`oauth: true` 时带自己的授权服务器：元数据发现、动态注册、PKCE、轮换的 refresh token），`{{mcp_http:<名字>}}` 换成它的 `/mcp` 地址。夹具的 `MCP_ECHO_START_LOG` 把每次启动记成一行，`expect.json_lines` 据此断言进程数。
 - 每模型设置与保守 Tool Profile（T29，`model-*.yaml`）：用 `run_files` 写 `data 数据/settings.json` 的 `modelProviders.models`（键 `mock-<端点>/mock-model`）；`configure_as: local` 端点的模型是低可靠性，默认得到保守 Profile。
 - 后台任务场景（T32，`bg-*.yaml`、`monitor-*.yaml`）：`core/tasks` 快照的每一行作为它所属主会话的事件参与匹配（`method: core/tasks`，`params` 是任务行），`wait` 可以等任务的状态、退出码与尾部行；顶层 `task_limits`（`monitor_batch_lines`、`monitor_batch_chars`、`monitor_total_chars`）为该场景缩小 Monitor 的限值。等命令开始输出再推进时钟（`wait: { method: item/updated, params: { item: { itemId, output } } }`），否则超时的计时还没开始。Monitor 的命令文本会出现在请求的对话历史里，`not_contains` 要用只在提醒里出现的写法（如 `1 new line.\n<行>`）。
@@ -371,6 +373,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | `sign_in` | `behavior`（`approve`/`deny`/`expire`）、`cancel`、`outcome`（`succeeded`/`failed`/`cancelled`）、`message` | 经 Core 登录测试服务商（T29，需要顶层 `oauth`）：运行器代替浏览器跟随授权页的重定向到 Agent Host 的回环端口，或在第一步取消；断言 `core/login` 的结束状态与消息，以及之后是否已登录 |
 | `sign_out` | — | 退出测试服务商的登录并确认凭据已删除 |
 | `mcp_sign_in` | `server`、`outcome`（`succeeded`/`failed`/`cancelled`） | 经 Core 的 `mcp_login` 登录 `mcp_http` 中带 OAuth 的 server（T36）：运行器代替浏览器跟随授权页，按 `core/login` 的结束状态比对 |
+| `check_commands` | `present`、`absent`（命令名列表） | 经 Core 的 `list_commands` 反复取工作区的斜杠命令，直到列出的都在、`absent` 的都不在（至多 10 s；MCP prompts 在 server 的通知后异步刷新，T40） |
 | `set_output_style` | `name`（可省略） | 经 Core 的 `set_output_style` 设置工作区的输出风格（写 `.piarc/settings.local.json`，省略即删除该键），运行中的 Agent Host 随即重新取 skills 与风格（T37） |
 | `set_web_search_key` | `backend`（`brave`）、`key`（可省略） | 经 Core 的 `set_web_search_key` 把 WebSearch 第三方后端的 API key 存进保险箱（省略即删除）；`WebSearch` 是否提供在会话打开时决定，所以用到它的会话设为 `deferred`（T38）。场景有 `web` 段时 Brave Search 的端点指向本地网页服务器，`/res/v1/web/search` 页面就是搜索回答 |
 | `advance_clock` | `seconds` | 推进任务管理器的时钟（T32）：前台命令的超时转后台、Monitor 的超时与唤醒都按它计时，场景不靠真实等待 |

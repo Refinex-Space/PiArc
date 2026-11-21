@@ -1,0 +1,44 @@
+id: pi-package-git
+description: A Pi package installed from git (pinned to its commit) and confirmed loads what its package.json pi field declares, in the Agent Host through Core's confirmed list; its extension's tool is offered and runs, its skill is in the index, its prompt template is a slash command; its themes are not loaded (T40).
+capabilities: [CAP-PIPKG-GIT-001]
+workspace:
+  trusted: true
+  run_files:
+    pkgs/pi-demo/package.json: '{"name": "pi-demo", "version": "0.1.0", "pi": {"extensions": ["./ext/probe.ts"], "skills": ["./skills"], "prompts": ["./prompts"], "themes": ["./themes"]}}'
+    pkgs/pi-demo/ext/probe.ts: |
+      export default function (pi: any) {
+        pi.registerTool({
+          name: 'package_probe',
+          label: 'Package probe',
+          description: 'Registered by the pi-demo package.',
+          parameters: { type: 'object', properties: {}, additionalProperties: false },
+          async execute() {
+            return { content: [{ type: 'text', text: 'package probe answered' }], details: {} };
+          },
+        });
+      }
+    pkgs/pi-demo/skills/lint/SKILL.md: "---\nname: lint\ndescription: Lints with the pi-demo rules\n---\nLint it.\n"
+    pkgs/pi-demo/prompts/tidy.md: "---\ndescription: Tidy up\n---\nTidy ${1:-everything} up.\n"
+    pkgs/pi-demo/themes/dark.json: '{}'
+packages:
+  - { path: pkgs/pi-demo, source: git }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: p1, name: package_probe, input: {} }]
+      - text: The probe answered.
+      - text: Tidied.
+approvals:
+  - { tool: package_probe, decision: allow }
+actions:
+  - check_commands: { present: [tidy, lint] }
+  - prompt: { text: Call the package probe., turn: a }
+  - wait: { method: turn/completed, turn: a }
+  - prompt: { text: /tidy src, turn: b }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - { index: 0, tools_include: [package_probe], contains: [lint, Lints with the pi-demo rules] }
+    - { index: 1, tool_results: [{ id: p1, is_error: false, contains: package probe answered }] }
+    - { index: 2, last_user_text: Tidy src up. }

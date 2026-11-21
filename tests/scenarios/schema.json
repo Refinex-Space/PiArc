@@ -167,6 +167,33 @@
         }
       }
     },
+    "packages": {
+      "description": "Extension packages installed through Core before the workspace opens (T40): a directory of run_files used in place, made a git repository and cloned (`git`), or packed and installed with the bundled npm (`npm`). Turned on and every executable item confirmed unless `enable` or `confirm` is false.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path"],
+        "properties": {
+          "path": {
+            "$ref": "#/$defs/relativePath",
+            "description": "The package directory, relative to the run's temporary root (write it with run_files)."
+          },
+          "source": {
+            "enum": ["directory", "git"]
+          },
+          "scope": {
+            "enum": ["user", "project"]
+          },
+          "enable": {
+            "type": "boolean"
+          },
+          "confirm": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
     "mcp_http": {
       "description": "Streamable HTTP MCP fixture servers by name (T36): `{{mcp_http:<name>}}` in workspace files and run_files is the server's URL; with oauth the server wants bearer tokens from its own authorization server (`mcp_sign_in`).",
       "type": "object",
@@ -1158,6 +1185,15 @@
                 "type": "string"
               }
             }
+          }
+        },
+        "check_commands": {
+          "description": "List the workspace's slash commands through Core (`listCommands`) until the named ones are present and the others absent, at most 10 s (T40).",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "present": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            "absent": { "type": "array", "items": { "type": "string", "minLength": 1 } }
           }
         },
         "set_output_style": {
