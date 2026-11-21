@@ -171,7 +171,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | W3 | [Windows：M3 达标](tasks/W3-windows-m3-parity.md) | 5 | R4（建议在 T43、T44 之后，需要读屏清单与性能测量脚本） | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 607809d |
 | T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 已完成 | c4e5f75 |
-| T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 进行中 | — |
+| T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 已完成 | 10fbeff |
 | T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,14 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-**T41 配置诊断完善、M4 hooks 事件与用量成本**（开工 2026-11-21；基线 `npm run verify -- --baseline` 通过，复用 c4e5f75 的全量结果）
-
-- [x] 1 配置诊断完整版：全部来源（设置七层、`~/.claude.json`、`.mcp.json`、memory、rules、agents、skills、commands、输出风格、插件与 Pi 包、企业预留）、加载状态、来源链、自动刷新、设置页
-- [x] 2 M4 hooks 事件：UserPromptExpansion、InstructionsLoaded、CwdChanged、FileChanged（`watchPaths`）、ConfigChange、StopFailure（错误类型映射）
-- [x] 3 `mcp_tool` handler 与 Core → Agent Host 的 AHP 请求
-- [x] 4 用量与成本：按会话、按模型汇总存 SQLite，价格表覆盖，右栏与"用量"页
-- [ ] 验收 A01–A13；收尾（piarc-hooks、piarc-config 的 AGENTS.md，架构 6.3.2、6.14）
 
 ## 登记事项
 
@@ -498,14 +490,16 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I173 | R4 | 错误类型化（R4 Q2，R3 I128 之后的余项）：`piarc-config`、`piarc-exec`、`piarc-diff` 没有错误枚举，`piarc_config::{mcp::claude_state_servers, rules::PathMatcher::new, trust::TrustLookup::lookup}` 返回 `String`，`piarc-exec` 的 `TaskLog`、`TerminalTree`、`cwd` 返回裸 `io::Result`，`piarc-git` 的 `GitError`、`checkout::Error` 没有 `kind()`/`retryable()`，`piarc_web::ssrf::Allowlist::new`、`piarc_hooks` 的端口返回 `String` | T41（`piarc-config`）、T39（`piarc-exec`）、T42（`piarc-diff`、`piarc-git`）、T45（`piarc-web`、`piarc-hooks`）；**T39**：`piarc-exec` 部分落地（75ad53c：`TaskLog`、`read_chunk`、`TerminalTree::attach`、`CwdProbe` 返回带 `kind()`/`retryable()` 的 `piarc_exec::Error`，Core 经 `error::exec_error_object` 保留 `ENOENT` 等代码）；其余按原分派 |
 | I174 | R4 | 平台分支散在业务代码里（R4 Q3）：Core `tool_io/exec.rs`、`exec/utility.rs`、`policy/assess.rs`、`hooks/launcher.rs`，`piarc-config/src/rules.rs`（`paths:` 是否区分大小写按 `cfg!(windows)`，而文件状态按卷判断：macOS 默认卷不区分大小写时 `SRC/a.ts` 不匹配 `src/**`），Agent Host `tools/paths.ts`、`runtime/session-helpers.ts` | T39 收进适配层；`rules.rs` 的大小写判据交 T41；**T39 转交 W3**：所列分支多数是 Windows 专有路径（Git Bash 的程序探测、`LANG=C.UTF-8`、MSYS 路径换算、hooks 的 PowerShell 回退），T39 在 macOS 上只能交叉编译、不能运行，搬进适配层后要在 Windows 上跑 `exec_commands`、`exec-windows-shells` 与 hooks 测试才算验证；T39 没有往业务代码新增平台分支（沙箱的平台差异在 `piarc_sandbox::platform`） |
 | I175 | R4 | 原子写入与 `\\?\` 去前缀的重复实现（R4 Q4）：`piarc-core/src/terminal/bound.rs` 的 `write_atomically`（不 fsync、临时名固定）、`piarc-term` 的 `snapshot.rs`、`shell.rs`、Core `composer/attachments.rs`；`strip_verbatim` 有四份（`piarc-git`、Core `sessions/mod.rs`、`piarc-config/rules.rs`、`piarc-exec/cwd.rs`） | T45：Core 内改用 `piarc_secrets::atomic::replace`，功能 crate 内的副本按复用表同步语义；Windows 上 rename 覆盖正在被读的屏幕文件由 W3 核对 |
-| I176 | R4 | 定义了却没有生产调用方的接口（R4 Q6）：AHP `exec/background/list`、`exec/background/read`（Agent Host 不调用）、NAPI `terminalLastCommand`、`piarc_term::Session::{command, wait_command}`（只在测试中用却登在复用表）；依赖真实时钟的否定断言（`piarc-term/tests/pointer.rs:271`、`terminal/tests.rs:441`、`t34-terminal-tui.e2e.ts` 的 `waitForTimeout`） | T41 决定接线或删除；否定断言的计时交 T44 |
+| I176 | R4 | 定义了却没有生产调用方的接口（R4 Q6）：AHP `exec/background/list`、`exec/background/read`（Agent Host 不调用）、NAPI `terminalLastCommand`、`piarc_term::Session::{command, wait_command}`（只在测试中用却登在复用表）；依赖真实时钟的否定断言（`piarc-term/tests/pointer.rs:271`、`terminal/tests.rs:441`、`t34-terminal-tui.e2e.ts` 的 `waitForTimeout`） | T41 决定接线或删除；否定断言的计时交 T44；**T41 决定**：NAPI `terminalLastCommand` 与 Core `Terminals::last_command` 没有调用方，已删除（10fbeff）；`piarc_term::Session::{command, wait_command}` 保留为 shell integration 测试的支撑，复用表已改写；AHP `exec/background/list`、`exec/background/read` 删除（模型读后台输出走 Read 输出文件），连同只剩 schema 导出的 `TerminalCommand` 类型与依赖它们的 16 处测试断言（任务归属的检查改到真实路径）交 R5 执行 |
 | I177 | T39 | ADR-0057（Windows 命令隔离）已于 2026-11-21 由用户采纳：到 Beta 维持现状（权限规则 + Job Object，界面提示不可用）；MXC `processcontainer` 列为 Beta 之后的候选，需要一个评估任务：从 `mxc-sdk` 源码自建并以 ETW 核对遥测关闭；先用作 Agent Host 的第二道防线（模型请求、会话 JSONL、npx 拉起的 MCP server 照常）；Bash 等 Git Bash 问题（MXC #1061、#1729）修复或改用 PowerShell / BusyBox 版 MinGit 后再进容器；系统不支持时明确提示不可用。ADR 第 5 条的实验：`windows-11-arm` 与本机虚拟机上的 ProcessContainer 探测、标准用户运行、Model 2 加本地代理的网络边界、Git Bash 管道与 `npm ci`/`cargo build`/`pip`、Job Object 嵌套、非管理员调用 `NetworkIsolationSetAppContainerConfig` | R6（Beta 发布评审）之后安排评估任务，实验代码不进发布产物；ADR-0057 的重新评估条件之一提前出现时提前安排；满足全部条件才以实验性、默认关闭的选项引入 |
 | I178 | T39 | 后台命令与 Monitor 在沙箱中被 Seatbelt 拒绝的文件操作不进结果说明与审计：`sandbox_report` 只在前台命令结束时按输出识别（代理拒绝对所有命令照常审计） | T45 安全收口时决定是否在任务结束时扫描输出文件尾部并补审计与完成通知的说明 |
 | I179 | T39 | Pi 1.5.2 的 `SettingsManager.withLock` 读设置也经 proper-lockfile 在 `.pi/` 下建 `settings.json.lock`；Agent Host 定稿配置因此单独放行这个名字（`.pi` 其余仍受保护），不放行时 13 个 L2 场景的压缩失败 | 升级 Pi 时复核锁文件的名字与位置（`crates/piarc-sandbox/src/seatbelt/agent-host.sbpl`），变化时更新模板与 golden |
 | I180 | T39 | ADR-0057 接受了 Windows 上没有 OS 级沙箱：经批准的命令可以写工作区外与外传数据，Agent Host 没有第二道防线（架构 10.3） | T45 的威胁模型与安全测试把它列为已接受风险，并核对设置页、环境栏、配置诊断的"不可用"提示仍在 |
 | I181 | T40 | 插件的 mods、LSP、monitors、channels、themes、output styles、workflows、`bin/`（加进 Bash 的 PATH）、`userConfig`（安装时填写的配置值与 `${user_config.KEY}`）与 `dependencies` 列为不支持；hook 进程拿不到 `CLAUDE_PLUGIN_ROOT`、`CLAUDE_PLUGIN_DATA`、`CLAUDE_PLUGIN_OPTION_*` 环境变量（只在命令文本中替换） | `bin/`、`userConfig` 与 hook 环境变量按需求评估，建议 T48；mods 不支持（架构第 6.7 节） |
 | I182 | T40 | 插件 skill 与命令文件的 `allowed-tools`、hooks 不生效（不在包的可执行项里，ADR-0058 第 12 条）；Pi 包的扩展不在子 agent 的会话里加载 | 需要时把它们纳入可执行项（逐项确认），由 T48 评估 |
-| I183 | T40 | 配置诊断还没有插件来源的展示：诊断 API 能从各组件的 `plugin` 字段与 `packagesList` 得到来源，界面未列出 | T41（配置诊断完善） |
+| I183 | T40 | 配置诊断还没有插件来源的展示：诊断 API 能从各组件的 `plugin` 字段与 `packagesList` 得到来源，界面未列出 | T41（配置诊断完善）；**已落地**（T41，ADR-0059）：诊断按来源类别列出插件与 Pi 包（`config_diagnostics/sources.rs` 的 `packages`） |
+| I184 | T41 | 用量的目录价只在 Core 见过某模型的 `models/list` 之后才有（打开过会话、设置页或生成报告时有运行中的 Agent Host）；从未出现在这些列表里的模型在用量页显示"未知"，直到再次列出 | 可接受的现状；需要时让生成报告在没有运行中 Agent Host 时临时起设置 Host 取一次目录，交 R5 评估 |
+| I185 | T41 | 全量 L2 并行时，T13 的设置监听（FSEvents）事件可能迟到几十秒：ConfigChange 已改为每个输入前核对，不受影响；配置诊断页的自动刷新、skills 与命令变化后的 `resources/reload` 仍依赖它 | R5 评估是否让这些消费方在使用前同样核对（或改为轮询少量固定文件） |
 ## 技术债
 
 评审任务（R1–R6）汇总的技术债，按影响排序。每条的细节、负责任务与检查时间点在对应的登记事项中。
@@ -1042,3 +1036,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 决策：ADR-0058（补充）；架构 2.51；`window.piarc` 共 112 个函数。Pi 包不写进 `pi/settings.json`，改经 AHP 交给 Agent Host（Pi 的 `resolve()` 会为缺失的包运行带安装脚本的 npm，且全局生效，见 ADR-0058 第 13 条）；可执行项逐项确认，包的新增项不让项目回到未信任；Claude Code 的 `enabledPlugins`、`extraKnownMarketplaces` 改为忽略
 - 登记：I154、I155、I158、I160 更新；新增 I181（插件不支持的组件与 hook 环境变量）、I182（插件 skill 与命令的 `allowed-tools`、hooks 不生效，子 agent 不加载包的扩展）、I183（配置诊断的插件来源，T41）
 - 下一项：macOS 上的 T41（配置诊断完善、M4 hooks 事件与用量成本）；Windows 上的 W3。本地提交，未推送。
+
+### 2026-11-21 T41 已完成（提交 10fbeff）
+
+- 交付：M4 hooks（`piarc-hooks` 新事件与 `mcp_tool` handler、`mcp_tool::fill`、`McpToolPort`；Core 的 `tool_io/hooks_m4.rs`：CwdChanged、FileChanged（`watchPaths` 轮询，上限 64）、ConfigChange（每个输入前与设置监听时核对，阻断钉住旧值并作用于权限与 hooks）；UserPromptExpansion 在命令与 skill 展开处；Agent Host 的 InstructionsLoaded、StopFailure（`stopFailureType`）、MCP prompt 展开的 hook 与 `hooks/mcpTool` 应答）；用量与成本（`piarc-store` schema v11 `usage_records`、`model_prices`，`piarc-core::usage` 整数计价，`CatalogModel.cost`，NAPI `usageReport`、`sessionUsage`、`setModelPrice`，右栏用量卡片与设置"用量"页）；配置诊断全部来源（`SourceKind`、新状态与忽略原因，`config_diagnostics/sources.rs`，设置监听另监听根目录与 rules、agents 目录，诊断页按来源分组）
+- 验收：13 项全部通过。`npm run verify` 15/15（10fbeff，Vitest 1,658 passed，L2 198 passed 3 个按平台跳过）；L4 `t41-`（用量与诊断）与受影响的 `t24-diagnostics` 共 3 passed（dev 形态，截图在 `tmp/evidence/T41/`）
+- 决策：ADR-0059（补充）；架构 2.52；`window.piarc` 共 115 个函数。FileChanged 改为轮询而不是 notify（全量 L2 下 FSEvents 流启动阻塞几十秒，CwdChanged 后的回合会卡住）；ConfigChange 不只依赖文件事件，每个输入前核对（权限裁决每次读文件，事件迟到会让被阻断的变更先生效）；成本按请求存行、查询时计价（可改价、可分档），没有价格为"未知"
+- 登记：I176 由 T41 决定（删除 `terminalLastCommand`；`exec/background/list|read` 删除交 R5）；I183 已落地；新增 I184（目录价只在见过模型列表后才有）、I185（设置监听在高负载下的迟到对其他消费方的影响）
+- 下一项：macOS 上的 T42（NotebookEdit、可操作通知与 diff 行内评论）。本地提交，未推送。

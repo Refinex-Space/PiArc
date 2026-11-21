@@ -4122,8 +4122,8 @@
       "id": "T41-A13",
       "task": "T41",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify：15/15 通过（10fbeff，工作区干净；Vitest 1,658 passed、1 skipped，cargo test 通过（计时测试按 cargo-test.mjs 单独以 release 运行），L2 198 passed、3 个按平台跳过，能力清单与 capabilities.md 一致）。"
     },
     {
       "id": "T42-A01",
