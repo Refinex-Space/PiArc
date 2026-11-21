@@ -108,7 +108,7 @@ impl Driver<'_> {
                 Choice::Always => Decision::AllowAlways,
                 Choice::Deny | Choice::Wait => Decision::Deny,
             },
-            via: None,
+            via: expected.via,
         };
         let result = call(
             |done| self.core.answer_approval(answer, done),
@@ -140,6 +140,15 @@ fn check_card(
         return Err(format!(
             "approval expected {:?}, got {:?}",
             expected.kind, card.kind
+        ));
+    }
+    if expected
+        .notification_allow
+        .is_some_and(|allow| allow != card.notification_allow)
+    {
+        return Err(format!(
+            "approval expected notificationAllow {:?}, got {}",
+            expected.notification_allow, card.notification_allow
         ));
     }
     let Some(origin) = &expected.subagent else {

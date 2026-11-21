@@ -215,6 +215,8 @@ fn declared_approvals_without_approval_requests_fail() {
         comments: Vec::new(),
         answers: Vec::new(),
         subagent: None,
+        via: None,
+        notification_allow: None,
     }];
     let failures = failures_of(&spec);
     println!("{failures:#?}");

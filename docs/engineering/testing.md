@@ -394,7 +394,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 
 ### 12.3 审批应答
 
-`approvals` 按顺序回答 `core/sessions` 快照中的新请求（`decision: allow|session|always|deny`，可指定 `tool`、审批卡的 `kind` 和拒绝的 `feedback`）。T26：计划卡（`kind: plan`）批准时用 `mode` 写后续模式（`acceptEdits`、`default`），继续规划用 `deny` 加 `feedback` 与 `comments`（`{quote, text}`，运行器按 `quote` 在计划中第一次出现的位置算 UTF-16 偏移）；提问表单（`kind: question`）用 `allow` 加 `answers`（每题 `{selected, other}`），`decision: wait` 不作答、让表单按 `askUserQuestion.timeoutSeconds` 超时。应答可写 `call` 指定它回答的工具调用（运行器取该卡片所属的、已开始未结束的同名工具调用比对；L3 运行按 `call` 选应答而不按顺序，没有应答点名的卡片拒绝并记为未脚本化，T30）。应答经 Core 公开命令；未声明的请求、工具不匹配、重复或过期答复、未用上的应答都使场景失败。`sessions.<label>.mode` 显式选择起始模式（`default`、`acceptEdits`、`plan`、`bypassPermissions`；跳过权限需要用 `workspace.run_files` 在 `data 数据/settings.json` 写入用户级开关），`set_mode` 操作向当前会话发送模式变更。
+`approvals` 按顺序回答 `core/sessions` 快照中的新请求（`decision: allow|session|always|deny`，可指定 `tool`、审批卡的 `kind` 和拒绝的 `feedback`）。T26：计划卡（`kind: plan`）批准时用 `mode` 写后续模式（`acceptEdits`、`default`），继续规划用 `deny` 加 `feedback` 与 `comments`（`{quote, text}`，运行器按 `quote` 在计划中第一次出现的位置算 UTF-16 偏移）；提问表单（`kind: question`）用 `allow` 加 `answers`（每题 `{selected, other}`），`decision: wait` 不作答、让表单按 `askUserQuestion.timeoutSeconds` 超时。应答可写 `call` 指定它回答的工具调用（运行器取该卡片所属的、已开始未结束的同名工具调用比对；L3 运行按 `call` 选应答而不按顺序，没有应答点名的卡片拒绝并记为未脚本化，T30）。应答可写 `via: notification` 表示从系统通知作答（只能是 `allow` 或不带 `feedback` 的 `deny`，Core 拒绝其他答复），`notification_allow` 核对卡片是否允许从通知放行（T42）。应答经 Core 公开命令；未声明的请求、工具不匹配、重复或过期答复、未用上的应答都使场景失败。`sessions.<label>.mode` 显式选择起始模式（`default`、`acceptEdits`、`plan`、`bypassPermissions`；跳过权限需要用 `workspace.run_files` 在 `data 数据/settings.json` 写入用户级开关），`set_mode` 操作向当前会话发送模式变更。
 
 ### 12.4 断言与匹配规则
 

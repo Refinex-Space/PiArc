@@ -1420,6 +1420,14 @@
             }
           }
         },
+        "via": {
+          "description": "The answer comes from a system notification's action (T42).",
+          "enum": ["notification"]
+        },
+        "notification_allow": {
+          "description": "Whether the card must offer Allow in its notification (T42).",
+          "type": "boolean"
+        },
         "decision": {
           "description": "wait leaves the card unanswered: a question form whose timeout answers it (T26).",
           "enum": ["allow", "deny", "always", "session", "wait"]

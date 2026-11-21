@@ -1,0 +1,45 @@
+id: notify-approval
+description: Answers from a system notification go through the same approval ledger (T42, FR-SY-03); a short command and a small file change may be allowed from it, a command longer than the notification shows only opens the card, and a notification may deny.
+capabilities: [CAP-SYS-NOTIFY-002]
+workspace:
+  trusted: true
+  files:
+    a.txt: "alpha\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: short, name: Bash, input: { command: 'env echo short' } }
+      - tool_calls:
+          - { id: small, name: Write, input: { path: b.txt, content: "beta\n" } }
+      - tool_calls:
+          - {
+              id: long,
+              name: Bash,
+              input:
+                {
+                  command: 'env echo xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+                },
+            }
+      - tool_calls:
+          - { id: refused, name: Bash, input: { command: 'env echo refused' } }
+      - text: Finished.
+actions:
+  - prompt: { text: Run the commands., turn: t }
+approvals:
+  - { tool: Bash, decision: allow, via: notification, notification_allow: true }
+  - { tool: Write, decision: allow, via: notification, notification_allow: true }
+  - { tool: Bash, decision: allow, notification_allow: false }
+  - { tool: Bash, decision: deny, via: notification, notification_allow: true }
+expect:
+  request_counts: { main: 5 }
+  requests:
+    - index: 4
+      tool_results:
+        - { id: short, is_error: false, contains: short }
+        - { id: small, is_error: false }
+        - { id: long, is_error: false, contains: xxxxxxxxxx }
+        - { id: refused, is_error: true }
+  files:
+    b.txt: "beta\n"

@@ -33,6 +33,12 @@ pub struct Approval {
     /// The subagent the card must come from (T31).
     #[serde(default)]
     pub subagent: Option<SubagentOriginSpec>,
+    /// The answer comes from a system notification's action (T42).
+    #[serde(default)]
+    pub via: Option<piarc_protocol::policy::AnswerVia>,
+    /// Whether the card must offer "Allow" in its notification (T42).
+    #[serde(default)]
+    pub notification_allow: Option<bool>,
 }
 
 /// Where an approval card must come from (T31).
