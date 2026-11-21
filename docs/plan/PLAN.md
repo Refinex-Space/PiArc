@@ -507,6 +507,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I183 | T40 | 配置诊断还没有插件来源的展示：诊断 API 能从各组件的 `plugin` 字段与 `packagesList` 得到来源，界面未列出 | T41（配置诊断完善）；**已落地**（T41，ADR-0059）：诊断按来源类别列出插件与 Pi 包（`config_diagnostics/sources.rs` 的 `packages`） |
 | I184 | T41 | 用量的目录价只在 Core 见过某模型的 `models/list` 之后才有（打开过会话、设置页或生成报告时有运行中的 Agent Host）；从未出现在这些列表里的模型在用量页显示"未知"，直到再次列出 | 可接受的现状；需要时让生成报告在没有运行中 Agent Host 时临时起设置 Host 取一次目录，交 R5 评估 |
 | I185 | T41 | 全量 L2 并行时，T13 的设置监听（FSEvents）事件可能迟到几十秒：ConfigChange 已改为每个输入前核对，不受影响；配置诊断页的自动刷新、skills 与命令变化后的 `resources/reload` 仍依赖它 | R5 评估是否让这些消费方在使用前同样核对（或改为轮询少量固定文件） |
+| I186 | T42 | 代码高亮的明暗配色跟随系统的 `prefers-color-scheme`（`transcript/use-color-scheme.ts`），不跟随应用的主题选择：系统为浅色、应用选深色时，Changes 面板与 transcript 代码块的 token 用浅色配色画在深色底上，对比度不足（`tmp/evidence/T42/` 的 `comments-saved-dark.png` 可见） | T43（无障碍与对比度）：让 `useDarkScheme` 读 `<html>` 的 `data-color-mode`，或在主进程按偏好设置 `nativeTheme.themeSource` |
+| I187 | T42 | 可操作通知的实机核对：macOS 横幅与按钮的截图需要终端有"屏幕录制"权限（本机 `screencapture` 报 could not create image from display，T42-A06 标 blocked）；Windows Toast 按钮的实机点击 | macOS 截图由用户授权屏幕录制后用 `PIARC_CAPTURE_NOTIFICATION=1 PIARC_EVIDENCE_TASK=T42 npx playwright test -c apps/desktop/playwright.config.ts t42-notify --project dev` 补拍；Windows 并入 W4 |
 ## 技术债
 
 评审任务（R1–R6）汇总的技术债，按影响排序。每条的细节、负责任务与检查时间点在对应的登记事项中。

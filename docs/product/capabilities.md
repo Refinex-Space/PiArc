@@ -11,7 +11,7 @@
 | M1 | 61 | 61 | 0 | 0 |
 | M2 | 46 | 46 | 0 | 0 |
 | M3 | 47 | 47 | 0 | 0 |
-| M4 | 27 | 22 | 5 | 0 |
+| M4 | 28 | 26 | 2 | 0 |
 | M5 | 7 | 0 | 7 | 0 |
 
 ## M1
@@ -204,15 +204,16 @@
 | CAP-PLUGIN-MCP-001 | 插件的 `.mcp.json` server 以 `plugin_<plugin>_<server>` 加入连接池（优先级最低）并暴露工具 | FR-EX-04、ARCH-6.7、ARCH-6.8 | T40 | `plugin-mcp` | 已实现 |
 | CAP-PLUGIN-SKILLS-001 | 插件的 skill 以 `<plugin>:<名称>` 进入索引并可由 Skill 工具加载 | FR-EX-04、ARCH-6.7 | T40 | `plugin-skills` | 已实现 |
 | CAP-PLUGIN-TRUST-001 | 未信任项目的项目作用域插件与 Pi 包不加载：无 hook、无 MCP 连接、无扩展、无命令 | FR-EX-04、ARCH-10.2 | T40 | `plugin-untrusted-project` | 已实现 |
-| CAP-RV-COMMENT-001 | diff 行内评论批量发送给 agent | FR-RV-04 | T42 | — | 计划中 |
 | CAP-SANDBOX-AUTO-001 | "沙箱内自动批准"模式下沙箱内的 Bash 命令不弹审批，deny、ask 规则、关键路径删除与计划模式照常拦截 | FR-TL-07、ARCH-6.2.3、ARCH-6.10 | T39 | `sandbox-auto-allow`（仅 macos）<br>`sandbox-auto-ask-rule`（仅 macos）<br>`sandbox-auto-critical-delete`（仅 macos）<br>`sandbox-auto-deny-rule`（仅 macos）<br>`sandbox-auto-plan`（仅 macos） | 已实现 |
 | CAP-SANDBOX-MACOS-001 | macOS 上 Bash 在 Seatbelt 中执行，文件写入与网络按白名单放行 | FR-TL-07、ARCH-6.10 | T39 | `sandbox-ask-writes`（仅 macos） | 已实现 |
 | CAP-SANDBOX-PATHS-001 | 前台命令、run_in_background 后台命令与 Monitor 命令都在沙箱内执行 | FR-TL-07、ARCH-6.10、ARCH-6.11 | T39 | `sandbox-launch-paths`（仅 macos）<br>`sandbox-terminal`（仅 macos） | 已实现 |
 | CAP-SANDBOX-PROJECT-001 | 项目级配置只能收紧沙箱：自动批准与白名单域名不生效并在配置诊断中标出 | FR-TL-07、ARCH-6.2.1、ARCH-6.10 | T39 | `sandbox-project-tightens`（仅 macos） | 已实现 |
 | CAP-SANDBOX-RETRY-001 | 沙箱外重试（dangerouslyDisableSandbox）在任何模式都询问，只有仅本次与拒绝，hooks 不能代答 | FR-TL-07、ARCH-6.10 | T39 | `sandbox-unsandboxed-retry`（仅 macos） | 已实现 |
 | CAP-SANDBOX-WINDOWS-001 | Windows 上命令的隔离方案（第一版只做进程树管理，见需求 D7） | FR-TL-07、ARCH-6.10 | T39 | `sandbox-windows-not-applied`（仅 windows） | 已实现 |
-| CAP-SYS-NOTIFY-002 | 在通知中直接允许或拒绝 | FR-SY-03 | T42 | — | 计划中 |
-| CAP-TOOL-NOTEBOOK-001 | NotebookEdit 编辑 Jupyter cell | FR-TL-06、ARCH-6.1.4 | T42 | — | 计划中 |
+| CAP-SYS-NOTIFY-002 | 在通知中直接允许或拒绝 | FR-SY-03 | T42 | `notify-approval` | 已实现 |
+| CAP-TOOL-NOTEBOOK-001 | NotebookEdit 编辑 Jupyter cell（插入、替换、删除，未改动的部分逐字节不变） | FR-TL-06、ARCH-6.1.4 | T42 | `notebook-edit-delete`<br>`notebook-edit-insert`<br>`notebook-edit-replace` | 已实现 |
+| CAP-TOOL-NOTEBOOK-ERRORS-001 | NotebookEdit 的先读后改、外部修改与不存在的 cell 报错，无 id 的旧版 notebook 按序号定位 | FR-TL-06、ARCH-6.1.2 | T42 | `notebook-edit-errors` | 已实现 |
+| CAP-TOOL-NOTEBOOK-PERMISSIONS-001 | NotebookEdit 受 Edit(...) 规则、受保护路径与模式约束，hooks 按规范名匹配，写入进检查点可回退 | FR-TL-06、ARCH-6.9 | T42 | `notebook-edit-permissions` | 已实现 |
 | CAP-USAGE-COST-001 | 按会话、按模型统计用量与成本 | FR-MD-06 | T41 | — | 计划中 |
 
 ## M5
@@ -234,6 +235,7 @@
 | FR-CH-05 | 三档视图只改变客户端的展示 | T29 |
 | FR-CH-07 | 复制消息与选中回合是客户端交互 | T19 |
 | FR-PM-05 | 审批热键、防误触、阅读闸门与输入法守卫是客户端交互规则 | T20 |
+| FR-RV-04 | diff 行内评论是渲染进程的草稿，批量发送是普通的 prompt 或排队消息，由 L4 验证 | T42 |
 | FR-SY-02 | 关窗后后台常驻、菜单栏与系统托盘属于 Electron 主进程 | T35 |
 | FR-SY-04 | URL scheme 与从文件管理器打开属于 Electron 主进程 | T35 |
 | FR-SY-05 | 快捷键与命令面板是客户端交互 | T18 |
