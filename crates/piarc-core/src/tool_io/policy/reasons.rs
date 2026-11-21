@@ -169,3 +169,60 @@ pub(super) fn argument_summary(p: &PolicyEvaluateParams) -> Value {
         "contentBytes":p.input.get("content").and_then(Value::as_str).map(str::len),
         "editCount":p.input.get("edits").and_then(Value::as_array).map(Vec::len)})
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use piarc_protocol::policy::CommandPlace;
+    use serde_json::json;
+
+    fn card(place: Option<CommandPlace>) -> ApprovalRequest {
+        let mut request: ApprovalRequest = serde_json::from_value(json!({
+            "requestId": "r1", "sessionId": "s1", "revision": 1, "connectionEpoch": 1,
+            "tool": "Bash", "kind": "command", "protectedPath": true,
+        }))
+        .expect("request");
+        request.sandbox = place;
+        request
+    }
+
+    fn reply(decision: ApprovalDecision) -> ApprovalAnswer {
+        serde_json::from_value(json!({
+            "requestId": "r1", "sessionId": "s1", "revision": 1, "connectionEpoch": 1,
+            "decision": decision,
+        }))
+        .expect("answer")
+    }
+
+    /// T39-A04: a command outside the sandbox is allowed once or refused, whatever the client
+    /// sends; a sandboxed command's card is not restricted here.
+    #[test]
+    fn an_unsandboxed_command_is_allowed_once_or_refused() {
+        let outside = card(Some(CommandPlace::Unsandboxed));
+        for decision in [ApprovalDecision::AllowOnce, ApprovalDecision::Deny] {
+            assert!(
+                check_unsandboxed(&outside, &reply(decision)).is_ok(),
+                "{decision:?}"
+            );
+        }
+        for decision in [
+            ApprovalDecision::AllowSession,
+            ApprovalDecision::AllowAlways,
+        ] {
+            let refused = check_unsandboxed(&outside, &reply(decision)).expect_err("refused");
+            assert_eq!(
+                refused.data.kind,
+                piarc_protocol::ErrorKind::PermissionDenied
+            );
+            assert!(
+                refused.message.contains("only be allowed once"),
+                "{}",
+                refused.message
+            );
+        }
+        for place in [Some(CommandPlace::Sandbox), None] {
+            let session = reply(ApprovalDecision::AllowSession);
+            assert!(check_unsandboxed(&card(place), &session).is_ok());
+        }
+    }
+}
