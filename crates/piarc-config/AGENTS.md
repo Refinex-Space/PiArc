@@ -46,7 +46,7 @@
 
 ## MCP 配置（`src/mcp.rs`，T36，ADR-0053）
 
-- `merge(sources, &MergeOptions { trusted, disabled_mcpjson, disabled, enabled, lookup })` 是 MCP 配置唯一的合并实现：`sources` 按优先级从高到低排好（Core 的 `piarc_core::mcp` 负责收集：local、`.piarc/settings.local.json`、`.piarc/settings.json`、`.mcp.json`、用户 `settings.json`、`~/.claude.json` 顶层），同名取第一份整条定义，其余记进 `overridden`；名称须是 1–64 个 `[A-Za-z0-9_-]`（`valid_name`）。
+- `merge(sources, &MergeOptions { trusted, disabled_mcpjson, disabled, enabled, lookup })` 是 MCP 配置唯一的合并实现：`sources` 按优先级从高到低排好（Core 的 `piarc_core::mcp` 负责收集：local、`.piarc/settings.local.json`、`.piarc/settings.json`、`.mcp.json`、用户 `settings.json`、`~/.claude.json` 顶层），同名取第一份整条定义，其余记进 `overridden`；名称须是 1–64 个 `[A-Za-z0-9_-]` 且不含 `__`（`valid_name`），拼成工具名（`-` 换成 `_`）后与先出现的 server 相同的排除并报问题：工具名与规则都以 `mcp__<server>__` 区分 server（R4 M2）。
 - 每条定义经 `definition()` 校验：`type` 为 `stdio`、`http`、`streamable-http`（`transport()`），`sse`、`ws`、`websocket` 为不支持并带原因，`headersHelper` 报问题不执行，`timeout` 为毫秒（不低于 `MIN_TIMEOUT_MS`）；`expand_vars` 在 `command`、`args`、`env`、`cwd`、`url`、`headers` 中展开 `${VAR}`、`${VAR:-default}`，没有值的引用保持原文并报问题。`apply_availability` 决定 `ready`、`disabled`（用户选择优先于 `disabledMcpjsonServers`）、`unsupported`、`untrusted`（只有 project 作用域受信任约束）；不可运行的定义不带程序、地址与展开后的值。
 - `claude_state_servers(home, workspace)` 读 `~/.claude.json` 的顶层与 `projects[<工作区>]` 段（键与工作区规范化后比较），`local_pointer` 给出后者的 JSON Pointer；`pool_settings(merged)` 读 `mcp.idleTimeoutSeconds`（默认 600）与 `mcp.deferThreshold`（默认 30）。
 - 可执行项：`executables::enumerate` 经 `mcp_items()` 列出 `.mcp.json`、`.piarc/settings*.json` 的 `mcpServers` 与项目级子 agent 定义的内联 server，条目名由 `trust_item_name` 给出（名称加程序或地址，再加 `type`、`args`、`env`、`cwd`、`headers`、`oauth`），改了运行什么就是新增项。`.pi/mcp.json` 不再枚举（Pi 的 MCP 扩展不再加载）。

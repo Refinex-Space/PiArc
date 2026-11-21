@@ -401,3 +401,40 @@ fn the_claude_state_file_gives_user_and_local_servers() {
             .is_none()
     );
 }
+
+/// R4 M2: a tool is `mcp__<server>__<tool>` with the server name spelled for tool names
+/// (other characters become `_`), and rules name servers by that prefix. A name with `__`
+/// (`github__admin`'s tools would fall under `mcp__github` rules) or one that spells like an
+/// earlier server's (`git-hub` and `git_hub`) is left out with an issue.
+#[test]
+fn server_names_that_make_tool_names_ambiguous_are_left_out() {
+    let sources = [
+        source(
+            McpScope::User,
+            "settings.json",
+            json!({ "git_hub": { "command": "u" }, "github": { "command": "g" } }),
+        ),
+        source(
+            McpScope::Project,
+            ".mcp.json",
+            json!({ "github__admin": { "command": "p" }, "git-hub": { "command": "q" } }),
+        ),
+    ];
+    // The user's servers come first (as if they ranked higher), the project's after.
+    let config = merge(&sources, &options(true));
+    let kept: Vec<&str> = config.servers.iter().map(|s| s.name.as_str()).collect();
+    assert_eq!(kept, ["git_hub", "github"], "{:?}", config.issues);
+    assert_eq!(config.issues.len(), 2, "{:?}", config.issues);
+    assert!(
+        config
+            .issues
+            .iter()
+            .any(|i| i.pointer == "/mcpServers/github__admin")
+    );
+    assert!(
+        config
+            .issues
+            .iter()
+            .any(|i| i.pointer == "/mcpServers/git-hub" && i.message.contains("git_hub"))
+    );
+}

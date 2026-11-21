@@ -92,6 +92,9 @@ pub const MCP_JSON: &str = ".mcp.json";
 pub fn merge(sources: &[SourceEntries], options: &MergeOptions<'_>) -> McpConfig {
     let mut config = McpConfig::default();
     let mut taken: BTreeMap<String, (String, McpServerDefinition)> = BTreeMap::new();
+    // Tool names spell the server name with `_` for other characters: two names that spell the
+    // same would share a tool prefix and each other's rules (R4 M2).
+    let mut spelled: BTreeMap<String, String> = BTreeMap::new();
     for entries in sources {
         let Some(servers) = &entries.servers else {
             continue;
@@ -120,8 +123,20 @@ pub fn merge(sources: &[SourceEntries], options: &MergeOptions<'_>) -> McpConfig
                 source: &entries.source,
                 pointer: &pointer,
             };
+            let tool_prefix = name.replace('-', "_");
+            if let Some(first) = spelled.get(&tool_prefix) {
+                config.issues.push(issue(
+                    &entries.source,
+                    &pointer,
+                    &format!(
+                        "server {name:?} would name its tools like server {first:?} (mcp__{tool_prefix}__…); the server is left out"
+                    ),
+                ));
+                continue;
+            }
             match definition(name, raw, &at, options, &mut config.issues) {
                 Some(def) => {
+                    spelled.insert(tool_prefix, name.clone());
                     taken.insert(name.clone(), (entries.source.clone(), def));
                 }
                 None => continue,
@@ -156,7 +171,7 @@ pub fn definition(
             at.source,
             at.pointer,
             &format!(
-                "server name {name:?} must be 1–64 letters, digits, \"_\" or \"-\"; the server is left out"
+                "server name {name:?} must be 1–64 letters, digits, \"_\" or \"-\" without \"__\" (it separates the server from the tool in tool names); the server is left out"
             ),
         ));
         return None;
@@ -426,6 +441,8 @@ fn text<'a>(map: &'a Map<String, Value>, key: &str) -> Option<&'a str> {
 pub fn valid_name(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= 64
+        // `mcp__github` rules would cover `github__admin`'s tools (R4 M2).
+        && !name.contains("__")
         && name
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
