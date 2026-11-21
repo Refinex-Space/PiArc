@@ -31,7 +31,6 @@ import { CanvasRenderer, type Highlight } from './vendor/ghostty-web/renderer.js
 /** How long after input the view pulls back to back while waiting for the echo. */
 export const EAGER_MS = 50;
 
-
 /** Half a blink period of a blinking cursor. */
 export const BLINK_MS = 600;
 

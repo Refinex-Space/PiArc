@@ -88,14 +88,14 @@ export function attachPointer(host: PointerHost, canvas: HTMLCanvasElement): () 
     }
   };
 
-  const openLink = async (event: PointerEvent) => {
+  const openLink = async (event: MouseEvent) => {
     const { col, row } = cellOf(at(event));
     const hyperlink = await host.linkAt(col, row).catch(() => null);
     const uri = hyperlink?.uri ?? urlAt(host.row(row), col)?.uri;
     if (uri !== undefined) host.open(uri);
   };
 
-  const showLink = async (event: PointerEvent) => {
+  const showLink = async (event: MouseEvent) => {
     const { col, row } = cellOf(at(event));
     const key = `${String(col)}:${String(row)}`;
     if (key === hoverKey) return;
@@ -116,7 +116,10 @@ export function attachPointer(host: PointerHost, canvas: HTMLCanvasElement): () 
     }
   };
 
-  const onDown = (event: PointerEvent) => {
+  // Mouse events, not pointer events: `detail` of a press is the platform's click count
+  // (double and triple clicks), which pointer events leave at 0. While a button is held the
+  // window gets the moves and the release, so a drag may leave the canvas.
+  const onDown = (event: MouseEvent) => {
     if (!host.attached()) return;
     host.focus();
     if (event.button === 0 && linkModifier(event)) {
@@ -125,9 +128,10 @@ export function attachPointer(host: PointerHost, canvas: HTMLCanvasElement): () 
       return;
     }
     const button = BUTTONS[event.button];
-    if (button === undefined) return;
+    if (button === undefined || held !== undefined) return;
     event.preventDefault();
-    canvas.setPointerCapture(event.pointerId);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
     held = button;
     const point = at(event);
     last = { ...point, mods: mods(event) };
@@ -139,7 +143,7 @@ export function attachPointer(host: PointerHost, canvas: HTMLCanvasElement): () 
       clicks: Math.max(1, Math.min(3, event.detail)),
     });
   };
-  const onMove = (event: PointerEvent) => {
+  const onMove = (event: MouseEvent) => {
     if (!host.attached()) return;
     if (held === undefined) {
       if (linkModifier(event)) void showLink(event);
@@ -151,12 +155,17 @@ export function attachPointer(host: PointerHost, canvas: HTMLCanvasElement): () 
     host.mouse({ action: 'motion', button: held, mods: mods(event), ...point });
     updateAutoscroll(point);
   };
-  const onUp = (event: PointerEvent) => {
+  const onUp = (event: MouseEvent) => {
     stopAutoscroll();
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
     if (held === undefined || !host.attached()) return;
     const button = held;
     held = undefined;
     host.mouse({ action: 'release', button, mods: mods(event), ...at(event) });
+  };
+  const onHover = (event: MouseEvent) => {
+    if (held === undefined && host.attached()) onMove(event);
   };
   const onWheel = (event: WheelEvent) => {
     if (!host.attached()) return;
@@ -183,20 +192,18 @@ export function attachPointer(host: PointerHost, canvas: HTMLCanvasElement): () 
     if (event.key === 'Meta' || event.key === 'Control') clearLink();
   };
 
-  canvas.addEventListener('pointerdown', onDown);
-  canvas.addEventListener('pointermove', onMove);
-  canvas.addEventListener('pointerup', onUp);
-  canvas.addEventListener('pointercancel', onUp);
-  canvas.addEventListener('pointerleave', clearLink);
+  canvas.addEventListener('mousedown', onDown);
+  canvas.addEventListener('mousemove', onHover);
+  canvas.addEventListener('mouseleave', clearLink);
   canvas.addEventListener('wheel', onWheel, { passive: false });
   window.addEventListener('keyup', onKeyModifier);
   return () => {
     stopAutoscroll();
-    canvas.removeEventListener('pointerdown', onDown);
-    canvas.removeEventListener('pointermove', onMove);
-    canvas.removeEventListener('pointerup', onUp);
-    canvas.removeEventListener('pointercancel', onUp);
-    canvas.removeEventListener('pointerleave', clearLink);
+    canvas.removeEventListener('mousedown', onDown);
+    canvas.removeEventListener('mousemove', onHover);
+    canvas.removeEventListener('mouseleave', clearLink);
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
     canvas.removeEventListener('wheel', onWheel);
     window.removeEventListener('keyup', onKeyModifier);
   };

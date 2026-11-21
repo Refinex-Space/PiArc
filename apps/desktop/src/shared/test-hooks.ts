@@ -104,6 +104,8 @@ export interface TestCoreApi {
   /** The visible screen of a terminal from libghostty-vt's formatter. */
   terminalText(id: number): Promise<string>;
   terminalStats(id: number): TerminalCoreStats;
+  /** What a terminal shows, as JSON text (`TerminalInfo`: size, title, sharing, …). */
+  terminalInfo(id: number): string;
   /** Microseconds from writing `byte` straight to the PTY until its echo was read back. */
   terminalProbeEcho(id: number, byte: number): Promise<number>;
   /**

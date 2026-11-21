@@ -119,19 +119,21 @@ body,
   color: var(--piarc-text-disabled);
 }
 
-.button-primary {
+/* Under :root[data-app], or `:root[data-app] button { color: inherit }` wins and the text
+   on the accent background loses its contrast (T34, axe). */
+:root[data-app] .button-primary {
   border-color: var(--piarc-c-button-primary-background);
   background: var(--piarc-c-button-primary-background);
   color: var(--piarc-c-button-primary-text);
   font-weight: var(--piarc-font-weight-medium);
 }
 
-.button-primary:hover:not(:disabled) {
+:root[data-app] .button-primary:hover:not(:disabled) {
   border-color: var(--piarc-c-button-primary-background-hover);
   background: var(--piarc-c-button-primary-background-hover);
 }
 
-.button-primary:disabled {
+:root[data-app] .button-primary:disabled {
   border-color: var(--piarc-border-default);
   background: var(--piarc-surface-active);
   color: var(--piarc-text-disabled);
@@ -1720,21 +1722,20 @@ textarea.input {
   overflow-x: auto;
   border-bottom: 1px solid var(--piarc-border-subtle);
 }
-:root[data-app] .terminal-tab {
+:root[data-app] .terminal-tablist {
+  display: flex;
+  align-items: stretch;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+}
+:root[data-app] .terminal-tab,
+:root[data-app] .terminal-new {
   display: flex;
   align-items: center;
+  gap: var(--piarc-space-1);
   border: 1px solid transparent;
   border-bottom: 0;
   border-radius: var(--piarc-radius-md) var(--piarc-radius-md) 0 0;
-}
-:root[data-app] .terminal-tab.is-active {
-  border-color: var(--piarc-border-subtle);
-  background: var(--piarc-c-terminal-background);
-}
-:root[data-app] .terminal-tab-name,
-:root[data-app] .terminal-tab-close,
-:root[data-app] .terminal-new {
-  border: 0;
   background: transparent;
   color: var(--piarc-text-secondary);
   font: inherit;
@@ -1742,7 +1743,9 @@ textarea.input {
   padding: var(--piarc-space-1) var(--piarc-space-2);
   cursor: pointer;
 }
-:root[data-app] .terminal-tab.is-active .terminal-tab-name {
+:root[data-app] .terminal-tab.is-active {
+  border-color: var(--piarc-border-subtle);
+  background: var(--piarc-c-terminal-background);
   color: var(--piarc-text-primary);
 }
 :root[data-app] .terminal-tab-name {
@@ -1750,6 +1753,13 @@ textarea.input {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+:root[data-app] .terminal-tab-close {
+  padding: 0 var(--piarc-space-1);
+  border-radius: var(--piarc-radius-md);
+}
+:root[data-app] .terminal-tab-close:hover {
+  background: var(--piarc-surface-hover);
 }
 :root[data-app] .terminal-tab-badge {
   margin-left: var(--piarc-space-1);

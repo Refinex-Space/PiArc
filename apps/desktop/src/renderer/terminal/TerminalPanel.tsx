@@ -235,77 +235,90 @@ export function TerminalPanel({ sessionId }: { readonly sessionId: string }) {
         }
       }}
     >
-      <div className="terminal-tabs" role="tablist" aria-label={t('panel.terminal')}>
-        {tabs.map((tab, index) => {
-          const name = nameOf(tab, index);
-          const selected = tab === active;
-          return (
-            <div key={tab.taskId} className={`terminal-tab${selected ? ' is-active' : ''}`}>
-              {renaming === tab.taskId ? (
-                <input
-                  className="terminal-tab-rename"
-                  aria-label={t('terminal.renameLabel')}
-                  defaultValue={name}
-                  data-autofocus
-                  ref={(input) => {
-                    input?.focus();
-                  }}
-                  data-testid="terminal-rename"
-                  onKeyDown={(event) => {
-                    if (event.nativeEvent.isComposing) return;
-                    if (event.key === 'Enter') {
-                      renameTerminal(tab.taskId, event.currentTarget.value);
-                      setRenaming(undefined);
-                    } else if (event.key === 'Escape') {
-                      setRenaming(undefined);
-                    }
-                  }}
-                  onBlur={(event) => {
+      <div className="terminal-tabs">
+        <div className="terminal-tablist" role="tablist" aria-label={t('panel.terminal')}>
+          {tabs.map((tab, index) => {
+            const name = nameOf(tab, index);
+            const selected = tab === active;
+            const close = () => {
+              window.piarc.closeTerminal(tab.terminalId).catch((reason: unknown) => {
+                setError(message(reason));
+              });
+              setOpened((list) => list.filter((entry) => entry.taskId !== tab.taskId));
+            };
+            return renaming === tab.taskId ? (
+              <input
+                key={tab.taskId}
+                className="terminal-tab-rename"
+                aria-label={t('terminal.renameLabel')}
+                defaultValue={name}
+                ref={(input) => {
+                  input?.focus();
+                }}
+                data-testid="terminal-rename"
+                onKeyDown={(event) => {
+                  if (event.nativeEvent.isComposing) return;
+                  if (event.key === 'Enter') {
                     renameTerminal(tab.taskId, event.currentTarget.value);
                     setRenaming(undefined);
-                  }}
-                />
-              ) : (
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  className="terminal-tab-name"
-                  data-testid="terminal-tab"
-                  data-task={tab.taskId}
-                  data-terminal={tab.terminalId}
-                  title={t('terminal.rename', { name })}
-                  onClick={() => {
-                    setActiveTerminal(sessionId, tab.taskId);
-                    setFocusNonce((n) => n + 1);
-                  }}
-                  onDoubleClick={() => {
-                    setRenaming(tab.taskId);
-                  }}
-                >
-                  {name}
-                  {tab.agent ? (
-                    <span className="terminal-tab-badge">{t('terminal.agentBadge')}</span>
-                  ) : null}
-                </button>
-              )}
+                  } else if (event.key === 'Escape') {
+                    setRenaming(undefined);
+                  }
+                }}
+                onBlur={(event) => {
+                  renameTerminal(tab.taskId, event.currentTarget.value);
+                  setRenaming(undefined);
+                }}
+              />
+            ) : (
               <button
+                key={tab.taskId}
                 type="button"
-                className="terminal-tab-close"
-                aria-label={t('terminal.close', { name })}
-                data-testid="terminal-tab-close"
+                role="tab"
+                aria-selected={selected}
+                aria-keyshortcuts="F2 Delete"
+                className={`terminal-tab${selected ? ' is-active' : ''}`}
+                data-testid="terminal-tab"
+                data-task={tab.taskId}
+                data-terminal={tab.terminalId}
+                title={`${name}\n${t('terminal.rename', { name })} (F2) · ${t('terminal.close', { name })} (Delete)`}
                 onClick={() => {
-                  window.piarc.closeTerminal(tab.terminalId).catch((reason: unknown) => {
-                    setError(message(reason));
-                  });
-                  setOpened((list) => list.filter((entry) => entry.taskId !== tab.taskId));
+                  setActiveTerminal(sessionId, tab.taskId);
+                  setFocusNonce((n) => n + 1);
+                }}
+                onDoubleClick={() => {
+                  setRenaming(tab.taskId);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'F2') {
+                    event.preventDefault();
+                    setRenaming(tab.taskId);
+                  } else if (event.key === 'Delete') {
+                    event.preventDefault();
+                    close();
+                  }
                 }}
               >
-                ×
+                <span className="terminal-tab-name">{name}</span>
+                {tab.agent ? (
+                  <span className="terminal-tab-badge">{t('terminal.agentBadge')}</span>
+                ) : null}
+                {/* The tab closes with Delete from the keyboard; this is the mouse's way. */}
+                <span
+                  className="terminal-tab-close"
+                  aria-hidden="true"
+                  data-testid="terminal-tab-close"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    close();
+                  }}
+                >
+                  ×
+                </span>
               </button>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
         <button
           type="button"
           className="terminal-new"
