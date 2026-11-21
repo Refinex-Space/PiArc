@@ -318,7 +318,7 @@ T37（Skills、斜杠命令、命令面板与输出风格）开工于 2026-11-21
 - [x] 5. NAPI、主进程 IPC、preload：命令与 skills 列表、输出风格切换
 - [x] 6. 渲染进程：composer `/` 命令面板、Mod+K 命令面板、内置命令、输出风格选择、设置页 skills 列表、共享模糊匹配（A08、A09、A10、A11）
 - [x] 7. L2 场景 `skill-*`、`command-*`、能力清单与 capabilities.md
-- [ ] 8. L4 `t37-*` 与截图证据
+- [x] 8. L4 `t37-*` 与截图证据
 - [ ] 9. 原创性自查（A13）、文档与 AGENTS.md、复用表、登记事项
 - [ ] 10. `npm run verify`（A14）、验收记录与收尾
 

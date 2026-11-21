@@ -24,6 +24,8 @@ function render() {
         import * as sub from './agent-host/src/harness/prompts/subagents.ts';
         import * as tasks from './agent-host/src/harness/prompts/tasks.ts';
         import * as mcp from './agent-host/src/harness/prompts/mcp.ts';
+        import * as skills from './agent-host/src/harness/prompts/skills.ts';
+        import * as styles from './agent-host/src/harness/prompts/output-styles.ts';
         const system = assembleSystem(CANONICAL_TOOLS, DEFAULT_PROFILE, [],
           {cwd: '', platform: '', date: '', gitStatus: ''}).text;
         const conservative = conservativeProfile(DEFAULT_PROFILE);
@@ -60,7 +62,13 @@ function render() {
           mcp.TOOL_SEARCH_DESCRIPTION,
           mcp.mcpSection([{ name: '', deferred: true }, { name: '', instructions: ' ', deferred: false }]) ?? '',
           ...[true, false].map((deferred) =>
-            mcp.changeReminder({ name: '', added: [''], removed: [''], deferred, instructions: '' }))];
+            mcp.changeReminder({ name: '', added: [''], removed: [''], deferred, instructions: '' })),
+          // T37: the skills index, its change reminders, Skill's results, the output styles.
+          skills.SKILLS_INDEX_INTRO, skills.skillsChanged([''], ['']), skills.skillAlreadyLoaded(''),
+          skills.skillLoaded('', '', '', ['']), skills.SKILL_UNTRUSTED_NOTE,
+          skills.skillAllowedNote(['']),
+          ...Object.entries(styles.BUILT_IN_STYLES).map(([name, text]) => styles.styleSection(name, text)),
+          styles.styleChanged('', ' '), styles.styleChanged('', undefined)];
         process.stdout.write([system, ...descriptions, ...notices].join(String.fromCharCode(10)));`,
       resolveDir: repoRoot,
     },
@@ -128,6 +136,13 @@ function sourceTexts() {
       const text = (m[1] ?? m[2] ?? m[3] ?? '').replace(/\$?\{[^}]*\}/g, ' ');
       if (words(text).length >= 5) texts.push(text);
     }
+  }
+  // T37: the built-in slash commands' and output styles' descriptions (the client's catalog).
+  const catalog = readFileSync(path.join(repoRoot, 'apps/desktop/src/shared/i18n/en.ts'), 'utf8');
+  for (const m of catalog.matchAll(
+    /'(?:composer\.command|outputStyle\.builtin)\.[^']+': '((?:[^'\\]|\\.)*)'/g,
+  )) {
+    texts.push(m[1] ?? '');
   }
   return texts;
 }
