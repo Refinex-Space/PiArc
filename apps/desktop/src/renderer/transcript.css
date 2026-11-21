@@ -460,6 +460,26 @@
   background: var(--piarc-state-warning);
 }
 
+/* Forced colors drop backgrounds: the status keeps a shape in system colors (filled when done,
+   highlighted while running, an outlined square when it did not succeed); its name is also in
+   the mark's text for screen readers and its title. */
+@media (forced-colors: active) {
+  .tool-status-dot {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+  .tool-status.is-inProgress .tool-status-dot {
+    background: Highlight;
+  }
+  .tool-status.is-failed .tool-status-dot,
+  .tool-status.is-declined .tool-status-dot,
+  .tool-status.is-interrupted .tool-status-dot {
+    border: 2px solid CanvasText;
+    border-radius: 1px;
+    background: Canvas;
+  }
+}
+
 @keyframes piarc-pulse {
   50% {
     opacity: 0.35;
@@ -871,6 +891,18 @@
 
 .composer-box:focus-within {
   border-color: var(--piarc-border-focus);
+}
+
+/* The attach button is a label around a hidden file input: the ring goes on the label. */
+:root[data-app] .composer-attach:has(input:focus-visible) {
+  outline: 2px solid var(--piarc-c-focus-ring);
+  outline-offset: 1px;
+}
+
+/* Keyboard focus in the editor shows the same ring as every other control, on the box. */
+:root[data-app] .composer-box:has(.composer-editor:focus-visible) {
+  outline: 2px solid var(--piarc-c-focus-ring);
+  outline-offset: 1px;
 }
 
 .composer-box.is-disabled {

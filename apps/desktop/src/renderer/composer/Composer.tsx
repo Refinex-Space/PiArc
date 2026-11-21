@@ -679,6 +679,7 @@ export function Composer({
             <input
               type="file"
               className="visually-hidden"
+              aria-label={t('composer.attach')}
               data-testid="composer-file-input"
               accept={(limits?.kinds ?? []).flatMap((kind) => kind.mimeTypes).join(',')}
               multiple

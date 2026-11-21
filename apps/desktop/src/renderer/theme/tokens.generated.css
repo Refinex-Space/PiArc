@@ -370,7 +370,7 @@
     --piarc-text-secondary: CanvasText;
     --piarc-text-disabled: GrayText;
     --piarc-text-accent: LinkText;
-    --piarc-text-on-accent: HighlightText;
+    --piarc-text-on-accent: ButtonText;
     --piarc-text-danger: CanvasText;
     --piarc-text-warning: CanvasText;
     --piarc-text-success: CanvasText;
@@ -378,7 +378,7 @@
     --piarc-border-default: CanvasText;
     --piarc-border-strong: CanvasText;
     --piarc-border-focus: Highlight;
-    --piarc-accent-solid: ButtonText;
+    --piarc-accent-solid: ButtonFace;
     --piarc-accent-solid-hover: Highlight;
     --piarc-accent-subtle: Canvas;
     --piarc-accent-subtle-hover: Canvas;

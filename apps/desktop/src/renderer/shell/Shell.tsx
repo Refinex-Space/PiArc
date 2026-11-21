@@ -36,6 +36,18 @@ import { UiContext, type Toast, type TrustMode, type Ui, type View } from './ui.
 import { useAttention } from './use-attention.js';
 import { useCommands } from './use-commands.js';
 
+/** Whether focus is in the bottom panels (a panel that closes takes it away). */
+function dockHasFocus(): boolean {
+  return document.activeElement?.closest('[data-testid="panel-area-dock"]') != null;
+}
+
+/** After the panel that had focus closed: the conversation's message box, not the page. */
+function focusMessageBox(): void {
+  requestAnimationFrame(() => {
+    document.querySelector<HTMLElement>('.conversation .composer-editor')?.focus();
+  });
+}
+
 /** The rail's width and the dock's height bounds (px). */
 const RAIL_WIDTH = { min: 240, max: 560 } as const;
 const DOCK_HEIGHT = { min: 120, max: 800 } as const;
@@ -331,10 +343,18 @@ export function Shell() {
         if (!trust && !shortcutsOpen) setPaletteOpen(true);
         break;
       case 'changes.toggle':
-        if (view.kind === 'session' && toggleChangesPanel()) showPanel('changes');
+        if (view.kind === 'session') {
+          const inside = dockHasFocus();
+          if (toggleChangesPanel()) showPanel('changes');
+          else if (inside) focusMessageBox();
+        }
         break;
       case 'terminal.toggle':
-        if (view.kind === 'session' && toggleTerminalPanel()) showPanel('terminal');
+        if (view.kind === 'session') {
+          const inside = dockHasFocus();
+          if (toggleTerminalPanel()) showPanel('terminal');
+          else if (inside) focusMessageBox();
+        }
         break;
       case 'app.settings':
         void window.piarc.openSettings();

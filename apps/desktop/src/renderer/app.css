@@ -573,6 +573,11 @@ textarea.input {
   .badge-awaiting {
     border: 1px solid CanvasText;
   }
+  /* The unread dot is a background: keep it, in a system color. */
+  .badge-unread::before {
+    forced-color-adjust: none;
+    background: Highlight;
+  }
 }
 
 /* ---- main area ---- */
