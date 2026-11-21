@@ -29,6 +29,11 @@ Core 层的集成测试在 `crates/piarc-core/tests/tool_io.rs`（越界、会�
 - 写前快照：`WriteSpec.snapshots` 给出对象库时，`write_checked` 在路径锁内、原子替换之前把旧字节 `put` 进 `piarc_checkpoint::ObjectStore`（`fs → checkpoint` 例外）；`Written` 带前后内容的 SHA-256 与钉住旧对象的 `snapshot`，Core 写完索引才释放它。Core 在设置关掉 `fileCheckpointingEnabled` 时不给对象库。
 - 写回原语 `replace`（`restore.rs`，回退、撤销、丢弃用，不是工具调用，不做先读后改）：路径锁内核对 `Replacement::expected`（不符为 `Error::Changed`，什么都不动）→ 当前字节存入对象库 → 原子替换为目标字节或删除 → `FileStates::forget`。字节按快照原样写回，编码、BOM、换行不变。`current_sha256`、`read_current` 给预览与 Changes 读当前内容。
 
+## Notebook（T42，ADR-0060）
+
+- `notebook::edit(text, &CellEdit)` 只替换、插入或删除一个 cell 的字节区间（`Scanner` 扫出各 cell 的范围，不解析再序列化），被改的 cell 按文件的缩进、换行与分隔风格重写（`Style`），它不改的键保留原文；替换代码 cell 清空 `outputs` 与 `execution_count`。没有 id 的旧版 notebook 用 `cell-N` 或 `N` 定位；`new_cell_id(seed, existing)` 由工具调用 id 派生新 cell 的 id。
+- Agent Host 的 `agent-host/src/tools/notebook-text.ts` 是同一算法：改其中一边时同步另一边，两边都跑 `tests/notebook/cases.json` 的共享向量（含 `fixtures/crlf/` 下的 CRLF notebook）；`PIARC_UPDATE_NOTEBOOK=1 cargo test -p piarc-fs notebook` 重写期望文件，之后逐个审阅再提交。
+
 ## 阈值与常量
 
 `MAX_READ_CHUNK`、`MAX_BLOB_BYTES`（32 MiB）、`MAX_UPLOAD_BYTES`（64 MiB）在 `piarc_protocol::fs`；`DETECT_BYTES`（编码检测看前 8 MiB）在 `content.rs`；PDF 的 `MAX_PAGES_WITHOUT_RANGE`（10）、`MAX_PAGES_PER_READ`（20）在 `pdf.rs`。工具结果的 50K/200K 不在这里，在 `agent-host/src/harness/tool-results.ts`。

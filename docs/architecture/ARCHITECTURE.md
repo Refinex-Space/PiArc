@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.52（2026-11-21） |
+| 版本 | 2.53（2026-11-21） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -274,6 +274,7 @@ PiArc/
 | [0057](../adr/0057-windows-command-isolation.md) | Windows 到 Beta 维持权限规则 + Job Object 与明确提示，MXC ProcessContainer 列为 Beta 之后的候选（先验证遥测，先用于 Agent Host，Git Bash 修复后再给命令） | 不引入要管理员、要签名或带不可关遥测的组件；Windows 上的提示与 Claude Code 一致 |
 | [0058](../adr/0058-plugins-pi-packages-and-mcp-prompts.md) | 插件与 Pi 包由 Core 安装（记录在 `core.sqlite`，npm 经内置 npm 且 `--ignore-scripts`，git 锁定提交），作用域在设置的 `plugins` 键，可执行项逐项确认、确认只在主进程原生对话框里；组件以命名空间排在所有来源之后；Pi 扩展经 AHP `plugins/extensions` 交给 Agent Host；MCP prompts 是 `mcp__<server>__<prompt>` 斜杠命令 | 装上不等于运行：每段代码在运行前都经用户逐项确认；项目未受信任时项目作用域的包一律不加载 |
 | [0059](../adr/0059-m4-hooks-config-diagnostics-and-usage-cost.md) | M4 hooks（UserPromptExpansion、InstructionsLoaded、CwdChanged、FileChanged、ConfigChange、StopFailure）的挂载点与 `watchPaths`、ConfigChange 阻断后本会话保留旧值；`mcp_tool` handler 经 AHP `hooks/mcpTool` 交给工作区的 MCP 池；配置诊断复用 T24 的报告结构并按来源类别列出全部来源；用量按请求从 JSONL 派生，按目录价或用户价以整数计算 | 诊断与成本都从功能自己的加载器和会话文件得出，不另写判断；没有价格的模型成本是"未知"而不是 0 |
+| [0060](../adr/0060-notebook-edit-actionable-notifications-and-diff-comments.md) | NotebookEdit 只替换一个 cell 的字节区间、Rust 与 TS 共用向量、新 cell 的 id 由调用 id 派生；系统通知只放行能在通知里读完的请求，按钮经同一审批账本；diff 行内评论是渲染进程的草稿，按摘录重新定位，一次发送 | 保真写入不产生整文件 diff；通知没有阅读闸门，只给短请求"允许"；评论发送后就是普通消息，不需要 Core 存储 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -520,6 +521,8 @@ T07 实测（S4，ADR-0020）：Pi 1.5.2 的 Operations 覆盖 bash、find（给
 | ToolSearch | 延迟加载工具检索（复用 Pi `tool_search`） | 否 | M3 |
 | KillShell / Monitor | 后台任务（6.11） | 否 / 是 | M3 |
 | NotebookEdit | Jupyter cell 编辑 | 是 | M4 |
+
+T42 落地（ADR-0060）：`NotebookEdit` 的参数沿用 Claude Code（`notebook_path`、`cell_id`、`new_source`、`cell_type`、`edit_mode`），`Edit(...)` 规则覆盖它。编辑只替换、插入或删除一个 cell 的字节区间（`piarc_fs::notebook`，Agent Host 的 `tools/notebook-text.ts` 是同一算法，两边跑 `tests/notebook/` 的共享向量），cell 之外逐字节不变；替换代码 cell 的源码清空它的输出与执行计数。没有 id 的旧版 notebook 按序号定位，新 cell 的 id 由工具调用 id 派生。先读后改、外部修改、检查点、`fileChange` diff 与受保护路径同 `Write`/`Edit`。
 
 T32 落地（ADR-0049）：`KillShell` 的参数是 `shell_id`，停止本会话（含其子 agent）的后台任务，裁决阶梯里与宿主工具一样是只读（默认不询问，`KillShell` 规则照常生效）；`Monitor` 的参数是 `command`、`description` 与可选的 `timeout`（秒），裁决同 Bash 的规则与分析（`Bash(…)` 规则覆盖 Monitor），但只读白名单与 Accept edits 不让它免审批；`Bash`/`PowerShell` 增加 `run_in_background`。
 
@@ -1223,7 +1226,7 @@ diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高�
 
 ### 7.7 diff 与预处理
 
-- **diff**：similar 计算行级与词级 diff，输出 hunk 结构；Changes 面板、审批卡、快照回退用同一份结构。超过阈值（例如 5,000 行或 300 个文件）时降级为折叠与纯文本。T16 落地行级部分：`piarc_diff::file_diff` 给出 `FileDiff`（unified 文本、3 行上下文的 hunk、增删行数，行文本不含换行符，末行无换行时标记 `noNewline`）；增删超过 5,000 行或文本超过 512 KiB 时不给 hunk、文本截断（`degraded`）；similar 的搜索限时 2 秒，超时后给出较粗的 diff。T28 的 Changes 面板沿用行级 `FileDiff`（基线为会话最早一条快照，当前内容从磁盘读），面板超过 300 个文件或合计 5,000 行增删时整体降级为折叠与纯文本（`piarc_diff::MAX_PANEL_FILES`、`MAX_PANEL_LINES`）；按 hunk 丢弃由 `piarc_diff::revert_hunks` 对当前文本反向应用。词级 diff 与 UTF-16 偏移仍未实现，由需要它们的任务（如 T42 的 diff 行内评论）补上。
+- **diff**：similar 计算行级与词级 diff，输出 hunk 结构；Changes 面板、审批卡、快照回退用同一份结构。超过阈值（例如 5,000 行或 300 个文件）时降级为折叠与纯文本。T16 落地行级部分：`piarc_diff::file_diff` 给出 `FileDiff`（unified 文本、3 行上下文的 hunk、增删行数，行文本不含换行符，末行无换行时标记 `noNewline`）；增删超过 5,000 行或文本超过 512 KiB 时不给 hunk、文本截断（`degraded`）；similar 的搜索限时 2 秒，超时后给出较粗的 diff。T28 的 Changes 面板沿用行级 `FileDiff`（基线为会话最早一条快照，当前内容从磁盘读），面板超过 300 个文件或合计 5,000 行增删时整体降级为折叠与纯文本（`piarc_diff::MAX_PANEL_FILES`、`MAX_PANEL_LINES`）；按 hunk 丢弃由 `piarc_diff::revert_hunks` 对当前文本反向应用。词级 diff 与 UTF-16 偏移仍未实现：T42 的 diff 行内评论按行号范围与行文本摘录定位，不需要它们（ADR-0060）。
 - **文件预览分类**：二进制、图片、超大文件在 Core 中识别，渲染进程按类型选择展示方式，不读原始字节。
 - **偏移**：Core 对外给出的文本偏移统一为 UTF-16 码元，与 JavaScript 字符串索引一致。
 - **为什么 Markdown 与高亮不放在 Core**：原生方案中 Core 做 Markdown 块解析和高亮，是为了给 AppKit 直接提供 span。改用 Web 界面后，渲染进程的生态（Markdown、shiki、公式、Mermaid）更完整；放在 Core 只会多一层序列化和一套重复实现。重活放在 Web Worker 里，不占用界面线程。
@@ -1281,6 +1284,7 @@ T35 落地（ADR-0052）：主窗口可以有任意多个（会话菜单"在新�
 - T35（ADR-0052）：新建会话表单有"在独立 worktree 中运行"（名称与基础分支可选，不是仓库顶层时说明原因），环境栏左端显示 worktree 名与分支；侧栏的筛选框同时搜索消息全文，标题匹配之下列出"消息中"的结果（按会话分组、带高亮摘要），点击后打开会话并滚到该条目（暂时标出，离开底部跟随）；会话菜单增加"在新窗口中打开"，归档有改动的 worktree 会话先由主进程询问；清理发现改动的 worktree 在主区顶部提示删除或再保留 30 天；拖到窗口上的文件夹作为工作区打开。
 - T34（ADR-0051）：停靠区的终端面板（Ctrl+\` 切换，打开时会话没有终端就新建一个）列出会话的终端任务为标签，工具条有共享开关、附加到消息、查找与以文本查看屏幕；面板只是查看会话终端，关闭面板或重载窗口不影响 shell。composer 新增片段胶囊：显示来源与行数，发送时以带来源的围栏代码块拼入消息。
 - T37（ADR-0054）：composer 的 `/` 面板列出 Core 的合并命令（`listCommands`），按来源分组（内置、项目 `.piarc`/`.claude`/Pi、用户三类）、用共享的模糊匹配（`src/shared/fuzzy.ts`）排序，显示描述、参数提示与 skill 标记；选中内置命令即执行，选中命令文件或 skill 则在输入框填入 `/名称 ` 等用户输入参数。`/output-style` 不带名称时打开风格列表。设置窗口新增"Skills 与插件"页：按工作区列出 skills 的来源、谁可调用、免审批的工具、`paths`、覆盖关系、警告与无效文件，并设置用户级默认输出风格。
+- T42（ADR-0060）：Changes 面板的行号是按钮，点击（Shift+点击扩成范围）在旧侧或新侧的行上写评论，可编辑、删除、跨文件；Mod+Enter 或"发送评论"把全部评论按文件分组拼成一条消息发出（运行中作为排队消息）。评论是渲染进程按会话存在 `localStorage` 的草稿，diff 更新后按摘录重新定位，找不到的标"已失效"并保留文本。
 - T19 的会话主区使用第 8.4 节的行组件与 ProseMirror 输入。提及胶囊显示文件名，发送时按相对路径展开。附件经主进程存入 Core 的会话附件目录，模型收到图像块或 PDF 提取文本。内置命令由 Core 提供，运行中的 steer、follow-up 与队列编辑都经会话 API 执行。
 
 ### 8.3 状态与数据流
@@ -1371,6 +1375,8 @@ T34 落地（ADR-0051）：Ctrl+\` 切换终端面板（`terminal.toggle`）。�
 T35 落地（ADR-0052）：关闭最后一个窗口后应用在两个平台都不退出。macOS 菜单栏是 template 图加计数文字（`▸运行中 ?等待审批`），Windows 托盘按任务栏明暗选黑或白的 `.ico`、计数在提示文字中、左键打开窗口；菜单有打开 PiArc、新建窗口、等待审批的会话（点击打开该会话）、退出。图标由 `scripts/dev/export-tray-icons.mjs` 从 `design/brand/mark.svg` 导出到 `design/brand/`，打包时作为资源。菜单与托盘的"退出"在有运行中的会话或后台任务时先确认。`piarc://open?path=…` 与 `piarc://session/<id>` 只做定位，其他参数忽略；命令行参数、第二次启动、macOS 的 `open-url`/`open-file`（Dock 拖放）与拖入窗口的文件夹都在最近的主窗口里打开，未信任的文件夹立即显示信任对话框。macOS 在 Info.plist 声明 URL scheme 与文件夹文档类型；Windows 由 Velopack 的安装、更新钩子在 `HKCU\Software\Classes` 注册 `piarc` 协议与资源管理器的"Open with PiArc"，卸载时删除。系统通知随应用退出被删除（I43）在后台常驻后影响变小：应用只在用户退出时才退出。
 
 T18 落地（ADR-0029，I43）：渲染进程按 `store/status.ts` 判断哪些会话需要处理（出错、等待审批、完成未读，归档除外）。会话开始需要处理、且它不在前台窗口中显示时，窗口给应用内提醒，主进程（`src/main/platform/attention.ts`）在 macOS 上 Dock 弹跳、在 Windows 上闪烁任务栏；窗口不在前台且通知开启时另发系统通知，点击通知打开该会话。计数在 macOS 上是 Dock 角标（`app.setBadgeCount`），在 Windows 上是任务栏覆盖图标（状态色圆点，描述文字为数量）。
+
+T42 落地（ADR-0060）：等待审批的通知带按钮。Core 给卡片标 `notificationAllow`：只有普通命令（可保存规则、单行、不超过 160 个字符）与小的文件改动（增删合计不超过 12 行）提供"仅本次允许"与"拒绝"，关键路径删除、沙箱外重试、受保护路径与超长参数只提供"打开"。按钮经与审批卡相同的 `answerApproval` 答复（`via: notification`，带 `requestId`、`revision`、`connectionEpoch`），Core 只接受这两种答复，先到的有效答复生效，过期答复在应用内提示，审计来源为"通知"。两个平台都用 Electron 的 `actions`（macOS 通知按钮、Windows Toast 按钮），系统通知在主进程的 `NotificationPort` 后面，测试换成替身；系统不支持通知时设置页说明原因。
 
 ---
 
@@ -1845,6 +1851,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.49 | 2026-11-21 | T39（ADR-0056）补充第 4 章 ADR-0056（ADR-0057 以提议列出）、6.2.3 节写明沙箱内自动批准在第 7 步、沙箱外执行紧接第 3 步；6.10 节 T39 落地（设置与来源约束、按命令生成配置、网络卡、拒绝反馈、不可用时降级、限制）；9.2 节审计的沙箱记录；10.3 节 Agent Host 配置定稿。Windows 隔离方案的 ADR-0057 为提议，第 6.10 节 Windows 一条、10.3、15.2 节与 R16 待用户决定后更新。 |
 | 2.50 | 2026-11-21 | T39：ADR-0057 被用户采纳。第 4 章去掉"提议"；6.10 节 Windows 一条写明评估结论（到 Beta 维持现状，MXC ProcessContainer 为 Beta 之后的候选及其前提）；10.3 节 Windows 的 Agent Host 没有第二道防线并计入已接受风险；15.2 节沙箱一行与第 14 章 R16 的对策和触发条件随之更新。 |
 | 2.51 | 2026-11-21 | T40（ADR-0058）补充第 4 章 ADR-0058；6.3.1 节插件 hooks 的层与确认；6.4 节插件的子 agent 定义；6.7 节 T40 落地（识别、安装位置、作用域与开关、确认与再确认、组件命名与优先级、Pi 扩展经 AHP、设置页）；6.8 节 MCP prompts 作为斜杠命令；6.14 节插件一行；7.4 节能力 `plugins` 与 Core API；9.2 节 `packages` 表（schema v10）；10.2 节项目作用域的包与信任。 |
+| 2.53 | 2026-11-21 | T42（ADR-0060）补充第 4 章 ADR-0060；6.1.4 节 `NotebookEdit` 已实现（参数、cell 字节区间的保真编辑、共享向量、新 cell 的 id）；8.2 节 Changes 面板的 diff 行内评论；8.8 节可操作通知（`notificationAllow` 的条件、经同一审批账本答复、审计来源"通知"）；7.7 节说明评论不需要词级 diff。 |
 | 2.52 | 2026-11-21 | T41（ADR-0059）补充第 4 章 ADR-0059；6.3.2 节 M4 事件与 `mcp_tool` 已实现（挂载点、`watchPaths`、ConfigChange 阻断、StopFailure 映射位置、`hooks/mcpTool`）；6.14 节诊断的全部来源、状态与自动刷新；7.4 节 `hooks/mcpTool`、`CatalogModel.cost` 与用量的 Core API；8.2 节右栏用量卡片与设置窗口"用量"页；9.2 节 `usage_records`、`model_prices`（schema v11）。 |
 | 2.40 | 2026-11-20 | T32（ADR-0049）补充第 4 章 ADR-0049、6.1.4 节 KillShell 与 Monitor 的参数与裁决、6.6.3 节 `monitorOutput`、`key` 与 `wake`、6.11 节任务管理器、超时转后台、通知、Monitor 回灌与限速的落地、7.3 节后台任务的持久化、7.4 节 `backgroundTasks` 能力的方法与成员、8.2 节后台任务卡与面板、9.2 节 schema v7、9.3 节任务输出的清理；基线决策未变（6.11 已定超时转后台与 Monitor） |
 | 2.39 | 2026-11-20 | T31（ADR-0048）补充第 4 章 ADR-0048、6.4 节子 agent 的落地（定义加载、子会话登记与链接、工具过滤用隐藏声明加闸门、深度与并发计数、前后台、空闲回收）、6.13 节模型别名表与解析、6.14 节 `model`、`effortLevel` 生效、`advisorModel` 忽略、`agent` 交 T48、7.4 节 `subagents` 能力的方法与成员、7.6 节子会话条目增量的现状、8.2 节子 agent 卡与设置页、9.2 节 schema v6；基线决策未变 |

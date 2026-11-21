@@ -75,3 +75,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0057](0057-windows-command-isolation.md) | Windows 上命令与 Agent Host 的隔离方案：到 Beta 维持权限规则 + Job Object 与明确提示，MXC ProcessContainer 列为 Beta 之后的候选（先验证遥测、先用于 Agent Host、Git Bash 修复后再给命令） | 已接受 |
 | [0058](0058-plugins-pi-packages-and-mcp-prompts.md) | 插件与 Pi 包：安装记录在 `core.sqlite`、作用域在设置的 `plugins` 键、npm 经内置 npm 且 `--ignore-scripts`、git 锁定提交、可执行项逐项确认（主进程原生确认框）、Pi 扩展经 AHP 交给 Agent Host；MCP prompts 作为 `mcp__<server>__<prompt>` 斜杠命令 | 已接受（补充） |
 | [0059](0059-m4-hooks-config-diagnostics-and-usage-cost.md) | M4 hooks 的挂载点与 `watchPaths`、ConfigChange 阻断保留旧值、`mcp_tool` 经 AHP `hooks/mcpTool`；配置诊断按来源类别复用 T24 的报告；用量按请求从 JSONL 派生、目录价或用户价以整数计算，没有价格为"未知" | 已接受（补充） |
+| [0060](0060-notebook-edit-actionable-notifications-and-diff-comments.md) | NotebookEdit 只改一个 cell 的字节区间（Rust 与 TS 两份实现共用向量，新 cell 的 id 由调用 id 派生）；通知只放行短命令与小改动，按钮经同一审批账本（`via: notification`，审计来源"通知"）；diff 行内评论是渲染进程草稿，按摘录重新定位，Mod+Enter 一次发送（运行中排队） | 已接受（补充） |

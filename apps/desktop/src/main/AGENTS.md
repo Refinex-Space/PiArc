@@ -28,6 +28,12 @@
 - 来源都汇成 `LaunchTarget`：启动参数、第二次启动（`second-instance` 带 argv 与工作目录）、macOS `open-url`/`open-file`（要在 `ready` 之前注册，先进 `early` 队列）、拖入窗口的文件夹（preload `pathForFile`）。窗口页面挂载前的目标排在 `AppShell` 的队列里，页面经 `takeLaunchTargets` 取走，之后的目标作为 `launch` 应用事件送达。主进程不检查路径是否为目录，交给 Core 的 `openWorkspace`。
 - macOS 的 scheme 与文件夹文档类型在 `forge.config.ts` 的 `protocols`、`extendInfo`；只有打包构建调用 `setAsDefaultProtocolClient`。Windows 的注册在 `platform/windows-shell.ts`（`HKCU\Software\Classes`，系统目录的 `reg.exe`，不经 shell），由 `platform/velopack.ts` 的安装、更新、卸载钩子运行。
 
+## 系统通知（`platform/attention.ts`，T18、T42）
+
+- 系统通知只经 `NotificationPort`（`ELECTRON_NOTIFICATIONS` 是 Electron 的实现）：测试换成替身，断言按钮与 `answerApproval` 的参数；不要在别处 `new Notification`。
+- 等待审批的通知按卡片的 `notificationAllow`（Core 在 `tool_io/policy/notify.rs` 判定：普通短命令、小改动）给"仅本次允许"与"拒绝"，否则只给"打开"；主进程不自己判断风险。按钮经 `connect` 接上的 `answerApproval` 答复，带 `via: notification` 与卡片的 `requestId`、`revision`、`connectionEpoch`，与审批卡走同一账本；没被采用的答复以应用事件 `approvalNotice` 告诉窗口。开发构建的测试钩子 `notificationAction` 模拟按下按钮（`e2e/t42-notify.e2e.ts`）。
+- macOS 上 Electron 对关掉通知的用户也报 `show`，所以通知之外总有 Dock 弹跳与应用内提醒（I43）；`notificationsSupported` 为假时设置页说明原因。
+
 ## 易错点
 
 - 截取菜单栏需要终端有"屏幕录制"权限；L4 用测试钩子 `tray()` 读标题、提示与菜单项，不依赖截图。
