@@ -849,6 +849,9 @@ impl Request {
         let mut expansion = None;
         let hook_context = match &mut op {
             Op::Prompt(input) | Op::Steer(input) | Op::FollowUp(input) => {
+                // A settings change since the last input runs its ConfigChange hooks first
+                // (T41): a blocked change must not apply to this input's decisions.
+                self.tool_io.check_config(&self.id.0).await;
                 expansion = self
                     .tool_io
                     .expand_command(&self.id.0, &input.text)

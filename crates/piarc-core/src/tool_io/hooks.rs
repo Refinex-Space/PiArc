@@ -391,7 +391,7 @@ impl ToolIo {
             HookEvent::SessionStart | HookEvent::SubagentStart => {
                 // `watchPaths` of SessionStart start the session's FileChanged watch (T41).
                 if let Some(paths) = &d.watch_paths {
-                    self.set_watch_paths(id, paths).await;
+                    self.replace_watch_paths(id, paths);
                 }
                 result.context = answer.context;
             }

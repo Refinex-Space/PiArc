@@ -300,17 +300,18 @@ struct WorkspaceActor {
     trust_restart_epoch: Option<u64>,
 }
 
-/// `ConfigChange` hooks (T41): each settings layer whose file changed, for every session of the
-/// workspace that is open. Ends with the settings watcher.
+/// `ConfigChange` hooks (T41): when the watcher sees a settings layer change, every open session
+/// of the workspace checks its settings (`ToolIo::check_config`, which each input also does
+/// first, so a late file event cannot let a change apply before its hooks ran). Ends with the
+/// settings watcher.
 async fn config_change_hooks(
     io: crate::tool_io::ToolIo,
     members: super::inbound::SessionSet,
     mut layers: tokio::sync::broadcast::Receiver<crate::workspace_settings::LayerChange>,
 ) {
     loop {
-        let change = match layers.recv().await {
-            Ok(change) => change,
-            Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+        match layers.recv().await {
+            Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
             Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
         };
         let sessions: Vec<String> = members
@@ -320,8 +321,7 @@ async fn config_change_hooks(
             .cloned()
             .collect();
         for id in sessions {
-            io.config_change(&id, change.layer, &change.file, change.previous.clone())
-                .await;
+            io.check_config(&id).await;
         }
     }
 }

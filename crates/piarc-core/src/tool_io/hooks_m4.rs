@@ -7,22 +7,22 @@
 //!
 //! - **Watch list.** One list per session, replaced by each `watchPaths` output; relative
 //!   paths are taken from the session's working directory. At most [`MAX_WATCH_PATHS`]
-//!   entries: the rest are dropped and the user is told. The files' directories are watched
-//!   (`piarc_fs::watch::Watcher`); events are debounced for [`FILE_DEBOUNCE`] and each changed watched
-//!   file runs `FileChanged` once (`event`: `change`, or `unlink` when it is gone).
+//!   entries: the rest are dropped and the user is told. The files are polled every
+//!   [`FILE_POLL`] (existence, size, modification time): starting an FSEvents stream can block
+//!   for many seconds when the system's event service is busy, while at most 64 `stat` calls
+//!   are cheap, start at once and behave the same on every platform. Each changed file runs
+//!   `FileChanged` once per poll (`event`: `change`, or `unlink` when it is gone).
 //! - **Config pins.** A `ConfigChange` hook that blocks keeps the layer's earlier value for that
 //!   session: its permission decisions and hooks use the pinned value
 //!   ([`ToolIo::session_settings`]); the file is not rolled back. `policy_settings` (enterprise,
 //!   T47) cannot be blocked.
 
-use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use piarc_hooks::HookEvent;
 use serde_json::{Map, Value, json};
-use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use super::{SessionIo, ToolIo, lock};
@@ -31,13 +31,50 @@ use crate::hooks::Request;
 /// The most files one session's `FileChanged` hooks watch.
 pub const MAX_WATCH_PATHS: usize = 64;
 
-/// How long file events settle before `FileChanged` runs.
-pub const FILE_DEBOUNCE: Duration = Duration::from_millis(150);
+/// How often the watched files are checked.
+pub const FILE_POLL: Duration = Duration::from_millis(500);
 
-/// A session's watched files and the watcher of their directories.
+/// What a poll compares: whether the file exists, its size and modification time.
+type Stamp = Option<(u64, Option<SystemTime>)>;
+
+fn stamp(path: &Path) -> Stamp {
+    std::fs::metadata(path)
+        .ok()
+        .map(|m| (m.len(), m.modified().ok()))
+}
+
+/// A settings layer as a session last saw it: id, file, loaded value.
+pub(crate) type SeenLayer = (&'static str, Option<PathBuf>, Option<Value>);
+
+/// A session's watch list: the number of the latest replacement and its watcher.
+#[derive(Default)]
+pub(crate) struct WatchSlot {
+    generation: u64,
+    pub(crate) watch: Option<FileWatch>,
+}
+
+/// A replacement of a session's watch list.
+struct WatchChange {
+    session: Arc<SessionIo>,
+    generation: u64,
+    paths: Vec<PathBuf>,
+    dropped: Vec<PathBuf>,
+}
+
+/// A session's watched files; dropping it stops their poll.
 pub(crate) struct FileWatch {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "the tests read the installed list")
+    )]
     pub(crate) paths: Vec<PathBuf>,
-    _watcher: piarc_fs::watch::Watcher,
+    stop: CancellationToken,
+}
+
+impl Drop for FileWatch {
+    fn drop(&mut self) {
+        self.stop.cancel();
+    }
 }
 
 /// The `ConfigChange` source of a settings layer (Claude Code's matcher values).
@@ -54,8 +91,14 @@ pub fn config_source(layer: &str) -> &'static str {
 }
 
 impl ToolIo {
-    /// Runs a Core-observed event's hooks for session `id` and applies `watchPaths`.
-    async fn observed(&self, id: &str, request: Request) -> Option<crate::hooks::Answer> {
+    /// Runs a Core-observed event's hooks for session `id` and applies `watchPaths`: in the
+    /// background, or (`settle`) before returning, so a change made after the event is seen.
+    async fn observed(
+        &self,
+        id: &str,
+        request: Request,
+        settle: bool,
+    ) -> Option<crate::hooks::Answer> {
         let (Some(hooks), Ok(s)) = (self.hook_service(), self.session(id)) else {
             return None;
         };
@@ -63,7 +106,11 @@ impl ToolIo {
         let facts = self.session_facts(&s, id, token);
         let answer = self.run_hooks(hooks, &facts, &request).await;
         if let Some(paths) = &answer.decision.watch_paths {
-            self.set_watch_paths(id, paths).await;
+            if settle {
+                self.set_watch_paths(id, paths).await;
+            } else {
+                self.replace_watch_paths(id, paths);
+            }
         }
         Some(answer)
     }
@@ -79,15 +126,34 @@ impl ToolIo {
             fields,
             tool: None,
         };
-        self.observed(id, request).await;
+        // The command's result waits for the new list: what the agent does next is watched.
+        self.observed(id, request, true).await;
     }
 
     /// Replaces session `id`'s watch list with `paths` (relative ones from its working
-    /// directory), at most [`MAX_WATCH_PATHS`].
-    pub(super) async fn set_watch_paths(&self, id: &str, paths: &[String]) {
-        let Ok(s) = self.session(id) else {
+    /// directory), at most [`MAX_WATCH_PATHS`], in the background (a hook's answer does not
+    /// wait for the notice about dropped paths). The replacement's number is taken now, so a
+    /// later list wins even if it is installed first.
+    pub(super) fn replace_watch_paths(&self, id: &str, paths: &[String]) {
+        let Some(change) = self.watch_change(id, paths) else {
             return;
         };
+        let io = self.clone();
+        let id = id.to_owned();
+        tokio::spawn(async move { io.install_watch(&id, change).await });
+    }
+
+    /// [`Self::replace_watch_paths`], returning once the watcher is in place: after a command
+    /// changed directory (its result comes after, so a later change is seen), and in tests.
+    pub(super) async fn set_watch_paths(&self, id: &str, paths: &[String]) {
+        if let Some(change) = self.watch_change(id, paths) {
+            self.install_watch(id, change).await;
+        }
+    }
+
+    /// The resolved list and its replacement number for session `id`.
+    fn watch_change(&self, id: &str, paths: &[String]) -> Option<WatchChange> {
+        let s = self.session(id).ok()?;
         let cwd = lock(&s.shell_cwd).clone();
         let mut resolved: Vec<PathBuf> = Vec::new();
         for path in paths {
@@ -102,8 +168,34 @@ impl ToolIo {
                 resolved.push(full);
             }
         }
-        if resolved.len() > MAX_WATCH_PATHS {
-            let dropped = resolved.split_off(MAX_WATCH_PATHS);
+        let dropped = if resolved.len() > MAX_WATCH_PATHS {
+            resolved.split_off(MAX_WATCH_PATHS)
+        } else {
+            Vec::new()
+        };
+        let generation = {
+            let mut slot = lock(&s.file_watch);
+            slot.generation += 1;
+            slot.generation
+        };
+        Some(WatchChange {
+            session: s,
+            generation,
+            paths: resolved,
+            dropped,
+        })
+    }
+
+    /// Tells the user about dropped paths and starts the poll unless a later list replaced
+    /// this one meanwhile.
+    async fn install_watch(&self, id: &str, change: WatchChange) {
+        let WatchChange {
+            session: s,
+            generation,
+            paths,
+            dropped,
+        } = change;
+        if !dropped.is_empty() {
             let message = format!(
                 "FileChanged watches at most {MAX_WATCH_PATHS} files; {} were not watched.",
                 dropped.len()
@@ -121,40 +213,30 @@ impl ToolIo {
                     .await;
             }
         }
-        let watch = self.watch(id, &resolved);
-        *lock(&s.file_watch) = watch;
+        let built = self.watch(id, generation, paths);
+        let mut slot = lock(&s.file_watch);
+        if slot.generation == generation {
+            // Replacing the slot's watch drops (stops) the earlier one.
+            slot.watch = built;
+        }
     }
 
-    /// A watcher of `paths`' directories whose changes run `FileChanged` for session `id`.
-    fn watch(&self, id: &str, paths: &[PathBuf]) -> Option<FileWatch> {
+    /// Starts polling `paths` for session `id`: their state now is the baseline.
+    fn watch(&self, id: &str, generation: u64, paths: Vec<PathBuf>) -> Option<FileWatch> {
         if paths.is_empty() {
             return None;
         }
-        let (tx, rx) = mpsc::unbounded_channel::<Vec<PathBuf>>();
-        let mut watcher = match piarc_fs::watch::Watcher::new(move |event| {
-            if let piarc_fs::watch::WatchEvent::Changed(paths) = event {
-                let _ = tx.send(paths);
-            }
-        }) {
-            Ok(watcher) => watcher,
-            Err(error) => {
-                tracing::warn!(target: "piarc_core::hooks", "cannot watch files: {error}");
-                return None;
-            }
-        };
-        let dirs: BTreeSet<PathBuf> = paths
-            .iter()
-            .filter_map(|p| p.parent().map(Path::to_owned))
-            .filter(|d| d.is_dir())
-            .collect();
-        for error in watcher.watch_dirs(&dirs.into_iter().collect::<Vec<_>>()) {
-            tracing::warn!(target: "piarc_core::hooks", "{error}");
-        }
-        tokio::spawn(file_events(self.clone(), id.to_owned(), paths.to_vec(), rx));
-        Some(FileWatch {
-            paths: paths.to_vec(),
-            _watcher: watcher,
-        })
+        let stop = CancellationToken::new();
+        let baseline: Vec<Stamp> = paths.iter().map(|p| stamp(p)).collect();
+        tokio::spawn(poll_files(
+            self.clone(),
+            id.to_owned(),
+            generation,
+            paths.clone(),
+            baseline,
+            stop.clone(),
+        ));
+        Some(FileWatch { paths, stop })
     }
 
     /// `FileChanged` (T41) for one watched file of session `id`.
@@ -171,7 +253,54 @@ impl ToolIo {
             fields,
             tool: None,
         };
-        self.observed(id, request).await;
+        // Replacing the list from inside its own event loop: in the background.
+        self.observed(id, request, false).await;
+    }
+
+    /// Compares the settings files with what session `id` last saw and runs `ConfigChange` for
+    /// each layer that changed (T41). The first check only records them. Runs before every input
+    /// and when the settings watcher sees a change, whichever comes first.
+    pub(crate) async fn check_config(&self, id: &str) {
+        let Ok(s) = self.session(id) else {
+            return;
+        };
+        let mut seen = s.config_seen.lock().await;
+        let data = self.config.data_dir.clone();
+        let home = self.config.home.clone();
+        let project = s.project().to_owned();
+        let Ok(now) = tokio::task::spawn_blocking(move || {
+            let table = piarc_config::LayerTable::workspace(&data, &project, home.as_deref());
+            let settings = piarc_config::Settings::load(table, piarc_config::TrustState::Untrusted);
+            settings
+                .loaded_layers()
+                .into_iter()
+                .map(|(layer, value)| {
+                    let file = settings
+                        .table()
+                        .get(layer)
+                        .and_then(|spec| spec.file().map(Path::to_owned));
+                    (layer, file, value)
+                })
+                .collect::<Vec<SeenLayer>>()
+        })
+        .await
+        else {
+            return;
+        };
+        if let Some(before) = seen.as_ref() {
+            for (layer, file, value) in &now {
+                let previous = before
+                    .iter()
+                    .find(|(l, _, _)| l == layer)
+                    .and_then(|(_, _, v)| v.clone());
+                if let Some(file) = file
+                    && previous != *value
+                {
+                    self.config_change(id, layer, file, previous).await;
+                }
+            }
+        }
+        *seen = Some(now);
     }
 
     /// `ConfigChange` (T41): settings layer `layer` (file `file`) changed while session `id`
@@ -194,7 +323,7 @@ impl ToolIo {
             fields,
             tool: None,
         };
-        let Some(answer) = self.observed(id, request).await else {
+        let Some(answer) = self.observed(id, request, false).await else {
             return false;
         };
         let Some(reason) = answer.decision.block.as_deref() else {
@@ -227,30 +356,43 @@ impl ToolIo {
     }
 }
 
-/// Runs `FileChanged` for the watched files among each debounced batch of events.
-async fn file_events(
+/// Polls the watched files every [`FILE_POLL`] and runs `FileChanged` for each that changed,
+/// until the list is replaced or the session is gone.
+async fn poll_files(
     io: ToolIo,
     id: String,
-    watched: Vec<PathBuf>,
-    mut rx: mpsc::UnboundedReceiver<Vec<PathBuf>>,
+    generation: u64,
+    paths: Vec<PathBuf>,
+    mut seen: Vec<Stamp>,
+    stop: CancellationToken,
 ) {
-    let watched = Arc::new(watched);
-    while let Some(first) = rx.recv().await {
-        let mut changed: BTreeSet<PathBuf> = first.into_iter().collect();
-        while let Ok(Some(more)) = tokio::time::timeout(FILE_DEBOUNCE, rx.recv()).await {
-            changed.extend(more);
+    loop {
+        tokio::select! {
+            () = stop.cancelled() => return,
+            () = tokio::time::sleep(FILE_POLL) => {}
         }
-        // The session's list may have been replaced: this watcher's list is the one it had.
-        let Ok(s) = io.session(&id) else {
+        let checked = paths.clone();
+        let Ok(now) = tokio::task::spawn_blocking(move || {
+            checked.iter().map(|p| stamp(p)).collect::<Vec<Stamp>>()
+        })
+        .await
+        else {
             return;
         };
-        let current = lock(&s.file_watch)
-            .as_ref()
-            .is_some_and(|w| w.paths == *watched);
+        let changed: Vec<&PathBuf> = paths
+            .iter()
+            .zip(seen.iter().zip(&now))
+            .filter(|(_, (before, after))| before != after)
+            .map(|(p, _)| p)
+            .collect();
+        seen = now;
+        let current = io
+            .session(&id)
+            .is_ok_and(|s| lock(&s.file_watch).generation == generation);
         if !current {
             return;
         }
-        for path in watched.iter().filter(|p| changed.contains(*p)) {
+        for path in changed {
             io.file_changed(&id, path).await;
         }
     }

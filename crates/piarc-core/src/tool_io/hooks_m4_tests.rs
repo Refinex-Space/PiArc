@@ -63,6 +63,7 @@ async fn the_watch_list_keeps_at_most_64_files_and_tells_the_user() {
     f.io.set_watch_paths(SESSION, &paths).await;
     let s = f.io.session(SESSION).expect("session");
     let watched = lock(&s.file_watch)
+        .watch
         .as_ref()
         .map(|w| w.paths.clone())
         .unwrap_or_default();

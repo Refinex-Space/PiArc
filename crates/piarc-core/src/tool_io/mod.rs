@@ -192,7 +192,10 @@ struct SessionIo {
     /// (T41): layer id → the value it had.
     config_pins: Mutex<HashMap<&'static str, Option<serde_json::Value>>>,
     /// The files `FileChanged` hooks watch for this session (T41).
-    file_watch: Mutex<Option<hooks_m4::FileWatch>>,
+    file_watch: Mutex<hooks_m4::WatchSlot>,
+    /// The settings layers' values this session last saw (T41's `ConfigChange`); `None` until
+    /// the first check. Held while a check runs, so a change is handled once.
+    config_seen: tokio::sync::Mutex<Option<Vec<hooks_m4::SeenLayer>>>,
 }
 
 impl SessionIo {
@@ -517,8 +520,16 @@ impl ToolIo {
                 subagent,
                 config_pins: Mutex::default(),
                 file_watch: Mutex::default(),
+                config_seen: tokio::sync::Mutex::default(),
             }),
         );
+        // The baseline `ConfigChange` compares with (T41); outside a runtime (some tests) the
+        // first input takes it.
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            let io = self.clone();
+            let id = session_id.to_owned();
+            handle.spawn(async move { io.check_config(&id).await });
+        }
     }
 
     /// The environment commands inherit (the user's login shell, T17).
