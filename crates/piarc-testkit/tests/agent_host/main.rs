@@ -416,29 +416,26 @@ fn flood_scenario() -> String {
 
 /// What the Agent Host gets done while Core reads nothing.
 async fn check_progress_while_core_is_stalled(env: &Env) {
-    // Node writes to a stdout pipe asynchronously on macOS: Core takes no events until Pi
-    // finished the turn, both model requests answered. On Windows it writes synchronously
-    // (`net.Socket` makes fd 1 and 2 blocking there): once the pipe is full the Agent Host's
-    // event loop waits in the write, so the pressure reaches Pi itself and the second step is
-    // not requested until Core reads again (docs/spikes/S09-ahp-resilience.md).
-    let expected = if cfg!(windows) { 1 } else { 2 };
+    // The first step is requested before the flood. Its 100 tool calls end in a PostToolBatch
+    // `hooks/run` request (T38, ADR-0055) that Pi awaits before the next model request, and
+    // that request goes out behind the queued notifications: the second step is not requested
+    // until Core reads again, on every platform. (Before T38, Node's asynchronous pipe writes
+    // let Pi finish the turn on macOS while Core read nothing; on Windows fd 1 is blocking, so
+    // the pressure reached Pi there in the write itself, docs/spikes/S09-ahp-resilience.md.)
     let deadline = std::time::Instant::now() + harness::WAIT;
-    while env.requests("flood").len() < expected {
+    while env.requests("flood").is_empty() {
         assert!(
             std::time::Instant::now() < deadline,
-            "the turn did not get far while Core was stalled: {} model requests",
-            env.requests("flood").len(),
+            "the turn did not start while Core was stalled"
         );
         tokio::time::sleep(std::time::Duration::from_millis(20)).await;
     }
-    if cfg!(windows) {
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-        assert_eq!(
-            env.requests("flood").len(),
-            1,
-            "the Agent Host kept going while its stdout was full"
-        );
-    }
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    assert_eq!(
+        env.requests("flood").len(),
+        1,
+        "the next step was requested before Core answered the PostToolBatch hooks"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -484,13 +481,23 @@ async fn a_slow_core_reader_makes_the_agent_host_queue_with_bounded_memory() {
             .any(|e| matches!(e, HostEvent::Exited { .. })),
         "the backpressured host was not killed"
     );
-    let produced: usize = events
+    let notified: usize = events
         .notifications(&a.0)
         .iter()
         .map(|n| serde_json::to_vec(n).map_or(0, |bytes| bytes.len()))
         .sum();
+    // Requests share the outbound queue: the PostToolBatch `hooks/run` carries the 100 calls'
+    // inputs and results (T38).
+    let requested: usize = core
+        .received
+        .lock()
+        .expect("lock")
+        .iter()
+        .map(|(_, size)| size)
+        .sum();
+    let produced = notified + requested;
     println!(
-        "{count} notifications, {produced} bytes, Core event queue 1; \
+        "{count} notifications, {notified} bytes, requests {requested} bytes, Core event queue 1; \
          Agent Host outbound peak {} bytes (before the turn {}); RSS {} -> {} bytes",
         after.outbound_peak_bytes,
         baseline.outbound_peak_bytes,

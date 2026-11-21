@@ -110,6 +110,8 @@ pub struct Core {
     pub calls: Arc<Mutex<Vec<Call>>>,
     /// The answer to `mcp/servers` (T36): the workspace's MCP configuration.
     pub mcp: Arc<Mutex<Value>>,
+    /// Every request the Agent Host sent: its method and the size of its encoded params.
+    pub received: Mutex<Vec<(String, usize)>>,
 }
 
 /// One `fs/*` or `exec/*` request Core answered.
@@ -166,6 +168,11 @@ impl InboundHandler for Core {
         params: Map<String, Value>,
         peer: Peer,
     ) -> BoxFuture<'static, Result<Value, ErrorObject>> {
+        let size = serde_json::to_vec(&params).map_or(0, |bytes| bytes.len());
+        self.received
+            .lock()
+            .expect("lock")
+            .push((method.clone(), size));
         // This harness tests delegation, scheduling and Pi parity. Its operator approves
         // every preflight. The scenario runner exercises the production approval ledger.
         if let Some(reply) = self.fixed(&method) {
@@ -389,6 +396,7 @@ impl Env {
             secrets,
             calls: Arc::default(),
             mcp: Arc::clone(&self.mcp),
+            received: Mutex::default(),
         });
         let (supervisor, events) =
             agent_host::start(config, Arc::clone(&core) as Arc<dyn InboundHandler>);
