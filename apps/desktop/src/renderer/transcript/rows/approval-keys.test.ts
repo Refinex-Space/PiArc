@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { approvalKey, canAlwaysAllow, canAnswerByKey } from './approval-keys.js';
+import { approvalKey, canAlwaysAllow, canAnswerByKey, typedElsewhere } from './approval-keys.js';
 const key = {
   key: 'Enter',
   altKey: false,
@@ -41,6 +41,12 @@ describe('approval shortcuts', () => {
     expect(canAnswerByKey('deny', { ...state, composerEmpty: false, cardFocused: true })).toBe(
       true,
     );
+  });
+  it('leaves keys typed into another text field to that field', () => {
+    expect(typedElsewhere({ editable: true, inCard: false, inComposer: false })).toBe(true);
+    expect(typedElsewhere({ editable: true, inCard: true, inComposer: false })).toBe(false);
+    expect(typedElsewhere({ editable: true, inCard: false, inComposer: true })).toBe(false);
+    expect(typedElsewhere({ editable: false, inCard: false, inComposer: false })).toBe(false);
   });
   it('gates persistent rules on protected paths and collapsed parameters', () => {
     expect(canAlwaysAllow(true, false, true)).toBe(false);

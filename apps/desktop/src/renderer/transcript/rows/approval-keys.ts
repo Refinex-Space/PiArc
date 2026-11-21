@@ -16,6 +16,18 @@ export function approvalKey(event: Key, platform: KeyPlatform): ApprovalKey | un
   return undefined;
 }
 
+/**
+ * A key typed into a text field of its own (not the card's, not the composer's: for example a
+ * comment on a diff line, T42) belongs to that field: it neither answers nor is consumed.
+ */
+export function typedElsewhere(field: {
+  editable: boolean;
+  inCard: boolean;
+  inComposer: boolean;
+}): boolean {
+  return field.editable && !field.inCard && !field.inComposer;
+}
+
 export function canAnswerByKey(
   key: ApprovalKey,
   state: {

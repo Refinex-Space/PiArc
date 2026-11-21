@@ -1,12 +1,17 @@
 // The keyboard of approval rows (T20, shared with T26's plan card and question form): Mod+Enter,
 // Mod+Shift+Enter and Esc answer the first approval visible in the transcript, never during an
 // input method composition, never in the first 400 ms of a card (`APPROVAL_DELAY_MS`), and Esc
-// only when the card has focus or the composer is empty. Each card maps the keys to its own
-// answers.
+// only when the card has focus or the composer is empty. Keys typed into another text field (a
+// diff comment's editor) stay with that field. Each card maps the keys to its own answers.
 import { useEffect, useRef, type RefObject } from 'react';
 
 import { useApp } from '../app/app-context.js';
-import { approvalKey, canAnswerByKey, type ApprovalKey } from '../transcript/rows/approval-keys.js';
+import {
+  approvalKey,
+  canAnswerByKey,
+  typedElsewhere,
+  type ApprovalKey,
+} from '../transcript/rows/approval-keys.js';
 
 function firstVisible(card: HTMLElement): boolean {
   const scroller = card.closest('.transcript-scroller');
@@ -53,6 +58,16 @@ export function useApprovalKeys(
       const key = approvalKey(ev, keyPlatform);
       if (!key || !firstVisible(el)) return;
       const composer = document.querySelector('.composer');
+      const target = ev.target instanceof HTMLElement ? ev.target : null;
+      if (
+        target !== null &&
+        typedElsewhere({
+          editable: target.isContentEditable || target.matches('input, textarea, select'),
+          inCard: el.contains(target),
+          inComposer: composer?.contains(target) === true,
+        })
+      )
+        return;
       const input = composer?.querySelector('[contenteditable="true"]');
       const composerEmpty =
         !input?.textContent && !composer?.querySelector('.composer-attachments');
