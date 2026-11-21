@@ -164,7 +164,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T33 | [无头终端（Core 侧）](tasks/T33-headless-terminal.md) | 4 | T32 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 33f4bf9 |
 | T34 | [终端渲染器与终端面板](tasks/T34-terminal-renderer-and-panel.md) | 4 | T33 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 991f323 |
 | T35 | [Worktree、并行会话、多窗口、全文搜索与后台常驻](tasks/T35-worktrees-parallel-sessions-and-windows.md) | 4 | T34 | macOS | high / 高 | 大 | 无 | 部分完成 | c4094dd |
-| T36 | [MCP 共享连接池](tasks/T36-mcp-connection-pool.md) | 4 | T35 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
+| T36 | [MCP 共享连接池](tasks/T36-mcp-connection-pool.md) | 4 | T35 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
 | T37 | [Skills、斜杠命令、命令面板与输出风格](tasks/T37-skills-commands-and-output-styles.md) | 4 | T36 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T38 | [WebSearch 与 hooks 扩展（M3）](tasks/T38-websearch-and-hooks-m3.md) | 4 | T37 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | R4 | [M3 评审](tasks/R4-m3-review.md) | 4 | T38、W2 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -309,7 +309,16 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-（无）
+T36（开工 2026-11-20，基线复用 c4094dd 的全量 verify；T35 的遗留 A10（Windows CI）、A11（应用内存）不影响本任务；远端 CI 运行 44868949621 两平台失败，用户决定登记为 I153 后继续）：
+
+- [ ] 1 Core 配置：来源（`.mcp.json`、`~/.claude.json` user/local、PiArc 用户与 `.piarc/` 设置）、同名取整条、`${VAR}` 展开、SSE/WebSocket 不支持、信任与可执行项、Claude Code 键（A04 的配置部分、A05 单元测试）
+- [ ] 2 协议：`mcp/servers`、`mcp/status`、`mcp/reconnect`、`mcp/setEnabled`、`mcp/login`、`mcp/statusChanged`、`policy/evaluate` 的 `requiresUserInteraction`；契约样本
+- [ ] 3 Core：应答 `mcp/servers`（基础环境与 PATH 前置内置 Node）、启停按工作区持久化、Hub/NAPI 的状态与操作、`core/mcp` 事件、MCP 登录沿用 `core/login`、`requiresUserInteraction` 任何模式询问（A09 的 Core 部分）
+- [ ] 4 Agent Host：PiArc MCP 扩展替换内置扩展（不加载 codemode）、自写 stdio 传输（不脱离 Agent Host 进程组）、工作区连接池（按需连接、空闲断开、退避重连、工具缓存与 `list_changed`、roots）、工具暴露（direct / 超过阈值经 `ToolSearch` 延迟）、server instructions 第 6 段与变化的追加消息、OAuth 凭据进保险箱（A01、A02、A03、A06、A07、A08、A10、A11）
+- [ ] 5 子 agent `mcpServers`：按名称复用连接池、内联 server 临时连接、项目级定义信任前不启动（A13）
+- [ ] 6 测试夹具与场景：独立实现的 stdio 与 Streamable HTTP server、mock OAuth、`tests/scenarios/mcp-*.yaml`、能力 ID（A01–A04、A06–A11、A13）
+- [ ] 7 客户端：设置窗口"MCP"页、配置诊断页的不支持提示、Playwright 截图（A05 截图、A12）
+- [ ] 8 文档、AGENTS.md、架构与 ADR、`coding-standards.md` 复用表、verify（A14）与收尾
 
 ## 登记事项
 
@@ -469,6 +478,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I150 | T35 | `crates/piarc-testkit/src/l2/runner.rs` 1,054 行，超过单文件 1,000 行（T34 后已是 1,049 行；T35 的新增动作放在 `runner/worktrees.rs`，只在分派处加了几行） | R4 整理：把动作分派按领域拆到 `runner/` 子模块 |
 | I151 | T35 | worktree 会话要求工作区是 git 工作树的顶层（`git rev-parse --show-toplevel`）；把仓库子目录作为工作区时新建表单说明原因、不提供 worktree，子 agent 的 `isolation: worktree` 返回错误 | 有需求时评估：worktree 建在仓库顶层的 `.piarc/worktrees/`、会话 cwd 落在 worktree 内对应的子目录（ADR-0052 的重新评估条件之一） |
 | I152 | T35 | 全文搜索索引 JSONL 里的全部消息，回退或切换分支后不在当前分支上的消息也会被搜到；点击这类结果时提示"这条消息不在对话的当前分支上"。正在运行的会话里实时显示的行没有 Pi 的 entry id，定位只在会话空闲时从历史重读后进行 | R4 评估是否在索引里标记分支（需要按 leaf 计算可达性） |
+| I153 | T36 开工检查 | 远端 CI 运行 44868949621（e0c41ce，T35 中途的提交，此前 R3 开工的运行 44731794641 起 Windows 已红，未记录）两平台失败：① 两平台 clippy `too_many_lines`（`crates/piarc-git/tests/worktree.rs:154`，本地 c4094dd 的 verify 已通过，应已修复）；② Windows `piarc-core` 单测 8 个失败：`tool_io::checkpoints` 3 个（回退结果的路径是绝对路径而不是相对路径）、`policy::tests::t23::always_allow_saves_one_rule_per_subcommand`（多存 `Bash(ls *)`）、`t31` 4 个（清理测试目录时 os error 32，文件被占用）；③ Windows L2 12 个失败（`rewind-*` 6 个、`subagent-*` 4 个、`changes-file-and-hunk`、`monitor-rate-limit`）；④ macOS L2 `bg-completion-reminder`（请求里出现了不该有的 `has ended.`，本地通过）；⑤ L4：macOS `t34-terminal*` 6 个、Windows `t19-composer`、`t28-rewind` 7 个。fail-fast 使 T32–T34 的 Windows 进程树测试没有跑到，T32-A04/A13、T33-A02/A12/A14、T34-A14 仍为 blocked | 用户推送当前 HEAD 后复核：Windows 部分交 W2（M2 的 Windows 达标覆盖 T23、T28）与 W3（T31–T35），macOS runner 上的 L2/L4 失败由下一个开工检查按新 CI 定位；用户决定先继续 T36 |
 ## 技术债
 
 评审任务（R1–R6）汇总的技术债，按影响排序。每条的细节、负责任务与检查时间点在对应的登记事项中。
