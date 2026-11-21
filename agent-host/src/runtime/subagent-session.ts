@@ -244,6 +244,9 @@ export class ChildSession {
       ...(spec.agents === undefined ? {} : { agents: spec.agents }),
     });
     const batches = new ToolBatches((tool) => CONCURRENCY_SAFE_TOOLS.has(canonical(tool)));
+    // Like a main session: `Skill` only when the model has skills to load, and the index of the
+    // system prompt matches the tools (T37). Core registered the child above.
+    await parts.skills?.catalog();
     const { runtime } = await createSessionRuntime({
       options: childOptions,
       manager,
