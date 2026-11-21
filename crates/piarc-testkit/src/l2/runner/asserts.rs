@@ -65,6 +65,28 @@ impl Driver<'_> {
         for f in check_json_lines(&self.spec.expect.json_lines, &self.env.workspace) {
             failures.push(failure("json_lines", f));
         }
+        if !self.spec.expect.absent_on_disk.is_empty() {
+            let needles: Vec<&[u8]> = self
+                .spec
+                .expect
+                .absent_on_disk
+                .iter()
+                .map(|s| s.as_bytes())
+                .collect();
+            let roots = [
+                self.env.data.as_path(),
+                self.env.workspace.as_path(),
+                self.env.home.as_path(),
+                self.env.cache.as_path(),
+            ];
+            let report = crate::plaintext::scan(&roots, &needles, None);
+            if report.files == 0 {
+                failures.push(failure("absent_on_disk", "the scan read no file"));
+            }
+            for found in &report.findings {
+                failures.push(failure("absent_on_disk", format!("found in {found:?}")));
+            }
+        }
         for f in check_requests(self.spec, &self.env.records()) {
             failures.push(failure("requests", f));
         }

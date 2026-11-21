@@ -409,6 +409,30 @@
           "type": "integer",
           "minimum": 0
         },
+        "web_search": {
+          "description": "A server-side web search before the text (Anthropic Messages only, T38).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["query"],
+          "properties": {
+            "query": { "type": "string" },
+            "error": { "type": "string" },
+            "results": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["title", "url"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "url": { "type": "string" },
+                  "page_age": { "type": "string" },
+                  "cited_text": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
         "error": {
           "type": "object",
           "additionalProperties": false,
@@ -1146,6 +1170,16 @@
               "minLength": 1
             }
           }
+        },
+        "set_web_search_key": {
+          "description": "Save a WebSearch backend's API key through Core (`setWebSearchKey`, T38); no key removes it.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["backend"],
+          "properties": {
+            "backend": { "enum": ["brave"] },
+            "key": { "type": "string", "minLength": 1 }
+          }
         }
       },
       "additionalProperties": false
@@ -1582,6 +1616,11 @@
               }
             }
           }
+        },
+        "absent_on_disk": {
+          "description": "Strings no file under the run's temporary root may contain after the run (T38: a key that must stay in the vault).",
+          "type": "array",
+          "items": { "type": "string", "minLength": 8 }
         },
         "json_lines": {
           "description": "Workspace files of JSON lines after the run (hook fixtures record their stdin, T25): exactly this many lines, each a field subset.",

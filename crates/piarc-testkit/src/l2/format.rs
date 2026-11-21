@@ -457,6 +457,15 @@ pub enum Action {
         #[serde(default)]
         name: Option<String>,
     },
+    /// Saves (or with no key removes) a WebSearch backend's API key through Core
+    /// (`setWebSearchKey`, T38): it goes into the vault.
+    SetWebSearchKey {
+        /// The backend (`brave`).
+        backend: String,
+        /// The key.
+        #[serde(default)]
+        key: Option<String>,
+    },
     /// Shuts Core down and starts it again on the same data directory, then reopens the
     /// workspace; sessions stay closed until `resume`.
     RestartCore {},
@@ -569,6 +578,7 @@ impl Action {
             Self::Wait(_) => "wait",
             Self::WriteFile { .. } => "write_file",
             Self::SetOutputStyle { .. } => "set_output_style",
+            Self::SetWebSearchKey { .. } => "set_web_search_key",
             Self::RestartCore {} => "restart_core",
             Self::Resume { .. } => "resume",
             Self::Fork(_) => "fork",
@@ -638,6 +648,7 @@ impl Action {
             | Self::Search(_)
             | Self::WriteFile { .. }
             | Self::SetOutputStyle { .. }
+            | Self::SetWebSearchKey { .. }
             | Self::RestartCore {}
             | Self::CheckFiles(_)
             | Self::SignIn(_)
@@ -817,6 +828,11 @@ pub struct Expect {
     /// Workspace files of JSON lines (hook fixtures' records): each line a field subset (T25).
     #[serde(default)]
     pub json_lines: BTreeMap<String, Vec<Value>>,
+    /// Strings no file of the run's temporary root (data directory, workspace, home) may
+    /// contain after the run, scanned byte for byte (T38: a key that must only be in the
+    /// vault).
+    #[serde(default)]
+    pub absent_on_disk: Vec<String>,
 }
 
 /// One request assertion; every field present must hold.

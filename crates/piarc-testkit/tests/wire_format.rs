@@ -376,3 +376,81 @@ async fn split_at_cuts_inside_a_string_value_and_an_escape_sequence() {
     assert!(fragments[2].starts_with('"'));
     assert_eq!(fragments.concat(), serialized);
 }
+
+const SEARCH: &str = r#"
+id: search
+steps:
+  - text: "Tokio is an async runtime."
+    web_search:
+      query: "tokio runtime"
+      results:
+        - title: "Tokio"
+          url: "https://tokio.rs/"
+          page_age: "2 days ago"
+          cited_text: "Tokio is an asynchronous runtime"
+        - title: "Docs"
+          url: "https://docs.rs/tokio"
+  - text: "Nothing found."
+    web_search:
+      query: "x"
+      error: max_uses_exceeded
+"#;
+
+#[tokio::test]
+async fn anthropic_web_search_steps_stream_server_tool_blocks_and_citations() {
+    let provider = MockProvider::start(library(&[SEARCH]))
+        .await
+        .expect("start");
+    let mut request = anthropic_request();
+    request["tools"] =
+        json!([{ "type": "web_search_20250305", "name": "web_search", "max_uses": 1 }]);
+    let reply = post(provider.address(), "/v1/messages", Some("search"), &request).await;
+    assert_eq!(reply.status, 200);
+    let events: Vec<Value> = parse_sse(&reply.body).iter().map(|e| e.json()).collect();
+    let starts: Vec<&Value> = events
+        .iter()
+        .filter(|e| e["type"] == "content_block_start")
+        .map(|e| &e["content_block"])
+        .collect();
+    assert_eq!(starts[0]["type"], "server_tool_use");
+    assert_eq!(starts[0]["name"], "web_search");
+    assert_eq!(starts[1]["type"], "web_search_tool_result");
+    assert_eq!(starts[1]["tool_use_id"], starts[0]["id"]);
+    assert_eq!(starts[1]["content"][0]["type"], "web_search_result");
+    assert_eq!(starts[1]["content"][0]["url"], "https://tokio.rs/");
+    assert_eq!(starts[1]["content"][1]["title"], "Docs");
+    assert_eq!(starts[2]["type"], "text");
+    let input: String = events
+        .iter()
+        .filter(|e| e["index"] == 0 && e["delta"]["type"] == "input_json_delta")
+        .filter_map(|e| e["delta"]["partial_json"].as_str())
+        .collect();
+    assert_eq!(input, r#"{"query":"tokio runtime"}"#);
+    let citations: Vec<&Value> = events
+        .iter()
+        .filter(|e| e["delta"]["type"] == "citations_delta")
+        .map(|e| &e["delta"]["citation"])
+        .collect();
+    assert_eq!(citations.len(), 1);
+    assert_eq!(citations[0]["type"], "web_search_result_location");
+    assert_eq!(
+        citations[0]["cited_text"],
+        "Tokio is an asynchronous runtime"
+    );
+    let delta = events
+        .iter()
+        .find(|e| e["type"] == "message_delta")
+        .expect("message_delta");
+    assert_eq!(delta["usage"]["server_tool_use"]["web_search_requests"], 1);
+
+    let failed = post(provider.address(), "/v1/messages", Some("search"), &request).await;
+    let events: Vec<Value> = parse_sse(&failed.body).iter().map(|e| e.json()).collect();
+    let result = events
+        .iter()
+        .find(|e| e["content_block"]["type"] == "web_search_tool_result")
+        .expect("a result block");
+    assert_eq!(
+        result["content_block"]["content"],
+        json!({ "type": "web_search_tool_result_error", "error_code": "max_uses_exceeded" })
+    );
+}

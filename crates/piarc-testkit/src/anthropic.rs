@@ -244,27 +244,7 @@ fn note_cache_control(
 pub(crate) fn encode_stream(step: &Step, context: &StreamContext) -> Result<Vec<String>, String> {
     let usage = step.usage;
     let mut events = vec![
-        event(
-            "message_start",
-            &json!({
-                "type": "message_start",
-                "message": {
-                    "id": format!("msg_mock_{}", context.response_number),
-                    "type": "message",
-                    "role": "assistant",
-                    "model": context.model,
-                    "content": [],
-                    "stop_reason": null,
-                    "stop_sequence": null,
-                    "usage": {
-                        "input_tokens": usage.input_tokens,
-                        "cache_creation_input_tokens": usage.cache_write_tokens,
-                        "cache_read_input_tokens": usage.cache_read_tokens,
-                        "output_tokens": 0,
-                    },
-                },
-            }),
-        ),
+        message_start(step, context),
         event("ping", &json!({ "type": "ping" })),
     ];
     let mut index = 0;
@@ -280,12 +260,21 @@ pub(crate) fn encode_stream(step: &Step, context: &StreamContext) -> Result<Vec<
         push_block(&mut events, index, &start, deltas);
         index += 1;
     }
+    let mut citations = Vec::new();
+    if let Some(search) = &step.web_search {
+        citations = push_web_search(&mut events, &mut index, search, context);
+    }
     let text = step.text_fragments();
     if !text.is_empty() {
         let start = json!({ "type": "text", "text": "" });
         let deltas = text
             .iter()
-            .map(|piece| json!({ "type": "text_delta", "text": piece }));
+            .map(|piece| json!({ "type": "text_delta", "text": piece }))
+            .chain(
+                citations
+                    .into_iter()
+                    .map(|citation| json!({ "type": "citations_delta", "citation": citation })),
+            );
         push_block(&mut events, index, &start, deltas);
         index += 1;
     }
@@ -313,11 +302,94 @@ pub(crate) fn encode_stream(step: &Step, context: &StreamContext) -> Result<Vec<
                 "cache_creation_input_tokens": usage.cache_write_tokens,
                 "cache_read_input_tokens": usage.cache_read_tokens,
                 "output_tokens": usage.output_tokens,
+                "server_tool_use": { "web_search_requests": u64::from(step.web_search.is_some()) },
             },
         }),
     ));
     events.push(event("message_stop", &json!({ "type": "message_stop" })));
     Ok(events)
+}
+
+fn message_start(step: &Step, context: &StreamContext) -> String {
+    let usage = step.usage;
+    event(
+        "message_start",
+        &json!({
+            "type": "message_start",
+            "message": {
+                "id": format!("msg_mock_{}", context.response_number),
+                "type": "message",
+                "role": "assistant",
+                "model": context.model,
+                "content": [],
+                "stop_reason": null,
+                "stop_sequence": null,
+                "usage": {
+                    "input_tokens": usage.input_tokens,
+                    "cache_creation_input_tokens": usage.cache_write_tokens,
+                    "cache_read_input_tokens": usage.cache_read_tokens,
+                    "output_tokens": 0,
+                },
+            },
+        }),
+    )
+}
+
+/// The `server_tool_use` block (its input streamed as one `input_json_delta`) and the
+/// `web_search_tool_result` block whose `content_block_start` carries the whole result, as the
+/// official streaming reference shows; returns the citations for the text block.
+fn push_web_search(
+    events: &mut Vec<String>,
+    index: &mut usize,
+    search: &crate::scenario::WebSearchStep,
+    context: &StreamContext,
+) -> Vec<Value> {
+    let id = format!("srvtoolu_mock_{}", context.step_index);
+    let start = json!({ "type": "server_tool_use", "id": id, "name": "web_search", "input": {} });
+    let input = json!({ "query": search.query }).to_string();
+    let delta = json!({ "type": "input_json_delta", "partial_json": input });
+    push_block(events, *index, &start, std::iter::once(delta));
+    *index += 1;
+    let content = match &search.error {
+        Some(code) => json!({ "type": "web_search_tool_result_error", "error_code": code }),
+        None => Value::Array(
+            search
+                .results
+                .iter()
+                .enumerate()
+                .map(|(n, r)| {
+                    json!({
+                        "type": "web_search_result",
+                        "url": r.url,
+                        "title": r.title,
+                        "encrypted_content": format!("mock-encrypted-{n}"),
+                        "page_age": r.page_age,
+                    })
+                })
+                .collect(),
+        ),
+    };
+    let result = json!({ "type": "web_search_tool_result", "tool_use_id": id, "content": content });
+    push_block(events, *index, &result, std::iter::empty());
+    *index += 1;
+    if search.error.is_some() {
+        return Vec::new();
+    }
+    search
+        .results
+        .iter()
+        .enumerate()
+        .filter_map(|(n, r)| {
+            let cited = r.cited_text.as_ref()?;
+            Some(json!({
+                "type": "web_search_result_location",
+                "url": r.url,
+                "title": r.title,
+                "encrypted_index": format!("mock-index-{n}"),
+                "cited_text": cited,
+            }))
+        })
+        .collect()
 }
 
 fn push_block(

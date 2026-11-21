@@ -86,6 +86,37 @@ pub struct Step {
     /// Answer with an HTTP error instead of a response.
     #[serde(default)]
     pub error: Option<InjectedError>,
+    /// A server-side web search before the text (Anthropic Messages only, T38): a
+    /// `server_tool_use` block, then its `web_search_tool_result`, and the text's citations.
+    #[serde(default)]
+    pub web_search: Option<WebSearchStep>,
+}
+
+/// A scripted server-side web search (Anthropic's `web_search_20250305` wire format).
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WebSearchStep {
+    /// The query the server tool ran.
+    pub query: String,
+    /// The results; ignored when `error` is set.
+    #[serde(default)]
+    pub results: Vec<WebSearchResultSpec>,
+    /// A `web_search_tool_result_error` code (`max_uses_exceeded`, `unavailable`, …) instead
+    /// of results.
+    #[serde(default)]
+    pub error: Option<String>,
+}
+
+/// One scripted search result; its `cited_text` becomes a citation of the text block.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WebSearchResultSpec {
+    pub title: String,
+    pub url: String,
+    #[serde(default)]
+    pub page_age: Option<String>,
+    #[serde(default)]
+    pub cited_text: Option<String>,
 }
 
 /// A scripted tool call.
@@ -304,6 +335,7 @@ impl Step {
             disconnect_after_events: None,
             stall_after_events: None,
             error: None,
+            web_search: None,
         }
     }
 

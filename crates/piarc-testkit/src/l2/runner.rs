@@ -380,6 +380,18 @@ impl Env {
                 } else {
                     Vec::new()
                 },
+                // The scenario's web server answers Brave Search's path (T38).
+                search_endpoints: self
+                    .web
+                    .as_ref()
+                    .map(|web| {
+                        [(
+                            "brave".to_owned(),
+                            format!("http://127.0.0.1:{}/res/v1/web/search", web.port),
+                        )]
+                        .into()
+                    })
+                    .unwrap_or_default(),
                 ..piarc_core::tool_io::WebConfig::default()
             },
             ..CoreConfig::default()
@@ -680,6 +692,15 @@ impl Driver<'_> {
             Action::CheckTrust { fields } => self.check_trust(fields).await,
             Action::Wait(wait) => self.wait_for_event(wait).await,
             Action::WriteFile { path, content } => write_file(&self.env.workspace, path, content),
+            Action::SetWebSearchKey { backend, key } => call(
+                |done| {
+                    self.core
+                        .set_web_search_key(backend.clone(), key.clone(), done)
+                },
+                "saving the web search key",
+            )
+            .await
+            .map(drop),
             Action::SetOutputStyle { name } => {
                 let ws = self.env.workspace.clone();
                 call(

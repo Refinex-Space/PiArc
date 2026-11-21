@@ -144,6 +144,9 @@ pub(crate) fn encode_stream(
     context: &StreamContext,
     include_usage: bool,
 ) -> Result<Vec<String>, String> {
+    if step.web_search.is_some() {
+        return Err("web_search steps need the Anthropic Messages wire format".into());
+    }
     let id = format!("chatcmpl-mock-{}", context.response_number);
     let chunk = |delta: Value, finish_reason: Option<&str>| {
         data(&json!({
