@@ -172,7 +172,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 607809d |
 | T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 已完成 | c4e5f75 |
 | T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 已完成 | 10fbeff |
-| T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 未开始 | — |
+| T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 进行中 | — |
 | T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 未开始 | — |
@@ -308,6 +308,13 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+**T42 NotebookEdit、可操作通知与 diff 行内评论**（开工 2026-11-21；基线 `npm run verify -- --baseline` 通过，复用 10fbeff 的全量结果；origin 停在 e0c41ce，没有新的 Windows CI 结果可关闭 `blocked` 项）
+
+- [ ] 1 NotebookEdit：插入、替换、删除，cell id 与序号定位，保真写入，先读后改与外部修改、检查点、权限与 hooks
+- [ ] 2 可操作通知：通知层窄接口与测试替身、经审批账本答复、高风险只给"打开"、macOS 按 S6 结论、Windows Toast 按钮与 CI 测试、审计来源"通知"
+- [ ] 3 diff 行内评论：添加、编辑、删除、跨文件，Mod+Enter 批量发送，排队，草稿存 localStorage 与重新定位
+- [ ] 验收 A01–A12；收尾（piarc-fs、通知模块、changes 模块的 AGENTS.md，架构第 8.8 节）
 
 ## 登记事项
 
