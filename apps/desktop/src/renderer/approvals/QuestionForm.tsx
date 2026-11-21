@@ -3,6 +3,7 @@
 // (checkboxes) or an answer of the user's own ("Other"). Mod+Enter submits, Esc skips the
 // questions (with the feedback, if any). Core answers the model; a configured timeout may answer
 // first, and the card then goes away.
+import { approvalLabel } from './approval-label.js';
 import type { ApprovalRequest, Question } from '@piarc/protocol';
 import { useRef, useState } from 'react';
 
@@ -169,6 +170,7 @@ export function QuestionForm({ request }: { readonly request: ApprovalRequest })
       ref={card}
       className="row approval-card question-card"
       tabIndex={-1}
+      aria-label={approvalLabel(request, t)}
       data-testid="approval-card"
       data-approval-card="question"
       data-request-id={request.requestId}

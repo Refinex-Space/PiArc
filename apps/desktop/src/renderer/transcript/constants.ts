@@ -55,3 +55,15 @@ export const HISTORY = {
 
 /** How long a row found by search stays marked (T35). */
 export const LOCATED_MS = 2000;
+
+/**
+ * The conversation's live region (architecture section 8.7, T43): what the agent is doing is
+ * announced at most once per interval while a turn runs, never token by token; the turn's result
+ * once when it ends.
+ */
+export const LIVE_ANNOUNCE = {
+  /** Shortest time between two progress announcements (ms). */
+  intervalMs: 5000,
+  /** The longest excerpt of the reply the result announcement reads (chars). */
+  excerptChars: 160,
+} as const;

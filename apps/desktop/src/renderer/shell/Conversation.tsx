@@ -29,6 +29,7 @@ import {
 } from '../store/hooks.js';
 import { badgeOf } from '../store/status.js';
 import type { SessionTranscript } from '../store/transcript.js';
+import { LiveRegion } from '../transcript/LiveRegion.js';
 import { HISTORY } from '../transcript/constants.js';
 import { BranchTail } from '../changes/BranchSwitcher.js';
 import { takeDraft } from '../changes/drafts.js';
@@ -504,6 +505,7 @@ export function Conversation({
               loadingEarlier={history.loadingEarlier}
               focus={focus}
             />
+            <LiveRegion />
           </div>
         </TranscriptContext.Provider>
       </DetailContext.Provider>

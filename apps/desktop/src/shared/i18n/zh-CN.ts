@@ -431,6 +431,11 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'conversation.error': '上一个回合失败：{message}',
   'conversation.empty': '还没有消息。',
 
+  'a11y.live.tool': '正在运行 {tool}：{target}',
+  'a11y.live.writing': '正在撰写回复：已写 {count} 个词',
+  'a11y.live.reply': '回复：{text}',
+  'a11y.live.finished': '智能体已完成',
+  'a11y.approval': '需要你的批准。{kind} {target}',
   'a11y.row.userMessage': '你的消息：{text}',
   'a11y.row.sending': '你的消息，正在发送：{text}',
   'a11y.row.undelivered': '你的消息，未送达：{text}',

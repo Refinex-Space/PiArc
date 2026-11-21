@@ -6,6 +6,7 @@
 import { useEffect, useRef, type RefObject } from 'react';
 
 import { useApp } from '../app/app-context.js';
+import { useApprovalFocus } from './use-approval-focus.js';
 import {
   approvalKey,
   canAnswerByKey,
@@ -35,6 +36,8 @@ export function useApprovalKeys(
   skip: (key: ApprovalKey) => boolean = () => false,
 ): void {
   const { keyPlatform } = useApp();
+  // Every card calls this hook: it also takes focus when it appears (T43).
+  useApprovalFocus(card);
   const mountedAt = useRef(performance.now());
   const latest = useRef({ onKey, skip });
   latest.current = { onKey, skip };

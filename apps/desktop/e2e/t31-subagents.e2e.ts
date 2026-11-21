@@ -87,7 +87,9 @@ test('a running subagent can be stopped from its card', async ({ app, page, work
   await expect(card).toHaveAttribute('data-status', 'interrupted');
   await expect(card.getByTestId('subagent-status')).toHaveText('Interrupted');
   await idle(page);
-  await expect(page.getByText('The survey was stopped early.')).toBeVisible();
+  await expect(
+    page.getByTestId('agent-message').getByText('The survey was stopped early.'),
+  ).toBeVisible();
   await screenshots(page, info, 'subagent-stopped');
 });
 

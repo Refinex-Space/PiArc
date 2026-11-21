@@ -41,7 +41,9 @@ test('normal, thinking and detailed views of one turn', async ({ page, app, work
     'sub/notes.txt': 'Release on Friday.\n',
   });
   await idle(page);
-  await expect(page.getByText('The notes say the release is on Friday.')).toBeVisible();
+  await expect(
+    page.getByTestId('agent-message').getByText('The notes say the release is on Friday.'),
+  ).toBeVisible();
 
   // The default is the thinking view: thinking collapsed, tools summarized, no reminders.
   await expect(page.getByTestId('detail-thinking')).toBeChecked();

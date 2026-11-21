@@ -3,6 +3,7 @@
 // Three answers: approve and accept edits (Mod+Enter), approve and review edits
 // (Mod+Shift+Enter), keep planning (Esc) with the feedback and the comments. The answer names
 // the card's revision and Agent Host connection, like every approval.
+import { approvalLabel } from './approval-label.js';
 import type { ApprovalRequest } from '@piarc/protocol';
 import { useEffect, useRef, useState } from 'react';
 
@@ -79,6 +80,7 @@ export function PlanApprovalCard({ request }: { readonly request: ApprovalReques
       ref={card}
       className="row approval-card plan-card"
       tabIndex={-1}
+      aria-label={approvalLabel(request, t)}
       data-testid="approval-card"
       data-approval-card="plan"
       data-request-id={request.requestId}

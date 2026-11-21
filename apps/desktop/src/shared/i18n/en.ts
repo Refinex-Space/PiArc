@@ -438,6 +438,11 @@ export const en = {
   'conversation.error': 'The last turn failed: {message}',
   'conversation.empty': 'No messages yet.',
 
+  'a11y.live.tool': 'Running {tool}: {target}',
+  'a11y.live.writing': 'Writing the reply: {count, plural, one {# word} other {# words}} so far',
+  'a11y.live.reply': 'Reply: {text}',
+  'a11y.live.finished': 'The agent finished',
+  'a11y.approval': 'Approval needed. {kind} {target}',
   'a11y.row.userMessage': 'Your message: {text}',
   'a11y.row.sending': 'Your message, sending: {text}',
   'a11y.row.undelivered': 'Your message, not delivered: {text}',

@@ -1,5 +1,6 @@
 // Actions refer to the revision and host connection shown. Only a newer Core snapshot can
 // remove the row. In particular, cancelling the native confirmation leaves it actionable.
+import { approvalLabel } from '../../approvals/approval-label.js';
 import type { ApprovalRequest } from '@piarc/protocol';
 import { useRef, useState } from 'react';
 import type { ApprovalAnswer } from '../../../shared/ipc.js';
@@ -84,6 +85,7 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
       ref={card}
       className="row approval-card"
       tabIndex={-1}
+      aria-label={approvalLabel(request, t)}
       data-testid="approval-card"
       data-approval-card={request.kind}
       data-request-id={request.requestId}

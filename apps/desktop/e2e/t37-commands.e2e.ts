@@ -73,7 +73,7 @@ test('the / palette groups by source, searches fuzzily, hints arguments and igno
   await expect(page.getByTestId('composer-input')).toHaveText('/frontend:component ');
   await page.keyboard.type('Button');
   await page.keyboard.press('Enter');
-  await expect(page.getByText('Component made.')).toBeVisible();
+  await expect(page.getByTestId('agent-message').getByText('Component made.')).toBeVisible();
   await idle(page);
   await expect(page.getByTestId('user-message').last()).toContainText('/frontend:component Button');
   const sent = await requests(mock, 't37-chat#palette');
@@ -130,7 +130,7 @@ test('built-in commands open their features and /output-style switches the style
     .poll(async () => (await readFile(local, 'utf8').catch(() => '')).includes('"Concise"'))
     .toBe(true);
   await send(page, 'After the switch');
-  await expect(page.getByText('Component made.')).toBeVisible();
+  await expect(page.getByTestId('agent-message').getByText('Component made.')).toBeVisible();
   await idle(page);
   const sent = await requests(mock, 't37-chat#builtins');
   expect(sent).toHaveLength(2);
