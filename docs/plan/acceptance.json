@@ -4031,8 +4031,8 @@
       "id": "T40-A11",
       "task": "T40",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run verify` 于 c4e5f75：15/15 通过（工作区干净；Vitest 1,636 passed、L2 192 passed 3 个按平台跳过、cargo test 通过）。受影响的 L4（dev）`preload`、`t18-settings`、`t37-`、`t40-` 共 14 passed。"
     },
     {
       "id": "T41-A01",

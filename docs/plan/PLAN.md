@@ -170,7 +170,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | R4 | [M3 评审](tasks/R4-m3-review.md) | 4 | T38、W2 | macOS | high / 高 | 中 | 无 | 部分完成 | 8a1b0cf |
 | W3 | [Windows：M3 达标](tasks/W3-windows-m3-parity.md) | 5 | R4（建议在 T43、T44 之后，需要读屏清单与性能测量脚本） | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 607809d |
-| T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 进行中 | — |
+| T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 已完成 | c4e5f75 |
 | T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,16 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-**T40 插件、Pi 包与 MCP prompts**（开工 2026-11-21；基线 `npm run verify -- --baseline` 通过；T39 只差 Windows CI 的 A12，与本任务无关；分支未推送，无 Windows CI 可核对）
-
-- [x] 1 识别与清单：`plugin.json` 与 Pi 包 `pi` 字段解析、组件枚举、不支持组件（mods、themes 等）、已安装记录（Core 持久化）
-- [x] 2 安装与作用域：本地目录、git（锁定提交、显式更新）、npm（内置 npm + `--ignore-scripts`）；用户作用域与 `.piarc/settings.json` 项目作用域；启用、停用、卸载、`resources/reload`；审计
-- [x] 3 组件接入：commands、agents、skills、hooks、`.mcp.json`（插件优先级最低）、Pi 扩展/skills/prompt templates 进 Agent Host
-- [ ] 4 启用确认与信任（Core 侧指纹、再确认、信任闸门与信任对话框列出已完成；主进程原生确认框与测试应答钩子待做）：可执行项与指纹、主进程原生确认框（测试应答钩子）、再确认、项目未信任不加载、信任对话框列出扩展包
-- [x] 5 MCP prompts 作为斜杠命令（`prompts/list`、`prompts/get`、`list_changed`）
-- [ ] 6 设置页"skills 与插件"的插件部分（中英文、L4 与亮暗截图）
-- [ ] 验收 A01–A11；收尾（AGENTS.md、复用表、架构 6.7、ADR、acceptance、PLAN）
 
 ## 登记事项
 
@@ -1037,3 +1027,10 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 验收：14 项通过，A12（Windows CI）仍为 blocked，看板改为"部分完成"；只改了文档，`npm run verify -- --baseline` 通过
 - 登记：I177 改为 Beta 之后的 MXC 评估任务与 ADR 第 5 条的实验（R6 之后安排）；新增 I180（T45 威胁模型把 Windows 无 OS 沙箱列为已接受风险）
 - 下一项：macOS 上的 T40（插件、Pi 包与 MCP prompts）；Windows 上的 W3。A12 在用户推送后由下一个任务的开工检查按 Windows CI 关闭。本地提交，未推送。
+
+### 2026-11-21 T40 已完成（提交 c4e5f75）
+- 交付：`piarc-config::plugins`（识别 Claude Code 插件与 Pi 包、组件与不支持的部分、可执行项的唯一命名、设置键 `plugins` 的声明与生效的包、只留已确认的 hooks/MCP/扩展/子 agent 项），skills、命令与子 agent 的发现接上包来源（`<plugin>:<名称>`，排在最后）；`piarc-store` schema v10 `packages`；`piarc-git::package`（克隆锁定提交、显式更新）；`piarc-core::plugins`（`PluginManager`：本地目录、git、内置 npm 且 `--ignore-scripts` 的安装，开关、确认、更新、卸载与 `kind: "plugin"` 审计；`permission_settings` 挂上生效的包，hooks 层 `plugin:<id>`、MCP 作用域 `plugin`；信任视图列出包的可执行项、信任即确认）；AHP `plugins/extensions`（能力 `plugins`）与 NAPI `packages*`；Agent Host 以 `additionalExtensionPaths` 加载已确认的 Pi 扩展、`resources/reload` 时重开有变化的会话并刷新 MCP 池，连接池的 MCP prompts（`prompts/list`、`list_changed`、`prompts/get`）作为 `mcp__<server>__<prompt>` 斜杠命令；设置页"Skills 与插件"的插件部分与主进程原生确认（`NativeConfirm`，开发构建测试钩子代答）；L2 格式的 `packages` 与 `check_commands`，8 个新场景，`check-app-layout.mjs` 的发布版测试导出检查
+- 验收：11 项全部通过。`npm run verify` 15/15（c4e5f75，Vitest 1,636 passed、L2 192 passed 3 个按平台跳过）；L4 `t40-` 与受影响的 preload、t18-settings、t37- 共 14 passed（dev 形态，截图与确认框文字在 `tmp/evidence/T40/`）；发布打包后 `check-app-layout.mjs --flavor release` 23/23
+- 决策：ADR-0058（补充）；架构 2.51；`window.piarc` 共 112 个函数。Pi 包不写进 `pi/settings.json`，改经 AHP 交给 Agent Host（Pi 的 `resolve()` 会为缺失的包运行带安装脚本的 npm，且全局生效，见 ADR-0058 第 13 条）；可执行项逐项确认，包的新增项不让项目回到未信任；Claude Code 的 `enabledPlugins`、`extraKnownMarketplaces` 改为忽略
+- 登记：I154、I155、I158、I160 更新；新增 I181（插件不支持的组件与 hook 环境变量）、I182（插件 skill 与命令的 `allowed-tools`、hooks 不生效，子 agent 不加载包的扩展）、I183（配置诊断的插件来源，T41）
+- 下一项：macOS 上的 T41（配置诊断完善、M4 hooks 事件与用量成本）；Windows 上的 W3。本地提交，未推送。
