@@ -747,5 +747,5 @@ fn approval_extends_only_the_selected_entries_of_an_existing_trust_snapshot() {
     core.shutdown_blocking().expect("shutdown");
 }
 
-#[path = "state_sources.rs"]
+#[path = "state/sources.rs"]
 mod sources;
