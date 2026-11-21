@@ -3961,71 +3961,71 @@
       "id": "T40-A01",
       "task": "T40",
       "description": "一个包含 commands、agents、skills、hooks、`.mcp.json` 的插件夹具启用后，五类组件分别生效：命令出现在命令面板并能展开，子 agent 可调用，skill 进入索引并可加载，hook 在对应事件执行，MCP server 连接并暴露工具。验证：L2 场景（每类一个，能力 ID 已登记）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 五个场景各一类组件，能力 ID 已登记：`cargo test -p piarc-testkit --test scenarios -- plugin-commands --exact`（CAP-PLUGIN-COMMANDS-001：`check_commands` 列出 `demo:hello`、`demo:db:migrate`，`/demo:hello Ada` 展开为替换了参数与 `${CLAUDE_PLUGIN_ROOT}` 的正文，同名项目命令不被覆盖）、`plugin-agents`（CAP-PLUGIN-AGENTS-001：Agent 工具以 `demo:checker` 运行子会话，子请求带定义正文）、`plugin-skills`（CAP-PLUGIN-SKILLS-001：索引含 `demo:review`，Skill 工具结果为替换后的正文）、`plugin-hooks`（CAP-PLUGIN-HOOKS-001：UserPromptSubmit hook 的上下文进入请求，未确认的另一插件 hook 不运行）、`plugin-mcp`（CAP-PLUGIN-MCP-001：`mcp__plugin_demo_echo__echo` 被声明并运行）均 ok。"
     },
     {
       "id": "T40-A02",
       "task": "T40",
       "description": "启用含可执行项的扩展包时，主进程确认框列出来源与每个可执行项；取消后没有任何可执行项运行，确认后生效；测试应答钩子在打包产物中不存在。验证：Playwright（经测试构建的应答钩子）与截图、打包产物测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `PIARC_EVIDENCE_TASK=T40 npx playwright test -c apps/desktop/playwright.config.ts t40- --project dev` 1 passed：测试钩子 `answerConfirm(false)` 时状态\"Nothing changed\"、包仍关闭、`mcp-starts.jsonl` 为空（没有 server 启动）；`answerConfirm(true)` 后开启并启动插件的 MCP server；确认框文字（`tmp/evidence/T40/native-confirmations.json`）列出 `Folder: <路径>`、hook `Stop[*] echo plugin-stop`、`plugin_demo_echo: <node 路径>` 与 Pi 扩展 `probe.ts` 及\"same permissions as the agent\"。截图 `tmp/evidence/T40/plugins-section-{light,dark,zh-CN-dark}.png`、`plugin-row-en.png`。打包产物：`npm run package:desktop`（release）后 `node scripts/ci/check-app-layout.mjs --flavor release` 23/23，含\"release Core has no testing exports (no test hooks, no answers to native confirmations)\"；开发构建同一检查为\"development Core has testing exports\"。"
     },
     {
       "id": "T40-A03",
       "task": "T40",
       "description": "扩展包更新后新增的 hook、MCP server 或 Pi 扩展在再次确认前不运行。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-core --lib plugins::tests::a_git_update_leaves_new_items_off_until_confirmed` ok：git 包更新后新增的 hook 与 MCP server 为未确认，`Active::hooks()` 只含原 hook、`mcp_servers()` 只有原 server；`confirm` 后两者生效；Pi 扩展的同一过滤见 `piarc-config` 的 `settings_decide_scope_and_trust_and_only_confirmed_items_run`（未确认的扩展不在 `extensions()` 中）。"
     },
     {
       "id": "T40-A04",
       "task": "T40",
       "description": "项目未信任时，项目作用域的插件与 Pi 包不加载（无 hook 执行、无 MCP 连接、无扩展加载）；信任后加载。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-core --lib plugins::tests::an_untrusted_project_loads_no_project_package_and_trust_confirms_its_items` ok（未信任时 `packages().active` 为空、无插件 MCP server；信任视图列出包的 2 个可执行项，信任后加载、hook 生效）；L2 `plugin-untrusted-project` ok（项目作用域的插件与 Pi 包：工具与 MCP 工具不在请求中、hook 未运行、命令不列出）。"
     },
     {
       "id": "T40-A05",
       "task": "T40",
       "description": "Pi 包从 npm 来源安装时由 Core 调用内置 npm，参数含 `--ignore-scripts`，夹具包的 postinstall 脚本没有执行。验证：测试（断言进程路径与参数，标记文件不存在）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-core --lib plugins::tests::npm_installs_run_the_bundled_npm_without_scripts` ok：记录的进程为内置 node、首个参数为 `npm-cli.js`、参数含 `install` 与 `--ignore-scripts`、`PATH` 第一项是内置 Node 的目录；夹具 tarball 的 postinstall 写标记文件，安装后标记文件不存在；结果带版本、sha512 完整性值与\"declares install scripts (postinstall)\"说明。"
     },
     {
       "id": "T40-A06",
       "task": "T40",
       "description": "Pi 包从 git 来源安装并确认后，`pi` 字段声明的扩展、skills、prompt templates 加载生效，themes 列为不支持。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `cargo test -p piarc-testkit --test scenarios -- pi-package-git --exact` ok（CAP-PIPKG-GIT-001）：运行器把包目录做成 git 仓库，经 Core 从 `file://` 安装（锁定提交）并确认；扩展注册的 `package_probe` 被声明并运行，skill `lint` 在索引中，模板 `/tidy src` 展开为 \"Tidy src up.\"；themes 列为不支持见 `piarc-config` 的 `a_pi_package_lists_extensions_skills_prompts_and_themes_as_unsupported` 与 L4 的 \"Not supported: themes\"。"
     },
     {
       "id": "T40-A07",
       "task": "T40",
       "description": "含 mods 的插件显示\"不支持\"提示，其余组件照常加载。验证：测试与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-config plugins::tests::a_plugin_lists_its_components_executables_and_unsupported_parts` ok（含 `modules` 的 hooks.json 与 `.lsp.json` 列为 mods、lspServers，其余组件照常列出）；L4 `t40-plugins` 的插件行显示 \"Not supported: mods, bin\"、组件照常列出并能开启（截图 `tmp/evidence/T40/plugin-row-en.png`、`plugins-section-zh-CN-dark.png` 为\"不支持：mods, bin\"）。"
     },
     {
       "id": "T40-A08",
       "task": "T40",
       "description": "声明 prompts 能力的 MCP server 的每个 prompt 出现在斜杠命令列表的 MCP 分组中，带参数调用后 `prompts/get` 的结果作为输入发送；server 发出 prompt 列表变化通知后命令列表更新。验证：L2 场景（mock MCP server）与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `cargo test -p piarc-testkit --test scenarios -- mcp-prompts --exact` ok（CAP-MCP-PROMPTS-001，夹具 server `MCP_ECHO_PROMPTS=1`）：`check_commands` 列出 `mcp__docs__greet`、`mcp__docs__picture`；缺必填参数与图片内容的输入被拒；`/mcp__docs__greet Ada warm` 时 mock 收到的最后一条用户文本为 `prompts/get` 的结果 \"Please greet Ada in a warm tone (docs).\"，转录条目带 `command`（`mcpPrompt`、`mcp`）；模型调用 `add_prompt` 后 server 发 `notifications/prompts/list_changed`，命令列表出现 `mcp__docs__recap`。单测 `npx vitest run agent-host/src/mcp/prompts.test.ts` 4 passed。"
     },
     {
       "id": "T40-A09",
       "task": "T40",
       "description": "用户作用域的扩展包在所有工作区可用，项目作用域的只在声明它的工作区可用；停用与卸载后组件立即消失，不需要重启应用。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-core --lib plugins::tests::scopes_confirmation_and_audit` ok：用户作用域的包在两个工作区都生效、项目作用域的只在声明它的工作区生效（含 MCP server 列表）；关闭与卸载后立即从生效列表与 MCP 配置中消失（不重启）；L4 `t40-plugins` 中关闭后状态立即为 Off，开启后已打开会话的池随 `resources/reload` 启动插件 server。"
     },
     {
       "id": "T40-A10",
       "task": "T40",
       "description": "安装、启用、停用、卸载与确认结果写入审计表。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-core --lib plugins::tests::scopes_confirmation_and_audit` ok：`audit_events` 中 `kind: \"plugin\"` 的行依次为 install、install、enable、enable、disable、uninstall，enable 行带确认的 2 个项；失败的安装同样写一行（`plugins/mod.rs` 的 `install`）。"
     },
     {
       "id": "T40-A11",

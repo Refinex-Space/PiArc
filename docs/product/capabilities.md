@@ -11,7 +11,7 @@
 | M1 | 61 | 61 | 0 | 0 |
 | M2 | 46 | 46 | 0 | 0 |
 | M3 | 47 | 47 | 0 | 0 |
-| M4 | 14 | 6 | 8 | 0 |
+| M4 | 21 | 15 | 6 | 0 |
 | M5 | 7 | 0 | 7 | 0 |
 
 ## M1
@@ -189,8 +189,15 @@
 |---|---|---|---|---|---|
 | CAP-CONFIG-DIAG-002 | 配置诊断完善（全部配置来源） | FR-EX-05 | T41 | — | 计划中 |
 | CAP-HOOK-M4-001 | UserPromptExpansion、InstructionsLoaded、CwdChanged、FileChanged、ConfigChange、StopFailure hooks 与 mcp_tool handler | FR-HN-05、ARCH-6.3.2 | T41 | — | 计划中 |
-| CAP-MCP-PROMPTS-001 | MCP prompts | ARCH-6.8 | T40 | — | 计划中 |
-| CAP-PLUGIN-001 | 插件：Claude Code 插件目录与 Pi 包，启用前展示来源与能力 | FR-EX-04、ARCH-6.7、ARCH-6.14 | T40 | — | 计划中 |
+| CAP-MCP-PROMPTS-001 | MCP prompts 作为斜杠命令 `mcp__<server>__<prompt>`：位置参数、必填检查、只送文本内容，`prompts/list_changed` 后命令列表更新 | ARCH-6.7、ARCH-6.8 | T40 | `mcp-prompts` | 已实现 |
+| CAP-PIPKG-GIT-001 | Pi 包从 git 安装并锁定提交，确认后 `pi` 字段声明的扩展、skills、prompt templates 生效，themes 不加载 | FR-EX-04、ARCH-6.7 | T40 | `pi-package-git` | 已实现 |
+| CAP-PLUGIN-001 | 插件：Claude Code 插件目录与 Pi 包，启用前展示来源与能力 | FR-EX-04、ARCH-6.7、ARCH-6.14 | T40 | `plugin-commands` | 已实现 |
+| CAP-PLUGIN-AGENTS-001 | 插件的子 agent 定义是 `<plugin>:<名称>` 类型，可由 Agent 工具调用 | FR-EX-04、ARCH-6.4、ARCH-6.7 | T40 | `plugin-agents` | 已实现 |
+| CAP-PLUGIN-COMMANDS-001 | 插件的命令文件是 `<plugin>:<路径>` 斜杠命令，展开时替换参数与 `${CLAUDE_PLUGIN_ROOT}`，不覆盖项目与用户的同名命令 | FR-EX-04、ARCH-6.7 | T40 | `plugin-commands` | 已实现 |
+| CAP-PLUGIN-HOOKS-001 | 插件的 `hooks/hooks.json` 在启用且确认后于对应事件运行；未确认的 hook 不运行 | FR-EX-04、ARCH-6.3、ARCH-6.7 | T40 | `plugin-hooks` | 已实现 |
+| CAP-PLUGIN-MCP-001 | 插件的 `.mcp.json` server 以 `plugin_<plugin>_<server>` 加入连接池（优先级最低）并暴露工具 | FR-EX-04、ARCH-6.7、ARCH-6.8 | T40 | `plugin-mcp` | 已实现 |
+| CAP-PLUGIN-SKILLS-001 | 插件的 skill 以 `<plugin>:<名称>` 进入索引并可由 Skill 工具加载 | FR-EX-04、ARCH-6.7 | T40 | `plugin-skills` | 已实现 |
+| CAP-PLUGIN-TRUST-001 | 未信任项目的项目作用域插件与 Pi 包不加载：无 hook、无 MCP 连接、无扩展、无命令 | FR-EX-04、ARCH-10.2 | T40 | `plugin-untrusted-project` | 已实现 |
 | CAP-RV-COMMENT-001 | diff 行内评论批量发送给 agent | FR-RV-04 | T42 | — | 计划中 |
 | CAP-SANDBOX-AUTO-001 | "沙箱内自动批准"模式下沙箱内的 Bash 命令不弹审批，deny、ask 规则、关键路径删除与计划模式照常拦截 | FR-TL-07、ARCH-6.2.3、ARCH-6.10 | T39 | `sandbox-auto-allow`（仅 macos）<br>`sandbox-auto-ask-rule`（仅 macos）<br>`sandbox-auto-critical-delete`（仅 macos）<br>`sandbox-auto-deny-rule`（仅 macos）<br>`sandbox-auto-plan`（仅 macos） | 已实现 |
 | CAP-SANDBOX-MACOS-001 | macOS 上 Bash 在 Seatbelt 中执行，文件写入与网络按白名单放行 | FR-TL-07、ARCH-6.10 | T39 | `sandbox-ask-writes`（仅 macos） | 已实现 |
