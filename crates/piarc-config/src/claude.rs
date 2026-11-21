@@ -180,6 +180,7 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     ),
     planned("enabledPlugins", "T40", "plugins"),
     ignored("enableWorkflows", NONE),
+    ignored("enforceAnthropicSignIn", ACCOUNT),
     ignored("enforceAvailableModels", NONE),
     ignored(
         "env",
