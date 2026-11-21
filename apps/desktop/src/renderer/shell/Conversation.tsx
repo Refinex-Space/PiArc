@@ -43,6 +43,7 @@ import { reason } from './errors.js';
 import { keyOf, useModelCatalog } from './model-catalog.js';
 import { ModelMenus } from './ModelMenus.js';
 import { PermissionModeMenu } from './PermissionModeMenu.js';
+import { SandboxStatus } from './SandboxStatus.js';
 import { UsageRing } from './ContextUsage.js';
 import { QueueList } from './QueueList.js';
 import { compactFocus, SessionInput, type Draft } from './session-input.js';
@@ -579,6 +580,7 @@ export function Conversation({
               setError(t('composer.failed', { reason: reason(failure) }));
             }}
           />
+          <SandboxStatus workspace={workspace} />
           <UsageRing sessionId={id} />
         </div>
       </div>

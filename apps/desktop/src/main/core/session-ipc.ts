@@ -370,13 +370,16 @@ function approvalAnswer(value: unknown): ApprovalAnswer {
   } satisfies ApprovalAnswer;
   if (decision === 'allowAlways') {
     const rules = a.rules === undefined ? [] : ruleList(a.rules);
-    if (a.directory === undefined && rules.length === 0) {
-      throw new TypeError('always allow needs a rule or directory');
+    // T39: a network-domain card's "add to allowlist" names its host instead.
+    const domain = a.domain === undefined ? undefined : text(a.domain, 'domain');
+    if (a.directory === undefined && rules.length === 0 && domain === undefined) {
+      throw new TypeError('always allow needs a rule, directory or domain');
     }
     return {
       ...fields,
       ...(rules.length === 0 ? {} : { rules }),
       ...(a.directory === undefined ? {} : { directory: absolutePath(a.directory) }),
+      ...(domain === undefined ? {} : { domain }),
     };
   }
   // T26: an approved plan carries its follow-up mode, a declined plan its comments, an answered
@@ -493,9 +496,14 @@ export function registerSessionHandlers(
       const options: Electron.MessageBoxOptions = {
         type: 'warning',
         message: t.t(
-          answer.directory === undefined ? 'approval.confirmRule' : 'approval.confirmDirectory',
+          answer.domain != null
+            ? 'approval.confirmDomain'
+            : answer.directory === undefined
+              ? 'approval.confirmRule'
+              : 'approval.confirmDirectory',
         ),
         detail: [
+          ...(answer.domain == null ? [] : [t.t('sandbox.domains') + '\n' + answer.domain]),
           ...(answer.rules === undefined || answer.rules.length === 0
             ? []
             : [t.t('approval.rule') + '\n' + answer.rules.join('\n')]),

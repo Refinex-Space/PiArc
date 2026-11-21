@@ -110,6 +110,8 @@ export const IPC_CHANNELS = {
   permissionCheck: 'piarc:permissions.check',
   permissionUpdate: 'piarc:permissions.update',
   auditEvents: 'piarc:permissions.audit',
+  sandboxSettings: 'piarc:sandbox.settings',
+  sandboxUpdate: 'piarc:sandbox.update',
   configDiagnostics: 'piarc:config.diagnostics',
   worktreeBranches: 'piarc:worktree.branches',
   worktreeIgnore: 'piarc:worktree.ignore',
@@ -167,11 +169,21 @@ export interface PermissionRuleChange {
 /** Filters of the permission audit view; absent fields match everything. */
 export interface AuditQuery {
   readonly workspace?: string;
+  /** `permission` (the default) or `sandbox`: sandbox denials and network approvals (T39). */
+  readonly kind?: 'permission' | 'sandbox';
   readonly sessionId?: string;
   readonly tool?: string;
   readonly conclusion?: 'allow' | 'deny';
   readonly since?: number;
   readonly limit?: number;
+}
+
+/** The user's sandbox values the settings page changes (T39); absent fields stay. */
+export interface SandboxChange {
+  readonly enabled?: boolean;
+  readonly autoAllow?: boolean;
+  readonly allowedDomains?: readonly string[];
+  readonly denyRead?: readonly string[];
 }
 
 /**
@@ -612,8 +624,19 @@ export interface PiarcApi {
   checkPermissionRule(rule: string, behavior: RuleBehavior): Promise<string>;
   /** Change one rule; new or changed allow rules need the native confirmation (JSON). */
   updatePermissionRule(change: PermissionRuleChange): Promise<string>;
-  /** Permission audit events, newest first (JSON). */
+  /** Permission (or, with `kind: 'sandbox'`, sandbox) audit events, newest first (JSON). */
   auditEvents(query: AuditQuery): Promise<string>;
+  /**
+   * The sandbox of a workspace (JSON, T39), the most recent one when null: on or off, mode,
+   * allowed domains and `denyRead` with their sources, writable places, project values that
+   * do not apply, and whether the platform has a sandbox.
+   */
+  sandboxSettings(workspace: string | null): Promise<string>;
+  /**
+   * Writes the user's sandbox values; turning auto-approval on and adding domains need the
+   * native confirmation (`{ status: 'cancelled' }`). Resolves with the new view (JSON).
+   */
+  setSandboxSettings(workspace: string | null, change: SandboxChange): Promise<string>;
   /**
    * The configuration diagnostics of a workspace (JSON), the most recent one when null:
    * every settings file with its load state and its applied, overridden and ignored keys.

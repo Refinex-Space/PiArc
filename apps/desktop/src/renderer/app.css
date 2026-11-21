@@ -197,6 +197,12 @@ textarea.input {
   font-size: var(--piarc-font-size-caption);
 }
 
+/* T39: the sandbox is on in the settings but does not apply here. */
+.tag.sandbox-warning {
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+}
+
 .icon {
   flex: none;
 }

@@ -1,12 +1,13 @@
 // The settings window (architecture section 8.2): navigation from the registered pages
-// (`registry.ts`), one page at a time. The hash `#/settings/<page>` selects the page.
+// (`registry.ts`), one page at a time. The hash `#/settings/<page>` selects the page; a query
+// after it (`#/settings/permissions?audit=sandbox`, T39) is left to the page.
 import { useEffect, useState } from 'react';
 
 import { useT } from '../app/app-context.js';
 import { settingsPages } from './registry.js';
 
 function pageFromHash(): string | undefined {
-  const match = /^#\/settings\/([a-zA-Z0-9.-]+)$/.exec(window.location.hash);
+  const match = /^#\/settings\/([a-zA-Z0-9.-]+)(?:\?[a-zA-Z0-9=&.-]*)?$/.exec(window.location.hash);
   return match?.[1];
 }
 

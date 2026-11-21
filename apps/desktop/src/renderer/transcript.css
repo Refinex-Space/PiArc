@@ -1083,6 +1083,19 @@
 .approval-path {
   overflow-wrap: anywhere;
 }
+/* T39: where an approved command runs; outside the sandbox stands out. */
+.approval-sandbox {
+  margin-inline-start: var(--piarc-space-2);
+  padding-inline: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  font-size: var(--piarc-font-size-caption);
+  font-weight: var(--piarc-font-weight-medium);
+  background: var(--piarc-accent-subtle);
+}
+.approval-sandbox.is-outside {
+  background: var(--piarc-state-danger-subtle);
+  color: var(--piarc-text-danger);
+}
 .environment-bar {
   padding: 0 var(--piarc-space-5) var(--piarc-space-2);
 }

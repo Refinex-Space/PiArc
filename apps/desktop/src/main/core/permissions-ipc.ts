@@ -86,6 +86,10 @@ export function auditQuery(raw: unknown): AuditQuery {
   if (conclusion !== undefined && conclusion !== 'allow' && conclusion !== 'deny') {
     throw new TypeError('conclusion must be allow or deny');
   }
+  const kind = raw.kind;
+  if (kind !== undefined && kind !== 'permission' && kind !== 'sandbox') {
+    throw new TypeError('kind must be permission or sandbox');
+  }
   const number = (value: unknown, name: string, max: number): number => {
     if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > max) {
       throw new TypeError(`${name} must be an integer from 0 to ${String(max)}`);
@@ -94,6 +98,7 @@ export function auditQuery(raw: unknown): AuditQuery {
   };
   return {
     ...(raw.workspace === undefined ? {} : { workspace: workspace(raw.workspace) }),
+    ...(kind === undefined ? {} : { kind }),
     ...(raw.sessionId === undefined ? {} : { sessionId: text(raw.sessionId, 'sessionId') }),
     ...(raw.tool === undefined ? {} : { tool: text(raw.tool, 'tool') }),
     ...(conclusion === undefined ? {} : { conclusion }),

@@ -415,6 +415,14 @@ const api: PiarcApi = {
     ipcRenderer.invoke(IPC_CHANNELS.permissionUpdate, change).then((v: unknown) => expectString(v)),
   auditEvents: (query) =>
     ipcRenderer.invoke(IPC_CHANNELS.auditEvents, query).then((v: unknown) => expectString(v)),
+  sandboxSettings: (workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sandboxSettings, workspace)
+      .then((v: unknown) => expectString(v)),
+  setSandboxSettings: (workspace, change) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sandboxUpdate, workspace, change)
+      .then((v: unknown) => expectString(v)),
   configDiagnostics: (workspace) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.configDiagnostics, workspace)

@@ -1020,6 +1020,77 @@ export const en = {
   'search.failed': 'Searching failed: {reason}',
   'transcript.located': 'The message is not on this branch of the conversation.',
 
+  'diagnostics.reason.projectSandbox': 'A project file can only tighten the sandbox',
+  'diagnostics.reason.platform': 'Has no effect on this platform',
+  'settings.sandbox': 'Sandbox',
+  'sandbox.intro':
+    'Bash commands the agent runs can run in an operating-system sandbox: writes stay in the workspace, the session’s temporary directory and added directories, protected paths stay read-only, and the network goes only to allowed domains through PiArc’s proxy. Your own commands in the terminal panel, hooks, MCP servers and file tools are not in this sandbox.',
+  'sandbox.workspace': 'Workspace',
+  'sandbox.noWorkspace':
+    'No workspace yet: the settings below are your own and apply to every workspace.',
+  'sandbox.enabled': 'Run Bash commands in the sandbox',
+  'sandbox.enabledHint':
+    'Off by default. A project can turn it on for itself but cannot turn it off.',
+  'sandbox.unsupported':
+    'The sandbox is not available on Windows: commands do not run in an operating-system sandbox and only the permission rules apply.',
+  'sandbox.unavailable':
+    'The sandbox cannot run on this Mac (sandbox-exec is missing or failed to start): commands run without it and each needs approval.',
+  'sandbox.mode': 'Approval',
+  'sandbox.mode.ask': 'Still ask before sandboxed commands',
+  'sandbox.mode.auto': 'Run sandboxed commands without asking',
+  'sandbox.modeHint':
+    'Deny and ask rules, deletions of key paths and plan mode still apply with automatic approval. A request to run a command outside the sandbox is always asked about.',
+  'sandbox.domains': 'Allowed domains',
+  'sandbox.domainsHint':
+    'Exact names or *.example.com for any subdomain. Commands can reach other hosts only after you allow them on a card.',
+  'sandbox.domainsProject': 'Domains in project files do not apply.',
+  'sandbox.add': 'Add',
+  'sandbox.remove': 'Remove {value}',
+  'sandbox.newDomain': 'New domain',
+  'sandbox.newPath': 'New path',
+  'sandbox.denyRead': 'Paths commands cannot read',
+  'sandbox.denyReadHint':
+    'For example ~/.ssh or ~/.aws. Relative paths are relative to your PiArc data folder.',
+  'sandbox.origin.user': 'Yours',
+  'sandbox.origin.claudeUser': 'Claude Code user settings',
+  'sandbox.origin.project': 'Project',
+  'sandbox.origin.enterprise': 'Managed by your organization',
+  'sandbox.readOnly': 'Read-only',
+  'sandbox.writable': 'Where sandboxed commands can write',
+  'sandbox.writable.workspace': 'Workspace',
+  'sandbox.writable.added': 'Added directory',
+  'sandbox.writable.sessionTmp': 'Each session’s temporary directory',
+  'sandbox.ignored': 'Project values that do not apply',
+  'sandbox.limits':
+    'In the sandbox, commands cannot listen on ports, use Unix sockets (Docker, ssh-agent, local databases) or change git’s configuration and hooks (git init, clone and config fail). Tools that ignore HTTP proxies, such as ssh, cannot reach the network.',
+  'sandbox.audit': 'Show sandbox denials',
+  'sandbox.confirmAutoAllow': 'Run sandboxed commands without asking?',
+  'sandbox.confirmAutoAllowDetail':
+    'Bash commands that run in the sandbox will no longer ask for approval. Deny and ask rules, deletions of key paths and plan mode still apply.',
+  'sandbox.confirmDomains': 'Allow sandboxed commands to reach these domains?',
+  'sandbox.notice.platform':
+    'Your settings turn the sandbox on, but Windows has no sandbox: commands run with the permission rules only.',
+  'sandbox.notice.unavailable':
+    'The sandbox is on but cannot run: commands run without it and each needs approval.',
+  'sandbox.badge': 'Sandbox',
+  'approval.inSandbox': 'Runs in the sandbox',
+  'approval.outsideSandbox': 'Runs outside the sandbox',
+  'approval.network': 'Allow network access?',
+  'approval.networkHost':
+    'A sandboxed command wants to reach {target}, which is not in the allowed domains.',
+  'approval.addToAllowlist': 'Add to allowed domains',
+  'approval.confirmDomain': 'Add this domain to the sandbox’s allowed domains?',
+  'notice.sandboxUnavailable':
+    'The sandbox is on but cannot run, so commands run without it and each needs approval.',
+  'permissions.audit.kind': 'Kind',
+  'permissions.audit.kind.permission': 'Permission decisions',
+  'permissions.audit.kind.sandbox': 'Sandbox denials',
+  'permissions.audit.target': 'Path or host',
+  'permissions.audit.denial.read': 'Read refused',
+  'permissions.audit.denial.write': 'Write refused',
+  'permissions.audit.denial.network': 'Network refused',
+  'permissions.audit.networkApproval': 'Network approval',
+
   'error.generic': 'Something went wrong: {reason}',
 } as const;
 

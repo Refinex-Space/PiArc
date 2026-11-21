@@ -13,7 +13,15 @@ import { useApp } from '../app/app-context.js';
 const STATUSES = ['loaded', 'missing', 'invalid', 'stale', 'untrusted'] as const;
 type FileStatus = (typeof STATUSES)[number];
 
-const REASONS = ['unknown', 'ignored', 'planned', 'untrusted', 'projectMode'] as const;
+const REASONS = [
+  'unknown',
+  'ignored',
+  'planned',
+  'untrusted',
+  'projectMode',
+  'projectSandbox',
+  'platform',
+] as const;
 type IgnoreReason = (typeof REASONS)[number];
 
 const LAYERS = [

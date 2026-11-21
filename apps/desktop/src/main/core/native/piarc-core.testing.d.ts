@@ -29,6 +29,17 @@ export declare class CoreRuntime {
    */
   shutdown(): Promise<void>;
   /**
+   * The sandbox of a workspace for the settings page (the most recent workspace when
+   * null): on or off, mode, allowed domains and `denyRead` with their sources, writable
+   * places, project values that do not apply, and whether the platform has a sandbox.
+   */
+  sandboxSettings(workspace?: string | null): Promise<string>;
+  /**
+   * Writes the user's sandbox values, JSON `{ enabled?, autoAllow?, allowedDomains?,
+   * denyRead? }`; answers the new view of `workspace`.
+   */
+  setSandboxSettings(workspace: string | null, changeJson: string): Promise<string>;
+  /**
    * Opens a workspace (an absolute directory): starts its Agent Host at once and resolves
    * when it is ready, with the workspace as `core/workspaces` lists it (JSON).
    */
@@ -420,7 +431,10 @@ export declare class CoreRuntime {
    * ranges WebFetch may reach, for its local test server), `PIARC_TEST_OAUTH_PROVIDER`
    * (a `--test-oauth-provider` file every Agent Host registers, for the mock sign-in) and,
    * from T38, `PIARC_TEST_SEARCH_ENDPOINTS` (comma-separated `backend=url`: the local mock
-   * search service that answers instead of the real one).
+   * search service that answers instead of the real one). From T39,
+   * `PIARC_TEST_SANDBOX_HOSTS` (comma-separated `name=port`: the sandbox's proxy reaches
+   * these names on local ports and nothing else) and `PIARC_TEST_SANDBOX_ENTERPRISE_DOMAINS`
+   * (comma-separated domains standing in for the enterprise's allowlist until T47).
    */
   static createForTests(
     options: CoreOptions,

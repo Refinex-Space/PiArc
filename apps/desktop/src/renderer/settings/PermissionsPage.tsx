@@ -106,6 +106,21 @@ export function parseAudit(raw: string): AuditRow[] {
   const events = isRecord(value) && Array.isArray(value.events) ? value.events : [];
   return events.filter(isRecord).map((e): AuditRow => {
     const d = isRecord(e.detail) ? e.detail : {};
+    if (typeof d.denial === 'string' || d.approval === 'network') {
+      // A sandbox row (T39): a refused path or host, or the answer to a network card.
+      const port = typeof d.port === 'number' ? `:${String(d.port)}` : '';
+      const target =
+        str(d.path) ?? (str(d.host) === undefined ? undefined : `${String(d.host)}${port}`);
+      return {
+        at: typeof e.at === 'number' ? e.at : 0,
+        sessionId: str(e.sessionId),
+        tool: str(d.denial) ?? str(d.approval),
+        step: str(d.operation) ?? str(d.reason) ?? str(d.decision),
+        conclusion: str(d.conclusion) ?? 'deny',
+        rule: target,
+        ruleSource: undefined,
+      };
+    }
     return {
       at: typeof e.at === 'number' ? e.at : 0,
       sessionId: str(e.sessionId),
@@ -400,18 +415,40 @@ function SourceSection({
 const SINCE = { hour: 3_600_000, day: 86_400_000, week: 604_800_000 } as const;
 type Since = keyof typeof SINCE | 'all';
 
+/** The audit kind a link asked for (`#/settings/permissions?audit=sandbox`, T39). */
+function initialKind(): 'permission' | 'sandbox' {
+  return /[?&]audit=sandbox(?:&|$)/u.test(window.location.hash) ? 'sandbox' : 'permission';
+}
+
 function AuditSection({ workspace }: { readonly workspace: string }) {
   const { t } = useApp();
   const [rows, setRows] = useState<AuditRow[]>([]);
+  const [kind, setKind] = useState<'permission' | 'sandbox'>(initialKind);
   const [session, setSession] = useState('');
   const [tool, setTool] = useState('');
   const [conclusion, setConclusion] = useState<'' | 'allow' | 'deny'>('');
   const [since, setSince] = useState<Since>('all');
   const [error, setError] = useState('');
-  const ids = { session: useId(), tool: useId(), conclusion: useId(), since: useId() };
+  const ids = {
+    kind: useId(),
+    session: useId(),
+    tool: useId(),
+    conclusion: useId(),
+    since: useId(),
+  };
+  useEffect(() => {
+    const onHash = () => {
+      setKind(initialKind());
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => {
+      window.removeEventListener('hashchange', onHash);
+    };
+  }, []);
   const load = useCallback(() => {
     const query: AuditQuery = {
       workspace,
+      ...(kind === 'sandbox' ? { kind } : {}),
       ...(session.trim() === '' ? {} : { sessionId: session.trim() }),
       ...(tool.trim() === '' ? {} : { tool: tool.trim() }),
       ...(conclusion === '' ? {} : { conclusion }),
@@ -427,12 +464,27 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
       .catch((e: unknown) => {
         setError(e instanceof Error ? e.message : String(e));
       });
-  }, [workspace, session, tool, conclusion, since]);
+  }, [workspace, kind, session, tool, conclusion, since]);
   useEffect(load, [load]);
   return (
     <section className="permission-audit" data-testid="permission-audit">
       <h2 className="permission-heading">{t('permissions.audit')}</h2>
       <div className="permission-filters">
+        <label htmlFor={ids.kind} className="permission-filter-label">
+          {t('permissions.audit.kind')}
+        </label>
+        <select
+          id={ids.kind}
+          className="input"
+          value={kind}
+          data-testid="audit-kind"
+          onChange={(e) => {
+            setKind(e.currentTarget.value === 'sandbox' ? 'sandbox' : 'permission');
+          }}
+        >
+          <option value="permission">{t('permissions.audit.kind.permission')}</option>
+          <option value="sandbox">{t('permissions.audit.kind.sandbox')}</option>
+        </select>
         <label htmlFor={ids.session} className="permission-filter-label">
           {t('permissions.audit.session')}
         </label>
@@ -507,7 +559,9 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
               <th>{t('permissions.audit.session')}</th>
               <th>{t('permissions.audit.tool')}</th>
               <th>{t('permissions.audit.step')}</th>
-              <th>{t('permissions.audit.rule')}</th>
+              <th>
+                {t(kind === 'sandbox' ? 'permissions.audit.target' : 'permissions.audit.rule')}
+              </th>
               <th>{t('permissions.audit.conclusion')}</th>
             </tr>
           </thead>
@@ -518,7 +572,9 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
                 <td className="permission-nowrap" title={r.sessionId}>
                   {r.sessionId?.slice(0, 8) ?? ''}
                 </td>
-                <td className="permission-nowrap">{r.tool ?? ''}</td>
+                <td className="permission-nowrap">
+                  {kind === 'sandbox' ? sandboxKind(r.tool, r.step, t) : (r.tool ?? '')}
+                </td>
                 <td className="permission-nowrap">{r.step ?? ''}</td>
                 <td>
                   {r.rule === undefined ? '' : <code>{r.rule}</code>}
@@ -538,6 +594,25 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
       )}
     </section>
   );
+}
+
+/** The label of a sandbox row's kind. */
+function sandboxKind(
+  denial: string | undefined,
+  step: string | undefined,
+  t: (id: MessageId) => string,
+): string {
+  if (denial === 'network' && step === undefined) return t('permissions.audit.denial.network');
+  switch (denial) {
+    case 'file':
+      return t(
+        step === 'read' ? 'permissions.audit.denial.read' : 'permissions.audit.denial.write',
+      );
+    case 'network':
+      return t('permissions.audit.denial.network');
+    default:
+      return t('permissions.audit.networkApproval');
+  }
 }
 
 export function PermissionsPage() {

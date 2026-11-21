@@ -30,8 +30,10 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
   const [error, setError] = useState('');
   const content = [request.command, request.diff?.unified].filter(Boolean).join('\n');
   const long = content.length > PREVIEW_CHARS || content.split('\n').length > PREVIEW_LINES;
+  // T39: a network-domain card names a host; its "always" adds it to the allowed domains.
+  const network = request.tool === 'SandboxNetwork' && request.domain != null;
   const allowPersistent =
-    request.protectedPath !== true && (offered.length > 0 || request.directory != null);
+    !network && request.protectedPath !== true && (offered.length > 0 || request.directory != null);
   function answer(decision: ApprovalAnswer['decision']) {
     if (busy.current) return;
     busy.current = true;
@@ -48,6 +50,9 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
         ...(decision === 'deny' && feedback ? { feedback } : {}),
         ...(decision === 'allowAlways' && offered.length > 0 ? { rules: edited } : {}),
         ...(decision === 'allowAlways' && request.directory != null ? { directory } : {}),
+        ...(decision === 'allowAlways' && network && request.domain != null
+          ? { domain: request.domain }
+          : {}),
       })
       .then(async (raw) => {
         const value: unknown = JSON.parse(raw);
@@ -84,10 +89,26 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
       data-request-id={request.requestId}
     >
       <header>
-        <strong>{t(`approval.kind.${request.kind}`)}</strong>{' '}
-        <span className="muted">{request.tool}</span>
+        <strong>{network ? t('approval.network') : t(`approval.kind.${request.kind}`)}</strong>{' '}
+        {!network && <span className="muted">{request.tool}</span>}
+        {request.sandbox != null && !network && (
+          <span
+            className={`approval-sandbox${request.sandbox === 'unsandboxed' ? ' is-outside' : ''}`}
+            data-testid="approval-sandbox"
+            data-place={request.sandbox}
+          >
+            {t(
+              request.sandbox === 'unsandboxed' ? 'approval.outsideSandbox' : 'approval.inSandbox',
+            )}
+          </span>
+        )}
       </header>
       <ApprovalOrigin request={request} />
+      {network && request.domain != null && (
+        <div className="approval-path" data-testid="approval-domain">
+          {t('approval.networkHost', { target: request.domain })}
+        </div>
+      )}
       {request.cwd && (
         <div className="approval-path">{t('approval.cwd', { path: request.cwd })}</div>
       )}
@@ -132,15 +153,17 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
         </button>
       )}
       <>
-        <label>
-          {t('approval.feedback')}
-          <input
-            value={feedback}
-            onChange={(e) => {
-              setFeedback(e.target.value);
-            }}
-          />
-        </label>
+        {!network && (
+          <label>
+            {t('approval.feedback')}
+            <input
+              value={feedback}
+              onChange={(e) => {
+                setFeedback(e.target.value);
+              }}
+            />
+          </label>
+        )}
         {allowPersistent && offered.length > 0 && (
           <label>
             {t('approval.rule')}
@@ -214,6 +237,19 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
               }}
             >
               {t('approval.always')}
+            </button>
+          )}
+          {network && (
+            <button
+              type="button"
+              className="button"
+              disabled={waiting}
+              data-testid="approval-add-domain"
+              onClick={() => {
+                answer('allowAlways');
+              }}
+            >
+              {t('approval.addToAllowlist')}
             </button>
           )}
         </div>

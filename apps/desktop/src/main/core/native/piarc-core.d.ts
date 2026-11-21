@@ -29,6 +29,17 @@ export declare class CoreRuntime {
    */
   shutdown(): Promise<void>;
   /**
+   * The sandbox of a workspace for the settings page (the most recent workspace when
+   * null): on or off, mode, allowed domains and `denyRead` with their sources, writable
+   * places, project values that do not apply, and whether the platform has a sandbox.
+   */
+  sandboxSettings(workspace?: string | null): Promise<string>;
+  /**
+   * Writes the user's sandbox values, JSON `{ enabled?, autoAllow?, allowedDomains?,
+   * denyRead? }`; answers the new view of `workspace`.
+   */
+  setSandboxSettings(workspace: string | null, changeJson: string): Promise<string>;
+  /**
    * Opens a workspace (an absolute directory): starts its Agent Host at once and resolves
    * when it is ready, with the workspace as `core/workspaces` lists it (JSON).
    */

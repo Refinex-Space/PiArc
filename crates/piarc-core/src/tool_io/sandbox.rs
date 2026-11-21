@@ -407,6 +407,7 @@ impl ToolIo {
         tracing::warn!(target: "piarc_core::sandbox", "the sandbox is on but not available; commands run without it");
         let notice = json!({
             "type": "sandboxUnavailable",
+            "message": "The sandbox is on but cannot run, so commands run without it and each needs approval.",
             "reason": if self.config.sandbox.platform.is_none() { "platform" } else { "failed" },
         });
         if let Some(events) = &self.notices
