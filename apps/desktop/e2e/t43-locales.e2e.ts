@@ -31,7 +31,7 @@ function overflowing(page: Page) {
     ]
       .filter((el) => el.offsetParent !== null && getComputedStyle(el).textOverflow !== 'ellipsis')
       .filter((el) => el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 2)
-      .map((el) => `${el.tagName.toLowerCase()} "${(el.textContent ?? '').trim().slice(0, 40)}"`),
+      .map((el) => `${el.tagName.toLowerCase()} "${el.textContent.trim().slice(0, 40)}"`),
   );
 }
 
