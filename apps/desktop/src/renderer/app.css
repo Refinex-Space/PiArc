@@ -883,8 +883,9 @@ textarea.input {
 
 .settings-nav-item {
   width: 100%;
-  height: var(--piarc-c-sidebar-row-height);
-  padding: 0 var(--piarc-space-3);
+  /* A long name (larger text, another language) wraps and the row grows with it. */
+  min-height: var(--piarc-c-sidebar-row-height);
+  padding: var(--piarc-space-1) var(--piarc-space-3);
   border: 0;
   border-radius: var(--piarc-radius-md);
   background: transparent;
