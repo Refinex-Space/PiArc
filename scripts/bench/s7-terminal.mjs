@@ -1,7 +1,7 @@
 // S7 benchmark (T10): the terminal prototype in the running Electron app.
 //
 //   npm run bench:s7 -- [--form packaged|dev] [--megabytes 100] [--repeat 1]
-//                       [--echo-samples 200] [--out <file.json>]
+//                       [--echo-samples 200] [--headless] [--out <file.json>]
 //
 // Needs `npm run package:desktop -- --flavor development` first. It opens `#/terminal-lab` and
 // measures, against architecture chapter 11 and the S7 criteria (chapter 16):
@@ -19,6 +19,11 @@
 //    the baseline), then the page times a typed key from its `keydown` to the decoded frame that
 //    shows it (the full path: renderer → main → Core key encoder → PTY → parser → frame → main →
 //    renderer). Extra latency = full − baseline of the same pair.
+//
+// `--headless` (T33-A13) measures only `cat` in a terminal no page shows: the terminal belongs
+// to the window but nothing pulls its frames, as when the agent runs a command in a terminal
+// whose panel is closed. It reports the main process's event-loop delay, Core's counters (no
+// frames should be encoded) and the main process's CPU time, to tmp/evidence/T33/bench/.
 //
 // Writes JSON (default tmp/evidence/T10/bench/) and prints a summary. The numbers are reported,
 // not asserted: they depend on the machine (see docs/spikes/S07-terminal.md).
@@ -257,6 +262,89 @@ async function measureCat(app, page, megabytes, repeat) {
 }
 
 /**
+ * `cat` in a terminal nobody looks at (T33-A13): the program itself prints the file and a
+ * marker; Core's own text of the terminal tells when it is done.
+ * @param {ElectronApplication} app
+ * @param {number} megabytes
+ * @param {number} repeat
+ */
+async function measureHeadless(app, megabytes, repeat) {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'piarc-t33-'));
+  try {
+    await writeLogFile(path.join(dir, 'log.txt'), megabytes);
+    const owner = await app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      if (window === undefined) {
+        throw new Error('no window');
+      }
+      return window.webContents.id;
+    });
+    /** @type {TestTerminalOptions} */
+    const terminal = WINDOWS
+      ? {
+          cols: 120,
+          rows: 40,
+          cwd: dir,
+          program: 'cmd.exe',
+          args: ['/D', '/C', catCommand(repeat)],
+        }
+      : { cols: 120, rows: 40, cwd: dir, program: '/bin/sh', args: ['-c', catCommand(repeat)] };
+    const cpuBefore = await app.evaluate(() => process.cpuUsage());
+    await app.evaluate(() => {
+      globalThis.__piarcTestHooks?.startLoopDelay();
+    });
+    const started = Date.now();
+    const id = await app.evaluate(
+      (_electron, options) => {
+        const hooks = globalThis.__piarcTestHooks;
+        if (hooks === undefined) {
+          throw new Error('no Core test hooks: package the development flavor');
+        }
+        return hooks.createTerminal(options.owner, options.terminal);
+      },
+      { owner, terminal },
+    );
+    const deadline = Date.now() + 300_000;
+    for (;;) {
+      const text = await app.evaluate(
+        (_electron, terminalId) => globalThis.__piarcTestHooks?.core.terminalText(terminalId),
+        id,
+      );
+      if ((text ?? '').split('\n').some((line) => line.trim() === 'CAT-DONE')) {
+        break;
+      }
+      if (Date.now() > deadline) {
+        throw new Error('cat never finished');
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    const wallMs = Date.now() - started;
+    const loopDelay = await app.evaluate(() => globalThis.__piarcTestHooks?.stopLoopDelay());
+    const after = await coreStats(app, id);
+    const t = after.terminal;
+    const cpuMs = (after.cpu.user - cpuBefore.user + after.cpu.system - cpuBefore.system) / 1000;
+    const seconds = wallMs / 1000;
+    return {
+      megabytes: megabytes * repeat,
+      seconds,
+      throughputMBps: (megabytes * repeat) / seconds,
+      mainLoopDelayMs: loopDelay,
+      core: {
+        bytesRead: t.bytesRead,
+        reads: t.reads,
+        vtWriteMs: t.vtWriteMicros / 1000,
+        vtWriteShareOfWall: t.vtWriteMicros / 1000 / wallMs,
+        frames: t.frames,
+      },
+      mainProcess: { cpuMs, cpuShareOfOneCore: cpuMs / wallMs },
+      ipc: { framesForwarded: after.forwarded.frames, frameBytes: after.forwarded.bytes },
+    };
+  } finally {
+    await rm(dir, { recursive: true, force: true, maxRetries: 20 });
+  }
+}
+
+/**
  * Waits until the page's cursor reaches column `x`.
  * @param {Page} page
  * @param {number} x
@@ -342,6 +430,41 @@ function ms(value) {
   return value === undefined || Number.isNaN(value) ? '-' : `${value.toFixed(2)} ms`;
 }
 
+/**
+ * Runs `--headless`, writes its report and prints the summary.
+ * @param {ElectronApplication} app
+ * @param {'dev' | 'packaged'} form
+ * @param {number} megabytes
+ * @param {number} repeat
+ * @param {string | undefined} out
+ */
+async function headless(app, form, megabytes, repeat, out) {
+  const cat = await measureHeadless(app, megabytes, repeat);
+  const report = {
+    date: new Date().toISOString(),
+    form,
+    platform: `${process.platform}-${process.arch}`,
+    cpus: os.cpus()[0]?.model,
+    headless: true,
+    cat,
+  };
+  const file =
+    out ?? path.join(repoRoot, 'tmp', 'evidence', 'T33', 'bench', `s7-headless-${form}.json`);
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  console.log(`S7 headless (${form}) — ${path.relative(repoRoot, file)}`);
+  console.log(
+    `cat ${String(cat.megabytes)} MB: ${cat.seconds.toFixed(1)} s (${cat.throughputMBps.toFixed(0)} MB/s); ` +
+      `main loop delay p50 ${ms(cat.mainLoopDelayMs?.p50)} p99 ${ms(cat.mainLoopDelayMs?.p99)} max ${ms(cat.mainLoopDelayMs?.max)} ` +
+      `(${String(cat.mainLoopDelayMs?.samples)} samples)`,
+  );
+  console.log(
+    `core: ${(cat.core.bytesRead / 1024 / 1024).toFixed(0)} MiB read, vt_write ${ms(cat.core.vtWriteMs)}, ` +
+      `${String(cat.core.frames)} frames encoded, ${String(cat.ipc.framesForwarded)} forwarded; ` +
+      `main process CPU ${(cat.mainProcess.cpuShareOfOneCore * 100).toFixed(1)}% of one core`,
+  );
+}
+
 async function main() {
   const { values } = parseArgs({
     options: {
@@ -349,6 +472,7 @@ async function main() {
       megabytes: { type: 'string', default: '100' },
       repeat: { type: 'string', default: '1' },
       'echo-samples': { type: 'string', default: '200' },
+      headless: { type: 'boolean', default: false },
       out: { type: 'string' },
     },
   });
@@ -362,6 +486,10 @@ async function main() {
   try {
     const page = await app.firstWindow();
     await page.getByTestId('app-shell').waitFor();
+    if (values.headless) {
+      await headless(app, form, megabytes, repeat, values.out);
+      return;
+    }
     const cat = await measureCat(app, page, megabytes, repeat);
     const echo = await measureEcho(app, page, echoSamples);
     const report = {

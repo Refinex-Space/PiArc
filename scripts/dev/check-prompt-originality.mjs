@@ -74,7 +74,8 @@ function render() {
  * parameter schema in the Harness Kit (its subdirectories too, T31) and the tool layer, and the
  * sentences of at least five words that session memory, the reminder channel, interruption, the
  * result budget, the subagent runs (T31), Bash's background results and Core's background task
- * notices (T32) write. */
+ * notices (T32), and the terminal texts Core writes (T33: the screen file's header, the
+ * command-finished and sharing notices) write. */
 function sourceTexts() {
   const literal = /'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g;
   const texts = [];
@@ -104,6 +105,8 @@ function sourceTexts() {
     // T32: Bash's background results, and the notices Core writes (completion, Monitor lines).
     'agent-host/src/tools/shell.ts',
     'crates/piarc-core/src/tasks/feed.rs',
+    // T33: the terminal task's screen-file header and its notices.
+    'crates/piarc-core/src/terminal/bound.rs',
   ]) {
     const source = readFileSync(path.join(repoRoot, file), 'utf8');
     for (const m of source.matchAll(literal)) {

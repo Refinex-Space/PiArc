@@ -320,7 +320,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 5 snapshot 持久化与降级（版本头、VT 重放、纯文本），归档清理（A06）
 - [x] 6 cwd、环境（T17 构造）与 shell integration 脚本（zsh、bash、PowerShell、Git Bash）（A09）
 - [x] 7 agent 接口：补充 ADR、终端承载任务、共享校验、L2 场景与能力 ID（A10、A11）
-- [ ] 8 进程树终止测试、`cat` 100 MB 无头测量（A12、A13）
+- [x] 8 进程树终止测试、`cat` 100 MB 无头测量（A12、A13）
 - [ ] 9 收尾：文档（架构 6.11、协议文档、AGENTS.md、复用表）、验收记录、`npm run verify`（A14）
 
 ## 登记事项
