@@ -112,7 +112,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | 0 工程基座 | 脚手架、质量门禁、工程规范、协议与契约测试 | T01–T02 | — | 已完成 |
 | 1 M0 技术验证 | Electron 安全基线、NAPI 事件通道、mock provider、Agent Host 多会话与 AHP、Operations 委托、凭据保险箱、transcript 渲染、终端、沙箱、打包与首次运行；S1–S10 两个平台的结论 | T03–T12、W0 | R1 | 已完成（有条件进入 M1） |
 | 2 M1 可行走骨架 | 存储与信任、会话编排与投影、L2 场景、文件工具与 Bash、客户端外壳、transcript 与 composer、基础审批、模型与凭据、system prompt 与 memory | T13–T22 | R2 | 已完成（macOS 达标；Windows 由 W1 达标，UNC 由 W2 补验） |
-| 3 M2 Harness 核心 | 权限规则与 Bash 分析、配置兼容层、hooks、计划模式与任务清单、压缩与用量、检查点与回退、WebFetch 与登录、L3 对齐；Windows 达到 M1 | W1、T23–T30 | R3 | 已完成（macOS 达标，R3；Windows 的 M1 由 W1 达标，UNC 由 W2 补验；M2 由 W2 验收） |
+| 3 M2 Harness 核心 | 权限规则与 Bash 分析、配置兼容层、hooks、计划模式与任务清单、压缩与用量、检查点与回退、WebFetch 与登录、L3 对齐；Windows 达到 M1 | W1、T23–T30 | R3 | 已完成（macOS 达标，R3；Windows 的 M1 由 W1 达标，UNC 由 W2 补验；Windows 的 M2 由 W2 达标） |
 | 4 M3 多会话与生态 | 子 agent、后台任务、终端、worktree 与并行会话、MCP、skills 与命令、WebSearch 与 hooks 扩展；Windows 达到 M2 | W2、T31–T38 | R4 | 进行中 |
 | 5 M4 安全与打磨 | 沙箱、插件、配置诊断与用量、NotebookEdit 与通知、无障碍与本地化、性能预算、安全收口；Windows 达到 M3 | W3、T39–T45 | R5 | 未开始 |
 | 6 M5 Beta | Auto 模式、自动记忆与托管配置、M5 补全、侧边对话与平台快捷操作、发布流水线；Windows 达到 M4 并与 Beta 同步；两平台端到端验收 | T46–T50、W4、T51 | R6 | 未开始 |
@@ -158,7 +158,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T29 | [WebFetch、登录与模型设置补全、三档视图](tasks/T29-webfetch-login-model-settings-views.md) | 3 | T28 | macOS | high / 高 | 中 | 无 | 已完成 | 7f9e79b |
 | T30 | [L3 行为对齐基座](tasks/T30-l3-behavior-alignment.md) | 3 | T29 | macOS | high / 高 | 中 | 无 | 已完成 | f52b5aa |
 | R3 | [M2 评审](tasks/R3-m2-review.md) | 3 | T30、W1 | macOS | high / 高 | 中 | 无 | 已完成 | 8e2b4a2 |
-| W2 | [Windows：M2 达标](tasks/W2-windows-m2-parity.md) | 4 | R3 | Windows | high / 高 | 中 | 无 | 进行中 | — |
+| W2 | [Windows：M2 达标](tasks/W2-windows-m2-parity.md) | 4 | R3 | Windows | high / 高 | 中 | 无 | 已完成 | 45124e4 |
 | T31 | [子 agent 与模型别名](tasks/T31-subagents-and-model-aliases.md) | 4 | R3 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 7ec1971 |
 | T32 | [后台任务、Monitor 与 KillShell](tasks/T32-background-tasks-and-monitor.md) | 4 | T31 | macOS | high / 高 | 中 | 无 | 已完成 | ef39d43 |
 | T33 | [无头终端（Core 侧）](tasks/T33-headless-terminal.md) | 4 | T32 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 33f4bf9 |
@@ -323,21 +323,6 @@ T35（开工 2026-11-20，基线复用 991f323 的全量 verify；T34 的遗留 
 - [ ] 10 内存测量脚本与 `docs/perf/M3-memory.md`（A11）
 - [ ] 11 文档、AGENTS.md、架构与 ADR、verify（A12）与收尾
 
-W2（开工 2026-11-21，Windows 11 x64，分支 `windows/dev` 自 e0c41ce 起，与 macOS 上进行中的 T35 并行，用户安排；R3 部分完成只因 R3-A07 等待 W1 的 UNC 项，由本任务补齐，不影响开工；本机没有全量通过记录，基线跑全量；Windows CI 运行 44731794641（483413b）的 verify 与 L4 失败于检查点路径标签，属于 M2 的平台问题，并入本任务修复）：
-
-- [x] 1 Windows CI 与本机基线失败修复：检查点路径标签（cafffc1）、Git 程序探测失败不缓存与 `ucrt64`（91f9994）、Monitor 分块输出丢失唤醒（db82eae）、三个测试与 L2 `tools_windows`（5ff57f6、82082b6）
-- [x] 2 本机 L2 全部通过、能力清单 M2 无 MISSING（A01）：145 通过、0 失败、4 个 macOS 专属跳过，MISSING 0；另修 c54271b（探测提速）、52e7d98（夹具二次 panic）、c45ffdd（归档时 Notification hook 持有会话，L2 `hooks-archive-during-hook`）；`cargo test --workspace --no-fail-fast` 95 个目标全部通过
-- [x] 3 Git Bash 的 Bash 规则、复合命令、包装剥离、只读白名单、关键路径删除（盘符根、`%USERPROFILE%`、工作区根、`/c/…` 与 `C:\…`），`Read`/`Edit` 路径规则（A02）
-- [x] 4 PowerShell 规则精确匹配、Manual 询问、"总是允许"再次命中、ADR-0047 越界判断（A03）
-- [x] 5 hooks：执行方式、stdin JSON、exit 2、超时与取消结束整棵进程树（进程表前后对比）、UserPromptSubmit 30 s（A04）
-- [x] 6 回退与 Changes：四个选项、冲突、按 hunk 丢弃，CRLF、空格中文、超过 260 字符、大小写、文件被占用、junction（A05）
-- [x] 7 压缩：阈值、`/compact` 重点、熔断、重注入、用量环（A06）
-- [x] 8 配置兼容层：`%USERPROFILE%\.claude\settings.json`、`.claude.json`、`.claude/rules` 的 `paths:`、诊断页、`.piarc` junction 写入被拒（A07）
-- [x] 9 界面流程：计划模式、任务清单、AskUserQuestion、下一步、三档视图，M2 的 L4 在 Windows（A08）
-- [x] 10 WebFetch SSRF、OAuth 与设备码登录、外部修改检测（A09）
-- [x] 11 L3 在 Windows（A10、I118）：锁定的 2.1.318（`tmp/l3-claude` 本地平台包）12 个场景 0 未解释、0 过期（edfaa51，allowlist 加 `platforms`）；PowerShell 场景保留排除（Windows 版 Claude Code 也没有 PowerShell 工具）；`~/.claude` 变化来自本会话的 Claude Code
-- [x] 12 R3 重点核对项：UNC（W1-A05、I96）、长命令与 `eval`（I102）、裁决与 AHP 往返预算（I95、I103）
-- [ ] 13 W2 报告、登记事项、AGENTS.md（已完成，d8efcd7）；最终 verify（A12）未完成：d8efcd7 上的全量 verify 在 ESLint 时因系统内存不足被停止，上一次全量 15/15 在 08fc09e；之后的代码改动（6110364 与 Windows 测试）已跑受影响 crate 的测试与 clippy
 
 ## 登记事项
 
@@ -928,6 +913,17 @@ W2（开工 2026-11-21，Windows 11 x64，分支 `windows/dev` 自 e0c41ce 起�
 - 决策：ADR-0049（补充）；架构 2.40。后台子 agent 的报告仍由 Agent Host 在同一提醒通道送达（ADR-0048 第 8 条不变），Core 只登记、停止与展示；Monitor 到时记为 `completed`；后台命令不随会话关闭结束。
 - 登记 I136（T17-A01 描述需用户修改）、I137（挂起通知不持久化）、I138（唤醒开关与限值的入口）、I139（`core/tasks` 快照载荷）；I03 落地开关与限速，待 R4 确认默认值。
 - 下一项：macOS 上的 T33（无头终端，依赖 T32）；Windows 上的 W2 仍可进行。本地提交，未推送。
+
+
+### 2026-11-21 W2 已完成（提交 45124e4，Windows 11 x64，分支 `windows/dev`）
+
+- 结论：M2 在 Windows 上达标，见 `docs/reviews/W2-windows-m2-parity.md`。L2 149 个场景中 145 个通过、4 个 macOS 专属跳过，MISSING 0；L3 对锁定的 Claude Code 2.1.318（本地平台包的 `claude.exe`）12 个场景 0 未解释、0 过期，`--repeat 2` 一致；M2 的 L4 17/17（dev 形态）；`npm run verify` 15/15。
+- 起点基线是红的（CI 运行 44731794641、44868949621）：并入修复 7 个 Windows 平台缺陷，均先有失败测试——检查点路径标签（cafffc1）、Git Bash 程序探测失败被缓存与 `ucrt64`（91f9994）及提速（c54271b）、Monitor 分块输出丢失唤醒（db82eae）、归档时 hook 持有会话（c45ffdd）、`$USERPROFILE` 不算关键路径删除（6110364）、子 agent 场景的 Windows 工具集（82082b6）；另修 5 处测试问题。
+- 用户在本会话要求认领其他"部分完成"任务的 Windows 侧：W1-A05（UNC 用 `C$` 管理共享补验）、R3-A07、T32-A04/A13、T33-A02/A12/A14、T34-A14 以本机 Windows 实测关闭（非 CI，evidence 已注明）；W1、R3、T32、T33 改为已完成，T34 仍有 A03（macOS 输入法）。
+- 决策：L3 的 allowlist 增加 `platforms`（Windows 版 Claude Code 的工具集不同）；W2 与 macOS 上进行中的 T35 并行（用户安排），W2 检查点单列，未改 T35 的内容（86a8bf1 误勾选 T35 的检查项，45124e4 已恢复）。架构 2.43 标注 M2 的 Windows 达标。
+- 登记：关闭 I96、I102、I118，I95 复测；新增 I146（pointer 测试只在 Unix）、I147（macOS CI 的 `bg-completion-reminder`）。
+- T35 的 Windows 侧（A10）：用户决定等 macOS 的 T35 完成第 8、9 项后在 Windows 上实测关闭。
+- 下一项：macOS 上继续 T35；推送 `windows/dev` 后在 macOS 合并。
 
 ## 计划变更记录
 

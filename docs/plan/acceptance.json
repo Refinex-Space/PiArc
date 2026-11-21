@@ -5235,8 +5235,8 @@
       "id": "W2-A12",
       "task": "W2",
       "description": "Windows 上 `npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Windows 11 本机 `npm run verify` 15/15 通过（提交 45124e4，工作区干净，tmp/evidence/W2/verify-final.log；cargo test 508 s、L2 145 通过 4 个 macOS 专属跳过）。"
     },
     {
       "id": "W3-A01",
