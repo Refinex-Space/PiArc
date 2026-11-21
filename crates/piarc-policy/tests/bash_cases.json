@@ -718,6 +718,36 @@
       "step": "criticalPath"
     },
     {
+      "category": "critical",
+      "input": "rm -rf \"$USERPROFILE\"",
+      "mode": "bypassPermissions",
+      "rules": { "allow": ["Bash(rm *)"] },
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
+      "category": "critical",
+      "input": "rm -r ${USERPROFILE}/..",
+      "mode": "bypassPermissions",
+      "rules": { "allow": ["Bash(rm *)"] },
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
+      "category": "critical",
+      "input": "rm -rf C:/",
+      "rules": { "allow": ["Bash(rm *)"] },
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
+      "category": "critical",
+      "input": "rm -rf 'C:\\'",
+      "rules": { "allow": ["Bash(rm *)"] },
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
       "category": "rules",
       "input": "sed -i s/a/b/ /home/u/.ssh/config",
       "rules": { "allow": ["Bash(sed *)"] },

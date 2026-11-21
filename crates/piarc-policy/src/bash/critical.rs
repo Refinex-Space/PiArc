@@ -56,12 +56,13 @@ pub fn is_critical_delete(cmd: &Command, ctx: &CriticalContext<'_>) -> bool {
 fn critical_target(word: &Word, cwd: &Cwd, ctx: &CriticalContext<'_>) -> bool {
     if !word.is_static() {
         // `"$HOME"`, `${HOME}/..`, `$PWD/..`: the home directory and the working directory
-        // are known, so the rest of the word is judged as a path (R3). Other run-time values
-        // are not judged here.
+        // are known, so the rest of the word is judged as a path (R3). `$USERPROFILE` is the
+        // home directory in Git Bash on Windows (W2). Other run-time values are not judged
+        // here.
         let source = word.source.replace(['"', '\''], "");
-        let expanded = source
-            .strip_prefix("${HOME}")
-            .or_else(|| source.strip_prefix("$HOME"))
+        let expanded = ["${HOME}", "$HOME", "${USERPROFILE}", "$USERPROFILE"]
+            .iter()
+            .find_map(|name| source.strip_prefix(name))
             .map(|rest| format!("~{rest}"))
             .or_else(|| {
                 source

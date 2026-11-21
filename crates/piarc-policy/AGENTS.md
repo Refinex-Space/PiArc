@@ -53,7 +53,7 @@ Core 的权限裁决（T20 起，T23 完整版）：Claude Code 格式的规则�
 - exec 包装（`EXEC_WRAPPERS`：`sudo`、`env` 带选项、`watch`、`setsid`、`flock`、带参数的 `xargs`、`find -exec/-delete`、`sh/bash -c` 等）只能被精确规则允许，它们运行的命令作为影子命令参与 deny、ask 与关键路径检查。
 - 只读白名单（`readonly.rs` 的 `spec_of`、`git` 子命令表、`BUILTINS`、`PROGRAMS`）：路径操作数必须在会话目录内；危险选项（`sort -o`、`find -exec`、`rg --pre`、`git -c`、`--output` 等）与对通配敏感的命令（find、sort、git）带未加引号的通配时不算只读；经 `xargs` 得到参数的命令不算只读。Accept edits 另接受字面量形式的 `mkdir [-p]`、`touch`、`mv a b`、`cp a b`。
 - 自动允许依赖的外部程序（含 exec 型包装和它们执行的同名内建）由 Core 解析（`exec/utility.rs` 的 `Programs`：PATH 不能指向工作区，程序不能在会话可写目录内，文件命令必须在 `/bin`、`/usr/bin`；Windows 只接受 Git 安装 `usr/bin`、`mingw64/bin` 中经探测确认的程序），执行时 `CwdProbe::pin_program` 在 bash 里核对并钉住；路径在执行前按同一 scope 再检查一次。
-- 关键路径删除（`critical.rs`）：带递归选项的 `rm`（或指向关键目录的通配）与 `rmdir`，目标为 `/`、一层系统目录及其常见二层、家目录（`~`、`$HOME`、`${HOME}`）、工作区根及其祖先、`.`/`..`（目录未知时也算）。
+- 关键路径删除（`critical.rs`）：带递归选项的 `rm`（或指向关键目录的通配）与 `rmdir`，目标为 `/`、一层系统目录及其常见二层、家目录（`~`、`$HOME`、`${HOME}`，以及 Git Bash 里同为家目录的 `$USERPROFILE`、`${USERPROFILE}`，W2）、工作区根及其祖先、`.`/`..`（目录未知时也算）。
 - "总是允许"（`prefix.rs`）：每个仍需批准的主命令一条 `Bash(<前缀> *)`；前缀是程序名加子命令（`SUBCOMMAND_TOOLS`，`npm run x` 一类取三段，解释器带脚本或 `-m 模块`）；删除、权限、网络、exec 包装类程序给精确规则；至多 5 条，有关键删除、无法判定、不安全赋值或 ask 命中时不提供。每条建议都验证能覆盖原命令。
 
 ## 易错点
