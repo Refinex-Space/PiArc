@@ -165,7 +165,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T34 | [终端渲染器与终端面板](tasks/T34-terminal-renderer-and-panel.md) | 4 | T33 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 991f323 |
 | T35 | [Worktree、并行会话、多窗口、全文搜索与后台常驻](tasks/T35-worktrees-parallel-sessions-and-windows.md) | 4 | T34 | macOS | high / 高 | 大 | 无 | 部分完成 | c4094dd |
 | T36 | [MCP 共享连接池](tasks/T36-mcp-connection-pool.md) | 4 | T35 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | ca3d873 |
-| T37 | [Skills、斜杠命令、命令面板与输出风格](tasks/T37-skills-commands-and-output-styles.md) | 4 | T36 | macOS | high / 高 | 大 | 无 | 进行中 | — |
+| T37 | [Skills、斜杠命令、命令面板与输出风格](tasks/T37-skills-commands-and-output-styles.md) | 4 | T36 | macOS | high / 高 | 大 | 无 | 已完成 | b9012bb |
 | T38 | [WebSearch 与 hooks 扩展（M3）](tasks/T38-websearch-and-hooks-m3.md) | 4 | T37 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | R4 | [M3 评审](tasks/R4-m3-review.md) | 4 | T38、W2 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | W3 | [Windows：M3 达标](tasks/W3-windows-m3-parity.md) | 5 | R4（建议在 T43、T44 之后，需要读屏清单与性能测量脚本） | Windows | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,19 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-T37（Skills、斜杠命令、命令面板与输出风格）开工于 2026-11-21；基线 `npm run verify -- --baseline` 通过（复用 ca3d873 的全量结果）；远端分支仍停在 e0c41ce（未推送 T36 起的提交），没有新的 Windows CI 结果可核对。
-
-- [x] 1. 协议：skills/命令/输出风格类型，AHP `skills/list`、`skills/invoke`、`skills/match`、`resources/listSkills|listCommands|reload`，`session/prompt` 的命令元数据，提醒类型（ADR-0054）
-- [x] 2. `piarc-config`：skills、命令、输出风格的发现与 frontmatter 解析、同名取舍与诊断、参数替换、`!` 命令标为不支持（A01、A07、A12）
-- [x] 3. Core：目录列表与监听（`resources/reload`）、`Skill` 只读裁决与 `Skill(名称)` 规则、skill 目录只读放行、`allowed-tools` 回合级免审批（信任约束）、skill hooks 作用域、斜杠命令展开与 UserPromptExpansion 挂载点（A04、A05）
-- [x] 4. Agent Host：关闭 Pi 自带 skills/模板、第 5 段索引与第 3 段输出风格、`Skill` 工具、`paths` 激活、索引与风格变化的提醒、重注入登记、`resources/*` 应答（A02、A03、A06、A11）
-- [x] 5. NAPI、主进程 IPC、preload：命令与 skills 列表、输出风格切换
-- [x] 6. 渲染进程：composer `/` 命令面板、Mod+K 命令面板、内置命令、输出风格选择、设置页 skills 列表、共享模糊匹配（A08、A09、A10、A11）
-- [x] 7. L2 场景 `skill-*`、`command-*`、能力清单与 capabilities.md
-- [x] 8. L4 `t37-*` 与截图证据
-- [ ] 9. 原创性自查（A13）、文档与 AGENTS.md、复用表、登记事项
-- [ ] 10. `npm run verify`（A14）、验收记录与收尾
 
 ## 登记事项
 
@@ -971,3 +958,10 @@ T37（Skills、斜杠命令、命令面板与输出风格）开工于 2026-11-21
 - 决策：ADR-0053（补充）；架构 2.44；`window.piarc` 共 98 个函数；server 不再继承 Agent Host 的 `PI_PACKAGE_DIR` 等内部变量（打包形态 L4 的断言随之改为"不存在"）；`~/.claude.json` 的 `mcpServers` 与 `disabledMcpjsonServers` 生效，`enableAllProjectMcpServers`、`enabledMcpjsonServers` 忽略，`allowedMcpServers`、`deniedMcpServers` 改标 T47
 - 登记：I05、I40（落地）、I111（复核）、I117（T36 部分复核，并补上 T32 漏登的 L3 条目）、I129、I132（落地）、I150 更新；新增 I153（开工时远端 CI 两平台失败）、I154（Pi 扩展注册的 MCP server，T40）、I155（MCP 资源工具与 prompts，T40）、I156（`headersHelper`，T47）、I157（OAuth 状态按 server 名存键，同名不同地址会互相覆盖）
 - 下一项：macOS 上的 T37（Skills、斜杠命令、命令面板与输出风格，依赖 T36）；Windows 上的 W2 仍可进行。本地提交，未推送。
+
+### 2026-11-21 T37 已完成（提交 b9012bb）
+- 交付：`piarc-config` 的 `skills`（skills、命令文件、Pi 模板与输出风格的发现与同名取舍、frontmatter、`args` 参数替换、合并命令列表、`watch_dirs`）与共用的 `frontmatter`，项目 skill 与命令的 `allowed-tools`、`hooks` 计入可执行项，`outputStyle`、`skillOverrides` 生效；协议 `skills` 模块（`skills/list|invoke|match`、`resources/listSkills|listCommands|reload`、`PromptCommand`，提醒 `skillsChanged`、`outputStyle`，能力 `skills`）；Core 的 `tool_io/skills.rs`（目录、`Skill` 授权消费、回合级 `allowed-tools` 来源 `skill`、skill hooks 作用域、skill 目录只读放行、`expand_command` 与 UserPromptExpansion 挂载点）、设置监听扩到 skills 目录并发 `resources/reload`、`Hub` 的 `list_commands`/`list_skills`/`set_output_style` 与 NAPI；Agent Host 关掉 Pi 的 skills 与模板，`SessionSkills`（第 3、5 段、变化与 `paths` 提醒、`piarc.skillInvoked`）、`Skill` 工具、命令输入记录；客户端的 `/` 面板（来源分组、共享模糊匹配、参数提示）、内置命令、输出风格对话框、Mod+K 命令面板、"Skills 与插件"设置页；L2 6 个新场景、L4 `t37-commands`
+- 验收：14 项全部通过。`npm run verify` 15/15（b9012bb，Vitest 1,583 passed、cargo test 934 passed、L2 165 passed 2 个按平台跳过）；L4 `t37-` 4/4 与受影响的 preload、composer、t18-settings、t19-composer、t27-context、t28-rewind、smoke 通过（dev 形态，截图在 `tmp/evidence/T37/`）；提示词原创性 6,102 词 0 个匹配窗口
+- 决策：ADR-0054（补充）；架构 2.45；`window.piarc` 新增 `listCommands`、`listSkills`、`setOutputStyle`；`composerInfo` 不再带命令列表（内置命令只在 `BUILT_IN_COMMANDS`）；`config-merge-order`、`t19-composer` 与两处 Rust 测试的"T37 计划中"示例随功能落地改为新的事实（`plansDirectory`、7 个内置命令）；L2 的 `check_worktree` 改为等待 Core 异步写入的记录（满载下偶发读早）
+- 登记：I02 更新；新增 I158（暂不支持的 frontmatter 字段：`context: fork` 一组与 `model`、`effort` → T48）、I159（子 agent 的 `skills` 预加载 → T48）、I160（Pi 设置与 Pi 包的 skills、模板、嵌套 skill → T40/T48）、I161（与 Claude Code 的有意差异，R4 确认）
+- 下一项：macOS 上的 T38（WebSearch 与 hooks 扩展，依赖 T37）；Windows 上的 W2 仍可进行。本地提交，未推送。

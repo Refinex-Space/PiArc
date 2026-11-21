@@ -3667,99 +3667,99 @@
       "id": "T37-A01",
       "task": "T37",
       "description": "skills 发现覆盖 Pi 默认路径、`.claude/skills`、`~/.claude/skills`、`.piarc/skills` 与 PiArc 用户目录，同名按优先级取舍并在诊断中列出。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-config --lib skills：discovery_covers_every_source_and_resolves_names_by_precedence 覆盖 .piarc/skills、.claude/skills、Pi 的 .pi/skills（根目录 *.md）与 .agents/skills、PiArc 用户 skills/、~/.claude/skills、<数据目录>/pi/skills、~/.agents/skills；同名 same 取 .piarc 项目级，其余 6 个路径按优先级列入 overrides（12 passed）。L2 skill-index：项目 shared 胜过用户 shared，设置页 L4 列出覆盖"
     },
     {
       "id": "T37-A02",
       "task": "T37",
       "description": "system prompt 只含 skills 索引（名称与截断后的描述），`disable-model-invocation` 的 skill 不在索引中。验证：mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 skill-index（mock 请求断言）：第 0 个请求含 <skills> 段（ordered_system_sections 在 project_context 与 environment 之间）、'- fix-issue: Fix a reported issue end to end When the user names an issue number' 等名称加描述，不含 release（disable-model-invocation）与任何正文 BODY-*；Vitest session-skills.test.ts 验证描述截断到 1,536 字符、nameOnly 只列名称"
     },
     {
       "id": "T37-A03",
       "task": "T37",
       "description": "`Skill` 工具加载正文并完成参数替换；已调用的 skill 在压缩后按上限重新注入；skill frontmatter 中的 `hooks` 在调用后开始生效。验证：L2 场景（mock 请求断言）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 skill-invoke：Skill 调用的结果为 'Fix issue 42 on main (42/main; all: 42 main).'（$issue/$branch、$1/$2、$ARGUMENTS）且含 ${CLAUDE_SKILL_DIR} 展开的路径；调用前 Read 正常、调用后同一 Read 被 skill frontmatter 的 PreToolUse hook 拦下（blocked by the skill hook）；/compact 之后的请求带 'Instructions of the skill \"fix-issue\", invoked earlier in this session:' 与正文"
     },
     {
       "id": "T37-A04",
       "task": "T37",
       "description": "`allowed-tools` 列出的工具在调用 skill 的当前回合免审批，下一回合恢复询问，deny 与 ask 规则仍然优先。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 skill-allowed-tools：加载 env skill（allowed-tools: Bash(printenv *)）后同回合 printenv HOME 不询问且成功，deny 规则 printenv SECRET_TOKEN 仍被拒，ask 规则 printenv USER 仍询问；下一回合 printenv HOME 再次询问（被拒，'Asked again.'）。Core 单测 tool_io::policy::tests::t37::allowed_tools_apply_to_the_invoking_turn_only 同样通过"
     },
     {
       "id": "T37-A05",
       "task": "T37",
       "description": "未信任项目中 skill 与命令的 `allowed-tools` 不产生免审批效果，skill frontmatter 中的 `hooks` 不执行。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --lib tool_io::policy::tests::t37::an_untrusted_project_skill_grants_nothing_and_runs_no_hooks：新增 skill 使项目回到未确认，skills/list 标 untrusted；skills/invoke 结果只有 untrusted 警告、printenv 仍询问；skill 的 PreToolUse hook 不运行；/show 命令的 allowed-tools 不产生授权；信任后授权与 hooks 生效（5 passed）。可执行项见 piarc-config tests/executables.rs::skill_and_command_permissions_and_hooks_are_executable_items"
     },
     {
       "id": "T37-A06",
       "task": "T37",
       "description": "带 `paths` 的 skill 在处理匹配文件后才进入索引，以追加消息送达。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 skill-paths：带 paths: src/**/*.rs 的 skill 在第 0、1 个请求中不出现（读 notes.md 后仍无），Read src/lib.rs 之后第 2 个请求的追加消息含 '[PiArc reminder]'、'These skills can now be loaded with the Skill tool:'、'- rust-style: How this project writes Rust'，再读 src/main.rs 不重复；四个请求 same_system_as 0"
     },
     {
       "id": "T37-A07",
       "task": "T37",
       "description": "斜杠命令列表合并内置命令、`.claude/commands`、Pi prompt templates 与可由用户调用的 skills，同名冲突按规则取舍；`$ARGUMENTS`、位置参数与命名参数替换正确。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-config --lib skills：merged_command_list_and_conflicts（内置 7 个在前，.claude/commands 的 frontend:component 命名空间、Pi 模板 pi-template 与 global、user-invocable 的 skill deploy；同名 compact 让位内置、同名 deploy skill 胜过命令文件、项目 review 胜过用户 review）；skills::args 5 个测试覆盖 $ARGUMENTS、$@、$1 起的位置参数、$ARGUMENTS[N]、arguments 命名参数、Pi 的 ${N:-默认}/${@:N}、转义与未接收时追加 ARGUMENTS:。L2 command-expand 验证展开后的文本"
     },
     {
       "id": "T37-A08",
       "task": "T37",
       "description": "`/compact`、`/clear`、`/model`、`/rewind`、`/context`、`/output-style` 执行对应功能。验证：L2 场景与 Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 command-expand：/frontend:component、/summarize（Pi 模板）、/greet（skill）展开后送达模型，转录的 userMessage 显示原文并带 command，未知 /no-such-command 原样发送，/compact 带重点送出摘要请求。Playwright t37-commands.e2e.ts 'built-in commands…'：/context 打开上下文卡片、/model 打开模型菜单、/rewind 打开回退对话框、/help 列出内置命令、/output-style 打开风格对话框并写入、/clear 回到新会话；/compact 另见 t27-context（本次回归通过）"
     },
     {
       "id": "T37-A09",
       "task": "T37",
       "description": "composer 命令面板按来源分组、模糊搜索并显示参数提示，输入法合成期间 `/` 不打开面板。验证：Playwright（截图存 `tmp/evidence/T37/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PIARC_EVIDENCE_TASK=T37 npx playwright test -c apps/desktop/playwright.config.ts t37- --project dev（4 passed）：'/' 面板分 builtIn、projectPiarc、projectClaude 三组，frontend:component 显示参数提示 [name]，greet 标 skill；输入 fc 只剩 frontend:component，Enter 填入 '/frontend:component '，发送后模型收到展开文本；CDP 输入法合成 '/' 不打开面板。截图 tmp/evidence/T37/l4/…/palette-groups.png、palette-fuzzy.png、command-sent.png、ime-slash-no-palette.png"
     },
     {
       "id": "T37-A10",
       "task": "T37",
       "description": "Mod+K 命令面板可模糊搜索并执行应用操作与会话切换，快捷键修改后立即生效。验证：Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Playwright t37-commands 'Mod+K runs actions…'：Mod+K 打开面板，输入 'first sess' 回车切到第一个会话，'keyboard shortcuts' 打开快捷键列表，'/output' 回车打开输出风格对话框；设置窗口把 app.commandPalette 改为 Mod+Shift+K 后 Mod+K 不再打开、Mod+Shift+K 立即打开。截图 mod-k-session.png、mod-k-command.png、mod-k-rebound.png"
     },
     {
       "id": "T37-A11",
       "task": "T37",
       "description": "内置与自定义输出风格可选；会话中途切换以追加消息送达，已发送的 system prompt 字节不变。验证：mock provider 请求断言与 Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 style-switch：新会话第 0 个请求 system 含 <output_style> 与 'Output style: Concise'；经 Core 的 setOutputStyle 换成自定义 teacher 后第 1 个请求的追加消息含 'The user switched the output style to \"teacher\"' 与其正文，删除本地选择后回到 Concise 也以提醒送达，三个请求 same_system_as 0。Playwright：/output-style 选 Concise 写入 .piarc/settings.local.json，下一请求的用户消息含切换提醒且 body.system 与第一个请求逐字节相同（style-switched.png、output-style-dialog.png）"
     },
     {
       "id": "T37-A12",
       "task": "T37",
       "description": "skill 正文中的 `` !`command` `` 不被执行，按原文传递，诊断中标为不支持。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-config --lib skills::tests::skill_frontmatter_fields：正文 'Context: !`git status`' 原样保留在 body，警告 dynamicCommand；dynamic_command_detection 覆盖行首、空白后与 ```! 块，KEY=!`cmd` 不算。Core 不执行任何 skill 中的命令（展开只做字符串替换）；设置页 L4 显示 '!`command`: PiArc does not run it'"
     },
     {
       "id": "T37-A13",
       "task": "T37",
       "description": "内置风格、内置命令描述与 `Skill` 工具描述完成原创性自查。验证：报告中的自查记录。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "node scripts/dev/check-prompt-originality.mjs：referenceFiles=3533 promptWords=6102 window=10 matchingWindows=0（覆盖 Skill 工具描述与指引、skills 段引导句与变化提醒、加载结果文案、Concise/Explanatory/Proactive 指令与切换提醒、内置命令与内置风格的英文描述），记录在 docs/engineering/prompt-originality.md"
     },
     {
       "id": "T37-A14",
       "task": "T37",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify 15/15 通过（HEAD b9012bb，target/verify/last-pass.json）：Vitest 1583 passed、cargo test 934 passed、L2 165 passed 2 个按平台跳过、protocol drift 与 contract samples 通过"
     },
     {
       "id": "T38-A01",
