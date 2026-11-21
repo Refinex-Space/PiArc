@@ -149,6 +149,7 @@ export class ChildSession {
   readonly #canonical: (tool: string) => string;
   readonly #harness: ReturnType<typeof sessionParts>['harness'];
   readonly #memory: ReturnType<typeof sessionParts>['memory'];
+  readonly #hooks: ReturnType<typeof sessionParts>['hooks'];
   readonly file: string | undefined;
   readonly warnings: readonly AgentWarning[];
   /** Where it works: the parent's directory, or its place in the run's worktree. */
@@ -168,6 +169,7 @@ export class ChildSession {
     this.#canonical = canonical;
     this.#harness = parts.harness;
     this.#memory = parts.memory;
+    this.#hooks = parts.hooks;
     this.file = runtime.session.sessionFile;
     this.warnings = registered.warnings;
     this.cwd = registered.cwd;
@@ -247,6 +249,7 @@ export class ChildSession {
     // Like a main session: `Skill` only when the model has skills to load, and the index of the
     // system prompt matches the tools (T37). Core registered the child above.
     await parts.skills?.catalog();
+    await parts.harness.prepareWebSearch(spec.model);
     const { runtime } = await createSessionRuntime({
       options: childOptions,
       manager,
@@ -375,6 +378,8 @@ export class ChildSession {
     try {
       signal.throwIfAborted();
       await this.#harness.compaction.prepare();
+      // SubagentStart hooks (T38): their context goes with the first request.
+      await this.#hooks?.subagentStart();
       if (await this.#memory.prepare()) await session.prompt(task);
     } catch (failure) {
       if (!signal.aborted && !limit.reached) error = describeError(failure);

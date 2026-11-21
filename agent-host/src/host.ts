@@ -47,6 +47,7 @@ export const HOST_CAPABILITIES: readonly string[] = [
   'context',
   'checkpoints',
   'webFetch',
+  'webSearch',
   'login',
   'subagents',
   'backgroundTasks',
@@ -504,6 +505,22 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
       ...(catalog.issues == null ? {} : { issues: catalog.issues }),
     };
   });
+  connection.handle('hooks/prompt', async (params) => {
+    const method = 'hooks/prompt';
+    const fields = paramsObject(method, params);
+    const timeoutMs = fields.timeoutMs;
+    if (typeof timeoutMs !== 'number' || !Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      throw new AhpError('invalidParams', `${method}: timeoutMs must be a positive number`, {
+        details: { member: 'timeoutMs' },
+      });
+    }
+    const model = optionalString(method, fields, 'model');
+    return (await sessions(method)).judgeHook(stringField(method, fields, 'sessionId'), {
+      prompt: stringField(method, fields, 'prompt'),
+      timeoutMs,
+      ...(model === undefined ? {} : { model }),
+    });
+  });
   connection.handle('resources/reload', async () => {
     (await sessions('resources/reload')).reloadResources();
     return {};
@@ -622,6 +639,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
           context: welcome.enabled.includes('context'),
           checkpoints: welcome.enabled.includes('checkpoints'),
           webFetch: welcome.enabled.includes('webFetch'),
+          webSearch: welcome.enabled.includes('webSearch'),
           subagents: welcome.enabled.includes('subagents'),
           backgroundTasks: welcome.enabled.includes('backgroundTasks'),
           skills: welcome.enabled.includes('skills'),

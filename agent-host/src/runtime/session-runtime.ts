@@ -144,6 +144,7 @@ export async function createSessionRuntime(
                     harness.recordMode(mode);
                   },
                   (tool) => spec.mcp?.requiresUserInteraction(tool) === true,
+                  () => harness.effort(),
                 ),
               ]
             : []),

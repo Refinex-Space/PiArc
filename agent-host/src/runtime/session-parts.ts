@@ -82,6 +82,7 @@ export function sessionParts(input: SessionPartsInput): SessionParts {
     appended: (message) => opened.projector?.reminder(message),
     log: sessionLog,
     contextWindow: (model) => workspace.preferences.contextWindow(model),
+    nativeWebSearch: (model) => workspace.preferences.nativeWebSearch(model),
     ...(input.agents === undefined ? {} : { agents: input.agents }),
   });
   const memory = new SessionMemory(
@@ -111,6 +112,7 @@ export function sessionParts(input: SessionPartsInput): SessionParts {
             return resolved;
           },
           log: sessionLog,
+          effort: () => harness.effort(),
           ...(input.child === undefined ? {} : { subagent: true }),
         });
   harness.connect(memory, hooks);

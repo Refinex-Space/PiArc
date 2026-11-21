@@ -82,13 +82,14 @@
     "payload": {
       "turnId": "turn-<id:1>",
       "item": {
-        "type": "dynamicToolCall",
+        "type": "webSearch",
         "itemId": "toolu_search",
         "status": "inProgress",
         "tool": "WebSearch",
         "arguments": {
           "query": "piarc"
-        }
+        },
+        "query": "piarc"
       }
     }
   },
@@ -97,14 +98,15 @@
     "payload": {
       "turnId": "turn-<id:1>",
       "item": {
-        "type": "dynamicToolCall",
+        "type": "webSearch",
         "itemId": "toolu_search",
         "status": "failed",
         "tool": "WebSearch",
         "arguments": {
           "query": "piarc"
         },
-        "output": "Tool WebSearch not found"
+        "output": "Tool WebSearch not found",
+        "query": "piarc"
       }
     }
   },

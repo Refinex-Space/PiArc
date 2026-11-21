@@ -48,6 +48,7 @@ import type { AuxiliaryModel } from './auxiliary.js';
 import { createAgentTool, type AgentToolHost } from './subagents/agent-tool.js';
 import { createKillShellTool, createMonitorTool } from './task-tools.js';
 import { createWebFetchTool } from './web-fetch.js';
+import { createWebSearchTool } from './web-search.js';
 import type { SessionSkills } from './skills/session-skills.js';
 import { createSkillTool } from './skills/skill-tool.js';
 
@@ -63,6 +64,8 @@ export interface HostToolCapabilities {
   readonly checkpoints?: boolean;
   /** `webFetch` (T29): Core fetches pages for WebFetch (`web/fetch`). */
   readonly webFetch?: boolean;
+  /** `webSearch` (T38): Core answers `web/searchBackend` and `web/search`. */
+  readonly webSearch?: boolean;
   /** `subagents` (T31): the `Agent` tool and child sessions Core registers. */
   readonly subagents?: boolean;
   /** `backgroundTasks` (T32): background commands, `KillShell` and `Monitor`. */
@@ -112,7 +115,12 @@ export interface SessionHarnessOptions {
   readonly conservative?: boolean;
   /** Runs the session's `Agent` calls (T31); absent: the session has no `Agent` tool. */
   readonly agents?: AgentToolHost;
+  /** Whether a model searches natively (T38, the catalog and the user's setting). */
+  readonly nativeWebSearch?: (model: Model<Api>) => boolean;
 }
+
+/** The effort levels Claude Code's hooks name. */
+const HOOK_EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
 
 export class SessionHarness {
   readonly reminders = new Reminders();
@@ -120,6 +128,9 @@ export class SessionHarness {
   readonly usage: ContextUsageTracker;
   /** The session's skills and output style (T37, capability `skills`); set before `tools()`. */
   skills: SessionSkills | undefined;
+  /** Whether the session offers WebSearch (T38); decided by `prepareWebSearch` before
+   * `tools()`. */
+  webSearchOffered = false;
   readonly #o: SessionHarnessOptions;
   #compaction: SessionCompaction | undefined;
   #memory: SessionMemory | undefined;
@@ -199,6 +210,41 @@ export class SessionHarness {
     return this.#compaction;
   }
 
+  /** The session's auxiliary model channel (T29), when it has one. */
+  get auxiliary(): AuxiliaryModel | undefined {
+    return this.#o.auxiliary;
+  }
+
+  /** The session's effort as hooks see it (T38): `low` to `max`, none for `off`. */
+  effort(): string | undefined {
+    const level: unknown = this.#o.session()?.thinkingLevel;
+    return typeof level === 'string' && HOOK_EFFORTS.has(level) ? level : undefined;
+  }
+
+  /**
+   * Decides whether the session offers WebSearch (T38): Core enables it and the session's model
+   * `model` searches natively, or Core has a third-party backend now. Call before `tools()`.
+   */
+  async prepareWebSearch(model: Model<Api> | undefined): Promise<boolean> {
+    const core = this.#o.core;
+    const io = this.#o.io;
+    if (core?.webSearch !== true || io === undefined || this.#o.auxiliary === undefined) {
+      this.webSearchOffered = false;
+      return false;
+    }
+    if (model !== undefined && this.#o.nativeWebSearch?.(model) === true) {
+      this.webSearchOffered = true;
+      return true;
+    }
+    try {
+      this.webSearchOffered = (await io.searchBackend()).backend != null;
+    } catch (error) {
+      this.#o.log(`web/searchBackend failed; no WebSearch: ${String(error)}`);
+      this.webSearchOffered = false;
+    }
+    return this.webSearchOffered;
+  }
+
   /** The host tools this session gets. */
   tools(): ToolDefinition[] {
     const profile = this.#o.profile;
@@ -217,6 +263,16 @@ export class SessionHarness {
       createSuggestNextStepsTool(profile.SuggestNextSteps),
       ...(core?.webFetch === true && this.#o.io !== undefined && this.#o.auxiliary !== undefined
         ? [createWebFetchTool(profile.WebFetch, this.#o.io, this.#o.auxiliary)]
+        : []),
+      ...(this.webSearchOffered && this.#o.io !== undefined && this.#o.auxiliary !== undefined
+        ? [
+            createWebSearchTool(profile.WebSearch, {
+              io: this.#o.io,
+              auxiliary: this.#o.auxiliary,
+              session: this.#o.session,
+              native: (model) => this.#o.nativeWebSearch?.(model) ?? false,
+            }),
+          ]
         : []),
       ...(core?.backgroundTasks === true && this.#o.io !== undefined
         ? [

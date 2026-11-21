@@ -23,6 +23,7 @@ import {
 } from '@earendil-works/pi-coding-agent';
 import type {
   HistoryWindow,
+  HooksPromptResult,
   InputAccepted,
   RewindMode,
   SessionRewound,
@@ -41,7 +42,9 @@ import type {
   SkillsCatalog,
 } from '@piarc/protocol';
 
+import { judgeHook, type JudgeRequest } from '../harness/hook-judge.js';
 import { expiredApprovals } from '../harness/policy.js';
+import { fetchCatalog } from '../harness/subagents/definitions.js';
 import type { SessionHarness } from '../harness/session-harness.js';
 import { missingToolCalls, repairInterruptedTurn } from '../harness/interruption.js';
 import { parseSkillsCatalog } from '../harness/skills/catalog.js';
@@ -614,6 +617,25 @@ export class SessionRegistry {
     return this.#get(sessionId).harness;
   }
 
+  /** `hooks/prompt` (T38): one judgement for a `prompt` hook of main session `sessionId`. */
+  async judgeHook(sessionId: string, request: JudgeRequest): Promise<HooksPromptResult> {
+    const hosted = this.#get(sessionId);
+    const auxiliary = hosted.harness.auxiliary;
+    const { tools, workspace } = this.#options;
+    if (auxiliary === undefined || tools.kind !== 'core') {
+      throw new AhpError(
+        'invalidParams',
+        `hooks/prompt: session ${sessionId} has no model channel`,
+      );
+    }
+    const cwd = hosted.runtime.session.sessionManager.getCwd();
+    return judgeHook(request, {
+      auxiliary,
+      runtime: workspace.modelRuntime,
+      aliases: async () => (await fetchCatalog(tools.bridge, cwd)).aliases,
+    });
+  }
+
   #startTurn(sessionId: string, hosted: HostedSession, job: Job): string {
     const turnId = `turn-${randomUUID()}`;
     this.#options.onPiEvent?.(sessionId, { control: 'beginTurn', turnId });
@@ -632,6 +654,7 @@ export class SessionRegistry {
     model: ModelRef | undefined,
     source: 'startup' | 'resume' | 'fork' | 'branch' = 'startup',
     profileKind?: ToolProfileKind,
+    offerWebSearch?: boolean,
   ): Promise<SessionOpened> {
     const recovering = source === 'resume';
     const { workspace } = this.#options;
@@ -685,6 +708,14 @@ export class SessionRegistry {
     });
     // The session gets `Skill` when the model has skills to load now (T37).
     await skills?.catalog();
+    // And WebSearch when its model searches natively or Core has a search service (T38).
+    const predicted =
+      selected ??
+      (restored === null
+        ? undefined
+        : workspace.modelRuntime.getModel(restored.provider, restored.modelId));
+    if (offerWebSearch === undefined) await harness.prepareWebSearch(predicted);
+    else harness.webSearchOffered = offerWebSearch;
     const { runtime, trusted } = await createSessionRuntime({
       options: this.#options,
       manager,
@@ -704,13 +735,21 @@ export class SessionRegistry {
       log: sessionLog,
     });
     const { session } = runtime;
-    if (tools.kind === 'core' && this.#profileKind(session.model) !== kind) {
-      // Pi chose another model than predicted: open again with that model's tools. Nothing has
-      // run yet (extensions bind below), so no hook saw this attempt.
+    // Pi chose another model than predicted whose native search differs: decide again.
+    const native = (m: Model<Api> | undefined) =>
+      m !== undefined && workspace.preferences.nativeWebSearch(m);
+    const offered = harness.webSearchOffered;
+    const offer =
+      offerWebSearch === undefined && native(session.model) !== native(predicted)
+        ? await harness.prepareWebSearch(session.model)
+        : offered;
+    if (tools.kind === 'core' && (this.#profileKind(session.model) !== kind || offer !== offered)) {
+      // Open again with that model's tools. Nothing has run yet (extensions bind below), so no
+      // hook saw this attempt.
       hooks?.mute();
       memory.cancel();
       await runtime.dispose();
-      return this.#open(cwd, manager, model, source, this.#profileKind(session.model));
+      return this.#open(cwd, manager, model, source, this.#profileKind(session.model), offer);
     }
     opened.session = session;
     harness.compaction.apply();

@@ -7,6 +7,7 @@ import type { AgentSession } from '@earendil-works/pi-coding-agent';
 
 import { AhpError } from '../protocol/errors.js';
 import { isObject } from '../runtime/items.js';
+import { nativeSearchCapability } from './web-search.js';
 
 export type Effort = Exclude<ReturnType<typeof getSupportedThinkingLevels>[number], 'minimal'>;
 
@@ -64,6 +65,7 @@ export function capabilities(model: Model<Api>): CatalogModel {
       strict && isObject(compat) && compat[strict] === true
         ? ('verified' as const)
         : ('unknown' as const),
+    ...nativeSearchCapability(model),
     ...CAPABILITY_OVERRIDES.get(`${model.provider}/${model.id}`),
   };
 }

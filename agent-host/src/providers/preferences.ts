@@ -20,6 +20,7 @@ import type {
 
 import { AhpError } from '../protocol/errors.js';
 import { isObject } from '../runtime/items.js';
+import { nativeSearchKnown } from './web-search.js';
 
 const EFFORTS = new Set<string>(['off', 'low', 'medium', 'high', 'xhigh', 'max']);
 const PROFILES = new Set<string>(['default', 'conservative']);
@@ -35,6 +36,11 @@ function parseOverride(key: string, value: unknown): ModelOverride {
   if (!isObject(value)) fail(`models.${key}`);
   const out: { -readonly [K in keyof ModelOverride]: ModelOverride[K] } = {};
   const { displayName, contextWindow, vision, defaultEffort, toolProfile, toolReliability } = value;
+  const { nativeWebSearch } = value;
+  if (nativeWebSearch !== undefined) {
+    if (typeof nativeWebSearch !== 'boolean') fail(`${key}.nativeWebSearch`);
+    out.nativeWebSearch = nativeWebSearch;
+  }
   if (displayName !== undefined) {
     if (typeof displayName !== 'string' || displayName.trim() === '') fail(`${key}.displayName`);
     out.displayName = displayName;
@@ -118,6 +124,12 @@ export class ModelPreferencesStore {
     return this.override(model)?.vision ?? model.input.includes('image');
   }
 
+  /** Whether `model`'s provider search serves WebSearch (T38): the user's per-model setting,
+   * else the catalog (Anthropic's own models). */
+  nativeWebSearch(model: Pick<Model<Api>, 'provider' | 'id' | 'api'>): boolean {
+    return this.override(model)?.nativeWebSearch ?? nativeSearchKnown(model);
+  }
+
   /** The effort applied when `model` is selected without one, if supported. */
   defaultEffort(model: ModelKey, supported: readonly string[]): EffortLevel | undefined {
     const effort = this.override(model)?.defaultEffort;
@@ -144,6 +156,7 @@ export class ModelPreferencesStore {
       ...(override?.displayName == null ? {} : { name: override.displayName }),
       ...(override?.contextWindow == null ? {} : { contextWindow: override.contextWindow }),
       ...(override?.vision == null ? {} : { vision: override.vision }),
+      ...(override?.nativeWebSearch == null ? {} : { nativeWebSearch: override.nativeWebSearch }),
       toolReliability,
       ...(defaultEffort === undefined ? {} : { defaultEffort }),
       ...(profile === 'default' ? {} : { toolProfile: profile }),

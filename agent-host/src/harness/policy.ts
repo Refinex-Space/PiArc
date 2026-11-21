@@ -19,6 +19,8 @@ interface ToolCall {
   input: Record<string, unknown>;
   /** An MCP tool that asks the user on every call (T36). */
   requiresUserInteraction?: boolean;
+  /** The session's effort level, for the hooks' `effort` (T38). */
+  effort?: string;
 }
 
 /** Core's decision on a call: a refusal reason, or the hooks' additions to an allowed call. */
@@ -102,6 +104,7 @@ export async function preflight(
       tool,
       toolCallId,
       ...(call.requiresUserInteraction === true ? { requiresUserInteraction: true } : {}),
+      ...(call.effort === undefined ? {} : { effort: call.effort }),
     };
     let params: Record<string, unknown> = { ...target, input };
     const envelope = {
@@ -239,6 +242,7 @@ export function policyGate(
   hookNotes?: Map<string, HookNote>,
   onMode?: (mode: PermissionMode) => void,
   requiresUserInteraction?: (tool: string) => boolean,
+  effort?: () => string | undefined,
 ): ExtensionFactory {
   return (pi) => {
     // A deny rule without a specifier removes the tool from the model's list (architecture
@@ -267,6 +271,7 @@ export function policyGate(
       return undefined;
     });
     pi.on('tool_call', async (event, ctx) => {
+      const level = effort?.();
       const decided = await preflight(
         bridge,
         sessionId,
@@ -278,6 +283,7 @@ export function policyGate(
           ...(requiresUserInteraction?.(event.toolName) === true
             ? { requiresUserInteraction: true }
             : {}),
+          ...(level === undefined ? {} : { effort: level }),
         },
         ctx.signal,
       );

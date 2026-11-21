@@ -13,6 +13,7 @@ import type {
   PromptCommand,
   SubagentState,
   TurnUsage,
+  WebSearchSource,
 } from '@piarc/protocol';
 
 import { wellFormedJson } from '../protocol/well-formed.js';
@@ -34,7 +35,13 @@ const COMMAND_TOOLS = new Set(['Bash', 'PowerShell']);
 const FILE_TOOLS = new Set(['Write', 'Edit', 'NotebookEdit']);
 
 export type ToolItemType =
-  'commandExecution' | 'fileChange' | 'mcpToolCall' | 'subagent' | 'webFetch' | 'dynamicToolCall';
+  | 'commandExecution'
+  | 'fileChange'
+  | 'mcpToolCall'
+  | 'subagent'
+  | 'webFetch'
+  | 'webSearch'
+  | 'dynamicToolCall';
 
 /** The item type of a canonical tool name. */
 export function toolItemType(tool: string): ToolItemType {
@@ -50,7 +57,32 @@ export function toolItemType(tool: string): ToolItemType {
   if (tool === 'Agent') {
     return 'subagent';
   }
+  if (tool === 'WebSearch') return 'webSearch';
   return tool === 'WebFetch' ? 'webFetch' : 'dynamicToolCall';
+}
+
+/** A WebSearch result's backend and sources (`details.webSearch`, T38). */
+function resultSearch(details: unknown): { backend?: string; sources: WebSearchSource[] } {
+  const search = isObject(details) ? details.webSearch : undefined;
+  if (!isObject(search)) return { sources: [] };
+  const sources: WebSearchSource[] = [];
+  if (Array.isArray(search.sources)) {
+    for (const s of search.sources as unknown[]) {
+      if (isObject(s) && typeof s.title === 'string' && typeof s.url === 'string') {
+        sources.push({
+          title: s.title.toWellFormed(),
+          url: s.url.toWellFormed(),
+          ...(typeof s.snippet === 'string' && s.snippet !== ''
+            ? { snippet: s.snippet.toWellFormed() }
+            : {}),
+        });
+      }
+    }
+  }
+  return {
+    ...(typeof search.backend === 'string' ? { backend: search.backend } : {}),
+    sources,
+  };
 }
 
 /** `mcp__<server>__<tool>` split into server and tool. */
@@ -125,6 +157,16 @@ export function toolItem(
     }
     case 'webFetch':
       return { type: 'webFetch', ...common, url: text('url') };
+    case 'webSearch': {
+      const { backend, sources } = resultSearch(details);
+      return {
+        type: 'webSearch',
+        ...common,
+        query: text('query'),
+        ...(backend === undefined ? {} : { backend }),
+        ...(sources.length === 0 ? {} : { sources }),
+      };
+    }
     case 'dynamicToolCall':
       return { type: 'dynamicToolCall', ...common };
   }

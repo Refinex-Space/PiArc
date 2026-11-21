@@ -113,6 +113,7 @@ impl HostConfig {
                 Capability::new("context"),
                 Capability::new("checkpoints"),
                 Capability::new("webFetch"),
+                Capability::new("webSearch"),
                 Capability::new("login"),
                 Capability::new("subagents"),
                 Capability::new("backgroundTasks"),

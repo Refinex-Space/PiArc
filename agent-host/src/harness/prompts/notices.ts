@@ -48,9 +48,14 @@ export function startListNotice(rounds: number): string {
 
 /** Context a hook added (T27); a Stop hook's reasons ask the model to go on. */
 export function hookContextNotice(event: string, text: string): string {
-  return event === 'Stop'
-    ? `A Stop hook asked to continue:\n${text}`
+  return event === 'Stop' || event === 'SubagentStop'
+    ? `A ${event} hook asked to continue:\n${text}`
     : `Context from a ${event} hook:\n${text}`;
+}
+
+/** A hook ended the previous run before the next model request (T38: PostToolBatch). */
+export function hookStoppedRun(event: string, reason: string): string {
+  return `A ${event} hook ended the previous run before your next step:\n${reason}`;
 }
 
 /** A file the session read or wrote changed outside it (T27). */

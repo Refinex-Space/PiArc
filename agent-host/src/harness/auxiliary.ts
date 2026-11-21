@@ -2,7 +2,8 @@
 // should not spend its context on, such as WebFetch's extraction (and M5's Auto mode review).
 //
 // - Model: the "auxiliary model" setting (Core's model preferences) when it is configured and
-//   has credentials, otherwise the session's model.
+//   has credentials, otherwise the session's model; a caller may name the model (T38: a native
+//   search goes to the session's provider, a prompt hook's `model`).
 // - The request carries no tools, no conversation and no prompt caching; it is retried per the
 //   session's retry settings and goes through the session's stream function, so credentials,
 //   the provider policy and error redaction are those of every other request.
@@ -27,11 +28,17 @@ import type { ModelPreferencesStore } from '../providers/preferences.js';
 export const AUXILIARY_USAGE_ENTRY = 'piarc.auxiliaryUsage';
 
 export interface AuxiliaryRequest {
-  /** What the call is for, recorded with its usage (`webFetch`). */
+  /** What the call is for, recorded with its usage (`webFetch`, `webSearch`, `hookPrompt`). */
   readonly purpose: string;
   readonly system: string;
   readonly prompt: string;
   readonly signal: AbortSignal;
+  /** The model to ask instead of the auxiliary model. */
+  readonly model?: Model<Api>;
+  /** Changes the provider request (a native search adds the provider's search tool). */
+  readonly onPayload?: (payload: unknown) => unknown;
+  /** Sees every raw provider stream event (a native search reads its result blocks). */
+  readonly onProviderStreamEvent?: (event: unknown) => void;
 }
 
 export interface AuxiliaryResult {
@@ -75,17 +82,26 @@ export class AuxiliaryModel {
   async complete(request: AuxiliaryRequest): Promise<AuxiliaryResult> {
     const session = this.#o.session();
     if (session === undefined) throw new Error('The session is not open');
-    const model = this.model();
+    const model = request.model ?? this.model();
     const context = normalizeContext({
       systemPrompt: request.system,
       messages: [
         { role: 'user', content: [{ type: 'text', text: request.prompt }], timestamp: Date.now() },
       ],
     });
+    const { onPayload, onProviderStreamEvent } = request;
     const options = {
       signal: request.signal,
       cacheRetention: 'none' as const,
       sessionId: randomUUID(),
+      ...(onPayload === undefined ? {} : { onPayload: (payload: unknown) => onPayload(payload) }),
+      ...(onProviderStreamEvent === undefined
+        ? {}
+        : {
+            onProviderStreamEvent: (event: unknown) => {
+              onProviderStreamEvent(event);
+            },
+          }),
     };
     const stream = session.agent.streamFunction;
     const response = await retryAssistantCall(

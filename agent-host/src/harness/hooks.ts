@@ -8,7 +8,9 @@
 // | `session_shutdown`      | SessionEnd            | nothing (awaited, Core bounds it)             |
 // | `tool_result` (success) | PostToolUse           | replaced output and feedback; context         |
 // | `tool_result` (error)   | PostToolUseFailure    | feedback; context                             |
-// | `agent_before_settle`   | Stop                  | continue with the reason, at most 8 in a row  |
+// | `agent_before_settle`   | Stop (SubagentStop in a subagent) | continue with the reason, at most 8 in a row |
+// | `turn_end` with results | PostToolBatch         | context; a block stops the run (T38)          |
+// | subagent's first run    | SubagentStart         | context for its first request (T38)           |
 // | `session_before_compact`| PreCompact            | cancel, or summary instructions (compaction.ts)|
 // | `session_compact`       | PostCompact, then SessionStart (`compact`) (compaction.ts)  |
 //
@@ -23,7 +25,7 @@ import { describeError } from '../protocol/errors.js';
 import { wellFormedJson } from '../protocol/well-formed.js';
 import type { CoreBridge } from '../runtime/core-bridge.js';
 import { isObject } from '../runtime/items.js';
-import { hookContextNotice } from './prompts/notices.js';
+import { hookContextNotice, hookStoppedRun } from './prompts/notices.js';
 import { reminderMessage, type Reminders } from './reminders.js';
 
 /** First line of a hook's feedback in a tool result (before T27 also of hook context
@@ -37,7 +39,10 @@ type HostEvent =
   | 'postToolUseFailure'
   | 'stop'
   | 'preCompact'
-  | 'postCompact';
+  | 'postCompact'
+  | 'subagentStart'
+  | 'subagentStop'
+  | 'postToolBatch';
 
 /** Core's merged answer (`hooks/run` result). */
 export interface HookResult {
@@ -158,9 +163,11 @@ export interface SessionHooksOptions {
   /** Resolves a file tool's `path` the way the preflight does. */
   readonly hookInput: (tool: string, input: Record<string, unknown>) => Record<string, unknown>;
   readonly log: (line: string) => void;
-  /** A subagent's session (T31): it reports tool events only; its start and end are
-   * SubagentStart and SubagentStop (T38), and it never runs Stop hooks. */
+  /** A subagent's session (T31): no SessionStart, Stop or SessionEnd; its start and end are
+   * SubagentStart and SubagentStop (T38). */
   readonly subagent?: boolean;
+  /** The session's effort level for the hooks' `effort` (T38); undefined without one. */
+  readonly effort?: () => string | undefined;
 }
 
 export class SessionHooks {
@@ -212,6 +219,19 @@ export class SessionHooks {
   /** The session closes only to reopen on another branch (T28): it does not end. */
   mute(): void {
     this.#muted = true;
+  }
+
+  /** `{ effort: { level } }` when the session's model has an effort level (T38, I115). */
+  #effort(): Record<string, unknown> {
+    const level = this.#o.effort?.();
+    return level === undefined ? {} : { effort: { level } };
+  }
+
+  /** `SubagentStart` (T38): the subagent is about to send its first request; the context
+   * hooks add goes with it. Core matches the agent type and adds `agent_id`, `agent_type`. */
+  async subagentStart(): Promise<void> {
+    const result = await this.run('subagentStart', {});
+    this.#remind('SubagentStart', result.context);
   }
 
   /** Context a hook added, for the model's next request. */
@@ -286,6 +306,7 @@ export class SessionHooks {
         tool_input: this.#toolInput(tool, event.input),
         tool_use_id: event.toolCallId,
         ...(started === undefined ? {} : { duration_ms: Date.now() - started }),
+        ...this.#effort(),
       };
       const result = event.isError
         ? await this.run('postToolUseFailure', {
@@ -316,16 +337,63 @@ export class SessionHooks {
       return changed ? { content } : undefined;
     });
 
+    pi.on('turn_end', async (event, ctx) => {
+      // One round of tool calls finished; the next request has not been sent (T38).
+      if (event.toolResults.length === 0 || event.outcome !== 'completed') return undefined;
+      const message: unknown = event.message;
+      const inputs = new Map<string, Record<string, unknown>>();
+      if (isObject(message) && Array.isArray(message.content)) {
+        for (const part of message.content as unknown[]) {
+          if (isObject(part) && part.type === 'toolCall' && typeof part.id === 'string') {
+            inputs.set(part.id, isObject(part.arguments) ? part.arguments : {});
+          }
+        }
+      }
+      const calls = event.toolResults.map((result) => {
+        const tool = this.#o.canonical(result.toolName);
+        return {
+          tool_name: tool,
+          tool_input: this.#toolInput(tool, inputs.get(result.toolCallId) ?? {}),
+          tool_use_id: result.toolCallId,
+          tool_response: contentForHook(result.content),
+        };
+      });
+      const batch = await this.run('postToolBatch', { tool_calls: calls, ...this.#effort() });
+      this.#remind('PostToolBatch', batch.context);
+      if (batch.block !== undefined || batch.stop !== undefined) {
+        // Pi's `turn_end` cannot end the run: stop it before the next request, and tell the
+        // model why with the next input (the user reads the reason in the hook notice).
+        this.#o.log('a PostToolBatch hook stopped the run');
+        const reason = batch.block ?? batch.stop?.reason;
+        if (reason !== undefined && reason !== '') {
+          this.#o.reminders.enqueue(this.#o.reminders.uniqueKey('hook:PostToolBatch'), {
+            type: 'hookContext',
+            source: 'PostToolBatch',
+            text: hookStoppedRun('PostToolBatch', reason),
+          });
+        }
+        ctx.abort();
+      }
+      return undefined;
+    });
+
     pi.on('agent_before_settle', async (event) => {
       // Not after an interrupt or a failed request (Claude Code's StopFailure, M4).
-      if (event.outcome !== 'completed' || this.#o.subagent === true) return undefined;
+      if (event.outcome !== 'completed') return undefined;
       const messages: readonly unknown[] = event.context.contextMessages;
       const last = messages.findLast((m) => isObject(m) && m.role === 'assistant');
       const text =
         isObject(last) && Array.isArray(last.content) ? contentText(last.content as unknown[]) : '';
+      const subagent = this.#o.subagent === true;
+      const transcript = this.#o.transcript();
       const result = await this.run(
-        'stop',
-        { stop_hook_active: this.#active, last_assistant_message: text },
+        subagent ? 'subagentStop' : 'stop',
+        {
+          stop_hook_active: this.#active,
+          last_assistant_message: text,
+          ...(subagent && transcript !== undefined ? { agent_transcript_path: transcript } : {}),
+          ...this.#effort(),
+        },
         this.#continuations,
       );
       if (result.stop !== undefined) return undefined;
@@ -335,12 +403,13 @@ export class SessionHooks {
       if (reasons.length === 0) return undefined;
       this.#continuations += 1;
       this.#active = true;
+      const name = subagent ? 'SubagentStop' : 'Stop';
       const reminder = reminderMessage([
         {
-          key: this.#o.reminders.uniqueKey('hook:Stop'),
+          key: this.#o.reminders.uniqueKey(`hook:${name}`),
           type: 'hookContext',
-          source: 'Stop',
-          text: hookContextNotice('Stop', reasons.join('\n\n')),
+          source: name,
+          text: hookContextNotice(name, reasons.join('\n\n')),
         },
       ]);
       return {

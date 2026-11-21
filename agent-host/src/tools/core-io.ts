@@ -10,6 +10,9 @@ import { randomUUID } from 'node:crypto';
 
 import type {
   WebFetchResult,
+  WebSearchBackendResult,
+  WebSearchResult,
+  WebSearchSource,
   BlobRef,
   TaskKind,
   TaskStarted,
@@ -536,6 +539,47 @@ export class CoreIo {
     return this.#request('exec/background/kill', { taskId }, parseTaskStopped, undefined, null);
   }
 
+  /**
+   * Searches with the user's third-party backend for an approved WebSearch call (`web/search`,
+   * T38). Core's message for a refused or failed search is written for the model.
+   */
+  async webSearch(
+    query: string,
+    filters: {
+      readonly allowedDomains: readonly string[];
+      readonly blockedDomains: readonly string[];
+    },
+    origin: Origin,
+    signal?: AbortSignal,
+  ): Promise<WebSearchResult> {
+    const params = {
+      query,
+      origin,
+      ...(filters.allowedDomains.length > 0 ? { allowedDomains: filters.allowedDomains } : {}),
+      ...(filters.blockedDomains.length > 0 ? { blockedDomains: filters.blockedDomains } : {}),
+    };
+    try {
+      // Core bounds the request (WebFetch's total timeout); the call waits for it.
+      return await this.#send('web/search', params, parseWebSearch, signal, null);
+    } catch (error) {
+      const prefix = 'web/search failed: ';
+      if (error instanceof AhpError && error.message.startsWith(prefix)) {
+        throw new AhpError(error.kind, error.message.slice(prefix.length), {
+          retryable: error.retryable,
+          details: error.details,
+        });
+      }
+      throw error;
+    }
+  }
+
+  /** The third-party search backend Core can use now (`web/searchBackend`, T38). */
+  async searchBackend(signal?: AbortSignal): Promise<WebSearchBackendResult> {
+    return this.#options.bridge.requestTyped('web/searchBackend', {}, parseSearchBackend, {
+      ...(signal === undefined ? {} : { signal }),
+    });
+  }
+
   async #request<T>(
     method: string,
     params: Record<string, unknown>,
@@ -934,6 +978,49 @@ function parseOutput(value: unknown): CommandOutput | undefined {
     ...(omittedChars === undefined ? {} : { omittedChars }),
     ...(fullOutputPath === undefined ? {} : { fullOutputPath }),
     ...(saveError === undefined ? {} : { saveError }),
+  };
+}
+
+function parseSource(v: unknown): WebSearchSource | undefined {
+  if (!isRecord(v) || typeof v.title !== 'string' || typeof v.url !== 'string') return undefined;
+  if (v.snippet !== undefined && typeof v.snippet !== 'string') return undefined;
+  return {
+    title: v.title,
+    url: v.url,
+    ...(typeof v.snippet === 'string' && v.snippet !== '' ? { snippet: v.snippet } : {}),
+  };
+}
+
+/** A `web/search` result, or undefined when it is malformed. */
+export function parseWebSearch(v: unknown): WebSearchResult | undefined {
+  if (!isRecord(v) || typeof v.backend !== 'string' || !Array.isArray(v.results)) return undefined;
+  const results: WebSearchSource[] = [];
+  for (const item of v.results as unknown[]) {
+    const source = parseSource(item);
+    if (source === undefined) return undefined;
+    results.push(source);
+  }
+  return { backend: v.backend, results };
+}
+
+/** A `web/searchBackend` result, or undefined when it is malformed. */
+export function parseSearchBackend(v: unknown): WebSearchBackendResult | undefined {
+  if (!isRecord(v)) return undefined;
+  const { backend, unavailable } = v;
+  if (
+    backend != null &&
+    (!isRecord(backend) || typeof backend.id !== 'string' || typeof backend.name !== 'string')
+  ) {
+    return undefined;
+  }
+  if (unavailable != null && unavailable !== 'notConfigured' && unavailable !== 'noKey') {
+    return undefined;
+  }
+  return {
+    ...(isRecord(backend) && typeof backend.id === 'string' && typeof backend.name === 'string'
+      ? { backend: { id: backend.id, name: backend.name } }
+      : {}),
+    ...(unavailable === 'notConfigured' || unavailable === 'noKey' ? { unavailable } : {}),
   };
 }
 
