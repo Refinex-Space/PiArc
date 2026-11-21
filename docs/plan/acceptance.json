@@ -3485,78 +3485,78 @@
       "id": "T35-A01",
       "task": "T35",
       "description": "新建会话可选独立 worktree：在 `.piarc/worktrees/<name>/` 创建 worktree 与分支，可选基础分支，`.worktreeinclude` 列出的被忽略文件被复制。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `worktree-session-create`（`cargo test -p piarc-testkit --test scenarios -- worktree-session-create --exact`）：`.piarc/worktrees/feature-a/` 与分支 `piarc/feature-a`、基础分支 `release` 的提交、`.worktreeinclude` 列出的 `.env.local` 被复制、未列出的被忽略文件不复制、`.gitignore` 提示与追加；单测 `cargo test -p piarc-git --test worktree`；L4 `t35-worktrees` 新建表单截图 `tmp/evidence/T35/l4/t35-worktrees.e2e.ts-start-c742f-efore-archiving-its-changes-dev/new-session-worktree-{light,dark}.png`。全量 L2 151 passed、2 skipped（平台）"
     },
     {
       "id": "T35-A02",
       "task": "T35",
       "description": "worktree 会话使用主 checkout 的项目信任与\"总是允许\"规则，新写入的规则落在主 checkout。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `worktree-session-rules`：worktree 会话沿用主 checkout 的信任与 allow 规则（免审批），\"总是允许\"写入主 checkout 的 `.piarc/settings.local.json`、worktree 内无设置文件；`cargo test -p piarc-core`（`open_session_in` 的 `project` 与模式按工作区记忆）通过"
     },
     {
       "id": "T35-A03",
       "task": "T35",
       "description": "归档有未提交改动的 worktree 会话时先询问；到期清理删除 worktree 目录并保留分支，清理时有未提交改动先询问。验证：场景测试（时钟可注入）与 Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `worktree-archive-cleanup`（场景时钟注入：归档后 29 天不清理、30 天删除无改动的 worktree 并保留分支、有改动的标记待确认，用户确认后删除 / 保留）；L4 `t35-worktrees` 的 \"start … before archiving its changes\"：归档有改动的 worktree 会话弹出原生三选项对话框（测试钩子应答），截图 `worktree-session-{light,dark}.png`"
     },
     {
       "id": "T35-A04",
       "task": "T35",
       "description": "`isolation: worktree` 的子 agent 在临时 worktree 中运行，无改动时结束后自动清理，有改动时保留并在结果中给出路径与分支。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `subagent-worktree`：`isolation: worktree` 的子 agent 在 `.piarc/worktrees/agent-<id>/` 运行，无改动时结束后目录与分支都删掉；有改动时保留并在结果中给出路径与分支 `piarc/agent-<id>`；非 git 仓库时报错（`subagent-denied-type`）"
     },
     {
       "id": "T35-A05",
       "task": "T35",
       "description": "全文搜索能查到中文、英文与混排的用户消息和助手正文；JSONL 新增内容增量进入索引；重建索引后结果一致。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-store --test search`：中文（trigram）、英文、中英混排、两字以下走 LIKE、用户消息与助手正文、JSONL 追加后增量进入索引、重建索引后结果一致、删除会话后不再命中、高亮范围按 UTF-16；`cargo test -p piarc-store` 全部通过（迁移到版本 8）"
     },
     {
       "id": "T35-A06",
       "task": "T35",
       "description": "点击搜索结果打开对应会话并定位到该条目。验证：Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `t35-worktrees` 的 \"finds … its session at that message\"：侧栏搜索按会话分组显示高亮片段，点击结果打开会话并定位到该条目（`data-located`）；截图 `tmp/evidence/T35/l4/t35-worktrees.e2e.ts-finds-aeafd-its-session-at-that-message-dev/search-results.png`、`search-located-{light,dark}.png`"
     },
     {
       "id": "T35-A07",
       "task": "T35",
       "description": "两个窗口同时显示同一审批时只有先到的答复生效，另一个窗口的卡片随之消失。验证：Playwright（截图存 `tmp/evidence/T35/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `t35-windows` 的 \"one app … first answer and leaves both\"：两个窗口同时显示同一审批卡，在窗口 1 答复后两个窗口的卡片都消失、命令只执行一次；截图 `tmp/evidence/T35/l4/t35-windows.e2e.ts-one-app-ee25c-irst-answer-and-leaves-both-dev/approval-window-{1,2}.png`、`approval-answered-window-{1,2}.png`"
     },
     {
       "id": "T35-A08",
       "task": "T35",
       "description": "关闭最后一个窗口后会话继续运行，菜单栏图标显示运行中与等待审批的计数；有运行中的会话时退出需确认。验证：Playwright 与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `t35-windows` 的 \"keeps running … asks before quitting\"：关闭最后一个窗口后会话继续运行，托盘标题 / 提示 / 菜单显示运行中与等待审批的计数（测试钩子从真实 `Tray` 读回，`tray.json`），有运行中的会话时退出弹出确认，取消后继续运行；从托盘重开窗口截图 `reopened-from-tray.png`。菜单栏本身的截图因终端没有屏幕录制权限没拍到（I149，需用户目视确认）"
     },
     {
       "id": "T35-A09",
       "task": "T35",
       "description": "`piarc://` 链接与从 Finder 拖入的文件夹在已运行实例中打开对应工作区或会话；链接参数不触发任何自动执行，未信任的文件夹照常显示信任对话框。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npx vitest run apps/desktop/src/main/launch.test.ts`（`piarc://` 解析：只接受 open/session 两种、拒绝其余参数与非法 id、不带任何执行类参数；argv 中的文件夹与链接）；L4 `t35-windows` 的 \"links … sessions in the running app\"：已运行实例收到 `piarc://open`、`piarc://session/<id>` 与拖入的文件夹，打开对应工作区 / 会话且不发送消息，未信任的文件夹照常显示信任对话框（`link-trust-dialog.png`）；`app-instance` L4 通过"
     },
     {
       "id": "T35-A10",
       "task": "T35",
       "description": "Windows 托盘、`piarc://` 注册与资源管理器右键菜单的注册与参数解析有单元测试并在 Windows CI 上通过。验证：Windows CI 输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "单元测试已写并在 macOS 通过：`apps/desktop/src/main/platform/tray.test.ts`（读取活动计数、标题与提示文字、菜单中的等待会话）、`windows-shell.test.ts`（HKCU 下 `piarc://` 与两个文件夹右键项的 reg.exe 参数、卸载删除、系统目录的 reg.exe 与失败报告、资源管理器与协议传给新实例的参数）、`launch.test.ts`（`piarc://` 与 Windows 参数解析）；Windows 交叉 clippy 通过。Windows CI 输出要在用户推送后由 CI 产生，本会话不推送（I147、W3）"
     },
     {
       "id": "T35-A11",
       "task": "T35",
       "description": "同一工作区 3 个并行会话（至少 1 个在独立 worktree）加 1 个子 agent 的稳态内存满足第 11 章预算（Agent Host 按活动会话数计算的上限、应用其余进程合计上限）。验证：测量脚本输出与 `docs/perf/M3-memory.md`。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "failing",
+      "evidence": "`npm run perf:m3 -- --form packaged`（3 次，M1 Max 32 GB，`tmp/evidence/T35/m3-memory.json`、`docs/perf/M3-memory.md`）：Agent Host 中位 222 / 最大 238 MB，满足 270 MB 上限；应用其余进程合计中位 566 / 最大 576 MB，超出 macOS 510 MB 上限。没有会话时基线已 505 MB，超出部分在主进程原生内存与渲染进程，登记 I146（R4），预算不放宽"
     },
     {
       "id": "T35-A12",
