@@ -49,6 +49,10 @@ pub enum Unresolved {
     Unsupported(String),
     /// Nested beyond the analyzer's limits.
     TooDeep,
+    /// Control characters other than tab and newline (R4 M1): a line editor acts on them
+    /// (`^U` erases what came before, a carriage return runs the line), so what a terminal
+    /// runs can differ from the text judged.
+    ControlCharacters,
 }
 
 /// Where a command runs, relative to the starting directory.
@@ -204,6 +208,12 @@ pub fn analyze(command: &str) -> Analysis {
             ..Analysis::default()
         };
     }
+    if has_control_characters(command) {
+        return Analysis {
+            unresolved: vec![Unresolved::ControlCharacters],
+            ..Analysis::default()
+        };
+    }
     if command.contains(DYNAMIC) || command.contains('\0') {
         return Analysis {
             unresolved: vec![Unresolved::ParseError],
@@ -211,6 +221,15 @@ pub fn analyze(command: &str) -> Analysis {
         };
     }
     walk::run(command, 0)
+}
+
+/// Whether `command` has a control character other than tab and newline (C0 or DEL), which
+/// a terminal's line editor would act on.
+#[must_use]
+pub fn has_control_characters(command: &str) -> bool {
+    command
+        .chars()
+        .any(|c| (c.is_ascii_control() && c != '\t' && c != '\n') || c == '\u{9b}')
 }
 
 #[cfg(test)]

@@ -94,6 +94,15 @@ impl ToolIo {
         launch: &Launch,
         wrap: Wrap,
     ) -> Result<ExecRunResult, ErrorObject> {
+        // Typed into bash's line editor, control characters act (`^U` erases, a carriage
+        // return runs the line): what runs would not be the text judged (R4 M1).
+        if piarc_policy::bash::has_control_characters(&p.command) {
+            return Err(ErrorObject::new(
+                ErrorKind::InvalidParams,
+                "the command has control characters a terminal would act on; run it without `terminal`",
+                false,
+            ));
+        }
         let bash = self.exec.bash()?;
         let mut spec = self
             .terminal_spec(

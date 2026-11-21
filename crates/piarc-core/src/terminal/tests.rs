@@ -538,3 +538,21 @@ async fn snapshots_survive_quitting_and_closing_drops_them() {
     .await;
     assert!(!new_snap.exists());
 }
+/// R4 M1: a command typed into the agent's terminal goes through bash's line editor, which
+/// acts on control characters (`^U` erases what came before, a carriage return runs the line):
+/// such a command is refused rather than typed.
+#[tokio::test]
+async fn a_command_with_control_characters_is_not_typed_into_a_terminal() {
+    let f = Fixture::new("control");
+    for command in ["echo ok\u{15}touch pwned", "echo ok\rtouch pwned"] {
+        let refused = f
+            .call(
+                "s",
+                "exec/run",
+                json!({ "command": command, "background": true, "terminal": true }),
+            )
+            .await
+            .expect_err("refused");
+        assert!(refused.contains("InvalidParams"), "{refused}");
+    }
+}

@@ -48,7 +48,7 @@ Core 的权限裁决（T20 起，T23 完整版）：Claude Code 格式的规则�
 
 ## Bash 分析（`bash/`）
 
-- `analyze` 只用文本：tree-sitter-bash 0.25.1（MIT）解析，线程内复用一个 `Parser`；超过 10,000 字符、语法错误、命令名或脚本是运行期值、`eval`、无法跳过的包装选项、嵌套过深（200 层、10 万节点、`sh -c` 3 层）都进 `unresolved`，裁决为询问。
+- `analyze` 只用文本：tree-sitter-bash 0.25.1（MIT）解析，线程内复用一个 `Parser`；超过 10,000 字符、含制表与换行以外的控制字符（`has_control_characters`：终端的行编辑会执行它们，R4 M1；Core 对 `terminal: true` 的命令直接拒绝）、语法错误、命令名或脚本是运行期值、`eval`、无法跳过的包装选项、嵌套过深（200 层、10 万节点、`sh -c` 3 层）都进 `unresolved`，裁决为询问。
 - 拆分：`&& || ; | |& &`、换行、子 shell、命令组、`$( )`、反引号、`<( )`/`>( )`、`for`/`while`/`if`/`case`/函数体、heredoc 正文里的命令替换（引号定界的 heredoc 不展开）。`cd`/`pushd` 跟踪目录：`||` 与条件体内的变化、`cd -`、`popd`、运行期目标使后续目录为 Unknown。
 - 剥离（`wrappers.rs`）：`timeout`、`time`、`nice`、`nohup`、`stdbuf`、`command`（不含 `-v/-V`）、`builtin`、`noglob`、无参 `xargs`、只含安全赋值的 `env`；安全前置赋值名单是 `SAFE_ENV`（locale、终端、颜色、CI、`NODE_ENV`、`RUST_LOG` 等），其余赋值保留并使命令不能自动允许。`walk.rs` 的 `is_special_variable` 是会改变后续命令解析的变量（`PATH`、`IFS`、`HOME`、`LD_*`、`GIT_*`…）。
 - exec 包装（`EXEC_WRAPPERS`：`sudo`、`env` 带选项、`watch`、`setsid`、`flock`、带参数的 `xargs`、`find -exec/-delete`、`sh/bash -c` 等）只能被精确规则允许，它们运行的命令作为影子命令参与 deny、ask 与关键路径检查。
