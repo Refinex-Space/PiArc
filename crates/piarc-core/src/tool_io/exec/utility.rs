@@ -55,10 +55,18 @@ impl Exec {
         };
         // All names are constants; the installation is passed as an argument to bash. Git's
         // native programs live in the MSYS2 environment the build uses: `mingw64`, `ucrt64`
-        // (x64 since Git for Windows 2.56) or `clangarm64` (arm64).
+        // (x64 since Git for Windows 2.56) or `clangarm64` (arm64). Only names Git ships are
+        // looked up, and through `hash` (no subshell; a fork is slow in MSYS): a name missing
+        // from Git cannot resolve to Git's program, and searching a long PATH for it took
+        // seconds (W2). `hash` skips builtins, whose programs `type -P` finds instead.
         let script = r#"root=$1; shift
         for n in "$@"; do
-            f=$(builtin type -P "$n") || continue
+            for d in usr mingw64 ucrt64 clangarm64 ""; do
+                [[ -n $d && -e "$root/$d/bin/$n.exe" ]] && break
+            done
+            [[ -n $d ]] || continue
+            f=; builtin hash -- "$n" 2>/dev/null && f=${BASH_CMDS[$n]}
+            [[ -n $f ]] || f=$(builtin type -P -- "$n") || continue
             for d in usr mingw64 ucrt64 clangarm64; do
                 if [[ "$f" -ef "$root/$d/bin/$n.exe" ]]; then builtin printf '%s %s\n' "$d" "$n"; break; fi
             done
@@ -82,8 +90,9 @@ impl Exec {
             cwd: root.clone(),
             env: env.to_vec(),
             launcher: None,
-            // A cold Git Bash under an antivirus scan and a busy machine can take seconds.
-            timeout: Some(Duration::from_secs(15)),
+            // A cold Git Bash under an antivirus scan and a busy machine can take seconds; an
+            // unanswered probe is asked again on the next preflight, so this stays short.
+            timeout: Some(Duration::from_secs(10)),
             kill_grace: Duration::from_millis(100),
         };
         let (tx, mut rx) = mpsc::channel::<OutputChunk>(8);
