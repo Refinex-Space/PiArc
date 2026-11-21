@@ -23,9 +23,14 @@
 //! 6. **Outcome.** [`piarc_exec::interpret`] for bash; PowerShell by its exit code.
 
 pub(super) mod background;
+mod display;
+mod launch;
 pub(super) mod utility;
 
-use std::collections::VecDeque;
+pub(super) use display::Display;
+use launch::remember_cwd;
+pub(super) use launch::{Launch, Wrap, launch_dir};
+
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -33,21 +38,20 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use piarc_exec::env::{login_shell_env, strip_internal};
-use piarc_exec::shells::{Probe, bash_invocation, detect, msys_to_windows, powershell_args};
+use piarc_exec::shells::{Probe, bash_invocation, detect, powershell_args};
 use piarc_exec::{
-    CapturedOutput, CommandExit, CommandRunner, CommandSpec, CwdProbe, ExecLimits, Launcher,
-    OutputCapture, OutputChunk, ProcessTreeSpawner, Shells, Stream, interpret,
+    CapturedOutput, CommandExit, CommandRunner, CommandSpec, CwdProbe, ExecLimits, OutputCapture,
+    OutputChunk, ProcessTreeSpawner, Shells, interpret,
 };
 use piarc_host::Peer;
 use piarc_protocol::exec::{
-    CommandOutcome, CommandOutput, CwdReset, CwdResetReason, ExecOutput, ExecOutputParams,
-    ExecRunParams, ExecRunResult, ExecShell, ExecShellsResult, ExecTimeout, OutputStream,
+    CommandOutcome, CommandOutput, CwdReset, ExecRunParams, ExecRunResult, ExecShell,
+    ExecShellsResult, ExecTimeout,
 };
 use piarc_protocol::tasks::{TaskKind, TaskStartReason, TaskStarted};
-use piarc_protocol::text::incomplete_utf8_suffix;
 use piarc_protocol::{ErrorKind, ErrorObject};
 use serde_json::json;
-use tokio::sync::{Notify, mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
 use super::{SessionIo, lock};
@@ -711,96 +715,6 @@ fn exec_timeout(timeout: piarc_exec::Timeout) -> ExecTimeout {
     }
 }
 
-/// What a sandbox adds around a command: its wrapper program and variables.
-#[derive(Default)]
-pub(super) struct Wrap {
-    pub launcher: Option<Launcher>,
-    pub env: Vec<(OsString, OsString)>,
-}
-
-/// Where a command starts, and whether it moves the session's remembered directory.
-pub(super) struct Launch {
-    pub dir: PathBuf,
-    pub tracked: bool,
-    /// Programs an automatic preflight relied on, pinned in the bash startup file.
-    pub pinned: Vec<(String, PathBuf)>,
-    /// The remembered directory was gone and the command starts at the root instead.
-    pub reset: Option<CwdReset>,
-}
-
-/// The working directory of a command of `session`: `requested`, or the remembered one.
-pub(super) fn launch_dir(
-    session: &SessionIo,
-    requested: Option<&str>,
-) -> Result<Launch, ErrorObject> {
-    if let Some(requested) = requested {
-        let dir = session
-            .scope
-            .resolve(requested)
-            .map_err(|e| e.to_error_object())?;
-        if !dir.is_dir() {
-            return Err(piarc_fs::Error::NotFound {
-                path: piarc_fs::display(&dir),
-            }
-            .to_error_object());
-        }
-        return Ok(Launch {
-            dir,
-            tracked: false,
-            pinned: Vec::new(),
-            reset: None,
-        });
-    }
-    let mut remembered = lock(&session.shell_cwd);
-    let mut reset = None;
-    if !remembered.is_dir() {
-        let root = session.scope.root().to_path_buf();
-        reset = Some(CwdReset {
-            ended_in: piarc_fs::display(&remembered),
-            reset_to: piarc_fs::display(&root),
-            reason: CwdResetReason::Missing,
-        });
-        *remembered = root;
-    }
-    Ok(Launch {
-        dir: remembered.clone(),
-        tracked: true,
-        pinned: Vec::new(),
-        reset,
-    })
-}
-
-/// Records where a bash command ended (`ended`, as the shell printed it): kept when inside the
-/// workspace or an added directory, else the workspace root and the reason.
-fn remember_cwd(session: &SessionIo, ended: Option<String>) -> Option<CwdReset> {
-    let ended = ended?;
-    let local = if cfg!(windows) {
-        msys_to_windows(&ended)
-    } else {
-        Some(ended.clone())
-    };
-    let inside = local
-        .as_deref()
-        .and_then(|path| session.scope.resolve(path).ok())
-        .filter(|dir| dir.is_dir());
-    let mut remembered = lock(&session.shell_cwd);
-    match inside {
-        Some(dir) => {
-            *remembered = dir;
-            None
-        }
-        None => {
-            let root = session.scope.root().to_path_buf();
-            *remembered = root.clone();
-            Some(CwdReset {
-                ended_in: local.unwrap_or(ended),
-                reset_to: piarc_fs::display(&root),
-                reason: CwdResetReason::OutsideWorkspace,
-            })
-        }
-    }
-}
-
 fn command_output(out: CapturedOutput) -> CommandOutput {
     CommandOutput {
         omitted_chars: out.tail.is_some().then_some(out.omitted_chars),
@@ -833,132 +747,6 @@ fn git_bash_setting(data_dir: &Path) -> Option<PathBuf> {
         .and_then(serde_json::Value::as_str)
         .filter(|path| !path.is_empty())
         .map(PathBuf::from)
-}
-
-/// The live view of a command's output: chunks in the order they were read, at most
-/// [`DISPLAY_WINDOW`] bytes waiting; older chunks are dropped and counted.
-#[derive(Default)]
-pub(super) struct Display {
-    state: Mutex<DisplayState>,
-    notify: Notify,
-}
-
-#[derive(Default)]
-struct DisplayState {
-    queue: VecDeque<(Stream, Vec<u8>)>,
-    bytes: usize,
-    skipped: [u64; 2],
-    closed: bool,
-}
-
-fn index(stream: Stream) -> usize {
-    usize::from(stream == Stream::Stderr)
-}
-
-impl Display {
-    fn push(&self, stream: Stream, bytes: Vec<u8>) {
-        {
-            let mut state = lock(&self.state);
-            state.bytes += bytes.len();
-            state.queue.push_back((stream, bytes));
-            while state.bytes > DISPLAY_WINDOW && state.queue.len() > 1 {
-                if let Some((old, dropped)) = state.queue.pop_front() {
-                    state.bytes -= dropped.len();
-                    state.skipped[index(old)] += dropped.len() as u64;
-                }
-            }
-        }
-        self.notify.notify_one();
-    }
-
-    fn close(&self) {
-        lock(&self.state).closed = true;
-        self.notify.notify_one();
-    }
-
-    /// Sends what arrives as `exec/output` until the capture is done; a connection that is
-    /// gone stops the command.
-    async fn forward(self: Arc<Self>, peer: Peer, request_id: String, token: CancellationToken) {
-        let mut seq = 0_u64;
-        let mut carry: [Vec<u8>; 2] = [Vec::new(), Vec::new()];
-        loop {
-            let (batch, skipped, closed) = {
-                let mut state = lock(&self.state);
-                state.bytes = 0;
-                (
-                    std::mem::take(&mut state.queue),
-                    std::mem::take(&mut state.skipped),
-                    state.closed,
-                )
-            };
-            if batch.is_empty() && !closed {
-                self.notify.notified().await;
-                continue;
-            }
-            let mut skipped = skipped;
-            for (stream, mut bytes) in batch {
-                let i = index(stream);
-                let mut gap = std::mem::take(&mut skipped[i]);
-                if gap > 0 {
-                    // The dropped chunks may have ended inside a character.
-                    gap += carry[i].len() as u64;
-                    carry[i].clear();
-                    let partial = bytes.iter().take_while(|&&b| b & 0xC0 == 0x80).count();
-                    bytes.drain(..partial);
-                    gap += partial as u64;
-                }
-                carry[i].extend_from_slice(&bytes);
-                let complete = carry[i].len() - incomplete_utf8_suffix(&carry[i]);
-                let rest = carry[i].split_off(complete);
-                let text = String::from_utf8_lossy(&carry[i]).into_owned();
-                carry[i] = rest;
-                self.send(&peer, &request_id, &token, &mut seq, stream, text, gap)
-                    .await;
-            }
-            if closed {
-                for stream in [Stream::Stdout, Stream::Stderr] {
-                    let rest = std::mem::take(&mut carry[index(stream)]);
-                    let text = String::from_utf8_lossy(&rest).into_owned();
-                    self.send(&peer, &request_id, &token, &mut seq, stream, text, 0)
-                        .await;
-                }
-                return;
-            }
-        }
-    }
-
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "one notification's fields and its counter"
-    )]
-    async fn send(
-        &self,
-        peer: &Peer,
-        request_id: &str,
-        token: &CancellationToken,
-        seq: &mut u64,
-        stream: Stream,
-        data: String,
-        skipped: u64,
-    ) {
-        if data.is_empty() && skipped == 0 {
-            return;
-        }
-        *seq += 1;
-        let params = ExecOutputParams {
-            request_id: request_id.to_owned(),
-            stream: match stream {
-                Stream::Stdout => OutputStream::Stdout,
-                Stream::Stderr => OutputStream::Stderr,
-            },
-            seq: *seq,
-            data,
-            skipped: (skipped > 0).then_some(skipped),
-        };
-        if peer.notify::<ExecOutput>(params).await.is_err() {
-            token.cancel();
-        }
-    }
 }
 
 #[cfg(test)]
