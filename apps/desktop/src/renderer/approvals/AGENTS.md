@@ -9,6 +9,7 @@
 - 计划批准只发 `allowOnce` 加 `mode`（`acceptEdits` 或 `default`）；继续规划发 `deny` 加反馈与 `comments`。提问表单每题必须有选项或自由回答才能提交。
 - 行内评论的偏移是计划原文的 UTF-16 码元：计划面板（`PlanPanel.tsx`）以原文文本节点加 `<mark>` 显示，容器里不能有原文以外的文字（编号用 CSS `::after` 显示），`selection.ts` 用 Range 的 `toString().length` 换算。评论草稿在本窗口的 `plan-comments.ts`（按 `requestId`），不重叠、按起点排序，答复成功后清空。
 - 计划面板与右栏任务卡片在 `shell/harness-panels.tsx` 注册；面板的 `when` 读 Shell 计算的 `PanelContext.plan`、`tasks`（会话的 harness 状态与待批计划）。卡片出现时用 `showPanel('plan')` 把计划面板调到前面。
+- 焦点（T43）：卡片出现时 `use-approval-focus.ts`（由 `useApprovalKeys` 调用，所有卡片共用）把焦点移到首张卡的容器，容器名称来自 `approval-label.ts`（类型与对象）；输入法合成期间等 `compositionend`；出现后 `APPROVAL_DELAY_MS` 内卡片控件上的 Enter、Space 被吞掉。审批快捷键不处理卡片与 composer 之外的文本框里的按键（`approval-keys.ts` 的 `typedElsewhere`）。
 
 ## 测试
 

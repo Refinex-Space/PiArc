@@ -23,6 +23,13 @@
 - 初次打开读最近 1,000 个 item，向上滚到距顶部 400 px 内再加载一页。重同步用整段历史窗口替换已确认的行，因为同一文本块的历史 ID 与实时 ID 可能不同。
 - “选中本回合”按回合 ID 分组（含 steer），缺少标记的旧历史按用户消息分组。先让虚拟列表挂载整个选区，再创建 DOM Range。选择结束后释放额外挂载的行。
 
+## 无障碍（T43）
+
+- 列表是 `role="feed"`、每行 `role="article"`（`TranscriptList` 的 `RowFrame`，子 agent 的转录用 `RowView.tsx` 的 `RowArticle`），名称来自 `row-label.ts` 的 `rowLabel`（与行显示的文字共用消息）；回合运行时 feed `aria-busy`。不要改回 `role="log"`：它隐含 `aria-live`，逐字播报流式输出。
+- 行 kind 在 `src/shared/row-kinds.ts` 的 `ROW_KINDS`：新增行类型加 kind 与名称（`rowKind` 的穷尽检查），并登记到 `e2e/a11y/states.ts`。
+- 会话的 live region 是 `LiveRegion.tsx`（挂在 `Conversation` 的 transcript 上下文里）：运行中的进展至多每 `LIVE_ANNOUNCE.intervalMs` 播报一次，回合结束播报一次结果；节流在 `live-announcer.ts`（可注入时钟，测试用假时钟统计次数）。L4 按文字找回复时限定在 `agent-message` 里，live region 会重复结果。
+- 代码高亮的主题在 `highlight/themes.ts`（GitHub 高对比度两套，浅色的注释灰换成主题里更深的灰），`themes.test.ts` 核对每个 token 在代码与 diff 底色上不低于 4.5:1；明暗跟随应用的主题选择（`use-color-scheme.ts`，I186），不只看系统。
+
 ## 三档视图（T29）
 
 - `detail.ts`：普通（隐藏 `reasoning` 行与 `reminder` 行）、思考（隐藏 `reminder` 行，默认档，保持 T19 起的显示）、详细（全部显示）。过滤在 `useShownRowIds`，store 里 `reminder` 条目照常归约（T27 的 `HIDDEN_ITEMS` 已去掉）。详细档里 `useExpanded` 的默认值为展开、键加 `detailed:` 前缀，所以详细档的展开选择不影响其他档。选择按会话存在渲染进程内存（`chooseDetail`），不持久化。新增行类型时在 `shownIn` 决定它属于哪一档。

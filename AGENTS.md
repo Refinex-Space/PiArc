@@ -20,9 +20,11 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `npm ci --ignore-scripts` | 按 lockfile 安装 npm 依赖（CI 同款） |
 | `node scripts/dev/install-tools.mjs` | 把锁定版本的 cargo-deny、ripgrep、fd、bindgen-cli 装进 `.tools/`（不做全局安装）；verify 第 11 步需要 cargo-deny，Agent Host 行为对照测试（Pi 原生 grep/find）需要 ripgrep 与 fd，重新生成 libghostty-vt 绑定需要 bindgen |
 | `node scripts/dev/gen-ghostty-bindings.mjs [--check]` | 重新生成（或比对）`crates/piarc-ghostty-sys/src/bindings.rs`；只在升级 libghostty-vt 时需要 |
-| `npm run verify` | 全部 15 项检查，结束时打印汇总表；收尾跑一次（先提交代码），全部通过且工作区干净时记下提交 |
+| `npm run verify` | 全部 16 项检查，结束时打印汇总表；收尾跑一次（先提交代码），全部通过且工作区干净时记下提交 |
 | `npm run verify -- --baseline` | 开工基线：上次全量通过之后只改了 `docs/` 时只查改动文件与验收清单，否则跑全量（`docs/plan/protocol.md`） |
 | `npm run gen:tokens` | 由 `design/tokens/` 生成渲染进程的 CSS 自定义属性与共享的 TS 常量；改令牌后运行并提交（verify 第 15 步检查漂移、对比度与品牌，ADR-0029） |
+| `node scripts/ci/check-i18n.mjs` | verify 第 16 步：中英文目录键与占位符一致、ICU 有效、只用该语言有的复数类别、引用的键存在、渲染进程与主进程没有硬编码文字与不带 locale 的格式化（规则见 `docs/engineering/accessibility.md`） |
+| `PIARC_EVIDENCE_TASK=T43 npx playwright test -c apps/desktop/playwright.config.ts t43- --project dev` | T43 无障碍：状态清单全部状态的 axe（亮暗，报告在 `tmp/evidence/T43/axe/`）、审批卡焦点、只用键盘的流程与系统偏好、中英文截图与溢出检查 |
 | `node scripts/dev/check-prompt-originality.mjs` | 修改 Harness 英文提示词或工具指引后，在含本地参考副本的机器上做连续 10 词比对，更新 `docs/engineering/prompt-originality.md` |
 | `npm run gen:protocol` | 由 `piarc-protocol` 重新生成 `packages/protocol/schema/` 与 `src/generated/`；改了协议类型后运行并提交 |
 | `npm run build:agent-host` | esbuild 把 Agent Host 打成 `agent-host/dist/bundle/agent-host.mjs`（另写 `pi-assets/package.json`，运行时以 `PI_PACKAGE_DIR` 指向它） |
@@ -128,6 +130,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - 项目级可执行配置（hooks、MCP、allow 规则、插件、Pi 扩展）只经 `piarc_config::project_trust` 判断信任（Core 侧 `piarc_core::trust`，Agent Host 侧 `agent-host/src/harness/project-trust.ts`），失败一律不信任；不要另写读表或读 Pi `trust.json` 的路径（ADR-0025）。有未确认的新增可执行项时项目不受信任（ADR-0029，I63）。项目的 skill、命令、输出风格与子 agent 定义：信任只覆盖根自己资源目录里的文件（`piarc_config::executables::covered_by_trust`，worktree 里的副本与根以上目录的不算），解析链接后出了项目目录的不读（`stays_in_project`，R4）。
 - Claude Code 的配置只读（ADR-0005、ADR-0038）：`.claude/settings*.json` 与 `~/.claude/settings.json` 和 PiArc 设置同表合并，一个键生效与否只看 `piarc_config::claude::SETTINGS_KEYS`（实现某个键的功能时改这一行，不另写判断）；`piarc-config` 的写入拒绝 `.claude/` 与 `.claude.json`，L2 每个场景比对 Claude Code 配置快照。用户级 Claude Code 文件从 `CoreConfig.home` 读：测试、L2、L4（`<user data>/test-home`）一律注入临时目录，不读本机 `~/.claude`。
 - 界面颜色、字号、间距只来自设计令牌（`var(--piarc-…)`），界面字符串只经 `src/shared/i18n/` 的目录（英文与简体中文同键）；verify 第 15 步拒绝对比度不达标、主色落在橙色 / 陶土色、打包字体或音频的改动。
+- 无障碍与本地化（T43，规则在 `docs/engineering/accessibility.md`）：新增设置页、面板、对话框或 transcript 行类型要登记到 `apps/desktop/e2e/a11y/states.ts` 并接到 `t43-a11y` 的旅程（Vitest 的覆盖检查拒绝没登记的）；transcript 是 `feed` 不是 `log`，流式进展只经会话的节流 live region；中文没有 `one` 复数类别（用 `=1`）；数字与日期用应用上下文的 `format`，不调不带 locale 的 `toLocaleString()`（verify 第 16 步）。
 - `cargo test`（含 `npm run verify`）会在登录钥匙串中以 `piarc-test.` 开头的服务名创建并删除测试条目；测试代码只用 `test_master_key_name` 命名条目，不碰 `piarc-core::identity` 的正式服务名。
 - `cargo test`（含 verify）中 `piarc-core` 的 `sandbox_commands` 测试经沙箱代理连 `registry.npmjs.org`、`index.crates.io`：离线时这两个用例失败并写明原因。沙箱内命令要联网的工具，配置文件里的代理设置会盖过 `HTTP_PROXY`（`crates/piarc-sandbox/AGENTS.md`）。
 - 测试里用 `vim -u NONE` 时加 `--cmd 'set encoding=utf-8'`：否则 vim 按 locale 选编码，`LANG` 为空的环境（CI runner、某些 IDE 或智能体的子进程）里中文显示成转义（I38）。

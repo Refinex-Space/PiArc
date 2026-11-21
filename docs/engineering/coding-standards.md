@@ -169,7 +169,7 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 
 | 能力 | 位置 | 说明 | 登记任务 |
 |---|---|---|---|
-| 统一检查入口 | `scripts/dev/verify.mjs`（`npm run verify`） | 按顺序运行 15 个检查步骤，失败后继续，最后打印汇总表；新增检查在 `STEPS` 中追加 | T01 |
+| 统一检查入口 | `scripts/dev/verify.mjs`（`npm run verify`） | 按顺序运行 16 个检查步骤，失败后继续，最后打印汇总表；新增检查在 `STEPS` 中追加 | T01 |
 | crate 依赖方向检查 | `scripts/ci/check-crate-deps.mjs` + `crates/deps-rules.json` | 读取 `cargo metadata`，按层与例外校验 workspace crate 之间的依赖 | T01 |
 | 验收清单一致性检查 | `scripts/plan/check-acceptance.mjs` | 比对任务文件中的 `- [Txx-Ayy]` 验收项与 `docs/plan/acceptance.json` | T01 |
 | 仓库内工具安装 | `scripts/dev/install-tools.mjs` | 把锁定版本的工具（cargo-deny、ripgrep、fd、bindgen-cli）装进 `.tools/`，不做全局安装；`localToolPath()` 给出可执行文件路径 | T01 |
@@ -314,3 +314,8 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | 内置 npm 调用 | `piarc_core::plugins::fetch`（`npm`、`npm_cli`、`with_path_first`、`NPM_SAFE_ARGS`） | Core 以内置 node 运行同目录发行包的 `npm-cli.js`，参数始终带 `--ignore-scripts`、`--no-audit`、`--no-fund`、`--legacy-peer-deps`，`PATH` 最前是内置 Node，环境取命令环境；`--prefix` 传真实路径（npm 经符号链接时写错锁文件）。不要另写一条运行 npm 的路径，也不要去掉 `--ignore-scripts` | T40 |
 | 原生确认框与测试应答钩子 | `apps/desktop/src/main/core/plugins-ipc.ts` 的 `NativeConfirm`（`ask`、测试钩子的 `answerConfirm`、`confirmations`） | 主进程的原生确认：开发构建的测试钩子可预先给出下一次的答复并记录显示的文字（Playwright 点不到原生对话框），发布构建没有测试钩子（`check-app-layout.mjs --flavor release` 核对 Core 无测试导出）。新的"必须由用户在原生对话框里确认"的操作复用它 | T40 |
 | 扩展包与可执行项 | `piarc_config::plugins`（`read`、`Manifest::executables`、`active`、`Active::{hooks, mcp_servers, extensions, restrict_agent}`）、`Settings::packages` | 插件与 Pi 包的组件、可执行项名字与已确认的过滤；读设置的地方经 `Settings::packages()` 取生效的包，不另读记录 | T40 |
+| 无障碍状态清单 | `apps/desktop/e2e/a11y/states.ts`（清单）、`e2e/a11y.ts` 的 `checkState`、`e2e/t43-a11y.e2e.ts`（旅程）、`e2e/a11y/states.test.ts`（覆盖） | 每个页面与组件状态一条，axe 亮暗两种主题零违规；新增设置页、面板、对话框、transcript 行类型要登记并接到旅程 | T43 |
+| transcript 行的可访问名称 | `apps/desktop/src/renderer/transcript/row-label.ts`（`rowLabel`、`rowKind`）、`src/shared/row-kinds.ts`（`ROW_KINDS`）、`RowView.tsx` 的 `useRowLabel`/`RowArticle` | 每种行一句描述，和可见文案共用 i18n；新增行类型在这里加 | T43 |
+| 节流播报 | `transcript/live-announcer.ts`（`ThrottledAnnouncer`，可注入时钟）、`transcript/LiveRegion.tsx`、`LIVE_ANNOUNCE`（`transcript/constants.ts`） | 进展至多每个间隔一次、结果立即且只一次；要播报的地方复用它，不另开 `aria-live` 区域逐条写 | T43 |
+| i18n 检查 | `scripts/ci/check-i18n.mjs`（verify 第 16 步；`readCatalog`、`catalogProblems`、`sourceProblems`） | 键集合、ICU 与占位符、复数类别、引用、硬编码文字与不带 locale 的格式化；固定文字用 `i18n-exempt:` 注释说明 | T43 |
+| 按应用语言格式化 | `apps/desktop/src/renderer/app/app-context.tsx` 的 `format.number`、`format.dateTime` | 数字与日期按应用选择的语言（不是系统语言） | T43 |

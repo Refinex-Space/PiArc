@@ -18,7 +18,7 @@
 
 ## 2. 质量门禁
 
-`npm run verify`（`scripts/dev/verify.mjs`）按顺序执行全部 15 项检查，一步失败后继续执行后续步骤，最后打印汇总表，任一步失败则退出码非 0：
+`npm run verify`（`scripts/dev/verify.mjs`）按顺序执行全部 16 项检查，一步失败后继续执行后续步骤，最后打印汇总表，任一步失败则退出码非 0：
 
 | # | 步骤 | 单独运行 |
 |---|---|---|
@@ -37,6 +37,7 @@
 | 13 | 验收清单一致性 | `node scripts/plan/check-acceptance.mjs` |
 | 14 | L2 场景与能力清单 | `node scripts/ci/run-l2.mjs`：构建 Agent Host bundle → 全部场景（`cargo test -p piarc-testkit --test scenarios -- --results target/l2/results.json`）→ 能力覆盖与 `capabilities.md` 漂移检查（第 12、13 节） |
 | 15 | 设计令牌 | `node scripts/ci/check-design-tokens.mjs`：生成物与 `design/tokens/` 一致、声明的前景 / 背景对在四种颜色模式下达到 WCAG、主色色相与表面色的品牌规则、不打包字体与音频（ADR-0029；试改令牌用 `--tokens <目录>`） |
+| 16 | i18n | `node scripts/ci/check-i18n.mjs`：两种语言键集合一致、ICU 有效且两种语言占位符一致、只用该语言有的复数类别、`t('…')` 引用的键存在、渲染进程与主进程没有硬编码的用户可见文字与不带 locale 的 `toLocaleString()`（T43，规则见 `accessibility.md`） |
 
 CI（`.github/workflows/ci.yml`）在 `macos-latest`（arm64）与 `windows-latest`（x64）上执行 `npm ci --ignore-scripts` 与 `npm run verify`。L3 不在 PR CI 中，由独立的 Nightly 工作流运行（第 14 节）；它的剥离检查单测（`scripts/l3/*.test.mjs`）属于第 5 步。后续任务新增的检查（L1 契约、L2 场景、schema 漂移等）都接进 verify，使本地与 CI 运行同一套检查。verify 作业结束后把 L2 报告（`target/l2/results.json`）上传为 artifact `l2-report-<os>`。
 
@@ -175,6 +176,13 @@ Playwright 配置在 `apps/desktop/playwright.config.ts`，两个 project 跑同
 - 帧编解码的一致性在 L0：`cargo test -p piarc-term --test consistency` 把帧与 formatter 逐格比较，并生成 TS 共享样本；`npx vitest run apps/desktop/src/renderer/terminal` 用同一样本检查 TS 解码器。
 - 性能不在 L4 中断言：`npm run bench:s7` 输出 JSON（`tmp/evidence/T10/bench/`），数字写进 S7 报告。
 - 这些 L4 用例与 `crates/piarc-term/tests/pty.rs` 用 Unix 程序，在 Windows 上不运行；ConPTY 与 Windows 程序的版本由 W0 补上。
+
+### 9.7 无障碍（T43）
+
+- axe：`PIARC_EVIDENCE_TASK=T43 npx playwright test -c apps/desktop/playwright.config.ts t43-a11y --project dev` 按旅程到达状态清单（`e2e/a11y/states.ts`）的每一条，`checkState(page, id)` 在亮色与暗色下各跑一次 axe（`e2e/a11y.ts`，WCAG 2.0–2.2 A/AA 与最佳实践，`setLegacyMode(true)`），报告写到 `tmp/evidence/<任务>/axe/<状态>-<主题>.json`；最后一个用例检查清单里的状态本次都到达了（全局 setup 先清空该目录）。只跑其中几个旅程时最后一个用例会失败，这是预期的。
+- 清单覆盖在 Vitest：`apps/desktop/e2e/a11y/states.test.ts` 枚举渲染进程注册的设置页、面板、渲染 `<Dialog>` 的文件与 `ROW_KINDS`，缺登记即失败。新增页面或组件时先登记再接到旅程里（`accessibility.md` 第 2 节）。
+- 键盘与系统偏好：`t43-keyboard`（只用键盘的流程、Tab 的区域顺序与焦点环、`page.emulateMedia` 的 `reducedMotion`、`contrast`、`forcedColors`）；审批卡焦点：`t43-approval-focus`（原型页、`page.clock` 与 CDP 输入法合成）；中英文截图与溢出：`t43-locales`。
+- 用例按页面文字定位时限定在所属元素内（例如 `getByTestId('agent-message').getByText(…)`）：会话的 live region 会重复回合结果的文字。
 
 ## 10. 严格 mock provider
 

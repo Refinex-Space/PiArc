@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.53（2026-11-21） |
+| 版本 | 2.54（2026-11-21） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -275,6 +275,7 @@ PiArc/
 | [0058](../adr/0058-plugins-pi-packages-and-mcp-prompts.md) | 插件与 Pi 包由 Core 安装（记录在 `core.sqlite`，npm 经内置 npm 且 `--ignore-scripts`，git 锁定提交），作用域在设置的 `plugins` 键，可执行项逐项确认、确认只在主进程原生对话框里；组件以命名空间排在所有来源之后；Pi 扩展经 AHP `plugins/extensions` 交给 Agent Host；MCP prompts 是 `mcp__<server>__<prompt>` 斜杠命令 | 装上不等于运行：每段代码在运行前都经用户逐项确认；项目未受信任时项目作用域的包一律不加载 |
 | [0059](../adr/0059-m4-hooks-config-diagnostics-and-usage-cost.md) | M4 hooks（UserPromptExpansion、InstructionsLoaded、CwdChanged、FileChanged、ConfigChange、StopFailure）的挂载点与 `watchPaths`、ConfigChange 阻断后本会话保留旧值；`mcp_tool` handler 经 AHP `hooks/mcpTool` 交给工作区的 MCP 池；配置诊断复用 T24 的报告结构并按来源类别列出全部来源；用量按请求从 JSONL 派生，按目录价或用户价以整数计算 | 诊断与成本都从功能自己的加载器和会话文件得出，不另写判断；没有价格的模型成本是"未知"而不是 0 |
 | [0060](../adr/0060-notebook-edit-actionable-notifications-and-diff-comments.md) | NotebookEdit 只替换一个 cell 的字节区间、Rust 与 TS 共用向量、新 cell 的 id 由调用 id 派生；系统通知只放行能在通知里读完的请求，按钮经同一审批账本；diff 行内评论是渲染进程的草稿，按摘录重新定位，一次发送 | 保真写入不产生整文件 diff；通知没有阅读闸门，只给短请求"允许"；评论发送后就是普通消息，不需要 Core 存储 |
+| [0061](../adr/0061-accessibility-and-localization.md) | 状态清单逐条 axe（亮暗）并由注册点核对覆盖；transcript 是带行名称的 feed；进展经 5 秒节流的 live region；审批卡出现时取焦点；侧栏叠层、高对比度代码主题与强制颜色的系统按钮色；i18n 检查进 verify | 无障碍要靠检查守住，读屏与对比度在真实背景上成立 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -1355,7 +1356,8 @@ T34 落地（ADR-0051）：Ctrl+\` 切换终端面板（`terminal.toggle`）。�
 - 键盘：所有功能可以只用键盘完成；焦点顺序经过设计和测试；焦点环始终可见。
 - 本地化：第一版提供简体中文与英文；字符串集中管理（ICU MessageFormat），主进程菜单与渲染进程共用同一份资源，不在代码中硬编码。
 - T34（ADR-0051）：终端的输入框可聚焦并有可读名称（"终端 <名称>"），画布对辅助技术隐藏；"以文本查看屏幕"在对话框中显示 Core 读屏的文本，供屏幕阅读器阅读与复制；查找的匹配数以 `aria-live` 播报。面板经 axe 检查无违规。
-- T18 落地（ADR-0029）：intl-messageformat 12.1.4（解释执行，不放宽 CSP）；目录在 `src/shared/i18n/`（`en.ts` 定义消息 id，`zh-CN.ts` 必须覆盖全部 id），主进程的菜单、原生对话框、通知与渲染进程共用；语言偏好为 `system` 时取系统首选语言，改语言后各窗口与菜单立即更新。缺失翻译的检查与全面无障碍由 T43 做。
+- T18 落地（ADR-0029）：intl-messageformat 12.1.4（解释执行，不放宽 CSP）；目录在 `src/shared/i18n/`（`en.ts` 定义消息 id，`zh-CN.ts` 必须覆盖全部 id），主进程的菜单、原生对话框、通知与渲染进程共用；语言偏好为 `system` 时取系统首选语言，改语言后各窗口与菜单立即更新。缺失翻译的检查与全面无障碍见下面 T43 一条。
+- T43 落地（ADR-0061）：状态清单（`apps/desktop/e2e/a11y/states.ts`）每个页面与组件状态一条，L4 逐条在亮暗两种主题下跑 axe 零违规，Vitest 按设置页、面板、对话框与行 kind 的注册核对清单覆盖。transcript 是 `feed`，每行是带名称的 `article`（"工具调用：读取 notes.txt，完成"），会话的 polite live region 至多每 5 秒播报一次进展、回合结束播报一次结果。审批卡出现时焦点移到卡片容器并读出类型与对象，输入法合成期间推迟，400 ms 内卡片上的 Enter、Space 无效。键盘：Tab 按侧栏 → 主区 → 右栏 → 停靠区，所有停靠点有焦点环，关掉含焦点的停靠面板时焦点回到输入框，右栏与停靠区的分隔条可用方向键调整。强制颜色下主按钮用系统按钮色、状态点保留形状。verify 第 16 步检查两种语言的目录、ICU 与占位符、复数类别（中文用 `=1` 而不是 `one`）、硬编码文字与不带 locale 的格式化；数字与日期按应用语言格式化。读屏核对清单在 `docs/engineering/accessibility.md`。
 
 ### 8.8 平台集成
 
@@ -1851,6 +1853,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.49 | 2026-11-21 | T39（ADR-0056）补充第 4 章 ADR-0056（ADR-0057 以提议列出）、6.2.3 节写明沙箱内自动批准在第 7 步、沙箱外执行紧接第 3 步；6.10 节 T39 落地（设置与来源约束、按命令生成配置、网络卡、拒绝反馈、不可用时降级、限制）；9.2 节审计的沙箱记录；10.3 节 Agent Host 配置定稿。Windows 隔离方案的 ADR-0057 为提议，第 6.10 节 Windows 一条、10.3、15.2 节与 R16 待用户决定后更新。 |
 | 2.50 | 2026-11-21 | T39：ADR-0057 被用户采纳。第 4 章去掉"提议"；6.10 节 Windows 一条写明评估结论（到 Beta 维持现状，MXC ProcessContainer 为 Beta 之后的候选及其前提）；10.3 节 Windows 的 Agent Host 没有第二道防线并计入已接受风险；15.2 节沙箱一行与第 14 章 R16 的对策和触发条件随之更新。 |
 | 2.51 | 2026-11-21 | T40（ADR-0058）补充第 4 章 ADR-0058；6.3.1 节插件 hooks 的层与确认；6.4 节插件的子 agent 定义；6.7 节 T40 落地（识别、安装位置、作用域与开关、确认与再确认、组件命名与优先级、Pi 扩展经 AHP、设置页）；6.8 节 MCP prompts 作为斜杠命令；6.14 节插件一行；7.4 节能力 `plugins` 与 Core API；9.2 节 `packages` 表（schema v10）；10.2 节项目作用域的包与信任。 |
+| 2.54 | 2026-11-21 | T43（ADR-0061）补充第 4 章 ADR-0061；8.7 节无障碍与本地化的落地（状态清单与 axe、feed 与行名称、节流播报、审批卡焦点、键盘与焦点环、强制颜色、i18n 检查与按应用语言格式化）。 |
 | 2.53 | 2026-11-21 | T42（ADR-0060）补充第 4 章 ADR-0060；6.1.4 节 `NotebookEdit` 已实现（参数、cell 字节区间的保真编辑、共享向量、新 cell 的 id）；8.2 节 Changes 面板的 diff 行内评论；8.8 节可操作通知（`notificationAllow` 的条件、经同一审批账本答复、审计来源"通知"）；7.7 节说明评论不需要词级 diff。 |
 | 2.52 | 2026-11-21 | T41（ADR-0059）补充第 4 章 ADR-0059；6.3.2 节 M4 事件与 `mcp_tool` 已实现（挂载点、`watchPaths`、ConfigChange 阻断、StopFailure 映射位置、`hooks/mcpTool`）；6.14 节诊断的全部来源、状态与自动刷新；7.4 节 `hooks/mcpTool`、`CatalogModel.cost` 与用量的 Core API；8.2 节右栏用量卡片与设置窗口"用量"页；9.2 节 `usage_records`、`model_prices`（schema v11）。 |
 | 2.40 | 2026-11-20 | T32（ADR-0049）补充第 4 章 ADR-0049、6.1.4 节 KillShell 与 Monitor 的参数与裁决、6.6.3 节 `monitorOutput`、`key` 与 `wake`、6.11 节任务管理器、超时转后台、通知、Monitor 回灌与限速的落地、7.3 节后台任务的持久化、7.4 节 `backgroundTasks` 能力的方法与成员、8.2 节后台任务卡与面板、9.2 节 schema v7、9.3 节任务输出的清理；基线决策未变（6.11 已定超时转后台与 Monitor） |
