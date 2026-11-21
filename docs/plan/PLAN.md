@@ -161,7 +161,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | W2 | [Windows：M2 达标](tasks/W2-windows-m2-parity.md) | 4 | R3 | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T31 | [子 agent 与模型别名](tasks/T31-subagents-and-model-aliases.md) | 4 | R3 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 7ec1971 |
 | T32 | [后台任务、Monitor 与 KillShell](tasks/T32-background-tasks-and-monitor.md) | 4 | T31 | macOS | high / 高 | 中 | 无 | 部分完成 | ef39d43 |
-| T33 | [无头终端（Core 侧）](tasks/T33-headless-terminal.md) | 4 | T32 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
+| T33 | [无头终端（Core 侧）](tasks/T33-headless-terminal.md) | 4 | T32 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 33f4bf9 |
 | T34 | [终端渲染器与终端面板](tasks/T34-terminal-renderer-and-panel.md) | 4 | T33 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T35 | [Worktree、并行会话、多窗口、全文搜索与后台常驻](tasks/T35-worktrees-parallel-sessions-and-windows.md) | 4 | T34 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T36 | [MCP 共享连接池](tasks/T36-mcp-connection-pool.md) | 4 | T35 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -308,20 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-### T33 无头终端（Core 侧）
-
-开工：2026-11-20，基线 `npm run verify -- --baseline` 通过（复用 ef39d43 的全量结果）。T32 部分完成的 A04、A13 等待 Windows CI，不影响本任务；分支尚未推送，无法关闭。S7 路线结论为正式路线，不启用 xterm.js 退路，字节流副本通道不做。
-
-- [x] 1 终端会话与 IO 线程：注册表记所属会话与工作区，进程树终止（macOS 进程组、Windows Job Object，I28），I55 余项（IO 线程 `Interrupted`、应答队列有界、线程 panic 防护、`createTerminal` 不在 JS 线程同步 spawn）
-- [x] 2 副作用回调：`PWD_CHANGED`、`SEMANTIC_PROMPT`、`CLIPBOARD_READ`（拒绝）、`CLIPBOARD_WRITE`（可关闭）；事件形状移入 `piarc-protocol`（A03）
-- [x] 3 读屏 API（屏幕、scrollback、最近 N 行，unwrap/trim）、OSC 133 命令边界与等待、后台搜索（A01、A02、A05）
-- [x] 4 帧协议定稿（schema、L1 样本、协议文档）、隐藏终端不出帧、输入编码（Kitty 键盘、鼠标、粘贴、焦点）（A04、A07、A08）
-- [x] 5 snapshot 持久化与降级（版本头、VT 重放、纯文本），归档清理（A06）
-- [x] 6 cwd、环境（T17 构造）与 shell integration 脚本（zsh、bash、PowerShell、Git Bash）（A09）
-- [x] 7 agent 接口：补充 ADR、终端承载任务、共享校验、L2 场景与能力 ID（A10、A11）
-- [x] 8 进程树终止测试、`cat` 100 MB 无头测量（A12、A13）
-- [ ] 9 收尾：文档（架构 6.11、协议文档、AGENTS.md、复用表）、验收记录、`npm run verify`（A14）
 
 ## 登记事项
 
@@ -920,3 +906,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 验收：14 项通过，0 项阻塞
 - 决策：ADR-0048（补充：定义由 Core 读、子会话经 `subagent/start` 登记、隐藏声明加闸门而非 `setActiveTools`、计数只在 Agent Host、超限不排队、后台不随中断结束、别名表在设置中由 Agent Host 解析、`advisorModel` 忽略、`agent` 交 T48）；架构 2.39；`Agent` 的 `model`/`effort` 写成 string enum（L3 无差异，`Agent` allowlist 条目删除，I117）；`sessions/session.rs` 拆出 `session/changes.rs`（I105）
 - 遗留：I129–I135（暂未生效的 frontmatter 字段、`agent` 键、子会话增量、子会话 MCP 进程、子会话沙箱、类型列表刷新、辅助模型别名的工作区解析）；ego-browser 不能操作 Electron 窗口，前端改动经 Playwright 驱动开发构建验证
+
+### 2026-11-20 T33 部分完成（提交 33f4bf9）
+
+- 交付：`piarc-term` 的副作用回调（查询应答、标题、目录、铃声、OSC 133、剪贴板读拒绝与写可关、render hold 由 Core 计时结束）、读屏与分步搜索、OSC 133 命令记录与等待、帧格式第 2 版（滚动条、选区；`TermFrame` schema 与 L1 样本）、键盘（legacy、Kitty）、鼠标、粘贴、焦点编码、snapshot 三级降级、zsh/bash/PowerShell 的 shell integration、有界写队列与线程 panic 防护；`piarc-exec::TerminalTree`（macOS 按终端设备收集进程组，Windows Job Object）；Core 的 `terminal/`（会话终端作为 `terminal` 类任务、屏幕文件、共享校验、命令结束提醒与任务退出码、退出时保存 snapshot、关闭与有序关闭等进程树结束）；`exec/run` 的 `terminal` 与 Bash 的 `terminal` 参数、能力 `terminalTasks`；NAPI 的会话终端、鼠标、焦点、粘贴、读屏、搜索、终端信息导出，`createTerminal` 改为 Promise；渲染进程解析终端任务，S7 基准的 `--headless`。
+- 验收：11 项通过；A02（Git Bash 与 PowerShell 的 OSC 133）、A12（进程树测试的 Windows 部分）、A14（verify 的 Windows CI 部分）等待用户推送后的 Windows CI，标 blocked。`npm run verify` 15/15（33f4bf9，Vitest 1438 passed、L2 145 passed 2 个按平台跳过）；Windows 交叉 clippy 通过；L4 t33-terminal、terminal、terminal-tui、t32-background 9/9（dev 形态，截图在 `tmp/evidence/T33/`）；无头 cat 100 MB 主进程事件循环 p99 1.40–1.52 ms；原创性检查 5,082 词 0 匹配；L3 用本机 Claude Code 2.1.318 跑 `perm-compound`，`Bash.params.terminal` 由新 allowlist 条目解释。
+- 决策：ADR-0050（补充）；架构 2.41。实现中定下的补充：终端环境没有 locale 时补 UTF-8（macOS `en_US.UTF-8`），否则 bash 把键入的中文改坏；模型的命令结束时先挂提醒再把退出码写到仍在运行的任务上（L2 以此确定地等待）；模型的 bash 终端在 macOS 上关掉系统 bash 的 zsh 提示；scrollback 只按行数限制（libghostty-vt 默认 10,000 字节上限是 T10 遗留缺陷）；有序关闭等每棵进程树的宽限与 kill 结束（修复前忽略挂断的进程活过 Core）。
+- 登记：I28、I55 已落地；新增 I140（L3 的 `KillShell`、`Monitor` 差异没有 allowlist 条目）。共享开关的界面与终端面板交 T34。
+- 下一项：macOS 上的 T34（终端渲染器与终端面板，依赖 T33）；Windows 上的 W2 仍可进行。本地提交，未推送。

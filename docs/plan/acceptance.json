@@ -3289,99 +3289,99 @@
       "id": "T33-A01",
       "task": "T33",
       "description": "读屏 API 返回的纯文本与终端状态逐格一致，覆盖宽字符、折行与 alt screen。验证：Rust 测试（与 render state 逐格比较）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-term --test read_screen`：wide_characters_read_as_the_cells_show_them、wrapped_lines_are_rows_or_one_line_unwrapped、the_alternate_screen_reads_as_shown_and_the_primary_comes_back 等 6 项通过，读屏文本与 render state 逐格比较（宽字符、折行与合并折行、alt screen 及切回主屏）；`--test consistency` 帧与 formatter 逐格一致。提交 33f4bf9"
     },
     {
       "id": "T33-A02",
       "task": "T33",
       "description": "OSC 133 正确识别命令的开始、结束与退出码：macOS 上 zsh 与 bash，Windows CI 上 Git Bash 与 PowerShell。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "macOS 已通过，Windows CI 待推送后确认：`cargo test -p piarc-term --test shell_integration` 5 项通过（zsh、bash 各有非交互与交互式用例，命令开始、结束、退出码与 OSC 7，用户启动文件照常生效），连跑 8 遍稳定；Git Bash 与 PowerShell 的用例在 `tests/shell_integration_windows.rs`，随 verify 在 Windows CI 运行，用户推送后由下一个任务按 CI 结果关闭。提交 33f4bf9"
     },
     {
       "id": "T33-A03",
       "task": "T33",
       "description": "查询应答（设备属性、光标位置报告）经 `WRITE_PTY` 写回 PTY；标题、工作目录、铃声进入 Core 事件流；`CLIPBOARD_READ` 默认被拒绝。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-term`：vt::tests 的 device_attribute_queries_are_answered_through_write_pty、title_and_bell_are_recorded、the_working_directory_and_a_reset_are_recorded、clipboard_reads_are_denied_and_writes_follow_the_setting（未授予时 CLIPBOARD_READ 一律 DENIED）；tests/pty.rs 的 a_device_attribute_query_is_answered_through_write_pty、title_and_bell_become_events；Core `--test terminal` 的 lifecycle_events_arrive_on_the_terminal_route（title、bell、exited 经 `term/<id>`），`--lib terminal::` 的环境用例收到 `pwd` 事件。提交 33f4bf9"
     },
     {
       "id": "T33-A04",
       "task": "T33",
       "description": "`RENDER_HOLD` 期间不产生新帧，超时后 Core 主动结束 hold。验证：测试（时钟可注入）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-term`：session::tests::a_render_hold_freezes_frames_until_core_ends_it（注入时钟 `SessionConfig.now`，hold 期间帧不变，超过 HOLD_TIMEOUT 1 s 后 Core 结束 hold）、a_hold_the_program_ends_in_time_shows_its_result_at_once；vt::tests::a_render_hold_captures_the_frame_at_its_start。提交 33f4bf9"
     },
     {
       "id": "T33-A05",
       "task": "T33",
       "description": "在 1 万行 scrollback 中搜索返回正确位置，搜索期间 IO 线程写入不被阻塞。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-term`：vt::tests::search_finds_matches_in_ten_thousand_rows_of_scrollback（1 万行中的匹配位置正确）、a_search_holds_the_terminal_only_while_it_feeds（分步搜索每步之间放开终端锁，期间写入照常进入）；read_screen 的 ten_thousand_lines_stay_in_the_scrollback（修正 libghostty-vt 默认 10,000 字节 scrollback 上限）。提交 33f4bf9"
     },
     {
       "id": "T33-A06",
       "task": "T33",
       "description": "snapshot 恢复后的屏幕与 scrollback 与保存前一致；版本头不一致时降级为 VT 重放，重放失败时恢复纯文本。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-term`：snapshot::tests 的 a_snapshot_restores_screen_and_scrollback_exactly、another_library_version_replays_the_vt_output（版本头不同降级为 VT 重放）、a_damaged_snapshot_falls_back_to_the_replay_and_a_damaged_replay_to_the_text、files_are_written_atomically_and_bad_files_are_refused；Core `--lib terminal::` 的 snapshots_survive_quitting_and_closing_drops_them。提交 33f4bf9"
     },
     {
       "id": "T33-A07",
       "task": "T33",
       "description": "帧协议有 schema 与 L1 golden 样本；帧只含脏行；隐藏的终端不产生帧。验证：L1 契约测试与单元测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L1：`cargo test -p piarc-protocol --test term_frame`（`tests/contracts/term-frame/` 样本与反例，JSON 形式符合 `TermFrame` schema）、`npx vitest run packages/protocol`（ajv 校验样本）与 renderer `frame/decoder.test.ts`（TS 解码器跑同一组样本）；frame::tests::frames_carry_only_dirty_rows、scrolling_output_reuses_rows_by_id_and_sends_only_new_rows；tests/pty.rs::a_hidden_terminal_produces_no_frames 与 L4 `terminal.e2e.ts` 的 a hidden terminal produces no frames；无头基准 0 帧。提交 33f4bf9"
     },
     {
       "id": "T33-A08",
       "task": "T33",
       "description": "键盘、鼠标、粘贴、焦点事件按当前终端模式编码，覆盖 legacy 与 Kitty 键盘协议、SGR 鼠标、bracketed paste。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-term`：vt::tests 的 the_key_encoder_follows_the_cursor_key_mode（legacy）、keys_follow_the_kitty_keyboard_protocol_when_the_program_asks、mouse_events_follow_the_tracking_mode_and_format（含 SGR）、pastes_are_bracketed_and_unsafe_text_is_refused、focus_reports_follow_mode_1004；tests/pty.rs::key_events_are_encoded_and_written；L4 `terminal.e2e.ts` keys are encoded by Core with the terminal modes。提交 33f4bf9"
     },
     {
       "id": "T33-A09",
       "task": "T33",
       "description": "新终端以会话 cwd（含 worktree）启动，环境变量来自 T17 的构造逻辑且不含凭据。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-core --lib terminal::`：a_session_terminal_starts_in_the_session_directory_with_the_command_environment（`cd sub` 之后在 worktree 的 sub 目录启动，OSC 7 回报同一目录；有 TERM、COLORTERM、LANG 与 shell integration 变量，ANTHROPIC_API_KEY、PIARC_TEST_TOKEN 不出现）、a_terminal_without_a_locale_still_takes_typed_chinese；L2 `term-agent-env`（macOS：登录 shell 的 PATH 生效，profile 的私有变量为 unset）。提交 33f4bf9"
     },
     {
       "id": "T33-A10",
       "task": "T33",
       "description": "agent 接口的补充 ADR 已写；界面未打开时，agent 读到终端承载任务的屏幕内容与最近一条命令的退出码，内容与 formatter 输出一致。验证：ADR 文件与 L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "ADR：docs/adr/0050-agent-terminal-screen-access.md。L2 `term-agent-command`（无界面：模型以 terminal 运行命令，任务以 exitCode 1 继续运行，下一回合提醒含退出码与屏幕末尾，Read 屏幕文件得到头部 `Last command: … ended with exit code 1.` 与屏幕文本），verify 第 14 步通过；`--lib terminal::` 的 the_model_reads_its_terminal_task_and_hears_when_the_command_ends 断言屏幕文件正文与 formatter 输出逐字相等。提交 33f4bf9"
     },
     {
       "id": "T33-A11",
       "task": "T33",
       "description": "agent 无法读取未被用户共享的终端。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-core --lib terminal::tests::the_model_cannot_read_a_terminal_the_user_did_not_share`：未共享时 `exec/background/list` 不列出、`exec/background/read` 与 KillShell 返回 notFound、没有屏幕文件；共享后可见并挂起共享提醒，取消共享后再次不可见。提交 33f4bf9"
     },
     {
       "id": "T33-A12",
       "task": "T33",
       "description": "关闭终端或应用退出时 shell 进程树被终止。验证：macOS 与 Windows CI 上的测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "macOS 已通过，Windows CI 待推送后确认：`cargo test -p piarc-core --test terminal` 的 closing_a_terminal_ends_its_whole_process_tree 与 quitting_ends_every_terminal_tree_before_it_returns（`set -m` 的作业自成进程组、忽略 HUP 与 TERM 的进程，关闭终端与关闭 Core 后 `ps` 均不存在；后者在修复前复现了忽略挂断的进程活过 Core）；`cargo test -p piarc-exec terminal_tree`。Windows 用例 `tests/terminal_windows.rs` 与 piarc-exec 的 Job 用例经交叉 clippy 编译，随 verify 在 Windows CI 运行。提交 33f4bf9"
     },
     {
       "id": "T33-A13",
       "task": "T33",
       "description": "无头状态下 `cat` 100 MB 期间主进程事件循环延迟 p99 ≤ 16 ms。验证：测量输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run bench:s7 -- --form packaged --headless`（macOS arm64，开发构建，终端无页面拉帧）：cat 100 MB 三次主进程事件循环延迟 p99 1.44 / 1.52 / 1.40 ms（max 7.3–8.0 ms，约 400 个采样）；`--repeat 10`（1 GB，4.8 s）p99 1.36 ms、max 9.1 ms、3742 个采样；Core 编码 0 帧、主进程转发 0 帧。JSON 在 tmp/evidence/T33/bench/。提交 33f4bf9"
     },
     {
       "id": "T33-A14",
       "task": "T33",
       "description": "`npm run verify` 通过（含 Windows CI 上的 piarc-term 测试）。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "macOS 已通过，Windows CI 待推送后确认：`npm run verify` 15/15 通过（33f4bf9，工作区干净；Vitest 1438 passed、L2 145 passed 2 个按平台跳过）；Windows 交叉 clippy（piarc-core、piarc-napi、piarc-term、piarc-exec）通过。Windows CI 上的 piarc-term 测试需用户推送后由下一个任务按 CI 结果关闭。"
     },
     {
       "id": "T34-A01",
