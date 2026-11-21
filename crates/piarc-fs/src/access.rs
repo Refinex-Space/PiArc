@@ -5,7 +5,8 @@
 //!
 //! - any component named `.git`, `.piarc`, `.claude` or `.pi` (version control and the agents'
 //!   own configuration);
-//! - shell configuration files, by file name ([`SHELL_CONFIG_FILES`]).
+//! - shell configuration files, by file name ([`SHELL_CONFIG_FILES`]);
+//! - project files that name programs to run ([`PROTECTED_FILES`]: `.mcp.json`).
 //!
 //! On case-insensitive volumes the names match in any case. This crate only marks such
 //! operations ([`crate::Error::NeedsApproval`]); deciding them is the caller's (Core's
@@ -16,6 +17,10 @@ use std::path::Path;
 
 /// Directories whose content is never written without asking.
 pub const PROTECTED_DIRS: [&str; 4] = [".git", ".piarc", ".claude", ".pi"];
+
+/// Project files that name programs to run: the project's MCP servers (R4 M3; the sandbox
+/// protects the same file).
+pub const PROTECTED_FILES: [&str; 1] = [".mcp.json"];
 
 /// Files a shell or terminal runs at startup: writing one changes every later command.
 pub const SHELL_CONFIG_FILES: [&str; 17] = [
@@ -126,7 +131,12 @@ pub fn protected_component(relative: &Path, case_insensitive: bool) -> Option<St
             return Some(format!("{dir}/"));
         }
         let last = index + 1 == components.len();
-        if last && let Some(file) = SHELL_CONFIG_FILES.iter().find(|f| same(component, f)) {
+        if last
+            && let Some(file) = SHELL_CONFIG_FILES
+                .iter()
+                .chain(PROTECTED_FILES.iter())
+                .find(|f| same(component, f))
+        {
             return Some((*file).to_owned());
         }
     }
@@ -148,6 +158,9 @@ mod tests {
         // A directory named like a shell file is not one.
         assert_eq!(check(".profile/notes.txt"), None);
         assert_eq!(check(".GIT/config"), None);
+        // R4 M3: the project's MCP servers, as in the sandbox's protected paths.
+        assert_eq!(check(".mcp.json").as_deref(), Some(".mcp.json"));
+        assert_eq!(check(".mcp.json.bak"), None);
         assert_eq!(
             protected_component(Path::new(".GIT/config"), true).as_deref(),
             Some(".git/")

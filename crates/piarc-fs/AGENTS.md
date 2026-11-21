@@ -16,7 +16,7 @@ Core 层的集成测试在 `crates/piarc-core/tests/tool_io.rs`（越界、会�
 1. 相对路径接到 cwd 上（接到 cwd 的非 `\\?\` 写法上：Windows 在 `\\?\` 前缀下不把 `/` 当分隔符）。
 2. 按词法去掉 `.`、`..`（与 Node 的 `path.resolve` 一致；`..` 停在根）。
 3. 存在的部分由操作系统规范化（解析符号链接；macOS 与 Windows 的 `canonicalize` 都返回磁盘上的大小写）；悬空的符号链接按目标继续解析，最多 40 跳，超出报 `ELOOP`；不存在的尾部原样接上。
-4. `Scope::check(path, Access)`：读允许工作区根、已添加目录（`with_added_dir`）与只读目录（`with_read_only_dir`，会话临时目录）；写只允许前两者，且路径的任一组件不能是 `.git`、`.piarc`、`.claude`、`.pi`，文件名不能是 shell 配置文件（`access::SHELL_CONFIG_FILES`）。否则 `Error::NeedsApproval`，不触碰目标。`Scope::resolve` 保留命令工作目录的边界（`OutsideWorkspace`）。
+4. `Scope::check(path, Access)`：读允许工作区根、已添加目录（`with_added_dir`）与只读目录（`with_read_only_dir`，会话临时目录）；写只允许前两者，且路径的任一组件不能是 `.git`、`.piarc`、`.claude`、`.pi`，文件名不能是 shell 配置文件（`access::SHELL_CONFIG_FILES`）或项目的可执行配置文件（`access::PROTECTED_FILES`：`.mcp.json`，与沙箱的受保护路径一致，R4）。否则 `Error::NeedsApproval`，不触碰目标。`Scope::resolve` 保留命令工作目录的边界（`OutsideWorkspace`）。
 5. 状态表的键 `Scope::key`：`display()` 后的路径，根所在的卷大小写不敏感时整体转小写。是否不敏感在 `Scope::new` 时探测一次：把根路径中最深的含 ASCII 字母的组件换大小写，看是否指向同一目录。
 
 ## 文件状态表的 T27 扩展
