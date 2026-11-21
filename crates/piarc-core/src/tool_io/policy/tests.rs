@@ -165,7 +165,15 @@ impl Fixture {
 
 impl Drop for Fixture {
     fn drop(&mut self) {
-        self.io.close_session(SESSION);
+        // Subagents' sessions too: their scopes hold directory handles, which Windows does not
+        // let anyone delete while they are open (ADR-0036).
+        let sessions: Vec<String> = super::super::lock(&self.io.sessions)
+            .keys()
+            .cloned()
+            .collect();
+        for id in sessions {
+            self.io.close_session(&id);
+        }
         self.storage.close();
         std::fs::remove_dir_all(&self.root).expect("remove test data");
     }

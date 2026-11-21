@@ -439,9 +439,18 @@ async fn untrusted_project_hooks_wait_for_trust_while_user_hooks_run() {
 
 #[tokio::test]
 async fn handlers_run_in_parallel_and_a_handler_in_two_files_runs_once() {
-    // A10.
-    let shared = command(&format!("sleep 1; {}", records("shared")));
-    let own = command(&format!("sleep 1; {}", records("own")));
+    // A10. Each handler waits up to 10 s for the other one to start: run one after the
+    // other, the first could never see the second (W2: a fixed time budget measured how
+    // fast a busy Windows machine starts two Git Bash processes instead).
+    let meets = |me: &str, other: &str| {
+        command(&format!(
+            "mkdir -p log && touch log/{me}.up && for i in $(seq 100); do \
+             if [ -e log/{other}.up ]; then touch log/{me}.saw; break; fi; sleep 0.1; done; {}",
+            records(me)
+        ))
+    };
+    let shared = meets("shared", "own");
+    let own = meets("own", "shared");
     let f = Fixture::new(Setup {
         user: json!({ "PreToolUse": group("Read", &[shared.clone(), own]) }),
         project: json!({ "PreToolUse": group("Read", &[shared]) }),
@@ -449,10 +458,11 @@ async fn handlers_run_in_parallel_and_a_handler_in_two_files_runs_once() {
     })
     .await;
     std::fs::write(f.work.join("a.txt"), "a").expect("file");
-    let started = Instant::now();
     f.evaluate("c", "Read", json!({"path": "a.txt"})).await;
-    let elapsed = started.elapsed();
-    assert!(elapsed < Duration::from_millis(1900), "took {elapsed:?}");
+    for me in ["shared", "own"] {
+        let saw = f.work.join("log").join(format!("{me}.saw"));
+        assert!(saw.exists(), "{me} ran while the other one ran");
+    }
     assert_eq!(f.log("shared").len(), 1);
     assert_eq!(f.log("own").len(), 1);
     assert_eq!(f.hook_audit().await.len(), 2);
