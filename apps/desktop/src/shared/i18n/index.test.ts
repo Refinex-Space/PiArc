@@ -116,6 +116,11 @@ describe('i18n', () => {
             side: 'new version',
             start: 11,
             end: 12,
+            text: 'Fix the parser',
+            kind: 'Run command?',
+            task: 'Check the build',
+            status: 'Done',
+            removed: 1,
           }),
         ).not.toThrow();
       }
