@@ -236,6 +236,12 @@ export declare class CoreRuntime {
    * when null; a null name removes the choice (T37).
    */
   setOutputStyle(workspace?: string | null, name?: string | null): Promise<string>;
+  /** The WebSearch settings, JSON text `{ backend, backends: [{ id, name, hasKey }] }` (T38). */
+  webSearchSettings(): Promise<string>;
+  /** Chooses WebSearch's third-party backend; null chooses none (T38). */
+  setWebSearchBackend(backend?: string | null): Promise<string>;
+  /** Saves a WebSearch backend's API key in the vault; null removes it (T38). */
+  setWebSearchKey(backend: string, key?: string | null): Promise<string>;
   /** Stops subagent `child` of session `parent`; JSON text `{ stopped }` (T31). */
   stopSubagent(parent: string, child: string): Promise<string>;
   /**
@@ -411,8 +417,10 @@ export declare class CoreRuntime {
    * Like `create`, with the vault's master key in memory under a `piarc-test.` name instead
    * of the system credential store: tests that open workspaces never touch the keychain
    * (T14). L4 (T29) may also set `PIARC_TEST_WEB_ALLOWLIST` (comma-separated hosts or
-   * ranges WebFetch may reach, for its local test server) and `PIARC_TEST_OAUTH_PROVIDER`
-   * (a `--test-oauth-provider` file every Agent Host registers, for the mock sign-in).
+   * ranges WebFetch may reach, for its local test server), `PIARC_TEST_OAUTH_PROVIDER`
+   * (a `--test-oauth-provider` file every Agent Host registers, for the mock sign-in) and,
+   * from T38, `PIARC_TEST_SEARCH_ENDPOINTS` (comma-separated `backend=url`: the local mock
+   * search service that answers instead of the real one).
    */
   static createForTests(
     options: CoreOptions,

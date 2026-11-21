@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { AliasSection } from './AliasSection.js';
 import { ModelSettingsSection } from './ModelSettingsSection.js';
+import { WebSearchSection } from './WebSearchSection.js';
 import { SignInSection } from './SignInSection.js';
 import { useT } from '../app/app-context.js';
 import type { MessageId } from '../../shared/i18n/index.js';
@@ -227,6 +228,7 @@ export function ProvidersPage() {
             void mutate(() => window.piarc.setModelPreferences(preferences), false);
           }}
         />
+        <WebSearchSection settings={settings} />
       </div>
     );
   const selectedProviders = settings.builtinProviders.filter((p) =>

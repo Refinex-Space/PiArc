@@ -33,6 +33,7 @@ interface Draft {
   displayName: string;
   contextWindow: string;
   vision: '' | 'on' | 'off';
+  nativeWebSearch: '' | 'on' | 'off';
   defaultEffort: string;
   toolProfile: '' | 'default' | 'conservative';
 }
@@ -42,6 +43,7 @@ function draftOf(o: ModelOverride | undefined): Draft {
     displayName: o?.displayName ?? '',
     contextWindow: o?.contextWindow === undefined ? '' : String(o.contextWindow),
     vision: o?.vision === undefined ? '' : o.vision ? 'on' : 'off',
+    nativeWebSearch: o?.nativeWebSearch === undefined ? '' : o.nativeWebSearch ? 'on' : 'off',
     defaultEffort: o?.defaultEffort ?? '',
     toolProfile: o?.toolProfile ?? '',
   };
@@ -60,6 +62,7 @@ export function overrideOf(draft: Draft): ModelOverride | MessageId {
     out.contextWindow = window;
   }
   if (draft.vision !== '') out.vision = draft.vision === 'on';
+  if (draft.nativeWebSearch !== '') out.nativeWebSearch = draft.nativeWebSearch === 'on';
   if (draft.defaultEffort !== '') out.defaultEffort = draft.defaultEffort;
   if (draft.toolProfile !== '') out.toolProfile = draft.toolProfile;
   return out;
@@ -157,6 +160,30 @@ function ModelForm({
             <option value="">
               {t('models.settings.catalog', {
                 value: t(model.vision ? 'models.settings.on' : 'models.settings.off'),
+              })}
+            </option>
+            <option value="on">{t('models.settings.on')}</option>
+            <option value="off">{t('models.settings.off')}</option>
+          </select>
+        </div>
+        <div className="setting">
+          <label className="setting-label" htmlFor={id('search')}>
+            {t('models.settings.nativeWebSearch')}
+          </label>
+          <select
+            id={id('search')}
+            className="input"
+            data-testid="model-native-search"
+            value={draft.nativeWebSearch}
+            onChange={(e) => {
+              set('nativeWebSearch', e.currentTarget.value as Draft['nativeWebSearch']);
+            }}
+          >
+            <option value="">
+              {t('models.settings.catalog', {
+                value: t(
+                  model.nativeWebSearch === true ? 'models.settings.on' : 'models.settings.off',
+                ),
               })}
             </option>
             <option value="on">{t('models.settings.on')}</option>

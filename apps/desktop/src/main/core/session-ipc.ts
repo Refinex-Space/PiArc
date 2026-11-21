@@ -86,6 +86,9 @@ export type SessionCore = Pick<
   | 'listCommands'
   | 'listSkills'
   | 'setOutputStyle'
+  | 'webSearchSettings'
+  | 'setWebSearchBackend'
+  | 'setWebSearchKey'
   | 'resendSnapshots'
   | 'projectTrust'
   | 'decideProjectTrust'
@@ -746,6 +749,22 @@ export function registerSessionHandlers(
       throw new TypeError('name must be an output style name of 1-64 characters or null');
     }
     await core.setOutputStyle(dir === null ? null : absolutePath(dir), name);
+  });
+  registerHandler(IPC_CHANNELS.webSearchSettings, () => core.webSearchSettings());
+  const backendId = (value: unknown): string => {
+    if (typeof value !== 'string' || !/^[a-z][a-z0-9-]{0,31}$/u.test(value)) {
+      throw new TypeError('backend must be a search backend id');
+    }
+    return value;
+  };
+  registerHandler(IPC_CHANNELS.webSearchBackendSet, async (_event, [backend]) => {
+    await core.setWebSearchBackend(backend === null ? null : backendId(backend));
+  });
+  registerHandler(IPC_CHANNELS.webSearchKeySet, async (_event, [backend, key]) => {
+    if (key !== null && (typeof key !== 'string' || key.length === 0 || key.length > 512)) {
+      throw new TypeError('key must be an API key of 1-512 characters or null');
+    }
+    await core.setWebSearchKey(backendId(backend), key);
   });
   registerHandler(IPC_CHANNELS.snapshotsResend, () => {
     core.resendSnapshots();

@@ -40,6 +40,8 @@ export interface CatalogEntry {
   vision: boolean;
   efforts: string[];
   toolReliability: string;
+  /** The provider's own web search serves WebSearch (T38). */
+  nativeWebSearch?: boolean;
 }
 
 /** The user's settings for one model (T29). */
@@ -49,6 +51,8 @@ export interface ModelOverride {
   vision?: boolean;
   defaultEffort?: string;
   toolProfile?: 'default' | 'conservative';
+  /** Whether the provider's own web search serves WebSearch (T38). */
+  nativeWebSearch?: boolean;
 }
 
 export interface ProviderSettings {

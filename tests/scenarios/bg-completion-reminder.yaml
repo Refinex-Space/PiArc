@@ -1,5 +1,5 @@
 id: bg-completion-reminder
-description: When background tasks end, the session's next turn gets a system reminder per task with its id, command, exit code and what it means, how long it ran, its output file and last lines - a failing exit code and grep's 1 (no matches, a success) alike (T32).
+description: When background tasks end, the session gets a system reminder per task - with the next request after they end (T38 - this may be the same turn's next request) - with its id, command, exit code and what it means, how long it ran, its output file and last lines, a failing exit code and grep's 1 (no matches, a success) alike, each delivered once (T32).
 capabilities: [CAP-BG-NOTICE-001]
 workspace:
   files:
@@ -26,9 +26,8 @@ actions:
   - prompt: { text: 'How did they end?', turn: two }
 expect:
   requests:
-    - index: 1
-      not_contains: ['has ended.']
     - index: 2
+      occurrences: { 'has ended.': 2 }
       contains:
         - '[PiArc reminder]'
         - 'has ended.\nCommand: printf'

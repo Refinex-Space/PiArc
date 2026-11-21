@@ -16,6 +16,7 @@ import { HostToolRow } from './harness.js';
 import { CompactionRow, ErrorCard, ReminderRow, UncertainCard, WorkingRow } from './status.js';
 import { SubagentCard } from './subagent.js';
 import { BashCard, FileChangeCard, ToolGroupRow } from './tools.js';
+import { WebSearchCard } from './web-search.js';
 
 function useCommitted(id: string): void {
   const { renderCounter } = useTranscriptServices();
@@ -119,6 +120,8 @@ const RowContent = memo(function RowContent({ id }: { readonly id: string }) {
       return <ReminderRow id={id} item={item} />;
     case 'subagent':
       return <SubagentCard id={id} item={item} startedAt={row.startedAt} />;
+    case 'webSearch':
+      return <WebSearchCard id={id} item={item} />;
     case 'dynamicToolCall':
       if (OWN_ROW_TOOLS.has(item.tool)) return <HostToolRow item={item} />;
       return <ToolGroupRow id={id} members={[id]} />;

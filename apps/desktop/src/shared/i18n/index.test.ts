@@ -32,6 +32,7 @@ describe('i18n', () => {
             lines: 2,
             id: 'provider',
             model: 'chat',
+            models: 'a, b',
             name: 'n',
             query: 'q',
             count: 2,

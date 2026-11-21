@@ -58,7 +58,7 @@ export function useToolLabel(): (item: Item) => string {
   return (item) => t(VERB_MESSAGE[verbOf(item)], { count: 1, target: targetOf(item) });
 }
 
-function StatusMark({ status }: { readonly status: ItemStatus }) {
+export function StatusMark({ status }: { readonly status: ItemStatus }) {
   const t = useT();
   return (
     <span

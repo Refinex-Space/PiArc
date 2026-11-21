@@ -1225,3 +1225,37 @@
   outline: 2px solid var(--piarc-c-focus-ring);
   outline-offset: -2px;
 }
+
+/* web search (T38) */
+
+.row-web-search > .bash-head {
+  margin-left: 0;
+}
+
+.web-search-query {
+  overflow: hidden;
+  max-width: 60ch;
+  color: var(--piarc-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.web-search-sources {
+  margin: var(--piarc-space-1) 0 0;
+  padding-left: var(--piarc-space-5);
+  font-size: var(--piarc-font-size-small);
+}
+
+.web-search-source {
+  margin: var(--piarc-space-1) 0;
+}
+
+.web-search-host,
+.web-search-backend,
+.web-search-empty {
+  color: var(--piarc-text-secondary);
+}
+
+.row-web-search.is-failed .bash-head {
+  color: var(--piarc-text-danger);
+}

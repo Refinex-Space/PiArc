@@ -98,6 +98,9 @@ export const IPC_CHANNELS = {
   commandsList: 'piarc:commands.list',
   skillsList: 'piarc:skills.list',
   outputStyleSet: 'piarc:outputStyle.set',
+  webSearchSettings: 'piarc:webSearch.settings',
+  webSearchBackendSet: 'piarc:webSearch.backend.set',
+  webSearchKeySet: 'piarc:webSearch.key.set',
   snapshotsResend: 'piarc:snapshots.resend',
   trustGet: 'piarc:trust.get',
   trustDecide: 'piarc:trust.decide',
@@ -715,6 +718,15 @@ export interface PiarcApi {
    * user's settings when `workspace` is null; a null name removes the choice (T37).
    */
   setOutputStyle(workspace: string | null, name: string | null): Promise<void>;
+  /**
+   * WebSearch's settings as JSON `{ backend, backends: [{ id, name, hasKey }] }`: the chosen
+   * third-party backend and whether each has a key in the vault (T38). Keys never come back.
+   */
+  webSearchSettings(): Promise<string>;
+  /** Chooses WebSearch's third-party backend in the user's settings; null chooses none (T38). */
+  setWebSearchBackend(backend: string | null): Promise<void>;
+  /** Saves a WebSearch backend's API key in the vault; null removes it (T38). */
+  setWebSearchKey(backend: string, key: string | null): Promise<void>;
   /** Asks Core to send the workspace and session snapshots again. */
   resendSnapshots(): Promise<void>;
   /** The trust view of a directory as JSON (`TrustView`). */

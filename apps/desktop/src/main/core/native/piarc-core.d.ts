@@ -236,6 +236,12 @@ export declare class CoreRuntime {
    * when null; a null name removes the choice (T37).
    */
   setOutputStyle(workspace?: string | null, name?: string | null): Promise<string>;
+  /** The WebSearch settings, JSON text `{ backend, backends: [{ id, name, hasKey }] }` (T38). */
+  webSearchSettings(): Promise<string>;
+  /** Chooses WebSearch's third-party backend; null chooses none (T38). */
+  setWebSearchBackend(backend?: string | null): Promise<string>;
+  /** Saves a WebSearch backend's API key in the vault; null removes it (T38). */
+  setWebSearchKey(backend: string, key?: string | null): Promise<string>;
   /** Stops subagent `child` of session `parent`; JSON text `{ stopped }` (T31). */
   stopSubagent(parent: string, child: string): Promise<string>;
   /**
