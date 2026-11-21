@@ -362,6 +362,11 @@ export declare class CoreRuntime {
    * `{"kind":"delta","rows":-3}`, `{"kind":"row","row":120}`). Never blocks.
    */
   terminalScroll(id: number, to: string): void;
+  /**
+   * Sets the default foreground, background and cursor colors (the viewer's theme): cells
+   * without colors of their own and programs' color queries use them. Never blocks.
+   */
+  terminalSetColors(id: number, colors: TerminalColors): void;
   /** Clears the selection. Never blocks. */
   terminalClearSelection(id: number): void;
   /**
@@ -567,6 +572,16 @@ export interface SessionTerminalOptions {
   cellHeight?: number;
   /** The task id of a terminal of this session saved earlier, to continue from its snapshot. */
   restore?: string;
+}
+
+/** A terminal's default colors as `0xRRGGBB` numbers (T34); absent keeps the built-in one. */
+export interface TerminalColors {
+  /** Text without a color of its own. */
+  foreground?: number;
+  /** Cells without a background of their own. */
+  background?: number;
+  /** The cursor. */
+  cursor?: number;
 }
 
 /** Options of `createTerminal`. */

@@ -167,6 +167,18 @@ pub enum Event {
 /// Receives [`Event`]s, on the IO thread. Must not block for long: output waits meanwhile.
 pub type EventHandler = Arc<dyn Fn(Event) + Send + Sync>;
 
+/// The default colors a viewer gives the terminal ([`Session::set_colors`]); `None` keeps
+/// libghostty-vt's default.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct DefaultColors {
+    /// Text without a color of its own.
+    pub foreground: Option<piarc_protocol::term_frame::Rgb>,
+    /// Cells without a background of their own.
+    pub background: Option<piarc_protocol::term_frame::Rgb>,
+    /// The cursor.
+    pub cursor: Option<piarc_protocol::term_frame::Rgb>,
+}
+
 /// Counters of one session.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SessionStats {
@@ -505,6 +517,16 @@ impl Session {
     /// As [`write`](Self::write).
     pub fn scroll(&self, to: ScrollTo) -> Result<()> {
         self.send(WriterMessage::Scroll(to))
+    }
+
+    /// Sets the default foreground, background and cursor colors (the viewer's theme). Never
+    /// blocks.
+    ///
+    /// # Errors
+    ///
+    /// As [`write`](Self::write).
+    pub fn set_colors(&self, colors: DefaultColors) -> Result<()> {
+        self.send(WriterMessage::Colors(colors))
     }
 
     /// Clears the selection, after the pointer events and keys already queued. Never blocks.

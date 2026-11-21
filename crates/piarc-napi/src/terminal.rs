@@ -61,6 +61,24 @@ pub struct TerminalMouseEvent {
     pub clicks: Option<u32>,
 }
 
+/// A terminal's default colors as `0xRRGGBB` numbers (T34); absent keeps the built-in one.
+#[napi(object, object_to_js = false)]
+pub struct TerminalColors {
+    /// Text without a color of its own.
+    pub foreground: Option<u32>,
+    /// Cells without a background of their own.
+    pub background: Option<u32>,
+    /// The cursor.
+    pub cursor: Option<u32>,
+}
+
+fn rgb(value: Option<u32>) -> Option<piarc_protocol::term_frame::Rgb> {
+    value.map(|v| {
+        let [_, r, g, b] = (v & 0x00ff_ffff).to_be_bytes();
+        piarc_protocol::term_frame::Rgb { r, g, b }
+    })
+}
+
 /// Options of `createTerminal`.
 #[napi(object, object_to_js = false)]
 pub struct TerminalCreateOptions {
@@ -478,6 +496,27 @@ impl CoreRuntime {
     pub fn terminal_scroll(&self, env: Env, id: u32, to: String) -> napi::Result<()> {
         boundary::call(&env, "CoreRuntime.terminalScroll", || {
             self.core.terminal_scroll(id, scroll_target(&to)?)
+        })
+    }
+
+    /// Sets the default foreground, background and cursor colors (the viewer's theme): cells
+    /// without colors of their own and programs' color queries use them. Never blocks.
+    #[napi(catch_unwind)]
+    pub fn terminal_set_colors(
+        &self,
+        env: Env,
+        id: u32,
+        colors: TerminalColors,
+    ) -> napi::Result<()> {
+        boundary::call(&env, "CoreRuntime.terminalSetColors", || {
+            self.core.terminal_set_colors(
+                id,
+                piarc_core::TerminalColors {
+                    foreground: rgb(colors.foreground),
+                    background: rgb(colors.background),
+                    cursor: rgb(colors.cursor),
+                },
+            )
         })
     }
 

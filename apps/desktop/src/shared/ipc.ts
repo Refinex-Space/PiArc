@@ -35,6 +35,7 @@ export const IPC_CHANNELS = {
   terminalResize: 'piarc:terminal.resize',
   terminalRequestFrame: 'piarc:terminal.requestFrame',
   terminalScroll: 'piarc:terminal.scroll',
+  terminalColors: 'piarc:terminal.colors',
   terminalClearSelection: 'piarc:terminal.clearSelection',
   terminalSelectionText: 'piarc:terminal.selectionText',
   terminalLinkAt: 'piarc:terminal.linkAt',
@@ -351,6 +352,21 @@ export function isTerminalScrollTarget(value: unknown): value is TerminalScrollT
   }
 }
 
+/** A terminal's default colors from the theme, `0xRRGGBB` each (T34). */
+export interface TerminalThemeColors {
+  readonly foreground: number;
+  readonly background: number;
+  readonly cursor: number;
+}
+
+export function isTerminalThemeColors(value: unknown): value is TerminalThemeColors {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  const color = (n: unknown) =>
+    typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 0xffffff;
+  return color(v.foreground) && color(v.background) && color(v.cursor);
+}
+
 /** A session terminal the panel opened (`openSessionTerminal`). */
 export interface TerminalOpened {
   readonly terminalId: number;
@@ -471,6 +487,11 @@ export interface PiarcApi {
   requestTerminalFrame(id: number, full: boolean, park?: boolean): Promise<Uint8Array>;
   /** Moves the viewport through the scrollback. */
   terminalScroll(id: number, to: TerminalScrollTarget): Promise<void>;
+  /**
+   * Gives the terminal the theme's default colors: cells without colors of their own and
+   * programs that ask (OSC 10/11/12) get them.
+   */
+  terminalColors(id: number, colors: TerminalThemeColors): Promise<void>;
   /** Clears the selection. */
   terminalClearSelection(id: number): Promise<void>;
   /** The selected text, '' when nothing is selected. */

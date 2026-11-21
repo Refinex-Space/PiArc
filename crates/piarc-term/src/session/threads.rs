@@ -31,6 +31,7 @@ pub(super) enum WriterMessage {
     Focus(bool),
     Scroll(ScrollTo),
     ClearSelection,
+    Colors(super::DefaultColors),
     Paste {
         text: String,
         allow_unsafe: bool,
@@ -368,6 +369,13 @@ fn handle(
         }
         WriterMessage::ClearSelection => {
             let _ = vt::clear_selection(&mut lock(&shared.terminal));
+        }
+        WriterMessage::Colors(colors) => {
+            let _ = lock(&shared.terminal).set_default_colors(
+                colors.foreground,
+                colors.background,
+                colors.cursor,
+            );
         }
         WriterMessage::Paste {
             text,

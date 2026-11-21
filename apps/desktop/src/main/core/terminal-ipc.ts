@@ -25,6 +25,7 @@ import {
   isTerminalMouseMessage,
   isTerminalScrollTarget,
   isTerminalSize,
+  isTerminalThemeColors,
   type TerminalSize,
 } from '../../shared/ipc.js';
 import {
@@ -79,6 +80,7 @@ export type TerminalCore = Pick<
   | 'terminalResize'
   | 'terminalFrame'
   | 'terminalScroll'
+  | 'terminalSetColors'
   | 'terminalClearSelection'
   | 'terminalSelectionText'
   | 'terminalLinkAt'
@@ -485,6 +487,13 @@ function registerViewHandlers(
       throw new TypeError('to must be a scroll target');
     }
     core.terminalScroll(terminal, JSON.stringify(to));
+  });
+  registerHandler(IPC_CHANNELS.terminalColors, (event, [id, colors]) => {
+    const terminal = use(event.sender, id);
+    if (!isTerminalThemeColors(colors)) {
+      throw new TypeError('colors must be three 0xRRGGBB numbers');
+    }
+    core.terminalSetColors(terminal, { ...colors });
   });
   registerHandler(IPC_CHANNELS.terminalClearSelection, (event, [id]) => {
     core.terminalClearSelection(use(event.sender, id));

@@ -259,6 +259,9 @@ const api: PiarcApi = {
   terminalScroll: async (id, to) => {
     await ipcRenderer.invoke(IPC_CHANNELS.terminalScroll, id, to);
   },
+  terminalColors: async (id, colors) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.terminalColors, id, colors);
+  },
   terminalClearSelection: async (id) => {
     await ipcRenderer.invoke(IPC_CHANNELS.terminalClearSelection, id);
   },

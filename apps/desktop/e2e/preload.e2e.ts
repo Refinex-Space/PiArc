@@ -74,6 +74,7 @@ const PIARC_API_SNAPSHOT = [
   'subscribeEvents',
   'switchBranch',
   'terminalClearSelection',
+  'terminalColors',
   'terminalFocus',
   'terminalInfo',
   'terminalInput',

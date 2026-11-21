@@ -62,6 +62,12 @@
   --piarc-c-badge-unread: var(--piarc-agent-status-unread);
   --piarc-c-badge-size: var(--piarc-size-badge);
   --piarc-c-focus-ring: var(--piarc-border-focus);
+  --piarc-c-terminal-background: var(--piarc-code-background);
+  --piarc-c-terminal-foreground: var(--piarc-code-text);
+  --piarc-c-terminal-cursor: var(--piarc-accent-solid);
+  --piarc-c-terminal-selection: var(--piarc-surface-selected);
+  --piarc-c-terminal-find-match: var(--piarc-state-warning-subtle);
+  --piarc-c-terminal-find-current: var(--piarc-state-warning);
   color-scheme: light;
   --piarc-surface-app: #fcfcfd;
   --piarc-surface-sidebar: #f8f9fa;

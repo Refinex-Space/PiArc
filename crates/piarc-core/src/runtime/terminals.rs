@@ -187,6 +187,18 @@ impl CoreRuntime {
         self.shared.terminals.scroll(id, to)
     }
 
+    /// Sets terminal `id`'s default foreground, background and cursor colors from the
+    /// viewer's theme (T34): cells without colors of their own and OSC 10/11/12 replies use
+    /// them. Never blocks.
+    ///
+    /// # Errors
+    ///
+    /// As [`terminal_write`](Self::terminal_write).
+    pub fn terminal_set_colors(&self, id: u32, colors: piarc_term::DefaultColors) -> Result<()> {
+        self.ensure_running()?;
+        self.shared.terminals.set_colors(id, colors)
+    }
+
     /// Clears terminal `id`'s selection (T34). Never blocks.
     ///
     /// # Errors

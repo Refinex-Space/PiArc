@@ -5,6 +5,7 @@ use std::ptr::{self, NonNull};
 use std::time::Instant;
 
 use piarc_ghostty_sys as sys;
+use piarc_protocol::term_frame::Rgb;
 
 use super::effects::{self, Effects, EffectsOutput};
 use super::render::RenderState;
@@ -245,6 +246,49 @@ impl Terminal {
             clipboard_reads_denied: std::mem::take(&mut effects.clipboard_reads_denied),
             reset: std::mem::take(&mut effects.reset),
         }
+    }
+
+    /// Sets the default foreground, background and cursor colors (the viewer's theme, T34):
+    /// what cells without colors of their own show and what programs read back with OSC 10,
+    /// 11 and 12. `None` keeps libghostty-vt's default.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Vt`] when libghostty-vt fails.
+    pub fn set_default_colors(
+        &mut self,
+        foreground: Option<Rgb>,
+        background: Option<Rgb>,
+        cursor: Option<Rgb>,
+    ) -> Result<()> {
+        for (call, option, color) in [
+            (
+                "ghostty_terminal_set(COLOR_FOREGROUND)",
+                sys::GHOSTTY_TERMINAL_OPT_COLOR_FOREGROUND,
+                foreground,
+            ),
+            (
+                "ghostty_terminal_set(COLOR_BACKGROUND)",
+                sys::GHOSTTY_TERMINAL_OPT_COLOR_BACKGROUND,
+                background,
+            ),
+            (
+                "ghostty_terminal_set(COLOR_CURSOR)",
+                sys::GHOSTTY_TERMINAL_OPT_COLOR_CURSOR,
+                cursor,
+            ),
+        ] {
+            let value = color.map(|c| sys::GhosttyColorRgb {
+                r: c.r,
+                g: c.g,
+                b: c.b,
+            });
+            let pointer = value
+                .as_ref()
+                .map_or(ptr::null(), |v| ptr::from_ref(v).cast());
+            self.set(call, option, pointer)?;
+        }
+        Ok(())
     }
 
     /// Whether programs may put text on the clipboard (OSC 52); on by default.

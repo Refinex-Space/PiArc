@@ -100,6 +100,7 @@ pub use demo::{DemoReport, DemoSourceConfig};
 pub use dirs::DataDirs;
 pub use error::{Error, Result};
 pub use events::{DeliveryDone, EventBatch, EventSink, EventStats, SinkClosed};
+pub use piarc_term::DefaultColors as TerminalColors;
 pub use piarc_term::SessionStats as TerminalStats;
 pub use piarc_term::vt::KeyAction;
 pub use piarc_term::vt::MouseAction;

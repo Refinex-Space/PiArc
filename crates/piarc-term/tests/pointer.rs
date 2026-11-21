@@ -275,3 +275,44 @@ fn a_parked_viewer_is_woken_once_by_new_output() {
         "one wake per parking: {more:?}"
     );
 }
+
+#[test]
+fn default_colors_reach_frames_and_programs() {
+    use piarc_protocol::term_frame::Rgb;
+    let (session, _events) = spawn();
+    let mut screen = Screen::new();
+    pull_until(&session, &mut screen, "the first frame", |s| s.rows() == 10);
+    let light = Rgb {
+        r: 0xf8,
+        g: 0xf9,
+        b: 0xfa,
+    };
+    let ink = Rgb {
+        r: 0x1d,
+        g: 0x20,
+        b: 0x27,
+    };
+    session
+        .set_colors(piarc_term::DefaultColors {
+            foreground: Some(ink),
+            background: Some(light),
+            cursor: None,
+        })
+        .expect("colors");
+    pull_until(&session, &mut screen, "the new colors", |s| {
+        s.colors()
+            .is_some_and(|c| c.background == light && c.foreground == ink)
+    });
+    // A program asking for the background (OSC 11) gets the theme's: the first 23 bytes of
+    // the reply, read raw so no line ending is needed.
+    session
+        .write(
+            b"stty raw -echo; printf '\\033]11;?\\007'; dd bs=1 count=23 2>/dev/null | cat -v; stty sane; echo\n"
+                .to_vec(),
+        )
+        .expect("write");
+    eventually("the color report", || {
+        let text = session.viewport_text().expect("text");
+        text.contains("rgb:f8f8/f9f9/fafa").then_some(())
+    });
+}

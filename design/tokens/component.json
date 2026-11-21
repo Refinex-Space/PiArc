@@ -41,5 +41,13 @@
   },
   "focus": {
     "ring": "border.focus"
+  },
+  "terminal": {
+    "background": "code.background",
+    "foreground": "code.text",
+    "cursor": "accent.solid",
+    "selection": "surface.selected",
+    "findMatch": "state.warningSubtle",
+    "findCurrent": "state.warning"
   }
 }

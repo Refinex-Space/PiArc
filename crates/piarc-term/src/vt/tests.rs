@@ -603,3 +603,19 @@ fn osc_8_links_are_found_with_their_extent() {
     assert_eq!(link_at(&mut t, 12, 0).expect("after"), None);
     assert_eq!(link_at(&mut t, 99, 9).expect("outside"), None);
 }
+
+#[test]
+fn default_colors_answer_color_queries() {
+    use piarc_protocol::term_frame::Rgb;
+    let mut t = terminal(10, 2);
+    let light = Rgb {
+        r: 0xf8,
+        g: 0xf9,
+        b: 0xfa,
+    };
+    t.set_default_colors(None, Some(light), None)
+        .expect("colors");
+    t.write(b"\x1b]11;?\x07");
+    let replies = String::from_utf8(t.take_effects().replies).expect("utf-8");
+    assert!(replies.contains("rgb:f8f8/f9f9/fafa"), "{replies:?}");
+}

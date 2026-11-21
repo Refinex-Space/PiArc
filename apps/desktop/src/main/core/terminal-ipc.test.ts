@@ -85,6 +85,8 @@ function setup(frame: () => Promise<Uint8Array> = () => Promise.resolve(new Uint
       return frame();
     },
     terminalScroll: (id, to) => calls.push(`scroll ${String(id)} ${to}`),
+    terminalSetColors: (id, colors) =>
+      calls.push(`colors ${String(id)} ${String(colors.background)}`),
     terminalClearSelection: (id) => calls.push(`clear ${String(id)}`),
     terminalSelectionText: () => Promise.resolve('selected'),
     terminalLinkAt: () =>
@@ -305,12 +307,21 @@ describe('terminal IPC', () => {
       expect(() => invoke(win, IPC_CHANNELS.terminalScroll, id, bad)).toThrow(TypeError);
     }
     invoke(win, IPC_CHANNELS.terminalScroll, id, { kind: 'delta', rows: -3 });
+    expect(() =>
+      invoke(win, IPC_CHANNELS.terminalColors, id, { foreground: 0, background: -1, cursor: 0 }),
+    ).toThrow(TypeError);
+    invoke(win, IPC_CHANNELS.terminalColors, id, {
+      foreground: 0,
+      background: 0xf8f9fa,
+      cursor: 0,
+    });
     await expect(
       invoke(win, IPC_CHANNELS.terminalPaste, id, 'echo hi', false) as Promise<unknown>,
     ).resolves.toBe('pasted');
     invoke(win, IPC_CHANNELS.terminalResize, id, { ...size, cols: 100 });
     expect(calls.slice(1)).toEqual([
       'scroll 1 {"kind":"delta","rows":-3}',
+      `colors 1 ${String(0xf8f9fa)}`,
       'paste 1 echo hi',
       'resize 1 100x24',
     ]);

@@ -114,7 +114,13 @@ export type ComponentToken =
   | 'badge.running'
   | 'badge.unread'
   | 'badge.size'
-  | 'focus.ring';
+  | 'focus.ring'
+  | 'terminal.background'
+  | 'terminal.foreground'
+  | 'terminal.cursor'
+  | 'terminal.selection'
+  | 'terminal.findMatch'
+  | 'terminal.findCurrent';
 
 /** Resolved colors per mode (for the main process: window backgrounds, title bar overlays). */
 export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, string>>>> = {
@@ -397,6 +403,12 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'badge.unread': '--piarc-c-badge-unread',
   'badge.size': '--piarc-c-badge-size',
   'focus.ring': '--piarc-c-focus-ring',
+  'terminal.background': '--piarc-c-terminal-background',
+  'terminal.foreground': '--piarc-c-terminal-foreground',
+  'terminal.cursor': '--piarc-c-terminal-cursor',
+  'terminal.selection': '--piarc-c-terminal-selection',
+  'terminal.findMatch': '--piarc-c-terminal-find-match',
+  'terminal.findCurrent': '--piarc-c-terminal-find-current',
 };
 
 /** `var(--piarc-…)` for a token, for inline styles. */

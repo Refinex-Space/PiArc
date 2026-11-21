@@ -417,6 +417,11 @@ impl Terminals {
         Ok(self.session(id)?.scroll(to)?)
     }
 
+    /// Sets terminal `id`'s default colors (the viewer's theme). Never blocks.
+    pub(crate) fn set_colors(&self, id: u32, colors: piarc_term::DefaultColors) -> Result<()> {
+        Ok(self.session(id)?.set_colors(colors)?)
+    }
+
     /// Clears terminal `id`'s selection. Never blocks.
     pub(crate) fn clear_selection(&self, id: u32) -> Result<()> {
         Ok(self.session(id)?.clear_selection()?)
