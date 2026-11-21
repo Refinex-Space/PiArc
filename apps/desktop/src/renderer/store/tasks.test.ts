@@ -27,6 +27,24 @@ describe('background task snapshots (T32)', () => {
     expect(taskOf({ ...row, startedAt: -1 })).toBeUndefined();
   });
 
+  it('reads terminal tasks with their terminal (T33)', () => {
+    const terminal = { terminalId: 3, origin: 'agent', shared: true };
+    const task = taskOf({ ...row, kind: 'terminal', terminal, exitCode: 1 });
+    expect(task?.kind).toBe('terminal');
+    expect(task?.terminal).toEqual(terminal);
+    expect(task?.exitCode).toBe(1);
+    // A closed terminal has no handle; a malformed terminal part is left out.
+    const closed = taskOf({
+      ...row,
+      kind: 'terminal',
+      terminal: { origin: 'user', shared: false },
+    });
+    expect(closed?.terminal).toEqual({ origin: 'user', shared: false });
+    expect(taskOf({ ...row, kind: 'terminal', terminal: { origin: 'robot' } })?.terminal).toBe(
+      undefined,
+    );
+  });
+
   it('keeps the newest revision and lists a main session’s tasks', () => {
     const list = new TaskList();
     let heard = 0;

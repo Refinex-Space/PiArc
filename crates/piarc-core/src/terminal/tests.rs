@@ -158,7 +158,10 @@ impl Fixture {
             if test(&text) {
                 return text;
             }
-            assert!(started.elapsed() < WAIT, "waiting for {what}; screen:\n{text}");
+            assert!(
+                started.elapsed() < WAIT,
+                "waiting for {what}; screen:\n{text}"
+            );
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
     }
@@ -393,6 +396,11 @@ async fn the_model_reads_its_terminal_task_and_hears_when_the_command_ends() {
         .expect("header");
     assert_eq!(body.trim_end(), formatted.trim_end());
     assert!(formatted.contains("hello\nworld"));
+    // The shell Core picked says nothing of its own (macOS bash's zsh notice).
+    assert!(
+        !formatted.contains("default interactive shell"),
+        "{formatted}"
+    );
     // KillShell closes it: the task ends as killed.
     let killed = f
         .call("s", "exec/background/kill", json!({ "taskId": task_id }))

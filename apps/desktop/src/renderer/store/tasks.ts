@@ -1,13 +1,21 @@
 // Background tasks (T32, architecture section 6.11): the `core/tasks` snapshot of Core's task
 // manager, gated by its `revision` like the other entity snapshots. The rail card shows the
-// selected session's tasks, the dock panel the tasks of the workspace's sessions.
-import type { BackgroundTask, TaskKind, TaskStatus } from '@piarc/protocol';
+// selected session's tasks, the dock panel the tasks of the workspace's sessions. Terminal tasks
+// (T33) carry their terminal's handle, origin and sharing.
+import type {
+  BackgroundTask,
+  TaskKind,
+  TaskStatus,
+  TerminalOrigin,
+  TerminalTask,
+} from '@piarc/protocol';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-const KINDS: readonly TaskKind[] = ['command', 'subagent', 'monitor'];
+const KINDS: readonly TaskKind[] = ['command', 'subagent', 'monitor', 'terminal'];
+const ORIGINS: readonly TerminalOrigin[] = ['agent', 'user'];
 const STATUSES: readonly TaskStatus[] = ['running', 'completed', 'failed', 'killed', 'interrupted'];
 
 const text = (value: unknown): string | undefined =>
@@ -16,6 +24,17 @@ const count = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
 const integer = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isSafeInteger(value) ? value : undefined;
+
+/** The terminal of a `terminal` task (T33), or undefined when `value` is not one. */
+function terminalOf(value: unknown): TerminalTask | undefined {
+  if (!isRecord(value) || typeof value.shared !== 'boolean') return undefined;
+  const origin = ORIGINS.find((o) => o === value.origin);
+  if (origin === undefined) return undefined;
+  const terminal: TerminalTask = { origin, shared: value.shared };
+  const id = count(value.terminalId);
+  if (id !== undefined) terminal.terminalId = id;
+  return terminal;
+}
 
 /** A task of the snapshot, or undefined when `value` is not one. */
 export function taskOf(value: unknown): BackgroundTask | undefined {
@@ -78,6 +97,8 @@ export function taskOf(value: unknown): BackgroundTask | undefined {
   if (value.outcome === 'success' || value.outcome === 'failure') {
     task.outcome = value.outcome;
   }
+  const terminal = terminalOf(value.terminal);
+  if (terminal !== undefined) task.terminal = terminal;
   return task;
 }
 

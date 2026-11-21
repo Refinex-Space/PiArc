@@ -95,7 +95,7 @@ impl ToolIo {
         wrap: Wrap,
     ) -> Result<ExecRunResult, ErrorObject> {
         let bash = self.exec.bash()?;
-        let spec = self
+        let mut spec = self
             .terminal_spec(
                 &p.session_id.0,
                 session,
@@ -104,6 +104,13 @@ impl ToolIo {
                 TerminalOrigin::Agent,
             )
             .await;
+        if cfg!(target_os = "macos") {
+            // macOS's bash 3.2 greets every interactive start with a notice that zsh is the
+            // default now; on the model's screen it is only noise. The user's own terminals run
+            // their shell untouched.
+            spec.env
+                .push(("BASH_SILENCE_DEPRECATION_WARNING".into(), "1".into()));
+        }
         let opened = self
             .terminals()?
             .open(BoundSpec {
