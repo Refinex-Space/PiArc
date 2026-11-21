@@ -314,12 +314,12 @@ T38（WebSearch 与 hooks 扩展）开工于 2026-11-21；基线 `npm run verify
 - [x] 1. 调研与决策：pi-ai 1.5.2 的服务端搜索、各服务商原生搜索线格式、第三方搜索 API 选型、`http`/`prompt` handler 与 M3 事件的官方语义；ADR
 - [x] 2. `piarc-hooks`：`http` 与 `prompt` handler 配置、白名单设置、事件与 handler 组合诊断、M3 事件与决策合并、错误枚举（I128）（A06、A12）
 - [x] 3. Core：`http` 执行（复用 `piarc-web` 客户端）、`prompt` 经 Agent Host 辅助模型判定与审计、`agent_id`/`agent_type`、`prompt_id`/`effort`（I115）、I93 环境白名单、I122（A06、A07、A11、A12）
-- [ ] 4. Agent Host：SubagentStart、SubagentStop、PostToolBatch 挂载（A08、A09、A10）
-- [ ] 5. WebSearch：工具、后端选择、原生后端（服务商适配在 `providers/`）、第三方后端适配接口与实现、保险箱 key、设置项与设置页说明（A01–A04）
+- [x] 4. Agent Host：SubagentStart、SubagentStop、PostToolBatch 挂载（A08、A09、A10）
+- [x] 5. WebSearch：工具、后端选择、原生后端（服务商适配在 `providers/`）、第三方后端适配接口与实现、保险箱 key、设置项与设置页说明（A01–A04）
 - [x] 6. mock：mock provider 的原生搜索结果块、本地 mock 搜索服务
-- [ ] 7. 渲染进程：transcript 搜索结果的来源链接（A05）
-- [ ] 8. L2 场景 `websearch-*`、`hooks-m3-*`，能力清单与 capabilities.md
-- [ ] 9. L4 与截图证据（A03、A05）
+- [x] 7. 渲染进程：transcript 搜索结果的来源链接（A05）
+- [x] 8. L2 场景 `websearch-*`、`hooks-m3-*`，能力清单与 capabilities.md
+- [x] 9. L4 与截图证据（A03、A05）
 - [ ] 10. 文档、AGENTS.md、复用表、登记事项
 - [ ] 11. `npm run verify`（A13）、验收记录与收尾
 
