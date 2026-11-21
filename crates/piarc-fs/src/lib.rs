@@ -62,6 +62,7 @@ pub mod fuzzy;
 mod glob;
 mod grep;
 mod image;
+pub mod notebook;
 mod pdf;
 mod restore;
 mod scope;
