@@ -3569,99 +3569,99 @@
       "id": "T36-A01",
       "task": "T36",
       "description": "Pi 内置 MCP 扩展与 codemode 均未加载，MCP 工具以 `mcp__<server>__<tool>` 直接或延迟暴露给模型。验证：测试与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "agent_host 端到端 `sessions_of_a_workspace_share_one_mcp_server_process`（`cargo test -p piarc-testkit --test agent_host`）：请求直接声明 `mcp__alpha__echo`，不含 `codemode`、`tool_search`、`ToolSearch`；L2 `mcp-pool-shared`（`tools_exclude: [ToolSearch, tool_search, codemode]`）与 `mcp-defer-toolsearch`（43 个工具超过阈值，请求只声明 `ToolSearch`，检索后下一次请求声明命中的工具）；Agent Host 不再加入 Pi 的 `createMcpExtension()`（`runtime/session-runtime.ts`）；L4 `t36-mcp` 首个请求带 `mcp__echo__echo`、`mcp__notes__extra_2` 且没有 `ToolSearch`。全量 L2 161 个场景：159 passed、2 skipped（平台）"
     },
     {
       "id": "T36-A02",
       "task": "T36",
       "description": "同一工作区两个会话使用同一个 stdio server 时只有一个 server 进程，两个会话的调用结果各自正确返回。验证：测试（进程计数与 PID 断言）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`sessions_of_a_workspace_share_one_mcp_server_process`：同一工作区两个会话（一个在子目录）调用同一 stdio server，两次结果各自返回、pid 相同；L2 `mcp-pool-shared`：启动日志 `mcp-starts.jsonl` 只有 1 行；`agent-host/src/mcp/pool.test.ts` 的 \"runs one process for two sessions and routes each call to its caller (A02)\"；L4 `t36-mcp` 每个 server 启动日志 1 行"
     },
     {
       "id": "T36-A03",
       "task": "T36",
       "description": "所有会话停止使用超过空闲阈值后连接断开、stdio 进程退出，之后有会话需要时自动重连。验证：测试（时钟可注入）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npx vitest run agent-host/src/mcp/pool.test.ts`（10 项）：手动时钟下空闲 999 ms 仍连接、1,000 ms 断开且进程退出、工具数保留，下一次调用起新进程并以新 pid 回答；进行中的调用使 server 越过空闲时间保持连接；同一 id 重开的会话在空闲时间内取回租约，进程不变（I111）；有租约时失败按退避重试"
     },
     {
       "id": "T36-A04",
       "task": "T36",
       "description": "未信任项目的 `.mcp.json` server 不连接、不启动进程；信任后才连接；`.mcp.json` 新增 server 时需要再次确认。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `mcp-untrusted-project`（未信任项目的 `.mcp.json` server 不启动，启动日志为空，同一工作区用户设置里的 server 照常运行）、`mcp-pool-shared`（信任后连接）；`cargo test -p piarc-core --lib mcp::`（5 项：未信任时为 `untrusted` 且不带程序，信任后 `ready`）；新增 server 再次确认：`cargo test -p piarc-config --test executables`（`.mcp.json`、`.piarc/settings*.json` 的 server 按程序命名，改程序即新增项）与 `cargo test -p piarc-core --test state`（`a_trust_view_lists_the_items_and_what_is_new_since_the_decision`）"
     },
     {
       "id": "T36-A05",
       "task": "T36",
       "description": "同名 server 按\"企业 > 本地 > 项目 > 用户 > 插件\"取整条定义；SSE 与 WebSocket 配置被标为不支持并在界面提示。验证：单元测试与 Playwright 截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "单元测试 `cargo test -p piarc-config`（`mcp::tests`：`the_highest_scope_takes_the_whole_definition_without_merging_fields`、`enterprise_definitions_rank_above_local_ones`、`sse_and_websocket_servers_are_listed_as_unsupported_with_the_reason` 等 11 项）与 `cargo test -p piarc-core --lib mcp::`（`every_source_is_read_and_the_highest_scope_wins`、`the_diagnostics_list_unsupported_servers_without_expanding_variables`）；L4 `t36-mcp`（dev 与 packaged 两种形态）：用户设置里的 `echo` 被项目 `.mcp.json` 的整条定义替换并列为被替换，SSE 与 WebSocket 在 MCP 页与配置诊断页标为不支持。截图 `tmp/evidence/T36/mcp-overridden-en.png`、`mcp-legacy-en.png`、`mcp-sockets-en.png`、`diagnostics-mcp-en.png`、`mcp-page-en.png`、`mcp-page-zh-CN.png`"
     },
     {
       "id": "T36-A06",
       "task": "T36",
       "description": "`npx` 启动的 stdio server 使用内置 Node，系统 PATH 中没有 node 时也能启动。验证：测试（从 PATH 中移除系统 node 后运行）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-testkit --test sessions mcp::an_npx_server_runs_on_the_agent_hosts_node_without_a_system_node`：Core 的命令环境 PATH 中没有任何 node，`npx` 拉起的 server 报告的 `execPath` 是 Agent Host 的 Node；打包形态 L4 `agent-host.e2e.ts`（`--project packaged`）：内置 npx 以 tarball 启动的 server 跑在内置 node v24.22.3 上，npm 缓存与临时目录在数据目录，Seatbelt 下工作区外写入为 `EPERM`"
     },
     {
       "id": "T36-A07",
       "task": "T36",
       "description": "经 mock 授权服务器完成浏览器授权、token 刷新与重新认证；token 只存在保险箱中，数据目录下没有 `mcp-auth.json` 或明文 token。验证：端到端测试与磁盘扫描。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-testkit --test sessions mcp::oauth_sign_in_refresh_and_sign_in_again_keep_tokens_in_the_vault`：mock 授权服务器（元数据发现、动态注册、PKCE S256）完成浏览器授权，access token 过期后刷新（refresh token 轮换），撤销全部 token 后状态为 `needsAuth`、重新登录成功；三代 token 只出现在保险箱，`piarc_testkit::plaintext::scan` 扫描数据目录、缓存目录与工作区 0 处明文，数据目录下没有 `mcp-auth.json`；L2 `mcp-http-oauth`（登录前不提供工具，登录后工具可调用）"
     },
     {
       "id": "T36-A08",
       "task": "T36",
       "description": "MCP 工具总数超过阈值（默认 30）时改为延迟加载，模型经 `ToolSearch` 检索到目标工具并成功调用。验证：L2 场景（mock 请求断言工具列表与调用顺序）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `mcp-defer-toolsearch`：43 个工具的 server 超过默认阈值 30，system prompt 写明它的工具要经 ToolSearch 查找，第一次请求只声明 `ToolSearch`，模型检索后下一次请求声明命中的工具，调用成功"
     },
     {
       "id": "T36-A09",
       "task": "T36",
       "description": "`mcp__server__tool` 与 `mcp__server__*` 规则生效，带 `requiresUserInteraction` 标记的工具在任何模式下都询问。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `mcp-rules-interaction`：`mcp__alpha__*` allow 让 `whoami` 免审批，`mcp__alpha__add_tool` deny 拒绝调用；带 `requiresUserInteraction` 的 `mcp__inter__echo` 在有 allow 规则时与 bypassPermissions 下都询问，卡片不提供可保存的规则；`cargo test -p piarc-core --lib tool_io::policy::tests::t36`（2 项）"
     },
     {
       "id": "T36-A10",
       "task": "T36",
       "description": "工具集因 `list_changed` 或连接变化而改变时，变化以追加消息送达，已发送的 system prompt 字节不变。验证：mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `mcp-tools-changed`：server 的 instructions 在 system prompt 的 MCP 段；`add_tool` 触发 `notifications/tools/list_changed` 后，下一次请求声明新工具、追加的 `mcpChanged` 提醒说明变化，前后请求的 system 字节相同（`same_system_as`）；`pool.test.ts` 的 \"lists the tools again after list_changed and tells the sessions\""
     },
     {
       "id": "T36-A11",
       "task": "T36",
       "description": "Agent Host 正常退出或被杀后没有遗留的 MCP server 进程。验证：macOS 与 Windows CI 上的测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "macOS 通过：`cargo test -p piarc-testkit --test sessions mcp::no_mcp_server_outlives_its_agent_host`（SIGKILL 杀掉 Agent Host 与正常关闭两种情况，忽略 stdin 结束与 SIGTERM 的 server 也不留进程）、`pool.test.ts` 的 \"kills a server that ignores the end of stdin and SIGTERM when it closes\"；Windows 的 Job Object 与 `taskkill /T` 分支经交叉 clippy 通过。Windows CI 输出要在用户推送后由 CI 产生，本会话不推送"
     },
     {
       "id": "T36-A12",
       "task": "T36",
       "description": "MCP 设置页显示每个 server 的来源、传输、状态与工具数，重连、启用、停用操作生效。验证：Playwright（截图存 `tmp/evidence/T36/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `PIARC_EVIDENCE_TASK=T36 npx playwright test -c apps/desktop/playwright.config.ts t36- --project dev`（连跑 3 次通过，packaged 形态也通过）：MCP 页按工作区列出每个 server 的来源文件、作用域、传输、状态与工具数；停用后状态为\"已停用\"且原进程退出，启用后起新进程并重新连接，重连 `notes` 后换新进程；截图 `tmp/evidence/T36/mcp-page-en.png`、`mcp-page-zh-CN.png`、`mcp-echo-en.png`、`mcp-notes-en.png`、`mcp-echo-disabled.png`"
     },
     {
       "id": "T36-A13",
       "task": "T36",
       "description": "子 agent 定义中按名称引用的 server 复用连接池，项目级内联 server 在信任前不启动。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 `mcp-subagent-servers`（子 agent 按名称引用的 `alpha` 用主会话已启动的进程，`alpha` 只启动一次；内联的 `scratch` 只在子 agent 运行期间启动）与 `mcp-subagent-untrusted`（未信任项目中项目级定义的内联 server 不启动，调用以未知工具失败，启动日志为空）；`pool.test.ts` 的 \"gives inline servers to their subagent only and closes them when it ends\""
     },
     {
       "id": "T36-A14",
       "task": "T36",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run verify` 于 ca3d873：15/15 通过（工作区干净），其中 cargo test 全部通过、Vitest 126 个文件 1,524 项通过、L2 161 个场景 159 passed、2 skipped（平台）、能力覆盖与 `capabilities.md` 无漂移；另跑 Windows 交叉 clippy（`--target x86_64-pc-windows-msvc --workspace --all-targets`）通过"
     },
     {
       "id": "T37-A01",

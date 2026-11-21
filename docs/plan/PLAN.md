@@ -164,7 +164,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T33 | [无头终端（Core 侧）](tasks/T33-headless-terminal.md) | 4 | T32 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 33f4bf9 |
 | T34 | [终端渲染器与终端面板](tasks/T34-terminal-renderer-and-panel.md) | 4 | T33 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 991f323 |
 | T35 | [Worktree、并行会话、多窗口、全文搜索与后台常驻](tasks/T35-worktrees-parallel-sessions-and-windows.md) | 4 | T34 | macOS | high / 高 | 大 | 无 | 部分完成 | c4094dd |
-| T36 | [MCP 共享连接池](tasks/T36-mcp-connection-pool.md) | 4 | T35 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
+| T36 | [MCP 共享连接池](tasks/T36-mcp-connection-pool.md) | 4 | T35 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | ca3d873 |
 | T37 | [Skills、斜杠命令、命令面板与输出风格](tasks/T37-skills-commands-and-output-styles.md) | 4 | T36 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T38 | [WebSearch 与 hooks 扩展（M3）](tasks/T38-websearch-and-hooks-m3.md) | 4 | T37 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | R4 | [M3 评审](tasks/R4-m3-review.md) | 4 | T38、W2 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,17 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-T36（开工 2026-11-20，基线复用 c4094dd 的全量 verify；T35 的遗留 A10（Windows CI）、A11（应用内存）不影响本任务；远端 CI 运行 44868949621 两平台失败，用户决定登记为 I153 后继续）：
-
-- [x] 1 Core 配置：来源（`.mcp.json`、`~/.claude.json` user/local、PiArc 用户与 `.piarc/` 设置）、同名取整条、`${VAR}` 展开、SSE/WebSocket 不支持、信任与可执行项、Claude Code 键（A04 的配置部分、A05 单元测试）
-- [x] 2 协议：`mcp/servers`、`mcp/status`、`mcp/reconnect`、`mcp/setEnabled`、`mcp/login`、`mcp/statusChanged`、`policy/evaluate` 的 `requiresUserInteraction`；契约样本
-- [x] 3 Core：应答 `mcp/servers`（基础环境与 PATH 前置内置 Node）、启停按工作区持久化、Hub/NAPI 的状态与操作、`core/mcp` 事件、MCP 登录沿用 `core/login`、`requiresUserInteraction` 任何模式询问（A09 的 Core 部分）
-- [x] 4 Agent Host：PiArc MCP 扩展替换内置扩展（不加载 codemode）、自写 stdio 传输（不脱离 Agent Host 进程组）、工作区连接池（按需连接、空闲断开、退避重连、工具缓存与 `list_changed`、roots）、工具暴露（direct / 超过阈值经 `ToolSearch` 延迟）、server instructions 第 6 段与变化的追加消息、OAuth 凭据进保险箱（A01、A02、A03、A06、A07、A08、A10、A11）
-- [x] 5 子 agent `mcpServers`：按名称复用连接池、内联 server 临时连接、项目级定义信任前不启动（A13）
-- [x] 6 测试夹具与场景：独立实现的 stdio 与 Streamable HTTP server、mock OAuth、`tests/scenarios/mcp-*.yaml`、能力 ID（A01–A04、A06–A11、A13）
-- [x] 7 客户端：设置窗口"MCP"页、配置诊断页的不支持提示、Playwright 截图（A05 截图、A12）
-- [ ] 8 文档、AGENTS.md、架构与 ADR、`coding-standards.md` 复用表、verify（A14）与收尾
 
 ## 登记事项
 
@@ -958,3 +947,10 @@ T36（开工 2026-11-20，基线复用 c4094dd 的全量 verify；T35 的遗留 
 - 决策：ADR-0052（补充）；架构 2.43；`window.piarc` 共 94 个函数；Claude Code 设置键 `worktree` 改标 T48（I148）
 - 登记：I80 落地、I129、I43、I143 更新；新增 I146（M3 内存超预算，R4）、I147（W3 的 Windows 核对项）、I148、I149（菜单栏截图需要屏幕录制权限）、I150（runner.rs 超 1,000 行）、I151（worktree 需要仓库顶层）、I152（搜索命中回退前的分支、运行中定位）
 - 下一项：macOS 上的 T36（MCP 共享连接池，依赖 T35）；Windows 上的 W2 仍可进行。本地提交，未推送。
+
+### 2026-11-21 T36 部分完成（提交 ca3d873）
+- 交付：PiArc 的 MCP 扩展替换 Pi 的（不加载 codemode，不读 `.pi/mcp.json`、`mcp-auth.json`）。Core 合并 local > project > user 的配置（`piarc_config::mcp`、`piarc_core::mcp`：`.mcp.json`、`~/.claude.json` 的 user 与 local、PiArc 用户与 `.piarc/` 设置，同名取整条，`${VAR}` 展开，SSE/WebSocket 标不支持，信任与按工作区的启停，schema v9 `mcp_servers`），AHP `mcp/servers|status|reconnect|setEnabled|login` 与工作区级通知 `mcp/statusChanged`（`core/mcp`）。Agent Host 的工作区连接池（`agent-host/src/mcp/`：租约、空闲断开、退避重连、工具缓存与 `list_changed`、roots 为工作区根与活动 worktree）、自写 stdio 传输（server 留在 Agent Host 的进程组，环境取命令环境并前置内置 Node）、超过阈值经 `ToolSearch` 延迟加载、instructions 进第 6 段与 `mcpChanged` 提醒、`requiresUserInteraction` 任何模式询问、OAuth 状态进保险箱 `mcp/<server>`、子 agent 的 `mcpServers`。设置窗口的 MCP 页、配置诊断的 MCP 部分、`agentHostProbe` 回答 `mcp/servers`。夹具：独立实现的 stdio 与 Streamable HTTP（含 OAuth）server，8 个 `mcp-*.yaml` 场景，能力 CAP-MCP-* 9 项为已实现
+- 验收：13 项通过；A11（Windows CI）blocked，macOS 上 SIGKILL 与正常关闭两种情况都不留 server 进程，等用户推送。`npm run verify` 15/15（ca3d873，Vitest 1,524 passed、cargo test 915 passed、L2 159 passed 2 个按平台跳过）；Windows 交叉 clippy 通过；L4 `t36-mcp` 在 dev 与 packaged 两种形态通过（dev 连跑 3 次），受影响的 preload、t18-trust、t24-diagnostics、t29、t31、打包形态 `agent-host.e2e.ts` 通过；`t18-review` 在本机因终端没有屏幕录制权限失败（与 I149 相同，非本任务引起）；`npm run l3` 12 个场景 0 条未解释差异、0 条过时条目；提示词原创性 5,587 词 0 个匹配窗口
+- 决策：ADR-0053（补充）；架构 2.44；`window.piarc` 共 98 个函数；server 不再继承 Agent Host 的 `PI_PACKAGE_DIR` 等内部变量（打包形态 L4 的断言随之改为"不存在"）；`~/.claude.json` 的 `mcpServers` 与 `disabledMcpjsonServers` 生效，`enableAllProjectMcpServers`、`enabledMcpjsonServers` 忽略，`allowedMcpServers`、`deniedMcpServers` 改标 T47
+- 登记：I05、I40（落地）、I111（复核）、I117（T36 部分复核，并补上 T32 漏登的 L3 条目）、I129、I132（落地）、I150 更新；新增 I153（开工时远端 CI 两平台失败）、I154（Pi 扩展注册的 MCP server，T40）、I155（MCP 资源工具与 prompts，T40）、I156（`headersHelper`，T47）、I157（OAuth 状态按 server 名存键，同名不同地址会互相覆盖）
+- 下一项：macOS 上的 T37（Skills、斜杠命令、命令面板与输出风格，依赖 T36）；Windows 上的 W2 仍可进行。本地提交，未推送。
