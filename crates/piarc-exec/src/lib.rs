@@ -43,6 +43,8 @@
 //!
 //! - T33: [`terminal_tree`] ends what a terminal's shell started (every process attached to
 //!   the PTY on macOS, a Job Object on Windows).
+//! - T39: [`Error`], with `kind()` and `retryable()`, for the file and process functions
+//!   ([`TaskLog`], [`task_log::read_chunk`], [`terminal_tree::TerminalTree::attach`], [`CwdProbe`]).
 //!
 //! The Windows `job` module (a safe wrapper over the Job Object calls) and the macOS
 //! `tty_processes` module (one `proc_listpids` call) are the crate's only unsafe code (coding
@@ -52,6 +54,7 @@ pub mod capture;
 mod command;
 pub mod cwd;
 pub mod env;
+mod error;
 #[cfg(windows)]
 #[allow(
     unsafe_code,
@@ -79,6 +82,7 @@ pub use command::{
     CommandExit, CommandRunner, CommandSpec, EXIT_GRACE, Launcher, OutputChunk, Stream,
 };
 pub use cwd::CwdProbe;
+pub use error::{Error, Result};
 pub use limits::{ExecLimits, Timeout};
 pub use semantic::{Interpretation, interpret};
 pub use shells::{Shells, msys_to_windows};

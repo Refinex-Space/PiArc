@@ -206,6 +206,26 @@ impl From<piarc_config::WriteError> for Error {
     }
 }
 
+/// The AHP error of a `piarc_exec` file or process failure: file errors in `piarc_fs`'s shape
+/// (`ENOENT` and the other POSIX codes with the path), the rest as `piarc_exec` classifies them.
+pub(crate) fn exec_error_object(error: piarc_exec::Error) -> ErrorObject {
+    match error {
+        piarc_exec::Error::File { path, source } => {
+            piarc_fs::Error::io(&path, source).to_error_object()
+        }
+        other => other.to_error_object(),
+    }
+}
+
+/// The operating system's error inside a `piarc_exec` error, for paths that report I/O
+/// failures as `io::Error` and name the file themselves.
+pub(crate) fn exec_io_error(error: piarc_exec::Error) -> std::io::Error {
+    let message = error.to_string();
+    error
+        .into_io()
+        .unwrap_or_else(|| std::io::Error::other(message))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -154,10 +154,10 @@ fn go_background(sink: Sink, order: Switch) -> Sink {
         let mut log = match (handover.spilled.as_ref(), spilled) {
             (Some(_), Some(spill)) => {
                 std::fs::rename(&spill, file)?;
-                TaskLog::resume(file, &handover.tail)?
+                TaskLog::resume(file, &handover.tail).map_err(crate::error::exec_io_error)?
             }
             _ => {
-                let mut log = TaskLog::create(file)?;
+                let mut log = TaskLog::create(file).map_err(crate::error::exec_io_error)?;
                 log.write_text(handover.text.as_deref().unwrap_or_default());
                 log
             }
@@ -207,8 +207,7 @@ pub(in crate::tool_io) fn start_task(
     let monitor = new.kind == piarc_protocol::tasks::TaskKind::Monitor;
     let tasks = tasks.clone();
     let reserved = tasks.reserve(&tasks_dir)?;
-    let log = TaskLog::create(&reserved.file)
-        .map_err(|e| piarc_fs::Error::io(&reserved.file, e).to_error_object())?;
+    let log = TaskLog::create(&reserved.file).map_err(crate::error::exec_error_object)?;
     let log = Arc::new(Mutex::new(log));
     tasks.register(&reserved, new.clone(), Arc::clone(&log), token.clone());
     let (tx, rx) = mpsc::channel::<OutputChunk>(OUTPUT_BUFFER);

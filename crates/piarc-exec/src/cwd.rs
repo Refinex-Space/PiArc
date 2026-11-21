@@ -15,8 +15,9 @@
 //! `%TEMP%`) resolve too; [`crate::msys_to_windows`] turns the answer into a Windows path.
 
 use std::ffi::OsString;
-use std::io;
 use std::path::{Path, PathBuf};
+
+use crate::error::{Error, Result};
 
 /// The two files of one command.
 #[derive(Debug)]
@@ -37,8 +38,8 @@ impl CwdProbe {
         dir: &Path,
         id: &str,
         user_bash_env: Option<&str>,
-    ) -> io::Result<(Self, (OsString, OsString))> {
-        std::fs::create_dir_all(dir)?;
+    ) -> Result<(Self, (OsString, OsString))> {
+        std::fs::create_dir_all(dir).map_err(Error::file(dir))?;
         let stem: String = id
             .chars()
             .map(|c| {
@@ -61,7 +62,7 @@ impl CwdProbe {
             }
             None => script.push_str("unset BASH_ENV\n"),
         }
-        std::fs::write(&init, script)?;
+        std::fs::write(&init, script).map_err(Error::file(&init))?;
         let variable = (OsString::from("BASH_ENV"), OsString::from(bash_path(&init)));
         Ok((Self { init, answer }, variable))
     }
@@ -71,8 +72,9 @@ impl CwdProbe {
     ///
     /// # Errors
     ///
-    /// The name is not a plain command name, or the startup file cannot be updated.
-    pub fn pin_program(&self, name: &str, path: &Path) -> io::Result<()> {
+    /// [`Error::InvalidProgram`] when the name is not a plain command name, [`Error::File`]
+    /// when the startup file cannot be updated.
+    pub fn pin_program(&self, name: &str, path: &Path) -> Result<()> {
         use std::io::Write;
         let plain = !name.is_empty()
             && !name.starts_with('-')
@@ -80,16 +82,21 @@ impl CwdProbe {
                 .chars()
                 .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '+' | '-'));
         if !plain {
-            return Err(io::ErrorKind::InvalidInput.into());
+            return Err(Error::InvalidProgram(name.to_owned()));
         }
         let program = quote(&bash_path(path));
-        let mut file = std::fs::OpenOptions::new().append(true).open(&self.init)?;
+        let failed = Error::file(&self.init);
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&self.init)
+            .map_err(Error::file(&self.init))?;
         let refused = "{ builtin printf '%s\\n' 'Command resolution changed. Request a new approval.' >&2; exit 126; }";
         writeln!(
             file,
             "[[ $(builtin type -t {name}) == file && $(builtin type -P {name}) -ef {program} ]] || {refused}"
-        )?;
-        writeln!(file, "builtin hash -p {program} {name} || {refused}")
+        )
+        .and_then(|()| writeln!(file, "builtin hash -p {program} {name} || {refused}"))
+        .map_err(failed)
     }
 
     /// The directory the shell ended in, as the shell printed it; removes both files.
@@ -174,7 +181,10 @@ mod tests {
         assert!(!String::from_utf8_lossy(&refused.stdout).contains("done"));
         for bad in ["", "-x", "a b", "a;b", "$(x)"] {
             let (probe, _) = CwdProbe::prepare(&dir, "req-bad", None).expect("probe");
-            assert!(probe.pin_program(bad, ls).is_err(), "{bad:?}");
+            assert!(
+                matches!(probe.pin_program(bad, ls), Err(Error::InvalidProgram(ref n)) if n == bad),
+                "{bad:?}"
+            );
             let _ = probe.finish();
         }
         std::fs::remove_dir_all(&dir).expect("cleanup");

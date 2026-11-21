@@ -53,6 +53,7 @@ Core 层的集成测试在 `crates/piarc-core/tests/exec_commands.rs`（cwd、�
 
 ## 易错点
 
+- 公开的文件与进程函数（`TaskLog::create`/`resume`、`task_log::read_chunk`、`TerminalTree::attach`、`CwdProbe::prepare`/`pin_program`）返回 `piarc_exec::Error`（`error.rs`，带 `kind()`、`retryable()`，I173）；Core 经 `piarc_core::error::exec_error_object` 把 `File` 变体按 `piarc_fs::Error::io` 的形状报告（保留 `ENOENT` 等代码与路径）。`CommandRunner::run` 仍返回 `io::Result`：它的失败来自注入的 `ProcessSpawner`。
 - 后台任务的 `TaskLog` 由 Core 以 `Arc<Mutex<_>>` 共享给消费者与快照：持锁只做一次写入或读尾部行，不要在锁里等待。
 - `ProcessControl::wait` 与 `kill`/`terminate` 都借用 `&mut self`：等待与停止分两步写（`watch` 的 `select!` 只决定原因，`stop_process` 再停）。
 - `OutputCapture::push` 在异步任务里同步写文件（`BufWriter`），只在输出超过内联预算后才写；不要在这里做阻塞更久的事。

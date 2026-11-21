@@ -15,8 +15,10 @@
 
 use std::collections::VecDeque;
 use std::fs::{File, OpenOptions};
-use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
+
+use crate::error::{Error, Result};
 
 use piarc_protocol::text::incomplete_utf8_suffix;
 
@@ -49,11 +51,11 @@ impl TaskLog {
     /// # Errors
     ///
     /// The directory or the file cannot be created.
-    pub fn create(path: &Path) -> io::Result<Self> {
+    pub fn create(path: &Path) -> Result<Self> {
         if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir)?;
+            std::fs::create_dir_all(dir).map_err(Error::file(dir))?;
         }
-        let file = File::create(path)?;
+        let file = File::create(path).map_err(Error::file(path))?;
         Ok(Self::with_file(file, 0))
     }
 
@@ -63,9 +65,12 @@ impl TaskLog {
     /// # Errors
     ///
     /// The file cannot be opened for appending.
-    pub fn resume(path: &Path, tail: &str) -> io::Result<Self> {
-        let file = OpenOptions::new().append(true).open(path)?;
-        let bytes = file.metadata()?.len();
+    pub fn resume(path: &Path, tail: &str) -> Result<Self> {
+        let file = OpenOptions::new()
+            .append(true)
+            .open(path)
+            .map_err(Error::file(path))?;
+        let bytes = file.metadata().map_err(Error::file(path))?.len();
         let mut log = Self::with_file(file, bytes);
         // The first line of `tail` may be cut; it is kept as it is, like any shortened line.
         let mut parts: Vec<&str> = tail.split('\n').collect();
@@ -223,16 +228,17 @@ pub struct Chunk {
 /// # Errors
 ///
 /// The file cannot be opened or read.
-pub fn read_chunk(path: &Path, offset: u64, max: usize) -> io::Result<Chunk> {
-    let mut file = File::open(path)?;
-    let total_bytes = file.metadata()?.len();
+pub fn read_chunk(path: &Path, offset: u64, max: usize) -> Result<Chunk> {
+    let mut file = File::open(path).map_err(Error::file(path))?;
+    let total_bytes = file.metadata().map_err(Error::file(path))?.len();
     let start = offset.min(total_bytes);
-    file.seek(SeekFrom::Start(start))?;
+    file.seek(SeekFrom::Start(start))
+        .map_err(Error::file(path))?;
     let wanted = usize::try_from(total_bytes - start)
         .unwrap_or(usize::MAX)
         .min(max);
     let mut bytes = vec![0_u8; wanted];
-    file.read_exact(&mut bytes)?;
+    file.read_exact(&mut bytes).map_err(Error::file(path))?;
     let at_end = start + wanted as u64 == total_bytes;
     if !at_end {
         let cut = incomplete_utf8_suffix(&bytes);

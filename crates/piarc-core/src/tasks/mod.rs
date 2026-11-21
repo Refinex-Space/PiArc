@@ -654,7 +654,7 @@ impl TaskManager {
         let task = task_id.to_owned();
         tokio::task::spawn_blocking(move || {
             let chunk = piarc_exec::task_log::read_chunk(&file, offset, max)
-                .map_err(|e| piarc_fs::Error::io(&file, e).to_error_object())?;
+                .map_err(crate::error::exec_error_object)?;
             Ok(TaskOutputChunk {
                 task_id: task,
                 offset: offset.min(chunk.total_bytes),

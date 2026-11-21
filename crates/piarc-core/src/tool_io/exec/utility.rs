@@ -99,7 +99,9 @@ impl Exec {
         let read = async {
             let mut bytes = Vec::new();
             while let Some(chunk) = rx.recv().await {
-                if chunk.stream == Stream::Stdout && bytes.len() + chunk.bytes.len() <= 16_384 {
+                if chunk.stream == piarc_exec::Stream::Stdout
+                    && bytes.len() + chunk.bytes.len() <= 16_384
+                {
                     bytes.extend(chunk.bytes);
                 }
             }

@@ -527,7 +527,7 @@ impl Exec {
                 &p.request_id,
                 user.as_deref(),
             )
-            .map_err(|e| piarc_fs::Error::io(&session.tmp_dir, e).to_error_object())?;
+            .map_err(crate::error::exec_error_object)?;
             if !launch.pinned.is_empty() && user.as_deref().is_some_and(|v| !v.is_empty()) {
                 return Err(super::policy::denied(
                     "Bash startup changed since automatic approval. Request approval again.",
@@ -536,7 +536,7 @@ impl Exec {
             for (name, program) in &launch.pinned {
                 probe
                     .pin_program(name, program)
-                    .map_err(|e| piarc_fs::Error::io(program, e).to_error_object())?;
+                    .map_err(crate::error::exec_error_object)?;
             }
             env = super::overlay_env(env, vec![variable]);
             Some(probe)

@@ -15,7 +15,6 @@
 //!   the shell started before it joined (in the first instant, before reading any input) is
 //!   not in the job.
 
-use std::io;
 use std::path::Path;
 use std::time::Duration;
 
@@ -39,11 +38,13 @@ impl TerminalTree {
     ///
     /// # Errors
     ///
-    /// Windows: the Job Object cannot be created or the shell cannot join it.
-    pub fn attach(pid: u32, tty: Option<&Path>) -> io::Result<Self> {
+    /// [`crate::Error::Process`]: the pid is out of range (Unix); the Job Object cannot be
+    /// created or the shell cannot join it (Windows).
+    pub fn attach(pid: u32, tty: Option<&Path>) -> crate::Result<Self> {
+        let process = |source| crate::Error::Process { pid, source };
         #[cfg(unix)]
         {
-            let leader = i32::try_from(pid).map_err(io::Error::other)?;
+            let leader = i32::try_from(pid).map_err(|e| process(std::io::Error::other(e)))?;
             #[cfg(target_os = "macos")]
             let device = tty.and_then(|tty| {
                 use std::os::unix::fs::MetadataExt;
@@ -60,8 +61,8 @@ impl TerminalTree {
         #[cfg(windows)]
         {
             let _ = tty;
-            let job = crate::job::Job::new()?;
-            job.assign_pid(pid)?;
+            let job = crate::job::Job::new().map_err(process)?;
+            job.assign_pid(pid).map_err(process)?;
             Ok(Self { job })
         }
     }
