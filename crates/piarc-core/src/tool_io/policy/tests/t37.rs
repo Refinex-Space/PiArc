@@ -171,6 +171,45 @@ async fn an_untrusted_project_skill_grants_nothing_and_runs_no_hooks() {
     f.asks("Bash", json!({"command": "printenv HOME"})).await;
 }
 
+/// R4 E1: the trust of the main checkout covers its own skill files, the ones its trust
+/// manifest lists. A worktree's own `.claude/skills` (another branch's files) and files of
+/// directories above the root are instructions only: no `allowed-tools`, no hooks.
+#[tokio::test]
+async fn a_worktrees_own_skills_grant_nothing_under_the_main_checkouts_trust() {
+    let f = Fixture::with_env(fixed_path()).await;
+    f.trust_now().await;
+    f.skill(".piarc/worktrees/w/.claude/skills/wenv/SKILL.md", ENV_SKILL);
+    let tree = f
+        .work
+        .join(".piarc/worktrees/w")
+        .canonicalize()
+        .expect("tree");
+    f.io.open_session_in("wt", &f.work, &tree, &tree)
+        .expect("worktree session");
+    let approved =
+        f.io.dispatch(
+            "policy/evaluate",
+            json!({"sessionId": "wt", "toolCallId": "s1", "tool": "Skill",
+                   "input": {"skill": "wenv", "args": "HOME"}})
+            .as_object()
+            .expect("params")
+            .clone(),
+            f.peer.clone(),
+        )
+        .await
+        .expect("preflight");
+    assert_eq!(approved["allowed"], true, "{approved}");
+    let loaded = f
+        .skills(
+            "skills/invoke",
+            json!({"sessionId": "wt", "toolCallId": "s1", "name": "wenv", "arguments": "HOME"}),
+        )
+        .await
+        .expect("loaded");
+    assert!(loaded.get("allowedTools").is_none(), "{loaded}");
+    assert_eq!(loaded["warnings"][0]["kind"], "untrusted", "{loaded}");
+}
+
 /// The directories of the listed skills are readable without asking; writing there is not.
 #[tokio::test]
 async fn skill_directories_are_readable_without_asking() {

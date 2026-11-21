@@ -115,8 +115,7 @@ impl ToolIo {
                     .warnings
                     .push(warning(ResourceWarningKind::Denied));
             }
-            if is_project(skill.info.source)
-                && !trusted
+            if !covered(skill.info.source, &skill.info.path, project, trusted)
                 && (!skill.info.allowed_tools.is_empty() || skill.hooks.is_some())
             {
                 skill
@@ -126,9 +125,12 @@ impl ToolIo {
             }
         }
         for command in &mut catalog.commands {
-            if is_project(command.info.source)
-                && !trusted
-                && (!command.info.allowed_tools.is_empty() || command.hooks.is_some())
+            if !covered(
+                command.info.source,
+                command.info.path.as_deref().unwrap_or_default(),
+                project,
+                trusted,
+            ) && (!command.info.allowed_tools.is_empty() || command.hooks.is_some())
             {
                 command
                     .info
@@ -296,7 +298,12 @@ impl ToolIo {
         if effects.allowed.is_empty() && effects.hooks.is_none() {
             return activated;
         }
-        if is_project(effects.source) && !settings.trust().is_trusted() {
+        if !covered(
+            effects.source,
+            effects.file,
+            s.project(),
+            settings.trust().is_trusted(),
+        ) {
             activated
                 .warnings
                 .push(warning(ResourceWarningKind::Untrusted));
@@ -475,4 +482,12 @@ fn render(
             vars: &vars,
         },
     )
+}
+
+/// Whether the trust that applies covers a resource file's `allowed-tools` and hooks: a user
+/// file always; a project file when the project is trusted and the file is one of its own,
+/// listed by its trust manifest (R4 E1: not a worktree's copy or a directory above the root).
+fn covered(source: ResourceSource, file: &str, project: &Path, trusted: bool) -> bool {
+    !is_project(source)
+        || (trusted && piarc_config::executables::covered_by_trust(project, Path::new(file)))
 }

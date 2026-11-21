@@ -340,3 +340,34 @@ fn skill_and_command_permissions_and_hooks_are_executable_items() {
     );
     let _ = std::fs::remove_dir_all(&root);
 }
+
+/// R4 E1: only the root's own resource directories are covered by its trust.
+#[test]
+fn trust_covers_only_the_roots_own_resource_files() {
+    use piarc_config::executables::covered_by_trust;
+    let root = std::path::Path::new("/w/repo");
+    let yes = [
+        ".claude/skills/a/SKILL.md",
+        ".piarc/commands/x.md",
+        ".pi/skills/b.md",
+        ".agents/skills/c/SKILL.md",
+        ".claude/agents/d.md",
+        ".piarc/output-styles/e.md",
+    ];
+    for file in yes {
+        assert!(covered_by_trust(root, &root.join(file)), "{file}");
+    }
+    let no = [
+        ".piarc/worktrees/w/.claude/skills/a/SKILL.md",
+        "sub/.claude/skills/a/SKILL.md",
+        ".piarc/.claude/skills/a/SKILL.md",
+        ".claude/settings.json",
+    ];
+    for file in no {
+        assert!(!covered_by_trust(root, &root.join(file)), "{file}");
+    }
+    assert!(!covered_by_trust(
+        root,
+        std::path::Path::new("/w/.claude/skills/a/SKILL.md")
+    ));
+}

@@ -333,6 +333,48 @@ async fn definition_hooks_apply_to_their_run_only_and_need_trust_for_projects() 
     assert_eq!(read["allowed"], true, "{read}");
 }
 
+/// R4 E1: a definition in a worktree's own `.claude/agents` (another branch's file) is not
+/// covered by the main checkout's trust: its hooks do not run.
+#[tokio::test]
+async fn a_worktrees_own_definition_hooks_need_more_than_the_main_checkouts_trust() {
+    let f = Fixture::new().await;
+    f.put(
+        ".piarc/worktrees/w/.claude/agents/guarded.md",
+        "---\nname: guarded\ndescription: d\nhooks:\n  PreToolUse:\n    - matcher: Read\n      hooks:\n        - type: command\n          command: exit 2\n---\nBody\n",
+    );
+    let trust = &f.io.services().expect("policy").trust;
+    let view = trust.view(&f.work).await.expect("view");
+    trust
+        .decide(&f.work, true, &view.version)
+        .await
+        .expect("trust");
+    let tree = f
+        .work
+        .join(".piarc/worktrees/w")
+        .canonicalize()
+        .expect("tree");
+    f.io.open_session_in("wt", &f.work, &tree, &tree)
+        .expect("worktree session");
+    let p = SubagentStartParams {
+        session_id: "guarded-w".into(),
+        parent_session_id: "wt".into(),
+        tool_call_id: "agent-w".into(),
+        agent_type: "guarded".into(),
+        description: None,
+        cwd: tree.display().to_string(),
+        session_file: None,
+        model: None,
+        background: false,
+        isolation: None,
+    };
+    let started =
+        serde_json::to_value(f.io.start_subagent(p).await.expect("registered")).expect("json");
+    assert_eq!(
+        started["warnings"][0]["kind"], "hooksUntrusted",
+        "{started}"
+    );
+}
+
 /// I82: parameter rules decide `Agent` calls by their arguments (deny and ask only).
 #[tokio::test]
 async fn parameter_rules_deny_and_ask_by_argument() {

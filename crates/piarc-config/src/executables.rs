@@ -79,6 +79,29 @@ const SETTINGS_FILES: [&str; 4] = [
     ".claude/settings.local.json",
 ];
 
+/// Whether `file`, read from a project source (a skill, command file or subagent definition),
+/// is one of `root`'s own files: in a resource directory of the root itself
+/// (`<root>/{.piarc,.claude,.pi,.agents}/{skills,commands,output-styles,prompts,agents}/…`),
+/// which is what [`enumerate`] lists. A worktree's copies under `.piarc/worktrees/`, files of a
+/// subdirectory and files of directories above the root are not, so the project's trust does
+/// not cover their `allowed-tools`, hooks or MCP servers (R4 E1).
+#[must_use]
+pub fn covered_by_trust(root: &Path, file: &Path) -> bool {
+    let Ok(rest) = file.strip_prefix(root) else {
+        return false;
+    };
+    let mut parts = rest.components().map(|c| c.as_os_str());
+    let (Some(base), Some(kind)) = (parts.next(), parts.next()) else {
+        return false;
+    };
+    [".piarc", ".claude", ".pi", ".agents"]
+        .iter()
+        .any(|b| base == *b)
+        && ["skills", "commands", "output-styles", "prompts", "agents"]
+            .iter()
+            .any(|k| kind == *k)
+}
+
 /// Lists the executable items of the project at `root`.
 #[must_use]
 pub fn enumerate(root: &Path) -> Inventory {
@@ -220,7 +243,7 @@ fn skill_items(root: &Path, items: &mut BTreeSet<Item>) {
     for (name, source, path, allowed, hooks) in entries {
         // Only the project's own files: directories above the root (and the home directory
         // among them) are not this project's to enable.
-        if !crate::skills::is_project(source) || !Path::new(path).starts_with(root) {
+        if !crate::skills::is_project(source) || !covered_by_trust(root, Path::new(path)) {
             continue;
         }
         let file = relative(path);

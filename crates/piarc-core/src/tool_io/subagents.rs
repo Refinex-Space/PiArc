@@ -30,6 +30,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use piarc_config::agents::{AgentDirs, is_project, load};
+use piarc_config::executables::covered_by_trust;
 use piarc_protocol::policy::{PermissionMode, PolicyEvaluateParams};
 use piarc_protocol::subagent::{
     AgentWarning, AgentWarningKind, AgentsList, AgentsListParams, ApprovalOrigin,
@@ -199,8 +200,10 @@ impl ToolIo {
             let mut agent = definition.view;
             agent.denied = denied(&agent.name);
             // Inline MCP servers (T36): a project definition's wait for the project's trust.
-            let trusted = !is_project(agent.source) || project_trusted;
             let source = agent.path.clone().unwrap_or_default();
+            // A worktree's copy or a directory above the root is not covered (R4 E1).
+            let trusted = !is_project(agent.source)
+                || (project_trusted && covered_by_trust(workspace, Path::new(&source)));
             agent.mcp_inline =
                 crate::mcp::inline_servers(&source, &definition.mcp_inline, trusted, &expansion);
             agents.push(agent);
@@ -459,12 +462,14 @@ impl ToolIo {
     ) -> Option<AgentWarning> {
         let hooks = definition.hooks.as_ref()?;
         let services = self.services().ok()?;
+        let file = definition.view.path.as_deref().unwrap_or_default();
         let trusted = !is_project(definition.view.source)
-            || services
-                .trust
-                .permission_settings(workspace)
-                .await
-                .is_ok_and(|s| s.trust().is_trusted());
+            || (covered_by_trust(workspace, Path::new(file))
+                && services
+                    .trust
+                    .permission_settings(workspace)
+                    .await
+                    .is_ok_and(|s| s.trust().is_trusted()));
         if !trusted {
             return Some(AgentWarning {
                 kind: AgentWarningKind::HooksUntrusted,
