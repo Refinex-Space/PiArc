@@ -170,7 +170,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | R4 | [M3 评审](tasks/R4-m3-review.md) | 4 | T38、W2 | macOS | high / 高 | 中 | 无 | 部分完成 | 8a1b0cf |
 | W3 | [Windows：M3 达标](tasks/W3-windows-m3-parity.md) | 5 | R4（建议在 T43、T44 之后，需要读屏清单与性能测量脚本） | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 607809d |
-| T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 未开始 | — |
+| T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 进行中 | — |
 | T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,6 +308,16 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+**T40 插件、Pi 包与 MCP prompts**（开工 2026-11-21；基线 `npm run verify -- --baseline` 通过；T39 只差 Windows CI 的 A12，与本任务无关；分支未推送，无 Windows CI 可核对）
+
+- [ ] 1 识别与清单：`plugin.json` 与 Pi 包 `pi` 字段解析、组件枚举、不支持组件（mods、themes 等）、已安装记录（Core 持久化）
+- [ ] 2 安装与作用域：本地目录、git（锁定提交、显式更新）、npm（内置 npm + `--ignore-scripts`）；用户作用域与 `.piarc/settings.json` 项目作用域；启用、停用、卸载、`resources/reload`；审计
+- [ ] 3 组件接入：commands、agents、skills、hooks、`.mcp.json`（插件优先级最低）、Pi 扩展/skills/prompt templates 进 Agent Host
+- [ ] 4 启用确认与信任：可执行项与指纹、主进程原生确认框（测试应答钩子）、再确认、项目未信任不加载、信任对话框列出扩展包
+- [ ] 5 MCP prompts 作为斜杠命令（`prompts/list`、`prompts/get`、`list_changed`）
+- [ ] 6 设置页"skills 与插件"的插件部分（中英文、L4 与亮暗截图）
+- [ ] 验收 A01–A11；收尾（AGENTS.md、复用表、架构 6.7、ADR、acceptance、PLAN）
 
 ## 登记事项
 
