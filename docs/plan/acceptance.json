@@ -3765,92 +3765,92 @@
       "id": "T38-A01",
       "task": "T38",
       "description": "WebSearch 经原生后端（mock provider 模拟服务端搜索）返回带来源的结果。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 websearch-native 通过：mock provider 以 server_tool_use、web_search_tool_result 与 citations_delta 模拟服务端搜索；辅助请求只带 web_search 工具（web_search_20250305、max_uses 1、blocked_domains），工具结果是带编号的来源列表且过滤掉被屏蔽域名，item/completed 的 webSearch 条目 backend 为 native、带来源。npm run verify 15/15 通过（HEAD fc9c022，target/verify/last-pass.json）"
     },
     {
       "id": "T38-A02",
       "task": "T38",
       "description": "当前模型不支持原生搜索时使用配置的第三方后端（本地 mock 搜索服务），API key 只存在保险箱中。验证：L2 场景与磁盘扫描。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 websearch-third-party 通过：模型无原生搜索时经 Core web/search 请求本地 mock 搜索服务（Brave 格式），key 经 Core 设置 API 存入保险箱 websearch/brave，absent_on_disk 断言没有文件含明文 key，域名过滤生效；cargo test -p piarc-core --lib tool_io::policy::tests::t38 断言 Agent Host 的 secrets/get、set、delete、lock 对 websearch/ 键都被拒、getAll 不含 key，搜索用保险箱的 key 且写审计。npm run verify 15/15 通过（HEAD fc9c022，target/verify/last-pass.json）"
     },
     {
       "id": "T38-A03",
       "task": "T38",
       "description": "没有可用后端时 `WebSearch` 不在模型的工具集中，设置页说明原因。验证：mock provider 请求断言与 Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 websearch-unavailable 通过：模型无原生搜索且未配置搜索服务时 mock 请求的 tools 不含 WebSearch，deny 规则也把它从原生搜索的模型中拿掉；Core 测试 the_backend_needs_a_choice_and_a_key 覆盖 notConfigured、noKey；Playwright t38-websearch 2/2（dev 形态）设置页说明，截图 tmp/evidence/T38/websearch-settings-unavailable.png、websearch-settings-service.png"
     },
     {
       "id": "T38-A04",
       "task": "T38",
       "description": "WebSearch 在 Manual 模式下需要审批，原生后端与第三方后端都经过 `WebSearch` 规则与 PreToolUse hooks。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 websearch-native、websearch-third-party 通过：Manual 模式下两种后端都先询问并运行项目的 PreToolUse hook；L2 websearch-rules 通过：WebSearch allow 规则让第一次搜索免询问，PreToolUse hook 带理由拒绝第二次，服务商搜索只为获准的调用发出。npm run verify 15/15 通过（HEAD fc9c022，target/verify/last-pass.json）"
     },
     {
       "id": "T38-A05",
       "task": "T38",
       "description": "transcript 中的搜索结果显示来源链接，点击后先确认再打开。验证：Playwright（截图存 `tmp/evidence/T38/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Playwright t38-websearch（dev 形态）通过：transcript 搜索卡片列出来源链接，点击先出原生确认，取消不打开、确认后经 openExternal 打开；截图 tmp/evidence/T38/websearch-sources.png"
     },
     {
       "id": "T38-A06",
       "task": "T38",
       "description": "`http` handler：响应体 JSON 的决策字段生效；非 2xx、超时与连接失败按非阻断错误处理；白名单外的 URL 不发请求；header 只插值白名单内的环境变量。验证：测试（本地 mock HTTP 服务）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --lib tool_io::hooks::tests::m3 通过（本地 mock HTTP 服务）：响应 JSON 的 block 决策生效、请求体是 hook 输入、headers 只插值白名单内的变量（其余为空串）、allowedHttpHookUrls 之外不发请求、审计只记 origin 不含 token；HTTP 500、超时、连接失败与非 JSON 响应 4 种都是非阻断错误，其余 hook 的 context 照常生效"
     },
     {
       "id": "T38-A07",
       "task": "T38",
       "description": "`prompt` handler：辅助模型返回 `ok: false` 时在可阻断事件上阻断并把理由回给模型；超时与解析失败按非阻断错误处理。验证：测试（mock provider）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --lib tool_io::hooks::tests::m3 的 prompt_hooks_block_with_the_reason_and_fail_open 通过（ok:false 阻断并回理由、模型与 30 秒默认超时、超时与无法解析为非阻断、审计记模型与 token）；L2 hooks-m3-prompt 通过（Stop prompt hook 经辅助模型通道判定，ok:false 带理由续跑、ok:true 结束）"
     },
     {
       "id": "T38-A08",
       "task": "T38",
       "description": "SubagentStart 按 agent 类型匹配，`additionalContext` 出现在子 agent 的首个请求中。验证：L2 场景（mock 请求断言）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 hooks-m3-subagent 通过：SubagentStart 按 agent_type matcher 匹配（guarded 运行，Explore 的 hook 日志为空），additionalContext 出现在子 agent 的首个 mock 请求中"
     },
     {
       "id": "T38-A09",
       "task": "T38",
       "description": "SubagentStop 返回 block 时子 agent 带理由续跑一轮，防循环计数生效。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 hooks-m3-subagent 通过：SubagentStop 返回 block 时子 agent 带理由续跑一轮，第二次输入 stop_hook_active 为 true 后结束（子 agent 共 3 次请求）"
     },
     {
       "id": "T38-A10",
       "task": "T38",
       "description": "PostToolBatch 在一批工具调用完成后、下一次模型请求前触发，block 时停止循环并带理由。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 hooks-m3-post-tool-batch 通过：两个并行 Read 完成后 PostToolBatch 运行一次（tool_calls 含 tool_name、tool_use_id），additionalContext 进下一次请求；第二轮 block 后不再请求（共 3 次，第 3 次是下一个提示），理由进入模型的下一次输入"
     },
     {
       "id": "T38-A11",
       "task": "T38",
       "description": "子 agent 内触发的 hooks（含 PreToolUse、PostToolUse 与子 agent frontmatter 中的 hooks）输入都带 `agent_id` 与 `agent_type`。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 hooks-m3-subagent 通过：子 agent 内的 PreToolUse、PostToolUse 与子 agent frontmatter 中的 hooks 输入都带 agent_id（子会话 id）与 agent_type，session_id 为主会话"
     },
     {
       "id": "T38-A12",
       "task": "T38",
       "description": "未信任项目中的 `http` 与 `prompt` hooks 不执行。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --lib tool_io::hooks::tests::m3 的未信任项目用例通过：项目设置中的 http 与 prompt hooks 不执行（mock HTTP 服务未收到请求、hooks/prompt 未调用），受信任后执行"
     },
     {
       "id": "T38-A13",
       "task": "T38",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify 15/15 通过（HEAD fc9c022，target/verify/last-pass.json）：Vitest 1611 passed（1 skipped）、cargo test 967 passed、L2 172 passed 2 个按平台跳过、protocol drift 与 contract samples 通过"
     },
     {
       "id": "T39-A01",

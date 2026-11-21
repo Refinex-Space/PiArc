@@ -11,7 +11,7 @@
 
 ## 原生网页搜索（T38，ADR-0055）
 
-- `providers/web-search.ts` 是服务商原生搜索的线格式适配：`nativeSearch(model, filters)` 给出 `onPayload`（只加入服务商的搜索工具，Anthropic 为 `web_search_20250305`、`max_uses` 1、域名过滤二选一）与 `onEvent`（读 `server_tool_use`、整块给出的 `web_search_tool_result` 与 `citations_delta`），`outcome()` 给出来源、错误码与是否真的搜索过。pi-ai 1.5.2 的 Anthropic 适配器不为这些块建内容、也不报错。能力表的 `nativeWebSearch` 来自 `nativeSearchCapability`，用户的每模型设置 `nativeWebSearch` 覆盖（`ModelPreferencesStore.nativeWebSearch`）。OpenAI Responses、Gemini 的原生搜索未接（I164）。
+- `providers/web-search.ts` 是服务商原生搜索的线格式适配：`nativeSearch(model, filters)` 给出 `onPayload`（只加入服务商的搜索工具，Anthropic 为 `web_search_20250305`、`max_uses` 1、域名过滤二选一）与 `onEvent`（读 `server_tool_use`、整块给出的 `web_search_tool_result` 与 `citations_delta`），`outcome()` 给出来源、错误码与是否真的搜索过。pi-ai 1.5.2 的 Anthropic 适配器不为这些块建内容、也不报错。能力表的 `nativeWebSearch` 来自 `nativeSearchCapability`，用户的每模型设置 `nativeWebSearch` 覆盖（`ModelPreferencesStore.nativeWebSearch`）。OpenAI Responses、Gemini 的原生搜索未接（I162）。
 - 辅助模型通道（`harness/auxiliary.ts`）的请求可带 `model`、`onPayload`、`onProviderStreamEvent`：Pi 会话的流函数把选项原样交给 `modelRuntime.streamSimple`。
 
 ## 模型别名（T31，ADR-0048）
