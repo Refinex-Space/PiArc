@@ -133,13 +133,13 @@ test('ending the main process ends the Agent Host and its process tree', async (
     expect(packed.status, packed.stderr).toBe(0);
     const tarball = path.join(root, packed.stdout.trim());
     await writeFile(
-      path.join(dataDir, 'pi', 'mcp.json'),
+      // PiArc's MCP pool (T36): Core answers `mcp/servers` from the user settings.
+      path.join(dataDir, 'settings.json'),
       JSON.stringify({
         mcpServers: {
           probe: {
             command: 'npx',
             args: ['-y', '--package', tarball, 'piarc-mcp-probe-server'],
-            exposure: 'direct',
           },
         },
       }),

@@ -151,13 +151,13 @@ test('the bundled Agent Host holds a mock conversation with tools and an npx MCP
     expect(packed.status, packed.stderr).toBe(0);
     const tarball = path.join(root, packed.stdout.trim());
     await writeFile(
-      path.join(dataDir, 'pi', 'mcp.json'),
+      // PiArc's MCP pool (T36): Core answers `mcp/servers` from the user settings.
+      path.join(dataDir, 'settings.json'),
       JSON.stringify({
         mcpServers: {
           probe: {
             command: 'npx',
             args: ['-y', '--package', tarball, 'piarc-mcp-probe-server'],
-            exposure: 'direct',
           },
         },
       }),
@@ -214,7 +214,10 @@ test('the bundled Agent Host holds a mock conversation with tools and an npx MCP
     const bundledNode = await realpath(bundledNodePath);
     expect(await realpath(probe.execPath)).toBe(bundledNode);
     expect(probe.nodeVersion).toBe('v24.22.3');
-    expect(probe.env.piPackageDir).toBe(path.join(resourcesDir, 'agent-host', 'pi-assets'));
+    // T36: a server starts from the user's command environment with the bundled node first on
+    // PATH and the Agent Host's temporary and npm cache directories; the Agent Host's own
+    // variables (Pi's resource directory) do not reach it.
+    expect(probe.env.piPackageDir).toBeNull();
     expect(probe.env.tmpdir).toBe(path.join(dataDir, 'agent-host', 'tmp'));
     expect(probe.env.npmCache).toBe(path.join(dataDir, 'agent-host', 'npm-cache'));
     expect(await readdir(path.join(dataDir, 'agent-host', 'npm-cache', '_npx'))).not.toEqual([]);

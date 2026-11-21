@@ -159,6 +159,37 @@ pub(crate) fn inline_servers(
         .collect()
 }
 
+/// `mcp/servers` with only the servers of one PiArc settings file (scope `user`), for the
+/// packaged app's Agent Host probe (S6, `host_probe`), which has no database or trust store.
+pub(crate) async fn settings_file_servers(io: &ToolIo, file: &Path) -> McpServersResult {
+    let mut issues = Vec::new();
+    let mut entries = file_source(file, &mut issues);
+    entries.scope = McpScope::User;
+    let expansion = io.expansion_environment().await;
+    let base = io.command_environment().await;
+    let lookup = lookup_in(&expansion);
+    let mut merged = config::merge(
+        &[entries],
+        &MergeOptions {
+            trusted: true,
+            disabled_mcpjson: &[],
+            disabled: &[],
+            enabled: &[],
+            lookup: &lookup,
+        },
+    );
+    issues.append(&mut merged.issues);
+    let (idle, threshold) = config::pool_settings(&Value::Null);
+    McpServersResult {
+        servers: merged.servers,
+        env: utf8_env(&base),
+        idle_timeout_ms: idle.saturating_mul(1000),
+        defer_threshold: threshold,
+        overridden: merged.overridden,
+        issues,
+    }
+}
+
 type Merged = (config::McpConfig, u64, u64);
 
 fn merge_for(

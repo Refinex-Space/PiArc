@@ -286,7 +286,8 @@ function FileSection({ file }: { file: FileView }) {
       {file.status !== 'missing' && (
         <details className="diagnostics-details" data-testid="diagnostics-details">
           <summary>{t('diagnostics.summary', counts)}</summary>
-          {file.merged && (
+          {/* `~/.claude.json` is not a settings layer, but its MCP servers apply (T36). */}
+          {(file.merged || file.effective.length > 0) && (
             <>
               <h4>{t('diagnostics.effective')}</h4>
               {file.effective.length === 0 ? (
@@ -294,6 +295,10 @@ function FileSection({ file }: { file: FileView }) {
               ) : (
                 <KeyTable rows={file.effective} kind="effective" />
               )}
+            </>
+          )}
+          {file.merged && (
+            <>
               <h4>{t('diagnostics.overridden')}</h4>
               {file.overridden.length === 0 ? (
                 <p className="muted">{t('diagnostics.none')}</p>

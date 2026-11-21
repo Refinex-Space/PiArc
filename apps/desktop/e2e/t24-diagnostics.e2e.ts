@@ -105,8 +105,11 @@ test('configuration diagnostics explain every file and follow a Claude Code edit
   const state = settings.getByTestId('diagnostics-file-claudeState');
   await expect(state.getByTestId('diagnostics-status')).toHaveText('Loaded');
   await state.getByTestId('diagnostics-details').locator('summary').click();
+  // T36: the user's MCP servers apply (listed by server name only).
+  await expect(
+    state.getByTestId('diagnostics-effective').getByTestId('diagnostics-key'),
+  ).toHaveText([/^\/mcpServers/]);
   await expect(state.getByTestId('diagnostics-ignored-key')).toHaveText([
-    '/mcpServers Not supported yet (planned in T36)',
     '/numStartups PiArc does not use this setting',
   ]);
   await expect(

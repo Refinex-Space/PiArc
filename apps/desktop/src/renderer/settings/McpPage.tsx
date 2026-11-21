@@ -140,8 +140,12 @@ function ServerRow({
         {t(`mcp.transport.${server.transport}`)}
         {' · '}
         {t(`mcp.scope.${server.scope}`)}
-        {' · '}
-        <span data-testid="mcp-tools">{t('mcp.tools', { count: server.tools })}</span>
+        {server.state === 'unsupported' ? null : (
+          <>
+            {' · '}
+            <span data-testid="mcp-tools">{t('mcp.tools', { count: server.tools })}</span>
+          </>
+        )}
         {server.sessions > 0 ? ` · ${t('mcp.sessions', { count: server.sessions })}` : ''}
       </div>
       <div className="muted small diagnostics-code" data-testid="mcp-source">

@@ -12,7 +12,8 @@
 //! key lives in memory. There is no user to ask, so the probe approves every tool preflight
 //! (`policy/evaluate`) and denies no tool as a whole (`policy/tools`) itself, as the Agent Host
 //! test harness of `piarc-testkit` does; the production approval ledger and rules are covered by
-//! the session tests and the L2 scenarios.
+//! the session tests and the L2 scenarios. `mcp/servers` lists the servers of
+//! `<data dir>/settings.json` only (T36).
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -82,6 +83,8 @@ pub struct ToolIoCall {
 
 struct ProbeCore {
     workspace: String,
+    /// `<data dir>/settings.json`: the MCP servers the probe answers `mcp/servers` with.
+    settings_file: PathBuf,
     io: ToolIo,
     secrets: SecretsService,
     calls: Arc<Mutex<Vec<ToolIoCall>>>,
@@ -106,6 +109,17 @@ impl InboundHandler for ProbeCore {
         }
         if method == "policy/tools" {
             return Box::pin(async { Ok(json!({ "denied": [] })) });
+        }
+        if method == "mcp/servers" {
+            // The MCP servers of `<data dir>/settings.json` (T36), as the user scope of a real
+            // Core: the probe has no database or trust store for the other sources.
+            let io = self.io.clone();
+            let file = self.settings_file.clone();
+            return Box::pin(async move {
+                let result = crate::mcp::settings_file_servers(&io, &file).await;
+                serde_json::to_value(result)
+                    .map_err(|e| ErrorObject::new(ErrorKind::InternalError, e.to_string(), false))
+            });
         }
         if SecretsService::handles(&method) {
             let secrets = self.secrets.clone();
@@ -159,6 +173,7 @@ pub async fn run(options: ProbeOptions) -> Result<ProbeReport> {
     let runtime = BundledRuntime::locate(&options.resources_dir)?;
     let core = Arc::new(ProbeCore {
         workspace: options.workspace.to_string_lossy().into_owned(),
+        settings_file: options.data_dir.join("settings.json"),
         io: ToolIo::new(ToolIoConfig {
             home: Some(options.data_dir.join("test-home")),
             ..ToolIoConfig::new(options.data_dir.clone())
@@ -272,6 +287,7 @@ mod tests {
         let data = std::env::temp_dir().join(crate::sessions::new_session_id().expect("id"));
         let core = ProbeCore {
             workspace: String::new(),
+            settings_file: data.join("settings.json"),
             io: ToolIo::new(ToolIoConfig::new(data.clone())),
             secrets: SecretsService::new(
                 SecretsConfig::with_master_key(&data, test_master_key_name("probe-tools")),
@@ -287,5 +303,52 @@ mod tests {
         assert_eq!(answer.expect("answered"), json!({ "denied": [] }));
         let calls = core.calls.lock().expect("calls");
         assert!(calls.iter().all(|call| call.error.is_none()), "{calls:?}");
+    }
+    /// The Agent Host's MCP pool asks `mcp/servers` when it starts (T36): the probe lists the
+    /// servers of `<data dir>/settings.json`, so the packaged app's L4 can start one with the
+    /// bundled `npx`.
+    #[tokio::test]
+    async fn the_probe_lists_the_mcp_servers_of_the_settings_file() {
+        let data = std::env::temp_dir().join(crate::sessions::new_session_id().expect("id"));
+        std::fs::create_dir_all(&data).expect("data dir");
+        std::fs::write(
+            data.join("settings.json"),
+            json!({ "mcpServers": {
+                "probe": { "command": "npx", "args": ["-y", "probe-server"] },
+                "legacy": { "type": "sse", "url": "https://legacy.example/sse" }
+            } })
+            .to_string(),
+        )
+        .expect("settings");
+        let core = ProbeCore {
+            workspace: String::new(),
+            settings_file: data.join("settings.json"),
+            io: ToolIo::new(ToolIoConfig::new(data.clone())),
+            secrets: SecretsService::new(
+                SecretsConfig::with_master_key(&data, test_master_key_name("probe-mcp")),
+                Arc::new(MemorySecretStore::new()),
+            ),
+            calls: Arc::default(),
+        };
+        let (peer, _frames) = Peer::channel(1);
+        let answer = core
+            .handle("mcp/servers".into(), Map::new(), peer)
+            .await
+            .expect("answered");
+        let _ = std::fs::remove_dir_all(&data);
+        let servers = answer["servers"].as_array().expect("servers");
+        let probe = servers
+            .iter()
+            .find(|s| s["name"] == "probe")
+            .expect("probe");
+        assert_eq!(probe["scope"], "user");
+        assert_eq!(probe["availability"], "ready");
+        assert_eq!(probe["stdio"]["command"], "npx");
+        let legacy = servers
+            .iter()
+            .find(|s| s["name"] == "legacy")
+            .expect("legacy");
+        assert_eq!(legacy["availability"], "unsupported");
+        assert!(answer["env"].is_object(), "{answer}");
     }
 }
