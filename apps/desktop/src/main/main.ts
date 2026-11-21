@@ -141,8 +141,12 @@ function start(dirs: DataDirs): void {
   });
   app.on('second-instance', (_event, argv, workingDirectory) => {
     const targets = launchTargets(argv, process.defaultApp, workingDirectory);
+    if (targets.length === 0) {
+      console.info('[app] second instance started; focusing the existing window');
+      shell?.focusMain();
+      return;
+    }
     console.info(`[app] second instance started with ${String(targets.length)} targets`);
-    if (targets.length === 0) shell?.focusMain();
     for (const target of targets) launch(target);
   });
   // Closing the last window leaves PiArc running in the menu bar or tray: sessions and

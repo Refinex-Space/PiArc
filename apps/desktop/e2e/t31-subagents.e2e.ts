@@ -102,7 +102,7 @@ test('the Subagents page lists types, overrides, warnings and invalid files', as
     '.claude/agents/reviewer.md': REVIEWER,
     '.piarc/agents/reviewer.md':
       '---\nname: reviewer\ndescription: Reviews with PiArc rules.\nmodel: fast\n' +
-      'isolation: worktree\npermissionMode: bypassPermissions\n---\nReview carefully.\n',
+      'isolation: worktree\nskills: [review]\npermissionMode: bypassPermissions\n---\nReview carefully.\n',
     '.claude/agents/broken.md': '---\nname: broken\ndescription: [unclosed\n---\nBody.\n',
   });
   await openFolder(page, app, ws);
@@ -115,8 +115,10 @@ test('the Subagents page lists types, overrides, warnings and invalid files', as
   await expect(reviewer).toContainText('Replaces');
   await expect(reviewer).toContainText('.claude');
   const warnings = reviewer.getByTestId('agent-warnings');
-  await expect(warnings).toContainText('isolation');
-  await expect(warnings).toContainText('T35');
+  // `isolation` works since T35; `skills` waits for T37.
+  await expect(warnings).not.toContainText('isolation');
+  await expect(warnings).toContainText('skills');
+  await expect(warnings).toContainText('T37');
   await expect(warnings).toContainText('bypassPermissions');
   for (const builtIn of ['general-purpose', 'Explore', 'Plan']) {
     await expect(
