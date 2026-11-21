@@ -7,7 +7,6 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
 use serde::de::IgnoredAny;
 use serde_json::Value;
 
@@ -293,8 +292,9 @@ fn leaves(value: &Value) -> Vec<(String, &Value)> {
 }
 
 /// The report of `<home>/.claude.json`: only key names are read (values are skipped while
-/// parsing, nothing is logged). Its MCP servers, top-level and the entry of `workspace`
-/// under `projects`, are T36's; everything else is Claude Code's own state, ignored.
+/// parsing, nothing is logged). Its MCP servers, top-level (user scope) and the entry of
+/// `workspace` under `projects` (local scope), apply (T36) and are listed by server name;
+/// everything else is Claude Code's own state, ignored.
 #[must_use]
 pub fn claude_state_report(home: &Path, workspace: &Path) -> FileReport {
     let file = home.join(claude::CLAUDE_STATE_FILE);
@@ -337,62 +337,66 @@ pub fn claude_state_report(home: &Path, workspace: &Path) -> FileReport {
         }
     };
     report.status = FileStatus::Loaded;
+    state_keys(&mut report, &keys, home, workspace);
+    report
+}
+
+/// The keys of a loaded `~/.claude.json`: its MCP servers apply (by server name: definitions
+/// may carry tokens in `env` or `headers`), the rest is ignored.
+fn state_keys(
+    report: &mut FileReport,
+    keys: &BTreeMap<String, IgnoredAny>,
+    home: &Path,
+    workspace: &Path,
+) {
+    let file = report.file.clone();
+    let servers = crate::mcp::claude_state_servers(home, workspace).unwrap_or_default();
+    let names = |value: &Value| {
+        Value::Array(
+            value
+                .as_object()
+                .into_iter()
+                .flat_map(|m| m.keys())
+                .map(|k| Value::String(k.clone()))
+                .collect(),
+        )
+    };
     for key in keys.keys() {
         let mut pointer = String::new();
         push_token(&mut pointer, key);
         let row = STATE_KEYS.iter().find(|r| r.key == key);
-        report.ignored.push(match row {
-            Some(row) => IgnoredKey {
+        if let (Some(row), Some(user)) = (row, &servers.user)
+            && row.status == KeyStatus::Active
+        {
+            let value = names(user);
+            report.effective.push(KeyReport {
                 pointer,
-                reason: match row.status {
-                    KeyStatus::Planned(_) => IgnoreReason::Planned,
-                    _ => IgnoreReason::Ignored,
-                },
-                task: match row.status {
-                    KeyStatus::Planned(task) => Some(task),
-                    _ => None,
-                },
-                note: Some(row.target),
-            },
-            None => IgnoredKey {
-                pointer,
-                reason: IgnoreReason::Ignored,
-                task: None,
-                note: Some("Claude Code state"),
-            },
-        });
-    }
-    if keys.contains_key("projects") && project_has_mcp(text, workspace) {
-        let mut pointer = "/projects".to_owned();
-        push_token(&mut pointer, &workspace.to_string_lossy());
-        push_token(&mut pointer, "mcpServers");
+                final_value: value.clone(),
+                value,
+                source: Some(CLAUDE_STATE),
+                source_file: Some(file.clone()),
+            });
+            continue;
+        }
         report.ignored.push(IgnoredKey {
             pointer,
-            reason: IgnoreReason::Planned,
-            task: Some("T36"),
-            note: Some("MCP servers"),
+            reason: IgnoreReason::Ignored,
+            task: None,
+            note: Some(row.map_or("Claude Code state", |r| r.target)),
+        });
+    }
+    if let Some((key, local)) = &servers.local {
+        let value = names(local);
+        report.effective.push(KeyReport {
+            pointer: crate::mcp::local_pointer(key),
+            final_value: value.clone(),
+            value,
+            source: Some(CLAUDE_STATE),
+            source_file: Some(file.clone()),
         });
     }
     report.ignored.sort_by(|a, b| a.pointer.cmp(&b.pointer));
-    report
-}
-
-fn project_has_mcp(text: &[u8], workspace: &Path) -> bool {
-    #[derive(Deserialize)]
-    struct State {
-        projects: BTreeMap<String, Project>,
-    }
-    #[derive(Deserialize)]
-    struct Project {
-        #[serde(rename = "mcpServers")]
-        mcp_servers: Option<IgnoredAny>,
-    }
-    serde_json::from_slice::<State>(text).is_ok_and(|state| {
-        state
-            .projects
-            .get(workspace.to_string_lossy().as_ref())
-            .is_some_and(|p| p.mcp_servers.is_some())
-    })
+    report.effective.sort_by(|a, b| a.pointer.cmp(&b.pointer));
 }
 
 fn state_issue(file: &Path, message: String, at: Option<(usize, usize)>) -> Issue {

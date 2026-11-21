@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 72,
+  "result": {
+    "name": "files",
+    "scope": "project",
+    "source": "/工作区 a/.mcp.json",
+    "transport": "stdio",
+    "tools": 3,
+    "sessions": 2,
+    "pid": 4242
+  }
+}

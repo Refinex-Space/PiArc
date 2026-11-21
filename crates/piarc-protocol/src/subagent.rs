@@ -133,6 +133,9 @@ pub struct AgentDefinition {
     /// MCP servers it names or defines (T36): their names.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub mcp_servers: Vec<String>,
+    /// The servers it defines inline, connected for its runs only (`agents/list`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mcp_inline: Vec<crate::mcp::McpServerDefinition>,
     /// Whether it defines hooks for its runs.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub hooks: bool,

@@ -1,0 +1,29 @@
+{
+  "jsonrpc": "2.0",
+  "method": "mcp/statusChanged",
+  "params": {
+    "servers": [
+      {
+        "name": "files",
+        "scope": "project",
+        "source": "/工作区 a/.mcp.json",
+        "transport": "stdio",
+        "state": "connected",
+        "tools": 3,
+        "sessions": 2,
+        "pid": 4242
+      },
+      {
+        "name": "docs",
+        "scope": "user",
+        "source": "/data/settings.json",
+        "transport": "http",
+        "state": "needsAuth",
+        "tools": 0,
+        "sessions": 1,
+        "error": "the server asked for a sign-in (401)",
+        "oauth": true
+      }
+    ]
+  }
+}

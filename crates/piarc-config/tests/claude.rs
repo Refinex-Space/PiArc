@@ -508,21 +508,30 @@ fn the_claude_state_file_lists_key_names_and_its_mcp_sections() {
             .replace('/', "~1"),
     );
     expected_mcp.push_str("/mcpServers");
-    let mut want = vec![
+    let want = vec![
         ("/autoConnectIde".to_owned(), IgnoreReason::Ignored, None),
-        ("/mcpServers".to_owned(), IgnoreReason::Planned, Some("T36")),
         ("/numStartups".to_owned(), IgnoreReason::Ignored, None),
         ("/oauthAccount".to_owned(), IgnoreReason::Ignored, None),
         ("/projects".to_owned(), IgnoreReason::Ignored, None),
-        (expected_mcp, IgnoreReason::Planned, Some("T36")),
     ];
-    want.sort_by(|a, b| a.0.cmp(&b.0));
     let got: Vec<(String, IgnoreReason, Option<&str>)> = report
         .ignored
         .iter()
         .map(|k| (k.pointer.clone(), k.reason, k.task))
         .collect();
     assert_eq!(got, want);
+    // T36: the user's and the workspace's MCP servers apply, listed by name.
+    let applied: Vec<(String, Value)> = report
+        .effective
+        .iter()
+        .map(|k| (k.pointer.clone(), k.value.clone()))
+        .collect();
+    let mut want_applied = vec![
+        ("/mcpServers".to_owned(), json!(["global"])),
+        (expected_mcp, json!(["local"])),
+    ];
+    want_applied.sort_by(|a, b| a.0.cmp(&b.0));
+    assert_eq!(applied, want_applied);
     // No value of the file is in the report.
     let text = serde_json::to_string(&report).expect("json");
     assert!(!text.contains("example.invalid") && !text.contains("\"command\""));

@@ -1,0 +1,17 @@
+{
+  "jsonrpc": "2.0",
+  "id": 71,
+  "result": {
+    "servers": [
+      {
+        "name": "files",
+        "scope": "project",
+        "source": "/工作区 a/.mcp.json",
+        "transport": "stdio",
+        "state": "connected",
+        "sessions": 2,
+        "pid": 4242
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "policy/evaluate",
+  "params": {
+    "sessionId": "s",
+    "toolCallId": "call_mcp_1",
+    "tool": "mcp__deploy__release",
+    "input": {
+      "service": "api"
+    },
+    "requiresUserInteraction": true
+  }
+}

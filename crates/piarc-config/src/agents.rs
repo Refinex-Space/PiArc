@@ -68,6 +68,9 @@ pub struct Definition {
     pub view: AgentDefinition,
     /// The frontmatter `hooks` object, as written.
     pub hooks: Option<Value>,
+    /// The servers `mcpServers` defines inline (`{name: definition}`, T36), as written. Core
+    /// checks and expands them like other MCP definitions.
+    pub mcp_inline: serde_json::Map<String, Value>,
 }
 
 /// The definitions of a directory and the files that are not valid ones.
@@ -203,7 +206,7 @@ pub fn parse(path: &Path, source: AgentSource, text: &str) -> Result<Definition,
     }
     let description = fields.required_text("description")?;
     let permission_mode = fields.mode(source, &mut warnings)?;
-    let mcp_servers = fields.servers()?;
+    let (mcp_servers, mcp_inline) = fields.servers()?;
     let skills = fields.list("skills")?.unwrap_or_default();
     let isolation = fields.text("isolation")?;
     if let Some(value) = &isolation
@@ -211,18 +214,13 @@ pub fn parse(path: &Path, source: AgentSource, text: &str) -> Result<Definition,
     {
         return Err(fields.problem("isolation", "isolation must be worktree"));
     }
-    for (field, active, task) in [
-        ("mcpServers", !mcp_servers.is_empty(), "T36"),
-        ("skills", !skills.is_empty(), "T37"),
-    ] {
-        if active {
-            warnings.push(warning(
-                AgentWarningKind::InactiveField,
-                Some(field),
-                None,
-                Some(task),
-            ));
-        }
+    if !skills.is_empty() {
+        warnings.push(warning(
+            AgentWarningKind::InactiveField,
+            Some("skills"),
+            None,
+            Some("T37"),
+        ));
     }
     warnings.extend(
         front
@@ -251,6 +249,7 @@ pub fn parse(path: &Path, source: AgentSource, text: &str) -> Result<Definition,
         max_turns: fields.max_turns()?,
         skills,
         mcp_servers,
+        mcp_inline: Vec::new(),
         hooks: hooks.is_some(),
         isolation,
         background: fields.flag("background")?,
@@ -262,7 +261,11 @@ pub fn parse(path: &Path, source: AgentSource, text: &str) -> Result<Definition,
         denied: false,
         resolved_model: None,
     };
-    Ok(Definition { view, hooks })
+    Ok(Definition {
+        view,
+        hooks,
+        mcp_inline,
+    })
 }
 
 /// The frontmatter's YAML text, the body and the frontmatter as a mapping.
@@ -465,18 +468,22 @@ impl Fields<'_> {
         }
     }
 
-    /// `mcpServers`: names of configured servers, or `{name: config}` entries (inline).
-    fn servers(&self) -> Result<Vec<String>, AgentIssue> {
+    /// `mcpServers`: names of configured servers, or `{name: config}` entries (inline). Returns
+    /// every name and the inline definitions.
+    fn servers(&self) -> Result<(Vec<String>, serde_json::Map<String, Value>), AgentIssue> {
         let invalid = || {
             self.problem(
                 "mcpServers",
                 "mcpServers must list server names or definitions",
             )
         };
+        let mut inline = serde_json::Map::new();
         let values = match self.front.get("mcpServers") {
-            None | Some(Value::Null) => return Ok(Vec::new()),
+            None | Some(Value::Null) => return Ok((Vec::new(), inline)),
             Some(Value::Array(values)) => values.clone(),
-            Some(Value::Object(map)) => return Ok(map.keys().cloned().collect()),
+            Some(Value::Object(map)) => {
+                return Ok((map.keys().cloned().collect(), map.clone()));
+            }
             Some(Value::String(text)) => vec![Value::String(text.clone())],
             Some(_) => return Err(invalid()),
         };
@@ -484,11 +491,14 @@ impl Fields<'_> {
         for value in values {
             match value {
                 Value::String(name) => names.push(name),
-                Value::Object(map) => names.extend(map.keys().cloned()),
+                Value::Object(map) => {
+                    names.extend(map.keys().cloned());
+                    inline.extend(map);
+                }
                 _ => return Err(invalid()),
             }
         }
-        Ok(names)
+        Ok((names, inline))
     }
 }
 

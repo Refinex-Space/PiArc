@@ -188,7 +188,18 @@ export type AhpMessage =
   | SubagentStopResponse
   | SubagentStartedNotification
   | SubagentProgressNotification
-  | SubagentCompletedNotification;
+  | SubagentCompletedNotification
+  | McpServersMethodRequest
+  | McpServersMethodResponse
+  | McpStatusMethodRequest
+  | McpStatusMethodResponse
+  | McpReconnectRequest
+  | McpReconnectResponse
+  | McpSetEnabledRequest
+  | McpSetEnabledResponse
+  | McpLoginRequest
+  | McpLoginResponse
+  | McpStatusChangedNotification;
 /**
  * A request id: an integer or a string. `null` and fractional numbers are not accepted.
  */
@@ -848,6 +859,19 @@ export type LoginPromptKind = 'text' | 'secret' | 'select' | 'manualCode';
  */
 export type RewindMode = 'branch' | 'summarize';
 /**
+ * Whether a configured server may be connected, before any connection is tried.
+ */
+export type McpAvailability = 'ready' | 'disabled' | 'unsupported' | 'untrusted';
+/**
+ * Where a server definition comes from. The same name in several scopes takes the whole
+ * definition of the first in this order: enterprise, local, project, user, plugin.
+ */
+export type McpScope = 'enterprise' | 'local' | 'project' | 'user' | 'plugin' | 'subagent';
+/**
+ * How the server is reached.
+ */
+export type McpTransport = 'stdio' | 'http' | 'sse' | 'ws';
+/**
  * Where a subagent definition came from, highest precedence first (ADR-0005).
  */
 export type AgentSource =
@@ -856,6 +880,26 @@ export type AgentSource =
  * Where a subagent's files are (T35).
  */
 export type SubagentIsolation = 'worktree';
+/**
+ * Parameters of `mcp/servers`.
+ */
+export type McpServersParams = Record<string, never>;
+/**
+ * Parameters of `mcp/status`.
+ */
+export type McpStatusParams = Record<string, never>;
+/**
+ * The state of a server in the pool.
+ */
+export type McpConnectionState =
+  | 'connected'
+  | 'connecting'
+  | 'idle'
+  | 'needsAuth'
+  | 'failed'
+  | 'disabled'
+  | 'unsupported'
+  | 'untrusted';
 /**
  * Presentation of a pending approval.
  */
@@ -2939,6 +2983,11 @@ export interface PolicyEvaluateParams {
    * subagent it registered (`subagent/start`).
    */
   parentSessionId?: string | null;
+  /**
+   * The tool asks the user on every call whatever the mode (an MCP tool's
+   * `_meta["anthropic/requiresUserInteraction"]`, T36).
+   */
+  requiresUserInteraction?: boolean;
   /**
    * Owning session.
    */
@@ -6159,6 +6208,10 @@ export interface AgentDefinition {
    */
   maxTurns?: number | null;
   /**
+   * The servers it defines inline, connected for its runs only (`agents/list`).
+   */
+  mcpInline?: McpServerDefinition[];
+  /**
    * MCP servers it names or defines (T36): their names.
    */
   mcpServers?: string[];
@@ -6210,6 +6263,118 @@ export interface AgentDefinition {
    * Ignored and inactive fields, restricted modes.
    */
   warnings?: AgentWarning[];
+}
+/**
+ * One configured server, as it applies.
+ */
+export interface McpServerDefinition {
+  /**
+   * `true`: its tools are declared to the model even when MCP tools are deferred.
+   */
+  alwaysLoad?: boolean;
+  /**
+   * Whether it may be connected.
+   */
+  availability: McpAvailability;
+  /**
+   * What it offers, in a sentence.
+   */
+  description?: string | null;
+  /**
+   * The endpoint of a `ready` HTTP server.
+   */
+  http?: McpHttp | null;
+  /**
+   * The name (`[A-Za-z0-9_-]`), unique in the workspace.
+   */
+  name: string;
+  /**
+   * Why not, for `unsupported`, `disabled` and `untrusted`.
+   */
+  reason?: string | null;
+  /**
+   * Its scope.
+   */
+  scope: McpScope;
+  /**
+   * The file it is defined in.
+   */
+  source: string;
+  /**
+   * The program of a `ready` stdio server.
+   */
+  stdio?: McpStdio | null;
+  /**
+   * Limit of one tool call, in milliseconds.
+   */
+  timeoutMs?: number | null;
+  /**
+   * Its transport.
+   */
+  transport: McpTransport;
+}
+/**
+ * A Streamable HTTP server. Values are expanded.
+ */
+export interface McpHttp {
+  /**
+   * Sent with every request.
+   */
+  headers?: {
+    [k: string]: string;
+  };
+  /**
+   * OAuth client settings.
+   */
+  oauth?: McpOAuth | null;
+  /**
+   * The endpoint.
+   */
+  url: string;
+}
+/**
+ * OAuth client settings of an HTTP server, for servers without dynamic client registration.
+ */
+export interface McpOAuth {
+  /**
+   * Authorization server metadata to use instead of discovery.
+   */
+  authServerMetadataUrl?: string | null;
+  /**
+   * Fixed port of the loopback callback.
+   */
+  callbackPort?: number | null;
+  /**
+   * Pre-registered client id.
+   */
+  clientId?: string | null;
+  /**
+   * Scopes to request, separated by spaces.
+   */
+  scope?: string | null;
+}
+/**
+ * A stdio server's program. Values are expanded (`${VAR}`, `${VAR:-default}`).
+ */
+export interface McpStdio {
+  /**
+   * Its arguments.
+   */
+  args?: string[];
+  /**
+   * The program.
+   */
+  command: string;
+  /**
+   * Working directory, relative to the workspace root unless absolute.
+   */
+  cwd?: string | null;
+  /**
+   * Variables the definition adds to the environment.
+   */
+  env?: {
+    [k: string]: string;
+  };
 }
 /**
  * A definition file that could not be read as one.
@@ -6494,6 +6659,267 @@ export interface SubagentCompletedNotification {
   jsonrpc: JsonRpcVersion;
   method: 'subagent/completed';
   params: SubagentEventParams;
+}
+/**
+ * Request for `mcp/servers`.
+ */
+export interface McpServersMethodRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'mcp/servers';
+  params: McpServersParams;
+}
+/**
+ * Successful response to `mcp/servers`.
+ */
+export interface McpServersMethodResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: McpServersResult;
+}
+/**
+ * Result of `mcp/servers`.
+ */
+export interface McpServersResult {
+  /**
+   * More MCP tools than this in a session are deferred behind `ToolSearch`.
+   */
+  deferThreshold: number;
+  /**
+   * The environment stdio servers start from (the command environment of the user's login
+   * shell, ADR-0035), before the definition's own `env`.
+   */
+  env?: {
+    [k: string]: string;
+  };
+  /**
+   * After this long without a call from any session the pool disconnects a server.
+   */
+  idleTimeoutMs: number;
+  /**
+   * Entries left out and values not used.
+   */
+  issues?: McpConfigIssue[];
+  /**
+   * Definitions replaced by higher scopes.
+   */
+  overridden?: McpOverridden[];
+  /**
+   * Every configured server, by name.
+   */
+  servers: McpServerDefinition[];
+}
+/**
+ * A configuration problem: the entry is left out or a value is not used.
+ */
+export interface McpConfigIssue {
+  /**
+   * What is wrong.
+   */
+  message: string;
+  /**
+   * JSON Pointer of the value in the file.
+   */
+  pointer: string;
+  /**
+   * The file.
+   */
+  source: string;
+}
+/**
+ * A definition that a higher scope's definition of the same name replaces.
+ */
+export interface McpOverridden {
+  /**
+   * The file of the definition that applies.
+   */
+  by: string;
+  /**
+   * The server name.
+   */
+  name: string;
+  /**
+   * The file of the replaced definition.
+   */
+  source: string;
+}
+/**
+ * Request for `mcp/status`.
+ */
+export interface McpStatusMethodRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'mcp/status';
+  params: McpStatusParams;
+}
+/**
+ * Successful response to `mcp/status`.
+ */
+export interface McpStatusMethodResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: McpStatus;
+}
+/**
+ * Result of `mcp/status` and the parameters of `mcp/statusChanged`.
+ */
+export interface McpStatus {
+  /**
+   * Entries left out and values not used.
+   */
+  issues?: McpConfigIssue[];
+  /**
+   * Definitions replaced by higher scopes.
+   */
+  overridden?: McpOverridden[];
+  /**
+   * Every configured server, by name.
+   */
+  servers: McpServerStatus[];
+}
+/**
+ * One server's state.
+ */
+export interface McpServerStatus {
+  /**
+   * The last error, or why it is unsupported, disabled or waiting.
+   */
+  error?: string | null;
+  /**
+   * The name.
+   */
+  name: string;
+  /**
+   * Whether it signs in with OAuth.
+   */
+  oauth?: boolean;
+  /**
+   * The process id of a connected stdio server.
+   */
+  pid?: number | null;
+  /**
+   * Its scope.
+   */
+  scope: McpScope;
+  /**
+   * Sessions using it now.
+   */
+  sessions: number;
+  /**
+   * Its file.
+   */
+  source: string;
+  /**
+   * The state.
+   */
+  state: McpConnectionState;
+  /**
+   * Tools it offers (from the last connection).
+   */
+  tools: number;
+  /**
+   * Its transport.
+   */
+  transport: McpTransport;
+}
+/**
+ * Request for `mcp/reconnect`.
+ */
+export interface McpReconnectRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'mcp/reconnect';
+  params: McpReconnectParams;
+}
+/**
+ * Parameters of `mcp/reconnect`.
+ */
+export interface McpReconnectParams {
+  /**
+   * The server.
+   */
+  name: string;
+}
+/**
+ * Successful response to `mcp/reconnect`.
+ */
+export interface McpReconnectResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: McpServerStatus;
+}
+/**
+ * Request for `mcp/setEnabled`.
+ */
+export interface McpSetEnabledRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'mcp/setEnabled';
+  params: McpSetEnabledParams;
+}
+/**
+ * Parameters of `mcp/setEnabled`.
+ */
+export interface McpSetEnabledParams {
+  /**
+   * On or off.
+   */
+  enabled: boolean;
+  /**
+   * The server.
+   */
+  name: string;
+}
+/**
+ * Successful response to `mcp/setEnabled`.
+ */
+export interface McpSetEnabledResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: McpServerStatus;
+}
+/**
+ * Request for `mcp/login`.
+ */
+export interface McpLoginRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'mcp/login';
+  params: McpLoginParams;
+}
+/**
+ * Parameters of `mcp/login`.
+ */
+export interface McpLoginParams {
+  /**
+   * The sign-in's id, for `ui/loginInteraction`.
+   */
+  loginId: string;
+  /**
+   * The server.
+   */
+  name: string;
+}
+/**
+ * Successful response to `mcp/login`.
+ */
+export interface McpLoginResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: McpServerStatus;
+}
+/**
+ * Notification `mcp/statusChanged`.
+ */
+export interface McpStatusChangedNotification {
+  jsonrpc: JsonRpcVersion;
+  method: 'mcp/statusChanged';
+  params: McpStatus;
 }
 /**
  * Immutable approval card from the Core ledger.

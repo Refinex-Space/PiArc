@@ -10,7 +10,20 @@
         "prompt": "You explore the repository and report what you found.",
         "tools": ["Read", "Glob", "Grep", "Bash"],
         "model": "fast",
-        "omitProjectContext": true
+        "omitProjectContext": true,
+        "mcpServers": ["github", "scratch"],
+        "mcpInline": [
+          {
+            "name": "scratch",
+            "scope": "subagent",
+            "source": "/工作区 a/.claude/agents/db.md",
+            "transport": "stdio",
+            "availability": "ready",
+            "stdio": {
+              "command": "scratch-mcp"
+            }
+          }
+        ]
       },
       {
         "name": "reviewer",

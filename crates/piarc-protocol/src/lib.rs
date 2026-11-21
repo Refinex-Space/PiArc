@@ -69,6 +69,7 @@ pub mod hooks;
 pub mod host;
 pub mod input;
 pub mod jsonrpc;
+pub mod mcp;
 pub mod memory;
 pub mod method;
 pub mod models;

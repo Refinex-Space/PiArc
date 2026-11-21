@@ -1,5 +1,7 @@
 //! T13-A13: the executable items of a fixture workspace by category and source; a new allow
-//! rule in `.piarc/settings.json` is the only new item.
+//! rule in `.piarc/settings.json` is the only new item. T36: MCP servers of `.mcp.json`,
+//! `.piarc/settings*.json` and subagent definitions name their program; Pi's `.pi/mcp.json`
+//! is not read.
 
 use std::path::Path;
 
@@ -32,7 +34,8 @@ fn lists_every_category_with_its_source_and_detects_new_items() {
     put(
         &root,
         ".piarc/settings.local.json",
-        r#"{ "permissions": { "allow": ["Read(./src/**)"] } }"#,
+        r#"{ "permissions": { "allow": ["Read(./src/**)"] },
+        "mcpServers": { "notes": { "type": "http", "url": "https://notes.example/mcp" } } }"#,
     );
     put(
         &root,
@@ -96,9 +99,17 @@ fn lists_every_category_with_its_source_and_detects_new_items() {
                 ".piarc/settings.json",
                 "PostToolUse[Edit] npx prettier --write"
             ),
-            item(Category::McpServer, ".mcp.json", "db"),
-            item(Category::McpServer, ".mcp.json", "files"),
-            item(Category::McpServer, ".pi/mcp.json", "pi-server"),
+            item(
+                Category::McpServer,
+                ".mcp.json",
+                r#"db: npx args=["db-mcp"]"#
+            ),
+            item(Category::McpServer, ".mcp.json", "files: files-mcp"),
+            item(
+                Category::McpServer,
+                ".piarc/settings.local.json",
+                r#"notes: https://notes.example/mcp type="http""#
+            ),
             item(
                 Category::AllowRule,
                 ".claude/settings.local.json",
@@ -155,6 +166,34 @@ fn lists_every_category_with_its_source_and_detects_new_items() {
     // Removing items is not something to confirm.
     std::fs::remove_file(root.join(".mcp.json")).expect("remove");
     assert_eq!(new_items(&enumerate(&root).items, &snapshot).len(), 1);
+    // A server whose program changes is new (the user trusted `npx db-mcp`, not this).
+    put(
+        &root,
+        ".mcp.json",
+        r#"{ "mcpServers": { "db": { "command": "npx", "args": ["evil-mcp"] }, "files": { "command": "files-mcp", "description": "only described" } } }"#,
+    );
+    assert_eq!(
+        new_items(&enumerate(&root).items, &snapshot),
+        [
+            item(
+                Category::McpServer,
+                ".mcp.json",
+                r#"db: npx args=["evil-mcp"]"#
+            ),
+            item(Category::AllowRule, ".piarc/settings.json", "Bash(curl *)"),
+        ]
+    );
+    // A subagent definition's inline server is executable project configuration too.
+    put(
+        &root,
+        ".claude/agents/db.md",
+        "---\nname: db\ndescription: d\nmcpServers:\n  - scratch: { command: scratch-mcp }\n---\nbody\n",
+    );
+    assert!(enumerate(&root).items.contains(&item(
+        Category::McpServer,
+        ".claude/agents/db.md",
+        "scratch: scratch-mcp"
+    )));
 
     // A broken file is reported and the rest is still listed.
     put(&root, ".claude/settings.json", "{ not json");

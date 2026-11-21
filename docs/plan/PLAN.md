@@ -311,8 +311,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 T36（开工 2026-11-20，基线复用 c4094dd 的全量 verify；T35 的遗留 A10（Windows CI）、A11（应用内存）不影响本任务；远端 CI 运行 44868949621 两平台失败，用户决定登记为 I153 后继续）：
 
-- [ ] 1 Core 配置：来源（`.mcp.json`、`~/.claude.json` user/local、PiArc 用户与 `.piarc/` 设置）、同名取整条、`${VAR}` 展开、SSE/WebSocket 不支持、信任与可执行项、Claude Code 键（A04 的配置部分、A05 单元测试）
-- [ ] 2 协议：`mcp/servers`、`mcp/status`、`mcp/reconnect`、`mcp/setEnabled`、`mcp/login`、`mcp/statusChanged`、`policy/evaluate` 的 `requiresUserInteraction`；契约样本
+- [x] 1 Core 配置：来源（`.mcp.json`、`~/.claude.json` user/local、PiArc 用户与 `.piarc/` 设置）、同名取整条、`${VAR}` 展开、SSE/WebSocket 不支持、信任与可执行项、Claude Code 键（A04 的配置部分、A05 单元测试）
+- [x] 2 协议：`mcp/servers`、`mcp/status`、`mcp/reconnect`、`mcp/setEnabled`、`mcp/login`、`mcp/statusChanged`、`policy/evaluate` 的 `requiresUserInteraction`；契约样本
 - [ ] 3 Core：应答 `mcp/servers`（基础环境与 PATH 前置内置 Node）、启停按工作区持久化、Hub/NAPI 的状态与操作、`core/mcp` 事件、MCP 登录沿用 `core/login`、`requiresUserInteraction` 任何模式询问（A09 的 Core 部分）
 - [ ] 4 Agent Host：PiArc MCP 扩展替换内置扩展（不加载 codemode）、自写 stdio 传输（不脱离 Agent Host 进程组）、工作区连接池（按需连接、空闲断开、退避重连、工具缓存与 `list_changed`、roots）、工具暴露（direct / 超过阈值经 `ToolSearch` 延迟）、server instructions 第 6 段与变化的追加消息、OAuth 凭据进保险箱（A01、A02、A03、A06、A07、A08、A10、A11）
 - [ ] 5 子 agent `mcpServers`：按名称复用连接池、内联 server 临时连接、项目级定义信任前不启动（A13）

@@ -4,7 +4,7 @@ use std::path::Path;
 use piarc_protocol::models::EffortLevel;
 use piarc_protocol::policy::PermissionMode;
 use piarc_protocol::subagent::{AgentSource, AgentWarningKind};
-use serde_json::json;
+use serde_json::{Value, json};
 
 use super::{AgentDirs, load, parse};
 
@@ -90,6 +90,11 @@ fn every_supported_field_is_read() {
     assert_eq!(view.max_turns, Some(12));
     assert_eq!(view.skills, ["lint"]);
     assert_eq!(view.mcp_servers, ["github", "local"]);
+    // `mcpServers` applies since T36: the inline definition is kept for Core to check.
+    assert_eq!(
+        Value::Object(definition.mcp_inline.clone()),
+        json!({"local": {"command": "node"}})
+    );
     assert!(view.hooks);
     assert_eq!(view.isolation.as_deref(), Some("worktree"));
     assert!(view.background);
@@ -109,11 +114,6 @@ fn every_supported_field_is_read() {
     assert_eq!(
         kinds,
         [
-            (
-                AgentWarningKind::InactiveField,
-                "mcpServers".into(),
-                Some("T36".into())
-            ),
             (
                 AgentWarningKind::InactiveField,
                 "skills".into(),

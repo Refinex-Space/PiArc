@@ -4,11 +4,13 @@
 //!
 //! Scanned, relative to the workspace root: `.piarc/settings.json`,
 //! `.piarc/settings.local.json`, `.claude/settings.json`, `.claude/settings.local.json`
-//! (`hooks`, `permissions.allow`, `enabledPlugins`), `.mcp.json` (`mcpServers`),
-//! `.claude-plugin/plugin.json` and `marketplace.json` (plugins), `.pi/extensions/` (one item
-//! per entry), `.pi/settings.json` (`extensions`, `packages`), `.pi/mcp.json`
-//! (`mcpServers`) and the `hooks` of subagent definitions in `.piarc/agents/` and
-//! `.claude/agents/` (T31).
+//! (`hooks`, `permissions.allow`, `enabledPlugins`; `mcpServers` of the `.piarc/` files),
+//! `.mcp.json` (`mcpServers`), `.claude-plugin/plugin.json` and `marketplace.json` (plugins),
+//! `.pi/extensions/` (one item per entry), `.pi/settings.json` (`extensions`, `packages`) and
+//! the `hooks` (T31) and inline `mcpServers` (T36) of subagent definitions in `.piarc/agents/`
+//! and `.claude/agents/`. An MCP server's item names its program or endpoint
+//! ([`crate::mcp::trust_item_name`]), so changing what runs is a new item. Pi's `.pi/mcp.json`
+//! is not read: PiArc's MCP extension replaces Pi's (T36).
 
 use std::collections::BTreeSet;
 use std::io;
@@ -98,15 +100,8 @@ pub fn enumerate(root: &Path) -> Inventory {
             settings_items(source, &settings, &mut items);
         }
     }
-    for source in [".mcp.json", ".pi/mcp.json"] {
-        if let Some(value) = read(source) {
-            keys_of(
-                source,
-                value.get("mcpServers"),
-                Category::McpServer,
-                &mut items,
-            );
-        }
+    if let Some(value) = read(crate::mcp::MCP_JSON) {
+        mcp_items(crate::mcp::MCP_JSON, value.get("mcpServers"), &mut items);
     }
     if let Some(plugin) = read(".claude-plugin/plugin.json") {
         let name = plugin
@@ -165,14 +160,17 @@ fn agent_hook_items(root: &Path, items: &mut BTreeSet<Item>, unreadable: &mut Ve
             let Ok(definition) = crate::agents::parse(&path, source, &text) else {
                 continue;
             };
+            let relative = path.strip_prefix(root).unwrap_or(&path);
+            let source = relative
+                .components()
+                .map(|c| c.as_os_str().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/");
             if let Some(hooks) = definition.hooks {
-                let relative = path.strip_prefix(root).unwrap_or(&path);
-                let source = relative
-                    .components()
-                    .map(|c| c.as_os_str().to_string_lossy())
-                    .collect::<Vec<_>>()
-                    .join("/");
                 settings_items(&source, &serde_json::json!({ "hooks": hooks }), items);
+            }
+            if !definition.mcp_inline.is_empty() {
+                mcp_items(&source, Some(&Value::Object(definition.mcp_inline)), items);
             }
         }
     }
@@ -271,6 +269,10 @@ pub(crate) fn settings_items(source: &str, settings: &Value, items: &mut BTreeSe
     {
         items.insert(item(Category::PermissionMode, source, "acceptEdits"));
     }
+    // PiArc's own files define MCP servers (T36); Claude Code's settings files do not.
+    if source.starts_with(".piarc/") {
+        mcp_items(source, settings.get(crate::mcp::SETTINGS_KEY), items);
+    }
     let plugins = settings.get("enabledPlugins").and_then(Value::as_object);
     for (name, enabled) in plugins.into_iter().flatten() {
         if enabled.as_bool() != Some(false) {
@@ -279,13 +281,10 @@ pub(crate) fn settings_items(source: &str, settings: &Value, items: &mut BTreeSe
     }
 }
 
-fn keys_of(source: &str, map: Option<&Value>, category: Category, items: &mut BTreeSet<Item>) {
-    for name in map
-        .and_then(Value::as_object)
-        .into_iter()
-        .flat_map(|m| m.keys())
-    {
-        items.insert(item(category, source, name));
+fn mcp_items(source: &str, map: Option<&Value>, items: &mut BTreeSet<Item>) {
+    for (name, entry) in map.and_then(Value::as_object).into_iter().flatten() {
+        let name = crate::mcp::trust_item_name(name, entry);
+        items.insert(item(Category::McpServer, source, &name));
     }
 }
 

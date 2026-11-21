@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 73,
+  "method": "mcp/setEnabled",
+  "params": {
+    "name": "files",
+    "enabled": "no"
+  }
+}

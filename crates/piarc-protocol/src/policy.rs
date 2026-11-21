@@ -34,6 +34,10 @@ pub struct PolicyEvaluateParams {
     /// For a subagent's call: its type.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_type: Option<String>,
+    /// The tool asks the user on every call whatever the mode (an MCP tool's
+    /// `_meta["anthropic/requiresUserInteraction"]`, T36).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub requires_user_interaction: bool,
 }
 
 /// Final decision. The Agent Host refuses on any bridge or decoding error.

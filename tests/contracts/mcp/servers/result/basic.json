@@ -1,0 +1,81 @@
+{
+  "jsonrpc": "2.0",
+  "id": 70,
+  "result": {
+    "servers": [
+      {
+        "name": "docs",
+        "scope": "user",
+        "source": "/data/settings.json",
+        "transport": "http",
+        "availability": "ready",
+        "http": {
+          "url": "https://docs.example/mcp",
+          "headers": {
+            "X-Team": "core"
+          },
+          "oauth": {
+            "clientId": "piarc-test",
+            "callbackPort": 8123,
+            "scope": "read write"
+          }
+        },
+        "description": "Team documentation",
+        "alwaysLoad": true
+      },
+      {
+        "name": "files",
+        "scope": "project",
+        "source": "/工作区 a/.mcp.json",
+        "transport": "stdio",
+        "availability": "ready",
+        "stdio": {
+          "command": "npx",
+          "args": ["-y", "@example/files-mcp", "."],
+          "env": {
+            "FILES_ROOT": "/工作区 a"
+          },
+          "cwd": "tools"
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "legacy",
+        "scope": "local",
+        "source": "/home/u/.claude.json",
+        "transport": "sse",
+        "availability": "unsupported",
+        "reason": "the SSE transport is deprecated and PiArc does not support it"
+      },
+      {
+        "name": "repo",
+        "scope": "project",
+        "source": "/工作区 a/.mcp.json",
+        "transport": "stdio",
+        "availability": "untrusted",
+        "reason": "the project is not trusted yet"
+      }
+    ],
+    "env": {
+      "PATH": "/opt/homebrew/bin:/usr/bin:/bin",
+      "HOME": "/Users/u",
+      "LANG": "zh_CN.UTF-8"
+    },
+    "idleTimeoutMs": 600000,
+    "deferThreshold": 30,
+    "overridden": [
+      {
+        "name": "files",
+        "source": "/data/settings.json",
+        "by": "/工作区 a/.mcp.json"
+      }
+    ],
+    "issues": [
+      {
+        "source": "/工作区 a/.mcp.json",
+        "pointer": "/mcpServers/files",
+        "message": "${FILES_TOKEN} has no value and no default; it stays as written"
+      }
+    ]
+  }
+}

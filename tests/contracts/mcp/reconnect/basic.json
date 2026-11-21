@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 72,
+  "method": "mcp/reconnect",
+  "params": {
+    "name": "files"
+  }
+}

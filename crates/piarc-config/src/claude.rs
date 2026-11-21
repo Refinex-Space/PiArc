@@ -92,7 +92,11 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     ignored("allowClaudeInChromeWithManagedMcp", MANAGED),
     ignored("allowedChannelPlugins", MANAGED),
     planned("allowedHttpHookUrls", "T38", "http hooks"),
-    planned("allowedMcpServers", "T36", "MCP servers"),
+    planned(
+        "allowedMcpServers",
+        "T47",
+        "MCP server allowlist with the managed MCP configuration",
+    ),
     ignored("allowedProviders", MANAGED),
     ignored("allowManagedHooksOnly", MANAGED),
     ignored("allowManagedMcpServersOnly", MANAGED),
@@ -133,7 +137,11 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     ignored("crossSessionInbound", NONE),
     ignored("defaultShell", NONE),
     ignored("defaultToAgentsView", GLOBAL),
-    planned("deniedMcpServers", "T36", "MCP servers"),
+    planned(
+        "deniedMcpServers",
+        "T47",
+        "MCP server denylist with the managed MCP configuration",
+    ),
     ignored("deniedModels", MANAGED),
     ignored("desktopSessionCleanupPeriodDays", NONE),
     ignored("dialogExpiry", UI),
@@ -148,7 +156,7 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     ignored("disableCommandPluginSources", MANAGED),
     ignored("disableDeepLinkRegistration", NONE),
     ignored("disableDesktopLocalSessions", MANAGED),
-    planned("disabledMcpjsonServers", "T36", "MCP servers"),
+    active("disabledMcpjsonServers", "/disabledMcpjsonServers"),
     ignored("disableMobileSimulatorTools", MANAGED),
     ignored("disableRemoteControl", NONE),
     ignored("disableRemotePreviewScripts", MANAGED),
@@ -158,9 +166,15 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     ignored("editorMode", UI),
     active("effortLevel", "/effortLevel"),
     ignored("emojiCompletionEnabled", UI),
-    planned("enableAllProjectMcpServers", "T36", "MCP servers"),
+    ignored(
+        "enableAllProjectMcpServers",
+        "PiArc approves project MCP servers with its project trust (architecture 10.2)",
+    ),
     ignored("enableArtifact", NONE),
-    planned("enabledMcpjsonServers", "T36", "MCP servers"),
+    ignored(
+        "enabledMcpjsonServers",
+        "PiArc approves project MCP servers with its project trust (architecture 10.2)",
+    ),
     planned("enabledPlugins", "T40", "plugins"),
     ignored("enableWorkflows", NONE),
     ignored("enforceAvailableModels", NONE),
@@ -293,9 +307,10 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     ignored("wslInheritsWindowsSettings", MANAGED),
 ];
 
-/// The mapping table of `~/.claude.json`: only its MCP servers concern PiArc (T36); the rest
-/// is Claude Code's own state.
-pub const STATE_KEYS: &[ClaudeKey] = &[planned("mcpServers", "T36", "MCP servers")];
+/// The mapping table of `~/.claude.json`: only its MCP servers concern PiArc (user scope, and
+/// the workspace's `projects` entry as local scope, `crate::mcp`); the rest is Claude Code's
+/// own state.
+pub const STATE_KEYS: &[ClaudeKey] = &[active("mcpServers", "MCP servers (user scope)")];
 
 /// How one key of a file was classified.
 #[derive(Debug, Clone, PartialEq, Eq)]

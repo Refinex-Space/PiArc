@@ -369,6 +369,33 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
         name: "disableAllHooks",
         shape: Shape::Bool,
     },
+    // MCP servers (T36, architecture section 6.8): `.mcp.json`'s entry shape, checked entry by
+    // entry by `crate::mcp` (a bad entry leaves out that server, not the file). Executable in
+    // project files.
+    Field {
+        name: "mcpServers",
+        shape: Shape::MapOf(&Shape::Any),
+    },
+    // Claude Code's key: `.mcp.json` servers to leave off, in any settings file.
+    Field {
+        name: "disabledMcpjsonServers",
+        shape: Shape::ListOf(&STRINGS),
+    },
+    // The MCP pool (T36): disconnect a server after this many seconds without a call from any
+    // session; defer MCP tools behind `ToolSearch` when a session has more than this many.
+    Field {
+        name: "mcp",
+        shape: Shape::Object(&[
+            Field {
+                name: "idleTimeoutSeconds",
+                shape: Shape::Number,
+            },
+            Field {
+                name: "deferThreshold",
+                shape: Shape::Number,
+            },
+        ]),
+    },
     // Automatic compaction (T27, ADR-0043), same names and meaning as Claude Code's keys:
     // `false` turns it off (`/compact` still works); the window caps the context the
     // threshold is computed from (Core clamps it to 100,000–1,000,000 tokens).

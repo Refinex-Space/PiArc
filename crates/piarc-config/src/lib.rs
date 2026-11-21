@@ -36,6 +36,7 @@ pub mod claude;
 pub mod diagnostics;
 pub mod executables;
 pub mod layers;
+pub mod mcp;
 pub mod merge;
 pub mod rules;
 pub mod schema;

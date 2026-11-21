@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 74,
+  "method": "mcp/login",
+  "params": {
+    "name": "docs"
+  }
+}

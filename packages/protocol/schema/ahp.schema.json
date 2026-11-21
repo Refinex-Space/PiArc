@@ -51,6 +51,13 @@
           "minimum": 0,
           "type": ["integer", "null"]
         },
+        "mcpInline": {
+          "description": "The servers it defines inline, connected for its runs only (`agents/list`).",
+          "items": {
+            "$ref": "#/$defs/McpServerDefinition"
+          },
+          "type": "array"
+        },
         "mcpServers": {
           "description": "MCP servers it names or defines (T36): their names.",
           "items": {
@@ -5468,6 +5475,702 @@
       "required": ["provider"],
       "type": "object"
     },
+    "McpAvailability": {
+      "description": "Whether a configured server may be connected, before any connection is tried.",
+      "oneOf": [
+        {
+          "const": "ready",
+          "description": "May be connected.",
+          "type": "string"
+        },
+        {
+          "const": "disabled",
+          "description": "The user or the configuration (`enabled: false`, `disabledMcpjsonServers`) turned it off.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported",
+          "description": "PiArc cannot use its transport or definition (`reason`).",
+          "type": "string"
+        },
+        {
+          "const": "untrusted",
+          "description": "A project server of a project that is not trusted yet.",
+          "type": "string"
+        }
+      ]
+    },
+    "McpConfigIssue": {
+      "description": "A configuration problem: the entry is left out or a value is not used.",
+      "properties": {
+        "message": {
+          "description": "What is wrong.",
+          "type": "string"
+        },
+        "pointer": {
+          "description": "JSON Pointer of the value in the file.",
+          "type": "string"
+        },
+        "source": {
+          "description": "The file.",
+          "type": "string"
+        }
+      },
+      "required": ["source", "pointer", "message"],
+      "type": "object"
+    },
+    "McpConnectionState": {
+      "description": "The state of a server in the pool.",
+      "oneOf": [
+        {
+          "const": "connected",
+          "description": "Connected; its tools are known.",
+          "type": "string"
+        },
+        {
+          "const": "connecting",
+          "description": "Connecting, or reconnecting after a failure.",
+          "type": "string"
+        },
+        {
+          "const": "idle",
+          "description": "Not connected: no session needed it yet, or it was idle; the next use connects it.",
+          "type": "string"
+        },
+        {
+          "const": "needsAuth",
+          "description": "The server asked for a sign-in (OAuth 401 or 403).",
+          "type": "string"
+        },
+        {
+          "const": "failed",
+          "description": "The last attempt failed (`error`); the pool retries with backoff while sessions need it.",
+          "type": "string"
+        },
+        {
+          "const": "disabled",
+          "description": "Turned off.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported",
+          "description": "PiArc cannot use it (`error` says why).",
+          "type": "string"
+        },
+        {
+          "const": "untrusted",
+          "description": "Waits for the project's trust.",
+          "type": "string"
+        }
+      ]
+    },
+    "McpHttp": {
+      "description": "A Streamable HTTP server. Values are expanded.",
+      "properties": {
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Sent with every request.",
+          "type": "object"
+        },
+        "oauth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/McpOAuth"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "OAuth client settings."
+        },
+        "url": {
+          "description": "The endpoint.",
+          "type": "string"
+        }
+      },
+      "required": ["url"],
+      "type": "object"
+    },
+    "McpLoginParams": {
+      "description": "Parameters of `mcp/login`.",
+      "properties": {
+        "loginId": {
+          "description": "The sign-in's id, for `ui/loginInteraction`.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The server.",
+          "type": "string"
+        }
+      },
+      "required": ["name", "loginId"],
+      "type": "object"
+    },
+    "McpLoginRequest": {
+      "description": "Request for `mcp/login`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "mcp/login",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/McpLoginParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "McpLoginResponse": {
+      "description": "Successful response to `mcp/login`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/McpServerStatus"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "McpOAuth": {
+      "description": "OAuth client settings of an HTTP server, for servers without dynamic client registration.",
+      "properties": {
+        "authServerMetadataUrl": {
+          "description": "Authorization server metadata to use instead of discovery.",
+          "type": ["string", "null"]
+        },
+        "callbackPort": {
+          "description": "Fixed port of the loopback callback.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "clientId": {
+          "description": "Pre-registered client id.",
+          "type": ["string", "null"]
+        },
+        "scope": {
+          "description": "Scopes to request, separated by spaces.",
+          "type": ["string", "null"]
+        }
+      },
+      "type": "object"
+    },
+    "McpOverridden": {
+      "description": "A definition that a higher scope's definition of the same name replaces.",
+      "properties": {
+        "by": {
+          "description": "The file of the definition that applies.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The server name.",
+          "type": "string"
+        },
+        "source": {
+          "description": "The file of the replaced definition.",
+          "type": "string"
+        }
+      },
+      "required": ["name", "source", "by"],
+      "type": "object"
+    },
+    "McpReconnectParams": {
+      "description": "Parameters of `mcp/reconnect`.",
+      "properties": {
+        "name": {
+          "description": "The server.",
+          "type": "string"
+        }
+      },
+      "required": ["name"],
+      "type": "object"
+    },
+    "McpReconnectRequest": {
+      "description": "Request for `mcp/reconnect`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "mcp/reconnect",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/McpReconnectParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "McpReconnectResponse": {
+      "description": "Successful response to `mcp/reconnect`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/McpServerStatus"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "McpScope": {
+      "description": "Where a server definition comes from. The same name in several scopes takes the whole\ndefinition of the first in this order: enterprise, local, project, user, plugin.",
+      "oneOf": [
+        {
+          "const": "enterprise",
+          "description": "Managed configuration (T47).",
+          "type": "string"
+        },
+        {
+          "const": "local",
+          "description": "`~/.claude.json`, the workspace's entry under `projects`.",
+          "type": "string"
+        },
+        {
+          "const": "project",
+          "description": "The workspace: `.piarc/settings.local.json`, `.piarc/settings.json`, `.mcp.json`. Needs\nthe project's trust.",
+          "type": "string"
+        },
+        {
+          "const": "user",
+          "description": "PiArc's user settings, then `~/.claude.json`'s top-level `mcpServers`.",
+          "type": "string"
+        },
+        {
+          "const": "plugin",
+          "description": "A plugin (T40).",
+          "type": "string"
+        },
+        {
+          "const": "subagent",
+          "description": "Defined inline by a subagent definition, for its runs only.",
+          "type": "string"
+        }
+      ]
+    },
+    "McpServerDefinition": {
+      "description": "One configured server, as it applies.",
+      "properties": {
+        "alwaysLoad": {
+          "description": "`true`: its tools are declared to the model even when MCP tools are deferred.",
+          "type": "boolean"
+        },
+        "availability": {
+          "$ref": "#/$defs/McpAvailability",
+          "description": "Whether it may be connected."
+        },
+        "description": {
+          "description": "What it offers, in a sentence.",
+          "type": ["string", "null"]
+        },
+        "http": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/McpHttp"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The endpoint of a `ready` HTTP server."
+        },
+        "name": {
+          "description": "The name (`[A-Za-z0-9_-]`), unique in the workspace.",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Why not, for `unsupported`, `disabled` and `untrusted`.",
+          "type": ["string", "null"]
+        },
+        "scope": {
+          "$ref": "#/$defs/McpScope",
+          "description": "Its scope."
+        },
+        "source": {
+          "description": "The file it is defined in.",
+          "type": "string"
+        },
+        "stdio": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/McpStdio"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The program of a `ready` stdio server."
+        },
+        "timeoutMs": {
+          "description": "Limit of one tool call, in milliseconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "transport": {
+          "$ref": "#/$defs/McpTransport",
+          "description": "Its transport."
+        }
+      },
+      "required": ["name", "scope", "source", "transport", "availability"],
+      "type": "object"
+    },
+    "McpServerStatus": {
+      "description": "One server's state.",
+      "properties": {
+        "error": {
+          "description": "The last error, or why it is unsupported, disabled or waiting.",
+          "type": ["string", "null"]
+        },
+        "name": {
+          "description": "The name.",
+          "type": "string"
+        },
+        "oauth": {
+          "description": "Whether it signs in with OAuth.",
+          "type": "boolean"
+        },
+        "pid": {
+          "description": "The process id of a connected stdio server.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "scope": {
+          "$ref": "#/$defs/McpScope",
+          "description": "Its scope."
+        },
+        "sessions": {
+          "description": "Sessions using it now.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source": {
+          "description": "Its file.",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/McpConnectionState",
+          "description": "The state."
+        },
+        "tools": {
+          "description": "Tools it offers (from the last connection).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "transport": {
+          "$ref": "#/$defs/McpTransport",
+          "description": "Its transport."
+        }
+      },
+      "required": ["name", "scope", "source", "transport", "state", "tools", "sessions"],
+      "type": "object"
+    },
+    "McpServersMethodRequest": {
+      "description": "Request for `mcp/servers`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "mcp/servers",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/McpServersParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "McpServersMethodResponse": {
+      "description": "Successful response to `mcp/servers`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/McpServersResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "McpServersParams": {
+      "description": "Parameters of `mcp/servers`.",
+      "type": "object"
+    },
+    "McpServersResult": {
+      "description": "Result of `mcp/servers`.",
+      "properties": {
+        "deferThreshold": {
+          "description": "More MCP tools than this in a session are deferred behind `ToolSearch`.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "The environment stdio servers start from (the command environment of the user's login\nshell, ADR-0035), before the definition's own `env`.",
+          "type": "object"
+        },
+        "idleTimeoutMs": {
+          "description": "After this long without a call from any session the pool disconnects a server.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "issues": {
+          "description": "Entries left out and values not used.",
+          "items": {
+            "$ref": "#/$defs/McpConfigIssue"
+          },
+          "type": "array"
+        },
+        "overridden": {
+          "description": "Definitions replaced by higher scopes.",
+          "items": {
+            "$ref": "#/$defs/McpOverridden"
+          },
+          "type": "array"
+        },
+        "servers": {
+          "description": "Every configured server, by name.",
+          "items": {
+            "$ref": "#/$defs/McpServerDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["servers", "idleTimeoutMs", "deferThreshold"],
+      "type": "object"
+    },
+    "McpSetEnabledParams": {
+      "description": "Parameters of `mcp/setEnabled`.",
+      "properties": {
+        "enabled": {
+          "description": "On or off.",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "The server.",
+          "type": "string"
+        }
+      },
+      "required": ["name", "enabled"],
+      "type": "object"
+    },
+    "McpSetEnabledRequest": {
+      "description": "Request for `mcp/setEnabled`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "mcp/setEnabled",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/McpSetEnabledParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "McpSetEnabledResponse": {
+      "description": "Successful response to `mcp/setEnabled`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/McpServerStatus"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "McpStatus": {
+      "description": "Result of `mcp/status` and the parameters of `mcp/statusChanged`.",
+      "properties": {
+        "issues": {
+          "description": "Entries left out and values not used.",
+          "items": {
+            "$ref": "#/$defs/McpConfigIssue"
+          },
+          "type": "array"
+        },
+        "overridden": {
+          "description": "Definitions replaced by higher scopes.",
+          "items": {
+            "$ref": "#/$defs/McpOverridden"
+          },
+          "type": "array"
+        },
+        "servers": {
+          "description": "Every configured server, by name.",
+          "items": {
+            "$ref": "#/$defs/McpServerStatus"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["servers"],
+      "type": "object"
+    },
+    "McpStatusChangedNotification": {
+      "description": "Notification `mcp/statusChanged`.",
+      "properties": {
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "mcp/statusChanged",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/McpStatus"
+        }
+      },
+      "required": ["jsonrpc", "method", "params"],
+      "type": "object"
+    },
+    "McpStatusMethodRequest": {
+      "description": "Request for `mcp/status`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "mcp/status",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/McpStatusParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "McpStatusMethodResponse": {
+      "description": "Successful response to `mcp/status`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/McpStatus"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "McpStatusParams": {
+      "description": "Parameters of `mcp/status`.",
+      "type": "object"
+    },
+    "McpStdio": {
+      "description": "A stdio server's program. Values are expanded (`${VAR}`, `${VAR:-default}`).",
+      "properties": {
+        "args": {
+          "description": "Its arguments.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "command": {
+          "description": "The program.",
+          "type": "string"
+        },
+        "cwd": {
+          "description": "Working directory, relative to the workspace root unless absolute.",
+          "type": ["string", "null"]
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Variables the definition adds to the environment.",
+          "type": "object"
+        }
+      },
+      "required": ["command"],
+      "type": "object"
+    },
+    "McpTransport": {
+      "description": "How the server is reached.",
+      "oneOf": [
+        {
+          "const": "stdio",
+          "description": "A local program speaking MCP on stdin and stdout.",
+          "type": "string"
+        },
+        {
+          "const": "http",
+          "description": "Streamable HTTP.",
+          "type": "string"
+        },
+        {
+          "const": "sse",
+          "description": "The deprecated SSE transport: not supported.",
+          "type": "string"
+        },
+        {
+          "const": "ws",
+          "description": "WebSocket: not supported.",
+          "type": "string"
+        }
+      ]
+    },
     "MemoryFile": {
       "description": "One memory document with expanded imports.",
       "properties": {
@@ -6266,6 +6969,10 @@
         "parentSessionId": {
           "description": "For a subagent's call (T31): the session that started it. Core checks it against the\nsubagent it registered (`subagent/start`).",
           "type": ["string", "null"]
+        },
+        "requiresUserInteraction": {
+          "description": "The tool asks the user on every call whatever the mode (an MCP tool's\n`_meta[\"anthropic/requiresUserInteraction\"]`, T36).",
+          "type": "boolean"
         },
         "sessionId": {
           "description": "Owning session.",
@@ -12423,6 +13130,39 @@
     },
     {
       "$ref": "#/$defs/SubagentCompletedNotification"
+    },
+    {
+      "$ref": "#/$defs/McpServersMethodRequest"
+    },
+    {
+      "$ref": "#/$defs/McpServersMethodResponse"
+    },
+    {
+      "$ref": "#/$defs/McpStatusMethodRequest"
+    },
+    {
+      "$ref": "#/$defs/McpStatusMethodResponse"
+    },
+    {
+      "$ref": "#/$defs/McpReconnectRequest"
+    },
+    {
+      "$ref": "#/$defs/McpReconnectResponse"
+    },
+    {
+      "$ref": "#/$defs/McpSetEnabledRequest"
+    },
+    {
+      "$ref": "#/$defs/McpSetEnabledResponse"
+    },
+    {
+      "$ref": "#/$defs/McpLoginRequest"
+    },
+    {
+      "$ref": "#/$defs/McpLoginResponse"
+    },
+    {
+      "$ref": "#/$defs/McpStatusChangedNotification"
     }
   ],
   "description": "Any message covered by the Agent Host Protocol 1.0 contracts. Generated from the piarc-protocol crate by `npm run gen:protocol`; do not edit.",

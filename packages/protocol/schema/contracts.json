@@ -1044,6 +1044,72 @@
       "method": "subagent/completed",
       "name": "subagent/completed",
       "schema": "SubagentCompletedNotification"
+    },
+    {
+      "kind": "request",
+      "method": "mcp/servers",
+      "name": "mcp/servers",
+      "schema": "McpServersMethodRequest"
+    },
+    {
+      "kind": "response",
+      "method": "mcp/servers",
+      "name": "mcp/servers/result",
+      "schema": "McpServersMethodResponse"
+    },
+    {
+      "kind": "request",
+      "method": "mcp/status",
+      "name": "mcp/status",
+      "schema": "McpStatusMethodRequest"
+    },
+    {
+      "kind": "response",
+      "method": "mcp/status",
+      "name": "mcp/status/result",
+      "schema": "McpStatusMethodResponse"
+    },
+    {
+      "kind": "request",
+      "method": "mcp/reconnect",
+      "name": "mcp/reconnect",
+      "schema": "McpReconnectRequest"
+    },
+    {
+      "kind": "response",
+      "method": "mcp/reconnect",
+      "name": "mcp/reconnect/result",
+      "schema": "McpReconnectResponse"
+    },
+    {
+      "kind": "request",
+      "method": "mcp/setEnabled",
+      "name": "mcp/setEnabled",
+      "schema": "McpSetEnabledRequest"
+    },
+    {
+      "kind": "response",
+      "method": "mcp/setEnabled",
+      "name": "mcp/setEnabled/result",
+      "schema": "McpSetEnabledResponse"
+    },
+    {
+      "kind": "request",
+      "method": "mcp/login",
+      "name": "mcp/login",
+      "schema": "McpLoginRequest"
+    },
+    {
+      "kind": "response",
+      "method": "mcp/login",
+      "name": "mcp/login/result",
+      "schema": "McpLoginResponse"
+    },
+    {
+      "kind": "notification",
+      "method": "mcp/statusChanged",
+      "name": "mcp/statusChanged",
+      "schema": "McpStatusChangedNotification"
     }
   ],
   "protocolVersion": "1.0"

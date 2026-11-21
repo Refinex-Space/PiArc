@@ -28,6 +28,9 @@ use crate::history::{HarnessEntry, SessionGetEntries, SessionHistory};
 use crate::hooks::HooksRun;
 use crate::host::{HostPing, HostShutdown};
 use crate::jsonrpc::{ErrorResponse, Notification, Request, SuccessResponse};
+use crate::mcp::{
+    McpLogin, McpReconnect, McpServersMethod, McpSetEnabled, McpStatusChanged, McpStatusMethod,
+};
 use crate::memory::FsMemory;
 use crate::method::{Method, NotificationMessage, RequestMessage, ResultMessage};
 use crate::models::{
@@ -337,6 +340,17 @@ pub static CONTRACTS: &[Contract] = &[
     notification::<SubagentStarted>(),
     notification::<SubagentProgress>(),
     notification::<SubagentCompleted>(),
+    request::<McpServersMethod>(McpServersMethod::NAME),
+    response::<McpServersMethod>("mcp/servers/result"),
+    request::<McpStatusMethod>(McpStatusMethod::NAME),
+    response::<McpStatusMethod>("mcp/status/result"),
+    request::<McpReconnect>(McpReconnect::NAME),
+    response::<McpReconnect>("mcp/reconnect/result"),
+    request::<McpSetEnabled>(McpSetEnabled::NAME),
+    response::<McpSetEnabled>("mcp/setEnabled/result"),
+    request::<McpLogin>(McpLogin::NAME),
+    response::<McpLogin>("mcp/login/result"),
+    notification::<McpStatusChanged>(),
 ];
 
 /// Looks up a contract by name.

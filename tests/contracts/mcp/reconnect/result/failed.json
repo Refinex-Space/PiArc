@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "id": 72,
+  "result": {
+    "name": "files",
+    "scope": "project",
+    "source": "/工作区 a/.mcp.json",
+    "transport": "stdio",
+    "state": "failed",
+    "tools": 0,
+    "sessions": 1,
+    "error": "spawn files-mcp ENOENT"
+  }
+}
