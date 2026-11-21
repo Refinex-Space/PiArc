@@ -1,0 +1,28 @@
+id: sandbox-auto-plan
+description: With the sandbox's auto-approval on, plan mode still refuses a command that is not read-only and points at ExitPlanMode (T39).
+capabilities: [CAP-SANDBOX-AUTO-001]
+platforms: [macos]
+platform_reason: The command sandbox (Seatbelt) exists on macOS only (requirement D7).
+sessions:
+  main: { provider: main, mode: plan }
+workspace:
+  trusted: true
+  run_files:
+    'data 数据/settings.json': '{"sandbox":{"enabled":true,"autoAllowBashIfSandboxed":true}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: write, name: Bash, input: { command: 'printf x > plan.txt' } }
+      - text: Here is my plan.
+actions:
+  - prompt: { text: Plan it., turn: t }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - index: 1
+      tool_results:
+        - { id: write, is_error: true, contains: plan mode is on }
+  files:
+    plan.txt: null

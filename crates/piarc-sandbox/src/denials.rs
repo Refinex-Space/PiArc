@@ -112,12 +112,14 @@ fn candidates(line: &str) -> Vec<String> {
     out
 }
 
+/// A path, or a bare file name relative to the command's directory; anything else the policy
+/// check discards anyway (a word like `bind` is a path inside the workspace, which is allowed).
 fn looks_like_path(text: &str) -> bool {
     !text.is_empty()
         && text.len() < 4096
         && !text.contains('\n')
-        && (text.contains('/') || text.starts_with('.') || text.starts_with('~'))
         && !text.contains("://")
+        && (text.contains('/') || !text.contains(char::is_whitespace))
 }
 
 /// `path` without `.` and `..`.
@@ -213,6 +215,8 @@ PermissionError: [Errno 1] Operation not permitted: '/nohome/u/elsewhere.txt'
 Error: EPERM: operation not permitted, open '/ws/.git/hooks/pre-commit'
 error: could not lock config file .git/config: Operation not permitted
 mkdir: /ws/sub/ok: Operation not permitted
+cat: notes.txt: Operation not permitted
+bind: Operation not permitted
 ";
         assert_eq!(
             found(output),
@@ -224,6 +228,22 @@ mkdir: /ws/sub/ok: Operation not permitted
                 ("/ws/.git/hooks/pre-commit".to_owned(), Operation::Write),
                 ("/ws/sub/.git/config".to_owned(), Operation::Write),
             ]
+        );
+        // A bare name is relative to the command's directory.
+        let unreadable = ResolvedPolicy {
+            deny_read: vec![PathBuf::from("/ws/sub/notes.txt")],
+            ..policy()
+        };
+        assert_eq!(
+            file_denials(
+                "cat: notes.txt: Operation not permitted\n",
+                Path::new("/ws/sub"),
+                &unreadable
+            ),
+            [FileDenial {
+                path: PathBuf::from("/ws/sub/notes.txt"),
+                operation: Operation::Read,
+            }]
         );
     }
 

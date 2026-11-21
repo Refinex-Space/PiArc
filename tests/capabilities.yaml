@@ -522,13 +522,37 @@ capabilities:
     milestone: M4
     refs: [FR-TL-07, ARCH-6.10]
     task: T39
-    status: planned
+    status: active
+  - id: CAP-SANDBOX-AUTO-001
+    title: '"沙箱内自动批准"模式下沙箱内的 Bash 命令不弹审批，deny、ask 规则、关键路径删除与计划模式照常拦截'
+    milestone: M4
+    refs: [FR-TL-07, ARCH-6.2.3, ARCH-6.10]
+    task: T39
+    status: active
+  - id: CAP-SANDBOX-PATHS-001
+    title: '前台命令、run_in_background 后台命令与 Monitor 命令都在沙箱内执行'
+    milestone: M4
+    refs: [FR-TL-07, ARCH-6.10, ARCH-6.11]
+    task: T39
+    status: active
+  - id: CAP-SANDBOX-RETRY-001
+    title: '沙箱外重试（dangerouslyDisableSandbox）在任何模式都询问，只有仅本次与拒绝，hooks 不能代答'
+    milestone: M4
+    refs: [FR-TL-07, ARCH-6.10]
+    task: T39
+    status: active
+  - id: CAP-SANDBOX-PROJECT-001
+    title: '项目级配置只能收紧沙箱：自动批准与白名单域名不生效并在配置诊断中标出'
+    milestone: M4
+    refs: [FR-TL-07, ARCH-6.2.1, ARCH-6.10]
+    task: T39
+    status: active
   - id: CAP-SANDBOX-WINDOWS-001
     title: 'Windows 上命令的隔离方案（第一版只做进程树管理，见需求 D7）'
     milestone: M4
     refs: [FR-TL-07, ARCH-6.10]
     task: T39
-    status: planned
+    status: active
 
   # Permissions
   - id: CAP-PERM-MODE-001

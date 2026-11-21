@@ -11,7 +11,7 @@
 | M1 | 61 | 61 | 0 | 0 |
 | M2 | 46 | 46 | 0 | 0 |
 | M3 | 47 | 47 | 0 | 0 |
-| M4 | 10 | 0 | 10 | 0 |
+| M4 | 14 | 6 | 8 | 0 |
 | M5 | 7 | 0 | 7 | 0 |
 
 ## M1
@@ -192,8 +192,12 @@
 | CAP-MCP-PROMPTS-001 | MCP prompts | ARCH-6.8 | T40 | — | 计划中 |
 | CAP-PLUGIN-001 | 插件：Claude Code 插件目录与 Pi 包，启用前展示来源与能力 | FR-EX-04、ARCH-6.7、ARCH-6.14 | T40 | — | 计划中 |
 | CAP-RV-COMMENT-001 | diff 行内评论批量发送给 agent | FR-RV-04 | T42 | — | 计划中 |
-| CAP-SANDBOX-MACOS-001 | macOS 上 Bash 在 Seatbelt 中执行，文件写入与网络按白名单放行 | FR-TL-07、ARCH-6.10 | T39 | — | 计划中 |
-| CAP-SANDBOX-WINDOWS-001 | Windows 上命令的隔离方案（第一版只做进程树管理，见需求 D7） | FR-TL-07、ARCH-6.10 | T39 | — | 计划中 |
+| CAP-SANDBOX-AUTO-001 | "沙箱内自动批准"模式下沙箱内的 Bash 命令不弹审批，deny、ask 规则、关键路径删除与计划模式照常拦截 | FR-TL-07、ARCH-6.2.3、ARCH-6.10 | T39 | `sandbox-auto-allow`（仅 macos）<br>`sandbox-auto-ask-rule`（仅 macos）<br>`sandbox-auto-critical-delete`（仅 macos）<br>`sandbox-auto-deny-rule`（仅 macos）<br>`sandbox-auto-plan`（仅 macos） | 已实现 |
+| CAP-SANDBOX-MACOS-001 | macOS 上 Bash 在 Seatbelt 中执行，文件写入与网络按白名单放行 | FR-TL-07、ARCH-6.10 | T39 | `sandbox-ask-writes`（仅 macos） | 已实现 |
+| CAP-SANDBOX-PATHS-001 | 前台命令、run_in_background 后台命令与 Monitor 命令都在沙箱内执行 | FR-TL-07、ARCH-6.10、ARCH-6.11 | T39 | `sandbox-launch-paths`（仅 macos） | 已实现 |
+| CAP-SANDBOX-PROJECT-001 | 项目级配置只能收紧沙箱：自动批准与白名单域名不生效并在配置诊断中标出 | FR-TL-07、ARCH-6.2.1、ARCH-6.10 | T39 | `sandbox-project-tightens`（仅 macos） | 已实现 |
+| CAP-SANDBOX-RETRY-001 | 沙箱外重试（dangerouslyDisableSandbox）在任何模式都询问，只有仅本次与拒绝，hooks 不能代答 | FR-TL-07、ARCH-6.10 | T39 | `sandbox-unsandboxed-retry`（仅 macos） | 已实现 |
+| CAP-SANDBOX-WINDOWS-001 | Windows 上命令的隔离方案（第一版只做进程树管理，见需求 D7） | FR-TL-07、ARCH-6.10 | T39 | `sandbox-windows-not-applied`（仅 windows） | 已实现 |
 | CAP-SYS-NOTIFY-002 | 在通知中直接允许或拒绝 | FR-SY-03 | T42 | — | 计划中 |
 | CAP-TOOL-NOTEBOOK-001 | NotebookEdit 编辑 Jupyter cell | FR-TL-06、ARCH-6.1.4 | T42 | — | 计划中 |
 | CAP-USAGE-COST-001 | 按会话、按模型统计用量与成本 | FR-MD-06 | T41 | — | 计划中 |

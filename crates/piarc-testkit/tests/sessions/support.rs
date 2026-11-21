@@ -383,7 +383,9 @@ pub fn record_host_pid(env: &Env, config: &mut piarc_core::CoreConfig) -> std::p
         panic!("expected development host")
     };
     let wrapper = env.root.join("host.mjs");
-    let pid_file = env.root.join("host.pid");
+    // Inside the Agent Host's own directory: its Seatbelt profile lets it write only there,
+    // Pi's agent directory, the workspace and the sessions' temporary directories (T39).
+    let pid_file = env.data.join("agent-host").join("host.pid");
     std::fs::write(&wrapper, format!(
         "import {{writeFileSync}} from 'node:fs';\nimport {{pathToFileURL}} from 'node:url';\nwriteFileSync({},String(process.pid));\nawait import(pathToFileURL({}).href);",
         serde_json::to_string(&pid_file).expect("path"), serde_json::to_string(bundle).expect("bundle"))).expect("wrapper");

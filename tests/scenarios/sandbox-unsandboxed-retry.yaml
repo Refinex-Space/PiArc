@@ -1,0 +1,44 @@
+id: sandbox-unsandboxed-retry
+description: A Bash call with dangerouslyDisableSandbox asks even in bypassPermissions with the sandbox's auto-approval on, a PermissionRequest hook that allows everything does not answer it, the card says it runs outside the sandbox, a refusal's feedback reaches the model, and an approved retry runs unsandboxed (T39).
+capabilities: [CAP-SANDBOX-RETRY-001]
+platforms: [macos]
+platform_reason: The command sandbox (Seatbelt) exists on macOS only (requirement D7).
+sessions:
+  main: { provider: main, mode: bypassPermissions }
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    hook-plans/grant.json: '{"json":{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}}'
+  run_files:
+    'data 数据/settings.json': '{"sandbox":{"enabled":true,"autoAllowBashIfSandboxed":true},"permissions":{"enableBypassPermissions":true},"hooks":{"PermissionRequest":[{"matcher":"Bash","hooks":[{"type":"command","command":"node hook.mjs grant"}]}]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: first
+            name: Bash
+            input: { command: 'printf out > "$HOME/out.txt" && printf done > outside.txt', dangerouslyDisableSandbox: true }
+      - tool_calls:
+          - id: again
+            name: Bash
+            input: { command: 'printf out > "$HOME/out.txt" && printf done > outside.txt', dangerouslyDisableSandbox: true }
+      - text: Done.
+approvals:
+  - { tool: Bash, decision: deny, feedback: Keep it in the sandbox. }
+  - { tool: Bash, decision: allow }
+actions:
+  - prompt: { text: Go., turn: t }
+expect:
+  request_counts: { main: 3 }
+  events:
+    - { method: core/sessions, params: { approvals: [{ tool: Bash, sandbox: unsandboxed, protectedPath: true }] } }
+  requests:
+    - index: 2
+      tool_results:
+        - { id: first, is_error: true, contains: Keep it in the sandbox. }
+        - { id: again, is_error: false }
+  files:
+    outside.txt: done

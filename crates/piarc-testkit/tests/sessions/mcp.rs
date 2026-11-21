@@ -370,7 +370,7 @@ fn node_path() -> std::path::PathBuf {
 
 /// `npm pack` of the probe server (`packages/testkit/src/mcp-probe-server/`) into `dir`: npx
 /// installs a tarball into its cache (a directory would be linked in place, I40).
-fn pack_probe(dir: &Path) -> std::path::PathBuf {
+pub(crate) fn pack_probe(dir: &Path) -> std::path::PathBuf {
     let node = node_path();
     let prefix = node.parent().expect("node's directory");
     let cli = if cfg!(windows) {
