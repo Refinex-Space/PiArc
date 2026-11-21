@@ -15,7 +15,16 @@ import { TOOL_GUIDANCE } from '../harness/prompts/tools.js';
 /** The tools whose file and command I/O Core performs, in the order the model sees them. A
  * session gets `Bash` when Core found bash (Git Bash on Windows) and `PowerShell` on Windows
  * only (`exec/shells`, T17). */
-export const CORE_TOOLS = ['Read', 'Write', 'Edit', 'Bash', 'PowerShell', 'Glob', 'Grep'] as const;
+export const CORE_TOOLS = [
+  'Read',
+  'Write',
+  'Edit',
+  'NotebookEdit',
+  'Bash',
+  'PowerShell',
+  'Glob',
+  'Grep',
+] as const;
 
 /** The Harness Kit's host tools (T26, `harness/session-harness.ts`), after the Core tools. */
 export const HOST_TOOLS = [
@@ -118,6 +127,19 @@ export const DEFAULT_PROFILE: ToolProfile = {
       'replaced instead. All entries refer to the file as it is before the call and must not ' +
       'overlap; put several changes to one file into one call.',
     ...TOOL_GUIDANCE.Edit,
+  },
+  NotebookEdit: {
+    name: 'NotebookEdit',
+    description:
+      'Change one cell of a Jupyter notebook (.ipynb). The notebook must have been read with ' +
+      'Read first and not changed since. `cell_id` names the cell by its id, or as `cell-N` ' +
+      '(the N-th cell, counting from 0) in a notebook without ids. `edit_mode` is `replace` ' +
+      "(the default: `new_source` becomes the cell's whole source, and a code cell's outputs " +
+      'and execution count are cleared because they no longer match), `insert` (a new cell ' +
+      'with `new_source` and the required `cell_type` goes after `cell_id`, or first without ' +
+      'it) or `delete`. `cell_type` (`code` or `markdown`) also changes the type of a replaced ' +
+      "cell. Other cells, the notebook's metadata and its formatting stay exactly as they were.",
+    ...TOOL_GUIDANCE.NotebookEdit,
   },
   Bash: {
     name: 'Bash',

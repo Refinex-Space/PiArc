@@ -7,6 +7,7 @@
 // | Read      | Pi read, on a stand-in path     | fs/stat, fs/read                |
 // | Write     | Pi write, on a stand-in path    | fs/mkdir, fs/write              |
 // | Edit      | Pi edit, on a stand-in path     | fs/stat, fs/read, fs/write      |
+// | NotebookEdit | PiArc's (Claude Code's params) | fs/read, fs/write             |
 // | Bash      | PiArc's (Pi's parameters)       | exec/run, exec/kill, exec/output|
 // | PowerShell| PiArc's, Windows only           | exec/run, exec/kill, exec/output|
 // | Glob      | Pi find + FindOperations        | fs/stat, fs/glob                |
@@ -17,6 +18,7 @@ import type { ToolDefinition } from '@earendil-works/pi-coding-agent';
 
 import type { CoreIo, Shells } from './core-io.js';
 import { createEditTool } from './edit.js';
+import { createNotebookEditTool } from './notebook.js';
 import { createGlobTool } from './glob.js';
 import { createGrepTool } from './grep.js';
 import { CORE_TOOLS, PI_BUILTIN_TOOL_NAMES, type CoreTool, type ToolProfile } from './profile.js';
@@ -51,6 +53,7 @@ const FACTORIES: Record<CoreTool, (setup: ToolSetup) => ToolDefinition> = {
   Read: createReadTool,
   Write: createWriteTool,
   Edit: createEditTool,
+  NotebookEdit: createNotebookEditTool,
   Bash: createBashTool,
   PowerShell: createPowerShellTool,
   Glob: createGlobTool,

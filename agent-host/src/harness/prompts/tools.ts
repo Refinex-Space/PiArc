@@ -21,6 +21,12 @@ export const TOOL_GUIDANCE = {
       'Choose an anchor that identifies the intended passage uniquely. Keep separate replacements disjoint.',
     ],
   },
+  NotebookEdit: {
+    snippet: 'NotebookEdit: insert, replace or delete one notebook cell',
+    guidelines: [
+      'Read the notebook first to see the cell ids. Use it instead of Edit for .ipynb files.',
+    ],
+  },
   Bash: {
     snippet: 'Bash: run a shell command',
     guidelines: [

@@ -107,13 +107,13 @@ pub(super) async fn prepare(
                 assessment.input.unsandboxed = sandbox.unsandboxed;
                 assessment
             }
-            "Read" | "Glob" | "Grep" | "Write" | "Edit" => {
-                let raw = field("path").unwrap_or(".");
+            "Read" | "Glob" | "Grep" | "Write" | "Edit" | "NotebookEdit" => {
+                let raw = field(path_key(&p.tool)).unwrap_or(".");
                 let (file_boundary, target) = prepare_file(&scope, &p, &mut card)?;
                 boundary = file_boundary;
                 let binding = piarc_fs::DirectoryBinding::capture(&target)
                     .map_err(|e| e.to_error_object())?;
-                if matches!(p.tool.as_str(), "Write" | "Edit")
+                if matches!(p.tool.as_str(), "Write" | "Edit" | "NotebookEdit")
                     && scope.check(&display(&target), Access::Read).is_ok()
                 {
                     scope
@@ -202,9 +202,13 @@ fn prepare_file(
     p: &PolicyEvaluateParams,
     card: &mut ApprovalRequest,
 ) -> Result<(Boundary, PathBuf), ErrorObject> {
-    let raw = p.input.get("path").and_then(Value::as_str).unwrap_or(".");
+    let raw = p
+        .input
+        .get(path_key(&p.tool))
+        .and_then(Value::as_str)
+        .unwrap_or(".");
     let target = scope.locate(raw).map_err(|e| e.to_error_object())?;
-    let write = matches!(p.tool.as_str(), "Write" | "Edit");
+    let write = matches!(p.tool.as_str(), "Write" | "Edit" | "NotebookEdit");
     let boundary = path_boundary(scope, raw, write)?;
     card.kind = if boundary == Boundary::Outside {
         ApprovalKind::PermissionExpansion
@@ -245,5 +249,14 @@ pub(super) fn path_boundary(
         Ok(_) => Ok(Boundary::Inside),
         Err(piarc_fs::Error::NeedsApproval { .. }) => Ok(Boundary::Outside),
         Err(e) => Err(e.to_error_object()),
+    }
+}
+
+/// The argument holding a file tool's path: Claude Code's `notebook_path` for `NotebookEdit`.
+pub(super) fn path_key(tool: &str) -> &'static str {
+    if tool == "NotebookEdit" {
+        super::notebook::PATH
+    } else {
+        "path"
     }
 }

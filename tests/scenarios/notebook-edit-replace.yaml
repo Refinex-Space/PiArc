@@ -1,0 +1,35 @@
+id: notebook-edit-replace
+description: NotebookEdit replaces a code cell found by its id after a Read; the cell's source changes, its outputs and execution count are cleared, and every other byte of the notebook (cells, metadata, indent, line endings) stays (T42).
+capabilities: [CAP-TOOL-NOTEBOOK-001]
+workspace:
+  fixtures:
+    analysis.ipynb: notebook/base.ipynb
+sessions:
+  main: { provider: main, mode: acceptEdits }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: read1, name: Read, input: { path: analysis.ipynb } }]
+      - tool_calls:
+          - id: call-1
+            name: NotebookEdit
+            input:
+              notebook_path: analysis.ipynb
+              cell_id: load
+              new_source: "import sys\nprint(sys.version)\n"
+      - text: Replaced.
+actions:
+  - prompt: { text: Print the Python version instead., turn: t }
+expect:
+  fixtures:
+    analysis.ipynb: notebook/base-replace-load.ipynb
+  requests:
+    - index: 2
+      tool_results:
+        - { id: read1, is_error: false }
+        - { id: call-1, is_error: false, contains: Replaced cell load of analysis.ipynb. }
+  events:
+    - method: item/completed
+      turn: t
+      params: { item: { itemId: call-1, type: fileChange, tool: NotebookEdit, status: completed } }

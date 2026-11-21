@@ -512,11 +512,23 @@ capabilities:
     task: T34
     status: active
   - id: CAP-TOOL-NOTEBOOK-001
-    title: 'NotebookEdit 编辑 Jupyter cell'
+    title: 'NotebookEdit 编辑 Jupyter cell（插入、替换、删除，未改动的部分逐字节不变）'
     milestone: M4
     refs: [FR-TL-06, ARCH-6.1.4]
     task: T42
-    status: planned
+    status: active
+  - id: CAP-TOOL-NOTEBOOK-ERRORS-001
+    title: 'NotebookEdit 的先读后改、外部修改与不存在的 cell 报错，无 id 的旧版 notebook 按序号定位'
+    milestone: M4
+    refs: [FR-TL-06, ARCH-6.1.2]
+    task: T42
+    status: active
+  - id: CAP-TOOL-NOTEBOOK-PERMISSIONS-001
+    title: 'NotebookEdit 受 Edit(...) 规则、受保护路径与模式约束，hooks 按规范名匹配，写入进检查点可回退'
+    milestone: M4
+    refs: [FR-TL-06, ARCH-6.9]
+    task: T42
+    status: active
   - id: CAP-SANDBOX-MACOS-001
     title: 'macOS 上 Bash 在 Seatbelt 中执行，文件写入与网络按白名单放行'
     milestone: M4

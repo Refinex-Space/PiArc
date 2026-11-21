@@ -47,6 +47,7 @@ pub(crate) mod hooks;
 mod inputs;
 pub(super) mod memory;
 mod modes;
+mod notebook;
 mod plan;
 mod prepare;
 mod preview;
@@ -712,6 +713,7 @@ impl Prepared {
         if let Some((path, label)) = self.preview.take() {
             let input = p.input.clone();
             let tool = p.tool.clone();
+            let call = p.tool_call_id.clone();
             let binding = self
                 .grant
                 .binding
@@ -719,7 +721,7 @@ impl Prepared {
                 .ok_or_else(|| denied("Missing file approval directory."))?;
             self.card.diff = Some(
                 tokio::task::spawn_blocking(move || {
-                    preview::file_preview(&tool, &input, &path, &label, &binding)
+                    preview::file_preview(&tool, &call, &input, &path, &label, &binding)
                 })
                 .await
                 .map_err(|e| denied(format!("Preview unavailable: {e}")))??,

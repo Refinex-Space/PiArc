@@ -13,7 +13,16 @@ use crate::harness::{
     Env, now_ms, offered_tools, open, prompt_text, spy_report, tool_results_in, with_io_spy,
 };
 
-const CANONICAL: [&str; 6] = ["Read", "Write", "Edit", "Bash", "Glob", "Grep"];
+const CANONICAL: [&str; 7] = [
+    "Read",
+    "Write",
+    "Edit",
+    // T42.
+    "NotebookEdit",
+    "Bash",
+    "Glob",
+    "Grep",
+];
 
 /// The Harness Kit's host tools after them (T26): no file or command I/O of their own.
 const HOST_TOOLS: [&str; 9] = [
@@ -35,7 +44,7 @@ const HOST_TOOLS: [&str; 9] = [
 fn offered_canonical() -> Vec<&'static str> {
     let mut names = CANONICAL.to_vec();
     if cfg!(windows) {
-        names.insert(4, "PowerShell");
+        names.insert(5, "PowerShell");
     }
     names.extend(HOST_TOOLS);
     names
@@ -289,6 +298,7 @@ async fn a_tool_profile_renames_tools_for_the_model_only() {
         ("Read", "read_file"),
         ("Write", "write_file"),
         ("Edit", "edit_file"),
+        ("NotebookEdit", "edit_notebook"),
         ("Bash", "run_shell"),
         ("Glob", "find_files"),
         ("Grep", "search_text"),

@@ -1,0 +1,95 @@
+id: notebook-edit-permissions
+description: NotebookEdit follows Edit's permissions and file tools' guarantees - Accept edits allows it inside the workspace, an Edit(...) deny rule blocks it, a protected path still asks, Manual mode asks with the cell's diff on the card, PreToolUse hooks match its canonical name, its item is a fileChange with Core's diff, and rewinding the turn restores the notebook from the checkpoint (T42).
+capabilities: [CAP-TOOL-NOTEBOOK-PERMISSIONS-001]
+workspace:
+  trusted: true
+  fixtures:
+    analysis.ipynb: notebook/base.ipynb
+    secret.ipynb: notebook/legacy.ipynb
+    .claude/kept.ipynb: notebook/legacy.ipynb
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .piarc/settings.json: '{"permissions": {"deny": ["Edit(./secret.ipynb)"]}}'
+    .claude/settings.json: '{"hooks": {"PreToolUse": [{"matcher": "NotebookEdit", "hooks": [{"type": "command", "command": "node hook.mjs pre"}]}]}}'
+sessions:
+  main: { provider: main, mode: acceptEdits }
+providers:
+  main:
+    wire: anthropic
+    validation: { rules: { role_order: false } }
+    steps:
+      - tool_calls:
+          - { id: r1, name: Read, input: { path: analysis.ipynb } }
+          - { id: r2, name: Read, input: { path: secret.ipynb } }
+          - { id: r3, name: Read, input: { path: .claude/kept.ipynb } }
+      - tool_calls:
+          - id: call-1
+            name: NotebookEdit
+            input:
+              notebook_path: analysis.ipynb
+              cell_id: load
+              new_source: "import sys\nprint(sys.version)\n"
+      - tool_calls:
+          - id: denied
+            name: NotebookEdit
+            input: { notebook_path: secret.ipynb, cell_id: cell-0, new_source: x = 2 }
+      - tool_calls:
+          - id: protected
+            name: NotebookEdit
+            input: { notebook_path: .claude/kept.ipynb, cell_id: cell-0, new_source: x = 3 }
+      - text: First turn done.
+      - tool_calls:
+          - id: manual
+            name: NotebookEdit
+            input:
+              { notebook_path: analysis.ipynb, cell_id: plot, edit_mode: delete, new_source: '' }
+      - text: Second turn done.
+approvals:
+  - { tool: NotebookEdit, kind: fileChange, decision: deny }
+  - { tool: NotebookEdit, kind: fileChange, decision: allow }
+actions:
+  - prompt: { text: Update the notebooks., turn: t1 }
+  - wait: { method: turn/completed, turn: t1 }
+  - set_mode: { mode: default }
+  - prompt: { text: Remove the plot., turn: t2 }
+  - wait: { method: turn/completed, turn: t2 }
+  - rewind:
+      turn: t1
+      scope: codeAndConversation
+      preview: { analysis.ipynb: restore }
+      outcomes: { analysis.ipynb: restored }
+      text: Update the notebooks.
+expect:
+  fixtures:
+    analysis.ipynb: notebook/base.ipynb
+    secret.ipynb: notebook/legacy.ipynb
+    .claude/kept.ipynb: notebook/legacy.ipynb
+  requests:
+    - index: 4
+      tool_results:
+        - { id: r1 }
+        - { id: r2 }
+        - { id: r3 }
+        - { id: call-1, is_error: false }
+        - { id: denied, is_error: true }
+        - { id: protected, is_error: true }
+  events:
+    - method: item/completed
+      turn: t1
+      params:
+        item:
+          itemId: call-1
+          type: fileChange
+          tool: NotebookEdit
+          path: analysis.ipynb
+          status: completed
+          diff: { path: analysis.ipynb }
+    - method: item/completed
+      turn: t2
+      params: { item: { itemId: manual, type: fileChange, tool: NotebookEdit, status: completed } }
+  json_lines:
+    hook-log/pre.jsonl:
+      - input: { hook_event_name: PreToolUse, tool_name: NotebookEdit, tool_use_id: call-1 }
+      - input: { tool_name: NotebookEdit, tool_use_id: denied }
+      - input: { tool_name: NotebookEdit, tool_use_id: protected }
+      - input: { tool_name: NotebookEdit, tool_use_id: manual }

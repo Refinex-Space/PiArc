@@ -196,7 +196,7 @@ pub(super) fn param_rules(
 /// Deny, ask, invalid rules and allow for a call matched by tool name and one subject.
 fn plain(rules: &RuleSet, tool: &str, subject: Subject<'_>, ctx: &PathContext<'_>) -> Input {
     let mut input = Input::default();
-    let deny_tools: Vec<&str> = if matches!(tool, "Write" | "Edit") {
+    let deny_tools: Vec<&str> = if matches!(tool, "Write" | "Edit" | "NotebookEdit") {
         vec![tool, "Read"]
     } else {
         vec![tool]
@@ -240,7 +240,7 @@ pub(super) fn file_call(
         paths.push(real);
     }
     let mut input = plain(rules, tool, Subject::Paths(&paths), &places.context());
-    let write = matches!(tool, "Write" | "Edit");
+    let write = matches!(tool, "Write" | "Edit" | "NotebookEdit");
     input.write = write;
     input.protected = boundary == Boundary::Protected;
     input.outside = boundary == Boundary::Outside;

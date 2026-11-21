@@ -3,6 +3,7 @@ use super::*;
 
 pub(super) fn file_preview(
     tool: &str,
+    call: &str,
     input: &serde_json::Map<String, Value>,
     target: &Path,
     label: &str,
@@ -16,6 +17,18 @@ pub(super) fn file_preview(
                 .ok_or_else(|| denied("The proposed file content is missing."))?;
             let old = original_text(target, binding)?;
             piarc_diff::file_diff(label, old.as_deref(), new)
+        }
+        "NotebookEdit" => {
+            let old = original_text(target, binding)?
+                .ok_or_else(|| denied("The notebook does not exist."))?;
+            // An edit that cannot be made fails in the tool with the same message; the card
+            // still shows what was asked.
+            match notebook::proposed(&old, input, call) {
+                Ok(new) => piarc_diff::file_diff(label, Some(&old), &new),
+                Err(error) => {
+                    piarc_diff::file_diff(label, Some(&old), &format!("{old}\n# {error}"))
+                }
+            }
         }
         _ => {
             let edits = input

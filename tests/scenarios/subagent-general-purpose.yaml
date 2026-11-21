@@ -44,12 +44,27 @@ expect:
       index: 1
       roles: [user]
       user_texts: [Report what the project memory says.]
-      tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, KillShell, Monitor, TodoWrite, Agent]
+      tools:
+        [
+          Read,
+          Write,
+          Edit,
+          NotebookEdit,
+          Bash,
+          Glob,
+          Grep,
+          WebFetch,
+          KillShell,
+          Monitor,
+          TodoWrite,
+          Agent,
+        ]
       tools_windows:
         [
           Read,
           Write,
           Edit,
+          NotebookEdit,
           Bash,
           PowerShell,
           Glob,

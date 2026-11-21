@@ -43,6 +43,11 @@ export function preflightInput(
   input: Record<string, unknown>,
   cwd: string,
 ): Record<string, unknown> {
+  if (tool === 'NotebookEdit') {
+    // Claude Code's parameter name (T42): resolved in place, as the tool resolves it.
+    if (typeof input.notebook_path !== 'string') throw new Error('missing notebook path');
+    return { ...input, notebook_path: resolveToolPath(input.notebook_path, cwd) };
+  }
   if (!['Read', 'Edit', 'Write', 'Glob', 'Grep'].includes(tool)) return input;
   const requested = input.path ?? (tool === 'Glob' || tool === 'Grep' ? '.' : undefined);
   if (typeof requested !== 'string') throw new Error('missing file path');

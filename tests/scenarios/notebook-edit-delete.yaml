@@ -1,0 +1,29 @@
+id: notebook-edit-delete
+description: NotebookEdit deletes the cell it names; the separator before it goes too and the rest of the notebook is unchanged byte for byte (T42).
+capabilities: [CAP-TOOL-NOTEBOOK-001]
+workspace:
+  fixtures:
+    analysis.ipynb: notebook/base.ipynb
+sessions:
+  main: { provider: main, mode: acceptEdits }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: read1, name: Read, input: { path: analysis.ipynb } }]
+      - tool_calls:
+          - id: call-5
+            name: NotebookEdit
+            input:
+              { notebook_path: analysis.ipynb, cell_id: plot, edit_mode: delete, new_source: '' }
+      - text: Deleted.
+actions:
+  - prompt: { text: Remove the plot cell., turn: t }
+expect:
+  fixtures:
+    analysis.ipynb: notebook/base-delete-plot.ipynb
+  requests:
+    - index: 2
+      tool_results:
+        - { id: read1, is_error: false }
+        - { id: call-5, is_error: false, contains: Deleted cell plot of analysis.ipynb. }

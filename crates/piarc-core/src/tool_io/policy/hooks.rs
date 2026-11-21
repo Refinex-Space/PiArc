@@ -462,7 +462,7 @@ pub(crate) fn condition(rule: &str, tool: &str, input: &Map<String, Value>, fact
         }
         "PowerShell" => hit(Subject::Command(field("command").unwrap_or_default()), None),
         "Read" | "Write" | "Edit" | "Glob" | "Grep" | "NotebookEdit" => {
-            let path = field("path").unwrap_or(".");
+            let path = field(super::prepare::path_key(tool)).unwrap_or(".");
             let absolute = super::assess::lexical(&facts.cwd.join(path));
             let home = std::env::home_dir().map(|h| posix(&h)).unwrap_or_default();
             let cwd = posix(&facts.cwd);

@@ -7,6 +7,8 @@ use super::*;
 
 pub(in crate::tool_io) struct Grant {
     pub(super) tool: String,
+    /// The tool call: a `NotebookEdit`'s new cell id derives from it (T42).
+    call: String,
     pub(super) path: Option<PathBuf>,
     pub(super) binding: Option<piarc_fs::DirectoryBinding>,
     pub(super) cwd: Option<PathBuf>,
@@ -32,6 +34,7 @@ impl Grant {
     pub(super) fn new(p: &PolicyEvaluateParams, peer: Peer) -> Self {
         Self {
             tool: p.tool.clone(),
+            call: p.tool_call_id.clone(),
             path: None,
             binding: None,
             cwd: None,
@@ -63,6 +66,9 @@ impl Grant {
                     .as_deref()
                         == Some(text)
                 }),
+            "NotebookEdit" => original.is_some_and(|old| {
+                super::notebook::proposed(old, &self.input, &self.call).as_deref() == Ok(text)
+            }),
             _ => false,
         }
     }
@@ -72,7 +78,7 @@ impl Grant {
             .get("lineEndings")
             .and_then(Value::as_str)
             .unwrap_or("asWritten");
-        let required = if self.tool == "Edit" {
+        let required = if matches!(self.tool.as_str(), "Edit" | "NotebookEdit") {
             "asWritten"
         } else {
             "matchFile"
@@ -151,11 +157,11 @@ impl Grant {
                 self.stat_paths.push(target.to_path_buf());
                 false
             }
-            ("fs/read", "Read" | "Edit") => {
+            ("fs/read", "Read" | "Edit" | "NotebookEdit") => {
                 let offset = params.get("offset").and_then(Value::as_u64).unwrap_or(0);
                 let blob = params.get("mode").and_then(Value::as_str) == Some("blob");
                 if self.last_read.is_some_and(|prior| offset <= prior)
-                    || (self.tool == "Edit"
+                    || (matches!(self.tool.as_str(), "Edit" | "NotebookEdit")
                         && (blob
                             || offset == 0
                                 && params.get("requireFresh").and_then(Value::as_bool)
@@ -164,7 +170,7 @@ impl Grant {
                     return Err(mismatch());
                 }
                 self.last_read = Some(if blob { u64::MAX } else { offset });
-                blob && self.tool == "Edit"
+                blob && matches!(self.tool.as_str(), "Edit" | "NotebookEdit")
             }
             ("fs/pdf", "Read")
                 if params.get("pages") == p.get("pages") && self.last_read.is_none() =>
@@ -174,7 +180,7 @@ impl Grant {
             }
             ("fs/glob", "Glob") if glob_matches(p, params) => true,
             ("fs/grep", "Grep") if grep_matches(p, params) => true,
-            ("fs/write", "Write" | "Edit") => self.accept_write_part(params)?,
+            ("fs/write", "Write" | "Edit" | "NotebookEdit") => self.accept_write_part(params)?,
             _ => return Err(mismatch()),
         };
         Ok(terminal)

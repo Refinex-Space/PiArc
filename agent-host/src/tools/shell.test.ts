@@ -318,18 +318,35 @@ describe('createToolSet', () => {
     const { io } = fakeCore(base);
     const names = (bash: boolean, powershell: boolean): string[] =>
       createToolSet(io, DEFAULT_PROFILE, { bash, powershell }).map((tool) => tool.name);
-    expect(names(true, false)).toEqual(['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep']);
+    expect(names(true, false)).toEqual([
+      'Read',
+      'Write',
+      'Edit',
+      'NotebookEdit',
+      'Bash',
+      'Glob',
+      'Grep',
+    ]);
     expect(names(true, true)).toEqual([
       'Read',
       'Write',
       'Edit',
+      'NotebookEdit',
       'Bash',
       'PowerShell',
       'Glob',
       'Grep',
     ]);
     // Windows without Git Bash.
-    expect(names(false, true)).toEqual(['Read', 'Write', 'Edit', 'PowerShell', 'Glob', 'Grep']);
+    expect(names(false, true)).toEqual([
+      'Read',
+      'Write',
+      'Edit',
+      'NotebookEdit',
+      'PowerShell',
+      'Glob',
+      'Grep',
+    ]);
   });
 });
 
