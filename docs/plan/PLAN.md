@@ -311,11 +311,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 **T40 插件、Pi 包与 MCP prompts**（开工 2026-11-21；基线 `npm run verify -- --baseline` 通过；T39 只差 Windows CI 的 A12，与本任务无关；分支未推送，无 Windows CI 可核对）
 
-- [ ] 1 识别与清单：`plugin.json` 与 Pi 包 `pi` 字段解析、组件枚举、不支持组件（mods、themes 等）、已安装记录（Core 持久化）
-- [ ] 2 安装与作用域：本地目录、git（锁定提交、显式更新）、npm（内置 npm + `--ignore-scripts`）；用户作用域与 `.piarc/settings.json` 项目作用域；启用、停用、卸载、`resources/reload`；审计
-- [ ] 3 组件接入：commands、agents、skills、hooks、`.mcp.json`（插件优先级最低）、Pi 扩展/skills/prompt templates 进 Agent Host
-- [ ] 4 启用确认与信任：可执行项与指纹、主进程原生确认框（测试应答钩子）、再确认、项目未信任不加载、信任对话框列出扩展包
-- [ ] 5 MCP prompts 作为斜杠命令（`prompts/list`、`prompts/get`、`list_changed`）
+- [x] 1 识别与清单：`plugin.json` 与 Pi 包 `pi` 字段解析、组件枚举、不支持组件（mods、themes 等）、已安装记录（Core 持久化）
+- [x] 2 安装与作用域：本地目录、git（锁定提交、显式更新）、npm（内置 npm + `--ignore-scripts`）；用户作用域与 `.piarc/settings.json` 项目作用域；启用、停用、卸载、`resources/reload`；审计
+- [x] 3 组件接入：commands、agents、skills、hooks、`.mcp.json`（插件优先级最低）、Pi 扩展/skills/prompt templates 进 Agent Host
+- [ ] 4 启用确认与信任（Core 侧指纹、再确认、信任闸门与信任对话框列出已完成；主进程原生确认框与测试应答钩子待做）：可执行项与指纹、主进程原生确认框（测试应答钩子）、再确认、项目未信任不加载、信任对话框列出扩展包
+- [x] 5 MCP prompts 作为斜杠命令（`prompts/list`、`prompts/get`、`list_changed`）
 - [ ] 6 设置页"skills 与插件"的插件部分（中英文、L4 与亮暗截图）
 - [ ] 验收 A01–A11；收尾（AGENTS.md、复用表、架构 6.7、ADR、acceptance、PLAN）
 
