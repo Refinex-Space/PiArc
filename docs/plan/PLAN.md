@@ -169,7 +169,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T38 | [WebSearch 与 hooks 扩展（M3）](tasks/T38-websearch-and-hooks-m3.md) | 4 | T37 | macOS | high / 高 | 中 | 无 | 已完成 | fc9c022 |
 | R4 | [M3 评审](tasks/R4-m3-review.md) | 4 | T38、W2 | macOS | high / 高 | 中 | 无 | 部分完成 | 8a1b0cf |
 | W3 | [Windows：M3 达标](tasks/W3-windows-m3-parity.md) | 5 | R4（建议在 T43、T44 之后，需要读屏清单与性能测量脚本） | Windows | high / 高 | 中 | 无 | 未开始 | — |
-| T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 阻塞（等待用户确认 ADR-0057） | — |
+| T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 607809d |
 | T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,16 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-T39（macOS 沙箱正式版与 Windows 隔离评估；开工 2026-11-21；状态：阻塞，等待用户确认 ADR-0057）
-
-已完成：macOS 部分全部交付（沙箱设置与来源约束、Bash 四条启动路径进沙箱、阶梯第 7 步的自动批准、沙箱外重试、拒绝反馈与审计、网络白名单与网络卡、代理加固、Agent Host 配置定稿、设置页与审计筛选、Windows 提示、L2/L4）；I165、I173（`piarc-exec`）、I117 已处理，I174 转交 W3；ADR-0056（已接受）、ADR-0057（提议）；收尾的 verify（18e3db9，15/15）、验收记录、文档已做。14 项验收通过，A12 为 `blocked`（Windows CI）。
-
-用户确认后续做：
-
-- [ ] 13. ADR-0057 被采纳（或按用户意见修改后采纳）：状态改"已接受"，同步架构第 6.10、10.3、15.2 节与第 14 章 R16，修订记录加一行；若决定实现某个方案，把实现工作登记到"登记事项"（I177）。被否决：按用户给的方向改写 ADR 后再请确认
-- [ ] 14. A12：用户推送后用 `gh run list` 查 Windows 的 L2（`sandbox-windows-not-applied`）与 L4（`t39-sandbox.e2e.ts` 的 Windows 用例与截图），通过则改 `passing`（evidence 写 run 链接）
-- [ ] 15. 两项都关闭后：看板改"已完成"（A12 仍待 Windows 时"部分完成"），填完成提交，清空本节，会话日志补一条
 
 ## 登记事项
 
@@ -501,9 +491,10 @@ T39（macOS 沙箱正式版与 Windows 隔离评估；开工 2026-11-21；状态
 | I174 | R4 | 平台分支散在业务代码里（R4 Q3）：Core `tool_io/exec.rs`、`exec/utility.rs`、`policy/assess.rs`、`hooks/launcher.rs`，`piarc-config/src/rules.rs`（`paths:` 是否区分大小写按 `cfg!(windows)`，而文件状态按卷判断：macOS 默认卷不区分大小写时 `SRC/a.ts` 不匹配 `src/**`），Agent Host `tools/paths.ts`、`runtime/session-helpers.ts` | T39 收进适配层；`rules.rs` 的大小写判据交 T41；**T39 转交 W3**：所列分支多数是 Windows 专有路径（Git Bash 的程序探测、`LANG=C.UTF-8`、MSYS 路径换算、hooks 的 PowerShell 回退），T39 在 macOS 上只能交叉编译、不能运行，搬进适配层后要在 Windows 上跑 `exec_commands`、`exec-windows-shells` 与 hooks 测试才算验证；T39 没有往业务代码新增平台分支（沙箱的平台差异在 `piarc_sandbox::platform`） |
 | I175 | R4 | 原子写入与 `\\?\` 去前缀的重复实现（R4 Q4）：`piarc-core/src/terminal/bound.rs` 的 `write_atomically`（不 fsync、临时名固定）、`piarc-term` 的 `snapshot.rs`、`shell.rs`、Core `composer/attachments.rs`；`strip_verbatim` 有四份（`piarc-git`、Core `sessions/mod.rs`、`piarc-config/rules.rs`、`piarc-exec/cwd.rs`） | T45：Core 内改用 `piarc_secrets::atomic::replace`，功能 crate 内的副本按复用表同步语义；Windows 上 rename 覆盖正在被读的屏幕文件由 W3 核对 |
 | I176 | R4 | 定义了却没有生产调用方的接口（R4 Q6）：AHP `exec/background/list`、`exec/background/read`（Agent Host 不调用）、NAPI `terminalLastCommand`、`piarc_term::Session::{command, wait_command}`（只在测试中用却登在复用表）；依赖真实时钟的否定断言（`piarc-term/tests/pointer.rs:271`、`terminal/tests.rs:441`、`t34-terminal-tui.e2e.ts` 的 `waitForTimeout`） | T41 决定接线或删除；否定断言的计时交 T44 |
-| I177 | T39 | ADR-0057（Windows 命令隔离，提议）等待用户决定：推荐 Beta 前维持现状（权限规则加审批，设置页写明 Windows 没有 OS 沙箱），Beta 后在 R6 评估 MXC `processcontainer` | 用户确认后：ADR 改为"已接受"（或按意见修改后接受），同步架构 6.10、10.3、15.2 与第 14 章 R16；决定实现某个方案时另登记实现工作 |
+| I177 | T39 | ADR-0057（Windows 命令隔离）已于 2026-11-21 由用户采纳：到 Beta 维持现状（权限规则 + Job Object，界面提示不可用）；MXC `processcontainer` 列为 Beta 之后的候选，需要一个评估任务：从 `mxc-sdk` 源码自建并以 ETW 核对遥测关闭；先用作 Agent Host 的第二道防线（模型请求、会话 JSONL、npx 拉起的 MCP server 照常）；Bash 等 Git Bash 问题（MXC #1061、#1729）修复或改用 PowerShell / BusyBox 版 MinGit 后再进容器；系统不支持时明确提示不可用。ADR 第 5 条的实验：`windows-11-arm` 与本机虚拟机上的 ProcessContainer 探测、标准用户运行、Model 2 加本地代理的网络边界、Git Bash 管道与 `npm ci`/`cargo build`/`pip`、Job Object 嵌套、非管理员调用 `NetworkIsolationSetAppContainerConfig` | R6（Beta 发布评审）之后安排评估任务，实验代码不进发布产物；ADR-0057 的重新评估条件之一提前出现时提前安排；满足全部条件才以实验性、默认关闭的选项引入 |
 | I178 | T39 | 后台命令与 Monitor 在沙箱中被 Seatbelt 拒绝的文件操作不进结果说明与审计：`sandbox_report` 只在前台命令结束时按输出识别（代理拒绝对所有命令照常审计） | T45 安全收口时决定是否在任务结束时扫描输出文件尾部并补审计与完成通知的说明 |
 | I179 | T39 | Pi 1.5.2 的 `SettingsManager.withLock` 读设置也经 proper-lockfile 在 `.pi/` 下建 `settings.json.lock`；Agent Host 定稿配置因此单独放行这个名字（`.pi` 其余仍受保护），不放行时 13 个 L2 场景的压缩失败 | 升级 Pi 时复核锁文件的名字与位置（`crates/piarc-sandbox/src/seatbelt/agent-host.sbpl`），变化时更新模板与 golden |
+| I180 | T39 | ADR-0057 接受了 Windows 上没有 OS 级沙箱：经批准的命令可以写工作区外与外传数据，Agent Host 没有第二道防线（架构 10.3） | T45 的威胁模型与安全测试把它列为已接受风险，并核对设置页、环境栏、配置诊断的"不可用"提示仍在 |
 ## 技术债
 
 评审任务（R1–R6）汇总的技术债，按影响排序。每条的细节、负责任务与检查时间点在对应的登记事项中。
@@ -1027,3 +1018,9 @@ T39（macOS 沙箱正式版与 Windows 隔离评估；开工 2026-11-21；状态
 - 决策：ADR-0056（补充，已接受：命令是否进沙箱在裁决时决定并随授权走、自动批准在第 7 步、沙箱外重试与网络卡任何模式都问且 hooks 不代答、项目只能收紧、代理加固与私网不拦、Agent Host 定稿配置与 Pi 设置锁的放行、登记事项 I05/I34/I35/I36/I40/I54/I133 的处理）；ADR-0057（变更型，提议：Windows 命令隔离，推荐 Beta 前维持现状、Beta 后在 R6 评估 MXC `processcontainer`）；架构 2.49；`window.piarc` 共 106 个函数
 - 登记：I05、I34、I35、I36、I40、I54、I61、I117、I133、I165、I173 更新或关闭；I174 转交 W3；新增 I177（ADR-0057 待决定）、I178（后台命令与 Monitor 的文件拒绝不进说明与审计，T45）、I179（Pi 设置锁的位置，升级 Pi 时复核）
 - 下一项：macOS 部分已全部完成，T40 可以开工；Windows 隔离等 ADR-0057 的决定（在新会话中说"采纳 ADR-0057"或"否决 ADR-0057，理由是……"，再 `/task T39`）。本地提交，未推送。
+
+### 2026-11-21 T39 部分完成（提交 607809d）
+- 用户采纳 ADR-0057：状态改"已接受"；架构 2.50 同步第 4 章、6.10 节 Windows 一条（到 Beta 维持现状，MXC ProcessContainer 为 Beta 之后的候选及其前提）、10.3 节（Windows 的 Agent Host 没有第二道防线，计入已接受风险）、15.2 节沙箱一行与第 14 章 R16；根目录与 `piarc-sandbox` 的 AGENTS.md 去掉"提议"；A13 证据注明接受
+- 验收：14 项通过，A12（Windows CI）仍为 blocked，看板改为"部分完成"；只改了文档，`npm run verify -- --baseline` 通过
+- 登记：I177 改为 Beta 之后的 MXC 评估任务与 ADR 第 5 条的实验（R6 之后安排）；新增 I180（T45 威胁模型把 Windows 无 OS 沙箱列为已接受风险）
+- 下一项：macOS 上的 T40（插件、Pi 包与 MCP prompts）；Windows 上的 W3。A12 在用户推送后由下一个任务的开工检查按 Windows CI 关闭。本地提交，未推送。
