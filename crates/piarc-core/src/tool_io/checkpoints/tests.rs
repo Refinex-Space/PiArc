@@ -728,3 +728,7 @@ async fn a_subagents_writes_belong_to_its_main_sessions_turn() {
     assert_eq!(f.bytes("shared.txt").as_deref(), Some(&b"before\n"[..]));
     assert_eq!(f.bytes("made.txt"), None);
 }
+
+/// W2-A05: Windows paths and file locks.
+#[cfg(windows)]
+mod windows;
