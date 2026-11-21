@@ -68,6 +68,9 @@ export interface ParentSession {
 interface Run {
   readonly id: string;
   readonly parentId: string;
+  /** Its parent, the parent's parent… up to the main session: a run is still reached once a
+   * subagent between it and the main session ended (R4 S3). */
+  readonly ancestors: readonly string[];
   readonly rootId: string;
   readonly depth: number;
   readonly toolCallId: string;
@@ -219,10 +222,7 @@ export class SubagentRunner {
   }
 
   #below(run: Run, sessionId: string): boolean {
-    for (let at: Run | undefined = run; at !== undefined; at = this.#runs.get(at.parentId)) {
-      if (at.parentId === sessionId) return true;
-    }
-    return false;
+    return run.ancestors.includes(sessionId);
   }
 
   async #start(
@@ -270,6 +270,7 @@ export class SubagentRunner {
     const run: Run = {
       id,
       parentId,
+      ancestors: [...(this.#runs.get(parentId)?.ancestors ?? []), parentId],
       rootId,
       depth,
       toolCallId,
@@ -448,7 +449,11 @@ export class SubagentRunner {
 
   /** A background run ended: its report reaches the parent's next request. */
   #deliver(run: Run, report: string): void {
-    const parent = this.#parent(run.parentId);
+    // The nearest session still open: a subagent that started the run may have ended.
+    const parent = [...run.ancestors]
+      .reverse()
+      .map((id) => this.#parent(id))
+      .find((p) => p !== undefined);
     if (parent === undefined) {
       this.#options.log(
         `[session ${run.parentId}] background subagent ${run.id} ended after its parent closed`,

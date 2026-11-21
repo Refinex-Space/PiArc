@@ -161,3 +161,110 @@ describe('SubagentRunner foreground runs', () => {
     expect(outcome?.details.subagent?.status).toBe('interrupted');
   });
 });
+
+describe('SubagentRunner background runs', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('reaches a background run whose parent subagent ended, and reports it to the main session (R4 S3)', async () => {
+    const bridge = {
+      requestTyped: (method: string, _params: unknown, parse: (v: unknown) => unknown) =>
+        Promise.resolve(
+          parse(
+            method === 'agents/list'
+              ? { agents: [], issues: [], limits: DEFAULT_LIMITS, deniedBuiltIn: [], aliases: {} }
+              : {},
+          ),
+        ),
+      request: () => Promise.resolve({}),
+    };
+    const options = {
+      log: () => undefined,
+      hostTools: { subagents: true },
+      tools: { kind: 'core', bridge },
+      workspace: {
+        modelRuntime: { getAvailable: () => Promise.resolve([]) },
+        preferences: { defaultEffort: () => undefined },
+      },
+    } as unknown as RegistryOptions;
+    const reminders: string[] = [];
+    const session = {
+      model: { provider: 'p', id: 'm', api: 'anthropic-messages', reasoning: false },
+      thinkingLevel: 'off',
+      sessionManager: { appendCustomEntry: () => 'entry' },
+    };
+    const main = {
+      sessionId: 'main',
+      cwd: '/w',
+      session,
+      harness: { remind: (r: { source: string }) => reminders.push(r.source) },
+      sink: { event: () => undefined, delta: () => undefined, replaceable: () => undefined },
+      tools: () => ['Read', 'Agent'],
+    } as unknown as ParentSession;
+    const runner = new SubagentRunner(options, (id) => (id === 'main' ? main : undefined));
+    // Each opened child: its id, and a run that ends when told to or when aborted.
+    const opened: { id: string; finish: () => void; signal?: AbortSignal }[] = [];
+    vi.spyOn(ChildSession, 'open').mockImplementation((spec) => {
+      const entry: { id: string; finish: () => void; signal?: AbortSignal } = {
+        id: spec.id,
+        finish: () => undefined,
+      };
+      opened.push(entry);
+      return Promise.resolve({
+        warnings: [],
+        cwd: '/w',
+        file: undefined,
+        session,
+        harness: {},
+        run: (_task: string, signal: AbortSignal) => {
+          entry.signal = signal;
+          return new Promise((resolve) => {
+            const end = () => {
+              resolve({
+                status: signal.aborted ? 'interrupted' : 'completed',
+                report: 'r',
+                turns: 1,
+              });
+            };
+            entry.finish = end;
+            signal.addEventListener('abort', end, { once: true });
+          });
+        },
+        finish: () => Promise.resolve(undefined),
+      } as unknown as ChildSession);
+    });
+    const host = await runner.hostFor('main', '/w');
+    const parentRun = host?.run(
+      'agent-c',
+      { description: 'C', prompt: 'Go.', type: 'general-purpose' },
+      undefined,
+      () => undefined,
+    );
+    await vi.waitFor(() => {
+      expect(opened[0]?.signal).toBeDefined();
+    });
+    const child = opened[0];
+    if (child === undefined) throw new Error('no child');
+    const childHost = await runner.hostFor(child.id, '/w');
+    await childHost?.run(
+      'agent-g',
+      { description: 'G', prompt: 'Go on.', type: 'general-purpose', background: true },
+      undefined,
+      () => undefined,
+    );
+    await vi.waitFor(() => {
+      expect(opened[1]?.signal).toBeDefined();
+    });
+    child.finish();
+    await parentRun;
+    const grandchild = opened[1];
+    expect(grandchild?.signal?.aborted).toBe(false);
+    // Closing the main session reaches it, and its report goes to the main session.
+    runner.abortBelow('main');
+    expect(grandchild?.signal?.aborted).toBe(true);
+    await vi.waitFor(() => {
+      expect(reminders).toEqual([`subagent:${grandchild?.id ?? ''}`]);
+    });
+  });
+});
