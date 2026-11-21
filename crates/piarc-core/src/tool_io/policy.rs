@@ -351,8 +351,7 @@ impl ToolIo {
     pub(super) async fn denied_tools(&self, p: PolicyToolsParams) -> Result<Value, ErrorObject> {
         let s = self.session(&p.session_id)?;
         let services = self.services()?;
-        let mut settings = services.settings(s.project()).await?;
-        ToolIo::apply_pins(&s, &mut settings);
+        let settings = session_settings(services, &s).await?;
         let rules = rules_of(&s, &settings);
         let denied = p
             .tools
@@ -434,9 +433,7 @@ impl ToolIo {
     ) -> Result<Value, ErrorObject> {
         super::subagents::prepare_call(s, p)?;
         let generation = inputs::begin(s, p, peer).await?;
-        let mut settings = services.settings(s.project()).await?;
-        // A ConfigChange hook may have kept a layer's earlier value for this session (T41).
-        ToolIo::apply_pins(s, &mut settings);
+        let settings = session_settings(services, s).await?;
         let (hook_token, _hook_guard) = super::hooks::linked(peer, Some(&generation));
         let pre = self
             .pre_tool_use(s, p, &settings, peer, hook_token.clone())
@@ -732,5 +729,15 @@ impl Prepared {
     }
 }
 
+/// Session `s`'s permission settings: its project's, with the layers its `ConfigChange` hooks
+/// kept at an earlier value (T41).
+async fn session_settings(
+    services: &Services,
+    s: &SessionIo,
+) -> Result<piarc_config::Settings, ErrorObject> {
+    let mut settings = services.settings(s.project()).await?;
+    ToolIo::apply_pins(s, &mut settings);
+    Ok(settings)
+}
 #[cfg(test)]
 mod tests;

@@ -412,31 +412,15 @@ impl ToolIo {
             }
             CommandKind::BuiltIn | CommandKind::McpPrompt => return Ok(None),
         };
-        let expanded = render(
-            body,
-            arguments,
-            names,
-            dir.as_deref(),
-            session_id,
-            s.project(),
-        );
+        let project = s.project();
+        let expanded = render(body, arguments, names, dir.as_deref(), session_id, project);
         // UserPromptExpansion (T41) before anything of the command applies: a block refuses
         // the input and turns nothing on.
-        let mut fields = Map::new();
-        fields.insert(
-            "expansion_type".into(),
-            json!(if entry.kind == CommandKind::Skill {
-                "skill"
-            } else {
-                "slash_command"
-            }),
-        );
-        fields.insert("command_name".into(), json!(name));
-        fields.insert("command_args".into(), json!(arguments));
-        fields.insert("command_source".into(), json!(entry.source));
-        fields.insert("prompt".into(), json!(expanded));
         let context = self
-            .user_prompt_expansion(session_id, fields)
+            .user_prompt_expansion(
+                session_id,
+                expansion_fields(&entry, name, arguments, &expanded),
+            )
             .await
             .map_err(|reason| expansion_blocked(name, &reason))?;
         let activated = self.activate(
@@ -524,4 +508,25 @@ fn covered(source: ResourceSource, file: &str, project: &Path, trusted: bool) ->
     }
     !is_project(source)
         || (trusted && piarc_config::executables::covered_by_trust(project, Path::new(file)))
+}
+
+/// `UserPromptExpansion`'s input for a command file or skill the user typed (T41).
+fn expansion_fields(
+    entry: &piarc_protocol::skills::CommandInfo,
+    name: &str,
+    arguments: &str,
+    expanded: &str,
+) -> Map<String, Value> {
+    let kind = if entry.kind == CommandKind::Skill {
+        "skill"
+    } else {
+        "slash_command"
+    };
+    let mut fields = Map::new();
+    fields.insert("expansion_type".into(), json!(kind));
+    fields.insert("command_name".into(), json!(name));
+    fields.insert("command_args".into(), json!(arguments));
+    fields.insert("command_source".into(), json!(entry.source));
+    fields.insert("prompt".into(), json!(expanded));
+    fields
 }

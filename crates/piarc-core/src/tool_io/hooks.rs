@@ -61,6 +61,7 @@ impl Drop for Running<'_> {
 
 /// The input fields and matcher subject of each event the Agent Host reports. `effort` is
 /// accepted everywhere; Core keeps it only on the events Claude Code sends it with.
+#[expect(clippy::too_many_lines, reason = "a table with one arm per event")]
 fn host_event(event: HostHookEvent) -> (HookEvent, &'static [&'static str], Option<&'static str>) {
     match event {
         HostHookEvent::SubagentStart => (HookEvent::SubagentStart, &[], None),
@@ -239,7 +240,20 @@ impl ToolIo {
         facts: &Facts,
         request: &Request,
     ) -> Answer {
-        match hooks.plan(facts, request).await {
+        // A session whose ConfigChange hooks pinned a layer plans with that value (T41).
+        let pinned = self
+            .session(&facts.session_id)
+            .ok()
+            .filter(|s| !lock(&s.config_pins).is_empty());
+        let planned = match pinned {
+            Some(s) => {
+                hooks
+                    .plan_adjusted(facts, request, |settings| Self::apply_pins(&s, settings))
+                    .await
+            }
+            None => hooks.plan(facts, request).await,
+        };
+        match planned {
             Some(plan) => {
                 let launch = self.exec.hook_launch().await;
                 hooks.execute(facts, request, plan, launch).await

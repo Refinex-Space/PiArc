@@ -1,0 +1,61 @@
+id: hooks-m4-cwd-file-changed
+description: SessionStart's watchPaths set the files FileChanged watches (at most 64, the rest dropped with a notice); a command that moves the session's working directory runs CwdChanged, whose watchPaths (relative to the new directory) replace the list and whose systemMessage reaches the user; a change to a watched file on disk then runs FileChanged with the file name as matcher (T41).
+capabilities: [CAP-HOOK-CWDCHANGED-001, CAP-HOOK-FILECHANGED-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    sub/notes.txt: "one\n"
+    .claude/settings.json: |
+      {"hooks": {
+        "SessionStart": [{"hooks": [{"type": "command", "command": "node hook.mjs start"}]}],
+        "CwdChanged": [{"hooks": [{"type": "command", "command": "node hook.mjs cwd"}]}],
+        "FileChanged": [
+          {"matcher": "notes.txt", "hooks": [{"type": "command", "command": "node hook.mjs file"}]},
+          {"matcher": "other.txt", "hooks": [{"type": "command", "command": "node hook.mjs other"}]}
+        ]
+      }}
+    hook-plans/start.json: '{"json": {"hookSpecificOutput": {"hookEventName": "SessionStart", "watchPaths": ["w00.txt", "w01.txt", "w02.txt", "w03.txt", "w04.txt", "w05.txt", "w06.txt", "w07.txt", "w08.txt", "w09.txt", "w10.txt", "w11.txt", "w12.txt", "w13.txt", "w14.txt", "w15.txt", "w16.txt", "w17.txt", "w18.txt", "w19.txt", "w20.txt", "w21.txt", "w22.txt", "w23.txt", "w24.txt", "w25.txt", "w26.txt", "w27.txt", "w28.txt", "w29.txt", "w30.txt", "w31.txt", "w32.txt", "w33.txt", "w34.txt", "w35.txt", "w36.txt", "w37.txt", "w38.txt", "w39.txt", "w40.txt", "w41.txt", "w42.txt", "w43.txt", "w44.txt", "w45.txt", "w46.txt", "w47.txt", "w48.txt", "w49.txt", "w50.txt", "w51.txt", "w52.txt", "w53.txt", "w54.txt", "w55.txt", "w56.txt", "w57.txt", "w58.txt", "w59.txt", "w60.txt", "w61.txt", "w62.txt", "w63.txt", "w64.txt", "w65.txt"]}}}'
+    hook-plans/cwd.json: '{"json": {"systemMessage": "Now watching notes.txt.", "hookSpecificOutput": {"hookEventName": "CwdChanged", "watchPaths": ["notes.txt"]}}}'
+    hook-plans/file.json: '{"json": {"systemMessage": "notes.txt changed on disk."}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: cd, name: Bash, input: { command: cd sub } }]
+      - text: Moved.
+actions:
+  - prompt: { text: Go into sub., turn: t }
+  - wait: { method: turn/completed, turn: t }
+  - write_file: { path: sub/notes.txt, content: "two\n" }
+  - wait:
+      { method: core/notices, params: { event: FileChanged, message: notes.txt changed on disk. } }
+expect:
+  request_counts: { main: 2 }
+  events:
+    - method: core/notices
+      params:
+        type: hook
+        event: FileChanged
+        level: error
+        message: FileChanged watches at most 64 files; 2 were not watched.
+    - method: core/notices
+      params: { type: hook, event: CwdChanged, level: message, message: Now watching notes.txt. }
+    - method: core/notices
+      params:
+        { type: hook, event: FileChanged, level: message, message: notes.txt changed on disk. }
+  json_lines:
+    hook-log/cwd.jsonl:
+      - types:
+          {
+            session_id: string,
+            transcript_path: string,
+            cwd: string,
+            old_cwd: string,
+            new_cwd: string,
+          }
+        input: { hook_event_name: CwdChanged }
+    hook-log/file.jsonl:
+      - types: { session_id: string, cwd: string, file_path: string }
+        input: { hook_event_name: FileChanged, event: change }

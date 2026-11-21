@@ -22,6 +22,8 @@
 //   required, and `tone`) and `picture` (an image message, which PiArc does not send) (T40);
 // - `MCP_ECHO_START_LOG=<path>`: append `{"server","pid"}` as one JSON line there on start
 //   (relative to the working directory), so a test can count the server's processes.
+// - `MCP_ECHO_REPLY=1`: also offer `reply` (`text`, `delay_ms`, `is_error`), which answers
+//   `text` verbatim after `delay_ms` milliseconds (T41's `mcp_tool` hooks).
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { execFileSync } from 'node:child_process';
@@ -98,6 +100,21 @@ function tools(): unknown[] {
       inputSchema: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
     },
   ];
+  if (env.MCP_ECHO_REPLY === '1') {
+    list.push({
+      name: 'reply',
+      description: `Answers the given text from the ${serverName} server.`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          text: { type: 'string' },
+          delay_ms: { type: 'number' },
+          is_error: { type: 'boolean' },
+        },
+        required: ['text'],
+      },
+    });
+  }
   if (prompts) {
     list.push({
       name: 'add_prompt',
@@ -252,6 +269,17 @@ for await (const line of createInterface({ input: process.stdin })) {
     }
     case 'tools/call': {
       const args = isRecord(params.arguments) ? params.arguments : {};
+      if (params.name === 'reply' && env.MCP_ECHO_REPLY === '1') {
+        const answer = {
+          content: [{ type: 'text', text: typeof args.text === 'string' ? args.text : '' }],
+          ...(args.is_error === true ? { isError: true } : {}),
+        };
+        const delay = typeof args.delay_ms === 'number' ? args.delay_ms : 0;
+        setTimeout(() => {
+          reply(message.id, answer);
+        }, delay);
+        break;
+      }
       const result = call(typeof params.name === 'string' ? params.name : '', args);
       if (result === undefined) fail(message.id, -32602, `unknown tool: ${String(params.name)}`);
       else reply(message.id, result);

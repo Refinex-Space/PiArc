@@ -105,15 +105,15 @@ impl ToolIo {
         if resolved.len() > MAX_WATCH_PATHS {
             let dropped = resolved.split_off(MAX_WATCH_PATHS);
             let message = format!(
-                "FileChanged watches at most {MAX_WATCH_PATHS} files; {} were not watched: {}",
-                dropped.len(),
-                dropped
-                    .iter()
-                    .map(|p| p.display().to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
+                "FileChanged watches at most {MAX_WATCH_PATHS} files; {} were not watched.",
+                dropped.len()
             );
-            tracing::warn!(target: "piarc_core::hooks", session = id, "{message}");
+            let names = dropped
+                .iter()
+                .map(|p| p.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            tracing::warn!(target: "piarc_core::hooks", session = id, "{message} {names}");
             if let Some(hooks) = self.hook_service() {
                 let facts = self.session_facts(&s, id, CancellationToken::new());
                 hooks
@@ -197,12 +197,23 @@ impl ToolIo {
         let Some(answer) = self.observed(id, request).await else {
             return false;
         };
-        if answer.decision.block.is_none() || source == "policy_settings" {
+        let Some(reason) = answer.decision.block.as_deref() else {
+            return false;
+        };
+        if source == "policy_settings" {
             return false;
         }
-        if let Ok(s) = self.session(id) {
-            // The earliest value stays: a second change of a pinned layer is blocked too.
-            lock(&s.config_pins).entry(layer).or_insert(previous);
+        let Ok(s) = self.session(id) else {
+            return false;
+        };
+        // The earliest value stays: a second change of a pinned layer is blocked too.
+        lock(&s.config_pins).entry(layer).or_insert(previous);
+        if let Some(hooks) = self.hook_service() {
+            let facts = self.session_facts(&s, id, CancellationToken::new());
+            let message = format!("The {source} change is not applied in this session: {reason}");
+            hooks
+                .notify(&facts, HookEvent::ConfigChange, "message", &message)
+                .await;
         }
         true
     }

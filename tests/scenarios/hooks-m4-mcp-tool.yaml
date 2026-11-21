@@ -1,0 +1,41 @@
+id: hooks-m4-mcp-tool
+description: An mcp_tool hook calls a tool on a connected MCP server of the workspace with its input template filled from the hook input (${tool_input.command}); the tool's text is read like a command's stdout (a decision block becomes feedback for the model), while a server that is not connected and a call past the hook's timeout are non-blocking errors shown to the user (T41).
+capabilities: [CAP-HOOK-MCPTOOL-001]
+workspace:
+  trusted: true
+  files:
+    notes.txt: "first line\n"
+    .mcp.json: '{"mcpServers":{"checks":{"command":"node","args":["{{mcp_echo}}","checks"],"env":{"MCP_ECHO_REPLY":"1"}}}}'
+    .claude/settings.json: |
+      {"hooks": {"PostToolUse": [{"matcher": "Bash", "hooks": [
+        {"type": "mcp_tool", "server": "checks", "tool": "reply", "input": {"text": "{\"decision\": \"block\", \"reason\": \"Lint failed for ${tool_input.command} (${hook_event_name}).\"}"}},
+        {"type": "mcp_tool", "server": "missing", "tool": "reply", "input": {"text": "never"}},
+        {"type": "mcp_tool", "server": "checks", "tool": "reply", "input": {"text": "late", "delay_ms": 5000}, "timeout": 1}
+      ]}]}}
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: c, name: Bash, input: { command: cat notes.txt } }]
+      - text: Noted.
+actions:
+  - prompt: { text: Show the notes., turn: t }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - index: 1
+      tool_results: [{ id: c, is_error: false, contains: first line }]
+      contains: ['Lint failed for cat notes.txt (PostToolUse).']
+  events:
+    - any_order:
+        - method: core/notices
+          params:
+            {
+              type: hook,
+              event: PostToolUse,
+              level: error,
+              message: 'MCP server "missing" is not configured',
+            }
+        - method: core/notices
+          params: { type: hook, event: PostToolUse, level: error, message: timed out after 1 s }
+    - { method: turn/completed, turn: t, params: { status: completed } }

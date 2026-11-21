@@ -882,3 +882,6 @@ async fn a_closed_session_is_let_go_once_its_running_hook_ends() {
 
 #[path = "hooks_m3_tests.rs"]
 mod m3;
+
+#[path = "hooks_m4_tests.rs"]
+mod m4;

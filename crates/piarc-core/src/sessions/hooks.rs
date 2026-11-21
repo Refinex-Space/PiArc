@@ -66,7 +66,11 @@ impl HookOutlet for HubHooks {
             let timeout = Duration::from_millis(params.timeout_ms) + TRANSPORT_SLACK;
             host.call_within::<piarc_protocol::hooks::HooksMcpTool>(params, timeout)
                 .await
-                .map_err(|e| e.to_string())
+                .map_err(|e| match e {
+                    // The pool's own words ("MCP server \"x\" is not configured").
+                    piarc_host::Error::Remote { error, .. } => error.message,
+                    other => other.to_string(),
+                })
         })
     }
 }

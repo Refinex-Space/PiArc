@@ -787,12 +787,48 @@ capabilities:
     refs: [FR-HN-05, ARCH-6.3.2]
     task: T38
     status: active
-  - id: CAP-HOOK-M4-001
-    title: 'UserPromptExpansion、InstructionsLoaded、CwdChanged、FileChanged、ConfigChange、StopFailure hooks 与 mcp_tool handler'
+  - id: CAP-HOOK-EXPANSION-001
+    title: 'UserPromptExpansion hooks：斜杠命令、skill 与 MCP prompt 展开前运行，exit 2 或 decision block 阻止展开，纯文本 stdout 作为上下文'
     milestone: M4
     refs: [FR-HN-05, ARCH-6.3.2]
     task: T41
-    status: planned
+    status: active
+  - id: CAP-HOOK-INSTRUCTIONS-001
+    title: 'InstructionsLoaded hooks：memory 文件与 rules 进入上下文时运行，matcher 为加载原因'
+    milestone: M4
+    refs: [FR-HN-05, ARCH-6.3.2]
+    task: T41
+    status: active
+  - id: CAP-HOOK-CWDCHANGED-001
+    title: 'CwdChanged hooks：命令改变会话的持久 cwd 后运行，watchPaths 替换监视列表'
+    milestone: M4
+    refs: [FR-HN-05, ARCH-6.3.2]
+    task: T41
+    status: active
+  - id: CAP-HOOK-FILECHANGED-001
+    title: 'FileChanged hooks：watchPaths 中的文件在磁盘上变化时运行，监视上限 64 个'
+    milestone: M4
+    refs: [FR-HN-05, ARCH-6.3.2]
+    task: T41
+    status: active
+  - id: CAP-HOOK-CONFIGCHANGE-001
+    title: 'ConfigChange hooks：会话中设置文件变化时运行，block 让该变更不在本会话生效（企业来源不可阻断）'
+    milestone: M4
+    refs: [FR-HN-05, ARCH-6.3.2]
+    task: T41
+    status: active
+  - id: CAP-HOOK-STOPFAILURE-001
+    title: 'StopFailure hooks：回合因 API 错误在重试用尽后结束时运行，matcher 为错误类型，输出被忽略'
+    milestone: M4
+    refs: [FR-HN-05, ARCH-6.3.2]
+    task: T41
+    status: active
+  - id: CAP-HOOK-MCPTOOL-001
+    title: 'mcp_tool hook handler：调用工作区已连接 MCP server 的工具，input 模板按 hook 输入替换，返回文本按决策协议解析'
+    milestone: M4
+    refs: [FR-HN-05, ARCH-6.3.2]
+    task: T41
+    status: active
   - id: CAP-HOOK-M5-001
     title: 'WorktreeCreate、WorktreeRemove、PreModelSwitch、PostModelSwitch、Elicitation、ElicitationResult、PermissionDenied hooks'
     milestone: M5

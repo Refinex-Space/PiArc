@@ -576,7 +576,18 @@ impl HooksService {
     /// The handlers `request` would run, or `None`. Settings that cannot be read run nothing
     /// and tell the user.
     pub(crate) async fn plan(&self, facts: &Facts, request: &Request) -> Option<Plan> {
-        let settings = match self.inner.trust.permission_settings(&facts.root).await {
+        self.plan_adjusted(facts, request, |_| ()).await
+    }
+
+    /// [`Self::plan`] with `adjust` applied to the loaded settings first (a session's pinned
+    /// layers, T41).
+    pub(crate) async fn plan_adjusted(
+        &self,
+        facts: &Facts,
+        request: &Request,
+        adjust: impl FnOnce(&mut piarc_config::Settings),
+    ) -> Option<Plan> {
+        let mut settings = match self.inner.trust.permission_settings(&facts.root).await {
             Ok(settings) => settings,
             Err(error) => {
                 let message = format!(
@@ -587,6 +598,7 @@ impl HooksService {
                 return None;
             }
         };
+        adjust(&mut settings);
         self.plan_in(&settings, facts, request)
     }
 
