@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.47（2026-11-21） |
+| 版本 | 2.48（2026-11-21） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -419,19 +419,19 @@ PiArc.app/Contents/
 |---|---|---|---|---|
 | 工具体系 | M1 已接入 Read、Write、Edit、Bash、Glob、Grep。Core 维护读取快照、目录身份、命令执行和结果落盘；PowerShell 与 Git Bash 留 W1 实机复核 | K + C | `create*Tool` + `*Operations`、`registerTool` | M1 |
 | 权限 | Manual、Accept edits、计划与跳过权限四种模式；Claude Code 规则语法与七层来源；tree-sitter-bash 复合命令分析、只读白名单、关键路径删除；"总是允许"、规则管理与审计（M2 已交付，R3）。Auto 模式在 M5 | C + K + U | `tool_call` 闸门 | M1 基础、M2 完整 |
-| Hooks | Claude Code 兼容的事件、配置格式、exit code 与 JSON 协议；M2 事件集与 `command` handler 已交付（R3），http、prompt handler 与子 agent 事件在 M3 | C + K | 各生命周期事件 | M2 |
-| 子 agent | `.claude/agents` 定义；进程内子会话；工具子集；任意服务商模型；后台运行；最多 3 层 | K + C + U | SDK 子会话 | M3 |
+| Hooks | Claude Code 兼容的事件、配置格式、exit code 与 JSON 协议；M2 事件集与 `command` handler 已交付（R3），`http`、`prompt` handler、子 agent 与 M3 事件已交付（T38，R4） | C + K | 各生命周期事件 | M2–M3 |
+| 子 agent | `.claude/agents` 定义；进程内子会话；工具子集；任意服务商模型与别名；后台运行；`isolation: worktree`；默认最多 3 层、并发 8（M3 已交付，R4） | K + C + U | SDK 子会话 | M3 |
 | Plan 模式 | 只读探索 → 提交计划 → 用户批准并选择后续模式（M2 已交付，R3） | K + C + U | `tool_call` 闸门、追加消息 | M2 |
 | 任务清单 / 下一步 | 宿主工具驱动，UI 结构化渲染，压缩后重新注入（M2 已交付，R3） | K + U | `registerTool`、工具 details | M2 |
-| 上下文工程 | M1 已交付分段 system prompt、会话恢复、memory 层级、懒加载和外部导入审批；M2 已交付统一提醒通道、条件 rules、自写摘要的自动与手动压缩、熔断、重注入与用量（R3）；skill 正文重注入随 M3 的 skills | K + C + U | `before_agent_start`、`context`、`session_before_compact` | M1–M3 |
-| Skills / 命令 | Agent Skills 标准；`.claude/skills`、`.claude/commands`；渐进加载 | K | Pi skills、prompt templates、`resources_discover` | M3 |
+| 上下文工程 | M1 已交付分段 system prompt、会话恢复、memory 层级、懒加载和外部导入审批；M2 已交付统一提醒通道、条件 rules、自写摘要的自动与手动压缩、熔断、重注入与用量（R3）；M3 的 skill 正文重注入已交付（T37） | K + C + U | `before_agent_start`、`context`、`session_before_compact` | M1–M3 |
+| Skills / 命令 | Agent Skills 标准；`.claude/skills`、`.claude/commands`、输出风格；渐进加载（M3 已交付，R4）。发现与解析在 Core，Pi 自带的 skills 与 prompt templates 加载关闭（ADR-0054） | C + K + U | `registerTool`、`before_agent_start` | M3 |
 | 插件 | 加载 Claude Code 插件目录与 Pi 包 | C + K | packages、扩展 | M4 |
-| MCP | stdio / Streamable HTTP；OAuth；工作区共享连接池；延迟加载 | K + C + U | pi-mcp、`tool_search` | M3 |
+| MCP | stdio / Streamable HTTP；OAuth；工作区共享连接池；延迟加载（M3 已交付，R4）。配置在 Core，连接池在 Agent Host（ADR-0053） | K + C + U | pi-mcp 客户端、`tool_search` | M3 |
 | Checkpoint / Rewind | 写前快照；回退代码 / 对话 / 两者、从此处摘要、分支切换、Changes 面板按文件与 hunk 丢弃（M2 已交付，R3） | C + K | 会话树 fork/leaf | M2 |
 | 沙箱 | macOS：Bash 在 Seatbelt 中执行，文件与网络白名单；Windows：第一版只做进程树管理（需求 D7） | C | BashOperations 委托 | M4 |
-| 后台任务 / 终端 | 后台命令、超时转后台、Monitor、终端面板 | C + K + U | BashOperations、`registerTool` | M3 |
-| Worktree | 每会话可选独立 worktree；子 agent 隔离 | C + K | cwd 按会话 | M3 |
-| 多模型适配 | M1 已交付服务商设置、凭据保险箱、模型与 effort 选择及切换代价提示；M2 已交付 OAuth 与设备码登录、每模型设置、辅助模型通道与保守 Tool Profile（R3）；模型别名随 M3 的子 agent | K + C + U | pi-ai 模型目录 | M1–M3 |
+| 后台任务 / 终端 | 后台命令、超时转后台、Monitor、终端面板（M3 已交付，R4） | C + K + U | BashOperations、`registerTool` | M3 |
+| Worktree | 每会话可选独立 worktree；子 agent 隔离（M3 已交付，R4） | C + K + U | cwd 按会话 | M3 |
+| 多模型适配 | M1 已交付服务商设置、凭据保险箱、模型与 effort 选择及切换代价提示；M2 已交付 OAuth 与设备码登录、每模型设置、辅助模型通道与保守 Tool Profile（R3）；模型别名已随子 agent 交付（T31） | K + C + U | pi-ai 模型目录 | M1–M3 |
 | Auto 模式（分类器） | 可配置的审查模型代替人审批，决策可审计 | C + K | 辅助模型调用 | M5 |
 
 ### 6.1 工具体系
@@ -455,7 +455,7 @@ PiArc.app/Contents/
 | 保真写入 | 保留原文件的换行符风格（LF/CRLF）、编码与 BOM；写入采用临时文件 + 原子 rename。 |
 | 结构化 diff | 每次文件变更产生真实的 unified diff 和 hunk 结构，供 UI 审阅和快照索引。 |
 | 输出截断 | 超长输出写入会话临时目录，模型收到头尾预览和文件路径（阈值见 6.11）。 |
-| 路径边界 | 默认只允许读写工作区与已添加目录；越界访问走权限询问。受保护路径（`.git/`、`.piarc/`、`.claude/`、`.pi/`、shell 配置文件）的写入在 Manual 与 Accept edits 模式下始终询问。 |
+| 路径边界 | 默认只允许读写工作区与已添加目录；越界访问走权限询问。受保护路径（`.git/`、`.piarc/`、`.claude/`、`.pi/`、shell 配置文件、`.mcp.json`（R4，与沙箱一致））的写入在 Manual 与 Accept edits 模式下始终询问。 |
 | 并发 | 只读工具可以并发；写同一文件的操作串行（Write 与 Edit 用 Harness Kit 的队列，键为词法绝对路径、Windows 不区分大小写；Pi 的 `withFileMutationQueue` 在替身路径上排队，不再承担这项职责，ADR-0020）；预检（含审批）串行。 |
 | 中断 | 中断时为所有未完成的工具调用补齐"已中断"结果，保证 tool_use / tool_result 配对完整。 |
 
@@ -550,6 +550,7 @@ T38 落地（ADR-0055）：`WebSearch` 的参数为 `query`、可选的 `allowed
 - 关键路径删除（`rm -rf` 指向工作区根、家目录、`/` 等）与 `requiresUserInteraction` 类工具在任何模式下都询问。
 - `WebFetch(domain:…)`（T29）：规则匹配、hooks matcher 与实际抓取都用 `piarc_web::rule_host` 解析同一个 URL（小写主机，IPv6 带方括号）；"总是允许"按该主机生成规则，URL 解析不出主机时不提供规则。
 - 已知限制（R3）：`Read(…)` 的 deny 按调用的路径参数匹配，Grep、Glob 以目录为参数时不过滤结果中的被拒文件，Bash 的递归读取（`grep -r`、`rg`）同样不受它约束，过滤由 T45 补上（I120）；带通配的 Bash/PowerShell allow 规则不放行越界路径（ADR-0047，R3）：像路径的参数在会话目录外或无法定位时按越界询问，精确规则照旧放行。
+- 控制字符（R4）：命令含制表与换行以外的控制字符（C0、DEL、C1 CSI）时 Bash 分析判为无法静态判定（询问）；`terminal: true` 的命令由 Core 直接拒绝：终端的行编辑会执行这些字符（`^U` 擦掉前文、回车提前执行），键入的结果与裁决的文本不同。
 
 #### 6.2.3 裁决流程
 
@@ -754,6 +755,7 @@ T37 落地（ADR-0054）：
 | 授权与 hooks | `allowed-tools` 是调用所在会话当前回合的 allow 来源 `skill`，回合结束、中断、断连或输入进入排队即撤回；skill 的 hooks 以层 `skill` 登记在会话上直到会话关闭；两者都要求项目来源的项目受信任，项目 skill 与命令的 `allowed-tools`、`hooks` 计入可执行项 |
 | 输出风格 | 内置 `Default`、`Concise`、`Explanatory`、`Proactive`（指令在 `agent-host/src/harness/prompts/output-styles.ts`），设置键 `outputStyle`；`/output-style` 写 `.piarc/settings.local.json`，设置窗口写用户级 `settings.json`；中途变化经 `outputStyle` 提醒送达，`piarc.outputStyle` 记下已送达的风格 |
 | 重新加载 | Core 的设置监听同时监听 skills、命令与输出风格目录，任何变化（及信任变化）后发 `resources/reload`，Agent Host 在下一次运行前重新取 `skills/list` |
+| 信任与链接（R4） | 项目信任只覆盖信任清单列出的文件：`<根>/{.piarc,.claude,.pi,.agents}/{skills,commands,output-styles,prompts,agents}/`（`piarc_config::executables::covered_by_trust`）；worktree 里的副本、子目录与根以上目录的项目文件只作为指令加载，`allowed-tools`、hooks 与子 agent 的内联 MCP 不生效。项目来源的 skill、命令、输出风格与子 agent 定义解析链接后须仍在项目目录内（`stays_in_project`），否则不读并报问题 |
 
 ### 6.8 MCP
 
@@ -772,6 +774,7 @@ T36 落地（ADR-0053）：
 - **暴露与上下文。** 会话的 MCP 工具不超过阈值时直接声明；超过时注册但不激活（`alwaysLoad` 的除外），由 `ToolSearch`（Pi 的 `tool_search` 以规范名与 PiArc 的描述注册）检索并激活。首个回合前最多等 10 s 让连接中的 server 连上，instructions 与延迟加载的 server 名单写进第 6 段；之后的变化经 `mcpChanged` 提醒。工具的 `_meta["anthropic/requiresUserInteraction"]` 使 Core 在任何模式下询问、不提供"总是允许"。
 - **OAuth。** pi-mcp 的流程，状态（客户端注册、token、PKCE verifier）存保险箱键 `mcp/<server>`，刷新前取 Core 的 `secrets/lock`；登录经 `mcp/login` 与 `ui/loginInteraction` 走 T29 的 `core/login`（provider `mcp:<server>`）。401、403 时状态为 `needsAuth`，设置页提供登录按钮。
 - **子 agent。** `mcpServers` 里按名称引用的 server 用池中已有的连接；内联定义由 Core 在 `agents/list` 中检查与展开，子会话运行期间作为它的临时 server，结束即关闭，项目级定义的内联 server 在信任前不启动。
+- **server 名（R4）。** 名称不含 `__`，拼成工具名（其他字符换成 `_`）后与先出现的 server 相同的排除并报问题：工具名与规则都以 `mcp__<server>__` 区分 server，`github__admin` 的工具否则落在 `mcp__github` 规则之下。
 
 ### 6.9 Checkpoint 与 Rewind
 
@@ -915,7 +918,7 @@ T24 落地（ADR-0038）：
 | 主题 | 规则 / 初始值 |
 |---|---|
 | 回合继续条件 | 助手消息中出现工具调用是继续下一轮的唯一信号；输出被截断（stop reason 为 length）时，本条消息中的工具调用一律判为失败，不执行（Pi 已实现） |
-| 工具并发 | 连续的只读/并发安全调用成批并行，单批上限 10；遇到写操作即切回串行 |
+| 工具并发 | 连续的只读/并发安全调用成批并行，单批上限 10；遇到写操作即切回串行。并发安全的是 Read、Glob、Grep 与 `Agent`（子 agent 各自裁决自己的调用，ADR-0048；`CONCURRENCY_SAFE_TOOLS`） |
 | 中断与降级 | 为未完成的工具调用补齐合成结果；可恢复错误（限流、过载、5xx）先重试，重试期间不向模型暴露中间错误 |
 | 自动压缩触发 | 当前上下文 ≥ 窗口 − min(最大输出, 20K) − 13K（token）；窗口取模型窗口与 `autoCompactWindow` 的较小值（T27：`harness/compaction-threshold.ts`，经 Pi 的 `compaction.reserveTokens` 生效，L2 `ctx-compact-threshold`、`ctx-compact-window-cap` 锁定边界） |
 | 压缩熔断 | 连续 3 次自动压缩失败或无效后停止自动压缩，提示用户（T27：`AUTO_COMPACT_FAILURE_LIMIT`，L2 `ctx-compact-breaker`） |
@@ -926,6 +929,12 @@ T24 落地（ADR-0038）：
 | 缓存断点 | system prompt 分为静态段与动态段并分别缓存；动态信息走 system-reminder；每个请求只放一个消息级缓存断点（Anthropic）；其他服务商按 pi-ai 的缓存策略 |
 | 子 agent 隔离 | 默认不继承父会话对话历史，只接收任务描述；fork 模式（继承历史、共享缓存）列为 M5 |
 | plan 模式 | 硬拦截：写工具与非只读命令在 `tool_call` 闸门处拒绝；工具列表保持不变以免缓存失效；不能只靠提示词约束 |
+| 子 agent 上限 | 默认嵌套 3 层、每个主会话并发 8，可由 `subagents.maxDepth`、`subagents.maxConcurrent` 调整；超限立即失败不排队（T31：Core `DEFAULT_MAX_DEPTH`、`DEFAULT_MAX_CONCURRENT`，Agent Host 的 `DEFAULT_LIMITS` 只是取不到 Core 回答时的兜底） |
+| Stop 续跑与任务清单提醒 | Stop / SubagentStop hook 的阻断至多让回合续跑 8 次（`piarc_hooks::STOP_CONTINUATION_LIMIT`）；任务清单 8 轮未更新时提醒（`TODO_REMINDER_ROUNDS`） |
+| Monitor | 默认时长 5 分钟、上限 30 分钟；单批 50 行或 5,000 字符、总量 50,000 字符、缓冲 2,000 行；空闲会话至多每 30 s 唤醒一次（T32：`TaskLimits`） |
+| MCP | 会话的 MCP 工具超过 30 个时经 `ToolSearch` 延迟加载（`mcp.deferThreshold`）；空闲 600 s 断开（`mcp.idleTimeoutSeconds`）；首个回合最多等 10 s 让连接中的 server 连上（T36：`DEFAULT_DEFER_THRESHOLD`、`DEFAULT_IDLE_TIMEOUT_SECONDS`、`STARTUP_WAIT_MS`） |
+
+R4 核对（2026-11-21）：R3 核对的数值未变；表中补上 M3 落地的子 agent 上限、Stop 续跑、Monitor 与 MCP 四行（数值与代码常量一致），工具并发一行写明 `Agent` 也是并发安全的。
 
 R3 核对（2026-11-20）：表中数值与代码常量一致，M2 的 L2/L3 没有给出调整依据，本表不变——工具批次上限 `MAX_BATCH` = 10（`agent-host/src/harness/tool-batches.ts`）、阈值公式的 20,000 与 13,000（`compaction-threshold.ts` 的 `OUTPUT_RESERVE_CAP`、`SAFETY_MARGIN`）、熔断 `AUTO_COMPACT_FAILURE_LIMIT` = 3、`RESTORE_LIMITS`（文件 5 个、单个 20K、合计 50K，skill 单个 5K、合计 25K）、`TOOL_RESULT_LIMITS`（50,000 / 200,000 / 2,000 字符）。缓存断点一行的实现：Anthropic 请求的 system 两段（静态前缀、会话段）各一个断点、工具定义末尾一个、消息级只有最后一条 user 消息一个（T22、T27，L2 `ctx-cache-breakpoints`）；plan 模式一行由 T26 落地（L2 `plan-mode-menu-reminder` 的 `same_tools_as`）。
 
@@ -1434,6 +1443,8 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 
 R2 起，肯定决定携带与 checkout、目录、清单及既有决定绑定的版本。清单或数据库快照不可用时保持未信任。版本已变时返回最新视图，用户重新确认。linked worktree 通过主仓库反向登记校验（ADR-0034）。
 
+R4 起，信任只覆盖信任清单扫描的文件：skill、命令与子 agent 定义只有在主 checkout 根自己的资源目录里时，其 `allowed-tools`、hooks 与内联 MCP 才随项目信任生效（worktree 会话从 `.piarc/worktrees/<名称>/` 向上找到的另一分支的文件不算）；hook 的条目名按 `type` 取实际运行的字段，并带上 `headers`、`allowedEnvVars`、`model`。
+
 T20 起，项目层的 `acceptEdits` 和 `additionalDirectories` 也纳入信任快照。新项目项需要确认，原生审批保存的精确授权只扩展原有信任记录。会话显式模式优先于设置；项目层声明的 `bypassPermissions` 或 `auto` 始终跳过。
 
 ### 10.3 进程加固
@@ -1515,6 +1526,8 @@ T20 起，项目层的 `acceptEdits` 和 `additionalDirectories` 也纳入信任
 | Beta 期无崩溃会话率 | ≥ 99.5% | 不适用 | 不适用 | 崩溃统计（用户同意后） |
 
 T35 的 M3 测量（[M3 内存](../perf/M3-memory.md)，`npm run perf:m3`，M1 Max / 32 GB，打包形态）：同一工作区 3 个并行会话（1 个在独立 worktree）加 1 个子 agent 持续流式输出并执行工具，Agent Host 最大 238 MB（4 个活动会话的上限 270 MB，达标）；应用其余进程合计最大 576 MB（macOS 预算 510 MB，**超出**），其中没有会话时的基线已有 505 MB（不连测试驱动 466 MB），会话只增加约 65 MB（渲染进程约 50 MB）。预算不放宽，R4 复测（I146）。
+
+R4 复测（[R4 评审](../reviews/R4-findings.md)第 1 节，同一台 M1 Max / 32 GB，开发构建打包形态，场景另加被 4 个会话共用的 1 个 stdio MCP server 与 8 个项目 skill 的索引）：两轮 Agent Host 最大 236、218 MB（上限 270 MB，达标）；应用其余进程合计最大 580、577 MB（macOS 预算 510 MB，**超出**），空闲基线约 511 MB；同一负载下这些进程的 phys_footprint 合计约 250 MB（最大 298 MB）。超出主要是 RSS 把各进程映射的同一份 Electron 框架代码页各算一次；口径的改变等于放宽，须走 ADR，交 T44（I26、I146）。
 
 体积估算依据：Electron 45 的 darwin-arm64 发行包压缩后约 121 MB，内置 Node 压缩后约 28–38 MB，再加应用代码、Core、rg、fd。作为对照，Claude Desktop 5.1231.2 安装后 621 MB（本机实测）。M0 实测：macOS arm64 安装后 449.0 MB，其中 Electron Framework 250 MiB、内置 node 145 MiB；Windows x64 的 Electron 本体约 360 MiB（`PiArc.exe` 238.5 MiB、locales 48.8 MiB），内置 node 102 MiB（S6 第 8、9.2 节）。
 
@@ -1711,7 +1724,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | **M0 技术验证**（3–5 周） | 在两个平台上验证高风险假设 | 每个 spike 的结论（通过 / 失败 / 有条件通过）记录在 `docs/spikes/`，两个平台分别给结论；失败项触发对应 ADR 复审。**已完成（R1，2026-11-16）：有条件进入 M1**，见 [M0 总结](../spikes/M0-summary.md) |
 | **M1 可行走骨架** | 单工作区、多会话列表、流式对话；Read/Write/Edit/Bash（Windows 另有 PowerShell）/Glob/Grep 经 Core 执行；Manual 与 Accept edits 模式的基础审批；模型与凭据设置（凭据保险箱）；会话持久化与恢复；transcript P0 行类型 | 能用至少 2 家服务商完成"读代码 → 改代码 → 跑测试"的完整任务；L2 场景 ≥ 20 个通过。**macOS 已达标（R2，2026-11-19）**：两种协议的打包应用工作流通过，真实百炼 qwen-flash 通过，L2 61 个通过。**Windows 已达标（W1，2026-11-19）**：两种协议的工作流在两种形态通过，L2 60 个通过，UNC 共享未能实机验证，见 [W1 报告](../reviews/W1-windows-m1-parity.md)。 |
 | **M2 Harness 核心** | 完整权限规则与 Bash 分析；plan 模式；任务清单；AskUserQuestion；hooks（M2 事件集，command 类型）；checkpoint 与 rewind；压缩与上下文用量；WebFetch；Changes 面板；memory 文件兼容 | 第 6 章 M2 能力全部有场景覆盖；L3 对齐在权限与 hooks 上无未解释差异。**macOS 已达标（R3，2026-11-20）**：M2 能力 46 项全部有 L2 场景，L2 118 个通过（2 个 Windows 专属），L3 对 Claude Code 2.1.318 的 12 个权限与 hooks 场景 0 个未解释差异；评审修复 16 项缺陷，并按用户确认的 ADR-0047 让带通配的命令规则不放行越界路径（L3 少了这条差异），见 [R3 评审](../reviews/R3-findings.md)。**Windows 已达标（W2，2026-11-21）**：L2 145 个通过（4 个 macOS 专属），L3 对 Claude Code 2.1.318 的 12 个场景 0 个未解释差异（allowlist 按平台限定 Windows 版的工具集差异），W1 遗留的 UNC 补验通过，修复 7 个 Windows 平台缺陷，见 [W2 报告](../reviews/W2-windows-m2-parity.md)。 |
-| **M3 多会话与生态** | 子 agent；后台任务与 Monitor；终端面板（libghostty-vt）；worktree；MCP 共享连接池；skills 与命令；WebSearch；ToolSearch；hooks 的 http/prompt 类型 | 3 个并行会话 + 子 agent 场景满足第 11 章内存预算 |
+| **M3 多会话与生态** | 子 agent；后台任务与 Monitor；终端面板（libghostty-vt）；worktree；MCP 共享连接池；skills 与命令；WebSearch；ToolSearch；hooks 的 http/prompt 类型 | 3 个并行会话 + 子 agent 场景满足第 11 章内存预算。**macOS 未达标（R4，2026-11-21）**：M3 能力全部有 L2 场景（L2 174 个通过、2 个 Windows 专属），四个独立审查的发现中修复 10 项缺陷；内存一项 Agent Host 达标（最大 236 MB，上限 270 MB），应用其余进程合计 580 MB 超出 510 MB（RSS 口径，phys_footprint 约 250 MB），阻塞进入 M4 的退出判定，见 [R4 评审](../reviews/R4-findings.md)。 |
 | **M4 安全与打磨** | macOS 沙箱；Windows 隔离方案评估；插件；NotebookEdit；可操作的系统通知；配置诊断；无障碍；本地化；性能预算全部进 CI | 安全威胁表逐条有测试；性能预算全部达标 |
 | **M5 Beta** | Auto 模式（可配置审查模型）；自动记忆；企业托管配置；Anthropic 服务端压缩；fork 子 agent；平台快捷操作（App Intents / 跳转列表）；完整发布流水线 | macOS 与 Windows 同时公开 Beta |
 
@@ -1775,6 +1788,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.46 | 2026-11-21 | T38（ADR-0055）补充第 4 章 ADR-0055、6.1.4 节 WebSearch 的落地（工具、后端选择、原生与第三方后端、结果与来源、设置）、6.3 节 hooks 的 T38 落地（`http`、`prompt` handler、事件与 handler 组合、白名单与 `hookAllowedEnvVars`、M3 事件、`agent_id`/`agent_type`/`prompt_id`/`effort`、项目 hook 的权限效力），6.4 节子 agent 的 hooks，6.13 节 `nativeWebSearch` 与辅助模型通道指定模型，6.14 节 hooks 的 handler 类型与两个白名单键，7.4 节 `web/search`、`web/searchBackend`、`hooks/prompt` 与新字段；基线决策未变（6.1.4 已定原生优先、第三方其次，6.3 已定 hooks 全部在 Core 与 M3 的分期） |
 | 2.45 | 2026-11-21 | T37（ADR-0054）补充第 4 章 ADR-0054、6.6.1 节第 3、5 段的生产者、6.7 节 skills、斜杠命令与输出风格的落地（发现与优先级、frontmatter、参数替换、索引与 `Skill`、展开位置、回合级授权与 hooks、输出风格、重新加载），6.14 节 `outputStyle`、`skillOverrides` 生效，7.4 节 `skills/*`、`resources/*` 方法与 `command` 字段，8.2 节 composer 命令面板与设置页，8.5 节 Mod+K；基线决策未变（6.7 已定 Pi 默认路径之外的发现、索引加 `Skill`、`allowed-tools` 由 Core 参考、切换以消息送达） |
 | 2.47 | 2026-11-21 | W2：第 16 章标注 M2 在 Windows 上达标（L2、L3、UNC 补验与平台缺陷修复，见 W2 报告）；W2 在 Windows 分支上编为 2.43，合并到 T38 之后改为 2.47。 |
+| 2.48 | 2026-11-21 | R4：第 16 章标注 M3（macOS）未达标（内存一项）；6.0 节矩阵按 M3 交付更新（Skills 的位置改为 C + K + U、依托能力改为 PiArc 自己的工具与提醒，MCP 写明配置与连接池的位置）；6.1.2 节受保护路径加 `.mcp.json`；6.2.2 节控制字符的处理；6.7 节信任与链接一行、6.8 节 server 名规则、10.2 节信任覆盖的文件与 hook 条目名；6.15 节补 M3 的四行与工具并发的 `Agent`；第 11 章 R4 的内存复测。预算未改。 |
 | 2.40 | 2026-11-20 | T32（ADR-0049）补充第 4 章 ADR-0049、6.1.4 节 KillShell 与 Monitor 的参数与裁决、6.6.3 节 `monitorOutput`、`key` 与 `wake`、6.11 节任务管理器、超时转后台、通知、Monitor 回灌与限速的落地、7.3 节后台任务的持久化、7.4 节 `backgroundTasks` 能力的方法与成员、8.2 节后台任务卡与面板、9.2 节 schema v7、9.3 节任务输出的清理；基线决策未变（6.11 已定超时转后台与 Monitor） |
 | 2.39 | 2026-11-20 | T31（ADR-0048）补充第 4 章 ADR-0048、6.4 节子 agent 的落地（定义加载、子会话登记与链接、工具过滤用隐藏声明加闸门、深度与并发计数、前后台、空闲回收）、6.13 节模型别名表与解析、6.14 节 `model`、`effortLevel` 生效、`advisorModel` 忽略、`agent` 交 T48、7.4 节 `subagents` 能力的方法与成员、7.6 节子会话条目增量的现状、8.2 节子 agent 卡与设置页、9.2 节 schema v6；基线决策未变 |
 | 2.38 | 2026-11-20 | R3（M2 macOS 阶段门）：第 4 章补上 ADR-0042；6.0 节矩阵按 M2 实际交付更新权限、Hooks、Plan、任务清单、上下文工程、Checkpoint、多模型七行；第 4 章加入 ADR-0047、6.2.2 与 6.2.3 节写明带通配的命令规则不放行越界路径（ADR-0047，修订 ADR-0037 的阶梯）；6.2.2 节写明 `Read` deny 对目录搜索与 Bash 递归读取的限制（I120）；6.3.1 节进程树终止按平台写准；6.6.4 节熔断复位范围（I107）；6.14 节 `plansDirectory` 交 T48（I104）；6.15 节记录 R3 对校准值的核对（数值不变）与缓存断点、plan 模式两行的实现；第 16 章记录 M2 的 macOS 结论；ADR-0047 改变了第 6.2.3 节阶梯第 6、7 步对带通配命令规则的先后 |
