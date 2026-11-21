@@ -171,7 +171,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | W3 | [Windows：M3 达标](tasks/W3-windows-m3-parity.md) | 5 | R4（建议在 T43、T44 之后，需要读屏清单与性能测量脚本） | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 607809d |
 | T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 已完成 | c4e5f75 |
-| T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 未开始 | — |
+| T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 进行中 | — |
 | T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,6 +308,14 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+**T41 配置诊断完善、M4 hooks 事件与用量成本**（开工 2026-11-21；基线 `npm run verify -- --baseline` 通过，复用 c4e5f75 的全量结果）
+
+- [ ] 1 配置诊断完整版：全部来源（设置七层、`~/.claude.json`、`.mcp.json`、memory、rules、agents、skills、commands、输出风格、插件与 Pi 包、企业预留）、加载状态、来源链、自动刷新、设置页
+- [ ] 2 M4 hooks 事件：UserPromptExpansion、InstructionsLoaded、CwdChanged、FileChanged（`watchPaths`）、ConfigChange、StopFailure（错误类型映射）
+- [ ] 3 `mcp_tool` handler 与 Core → Agent Host 的 AHP 请求
+- [ ] 4 用量与成本：按会话、按模型汇总存 SQLite，价格表覆盖，右栏与"用量"页
+- [ ] 验收 A01–A13；收尾（piarc-hooks、piarc-config 的 AGENTS.md，架构 6.3.2、6.14）
 
 ## 登记事项
 
