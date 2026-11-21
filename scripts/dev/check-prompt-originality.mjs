@@ -138,6 +138,9 @@ function sourceTexts() {
     'agent-host/src/mcp/pool.ts',
     'agent-host/src/mcp/stdio.ts',
     'agent-host/src/mcp/sign-in.ts',
+    // T39: the sandbox note after a failed command, and the proxy's refusal a command prints.
+    'agent-host/src/tools/sandbox-report.ts',
+    'crates/piarc-sandbox/src/proxy/mod.rs',
   ]) {
     const source = readFileSync(path.join(repoRoot, file), 'utf8');
     for (const m of source.matchAll(literal)) {
