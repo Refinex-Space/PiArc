@@ -426,3 +426,80 @@ fn subagent_links_come_from_the_file_and_survive_a_rebuild() {
     assert_eq!(link(&rebuilt, "child-1"), link(&synced, "child-1"));
     assert_eq!(rebuilt, fresh_rebuild(&sessions));
 }
+
+/// T35: a session's worktree columns are Core's own state: they survive a rebuild, and an
+/// archived session's worktree is due for cleanup once its time has come, unless it waits for
+/// the user or was removed.
+#[test]
+fn worktree_columns_survive_a_rebuild_and_list_due_cleanups() {
+    let dir = TempDir::new("worktrees");
+    let sessions = dir.path().join("pi").join("sessions");
+    let mut store = Store::open(&dir.path().join("core.sqlite"), 0).expect("store");
+    let mut writer = SessionWriter::create(&sessions, "/work/项目", "s-wt", Some(3));
+    let line = writer.user("hello");
+    writer.append_raw(&line);
+    assert!(
+        !store
+            .set_session_worktree("s-wt", "/w/x", Some("piarc/x"))
+            .expect("before")
+    );
+    store.sync_dir(&sessions).expect("sync");
+    let path = "/work/项目/.piarc/worktrees/one";
+    assert!(
+        store
+            .set_session_worktree("s-wt", path, Some("piarc/one"))
+            .expect("write")
+    );
+    store
+        .set_session_state("s-wt", "/work/项目", "idle", false)
+        .expect("state");
+    store.rebuild_index(&sessions).expect("rebuild");
+    let record = store.session("s-wt").expect("read").expect("row");
+    let worktree = record.worktree.expect("worktree kept");
+    assert_eq!(worktree.path, path);
+    assert_eq!(worktree.branch.as_deref(), Some("piarc/one"));
+    assert_eq!(worktree.cleanup_at, None);
+
+    // Not archived: never due.
+    store
+        .set_worktree_cleanup("s-wt", Some(100), false)
+        .expect("cleanup");
+    assert!(store.due_worktrees(1_000).expect("due").is_empty());
+    let archive = piarc_store::SessionPrefsChange {
+        archived: Some(true),
+        ..Default::default()
+    };
+    store.set_session_prefs("s-wt", &archive).expect("archive");
+    assert!(store.due_worktrees(99).expect("due").is_empty());
+    let due = store.due_worktrees(100).expect("due");
+    assert_eq!(due.len(), 1);
+    assert_eq!(due[0].path, path);
+    assert_eq!(due[0].workspace.as_deref(), Some("/work/项目"));
+    // Waiting for the user: not listed again.
+    store
+        .set_worktree_cleanup("s-wt", Some(100), true)
+        .expect("confirm");
+    assert!(store.due_worktrees(1_000).expect("due").is_empty());
+    assert!(
+        store
+            .session("s-wt")
+            .expect("read")
+            .expect("row")
+            .worktree
+            .expect("wt")
+            .confirm
+    );
+    // Removed: never due, and the confirmation is gone.
+    store
+        .set_worktree_removed("s-wt", Some(500))
+        .expect("removed");
+    let removed = store
+        .session("s-wt")
+        .expect("read")
+        .expect("row")
+        .worktree
+        .expect("wt");
+    assert_eq!(removed.removed_at, Some(500));
+    assert!(!removed.confirm);
+    assert!(store.due_worktrees(1_000).expect("due").is_empty());
+}

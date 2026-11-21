@@ -60,6 +60,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "background_tasks",
         sql: include_str!("sql/0007_background_tasks.sql"),
     },
+    Migration {
+        version: 8,
+        name: "worktrees_and_search",
+        sql: include_str!("sql/0008_worktrees_and_search.sql"),
+    },
 ];
 
 /// The highest version in `migrations`.

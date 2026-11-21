@@ -26,7 +26,7 @@ use sha2::{Digest, Sha256};
 
 use crate::error::{Error, Result, path_text};
 use crate::jsonl::{LineReader, Parsed};
-use crate::pi_session::{Entry, SessionMeta, Unindexable, Usage};
+use crate::pi_session::{Entry, EntryText, SessionMeta, Unindexable, Usage};
 use crate::store::Store;
 
 /// Whether a session's metadata could be read.
@@ -80,6 +80,34 @@ pub struct SessionRecord {
     pub unread: bool,
     /// Core's own state: the title the user gave the session in PiArc.
     pub custom_title: Option<String>,
+    /// Core's own state: the session's worktree (T35).
+    pub worktree: Option<WorktreeRecord>,
+}
+
+/// A session's worktree (T35): Core's own columns.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorktreeRecord {
+    /// Its directory.
+    pub path: String,
+    /// Its branch, when known.
+    pub branch: Option<String>,
+    /// When the archived session's worktree is due for cleanup (Unix ms).
+    pub cleanup_at: Option<i64>,
+    /// The cleanup found uncommitted changes and waits for the user.
+    pub confirm: bool,
+    /// When it was removed (the branch stays).
+    pub removed_at: Option<i64>,
+}
+
+/// An archived session's worktree due for cleanup.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DueWorktree {
+    /// The session.
+    pub session_id: String,
+    /// Its workspace.
+    pub workspace: Option<String>,
+    /// The worktree's directory.
+    pub path: String,
 }
 
 impl SessionRecord {
@@ -251,21 +279,27 @@ impl Store {
             _ => None,
         };
         let appending = resume.is_some();
-        let scan = match resume {
-            Some((state, record)) => {
+        let start = resume.map(|(state, record)| (state.byte_offset, state.tail_start, record));
+        let last_entry = match &start {
+            Some(_) => self.last_entry_id(&key)?,
+            None => None,
+        };
+        // The searchable text goes in with the rest of the scan, or not at all (T35).
+        let tx = self
+            .conn
+            .transaction()
+            .map_err(Error::sqlite("cannot start the index transaction"))?;
+        let mut texts = TextSink::new(&tx, stored.as_ref().map(|r| r.id.clone()), appending)?;
+        let scan = match start {
+            Some((offset, tail_start, record)) => {
                 let mut meta = record.meta.clone();
-                meta.last_entry_id = self.last_entry_id(&key)?;
-                scan_file(
-                    &mut file,
-                    path,
-                    state.byte_offset,
-                    state.tail_start,
-                    Some(meta),
-                )
+                meta.last_entry_id = last_entry;
+                scan_file(&mut file, path, offset, tail_start, Some(meta), &mut texts)
             }
-            None => scan_file(&mut file, path, 0, 0, None),
+            None => scan_file(&mut file, path, 0, 0, None, &mut texts),
         }
         .map_err(Error::io("cannot read", path))?;
+        texts.finish()?;
         if appending
             && state.as_ref().is_some_and(|s| s.byte_offset == scan.offset)
             && scan.skipped.is_empty()
@@ -277,38 +311,107 @@ impl Store {
             .as_ref()
             .filter(|_| appending)
             .map_or(0, |s| s.skipped);
-        let outcome = self.store_scan(path, &mut file, &scan, prior_skips, appending, &stamp)?;
+        let outcome = store_scan(tx, path, &mut file, &scan, prior_skips, appending, &stamp)?;
         skipped.extend(scan.skipped);
         Ok(outcome)
     }
+}
 
-    fn store_scan(
-        &mut self,
-        path: &Path,
-        file: &mut File,
-        scan: &Scan,
-        prior_skips: i64,
-        appending: bool,
-        stamp: &Stamp,
-    ) -> Result<FileOutcome> {
-        let key = path_text(path)?;
-        if scan.offset == 0 {
-            return Ok(FileOutcome::Empty);
+/// Inserts the searchable text of scanned entries in the scan's transaction (T35). A scan
+/// from the start first drops the session's earlier rows.
+struct TextSink<'t> {
+    tx: &'t Transaction<'t>,
+    stored: Option<String>,
+    cleared: bool,
+    error: Option<Error>,
+}
+
+impl<'t> TextSink<'t> {
+    fn new(tx: &'t Transaction<'t>, stored: Option<String>, appending: bool) -> Result<Self> {
+        if !appending && let Some(id) = &stored {
+            delete_texts(tx, id)?;
         }
-        let tail_hash = hash_range(file, scan.tail_start, scan.offset)
-            .map_err(Error::io("cannot read", path))?;
-        let (status, error) = match &scan.unindexable {
-            None => (IndexStatus::Indexed, None),
-            Some(reason) => (IndexStatus::Unavailable, Some(reason.to_string())),
+        Ok(Self {
+            tx,
+            stored,
+            cleared: appending,
+            error: None,
+        })
+    }
+
+    fn add(&mut self, session: Option<&str>, text: EntryText) {
+        if self.error.is_some() {
+            return;
+        }
+        let Some(session) = session else {
+            return;
         };
-        let id = scan.meta.id.clone().unwrap_or_else(|| fallback_id(path));
-        let skipped_total = prior_skips + i64::try_from(scan.skipped.len()).unwrap_or(i64::MAX);
-        let tx = self
-            .conn
-            .transaction()
-            .map_err(Error::sqlite("cannot start the index transaction"))?;
-        write_session(&tx, &id, key, &scan.meta, status, error.as_deref())?;
-        tx.execute(
+        if let Err(error) = self.insert(session, text) {
+            self.error = Some(error);
+        }
+    }
+
+    fn insert(&mut self, session: &str, text: EntryText) -> Result<()> {
+        if !self.cleared {
+            // The file now names another session than its row did.
+            if self.stored.as_deref() != Some(session) {
+                delete_texts(self.tx, session)?;
+            }
+            self.cleared = true;
+        }
+        self.tx
+            .prepare_cached(
+                "INSERT INTO session_text (session_id, entry_id, role, at, text)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+            )
+            .and_then(|mut s| {
+                s.execute(params![
+                    session,
+                    text.entry_id,
+                    text.role,
+                    text.at,
+                    text.text
+                ])
+            })
+            .map_err(Error::sqlite("cannot write session_text"))?;
+        Ok(())
+    }
+
+    fn finish(self) -> Result<()> {
+        self.error.map_or(Ok(()), Err)
+    }
+}
+
+/// Removes the searchable text of session `id`.
+fn delete_texts(conn: &rusqlite::Connection, id: &str) -> Result<()> {
+    conn.execute("DELETE FROM session_text WHERE session_id = ?1", [id])
+        .map(drop)
+        .map_err(Error::sqlite("cannot delete from session_text"))
+}
+
+fn store_scan(
+    tx: Transaction<'_>,
+    path: &Path,
+    file: &mut File,
+    scan: &Scan,
+    prior_skips: i64,
+    appending: bool,
+    stamp: &Stamp,
+) -> Result<FileOutcome> {
+    let key = path_text(path)?;
+    if scan.offset == 0 {
+        return Ok(FileOutcome::Empty);
+    }
+    let tail_hash =
+        hash_range(file, scan.tail_start, scan.offset).map_err(Error::io("cannot read", path))?;
+    let (status, error) = match &scan.unindexable {
+        None => (IndexStatus::Indexed, None),
+        Some(reason) => (IndexStatus::Unavailable, Some(reason.to_string())),
+    };
+    let id = scan.meta.id.clone().unwrap_or_else(|| fallback_id(path));
+    let skipped_total = prior_skips + i64::try_from(scan.skipped.len()).unwrap_or(i64::MAX);
+    write_session(&tx, &id, key, &scan.meta, status, error.as_deref())?;
+    tx.execute(
             "INSERT INTO session_files (file_path, session_id, byte_offset, tail_start, tail_hash, last_entry_id, skipped_lines, file_identity, modified_ns)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
              ON CONFLICT(file_path) DO UPDATE SET session_id = excluded.session_id,
@@ -326,21 +429,22 @@ impl Store {
             ],
         )
         .map_err(Error::sqlite("cannot write session_files"))?;
-        tx.commit()
-            .map_err(Error::sqlite("cannot commit the index transaction"))?;
-        Ok(match (&scan.unindexable, appending) {
-            (Some(reason), _) => FileOutcome::Unavailable {
-                reason: reason.to_string(),
-            },
-            (None, true) => FileOutcome::Appended {
-                entries: scan.entries,
-            },
-            (None, false) => FileOutcome::Rescanned {
-                entries: scan.entries,
-            },
-        })
-    }
+    tx.commit()
+        .map_err(Error::sqlite("cannot commit the index transaction"))?;
+    Ok(match (&scan.unindexable, appending) {
+        (Some(reason), _) => FileOutcome::Unavailable {
+            reason: reason.to_string(),
+        },
+        (None, true) => FileOutcome::Appended {
+            entries: scan.entries,
+        },
+        (None, false) => FileOutcome::Rescanned {
+            entries: scan.entries,
+        },
+    })
+}
 
+impl Store {
     /// Syncs every session file under `sessions_dir` (Pi's `<agentDir>/sessions/`: one
     /// directory per working directory, `*.jsonl` inside) and removes index rows of files
     /// under it that no longer exist.
@@ -373,8 +477,8 @@ impl Store {
         Ok(report)
     }
 
-    /// Rebuilds the session index from the files: drops the sync state and every derived
-    /// column, then reads every file under `sessions_dir` from the start. Core's own columns
+    /// Rebuilds the session index from the files: drops the sync state, every derived column
+    /// and the searchable text (T35), then reads every file under `sessions_dir` from the start. Core's own columns
     /// (pinned, archived, unread, workspace) of sessions whose file still exists are kept.
     ///
     /// # Errors
@@ -385,6 +489,7 @@ impl Store {
             .execute_batch(
                 "BEGIN;
                  DELETE FROM session_files;
+                 DELETE FROM session_text;
                  UPDATE sessions SET cwd = NULL, parent_session = NULL, name = NULL,
                     subagent_parent = NULL, subagent_type = NULL,
                     first_message = NULL, model_provider = NULL, model_id = NULL,
@@ -476,6 +581,89 @@ impl Store {
         Ok(true)
     }
 
+    /// Records the worktree of session `id` (T35): its directory and branch. Returns false when
+    /// the index has no row for it yet.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Sqlite`] when the row cannot be written.
+    pub fn set_session_worktree(&self, id: &str, path: &str, branch: Option<&str>) -> Result<bool> {
+        let changed = self
+            .conn
+            .execute(
+                "UPDATE sessions SET worktree = ?2, worktree_branch = COALESCE(?3, worktree_branch)
+                 WHERE id = ?1",
+                params![id, path, branch],
+            )
+            .map_err(Error::sqlite("cannot write the session worktree"))?;
+        Ok(changed > 0)
+    }
+
+    /// Sets when session `id`'s worktree is due for cleanup (`None`: never) and whether the
+    /// cleanup waits for the user (T35).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Sqlite`] when the row cannot be written.
+    pub fn set_worktree_cleanup(&self, id: &str, at: Option<i64>, confirm: bool) -> Result<bool> {
+        let changed = self
+            .conn
+            .execute(
+                "UPDATE sessions SET worktree_cleanup_at = ?2, worktree_confirm = ?3
+                 WHERE id = ?1 AND worktree IS NOT NULL",
+                params![id, at, confirm],
+            )
+            .map_err(Error::sqlite("cannot write the worktree cleanup"))?;
+        Ok(changed > 0)
+    }
+
+    /// Records that session `id`'s worktree was removed at `at`, or (`None`) added again.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Sqlite`] when the row cannot be written.
+    pub fn set_worktree_removed(&self, id: &str, at: Option<i64>) -> Result<bool> {
+        let changed = self
+            .conn
+            .execute(
+                "UPDATE sessions SET worktree_removed_at = ?2, worktree_cleanup_at = NULL,
+                    worktree_confirm = 0
+                 WHERE id = ?1 AND worktree IS NOT NULL",
+                params![id, at],
+            )
+            .map_err(Error::sqlite("cannot write the worktree state"))?;
+        Ok(changed > 0)
+    }
+
+    /// Archived sessions whose worktree is due for cleanup at `now` and not waiting for the
+    /// user (T35).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Sqlite`] when the index cannot be read.
+    pub fn due_worktrees(&self, now: i64) -> Result<Vec<DueWorktree>> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT id, workspace_path, worktree FROM sessions
+                 WHERE archived = 1 AND worktree IS NOT NULL AND worktree_removed_at IS NULL
+                    AND worktree_confirm = 0 AND worktree_cleanup_at <= ?1
+                 ORDER BY worktree_cleanup_at, id",
+            )
+            .map_err(Error::sqlite("cannot read sessions"))?;
+        let rows = statement
+            .query_map([now], |row| {
+                Ok(DueWorktree {
+                    session_id: row.get(0)?,
+                    workspace: row.get(1)?,
+                    path: row.get(2)?,
+                })
+            })
+            .map_err(Error::sqlite("cannot read sessions"))?;
+        rows.collect::<rusqlite::Result<_>>()
+            .map_err(Error::sqlite("cannot read sessions"))
+    }
+
     /// Forgets session `id`: its row and its file's sync state. Returns its file (to be
     /// deleted by the caller), or `None` when the index does not know it.
     ///
@@ -496,6 +684,7 @@ impl Store {
             .optional()
             .map_err(Error::sqlite("cannot read sessions"))?;
         if let Some(file) = &file {
+            delete_texts(&tx, id)?;
             tx.execute("DELETE FROM sessions WHERE id = ?1", [id])
                 .map_err(Error::sqlite("cannot delete from sessions"))?;
             tx.execute("DELETE FROM session_files WHERE file_path = ?1", [file])
@@ -590,6 +779,12 @@ impl Store {
             .transaction()
             .map_err(Error::sqlite("cannot start the index transaction"))?;
         for path in &gone {
+            tx.execute(
+                "DELETE FROM session_text WHERE session_id IN
+                    (SELECT id FROM sessions WHERE file_path = ?1)",
+                [path],
+            )
+            .map_err(Error::sqlite("cannot delete from session_text"))?;
             tx.execute("DELETE FROM sessions WHERE file_path = ?1", [path])
                 .map_err(Error::sqlite("cannot delete from sessions"))?;
             tx.execute("DELETE FROM session_files WHERE file_path = ?1", [path])
@@ -605,7 +800,8 @@ const SESSION_COLUMNS: &str = "id, file_path, cwd, parent_session, name, first_m
     model_provider, model_id, message_count, input_tokens, output_tokens, cache_read_tokens, \
     cache_write_tokens, cost_total, created_at, updated_at, format_version, index_status, \
     index_error, workspace_path, pinned, archived, unread, status, custom_title, \
-    subagent_parent, subagent_type";
+    subagent_parent, subagent_type, worktree, worktree_branch, worktree_cleanup_at, \
+    worktree_confirm, worktree_removed_at";
 
 fn session_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SessionRecord> {
     let status: String = row.get(17)?;
@@ -643,6 +839,18 @@ fn session_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SessionRecord> 
         unread: row.get(22)?,
         status: row.get(23)?,
         custom_title: row.get(24)?,
+        worktree: row
+            .get::<_, Option<String>>(27)?
+            .map(|path| -> rusqlite::Result<WorktreeRecord> {
+                Ok(WorktreeRecord {
+                    path,
+                    branch: row.get(28)?,
+                    cleanup_at: row.get(29)?,
+                    confirm: row.get(30)?,
+                    removed_at: row.get(31)?,
+                })
+            })
+            .transpose()?,
     })
 }
 
@@ -654,7 +862,13 @@ fn write_session(
     status: IndexStatus,
     error: Option<&str>,
 ) -> Result<()> {
-    // The file now holds another session (it was replaced): drop the old row.
+    // The file now holds another session (it was replaced): drop the old row and its text.
+    tx.execute(
+        "DELETE FROM session_text WHERE session_id IN
+            (SELECT id FROM sessions WHERE file_path = ?1 AND id <> ?2)",
+        params![key, id],
+    )
+    .map_err(Error::sqlite("cannot write session_text"))?;
     tx.execute(
         "DELETE FROM sessions WHERE file_path = ?1 AND id <> ?2",
         params![key, id],
@@ -714,6 +928,7 @@ fn scan_file(
     offset: u64,
     tail_start: u64,
     meta: Option<SessionMeta>,
+    texts: &mut TextSink<'_>,
 ) -> io::Result<Scan> {
     let fresh = meta.is_none();
     let mut scan = Scan {
@@ -743,7 +958,9 @@ fn scan_file(
                 }
             }
             Parsed::Value(entry) => {
-                scan.meta.fold(entry);
+                if let Some(text) = scan.meta.fold(entry) {
+                    texts.add(scan.meta.id.as_deref(), text);
+                }
                 scan.entries += 1;
             }
         }

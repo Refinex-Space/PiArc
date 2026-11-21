@@ -18,6 +18,22 @@ pub const KNOWN_VERSIONS: std::ops::RangeInclusive<i64> = 1..=3;
 /// Characters of the first user message kept as the fallback title.
 pub const FIRST_MESSAGE_CHARS: usize = 200;
 
+/// Characters of one message indexed for full-text search (T35); the rest is not searchable.
+pub const SEARCH_TEXT_CHARS: usize = 20_000;
+
+/// The searchable text of one entry (T35): a user message or an assistant reply's text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EntryText {
+    /// The entry's id.
+    pub entry_id: Option<String>,
+    /// `user` or `assistant`.
+    pub role: &'static str,
+    /// When it was written (Unix ms).
+    pub at: Option<i64>,
+    /// Its text parts joined by line breaks, at most [`SEARCH_TEXT_CHARS`] characters.
+    pub text: String,
+}
+
 /// What the index knows about one session.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SessionMeta {
@@ -231,7 +247,7 @@ struct Message {
     #[serde(default)]
     role: Option<String>,
     #[serde(default)]
-    content: Option<TextPrefix>,
+    content: Option<MessageText>,
     #[serde(default)]
     provider: Option<String>,
     #[serde(default)]
@@ -268,11 +284,13 @@ impl SessionMeta {
         Ok(())
     }
 
-    /// Folds one entry after the header.
-    pub fn fold(&mut self, entry: Entry) {
+    /// Folds one entry after the header; returns its searchable text, if it has any.
+    pub fn fold(&mut self, entry: Entry) -> Option<EntryText> {
+        let entry_id = entry.id.clone();
         if let Some(id) = entry.id {
             self.last_entry_id = Some(id);
         }
+        let mut text = None;
         let mut at = entry.timestamp.as_ref().and_then(Timestamp::millis);
         match entry.kind.as_str() {
             "custom" if entry.custom_type.as_deref() == Some(SUBAGENT_ENTRY) => {
@@ -300,7 +318,12 @@ impl SessionMeta {
                     if let Some(ms) = message.timestamp.as_ref().and_then(Timestamp::millis) {
                         at = Some(at.map_or(ms, |a| a.max(ms)));
                     }
-                    self.fold_message(message);
+                    text = self.fold_message(message).map(|(role, text)| EntryText {
+                        entry_id,
+                        role,
+                        at,
+                        text,
+                    });
                 }
             }
             _ => {}
@@ -311,12 +334,19 @@ impl SessionMeta {
         if let Some(ms) = at {
             self.updated_at = Some(self.updated_at.map_or(ms, |u| u.max(ms)));
         }
+        text
     }
 
-    fn fold_message(&mut self, message: Message) {
-        match message.role.as_deref() {
-            Some("user") if self.first_message.is_none() => {
-                self.first_message = message.content.map(|c| c.0).filter(|t| !t.is_empty());
+    /// Folds a message; returns its role and searchable text when it is a user message or an
+    /// assistant reply with text.
+    fn fold_message(&mut self, message: Message) -> Option<(&'static str, String)> {
+        let content = message.content.unwrap_or_default();
+        let role = match message.role.as_deref() {
+            Some("user") => {
+                if self.first_message.is_none() && !content.prefix.is_empty() {
+                    self.first_message = Some(content.prefix);
+                }
+                "user"
             }
             Some("assistant") => {
                 if message.provider.is_some() || message.model.is_some() {
@@ -326,9 +356,11 @@ impl SessionMeta {
                 if let Some(usage) = &message.usage {
                     self.usage.add(usage);
                 }
+                "assistant"
             }
-            _ => {}
-        }
+            _ => return None,
+        };
+        (!content.full.is_empty()).then_some((role, content.full))
     }
 }
 
@@ -351,57 +383,82 @@ impl Usage {
     }
 }
 
-/// The leading text of message content (a string, or the `text` parts of a part list joined
-/// by a space), cut to [`FIRST_MESSAGE_CHARS`] characters. Non-text parts are skipped
-/// without being kept.
+/// The text of message content (a string, or the `text` parts of a part list): `prefix` joins
+/// the parts by a space and is cut to [`FIRST_MESSAGE_CHARS`] characters (the title), `full`
+/// joins them by line breaks and is cut to [`SEARCH_TEXT_CHARS`] (search). Non-text parts
+/// (images, thinking, tool calls) are skipped without being kept.
 #[derive(Debug, Default)]
-struct TextPrefix(String);
+struct MessageText {
+    prefix: String,
+    prefix_chars: usize,
+    full: String,
+    full_chars: usize,
+}
 
-impl TextPrefix {
+impl MessageText {
     fn push(&mut self, text: &str) {
         let text = text.trim();
         if text.is_empty() {
             return;
         }
-        let separator = usize::from(!self.0.is_empty());
-        let room = FIRST_MESSAGE_CHARS.saturating_sub(self.0.chars().count() + separator);
+        Self::append(
+            &mut self.prefix,
+            &mut self.prefix_chars,
+            ' ',
+            text,
+            FIRST_MESSAGE_CHARS,
+        );
+        Self::append(
+            &mut self.full,
+            &mut self.full_chars,
+            '\n',
+            text,
+            SEARCH_TEXT_CHARS,
+        );
+    }
+
+    fn append(out: &mut String, count: &mut usize, separator: char, text: &str, limit: usize) {
+        let gap = usize::from(!out.is_empty());
+        let room = limit.saturating_sub(*count + gap);
         if room == 0 {
             return;
         }
-        if separator == 1 {
-            self.0.push(' ');
+        if gap == 1 {
+            out.push(separator);
         }
-        self.0.extend(text.chars().take(room));
+        let before = out.len();
+        out.extend(text.chars().take(room));
+        *count += gap + out[before..].chars().count();
     }
 }
 
-impl<'de> Deserialize<'de> for TextPrefix {
+impl<'de> Deserialize<'de> for MessageText {
     fn deserialize<D: de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         struct Content;
 
         impl<'de> Visitor<'de> for Content {
-            type Value = TextPrefix;
+            type Value = MessageText;
 
             fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 f.write_str("a string or a list of content parts")
             }
 
-            fn visit_str<E: de::Error>(self, text: &str) -> Result<TextPrefix, E> {
-                let mut prefix = TextPrefix::default();
-                prefix.push(text);
-                Ok(prefix)
+            fn visit_str<E: de::Error>(self, text: &str) -> Result<MessageText, E> {
+                let mut content = MessageText::default();
+                content.push(text);
+                Ok(content)
             }
 
-            fn visit_seq<A: SeqAccess<'de>>(self, mut parts: A) -> Result<TextPrefix, A::Error> {
-                let mut prefix = TextPrefix::default();
+            fn visit_seq<A: SeqAccess<'de>>(self, mut parts: A) -> Result<MessageText, A::Error> {
+                let mut content = MessageText::default();
                 while let Some(part) = parts.next_element::<Part>()? {
                     if part.kind.as_deref() == Some("text")
                         && let Some(text) = part.text
                     {
-                        prefix.push(&text);
+                        content.push(&text);
                     }
                 }
-                Ok(prefix)
+                Ok(content)
             }
         }
 

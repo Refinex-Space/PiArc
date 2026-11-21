@@ -35,6 +35,7 @@ mod memory_imports;
 pub mod migrate;
 pub mod pi_session;
 pub mod records;
+pub mod search;
 mod store;
 pub mod time;
 
@@ -42,9 +43,11 @@ pub use background_tasks::TaskRow;
 pub use checkpoints::{CheckpointFileRow, CheckpointRow, NewCheckpointFile};
 pub use error::{Error, Result};
 pub use index::{
-    FileOutcome, IndexStatus, SessionPrefsChange, SessionRecord, SkippedLine, SyncReport,
+    DueWorktree, FileOutcome, IndexStatus, SessionPrefsChange, SessionRecord, SkippedLine,
+    SyncReport, WorktreeRecord,
 };
 pub use migrate::{MIGRATIONS, Migration};
 pub use pi_session::{SessionMeta, Usage};
 pub use records::{AuditEvent, AuditFilter, TrustDecision, TrustRecord, WorkspaceRecord};
+pub use search::{SearchHit, SessionHits};
 pub use store::{BUSY_TIMEOUT, CACHE_KIB, Store};
