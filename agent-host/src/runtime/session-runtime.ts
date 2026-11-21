@@ -6,7 +6,6 @@ import {
   createAgentSessionFromServices,
   createAgentSessionRuntime,
   createAgentSessionServices,
-  createMcpExtension,
   SettingsManager,
   type AgentSessionRuntime,
   type CreateAgentSessionRuntimeFactory,
@@ -23,6 +22,7 @@ import type { SessionMemory } from '../harness/session-memory.js';
 import { interruptedContext } from '../harness/interruption.js';
 import { takeOverProjectTrust, type TrustTakeover } from '../harness/project-trust.js';
 import type { ToolBatches } from '../harness/tool-batches.js';
+import type { McpSession } from '../mcp/session.js';
 import { createToolResultBudget, TOOL_RESULT_LIMITS } from '../harness/tool-results.js';
 import { toolOptions } from '../tools/index.js';
 import type { ToolProfile } from '../tools/profile.js';
@@ -48,6 +48,8 @@ export interface RuntimeSpec {
   readonly harness: SessionHarness;
   readonly memory: SessionMemory;
   readonly hooks: SessionHooks | undefined;
+  /** The session's part of the workspace MCP pool (T36): PiArc's MCP extension. */
+  readonly mcp: McpSession | undefined;
   /** The model to start on; Pi's choice (the branch's, else its default) when absent. */
   readonly model: Model<Api> | undefined;
   /** A refused call (its item shows `declined`). */
@@ -122,6 +124,9 @@ export async function createSessionRuntime(
         systemPromptOverride: () => IDENTITY,
         appendSystemPromptOverride: () => [],
         extensionFactories: [
+          // PiArc's MCP extension replaces Pi's (T36): first, so its tools are registered
+          // before the gates prune them and its servers' notes are ready for the system prompt.
+          ...(spec.mcp === undefined ? [] : [spec.mcp.extension]),
           ...(child === undefined ? [] : [child.gate]),
           ...(tools.kind === 'core'
             ? [
@@ -135,10 +140,10 @@ export async function createSessionRuntime(
                   (mode) => {
                     harness.recordMode(mode);
                   },
+                  (tool) => spec.mcp?.requiresUserInteraction(tool) === true,
                 ),
               ]
             : []),
-          createMcpExtension(),
           ...budget,
           // After the budget: hooks see (and may replace) what the model would read.
           ...(hooks === undefined ? [] : [hooks.extension]),

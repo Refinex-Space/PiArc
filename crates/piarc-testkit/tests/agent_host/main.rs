@@ -268,22 +268,19 @@ steps:
 const MCP_B: &str = r#"
 id: mcp-b
 steps:
-  - tool_calls: [{ name: mcp__beta__echo, input: { text: "hi from B" } }]
+  - tool_calls: [{ name: mcp__alpha__echo, input: { text: "hi from B" } }]
   - text: "B heard back."
 "#;
 
+/// T36 (replaces S3's per-session MCP servers): two sessions working in different
+/// directories of one workspace share the pool's one `alpha` process, which runs in the
+/// workspace root; each gets its own result. Pi's MCP extension and codemode are not loaded:
+/// the requests declare `mcp__alpha__echo` directly and no `codemode` or `tool_search`.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn each_session_gets_only_the_mcp_servers_of_its_own_project() {
+async fn sessions_of_a_workspace_share_one_mcp_server_process() {
     let env = Env::new("mcp", &[MCP_A, MCP_B], json!({})).await;
-    for (ws, server) in [(&env.ws[0], "alpha"), (&env.ws[1], "beta")] {
-        let config = json!({ "mcpServers": { server: {
-            "command": harness::node(), "args": [harness::mcp_fixture(), server], "exposure": "direct"
-        }}});
-        std::fs::create_dir_all(ws.join(".pi")).expect(".pi created");
-        std::fs::write(ws.join(".pi").join("mcp.json"), config.to_string())
-            .expect("mcp.json written");
-    }
-    let (supervisor, mut events, core) = env.start(&[env.ws[0].as_path(), env.ws[1].as_path()]);
+    *env.mcp.lock().expect("lock") = harness::mcp_servers(&["alpha"], &json!({}));
+    let (supervisor, mut events, core) = env.start(&[]);
     events
         .until(|e| matches!(e, HostEvent::Connected { .. }))
         .await;
@@ -295,45 +292,42 @@ async fn each_session_gets_only_the_mcp_servers_of_its_own_project() {
         .expect("accepted")
         .turn_id;
     let tb = supervisor
-        .prompt(&b, "b", &prompt_text("Call beta.", "mcp-b"))
+        .prompt(&b, "b", &prompt_text("Call alpha too.", "mcp-b"))
         .await
         .expect("accepted")
         .turn_id;
     assert_eq!(events.turn_completed(&ta.0).await["status"], "completed");
     assert_eq!(events.turn_completed(&tb.0).await["status"], "completed");
 
-    for (session, server, cwd, selector) in [
-        (&a, "alpha", env.cwd(0), "mcp-a"),
-        (&b, "beta", env.cwd(1), "mcp-b"),
-    ] {
+    let mut pids = Vec::new();
+    for (session, said, selector) in [(&a, "hi from A", "mcp-a"), (&b, "hi from B", "mcp-b")] {
         let results = harness_tools(&events, &session.0);
-        println!("{server}: {results:?}");
+        println!("{selector}: {results:?}");
         assert_eq!(results.len(), 1);
         assert_eq!(
             (results[0].0.as_str(), results[0].1.as_str()),
-            (format!("mcp__{server}__echo").as_str(), "completed")
+            ("mcp__alpha__echo", "completed")
+        );
+        let output = &results[0].2;
+        let expected = format!(
+            "alpha echoes \"{said}\" from {} (pid ",
+            harness::canonical(&env.root).to_string_lossy()
         );
         assert!(
-            results[0].2.starts_with(&format!("{server} echoes")),
-            "{}",
-            results[0].2
+            output.starts_with(&expected),
+            "the shared server runs in the workspace root: {output}"
         );
-        assert!(
-            results[0].2.contains(&cwd),
-            "the server runs in the session's cwd: {}",
-            results[0].2
-        );
+        pids.push(output[expected.len()..].trim_end_matches(')').to_owned());
         let first = &env.requests(selector)[0].body;
-        let other = if server == "alpha" {
-            "mcp__beta__echo"
-        } else {
-            "mcp__alpha__echo"
-        };
-        assert!(
-            first.contains(&format!("mcp__{server}__echo")) && !first.contains(other),
-            "tools offered to {server}'s session"
-        );
+        assert!(first.contains("\"mcp__alpha__echo\""), "declared directly");
+        for absent in ["\"codemode\"", "\"tool_search\"", "\"ToolSearch\""] {
+            assert!(
+                !first.contains(absent),
+                "{absent} is not offered to {selector}"
+            );
+        }
     }
+    assert_eq!(pids[0], pids[1], "one server process for both sessions");
     supervisor.shutdown().await;
 }
 

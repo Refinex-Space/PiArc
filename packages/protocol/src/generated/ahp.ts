@@ -709,7 +709,8 @@ export type ReminderType =
   | 'memoryLazyLoad'
   | 'rulesMatched'
   | 'hookContext'
-  | 'contextRestore';
+  | 'contextRestore'
+  | 'mcpChanged';
 /**
  * The events the Agent Host reports.
  */

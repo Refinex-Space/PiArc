@@ -332,6 +332,9 @@ export class SessionMemory {
     for (const reminder of reminders) this.#apply(reminder.data);
   }
 
+  /** The MCP section of the system prompt (T36), read when the system prompt is frozen. */
+  mcpSection: (() => string | undefined) | undefined;
+
   extension: ExtensionFactory = (pi) => {
     pi.on('before_agent_start', async (event, ctx) => {
       const options = event.systemPromptOptions;
@@ -365,6 +368,7 @@ export class SessionMemory {
             ...(snapshot.gitStatus == null ? {} : { gitStatus: snapshot.gitStatus }),
           },
           this.#persona,
+          this.mcpSection?.(),
         );
         const versions = Object.fromEntries(
           snapshot.files.map((file) => [file.path, digest(file)]),

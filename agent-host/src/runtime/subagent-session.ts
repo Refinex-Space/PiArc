@@ -237,7 +237,10 @@ export class ChildSession {
       canonical,
       opened,
       log,
-      child: { persona },
+      child: {
+        persona,
+        ...(definition.mcpInline === undefined ? {} : { mcpInline: definition.mcpInline }),
+      },
       ...(spec.agents === undefined ? {} : { agents: spec.agents }),
     });
     const batches = new ToolBatches((tool) => CONCURRENCY_SAFE_TOOLS.has(canonical(tool)));
@@ -252,6 +255,7 @@ export class ChildSession {
       harness: parts.harness,
       memory: parts.memory,
       hooks: parts.hooks,
+      mcp: parts.mcp,
       model: spec.model,
       declined: () => undefined,
       log,

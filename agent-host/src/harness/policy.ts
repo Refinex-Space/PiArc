@@ -17,6 +17,8 @@ interface ToolCall {
   tool: string;
   toolCallId: string;
   input: Record<string, unknown>;
+  /** An MCP tool that asks the user on every call (T36). */
+  requiresUserInteraction?: boolean;
 }
 
 /** Core's decision on a call: a refusal reason, or the hooks' additions to an allowed call. */
@@ -95,7 +97,12 @@ export async function preflight(
   try {
     const { tool, toolCallId } = call;
     const input = wellFormedJson(preflightInput(tool, call.input, cwd));
-    const target = { sessionId, tool, toolCallId };
+    const target = {
+      sessionId,
+      tool,
+      toolCallId,
+      ...(call.requiresUserInteraction === true ? { requiresUserInteraction: true } : {}),
+    };
     let params: Record<string, unknown> = { ...target, input };
     const envelope = {
       jsonrpc: '2.0',
@@ -231,6 +238,7 @@ export function policyGate(
   log: (line: string) => void = () => undefined,
   hookNotes?: Map<string, HookNote>,
   onMode?: (mode: PermissionMode) => void,
+  requiresUserInteraction?: (tool: string) => boolean,
 ): ExtensionFactory {
   return (pi) => {
     // A deny rule without a specifier removes the tool from the model's list (architecture
@@ -267,6 +275,9 @@ export function policyGate(
           tool: canonical(event.toolName),
           toolCallId: event.toolCallId,
           input: event.input,
+          ...(requiresUserInteraction?.(event.toolName) === true
+            ? { requiresUserInteraction: true }
+            : {}),
         },
         ctx.signal,
       );

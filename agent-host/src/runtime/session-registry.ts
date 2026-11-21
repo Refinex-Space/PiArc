@@ -654,7 +654,7 @@ export class SessionRegistry {
     };
     // The `Agent` tool lists the types Core found from the session's directory (T31).
     const agents = await this.subagents.hostFor(manager.getSessionId(), cwd);
-    const { harness, memory, hooks } = sessionParts({
+    const { harness, memory, hooks, mcp } = sessionParts({
       options: this.#options,
       manager,
       cwd,
@@ -677,6 +677,7 @@ export class SessionRegistry {
       harness,
       memory,
       hooks,
+      mcp,
       model: selected,
       declined: (id) => {
         opened.projector?.markDeclined(id);

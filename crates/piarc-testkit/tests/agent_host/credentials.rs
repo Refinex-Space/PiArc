@@ -108,7 +108,7 @@ async fn login_and_one_refresh_reach_the_vault_and_every_session() {
     let mut yaml: Vec<&str> = scenarios.iter().map(String::as_str).collect();
     yaml.push(ENV_DUMP);
     let env = Env::new("credentials", &yaml, json!({})).await;
-    write_mcp_config(&env.ws[0]);
+    write_mcp_config(&env);
     let tokens = TokenServer::start(Duration::from_millis(300)).await;
     let mut changes = env.secrets.changes();
 
@@ -192,12 +192,9 @@ async fn run_three_sessions(
     assert_eq!(done["status"], "completed", "{done}");
 }
 
-fn write_mcp_config(ws: &Path) {
-    let config = json!({ "mcpServers": { "alpha": {
-        "command": harness::node(), "args": [harness::mcp_fixture(), "alpha"], "exposure": "direct"
-    }}});
-    std::fs::create_dir_all(ws.join(".pi")).expect(".pi created");
-    std::fs::write(ws.join(".pi").join("mcp.json"), config.to_string()).expect("mcp.json");
+/// The `alpha` fixture server of the workspace (T36: Core's `mcp/servers` answer).
+fn write_mcp_config(env: &Env) {
+    *env.mcp.lock().expect("lock") = harness::mcp_servers(&["alpha"], &json!({}));
 }
 
 /// One login and one refresh reached the token endpoint; all three requests carried the

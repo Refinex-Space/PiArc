@@ -32,6 +32,8 @@ import { agentDirOf, openWorkspace } from './runtime/workspace.js';
 import { parsePreferences } from './providers/preferences.js';
 import { Logins } from './providers/login.js';
 import { CoreIo, DEFAULT_PROFILE, ExecOutputRouter, type ToolProfile } from './tools/index.js';
+import { McpPool, type PoolClock } from './mcp/pool.js';
+import { signInToServer } from './mcp/sign-in.js';
 
 /** Capabilities this Agent Host announces in `host/hello`. The models capability includes session selection and provider settings. */
 export const HOST_CAPABILITIES: readonly string[] = [
@@ -48,6 +50,7 @@ export const HOST_CAPABILITIES: readonly string[] = [
   'subagents',
   'backgroundTasks',
   'terminalTasks',
+  'mcpPool',
 ];
 
 /** Exit codes, for Core's log and restart decisions. */
@@ -75,6 +78,8 @@ export interface HostOptions {
   readonly recordEvents?: (sessionId: string, event: unknown) => void;
   /** Leaves the session notification with this `seq` out of stdout (gap tests only). */
   readonly dropSeq?: number;
+  /** The clock of the MCP pool's idle and retry timers (tests). */
+  readonly mcpClock?: PoolClock;
   /** Writes one log line to stderr. */
   readonly log: (line: string) => void;
   /** Ends the process once stdout is flushed. */
@@ -91,6 +96,8 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
   const { log } = options;
   let shuttingDown: Promise<void> | undefined;
   let registry: SessionRegistry | undefined;
+  // The workspace's MCP pool (T36), when Core enabled `mcpPool`.
+  let mcp: McpPool | undefined;
   // Core may send its first request right after `core/welcome`, while the workspace is still
   // opening: session requests wait for it.
   const ready = Promise.withResolvers<SessionRegistry>();
@@ -163,6 +170,9 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
       await credentials.flush();
       connection.bridge.close(`the Agent Host is shutting down (${reason})`);
       await registry?.closeAll();
+      // Stdio servers get the specification's shutdown; Core ends what is left with the
+      // Agent Host's process group or Job Object.
+      await mcp?.close();
       await outbound.flushed();
       options.exit(code);
     })();
@@ -468,6 +478,38 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
       ),
     };
   });
+  const pool = async (method: string): Promise<McpPool> => {
+    await sessions(method);
+    if (mcp === undefined) {
+      throw new AhpError('methodNotFound', `${method}: Core did not enable mcpPool`);
+    }
+    return mcp;
+  };
+  connection.handle('mcp/status', async () => {
+    const servers = await pool('mcp/status');
+    await servers.refresh();
+    return servers.status();
+  });
+  connection.handle('mcp/reconnect', async (params) => {
+    const method = 'mcp/reconnect';
+    const name = stringField(method, paramsObject(method, params), 'name');
+    return (await pool(method)).reconnect(name);
+  });
+  connection.handle('mcp/setEnabled', async (params) => {
+    const method = 'mcp/setEnabled';
+    const name = stringField(method, paramsObject(method, params), 'name');
+    return (await pool(method)).setEnabled(name);
+  });
+  connection.handle('mcp/login', async (params) => {
+    const method = 'mcp/login';
+    const fields = paramsObject(method, params);
+    return signInToServer(
+      await pool(method),
+      connection.bridge,
+      stringField(method, fields, 'name'),
+      stringField(method, fields, 'loginId'),
+    );
+  });
   connection.handle('session/close', async (params) => {
     const sessionId = stringField(
       'session/close',
@@ -516,9 +558,21 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
         registerTestOAuthProvider(workspace.modelRuntime, options.testOAuthProvider);
         await testLogin(workspace.modelRuntime, options.testOAuthProvider, log);
       }
+      if (welcome.enabled.includes('mcpPool') && tools.kind === 'core') {
+        mcp = new McpPool({
+          workspace: welcome.workspace,
+          bridge: connection.bridge,
+          log,
+          notify: (status) => {
+            outbound.sendMessage({ jsonrpc: '2.0', method: 'mcp/statusChanged', params: status });
+          },
+          ...(options.mcpClock === undefined ? {} : { clock: options.mcpClock }),
+        });
+      }
       registry = new SessionRegistry({
         workspace,
         tools,
+        ...(mcp === undefined ? {} : { mcp }),
         ...(welcome.enabled.includes('memory') ? { memoryBridge: connection.bridge } : {}),
         ...(welcome.enabled.includes('hooks') ? { hooksBridge: connection.bridge } : {}),
         hostTools: {

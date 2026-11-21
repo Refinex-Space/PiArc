@@ -117,6 +117,7 @@ impl HostConfig {
                 Capability::new("subagents"),
                 Capability::new("backgroundTasks"),
                 Capability::new("terminalTasks"),
+                Capability::new("mcpPool"),
             ],
             allow_model_network: None,
             model_preferences: None,

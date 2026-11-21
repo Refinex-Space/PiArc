@@ -13,6 +13,7 @@
 // | `rulesMatched`   | session-memory.ts (`paths:` rules)          | `memory:<path>`        |
 // | `hookContext`    | hooks.ts (`additionalContext`, stdout)      | `hook:<event>:<n>`     |
 // | `contextRestore` | compaction.ts (after a compaction)          | one message, appended  |
+// | `mcpChanged`     | mcp/session.ts (a server's tools changed)   | `mcp:<server>`         |
 //
 // A delivery is a Pi custom message (`piarc.reminder`, not displayed) whose text starts with
 // `REMINDER_MARKER`, followed by the reminders' texts. `details.reminders` records each one's
@@ -117,6 +118,7 @@ const TYPES: readonly ReminderType[] = [
   'rulesMatched',
   'hookContext',
   'contextRestore',
+  'mcpChanged',
 ];
 const CATEGORIES: readonly ReminderCategory[] = ['memory', 'skills', 'conversation'];
 

@@ -53,12 +53,15 @@ export function assembleSystem(
   files: readonly MemoryFile[],
   environment: { cwd: string; platform: string; date: string; gitStatus?: string },
   persona?: Persona,
+  mcp?: string,
 ): FrozenSystem {
   const context = persona?.projectContext !== false;
   const sections: [string, string][] = [
     ['identity', persona?.identity ?? IDENTITY],
     ['tool_guidance', toolGuidance(tools, profile)],
     ...(context ? [['project_context', files.map(sourced).join('\n\n')] as [string, string]] : []),
+    // Section 6 (T36): the connected MCP servers' instructions and the deferred servers.
+    ...(mcp === undefined ? [] : [['mcp_servers', mcp] as [string, string]]),
     [
       'environment',
       [

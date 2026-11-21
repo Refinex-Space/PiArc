@@ -43,6 +43,9 @@ pub enum ReminderType {
     /// State given back after a compaction: memory, the plan, the task list, invoked skills,
     /// recently used files.
     ContextRestore,
+    /// An MCP server's tools or instructions changed during the session (T36, capability
+    /// `mcpPool`).
+    McpChanged,
 }
 
 /// One reminder of a reminder message: its type and where it came from.

@@ -15,6 +15,7 @@ import type { PreparedInput } from './input.js';
 import type { Projector, ProjectionSink } from './projector.js';
 import type { InputQueue } from './queue.js';
 import type { Workspace } from './workspace.js';
+import type { McpPool } from '../mcp/pool.js';
 
 /** Emits the projected notifications of one session. */
 export type SessionSinkFactory = (sessionId: string) => ProjectionSink;
@@ -62,6 +63,8 @@ export interface RegistryOptions {
   readonly hooksBridge?: CoreBridge;
   /** What Core enabled for the host tools (`planMode`, `todo`, `ask`; T26). */
   readonly hostTools?: HostToolCapabilities;
+  /** The workspace's MCP connection pool (`mcpPool` capability, T36). */
+  readonly mcp?: McpPool;
 }
 
 /** What a turn runs: an input, or a compaction (`/compact [focus]`). */

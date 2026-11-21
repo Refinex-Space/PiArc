@@ -3,6 +3,7 @@
 // out of `SessionRegistry.#open` (R3, file length); the registry wires them into Pi.
 
 import type { AgentSession, SessionManager } from '@earendil-works/pi-coding-agent';
+import type { McpServerDefinition } from '@piarc/protocol';
 
 import { AUXILIARY_USAGE_ENTRY, AuxiliaryModel } from '../harness/auxiliary.js';
 import { SessionHooks } from '../harness/hooks.js';
@@ -12,6 +13,7 @@ import { SessionHarness } from '../harness/session-harness.js';
 import { SessionMemory } from '../harness/session-memory.js';
 import type { Persona } from '../harness/prompts/system.js';
 import type { AgentToolHost } from '../harness/subagents/agent-tool.js';
+import { McpSession } from '../mcp/session.js';
 import type { ToolProfile } from '../tools/profile.js';
 import type { Projector } from './projector.js';
 import type { RegistryOptions } from './session-types.js';
@@ -29,14 +31,20 @@ export interface SessionPartsInput {
   readonly log: (line: string) => void;
   /** The session's `Agent` tool (T31), when it may start subagents. */
   readonly agents?: AgentToolHost;
-  /** Set for a subagent's session (T31): its identity and context choice. */
-  readonly child?: { readonly persona: Persona };
+  /** Set for a subagent's session (T31): its identity and context choice; the MCP servers its
+   * definition defines inline (T36). */
+  readonly child?: {
+    readonly persona: Persona;
+    readonly mcpInline?: readonly McpServerDefinition[];
+  };
 }
 
 export interface SessionParts {
   readonly harness: SessionHarness;
   readonly memory: SessionMemory;
   readonly hooks: SessionHooks | undefined;
+  /** The session's part of the workspace MCP pool (T36). */
+  readonly mcp: McpSession | undefined;
 }
 
 /** Creates and connects the parts of one session. */
@@ -103,5 +111,18 @@ export function sessionParts(input: SessionPartsInput): SessionParts {
           ...(input.child === undefined ? {} : { subagent: true }),
         });
   harness.connect(memory, hooks);
-  return { harness, memory, hooks };
+  const pool = tools.kind === 'core' ? options.mcp : undefined;
+  const mcp =
+    pool === undefined
+      ? undefined
+      : new McpSession({
+          pool,
+          sessionId: manager.getSessionId(),
+          cwd,
+          reminders: harness.reminders,
+          log: sessionLog,
+          ...(input.child?.mcpInline === undefined ? {} : { inline: input.child.mcpInline }),
+        });
+  if (mcp !== undefined) memory.mcpSection = () => mcp.systemSection();
+  return { harness, memory, hooks, mcp };
 }

@@ -9,9 +9,11 @@ import type {
   AgentWarningKind,
   EffortLevel,
   PermissionMode,
+  McpServerDefinition,
   SubagentLimits,
 } from '@piarc/protocol';
 
+import { parseDefinition as parseMcpDefinition } from '../../mcp/config.js';
 import { isObject } from '../../runtime/items.js';
 import type { CoreBridge } from '../../runtime/core-bridge.js';
 import { EXPLORE, GENERAL_PURPOSE, PLAN, type BuiltInText } from '../prompts/subagents.js';
@@ -181,6 +183,10 @@ function parseDefinition(value: unknown): AgentDefinition | undefined {
     return undefined;
   const warnings = (value.warnings ?? []).map(parseWarning);
   if (warnings.some((w) => w === undefined)) return undefined;
+  // Inline MCP servers (T36): Core checked and expanded them; untrusted ones have no program.
+  const inline = Array.isArray(value.mcpInline) ? value.mcpInline.map(parseMcpDefinition) : [];
+  if (inline.some((d) => d === undefined)) return undefined;
+  const mcpInline = inline.filter((d): d is McpServerDefinition => d !== undefined);
   return {
     name: value.name,
     description: value.description,
@@ -196,6 +202,7 @@ function parseDefinition(value: unknown): AgentDefinition | undefined {
     ...(value.maxTurns === undefined ? {} : { maxTurns: value.maxTurns }),
     ...(value.skills === undefined ? {} : { skills: value.skills }),
     ...(value.mcpServers === undefined ? {} : { mcpServers: value.mcpServers }),
+    ...(mcpInline.length === 0 ? {} : { mcpInline }),
     ...(value.hooks === true ? { hooks: true } : {}),
     ...(value.isolation === undefined ? {} : { isolation: value.isolation }),
     ...(value.background === true ? { background: true } : {}),

@@ -7834,6 +7834,11 @@
           "const": "contextRestore",
           "description": "State given back after a compaction: memory, the plan, the task list, invoked skills,\nrecently used files.",
           "type": "string"
+        },
+        {
+          "const": "mcpChanged",
+          "description": "An MCP server's tools or instructions changed during the session (T36, capability\n`mcpPool`).",
+          "type": "string"
         }
       ]
     },

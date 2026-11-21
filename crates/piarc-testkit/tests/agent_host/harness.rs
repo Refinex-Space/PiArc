@@ -108,6 +108,8 @@ pub struct Core {
     pub io: ToolIo,
     pub secrets: SecretsService,
     pub calls: Arc<Mutex<Vec<Call>>>,
+    /// The answer to `mcp/servers` (T36): the workspace's MCP configuration.
+    pub mcp: Arc<Mutex<Value>>,
 }
 
 /// One `fs/*` or `exec/*` request Core answered.
@@ -192,6 +194,10 @@ impl InboundHandler for Core {
             let secrets = self.secrets.clone();
             return Box::pin(async move { secrets.dispatch(&method, params, peer).await });
         }
+        if method == "mcp/servers" {
+            let answer = self.mcp.lock().expect("lock").clone();
+            return Box::pin(async move { Ok(answer) });
+        }
         if !ToolIo::handles(&method) {
             return Box::pin(async move {
                 Err(ErrorObject::new(
@@ -240,6 +246,29 @@ pub struct Env {
     /// Two session working directories.
     pub ws: [PathBuf; 2],
     pub mock: MockProvider,
+    /// What Core answers to `mcp/servers` (T36); no servers unless a test sets them.
+    pub mcp: Arc<Mutex<Value>>,
+}
+
+/// A `mcp/servers` answer with stdio fixture servers (`mcp_fixture`) named `names`, each run by
+/// the test's Node with the variables of `env` added.
+pub fn mcp_servers(names: &[&str], env: &Value) -> Value {
+    let servers: Vec<Value> = names
+        .iter()
+        .map(|name| {
+            json!({
+                "name": name, "scope": "project", "source": ".mcp.json", "transport": "stdio",
+                "availability": "ready",
+                "stdio": { "command": node(), "args": [mcp_fixture(), name], "env": env },
+            })
+        })
+        .collect();
+    json!({
+        "servers": servers,
+        "env": { "PATH": std::env::var("PATH").unwrap_or_default() },
+        "idleTimeoutMs": 600_000,
+        "deferThreshold": 30,
+    })
 }
 
 impl Env {
@@ -293,6 +322,7 @@ impl Env {
             key_store,
             ws,
             mock,
+            mcp: Arc::new(Mutex::new(mcp_servers(&[], &json!({})))),
         }
     }
 
@@ -352,6 +382,7 @@ impl Env {
             }),
             secrets,
             calls: Arc::default(),
+            mcp: Arc::clone(&self.mcp),
         });
         let (supervisor, events) =
             agent_host::start(config, Arc::clone(&core) as Arc<dyn InboundHandler>);
