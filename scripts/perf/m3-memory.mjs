@@ -227,7 +227,7 @@ async function makeRepository(dir, startLog) {
       `---\ndescription: Step ${String(i + 1)} of the project's release checklist\n---\nFollow the checklist.\n`,
     );
   }
-  await writeFile(path.join(dir, '.gitignore'), '.piarc/worktrees/\n');
+  await writeFile(path.join(dir, '.gitignore'), '.piarc/worktrees/\nmcp-starts.jsonl\n');
   const git = (/** @type {string[]} */ ...args) =>
     execFileSync(
       'git',
@@ -397,7 +397,8 @@ export async function measure(options) {
   const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'piarc m3 内存 ')));
   const userData = path.join(root, 'data');
   const workspace = path.join(root, 'repo 仓库');
-  const startLog = path.join(root, 'mcp-starts.jsonl');
+  // In the workspace: the Agent Host's sandbox lets the server write nowhere else.
+  const startLog = path.join(workspace, 'mcp-starts.jsonl');
   await writeScenarios(path.join(root, 'scenarios'));
   await makeRepository(workspace, startLog);
   const mock = await startMock(path.join(root, 'scenarios'));
