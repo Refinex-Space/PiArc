@@ -526,6 +526,55 @@ impl CoreRuntime {
         })
     }
 
+    /// The slash commands and output styles of `workspace` from `cwd` (T37).
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn list_commands(
+        &self,
+        workspace: std::path::PathBuf,
+        cwd: Option<std::path::PathBuf>,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.list_commands(workspace, cwd).await
+        })
+    }
+
+    /// The skills of `workspace` from `cwd` (T37).
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn list_skills(
+        &self,
+        workspace: std::path::PathBuf,
+        cwd: Option<std::path::PathBuf>,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.list_skills(workspace, cwd).await
+        })
+    }
+
+    /// Sets the output style of `workspace` (its `.piarc/settings.local.json`) or of the user
+    /// (`None`); `name: None` removes the choice (T37).
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn set_output_style(
+        &self,
+        workspace: Option<std::path::PathBuf>,
+        name: Option<String>,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.set_output_style(workspace, name).await
+        })
+    }
+
     /// Stops subagent `child` of session `parent` (T31).
     ///
     /// # Errors

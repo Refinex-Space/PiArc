@@ -29,10 +29,13 @@ pub(super) fn home() -> PathBuf {
         .unwrap_or_default()
 }
 
-/// Build (or reuse) the rule set of a call.
+/// Build (or reuse) the rule set of a call. `turn` holds the `allowed-tools` of the skills
+/// and commands invoked in the current turn (T37): allow rules of source `skill`, after the
+/// session's.
 pub(super) fn rule_set(
     lists: &[PermissionLists],
     session: &[String],
+    turn: &[String],
     root: &Path,
     cache: &mut Option<(u64, Arc<RuleSet>)>,
 ) -> Arc<RuleSet> {
@@ -44,7 +47,7 @@ pub(super) fn rule_set(
         _ => root_anchor.clone(),
     };
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    (session, &root_anchor).hash(&mut hasher);
+    (session, turn, &root_anchor).hash(&mut hasher);
     for l in lists {
         (l.layer, anchor(l), &l.deny, &l.ask, &l.allow).hash(&mut hasher);
     }
@@ -83,6 +86,7 @@ pub(super) fn rule_set(
         add(l.layer, anchor(l), Some(l), &[]);
     }
     add("session", root_anchor.clone(), None, session);
+    add("skill", root_anchor.clone(), None, turn);
     for l in others {
         add(l.layer, anchor(l), Some(l), &[]);
     }
@@ -412,9 +416,10 @@ pub(super) fn other_call(
         // form of AskUserQuestion is shown by the tool itself (`ui/ask`) in every mode. `Agent`
         // (T31) only starts a subagent, whose own calls are each decided here; `Agent(<type>)`
         // deny and ask rules still apply to it.
-        // `ToolSearch` (T36) only loads tool definitions into the conversation.
+        // `ToolSearch` (T36) only loads tool definitions into the conversation, `Skill` (T37)
+        // a skill's instructions; `Skill(<name>)` deny and ask rules still apply.
         "TodoWrite" | "EnterPlanMode" | "SuggestNextSteps" | "AskUserQuestion" | "Agent"
-        | "KillShell" | "ToolSearch" => {
+        | "KillShell" | "ToolSearch" | "Skill" => {
             ladder.read_only = true;
             return Assessment::new(ladder, Vec::new());
         }

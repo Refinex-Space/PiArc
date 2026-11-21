@@ -38,6 +38,7 @@ mod hooks;
 mod memory;
 mod memory_reader;
 pub(crate) mod policy;
+mod skills;
 pub(crate) mod subagents;
 mod tasks;
 mod terminals;
@@ -154,6 +155,8 @@ struct SessionIo {
     turn: Mutex<Option<String>>,
     /// Set for a subagent's session (T31): its main session and how it was started.
     subagent: Option<subagents::Link>,
+    /// The directories of the skills the session sees (T37): read-only for its file tools.
+    skill_dirs: Mutex<Vec<PathBuf>>,
 }
 
 impl SessionIo {
@@ -433,6 +436,7 @@ impl ToolIo {
                 shell_cwd,
                 sandbox,
                 turn: Mutex::default(),
+                skill_dirs: Mutex::default(),
                 subagent,
             }),
         );
@@ -487,6 +491,10 @@ impl ToolIo {
     /// Forgets the session and terminates its running commands.
     pub fn close_session(&self, session_id: &str) {
         self.clear_approvals(session_id, policy::Cleanup::Interrupted);
+        // The hooks of the skills it invoked stop with it (T37).
+        if let Some(hooks) = self.policy.as_ref().and_then(|p| p.hooks.as_ref()) {
+            hooks.unscope_hooks(session_id);
+        }
         if let Some(session) = lock(&self.sessions).remove(session_id) {
             for token in lock(&session.running).values() {
                 token.cancel();

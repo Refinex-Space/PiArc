@@ -838,13 +838,50 @@ impl Request {
         if let Op::Checkpoint(op) = op {
             return self.checkpoint(op).await;
         }
-        // `UserPromptSubmit` sees the input before the Agent Host does.
-        let hook_context = match &op {
+        // A `/name` input becomes its command's text (T37); `UserPromptSubmit` sees what the
+        // user typed, before the Agent Host does.
+        let mut op = op;
+        let mut expansion = None;
+        let hook_context = match &mut op {
             Op::Prompt(input) | Op::Steer(input) | Op::FollowUp(input) => {
-                self.prompt_hooks(&input.text).await?
+                expansion = self
+                    .tool_io
+                    .expand_command(&self.id.0, &input.text)
+                    .await
+                    .map_err(|e| Error::feature(&e))?;
+                let context = self.prompt_hooks(&input.text).await;
+                if let Some(expanded) = &expansion {
+                    input.text.clone_from(&expanded.text);
+                    // A blocked input starts no turn: its grant must not reach the next one.
+                    if let (Err(_), Some(grant)) = (&context, expanded.grant) {
+                        self.tool_io.revoke_turn_grant(&self.id.0, grant);
+                    }
+                }
+                context?
             }
             _ => None,
         };
+        let command = expansion.as_ref().map(|e| e.command.clone());
+        let grant = expansion.as_ref().and_then(|e| e.grant);
+        let result = self.send(op, hook_context, command).await;
+        // A command's `allowed-tools` belong to the turn its input starts or joins: none when
+        // the input failed or waits in the queue.
+        if let Some(grant) = grant
+            && result.as_ref().map_or(true, |value| {
+                value.get("disposition").and_then(Value::as_str) == Some("queued")
+            })
+        {
+            self.tool_io.revoke_turn_grant(&self.id.0, grant);
+        }
+        result
+    }
+
+    async fn send(
+        &self,
+        op: Op,
+        hook_context: Option<String>,
+        command: Option<piarc_protocol::skills::PromptCommand>,
+    ) -> Result<Value> {
         let supervisor = self.ws.acquire().await?;
         // A turn starting now takes every finished task's notice with it (ADR-0049 rule 5).
         if matches!(op, Op::Prompt(_) | Op::Steer(_) | Op::FollowUp(_)) {
@@ -863,17 +900,17 @@ impl Request {
                     mentions: input.mentions,
                     attachments: input.attachments,
                     hook_context,
-                    command: None,
+                    command,
                 };
                 self.call::<SessionPrompt>(&supervisor, Some(&request_id), params)
                     .await
             }
             Op::Steer(input) => {
-                self.input::<SessionSteer>(&supervisor, input, hook_context)
+                self.input::<SessionSteer>(&supervisor, input, hook_context, command)
                     .await
             }
             Op::FollowUp(input) => {
-                self.input::<SessionFollowUp>(&supervisor, input, hook_context)
+                self.input::<SessionFollowUp>(&supervisor, input, hook_context, command)
                     .await
             }
             Op::Compact(instructions) => {
@@ -935,6 +972,7 @@ impl Request {
         supervisor: &HostSupervisor,
         input: UserInput,
         hook_context: Option<String>,
+        command: Option<piarc_protocol::skills::PromptCommand>,
     ) -> Result<Value>
     where
         M: RequestMethod<Params = SessionInputParams>,
@@ -950,7 +988,7 @@ impl Request {
             mentions: input.mentions,
             attachments: input.attachments,
             hook_context,
-            command: None,
+            command,
         };
         self.call::<M>(supervisor, Some(&request_id), params).await
     }

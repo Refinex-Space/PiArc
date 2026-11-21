@@ -116,6 +116,36 @@ impl WorkspaceInbound {
 }
 
 impl WorkspaceInbound {
+    /// `skills/list`, `skills/invoke`, `skills/match` (T37); a named session must be ours.
+    fn skills(
+        &self,
+        method: String,
+        params: Map<String, Value>,
+        peer: Peer,
+    ) -> BoxFuture<'static, Result<Value, ErrorObject>> {
+        let ours = params
+            .get("sessionId")
+            .and_then(Value::as_str)
+            .is_none_or(|id| {
+                self.sessions
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .contains(id)
+            });
+        let io = self.tool_io.clone();
+        let workspace = self.workspace.clone();
+        Box::pin(async move {
+            if !ours {
+                return Err(ErrorObject::new(
+                    ErrorKind::SessionNotFound,
+                    format!("{method}: the session is not in this workspace"),
+                    false,
+                ));
+            }
+            io.skills_request(&workspace, &method, params, &peer).await
+        })
+    }
+
     /// `mcp/servers` and an MCP server's sign-in steps (T36). Only a sign-in Core started
     /// (`mcp/login`) is shown: the id must be the active one.
     fn mcp(
@@ -184,6 +214,9 @@ impl InboundHandler for WorkspaceInbound {
             let io = self.tool_io.clone();
             let workspace = self.workspace.clone();
             return Box::pin(async move { io.agents_request(&workspace, params).await });
+        }
+        if method.starts_with("skills/") {
+            return self.skills(method, params, peer);
         }
         if method == "subagent/start" || method == "subagent/finish" {
             return self.subagent(&method, params, peer);

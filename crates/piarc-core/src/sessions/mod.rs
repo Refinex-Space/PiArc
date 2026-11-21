@@ -38,6 +38,7 @@ mod login;
 mod mcp;
 mod provider_settings;
 mod session;
+mod skills;
 mod snapshot;
 mod subagents;
 mod tasks;

@@ -148,6 +148,9 @@ impl WorkspaceHandle {
             trust_restart_epoch: None,
             settings,
         };
+        if let Some(changes) = actor.settings.as_ref().map(WorkspaceSettings::changes) {
+            ctx.handle.spawn(reload_resources(handle.clone(), changes));
+        }
         ctx.handle.spawn(actor.run(rx));
         Ok(handle)
     }
@@ -278,16 +281,29 @@ struct WorkspaceActor {
     /// Increments whenever the idle timer is armed or disarmed.
     idle_generation: u64,
     /// Kept for its watcher; dropped with the actor.
-    #[expect(
-        dead_code,
-        reason = "held for its file watcher, which stops when it is dropped"
-    )]
     settings: Option<WorkspaceSettings>,
     /// The epoch of the last `Connected` of the current supervisor (0 before the first).
     connected_epoch: u64,
     /// A trust restart was asked for: the host is ready only once a process of this epoch or
     /// later connected (the process before it is about to restart).
     trust_restart_epoch: Option<u64>,
+}
+
+/// Tells the running Agent Host that skills, commands, output styles or settings may have
+/// changed (`resources/reload`, T37); a stopped host reads them when it starts. Ends with the
+/// settings watcher.
+async fn reload_resources(handle: WorkspaceHandle, mut changes: tokio::sync::watch::Receiver<u64>) {
+    while changes.changed().await.is_ok() {
+        if let Some(supervisor) = handle.peek().await
+            && let Err(error) = supervisor
+                .call::<piarc_protocol::skills::ResourcesReload>(
+                    piarc_protocol::skills::ResourcesReloadParams {},
+                )
+                .await
+        {
+            tracing::debug!(target: "piarc_core::sessions", "resources/reload: {error}");
+        }
+    }
 }
 
 impl WorkspaceActor {

@@ -831,6 +831,47 @@ impl CoreRuntime {
         })
     }
 
+    /// The slash commands and output styles of `workspace` from `cwd` (the workspace root when
+    /// null), as JSON text (T37).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn list_commands<'env>(
+        &self,
+        env: &'env Env,
+        workspace: String,
+        #[napi(ts_arg_type = "string | null")] cwd: Option<String>,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.listCommands", |core, done| {
+            core.list_commands(workspace.into(), cwd.map(Into::into), done)
+        })
+    }
+
+    /// The skills of `workspace` from `cwd` (the workspace root when null), as JSON text (T37).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn list_skills<'env>(
+        &self,
+        env: &'env Env,
+        workspace: String,
+        #[napi(ts_arg_type = "string | null")] cwd: Option<String>,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.listSkills", |core, done| {
+            core.list_skills(workspace.into(), cwd.map(Into::into), done)
+        })
+    }
+
+    /// Sets the output style of `workspace` (its `.piarc/settings.local.json`), or the user's
+    /// when null; a null name removes the choice (T37).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn set_output_style<'env>(
+        &self,
+        env: &'env Env,
+        #[napi(ts_arg_type = "string | null")] workspace: Option<String>,
+        #[napi(ts_arg_type = "string | null")] name: Option<String>,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.setOutputStyle", |core, done| {
+            core.set_output_style(workspace.map(Into::into), name, done)
+        })
+    }
+
     /// Stops subagent `child` of session `parent`; JSON text `{ stopped }` (T31).
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]
     pub fn stop_subagent<'env>(

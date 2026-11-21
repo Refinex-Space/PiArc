@@ -102,9 +102,10 @@ struct Inner {
     transcripts: Mutex<HashMap<String, String>>,
     /// Each session's `SessionStart` runs in progress.
     starts: Mutex<HashMap<String, watch::Sender<u32>>>,
-    /// Hooks of a subagent definition, by the subagent's session id, while it runs (T31): a
-    /// source above every settings file, for that session only.
-    scoped: Mutex<HashMap<String, (Option<PathBuf>, Value)>>,
+    /// Hooks scoped to one session, by session id: a subagent definition's while it runs
+    /// (T31), the skills the session invoked until it closes (T37). Sources above every
+    /// settings file, for that session only.
+    scoped: Mutex<HashMap<String, Vec<Scoped>>>,
 }
 
 /// Marks one `SessionStart` run in progress until it drops ([`HooksService::starting`]).
@@ -138,6 +139,18 @@ impl std::fmt::Debug for HooksService {
 
 /// The layer id of a subagent definition's hooks in audits and notices.
 const SUBAGENT_LAYER: &str = "subagent";
+/// The layer id of an invoked skill's hooks (T37).
+const SKILL_LAYER: &str = "skill";
+
+/// Hooks scoped to a session: where they come from and the `hooks` object.
+#[derive(Debug, Clone)]
+struct Scoped {
+    /// `subagent`, or `skill:<name>`: one entry per key.
+    key: String,
+    layer: &'static str,
+    file: Option<PathBuf>,
+    hooks: Value,
+}
 
 fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
@@ -145,20 +158,17 @@ fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 
 /// The hooks of `settings`, highest precedence first.
 pub(crate) fn config_of(settings: &piarc_config::Settings) -> HookConfig {
-    config_with(settings, None)
+    config_with(settings, &[])
 }
 
-/// [`config_of`] with a subagent definition's hooks (T31) above the settings files.
-fn config_with(
-    settings: &piarc_config::Settings,
-    scoped: Option<&(Option<PathBuf>, Value)>,
-) -> HookConfig {
-    let scoped = scoped.map(|(file, hooks)| LayerHooks {
+/// [`config_of`] with a session's scoped hooks (T31, T37) above the settings files.
+fn config_with(settings: &piarc_config::Settings, scoped: &[Scoped]) -> HookConfig {
+    let scoped = scoped.iter().map(|scoped| LayerHooks {
         source: Source {
-            layer: SUBAGENT_LAYER.to_owned(),
-            file: file.clone(),
+            layer: scoped.layer.to_owned(),
+            file: scoped.file.clone(),
         },
-        hooks: Some(hooks),
+        hooks: Some(&scoped.hooks),
     });
     let layers: Vec<LayerHooks<'_>> = scoped
         .into_iter()
@@ -221,10 +231,50 @@ impl HooksService {
     /// Runs a subagent definition's `hooks` (from `file`) for `session_id`'s events until
     /// [`Self::unscope_hooks`] (T31). The caller checked the project's trust.
     pub(crate) fn scope_hooks(&self, session_id: &str, file: Option<&Path>, hooks: Value) {
-        lock(&self.inner.scoped).insert(session_id.to_owned(), (file.map(Path::to_owned), hooks));
+        self.scope(session_id, "subagent".into(), SUBAGENT_LAYER, file, hooks);
     }
 
-    /// The subagent ended: its definition's hooks stop applying.
+    /// Runs skill `name`'s `hooks` (from `file`) for `session_id`'s events until the session
+    /// closes (T37, ADR-0054 rule 11); invoking it again changes nothing. The caller checked
+    /// the project's trust.
+    pub(crate) fn scope_skill_hooks(
+        &self,
+        session_id: &str,
+        name: &str,
+        file: Option<&Path>,
+        hooks: Value,
+    ) {
+        self.scope(
+            session_id,
+            format!("skill:{name}"),
+            SKILL_LAYER,
+            file,
+            hooks,
+        );
+    }
+
+    fn scope(
+        &self,
+        session_id: &str,
+        key: String,
+        layer: &'static str,
+        file: Option<&Path>,
+        hooks: Value,
+    ) {
+        let mut scoped = lock(&self.inner.scoped);
+        let entries = scoped.entry(session_id.to_owned()).or_default();
+        if entries.iter().any(|s| s.key == key) {
+            return;
+        }
+        entries.push(Scoped {
+            key,
+            layer,
+            file: file.map(Path::to_owned),
+            hooks,
+        });
+    }
+
+    /// The subagent ended or the session closed: its scoped hooks stop applying.
     pub(crate) fn unscope_hooks(&self, session_id: &str) {
         lock(&self.inner.scoped).remove(session_id);
     }
@@ -310,7 +360,10 @@ impl HooksService {
     ) -> Option<Plan> {
         let config = {
             let scoped = lock(&self.inner.scoped);
-            config_with(settings, scoped.get(&facts.session_id))
+            config_with(
+                settings,
+                scoped.get(&facts.session_id).map_or(&[], Vec::as_slice),
+            )
         };
         let mut handlers = config.select(request.event, request.subject.as_deref());
         if let Some((tool, input)) = &request.tool {

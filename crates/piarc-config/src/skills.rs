@@ -294,6 +294,43 @@ fn style_dirs(dirs: &ResourceDirs<'_>) -> Vec<SourceDir> {
     out
 }
 
+/// The directories whose changes can change the catalog: every source directory and the
+/// directories below it (skill directories, command namespaces), at most `MAX_WATCH_DEPTH`
+/// levels down. A source that does not exist is listed as it is (the caller watches its
+/// nearest existing ancestor).
+#[must_use]
+pub fn watch_dirs(dirs: &ResourceDirs<'_>) -> Vec<PathBuf> {
+    const MAX_WATCH_DEPTH: usize = 3;
+    fn below(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
+        if depth == 0 {
+            return;
+        }
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let hidden = entry.file_name().to_string_lossy().starts_with('.');
+            if !hidden && path.is_dir() && entry.file_name() != "node_modules" {
+                out.push(path.clone());
+                below(&path, depth - 1, out);
+            }
+        }
+    }
+    let mut out = Vec::new();
+    for source in skill_dirs(dirs)
+        .into_iter()
+        .chain(command_dirs(dirs))
+        .chain(style_dirs(dirs))
+    {
+        below(&source.dir, MAX_WATCH_DEPTH, &mut out);
+        out.push(source.dir);
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
 /// Reads every source and merges each kind by name.
 #[must_use]
 pub fn load(dirs: &ResourceDirs<'_>) -> Catalog {

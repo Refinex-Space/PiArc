@@ -223,6 +223,10 @@ fn dynamic_command_detection() {
 /// subdirectory), Pi prompt templates and the skills the user may invoke; a built-in name
 /// wins, then sources by precedence, a skill before a command file of the same source.
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one fixture with every kind of source and conflict"
+)]
 fn merged_command_list_and_conflicts() {
     let t = Tree::new("commands");
     let w = "work tree 中文";

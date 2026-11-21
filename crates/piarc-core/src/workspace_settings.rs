@@ -10,6 +10,10 @@
 //! (`piarc_config::Issue`: `layer`, `file`, `pointer`, `message`, `severity`). An event is sent
 //! when merged values changed or the problems of the files changed; an invalid file keeps its
 //! last valid content, so its event has issues and no changed keys.
+//!
+//! The directories of skills, commands and output styles (T37) are watched too: every reload
+//! advances [`WorkspaceSettings::changes`], which the workspace turns into `resources/reload`
+//! for its Agent Host.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
@@ -18,7 +22,7 @@ use std::time::Duration;
 use piarc_config::{Issue, Settings, TrustState};
 use piarc_fs::watch::{WatchEvent, Watcher};
 use serde_json::Value;
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
 
 use crate::dirs::DataDirs;
@@ -39,6 +43,9 @@ pub struct WorkspaceSettings {
     workspace: PathBuf,
     task: JoinHandle<()>,
     _watcher: Arc<Mutex<Watcher>>,
+    /// Advances after every reload (files of settings or of skills, commands, styles) and
+    /// trust change (T37).
+    changes: watch::Receiver<u64>,
 }
 
 impl std::fmt::Debug for WorkspaceSettings {
@@ -89,14 +96,20 @@ impl WorkspaceSettings {
         })?;
         let watcher = Arc::new(Mutex::new(watcher));
         let (registered, ready) = oneshot::channel();
+        let (changed, changes) = watch::channel(0);
         let task = tokio::spawn(run(
             Loop {
                 inner: Arc::clone(&inner),
                 watcher: Arc::clone(&watcher),
                 workspace: workspace.clone(),
+                resources: (
+                    dirs.data().to_path_buf(),
+                    dirs.home().map(Path::to_path_buf),
+                ),
                 trust,
                 events,
                 notifications: rx,
+                changed,
             },
             trust_changes,
             registered,
@@ -106,6 +119,7 @@ impl WorkspaceSettings {
             workspace,
             task,
             _watcher: watcher,
+            changes,
         };
         if wait_for_registration {
             ready.await.map_err(|_| Error::Internal {
@@ -119,6 +133,12 @@ impl WorkspaceSettings {
     #[must_use]
     pub fn merged(&self) -> Value {
         lock(&self.inner).merged().clone()
+    }
+
+    /// Advances whenever the settings, skills, commands or output styles may have changed.
+    #[must_use]
+    pub(crate) fn changes(&self) -> watch::Receiver<u64> {
+        self.changes.clone()
     }
 
     /// Problems of the last read.
@@ -158,9 +178,12 @@ struct Loop {
     inner: Arc<Mutex<Settings>>,
     watcher: Arc<Mutex<Watcher>>,
     workspace: PathBuf,
+    /// The data and home directories (user skills, commands and styles).
+    resources: (PathBuf, Option<PathBuf>),
     trust: TrustService,
     events: EventSender,
     notifications: mpsc::UnboundedReceiver<()>,
+    changed: watch::Sender<u64>,
 }
 
 async fn run(
@@ -170,13 +193,16 @@ async fn run(
 ) {
     // FSEvents can block in the system daemon while several streams start or stop.
     // Establish the watch off the runtime workers; then pick up edits made since load.
-    let (watcher, inner, workspace) = (
+    let (watcher, inner, workspace, resources) = (
         state.watcher.clone(),
         state.inner.clone(),
         state.workspace.clone(),
+        state.resources.clone(),
     );
-    if let Err(error) =
-        tokio::task::spawn_blocking(move || watch_dirs(&watcher, &inner, &workspace)).await
+    if let Err(error) = tokio::task::spawn_blocking(move || {
+        watch_dirs(&watcher, &inner, &workspace, &resources);
+    })
+    .await
     {
         tracing::error!(target:"piarc_core::settings","settings registration failed: {error}");
         return;
@@ -207,14 +233,17 @@ impl Loop {
         let inner = Arc::clone(&self.inner);
         let watcher = Arc::clone(&self.watcher);
         let workspace = self.workspace.clone();
+        let resources = self.resources.clone();
         let result = tokio::task::spawn_blocking(move || {
             let before = lock(&inner).issues().to_vec();
             let change = lock(&inner).reload();
-            // `.piarc/` may have been created since: watch it now.
-            watch_dirs(&watcher, &inner, &workspace);
+            // `.piarc/` or a skill directory may have been created since: watch it now.
+            watch_dirs(&watcher, &inner, &workspace, &resources);
             (before, change)
         })
         .await;
+        // Skills, commands and styles have no event of their own: the Agent Host reloads.
+        self.changed.send_modify(|n| *n += 1);
         match result {
             Ok((before, change)) => {
                 if !change.changed.is_empty() || change.issues != before {
@@ -233,6 +262,7 @@ impl Loop {
     async fn retrust(&self) {
         let state = self.trust.state(&self.workspace).await;
         let change = lock(&self.inner).set_trust(state);
+        self.changed.send_modify(|n| *n += 1);
         if !change.changed.is_empty() {
             let issues = lock(&self.inner).issues().to_vec();
             self.emit(change.changed, issues).await;
@@ -261,8 +291,13 @@ impl Loop {
 /// Watches the directories of the layer files; for a directory that does not exist yet
 /// (`.piarc/`, `.claude/`, `~/.claude/`), its nearest existing ancestor, so its creation is
 /// noticed.
-fn watch_dirs(watcher: &Mutex<Watcher>, settings: &Mutex<Settings>, workspace: &Path) {
-    let dirs: Vec<PathBuf> = {
+fn watch_dirs(
+    watcher: &Mutex<Watcher>,
+    settings: &Mutex<Settings>,
+    workspace: &Path,
+    (data, home): &(PathBuf, Option<PathBuf>),
+) {
+    let mut dirs: Vec<PathBuf> = {
         let settings = lock(settings);
         settings
             .table()
@@ -271,6 +306,20 @@ fn watch_dirs(watcher: &Mutex<Watcher>, settings: &Mutex<Settings>, workspace: &
             .map(Path::to_owned)
             .collect()
     };
+    // Directories above the home directory are nobody's skills: not watched.
+    dirs.extend(
+        piarc_config::skills::watch_dirs(&piarc_config::skills::ResourceDirs {
+            cwd: workspace,
+            data: Some(data),
+            home: home.as_deref(),
+        })
+        .into_iter()
+        .filter(|dir| {
+            dir.starts_with(workspace)
+                || dir.starts_with(data)
+                || home.as_deref().is_some_and(|h| dir.starts_with(h))
+        }),
+    );
     let mut roots: Vec<PathBuf> = dirs
         .iter()
         .map(|dir| {

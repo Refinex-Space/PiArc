@@ -416,6 +416,26 @@ fn timeout_matches(expected: Option<f64>, wire: Option<u64>) -> bool {
 
 /// The approved `WebFetch` call `p` names, for this URL: consumed, so one approval is one
 /// fetch (T29). Same-site redirects are part of that fetch; another site is a new call.
+/// Consumes the approval of `Skill` call `call` for skill `name` (T37): one approval, one load.
+pub(in crate::tool_io) fn claim_skill(
+    s: &SessionIo,
+    call: &str,
+    name: &str,
+    peer: &Peer,
+) -> Result<(), ErrorObject> {
+    let mut state = lock(&s.policy);
+    let grant = state
+        .grants
+        .get(call)
+        .filter(|g| g.belongs("Skill", peer))
+        .ok_or_else(mismatch)?;
+    if grant.input.get("skill").and_then(Value::as_str) != Some(name) {
+        return Err(mismatch());
+    }
+    state.grants.remove(call);
+    Ok(())
+}
+
 pub(in crate::tool_io) fn claim_fetch(
     s: &SessionIo,
     p: &piarc_protocol::web::WebFetchParams,

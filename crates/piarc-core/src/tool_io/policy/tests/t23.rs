@@ -35,7 +35,7 @@ impl Fixture {
             .expect("trust the new items");
     }
 
-    async fn answer_next(&self, decision: ApprovalDecision) -> ApprovalRequest {
+    pub(super) async fn answer_next(&self, decision: ApprovalDecision) -> ApprovalRequest {
         let card = self.pending().await;
         let mut reply = answer(&card, decision);
         if decision == ApprovalDecision::AllowAlways {
@@ -48,7 +48,7 @@ impl Fixture {
         card
     }
 
-    async fn asks(&self, tool: &str, input: Value) -> ApprovalRequest {
+    pub(super) async fn asks(&self, tool: &str, input: Value) -> ApprovalRequest {
         let (result, card) = tokio::join!(
             self.evaluate("asked", tool, input),
             self.answer_next(ApprovalDecision::Deny)

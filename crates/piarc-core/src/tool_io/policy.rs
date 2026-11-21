@@ -52,7 +52,9 @@ mod waits;
 use waits::{post_card, wait_for_user, withdraw_card};
 pub(crate) mod settings_view;
 use grants::Grant;
-pub(super) use grants::{FilePermit, claim_command, claim_fetch, claim_monitor, file_permit};
+pub(super) use grants::{
+    FilePermit, claim_command, claim_fetch, claim_monitor, claim_skill, file_permit,
+};
 
 /// `path` without `.` and `..` components (no file system access).
 pub(super) fn lexical(path: &Path) -> PathBuf {
@@ -66,6 +68,10 @@ pub(super) struct State {
     project_auto: bool,
     /// Rules the user allowed for this session, in order.
     rules: Vec<String>,
+    /// `allowed-tools` of the skills and commands invoked in the current turn (T37), by
+    /// grant: cleared when the turn ends ([`State::cancel`]).
+    turn_rules: Vec<(u64, Vec<String>)>,
+    next_turn_grant: u64,
     rule_cache: Option<(u64, Arc<RuleSet>)>,
     ledger: Ledger<Pending>,
     grants: HashMap<String, Grant>,
@@ -164,7 +170,27 @@ impl State {
             }
         }
         self.grants.clear();
+        self.turn_rules.clear();
         self.publish(id, services);
+    }
+
+    /// Allows `rules` until the current turn ends (T37); returns the grant's id.
+    pub(super) fn grant_turn_rules(&mut self, rules: Vec<String>) -> u64 {
+        self.next_turn_grant += 1;
+        self.turn_rules.push((self.next_turn_grant, rules));
+        self.next_turn_grant
+    }
+
+    /// Withdraws grant `id` (its input did not start or join a turn).
+    pub(super) fn revoke_turn_rules(&mut self, id: u64) {
+        self.turn_rules.retain(|(grant, _)| *grant != id);
+    }
+
+    fn turn_rules(&self) -> Vec<String> {
+        self.turn_rules
+            .iter()
+            .flat_map(|(_, rules)| rules.iter().cloned())
+            .collect()
     }
 }
 
@@ -573,11 +599,15 @@ async fn commit(
 /// subagent's is its main session's (T31).
 fn rules_of(s: &SessionIo, settings: &Settings) -> Arc<RuleSet> {
     let owner = super::subagents::rule_owner(s);
+    // A skill's grant belongs to the session whose turn invoked it (a subagent's own).
+    let own_turn = (!std::ptr::eq(owner, s)).then(|| lock(&s.policy).turn_rules());
     let mut state = lock(&owner.policy);
     let state = &mut *state;
+    let turn = own_turn.unwrap_or_else(|| state.turn_rules());
     assess::rule_set(
         &settings.permission_lists(),
         &state.rules,
+        &turn,
         s.scope.root(),
         &mut state.rule_cache,
     )
@@ -585,7 +615,19 @@ fn rules_of(s: &SessionIo, settings: &Settings) -> Arc<RuleSet> {
 
 /// The workspace's rules without a session's own (`agents/list`, T31).
 pub(super) fn workspace_rules(settings: &Settings, root: &Path) -> Arc<RuleSet> {
-    assess::rule_set(&settings.permission_lists(), &[], root, &mut None)
+    assess::rule_set(&settings.permission_lists(), &[], &[], root, &mut None)
+}
+
+/// Whether a `Skill(<name>)` deny rule (or a deny of the whole tool) hides skill `name` (T37).
+pub(super) fn denies_skill(rules: &RuleSet, name: &str) -> bool {
+    rules
+        .find(
+            piarc_policy::rules::Behavior::Deny,
+            "Skill",
+            piarc_policy::rules::Subject::Name(name),
+            None,
+        )
+        .is_some_and(|(_, certainty)| certainty == piarc_policy::rules::Certainty::Certain)
 }
 
 /// Whether an `Agent(<name>)` deny rule (or a deny of the whole tool) removes type `name`.
@@ -828,8 +870,15 @@ async fn prepare(
         .filter_map(Value::as_str)
         .map(|d| s.scope.root().join(d))
         .collect();
+    // The skills' directories (T37): Read, Glob and Grep may read them without asking.
+    let skill_dirs = lock(&s.skill_dirs).clone();
     tokio::task::spawn_blocking(move || {
-        let scope = with_directories(s.scope.clone(), &dirs)?;
+        let mut scope = with_directories(s.scope.clone(), &dirs)?;
+        for dir in &skill_dirs {
+            if let Ok(with) = scope.clone().with_read_only_dir(dir) {
+                scope = with;
+            }
+        }
         let places = assess::Places::new(&scope);
         let mut card = new_request(&p, &peer)?;
         let mut grant = Grant::new(&p, peer);
