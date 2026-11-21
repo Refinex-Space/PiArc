@@ -892,25 +892,55 @@ capabilities:
     milestone: M3
     refs: [FR-EX-03, ARCH-6.8]
     task: T36
-    status: planned
+    status: active
   - id: CAP-MCP-OAUTH-001
     title: 'MCP 的 OAuth'
     milestone: M3
     refs: [FR-EX-03, ARCH-6.8]
     task: T36
-    status: planned
+    status: active
   - id: CAP-MCP-POOL-001
     title: 'MCP 工作区共享连接池'
     milestone: M3
     refs: [FR-EX-03, ARCH-6.8]
     task: T36
-    status: planned
+    status: active
   - id: CAP-MCP-DEFER-001
     title: '工具多时延迟加载（ToolSearch）'
     milestone: M3
     refs: [FR-EX-03, ARCH-6.1.4, ARCH-6.8]
     task: T36
-    status: planned
+    status: active
+  - id: CAP-MCP-CONFIG-001
+    title: 'MCP 配置来源（`.mcp.json`、`~/.claude.json` 的 user 与 local、PiArc 用户与 `.piarc/` 设置）、同名按"企业 > 本地 > 项目 > 用户 > 插件"取整条定义、`${VAR}` 展开、SSE 与 WebSocket 标为不支持'
+    milestone: M3
+    refs: [FR-EX-03, ARCH-6.8, ARCH-6.14]
+    task: T36
+    status: active
+  - id: CAP-MCP-TRUST-001
+    title: '未信任项目的 MCP server（`.mcp.json`、`.piarc/` 设置、项目级子 agent 的内联定义）不连接、不启动进程'
+    milestone: M3
+    refs: [FR-EX-03, ARCH-6.8, ARCH-10.2]
+    task: T36
+    status: active
+  - id: CAP-MCP-PERM-001
+    title: '`mcp__server__tool` 与 `mcp__server__*` 规则生效，带 `requiresUserInteraction` 标记的工具在任何模式下都询问'
+    milestone: M3
+    refs: [FR-EX-03, ARCH-6.2.2, ARCH-6.8]
+    task: T36
+    status: active
+  - id: CAP-MCP-CHANGES-001
+    title: 'server instructions 进入 system prompt 第 6 段；工具集因 `list_changed` 或连接变化而改变时以追加消息送达，system prompt 不变'
+    milestone: M3
+    refs: [FR-EX-03, ARCH-6.6.1, ARCH-6.8]
+    task: T36
+    status: active
+  - id: CAP-MCP-SUBAGENT-001
+    title: '子 agent 定义的 `mcpServers`：按名称引用的 server 复用连接池，内联 server 只在该子 agent 运行期间连接'
+    milestone: M3
+    refs: [FR-HN-04, FR-EX-03, ARCH-6.4, ARCH-6.8]
+    task: T36
+    status: active
   - id: CAP-MCP-PROMPTS-001
     title: 'MCP prompts'
     milestone: M4

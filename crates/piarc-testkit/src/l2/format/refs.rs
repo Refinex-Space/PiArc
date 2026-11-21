@@ -229,6 +229,14 @@ fn check_references(spec: &ScenarioSpec, action: &Action, field: &str, problems:
                 problems.push(format!("{field}: signing in needs an `oauth` section"));
             }
         }
+        Action::McpSignIn(sign_in) => {
+            if !spec.mcp_http.contains_key(&sign_in.server) {
+                problems.push(format!(
+                    "{field}: `{}` is not an `mcp_http` server",
+                    sign_in.server
+                ));
+            }
+        }
     }
 }
 

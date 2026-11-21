@@ -41,6 +41,7 @@ mod checkpoints;
 mod harness;
 mod l3;
 mod login;
+mod mcp;
 mod settings;
 mod terminals;
 mod worktrees;
@@ -252,6 +253,8 @@ struct Env {
     /// The mock authorization server and the test provider's file (T29).
     auth: Option<crate::auth_server::MockAuthServer>,
     oauth_file: Option<PathBuf>,
+    /// The HTTP MCP fixture servers by name (T36).
+    mcp_http: BTreeMap<String, crate::mcp_server::MockMcpServer>,
     /// The task manager's clock (T32), kept across Core restarts; `advance_clock` moves it.
     clock: Arc<piarc_core::clock::ManualClock>,
     /// The scenario's Monitor limits (T32).
@@ -271,7 +274,9 @@ impl Env {
         for dir in [&workspace, &data.join("pi"), &cache] {
             std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         }
-        prepare_workspace(spec, root, &workspace)?;
+        let mcp_http = mcp::start_servers(spec).await?;
+        let urls = mcp_http.iter().map(|(n, s)| (n.clone(), s.url())).collect();
+        prepare_workspace(spec, root, &workspace, &urls)?;
         let web = match &spec.web {
             Some(pages) => Some(
                 super::web::start(pages)
@@ -331,6 +336,7 @@ impl Env {
             web,
             auth,
             oauth_file,
+            mcp_http,
             clock: piarc_core::clock::ManualClock::new(),
             task_limits: spec.task_limits,
         })
@@ -706,6 +712,7 @@ impl Driver<'_> {
             Action::CheckFiles(spec) => self.check_files_now(spec),
             Action::SignIn(spec) => self.sign_in(spec).await,
             Action::SignOut {} => self.sign_out().await,
+            Action::McpSignIn(spec) => self.mcp_sign_in(spec).await,
         }
     }
 

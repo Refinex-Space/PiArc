@@ -1,5 +1,6 @@
 //! Workspace, home, data and command environment fixtures isolated to one scenario run.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -93,9 +94,10 @@ pub(super) fn prepare_workspace(
     spec: &ScenarioSpec,
     root: &Path,
     workspace: &Path,
+    mcp_urls: &BTreeMap<String, String>,
 ) -> Result<(), String> {
     for (path, content) in &spec.workspace.run_files {
-        write_file(root, path, &fill_paths(spec, content))?;
+        write_file(root, path, &fill_paths(spec, content, mcp_urls))?;
     }
     if spec.workspace.git {
         let result = Command::new("git")
@@ -111,7 +113,7 @@ pub(super) fn prepare_workspace(
         }
     }
     for (path, content) in &spec.workspace.files {
-        write_file(workspace, path, &fill_paths(spec, content))?;
+        write_file(workspace, path, &fill_paths(spec, content, mcp_urls))?;
     }
     if spec.workspace.git_commit {
         commit_all(workspace, &spec.workspace.git_branches)?;
@@ -138,9 +140,14 @@ pub(super) fn prepare_workspace(
 /// can configure it in `.mcp.json` (`"command": "node", "args": ["{{mcp_echo}}", "alpha"]`).
 pub const MCP_ECHO_PLACEHOLDER: &str = "{{mcp_echo}}";
 
-fn fill_paths(spec: &ScenarioSpec, content: &str) -> String {
+fn fill_paths(spec: &ScenarioSpec, content: &str, mcp_urls: &BTreeMap<String, String>) -> String {
+    let mut content = content.to_owned();
+    // `{{mcp_http:<name>}}`: the URL of the scenario's HTTP MCP fixture server `name` (T36).
+    for (name, url) in mcp_urls {
+        content = content.replace(&format!("{{{{mcp_http:{name}}}}}"), url);
+    }
     if !content.contains(MCP_ECHO_PLACEHOLDER) {
-        return content.to_owned();
+        return content;
     }
     let echo = spec
         .fixture(".")

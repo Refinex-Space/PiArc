@@ -20,7 +20,7 @@ use crate::l2::login_spec::{SignInAction, SignInBehavior};
 pub(super) const OAUTH_PROVIDER: &str = "piarc-test-oauth";
 
 /// A plain HTTP GET: the status and the `location` header.
-async fn get(url: &str) -> Result<(u16, Option<String>), String> {
+pub(super) async fn get(url: &str) -> Result<(u16, Option<String>), String> {
     let rest = url
         .strip_prefix("http://")
         .ok_or_else(|| format!("not an http URL: {url}"))?;
@@ -55,7 +55,7 @@ async fn get(url: &str) -> Result<(u16, Option<String>), String> {
 
 impl Driver<'_> {
     /// The first `core/login` event that `pred` accepts, waiting for it.
-    async fn login_event(
+    pub(super) async fn login_event(
         &self,
         what: &str,
         pred: impl Fn(&Value) -> bool,

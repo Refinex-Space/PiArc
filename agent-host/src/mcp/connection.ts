@@ -345,9 +345,12 @@ export class ServerConnection {
       this.pid = transport instanceof StdioServerTransport ? transport.pid : undefined;
       const instructions =
         client.instructions?.trim() === '' ? undefined : client.instructions?.trim();
+      // The first listing is a change too: sessions that started before the server connected
+      // (a sign-in, a retry) register its tools now.
       const changed =
-        this.listed &&
-        (toolsKey(tools) !== toolsKey(this.tools) || instructions !== this.instructions);
+        !this.listed ||
+        toolsKey(tools) !== toolsKey(this.tools) ||
+        instructions !== this.instructions;
       this.tools = tools;
       this.instructions = instructions;
       this.listed = true;

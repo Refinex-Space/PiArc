@@ -99,6 +99,10 @@ pub struct ScenarioSpec {
     /// A mock authorization server and the test OAuth provider (T29).
     #[serde(default)]
     pub oauth: Option<crate::l2::login_spec::OAuthSpec>,
+    /// Streamable HTTP MCP fixture servers by name (T36): `{{mcp_http:<name>}}` in workspace
+    /// files is the server's URL.
+    #[serde(default)]
+    pub mcp_http: BTreeMap<String, McpHttpSpec>,
     /// SDK cloud providers to configure with an isolated fake API key; never used for inference.
     #[serde(default)]
     pub cloud_providers: Vec<String>,
@@ -124,6 +128,25 @@ impl ScenarioSpec {
         name.split('/')
             .fold(self.fixture_dir.clone(), |path, part| path.join(part))
     }
+}
+
+/// One HTTP MCP fixture server of a scenario (T36, `crate::mcp_server`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct McpHttpSpec {
+    /// The server wants OAuth bearer tokens from its own authorization server.
+    #[serde(default)]
+    pub oauth: bool,
+}
+
+/// Signs in to an HTTP MCP fixture server (T36): the runner plays the browser.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct McpSignInAction {
+    /// The server (a name of `mcp_http`).
+    pub server: String,
+    /// How `core/login` ends.
+    pub outcome: crate::l2::login_spec::SignInOutcome,
 }
 
 /// Monitor limits a scenario sets (T32): each one replaces Core's default.
@@ -472,6 +495,8 @@ pub enum Action {
     SignIn(crate::l2::login_spec::SignInAction),
     /// Signs out of the test OAuth provider (T29).
     SignOut {},
+    /// Signs in to an HTTP MCP fixture server of the workspace (T36).
+    McpSignIn(McpSignInAction),
     /// Moves the task manager's clock forward (T32): foreground timeouts, Monitor timeouts and
     /// wakes happen without real waiting.
     AdvanceClock {
@@ -556,6 +581,7 @@ impl Action {
             Self::Search(_) => "search",
             Self::SignIn(_) => "sign_in",
             Self::SignOut {} => "sign_out",
+            Self::McpSignIn(_) => "mcp_sign_in",
             Self::AdvanceClock { .. } => "advance_clock",
             Self::StopTask { .. } => "stop_task",
             Self::OpenTerminal { .. } => "open_terminal",
@@ -606,6 +632,7 @@ impl Action {
             | Self::RestartCore {}
             | Self::CheckFiles(_)
             | Self::SignIn(_)
+            | Self::McpSignIn(_)
             | Self::AdvanceClock { .. }
             | Self::SignOut {} => None,
         }

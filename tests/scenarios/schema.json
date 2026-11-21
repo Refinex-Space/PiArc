@@ -117,6 +117,16 @@
       "required": ["flow"],
       "properties": { "flow": { "enum": ["authorization_code", "device_code"] } }
     },
+    "mcp_http": {
+      "description": "Streamable HTTP MCP fixture servers by name (T36): `{{mcp_http:<name>}}` in workspace files and run_files is the server's URL; with oauth the server wants bearer tokens from its own authorization server (`mcp_sign_in`).",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/label" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": { "oauth": { "type": "boolean" } }
+      }
+    },
     "cloud_providers": {
       "description": "Configure a cloud API key through the real settings path; model requests remain on loopback mocks.",
       "type": "array",
@@ -483,6 +493,16 @@
           "description": "Signs out of the test OAuth provider (T29).",
           "type": "object",
           "additionalProperties": false
+        },
+        "mcp_sign_in": {
+          "description": "Signs in to an mcp_http server through Core's mcp_login; the runner follows the authorization page's redirect like the user's browser (T36).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["server", "outcome"],
+          "properties": {
+            "server": { "$ref": "#/$defs/label" },
+            "outcome": { "enum": ["succeeded", "failed", "cancelled"] }
+          }
         },
         "advance_clock": {
           "description": "Moves the task manager's clock forward by this many seconds (T32): foreground timeouts move commands to the background, Monitor timeouts and wakes happen, without real waiting.",

@@ -1,0 +1,42 @@
+id: mcp-http-oauth
+description: Two Streamable HTTP servers from the user's settings; plain answers at once, docs needs an OAuth sign-in and offers no tools until then; after the sign-in through Core's mcp_login (the runner plays the browser), its tools are offered and its call carries the token (T36).
+capabilities: [CAP-MCP-TRANSPORT-001, CAP-MCP-OAUTH-001]
+mcp_http:
+  plain: {}
+  docs: { oauth: true }
+workspace:
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"allow":["mcp__plain__*","mcp__docs__*"]},"mcpServers":{"plain":{"type":"http","url":"{{mcp_http:plain}}"},"docs":{"type":"http","url":"{{mcp_http:docs}}"}}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: plain, name: mcp__plain__echo, input: { text: before } }]
+      - text: Plain answered.
+      - tool_calls: [{ id: docs, name: mcp__docs__echo, input: { text: after } }]
+      - text: Docs answered.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Echo through plain., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - mcp_sign_in: { server: docs, outcome: succeeded }
+  - prompt: { text: Now through docs., turn: two }
+expect:
+  request_counts: { main: 4 }
+  requests:
+    - provider: main
+      index: 0
+      tools_include: [mcp__plain__echo]
+      tools_exclude: [mcp__docs__echo]
+    - provider: main
+      index: 1
+      tool_results: [{ id: plain, is_error: false, contains: 'plain echoes "before"' }]
+    - provider: main
+      index: 2
+      tools_include: [mcp__plain__echo, mcp__docs__echo]
+    - provider: main
+      index: 3
+      tool_results:
+        - { id: plain, is_error: false }
+        - { id: docs, is_error: false, contains: 'docs echoes "after" (token gen-1)' }
