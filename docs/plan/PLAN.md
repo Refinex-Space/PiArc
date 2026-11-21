@@ -318,15 +318,15 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 - [x] 1 Core 侧：piarc-term 选区手势、视口滚动、链接、选区文本；Core 与 NAPI 导出（A05、A07）；另加停拉后的 `output` 唤醒事件（空闲不轮询）
 - [x] 2 主进程与 preload：会话终端的打开、归属与重载后重连，鼠标、焦点、粘贴、读屏、搜索、选区、滚动、链接、共享；I51 的防线与上限（A04、A09、A10）；`window.piarc` 去掉 `createTerminal`（I30）
-- [ ] 3 渲染器：`RemoteRenderable` 行复用与脏行、小数 DPR、宽字符与 emoji、光标样式与闪烁（`prefers-reduced-motion`）、系统等宽字体与令牌颜色（A01）
-- [ ] 4 拉帧与输入：rAF 拉帧、隐藏与最小化停拉、键盘归属与全局快捷键、Mod+C / Ctrl+C、粘贴（A02、A04）
-- [ ] 5 IME：textarea 跟随光标、预编辑绘制、上屏一次写入（A03）
-- [ ] 6 选区与复制、查找栏、链接确认（A05、A06、A07）
-- [ ] 7 终端面板：停靠、多标签、会话 cwd、重命名与标题、关闭结束进程树、Ctrl+\`、共享开关、打开 agent 的终端任务、选中内容附加到对话（A08、A09）
-- [ ] 8 重载恢复与无障碍：一次拉帧恢复、以文本查看屏幕、axe（A10、A12）
-- [ ] 9 L4 与截图：vim、htop/top、less、缩放（A01）；L2 共享场景（A09）
-- [ ] 10 测量：`cat` 100 MB 事件循环 p99、回显 p95、帧率与 IPC 字节（A11）
-- [ ] 11 许可证与来源：fork 声明、改动清单、`third-party/sources.json`（A13）
+- [x] 3 渲染器：`RemoteRenderable` 行复用与脏行、小数 DPR、宽字符与 emoji、光标样式与闪烁（`prefers-reduced-motion`）、系统等宽字体与令牌颜色（A01）
+- [x] 4 拉帧与输入：rAF 拉帧、隐藏与最小化停拉、键盘归属与全局快捷键、Mod+C / Ctrl+C、粘贴（A02、A04）
+- [x] 5 IME：textarea 跟随光标、预编辑绘制、上屏一次写入（A03）
+- [x] 6 选区与复制、查找栏、链接确认（A05、A06、A07）
+- [x] 7 终端面板：停靠、多标签、会话 cwd、重命名与标题、关闭结束进程树、Ctrl+\`、共享开关、打开 agent 的终端任务、选中内容附加到对话（A08、A09）
+- [x] 8 重载恢复与无障碍：一次拉帧恢复、以文本查看屏幕、axe（A10、A12）
+- [x] 9 L4 与截图：vim、htop/top、less、缩放（A01）；L2 共享场景（A09）
+- [x] 10 测量：`cat` 100 MB 事件循环 p99、回显 p95、帧率与 IPC 字节（A11）
+- [x] 11 许可证与来源：fork 声明、改动清单、`third-party/sources.json`（A13）
 - [ ] 12 文档与收尾：架构 6.11/8.x/10.3、ADR、`renderer/terminal/AGENTS.md`、W3 核对项、I30/I51/I59，`npm run verify`（A14）
 
 ## 登记事项

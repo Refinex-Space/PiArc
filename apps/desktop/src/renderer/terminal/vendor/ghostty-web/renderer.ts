@@ -8,9 +8,10 @@
  * Copyright (c) 2025 Coder. Licensed under the MIT License; the full text is in LICENSE next
  * to this file.
  *
- * Modified for PiArc (ADR-0017): the data source is a terminal state held by PiArc Core and
- * delivered as frames, not ghostty-web's WASM terminal. The list of changes is in README.md
- * next to this file.
+ * Modified for PiArc (ADR-0017; T10, T34): the data source is a terminal state held by PiArc
+ * Core and delivered as frames, not ghostty-web's WASM terminal; T34 draws in device pixels,
+ * adds the selection, find matches, link underlines, cursor look changes and Powerline
+ * separators. The list of changes is in README.md next to this file.
  */
 
 // ============================================================================

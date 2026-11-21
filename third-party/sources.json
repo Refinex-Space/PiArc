@@ -34,8 +34,9 @@
         "path": "lib/renderer.ts",
         "commit": "640db4617c69a73ccebce437cebc598c7f73cdb7"
       },
-      "usedBy": "apps/desktop/src/renderer/terminal/vendor/ghostty-web/renderer.ts (modified; changes listed in README.md next to it)",
-      "addedBy": "T10"
+      "usedBy": "apps/desktop/src/renderer/terminal/vendor/ghostty-web/renderer.ts (modified; changes listed in README.md next to it): the terminal panel's renderer (T34)",
+      "addedBy": "T10",
+      "changedBy": ["T34"]
     },
     {
       "id": "openai-codex-seatbelt-base-policy",
