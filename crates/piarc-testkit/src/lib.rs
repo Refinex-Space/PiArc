@@ -103,6 +103,7 @@ mod error;
 mod fragment;
 pub mod l2;
 pub mod l3;
+pub mod mcp_server;
 mod openai;
 pub mod plaintext;
 mod record;

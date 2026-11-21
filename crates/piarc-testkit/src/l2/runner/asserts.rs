@@ -34,9 +34,11 @@ impl Driver<'_> {
     pub(super) async fn json_lines_written(&self) {
         let want = &self.spec.expect.json_lines;
         let ready = || {
+            // A missing file has no lines, as `check_json_lines` reads it (T36: "never started").
             want.iter().all(|(path, lines)| {
                 std::fs::read_to_string(resolve(&self.env.workspace, path))
-                    .is_ok_and(|text| text.lines().count() >= lines.len())
+                    .map_or(0, |text| text.lines().count())
+                    >= lines.len()
             })
         };
         let deadline = tokio::time::Instant::now() + WAIT;

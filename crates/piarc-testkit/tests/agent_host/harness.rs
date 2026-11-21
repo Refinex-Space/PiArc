@@ -140,6 +140,25 @@ impl Core {
     }
 }
 
+impl Core {
+    /// Answers that need no I/O: preflights (the queue of injected faults, else allowed),
+    /// `policy/recover`, and `mcp/servers` (T36).
+    fn fixed(&self, method: &str) -> Option<Result<Value, ErrorObject>> {
+        match method {
+            "policy/evaluate" => Some(
+                self.policy_answers
+                    .lock()
+                    .expect("policy queue")
+                    .pop_front()
+                    .unwrap_or_else(|| Ok(json!({"allowed": true}))),
+            ),
+            "policy/recover" => Some(Ok(json!({}))),
+            "mcp/servers" => Some(Ok(self.mcp.lock().expect("lock").clone())),
+            _ => None,
+        }
+    }
+}
+
 impl InboundHandler for Core {
     fn handle(
         &self,
@@ -149,17 +168,8 @@ impl InboundHandler for Core {
     ) -> BoxFuture<'static, Result<Value, ErrorObject>> {
         // This harness tests delegation, scheduling and Pi parity. Its operator approves
         // every preflight. The scenario runner exercises the production approval ledger.
-        if method == "policy/evaluate" {
-            let reply = self
-                .policy_answers
-                .lock()
-                .expect("policy queue")
-                .pop_front()
-                .unwrap_or_else(|| Ok(json!({"allowed": true})));
+        if let Some(reply) = self.fixed(&method) {
             return Box::pin(async move { reply });
-        }
-        if method == "policy/recover" {
-            return Box::pin(async { Ok(json!({})) });
         }
         if method == "policy/tools" {
             // No deny rule removes a tool here; the Core policy tests cover the rules.
@@ -193,10 +203,6 @@ impl InboundHandler for Core {
         if SecretsService::handles(&method) {
             let secrets = self.secrets.clone();
             return Box::pin(async move { secrets.dispatch(&method, params, peer).await });
-        }
-        if method == "mcp/servers" {
-            let answer = self.mcp.lock().expect("lock").clone();
-            return Box::pin(async move { Ok(answer) });
         }
         if !ToolIo::handles(&method) {
             return Box::pin(async move {

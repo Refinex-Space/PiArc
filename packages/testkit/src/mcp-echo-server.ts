@@ -15,8 +15,10 @@
 // - `MCP_ECHO_INTERACTIVE=1`: `echo` carries `_meta["anthropic/requiresUserInteraction"]`;
 // - `MCP_ECHO_INSTRUCTIONS=<text>`: the `instructions` of `initialize`;
 // - `MCP_ECHO_STUBBORN=1`: ignore SIGTERM and the end of stdin (only SIGKILL ends it);
-// - `MCP_ECHO_PID_FILE=<path>`: write the process id there on start.
-import { writeFileSync } from 'node:fs';
+// - `MCP_ECHO_PID_FILE=<path>`: write the process id there on start;
+// - `MCP_ECHO_START_LOG=<path>`: append `{"server","pid"}` as one JSON line there on start
+//   (relative to the working directory), so a test can count the server's processes.
+import { appendFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { execFileSync } from 'node:child_process';
 
@@ -26,6 +28,12 @@ const extra = Number.parseInt(env.MCP_ECHO_TOOLS ?? '0', 10);
 const added: string[] = [];
 
 if (env.MCP_ECHO_PID_FILE !== undefined) writeFileSync(env.MCP_ECHO_PID_FILE, String(process.pid));
+if (env.MCP_ECHO_START_LOG !== undefined) {
+  appendFileSync(
+    env.MCP_ECHO_START_LOG,
+    `${JSON.stringify({ server: serverName, pid: process.pid })}\n`,
+  );
+}
 if (env.MCP_ECHO_STUBBORN === '1') {
   process.on('SIGTERM', () => undefined);
   // Outlives the end of stdin.

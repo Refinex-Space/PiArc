@@ -1,0 +1,39 @@
+id: mcp-tools-changed
+description: A connected server's instructions are in the system prompt's MCP section; when its tools change (notifications/tools/list_changed) the next request declares the new tool and an appended reminder tells of it, while the system prompt stays byte for byte the same (T36).
+capabilities: [CAP-MCP-CHANGES-001]
+workspace:
+  trusted: true
+  files:
+    .mcp.json: '{"mcpServers":{"alpha":{"command":"node","args":["{{mcp_echo}}","alpha"],"env":{"MCP_ECHO_INSTRUCTIONS":"Alpha keeps echo results short."}}}}'
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"allow":["mcp__alpha__*"]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: add, name: mcp__alpha__add_tool, input: { name: later } }]
+      - tool_calls: [{ id: later, name: mcp__alpha__later, input: {} }]
+      - text: Done.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Add a tool and use it., turn: one }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - provider: main
+      index: 0
+      contains: ['<mcp_servers>', 'Alpha keeps echo results short.']
+      tools_exclude: [mcp__alpha__later]
+    - provider: main
+      index: 1
+      same_system_as: 0
+      tools_include: [mcp__alpha__later]
+      contains: ['MCP server alpha now offers these tools: mcp__alpha__later']
+      tool_results: [{ id: add, is_error: false, contains: added later }]
+    - provider: main
+      index: 2
+      same_system_as: 0
+      tool_results:
+        - { id: add, is_error: false }
+        - { id: later, is_error: false, contains: later ran on alpha }

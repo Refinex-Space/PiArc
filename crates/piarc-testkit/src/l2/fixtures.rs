@@ -95,7 +95,7 @@ pub(super) fn prepare_workspace(
     workspace: &Path,
 ) -> Result<(), String> {
     for (path, content) in &spec.workspace.run_files {
-        write_file(root, path, content)?;
+        write_file(root, path, &fill_paths(spec, content))?;
     }
     if spec.workspace.git {
         let result = Command::new("git")
@@ -111,7 +111,7 @@ pub(super) fn prepare_workspace(
         }
     }
     for (path, content) in &spec.workspace.files {
-        write_file(workspace, path, content)?;
+        write_file(workspace, path, &fill_paths(spec, content))?;
     }
     if spec.workspace.git_commit {
         commit_all(workspace, &spec.workspace.git_branches)?;
@@ -131,6 +131,32 @@ pub(super) fn prepare_workspace(
         }
     }
     Ok(())
+}
+
+/// `{{mcp_echo}}` in a file's text: the absolute path of the stdio MCP fixture server
+/// (`packages/testkit/src/mcp-echo-server.ts`, T36), escaped for a JSON string, so scenarios
+/// can configure it in `.mcp.json` (`"command": "node", "args": ["{{mcp_echo}}", "alpha"]`).
+pub const MCP_ECHO_PLACEHOLDER: &str = "{{mcp_echo}}";
+
+fn fill_paths(spec: &ScenarioSpec, content: &str) -> String {
+    if !content.contains(MCP_ECHO_PLACEHOLDER) {
+        return content.to_owned();
+    }
+    let echo = spec
+        .fixture(".")
+        .join("..")
+        .join("..")
+        .join("..")
+        .join("packages")
+        .join("testkit")
+        .join("src")
+        .join("mcp-echo-server.ts");
+    let echo = std::fs::canonicalize(&echo).unwrap_or(echo);
+    let text = echo.to_string_lossy();
+    // Windows: no `\\?\` prefix for Node, and backslashes escaped for JSON.
+    let plain = text.strip_prefix(r"\\?\").unwrap_or(&text);
+    let quoted = serde_json::to_string(plain).unwrap_or_default();
+    content.replace(MCP_ECHO_PLACEHOLDER, quoted.trim_matches('"'))
 }
 
 /// Commits the workspace's files with a fixed identity, then creates `branches` there (T35).

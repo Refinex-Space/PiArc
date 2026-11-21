@@ -14,6 +14,7 @@
 // with `setActiveTools` instead would let Pi answer such a call with "not found" before any
 // gate ran, and tools that register later (MCP) would start active.
 import type { ExtensionFactory, ToolDefinition } from '@earendil-works/pi-coding-agent';
+import { mcpNamespace } from '@earendil-works/pi-mcp';
 import type { AgentDefinition } from '@piarc/protocol';
 
 import { toolNotAvailable } from '../prompts/subagents.js';
@@ -26,10 +27,40 @@ export const PARENT_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'SuggestNextSteps',
 ]);
 
+/**
+ * The tool set plus the tools of the subagent's own inline MCP servers (T36), which register
+ * only once the subagent's session connects them: `mcp__<server>__…` of those servers, unless
+ * `disallowedTools` names the tool or the server (`mcp__<server>`).
+ */
+class WithInlineServers extends Set<string> {
+  readonly #prefixes: readonly string[];
+  readonly #disallowed: ReadonlySet<string>;
+
+  constructor(
+    tools: Iterable<string>,
+    prefixes: readonly string[],
+    disallowed: ReadonlySet<string>,
+  ) {
+    super(tools);
+    this.#prefixes = prefixes;
+    this.#disallowed = disallowed;
+  }
+
+  override has(tool: string): boolean {
+    if (super.has(tool)) return true;
+    const prefix = this.#prefixes.find((p) => tool.startsWith(p));
+    return (
+      prefix !== undefined &&
+      !this.#disallowed.has(tool) &&
+      !this.#disallowed.has(prefix.slice(0, -2))
+    );
+  }
+}
+
 /** The canonical tools a subagent of `definition` may use at `depth` (1 = a main session's). */
 export function allowedTools(
   parentTools: readonly string[],
-  definition: Pick<AgentDefinition, 'tools' | 'disallowedTools'>,
+  definition: Pick<AgentDefinition, 'tools' | 'disallowedTools' | 'mcpInline'>,
   depth: number,
   maxDepth: number,
 ): Set<string> {
@@ -39,14 +70,16 @@ export function allowedTools(
     allowed = allowed.filter((tool) => listed.has(tool));
   }
   const disallowed = new Set(definition.disallowedTools ?? []);
-  return new Set(
-    allowed.filter(
-      (tool) =>
-        !disallowed.has(tool) &&
-        !PARENT_ONLY_TOOLS.has(tool) &&
-        !(tool === 'Agent' && depth >= maxDepth),
-    ),
+  const tools = allowed.filter(
+    (tool) =>
+      !disallowed.has(tool) &&
+      !PARENT_ONLY_TOOLS.has(tool) &&
+      !(tool === 'Agent' && depth >= maxDepth),
   );
+  const inline = (definition.mcpInline ?? [])
+    .filter((server) => server.availability === 'ready')
+    .map((server) => `${mcpNamespace(server.name)}__`);
+  return inline.length === 0 ? new Set(tools) : new WithInlineServers(tools, inline, disallowed);
 }
 
 /** `tool` hiding every declared tool outside `allowed` (canonical names) from requests. */

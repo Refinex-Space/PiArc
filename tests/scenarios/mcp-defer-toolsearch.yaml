@@ -1,0 +1,38 @@
+id: mcp-defer-toolsearch
+description: A server with 43 tools (more than the default threshold of 30) is deferred behind ToolSearch; the system prompt names it, the model searches, the next request declares the found tool and its call succeeds (T36).
+capabilities: [CAP-MCP-DEFER-001]
+workspace:
+  trusted: true
+  files:
+    .mcp.json: '{"mcpServers":{"big":{"command":"node","args":["{{mcp_echo}}","big"],"env":{"MCP_ECHO_TOOLS":"40"}}}}'
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"allow":["mcp__big__*"]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: search, name: ToolSearch, input: { query: extra_7 } }]
+      - tool_calls: [{ id: run, name: mcp__big__extra_7, input: {} }]
+      - text: Done.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Use the seventh extra tool., turn: one }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - provider: main
+      index: 0
+      tools_include: [ToolSearch]
+      tools_exclude: [mcp__big__extra_7, mcp__big__echo]
+      contains: ['find them with ToolSearch: big']
+    - provider: main
+      index: 1
+      tools_include: [ToolSearch, mcp__big__extra_7]
+      same_system_as: 0
+      tool_results: [{ id: search, is_error: false, contains: mcp__big__extra_7 }]
+    - provider: main
+      index: 2
+      tool_results:
+        - { id: search, is_error: false }
+        - { id: run, is_error: false, contains: extra_7 ran on big }

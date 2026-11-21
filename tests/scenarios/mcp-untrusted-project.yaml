@@ -1,0 +1,30 @@
+id: mcp-untrusted-project
+description: An untrusted project's .mcp.json server is neither started nor offered (its start log stays empty); a server of the user's own settings in the same workspace runs (T36).
+capabilities: [CAP-MCP-TRUST-001, CAP-MCP-CONFIG-001]
+workspace:
+  files:
+    .mcp.json: '{"mcpServers":{"repo":{"command":"node","args":["{{mcp_echo}}","repo"],"env":{"MCP_ECHO_START_LOG":"mcp-starts.jsonl"}}}}'
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"allow":["mcp__mine__*"]},"mcpServers":{"mine":{"command":"node","args":["{{mcp_echo}}","mine"],"env":{"MCP_ECHO_START_LOG":"mcp-starts.jsonl"}}}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: mine, name: mcp__mine__echo, input: { text: user server } }]
+      - text: Done.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Echo., turn: one }
+expect:
+  request_counts: { main: 2 }
+  json_lines:
+    mcp-starts.jsonl: [{ server: mine }]
+  requests:
+    - provider: main
+      index: 0
+      tools_include: [mcp__mine__echo]
+      tools_exclude: [mcp__repo__echo]
+    - provider: main
+      index: 1
+      tool_results: [{ id: mine, is_error: false, contains: 'mine echoes "user server"' }]
