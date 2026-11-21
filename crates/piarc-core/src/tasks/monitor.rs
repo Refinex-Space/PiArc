@@ -1,7 +1,9 @@
 //! Monitor's pace (ADR-0049 rule 6): new lines become the session's waiting `monitorOutput`
 //! notice; an idle session is woken at most once per [`TaskLimits::monitor_wake_interval`].
 
-use super::feed::MonitorEnd;
+use std::time::{Duration, Instant};
+
+use super::feed::{MonitorEnd, MonitorFeed};
 use super::{Notice, StopBy, TaskManager, lock};
 use piarc_protocol::context::ReminderType;
 
@@ -68,22 +70,18 @@ impl TaskManager {
                 }
                 return;
             };
-            let mut wake = false;
-            let mut arm = None;
-            if !running {
-                let due = feed
-                    .last_wake
-                    .is_none_or(|last| now >= last + limits.monitor_wake_interval);
-                if due {
-                    wake = true;
-                    feed.last_wake = Some(now);
-                } else if !feed.wake_armed {
-                    feed.wake_armed = true;
-                    let last = feed.last_wake.unwrap_or(now);
-                    arm =
-                        Some((last + limits.monitor_wake_interval).saturating_duration_since(now));
-                }
-            }
+            // A waking notice that has not gone out yet keeps waking when more lines join it
+            // (W2: a burst can arrive in pieces).
+            let waking = state
+                .notices
+                .get(&session)
+                .and_then(|n| n.get(&key))
+                .is_some_and(|n| n.wake);
+            let (wake, arm) = if running {
+                (false, None)
+            } else {
+                pace(feed, now, limits.monitor_wake_interval, waking)
+            };
             feed.remember(&batch);
             let notice = Notice {
                 key: key.clone(),
@@ -118,4 +116,30 @@ impl TaskManager {
             outlet.notices_waiting(&session);
         }
     }
+}
+
+/// Whether new lines wake the idle session now, and otherwise when to look again: at most one
+/// wake per `interval`, one timer at a time.
+fn pace(
+    feed: &mut MonitorFeed,
+    now: Instant,
+    interval: Duration,
+    waking: bool,
+) -> (bool, Option<Duration>) {
+    if feed.last_wake.is_none_or(|last| now >= last + interval) {
+        feed.last_wake = Some(now);
+        return (true, None);
+    }
+    if waking {
+        return (true, None);
+    }
+    if feed.wake_armed {
+        return (false, None);
+    }
+    feed.wake_armed = true;
+    let last = feed.last_wake.unwrap_or(now);
+    (
+        false,
+        Some((last + interval).saturating_duration_since(now)),
+    )
 }
