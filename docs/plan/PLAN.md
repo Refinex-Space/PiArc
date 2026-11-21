@@ -162,7 +162,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T31 | [子 agent 与模型别名](tasks/T31-subagents-and-model-aliases.md) | 4 | R3 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 7ec1971 |
 | T32 | [后台任务、Monitor 与 KillShell](tasks/T32-background-tasks-and-monitor.md) | 4 | T31 | macOS | high / 高 | 中 | 无 | 部分完成 | ef39d43 |
 | T33 | [无头终端（Core 侧）](tasks/T33-headless-terminal.md) | 4 | T32 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 33f4bf9 |
-| T34 | [终端渲染器与终端面板](tasks/T34-terminal-renderer-and-panel.md) | 4 | T33 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
+| T34 | [终端渲染器与终端面板](tasks/T34-terminal-renderer-and-panel.md) | 4 | T33 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 991f323 |
 | T35 | [Worktree、并行会话、多窗口、全文搜索与后台常驻](tasks/T35-worktrees-parallel-sessions-and-windows.md) | 4 | T34 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T36 | [MCP 共享连接池](tasks/T36-mcp-connection-pool.md) | 4 | T35 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T37 | [Skills、斜杠命令、命令面板与输出风格](tasks/T37-skills-commands-and-output-styles.md) | 4 | T36 | macOS | high / 高 | 大 | 无 | 未开始 | — |
@@ -308,26 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-### T34 终端渲染器与终端面板（2026-11-20 开工）
-
-- 路线：**主路线**。S7 报告第 1 节结论为"正式路线，不启用 xterm.js 退路"（macOS 通过，Windows W0 有条件通过、回显口径由 R1 校准后通过）：fork 的 Canvas 渲染器由 T33 的帧协议（第 2 版）驱动，帧作为 `requestTerminalFrame` 的返回值送达（ADR-0023）。
-- 前置：T33 部分完成，遗留 A02、A12、A14 只等 Windows CI，不影响本任务。基线 `npm run verify -- --baseline` 通过（复用 33f4bf9 的全量结果）。
-
-检查清单（交付物 → 验收项）：
-
-- [x] 1 Core 侧：piarc-term 选区手势、视口滚动、链接、选区文本；Core 与 NAPI 导出（A05、A07）；另加停拉后的 `output` 唤醒事件（空闲不轮询）
-- [x] 2 主进程与 preload：会话终端的打开、归属与重载后重连，鼠标、焦点、粘贴、读屏、搜索、选区、滚动、链接、共享；I51 的防线与上限（A04、A09、A10）；`window.piarc` 去掉 `createTerminal`（I30）
-- [x] 3 渲染器：`RemoteRenderable` 行复用与脏行、小数 DPR、宽字符与 emoji、光标样式与闪烁（`prefers-reduced-motion`）、系统等宽字体与令牌颜色（A01）
-- [x] 4 拉帧与输入：rAF 拉帧、隐藏与最小化停拉、键盘归属与全局快捷键、Mod+C / Ctrl+C、粘贴（A02、A04）
-- [x] 5 IME：textarea 跟随光标、预编辑绘制、上屏一次写入（A03）
-- [x] 6 选区与复制、查找栏、链接确认（A05、A06、A07）
-- [x] 7 终端面板：停靠、多标签、会话 cwd、重命名与标题、关闭结束进程树、Ctrl+\`、共享开关、打开 agent 的终端任务、选中内容附加到对话（A08、A09）
-- [x] 8 重载恢复与无障碍：一次拉帧恢复、以文本查看屏幕、axe（A10、A12）
-- [x] 9 L4 与截图：vim、htop/top、less、缩放（A01）；L2 共享场景（A09）
-- [x] 10 测量：`cat` 100 MB 事件循环 p99、回显 p95、帧率与 IPC 字节（A11）
-- [x] 11 许可证与来源：fork 声明、改动清单、`third-party/sources.json`（A13）
-- [ ] 12 文档与收尾：架构 6.11/8.x/10.3、ADR、`renderer/terminal/AGENTS.md`、W3 核对项、I30/I51/I59，`npm run verify`（A14）
 
 ## 登记事项
 
@@ -939,3 +919,12 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 决策：ADR-0050（补充）；架构 2.41。实现中定下的补充：终端环境没有 locale 时补 UTF-8（macOS `en_US.UTF-8`），否则 bash 把键入的中文改坏；模型的命令结束时先挂提醒再把退出码写到仍在运行的任务上（L2 以此确定地等待）；模型的 bash 终端在 macOS 上关掉系统 bash 的 zsh 提示；scrollback 只按行数限制（libghostty-vt 默认 10,000 字节上限是 T10 遗留缺陷）；有序关闭等每棵进程树的宽限与 kill 结束（修复前忽略挂断的进程活过 Core）。
 - 登记：I28、I55 已落地；新增 I140（L3 的 `KillShell`、`Monitor` 差异没有 allowlist 条目）。共享开关的界面与终端面板交 T34。
 - 下一项：macOS 上的 T34（终端渲染器与终端面板，依赖 T33）；Windows 上的 W2 仍可进行。本地提交，未推送。
+
+### 2026-11-20 T34 部分完成（提交 991f323）
+
+- 路线：S7 的正式路线（fork 的 Canvas 渲染器由帧协议驱动），没有启用 xterm.js 退路。
+- 交付：piarc-term 的选区手势、选区文本、视口滚动、OSC 8 链接、默认颜色与停拉唤醒（`vt/selection.rs`、写线程上的 `session/pointer.rs`，`Event::Output`）；Core 与 NAPI 的 `terminalScroll`、`terminalClearSelection`、`terminalSelectionText`、`terminalLinkAt`、`terminalSetColors`、`terminalFrame` 的 `park`、鼠标 `clicks`；协议 `TerminalEvent::Output`、`TerminalScroll`、`TerminalLink`；主进程终端 IPC 重写（会话终端归会话、近期真实输入防线、每会话 16 个与每窗口每终端一个在途拉帧的上限，`window.piarc` 去掉 `createTerminal`、新增 13 个终端命令与 `visibility` 应用事件）；渲染器（设备像素绘制、选区与查找高亮、链接下划线、光标闪烁与减少动效、Powerline、令牌颜色）、视图控制器（rAF 拉帧、停拉、可见性、适配、输入与输入法、指针、复制粘贴）、终端面板（标签、重命名、关闭、共享开关、查找、以文本查看、附加到消息、Ctrl+\`）、composer 片段胶囊、后台任务卡的“在终端面板中打开”；L2 动作 `open_terminal`/`type_terminal`/`share_terminal` 与场景 `term-user-share`、能力 CAP-TERM-SHARE-001；L4 `t34-terminal.e2e.ts`（7）与 `t34-terminal-tui.e2e.ts`（4）。
+- 验收：12 项通过；A03（真实拼音输入法的实测截图，I141）等待用户在本机操作，A14（verify 的 Windows CI 部分）等待用户推送后的 Windows CI，标 blocked。`npm run verify` 15/15（991f323，Vitest 1452 passed、cargo test 875 passed、L2 146 passed 2 个按平台跳过）；Windows 交叉 clippy 通过；T34 L4 11/11 与受影响的 preload、terminal、terminal-tui、t32、t33、t19-composer、t18-settings、composer、external-links 通过（dev 形态，截图在 `tmp/evidence/T34/`）；S7 基准 cat 100 MB 主进程事件循环 p99 2.14 ms、回显额外 p95 0.68 ms、IPC 0.7 MiB/101 MiB。
+- 决策：ADR-0051（补充）；架构 2.42。axe 发现并修复两处存量问题：主按钮文字对比度（全应用，I144）与 tablist 子元素；`window.piarc` 共 86 个函数。
+- 登记：I30、I51、I59 更新（I51 落地）；新增 I141（真实拼音核对）、I142（W3 的 Windows 核对项与 t34 L4 的 Windows 版）、I143（重启后恢复终端的入口）、I144、I145（没有 htop，用 top）。
+- 下一项：macOS 上的 T35（Worktree、并行会话、多窗口，依赖 T34）；Windows 上的 W2 仍可进行。本地提交，未推送。

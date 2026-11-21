@@ -3387,99 +3387,99 @@
       "id": "T34-A01",
       "task": "T34",
       "description": "vim、htop、less 在面板中渲染正确，覆盖颜色、光标、alt screen 切换与窗口缩放后的重排。验证：Playwright 截图（存 `tmp/evidence/T34/`）与 Core formatter 输出对照。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `t34-terminal-tui.e2e.ts`「vim, top and less render as Core says, before and after a resize」：面板中 vim（`syntax on`、`set number`，中文注释、emoji、`~` 行）、top（整屏重绘、反色表头）、less（首页与 G 到末页）在页面从帧重建的屏幕与 Core formatter 文本相等并保持 300 ms 后截图；窗口缩窄后 Core 的列数变小、vim 重排后两者再次相等。截图与 formatter 文本在 tmp/evidence/T34/l4/t34-terminal-tui.e2e.ts-vi-67c62-s-before-and-after-a-resize-dev/（vim.png、vim-resized.png、top.png、less.png、less-end.png 与各自 .formatter.txt）。本机没有 htop，按 T10 做法用 top（PLAN I145）。命令：PIARC_EVIDENCE_TASK=T34 npx playwright test -c apps/desktop/playwright.config.ts t34- --project dev（11/11 通过，dev 形态）"
     },
     {
       "id": "T34-A02",
       "task": "T34",
       "description": "面板隐藏或窗口最小化时渲染进程不接收终端数据（主路线：拉帧次数为 0；退路：暂停字节流投递），恢复显示后内容完整。验证：测试（计数）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `t34-terminal-tui.e2e.ts`「a hidden panel and a minimized window pull no frames」：终端持续输出 tick 时，Ctrl+` 关闭面板后 1 s 内主进程收到的拉帧请求数为 0，再打开后 tick 追上；窗口最小化（主进程 `visibility` 应用事件）后 1 s 内拉帧 0 次，恢复后追上。原型页 `terminal.e2e.ts` 另验证空闲视图停拉（请求数为 0、≤ PARK_AFTER+1 个 14 字节空帧）且输出将其唤醒；Core `pointer.rs` 的 `a_parked_viewer_is_woken_once_by_new_output`。tmp/evidence/T34/l4/t34-terminal-tui.e2e.ts-a--ec3f4-s-shown-again-they-catch-up-dev/"
     },
     {
       "id": "T34-A03",
       "task": "T34",
       "description": "中文输入法的预编辑文本绘制在光标处，候选框跟随光标，上屏文本只写入 PTY 一次。验证：macOS 实测截图与组件测试（模拟 composition 事件）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "组件测试与 CDP 合成已通过，真实拼音输入法的实测截图等待用户在本机操作（PLAN I141）。已验证：`npx vitest run apps/desktop/src/renderer/terminal/input.test.ts`（模拟 compositionstart/update/end 与 229 按键：合成中按键不发给 Core、预编辑依次为 ni→你好、上屏只写一次、其后的 input 事件不重复写入）；L4 `t34-terminal-tui.e2e.ts`「the input method composes at the cursor and commits once」在 macOS 上用 CDP `Input.imeSetComposition`/`insertText`：预编辑画在光标处且 PTY 未收到字节、textarea 与光标格重合并随上屏右移 4 格、输出行只有一个“你好”（tmp/evidence/T34/l4/t34-terminal-tui.e2e.ts-th-d4c74-the-cursor-and-commits-once-dev/ime-preedit.png、ime-committed.png）。候选框位置要用系统“简体拼音”在前台实测（S7 第 8 节 T1–T4 改在终端面板中做）。"
     },
     {
       "id": "T34-A04",
       "task": "T34",
       "description": "键盘、鼠标、粘贴经 Core 编码：vim 中方向键、鼠标点击与 bracketed paste 生效。验证：Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `t34-terminal-tui.e2e.ts`「vim gets arrow keys, mouse clicks and bracketed paste through Core」：vim（`set mouse=a`）中 ↓ 后 x 删掉第二行首字符、鼠标点击 three 的第 3 列后 x 删掉 r、`o` 后粘贴两行，未出现不安全粘贴确认框，`:wq` 后文件为 `one\\nwo\\nthee\\npasted 1\\npasted 2\\n`；`printf '\\033[?2004h'; cat -v` 中粘贴显示 `^[[200~alpha` 与 `beta^[[201~`（Core 按程序的模式包装）。命令：PIARC_EVIDENCE_TASK=T34 npx playwright test -c apps/desktop/playwright.config.ts t34- --project dev（11/11 通过，dev 形态）"
     },
     {
       "id": "T34-A05",
       "task": "T34",
       "description": "拖选、双击选词、三击选行后复制，剪贴板内容与屏幕文本一致。验证：Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `t34-terminal.e2e.ts`「dragging, double and triple clicks select; Mod+C copies」：拖选第 6–15 列后帧带回该行选区列 `6-15`，⌘C 后剪贴板为 `beta gamma`；双击 alpha 选区 `0-4`、剪贴板 `alpha`；三击第二行选区 `0-15`、剪贴板 `second line here`；之后键入清除选区。剪贴板经 `withSavedClipboard` 恢复。Core 侧 `cargo test -p piarc-term --lib vt::tests::` 与 `--test pointer`、`cargo test -p piarc-core --test terminal`。tmp/evidence/T34/l4/t34-terminal.e2e.ts-draggi-35b60-ction-goes-into-the-message-dev/selection-light.png"
     },
     {
       "id": "T34-A06",
       "task": "T34",
       "description": "查找栏高亮全部匹配并可上下跳转，显示匹配数。验证：Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `t34-terminal.e2e.ts`「the find bar highlights every match, steps through them and shows the count」：搜 needle 显示“1 of 3”，三行各高亮 0–5 列且当前项带标记；Enter 到“2 of 3”、Shift+Enter 回“1 of 3”、↓ 按钮到“3 of 3”，无匹配显示“No matches”，Esc 关闭后高亮清空、焦点回到终端。单测 `search.test.ts`。tmp/evidence/T34/l4/t34-terminal.e2e.ts-the-fi-09a85-gh-them-and-shows-the-count-dev/find-light.png"
     },
     {
       "id": "T34-A07",
       "task": "T34",
       "description": "OSC 8 链接与普通 URL 点击后先显示目标地址，确认后才调用 `shell.openExternal`，取消则不打开。验证：Playwright（拦截主进程调用）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `t34-terminal.e2e.ts`「OSC 8 links and plain URLs show their address and open only when confirmed」：主进程的确认框与 `shell.openExternal` 换成记录器；⌘+点击 OSC 8 链接，取消时只记录 `confirm https://example.com/osc8`、未打开，确认时记录 `open https://example.com/osc8`；普通 URL 同样先确认再打开；不带修饰键的点击不打开；悬停显示指针光标与下划线（link-hover.png）。单测 `links.test.ts`（只认 https/http/mailto、拒绝带用户信息）。tmp/evidence/T34/l4/t34-terminal.e2e.ts-OSC-8--d740a-nd-open-only-when-confirmed-dev/"
     },
     {
       "id": "T34-A08",
       "task": "T34",
       "description": "面板支持多标签，新标签以会话 cwd 启动，关闭标签终止 shell 进程树，Ctrl+反引号切换面板；选中内容可附加到对话。验证：Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `t34-terminal.e2e.ts`「Ctrl+` opens a terminal in the session directory; tabs open, rename, switch and close」：Ctrl+` 打开面板并新建终端、焦点在终端，`pwd` 输出会话的工作区路径；新建第二个标签、改名为“build 构建”；切回第一个标签以一次 RESET 帧恢复；关闭第一个标签后它启动的 `sleep 600` 进程消失（`process.kill(pid, 0)` 失败）；Ctrl+` 关闭再打开面板只剩“build 构建”。另一用例把选中内容附加到消息：composer 出现片段胶囊，发送后 mock 收到的用户消息含 ```text\\nsecond line here\\n```。tmp/evidence/T34/l4/t34-terminal.e2e.ts-Ctrl-o-5668c-pen-rename-switch-and-close-dev/tabs-light.png、tmp/evidence/T34/l4/t34-terminal.e2e.ts-draggi-35b60-ction-goes-into-the-message-dev/attached-light.png"
     },
     {
       "id": "T34-A09",
       "task": "T34",
       "description": "\"共享给 agent\"开关默认关闭，打开后 agent 才能读取该终端。验证：Playwright 与 L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `t34-terminal.e2e.ts`「a user terminal is not shared until the switch is turned on」：开关默认未选中、Core `terminalInfo.shared` 为 false，打开后为 true，关闭后回到 false（shared-light.png）。L2 `cargo test -p piarc-testkit --test scenarios -- term-user-share --exact` 通过：未共享时会话 tasks 目录里没有该终端的屏幕文件（grep 无匹配），共享后下一回合收到“The user shared a terminal with you: bg-…”提醒、Read 读到用户输入的 `shared-42`，取消共享后又看不到；全部 L2 146 通过（verify 第 14 步）。"
     },
     {
       "id": "T34-A10",
       "task": "T34",
       "description": "渲染进程重载后终端内容恢复、shell 进程不受影响（主路线：一次拉帧；退路：VT 重放，且渲染端产生的查询应答被丢弃）。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `t34-terminal.e2e.ts`「after a reload one frame brings the screen back and the shell is the same」：重载窗口后选中会话，面板自动回到同一终端，收到的第一帧即 RESET（`resets` 为 1）且屏幕含重载前的 `before-reload`；再执行 `echo SHELL_PID=$$` 得到同一 PID（两行相同）。主进程单测 `terminal-ipc.test.ts`「lets every window use a session terminal and keeps it across a reload」（重载、渲染进程崩溃都不关闭会话终端）。tmp/evidence/T34/l4/t34-terminal.e2e.ts-after--66d21-k-and-the-shell-is-the-same-dev/"
     },
     {
       "id": "T34-A11",
       "task": "T34",
       "description": "`cat` 100 MB 期间主进程事件循环延迟 p99 ≤ 16 ms，键入回显额外延迟 p95 ≤ 5 ms，并记录帧率与 IPC 字节数。验证：测量输出（与 S7 数据对照）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run bench:s7 -- --form packaged --out tmp/evidence/T34/bench/s7-packaged.json`（开发构建打包产物，Apple M1 Max，渲染器与面板共用的 `TerminalController`）：cat 100 MB 0.7 s（138 MB/s），主进程事件循环延迟 p50 1.29 / p99 2.14 / max 15.19 ms（预算 p99 ≤ 16；S7 为 2.04）；渲染进程每秒绘制 81.5 帧，每帧主线程工作 p50 4.40 / p99 11.47 ms，超过 50 ms 的任务 0；IPC 帧 0.7 MiB 对 101 MiB 输出（S7 为 1.5 MiB）；键入回显 200 对样本：直接写 PTY p95 0.03 ms、完整路径 p95 0.70 ms，额外 p95 0.68 ms（两组 p95 之差 0.67 ms，预算 ≤ 5；S7 为 0.79）。"
     },
     {
       "id": "T34-A12",
       "task": "T34",
       "description": "终端区域可聚焦、有可读标签，\"以文本查看屏幕\"的内容与读屏 API 一致。验证：axe 检查与 Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `t34-terminal.e2e.ts`「the terminal is focusable, labeled, and its screen can be read as text」：`getByRole('textbox', { name: /Terminal/ })` 获得焦点，`getByRole('group', { name: /Terminal/ })` 可见；“以文本查看屏幕”对话框获得焦点，内容与 Core 读屏 API（`terminalText` 视口）逐字相等；axe（@axe-core/playwright 4.14.0，legacy 模式）对对话框与终端面板均无违规（修复了主按钮对比度与 tablist 子元素两处，PLAN I144）。tmp/evidence/T34/l4/t34-terminal.e2e.ts-the-te-1d9a9--screen-can-be-read-as-text-dev/screen-text-light.png"
     },
     {
       "id": "T34-A13",
       "task": "T34",
       "description": "fork 代码保留 MIT 版权声明与许可证文件，来源与改动已记录，并登记到第三方许可证清单（退路时为 xterm.js）。验证：文件检查。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "文件检查：`apps/desktop/src/renderer/terminal/vendor/ghostty-web/LICENSE` 为原样的 MIT 许可证（Copyright (c) 2025 Coder）；`renderer.ts` 文件头保留上游标题与版权声明，写明来源（coder/ghostty-web `lib/renderer.ts`，提交 640db4617c69a73ccebce437cebc598c7f73cdb7）与 T10、T34 的修改；同目录 README 的改动清单列出 14 项（T34 为第 10–14 项）；`third-party/sources.json` 的 `ghostty-web-canvas-renderer` 条目记录仓库、路径、提交、许可证文件、`changedBy: [\"T34\"]`。提交说明见 2c1d0ef。"
     },
     {
       "id": "T34-A14",
       "task": "T34",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "macOS 已通过，Windows CI 待推送后确认：`npm run verify` 15/15 通过（991f323，工作区干净；Vitest 1452 passed 1 skipped、cargo test 875 passed 0 failed、L2 146 passed 2 个按平台跳过，日志 tmp/evidence/T34/verify.log）；Windows 交叉 clippy（piarc-term、piarc-core、piarc-napi、piarc-testkit、piarc-protocol，`--all-targets -D warnings`）通过。piarc-term 写线程与 Core 终端入口的改动在 Windows CI 上的 cargo test 需用户推送后由下一个任务按 CI 结果关闭。"
     },
     {
       "id": "T35-A01",
