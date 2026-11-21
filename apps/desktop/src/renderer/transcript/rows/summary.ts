@@ -3,6 +3,8 @@
 // changes' line counts summed. Pure functions over Core's items; the row turns them into text.
 import type { Item, ItemStatus } from '@piarc/protocol';
 
+import type { MessageId } from '../../../shared/i18n/index.js';
+
 export type ToolVerb = 'read' | 'search' | 'find' | 'edit' | 'fetch' | 'mcp' | 'agent' | 'other';
 
 export interface ToolPart {
@@ -143,3 +145,24 @@ export function summarize(items: readonly Item[]): GroupSummary {
   });
   return { parts, added, removed, status };
 }
+
+/** The message of each verb ("Read 3 files"). */
+export const VERB_MESSAGE: Record<ToolVerb, MessageId> = {
+  read: 'transcript.tool.read',
+  search: 'transcript.tool.search',
+  find: 'transcript.tool.find',
+  edit: 'transcript.tool.edit',
+  fetch: 'transcript.tool.fetch',
+  mcp: 'transcript.tool.mcp',
+  agent: 'transcript.tool.agent',
+  other: 'transcript.tool.other',
+};
+
+/** The message of each status. */
+export const STATUS_MESSAGE: Record<ItemStatus, MessageId> = {
+  inProgress: 'transcript.tool.status.inProgress',
+  completed: 'transcript.tool.status.completed',
+  failed: 'transcript.tool.status.failed',
+  declined: 'transcript.tool.status.declined',
+  interrupted: 'transcript.tool.status.interrupted',
+};

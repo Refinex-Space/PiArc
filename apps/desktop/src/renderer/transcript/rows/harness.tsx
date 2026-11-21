@@ -85,17 +85,21 @@ export function planPreview(plan: string, lines = 8): string {
   return all.length > lines ? all.slice(0, lines).join('\n') + '\n…' : plan;
 }
 
+/** Where a submitted plan stands, from its `ExitPlanMode` call. */
+export function planStatus(item: ToolItem): 'approved' | 'declined' | 'interrupted' | 'pending' {
+  return item.status === 'completed'
+    ? 'approved'
+    : item.status === 'declined' || item.status === 'failed'
+      ? 'declined'
+      : item.status === 'interrupted'
+        ? 'interrupted'
+        : 'pending';
+}
+
 function PlanCard({ item }: { readonly item: ToolItem }) {
   const t = useT();
   const plan = typeof item.arguments.plan === 'string' ? item.arguments.plan : '';
-  const status =
-    item.status === 'completed'
-      ? 'approved'
-      : item.status === 'declined' || item.status === 'failed'
-        ? 'declined'
-        : item.status === 'interrupted'
-          ? 'interrupted'
-          : 'pending';
+  const status = planStatus(item);
   return (
     <section className="row harness-card plan-row" data-testid="plan-row" data-status={status}>
       <header>

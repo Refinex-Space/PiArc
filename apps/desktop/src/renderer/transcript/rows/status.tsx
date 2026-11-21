@@ -96,7 +96,7 @@ export function CompactionRow({
   );
 }
 
-const ERROR_TITLE: Record<TurnErrorKind, MessageId> = {
+export const ERROR_TITLE: Record<TurnErrorKind, MessageId> = {
   auth: 'transcript.error.auth',
   rateLimit: 'transcript.error.rateLimit',
   provider: 'transcript.error.provider',

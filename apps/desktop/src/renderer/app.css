@@ -48,17 +48,6 @@ body,
   transition-duration: 0s !important;
 }
 
-/* Text for assistive technology only. */
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
 :root[data-app] :focus-visible {
   outline: 2px solid var(--piarc-c-focus-ring);
   outline-offset: 1px;

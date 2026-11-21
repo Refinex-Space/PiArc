@@ -15,8 +15,8 @@ import { useT } from '../app/app-context.js';
 import { LOCATED_MS, VIRTUAL_LIST } from './constants.js';
 import { loadExchange } from './copy.js';
 import { ListActionsContext, type ListActions } from './rows/list-actions.js';
-import { RowView } from './rows/RowView.js';
-import { useTranscriptView } from './services.js';
+import { RowView, useRowLabel } from './rows/RowView.js';
+import { useTranscriptView, useTurn } from './services.js';
 
 type RowVirtualizer = Virtualizer<HTMLDivElement, HTMLDivElement>;
 
@@ -50,6 +50,41 @@ function pixelOverscan(
   return indexes;
 }
 
+/** One row of the list: an article of the feed, named by the row's description. */
+function RowFrame({
+  id,
+  index,
+  count,
+  start,
+  located,
+  measure,
+}: {
+  readonly id: string;
+  readonly index: number;
+  readonly count: number;
+  readonly start: number;
+  readonly located: boolean;
+  readonly measure: (element: HTMLDivElement | null) => void;
+}) {
+  const label = useRowLabel(id);
+  return (
+    <div
+      ref={measure}
+      data-index={index}
+      data-row-id={id}
+      data-located={located ? true : undefined}
+      className="transcript-row"
+      style={{ transform: `translateY(${String(start)}px)` }}
+      role="article"
+      aria-label={label}
+      aria-posinset={index + 1}
+      aria-setsize={count}
+    >
+      <RowView id={id} />
+    </div>
+  );
+}
+
 export function TranscriptList({
   ids,
   onScroller,
@@ -70,6 +105,8 @@ export function TranscriptList({
   loadEarlier: (() => Promise<void>) | undefined;
 }) {
   const t = useT();
+  // The feed is busy while a turn adds rows (WAI-ARIA feed pattern).
+  const busy = useTurn().running;
   const { services, transcript } = useTranscriptView();
   const { heights } = services;
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
@@ -229,8 +266,11 @@ export function TranscriptList({
         className="transcript-scroller"
         data-testid="transcript-scroller"
         tabIndex={0}
-        role="log"
+        // A feed of articles, not a live log: streamed text is announced by the conversation's
+        // throttled live region (`LiveAnnouncer`), not token by token.
+        role="feed"
         aria-label={t('transcript.label')}
+        aria-busy={busy}
       >
         <div
           ref={onContent}
@@ -240,17 +280,15 @@ export function TranscriptList({
           {virtualizer.getVirtualItems().map((item) => {
             const id = ids[item.index] ?? '';
             return (
-              <div
+              <RowFrame
                 key={item.key}
-                ref={virtualizer.measureElement}
-                data-index={item.index}
-                data-row-id={id}
-                data-located={located === id ? true : undefined}
-                className="transcript-row"
-                style={{ transform: `translateY(${String(item.start)}px)` }}
-              >
-                <RowView id={id} />
-              </div>
+                id={id}
+                index={item.index}
+                count={ids.length}
+                start={item.start}
+                located={located === id}
+                measure={virtualizer.measureElement}
+              />
             );
           })}
         </div>

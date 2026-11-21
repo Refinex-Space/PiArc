@@ -18,7 +18,7 @@ import {
   type TranscriptView,
 } from '../services.js';
 import { useElapsedText, useNow } from './common.js';
-import { RowView } from './RowView.js';
+import { RowArticle } from './RowView.js';
 
 type SubagentItem = Extract<Item, { type: 'subagent' }>;
 
@@ -108,9 +108,11 @@ function ChildTranscript({ child, version }: { readonly child: string; readonly 
         <p className="muted">{t('subagent.transcriptEmpty')}</p>
       ) : (
         <TranscriptContext.Provider value={view}>
-          {ids.map((id) => (
-            <RowView key={id} id={id} />
-          ))}
+          <div role="feed" aria-label={t('subagent.transcriptLabel')}>
+            {ids.map((id) => (
+              <RowArticle key={id} id={id} />
+            ))}
+          </div>
         </TranscriptContext.Provider>
       )}
     </div>

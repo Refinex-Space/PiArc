@@ -7,10 +7,16 @@ import type { DiffHunk, Item, ItemStatus } from '@piarc/protocol';
 import { memo } from 'react';
 
 import { useT } from '../../app/app-context.js';
-import type { MessageId } from '../../../shared/i18n/index.js';
 import { useExpanded, useTranscriptRow, useTranscriptRows } from '../services.js';
 import { useElapsedText, useNow } from './common.js';
-import { summarize, targetOf, verbOf, type GroupSummary, type ToolVerb } from './summary.js';
+import {
+  STATUS_MESSAGE,
+  summarize,
+  targetOf,
+  VERB_MESSAGE,
+  verbOf,
+  type GroupSummary,
+} from './summary.js';
 
 type CommandItem = Extract<Item, { type: 'commandExecution' }>;
 type FileChangeItem = Extract<Item, { type: 'fileChange' }>;
@@ -23,25 +29,6 @@ const DIFF_PREVIEW_LINES = 40;
 
 /** Output lines a tool call shows when expanded. */
 const OUTPUT_PREVIEW_LINES = 30;
-
-const VERB_MESSAGE: Record<ToolVerb, MessageId> = {
-  read: 'transcript.tool.read',
-  search: 'transcript.tool.search',
-  find: 'transcript.tool.find',
-  edit: 'transcript.tool.edit',
-  fetch: 'transcript.tool.fetch',
-  mcp: 'transcript.tool.mcp',
-  agent: 'transcript.tool.agent',
-  other: 'transcript.tool.other',
-};
-
-const STATUS_MESSAGE: Record<ItemStatus, MessageId> = {
-  inProgress: 'transcript.tool.status.inProgress',
-  completed: 'transcript.tool.status.completed',
-  failed: 'transcript.tool.status.failed',
-  declined: 'transcript.tool.status.declined',
-  interrupted: 'transcript.tool.status.interrupted',
-};
 
 /** The summary as text: "Read 3 files · Edited a.ts". */
 export function useSummaryText(): (summary: GroupSummary) => string {

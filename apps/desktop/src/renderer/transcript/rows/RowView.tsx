@@ -5,7 +5,8 @@ import { Component, memo, useLayoutEffect, useRef, type ErrorInfo, type ReactNod
 
 import type { PermissionMode } from '@piarc/protocol';
 import { useT } from '../../app/app-context.js';
-import { useTranscriptRow, useTranscriptServices } from '../services.js';
+import { useTranscriptRow, useTranscriptRows, useTranscriptServices } from '../services.js';
+import { rowLabel } from '../row-label.js';
 import { useListActions } from './list-actions.js';
 import { AgentMessageRow, OptimisticRow, ThinkingRow, UserMessageRow } from './messages.js';
 import { ApprovalCard } from './ApprovalCard.js';
@@ -139,3 +140,28 @@ export const RowView = memo(function RowView({ id }: { readonly id: string }) {
     </RowBoundary>
   );
 });
+
+const NO_MEMBERS: readonly string[] = [];
+
+/** What a screen reader hears when it enters row `id` (`row-label.ts`). */
+export function useRowLabel(id: string): string | undefined {
+  const t = useT();
+  const row = useTranscriptRow(id);
+  const memberIds = row?.kind === 'group' ? row.members : NO_MEMBERS;
+  const members = useTranscriptRows(memberIds);
+  if (row === undefined) return undefined;
+  return rowLabel(row, t, (member) => {
+    const found = members[memberIds.indexOf(member)];
+    return found?.kind === 'item' ? found.item : undefined;
+  });
+}
+
+/** Row `id` as an article of a feed, named by its description (a subagent's transcript). */
+export function RowArticle({ id }: { readonly id: string }) {
+  const label = useRowLabel(id);
+  return (
+    <div role="article" aria-label={label}>
+      <RowView id={id} />
+    </div>
+  );
+}
