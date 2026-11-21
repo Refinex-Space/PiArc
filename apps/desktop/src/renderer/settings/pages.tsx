@@ -266,7 +266,9 @@ function ShortcutsPage() {
           <tr>
             <th>{t('settings.shortcuts.command')}</th>
             <th>{t('settings.shortcuts.key')}</th>
-            <th />
+            <th>
+              <span className="visually-hidden">{t('settings.shortcuts.actions')}</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -276,12 +278,16 @@ function ShortcutsPage() {
             const isRecording = recording === command.id;
             return (
               <tr key={command.id} data-testid={`shortcut-${command.id}`}>
-                <td>{t(command.label)}</td>
+                <td id={`shortcut-label-${command.id}`}>{t(command.label)}</td>
                 <td>
                   <button
                     type="button"
                     className={`key-button${isRecording ? ' is-recording' : ''}`}
-                    aria-label={t('settings.shortcuts.change', { command: t(command.label) })}
+                    // The name is the command and the key as shown ("New session ⌘N");
+                    // what the button does is its description.
+                    id={`shortcut-key-${command.id}`}
+                    aria-labelledby={`shortcut-label-${command.id} shortcut-key-${command.id}`}
+                    title={t('settings.shortcuts.change', { command: t(command.label) })}
                     data-testid={`shortcut-key-${command.id}`}
                     onClick={() => {
                       setProblem(undefined);

@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 
 import { useT } from '../app/app-context.js';
+import { isImeComposing } from '../composer/ime-guard.js';
 import {
   panelsFor,
   usePanels,
@@ -16,11 +17,15 @@ function Area({
   area,
   context,
   size,
+  min,
+  max,
   onResize,
 }: {
   readonly area: PanelArea;
   readonly context: PanelContext;
   readonly size: number;
+  readonly min: number;
+  readonly max: number;
   readonly onResize: (size: number) => void;
 }) {
   const t = useT();
@@ -55,13 +60,31 @@ function Area({
     <aside
       className={`panel-area panel-area-${area}`}
       style={vertical ? { width: size } : { height: size }}
+      aria-label={t(vertical ? 'panels.rail' : 'panels.dock')}
       data-testid={`panel-area-${area}`}
     >
       <div
         className={`resizer ${vertical ? 'resizer-x' : 'resizer-y'}`}
         role="separator"
         aria-orientation={vertical ? 'vertical' : 'horizontal'}
+        aria-label={t(vertical ? 'panels.resizeRail' : 'panels.resizeDock')}
+        aria-valuemin={min}
+        aria-valuemax={max}
+        aria-valuenow={size}
+        tabIndex={0}
+        data-testid={`panel-resizer-${area}`}
         onPointerDown={startResize}
+        onKeyDown={(event) => {
+          if (isImeComposing(event.nativeEvent)) return;
+          // The separator is on the area's leading edge: moving it away from the area grows it.
+          const grow = vertical ? 'ArrowLeft' : 'ArrowUp';
+          const shrink = vertical ? 'ArrowRight' : 'ArrowDown';
+          const step = event.key === grow ? 16 : event.key === shrink ? -16 : 0;
+          if (step !== 0) {
+            event.preventDefault();
+            onResize(size + step);
+          }
+        }}
       />
       <div className="panel-tabs" role="tablist">
         {panels.map((panel) => (
@@ -90,6 +113,8 @@ function Area({
 export function RailArea(props: {
   context: PanelContext;
   size: number;
+  min: number;
+  max: number;
   onResize: (n: number) => void;
 }) {
   return <Area area="rail" {...props} />;
@@ -98,6 +123,8 @@ export function RailArea(props: {
 export function DockArea(props: {
   context: PanelContext;
   size: number;
+  min: number;
+  max: number;
   onResize: (n: number) => void;
 }) {
   return <Area area="dock" {...props} />;

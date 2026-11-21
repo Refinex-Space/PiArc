@@ -48,6 +48,17 @@ body,
   transition-duration: 0s !important;
 }
 
+/* Text for assistive technology only. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 :root[data-app] :focus-visible {
   outline: 2px solid var(--piarc-c-focus-ring);
   outline-offset: 1px;
@@ -211,7 +222,7 @@ textarea.input {
 
 .shell {
   display: grid;
-  grid-template-columns: var(--piarc-sidebar-width) 1px minmax(0, 1fr);
+  grid-template-columns: var(--piarc-sidebar-width) minmax(0, 1fr);
   height: 100%;
 }
 
@@ -360,15 +371,26 @@ textarea.input {
 /* ---- sidebar ---- */
 
 .sidebar {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
   background: var(--piarc-c-sidebar-background);
 }
 
+/* The sidebar's separator is inside its landmark, on its right edge. */
+.sidebar-resizer {
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: 1;
+  width: 1px;
+}
+
+/* The material shows through a light veil of the sidebar's own color: text keeps its contrast
+   whatever is behind the window (axe, which cannot see the material, measures it on white). */
 :root[data-platform='mac']:not([data-color-mode$='HighContrast']) .sidebar,
 :root[data-platform='windows']:not([data-color-mode$='HighContrast']) .sidebar {
-  background: transparent;
+  background: color-mix(in srgb, var(--piarc-c-sidebar-background) 90%, transparent);
 }
 
 .titlebar-actions {

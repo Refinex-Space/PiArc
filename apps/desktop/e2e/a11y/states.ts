@@ -1,0 +1,183 @@
+// The accessibility state list (T43, architecture section 8.7): every page and component state
+// axe checks, in the light and the dark theme (`t43-a11y.e2e.ts`). `states.test.ts` compares it
+// with what the renderer registers: every settings page, rail and dock panel, dialog (each file
+// that renders `<Dialog>`) and transcript row kind (`ROW_KINDS` of `transcript/row-label.ts`)
+// needs an entry here, so a new page or row fails the check until it is listed and reached.
+//
+// Add a state: an entry here (`id` by its area; `source` for a dialog's file, `page` for a
+// settings page, `panel` for a panel, `row` for a row kind) and a `checkState(page, id)` call in
+// the journey of `t43-a11y.e2e.ts` that reaches it.
+
+export type A11yArea = 'window' | 'settings' | 'row' | 'approval' | 'panel' | 'dialog' | 'state';
+
+interface Base {
+  readonly id: string;
+  readonly area: A11yArea;
+  /** What is on screen. */
+  readonly note: string;
+}
+
+export type A11yState =
+  | (Base & { readonly area: 'window' | 'approval' | 'state' })
+  | (Base & { readonly area: 'settings'; readonly page: string })
+  | (Base & { readonly area: 'panel'; readonly panel: string })
+  | (Base & { readonly area: 'dialog'; readonly source: string })
+  | (Base & { readonly area: 'row'; readonly row: string });
+
+export const A11Y_STATES = [
+  // Windows.
+  { id: 'window:welcome', area: 'window', note: 'main window without a workspace' },
+  { id: 'window:new-session', area: 'window', note: 'new session form of an open workspace' },
+  { id: 'window:conversation', area: 'window', note: 'a session after a turn, sidebar and rail' },
+  { id: 'window:message-search', area: 'window', note: 'sidebar message search with results' },
+  // Settings window, one state per registered page.
+  { id: 'settings:general', area: 'settings', page: 'general', note: 'General' },
+  { id: 'settings:appearance', area: 'settings', page: 'appearance', note: 'Appearance' },
+  { id: 'settings:providers', area: 'settings', page: 'providers', note: 'Models and providers' },
+  { id: 'settings:permissions', area: 'settings', page: 'permissions', note: 'Permissions' },
+  { id: 'settings:sandbox', area: 'settings', page: 'sandbox', note: 'Sandbox' },
+  { id: 'settings:agents', area: 'settings', page: 'agents', note: 'Subagents' },
+  {
+    id: 'settings:skills',
+    area: 'settings',
+    page: 'skills',
+    note: 'Skills and plugins, a plugin waiting for confirmation',
+  },
+  { id: 'settings:mcp', area: 'settings', page: 'mcp', note: 'MCP servers' },
+  { id: 'settings:usage', area: 'settings', page: 'usage', note: 'Usage' },
+  {
+    id: 'settings:diagnostics',
+    area: 'settings',
+    page: 'diagnostics',
+    note: 'Configuration diagnostics',
+  },
+  { id: 'settings:shortcuts', area: 'settings', page: 'shortcuts', note: 'Keyboard shortcuts' },
+  // Transcript rows, one per row kind.
+  { id: 'row:userMessage', area: 'row', row: 'userMessage', note: 'a sent message' },
+  {
+    id: 'row:optimistic',
+    area: 'row',
+    row: 'optimistic',
+    note: 'a message Core did not take (not delivered, resend)',
+  },
+  { id: 'row:agentMessage', area: 'row', row: 'agentMessage', note: 'a reply with Markdown' },
+  { id: 'row:reasoning', area: 'row', row: 'reasoning', note: 'a finished thinking block' },
+  { id: 'row:group', area: 'row', row: 'group', note: 'a tool group (Read, Grep)' },
+  { id: 'row:commandExecution', area: 'row', row: 'commandExecution', note: 'a Bash card' },
+  {
+    id: 'row:fileChange',
+    area: 'row',
+    row: 'fileChange',
+    note: 'a file change card with its diff',
+  },
+  { id: 'row:error', area: 'row', row: 'error', note: 'an error card (authentication)' },
+  {
+    id: 'row:uncertain',
+    area: 'row',
+    row: 'uncertain',
+    note: 'outcome unknown after the Agent Host died',
+  },
+  { id: 'row:working', area: 'row', row: 'working', note: 'the working row during a turn' },
+  {
+    id: 'row:permissionModeChanged',
+    area: 'row',
+    row: 'permissionModeChanged',
+    note: 'a mode change record',
+  },
+  {
+    id: 'row:contextCompaction',
+    area: 'row',
+    row: 'contextCompaction',
+    note: 'a compaction note after /compact',
+  },
+  { id: 'row:reminder', area: 'row', row: 'reminder', note: 'a reminder in the detailed view' },
+  { id: 'row:subagent', area: 'row', row: 'subagent', note: 'a subagent card' },
+  { id: 'row:webSearch', area: 'row', row: 'webSearch', note: 'a web search with its sources' },
+  { id: 'row:todo', area: 'row', row: 'todo', note: 'the task card (TodoWrite)' },
+  { id: 'row:plan', area: 'row', row: 'plan', note: 'a submitted plan (ExitPlanMode)' },
+  {
+    id: 'row:question',
+    area: 'row',
+    row: 'question',
+    note: 'an answered question (AskUserQuestion)',
+  },
+  { id: 'row:nextSteps', area: 'row', row: 'nextSteps', note: 'suggested next steps' },
+  // Approval cards: the four kinds of section 8.2 and the plan card.
+  { id: 'approval:command', area: 'approval', note: 'command card' },
+  { id: 'approval:fileChange', area: 'approval', note: 'file change card with its diff' },
+  { id: 'approval:permissionExpansion', area: 'approval', note: 'directory outside the workspace' },
+  { id: 'approval:question', area: 'approval', note: 'question form' },
+  { id: 'approval:plan', area: 'approval', note: 'plan card' },
+  // Rail cards and dock panels, one per registered panel.
+  { id: 'panel:context', area: 'panel', panel: 'context', note: 'context card' },
+  { id: 'panel:usage', area: 'panel', panel: 'usage', note: 'usage card' },
+  { id: 'panel:tasks', area: 'panel', panel: 'tasks', note: 'task list card' },
+  { id: 'panel:plan', area: 'panel', panel: 'plan', note: 'plan panel' },
+  {
+    id: 'panel:background-tasks-card',
+    area: 'panel',
+    panel: 'background-tasks-card',
+    note: 'background tasks card',
+  },
+  {
+    id: 'panel:background-tasks',
+    area: 'panel',
+    panel: 'background-tasks',
+    note: 'background tasks panel with output',
+  },
+  { id: 'panel:changes-card', area: 'panel', panel: 'changes-card', note: 'changes card' },
+  {
+    id: 'panel:changes',
+    area: 'panel',
+    panel: 'changes',
+    note: 'Changes panel with a comment being written and saved ones',
+  },
+  { id: 'panel:terminal', area: 'panel', panel: 'terminal', note: 'terminal panel' },
+  // Dialogs, one or more per file that renders `<Dialog>`.
+  { id: 'dialog:trust', area: 'dialog', source: 'shell/TrustDialog.tsx', note: 'trust a folder' },
+  {
+    id: 'dialog:command-palette',
+    area: 'dialog',
+    source: 'shell/CommandPalette.tsx',
+    note: 'Mod+K',
+  },
+  { id: 'dialog:shortcuts', area: 'dialog', source: 'shell/ShortcutsDialog.tsx', note: 'Mod+/' },
+  {
+    id: 'dialog:output-style',
+    area: 'dialog',
+    source: 'shell/OutputStyleDialog.tsx',
+    note: '/output-style',
+  },
+  {
+    id: 'dialog:model-switch',
+    area: 'dialog',
+    source: 'shell/ModelMenus.tsx',
+    note: 'the cost of switching models',
+  },
+  {
+    id: 'dialog:rewind',
+    area: 'dialog',
+    source: 'changes/RewindDialog.tsx',
+    note: 'rewind to a message',
+  },
+  {
+    id: 'dialog:sign-in',
+    area: 'dialog',
+    source: 'settings/SignInSection.tsx',
+    note: 'sign in with a code',
+  },
+  {
+    id: 'dialog:terminal-text',
+    area: 'dialog',
+    source: 'terminal/TerminalPanel.tsx',
+    note: 'the screen as text',
+  },
+  // Empty and error states.
+  {
+    id: 'state:changes-empty',
+    area: 'state',
+    note: 'Changes panel of a session that changed nothing',
+  },
+] as const satisfies readonly A11yState[];
+
+export type A11yStateId = (typeof A11Y_STATES)[number]['id'];

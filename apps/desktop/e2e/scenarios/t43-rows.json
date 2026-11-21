@@ -1,0 +1,16 @@
+{
+  "id": "t43-rows",
+  "steps": [
+    {
+      "thinking": "The notes are in the workspace. I will read them and look for the date.",
+      "tool_calls": [
+        { "id": "read1", "name": "Read", "input": { "path": "notes.txt" } },
+        { "id": "grep1", "name": "Grep", "input": { "pattern": "Friday" } }
+      ]
+    },
+    {
+      "text": "The notes say the release is on **Friday**.\n\n- Read `notes.txt`\n- Searched for the date"
+    },
+    { "text": "You are welcome." }
+  ]
+}

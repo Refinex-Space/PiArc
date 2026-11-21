@@ -36,6 +36,10 @@ import { UiContext, type Toast, type TrustMode, type Ui, type View } from './ui.
 import { useAttention } from './use-attention.js';
 import { useCommands } from './use-commands.js';
 
+/** The rail's width and the dock's height bounds (px). */
+const RAIL_WIDTH = { min: 240, max: 560 } as const;
+const DOCK_HEIGHT = { min: 120, max: 800 } as const;
+
 interface TrustRequest {
   readonly workspace: string;
   readonly mode: TrustMode;
@@ -378,41 +382,42 @@ export function Shell() {
           }
         >
           {!layout.sidebarCollapsed && (
-            <>
-              <Sidebar />
-              <div
-                className="resizer resizer-x sidebar-resizer"
-                role="separator"
-                aria-orientation="vertical"
-                aria-label={t('sidebar.resize')}
-                aria-valuemin={200}
-                aria-valuemax={420}
-                aria-valuenow={layout.sidebarWidth}
-                tabIndex={0}
-                data-testid="sidebar-resizer"
-                onPointerDown={startResize}
-                onDoubleClick={() => {
-                  setLayout((current) => ({
-                    ...current,
-                    sidebarWidth: loadLayout(undefined).sidebarWidth,
-                  }));
-                }}
-                onKeyDown={(event) => {
-                  if (isImeComposing(event.nativeEvent)) {
-                    return;
-                  }
-                  const step =
-                    event.key === 'ArrowLeft' ? -16 : event.key === 'ArrowRight' ? 16 : 0;
-                  if (step !== 0) {
-                    event.preventDefault();
+            <Sidebar
+              resizer={
+                <div
+                  className="resizer resizer-x sidebar-resizer"
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label={t('sidebar.resize')}
+                  aria-valuemin={200}
+                  aria-valuemax={420}
+                  aria-valuenow={layout.sidebarWidth}
+                  tabIndex={0}
+                  data-testid="sidebar-resizer"
+                  onPointerDown={startResize}
+                  onDoubleClick={() => {
                     setLayout((current) => ({
                       ...current,
-                      sidebarWidth: clampSidebar(current.sidebarWidth + step),
+                      sidebarWidth: loadLayout(undefined).sidebarWidth,
                     }));
-                  }
-                }}
-              />
-            </>
+                  }}
+                  onKeyDown={(event) => {
+                    if (isImeComposing(event.nativeEvent)) {
+                      return;
+                    }
+                    const step =
+                      event.key === 'ArrowLeft' ? -16 : event.key === 'ArrowRight' ? 16 : 0;
+                    if (step !== 0) {
+                      event.preventDefault();
+                      setLayout((current) => ({
+                        ...current,
+                        sidebarWidth: clampSidebar(current.sidebarWidth + step),
+                      }));
+                    }
+                  }}
+                />
+              }
+            />
           )}
           <div className="workspace-area">
             <div className="main-row">
@@ -450,10 +455,12 @@ export function Shell() {
               <RailArea
                 context={context}
                 size={layout.railWidth}
+                min={RAIL_WIDTH.min}
+                max={RAIL_WIDTH.max}
                 onResize={(size) => {
                   setLayout((current) => ({
                     ...current,
-                    railWidth: Math.min(560, Math.max(240, size)),
+                    railWidth: Math.min(RAIL_WIDTH.max, Math.max(RAIL_WIDTH.min, size)),
                   }));
                 }}
               />
@@ -461,10 +468,12 @@ export function Shell() {
             <DockArea
               context={context}
               size={layout.dockHeight}
+              min={DOCK_HEIGHT.min}
+              max={DOCK_HEIGHT.max}
               onResize={(size) => {
                 setLayout((current) => ({
                   ...current,
-                  dockHeight: Math.min(800, Math.max(120, size)),
+                  dockHeight: Math.min(DOCK_HEIGHT.max, Math.max(DOCK_HEIGHT.min, size)),
                 }));
               }}
             />

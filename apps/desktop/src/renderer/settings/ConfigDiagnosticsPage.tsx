@@ -561,9 +561,12 @@ export function ConfigDiagnosticsPage() {
             {t(view.trusted ? 'diagnostics.trusted' : 'diagnostics.untrusted')}
           </p>
           {error !== '' && <p className="error-text">{error}</p>}
-          {view.files.filter(isSettings).map((file) => (
-            <FileSection key={`${file.kind}:${file.layer}`} file={file} />
-          ))}
+          <section data-testid="diagnostics-kind-settings">
+            <h2 className="settings-heading">{t('diagnostics.kind.settings')}</h2>
+            {view.files.filter(isSettings).map((file) => (
+              <FileSection key={`${file.kind}:${file.layer}`} file={file} />
+            ))}
+          </section>
           {SOURCE_KINDS.map((kind) => {
             const files = view.files.filter((f) => f.kind === kind);
             if (files.length === 0) return null;

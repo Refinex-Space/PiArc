@@ -1,6 +1,6 @@
 // The sidebar (architecture section 8.2): sessions grouped by workspace, each with its status
 // badge; filter, pinned sessions first, archived ones on request; new session and open folder.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { displayKey, effectiveBindings } from '../../shared/keybindings.js';
 import { useApp } from '../app/app-context.js';
@@ -65,7 +65,8 @@ export function groupSessions(
     .map(([path, group]) => ({ path, name: group.name, sessions: group.sessions.sort(order) }));
 }
 
-export function Sidebar() {
+/** `resizer`: the separator that resizes the sidebar, inside its landmark. */
+export function Sidebar({ resizer }: { readonly resizer?: ReactNode }) {
   const { t, preferences, keyPlatform } = useApp();
   const ui = useUi();
   const store = useStore();
@@ -225,6 +226,7 @@ export function Sidebar() {
           </button>
         </div>
       </footer>
+      {resizer}
     </nav>
   );
 }
