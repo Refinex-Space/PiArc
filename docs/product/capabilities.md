@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | M1 | 61 | 61 | 0 | 0 |
 | M2 | 46 | 46 | 0 | 0 |
-| M3 | 36 | 26 | 10 | 0 |
+| M3 | 41 | 35 | 6 | 0 |
 | M4 | 10 | 0 | 10 | 0 |
 | M5 | 7 | 0 | 7 | 0 |
 
@@ -152,10 +152,15 @@
 | CAP-CMD-001 | 自定义斜杠命令（`.claude/commands`、Pi prompt templates） | FR-EX-02、ARCH-6.7 | T37 | — | 计划中 |
 | CAP-HOOK-HANDLER-001 | http 与 prompt 类型的 hook handler | FR-HN-05、ARCH-6.3.2 | T38 | — | 计划中 |
 | CAP-HOOK-SUBAGENT-001 | SubagentStart、SubagentStop 与 PostToolBatch hooks | FR-HN-05、ARCH-6.3.2 | T38 | — | 计划中 |
-| CAP-MCP-DEFER-001 | 工具多时延迟加载（ToolSearch） | FR-EX-03、ARCH-6.1.4、ARCH-6.8 | T36 | — | 计划中 |
-| CAP-MCP-OAUTH-001 | MCP 的 OAuth | FR-EX-03、ARCH-6.8 | T36 | — | 计划中 |
-| CAP-MCP-POOL-001 | MCP 工作区共享连接池 | FR-EX-03、ARCH-6.8 | T36 | — | 计划中 |
-| CAP-MCP-TRANSPORT-001 | MCP 的 stdio 与 Streamable HTTP 传输 | FR-EX-03、ARCH-6.8 | T36 | — | 计划中 |
+| CAP-MCP-CHANGES-001 | server instructions 进入 system prompt 第 6 段；工具集因 `list_changed` 或连接变化而改变时以追加消息送达，system prompt 不变 | FR-EX-03、ARCH-6.6.1、ARCH-6.8 | T36 | `mcp-tools-changed` | 已实现 |
+| CAP-MCP-CONFIG-001 | MCP 配置来源（`.mcp.json`、`~/.claude.json` 的 user 与 local、PiArc 用户与 `.piarc/` 设置）、同名按"企业 > 本地 > 项目 > 用户 > 插件"取整条定义、`${VAR}` 展开、SSE 与 WebSocket 标为不支持 | FR-EX-03、ARCH-6.8、ARCH-6.14 | T36 | `mcp-untrusted-project` | 已实现 |
+| CAP-MCP-DEFER-001 | 工具多时延迟加载（ToolSearch） | FR-EX-03、ARCH-6.1.4、ARCH-6.8 | T36 | `mcp-defer-toolsearch` | 已实现 |
+| CAP-MCP-OAUTH-001 | MCP 的 OAuth | FR-EX-03、ARCH-6.8 | T36 | `mcp-http-oauth` | 已实现 |
+| CAP-MCP-PERM-001 | `mcp__server__tool` 与 `mcp__server__*` 规则生效，带 `requiresUserInteraction` 标记的工具在任何模式下都询问 | FR-EX-03、ARCH-6.2.2、ARCH-6.8 | T36 | `mcp-rules-interaction` | 已实现 |
+| CAP-MCP-POOL-001 | MCP 工作区共享连接池 | FR-EX-03、ARCH-6.8 | T36 | `mcp-pool-shared` | 已实现 |
+| CAP-MCP-SUBAGENT-001 | 子 agent 定义的 `mcpServers`：按名称引用的 server 复用连接池，内联 server 只在该子 agent 运行期间连接 | FR-HN-04、FR-EX-03、ARCH-6.4、ARCH-6.8 | T36 | `mcp-subagent-servers`<br>`mcp-subagent-untrusted` | 已实现 |
+| CAP-MCP-TRANSPORT-001 | MCP 的 stdio 与 Streamable HTTP 传输 | FR-EX-03、ARCH-6.8 | T36 | `mcp-http-oauth`<br>`mcp-pool-shared` | 已实现 |
+| CAP-MCP-TRUST-001 | 未信任项目的 MCP server（`.mcp.json`、`.piarc/` 设置、项目级子 agent 的内联定义）不连接、不启动进程 | FR-EX-03、ARCH-6.8、ARCH-10.2 | T36 | `mcp-subagent-untrusted`<br>`mcp-untrusted-project` | 已实现 |
 | CAP-MODEL-ALIAS-001 | 模型别名表供子 agent 与 skills 引用 | FR-MD-05 | T31 | `model-default-setting`<br>`subagent-degrade`<br>`subagent-explore-fast`<br>`subagent-model-aliases` | 已实现 |
 | CAP-MODEL-DEGRADE-001 | 按模型能力降级（例如不支持图片输入时的处理） | ARCH-6.13 | T31 | `subagent-degrade` | 已实现 |
 | CAP-MONITOR-PERM-001 | Monitor 的命令受 Bash 规则、Bash 分析与 Bash matcher 的 PreToolUse hooks 约束，Manual 模式下需要审批 | FR-TL-04、FR-PM-03、ARCH-6.2、ARCH-6.3 | T32 | `monitor-hooks-bash-matcher`<br>`monitor-permissions` | 已实现 |
