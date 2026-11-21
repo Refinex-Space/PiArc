@@ -312,7 +312,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 **T42 NotebookEdit、可操作通知与 diff 行内评论**（开工 2026-11-21；基线 `npm run verify -- --baseline` 通过，复用 10fbeff 的全量结果；origin 停在 e0c41ce，没有新的 Windows CI 结果可关闭 `blocked` 项）
 
 - [x] 1 NotebookEdit：插入、替换、删除，cell id 与序号定位，保真写入，先读后改与外部修改、检查点、权限与 hooks
-- [ ] 2 可操作通知：通知层窄接口与测试替身、经审批账本答复、高风险只给"打开"、macOS 按 S6 结论、Windows Toast 按钮与 CI 测试、审计来源"通知"
+- [x] 2 可操作通知：通知层窄接口与测试替身、经审批账本答复、高风险只给"打开"、macOS 按 S6 结论、Windows Toast 按钮与 CI 测试、审计来源"通知"
 - [ ] 3 diff 行内评论：添加、编辑、删除、跨文件，Mod+Enter 批量发送，排队，草稿存 localStorage 与重新定位
 - [ ] 验收 A01–A12；收尾（piarc-fs、通知模块、changes 模块的 AGENTS.md，架构第 8.8 节）
 
