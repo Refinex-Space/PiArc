@@ -131,6 +131,9 @@ impl ToolIoConfig {
 /// A session's scope, file state and running commands.
 struct SessionIo {
     scope: Scope,
+    /// The workspace whose settings, rules, trust and audit the session uses: the scope's root,
+    /// except for a session in a worktree, whose scope is the worktree (T35).
+    project: PathBuf,
     memory: memory::State,
     policy: Mutex<policy::State>,
     blob_dir: PathBuf,
@@ -151,6 +154,13 @@ struct SessionIo {
     turn: Mutex<Option<String>>,
     /// Set for a subagent's session (T31): its main session and how it was started.
     subagent: Option<subagents::Link>,
+}
+
+impl SessionIo {
+    /// The workspace of the session's settings, rules, trust and audit (T35).
+    fn project(&self) -> &Path {
+        &self.project
+    }
 }
 
 /// What a sandboxed session may reach besides its workspace (architecture section 6.10).
@@ -266,6 +276,22 @@ impl ToolIo {
         root: &Path,
         cwd: &Path,
     ) -> Result<(), ErrorObject> {
+        self.open_session_in(session_id, root, root, cwd)
+    }
+
+    /// Like [`ToolIo::open_session`] for a session whose files are `root` (a worktree) while
+    /// its settings, rules, trust and audit are those of workspace `project` (T35).
+    ///
+    /// # Errors
+    ///
+    /// As [`ToolIo::open_session`].
+    pub fn open_session_in(
+        &self,
+        session_id: &str,
+        project: &Path,
+        root: &Path,
+        cwd: &Path,
+    ) -> Result<(), ErrorObject> {
         check_session_id(session_id)?;
         let tmp = self.create_tmp(session_id)?;
         let attachments = self.create_attachments(session_id)?;
@@ -275,7 +301,14 @@ impl ToolIo {
             .and_then(|scope| scope.with_read_only_dir(&attachments))
             .and_then(|scope| scope.with_read_only_dir(&tasks))
             .map_err(|e| e.to_error_object())?;
-        self.register(session_id, scope, tmp, None, None);
+        // Spelled like the scope's root (symbolic links resolved), which the rules and the
+        // audit compared before worktrees existed.
+        let project = if project == root {
+            scope.root().to_path_buf()
+        } else {
+            piarc_git::canonical(project).unwrap_or_else(|_| project.to_path_buf())
+        };
+        self.register(session_id, scope, &project, tmp, None, None);
         Ok(())
     }
 
@@ -284,6 +317,7 @@ impl ToolIo {
     fn open_linked(
         &self,
         session_id: &str,
+        project: &Path,
         root: &Path,
         cwd: &Path,
         link: subagents::Link,
@@ -297,7 +331,7 @@ impl ToolIo {
             .and_then(|scope| scope.with_read_only_dir(&attachments))
             .and_then(|scope| scope.with_read_only_dir(&tasks))
             .map_err(|e| e.to_error_object())?;
-        self.register(session_id, scope, tmp, None, Some(link));
+        self.register(session_id, scope, project, tmp, None, Some(link));
         Ok(())
     }
 
@@ -363,7 +397,8 @@ impl ToolIo {
         let sandbox = SessionSandbox::start(&policy, allowlist, Arc::new(SystemNetwork))
             .await
             .map_err(|e| sandbox_error(&e))?;
-        self.register(session_id, scope, tmp, Some(sandbox), None);
+        let project = scope.root().to_path_buf();
+        self.register(session_id, scope, &project, tmp, Some(sandbox), None);
         Ok(())
     }
 
@@ -375,6 +410,7 @@ impl ToolIo {
         &self,
         session_id: &str,
         scope: Scope,
+        project: &Path,
         tmp_dir: PathBuf,
         sandbox: Option<SessionSandbox>,
         subagent: Option<subagents::Link>,
@@ -385,6 +421,7 @@ impl ToolIo {
             session_id.to_owned(),
             Arc::new(SessionIo {
                 scope,
+                project: project.to_owned(),
                 memory: memory::State::default(),
                 policy: Mutex::default(),
                 blob_dir,
@@ -399,6 +436,38 @@ impl ToolIo {
                 subagent,
             }),
         );
+    }
+
+    /// The environment commands inherit (the user's login shell, T17).
+    pub(crate) async fn command_environment(&self) -> Vec<(OsString, OsString)> {
+        self.exec.hook_launch().await.env
+    }
+
+    /// Runs git for worktrees of `workspace` (T35): the commands' environment, the git on its
+    /// `PATH` outside the workspace, the process-tree spawner.
+    ///
+    /// # Errors
+    ///
+    /// `notFound` when no git is on that `PATH`.
+    pub(crate) async fn git_runner(&self, workspace: &Path) -> Result<piarc_git::Git, ErrorObject> {
+        let env = self.command_environment().await;
+        let path = env
+            .iter()
+            .find(|(k, _)| k.to_string_lossy().eq_ignore_ascii_case("PATH"))
+            .map(|(_, v)| v.clone())
+            .unwrap_or_default();
+        let program = piarc_git::git::find_program(&path, Some(workspace)).ok_or_else(|| {
+            ErrorObject::new(
+                ErrorKind::NotFound,
+                "git was not found on the PATH of commands",
+                false,
+            )
+        })?;
+        Ok(piarc_git::Git::new(
+            Arc::new(piarc_exec::ProcessTreeSpawner),
+            program,
+            env,
+        ))
     }
 
     /// The proxy port of a sandboxed session.

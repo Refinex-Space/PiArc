@@ -9340,7 +9340,30 @@
     },
     "SubagentFinishResult": {
       "description": "Result of `subagent/finish`.",
+      "properties": {
+        "worktree": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SubagentWorktree"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The run's worktree, kept because it has changes or commits (T35); an untouched one is\nremoved with its branch and not listed."
+        }
+      },
       "type": "object"
+    },
+    "SubagentIsolation": {
+      "description": "Where a subagent's files are (T35).",
+      "oneOf": [
+        {
+          "const": "worktree",
+          "description": "A temporary git worktree at `.piarc/worktrees/agent-<id>/` from the parent's HEAD.",
+          "type": "string"
+        }
+      ]
     },
     "SubagentLimits": {
       "description": "Depth and concurrency limits (settings `subagents.maxDepth`, `subagents.maxConcurrent`).",
@@ -9396,6 +9419,17 @@
         "description": {
           "description": "The task description the model gave.",
           "type": ["string", "null"]
+        },
+        "isolation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SubagentIsolation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Runs in a temporary worktree (T35): Core creates it and answers the child's `cwd`."
         },
         "model": {
           "anyOf": [
@@ -9468,6 +9502,10 @@
     "SubagentStartResult": {
       "description": "Result of `subagent/start`.",
       "properties": {
+        "cwd": {
+          "description": "The child's working directory when Core chose it (isolation: inside its worktree).",
+          "type": ["string", "null"]
+        },
         "permissionMode": {
           "$ref": "#/$defs/PermissionMode",
           "description": "The child's permission mode now: the definition's, never looser than the parent's."
@@ -9478,6 +9516,17 @@
             "$ref": "#/$defs/AgentWarning"
           },
           "type": "array"
+        },
+        "worktree": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SubagentWorktree"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The worktree created for it (isolation)."
         }
       },
       "required": ["permissionMode"],
@@ -9719,6 +9768,21 @@
         }
       },
       "required": ["input", "output", "cacheRead", "cacheWrite"],
+      "type": "object"
+    },
+    "SubagentWorktree": {
+      "description": "A subagent's temporary worktree (T35).",
+      "properties": {
+        "branch": {
+          "description": "Its branch.",
+          "type": "string"
+        },
+        "path": {
+          "description": "Its directory.",
+          "type": "string"
+        }
+      },
+      "required": ["path", "branch"],
       "type": "object"
     },
     "SuccessResponse": {

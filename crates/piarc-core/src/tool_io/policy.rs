@@ -308,7 +308,7 @@ impl ToolIo {
     pub(super) async fn denied_tools(&self, p: PolicyToolsParams) -> Result<Value, ErrorObject> {
         let s = self.session(&p.session_id)?;
         let services = self.services()?;
-        let settings = services.settings(s.scope.root()).await?;
+        let settings = services.settings(s.project()).await?;
         let rules = rules_of(&s, &settings);
         let denied = p
             .tools
@@ -373,9 +373,7 @@ impl ToolIo {
             let mode = lock(&s.policy).mode;
             let detail = json!({"tool":p.tool,"toolCallId":p.tool_call_id,"arguments":argument_summary(&p),"mode":mode,
                 "step":"preflightError","errorKind":error.data.kind,"source":"automatic","conclusion":"deny"});
-            services
-                .audit(&p.session_id, s.scope.root(), &detail)
-                .await?;
+            services.audit(&p.session_id, s.project(), &detail).await?;
         }
         result
     }
@@ -389,7 +387,7 @@ impl ToolIo {
     ) -> Result<Value, ErrorObject> {
         super::subagents::prepare_call(s, p)?;
         let generation = inputs::begin(s, p, peer).await?;
-        let settings = services.settings(s.scope.root()).await?;
+        let settings = services.settings(s.project()).await?;
         let (hook_token, _hook_guard) = super::hooks::linked(peer, Some(&generation));
         let pre = self
             .pre_tool_use(s, p, &settings, peer, hook_token.clone())
@@ -541,15 +539,13 @@ async fn commit(
     answer: Option<ApprovalAnswer>,
     allowed: Option<Prepared>,
 ) -> Result<(), ErrorObject> {
-    services
-        .audit(&p.session_id, s.scope.root(), detail)
-        .await?;
+    services.audit(&p.session_id, s.project(), detail).await?;
     let decision = answer.as_ref().map(|a| a.decision);
     if let Some(answer) = answer.filter(|a| a.decision == ApprovalDecision::AllowAlways) {
         if generation.is_cancelled() || peer.is_closed() {
             return Err(denied(LOST));
         }
-        services.persist(s.scope.root(), &answer).await?;
+        services.persist(s.project(), &answer).await?;
     }
     if let Some(prepared) = allowed {
         if generation.is_cancelled() || peer.is_closed() {

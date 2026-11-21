@@ -43,6 +43,7 @@ mod l3;
 mod login;
 mod settings;
 mod terminals;
+mod worktrees;
 
 pub use l3::run_l3;
 
@@ -366,6 +367,22 @@ impl Env {
                     .task_limits
                     .map_or_else(Default::default, |spec| spec.apply(Default::default())),
             },
+            // Worktree retention follows the scenario's clock; the timer never fires on its own
+            // (`sweep_worktrees` runs a cleanup), so a cleanup cannot race the scenario's.
+            worktrees: piarc_core::worktrees::WorktreeConfig {
+                now_ms: {
+                    let clock = self.clock.clone();
+                    let start = piarc_core::storage::now_ms();
+                    let base = piarc_ports::Clock::now(clock.as_ref());
+                    std::sync::Arc::new(move || {
+                        let elapsed = piarc_ports::Clock::now(clock.as_ref()) - base;
+                        start + i64::try_from(elapsed.as_millis()).unwrap_or(i64::MAX)
+                    })
+                },
+                clock: self.clock.clone(),
+                sweep_interval: Duration::from_secs(100 * 365 * 24 * 60 * 60),
+                ..piarc_core::worktrees::WorktreeConfig::default()
+            },
             web: piarc_core::tool_io::WebConfig {
                 allowlist: if self.web.is_some() {
                     vec!["127.0.0.1".into(), "localhost".into()]
@@ -579,9 +596,20 @@ impl Driver<'_> {
         });
         let ws = workspace.to_owned();
         let created = call(
-            |done| {
-                self.core
-                    .create_session_with_mode(ws, cwd, model, session.mode, done)
+            |done| match &session.worktree {
+                Some(tree) => self.core.create_worktree_session(
+                    ws,
+                    model,
+                    session.mode,
+                    piarc_core::sessions::WorktreeRequest {
+                        name: tree.name.clone(),
+                        base: tree.base.clone(),
+                    },
+                    done,
+                ),
+                None => self
+                    .core
+                    .create_session_with_mode(ws, cwd, model, session.mode, done),
             },
             &format!("creating session `{label}`"),
         )
@@ -663,6 +691,12 @@ impl Driver<'_> {
                 .await
                 .map(drop)
             }
+            Action::SweepWorktrees(spec) => self.sweep_worktrees(spec).await,
+            Action::CheckWorktree(spec) => self.check_worktree(spec),
+            Action::RemoveWorktree(spec) => self.remove_worktree(spec).await,
+            Action::KeepWorktree(spec) => self.keep_worktree(spec).await,
+            Action::CheckGit(spec) => self.check_git(spec),
+            Action::Search(spec) => self.search(spec).await,
             Action::CheckStoredSession { session, fields } => {
                 self.check_stored_session(session.as_deref(), fields)
             }

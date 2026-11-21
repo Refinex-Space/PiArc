@@ -72,7 +72,7 @@ impl ToolIo {
         };
         let settings = services
             .trust
-            .permission_settings(s.scope.root())
+            .permission_settings(s.project())
             .await
             .map_err(|e| e.to_error_object())?;
         to_value(&context_settings(&settings))

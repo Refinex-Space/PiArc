@@ -212,7 +212,6 @@ pub fn parse(path: &Path, source: AgentSource, text: &str) -> Result<Definition,
         return Err(fields.problem("isolation", "isolation must be worktree"));
     }
     for (field, active, task) in [
-        ("isolation", isolation.is_some(), "T35"),
         ("mcpServers", !mcp_servers.is_empty(), "T36"),
         ("skills", !skills.is_empty(), "T37"),
     ] {

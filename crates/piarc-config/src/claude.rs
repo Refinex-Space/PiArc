@@ -289,7 +289,7 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     ignored("wheelScrollAccelerationEnabled", UI),
     ignored("workflowKeywordTriggerEnabled", NONE),
     ignored("workflowSizeGuideline", NONE),
-    planned("worktree", "T35", "worktrees"),
+    planned("worktree", "T48", "worktree options"),
     ignored("wslInheritsWindowsSettings", MANAGED),
 ];
 

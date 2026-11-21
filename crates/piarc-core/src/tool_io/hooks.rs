@@ -134,7 +134,7 @@ impl ToolIo {
         let mode = lock(&s.policy).mode();
         Facts {
             session_id: id.to_owned(),
-            root: s.scope.root().to_path_buf(),
+            root: s.project().to_path_buf(),
             cwd: s.scope.cwd().to_path_buf(),
             tmp_dir: s.tmp_dir.clone(),
             mode: Some(mode),

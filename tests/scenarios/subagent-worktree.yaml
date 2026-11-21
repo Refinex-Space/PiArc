@@ -1,0 +1,70 @@
+id: subagent-worktree
+description: A subagent run with isolation worktree works in a temporary worktree .piarc/worktrees/agent-<id>/ started from the parent's HEAD; a run that changed nothing leaves no worktree and no branch, a run with changes keeps both and its report names the path and branch; its edit does not touch the main checkout (T35).
+capabilities: [CAP-WT-AGENT-001, CAP-AGENT-RUN-001]
+workspace:
+  git: true
+  git_commit: true
+  files:
+    .gitignore: ".piarc/worktrees/\n"
+    README.md: "# repo\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: look,
+              name: Agent,
+              input:
+                {
+                  description: Look,
+                  prompt: Read nothing and report.,
+                  subagent_type: general-purpose,
+                  isolation: worktree,
+                },
+            },
+          ]
+      - text: Nothing changed here.
+      - tool_calls:
+          [
+            {
+              id: change,
+              name: Agent,
+              input:
+                {
+                  description: Change,
+                  prompt: Write a file.,
+                  subagent_type: general-purpose,
+                  isolation: worktree,
+                },
+            },
+          ]
+      - tool_calls:
+          [{ id: made, name: Write, input: { path: made.txt, content: from the subagent } }]
+      - text: Wrote made.txt.
+      - text: One kept worktree.
+sessions:
+  main: { provider: main, mode: acceptEdits }
+actions:
+  - prompt: { text: Use isolated subagents., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - check_git: { args: [branch, --list, 'piarc/agent-*'], contains: [piarc/agent-], lines: 1 }
+  - check_git: { args: [worktree, list], contains: [.piarc/worktrees/agent-], lines: 2 }
+  - check_git: { args: [status, --porcelain], not_contains: [made.txt] }
+expect:
+  request_counts: { main: 6 }
+  requests:
+    - index: 1
+      roles: [user]
+      user_texts: [Read nothing and report.]
+    - index: 2
+      tool_results: [{ id: look, is_error: false, contains: Nothing changed here. }]
+    - index: 4
+      tool_results: [{ id: made, is_error: false }]
+    - index: 5
+      tool_results:
+        - { id: look, is_error: false }
+        - { id: change, is_error: false, contains: '(branch piarc/agent-' }
+  files:
+    made.txt: null

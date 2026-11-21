@@ -94,7 +94,9 @@ impl WorkspaceInbound {
             // stopped) is unregistered then; its row records the interruption.
             tokio::spawn(async move {
                 peer.closed().await;
+                let worktree = io.subagent_worktree(&child);
                 if io.finish_subagent(&child) {
+                    io.settle_worktree(worktree).await;
                     sessions
                         .lock()
                         .unwrap_or_else(PoisonError::into_inner)

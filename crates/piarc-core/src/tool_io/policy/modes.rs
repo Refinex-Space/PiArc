@@ -38,10 +38,10 @@ impl ToolIo {
         let services = self.services()?;
         let mut settings = services
             .trust
-            .permission_settings(s.scope.root())
+            .permission_settings(s.project())
             .await
             .map_err(|e| e.to_error_object())?;
-        let workspace = display(s.scope.root());
+        let workspace = display(s.project());
         let remembered = services
             .storage
             .run(move |db| db.workspace_mode(&workspace))
@@ -54,7 +54,7 @@ impl ToolIo {
         for (layer, mode) in settings.ignored_modes().to_vec() {
             let detail = json!({"step":"ignoredProjectMode","layer":layer,"mode":mode,
                 "conclusion":"deny","source":"automatic"});
-            services.audit(id, s.scope.root(), &detail).await?;
+            services.audit(id, s.project(), &detail).await?;
         }
         let mode = |settings: &Settings| {
             piarc_policy::starting_mode(
@@ -88,7 +88,7 @@ impl ToolIo {
         let settings = self
             .services()?
             .trust
-            .permission_settings(s.scope.root())
+            .permission_settings(s.project())
             .await
             .map_err(|e| e.to_error_object())?;
         if bypass_enabled(&settings) {
@@ -114,7 +114,7 @@ impl ToolIo {
             state.mode = mode;
             state.publish(id, services);
         }
-        let workspace = display(s.scope.root());
+        let workspace = display(s.project());
         let name = mode_name(mode);
         services
             .storage

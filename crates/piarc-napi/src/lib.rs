@@ -58,3 +58,4 @@ pub mod state;
 pub mod terminal;
 #[cfg(feature = "testing")]
 pub mod testing;
+pub mod worktrees;

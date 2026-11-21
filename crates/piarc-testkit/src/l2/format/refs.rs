@@ -191,6 +191,10 @@ fn check_references(spec: &ScenarioSpec, action: &Action, field: &str, problems:
         | Action::CheckChanges(_)
         | Action::SwitchBranch(_)
         | Action::CheckBranch(_)
+        | Action::CheckWorktree(_)
+        | Action::RemoveWorktree(_)
+        | Action::KeepWorktree(_)
+        | Action::CheckGit(_)
         // Checked by `check_checkpoint_action`.
         | Action::Rewind(_)
         | Action::Discard(_)
@@ -204,6 +208,22 @@ fn check_references(spec: &ScenarioSpec, action: &Action, field: &str, problems:
             }
         }
         Action::WriteFile { path, .. } => check_path(&format!("{field}/path"), path, problems),
+        Action::Search(search) => {
+            let sessions = spec.sessions();
+            for label in &search.sessions {
+                if !sessions.contains_key(label) {
+                    problems.push(format!("{field}: no session `{label}`"));
+                }
+            }
+        }
+        Action::SweepWorktrees(sweep) => {
+            let sessions = spec.sessions();
+            for label in sweep.removed.iter().chain(&sweep.waiting) {
+                if !sessions.contains_key(label) {
+                    problems.push(format!("{field}: no session `{label}`"));
+                }
+            }
+        }
         Action::SignIn(_) | Action::SignOut {} => {
             if spec.oauth.is_none() {
                 problems.push(format!("{field}: signing in needs an `oauth` section"));

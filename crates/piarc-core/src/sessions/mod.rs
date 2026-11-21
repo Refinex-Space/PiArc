@@ -32,6 +32,7 @@
 //! index is synced incrementally and the row updated. After a restart the session list comes
 //! from the index and `resume` reopens a session from its file.
 
+mod create;
 mod inbound;
 mod login;
 mod provider_settings;
@@ -39,6 +40,7 @@ mod session;
 mod snapshot;
 mod subagents;
 mod workspace;
+mod worktrees;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -48,7 +50,7 @@ use std::time::Duration;
 use piarc_host::HostConfig;
 use piarc_ports::Clock;
 use piarc_protocol::history::{HistoryParams, SessionHistory};
-use piarc_protocol::session::{ModelRef, SessionId};
+use piarc_protocol::session::SessionId;
 use serde_json::Value;
 use tokio::runtime::Handle;
 use tokio_util::sync::CancellationToken;
@@ -76,7 +78,8 @@ pub enum ForkPoint {
 pub(crate) use snapshot::{SnapshotMsg, Snapshots};
 
 pub use piarc_store::SessionPrefsChange;
-pub use snapshot::{HostState, SessionStatus, SessionView, WorkspaceView};
+pub use snapshot::{Activity, HostState, SessionStatus, SessionView, WorkspaceView, WorktreeView};
+pub use worktrees::{MAX_SEARCH_SESSIONS, SEARCH_HITS_PER_SESSION, WorktreeRequest};
 
 /// How long every session of a workspace stays idle before its Agent Host is stopped.
 pub const DEFAULT_IDLE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
@@ -147,6 +150,8 @@ pub(crate) struct Ctx {
     pub snapshots: Snapshots,
     pub cancel: CancellationToken,
     pub files: FileSearch,
+    /// Worktrees of sessions (T35).
+    pub worktrees: crate::worktrees::Worktrees,
 }
 
 /// The entry of the session layer. Cheap to clone.
@@ -210,40 +215,6 @@ impl Hub {
         Ok(())
     }
 
-    /// Creates a session in `workspace` (opened when it is not), working in `cwd` (the
-    /// workspace itself by default).
-    pub async fn create_session(
-        &self,
-        workspace: PathBuf,
-        cwd: Option<PathBuf>,
-        model: Option<ModelRef>,
-        mode: Option<piarc_protocol::policy::PermissionMode>,
-    ) -> Result<Value> {
-        let workspace = self.workspace(workspace).await?;
-        let cwd = match cwd {
-            Some(cwd) => canonical_dir(cwd, "cwd").await?,
-            None => workspace.path.clone(),
-        };
-        if !cwd.starts_with(&workspace.path) {
-            return Err(Error::InvalidArgument {
-                field: "cwd",
-                reason: "must be inside the workspace".into(),
-            });
-        }
-        let id = new_session_id()?;
-        let handle = session::SessionHandle::spawn(&self.ctx, &workspace, id.clone(), cwd)?;
-        self.register(handle.clone())?;
-        match handle.create(model, mode).await {
-            Ok(opened) => Ok(opened),
-            Err(error) => {
-                lock(&self.routes).sessions.remove(&id);
-                // Nothing to close when the create never reached the Agent Host.
-                let _ = handle.close().await;
-                Err(error)
-            }
-        }
-    }
-
     /// The configuration diagnostics of a workspace (T24).
     pub async fn config_diagnostics(&self, workspace: Option<PathBuf>) -> Result<Value> {
         crate::config_diagnostics::report(&self.ctx.storage, &self.ctx.trust, workspace).await
@@ -303,6 +274,7 @@ impl Hub {
         }
         let (workspace, cwd) = self.indexed_location(&id).await?;
         let workspace = self.workspace(workspace).await?;
+        self.restore_worktree(&id).await?;
         let handle = session::SessionHandle::spawn(&self.ctx, &workspace, id.clone(), cwd)?;
         self.register(handle.clone())?;
         match handle.resume().await {
@@ -507,11 +479,15 @@ impl Hub {
             }
         }
         let key = id.clone();
+        let archived = change.archived;
         let stored = self
             .ctx
             .storage
             .run(move |store| store.set_session_prefs(&key, &change))
             .await??;
+        if let Some(archived) = archived {
+            self.archived_worktree(&id, archived).await?;
+        }
         if archiving {
             remove_path(
                 self.ctx.storage.dirs().sessions().join(&id),

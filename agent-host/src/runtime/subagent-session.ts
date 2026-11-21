@@ -53,6 +53,8 @@ export interface ChildSpec {
   readonly model: Model<Api>;
   readonly effort: EffortLevel | undefined;
   readonly background: boolean;
+  /** Runs in a temporary worktree Core creates (T35). */
+  readonly isolated: boolean;
   /** Canonical names of the tools it may use. */
   readonly allowed: ReadonlySet<string>;
   /** Its own `Agent` tool, when it may start subagents itself. */
@@ -75,8 +77,23 @@ export interface Ending {
   readonly error?: string;
 }
 
-/** Registers the child with Core; answers its mode and the warnings of the run. */
-async function register(bridge: CoreBridge, spec: ChildSpec, file: string | undefined) {
+/** A subagent's temporary worktree (T35). */
+export interface ChildWorktree {
+  readonly path: string;
+  readonly branch: string;
+}
+
+function worktreeOf(value: unknown): ChildWorktree | undefined {
+  return isObject(value) && typeof value.path === 'string' && typeof value.branch === 'string'
+    ? { path: value.path, branch: value.branch }
+    : undefined;
+}
+
+/**
+ * Registers the child with Core before its Pi session exists: answers its mode, the warnings
+ * of the run and, for an isolated run, the worktree Core created and the child's cwd in it.
+ */
+async function register(bridge: CoreBridge, spec: ChildSpec) {
   return bridge.requestTyped(
     'subagent/start',
     {
@@ -86,15 +103,17 @@ async function register(bridge: CoreBridge, spec: ChildSpec, file: string | unde
       agentType: spec.definition.name,
       description: spec.description,
       cwd: spec.cwd,
-      ...(file === undefined ? {} : { sessionFile: file }),
       model: { provider: spec.model.provider, id: spec.model.id },
       ...(spec.background ? { background: true } : {}),
+      ...(spec.isolated ? { isolation: 'worktree' } : {}),
     },
     (value) =>
       isObject(value) && typeof value.permissionMode === 'string'
         ? {
             permissionMode: value.permissionMode as PermissionMode,
             warnings: Array.isArray(value.warnings) ? (value.warnings as AgentWarning[]) : [],
+            cwd: typeof value.cwd === 'string' ? value.cwd : undefined,
+            worktree: worktreeOf(value.worktree),
           }
         : undefined,
   );
@@ -132,13 +151,17 @@ export class ChildSession {
   readonly #memory: ReturnType<typeof sessionParts>['memory'];
   readonly file: string | undefined;
   readonly warnings: readonly AgentWarning[];
+  /** Where it works: the parent's directory, or its place in the run's worktree. */
+  readonly cwd: string;
+  /** The run's worktree (isolation, T35). */
+  readonly worktree: ChildWorktree | undefined;
 
   private constructor(
     spec: ChildSpec,
     runtime: AgentSessionRuntime,
     canonical: (tool: string) => string,
     parts: ReturnType<typeof sessionParts>,
-    warnings: readonly AgentWarning[],
+    registered: { warnings: readonly AgentWarning[]; cwd: string; worktree?: ChildWorktree },
   ) {
     this.#spec = spec;
     this.#runtime = runtime;
@@ -146,12 +169,36 @@ export class ChildSession {
     this.#harness = parts.harness;
     this.#memory = parts.memory;
     this.file = runtime.session.sessionFile;
-    this.warnings = warnings;
+    this.warnings = registered.warnings;
+    this.cwd = registered.cwd;
+    this.worktree = registered.worktree;
   }
 
-  /** Registers the child with Core and creates its Pi session. */
+  /**
+   * Registers the child with Core and creates its Pi session. A failure after the
+   * registration is the caller's to report with `subagent/finish` (Core then removes an
+   * untouched worktree).
+   */
   static async open(spec: ChildSpec): Promise<ChildSession> {
+    const { options } = spec;
+    const { tools } = options;
+    if (tools.kind !== 'core') throw new Error('subagents need the Core tool backend');
+    const registered = await register(tools.bridge, spec);
+    const cwd = registered.cwd ?? spec.cwd;
+    return ChildSession.#create({ ...spec, cwd }, registered);
+  }
+
+  static async #create(
+    spec: ChildSpec,
+    registered: {
+      permissionMode: PermissionMode;
+      warnings: readonly AgentWarning[];
+      worktree: ChildWorktree | undefined;
+    },
+  ): Promise<ChildSession> {
     const { options, definition } = spec;
+    const { tools, workspace } = options;
+    if (tools.kind !== 'core') throw new Error('subagents need the Core tool backend');
     const manager = SessionManager.create(spec.cwd, undefined, { id: spec.id });
     manager.appendCustomEntry(SUBAGENT_ENTRY, {
       parentSessionId: spec.parentId,
@@ -160,9 +207,6 @@ export class ChildSession {
       description: spec.description,
       ...(spec.background ? { background: true } : {}),
     });
-    const { tools, workspace } = options;
-    if (tools.kind !== 'core') throw new Error('subagents need the Core tool backend');
-    const registered = await register(tools.bridge, spec, manager.getSessionFile());
     const kind = workspace.preferences.profile(
       spec.model,
       capabilities(spec.model).toolReliability,
@@ -232,7 +276,11 @@ export class ChildSession {
     log(
       `subagent ${definition.name} of ${spec.parentId} opened (mode ${registered.permissionMode}, model ${spec.model.provider}/${spec.model.id})`,
     );
-    return new ChildSession(spec, runtime, canonical, parts, registered.warnings);
+    return new ChildSession(spec, runtime, canonical, parts, {
+      warnings: registered.warnings,
+      cwd: spec.cwd,
+      ...(registered.worktree === undefined ? {} : { worktree: registered.worktree }),
+    });
   }
 
   get session(): AgentSession {
@@ -349,28 +397,31 @@ export class ChildSession {
     };
   }
 
-  /** Shuts the child session down (its MCP connections close) and tells Core it ended. */
-  async finish(status: SubagentStatus, tokens: SubagentTokens): Promise<void> {
+  /**
+   * Shuts the child session down (its MCP connections close) and tells Core it ended; answers
+   * the run's worktree when Core kept it (it has changes or commits).
+   */
+  async finish(status: SubagentStatus, tokens: SubagentTokens): Promise<ChildWorktree | undefined> {
     try {
       await this.#runtime.dispose();
     } catch (error) {
       this.#spec.log(`[session ${this.#spec.id}] closing failed: ${describeError(error)}`);
     }
-    await finishInCore(this.#spec.options, this.#spec.id, status, tokens);
+    return finishInCore(this.#spec.options, this.#spec.id, status, tokens);
   }
 }
 
-/** `subagent/finish`: Core unregisters the child. A failure is logged; Core also drops it when
- * the connection ends. */
+/** `subagent/finish`: Core unregisters the child and settles its worktree. A failure is
+ * logged; Core also drops it when the connection ends. */
 export async function finishInCore(
   options: RegistryOptions,
   id: string,
   status: SubagentStatus,
   tokens: SubagentTokens,
-): Promise<void> {
-  if (options.tools.kind !== 'core') return;
+): Promise<ChildWorktree | undefined> {
+  if (options.tools.kind !== 'core') return undefined;
   try {
-    await options.tools.bridge.request('subagent/finish', {
+    const result: unknown = await options.tools.bridge.request('subagent/finish', {
       sessionId: id,
       status,
       usage: {
@@ -381,7 +432,9 @@ export async function finishInCore(
         cost: 0,
       },
     });
+    return isObject(result) ? worktreeOf(result.worktree) : undefined;
   } catch (error) {
     options.log(`[session ${id}] subagent/finish failed: ${describeError(error)}`);
+    return undefined;
   }
 }

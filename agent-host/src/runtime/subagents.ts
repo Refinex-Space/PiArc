@@ -32,6 +32,7 @@ import {
   backgroundFinished,
   backgroundStarted,
   partialReport,
+  worktreeKept,
 } from '../harness/prompts/subagents.js';
 import type { AgentCall, AgentToolHost } from '../harness/subagents/agent-tool.js';
 import {
@@ -245,11 +246,6 @@ export class SubagentRunner {
           : `Unknown subagent type "${call.type}". Available: ${types.map((t) => t.name).join(', ')}.`,
       );
     }
-    if (call.isolation === 'worktree' || definition.isolation !== undefined) {
-      return refuse(
-        'Running a subagent in its own worktree (isolation: worktree) is not available yet. Start it without isolation.',
-      );
-    }
     const rootId = this.rootOf(parentId);
     const depth = this.depthOf(parentId) + 1;
     const { maxDepth, maxConcurrent } = catalog.limits;
@@ -309,6 +305,7 @@ export class SubagentRunner {
         model: chosen.model,
         effort: chosen.effort,
         background,
+        isolated: call.isolation === 'worktree' || definition.isolation === 'worktree',
         allowed: run.allowed,
         agents: await this.hostFor(id, parent.cwd),
         log: this.#options.log,
@@ -325,7 +322,7 @@ export class SubagentRunner {
     };
     run.view = {
       sessionId: id,
-      cwd: parent.cwd,
+      cwd: child.cwd,
       session: child.session,
       harness: child.harness,
       sink: SILENT,
@@ -406,7 +403,7 @@ export class SubagentRunner {
       tokens,
       ...(ending.error === undefined ? {} : { error: ending.error }),
     };
-    await child.finish(status, tokens);
+    const kept = await child.finish(status, tokens);
     this.#runs.delete(run.id);
     const parent = this.#parent(run.parentId);
     parent?.sink.event('subagent/completed', { itemId: run.toolCallId, subagent: run.state });
@@ -414,7 +411,10 @@ export class SubagentRunner {
       itemId: run.toolCallId,
       subagent: run.state,
     });
-    return this.#outcome(status, ending, run.state);
+    const outcome = this.#outcome(status, ending, run.state);
+    return kept === undefined
+      ? outcome
+      : { ...outcome, text: `${outcome.text}\n\n${worktreeKept(kept.path, kept.branch)}` };
   }
 
   #outcome(

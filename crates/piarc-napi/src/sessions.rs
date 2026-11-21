@@ -911,7 +911,7 @@ impl CoreRuntime {
 }
 
 impl CoreRuntime {
-    fn queue<'env>(
+    pub(crate) fn queue<'env>(
         &self,
         env: &'env Env,
         location: &'static str,
@@ -941,7 +941,10 @@ impl CoreRuntime {
     }
 }
 
-fn permission_mode(env: &Env, mode: &str) -> napi::Result<piarc_protocol::policy::PermissionMode> {
+pub(crate) fn permission_mode(
+    env: &Env,
+    mode: &str,
+) -> napi::Result<piarc_protocol::policy::PermissionMode> {
     boundary::call(env, "permissionMode", || {
         serde_json::from_value(serde_json::Value::String(mode.into())).map_err(|_| {
             piarc_core::Error::InvalidArgument {

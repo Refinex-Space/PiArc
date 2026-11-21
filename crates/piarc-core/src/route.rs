@@ -90,6 +90,13 @@ impl RouteKey {
         Self(Arc::from("core/sessions"))
     }
 
+    /// The route of the activity counts (`core/activity`, T35): running sessions and the
+    /// ones waiting for approval, for the menu-bar or tray icon.
+    #[must_use]
+    pub fn activity() -> Self {
+        Self(Arc::from("core/activity"))
+    }
+
     /// The route of the background task snapshots (`core/tasks`, T32).
     #[must_use]
     pub fn tasks() -> Self {

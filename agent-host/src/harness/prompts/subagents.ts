@@ -109,6 +109,14 @@ export function partialReport(turns: number, report: string): string {
   return `[The subagent stopped after ${String(turns)} turns, its limit; this report may be incomplete.]\n${report}`;
 }
 
+/** Follows the report of an isolated run whose worktree has changes (T35). */
+export function worktreeKept(path: string, branch: string): string {
+  return (
+    `[The subagent worked in its own git worktree, which keeps its changes: ${path} ` +
+    `(branch ${branch}). Review or merge them from there.]`
+  );
+}
+
 /** The report of a run that produced no text. */
 export const EMPTY_REPORT = '(The subagent ended without a final message.)';
 

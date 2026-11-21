@@ -252,6 +252,27 @@ pub struct SubagentStartParams {
     /// Whether it runs in the background.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub background: bool,
+    /// Runs in a temporary worktree (T35): Core creates it and answers the child's `cwd`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub isolation: Option<SubagentIsolation>,
+}
+
+/// Where a subagent's files are (T35).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum SubagentIsolation {
+    /// A temporary git worktree at `.piarc/worktrees/agent-<id>/` from the parent's HEAD.
+    Worktree,
+}
+
+/// A subagent's temporary worktree (T35).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SubagentWorktree {
+    /// Its directory.
+    pub path: String,
+    /// Its branch.
+    pub branch: String,
 }
 
 /// Result of `subagent/start`.
@@ -263,6 +284,12 @@ pub struct SubagentStartResult {
     /// What the user should know about the run (a restricted mode, untrusted hooks).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<AgentWarning>,
+    /// The child's working directory when Core chose it (isolation: inside its worktree).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<String>,
+    /// The worktree created for it (isolation).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worktree: Option<SubagentWorktree>,
 }
 
 request!(
@@ -302,7 +329,12 @@ pub struct SubagentFinishParams {
 /// Result of `subagent/finish`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct SubagentFinishResult {}
+pub struct SubagentFinishResult {
+    /// The run's worktree, kept because it has changes or commits (T35); an untouched one is
+    /// removed with its branch and not listed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worktree: Option<SubagentWorktree>,
+}
 
 request!(
     /// Method marker for `subagent/finish` (Agent Host → Core).

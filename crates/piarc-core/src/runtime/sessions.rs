@@ -151,8 +151,135 @@ impl CoreRuntime {
         on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
     ) -> Result<()> {
         self.on_sessions(on_done, move |hub| async move {
-            hub.create_session(workspace, cwd, model, mode).await
+            hub.create_session(workspace, cwd, model, mode, None).await
         })
+    }
+
+    /// Creates a session in a new worktree of `workspace`'s repository (T35): the answer of
+    /// [`Self::create_session`] with a `worktree` object (name, path, branch, base, copied
+    /// files, whether the repository ignores `.piarc/worktrees/`).
+    ///
+    /// # Errors
+    /// As [`Self::create_session`].
+    pub fn create_worktree_session(
+        &self,
+        workspace: PathBuf,
+        model: Option<piarc_protocol::session::ModelRef>,
+        mode: Option<piarc_protocol::policy::PermissionMode>,
+        worktree: crate::sessions::WorktreeRequest,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.create_session(workspace, None, model, mode, Some(worktree))
+                .await
+        })
+    }
+
+    /// The branches of `workspace`'s repository for the new-session form (T35).
+    ///
+    /// # Errors
+    /// As [`Self::create_session`].
+    pub fn worktree_branches(
+        &self,
+        workspace: PathBuf,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.worktree_branches(workspace).await
+        })
+    }
+
+    /// Adds `.piarc/worktrees/` to `workspace`'s `.gitignore` (T35).
+    ///
+    /// # Errors
+    /// As [`Self::create_session`].
+    pub fn ignore_worktrees(
+        &self,
+        workspace: PathBuf,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.ignore_worktrees(workspace).await
+        })
+    }
+
+    /// The uncommitted changes of session `id`'s worktree (T35).
+    ///
+    /// # Errors
+    /// As [`Self::create_session`].
+    pub fn session_worktree_status(
+        &self,
+        id: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.session_worktree_status(id).await
+        })
+    }
+
+    /// Removes closed session `id`'s worktree; `discard` throws its changes away (T35).
+    ///
+    /// # Errors
+    /// As [`Self::create_session`].
+    pub fn remove_session_worktree(
+        &self,
+        id: String,
+        discard: bool,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.remove_session_worktree(id, discard).await
+        })
+    }
+
+    /// Keeps archived session `id`'s worktree for another retention period (T35).
+    ///
+    /// # Errors
+    /// As [`Self::create_session`].
+    pub fn keep_session_worktree(
+        &self,
+        id: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.keep_session_worktree(id).await
+        })
+    }
+
+    /// Runs one worktree cleanup now, as the timer does (T35): `{ removed, waiting, failed }`.
+    ///
+    /// # Errors
+    /// As [`Self::create_session`].
+    pub fn sweep_worktrees(
+        &self,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            Ok(hub.sweep_worktrees().await)
+        })
+    }
+
+    /// Full-text search over the sessions' messages (T35).
+    ///
+    /// # Errors
+    /// As [`Self::create_session`].
+    pub fn search_sessions(
+        &self,
+        query: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.search_sessions(query).await
+        })
+    }
+
+    /// Running sessions and background tasks now: `{ sessions, tasks }` (T35).
+    ///
+    /// # Errors
+    /// [`Error::NoDataDirectory`], [`Error::ShuttingDown`].
+    pub fn running_work(&self) -> Result<serde_json::Value> {
+        self.ensure_running()?;
+        Ok(self.services()?.sessions.running_work())
     }
 
     /// Answers the request identified by its session, revision and connection epoch.

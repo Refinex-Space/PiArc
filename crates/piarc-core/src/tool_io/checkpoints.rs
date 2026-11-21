@@ -168,7 +168,7 @@ impl ToolIo {
     pub(super) async fn checkpoints_for(&self, s: &SessionIo) -> Option<Checkpoints> {
         let cp = self.checkpoints.clone()?;
         let trust = self.policy.as_ref().map(|p| p.trust.clone());
-        checkpointing_on(trust.as_ref(), s.scope.root())
+        checkpointing_on(trust.as_ref(), s.project())
             .await
             .then_some(cp)
     }
@@ -195,7 +195,7 @@ impl ToolIo {
     ) -> Option<impl Future<Output = ()> + Send + 'static> {
         let cp = self.checkpoints.clone()?;
         let trust = self.policy.as_ref().map(|p| p.trust.clone());
-        let root = s.scope.root().to_owned();
+        let root = s.project().to_owned();
         let (id, turn) = (session_id.to_owned(), turn.to_owned());
         Some(async move {
             if !checkpointing_on(trust.as_ref(), &root).await {

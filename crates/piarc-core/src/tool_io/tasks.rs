@@ -34,7 +34,7 @@ impl ToolIo {
             session_id: session_id.to_owned(),
             output_dir: self.session_dir(&owner).join("tasks"),
             owner_session_id: owner,
-            workspace: piarc_fs::display(session.scope.root()),
+            workspace: piarc_fs::display(session.project()),
         }
     }
 
@@ -128,11 +128,7 @@ impl ToolIo {
         let (Ok(session), Some(services)) = (self.session(session_id), &self.policy) else {
             return true;
         };
-        match services
-            .trust
-            .permission_settings(session.scope.root())
-            .await
-        {
+        match services.trust.permission_settings(session.project()).await {
             Ok(settings) => settings
                 .get(WAKE_SETTING)
                 .and_then(Value::as_bool)

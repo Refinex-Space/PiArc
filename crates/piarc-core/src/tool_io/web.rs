@@ -114,7 +114,7 @@ impl ToolIo {
         };
         if let Some(services) = &self.policy {
             services
-                .record("webFetch", &p.session_id.0, session.scope.root(), &detail)
+                .record("webFetch", &p.session_id.0, session.project(), &detail)
                 .await?;
         }
         to_value(&result_of(outcome.map_err(|e| e.to_error_object())?))

@@ -672,8 +672,10 @@ async fn a_subagents_writes_belong_to_its_main_sessions_turn() {
         description: None,
         mode: None,
         detached: false,
+        worktree: None,
     };
-    f.io.open_linked("child", &ws, &ws, link).expect("child");
+    f.io.open_linked("child", &ws, &ws, &ws, link)
+        .expect("child");
     let origin = json!({"tool":"Read","toolCallId":"child-read"});
     let read = json!({"sessionId":"child","path":"shared.txt","read":{},"origin":origin});
     f.call("fs/stat", read.clone()).await.expect("stat");

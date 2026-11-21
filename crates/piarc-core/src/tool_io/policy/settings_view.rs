@@ -205,7 +205,7 @@ impl ToolIo {
     fn sessions_in(&self, root: &Path) -> Vec<(String, Arc<SessionIo>)> {
         let mut found: Vec<(String, Arc<SessionIo>)> = lock(&self.sessions)
             .iter()
-            .filter(|(_, s)| s.scope.root() == root)
+            .filter(|(_, s)| s.project() == root)
             .map(|(id, s)| (id.clone(), Arc::clone(s)))
             .collect();
         found.sort_by(|a, b| a.0.cmp(&b.0));

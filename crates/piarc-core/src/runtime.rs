@@ -104,6 +104,8 @@ pub struct CoreConfig {
     pub web: crate::tool_io::WebConfig,
     /// Background tasks' thresholds and timer clock (T32); tests move the clock.
     pub tasks: crate::tasks::TasksConfig,
+    /// Worktree retention and its clocks (T35); tests move them.
+    pub worktrees: crate::worktrees::WorktreeConfig,
 }
 
 /// A credential store for the vault's master key and the key's name in it.
@@ -139,6 +141,7 @@ impl Default for CoreConfig {
             checkpoints: crate::checkpoints::CheckpointConfig::default(),
             web: crate::tool_io::WebConfig::default(),
             tasks: crate::tasks::TasksConfig::default(),
+            worktrees: crate::worktrees::WorktreeConfig::default(),
         }
     }
 }
@@ -613,6 +616,21 @@ fn open_state(
         crate::checkpoints::Checkpoints::open(storage.clone(), config.checkpoints.clone())?;
     checkpoints.spawn_sweeper(handle, config.sessions.clock.clone(), cancel.child_token());
     let tasks = crate::tasks::TaskManager::new(config.tasks.clone());
+    let tool_io = state_tool_io(config, data.clone(), events, &storage, &trust, &snapshots)
+        .with_checkpoints(checkpoints)
+        .with_tasks(tasks.clone())
+        .with_terminals(terminals.clone());
+    let worktrees = crate::worktrees::Worktrees::new(
+        storage.clone(),
+        tool_io.clone(),
+        config.worktrees.clone(),
+    );
+    {
+        let snapshots = snapshots.clone();
+        worktrees.spawn_sweeper(handle, cancel.child_token(), move || {
+            snapshots.send(crate::sessions::SnapshotMsg::Reload);
+        });
+    }
     let sessions = Hub::new(crate::sessions::Ctx {
         handle: handle.clone(),
         events: events.clone(),
@@ -625,14 +643,12 @@ fn open_state(
         model_preferences: Arc::new(std::sync::Mutex::new(crate::providers::preferences(&data))),
         logins: Arc::default(),
         provider_writer: tokio::sync::Mutex::new(()),
-        tool_io: state_tool_io(config, data.clone(), events, &storage, &trust, &snapshots)
-            .with_checkpoints(checkpoints)
-            .with_tasks(tasks.clone())
-            .with_terminals(terminals.clone()),
+        tool_io,
         config: config.sessions.clone(),
         snapshots,
         cancel: cancel.child_token(),
         files: crate::composer::file_search::FileSearch::default(),
+        worktrees,
     });
     tasks.set_outlet(sessions.task_outlet());
     terminals.attach(data, tasks.clone());

@@ -295,6 +295,16 @@ impl TaskManager {
         }
     }
 
+    /// How many tasks run now (T35: quitting asks first when some do).
+    #[must_use]
+    pub fn running(&self) -> usize {
+        lock(&self.inner.state)
+            .tasks
+            .values()
+            .filter(|entry| entry.task.status == TaskStatus::Running)
+            .count()
+    }
+
     /// The `core/tasks` snapshot now.
     #[must_use]
     pub fn snapshot(&self) -> TasksSnapshot {

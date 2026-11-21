@@ -11,6 +11,7 @@
 //! and unread flag). Live state wins for the fields it has.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use piarc_protocol::policy::{ApprovalRequest, PermissionMode};
 use serde::Serialize;
@@ -95,6 +96,44 @@ pub(crate) struct LiveSession {
     /// The first message sent in this session, for its title until the index has one (Pi
     /// writes the file only with the first reply).
     pub first_message: Option<String>,
+    /// Its worktree directory (T35).
+    pub worktree: Option<String>,
+}
+
+/// A session's worktree in `core/sessions` (T35).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorktreeView {
+    /// Its name (the directory's name).
+    pub name: String,
+    /// Its directory.
+    pub path: String,
+    /// Its branch, when known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub branch: Option<String>,
+    /// When an archived session's worktree is due for cleanup (Unix ms).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cleanup_at: Option<i64>,
+    /// The cleanup found uncommitted changes: the user removes or keeps it.
+    pub confirm_cleanup: bool,
+    /// It was removed (its branch stays; reopening the session adds it again).
+    pub removed: bool,
+}
+
+impl WorktreeView {
+    fn new(path: &str) -> Self {
+        Self {
+            name: std::path::Path::new(path)
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+            path: path.to_owned(),
+            branch: None,
+            cleanup_at: None,
+            confirm_cleanup: false,
+            removed: false,
+        }
+    }
 }
 
 /// One session of `core/sessions`.
@@ -145,6 +184,9 @@ pub struct SessionView {
     /// Why it is in error.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// Its worktree (T35).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub worktree: Option<WorktreeView>,
 }
 
 pub(crate) enum SnapshotMsg {
@@ -165,15 +207,69 @@ pub(crate) enum SnapshotMsg {
 #[derive(Clone)]
 pub(crate) struct Snapshots {
     tx: mpsc::UnboundedSender<SnapshotMsg>,
+    activity: Arc<std::sync::Mutex<Activity>>,
+}
+
+/// The activity counts of `core/activity` (T35): what the menu-bar or tray icon shows, taken
+/// from the session list as last sent. Archived sessions do not count.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Activity {
+    /// Sessions in a turn.
+    pub running: usize,
+    /// Sessions waiting for an approval.
+    pub awaiting: usize,
+    /// The sessions waiting for an approval (at most [`ACTIVITY_LISTED`]).
+    pub awaiting_sessions: Vec<ActivitySession>,
+}
+
+/// A session the tray menu lists.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivitySession {
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub workspace: Option<String>,
+}
+
+/// Sessions the tray menu lists at most.
+pub const ACTIVITY_LISTED: usize = 20;
+
+impl Activity {
+    fn of(list: &[SessionView]) -> Self {
+        let active = list.iter().filter(|v| !v.archived);
+        let waiting: Vec<&SessionView> =
+            active.clone().filter(|v| v.pending_approvals > 0).collect();
+        Self {
+            running: active
+                .filter(|v| v.status == SessionStatus::Running)
+                .count(),
+            awaiting: waiting.len(),
+            awaiting_sessions: waiting
+                .iter()
+                .take(ACTIVITY_LISTED)
+                .map(|v| ActivitySession {
+                    id: v.id.clone(),
+                    title: v.title.clone(),
+                    workspace: v.workspace.clone(),
+                })
+                .collect(),
+        }
+    }
 }
 
 impl Snapshots {
     pub fn spawn(handle: &tokio::runtime::Handle, events: EventSender, storage: Storage) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
+        let activity = Arc::new(std::sync::Mutex::new(Activity::default()));
         let task = SnapshotTask {
             rx,
             events,
             storage,
+            activity: Arc::clone(&activity),
+            resend_activity: true,
             workspaces: BTreeMap::new(),
             live: BTreeMap::new(),
             policies: BTreeMap::new(),
@@ -184,7 +280,7 @@ impl Snapshots {
             session_revision: 0,
         };
         handle.spawn(task.run());
-        let snapshots = Self { tx };
+        let snapshots = Self { tx, activity };
         snapshots.send(SnapshotMsg::Reload);
         snapshots
     }
@@ -193,12 +289,24 @@ impl Snapshots {
         // The task ends only when Core shuts down; nothing is left to tell then.
         let _ = self.tx.send(msg);
     }
+
+    /// The activity counts as last sent.
+    pub fn activity(&self) -> Activity {
+        self.activity
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
 }
 
 struct SnapshotTask {
     rx: mpsc::UnboundedReceiver<SnapshotMsg>,
     events: EventSender,
     storage: Storage,
+    /// The counts last sent on `core/activity` (shared with [`Snapshots::activity`]).
+    activity: Arc<std::sync::Mutex<Activity>>,
+    /// Send the counts with the next list even when unchanged (a client subscribed anew).
+    resend_activity: bool,
     /// Workspaces the actors reported, by path.
     workspaces: BTreeMap<String, WorkspaceView>,
     /// Open sessions, by id.
@@ -249,7 +357,10 @@ impl SnapshotTask {
                         sessions = true;
                     }
                     SnapshotMsg::Reload => reload = true,
-                    SnapshotMsg::Resend => (workspaces, sessions) = (true, true),
+                    SnapshotMsg::Resend => {
+                        (workspaces, sessions) = (true, true);
+                        self.resend_activity = true;
+                    }
                 }
             }
             if reload {
@@ -355,11 +466,34 @@ impl SnapshotTask {
                 }
             }
         }
+        let activity = Activity::of(&list);
         let payload = serde_json::json!({
             "revision": self.session_revision,
             "sessions": list,
         });
-        self.emit(RouteKey::sessions(), &payload).await
+        if !self.emit(RouteKey::sessions(), &payload).await {
+            return false;
+        }
+        self.emit_activity(activity).await
+    }
+
+    /// Sends the activity counts when they changed (and once at the start).
+    async fn emit_activity(&mut self, activity: Activity) -> bool {
+        {
+            let mut last = self
+                .activity
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if *last == activity && !std::mem::take(&mut self.resend_activity) {
+                return true;
+            }
+            self.resend_activity = false;
+            last.clone_from(&activity);
+        }
+        match serde_json::to_value(&activity) {
+            Ok(payload) => self.emit(RouteKey::activity(), &payload).await,
+            Err(_) => true,
+        }
     }
 
     async fn emit(&self, route: RouteKey, payload: &serde_json::Value) -> bool {
@@ -402,6 +536,13 @@ fn indexed_view(record: &piarc_store::SessionRecord) -> SessionView {
         updated_at: meta.updated_at,
         parent_session: meta.parent_session.clone(),
         error: record.index_error.clone(),
+        worktree: record.worktree.as_ref().map(|w| WorktreeView {
+            branch: w.branch.clone(),
+            cleanup_at: w.cleanup_at,
+            confirm_cleanup: w.confirm,
+            removed: w.removed_at.is_some(),
+            ..WorktreeView::new(&w.path)
+        }),
     }
 }
 
@@ -425,6 +566,7 @@ fn empty_view(id: &str) -> SessionView {
         updated_at: None,
         parent_session: None,
         error: None,
+        worktree: None,
     }
 }
 
@@ -451,5 +593,10 @@ fn apply_live(view: &mut SessionView, live: &LiveSession, derived: Option<&Strin
     }
     if let Some(archived) = live.prefs.archived {
         view.archived = archived;
+    }
+    if view.worktree.is_none()
+        && let Some(path) = &live.worktree
+    {
+        view.worktree = Some(WorktreeView::new(path));
     }
 }

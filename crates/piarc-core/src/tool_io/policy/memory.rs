@@ -16,7 +16,7 @@ pub(in crate::tool_io) async fn approve(
         // A lossy label could name two different files in the approval UI and database.
         return Ok((ApprovalDecision::Deny, None));
     }
-    let workspace = session.scope.key(session.scope.root());
+    let workspace = session.scope.key(session.project());
     let key = display(target);
     let lookup = (workspace.clone(), key.clone());
     if services
@@ -53,7 +53,7 @@ pub(in crate::tool_io) async fn approve(
         if decision == ApprovalDecision::AllowAlways && answer.rules != card.rules {
             return Err(denied("Permanent memory consent must name the requested file exactly."));
         }
-        services.audit(id, session.scope.root(), &json!({
+        services.audit(id, session.project(), &json!({
             "tool":p.tool, "toolCallId":call, "path":card.path, "decision":decision,
             "source":"user", "conclusion": if decision == ApprovalDecision::Deny {"deny"} else {"allow"}
         })).await?;

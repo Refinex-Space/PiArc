@@ -25,6 +25,7 @@ pub mod matcher;
 pub mod runner;
 pub mod suite;
 pub mod web;
+pub mod worktree_spec;
 
 use std::path::PathBuf;
 

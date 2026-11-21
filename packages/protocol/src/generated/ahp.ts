@@ -853,9 +853,9 @@ export type RewindMode = 'branch' | 'summarize';
 export type AgentSource =
   'projectPiarc' | 'projectClaude' | 'user' | 'userClaude' | 'plugin' | 'builtIn';
 /**
- * Result of `subagent/finish`.
+ * Where a subagent's files are (T35).
  */
-export type SubagentFinishResult = Record<string, never>;
+export type SubagentIsolation = 'worktree';
 /**
  * Presentation of a pending approval.
  */
@@ -6298,6 +6298,10 @@ export interface SubagentStartParams {
    */
   description?: string | null;
   /**
+   * Runs in a temporary worktree (T35): Core creates it and answers the child's `cwd`.
+   */
+  isolation?: SubagentIsolation | null;
+  /**
    * The model it runs on.
    */
   model?: ModelRef | null;
@@ -6332,6 +6336,10 @@ export interface SubagentStartResponse {
  */
 export interface SubagentStartResult {
   /**
+   * The child's working directory when Core chose it (isolation: inside its worktree).
+   */
+  cwd?: string | null;
+  /**
    * The child's permission mode now: the definition's, never looser than the parent's.
    */
   permissionMode: PermissionMode;
@@ -6339,6 +6347,23 @@ export interface SubagentStartResult {
    * What the user should know about the run (a restricted mode, untrusted hooks).
    */
   warnings?: AgentWarning[];
+  /**
+   * The worktree created for it (isolation).
+   */
+  worktree?: SubagentWorktree | null;
+}
+/**
+ * A subagent's temporary worktree (T35).
+ */
+export interface SubagentWorktree {
+  /**
+   * Its branch.
+   */
+  branch: string;
+  /**
+   * Its directory.
+   */
+  path: string;
 }
 /**
  * Request for `subagent/finish`.
@@ -6374,6 +6399,16 @@ export interface SubagentFinishResponse {
   id: RequestId;
   jsonrpc: JsonRpcVersion;
   result: SubagentFinishResult;
+}
+/**
+ * Result of `subagent/finish`.
+ */
+export interface SubagentFinishResult {
+  /**
+   * The run's worktree, kept because it has changes or commits (T35); an untouched one is
+   * removed with its branch and not listed.
+   */
+  worktree?: SubagentWorktree | null;
 }
 /**
  * Request for `subagent/stop`.

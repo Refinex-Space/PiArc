@@ -65,6 +65,15 @@
         "trusted": {
           "description": "Record a trust decision for the workspace before it opens; untrusted when absent.",
           "type": "boolean"
+        },
+        "git_commit": {
+          "description": "With git: commit the initial files with a fixed identity (T35).",
+          "type": "boolean"
+        },
+        "git_branches": {
+          "description": "With git_commit: branches created at the initial commit (T35).",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
         }
       }
     },
@@ -281,6 +290,15 @@
         "settings_model": {
           "description": "Create the session without a model: the settings' default model and effort apply (T31); provider still names the endpoint the scenario expects.",
           "type": "boolean"
+        },
+        "worktree": {
+          "description": "Create the session in a worktree of its own (T35): optional name and base branch or commit.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "base": { "type": "string", "minLength": 1 }
+          }
         }
       }
     },
@@ -631,6 +649,64 @@
           "required": ["files"],
           "properties": {
             "files": { "type": "object", "additionalProperties": { "type": ["string", "null"] } }
+          }
+        },
+        "sweep_worktrees": {
+          "description": "Runs one worktree cleanup now and checks which sessions' worktrees it removed and which wait for the user (T35).",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "removed": { "type": "array", "items": { "$ref": "#/$defs/label" } },
+            "waiting": { "type": "array", "items": { "$ref": "#/$defs/label" } }
+          }
+        },
+        "check_worktree": {
+          "description": "Checks a session's stored worktree: a field subset of path (workspace-relative), branch, exists, removed, cleanupDue, confirm; null for none (T35).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fields"],
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "fields": { "type": ["object", "null"] }
+          }
+        },
+        "remove_worktree": {
+          "description": "Removes a closed session's worktree; discard throws its changes away; succeeds false expects a refusal (T35).",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "discard": { "type": "boolean" },
+            "succeeds": { "type": "boolean" }
+          }
+        },
+        "keep_worktree": {
+          "description": "Keeps a session's worktree for another retention period (T35).",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "session": { "$ref": "#/$defs/label" } }
+        },
+        "check_git": {
+          "description": "Runs git in the workspace and checks its standard output (T35).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["args"],
+          "properties": {
+            "args": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+            "contains": { "type": "array", "items": { "type": "string" } },
+            "not_contains": { "type": "array", "items": { "type": "string" } },
+            "lines": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "search": {
+          "description": "Searches the sessions' messages through Core: the matching sessions (labels, as a set) and texts some snippet contains (T35).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["query", "sessions"],
+          "properties": {
+            "query": { "type": "string", "minLength": 1 },
+            "sessions": { "type": "array", "items": { "$ref": "#/$defs/label" } },
+            "snippets": { "type": "array", "items": { "type": "string" } }
           }
         }
       },

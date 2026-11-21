@@ -108,10 +108,11 @@ impl ToolIo {
     ) -> Result<memory_reader::Collection, ErrorObject> {
         let config = Arc::clone(&self.config);
         let scope = session.scope.clone();
+        let project = session.project().to_owned();
         tokio::task::spawn_blocking(move || {
             let table = piarc_config::LayerTable::workspace(
                 &config.data_dir,
-                scope.root(),
+                &project,
                 config.home.as_deref(),
             );
             // This setting governs the choice of two documents; project code is never enabled.

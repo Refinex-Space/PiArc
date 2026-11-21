@@ -169,8 +169,11 @@ impl SessionHandle {
         id: String,
         cwd: PathBuf,
     ) -> Result<Self> {
+        // A session in a worktree has the worktree's files and the workspace's settings (T35).
+        let worktree = piarc_git::worktree::containing(&workspace.path, &cwd);
+        let files = worktree.clone().unwrap_or_else(|| workspace.path.clone());
         ctx.tool_io
-            .open_session(&id, &workspace.path, &cwd)
+            .open_session_in(&id, &workspace.path, &files, &cwd)
             .map_err(|e| Error::feature(&e))?;
         ctx.tool_io.session_opened(&id);
         let (tx, rx) = mpsc::channel(MAILBOX);
@@ -200,6 +203,7 @@ impl SessionHandle {
             unread: false,
             prefs: piarc_store::SessionPrefsChange::default(),
             first_message: None,
+            worktree,
             ops: 0,
             starting: 0,
             exclusive: false,
@@ -355,6 +359,8 @@ struct SessionActor {
     prefs: piarc_store::SessionPrefsChange,
     /// The first message this actor sent (the title until the index has the session).
     first_message: Option<String>,
+    /// The worktree it works in (T35).
+    worktree: Option<PathBuf>,
     /// Requests in flight.
     ops: u32,
     /// Prompts, steers and follow-ups in flight (each may start a turn).
@@ -768,6 +774,7 @@ impl SessionActor {
             error: self.error.clone(),
             prefs: self.prefs.clone(),
             first_message: self.first_message.clone(),
+            worktree: self.worktree.as_deref().map(path_text),
         }));
     }
 
@@ -785,6 +792,7 @@ impl SessionActor {
         let snapshots = self.ctx.snapshots.clone();
         let (id, workspace) = (self.id.clone(), path_text(&self.ws.path));
         let (status, unread, prefs) = (self.status, self.unread, self.prefs.clone());
+        let worktree = self.worktree.clone();
         self.ctx.handle.spawn(async move {
             if let Err(error) = storage.sync_sessions().await {
                 tracing::warn!(target: "piarc_core::sessions", session = %id, "syncing the index failed: {error}");
@@ -792,6 +800,11 @@ impl SessionActor {
             let stored = storage
                 .run(move |store| {
                     store.set_session_state(&id, &workspace, status.as_str(), unread)?;
+                    if let Some(tree) = &worktree {
+                        // The branch as checked out now (the agent may have switched it).
+                        let branch = piarc_git::worktree::head_branch(tree);
+                        store.set_session_worktree(&id, &path_text(tree), branch.as_deref())?;
+                    }
                     store.set_session_prefs(&id, &prefs)
                 })
                 .await;

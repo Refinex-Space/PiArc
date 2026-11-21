@@ -111,11 +111,6 @@ fn every_supported_field_is_read() {
         [
             (
                 AgentWarningKind::InactiveField,
-                "isolation".into(),
-                Some("T35".into())
-            ),
-            (
-                AgentWarningKind::InactiveField,
                 "mcpServers".into(),
                 Some("T36".into())
             ),

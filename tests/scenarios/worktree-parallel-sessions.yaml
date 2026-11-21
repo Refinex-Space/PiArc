@@ -1,0 +1,59 @@
+id: worktree-parallel-sessions
+description: Three sessions of one workspace run at once in the same Agent Host, one of them in its own worktree, and that one starts a subagent; each works in its own directory and all three turns complete (scenario S3, T35).
+capabilities: [CAP-SESSION-PARALLEL-001, CAP-WT-SESSION-001]
+workspace:
+  git: true
+  git_commit: true
+  files:
+    .gitignore: ".piarc/worktrees/\n"
+    shared.txt: "base\n"
+providers:
+  first:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: a1, name: Write, input: { path: first.txt, content: one } }]
+      - text: First done.
+  second:
+    wire: openai
+    steps:
+      - tool_calls: [{ id: b1, name: Bash, input: { command: cat shared.txt } }]
+      - text: Second done.
+  third:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: c1,
+              name: Agent,
+              input: { description: Check, prompt: Report back., subagent_type: Explore },
+            },
+          ]
+      - text: Reported.
+      - tool_calls: [{ id: c2, name: Write, input: { path: third.txt, content: three } }]
+      - text: Third done.
+sessions:
+  one: { provider: first, mode: acceptEdits }
+  two: { provider: second, mode: acceptEdits }
+  three: { provider: third, mode: acceptEdits, worktree: { name: third } }
+actions:
+  - prompt: { session: one, text: Go one., turn: t1 }
+  - prompt: { session: two, text: Go two., turn: t2 }
+  - prompt: { session: three, text: Go three., turn: t3 }
+  - wait: { session: one, method: turn/completed, turn: t1 }
+  - wait: { session: two, method: turn/completed, turn: t2 }
+  - wait: { session: three, method: turn/completed, turn: t3 }
+expect:
+  request_counts: { first: 2, second: 2, third: 4 }
+  events:
+    - { session: one, method: turn/completed, turn: t1, params: { status: completed } }
+    - { session: two, method: turn/completed, turn: t2, params: { status: completed } }
+    - { session: three, method: turn/completed, turn: t3, params: { status: completed } }
+  requests:
+    - provider: second
+      index: 1
+      tool_results: [{ id: b1, contains: base }]
+  files:
+    first.txt: one
+    third.txt: null
+    .piarc/worktrees/third/third.txt: three

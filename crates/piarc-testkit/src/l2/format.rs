@@ -178,6 +178,12 @@ pub struct WorkspaceSpec {
     /// Trust the workspace before opening it.
     #[serde(default)]
     pub trusted: bool,
+    /// With `git`: commit the initial files (T35).
+    #[serde(default)]
+    pub git_commit: bool,
+    /// With `git_commit`: branches created at the initial commit (T35).
+    #[serde(default)]
+    pub git_branches: Vec<String>,
 }
 
 /// A wire format of a mock endpoint.
@@ -266,6 +272,9 @@ pub struct SessionSpec {
     /// Create the session without a model: the settings' defaults apply (T31).
     #[serde(default)]
     pub settings_model: bool,
+    /// Create the session in a worktree of its own (T35).
+    #[serde(default)]
+    pub worktree: Option<super::worktree_spec::WorktreeSpec>,
 }
 
 /// A file the client attaches, read from the scenario fixtures and stored through Core.
@@ -447,6 +456,18 @@ pub enum Action {
     CheckBranch(super::checkpoint_spec::CheckBranchSpec),
     /// Checks workspace files mid-scenario (T28).
     CheckFiles(super::checkpoint_spec::CheckFilesSpec),
+    /// Runs one worktree cleanup now (T35).
+    SweepWorktrees(super::worktree_spec::SweepWorktreesSpec),
+    /// Checks a session's worktree (T35).
+    CheckWorktree(super::worktree_spec::CheckWorktreeSpec),
+    /// Removes a closed session's worktree (T35).
+    RemoveWorktree(super::worktree_spec::RemoveWorktreeSpec),
+    /// Keeps a session's worktree for another retention period (T35).
+    KeepWorktree(super::worktree_spec::KeepWorktreeSpec),
+    /// Runs git in the workspace and checks its output (T35).
+    CheckGit(super::worktree_spec::CheckGitSpec),
+    /// Searches the sessions' messages (T35).
+    Search(super::worktree_spec::SearchSpec),
     /// Signs in to the test OAuth provider (T29).
     SignIn(crate::l2::login_spec::SignInAction),
     /// Signs out of the test OAuth provider (T29).
@@ -527,6 +548,12 @@ impl Action {
             Self::SwitchBranch(_) => "switch_branch",
             Self::CheckBranch(_) => "check_branch",
             Self::CheckFiles(_) => "check_files",
+            Self::SweepWorktrees(_) => "sweep_worktrees",
+            Self::CheckWorktree(_) => "check_worktree",
+            Self::RemoveWorktree(_) => "remove_worktree",
+            Self::KeepWorktree(_) => "keep_worktree",
+            Self::CheckGit(_) => "check_git",
+            Self::Search(_) => "search",
             Self::SignIn(_) => "sign_in",
             Self::SignOut {} => "sign_out",
             Self::AdvanceClock { .. } => "advance_clock",
@@ -568,7 +595,13 @@ impl Action {
             Self::Discard(spec) => Some(&spec.session),
             Self::SwitchBranch(spec) => Some(&spec.session),
             Self::CheckBranch(spec) => Some(&spec.session),
+            Self::CheckWorktree(spec) => Some(&spec.session),
+            Self::RemoveWorktree(spec) => Some(&spec.session),
+            Self::KeepWorktree(spec) => Some(&spec.session),
             Self::CheckTrust { .. }
+            | Self::SweepWorktrees(_)
+            | Self::CheckGit(_)
+            | Self::Search(_)
             | Self::WriteFile { .. }
             | Self::RestartCore {}
             | Self::CheckFiles(_)
@@ -846,6 +879,7 @@ impl ScenarioSpec {
                 deferred: false,
                 cwd: None,
                 settings_model: false,
+                worktree: None,
             },
         )])
     }

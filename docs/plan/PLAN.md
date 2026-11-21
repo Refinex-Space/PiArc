@@ -312,10 +312,10 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 T35（开工 2026-11-20，基线复用 991f323 的全量 verify；T34 的遗留 A03、A14 不影响本任务；分支自 483413b 起未推送，没有新的 Windows CI 可核对）：
 
 - [x] 1 piarc-git：worktree 创建（分支、基础分支）、`.worktreeinclude` 复制、状态（未提交改动）、删除目录保留分支；路径含空格与中文
-- [ ] 2 Core：新建会话选 worktree（`sessions.worktree`、cwd、环境栏）、`.gitignore` 提示、信任与"总是允许"按主 checkout（A01、A02）
-- [ ] 3 归档询问与到期清理（时钟可注入）（A03 的 Core 与场景部分）
-- [ ] 4 子 agent `isolation: worktree`（A04）
-- [ ] 5 全文搜索：`session_fts`（FTS5 trigram）、增量同步、重建、Core API（A05）
+- [x] 2 Core：新建会话选 worktree（`sessions.worktree`、cwd、环境栏）、`.gitignore` 提示、信任与"总是允许"按主 checkout（A01、A02）
+- [x] 3 归档询问与到期清理（时钟可注入）（A03 的 Core 与场景部分）
+- [x] 4 子 agent `isolation: worktree`（A04）
+- [x] 5 全文搜索：`session_fts`（FTS5 trigram）、增量同步、重建、Core API（A05）
 - [ ] 6 客户端：新建会话 worktree 选项、归档对话、侧栏搜索与定位（A03 Playwright、A06）
 - [ ] 7 主进程：多窗口、窗口状态、审批一致（A07）
 - [ ] 8 后台常驻：托盘 / 菜单栏、计数、退出确认、图标导出（A08）

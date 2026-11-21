@@ -60,25 +60,25 @@ capabilities:
     milestone: M3
     refs: [FR-WS-04, ARCH-9.2]
     task: T35
-    status: planned
+    status: active
   - id: CAP-SESSION-PARALLEL-001
     title: '跨工作区与多窗口的会话并行运行'
     milestone: M3
     refs: [FR-WS-05]
     task: T35
-    status: planned
+    status: active
   - id: CAP-WT-SESSION-001
     title: '新建会话可选在独立 git worktree 中运行，归档时处理未提交改动'
     milestone: M3
     refs: [FR-WS-06, ARCH-6.12]
     task: T35
-    status: planned
+    status: active
   - id: CAP-WT-AGENT-001
     title: '子 agent 可在独立 worktree 中隔离运行'
     milestone: M3
     refs: [ARCH-6.12]
     task: T35
-    status: planned
+    status: active
 
   # Turns, queue and conversation
   - id: CAP-SESSION-TURN-001

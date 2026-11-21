@@ -343,7 +343,7 @@ impl ToolIo {
         rules: &[String],
         services: &super::Services,
     ) -> Result<(), String> {
-        let root = s.scope.root().to_path_buf();
+        let root = s.project().to_path_buf();
         let table = services.storage.dirs().layers(&root);
         let (key, list) = (behavior.to_owned(), rules.to_vec());
         let written = tokio::task::spawn_blocking(move || {

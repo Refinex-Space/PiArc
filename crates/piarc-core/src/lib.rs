@@ -95,6 +95,7 @@ pub mod terminal;
 pub mod tool_io;
 pub mod trust;
 pub mod workspace_settings;
+pub mod worktrees;
 
 pub use demo::{DemoReport, DemoSourceConfig};
 pub use dirs::DataDirs;

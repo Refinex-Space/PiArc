@@ -113,6 +113,9 @@ pub(super) fn prepare_workspace(
     for (path, content) in &spec.workspace.files {
         write_file(workspace, path, content)?;
     }
+    if spec.workspace.git_commit {
+        commit_all(workspace, &spec.workspace.git_branches)?;
+    }
     for (path, name) in &spec.workspace.fixtures {
         let target = resolve(workspace, path);
         if let Some(parent) = target.parent() {
@@ -126,6 +129,39 @@ pub(super) fn prepare_workspace(
             let dir = resolve(workspace, cwd);
             std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         }
+    }
+    Ok(())
+}
+
+/// Commits the workspace's files with a fixed identity, then creates `branches` there (T35).
+fn commit_all(workspace: &Path, branches: &[String]) -> Result<(), String> {
+    let git = |args: &[&str]| -> Result<(), String> {
+        let result = Command::new("git")
+            .args([
+                "-c",
+                "user.name=PiArc L2",
+                "-c",
+                "user.email=l2@example.invalid",
+                "-c",
+                "commit.gpgsign=false",
+            ])
+            .args(args)
+            .current_dir(workspace)
+            .output()
+            .map_err(|e| format!("git {args:?}: {e}"))?;
+        if result.status.success() {
+            Ok(())
+        } else {
+            Err(format!(
+                "git {args:?} failed: {}",
+                String::from_utf8_lossy(&result.stderr)
+            ))
+        }
+    };
+    git(&["add", "--all"])?;
+    git(&["commit", "--quiet", "--allow-empty", "-m", "initial"])?;
+    for branch in branches {
+        git(&["branch", branch])?;
     }
     Ok(())
 }

@@ -25,6 +25,7 @@ impl Fixture {
             session_file: None,
             model: None,
             background,
+            isolation: None,
         };
         serde_json::to_value(self.io.start_subagent(p).await.expect("registered")).expect("json")
     }

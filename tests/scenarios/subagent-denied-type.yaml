@@ -1,5 +1,5 @@
 id: subagent-denied-type
-description: An Agent(<type>) deny rule removes that type from the Agent tool's list and refuses a call that names it; a worktree isolation request fails with a clear error until worktrees exist (T31, T35).
+description: An Agent(<type>) deny rule removes that type from the Agent tool's list and refuses a call that names it; a worktree isolation request outside a git repository fails with a clear error (T31, T35).
 capabilities: [CAP-AGENT-DEF-001, CAP-PERM-RULE-001]
 workspace:
   files:
@@ -45,5 +45,5 @@ expect:
       tool_results:
         [
           { id: denied, is_error: true },
-          { id: tree, is_error: true, contains: 'isolation: worktree' },
+          { id: tree, is_error: true, contains: not a git repository },
         ]

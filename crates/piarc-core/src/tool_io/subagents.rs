@@ -19,6 +19,12 @@
 //! A definition's `hooks` run as a source scoped to the child's session id while it runs;
 //! a project definition's hooks only when the project is trusted. `subagent/finish`, or the
 //! end of the connection, unregisters the child.
+//!
+//! Isolation (T35): a run with `isolation: worktree` gets a temporary worktree
+//! `.piarc/worktrees/agent-<id>/` of its main session's workspace, starting at the parent's
+//! current HEAD; the child's files are the worktree, its settings stay the workspace's. When the
+//! run ends without uncommitted changes and without new commits, the worktree and its branch
+//! are removed; otherwise both stay and `subagent/finish` names them.
 
 use std::path::Path;
 use std::sync::Arc;
@@ -26,8 +32,8 @@ use std::sync::Arc;
 use piarc_config::agents::{AgentDirs, is_project, load};
 use piarc_protocol::policy::{PermissionMode, PolicyEvaluateParams};
 use piarc_protocol::subagent::{
-    AgentWarning, AgentWarningKind, AgentsList, AgentsListParams, ApprovalOrigin, SubagentLimits,
-    SubagentStartParams, SubagentStartResult,
+    AgentWarning, AgentWarningKind, AgentsList, AgentsListParams, ApprovalOrigin,
+    SubagentIsolation, SubagentLimits, SubagentStartParams, SubagentStartResult, SubagentWorktree,
 };
 use piarc_protocol::{ErrorKind, ErrorObject};
 use serde_json::{Value, json};
@@ -54,6 +60,19 @@ pub(super) struct Link {
     /// Runs in the background, or below a run that does: the main session's interrupt does
     /// not stop it.
     pub detached: bool,
+    /// Its temporary worktree (T35).
+    pub worktree: Option<AgentWorktree>,
+}
+
+/// A subagent's temporary worktree (T35).
+#[derive(Debug, Clone)]
+pub(crate) struct AgentWorktree {
+    /// The workspace whose repository holds it.
+    pub project: std::path::PathBuf,
+    pub path: std::path::PathBuf,
+    pub branch: String,
+    /// The commit it started at.
+    pub base: String,
 }
 
 /// Strictness of a mode: a subagent's mode may only be as strict or stricter.
@@ -200,19 +219,8 @@ impl ToolIo {
             Some(link) => (link.root_id.clone(), Arc::clone(&link.root), link.detached),
             None => (p.parent_session_id.clone(), Arc::clone(&parent), false),
         };
-        let cwd = parent.scope.cwd().to_path_buf();
-        let workspace = parent.scope.root().to_path_buf();
-        let dirs = services.storage.dirs().clone();
-        let lookup = cwd.clone();
-        let loaded = tokio::task::spawn_blocking(move || {
-            load(&AgentDirs {
-                cwd: &lookup,
-                data: Some(dirs.data()),
-                home: dirs.home(),
-            })
-        })
-        .await
-        .map_err(|e| ErrorObject::new(ErrorKind::InternalError, e.to_string(), false))?;
+        let workspace = parent.project().to_path_buf();
+        let loaded = self.definitions_from(parent.scope.cwd()).await?;
         let definition = loaded.get(&p.agent_type);
         let mut warnings: Vec<AgentWarning> = Vec::new();
         if let Some(definition) = definition {
@@ -221,6 +229,7 @@ impl ToolIo {
                     .await,
             );
         }
+        let (worktree, files, cwd) = self.child_place(&p, &parent).await?;
         let link = Link {
             root_id: root_id.clone(),
             root,
@@ -229,6 +238,7 @@ impl ToolIo {
             description: p.description.clone(),
             mode: definition.and_then(|d| d.view.permission_mode),
             detached: detached || p.background,
+            worktree: worktree.clone(),
         };
         let mode = effective_mode(&link);
         if let Some(asked) = link.mode
@@ -241,10 +251,19 @@ impl ToolIo {
                 task: None,
             });
         }
-        self.open_linked(&p.session_id, &workspace, &cwd, link)?;
-        lock(&self.session(&p.session_id)?.policy).follow_mode(mode);
-        if p.background {
-            self.register_background(&p, &root_id, &workspace, &cwd)?;
+        let opened = self
+            .open_linked(&p.session_id, &workspace, &files, &cwd, link)
+            .and_then(|()| {
+                lock(&self.session(&p.session_id)?.policy).follow_mode(mode);
+                if p.background {
+                    self.register_background(&p, &root_id, &workspace, &cwd)?;
+                }
+                Ok(())
+            });
+        if let Err(error) = opened {
+            self.finish_subagent(&p.session_id);
+            self.settle_worktree(worktree).await;
+            return Err(error);
         }
         services
             .snapshots
@@ -252,7 +271,144 @@ impl ToolIo {
         Ok(SubagentStartResult {
             permission_mode: mode,
             warnings,
+            cwd: worktree.as_ref().map(|_| piarc_fs::display(&cwd)),
+            worktree: worktree.map(|tree| SubagentWorktree {
+                path: piarc_fs::display(&tree.path),
+                branch: tree.branch,
+            }),
         })
+    }
+
+    /// The definitions found from `cwd`.
+    async fn definitions_from(
+        &self,
+        cwd: &Path,
+    ) -> Result<piarc_config::agents::LoadedAgents, ErrorObject> {
+        let dirs = self.services()?.storage.dirs().clone();
+        let lookup = cwd.to_path_buf();
+        tokio::task::spawn_blocking(move || {
+            load(&AgentDirs {
+                cwd: &lookup,
+                data: Some(dirs.data()),
+                home: dirs.home(),
+            })
+        })
+        .await
+        .map_err(|e| ErrorObject::new(ErrorKind::InternalError, e.to_string(), false))
+    }
+
+    /// The child's worktree (isolation), files and working directory: its worktree at the same
+    /// place below it as the parent's directory, or the parent's own.
+    async fn child_place(
+        &self,
+        p: &SubagentStartParams,
+        parent: &SessionIo,
+    ) -> Result<
+        (
+            Option<AgentWorktree>,
+            std::path::PathBuf,
+            std::path::PathBuf,
+        ),
+        ErrorObject,
+    > {
+        let parent_cwd = parent.scope.cwd();
+        match p.isolation {
+            Some(SubagentIsolation::Worktree) => {
+                let tree = self.agent_worktree(&p.session_id, parent).await?;
+                let below = parent_cwd
+                    .strip_prefix(parent.scope.root())
+                    .unwrap_or(Path::new(""));
+                let (files, cwd) = (tree.path.clone(), tree.path.join(below));
+                Ok((Some(tree), files, cwd))
+            }
+            None => Ok((
+                None,
+                parent.scope.root().to_path_buf(),
+                parent_cwd.to_path_buf(),
+            )),
+        }
+    }
+
+    /// Creates the temporary worktree of subagent `id` from `parent`'s HEAD (T35).
+    async fn agent_worktree(
+        &self,
+        id: &str,
+        parent: &SessionIo,
+    ) -> Result<AgentWorktree, ErrorObject> {
+        let project = parent.project().to_path_buf();
+        let git = self.git_runner(&project).await?;
+        let base = piarc_git::worktree::head(&git, parent.scope.root())
+            .await
+            .map_err(|e| e.to_error_object())?;
+        let short: String = id
+            .chars()
+            .filter(char::is_ascii_alphanumeric)
+            .take(8)
+            .collect();
+        let name = format!("{}{short}", piarc_git::worktree::AGENT_PREFIX);
+        let created = piarc_git::worktree::create(&git, &project, &name, Some(&base))
+            .await
+            .map_err(|e| e.to_error_object())?;
+        tracing::info!(target: "piarc_core::worktrees", session = %id,
+            path = %created.worktree.path.display(), "subagent worktree created");
+        Ok(AgentWorktree {
+            project,
+            path: created.worktree.path,
+            branch: created.worktree.branch,
+            base: created.worktree.base,
+        })
+    }
+
+    /// The temporary worktree of registered subagent `id`.
+    pub(crate) fn subagent_worktree(&self, id: &str) -> Option<AgentWorktree> {
+        lock(&self.sessions)
+            .get(id)
+            .and_then(|s| s.subagent.as_ref())
+            .and_then(|link| link.worktree.clone())
+    }
+
+    /// A run ended: its untouched worktree is removed with its branch; one with changes or
+    /// commits stays and is returned. When it cannot be inspected, it stays.
+    pub(crate) async fn settle_worktree(
+        &self,
+        worktree: Option<AgentWorktree>,
+    ) -> Option<SubagentWorktree> {
+        let tree = worktree?;
+        let kept = SubagentWorktree {
+            path: piarc_fs::display(&tree.path),
+            branch: tree.branch.clone(),
+        };
+        let git = self.git_runner(&tree.project).await.ok()?;
+        let untouched = async {
+            let clean = piarc_git::worktree::changes(&git, &tree.path)
+                .await?
+                .is_clean();
+            let head = piarc_git::worktree::head(&git, &tree.path).await?;
+            Ok::<_, piarc_git::WorktreeError>(clean && head == tree.base)
+        };
+        match untouched.await {
+            Ok(true) => {}
+            Ok(false) => return Some(kept),
+            Err(error) => {
+                tracing::warn!(target: "piarc_core::worktrees", "cannot inspect {}: {error}", kept.path);
+                return Some(kept);
+            }
+        }
+        // Without force: a change made since the check keeps it.
+        if let Err(error) =
+            piarc_git::worktree::remove(&git, &tree.project, &tree.path, false).await
+        {
+            tracing::warn!(target: "piarc_core::worktrees", "cannot remove {}: {error}", kept.path);
+            return Some(kept);
+        }
+        if let Err(error) =
+            piarc_git::worktree::delete_branch_at(&git, &tree.project, &tree.branch, &tree.base)
+                .await
+        {
+            tracing::warn!(target: "piarc_core::worktrees", "cannot delete {}: {error}", tree.branch);
+        }
+        tracing::info!(target: "piarc_core::worktrees", path = %kept.path, "untouched subagent worktree removed");
+        None
     }
 
     /// A background run is a task of its main session (T32, ADR-0049 rule 5).
@@ -390,13 +546,15 @@ impl ToolIo {
         let p: piarc_protocol::subagent::SubagentFinishParams =
             super::parse("subagent/finish", params)?;
         self.tasks.subagent_ended(&p.session_id, Some(p.status));
+        let worktree = self.subagent_worktree(&p.session_id);
         self.finish_subagent(&p.session_id);
+        let worktree = self.settle_worktree(worktree).await;
         let status = match p.status {
             piarc_protocol::subagent::SubagentStatus::Failed => "error",
             _ => "idle",
         };
         self.index_subagent(&p.session_id, workspace, status).await;
-        super::to_value(&piarc_protocol::subagent::SubagentFinishResult {})
+        super::to_value(&piarc_protocol::subagent::SubagentFinishResult { worktree })
     }
 
     /// Writes a finished subagent's row (its workspace, so its transcript can be read later).
