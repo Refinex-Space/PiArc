@@ -1,0 +1,23 @@
+{
+  "id": "t38-search",
+  "steps": [
+    {
+      "tool_calls": [{ "id": "search1", "name": "WebSearch", "input": { "query": "piarc release" } }]
+    },
+    {
+      "text": "Two pages cover the release.",
+      "web_search": {
+        "query": "piarc release",
+        "results": [
+          {
+            "title": "PiArc 1.0 released",
+            "url": "https://piarc.example/blog/1-0",
+            "cited_text": "PiArc 1.0 ships subagents."
+          },
+          { "title": "Changelog", "url": "https://docs.piarc.example/changelog" }
+        ]
+      }
+    },
+    { "text": "PiArc 1.0 shipped subagents (https://piarc.example/blog/1-0)." }
+  ]
+}

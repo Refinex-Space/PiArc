@@ -136,7 +136,7 @@ export const en = {
   'models.settings.nativeWebSearch': "Provider's web search",
   'webSearch.title': 'Web search',
   'webSearch.hint':
-    "WebSearch uses the model provider's own search when the session's model has one, otherwise the search service below. Each search asks for approval like any other tool call.",
+    "WebSearch uses the model provider's own search when the session's model has one, otherwise the search service below. Searches go through the same permission rules and hooks as other tool calls.",
   'webSearch.status.service': 'WebSearch is available: models without their own search use {name}.',
   'webSearch.status.nativeOnly':
     'WebSearch is available only in sessions on {models}; set up a search service for the other models.',

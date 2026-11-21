@@ -77,6 +77,8 @@ const PIARC_API_SNAPSHOT = [
   'setSessionEffort',
   'setSessionModel',
   'setSessionPinned',
+  'setWebSearchBackend',
+  'setWebSearchKey',
   'shareTerminal',
   'startLogin',
   'steer',
@@ -105,6 +107,7 @@ const PIARC_API_SNAPSHOT = [
   'undoRewind',
   'unsubscribeEvents',
   'updatePermissionRule',
+  'webSearchSettings',
   'workspaceModels',
   'worktreeBranches',
 ];

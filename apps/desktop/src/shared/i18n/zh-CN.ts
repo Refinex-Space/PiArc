@@ -133,7 +133,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'models.settings.nativeWebSearch': '服务商自带网页搜索',
   'webSearch.title': '网页搜索',
   'webSearch.hint':
-    '会话的模型有服务商自带的搜索时，WebSearch 用它；否则用下面的搜索服务。每次搜索都和其他工具调用一样需要审批。',
+    '会话的模型有服务商自带的搜索时，WebSearch 用它；否则用下面的搜索服务。搜索与其他工具调用一样经过权限规则与 hooks。',
   'webSearch.status.service': 'WebSearch 可用：没有自带搜索的模型使用 {name}。',
   'webSearch.status.nativeOnly':
     'WebSearch 只在使用 {models} 的会话中可用；为其他模型设置一个搜索服务即可。',
