@@ -121,11 +121,6 @@ differences:
     claude_code: '>=2.1.318 <2.2.0'
     reason: PiArc's Bash keeps Pi's parameters (command, timeout in seconds, ADR-0028); the client shows the command itself instead of a model-written description.
   - scenario: '*'
-    path: 'requests.items[*].tools.Bash.params.dangerouslyDisableSandbox'
-    claude_code: '>=2.1.318 <2.2.0'
-    reason: PiArc's command sandbox and its per-call escape are not settled yet (macOS sandbox and Windows isolation).
-    follow_up: T39
-  - scenario: '*'
     path: 'requests.items[*].tools.Bash.params.terminal'
     claude_code: '>=2.1.318 <2.2.0'
     reason: PiArc's own parameter (ADR-0050) runs the command in a PiArc terminal the user can open, with the terminal's screen as the background task's output file.
