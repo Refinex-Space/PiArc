@@ -19,6 +19,7 @@
 //   ad-hoc signed.
 // Exit code 0 when every check passes.
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { existsSync, lstatSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
@@ -115,11 +116,34 @@ function walk(dir) {
 }
 
 /**
- * Runs every check against one packaged app.
- * @param {{ app: string, platform: string, arch: string }} options
+ * Whether the Core module at `file` has the development build's testing exports; undefined when
+ * this Node cannot load it (another architecture).
+ * @param {string} file
+ * @param {string} arch
+ * @returns {boolean | undefined}
+ */
+export function testingExports(file, arch) {
+  if (arch !== process.arch) return undefined;
+  /** @type {unknown} */
+  const loaded = createRequire(import.meta.url)(file);
+  const runtime =
+    typeof loaded === 'object' && loaded !== null && 'CoreRuntime' in loaded
+      ? loaded.CoreRuntime
+      : undefined;
+  const prototype =
+    typeof runtime === 'function' && typeof runtime.prototype === 'object'
+      ? /** @type {object} */ (runtime.prototype)
+      : {};
+  return 'startDemoSource' in prototype && 'triggerPanic' in prototype;
+}
+
+/**
+ * Runs every check against one packaged app; with `flavor`, also whether its Core has the
+ * testing exports that flavor should (or should not) have.
+ * @param {{ app: string, platform: string, arch: string, flavor?: string }} options
  * @returns {Check[]}
  */
-export function checkAppLayout({ app, platform, arch }) {
+export function checkAppLayout({ app, platform, arch, flavor }) {
   /** @type {Check[]} */
   const checks = [];
   const add = (/** @type {string} */ name, /** @type {boolean} */ ok, detail = '') =>
@@ -167,6 +191,20 @@ export function checkAppLayout({ app, platform, arch }) {
   );
   const core = path.join(resources, 'app.asar.unpacked', 'native', coreBinaryName(platform, arch));
   add('Core module in app.asar.unpacked/native/', existsSync(core), core);
+  if (flavor !== undefined && existsSync(core)) {
+    const testing = testingExports(core, arch);
+    if (testing !== undefined) {
+      // The main process installs its test hooks (among them the answer to the extension
+      // packages' native confirmation, T40) only for a Core with testing exports.
+      add(
+        flavor === 'release'
+          ? 'release Core has no testing exports (no test hooks, no answers to native confirmations)'
+          : 'development Core has testing exports',
+        testing === (flavor !== 'release'),
+        `testing exports: ${String(testing)}`,
+      );
+    }
+  }
 
   if (platform !== 'darwin') {
     return checks;
@@ -237,7 +275,7 @@ function main() {
     process.exitCode = 1;
     return;
   }
-  const checks = checkAppLayout({ app, platform, arch: values.arch });
+  const checks = checkAppLayout({ app, platform, arch: values.arch, flavor });
   console.log(`Layout and signatures of ${app}`);
   for (const check of checks) {
     console.log(`  ${check.ok ? '✔' : '✖'} ${check.name}`);

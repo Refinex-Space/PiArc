@@ -31,6 +31,10 @@ git 的状态、diff、worktree、分支。T13：目录所属仓库的主 checko
 - `head_branch` 读 `.git`（文件或目录）与 `HEAD`，不起进程，快照与环境栏用它。
 - `Git` 经注入的 `ProcessSpawner` 运行（生产是 `piarc-exec` 的进程树启动器），环境由调用方给（Core 用命令环境），另加 `GIT_TERMINAL_PROMPT=0`；超时默认 300 s，超时即杀。stdin 写完即关。`find_program` 只认 `PATH` 中的绝对目录，排除工作区内的 git。
 
+## 扩展包（`package`，T40）
+
+- `clone_pinned(git, url, dir)`：URL 放在 `--` 之后克隆，检出为分离 HEAD 并返回提交（失败时删掉目录）；`update_pinned` 取 `origin/HEAD`（没有时 `FETCH_HEAD`）并重新检出，返回新旧提交。位置与内容由 Core 与 `piarc-config` 决定。
+
 ## 易错点
 
 - `tests/worktree.rs` 自带一个 tokio 的最小启动器（功能 crate 不能依赖 `piarc-exec`），Windows 上同样能跑。

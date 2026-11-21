@@ -1,0 +1,6 @@
+{
+  "jsonrpc": "2.0",
+  "id": 91,
+  "method": "plugins/extensions",
+  "params": { "cwd": "/Users/ada/项目 工作区" }
+}

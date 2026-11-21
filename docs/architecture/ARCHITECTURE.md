@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.50（2026-11-21） |
+| 版本 | 2.51（2026-11-21） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -272,6 +272,7 @@ PiArc/
 | [0055](../adr/0055-websearch-and-hooks-m3.md) | `WebSearch` 经同一闸门裁决后，模型支持原生搜索时用辅助模型通道向同一服务商发一次只带服务端搜索工具的请求（适配在 `providers/web-search.ts`），否则经 Core 的 `web/search` 用第三方后端（首个为 Brave Search，key 只在 Core 的保险箱）；都不可用时不进工具集。`http`、`prompt` handler 与 command 共用 Core 的执行框架（端口注入：`piarc-web` 发请求、Agent Host 的 `hooks/prompt` 做判定）；SubagentStart、SubagentStop、PostToolBatch 由 Agent Host 报告；子 agent 里的 hooks 输入带 `agent_id`、`agent_type`；`prompt_id`、`effort`；项目 hook 的权限更新不越出信任 | 所有搜索后端经同一审批、规则、hooks 与审计；API key 不进 Agent Host；hooks 只有一套执行器 |
 | [0056](../adr/0056-macos-sandbox-and-agent-host-profile.md) | macOS 的 Bash 沙箱随调用的授权走、配置按命令从当时的设置生成；键沿用 Claude Code 的 `sandbox.*`，项目只能收紧；自动批准是第 7 步的模式默认；沙箱外重试任何模式都问、只有仅本次与拒绝、hooks 不代答；白名单外域名由代理挂起并发网络卡；拒绝写审计并回到模型；Agent Host 只写工作区与数据目录里它自己的位置 | 沙箱的开关与白名单即时生效且不扩大自动批准的范围；第二道防线覆盖用户设置、信任与用户级资源 |
 | [0057](../adr/0057-windows-command-isolation.md) | Windows 到 Beta 维持权限规则 + Job Object 与明确提示，MXC ProcessContainer 列为 Beta 之后的候选（先验证遥测，先用于 Agent Host，Git Bash 修复后再给命令） | 不引入要管理员、要签名或带不可关遥测的组件；Windows 上的提示与 Claude Code 一致 |
+| [0058](../adr/0058-plugins-pi-packages-and-mcp-prompts.md) | 插件与 Pi 包由 Core 安装（记录在 `core.sqlite`，npm 经内置 npm 且 `--ignore-scripts`，git 锁定提交），作用域在设置的 `plugins` 键，可执行项逐项确认、确认只在主进程原生对话框里；组件以命名空间排在所有来源之后；Pi 扩展经 AHP `plugins/extensions` 交给 Agent Host；MCP prompts 是 `mcp__<server>__<prompt>` 斜杠命令 | 装上不等于运行：每段代码在运行前都经用户逐项确认；项目未受信任时项目作用域的包一律不加载 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -610,6 +611,8 @@ T25 落地（ADR-0039）：
 | 决策 | `piarc_hooks::Decision` 按事件合并：PreToolUse deny > ask > allow（`defer` 按 ask），`updatedInput` 在规则之前替换参数；PermissionRequest deny 优先，allow 的 `updatedInput` 重新经过裁决，`updatedPermissions` 支持 `addRules`（会话与 `.piarc/` 文件）和 `setMode`（会话）；PostToolUse 可替换输出并追加上下文与反馈，PostToolUseFailure 只追加；PreCompact 的纯文本 stdout 作为摘要指令 |
 | 呈现与审计 | 每个 handler 一行 `audit_events`（`kind: "hook"`）；`systemMessage`、`stopReason` 与错误经 `core/notices`（`type: "hook"`）显示在客户端的提示行；超过 10,000 字符的上下文写入会话临时目录 `hooks/`，只送 2,000 字符预览与路径 |
 
+T40（ADR-0058）：生效的插件的 `hooks/hooks.json` 与清单里的 hooks 作为层 `plugin:<id>` 排在设置文件之后，只运行用户确认过的 handler（与信任清单同一种条目名），`${CLAUDE_PLUGIN_ROOT}`、`${CLAUDE_PLUGIN_DATA}` 在命令文本中替换、不导出为环境变量；`disableAllHooks` 同样关掉它们。
+
 T38 落地（ADR-0055）：
 
 | 部分 | 实现 |
@@ -653,6 +656,8 @@ handler 类型：`command`（M2）→ `http`、`prompt`（M3）→ `mcp_tool`（
 - 子 agent 的文件编辑同样进入快照（Core 统一入口），这一点比 Claude Code 更完整。
 
 T31 落地（ADR-0048）：定义由 Core 的 `piarc_config::agents` 发现、解析与合并（来源顺序同上，项目两级从 cwd 向上、越近越优先；同名取整条；不认识的字段、`skills`（T37 前暂未生效；`isolation` 自 T35 生效、`mcpServers` 自 T36 生效）、项目级 `bypassPermissions`/`auto` 都作为警告列出，解析错误带行号），Agent Host 经 `agents/list` 取得并加上三个内置类型（`Explore`、`Plan` 只读、不加载 memory 与 git 状态，`Explore` 默认 `fast`）。子会话在 `agent-host/src/runtime/subagent-session.ts` 创建、`runtime/subagents.ts` 的 `SubagentRunner` 运行与计数（每棵树一份，超过并发上限立即报错，不排队），运行前经 `subagent/start` 在 Core 登记自己的会话 id（独立的文件状态表）并链接主会话：生效模式取定义与主会话当前模式中更严的一个，"本会话允许"的规则存于主会话，写入记在主会话当前回合的检查点下（带子会话 id），定义的 hooks 作为只在子会话运行期间生效的来源（项目级的要求项目受信任）。工具过滤顺序：父会话当前工具 → `tools` → `disallowedTools`（优先）→ 去掉 `AskUserQuestion`、`EnterPlanMode`、`ExitPlanMode`、`SuggestNextSteps` → 到达深度上限时去掉 `Agent`；集合外的工具经 Pi 的 `prepareLoadout` 隐藏声明从请求中隐藏，调用到达 `tool_call` 闸门被拒绝（`setActiveTools` 移除的工具在闸门前就以 "not found" 结束）。后台运行立即返回运行 id，结束后经 `backgroundTask` 提醒回报，不随主会话中断结束，关闭会话或卡片上的停止按钮结束它；运行中的子会话让工作区保持忙碌，空闲计时不回收其 Agent Host。子会话 JSONL 首条 `piarc.subagent` 记父会话与类型，`sessions` 表由它派生父子关系（schema v6），会话列表不含子会话。
+
+T40（ADR-0058）：生效的插件的子 agent 定义排在所有来源之后，类型名为 `<plugin>:<名称>`（`AgentSource::Plugin`，带 `plugin`），正文中的插件变量已替换；定义里的 hooks 与内联 MCP server 只保留用户确认过的。
 
 T38（ADR-0055）：子会话的开始与结束触发 SubagentStart、SubagentStop hooks（取代 SessionStart、Stop），子会话内触发的全部 hooks（设置、子 agent 定义与 skill 的）输入带 `agent_id`、`agent_type`。
 
@@ -762,6 +767,17 @@ T37 落地（ADR-0054）：
 | 重新加载 | Core 的设置监听同时监听 skills、命令与输出风格目录，任何变化（及信任变化）后发 `resources/reload`，Agent Host 在下一次运行前重新取 `skills/list` |
 | 信任与链接（R4） | 项目信任只覆盖信任清单列出的文件：`<根>/{.piarc,.claude,.pi,.agents}/{skills,commands,output-styles,prompts,agents}/`（`piarc_config::executables::covered_by_trust`）；worktree 里的副本、子目录与根以上目录的项目文件只作为指令加载，`allowed-tools`、hooks 与子 agent 的内联 MCP 不生效。项目来源的 skill、命令、输出风格与子 agent 定义解析链接后须仍在项目目录内（`stays_in_project`），否则不读并报问题 |
 
+T40 落地（ADR-0058）：
+
+| 部分 | 实现 |
+|---|---|
+| 识别 | `piarc_config::plugins::read`：有 `.claude-plugin/plugin.json`（或只有标准布局，名称取目录名）的是 Claude Code 插件，`package.json` 带 `pi` 字段（或有 Pi 的约定目录）的是 Pi 包。插件的 `commands`、`agents` 路径替换默认目录，`skills` 追加，`hooks`、`mcpServers` 与 `hooks/hooks.json`、`.mcp.json` 合并；Pi 包按 `pi` 字段列 extensions、skills、prompts、themes。mods、LSP、monitors、channels、themes、output styles、workflows、`bin/`、`userConfig` 等列为不支持，其余照常加载 |
+| 安装位置 | 本地目录原地使用；npm 装进 `<数据目录>/pi/npm/`（一个 npm 前缀，Pi 的布局），由 Core 以内置 node 运行 `npm-cli.js`，参数始终含 `--ignore-scripts`，`PATH` 最前是内置 Node；git 克隆到 `<数据目录>/pi/git/<host>/<path>` 并锁定提交，更新是显式操作、给出新旧提交。安装记录在 `core.sqlite` 的 `packages` |
+| 作用域与开关 | 设置的 `plugins`（id → 开或关）：用户级 `settings.json` 对所有工作区生效，`.piarc/settings.json` 只对该工作区生效且是可执行配置（信任前不进合并）。安装即关闭；开启、关闭、卸载后 Core 向运行中的 Agent Host 发 `resources/reload`，不重启应用。每次操作写 `audit_events`（`kind: "plugin"`） |
+| 确认与再确认 | 可执行项是 hook、MCP server、Pi 扩展入口、子 agent 定义里的 hooks 与内联 server，记录存已确认项的名字；只有已确认的项运行，更新带来的新项在再次确认前不运行。开启与允许新项都在主进程的原生确认框里完成（来源、每个可执行项、Pi 扩展在 Agent Host 进程内运行的说明），只把框里列出的项交给 Core。项目作用域的包在信任对话框里随项目列出，信任即确认列出的项 |
+| 组件 | 命令与 skill 为 `<plugin>:<名称>`，子 agent 为 `<plugin>:<名称>`，MCP server 为 `plugin_<plugin>_<server>`，都排在项目与用户来源之后、不覆盖同名组件；Pi 包的 skill 与模板不加命名空间。插件 skill 与命令的 `allowed-tools`、hooks 不生效。Pi 扩展由 Agent Host 经 `plugins/extensions` 取得已确认的入口文件后交给 Pi 的资源加载器，不写进 `pi/settings.json`（Pi 会为缺失的包运行带安装脚本的 npm） |
+| 设置页 | "Skills 与插件"页的插件部分：已安装列表（类型、来源、作用域、开关状态、组件、不支持的组件、等待确认的项）、从文件夹、git、npm 安装、开启与关闭、更新、查看新增项、卸载 |
+
 ### 6.8 MCP
 
 - 配置来源：`.mcp.json`（项目，需信任）、`~/.claude.json` 中的 user/local 级 server、PiArc 自己的配置、插件、企业策略；同名按"企业 > 本地 > 项目 > 用户 > 插件"取整条定义。
@@ -769,7 +785,7 @@ T37 落地（ADR-0054）：
 - **连接池**：PiArc 的 MCP 扩展替换 Pi 内置 MCP 扩展，在 Agent Host 内按工作区维护共享连接池，同一 server 只启动一份，按需连接、空闲断开（ADR-0010）。stdio server 的进程由 Agent Host 启动，PATH 中前置内置 Node，使 `npx` 类 server 开箱即用。
 - OAuth：使用 pi-mcp 的 OAuth 流程；浏览器授权由客户端发起；token 存凭据保险箱（经 Core），不写明文文件。
 - 工具暴露：工具总数较少时直接暴露；超过阈值（默认 30 个）时改为延迟加载，经 `ToolSearch` 检索。
-- 缺口：elicitation、sampling、prompts、resources/subscribe（pi-mcp 不支持）。prompts 可以在扩展层基于通用请求实现为斜杠命令（M4）；elicitation 需要扩展 pi-mcp 的 handler，先提上游 issue（M5）。
+- 缺口：elicitation、sampling、prompts、resources/subscribe（pi-mcp 不支持）。prompts 可以在扩展层基于通用请求实现为斜杠命令（M4）；elicitation 需要扩展 pi-mcp 的 handler，先提上游 issue（M5）。T40 已补上 prompts（ADR-0058）：连接池对声明 `prompts` 能力的 server 用 `prompts/list` 取全并在 `notifications/prompts/list_changed` 后重取，每个 prompt 是斜杠命令 `mcp__<server>__<prompt>`（只有已连接的 server 提供）；输入 `/mcp__…` 时 Agent Host 按声明顺序对应空白切分的参数、检查必填参数，以 `prompts/get` 各条消息的文本作为本次输入，其他内容类型给出明确提示。
 
 T36 落地（ADR-0053）：
 
@@ -909,7 +925,7 @@ T21 的 `models/list` 返回可用模型的 `provider`、`id`、`name`、`contex
 | `.claude/skills/` | 完整 | `context: fork` 在 M5 |
 | `.claude/commands/` | 完整 | |
 | `.mcp.json`、`~/.claude.json` 的 MCP 段 | 部分 | 不支持 SSE、WebSocket 传输；`headersHelper` 不执行（T36，ADR-0053） |
-| 插件（`.claude-plugin/`） | 部分 | 不支持 mods、LSP、Channels、Monitors |
+| 插件（`.claude-plugin/`） | 部分 | 不支持 mods、LSP、Channels、Monitors、themes、output styles、`bin/`、`userConfig` 与插件市场；`enabledPlugins`、`extraKnownMarketplaces` 忽略，PiArc 以自己的 `plugins` 键开关（T40，ADR-0058） |
 | 输出风格 | 完整 | |
 | 企业托管配置（`managed-settings.json`） | M5 | PiArc 自有托管配置格式另行设计，兼容读取 Claude Code 的托管文件 |
 
@@ -1076,6 +1092,8 @@ T33 已实现（ADR-0050，能力 `terminalTasks`）：`exec/run` 新增 `termin
 T35 已实现（ADR-0052）：`subagent/start` 新增可选的 `isolation`（`worktree`），结果新增 `cwd` 与 `worktree`（路径、分支）；`subagent/finish` 的结果新增 `worktree`（只在保留时出现）。
 
 T36 已实现（ADR-0053，能力 `mcpPool`）：Agent Host → Core 的请求 `mcp/servers`（`McpServersResult`：定义带作用域、来源文件、传输、可用性与原因；`env` 是 stdio server 的基础环境；`idleTimeoutMs`、`deferThreshold`；`overridden`、`issues`）；Core → Agent Host 的请求 `mcp/status`（先重读配置）、`mcp/reconnect`、`mcp/setEnabled`、`mcp/login`（带 `loginId`，经 `ui/loginInteraction` 交出授权页），后三者的结果是该 server 的 `McpServerStatus`；Agent Host → Core 的通知 `mcp/statusChanged`（`McpStatus`）没有会话头，是第一个工作区级通知：`piarc-host` 只对 `HOST_NOTIFICATIONS` 中的方法放行，Core 加上 `workspace` 发到路由 `core/mcp`。`policy/evaluate` 新增可选的 `requiresUserInteraction`，`AgentDefinition` 新增 `mcpInline`，`ReminderType` 新增 `mcpChanged`。Core API 新增 `mcpStatus(workspace)`、`mcpReconnect`、`mcpSetEnabled`、`mcpLogin`（工作区没有运行中的 Agent Host 时，`mcpStatus` 按配置回答），配置诊断报告新增 `mcp`（不支持的 server 与合并问题）。
+
+T40 已实现（ADR-0058，能力 `plugins`）：Agent Host → Core 的请求 `plugins/extensions`（`cwd` 在工作区内；结果是生效的包里已确认的 Pi 扩展入口文件）。`SkillInfo`、`CommandInfo`、`AgentDefinition`、`McpServerDefinition` 新增可选的 `plugin`；`resources/listCommands` 由 Agent Host 接上已连接 server 的 MCP prompts（类别 `mcpPrompt`、来源 `mcp`）。Core API 新增 `packagesList(workspace?)`、`packageInstall`、`packageUpdate`、`packageSetEnabled`、`packageConfirm`、`packageUninstall`，结果为 `PackagesList`、`PackageInstallResult`。
 
 T37 已实现（ADR-0054，能力 `skills`）：Agent Host → Core 的请求 `skills/list`（`SkillsCatalog`：skills、合并后的命令、输出风格与自定义风格的指令、当前风格、问题；带会话 id 时 Core 记下该会话可读的 skill 目录）、`skills/invoke`（会话、`Skill` 调用 id、名称、参数；结果为替换后的正文、目录、本回合放行的规则、hooks 是否生效、未生效的原因）、`skills/match`（会话碰过的文件与待激活的 `paths` skill）；Core → Agent Host 的请求 `resources/listSkills`、`resources/listCommands`（Agent Host 合并自己的来源，插件与 MCP prompts 留给 T40）、`resources/reload`。`session/prompt`、`session/steer`、`session/followUp` 新增可选的 `command`（`PromptCommand`），`userMessage` 条目新增可选的 `command`，`ReminderType` 新增 `skillsChanged`、`outputStyle`。Core API 新增 `listCommands(workspace, cwd)`、`listSkills(workspace, cwd)`、`setOutputStyle(workspace?, name?)`（工作区没有运行中的 Agent Host 时由 Core 按文件回答列表）；`composerInfo` 不再带命令列表。
 
@@ -1353,9 +1371,11 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 ├── MEMORY.md                  # 用户编写的全局 memory（可选，T22）
 ├── settings.json              # 用户级 PiArc 设置
 ├── agents/ skills/ commands/  # 用户级资源（PiArc 自有）
+├── plugins/data/<id>/         # 插件的 ${CLAUDE_PLUGIN_DATA}（T40）
 ├── pi/                        # Pi 的 agent 目录（经 SDK agentDir 指定）
 │   ├── settings.json          # 由 Core 生成，Pi 读取
 │   ├── models.json            # 自定义端点与模型覆盖
+│   ├── npm/ git/              # Core 安装的 Pi 包与插件（npm 前缀；git/<host>/<path> 的克隆，T40）
 │   └── sessions/              # Pi 会话 JSONL（对话事实来源）
 ├── checkpoints/objects/       # 内容寻址的文件快照（sha256 分桶）
 ├── sessions/<sessionId>/      # 会话文件，attachments/ 保存用户附件，临时区域保存工具及后台任务输出，terminals/ 保存退出时的终端（T33）
@@ -1400,6 +1420,8 @@ T23（ADR-0037）：`workspaces.default_mode` 记录用户在该工作区最后�
 T25（ADR-0039）：每次 hook 运行每个 handler 写一行 `audit_events`（`kind: "hook"`），记录事件、matcher 看到的值、来源层与文件、JSON Pointer、程序名与命令的 SHA-256（不存命令原文）、退出码、耗时、是否超时或被取消、判定。
 
 T35（schema v8，ADR-0052）：`sessions` 增加 `worktree_branch`、`worktree_cleanup_at`、`worktree_confirm`、`worktree_removed_at`（与已有的 `worktree` 同属 Core 自己的列，重建时保留）；迁移清空 `session_files`，升级后首次同步把已有会话的正文读进 `session_text`。
+
+T40（schema v10，ADR-0058）：新增 `packages`（id、类别、来源类别与地址、安装目录、git 提交、版本、npm 完整性值、已确认可执行项名称的 JSON 数组、时间）；开关与作用域在设置的 `plugins` 键。
 
 T36（schema v9，ADR-0053）：新增 `mcp_servers(workspace, name, enabled, changed_at)`，记用户在 MCP 设置页对某个工作区的 server 的启停选择（工作区为主 checkout 的规范路径）。
 
@@ -1456,6 +1478,8 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 R2 起，肯定决定携带与 checkout、目录、清单及既有决定绑定的版本。清单或数据库快照不可用时保持未信任。版本已变时返回最新视图，用户重新确认。linked worktree 通过主仓库反向登记校验（ADR-0034）。
 
 R4 起，信任只覆盖信任清单扫描的文件：skill、命令与子 agent 定义只有在主 checkout 根自己的资源目录里时，其 `allowed-tools`、hooks 与内联 MCP 才随项目信任生效（worktree 会话从 `.piarc/worktrees/<名称>/` 向上找到的另一分支的文件不算）；hook 的条目名按 `type` 取实际运行的字段，并带上 `headers`、`allowedEnvVars`、`model`。
+
+T40 起（ADR-0058），`.piarc/settings*.json` 的 `plugins` 开启的包在清单里另列出它的全部可执行项（来源 `plugin:<id>`），信任即把这些项记为该包已确认；包后来新增的项只等该包自己的确认，不让项目回到未信任。在受信任的项目里经原生确认开启项目作用域的包时，新增的清单项并入信任快照。
 
 T20 起，项目层的 `acceptEdits` 和 `additionalDirectories` 也纳入信任快照。新项目项需要确认，原生审批保存的精确授权只扩展原有信任记录。会话显式模式优先于设置；项目层声明的 `bypassPermissions` 或 `auto` 始终跳过。
 
@@ -1803,6 +1827,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.48 | 2026-11-21 | R4：第 16 章标注 M3（macOS）未达标（内存一项）；6.0 节矩阵按 M3 交付更新（Skills 的位置改为 C + K + U、依托能力改为 PiArc 自己的工具与提醒，MCP 写明配置与连接池的位置）；6.1.2 节受保护路径加 `.mcp.json`；6.2.2 节控制字符的处理；6.7 节信任与链接一行、6.8 节 server 名规则、10.2 节信任覆盖的文件与 hook 条目名；6.15 节补 M3 的四行与工具并发的 `Agent`；第 11 章 R4 的内存复测。预算未改。 |
 | 2.49 | 2026-11-21 | T39（ADR-0056）补充第 4 章 ADR-0056（ADR-0057 以提议列出）、6.2.3 节写明沙箱内自动批准在第 7 步、沙箱外执行紧接第 3 步；6.10 节 T39 落地（设置与来源约束、按命令生成配置、网络卡、拒绝反馈、不可用时降级、限制）；9.2 节审计的沙箱记录；10.3 节 Agent Host 配置定稿。Windows 隔离方案的 ADR-0057 为提议，第 6.10 节 Windows 一条、10.3、15.2 节与 R16 待用户决定后更新。 |
 | 2.50 | 2026-11-21 | T39：ADR-0057 被用户采纳。第 4 章去掉"提议"；6.10 节 Windows 一条写明评估结论（到 Beta 维持现状，MXC ProcessContainer 为 Beta 之后的候选及其前提）；10.3 节 Windows 的 Agent Host 没有第二道防线并计入已接受风险；15.2 节沙箱一行与第 14 章 R16 的对策和触发条件随之更新。 |
+| 2.51 | 2026-11-21 | T40（ADR-0058）补充第 4 章 ADR-0058；6.3.1 节插件 hooks 的层与确认；6.4 节插件的子 agent 定义；6.7 节 T40 落地（识别、安装位置、作用域与开关、确认与再确认、组件命名与优先级、Pi 扩展经 AHP、设置页）；6.8 节 MCP prompts 作为斜杠命令；6.14 节插件一行；7.4 节能力 `plugins` 与 Core API；9.2 节 `packages` 表（schema v10）；10.2 节项目作用域的包与信任。 |
 | 2.40 | 2026-11-20 | T32（ADR-0049）补充第 4 章 ADR-0049、6.1.4 节 KillShell 与 Monitor 的参数与裁决、6.6.3 节 `monitorOutput`、`key` 与 `wake`、6.11 节任务管理器、超时转后台、通知、Monitor 回灌与限速的落地、7.3 节后台任务的持久化、7.4 节 `backgroundTasks` 能力的方法与成员、8.2 节后台任务卡与面板、9.2 节 schema v7、9.3 节任务输出的清理；基线决策未变（6.11 已定超时转后台与 Monitor） |
 | 2.39 | 2026-11-20 | T31（ADR-0048）补充第 4 章 ADR-0048、6.4 节子 agent 的落地（定义加载、子会话登记与链接、工具过滤用隐藏声明加闸门、深度与并发计数、前后台、空闲回收）、6.13 节模型别名表与解析、6.14 节 `model`、`effortLevel` 生效、`advisorModel` 忽略、`agent` 交 T48、7.4 节 `subagents` 能力的方法与成员、7.6 节子会话条目增量的现状、8.2 节子 agent 卡与设置页、9.2 节 schema v6；基线决策未变 |
 | 2.38 | 2026-11-20 | R3（M2 macOS 阶段门）：第 4 章补上 ADR-0042；6.0 节矩阵按 M2 实际交付更新权限、Hooks、Plan、任务清单、上下文工程、Checkpoint、多模型七行；第 4 章加入 ADR-0047、6.2.2 与 6.2.3 节写明带通配的命令规则不放行越界路径（ADR-0047，修订 ADR-0037 的阶梯）；6.2.2 节写明 `Read` deny 对目录搜索与 Bash 递归读取的限制（I120）；6.3.1 节进程树终止按平台写准；6.6.4 节熔断复位范围（I107）；6.14 节 `plansDirectory` 交 T48（I104）；6.15 节记录 R3 对校准值的核对（数值不变）与缓存断点、plan 模式两行的实现；第 16 章记录 M2 的 macOS 结论；ADR-0047 改变了第 6.2.3 节阶梯第 6、7 步对带通配命令规则的先后 |

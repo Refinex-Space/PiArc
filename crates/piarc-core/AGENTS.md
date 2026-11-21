@@ -87,6 +87,12 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 状态与操作经 `Hub::{mcp_status, mcp_reconnect, mcp_set_enabled, mcp_login}`（`sessions/mcp.rs`，NAPI `mcpStatus` 等）：工作区有运行中的 Agent Host 时转给它，没有时 `status_from_config` 按配置回答（可运行的为 `idle`）。Agent Host 的 `mcp/statusChanged` 以 `HostEvent::HostNotification` 到达工作区 actor，加上 `workspace` 发到路由 `core/mcp`（`MCP_ROUTE`）。MCP 登录沿用 T29 的登录记录与 `core/login`，provider 为 `mcp:<server>`。
 - `policy/evaluate` 的 `requiresUserInteraction` 经 `tool_io::policy` 的 `requires_user_interaction` 成为必须询问的一步并清空可保存的规则；`ToolSearch` 在只读宿主工具里。配置诊断报告的 `mcp` 由 `diagnostics()` 给出（不展开变量）。打包产物的探针（`host_probe`）只用 `<数据目录>/settings.json` 的 `mcpServers` 回答（`settings_file_servers`）。
 
+## 扩展包（`plugins`，T40，ADR-0058）
+
+- `PluginManager`（`plugins/mod.rs`，Hub 的 `sessions/plugins.rs` 每次操作新建）：安装（本地目录原地用；npm 经 `plugins/fetch.rs` 的内置 npm、`--ignore-scripts`；git 经 `piarc_git::package` 克隆并锁定提交）、更新、开关（写用户 `settings.json` 或 `.piarc/settings.json` 的 `plugins.<id>`，开启时把原生确认列出的项记为已确认，项目作用域的新清单项经 `TrustService::confirm_items` 并入信任快照）、确认、卸载，每次写 `audit_events`（`kind: "plugin"`）。记录在 `piarc-store` 的 `packages`；Hub 在每次改动后向运行中的 Agent Host 发 `resources/reload`。node 取 `AgentHostLaunch::node()`。
+- `TrustService::permission_settings` 在有 `plugins` 声明时读记录并 `set_packages`（`trust.rs` 的 `attach_packages`），hooks（`config_with` 的层 `plugin:<id>`）、MCP（`mcp.rs` 的 `plugin_sources`，作用域 `plugin`）、skills（`tool_io/skills.rs`）、子 agent（`tool_io/subagents.rs` 的 `definitions_in`）与 AHP `plugins/extensions`（`plugins::extensions`）都用这一份。信任视图把 `.piarc/` 开启的包的可执行项列为 `plugin:<id>` 项（`package_items`），信任时记为已确认（`confirm_listed_packages`），它们不计入新增项。
+- 测试：`cargo test -p piarc-core --lib plugins::`（npm 的进程与参数、postinstall 未运行；作用域、开关、卸载与审计；未信任项目与信任后加载；git 更新后新项不运行直到确认）。
+
 ## Skills 与输出风格（T37，ADR-0054）
 
 - 设置监听（`workspace_settings.rs`）同时监听 skills、命令与输出风格的目录（`piarc_config::skills::watch_dirs`，只取工作区、数据目录与家目录之下的），每次重载与信任变化推进 `WorkspaceSettings::changes`；工作区 actor 启动时开 `reload_resources` 任务，Agent Host 运行时发 `resources/reload`（不启动它）。

@@ -70,6 +70,11 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - `allowed-tools` 的传递：Agent Host 不传规则。用户的 `/名称` 由 Core 在 UserPromptSubmit 之前展开并直接登记；模型的 `Skill` 调用经 `policy/evaluate`（只读，`Skill(名称)` 规则）后由 `skills/invoke` 登记。`session/prompt`、`session/steer`、`session/followUp` 的 `command` 进 `UserInput.command`：`piarc.input` 记下用户输入的原文与命令（`inputRecord`），`userMessage` 条目显示原文并带 `command`，历史不要求消息以原文开头；skill 的 `/名称` 另写 `piarc.skillInvoked`（`SessionSkills.invokedByUser`）。
 - `resources/listSkills`、`resources/listCommands` 由注册表的 `resources(cwd)` 取 Core 的 `skills/list` 回答；插件与 MCP prompts（T40）在这里并入。
 
+## 扩展包与 MCP prompts（T40，ADR-0058）
+
+- Pi 包的扩展：能力 `plugins` 打开时，注册表 `#open` 经 `runtime/plugin-extensions.ts` 的 `pluginExtensions` 取 Core 的 `plugins/extensions`（已确认的入口文件，任何失败都不加载），作为 `additionalExtensionPaths` 交给 Pi（`session-runtime.ts`）；不要把包写进 `pi/settings.json`（Pi 会为缺失的包运行带脚本的 npm）。`resources/reload` 时 `changedExtensions` 比对，变化的空闲会话立即重开，运行中的回合结束后重开（`profileStale`），并让 MCP 池 `refresh()`。子 agent 的会话不加载包的扩展。
+- MCP prompts：`src/mcp/prompts.ts`（命令名、参数对应、文本拼接）、连接的 `prompts`/`getPrompt`、池的 `prompts()`/`getPrompt()`；`resources/listCommands` 经 `withPromptCommands` 接在 Core 的命令后，输入经 `expandInput` 在 `#prepare` 之前展开（Core 已展开过的输入不动）。
+
 ## WebSearch 与 M3 hooks（T38，ADR-0055）
 
 - 后端选择：`SessionHarness.prepareWebSearch(model)` 在会话打开时（`tools()` 之前，注册表 `#open` 与 `ChildSession`）决定是否注册 `WebSearch`：Core 开了能力 `webSearch`，且会话模型能原生搜索（`ModelPreferencesStore.nativeWebSearch`：用户的每模型设置，否则 `nativeSearchKnown`，即服务商 `anthropic` 的 Anthropic Messages 模型）或 `web/searchBackend` 报告有第三方后端。Pi 选的模型与预测不同且原生能力不同时重新决定并重开（同 Profile 的做法）。执行时再按当时的会话模型选：原生 → 辅助模型通道（会话模型，`onPayload`/`onProviderStreamEvent`），否则 `CoreIo.webSearch`（`web/search`），都没有时工具结果是 `NO_SEARCH_BACKEND`。

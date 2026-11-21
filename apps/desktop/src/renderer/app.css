@@ -1283,6 +1283,9 @@ textarea.input {
 .diagnostics-code {
   font-family: var(--piarc-font-mono);
 }
+.package-source {
+  overflow-wrap: anywhere;
+}
 .diagnostics-ignored,
 .diagnostics-issues {
   margin: 0;

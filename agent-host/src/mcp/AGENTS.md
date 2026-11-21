@@ -10,6 +10,8 @@ Agent Host 的 MCP 连接池与每会话的 MCP 扩展（T36，ADR-0053）。配
 - 暴露：会话的 MCP 工具数不超过 `mcp.deferThreshold`（默认 30）时直接声明，超过时注册但不激活（`alwaysLoad` 除外）并激活 `ToolSearch`，命中经 `setActiveTools` 激活（这里用 `setActiveTools` 是对的：被激活的是池注册的工具，与子 agent 过滤不同）。首个回合最多等 `STARTUP_WAIT_MS`（10 s）让连接中的 server 连上，instructions 进 system prompt 的 `mcp_servers` 段；之后的变化只经 `mcpChanged` 提醒。
 - 裁决：工具 `_meta["anthropic/requiresUserInteraction"]` 为真时 `policy/evaluate` 带 `requiresUserInteraction: true`（`McpSession.requiresUserInteraction`），Core 总是询问。
 
+- prompts（T40，ADR-0058）：声明 `prompts` 能力的 server 连接后用 `client.request('prompts/list')` 分页取全，`notifications/prompts/list_changed` 后重取并经 `#changed(false)` 发状态；`prompts.ts` 把它们变成 `mcp__<server>__<prompt>` 命令并展开输入（只送文本内容）。pi-mcp 没有 prompts API，不要等它。
+
 易错点：
 
 - 不要用 pi-mcp 的 `StdioTransport`：它以 `detached` 启动 server，Agent Host 被杀时 server 成为孤儿。`stdio.ts` 让 server 留在 Agent Host 的进程组，关闭顺序是关 stdin（1 s）→ `SIGTERM` 进程树（2 s，macOS 先经 `/bin/ps` 收集子孙）→ `SIGKILL`；Windows 用 `taskkill /T /F`。

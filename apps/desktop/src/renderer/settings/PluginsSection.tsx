@@ -163,7 +163,7 @@ function PackageRow({ pkg, busy, act, workspace }: RowProps) {
         </span>
       </div>
       {pkg.description == null ? null : <p className="small">{pkg.description}</p>}
-      <div className="muted small diagnostics-code" data-testid="package-source">
+      <div className="muted small diagnostics-code package-source" data-testid="package-source">
         {source}
       </div>
       <div className="muted small">
@@ -197,7 +197,7 @@ function PackageRow({ pkg, busy, act, workspace }: RowProps) {
           {issue}
         </div>
       ))}
-      <div className="row-actions">
+      <div className="dialog-actions mcp-actions">
         {pkg.enabled ? (
           <button
             type="button"

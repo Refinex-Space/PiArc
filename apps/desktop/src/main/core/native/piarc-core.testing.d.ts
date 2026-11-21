@@ -34,13 +34,13 @@ export declare class CoreRuntime {
     enabled: boolean,
     scope: string,
     workspace: string | null,
-    confirm: string[],
+    confirm: Array<string>,
   ): Promise<string>;
   /**
    * Confirms executable items of package `id` (after the native confirmation). Answers the
    * list.
    */
-  packageConfirm(id: string, items: string[], workspace?: string | null): Promise<string>;
+  packageConfirm(id: string, items: Array<string>, workspace?: string | null): Promise<string>;
   /**
    * Uninstalls package `id` (its declarations in the user settings and `workspace`'s, its
    * files unless it is a local directory). Answers the list.

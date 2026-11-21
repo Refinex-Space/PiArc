@@ -29,7 +29,7 @@
 
 ## 子 agent 定义（`src/agents.rs`，T31，ADR-0048）
 
-- `load(AgentDirs { cwd, data, home })` 按来源顺序（cwd 向上各级的 `.piarc/agents/`，再各级的 `.claude/agents/`，越近越优先、跳过家目录；PiArc 用户 `agents/`；`~/.claude/agents/`）读全部 `*.md`，以 `name` 字段而不是文件名识别类型，同名取第一份整条定义，后面的路径记进 `overrides`。插件来源留给 T40。
+- `load(AgentDirs { cwd, data, home })` 按来源顺序（cwd 向上各级的 `.piarc/agents/`，再各级的 `.claude/agents/`，越近越优先、跳过家目录；PiArc 用户 `agents/`；`~/.claude/agents/`）读全部 `*.md`，以 `name` 字段而不是文件名识别类型，同名取第一份整条定义，后面的路径记进 `overrides`。生效的扩展包（`AgentDirs.packages`，T40）的定义排在最后，类型名 `<plugin>:<名称>`，只保留已确认的 hooks 与内联 server。
 - `parse` 用 `serde_saphyr` 解析 frontmatter，问题作为 `AgentIssue`（路径、行号、原因）返回，文件不进列表；单个文件上限 `MAX_DEFINITION_BYTES`（256 KiB）。不认识的字段是 `ignoredField`，`isolation` 校验为 `worktree`（T35 起生效），`skills`（预加载 skill）校验后标 `inactiveField`（T48，T37 未接手），`mcpServers` 自 T36 生效：名称引用原样返回，内联定义作为 `Definition.mcp_inline` 交给 Core 检查与展开（`servers()` 返回两者），项目级的 `bypassPermissions`、`auto` 改为 `default` 并标 `projectModeIgnored`，`auto`、`dontAsk` 标 `unsupportedMode`。`tools`、`disallowedTools` 的 `Tool(specifier)` 只保留工具名。
 - 定义里的 `hooks` 是可执行项：项目级定义的 hooks 计入 `executables::enumerate`（新增即让项目回到未确认，ADR-0029），由 Core 在信任时作为限定作用域的来源登记。
 - 设置键：`modelAliases`（别名 → `provider/model`，对象逐键合并）、`subagents.maxDepth`、`subagents.maxConcurrent`（PiArc 自己的键）；Claude Code 的 `model`、`effortLevel` 生效（新会话的默认模型与 effort，`model` 可为别名，Core 的 `tool_io::context::session_defaults` 解析），`advisorModel` 忽略（Anthropic 服务端的 advisor 工具），`agent` 为 `planned(T48)`。
@@ -43,6 +43,12 @@
 - `watch_dirs` 给出 Core 要监听的目录（各来源目录与其下三层子目录）；读取不需要信任，信任只影响 Core 是否施加 `allowed-tools` 与 hooks。
 - 项目来源的 skill、命令文件、输出风格与子 agent 定义解析链接后必须仍在持有该来源的项目目录内（`executables::stays_in_project`），否则跳过并报问题：链接会把任意本机文件带进 system prompt 或 `Skill` 结果（R4 E2）。用户来源不限制。
 - 信任只覆盖信任清单列出的文件：`executables::covered_by_trust(root, file)`，即 `<根>/{.piarc,.claude,.pi,.agents}/{skills,commands,output-styles,prompts,agents}/…`。worktree 里的副本（`.piarc/worktrees/`）、子目录与根以上目录的项目文件只作为指令加载，`allowed-tools`、hooks、内联 MCP 不生效（R4 E1）；Core 的技能激活、`agents/list` 与定义 hooks 都经它判断，不另写路径判断。
+
+## 扩展包（`src/plugins/`，T40，ADR-0058）
+
+- `plugins::read(目录, 数据目录)` 识别 Claude Code 插件（`.claude-plugin/plugin.json` 或标准布局）与 Pi 包（`package.json` 的 `pi` 字段或约定目录），给出 `Manifest`：skills、命令、子 agent 的路径，合并后的 hooks 与 MCP server（`${CLAUDE_PLUGIN_ROOT}`、`${CLAUDE_PLUGIN_DATA}` 已替换）、Pi 扩展入口、不支持的组件与问题。`Manifest::executables()` 是可执行项的唯一命名（hook 用 `executables::hook_item_name`，与信任清单相同；server 用 `mcp::trust_item_name` 加池名 `plugin_<plugin>_<server>`；扩展是相对入口；子 agent 的项前缀类型名）。
+- 设置键 `plugins`（id → 布尔，`schema::PIARC_SETTINGS`，PiArc 项目层的可执行指针 `/plugins`）：`declarations` 给出生效的声明（信任过滤后，项目层的值盖过用户层），`listed` 给出文件里写的（设置页用），`active(设置, 安装记录, 数据目录)` 给出生效的包。Core 把结果经 `Settings::set_packages` 挂在设置上，消费者只读 `Settings::packages()`。`Active::{hooks, mcp_servers, extensions, restrict_agent}` 只留已确认的项。
+- 组件进既有来源：`ResourceDirs.packages`（`skills::load_package`，插件的命令与 skill 名为 `<plugin>:<名称>`，排在所有来源之后）与 `AgentDirs.packages`；`executables::settings_items` 把 `.piarc/` 文件里开启的 `plugins` 列为 `Category::Plugin` 项。Claude Code 的 `enabledPlugins`、`extraKnownMarketplaces` 为忽略（`claude::SETTINGS_KEYS`）。
 
 ## MCP 配置（`src/mcp.rs`，T36，ADR-0053）
 
