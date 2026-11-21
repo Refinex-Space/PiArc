@@ -619,3 +619,31 @@ fn default_colors_answer_color_queries() {
     let replies = String::from_utf8(t.take_effects().replies).expect("utf-8");
     assert!(replies.contains("rgb:f8f8/f9f9/fafa"), "{replies:?}");
 }
+
+/// R4 M11: program output may query the terminal, and the answers are typed into the PTY.
+/// No answer carries text the program chose (a title report, DECRQSS, XTGETTCAP), so output
+/// cannot type a command into the shell.
+#[test]
+fn no_query_answer_echoes_text_the_program_chose() {
+    let mut t = terminal(80, 24);
+    t.write(b"\x1b]2;EVIL; touch pwned\x07\x1b]1;EVIL icon\x07");
+    let _ = t.take_effects();
+    for query in [
+        &b"\x1b[21t"[..],
+        b"\x1b[20t",
+        b"\x1bP$qEVIL\x1b\\",
+        b"\x1bP$qm\x1b\\",
+        b"\x1bP+q4556494c\x1b\\",
+        b"\x1b[>0q",
+        b"\x1b]10;?\x07",
+        b"\x1b[?996n",
+    ] {
+        t.write(query);
+        let replies = t.take_effects().replies;
+        let text = String::from_utf8_lossy(&replies).into_owned();
+        assert!(
+            !text.contains("EVIL") && !text.contains("touch"),
+            "{query:?} answered {text:?}"
+        );
+    }
+}
