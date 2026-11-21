@@ -68,3 +68,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0050](0050-agent-terminal-screen-access.md) | agent 使用终端屏幕的接口：终端承载的任务、`Bash` 的 `terminal` 参数、屏幕文件与共享（补充 ADR-0017、0049） | 已接受 |
 | [0051](0051-terminal-panel-and-renderer.md) | 终端面板与渲染器：会话终端归会话、近期真实输入防线与上限、停拉唤醒、选区与滚动在 Core、默认颜色取令牌（补充 ADR-0017、0023、0050） | 已接受 |
 | [0052](0052-worktrees-search-windows-and-background.md) | Worktree、全文搜索、多窗口与后台常驻的落地：worktree 位置与命名、文件根与设置来源分开、子 agent 的 worktree 在 `subagent/start` 创建、trigram 全文搜索、`core/activity` 托盘计数、链接只做定位、Windows 注册随 Velopack（补充 ADR-0010、0018、0025、0048） | 已接受 |
+| [0053](0053-mcp-extension-and-connection-pool.md) | MCP 扩展与工作区连接池的落地：替换 Pi 的 MCP 扩展、Core 合并配置与 `${VAR}` 展开、租约与空闲断开、roots 按工作区、自写 stdio 传输不脱离进程组、server 环境取命令环境、`ToolSearch` 复用 Pi 的 `tool_search`、OAuth 状态进保险箱、`mcp/statusChanged` 工作区级通知（补充 ADR-0005、0010、0021、0025、0035、0048） | 已接受 |
