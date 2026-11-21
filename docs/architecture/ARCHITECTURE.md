@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.49（2026-11-21） |
+| 版本 | 2.50（2026-11-21） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -271,7 +271,7 @@ PiArc/
 | [0054](../adr/0054-skills-commands-and-output-styles.md) | Core 发现并解析 skills、命令文件、Pi 模板与输出风格（项目优先于用户，同级 `.piarc` > `.claude` > Pi），Pi 自带的加载关掉；system prompt 第 3 段是输出风格、第 5 段是 skills 索引，中途变化经 `skillsChanged`、`outputStyle` 提醒；`Skill` 是只读工具，经 `skills/invoke` 加载正文；`/名称` 由 Core 在 UserPromptSubmit 之前展开；`allowed-tools` 是回合级 allow 来源、skill 的 hooks 从调用起到会话结束生效，项目来源要求信任；`$1` 起的位置参数 | 带 `.claude/skills`、`.claude/commands` 的仓库直接可用；授权与 hooks 受 Core 的信任与规则约束；system prompt 不被改写 |
 | [0055](../adr/0055-websearch-and-hooks-m3.md) | `WebSearch` 经同一闸门裁决后，模型支持原生搜索时用辅助模型通道向同一服务商发一次只带服务端搜索工具的请求（适配在 `providers/web-search.ts`），否则经 Core 的 `web/search` 用第三方后端（首个为 Brave Search，key 只在 Core 的保险箱）；都不可用时不进工具集。`http`、`prompt` handler 与 command 共用 Core 的执行框架（端口注入：`piarc-web` 发请求、Agent Host 的 `hooks/prompt` 做判定）；SubagentStart、SubagentStop、PostToolBatch 由 Agent Host 报告；子 agent 里的 hooks 输入带 `agent_id`、`agent_type`；`prompt_id`、`effort`；项目 hook 的权限更新不越出信任 | 所有搜索后端经同一审批、规则、hooks 与审计；API key 不进 Agent Host；hooks 只有一套执行器 |
 | [0056](../adr/0056-macos-sandbox-and-agent-host-profile.md) | macOS 的 Bash 沙箱随调用的授权走、配置按命令从当时的设置生成；键沿用 Claude Code 的 `sandbox.*`，项目只能收紧；自动批准是第 7 步的模式默认；沙箱外重试任何模式都问、只有仅本次与拒绝、hooks 不代答；白名单外域名由代理挂起并发网络卡；拒绝写审计并回到模型；Agent Host 只写工作区与数据目录里它自己的位置 | 沙箱的开关与白名单即时生效且不扩大自动批准的范围；第二道防线覆盖用户设置、信任与用户级资源 |
-| [0057](../adr/0057-windows-command-isolation.md)（提议） | Windows 到 Beta 维持权限规则 + Job Object 与明确提示，MXC ProcessContainer 列为 Beta 之后的候选（先验证遥测，先用于 Agent Host，Git Bash 修复后再给命令） | 不引入要管理员、要签名或带不可关遥测的组件；Windows 上的提示与 Claude Code 一致 |
+| [0057](../adr/0057-windows-command-isolation.md) | Windows 到 Beta 维持权限规则 + Job Object 与明确提示，MXC ProcessContainer 列为 Beta 之后的候选（先验证遥测，先用于 Agent Host，Git Bash 修复后再给命令） | 不引入要管理员、要签名或带不可关遥测的组件；Windows 上的提示与 Claude Code 一致 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -801,7 +801,7 @@ T36 落地（ADR-0053）：
 - 网络：沙箱内无直连，经 Core 内置的本地代理按域名白名单放行；白名单初始为空，由用户或企业策略配置。
 - 两种模式：沙箱内命令自动批准 / 沙箱内仍走正常审批（默认）。命令因沙箱失败时，模型可请求在沙箱外重试，这一请求总是需要审批。
 - Agent Host 进程本身也运行在一个较宽松的 Seatbelt 配置中，作为第二道防线（ADR-0004、ADR-0015）。
-- Windows：第一版不提供 OS 级沙箱（与 Claude Code 在原生 Windows 上的现状一致，需求 D7）。Core 用 Job Object 管理进程树，保证超时与停止时整棵进程树被终止；权限规则照常生效。设置页与沙箱开关处明确提示"Windows 上沙箱不可用"，不静默降级。隔离方案（AppContainer 等）在 M4 评估，结论另写 ADR。
+- Windows：到 Beta 不提供 OS 级沙箱（与 Claude Code 在原生 Windows 上的现状一致，需求 D7）。Core 用 Job Object 管理进程树，保证超时与停止时整棵进程树被终止；权限规则照常生效。设置页与沙箱开关处明确提示"Windows 上沙箱不可用"，不静默降级。隔离方案的评估结论见 ADR-0057：到 Beta 维持现状；AppContainer、Win32 app isolation、Windows Sandbox、受限令牌或独立账户、WSL2 不采用；MXC ProcessContainer 列为 Beta 之后的候选，R6 之后先验证（自建并关闭遥测，先用于 Agent Host 的第二道防线，Git Bash 的问题修复后再给命令），满足条件时以实验性、默认关闭的选项引入，Windows 后端作为新的 `CommandSandbox` 实现接入 `piarc-sandbox`。
 - **沙箱受保护路径**（T11，`piarc_sandbox::PROTECTED_PATHS`）：在每个可写目录下任意深度禁写，目录连同其下内容；比 6.1.2 面向文件工具的清单窄，整个 `.git/` 保持可写，`git add`、`git commit` 才能在沙箱内运行。
 
   | 路径 | 理由 |
@@ -1490,7 +1490,7 @@ T20 起，项目层的 `acceptEdits` 和 `additionalDirectories` 也纳入信任
 **Agent Host**：
 
 - macOS：运行在 Seatbelt 配置下（ADR-0015），T39 定稿（ADR-0056）：模板 `crates/piarc-sandbox/src/seatbelt/agent-host.sbpl`（路径经 `-D` 参数传入，生成结果的 golden 为 `crates/piarc-sandbox/tests/snapshots/agent-host-profile.sbpl`）。读取、进程与网络放开（模型请求需要）；写入只限工作区（受保护路径除外，worktree 同样）、`<数据目录>/pi`、`<数据目录>/agent-host`、`<数据目录>/sessions/*/tmp` 与终端设备，Pi 读项目设置时要建的 `.pi/settings.json.lock` 单独放行；数据目录的其余部分（用户设置、数据库、保险箱、用户级资源、shell integration、检查点、日志）对它只读。子进程（npx、MCP server、git）继承它，`TMPDIR`、`npm_config_cache`、`XDG_CACHE_HOME` 指向 `<数据目录>/agent-host/`。开发构建与测试同样套这份配置，全部 L2 场景在它之下运行；真实 `sandbox-exec` 上的验证在 `crates/piarc-core/tests/agent_host_profile.rs` 与 `crates/piarc-testkit/tests/sessions/sandbox.rs`（测试扩展写主目录失败、npx MCP server 只写允许的位置）。第 6.10 节说的"MCP server 在沙箱外"指 Bash 沙箱，MCP server 仍受这份配置约束。
-- Windows：第一版没有等价的进程级隔离，只用 Job Object 管理进程树（第 6.10 节、需求 D7）。
+- Windows：到 Beta 没有等价的进程级隔离，只用 Job Object 管理进程树（第 6.10 节、需求 D7、ADR-0057）；Agent Host 因此没有第二道防线，这一点计入 T45 威胁模型的已接受风险。Beta 之后先评估的 MXC ProcessContainer 首先用于 Agent Host（ADR-0057 第 3 条）。
 
 ### 10.4 合规
 
@@ -1685,7 +1685,7 @@ Forge 打包 ──► 放入 .node 与 Windows 的 ghostty-vt.dll（app.asar.un
 | R13 | 渲染进程被注入（XSS）后越权 | 高 | 第 10.3 节的 Electron 加固；Markdown 不走 `innerHTML`；preload 白名单与来源校验；安全回归测试 | 发现绕过时按安全事件处理，补回归用例后发布修复 |
 | R14 | 双平台同步拖慢整体节奏 | 中 | Windows 最多滞后一个里程碑；两个平台 CI 全量运行；平台差异集中在适配层 | macOS 里程碑连续两次延期时，Windows 改为固定滞后一个里程碑（ADR-0013） |
 | R15 | libghostty-vt 刚发布 1.0，绑定与周边生态不成熟 | 中 | 直接对 C ABI 生成绑定；精确锁版本；保留 ADR-0017 中的退路。M0 S7 两个平台通过，走正式路线，不启用退路 | M0 S7 不通过时启用退路 |
-| R16 | Windows 第一版没有 OS 级沙箱 | 中 | 权限规则 + Job Object 进程树管理；界面明确提示（需求 D7） | M4 评估 AppContainer 等方案 |
+| R16 | Windows 到 Beta 没有 OS 级沙箱 | 中 | 权限规则 + Job Object 进程树管理；界面明确提示（需求 D7）；T39 评估后维持现状（ADR-0057） | ADR-0057 的重新评估条件之一出现（MXC 的 Git Bash 问题修复、遥测可关、ProcessContainer 覆盖主流版本等）时，安排 MXC ProcessContainer 的验证任务 |
 | R17 | Chromium 安全更新跟进不及时 | 中 | 只使用 Electron 仍在支持期内的大版本，按第 13.4 节的节奏升级；macOS 没有自动更新，应用内提示标明"安全更新" | 出现在野利用的高危漏洞时立即发版 |
 | R18 | 不做平台签名带来的安装摩擦、更新滞后与安全软件拦截 | 中 | 首次运行指引；发布清单签名；Defender 扫描与误报申诉；凭据保险箱把授权弹窗降到每次更新最多一次（ADR-0018） | 安装受阻或用户停留旧版本成为主要反馈时，先申请 SignPath 免费签名（Windows），再评估 Apple 开发者计划 |
 
@@ -1709,7 +1709,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | 进程树 | 进程组 + 信号 | Job Object | piarc-exec | M1 |
 | PTY | Unix PTY | ConPTY（用系统自带的，不随附 conpty.dll；程序退出由单独的等待线程报告；启动前清除继承的"忽略 Ctrl+C"状态，W0） | piarc-term | M3 |
 | 凭据主密钥 | 钥匙串 | 凭据管理器（保险箱方案避开了单条 2,560 字节上限） | piarc-secrets | M1 |
-| 沙箱 | Seatbelt + 网络代理 | 第一版不提供（需求 D7） | piarc-sandbox | M4 |
+| 沙箱 | Seatbelt + 网络代理 | 到 Beta 不提供，界面提示不可用（需求 D7、ADR-0057）；MXC ProcessContainer 为 Beta 之后的候选 | piarc-sandbox | M4 |
 | 路径 | `/`；默认卷大小写不敏感 | `\` 与盘符、UNC、超过 260 字符的长路径、保留文件名（`CON`、`NUL` 等）；大小写不敏感。文件工具拒绝保留设备名与以点或空格结尾的名字（W1） | piarc-fs | M1 |
 | 换行与编码 | LF 为主 | CRLF 常见（保真写入已覆盖）；子进程控制台使用 UTF-8 | piarc-fs、piarc-exec | M1 |
 | 文件监听 | FSEvents | ReadDirectoryChangesW（经 notify 封装） | piarc-fs | M2 |
@@ -1802,6 +1802,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.47 | 2026-11-21 | W2：第 16 章标注 M2 在 Windows 上达标（L2、L3、UNC 补验与平台缺陷修复，见 W2 报告）；W2 在 Windows 分支上编为 2.43，合并到 T38 之后改为 2.47。 |
 | 2.48 | 2026-11-21 | R4：第 16 章标注 M3（macOS）未达标（内存一项）；6.0 节矩阵按 M3 交付更新（Skills 的位置改为 C + K + U、依托能力改为 PiArc 自己的工具与提醒，MCP 写明配置与连接池的位置）；6.1.2 节受保护路径加 `.mcp.json`；6.2.2 节控制字符的处理；6.7 节信任与链接一行、6.8 节 server 名规则、10.2 节信任覆盖的文件与 hook 条目名；6.15 节补 M3 的四行与工具并发的 `Agent`；第 11 章 R4 的内存复测。预算未改。 |
 | 2.49 | 2026-11-21 | T39（ADR-0056）补充第 4 章 ADR-0056（ADR-0057 以提议列出）、6.2.3 节写明沙箱内自动批准在第 7 步、沙箱外执行紧接第 3 步；6.10 节 T39 落地（设置与来源约束、按命令生成配置、网络卡、拒绝反馈、不可用时降级、限制）；9.2 节审计的沙箱记录；10.3 节 Agent Host 配置定稿。Windows 隔离方案的 ADR-0057 为提议，第 6.10 节 Windows 一条、10.3、15.2 节与 R16 待用户决定后更新。 |
+| 2.50 | 2026-11-21 | T39：ADR-0057 被用户采纳。第 4 章去掉"提议"；6.10 节 Windows 一条写明评估结论（到 Beta 维持现状，MXC ProcessContainer 为 Beta 之后的候选及其前提）；10.3 节 Windows 的 Agent Host 没有第二道防线并计入已接受风险；15.2 节沙箱一行与第 14 章 R16 的对策和触发条件随之更新。 |
 | 2.40 | 2026-11-20 | T32（ADR-0049）补充第 4 章 ADR-0049、6.1.4 节 KillShell 与 Monitor 的参数与裁决、6.6.3 节 `monitorOutput`、`key` 与 `wake`、6.11 节任务管理器、超时转后台、通知、Monitor 回灌与限速的落地、7.3 节后台任务的持久化、7.4 节 `backgroundTasks` 能力的方法与成员、8.2 节后台任务卡与面板、9.2 节 schema v7、9.3 节任务输出的清理；基线决策未变（6.11 已定超时转后台与 Monitor） |
 | 2.39 | 2026-11-20 | T31（ADR-0048）补充第 4 章 ADR-0048、6.4 节子 agent 的落地（定义加载、子会话登记与链接、工具过滤用隐藏声明加闸门、深度与并发计数、前后台、空闲回收）、6.13 节模型别名表与解析、6.14 节 `model`、`effortLevel` 生效、`advisorModel` 忽略、`agent` 交 T48、7.4 节 `subagents` 能力的方法与成员、7.6 节子会话条目增量的现状、8.2 节子 agent 卡与设置页、9.2 节 schema v6；基线决策未变 |
 | 2.38 | 2026-11-20 | R3（M2 macOS 阶段门）：第 4 章补上 ADR-0042；6.0 节矩阵按 M2 实际交付更新权限、Hooks、Plan、任务清单、上下文工程、Checkpoint、多模型七行；第 4 章加入 ADR-0047、6.2.2 与 6.2.3 节写明带通配的命令规则不放行越界路径（ADR-0047，修订 ADR-0037 的阶梯）；6.2.2 节写明 `Read` deny 对目录搜索与 Bash 递归读取的限制（I120）；6.3.1 节进程树终止按平台写准；6.6.4 节熔断复位范围（I107）；6.14 节 `plansDirectory` 交 T48（I104）；6.15 节记录 R3 对校准值的核对（数值不变）与缓存断点、plan 模式两行的实现；第 16 章记录 M2 的 macOS 结论；ADR-0047 改变了第 6.2.3 节阶梯第 6、7 步对带通配命令规则的先后 |

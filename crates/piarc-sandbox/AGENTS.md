@@ -69,4 +69,4 @@ Bash 沙箱与 Agent Host 的 Seatbelt 配置、会话的本地代理与域名�
 
 ## 参考
 
-- 架构第 6.2.3、6.10、10.3 节；ADR-0004 第 4 条、ADR-0015、ADR-0056、ADR-0057（Windows，提议）；`docs/spikes/S08-sandbox.md`。
+- 架构第 6.2.3、6.10、10.3 节；ADR-0004 第 4 条、ADR-0015、ADR-0056、ADR-0057（Windows，已接受）；`docs/spikes/S08-sandbox.md`。

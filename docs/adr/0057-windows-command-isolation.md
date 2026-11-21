@@ -1,7 +1,7 @@
 # 0057. Windows 上命令与 Agent Host 的隔离方案
 
-- 状态：提议
-- 日期：2026-11-21
+- 状态：已接受
+- 日期：2026-11-21（提议）；2026-11-21 接受（用户在 T39 中采纳）
 - 取代：无
 - 相关：架构第 6.10、10.3、14 章（R16）、15.2 节；需求 FR-TL-07、D7；ADR-0004 第 4 条、ADR-0015、ADR-0018；T39；`docs/research/native-stack.md` 第 8 章、`docs/research/electron-stack.md` 第 8 节
 
@@ -31,7 +31,7 @@ PiArc 的硬约束：Windows 11 x64 与 arm64；Velopack 按用户安装，安�
 | F. WSL2 路线（在 WSL2 里用 bubblewrap，Claude Code 的做法）[CC][WSL1][WSL2] | 能 | 能（bubblewrap 删网络命名空间 + socat 转发）| 跑的是 Linux 工具链，不是 Git Bash 与 MSVC；调用 Windows `.exe` 不受 bubblewrap 约束；`/mnt/c` 跨文件系统慢 [WSL2] | Win10 2004+、Win11 | `wsl --install` 要管理员与重启 [WSL1] | 无 | 兼容 | 不适用（Agent Host 是 Windows 进程） | 大；与 PiArc 以 Windows 原生工具链为主的定位不符，可作为以后的可选模式 |
 | G. 维持现状（权限规则 + Job Object） | 无 OS 级限制 | 无 | 全部可用 | 全部 | 不要 | 无 | 兼容 | 无 | 最小；与 Claude Code 在原生 Windows 上一致："On native Windows, Claude Code runs commands unsandboxed" [CC] |
 
-## 决策（提议）
+## 决策
 
 1. **到 Beta 维持现状（方案 G）**，并保留 T39 已做的提示：设置页、环境栏、配置诊断写明 Windows 上命令不在 OS 沙箱中运行，自动批准不生效，命令按权限规则审批；Job Object 照常结束整棵进程树。
 2. **不做 A、C、D、E2、F。** A 跑不了 Git Bash 且挡不住网络；C 要签名的 MSIX；D 不适合按会话或按命令使用；E2 要管理员；F 换掉了工具链。E1 只能限制写入、网络仍可外传，单独上线会让用户误以为有沙箱，不做。
@@ -49,7 +49,7 @@ PiArc 的硬约束：Windows 11 x64 与 arm64；Velopack 按用户安装，安�
    - Job Object 嵌套：Core 的 `KILL_ON_JOB_CLOSE` 能否结束容器内的整棵进程树；
    - AppContainer：以非管理员调用 `NetworkIsolationSetAppContainerConfig` 是否成功（补上方案 A 未验证的一条）。
 
-用户确认后：本 ADR 改为"已接受"（或按意见修改后接受），同步更新架构第 6.10、10.3、15.2 节与第 14 章 R16；若决定按第 3 条安排评估任务，在 `docs/plan/PLAN.md` 的"登记事项"登记。
+接受后已做：架构第 6.10、10.3、15.2 节与第 14 章 R16 同步（2.50）；第 3 条的评估任务与第 5 条的实验登记在 `docs/plan/PLAN.md` 的 I177，安排在 R6 之后。
 
 ## 备选方案
 

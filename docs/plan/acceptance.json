@@ -3941,7 +3941,7 @@
       "task": "T39",
       "description": "Windows 隔离方案评估 ADR 已写入 `docs/adr/`，状态\"提议\"，比较表覆盖 AppContainer、MXC、Win32 app isolation、Windows Sandbox、受限令牌或独立账户方案、WSL2 与维持现状，事实注明来源与日期；`docs/adr/README.md` 索引已更新。验证：文件内容。",
       "status": "passing",
-      "evidence": "`docs/adr/0057-windows-command-isolation.md`：状态\"提议\"，比较表覆盖 AppContainer、MXC、Win32 app isolation、Windows Sandbox、受限令牌或独立账户、WSL2 与维持现状，事实注明来源与 2026-11-21 的核对日期；`docs/adr/README.md` 索引已加 0056、0057。"
+      "evidence": "`docs/adr/0057-windows-command-isolation.md`：以\"提议\"写入（c89576d），2026-11-21 用户采纳后改为\"已接受\"；比较表覆盖 AppContainer、MXC、Win32 app isolation、Windows Sandbox、受限令牌或独立账户、WSL2 与维持现状，事实注明来源与 2026-11-21 的核对日期；`docs/adr/README.md` 索引已加 0056、0057。"
     },
     {
       "id": "T39-A14",
