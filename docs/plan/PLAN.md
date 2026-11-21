@@ -312,8 +312,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 **T41 配置诊断完善、M4 hooks 事件与用量成本**（开工 2026-11-21；基线 `npm run verify -- --baseline` 通过，复用 c4e5f75 的全量结果）
 
 - [ ] 1 配置诊断完整版：全部来源（设置七层、`~/.claude.json`、`.mcp.json`、memory、rules、agents、skills、commands、输出风格、插件与 Pi 包、企业预留）、加载状态、来源链、自动刷新、设置页
-- [ ] 2 M4 hooks 事件：UserPromptExpansion、InstructionsLoaded、CwdChanged、FileChanged（`watchPaths`）、ConfigChange、StopFailure（错误类型映射）
-- [ ] 3 `mcp_tool` handler 与 Core → Agent Host 的 AHP 请求
+- [x] 2 M4 hooks 事件：UserPromptExpansion、InstructionsLoaded、CwdChanged、FileChanged（`watchPaths`）、ConfigChange、StopFailure（错误类型映射）
+- [x] 3 `mcp_tool` handler 与 Core → Agent Host 的 AHP 请求
 - [ ] 4 用量与成本：按会话、按模型汇总存 SQLite，价格表覆盖，右栏与"用量"页
 - [ ] 验收 A01–A13；收尾（piarc-hooks、piarc-config 的 AGENTS.md，架构 6.3.2、6.14）
 
