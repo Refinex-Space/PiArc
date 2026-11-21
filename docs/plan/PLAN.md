@@ -317,7 +317,7 @@ T36（开工 2026-11-20，基线复用 c4094dd 的全量 verify；T35 的遗留 
 - [x] 4 Agent Host：PiArc MCP 扩展替换内置扩展（不加载 codemode）、自写 stdio 传输（不脱离 Agent Host 进程组）、工作区连接池（按需连接、空闲断开、退避重连、工具缓存与 `list_changed`、roots）、工具暴露（direct / 超过阈值经 `ToolSearch` 延迟）、server instructions 第 6 段与变化的追加消息、OAuth 凭据进保险箱（A01、A02、A03、A06、A07、A08、A10、A11）
 - [x] 5 子 agent `mcpServers`：按名称复用连接池、内联 server 临时连接、项目级定义信任前不启动（A13）
 - [x] 6 测试夹具与场景：独立实现的 stdio 与 Streamable HTTP server、mock OAuth、`tests/scenarios/mcp-*.yaml`、能力 ID（A01–A04、A06–A11、A13）
-- [ ] 7 客户端：设置窗口"MCP"页、配置诊断页的不支持提示、Playwright 截图（A05 截图、A12）
+- [x] 7 客户端：设置窗口"MCP"页、配置诊断页的不支持提示、Playwright 截图（A05 截图、A12）
 - [ ] 8 文档、AGENTS.md、架构与 ADR、`coding-standards.md` 复用表、verify（A14）与收尾
 
 ## 登记事项
