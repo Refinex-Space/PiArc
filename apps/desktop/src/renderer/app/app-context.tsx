@@ -14,6 +14,7 @@ import { keyPlatformOf, type KeyPlatform } from '../../shared/keybindings.js';
 import type { Preferences } from '../../shared/preferences.js';
 import { applyAppearance } from './appearance.js';
 import { setWindowFocused } from './window-focus.js';
+import { setWindowVisible } from './window-visibility.js';
 
 export interface AppContextValue {
   readonly platform: string;
@@ -53,6 +54,8 @@ export function AppProvider({
         setState({ preferences: event.preferences, locale: event.locale });
       } else if (event.type === 'focus') {
         setWindowFocused(event.focused);
+      } else if (event.type === 'visibility') {
+        setWindowVisible(event.visible);
       }
     });
   }, [initial.focused]);

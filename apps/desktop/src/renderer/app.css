@@ -1807,10 +1807,17 @@ textarea.input {
   color: var(--piarc-text-secondary);
 }
 :root[data-app] .terminal-surface {
+  display: flex;
   flex: 1;
   min-height: 0;
+  padding: var(--piarc-space-1);
   overflow: hidden;
   background: var(--piarc-c-terminal-background);
+}
+:root[data-app] .terminal-host {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
 }
 :root[data-app] .terminal-surface:focus-within {
   outline: 2px solid var(--piarc-c-focus-ring);

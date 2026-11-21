@@ -164,7 +164,9 @@ export type AppEvent =
    * `document.hasFocus()` for this (it stays true under automation and in some window
    * arrangements).
    */
-  | { readonly type: 'focus'; readonly focused: boolean };
+  | { readonly type: 'focus'; readonly focused: boolean }
+  /** The window was minimized or hidden (`false`), restored or shown (`true`) (T34). */
+  | { readonly type: 'visibility'; readonly visible: boolean };
 
 /** Something the user should look at (architecture section 8.8): the main process notifies. */
 export interface AttentionNotice {

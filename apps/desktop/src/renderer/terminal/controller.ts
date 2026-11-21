@@ -8,8 +8,8 @@
 // After `PARK_AFTER` empty frames in a row the next request parks: if it is empty too the view
 // stops asking, and Core sends `output` on `term/<id>` when the terminal changes (`wake`).
 // Input, resizing, scrolling and focus wake the view as well. A hidden view (`display: none`,
-// off screen, a hidden or minimized window) schedules nothing and asks for nothing; an idle one
-// runs no animation frames at all. After the person types, the view pulls back to back until
+// off screen, a hidden page, a minimized or hidden window as the main process reports it)
+// schedules nothing and asks for nothing; an idle one runs no animation frames at all. After the person types, the view pulls back to back until
 // the echo arrives (at most EAGER_MS), so echo latency is not quantized to the frame interval.
 import type { PiarcApi, TerminalScrollTarget } from '../../shared/ipc.js';
 import {
@@ -18,6 +18,7 @@ import {
   type TerminalLabStats,
   type TerminalPanelProbe,
 } from '../../shared/terminal-lab.js';
+import { isWindowVisible, onWindowVisibility } from '../app/window-visibility.js';
 import { decodeFrame } from './frame/decoder.js';
 import { Screen } from './frame/screen.js';
 import { attachInput, type InputHost } from './input.js';
@@ -181,6 +182,11 @@ export class TerminalController {
     this.#listen(document, 'visibilitychange', () => {
       this.#schedule();
     });
+    this.#cleanups.push(
+      onWindowVisibility(() => {
+        this.#schedule();
+      }),
+    );
     this.#watchRatio();
     if (options.fit) {
       const resize = new ResizeObserver(() => {
@@ -412,7 +418,7 @@ export class TerminalController {
   }
 
   #visible(): boolean {
-    return this.#onScreen && document.visibilityState === 'visible';
+    return this.#onScreen && document.visibilityState === 'visible' && isWindowVisible();
   }
 
   /** Asks for an animation frame when one is due: attached, visible, not parked. */

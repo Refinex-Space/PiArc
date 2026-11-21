@@ -133,14 +133,16 @@ export function TerminalSurface({
     controller.current?.setLabel(label);
   }, [label]);
 
+  // The canvas sits in an inner box: the surface's padding keeps the focus ring off the cells.
   return (
     <div
-      ref={host}
       className="terminal-surface"
       role="group"
       aria-label={label}
       data-testid="terminal-surface"
       data-terminal={terminalId}
-    />
+    >
+      <div ref={host} className="terminal-host" />
+    </div>
   );
 }

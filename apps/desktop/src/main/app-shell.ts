@@ -204,7 +204,7 @@ export class AppShell {
     }
   }
 
-  /** Tells the window's page when it comes to the front or leaves it. */
+  /** Tells the window's page when it comes to the front or leaves it, and when it is minimized. */
   private reportFocus(window: BrowserWindow): void {
     window.on('focus', () => {
       this.send(window, { type: 'focus', focused: true });
@@ -212,6 +212,14 @@ export class AppShell {
     window.on('blur', () => {
       this.send(window, { type: 'focus', focused: false });
     });
+    // Minimized pages may keep running animation frames: views that pull per frame stop.
+    const visibility = (visible: boolean) => () => {
+      this.send(window, { type: 'visibility', visible });
+    };
+    window.on('minimize', visibility(false));
+    window.on('hide', visibility(false));
+    window.on('restore', visibility(true));
+    window.on('show', visibility(true));
   }
 
   private send(window: BrowserWindow, event: AppEvent): void {

@@ -69,17 +69,15 @@ export async function waitForPanel(
   what: string,
   timeout = 15_000,
 ): Promise<string> {
-  let last = '';
-  await expect
-    .poll(
-      async () => {
-        last = await panelScreen(page);
-        return predicate(last);
-      },
-      { timeout, message: `${what}; the screen shows:\n${last}` },
-    )
-    .toBe(true);
-  return last;
+  const deadline = Date.now() + timeout;
+  for (;;) {
+    const text = await panelScreen(page);
+    if (predicate(text)) return text;
+    if (Date.now() > deadline) {
+      throw new Error(`timed out waiting for ${what}; the screen shows:\n${text}`);
+    }
+    await page.waitForTimeout(25);
+  }
 }
 
 /**
@@ -201,4 +199,17 @@ export async function recordExternalLinks(
 
 export function linkCalls(app: ElectronApplication): Promise<string[]> {
   return app.evaluate(() => (globalThis as Recorder).__terminalLinkCalls ?? []);
+}
+
+/** Makes the dock `by` pixels taller by dragging its edge. */
+export async function growDock(page: Page, by: number): Promise<void> {
+  const edge = page.locator('[data-testid="panel-area-dock"] > .resizer');
+  const box = await edge.boundingBox();
+  if (box === null) throw new Error('no dock edge');
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x, y - by, { steps: 8 });
+  await page.mouse.up();
 }
