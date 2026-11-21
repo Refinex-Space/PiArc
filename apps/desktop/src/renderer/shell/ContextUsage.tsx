@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import type { ContextUsage } from '@piarc/protocol';
 
-import { useT } from '../app/app-context.js';
+import { useApp, useT } from '../app/app-context.js';
 import { CATEGORY_ORDER, levelOf, percentOf } from '../store/context-usage.js';
 import { useContextUsage, useTurnInfo } from '../store/hooks.js';
 import { showPanel } from './registry.js';
@@ -101,7 +101,7 @@ function AutoCompactLine({ usage }: { readonly usage: ContextUsage }) {
 
 /** The rail's context card. */
 export function ContextPanel({ sessionId }: { readonly sessionId: string }) {
-  const t = useT();
+  const { t, format } = useApp();
   const usage = useContextUsage(sessionId);
   const turn = useTurnInfo(sessionId);
   const [failure, setFailure] = useState<string | undefined>(undefined);
@@ -132,7 +132,7 @@ export function ContextPanel({ sessionId }: { readonly sessionId: string }) {
                   <span className="context-category-bar" aria-hidden="true">
                     <span style={{ inlineSize: `${share.toFixed(1)}%` }} />
                   </span>
-                  <span className="context-category-tokens">{tokens.toLocaleString()}</span>
+                  <span className="context-category-tokens">{format.number(tokens)}</span>
                 </li>
               );
             })}

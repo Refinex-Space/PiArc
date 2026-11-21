@@ -2,7 +2,7 @@
 // shown with its capabilities. haiku, sonnet and opus follow fast, balanced and strong unless
 // set on their own. Saved with the other model preferences (`setModelPreferences`), as the
 // user's `modelAliases`; a workspace's `.piarc/settings.json` can set its own.
-import { useT } from '../app/app-context.js';
+import { useApp } from '../app/app-context.js';
 import {
   ALIAS_FOLLOWS,
   MODEL_ALIASES,
@@ -22,7 +22,7 @@ export function AliasSection({
   /** Saves the preferences (`setModelPreferences`). */
   readonly save: (preferencesJson: string) => void;
 }) {
-  const t = useT();
+  const { t, format } = useApp();
   const models = settings.catalogModels;
   const choose = (alias: string, target: string) => {
     const aliases = Object.fromEntries(
@@ -45,7 +45,7 @@ export function AliasSection({
     model === undefined
       ? undefined
       : t('models.aliases.summary', {
-          context: model.contextWindow.toLocaleString(),
+          context: format.number(model.contextWindow),
           output: model.vision ? 'image' : 'text',
           efforts: model.efforts.join(' / ') || '-',
         });

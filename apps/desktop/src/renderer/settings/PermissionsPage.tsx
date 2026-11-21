@@ -421,7 +421,7 @@ function initialKind(): 'permission' | 'sandbox' {
 }
 
 function AuditSection({ workspace }: { readonly workspace: string }) {
-  const { t } = useApp();
+  const { t, format } = useApp();
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [kind, setKind] = useState<'permission' | 'sandbox'>(initialKind);
   const [session, setSession] = useState('');
@@ -568,7 +568,7 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
           <tbody>
             {rows.map((r, i) => (
               <tr key={`${String(r.at)}-${String(i)}`} data-testid="audit-row">
-                <td className="permission-nowrap">{new Date(r.at).toLocaleString()}</td>
+                <td className="permission-nowrap">{format.dateTime(r.at)}</td>
                 <td className="permission-nowrap" title={r.sessionId}>
                   {r.sessionId?.slice(0, 8) ?? ''}
                 </td>

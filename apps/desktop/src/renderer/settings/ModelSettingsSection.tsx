@@ -3,7 +3,7 @@
 // catalog's values; Core saves them in the user's settings and sends them to every Agent Host.
 import { useId, useState } from 'react';
 
-import { useT } from '../app/app-context.js';
+import { useApp, useT } from '../app/app-context.js';
 import type { MessageId } from '../../shared/i18n/index.js';
 import {
   MODEL_ALIASES,
@@ -255,7 +255,7 @@ export function ModelSettingsSection({
   /** Saves the preferences (`setModelPreferences`). */
   readonly save: (preferencesJson: string) => void;
 }) {
-  const t = useT();
+  const { t, format } = useApp();
   const auxId = useId();
   const [editing, setEditing] = useState<string>();
   // Every save sends the whole preferences, the alias table included (T31).
@@ -332,7 +332,7 @@ export function ModelSettingsSection({
                 <div>
                   <strong>{o?.displayName ?? m.name}</strong>
                   <div className="muted small">
-                    {keyOf(m)} · {(o?.contextWindow ?? m.contextWindow).toLocaleString()}
+                    {keyOf(m)} · {format.number(o?.contextWindow ?? m.contextWindow)}
                   </div>
                 </div>
                 <button

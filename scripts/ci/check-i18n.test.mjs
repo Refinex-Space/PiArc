@@ -64,11 +64,13 @@ describe('check-i18n', () => {
       '// i18n-exempt: the product name',
       'export const D = () => <h1>PiArc</h1>;',
       "export const E = () => <span aria-hidden>▸ {'…'}</span>;",
+      'export const F = (n: number) => <span>{n.toLocaleString()}{n.toLocaleString(locale)}</span>;',
     ].join('\n');
     expect(sourceProblems(file, source, keys, 'renderer')).toEqual([
       'apps/desktop/src/renderer/X.tsx:1: hard-coded title "Hello"',
       'apps/desktop/src/renderer/X.tsx:1: hard-coded text "Plain text"',
       "apps/desktop/src/renderer/X.tsx:2: t('missing.key') names no message",
+      "apps/desktop/src/renderer/X.tsx:7: toLocaleString() formats in the system's language; use the app's locale",
     ]);
     const main =
       "dialog.showMessageBox({ message: 'Quit now?', buttons: ['Quit', t.t('ok.key')] });";

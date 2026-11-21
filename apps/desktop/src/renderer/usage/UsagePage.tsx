@@ -125,7 +125,7 @@ function ModelTable({
   readonly models: readonly ModelUsage[];
   readonly onChanged: () => void;
 }) {
-  const { t } = useApp();
+  const { t, format } = useApp();
   const [editing, setEditing] = useState<string | undefined>(undefined);
   return (
     <div className="usage-table-wrap">
@@ -164,11 +164,11 @@ function ModelTable({
                     </button>
                   </div>
                 </td>
-                <td className="usage-number">{m.tokens.requests.toLocaleString()}</td>
-                <td className="usage-number">{m.tokens.input.toLocaleString()}</td>
-                <td className="usage-number">{m.tokens.output.toLocaleString()}</td>
-                <td className="usage-number">{m.tokens.cacheRead.toLocaleString()}</td>
-                <td className="usage-number">{m.tokens.cacheWrite.toLocaleString()}</td>
+                <td className="usage-number">{format.number(m.tokens.requests)}</td>
+                <td className="usage-number">{format.number(m.tokens.input)}</td>
+                <td className="usage-number">{format.number(m.tokens.output)}</td>
+                <td className="usage-number">{format.number(m.tokens.cacheRead)}</td>
+                <td className="usage-number">{format.number(m.tokens.cacheWrite)}</td>
                 <td className="usage-number">
                   <Cost cost={m.cost} testId="usage-model-cost" bare />
                 </td>
@@ -195,7 +195,7 @@ function ModelTable({
 }
 
 function SessionTable({ report }: { readonly report: UsageReport }) {
-  const { t } = useApp();
+  const { t, format } = useApp();
   return (
     <div className="usage-table-wrap">
       <table className="diagnostics-table usage-table" data-testid="usage-sessions">
@@ -243,7 +243,7 @@ function SessionTable({ report }: { readonly report: UsageReport }) {
                   </div>
                 ))}
               </td>
-              <td className="usage-number">{totalTokens(s.tokens).toLocaleString()}</td>
+              <td className="usage-number">{format.number(totalTokens(s.tokens))}</td>
               <td className="usage-number">
                 <Cost cost={s.cost} partial={s.partial} testId="usage-session-cost" bare />
               </td>

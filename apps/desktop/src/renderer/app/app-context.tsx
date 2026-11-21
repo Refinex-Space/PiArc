@@ -24,6 +24,11 @@ export interface AppContextValue {
   readonly preferences: Preferences;
   readonly locale: Locale;
   readonly t: (id: MessageId, values?: MessageValues) => string;
+  /** Numbers and times in the app's language (not the system's). */
+  readonly format: {
+    number(value: number, options?: Intl.NumberFormatOptions): string;
+    dateTime(ms: number): string;
+  };
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -77,6 +82,14 @@ export function AppProvider({
       preferences: state.preferences,
       locale: state.locale,
       t: (id, values) => translator.t(id, values),
+      format: {
+        number: (value, options) => new Intl.NumberFormat(state.locale, options).format(value),
+        dateTime: (ms) =>
+          new Intl.DateTimeFormat(state.locale, {
+            dateStyle: 'medium',
+            timeStyle: 'medium',
+          }).format(ms),
+      },
     };
   }, [initial.platform, initial.notificationsSupported, state]);
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

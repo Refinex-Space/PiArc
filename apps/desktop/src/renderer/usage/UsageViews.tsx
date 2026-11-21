@@ -52,7 +52,7 @@ export function Cost({
 
 /** Input, output, cache reads and writes (and reasoning when reported). */
 export function TokenList({ tokens }: { readonly tokens: UsageTokens }) {
-  const { t } = useApp();
+  const { t, format } = useApp();
   const rows: [MessageId, number][] = [
     ['usage.tokens.input', tokens.input],
     ['usage.tokens.output', tokens.output],
@@ -65,7 +65,7 @@ export function TokenList({ tokens }: { readonly tokens: UsageTokens }) {
       {rows.map(([label, value]) => (
         <div key={label} className="usage-token">
           <dt>{t(label)}</dt>
-          <dd>{value.toLocaleString()}</dd>
+          <dd>{format.number(value)}</dd>
         </div>
       ))}
     </dl>

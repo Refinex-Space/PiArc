@@ -43,6 +43,7 @@ const MAIN_FIELDS = new Set([
   'subtitle',
 ]);
 const LETTER = /\p{L}/u;
+const LOCALE_LESS = new Set(['toLocaleString', 'toLocaleDateString', 'toLocaleTimeString']);
 const EXEMPT = 'i18n-exempt:';
 
 /**
@@ -248,6 +249,10 @@ export function sourceProblems(file, text, keys, side) {
       const key = first === undefined ? undefined : literal(first);
       if (name === 't' && key !== undefined && !keys.has(key))
         report(node, `t('${key}') names no message`);
+      // Numbers and dates in the app's language, not the system's (`format` of the app context).
+      if (LOCALE_LESS.has(name) && node.arguments.length === 0) {
+        report(node, `${name}() formats in the system's language; use the app's locale`);
+      }
     }
     if (side === 'renderer') {
       if (ts.isJsxText(node) && LETTER.test(node.text.trim())) {

@@ -6,7 +6,7 @@
 import type { DiffHunk, Item, ItemStatus } from '@piarc/protocol';
 import { memo } from 'react';
 
-import { useT } from '../../app/app-context.js';
+import { useApp, useT } from '../../app/app-context.js';
 import { useExpanded, useTranscriptRow, useTranscriptRows } from '../services.js';
 import { useElapsedText, useNow } from './common.js';
 import {
@@ -172,7 +172,7 @@ export function BashCard({
   readonly item: CommandItem;
   readonly startedAt: number | undefined;
 }) {
-  const t = useT();
+  const { t, format } = useApp();
   const elapsedText = useElapsedText();
   const running = item.status === 'inProgress';
   const now = useNow(1000, running && startedAt !== undefined);
@@ -226,7 +226,12 @@ export function BashCard({
         )}
         {execution === undefined ? null : (
           <span className="bash-duration">
-            {t('transcript.bash.duration', { seconds: (execution.durationMs / 1000).toFixed(1) })}
+            {t('transcript.bash.duration', {
+              seconds: format.number(execution.durationMs / 1000, {
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 1,
+              }),
+            })}
           </span>
         )}
       </div>
