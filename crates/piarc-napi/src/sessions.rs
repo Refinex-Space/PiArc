@@ -872,6 +872,39 @@ impl CoreRuntime {
         })
     }
 
+    /// The WebSearch settings, JSON text `{ backend, backends: [{ id, name, hasKey }] }` (T38).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn web_search_settings<'env>(&self, env: &'env Env) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.webSearchSettings", |core, done| {
+            core.web_search_settings(done)
+        })
+    }
+
+    /// Chooses WebSearch's third-party backend; null chooses none (T38).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn set_web_search_backend<'env>(
+        &self,
+        env: &'env Env,
+        #[napi(ts_arg_type = "string | null")] backend: Option<String>,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.setWebSearchBackend", |core, done| {
+            core.set_web_search_backend(backend, done)
+        })
+    }
+
+    /// Saves a WebSearch backend's API key in the vault; null removes it (T38).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn set_web_search_key<'env>(
+        &self,
+        env: &'env Env,
+        backend: String,
+        #[napi(ts_arg_type = "string | null")] key: Option<String>,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.setWebSearchKey", |core, done| {
+            core.set_web_search_key(backend, key, done)
+        })
+    }
+
     /// Stops subagent `child` of session `parent`; JSON text `{ stopped }` (T31).
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]
     pub fn stop_subagent<'env>(

@@ -22,6 +22,9 @@ pub struct WebConfig {
     /// test HTTP servers of L2 and L4 are admitted through it. Not read from project settings:
     /// a repository must not open the user's network to its own commands.
     pub allowlist: Vec<String>,
+    /// Search backend id → endpoint used instead of the service's own (T38): the local mock
+    /// search services of L2 and L4. Empty in the app.
+    pub search_endpoints: std::collections::BTreeMap<String, String>,
 }
 
 /// The fetcher, built on first use (the platform verifier loads the trust store).
@@ -29,7 +32,7 @@ pub struct WebConfig {
 pub(super) struct WebState(OnceLock<Result<Arc<Fetcher>, ErrorObject>>);
 
 impl WebState {
-    fn fetcher(&self, config: &WebConfig) -> Result<Arc<Fetcher>, ErrorObject> {
+    pub(super) fn fetcher(&self, config: &WebConfig) -> Result<Arc<Fetcher>, ErrorObject> {
         self.0
             .get_or_init(|| {
                 let allow = Allowlist::new(&config.allowlist).map_err(|reason| {

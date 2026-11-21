@@ -158,6 +158,32 @@ struct Inner {
     changes: broadcast::Sender<SecretChange>,
 }
 
+/// Keys only Core reads (T38: search services' API keys): an Agent Host can neither read,
+/// write nor lock them, `secrets/getAll` leaves them out and changes to them are not pushed.
+const CORE_ONLY_PREFIXES: &[&str] = &["websearch/"];
+
+fn core_only(key: &str) -> bool {
+    CORE_ONLY_PREFIXES.iter().any(|p| key.starts_with(p))
+}
+
+/// Whether a request's `key` or `keys` names a Core-only key.
+fn names_core_only(params: &Map<String, Value>) -> bool {
+    let named = |v: &Value| v.as_str().is_some_and(core_only);
+    params.get("key").is_some_and(named)
+        || params
+            .get("keys")
+            .and_then(Value::as_array)
+            .is_some_and(|keys| keys.iter().any(named))
+}
+
+fn core_only_error(method: &str) -> ErrorObject {
+    ErrorObject::new(
+        ErrorKind::PermissionDenied,
+        format!("{method}: the key is kept for Core"),
+        false,
+    )
+}
+
 /// Answers `secrets/*` for every Agent Host. Cheap to clone.
 #[derive(Clone)]
 pub struct SecretsService {
@@ -208,30 +234,11 @@ impl SecretsService {
         params: Map<String, Value>,
         peer: Peer,
     ) -> Result<Value, ErrorObject> {
+        if names_core_only(&params) {
+            return Err(core_only_error(method));
+        }
         match method {
-            "secrets/getAll" => {
-                let p: SecretsGetAllParams = parse(method, params)?;
-                let wanted = move |key: &str| {
-                    p.prefixes
-                        .as_ref()
-                        .is_none_or(|prefixes| prefixes.iter().any(|x| key.starts_with(x.as_str())))
-                };
-                // Subscribe first: writes between subscription and the snapshot are harmless
-                // duplicates. A subscription after the snapshot could permanently miss a write.
-                self.subscribe(peer);
-                let (revision, entries) = self
-                    .with_vault(move |v| {
-                        let entries: Vec<_> =
-                            v.entries().filter(|e| wanted(e.key)).map(entry).collect();
-                        Ok((v.revision(), entries))
-                    })
-                    .await?;
-                let entries = entries.into_iter().collect::<Result<Vec<_>, _>>()?;
-                to_value(&SecretsGetAllResult {
-                    entries,
-                    revision: Some(revision),
-                })
-            }
+            "secrets/getAll" => self.get_all(parse(method, params)?, peer).await,
             "secrets/get" => {
                 let p: SecretsGetParams = parse(method, params)?;
                 piarc_secrets::validate_key(&p.key).map_err(|e| e.to_error_object())?;
@@ -288,6 +295,69 @@ impl SecretsService {
                 false,
             )),
         }
+    }
+
+    /// The value Core itself stored under `key` (T38: a search service's API key), or `None`.
+    pub(crate) async fn value_of(
+        &self,
+        key: &str,
+    ) -> Result<Option<Map<String, Value>>, ErrorObject> {
+        piarc_secrets::validate_key(key).map_err(|e| e.to_error_object())?;
+        let key = key.to_owned();
+        let found = self.with_vault(move |v| Ok(v.get(&key).map(entry))).await?;
+        Ok(found.transpose()?.map(|e| e.value))
+    }
+
+    /// Stores `value` under `key` for Core itself, under the same per-key lock as an Agent
+    /// Host's write; `None` deletes the key.
+    pub(crate) async fn store_value(
+        &self,
+        key: &str,
+        value: Option<Map<String, Value>>,
+    ) -> Result<(), ErrorObject> {
+        // Core's own writes hold the lock through a peer of their own.
+        let (peer, _frames) = Peer::channel(1);
+        match value {
+            Some(value) => {
+                let params = SecretsSetParams {
+                    key: key.to_owned(),
+                    value,
+                    lock_id: None,
+                };
+                self.set(params, &peer).await.map(drop)
+            }
+            None => {
+                let params = SecretsDeleteParams {
+                    key: key.to_owned(),
+                    lock_id: None,
+                };
+                self.delete(params, &peer).await.map(drop)
+            }
+        }
+    }
+
+    /// `secrets/getAll`: the entries with the requested prefixes, Core-only keys left out; the
+    /// connection then hears of every change.
+    async fn get_all(&self, p: SecretsGetAllParams, peer: Peer) -> Result<Value, ErrorObject> {
+        let prefixes = p.prefixes;
+        let wanted = move |key: &str| {
+            let listed = |list: &Vec<String>| list.iter().any(|x| key.starts_with(x.as_str()));
+            !core_only(key) && prefixes.as_ref().is_none_or(listed)
+        };
+        // Subscribe first: writes between subscription and the snapshot are harmless
+        // duplicates. A subscription after the snapshot could permanently miss a write.
+        self.subscribe(peer);
+        let (revision, entries) = self
+            .with_vault(move |v| {
+                let entries: Vec<_> = v.entries().filter(|e| wanted(e.key)).map(entry).collect();
+                Ok((v.revision(), entries))
+            })
+            .await?;
+        let entries = entries.into_iter().collect::<Result<Vec<_>, _>>()?;
+        to_value(&SecretsGetAllResult {
+            entries,
+            revision: Some(revision),
+        })
     }
 
     async fn set(&self, p: SecretsSetParams, peer: &Peer) -> Result<Value, ErrorObject> {
@@ -527,6 +597,9 @@ impl SecretsService {
             revision,
             deleted: value.is_none(),
         });
+        if core_only(&key) {
+            return;
+        }
         let subscribers: Vec<Peer> = {
             let mut subscribers = lock(&self.inner.subscribers);
             subscribers.retain(|p| !p.is_closed());

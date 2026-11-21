@@ -224,7 +224,7 @@ impl InboundHandler for WorkspaceInbound {
         if method == "mcp/servers" || method == "ui/loginInteraction" {
             return self.mcp(&method, params);
         }
-        if method == "exec/shells" {
+        if method == "exec/shells" || method == "web/searchBackend" {
             // Machine-wide, and asked while a session is being created (before it is ours).
             let io = self.tool_io.clone();
             return Box::pin(async move { io.dispatch(&method, params, peer).await });

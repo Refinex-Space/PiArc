@@ -620,7 +620,8 @@ fn open_state(
     let tool_io = state_tool_io(config, data.clone(), events, &storage, &trust, &snapshots)
         .with_checkpoints(checkpoints)
         .with_tasks(tasks.clone())
-        .with_terminals(terminals.clone());
+        .with_terminals(terminals.clone())
+        .with_secrets(secrets.clone());
     let worktrees = crate::worktrees::Worktrees::new(
         storage.clone(),
         tool_io.clone(),

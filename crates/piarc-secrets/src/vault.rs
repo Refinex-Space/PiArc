@@ -26,8 +26,9 @@ use crate::error::{Error, Result};
 use crate::format;
 use crate::master_key::MasterKey;
 
-/// Key prefixes the vault accepts: provider API keys, OAuth tokens, MCP tokens.
-pub const KEY_PREFIXES: [&str; 3] = ["provider/", "oauth/", "mcp/"];
+/// Key prefixes the vault accepts: provider API keys, OAuth tokens, MCP tokens, search
+/// services' API keys (T38; Core keeps those from the Agent Hosts).
+pub const KEY_PREFIXES: [&str; 4] = ["provider/", "oauth/", "mcp/", "websearch/"];
 /// Longest accepted credential key, in bytes.
 pub const MAX_KEY_BYTES: usize = 256;
 /// Largest accepted credential value (its JSON text), in bytes.
@@ -266,7 +267,7 @@ pub fn validate_key(key: &str) -> Result<()> {
         })
     };
     let Some(prefix) = KEY_PREFIXES.iter().find(|p| key.starts_with(*p)) else {
-        return invalid("it must start with provider/, oauth/ or mcp/");
+        return invalid("it must start with provider/, oauth/, mcp/ or websearch/");
     };
     if key.len() == prefix.len() {
         return invalid("the name after the prefix is empty");

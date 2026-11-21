@@ -575,6 +575,53 @@ impl CoreRuntime {
         })
     }
 
+    /// The WebSearch settings: the chosen third-party backend and which backends have a key
+    /// (T38).
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn web_search_settings(
+        &self,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.web_search_settings().await
+        })
+    }
+
+    /// Chooses WebSearch's third-party backend in the user's settings; `None` chooses none
+    /// (T38).
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn set_web_search_backend(
+        &self,
+        backend: Option<String>,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.set_web_search_backend(backend).await
+        })
+    }
+
+    /// Saves `backend`'s API key in the vault, or removes it (`None`) (T38).
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn set_web_search_key(
+        &self,
+        backend: String,
+        key: Option<String>,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.set_web_search_key(backend, key).await
+        })
+    }
+
     /// Stops subagent `child` of session `parent` (T31).
     ///
     /// # Errors

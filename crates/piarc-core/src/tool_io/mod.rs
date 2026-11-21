@@ -43,6 +43,8 @@ pub(crate) mod subagents;
 mod tasks;
 mod terminals;
 mod web;
+mod web_search;
+pub(crate) use web_search::chosen_backend as chosen_search_backend;
 
 pub use exec::{CommandEnv, DISPLAY_WINDOW};
 use piarc_exec::{ExecLimits, Launcher};
@@ -195,6 +197,8 @@ pub struct ToolIo {
     tasks: crate::tasks::TaskManager,
     /// Terminals (T33); none without Core's state.
     terminals: Option<crate::terminal::Terminals>,
+    /// The vault, for search services' API keys (T38); none without Core's state.
+    secrets: Option<crate::secrets::SecretsService>,
 }
 
 impl std::fmt::Debug for ToolIo {
@@ -230,7 +234,15 @@ impl ToolIo {
             web: Arc::default(),
             tasks: crate::tasks::TaskManager::new(crate::tasks::TasksConfig::default()),
             terminals: None,
+            secrets: None,
         }
+    }
+
+    /// Reads search services' API keys from `secrets` (T38).
+    #[must_use]
+    pub(crate) fn with_secrets(mut self, secrets: crate::secrets::SecretsService) -> Self {
+        self.secrets = Some(secrets);
+        self
     }
 
     /// Uses `tasks` as the task manager (Core's runtime gives the one with the database).
@@ -261,6 +273,8 @@ impl ToolIo {
                     | "ui/ask"
                     | "context/settings"
                     | "web/fetch"
+                    | "web/search"
+                    | "web/searchBackend"
             )
     }
 
@@ -549,6 +563,8 @@ impl ToolIo {
             "policy/tools" => return self.denied_tools(parse(method, params)?).await,
             "ui/ask" => return self.ask(parse(method, params)?, peer).await,
             "web/fetch" => return self.web_fetch(parse(method, params)?, peer).await,
+            "web/search" => return self.web_search(parse(method, params)?, peer).await,
+            "web/searchBackend" => return to_value(&self.search_backend().await),
             "context/settings" => return self.context_settings(&parse(method, params)?).await,
             "fs/changes" => return self.external_changes(&parse(method, params)?).await,
             "fs/forgetReads" => return self.forget_reads(&parse(method, params)?),

@@ -54,8 +54,10 @@ impl CoreRuntime {
     /// Like `create`, with the vault's master key in memory under a `piarc-test.` name instead
     /// of the system credential store: tests that open workspaces never touch the keychain
     /// (T14). L4 (T29) may also set `PIARC_TEST_WEB_ALLOWLIST` (comma-separated hosts or
-    /// ranges WebFetch may reach, for its local test server) and `PIARC_TEST_OAUTH_PROVIDER`
-    /// (a `--test-oauth-provider` file every Agent Host registers, for the mock sign-in).
+    /// ranges WebFetch may reach, for its local test server), `PIARC_TEST_OAUTH_PROVIDER`
+    /// (a `--test-oauth-provider` file every Agent Host registers, for the mock sign-in) and,
+    /// from T38, `PIARC_TEST_SEARCH_ENDPOINTS` (comma-separated `backend=url`: the local mock
+    /// search service that answers instead of the real one).
     #[napi(factory, catch_unwind)]
     pub fn create_for_tests(
         env: Env,
@@ -79,6 +81,13 @@ impl CoreRuntime {
                     .map(str::trim)
                     .filter(|s| !s.is_empty())
                     .map(str::to_owned)
+                    .collect();
+            }
+            if let Ok(list) = std::env::var("PIARC_TEST_SEARCH_ENDPOINTS") {
+                config.web.search_endpoints = list
+                    .split(',')
+                    .filter_map(|pair| pair.split_once('='))
+                    .map(|(id, url)| (id.trim().to_owned(), url.trim().to_owned()))
                     .collect();
             }
             if let Some(file) = std::env::var_os("PIARC_TEST_OAUTH_PROVIDER") {

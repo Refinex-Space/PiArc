@@ -351,6 +351,11 @@ fn rejects_unknown_key_prefixes_and_non_object_values() {
     assert!(!error.to_string().contains(SECRET));
     assert_eq!(error.kind(), ErrorKind::InvalidParams);
     assert!(vault.set("mcp/my server", &json!({ "token": "t" })).is_ok());
+    assert!(
+        vault
+            .set("websearch/brave", &json!({ "apiKey": "k" }))
+            .is_ok()
+    );
 }
 
 #[test]
