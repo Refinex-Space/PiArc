@@ -23,6 +23,8 @@ Harness Kit：PiArc 写的 Pi 扩展（system prompt 与 memory、权限预检�
 - T38（ADR-0055）：`turn_end`（本轮有工具结果且正常完成）报告 PostToolBatch，`tool_calls` 带每个调用的规范名、输入（`preflightInput` 解析过的路径）、id 与模型收到的结果；上下文是 `hookContext` 提醒（hooks 扩展排在提醒扩展之前，所以随下一次请求送达），block 或 `stop` 时 `ctx.abort()`（Pi 的 `turn_end` 不能结束运行）并把理由作为 `hookStoppedRun` 提醒留给下一次输入。子会话（`subagent: true`）的 `agent_before_settle` 报告 SubagentStop（带 `agent_transcript_path`，续跑与提醒同 Stop），`subagentStart()` 由 `ChildSession.run` 在首次 `prompt` 前调用。工具类事件与 Stop 类事件的输入带 `effort`（`SessionHooksOptions.effort`）。这一轮多一次 `hooks/run` 往返：后台任务的完成提醒可能因此赶上同一回合的下一次请求（`bg-completion-reminder` 不再断言它只在下一回合）。
 - `preflight` 的 `updatedInput` 原地替换 `event.input`，`context`、`stop` 记在 `SessionHooks.notes` 到 `tool_result` 处理；Core 在 hooks 前发 `policy/pending` 停住期限，不要去掉 `policy/evaluate` 的期限。`hooks/run` 无期限，超帧输入由 `fitFrame` 截断（否则 Core 丢帧、回合永远等）。PreCompact 的指令并入 PiArc 自己的摘要请求（`compaction.ts`）。
 
+- T41（ADR-0059）：`SessionHooks.instructionsLoaded`（`SessionMemory.onLoaded` 在会话开始、懒加载、条件 rule、压缩后重注入时调用，不等结果）、`stopFailure`（`Projector` 的 `onFailure`，错误类型来自 `runtime/turn-errors.ts` 的 `stopFailureType`）、`expansion`（`mcp/prompts.ts` 的 `expandMcpPrompt` 在展开 MCP prompt 时调用，block 抛 `permissionDenied`，上下文随输入的 `context` 交给注册表）。`host.ts` 应答 Core 的 `hooks/mcpTool`：工作区池的 `call`，会话名记为 `hook:<sessionId>`，`AbortSignal.timeout(timeoutMs)`，只回文本块与 `isError`。
+
 ## 宿主工具（T26，ADR-0042）
 
 - `harness/session-harness.ts` 按 Core 启用的能力（`planMode`、`todo`、`ask`）注册 `EnterPlanMode`、`ExitPlanMode`（`plan-mode.ts`）、`TodoWrite`（`todos.ts`）、`AskUserQuestion`（`questions.ts`，经 `ui/ask`）与 `SuggestNextSteps`（`next-steps.ts`），排在 Core 工具之后；描述在 `tools/profile.ts`，工具指引与提醒文案在 `harness/prompts/`（改后跑原创性检查）。

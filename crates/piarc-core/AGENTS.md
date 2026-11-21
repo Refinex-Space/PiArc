@@ -93,6 +93,17 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - `TrustService::permission_settings` 在有 `plugins` 声明时读记录并 `set_packages`（`trust.rs` 的 `attach_packages`），hooks（`config_with` 的层 `plugin:<id>`）、MCP（`mcp.rs` 的 `plugin_sources`，作用域 `plugin`）、skills（`tool_io/skills.rs`）、子 agent（`tool_io/subagents.rs` 的 `definitions_in`）与 AHP `plugins/extensions`（`plugins::extensions`）都用这一份。信任视图把 `.piarc/` 开启的包的可执行项列为 `plugin:<id>` 项（`package_items`），信任时记为已确认（`confirm_listed_packages`），它们不计入新增项。
 - 测试：`cargo test -p piarc-core --lib plugins::`（npm 的进程与参数、postinstall 未运行；作用域、开关、卸载与审计；未信任项目与信任后加载；git 更新后新项不运行直到确认）。
 
+## 用量与成本（`usage`，T41，ADR-0059）
+
+- `usage.rs` 是计价的唯一实现：单价换成每 token 的皮美元（`Pricing`），没有分档按合计算、有分档逐请求选档（`calculateCost` 的规则，1 小时缓存写入按输入价两倍），`u128` 精确求和后才转美元；`PriceBook` 先用户的 `modelPrices` 后目录价，都没有为 `Unknown`（成本 `None`，报告标 `partial`）。`report` 沿 `subagent_parent` 把子会话计入主会话并单独列出，辅助调用按用途列出。共享向量 `tests/usage/cost-vectors.json` 由 pi-ai 的 `calculateCost` 算出，`usage_tests.rs` 与 `agent-host/src/providers/usage-costs.test.ts` 都按它核对。
+- `sessions/usage.rs`：`Hub::usage_report`、`session_usage`、`set_model_price`（NAPI `usageReport`、`sessionUsage`、`setModelPrice`）。生成报告前先向运行中的 Agent Host 取一次 `models/list` 记下目录价（`record_prices`，`workspace_models` 与服务商设置也记），再增量同步会话索引。
+- 测试：`cargo test -p piarc-core --lib usage::`。
+
+## 配置诊断的其他来源（`config_diagnostics/sources.rs`，T41，ADR-0059）
+
+- `.mcp.json`（`crate::mcp::merged_config`）、memory 文件与导入（`tool_io::memory_documents`，从正文的 `[Memory source: …]` 等标记取导入）、rules、子 agent 定义、skills、命令、输出风格（`piarc_config::{agents, skills, rules}`）、包（`PluginManager::list`）与企业占位，各是一份 `FileReport`。`Hub::config_diagnostics` 先定工作区再取包列表交给 `report_with`。设置监听每次重载都发 `core/settings`，并监听工作区根目录与 rules、agents 目录。
+- 测试：`cargo test -p piarc-core --test state sources`（每类来源一个夹具、信任前后、运行中新增 rule 后刷新）与 `--lib config_diagnostics`。
+
 ## Skills 与输出风格（T37，ADR-0054）
 
 - 设置监听（`workspace_settings.rs`）同时监听 skills、命令与输出风格的目录（`piarc_config::skills::watch_dirs`，只取工作区、数据目录与家目录之下的），每次重载与信任变化推进 `WorkspaceSettings::changes`；工作区 actor 启动时开 `reload_resources` 任务，Agent Host 运行时发 `resources/reload`（不启动它）。

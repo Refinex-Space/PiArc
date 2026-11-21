@@ -74,3 +74,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0056](0056-macos-sandbox-and-agent-host-profile.md) | macOS Bash 沙箱正式版与 Agent Host 配置定稿：沙箱随调用的授权走、配置按命令生成、`sandbox.*` 键与项目只能收紧、自动批准在第 7 步、沙箱外重试任何模式都问且只有仅本次与拒绝、白名单外域名的网络卡、拒绝的识别与审计、不可用时降级并提示、代理加固、Agent Host 只写工作区与数据目录里它自己的位置（补充 ADR-0004、0005、0015、0028、0031、0037） | 已接受 |
 | [0057](0057-windows-command-isolation.md) | Windows 上命令与 Agent Host 的隔离方案：到 Beta 维持权限规则 + Job Object 与明确提示，MXC ProcessContainer 列为 Beta 之后的候选（先验证遥测、先用于 Agent Host、Git Bash 修复后再给命令） | 已接受 |
 | [0058](0058-plugins-pi-packages-and-mcp-prompts.md) | 插件与 Pi 包：安装记录在 `core.sqlite`、作用域在设置的 `plugins` 键、npm 经内置 npm 且 `--ignore-scripts`、git 锁定提交、可执行项逐项确认（主进程原生确认框）、Pi 扩展经 AHP 交给 Agent Host；MCP prompts 作为 `mcp__<server>__<prompt>` 斜杠命令 | 已接受（补充） |
+| [0059](0059-m4-hooks-config-diagnostics-and-usage-cost.md) | M4 hooks 的挂载点与 `watchPaths`、ConfigChange 阻断保留旧值、`mcp_tool` 经 AHP `hooks/mcpTool`；配置诊断按来源类别复用 T24 的报告；用量按请求从 JSONL 派生、目录价或用户价以整数计算，没有价格为"未知" | 已接受（补充） |

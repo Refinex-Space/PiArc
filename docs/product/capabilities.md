@@ -11,7 +11,7 @@
 | M1 | 61 | 61 | 0 | 0 |
 | M2 | 46 | 46 | 0 | 0 |
 | M3 | 47 | 47 | 0 | 0 |
-| M4 | 21 | 15 | 6 | 0 |
+| M4 | 27 | 22 | 5 | 0 |
 | M5 | 7 | 0 | 7 | 0 |
 
 ## M1
@@ -188,7 +188,13 @@
 | ID | 能力 | 需求与架构 | 任务 | 覆盖场景 | 状态 |
 |---|---|---|---|---|---|
 | CAP-CONFIG-DIAG-002 | 配置诊断完善（全部配置来源） | FR-EX-05 | T41 | — | 计划中 |
-| CAP-HOOK-M4-001 | UserPromptExpansion、InstructionsLoaded、CwdChanged、FileChanged、ConfigChange、StopFailure hooks 与 mcp_tool handler | FR-HN-05、ARCH-6.3.2 | T41 | — | 计划中 |
+| CAP-HOOK-CONFIGCHANGE-001 | ConfigChange hooks：会话中设置文件变化时运行，block 让该变更不在本会话生效（企业来源不可阻断） | FR-HN-05、ARCH-6.3.2 | T41 | `hooks-m4-config-change` | 已实现 |
+| CAP-HOOK-CWDCHANGED-001 | CwdChanged hooks：命令改变会话的持久 cwd 后运行，watchPaths 替换监视列表 | FR-HN-05、ARCH-6.3.2 | T41 | `hooks-m4-cwd-file-changed` | 已实现 |
+| CAP-HOOK-EXPANSION-001 | UserPromptExpansion hooks：斜杠命令、skill 与 MCP prompt 展开前运行，exit 2 或 decision block 阻止展开，纯文本 stdout 作为上下文 | FR-HN-05、ARCH-6.3.2 | T41 | `hooks-m4-expansion` | 已实现 |
+| CAP-HOOK-FILECHANGED-001 | FileChanged hooks：watchPaths 中的文件在磁盘上变化时运行，监视上限 64 个 | FR-HN-05、ARCH-6.3.2 | T41 | `hooks-m4-cwd-file-changed` | 已实现 |
+| CAP-HOOK-INSTRUCTIONS-001 | InstructionsLoaded hooks：memory 文件与 rules 进入上下文时运行，matcher 为加载原因 | FR-HN-05、ARCH-6.3.2 | T41 | `hooks-m4-instructions-loaded` | 已实现 |
+| CAP-HOOK-MCPTOOL-001 | mcp_tool hook handler：调用工作区已连接 MCP server 的工具，input 模板按 hook 输入替换，返回文本按决策协议解析 | FR-HN-05、ARCH-6.3.2 | T41 | `hooks-m4-mcp-tool` | 已实现 |
+| CAP-HOOK-STOPFAILURE-001 | StopFailure hooks：回合因 API 错误在重试用尽后结束时运行，matcher 为错误类型，输出被忽略 | FR-HN-05、ARCH-6.3.2 | T41 | `hooks-m4-stop-failure` | 已实现 |
 | CAP-MCP-PROMPTS-001 | MCP prompts 作为斜杠命令 `mcp__<server>__<prompt>`：位置参数、必填检查、只送文本内容，`prompts/list_changed` 后命令列表更新 | ARCH-6.7、ARCH-6.8 | T40 | `mcp-prompts` | 已实现 |
 | CAP-PIPKG-GIT-001 | Pi 包从 git 安装并锁定提交，确认后 `pi` 字段声明的扩展、skills、prompt templates 生效，themes 不加载 | FR-EX-04、ARCH-6.7 | T40 | `pi-package-git` | 已实现 |
 | CAP-PLUGIN-001 | 插件：Claude Code 插件目录与 Pi 包，启用前展示来源与能力 | FR-EX-04、ARCH-6.7、ARCH-6.14 | T40 | `plugin-commands` | 已实现 |

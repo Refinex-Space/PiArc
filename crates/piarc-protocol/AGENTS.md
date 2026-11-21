@@ -33,6 +33,7 @@ AHP 与 Core API 数据类型的唯一来源：Rust 类型 → JSON Schema → `
 
 - `harness.rs`（T26）：任务清单、计划、提问的类型与 `harness/todo`、`harness/plan`、`ui/ask`；审批卡的 `plan`、`questions` 与答复的 `mode`、`comments`、`answers` 在 `policy.rs` 引用它们。评论偏移是计划原文的 UTF-16 码元。
 - `context.rs`（T27，能力 `context`）：提醒类型 `ReminderType`（成员名 `type`，Rust 里是 `kind`）、`ContextUsage` 与分类、`session/usage`、`session/getContextUsage`、`session/remind`、`context/settings`、`fs/changes`、`fs/forgetReads`。`Item::Reminder`、`ContextCompaction.autoCompactStopped`、`SessionCompactParams.instructions`、`FsReadParams.restore` 分别在 `turn.rs`、`session.rs`、`fs.rs`。
+- `usage.rs`（T41）：价格 `ModelPrice`（含分档 `PriceTier`）、`PriceSource` 与报告 `UsageReport`、`SessionUsage`、`ModelUsage`、`SubagentUsage`、`AuxiliaryUsage`、`UsageTokens`（Core API，经 `schema.rs` 与 `gen-protocol.mjs` 的列表导出给 TS）；`CatalogModel.cost` 引用 `ModelPrice`。`hooks.rs` 的 `hooks/mcpTool`（Core → Agent Host）与 `HostHookEvent` 的三个 M4 值。
 - `models.rs` 定义目录、设置 Host 写入与公开状态、会话切换与代价预览。可空价格字段用 JSON `null` 表达未知；切换输入明确区分目标模型和当前 effort。
 
 - `tasks.rs`（T32，能力 `backgroundTasks`）：`BackgroundTask`、`TaskKind`、`TaskStatus`、`TaskStarted`（`exec/run` 的 `task`、`CommandExecutionInfo.task`）、`exec/monitor`、`exec/background/list|read|kill`、`TasksSnapshot`（Core API 的 `core/tasks`）；`session/remind` 的 `key`、`wake` 与 `ReminderType::MonitorOutput` 在 `context.rs`。T33（能力 `terminalTasks`）：`TaskKind::Terminal`、`BackgroundTask.terminal`（`TerminalTask`：终端句柄、来源 `TerminalOrigin`、是否共享）、`ExecRunParams.terminal`。

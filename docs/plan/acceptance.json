@@ -4038,85 +4038,85 @@
       "id": "T41-A01",
       "task": "T41",
       "description": "配置诊断列出交付物 1 中的全部来源，每个来源显示加载状态、生效键、被覆盖键（标明覆盖来源）、忽略键（附原因）与解析错误位置。验证：测试（每类来源一个夹具）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --test state sources：一个工作区夹具含每类来源（.mcp.json、CLAUDE.md 与 @import、条件与无条件 rule、子 agent 定义（覆盖用户同名、忽略字段、无效文件带行号）、skill（覆盖用户同名）、命令、输出风格、企业占位），断言每类的状态、生效项、被覆盖项与 sourceFile、忽略项与原因、解析错误行号，1 passed；插件来源 cargo test -p piarc-core --lib config_diagnostics（生效、未信任、关闭三种状态与待确认项、不支持组件），3 passed；设置文件部分沿用 T24 的 state 测试（8 passed）。"
     },
     {
       "id": "T41-A02",
       "task": "T41",
       "description": "未信任项目的可执行配置在诊断中标为\"未信任，未生效\"；企业来源显示为预留且\"未配置\"。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "同 A01 的 state sources 测试：信任前 .mcp.json 状态 untrusted、skill 的 allowed-tools 标 untrusted，信任后 loaded；企业来源 status notConfigured；界面文案\"未信任，未生效\"与\"未配置\"见 L4 t41-diagnostics（tmp/evidence/T41/diagnostics-sources-zh-CN-dark.png）。"
     },
     {
       "id": "T41-A03",
       "task": "T41",
       "description": "配置文件在会话中变化后，诊断结果自动刷新，不需要重开设置窗口。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "state sources 测试：运行中新增 .claude/rules/new.md 后 core/settings 发出事件，下一次诊断含该 rule；L4 t41-diagnostics：页面不重开即显示新增的 review.md（tmp/evidence/T41/diagnostics-rule-added.png）。设置监听每次重载都发 core/settings，并监听工作区根目录与 rules、agents 目录。"
     },
     {
       "id": "T41-A04",
       "task": "T41",
       "description": "诊断页展示上述信息，中英文文案完整。验证：Playwright 与亮/暗截图（`tmp/evidence/T41/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PIARC_EVIDENCE_TASK=T41 npx playwright test -c apps/desktop/playwright.config.ts t41-diagnostics t24-diagnostics --project dev：2 passed；按来源分组、状态、条件 rule、忽略原因、企业预留；截图 tmp/evidence/T41/diagnostics-sources-light.png、diagnostics-sources-dark.png、diagnostics-sources-zh-CN-dark.png。"
     },
     {
       "id": "T41-A05",
       "task": "T41",
       "description": "六个 M4 事件各有一个场景，覆盖 matcher、该事件的输入字段与 JSON 输出字段。验证：L2 场景（能力 ID 已登记）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test scenarios -- hooks-m4-：6 个事件各一个场景（hooks-m4-expansion、hooks-m4-instructions-loaded、hooks-m4-cwd-file-changed（CwdChanged 与 FileChanged）、hooks-m4-config-change、hooks-m4-stop-failure）加 hooks-m4-mcp-tool，覆盖 matcher、输入字段（json_lines 断言）与 JSON 输出字段；能力 CAP-HOOK-EXPANSION-001、CAP-HOOK-INSTRUCTIONS-001、CAP-HOOK-CWDCHANGED-001、CAP-HOOK-FILECHANGED-001、CAP-HOOK-CONFIGCHANGE-001、CAP-HOOK-STOPFAILURE-001、CAP-HOOK-MCPTOOL-001 已登记，hooks- 全部 24 个场景连续两轮通过。"
     },
     {
       "id": "T41-A06",
       "task": "T41",
       "description": "UserPromptExpansion 以 exit 2 或 `decision: \"block\"` 阻止展开且理由显示给用户；ConfigChange 阻断后该变更不在当前会话生效，企业来源的变更不可阻断。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 hooks-m4-expansion：exit 2 与 decision block 都拒绝输入（rejected 断言理由），纯文本 stdout 与 additionalContext 进请求；hooks-m4-config-change：local_settings 的阻断使新 deny 规则不在本会话生效（cat 仍成功、文件保持写入内容、提示\"本会话未应用\"），project_settings 的变更生效（head 被拒）；会话在每个输入前核对设置文件，场景写完文件直接发下一条输入，不依赖文件事件的时机，全量 L2（201 个场景并行）连续两轮通过。企业来源在 T47 前没有可加载的层，不可阻断由 cargo test -p piarc-core --lib tool_io::hooks::tests::m4 验证（policy 层阻断不生效、阻断后 hooks 规划也用旧值），2 passed。"
     },
     {
       "id": "T41-A07",
       "task": "T41",
       "description": "FileChanged 按 SessionStart 与 CwdChanged 返回的 `watchPaths` 监视文件，文件变化后 hook 执行且 `systemMessage` 送达；超出监视上限的路径被丢弃并记录。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 hooks-m4-cwd-file-changed：SessionStart 返回 66 个 watchPaths，64 个之外丢弃并提示\"FileChanged watches at most 64 files; 2 were not watched.\"；Bash cd 触发 CwdChanged（old_cwd、new_cwd），其 watchPaths 替换列表、systemMessage 送达；改写被监视文件后 FileChanged（event change，matcher 为文件名）运行且 systemMessage 送达。单测 the_watch_list_keeps_at_most_64_files_and_tells_the_user 通过。"
     },
     {
       "id": "T41-A08",
       "task": "T41",
       "description": "mock provider 注入 429、529、5xx、鉴权失败且重试用尽后触发 StopFailure，错误类型映射正确，hook 输出不改变回合结果。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 hooks-m4-stop-failure：mock 注入 429、529、5xx（各重试用尽，4 次请求）与鉴权失败（1 次），StopFailure 的 error 依次为 rate_limit、overloaded、server_error、authentication_failed，带 block/continue 的输出与 exit 2 都不改变回合（turn/completed status failed）；映射表单测 npx vitest run agent-host/src/runtime/turn-errors.test.ts，22 passed。"
     },
     {
       "id": "T41-A09",
       "task": "T41",
       "description": "`mcp_tool` handler 调用已连接 MCP server 的工具，`input` 模板替换正确，返回文本按决策协议解析；server 未连接或超时按非阻断错误处理。验证：L2 场景（mock MCP server）与新增 AHP 请求的 L1 样本。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 hooks-m4-mcp-tool：夹具 server 的 reply 工具返回 decision block，${tool_input.command} 与 ${hook_event_name} 替换后作为反馈到达模型；未配置的 server 与超时（timeout 1 s）是非阻断错误提示，回合照常完成。L1：tests/contracts/hooks/mcpTool/（请求、结果与各一个反例），cargo test -p piarc-protocol 通过，check-contract-samples 207 个契约齐全；占位替换单测 cargo test -p piarc-hooks（52 passed）。"
     },
     {
       "id": "T41-A10",
       "task": "T41",
       "description": "会话与模型的成本等于各请求 token 数乘以价格表单价之和（含缓存读写），对目录价与 pi-ai `calculateCost` 的结果一致；子 agent 用量计入父会话并单独列出。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --lib usage::（4 passed）：tests/usage/cost-vectors.json 的 21 个 calculateCost 结果（含分档与 1 小时缓存写入）与 Core 整数计算一致（相对误差 ≤ 1e-12），npx vitest run agent-host/src/providers/usage-costs.test.ts 核对向量仍是 pi-ai 的结果；子 agent 计入主会话并单独列出、辅助调用按用途列出、分档逐请求计价；用量行随 JSONL 增量写入、重建一致：cargo test -p piarc-store --test usage（2 passed）。"
     },
     {
       "id": "T41-A11",
       "task": "T41",
       "description": "用户覆盖价格后成本按新价格计算；价格未知的模型显示\"未知\"而不是 0。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "usage 单测：用户价替换目录价、为无价模型设价后不再 partial、负数与格式错误的价格被忽略、无价模型 cost 为 None 而非 0；L4 t41-usage：mock 模型无目录价时右栏与\"用量\"页显示\"Unknown\"，设价 3/15/0.3/3.75 后显示 $0.01725（2 次请求 × 8,625 微美元），恢复目录价后回到\"Unknown\"。"
     },
     {
       "id": "T41-A12",
       "task": "T41",
       "description": "会话右栏与\"用量\"页按会话、按模型显示 token 与成本。验证：Playwright 与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PIARC_EVIDENCE_TASK=T41 npx playwright test -c apps/desktop/playwright.config.ts t41-usage --project dev：1 passed；右栏用量卡片（成本、请求数、四类 token、按模型）与设置\"用量\"页（按模型含价格来源与改价、按会话）；截图 tmp/evidence/T41/usage-card-light.png、usage-card-dark.png、usage-page-light.png、usage-page-dark.png、usage-page-zh-CN-dark.png。"
     },
     {
       "id": "T41-A13",

@@ -65,6 +65,8 @@
 - **不写 `.claude/`**：`write.rs` 的所有写入（含 `replace_file`）对路径含 `.claude` 目录或名为 `.claude.json` 的目标返回 `WriteError::ClaudeConfig`（Core 映射为 `permissionDenied`），与层是否标为可写无关。"总是允许"、模式记忆、设置页只写 `.piarc/` 与用户级 PiArc 设置。
 - **rules**（`src/rules.rs`）：`rule_files` 递归列出 `*.md`（跟随符号链接，同一目录只访问一次，跳过隐藏项）；`parse` 拆出 frontmatter 的 `paths:`（列表或逗号分隔的字符串，YAML 无效时整个文件按无条件处理）；`PathMatcher` 按 gitignore 语义相对工作区根匹配，Windows 不区分大小写。读取与送达在 `piarc-core::tool_io::memory_reader`。
 - **诊断**（`src/diagnostics.rs`）：`Settings::diagnostics()` 按文件（高到低）给出加载状态、生效键（标量带决定它的层，列表为合并）、被覆盖键与覆盖层、忽略键与原因（`unknown`、`ignored`、`planned` + 任务、`untrusted`、`projectMode`）、带行列的问题；`claude_state_report(home, workspace)` 只读 `~/.claude.json` 的键名（值在解析时跳过）。
+- **来源类别**（T41，ADR-0059）：`FileReport.kind`（`SourceKind`）区分设置文件、`~/.claude.json` 与 Core 另外报告的来源（`mcpJson`、`memory`、`rule`、`agent`、`skill`、`command`、`outputStyle`、`plugin`、`enterprise`，在 `piarc-core::config_diagnostics::sources` 由各自的加载器生成）；`FileStatus` 另有 `platform`、`ignored`、`notConfigured`，`IgnoreReason` 另有 `unsupported`、`disabled`、`conditional`、`unconfirmed`、`notApproved`、`invalid`，`IgnoredKey.detail` 是该次的具体说明。来源链：设置键的 `KeyReport.source` 是决定值的层，其他来源的被覆盖项用 `sourceFile` 写明覆盖它的文件。新增一种来源 = 加一个 `SourceKind` 与 Core 里一个生成函数，不另建结构。
+- 用户价格 `modelPrices`（T41）：`provider/model` → `{input, output, cacheRead, cacheWrite}`（美元 / 百万 token），只由 Core 从用户层读，用量报告用它替换目录价。
 
 ## 信任查询的唯一入口
 

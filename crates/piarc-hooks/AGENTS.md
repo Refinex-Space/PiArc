@@ -26,8 +26,8 @@ hooks 的通用部分（架构第 6.3 节，ADR-0039、ADR-0055）：配置解�
 | UserPromptExpansion（T41） | Core 与 Agent Host | 命令文件与 skill：Core 展开之后、登记 `allowed-tools` 与 hooks 之前（`tool_io/skills.rs` 的 `expand_command` → `ToolIo::user_prompt_expansion`）；MCP prompt：Agent Host 的 `mcp/prompts.ts` `expandMcpPrompt` 经 `hooks/run`。matcher 是命令名，block 拒绝输入（`permissionDenied`、`hookBlocked`） |
 | InstructionsLoaded（T41） | Agent Host | `SessionMemory.onLoaded`：会话开始（`session_start`）、子目录懒加载（`nested_traversal`）、条件 rules（`path_glob_match`）、压缩后重注入（`compact`）；matcher 是加载原因，不等结果 |
 | CwdChanged（T41） | Core | `exec/run` 结束后会话的 shell 目录变了（`tool_io/hooks_m4.rs` 的 `cwd_changed`） |
-| FileChanged（T41） | Core | 会话监视列表里的文件变化（`piarc_fs::watch`，去抖 150 ms），matcher 是文件名，`event` 为 `change` 或 `unlink` |
-| ConfigChange（T41） | Core | 设置监听重载后变化的层（`WorkspaceSettings::layer_changes` → `sessions/workspace.rs` 的 `config_change_hooks`）；matcher 是来源 `user_settings`、`project_settings`、`local_settings`、`policy_settings` |
+| FileChanged（T41） | Core | 会话监视列表里的文件变化（每 500 ms 轮询存在、大小与修改时间），matcher 是文件名，`event` 为 `change` 或 `unlink` |
+| ConfigChange（T41） | Core | 每个输入之前与设置监听看到变化时，`ToolIo::check_config` 把设置文件与会话上次见到的取值比对，变化的层运行；matcher 是来源 `user_settings`、`project_settings`、`local_settings`、`policy_settings` |
 | StopFailure（T41） | Agent Host | 回合以模型 API 错误结束（重试用尽）：`Projector` 的 `onFailure`；错误类型映射只在 `agent-host/src/runtime/turn-errors.ts` 的 `stopFailureType`（`rate_limit`、`overloaded`、`authentication_failed`、`billing_error`、`invalid_request`、`model_not_found`、`server_error`、`max_output_tokens`，其余 `unknown`）；输出被忽略 |
 
 - `watchPaths`（T41）：SessionStart、CwdChanged、FileChanged 的 `hookSpecificOutput.watchPaths` 合并后整体替换会话的监视列表（相对路径按会话当前目录），上限 `MAX_WATCH_PATHS` = 64，超出的丢弃并发 `FileChanged` 的错误提示（只写个数，路径写日志）。

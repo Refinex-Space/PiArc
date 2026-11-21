@@ -49,6 +49,12 @@
 - T38（ADR-0055）：`HooksService::execute` 给 `Runner` 装上 `http` 端口（`WebPort`，第一次用时建 `Fetcher`）与 `prompt` 端口（`SessionJudge` → `HookOutlet`：`sessions/hooks.rs` 的 `Hub::connect_hooks` 在运行时启动时接上，按主会话 id 找到工作区的 Agent Host 发 `hooks/prompt`）；`Plan` 带上本次设置的 `allowedHttpHookUrls`、`httpHookAllowedEnvVars` 与用户层的 `hookAllowedEnvVars`，变量值取 `Launch.expansion`（登录 shell 环境）。`Facts` 有 `main_session_id` 与 `agent`（子会话从 `Link` 取）：输入的 `session_id`、`transcript_path`、`prompt_id` 用主会话的，子会话另加 `agent_id`、`agent_type`；`new_prompt` 在每次 UserPromptSubmit 生成 `prompt_id`；`effort` 只留在工具类事件、Stop、SubagentStop、PostToolBatch（`policy/evaluate` 的 `effort` 经 `tool_request` 进输入）。`hooks_run` 接受 `subagentStart`、`subagentStop`（subject 为 agent 类型）、`postToolBatch`（`host_request` 组装请求）。
 - 项目 hook 的权限更新（I122）：`policy/hooks.rs` 的 `apply_permissions` 看 `RequestAnswer.updated_by`，来源是项目设置层或项目内的 skill、子 agent 定义时，`setMode` 只经 `session_mode` 改本会话，写进 `.piarc/` 的 allow 规则不 `confirm_items`。
 
+## M4 hooks（T41，ADR-0059）
+
+- `tool_io/hooks_m4.rs`：CwdChanged（`exec_run` 结束后 shell 目录变了）、FileChanged（会话的 `WatchSlot`，`watchPaths` 整体替换并带替换序号，上限 `MAX_WATCH_PATHS`，每 `FILE_POLL` 轮询一次文件的存在、大小与修改时间；不要换回 FSEvents：负载下它的流启动会阻塞几十秒）、ConfigChange（`check_config` 把设置文件与 `SessionIo.config_seen` 比对：会话登记时取基线，`sessions/session.rs` 的 `Request::run` 在每个输入前调用，`sessions/workspace.rs` 的 `config_change_hooks` 在设置监听看到变化时调用；阻断时 `SessionIo.config_pins` 记该层旧值，`ToolIo::apply_pins` 在权限裁决（`policy.rs` 的 `session_settings`）与 hooks 规划（`run_hooks` → `HooksService::plan_adjusted`）里施加；`policy_settings` 不可阻断）。UserPromptExpansion 在 `hooks.rs` 的 `user_prompt_expansion`，由 `skills.rs` 的 `expand_command` 在登记 `allowed-tools` 与 hooks 之前调用；InstructionsLoaded、StopFailure、MCP prompt 的 UserPromptExpansion 经 `hooks/run`（`host_event` 的白名单字段）。
+- `mcp_tool`：`hooks/mod.rs` 的 `SessionMcp` 端口 → `sessions/hooks.rs` 的 `HookOutlet::mcp_tool` → AHP `hooks/mcpTool`，远端错误只取 Agent Host 给的消息。
+- 单测：`cargo test -p piarc-core --lib tool_io::hooks::tests::m4`；L2 `hooks-m4-*`。
+
 ## 文件根与设置来源（T35，ADR-0052）
 
 - `SessionIo.scope` 的根是会话能读写的文件根，`SessionIo.project` 是设置、规则、信任、审计、模式记忆、memory 设置与 hooks 的来源。普通会话两者相同（`open_session`）；worktree 会话与带 worktree 的子 agent 文件根是 worktree、`project` 是主工作区（`open_session_in`、`open_linked`）。读设置、写"总是允许"规则、写审计、算任务的工作区一律用 `project()`；路径边界、受保护路径、规则里的相对路径、cwd 回退用 `scope.root()`。新增读设置的入口时按这条分。
