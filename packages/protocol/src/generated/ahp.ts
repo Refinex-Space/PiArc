@@ -217,7 +217,9 @@ export type AhpMessage =
   | ResourcesListCommandsRequest
   | ResourcesListCommandsResponse
   | ResourcesReloadRequest
-  | ResourcesReloadResponse;
+  | ResourcesReloadResponse
+  | PluginsExtensionsMethodRequest
+  | PluginsExtensionsMethodResponse;
 /**
  * A request id: an integer or a string. `null` and fractional numbers are not accepted.
  */
@@ -6621,6 +6623,10 @@ export interface AgentDefinition {
    */
   permissionMode?: PermissionMode | null;
   /**
+   * The extension package it comes from (T40), for `plugin` sources.
+   */
+  plugin?: string | null;
+  /**
    * The body: the subagent's identity in its system prompt.
    */
   prompt: string;
@@ -6669,6 +6675,10 @@ export interface McpServerDefinition {
    * The name (`[A-Za-z0-9_-]`), unique in the workspace.
    */
   name: string;
+  /**
+   * The extension package it comes from (T40), for the `plugin` scope.
+   */
+  plugin?: string | null;
   /**
    * Why not, for `unsupported`, `disabled` and `untrusted`.
    */
@@ -7401,6 +7411,10 @@ export interface CommandInfo {
    */
   path?: string | null;
   /**
+   * The extension package it comes from (T40), for `plugin` sources.
+   */
+  plugin?: string | null;
+  /**
    * Where it came from.
    */
   source: ResourceSource;
@@ -7542,6 +7556,10 @@ export interface SkillInfo {
    * File globs that make it available (`paths`); empty: always.
    */
   paths?: string[];
+  /**
+   * The extension package it comes from (T40), for `plugin` sources.
+   */
+  plugin?: string | null;
   /**
    * Where it came from.
    */
@@ -7767,6 +7785,55 @@ export interface ResourcesReloadResponse {
   id: RequestId;
   jsonrpc: JsonRpcVersion;
   result: ResourcesReloadResult;
+}
+/**
+ * Request for `plugins/extensions`.
+ */
+export interface PluginsExtensionsMethodRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'plugins/extensions';
+  params: PluginsExtensionsParams;
+}
+/**
+ * Parameters of `plugins/extensions`.
+ */
+export interface PluginsExtensionsParams {
+  /**
+   * The session's directory; inside the connection's workspace.
+   */
+  cwd: string;
+}
+/**
+ * Successful response to `plugins/extensions`.
+ */
+export interface PluginsExtensionsMethodResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: PluginsExtensions;
+}
+/**
+ * Result of `plugins/extensions`.
+ */
+export interface PluginsExtensions {
+  /**
+   * The confirmed extension entries of the packages in effect, in package order.
+   */
+  extensions?: PluginExtension[];
+}
+/**
+ * A Pi extension to load.
+ */
+export interface PluginExtension {
+  /**
+   * The package it belongs to.
+   */
+  package: string;
+  /**
+   * The entry file (absolute).
+   */
+  path: string;
 }
 /**
  * Immutable approval card from the Core ledger.

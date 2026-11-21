@@ -54,6 +54,7 @@ export const HOST_CAPABILITIES: readonly string[] = [
   'terminalTasks',
   'mcpPool',
   'skills',
+  'plugins',
 ];
 
 /** Exit codes, for Core's log and restart decisions. */
@@ -643,6 +644,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
           subagents: welcome.enabled.includes('subagents'),
           backgroundTasks: welcome.enabled.includes('backgroundTasks'),
           skills: welcome.enabled.includes('skills'),
+          plugins: welcome.enabled.includes('plugins'),
         },
         log,
         sinkFor: (sessionId) => ({

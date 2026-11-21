@@ -28,7 +28,13 @@ import type {
 import type { CoreBridge } from '../runtime/core-bridge.js';
 import { AhpError } from '../protocol/errors.js';
 import { definitionKey, parseServers } from './config.js';
-import { ServerConnection, describe, type ConnectionContext } from './connection.js';
+import {
+  ServerConnection,
+  describe,
+  type ConnectionContext,
+  type McpPrompt,
+  type McpPromptMessage,
+} from './connection.js';
 
 /** A clock the idle and retry timers run on; tests inject a manual one. */
 export interface PoolClock {
@@ -132,6 +138,33 @@ export class McpPool {
   /** The configuration has been read once (sessions wait for it before their first prompt). */
   async ready(): Promise<void> {
     if (this.#config === undefined) await this.refresh();
+  }
+
+  /** The prompts of the connected workspace servers (T40), by server. */
+  prompts(): { readonly server: string; readonly prompts: readonly McpPrompt[] }[] {
+    return this.servers()
+      .filter((s) => s.connected && s.prompts.length > 0)
+      .map((s) => ({ server: s.def.name, prompts: s.prompts }));
+  }
+
+  /** `prompts/get` on workspace server `server`. */
+  async getPrompt(
+    server: string,
+    name: string,
+    args: Readonly<Record<string, string>>,
+  ): Promise<readonly McpPromptMessage[]> {
+    const entry = this.#entries.get(server);
+    if (!entry?.connection.connected) {
+      throw new AhpError('invalidParams', `MCP server "${server}" is not connected`);
+    }
+    entry.inFlight++;
+    try {
+      return await entry.connection.getPrompt(name, args);
+    } finally {
+      entry.inFlight--;
+      entry.lastUsed = this.#clock.now();
+      this.#scheduleIdle(entry);
+    }
   }
 
   /** The servers sessions may use (workspace servers that may run), by name. */

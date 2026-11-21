@@ -8,7 +8,9 @@
 //   tell which server instance answered which session;
 // - `whoami`: the server's process id, its process group (POSIX), the Node that runs it, and
 //   the values of the variables named in `MCP_ECHO_SHOW` (comma-separated);
-// - `add_tool` (`name`): offers one more tool and sends `notifications/tools/list_changed`.
+// - `add_tool` (`name`): offers one more tool and sends `notifications/tools/list_changed`;
+// - `add_prompt` (`name`): with prompts on, offers one more prompt and sends
+//   `notifications/prompts/list_changed` (T40).
 //
 // Environment knobs:
 // - `MCP_ECHO_TOOLS=<n>`: also offer `extra_1` … `extra_<n>` (for the deferral threshold);
@@ -16,6 +18,8 @@
 // - `MCP_ECHO_INSTRUCTIONS=<text>`: the `instructions` of `initialize`;
 // - `MCP_ECHO_STUBBORN=1`: ignore SIGTERM and the end of stdin (only SIGKILL ends it);
 // - `MCP_ECHO_PID_FILE=<path>`: write the process id there on start;
+// - `MCP_ECHO_PROMPTS=1`: declare the `prompts` capability with `greet` (arguments `name`,
+//   required, and `tone`) and `picture` (an image message, which PiArc does not send) (T40);
 // - `MCP_ECHO_START_LOG=<path>`: append `{"server","pid"}` as one JSON line there on start
 //   (relative to the working directory), so a test can count the server's processes.
 import { appendFileSync, writeFileSync } from 'node:fs';
@@ -26,6 +30,8 @@ const serverName = process.argv[2] ?? 'echo';
 const env = process.env;
 const extra = Number.parseInt(env.MCP_ECHO_TOOLS ?? '0', 10);
 const added: string[] = [];
+const prompts = env.MCP_ECHO_PROMPTS === '1';
+const addedPrompts: string[] = [];
 
 if (env.MCP_ECHO_PID_FILE !== undefined) writeFileSync(env.MCP_ECHO_PID_FILE, String(process.pid));
 if (env.MCP_ECHO_START_LOG !== undefined) {
@@ -92,6 +98,13 @@ function tools(): unknown[] {
       inputSchema: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
     },
   ];
+  if (prompts) {
+    list.push({
+      name: 'add_prompt',
+      description: `Adds a prompt to the ${serverName} server.`,
+      inputSchema: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
+    });
+  }
   for (let n = 1; n <= extra; n++) {
     list.push({
       name: `extra_${String(n)}`,
@@ -107,6 +120,48 @@ function tools(): unknown[] {
     });
   }
   return list;
+}
+
+function promptList(): unknown[] {
+  return [
+    {
+      name: 'greet',
+      description: `Greets someone, from the ${serverName} server.`,
+      arguments: [
+        { name: 'name', description: 'Who to greet', required: true },
+        { name: 'tone', description: 'How' },
+      ],
+    },
+    { name: 'picture', description: 'A picture prompt.' },
+    ...addedPrompts.map((name) => ({ name, description: `A prompt ${serverName} added later.` })),
+  ];
+}
+
+function getPrompt(name: string, args: Record<string, unknown>): unknown {
+  if (name === 'greet') {
+    const who = typeof args.name === 'string' ? args.name : '';
+    const tone = typeof args.tone === 'string' ? args.tone : 'plain';
+    return {
+      description: 'A greeting',
+      messages: [
+        {
+          role: 'user',
+          content: { type: 'text', text: `Please greet ${who} in a ${tone} tone (${serverName}).` },
+        },
+      ],
+    };
+  }
+  if (name === 'picture') {
+    return {
+      messages: [{ role: 'user', content: { type: 'image', data: 'AAAA', mimeType: 'image/png' } }],
+    };
+  }
+  if (addedPrompts.includes(name)) {
+    return {
+      messages: [{ role: 'user', content: { type: 'text', text: `${name} from ${serverName}` } }],
+    };
+  }
+  return undefined;
 }
 
 function call(name: string, args: Record<string, unknown>): unknown {
@@ -139,6 +194,12 @@ function call(name: string, args: Record<string, unknown>): unknown {
       send({ jsonrpc: '2.0', method: 'notifications/tools/list_changed' });
       return text(`added ${toolName}`);
     }
+    case 'add_prompt': {
+      const promptName = typeof args.name === 'string' ? args.name : 'later';
+      addedPrompts.push(promptName);
+      send({ jsonrpc: '2.0', method: 'notifications/prompts/list_changed' });
+      return text(`added prompt ${promptName}`);
+    }
     default:
       if (/^extra_\d+$/.test(name) || added.includes(name))
         return text(`${name} ran on ${serverName}`);
@@ -160,7 +221,10 @@ for await (const line of createInterface({ input: process.stdin })) {
       reply(message.id, {
         protocolVersion:
           typeof params.protocolVersion === 'string' ? params.protocolVersion : '2025-11-25',
-        capabilities: { tools: { listChanged: true } },
+        capabilities: {
+          tools: { listChanged: true },
+          ...(prompts ? { prompts: { listChanged: true } } : {}),
+        },
         serverInfo: { name: serverName, version: '0.0.0' },
         ...(env.MCP_ECHO_INSTRUCTIONS === undefined
           ? {}
@@ -173,6 +237,19 @@ for await (const line of createInterface({ input: process.stdin })) {
     case 'tools/list':
       reply(message.id, { tools: tools() });
       break;
+    case 'prompts/list':
+      if (prompts) reply(message.id, { prompts: promptList() });
+      else fail(message.id, -32601, 'method not found: prompts/list');
+      break;
+    case 'prompts/get': {
+      const args = isRecord(params.arguments) ? params.arguments : {};
+      const result = prompts
+        ? getPrompt(typeof params.name === 'string' ? params.name : '', args)
+        : undefined;
+      if (result === undefined) fail(message.id, -32602, `unknown prompt: ${String(params.name)}`);
+      else reply(message.id, result);
+      break;
+    }
     case 'tools/call': {
       const args = isRecord(params.arguments) ? params.arguments : {};
       const result = call(typeof params.name === 'string' ? params.name : '', args);

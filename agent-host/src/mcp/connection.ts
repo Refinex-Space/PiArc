@@ -85,6 +85,57 @@ export function serverEnv(
   return { ...env, ...own };
 }
 
+/** One prompt a server offers (MCP `prompts/list`, T40). */
+export interface McpPrompt {
+  readonly name: string;
+  readonly description?: string;
+  readonly arguments: readonly {
+    readonly name: string;
+    readonly description?: string;
+    readonly required: boolean;
+  }[];
+}
+
+/** One message of `prompts/get`: its role and content as the server sent them. */
+export interface McpPromptMessage {
+  readonly role: string;
+  readonly content: unknown;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** The prompts of a `prompts/list` page; malformed entries are left out. */
+export function parsePrompts(result: unknown): { prompts: McpPrompt[]; next?: string } {
+  if (!isRecord(result) || !Array.isArray(result.prompts)) return { prompts: [] };
+  const prompts: McpPrompt[] = [];
+  for (const raw of result.prompts) {
+    if (!isRecord(raw) || typeof raw.name !== 'string' || raw.name === '') continue;
+    const args = Array.isArray(raw.arguments) ? raw.arguments : [];
+    prompts.push({
+      name: raw.name,
+      ...(typeof raw.description === 'string' ? { description: raw.description } : {}),
+      arguments: args.flatMap((arg) =>
+        isRecord(arg) && typeof arg.name === 'string'
+          ? [
+              {
+                name: arg.name,
+                ...(typeof arg.description === 'string' ? { description: arg.description } : {}),
+                required: arg.required === true,
+              },
+            ]
+          : [],
+      ),
+    });
+  }
+  const next = typeof result.nextCursor === 'string' ? result.nextCursor : undefined;
+  return next === undefined ? { prompts } : { prompts, next };
+}
+
+/** The most `prompts/list` pages read (a server that never stops paging). */
+const MAX_PROMPT_PAGES = 20;
+
 function toolsKey(tools: readonly Tool[]): string {
   return JSON.stringify(
     tools.map((tool) => [tool.name, tool.description ?? '', tool.inputSchema, tool._meta ?? null]),
@@ -95,6 +146,8 @@ export class ServerConnection {
   state: ConnectionState = 'idle';
   error: string | undefined;
   tools: Tool[] = [];
+  /** The server's prompts (T40); empty when it does not declare the capability. */
+  prompts: McpPrompt[] = [];
   instructions: string | undefined;
   /** Whether the tools were listed at least once (the cache is meaningful). */
   listed = false;
@@ -183,6 +236,23 @@ export class ServerConnection {
         throw error;
       }
     }
+  }
+
+  /** `prompts/get` of prompt `name` with `args`: the messages it answers. */
+  async getPrompt(
+    name: string,
+    args: Readonly<Record<string, string>>,
+  ): Promise<readonly McpPromptMessage[]> {
+    const client = await this.client();
+    const result = await client.request('prompts/get', { name, arguments: { ...args } });
+    if (!isRecord(result) || !Array.isArray(result.messages)) {
+      throw new Error(`MCP server "${this.def.name}" answered prompts/get without messages`);
+    }
+    return result.messages.flatMap((message) =>
+      isRecord(message) && typeof message.role === 'string'
+        ? [{ role: message.role, content: message.content }]
+        : [],
+    );
   }
 
   /** Disconnects; the next use connects again. Tools stay cached. */
@@ -334,10 +404,14 @@ export class ServerConnection {
       client.onNotification('notifications/tools/list_changed', () => {
         void this.#refreshTools(client);
       });
+      client.onNotification('notifications/prompts/list_changed', () => {
+        void this.#refreshPrompts(client);
+      });
       client.onClose(() => {
         this.#closed(client, transport);
       });
       const tools = client.serverCapabilities?.tools === undefined ? [] : await client.listTools();
+      const prompts = await this.#listPrompts(client);
       if (this.#ended || client.connectionState !== 'connected') {
         throw new Error('the connection closed while it was being set up');
       }
@@ -352,6 +426,7 @@ export class ServerConnection {
         toolsKey(tools) !== toolsKey(this.tools) ||
         instructions !== this.instructions;
       this.tools = tools;
+      this.prompts = prompts;
       this.instructions = instructions;
       this.listed = true;
       this.#set('connected', undefined, changed);
@@ -400,6 +475,35 @@ export class ServerConnection {
         ? 'the connection closed'
         : `the connection closed\n${stderr.slice(-ERROR_TAIL_CHARS)}`,
     );
+  }
+
+  /** Every page of `prompts/list`, when the server declares prompts. */
+  async #listPrompts(client: McpClient): Promise<McpPrompt[]> {
+    if (client.serverCapabilities?.prompts === undefined) return [];
+    const prompts: McpPrompt[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < MAX_PROMPT_PAGES; page++) {
+      const result = await client.request('prompts/list', cursor === undefined ? {} : { cursor });
+      const parsed = parsePrompts(result);
+      prompts.push(...parsed.prompts);
+      if (parsed.next === undefined) break;
+      cursor = parsed.next;
+    }
+    return prompts;
+  }
+
+  async #refreshPrompts(client: McpClient): Promise<void> {
+    try {
+      const prompts = await this.#listPrompts(client);
+      if (this.#client !== client) return;
+      this.prompts = prompts;
+      // A state change: the status goes out and the client asks for the commands again.
+      this.#changed(false);
+    } catch (error) {
+      this.#context.log(
+        `MCP server "${this.def.name}": listing prompts again failed: ${describe(error)}`,
+      );
+    }
   }
 
   async #refreshTools(client: McpClient): Promise<void> {

@@ -99,6 +99,10 @@
           ],
           "description": "The permission mode it asks for, after the project restriction."
         },
+        "plugin": {
+          "description": "The extension package it comes from (T40), for `plugin` sources.",
+          "type": ["string", "null"]
+        },
         "prompt": {
           "description": "The body: the subagent's identity in its system prompt.",
           "type": "string"
@@ -1253,6 +1257,10 @@
         },
         "path": {
           "description": "Its file; absent for built-in commands.",
+          "type": ["string", "null"]
+        },
+        "plugin": {
+          "description": "The extension package it comes from (T40), for `plugin` sources.",
           "type": ["string", "null"]
         },
         "source": {
@@ -6150,6 +6158,10 @@
           "description": "The name (`[A-Za-z0-9_-]`), unique in the workspace.",
           "type": "string"
         },
+        "plugin": {
+          "description": "The extension package it comes from (T40), for the `plugin` scope.",
+          "type": ["string", "null"]
+        },
         "reason": {
           "description": "Why not, for `unsupported`, `disabled` and `untrusted`.",
           "type": ["string", "null"]
@@ -7215,6 +7227,341 @@
       "required": ["name", "source"],
       "type": "object"
     },
+    "PackageComponents": {
+      "description": "The components a package brings.",
+      "properties": {
+        "agents": {
+          "description": "Subagent types, with their namespace.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "commands": {
+          "description": "Slash commands, with their namespace (`plugin:command`) or Pi prompt templates.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "extensions": {
+          "description": "Pi extension entry files, relative to the package.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "hooks": {
+          "description": "Hook events with handlers.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "mcpServers": {
+          "description": "MCP server names as the pool knows them (`plugin_<plugin>_<server>`).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "skills": {
+          "description": "Skills, with their namespace for plugins.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "PackageExecutable": {
+      "description": "One executable item: it runs only once the user confirmed it.",
+      "properties": {
+        "confirmed": {
+          "description": "Whether the user confirmed it (enabling, confirming, or trusting the project).",
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/$defs/PackageExecutableKind",
+          "description": "What it runs."
+        },
+        "name": {
+          "description": "The item's identity (part of the package's fingerprint): a hook's event, matcher and\ncommand, a server's name and command line or URL, an extension's entry file.",
+          "type": "string"
+        }
+      },
+      "required": ["kind", "name", "confirmed"],
+      "type": "object"
+    },
+    "PackageExecutableKind": {
+      "description": "What an executable item runs.",
+      "oneOf": [
+        {
+          "const": "hook",
+          "description": "A hook of the package (`hooks/hooks.json`, the manifest's `hooks`).",
+          "type": "string"
+        },
+        {
+          "const": "mcpServer",
+          "description": "An MCP server the package starts or connects.",
+          "type": "string"
+        },
+        {
+          "const": "piExtension",
+          "description": "A Pi extension: code loaded into the Agent Host process.",
+          "type": "string"
+        },
+        {
+          "const": "agentHook",
+          "description": "A hook of one of the package's subagent definitions.",
+          "type": "string"
+        },
+        {
+          "const": "agentMcpServer",
+          "description": "An inline MCP server of one of the package's subagent definitions.",
+          "type": "string"
+        }
+      ]
+    },
+    "PackageInfo": {
+      "description": "An installed package as the settings window shows it.",
+      "properties": {
+        "active": {
+          "description": "Whether its components apply now: on, and the project trusted for the project scope.",
+          "type": "boolean"
+        },
+        "components": {
+          "$ref": "#/$defs/PackageComponents",
+          "description": "What it brings."
+        },
+        "description": {
+          "description": "Its description, when the manifest has one.",
+          "type": ["string", "null"]
+        },
+        "enabled": {
+          "description": "Whether it is on for the workspace asked about (declared and set to `true`).",
+          "type": "boolean"
+        },
+        "executables": {
+          "description": "The executable items and whether each one is confirmed.",
+          "items": {
+            "$ref": "#/$defs/PackageExecutable"
+          },
+          "type": "array"
+        },
+        "id": {
+          "description": "Its identifier: the plugin or package name; the key under `plugins` in settings.",
+          "type": "string"
+        },
+        "installedAt": {
+          "description": "When it was installed (Unix ms).",
+          "format": "int64",
+          "type": "integer"
+        },
+        "issues": {
+          "description": "Problems reading it (manifest errors, missing directory).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/PackageKind",
+          "description": "Plugin or Pi package."
+        },
+        "path": {
+          "description": "Its directory.",
+          "type": "string"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageScope"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where it is declared for the workspace asked about; absent when neither the user\nsettings nor the workspace's declare it."
+        },
+        "source": {
+          "$ref": "#/$defs/PackageSource",
+          "description": "Where it came from."
+        },
+        "unsupported": {
+          "description": "Components PiArc does not support (`mods`, `themes`, `lspServers`, ...), still listed.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "updatedAt": {
+          "description": "When it was last installed again or updated (Unix ms).",
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "source",
+        "path",
+        "enabled",
+        "active",
+        "components",
+        "installedAt",
+        "updatedAt"
+      ],
+      "type": "object"
+    },
+    "PackageInstallRequest": {
+      "description": "What installing does.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/PackageSourceKind",
+          "description": "The kind of source."
+        },
+        "location": {
+          "description": "An absolute directory, a git URL, or an npm spec (name, `name@version`, a tarball path).",
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/PackageScope",
+          "description": "Where to declare it."
+        },
+        "workspace": {
+          "description": "The workspace for the project scope.",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["kind", "location", "scope"],
+      "type": "object"
+    },
+    "PackageInstallResult": {
+      "description": "What installing or updating produced.",
+      "properties": {
+        "notes": {
+          "description": "What the user should know (lifecycle scripts not run, packages that declared them).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "package": {
+          "$ref": "#/$defs/PackageInfo",
+          "description": "The package (installed off; enabling asks for confirmation)."
+        },
+        "previousCommit": {
+          "description": "The commit before an update.",
+          "type": ["string", "null"]
+        },
+        "previousVersion": {
+          "description": "The version before an update.",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["package"],
+      "type": "object"
+    },
+    "PackageKind": {
+      "description": "What kind of package.",
+      "oneOf": [
+        {
+          "const": "claudePlugin",
+          "description": "A Claude Code plugin (`.claude-plugin/plugin.json` or its standard layout).",
+          "type": "string"
+        },
+        {
+          "const": "piPackage",
+          "description": "A Pi package (`package.json` with a `pi` field, or Pi's conventional directories).",
+          "type": "string"
+        }
+      ]
+    },
+    "PackageScope": {
+      "description": "Where a package is declared (and so where it applies).",
+      "oneOf": [
+        {
+          "const": "user",
+          "description": "PiArc's user settings: every workspace.",
+          "type": "string"
+        },
+        {
+          "const": "project",
+          "description": "The workspace's `.piarc/settings.json`: that workspace only, once trusted.",
+          "type": "string"
+        }
+      ]
+    },
+    "PackageSource": {
+      "description": "A package's origin and the version installed.",
+      "properties": {
+        "commit": {
+          "description": "The git commit checked out.",
+          "type": ["string", "null"]
+        },
+        "integrity": {
+          "description": "npm's integrity value of the installed tarball.",
+          "type": ["string", "null"]
+        },
+        "kind": {
+          "$ref": "#/$defs/PackageSourceKind",
+          "description": "The kind of source."
+        },
+        "location": {
+          "description": "The directory, git URL or npm spec as given.",
+          "type": "string"
+        },
+        "version": {
+          "description": "The package version (`plugin.json` or `package.json`; npm's resolved version).",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["kind", "location"],
+      "type": "object"
+    },
+    "PackageSourceKind": {
+      "description": "Where a package was installed from.",
+      "oneOf": [
+        {
+          "const": "directory",
+          "description": "A local directory, used in place.",
+          "type": "string"
+        },
+        {
+          "const": "git",
+          "description": "A git repository, cloned and pinned to a commit.",
+          "type": "string"
+        },
+        {
+          "const": "npm",
+          "description": "An npm package (name, spec or tarball), installed with the bundled npm and no\nlifecycle scripts.",
+          "type": "string"
+        }
+      ]
+    },
+    "PackagesList": {
+      "description": "The packages installed, as one workspace (or no workspace) sees them.",
+      "properties": {
+        "missing": {
+          "description": "Ids declared in the settings that are not installed.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "packages": {
+          "description": "Installed packages, by id.",
+          "items": {
+            "$ref": "#/$defs/PackageInfo"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["packages"],
+      "type": "object"
+    },
     "PdfPage": {
       "description": "The text of one PDF page.",
       "properties": {
@@ -7305,6 +7652,83 @@
         }
       },
       "required": ["plan", "toolCallId", "entryId", "mode"],
+      "type": "object"
+    },
+    "PluginExtension": {
+      "description": "A Pi extension to load.",
+      "properties": {
+        "package": {
+          "description": "The package it belongs to.",
+          "type": "string"
+        },
+        "path": {
+          "description": "The entry file (absolute).",
+          "type": "string"
+        }
+      },
+      "required": ["package", "path"],
+      "type": "object"
+    },
+    "PluginsExtensions": {
+      "description": "Result of `plugins/extensions`.",
+      "properties": {
+        "extensions": {
+          "default": [],
+          "description": "The confirmed extension entries of the packages in effect, in package order.",
+          "items": {
+            "$ref": "#/$defs/PluginExtension"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "PluginsExtensionsMethodRequest": {
+      "description": "Request for `plugins/extensions`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "plugins/extensions",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/PluginsExtensionsParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "PluginsExtensionsMethodResponse": {
+      "description": "Successful response to `plugins/extensions`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/PluginsExtensions"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "PluginsExtensionsParams": {
+      "description": "Parameters of `plugins/extensions`.",
+      "properties": {
+        "cwd": {
+          "description": "The session's directory; inside the connection's workspace.",
+          "type": "string"
+        }
+      },
+      "required": ["cwd"],
       "type": "object"
     },
     "PolicyCancelRequest": {
@@ -10774,6 +11198,10 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "plugin": {
+          "description": "The extension package it comes from (T40), for `plugin` sources.",
+          "type": ["string", "null"]
         },
         "source": {
           "$ref": "#/$defs/ResourceSource",
@@ -14605,6 +15033,12 @@
     },
     {
       "$ref": "#/$defs/ResourcesReloadResponse"
+    },
+    {
+      "$ref": "#/$defs/PluginsExtensionsMethodRequest"
+    },
+    {
+      "$ref": "#/$defs/PluginsExtensionsMethodResponse"
     }
   ],
   "description": "Any message covered by the Agent Host Protocol 1.0 contracts. Generated from the piarc-protocol crate by `npm run gen:protocol`; do not edit.",

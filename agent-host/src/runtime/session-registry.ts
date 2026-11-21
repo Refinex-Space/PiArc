@@ -48,6 +48,8 @@ import { fetchCatalog } from '../harness/subagents/definitions.js';
 import type { SessionHarness } from '../harness/session-harness.js';
 import { missingToolCalls, repairInterruptedTurn } from '../harness/interruption.js';
 import { parseSkillsCatalog } from '../harness/skills/catalog.js';
+import { expandInput, withPromptCommands } from '../mcp/prompts.js';
+import { changedExtensions, pluginExtensions } from './plugin-extensions.js';
 import { CONCURRENCY_SAFE_TOOLS, ToolBatches } from '../harness/tool-batches.js';
 import { AhpError, describeError } from '../protocol/errors.js';
 import { DEFAULT_PROFILE, ToolNameMap } from '../tools/index.js';
@@ -289,7 +291,10 @@ export class SessionRegistry {
       return { turnId: known };
     }
     return this.#onceFor(hosted, requestId, async () => {
-      const prepared = withHookContext(await this.#prepare(sessionId, input), hookContext);
+      const prepared = withHookContext(
+        await this.#prepare(sessionId, await this.#expandPrompt(input)),
+        hookContext,
+      );
       const again = hosted.prompts.get(requestId);
       if (again !== undefined) {
         return { turnId: again };
@@ -350,12 +355,39 @@ export class SessionRegistry {
     if (hostTools?.skills !== true) {
       throw new AhpError('methodNotFound', 'Core did not enable skills');
     }
-    return hostTools.bridge.requestTyped('skills/list', { cwd }, parseSkillsCatalog);
+    const catalog = await hostTools.bridge.requestTyped('skills/list', { cwd }, parseSkillsCatalog);
+    return withPromptCommands(catalog, this.#options.mcp);
   }
 
-  /** `resources/reload` (T37): skill, command, style or settings files changed. */
+  /** `resources/reload` (T37): skill, command, style or settings files changed; T40: packages
+   * changed too, so the MCP configuration and the packages' Pi extensions are read again. */
   reloadResources(): void {
     for (const hosted of this.#sessions.values()) hosted.skills?.invalidate();
+    this.#options.mcp?.refresh().catch((error: unknown) => {
+      this.#options.log(`MCP configuration refresh failed: ${describeError(error)}`);
+    });
+    void this.#reloadExtensions();
+  }
+
+  /** Reopens idle sessions whose package extensions changed; a running one after its turn. */
+  async #reloadExtensions(): Promise<void> {
+    const { hostTools } = this.#options;
+    if (hostTools?.plugins !== true) return;
+    const changed = await changedExtensions(hostTools.bridge, this.#sessions, this.#options.log);
+    for (const [sessionId, hosted] of changed) {
+      if (hosted.projector.activeTurnId !== undefined || hosted.changingModel) {
+        hosted.profileStale = true;
+        continue;
+      }
+      await this.#reopen(sessionId, hosted).catch((error: unknown) => {
+        this.#options.log(`[session ${sessionId}] reopen failed: ${describeError(error)}`);
+      });
+    }
+  }
+
+  /** `input` with a typed MCP prompt command expanded (T40). */
+  async #expandPrompt(input: UserInput): Promise<UserInput> {
+    return this.#options.mcp === undefined ? input : expandInput(this.#options.mcp, input);
   }
 
   /** The running turn of `sessionId` (its writes' checkpoint); a subagent's writes belong to
@@ -382,7 +414,10 @@ export class SessionRegistry {
       return known;
     }
     return this.#onceFor(hosted, requestId, async () => {
-      const prepared = withHookContext(await this.#prepare(sessionId, input), hookContext);
+      const prepared = withHookContext(
+        await this.#prepare(sessionId, await this.#expandPrompt(input)),
+        hookContext,
+      );
       const again = hosted.inputs.get(requestId);
       if (again !== undefined) {
         return again;
@@ -716,10 +751,17 @@ export class SessionRegistry {
         : workspace.modelRuntime.getModel(restored.provider, restored.modelId));
     if (offerWebSearch === undefined) await harness.prepareWebSearch(predicted);
     else harness.webSearchOffered = offerWebSearch;
+    // The packages' Pi extensions (T40), as Core confirmed them for this directory.
+    const { hostTools } = this.#options;
+    const extensions =
+      hostTools?.plugins === true
+        ? await pluginExtensions(hostTools.bridge, cwd, sessionLog)
+        : undefined;
     const { runtime, trusted } = await createSessionRuntime({
       options: this.#options,
       manager,
       cwd,
+      ...(extensions === undefined ? {} : { extensions }),
       profile,
       conservative,
       canonical: toCanonical,
@@ -798,6 +840,7 @@ export class SessionRegistry {
       changingModel: false,
       closed: false,
       profileKind: kind,
+      ...(extensions === undefined ? {} : { extensions }),
     };
     hosted.unsubscribe = session.subscribe((event) => {
       this.#onEvent(sessionId, hosted, event);

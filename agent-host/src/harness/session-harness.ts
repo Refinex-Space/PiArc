@@ -72,6 +72,8 @@ export interface HostToolCapabilities {
   readonly backgroundTasks?: boolean;
   /** `skills` (T37): skills, the `Skill` tool, output styles and slash commands. */
   readonly skills?: boolean;
+  /** `plugins` (T40): the extension packages' Pi extensions (`plugins/extensions`). */
+  readonly plugins?: boolean;
 }
 
 /** The plan and task list at the head of a branch, or undefined when it has neither. */

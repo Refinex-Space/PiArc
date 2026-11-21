@@ -1218,6 +1218,18 @@
       "method": "resources/reload",
       "name": "resources/reload/result",
       "schema": "ResourcesReloadResponse"
+    },
+    {
+      "kind": "request",
+      "method": "plugins/extensions",
+      "name": "plugins/extensions",
+      "schema": "PluginsExtensionsMethodRequest"
+    },
+    {
+      "kind": "response",
+      "method": "plugins/extensions",
+      "name": "plugins/extensions/result",
+      "schema": "PluginsExtensionsMethodResponse"
     }
   ],
   "protocolVersion": "1.0"

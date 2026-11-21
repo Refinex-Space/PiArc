@@ -112,4 +112,6 @@ export interface HostedSession {
   readonly profileKind: ToolProfileKind;
   /** The model's profile changed while a turn ran: reopen once the session is idle. */
   profileStale?: boolean;
+  /** The package Pi extensions the runtime loaded (T40); undefined without `plugins`. */
+  extensions?: readonly string[];
 }

@@ -57,6 +57,8 @@ export interface RuntimeSpec {
   readonly log: (line: string) => void;
   /** Set for a subagent's session. */
   readonly child?: ChildTools;
+  /** The extension packages' Pi extension entries to load (T40). */
+  readonly extensions?: readonly string[];
 }
 
 /** Creates the Pi runtime of `spec`; `trust()` answers whether the project was trusted. */
@@ -124,6 +126,10 @@ export async function createSessionRuntime(
         noContextFiles: true,
         noSkills: true,
         noPromptTemplates: true,
+        // Packages' Pi extensions (T40): the entries Core confirmed, as plain files.
+        ...(spec.extensions === undefined || spec.extensions.length === 0
+          ? {}
+          : { additionalExtensionPaths: [...spec.extensions] }),
         systemPromptOverride: () => IDENTITY,
         appendSystemPromptOverride: () => [],
         extensionFactories: [
