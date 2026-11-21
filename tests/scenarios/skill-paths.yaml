@@ -1,0 +1,33 @@
+id: skill-paths
+description: A skill with paths stays out of the index until the agent reads a matching file; then it arrives in an appended reminder, once, and the system prompt does not change (T37).
+capabilities: [CAP-SKILL-PATHS-001]
+workspace:
+  files:
+    .claude/skills/rust-style/SKILL.md: "---\ndescription: How this project writes Rust\npaths: \"src/**/*.rs\"\n---\nBODY-RUST\n"
+    notes.md: plain notes
+    src/lib.rs: pub fn a() {}
+    src/main.rs: fn main() {}
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: notes, name: Read, input: { path: notes.md } }]
+      - tool_calls: [{ id: lib, name: Read, input: { path: src/lib.rs } }]
+      - tool_calls: [{ id: main, name: Read, input: { path: src/main.rs } }]
+      - text: Finished.
+actions:
+  - prompt: { text: Look around. }
+expect:
+  request_counts: { main: 4 }
+  requests:
+    - { index: 0, not_contains: [rust-style, BODY-RUST] }
+    - { index: 1, same_system_as: 0, occurrences: { '- rust-style:': 0 } }
+    - index: 2
+      same_system_as: 0
+      user_message_contains:
+        [
+          '[PiArc reminder]',
+          'These skills can now be loaded with the Skill tool:',
+          '- rust-style: How this project writes Rust',
+        ]
+    - { index: 3, same_system_as: 0, occurrences: { '- rust-style:': 1, BODY-RUST: 0 } }

@@ -6,7 +6,8 @@
 use std::path::PathBuf;
 
 use piarc_protocol::skills::{
-    CommandsList, ResourcesListCommands, ResourcesListParams, ResourcesListSkills, SkillsList,
+    CommandsList, ResourcesListCommands, ResourcesListParams, ResourcesListSkills, ResourcesReload,
+    ResourcesReloadParams, SkillsList,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -96,6 +97,7 @@ impl Hub {
         }
         let value = name.map(Value::String);
         let dirs = self.ctx.storage.dirs().clone();
+        let target = workspace.clone();
         tokio::task::spawn_blocking(move || match workspace {
             Some(workspace) => piarc_config::write_value(
                 &dirs.layers(&workspace),
@@ -111,6 +113,17 @@ impl Hub {
         .map_err(|e| Error::Internal {
             reason: format!("writing the output style failed: {e}"),
         })??;
+        // The running Agent Host hears now, not after the watcher's debounce: the next prompt
+        // already carries the new style.
+        if let Some(workspace) = target {
+            let handle = self.workspace(workspace).await?;
+            if let Some(supervisor) = handle.peek().await {
+                supervisor
+                    .call::<ResourcesReload>(ResourcesReloadParams {})
+                    .await
+                    .map_err(host_error)?;
+            }
+        }
         Ok(Value::Null)
     }
 }

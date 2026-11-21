@@ -117,7 +117,7 @@ fn every_supported_field_is_read() {
             (
                 AgentWarningKind::InactiveField,
                 "skills".into(),
-                Some("T37".into())
+                Some("T48".into())
             ),
             (AgentWarningKind::IgnoredField, "initialPrompt".into(), None),
             (AgentWarningKind::IgnoredField, "memory".into(), None),

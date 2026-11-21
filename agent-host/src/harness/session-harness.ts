@@ -48,6 +48,8 @@ import type { AuxiliaryModel } from './auxiliary.js';
 import { createAgentTool, type AgentToolHost } from './subagents/agent-tool.js';
 import { createKillShellTool, createMonitorTool } from './task-tools.js';
 import { createWebFetchTool } from './web-fetch.js';
+import type { SessionSkills } from './skills/session-skills.js';
+import { createSkillTool } from './skills/skill-tool.js';
 
 /** What Core enabled for the host tools in the handshake. */
 export interface HostToolCapabilities {
@@ -65,6 +67,8 @@ export interface HostToolCapabilities {
   readonly subagents?: boolean;
   /** `backgroundTasks` (T32): background commands, `KillShell` and `Monitor`. */
   readonly backgroundTasks?: boolean;
+  /** `skills` (T37): skills, the `Skill` tool, output styles and slash commands. */
+  readonly skills?: boolean;
 }
 
 /** The plan and task list at the head of a branch, or undefined when it has neither. */
@@ -114,6 +118,8 @@ export class SessionHarness {
   readonly reminders = new Reminders();
   readonly planMode: PlanMode;
   readonly usage: ContextUsageTracker;
+  /** The session's skills and output style (T37, capability `skills`); set before `tools()`. */
+  skills: SessionSkills | undefined;
   readonly #o: SessionHarnessOptions;
   #compaction: SessionCompaction | undefined;
   #memory: SessionMemory | undefined;
@@ -219,6 +225,9 @@ export class SessionHarness {
           ]
         : []),
       ...(this.#o.agents === undefined ? [] : [createAgentTool(profile.Agent, this.#o.agents)]),
+      // Registered when the session opens with skills the model may load: the tool set stays
+      // the same for the whole session (prompt cache).
+      ...(this.skills?.modelSkills === true ? [createSkillTool(profile.Skill, this.skills)] : []),
     ];
   }
 
@@ -226,6 +235,8 @@ export class SessionHarness {
    * observe, then the reminders deliver. */
   extensions(): ExtensionFactory[] {
     return [
+      // Index and style changes are queued before the reminders deliver (T37).
+      ...(this.skills === undefined ? [] : [this.skills.extension]),
       todoWatch(
         this.#o.manager,
         this.reminders,

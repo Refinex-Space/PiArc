@@ -38,11 +38,13 @@ import type {
   SessionRemindParams,
   SessionRemindResult,
   SessionStopped,
+  SkillsCatalog,
 } from '@piarc/protocol';
 
 import { expiredApprovals } from '../harness/policy.js';
 import type { SessionHarness } from '../harness/session-harness.js';
 import { missingToolCalls, repairInterruptedTurn } from '../harness/interruption.js';
+import { parseSkillsCatalog } from '../harness/skills/catalog.js';
 import { CONCURRENCY_SAFE_TOOLS, ToolBatches } from '../harness/tool-batches.js';
 import { AhpError, describeError } from '../protocol/errors.js';
 import { DEFAULT_PROFILE, ToolNameMap } from '../tools/index.js';
@@ -336,6 +338,21 @@ export class SessionRegistry {
     this.#checkIdle(sessionId, hosted);
     switchTo(hosted.runtime.session.sessionManager, entryId);
     return this.#reopen(sessionId, hosted);
+  }
+
+  /** `resources/listSkills` and `resources/listCommands` (T37): Core's catalog from `cwd`;
+   * plugins and MCP prompts (T40) join here. */
+  async resources(cwd: string): Promise<SkillsCatalog> {
+    const { hostTools } = this.#options;
+    if (hostTools?.skills !== true) {
+      throw new AhpError('methodNotFound', 'Core did not enable skills');
+    }
+    return hostTools.bridge.requestTyped('skills/list', { cwd }, parseSkillsCatalog);
+  }
+
+  /** `resources/reload` (T37): skill, command, style or settings files changed. */
+  reloadResources(): void {
+    for (const hosted of this.#sessions.values()) hosted.skills?.invalidate();
   }
 
   /** The running turn of `sessionId` (its writes' checkpoint); a subagent's writes belong to
@@ -654,7 +671,7 @@ export class SessionRegistry {
     };
     // The `Agent` tool lists the types Core found from the session's directory (T31).
     const agents = await this.subagents.hostFor(manager.getSessionId(), cwd);
-    const { harness, memory, hooks, mcp } = sessionParts({
+    const { harness, memory, hooks, mcp, skills } = sessionParts({
       options: this.#options,
       manager,
       cwd,
@@ -666,6 +683,8 @@ export class SessionRegistry {
       log: sessionLog,
       ...(agents === undefined ? {} : { agents }),
     });
+    // The session gets `Skill` when the model has skills to load now (T37).
+    await skills?.catalog();
     const { runtime, trusted } = await createSessionRuntime({
       options: this.#options,
       manager,
@@ -731,6 +750,7 @@ export class SessionRegistry {
       toCanonical,
       hooks,
       harness,
+      skills,
       unsubscribe: () => undefined,
       prompts: new Map(),
       inputs: new Map(),
@@ -837,6 +857,10 @@ export class SessionRegistry {
     const [prepared] = hosted.delivering.splice(index, 1);
     if (prepared === undefined) return;
     const record = inputRecord(prepared);
+    // A skill the user started with `/name`: its text comes back after a compaction (T37).
+    if (prepared.input.command != null) {
+      hosted.skills?.invokedByUser(prepared.input.command, prepared.input.text);
+    }
     const turnId = hosted.projector.activeTurnId;
     const { session } = hosted.runtime;
     const from = hosted.turnFrom?.turnId === turnId ? hosted.turnFrom : undefined;

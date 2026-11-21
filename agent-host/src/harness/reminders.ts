@@ -14,6 +14,8 @@
 // | `hookContext`    | hooks.ts (`additionalContext`, stdout)      | `hook:<event>:<n>`     |
 // | `contextRestore` | compaction.ts (after a compaction)          | one message, appended  |
 // | `mcpChanged`     | mcp/session.ts (a server's tools changed)   | `mcp:<server>`         |
+// | `skillsChanged`  | skills/session-skills.ts (index, `paths`)   | `skills:index`, `skills:paths` |
+// | `outputStyle`    | skills/session-skills.ts (style switched)   | `style`                |
 //
 // A delivery is a Pi custom message (`piarc.reminder`, not displayed) whose text starts with
 // `REMINDER_MARKER`, followed by the reminders' texts. `details.reminders` records each one's
@@ -119,6 +121,8 @@ const TYPES: readonly ReminderType[] = [
   'hookContext',
   'contextRestore',
   'mcpChanged',
+  'skillsChanged',
+  'outputStyle',
 ];
 const CATEGORIES: readonly ReminderCategory[] = ['memory', 'skills', 'conversation'];
 

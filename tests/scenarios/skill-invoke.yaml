@@ -1,0 +1,53 @@
+id: skill-invoke
+description: The Skill tool loads a skill's body with its arguments substituted ($ARGUMENTS, positional and named, ${CLAUDE_SKILL_DIR}); the body stays in the conversation as the tool result, a skill's frontmatter hooks run from the load on, and after /compact the restore reminder gives the body back (T37).
+capabilities: [CAP-SKILL-INVOKE-001]
+workspace:
+  trusted: true
+  files:
+    .pi/settings.json: '{"compaction":{"keepRecentTokens":1}}'
+    notes.txt: "plain notes\n"
+    .claude/skills/fix-issue/SKILL.md: |
+      ---
+      description: Fix an issue
+      arguments: issue branch
+      hooks:
+        PreToolUse:
+          - matcher: Read
+            hooks:
+              - type: command
+                command: echo blocked by the skill hook >&2; exit 2
+      ---
+      Fix issue $issue on $branch ($1/$2; all: $ARGUMENTS).
+      Notes are in ${CLAUDE_SKILL_DIR}/notes.md.
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: before, name: Read, input: { path: notes.txt } }]
+      - tool_calls: [{ id: load, name: Skill, input: { skill: fix-issue, args: '42 main' } }]
+      - tool_calls: [{ id: after, name: Read, input: { path: notes.txt } }]
+      - text: Loaded.
+      - text: 'Summary: the skill was loaded.'
+      - text: Continuing.
+actions:
+  - prompt: { text: Fix issue 42., turn: t }
+  - wait: { method: turn/completed, turn: t }
+  - compact: {}
+  - wait: { method: turn/completed, count: 2 }
+  - prompt: { text: Go on. }
+expect:
+  request_counts: { main: 6 }
+  requests:
+    - index: 3
+      same_system_as: 0
+      tool_results:
+        - { id: before, is_error: false, contains: plain notes }
+        - { id: load, is_error: false, contains: 'Fix issue 42 on main (42/main; all: 42 main).' }
+        - { id: after, is_error: true, contains: blocked by the skill hook }
+    - index: 3
+      contains: ['.claude/skills/fix-issue/notes.md']
+    - index: 5
+      user_message_contains:
+        - '[PiArc reminder]'
+        - 'Instructions of the skill "fix-issue", invoked earlier in this session:'
+        - 'Fix issue 42 on main (42/main; all: 42 main).'

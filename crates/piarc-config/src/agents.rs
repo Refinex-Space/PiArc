@@ -219,7 +219,7 @@ pub fn parse(path: &Path, source: AgentSource, text: &str) -> Result<Definition,
             AgentWarningKind::InactiveField,
             Some("skills"),
             None,
-            Some("T37"),
+            Some("T48"),
         ));
     }
     warnings.extend(

@@ -680,6 +680,15 @@ impl Driver<'_> {
             Action::CheckTrust { fields } => self.check_trust(fields).await,
             Action::Wait(wait) => self.wait_for_event(wait).await,
             Action::WriteFile { path, content } => write_file(&self.env.workspace, path, content),
+            Action::SetOutputStyle { name } => {
+                let ws = self.env.workspace.clone();
+                call(
+                    |done| self.core.set_output_style(Some(ws), name.clone(), done),
+                    "setting the output style",
+                )
+                .await
+                .map(drop)
+            }
             Action::AdvanceClock { seconds } => {
                 self.env.clock.advance(Duration::from_secs_f64(*seconds));
                 Ok(())

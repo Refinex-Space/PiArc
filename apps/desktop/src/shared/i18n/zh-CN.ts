@@ -426,6 +426,8 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'transcript.reminder.hookContext': 'hook 上下文',
   'transcript.reminder.contextRestore': '压缩后恢复的上下文',
   'transcript.reminder.mcpChanged': 'MCP 工具变化',
+  'transcript.reminder.skillsChanged': 'Skills 变化',
+  'transcript.reminder.outputStyle': '输出风格变化',
   'transcript.copyMarkdown': '复制 Markdown',
   'transcript.copyText': '复制纯文本',
   'transcript.copied': '已复制',

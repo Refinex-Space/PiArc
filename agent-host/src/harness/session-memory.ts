@@ -335,6 +335,10 @@ export class SessionMemory {
   /** The MCP section of the system prompt (T36), read when the system prompt is frozen. */
   mcpSection: (() => string | undefined) | undefined;
 
+  /** The output style and skills index sections (T37), read when the prompt is frozen. */
+  skillSections:
+    ((signal?: AbortSignal) => Promise<{ style?: string; skills?: string }>) | undefined;
+
   extension: ExtensionFactory = (pi) => {
     pi.on('before_agent_start', async (event, ctx) => {
       const options = event.systemPromptOptions;
@@ -357,6 +361,7 @@ export class SessionMemory {
         const tools = options.selectedTools.filter(
           (tool) => active.has(tool) && !options.hiddenTools.includes(tool),
         );
+        const skills = await this.skillSections?.(ctx.signal);
         this.#system = assembleSystem(
           tools,
           this.#profile,
@@ -369,6 +374,7 @@ export class SessionMemory {
           },
           this.#persona,
           this.mcpSection?.(),
+          skills,
         );
         const versions = Object.fromEntries(
           snapshot.files.map((file) => [file.path, digest(file)]),

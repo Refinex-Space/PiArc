@@ -11,7 +11,13 @@ import os from 'node:os';
 import path from 'node:path';
 
 import type { ImageContent } from '@earendil-works/pi-ai';
-import type { BlobRef, FsPdfResult, InputAttachment, InputMention } from '@piarc/protocol';
+import type {
+  BlobRef,
+  FsPdfResult,
+  InputAttachment,
+  InputMention,
+  PromptCommand,
+} from '@piarc/protocol';
 
 import { isObject } from './items.js';
 
@@ -26,6 +32,9 @@ export interface UserInput {
   readonly text: string;
   readonly mentions: readonly InputMention[];
   readonly attachments: readonly InputAttachment[];
+  /** The slash command Core expanded into `text` (T37): what the user typed is
+   * `command.input`. */
+  readonly command?: PromptCommand;
 }
 
 /** An input ready for Pi. */
@@ -59,6 +68,8 @@ export function composedText(prepared: PreparedInput): string {
 /** The record kept for the user message; undefined for plain text (nothing to show). */
 export function inputRecord(prepared: PreparedInput): UserInput | undefined {
   const { input } = prepared;
+  // A command shows as the user typed it, not as its expansion (T37).
+  if (input.command !== undefined) return { ...input, text: input.command.input };
   return input.mentions.length === 0 && input.attachments.length === 0 ? undefined : input;
 }
 
@@ -116,7 +127,54 @@ export function parseInputRecord(data: unknown): UserInput | undefined {
   }
   const mentions = Array.isArray(data.mentions) ? data.mentions.flatMap(mentionOf) : [];
   const attachments = Array.isArray(data.attachments) ? data.attachments.flatMap(attachmentOf) : [];
-  return { text: data.text, mentions, attachments };
+  const command = commandOf(data.command);
+  return { text: data.text, mentions, attachments, ...(command === undefined ? {} : { command }) };
+}
+
+const COMMAND_KINDS: readonly PromptCommand['kind'][] = [
+  'builtIn',
+  'command',
+  'skill',
+  'mcpPrompt',
+];
+const SOURCES: readonly PromptCommand['source'][] = [
+  'builtIn',
+  'projectPiarc',
+  'projectClaude',
+  'projectPi',
+  'user',
+  'userClaude',
+  'userPi',
+  'plugin',
+  'mcp',
+];
+
+const isKind = (value: unknown): value is PromptCommand['kind'] =>
+  COMMAND_KINDS.some((kind) => kind === value);
+const isSource = (value: unknown): value is PromptCommand['source'] =>
+  SOURCES.some((source) => source === value);
+
+/** A slash command of an input (`session/prompt` and `piarc.input`, T37). */
+export function commandOf(value: unknown): PromptCommand | undefined {
+  if (
+    !isObject(value) ||
+    typeof value.name !== 'string' ||
+    typeof value.input !== 'string' ||
+    !isKind(value.kind) ||
+    !isSource(value.source) ||
+    !(value.arguments == null || typeof value.arguments === 'string')
+  ) {
+    return undefined;
+  }
+  return {
+    name: value.name,
+    kind: value.kind,
+    source: value.source,
+    input: value.input,
+    ...(typeof value.arguments === 'string' && value.arguments !== ''
+      ? { arguments: value.arguments }
+      : {}),
+  };
 }
 
 function mentionOf(value: unknown): InputMention[] {

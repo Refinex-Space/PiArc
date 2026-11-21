@@ -20,6 +20,7 @@ import {
   textField,
 } from './protocol/params.js';
 import { blobReader } from './runtime/blobs.js';
+import { commandOf, type UserInput } from './runtime/input.js';
 import { CoreCredentialStore } from './runtime/credentials.js';
 import { isObject } from './runtime/items.js';
 import { SessionRegistry, type ToolBackend } from './runtime/session-registry.js';
@@ -51,6 +52,7 @@ export const HOST_CAPABILITIES: readonly string[] = [
   'backgroundTasks',
   'terminalTasks',
   'mcpPool',
+  'skills',
 ];
 
 /** Exit codes, for Core's log and restart decisions. */
@@ -359,7 +361,12 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     const sessionId = stringField('session/prompt', fields, 'sessionId');
     const requestId = stringField('session/prompt', fields, 'requestId');
     const hookContext = optionalString('session/prompt', fields, 'hookContext');
-    return (await sessions('session/prompt')).prompt(sessionId, requestId, input, hookContext);
+    return (await sessions('session/prompt')).prompt(
+      sessionId,
+      requestId,
+      withCommand('session/prompt', input, fields),
+      hookContext,
+    );
   });
   connection.handle('session/setPermissionMode', async (params) => {
     const method = 'session/setPermissionMode';
@@ -414,7 +421,13 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
       const sessionId = stringField(method, fields, 'sessionId');
       const requestId = stringField(method, fields, 'requestId');
       const hookContext = optionalString(method, fields, 'hookContext');
-      return (await sessions(method)).input(sessionId, requestId, input, kind, hookContext);
+      return (await sessions(method)).input(
+        sessionId,
+        requestId,
+        withCommand(method, input, fields),
+        kind,
+        hookContext,
+      );
     });
   }
   connection.handle('session/queue/edit', async (params) => {
@@ -468,6 +481,32 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     const registry = await sessions(method);
     const cwd = optionalString(method, paramsObject(method, params), 'cwd');
     return registry.subagents.list(cwd ?? registry.workspace.root);
+  });
+  connection.handle('resources/listSkills', async (params) => {
+    const method = 'resources/listSkills';
+    const registry = await sessions(method);
+    const cwd = optionalString(method, paramsObject(method, params), 'cwd');
+    const catalog = await registry.resources(cwd ?? registry.workspace.root);
+    return {
+      skills: catalog.skills,
+      ...(catalog.issues == null ? {} : { issues: catalog.issues }),
+    };
+  });
+  connection.handle('resources/listCommands', async (params) => {
+    const method = 'resources/listCommands';
+    const registry = await sessions(method);
+    const cwd = optionalString(method, paramsObject(method, params), 'cwd');
+    const catalog = await registry.resources(cwd ?? registry.workspace.root);
+    return {
+      commands: catalog.commands,
+      outputStyles: catalog.outputStyles,
+      outputStyle: catalog.outputStyle,
+      ...(catalog.issues == null ? {} : { issues: catalog.issues }),
+    };
+  });
+  connection.handle('resources/reload', async () => {
+    (await sessions('resources/reload')).reloadResources();
+    return {};
   });
   connection.handle('subagent/stop', async (params) => {
     const method = 'subagent/stop';
@@ -585,6 +624,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
           webFetch: welcome.enabled.includes('webFetch'),
           subagents: welcome.enabled.includes('subagents'),
           backgroundTasks: welcome.enabled.includes('backgroundTasks'),
+          skills: welcome.enabled.includes('skills'),
         },
         log,
         sinkFor: (sessionId) => ({
@@ -613,4 +653,17 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
   })();
 
   return { shutdown };
+}
+
+/** `input` with the slash command Core expanded into its text (T37), when the request has
+ * one. */
+function withCommand(method: string, input: UserInput, fields: Record<string, unknown>): UserInput {
+  if (fields.command == null) return input;
+  const command = commandOf(fields.command);
+  if (command === undefined) {
+    throw new AhpError('invalidParams', `${method}: command is not a slash command`, {
+      details: { member: 'command' },
+    });
+  }
+  return { ...input, command };
 }

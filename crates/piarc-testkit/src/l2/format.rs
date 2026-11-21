@@ -450,6 +450,13 @@ pub enum Action {
         /// Content.
         content: String,
     },
+    /// Sets the workspace's output style through Core (`setOutputStyle`, T37): its
+    /// `.piarc/settings.local.json`; no name removes the choice.
+    SetOutputStyle {
+        /// The style's name.
+        #[serde(default)]
+        name: Option<String>,
+    },
     /// Shuts Core down and starts it again on the same data directory, then reopens the
     /// workspace; sessions stay closed until `resume`.
     RestartCore {},
@@ -561,6 +568,7 @@ impl Action {
             Self::CheckTrust { .. } => "check_trust",
             Self::Wait(_) => "wait",
             Self::WriteFile { .. } => "write_file",
+            Self::SetOutputStyle { .. } => "set_output_style",
             Self::RestartCore {} => "restart_core",
             Self::Resume { .. } => "resume",
             Self::Fork(_) => "fork",
@@ -629,6 +637,7 @@ impl Action {
             | Self::CheckGit(_)
             | Self::Search(_)
             | Self::WriteFile { .. }
+            | Self::SetOutputStyle { .. }
             | Self::RestartCore {}
             | Self::CheckFiles(_)
             | Self::SignIn(_)

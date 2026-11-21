@@ -1,4 +1,5 @@
-// The seven slots follow architecture section 6.6.1. Slots 3, 5 and 6 have no M1 producer.
+// The seven slots follow architecture section 6.6.1: identity, tool guidance, output style (T37),
+// project context, skills index (T37), MCP servers (T36), environment.
 import type { MemoryFile } from '@piarc/protocol';
 import { CANONICAL_TOOLS, type ToolProfile } from '../../tools/profile.js';
 
@@ -54,12 +55,17 @@ export function assembleSystem(
   environment: { cwd: string; platform: string; date: string; gitStatus?: string },
   persona?: Persona,
   mcp?: string,
+  skills?: { readonly style?: string; readonly skills?: string },
 ): FrozenSystem {
   const context = persona?.projectContext !== false;
   const sections: [string, string][] = [
     ['identity', persona?.identity ?? IDENTITY],
     ['tool_guidance', toolGuidance(tools, profile)],
+    // Section 3 (T37): the output style's instructions.
+    ...(skills?.style === undefined ? [] : [['output_style', skills.style] as [string, string]]),
     ...(context ? [['project_context', files.map(sourced).join('\n\n')] as [string, string]] : []),
+    // Section 5 (T37): the skills the model may load.
+    ...(skills?.skills === undefined ? [] : [['skills', skills.skills] as [string, string]]),
     // Section 6 (T36): the connected MCP servers' instructions and the deferred servers.
     ...(mcp === undefined ? [] : [['mcp_servers', mcp] as [string, string]]),
     [

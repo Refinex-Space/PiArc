@@ -10,6 +10,7 @@ import type {
   InputMention,
   Item,
   ItemStatus,
+  PromptCommand,
   SubagentState,
   TurnUsage,
 } from '@piarc/protocol';
@@ -138,6 +139,7 @@ export function userMessage(
     text: string;
     mentions: readonly InputMention[];
     attachments: readonly InputAttachment[];
+    command?: PromptCommand;
   },
 ): Item {
   if (record === undefined) {
@@ -150,6 +152,7 @@ export function userMessage(
     text: record.text.toWellFormed(),
     ...(record.mentions.length === 0 ? {} : { mentions: [...record.mentions] }),
     ...(record.attachments.length === 0 ? {} : { attachments: [...record.attachments] }),
+    ...(record.command === undefined ? {} : { command: record.command }),
   };
 }
 

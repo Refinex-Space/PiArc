@@ -430,6 +430,8 @@ export const en = {
   'transcript.reminder.hookContext': 'hook context',
   'transcript.reminder.contextRestore': 'context restored after compaction',
   'transcript.reminder.mcpChanged': 'MCP tools changed',
+  'transcript.reminder.skillsChanged': 'Skills changed',
+  'transcript.reminder.outputStyle': 'Output style changed',
   'transcript.loadEarlier': 'Loading earlier messages…',
   'shell.pageFailed': 'This page could not be shown. Select a session or start a new one.',
   'transcript.rowFailed': 'This part of the conversation could not be shown.',

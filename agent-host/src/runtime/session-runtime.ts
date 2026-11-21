@@ -119,8 +119,11 @@ export async function createSessionRuntime(
       settingsManager,
       resourceLoaderReloadOptions: trust.reloadOptions,
       resourceLoaderOptions: {
-        // PiArc assembles project context itself (T22).
+        // PiArc assembles project context itself (T22); skills and prompt templates come
+        // from Core (T37, ADR-0054): Pi neither lists them nor expands `/skill:` or templates.
         noContextFiles: true,
+        noSkills: true,
+        noPromptTemplates: true,
         systemPromptOverride: () => IDENTITY,
         appendSystemPromptOverride: () => [],
         extensionFactories: [

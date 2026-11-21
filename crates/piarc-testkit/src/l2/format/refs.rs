@@ -198,6 +198,7 @@ fn check_references(spec: &ScenarioSpec, action: &Action, field: &str, problems:
         // Checked by `check_checkpoint_action`.
         | Action::Rewind(_)
         | Action::Discard(_)
+        | Action::SetOutputStyle { .. }
         | Action::CheckFiles(_) => {}
         Action::Fork(fork) => {
             if !spec.sessions().get(&fork.label).is_some_and(|s| s.deferred) {

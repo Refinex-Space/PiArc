@@ -7,6 +7,7 @@ import type { InputAccepted } from '@piarc/protocol';
 import type { SessionHooks } from '../harness/hooks.js';
 import type { HostToolCapabilities, SessionHarness } from '../harness/session-harness.js';
 import type { SessionMemory } from '../harness/session-memory.js';
+import type { SessionSkills } from '../harness/skills/session-skills.js';
 import type { ToolBatches } from '../harness/tool-batches.js';
 import type { ToolResultLimits } from '../harness/tool-results.js';
 import type { CoreIo, ToolProfile } from '../tools/index.js';
@@ -92,6 +93,8 @@ export interface HostedSession {
   readonly hooks: SessionHooks | undefined;
   /** Host tools, plan mode and reminders (T26). */
   readonly harness: SessionHarness;
+  /** Skills and the output style (T37, capability `skills`). */
+  readonly skills: SessionSkills | undefined;
   unsubscribe: () => void;
   /** Idempotency keys of accepted prompts → their turn ids. */
   readonly prompts: Map<string, string>;

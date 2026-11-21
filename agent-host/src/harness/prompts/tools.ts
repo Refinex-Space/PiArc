@@ -95,4 +95,10 @@ export const TOOL_GUIDANCE = {
       'Write the task so it stands alone; the subagent sees none of this conversation. Start independent subagents in one response so they run together.',
     ],
   },
+  Skill: {
+    snippet: 'Skill: load the instructions of a listed skill',
+    guidelines: [
+      'Load a skill when the request matches its description, before doing the work, and then follow its instructions.',
+    ],
+  },
 } satisfies Record<CanonicalTool, Pick<ToolPresentation, 'snippet' | 'guidelines'>>;

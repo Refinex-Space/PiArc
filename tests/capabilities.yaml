@@ -694,7 +694,13 @@ capabilities:
     milestone: M3
     refs: [FR-HN-07, ARCH-6.7]
     task: T37
-    status: planned
+    status: active
+  - id: CAP-STYLE-SWITCH-001
+    title: '新会话把当前输出风格放在 system prompt 第 3 段；会话中途切换以追加消息送达，已发送的 system prompt 不变'
+    milestone: M3
+    refs: [FR-HN-07, ARCH-6.6.1, ARCH-6.7]
+    task: T37
+    status: active
 
   # Hooks (architecture section 6.3.2)
   - id: CAP-HOOK-SESSION-001
@@ -874,7 +880,31 @@ capabilities:
     milestone: M3
     refs: [FR-EX-01, ARCH-6.7]
     task: T37
-    status: planned
+    status: active
+  - id: CAP-SKILL-INDEX-001
+    title: 'system prompt 第 5 段只列模型可调用的 skill 名称与截断后的描述，`disable-model-invocation` 的不列'
+    milestone: M3
+    refs: [FR-EX-01, ARCH-6.6.1, ARCH-6.7]
+    task: T37
+    status: active
+  - id: CAP-SKILL-INVOKE-001
+    title: '`Skill` 工具加载正文并完成参数替换，正文留在对话中、压缩后按上限重注入，frontmatter 的 `hooks` 从调用起生效'
+    milestone: M3
+    refs: [FR-EX-01, ARCH-6.6.4, ARCH-6.7]
+    task: T37
+    status: active
+  - id: CAP-SKILL-ALLOWED-001
+    title: '`allowed-tools` 在调用 skill 的回合内免审批，下一回合恢复询问，deny 与 ask 规则仍然优先'
+    milestone: M3
+    refs: [FR-EX-01, ARCH-6.2.3, ARCH-6.7]
+    task: T37
+    status: active
+  - id: CAP-SKILL-PATHS-001
+    title: '带 `paths` 的 skill 在处理匹配文件后才进入索引，以追加消息送达'
+    milestone: M3
+    refs: [FR-EX-01, ARCH-6.7]
+    task: T37
+    status: active
   - id: CAP-SKILL-FORK-001
     title: 'skill 的 `context: fork`'
     milestone: M5
@@ -886,7 +916,13 @@ capabilities:
     milestone: M3
     refs: [FR-EX-02, ARCH-6.7]
     task: T37
-    status: planned
+    status: active
+  - id: CAP-CMD-EXPAND-001
+    title: '`/名称 参数` 由 Core 在 UserPromptSubmit 之前展开（`$ARGUMENTS`、位置参数与命名参数），转录显示用户输入的原文，可由用户调用的 skill 同样展开'
+    milestone: M3
+    refs: [FR-EX-02, ARCH-6.7]
+    task: T37
+    status: active
   - id: CAP-MCP-TRANSPORT-001
     title: 'MCP 的 stdio 与 Streamable HTTP 传输'
     milestone: M3

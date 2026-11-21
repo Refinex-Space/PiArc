@@ -183,7 +183,8 @@ export function projectHistory(
       // (attached PDFs' text follows it).
       const record = pending?.kind === 'user' ? pending : undefined;
       const own = record?.input;
-      const matches = own === undefined || text.startsWith(own.text);
+      // A slash command's message is its expansion, not what the user typed (T37).
+      const matches = own === undefined || own.command !== undefined || text.startsWith(own.text);
       currentTurn = (matches ? record?.turnId : undefined) ?? entry.id;
       pending = undefined;
       items.push({

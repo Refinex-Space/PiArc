@@ -9,7 +9,7 @@ workspace:
     .claude/settings.local.json: "{\r\n  \"permissions\": { \"defaultMode\": \"default\" }\r\n}\r\n"
     .claude/rules/house.md: Follow the house style.
   run_files:
-    'home 家/.claude/settings.json': '{"permissions":{"allow":["Bash(sed -n *)"],"defaultMode":"plan"},"outputStyle":"ignored-style"}'
+    'home 家/.claude/settings.json': '{"permissions":{"allow":["Bash(sed -n *)"],"defaultMode":"plan"},"plansDirectory":"plans"}'
     'home 家/.claude.json': '{"numStartups":3,"mcpServers":{}}'
 providers:
   main:
@@ -58,7 +58,7 @@ expect:
         status: loaded
         overridden:
           - { pointer: /permissions/defaultMode, value: plan, source: claudeProjectLocal }
-        ignored: [{ pointer: /outputStyle, reason: planned, task: T37 }]
+        ignored: [{ pointer: /plansDirectory, reason: planned, task: T48 }]
       claudeState:
         status: loaded
         # T36: the user's MCP servers apply (listed by name only).

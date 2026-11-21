@@ -11,6 +11,7 @@ import { memoryReader } from '../harness/memory-io.js';
 import { preflightInput } from '../harness/policy.js';
 import { SessionHarness } from '../harness/session-harness.js';
 import { SessionMemory } from '../harness/session-memory.js';
+import { SessionSkills } from '../harness/skills/session-skills.js';
 import type { Persona } from '../harness/prompts/system.js';
 import type { AgentToolHost } from '../harness/subagents/agent-tool.js';
 import { McpSession } from '../mcp/session.js';
@@ -45,6 +46,8 @@ export interface SessionParts {
   readonly hooks: SessionHooks | undefined;
   /** The session's part of the workspace MCP pool (T36). */
   readonly mcp: McpSession | undefined;
+  /** The session's skills and output style (T37); read the catalog before the tools. */
+  readonly skills: SessionSkills | undefined;
 }
 
 /** Creates and connects the parts of one session. */
@@ -124,5 +127,21 @@ export function sessionParts(input: SessionPartsInput): SessionParts {
           ...(input.child?.mcpInline === undefined ? {} : { inline: input.child.mcpInline }),
         });
   if (mcp !== undefined) memory.mcpSection = () => mcp.systemSection();
-  return { harness, memory, hooks, mcp };
+  const skills =
+    tools.kind === 'core' && options.hostTools?.skills === true
+      ? new SessionSkills({
+          sessionId: manager.getSessionId(),
+          manager,
+          bridge: options.hostTools.bridge,
+          reminders: harness.reminders,
+          canonical: toCanonical,
+          cwd,
+          log: sessionLog,
+        })
+      : undefined;
+  if (skills !== undefined) {
+    harness.skills = skills;
+    memory.skillSections = (signal) => skills.sections(signal);
+  }
+  return { harness, memory, hooks, mcp, skills };
 }

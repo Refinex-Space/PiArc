@@ -1,0 +1,75 @@
+id: command-expand
+description: The input /name with arguments runs a .claude/commands file (namespaced by subdirectory), a Pi prompt template or a user-invocable skill; Core substitutes $ARGUMENTS, positional and named arguments before the Agent Host gets the text, the transcript shows what the user typed with the command, an unknown name stays as typed, and /compact compacts (T37).
+capabilities: [CAP-CMD-001, CAP-CMD-EXPAND-001]
+workspace:
+  trusted: true
+  files:
+    .claude/commands/frontend/component.md: "---\ndescription: Make a component\nargument-hint: '[name] [kind]'\n---\nCreate the $2 component $1 (all: $ARGUMENTS).\n"
+    .pi/prompts/summarize.md: "---\ndescription: Summarize\n---\nSummarize ${1:-everything} briefly.\n"
+    .claude/skills/greet/SKILL.md: "---\ndescription: Greet someone\narguments: [person]\n---\nSay hello to $person.\n"
+    .pi/settings.json: '{"compaction":{"keepRecentTokens":1}}'
+providers:
+  main:
+    wire: anthropic
+    validation: { rules: { role_order: false } }
+    steps:
+      - text: Made.
+      - text: Summarized.
+      - text: Greeted.
+      - text: Unknown.
+      - text: 'Summary of the commands.'
+actions:
+  - prompt: { text: '/frontend:component Button "icon only"', turn: a }
+  - wait: { method: turn/completed, turn: a }
+  - prompt: { text: '/summarize', turn: b }
+  - wait: { method: turn/completed, turn: b }
+  - prompt: { text: '/greet "Ada Lovelace"', turn: c }
+  - wait: { method: turn/completed, turn: c }
+  - prompt: { text: '/no-such-command stays', turn: d }
+  - wait: { method: turn/completed, turn: d }
+  - compact: { instructions: Keep the component names. }
+  - wait: { method: turn/completed, count: 5 }
+expect:
+  request_counts: { main: 5 }
+  requests:
+    - {
+        index: 0,
+        last_user_text: 'Create the icon only component Button (all: Button "icon only").',
+      }
+    - { index: 1, last_user_text: Summarize everything briefly. }
+    - { index: 2, last_user_text: Say hello to Ada Lovelace. }
+    - { index: 3, last_user_text: /no-such-command stays }
+    - { index: 4, contains: ['Focus requested by the user: Keep the component names.'] }
+  events:
+    - method: item/completed
+      params:
+        item:
+          type: userMessage
+          text: '/frontend:component Button "icon only"'
+          command:
+            {
+              name: 'frontend:component',
+              kind: command,
+              source: projectClaude,
+              input: '/frontend:component Button "icon only"',
+            }
+    - method: item/completed
+      params:
+        {
+          item:
+            {
+              type: userMessage,
+              text: /summarize,
+              command: { name: summarize, kind: command, source: projectPi },
+            },
+        }
+    - method: item/completed
+      params:
+        {
+          item:
+            {
+              type: userMessage,
+              text: '/greet "Ada Lovelace"',
+              command: { name: greet, kind: skill },
+            },
+        }
