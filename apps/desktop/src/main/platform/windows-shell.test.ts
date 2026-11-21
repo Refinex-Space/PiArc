@@ -3,7 +3,7 @@
 // every platform; Windows CI covers it there.
 import { describe, expect, it } from 'vitest';
 
-import { launchTargets, leadingArguments } from '../launch.js';
+import { launchTargets } from '../launch.js';
 import {
   OPEN_WITH_LABEL,
   regExe,
@@ -65,15 +65,11 @@ describe('Windows shell registration', () => {
 
   it('gets the argument Explorer and the scheme pass to a new instance', () => {
     // Explorer: `"PiArc.exe" "D:\work\repo 仓库"`; scheme: `"PiArc.exe" "piarc://session/s1"`.
-    expect(launchTargets([EXE, 'D:\\work\\repo 仓库'], leadingArguments(false), 'C:\\')).toEqual([
+    expect(launchTargets([EXE, 'D:\\work\\repo 仓库'], false, 'C:\\')).toEqual([
       { kind: 'workspace', path: 'D:\\work\\repo 仓库' },
     ]);
     expect(
-      launchTargets(
-        [EXE, '--allow-file-access', 'piarc://session/s1'],
-        leadingArguments(false),
-        'C:\\',
-      ),
+      launchTargets([EXE, '--allow-file-access', 'piarc://session/s1'], false, 'C:\\'),
     ).toEqual([{ kind: 'session', sessionId: 's1' }]);
   });
 });

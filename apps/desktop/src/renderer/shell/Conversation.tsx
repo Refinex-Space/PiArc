@@ -118,9 +118,21 @@ function useLocated(
     if (request === undefined || loading || !transcript.hasContent()) return;
     // Cleared when the effect is replaced: a stale search stops.
     const run = { active: true };
+    const find = () => transcript.rowIds().find((row) => rowShowsEntry(row, request.entryId));
     void (async () => {
+      // Rows shown live carry the projector's ids, rows from the history carry Pi's entry ids:
+      // an idle session is read again from its history when the entry is not found.
+      if (find() === undefined && !transcript.isRunning()) {
+        const window = parseWindow(
+          await globalThis.window.piarc.transcriptWindow(id, null, HISTORY.pageItems),
+        );
+        if (!run.active) return;
+        transcript.load(window.items, window.start);
+        transcript.harness.load(window.harness);
+        transcript.branches.load(window.branches);
+      }
       for (let page = 0; page <= LOCATE_PAGES && run.active; page += 1) {
-        const rowId = transcript.rowIds().find((row) => rowShowsEntry(row, request.entryId));
+        const rowId = find();
         if (rowId !== undefined) {
           setFocus({ rowId, nonce: request.nonce });
           setRequest(undefined);
@@ -138,7 +150,7 @@ function useLocated(
     return () => {
       run.active = false;
     };
-  }, [request, loading, transcript, loadEarlier, notFound, t]);
+  }, [id, request, loading, transcript, loadEarlier, notFound, t]);
   return focus;
 }
 

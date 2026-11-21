@@ -96,8 +96,8 @@ pub(crate) struct LiveSession {
     /// The first message sent in this session, for its title until the index has one (Pi
     /// writes the file only with the first reply).
     pub first_message: Option<String>,
-    /// Its worktree directory (T35).
-    pub worktree: Option<String>,
+    /// Its worktree directory and the branch checked out there when it opened (T35).
+    pub worktree: Option<(String, Option<String>)>,
 }
 
 /// A session's worktree in `core/sessions` (T35).
@@ -595,8 +595,11 @@ fn apply_live(view: &mut SessionView, live: &LiveSession, derived: Option<&Strin
         view.archived = archived;
     }
     if view.worktree.is_none()
-        && let Some(path) = &live.worktree
+        && let Some((path, branch)) = &live.worktree
     {
-        view.worktree = Some(WorktreeView::new(path));
+        view.worktree = Some(WorktreeView {
+            branch: branch.clone(),
+            ..WorktreeView::new(path)
+        });
     }
 }

@@ -57,22 +57,26 @@ export function parseLaunchUrl(text: string): LaunchTarget | undefined {
 
 /**
  * The targets of a command line: `piarc://` links and folders (relative ones against `cwd`).
- * `skip` leading arguments are the executable (and, when started as `electron <app>`, the app
- * path); switches are ignored.
+ * The first argument is the executable; when started as `electron <app>` (`defaultApp`), the
+ * first argument that is not a switch is the app's path. Switches are ignored.
  */
-export function launchTargets(argv: readonly string[], skip: number, cwd: string): LaunchTarget[] {
+export function launchTargets(
+  argv: readonly string[],
+  defaultApp: boolean,
+  cwd: string,
+): LaunchTarget[] {
   const targets: LaunchTarget[] = [];
-  for (const arg of argv.slice(skip)) {
+  let appPath = defaultApp;
+  for (const arg of argv.slice(1)) {
     if (arg.length === 0 || arg.startsWith('-')) continue;
+    if (appPath) {
+      appPath = false;
+      continue;
+    }
     const target = arg.toLowerCase().startsWith(`${URL_SCHEME}:`)
       ? parseLaunchUrl(arg)
       : folder(absolute(arg) ? arg : path.resolve(cwd, arg));
     if (target !== undefined) targets.push(target);
   }
   return targets;
-}
-
-/** Arguments before the user's: the executable, and the app path of `electron <app>`. */
-export function leadingArguments(defaultApp: boolean): number {
-  return defaultApp ? 2 : 1;
 }

@@ -203,6 +203,9 @@ impl SessionHandle {
             unread: false,
             prefs: piarc_store::SessionPrefsChange::default(),
             first_message: None,
+            worktree_branch: worktree
+                .as_deref()
+                .and_then(piarc_git::worktree::head_branch),
             worktree,
             ops: 0,
             starting: 0,
@@ -359,8 +362,9 @@ struct SessionActor {
     prefs: piarc_store::SessionPrefsChange,
     /// The first message this actor sent (the title until the index has the session).
     first_message: Option<String>,
-    /// The worktree it works in (T35).
+    /// The worktree it works in (T35), and its branch when the session opened.
     worktree: Option<PathBuf>,
+    worktree_branch: Option<String>,
     /// Requests in flight.
     ops: u32,
     /// Prompts, steers and follow-ups in flight (each may start a turn).
@@ -774,7 +778,10 @@ impl SessionActor {
             error: self.error.clone(),
             prefs: self.prefs.clone(),
             first_message: self.first_message.clone(),
-            worktree: self.worktree.as_deref().map(path_text),
+            worktree: self
+                .worktree
+                .as_deref()
+                .map(|tree| (path_text(tree), self.worktree_branch.clone())),
         }));
     }
 

@@ -1,0 +1,20 @@
+{
+  "id": "t35-approve",
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "both",
+          "name": "Bash",
+          "input": {
+            "command": "env echo from both windows",
+            "description": "Asks in both windows"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Ran once."
+    }
+  ]
+}

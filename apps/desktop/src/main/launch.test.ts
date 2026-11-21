@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { launchTargets, leadingArguments, parseLaunchUrl } from './launch.js';
+import { launchTargets, parseLaunchUrl } from './launch.js';
 
 describe('piarc:// links', () => {
   it('open a folder or show a session', () => {
@@ -51,21 +51,30 @@ describe('command lines', () => {
       '/abs/dir',
       '',
     ];
-    expect(launchTargets(argv, leadingArguments(false), '/home/me')).toEqual([
+    expect(launchTargets(argv, false, '/home/me')).toEqual([
       { kind: 'session', sessionId: 'abc' },
       { kind: 'workspace', path: '/home/me/repo 仓库' },
       { kind: 'workspace', path: '/abs/dir' },
     ]);
   });
 
-  it('skip the app path when started as `electron <app>`', () => {
-    expect(
-      launchTargets(['electron', '.', 'piarc://session/s1'], leadingArguments(true), '/x'),
-    ).toEqual([{ kind: 'session', sessionId: 's1' }]);
+  it('skip the app path when started as `electron <app>`, after any switches', () => {
+    expect(launchTargets(['electron', '.', 'piarc://session/s1'], true, '/x')).toEqual([
+      { kind: 'session', sessionId: 's1' },
+    ]);
+    // Playwright puts its switches before the app path.
+    const playwright = [
+      'electron',
+      '--inspect=0',
+      '--remote-debugging-port=0',
+      '/repo/apps/desktop',
+      '--user-data-dir=/d',
+    ];
+    expect(launchTargets(playwright, true, '/x')).toEqual([]);
   });
 
   it('accept the Windows shell verb argument', () => {
-    expect(launchTargets(['C:\\PiArc\\PiArc.exe', 'D:\\work\\repo'], 1, 'C:\\')).toEqual([
+    expect(launchTargets(['C:\\PiArc\\PiArc.exe', 'D:\\work\\repo'], false, 'C:\\')).toEqual([
       { kind: 'workspace', path: 'D:\\work\\repo' },
     ]);
   });

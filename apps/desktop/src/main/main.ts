@@ -24,7 +24,7 @@ import { applyDevServerCsp, resolveDevServer } from './dev-server.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
 import { createIpcRegistrar } from './ipc/register.js';
 import { registerWorktreeHandlers } from './core/worktree-ipc.js';
-import { URL_SCHEME, launchTargets, leadingArguments, parseLaunchUrl } from './launch.js';
+import { URL_SCHEME, launchTargets, parseLaunchUrl } from './launch.js';
 import { applyDataDirs, type DataDirs } from './platform/data-dirs.js';
 import { PreferenceStore } from './preferences.js';
 import { applyAppIdentity } from './platform/index.js';
@@ -140,7 +140,7 @@ function start(dirs: DataDirs): void {
     guardWebContents(contents, trustedOrigins);
   });
   app.on('second-instance', (_event, argv, workingDirectory) => {
-    const targets = launchTargets(argv, leadingArguments(process.defaultApp), workingDirectory);
+    const targets = launchTargets(argv, process.defaultApp, workingDirectory);
     console.info(`[app] second instance started with ${String(targets.length)} targets`);
     if (targets.length === 0) shell?.focusMain();
     for (const target of targets) launch(target);
@@ -235,7 +235,7 @@ function start(dirs: DataDirs): void {
     void preferences.load().then(() => {
       appShell.start();
       const targets = [
-        ...launchTargets(process.argv, leadingArguments(process.defaultApp), process.cwd()),
+        ...launchTargets(process.argv, process.defaultApp, process.cwd()),
         ...early.splice(0),
       ];
       appShell.openMain(targets);
@@ -262,7 +262,7 @@ if (app.requestSingleInstanceLock()) {
   });
   app.on('open-file', (event, file) => {
     event.preventDefault();
-    launch(launchTargets([file], 0, '/')[0]);
+    launch(launchTargets(['', file], false, '/')[0]);
   });
   // The installed app answers `piarc://` (packaged: macOS declares it in Info.plist, the
   // Windows installer registers it, ADR-0052); a development run does not claim the scheme.
