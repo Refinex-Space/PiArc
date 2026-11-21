@@ -4,6 +4,8 @@
 //!
 //! - Git status, diff, worktrees and branches.
 //! - T13: the main checkout of a directory, the key of project trust ([`checkout`]).
+//! - T35: PiArc's worktrees ([`worktree`]), with git run through the injected process spawner
+//!   ([`git`]).
 //!
 //! # Not responsible for
 //!
@@ -20,5 +22,9 @@
 //! `scripts/ci/check-crate-deps.mjs` (architecture section 7.1).
 
 pub mod checkout;
+pub mod git;
+pub mod worktree;
 
 pub use checkout::{Checkout, CheckoutKind, Error, Result, canonical, resolve, strip_verbatim};
+pub use git::{Git, GitError};
+pub use worktree::WorktreeError;
