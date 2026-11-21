@@ -363,6 +363,7 @@ fn finished(ran: &Ran<'_>, exit: CommandExit, capture: OutputCapture) -> ExecRun
             cwd_reset: ran.reset.clone(),
             output: Some(command_output(capture.finish(success))),
             task: None,
+            sandbox: None,
         }
     }
 }
@@ -702,6 +703,7 @@ fn task_result(
             output_path: reserved.output_path,
             reason,
         }),
+        sandbox: None,
     }
 }
 

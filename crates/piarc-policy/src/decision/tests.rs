@@ -371,3 +371,78 @@ fn plan_mode_refusal_points_at_exit_plan_mode() {
     assert!(PLAN_MODE_REFUSAL.contains("plan mode is on"));
     assert!(PLAN_MODE_REFUSAL.contains("ExitPlanMode"));
 }
+
+/// T39-A02: sandbox auto-approval is a mode default (step 7): deny and ask rules, critical
+/// deletions, unresolved commands and plan mode's refusal still come first.
+#[test]
+fn sandbox_auto_approval_is_a_mode_default() {
+    for mode in [Default, AcceptEdits] {
+        let auto = Input {
+            sandbox_auto: true,
+            outside: true,
+            tainted: true,
+            write: true,
+            ..input(mode)
+        };
+        assert_eq!(decide(&auto).step, "sandboxAutoAllow", "{mode:?}");
+        let denied = Input {
+            deny: Some(hit(Behavior::Deny)),
+            ..auto.clone()
+        };
+        assert_eq!(decide(&denied).step, "denyRule");
+        for step in ["askRule", "criticalPath", "unresolved"] {
+            let asked = Input {
+                ask: Some(MustAsk { step, hit: None }),
+                ..auto.clone()
+            };
+            assert_eq!(decide(&asked).step, step);
+        }
+        let protected = Input {
+            protected: true,
+            ..auto.clone()
+        };
+        assert_eq!(decide(&protected).step, "protectedPath");
+    }
+    let plan = Input {
+        sandbox_auto: true,
+        write: true,
+        ..input(Plan)
+    };
+    assert_eq!(decide(&plan).step, "planMode");
+}
+
+/// T39-A04: a command outside the sandbox asks in every mode; deny rules and plan mode's
+/// refusal of writes still win, and no hook answers it.
+#[test]
+fn an_unsandboxed_command_asks_in_every_mode() {
+    for mode in MODES {
+        let outside = Input {
+            unsandboxed: true,
+            sandbox_auto: false,
+            allow: vec![hit(Behavior::Allow)],
+            allowed: true,
+            hook: HookVerdict::Allow,
+            ..input(mode)
+        };
+        let ruling = decide(&outside);
+        assert_eq!(
+            (ruling.outcome, ruling.step),
+            (Outcome::Ask, "unsandboxed"),
+            "{mode:?}"
+        );
+        for verdict in [HookVerdict::Allow, HookVerdict::Deny("no".into())] {
+            assert_eq!(after_permission_request(ruling.clone(), &verdict), ruling);
+        }
+        let denied = Input {
+            deny: Some(hit(Behavior::Deny)),
+            ..outside.clone()
+        };
+        assert_eq!(decide(&denied).step, "denyRule");
+    }
+    let plan = Input {
+        unsandboxed: true,
+        write: true,
+        ..input(Plan)
+    };
+    assert_eq!(decide(&plan).step, "planMode");
+}

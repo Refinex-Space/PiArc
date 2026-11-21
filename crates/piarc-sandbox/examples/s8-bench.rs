@@ -59,14 +59,16 @@ mod bench {
         std::fs::create_dir_all(&tmp).expect("tmp");
         let upstream = upstream().await;
         let sandbox = SessionSandbox::start(
-            &SandboxPolicy::new(ws.clone(), tmp),
+            piarc_sandbox::platform_sandbox().expect("Seatbelt"),
             Allowlist::new([HOST]).expect("allowlist"),
             Arc::new(LocalNetwork(upstream)),
+            Arc::new(piarc_sandbox::proxy::DenyUnlisted),
         )
         .await
         .expect("sandbox starts");
+        let policy = SandboxPolicy::new(ws.clone(), tmp);
         println!("macOS {}, {iterations} iterations each\n", os_version());
-        commands(&sandbox, &ws, iterations);
+        commands(&sandbox, &policy, &ws, iterations);
         proxy(sandbox.proxy_port(), upstream, iterations).await;
         throughput(sandbox.proxy_port(), upstream).await;
         let _ = std::fs::remove_dir_all(dir);
@@ -80,7 +82,12 @@ mod bench {
             .unwrap_or_default()
     }
 
-    fn commands(sandbox: &SessionSandbox, ws: &std::path::Path, iterations: usize) {
+    fn commands(
+        sandbox: &SessionSandbox,
+        policy: &SandboxPolicy,
+        ws: &std::path::Path,
+        iterations: usize,
+    ) {
         let (mut direct, mut wrapped, mut generate) = (Vec::new(), Vec::new(), Vec::new());
         for i in 0..iterations + 10 {
             let started = Instant::now();
@@ -93,7 +100,7 @@ mod bench {
             let plain = started.elapsed();
             assert!(status.success());
             let started = Instant::now();
-            let launch = sandbox.launch().expect("profile");
+            let (launch, _) = sandbox.launch(policy).expect("profile");
             let generated = started.elapsed();
             let status = Command::new(&launch.program)
                 .args(&launch.args)

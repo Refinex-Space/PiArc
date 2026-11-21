@@ -73,6 +73,44 @@ pub fn write_value(
     })
 }
 
+/// Appends `item` to the list of strings at `pointer` in the file of layer `layer` (creating the
+/// list) unless an equal string (ignoring ASCII case) is there, in one read-modify-write under
+/// the settings writer's lock: the network-domain card's "add to the allowlist" (T39). Returns
+/// the file.
+///
+/// # Errors
+///
+/// See [`WriteError`]; a value at `pointer` that is not a list is replaced only if absent.
+pub fn append_unique(
+    table: &LayerTable,
+    layer: &str,
+    pointer: &str,
+    item: &str,
+) -> Result<PathBuf, WriteError> {
+    let tokens = parse_pointer(pointer)?;
+    update_file(table, layer, |document| {
+        let current = document.pointer(pointer).cloned();
+        let mut list = match current {
+            None => Vec::new(),
+            Some(Value::Array(list)) => list,
+            Some(_) => {
+                return Err(WriteError::InvalidUpdate(format!(
+                    "{pointer} is not a list"
+                )));
+            }
+        };
+        let present = list
+            .iter()
+            .filter_map(Value::as_str)
+            .any(|s| s.eq_ignore_ascii_case(item));
+        if !present {
+            list.push(Value::String(item.to_owned()));
+        }
+        apply(document, &tokens, Some(Value::Array(list)));
+        Ok(())
+    })
+}
+
 /// Append natively confirmed permissions to the project-local settings in a single
 /// read-modify-write. The returned items are the only additions confirmed by this action.
 ///

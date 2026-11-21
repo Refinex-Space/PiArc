@@ -159,6 +159,7 @@ mod tests {
             feedback: None,
             rules: Vec::new(),
             directory: None,
+            domain: None,
             mode: None,
             comments: Vec::new(),
             answers: Vec::new(),
@@ -183,6 +184,8 @@ mod tests {
             plan: Some(plan.into()),
             questions: Vec::new(),
             subagent: None,
+            sandbox: None,
+            domain: None,
         }
     }
 

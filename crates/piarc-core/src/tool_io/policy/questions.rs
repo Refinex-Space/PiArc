@@ -218,6 +218,8 @@ impl ToolIo {
             plan: None,
             questions: p.questions.clone(),
             subagent: None,
+            sandbox: None,
+            domain: None,
         };
         let (tx, mut rx) = oneshot::channel();
         if !post_card(&s, services, &p.tool_call_id, &card, &peer, &generation, tx).await? {
@@ -313,6 +315,8 @@ mod tests {
             plan: None,
             questions,
             subagent: None,
+            sandbox: None,
+            domain: None,
         }
     }
 
@@ -326,6 +330,7 @@ mod tests {
             feedback: None,
             rules: Vec::new(),
             directory: None,
+            domain: None,
             mode: None,
             comments: Vec::new(),
             answers,

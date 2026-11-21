@@ -52,6 +52,7 @@ impl Driver<'_> {
             feedback: None,
             rules: Vec::new(),
             directory: None,
+            domain: None,
             mode: None,
             comments: Vec::new(),
             answers: Vec::new(),

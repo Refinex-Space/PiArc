@@ -140,6 +140,47 @@ pub struct ExecRunResult {
     /// T32): asked for, or moved there by its timeout. The exit fields are then absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub task: Option<crate::tasks::TaskStarted>,
+    /// Present when the command ran in the sandbox (T39, architecture section 6.10): what the
+    /// sandbox refused, as far as Core could tell.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sandbox: Option<SandboxReport>,
+}
+
+/// What the sandbox did to one command (T39).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SandboxReport {
+    /// What the sandbox refused: paths named in the command's failure output that its policy
+    /// forbids, and hosts the proxy refused while it ran. Empty when nothing was recognized.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub denials: Vec<SandboxDenial>,
+    /// The sandbox itself could not start, so the command did not run; later commands run
+    /// without it and go through the normal approval (risk R10).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub failed_to_start: bool,
+}
+
+/// One thing the sandbox refused.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SandboxDenial {
+    /// What was refused.
+    pub kind: SandboxDenialKind,
+    /// The path (`read`, `write`) or `host:port` (`network`).
+    pub target: String,
+}
+
+/// The kinds of [`SandboxDenial`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum SandboxDenialKind {
+    /// Reading a `denyRead` path.
+    Read,
+    /// Writing outside the writable directories or a protected path.
+    Write,
+    /// Reaching a host the allowlist does not name (and the user did not allow), or one that
+    /// resolves to a refused address.
+    Network,
 }
 
 /// The timeout a command ran with.

@@ -17,6 +17,9 @@ pub(in crate::tool_io) struct Grant {
     pub(super) programs: Vec<(String, PathBuf)>,
     /// Paths an automatic Bash allowance checked; checked again at execution.
     pub(super) targets: Vec<(PathBuf, bool)>,
+    /// The command runs in the sandbox (T39): decided when the call was judged, so a call
+    /// approved for running sandboxed never runs outside it.
+    pub(super) sandboxed: bool,
     input: Map<String, Value>,
     peer: Peer,
     made_parent: bool,
@@ -36,6 +39,7 @@ impl Grant {
             scope: None,
             programs: Vec::new(),
             targets: Vec::new(),
+            sandboxed: false,
             input: p.input.clone(),
             peer,
             made_parent: false,
@@ -312,12 +316,20 @@ pub(in crate::tool_io) fn file_permit(
     })
 }
 
+/// What a consumed command grant carries to the execution.
+pub(in crate::tool_io) struct Claimed {
+    /// Programs an automatic allowance pinned.
+    pub pinned: Vec<(String, PathBuf)>,
+    /// The command runs in the sandbox (T39).
+    pub sandboxed: bool,
+}
+
 pub(in crate::tool_io) fn claim_command(
     s: &SessionIo,
     p: &ExecRunParams,
     peer: &Peer,
     cwd: &Path,
-) -> Result<Vec<(String, PathBuf)>, ErrorObject> {
+) -> Result<Claimed, ErrorObject> {
     let origin = p.origin.as_ref().ok_or_else(mismatch)?;
     let mut state = lock(&s.policy);
     let grant = state
@@ -355,11 +367,14 @@ pub(in crate::tool_io) fn claim_command(
             }
         }
     }
-    Ok(state
+    state
         .grants
         .remove(&origin.tool_call_id)
-        .map(|g| g.programs)
-        .unwrap_or_default())
+        .map(|g| Claimed {
+            pinned: g.programs,
+            sandboxed: g.sandboxed,
+        })
+        .ok_or_else(mismatch)
 }
 
 /// Whether the approved call asked to run in the background (T32), which running in a
@@ -380,7 +395,7 @@ pub(in crate::tool_io) fn claim_monitor(
     p: &piarc_protocol::tasks::ExecMonitorParams,
     peer: &Peer,
     cwd: &Path,
-) -> Result<Vec<(String, PathBuf)>, ErrorObject> {
+) -> Result<Claimed, ErrorObject> {
     let origin = p.origin.as_ref().ok_or_else(mismatch)?;
     let mut state = lock(&s.policy);
     let grant = state
@@ -399,11 +414,14 @@ pub(in crate::tool_io) fn claim_monitor(
     {
         return Err(mismatch());
     }
-    Ok(state
+    state
         .grants
         .remove(&origin.tool_call_id)
-        .map(|g| g.programs)
-        .unwrap_or_default())
+        .map(|g| Claimed {
+            pinned: g.programs,
+            sandboxed: g.sandboxed,
+        })
+        .ok_or_else(mismatch)
 }
 
 fn timeout_matches(expected: Option<f64>, wire: Option<u64>) -> bool {

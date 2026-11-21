@@ -35,6 +35,9 @@ pub const SANDBOX_EXEC: &str = "/usr/bin/sandbox-exec";
 
 const BASE_POLICY: &str = include_str!("seatbelt/base.sbpl");
 
+/// The Agent Host's profile: fixed text, paths as parameters (`seatbelt/agent-host.sbpl`).
+const AGENT_HOST_POLICY: &str = include_str!("seatbelt/agent-host.sbpl");
+
 /// A generated profile and the parameters it reads.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SeatbeltProfile {
@@ -122,34 +125,30 @@ impl SeatbeltProfile {
         })
     }
 
-    /// The permissive profile of the Agent Host process and everything it starts (MCP
-    /// servers, npm, npx; ADR-0015, architecture section 10.3): everything is allowed except
-    /// writing files outside `writable` (canonical directories: the workspace, PiArc's data
-    /// directory) and the terminal devices. Reads and network stay open: the Agent Host reads
-    /// broadly and sends the model requests. T39 tightens it; until then it only keeps a
-    /// compromised Agent Host or MCP server from writing into the rest of the user's files.
+    /// The profile of the Agent Host process and everything it starts (MCP servers, npm, npx;
+    /// ADR-0004 rule 4, ADR-0015, architecture section 10.3): the fixed text of
+    /// `seatbelt/agent-host.sbpl` with `workspace` and `data_dir` (canonical directories) as
+    /// parameters. Writes go only to the workspace (its protected paths excepted), Pi's agent
+    /// directory, the Agent Host's own directory and the sessions' temporary directories;
+    /// reads and the network stay open.
     ///
     /// # Errors
     ///
     /// A path is not UTF-8.
-    pub fn agent_host(writable: &[PathBuf]) -> Result<Self> {
+    pub fn agent_host(workspace: &Path, data_dir: &Path, protected: &[String]) -> Result<Self> {
         let mut builder = Builder::default();
-        builder.line("(version 1)");
-        builder.section("PiArc Agent Host: permissive profile (ADR-0015; tightened in T39)");
-        builder.line("(allow default)");
-        builder.section("PiArc Agent Host: writes only inside these directories");
-        builder.line("(deny file-write*)");
-        let keys: Vec<String> = writable
-            .iter()
-            .enumerate()
-            .map(|(i, dir)| builder.param(&format!("WRITABLE_{i}"), dir))
-            .collect::<Result<_>>()?;
-        builder.rule("allow file-write*", keys.iter().map(|k| subpath(k)));
-        builder.line(
-            "(allow file-write-data (literal \"/dev/null\") (literal \"/dev/stdout\") \
-             (literal \"/dev/stderr\") (literal \"/dev/dtracehelper\") \
-             (regex #\"^/dev/tty\") (regex #\"^/dev/fd/[0-9]+$\"))",
-        );
+        builder.text.push_str(AGENT_HOST_POLICY);
+        builder.param("WORKSPACE", workspace)?;
+        builder.raw_param("WORKSPACE_RE", regex_escape(utf8(workspace)?));
+        builder.param("PI_DIR", &data_dir.join("pi"))?;
+        builder.param("AGENT_HOST_DIR", &data_dir.join("agent-host"))?;
+        builder.raw_param("DATA_RE", regex_escape(utf8(data_dir)?));
+        let pattern = alternation(protected.iter().map(|p| glob_regex(p)))
+            .map_or_else(|| "^$".to_owned(), |p| format!("/(.*/)?({p})(/.*)?$"));
+        builder.raw_param("PROTECTED_RE", pattern);
+        let anchors = alternation(protected.iter().flat_map(|p| literal_prefixes(p)))
+            .map_or_else(|| "^$".to_owned(), |a| format!("/(.*/)?({a})$"));
+        builder.raw_param("ANCHORS_RE", anchors);
         Ok(Self {
             text: builder.text,
             params: builder.params,
@@ -366,12 +365,15 @@ mod tests {
         assert_eq!(snapshot, expected);
     }
 
+    /// T39-A10: the golden of the Agent Host's profile (the template and its parameters).
     #[test]
     fn agent_host_profile_snapshot() {
-        let profile = SeatbeltProfile::agent_host(&[
-            PathBuf::from("/Users/dev/项目 one"),
-            PathBuf::from("/Users/dev/Library/Application Support/PiArc"),
-        ])
+        let protected: Vec<String> = PROTECTED_PATHS.iter().map(|&p| p.to_owned()).collect();
+        let profile = SeatbeltProfile::agent_host(
+            Path::new("/Users/dev/项目 one"),
+            Path::new("/Users/dev/Library/Application Support/PiArc"),
+            &protected,
+        )
         .expect("builds");
         assert!(
             !profile.text.contains("项目"),

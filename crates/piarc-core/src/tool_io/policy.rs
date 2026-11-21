@@ -35,7 +35,9 @@ pub(crate) struct Services {
 struct Pending {
     call: String,
     reply: oneshot::Sender<(ApprovalAnswer, oneshot::Sender<Result<(), ErrorObject>>)>,
-    peer: Peer,
+    /// The connection whose call waits; none for a network-domain card (T39), which the
+    /// sandbox's proxy raises for a running command.
+    peer: Option<Peer>,
 }
 
 mod assess;
@@ -52,8 +54,12 @@ mod questions;
 mod reasons;
 mod waits;
 use prepare::{new_request, path_boundary, prepare};
-use reasons::{LOST, argument_summary, audit_detail, check_permanent, refusal_of};
+use reasons::{
+    LOST, argument_summary, audit_detail, check_network, check_permanent, check_unsandboxed,
+    refusal_of,
+};
 use waits::{post_card, wait_for_user, withdraw_card};
+pub(super) use waits::{post_network_card, withdraw_network_card};
 pub(crate) mod settings_view;
 use grants::Grant;
 pub(super) use grants::{
@@ -164,12 +170,17 @@ impl State {
         if !keep_memory && let Some((_, scan)) = self.memory_scan.take() {
             scan.cancel();
         }
+        // A network-domain card belongs to a running command, which may be a background one
+        // that outlives the turn and the connection: it ends with its answer or timeout (T39).
         for (_, pending) in self.ledger.cancel_session_if(id, |r| {
             !(keep_memory
                 && r.kind == ApprovalKind::PermissionExpansion
                 && r.tool == "MemoryImport")
+                && r.tool != piarc_protocol::policy::NETWORK_TOOL
         }) {
-            if matches!(cause, Cleanup::Disconnected) || pending.peer.is_closed() {
+            if matches!(cause, Cleanup::Disconnected)
+                || pending.peer.as_ref().is_some_and(Peer::is_closed)
+            {
                 self.expired.insert(pending.call);
             }
         }
@@ -315,7 +326,9 @@ impl ToolIo {
         state.inputs.cancel(call, peer);
         if state
             .ledger
-            .take_if(|_, p| p.call == call && p.peer.same_connection(peer))
+            .take_if(|_, p| {
+                p.call == call && p.peer.as_ref().is_some_and(|p| p.same_connection(peer))
+            })
             .is_some()
         {
             state.publish(id, self.services()?);
@@ -369,16 +382,19 @@ impl ToolIo {
                     ApprovalKind::Plan => plan::check_answer(request, &answer)?,
                     _ => {}
                 }
-                if answer.decision == ApprovalDecision::AllowAlways {
+                if request.tool == piarc_protocol::policy::NETWORK_TOOL {
+                    check_network(request, &answer)?;
+                } else if answer.decision == ApprovalDecision::AllowAlways {
                     check_permanent(request, &answer)?;
                 }
+                check_unsandboxed(request, &answer)?;
             }
             let (request, pending) = match state.ledger.claim(&answer) {
                 Ok(p) => p,
                 Err(status) => return Ok(json!({"status": status})),
             };
             state.publish(&request.session_id, self.services()?);
-            if pending.peer.is_closed() {
+            if pending.peer.as_ref().is_some_and(Peer::is_closed) {
                 state.expired.insert(pending.call);
                 return Ok(json!({"status":AnswerStatus::Stale}));
             }
@@ -527,10 +543,17 @@ impl ToolIo {
         peer: &Peer,
     ) -> Result<Prepared, ErrorObject> {
         let rules = rules_of(s, settings);
-        let programs = if p.tool == "Bash" || p.tool == "Monitor" {
-            Some(self.exec.programs().await)
+        let (programs, sandbox) = if p.tool == "Bash" || p.tool == "Monitor" {
+            let sandbox = self.sandbox_with(s, Some(settings));
+            if sandbox.resolved.enabled && !sandbox.available {
+                self.tell_unavailable();
+            }
+            (
+                Some(self.exec.programs().await),
+                sandbox.for_call(&p.tool, &p.input),
+            )
         } else {
-            None
+            (None, super::sandbox::CallSandbox::default())
         };
         prepare(
             Arc::clone(s),
@@ -539,6 +562,7 @@ impl ToolIo {
             peer.clone(),
             programs,
             rules,
+            sandbox,
         )
         .await
     }
@@ -548,6 +572,7 @@ impl ToolIo {
 /// checks that ask whatever the mode.
 const RULE_ASKS: &[&str] = &[
     "askRule",
+    "unsandboxed",
     "criticalPath",
     "unresolved",
     "invalidRule",

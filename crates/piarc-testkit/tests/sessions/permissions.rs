@@ -39,6 +39,7 @@ fn allow(card: &ApprovalRequest) -> ApprovalAnswer {
         decision: ApprovalDecision::AllowOnce,
         rules: Vec::new(),
         directory: None,
+        domain: None,
         feedback: None,
         mode: None,
         comments: Vec::new(),

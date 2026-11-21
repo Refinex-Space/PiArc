@@ -85,6 +85,7 @@ async fn approve(core: &piarc_core::CoreRuntime, events: &crate::support::Events
         decision: ApprovalDecision::AllowOnce,
         rules: Vec::new(),
         directory: None,
+        domain: None,
         feedback: None,
         mode: None,
         comments: Vec::new(),

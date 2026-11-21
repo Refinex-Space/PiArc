@@ -179,6 +179,30 @@ pub struct ApprovalRequest {
     /// lists it with its own approvals; the answer goes to `session_id` (the subagent).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subagent: Option<crate::subagent::ApprovalOrigin>,
+    /// Where an approved command runs (T39): in the sandbox, or outside it at the model's
+    /// request (`dangerouslyDisableSandbox`), which the card shows with the full command and
+    /// answers only with `allowOnce` or `deny`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sandbox: Option<CommandPlace>,
+    /// The host a sandboxed command asks to reach outside the network allowlist (a
+    /// `permissionExpansion` card for tool [`NETWORK_TOOL`], T39). `allowOnce` lets this
+    /// connection through, `allowSession` the host for the session, `allowAlways` adds it to
+    /// the user's allowlist; `deny` and no answer within the timeout refuse the connection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub domain: Option<String>,
+}
+
+/// The tool name of a network-domain card (T39): no tool call asks, the sandbox's proxy does.
+pub const NETWORK_TOOL: &str = "SandboxNetwork";
+
+/// Where an approved command runs (T39).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum CommandPlace {
+    /// In the sandbox.
+    Sandbox,
+    /// Outside the sandbox, as the model asked.
+    Unsandboxed,
 }
 
 /// Answer bound to the request as displayed.
@@ -204,6 +228,10 @@ pub struct ApprovalAnswer {
     /// Directory shown in the native confirmation dialog.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub directory: Option<String>,
+    /// The host the native confirmation dialog showed for a network-domain card's
+    /// `allowAlways` (T39): it must be the card's `domain`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub domain: Option<String>,
     /// The mode an approved plan continues in: `acceptEdits` or `default`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mode: Option<PermissionMode>,

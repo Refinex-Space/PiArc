@@ -23,6 +23,8 @@ pub(super) fn new_request(
         plan: None,
         questions: Vec::new(),
         subagent: None,
+        sandbox: None,
+        domain: None,
     })
 }
 
@@ -37,6 +39,7 @@ pub(super) async fn prepare(
     peer: Peer,
     programs: Option<exec::utility::Programs>,
     rules: Arc<RuleSet>,
+    sandbox: crate::tool_io::sandbox::CallSandbox,
 ) -> Result<Prepared, ErrorObject> {
     let dirs: Vec<PathBuf> = settings
         .get("/permissions/additionalDirectories")
@@ -90,6 +93,18 @@ pub(super) async fn prepare(
                 grant.cwd = Some(cwd);
                 grant.command = Some(cmd.to_owned());
                 grant.scope = Some(scope.clone());
+                // T39: where the command runs is part of what is approved.
+                grant.sandboxed = sandbox.sandboxed;
+                card.sandbox = if sandbox.unsandboxed {
+                    Some(piarc_protocol::policy::CommandPlace::Unsandboxed)
+                } else {
+                    sandbox
+                        .sandboxed
+                        .then_some(piarc_protocol::policy::CommandPlace::Sandbox)
+                };
+                let mut assessment = assessment;
+                assessment.input.sandbox_auto = sandbox.auto;
+                assessment.input.unsandboxed = sandbox.unsandboxed;
                 assessment
             }
             "Read" | "Glob" | "Grep" | "Write" | "Edit" => {
@@ -132,6 +147,10 @@ pub(super) async fn prepare(
             // An MCP tool marked `requiresUserInteraction` (T36): every call asks, in every
             // mode, and the card offers no session or permanent allow.
             assess::requires_user_interaction(&mut assessment);
+            card.protected_path = Some(true);
+        }
+        if sandbox.unsandboxed {
+            // Outside the sandbox (T39): allowed once or refused, never remembered.
             card.protected_path = Some(true);
         }
         if card.protected_path != Some(true) {

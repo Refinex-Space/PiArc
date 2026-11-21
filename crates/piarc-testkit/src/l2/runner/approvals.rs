@@ -98,6 +98,7 @@ impl Driver<'_> {
             feedback: expected.feedback.clone(),
             rules: card.rules,
             directory: card.directory,
+            domain: None,
             mode: expected.mode,
             comments,
             answers: harness::question_answers(expected),

@@ -15,7 +15,9 @@ use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper_util::rt::TokioIo;
 use piarc_ports::BoxFuture;
-use piarc_sandbox::proxy::{Allowlist, DENIED_HEADER, Network, NetworkProxy};
+use piarc_sandbox::proxy::{
+    Allowlist, DENIED_HEADER, DenyReason, Network, NetworkProxy, ProxyHooks, ProxyLimits, Refused,
+};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -103,6 +105,14 @@ async fn echo_upstream() -> u16 {
 }
 
 async fn proxy(allow: &[&str]) -> NetworkProxy {
+    proxy_with(allow, None, ProxyLimits::default()).await
+}
+
+async fn proxy_with(
+    allow: &[&str],
+    hooks: Option<Arc<dyn ProxyHooks>>,
+    limits: ProxyLimits,
+) -> NetworkProxy {
     let http = http_upstream().await;
     let echo = echo_upstream().await;
     let names = HashMap::from([
@@ -117,12 +127,36 @@ async fn proxy(allow: &[&str]) -> NetworkProxy {
         ("v6-loopback.example.org", "::1".parse().expect("ip")),
     ]);
     let routes = HashMap::from([(IpAddr::from(HTTP_IP), http), (IpAddr::from(ECHO_IP), echo)]);
-    NetworkProxy::start(
-        Allowlist::new(allow).expect("valid allowlist"),
-        Arc::new(TestNetwork { names, routes }),
-    )
-    .await
+    let allowlist = Allowlist::new(allow).expect("valid allowlist");
+    let network = Arc::new(TestNetwork { names, routes });
+    match hooks {
+        Some(hooks) => NetworkProxy::start_with(allowlist, network, hooks, limits).await,
+        None => NetworkProxy::start(allowlist, network).await,
+    }
     .expect("proxy starts")
+}
+
+/// Answers unlisted hosts from a list and records what it was asked and told.
+#[derive(Default)]
+struct Recorder {
+    allow: Vec<&'static str>,
+    asked: std::sync::Mutex<Vec<String>>,
+    refused: std::sync::Mutex<Vec<Refused>>,
+}
+
+impl ProxyHooks for Recorder {
+    fn unlisted<'a>(&'a self, host: &'a str, port: u16) -> BoxFuture<'a, bool> {
+        self.asked
+            .lock()
+            .expect("asked")
+            .push(format!("{host}:{port}"));
+        let allowed = self.allow.contains(&host);
+        Box::pin(async move { allowed })
+    }
+
+    fn refused(&self, refused: &Refused) {
+        self.refused.lock().expect("refused").push(refused.clone());
+    }
 }
 
 /// A response's status line, headers (lower-case names) and body.
@@ -341,4 +375,136 @@ async fn dropping_the_proxy_closes_its_port() {
         assert!(std::time::Instant::now() < deadline, "still listening");
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }
+}
+
+/// T39-A05: a changed allowlist applies to the next connection of the running proxy.
+#[tokio::test]
+async fn a_new_allowlist_applies_to_the_next_connection() {
+    let proxy = proxy(&["registry.npmjs.org"]).await;
+    let reply = http_get(&proxy, "http://evil.test/", "evil.test").await;
+    assert_eq!(reply.status, 403);
+    proxy.set_allowlist(Allowlist::new(["evil.test"]).expect("valid"));
+    let reply = http_get(&proxy, "http://evil.test/", "evil.test").await;
+    assert_eq!(reply.status, 200, "{}", reply.body);
+    let reply = http_get(&proxy, "http://registry.npmjs.org/", "registry.npmjs.org").await;
+    assert_eq!(reply.status, 403, "the old entry is gone");
+}
+
+/// T39-A14 (proxy side): a host outside the allowlist is put to the hooks; their answer
+/// decides that one connection, and every refusal is reported.
+#[tokio::test]
+async fn unlisted_hosts_are_asked_about_and_refusals_reported() {
+    let hooks = Arc::new(Recorder {
+        allow: vec!["tunnel.example.org", "localhost.example.org"],
+        ..Recorder::default()
+    });
+    let proxy = proxy_with(
+        &["registry.npmjs.org"],
+        Some(hooks.clone()),
+        ProxyLimits::default(),
+    )
+    .await;
+    let reply = connect(&proxy, "tunnel.example.org:443").await;
+    assert_eq!(reply.status, 200, "{}", reply.body);
+    let reply = http_get(&proxy, "http://evil.test/x", "evil.test").await;
+    assert_eq!(reply.status, 403);
+    assert_eq!(reply.header(DENIED_HEADER), Some("not-allowed"));
+    let reply = http_get(&proxy, "http://registry.npmjs.org/", "registry.npmjs.org").await;
+    assert_eq!(reply.status, 200, "listed hosts are not asked about");
+    let reply = connect(&proxy, "localhost.example.org:443").await;
+    assert_eq!(
+        reply.status, 403,
+        "an allowed name still may not reach loopback"
+    );
+    assert_eq!(
+        *hooks.asked.lock().expect("asked"),
+        [
+            "tunnel.example.org:443",
+            "evil.test:80",
+            "localhost.example.org:443"
+        ]
+    );
+    let refused: Vec<(String, u16, DenyReason)> = hooks
+        .refused
+        .lock()
+        .expect("refused")
+        .iter()
+        .map(|r| (r.host.clone(), r.port, r.reason))
+        .collect();
+    assert_eq!(
+        refused,
+        [
+            ("evil.test".to_owned(), 80, DenyReason::NotAllowed),
+            (
+                "localhost.example.org".to_owned(),
+                443,
+                DenyReason::BlockedAddress
+            ),
+        ]
+    );
+}
+
+/// R1 I54: a forwarded request carries its target's host, not the one the client wrote.
+#[tokio::test]
+async fn a_forwarded_request_carries_the_targets_host() {
+    let proxy = proxy(&["registry.npmjs.org"]).await;
+    let reply = http_get(&proxy, "http://registry.npmjs.org/a", "evil.test").await;
+    assert_eq!(reply.status, 200, "{}", reply.body);
+    assert_eq!(reply.body, "GET /a host=registry.npmjs.org");
+}
+
+/// R1 I54: a tunnel without traffic is closed after the idle limit.
+#[tokio::test]
+async fn an_idle_tunnel_is_closed() {
+    let limits = ProxyLimits {
+        idle_timeout: std::time::Duration::from_millis(300),
+        ..ProxyLimits::default()
+    };
+    let proxy = proxy_with(
+        &["tunnel.example.org"],
+        Some(Arc::new(Recorder::default())),
+        limits,
+    )
+    .await;
+    let mut stream = TcpStream::connect(("127.0.0.1", proxy.port()))
+        .await
+        .expect("connects");
+    stream
+        .write_all(
+            b"CONNECT tunnel.example.org:443 HTTP/1.1\r\nHost: tunnel.example.org:443\r\n\r\n",
+        )
+        .await
+        .expect("writes");
+    let (status, _, _) = read_head(&mut stream).await;
+    assert_eq!(status, 200);
+    let mut buf = [0_u8; 16];
+    let read = tokio::time::timeout(std::time::Duration::from_secs(5), stream.read(&mut buf))
+        .await
+        .expect("the tunnel closes before the safety net");
+    assert_eq!(read.expect("reads"), 0, "closed without data");
+}
+
+/// R1 I54: a client that never finishes its request head is disconnected.
+#[tokio::test]
+async fn a_slow_request_head_is_cut_off() {
+    let limits = ProxyLimits {
+        header_timeout: std::time::Duration::from_millis(300),
+        ..ProxyLimits::default()
+    };
+    let proxy = proxy_with(&[], Some(Arc::new(Recorder::default())), limits).await;
+    let mut stream = TcpStream::connect(("127.0.0.1", proxy.port()))
+        .await
+        .expect("connects");
+    stream
+        .write_all(b"GET http://evil.test/ HTTP/1.1\r\n")
+        .await
+        .expect("writes");
+    let mut rest = Vec::new();
+    tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        stream.read_to_end(&mut rest),
+    )
+    .await
+    .expect("the proxy closes before the safety net")
+    .expect("reads");
 }

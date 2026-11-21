@@ -6,12 +6,15 @@
 //! 2. PreToolUse hooks (slot, T25): deny → deny; ask → step 4; allow → step 6
 //! 3. deny rules                                     → deny
 //!    ExitPlanMode: plan mode → ask (the plan card); any other mode → deny
+//!    a command to run outside the sandbox (T39): plan mode + a write → deny; otherwise ask,
+//!    in every mode, and no PermissionRequest hook answers it
 //! 4. ask rules, critical deletion, unresolved command, requiresUserInteraction → ask
 //! 5. mode: plan + a write → deny with "present the plan"; bypassPermissions → allow
 //!    then protected path writes (Manual, Accept edits) → ask
 //! 6. allow rules (all parts; a wildcard command rule does not take outside paths,
 //!    ADR-0047: `bash::judge` and Core report those as outside), hook allow → allow
-//! 7. mode defaults: outside → ask; read-only → allow; Accept edits edits → allow
+//! 7. mode defaults: a sandboxed command with auto-approval on → allow (T39); outside → ask;
+//!    read-only → allow; Accept edits edits → allow
 //! 8. PermissionRequest hooks (slot, T25) → user
 //! ```
 
@@ -98,6 +101,14 @@ pub struct Input {
     pub read_only: bool,
     /// Step 7: what Accept edits takes.
     pub accept_edit: bool,
+    /// Step 7 (T39): the command runs in the sandbox and sandboxed commands skip the approval
+    /// (`sandbox.autoAllowBashIfSandboxed`). Deny and ask rules, critical deletions, unresolved
+    /// commands, plan mode and protected paths still come first.
+    pub sandbox_auto: bool,
+    /// After step 3 (T39): the model asks to run the command outside the sandbox
+    /// (`dangerouslyDisableSandbox`). Asks in every mode, bypass and sandbox auto-approval
+    /// included; only the user answers.
+    pub unsandboxed: bool,
 }
 
 /// The decision, with the step and rules recorded in the audit.
@@ -152,6 +163,16 @@ pub fn decide(input: &Input) -> Ruling {
             Ruling::new(Deny, "notInPlanMode", Vec::new())
         };
     }
+    if input.unsandboxed {
+        if input.mode == PermissionMode::Plan && input.write {
+            return Ruling::new(Deny, "planMode", Vec::new());
+        }
+        return Ruling::new(
+            Ask,
+            "unsandboxed",
+            input.ask.iter().filter_map(|a| a.hit.clone()).collect(),
+        );
+    }
     if let Some(ask) = &input.ask {
         return Ruling::new(Ask, ask.step, ask.hit.iter().cloned().collect());
     }
@@ -176,6 +197,9 @@ pub fn decide(input: &Input) -> Ruling {
             return Ruling::new(Allow, "hookAllow", Vec::new());
         }
     }
+    if input.sandbox_auto {
+        return Ruling::new(Allow, "sandboxAutoAllow", Vec::new());
+    }
     if input.outside {
         return Ruling::new(Ask, "outsideWorkspace", Vec::new());
     }
@@ -191,14 +215,15 @@ pub fn decide(input: &Input) -> Ruling {
 }
 
 /// Step 8: the PermissionRequest slot answers before the user sees the card. It cannot
-/// approve a critical deletion, a tool that needs the user's own input or a plan (the user
-/// chooses the mode to continue in).
+/// approve a critical deletion, a tool that needs the user's own input, a plan (the user
+/// chooses the mode to continue in) or a command outside the sandbox (T39: only the user
+/// answers that); a hook's refusal of the latter does not count either.
 #[must_use]
 pub fn after_permission_request(ruling: Ruling, verdict: &HookVerdict) -> Ruling {
     if ruling.outcome != Outcome::Ask
         || matches!(
             ruling.step,
-            "criticalPath" | "requiresUserInteraction" | "planApproval"
+            "criticalPath" | "requiresUserInteraction" | "planApproval" | "unsandboxed"
         )
     {
         return ruling;

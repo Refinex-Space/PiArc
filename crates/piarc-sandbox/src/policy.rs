@@ -143,7 +143,7 @@ pub(crate) fn resolve_existing(path: &Path) -> Result<PathBuf> {
 
 /// The canonical form of a path that may not exist: the longest existing ancestor resolved,
 /// the rest appended after removing `.` and `..` lexically.
-fn resolve_maybe_missing(path: &Path) -> Result<PathBuf> {
+pub(crate) fn resolve_maybe_missing(path: &Path) -> Result<PathBuf> {
     if !path.is_absolute() {
         return Err(Error::NotAbsolute {
             path: path.to_path_buf(),

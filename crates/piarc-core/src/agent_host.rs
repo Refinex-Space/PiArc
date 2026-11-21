@@ -7,8 +7,11 @@
 //!
 //! A packaged app starts the Agent Host from its own resources ([`BundledRuntime`],
 //! [`start_bundled`]): the bundled Node, `PI_PACKAGE_DIR` set to `pi-assets/`, the bundled
-//! Node's directory and rg/fd first on `PATH`; on macOS under `/usr/bin/sandbox-exec` with the
-//! permissive profile of `piarc_sandbox::agent_host_launch` (ADR-0015).
+//! Node's directory and rg/fd first on `PATH`. Every start on macOS, packaged or from a
+//! development bundle ([`AgentHostLaunch::Custom`]), goes through `/usr/bin/sandbox-exec` with
+//! the profile of `piarc_sandbox::agent_host_launch` (ADR-0015, finalized in T39), with
+//! `TMPDIR`, the npm cache and `XDG_CACHE_HOME` in the Agent Host's directory of the data
+//! directory ([`agent_host_env`]), where the profile lets it and its children write.
 
 use std::ffi::{OsStr, OsString};
 use std::io;
@@ -115,12 +118,17 @@ pub fn start_for(
             extra_args,
             extra_env,
         } => {
-            let mut config = HostConfig::new(workspace, data_dir, node.clone(), bundle.clone());
+            prepare_dirs(&data_dir)?;
+            let spawner = platform_spawner(&workspace, &data_dir)?;
+            let mut config =
+                HostConfig::new(workspace, data_dir.clone(), node.clone(), bundle.clone());
             config.pi_package_dir.clone_from(pi_package_dir);
             config.extra_args.clone_from(extra_args);
-            config.extra_env.clone_from(extra_env);
+            config.env_passthrough.retain(|name| name != "TMPDIR");
+            config.extra_env = agent_host_env(&data_dir);
+            config.extra_env.extend(extra_env.iter().cloned());
             tune(&mut config);
-            Ok(start(config, inbound))
+            Ok(start_with(config, inbound, spawner))
         }
     }
 }
@@ -241,9 +249,9 @@ impl BundledRuntime {
     /// `TMPDIR`, plus:
     /// - `PATH`: the bundled Node's directory and `bin/` (rg, fd) before Core's own `PATH`, so
     ///   `npx` and the MCP servers it starts run on the bundled Node (ADR-0015 rule 6);
-    /// - `TMPDIR`, `npm_config_cache`: inside [`agent_host_dirs`], which the Seatbelt profile
-    ///   lets the Agent Host write;
-    /// - `npm_config_update_notifier=false`: npm never checks for its own updates.
+    /// - [`agent_host_env`]: `TMPDIR`, `npm_config_cache` and `XDG_CACHE_HOME` inside the Agent
+    ///   Host's directory, which the Seatbelt profile lets it write, and
+    ///   `npm_config_update_notifier=false` (npm never checks for its own updates).
     ///
     /// # Errors
     ///
@@ -255,7 +263,7 @@ impl BundledRuntime {
         data_dir: PathBuf,
         lookup: &dyn Fn(&OsStr) -> Option<OsString>,
     ) -> Result<HostConfig> {
-        let (tmp, npm_cache) = agent_host_dirs(&data_dir);
+        let env = agent_host_env(&data_dir);
         let mut config = HostConfig::new(workspace, data_dir, self.node(), self.bundle());
         config.pi_package_dir = Some(self.pi_package_dir());
         config
@@ -268,18 +276,8 @@ impl BundledRuntime {
         let path = std::env::join_paths(path).map_err(|e| CoreError::BundledRuntime {
             reason: format!("cannot build PATH: {e}"),
         })?;
-        config.extra_env = vec![
-            (OsString::from("PATH"), path),
-            (OsString::from("TMPDIR"), tmp.into_os_string()),
-            (
-                OsString::from("npm_config_cache"),
-                npm_cache.into_os_string(),
-            ),
-            (
-                OsString::from("npm_config_update_notifier"),
-                OsString::from("false"),
-            ),
-        ];
+        config.extra_env = vec![(OsString::from("PATH"), path)];
+        config.extra_env.extend(env);
         Ok(config)
     }
 }
@@ -290,6 +288,41 @@ impl BundledRuntime {
 pub fn agent_host_dirs(data_dir: &Path) -> (PathBuf, PathBuf) {
     let base = data_dir.join("agent-host");
     (base.join("tmp"), base.join("npm-cache"))
+}
+
+/// The variables that keep the Agent Host's and its children's writes in its own directory
+/// (`TMPDIR`, `npm_config_cache`, `XDG_CACHE_HOME`), which its Seatbelt profile lets them
+/// write, and keep npm from checking for its own updates (T39).
+#[must_use]
+pub fn agent_host_env(data_dir: &Path) -> Vec<(OsString, OsString)> {
+    let (tmp, npm_cache) = agent_host_dirs(data_dir);
+    vec![
+        (OsString::from("TMPDIR"), tmp.into_os_string()),
+        (
+            OsString::from("npm_config_cache"),
+            npm_cache.into_os_string(),
+        ),
+        (
+            OsString::from("XDG_CACHE_HOME"),
+            data_dir.join("agent-host").join("cache").into_os_string(),
+        ),
+        (
+            OsString::from("npm_config_update_notifier"),
+            OsString::from("false"),
+        ),
+    ]
+}
+
+/// Creates the directories the Agent Host writes: Pi's agent directory and its own.
+fn prepare_dirs(data_dir: &Path) -> Result<()> {
+    let (tmp, npm_cache) = agent_host_dirs(data_dir);
+    let cache = data_dir.join("agent-host").join("cache");
+    for dir in [&data_dir.join("pi"), &tmp, &npm_cache, &cache] {
+        std::fs::create_dir_all(dir).map_err(|e| CoreError::BundledRuntime {
+            reason: format!("cannot create {}: {e}", dir.display()),
+        })?;
+    }
+    Ok(())
 }
 
 /// Starts supervising the Agent Host of a packaged app for one workspace: settings from
@@ -317,12 +350,7 @@ fn bundled(
     inbound: SharedInbound,
     tune: &dyn Fn(&mut HostConfig),
 ) -> Result<(HostSupervisor, HostEvents)> {
-    let (tmp, npm_cache) = agent_host_dirs(&data_dir);
-    for dir in [&tmp, &npm_cache] {
-        std::fs::create_dir_all(dir).map_err(|e| CoreError::BundledRuntime {
-            reason: format!("cannot create {}: {e}", dir.display()),
-        })?;
-    }
+    prepare_dirs(&data_dir)?;
     let spawner = platform_spawner(&workspace, &data_dir)?;
     let mut config = runtime.host_config(workspace, data_dir, &|name| std::env::var_os(name))?;
     tune(&mut config);
@@ -331,11 +359,11 @@ fn bundled(
 
 #[cfg(target_os = "macos")]
 fn platform_spawner(workspace: &Path, data_dir: &Path) -> Result<Arc<dyn ProcessSpawner>> {
-    let launch =
-        piarc_sandbox::agent_host_launch(&[workspace.to_path_buf(), data_dir.to_path_buf()])
-            .map_err(|e| CoreError::BundledRuntime {
-                reason: format!("cannot build the Agent Host's Seatbelt profile: {e}"),
-            })?;
+    let launch = piarc_sandbox::agent_host_launch(workspace, data_dir).map_err(|e| {
+        CoreError::BundledRuntime {
+            reason: format!("cannot build the Agent Host's Seatbelt profile: {e}"),
+        }
+    })?;
     Ok(Arc::new(LauncherSpawner {
         program: launch.program,
         args: launch.args,

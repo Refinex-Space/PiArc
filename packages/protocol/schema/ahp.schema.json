@@ -412,6 +412,10 @@
           "description": "Directory shown in the native confirmation dialog.",
           "type": ["string", "null"]
         },
+        "domain": {
+          "description": "The host the native confirmation dialog showed for a network-domain card's\n`allowAlways` (T39): it must be the card's `domain`.",
+          "type": ["string", "null"]
+        },
         "feedback": {
           "description": "Feedback to return on refusal.",
           "type": ["string", "null"]
@@ -562,6 +566,10 @@
           "description": "Suggested directory to add.",
           "type": ["string", "null"]
         },
+        "domain": {
+          "description": "The host a sandboxed command asks to reach outside the network allowlist (a\n`permissionExpansion` card for tool [`NETWORK_TOOL`], T39). `allowOnce` lets this\nconnection through, `allowSession` the host for the session, `allowAlways` adds it to\nthe user's allowlist; `deny` and no answer within the timeout refuse the connection.",
+          "type": ["string", "null"]
+        },
         "kind": {
           "$ref": "#/$defs/ApprovalKind",
           "description": "Which card to show."
@@ -601,6 +609,17 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "sandbox": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CommandPlace"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where an approved command runs (T39): in the sandbox, or outside it at the model's\nrequest (`dangerouslyDisableSandbox`), which the card shows with the full command and\nanswers only with `allowOnce` or `deny`."
         },
         "sessionId": {
           "description": "Owning session.",
@@ -1325,6 +1344,21 @@
       },
       "required": ["head", "totalChars"],
       "type": "object"
+    },
+    "CommandPlace": {
+      "description": "Where an approved command runs (T39).",
+      "oneOf": [
+        {
+          "const": "sandbox",
+          "description": "In the sandbox.",
+          "type": "string"
+        },
+        {
+          "const": "unsandboxed",
+          "description": "Outside the sandbox, as the model asked.",
+          "type": "string"
+        }
+      ]
     },
     "CommandsList": {
       "description": "Result of `resources/listCommands`.",
@@ -2443,6 +2477,17 @@
             }
           ],
           "description": "The output the model sees."
+        },
+        "sandbox": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SandboxReport"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Present when the command ran in the sandbox (T39, architecture section 6.10): what the\nsandbox refused, as far as Core could tell."
         },
         "signal": {
           "description": "The terminating signal number on Unix, when a signal ended the command.",
@@ -8768,6 +8813,58 @@
         "text": {
           "description": "What the user wrote in the turn's first message, for the input box.",
           "type": ["string", "null"]
+        }
+      },
+      "type": "object"
+    },
+    "SandboxDenial": {
+      "description": "One thing the sandbox refused.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SandboxDenialKind",
+          "description": "What was refused."
+        },
+        "target": {
+          "description": "The path (`read`, `write`) or `host:port` (`network`).",
+          "type": "string"
+        }
+      },
+      "required": ["kind", "target"],
+      "type": "object"
+    },
+    "SandboxDenialKind": {
+      "description": "The kinds of [`SandboxDenial`].",
+      "oneOf": [
+        {
+          "const": "read",
+          "description": "Reading a `denyRead` path.",
+          "type": "string"
+        },
+        {
+          "const": "write",
+          "description": "Writing outside the writable directories or a protected path.",
+          "type": "string"
+        },
+        {
+          "const": "network",
+          "description": "Reaching a host the allowlist does not name (and the user did not allow), or one that\nresolves to a refused address.",
+          "type": "string"
+        }
+      ]
+    },
+    "SandboxReport": {
+      "description": "What the sandbox did to one command (T39).",
+      "properties": {
+        "denials": {
+          "description": "What the sandbox refused: paths named in the command's failure output that its policy\nforbids, and hosts the proxy refused while it ran. Empty when nothing was recognized.",
+          "items": {
+            "$ref": "#/$defs/SandboxDenial"
+          },
+          "type": "array"
+        },
+        "failedToStart": {
+          "description": "The sandbox itself could not start, so the command did not run; later commands run\nwithout it and go through the normal approval (risk R10).",
+          "type": "boolean"
         }
       },
       "type": "object"

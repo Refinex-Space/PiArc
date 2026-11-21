@@ -3,7 +3,7 @@
 //! ends with the answer, the end of the connection or the interruption of the turn.
 use super::*;
 
-pub(super) type Answered = (ApprovalAnswer, oneshot::Sender<Result<(), ErrorObject>>);
+pub(in crate::tool_io) type Answered = (ApprovalAnswer, oneshot::Sender<Result<(), ErrorObject>>);
 
 pub(super) async fn wait_for_user(
     s: &SessionIo,
@@ -54,7 +54,7 @@ pub(super) async fn post_card(
             Pending {
                 call: call.to_owned(),
                 reply: tx,
-                peer: peer.clone(),
+                peer: Some(peer.clone()),
             },
         ) {
             return Err(denied("Duplicate approval request."));
@@ -91,4 +91,45 @@ pub(super) fn withdraw_card(
         .is_some();
     state.publish(&card.session_id, services);
     taken
+}
+
+/// Puts a network-domain card (T39) in the session's ledger: no Agent Host call waits on it,
+/// so there is no `policy/pending` and no connection to watch. False when the id is taken.
+pub(in crate::tool_io) fn post_network_card(
+    s: &SessionIo,
+    services: &Services,
+    card: &ApprovalRequest,
+    tx: oneshot::Sender<Answered>,
+) -> bool {
+    let mut state = lock(&s.policy);
+    let mut shown = card.clone();
+    shown.subagent = super::super::subagents::origin(s, &card.session_id);
+    let inserted = state.ledger.insert(
+        shown,
+        Pending {
+            call: format!("network:{}", card.request_id),
+            reply: tx,
+            peer: None,
+        },
+    );
+    if inserted {
+        state.publish(&card.session_id, services);
+    }
+    inserted
+}
+
+/// Takes an unanswered network-domain card back out of the ledger.
+pub(in crate::tool_io) fn withdraw_network_card(
+    s: &SessionIo,
+    services: &Services,
+    card: &ApprovalRequest,
+) {
+    let mut state = lock(&s.policy);
+    if state
+        .ledger
+        .take_if(|r, _| r.request_id == card.request_id)
+        .is_some()
+    {
+        state.publish(&card.session_id, services);
+    }
 }

@@ -1,7 +1,8 @@
 //! Terminals of a session through the tool I/O (T33, ADR-0050): a user's terminal for the
 //! panel, and `exec/run` with `terminal` for the model. Both start in the session's shell
-//! directory with the environment of its commands (T17, ADR-0035) and, in a sandboxed session,
-//! inside the same sandbox wrapper; `crate::terminal` runs them as background tasks.
+//! directory with the environment of its commands (T17, ADR-0035); the model's runs inside the
+//! sandbox wrapper when its call was judged to run sandboxed (T39), the user's never does.
+//! `crate::terminal` runs them as background tasks.
 
 use piarc_protocol::exec::{ExecRunParams, ExecRunResult};
 use piarc_protocol::tasks::{TaskStartReason, TaskStarted, TerminalOrigin};
@@ -53,7 +54,8 @@ impl ToolIo {
         request: UserTerminal,
     ) -> Result<Opened, ErrorObject> {
         let session = self.session(session_id)?;
-        let wrap = super::sandbox_wrap(&session)?;
+        // What the user types in their own terminal is theirs to run: never sandboxed (T39).
+        let wrap = Wrap::default();
         let cwd = lock(&session.shell_cwd).clone();
         let cwd = if cwd.is_dir() {
             cwd
@@ -151,6 +153,7 @@ impl ToolIo {
                 output_path: opened.output_path,
                 reason: TaskStartReason::Requested,
             }),
+            sandbox: None,
         })
     }
 

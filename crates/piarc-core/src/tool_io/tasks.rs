@@ -3,7 +3,6 @@
 
 use std::time::Duration;
 
-use piarc_exec::CommandSpec;
 use piarc_host::Peer;
 use piarc_protocol::ErrorObject;
 use piarc_protocol::exec::{ExecRunParams, ExecShell};
@@ -48,9 +47,18 @@ impl ToolIo {
         let session = self.session(&p.session_id.0)?;
         let mut launch = exec::launch_dir(&session, None)?;
         launch.tracked = false;
+        let mut sandboxed = session.sandbox.forced.is_some();
         if self.policy.is_some() {
-            launch.pinned = super::policy::claim_monitor(&session, &p, &peer, &launch.dir)?;
+            let claimed = super::policy::claim_monitor(&session, &p, &peer, &launch.dir)?;
+            launch.pinned = claimed.pinned;
+            sandboxed |= claimed.sandboxed;
         }
+        // The command runs in the sandbox like a background `exec/run` (T39).
+        let wrap = if sandboxed {
+            self.sandbox_launch(&session, &p.session_id.0).await?.0
+        } else {
+            exec::Wrap::default()
+        };
         let limits = *self.tasks.limits();
         let (timeout, capped) = limits.monitor_timeout(p.timeout_ms.map(Duration::from_millis));
         // The command's environment and wrapper are those of a background `exec/run`.
@@ -66,7 +74,10 @@ impl ToolIo {
             background: true,
             terminal: false,
         };
-        let spec = self.monitor_spec(&session, &run, &launch).await?;
+        let spec = self
+            .exec
+            .background_spec(&session, &run, &launch, wrap)
+            .await?;
         let place = self.place(&p.session_id.0, &session);
         let new = NewTask {
             session_id: place.session_id.clone(),
@@ -98,28 +109,6 @@ impl ToolIo {
             timeout_ms: millis(timeout),
             requested_timeout_ms: capped.then_some(p.timeout_ms).flatten(),
         })
-    }
-
-    async fn monitor_spec(
-        &self,
-        session: &SessionIo,
-        run: &ExecRunParams,
-        launch: &exec::Launch,
-    ) -> Result<CommandSpec, ErrorObject> {
-        let wrap = match &session.sandbox {
-            Some(sandbox) => {
-                let launch = sandbox.launch().map_err(|e| super::sandbox_error(&e))?;
-                exec::Wrap {
-                    launcher: Some(piarc_exec::Launcher {
-                        program: launch.program,
-                        args: launch.args,
-                    }),
-                    env: launch.env,
-                }
-            }
-            None => exec::Wrap::default(),
-        };
-        self.exec.background_spec(session, run, launch, wrap).await
     }
 
     /// Whether a Monitor may wake `session_id` when it is idle: the merged setting

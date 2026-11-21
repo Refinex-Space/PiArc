@@ -23,6 +23,42 @@ pub(super) fn check_permanent(
     Ok(())
 }
 
+/// A network-domain card (T39) takes every decision; its `allowAlways` must name the card's
+/// host, which the native confirmation showed.
+pub(super) fn check_network(
+    request: &ApprovalRequest,
+    answer: &ApprovalAnswer,
+) -> Result<(), ErrorObject> {
+    if answer.decision == ApprovalDecision::AllowAlways
+        && (answer.domain.is_none() || answer.domain != request.domain)
+    {
+        return Err(denied(
+            "Adding a domain to the allowlist must name the domain of the card.",
+        ));
+    }
+    Ok(())
+}
+
+/// A command outside the sandbox (T39) is allowed once or refused: no session or permanent
+/// allowance carries it to later calls.
+pub(super) fn check_unsandboxed(
+    request: &ApprovalRequest,
+    answer: &ApprovalAnswer,
+) -> Result<(), ErrorObject> {
+    let outside = request.sandbox == Some(piarc_protocol::policy::CommandPlace::Unsandboxed);
+    if outside
+        && matches!(
+            answer.decision,
+            ApprovalDecision::AllowSession | ApprovalDecision::AllowAlways
+        )
+    {
+        return Err(denied(
+            "A command outside the sandbox can only be allowed once.",
+        ));
+    }
+    Ok(())
+}
+
 pub(super) const LOST: &str = "Permission denied because the pending approval expired. Request a new approval before retrying.";
 
 fn refusal(prepared: &Prepared, case_insensitive: bool, feedback: Option<&str>) -> String {

@@ -107,6 +107,9 @@ pub struct CoreConfig {
     pub tasks: crate::tasks::TasksConfig,
     /// Worktree retention and its clocks (T35); tests move them.
     pub worktrees: crate::worktrees::WorktreeConfig,
+    /// The Bash sandbox's platform, proxy network, enterprise values and approval timeout
+    /// (T39); tests point the proxy at local servers and stand in for the enterprise.
+    pub sandbox: crate::tool_io::SandboxConfig,
 }
 
 /// A credential store for the vault's master key and the key's name in it.
@@ -143,6 +146,7 @@ impl Default for CoreConfig {
             web: crate::tool_io::WebConfig::default(),
             tasks: crate::tasks::TasksConfig::default(),
             worktrees: crate::worktrees::WorktreeConfig::default(),
+            sandbox: crate::tool_io::SandboxConfig::default(),
         }
     }
 }
@@ -686,6 +690,7 @@ fn state_tool_io(
                 .unwrap_or_else(crate::tool_io::CommandEnv::login_shell),
             clock: config.sessions.clock.clone(),
             web: config.web.clone(),
+            sandbox: config.sandbox.clone(),
             ..ToolIoConfig::new(data)
         },
         Some(events.clone()),

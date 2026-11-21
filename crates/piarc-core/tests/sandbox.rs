@@ -460,10 +460,12 @@ async fn killing_a_sandboxed_command_leaves_no_process() {
     println!("after kill, group {pgid}: {:?}", group_members(pgid));
 }
 
-/// Closing the session stops its proxy.
+/// Closing the session stops its proxy (started with its first sandboxed command, T39).
 #[tokio::test]
 async fn closing_the_session_stops_its_proxy() {
     let f = Fixture::new("close", &[]).await;
+    assert_eq!(f.io.sandbox_proxy_port("s1"), None, "no command ran yet");
+    f.run("true").await;
     let port = f.io.sandbox_proxy_port("s1").expect("a proxy");
     assert!(
         tokio::net::TcpStream::connect(("127.0.0.1", port))

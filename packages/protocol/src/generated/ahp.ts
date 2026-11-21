@@ -821,6 +821,10 @@ export type LineEndings = 'asWritten' | 'matchFile';
  */
 export type ExecShell = 'bash' | 'powershell';
 /**
+ * The kinds of [`SandboxDenial`].
+ */
+export type SandboxDenialKind = 'read' | 'write' | 'network';
+/**
  * Which output stream a chunk came from.
  */
 export type OutputStream = 'stdout' | 'stderr';
@@ -1019,6 +1023,10 @@ export type ResourcesReloadResult = Record<string, never>;
  * Presentation of a pending approval.
  */
 export type ApprovalKind = 'command' | 'fileChange' | 'permissionExpansion' | 'question' | 'plan';
+/**
+ * Where an approved command runs (T39).
+ */
+export type CommandPlace = 'sandbox' | 'unsandboxed';
 /**
  * User choice for a pending request.
  */
@@ -4321,6 +4329,11 @@ export interface ExecRunResult {
    */
   output?: CommandOutput | null;
   /**
+   * Present when the command ran in the sandbox (T39, architecture section 6.10): what the
+   * sandbox refused, as far as Core could tell.
+   */
+  sandbox?: SandboxReport | null;
+  /**
    * The terminating signal number on Unix, when a signal ended the command.
    */
   signal?: number | null;
@@ -4367,6 +4380,34 @@ export interface CommandOutput {
    * Characters of the whole output.
    */
   totalChars: number;
+}
+/**
+ * What the sandbox did to one command (T39).
+ */
+export interface SandboxReport {
+  /**
+   * What the sandbox refused: paths named in the command's failure output that its policy
+   * forbids, and hosts the proxy refused while it ran. Empty when nothing was recognized.
+   */
+  denials?: SandboxDenial[];
+  /**
+   * The sandbox itself could not start, so the command did not run; later commands run
+   * without it and go through the normal approval (risk R10).
+   */
+  failedToStart?: boolean;
+}
+/**
+ * One thing the sandbox refused.
+ */
+export interface SandboxDenial {
+  /**
+   * What was refused.
+   */
+  kind: SandboxDenialKind;
+  /**
+   * The path (`read`, `write`) or `host:port` (`network`).
+   */
+  target: string;
 }
 /**
  * The timeout a command ran with.
@@ -7752,6 +7793,13 @@ export interface ApprovalRequest {
    */
   directory?: string | null;
   /**
+   * The host a sandboxed command asks to reach outside the network allowlist (a
+   * `permissionExpansion` card for tool [`NETWORK_TOOL`], T39). `allowOnce` lets this
+   * connection through, `allowSession` the host for the session, `allowAlways` adds it to
+   * the user's allowlist; `deny` and no answer within the timeout refuse the connection.
+   */
+  domain?: string | null;
+  /**
    * Which card to show.
    */
   kind: ApprovalKind;
@@ -7785,6 +7833,12 @@ export interface ApprovalRequest {
    * a command that cannot be analyzed).
    */
   rules?: string[];
+  /**
+   * Where an approved command runs (T39): in the sandbox, or outside it at the model's
+   * request (`dangerouslyDisableSandbox`), which the card shows with the full command and
+   * answers only with `allowOnce` or `deny`.
+   */
+  sandbox?: CommandPlace | null;
   /**
    * Owning session.
    */
@@ -7844,6 +7898,11 @@ export interface ApprovalAnswer {
    * Directory shown in the native confirmation dialog.
    */
   directory?: string | null;
+  /**
+   * The host the native confirmation dialog showed for a network-domain card's
+   * `allowAlways` (T39): it must be the card's `domain`.
+   */
+  domain?: string | null;
   /**
    * Feedback to return on refusal.
    */

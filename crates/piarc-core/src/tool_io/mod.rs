@@ -16,13 +16,14 @@
 //! is cancelled by `exec/kill` with the same `requestId`, and stopped with its whole process
 //! tree when the connection ends or the session's turn is interrupted.
 //!
-//! A session opened with [`ToolIo::open_sandboxed_session`] runs its commands sandboxed
-//! (architecture section 6.10, T11): `piarc-sandbox` gives the wrapper (`sandbox-exec` with a
-//! profile generated for the command) and the proxy and cache variables, which go on top of
-//! the environment; like every command it runs with the process-tree spawner, so cancelling a
-//! command ends everything it started. The session's network proxy stops when the session is
-//! closed. Output, exit status and cancellation are those of any `exec/run`. Which sessions
-//! are sandboxed, and the Bash tool's two sandbox modes, are T39's.
+//! The sandbox (architecture section 6.10, T11, T39, `sandbox.rs`): a Bash command whose call
+//! was judged to run sandboxed gets `piarc-sandbox`'s wrapper (`sandbox-exec` with a profile
+//! generated for the command from the settings as they stand) and the proxy and cache
+//! variables on top of its environment; like every command it runs with the process-tree
+//! spawner, so cancelling a command ends everything it started. The session's network proxy
+//! starts with its first sandboxed command and stops when the session is closed. A session
+//! opened with [`ToolIo::open_sandboxed_session`] (tests) runs every command sandboxed with
+//! fixed settings.
 
 use std::collections::HashMap;
 use std::ffi::OsString;
@@ -38,6 +39,7 @@ mod hooks;
 mod memory;
 mod memory_reader;
 pub(crate) mod policy;
+mod sandbox;
 mod skills;
 pub(crate) mod subagents;
 mod tasks;
@@ -47,7 +49,7 @@ mod web_search;
 pub(crate) use web_search::chosen_backend as chosen_search_backend;
 
 pub use exec::{CommandEnv, DISPLAY_WINDOW};
-use piarc_exec::{ExecLimits, Launcher};
+use piarc_exec::ExecLimits;
 use piarc_fs::{EncodingCache, FileStates, Scope};
 use piarc_host::{InboundHandler, Peer};
 use piarc_ports::BoxFuture;
@@ -57,9 +59,9 @@ use piarc_protocol::fs::{
     FsSpillParams, FsStatParams, FsWriteParams,
 };
 use piarc_protocol::{ErrorKind, ErrorObject};
-use piarc_sandbox::proxy::{Allowlist, SystemNetwork};
-use piarc_sandbox::{SandboxPolicy, SessionSandbox};
+use piarc_sandbox::proxy::Allowlist;
 pub(crate) use policy::hooks::condition as hook_condition;
+pub use sandbox::{DEFAULT_APPROVAL_TIMEOUT, SandboxConfig};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
@@ -101,6 +103,8 @@ pub struct ToolIoConfig {
     pub clock: Arc<dyn piarc_ports::Clock>,
     /// Limits and allowlist of `web/fetch` (T29).
     pub web: WebConfig,
+    /// The Bash sandbox's platform, network and enterprise values (T39).
+    pub sandbox: SandboxConfig,
 }
 
 impl std::fmt::Debug for ToolIoConfig {
@@ -127,6 +131,7 @@ impl ToolIoConfig {
             observer: None,
             clock: Arc::new(crate::clock::SystemClock),
             web: WebConfig::default(),
+            sandbox: SandboxConfig::default(),
         }
     }
 }
@@ -171,8 +176,8 @@ struct SessionIo {
     running: Mutex<HashMap<String, CancellationToken>>,
     /// Where the session's next bash command without an explicit `cwd` starts.
     shell_cwd: Mutex<PathBuf>,
-    /// Present when the session's commands run sandboxed; owns the session's proxy.
-    sandbox: Option<SessionSandbox>,
+    /// The session's sandbox: its proxy and the hosts the user allowed (T39).
+    sandbox: sandbox::SessionState,
     /// The running (or last) turn: writes without a `turnId` go to its checkpoint (T28).
     turn: Mutex<Option<String>>,
     /// Set for a subagent's session (T31): its main session and how it was started.
@@ -219,6 +224,10 @@ pub struct ToolIo {
     terminals: Option<crate::terminal::Terminals>,
     /// The vault, for search services' API keys (T38); none without Core's state.
     secrets: Option<crate::secrets::SecretsService>,
+    /// Notices for the user (`core/notices`).
+    notices: Option<EventSender>,
+    /// Whether the sandbox failed to start in this Core (T39, R10).
+    sandbox_health: Arc<sandbox::Health>,
 }
 
 impl std::fmt::Debug for ToolIo {
@@ -242,7 +251,7 @@ impl ToolIo {
             config.exec_limits,
             config.command_env.clone(),
             config.data_dir.clone(),
-            notices,
+            notices.clone(),
         );
         Self {
             sessions: Arc::default(),
@@ -255,6 +264,8 @@ impl ToolIo {
             tasks: crate::tasks::TaskManager::new(crate::tasks::TasksConfig::default()),
             terminals: None,
             secrets: None,
+            notices,
+            sandbox_health: Arc::default(),
         }
     }
 
@@ -345,7 +356,14 @@ impl ToolIo {
         } else {
             piarc_git::canonical(project).unwrap_or_else(|_| project.to_path_buf())
         };
-        self.register(session_id, scope, &project, tmp, None, None);
+        self.register(
+            session_id,
+            scope,
+            &project,
+            tmp,
+            sandbox::SessionState::default(),
+            None,
+        );
         Ok(())
     }
 
@@ -368,7 +386,14 @@ impl ToolIo {
             .and_then(|scope| scope.with_read_only_dir(&attachments))
             .and_then(|scope| scope.with_read_only_dir(&tasks))
             .map_err(|e| e.to_error_object())?;
-        self.register(session_id, scope, project, tmp, None, Some(link));
+        self.register(
+            session_id,
+            scope,
+            project,
+            tmp,
+            sandbox::SessionState::default(),
+            Some(link),
+        );
         Ok(())
     }
 
@@ -397,10 +422,11 @@ impl ToolIo {
         Ok(dir)
     }
 
-    /// Like [`ToolIo::open_session`], with every command of the session sandboxed: writes
-    /// limited to the workspace, the session's temporary directory
-    /// (`<data dir>/sessions/<id>/tmp/`, created here) and `settings.extra_dirs`, network only
-    /// through a proxy started for the session with `settings.allowed_domains`.
+    /// Like [`ToolIo::open_session`], with every command of the session sandboxed whatever
+    /// the settings say (tests of the sandbox itself): writes limited to the workspace, the
+    /// session's temporary directory (`<data dir>/sessions/<id>/tmp/`, created here) and
+    /// `settings.extra_dirs`, network only through the session's proxy with
+    /// `settings.allowed_domains`.
     ///
     /// # Errors
     ///
@@ -415,8 +441,15 @@ impl ToolIo {
         settings: SandboxSettings,
     ) -> Result<(), ErrorObject> {
         check_session_id(session_id)?;
-        let allowlist = Allowlist::new(&settings.allowed_domains)
+        Allowlist::new(&settings.allowed_domains)
             .map_err(|e| ErrorObject::new(ErrorKind::InvalidParams, e.to_string(), false))?;
+        if self.config.sandbox.platform.is_none() {
+            return Err(ErrorObject::new(
+                ErrorKind::InternalError,
+                piarc_sandbox::Error::Unsupported.to_string(),
+                false,
+            ));
+        }
         let tmp = self.create_tmp(session_id)?;
         let attachments = self.create_attachments(session_id)?;
         let tasks = self.create_tasks_dir(session_id)?;
@@ -428,14 +461,15 @@ impl ToolIo {
         for dir in &settings.extra_dirs {
             scope = scope.with_added_dir(dir).map_err(|e| e.to_error_object())?;
         }
-        let mut policy = SandboxPolicy::new(scope.root().to_path_buf(), tmp.clone());
-        policy.extra_dirs = settings.extra_dirs;
-        policy.deny_read = settings.deny_read;
-        let sandbox = SessionSandbox::start(&policy, allowlist, Arc::new(SystemNetwork))
-            .await
-            .map_err(|e| sandbox_error(&e))?;
         let project = scope.root().to_path_buf();
-        self.register(session_id, scope, &project, tmp, Some(sandbox), None);
+        self.register(
+            session_id,
+            scope,
+            &project,
+            tmp,
+            sandbox::SessionState::forced(settings),
+            None,
+        );
         Ok(())
     }
 
@@ -449,7 +483,7 @@ impl ToolIo {
         scope: Scope,
         project: &Path,
         tmp_dir: PathBuf,
-        sandbox: Option<SessionSandbox>,
+        sandbox: sandbox::SessionState,
         subagent: Option<subagents::Link>,
     ) {
         let blob_dir = self.session_dir(session_id).join("blobs");
@@ -514,12 +548,12 @@ impl ToolIo {
         ))
     }
 
-    /// The proxy port of a sandboxed session.
+    /// The proxy port of a session whose proxy has started (its first sandboxed command).
     #[must_use]
     pub fn sandbox_proxy_port(&self, session_id: &str) -> Option<u16> {
         lock(&self.sessions)
             .get(session_id)
-            .and_then(|s| s.sandbox.as_ref().map(SessionSandbox::proxy_port))
+            .and_then(|s| Self::started_proxy_port(s))
     }
 
     /// Taken before closing session `session_id`, tells when Core has let go of its state:
@@ -722,12 +756,20 @@ impl ToolIo {
     async fn exec_run(&self, p: ExecRunParams, peer: Peer) -> Result<Value, ErrorObject> {
         let session = self.session(&p.session_id.0)?;
         let mut launch = exec::launch_dir(&session, p.cwd.as_deref())?;
+        let mut sandboxed = session.sandbox.forced.is_some();
         if self.policy.is_some() {
-            launch.pinned = policy::claim_command(&session, &p, &peer, &launch.dir)?;
+            let claimed = policy::claim_command(&session, &p, &peer, &launch.dir)?;
+            launch.pinned = claimed.pinned;
+            sandboxed |= claimed.sandboxed;
         }
+        let (wrap, run) = if sandboxed {
+            let (wrap, run) = self.sandbox_launch(&session, &p.session_id.0).await?;
+            (wrap, Some(run))
+        } else {
+            (exec::Wrap::default(), None)
+        };
         if p.terminal {
             // A terminal task outlives the turn and the connection (ADR-0050).
-            let wrap = sandbox_wrap(&session)?;
             return to_value(&self.exec_terminal(&session, &p, &launch, wrap).await?);
         }
         let token = CancellationToken::new();
@@ -742,13 +784,6 @@ impl ToolIo {
             }
             running.insert(p.request_id.clone(), token.clone());
         }
-        let wrap = match sandbox_wrap(&session) {
-            Ok(wrap) => wrap,
-            Err(error) => {
-                lock(&session.running).remove(&p.request_id);
-                return Err(error);
-            }
-        };
         let watcher = {
             let (peer, token) = (peer.clone(), token.clone());
             tokio::spawn(async move {
@@ -759,6 +794,8 @@ impl ToolIo {
             })
         };
         let request_id = p.request_id.clone();
+        let session_id = p.session_id.0.clone();
+        let call = p.origin.as_ref().map(|o| o.tool_call_id.clone());
         let place = self.place(&p.session_id.0, &session);
         let result = self
             .exec
@@ -766,7 +803,16 @@ impl ToolIo {
             .await;
         watcher.abort();
         lock(&session.running).remove(&request_id);
-        to_value(&result?)
+        let mut result = result?;
+        if let Some(run) = &run {
+            if result.task.is_none() {
+                self.sandbox_report(&session, &session_id, call.as_deref(), run, &mut result)
+                    .await;
+            } else {
+                result.sandbox = Some(piarc_protocol::exec::SandboxReport::default());
+            }
+        }
+        to_value(&result)
     }
 
     fn exec_kill(&self, p: &ExecKillParams) -> Result<Value, ErrorObject> {
@@ -868,27 +914,6 @@ fn check_session_id(session_id: &str) -> Result<(), ErrorObject> {
             false,
         ))
     }
-}
-
-/// The sandbox wrapper of `session`'s commands and terminals; none outside a sandbox.
-fn sandbox_wrap(session: &SessionIo) -> Result<exec::Wrap, ErrorObject> {
-    match &session.sandbox {
-        Some(sandbox) => {
-            let launch = sandbox.launch().map_err(|e| sandbox_error(&e))?;
-            Ok(exec::Wrap {
-                launcher: Some(Launcher {
-                    program: launch.program,
-                    args: launch.args,
-                }),
-                env: launch.env,
-            })
-        }
-        None => Ok(exec::Wrap::default()),
-    }
-}
-
-fn sandbox_error(error: &piarc_sandbox::Error) -> ErrorObject {
-    ErrorObject::new(error.kind(), error.to_string(), error.retryable())
 }
 
 fn parse<T: DeserializeOwned>(method: &str, params: Map<String, Value>) -> Result<T, ErrorObject> {
