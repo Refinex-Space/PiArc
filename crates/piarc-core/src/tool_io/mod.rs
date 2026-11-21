@@ -128,6 +128,26 @@ impl ToolIoConfig {
     }
 }
 
+/// See [`ToolIo::session_hold`].
+pub(crate) struct SessionHold(Option<std::sync::Weak<SessionIo>>);
+
+impl SessionHold {
+    /// How long a closed session's in-flight work may keep it: closing cancels that work, so
+    /// it ends as soon as its processes do.
+    const LIMIT: std::time::Duration = std::time::Duration::from_secs(10);
+
+    /// Waits until nothing in Core holds the session any more (at most [`Self::LIMIT`]).
+    pub(crate) async fn released(self) {
+        let Some(held) = self.0 else {
+            return;
+        };
+        let deadline = tokio::time::Instant::now() + Self::LIMIT;
+        while held.strong_count() > 0 && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    }
+}
+
 /// A session's scope, file state and running commands.
 struct SessionIo {
     scope: Scope,
@@ -407,6 +427,13 @@ impl ToolIo {
         lock(&self.sessions)
             .get(session_id)
             .and_then(|s| s.sandbox.as_ref().map(SessionSandbox::proxy_port))
+    }
+
+    /// Taken before closing session `session_id`, tells when Core has let go of its state:
+    /// work that started while it was open (an idle `Notification` hook) keeps it, and with it
+    /// the scope's directory handles, which Windows does not let anyone delete (ADR-0036, W2).
+    pub(crate) fn session_hold(&self, session_id: &str) -> SessionHold {
+        SessionHold(lock(&self.sessions).get(session_id).map(Arc::downgrade))
     }
 
     /// Forgets the session and terminates its running commands.

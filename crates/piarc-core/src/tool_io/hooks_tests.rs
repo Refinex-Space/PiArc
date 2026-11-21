@@ -845,3 +845,36 @@ async fn hooks_run_refuses_an_open_session_of_another_workspace() {
         .expect("its own session");
     assert_eq!(f.log("stop").len(), 1);
 }
+
+/// W2: archiving right after a turn, while its idle `Notification` hook runs. Closing cancels
+/// the hook; the session's directory can go once Core has let go of the session (on Windows
+/// the hook's hold kept the scope's directory handles open and the removal failed).
+#[tokio::test]
+async fn a_closed_session_is_let_go_once_its_running_hook_ends() {
+    let f = Fixture::new(Setup {
+        user: json!({ "Notification": group("", &[command(
+            "mkdir -p log && touch log/up && sleep 5"
+        )]) }),
+        ..Setup::default()
+    })
+    .await;
+    let io = f.io.clone();
+    let hook = tokio::spawn(async move {
+        io.notification_hooks(SESSION, "idle_prompt", "PiArc is waiting for your input")
+            .await;
+    });
+    let up = f.work.join("log").join("up");
+    for _ in 0..1000 {
+        if up.exists() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(up.exists(), "the hook started");
+    let hold = f.io.session_hold(SESSION);
+    f.io.close_session(SESSION);
+    hold.released().await;
+    let dir = f.root.join("data").join("sessions").join(SESSION);
+    std::fs::remove_dir_all(&dir).expect("nothing holds the session's directory");
+    hook.await.expect("the hook's task");
+}

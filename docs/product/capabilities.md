@@ -99,7 +99,7 @@
 | CAP-CTX-RULES-001 | `.claude/rules` 与 `paths:` 条件加载 | FR-CX-02、ARCH-6.14 | T24 | `config-rules-paths` | 已实现 |
 | CAP-CTX-USAGE-001 | 上下文用量与分类明细 | FR-CX-04、ARCH-6.6.5 | T27 | `ctx-usage` | 已实现 |
 | CAP-HOOK-COMPACT-001 | PreCompact 与 PostCompact hooks | FR-HN-05、ARCH-6.3.2 | T25 | `ctx-compact-focus`<br>`hooks-compact`<br>`hooks-pre-compact-block` | 已实现 |
-| CAP-HOOK-NOTIFY-001 | Notification hook | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-notification` | 已实现 |
+| CAP-HOOK-NOTIFY-001 | Notification hook | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-archive-during-hook`<br>`hooks-notification` | 已实现 |
 | CAP-HOOK-PERM-001 | PermissionRequest hook | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-permission-request` | 已实现 |
 | CAP-HOOK-POST-001 | PostToolUse 与 PostToolUseFailure hooks（可改写输出、追加上下文） | FR-HN-05、ARCH-6.3.2 | T25 | `hooks-post-tool-use` | 已实现 |
 | CAP-HOOK-PRE-001 | PreToolUse hook 参与权限裁决 | FR-HN-05、ARCH-6.3.2、ARCH-6.2.3 | T25 | `hooks-pre-tool-use` | 已实现 |
