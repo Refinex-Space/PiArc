@@ -263,7 +263,86 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     ignored("requiredMinimumVersion", MANAGED),
     ignored("respectGitignore", NONE),
     ignored("respondToBashCommands", NONE),
-    planned("sandbox", "T39", "sandbox"),
+    ignored(
+        "sandbox.allowAppleEvents",
+        "sandboxed commands never send Apple Events (T39)",
+    ),
+    ignored("sandbox.allowNestedUserNamespaces", "Linux and WSL2 only"),
+    ignored(
+        "sandbox.allowUnsandboxedCommands",
+        "PiArc asks the user about every request to run outside the sandbox (T39)",
+    ),
+    active(
+        "sandbox.autoAllowBashIfSandboxed",
+        "/sandbox/autoAllowBashIfSandboxed",
+    ),
+    ignored("sandbox.bwrapPath", "Linux and WSL2 only"),
+    ignored("sandbox.credentials", NONE),
+    ignored("sandbox.enableWeakerNestedSandbox", "Linux and WSL2 only"),
+    ignored(
+        "sandbox.enableWeakerNetworkIsolation",
+        "the sandbox never reaches trustd (T39)",
+    ),
+    active("sandbox.enabled", "/sandbox/enabled"),
+    ignored(
+        "sandbox.excludedCommands",
+        "every Bash command runs in the sandbox while it is on (T39)",
+    ),
+    ignored(
+        "sandbox.failIfUnavailable",
+        "without a sandbox PiArc falls back to permission rules and says so (T39)",
+    ),
+    ignored("sandbox.filesystem.allowManagedReadPathsOnly", MANAGED),
+    ignored("sandbox.filesystem.allowRead", NONE),
+    ignored(
+        "sandbox.filesystem.allowWrite",
+        "writable places are the workspace, the session's temporary directory and the added directories (T39)",
+    ),
+    active(
+        "sandbox.filesystem.denyRead",
+        "/sandbox/filesystem/denyRead",
+    ),
+    ignored("sandbox.filesystem.denyWrite", NONE),
+    ignored("sandbox.filesystem.disabled", NONE),
+    ignored("sandbox.ignoreViolations", NONE),
+    ignored(
+        "sandbox.network.allowAllUnixSockets",
+        "sandboxed commands cannot use Unix sockets (T39)",
+    ),
+    ignored(
+        "sandbox.network.allowLocalBinding",
+        "sandboxed commands cannot listen on ports (T39)",
+    ),
+    ignored("sandbox.network.allowMachLookup", NONE),
+    planned(
+        "sandbox.network.allowManagedDomainsOnly",
+        "T47",
+        "the managed sandbox network allowlist",
+    ),
+    ignored(
+        "sandbox.network.allowUnixSockets",
+        "sandboxed commands cannot use Unix sockets (T39)",
+    ),
+    active(
+        "sandbox.network.allowedDomains",
+        "/sandbox/network/allowedDomains",
+    ),
+    ignored("sandbox.network.deniedDomains", NONE),
+    ignored(
+        "sandbox.network.httpProxyPort",
+        "the sandbox's proxy is PiArc's own (T39)",
+    ),
+    ignored(
+        "sandbox.network.socksProxyPort",
+        "the sandbox's proxy is PiArc's own (T39)",
+    ),
+    ignored(
+        "sandbox.network.strictAllowlist",
+        "hosts outside the allowlist are always asked about (T39)",
+    ),
+    ignored("sandbox.network.tlsTerminate", NONE),
+    ignored("sandbox.ripgrep", NONE),
+    ignored("sandbox.socatPath", "Linux and WSL2 only"),
     ignored("showClearContextOnPlanAccept", UI),
     ignored("showThinkingSummaries", UI),
     ignored("showTurnDuration", UI),
@@ -480,13 +559,13 @@ mod tests {
                     true
                 ),
                 ("/permissions/mystery".to_owned(), KeyStatus::Ignored, false),
-                ("/sandbox".to_owned(), KeyStatus::Planned("T39"), true),
+                ("/sandbox/enabled".to_owned(), KeyStatus::Active, true),
                 ("/theme".to_owned(), KeyStatus::Ignored, true),
             ]
         );
         assert_eq!(
             project(&value),
-            json!({ "hooks": { "PreToolUse": [] }, "permissions": { "allow": ["Bash(ls)"], "deny": ["Read(.env)"] } })
+            json!({ "hooks": { "PreToolUse": [] }, "permissions": { "allow": ["Bash(ls)"], "deny": ["Read(.env)"] }, "sandbox": { "enabled": true } })
         );
         // A wrongly typed parent is one ignored entry and contributes nothing.
         let wrong = json!({ "permissions": ["Bash(ls)"] });

@@ -66,6 +66,11 @@ pub enum IgnoreReason {
     Untrusted,
     /// `bypassPermissions` and `auto` never apply from a project file.
     ProjectMode,
+    /// A project file may only tighten the sandbox (T39): its `allowedDomains`, auto-approval
+    /// and turning the sandbox off do not apply.
+    ProjectSandbox,
+    /// The setting has no effect on this platform (the sandbox on Windows, requirement D7).
+    Platform,
 }
 
 /// One key that is not used.
@@ -111,6 +116,30 @@ pub struct FileReport {
     pub ignored: Vec<IgnoredKey>,
     /// Parse errors and schema findings.
     pub issues: Vec<Issue>,
+}
+
+/// Moves the keys at `pointers` that a file applies to its ignored keys with
+/// [`IgnoreReason::Platform`]: Core calls it on a platform without the feature (the sandbox
+/// on Windows, T39), so the report says the value has no effect here.
+pub fn mark_platform_unsupported(reports: &mut [FileReport], pointers: &[&str]) {
+    for report in reports {
+        let (moved, kept): (Vec<KeyReport>, Vec<KeyReport>) = std::mem::take(&mut report.effective)
+            .into_iter()
+            .partition(|key| pointers.contains(&key.pointer.as_str()));
+        report.effective = kept;
+        report
+            .overridden
+            .retain(|key| !pointers.contains(&key.pointer.as_str()));
+        for key in moved {
+            report.ignored.push(IgnoredKey {
+                pointer: key.pointer,
+                reason: IgnoreReason::Platform,
+                task: None,
+                note: None,
+            });
+        }
+        report.ignored.sort_by(|a, b| a.pointer.cmp(&b.pointer));
+    }
 }
 
 /// The layer id of `~/.claude.json` in reports.
@@ -209,8 +238,14 @@ impl Settings {
                 .iter()
                 .any(|(layer, _)| *layer == spec.id)
                 && pointer == "/permissions/defaultMode";
+            let project_sandbox = self
+                .ignored_sandbox
+                .iter()
+                .any(|(layer, removed)| *layer == spec.id && *removed == pointer);
             let reason = if project_mode {
                 IgnoreReason::ProjectMode
+            } else if project_sandbox {
+                IgnoreReason::ProjectSandbox
             } else {
                 untrusted = true;
                 IgnoreReason::Untrusted

@@ -406,6 +406,39 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
         name: "mcpServers",
         shape: Shape::MapOf(&Shape::Any),
     },
+    // The Bash sandbox (T39, architecture section 6.10), Claude Code's keys with the same
+    // meaning: on or off (default off), whether sandboxed commands skip the approval
+    // (default false: they are still approved), paths no sandboxed command may read, and the
+    // domains the sandbox's proxy lets through. A project file can only tighten: turning the
+    // sandbox on and adding `denyRead` apply, `allowedDomains` and auto-approval do not
+    // (`crate::sandbox`).
+    Field {
+        name: "sandbox",
+        shape: Shape::Object(&[
+            Field {
+                name: "enabled",
+                shape: Shape::Bool,
+            },
+            Field {
+                name: "autoAllowBashIfSandboxed",
+                shape: Shape::Bool,
+            },
+            Field {
+                name: "filesystem",
+                shape: Shape::Object(&[Field {
+                    name: "denyRead",
+                    shape: Shape::ListOf(&STRINGS),
+                }]),
+            },
+            Field {
+                name: "network",
+                shape: Shape::Object(&[Field {
+                    name: "allowedDomains",
+                    shape: Shape::ListOf(&STRINGS),
+                }]),
+            },
+        ]),
+    },
     // Claude Code's key: `.mcp.json` servers to leave off, in any settings file.
     Field {
         name: "disabledMcpjsonServers",

@@ -362,11 +362,13 @@ fn unknown_planned_and_ignored_keys_are_each_listed() {
     );
     let settings = Settings::load(f.table(), TrustState::Trusted);
     assert!(settings.issues().is_empty(), "{:?}", settings.issues());
-    // `model` applies since T31 (the default model of new sessions), `outputStyle` since T37;
-    // `plansDirectory` is planned.
+    // `model` applies since T31 (the default model of new sessions), `outputStyle` since T37,
+    // `sandbox.enabled` since T39; `plansDirectory` is planned.
     assert_eq!(settings.get("/model"), Some(&json!("claude-opus")));
     assert_eq!(settings.get("/outputStyle"), Some(&json!("Explanatory")));
     assert_eq!(settings.get("/plansDirectory"), None);
+    assert_eq!(settings.get("/sandbox/enabled"), Some(&json!(true)));
+    assert_eq!(settings.get("/sandbox/network/allowedDomains"), None);
     let reports = settings.diagnostics();
     assert_eq!(
         ignored(report(&reports, ids::CLAUDE_PROJECT)),
@@ -382,7 +384,12 @@ fn unknown_planned_and_ignored_keys_are_each_listed() {
             ),
             ("/permissions/futureKey", IgnoreReason::Unknown, None),
             ("/plansDirectory", IgnoreReason::Planned, Some("T48")),
-            ("/sandbox", IgnoreReason::Planned, Some("T39")),
+            // T39: `sandbox.enabled` applies; a project's allowed domains never do.
+            (
+                "/sandbox/network/allowedDomains",
+                IgnoreReason::ProjectSandbox,
+                None
+            ),
             ("/statusLine", IgnoreReason::Ignored, None),
         ]
     );

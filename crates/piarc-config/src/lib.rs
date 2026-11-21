@@ -17,6 +17,8 @@
 //!   user levels, frontmatter parsing ([`frontmatter`]) and the merge by name.
 //! - Skills, slash command files, Pi prompt templates and output styles ([`skills`], T37):
 //!   discovery, frontmatter, the merge by name and argument substitution.
+//! - The Bash sandbox's settings ([`sandbox`], T39): project files only tighten, allowed
+//!   domains from the user and enterprise sources, `denyRead` paths resolved per file.
 //!
 //! # Not responsible for
 //!
@@ -42,6 +44,7 @@ pub mod layers;
 pub mod mcp;
 pub mod merge;
 pub mod rules;
+pub mod sandbox;
 pub mod schema;
 pub mod settings;
 pub mod skills;

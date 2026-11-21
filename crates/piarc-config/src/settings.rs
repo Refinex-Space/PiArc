@@ -108,6 +108,9 @@ pub struct Settings {
     pub(crate) effective: Vec<Option<Value>>,
     /// Project layers whose `bypassPermissions` or `auto` default mode was left out.
     pub(crate) ignored_modes: Vec<(&'static str, String)>,
+    /// Sandbox values of project layers that would loosen the sandbox, left out (T39):
+    /// `(layer, JSON Pointer)`.
+    pub(crate) ignored_sandbox: Vec<(&'static str, String)>,
 }
 
 impl Settings {
@@ -129,6 +132,7 @@ impl Settings {
             issues: Vec::new(),
             effective: Vec::new(),
             ignored_modes: Vec::new(),
+            ignored_sandbox: Vec::new(),
         };
         settings.reload();
         settings
@@ -187,6 +191,7 @@ impl Settings {
     fn remerge(&mut self) -> Vec<String> {
         let trusted = self.trust.is_trusted();
         let mut ignored = Vec::new();
+        let mut ignored_sandbox = Vec::new();
         let effective: Vec<Option<Value>> = self
             .table
             .layers()
@@ -213,6 +218,12 @@ impl Settings {
                         remove_pointer(&mut value, pointer);
                     }
                 }
+                if project {
+                    for pointer in crate::sandbox::loosening(&value) {
+                        remove_pointer(&mut value, pointer);
+                        ignored_sandbox.push((spec.id, pointer.to_owned()));
+                    }
+                }
                 Some(value)
             })
             .collect();
@@ -222,6 +233,7 @@ impl Settings {
         self.merged = merged;
         self.effective = effective;
         self.ignored_modes = ignored;
+        self.ignored_sandbox = ignored_sandbox;
         changed
     }
 
