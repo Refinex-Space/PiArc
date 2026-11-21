@@ -481,7 +481,7 @@ L2 证明 PiArc 符合我们写下的期望，L3 检查这些期望是否与 Cla
 - 前提：PATH 上有 `claude`（版本写进报告首行）。没有时命令打印安装提示并以 2 退出。本机按 Nightly 锁定的版本安装：`npm install -g @anthropic-ai/claude-code@<版本>`（全局安装，先征得用户同意）。版本在 `.github/workflows/l3-nightly.yml` 的 `CLAUDE_CODE_VERSION`。
 - 退出码：有未解释的差异、过期或缺理由的 allowlist 条目、剥离检查失败、某侧运行失败（主循环请求被 mock 拒绝或运行器报错）、重复运行不一致、`~/.claude` 有变化时为 1。
 - `~/.claude` 比对看的是整个目录：本机同时开着别的 Claude Code 会话（例如正在用 Claude Code 开发），它写会话记录也会被报告。取证时在没有其他会话写入时运行。
-- 平台：Nightly 在 macOS 上运行。PowerShell 场景排除；Windows 上运行需要原生安装器装的 `claude.exe`（Node 不经 shell 不能启动 npm 的 `claude.cmd`）。
+- 平台：Nightly 在 macOS 上运行。Windows 上运行需要原生的 `claude.exe`（Node 不经 shell 不能启动 npm 的 `claude.cmd`）：锁定版本的 npm 平台包自带它，`npm install --prefix tmp/l3-claude --no-save --ignore-scripts @anthropic-ai/claude-code-win32-x64@<版本>` 后把 `tmp/l3-claude/node_modules/@anthropic-ai/claude-code-win32-x64` 放在 `PATH` 最前运行 `npm run l3`（不是全局安装，不动本机的 `claude`）。W2 在 Windows 上对 2.1.318 跑通：Windows 版 Claude Code 自带 Grep、Glob（参数与 PiArc 不同），没有 PowerShell、KillShell、Monitor，这些差异用 `platforms: [windows]` 的条目说明；PowerShell 场景仍排除（Claude Code 在 Windows 上同样没有 PowerShell 工具）。
 
 ### 14.2 隔离
 
@@ -542,7 +542,7 @@ approvals:                        # 按工具调用 id 作答；没有点名的�
 
 `tests/l3-allowlist.yaml`：
 
-- `differences`：`scenario`（id 或带 `*` 的模式）、`path`（字段路径模式：`*` 匹配一个键内的文字、`[*]` 任意下标、`**` 任意一段路径）、`claude_code`（适用的版本范围，空格分隔的比较式如 `>=2.1.318 <2.2.0`，或 `*`）、`reason`（必填）、`follow_up`（可选，后续处理的任务，同步写进 `PLAN.md` 登记事项）。
+- `differences`：`scenario`（id 或带 `*` 的模式）、`path`（字段路径模式：`*` 匹配一个键内的文字、`[*]` 任意下标、`**` 任意一段路径）、`claude_code`（适用的版本范围，空格分隔的比较式如 `>=2.1.318 <2.2.0`，或 `*`）、`reason`（必填）、`follow_up`（可选，后续处理的任务，同步写进 `PLAN.md` 登记事项）、`platforms`（可选，`[macos]`、`[windows]` 或两者，缺省两者都适用；只在所列平台上放行差异、判定过期，W2：Claude Code 的工具集因平台而不同）。
 - `excluded`：对照领域（`perm-`、`policy-`、`hooks-`、`config-` 开头的 L2 场景）中没有 L3 场景对照的，写明 `claude -p` 无法复现的原因；也可以排除某个 L3 场景。每个这样的 L2 场景必须被对照或排除，否则命令失败。
 - 缺理由的条目、版本在范围内且所点名场景都跑过却没有匹配任何差异的条目，都让命令失败：修好的偏差要从清单删掉。Claude Code 升级后，新差异先分析，再修正或加条目（新条目的版本范围从新版本开始）。
 
