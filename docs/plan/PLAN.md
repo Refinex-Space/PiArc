@@ -476,7 +476,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I139 | T32 | `core/tasks` 快照是全局最近 200 个任务的整表，每次变化至多每 250 ms 推一次（带每个任务的最后几行）：任务多、输出频繁时载荷偏大 | T44 的性能预算里测一次，必要时按工作区或会话分路由 |
 | I140 | T33 | L3 的 `perm-compound`（Claude Code 2.1.318）有 12 条未解释差异：PiArc 的请求多出 `KillShell`、`Monitor` 两个工具（T32 加入，allowlist 没有对应条目）；L3 不在 verify 中，只在 Nightly 运行 | 下次运行 L3 的任务（或 R4）确认 Claude Code 该版本的对应工具（名称与是否在 `-p` 下提供）后补 allowlist 条目或参数映射 |
 | I141 | T34 | 真实拼音输入法在终端面板中的核对未做：T34-A03 的 CDP 合成（预编辑画在光标处、textarea 跟随光标、上屏只写一次）与组件测试已通过，系统"简体拼音"的候选框位置要人在本机前台操作（智能体没有前台键盘与屏幕操作的工具） | 用户按 S7 报告第 8 节 T1–T4 在终端面板（Ctrl+\` 打开）中核对：候选框贴着光标格、预编辑带下划线、选词后只上屏一次、vim 插入模式下 Esc 只取消合成；结果告诉下一个任务即可改判 T34-A03 |
-| I142 | T34 | W3 的 Windows 核对项：① 微软拼音在终端面板中的预编辑与候选框位置（同 I141 的 T1–T4）；② ConPTY 下面板中的 vim（Git 自带）、htop 或 PowerShell 进程表的渲染与缩放；③ Ctrl+C：有选区时复制、无选区时中断程序，Ctrl+Shift+C 总是复制，Ctrl+V 粘贴；④ 面板隐藏与窗口最小化时拉帧为 0（`visibility` 应用事件在 Windows 上的行为） | W3 |
+| I142 | T34 | W3 的 Windows 核对项：① 微软拼音在终端面板中的预编辑与候选框位置（同 I141 的 T1–T4）；② ConPTY 下面板中的 vim（Git 自带）、htop 或 PowerShell 进程表的渲染与缩放；③ Ctrl+C：有选区时复制、无选区时中断程序，Ctrl+Shift+C 总是复制，Ctrl+V 粘贴；④ 面板隐藏与窗口最小化时拉帧为 0（`visibility` 应用事件在 Windows 上的行为）；⑤ `t34-terminal*.e2e.ts` 在 Windows 上整体跳过（用例键入 POSIX shell 命令），W3 写 Windows 版（PowerShell 或 cmd、Git 的 vim）后去掉跳过 | W3 |
 | I143 | T34 | 应用重启后被中断的会话终端（任务 `interrupted`，T33 已保存 snapshot）在面板中没有"恢复"入口：Core 的 `openSessionTerminal` 支持 `restore`，界面未提供 | T35（并行会话与多窗口）或 M4 的终端完善时加入 |
 | I144 | T34 | axe 检查发现存量对比度缺陷：`:root[data-app] button { color: inherit }` 的优先级高于 `.button-primary`，全应用主按钮文字为深色（对比度 2.87）；T34 把三条主按钮规则移到 `:root[data-app]` 下修复，T18 视觉关口的截图里主按钮文字颜色与现在不同 | 已落地（T34）；T43 的无障碍检查覆盖全部界面 |
 | I145 | T34 | 测试机没有 htop：T34-A01 的全屏重绘程序用 top 代替（与 T10 相同，未全局安装 htop） | 需要 htop 截图时由用户决定是否 `brew install htop` |

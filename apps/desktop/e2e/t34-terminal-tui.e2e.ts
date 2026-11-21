@@ -22,6 +22,10 @@ import {
 } from './terminal-panel.js';
 import { withSavedClipboard } from './transcript.js';
 
+// The session terminal runs the user's shell: these cases type POSIX shell commands, vim and
+// top. The Windows variants (PowerShell or cmd, Git's vim) are W3's (PLAN I142).
+test.skip(process.platform === 'win32', 'POSIX shell commands; the Windows variants are W3');
+
 const SOURCE = [
   '// PiArc terminal panel: 中文注释 and emoji 😀',
   'fn main() {',
