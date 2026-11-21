@@ -66,3 +66,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0048](0048-subagents-and-model-aliases.md) | 子 agent 与模型别名的落地（补充 ADR-0005、0009、0010、0037、0039、0043、0044） | 已接受 |
 | [0049](0049-background-tasks-and-monitor.md) | 后台任务、Monitor 与 KillShell 的落地（补充 ADR-0009、0028、0037、0039、0043、0048） | 已接受 |
 | [0050](0050-agent-terminal-screen-access.md) | agent 使用终端屏幕的接口：终端承载的任务、`Bash` 的 `terminal` 参数、屏幕文件与共享（补充 ADR-0017、0049） | 已接受 |
+| [0051](0051-terminal-panel-and-renderer.md) | 终端面板与渲染器：会话终端归会话、近期真实输入防线与上限、停拉唤醒、选区与滚动在 Core、默认颜色取令牌（补充 ADR-0017、0023、0050） | 已接受 |

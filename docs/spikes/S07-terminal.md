@@ -187,7 +187,7 @@ L4 `apps/desktop/e2e/terminal-tui.e2e.ts`（dev 与 packaged 两种形态）等�
 | Windows 上键入回显额外延迟的测量口径 | R1 |
 | 真实拼音输入法核对（第 8 节 T1–T4，T10-A11） | 已完成（2026-11-16），全部符合预期 |
 | 帧协议定稿、JSON Schema 与 L1 样本、终端事件形状、agent 读屏、OSC 133、snapshot | T33 |
-| 选区、复制、滚动与 scrollback、链接、查找、无障碍、多窗口同时查看一个终端（现在每个终端只有一个 viewer，换 viewer 时发 RESET 帧）、光标闪烁 | T34 |
+| 选区、复制、滚动与 scrollback、链接、查找、无障碍、多窗口同时查看一个终端（现在每个终端只有一个 viewer，换 viewer 时发 RESET 帧）、光标闪烁 | T34 已完成（ADR-0051），走本报告的正式路线；多窗口同时查看留给 T35 |
 
 ## 11. Windows（W0，2026-11-16）
 

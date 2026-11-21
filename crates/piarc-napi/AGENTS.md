@@ -17,6 +17,7 @@ NAPI-RS 导出层（薄）：把 `piarc_core::CoreRuntime` 暴露为主进程里
 
 - `createSession` 可显式选择权限模式，`setPermissionMode` 把选择写入会话，`answerApproval` 校验并答复一张卡；保存永久规则的原生确认在主进程。
 
+- 终端导出（T34 新增，两种构建都有）：`terminalScroll`（JSON 目标）、`terminalClearSelection`、`terminalSelectionText`、`terminalLinkAt`、`terminalSetColors`（`0xRRGGBB`）、`terminalFrame` 的可选 `park`、鼠标事件的 `clicks`；`terminalInfo`、`openSessionTerminal`、`setTerminalShared` 等 T33 导出供主进程的面板命令使用。
 - 终端导出（T10）：`createTerminal`、`terminalInput`、`terminalKey`、`terminalResize`、`terminalFrame`（`JsDeferred` 解析为帧字节，主进程把它作为拉取请求的返回值交给窗口，ADR-0023）、`closeTerminal` 在两种构建里都有；`terminalText`、`terminalStats`、`terminalProbeEcho` 只在 `testing`。Windows 的 `.node` 依赖同目录的 `ghostty-vt.dll`（`crates/piarc-term/AGENTS.md`）。
 
 - 每个导出都带 `#[napi(catch_unwind)]`，函数体经 `boundary::call`：Core 错误与 panic 都变成抛出的 `Error`，带 `code` 与 `data: { kind, retryable, details? }`（`piarc_protocol::ErrorObject` 形状）。panic 的 kind 是 `internalError`。

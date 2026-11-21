@@ -365,6 +365,9 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | `sign_out` | — | 退出测试服务商的登录并确认凭据已删除 |
 | `advance_clock` | `seconds` | 推进任务管理器的时钟（T32）：前台命令的超时转后台、Monitor 的超时与唤醒都按它计时，场景不靠真实等待 |
 | `stop_task` | `kind`（可选） | 停止该会话（主会话）最新的运行中后台任务，同面板的停止按钮（T32） |
+| `open_terminal` | — | 为用户在该会话打开一个终端（Core 的 `open_session_terminal`，同终端面板），不共享（T34） |
+| `type_terminal` | `text` | 向该会话最近打开的终端键入文本，`\r` 为回车（T34） |
+| `share_terminal` | `shared` | 打开或关闭该会话最近打开的终端的共享，同面板的开关（T34） |
 
 `prompt`、`steer`、`follow_up` 都可带客户端的 `request_id`（重发时沿用），以及 `mentions` 和 `attachments`；`rejected: <文本>` 要求 Core 拒绝这条输入、错误消息含该文本（UserPromptSubmit hook 阻断，T25），不记回合。提及按 Core 输入格式写 `{path, start, end}`，两个偏移是发送文本中 `@path` 的 UTF-16 起止位置。附件写 `{fixture, mime_type}`；运行器读取 `fixtures/` 中对应文件并调用 Core 的 `store_attachment`，将返回的引用随输入发送。面板的键盘交互在 L4 验证。
 

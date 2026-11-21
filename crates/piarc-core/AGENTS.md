@@ -58,6 +58,7 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 启动、取帧、读屏、搜索、粘贴、回显探针都在阻塞线程池上，结果经回调交给 NAPI；`create_terminal` 只同步校验尺寸（1–1000）与绝对 cwd。`write`/`key`/`mouse`/`focus` 只入队（写队列满时 `busy`）。
 - 会话的终端（`open`）：用户的（`ToolIo::open_user_terminal`，登录 shell）与智能体的（`exec/run` 带 `terminal`，bash 或 Git Bash，键入审批过的命令）都是 `TaskKind::Terminal` 的后台任务，在会话的 shell 目录、以 T17 的命令环境（没有 locale 时补 UTF-8；智能体的 bash 终端在 macOS 上另设 `BASH_SILENCE_DEPRECATION_WARNING=1`，免得系统 bash 的 zsh 提示进入模型读的屏幕）启动，沙箱会话套同一个沙箱包装。屏幕文件 `tasks/<任务 id>.log` 每 500 ms 有变化时重写，命令结束通知与读取之前也重写；只有智能体自己的终端和用户共享的终端写屏幕文件、对模型可见（`tasks/terminal.rs` 的 `TerminalViews`）。智能体的命令结束时先挂通知，再把退出码写到仍在运行的任务上。
 - 关闭：`close` 对会话终端经任务停止（`StopBy::User`），watch 循环再 `close_now`（应用退出时保留 snapshot，其余丢弃）；`close_now` 挂断并结束进程树（宽限 2 s 后 `SIGKILL`）。有序关闭第 1 步 `Terminals::shutdown` 停止全部会话终端、关闭其余终端，并等每棵树的挂断、宽限与 kill 都结束才返回（之前只等 shell 退出，忽略挂断的进程会活过 Core）。
+- T34（ADR-0051）：视口滚动、清除选区、默认颜色只入写队列；选区文本与 OSC 8 链接在阻塞线程池上；取帧可带 `park`（`terminal_frame_parking`），停拉的 viewer 由 `term/<id>` 的 `output` 事件唤醒。`cargo test -p piarc-core --test terminal` 的 `selection_scrolling_links_and_parking_go_through_core` 覆盖这些入口。
 - 测试夹具不要在 `for` 头部的表达式里拿 `entries` 的锁：守卫活到循环结束，循环体里再取同一把锁就自锁（T33 实测卡死）。
 
 ## 数据目录与状态（T13）

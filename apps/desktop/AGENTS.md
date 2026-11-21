@@ -28,8 +28,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 | `npx vite build -c apps/desktop/vite.renderer.config.ts` | 只重建渲染进程的 `.vite/renderer/`（在 `apps/desktop` 下运行）：只改了 `src/renderer/` 时，`dev` 形态 L4 不必重新打包 |
 | `PIARC_EVIDENCE_TASK=T18 npx playwright test t18- --project dev` | T18 的 L4 流程（会话、信任、设置与快捷键、语言、通知、评审截图），mock provider 的脚本在 `e2e/scenarios/` |
 | `PIARC_EVIDENCE_TASK=W1 npm run test:e2e -w @piarc/desktop -- w1-windows-shells` | Windows：Git Bash 与 PowerShell 两个工具、Manual 下询问、中文输出；隐藏 Git 后只剩 PowerShell 并显示安装提示（夹具选项 `appEnv` 覆盖应用的环境变量） |
-| `npm run bench:t18` | 冷启动到侧栏（100 个会话）就绪的 10 次测量（打包产物），JSON 写到 `tmp/evidence/T18/bench/` |
-| `npm run bench:t19` | 在前台测开发打包产物的真实会话，使用本地 mock provider。结果写入 `tmp/evidence/T19/bench/` |
+| `npm run bench:t18`、`npm run bench:t19` | 冷启动到侧栏（100 个会话）就绪的 10 次测量（打包产物，`tmp/evidence/T18/bench/`）；在前台测开发打包产物的真实会话（本地 mock provider，`tmp/evidence/T19/bench/`） |
 
 ## 结构
 
@@ -37,7 +36,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 安全基线（架构第 10.3 节）的实现位置与逐条对照见 `docs/spikes/S10-electron-security.md` 第 3 节；`src/main/security/` 与 `src/main/ipc/` 是入口。
 - Core 只在 `src/main/core/` 加载与转发（ADR-0014）：`.node` 路径的唯一解析处是 `native-path.ts`；`router.ts` 按路由键转发事件批次；`terminal-ipc.ts` 管终端归属；`test-hooks.ts` 只在加载开发版 Core 时安装。`native/*.d.ts` 是 NAPI-RS 生成的 L1 快照，不手改。
 - 渲染进程：transcript 在 `src/renderer/transcript/`（常量只在 `constants.ts`），Worker 在 `src/renderer/workers/`（ES module，受同一 CSP 约束），composer 在 `src/renderer/composer/`，终端在 `src/renderer/terminal/`（`vendor/ghostty-web/` 是 fork 的 MIT 代码，改动清单在其 README）。消息形状与守卫在各目录的 `protocol.ts`。
-- 原型页 `#/event-probe`、`#/transcript-lab`、`#/terminal-lab` 经 `globalThis.__piarc*` 给 L4 与基准用（类型在 `src/shared/`），目前也随发布构建分发（I13、I24、I30）。
+- 原型页 `#/event-probe`、`#/transcript-lab`、`#/terminal-lab` 经 `globalThis.__piarc*` 给 L4 与基准用（类型在 `src/shared/`），目前也随发布构建分发（I13、I24、I30；终端原型页 T34 起只能接测试钩子创建的终端）。
 - 正式会话与原型共用 transcript 和 composer。行类型、历史窗口与滚动参数见 [transcript/AGENTS.md](src/renderer/transcript/AGENTS.md)，提及、附件与键盘约定见 [composer/AGENTS.md](src/renderer/composer/AGENTS.md)。
 - 窗口（T18，ADR-0029）：主窗口的根是 `src/renderer/shell/Shell.tsx`（侧栏、主区、注册式右栏与面板区、对话框、提醒），设置窗口是 `#/settings` 的 `src/renderer/settings/SettingsApp.tsx`；两者共用 `src/renderer/app/app-context.tsx`（平台、偏好、翻译）与 `app.css`（只读令牌；元素级规则写在 `:root[data-app]` 之下，`main.tsx` 只给这两个窗口设 `data-app`，原型页不受影响）。主进程的窗口、菜单、偏好、通知在 `src/main/app-shell.ts`、`menu.ts`、`preferences.ts`、`platform/attention.ts`、`platform/window-chrome.ts`；会话、工作区与信任命令在 `src/main/core/session-ipc.ts`。
 - 注册点：右栏与面板区 `registerPanel`（`src/renderer/shell/registry.ts`，area 为 `rail` 或 `dock`，没有注册内容的区域不渲染）；设置页 `registerSettingsPage`（`src/renderer/settings/registry.ts`）；快捷键在 `src/shared/keybindings.ts` 的 `COMMANDS` 追加一行（id、`Mod` 记法默认键、标签消息 id），渲染进程的 `use-commands.ts` 与主进程菜单自动跟随；界面字符串在 `src/shared/i18n/en.ts` 与 `zh-CN.ts` 各加一条（类型检查保证两边键相同），用 `useT()`（渲染进程）或 `AppShell.t()`（主进程）。
@@ -56,7 +55,8 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - T29（ADR-0045）：会话标题栏的三档视图切换在 `transcript/DetailSwitch.tsx`、`transcript/detail.ts`（见其 AGENTS.md）；设置页"模型与服务商"新增登录（`settings/SignInSection.tsx`，订阅 `core/login`，"在浏览器中打开"经 `openExternal` 的主进程确认）与每模型设置、辅助模型（`settings/ModelSettingsSection.tsx`），IPC 为 `startLogin`、`answerLogin`、`logoutProvider`（主进程原生确认）、`setModelPreferences`。开发构建的 `createForTests` 读 `PIARC_TEST_OAUTH_PROVIDER`（`--test-oauth-provider` 文件，设置 Host 每次启动时读，内容可在应用启动后再写）与 `PIARC_TEST_WEB_ALLOWLIST`。`PIARC_EVIDENCE_TASK=T29 npx playwright test -c apps/desktop/playwright.config.ts t29- --project dev` 覆盖三档视图（截图在 `tmp/evidence/T29/`）与登录、拒绝、过期、取消、每模型设置（`shell.openExternal` 换成跟随重定向的 fetch）。
 - T31（ADR-0048）：子 agent 卡在 `transcript/rows/subagent.tsx`（见其 AGENTS.md），来自子 agent 的审批卡、计划卡、提问表单经 `approvals/ApprovalOrigin.tsx` 标明来源；设置页 `#/settings/agents`（`settings/AgentsPage.tsx`）按工作区列出类型、来源、覆盖、解析到的模型、工具、警告与无效文件，"模型与服务商"页新增别名一节（`settings/AliasSection.tsx`，随 `setModelPreferences` 保存）且辅助模型可选别名。IPC 为 `listAgents`、`stopSubagent`、`subagentTranscript`。`PIARC_EVIDENCE_TASK=T31 npx playwright test -c apps/desktop/playwright.config.ts t31- --project dev` 覆盖这些流程（截图在 `tmp/evidence/T31/`）。
 - T32（ADR-0049）：右栏的后台任务卡与停靠的后台任务面板在 `shell/BackgroundTasks.tsx`，经 `shell/task-panels.tsx` 注册（`PanelContext.backgroundTasks`、`workspaceTasks` 由 Shell 按 `core/tasks` 计算）；数据在 `store/tasks.ts`（`TaskList`，按 `revision` 门控，`useTasks`/`useTasksOf`）。输出查看器按偏移向 Core 分段读取（先读末尾 64 KiB，随增长续读，可向前加载，至多保留 512 KiB）。IPC 为 `stopTask`、`readTaskOutput`（主进程校验任务 id 为 `bg-` 加 12 位十六进制、偏移与长度）。转后台的命令卡显示"后台运行"与任务 id（`transcript/rows/tools.tsx`），Monitor 的提醒在三档视图都显示为 Monitor 事件（`detail.ts`、`rows/status.tsx`）。`PIARC_EVIDENCE_TASK=T32 npx playwright test -c apps/desktop/playwright.config.ts t32- --project dev` 覆盖卡片、面板、读取输出与停止（截图在 `tmp/evidence/T32/`）。
-- T33（ADR-0050）：模型以 `terminal` 运行的命令是 `terminal` 类后台任务，卡片与面板显示类型"终端"（`store/tasks.ts` 解析 `terminal` 段：句柄、来源、是否共享），输出查看器读的是 Core 的屏幕文件。终端面板本身由 T34 做。`PIARC_EVIDENCE_TASK=T33 npx playwright test -c apps/desktop/playwright.config.ts t33-terminal --project dev` 覆盖卡片、面板读屏幕文件与停止（截图在 `tmp/evidence/T33/`）。
+- T33（ADR-0050）：模型以 `terminal` 运行的命令是 `terminal` 类后台任务，卡片与面板显示类型"终端"（`store/tasks.ts` 解析 `terminal` 段：句柄、来源、是否共享），输出查看器读的是 Core 的屏幕文件。`PIARC_EVIDENCE_TASK=T33 npx playwright test -c apps/desktop/playwright.config.ts t33-terminal --project dev` 覆盖卡片、面板读屏幕文件与停止（截图在 `tmp/evidence/T33/`）。
+- T34（ADR-0051）：终端面板与渲染器在 `src/renderer/terminal/`（见其 AGENTS.md），停靠面板 `terminal`（Ctrl+\` 切换，`PanelContext.terminal`），后台任务卡与面板对运行中的终端任务有"在终端面板中打开"。IPC 新增 13 个终端命令（`openSessionTerminal`、`shareTerminal`、`terminalMouse`、`terminalFocus`、`terminalPaste`、`terminalScroll`、`terminalColors`、`terminalClearSelection`、`terminalSelectionText`、`terminalLinkAt`、`terminalSearch`、`terminalScreenText`、`terminalInfo`），去掉 `createTerminal`；应用事件新增 `visibility`。composer 的片段胶囊（`composer/snippets.ts`、schema 的 `snippet` 节点）接收"附加到消息"。`PIARC_EVIDENCE_TASK=T34 npx playwright test -c apps/desktop/playwright.config.ts t34- --project dev` 覆盖面板全部流程（截图与 formatter 文本在 `tmp/evidence/T34/`）。
 - 通用设置的「项目指令」复选框写用户级 `/memory/readBoth`。Core 负责 memory 文件取舍和外部导入审批；窗口只在 Core 确认写入后更新勾选状态。真实设置和首次导入审批见 `e2e/t22-memory.e2e.ts`。
 - T20 审批卡来自 `core/sessions` 的 `approvals` 实体快照，以 `requestId`、`connectionEpoch`、`revision` 绑定答复。审批入口是 `window.piarc.answerApproval`；`allowAlways` 必须由主进程用原生确认框显示准备保存的每条规则和目录，用户确认后才交给 Core。模式菜单使用注册表命令 `session.permissionMode`，模式与变更记录以 Core 为准。运行 `PIARC_EVIDENCE_TASK=T20 npm run test:e2e -w @piarc/desktop -- t20-approvals.e2e.ts` 覆盖端到端流程。
 - preload 不暴露 `ipcRenderer`，只能 `require('electron')`（ESLint 禁止 Node 内置模块）；以后的事件 API 必须剥掉 Electron 的 event 对象再交给页面回调。
@@ -66,7 +66,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 外链只放行 `https:`、`http:`、`mailto:`（不带用户信息），必须先经原生确认框，每个窗口同一时刻最多一个（`LinkConfirmations`）。
 - 主进程比较 origin 用 `originOf`，不用前缀匹配，也不直接用 `new URL(x).origin`。
 - 主进程只按路由键转发事件批次，不解析载荷；批次一律经结构化克隆复制（Electron 45 的 `MessagePortMain` 只能转移端口，ADR-0019）；不要尝试转移 `ArrayBuffer`。
-- 终端：窗口只能用自己创建的终端（`TerminalOwners`），创建它的页面消失（窗口销毁、渲染进程崩溃、重载）时关闭它的终端；主进程不解析拉取请求与帧。Core 在阻塞线程池上启动终端（`createTerminal` 返回 Promise，T33）：创建前记下页面（`owners.page`），完成时页面已离开就关闭新终端并拒绝请求（`assign` 返回 false）。改 `vendor/ghostty-web/` 下的代码要同步其 README 的改动清单，保留 MIT 声明。
+- 终端（`terminal-ipc.ts` 的 `TerminalOwners`，ADR-0051）：会话终端归会话，任何窗口可用、重载不关闭；没有会话的终端只由测试钩子创建，归页面所有，页面消失（窗口销毁、渲染进程崩溃、重载）即关闭。写入、打开与共享要求窗口 5 秒内有真实输入（`input-event`，从 `web-contents-created` 起记录），每会话至多 16 个终端，每窗口每终端一个在途拉帧；主进程不解析拉取请求与帧。改 `vendor/ghostty-web/` 下的代码要同步其 README 的改动清单，保留 MIT 声明。
 - 渲染进程不加载原生模块；Core 只经主进程（`window.piarc.subscribeEvents` 等）。页面回调只收到批次，没有 Electron 的 event 对象。
 - 安全渲染（架构第 10.3 节）：渲染进程不从 HTML 字符串建 DOM，ESLint 禁止 `innerHTML`、`outerHTML`、`dangerouslySetInnerHTML`、`insertAdjacentHTML`、`createContextualFragment`、`setHTMLUnsafe`、`document.write`；模型输出里的原始 HTML 作为 `html` 节点按文本显示；链接只保留 `safeHref` 通过的 `https:`、`http:`、`mailto:`，点击经 `window.piarc.openExternal`（主进程确认框）；图片不加载，显示为链接；代码高亮只输出 token 与颜色。
 - 高亮不放宽 CSP：shiki 用 `@shikijs/engine-javascript`，不用需要 `wasm-unsafe-eval` 的 Oniguruma 引擎；语法按需加载，每种一个 chunk，`GRAMMARS` 与 `languages.ts` 的别名表一起改。
@@ -109,7 +109,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 从 Node 调 PowerShell 时关掉它的 stdin（`stdio: ['ignore', …]`），否则命令打印完结果还会一直等 stdin。
 - ProseMirror 自己在合成期间不分发按键，所以只测合成中的按键测不出守卫是否生效；`composer.e2e.ts` 另有"合成开始前到达的 229 按键"和"合成文本恰为 `@`、`/`"两类用例，去掉守卫时它们会失败。
 - 页面处理按键之后，经事件 MessagePort 投来的消息要到下一帧的 rAF 之后才被处理（`invoke` 的回复不受影响）：所以终端帧作为 `requestTerminalFrame` 的返回值送达，不要改回事件端口（ADR-0023，S7 报告第 5.2 节）。
-- 终端 L4（`terminal.e2e.ts`、`terminal-tui.e2e.ts`）按平台选程序：macOS 用 `/bin/sh`、`cat`、`vim`、`top`；Windows 用 cmd（`PROMPT=$$$S`）、PowerShell、Git 自带的 vim（由 `git --exec-path` 找到）与 `e2e/programs/show-keys.ts`（Node 直接运行 `.ts`）。ConPTY 下 conhost 会重新编码按键，Windows 版的按键用例只断言按键到达程序。
+- 终端 L4（`terminal.e2e.ts`、`terminal-tui.e2e.ts`）按平台选程序：macOS 用 `/bin/sh`、`cat`、`vim`、`top`；Windows 用 cmd（`PROMPT=$$$S`）、PowerShell、Git 自带的 vim（由 `git --exec-path` 找到）与 `e2e/programs/show-keys.ts`（Node 直接运行 `.ts`）。ConPTY 下 conhost 会重新编码按键，Windows 版的按键用例只断言按键到达程序。 面板（T34）：终端只认真实输入：L4 用 Playwright 的键盘、鼠标或 CDP 输入驱动面板，页面里直接调写入命令会被拒绝；最小化窗口的 rAF 仍在跑，按帧工作的视图看 `visibility` 应用事件（`renderer/app/window-visibility.ts`）；axe 要 `setLegacyMode(true)`。
 - 不要在 `postPackage` 之前把内置 node 放进 bundle：fuses 插件与 `resealElectron` 的 `--deep` 会把它改成 ad-hoc 签名。新增随包的 Mach-O 文件放在 Resources 下即可，`signResourcesAndBundle` 会扫描签名；要保留原签名的目录加进 `keepSigned`。
 - 本机 Gatekeeper 评估被关闭时（`spctl --status` 为 `assessments disabled`），`spctl --assess` 一律显示 accepted，不能作为首次打开的证据；首次运行检查要在开启 Gatekeeper 的机器上做。
 - MCP 夹具要先 `npm pack` 再经 `npx --package <tgz>` 启动：`npx <目录>` 会链接目录并 chmod 其中的 bin，在 Agent Host 的 Seatbelt 下被拒绝（真实 MCP 包来自 registry 的 tarball，不受影响）。
@@ -117,4 +117,4 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 
 ## 参考
 
-- 架构第 3.4、6.11、7.6、8.1–8.8、10.2、10.3、11 章；ADR-0013、ADR-0014、ADR-0017、ADR-0018 第 1、6 条、ADR-0022、ADR-0023、ADR-0029；`docs/spikes/S10-electron-security.md`、`S02-napi-event-channel.md`、`S01-transcript-composer.md`、`S07-terminal.md`；`docs/engineering/testing.md` 第 9 节。
+- 架构第 3.4、6.11、7.6、8.1–8.8、10.2、10.3、11 章；ADR-0013、ADR-0014、ADR-0017、ADR-0018 第 1、6 条、ADR-0022、ADR-0023、ADR-0029、ADR-0051；`docs/spikes/S10-electron-security.md`、`S02-napi-event-channel.md`、`S01-transcript-composer.md`、`S07-terminal.md`；`docs/engineering/testing.md` 第 9 节。

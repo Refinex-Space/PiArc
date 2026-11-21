@@ -1,12 +1,13 @@
 # piarc-term
 
-终端会话（ADR-0017）：portable-pty 管 PTY，libghostty-vt 持有终端状态，按 viewer 编码增量帧（格式第 2 版，定义在 `piarc_protocol::term_frame`）。T33 起还有：副作用回调（`vt/effects.rs`）、读屏与搜索（`vt/formatter.rs`、`vt/search.rs`）、OSC 133 命令记录（`commands.rs`）、终端的保存与恢复（`snapshot.rs`）、shell integration（`shell.rs` 与 `shell-integration/`）、鼠标与粘贴编码。libghostty-vt 的原始绑定、预编译产物的下载与校验在 `piarc-ghostty-sys`（本文件一并说明）。不负责渲染（`apps/desktop/src/renderer/terminal/`）、Core 的终端注册表与会话终端任务（`piarc-core::terminal`），也不负责进程树（`piarc-exec::TerminalTree`）。
+终端会话（ADR-0017）：portable-pty 管 PTY，libghostty-vt 持有终端状态，按 viewer 编码增量帧（格式第 2 版，定义在 `piarc_protocol::term_frame`）。T34 起还有：选区手势、选区文本、视口滚动与 OSC 8 链接（`vt/selection.rs`）、写线程上的指针事件（`session/pointer.rs`）、默认颜色、停拉后的 `Event::Output`。T33 起还有：副作用回调（`vt/effects.rs`）、读屏与搜索（`vt/formatter.rs`、`vt/search.rs`）、OSC 133 命令记录（`commands.rs`）、终端的保存与恢复（`snapshot.rs`）、shell integration（`shell.rs` 与 `shell-integration/`）、鼠标与粘贴编码。libghostty-vt 的原始绑定、预编译产物的下载与校验在 `piarc-ghostty-sys`（本文件一并说明）。不负责渲染（`apps/desktop/src/renderer/terminal/`）、Core 的终端注册表与会话终端任务（`piarc-core::terminal`），也不负责进程树（`piarc-exec::TerminalTree`）。
 
 ## 命令
 
 | 命令 | 用途 |
 |---|---|
 | `cargo test -p piarc-term` | safe 封装（effects、render state、键盘与鼠标编码、粘贴、formatter、搜索、snapshot、render hold）、命令记录、帧编码器、键位表；`tests/pty.rs` 真实 PTY（Unix，含隐藏终端不出帧）、`tests/pty_windows.rs` 真实 ConPTY（Windows：cmd、PowerShell、Git 自带的 vim）；`tests/consistency.rs` 帧与 formatter 逐格比较；`tests/read_screen.rs` 读屏与 render state 逐格一致（宽字符、折行、alt screen）、1 万行 scrollback 搜索不阻塞写入、snapshot 三级降级 |
+| `cargo test -p piarc-term --test pointer` | T34：真实 PTY 中的拖选与双击（帧带回选区列）、键入清除选区、滚轮与 scrollback、跟踪鼠标的程序收到按下（Shift 时选区）、停拉后输出唤醒一次、默认颜色进入帧与 OSC 11 应答 |
 | `cargo test -p piarc-term --test shell_integration` | 真实 zsh 与 bash（macOS）的 OSC 133 命令边界、退出码与 OSC 7；`shell_integration_windows.rs` 是 Git Bash 与 PowerShell（Windows CI） |
 | `PIARC_UPDATE_FRAME_SAMPLES=1 cargo test -p piarc-term --test consistency` | 改了帧编码或格式后重写 TS 共享样本 `apps/desktop/src/renderer/terminal/frame/frame-samples.json`（不带变量时只检查它是最新的） |
 | `cargo test -p piarc-ghostty-sys` | 产物校验（官方 `SHA256SUMS` 及其真实签名）与链接冒烟 |
@@ -25,6 +26,13 @@
 - 写队列有界（`WRITER_QUEUE` 256 条）：`write`/`key`/`mouse`/`focus` 用 `try_send`，满了返回 `Busy`，不阻塞调用者；`paste` 等写线程答复（它要先读终端模式）。
 - 事件（`Event`：标题、目录、铃声、命令开始与结束、剪贴板、退出、失败）在 IO 线程上调用 `EventHandler`：处理函数不能阻塞，Core 只做入队。
 - 取帧、读屏、搜索、保存都要终端锁，调用方放到阻塞线程池；搜索分步进行，每步之间放开锁，所以长时间搜索时输出照常进入（`vt/search.rs`）。
+
+## 指针、选区与视口（T34，ADR-0051）
+
+- 指针事件经写线程（与按键同一队列，保持顺序）：程序跟踪鼠标（模式 9/1000/1002/1003）且不是按住 Shift 的左键时交给鼠标编码器；否则左键驱动 `SelectionGesture`（点击次数由 viewer 给出，内部换成相隔 1 ns 或 10 s 的时间），滚轮在主屏滚动视口、在备用屏且开启 1007 时发方向键。进行中的选区拖动不因模式变化而改道。
+- 选区是终端自己的跟踪状态（`OPT_SELECTION`），帧经 render state 带回每行的选区列；选区文本用 formatter（合并折行、去行尾空格）。`Input`（键入、上屏文本、批准的命令）与按键、粘贴之后回到底部并清除选区；查询应答用 `Bytes`，不影响视口。
+- `frame_parking(.., park)` 在持终端锁时置唤醒标记，帧非空时清除；IO 线程写入后见到标记就发一次 `Event::Output`。
+- 拖动经过网格中线才包含该格（与终端惯例一致），测试按格的左右部分取坐标。
 
 ## 副作用回调（`vt/effects.rs`）
 

@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.41（2026-11-20） |
+| 版本 | 2.42（2026-11-20） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -265,6 +265,7 @@ PiArc/
 | [0048](../adr/0048-subagents-and-model-aliases.md) | 子 agent 定义由 Core 读、Agent Host 加内置类型；子会话经 `subagent/start` 在 Core 登记自己的会话 id 并链接主会话（模式取更严者、会话规则与检查点归主会话、审批卡标来源）；工具过滤用隐藏声明加 `tool_call` 闸门；深度与并发只在 Agent Host 的 `SubagentRunner` 计数，超限立即报错；后台运行不随中断结束、经提醒回报；别名表是设置键 `modelAliases`，由 Agent Host 的 `resolveModel` 解析 | 子 agent 沿用同一套裁决、快照与 hooks；被移除工具的调用仍经过闸门；排队会让前台子 agent 互相等待而死锁 |
 | [0049](../adr/0049-background-tasks-and-monitor.md) | Core 的任务管理器（`piarc-core::tasks`）统一管理后台命令、后台子 agent 与 Monitor：元数据写 `background_tasks`、实体快照 `core/tasks`；前台超时由任务时钟计时，同一进程转为后台任务，输出写主会话的 `tasks/<任务 id>.log`；完成通知在 Core 挂起到看见送达，经带 `key` 的 `session/remind` 发出、按类型与来源去重；Monitor 的新行按批次与总量限速回灌，会话空闲时以 `wake` 唤醒（有间隔下限、可关闭）；Monitor 的命令走 Bash 的规则与分析但不享受只读白名单，`Bash` matcher 的 hooks 同时匹配 Monitor | 进程归 Core，Agent Host 崩溃、空闲回收、回合中断都不影响后台命令；通知不丢不重；时间相关的逻辑可注入时钟 |
 | [0050](../adr/0050-agent-terminal-screen-access.md) | 终端承载的任务：每个属于会话的终端登记为 `terminal` 类任务；`Bash` 的 PiArc 参数 `terminal` 让命令在会话的终端里后台运行；模型用 Read 读 Core 维护的屏幕文件（formatter 输出，命令结束通知与读取前重写）；用户的终端只在共享后对模型可见，agent 不能向交互终端写入；Monitor 不扩展到终端 | 读屏来自同一个终端实例、不读原始字节；沿用后台任务的读法与通知，模型不需要新工具 |
+| [0051](../adr/0051-terminal-panel-and-renderer.md) | 终端面板只打开会话终端，它们归会话、重载后重连；写入、打开与共享终端要求窗口 5 秒内有真实输入，每会话至多 16 个、每窗口每终端一个在途拉帧；空帧若干次后停拉，Core 以 `output` 事件唤醒；选区手势、视口滚动与 OSC 8 链接在 Core（与按键同一写线程）；默认前景、背景、光标取设计令牌并交给 Core；渲染器按设备像素绘制 | 重载不打断 shell；渲染进程被注入时无人操作就不能借终端执行命令；空闲终端不轮询；选区随 scrollback 移动、复制用 formatter 规则；程序查询到的颜色与画面一致 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -801,6 +802,12 @@ T27 落地（ADR-0043）：`agent-host/src/harness/context-usage.ts` 在每次�
   - shell integration：zsh（`ZDOTDIR`）、bash 与 Git Bash（`--rcfile`）、PowerShell（profile 之后点源）的脚本为 PiArc 自写，装在数据目录的 `shell-integration/`，不改用户的启动文件；发出 OSC 133 A/B/C/D（C 带百分号编码的命令行）与 OSC 7。终端以会话的 shell 目录（含 worktree）和 T17 的命令环境启动，另加 `TERM=xterm-256color`、`COLORTERM=truecolor` 与脚本位置；环境里没有 locale 时补 UTF-8 locale（macOS `en_US.UTF-8`，Windows `C.UTF-8`），否则 bash 的行编辑器在 C locale 下把键入的中文当成 Meta 键。沙箱会话的终端套同一个沙箱包装。
   - 会话终端与 agent：用户的终端（`openSessionTerminal`，登录 shell）与模型的终端（`exec/run` 带 `terminal`）都是 `terminal` 类任务（来源 `user`/`agent`、是否共享在 `background_tasks.metadata`，不改 schema）。屏幕文件 `tasks/<任务 id>.log` 第一行是终端与标题，第二行是最近一条命令及其结束方式，之后是 formatter 的全部文本；变化后至多每 500 ms 重写，通知与读取前立即重写。模型的命令结束时先挂起提醒，再把退出码写到仍在运行的任务上（终端保留）。用户的终端未共享时不列出、读不到、没有屏幕文件，KillShell 停不了它。
   - 进程树：macOS 上 `TerminalTree` 在挂断前按终端设备列出全部进程（作业各在自己的进程组），挂断后向它们的进程组发 `SIGHUP`、`SIGCONT`，宽限 2 秒后 `SIGKILL`；Windows 上 shell 启动后立即加入 `KILL_ON_JOB_CLOSE` 的 Job Object。关闭终端与有序关闭都等进程树结束（含忽略挂断的进程）才返回。
+- **T34 落地（ADR-0051）**：
+  - 路线：S7 结论的正式路线，fork 的 `CanvasRenderer` 由帧协议驱动（`apps/desktop/src/renderer/terminal/`），不启用 xterm.js 退路。渲染器按设备像素度量与绘制（小数缩放比下格子落在整像素），按行 id 复用、只重画脏行与相邻行，宽字符与 emoji 在两格内居中，Powerline 分隔符画成形状；光标样式来自帧，闪烁只在获得焦点且未开启减少动效时计时，失焦显示空心块。字体是设计令牌的系统等宽字体，默认前景、背景、光标取组件令牌 `terminal.*` 并交给 Core 作为终端的默认颜色（程序的 OSC 10/11/12 查询得到同一组值），ANSI 调色板是终端自己的。
+  - 拉帧：只在 rAF 回调中拉；连续 8 个空帧后带 `park` 拉取，仍为空就停止拉取与 rAF，Core 在下一段输出时于 `term/<id>` 发一次 `output` 事件唤醒；输入后连续拉取直到回显（至多 50 ms）。面板关闭、标签不可见、页面隐藏、窗口最小化或隐藏（主进程的 `visibility` 应用事件）时不拉帧。
+  - 会话终端归会话：面板只经 `openSessionTerminal` 打开终端，任何窗口都可查看与输入，重载后从 `core/tasks` 找回并以一次 RESET 帧恢复，shell 不受影响；关闭标签经任务停止结束 shell 及其全部进程。agent 的终端任务也列为标签（标 Agent），后台任务卡可"在终端面板中打开"。
+  - 选区、滚动、链接在 Core：piarc-term 暴露 libghostty-vt 的选区手势（拖选、双击选词、三击选行、Shift 扩展；点击次数取渲染进程的 `MouseEvent.detail`）、选区文本（formatter 合并折行、去行尾空格）、视口滚动与 OSC 8 链接；指针事件与按键走同一个写线程，程序跟踪鼠标时交给鼠标编码器，否则（或按住 Shift 的左键）作为选区；滚轮在主屏滚动 scrollback、在备用屏且开启 1007 时发方向键；键入回到底部并清除选区。普通 URL 由渲染进程在帧的行文本中识别。
+  - 面板：停靠区的"终端"面板，多标签（标题跟随程序的标题、可重命名、Delete 关闭、F2 重命名），工具条有"共享给 agent"（用户终端默认关）、"把选中内容附加到消息"（composer 中的片段胶囊，发送时为带来源的围栏代码块）、查找（Core 搜索，高亮全部匹配、上下跳转、显示匹配数）与"以文本查看屏幕"（Core 读屏）。可能直接执行的粘贴先在面板中确认；Mod+点击链接经主进程确认框打开。
 
 ### 6.12 Worktree 与并行会话
 
@@ -1154,6 +1161,7 @@ diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高�
 - T26（ADR-0042）：transcript 中 `TodoWrite` 是任务卡（进行中项高亮、完成计数），`ExitPlanMode` 是计划卡（摘要与状态，可在计划面板中打开），`AskUserQuestion` 的结果按题列出，`SuggestNextSteps` 是下一步建议（每条"在此执行""开始新会话"）；待批的计划与提问在审批卡位置显示为计划审批卡与提问表单，沿用审批热键、400 ms 防误触与输入法守卫；右栏注册任务卡片（会话有任务清单时），停靠区注册计划面板（会话有待批或已批准的计划时）。
 - T32（ADR-0049）：右栏的后台任务卡（会话有后台任务时注册）列出该会话及其子 agent 的任务：类型、标题、状态、耗时、运行中的最后三行与停止按钮；停靠区的后台任务面板按会话列出工作区的任务，展开后按偏移分段向 Core 读取输出（先读末尾，随增长续读，可向前加载，渲染进程至多保留 512 KiB）；两处停止都经 `stopTask`（与 KillShell 同一 Core 入口）。转后台的命令卡显示"后台运行"与任务 id；Monitor 的提醒在默认视图里显示为 Monitor 事件。
 - T31（ADR-0048）：子 agent 卡（`transcript/rows/subagent.tsx`）显示任务名、类型、颜色、实际模型、状态、耗时、工具调用数、token、后台标记与警告，运行中显示当前活动和停止按钮；展开后以只读方式显示子会话转录（复用行组件，不提供重试、回退与分支）。来自子 agent 的审批卡、计划卡与提问表单标明"来自子 agent：名称（类型）"。
+- T34（ADR-0051）：停靠区的终端面板（Ctrl+\` 切换，打开时会话没有终端就新建一个）列出会话的终端任务为标签，工具条有共享开关、附加到消息、查找与以文本查看屏幕；面板只是查看会话终端，关闭面板或重载窗口不影响 shell。composer 新增片段胶囊：显示来源与行数，发送时以带来源的围栏代码块拼入消息。
 - T19 的会话主区使用第 8.4 节的行组件与 ProseMirror 输入。提及胶囊显示文件名，发送时按相对路径展开。附件经主进程存入 Core 的会话附件目录，模型收到图像块或 PDF 提取文本。内置命令由 Core 提供，运行中的 steer、follow-up 与队列编辑都经会话 API 执行。
 
 ### 8.3 状态与数据流
@@ -1171,7 +1179,7 @@ Core 事件批次 ──► 主进程（只转发）──MessagePort──► �
 3. store 自己实现，基于 React 的 `useSyncExternalStore`，按会话和 item 粒度订阅。流式增量只让最后一个 item 的订阅者重新渲染，不触发整棵组件树刷新。
 4. 实体快照按 `revision` 门控，旧数据丢弃。
 5. 事件批次（包括 transcript 窗口、长 diff 等大块数据）以二进制载荷经结构化克隆复制转发：Electron 主进程的 `MessagePortMain` 只能转移端口，不能转移 `ArrayBuffer`（ADR-0019）。单批转发耗时计入第 11 章"Core 事件到渲染进程"的预算；大块内容的体量从源头控制，例如按需拉取 transcript 窗口。
-6. 终端帧不走事件通道：渲染进程按动画帧拉取，帧作为拉取请求（`ipcRenderer.invoke`）的返回值送达；事件 MessagePort 上的消息在按键之后会被推迟到下一帧之后处理（ADR-0023）。终端的标题、响铃、退出事件仍经事件通道（路由 `term/<id>`）。
+6. 终端帧不走事件通道：渲染进程按动画帧拉取，帧作为拉取请求（`ipcRenderer.invoke`）的返回值送达；事件 MessagePort 上的消息在按键之后会被推迟到下一帧之后处理（ADR-0023）。终端的标题、响铃、退出事件仍经事件通道（路由 `term/<id>`）。T34：空闲的视图停拉，Core 在新输出到达时于 `term/<id>` 发一次 `output` 事件唤醒它；窗口的最小化与恢复经应用事件 `visibility` 告知页面（ADR-0051）。
 7. T18 落地：store 在 `src/renderer/store/`（`AppStore`、`SessionTranscript`，React 绑定在 `hooks.ts`），订阅粒度为工作区列表、会话列表、单个会话条目与单行 transcript；revision 不大于当前值的快照丢弃，未变化的条目保留原对象；乐观行按 `clientId` 记录，提示被接受后记下 `turnId`，Core 的用户消息在原位置替换它（事件先于提示的应答到达时按相同文本匹配第一条未确认的行），不会出现两次。渲染计数由 happy-dom 下的单元测试验证。窗口是否在前台由主进程的 `focus`、`blur` 应用事件告知，标记已读与提醒以它为准。
 
 ### 8.4 Transcript 渲染管线
@@ -1204,6 +1212,8 @@ Core 事件批次 ──► 主进程（只转发）──MessagePort──► �
 
 T18 落地（ADR-0029）：快捷键注册表在 `src/shared/keybindings.ts`（命令 id、`Mod` 记法的默认键、标签消息 id）。渲染进程按 `KeyboardEvent.code` 匹配用户覆盖后的有效绑定，执行命令并阻止默认行为；输入法合成中不匹配。主进程菜单显示同一份绑定作为加速键，菜单点击经应用事件送到窗口。冲突按平台换算后的物理按键判断，只允许 Mod、Ctrl、Alt 组合或功能键。T18 注册了 Mod+N、Mod+W、Ctrl+Tab、Mod+/，以及设置窗口的 Mod+,；其余快捷键由所属任务在 `COMMANDS` 中追加。
 
+T34 落地（ADR-0051）：Ctrl+\` 切换终端面板（`terminal.toggle`）。注册表的命令可标 `global`：终端获得焦点时只有全局命令（Ctrl+\`、Ctrl+Tab、Mod+,）留给应用，其余按键都交给终端；macOS 的 ⌘ 组合键不进终端。复制在 macOS 为 ⌘C，在 Windows 为 Ctrl+Shift+C 或有选区时的 Ctrl+C（无选区时 Ctrl+C 发给程序）；粘贴由浏览器的 paste 事件交给 Core 按 bracketed paste 包装。终端中的链接 Mod+点击打开，先经主进程确认框显示地址。
+
 ### 8.6 设计语言
 
 - PiArc 使用**自有视觉品牌**（ADR-0006）：主色避开橙色 / 陶土色系；不用"暖奶油底 + 衬线大标题"组合；插画、提示音自行设计。应用图标与标记用 `design/brand/` 中的黑白 Pi 字形（来源与许可证见该目录 README）；公开发布前要确认 Pi logo 的使用许可（需求 D3）。
@@ -1219,6 +1229,7 @@ T18 落地（ADR-0029）：快捷键注册表在 `src/shared/keybindings.ts`（�
 - 屏幕阅读器在 macOS VoiceOver 与 Windows Narrator / NVDA 上验证。
 - 键盘：所有功能可以只用键盘完成；焦点顺序经过设计和测试；焦点环始终可见。
 - 本地化：第一版提供简体中文与英文；字符串集中管理（ICU MessageFormat），主进程菜单与渲染进程共用同一份资源，不在代码中硬编码。
+- T34（ADR-0051）：终端的输入框可聚焦并有可读名称（"终端 <名称>"），画布对辅助技术隐藏；"以文本查看屏幕"在对话框中显示 Core 读屏的文本，供屏幕阅读器阅读与复制；查找的匹配数以 `aria-live` 播报。面板经 axe 检查无违规。
 - T18 落地（ADR-0029）：intl-messageformat 12.1.4（解释执行，不放宽 CSP）；目录在 `src/shared/i18n/`（`en.ts` 定义消息 id，`zh-CN.ts` 必须覆盖全部 id），主进程的菜单、原生对话框、通知与渲染进程共用；语言偏好为 `system` 时取系统首选语言，改语言后各窗口与菜单立即更新。缺失翻译的检查与全面无障碍由 T43 做。
 
 ### 8.8 平台集成
@@ -1367,7 +1378,7 @@ T20 起，项目层的 `acceptEdits` 和 `additionalDirectories` 也纳入信任
 - preload 只暴露窄接口，不直接暴露 `ipcRenderer`；事件回调剥掉 Electron 的 event 对象后再交给页面。
 - 主进程对每个 IPC 请求校验 `senderFrame` 的 origin（用 origin，不用 URL 前缀匹配；frame 可能为空，此时拒绝）。
 - 即使渲染进程被攻破，它能调用的也只是 preload 白名单中的命令；有副作用的操作（执行命令、写文件、改权限规则）仍要经 Core 的权限裁决，"总是允许"类规则的修改需要在主进程弹出的原生确认框中确认。
-- 现状与这条的差距（R1）：终端面板的输入（`terminalInput`、`terminalKey`）是用户在自己的 shell 里打字，不经 Core 的权限裁决，渲染进程被注入时可以借它执行命令；发布构建目前也带着原型终端的函数。防线与每窗口上限由 T34 决定并写入本节，以文档例外接受时先写 ADR（登记事项 I51、I30）。
+- 终端输入（T34，ADR-0051，I51 收口）：用户在自己的 shell 里打字就是执行命令，不经 Core 的权限裁决；防线是"近期真实输入"：主进程从窗口创建起记录 Electron 的 `input-event`（键盘、鼠标按键与滚轮、触摸，页面脚本无法伪造），终端的写入（输入、按键、粘贴、鼠标按下与松开）、打开会话终端与共享给 agent 都要求该窗口 5 秒内有过真实输入。上限：每个会话至多 16 个终端，每个窗口对每个终端至多一个在途拉帧。`window.piarc` 不能启动没有会话的终端（只剩开发构建的测试钩子）。
 - 外链确认框每个窗口同一时刻最多一个，带用户信息的地址（`https://a@b/`）直接拒绝（R1）。
 - T23 新增权限页的四个命令（`permissionRules`、`checkPermissionRule`、`updatePermissionRule`、`auditEvents`）：主进程校验参数，新增或修改 allow 规则先弹原生确认；切换到跳过权限模式前同样弹原生确认，Core 另核对用户级开关。
 - T18 新增的命令（会话、工作区、信任、偏好、设置窗口、通知与计数）都在主进程校验参数：会话 id 按 Core 的规则校验，路径必须是绝对路径，标题不超过 200 字符，偏好只接受白名单内的键与值。删除会话由主进程弹原生确认框，页面无法绕过。主进程经 `piarc:app.event` 推送应用事件（偏好、菜单命令、打开会话、窗口焦点），preload 去掉 Electron 的 event 对象后再交给页面。
@@ -1387,7 +1398,7 @@ T20 起，项目层的 `acceptEdits` 和 `additionalDirectories` 也纳入信任
 ### 10.4 合规
 
 - 遵守 ADR-0006：不提供 Claude 订阅登录；clean-room；自有品牌。
-- 第三方许可证：构建时生成 `THIRD_PARTY_NOTICES`（Rust crates、npm 依赖、Pi、libghostty-vt、fork 的 ghostty-web 渲染器代码、Node 等），并随包附带 Electron / Chromium 的许可证文件，在"关于"中可查看。
+- 第三方许可证：构建时生成 `THIRD_PARTY_NOTICES`（Rust crates、npm 依赖、Pi、libghostty-vt、fork 的 ghostty-web 渲染器代码、Node 等），并随包附带 Electron / Chromium 的许可证文件，在"关于"中可查看。不经包管理器进入产物的代码与二进制登记在 `third-party/sources.json`（fork 的渲染器：来源、提交、许可证文件，改动清单在其目录的 README，T10、T34）。
 - PR 模板包含"来源与许可证"检查项：新增代码若参考了外部项目，写明来源与许可证。
 
 ### 10.5 隐私与遥测
@@ -1417,14 +1428,14 @@ T20 起，项目层的 `acceptEdits` 和 `additionalDirectories` 也纳入信任
 | 流式渲染（100 token/s） | 渲染进程主线程无超过 50 ms 的长任务；每帧主线程工作 p99 ≤ 12 ms（原：帧时间 p99 ≤ 16 ms） | 长任务 0；p99 5.7 ms | 长任务 0；p99 4.7 ms | CDP 追踪：相邻两次 `BeginMainThreadFrame` 之间主线程任务的总耗时（S1 第 2 节） |
 | 万条 item 的 transcript 滚动 | 60 fps | 60.1 fps（60 Hz 屏） | 75.1 fps（75 Hz 屏） | 自动化滚动测试 |
 | 会话切换 | 已缓存 ≤ 100 ms；冷加载 1,000 条 item ≤ 170 ms（原：≤ 300 ms） | 已缓存未测；冷加载中位 52 ms | 已缓存未测；冷加载中位 81 ms | 打点 |
-| 主进程事件循环延迟 | p99 ≤ 16 ms | 10 万事件/分钟 3.58 ms；终端 100 MB 输出 2.04 ms | 原始值 16.81 ms，同机空闲 16.58 ms，超出空闲 0.23 ms；终端 100 MB 输出 14.34 ms | `monitorEventLoopDelay`（1 ms 采样）；计时器粒度粗于 1 ms 的平台（Windows 约 15.6 ms）取"满载 p99 − 同机同轮空闲 p99" |
+| 主进程事件循环延迟 | p99 ≤ 16 ms | 10 万事件/分钟 3.58 ms；终端 100 MB 输出 2.04 ms（T34 渲染器 2.14 ms） | 原始值 16.81 ms，同机空闲 16.58 ms，超出空闲 0.23 ms；终端 100 MB 输出 14.34 ms | `monitorEventLoopDelay`（1 ms 采样）；计时器粒度粗于 1 ms 的平台（Windows 约 15.6 ms）取"满载 p99 − 同机同轮空闲 p99" |
 | Core 事件到渲染进程（主进程转发） | p95 ≤ 1.1 ms（原：≤ 5 ms） | 0.50 ms | ≤ 0.21 ms（p99） | 打点，每次投递，常规批次（≤ 1 MiB） |
 | AHP 往返（小文件 fs 操作） | macOS p95 ≤ 5 ms；Windows p95 ≤ 15 ms（ADR-0041，W1） | 0.19–0.22 ms | W0 ≤ 5 ms（数值未记录）；W1 在 ADR-0036 之后单独运行 5.04 ms、全量 `cargo test` 中 9.32 ms | 契约测试中计时 |
 | 无需用户参与的权限裁决 | macOS p95 ≤ 2 ms；Windows p95 ≤ 10 ms（ADR-0040，W1） | p95 0.526 ms，1,000 次（T20，含路径、配置、信任及 SQLite 审计）；T23 加入规则集、复合 Bash 分析与程序解析后 p95 0.70 ms（调试构建，1,000 次） | p95 3.35 ms（CI 运行 44453549786）；实机 8.4–8.9 ms（W1，Defender 实时保护开启；均为 T23 之前的代码） | Core 基准测试 `tool_io::policy::tests::automatic_decision_latency` |
-| 终端键入回显的额外延迟（相对直接写 PTY） | p95 ≤ 5 ms | 0.76 ms（逐对相减 0.79 ms） | −0.85 ms（逐对相减 6.86 ms） | 两组样本各 ≥ 1,000 个，取"完整路径 p95 − 直接写 PTY p95"；逐对相减在 ConPTY 下会叠加两次独立往返的抖动 |
+| 终端键入回显的额外延迟（相对直接写 PTY） | p95 ≤ 5 ms | 0.76 ms（逐对相减 0.79 ms）；T34 渲染器 0.67 ms（逐对相减 0.68 ms） | −0.85 ms（逐对相减 6.86 ms） | 两组样本各 ≥ 1,000 个，取"完整路径 p95 − 直接写 PTY p95"；逐对相减在 ConPTY 下会叠加两次独立往返的抖动 |
 | 安装包体积（macOS arm64 DMG / Windows x64 安装包） | ≤ 200 MB | 168.8 MB | **超出**：225.3 MB（开发构建） | 构建产物 |
 | 安装后体积 | ≤ 450 MB | 449.0 MB（余约 1 MB） | **超出**：521.3 MB | 构建产物 |
-| 空闲 CPU | 接近 0%，无轮询；窗口隐藏时停止动画与终端帧 | 未测（隐藏终端不拉帧已由 L4 验证） | 未测 | Activity Monitor / 任务管理器 |
+| 空闲 CPU | 接近 0%，无轮询；窗口隐藏时停止动画与终端帧 | 未测（终端：空闲视图停拉、不跑 rAF，面板隐藏与窗口最小化时拉帧 0 次，T34 L4 计数） | 未测 | Activity Monitor / 任务管理器 |
 | Agent Host 崩溃后恢复 | ≤ 3 s | 未测（S9 验证了流程，首次退避 1 s） | 未测 | 故障注入测试 |
 | 渲染进程崩溃或重载后恢复 | ≤ 2 s，会话不中断 | 未测 | 未测 | 故障注入测试 |
 | Beta 期无崩溃会话率 | ≥ 99.5% | 不适用 | 不适用 | 崩溃统计（用户同意后） |
@@ -1682,6 +1693,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 版本 | 日期 | 说明 |
 |---|---|---|
 | 2.41 | 2026-11-20 | T33（ADR-0050）补充第 4 章 ADR-0050、6.11 节终端的线程与有界写队列、新增 effects 与事件、读屏与搜索、帧格式第 2 版定稿、输入编码、保存与恢复、shell integration、终端环境的 UTF-8 locale、会话终端与 agent 的屏幕文件、进程树的结束方式，7.1 节 `unsafe` 范围加 `piarc-exec` 的 `tty_processes`，7.4 节 `terminalTasks` 能力，7.6 节终端导出，9.1 节 `terminals/` 与 `shell-integration/`；基线决策未变（ADR-0017 已定读屏来源与 OSC 133） |
+| 2.42 | 2026-11-20 | T34（ADR-0051）补充第 4 章 ADR-0051、6.11 节终端面板与渲染器的落地（会话终端的归属与重载、停拉与 `output` 唤醒、选区与滚动与链接在 Core、默认颜色、键盘归属），8.2 节终端面板，8.3 节第 6 条停拉与窗口可见性事件，8.5 节终端快捷键与全局命令、复制粘贴，8.7 节终端的无障碍，10.3 节终端输入的防线与上限（I51 收口），10.4 节 fork 渲染器的登记，11 章空闲 CPU 与终端两行的 T34 实测；基线决策未变（ADR-0017、0023 已定拉帧与渲染层） |
 | 2.40 | 2026-11-20 | T32（ADR-0049）补充第 4 章 ADR-0049、6.1.4 节 KillShell 与 Monitor 的参数与裁决、6.6.3 节 `monitorOutput`、`key` 与 `wake`、6.11 节任务管理器、超时转后台、通知、Monitor 回灌与限速的落地、7.3 节后台任务的持久化、7.4 节 `backgroundTasks` 能力的方法与成员、8.2 节后台任务卡与面板、9.2 节 schema v7、9.3 节任务输出的清理；基线决策未变（6.11 已定超时转后台与 Monitor） |
 | 2.39 | 2026-11-20 | T31（ADR-0048）补充第 4 章 ADR-0048、6.4 节子 agent 的落地（定义加载、子会话登记与链接、工具过滤用隐藏声明加闸门、深度与并发计数、前后台、空闲回收）、6.13 节模型别名表与解析、6.14 节 `model`、`effortLevel` 生效、`advisorModel` 忽略、`agent` 交 T48、7.4 节 `subagents` 能力的方法与成员、7.6 节子会话条目增量的现状、8.2 节子 agent 卡与设置页、9.2 节 schema v6；基线决策未变 |
 | 2.38 | 2026-11-20 | R3（M2 macOS 阶段门）：第 4 章补上 ADR-0042；6.0 节矩阵按 M2 实际交付更新权限、Hooks、Plan、任务清单、上下文工程、Checkpoint、多模型七行；第 4 章加入 ADR-0047、6.2.2 与 6.2.3 节写明带通配的命令规则不放行越界路径（ADR-0047，修订 ADR-0037 的阶梯）；6.2.2 节写明 `Read` deny 对目录搜索与 Bash 递归读取的限制（I120）；6.3.1 节进程树终止按平台写准；6.6.4 节熔断复位范围（I107）；6.14 节 `plansDirectory` 交 T48（I104）；6.15 节记录 R3 对校准值的核对（数值不变）与缓存断点、plan 模式两行的实现；第 16 章记录 M2 的 macOS 结论；ADR-0047 改变了第 6.2.3 节阶梯第 6、7 步对带通配命令规则的先后 |

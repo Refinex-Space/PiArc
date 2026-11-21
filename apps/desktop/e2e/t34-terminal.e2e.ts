@@ -127,6 +127,8 @@ test('dragging, double and triple clicks select; Mod+C copies; the selection goe
   await screenshots(page, info, 'attached');
   await typeInComposer(page, ' What is this?');
   await page.keyboard.press('Enter');
+  // The second reply means the second request was made.
+  await expect(page.getByText('Got the terminal output.')).toBeVisible({ timeout: 30_000 });
   await idle(page);
   const sent = await requests(mock, 't34-panel');
   const texts = userTexts(sent.at(-1)?.body ?? {});
