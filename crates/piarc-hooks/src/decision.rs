@@ -50,6 +50,9 @@ pub struct RequestAnswer {
     pub message: Option<String>,
     /// Deny: stop the agent too.
     pub interrupt: bool,
+    /// Allow: where the handlers that gave `updated_permissions` are defined (T38, I122: a
+    /// project's hooks may not persist permissions beyond the session).
+    pub updated_by: Vec<crate::config::Source>,
 }
 
 /// The merged decision of one event.
@@ -152,6 +155,7 @@ impl Merger {
                     updated_permissions: Vec::new(),
                     message: Some(message.to_owned()),
                     interrupt: false,
+                    updated_by: Vec::new(),
                 });
                 "deny"
             }
@@ -330,19 +334,26 @@ impl Merger {
         let text = |key: &str| decision.get(key).and_then(Value::as_str).map(str::to_owned);
         match decision.get("behavior").and_then(Value::as_str) {
             Some("allow") => {
+                let updated_permissions = decision
+                    .get("updatedPermissions")
+                    .and_then(Value::as_array)
+                    .cloned()
+                    .unwrap_or_default();
+                let updated_by = if updated_permissions.is_empty() {
+                    Vec::new()
+                } else {
+                    vec![o.handler.source.clone()]
+                };
                 self.answer(RequestAnswer {
                     allow: true,
                     updated_input: decision
                         .get("updatedInput")
                         .and_then(Value::as_object)
                         .cloned(),
-                    updated_permissions: decision
-                        .get("updatedPermissions")
-                        .and_then(Value::as_array)
-                        .cloned()
-                        .unwrap_or_default(),
+                    updated_permissions,
                     message: None,
                     interrupt: false,
+                    updated_by,
                 });
                 "allow"
             }
@@ -353,6 +364,7 @@ impl Merger {
                     updated_permissions: Vec::new(),
                     message: text("message"),
                     interrupt: decision.get("interrupt") == Some(&Value::Bool(true)),
+                    updated_by: Vec::new(),
                 });
                 "deny"
             }
@@ -367,6 +379,7 @@ impl Merger {
             Some(current) if current.allow && !next.allow => self.d.request = Some(next),
             Some(current) if current.allow => {
                 current.updated_permissions.extend(next.updated_permissions);
+                current.updated_by.extend(next.updated_by);
                 if current.updated_input.is_none() {
                     current.updated_input = next.updated_input;
                 }

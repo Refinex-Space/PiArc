@@ -374,3 +374,97 @@ async fn inputs_carry_the_prompt_id_and_the_effort_of_tool_events() {
     assert_eq!(ends[0].get("effort"), None, "SessionEnd has no effort");
     assert_eq!(ends[0].get("agent_id"), None);
 }
+
+/// A PermissionRequest hook that allows with a session mode and a `.piarc/` allow rule.
+fn widening_hook() -> Value {
+    prints(
+        &json!({ "hookSpecificOutput": { "hookEventName": "PermissionRequest", "decision": {
+            "behavior": "allow",
+            "updatedPermissions": [
+                { "type": "setMode", "mode": "acceptEdits", "destination": "session" },
+                { "type": "addRules", "rules": [{ "toolName": "Bash", "ruleContent": "sed -n *" }], "behavior": "allow", "destination": "localSettings" }
+            ]
+        }}}),
+    )
+}
+
+/// The workspace path as the session's settings source spells it.
+fn project_path(f: &Fixture) -> String {
+    piarc_fs::display(f.io.session(SESSION).expect("session").project())
+}
+
+async fn remembered_mode(f: &Fixture) -> Option<String> {
+    let path = project_path(f);
+    f.storage
+        .run(move |db| db.workspace_mode(&path))
+        .await
+        .expect("storage")
+        .expect("mode")
+}
+
+async fn register_workspace(f: &Fixture) {
+    let record = piarc_store::WorkspaceRecord {
+        path: project_path(f),
+        display_name: "w".into(),
+        main_checkout: project_path(f),
+        last_opened_at: 0,
+        default_mode: None,
+        default_model: None,
+    };
+    f.storage
+        .run(move |db| db.upsert_workspace(&record))
+        .await
+        .expect("storage")
+        .expect("workspace");
+}
+
+#[tokio::test]
+async fn a_project_hooks_permission_updates_stay_within_its_trust() {
+    let f = Fixture::new(Setup {
+        project: json!({ "PermissionRequest": group("Bash", &[widening_hook()]) }),
+        ..Setup::default()
+    })
+    .await;
+    register_workspace(&f).await;
+    std::fs::write(f.work.join("notes"), "one\n").expect("notes");
+    let ruling = f
+        .evaluate("one", "Bash", json!({"command": "sed -n 1p notes"}))
+        .await;
+    assert_eq!(ruling["allowed"], true, "{ruling}");
+    let session = f.io.session(SESSION).expect("session");
+    assert_eq!(
+        lock(&session.policy).mode(),
+        PermissionMode::AcceptEdits,
+        "the session switches"
+    );
+    assert_eq!(
+        remembered_mode(&f).await,
+        None,
+        "the workspace does not remember it"
+    );
+    let local = std::fs::read_to_string(f.work.join(".piarc/settings.local.json"))
+        .expect("the rule was written");
+    assert!(local.contains("Bash(sed -n *)"));
+    let view = f.trust.view(&f.work).await.expect("view");
+    assert!(
+        !view.trusted,
+        "the written allow rule is a new project item waiting for the user"
+    );
+}
+
+#[tokio::test]
+async fn the_users_hooks_permission_updates_persist() {
+    let f = Fixture::new(Setup {
+        user: json!({ "PermissionRequest": group("Bash", &[widening_hook()]) }),
+        ..Setup::default()
+    })
+    .await;
+    register_workspace(&f).await;
+    std::fs::write(f.work.join("notes"), "one\n").expect("notes");
+    let ruling = f
+        .evaluate("one", "Bash", json!({"command": "sed -n 1p notes"}))
+        .await;
+    assert_eq!(ruling["allowed"], true, "{ruling}");
+    assert_eq!(remembered_mode(&f).await.as_deref(), Some("acceptEdits"));
+    assert!(f.trust.view(&f.work).await.expect("view").trusted);
+}

@@ -59,7 +59,7 @@
 13. **通用字段（I115）。** `prompt_id`：Core 在每次 UserPromptSubmit（prompt、steer、follow-up）生成一个 UUID 记在会话上，之后该会话及其子 agent 的所有事件都带它，第一次输入之前没有。`effort`：Agent Host 在 `hooks/run` 与 `policy/evaluate` 中给出会话当前的 effort 档位，Core 只在工具事件、Stop、SubagentStop、PostToolBatch 上写成 `{ level }`，模型不支持 effort（档位为 off）时省略。
 14. **命令 hook 的环境变量白名单（I93，用户决定）。** 用户级 `settings.json` 的 `hookAllowedEnvVars`（变量名列表，只读用户层）：列出的变量从登录 shell 环境加进命令 hook 的环境（ADR-0035 的准入环境之外），其余仍不传。项目文件里的这个键不生效。
 15. **错误与审计步骤（I128）。** `piarc-hooks` 的解析错误是 `piarc_hooks::Error`（`error.rs`，`kind()`、`retryable()`），执行函数移出 `lib.rs`；`piarc-web` 的 `FetchError` 移到 `error.rs`。审计步骤名维持字符串（`policy.rs` 的 `hookDeny` 等是 AHP 与审计表的对外值），不改。
-16. **权限效力（I122 的文档部分）。** ADR-0039 的第 6 条补充：PermissionRequest hook 的 allow 可以代答 ask 规则、受保护路径与越界询问（Claude Code 文档的语义：ask 规则只是"需要询问"，hook 是询问的一种答复），不能代答关键路径删除与 `requiresUserInteraction`。撤销信任时清掉项目 hook 写入的模式记忆与规则的代码改动不在 T38 范围（登记 I165）。
+16. **权限效力（I122）。** ADR-0039 的第 6 条补充：PermissionRequest hook 的 allow 可以代答 ask 规则、受保护路径与越界询问（Claude Code 文档的语义：ask 规则只是"需要询问"，hook 是询问的一种答复），不能代答关键路径删除与 `requiresUserInteraction`。项目的 hook（项目设置文件、项目内的 skill 与子 agent 定义）给出的 `updatedPermissions` 不越出项目信任的范围：`setMode` 只改本会话的模式，不写 `workspaces.default_mode`；写进 `.piarc/` 文件的 allow 规则不确认进信任快照，与其他新增的项目 allow 规则一样等用户重新确认才生效。这样撤销信任后不会残留项目 hook 写下的模式记忆与已确认的规则，不需要在撤销时另做清理。用户自己的 hook 照旧（模式记入工作区，规则确认）。`RequestAnswer.updated_by` 记下给出权限更新的 handler 来源。
 
 ## 备选方案
 
@@ -76,4 +76,4 @@
 
 - AHP：能力 `webSearch`，方法 `web/search`、`web/searchBackend`（Agent Host → Core）与 `hooks/prompt`（Core → Agent Host）；`hooks/run` 新增三个事件与 `effort`；`policy/evaluate` 新增可选 `effort`；`models/list` 的模型新增 `nativeWebSearch`。
 - 设置键：`allowedHttpHookUrls`、`httpHookAllowedEnvVars` 生效（`claude::SETTINGS_KEYS`）；PiArc 新增 `webSearch.backend`、`hookAllowedEnvVars`（只读用户层）与每模型的 `nativeWebSearch`。
-- 新的登记：I164（OpenAI Responses、Gemini 的原生搜索）、I165（撤销信任时清理项目 hook 写入的模式与规则）；I112 改交 T45。
+- 新的登记：I164（OpenAI Responses、Gemini 的原生搜索）；I112 改交 T45。

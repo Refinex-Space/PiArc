@@ -101,19 +101,26 @@ impl ToolIo {
     }
 
     /// The user switched modes: apply it and remember it for the workspace.
+    /// Switches session `id` to `mode` without remembering it for the workspace (a project
+    /// hook's `setMode`, I122).
+    pub(crate) fn session_mode(&self, id: &str, mode: PermissionMode) -> Result<(), ErrorObject> {
+        let s = self.session(id)?;
+        let services = self.services()?;
+        let mut state = lock(&s.policy);
+        state.project_auto = false;
+        state.mode = mode;
+        state.publish(id, services);
+        Ok(())
+    }
+
     pub(crate) async fn changed_mode(
         &self,
         id: &str,
         mode: PermissionMode,
     ) -> Result<(), ErrorObject> {
+        self.session_mode(id, mode)?;
         let s = self.session(id)?;
         let services = self.services()?;
-        {
-            let mut state = lock(&s.policy);
-            state.project_auto = false;
-            state.mode = mode;
-            state.publish(id, services);
-        }
         let workspace = display(s.project());
         let name = mode_name(mode);
         services

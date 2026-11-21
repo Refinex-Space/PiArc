@@ -171,8 +171,18 @@ impl ToolIo {
             }
         }
         if ruling.outcome == Outcome::Allow {
-            self.apply_permissions(step.s, p, &answer.updated_permissions, step.services)
-                .await;
+            let project = answer
+                .updated_by
+                .iter()
+                .any(|source| project_source(source, step.s.project()));
+            self.apply_permissions(
+                step.s,
+                p,
+                &answer.updated_permissions,
+                project,
+                step.services,
+            )
+            .await;
         }
         Ok(ruling)
     }
@@ -248,16 +258,22 @@ impl ToolIo {
     /// Applies a `PermissionRequest` allow's `updatedPermissions`: `addRules` to the session
     /// or the `.piarc/` files and `setMode` for the session. Everything else (other types,
     /// `userSettings`, `.claude/`, bypass or auto mode) is left out and the user is told.
+    ///
+    /// `project`: a project's hook gave them (I122, ADR-0055). Their effect then stays within
+    /// what the project's trust covers: the mode changes for the session without becoming the
+    /// workspace's remembered mode, and allow rules written to `.piarc/` files are not confirmed
+    /// for the trust decision, so they wait for the user like any other new project rule.
     pub(super) async fn apply_permissions(
         &self,
         s: &SessionIo,
         p: &PolicyEvaluateParams,
         updates: &[Value],
+        project: bool,
         services: &super::Services,
     ) {
         let mut refused = Vec::new();
         for update in updates {
-            if let Err(why) = self.apply_one(s, p, update, services).await {
+            if let Err(why) = self.apply_one(s, p, update, project, services).await {
                 refused.push(why);
             }
         }
@@ -278,6 +294,7 @@ impl ToolIo {
         s: &SessionIo,
         p: &PolicyEvaluateParams,
         update: &Value,
+        project: bool,
         services: &super::Services,
     ) -> Result<(), String> {
         let text = |key: &str| update.get(key).and_then(Value::as_str).unwrap_or_default();
@@ -290,9 +307,14 @@ impl ToolIo {
                     "plan" => PermissionMode::Plan,
                     other => return Err(format!("mode {other:?} cannot be set by a hook")),
                 };
-                self.changed_mode(&p.session_id, mode)
-                    .await
-                    .map_err(|e| e.message)
+                if project {
+                    self.session_mode(&p.session_id, mode)
+                        .map_err(|e| e.message)
+                } else {
+                    self.changed_mode(&p.session_id, mode)
+                        .await
+                        .map_err(|e| e.message)
+                }
             }
             "addRules" => {
                 let behavior = text("behavior");
@@ -330,7 +352,8 @@ impl ToolIo {
                 if !matches!(behavior, "allow" | "ask" | "deny") {
                     return Err(format!("unknown rule behavior {behavior:?}"));
                 }
-                self.add_rules(s, layer, behavior, &rules, services).await
+                self.add_rules(s, layer, behavior, &rules, !project, services)
+                    .await
             }
             other => Err(format!(
                 "{other:?} updates to {destination:?} are not supported"
@@ -344,6 +367,7 @@ impl ToolIo {
         layer: &'static str,
         behavior: &str,
         rules: &[String],
+        confirm: bool,
         services: &super::Services,
     ) -> Result<(), String> {
         let root = s.project().to_path_buf();
@@ -368,6 +392,7 @@ impl ToolIo {
         // The hook's own allow rules are not new for the trust decision: a trusted hook
         // (or the user's own) wrote them, like a native confirmation would have.
         if behavior == "allow"
+            && confirm
             && let Some(file) = written
         {
             let source = file
@@ -392,6 +417,17 @@ impl ToolIo {
                 .map_err(|e| e.to_string())?;
         }
         Ok(())
+    }
+}
+
+/// Whether a hook defined in `source` is a project's: a project settings file, or a skill or
+/// subagent definition below the project root.
+fn project_source(source: &piarc_hooks::Source, root: &std::path::Path) -> bool {
+    use piarc_config::ids;
+    match source.layer.as_str() {
+        ids::PROJECT | ids::PROJECT_LOCAL | ids::CLAUDE_PROJECT | ids::CLAUDE_PROJECT_LOCAL => true,
+        "subagent" | "skill" => source.file.as_ref().is_some_and(|f| f.starts_with(root)),
+        _ => false,
     }
 }
 
