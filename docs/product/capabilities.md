@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | M1 | 61 | 61 | 0 | 0 |
 | M2 | 46 | 46 | 0 | 0 |
-| M3 | 36 | 22 | 14 | 0 |
+| M3 | 36 | 26 | 10 | 0 |
 | M4 | 10 | 0 | 10 | 0 |
 | M5 | 7 | 0 | 7 | 0 |
 
@@ -115,7 +115,7 @@
 | CAP-PERM-CRITICAL-001 | 关键路径删除在任何模式下都询问，包括跳过权限与存在匹配的 allow 规则 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-critical-delete` | 已实现 |
 | CAP-PERM-MODE-002 | 计划与跳过权限模式（跳过权限需显式开启并二次确认） | FR-PM-01、ARCH-6.2.1 | T23 | `perm-bypass`<br>`perm-critical-delete`<br>`perm-plan` | 已实现 |
 | CAP-PERM-READONLY-001 | 内置只读命令白名单在手动模式下免审批，路径越界或夹带其他命令时询问 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-read-only` | 已实现 |
-| CAP-PERM-RULE-001 | 兼容 Claude Code 的规则语法，按 deny → ask → allow 裁决 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-powershell-whole`（仅 windows）<br>`perm-rule-match`<br>`subagent-denied-type`<br>`webfetch-domain-rules` | 已实现 |
+| CAP-PERM-RULE-001 | 兼容 Claude Code 的规则语法，按 deny → ask → allow 裁决 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-powershell-whole`（仅 windows）<br>`perm-rule-match`<br>`subagent-denied-type`<br>`webfetch-domain-rules`<br>`worktree-session-rules` | 已实现 |
 | CAP-PERM-TOOLS-001 | 不带 specifier 的 deny 规则把工具从模型请求的工具列表中移除 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-rule-match` | 已实现 |
 | CAP-PLAN-ENTRY-001 | 批准的计划保存为会话 entry，重启与恢复后经注入接口读回 | FR-HN-01、ARCH-6.5 | T26 | `plan-entry-restart` | 已实现 |
 | CAP-PLAN-MODE-001 | 计划模式：写工具与非只读命令被硬拦截，提交计划，批准时选择后续模式 | FR-HN-01、ARCH-6.5、ARCH-6.15 | T26 | `plan-keep-planning`<br>`plan-mode-gate`<br>`plan-mode-menu-reminder` | 已实现 |
@@ -142,7 +142,7 @@
 | CAP-AGENT-HOOKS-001 | 子 agent 定义中的 hooks 只在其运行期间生效，项目级定义的 hooks 信任前不执行 | FR-HN-04、ARCH-6.3.1 | T31 | `subagent-hooks`<br>`subagent-hooks-untrusted` | 已实现 |
 | CAP-AGENT-INTERRUPT-001 | 中断主会话时进行中的子 agent 一并中止，未完成的工具调用补齐已中断结果 | FR-HN-04、ARCH-6.15 | T31 | `subagent-interrupt` | 已实现 |
 | CAP-AGENT-LIMIT-001 | 子 agent 深度上限移除 Agent 工具，并发上限立即返回说明上限的错误 | FR-HN-04、ARCH-6.4 | T31 | `subagent-concurrency`<br>`subagent-depth` | 已实现 |
-| CAP-AGENT-RUN-001 | 子 agent 使用任意服务商模型、可后台运行、最多 3 层、默认不继承父会话历史 | FR-HN-04、ARCH-6.4、ARCH-6.15 | T31 | `subagent-background`<br>`subagent-compaction`<br>`subagent-explore-fast`<br>`subagent-general-purpose`<br>`subagent-max-turns` | 已实现 |
+| CAP-AGENT-RUN-001 | 子 agent 使用任意服务商模型、可后台运行、最多 3 层、默认不继承父会话历史 | FR-HN-04、ARCH-6.4、ARCH-6.15 | T31 | `subagent-background`<br>`subagent-compaction`<br>`subagent-explore-fast`<br>`subagent-general-purpose`<br>`subagent-max-turns`<br>`subagent-worktree` | 已实现 |
 | CAP-BG-COMMAND-001 | run_in_background 启动的命令立即返回任务 id 与输出文件，模型用 Read 读取输出 | FR-TL-04、ARCH-6.11 | T32 | `bg-run-in-background` | 已实现 |
 | CAP-BG-KILL-001 | KillShell 终止整棵进程树并保留输出，只能停止本会话（含子 agent）的任务 | FR-TL-04、ARCH-6.11 | T32 | `exec-timeout-kills-tree` | 已实现 |
 | CAP-BG-MONITOR-001 | Monitor 后台运行命令，把新增输出按行回灌给模型 | FR-TL-04、ARCH-6.11 | T32 | `monitor-wake-idle` | 已实现 |
@@ -161,16 +161,16 @@
 | CAP-MONITOR-PERM-001 | Monitor 的命令受 Bash 规则、Bash 分析与 Bash matcher 的 PreToolUse hooks 约束，Manual 模式下需要审批 | FR-TL-04、FR-PM-03、ARCH-6.2、ARCH-6.3 | T32 | `monitor-hooks-bash-matcher`<br>`monitor-permissions` | 已实现 |
 | CAP-MONITOR-RATE-001 | Monitor 单次回灌受行数与字符数上限约束，超出时说明省略行数与输出文件；总量到上限后停止回灌并告知模型 | FR-TL-04、ARCH-6.11 | T32 | `monitor-rate-limit` | 已实现 |
 | CAP-MONITOR-WAKE-001 | 会话空闲时 Monitor 的新增输出唤醒会话，唤醒频率受限速约束 | FR-TL-04、ARCH-6.11 | T32 | `monitor-wake-idle` | 已实现 |
-| CAP-SESSION-PARALLEL-001 | 跨工作区与多窗口的会话并行运行 | FR-WS-05 | T35 | — | 计划中 |
-| CAP-SESSION-SEARCH-001 | 会话全文搜索 | FR-WS-04、ARCH-9.2 | T35 | — | 计划中 |
+| CAP-SESSION-PARALLEL-001 | 跨工作区与多窗口的会话并行运行 | FR-WS-05 | T35 | `worktree-parallel-sessions` | 已实现 |
+| CAP-SESSION-SEARCH-001 | 会话全文搜索 | FR-WS-04、ARCH-9.2 | T35 | `worktree-session-create` | 已实现 |
 | CAP-SKILL-001 | Skills（Agent Skills 标准；`.claude/skills`、`.piarc/skills`、用户级），渐进加载 | FR-EX-01、ARCH-6.7 | T37 | — | 计划中 |
 | CAP-STYLE-001 | 输出风格切换与自定义 | FR-HN-07、ARCH-6.7 | T37 | — | 计划中 |
 | CAP-TERM-READ-001 | agent 用 terminal 运行的命令进入会话的终端并作为后台任务运行；命令结束后提醒退出码与屏幕末尾，Read 任务文件得到屏幕文本与最近一条命令的结果 | FR-TL-05、ARCH-6.11 | T33 | `term-agent-command` | 已实现 |
 | CAP-TERM-SCREEN-001 | 集成终端与会话共享目录和环境，agent 可读取后台终端的屏幕内容 | FR-TL-05、ARCH-6.11 | T33 | `term-agent-command`<br>`term-agent-env`（仅 macos） | 已实现 |
 | CAP-TERM-SHARE-001 | 用户在终端面板中打开的终端默认不给 agent；用户打开共享后 agent 得到屏幕的位置并能读取，取消共享后又看不到 | FR-TL-05、ARCH-6.11 | T34 | `term-user-share`（仅 macos） | 已实现 |
 | CAP-TOOL-WEBSEARCH-001 | WebSearch 可配置后端 | FR-TL-03、ARCH-6.1.4 | T38 | — | 计划中 |
-| CAP-WT-AGENT-001 | 子 agent 可在独立 worktree 中隔离运行 | ARCH-6.12 | T35 | — | 计划中 |
-| CAP-WT-SESSION-001 | 新建会话可选在独立 git worktree 中运行，归档时处理未提交改动 | FR-WS-06、ARCH-6.12 | T35 | — | 计划中 |
+| CAP-WT-AGENT-001 | 子 agent 可在独立 worktree 中隔离运行 | ARCH-6.12 | T35 | `subagent-worktree` | 已实现 |
+| CAP-WT-SESSION-001 | 新建会话可选在独立 git worktree 中运行，归档时处理未提交改动 | FR-WS-06、ARCH-6.12 | T35 | `worktree-archive-cleanup`<br>`worktree-parallel-sessions`<br>`worktree-session-create`<br>`worktree-session-rules` | 已实现 |
 
 ## M4
 

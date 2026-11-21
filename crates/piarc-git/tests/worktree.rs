@@ -234,6 +234,22 @@ async fn a_session_worktree_is_created_copied_inspected_and_removed() {
         ["main", "piarc/feature-1", "piarc/second", "release-1"]
     );
 
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[tokio::test]
+async fn changes_are_listed_and_removal_keeps_the_branch() {
+    let root = temp_dir("removal");
+    let repo = repository(&root);
+    let git_runner = runner();
+    let created = worktree::create(&git_runner, &repo, "feature-1", None)
+        .await
+        .expect("created");
+    let path = created.worktree.path.clone();
+    let second = worktree::create(&git_runner, &repo, "second", None)
+        .await
+        .expect("second");
+
     // Uncommitted changes: listed, and removal without force is refused and keeps everything.
     std::fs::write(path.join("README.md"), "changed\n").expect("edit");
     std::fs::write(path.join("新 文件.txt"), "new\n").expect("new");
