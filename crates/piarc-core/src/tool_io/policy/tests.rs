@@ -858,10 +858,12 @@ mod windows_paths {
             .await;
         assert_eq!(glob["allowed"], true);
         let origin = json!({"tool": "Glob", "toolCallId": "unc-glob"});
+        // As the Agent Host asks (W2: the call lacked these, and W1 could not run it).
         let found = f
             .io_call(
                 "fs/glob",
-                json!({"sessionId": SESSION, "path": ".", "pattern": "*.txt", "origin": origin}),
+                json!({"sessionId": SESSION, "path": ".", "pattern": "*.txt", "limit": 1001,
+                    "exclude": ["**/node_modules/**", "**/.git/**"], "origin": origin}),
             )
             .await
             .expect("glob");
