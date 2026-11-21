@@ -213,7 +213,6 @@ test('the Skills & plugins page lists skills with source, overrides and warnings
   app,
   page,
   workspaces,
-  userDataDir,
 }, info) => {
   await openSession(app, page, workspaces, 'skills 技能', 't37-chat#skills', 'Hello', {
     ...FILES,
@@ -221,7 +220,6 @@ test('the Skills & plugins page lists skills with source, overrides and warnings
       '---\ndescription: Fix an issue\nallowed-tools: Bash(git *)\ncontext: fork\n---\nBranch: !`git branch`\n',
   });
   await idle(page);
-  void userDataDir;
   const settings = await openSettings(app, page);
   await settings.getByTestId('settings-nav-skills').click();
   const list = settings.getByTestId('skill-list');
