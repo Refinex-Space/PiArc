@@ -61,6 +61,8 @@ expect:
         ignored: [{ pointer: /outputStyle, reason: planned, task: T37 }]
       claudeState:
         status: loaded
+        # T36: the user's MCP servers apply (listed by name only).
+        effective:
+          - { pointer: /mcpServers, value: [] }
         ignored:
-          - { pointer: /mcpServers, reason: planned, task: T36 }
           - { pointer: /numStartups, reason: ignored }

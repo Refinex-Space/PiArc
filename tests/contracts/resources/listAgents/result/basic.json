@@ -37,8 +37,8 @@
           },
           {
             "kind": "inactiveField",
-            "field": "mcpServers",
-            "task": "T36"
+            "field": "skills",
+            "task": "T37"
           },
           {
             "kind": "hooksUntrusted"
