@@ -313,15 +313,15 @@ T35（开工 2026-11-20，基线复用 991f323 的全量 verify；T34 的遗留 
 
 - [x] 1 piarc-git：worktree 创建（分支、基础分支）、`.worktreeinclude` 复制、状态（未提交改动）、删除目录保留分支；路径含空格与中文
 - [ ] 2 Core：新建会话选 worktree（`sessions.worktree`、cwd、环境栏）、`.gitignore` 提示、信任与"总是允许"按主 checkout（A01、A02）
-- [ ] 3 归档询问与到期清理（时钟可注入）（A03 的 Core 与场景部分）
-- [ ] 4 子 agent `isolation: worktree`（A04）
-- [ ] 5 全文搜索：`session_fts`（FTS5 trigram）、增量同步、重建、Core API（A05）
-- [ ] 6 客户端：新建会话 worktree 选项、归档对话、侧栏搜索与定位（A03 Playwright、A06）
-- [ ] 7 主进程：多窗口、窗口状态、审批一致（A07）
-- [ ] 8 后台常驻：托盘 / 菜单栏、计数、退出确认、图标导出（A08）
-- [ ] 9 `piarc://`、open-file、拖入文件夹、Windows 右键菜单注册与参数解析（A09、A10）
-- [ ] 10 内存测量脚本与 `docs/perf/M3-memory.md`（A11）
-- [ ] 11 文档、AGENTS.md、架构与 ADR、verify（A12）与收尾
+- [x] 3 归档询问与到期清理（时钟可注入）（A03 的 Core 与场景部分）
+- [x] 4 子 agent `isolation: worktree`（A04）
+- [x] 5 全文搜索：`session_fts`（FTS5 trigram）、增量同步、重建、Core API（A05）
+- [x] 6 客户端：新建会话 worktree 选项、归档对话、侧栏搜索与定位（A03 Playwright、A06）
+- [x] 7 主进程：多窗口、窗口状态、审批一致（A07）
+- [x] 8 后台常驻：托盘 / 菜单栏、计数、退出确认、图标导出（A08）
+- [x] 9 `piarc://`、open-file、拖入文件夹、Windows 右键菜单注册与参数解析（A09、A10）
+- [x] 10 内存测量脚本与 `docs/perf/M3-memory.md`（A11）
+- [x] 11 文档、AGENTS.md、架构与 ADR、verify（A12）与收尾
 
 W2（开工 2026-11-21，Windows 11 x64，分支 `windows/dev` 自 e0c41ce 起，与 macOS 上进行中的 T35 并行，用户安排；R3 部分完成只因 R3-A07 等待 W1 的 UNC 项，由本任务补齐，不影响开工；本机没有全量通过记录，基线跑全量；Windows CI 运行 44731794641（483413b）的 verify 与 L4 失败于检查点路径标签，属于 M2 的平台问题，并入本任务修复）：
 
@@ -336,8 +336,8 @@ W2（开工 2026-11-21，Windows 11 x64，分支 `windows/dev` 自 e0c41ce 起�
 - [ ] 9 界面流程：计划模式、任务清单、AskUserQuestion、下一步、三档视图，M2 的 L4 在 Windows（A08）
 - [ ] 10 WebFetch SSRF、OAuth 与设备码登录、外部修改检测（A09）
 - [x] 11 L3 在 Windows（A10、I118）：锁定的 2.1.318（`tmp/l3-claude` 本地平台包）12 个场景 0 未解释、0 过期（edfaa51，allowlist 加 `platforms`）；PowerShell 场景保留排除（Windows 版 Claude Code 也没有 PowerShell 工具）；`~/.claude` 变化来自本会话的 Claude Code
-- [ ] 12 R3 重点核对项：UNC（W1-A05、I96）、长命令与 `eval`（I102）、裁决与 AHP 往返预算（I95、I103）
-- [ ] 13 W2 报告、登记事项、AGENTS.md、verify（A11、A12）与收尾
+- [x] 12 R3 重点核对项：UNC（W1-A05、I96）、长命令与 `eval`（I102）、裁决与 AHP 往返预算（I95、I103）
+- [ ] 13 W2 报告、登记事项、AGENTS.md（已完成，d8efcd7）；最终 verify（A12）未完成：d8efcd7 上的全量 verify 在 ESLint 时因系统内存不足被停止，上一次全量 15/15 在 08fc09e；之后的代码改动（6110364 与 Windows 测试）已跑受影响 crate 的测试与 clippy
 
 ## 登记事项
 
