@@ -39,6 +39,7 @@ mod provider_settings;
 mod session;
 mod snapshot;
 mod subagents;
+mod tasks;
 mod workspace;
 mod worktrees;
 
@@ -166,6 +167,25 @@ struct Routes {
     workspaces: HashMap<PathBuf, workspace::WorkspaceHandle>,
     sessions: HashMap<String, session::SessionHandle>,
     closed: bool,
+    /// Trust changes so far, and the latest ones (I80): a workspace that was still opening
+    /// when one came is not in `workspaces` yet and catches up after it is registered.
+    trust_epoch: u64,
+    trust_changes: std::collections::VecDeque<(u64, PathBuf)>,
+}
+
+/// Trust changes remembered for workspaces that were opening (far more than can overlap).
+const TRUST_CHANGES_KEPT: usize = 64;
+
+/// The checkouts whose trust changed after `epoch`.
+fn trust_changes_since(
+    changes: &std::collections::VecDeque<(u64, PathBuf)>,
+    epoch: u64,
+) -> Vec<PathBuf> {
+    changes
+        .iter()
+        .filter(|(at, _)| *at > epoch)
+        .map(|(_, checkout)| checkout.clone())
+        .collect()
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -563,8 +583,16 @@ impl Hub {
     /// their Agent Host. Returns once every workspace marked its host as restarting, so
     /// requests made after this wait for the new process.
     pub async fn trust_changed(&self, checkout: &Path) {
-        let workspaces: Vec<workspace::WorkspaceHandle> =
-            lock(&self.routes).workspaces.values().cloned().collect();
+        let workspaces: Vec<workspace::WorkspaceHandle> = {
+            let mut routes = lock(&self.routes);
+            routes.trust_epoch += 1;
+            let epoch = routes.trust_epoch;
+            routes.trust_changes.push_back((epoch, checkout.to_owned()));
+            while routes.trust_changes.len() > TRUST_CHANGES_KEPT {
+                routes.trust_changes.pop_front();
+            }
+            routes.workspaces.values().cloned().collect()
+        };
         for workspace in workspaces {
             workspace.trust_changed(checkout.to_owned()).await;
         }
@@ -579,81 +607,6 @@ impl Hub {
     pub fn resend_snapshots(&self) {
         self.ctx.snapshots.send(snapshot::SnapshotMsg::Resend);
         self.ctx.tool_io.tasks().republish();
-    }
-
-    /// The stop button of a background task (T32).
-    pub async fn stop_task(&self, task_id: String) -> Result<Value> {
-        let (task, stopped, tail) = self
-            .ctx
-            .tool_io
-            .tasks()
-            .stop(&task_id, crate::tasks::StopBy::User)
-            .await
-            .map_err(|e| Error::feature(&e))?;
-        serde_json::to_value(piarc_protocol::tasks::TaskKillResult {
-            task,
-            stopped,
-            tail,
-        })
-        .map_err(|e| Error::Internal {
-            reason: format!("cannot encode the answer: {e}"),
-        })
-    }
-
-    /// Opens a terminal for the user in open session `session_id` (T33): a background task
-    /// of kind `terminal`; answers `{ terminalId, taskId, restored? }`.
-    ///
-    /// # Errors
-    ///
-    /// The session is not open; the terminal cannot start.
-    pub async fn open_terminal(
-        &self,
-        session_id: String,
-        request: crate::tool_io::UserTerminal,
-    ) -> Result<Value> {
-        let opened = self
-            .ctx
-            .tool_io
-            .open_user_terminal(&session_id, request)
-            .await
-            .map_err(|e| Error::feature(&e))?;
-        let restored = opened.restored.map(|how| match how {
-            piarc_term::snapshot::Restored::Snapshot => "snapshot",
-            piarc_term::snapshot::Restored::Replay => "replay",
-            piarc_term::snapshot::Restored::Text => "text",
-        });
-        Ok(serde_json::json!({
-            "terminalId": opened.terminal_id,
-            "taskId": opened.task_id,
-            "restored": restored,
-        }))
-    }
-
-    /// Part of a background task's output (T32).
-    pub async fn read_task_output(
-        &self,
-        task_id: String,
-        offset: u64,
-        length: Option<u64>,
-    ) -> Result<Value> {
-        let chunk = self
-            .ctx
-            .tool_io
-            .tasks()
-            .read(None, &task_id, offset, length)
-            .await
-            .map_err(|e| Error::feature(&e))?;
-        serde_json::to_value(chunk).map_err(|e| Error::Internal {
-            reason: format!("cannot encode the answer: {e}"),
-        })
-    }
-
-    /// What the task manager reaches of the session layer (T32).
-    pub(crate) fn task_outlet(&self) -> Arc<dyn crate::tasks::TaskOutlet> {
-        Arc::new(HubOutlet {
-            ctx: Arc::downgrade(&self.ctx),
-            routes: Arc::downgrade(&self.routes),
-        })
     }
 
     /// Ordered shutdown: refuses new workspaces and sessions, then stops every Agent Host
@@ -698,23 +651,31 @@ impl Hub {
         if let Some(open) = lock(&self.routes).workspaces.get(&path).cloned() {
             return Ok(open);
         }
+        let epoch = lock(&self.routes).trust_epoch;
         let opened = workspace::WorkspaceHandle::open(&self.ctx, path.clone()).await?;
         // Another request may have opened it meanwhile (keep the first), or Core began to shut
         // down: the new one is closed again.
-        let kept: Result<Option<workspace::WorkspaceHandle>> = {
+        let kept: Result<(Option<workspace::WorkspaceHandle>, Vec<PathBuf>)> = {
             let mut routes = lock(&self.routes);
             if routes.closed {
                 Err(Error::ShuttingDown)
             } else if let Some(first) = routes.workspaces.get(&path).cloned() {
-                Ok(Some(first))
+                Ok((Some(first), Vec::new()))
             } else {
                 routes.workspaces.insert(path, opened.clone());
-                Ok(None)
+                Ok((None, trust_changes_since(&routes.trust_changes, epoch)))
             }
         };
         match kept {
-            Ok(None) => Ok(opened),
-            Ok(Some(first)) => {
+            Ok((None, missed)) => {
+                // Trust changed while it was opening (I80): its Agent Host may have asked
+                // before the change; the actor restarts it when the checkout is its own.
+                for checkout in missed {
+                    opened.trust_changed(checkout).await;
+                }
+                Ok(opened)
+            }
+            Ok((Some(first), _)) => {
                 opened.close().await;
                 Ok(first)
             }
@@ -908,49 +869,25 @@ pub(crate) fn path_text(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// The task manager's way into the session layer (T32): weak, so the manager the tool I/O
-/// holds does not keep the hub alive.
-struct HubOutlet {
-    ctx: std::sync::Weak<Ctx>,
-    routes: std::sync::Weak<Mutex<Routes>>,
-}
-
-impl crate::tasks::TaskOutlet for HubOutlet {
-    fn notices_waiting(&self, session_id: &str) {
-        let Some(routes) = self.routes.upgrade() else {
-            return;
-        };
-        let session = lock(&routes).sessions.get(session_id).cloned();
-        if let Some(session) = session {
-            session.notices_waiting();
-        }
-    }
-
-    fn stop_subagent(
-        &self,
-        owner: &str,
-        child: &str,
-    ) -> piarc_ports::BoxFuture<'static, std::result::Result<(), piarc_protocol::ErrorObject>> {
-        let hub = match (self.ctx.upgrade(), self.routes.upgrade()) {
-            (Some(ctx), Some(routes)) => Some(Hub { ctx, routes }),
-            _ => None,
-        };
-        let (owner, child) = (owner.to_owned(), child.to_owned());
-        Box::pin(async move {
-            let Some(hub) = hub else {
-                return Ok(());
-            };
-            hub.stop_subagent(owner, child)
-                .await
-                .map(drop)
-                .map_err(|e| e.to_error_object())
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_workspace_opening_sees_the_trust_changes_after_it_started() {
+        let changes: std::collections::VecDeque<(u64, PathBuf)> = [
+            (1, PathBuf::from("/a")),
+            (2, PathBuf::from("/b")),
+            (3, PathBuf::from("/a")),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(
+            trust_changes_since(&changes, 1),
+            [PathBuf::from("/b"), PathBuf::from("/a")]
+        );
+        assert!(trust_changes_since(&changes, 3).is_empty());
+    }
 
     #[test]
     fn session_ids_follow_pis_rule() {

@@ -367,22 +367,7 @@ impl Env {
                     .task_limits
                     .map_or_else(Default::default, |spec| spec.apply(Default::default())),
             },
-            // Worktree retention follows the scenario's clock; the timer never fires on its own
-            // (`sweep_worktrees` runs a cleanup), so a cleanup cannot race the scenario's.
-            worktrees: piarc_core::worktrees::WorktreeConfig {
-                now_ms: {
-                    let clock = self.clock.clone();
-                    let start = piarc_core::storage::now_ms();
-                    let base = piarc_ports::Clock::now(clock.as_ref());
-                    std::sync::Arc::new(move || {
-                        let elapsed = piarc_ports::Clock::now(clock.as_ref()) - base;
-                        start + i64::try_from(elapsed.as_millis()).unwrap_or(i64::MAX)
-                    })
-                },
-                clock: self.clock.clone(),
-                sweep_interval: Duration::from_secs(100 * 365 * 24 * 60 * 60),
-                ..piarc_core::worktrees::WorktreeConfig::default()
-            },
+            worktrees: worktrees::config(&self.clock),
             web: piarc_core::tool_io::WebConfig {
                 allowlist: if self.web.is_some() {
                     vec!["127.0.0.1".into(), "localhost".into()]
@@ -596,21 +581,7 @@ impl Driver<'_> {
         });
         let ws = workspace.to_owned();
         let created = call(
-            |done| match &session.worktree {
-                Some(tree) => self.core.create_worktree_session(
-                    ws,
-                    model,
-                    session.mode,
-                    piarc_core::sessions::WorktreeRequest {
-                        name: tree.name.clone(),
-                        base: tree.base.clone(),
-                    },
-                    done,
-                ),
-                None => self
-                    .core
-                    .create_session_with_mode(ws, cwd, model, session.mode, done),
-            },
+            |done| worktrees::create(&self.core, ws, cwd, model, session, done),
             &format!("creating session `{label}`"),
         )
         .await?;

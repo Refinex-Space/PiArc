@@ -13,6 +13,50 @@ use crate::l2::worktree_spec::{
     SweepWorktreesSpec,
 };
 
+/// Worktree retention on the scenario's clock (`advance_clock` moves it). The timer never fires
+/// on its own (`sweep_worktrees` runs a cleanup), so a cleanup cannot race the scenario's.
+pub(super) fn config(
+    clock: &std::sync::Arc<piarc_core::clock::ManualClock>,
+) -> piarc_core::worktrees::WorktreeConfig {
+    let clock = std::sync::Arc::clone(clock);
+    let start = piarc_core::storage::now_ms();
+    let base = piarc_ports::Clock::now(clock.as_ref());
+    let timer: std::sync::Arc<dyn piarc_ports::Clock> = clock.clone();
+    piarc_core::worktrees::WorktreeConfig {
+        now_ms: std::sync::Arc::new(move || {
+            let elapsed = piarc_ports::Clock::now(clock.as_ref()) - base;
+            start + i64::try_from(elapsed.as_millis()).unwrap_or(i64::MAX)
+        }),
+        clock: timer,
+        sweep_interval: std::time::Duration::from_secs(100 * 365 * 24 * 60 * 60),
+        ..piarc_core::worktrees::WorktreeConfig::default()
+    }
+}
+
+/// Creates `session` as the runner does, in a worktree when it asks for one.
+pub(super) fn create(
+    core: &piarc_core::CoreRuntime,
+    workspace: std::path::PathBuf,
+    cwd: Option<std::path::PathBuf>,
+    model: Option<piarc_protocol::session::ModelRef>,
+    session: &crate::l2::format::SessionSpec,
+    done: impl FnOnce(piarc_core::Result<Value>) + Send + 'static,
+) -> piarc_core::Result<()> {
+    match &session.worktree {
+        Some(tree) => core.create_worktree_session(
+            workspace,
+            model,
+            session.mode,
+            piarc_core::sessions::WorktreeRequest {
+                name: tree.name.clone(),
+                base: tree.base.clone(),
+            },
+            done,
+        ),
+        None => core.create_session_with_mode(workspace, cwd, model, session.mode, done),
+    }
+}
+
 impl Driver<'_> {
     pub(super) async fn sweep_worktrees(&self, spec: &SweepWorktreesSpec) -> Result<(), String> {
         let report = call(|done| self.core.sweep_worktrees(done), "sweeping worktrees").await?;

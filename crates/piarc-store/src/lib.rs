@@ -38,16 +38,17 @@ pub mod records;
 pub mod search;
 mod store;
 pub mod time;
+pub mod worktrees;
 
 pub use background_tasks::TaskRow;
 pub use checkpoints::{CheckpointFileRow, CheckpointRow, NewCheckpointFile};
 pub use error::{Error, Result};
 pub use index::{
-    DueWorktree, FileOutcome, IndexStatus, SessionPrefsChange, SessionRecord, SkippedLine,
-    SyncReport, WorktreeRecord,
+    FileOutcome, IndexStatus, SessionPrefsChange, SessionRecord, SkippedLine, SyncReport,
 };
 pub use migrate::{MIGRATIONS, Migration};
 pub use pi_session::{SessionMeta, Usage};
 pub use records::{AuditEvent, AuditFilter, TrustDecision, TrustRecord, WorkspaceRecord};
 pub use search::{SearchHit, SessionHits};
 pub use store::{BUSY_TIMEOUT, CACHE_KIB, Store};
+pub use worktrees::{DueWorktree, WorktreeRecord};

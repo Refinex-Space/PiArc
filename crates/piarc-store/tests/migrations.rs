@@ -85,7 +85,7 @@ fn migrating_twice_from_empty_and_from_migrated_gives_the_same_schema() {
     let mut conn = Connection::open(&other).expect("open");
     assert_eq!(
         migrate::apply(&mut conn, MIGRATIONS, 5).expect("first"),
-        vec![1, 2, 3, 4, 5, 6, 7]
+        vec![1, 2, 3, 4, 5, 6, 7, 8]
     );
     assert_eq!(
         migrate::apply(&mut conn, MIGRATIONS, 6).expect("second"),
