@@ -313,28 +313,28 @@ T35（开工 2026-11-20，基线复用 991f323 的全量 verify；T34 的遗留 
 
 - [x] 1 piarc-git：worktree 创建（分支、基础分支）、`.worktreeinclude` 复制、状态（未提交改动）、删除目录保留分支；路径含空格与中文
 - [ ] 2 Core：新建会话选 worktree（`sessions.worktree`、cwd、环境栏）、`.gitignore` 提示、信任与"总是允许"按主 checkout（A01、A02）
-- [x] 3 归档询问与到期清理（时钟可注入）（A03 的 Core 与场景部分）
-- [x] 4 子 agent `isolation: worktree`（A04）
-- [x] 5 全文搜索：`session_fts`（FTS5 trigram）、增量同步、重建、Core API（A05）
-- [x] 6 客户端：新建会话 worktree 选项、归档对话、侧栏搜索与定位（A03 Playwright、A06）
-- [x] 7 主进程：多窗口、窗口状态、审批一致（A07）
-- [x] 8 后台常驻：托盘 / 菜单栏、计数、退出确认、图标导出（A08）
-- [x] 9 `piarc://`、open-file、拖入文件夹、Windows 右键菜单注册与参数解析（A09、A10）
-- [x] 10 内存测量脚本与 `docs/perf/M3-memory.md`（A11）
-- [x] 11 文档、AGENTS.md、架构与 ADR、verify（A12）与收尾
+- [ ] 3 归档询问与到期清理（时钟可注入）（A03 的 Core 与场景部分）
+- [ ] 4 子 agent `isolation: worktree`（A04）
+- [ ] 5 全文搜索：`session_fts`（FTS5 trigram）、增量同步、重建、Core API（A05）
+- [ ] 6 客户端：新建会话 worktree 选项、归档对话、侧栏搜索与定位（A03 Playwright、A06）
+- [ ] 7 主进程：多窗口、窗口状态、审批一致（A07）
+- [ ] 8 后台常驻：托盘 / 菜单栏、计数、退出确认、图标导出（A08）
+- [ ] 9 `piarc://`、open-file、拖入文件夹、Windows 右键菜单注册与参数解析（A09、A10）
+- [ ] 10 内存测量脚本与 `docs/perf/M3-memory.md`（A11）
+- [ ] 11 文档、AGENTS.md、架构与 ADR、verify（A12）与收尾
 
 W2（开工 2026-11-21，Windows 11 x64，分支 `windows/dev` 自 e0c41ce 起，与 macOS 上进行中的 T35 并行，用户安排；R3 部分完成只因 R3-A07 等待 W1 的 UNC 项，由本任务补齐，不影响开工；本机没有全量通过记录，基线跑全量；Windows CI 运行 44731794641（483413b）的 verify 与 L4 失败于检查点路径标签，属于 M2 的平台问题，并入本任务修复）：
 
 - [x] 1 Windows CI 与本机基线失败修复：检查点路径标签（cafffc1）、Git 程序探测失败不缓存与 `ucrt64`（91f9994）、Monitor 分块输出丢失唤醒（db82eae）、三个测试与 L2 `tools_windows`（5ff57f6、82082b6）
 - [x] 2 本机 L2 全部通过、能力清单 M2 无 MISSING（A01）：145 通过、0 失败、4 个 macOS 专属跳过，MISSING 0；另修 c54271b（探测提速）、52e7d98（夹具二次 panic）、c45ffdd（归档时 Notification hook 持有会话，L2 `hooks-archive-during-hook`）；`cargo test --workspace --no-fail-fast` 95 个目标全部通过
-- [ ] 3 Git Bash 的 Bash 规则、复合命令、包装剥离、只读白名单、关键路径删除（盘符根、`%USERPROFILE%`、工作区根、`/c/…` 与 `C:\…`），`Read`/`Edit` 路径规则（A02）
-- [ ] 4 PowerShell 规则精确匹配、Manual 询问、"总是允许"再次命中、ADR-0047 越界判断（A03）
-- [ ] 5 hooks：执行方式、stdin JSON、exit 2、超时与取消结束整棵进程树（进程表前后对比）、UserPromptSubmit 30 s（A04）
-- [ ] 6 回退与 Changes：四个选项、冲突、按 hunk 丢弃，CRLF、空格中文、超过 260 字符、大小写、文件被占用、junction（A05）
-- [ ] 7 压缩：阈值、`/compact` 重点、熔断、重注入、用量环（A06）
-- [ ] 8 配置兼容层：`%USERPROFILE%\.claude\settings.json`、`.claude.json`、`.claude/rules` 的 `paths:`、诊断页、`.piarc` junction 写入被拒（A07）
-- [ ] 9 界面流程：计划模式、任务清单、AskUserQuestion、下一步、三档视图，M2 的 L4 在 Windows（A08）
-- [ ] 10 WebFetch SSRF、OAuth 与设备码登录、外部修改检测（A09）
+- [x] 3 Git Bash 的 Bash 规则、复合命令、包装剥离、只读白名单、关键路径删除（盘符根、`%USERPROFILE%`、工作区根、`/c/…` 与 `C:\…`），`Read`/`Edit` 路径规则（A02）
+- [x] 4 PowerShell 规则精确匹配、Manual 询问、"总是允许"再次命中、ADR-0047 越界判断（A03）
+- [x] 5 hooks：执行方式、stdin JSON、exit 2、超时与取消结束整棵进程树（进程表前后对比）、UserPromptSubmit 30 s（A04）
+- [x] 6 回退与 Changes：四个选项、冲突、按 hunk 丢弃，CRLF、空格中文、超过 260 字符、大小写、文件被占用、junction（A05）
+- [x] 7 压缩：阈值、`/compact` 重点、熔断、重注入、用量环（A06）
+- [x] 8 配置兼容层：`%USERPROFILE%\.claude\settings.json`、`.claude.json`、`.claude/rules` 的 `paths:`、诊断页、`.piarc` junction 写入被拒（A07）
+- [x] 9 界面流程：计划模式、任务清单、AskUserQuestion、下一步、三档视图，M2 的 L4 在 Windows（A08）
+- [x] 10 WebFetch SSRF、OAuth 与设备码登录、外部修改检测（A09）
 - [x] 11 L3 在 Windows（A10、I118）：锁定的 2.1.318（`tmp/l3-claude` 本地平台包）12 个场景 0 未解释、0 过期（edfaa51，allowlist 加 `platforms`）；PowerShell 场景保留排除（Windows 版 Claude Code 也没有 PowerShell 工具）；`~/.claude` 变化来自本会话的 Claude Code
 - [x] 12 R3 重点核对项：UNC（W1-A05、I96）、长命令与 `eval`（I102）、裁决与 AHP 往返预算（I95、I103）
 - [ ] 13 W2 报告、登记事项、AGENTS.md（已完成，d8efcd7）；最终 verify（A12）未完成：d8efcd7 上的全量 verify 在 ESLint 时因系统内存不足被停止，上一次全量 15/15 在 08fc09e；之后的代码改动（6110364 与 Windows 测试）已跑受影响 crate 的测试与 clippy
