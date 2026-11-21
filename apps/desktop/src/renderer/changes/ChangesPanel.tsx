@@ -3,17 +3,20 @@
 // it, as a unified diff with line counts and syntax colors. A file or one hunk can be discarded
 // (Core puts the recorded content back, or reverts the hunk, after checking the file still is
 // what the panel shows). Past the panel's limits the files are folded and a file opened alone
-// shows its diff as plain text.
+// shows its diff as plain text. Lines take comments that go to the agent together (T42,
+// `DiffComments.tsx`).
 import type { ChangesFile, ChangesView } from '@piarc/protocol';
 import { useState } from 'react';
 
-import { useT } from '../app/app-context.js';
+import { useApp, useT } from '../app/app-context.js';
 import { useChanges, useStore } from '../store/hooks.js';
 import { changesOf } from '../store/changes.js';
 import { reason } from '../shell/errors.js';
 import { showPanel } from '../shell/registry.js';
 import { useUi } from '../shell/ui.js';
+import { isSendKey } from './comments.js';
 import { DiffBody } from './DiffBody.js';
+import { CommentsBar, DiffCommentsProvider, useDiffCommentsState } from './DiffComments.js';
 import { languageOf } from './language.js';
 import { openChangesPanel } from './panel-state.js';
 
@@ -147,6 +150,7 @@ function FileRow({
           highlight={transcriptServices.highlight}
           onDiscard={discard}
           busy={busy}
+          file={file}
         />
       )}
     </li>
@@ -175,56 +179,70 @@ function FileList({ sessionId, view }: { readonly sessionId: string; readonly vi
 
 /** The dock's Changes panel. */
 export function ChangesPanel({ sessionId }: { readonly sessionId: string }) {
-  const t = useT();
+  const { t, keyPlatform } = useApp();
   const store = useStore();
   const state = useChanges(sessionId);
   const view = state?.view;
+  const comments = useDiffCommentsState(sessionId, view?.files);
   const refresh = () => {
     void store.transcript(sessionId).changes.refresh(() => window.piarc.sessionChanges(sessionId));
   };
   return (
-    <div className="changes-panel" data-testid="changes-panel" aria-busy={state?.loading === true}>
-      <div className="changes-head">
-        {view === undefined || view.files.length === 0 ? null : (
+    <DiffCommentsProvider value={comments}>
+      <div
+        className="changes-panel"
+        data-testid="changes-panel"
+        aria-busy={state?.loading === true}
+        onKeyDown={(event) => {
+          if (!isSendKey(event.nativeEvent, keyPlatform)) return;
+          event.preventDefault();
+          const draft = comments.draft;
+          void comments.send(view?.files.find((f) => f.label === draft?.path));
+        }}
+      >
+        <div className="changes-head">
+          {view === undefined || view.files.length === 0 ? null : (
+            <>
+              <Counts added={view.added} removed={view.removed} />
+              <span className="muted">{t('changes.files', { count: view.files.length })}</span>
+            </>
+          )}
+          <button
+            type="button"
+            className="row-action"
+            data-testid="changes-refresh"
+            onClick={refresh}
+          >
+            {t('changes.refresh')}
+          </button>
+        </div>
+        {state?.failure === undefined ? null : (
+          <p className="changes-error" role="alert">
+            {t('changes.failed', { reason: state.failure })}
+          </p>
+        )}
+        {view === undefined ? (
+          <p className="muted">{t('changes.loading')}</p>
+        ) : view.files.length === 0 ? (
+          <p className="muted" data-testid="changes-empty">
+            {t('changes.none')}
+          </p>
+        ) : (
           <>
-            <Counts added={view.added} removed={view.removed} />
-            <span className="muted">{t('changes.files', { count: view.files.length })}</span>
+            {view.degraded === true ? (
+              <p className="changes-note warning-text" data-testid="changes-degraded">
+                {t('changes.degraded')}
+              </p>
+            ) : null}
+            <FileList sessionId={sessionId} view={view} />
           </>
         )}
-        <button
-          type="button"
-          className="row-action"
-          data-testid="changes-refresh"
-          onClick={refresh}
-        >
-          {t('changes.refresh')}
-        </button>
+        <CommentsBar />
+        <p className="muted changes-note" data-testid="changes-bash-note">
+          {t('changes.bashNote')}
+        </p>
       </div>
-      {state?.failure === undefined ? null : (
-        <p className="changes-error" role="alert">
-          {t('changes.failed', { reason: state.failure })}
-        </p>
-      )}
-      {view === undefined ? (
-        <p className="muted">{t('changes.loading')}</p>
-      ) : view.files.length === 0 ? (
-        <p className="muted" data-testid="changes-empty">
-          {t('changes.none')}
-        </p>
-      ) : (
-        <>
-          {view.degraded === true ? (
-            <p className="changes-note warning-text" data-testid="changes-degraded">
-              {t('changes.degraded')}
-            </p>
-          ) : null}
-          <FileList sessionId={sessionId} view={view} />
-        </>
-      )}
-      <p className="muted changes-note" data-testid="changes-bash-note">
-        {t('changes.bashNote')}
-      </p>
-    </div>
+    </DiffCommentsProvider>
   );
 }
 

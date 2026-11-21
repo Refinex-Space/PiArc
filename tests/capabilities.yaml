@@ -1153,13 +1153,6 @@ capabilities:
     refs: [FR-RV-02, ARCH-7.7]
     task: T28
     status: active
-  - id: CAP-RV-COMMENT-001
-    title: 'diff 行内评论批量发送给 agent'
-    milestone: M4
-    refs: [FR-RV-04]
-    task: T42
-    status: planned
-
   # System integration (Core side)
   - id: CAP-SYS-NOTIFY-001
     title: '会话完成或等待审批时发出通知事件'
@@ -1172,7 +1165,7 @@ capabilities:
     milestone: M4
     refs: [FR-SY-03]
     task: T42
-    status: planned
+    status: active
 
 client_only:
   - ref: FR-CH-05
@@ -1184,6 +1177,9 @@ client_only:
   - ref: FR-PM-05
     reason: 审批热键、防误触、阅读闸门与输入法守卫是客户端交互规则
     task: T20
+  - ref: FR-RV-04
+    reason: diff 行内评论是渲染进程的草稿，批量发送是普通的 prompt 或排队消息，由 L4 验证
+    task: T42
   - ref: FR-SY-02
     reason: 关窗后后台常驻、菜单栏与系统托盘属于 Electron 主进程
     task: T35

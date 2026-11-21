@@ -1509,6 +1509,65 @@ textarea.input {
 :root[data-app] .changes-hunk-discard {
   float: inline-end;
 }
+:root[data-app] .diff-gutter-button {
+  min-width: 2.5em;
+  padding: 0 var(--piarc-space-1);
+  border: 0;
+  border-radius: var(--piarc-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: right;
+  cursor: pointer;
+}
+:root[data-app] .diff-gutter-button:hover {
+  background: var(--piarc-accent-subtle);
+  color: var(--piarc-text-accent);
+}
+:root[data-app] .diff-comment td,
+:root[data-app] .diff-comment-editor td {
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border-block: 1px solid var(--piarc-border-subtle);
+  background: var(--piarc-surface-panel);
+  font-family: var(--piarc-font-ui);
+  white-space: normal;
+}
+:root[data-app] .diff-comment-body p {
+  margin: var(--piarc-space-1) 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+:root[data-app] .diff-comment-form {
+  display: grid;
+  gap: var(--piarc-space-1);
+}
+:root[data-app] .diff-comment-input {
+  width: 100%;
+  resize: vertical;
+}
+:root[data-app] .diff-comment-actions {
+  display: flex;
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .diff-comments-bar {
+  display: grid;
+  gap: var(--piarc-space-2);
+  margin-block-start: var(--piarc-space-2);
+}
+:root[data-app] .diff-comments-send {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .diff-comments-stale {
+  display: grid;
+  gap: var(--piarc-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-wrap: anywhere;
+}
 :root[data-app] .changes-plain {
   margin: var(--piarc-space-1) 0 0;
   max-height: 24em;
