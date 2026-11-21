@@ -35,8 +35,9 @@ providers:
               }
       - text: Done.
 approvals:
-  - { tool: Bash, decision: deny, feedback: Keep it in the sandbox. }
-  - { tool: Bash, decision: allow }
+  # Outside the sandbox the notification only opens the card (T42).
+  - { tool: Bash, decision: deny, feedback: Keep it in the sandbox., notification_allow: false }
+  - { tool: Bash, decision: allow, notification_allow: false }
 actions:
   - prompt: { text: Go., turn: t }
 expect:

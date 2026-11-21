@@ -50,12 +50,14 @@ async fn a_notification_allows_once_through_the_ledger_and_is_audited() {
 }
 
 #[tokio::test]
-async fn long_and_multi_line_commands_and_protected_paths_only_open_the_card() {
+async fn long_critical_and_protected_requests_only_open_the_card() {
     let f = Fixture::new().await;
     let long = format!("printenv {}", "X".repeat(notify::NOTIFY_COMMAND_CHARS));
     for (call, input) in [
         ("long", json!({"command": long})),
         ("lines", json!({"command": "printenv HOME\nprintenv PATH"})),
+        // A critical deletion has no rule to save and is read on the card only.
+        ("critical", json!({"command": "rm -rf ~"})),
     ] {
         let answering = async {
             let card = f.pending_of(SESSION).await;
