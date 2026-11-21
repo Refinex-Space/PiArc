@@ -279,11 +279,16 @@ impl Scope {
         }
     }
 
-    /// How diffs name a canonical `path`: relative to the workspace root with `/`, absolute
-    /// outside it.
+    /// How diffs name a canonical `path`, or a recorded one in its usual spelling (`display`,
+    /// without the Windows `\\?\` prefix the canonical root carries): relative to the workspace
+    /// root with `/`, absolute outside it.
     #[must_use]
     pub fn label(&self, path: &Path) -> String {
-        match path.strip_prefix(&self.root) {
+        let usual_root = PathBuf::from(display(&self.root));
+        match path
+            .strip_prefix(&self.root)
+            .or_else(|_| path.strip_prefix(&usual_root))
+        {
             Ok(relative) => relative
                 .components()
                 .map(|c| c.as_os_str().to_string_lossy())
@@ -648,6 +653,19 @@ mod tests {
             // The development machines and CI runners use the default volumes.
             assert!(scope.case_insensitive());
         }
+    }
+
+    /// Checkpoints keep the paths they recorded in their usual spelling (`display`), without the
+    /// `\\?\` prefix that the canonical root carries on Windows; both spellings label the same.
+    #[test]
+    fn a_recorded_path_in_its_usual_spelling_is_labelled_relative_to_the_root() {
+        let tree = TempTree::new("scope-label 中文");
+        tree.file("ws 工作区/src/b 中文.txt", "x");
+        let scope = Scope::new(&tree.path("ws 工作区"), &tree.path("ws 工作区")).expect("scope");
+        let canonical = scope.check("src/b 中文.txt", Access::Read).expect("found");
+        let recorded = PathBuf::from(display(&canonical));
+        assert_eq!(scope.label(&canonical), "src/b 中文.txt");
+        assert_eq!(scope.label(&recorded), "src/b 中文.txt");
     }
 
     #[test]
