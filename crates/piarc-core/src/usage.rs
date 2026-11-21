@@ -161,7 +161,7 @@ impl PriceBook {
     /// From the recorded catalog prices (`(provider, model, JSON)`) and the user's
     /// `modelPrices` object; malformed entries are left out.
     #[must_use]
-    pub fn new(catalog: &[(String, String, String)], user: Option<&Value>) -> Self {
+    pub fn new(catalog: &[CatalogRow], user: Option<&Value>) -> Self {
         let catalog = catalog
             .iter()
             .filter_map(|(provider, model, json)| {
@@ -210,12 +210,18 @@ pub fn user_price(value: &Value) -> Option<ModelPrice> {
     Pricing::of(&price).map(|_| price)
 }
 
-/// The catalog prices of a `models/list` answer: `(provider, model, JSON)` for priced models,
-/// and the models it lists without a price.
+/// A recorded catalog price: `(provider, model, pi-ai's cost as JSON)`.
+pub type CatalogRow = (String, String, String);
+
+/// A model: `(provider, model)`.
+pub type ModelKey = (String, String);
+
+/// The catalog prices of a `models/list` answer: rows for priced models, and the models it
+/// lists without a price.
 #[must_use]
 pub fn catalog_prices(
     models: &[piarc_protocol::models::CatalogModel],
-) -> (Vec<(String, String, String)>, Vec<(String, String)>) {
+) -> (Vec<CatalogRow>, Vec<ModelKey>) {
     let mut priced = Vec::new();
     let mut unpriced = Vec::new();
     for model in models {
@@ -294,7 +300,7 @@ fn arithmetic(t: &UsageTokens, cache_write_1h: i64) -> Tokens {
 pub struct Inputs<'a> {
     pub groups: &'a [UsageGroup],
     /// Requests of the tiered models, by `(provider, model)`.
-    pub requests: &'a HashMap<(String, String), Vec<RequestTokens>>,
+    pub requests: &'a HashMap<ModelKey, Vec<RequestTokens>>,
     pub sessions: &'a [UsageSession],
     pub book: &'a PriceBook,
 }
@@ -393,6 +399,43 @@ fn model_rows(book: &PriceBook, sums: &BTreeMap<(&str, &str), Sum>) -> Vec<Model
         .collect()
 }
 
+/// A main session's row of the report.
+fn session_row(
+    info: &UsageSession,
+    sums: &SessionSums<'_>,
+    by_id: &HashMap<&str, &UsageSession>,
+    book: &PriceBook,
+) -> SessionUsage {
+    SessionUsage {
+        session_id: info.id.clone(),
+        title: info.title.clone(),
+        workspace: info.workspace.clone(),
+        tokens: sums.total.tokens.clone(),
+        cost: sums.total.cost(),
+        partial: sums.total.unpriced,
+        models: model_rows(book, &sums.models),
+        subagents: sums
+            .subagents
+            .iter()
+            .map(|(id, sum)| SubagentUsage {
+                session_id: (*id).to_owned(),
+                agent_type: by_id.get(id).and_then(|s| s.subagent_type.clone()),
+                tokens: sum.tokens.clone(),
+                cost: sum.cost(),
+            })
+            .collect(),
+        auxiliary: sums
+            .auxiliary
+            .iter()
+            .map(|(purpose, sum)| AuxiliaryUsage {
+                purpose: (*purpose).to_owned(),
+                tokens: sum.tokens.clone(),
+                cost: sum.cost(),
+            })
+            .collect(),
+    }
+}
+
 /// The report: by model, and by main session (only those `keep` accepts) with their subagents
 /// and auxiliary calls; sessions in `inputs.sessions` order.
 #[must_use]
@@ -444,34 +487,7 @@ pub fn report(inputs: &Inputs<'_>, keep: &dyn Fn(&UsageSession) -> bool) -> Usag
         .iter()
         .filter_map(|info| {
             let sums = sessions.get(info.id.as_str())?;
-            Some(SessionUsage {
-                session_id: info.id.clone(),
-                title: info.title.clone(),
-                workspace: info.workspace.clone(),
-                tokens: sums.total.tokens.clone(),
-                cost: sums.total.cost(),
-                partial: sums.total.unpriced,
-                models: model_rows(inputs.book, &sums.models),
-                subagents: sums
-                    .subagents
-                    .iter()
-                    .map(|(id, sum)| SubagentUsage {
-                        session_id: (*id).to_owned(),
-                        agent_type: by_id.get(id).and_then(|s| s.subagent_type.clone()),
-                        tokens: sum.tokens.clone(),
-                        cost: sum.cost(),
-                    })
-                    .collect(),
-                auxiliary: sums
-                    .auxiliary
-                    .iter()
-                    .map(|(purpose, sum)| AuxiliaryUsage {
-                        purpose: (*purpose).to_owned(),
-                        tokens: sum.tokens.clone(),
-                        cost: sum.cost(),
-                    })
-                    .collect(),
-            })
+            Some(session_row(info, sums, &by_id, inputs.book))
         })
         .collect();
     UsageReport {
@@ -485,8 +501,8 @@ pub fn report(inputs: &Inputs<'_>, keep: &dyn Fn(&UsageSession) -> bool) -> Usag
 
 /// Every `(provider, model)` of `groups` whose price in `book` has tiers.
 #[must_use]
-pub fn tiered_models(groups: &[UsageGroup], book: &PriceBook) -> Vec<(String, String)> {
-    let mut out: Vec<(String, String)> = groups
+pub fn tiered_models(groups: &[UsageGroup], book: &PriceBook) -> Vec<ModelKey> {
+    let mut out: Vec<ModelKey> = groups
         .iter()
         .filter(|g| {
             book.price(&g.provider, &g.model)
