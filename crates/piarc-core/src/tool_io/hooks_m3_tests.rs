@@ -238,6 +238,13 @@ impl HookOutlet for Judge {
             })
         })
     }
+
+    fn mcp_tool(
+        &self,
+        _params: piarc_protocol::hooks::HooksMcpToolParams,
+    ) -> BoxFuture<'static, Result<piarc_protocol::hooks::HooksMcpToolResult, String>> {
+        Box::pin(async { Err("no MCP servers in these tests".to_owned()) })
+    }
 }
 
 fn prompt(text: &str, extra: Value) -> Value {

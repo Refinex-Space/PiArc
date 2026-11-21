@@ -25,7 +25,7 @@ use crate::fs::{FsGlob, FsGrep, FsList, FsMkdir, FsPdf, FsRead, FsSpill, FsStat,
 use crate::handshake::HostHello;
 use crate::harness::{HarnessPlan, HarnessTodo, UiAsk};
 use crate::history::{HarnessEntry, SessionGetEntries, SessionHistory};
-use crate::hooks::{HooksPrompt, HooksRun};
+use crate::hooks::{HooksMcpTool, HooksPrompt, HooksRun};
 use crate::host::{HostPing, HostShutdown};
 use crate::jsonrpc::{ErrorResponse, Notification, Request, SuccessResponse};
 use crate::mcp::{
@@ -243,6 +243,8 @@ pub static CONTRACTS: &[Contract] = &[
     response::<HooksRun>("hooks/run/result"),
     request::<HooksPrompt>(HooksPrompt::NAME),
     response::<HooksPrompt>("hooks/prompt/result"),
+    request::<HooksMcpTool>(HooksMcpTool::NAME),
+    response::<HooksMcpTool>("hooks/mcpTool/result"),
     request::<FsMemory>(FsMemory::NAME),
     response::<FsMemory>("fs/memory/result"),
     request::<FsStat>(FsStat::NAME),

@@ -25,7 +25,7 @@ use piarc_protocol::skills::{
     SkillsMatchParams, SkillsMatchResult,
 };
 use piarc_protocol::{ErrorKind, ErrorObject};
-use serde_json::{Map, Value};
+use serde_json::{Map, Value, json};
 
 use super::{SessionIo, ToolIo, lock, policy};
 
@@ -39,6 +39,8 @@ pub(crate) struct Expansion {
     /// The turn grant of its `allowed-tools`, to withdraw when the input does not start or
     /// join a turn.
     pub grant: Option<u64>,
+    /// Context `UserPromptExpansion` hooks added (T41).
+    pub context: Option<String>,
 }
 
 /// What an invocation turned on.
@@ -418,7 +420,25 @@ impl ToolIo {
             session_id,
             s.project(),
         );
-        let expanded = user_prompt_expansion(expanded);
+        // UserPromptExpansion (T41) before anything of the command applies: a block refuses
+        // the input and turns nothing on.
+        let mut fields = Map::new();
+        fields.insert(
+            "expansion_type".into(),
+            json!(if entry.kind == CommandKind::Skill {
+                "skill"
+            } else {
+                "slash_command"
+            }),
+        );
+        fields.insert("command_name".into(), json!(name));
+        fields.insert("command_args".into(), json!(arguments));
+        fields.insert("command_source".into(), json!(entry.source));
+        fields.insert("prompt".into(), json!(expanded));
+        let context = self
+            .user_prompt_expansion(session_id, fields)
+            .await
+            .map_err(|reason| expansion_blocked(name, &reason))?;
         let activated = self.activate(
             &s,
             session_id,
@@ -442,6 +462,7 @@ impl ToolIo {
                 input: text.trim().to_owned(),
             },
             grant: activated.grant,
+            context,
         }))
     }
 
@@ -461,10 +482,15 @@ impl ToolIo {
     }
 }
 
-/// The expansion hook (UserPromptExpansion, T41): returns the text to send. T37 sends it as
-/// expanded.
-fn user_prompt_expansion(text: String) -> String {
-    text
+/// The error of an input whose expansion a `UserPromptExpansion` hook blocked (T41).
+pub(crate) fn expansion_blocked(name: &str, reason: &str) -> ErrorObject {
+    let mut error = ErrorObject::new(
+        ErrorKind::PermissionDenied,
+        format!("A UserPromptExpansion hook blocked /{name}: {reason}"),
+        false,
+    );
+    error.data.details = Some(json!({ "reason": "hookBlocked", "hookReason": reason }));
+    error
 }
 
 /// A body with its arguments substituted and its variables replaced.

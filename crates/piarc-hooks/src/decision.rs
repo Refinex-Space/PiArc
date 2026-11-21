@@ -14,6 +14,11 @@
 //! | `PostToolUseFailure` | as `PostToolUse` without `updatedToolOutput` |
 //! | `SessionStart` | `additionalContext` and plain stdout add context; exit 2's stderr goes to the user |
 //! | `SessionEnd`, `PostCompact`, `Notification` | nothing; exit 2's stderr goes to the user (not for `Notification`) |
+//! | `UserPromptExpansion` (T41) | `decision: "block"` or exit 2 blocks the expansion, `additionalContext` and plain stdout add context |
+//! | `ConfigChange` (T41) | `decision: "block"` or exit 2: the change does not apply to the session (Core ignores it for policy settings) |
+//! | `CwdChanged`, `FileChanged` (T41) | `watchPaths` (with `SessionStart`'s) replaces the watched files; exit 2's stderr goes to the user |
+//! | `InstructionsLoaded` (T41) | nothing; exit 2's stderr goes to the user |
+//! | `StopFailure` (T41) | nothing: its output is ignored |
 //!
 //! Every event but `SessionEnd`, `PreCompact`, `PostCompact` and `Notification` also takes
 //! `systemMessage` (shown to the user) and `continue: false` with `stopReason` (the agent stops).
@@ -83,6 +88,9 @@ pub struct Decision {
     pub messages: Vec<String>,
     /// Errors for the user (non-blocking errors, exit 2's stderr where only the user reads it).
     pub errors: Vec<String>,
+    /// `SessionStart`, `CwdChanged`, `FileChanged` (T41): the files to watch next, the union of
+    /// the handlers that set `watchPaths`; `None` when none did.
+    pub watch_paths: Option<Vec<String>>,
     /// Each handler's verdict for the audit, in handler order.
     pub verdicts: Vec<&'static str>,
 }
@@ -206,14 +214,39 @@ impl Merger {
     }
 
     fn success(&mut self, event: HookEvent, o: &Outcome) -> &'static str {
+        if event.sets_watch_paths()
+            && let Some(paths) = o.specific().and_then(|s| s.get("watchPaths"))
+        {
+            let list = self.d.watch_paths.get_or_insert_with(Vec::new);
+            for path in paths
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+            {
+                if !list.iter().any(|p| p == path) {
+                    list.push(path.to_owned());
+                }
+            }
+        }
         match event {
             HookEvent::PreToolUse => self.pre_tool_use(o),
             HookEvent::PermissionRequest => self.permission_request(o),
-            HookEvent::SessionEnd | HookEvent::PostCompact | HookEvent::Notification => "none",
+            HookEvent::SessionEnd
+            | HookEvent::PostCompact
+            | HookEvent::Notification
+            | HookEvent::StopFailure
+            | HookEvent::InstructionsLoaded => "none",
             _ => {
                 let mut verdict = "none";
                 if o.field("decision") == Some("block")
-                    && !matches!(event, HookEvent::SessionStart | HookEvent::SubagentStart)
+                    && !matches!(
+                        event,
+                        HookEvent::SessionStart
+                            | HookEvent::SubagentStart
+                            | HookEvent::CwdChanged
+                            | HookEvent::FileChanged
+                    )
                 {
                     let reason = o.field("reason").unwrap_or_default().to_owned();
                     verdict = "block";

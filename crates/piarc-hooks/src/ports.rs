@@ -61,3 +61,35 @@ pub trait JudgePort: Send + Sync {
     /// Why there is no answer (no Agent Host, the model request failed), for the user.
     fn judge(&self, call: JudgeCall) -> BoxFuture<'static, Result<JudgeReply, String>>;
 }
+
+/// One `mcp_tool` handler's call (T41).
+#[derive(Debug, Clone, PartialEq)]
+pub struct McpToolCall {
+    /// The server's name in the workspace.
+    pub server: String,
+    /// The tool on it.
+    pub tool: String,
+    /// The arguments, placeholders filled.
+    pub arguments: serde_json::Value,
+    /// The handler's timeout, so the call ends with it.
+    pub timeout_ms: u64,
+}
+
+/// What an MCP tool answered.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct McpToolReply {
+    /// The text content, joined: read as a command's stdout.
+    pub text: String,
+    /// The tool reported an error (`isError`).
+    pub is_error: bool,
+}
+
+/// Calls tools on the workspace's MCP servers (Core: the Agent Host's pool, `hooks/mcpTool`).
+pub trait McpToolPort: Send + Sync {
+    /// Calls `call`.
+    ///
+    /// # Errors
+    ///
+    /// Why there is no answer (the server is not connected, no Agent Host, the call failed).
+    fn call(&self, call: McpToolCall) -> BoxFuture<'static, Result<McpToolReply, String>>;
+}

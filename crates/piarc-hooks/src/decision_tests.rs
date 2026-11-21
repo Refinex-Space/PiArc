@@ -533,3 +533,78 @@ fn replies_read_as_json_and_failures_as_errors() {
     let closed = Decision::merge(e, &[failed(e, "connection refused", true)]);
     assert_eq!(closed.permission, Some(Permission::Deny));
 }
+
+#[test]
+fn m4_events_block_expansions_and_changes_and_collect_watch_paths() {
+    let ev = HookEvent::UserPromptExpansion;
+    let d = Decision::merge(ev, &[out(ev, 2, "", "no deploys today")]);
+    assert_eq!(d.block.as_deref(), Some("no deploys today"));
+    let d = Decision::merge(
+        ev,
+        &[
+            out(ev, 0, "Release notes are in docs/", ""),
+            json_out(ev, &json!({"decision": "block", "reason": "frozen"})),
+        ],
+    );
+    assert_eq!(d.block.as_deref(), Some("frozen"));
+    assert_eq!(d.context, ["Release notes are in docs/"]);
+
+    let ev = HookEvent::ConfigChange;
+    let d = Decision::merge(
+        ev,
+        &[json_out(
+            ev,
+            &json!({"decision": "block", "reason": "keep"}),
+        )],
+    );
+    assert_eq!(d.block.as_deref(), Some("keep"));
+
+    for ev in [
+        HookEvent::SessionStart,
+        HookEvent::CwdChanged,
+        HookEvent::FileChanged,
+    ] {
+        let d = Decision::merge(
+            ev,
+            &[
+                json_out(ev, &specific(ev, json!({"watchPaths": [".envrc", ".env"]}))),
+                json_out(
+                    ev,
+                    &json!({
+                        "systemMessage": "watching",
+                        "decision": "block",
+                        "hookSpecificOutput": {"hookEventName": ev.name(), "watchPaths": [".env", "x"]}
+                    }),
+                ),
+            ],
+        );
+        assert_eq!(
+            d.watch_paths,
+            Some(vec![".envrc".into(), ".env".into(), "x".into()]),
+            "{ev:?}"
+        );
+        assert_eq!(d.messages, ["watching"], "{ev:?}");
+        assert_eq!(d.block, None, "{ev:?}");
+    }
+    let d = Decision::merge(
+        HookEvent::CwdChanged,
+        &[out(HookEvent::CwdChanged, 0, "", "")],
+    );
+    assert_eq!(d.watch_paths, None);
+
+    for ev in [HookEvent::StopFailure, HookEvent::InstructionsLoaded] {
+        let d = Decision::merge(
+            ev,
+            &[json_out(
+                ev,
+                &json!({"decision": "block", "reason": "x", "continue": false}),
+            )],
+        );
+        assert_eq!(d.block, None, "{ev:?}");
+        if ev == HookEvent::StopFailure {
+            assert_eq!(d.stop, None);
+            let d = Decision::merge(ev, &[out(ev, 2, "", "ignored")]);
+            assert!(d.errors.is_empty() && d.block.is_none());
+        }
+    }
+}

@@ -48,4 +48,25 @@ impl HookOutlet for HubHooks {
                 .map_err(|e| e.to_string())
         })
     }
+
+    fn mcp_tool(
+        &self,
+        params: piarc_protocol::hooks::HooksMcpToolParams,
+    ) -> BoxFuture<'static, Result<piarc_protocol::hooks::HooksMcpToolResult, String>> {
+        let session = self
+            .routes
+            .upgrade()
+            .and_then(|routes| lock(&routes).sessions.get(&params.session_id).cloned());
+        Box::pin(async move {
+            let session = session.ok_or_else(|| "the session is not open".to_owned())?;
+            let host = session
+                .host()
+                .await
+                .ok_or_else(|| "the session's Agent Host is not running".to_owned())?;
+            let timeout = Duration::from_millis(params.timeout_ms) + TRANSPORT_SLACK;
+            host.call_within::<piarc_protocol::hooks::HooksMcpTool>(params, timeout)
+                .await
+                .map_err(|e| e.to_string())
+        })
+    }
 }

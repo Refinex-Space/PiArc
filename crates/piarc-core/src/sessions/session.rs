@@ -862,7 +862,12 @@ impl Request {
                         self.tool_io.revoke_turn_grant(&self.id.0, grant);
                     }
                 }
-                context?
+                // The expansion's hook context (T41) comes before the submission's.
+                let expansion_context = expansion.as_ref().and_then(|e| e.context.clone());
+                match (expansion_context, context?) {
+                    (Some(a), Some(b)) => Some(format!("{a}\n\n{b}")),
+                    (a, b) => a.or(b),
+                }
             }
             _ => None,
         };

@@ -42,6 +42,7 @@ mod error;
 mod event;
 mod http;
 mod matcher;
+pub mod mcp_tool;
 mod output;
 mod ports;
 mod prompt;
@@ -51,8 +52,8 @@ pub mod spill;
 
 pub use audit::audit_detail;
 pub use config::{
-    Action, Command, Diagnostic, DiagnosticKind, Handler, HookConfig, Http, LayerHooks, Prompt,
-    Shell, Source,
+    Action, Command, Diagnostic, DiagnosticKind, Handler, HookConfig, Http, LayerHooks, McpTool,
+    Prompt, Shell, Source,
 };
 pub use decision::{Decision, Permission, RequestAnswer};
 pub use error::Error;
@@ -60,7 +61,10 @@ pub use event::{ExitTwo, HandlerKind, HookEvent, LATER_EVENTS, PlainStdout, Time
 pub use http::HttpRules;
 pub use matcher::Matcher;
 pub use output::{Kind, Outcome};
-pub use ports::{HttpCall, HttpPort, HttpReply, JudgeCall, JudgePort, JudgeReply};
+pub use ports::{
+    HttpCall, HttpPort, HttpReply, JudgeCall, JudgePort, JudgeReply, McpToolCall, McpToolPort,
+    McpToolReply,
+};
 pub use prompt::fill as fill_prompt;
 pub use run::{Ran, run};
 pub use runner::{Detail, HandlerRun, Launcher, RunStatus, Runner, RunnerConfig};

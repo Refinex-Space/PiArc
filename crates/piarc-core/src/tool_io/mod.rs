@@ -36,6 +36,7 @@ mod exec;
 mod files;
 mod git_status;
 mod hooks;
+mod hooks_m4;
 mod memory;
 mod memory_reader;
 pub(crate) mod policy;
@@ -186,6 +187,11 @@ struct SessionIo {
     subagent: Option<subagents::Link>,
     /// The directories of the skills the session sees (T37): read-only for its file tools.
     skill_dirs: Mutex<Vec<PathBuf>>,
+    /// Settings layers a `ConfigChange` hook kept at their earlier value for this session
+    /// (T41): layer id → the value it had.
+    config_pins: Mutex<HashMap<&'static str, Option<serde_json::Value>>>,
+    /// The files `FileChanged` hooks watch for this session (T41).
+    file_watch: Mutex<Option<hooks_m4::FileWatch>>,
 }
 
 impl SessionIo {
@@ -508,6 +514,8 @@ impl ToolIo {
                 turn: Mutex::default(),
                 skill_dirs: Mutex::default(),
                 subagent,
+                config_pins: Mutex::default(),
+                file_watch: Mutex::default(),
             }),
         );
     }
@@ -799,6 +807,7 @@ impl ToolIo {
         let session_id = p.session_id.0.clone();
         let call = p.origin.as_ref().map(|o| o.tool_call_id.clone());
         let place = self.place(&p.session_id.0, &session);
+        let cwd_before = lock(&session.shell_cwd).clone();
         let result = self
             .exec
             .run(&session, p, launch, wrap, peer, token, place)
@@ -806,6 +815,11 @@ impl ToolIo {
         watcher.abort();
         lock(&session.running).remove(&request_id);
         let mut result = result?;
+        // CwdChanged (T41): the command moved the session's working directory.
+        let cwd_after = lock(&session.shell_cwd).clone();
+        if cwd_after != cwd_before {
+            self.cwd_changed(&session_id, &cwd_before, &cwd_after).await;
+        }
         if let Some(run) = &run {
             if result.task.is_none() {
                 self.sandbox_report(&session, &session_id, call.as_deref(), run, &mut result)

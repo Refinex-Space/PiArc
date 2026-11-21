@@ -129,6 +129,27 @@ fn host_event(event: HostHookEvent) -> (HookEvent, &'static [&'static str], Opti
             &["trigger", "compact_summary"],
             Some("trigger"),
         ),
+        HostHookEvent::InstructionsLoaded => (
+            HookEvent::InstructionsLoaded,
+            &["file_path", "memory_type", "load_reason"],
+            Some("load_reason"),
+        ),
+        HostHookEvent::StopFailure => (
+            HookEvent::StopFailure,
+            &["error", "error_details", "last_assistant_message"],
+            Some("error"),
+        ),
+        HostHookEvent::UserPromptExpansion => (
+            HookEvent::UserPromptExpansion,
+            &[
+                "expansion_type",
+                "command_name",
+                "command_args",
+                "command_source",
+                "prompt",
+            ],
+            Some("command_name"),
+        ),
     }
 }
 
@@ -353,7 +374,17 @@ impl ToolIo {
                     result.updated_output = d.updated_output;
                 }
             }
-            HookEvent::SessionStart | HookEvent::SubagentStart => result.context = answer.context,
+            HookEvent::SessionStart | HookEvent::SubagentStart => {
+                // `watchPaths` of SessionStart start the session's FileChanged watch (T41).
+                if let Some(paths) = &d.watch_paths {
+                    self.set_watch_paths(id, paths).await;
+                }
+                result.context = answer.context;
+            }
+            HookEvent::UserPromptExpansion => {
+                result.block = d.block;
+                result.context = answer.context;
+            }
             HookEvent::PostToolBatch => {
                 if let (Some(reason), Ok(s)) = (&d.block, self.session(id)) {
                     let facts = self.session_facts(&s, id, CancellationToken::new());
@@ -391,6 +422,37 @@ impl ToolIo {
         let request = Request {
             event: HookEvent::UserPromptSubmit,
             subject: None,
+            fields,
+            tool: None,
+        };
+        let answer = self.run_hooks(hooks, &facts, &request).await;
+        match answer.decision.block {
+            Some(reason) => Err(reason),
+            None => Ok(answer.context),
+        }
+    }
+
+    /// `UserPromptExpansion` (T41): a slash command, skill or MCP prompt the user typed is about
+    /// to become the input (`command_name` is the matcher). `Err` with the reason when a hook
+    /// blocks it, otherwise the context hooks added.
+    pub(crate) async fn user_prompt_expansion(
+        &self,
+        id: &str,
+        fields: Map<String, Value>,
+    ) -> Result<Option<String>, String> {
+        let (Some(hooks), Ok(s)) = (self.hook_service(), self.session(id)) else {
+            return Ok(None);
+        };
+        let token = CancellationToken::new();
+        let _running = Running::new(&s, &token);
+        hooks.started(id, &token).await;
+        let facts = self.session_facts(&s, id, token.clone());
+        let request = Request {
+            event: HookEvent::UserPromptExpansion,
+            subject: fields
+                .get("command_name")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
             fields,
             tool: None,
         };

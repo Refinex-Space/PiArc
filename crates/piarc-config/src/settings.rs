@@ -299,6 +299,36 @@ impl Settings {
             .and_then(|(_, state)| state.value.as_ref())
     }
 
+    /// The loaded value of every layer, by id (before the trust and mode filters): what a
+    /// `ConfigChange` hook keeps when it blocks a change (T41).
+    #[must_use]
+    pub fn loaded_layers(&self) -> Vec<(&'static str, Option<Value>)> {
+        self.table
+            .layers()
+            .iter()
+            .zip(&self.states)
+            .map(|(spec, state)| (spec.id, state.value.clone()))
+            .collect()
+    }
+
+    /// Replaces layer `id`'s loaded value with `value` (`None`: as if its file were missing)
+    /// and merges again: a session whose `ConfigChange` hook blocked a change keeps the value
+    /// it had (T41). Unknown ids change nothing.
+    pub fn pin_layer(&mut self, id: &str, value: Option<Value>) -> Vec<String> {
+        let Some(index) = self.table.layers().iter().position(|spec| spec.id == id) else {
+            return Vec::new();
+        };
+        if let Some(state) = self.states.get_mut(index) {
+            state.status = if value.is_some() {
+                LayerStatus::Loaded
+            } else {
+                LayerStatus::Missing
+            };
+            state.value = value;
+        }
+        self.remerge()
+    }
+
     /// Project layers that asked for `bypassPermissions` or `auto`, which never apply.
     #[must_use]
     pub fn ignored_modes(&self) -> &[(&'static str, String)] {

@@ -41,6 +41,13 @@ pub enum HostHookEvent {
     SubagentStop,
     /// Pi's `turn_end` after a round of tool calls (T38).
     PostToolBatch,
+    /// A memory file or rule entered the session's context (T41).
+    InstructionsLoaded,
+    /// A turn ended with a model API error after its retries (T41).
+    StopFailure,
+    /// An MCP prompt the user typed is about to become the input (T41; Core runs it itself for
+    /// command files and skills).
+    UserPromptExpansion,
 }
 
 /// Parameters of `hooks/run`.
@@ -132,4 +139,36 @@ pub struct HooksPromptResult {
     pub input_tokens: u64,
     /// Output tokens of the call.
     pub output_tokens: u64,
+}
+
+crate::method::request!(
+    /// One MCP tool call of an `mcp_tool` hook (Core → Agent Host, T41).
+    HooksMcpTool, "hooks/mcpTool", HooksMcpToolParams, HooksMcpToolResult
+);
+
+/// Parameters of `hooks/mcpTool`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct HooksMcpToolParams {
+    /// The main session the hook runs for.
+    pub session_id: String,
+    /// A server of the workspace's pool.
+    pub server: String,
+    /// The tool on it.
+    pub tool: String,
+    /// The tool's arguments (placeholders already filled).
+    pub arguments: Value,
+    /// The hook's timeout; the call ends with it.
+    pub timeout_ms: u64,
+}
+
+/// Result of `hooks/mcpTool`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct HooksMcpToolResult {
+    /// The tool's text content, joined by newlines.
+    pub text: String,
+    /// The tool reported an error (`isError`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub is_error: bool,
 }

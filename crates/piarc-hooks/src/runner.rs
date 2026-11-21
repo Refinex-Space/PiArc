@@ -27,7 +27,7 @@ use crate::config::{Action, Command, Handler, Http, Prompt};
 use crate::error::Error;
 use crate::event::{HookEvent, Timeouts};
 use crate::http::{HttpRules, read_reply};
-use crate::ports::{HttpPort, JudgeCall, JudgePort};
+use crate::ports::{HttpPort, JudgeCall, JudgePort, McpToolCall, McpToolPort};
 
 /// After the handler exits, how long its pipes may stay quiet before reading stops.
 const EXIT_GRACE: Duration = Duration::from_millis(100);
@@ -79,6 +79,9 @@ pub enum RunStatus {
     Replied(Map<String, Value>),
     /// An `http` or `prompt` handler failed without blocking: why.
     Failed(String),
+    /// An `mcp_tool` handler's tool answered (T41): its text, read as a command's stdout on
+    /// exit 0.
+    Answered(String),
 }
 
 /// What the audit records of a run besides its status.
@@ -88,6 +91,8 @@ pub enum Detail {
     Process,
     /// An `http` handler: the response status, when one arrived.
     Http { status: Option<u16> },
+    /// An `mcp_tool` handler (T41): the tool reported an error.
+    McpTool { is_error: bool },
     /// A `prompt` handler: the model that answered and its tokens.
     Prompt {
         model: Option<String>,
@@ -121,6 +126,7 @@ pub struct Runner {
     config: RunnerConfig,
     http: Option<(Arc<dyn HttpPort>, Arc<HttpRules>)>,
     judge: Option<Arc<dyn JudgePort>>,
+    mcp: Option<Arc<dyn McpToolPort>>,
 }
 
 impl std::fmt::Debug for Runner {
@@ -145,7 +151,15 @@ impl Runner {
             config,
             http: None,
             judge: None,
+            mcp: None,
         }
+    }
+
+    /// Runs `mcp_tool` handlers through `port` (T41); without it they fail to start.
+    #[must_use]
+    pub fn with_mcp(mut self, port: Arc<dyn McpToolPort>) -> Self {
+        self.mcp = Some(port);
+        self
     }
 
     /// Runs `http` handlers through `port` under `rules`; without it they fail to start.
@@ -203,6 +217,14 @@ impl Runner {
                     let (http, input) = (http.clone(), Arc::clone(&bytes));
                     tasks.spawn(async move {
                         let run = post(event, &http, call, &input, timeout, &cancel).await;
+                        (index, run.finish(handler))
+                    });
+                }
+                Action::McpTool(tool) => {
+                    let port = self.mcp.clone();
+                    let (tool, input) = (tool.clone(), Arc::clone(&bytes));
+                    tasks.spawn(async move {
+                        let run = call_tool(&tool, port, &input, timeout, &cancel).await;
                         (index, run.finish(handler))
                     });
                 }
@@ -320,6 +342,53 @@ async fn post(
         Bounded::Done(Err(why)) => done(RunStatus::Failed(why), None),
         Bounded::TimedOut => done(RunStatus::TimedOut(timeout), None),
         Bounded::Cancelled => done(RunStatus::Cancelled, None),
+    }
+}
+
+/// An `mcp_tool` handler's run (T41): the tool's text is read as a command's stdout on exit 0;
+/// an error result, a failed call or no port is a non-blocking error.
+async fn call_tool(
+    tool: &crate::config::McpTool,
+    port: Option<Arc<dyn McpToolPort>>,
+    input: &[u8],
+    timeout: Duration,
+    cancel: &CancellationToken,
+) -> Remote {
+    let started = Instant::now();
+    let mut detail = Detail::McpTool { is_error: false };
+    let Some(port) = port else {
+        return Remote {
+            status: RunStatus::NotStarted("mcp_tool hooks cannot run here".into()),
+            detail,
+            duration: started.elapsed(),
+        };
+    };
+    let input: serde_json::Value = serde_json::from_slice(input).unwrap_or_default();
+    let call = McpToolCall {
+        server: tool.server.clone(),
+        tool: tool.tool.clone(),
+        arguments: crate::mcp_tool::fill(&tool.input, &input),
+        timeout_ms: u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
+    };
+    let status = match bounded(port.call(call), timeout, cancel).await {
+        Bounded::Done(Ok(reply)) if reply.is_error => {
+            detail = Detail::McpTool { is_error: true };
+            RunStatus::Failed(format!(
+                "{}/{} returned an error: {}",
+                tool.server,
+                tool.tool,
+                reply.text.lines().next().unwrap_or_default()
+            ))
+        }
+        Bounded::Done(Ok(reply)) => RunStatus::Answered(reply.text),
+        Bounded::Done(Err(why)) => RunStatus::Failed(why),
+        Bounded::TimedOut => RunStatus::TimedOut(timeout),
+        Bounded::Cancelled => RunStatus::Cancelled,
+    };
+    Remote {
+        status,
+        detail,
+        duration: started.elapsed(),
     }
 }
 

@@ -76,9 +76,16 @@ pub fn audit_detail(
         Action::Prompt(prompt) => {
             record.insert("promptSha256".into(), json!(sha256(&prompt.prompt)));
         }
+        Action::McpTool(tool) => {
+            record.insert("server".into(), json!(tool.server));
+            record.insert("tool".into(), json!(tool.tool));
+        }
     }
     match &outcome.detail {
         Detail::Process => {}
+        Detail::McpTool { is_error } => {
+            record.insert("toolError".into(), json!(is_error));
+        }
         Detail::Http { status } => {
             record.insert("httpStatus".into(), json!(status));
         }

@@ -4297,6 +4297,86 @@
       },
       "type": "object"
     },
+    "HooksMcpToolParams": {
+      "description": "Parameters of `hooks/mcpTool`.",
+      "properties": {
+        "arguments": {
+          "description": "The tool's arguments (placeholders already filled)."
+        },
+        "server": {
+          "description": "A server of the workspace's pool.",
+          "type": "string"
+        },
+        "sessionId": {
+          "description": "The main session the hook runs for.",
+          "type": "string"
+        },
+        "timeoutMs": {
+          "description": "The hook's timeout; the call ends with it.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tool": {
+          "description": "The tool on it.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "server", "tool", "arguments", "timeoutMs"],
+      "type": "object"
+    },
+    "HooksMcpToolRequest": {
+      "description": "Request for `hooks/mcpTool`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "hooks/mcpTool",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/HooksMcpToolParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "HooksMcpToolResponse": {
+      "description": "Successful response to `hooks/mcpTool`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/HooksMcpToolResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "HooksMcpToolResult": {
+      "description": "Result of `hooks/mcpTool`.",
+      "properties": {
+        "isError": {
+          "description": "The tool reported an error (`isError`).",
+          "type": "boolean"
+        },
+        "text": {
+          "description": "The tool's text content, joined by newlines.",
+          "type": "string"
+        }
+      },
+      "required": ["text"],
+      "type": "object"
+    },
     "HooksPromptParams": {
       "description": "Parameters of `hooks/prompt`.",
       "properties": {
@@ -4603,6 +4683,21 @@
         {
           "const": "postToolBatch",
           "description": "Pi's `turn_end` after a round of tool calls (T38).",
+          "type": "string"
+        },
+        {
+          "const": "instructionsLoaded",
+          "description": "A memory file or rule entered the session's context (T41).",
+          "type": "string"
+        },
+        {
+          "const": "stopFailure",
+          "description": "A turn ended with a model API error after its retries (T41).",
+          "type": "string"
+        },
+        {
+          "const": "userPromptExpansion",
+          "description": "An MCP prompt the user typed is about to become the input (T41; Core runs it itself for\ncommand files and skills).",
           "type": "string"
         }
       ]
@@ -14640,6 +14735,12 @@
     },
     {
       "$ref": "#/$defs/HooksPromptResponse"
+    },
+    {
+      "$ref": "#/$defs/HooksMcpToolRequest"
+    },
+    {
+      "$ref": "#/$defs/HooksMcpToolResponse"
     },
     {
       "$ref": "#/$defs/FsMemoryRequest"

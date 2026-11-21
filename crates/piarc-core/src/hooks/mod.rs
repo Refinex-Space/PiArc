@@ -125,6 +125,12 @@ pub(crate) trait HookOutlet: Send + Sync {
         &self,
         params: HooksPromptParams,
     ) -> BoxFuture<'static, Result<HooksPromptResult, String>>;
+
+    /// Calls an MCP tool for an `mcp_tool` hook on the session's Agent Host (T41).
+    fn mcp_tool(
+        &self,
+        params: piarc_protocol::hooks::HooksMcpToolParams,
+    ) -> BoxFuture<'static, Result<piarc_protocol::hooks::HooksMcpToolResult, String>>;
 }
 
 /// Bytes of an `http` hook's response read.
@@ -208,6 +214,37 @@ impl JudgePort for SessionJudge {
                 model: answer.model,
                 input_tokens: answer.input_tokens,
                 output_tokens: answer.output_tokens,
+            })
+        })
+    }
+}
+
+/// `mcp_tool` hooks of one main session through the outlet (T41).
+struct SessionMcp {
+    outlet: Option<Arc<dyn HookOutlet>>,
+    session_id: String,
+}
+
+impl piarc_hooks::McpToolPort for SessionMcp {
+    fn call(
+        &self,
+        call: piarc_hooks::McpToolCall,
+    ) -> BoxFuture<'static, Result<piarc_hooks::McpToolReply, String>> {
+        let Some(outlet) = self.outlet.clone() else {
+            return Box::pin(async { Err("no Agent Host can run mcp_tool hooks here".to_owned()) });
+        };
+        let params = piarc_protocol::hooks::HooksMcpToolParams {
+            session_id: self.session_id.clone(),
+            server: call.server,
+            tool: call.tool,
+            arguments: call.arguments,
+            timeout_ms: call.timeout_ms,
+        };
+        Box::pin(async move {
+            let answer = outlet.mcp_tool(params).await?;
+            Ok(piarc_hooks::McpToolReply {
+                text: answer.text,
+                is_error: answer.is_error,
             })
         })
     }
@@ -621,6 +658,10 @@ impl HooksService {
             outlet: lock(&self.inner.outlet).clone(),
             session_id: facts.main_session_id.clone(),
         };
+        let mcp = SessionMcp {
+            outlet: lock(&self.inner.outlet).clone(),
+            session_id: facts.main_session_id.clone(),
+        };
         let handlers = plan.handlers;
         let runner = Runner::new(
             Arc::clone(&self.inner.spawner),
@@ -632,7 +673,8 @@ impl HooksService {
             self.inner.runner,
         )
         .with_http(self.inner.http.clone(), rules)
-        .with_judge(Arc::new(judge));
+        .with_judge(Arc::new(judge))
+        .with_mcp(Arc::new(mcp));
         let ran = piarc_hooks::run(
             &runner,
             request.event,

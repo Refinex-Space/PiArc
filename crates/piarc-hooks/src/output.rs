@@ -75,13 +75,7 @@ impl Outcome {
             RunStatus::Exited(status) => {
                 outcome.exit_code = status.code;
                 match status.code {
-                    Some(0) => match parse_stdout(event, &run.stdout) {
-                        Ok(Stdout::Json(json)) => outcome.json = Some(json),
-                        Ok(Stdout::Text(text)) => outcome.text = text,
-                        Err(message) => {
-                            outcome.kind = Kind::Error(format!("{name} hook error: {message}"));
-                        }
-                    },
+                    Some(0) => outcome.read_stdout(event, &run.stdout),
                     Some(2) => {
                         let json = match parse_stdout(event, &run.stdout) {
                             Ok(Stdout::Json(json)) => Some(json),
@@ -126,12 +120,24 @@ impl Outcome {
             RunStatus::NotStarted(reason) | RunStatus::Failed(reason) => {
                 outcome.kind = Kind::Error(format!("{name} hook error: {reason}"));
             }
+            RunStatus::Answered(text) => outcome.read_stdout(event, &text),
             RunStatus::Replied(json) => {
                 outcome.exit_code = None;
                 outcome.json = (!json.is_empty()).then_some(json);
             }
         }
         outcome
+    }
+
+    /// Reads the stdout of a success (exit 0, or an `mcp_tool` handler's text).
+    fn read_stdout(&mut self, event: HookEvent, stdout: &str) {
+        match parse_stdout(event, stdout) {
+            Ok(Stdout::Json(json)) => self.json = Some(json),
+            Ok(Stdout::Text(text)) => self.text = text,
+            Err(message) => {
+                self.kind = Kind::Error(format!("{} hook error: {message}", event.name()));
+            }
+        }
     }
 
     /// The `hookSpecificOutput` object.

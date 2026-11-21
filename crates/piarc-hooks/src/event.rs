@@ -3,8 +3,8 @@
 
 use std::time::Duration;
 
-/// An event that runs hooks: M2's eleven and M3's three; the others of Claude Code's set arrive
-/// with the tasks in [`LATER_EVENTS`].
+/// An event that runs hooks: M2's eleven, M3's three and M4's six (T41); the others of Claude
+/// Code's set arrive with the tasks in [`LATER_EVENTS`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum HookEvent {
     /// A session was created, resumed or forked, or its context was compacted.
@@ -35,6 +35,18 @@ pub enum HookEvent {
     SubagentStop,
     /// Every tool call of one model response has its result, before the next request (T38).
     PostToolBatch,
+    /// A slash command, skill or MCP prompt the user typed is about to become the input (T41).
+    UserPromptExpansion,
+    /// A memory file or rule entered the context (T41).
+    InstructionsLoaded,
+    /// A command changed the session's working directory (T41).
+    CwdChanged,
+    /// A watched file changed on disk (T41).
+    FileChanged,
+    /// A configuration file changed during the session (T41).
+    ConfigChange,
+    /// A turn ended with a model API error after its retries (T41).
+    StopFailure,
 }
 
 /// A handler type (the `type` field) PiArc runs.
@@ -46,6 +58,8 @@ pub enum HandlerKind {
     Http,
     /// One model call judging the input.
     Prompt,
+    /// One tool call on a connected MCP server (T41).
+    McpTool,
 }
 
 impl HandlerKind {
@@ -56,6 +70,7 @@ impl HandlerKind {
             Self::Command => "command",
             Self::Http => "http",
             Self::Prompt => "prompt",
+            Self::McpTool => "mcp_tool",
         }
     }
 }
@@ -113,7 +128,7 @@ impl Default for Timeouts {
 
 impl HookEvent {
     /// Every event, in Claude Code's documentation order.
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 20] = [
         Self::SessionStart,
         Self::SessionEnd,
         Self::UserPromptSubmit,
@@ -128,6 +143,12 @@ impl HookEvent {
         Self::SubagentStart,
         Self::SubagentStop,
         Self::PostToolBatch,
+        Self::UserPromptExpansion,
+        Self::InstructionsLoaded,
+        Self::CwdChanged,
+        Self::FileChanged,
+        Self::ConfigChange,
+        Self::StopFailure,
     ];
 
     /// The configuration key and `hook_event_name`.
@@ -148,6 +169,12 @@ impl HookEvent {
             Self::SubagentStart => "SubagentStart",
             Self::SubagentStop => "SubagentStop",
             Self::PostToolBatch => "PostToolBatch",
+            Self::UserPromptExpansion => "UserPromptExpansion",
+            Self::InstructionsLoaded => "InstructionsLoaded",
+            Self::CwdChanged => "CwdChanged",
+            Self::FileChanged => "FileChanged",
+            Self::ConfigChange => "ConfigChange",
+            Self::StopFailure => "StopFailure",
         }
     }
 
@@ -157,14 +184,15 @@ impl HookEvent {
         Self::ALL.into_iter().find(|event| event.name() == name)
     }
 
-    /// Whether the event's matcher filters anything. `UserPromptSubmit`, `Stop` and
-    /// `PostToolBatch` always fire: a matcher there is ignored. The subagent events match the
-    /// agent type.
+    /// Whether the event's matcher filters anything. `UserPromptSubmit`, `Stop`,
+    /// `PostToolBatch` and `CwdChanged` always fire: a matcher there is ignored. The subagent
+    /// events match the agent type; the M4 events match the command name, the load reason, the
+    /// file name, the configuration source and the error type.
     #[must_use]
     pub fn uses_matcher(self) -> bool {
         !matches!(
             self,
-            Self::UserPromptSubmit | Self::Stop | Self::PostToolBatch
+            Self::UserPromptSubmit | Self::Stop | Self::PostToolBatch | Self::CwdChanged
         )
     }
 
@@ -174,7 +202,7 @@ impl HookEvent {
     #[must_use]
     pub fn supports(self, kind: HandlerKind) -> bool {
         match kind {
-            HandlerKind::Command => true,
+            HandlerKind::Command | HandlerKind::McpTool => true,
             HandlerKind::Http => self != Self::SessionStart,
             HandlerKind::Prompt => matches!(
                 self,
@@ -186,6 +214,7 @@ impl HookEvent {
                     | Self::SubagentStop
                     | Self::UserPromptSubmit
                     | Self::PostToolBatch
+                    | Self::UserPromptExpansion
             ),
         }
     }
@@ -234,7 +263,9 @@ impl HookEvent {
     #[must_use]
     pub fn plain_stdout(self) -> PlainStdout {
         match self {
-            Self::SessionStart | Self::UserPromptSubmit => PlainStdout::Context,
+            Self::SessionStart | Self::UserPromptSubmit | Self::UserPromptExpansion => {
+                PlainStdout::Context
+            }
             Self::PreCompact => PlainStdout::Instructions,
             _ => PlainStdout::Ignored,
         }
@@ -249,12 +280,18 @@ impl HookEvent {
             | Self::Stop
             | Self::SubagentStop
             | Self::PreCompact
-            | Self::PostToolBatch => ExitTwo::Blocks,
+            | Self::PostToolBatch
+            | Self::UserPromptExpansion
+            | Self::ConfigChange => ExitTwo::Blocks,
             Self::PostToolUse | Self::PostToolUseFailure => ExitTwo::ToModel,
-            Self::SessionStart | Self::SessionEnd | Self::PostCompact | Self::SubagentStart => {
-                ExitTwo::ToUser
-            }
-            Self::PermissionRequest | Self::Notification => ExitTwo::Ignored,
+            Self::SessionStart
+            | Self::SessionEnd
+            | Self::PostCompact
+            | Self::SubagentStart
+            | Self::InstructionsLoaded
+            | Self::CwdChanged
+            | Self::FileChanged => ExitTwo::ToUser,
+            Self::PermissionRequest | Self::Notification | Self::StopFailure => ExitTwo::Ignored,
         }
     }
 
@@ -264,7 +301,21 @@ impl HookEvent {
     pub fn uses_common_fields(self) -> bool {
         !matches!(
             self,
-            Self::SessionEnd | Self::PreCompact | Self::PostCompact | Self::Notification
+            Self::SessionEnd
+                | Self::PreCompact
+                | Self::PostCompact
+                | Self::Notification
+                | Self::StopFailure
+        )
+    }
+
+    /// Whether the event's JSON output may set `watchPaths` (T41): the files `FileChanged`
+    /// watches next.
+    #[must_use]
+    pub fn sets_watch_paths(self) -> bool {
+        matches!(
+            self,
+            Self::SessionStart | Self::CwdChanged | Self::FileChanged
         )
     }
 }
@@ -272,12 +323,6 @@ impl HookEvent {
 /// Events of Claude Code's set that PiArc recognizes but does not run yet, with the task that
 /// adds them ("unscheduled" when none does). Configuration naming them is reported, not run.
 pub const LATER_EVENTS: &[(&str, &str)] = &[
-    ("UserPromptExpansion", "T41"),
-    ("InstructionsLoaded", "T41"),
-    ("CwdChanged", "T41"),
-    ("FileChanged", "T41"),
-    ("ConfigChange", "T41"),
-    ("StopFailure", "T41"),
     ("WorktreeCreate", "T48"),
     ("WorktreeRemove", "T48"),
     ("PreModelSwitch", "T48"),

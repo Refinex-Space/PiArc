@@ -37,6 +37,17 @@ pub const SETTINGS_ROUTE: &str = "core/settings";
 /// Quiet time after the last file notification before the files are read again.
 pub const DEBOUNCE: Duration = Duration::from_millis(150);
 
+/// One settings layer whose file changed (T41: what `ConfigChange` hooks hear).
+#[derive(Debug, Clone, PartialEq)]
+pub struct LayerChange {
+    /// The layer id.
+    pub layer: &'static str,
+    /// Its file.
+    pub file: PathBuf,
+    /// The value it had before.
+    pub previous: Option<Value>,
+}
+
 /// One workspace's settings. Dropping it stops watching.
 pub struct WorkspaceSettings {
     inner: Arc<Mutex<Settings>>,
@@ -46,6 +57,8 @@ pub struct WorkspaceSettings {
     /// Advances after every reload (files of settings or of skills, commands, styles) and
     /// trust change (T37).
     changes: watch::Receiver<u64>,
+    /// The layers whose files changed, one event each (T41).
+    layer_changes: broadcast::Sender<LayerChange>,
 }
 
 impl std::fmt::Debug for WorkspaceSettings {
@@ -97,6 +110,7 @@ impl WorkspaceSettings {
         let watcher = Arc::new(Mutex::new(watcher));
         let (registered, ready) = oneshot::channel();
         let (changed, changes) = watch::channel(0);
+        let (layer_changes, _) = broadcast::channel(64);
         let task = tokio::spawn(run(
             Loop {
                 inner: Arc::clone(&inner),
@@ -110,6 +124,7 @@ impl WorkspaceSettings {
                 events,
                 notifications: rx,
                 changed,
+                layer_changes: layer_changes.clone(),
             },
             trust_changes,
             registered,
@@ -120,6 +135,7 @@ impl WorkspaceSettings {
             task,
             _watcher: watcher,
             changes,
+            layer_changes,
         };
         if wait_for_registration {
             ready.await.map_err(|_| Error::Internal {
@@ -139,6 +155,11 @@ impl WorkspaceSettings {
     #[must_use]
     pub(crate) fn changes(&self) -> watch::Receiver<u64> {
         self.changes.clone()
+    }
+
+    /// Hears each settings layer whose file changed (T41's `ConfigChange`).
+    pub(crate) fn layer_changes(&self) -> broadcast::Receiver<LayerChange> {
+        self.layer_changes.subscribe()
     }
 
     /// Problems of the last read.
@@ -184,6 +205,7 @@ struct Loop {
     events: EventSender,
     notifications: mpsc::UnboundedReceiver<()>,
     changed: watch::Sender<u64>,
+    layer_changes: broadcast::Sender<LayerChange>,
 }
 
 async fn run(
@@ -236,16 +258,22 @@ impl Loop {
         let resources = self.resources.clone();
         let result = tokio::task::spawn_blocking(move || {
             let before = lock(&inner).issues().to_vec();
+            let layers_before = lock(&inner).loaded_layers();
             let change = lock(&inner).reload();
+            let layers = layer_changes(&lock(&inner), layers_before);
             // `.piarc/` or a skill directory may have been created since: watch it now.
             watch_dirs(&watcher, &inner, &workspace, &resources);
-            (before, change)
+            (before, change, layers)
         })
         .await;
         // Skills, commands and styles have no event of their own: the Agent Host reloads.
         self.changed.send_modify(|n| *n += 1);
         match result {
-            Ok((before, change)) => {
+            Ok((before, change, layers)) => {
+                for layer in layers {
+                    // Nobody listening (no open session) is fine.
+                    let _ = self.layer_changes.send(layer);
+                }
                 if !change.changed.is_empty() || change.issues != before {
                     for issue in &change.issues {
                         log_issue(issue);
@@ -286,6 +314,30 @@ impl Loop {
             }
         }
     }
+}
+
+/// The layers whose loaded value differs from `before`, with their file and earlier value.
+fn layer_changes(
+    settings: &Settings,
+    before: Vec<(&'static str, Option<Value>)>,
+) -> Vec<LayerChange> {
+    let after = settings.loaded_layers();
+    before
+        .into_iter()
+        .zip(after)
+        .filter(|((_, old), (_, new))| old != new)
+        .filter_map(|((layer, previous), _)| {
+            let file = settings
+                .table()
+                .get(layer)
+                .and_then(|spec| spec.file().map(Path::to_owned))?;
+            Some(LayerChange {
+                layer,
+                file,
+                previous,
+            })
+        })
+        .collect()
 }
 
 /// Watches the directories of the layer files; for a directory that does not exist yet

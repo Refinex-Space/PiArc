@@ -435,6 +435,18 @@
     },
     {
       "kind": "request",
+      "method": "hooks/mcpTool",
+      "name": "hooks/mcpTool",
+      "schema": "HooksMcpToolRequest"
+    },
+    {
+      "kind": "response",
+      "method": "hooks/mcpTool",
+      "name": "hooks/mcpTool/result",
+      "schema": "HooksMcpToolResponse"
+    },
+    {
+      "kind": "request",
       "method": "fs/memory",
       "name": "fs/memory",
       "schema": "FsMemoryRequest"

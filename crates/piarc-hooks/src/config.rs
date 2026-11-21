@@ -84,12 +84,25 @@ pub struct Prompt {
     pub continue_on_block: bool,
 }
 
+/// Which MCP tool an `mcp_tool` handler calls (T41).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct McpTool {
+    /// `server`: a configured server of the workspace.
+    pub server: String,
+    /// `tool`: the tool's name on that server.
+    pub tool: String,
+    /// `input`: the arguments, `${path}` placeholders filled from the hook input
+    /// ([`crate::mcp_tool::fill`]).
+    pub input: Value,
+}
+
 /// What a handler does.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
     Command(Command),
     Http(Http),
     Prompt(Prompt),
+    McpTool(McpTool),
 }
 
 /// A handler.
@@ -117,6 +130,7 @@ impl Handler {
             Action::Command(_) => HandlerKind::Command,
             Action::Http(_) => HandlerKind::Http,
             Action::Prompt(_) => HandlerKind::Prompt,
+            Action::McpTool(_) => HandlerKind::McpTool,
         }
     }
 
@@ -281,7 +295,7 @@ impl HookConfig {
             Some("command") => HandlerKind::Command,
             Some("http") => HandlerKind::Http,
             Some("prompt") => HandlerKind::Prompt,
-            Some(kind @ "mcp_tool") => return self.unsupported_type(source, &pointer, kind, "T41"),
+            Some("mcp_tool") => HandlerKind::McpTool,
             Some(kind @ "agent") => {
                 return self.unsupported_type(source, &pointer, kind, "unscheduled");
             }
@@ -530,6 +544,20 @@ fn action(kind: HandlerKind, fields: &serde_json::Map<String, Value>) -> Result<
                 continue_on_block,
             }))
         }
+        HandlerKind::McpTool => {
+            let server = required(fields, "server", "an mcp_tool hook")?.to_owned();
+            let tool = required(fields, "tool", "an mcp_tool hook")?.to_owned();
+            let input = match fields.get("input") {
+                None => Value::Object(serde_json::Map::new()),
+                Some(value @ Value::Object(_)) => value.clone(),
+                Some(_) => return Err("input must be an object".into()),
+            };
+            Ok(Action::McpTool(McpTool {
+                server,
+                tool,
+                input,
+            }))
+        }
     }
 }
 
@@ -569,6 +597,7 @@ mod tests {
                 Action::Command(c) => c.command.as_str(),
                 Action::Http(h) => h.url.as_str(),
                 Action::Prompt(p) => p.prompt.as_str(),
+                Action::McpTool(t) => t.tool.as_str(),
             })
             .collect()
     }
@@ -639,14 +668,15 @@ mod tests {
                     {"type": "prompt", "prompt": "start?"}
                 ]}],
                 "SubagentStart": [{"hooks": [{"type": "prompt", "prompt": "go?"}]}],
-                "UserPromptExpansion": [],
+                "WorktreeCreate": [],
                 "BeforeEverything": [],
                 "Stop": [{"hooks": [{"type": "command", "command": "c", "if": "Bash(*)"}]}]
             }),
         )]);
         assert_eq!(
             commands(&config.select(HookEvent::PreToolUse, Some("Bash"))),
-            ["https://example.invalid", "ok?", "sync"]
+            // `mcp_tool` runs since T41.
+            ["https://example.invalid", "ok?", "t", "sync"]
         );
         assert!(config.select(HookEvent::Stop, None).is_empty());
         assert!(
@@ -678,10 +708,6 @@ mod tests {
                 ),
                 (
                     DiagnosticKind::UnsupportedType,
-                    "/hooks/PreToolUse/1/hooks/3/type"
-                ),
-                (
-                    DiagnosticKind::UnsupportedType,
                     "/hooks/PreToolUse/1/hooks/4/type"
                 ),
                 (
@@ -701,13 +727,13 @@ mod tests {
                     DiagnosticKind::UnsupportedType,
                     "/hooks/SubagentStart/0/hooks/0/type"
                 ),
-                (DiagnosticKind::LaterEvent, "/hooks/UserPromptExpansion"),
+                (DiagnosticKind::LaterEvent, "/hooks/WorktreeCreate"),
             ]
         );
         assert!(config.diagnostics()[0].message.contains("not a hook event"));
         assert!(config.diagnostics()[1].message.contains("look-ahead"));
         assert!(
-            config.diagnostics()[6]
+            config.diagnostics()[5]
                 .message
                 .contains("http hooks do not run on SessionStart")
         );

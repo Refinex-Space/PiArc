@@ -382,17 +382,31 @@ pub(crate) fn hook_item_name(event: &str, matcher: &str, handler: &Value) -> Str
     let field = match handler.get("type").and_then(Value::as_str) {
         Some("http") => "url",
         Some("prompt") => "prompt",
+        Some("mcp_tool") => "tool",
         _ => "command",
     };
     let what = handler
         .get(field)
         .and_then(Value::as_str)
         .unwrap_or("(no command)");
+    // An `mcp_tool` handler (T41) runs a tool of a server with an input.
+    let what = match handler.get("server").and_then(Value::as_str) {
+        Some(server) if field == "tool" => format!("mcp_tool {server}/{what}"),
+        _ => what.to_owned(),
+    };
     // What else decides what runs and what it sends (the handler's identity in
     // `piarc-hooks`): arguments, shell, condition (R3), headers, the variables they may use
     // and a prompt hook's model (R4 E3) make a new item.
     let mut name = format!("{event}[{matcher}] {what}");
-    for key in ["args", "shell", "if", "headers", "allowedEnvVars", "model"] {
+    for key in [
+        "args",
+        "shell",
+        "if",
+        "headers",
+        "allowedEnvVars",
+        "model",
+        "input",
+    ] {
         if let Some(value) = handler.get(key) {
             name.push_str(&format!(" {key}={value}"));
         }

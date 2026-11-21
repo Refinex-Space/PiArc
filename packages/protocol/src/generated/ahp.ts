@@ -90,6 +90,8 @@ export type AhpMessage =
   | HooksRunResponse
   | HooksPromptRequest
   | HooksPromptResponse
+  | HooksMcpToolRequest
+  | HooksMcpToolResponse
   | FsMemoryRequest
   | FsMemoryResponse
   | FsStatRequest
@@ -808,7 +810,10 @@ export type HostHookEvent =
   | 'postCompact'
   | 'subagentStart'
   | 'subagentStop'
-  | 'postToolBatch';
+  | 'postToolBatch'
+  | 'instructionsLoaded'
+  | 'stopFailure'
+  | 'userPromptExpansion';
 /**
  * What a path names.
  */
@@ -3444,6 +3449,62 @@ export interface HooksPromptResult {
   outputTokens: number;
   /**
    * The model's answer text.
+   */
+  text: string;
+}
+/**
+ * Request for `hooks/mcpTool`.
+ */
+export interface HooksMcpToolRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'hooks/mcpTool';
+  params: HooksMcpToolParams;
+}
+/**
+ * Parameters of `hooks/mcpTool`.
+ */
+export interface HooksMcpToolParams {
+  /**
+   * The tool's arguments (placeholders already filled).
+   */
+  arguments: unknown;
+  /**
+   * A server of the workspace's pool.
+   */
+  server: string;
+  /**
+   * The main session the hook runs for.
+   */
+  sessionId: string;
+  /**
+   * The hook's timeout; the call ends with it.
+   */
+  timeoutMs: number;
+  /**
+   * The tool on it.
+   */
+  tool: string;
+}
+/**
+ * Successful response to `hooks/mcpTool`.
+ */
+export interface HooksMcpToolResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: HooksMcpToolResult;
+}
+/**
+ * Result of `hooks/mcpTool`.
+ */
+export interface HooksMcpToolResult {
+  /**
+   * The tool reported an error (`isError`).
+   */
+  isError?: boolean;
+  /**
+   * The tool's text content, joined by newlines.
    */
   text: string;
 }
