@@ -313,14 +313,14 @@ T39（macOS 沙箱正式版与 Windows 隔离评估）。开工：基线复用 8
 
 - [ ] 0. 先拆分 `tool_io/exec.rs`、`tool_io/policy.rs`（I165，已完成 68b8a66），`piarc-exec` 错误枚举（I173），平台分支收进适配层（I174）
 - [x] 1. 沙箱设置与来源约束（a1f8971）：`sandbox.*` 键、两种模式、项目级只收紧、企业来源测试替身、配置诊断"项目级不生效""本平台不生效"（A06）
-- [~] 2. Bash 执行路径接入沙箱（Core 接线 ccc0deb；L2 与路径清单待做）：前台、后台、Monitor、agent 启动的终端；每条命令生成配置；子会话随主会话（I133）；路径清单（A01、A03）
-- [~] 3. 裁决（阶梯与单测 ccc0deb；L2 待做）：沙箱自动批准在第 7 步；关键路径删除、plan、deny、ask 仍生效；沙箱不可用时降级（A02）
-- [~] 4. 沙箱外重试 `dangerouslyDisableSandbox`（Core 与 Agent Host 参数完成；L2 待做）：任何模式询问，只有仅本次与拒绝，hooks 不代答，审计（A04）
-- [ ] 5. 沙箱拒绝的反馈与审计：Seatbelt 与代理拒绝进 `audit_events`（A07 测试部分）
-- [ ] 6. 网络白名单：用户与企业并集、改后下一条命令生效、代理拒绝审计、代理加固（I54）、白名单外域名的"权限扩展（网络域名）"审批（A05、A14）
-- [ ] 7. 常见构建命令在沙箱内（git、npm install、cargo build、python）（A11；I34、I35）
-- [ ] 8. Agent Host Seatbelt 配置定稿：模板入库、golden、子进程缓存与 TMPDIR、测试扩展写主目录失败、npx MCP（A09、A10；I05、I40）
-- [ ] 9. 设置页"沙箱"、审计页"沙箱拒绝"筛选、Windows 提示与环境栏提示；L4 与亮/暗截图（A07、A08、A12、A14 界面部分）
+- [x] 2. Bash 执行路径接入沙箱（ccc0deb、d72d9cc；路径清单待写进 AGENTS.md）：前台、后台、Monitor、agent 启动的终端；每条命令生成配置；子会话随主会话（I133）；路径清单（A01、A03）
+- [x] 3. 裁决（ccc0deb、d72d9cc）：沙箱自动批准在第 7 步；关键路径删除、plan、deny、ask 仍生效；沙箱不可用时降级（A02）
+- [x] 4. 沙箱外重试 `dangerouslyDisableSandbox`（b78df0b、d72d9cc）：任何模式询问，只有仅本次与拒绝，hooks 不代答，审计（A04）
+- [x] 5. 沙箱拒绝的反馈与审计（会话层测试已提交）：Seatbelt 与代理拒绝进 `audit_events`（A07 测试部分）
+- [x] 6. 网络白名单（会话层测试已提交）：用户与企业并集、改后下一条命令生效、代理拒绝审计、代理加固（I54）、白名单外域名的"权限扩展（网络域名）"审批（A05、A14）
+- [x] 7. 常见构建命令在沙箱内（git、npm install、cargo build、python）（A11；I34、I35）
+- [x] 8. Agent Host Seatbelt 配置定稿（Pi 的设置锁放行，L2 全部通过）：模板入库、golden、子进程缓存与 TMPDIR、测试扩展写主目录失败、npx MCP（A09、A10；I05、I40）
+- [~] 9. 设置页"沙箱"（界面 82d253c；L4 与截图待做）、审计页"沙箱拒绝"筛选、Windows 提示与环境栏提示；L4 与亮/暗截图（A07、A08、A12、A14 界面部分）
 - [ ] 10. Windows 隔离方案评估 ADR（提议）与索引（A13）
 - [ ] 11. 文档：架构 6.2.3、6.10、10.3，piarc-sandbox 的 AGENTS.md，L3 复核（I117）
 - [ ] 12. 收尾：`npm run verify`、验收记录、看板（Windows 部分阻塞等 ADR）
