@@ -163,7 +163,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T32 | [后台任务、Monitor 与 KillShell](tasks/T32-background-tasks-and-monitor.md) | 4 | T31 | macOS | high / 高 | 中 | 无 | 部分完成 | ef39d43 |
 | T33 | [无头终端（Core 侧）](tasks/T33-headless-terminal.md) | 4 | T32 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 33f4bf9 |
 | T34 | [终端渲染器与终端面板](tasks/T34-terminal-renderer-and-panel.md) | 4 | T33 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 991f323 |
-| T35 | [Worktree、并行会话、多窗口、全文搜索与后台常驻](tasks/T35-worktrees-parallel-sessions-and-windows.md) | 4 | T34 | macOS | high / 高 | 大 | 无 | 进行中 | — |
+| T35 | [Worktree、并行会话、多窗口、全文搜索与后台常驻](tasks/T35-worktrees-parallel-sessions-and-windows.md) | 4 | T34 | macOS | high / 高 | 大 | 无 | 部分完成 | c4094dd |
 | T36 | [MCP 共享连接池](tasks/T36-mcp-connection-pool.md) | 4 | T35 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T37 | [Skills、斜杠命令、命令面板与输出风格](tasks/T37-skills-commands-and-output-styles.md) | 4 | T36 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T38 | [WebSearch 与 hooks 扩展（M3）](tasks/T38-websearch-and-hooks-m3.md) | 4 | T37 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -309,19 +309,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-T35（开工 2026-11-20，基线复用 991f323 的全量 verify；T34 的遗留 A03、A14 不影响本任务；分支自 483413b 起未推送，没有新的 Windows CI 可核对）：
-
-- [x] 1 piarc-git：worktree 创建（分支、基础分支）、`.worktreeinclude` 复制、状态（未提交改动）、删除目录保留分支；路径含空格与中文
-- [x] 2 Core：新建会话选 worktree（`sessions.worktree`、cwd、环境栏）、`.gitignore` 提示、信任与"总是允许"按主 checkout（A01、A02）
-- [x] 3 归档询问与到期清理（时钟可注入）（A03 的 Core 与场景部分）
-- [x] 4 子 agent `isolation: worktree`（A04）
-- [x] 5 全文搜索：`session_fts`（FTS5 trigram）、增量同步、重建、Core API（A05）
-- [x] 6 客户端：新建会话 worktree 选项、归档对话、侧栏搜索与定位（A03 Playwright、A06）
-- [x] 7 主进程：多窗口、窗口状态、审批一致（A07）
-- [x] 8 后台常驻：托盘 / 菜单栏、计数、退出确认、图标导出（A08）
-- [x] 9 `piarc://`、open-file、拖入文件夹、Windows 右键菜单注册与参数解析（A09、A10）
-- [x] 10 内存测量脚本与 `docs/perf/M3-memory.md`（A11 failing：应用其余进程 576 MB > 510 MB，I146）
-- [ ] 11 文档、AGENTS.md、架构与 ADR、verify（A12）与收尾
+（无）
 
 ## 登记事项
 
@@ -949,3 +937,10 @@ T35（开工 2026-11-20，基线复用 991f323 的全量 verify；T34 的遗留 
 - 决策：ADR-0051（补充）；架构 2.42。axe 发现并修复两处存量问题：主按钮文字对比度（全应用，I144）与 tablist 子元素；`window.piarc` 共 86 个函数。
 - 登记：I30、I51、I59 更新（I51 落地）；新增 I141（真实拼音核对）、I142（W3 的 Windows 核对项与 t34 L4 的 Windows 版）、I143（重启后恢复终端的入口）、I144、I145（没有 htop，用 top）。
 - 下一项：macOS 上的 T35（Worktree、并行会话、多窗口，依赖 T34）；Windows 上的 W2 仍可进行。本地提交，未推送。
+
+### 2026-11-20 T35 部分完成（提交 c4094dd）
+- 交付：`piarc-git` 的 git 运行器与 worktree（创建、基础分支、`.worktreeinclude`、`.gitignore` 追加、改动、删除保留分支、恢复）；`piarc-store` 迁移 8（会话的 worktree 列、`session_text` + FTS5 trigram 的 `session_fts`、增量与重建、搜索与高亮）；Core 的 `worktrees`（保留期清理、可注入时钟）、worktree 会话（文件根是 worktree、设置与信任来自 `SessionIo.project`）、子 agent `isolation: worktree`（`subagent/start` 的 `isolation`、`subagent/finish` 的 `worktree`）、`search_sessions`、`core/activity`、I80 的补发；NAPI 新增 worktree、搜索与 `runningWork`；主进程多窗口与窗口状态、菜单栏 / 托盘与退出确认、`piarc://` 与 open-file、拖入文件夹、Windows 右键菜单与 Velopack hooks；渲染进程的新建会话 worktree 选项、归档询问、环境栏 worktree、侧栏搜索与定位、在新窗口打开；托盘图标导出脚本；`npm run perf:m3` 与 `docs/perf/M3-memory.md`；L2 5 个新场景、L4 `t35-worktrees`、`t35-windows`
+- 验收：10 项通过；A10（Windows CI）blocked，等用户推送；A11 failing：应用其余进程合计最大 576 MB，超出 macOS 预算 510 MB（Agent Host 238 MB，预算 270 MB，达标），登记 I146，预算不放宽。`npm run verify` 15/15（c4094dd，Vitest 1472 passed、cargo test 889 passed、L2 151 passed 2 个按平台跳过）；Windows 交叉 clippy 通过；T35 L4 6/6 与受影响的 preload、app-instance、smoke、t18-sessions、t18-attention、t20-approvals、t31-subagents 通过（dev 形态，截图在 `tmp/evidence/T35/`）；提示词原创性 5,118 词 0 处重合
+- 决策：ADR-0052（补充）；架构 2.43；`window.piarc` 共 94 个函数；Claude Code 设置键 `worktree` 改标 T48（I148）
+- 登记：I80 落地、I129、I43、I143 更新；新增 I146（M3 内存超预算，R4）、I147（W3 的 Windows 核对项）、I148、I149（菜单栏截图需要屏幕录制权限）、I150（runner.rs 超 1,000 行）、I151（worktree 需要仓库顶层）、I152（搜索命中回退前的分支、运行中定位）
+- 下一项：macOS 上的 T36（MCP 共享连接池，依赖 T35）；Windows 上的 W2 仍可进行。本地提交，未推送。

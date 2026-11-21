@@ -3562,8 +3562,8 @@
       "id": "T35-A12",
       "task": "T35",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run verify` 在 c4094dd（工作区干净）15/15 PASS：Vitest 1472 passed 1 skipped、cargo test 889 passed、L2 151 passed 0 failed 2 skipped（平台）153 个场景、capabilities 与 acceptance、design tokens 通过；Windows 交叉 clippy 通过；Windows CI 部分见 A10"
     },
     {
       "id": "T36-A01",
