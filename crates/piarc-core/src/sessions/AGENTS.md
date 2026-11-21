@@ -16,6 +16,14 @@
 - 客户端偏好（`client_settings`）：可写 `language`、`appearance`、`keybindings`、`notifications`，以及布尔偏好 `/memory/readBoth`，经 `piarc_config::write_value`；读取返回整份文件（不存在为 `{}`）。
 - I62 已接上：工作区 actor 打开时启动设置监听（`WorkspaceSettings`）。macOS 的首次 FSEvents 注册在阻塞线程池进行，与 Host 握手并行。注册完成后重新读取设置，显式 `open_settings` 仍等待监听就绪。回合结束时同步索引。信任变化重启（T18 起）：`CoreRuntime::trust_view`（决定）与 `revoke_trust` 在应答前调 `Hub::trust_changed`，同一主 checkout 的工作区 actor 先把状态置为 `Restarting`（之后的请求等新进程就绪）再调 `HostSupervisor::restart`，所以信任对话框之后立即创建的会话落在新进程上；`agent_host::restart_on_trust_change` 只剩监管器层面的测试使用。
 
+## Worktree、搜索与活动计数（T35，ADR-0052）
+
+- 新建：`create_session` 带 `WorktreeRequest` 时先经 `Worktrees::create`（`crate::worktrees`，git 用 `ToolIo::git_runner`：命令环境 + 进程树启动器）建 `.piarc/worktrees/<名称>/`，cwd 是 worktree；会话没建成时删掉 worktree 与没动过的分支。`SessionHandle::spawn` 用 `piarc_git::worktree::containing(工作区, cwd)` 认出 worktree 会话，以 worktree 为文件根、工作区为 `project` 登记（`ToolIo::open_session_in`），恢复会话同样适用；actor 在每次索引同步后写 `set_session_worktree`（分支取当时的 `head_branch`）。
+- 归档与清理（`sessions/worktrees.rs`）：归档记 `worktree_cleanup_at = 现在 + retention`、恢复清除；`Worktrees::spawn_sweeper` 在启动时与每 `sweep_interval` 清理到期的（无改动的删除，有改动的置 `worktree_confirm`，失败留到下一轮）；`remove_session_worktree` 只对未打开的会话（打开的返回 `sessionBusy`）；`resume_session` 先 `restore_worktree`。时钟是 `CoreConfig.worktrees`（`now_ms` 与 sweep 的 `clock` 都可注入，L2 用场景时钟并把间隔设成很大，只经 `sweep_worktrees` 清理）。
+- 搜索：`search_sessions` 经 `Store::search_sessions` 取命中，再补标题、工作区与归档标记。
+- 活动计数：快照任务在发出 `core/sessions` 之后按同一份列表算 `Activity`（不含归档），变化时或 `Resend` 后发 `core/activity`；`Snapshots::activity()` 是最后一次的值，`running_work` 用它加 `TaskManager::running()`。
+- I80：`trust_changed` 记下变化的 checkout 与代次；`Hub::workspace` 在登记新开的工作区后补发它打开期间漏掉的变化（actor 只重启 checkout 相同的）。
+
 ## 后台任务（T32，ADR-0049）
 
 - 会话 actor 把 `turn/started`、`turn/completed` 报给任务管理器（Monitor 的唤醒判断），在 `reminder` 条目里认出 `backgroundTask`/`monitorOutput` 的来源并报告送达（`session/notices.rs` 的 `reminders_delivered`），收到 `SessionMsg::Notices` 时一轮一轮地发送挂起的通知（`send_notices`，在途时合并）；`Restored`、`create`/`resume` 之后与每个 prompt/steer/follow-up 发出前也发送（`notices::deliver`）。唤醒前读合并设置 `monitor.wakeIdleSession`（`ToolIo::monitor_wake_allowed`），关掉时以不唤醒的方式发出。

@@ -1,0 +1,34 @@
+# apps/desktop · src/main
+
+主进程：窗口、菜单、托盘、启动目标、平台集成与 Core 的加载转发（ADR-0013、ADR-0014）。应用级的命令、安全基线与 L4 见上级 [`apps/desktop/AGENTS.md`](../../AGENTS.md)。
+
+## 命令
+
+| 命令 | 用途 |
+|---|---|
+| `npx vitest run apps/desktop/src/main` | 主进程纯函数：启动目标解析、窗口状态的放置、托盘的计数与菜单、Windows 注册表命令、路由、IPC 校验 |
+| `node scripts/dev/export-tray-icons.mjs [--check]` | 从 `design/brand/mark.svg` 导出菜单栏 template 图与 Windows 托盘 `.ico` 到 `design/brand/`（`--check` 只比对） |
+| `PIARC_EVIDENCE_TASK=T35 npx playwright test -c apps/desktop/playwright.config.ts t35- --project dev` | T35 L4：worktree 会话与归档询问、搜索定位、两个窗口的审批、无窗口后台运行与托盘计数、退出确认、链接与第二次启动、窗口状态（截图在 `tmp/evidence/T35/`） |
+
+## 窗口（T35，ADR-0052）
+
+- `AppShell` 管任意多个主窗口：最近获得焦点的是"当前"主窗口（菜单命令、系统通知、Dock 角标只认它）；全部窗口共用一个 Core、订阅同一批快照，审批的先到答复由 Core 的账本裁定。
+- 窗口状态：主窗口移动、缩放（防抖 500 ms）与关闭时写 `<userData>/window-state.json`（`platform/window-state.ts`，同目录临时文件 + rename）；新窗口按 24 px 错开，`placeWindow` 把落在已不存在显示器上的窗口移回主显示器居中。
+- 关闭最后一个窗口不退出（两个平台一样）。退出只经菜单与托盘的 `app.quit` 命令（`platform/quit.ts`）：Core 的 `runningWork()` 报告有运行中的会话或后台任务时先弹原生确认；系统注销、测试驱动的 `app.quit()` 不询问。不要把确认挂到 `before-quit` 上。
+
+## 托盘（`platform/tray.ts`）
+
+- 计数只来自 Core：快照任务在路由 `core/activity` 发运行中与等待审批的会话数和等待审批的会话（不含归档），主进程经 `EventRouter.listen` 只监听这一个路由；不要在主进程订阅 `core/sessions` 自己统计。
+- macOS：`trayTemplate.png`（+ `@2x`）设为 template 图，计数作为标题 `▸运行中 ?等待审批`。Windows：按 `nativeTheme.shouldUseDarkColorsForSystemIntegratedUI` 选 `tray-dark.ico`（白）或 `tray-light.ico`（黑），左键打开窗口，计数在提示文字里。图标目录：打包时在 `process.resourcesPath`（Forge `extraResource`），源码树运行时在仓库的 `design/brand/`。
+
+## 启动目标（`launch.ts`）
+
+- `piarc://open?path=<绝对路径>` 与 `piarc://session/<id>` 只做定位；其他主机名与参数一律忽略（链接不能带提示词或命令）。T29 的 OAuth 回调走回环端口，不经这里。
+- 命令行：第 0 个参数是可执行文件；`process.defaultApp`（`electron <app>`）时第一个非开关参数是应用路径要跳过（Playwright 会把自己的开关放在它前面，不能按固定位置跳）。开关一律忽略，相对路径按工作目录解析。
+- 来源都汇成 `LaunchTarget`：启动参数、第二次启动（`second-instance` 带 argv 与工作目录）、macOS `open-url`/`open-file`（要在 `ready` 之前注册，先进 `early` 队列）、拖入窗口的文件夹（preload `pathForFile`）。窗口页面挂载前的目标排在 `AppShell` 的队列里，页面经 `takeLaunchTargets` 取走，之后的目标作为 `launch` 应用事件送达。主进程不检查路径是否为目录，交给 Core 的 `openWorkspace`。
+- macOS 的 scheme 与文件夹文档类型在 `forge.config.ts` 的 `protocols`、`extendInfo`；只有打包构建调用 `setAsDefaultProtocolClient`。Windows 的注册在 `platform/windows-shell.ts`（`HKCU\Software\Classes`，系统目录的 `reg.exe`，不经 shell），由 `platform/velopack.ts` 的安装、更新、卸载钩子运行。
+
+## 易错点
+
+- 截取菜单栏需要终端有"屏幕录制"权限；L4 用测试钩子 `tray()` 读标题、提示与菜单项，不依赖截图。
+- 测试钩子 `launch`、`quit`、`mainWindows`、`tray` 只在开发版 Core 时安装（`core/test-hooks.ts`）。

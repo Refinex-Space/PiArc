@@ -43,9 +43,15 @@
 - 顺序（T30，ADR-0046）：`hooks_run` 收到 SessionStart（非 `compact`）时先 `HooksService::starting` 登记再运行，`user_prompt_submit` 先 `started` 等登记清零：Agent Host 打开会话时先写出这个 `hooks/run` 再应答，所以登记总在该会话的提示之前。不要在登记之前加 `await`。L2 `hooks-session-start-order` 用慢的 SessionStart hook 锁定它。
 - `tool_io/hooks_tests.rs` 用真实 Core（命令环境固定 `PATH`，否则 cargo 的 `DYLD_*` 关掉规则 allow）；Bash 规则 allow 不覆盖文件写入，测会话规则用 `sed -n` 而不是 `touch`。
 
+## 文件根与设置来源（T35，ADR-0052）
+
+- `SessionIo.scope` 的根是会话能读写的文件根，`SessionIo.project` 是设置、规则、信任、审计、模式记忆、memory 设置与 hooks 的来源。普通会话两者相同（`open_session`）；worktree 会话与带 worktree 的子 agent 文件根是 worktree、`project` 是主工作区（`open_session_in`、`open_linked`）。读设置、写"总是允许"规则、写审计、算任务的工作区一律用 `project()`；路径边界、受保护路径、规则里的相对路径、cwd 回退用 `scope.root()`。新增读设置的入口时按这条分。
+- `git_runner(workspace)`：worktree 的 git 用命令环境与进程树启动器，git 程序从该 `PATH` 中工作区以外的目录找。
+
 ## 子 agent（T31，ADR-0048）
 
 - `tool_io/subagents.rs`：`agents/list`（`piarc_config::agents::load` 加信任、deny 与上限、合并后的 `modelAliases`）、`subagent/start`（`open_linked`：子会话自己的 `SessionIo`，工作区根与 cwd 同父会话，`Link` 指向主会话；登记定义的 hooks；返回生效模式与警告）、`subagent/finish`（注销、写索引）。经 `Link`：`effective_mode` 取定义与主会话当前模式中更严的一个（每次裁决重新取），`rule_owner` 让"本会话允许"存进主会话，`origin` 给审批卡标来源（快照里并入主会话的条目），`checkpoint_owner` 让写入记在主会话当前回合下，`attached` 列出主会话中断时要一起撤下审批、结束命令的前台子会话（后台的不在内）。
+- `isolation: worktree`（T35）：`start_subagent` 经 `child_place` 先建 `.piarc/worktrees/agent-<id>/`（基础为父会话文件根的 HEAD）、以它为子会话文件根并在结果里答 `cwd` 与 `worktree`；`finish_request` 与连接结束都经 `settle_worktree`：无改动且 HEAD 未动时删除 worktree 与分支，否则保留并在 `SubagentFinishResult.worktree` 给出。登记失败时同样清理。
 - 子会话的 `policy/evaluate` 声明的 `parentSessionId`、`agentType` 必须与 `Link` 一致（`prepare_call`），否则拒绝。参数规则（`Agent(model:…)` 等，I82）在阶梯输入组装之后由 `assess::param_rules` 施加。
 - 定义的 hooks 经 `HooksService::scope_hooks` 以 `subagent` 层登记在子会话 id 下，`unscope_hooks` 撤下；项目级定义要求项目受信任（否则 `hooksUntrusted` 警告）。
 - 设置的默认模型与 effort（`model`、`effortLevel`，I113）由 `context.rs` 的 `session_defaults` 给新会话，`model` 的别名经 `ModelAlias::target` 用合并表解析。

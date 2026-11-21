@@ -324,7 +324,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 - 提供商设置场景在端点下写 `configure_as: custom` 或 `local`，运行器通过 `CoreRuntime.provider_op` 提交本机 mock URL、线协议和模型 ID。自定义端点使用保险箱中的测试密钥，本地端点无需密钥。这些端点使用首条用户消息中的 `[[piarc-scenario:<场景 id>]]` 选择脚本，切换后同一段历史仍可重放。
 - 顶层 `cloud_providers` 接受 `amazon-bedrock` 和 `google-vertex`，仅配置测试凭据。所有会话仍指定 mock 端点。用 `expect.configured_providers` 按 id 校验公开设置字段与模型目录可用性，同时扫描该场景数据目录中的测试密钥明文。
 - `workspace.files` 与 `expect.files` 的路径都相对工作区；工作区本身在临时根下的 `work space 工作区`，会话的 `cwd` 相对它。
-- `workspace.run_files` 在该次运行的临时根下建立夹具，可设置祖先目录的 memory、模拟家目录 `home 家/`、数据目录 `data 数据/` 或用于审批的相邻文件。`workspace.git: true` 在工作区创建空仓库，便于验证初始 Git 状态。
+- `workspace.run_files` 在该次运行的临时根下建立夹具，可设置祖先目录的 memory、模拟家目录 `home 家/`、数据目录 `data 数据/` 或用于审批的相邻文件。`workspace.git: true` 在工作区创建空仓库，便于验证初始 Git 状态；再加 `git_commit: true` 以固定身份提交初始文件，`git_branches` 在初始提交上建分支（T35，worktree 需要提交）。会话的 `worktree: { name?, base? }` 让它在独立 worktree 中创建（T35）。
 - 会话通常在动作开始前建立。`sessions.<label>.deferred: true` 将该会话的创建推迟到第一次输入，可验证跨会话的授权与配置。
 - 按字节的夹具放在 `tests/scenarios/fixtures/`（`.gitattributes` 设为 `-text`，换行与编码不被 Git 改动）；加载时检查夹具存在。PDF 夹具用 `piarc-fs` 测试里的 `make_pdf` 生成，手写的 PDF 可能取不到文字。
 - 端点脚本工具参数里的 `{{workspace}}` 换成本次运行工作区的绝对路径（T30，L3 场景要用绝对路径的 `file_path`）。
@@ -368,6 +368,12 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | `open_terminal` | — | 为用户在该会话打开一个终端（Core 的 `open_session_terminal`，同终端面板），不共享（T34） |
 | `type_terminal` | `text` | 向该会话最近打开的终端键入文本，`\r` 为回车（T34） |
 | `share_terminal` | `shared` | 打开或关闭该会话最近打开的终端的共享，同面板的开关（T34） |
+| `sweep_worktrees` | `removed`、`waiting`（会话标签） | 立即运行一次 worktree 清理并按集合比对删除的与等待用户的（T35）；到期按任务时钟算，用 `advance_clock` 推进，后台计时器在 L2 中不自行触发 |
+| `check_worktree` | `fields` | Core 记录的该会话 worktree 字段子集：`path`（相对工作区）、`branch`、`exists`、`removed`、`cleanupDue`、`confirm`；`null` 表示没有 worktree（T35） |
+| `remove_worktree` | `discard`、`succeeds` | 删除已关闭会话的 worktree，`discard` 丢弃未提交改动；`succeeds: false` 断言 Core 拒绝（T35） |
+| `keep_worktree` | — | 再保留 30 天（清理提示的"保留"，T35） |
+| `check_git` | `args`、`contains`、`not_contains`、`lines` | 在工作区运行 git，检查标准输出（T35） |
+| `search` | `query`、`sessions`、`snippets` | 经 Core 的全文搜索，按集合比对命中的会话标签，摘要须含 `snippets` 中的文字（T35） |
 
 `prompt`、`steer`、`follow_up` 都可带客户端的 `request_id`（重发时沿用），以及 `mentions` 和 `attachments`；`rejected: <文本>` 要求 Core 拒绝这条输入、错误消息含该文本（UserPromptSubmit hook 阻断，T25），不记回合。提及按 Core 输入格式写 `{path, start, end}`，两个偏移是发送文本中 `@path` 的 UTF-16 起止位置。附件写 `{fixture, mime_type}`；运行器读取 `fixtures/` 中对应文件并调用 Core 的 `store_attachment`，将返回的引用随输入发送。面板的键盘交互在 L4 验证。
 

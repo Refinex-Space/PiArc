@@ -13,6 +13,7 @@
 | `icon.ico` | Windows 应用图标，含 14 个尺寸（安装包与窗口图标） |
 | `mark.svg` | 单独的 Pi 字形，跟随明暗模式反色；用于界面内 logo，以及菜单栏 / 托盘图标的源文件 |
 | `mark.LICENSE` | Pi 字形来源的 MIT 许可证（必须随资产保留） |
+| `trayTemplate.png`、`trayTemplate@2x.png`、`tray-light.ico`、`tray-dark.ico` | 菜单栏与托盘图标，由 `mark.svg` 导出（T35） |
 
 重新生成 `icon.icns`（只能在 macOS 上执行）：
 
@@ -31,4 +32,4 @@ iconutil -c icns design/brand/icon.iconset -o design/brand/icon.icns
 
 - 这个字形就是 Pi 项目自己的 logo 造型（Pi 在终端中用珊瑚、蓝、黄三色绘制同一个 "P + i" 像素图形），PiArc 用的是黑白版本。thesvg 的 MIT 许可证只覆盖这份 SVG 文件，不授予 Pi 名称或 logo 的商标权利。公开发布前要确认是否需要 Pi 项目的许可，或改用派生标记（需求规格 D3）。
 - 构建产物的第三方许可证清单（`THIRD_PARTY_NOTICES`）要包含 `mark.LICENSE`。
-- 菜单栏 / 托盘图标需要按平台规范另行导出（macOS 用黑色加透明的 template 图），源文件用 `mark.svg`；导出的文件也放在本目录。
+- 菜单栏 / 托盘图标由 `node scripts/dev/export-tray-icons.mjs` 从 `mark.svg` 导出（T35）：`trayTemplate.png`、`trayTemplate@2x.png`（16、32 px，黑色加透明的 macOS template 图）与 `tray-light.ico`（黑）、`tray-dark.ico`（白，深色任务栏）（Windows，16–48 px 的 PNG 条目）。改了 `mark.svg` 后重新导出并提交，`--check` 比对已提交的文件。打包时作为 `Resources/` 下的资源。

@@ -51,6 +51,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - 深度与并发只在 `SubagentRunner` 计数（`#runs` 树加启动中的 `#starting` 占位，同一回复里并行的 `Agent` 调用不会一起越过上限）；上限来自 Core 的 `agents/list`。超限立即返回错误结果，不排队（前台子 agent 各自等自己的子 agent，排队会死锁）。
 - 子会话先经 `subagent/start` 在 Core 登记再请求模型：没登记的会话 id 调 `fs/*`、`exec/*` 得到 `sessionNotFound`。子会话的 Pi 事件不发给 Core（Core 没有它的会话 actor）：进度汇总成 `SubagentState`，经父会话 `Agent` 调用的 `onUpdate`（`subagent` 条目的 `item/updated`）与 `subagent/*` 通知发出，最终状态另写父会话的 `piarc.subagentState` 条目供历史使用。
 - 子会话 JSONL 首条是 `piarc.subagent`（父会话、类型）；身份段换成定义正文（`Persona`），`omitProjectContext` 的类型不加载 memory 与 git 状态；Tool Profile 按子会话自己的模型选；hooks 不发 SessionStart、Stop、SessionEnd（T38 的 SubagentStart/SubagentStop 之前）。
+- `isolation: worktree`（T35，ADR-0052）：调用参数或定义要求时，`ChildSession.open` 先 `subagent/start`（带 `isolation`）再按 Core 答的 `cwd` 创建 Pi 会话（会话文件按 cwd 放置，所以登记在前，`sessionFile` 不再随登记发送）；结束时 `finishInCore` 返回保留下来的 worktree，`#execute` 把 `worktreeKept` 的说明接在报告后。打开失败时照常 `subagent/finish`，Core 据此清理。
 - `maxTurns` 到达后中止并把结果标 `partial`：报告取最后一条真实回复，跳过中断补齐写的标记（`isInterruptionMarker`）。前台运行随调用的 abort 信号中止（父会话中断）；后台运行不随中断结束，`close` 与 `subagent/stop` 中止它，结束后经 `harness.remind` 的 `backgroundTask` 提醒回报；进程重启后 `recover()` 把记录中仍在运行的后台运行标为 `interrupted` 并提醒。
 - 同进程易错点：MCP 扩展按会话实例化，每个子会话各起一份 server 进程（T36 的共享池之前）；扩展加载器的模块级缓存按 cwd 失效，子会话与父会话 cwd 相同不受影响；不要在子会话代码里改 `process.env` 或读 `process.cwd()`。
 

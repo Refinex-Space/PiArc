@@ -6,7 +6,7 @@ Core 的数据库 `<数据目录>/core.sqlite`（rusqlite，SQLite 随 `bundled`
 
 | 命令 | 用途 |
 |---|---|
-| `cargo test -p piarc-store` | 单元测试 + `tests/migrations.rs`（A01）+ `tests/index.rs`（A03、A05）+ `tests/memory.rs`（A04） |
+| `cargo test -p piarc-store` | 单元测试 + `tests/migrations.rs`（A01）+ `tests/index.rs`（A03、A05，T35 的 worktree 列）+ `tests/memory.rs`（A04）+ `tests/search.rs`（T35-A05：中文、英文、混排、增量、重建一致、短查询） |
 | `cargo test -p piarc-store --test memory -- --nocapture` | 打印 100 MiB 会话文件建索引的堆峰值与耗时 |
 
 ## 迁移的写法
@@ -17,6 +17,7 @@ Core 的数据库 `<数据目录>/core.sqlite`（rusqlite，SQLite 随 `bundled`
 - 表用 `STRICT`；时间是 Unix 毫秒；路径列存 UTF-8 文本（非 UTF-8 路径拒绝为 `NonUtf8Path`）。
 
 - schema v5（T28，ADR-0044）：`checkpoints`（自增 id 即回合顺序，会话与回合 id 唯一）、`checkpoint_files`（自增 id 即写入顺序，前后内容的十六进制 SHA-256，空值表示文件不存在，`operation` 为 `create`/`modify`/`restore`/`undo`/`discard`，`restore_id` 是恢复批次，随检查点级联删除）、`checkpoint_sessions`（最近访问时间，30 天清理用）。读写在 `src/checkpoints.rs`，规则在 `piarc-checkpoint`，编排在 `piarc-core::checkpoints`；`referenced_snapshots` 是回收时仍被引用的哈希集合。
+- schema v8（T35，ADR-0052）：`sessions` 加 Core 自己的 worktree 列（`worktree_branch`、`worktree_cleanup_at`、`worktree_confirm`、`worktree_removed_at`，读写在 `src/worktrees.rs`）；`session_text`（会话、entry id、角色、时间、正文）与外部内容 FTS5 表 `session_fts`（`tokenize = 'trigram'`，触发器同步）；迁移清空 `session_files`，升级后首次同步重扫全部会话以填入正文。
 - schema v7（T32，ADR-0049）：重建从未写过的 `background_tasks`（主会话、工作区、标题、cwd、输出字节数，其余在 `metadata` JSON；`kind` 不设 CHECK，T33 加终端类型），读写在 `src/background_tasks.rs`（`put_task`、`task`、`recent_tasks`、`interrupt_running_tasks`、`delete_session_tasks`），状态机与通知在 `piarc-core::tasks`。
 - schema v6（T31，ADR-0048）：`sessions.subagent_parent`、`subagent_type`（从子会话 JSONL 的 `piarc.subagent` 自定义条目派生，`pi_session.rs` 宽松解析，属于重建时清空重读的派生列）、`checkpoint_files.subagent_session`（写入来自哪个子会话）。会话列表不含子会话由 Core 的快照过滤，索引照常收录。
 - schema v4 在 `session_files` 保存文件标识与修改时间：同长度重写或文件替换时重扫。迁移后的空值在首次同步时补齐。
@@ -29,6 +30,12 @@ Core 的数据库 `<数据目录>/core.sqlite`（rusqlite，SQLite 随 `bundled`
 - 末行没有 `\n` 是 Pi 还没写完（`appendFileSync` 不加锁）：不报错、不前进偏移，补全后再读。坏行跳过并计入报告（`SyncReport::skipped_lines`），由 Core 写日志。
 - 已知格式版本 1–3（`pi_session::KNOWN_VERSIONS`，Pi 1.5.2 写 3）。其他版本或首行不是 header：该会话 `index_status = unavailable`、`index_error` 写原因，同步不失败。升级 Pi 时先核对 `session-manager.ts` 的 `CURRENT_SESSION_VERSION` 与 entry 类型。
 - 折叠必须对文件顺序满足结合律（求和、后写覆盖、只设一次），增量结果才与全量重建逐列相同（`tests/index.rs` 随机追加对比）。新增派生列时同步 `rebuild_index` 的清空语句与 `session_from_row`。
+
+## 全文搜索（`src/search.rs`，T35）
+
+- 分词选 trigram：按三个字符的子串建索引，中文、英文与混排都能按子串检索、不需要分词器，大小写不敏感（`unicode61` 把连续汉字当一个词，不能检索中文子串）。查询按空白分词、全部要出现（至多 8 个词、200 字符），每个词加双引号作 FTS5 短语，FTS 语法不会生效；有不足三个字符的词时改用 `LIKE … ESCAPE '\'` 扫描 `session_text`（ASCII 大小写不敏感）。
+- 正文：`pi_session::MessageText` 同时给标题前缀与全文（文本块以换行连接，每条至多 `SEARCH_TEXT_CHARS` 20,000 字符）；只收用户消息与助手正文，不收思考、工具参数与工具结果。`TextSink` 在扫描时逐条写入同一个事务（不攒在内存里，A04 的堆峰值不变）；整文件重扫先删该会话旧行，文件换成别的会话时删旧会话的行；`remove_session`、`remove_missing`、`rebuild_index` 一并删正文。
+- 结果按会话（最近更新在前）分组，至多读 2,000 行；摘要在 Rust 里按字符计算，高亮范围是 UTF-16 码元。子 agent 的会话不进结果。分支上被回退掉的消息仍在 JSONL 里，也会被搜到（定位时找不到就提示）。
 
 按会话读权限审计用 `Store::session_audit_events`，通过会话索引取最近记录并保持时间和行 id 的倒序。设置页的审计用 `filter_audit_events`（会话、工作区、类别，以及 detail JSON 里的工具与结论，`json_extract`）。`set_workspace_mode`、`workspace_mode` 读写工作区记住的权限模式（T23）。
 
