@@ -84,6 +84,8 @@ export const STEPS = [
   { name: 'L2 scenarios + capabilities', command: nodeScript('scripts/ci/run-l2.mjs') },
   // Generated CSS and TS match design/tokens/, WCAG contrast in four modes, brand rules.
   { name: 'design tokens', command: nodeScript('scripts/ci/check-design-tokens.mjs') },
+  // Same keys in both catalogs, valid ICU with the same placeholders, no hard-coded text (T43).
+  { name: 'i18n', command: nodeScript('scripts/ci/check-i18n.mjs') },
 ];
 
 /**

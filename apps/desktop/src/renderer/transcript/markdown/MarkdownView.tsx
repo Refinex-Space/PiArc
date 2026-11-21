@@ -4,6 +4,7 @@
 // memoized by identity, so while a message streams only its changed tail re-renders.
 import { memo, type MouseEvent, type ReactNode } from 'react';
 
+import { useT } from '../../app/app-context.js';
 import { CodeBlock } from '../highlight/CodeBlock.js';
 import type { Align, Block, Span } from './ir.js';
 
@@ -23,9 +24,10 @@ function Link({
   title: string | null;
   children: ReactNode;
 }) {
+  const t = useT();
   if (href === null) {
     return (
-      <span className="md-link-blocked" title="This link target is not allowed">
+      <span className="md-link-blocked" title={t('markdown.linkBlocked')}>
         {children}
       </span>
     );
@@ -49,6 +51,7 @@ function Spans({ spans }: { spans: readonly Span[] }): ReactNode {
 }
 
 function SpanView({ span }: { span: Span }): ReactNode {
+  const t = useT();
   switch (span.kind) {
     case 'text':
       return span.text;
@@ -84,7 +87,7 @@ function SpanView({ span }: { span: Span }): ReactNode {
       return (
         <Link href={span.href} title={span.title}>
           <span className="md-image-label">
-            Image: {span.alt === '' ? (span.href ?? '') : span.alt}
+            {t('markdown.image', { name: span.alt === '' ? (span.href ?? '') : span.alt })}
           </span>
         </Link>
       );
@@ -111,6 +114,7 @@ function Blocks({
 }
 
 const BlockView = memo(function BlockView({ block }: { block: Block }): ReactNode {
+  const t = useT();
   switch (block.kind) {
     case 'paragraph':
       return (
@@ -142,7 +146,12 @@ const BlockView = memo(function BlockView({ block }: { block: Block }): ReactNod
       const items = block.items.map((item, index) => (
         <li key={index} className={item.checked === null ? undefined : 'md-task'}>
           {item.checked === null ? null : (
-            <input type="checkbox" checked={item.checked} disabled aria-label="Task" />
+            <input
+              type="checkbox"
+              checked={item.checked}
+              disabled
+              aria-label={t(item.checked ? 'markdown.taskDone' : 'markdown.task')}
+            />
           )}
           <Blocks blocks={item.blocks} tight={!block.loose} />
         </li>

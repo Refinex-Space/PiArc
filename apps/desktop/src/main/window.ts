@@ -20,6 +20,7 @@ export function createMainWindow(
     height: 800,
     minWidth: MAIN_WINDOW_MIN.width,
     minHeight: MAIN_WINDOW_MIN.height,
+    // i18n-exempt: the product name, the same in every language.
     title: 'PiArc',
     show: false,
     ...chrome,

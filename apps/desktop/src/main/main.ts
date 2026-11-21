@@ -215,7 +215,7 @@ function start(dirs: DataDirs): void {
       if (activity !== undefined) tray?.update(activity);
     });
     const registerHandler = createIpcRegistrar(trustedOrigins);
-    registerIpcHandlers(registerHandler);
+    registerIpcHandlers(registerHandler, () => appShell.t());
     appShell.registerHandlers(registerHandler);
     registerSessionHandlers(
       registerHandler,

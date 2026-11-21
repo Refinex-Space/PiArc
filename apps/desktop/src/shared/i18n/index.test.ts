@@ -118,9 +118,7 @@ describe('i18n', () => {
             end: 12,
             text: 'Fix the parser',
             kind: 'Run command?',
-            task: 'Check the build',
             status: 'Done',
-            removed: 1,
           }),
         ).not.toThrow();
       }
