@@ -57,6 +57,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 ## 后台任务（T32，ADR-0049）
 
 - 能力 `backgroundTasks` 打开时：`Bash`/`PowerShell` 有 `run_in_background`，结果带 `task` 时文案说明转后台与输出文件（`tools/shell.ts` 的 `taskText`）；`harness/task-tools.ts` 注册 `KillShell`（`shell_id` → `exec/background/kill`，`notFound` 换成给模型的说明）与 `Monitor`（`exec/monitor`）。结果文案在 `harness/prompts/tasks.ts`（改后跑原创性检查）。
+- 能力 `terminalTasks`（T33，ADR-0050）：`Bash`（不含 PowerShell）有 PiArc 自有的 `terminal`，为真时隐含后台，命令在会话的 PiArc 终端里运行；结果文案说明屏幕文件与命令结束通知（`taskText` 的终端分支）。L3 allowlist 登记了这个有意偏离。
 - `session/remind` 进 `SessionRegistry.remind`：`SessionHarness.remind` 带 `key` 时文本原样、同键替换、分支上已有同类型同来源的已送达提醒就答 `delivered`；`wake` 且会话空闲时开一个 `wake` 回合：写 `piarc.input`（`action: wake`）后以排队的提醒消息 `sendCustomMessage(…, { triggerTurn: true })` 启动运行。`wake` 回合不是分支点（`branches.ts`），历史里提醒条目归入该回合（`history.ts`）。
 - 后台子 agent 的通知仍由 Agent Host 排队（ADR-0048），Core 只登记与停止它的任务。
 

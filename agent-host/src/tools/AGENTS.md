@@ -15,7 +15,7 @@
 - 参数 schema 在 Pi 的之上扩展（Read 的 `pages`、Edit 的 `replaceAll`）用 `typebox`（与 Pi 同版本 1.3.27 的直接依赖）。
 - Bash 不读 Pi 设置的 `shellPath`、`shellCommandPrefix`（Windows 的 Git Bash 路径是 PiArc 设置 `shell.gitBashPath`），Read 按会话 `SettingsManager.getImageAutoResize()` 读取 `images.autoResize`（I21）；命令环境是 Core 的登录 shell 环境去掉内部变量，Agent Host 不再传 Pi 的 `PI_*` 会话变量。
 - Bash 的结果文本在与 Pi 含义相同处用 Pi 的措辞（"Command exited with code N" 等，`parity.rs` 的 Bash 步骤与 L2 断言依赖）；输出保留原样的末尾换行。改措辞时同步对照测试与 `tests/scenarios/exec-*.yaml`。
-- 转后台的命令（T32）：结果不是错误，`details.commandExecution` 带 `task`（`durationMs` 是前台运行时长），`parseExecutionInfo` 同样校验它；`run_in_background` 原样作为 `exec/run` 的 `background` 发出。
+- 转后台的命令（T32）：结果不是错误，`details.commandExecution` 带 `task`（`durationMs` 是前台运行时长），`parseExecutionInfo` 同样校验它；`run_in_background` 原样作为 `exec/run` 的 `background` 发出。Bash 的 `terminal`（T33）作为 `exec/run` 的 `terminal` 发出并同时带 `background`，结果的输出文件是终端的屏幕文件。
 - 命令的 `details.commandExecution` 由 `shell.ts` 写、`items.ts` 的 `resultExecution` 校验后放进条目的 `execution`（实时与历史都经它）；改形状时两边与协议类型一起改。
 
 相关基线见架构第 5、7 章、ADR-0002、0009、0010、0015、0020、Pi 调研的 v1.5.2 差异，以及 S03、S04、S09 报告。

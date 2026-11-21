@@ -1,6 +1,6 @@
 # piarc-protocol
 
-AHP 与 Core API 数据类型的唯一来源：Rust 类型 → JSON Schema → `@piarc/protocol` 的 TS 类型（ADR-0009 第 7 条、ADR-0014 第 6 条）。另含版本协商 `negotiate`、只处理字节缓冲的 LF 帧编解码器，以及终端帧格式草案 `term_frame`（二进制，不导出 JSON Schema，T33 定稿；改动要同步渲染进程的 TS 解码器并重写共享样本，见 `crates/piarc-term/AGENTS.md`）。不负责 I/O、进程监管、心跳与背压（`piarc-host`）。
+AHP 与 Core API 数据类型的唯一来源：Rust 类型 → JSON Schema → `@piarc/protocol` 的 TS 类型（ADR-0009 第 7 条、ADR-0014 第 6 条）。另含版本协商 `negotiate`、只处理字节缓冲的 LF 帧编解码器，以及终端帧格式 `term_frame`（二进制，第 2 版，T33 定稿；解码后的 JSON 形式导出为 schema `TermFrame`，L1 样本在 `tests/contracts/term-frame/`，由 `PIARC_UPDATE_TERM_FRAME_SAMPLES=1 cargo test -p piarc-protocol --test term_frame` 重写；改动要同步渲染进程的 TS 解码器并重写 `piarc-term` 的共享样本，见 `crates/piarc-term/AGENTS.md`）与终端的事件、读屏与信息类型 `terminal`（T33）。不负责 I/O、进程监管、心跳与背压（`piarc-host`）。
 
 ## 命令
 
@@ -35,7 +35,8 @@ AHP 与 Core API 数据类型的唯一来源：Rust 类型 → JSON Schema → `
 - `context.rs`（T27，能力 `context`）：提醒类型 `ReminderType`（成员名 `type`，Rust 里是 `kind`）、`ContextUsage` 与分类、`session/usage`、`session/getContextUsage`、`session/remind`、`context/settings`、`fs/changes`、`fs/forgetReads`。`Item::Reminder`、`ContextCompaction.autoCompactStopped`、`SessionCompactParams.instructions`、`FsReadParams.restore` 分别在 `turn.rs`、`session.rs`、`fs.rs`。
 - `models.rs` 定义目录、设置 Host 写入与公开状态、会话切换与代价预览。可空价格字段用 JSON `null` 表达未知；切换输入明确区分目标模型和当前 effort。
 
-- `tasks.rs`（T32，能力 `backgroundTasks`）：`BackgroundTask`、`TaskKind`、`TaskStatus`、`TaskStarted`（`exec/run` 的 `task`、`CommandExecutionInfo.task`）、`exec/monitor`、`exec/background/list|read|kill`、`TasksSnapshot`（Core API 的 `core/tasks`）；`session/remind` 的 `key`、`wake` 与 `ReminderType::MonitorOutput` 在 `context.rs`。
+- `tasks.rs`（T32，能力 `backgroundTasks`）：`BackgroundTask`、`TaskKind`、`TaskStatus`、`TaskStarted`（`exec/run` 的 `task`、`CommandExecutionInfo.task`）、`exec/monitor`、`exec/background/list|read|kill`、`TasksSnapshot`（Core API 的 `core/tasks`）；`session/remind` 的 `key`、`wake` 与 `ReminderType::MonitorOutput` 在 `context.rs`。T33（能力 `terminalTasks`）：`TaskKind::Terminal`、`BackgroundTask.terminal`（`TerminalTask`：终端句柄、来源 `TerminalOrigin`、是否共享）、`ExecRunParams.terminal`。
+- `terminal.rs`（T33）：Core API 的终端类型：事件 `TerminalEvent`（按 `type` 标记）、读屏范围 `TerminalTextRange`（按 `kind` 标记）、`TerminalInfo`、`TerminalCommand`、`TerminalPoint`、`TerminalMatch`、`TerminalPasteOutcome`。`term_frame` 的 JSON 形式（`TermFrame` 等）的 `u32` 字段用 `#[schemars(with = "u64")]`：schemars 的 `uint32` 格式 ajv 不认识。
 - `web.rs`（T29，能力 `webFetch`）：`web/fetch`；`models.rs` 的 `models/login/start|cancel`、`models/logout`、`ui/loginInteraction`（能力 `login`，交互以 `type` 标记）、`ModelPreferences`/`ModelOverride`（`core/welcome.modelPreferences`、`models/reload.preferences`）与 `ToolReliability::Low`、`ToolProfileKind`。整数字段用 `u64`：schemars 给 `u16` 的 `uint16` 格式 ajv 不认识。空结构体的结果能从 `[]` 反序列化，反例用 `false`。
 
 ## 易错点

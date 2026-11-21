@@ -1,6 +1,6 @@
 # piarc-exec
 
-进程与 shell 命令（架构第 6.11 节，ADR-0028）：`ProcessSpawner` 的两个实现（只终止直接子进程的 `TokioProcessSpawner`，终止整棵进程树的 `ProcessTreeSpawner`）、`CommandRunner`（超时与两段终止），以及 T17 的命令行为模块：`limits`（阈值）、`capture`（输出预算与落盘）、`semantic`（语义退出码）、`env`（登录 shell 环境与剔除）、`shells`（bash / Git Bash / PowerShell 的探测与参数）、`cwd`（bash 命令的最终目录），以及 T32 的 `task_log`（后台任务的输出文件）与 `OutputCapture::hand_over`。`piarc-core::tool_io::exec` 把它们装配成 `exec/run`，后台任务的编排在 `piarc-core::tasks`。不决定命令能否运行（`piarc-policy`），不生成沙箱配置（`piarc-sandbox`），不管 PTY（`piarc-term`）。
+进程与 shell 命令（架构第 6.11 节，ADR-0028）：`ProcessSpawner` 的两个实现（只终止直接子进程的 `TokioProcessSpawner`，终止整棵进程树的 `ProcessTreeSpawner`）、`CommandRunner`（超时与两段终止），以及 T17 的命令行为模块：`limits`（阈值）、`capture`（输出预算与落盘）、`semantic`（语义退出码）、`env`（登录 shell 环境与剔除）、`shells`（bash / Git Bash / PowerShell 的探测与参数）、`cwd`（bash 命令的最终目录），以及 T32 的 `task_log`（后台任务的输出文件）与 `OutputCapture::hand_over`，T33 的 `terminal_tree`（终端里 shell 启动的全部进程）。`piarc-core::tool_io::exec` 把它们装配成 `exec/run`，后台任务的编排在 `piarc-core::tasks`。不决定命令能否运行（`piarc-policy`），不生成沙箱配置（`piarc-sandbox`），不管 PTY（`piarc-term`）。
 
 ## 命令
 
@@ -8,6 +8,7 @@
 |---|---|
 | `cargo test -p piarc-exec` | 全部单元测试；`termination_tests` 是进程树（超时、取消、shell 退出后的后台进程、运行时关闭各自按 PID 确认子孙进程退出）、SIGTERM 先于 SIGKILL、注入时钟上的 2/10 分钟超时（`CommandRunner::with_clock`）、两个管道各 50 MB |
 | `cargo test -p piarc-exec termination -- --nocapture` | 只跑终止相关测试并打印 PID 与 100 MB 耗时 |
+| `cargo test -p piarc-exec terminal_tree` | 终端进程树（T33）：挂断结束进程组、忽略挂断的进程在宽限后被杀（Unix）；Windows 上结束 Job 终止 shell 与子进程 |
 | `cargo clippy -p piarc-exec --all-targets -- -D warnings` | lint；Windows 代码在 macOS 上用根 `AGENTS.md` 的交叉 clippy 命令 |
 
 Core 层的集成测试在 `crates/piarc-core/tests/exec_commands.rs`（cwd、超时、落盘、50 MB、语义、环境、`exec/shells`、Windows 中文输出）与 `tests/tool_io.rs`。
@@ -23,6 +24,12 @@ Core 层的集成测试在 `crates/piarc-core/tests/exec_commands.rs`（cwd、�
 - `task_log.rs` 的 `TaskLog`：按读到的顺序把两个管道的原始字节追加写入文件（不缓冲，模型边跑边 Read），计字节数，按管道切行并保留最后 `TAIL_LINES`（50）行；`write` 返回这块补全的行（Monitor 用）。未完的行超过 `MAX_PENDING_BYTES`（64 KiB）就切成一行，保留的行截到 `MAX_LINE_CHARS`。写失败只停写、不停计数（`error()`）。`read_chunk` 按字节偏移读回文本，不到文件末尾时停在字符边界之前。
 - 转后台不重启进程：Core 不把超时交给 `CommandRunner`（`CommandSpec.timeout` 为 `None`），由任务时钟计时；到时输出消费者调 `OutputCapture::hand_over`（已落盘就交出文件，否则交出文本与未完的 UTF-8 字节），Core 把落盘文件改名为任务输出文件后 `TaskLog::resume`，或新建后写入文本。`CommandRunner` 的超时仍给 hooks 等调用方用。
 - 停止后台任务就是取消 `CommandRunner::run` 的令牌：与回合中断同一条两段终止路径。Windows 上每个命令（因此每个后台任务）一个 Job Object（`ProcessTreeSpawner`），KillShell 与应用退出终止整个 Job。
+
+## 终端的进程树（`terminal_tree.rs`，T33）
+
+- 终端的 shell 由 PTY 库（`piarc-term`）启动，不经 `ProcessTreeSpawner`，所以 `TerminalTree::attach(pid, tty)` 在启动后收集：macOS 记下 shell 的 pid 与终端设备，结束时先用 `tty_processes::processes_of_tty`（`proc_listpids(PROC_TTY_ONLY)`，唯一的 `unsafe`）列出控制终端是它的全部进程，再挂断（关闭 master）、向它们的全部进程组发 `SIGHUP` 与 `SIGCONT`，等 `HANGUP_GRACE`（2 s）后对剩下的发 `SIGKILL`。交互式 shell 把每个作业放进自己的进程组，只杀 shell 的进程组不够。自己 `setsid` 离开终端的进程（守护进程）不在其中。
+- Windows：shell 启动后立刻加入一个 `KILL_ON_JOB_CLOSE` 的 Job Object（`Job::assign_pid`），之后它启动的都在 Job 里，结束即终止 Job，没有宽限。shell 加入 Job 之前（启动后的一瞬间、读到任何输入之前）启动的进程不在 Job 里。
+- 列进程要在挂断之前：挂断后进程脱离终端，按终端设备就找不到了。Core 的 `Terminals` 负责在关闭终端与有序关闭时调用 `end` 并等它结束。
 
 ## cwd 跟踪（`cwd.rs`）
 

@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.40（2026-11-20） |
+| 版本 | 2.41（2026-11-20） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -264,6 +264,7 @@ PiArc/
 | [0047](../adr/0047-outside-paths-before-wildcard-command-rules.md) | 带通配的 Bash/PowerShell allow 规则不放行像路径而在会话目录外（或无法定位）的参数，调用按越界询问；精确规则、文件工具的路径规则与 PreToolUse allow 不变（修订 ADR-0037 阶梯第 6、7 步） | 一次"总是允许"不再让同类命令无询问地读写工作区外的文件，与 Claude Code 的越界询问一致 |
 | [0048](../adr/0048-subagents-and-model-aliases.md) | 子 agent 定义由 Core 读、Agent Host 加内置类型；子会话经 `subagent/start` 在 Core 登记自己的会话 id 并链接主会话（模式取更严者、会话规则与检查点归主会话、审批卡标来源）；工具过滤用隐藏声明加 `tool_call` 闸门；深度与并发只在 Agent Host 的 `SubagentRunner` 计数，超限立即报错；后台运行不随中断结束、经提醒回报；别名表是设置键 `modelAliases`，由 Agent Host 的 `resolveModel` 解析 | 子 agent 沿用同一套裁决、快照与 hooks；被移除工具的调用仍经过闸门；排队会让前台子 agent 互相等待而死锁 |
 | [0049](../adr/0049-background-tasks-and-monitor.md) | Core 的任务管理器（`piarc-core::tasks`）统一管理后台命令、后台子 agent 与 Monitor：元数据写 `background_tasks`、实体快照 `core/tasks`；前台超时由任务时钟计时，同一进程转为后台任务，输出写主会话的 `tasks/<任务 id>.log`；完成通知在 Core 挂起到看见送达，经带 `key` 的 `session/remind` 发出、按类型与来源去重；Monitor 的新行按批次与总量限速回灌，会话空闲时以 `wake` 唤醒（有间隔下限、可关闭）；Monitor 的命令走 Bash 的规则与分析但不享受只读白名单，`Bash` matcher 的 hooks 同时匹配 Monitor | 进程归 Core，Agent Host 崩溃、空闲回收、回合中断都不影响后台命令；通知不丢不重；时间相关的逻辑可注入时钟 |
+| [0050](../adr/0050-agent-terminal-screen-access.md) | 终端承载的任务：每个属于会话的终端登记为 `terminal` 类任务；`Bash` 的 PiArc 参数 `terminal` 让命令在会话的终端里后台运行；模型用 Read 读 Core 维护的屏幕文件（formatter 输出，命令结束通知与读取前重写）；用户的终端只在共享后对模型可见，agent 不能向交互终端写入；Monitor 不扩展到终端 | 读屏来自同一个终端实例、不读原始字节；沿用后台任务的读法与通知，模型不需要新工具 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -789,7 +790,17 @@ T27 落地（ADR-0043）：`agent-host/src/harness/context-usage.ts` 在每次�
   - 与会话共享工作目录与环境；支持 OSC 133 shell integration；退出时保存 snapshot 以便重启后恢复。终端内容不自动进入模型上下文，用户可以把选中内容附加到对话。
   - 自研渲染器不达标时，渲染端退回 xterm.js 6 + WebGL 的字节流副本模式，Core 仍是唯一权威。
   - T10 原型的实现（`docs/spikes/S07-terminal.md`）：每个终端一个 IO 线程（读 PTY、`vt_write`）与一个写线程（输入、按终端模式编码按键、调整尺寸、查询应答）；注册 `WRITE_PTY`、`TITLE_CHANGED`、`BELL`、`RENDER_HOLD` 四个 effects，同步输出 hold 开始时捕获当时的屏幕，超过 1 秒由 Core 结束；帧格式草案在 `piarc_protocol::term_frame`（T33 定稿），脏行与 viewer 已有的内容逐格比较后才发送；每个终端当前只有一个 viewer，换 viewer 时发 RESET 帧；标题、响铃、退出事件发到路由 `term/<id>`；页面每个动画帧最多一个在途拉取，输入后连续拉取直到回显到达（最多 50 ms）。帧经事件 MessagePort 送达时，按键之后的帧要等下一帧之后才被处理，回显额外延迟 p95 16 ms；改为拉取请求的返回值后 p95 0.77 ms（ADR-0023）。
-  - PTY 子进程由 portable-pty 启动（ADR-0017），不经 `ProcessSpawner`；终端承载的后台任务（T32、T33）接入时再决定进程树清理的方式。
+  - PTY 子进程由 portable-pty 启动（ADR-0017），不经 `ProcessSpawner`；进程树由 `piarc_exec::TerminalTree` 在启动后收集（T33，见下）。
+- **T33 落地（ADR-0050）**：
+  - 线程：每个终端一个 IO 线程（读 PTY、`vt_write`、处理 effects）、一个写线程（独占 master：输入、键盘与鼠标编码、粘贴、尺寸、查询应答）与一个等待线程；写队列有界（256 条，满了答 `busy`），三个线程的 panic 都变成终端的 `failed` 事件。Core 的启动、取帧、读屏、搜索都在阻塞线程池上，NAPI 的 `createTerminal` 返回 Promise，同步方法只入队（第 7.2 节）。无头 `cat` 100 MB 时主进程事件循环延迟 p99 1.4–1.5 ms（macOS 开发构建，S7 基准的 `--headless`）。
+  - effects：在 T10 的四个之外注册 `PWD_CHANGED`、`SEMANTIC_PROMPT`（OSC 133，标记带 tracked point，命令记录保留最近 64 条及输出范围）、`CLIPBOARD_READ`（一律拒绝，只为 Kitty 粘贴事件放行那一次）、`CLIPBOARD_WRITE`（设置 `/terminal/clipboardWrite`，默认允许，只接受标准剪贴板的 `text/*`，上限 1 MiB）。事件 `title`、`pwd`、`bell`、`commandStarted`、`commandFinished`、`clipboard`、`clipboardReadDenied`、`exited`、`failed` 的形状在 `piarc-protocol::terminal`，经 `term/<id>` 发出。
+  - 读屏与搜索：formatter 输出屏幕、视口、全部或最近 N 行（去掉末尾空行后计），可合并折行、去行尾空格；搜索分步持锁，1 万行 scrollback 中搜索时输出照常进入。libghostty-vt 默认的 scrollback 字节上限（10,000 字节）会让 scrollback 几乎立即丢失，Core 取消字节上限，只按行数限制（T10 遗留缺陷）。
+  - 帧格式第 2 版（`piarc_protocol::term_frame` 定稿）：在草案之上加滚动条段（总行数、首个可见行、可见行数）与每行的选区列；解码后的 JSON 形式有 schema（`TermFrame`）与 L1 样本（`tests/contracts/term-frame/`），Rust 与 TS 两份编解码器跑同一组样本。只有被拉取的终端才编码帧，隐藏的终端不产生帧。
+  - 输入：键盘按终端模式编码（legacy 与 Kitty 键盘协议）、鼠标按跟踪模式与格式（含 SGR）编码、粘贴按 bracketed paste 与 Kitty 粘贴事件包装并对可能自行执行的文本返回 `unsafe`（用户确认后带 `allowUnsafe` 重发）、焦点按 1004 模式上报。
+  - 保存与恢复：会话终端在应用退出时保存到 `sessions/<主会话 id>/terminals/<任务 id>.snap`（snapshot、VT 重放、纯文本三份，各带哈希；文件头记 libghostty-vt 版本与 snapshot 格式号），下次以该任务 id 续开时依次尝试三者；用户或模型关闭终端时删除。
+  - shell integration：zsh（`ZDOTDIR`）、bash 与 Git Bash（`--rcfile`）、PowerShell（profile 之后点源）的脚本为 PiArc 自写，装在数据目录的 `shell-integration/`，不改用户的启动文件；发出 OSC 133 A/B/C/D（C 带百分号编码的命令行）与 OSC 7。终端以会话的 shell 目录（含 worktree）和 T17 的命令环境启动，另加 `TERM=xterm-256color`、`COLORTERM=truecolor` 与脚本位置；环境里没有 locale 时补 UTF-8 locale（macOS `en_US.UTF-8`，Windows `C.UTF-8`），否则 bash 的行编辑器在 C locale 下把键入的中文当成 Meta 键。沙箱会话的终端套同一个沙箱包装。
+  - 会话终端与 agent：用户的终端（`openSessionTerminal`，登录 shell）与模型的终端（`exec/run` 带 `terminal`）都是 `terminal` 类任务（来源 `user`/`agent`、是否共享在 `background_tasks.metadata`，不改 schema）。屏幕文件 `tasks/<任务 id>.log` 第一行是终端与标题，第二行是最近一条命令及其结束方式，之后是 formatter 的全部文本；变化后至多每 500 ms 重写，通知与读取前立即重写。模型的命令结束时先挂起提醒，再把退出码写到仍在运行的任务上（终端保留）。用户的终端未共享时不列出、读不到、没有屏幕文件，KillShell 停不了它。
+  - 进程树：macOS 上 `TerminalTree` 在挂断前按终端设备列出全部进程（作业各在自己的进程组），挂断后向它们的进程组发 `SIGHUP`、`SIGCONT`，宽限 2 秒后 `SIGKILL`；Windows 上 shell 启动后立即加入 `KILL_ON_JOB_CLOSE` 的 Job Object。关闭终端与有序关闭都等进程树结束（含忽略挂断的进程）才返回。
 
 ### 6.12 Worktree 与并行会话
 
@@ -902,7 +913,7 @@ crates/
 - I/O 边界用窄 trait 隔离（`ProcessSpawner`、`FileSystem`、`Clock`、`SecretStore`、`AgentHostTransport`），测试用内存实现驱动。
 - 错误类型化：每个 crate 定义 `thiserror` 枚举，带可机读的 `kind` 与 `retryable`；跨 NAPI 和 AHP 时映射为结构化错误，不传裸字符串。
 - panic 不得穿过 NAPI 边界：导出函数在边界处捕获 panic 并转成结构化错误，Core 内部错误不能让主进程崩溃。
-- `unsafe` 只出现在 `-sys` crate、`piarc-napi`、`piarc-term` 的 `vt` 模块（libghostty-vt 的 safe 封装，T10）与 `piarc-exec` 的 `job` 模块（Windows Job Object 的 safe 封装，T11）；规则与写法见 `docs/engineering/coding-standards.md` 第 2.8 节。
+- `unsafe` 只出现在 `-sys` crate、`piarc-napi`、`piarc-term` 的 `vt` 模块（libghostty-vt 的 safe 封装，T10）、`piarc-exec` 的 `job` 模块（Windows Job Object 的 safe 封装，T11）与 `tty_processes` 模块（macOS 按终端设备列进程，T33）；规则与写法见 `docs/engineering/coding-standards.md` 第 2.8 节。
 - 单文件超过 1,000 行、单函数超过 80 行需要在评审中说明理由（规避 claw-code 的上帝文件问题）。
 
 ### 7.2 运行时与并发
@@ -979,6 +990,8 @@ T19（ADR-0030）为 `session/prompt`、`session/steer`、`session/followUp` 添
 T29 已实现（ADR-0045）：Agent Host → Core 的请求 `web/fetch`（能力 `webFetch`，`{ sessionId, origin, url }`，结果为最终 URL、状态、内容类型、`markdown`/`text` 格式的正文、字节数、截断标记与跨站重定向的 `redirect`）与 `ui/loginInteraction`（能力 `login`，`{ loginId, provider, interaction }`，交互为 `authUrl`、`deviceCode`、`progress`、`info`、`prompt`，提问的结果带 `value`）；Core → 设置 Host 的请求 `models/login/start`、`models/login/cancel`、`models/logout`。`core/welcome` 新增可选的 `modelPreferences`，`models/reload` 新增可选的 `preferences`，`models/list` 结果新增可选的 `loginProviders`，`CatalogModel` 新增可选的 `defaultEffort`、`toolProfile`，`ToolReliability` 新增 `low`。
 
 T32 已实现（ADR-0049，能力 `backgroundTasks`）：`exec/run` 新增 `background` 与结果的 `task`（`TaskStarted`：任务 id、输出文件、`requested`/`timeout`），`commandExecution` 的 `execution` 新增 `task`；Agent Host → Core 的请求 `exec/monitor`（结果为任务 id、输出文件、生效的超时与被截断时请求的超时）、`exec/background/list`（本会话与其子 agent 的任务）、`exec/background/read`（按字节偏移，至多 64 KiB，在字符边界截断）、`exec/background/kill`（只接受本会话或其子 agent 的任务，其他 id 一律 `notFound`）；Core → Agent Host 的 `session/remind` 新增 `key`、`wake` 与结果的 `delivered`、`turnId`，接受 `monitorOutput`。Core API 新增 `core/tasks` 快照（`TasksSnapshot`）、`stopTask(taskId)`、`readTaskOutput(taskId, offset, length)`。
+
+T33 已实现（ADR-0050，能力 `terminalTasks`）：`exec/run` 新增 `terminal`（隐含后台，结果的 `task` 指向屏幕文件）；`TaskKind` 新增 `terminal`，`BackgroundTask` 新增 `terminal`（终端句柄、来源 `agent`/`user`、是否共享），运行中的模型终端任务以 `exitCode` 报告其命令的退出码。终端事件、读屏范围、命令、搜索结果与终端信息的类型在 `piarc-protocol::terminal`，帧格式与 `TermFrame` schema 在 `term_frame`。
 
 T31 已实现（ADR-0048，能力 `subagents`）：Agent Host → Core 的请求 `agents/list`（`{ cwd, builtIn }`，结果 `AgentsList`：合并后的定义与警告、解析问题、深度与并发上限、被 deny 的内置类型、合并后的别名表）、`subagent/start`（子会话 id、父会话、工具调用 id、类型、描述、cwd、JSONL 路径、模型、是否后台；结果为生效的权限模式与警告）、`subagent/finish`（状态与用量）；Core → Agent Host 的请求 `resources/listAgents`（结果同 `AgentsList`，每条带解析到的模型）与 `subagent/stop`；父会话路由上的通知 `subagent/started`、`subagent/progress`、`subagent/completed`（`{ itemId, subagent: SubagentState }`）。`policy/evaluate` 参数新增可选的 `parentSessionId`、`agentType`，审批卡新增可选的 `subagent`（`ApprovalOrigin`），`subagent` 条目新增可选的 `subagent`（`SubagentState`），`session/create` 新增可选的 `defaultModel`、`defaultEffort`，`ModelPreferences` 新增 `auxiliaryAlias`、`aliases`。Core API 新增 `listAgents(workspace, cwd)`、`stopSubagent(parent, child)`、`subagentTranscript(parent, child, start, limit)`。
 
@@ -1068,7 +1081,7 @@ impl Session {
 - 渲染进程能调用的命令是上面接口的子集，在 preload 中逐个列出；主进程校验调用来源（发起请求的窗口和页面地址）后才转给 Core。
 - NAPI-RS 生成的 TypeScript 声明与 `packages/protocol` 的类型都纳入 L1 快照测试，接口变化必须同时更新快照。
 - 已实现的导出面（T04）：`CoreRuntime.create(options, onEvents)`、`shutdown(): Promise<void>`、`state`。`onEvents` 每次收到一组批次 `{ route, seq, payload }`：`route` 是路由键（1–128 个 `[A-Za-z0-9._:/-]`，`core/` 前缀保留给 Core 自己的事件，例如 `core/errors`），`seq` 是每个路由从 1 起连续的批次序号，`payload` 是该路由事件的 UTF-8 JSON 数组（`Uint8Array`），主进程不解析，以结构化克隆转发（ADR-0019）。开发构建另有 `testing` 导出（演示事件源、同步轻量方法 `echo`、计数、panic 触发），发布构建不含。
-- 终端导出（T10）：`createTerminal`、`terminalInput`、`terminalKey`、`terminalResize`、`terminalFrame(id, viewer, full): Promise<Uint8Array>`、`closeTerminal`；开发构建另有 `terminalText`、`terminalStats`、`terminalProbeEcho`。主进程校验终端归属（窗口只能用自己创建的终端，窗口销毁时关闭它们），帧不解析，作为拉取请求的返回值交给发起的窗口（ADR-0023）。
+- 终端导出（T10、T33）：`createTerminal(options): Promise<number>`、`terminalInput`、`terminalKey`、`terminalMouse`、`terminalFocus`、`terminalPaste(id, text, allowUnsafe?): Promise<'pasted' | 'unsafe' | 'empty'>`、`terminalResize`、`terminalFrame(id, viewer, full): Promise<Uint8Array>`、`terminalText(id, range?, unwrap?)`、`terminalLastCommand`、`terminalSearch`、`terminalInfo`、`closeTerminal`；会话终端 `openSessionTerminal(sessionId, options)`（`{ terminalId, taskId, restored }`）与 `setTerminalShared(id, shared)`；开发构建另有 `terminalStats`、`terminalProbeEcho`。主进程校验终端归属（窗口只能用自己创建的终端，窗口销毁时关闭它们），帧不解析，作为拉取请求的返回值交给发起的窗口（ADR-0023）。
 - 错误跨 NAPI 时是抛出的 `Error`，带 `code` 与 `data: { kind, retryable, details? }`（`piarc_protocol::ErrorObject` 的形状）；导出函数在边界捕获 panic，kind 为 `internalError`。Core API 专用的错误类别有 `shuttingDown`（关闭后的请求）与 `busy`（队列满，可重试）。
 - 状态导出（T13）：`CoreRuntime.create` 的选项增加 `dataDir` 与 `cacheDir`（同时给或都不给；不给时没有数据库、设置、信任与日志文件，只用于事件通道的测试）；`rebuildSessionIndex()`、`projectTrust(path)`、`decideProjectTrust(path, trusted, version)`、`revokeProjectTrust(path)` 都返回 JSON 文本的 Promise（`piarc_core::storage::report_json`、`piarc_core::trust::TrustView`）。设置变化以事件发到 `core/settings`（`{ workspace, changed, issues }`）。
 - Promise 由 Core 自己的运行时经 NAPI-RS 的 `JsDeferred` 结算，不用 `#[napi] async fn`（它会另起 NAPI-RS 的全局 tokio 运行时）。
@@ -1244,7 +1257,8 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 │   ├── models.json            # 自定义端点与模型覆盖
 │   └── sessions/              # Pi 会话 JSONL（对话事实来源）
 ├── checkpoints/objects/       # 内容寻址的文件快照（sha256 分桶）
-├── sessions/<sessionId>/      # 会话文件，attachments/ 保存用户附件，临时区域保存工具及后台任务输出
+├── sessions/<sessionId>/      # 会话文件，attachments/ 保存用户附件，临时区域保存工具及后台任务输出，terminals/ 保存退出时的终端（T33）
+├── shell-integration/         # 终端的 shell integration 脚本（Core 启动时写出，T33）
 ├── agent-host/                # Agent Host 的 tmp/（TMPDIR）与 npm-cache/（npx 安装的 MCP server），可丢弃
 └── logs/                      # Core 与 Agent Host 日志（按天轮转，默认保留 7 天）
 
@@ -1667,6 +1681,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| 2.41 | 2026-11-20 | T33（ADR-0050）补充第 4 章 ADR-0050、6.11 节终端的线程与有界写队列、新增 effects 与事件、读屏与搜索、帧格式第 2 版定稿、输入编码、保存与恢复、shell integration、终端环境的 UTF-8 locale、会话终端与 agent 的屏幕文件、进程树的结束方式，7.1 节 `unsafe` 范围加 `piarc-exec` 的 `tty_processes`，7.4 节 `terminalTasks` 能力，7.6 节终端导出，9.1 节 `terminals/` 与 `shell-integration/`；基线决策未变（ADR-0017 已定读屏来源与 OSC 133） |
 | 2.40 | 2026-11-20 | T32（ADR-0049）补充第 4 章 ADR-0049、6.1.4 节 KillShell 与 Monitor 的参数与裁决、6.6.3 节 `monitorOutput`、`key` 与 `wake`、6.11 节任务管理器、超时转后台、通知、Monitor 回灌与限速的落地、7.3 节后台任务的持久化、7.4 节 `backgroundTasks` 能力的方法与成员、8.2 节后台任务卡与面板、9.2 节 schema v7、9.3 节任务输出的清理；基线决策未变（6.11 已定超时转后台与 Monitor） |
 | 2.39 | 2026-11-20 | T31（ADR-0048）补充第 4 章 ADR-0048、6.4 节子 agent 的落地（定义加载、子会话登记与链接、工具过滤用隐藏声明加闸门、深度与并发计数、前后台、空闲回收）、6.13 节模型别名表与解析、6.14 节 `model`、`effortLevel` 生效、`advisorModel` 忽略、`agent` 交 T48、7.4 节 `subagents` 能力的方法与成员、7.6 节子会话条目增量的现状、8.2 节子 agent 卡与设置页、9.2 节 schema v6；基线决策未变 |
 | 2.38 | 2026-11-20 | R3（M2 macOS 阶段门）：第 4 章补上 ADR-0042；6.0 节矩阵按 M2 实际交付更新权限、Hooks、Plan、任务清单、上下文工程、Checkpoint、多模型七行；第 4 章加入 ADR-0047、6.2.2 与 6.2.3 节写明带通配的命令规则不放行越界路径（ADR-0047，修订 ADR-0037 的阶梯）；6.2.2 节写明 `Read` deny 对目录搜索与 Bash 递归读取的限制（I120）；6.3.1 节进程树终止按平台写准；6.6.4 节熔断复位范围（I107）；6.14 节 `plansDirectory` 交 T48（I104）；6.15 节记录 R3 对校准值的核对（数值不变）与缓存断点、plan 模式两行的实现；第 16 章记录 M2 的 macOS 结论；ADR-0047 改变了第 6.2.3 节阶梯第 6、7 步对带通配命令规则的先后 |

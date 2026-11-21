@@ -49,7 +49,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `npm run test:e2e -w @piarc/desktop` | L4：Playwright 驱动开发形态与打包产物（先打开发构建） |
 | `npm run check:fuses` | 发布构建产物的 fuse 与 `apps/desktop/fuses.mjs` 比对 |
 | `npm run bench:s2 -- --form packaged` | S2 基准：事件吞吐、主进程事件循环延迟、同步调用、大批次、空闲内存（先打开发构建） |
-| `npm run bench:s7 -- --form packaged` | S7 基准：终端中 `cat` 大文件（`--megabytes`、`--repeat`）与键入回显配对测量（先打开发构建） |
+| `npm run bench:s7 -- --form packaged` | S7 基准：终端中 `cat` 大文件（`--megabytes`、`--repeat`）与键入回显配对测量（先打开发构建）；`--headless` 只测没有页面拉帧的终端（T33-A13，结果在 `tmp/evidence/T33/bench/`） |
 | `npm run bench:t18` | T18 冷启动：打包产物以 100 个会话的数据目录冷启动 10 次，测到侧栏就绪（预算 1.0 s，先打开发构建） |
 | `npm run bench:t19` | 正式会话的流式渲染、万条滚动、缓存切换与千条冷加载基准。先打开发构建，在前台运行 |
 | `npm run bench:s1 -- --form packaged` | S1 基准：transcript 流式 60 s、万条滚动、千条冷加载、渲染进程内存（CDP 追踪，先打开发构建） |
@@ -64,6 +64,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `cargo run -q -p piarc-devcli -- run tests/scenarios [--json <文件>]` | 不经 UI 运行一个场景文件或整个目录，输出 JSON 报告 |
 | `node scripts/plan/check-capabilities.mjs [--milestone M2]` | 检查能力清单；`--milestone` 列出该里程碑及之前未完成的能力；`--results <报告> --doc write` 重新生成 `capabilities.md` |
 | `cargo test -p piarc-policy --test bash_cases -- --nocapture` | T23 的 Bash 分析数据驱动用例（`crates/piarc-policy/tests/bash_cases.json`，打印条数与类别）与随机输入测试 |
+| `cargo test -p piarc-core --lib terminal::` 与 `cargo test -p piarc-core --test terminal` | T33 终端：会话目录与命令环境、智能体的终端任务与屏幕文件、未共享的终端模型看不到、snapshot 保存与丢弃；关闭终端与关闭 Core 都结束整棵进程树（Windows 版 `--test terminal_windows`）。shell integration 在 `cargo test -p piarc-term --test shell_integration`（Windows：`shell_integration_windows`） |
 | `cargo test -p piarc-core --test background_tasks` | T32 后台命令：`background` 立即作答、KillShell 结束整棵进程树并保留输出、其他会话停不了、Monitor 以任务运行；`cargo test -p piarc-testkit --test sessions tasks::` 是 Agent Host 被杀后后台命令继续与通知送达、退出时进程树结束与重启后显示已中断 |
 | `cargo test -p piarc-testkit --test sessions` | 会话层端到端：Core 的工作区与会话 actor 驱动真实 Agent Host 与 mock（排队、中断、工具批次、重试、缺口补齐、空闲回收、重启恢复） |
 | `cargo test -p piarc-core --lib tool_io::hooks` | hooks 经真实 Core：裁决第 2、8 步、`hooks/run`、信任、审计与落盘、并行与去重、超时与中断后整棵进程树结束（T25）；L2 为 `cargo test -p piarc-testkit --test scenarios -- hooks-` |
@@ -102,7 +103,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - 第一次构建 `piarc-ghostty-sys`（任何依赖 `piarc-core` 的构建）会联网下载 libghostty-vt 预编译产物到 `.tools/cache/ghostty-vt/`，并校验 SHA-256 与 minisign 签名；校验失败直接报错，不会重下。离线时设 `PIARC_GHOSTTY_VT_OFFLINE=1` 并预先填好缓存（`PIARC_GHOSTTY_VT_CACHE` 可换目录），详见 `crates/piarc-term/AGENTS.md`。
 - Windows 的 Core 模块依赖同目录下的 `ghostty-vt.dll`：手工拷 `.node` 时要一起拷（`build:core` 与打包会处理）。
 - Windows 开发环境：Visual Studio Build Tools（MSVC 与 Windows SDK）、Git for Windows（委托的 Bash 用 Git Bash，终端 L4 用它自带的 vim）、Node 24；`npm run verify` 与 L4 在 Windows 上都能完整运行。Windows 专有的行为差异（ConPTY、同步的 stdout、计时器粒度、`\\?\` 路径）见 `crates/piarc-term`、`agent-host`、`apps/desktop`、`crates/piarc-testkit` 的 AGENTS.md 与 S2、S7、S9 报告。
-- 改了终端帧的编码或格式，要用 `PIARC_UPDATE_FRAME_SAMPLES=1 cargo test -p piarc-term --test consistency` 重写 TS 共享样本，否则 Rust 与 TS 两侧的样本检查都会失败。
+- 改了终端帧的编码或格式，要用 `PIARC_UPDATE_FRAME_SAMPLES=1 cargo test -p piarc-term --test consistency` 重写 TS 共享样本、用 `PIARC_UPDATE_TERM_FRAME_SAMPLES=1 cargo test -p piarc-protocol --test term_frame` 重写 L1 样本（`tests/contracts/term-frame/`），否则 Rust 与 TS 两侧的样本检查都会失败；`scripts/ci/core-load-check.mjs` 的 `frameRows` 也按格式版本读帧。
 - 改了 `piarc-napi` 的导出却没运行 `npm run build:core -- --flavor all`，verify 的"Core module + API snapshot"会失败。源码树运行应用、L4 的 `dev` 形态、Vitest 的 Core 集成测试都加载 `target/piarc-core/development/` 下的模块，缺了会直接报错（`package:desktop` 会先构建它）。
 - 需要保留 CRLF 的测试夹具放在 `fixtures/crlf/` 目录下，L2 场景的按字节夹具放在 `tests/scenarios/fixtures/`（两处都是 `-text`），其余文本文件都会被 `.gitattributes` 规范为 LF。
 - Vitest 中的 `packages/testkit` 测试会先 `cargo build` mock provider 的 bin，所以 `npm test` 需要 Rust 工具链；L0–L2 测试不访问真实服务商，模型侧一律用 mock provider。
@@ -132,4 +133,5 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - L3（T30，ADR-0046）：Claude Code 只在临时 `CLAUDE_CONFIG_DIR` 与 `HOME`、假 key、指向本地 mock 的 base URL 下运行，录制只写白名单结构（`scripts/l3/check-recordings.mjs` 把关），不得把 Claude Code 的提示词或工具描述写进任何文件、日志或终端输出；调试只打印长度与 hash。命令运行前后比较本机 `~/.claude`，同时开着的 Claude Code 会话写会话记录也会被报告。allowlist 中修好的条目要删掉（不再匹配即失败）；PiArc 的偏差先写能复现的 L2 场景再修。
 - 子 agent（T31，ADR-0048）：定义由 Core 读（`piarc_config::agents`），子会话在同一 Agent Host 内运行（`agent-host/src/runtime/subagents.ts` 是深度与并发的唯一计数），运行前经 `subagent/start` 在 Core 登记自己的会话 id 并链接主会话：模式取更严者、"本会话允许"与检查点归主会话、审批卡标来源。工具过滤用 Pi 的隐藏声明加 `tool_call` 闸门，不要改成 `setActiveTools`（被移除工具的调用会绕过闸门）。模型说明只经 `agent-host/src/providers/aliases.ts` 的 `resolveModel` 解析，别名表是设置键 `modelAliases`。
 - 后台任务（T32，ADR-0049）：后台命令、后台子 agent、Monitor 都登记在 Core 的 `piarc_core::tasks::TaskManager`（状态机、`background_tasks`、`core/tasks` 快照、停止、分段读取），T33 的终端任务加一种 `TaskKind`，不另建注册表。前台超时由任务时钟计时、同一进程转后台（不要把超时交回 `CommandRunner`）；后台命令不随回合中断、会话关闭、Agent Host 崩溃结束，归档或删除会话、KillShell、面板、应用退出才结束。模型可见的后台通知只经 Core 挂起的 `Notice` 与带 `key` 的 `session/remind`（送达以 `reminder` 条目为准），Monitor 限值只在 `TaskLimits`。Monitor 的命令走 Bash 规则与分析但不享受只读白名单；`Bash` matcher 的 hooks 也匹配 Monitor。L2 用 `advance_clock` 推进任务时钟，不靠真实等待。
+- 终端（T33，ADR-0050）：会话的终端是 `TaskKind::Terminal` 的后台任务（Core 的 `terminal/bound.rs`），模型读的是 Core 写的屏幕文件（formatter 输出），不是原始字节；用户的终端只在共享后对模型可见，读取时在 Core 核对。终端环境来自 T17 的构造，没有 locale 时补 UTF-8（否则 bash 在 C locale 下把键入的中文变成 Meta 键）。进程树由 `piarc_exec::TerminalTree` 结束，有序关闭要等它（含宽限后的 `SIGKILL`）。升级 libghostty-vt 按 `crates/piarc-term/AGENTS.md` 的检查项判断 `SNAPSHOT_FORMAT`。
 - Hooks（T25，ADR-0039）：hook 命令只在 Core 运行（`piarc-hooks` 解析、匹配、执行、合并，`piarc-core::hooks` 读设置与信任、写审计），Agent Host 只经 `hooks/run` 报告 Pi 事件并应用结果；新增事件在 `HookEvent` 加一项、在挂载处调 `HooksService::run`，不另写执行器。Stop 续跑上限只在 `piarc_hooks::STOP_CONTINUATION_LIMIT`。L2 的 hook 夹具是 `tests/scenarios/fixtures/hooks/hook.mjs.txt`（复制成 `hook.mjs` 运行）。

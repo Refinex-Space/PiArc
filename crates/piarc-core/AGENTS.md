@@ -1,6 +1,6 @@
 # piarc-core
 
-Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、有序关闭、任务监督；`agent_host` 模块把 `piarc-host` 的监管器与生产 I/O（`piarc-exec` 的进程启动器、`SystemClock`）装配起来，是 Agent Host 测试的无头入口（T06）；`tool_io` 应答 Agent Host 委托的 `fs/*`、`exec/*`（T07），沙箱会话的命令经 `piarc-sandbox` 包装（T11）；`secrets` 把凭据保险箱提供给所有 Agent Host（`secrets/*`，T08），`identity` 是应用标识的唯一定义；`terminal` 是终端会话的注册表（T10）；`dirs`、`storage`、`trust`、`workspace_settings` 是数据目录、数据库、项目信任与工作区设置（T13）；`sessions` 是工作区与会话的编排（T14），`clock` 是空闲计时用的时钟；`client_settings` 读写用户级 `settings.json` 中的客户端偏好（T18）。运行时门面的状态与会话方法分别在 `runtime/state.rs` 与 `runtime/sessions.rs`。会话删除的原生确认先从 Core 读取目标标题和工作区，并显示同一会话 ID。不负责 JavaScript 绑定（`piarc-napi`）。
+Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、有序关闭、任务监督；`agent_host` 模块把 `piarc-host` 的监管器与生产 I/O（`piarc-exec` 的进程启动器、`SystemClock`）装配起来，是 Agent Host 测试的无头入口（T06）；`tool_io` 应答 Agent Host 委托的 `fs/*`、`exec/*`（T07），沙箱会话的命令经 `piarc-sandbox` 包装（T11）；`secrets` 把凭据保险箱提供给所有 Agent Host（`secrets/*`，T08），`identity` 是应用标识的唯一定义；`terminal` 是终端的注册表（T10），T33 起会话的终端作为后台任务运行；`dirs`、`storage`、`trust`、`workspace_settings` 是数据目录、数据库、项目信任与工作区设置（T13）；`sessions` 是工作区与会话的编排（T14），`clock` 是空闲计时用的时钟；`client_settings` 读写用户级 `settings.json` 中的客户端偏好（T18）。运行时门面的状态与会话方法分别在 `runtime/state.rs` 与 `runtime/sessions.rs`。会话删除的原生确认先从 Core 读取目标标题和工作区，并显示同一会话 ID。不负责 JavaScript 绑定（`piarc-napi`）。
 
 ## 命令
 
@@ -16,7 +16,8 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 | `cargo test -p piarc-testkit --test sessions` | 会话层端到端（真实 Agent Host + mock）：排队、steer 与 follow-up、中断、工具批次、重试、缺口补齐、空闲回收、快照 revision、fork 与关闭、重启恢复（T14） |
 | `cargo run --release -p piarc-testkit --example t14-warmup` | 打开工作区到 Agent Host 就绪的 10 次测量（T14-A09） |
 | `cargo test -p piarc-core --test background_tasks` | 后台命令（T32）：`background` 立即作答并写输出文件、KillShell 结束整棵进程树（含忽略 SIGTERM 的孙进程）并保留输出、其他会话停不了、Monitor 以任务运行；单测 `--lib tasks::`（通知、Monitor 节奏与手动时钟、权限范围、子 agent 状态、分段读取） |
-| `cargo test -p piarc-core --test terminal` | 终端：`term/<id>` 事件、经回调取帧、错误类别、关闭时结束终端（Unix） |
+| `cargo test -p piarc-core --test terminal` | 终端：`term/<id>` 事件、经回调取帧、错误类别、关闭终端与关闭 Core 都结束整棵进程树（自成进程组的作业、忽略 HUP/TERM 的进程，Unix；Windows 版在 `tests/terminal_windows.rs`） |
+| `cargo test -p piarc-core --lib terminal::` | 会话终端（T33）：会话目录与命令环境、没有 locale 时补 UTF-8、智能体的终端任务（退出码、命令结束通知、屏幕文件与 formatter 一致）、未共享的终端模型看不到、退出时保存与关闭时丢弃 snapshot |
 | `cargo clippy -p piarc-core --all-targets -- -D warnings` | lint |
 
 ## 运行时与关闭顺序
@@ -51,10 +52,13 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - `BUILTIN_RELEASE_KEYS` 在 T50 之前为空：没有信任的公钥时任何清单都被拒绝。不要把 `scripts/release/test-keys/` 的测试公钥放进去。
 - 测试样本由 Node 的 `scripts/release/release-manifest.mjs` 签名（`tests/fixtures/release/`，`.gitattributes` 设为 `-text` 保持字节不变），换测试密钥后按该目录 README 重写。
 
-## 终端（`terminal`）
+## 终端（`terminal`，T10、T33，ADR-0017、ADR-0050）
 
-- 注册表持有 `piarc_term::Session`；`create_terminal` 校验尺寸（1–1000）与绝对 cwd，事件（标题、响铃、退出）以 JSON 发到 `term/<id>`：IO 线程上用 `EventSender::blocking_send`，不能在运行时线程调用。
-- 取帧、读屏、回显探针都放到阻塞线程池，结果经回调交给 NAPI；关闭 Core 时先关掉全部终端（有序关闭第 2 步）。
+- `Terminals`（`terminal/mod.rs`）持有全部终端：每个是 `piarc_term::Session`、它的进程树（`piarc_exec::TerminalTree`，启动后立即收集）和可选的会话绑定（`terminal/bound.rs`）。事件以 JSON 发到 `term/<id>`：IO 线程上用 `EventSender::blocking_send`，不能在运行时线程调用。
+- 启动、取帧、读屏、搜索、粘贴、回显探针都在阻塞线程池上，结果经回调交给 NAPI；`create_terminal` 只同步校验尺寸（1–1000）与绝对 cwd。`write`/`key`/`mouse`/`focus` 只入队（写队列满时 `busy`）。
+- 会话的终端（`open`）：用户的（`ToolIo::open_user_terminal`，登录 shell）与智能体的（`exec/run` 带 `terminal`，bash 或 Git Bash，键入审批过的命令）都是 `TaskKind::Terminal` 的后台任务，在会话的 shell 目录、以 T17 的命令环境（没有 locale 时补 UTF-8；智能体的 bash 终端在 macOS 上另设 `BASH_SILENCE_DEPRECATION_WARNING=1`，免得系统 bash 的 zsh 提示进入模型读的屏幕）启动，沙箱会话套同一个沙箱包装。屏幕文件 `tasks/<任务 id>.log` 每 500 ms 有变化时重写，命令结束通知与读取之前也重写；只有智能体自己的终端和用户共享的终端写屏幕文件、对模型可见（`tasks/terminal.rs` 的 `TerminalViews`）。智能体的命令结束时先挂通知，再把退出码写到仍在运行的任务上。
+- 关闭：`close` 对会话终端经任务停止（`StopBy::User`），watch 循环再 `close_now`（应用退出时保留 snapshot，其余丢弃）；`close_now` 挂断并结束进程树（宽限 2 s 后 `SIGKILL`）。有序关闭第 1 步 `Terminals::shutdown` 停止全部会话终端、关闭其余终端，并等每棵树的挂断、宽限与 kill 都结束才返回（之前只等 shell 退出，忽略挂断的进程会活过 Core）。
+- 测试夹具不要在 `for` 头部的表达式里拿 `entries` 的锁：守卫活到循环结束，循环体里再取同一把锁就自锁（T33 实测卡死）。
 
 ## 数据目录与状态（T13）
 

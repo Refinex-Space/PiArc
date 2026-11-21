@@ -1,4 +1,4 @@
-//! Saved terminals (`sessions/<sessionId>/terminals/<terminalId>.snap`, ADR-0017 rule 6): what
+//! Saved terminals (`sessions/<sessionId>/terminals/<taskId>.snap`, ADR-0017 rule 6): what
 //! a terminal showed, so it can be shown again after PiArc restarts.
 //!
 //! A file holds the same screen three ways, because libghostty-vt's snapshot format is outside

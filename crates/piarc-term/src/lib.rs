@@ -4,6 +4,10 @@
 //!
 //! - Terminal sessions: PTY (`portable-pty`) plus libghostty-vt terminal state, and screen
 //!   snapshots (ADR-0017).
+//! - What a terminal tells (T33): effects (query replies, title, working directory, bell,
+//!   clipboard), OSC 133 command boundaries, plain text of any range and search, saving and
+//!   restoring a terminal, input encoding (keys, mouse, paste, focus), and the shell
+//!   integration scripts for zsh, bash and PowerShell.
 //!
 //! # Not responsible for
 //!

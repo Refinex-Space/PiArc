@@ -90,6 +90,7 @@ CI（`.github/workflows/ci.yml`）在 `macos-latest`（arm64）与 `windows-late
 - 契约清单是 `piarc-protocol` 的 `CONTRACTS`，导出为 `packages/protocol/schema/contracts.json`。每个方法消息（请求、成功响应、通知）与每个顶层消息类型（`jsonrpc/*`、`envelope/*`）各是一个契约，`schema` 字段指向 `ahp.schema.json` 中 `$defs` 下的定义。
 - 契约名就是样本目录：`host/hello` 的样本放在 `tests/contracts/host/hello/`。目录下每个 `*.json` 是一个完整的合法消息，`invalid/` 下的 `*.json` 是反例。反例覆盖三类：缺必填字段、枚举值非法、类型错误；结构上的约束（例如响应中 `result` 与 `error` 同时出现）也写成反例。
 - `tests/contracts/framing/` 不是契约，是帧编解码器 Rust 与 TS 两份实现共用的字节级用例（`decode.json`、`encode.json`）。
+- `tests/contracts/term-frame/` 也不按契约目录检查：`samples.json` 是终端帧（第 2 版）的二进制与解码后 JSON 的成对样本，`invalid.json` 是畸形帧与两边解码器给出的原因；由 `crates/piarc-protocol/tests/term_frame.rs` 生成（`PIARC_UPDATE_TERM_FRAME_SAMPLES=1`），平时只检查一致（T33）。
 - 样本文件经 Prettier 格式化；字符串中的 U+2028、U+2029 写成 `\u2028`、`\u2029` 转义，便于阅读。
 
 ### 7.2 检查
@@ -99,6 +100,7 @@ CI（`.github/workflows/ci.yml`）在 `macos-latest`（arm64）与 `windows-late
 | Rust 往返 | `crates/piarc-protocol/tests/contracts.rs` | 合法样本反序列化为契约的 Rust 类型再序列化，按 JSON 语义与原样本相等；反例反序列化失败 |
 | TS 校验与往返 | `packages/protocol/src/contracts.test.ts` | ajv（draft 2020-12，strict）按导出的 schema 校验：合法样本通过并经 `JSON.parse` → `JSON.stringify` 往返不变，反例失败 |
 | 帧编解码 | `crates/piarc-protocol/tests/framing.rs`、`packages/protocol/src/framing.test.ts` | 两份实现跑同一份 `tests/contracts/framing/` 用例 |
+| 终端帧 | `crates/piarc-protocol/tests/term_frame.rs`、`packages/protocol/src/contracts.test.ts`（`TermFrame` schema）、`apps/desktop/src/renderer/terminal/frame/decoder.test.ts` | Rust 与 TS 解码器对 `tests/contracts/term-frame/` 的每个样本给出相同的 JSON，JSON 符合 `TermFrame` schema；畸形帧两边都拒绝 |
 | 漂移 | `scripts/ci/check-protocol-drift.mjs`（verify 第 9 步） | 在临时目录重新生成，与仓库中的 schema 与生成类型逐字节比较，列出变化、缺失与多余的文件 |
 | 样本完整性 | `scripts/ci/check-contract-samples.mjs`（verify 第 10 步） | `contracts.json` 中每个契约至少有一个合法样本和一个反例；不属于任何契约的样本目录也报错 |
 
