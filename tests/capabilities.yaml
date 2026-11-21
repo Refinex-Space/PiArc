@@ -434,11 +434,11 @@ capabilities:
     task: T29
     status: active
   - id: CAP-TOOL-WEBSEARCH-001
-    title: 'WebSearch 可配置后端'
+    title: 'WebSearch 可配置后端：服务商原生搜索优先、其次第三方搜索 API（key 只在保险箱），结果带来源，经同一权限裁决与 hooks，无可用后端时不提供'
     milestone: M3
     refs: [FR-TL-03, ARCH-6.1.4]
     task: T38
-    status: planned
+    status: active
   - id: CAP-BG-COMMAND-001
     title: 'run_in_background 启动的命令立即返回任务 id 与输出文件，模型用 Read 读取输出'
     milestone: M3
@@ -752,17 +752,17 @@ capabilities:
     task: T25
     status: active
   - id: CAP-HOOK-SUBAGENT-001
-    title: 'SubagentStart、SubagentStop 与 PostToolBatch hooks'
+    title: 'SubagentStart、SubagentStop 与 PostToolBatch hooks；子 agent 内的 hooks 输入带 agent_id、agent_type'
     milestone: M3
     refs: [FR-HN-05, ARCH-6.3.2]
     task: T38
-    status: planned
+    status: active
   - id: CAP-HOOK-HANDLER-001
-    title: 'http 与 prompt 类型的 hook handler'
+    title: 'http 与 prompt 类型的 hook handler（prompt 经辅助模型单轮判定）'
     milestone: M3
     refs: [FR-HN-05, ARCH-6.3.2]
     task: T38
-    status: planned
+    status: active
   - id: CAP-HOOK-M4-001
     title: 'UserPromptExpansion、InstructionsLoaded、CwdChanged、FileChanged、ConfigChange、StopFailure hooks 与 mcp_tool handler'
     milestone: M4

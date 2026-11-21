@@ -1,0 +1,40 @@
+id: websearch-rules
+description: A `WebSearch` allow rule lets the first search run without asking; a PreToolUse hook refuses the second with its reason, and the provider's search runs only for the allowed call (T38).
+capabilities: [CAP-TOOL-WEBSEARCH-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .claude/settings.json: '{"permissions": {"allow": ["WebSearch"]}, "hooks": {"PreToolUse": [{"matcher": "WebSearch", "hooks": [{"type": "command", "command": "node hook.mjs search"}]}]}}'
+    hook-plans/search.json: '{"sequence": [{}, {"json": {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Search only the docs site."}}}]}'
+  run_files:
+    data 数据/settings.json: '{"modelProviders":{"models":{"mock-main/mock-model":{"nativeWebSearch":true}}}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: first, name: WebSearch, input: { query: pi agent } }]
+      - text: Found one.
+        web_search:
+          query: pi agent
+          results: [{ title: Pi, url: 'https://pi.example/' }]
+      - tool_calls: [{ id: second, name: WebSearch, input: { query: pi agent news } }]
+      - text: Done.
+actions:
+  - prompt: { text: Look up Pi., turn: one }
+expect:
+  request_counts: { main: 4 }
+  requests:
+    - index: 1
+      tools: [web_search]
+    - index: 2
+      tool_results: [{ id: first, is_error: false, contains: 'https://pi.example/' }]
+    - index: 3
+      tool_results:
+        - { id: first }
+        - { id: second, is_error: true, contains: Search only the docs site. }
+  json_lines:
+    hook-log/search.jsonl:
+      - input: { tool_name: WebSearch, tool_input: { query: pi agent } }
+      - input: { tool_name: WebSearch, tool_input: { query: pi agent news } }

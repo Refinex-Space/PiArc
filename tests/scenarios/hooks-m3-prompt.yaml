@@ -1,0 +1,35 @@
+id: hooks-m3-prompt
+description: A Stop prompt hook asks the session's model through the auxiliary channel with the hook input in place of $ARGUMENTS; ok false continues the turn with the reason for the model, ok true lets it end (T38).
+capabilities: [CAP-HOOK-HANDLER-001]
+workspace:
+  trusted: true
+  files:
+    .claude/settings.json: '{"hooks": {"Stop": [{"hooks": [{"type": "prompt", "prompt": "Does the answer mention the tests? $ARGUMENTS"}]}]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: Done.
+      - text: '{"ok": false, "reason": "Mention whether the tests pass."}'
+        usage: { input_tokens: 200, output_tokens: 12 }
+      - text: Done, and the tests pass.
+      - text: '{"ok": true}'
+actions:
+  - prompt: { text: Finish up., turn: one }
+expect:
+  request_counts: { main: 4 }
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }
+  requests:
+    - index: 1
+      tools: []
+      contains:
+        - 'Does the answer mention the tests? {'
+        - '\"hook_event_name\":\"Stop\"'
+        - '\"last_assistant_message\":\"Done.\"'
+        - Answer with one JSON object and nothing else
+    - index: 2
+      contains: [Mention whether the tests pass.]
+    - index: 3
+      tools: []
+      contains: ['\"stop_hook_active\":true', 'Done, and the tests pass.']

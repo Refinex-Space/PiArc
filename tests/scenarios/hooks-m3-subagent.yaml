@@ -1,0 +1,70 @@
+id: hooks-m3-subagent
+description: SubagentStart hooks match the agent type and their context reaches the subagent's first request; SubagentStop blocks once and the subagent continues with the reason; hooks fired inside the subagent - settings and definition hooks alike - carry agent_id and agent_type, with the main session's session_id (T38).
+capabilities: [CAP-HOOK-SUBAGENT-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    notes.txt: "first\n"
+    .claude/agents/guarded.md: "---\nname: guarded\ndescription: Guarded.\nmodel: mock-child/mock-model\nhooks:\n  PreToolUse:\n    - matcher: Read\n      hooks:\n        - type: command\n          command: node hook.mjs def\n---\nRead what you are asked to.\n"
+    .claude/settings.json: |
+      {"hooks": {
+        "SubagentStart": [
+          {"matcher": "guarded", "hooks": [{"type": "command", "command": "node hook.mjs start"}]},
+          {"matcher": "Explore", "hooks": [{"type": "command", "command": "node hook.mjs other"}]}
+        ],
+        "SubagentStop": [{"matcher": "guarded", "hooks": [{"type": "command", "command": "node hook.mjs stop"}]}],
+        "PreToolUse": [{"matcher": "Read", "hooks": [{"type": "command", "command": "node hook.mjs pre"}]}],
+        "PostToolUse": [{"matcher": "Read", "hooks": [{"type": "command", "command": "node hook.mjs post"}]}]
+      }}
+    hook-plans/start.json: '{"json": {"hookSpecificOutput": {"hookEventName": "SubagentStart", "additionalContext": "Use the fixtures directory."}}}'
+    hook-plans/stop.json: '{"sequence": [{"json": {"decision": "block", "reason": "Also list the tests."}}, {}]}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [{ id: agent-1, name: Agent, input: { description: Read notes, prompt: Read notes.txt., subagent_type: guarded } }]
+      - text: Done.
+  child:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: c1, name: Read, input: { path: notes.txt } }]
+      - text: Found it.
+      - text: The tests are listed too.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Ask the subagent., turn: one }
+expect:
+  request_counts: { main: 2, child: 3 }
+  requests:
+    - provider: child
+      index: 0
+      contains: [Use the fixtures directory.]
+    - provider: child
+      index: 2
+      contains: [Also list the tests.]
+    - provider: main
+      index: 1
+      tool_results: [{ id: agent-1, is_error: false, contains: The tests are listed too. }]
+  json_lines:
+    hook-log/start.jsonl:
+      - types: { session_id: string, agent_id: string, transcript_path: string, cwd: string }
+        input: { hook_event_name: SubagentStart, agent_type: guarded }
+    hook-log/other.jsonl: []
+    hook-log/pre.jsonl:
+      - types: { agent_id: string, session_id: string }
+        input: { hook_event_name: PreToolUse, tool_name: Read, agent_type: guarded }
+    hook-log/def.jsonl:
+      - types: { agent_id: string }
+        input: { hook_event_name: PreToolUse, tool_name: Read, agent_type: guarded }
+    hook-log/post.jsonl:
+      - types: { agent_id: string }
+        input: { hook_event_name: PostToolUse, tool_name: Read, agent_type: guarded }
+    hook-log/stop.jsonl:
+      - types: { agent_id: string, agent_transcript_path: string }
+        input:
+          { hook_event_name: SubagentStop, agent_type: guarded, stop_hook_active: false, last_assistant_message: Found it. }
+      - input: { hook_event_name: SubagentStop, stop_hook_active: true, last_assistant_message: The tests are listed too. }
