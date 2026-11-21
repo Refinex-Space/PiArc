@@ -531,6 +531,46 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    /// R3's check for W2: on Windows the link is a junction (no privilege needed), seen as a
+    /// reparse point and resolved through `canonicalize`.
+    #[cfg(windows)]
+    #[test]
+    fn a_project_settings_junction_into_claude_code_config_is_refused() {
+        let dir =
+            std::env::temp_dir().join(format!("piarc-config-junction 中文 {}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let claude = dir.join("home").join(".claude");
+        let workspace = dir.join("ws");
+        fs::create_dir_all(&claude).expect("claude dir");
+        fs::create_dir_all(&workspace).expect("workspace");
+        fs::write(claude.join("settings.json"), b"{\"model\": \"kept\"}\r\n").expect("file");
+        let out = std::process::Command::new("cmd")
+            .args(["/d", "/c", "mklink", "/J"])
+            .arg(workspace.join(".piarc"))
+            .arg(&claude)
+            .output()
+            .expect("cmd runs");
+        assert!(out.status.success(), "mklink /J: {out:?}");
+        let table = LayerTable::piarc(&dir.join("data"), &workspace);
+        for layer in [ids::PROJECT, ids::PROJECT_LOCAL] {
+            let error = write_value(&table, layer, "/model", Some(json!("x"))).unwrap_err();
+            assert!(
+                matches!(
+                    error,
+                    WriteError::ClaudeConfig { .. } | WriteError::InvalidUpdate(_)
+                ),
+                "{layer}: {error}"
+            );
+        }
+        assert_eq!(
+            fs::read(claude.join("settings.json")).expect("file"),
+            b"{\"model\": \"kept\"}\r\n"
+        );
+        assert!(!claude.join("settings.local.json").exists());
+        fs::remove_dir(workspace.join(".piarc")).expect("remove the junction");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn pointers_create_and_remove_nested_keys() {
         let mut doc = json!({ "permissions": { "allow": ["Read"] }, "model": "x" });
