@@ -30,9 +30,17 @@
 ## 子 agent 定义（`src/agents.rs`，T31，ADR-0048）
 
 - `load(AgentDirs { cwd, data, home })` 按来源顺序（cwd 向上各级的 `.piarc/agents/`，再各级的 `.claude/agents/`，越近越优先、跳过家目录；PiArc 用户 `agents/`；`~/.claude/agents/`）读全部 `*.md`，以 `name` 字段而不是文件名识别类型，同名取第一份整条定义，后面的路径记进 `overrides`。插件来源留给 T40。
-- `parse` 用 `serde_saphyr` 解析 frontmatter，问题作为 `AgentIssue`（路径、行号、原因）返回，文件不进列表；单个文件上限 `MAX_DEFINITION_BYTES`（256 KiB）。不认识的字段是 `ignoredField`，`isolation` 校验为 `worktree`（T35 起生效），`skills` 校验后标 `inactiveField`（T37），`mcpServers` 自 T36 生效：名称引用原样返回，内联定义作为 `Definition.mcp_inline` 交给 Core 检查与展开（`servers()` 返回两者），项目级的 `bypassPermissions`、`auto` 改为 `default` 并标 `projectModeIgnored`，`auto`、`dontAsk` 标 `unsupportedMode`。`tools`、`disallowedTools` 的 `Tool(specifier)` 只保留工具名。
+- `parse` 用 `serde_saphyr` 解析 frontmatter，问题作为 `AgentIssue`（路径、行号、原因）返回，文件不进列表；单个文件上限 `MAX_DEFINITION_BYTES`（256 KiB）。不认识的字段是 `ignoredField`，`isolation` 校验为 `worktree`（T35 起生效），`skills`（预加载 skill）校验后标 `inactiveField`（T48，T37 未接手），`mcpServers` 自 T36 生效：名称引用原样返回，内联定义作为 `Definition.mcp_inline` 交给 Core 检查与展开（`servers()` 返回两者），项目级的 `bypassPermissions`、`auto` 改为 `default` 并标 `projectModeIgnored`，`auto`、`dontAsk` 标 `unsupportedMode`。`tools`、`disallowedTools` 的 `Tool(specifier)` 只保留工具名。
 - 定义里的 `hooks` 是可执行项：项目级定义的 hooks 计入 `executables::enumerate`（新增即让项目回到未确认，ADR-0029），由 Core 在信任时作为限定作用域的来源登记。
 - 设置键：`modelAliases`（别名 → `provider/model`，对象逐键合并）、`subagents.maxDepth`、`subagents.maxConcurrent`（PiArc 自己的键）；Claude Code 的 `model`、`effortLevel` 生效（新会话的默认模型与 effort，`model` 可为别名，Core 的 `tool_io::context::session_defaults` 解析），`advisorModel` 忽略（Anthropic 服务端的 advisor 工具），`agent` 为 `planned(T48)`。
+
+## Skills、命令文件与输出风格（`src/skills.rs`，T37，ADR-0054）
+
+- `load(ResourceDirs { cwd, data, home })` 按来源顺序（项目优先于用户；同级 `.piarc` > `.claude` > Pi 的目录；项目目录从 cwd 向上，越近越优先、跳过家目录）读 skills（含 `SKILL.md` 的目录，递归到第一个 `SKILL.md` 为止，跳过隐藏项与 `node_modules`；Pi 的两个 skills 目录另认根目录下带 `description` 的 `*.md`）、命令文件（`commands/**/*.md`，名称为相对路径换 `:`；Pi 模板取文件名）与输出风格，每类同名取第一份，后面的路径记进 `overrides`。单个文件上限 `MAX_FILE_BYTES`（256 KiB），名称为 1–64 个字母、数字、`-`、`_`、`.`、`:`（`valid_name`），不合规的是 `ResourceIssue`。
+- frontmatter 用 `crate::frontmatter`（与子 agent 定义共用的 `split`、`mapping`、`line_of`）。YAML 无效时与 Claude Code 一样仍加载、所有字段视为未设置并给 `invalidFrontmatter` 警告；类型错的字段单独 `invalidField`。`context`、`agent`、`background`、`model`、`effort` 为 `unsupportedField`（T48），其余未用字段 `ignoredField`；正文含 `` !`命令` `` 或 ```` ```! ```` 时 `dynamicCommand`（`has_dynamic_command`），正文原样保留。`allowed-tools` 接受列表或以逗号、括号外空白分隔的字符串（`split_tools`）。
+- 参数替换只用 `skills::args`（`split` 按 shell 规则切分，`substitute` 的规则见模块文档与 ADR-0054 第 5 条）；`variables` 给 `${CLAUDE_SKILL_DIR}`、`${CLAUDE_SESSION_ID}`、`${CLAUDE_PROJECT_DIR}`。合并后的命令列表只用 `commands(&catalog)`（`BUILT_IN_COMMANDS` 在前，其后按 `rank` 的来源顺序，同来源 skill 先于命令文件），输出风格只用 `styles` 与 `current_style`（`BUILT_IN_STYLES` 在前，同名的自定义风格被内置覆盖）；`skillOverrides` 经 `apply_visibility`。
+- 可执行项：`executables::enumerate` 的 `skill_items` 列出工作区根之内项目来源的 skill 与命令文件的 `allowed-tools`（每条一项，名称 `<名称>: <规则>`）与 `hooks`（与设置文件同样的 hook 条目名）。设置键 `outputStyle`、`skillOverrides` 生效（`claude::SETTINGS_KEYS` 与 `schema::PIARC_SETTINGS`），`disableBundledSkills`、`disableSkillShellExecution` 忽略。
+- `watch_dirs` 给出 Core 要监听的目录（各来源目录与其下三层子目录）；读取不需要信任，信任只影响 Core 是否施加 `allowed-tools` 与 hooks。
 
 ## MCP 配置（`src/mcp.rs`，T36，ADR-0053）
 

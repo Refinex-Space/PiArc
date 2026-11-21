@@ -366,6 +366,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | `sign_in` | `behavior`（`approve`/`deny`/`expire`）、`cancel`、`outcome`（`succeeded`/`failed`/`cancelled`）、`message` | 经 Core 登录测试服务商（T29，需要顶层 `oauth`）：运行器代替浏览器跟随授权页的重定向到 Agent Host 的回环端口，或在第一步取消；断言 `core/login` 的结束状态与消息，以及之后是否已登录 |
 | `sign_out` | — | 退出测试服务商的登录并确认凭据已删除 |
 | `mcp_sign_in` | `server`、`outcome`（`succeeded`/`failed`/`cancelled`） | 经 Core 的 `mcp_login` 登录 `mcp_http` 中带 OAuth 的 server（T36）：运行器代替浏览器跟随授权页，按 `core/login` 的结束状态比对 |
+| `set_output_style` | `name`（可省略） | 经 Core 的 `set_output_style` 设置工作区的输出风格（写 `.piarc/settings.local.json`，省略即删除该键），运行中的 Agent Host 随即重新取 skills 与风格（T37） |
 | `advance_clock` | `seconds` | 推进任务管理器的时钟（T32）：前台命令的超时转后台、Monitor 的超时与唤醒都按它计时，场景不靠真实等待 |
 | `stop_task` | `kind`（可选） | 停止该会话（主会话）最新的运行中后台任务，同面板的停止按钮（T32） |
 | `open_terminal` | — | 为用户在该会话打开一个终端（Core 的 `open_session_terminal`，同终端面板），不共享（T34） |

@@ -57,6 +57,13 @@
 - 设置的默认模型与 effort（`model`、`effortLevel`，I113）由 `context.rs` 的 `session_defaults` 给新会话，`model` 的别名经 `ModelAlias::target` 用合并表解析。
 - 单测：`cargo test -p piarc-core --lib tool_io::policy::tests::t31`（审批来源与会话规则、模式收紧、中断、定义列表、定义 hooks、参数规则）与 `--lib tool_io::checkpoints`（子 agent 写入归属）。
 
+## Skills、斜杠命令与输出风格（T37，ADR-0054）
+
+- `tool_io/skills.rs`：`resource_catalog`（`piarc_config::skills::load` 在阻塞线程池上，加 `skillOverrides`、`Skill`/`Skill(名称)` deny 与未信任项目的警告）、`skills_view`（合并命令、风格与当前风格）、`skills_request` 应答 `skills/list`（带会话 id 时把该会话可见 skill 的目录记进 `SessionIo.skill_dirs`，`policy::prepare` 把它们作为只读目录交给 Read、Glob、Grep 的裁决）、`skills/invoke`（`policy::claim_skill` 消费同一 `Skill` 调用的授权，`disable-model-invocation` 的拒绝，替换参数，`activate`）、`skills/match`（会话碰过的文件经 `scope.locate` 规范化后相对文件根用 `rules::PathMatcher` 匹配）。设置与信任取 `SessionIo.project()`，发现从 `scope.cwd()` 起。
+- `activate`：项目来源且项目未受信任时只回 `untrusted` 警告；否则把 `allowed-tools`（替换变量后）经 `State::grant_turn_rules` 登记在调用所在会话，并经 `HooksService::scope_skill_hooks` 以层 `skill` 登记 hooks（同一 skill 一次，会话关闭时 `close_session` 撤下）。
+- `expand_command(session, text)`：`/名称 参数` 是命令文件或可由用户调用的 skill 时返回展开后的正文、`PromptCommand` 与回合授权的 id；内置命令、MCP prompts 与不认识的名字返回 `None`。`user_prompt_expansion` 是 T41 的 UserPromptExpansion 挂载点（T37 原样返回）。调用方是会话层的 `Request::run`（`sessions/session.rs`）：先展开、再以原文跑 UserPromptSubmit；被 hook 阻断、请求失败或答 `queued` 时 `revoke_turn_grant`。
+- 单测：`cargo test -p piarc-core --lib tool_io::policy::tests::t37`（回合级免审批、deny 与 ask 优先、下一回合恢复询问、未信任项目、skill hooks、skill 目录只读放行、deny 与 user-only、`paths` 匹配）。
+
 ## 后台任务的裁决（T32）
 
 - Monitor 走 `assess::bash_call`，`BashFacts.tool` 为 `Monitor`（`piarc-policy` 用它查规则：`Bash(…)` 覆盖 Monitor，`Monitor(…)` 只管 Monitor），之后去掉只读白名单与 Accept edits 的放行（`allow` 为空时 `allowed = false`）。KillShell 在 `other_call` 里与宿主工具一样是只读。

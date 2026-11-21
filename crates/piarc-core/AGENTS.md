@@ -85,6 +85,11 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 状态与操作经 `Hub::{mcp_status, mcp_reconnect, mcp_set_enabled, mcp_login}`（`sessions/mcp.rs`，NAPI `mcpStatus` 等）：工作区有运行中的 Agent Host 时转给它，没有时 `status_from_config` 按配置回答（可运行的为 `idle`）。Agent Host 的 `mcp/statusChanged` 以 `HostEvent::HostNotification` 到达工作区 actor，加上 `workspace` 发到路由 `core/mcp`（`MCP_ROUTE`）。MCP 登录沿用 T29 的登录记录与 `core/login`，provider 为 `mcp:<server>`。
 - `policy/evaluate` 的 `requiresUserInteraction` 经 `tool_io::policy` 的 `requires_user_interaction` 成为必须询问的一步并清空可保存的规则；`ToolSearch` 在只读宿主工具里。配置诊断报告的 `mcp` 由 `diagnostics()` 给出（不展开变量）。打包产物的探针（`host_probe`）只用 `<数据目录>/settings.json` 的 `mcpServers` 回答（`settings_file_servers`）。
 
+## Skills 与输出风格（T37，ADR-0054）
+
+- 设置监听（`workspace_settings.rs`）同时监听 skills、命令与输出风格的目录（`piarc_config::skills::watch_dirs`，只取工作区、数据目录与家目录之下的），每次重载与信任变化推进 `WorkspaceSettings::changes`；工作区 actor 启动时开 `reload_resources` 任务，Agent Host 运行时发 `resources/reload`（不启动它）。
+- `sessions/skills.rs` 是 `Hub` 的 `list_commands`、`list_skills`（有运行中的 Agent Host 时问 `resources/listCommands`、`resources/listSkills`，否则 Core 按文件回答）与 `set_output_style`（工作区写 `.piarc/settings.local.json` 并立即对运行中的 Agent Host 发 `resources/reload`，不带工作区写用户级 `settings.json`）；NAPI `listCommands`、`listSkills`、`setOutputStyle`。内置命令只在 `piarc_config::skills::BUILT_IN_COMMANDS` 定义，`composer::info` 不再带命令列表。
+
 ## 子目录说明
 
 - `src/tool_io/AGENTS.md`：委托的工具 I/O、工具预检、memory 与 rules、上下文工程、检查点与回退、WebFetch、hooks（T16–T30）。

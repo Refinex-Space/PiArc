@@ -329,7 +329,7 @@ T37（Skills、斜杠命令、命令面板与输出风格）开工于 2026-11-21
 | 编号 | 发现于 | 内容 | 建议处理 |
 |---|---|---|---|
 | I01 | 制定计划 | Claude Code 当前默认使用 TaskCreate / TaskUpdate 等任务工具，TodoWrite 已是旧版（`claude-official-capabilities.md`）。PiArc 的规范名仍是 TodoWrite，权限规则与 L3 比对会出现差异 | T26 评估是否增加兼容映射；T30 先把差异写入 L3 allowlist；**T26 评估：不加映射**。PiArc 的清单工具只有 `TodoWrite`（规范名，参数与 Claude Code 一致），`TaskCreate`/`TaskUpdate` 是拆成多次调用的另一种接口，模型可见名之间映射会让规则与 hooks 的 matcher 对不上；写 `TaskCreate(…)` 规则或 matcher 的用户需要改写为 `TodoWrite`，T30 仍把差异写入 L3 allowlist；**已落地（T30）**：`tests/l3-allowlist.yaml` 的 `requests.items[*].tools.TodoWrite` 条目 |
-| I02 | 制定计划 | FR-MD-05 要求 skills 能引用模型别名，但架构第 6.7 节的 skill frontmatter 没有 `model` 字段 | T37 评估：支持则补架构与实现，不支持则改需求描述 |
+| I02 | 制定计划 | FR-MD-05 要求 skills 能引用模型别名，但架构第 6.7 节的 skill frontmatter 没有 `model` 字段 | T37 评估：支持则补架构与实现，不支持则改需求描述；**T37**：任务范围把 skill 的 `model`、`effort` 定为解析后标暂不支持（Claude Code 中它们只在本回合或 `context: fork` 的子 agent 里生效），诊断标 T48；建议 T48 随 `context: fork` 一起实现（模型说明经 `resolveModel`，别名可用），届时 FR-MD-05 的 skills 部分落地，需求描述不改 |
 | I03 | 制定计划 | Monitor 在会话空闲时唤醒会话（按 Claude Code 官方行为）会自动产生模型费用 | T32 实现时提供开关与限速，R4 请用户确认默认值；**已落地（T32）**：设置 `monitor.wakeIdleSession`（合并层，默认 true，关掉时新行只排队、不唤醒）与唤醒间隔 30 s（`piarc_core::tasks::TaskLimits::monitor_wake_interval`），单批与总量限速同在 `TaskLimits`；R4 请用户确认默认值 |
 | I04 | 制定计划 | macOS App Intents 在 ad-hoc 签名下能否工作，M0 没有验证（需要 Xcode 生成的元数据随包分发） | T49 先做可行性原型；不可行时写 ADR 提议。若想提前知道结论，可在 R1 时追加一次快速验证；R1 决定：不在 R1 追加验证，T49 先做可行性原型（不影响 M1） |
 | I05 | 制定计划 | 架构第 6.10 节说 MCP server 在沙箱外，但 stdio MCP server 由 Agent Host 启动，会继承 Agent Host 的 Seatbelt 写入限制（第 10.3 节） | T39 定稿 Agent Host 配置时澄清并更新架构；放宽写入范围属于变更型；**T36**：stdio MCP server 由 PiArc 自写的传输启动、留在 Agent Host 的进程组（为了不留孤儿进程，ADR-0053 第 8 条），所以仍继承 Agent Host 的 Seatbelt；npm 缓存与临时目录指向数据目录，registry 包可用，问题留给 T39 |
@@ -485,6 +485,10 @@ T37（Skills、斜杠命令、命令面板与输出风格）开工于 2026-11-21
 | I155 | T36 | MCP 资源（`resources/list`、`resources/read`）没有暴露给模型（Claude Code 有列出与读取资源的工具）；prompts 作为斜杠命令同样未做（架构第 6.8 节缺口） | T40 与 MCP prompts 斜杠命令一起评估：经池取连接（`coding-standards.md` 复用表的 MCP 连接池） |
 | I156 | T36 | `headersHelper`（运行命令生成 HTTP 请求头）不执行，只报为配置问题；需要它的 server 要改成静态 `headers` 或 OAuth | T47 评估（企业托管配置常用；它是可执行项，要走信任与审计） |
 | I157 | T36 | MCP 的 OAuth 状态按 server 名存在保险箱键 `mcp/<server>`：两个工作区各有一个同名而地址不同的 server 时，pi-mcp 只用地址相同的状态，登录一个会覆盖另一个的 token（需要重新登录） | 后续按 server 地址区分键（如 `mcp/<server>/<地址摘要>`），迁移旧键；T47 前复核 |
+| I158 | T37 | 暂不支持的 skill frontmatter 字段：`context: fork`、`agent`、`background`（在子 agent 中运行 skill）与 `model`、`effort`，诊断标 T48；`disallowed-tools`、`shell` 与 `metadata`、`license`、`compatibility` 等标忽略；输出风格的 `force-for-plugin` 标 T40 | T48（`context: fork` 一组与 `model`、`effort`）、T40（插件风格） |
+| I159 | T37 | 子 agent 定义的 `skills`（启动时预加载 skill 正文）仍未生效，警告的接手任务由 T37 改为 T48 | T48 与 `context: fork` 一起实现（经 Core 读取正文，不走 `Skill` 调用的授权） |
+| I160 | T37 | Pi 自带的 skills 与 prompt templates 加载已关掉（ADR-0054），Pi 设置里 `skills`、`prompts` 列出的额外路径与 Pi 包携带的 skills、模板不再生效；项目根以下子目录的 `.claude/skills`（Claude Code 的嵌套 skill）与 `--add-dir` 目录的 skills 也不加载 | T40（Pi 包与插件）一并接入；嵌套 skill 由 T48 评估 |
+| I161 | T37 | 与 Claude Code 的有意差异：同名 skill 项目级优先于个人级（Claude Code 相反，PiArc 与设置层、子 agent 定义一致）；位置参数 `$1` 起（Claude Code 当前文档 `$0` 起，`$ARGUMENTS[N]` 两者一致）；经排队的 follow-up 发出的命令不带 `allowed-tools` 的回合授权（它开始的回合照常询问）；`skillListingBudgetFraction`、`skillListingMaxDescChars` 未实现（索引描述固定截断到 1,536 字符） | R4 请用户确认这几处差异；有 L3 场景涉及时写入 `tests/l3-allowlist.yaml` |
 ## 技术债
 
 评审任务（R1–R6）汇总的技术债，按影响排序。每条的细节、负责任务与检查时间点在对应的登记事项中。

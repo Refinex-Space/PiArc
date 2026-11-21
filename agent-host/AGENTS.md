@@ -81,6 +81,14 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - OAuth 状态在保险箱键 `mcp/<server>`；刷新前取 `secrets/lock`，失效的锁写入得到 `secretLockLost`。pi-mcp 只使用 `serverUrl` 相同的状态。
 - 子 agent 的内联 server 经 `pool.addTemporary(子会话 id, defs)` 加入（键为 `owner\0name`），子会话结束即关闭；`tool-filter.ts` 的 `WithInlineServers` 让它们的 `mcp__<server>__…` 通过过滤。
 
+## Skills、命令与输出风格（T37，ADR-0054）
+
+- 发现在 Core（`piarc_config::skills`）：项目优先于用户，同级 `.piarc` > `.claude` > Pi 的目录（`.pi/skills`、`.agents/skills`、`<数据目录>/pi/skills`、`~/.agents/skills`；命令另有 `.pi/prompts`、`<数据目录>/pi/prompts`），项目目录从 cwd 向上。Agent Host 只经 `skills/list`（带会话 id）取结果：会话运行时传 `noSkills: true`、`noPromptTemplates: true`，Pi 不加载、不列出、不展开 `/skill:` 与模板。不要在 Agent Host 读 skill 或命令文件，也不要改回 Pi 的资源加载器（`allowed-tools` 与 hooks 要由 Core 判断）。
+- `harness/skills/session-skills.ts` 的 `SessionSkills`（能力 `skills`，每会话一个，`session-parts.ts` 建）：`catalog()` 缓存 Core 的回答，`resources/reload`（`SessionRegistry.reloadResources`）只让它失效，下一次运行前重新取；`sections()` 在冻结 system prompt 时给出第 3 段（输出风格）与第 5 段（索引，描述截断到 `SKILL_INDEX_DESCRIPTION_CHARS`），并写 `piarc.skillsIndex`、`piarc.outputStyle`；它的扩展在 `before_agent_start` 比对分支上的记录，变化以 `skillsChanged`（键 `skills:index`）、`outputStyle`（键 `style`）提醒送达，在 `tool_result` 对 Read、Write、Edit 的文件经 `skills/match` 激活 `paths` skill（`piarc.skillsActive`，提醒键 `skills:paths`）。扩展排在 `harness.extensions()` 最前（memory 之后、提醒送达之前）。
+- `Skill` 工具（`harness/skills/skill-tool.ts`）只在会话打开时模型有可调用的 skill 才注册（工具集整个会话不变）；执行经 `skills/invoke`（Core 消费同一调用的授权、替换参数、登记回合级 `allowed-tools` 与 skill 的 hooks），正文是工具结果，并写 `piarc.skillInvoked` 供 T27 的重注入；同一正文再次加载只回答已加载。描述与结果文案在 `harness/prompts/skills.ts`，内置输出风格的指令在 `harness/prompts/output-styles.ts`（改后跑原创性检查）。
+- `allowed-tools` 的传递：Agent Host 不传规则。用户的 `/名称` 由 Core 在 UserPromptSubmit 之前展开并直接登记；模型的 `Skill` 调用经 `policy/evaluate`（只读，`Skill(名称)` 规则）后由 `skills/invoke` 登记。`session/prompt`、`session/steer`、`session/followUp` 的 `command` 进 `UserInput.command`：`piarc.input` 记下用户输入的原文与命令（`inputRecord`），`userMessage` 条目显示原文并带 `command`，历史不要求消息以原文开头；skill 的 `/名称` 另写 `piarc.skillInvoked`（`SessionSkills.invokedByUser`）。
+- `resources/listSkills`、`resources/listCommands` 由注册表的 `resources(cwd)` 取 Core 的 `skills/list` 回答；插件与 MCP prompts（T40）在这里并入。
+
 ## 子目录说明
 
 - `src/harness/AGENTS.md`：system prompt 与 memory、权限预检、hooks、宿主工具、上下文工程（提醒、压缩、重注入、熔断、用量）、回合不变量的补齐。

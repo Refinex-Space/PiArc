@@ -43,6 +43,7 @@ Core 的权限裁决（T20 起，T23 完整版）：Claude Code 格式的规则�
 ## 错误与子 agent
 
 - 公开解析函数（`rules::parse`、`paths::parse`）返回 `piarc_policy::Error`（`InvalidRule`、`InvalidPath`；`kind()`、`retryable()`、`to_error_object()`，T31，I128）。新增失败原因加变体，不返回 `String`。
+- 回合级免审批（T37，ADR-0054）：skill 与命令文件的 `allowed-tools` 是 Core 加在规则集里的一个 allow 来源 `skill`（在会话规则之后、设置层之前，`tool_io::policy::assess::rule_set` 的 `turn` 参数），所以只到第 6 步：deny、ask、计划模式、受保护路径与 `requiresUserInteraction` 照常优先。生命周期在 Core 的 `tool_io::policy::State`：`grant_turn_rules` 在调用所在会话（子 agent 是它自己的）登记一组规则并返回 id；回合完成、中断、连接断开（`State::cancel`，与"仅本次允许"的授权同处清理）全部清除；输入被 UserPromptSubmit 阻断、请求失败或作为 follow-up 进入排队时按 id 撤回（`revoke_turn_rules`）。项目来源的规则只在项目受信任时登记，`Bash(${CLAUDE_SKILL_DIR}/…)` 的变量在登记前替换。`Skill` 在阶梯里是 `read_only`，`Skill(名称)` 的 deny 与 ask 照常匹配。
 - 子 agent（T31，ADR-0048）的调用走同一阶梯：Core 的 `tool_io::subagents` 决定生效模式（定义与主会话当前模式中更严的一个）与规则所属会话（主会话：子 agent 卡上的"本会话允许"作用于整棵树），审批卡带 `ApprovalOrigin`（`piarc_protocol::subagent`），审计记子会话与类型。`Agent` 在阶梯里与宿主工具一样是 `read_only`：派出本身不询问，子 agent 的每个调用各自裁决；`Agent(<类型>)` deny 让该类型不能派出，也不出现在工具描述里。
 
 ## Bash 分析（`bash/`）
