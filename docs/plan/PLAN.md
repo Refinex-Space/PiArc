@@ -173,7 +173,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 已完成 | c4e5f75 |
 | T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 已完成 | 10fbeff |
 | T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 部分完成 | 868065b |
-| T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 未开始 | — |
+| T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 进行中 | — |
 | T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 未开始 | — |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,6 +308,15 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+**T43 无障碍与本地化**（开工 2026-11-21；基线 `npm run verify -- --baseline` 通过，复用 868065b 的全量结果；依赖 T42 为"部分完成"，遗留的 A06 通知截图与 A07 Windows CI 不影响本任务；origin 停在 e0c41ce，没有新的 Windows CI 结果可关闭 `blocked` 项）
+
+- [ ] 1 axe 自动化：状态清单入库、Playwright 逐条亮 / 暗检查、修复全部违规、页面注册表与清单的覆盖检查
+- [ ] 2 读屏：transcript 行的可访问名称（i18n）、流式节流播报（常量集中）、审批卡焦点与播报（输入法推迟、400 ms）
+- [ ] 3 键盘与系统偏好：全键盘流程、焦点顺序与焦点环、对话框焦点受限与归还、终端保留全局快捷键；reduced-motion、contrast more、forced-colors
+- [ ] 4 `docs/engineering/accessibility.md`：规则摘要、状态清单维护、读屏核对清单（VoiceOver 一列）
+- [ ] 5 本地化：`scripts/ci/check-i18n.mjs` 并入 verify（键集合、引用、ICU 与占位符、硬编码字符串）、`Intl` 格式化、中英文截图；I186 代码高亮跟随应用主题
+- [ ] 验收 A01–A11；收尾（apps/desktop AGENTS.md、coding-standards 复用表、testing.md）
 
 ## 登记事项
 
