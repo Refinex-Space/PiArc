@@ -1,9 +1,10 @@
 import { SessionManager } from '@earendil-works/pi-coding-agent';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { SUBAGENT_STATE_ENTRY } from '../harness/subagents/definitions.js';
+import { DEFAULT_LIMITS, SUBAGENT_STATE_ENTRY } from '../harness/subagents/definitions.js';
 import type { SessionHarness } from '../harness/session-harness.js';
-import { SubagentRunner } from './subagents.js';
+import { ChildSession } from './subagent-session.js';
+import { SubagentRunner, type ParentSession } from './subagents.js';
 import type { RegistryOptions } from './session-types.js';
 
 /** A background run's `Agent` call and its result, as the parent's file holds them. */
@@ -78,5 +79,85 @@ describe('SubagentRunner.recover', () => {
     // Recorded once: reopening again finds the run ended.
     runner.recover('main', manager, harness);
     expect(reminders).toHaveLength(1);
+  });
+});
+
+describe('SubagentRunner foreground runs', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('stops a run whose parent was interrupted while the child session was opening (R4 S1)', async () => {
+    const answer = (method: string, value: unknown) =>
+      method === 'agents/list'
+        ? { agents: [], issues: [], limits: DEFAULT_LIMITS, deniedBuiltIn: [], aliases: {} }
+        : value;
+    const bridge = {
+      requestTyped: (method: string, _params: unknown, parse: (v: unknown) => unknown) =>
+        Promise.resolve(parse(answer(method, {}))),
+      request: () => Promise.resolve({}),
+    };
+    const options = {
+      log: () => undefined,
+      hostTools: { subagents: true },
+      tools: { kind: 'core', bridge },
+      workspace: {
+        modelRuntime: { getAvailable: () => Promise.resolve([]) },
+        preferences: { defaultEffort: () => undefined },
+      },
+    } as unknown as RegistryOptions;
+    const parent = {
+      sessionId: 'main',
+      cwd: '/w',
+      session: {
+        model: { provider: 'p', id: 'm', api: 'anthropic-messages', reasoning: false },
+        thinkingLevel: 'off',
+        sessionManager: { appendCustomEntry: () => 'entry' },
+      },
+      harness: {},
+      sink: { event: () => undefined, delta: () => undefined, replaceable: () => undefined },
+      tools: () => ['Read'],
+    } as unknown as ParentSession;
+    const runner = new SubagentRunner(options, (id) => (id === 'main' ? parent : undefined));
+    const host = await runner.hostFor('main', '/w');
+    let open: ((child: ChildSession) => void) | undefined;
+    vi.spyOn(ChildSession, 'open').mockReturnValue(
+      new Promise((resolve) => {
+        open = resolve;
+      }),
+    );
+    let asked: boolean | undefined;
+    const child = {
+      warnings: [],
+      cwd: '/w',
+      file: undefined,
+      session: {},
+      harness: {},
+      run: (_task: string, signal: AbortSignal) => {
+        asked = !signal.aborted;
+        return Promise.resolve({
+          status: signal.aborted ? 'interrupted' : 'completed',
+          report: 'done',
+          turns: 1,
+        });
+      },
+      finish: () => Promise.resolve(undefined),
+    } as unknown as ChildSession;
+    const interrupt = new AbortController();
+    const result = host?.run(
+      'agent-1',
+      { description: 'Scout', prompt: 'Look around.', type: 'general-purpose' },
+      interrupt.signal,
+      () => undefined,
+    );
+    await vi.waitFor(() => {
+      expect(open).toBeDefined();
+    });
+    interrupt.abort('interrupted');
+    open?.(child);
+    const outcome = await result;
+    expect(asked).toBe(false);
+    expect(outcome?.isError).toBe(true);
+    expect(outcome?.details.subagent?.status).toBe('interrupted');
   });
 });

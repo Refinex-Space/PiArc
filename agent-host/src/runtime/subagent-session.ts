@@ -380,7 +380,11 @@ export class ChildSession {
       await this.#harness.compaction.prepare();
       // SubagentStart hooks (T38): their context goes with the first request.
       await this.#hooks?.subagentStart();
-      if (await this.#memory.prepare()) await session.prompt(task);
+      const ready = await this.#memory.prepare();
+      // An abort during the preparation finds no run to stop: check again before asking the
+      // model (R4 S2).
+      signal.throwIfAborted();
+      if (ready) await session.prompt(task);
     } catch (failure) {
       if (!signal.aborted && !limit.reached) error = describeError(failure);
     } finally {

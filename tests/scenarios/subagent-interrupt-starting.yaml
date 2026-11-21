@@ -1,0 +1,46 @@
+id: subagent-interrupt-starting
+description: Interrupting the main session while its foreground subagent's SubagentStart hook still runs stops the subagent before it asks its model; the Agent call ends as interrupted and the next request pairs it with an error result (R4).
+capabilities: [CAP-AGENT-INTERRUPT-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .claude/agents/sleeper.md: "---\nname: sleeper\ndescription: Waits.\nmodel: mock-child/mock-model\n---\nWait.\n"
+    .claude/settings.json: '{"hooks": {"SubagentStart": [{"matcher": "sleeper", "hooks": [{"type": "command", "command": "node hook.mjs start 3000"}]}]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: agent-1,
+              name: Agent,
+              input: { description: Wait a while, prompt: Wait., subagent_type: sleeper },
+            },
+          ]
+      - text: Answered after the interruption.
+  child:
+    wire: anthropic
+    steps:
+      - text: The subagent should not have been asked.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Start the sleeper., turn: first }
+  - wait: { method: subagent/started, params: { itemId: agent-1 } }
+  - abort: {}
+  - wait: { method: turn/completed, turn: first }
+  - prompt: { text: Go on., turn: second }
+expect:
+  request_counts: { main: 2, child: 0 }
+  events:
+    - method: subagent/completed
+      params: { itemId: agent-1, subagent: { status: interrupted } }
+    - { method: turn/completed, turn: first, params: { status: interrupted } }
+    - { method: turn/completed, turn: second, params: { status: completed } }
+  requests:
+    - provider: main
+      index: 1
+      tool_results: [{ id: agent-1, is_error: true }]

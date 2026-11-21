@@ -334,6 +334,9 @@ export class SubagentRunner {
       run.controller.abort(relay?.reason);
     };
     relay?.addEventListener('abort', stop, { once: true });
+    // The parent may have been interrupted while the child was opening: no event comes then
+    // (R4 S1).
+    if (relay?.aborted === true) stop();
     const done = this.#execute(run, child, call, definition, progress).finally(() => {
       relay?.removeEventListener('abort', stop);
     });
