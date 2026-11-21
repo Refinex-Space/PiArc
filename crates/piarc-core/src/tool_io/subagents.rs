@@ -495,6 +495,9 @@ impl ToolIo {
         // Without `subagent/finish` first (its connection ended), a background run was
         // interrupted; after it, the task already ended and this changes nothing.
         self.tasks.subagent_ended(id, None);
+        // Its Monitors follow it (R4 S4); its background commands go on, like a closed
+        // session's.
+        self.tasks.session_closed(id);
         self.close_session(id);
         if let Ok(services) = self.services() {
             if let Some(hooks) = &services.hooks {

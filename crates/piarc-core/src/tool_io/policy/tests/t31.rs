@@ -122,6 +122,41 @@ async fn a_subagent_asks_in_its_main_session_and_session_rules_cover_the_tree() 
 }
 
 #[tokio::test]
+async fn finishing_a_subagent_stops_its_monitors() {
+    // R4 S4: a Monitor follows the session that started it; the subagent's ends with it.
+    let f = Fixture::new().await;
+    f.start(CHILD, SESSION, "general-purpose", false).await;
+    let tasks = f.io.tasks();
+    let dir = f.work.join("monitor-tasks");
+    let reserved = tasks.reserve(&dir).expect("reserve");
+    let log = std::sync::Arc::new(std::sync::Mutex::new(
+        piarc_exec::TaskLog::create(&reserved.file).expect("log"),
+    ));
+    let cancel = tokio_util::sync::CancellationToken::new();
+    tasks.register(
+        &reserved,
+        crate::tasks::NewTask {
+            session_id: CHILD.into(),
+            owner_session_id: SESSION.into(),
+            workspace: f.work.display().to_string(),
+            kind: piarc_protocol::tasks::TaskKind::Monitor,
+            title: "watch".into(),
+            command: "tail -f app.log".into(),
+            cwd: f.work.display().to_string(),
+            tool_call_id: Some("m1".into()),
+            output_dir: dir.clone(),
+            timeout: None,
+        },
+        log,
+        cancel.clone(),
+    );
+    assert!(f.io.finish_subagent(CHILD));
+    tokio::time::timeout(Duration::from_secs(10), cancel.cancelled())
+        .await
+        .expect("the subagent's Monitor was stopped");
+}
+
+#[tokio::test]
 async fn the_mode_is_never_looser_than_the_main_sessions() {
     let f = Fixture::new().await;
     f.put(

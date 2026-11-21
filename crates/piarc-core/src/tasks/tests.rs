@@ -224,6 +224,21 @@ async fn a_finished_command_leaves_a_notice_unless_killshell_stopped_it() {
 }
 
 #[tokio::test]
+async fn a_subagents_finished_command_tells_its_main_session() {
+    // R4 S4: a subagent's session has no session actor to deliver to; its task belongs to the
+    // main session (ADR-0049 rule 1), and so does the notice.
+    let f = Fixture::new("subagent notice");
+    let (done, _) = f.start(TaskKind::Command, "child", "main");
+    f.tasks.ended(&done, Ended::default());
+    assert!(
+        f.notice("child").is_none(),
+        "nobody delivers to the subagent"
+    );
+    let notice = f.notice("main").expect("the main session hears of it");
+    assert_eq!(notice.source, done);
+}
+
+#[tokio::test]
 async fn killshell_reaches_the_session_and_its_subagents_only() {
     let f = Fixture::new("owners");
     let (own, cancel) = f.start(TaskKind::Command, "main", "main");

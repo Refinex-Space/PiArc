@@ -491,7 +491,9 @@ impl TaskManager {
             self.monitor_ended(task_id, end);
         }
         if let Some(notice) = notice {
-            self.add_notice(&task.session_id, notice);
+            // A subagent's session has no session actor to deliver to and may have ended: the
+            // task is its main session's (ADR-0049 rule 1), and so is the notice (R4 S4).
+            self.add_notice(&task.owner_session_id, notice);
         }
         self.changed(Some(task));
     }
