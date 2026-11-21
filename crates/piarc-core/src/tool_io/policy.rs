@@ -495,14 +495,7 @@ impl ToolIo {
             stop: stop.map(|reason| piarc_protocol::hooks::HookStop { reason }),
             mode: None,
         };
-        let source = match (&answer, ruling.step) {
-            (Some(a), _) if a.via == Some(piarc_protocol::policy::AnswerVia::Notification) => {
-                "notification"
-            }
-            (Some(_), _) => "user",
-            (None, "hookDeny" | "hookAllow" | "permissionRequestHook") => "hook",
-            _ => "automatic",
-        };
+        let source = audit_source(answer.as_ref(), ruling.step);
         let mut detail = audit_detail(p, mode, &ruling, &prepared.card, result.allowed, source);
         super::subagents::annotate(&mut detail, s);
         let prepared = result.allowed.then_some(prepared);
@@ -734,6 +727,19 @@ impl Prepared {
             );
         }
         Ok(())
+    }
+}
+
+/// Who decided a call, for the audit: the user (on the card or, T42, from a notification), a
+/// hook, or the rules.
+fn audit_source(answer: Option<&ApprovalAnswer>, step: &str) -> &'static str {
+    match (answer, step) {
+        (Some(a), _) if a.via == Some(piarc_protocol::policy::AnswerVia::Notification) => {
+            "notification"
+        }
+        (Some(_), _) => "user",
+        (None, "hookDeny" | "hookAllow" | "permissionRequestHook") => "hook",
+        _ => "automatic",
     }
 }
 
