@@ -190,6 +190,20 @@ pub struct ApprovalRequest {
     /// the user's allowlist; `deny` and no answer within the timeout refuse the connection.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub domain: Option<String>,
+    /// The user may allow this call from a system notification (T42): an ordinary command or
+    /// file change short enough to read there. False for critical deletions, commands outside
+    /// the sandbox, protected paths and anything longer; their notification only opens the card.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub notification_allow: bool,
+}
+
+/// Where an answer was given (T42); absent: on the approval card.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum AnswerVia {
+    /// A system notification's action: `allowOnce` (only on a card with
+    /// `notificationAllow`) or `deny` without feedback.
+    Notification,
 }
 
 /// The tool name of a network-domain card (T39): no tool call asks, the sandbox's proxy does.
@@ -241,6 +255,9 @@ pub struct ApprovalAnswer {
     /// One answer per question of a `question` card, with `allowOnce`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub answers: Vec<crate::harness::QuestionAnswer>,
+    /// Where the user answered (T42); absent on the card.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub via: Option<AnswerVia>,
 }
 
 /// Correlates an approval wait on the current Agent Host connection.

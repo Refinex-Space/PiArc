@@ -25,6 +25,7 @@ pub(super) fn new_request(
         subagent: None,
         sandbox: None,
         domain: None,
+        notification_allow: false,
     })
 }
 

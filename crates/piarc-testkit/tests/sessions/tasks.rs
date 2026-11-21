@@ -90,6 +90,7 @@ async fn approve(core: &piarc_core::CoreRuntime, events: &crate::support::Events
         mode: None,
         comments: Vec::new(),
         answers: Vec::new(),
+        via: None,
     };
     let (done, rx) = reply();
     core.answer_approval(answer, done).expect("queued");

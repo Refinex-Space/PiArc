@@ -44,6 +44,7 @@ fn allow(card: &ApprovalRequest) -> ApprovalAnswer {
         mode: None,
         comments: Vec::new(),
         answers: Vec::new(),
+        via: None,
     }
 }
 

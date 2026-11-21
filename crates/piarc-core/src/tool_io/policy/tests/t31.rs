@@ -43,7 +43,7 @@ impl Fixture {
             .expect("preflight")
     }
 
-    async fn pending_of(&self, session: &str) -> ApprovalRequest {
+    pub(super) async fn pending_of(&self, session: &str) -> ApprovalRequest {
         let s = self.io.session(session).expect("registered");
         tokio::time::timeout(Duration::from_secs(10), async {
             loop {
@@ -57,7 +57,7 @@ impl Fixture {
         .expect("approval arrived")
     }
 
-    fn child_audit(&self, session: &str) -> Vec<Value> {
+    pub(super) fn child_audit(&self, session: &str) -> Vec<Value> {
         self.storage
             .with(|s| s.session_audit_events(session, 100))
             .expect("open")

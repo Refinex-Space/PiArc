@@ -108,6 +108,7 @@ impl Driver<'_> {
                 Choice::Always => Decision::AllowAlways,
                 Choice::Deny | Choice::Wait => Decision::Deny,
             },
+            via: None,
         };
         let result = call(
             |done| self.core.answer_approval(answer, done),

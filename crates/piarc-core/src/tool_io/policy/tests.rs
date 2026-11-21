@@ -202,6 +202,7 @@ fn answer(r: &ApprovalRequest, decision: ApprovalDecision) -> ApprovalAnswer {
         mode: None,
         comments: Vec::new(),
         answers: Vec::new(),
+        via: None,
     }
 }
 
@@ -631,6 +632,7 @@ mod t31;
 mod t36;
 mod t37;
 mod t38;
+mod t42;
 
 /// W1 (architecture 15.2): Windows paths through the whole production path, preflight, grant
 /// and directory-bound I/O. Long paths and reserved names are made here, never committed.

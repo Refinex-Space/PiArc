@@ -163,6 +163,7 @@ mod tests {
             mode: None,
             comments: Vec::new(),
             answers: Vec::new(),
+            via: None,
         }
     }
 
@@ -186,6 +187,7 @@ mod tests {
             subagent: None,
             sandbox: None,
             domain: None,
+            notification_allow: false,
         }
     }
 

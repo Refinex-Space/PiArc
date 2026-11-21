@@ -1043,6 +1043,10 @@ export type CommandPlace = 'sandbox' | 'unsandboxed';
  */
 export type ApprovalDecision = 'allowOnce' | 'allowSession' | 'allowAlways' | 'deny';
 /**
+ * Where an answer was given (T42); absent: on the approval card.
+ */
+export type AnswerVia = 'notification';
+/**
  * Result of answering the approval ledger.
  */
 export type AnswerStatus = 'applied' | 'alreadyHandled' | 'stale';
@@ -8012,6 +8016,12 @@ export interface ApprovalRequest {
    */
   kind: ApprovalKind;
   /**
+   * The user may allow this call from a system notification (T42): an ordinary command or
+   * file change short enough to read there. False for critical deletions, commands outside
+   * the sandbox, protected paths and anything longer; their notification only opens the card.
+   */
+  notificationAllow?: boolean;
+  /**
    * Path of the file being accessed.
    */
   path?: string | null;
@@ -8135,6 +8145,10 @@ export interface ApprovalAnswer {
    * Owning session.
    */
   sessionId: string;
+  /**
+   * Where the user answered (T42); absent on the card.
+   */
+  via?: AnswerVia | null;
 }
 /**
  * The user's answer to one question, in the order of the questions.

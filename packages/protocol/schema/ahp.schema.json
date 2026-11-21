@@ -385,6 +385,16 @@
         }
       ]
     },
+    "AnswerVia": {
+      "description": "Where an answer was given (T42); absent: on the approval card.",
+      "oneOf": [
+        {
+          "const": "notification",
+          "description": "A system notification's action: `allowOnce` (only on a card with\n`notificationAllow`) or `deny` without feedback.",
+          "type": "string"
+        }
+      ]
+    },
     "ApprovalAnswer": {
       "description": "Answer bound to the request as displayed.",
       "properties": {
@@ -455,6 +465,17 @@
         "sessionId": {
           "description": "Owning session.",
           "type": "string"
+        },
+        "via": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnswerVia"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where the user answered (T42); absent on the card."
         }
       },
       "required": ["requestId", "sessionId", "revision", "connectionEpoch", "decision"],
@@ -577,6 +598,10 @@
         "kind": {
           "$ref": "#/$defs/ApprovalKind",
           "description": "Which card to show."
+        },
+        "notificationAllow": {
+          "description": "The user may allow this call from a system notification (T42): an ordinary command or\nfile change short enough to read there. False for critical deletions, commands outside\nthe sandbox, protected paths and anything longer; their notification only opens the card.",
+          "type": "boolean"
         },
         "path": {
           "description": "Path of the file being accessed.",

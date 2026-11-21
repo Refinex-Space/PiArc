@@ -126,6 +126,7 @@ async fn answer_card(
         mode: None,
         comments: Vec::new(),
         answers: Vec::new(),
+        via: None,
     };
     let (done, rx) = reply();
     core.answer_approval(answer, done).expect("queued");

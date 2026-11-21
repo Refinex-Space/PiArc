@@ -48,6 +48,7 @@ mod inputs;
 pub(super) mod memory;
 mod modes;
 mod notebook;
+mod notify;
 mod plan;
 mod prepare;
 mod preview;
@@ -389,6 +390,7 @@ impl ToolIo {
                     check_permanent(request, &answer)?;
                 }
                 check_unsandboxed(request, &answer)?;
+                notify::check_answer(request, &answer)?;
             }
             let (request, pending) = match state.ledger.claim(&answer) {
                 Ok(p) => p,
@@ -494,6 +496,9 @@ impl ToolIo {
             mode: None,
         };
         let source = match (&answer, ruling.step) {
+            (Some(a), _) if a.via == Some(piarc_protocol::policy::AnswerVia::Notification) => {
+                "notification"
+            }
             (Some(_), _) => "user",
             (None, "hookDeny" | "hookAllow" | "permissionRequestHook") => "hook",
             _ => "automatic",
@@ -525,6 +530,7 @@ impl ToolIo {
         generation: &CancellationToken,
     ) -> Result<Option<waits::Answered>, ErrorObject> {
         prepared.add_preview(p).await?;
+        prepared.card.notification_allow = notify::allowed(&prepared.card);
         // `Notification` hooks: an approval waits for the user.
         let (io, id) = (self.clone(), p.session_id.clone());
         let message = format!("PiArc needs your permission to use {}", p.tool);

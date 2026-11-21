@@ -220,6 +220,7 @@ impl ToolIo {
             subagent: None,
             sandbox: None,
             domain: None,
+            notification_allow: false,
         };
         let (tx, mut rx) = oneshot::channel();
         if !post_card(&s, services, &p.tool_call_id, &card, &peer, &generation, tx).await? {
@@ -317,6 +318,7 @@ mod tests {
             subagent: None,
             sandbox: None,
             domain: None,
+            notification_allow: false,
         }
     }
 
@@ -334,6 +336,7 @@ mod tests {
             mode: None,
             comments: Vec::new(),
             answers,
+            via: None,
         }
     }
 

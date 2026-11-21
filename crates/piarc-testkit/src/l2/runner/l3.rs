@@ -56,6 +56,7 @@ impl Driver<'_> {
             mode: None,
             comments: Vec::new(),
             answers: Vec::new(),
+            via: None,
         };
         let result = call(
             |done| self.core.answer_approval(answer, done),
