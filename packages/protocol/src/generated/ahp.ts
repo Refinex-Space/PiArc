@@ -199,7 +199,19 @@ export type AhpMessage =
   | McpSetEnabledResponse
   | McpLoginRequest
   | McpLoginResponse
-  | McpStatusChangedNotification;
+  | McpStatusChangedNotification
+  | SkillsListMethodRequest
+  | SkillsListMethodResponse
+  | SkillsInvokeRequest
+  | SkillsInvokeResponse
+  | SkillsMatchRequest
+  | SkillsMatchResponse
+  | ResourcesListSkillsRequest
+  | ResourcesListSkillsResponse
+  | ResourcesListCommandsRequest
+  | ResourcesListCommandsResponse
+  | ResourcesReloadRequest
+  | ResourcesReloadResponse;
 /**
  * A request id: an integer or a string. `null` and fractional numbers are not accepted.
  */
@@ -293,6 +305,23 @@ export type AttachmentKind = 'image' | 'pdf';
  */
 export type QueueKind = 'steer' | 'followUp';
 /**
+ * What a slash command runs.
+ */
+export type CommandKind = 'builtIn' | 'command' | 'skill' | 'mcpPrompt';
+/**
+ * Where a skill, command or output style came from, highest precedence first (ADR-0054).
+ */
+export type ResourceSource =
+  | 'builtIn'
+  | 'projectPiarc'
+  | 'projectClaude'
+  | 'projectPi'
+  | 'user'
+  | 'userClaude'
+  | 'userPi'
+  | 'plugin'
+  | 'mcp';
+/**
  * The chunk was accepted at the requested offset.
  */
 export type PolicyInputChunkResult = Record<string, never>;
@@ -346,6 +375,11 @@ export type Item =
        * The images and PDFs the user attached.
        */
       attachments?: InputAttachment[];
+      /**
+       * The slash command the text invoked (T37): `text` is what the user typed, the model
+       * received the command's expansion.
+       */
+      command?: PromptCommand | null;
       /**
        * The item's identifier.
        */
@@ -710,7 +744,9 @@ export type ReminderType =
   | 'rulesMatched'
   | 'hookContext'
   | 'contextRestore'
-  | 'mcpChanged';
+  | 'mcpChanged'
+  | 'skillsChanged'
+  | 'outputStyle';
 /**
  * The events the Agent Host reports.
  */
@@ -901,6 +937,30 @@ export type McpConnectionState =
   | 'disabled'
   | 'unsupported'
   | 'untrusted';
+/**
+ * Something about a skill, command or style the user should know; the client words it.
+ */
+export type ResourceWarningKind =
+  | 'ignoredField'
+  | 'unsupportedField'
+  | 'dynamicCommand'
+  | 'invalidFrontmatter'
+  | 'invalidField'
+  | 'untrusted'
+  | 'denied'
+  | 'overridden';
+/**
+ * How much of a skill the model sees (Claude Code's `skillOverrides`).
+ */
+export type SkillVisibility = 'on' | 'nameOnly' | 'userInvocableOnly' | 'off';
+/**
+ * Parameters of `resources/reload`.
+ */
+export type ResourcesReloadParams = Record<string, never>;
+/**
+ * Result of `resources/reload`.
+ */
+export type ResourcesReloadResult = Record<string, never>;
 /**
  * Presentation of a pending approval.
  */
@@ -1576,6 +1636,10 @@ export interface SessionPromptParams {
    */
   attachments?: InputAttachment[];
   /**
+   * The slash command Core expanded into `text` (T37, capability `skills`).
+   */
+  command?: PromptCommand | null;
+  /**
    * Context `UserPromptSubmit` hooks added for the model (`additionalContext`, plain
    * stdout), already bounded; delivered with this input and not shown in the transcript.
    */
@@ -1596,6 +1660,32 @@ export interface SessionPromptParams {
    * The user's input.
    */
   text: string;
+}
+/**
+ * A slash command the user's input invoked (`session/prompt`, `session/steer`,
+ * `session/followUp`): the text the Agent Host receives is its expansion.
+ */
+export interface PromptCommand {
+  /**
+   * The arguments as typed.
+   */
+  arguments?: string;
+  /**
+   * What the user typed (`/name arguments`), shown in the transcript.
+   */
+  input: string;
+  /**
+   * A command file, a template or a skill.
+   */
+  kind: CommandKind;
+  /**
+   * The command's name.
+   */
+  name: string;
+  /**
+   * Where it came from.
+   */
+  source: ResourceSource;
 }
 /**
  * Successful response to `session/prompt`.
@@ -2298,6 +2388,10 @@ export interface SessionInputParams {
    * Images and PDFs, by reference.
    */
   attachments?: InputAttachment[];
+  /**
+   * The slash command Core expanded into `text` (T37, capability `skills`).
+   */
+  command?: PromptCommand | null;
   /**
    * Context `UserPromptSubmit` hooks added for the model (`additionalContext`, plain
    * stdout), already bounded; delivered with this input and not shown in the transcript.
@@ -6921,6 +7015,472 @@ export interface McpStatusChangedNotification {
   jsonrpc: JsonRpcVersion;
   method: 'mcp/statusChanged';
   params: McpStatus;
+}
+/**
+ * Request for `skills/list`.
+ */
+export interface SkillsListMethodRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'skills/list';
+  params: SkillsListParams;
+}
+/**
+ * Parameters of `skills/list`.
+ */
+export interface SkillsListParams {
+  /**
+   * The directory to look up from when no session asks; inside the connection's workspace.
+   */
+  cwd?: string | null;
+  /**
+   * The session asking: its directory is where project files are looked up from, and its
+   * file tools may read the skills' directories.
+   */
+  sessionId?: string | null;
+}
+/**
+ * Successful response to `skills/list`.
+ */
+export interface SkillsListMethodResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SkillsCatalog;
+}
+/**
+ * Result of `skills/list`.
+ */
+export interface SkillsCatalog {
+  /**
+   * The slash commands in effect: built-in commands, command files, Pi templates and the
+   * skills the user may invoke.
+   */
+  commands: CommandInfo[];
+  /**
+   * Files that are not valid skills, commands or styles.
+   */
+  issues?: ResourceIssue[];
+  /**
+   * The style in effect.
+   */
+  outputStyle: CurrentOutputStyle;
+  /**
+   * The output styles: built-in ones (without instructions) and custom ones.
+   */
+  outputStyles: OutputStyleInfo[];
+  /**
+   * The skills in effect, by name (hidden ones included, with their visibility).
+   */
+  skills: SkillInfo[];
+}
+/**
+ * A slash command in the merged list.
+ */
+export interface CommandInfo {
+  /**
+   * Other names it answers to (built-in commands).
+   */
+  aliases?: string[];
+  /**
+   * Rules the turn it starts allows (`allowed-tools`).
+   */
+  allowedTools?: string[];
+  /**
+   * `argument-hint`.
+   */
+  argumentHint?: string | null;
+  /**
+   * Names of `arguments`, in order.
+   */
+  arguments?: string[];
+  /**
+   * Its description; empty for built-in commands (the client words them).
+   */
+  description?: string;
+  /**
+   * What it runs.
+   */
+  kind: CommandKind;
+  /**
+   * Its name, without the slash.
+   */
+  name: string;
+  /**
+   * Files or built-in commands of the same name it replaces.
+   */
+  overrides?: string[];
+  /**
+   * Its file; absent for built-in commands.
+   */
+  path?: string | null;
+  /**
+   * Where it came from.
+   */
+  source: ResourceSource;
+  /**
+   * What the user should know.
+   */
+  warnings?: ResourceWarning[];
+}
+/**
+ * One warning about a skill, a command or an output style.
+ */
+export interface ResourceWarning {
+  /**
+   * The frontmatter field concerned.
+   */
+  field?: string | null;
+  /**
+   * What it is about.
+   */
+  kind: ResourceWarningKind;
+  /**
+   * The task that makes an unsupported field work.
+   */
+  task?: string | null;
+  /**
+   * The value concerned.
+   */
+  value?: string | null;
+}
+/**
+ * A file that could not be read as a skill, command or style.
+ */
+export interface ResourceIssue {
+  /**
+   * Its line (1-based), when the problem has one.
+   */
+  line?: number | null;
+  /**
+   * What is wrong.
+   */
+  message: string;
+  /**
+   * The file or directory.
+   */
+  path: string;
+}
+/**
+ * The output style in effect.
+ */
+export interface CurrentOutputStyle {
+  /**
+   * The setting's value when it names no style.
+   */
+  missing?: string | null;
+  /**
+   * The style that applies (`Default` when the setting names none that exists).
+   */
+  name: string;
+}
+/**
+ * An output style.
+ */
+export interface OutputStyleInfo {
+  /**
+   * Its description; empty for built-in styles (the client words them).
+   */
+  description?: string;
+  /**
+   * Its instructions (custom styles in `skills/list`; the Agent Host has the built-in
+   * ones).
+   */
+  instructions?: string | null;
+  /**
+   * Its name (the `outputStyle` setting's value).
+   */
+  name: string;
+  /**
+   * Files of the same name it replaces.
+   */
+  overrides?: string[];
+  /**
+   * Its file; absent for built-in styles.
+   */
+  path?: string | null;
+  /**
+   * Where it came from.
+   */
+  source: ResourceSource;
+  /**
+   * What the user should know.
+   */
+  warnings?: ResourceWarning[];
+}
+/**
+ * A skill in effect.
+ */
+export interface SkillInfo {
+  /**
+   * Rules the turn that invokes it allows (`allowed-tools`), as written.
+   */
+  allowedTools?: string[];
+  /**
+   * `argument-hint`.
+   */
+  argumentHint?: string | null;
+  /**
+   * Names of `arguments`, in order.
+   */
+  arguments?: string[];
+  /**
+   * What it does and when to use it (`description`, then `when_to_use`), not truncated.
+   */
+  description: string;
+  /**
+   * The directory holding it: readable without asking (`${CLAUDE_SKILL_DIR}`).
+   */
+  dir: string;
+  /**
+   * Whether it defines hooks.
+   */
+  hooks?: boolean;
+  /**
+   * The model may load it (not `disable-model-invocation`, not hidden, not denied).
+   */
+  modelInvocable: boolean;
+  /**
+   * Its name (`/name`, `Skill(name)`).
+   */
+  name: string;
+  /**
+   * Files of the same name it replaces.
+   */
+  overrides?: string[];
+  /**
+   * Its `SKILL.md` (or Pi's single-file skill).
+   */
+  path: string;
+  /**
+   * File globs that make it available (`paths`); empty: always.
+   */
+  paths?: string[];
+  /**
+   * Where it came from.
+   */
+  source: ResourceSource;
+  /**
+   * The user may invoke it as `/name`.
+   */
+  userInvocable: boolean;
+  /**
+   * How much of it the model sees.
+   */
+  visibility?: SkillVisibility & string;
+  /**
+   * What the user should know.
+   */
+  warnings?: ResourceWarning[];
+}
+/**
+ * Request for `skills/invoke`.
+ */
+export interface SkillsInvokeRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'skills/invoke';
+  params: SkillsInvokeParams;
+}
+/**
+ * Parameters of `skills/invoke`.
+ */
+export interface SkillsInvokeParams {
+  /**
+   * The call's `args`, as written.
+   */
+  arguments?: string | null;
+  /**
+   * The skill's name.
+   */
+  name: string;
+  /**
+   * The session whose `Skill` call loads it.
+   */
+  sessionId: string;
+  /**
+   * The `Skill` call (its approval is consumed).
+   */
+  toolCallId: string;
+}
+/**
+ * Successful response to `skills/invoke`.
+ */
+export interface SkillsInvokeResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SkillsInvokeResult;
+}
+/**
+ * Result of `skills/invoke`.
+ */
+export interface SkillsInvokeResult {
+  /**
+   * Rules the current turn now allows.
+   */
+  allowedTools?: string[];
+  /**
+   * Its body with the arguments substituted.
+   */
+  content: string;
+  /**
+   * Its directory.
+   */
+  dir: string;
+  /**
+   * Whether its hooks now apply to the session.
+   */
+  hooks?: boolean;
+  /**
+   * The skill's name.
+   */
+  name: string;
+  /**
+   * What did not apply (an untrusted project's `allowed-tools` and hooks).
+   */
+  warnings?: ResourceWarning[];
+}
+/**
+ * Request for `skills/match`.
+ */
+export interface SkillsMatchRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'skills/match';
+  params: SkillsMatchParams;
+}
+/**
+ * Parameters of `skills/match`.
+ */
+export interface SkillsMatchParams {
+  /**
+   * Absolute paths of files the session read or wrote.
+   */
+  files: string[];
+  /**
+   * The session that touched the files.
+   */
+  sessionId: string;
+  /**
+   * The `paths` skills not yet available, by name.
+   */
+  skills: string[];
+}
+/**
+ * Successful response to `skills/match`.
+ */
+export interface SkillsMatchResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SkillsMatchResult;
+}
+/**
+ * Result of `skills/match`.
+ */
+export interface SkillsMatchResult {
+  /**
+   * The skills one of the files activates.
+   */
+  matched?: string[];
+}
+/**
+ * Request for `resources/listSkills`.
+ */
+export interface ResourcesListSkillsRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'resources/listSkills';
+  params: ResourcesListParams;
+}
+/**
+ * Parameters of `resources/listSkills` and `resources/listCommands`.
+ */
+export interface ResourcesListParams {
+  /**
+   * The directory to look up from; the workspace root when absent.
+   */
+  cwd?: string | null;
+}
+/**
+ * Successful response to `resources/listSkills`.
+ */
+export interface ResourcesListSkillsResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SkillsList;
+}
+/**
+ * Result of `resources/listSkills`.
+ */
+export interface SkillsList {
+  /**
+   * Files that are not valid skills, commands or styles.
+   */
+  issues?: ResourceIssue[];
+  /**
+   * The skills in effect.
+   */
+  skills: SkillInfo[];
+}
+/**
+ * Request for `resources/listCommands`.
+ */
+export interface ResourcesListCommandsRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'resources/listCommands';
+  params: ResourcesListParams;
+}
+/**
+ * Successful response to `resources/listCommands`.
+ */
+export interface ResourcesListCommandsResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: CommandsList;
+}
+/**
+ * Result of `resources/listCommands`.
+ */
+export interface CommandsList {
+  /**
+   * The slash commands in effect, in precedence order.
+   */
+  commands: CommandInfo[];
+  /**
+   * Files that are not valid skills, commands or styles.
+   */
+  issues?: ResourceIssue[];
+  /**
+   * The style in effect.
+   */
+  outputStyle: CurrentOutputStyle;
+  /**
+   * The output styles (`/output-style` lists them).
+   */
+  outputStyles: OutputStyleInfo[];
+}
+/**
+ * Request for `resources/reload`.
+ */
+export interface ResourcesReloadRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'resources/reload';
+  params: ResourcesReloadParams;
+}
+/**
+ * Successful response to `resources/reload`.
+ */
+export interface ResourcesReloadResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: ResourcesReloadResult;
 }
 /**
  * Immutable approval card from the Core ledger.

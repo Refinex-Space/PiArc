@@ -217,6 +217,7 @@ async fn steer_and_follow_up(
         mentions: Vec::new(),
         attachments: Vec::new(),
         hook_context: None,
+        command: None,
     };
     supervisor
         .session_call::<SessionSteer>(&id, Some("s1"), input("s1", "Also mention the signal."))

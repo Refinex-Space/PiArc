@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 70,
+  "method": "skills/list",
+  "params": {
+    "sessionId": 7
+  }
+}

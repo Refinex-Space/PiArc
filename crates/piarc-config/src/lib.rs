@@ -14,7 +14,9 @@
 //! - Configuration diagnostics ([`diagnostics`]): every file's load state, applied,
 //!   overridden and ignored keys.
 //! - Subagent definition files ([`agents`], T31): discovery from a directory upward and the
-//!   user levels, frontmatter parsing and the merge by name.
+//!   user levels, frontmatter parsing ([`frontmatter`]) and the merge by name.
+//! - Skills, slash command files, Pi prompt templates and output styles ([`skills`], T37):
+//!   discovery, frontmatter, the merge by name and argument substitution.
 //!
 //! # Not responsible for
 //!
@@ -35,12 +37,14 @@ pub mod agents;
 pub mod claude;
 pub mod diagnostics;
 pub mod executables;
+pub mod frontmatter;
 pub mod layers;
 pub mod mcp;
 pub mod merge;
 pub mod rules;
 pub mod schema;
 pub mod settings;
+pub mod skills;
 pub mod trust;
 pub mod write;
 

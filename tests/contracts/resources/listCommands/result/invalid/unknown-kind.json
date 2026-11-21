@@ -1,0 +1,17 @@
+{
+  "jsonrpc": "2.0",
+  "id": 82,
+  "result": {
+    "commands": [
+      {
+        "name": "x",
+        "kind": "macro",
+        "source": "builtIn"
+      }
+    ],
+    "outputStyles": [],
+    "outputStyle": {
+      "name": "teacher"
+    }
+  }
+}

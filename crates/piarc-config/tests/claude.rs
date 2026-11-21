@@ -355,15 +355,18 @@ fn unknown_planned_and_ignored_keys_are_each_listed() {
             "statusLine": { "type": "command", "command": "x" },
             "madeUpKey": 1,
             "model": "claude-opus",
-            "outputStyle": "Explanatory"
+            "outputStyle": "Explanatory",
+            "plansDirectory": "plans"
         })
         .to_string(),
     );
     let settings = Settings::load(f.table(), TrustState::Trusted);
     assert!(settings.issues().is_empty(), "{:?}", settings.issues());
-    // `model` applies since T31 (the default model of new sessions); `outputStyle` is planned.
+    // `model` applies since T31 (the default model of new sessions), `outputStyle` since T37;
+    // `plansDirectory` is planned.
     assert_eq!(settings.get("/model"), Some(&json!("claude-opus")));
-    assert_eq!(settings.get("/outputStyle"), None);
+    assert_eq!(settings.get("/outputStyle"), Some(&json!("Explanatory")));
+    assert_eq!(settings.get("/plansDirectory"), None);
     let reports = settings.diagnostics();
     assert_eq!(
         ignored(report(&reports, ids::CLAUDE_PROJECT)),
@@ -372,13 +375,13 @@ fn unknown_planned_and_ignored_keys_are_each_listed() {
             ("/enabledPlugins", IgnoreReason::Planned, Some("T40")),
             ("/env", IgnoreReason::Ignored, None),
             ("/madeUpKey", IgnoreReason::Unknown, None),
-            ("/outputStyle", IgnoreReason::Planned, Some("T37")),
             (
                 "/permissions/disableBypassPermissionsMode",
                 IgnoreReason::Ignored,
                 None
             ),
             ("/permissions/futureKey", IgnoreReason::Unknown, None),
+            ("/plansDirectory", IgnoreReason::Planned, Some("T48")),
             ("/sandbox", IgnoreReason::Planned, Some("T39")),
             ("/statusLine", IgnoreReason::Ignored, None),
         ]

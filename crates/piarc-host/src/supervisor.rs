@@ -362,6 +362,7 @@ impl HostSupervisor {
             mentions: Vec::new(),
             attachments: Vec::new(),
             hook_context: None,
+            command: None,
         };
         let tracking = Tracking {
             session_id: Some(session_id.0.clone()),

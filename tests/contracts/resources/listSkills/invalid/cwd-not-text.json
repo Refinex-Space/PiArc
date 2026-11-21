@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 80,
+  "method": "resources/listSkills",
+  "params": {
+    "cwd": 1
+  }
+}

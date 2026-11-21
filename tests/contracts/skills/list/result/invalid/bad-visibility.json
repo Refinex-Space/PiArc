@@ -1,0 +1,23 @@
+{
+  "jsonrpc": "2.0",
+  "id": 70,
+  "result": {
+    "skills": [
+      {
+        "name": "deploy",
+        "description": "Deploy",
+        "source": "user",
+        "path": "/data/skills/deploy/SKILL.md",
+        "dir": "/data/skills/deploy",
+        "modelInvocable": false,
+        "userInvocable": true,
+        "visibility": "hidden"
+      }
+    ],
+    "commands": [],
+    "outputStyles": [],
+    "outputStyle": {
+      "name": "teacher"
+    }
+  }
+}

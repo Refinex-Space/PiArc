@@ -1181,6 +1181,97 @@
       "required": ["cwd", "outcome", "durationMs", "timedOut", "timeoutMs", "truncated"],
       "type": "object"
     },
+    "CommandInfo": {
+      "description": "A slash command in the merged list.",
+      "properties": {
+        "aliases": {
+          "description": "Other names it answers to (built-in commands).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "allowedTools": {
+          "description": "Rules the turn it starts allows (`allowed-tools`).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "argumentHint": {
+          "description": "`argument-hint`.",
+          "type": ["string", "null"]
+        },
+        "arguments": {
+          "description": "Names of `arguments`, in order.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "description": {
+          "description": "Its description; empty for built-in commands (the client words them).",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/CommandKind",
+          "description": "What it runs."
+        },
+        "name": {
+          "description": "Its name, without the slash.",
+          "type": "string"
+        },
+        "overrides": {
+          "description": "Files or built-in commands of the same name it replaces.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "path": {
+          "description": "Its file; absent for built-in commands.",
+          "type": ["string", "null"]
+        },
+        "source": {
+          "$ref": "#/$defs/ResourceSource",
+          "description": "Where it came from."
+        },
+        "warnings": {
+          "description": "What the user should know.",
+          "items": {
+            "$ref": "#/$defs/ResourceWarning"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["name", "kind", "source"],
+      "type": "object"
+    },
+    "CommandKind": {
+      "description": "What a slash command runs.",
+      "oneOf": [
+        {
+          "const": "builtIn",
+          "description": "A command the client carries out (`/compact`, `/model`, ...).",
+          "type": "string"
+        },
+        {
+          "const": "command",
+          "description": "A command file or a Pi prompt template: its body is the prompt.",
+          "type": "string"
+        },
+        {
+          "const": "skill",
+          "description": "A skill the user may invoke.",
+          "type": "string"
+        },
+        {
+          "const": "mcpPrompt",
+          "description": "An MCP prompt (T40).",
+          "type": "string"
+        }
+      ]
+    },
     "CommandOutcome": {
       "description": "Whether a command succeeded.",
       "oneOf": [
@@ -1229,6 +1320,38 @@
         }
       },
       "required": ["head", "totalChars"],
+      "type": "object"
+    },
+    "CommandsList": {
+      "description": "Result of `resources/listCommands`.",
+      "properties": {
+        "commands": {
+          "description": "The slash commands in effect, in precedence order.",
+          "items": {
+            "$ref": "#/$defs/CommandInfo"
+          },
+          "type": "array"
+        },
+        "issues": {
+          "description": "Files that are not valid skills, commands or styles.",
+          "items": {
+            "$ref": "#/$defs/ResourceIssue"
+          },
+          "type": "array"
+        },
+        "outputStyle": {
+          "$ref": "#/$defs/CurrentOutputStyle",
+          "description": "The style in effect."
+        },
+        "outputStyles": {
+          "description": "The output styles (`/output-style` lists them).",
+          "items": {
+            "$ref": "#/$defs/OutputStyleInfo"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["commands", "outputStyles", "outputStyle"],
       "type": "object"
     },
     "CompactionReason": {
@@ -1526,6 +1649,21 @@
         }
       },
       "required": ["hasCredential"],
+      "type": "object"
+    },
+    "CurrentOutputStyle": {
+      "description": "The output style in effect.",
+      "properties": {
+        "missing": {
+          "description": "The setting's value when it names no style.",
+          "type": ["string", "null"]
+        },
+        "name": {
+          "description": "The style that applies (`Default` when the setting names none that exists).",
+          "type": "string"
+        }
+      },
+      "required": ["name"],
       "type": "object"
     },
     "CwdReset": {
@@ -4569,6 +4707,17 @@
               },
               "type": "array"
             },
+            "command": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PromptCommand"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The slash command the text invoked (T37): `text` is what the user typed, the model\nreceived the command's expansion."
+            },
             "itemId": {
               "$ref": "#/$defs/ItemId",
               "description": "The item's identifier."
@@ -6821,6 +6970,47 @@
         }
       ]
     },
+    "OutputStyleInfo": {
+      "description": "An output style.",
+      "properties": {
+        "description": {
+          "description": "Its description; empty for built-in styles (the client words them).",
+          "type": "string"
+        },
+        "instructions": {
+          "description": "Its instructions (custom styles in `skills/list`; the Agent Host has the built-in\nones).",
+          "type": ["string", "null"]
+        },
+        "name": {
+          "description": "Its name (the `outputStyle` setting's value).",
+          "type": "string"
+        },
+        "overrides": {
+          "description": "Files of the same name it replaces.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "path": {
+          "description": "Its file; absent for built-in styles.",
+          "type": ["string", "null"]
+        },
+        "source": {
+          "$ref": "#/$defs/ResourceSource",
+          "description": "Where it came from."
+        },
+        "warnings": {
+          "description": "What the user should know.",
+          "items": {
+            "$ref": "#/$defs/ResourceWarning"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["name", "source"],
+      "type": "object"
+    },
     "PdfPage": {
       "description": "The text of one PDF page.",
       "properties": {
@@ -7321,6 +7511,33 @@
         }
       },
       "required": ["turnId"],
+      "type": "object"
+    },
+    "PromptCommand": {
+      "description": "A slash command the user's input invoked (`session/prompt`, `session/steer`,\n`session/followUp`): the text the Agent Host receives is its expansion.",
+      "properties": {
+        "arguments": {
+          "description": "The arguments as typed.",
+          "type": "string"
+        },
+        "input": {
+          "description": "What the user typed (`/name arguments`), shown in the transcript.",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/CommandKind",
+          "description": "A command file, a template or a skill."
+        },
+        "name": {
+          "description": "The command's name.",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/ResourceSource",
+          "description": "Where it came from."
+        }
+      },
+      "required": ["name", "kind", "source", "input"],
       "type": "object"
     },
     "ProtocolVersion": {
@@ -7839,6 +8056,16 @@
           "const": "mcpChanged",
           "description": "An MCP server's tools or instructions changed during the session (T36, capability\n`mcpPool`).",
           "type": "string"
+        },
+        {
+          "const": "skillsChanged",
+          "description": "Skills became available or changed during the session, or a `paths` skill matched a\nfile (T37, capability `skills`).",
+          "type": "string"
+        },
+        {
+          "const": "outputStyle",
+          "description": "The output style changed during the session (T37, capability `skills`).",
+          "type": "string"
         }
       ]
     },
@@ -7879,6 +8106,145 @@
         }
       ],
       "description": "A request id: an integer or a string. `null` and fractional numbers are not accepted."
+    },
+    "ResourceIssue": {
+      "description": "A file that could not be read as a skill, command or style.",
+      "properties": {
+        "line": {
+          "description": "Its line (1-based), when the problem has one.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "message": {
+          "description": "What is wrong.",
+          "type": "string"
+        },
+        "path": {
+          "description": "The file or directory.",
+          "type": "string"
+        }
+      },
+      "required": ["path", "message"],
+      "type": "object"
+    },
+    "ResourceSource": {
+      "description": "Where a skill, command or output style came from, highest precedence first (ADR-0054).",
+      "oneOf": [
+        {
+          "const": "builtIn",
+          "description": "Shipped with PiArc (built-in commands and output styles).",
+          "type": "string"
+        },
+        {
+          "const": "projectPiarc",
+          "description": "`.piarc/` of the directory or one above it.",
+          "type": "string"
+        },
+        {
+          "const": "projectClaude",
+          "description": "`.claude/` of the directory or one above it.",
+          "type": "string"
+        },
+        {
+          "const": "projectPi",
+          "description": "Pi's project directories: `.pi/skills/`, `.agents/skills/`, `.pi/prompts/`.",
+          "type": "string"
+        },
+        {
+          "const": "user",
+          "description": "PiArc's data directory (`skills/`, `commands/`, `output-styles/`).",
+          "type": "string"
+        },
+        {
+          "const": "userClaude",
+          "description": "`~/.claude/`.",
+          "type": "string"
+        },
+        {
+          "const": "userPi",
+          "description": "Pi's user directories: `<data>/pi/skills/`, `~/.agents/skills/`, `<data>/pi/prompts/`.",
+          "type": "string"
+        },
+        {
+          "const": "plugin",
+          "description": "A plugin (T40).",
+          "type": "string"
+        },
+        {
+          "const": "mcp",
+          "description": "An MCP server's prompt (T40).",
+          "type": "string"
+        }
+      ]
+    },
+    "ResourceWarning": {
+      "description": "One warning about a skill, a command or an output style.",
+      "properties": {
+        "field": {
+          "description": "The frontmatter field concerned.",
+          "type": ["string", "null"]
+        },
+        "kind": {
+          "$ref": "#/$defs/ResourceWarningKind",
+          "description": "What it is about."
+        },
+        "task": {
+          "description": "The task that makes an unsupported field work.",
+          "type": ["string", "null"]
+        },
+        "value": {
+          "description": "The value concerned.",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["kind"],
+      "type": "object"
+    },
+    "ResourceWarningKind": {
+      "description": "Something about a skill, command or style the user should know; the client words it.",
+      "oneOf": [
+        {
+          "const": "ignoredField",
+          "description": "A frontmatter field PiArc does not use (`field`).",
+          "type": "string"
+        },
+        {
+          "const": "unsupportedField",
+          "description": "A field PiArc reads but does not support yet (`field`, `task`).",
+          "type": "string"
+        },
+        {
+          "const": "dynamicCommand",
+          "description": "The body has `` !`command` `` or a ```` ```! ```` block: PiArc does not run it and\npasses the text as written.",
+          "type": "string"
+        },
+        {
+          "const": "invalidFrontmatter",
+          "description": "The frontmatter is not valid YAML: every field is unset (`value` says why).",
+          "type": "string"
+        },
+        {
+          "const": "invalidField",
+          "description": "A field has a value of the wrong kind and is unset (`field`).",
+          "type": "string"
+        },
+        {
+          "const": "untrusted",
+          "description": "`allowed-tools` and `hooks` do not apply: the project is not trusted.",
+          "type": "string"
+        },
+        {
+          "const": "denied",
+          "description": "A `Skill` or `Skill(<name>)` deny rule hides it from the model.",
+          "type": "string"
+        },
+        {
+          "const": "overridden",
+          "description": "A higher-precedence entry of the same name replaces it (`value` is the winner's path or\n`builtIn`).",
+          "type": "string"
+        }
+      ]
     },
     "ResourcesListAgentsParams": {
       "description": "Parameters of `resources/listAgents`.",
@@ -7925,6 +8291,135 @@
         }
       },
       "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "ResourcesListCommandsRequest": {
+      "description": "Request for `resources/listCommands`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "resources/listCommands",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ResourcesListParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "ResourcesListCommandsResponse": {
+      "description": "Successful response to `resources/listCommands`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/CommandsList"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "ResourcesListParams": {
+      "description": "Parameters of `resources/listSkills` and `resources/listCommands`.",
+      "properties": {
+        "cwd": {
+          "description": "The directory to look up from; the workspace root when absent.",
+          "type": ["string", "null"]
+        }
+      },
+      "type": "object"
+    },
+    "ResourcesListSkillsRequest": {
+      "description": "Request for `resources/listSkills`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "resources/listSkills",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ResourcesListParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "ResourcesListSkillsResponse": {
+      "description": "Successful response to `resources/listSkills`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SkillsList"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "ResourcesReloadParams": {
+      "description": "Parameters of `resources/reload`.",
+      "type": "object"
+    },
+    "ResourcesReloadRequest": {
+      "description": "Request for `resources/reload`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "resources/reload",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ResourcesReloadParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "ResourcesReloadResponse": {
+      "description": "Successful response to `resources/reload`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/ResourcesReloadResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "ResourcesReloadResult": {
+      "description": "Result of `resources/reload`.",
       "type": "object"
     },
     "RewindAction": {
@@ -9186,6 +9681,17 @@
           },
           "type": "array"
         },
+        "command": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PromptCommand"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The slash command Core expanded into `text` (T37, capability `skills`)."
+        },
         "hookContext": {
           "description": "Context `UserPromptSubmit` hooks added for the model (`additionalContext`, plain\nstdout), already bounded; delivered with this input and not shown in the transcript.",
           "type": ["string", "null"]
@@ -9302,6 +9808,17 @@
             "$ref": "#/$defs/InputAttachment"
           },
           "type": "array"
+        },
+        "command": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PromptCommand"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The slash command Core expanded into `text` (T37, capability `skills`)."
         },
         "hookContext": {
           "description": "Context `UserPromptSubmit` hooks added for the model (`additionalContext`, plain\nstdout), already bounded; delivered with this input and not shown in the transcript.",
@@ -9937,6 +10454,406 @@
     },
     "SetPermissionModeResult": {
       "description": "Acknowledgement that the mode entry is in the session.",
+      "type": "object"
+    },
+    "SkillInfo": {
+      "description": "A skill in effect.",
+      "properties": {
+        "allowedTools": {
+          "description": "Rules the turn that invokes it allows (`allowed-tools`), as written.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "argumentHint": {
+          "description": "`argument-hint`.",
+          "type": ["string", "null"]
+        },
+        "arguments": {
+          "description": "Names of `arguments`, in order.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "description": {
+          "description": "What it does and when to use it (`description`, then `when_to_use`), not truncated.",
+          "type": "string"
+        },
+        "dir": {
+          "description": "The directory holding it: readable without asking (`${CLAUDE_SKILL_DIR}`).",
+          "type": "string"
+        },
+        "hooks": {
+          "description": "Whether it defines hooks.",
+          "type": "boolean"
+        },
+        "modelInvocable": {
+          "description": "The model may load it (not `disable-model-invocation`, not hidden, not denied).",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "Its name (`/name`, `Skill(name)`).",
+          "type": "string"
+        },
+        "overrides": {
+          "description": "Files of the same name it replaces.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "path": {
+          "description": "Its `SKILL.md` (or Pi's single-file skill).",
+          "type": "string"
+        },
+        "paths": {
+          "description": "File globs that make it available (`paths`); empty: always.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "source": {
+          "$ref": "#/$defs/ResourceSource",
+          "description": "Where it came from."
+        },
+        "userInvocable": {
+          "description": "The user may invoke it as `/name`.",
+          "type": "boolean"
+        },
+        "visibility": {
+          "$ref": "#/$defs/SkillVisibility",
+          "default": "on",
+          "description": "How much of it the model sees."
+        },
+        "warnings": {
+          "description": "What the user should know.",
+          "items": {
+            "$ref": "#/$defs/ResourceWarning"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "source",
+        "path",
+        "dir",
+        "modelInvocable",
+        "userInvocable"
+      ],
+      "type": "object"
+    },
+    "SkillVisibility": {
+      "description": "How much of a skill the model sees (Claude Code's `skillOverrides`).",
+      "oneOf": [
+        {
+          "const": "on",
+          "description": "Name and description in the index; the user may invoke it.",
+          "type": "string"
+        },
+        {
+          "const": "nameOnly",
+          "description": "Name only in the index.",
+          "type": "string"
+        },
+        {
+          "const": "userInvocableOnly",
+          "description": "Not in the index; the user may still invoke it.",
+          "type": "string"
+        },
+        {
+          "const": "off",
+          "description": "Neither in the index nor among the commands.",
+          "type": "string"
+        }
+      ]
+    },
+    "SkillsCatalog": {
+      "description": "Result of `skills/list`.",
+      "properties": {
+        "commands": {
+          "description": "The slash commands in effect: built-in commands, command files, Pi templates and the\nskills the user may invoke.",
+          "items": {
+            "$ref": "#/$defs/CommandInfo"
+          },
+          "type": "array"
+        },
+        "issues": {
+          "description": "Files that are not valid skills, commands or styles.",
+          "items": {
+            "$ref": "#/$defs/ResourceIssue"
+          },
+          "type": "array"
+        },
+        "outputStyle": {
+          "$ref": "#/$defs/CurrentOutputStyle",
+          "description": "The style in effect."
+        },
+        "outputStyles": {
+          "description": "The output styles: built-in ones (without instructions) and custom ones.",
+          "items": {
+            "$ref": "#/$defs/OutputStyleInfo"
+          },
+          "type": "array"
+        },
+        "skills": {
+          "description": "The skills in effect, by name (hidden ones included, with their visibility).",
+          "items": {
+            "$ref": "#/$defs/SkillInfo"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["skills", "commands", "outputStyles", "outputStyle"],
+      "type": "object"
+    },
+    "SkillsInvokeParams": {
+      "description": "Parameters of `skills/invoke`.",
+      "properties": {
+        "arguments": {
+          "description": "The call's `args`, as written.",
+          "type": ["string", "null"]
+        },
+        "name": {
+          "description": "The skill's name.",
+          "type": "string"
+        },
+        "sessionId": {
+          "description": "The session whose `Skill` call loads it.",
+          "type": "string"
+        },
+        "toolCallId": {
+          "description": "The `Skill` call (its approval is consumed).",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "toolCallId", "name"],
+      "type": "object"
+    },
+    "SkillsInvokeRequest": {
+      "description": "Request for `skills/invoke`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "skills/invoke",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SkillsInvokeParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SkillsInvokeResponse": {
+      "description": "Successful response to `skills/invoke`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SkillsInvokeResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SkillsInvokeResult": {
+      "description": "Result of `skills/invoke`.",
+      "properties": {
+        "allowedTools": {
+          "description": "Rules the current turn now allows.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "content": {
+          "description": "Its body with the arguments substituted.",
+          "type": "string"
+        },
+        "dir": {
+          "description": "Its directory.",
+          "type": "string"
+        },
+        "hooks": {
+          "description": "Whether its hooks now apply to the session.",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "The skill's name.",
+          "type": "string"
+        },
+        "warnings": {
+          "description": "What did not apply (an untrusted project's `allowed-tools` and hooks).",
+          "items": {
+            "$ref": "#/$defs/ResourceWarning"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["name", "content", "dir"],
+      "type": "object"
+    },
+    "SkillsList": {
+      "description": "Result of `resources/listSkills`.",
+      "properties": {
+        "issues": {
+          "description": "Files that are not valid skills, commands or styles.",
+          "items": {
+            "$ref": "#/$defs/ResourceIssue"
+          },
+          "type": "array"
+        },
+        "skills": {
+          "description": "The skills in effect.",
+          "items": {
+            "$ref": "#/$defs/SkillInfo"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["skills"],
+      "type": "object"
+    },
+    "SkillsListMethodRequest": {
+      "description": "Request for `skills/list`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "skills/list",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SkillsListParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SkillsListMethodResponse": {
+      "description": "Successful response to `skills/list`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SkillsCatalog"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SkillsListParams": {
+      "description": "Parameters of `skills/list`.",
+      "properties": {
+        "cwd": {
+          "description": "The directory to look up from when no session asks; inside the connection's workspace.",
+          "type": ["string", "null"]
+        },
+        "sessionId": {
+          "description": "The session asking: its directory is where project files are looked up from, and its\nfile tools may read the skills' directories.",
+          "type": ["string", "null"]
+        }
+      },
+      "type": "object"
+    },
+    "SkillsMatchParams": {
+      "description": "Parameters of `skills/match`.",
+      "properties": {
+        "files": {
+          "description": "Absolute paths of files the session read or wrote.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "sessionId": {
+          "description": "The session that touched the files.",
+          "type": "string"
+        },
+        "skills": {
+          "description": "The `paths` skills not yet available, by name.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["sessionId", "files", "skills"],
+      "type": "object"
+    },
+    "SkillsMatchRequest": {
+      "description": "Request for `skills/match`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "skills/match",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SkillsMatchParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SkillsMatchResponse": {
+      "description": "Successful response to `skills/match`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SkillsMatchResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SkillsMatchResult": {
+      "description": "Result of `skills/match`.",
+      "properties": {
+        "matched": {
+          "default": [],
+          "description": "The skills one of the files activates.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
       "type": "object"
     },
     "SubagentCompletedNotification": {
@@ -13168,6 +14085,42 @@
     },
     {
       "$ref": "#/$defs/McpStatusChangedNotification"
+    },
+    {
+      "$ref": "#/$defs/SkillsListMethodRequest"
+    },
+    {
+      "$ref": "#/$defs/SkillsListMethodResponse"
+    },
+    {
+      "$ref": "#/$defs/SkillsInvokeRequest"
+    },
+    {
+      "$ref": "#/$defs/SkillsInvokeResponse"
+    },
+    {
+      "$ref": "#/$defs/SkillsMatchRequest"
+    },
+    {
+      "$ref": "#/$defs/SkillsMatchResponse"
+    },
+    {
+      "$ref": "#/$defs/ResourcesListSkillsRequest"
+    },
+    {
+      "$ref": "#/$defs/ResourcesListSkillsResponse"
+    },
+    {
+      "$ref": "#/$defs/ResourcesListCommandsRequest"
+    },
+    {
+      "$ref": "#/$defs/ResourcesListCommandsResponse"
+    },
+    {
+      "$ref": "#/$defs/ResourcesReloadRequest"
+    },
+    {
+      "$ref": "#/$defs/ResourcesReloadResponse"
     }
   ],
   "description": "Any message covered by the Agent Host Protocol 1.0 contracts. Generated from the piarc-protocol crate by `npm run gen:protocol`; do not edit.",

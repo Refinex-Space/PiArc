@@ -79,6 +79,7 @@ pub mod rpc_error;
 mod schema;
 pub mod secrets;
 pub mod session;
+pub mod skills;
 pub mod subagent;
 pub mod tasks;
 pub mod term_frame;

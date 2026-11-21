@@ -863,6 +863,7 @@ impl Request {
                     mentions: input.mentions,
                     attachments: input.attachments,
                     hook_context,
+                    command: None,
                 };
                 self.call::<SessionPrompt>(&supervisor, Some(&request_id), params)
                     .await
@@ -949,6 +950,7 @@ impl Request {
             mentions: input.mentions,
             attachments: input.attachments,
             hook_context,
+            command: None,
         };
         self.call::<M>(supervisor, Some(&request_id), params).await
     }

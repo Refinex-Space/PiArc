@@ -270,3 +270,73 @@ fn subagent_hooks_are_executable_items() {
     );
     let _ = std::fs::remove_dir_all(&root);
 }
+
+/// T37: a project skill's `allowed-tools` and `hooks`, and a command file's, are executable
+/// items; changing a rule is a new item. Skills without either add nothing.
+#[test]
+fn skill_and_command_permissions_and_hooks_are_executable_items() {
+    let root = std::env::temp_dir().join(format!("piarc-exec skills 中文 {}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    put(
+        &root,
+        ".claude/skills/release/SKILL.md",
+        "---\ndescription: Release\nallowed-tools: Bash(git tag *) Read\nhooks:\n  PostToolUse:\n    - matcher: Bash\n      hooks:\n        - type: command\n          command: ./notify.sh\n---\nRelease.\n",
+    );
+    put(
+        &root,
+        ".piarc/commands/fmt.md",
+        "---\nallowed-tools: Bash(cargo fmt)\n---\nFormat.\n",
+    );
+    put(
+        &root,
+        ".claude/skills/plain/SKILL.md",
+        "---\ndescription: Plain\n---\nNothing.\n",
+    );
+    let inventory = enumerate(&root);
+    let skill_items: Vec<&Item> = inventory
+        .items
+        .iter()
+        .filter(|i| i.source.contains("skills") || i.source.contains("commands"))
+        .collect();
+    assert_eq!(
+        skill_items,
+        [
+            &item(
+                Category::Hook,
+                ".claude/skills/release/SKILL.md",
+                "PostToolUse[Bash] ./notify.sh"
+            ),
+            &item(
+                Category::AllowRule,
+                ".claude/skills/release/SKILL.md",
+                "release: Bash(git tag *)"
+            ),
+            &item(
+                Category::AllowRule,
+                ".claude/skills/release/SKILL.md",
+                "release: Read"
+            ),
+            &item(
+                Category::AllowRule,
+                ".piarc/commands/fmt.md",
+                "fmt: Bash(cargo fmt)"
+            ),
+        ]
+    );
+    let before = inventory.items.clone();
+    put(
+        &root,
+        ".piarc/commands/fmt.md",
+        "---\nallowed-tools: Bash(cargo fmt *)\n---\nFormat.\n",
+    );
+    let after = enumerate(&root).items;
+    assert_eq!(
+        new_items(&after, &before),
+        [item(
+            Category::AllowRule,
+            ".piarc/commands/fmt.md",
+            "fmt: Bash(cargo fmt *)"
+        )]
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}

@@ -311,8 +311,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 T37（Skills、斜杠命令、命令面板与输出风格）开工于 2026-11-21；基线 `npm run verify -- --baseline` 通过（复用 ca3d873 的全量结果）；远端分支仍停在 e0c41ce（未推送 T36 起的提交），没有新的 Windows CI 结果可核对。
 
-- [ ] 1. 协议：skills/命令/输出风格类型，AHP `skills/list`、`skills/invoke`、`skills/match`、`resources/listSkills|listCommands|reload`，`session/prompt` 的命令元数据，提醒类型（ADR-0054）
-- [ ] 2. `piarc-config`：skills、命令、输出风格的发现与 frontmatter 解析、同名取舍与诊断、参数替换、`!` 命令标为不支持（A01、A07、A12）
+- [x] 1. 协议：skills/命令/输出风格类型，AHP `skills/list`、`skills/invoke`、`skills/match`、`resources/listSkills|listCommands|reload`，`session/prompt` 的命令元数据，提醒类型（ADR-0054）
+- [x] 2. `piarc-config`：skills、命令、输出风格的发现与 frontmatter 解析、同名取舍与诊断、参数替换、`!` 命令标为不支持（A01、A07、A12）
 - [ ] 3. Core：目录列表与监听（`resources/reload`）、`Skill` 只读裁决与 `Skill(名称)` 规则、skill 目录只读放行、`allowed-tools` 回合级免审批（信任约束）、skill hooks 作用域、斜杠命令展开与 UserPromptExpansion 挂载点（A04、A05）
 - [ ] 4. Agent Host：关闭 Pi 自带 skills/模板、第 5 段索引与第 3 段输出风格、`Skill` 工具、`paths` 激活、索引与风格变化的提醒、重注入登记、`resources/*` 应答（A02、A03、A06、A11）
 - [ ] 5. NAPI、主进程 IPC、preload：命令与 skills 列表、输出风格切换

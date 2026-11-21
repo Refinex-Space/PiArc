@@ -49,6 +49,10 @@ use crate::session::{
     SessionEventNotification, SessionFollowUp, SessionFork, SessionPrompt, SessionResume,
     SessionSetPermissionMode, SessionSteer,
 };
+use crate::skills::{
+    ResourcesListCommands, ResourcesListSkills, ResourcesReload, SkillsInvoke, SkillsListMethod,
+    SkillsMatch,
+};
 use crate::subagent::{
     AgentsListMethod, ResourcesListAgents, SubagentCompleted, SubagentFinish, SubagentProgress,
     SubagentStart, SubagentStarted, SubagentStop,
@@ -351,6 +355,18 @@ pub static CONTRACTS: &[Contract] = &[
     request::<McpLogin>(McpLogin::NAME),
     response::<McpLogin>("mcp/login/result"),
     notification::<McpStatusChanged>(),
+    request::<SkillsListMethod>(SkillsListMethod::NAME),
+    response::<SkillsListMethod>("skills/list/result"),
+    request::<SkillsInvoke>(SkillsInvoke::NAME),
+    response::<SkillsInvoke>("skills/invoke/result"),
+    request::<SkillsMatch>(SkillsMatch::NAME),
+    response::<SkillsMatch>("skills/match/result"),
+    request::<ResourcesListSkills>(ResourcesListSkills::NAME),
+    response::<ResourcesListSkills>("resources/listSkills/result"),
+    request::<ResourcesListCommands>(ResourcesListCommands::NAME),
+    response::<ResourcesListCommands>("resources/listCommands/result"),
+    request::<ResourcesReload>(ResourcesReload::NAME),
+    response::<ResourcesReload>("resources/reload/result"),
 ];
 
 /// Looks up a contract by name.

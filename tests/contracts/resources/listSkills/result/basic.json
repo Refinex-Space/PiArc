@@ -1,0 +1,44 @@
+{
+  "jsonrpc": "2.0",
+  "id": 80,
+  "result": {
+    "skills": [
+      {
+        "name": "fix-issue",
+        "description": "Fix a GitHub issue\nWhen a bug report names an issue",
+        "source": "projectClaude",
+        "path": "/工作区 a/.claude/skills/fix-issue/SKILL.md",
+        "dir": "/工作区 a/.claude/skills/fix-issue",
+        "argumentHint": "[issue] [branch]",
+        "arguments": ["issue", "branch"],
+        "modelInvocable": true,
+        "userInvocable": true,
+        "visibility": "on",
+        "allowedTools": ["Bash(git add *)", "Read"],
+        "paths": ["src/**/*.rs"],
+        "hooks": true,
+        "overrides": ["/home/u/.claude/skills/fix-issue/SKILL.md"],
+        "warnings": [
+          {
+            "kind": "unsupportedField",
+            "field": "context",
+            "task": "T48"
+          },
+          {
+            "kind": "dynamicCommand"
+          }
+        ]
+      },
+      {
+        "name": "deploy",
+        "description": "Deploy",
+        "source": "user",
+        "path": "/data/skills/deploy/SKILL.md",
+        "dir": "/data/skills/deploy",
+        "modelInvocable": false,
+        "userInvocable": true,
+        "visibility": "userInvocableOnly"
+      }
+    ]
+  }
+}

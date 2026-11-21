@@ -122,6 +122,10 @@ pub enum Item {
         /// The images and PDFs the user attached.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         attachments: Vec<InputAttachment>,
+        /// The slash command the text invoked (T37): `text` is what the user typed, the model
+        /// received the command's expansion.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        command: Option<crate::skills::PromptCommand>,
     },
     /// Text produced by the agent.
     AgentMessage {

@@ -46,6 +46,11 @@ pub enum ReminderType {
     /// An MCP server's tools or instructions changed during the session (T36, capability
     /// `mcpPool`).
     McpChanged,
+    /// Skills became available or changed during the session, or a `paths` skill matched a
+    /// file (T37, capability `skills`).
+    SkillsChanged,
+    /// The output style changed during the session (T37, capability `skills`).
+    OutputStyle,
 }
 
 /// One reminder of a reminder message: its type and where it came from.

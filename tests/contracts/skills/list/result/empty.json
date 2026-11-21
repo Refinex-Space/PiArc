@@ -1,0 +1,18 @@
+{
+  "jsonrpc": "2.0",
+  "id": 71,
+  "result": {
+    "skills": [],
+    "commands": [],
+    "outputStyles": [
+      {
+        "name": "Default",
+        "source": "builtIn"
+      }
+    ],
+    "outputStyle": {
+      "name": "Default",
+      "missing": "explanatory"
+    }
+  }
+}

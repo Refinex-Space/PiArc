@@ -1110,6 +1110,78 @@
       "method": "mcp/statusChanged",
       "name": "mcp/statusChanged",
       "schema": "McpStatusChangedNotification"
+    },
+    {
+      "kind": "request",
+      "method": "skills/list",
+      "name": "skills/list",
+      "schema": "SkillsListMethodRequest"
+    },
+    {
+      "kind": "response",
+      "method": "skills/list",
+      "name": "skills/list/result",
+      "schema": "SkillsListMethodResponse"
+    },
+    {
+      "kind": "request",
+      "method": "skills/invoke",
+      "name": "skills/invoke",
+      "schema": "SkillsInvokeRequest"
+    },
+    {
+      "kind": "response",
+      "method": "skills/invoke",
+      "name": "skills/invoke/result",
+      "schema": "SkillsInvokeResponse"
+    },
+    {
+      "kind": "request",
+      "method": "skills/match",
+      "name": "skills/match",
+      "schema": "SkillsMatchRequest"
+    },
+    {
+      "kind": "response",
+      "method": "skills/match",
+      "name": "skills/match/result",
+      "schema": "SkillsMatchResponse"
+    },
+    {
+      "kind": "request",
+      "method": "resources/listSkills",
+      "name": "resources/listSkills",
+      "schema": "ResourcesListSkillsRequest"
+    },
+    {
+      "kind": "response",
+      "method": "resources/listSkills",
+      "name": "resources/listSkills/result",
+      "schema": "ResourcesListSkillsResponse"
+    },
+    {
+      "kind": "request",
+      "method": "resources/listCommands",
+      "name": "resources/listCommands",
+      "schema": "ResourcesListCommandsRequest"
+    },
+    {
+      "kind": "response",
+      "method": "resources/listCommands",
+      "name": "resources/listCommands/result",
+      "schema": "ResourcesListCommandsResponse"
+    },
+    {
+      "kind": "request",
+      "method": "resources/reload",
+      "name": "resources/reload",
+      "schema": "ResourcesReloadRequest"
+    },
+    {
+      "kind": "response",
+      "method": "resources/reload",
+      "name": "resources/reload/result",
+      "schema": "ResourcesReloadResponse"
     }
   ],
   "protocolVersion": "1.0"

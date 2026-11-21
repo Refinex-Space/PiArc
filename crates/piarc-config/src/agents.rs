@@ -273,32 +273,13 @@ fn frontmatter<'t>(
     path: &Path,
     text: &'t str,
 ) -> Result<(&'t str, &'t str, serde_json::Map<String, Value>), AgentIssue> {
-    let Some((yaml, body)) = crate::rules::split_frontmatter(text) else {
+    let document = crate::frontmatter::split(text);
+    let Some(yaml) = document.yaml else {
         return Err(issue(path, Some(1), "no YAML frontmatter (--- ... ---)"));
     };
-    let front: Value = match serde_saphyr::from_str::<Option<Value>>(yaml) {
-        Ok(Some(value)) => value,
-        Ok(None) => Value::Null,
-        // The frontmatter starts on the file's second line. One line without the parser's
-        // source snippet: the settings page and the card show it in a list.
-        Err(error) => {
-            let text = error.render_with_options(serde_saphyr::render_options! {
-                snippets: serde_saphyr::SnippetMode::Off,
-                line_offset: 1,
-            });
-            let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
-            return Err(issue(
-                path,
-                error.location().map(|l| l.line() + 1),
-                format!("invalid YAML: {text}"),
-            ));
-        }
-    };
-    match front {
-        Value::Object(front) => Ok((yaml, body, front)),
-        Value::Null => Ok((yaml, body, serde_json::Map::new())),
-        _ => Err(issue(path, Some(2), "the frontmatter is not a mapping")),
-    }
+    let front = crate::frontmatter::mapping(yaml)
+        .map_err(|invalid| issue(path, invalid.line, invalid.message))?;
+    Ok((yaml, document.body, front))
 }
 
 fn warning(
@@ -337,11 +318,7 @@ struct Fields<'a> {
 impl Fields<'_> {
     /// The file line of `key` in the frontmatter (which starts on line 2).
     fn line(&self, key: &str) -> Option<u64> {
-        let prefix = format!("{key}:");
-        self.yaml
-            .lines()
-            .position(|line| line.trim_start().starts_with(&prefix))
-            .and_then(|index| u64::try_from(index + 2).ok())
+        crate::frontmatter::line_of(self.yaml, key)
     }
 
     fn problem(&self, key: &str, message: &str) -> AgentIssue {

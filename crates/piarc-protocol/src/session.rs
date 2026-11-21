@@ -231,6 +231,9 @@ pub struct SessionInputParams {
     /// stdout), already bounded; delivered with this input and not shown in the transcript.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hook_context: Option<String>,
+    /// The slash command Core expanded into `text` (T37, capability `skills`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<crate::skills::PromptCommand>,
 }
 
 /// Result of `session/steer` and `session/followUp`.
@@ -273,6 +276,9 @@ pub struct SessionPromptParams {
     /// stdout), already bounded; delivered with this input and not shown in the transcript.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hook_context: Option<String>,
+    /// The slash command Core expanded into `text` (T37, capability `skills`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<crate::skills::PromptCommand>,
 }
 
 /// Parameters of `session/compact`.

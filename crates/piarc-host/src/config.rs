@@ -118,6 +118,7 @@ impl HostConfig {
                 Capability::new("backgroundTasks"),
                 Capability::new("terminalTasks"),
                 Capability::new("mcpPool"),
+                Capability::new("skills"),
             ],
             allow_model_network: None,
             model_preferences: None,

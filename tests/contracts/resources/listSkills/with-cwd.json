@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 81,
+  "method": "resources/listSkills",
+  "params": {
+    "cwd": "/工作区 a/pkg"
+  }
+}

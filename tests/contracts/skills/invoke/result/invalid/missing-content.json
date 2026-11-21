@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 72,
+  "result": {
+    "name": "x",
+    "dir": "/d"
+  }
+}

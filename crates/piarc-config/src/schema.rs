@@ -413,6 +413,17 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
         name: "fileCheckpointingEnabled",
         shape: Shape::Bool,
     },
+    // Output style (T37, ADR-0054), Claude Code's key: the name of a built-in or custom
+    // style; a name no style has means `Default`.
+    Field {
+        name: "outputStyle",
+        shape: Shape::String,
+    },
+    // Claude Code's key (T37): skill name → `on`, `name-only`, `user-invocable-only`, `off`.
+    Field {
+        name: "skillOverrides",
+        shape: Shape::MapOf(&Shape::String),
+    },
     // `AskUserQuestion`'s form (T26): after this many seconds the questions' default options
     // stand, or the model hears that the user did not answer. Absent: no timeout.
     Field {

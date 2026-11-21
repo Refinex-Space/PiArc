@@ -8,7 +8,8 @@
 //! `.mcp.json` (`mcpServers`), `.claude-plugin/plugin.json` and `marketplace.json` (plugins),
 //! `.pi/extensions/` (one item per entry), `.pi/settings.json` (`extensions`, `packages`) and
 //! the `hooks` (T31) and inline `mcpServers` (T36) of subagent definitions in `.piarc/agents/`
-//! and `.claude/agents/`. An MCP server's item names its program or endpoint
+//! and `.claude/agents/`, and the `allowed-tools` and `hooks` of skills and command files in
+//! the project's `.piarc/`, `.claude/` and Pi directories (T37). An MCP server's item names its program or endpoint
 //! ([`crate::mcp::trust_item_name`]), so changing what runs is a new item. Pi's `.pi/mcp.json`
 //! is not read: PiArc's MCP extension replaces Pi's (T36).
 
@@ -117,6 +118,7 @@ pub fn enumerate(root: &Path) -> Inventory {
         pi_settings_items(&pi, &mut items);
     }
     agent_hook_items(root, &mut items, &mut unreadable);
+    skill_items(root, &mut items);
     match extension_entries(&root.join(".pi").join("extensions")) {
         Ok(names) => {
             for name in names {
@@ -172,6 +174,61 @@ fn agent_hook_items(root: &Path, items: &mut BTreeSet<Item>, unreadable: &mut Ve
             if !definition.mcp_inline.is_empty() {
                 mcp_items(&source, Some(&Value::Object(definition.mcp_inline)), items);
             }
+        }
+    }
+}
+
+/// `allowed-tools` and `hooks` of the project's skills and command files (T37, ADR-0054 rule
+/// 10): they allow tools and run commands once invoked, like allow rules and hooks in settings.
+/// One allow item per rule (`<name>: <rule>`), hooks as in settings files.
+fn skill_items(root: &Path, items: &mut BTreeSet<Item>) {
+    let catalog = crate::skills::load(&crate::skills::ResourceDirs {
+        cwd: root,
+        data: None,
+        home: None,
+    });
+    let relative = |path: &str| {
+        let path = Path::new(path);
+        path.strip_prefix(root)
+            .unwrap_or(path)
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy())
+            .collect::<Vec<_>>()
+            .join("/")
+    };
+    let entries = catalog
+        .skills
+        .iter()
+        .map(|s| {
+            (
+                &s.info.name,
+                s.info.source,
+                &s.info.path,
+                &s.info.allowed_tools,
+                &s.hooks,
+            )
+        })
+        .chain(catalog.commands.iter().map(|c| {
+            (
+                &c.info.name,
+                c.info.source,
+                c.info.path.as_ref().unwrap_or(&c.info.name),
+                &c.info.allowed_tools,
+                &c.hooks,
+            )
+        }));
+    for (name, source, path, allowed, hooks) in entries {
+        // Only the project's own files: directories above the root (and the home directory
+        // among them) are not this project's to enable.
+        if !crate::skills::is_project(source) || !Path::new(path).starts_with(root) {
+            continue;
+        }
+        let file = relative(path);
+        for rule in allowed {
+            items.insert(item(Category::AllowRule, &file, &format!("{name}: {rule}")));
+        }
+        if let Some(hooks) = hooks {
+            settings_items(&file, &serde_json::json!({ "hooks": hooks }), items);
         }
     }
 }

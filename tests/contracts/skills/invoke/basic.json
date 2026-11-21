@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 72,
+  "method": "skills/invoke",
+  "params": {
+    "sessionId": "0b9f8c1e-6a6d-4f5b-9a77-2f43c1d0e001",
+    "toolCallId": "toolu_01",
+    "name": "fix-issue",
+    "arguments": "42 \"feature x\""
+  }
+}

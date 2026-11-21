@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 74,
+  "method": "skills/match",
+  "params": {
+    "sessionId": "s1",
+    "files": ["/工作区 a/src/lib.rs"],
+    "skills": ["rust-style", "docs"]
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "jsonrpc": "2.0",
+  "id": 74,
+  "result": {
+    "matched": ["rust-style"]
+  }
+}
