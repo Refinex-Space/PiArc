@@ -1,0 +1,9 @@
+{
+  "id": "t39-windows",
+  "steps": [
+    {
+      "tool_calls": [{ "id": "write", "name": "Bash", "input": { "command": "printf w > w.txt" } }]
+    },
+    { "text": "Done." }
+  ]
+}
