@@ -20,6 +20,7 @@ import {
   MAX_ATTACHMENT_IPC_BYTES,
   MAX_PROMPT_LENGTH,
   isSessionId,
+  isWorktreeName,
 } from '../../shared/ipc.js';
 import type { Translator } from '../../shared/i18n/index.js';
 import type { RegisterHandler } from '../ipc/register.js';
@@ -30,6 +31,7 @@ export type SessionCore = Pick<
   CoreRuntime,
   | 'openWorkspace'
   | 'createSession'
+  | 'createWorktreeSession'
   | 'resumeSession'
   | 'closeSession'
   | 'prompt'
@@ -151,6 +153,29 @@ function absolutePath(value: unknown): string {
     throw new TypeError('path must be an absolute path');
   }
   return value;
+}
+
+/** The new-session form's worktree choice (T35): a valid name and a short base, both optional. */
+function worktreeOptions(value: unknown): { name?: string; base?: string } {
+  if (typeof value !== 'object' || value === null) throw new TypeError('invalid worktree');
+  const tree = value as Record<string, unknown>;
+  const options: { name?: string; base?: string } = {};
+  if (tree.name !== undefined) {
+    if (!isWorktreeName(tree.name)) throw new TypeError('invalid worktree name');
+    options.name = tree.name;
+  }
+  if (tree.base !== undefined) {
+    if (
+      typeof tree.base !== 'string' ||
+      tree.base.length === 0 ||
+      tree.base.length > 256 ||
+      Array.from(tree.base, (c) => c.charCodeAt(0)).some((code) => code < 0x20 || code === 0x7f)
+    ) {
+      throw new TypeError('invalid worktree base');
+    }
+    options.base = tree.base;
+  }
+  return options;
 }
 
 function flag(value: unknown, name: string): boolean {
@@ -396,16 +421,20 @@ export function registerSessionHandlers(
     await faults.hold(IPC_CHANNELS.workspaceOpen);
     return opened;
   });
-  registerHandler(IPC_CHANNELS.sessionCreate, (_event, [workspace, selected]) => {
+  registerHandler(IPC_CHANNELS.sessionCreate, (_event, [workspace, selected, tree]) => {
     const dir = absolutePath(workspace);
     faults.check(IPC_CHANNELS.sessionCreate);
-    if (selected == null) return core.createSession(dir, null);
-    if (typeof selected !== 'object' || !('provider' in selected) || !('id' in selected)) {
-      throw new TypeError('invalid model');
+    let model: { provider: string; id: string } | undefined;
+    if (selected != null) {
+      if (typeof selected !== 'object' || !('provider' in selected) || !('id' in selected)) {
+        throw new TypeError('invalid model');
+      }
+      model = { provider: token(selected.provider, 'provider'), id: text(selected.id, 'model') };
     }
-    return core.createSession(dir, {
-      model: { provider: token(selected.provider, 'provider'), id: text(selected.id, 'model') },
-    });
+    if (tree != null) {
+      return core.createWorktreeSession(dir, { ...worktreeOptions(tree), ...(model && { model }) });
+    }
+    return core.createSession(dir, model === undefined ? null : { model });
   });
   registerHandler(IPC_CHANNELS.sessionResume, (_event, [id]) => core.resumeSession(sessionId(id)));
   registerHandler(IPC_CHANNELS.sessionClose, (_event, [id]) => core.closeSession(sessionId(id)));
@@ -631,9 +660,6 @@ export function registerSessionHandlers(
   });
   registerHandler(IPC_CHANNELS.sessionSetPinned, async (_event, [id, pinned]) => {
     await core.setSessionPinned(sessionId(id), flag(pinned, 'pinned'));
-  });
-  registerHandler(IPC_CHANNELS.sessionSetArchived, async (_event, [id, archived]) => {
-    await core.setSessionArchived(sessionId(id), flag(archived, 'archived'));
   });
   registerHandler(IPC_CHANNELS.sessionDelete, async (event, [id]) => {
     const target = sessionId(id);

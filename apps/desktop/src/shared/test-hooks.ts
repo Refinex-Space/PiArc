@@ -2,6 +2,8 @@
 // benchmark see them through Playwright's `electronApp.evaluate`. They exist only when the
 // loaded Core is a development build. Test-only: no product feature uses them.
 
+import type { LaunchTarget } from './ipc.js';
+
 /**
  * Event-loop delay percentiles of the main process, in milliseconds, as
  * `monitorEventLoopDelay` reports them: each value is the interval between two samples, so it
@@ -176,6 +178,26 @@ export interface PiarcTestHooks {
   failNext(channel: string, message: string): void;
   /** Makes the next answer on IPC `channel` reach the window `ms` after Core gave it. */
   holdNext(channel: string, ms: number): void;
+  /** The tray's title, tooltip, menu item ids and counts (T35); undefined before it exists. */
+  tray(): TrayObservation | undefined;
+  /** Routes a launch target as a link or a second start would (T35). */
+  launch(target: LaunchTarget): void;
+  /** Quits as the menu and the tray do: asks first when work is running (T35). */
+  quit(): void;
+  /** `webContents.id` of each open main window (T35). */
+  mainWindows(): number[];
+}
+
+/** See `src/main/platform/tray.ts`. */
+export interface TrayObservation {
+  readonly title: string;
+  readonly tooltip: string;
+  readonly items: readonly string[];
+  readonly activity: {
+    readonly running: number;
+    readonly awaiting: number;
+    readonly awaitingSessions: readonly { readonly id: string; readonly title?: string }[];
+  };
 }
 
 /** See `src/main/platform/attention.ts`. */

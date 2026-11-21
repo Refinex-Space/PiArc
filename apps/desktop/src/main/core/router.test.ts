@@ -154,3 +154,17 @@ describe('EventRouter', () => {
     expect(seen[0]?.durationMs).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe('main-process listeners (T35)', () => {
+  it('hear their route whether or not a window subscribed, and do not count as unrouted', () => {
+    const router = new EventRouter();
+    const heard: string[] = [];
+    router.listen('core/activity', (batch) => {
+      heard.push(new TextDecoder().decode(batch.payload));
+    });
+    const payload = new TextEncoder().encode('[{"running":1}]');
+    router.forward([{ route: 'core/activity', seq: 1, payload }]);
+    expect(heard).toEqual(['[{"running":1}]']);
+    expect(router.stats().unrouted).toBe(0);
+  });
+});

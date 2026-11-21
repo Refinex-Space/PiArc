@@ -2,7 +2,7 @@
 // Owns the window's presentation state (`ui.tsx`) and connects the store to Core's events.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { AppCommand } from '../../shared/ipc.js';
+import type { AppCommand, LaunchTarget } from '../../shared/ipc.js';
 import { parseComposerInfo, type ComposerInfo } from '../composer/attachments.js';
 import { isImeComposing } from '../composer/ime-guard.js';
 import { useApp } from '../app/app-context.js';
@@ -14,6 +14,7 @@ import { Conversation } from './Conversation.js';
 import { Home } from './Home.js';
 import { clampSidebar, loadLayout, localStore, saveLayout, type Layout } from './layout.js';
 import { NoticeBar } from './NoticeBar.js';
+import { WorktreeCleanupNotices, folderDrop, useLaunchTargets } from './worktree-ui.js';
 import { PageBoundary } from './PageBoundary.js';
 import { DockArea, RailArea } from './PanelAreas.js';
 import type { PanelContext } from './registry.js';
@@ -172,11 +173,8 @@ export function Shell() {
     });
   }, []);
 
-  const openFolder = useCallback(async (): Promise<string | undefined> => {
-    const path = await window.piarc.chooseFolder();
-    if (path === null) {
-      return undefined;
-    }
+  /** Opens `path` as a workspace and shows its home view; resolves Core's spelling of it. */
+  const openPath = useCallback(async (path: string): Promise<string> => {
     const opened: unknown = JSON.parse(await window.piarc.openWorkspace(path));
     const canonical =
       typeof opened === 'object' &&
@@ -193,6 +191,40 @@ export function Shell() {
     );
     return canonical;
   }, []);
+
+  const openFolder = useCallback(async (): Promise<string | undefined> => {
+    const path = await window.piarc.chooseFolder();
+    if (path === null) {
+      return undefined;
+    }
+    return openPath(path);
+  }, [openPath]);
+
+  // T35: a link, a dropped folder or a second start. A folder opens as a workspace and, when it
+  // is not trusted yet, the trust dialog shows as for any folder; a session is shown.
+  const launch = useCallback(
+    (target: LaunchTarget) => {
+      if (target.kind === 'session') {
+        show({ kind: 'session', id: target.sessionId });
+        return;
+      }
+      openPath(target.path).then(
+        (opened) => ensureTrust(opened, 'decide'),
+        (error: unknown) => {
+          console.error('[shell] cannot open the folder', error);
+        },
+      );
+    },
+    [show, ensureTrust, openPath],
+  );
+  useLaunchTargets(launch);
+  const drop = useMemo(
+    () =>
+      folderDrop((path) => {
+        launch({ kind: 'workspace', path });
+      }),
+    [launch],
+  );
 
   const toggleSidebar = useCallback(() => {
     setLayout((current) => ({ ...current, sidebarCollapsed: !current.sidebarCollapsed }));
@@ -328,6 +360,8 @@ export function Shell() {
         <div
           className={`shell${layout.sidebarCollapsed ? ' is-collapsed' : ''}`}
           data-testid="app-shell"
+          onDragOver={drop.onDragOver}
+          onDrop={drop.onDrop}
           style={
             { '--piarc-sidebar-width': `${String(layout.sidebarWidth)}px` } as React.CSSProperties
           }
@@ -385,6 +419,7 @@ export function Shell() {
                   </button>
                 )}
                 <NoticeBar />
+                <WorktreeCleanupNotices />
                 <PageBoundary
                   key={view.kind === 'home' ? `home:${String(viewNonce)}` : view.id}
                   message={t('shell.pageFailed')}

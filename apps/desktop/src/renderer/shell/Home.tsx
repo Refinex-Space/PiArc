@@ -1,10 +1,13 @@
 // The main area without a session: pick a folder, describe a task, start. The message appears
 // at once (optimistic, with a clientId), then the trust dialog when this is the folder's first
 // session, then the session is created and the message sent; a failure rolls the message back
-// and puts the text back into the input.
+// and puts the text back into the input. T35: the session may run in a worktree of its own (a
+// name and a base branch, both optional); a worktree the repository does not ignore yet gets a
+// notice offering the `.gitignore` line.
 import { useEffect, useId, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
+import { isWorktreeName, type WorktreeOptions } from '../../shared/ipc.js';
 import { isImeComposing } from '../composer/ime-guard.js';
 import { useT } from '../app/app-context.js';
 import { useStore, useWorkspaces } from '../store/hooks.js';
@@ -38,6 +41,7 @@ export function Home({
   const [text, setText] = useState(draft ?? '');
   const [echo, setEcho] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(failure);
+  const tree = useWorktreeChoice(workspace);
   const busy = echo !== undefined;
   const input = useRef<HTMLTextAreaElement>(null);
   const folderLabel = useId();
@@ -54,9 +58,14 @@ export function Home({
       return;
     }
     setError(undefined);
+    if (tree.options === 'invalid') {
+      setError(t('home.worktreeInvalidName'));
+      return;
+    }
     if (!(await ui.ensureTrust(workspace, 'decide'))) {
       return;
     }
+    const worktree = tree.options;
     setText('');
     try {
       await startSession({
@@ -64,6 +73,7 @@ export function Home({
         store,
         workspace,
         ...(model ? { model: { provider: model.provider, id: model.id } } : {}),
+        ...(worktree === undefined ? {} : { worktree }),
         text: message,
         clientId: crypto.randomUUID(),
         watch: (id) => ui.connection.watchSession(id),
@@ -76,6 +86,15 @@ export function Home({
             });
           } else {
             ui.show({ kind: 'session', id: step.sessionId });
+            if (step.unignoredWorktree === true) {
+              store.addLocalNotice({
+                key: `gitignore:${workspace}`,
+                type: 'gitignore',
+                message: t('notice.gitignore', { workspace }),
+                downloadUrl: undefined,
+                workspace,
+              });
+            }
           }
         },
       });
@@ -163,6 +182,7 @@ export function Home({
             </select>
           </label>
         )}
+        {workspace && <WorktreeFields choice={tree} disabled={busy} />}
         {catalogFailure && (
           <p className="error-text" role="alert">
             {t('models.failed', { reason: catalogFailure })}
@@ -217,5 +237,142 @@ export function Home({
         </div>
       </div>
     </section>
+  );
+}
+
+interface WorktreeChoice {
+  readonly enabled: boolean;
+  readonly setEnabled: (enabled: boolean) => void;
+  readonly name: string;
+  readonly setName: (name: string) => void;
+  readonly base: string;
+  readonly setBase: (base: string) => void;
+  /** `undefined` before the answer, `false` outside a repository's top level. */
+  readonly branches:
+    { readonly current?: string; readonly list: readonly string[] } | false | undefined;
+  /** What to send: nothing (no worktree), the options, or `invalid` for a bad name. */
+  readonly options: WorktreeOptions | undefined | 'invalid';
+}
+
+/** The worktree part of the form; the branches are read when the box is ticked. */
+function useWorktreeChoice(workspace: string | undefined): WorktreeChoice {
+  const [enabled, setEnabled] = useState(false);
+  const [name, setName] = useState('');
+  const [base, setBase] = useState('');
+  const [branches, setBranches] = useState<WorktreeChoice['branches']>(undefined);
+  useEffect(() => {
+    setBranches(undefined);
+    setBase('');
+    if (!enabled || workspace === undefined) return;
+    let active = true;
+    window.piarc.worktreeBranches(workspace).then(
+      (text) => {
+        if (!active) return;
+        const value: unknown = JSON.parse(text);
+        const answer =
+          typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
+        if (answer.repository !== true) {
+          setBranches(false);
+          return;
+        }
+        const list = Array.isArray(answer.branches)
+          ? answer.branches.filter((b: unknown): b is string => typeof b === 'string')
+          : [];
+        setBranches({
+          ...(typeof answer.current === 'string' ? { current: answer.current } : {}),
+          list,
+        });
+      },
+      () => {
+        if (active) setBranches(false);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [enabled, workspace]);
+  const trimmed = name.trim();
+  const options: WorktreeChoice['options'] =
+    !enabled || branches === false
+      ? undefined
+      : trimmed.length > 0 && !isWorktreeName(trimmed)
+        ? 'invalid'
+        : {
+            ...(trimmed.length > 0 ? { name: trimmed } : {}),
+            ...(base.length > 0 ? { base } : {}),
+          };
+  return { enabled, setEnabled, name, setName, base, setBase, branches, options };
+}
+
+function WorktreeFields({ choice, disabled }: { choice: WorktreeChoice; disabled: boolean }) {
+  const t = useT();
+  const nameId = useId();
+  const baseId = useId();
+  const { branches } = choice;
+  return (
+    <div className="worktree-fields" data-testid="home-worktree-fields">
+      <label className="checkbox">
+        <input
+          type="checkbox"
+          checked={choice.enabled}
+          disabled={disabled}
+          data-testid="home-worktree"
+          onChange={(event) => {
+            choice.setEnabled(event.currentTarget.checked);
+          }}
+        />
+        {t('home.worktree')}
+      </label>
+      {choice.enabled && branches === false && (
+        <p className="muted small" role="status" data-testid="home-worktree-unavailable">
+          {t('home.worktreeNoRepo')}
+        </p>
+      )}
+      {choice.enabled && branches !== false && (
+        <div className="field-row">
+          <label htmlFor={nameId} className="field-label">
+            {t('home.worktreeName')}
+          </label>
+          <input
+            id={nameId}
+            className="input"
+            value={choice.name}
+            disabled={disabled}
+            placeholder={t('home.worktreeNameHint')}
+            aria-invalid={choice.options === 'invalid'}
+            data-testid="home-worktree-name"
+            onChange={(event) => {
+              choice.setName(event.currentTarget.value);
+            }}
+          />
+          <label htmlFor={baseId} className="field-label">
+            {t('home.worktreeBase')}
+          </label>
+          <select
+            id={baseId}
+            className="input"
+            value={choice.base}
+            disabled={disabled || branches === undefined}
+            data-testid="home-worktree-base"
+            onChange={(event) => {
+              choice.setBase(event.currentTarget.value);
+            }}
+          >
+            <option value="">
+              {branches?.current === undefined
+                ? t('home.worktreeBaseDetached')
+                : t('home.worktreeBaseHead', { branch: branches.current })}
+            </option>
+            {branches?.list
+              .filter((branch) => branch !== branches.current)
+              .map((branch) => (
+                <option key={branch} value={branch}>
+                  {branch}
+                </option>
+              ))}
+          </select>
+        </div>
+      )}
+    </div>
   );
 }

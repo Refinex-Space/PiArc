@@ -4,12 +4,29 @@
 // that was created but did not take its first prompt is closed again (Pi keeps no file for a
 // session without a reply, so it leaves no trace).
 import type { ModelRef } from '@piarc/protocol';
-import type { PiarcApi } from '../../shared/ipc.js';
+import type { PiarcApi, WorktreeOptions } from '../../shared/ipc.js';
 import type { AppStore } from '../store/app-store.js';
 
 export type StartStep =
   | { readonly kind: 'echo'; readonly clientId: string; readonly text: string }
-  | { readonly kind: 'created'; readonly sessionId: string };
+  | {
+      readonly kind: 'created';
+      readonly sessionId: string;
+      /** The session got a worktree that the repository's `.gitignore` does not cover (T35). */
+      readonly unignoredWorktree?: boolean;
+    };
+
+/** Whether the create answer names a worktree the repository does not ignore. */
+function unignoredWorktree(text: string): boolean {
+  try {
+    const value: unknown = JSON.parse(text);
+    if (typeof value !== 'object' || value === null || !('worktree' in value)) return false;
+    const tree: unknown = value.worktree;
+    return typeof tree === 'object' && tree !== null && 'ignored' in tree && tree.ignored === false;
+  } catch {
+    return false;
+  }
+}
 
 function field(text: string, name: string): string | undefined {
   try {
@@ -34,6 +51,8 @@ export async function startSession(options: {
   readonly store: AppStore;
   readonly workspace: string;
   readonly model?: ModelRef;
+  /** Run the session in a worktree of its own (T35). */
+  readonly worktree?: WorktreeOptions;
   readonly text: string;
   readonly clientId: string;
   readonly watch: (sessionId: string) => () => void;
@@ -41,14 +60,19 @@ export async function startSession(options: {
 }): Promise<string> {
   const { api, store, workspace, text, clientId } = options;
   options.onStep({ kind: 'echo', clientId, text });
-  const sessionId = field(await api.createSession(workspace, options.model), 'sessionId');
+  const created = await api.createSession(workspace, options.model, options.worktree);
+  const sessionId = field(created, 'sessionId');
   if (sessionId === undefined) {
     throw new Error('Core did not return a session id');
   }
   const transcript = store.transcript(sessionId);
   transcript.addOptimistic(clientId, { text, mentions: [], attachments: [] });
   const unwatch = options.watch(sessionId);
-  options.onStep({ kind: 'created', sessionId });
+  options.onStep({
+    kind: 'created',
+    sessionId,
+    ...(unignoredWorktree(created) ? { unignoredWorktree: true } : {}),
+  });
   try {
     const input = { requestId: clientId, text, mentions: [], attachments: [] };
     const turnId = field(await api.prompt(sessionId, input), 'turnId');

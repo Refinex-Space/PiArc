@@ -4,9 +4,12 @@ import { BrowserWindow, type BrowserWindowConstructorOptions } from 'electron';
 
 import { secureWebPreferences } from './web-preferences.js';
 
+/** The smallest main window. */
+export const MAIN_WINDOW_MIN = { width: 960, height: 600 } as const;
+
 /**
- * Creates the main window with the platform's `chrome` (title bar, material). It is shown once
- * the first frame is ready.
+ * Creates the main window with the platform's `chrome` (title bar, material) and, when given,
+ * its position and size. It is shown once the first frame is ready.
  */
 export function createMainWindow(
   preloadPath: string,
@@ -15,8 +18,8 @@ export function createMainWindow(
   const window = new BrowserWindow({
     width: 1280,
     height: 800,
-    minWidth: 960,
-    minHeight: 600,
+    minWidth: MAIN_WINDOW_MIN.width,
+    minHeight: MAIN_WINDOW_MIN.height,
     title: 'PiArc',
     show: false,
     ...chrome,

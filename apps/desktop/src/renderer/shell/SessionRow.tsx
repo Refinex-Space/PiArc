@@ -48,13 +48,22 @@ export const SessionRow = memo(function SessionRow({ id }: { readonly id: string
       },
     },
     {
+      id: 'open-window',
+      label: t('session.openWindow'),
+      run: () => {
+        window.piarc.openSessionWindow(id).catch(report);
+      },
+    },
+    {
       id: session.archived ? 'unarchive' : 'archive',
       label: t(session.archived ? 'session.unarchive' : 'session.archive'),
       run: () => {
-        if (!session.archived && selected) {
-          ui.show({ kind: 'home', workspace: session.workspace });
-        }
-        window.piarc.setSessionArchived(id, !session.archived).catch(report);
+        // A worktree with changes is asked about first (T35); cancelling keeps the session.
+        window.piarc.setSessionArchived(id, !session.archived).then((done) => {
+          if (done && !session.archived && selected) {
+            ui.show({ kind: 'home', workspace: session.workspace });
+          }
+        }, report);
       },
     },
     {

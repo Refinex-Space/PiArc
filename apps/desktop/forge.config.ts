@@ -92,6 +92,28 @@ const config: ForgeConfig = {
     // appends the platform's extension.
     icon: path.join(repoRoot, 'design', 'brand', 'icon'),
     appBundleId: APP_IDENTIFIER,
+    // T35: the menu-bar and tray icons, exported from design/brand/mark.svg
+    // (scripts/dev/export-tray-icons.mjs), next to the app's resources.
+    extraResource: [
+      'trayTemplate.png',
+      'trayTemplate@2x.png',
+      'tray-light.ico',
+      'tray-dark.ico',
+    ].map((name) => path.join(repoRoot, 'design', 'brand', name)),
+    // macOS: `piarc://` links open PiArc (CFBundleURLTypes), and folders dropped on its Dock
+    // icon reach it as `open-file` (CFBundleDocumentTypes). Windows registers both from the
+    // Velopack hooks (src/main/platform/windows-shell.ts, ADR-0052).
+    protocols: [{ name: 'PiArc', schemes: ['piarc'] }],
+    extendInfo: {
+      CFBundleDocumentTypes: [
+        {
+          CFBundleTypeName: 'Folder',
+          CFBundleTypeRole: 'Viewer',
+          LSHandlerRank: 'Alternate',
+          LSItemContentTypes: ['public.folder'],
+        },
+      ],
+    },
   },
   rebuildConfig: {},
   makers: [new MakerHdiutilDmg({}), new MakerZIP({}, ['darwin'])],

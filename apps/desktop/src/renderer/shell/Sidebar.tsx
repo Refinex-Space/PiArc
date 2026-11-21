@@ -8,6 +8,7 @@ import { useSessions, useStore, useWorkspaces } from '../store/hooks.js';
 import type { SessionEntry, WorkspaceEntry } from '../store/snapshots.js';
 import { FolderIcon, GearIcon, PlusIcon, SidebarIcon } from './icons.js';
 import { MenuButton } from './Menu.js';
+import { MessageSearch } from './MessageSearch.js';
 import { SessionRow, sessionTitle } from './SessionRow.js';
 import { baseName, useUi } from './ui.js';
 
@@ -131,7 +132,7 @@ export function Sidebar() {
         />
       </div>
       <div className="sidebar-list" data-testid="session-list">
-        {loaded && groups.length === 0 && (
+        {loaded && groups.length === 0 && filter.trim().length === 0 && (
           <p className="sidebar-empty muted">
             {filter.trim().length > 0
               ? t('sidebar.noMatches', { query: filter.trim() })
@@ -183,6 +184,7 @@ export function Sidebar() {
             )}
           </section>
         ))}
+        <MessageSearch filter={filter} />
       </div>
       <footer className="sidebar-footer">
         <label className="checkbox small">

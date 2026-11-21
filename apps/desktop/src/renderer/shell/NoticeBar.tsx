@@ -25,7 +25,32 @@ export function NoticeBar() {
                 })}
               </strong>
             )}
-            <span>{notice.hook === undefined && isMessageId(id) ? t(id) : notice.message}</span>
+            <span>
+              {notice.hook === undefined && notice.workspace === undefined && isMessageId(id)
+                ? t(id)
+                : notice.message}
+            </span>
+            {notice.type === 'gitignore' && notice.workspace !== undefined && (
+              <button
+                type="button"
+                className="button button-small"
+                data-testid="notice-gitignore"
+                onClick={() => {
+                  const { workspace } = notice;
+                  if (workspace === undefined) return;
+                  window.piarc.ignoreWorktrees(workspace).then(
+                    () => {
+                      store.dismissNotice(notice.key);
+                    },
+                    (error: unknown) => {
+                      console.error('[notice] adding the .gitignore line failed', error);
+                    },
+                  );
+                }}
+              >
+                {t('notice.gitignoreAdd')}
+              </button>
+            )}
             {notice.downloadUrl !== undefined && (
               <button
                 type="button"

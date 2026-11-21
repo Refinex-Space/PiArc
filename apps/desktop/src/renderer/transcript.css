@@ -1196,3 +1196,11 @@
   display: block;
   color: var(--piarc-text-warning);
 }
+
+/* A row reached from a search result (T35), marked for a moment. */
+.transcript-sizer > .transcript-row[data-located] {
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-accent-subtle);
+  outline: 2px solid var(--piarc-c-focus-ring);
+  outline-offset: -2px;
+}

@@ -52,3 +52,6 @@ export const HISTORY = {
   /** Items loaded when a session is opened, and per earlier page (Core's maximum is 1,000). */
   pageItems: 1000,
 } as const;
+
+/** How long a row found by search stays marked (T35). */
+export const LOCATED_MS = 2000;

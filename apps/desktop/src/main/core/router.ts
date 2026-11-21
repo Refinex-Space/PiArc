@@ -1,6 +1,7 @@
 // The main process's routing table: route key → windows subscribed to it (architecture
 // sections 7.6 and 8.3). Each window has one event port (a MessagePortMain in production).
-// Batches are forwarded by route key as they are; the payload is never read.
+// Batches are forwarded by route key as they are; the payload is never read here. The main
+// process itself listens to `core/activity` only (T35: the tray's counts), through `listen`.
 import { performance } from 'node:perf_hooks';
 
 import type { EventBatch, EventPortMessage } from '../../shared/ipc.js';
@@ -20,6 +21,7 @@ interface WindowChannel {
 export class EventRouter {
   readonly #windows = new Map<number, WindowChannel>();
   readonly #subscribers = new Map<string, Set<number>>();
+  readonly #listeners = new Map<string, (batch: EventBatch) => void>();
   #observer: ((observation: ForwardObservation) => void) | undefined;
   #deliveries = 0;
   #batches = 0;
@@ -72,6 +74,11 @@ export class EventRouter {
     this.#removeSubscriber(route, windowId);
   }
 
+  /** Hands every batch of `route` to the main process's `listener` (one per route). */
+  listen(route: string, listener: (batch: EventBatch) => void): void {
+    this.#listeners.set(route, listener);
+  }
+
   /**
    * Posts each window one message with the batches of the routes it subscribed to. Batches
    * nobody subscribed to are dropped: routing is the only decision made here.
@@ -80,8 +87,17 @@ export class EventRouter {
     const started = this.#observer === undefined ? 0 : performance.now();
     const perWindow = new Map<number, EventBatch[]>();
     for (const batch of batches) {
+      const listener = this.#listeners.get(batch.route);
+      if (listener !== undefined) {
+        try {
+          listener(batch);
+        } catch (error) {
+          console.error(`[core] the listener of ${batch.route} failed`, error);
+        }
+      }
       const windows = this.#subscribers.get(batch.route);
       if (windows === undefined) {
+        if (listener !== undefined) continue;
         this.#unrouted += 1;
         continue;
       }

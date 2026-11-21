@@ -9,10 +9,10 @@ import {
   type Range,
   type Virtualizer,
 } from '@tanstack/react-virtual';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { useT } from '../app/app-context.js';
-import { VIRTUAL_LIST } from './constants.js';
+import { LOCATED_MS, VIRTUAL_LIST } from './constants.js';
 import { loadExchange } from './copy.js';
 import { ListActionsContext, type ListActions } from './rows/list-actions.js';
 import { RowView } from './rows/RowView.js';
@@ -56,8 +56,11 @@ export function TranscriptList({
   onContent,
   onRowCommitted,
   loadEarlier,
+  focus,
 }: {
   ids: readonly string[];
+  /** Scroll to this row and mark it for a moment (T35). */
+  focus?: { readonly rowId: string; readonly nonce: number } | undefined;
   /** Receives the scroll element. */
   onScroller: (element: HTMLElement | null) => void;
   /** Receives the element whose size changes when rows change size. */
@@ -106,6 +109,21 @@ export function TranscriptList({
     },
   });
   instance.current = virtualizer;
+  const [located, setLocated] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (focus === undefined) return;
+    const index = ids.indexOf(focus.rowId);
+    if (index === -1) return;
+    virtualizer.scrollToIndex(index, { align: 'center' });
+    setLocated(focus.rowId);
+    const timer = setTimeout(() => {
+      setLocated(undefined);
+    }, LOCATED_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+    // Only a new request (its nonce) scrolls; later row changes do not pull the view back.
+  }, [focus?.nonce]);
 
   // Track the width: heights are cached per width, and a new width needs new measurements.
   useLayoutEffect(() => {
@@ -227,6 +245,7 @@ export function TranscriptList({
                 ref={virtualizer.measureElement}
                 data-index={item.index}
                 data-row-id={id}
+                data-located={located === id ? true : undefined}
                 className="transcript-row"
                 style={{ transform: `translateY(${String(item.start)}px)` }}
               >

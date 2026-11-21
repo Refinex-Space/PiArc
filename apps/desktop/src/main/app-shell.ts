@@ -2,7 +2,14 @@
 // language, the application menu, theme following, notifications and the attention count.
 // Platform integration only: what a session is and when it needs the user is decided in the
 // renderer from Core's snapshots (ADR-0013).
-import { BrowserWindow, Menu, nativeTheme } from 'electron';
+//
+// T35: any number of main windows share the one Core (each subscribes to the same snapshots,
+// so they show the same approvals and the first answer wins in Core's ledger). The most
+// recently focused one is "the" main window for the menu, notifications and the attention
+// count. Main windows take their position and size from the window state file. Links, dropped
+// folders and second starts become launch targets: a window that has not taken its queue yet
+// gets them when its page asks (`takeLaunchTargets`), a running page as an app event.
+import { BrowserWindow, Menu, nativeTheme, screen } from 'electron';
 
 import {
   APP_EVENT_CHANNEL,
@@ -12,15 +19,17 @@ import {
   type AppEvent,
   type AppState,
   type AttentionNotice,
+  type LaunchTarget,
 } from '../shared/ipc.js';
 import { Translator } from '../shared/i18n/index.js';
 import { effectiveBindings } from '../shared/keybindings.js';
 import type { RegisterHandler } from './ipc/register.js';
-import { buildMenuTemplate } from './menu.js';
+import { buildMenuTemplate, type MainCommand } from './menu.js';
 import { Attention } from './platform/attention.js';
 import { followTheme, mainWindowChrome, settingsWindowChrome } from './platform/window-chrome.js';
 import type { PreferenceStore } from './preferences.js';
-import { createMainWindow, createSettingsWindow } from './window.js';
+import { CASCADE, placeWindow, type WindowStateFile } from './platform/window-state.js';
+import { MAIN_WINDOW_MIN, createMainWindow, createSettingsWindow } from './window.js';
 
 /** Hash route of the settings window's page (src/renderer/main.tsx). */
 export const SETTINGS_HASH = '#/settings';
@@ -35,11 +44,25 @@ export interface AppShellOptions {
   readonly preferences: PreferenceStore;
   /** Development build: developer menu entries. */
   readonly developer: boolean;
+  /** Where main windows' position and size are kept. */
+  readonly windowState: WindowStateFile;
+  /** Quits after asking when work is running (T35). */
+  readonly quit: () => void;
 }
 
+/** How long moving or resizing waits before the window state is written. */
+const SAVE_DELAY_MS = 500;
+
 export class AppShell {
+  /** The most recently focused main window. */
   private main: BrowserWindow | null = null;
+  private readonly mains = new Set<BrowserWindow>();
+  /** Launch targets waiting for a window's page, by `webContents.id`. */
+  private readonly pending = new Map<number, LaunchTarget[]>();
+  /** Pages that took their queue: they hear launch targets as app events. */
+  private readonly listening = new Set<number>();
   private settings: BrowserWindow | null = null;
+  private readonly languageListeners = new Set<() => void>();
   private translator: Translator;
   readonly attention: Attention;
 
@@ -64,16 +87,26 @@ export class AppShell {
     this.applyPreferences();
   }
 
-  /** Invalidate the main window's model directory after a settings change. */
+  /** Invalidate the main windows' model directory after a settings change. */
   providersChanged(): void {
-    if (this.main !== null) this.send(this.main, { type: 'providersChanged' });
+    for (const window of this.mains) this.send(window, { type: 'providersChanged' });
   }
 
   mainWindow(): BrowserWindow | null {
     return this.main;
   }
 
-  /** Opens the main window (or focuses it) and returns it. */
+  /** The open main windows. */
+  mainWindows(): BrowserWindow[] {
+    return [...this.mains].filter((w) => !w.isDestroyed());
+  }
+
+  /** Runs `listener` after the language changed (the tray rebuilds its texts). */
+  onLanguage(listener: () => void): void {
+    this.languageListeners.add(listener);
+  }
+
+  /** Opens a main window (or focuses the most recent one) and returns it. */
   focusMain(): BrowserWindow {
     const window = this.main === null || this.main.isDestroyed() ? this.openMain() : this.main;
     if (window.isMinimized()) {
@@ -84,18 +117,90 @@ export class AppShell {
     return window;
   }
 
-  openMain(): BrowserWindow {
-    const window = createMainWindow(this.options.preloadPath, mainWindowChrome(process.platform));
+  /** Opens another main window; `targets` wait for its page. */
+  openMain(targets: readonly LaunchTarget[] = []): BrowserWindow {
+    const areas = screen.getAllDisplays().map((display) => display.workArea);
+    const primary = screen.getPrimaryDisplay().workArea;
+    const ordered = [primary, ...areas.filter((a) => a !== primary)];
+    const bounds = placeWindow(
+      this.options.windowState.load(),
+      ordered,
+      MAIN_WINDOW_MIN,
+      CASCADE * this.mainWindows().length,
+    );
+    const window = createMainWindow(this.options.preloadPath, {
+      ...mainWindowChrome(process.platform),
+      ...(bounds === undefined
+        ? {}
+        : { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }),
+    });
+    if (bounds?.maximized === true) {
+      window.once('ready-to-show', () => {
+        window.maximize();
+      });
+    }
+    const id = window.webContents.id;
+    this.pending.set(id, [...targets]);
     followTheme(window, process.platform);
     this.reportFocus(window);
+    this.keepState(window);
     void window.loadURL(this.options.entryUrl);
     this.main = window;
+    this.mains.add(window);
+    window.on('focus', () => {
+      this.main = window;
+    });
     window.on('closed', () => {
+      this.mains.delete(window);
+      this.pending.delete(id);
+      this.listening.delete(id);
       if (this.main === window) {
-        this.main = null;
+        this.main = this.mainWindows().at(-1) ?? null;
       }
     });
     return window;
+  }
+
+  /** Opens session `id` in a new main window (T35). */
+  openSessionWindow(id: string): BrowserWindow {
+    return this.openMain([{ kind: 'session', sessionId: id }]);
+  }
+
+  /**
+   * Opens what a link, a dropped folder or a second start names: in the most recent main
+   * window, opening one when none is open.
+   */
+  launch(target: LaunchTarget): void {
+    if (this.main === null || this.main.isDestroyed()) {
+      this.openMain([target]);
+      return;
+    }
+    const window = this.focusMain();
+    const id = window.webContents.id;
+    if (this.listening.has(id)) {
+      this.send(window, { type: 'launch', target });
+    } else {
+      this.pending.set(id, [...(this.pending.get(id) ?? []), target]);
+    }
+  }
+
+  /** Writes the window's position and size when it moves, resizes or closes. */
+  private keepState(window: BrowserWindow): void {
+    let timer: NodeJS.Timeout | undefined;
+    const save = () => {
+      if (timer !== undefined) clearTimeout(timer);
+      timer = undefined;
+      if (window.isDestroyed()) return;
+      const normal = window.getNormalBounds();
+      this.options.windowState.save({ ...normal, maximized: window.isMaximized() });
+    };
+    const later = () => {
+      if (timer !== undefined) clearTimeout(timer);
+      timer = setTimeout(save, SAVE_DELAY_MS);
+    };
+    window.on('resize', later);
+    window.on('move', later);
+    window.on('close', save);
   }
 
   /** Opens the settings window on `page` (or focuses it). */
@@ -127,9 +232,17 @@ export class AppShell {
   }
 
   /** Runs a command from the menu (or a shortcut the menu handled). */
-  run(command: AppCommand): void {
+  run(command: AppCommand | MainCommand): void {
     if (command === 'app.settings') {
       this.openSettings();
+      return;
+    }
+    if (command === 'app.quit') {
+      this.options.quit();
+      return;
+    }
+    if (command === 'window.new') {
+      this.openMain();
       return;
     }
     const window = this.focusMain();
@@ -144,6 +257,13 @@ export class AppShell {
       locale: this.options.preferences.locale(),
       focused: BrowserWindow.fromWebContents(event.sender)?.isFocused() ?? false,
     }));
+    registerHandler(IPC_CHANNELS.launchTargets, (event): LaunchTarget[] => {
+      const id = event.sender.id;
+      this.listening.add(id);
+      const targets = this.pending.get(id) ?? [];
+      this.pending.set(id, []);
+      return targets;
+    });
     registerHandler(IPC_CHANNELS.preferencesSet, (_event, [change]) =>
       this.options.preferences.set(change),
     );
@@ -194,6 +314,7 @@ export class AppShell {
       ),
     );
     this.settings?.setTitle(this.translator.t('settings.title'));
+    for (const listener of this.languageListeners) listener();
     const event: AppEvent = {
       type: 'preferences',
       preferences,

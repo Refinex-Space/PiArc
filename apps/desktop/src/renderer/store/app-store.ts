@@ -23,6 +23,8 @@ export interface Notice {
   readonly downloadUrl: string | undefined;
   /** A hook's `systemMessage` or error (T25): its event, and whether it is an error. */
   readonly hook?: { readonly event: string; readonly error: boolean };
+  /** A client notice about a workspace (T35: add `.piarc/worktrees/` to its `.gitignore`). */
+  readonly workspace?: string;
 }
 
 /** Hook notices kept on screen; older ones give way to new ones. */
@@ -174,6 +176,13 @@ export class AppStore {
       list = list.filter((notice) => !dropped.has(notice));
     }
     this.noticeList = list;
+    emit(this.noticeListeners);
+  }
+
+  /** Shows a notice the window itself raised (T35), once per key. */
+  addLocalNotice(notice: Notice): void {
+    if (this.noticeList.some((shown) => shown.key === notice.key)) return;
+    this.noticeList = [...this.noticeList, notice];
     emit(this.noticeListeners);
   }
 

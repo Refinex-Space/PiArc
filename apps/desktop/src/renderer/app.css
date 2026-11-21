@@ -1855,3 +1855,59 @@ textarea.input {
   font-size: var(--piarc-font-size-small);
   white-space: pre;
 }
+
+/* T35: the session's worktree in the environment bar, the new-session form's worktree fields. */
+:root[data-app] .worktree-tag {
+  font-family: var(--piarc-font-mono);
+  overflow-wrap: anywhere;
+}
+:root[data-app] .worktree-fields {
+  display: grid;
+  gap: var(--piarc-space-2);
+}
+
+/* Sidebar message search (T35). */
+:root[data-app] .message-search {
+  padding-block: var(--piarc-space-2);
+  border-top: 1px solid var(--piarc-border-subtle);
+}
+:root[data-app] .search-results,
+:root[data-app] .search-hits {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+:root[data-app] .search-result {
+  padding-block: var(--piarc-space-1);
+}
+:root[data-app] .search-session,
+:root[data-app] .search-hit {
+  display: block;
+  width: 100%;
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border: 0;
+  border-radius: var(--piarc-radius-sm);
+  background: none;
+  text-align: start;
+  cursor: pointer;
+}
+:root[data-app] .search-session {
+  font-weight: 600;
+}
+:root[data-app] .search-session:hover,
+:root[data-app] .search-hit:hover {
+  background: var(--piarc-surface-active);
+}
+:root[data-app] .search-hit {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .search-role {
+  margin-inline-end: var(--piarc-space-1);
+  color: var(--piarc-text-tertiary);
+}
+:root[data-app] .search-snippet mark {
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-accent-subtle-hover);
+  color: var(--piarc-text-primary);
+}

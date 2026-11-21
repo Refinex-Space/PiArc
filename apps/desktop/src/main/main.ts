@@ -23,9 +23,15 @@ import { installTestHooks } from './core/test-hooks.js';
 import { applyDevServerCsp, resolveDevServer } from './dev-server.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
 import { createIpcRegistrar } from './ipc/register.js';
+import { registerWorktreeHandlers } from './core/worktree-ipc.js';
+import { URL_SCHEME, launchTargets, leadingArguments, parseLaunchUrl } from './launch.js';
 import { applyDataDirs, type DataDirs } from './platform/data-dirs.js';
 import { PreferenceStore } from './preferences.js';
-import { applyAppIdentity, quitsWhenAllWindowsClosed } from './platform/index.js';
+import { applyAppIdentity } from './platform/index.js';
+import { confirmQuit } from './platform/quit.js';
+import { TrayIcon, parseActivity, trayIconDirectory } from './platform/tray.js';
+import { WindowStateFile } from './platform/window-state.js';
+import type { LaunchTarget } from '../shared/ipc.js';
 import { runVelopackStartup } from './platform/velopack.js';
 import { PRODUCTION_CSP } from './security/csp.js';
 import { guardWebContents } from './security/navigation.js';
@@ -41,7 +47,16 @@ const trustedOrigins: readonly string[] =
   devServer === undefined ? [APP_ORIGIN] : [APP_ORIGIN, devServer.origin];
 
 let shell: AppShell | undefined;
+let tray: TrayIcon | undefined;
 const eventRouter = new EventRouter();
+/** Launch targets that arrived before the shell existed (macOS sends them before `ready`). */
+const early: LaunchTarget[] = [];
+
+function launch(target: LaunchTarget | undefined): void {
+  if (target === undefined) return;
+  if (shell === undefined) early.push(target);
+  else shell.launch(target);
+}
 const terminalStats = { requests: 0, frames: 0, bytes: 0, errors: 0 };
 const faults = new FaultInjector();
 
@@ -89,6 +104,14 @@ function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners, app: App
     return;
   }
   installTestHooks({
+    tray: () => tray?.observe(),
+    launch: (target) => {
+      launch(target);
+    },
+    quit: () => {
+      app.run('app.quit');
+    },
+    mainWindows: () => app.mainWindows().map((w) => w.webContents.id),
     attention: () => app.attention.observed(),
     failNext: (channel, message) => {
       faults.failNext(channel, message);
@@ -116,14 +139,16 @@ function start(dirs: DataDirs): void {
   app.on('web-contents-created', (_event, contents) => {
     guardWebContents(contents, trustedOrigins);
   });
-  app.on('second-instance', () => {
-    console.info('[app] second instance started; focusing the existing window');
-    shell?.focusMain();
+  app.on('second-instance', (_event, argv, workingDirectory) => {
+    const targets = launchTargets(argv, leadingArguments(process.defaultApp), workingDirectory);
+    console.info(`[app] second instance started with ${String(targets.length)} targets`);
+    if (targets.length === 0) shell?.focusMain();
+    for (const target of targets) launch(target);
   });
+  // Closing the last window leaves PiArc running in the menu bar or tray: sessions and
+  // background tasks go on (architecture section 3.3). Quitting is the tray's or the menu's.
   app.on('window-all-closed', () => {
-    if (quitsWhenAllWindowsClosed) {
-      app.quit();
-    }
+    console.info('[app] no window open; running in the background');
   });
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -148,8 +173,32 @@ function start(dirs: DataDirs): void {
       entryUrl: entryUrl(),
       preferences,
       developer: import.meta.env.DEV || hasTestingExports(core.runtime),
+      windowState: WindowStateFile.in(app.getPath('userData')),
+      quit: () => {
+        void confirmQuit(core.runtime, () => appShell.t());
+      },
     });
     shell = appShell;
+    tray = new TrayIcon(
+      process.platform,
+      trayIconDirectory(app.isPackaged, process.resourcesPath, app.getAppPath()),
+      () => appShell.t(),
+      {
+        open: () => appShell.focusMain(),
+        newWindow: () => appShell.openMain(),
+        openSession: (id) => {
+          appShell.launch({ kind: 'session', sessionId: id });
+        },
+        quit: () => {
+          appShell.run('app.quit');
+        },
+      },
+    );
+    appShell.onLanguage(() => tray?.refresh());
+    eventRouter.listen('core/activity', (batch) => {
+      const activity = parseActivity(batch.payload);
+      if (activity !== undefined) tray?.update(activity);
+    });
     const registerHandler = createIpcRegistrar(trustedOrigins);
     registerIpcHandlers(registerHandler);
     appShell.registerHandlers(registerHandler);
@@ -163,6 +212,14 @@ function start(dirs: DataDirs): void {
       },
     );
     registerPermissionHandlers(registerHandler, core.runtime, () => appShell.t());
+    registerWorktreeHandlers(
+      registerHandler,
+      core.runtime,
+      () => appShell.t(),
+      (id) => {
+        appShell.openSessionWindow(id);
+      },
+    );
     const terminalOwners = new TerminalOwners(core.runtime);
     // Every page is watched from its creation: terminal input needs the page's recent real
     // input (I51), so the first keystroke must already be seen.
@@ -177,7 +234,11 @@ function start(dirs: DataDirs): void {
     // The preferences come first: the window's language, theme and menu depend on them.
     void preferences.load().then(() => {
       appShell.start();
-      appShell.openMain();
+      const targets = [
+        ...launchTargets(process.argv, leadingArguments(process.defaultApp), process.cwd()),
+        ...early.splice(0),
+      ];
+      appShell.openMain(targets);
     });
   });
 }
@@ -194,6 +255,18 @@ protocol.registerSchemesAsPrivileged([APP_SCHEME_REGISTRATION]);
 const dataDirs = applyDataDirs(app, process.env, process.platform);
 
 if (app.requestSingleInstanceLock()) {
+  // macOS delivers links and Dock drops as events, possibly before `ready`.
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    launch(parseLaunchUrl(url));
+  });
+  app.on('open-file', (event, file) => {
+    event.preventDefault();
+    launch(launchTargets([file], 0, '/')[0]);
+  });
+  // The installed app answers `piarc://` (packaged: macOS declares it in Info.plist, the
+  // Windows installer registers it, ADR-0052); a development run does not claim the scheme.
+  if (app.isPackaged) app.setAsDefaultProtocolClient(URL_SCHEME);
   start(dataDirs);
 } else {
   console.info('[app] another instance is running; exiting');

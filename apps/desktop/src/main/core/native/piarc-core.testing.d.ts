@@ -440,6 +440,44 @@ export declare class CoreRuntime {
    * as JSON; it may wait while macOS asks the user for keychain access.
    */
   keychainProbe(action: string, dir: string): Promise<string>;
+  /**
+   * Creates a session in a new worktree `.piarc/worktrees/<name>/` of the workspace's
+   * repository on the branch `piarc/<name>`. Resolves like `createSession`, with
+   * `worktree: { name, path, branch, base, copied, ignored }`.
+   */
+  createWorktreeSession(workspace: string, options: WorktreeSessionOptions): Promise<string>;
+  /**
+   * The local branches of an opened workspace's repository:
+   * `{ repository, current?, branches? }`.
+   */
+  worktreeBranches(workspace: string): Promise<string>;
+  /** Appends `.piarc/worktrees/` to an opened workspace's `.gitignore`: `{ changed }`. */
+  ignoreWorktrees(workspace: string): Promise<string>;
+  /**
+   * The uncommitted changes of a session's worktree:
+   * `{ path, branch?, exists, changes, files }`.
+   */
+  sessionWorktreeStatus(sessionId: string): Promise<string>;
+  /**
+   * Removes a closed session's worktree (its branch stays); `discard` throws its
+   * uncommitted changes away. Without it, a worktree with changes is refused.
+   */
+  removeSessionWorktree(sessionId: string, discard: boolean): Promise<string>;
+  /** Keeps an archived session's worktree for another retention period. */
+  keepSessionWorktree(sessionId: string): Promise<string>;
+  /** Runs one worktree cleanup now, as the timer does: `{ removed, waiting, failed }`. */
+  sweepWorktrees(): Promise<string>;
+  /**
+   * Sessions whose messages contain every term of `query`: `{ results: [{ sessionId,
+   * title?, workspace?, archived, updatedAt?, total, hits: [{ entryId?, role, at?, snippet,
+   * highlights: [[start, end]] }] }] }` (highlights in UTF-16 code units of the snippet).
+   */
+  searchSessions(query: string): Promise<string>;
+  /**
+   * Running sessions and background tasks now, as JSON `{ sessions, tasks }`: quitting asks
+   * first when there are some.
+   */
+  runningWork(): string;
 }
 
 /**
@@ -657,4 +695,16 @@ export interface TerminalStats {
   rowsWithCells: number;
   /** Rows sent as references. */
   rowsReused: number;
+}
+
+/** Options of `createWorktreeSession`. */
+export interface WorktreeSessionOptions {
+  /** The worktree's name (1–64 of `[A-Za-z0-9._-]`); the session id's start when absent. */
+  name?: string;
+  /** The branch or commit it starts from; the workspace's HEAD when absent. */
+  base?: string;
+  /** The model to start with; the Agent Host's default when absent. */
+  model?: SessionModel;
+  /** Optional explicit permission mode. */
+  permissionMode?: string;
 }

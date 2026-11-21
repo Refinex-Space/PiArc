@@ -14,7 +14,10 @@ export function Transcript({
   onFollow,
   onReachTop,
   loadingEarlier = false,
+  focus,
 }: {
+  /** Scrolls to this row and marks it (T35: a search result); a new nonce scrolls again. */
+  focus?: { readonly rowId: string; readonly nonce: number } | undefined;
   /** Receives the scroll-follow state machine and scroll element (prototype page, tests). */
   onFollow?: (follow: ScrollFollow, scroller: HTMLElement | null) => void;
   /** The user scrolled near the top: load earlier history, when there is any. */
@@ -29,6 +32,10 @@ export function Transcript({
   const [content, setContent] = useState<HTMLElement | null>(null);
   useScrollFollow(follow, scroller, content);
   const view = useFollowView(follow);
+  // Moving to a found message is like the user scrolling: it stops following the end.
+  useEffect(() => {
+    if (focus !== undefined) follow.userInput(performance.now());
+  }, [focus, follow]);
   useEffect(() => {
     onFollow?.(follow, scroller);
   }, [onFollow, follow, scroller]);
@@ -86,6 +93,7 @@ export function Transcript({
         onContent={setContent}
         onRowCommitted={onRowCommitted}
         loadEarlier={onReachTop}
+        focus={focus}
       />
       {view.showButton ? (
         <button

@@ -105,7 +105,38 @@ export const IPC_CHANNELS = {
   permissionUpdate: 'piarc:permissions.update',
   auditEvents: 'piarc:permissions.audit',
   configDiagnostics: 'piarc:config.diagnostics',
+  worktreeBranches: 'piarc:worktree.branches',
+  worktreeIgnore: 'piarc:worktree.ignore',
+  worktreeRemove: 'piarc:worktree.remove',
+  worktreeKeep: 'piarc:worktree.keep',
+  sessionSearch: 'piarc:session.search',
+  sessionOpenWindow: 'piarc:session.openWindow',
+  launchTargets: 'piarc:app.launchTargets',
 } as const;
+
+/** The new-session form's worktree choice (T35). */
+export interface WorktreeOptions {
+  /** 1–64 of `[A-Za-z0-9._-]`, starting with a letter or digit; Core picks one when absent. */
+  readonly name?: string;
+  /** The branch or commit it starts from; the workspace's HEAD when absent. */
+  readonly base?: string;
+}
+
+/** Worktree names as Core accepts them (`piarc_git::worktree::check_name`). */
+export function isWorktreeName(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(value) &&
+    !value.includes('..') &&
+    !value.endsWith('.') &&
+    !value.endsWith('.lock')
+  );
+}
+
+/** What a link, a dropped folder or a second start asks the app to open (T35). */
+export type LaunchTarget =
+  | { readonly kind: 'workspace'; readonly path: string }
+  | { readonly kind: 'session'; readonly sessionId: string };
 
 /** The list a permission rule is in. */
 export type RuleBehavior = 'allow' | 'ask' | 'deny';
@@ -166,7 +197,9 @@ export type AppEvent =
    */
   | { readonly type: 'focus'; readonly focused: boolean }
   /** The window was minimized or hidden (`false`), restored or shown (`true`) (T34). */
-  | { readonly type: 'visibility'; readonly visible: boolean };
+  | { readonly type: 'visibility'; readonly visible: boolean }
+  /** A link, a dropped folder or a second start asks to open something (T35). */
+  | { readonly type: 'launch'; readonly target: LaunchTarget };
 
 /** Something the user should look at (architecture section 8.8): the main process notifies. */
 export interface AttentionNotice {
@@ -524,7 +557,7 @@ export interface PiarcApi {
   /** Opens a directory as a workspace (starts its Agent Host); resolves with Core's JSON. */
   openWorkspace(path: string): Promise<string>;
   /** Creates a session in a workspace; resolves with `{ sessionId, ... }` as JSON. */
-  createSession(workspace: string, model?: ModelRef): Promise<string>;
+  createSession(workspace: string, model?: ModelRef, worktree?: WorktreeOptions): Promise<string>;
   providerSettings(): Promise<string>;
   saveProvider(configJson: string, secretJson?: string): Promise<string>;
   deleteProvider(id: string): Promise<string | null>;
@@ -625,7 +658,7 @@ export interface PiarcApi {
   /** Gives a session a title, or removes it (`null`). */
   renameSession(id: string, title: string | null): Promise<void>;
   setSessionPinned(id: string, pinned: boolean): Promise<void>;
-  setSessionArchived(id: string, archived: boolean): Promise<void>;
+  setSessionArchived(id: string, archived: boolean): Promise<boolean>;
   /**
    * Deletes a session after the user confirms in a native dialog shown by the main process
    * (`title` is what the dialog names). Resolves `false` when the user cancelled.
@@ -674,6 +707,15 @@ export interface PiarcApi {
    * Tells the main process a session needs the user: a system notification (when the window
    * is not in front and notifications are on), the Dock bounce or taskbar flash.
    */
+  worktreeBranches(workspace: string): Promise<string>;
+  ignoreWorktrees(workspace: string): Promise<string>;
+  removeSessionWorktree(id: string): Promise<boolean>;
+  keepSessionWorktree(id: string): Promise<void>;
+  searchSessions(query: string): Promise<string>;
+  openSessionWindow(id: string): Promise<void>;
+  takeLaunchTargets(): Promise<readonly LaunchTarget[]>;
+  pathForFile(file: object): string;
+
   notifyAttention(notice: AttentionNotice): Promise<void>;
   /** The number of sessions that need the user (Dock badge, taskbar overlay icon). */
   setAttentionCount(count: number): Promise<void>;

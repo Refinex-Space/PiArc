@@ -5,13 +5,25 @@
 //
 // The binding is not bundled: packaging copies it into app.asar's node_modules for Windows
 // builds only (packaging/velopack-runtime.mjs), and it is loaded from there at run time.
+//
+// T35: the install and update hooks register the `piarc://` scheme and Explorer's "Open with
+// PiArc" for the installed executable; the uninstall hook removes them (windows-shell.ts).
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
 import { app } from 'electron';
 
+import { runRegistry, shellRegistration, shellUnregistration } from './windows-shell.js';
+
+interface VelopackBuilder {
+  onAfterInstallFastCallback(callback: () => void): VelopackBuilder;
+  onAfterUpdateFastCallback(callback: () => void): VelopackBuilder;
+  onBeforeUninstallFastCallback(callback: () => void): VelopackBuilder;
+  run(): void;
+}
+
 interface VelopackBinding {
-  readonly VelopackApp: { build(): { run(): void } };
+  readonly VelopackApp: { build(): VelopackBuilder };
 }
 
 function isVelopackBinding(value: unknown): value is VelopackBinding {
@@ -43,7 +55,16 @@ export function runVelopackStartup(): void {
       console.error('[velopack] the bundled binding has no VelopackApp');
       return;
     }
-    binding.VelopackApp.build().run();
+    const register = () => {
+      runRegistry(shellRegistration(process.execPath));
+    };
+    binding.VelopackApp.build()
+      .onAfterInstallFastCallback(register)
+      .onAfterUpdateFastCallback(register)
+      .onBeforeUninstallFastCallback(() => {
+        runRegistry(shellUnregistration());
+      })
+      .run();
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     console.warn(`[velopack] startup hooks not run: ${reason}`);

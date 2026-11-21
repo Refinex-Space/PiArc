@@ -7,6 +7,9 @@
 import type { MenuItemConstructorOptions } from 'electron';
 
 import type { AppCommand } from '../shared/ipc.js';
+
+/** Commands the main process runs itself (T35): quitting asks first when work is running. */
+export type MainCommand = 'app.quit' | 'window.new';
 import type { Translator } from '../shared/i18n/index.js';
 import { commandLabel, toAccelerator, type CommandId } from '../shared/keybindings.js';
 
@@ -18,7 +21,7 @@ export interface MenuContext {
   /** Development build: reload and developer tools entries. */
   readonly developer: boolean;
   /** Runs a command (the main process forwards most of them to the focused main window). */
-  readonly run: (command: AppCommand) => void;
+  readonly run: (command: AppCommand | MainCommand) => void;
 }
 
 /** The menu template for `context`. */
@@ -52,13 +55,27 @@ export function buildMenuTemplate(context: MenuContext): MenuItemConstructorOpti
       { role: 'hideOthers', label: t('menu.app.hideOthers') },
       { role: 'unhide', label: t('menu.app.showAll') },
       separator,
-      { role: 'quit', label: t('menu.app.quit') },
+      {
+        id: 'app.quit',
+        label: t('menu.app.quit'),
+        accelerator: 'Command+Q',
+        click: () => {
+          run('app.quit');
+        },
+      },
     ],
   };
   const fileMenu: MenuItemConstructorOptions = {
     label: t('menu.file'),
     submenu: [
       command('session.new'),
+      {
+        id: 'window.new',
+        label: t('tray.newWindow'),
+        click: () => {
+          run('window.new');
+        },
+      },
       {
         id: 'workspace.openFolder',
         label: t('menu.file.openFolder'),
@@ -74,7 +91,13 @@ export function buildMenuTemplate(context: MenuContext): MenuItemConstructorOpti
             separator,
             command('app.settings'),
             separator,
-            { role: 'quit' as const, label: t('menu.file.exit') },
+            {
+              id: 'app.quit',
+              label: t('menu.file.exit'),
+              click: () => {
+                run('app.quit');
+              },
+            },
           ]),
     ],
   };

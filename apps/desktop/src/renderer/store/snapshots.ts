@@ -41,6 +41,17 @@ export interface SessionEntry {
   readonly approvals: readonly ApprovalRequest[];
   readonly permissionMode: PermissionMode;
   readonly pendingApprovals: number;
+  /**
+   * Its worktree (T35): name, directory and branch; flat values, so an unchanged entry stays
+   * the same object across snapshots.
+   */
+  readonly worktreeName: string | undefined;
+  readonly worktreePath: string | undefined;
+  readonly worktreeBranch: string | undefined;
+  /** The cleanup found uncommitted changes in its worktree and waits for the user. */
+  readonly worktreeConfirmCleanup: boolean;
+  /** Its worktree was removed (its branch stays). */
+  readonly worktreeRemoved: boolean;
 }
 
 export interface Snapshot<T> {
@@ -120,6 +131,18 @@ function sessionEntry(value: unknown): SessionEntry | undefined {
           )
         : NO_APPROVALS,
     pendingApprovals: optionalNumber(value.pendingApprovals) ?? 0,
+    ...worktreeFields(value.worktree),
+  };
+}
+
+function worktreeFields(value: unknown) {
+  const tree = isRecord(value) ? value : {};
+  return {
+    worktreeName: optionalString(tree.name),
+    worktreePath: optionalString(tree.path),
+    worktreeBranch: optionalString(tree.branch),
+    worktreeConfirmCleanup: tree.confirmCleanup === true,
+    worktreeRemoved: tree.removed === true,
   };
 }
 

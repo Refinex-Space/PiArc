@@ -34,6 +34,7 @@ import { RewindDialog, type RewindTarget } from '../changes/RewindDialog.js';
 import { useBranchActions } from '../changes/use-branch-actions.js';
 import { TranscriptContext, type TranscriptView } from '../transcript/services.js';
 import { Transcript } from '../transcript/Transcript.js';
+import { onLocate, rowShowsEntry, takeLocate } from '../store/locate.js';
 import { chooseDetail, DetailContext, detailOf } from '../transcript/detail.js';
 import { DetailSwitch } from '../transcript/DetailSwitch.js';
 import { reason } from './errors.js';
@@ -85,6 +86,60 @@ function draftOf(submission: ComposerSubmission): Draft {
     pending: submission.attachments,
     stored: [],
   };
+}
+
+/** Earlier pages a search result may load to find its entry. */
+const LOCATE_PAGES = 50;
+
+/**
+ * A search result's entry (T35): once the history is loaded, the row that shows it, loading
+ * earlier pages while it is not there yet. A message on another branch is not shown: the user
+ * is told.
+ */
+function useLocated(
+  id: string,
+  transcript: SessionTranscript,
+  history: { loading: boolean; loadEarlier: () => Promise<void> },
+  notFound: (text: string) => void,
+): { rowId: string; nonce: number } | undefined {
+  const t = useT();
+  const [focus, setFocus] = useState<{ rowId: string; nonce: number }>();
+  const [request, setRequest] = useState(() => takeLocate(id));
+  useEffect(
+    () =>
+      onLocate(() => {
+        const next = takeLocate(id);
+        if (next !== undefined) setRequest(next);
+      }),
+    [id],
+  );
+  const { loading, loadEarlier } = history;
+  useEffect(() => {
+    if (request === undefined || loading || !transcript.hasContent()) return;
+    // Cleared when the effect is replaced: a stale search stops.
+    const run = { active: true };
+    void (async () => {
+      for (let page = 0; page <= LOCATE_PAGES && run.active; page += 1) {
+        const rowId = transcript.rowIds().find((row) => rowShowsEntry(row, request.entryId));
+        if (rowId !== undefined) {
+          setFocus({ rowId, nonce: request.nonce });
+          setRequest(undefined);
+          return;
+        }
+        const start = transcript.historyStart();
+        if (start === undefined || start === 0) break;
+        await loadEarlier();
+      }
+      if (run.active) {
+        setRequest(undefined);
+        notFound(t('transcript.located'));
+      }
+    })();
+    return () => {
+      run.active = false;
+    };
+  }, [request, loading, transcript, loadEarlier, notFound, t]);
+  return focus;
 }
 
 /** Loads the history when the session was not shown before, and again after lost events. */
@@ -224,6 +279,9 @@ export function Conversation({
     ui.watchSession(id);
   }, [ui, id]);
   const history = useHistory(id, transcript);
+  const focus = useLocated(id, transcript, history, (text) => {
+    ui.addToast({ sessionId: id, text });
+  });
 
   // Shown to the user (the window in front): no longer unread.
   const unread = session?.unread === true;
@@ -353,7 +411,11 @@ export function Conversation({
               <p className="muted conversation-note">{t('conversation.loading')}</p>
             ) : null}
             {empty ? <p className="muted conversation-note">{t('conversation.empty')}</p> : null}
-            <Transcript onReachTop={history.loadEarlier} loadingEarlier={history.loadingEarlier} />
+            <Transcript
+              onReachTop={history.loadEarlier}
+              loadingEarlier={history.loadingEarlier}
+              focus={focus}
+            />
           </div>
         </TranscriptContext.Provider>
       </DetailContext.Provider>
@@ -397,6 +459,19 @@ export function Conversation({
           }
         />
         <div className="environment-bar">
+          {session?.worktreeName !== undefined && (
+            <span
+              className="tag worktree-tag"
+              data-testid="env-worktree"
+              title={t('env.worktreeTitle', {
+                path: session.worktreePath ?? '',
+                branch: session.worktreeBranch ?? '',
+              })}
+            >
+              {t('env.worktree', { name: session.worktreeName })}
+              {session.worktreeBranch === undefined ? null : ` · ${session.worktreeBranch}`}
+            </span>
+          )}
           <ModelMenus
             id={id}
             catalog={catalog}

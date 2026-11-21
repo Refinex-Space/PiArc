@@ -2,7 +2,7 @@
 // imports nothing else at runtime. It exposes the `window.piarc` allowlist and never
 // `ipcRenderer` itself (Electron security checklist item 20). Event listeners receive the
 // batch only, never an Electron event object.
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 import {
   APP_EVENT_CHANNEL,
@@ -12,6 +12,7 @@ import {
   type AppState,
   type EventBatch,
   type EventListener,
+  type LaunchTarget,
   type PiarcApi,
 } from '../shared/ipc.js';
 import type { Preferences } from '../shared/preferences.js';
@@ -90,6 +91,23 @@ function expectPreferences(value: unknown): Preferences {
 
 const appListeners = new Set<(event: AppEvent) => void>();
 let appChannelOpen = false;
+
+function launchTargetsOf(value: unknown): LaunchTarget[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const targets: LaunchTarget[] = [];
+  for (const item of value as unknown[]) {
+    if (typeof item !== 'object' || item === null) return undefined;
+    const target = item as Record<string, unknown>;
+    if (target.kind === 'workspace' && typeof target.path === 'string') {
+      targets.push({ kind: 'workspace', path: target.path });
+    } else if (target.kind === 'session' && typeof target.sessionId === 'string') {
+      targets.push({ kind: 'session', sessionId: target.sessionId });
+    } else {
+      return undefined;
+    }
+  }
+  return targets;
+}
 
 function onAppEvent(listener: (event: AppEvent) => void): () => void {
   if (typeof listener !== 'function') {
@@ -299,9 +317,9 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.workspaceOpen, path)
       .then((value: unknown) => expectString(value)),
-  createSession: (workspace, model) =>
+  createSession: (workspace, model, worktree) =>
     ipcRenderer
-      .invoke(IPC_CHANNELS.sessionCreate, workspace, model)
+      .invoke(IPC_CHANNELS.sessionCreate, workspace, model, worktree)
       .then((value: unknown) => expectString(value)),
   resumeSession: (id) =>
     ipcRenderer
@@ -456,9 +474,10 @@ const api: PiarcApi = {
   setSessionPinned: async (id, pinned) => {
     await ipcRenderer.invoke(IPC_CHANNELS.sessionSetPinned, id, pinned);
   },
-  setSessionArchived: async (id, archived) => {
-    await ipcRenderer.invoke(IPC_CHANNELS.sessionSetArchived, id, archived);
-  },
+  setSessionArchived: (id, archived) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionSetArchived, id, archived)
+      .then((value: unknown) => expectBoolean(value)),
   deleteSession: (id, title) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.sessionDelete, id, title)
@@ -494,6 +513,35 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.trustDecide, path, trusted, version)
       .then((value: unknown) => expectString(value)),
+  worktreeBranches: (workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.worktreeBranches, workspace)
+      .then((value: unknown) => expectString(value)),
+  ignoreWorktrees: (workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.worktreeIgnore, workspace)
+      .then((value: unknown) => expectString(value)),
+  removeSessionWorktree: (id) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.worktreeRemove, id)
+      .then((value: unknown) => expectBoolean(value)),
+  keepSessionWorktree: async (id) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.worktreeKeep, id);
+  },
+  searchSessions: (query) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionSearch, query)
+      .then((value: unknown) => expectString(value)),
+  openSessionWindow: async (id) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.sessionOpenWindow, id);
+  },
+  takeLaunchTargets: () =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.launchTargets)
+      .then((value: unknown) => expectShape(value, launchTargetsOf, 'launch targets')),
+  // A file or folder dropped on the page: its path, for opening a dropped folder (T35).
+  pathForFile: (file) =>
+    webUtils.getPathForFile(file as Parameters<typeof webUtils.getPathForFile>[0]),
   notifyAttention: async (notice) => {
     await ipcRenderer.invoke(IPC_CHANNELS.attentionNotify, notice);
   },

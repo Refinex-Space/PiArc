@@ -6,11 +6,13 @@ import { monitorEventLoopDelay, performance, type ELDHistogram } from 'node:perf
 
 import { Notification, webContents } from 'electron';
 
+import type { LaunchTarget } from '../../shared/ipc.js';
 import type {
   AttentionObservation,
   ForwardObservation,
   NotificationProbeEvent,
   TerminalForwardStats,
+  TrayObservation,
 } from '../../shared/test-hooks.js';
 import type { TestingCore } from './load.js';
 import type { EventRouter } from './router.js';
@@ -32,6 +34,10 @@ export function installTestHooks(options: {
   readonly attention: () => AttentionObservation;
   readonly failNext: (channel: string, message: string) => void;
   readonly holdNext: (channel: string, ms: number) => void;
+  readonly tray: () => TrayObservation | undefined;
+  readonly launch: (target: LaunchTarget) => void;
+  readonly quit: () => void;
+  readonly mainWindows: () => number[];
 }): void {
   const { router } = options;
   let histogram: ELDHistogram | undefined;
@@ -42,6 +48,10 @@ export function installTestHooks(options: {
     routerStats: () => router.stats(),
     routesOf: (id) => router.routesOf(id),
     openWindow: options.openWindow,
+    tray: options.tray,
+    launch: options.launch,
+    quit: options.quit,
+    mainWindows: options.mainWindows,
     measureEcho: (route, payload, calls) => {
       const durations: number[] = [];
       for (let i = 0; i < calls; i += 1) {
