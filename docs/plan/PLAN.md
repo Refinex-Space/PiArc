@@ -316,10 +316,10 @@ T35（开工 2026-11-20，基线复用 991f323 的全量 verify；T34 的遗留 
 - [x] 3 归档询问与到期清理（时钟可注入）（A03 的 Core 与场景部分）
 - [x] 4 子 agent `isolation: worktree`（A04）
 - [x] 5 全文搜索：`session_fts`（FTS5 trigram）、增量同步、重建、Core API（A05）
-- [ ] 6 客户端：新建会话 worktree 选项、归档对话、侧栏搜索与定位（A03 Playwright、A06）
-- [ ] 7 主进程：多窗口、窗口状态、审批一致（A07）
-- [ ] 8 后台常驻：托盘 / 菜单栏、计数、退出确认、图标导出（A08）
-- [ ] 9 `piarc://`、open-file、拖入文件夹、Windows 右键菜单注册与参数解析（A09、A10）
+- [x] 6 客户端：新建会话 worktree 选项、归档对话、侧栏搜索与定位（A03 Playwright、A06）
+- [x] 7 主进程：多窗口、窗口状态、审批一致（A07）
+- [x] 8 后台常驻：托盘 / 菜单栏、计数、退出确认、图标导出（A08）
+- [x] 9 `piarc://`、open-file、拖入文件夹、Windows 右键菜单注册与参数解析（A09、A10）
 - [ ] 10 内存测量脚本与 `docs/perf/M3-memory.md`（A11）
 - [ ] 11 文档、AGENTS.md、架构与 ADR、verify（A12）与收尾
 
