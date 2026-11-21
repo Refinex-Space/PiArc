@@ -91,7 +91,7 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     ignored("allowAllClaudeAiMcps", MANAGED),
     ignored("allowClaudeInChromeWithManagedMcp", MANAGED),
     ignored("allowedChannelPlugins", MANAGED),
-    planned("allowedHttpHookUrls", "T38", "http hooks"),
+    active("allowedHttpHookUrls", "/allowedHttpHookUrls"),
     planned(
         "allowedMcpServers",
         "T47",
@@ -202,7 +202,7 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     ignored("gatewayInternalNetworks", MANAGED),
     ignored("gcpAuthRefresh", ACCOUNT),
     active("hooks", "/hooks"),
-    planned("httpHookAllowedEnvVars", "T38", "http hooks"),
+    active("httpHookAllowedEnvVars", "/httpHookAllowedEnvVars"),
     ignored("idleCompaction", NONE),
     ignored("includeCoAuthoredBy", NONE),
     ignored("includeGitInstructions", NONE),

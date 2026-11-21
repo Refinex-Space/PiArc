@@ -6,8 +6,9 @@
 //!   file runs once per event, with the settings of the highest-precedence copy.
 //! - `disableAllHooks: true` (after merging) turns every hook off.
 //! - What PiArc does not run is reported as a [`Diagnostic`] and never runs: events of later
-//!   milestones, `http`, `prompt`, `mcp_tool` and `agent` handlers, `async` and `asyncRewake`
-//!   handlers, and matchers its regular expressions cannot express.
+//!   milestones, `mcp_tool` and `agent` handlers, a handler type the event does not take
+//!   ([`HookEvent::supports`]), `async` and `asyncRewake` handlers, and matchers its regular
+//!   expressions cannot express.
 //!
 //! The caller decides which layers apply: an untrusted project's layers arrive without hooks
 //! (`piarc-config` leaves them out of the merge).
@@ -19,7 +20,7 @@ use std::time::Duration;
 
 use serde_json::Value;
 
-use crate::event::{HookEvent, LATER_EVENTS};
+use crate::event::{HandlerKind, HookEvent, LATER_EVENTS};
 use crate::matcher::Matcher;
 
 /// Where a handler is defined.
@@ -49,15 +50,53 @@ pub enum Shell {
     PowerShell,
 }
 
-/// A `command` handler.
+/// What a `command` handler runs.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Handler {
+pub struct Command {
     /// The shell command, or the program in exec form.
     pub command: String,
     /// Exec form: arguments given to `command` without a shell.
     pub args: Option<Vec<String>>,
     /// `shell`, when set.
     pub shell: Option<Shell>,
+}
+
+/// Where an `http` handler posts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Http {
+    /// `url`.
+    pub url: String,
+    /// `headers`, values before `$VAR` interpolation.
+    pub headers: BTreeMap<String, String>,
+    /// `allowedEnvVars`: the variables its headers may interpolate.
+    pub allowed_env_vars: Vec<String>,
+}
+
+/// What a `prompt` handler asks the model.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Prompt {
+    /// `prompt`, with `$ARGUMENTS` where the input goes.
+    pub prompt: String,
+    /// `model`: a model alias, `provider/model` or a model id; the auxiliary model when unset.
+    pub model: Option<String>,
+    /// `continueOnBlock`: on `PreToolUse` and `PostToolUse`, `ok: false` gives the model the
+    /// reason and the turn goes on instead of ending.
+    pub continue_on_block: bool,
+}
+
+/// What a handler does.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Action {
+    Command(Command),
+    Http(Http),
+    Prompt(Prompt),
+}
+
+/// A handler.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Handler {
+    /// Its type and fields.
+    pub action: Action,
     /// `timeout`.
     pub timeout: Option<Duration>,
     /// `if`: one permission rule a tool call must match.
@@ -71,13 +110,18 @@ pub struct Handler {
 }
 
 impl Handler {
-    fn identity(&self) -> (&str, Option<&[String]>, Option<Shell>, Option<&str>) {
-        (
-            &self.command,
-            self.args.as_deref(),
-            self.shell,
-            self.condition.as_deref(),
-        )
+    /// The handler type.
+    #[must_use]
+    pub fn kind(&self) -> HandlerKind {
+        match self.action {
+            Action::Command(_) => HandlerKind::Command,
+            Action::Http(_) => HandlerKind::Http,
+            Action::Prompt(_) => HandlerKind::Prompt,
+        }
+    }
+
+    fn identity(&self) -> (&Action, Option<&str>) {
+        (&self.action, self.condition.as_deref())
     }
 }
 
@@ -88,7 +132,7 @@ pub enum DiagnosticKind {
     LaterEvent,
     /// An event name nobody defines.
     UnknownEvent,
-    /// A handler type PiArc runs from a later task.
+    /// A handler type PiArc runs from a later task, or one the event does not take.
     UnsupportedType,
     /// A field PiArc does not honor; the handler does not run (`async`) or runs without it.
     UnsupportedField,
@@ -188,12 +232,12 @@ impl HookConfig {
             let matcher_text = group.get("matcher").and_then(Value::as_str);
             let matcher = match Matcher::parse(matcher_text) {
                 Ok(m) => m,
-                Err(message) => {
+                Err(error) => {
                     self.report(
                         source,
                         &format!("{pointer}/matcher"),
                         DiagnosticKind::InvalidMatcher,
-                        &message,
+                        &error.to_string(),
                     );
                     continue;
                 }
@@ -233,21 +277,33 @@ impl HookConfig {
         let Some(fields) = value.as_object() else {
             return invalid(self, "a hook must be an object");
         };
-        match fields.get("type").and_then(Value::as_str) {
-            Some("command") => {}
-            Some(kind @ ("http" | "prompt")) => {
-                return self.unsupported_type(source, &pointer, kind, "T38");
-            }
+        let kind = match fields.get("type").and_then(Value::as_str) {
+            Some("command") => HandlerKind::Command,
+            Some("http") => HandlerKind::Http,
+            Some("prompt") => HandlerKind::Prompt,
             Some(kind @ "mcp_tool") => return self.unsupported_type(source, &pointer, kind, "T41"),
             Some(kind @ "agent") => {
                 return self.unsupported_type(source, &pointer, kind, "unscheduled");
             }
             Some(other) => return invalid(self, &format!("unknown hook type {other:?}")),
             None => return invalid(self, "a hook needs a type"),
+        };
+        if !event.supports(kind) {
+            self.report(
+                source,
+                &format!("{pointer}/type"),
+                DiagnosticKind::UnsupportedType,
+                &format!(
+                    "{} hooks do not run on {}; this hook is ignored",
+                    kind.name(),
+                    event.name()
+                ),
+            );
+            return None;
         }
-        let command = match fields.get("command").and_then(Value::as_str) {
-            Some(c) if !c.trim().is_empty() => c.to_owned(),
-            _ => return invalid(self, "a command hook needs a command"),
+        let action = match action(kind, fields) {
+            Ok(action) => action,
+            Err(message) => return invalid(self, &message),
         };
         for flag in ["async", "asyncRewake"] {
             if fields.get(flag) == Some(&Value::Bool(true)) {
@@ -286,9 +342,7 @@ impl HookConfig {
             Err(message) => return invalid(self, &message),
         };
         Some(Handler {
-            command,
-            args: options.args,
-            shell: options.shell,
+            action,
             timeout: options.timeout,
             condition,
             block_on_failure: options.block_on_failure,
@@ -366,31 +420,13 @@ impl HookConfig {
     }
 }
 
-/// A command handler's optional fields.
+/// The optional fields every handler type takes.
 struct Options {
-    args: Option<Vec<String>>,
-    shell: Option<Shell>,
     timeout: Option<Duration>,
     block_on_failure: bool,
 }
 
 fn options(fields: &serde_json::Map<String, Value>) -> Result<Options, String> {
-    let args = match fields.get("args") {
-        None => None,
-        Some(Value::Array(list)) if list.iter().all(Value::is_string) => Some(
-            list.iter()
-                .filter_map(Value::as_str)
-                .map(str::to_owned)
-                .collect(),
-        ),
-        Some(_) => return Err("args must be a list of strings".into()),
-    };
-    let shell = match fields.get("shell").and_then(Value::as_str) {
-        None => None,
-        Some("bash") => Some(Shell::Bash),
-        Some("powershell") => Some(Shell::PowerShell),
-        Some(other) => return Err(format!("unknown shell {other:?}")),
-    };
     let timeout = match fields.get("timeout") {
         None => None,
         Some(v) => match v.as_f64() {
@@ -406,11 +442,95 @@ fn options(fields: &serde_json::Map<String, Value>) -> Result<Options, String> {
         Some(other) => return Err(format!("unknown onFailure {other:?}")),
     };
     Ok(Options {
-        args,
-        shell,
         timeout,
         block_on_failure,
     })
+}
+
+/// A required non-blank string field.
+fn required<'a>(
+    fields: &'a serde_json::Map<String, Value>,
+    key: &str,
+    what: &str,
+) -> Result<&'a str, String> {
+    match fields.get(key).and_then(Value::as_str) {
+        Some(text) if !text.trim().is_empty() => Ok(text),
+        _ => Err(format!("{what} needs {key}")),
+    }
+}
+
+/// A list of strings, or nothing.
+fn strings(fields: &serde_json::Map<String, Value>, key: &str) -> Result<Vec<String>, String> {
+    match fields.get(key) {
+        None => Ok(Vec::new()),
+        Some(Value::Array(list)) if list.iter().all(Value::is_string) => Ok(list
+            .iter()
+            .filter_map(Value::as_str)
+            .map(str::to_owned)
+            .collect()),
+        Some(_) => Err(format!("{key} must be a list of strings")),
+    }
+}
+
+/// The type's own fields.
+fn action(kind: HandlerKind, fields: &serde_json::Map<String, Value>) -> Result<Action, String> {
+    match kind {
+        HandlerKind::Command => {
+            let command = required(fields, "command", "a command hook")?.to_owned();
+            let args = match fields.get("args") {
+                None => None,
+                Some(_) => Some(strings(fields, "args")?),
+            };
+            let shell = match fields.get("shell").and_then(Value::as_str) {
+                None => None,
+                Some("bash") => Some(Shell::Bash),
+                Some("powershell") => Some(Shell::PowerShell),
+                Some(other) => return Err(format!("unknown shell {other:?}")),
+            };
+            Ok(Action::Command(Command {
+                command,
+                args,
+                shell,
+            }))
+        }
+        HandlerKind::Http => {
+            let url = required(fields, "url", "an http hook")?.trim().to_owned();
+            if !(url.starts_with("http://") || url.starts_with("https://")) {
+                return Err("an http hook's url must start with http:// or https://".into());
+            }
+            let headers = match fields.get("headers") {
+                None => BTreeMap::new(),
+                Some(Value::Object(map)) if map.values().all(Value::is_string) => map
+                    .iter()
+                    .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_owned())))
+                    .collect(),
+                Some(_) => return Err("headers must map names to strings".into()),
+            };
+            Ok(Action::Http(Http {
+                url,
+                headers,
+                allowed_env_vars: strings(fields, "allowedEnvVars")?,
+            }))
+        }
+        HandlerKind::Prompt => {
+            let prompt = required(fields, "prompt", "a prompt hook")?.to_owned();
+            let model = match fields.get("model") {
+                None => None,
+                Some(Value::String(m)) if !m.trim().is_empty() => Some(m.trim().to_owned()),
+                Some(_) => return Err("model must be a model name".into()),
+            };
+            let continue_on_block = match fields.get("continueOnBlock") {
+                None => false,
+                Some(Value::Bool(b)) => *b,
+                Some(_) => return Err("continueOnBlock must be true or false".into()),
+            };
+            Ok(Action::Prompt(Prompt {
+                prompt,
+                model,
+                continue_on_block,
+            }))
+        }
+    }
 }
 
 /// A JSON Pointer token.
@@ -443,7 +563,14 @@ mod tests {
     }
 
     fn commands(handlers: &[Arc<Handler>]) -> Vec<&str> {
-        handlers.iter().map(|h| h.command.as_str()).collect()
+        handlers
+            .iter()
+            .map(|h| match &h.action {
+                Action::Command(c) => c.command.as_str(),
+                Action::Http(h) => h.url.as_str(),
+                Action::Prompt(p) => p.prompt.as_str(),
+            })
+            .collect()
     }
 
     #[test]
@@ -493,6 +620,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::too_many_lines, reason = "one table of every diagnostic kind")]
     fn unsupported_parts_are_reported_and_do_not_run() {
         let config = parse(&[(
             "claudeProject",
@@ -506,16 +634,31 @@ mod tests {
                         {"type": "agent", "prompt": "check"},
                         {"type": "command", "command": "sync", "async": false, "once": true}
                     ]}],
-                "SubagentStop": [],
+                "SessionStart": [{"hooks": [
+                    {"type": "http", "url": "https://example.invalid/start"},
+                    {"type": "prompt", "prompt": "start?"}
+                ]}],
+                "SubagentStart": [{"hooks": [{"type": "prompt", "prompt": "go?"}]}],
+                "UserPromptExpansion": [],
                 "BeforeEverything": [],
                 "Stop": [{"hooks": [{"type": "command", "command": "c", "if": "Bash(*)"}]}]
             }),
         )]);
         assert_eq!(
             commands(&config.select(HookEvent::PreToolUse, Some("Bash"))),
-            ["sync"]
+            ["https://example.invalid", "ok?", "sync"]
         );
         assert!(config.select(HookEvent::Stop, None).is_empty());
+        assert!(
+            config
+                .select(HookEvent::SessionStart, Some("startup"))
+                .is_empty()
+        );
+        assert!(
+            config
+                .select(HookEvent::SubagentStart, Some("Explore"))
+                .is_empty()
+        );
         let kinds: Vec<(DiagnosticKind, &str)> = config
             .diagnostics()
             .iter()
@@ -535,14 +678,6 @@ mod tests {
                 ),
                 (
                     DiagnosticKind::UnsupportedType,
-                    "/hooks/PreToolUse/1/hooks/1/type"
-                ),
-                (
-                    DiagnosticKind::UnsupportedType,
-                    "/hooks/PreToolUse/1/hooks/2/type"
-                ),
-                (
-                    DiagnosticKind::UnsupportedType,
                     "/hooks/PreToolUse/1/hooks/3/type"
                 ),
                 (
@@ -553,12 +688,74 @@ mod tests {
                     DiagnosticKind::UnsupportedField,
                     "/hooks/PreToolUse/1/hooks/5/once"
                 ),
+                (
+                    DiagnosticKind::UnsupportedType,
+                    "/hooks/SessionStart/0/hooks/0/type"
+                ),
+                (
+                    DiagnosticKind::UnsupportedType,
+                    "/hooks/SessionStart/0/hooks/1/type"
+                ),
                 (DiagnosticKind::UnsupportedField, "/hooks/Stop/0/hooks/0/if"),
-                (DiagnosticKind::LaterEvent, "/hooks/SubagentStop"),
+                (
+                    DiagnosticKind::UnsupportedType,
+                    "/hooks/SubagentStart/0/hooks/0/type"
+                ),
+                (DiagnosticKind::LaterEvent, "/hooks/UserPromptExpansion"),
             ]
         );
         assert!(config.diagnostics()[0].message.contains("not a hook event"));
         assert!(config.diagnostics()[1].message.contains("look-ahead"));
+        assert!(
+            config.diagnostics()[6]
+                .message
+                .contains("http hooks do not run on SessionStart")
+        );
+    }
+
+    #[test]
+    fn http_and_prompt_fields_are_read() {
+        let config = parse(&[(
+            "user",
+            json!({
+                "PostToolBatch": [{"hooks": [
+                    {"type": "http", "url": " https://hooks.example/batch ", "timeout": 5,
+                     "headers": {"Authorization": "Bearer $TOKEN"}, "allowedEnvVars": ["TOKEN"]},
+                    {"type": "prompt", "prompt": "Judge $ARGUMENTS", "model": "fast", "continueOnBlock": true},
+                    {"type": "http", "url": "ftp://x"},
+                    {"type": "http", "url": "https://x", "headers": {"A": 1}},
+                    {"type": "prompt", "prompt": "  "},
+                    {"type": "prompt", "prompt": "p", "continueOnBlock": "yes"}
+                ]}]
+            }),
+        )]);
+        let selected = config.select(HookEvent::PostToolBatch, None);
+        assert_eq!(selected.len(), 2);
+        assert_eq!(
+            selected[0].action,
+            Action::Http(Http {
+                url: "https://hooks.example/batch".into(),
+                headers: BTreeMap::from([("Authorization".into(), "Bearer $TOKEN".into())]),
+                allowed_env_vars: vec!["TOKEN".into()],
+            })
+        );
+        assert_eq!(selected[0].kind(), HandlerKind::Http);
+        assert_eq!(selected[0].timeout, Some(Duration::from_secs(5)));
+        assert_eq!(
+            selected[1].action,
+            Action::Prompt(Prompt {
+                prompt: "Judge $ARGUMENTS".into(),
+                model: Some("fast".into()),
+                continue_on_block: true,
+            })
+        );
+        assert_eq!(config.diagnostics().len(), 4);
+        assert!(
+            config
+                .diagnostics()
+                .iter()
+                .all(|d| d.kind == DiagnosticKind::Invalid)
+        );
     }
 
     #[test]
@@ -573,11 +770,14 @@ mod tests {
         )]);
         let selected = config.select(HookEvent::PostToolUse, Some("Write"));
         let h = &selected[0];
+        let Action::Command(c) = &h.action else {
+            panic!("a command hook");
+        };
         assert_eq!(
-            h.args.as_deref(),
+            c.args.as_deref(),
             Some(&["fmt.js".to_owned(), "--fix".to_owned()][..])
         );
-        assert_eq!(h.shell, Some(Shell::PowerShell));
+        assert_eq!(c.shell, Some(Shell::PowerShell));
         assert_eq!(h.timeout, Some(Duration::from_millis(2500)));
         assert_eq!(h.condition.as_deref(), Some("Write(src/**)"));
         assert!(h.block_on_failure);

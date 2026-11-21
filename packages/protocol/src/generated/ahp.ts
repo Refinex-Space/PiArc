@@ -85,6 +85,8 @@ export type AhpMessage =
   | TrustGetResponse
   | HooksRunRequest
   | HooksRunResponse
+  | HooksPromptRequest
+  | HooksPromptResponse
   | FsMemoryRequest
   | FsMemoryResponse
   | FsStatRequest
@@ -163,6 +165,10 @@ export type AhpMessage =
   | FsForgetReadsResponse
   | WebFetchRequest
   | WebFetchResponse
+  | WebSearchRequest
+  | WebSearchResponse
+  | WebSearchBackendRequest
+  | WebSearchBackendResponse
   | ModelsLoginStartRequest
   | ModelsLoginStartResponse
   | ModelsLoginCancelRequest
@@ -599,6 +605,43 @@ export type Item =
         [k: string]: unknown;
       };
       /**
+       * The backend that answered (`native` or a third-party id), in `item/completed`.
+       */
+      backend?: string | null;
+      /**
+       * The item's identifier: the tool call id.
+       */
+      itemId: ItemId;
+      /**
+       * The text the tool returned, in `item/completed`.
+       */
+      output?: string | null;
+      /**
+       * The search terms.
+       */
+      query: string;
+      /**
+       * The results, in `item/completed`.
+       */
+      sources?: WebSearchSource[];
+      /**
+       * Lifecycle state.
+       */
+      status: ItemStatus;
+      /**
+       * Canonical tool name.
+       */
+      tool: string;
+      type: 'webSearch';
+    }
+  | {
+      /**
+       * The arguments the tool was called with.
+       */
+      arguments: {
+        [k: string]: unknown;
+      };
+      /**
        * The item's identifier: the tool call id.
        */
       itemId: ItemId;
@@ -757,7 +800,10 @@ export type HostHookEvent =
   | 'postToolUseFailure'
   | 'stop'
   | 'preCompact'
-  | 'postCompact';
+  | 'postCompact'
+  | 'subagentStart'
+  | 'subagentStop'
+  | 'postToolBatch';
 /**
  * What a path names.
  */
@@ -819,6 +865,14 @@ export type ExternalChange = 'modified' | 'deleted';
  * How `content` was produced.
  */
 export type WebContentFormat = 'markdown' | 'text';
+/**
+ * Parameters of `web/searchBackend`: none.
+ */
+export type WebSearchBackendParams = Record<string, never>;
+/**
+ * Why no third-party search backend can be used.
+ */
+export type WebSearchUnavailable = 'notConfigured' | 'noKey';
 /**
  * One step of a sign-in shown to the user. A later prompt of the same sign-in replaces the
  * prompt on screen, which is answered with `cancelled`; status lines and links do not.
@@ -1261,6 +1315,11 @@ export interface ModelOverride {
    * Display name.
    */
   displayName?: string | null;
+  /**
+   * Whether the provider's own web search serves `WebSearch` (T38); absent: the catalog's
+   * answer (Anthropic's own models).
+   */
+  nativeWebSearch?: boolean | null;
   /**
    * Tool Profile; absent: chosen by the tool reliability.
    */
@@ -1974,6 +2033,10 @@ export interface CatalogModel {
    * Display name.
    */
   name: string;
+  /**
+   * The provider's own web search can serve `WebSearch` (T38, ADR-0055).
+   */
+  nativeWebSearch?: boolean;
   /**
    * Supports prompt caching.
    */
@@ -3038,6 +3101,23 @@ export interface AgentWarning {
   value?: string | null;
 }
 /**
+ * One search result: what both backends give the model and the transcript.
+ */
+export interface WebSearchSource {
+  /**
+   * A short excerpt; empty when the backend gives none.
+   */
+  snippet?: string;
+  /**
+   * The page title.
+   */
+  title: string;
+  /**
+   * The page address.
+   */
+  url: string;
+}
+/**
  * One reminder of a reminder message: its type and where it came from.
  */
 export interface ReminderRef {
@@ -3067,6 +3147,10 @@ export interface PolicyEvaluateParams {
    * For a subagent's call: its type.
    */
   agentType?: string | null;
+  /**
+   * The session's effort level when its model has one (T38): hooks' `effort`.
+   */
+  effort?: string | null;
   /**
    * Tool arguments before execution.
    */
@@ -3205,7 +3289,7 @@ export interface HooksRunRequest {
  */
 export interface HooksRunParams {
   /**
-   * `Stop`: how many times in a row hooks already continued this turn.
+   * `Stop`, `SubagentStop`: how many times in a row hooks already continued this turn.
    */
   continuations?: number | null;
   /**
@@ -3247,8 +3331,8 @@ export interface HooksRunResponse {
  */
 export interface HooksRunResult {
   /**
-   * `Stop`: continue the turn with this reason for the model. `PreCompact`: do not compact
-   * (the reason went to the user).
+   * `Stop`, `SubagentStop`: continue the turn with this reason for the model. `PreCompact`:
+   * do not compact (the reason went to the user). `PostToolBatch`: stop the loop.
    */
   block?: string | null;
   /**
@@ -3271,6 +3355,67 @@ export interface HooksRunResult {
    * `PostToolUse`: the tool output the model reads instead (`updatedToolOutput`).
    */
   updatedOutput?: unknown;
+}
+/**
+ * Request for `hooks/prompt`.
+ */
+export interface HooksPromptRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'hooks/prompt';
+  params: HooksPromptParams;
+}
+/**
+ * Parameters of `hooks/prompt`.
+ */
+export interface HooksPromptParams {
+  /**
+   * The hook's `model` (an alias, `provider/model` or a model id); absent: the auxiliary
+   * model.
+   */
+  model?: string | null;
+  /**
+   * The hook's prompt with the input JSON in place of `$ARGUMENTS`.
+   */
+  prompt: string;
+  /**
+   * The main session whose model settings and usage the call belongs to.
+   */
+  sessionId: string;
+  /**
+   * The hook's timeout; the model call ends with it.
+   */
+  timeoutMs: number;
+}
+/**
+ * Successful response to `hooks/prompt`.
+ */
+export interface HooksPromptResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: HooksPromptResult;
+}
+/**
+ * Result of `hooks/prompt`.
+ */
+export interface HooksPromptResult {
+  /**
+   * Input tokens of the call.
+   */
+  inputTokens: number;
+  /**
+   * `provider/model` that answered.
+   */
+  model: string;
+  /**
+   * Output tokens of the call.
+   */
+  outputTokens: number;
+  /**
+   * The model's answer text.
+   */
+  text: string;
 }
 /**
  * Request for `fs/memory`.
@@ -5922,6 +6067,106 @@ export interface WebRedirect {
    * The absolute target URL.
    */
   url: string;
+}
+/**
+ * Request for `web/search`.
+ */
+export interface WebSearchRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'web/search';
+  params: WebSearchParams;
+}
+/**
+ * Parameters of `web/search`.
+ */
+export interface WebSearchParams {
+  /**
+   * Keep only results on these hosts (and their subdomains).
+   */
+  allowedDomains?: string[];
+  /**
+   * Drop results on these hosts (and their subdomains).
+   */
+  blockedDomains?: string[];
+  /**
+   * The approved `WebSearch` call; its input's `query` must equal `query`.
+   */
+  origin: ToolOrigin;
+  /**
+   * The search terms.
+   */
+  query: string;
+  /**
+   * The session of the call.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `web/search`.
+ */
+export interface WebSearchResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: WebSearchResult;
+}
+/**
+ * Result of `web/search`.
+ */
+export interface WebSearchResult {
+  /**
+   * The backend that answered (`brave`).
+   */
+  backend: string;
+  /**
+   * The results, best first, after the domain filters.
+   */
+  results: WebSearchSource[];
+}
+/**
+ * Request for `web/searchBackend`.
+ */
+export interface WebSearchBackendRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'web/searchBackend';
+  params: WebSearchBackendParams;
+}
+/**
+ * Successful response to `web/searchBackend`.
+ */
+export interface WebSearchBackendResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: WebSearchBackendResult;
+}
+/**
+ * Result of `web/searchBackend`: the usable backend, or why there is none.
+ */
+export interface WebSearchBackendResult {
+  /**
+   * The configured backend with its key saved.
+   */
+  backend?: WebSearchBackendInfo | null;
+  /**
+   * Why there is no usable backend.
+   */
+  unavailable?: WebSearchUnavailable | null;
+}
+/**
+ * A third-party search backend.
+ */
+export interface WebSearchBackendInfo {
+  /**
+   * Its id (`brave`).
+   */
+  id: string;
+  /**
+   * Its name for the user and the model.
+   */
+  name: string;
 }
 /**
  * Request for `models/login/start`.

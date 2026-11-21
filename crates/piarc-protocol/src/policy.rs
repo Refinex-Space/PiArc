@@ -38,6 +38,9 @@ pub struct PolicyEvaluateParams {
     /// `_meta["anthropic/requiresUserInteraction"]`, T36).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub requires_user_interaction: bool,
+    /// The session's effort level when its model has one (T38): hooks' `effort`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
 }
 
 /// Final decision. The Agent Host refuses on any bridge or decoding error.

@@ -54,6 +54,8 @@ struct Fixture {
 struct Setup {
     trusted: bool,
     user: Value,
+    /// Other keys of the user's settings file (T38).
+    user_settings: Value,
     project: Value,
     permissions: Value,
     runner: RunnerConfig,
@@ -66,6 +68,7 @@ impl Default for Setup {
         Self {
             trusted: true,
             user: json!({}),
+            user_settings: json!({}),
             project: json!({}),
             permissions: json!({}),
             runner: RunnerConfig {
@@ -114,11 +117,9 @@ impl Fixture {
         dirs.create_layout().expect("layout");
         std::fs::create_dir_all(work.join(".claude")).expect("workspace");
         std::fs::create_dir_all(home.join(".claude")).expect("home");
-        std::fs::write(
-            data.join("settings.json"),
-            json!({ "hooks": setup.user }).to_string(),
-        )
-        .expect("user settings");
+        let mut user = setup.user_settings.clone();
+        user["hooks"] = setup.user;
+        std::fs::write(data.join("settings.json"), user.to_string()).expect("user settings");
         std::fs::write(
             work.join(".claude/settings.json"),
             json!({ "hooks": setup.project, "permissions": setup.permissions }).to_string(),
@@ -835,3 +836,6 @@ async fn hooks_run_refuses_an_open_session_of_another_workspace() {
         .expect("its own session");
     assert_eq!(f.log("stop").len(), 1);
 }
+
+#[path = "hooks_m3_tests.rs"]
+mod m3;

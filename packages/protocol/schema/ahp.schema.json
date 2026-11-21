@@ -935,6 +935,10 @@
           "description": "Display name.",
           "type": "string"
         },
+        "nativeWebSearch": {
+          "description": "The provider's own web search can serve `WebSearch` (T38, ADR-0055).",
+          "type": "boolean"
+        },
         "promptCache": {
           "description": "Supports prompt caching.",
           "type": "boolean"
@@ -4240,11 +4244,100 @@
       },
       "type": "object"
     },
+    "HooksPromptParams": {
+      "description": "Parameters of `hooks/prompt`.",
+      "properties": {
+        "model": {
+          "description": "The hook's `model` (an alias, `provider/model` or a model id); absent: the auxiliary\nmodel.",
+          "type": ["string", "null"]
+        },
+        "prompt": {
+          "description": "The hook's prompt with the input JSON in place of `$ARGUMENTS`.",
+          "type": "string"
+        },
+        "sessionId": {
+          "description": "The main session whose model settings and usage the call belongs to.",
+          "type": "string"
+        },
+        "timeoutMs": {
+          "description": "The hook's timeout; the model call ends with it.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["sessionId", "prompt", "timeoutMs"],
+      "type": "object"
+    },
+    "HooksPromptRequest": {
+      "description": "Request for `hooks/prompt`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "hooks/prompt",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/HooksPromptParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "HooksPromptResponse": {
+      "description": "Successful response to `hooks/prompt`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/HooksPromptResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "HooksPromptResult": {
+      "description": "Result of `hooks/prompt`.",
+      "properties": {
+        "inputTokens": {
+          "description": "Input tokens of the call.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "model": {
+          "description": "`provider/model` that answered.",
+          "type": "string"
+        },
+        "outputTokens": {
+          "description": "Output tokens of the call.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "text": {
+          "description": "The model's answer text.",
+          "type": "string"
+        }
+      },
+      "required": ["text", "model", "inputTokens", "outputTokens"],
+      "type": "object"
+    },
     "HooksRunParams": {
       "description": "Parameters of `hooks/run`.",
       "properties": {
         "continuations": {
-          "description": "`Stop`: how many times in a row hooks already continued this turn.",
+          "description": "`Stop`, `SubagentStop`: how many times in a row hooks already continued this turn.",
           "format": "uint64",
           "minimum": 0,
           "type": ["integer", "null"]
@@ -4315,7 +4408,7 @@
       "description": "The merged decision. Every member is optional: an empty result means \"go on unchanged\".",
       "properties": {
         "block": {
-          "description": "`Stop`: continue the turn with this reason for the model. `PreCompact`: do not compact\n(the reason went to the user).",
+          "description": "`Stop`, `SubagentStop`: continue the turn with this reason for the model. `PreCompact`:\ndo not compact (the reason went to the user). `PostToolBatch`: stop the loop.",
           "type": ["string", "null"]
         },
         "context": {
@@ -4442,6 +4535,21 @@
         {
           "const": "postCompact",
           "description": "Pi's `session_compact`.",
+          "type": "string"
+        },
+        {
+          "const": "subagentStart",
+          "description": "A subagent session is about to send its first request (T38).",
+          "type": "string"
+        },
+        {
+          "const": "subagentStop",
+          "description": "A subagent's `agent_before_settle` (T38).",
+          "type": "string"
+        },
+        {
+          "const": "postToolBatch",
+          "description": "Pi's `turn_end` after a round of tool calls (T38).",
           "type": "string"
         }
       ]
@@ -5006,6 +5114,53 @@
             }
           },
           "required": ["type", "itemId", "status", "tool", "arguments", "url"],
+          "type": "object"
+        },
+        {
+          "description": "A web search (`WebSearch`, T38).",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "description": "The arguments the tool was called with.",
+              "type": "object"
+            },
+            "backend": {
+              "description": "The backend that answered (`native` or a third-party id), in `item/completed`.",
+              "type": ["string", "null"]
+            },
+            "itemId": {
+              "$ref": "#/$defs/ItemId",
+              "description": "The item's identifier: the tool call id."
+            },
+            "output": {
+              "description": "The text the tool returned, in `item/completed`.",
+              "type": ["string", "null"]
+            },
+            "query": {
+              "description": "The search terms.",
+              "type": "string"
+            },
+            "sources": {
+              "description": "The results, in `item/completed`.",
+              "items": {
+                "$ref": "#/$defs/WebSearchSource"
+              },
+              "type": "array"
+            },
+            "status": {
+              "$ref": "#/$defs/ItemStatus",
+              "description": "Lifecycle state."
+            },
+            "tool": {
+              "description": "Canonical tool name.",
+              "type": "string"
+            },
+            "type": {
+              "const": "webSearch",
+              "type": "string"
+            }
+          },
+          "required": ["type", "itemId", "status", "tool", "arguments", "query"],
           "type": "object"
         },
         {
@@ -6430,6 +6585,10 @@
           "description": "Display name.",
           "type": ["string", "null"]
         },
+        "nativeWebSearch": {
+          "description": "Whether the provider's own web search serves `WebSearch` (T38); absent: the catalog's\nanswer (Anthropic's own models).",
+          "type": ["boolean", "null"]
+        },
         "toolProfile": {
           "anyOf": [
             {
@@ -7149,6 +7308,10 @@
       "properties": {
         "agentType": {
           "description": "For a subagent's call: its type.",
+          "type": ["string", "null"]
+        },
+        "effort": {
+          "description": "The session's effort level when its model has one (T38): hooks' `effort`.",
           "type": ["string", "null"]
         },
         "input": {
@@ -13527,6 +13690,212 @@
       },
       "required": ["url", "status"],
       "type": "object"
+    },
+    "WebSearchBackendInfo": {
+      "description": "A third-party search backend.",
+      "properties": {
+        "id": {
+          "description": "Its id (`brave`).",
+          "type": "string"
+        },
+        "name": {
+          "description": "Its name for the user and the model.",
+          "type": "string"
+        }
+      },
+      "required": ["id", "name"],
+      "type": "object"
+    },
+    "WebSearchBackendParams": {
+      "description": "Parameters of `web/searchBackend`: none.",
+      "type": "object"
+    },
+    "WebSearchBackendRequest": {
+      "description": "Request for `web/searchBackend`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "web/searchBackend",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/WebSearchBackendParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "WebSearchBackendResponse": {
+      "description": "Successful response to `web/searchBackend`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/WebSearchBackendResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "WebSearchBackendResult": {
+      "description": "Result of `web/searchBackend`: the usable backend, or why there is none.",
+      "properties": {
+        "backend": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WebSearchBackendInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The configured backend with its key saved."
+        },
+        "unavailable": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WebSearchUnavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why there is no usable backend."
+        }
+      },
+      "type": "object"
+    },
+    "WebSearchParams": {
+      "description": "Parameters of `web/search`.",
+      "properties": {
+        "allowedDomains": {
+          "description": "Keep only results on these hosts (and their subdomains).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "blockedDomains": {
+          "description": "Drop results on these hosts (and their subdomains).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "origin": {
+          "$ref": "#/$defs/ToolOrigin",
+          "description": "The approved `WebSearch` call; its input's `query` must equal `query`."
+        },
+        "query": {
+          "description": "The search terms.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session of the call."
+        }
+      },
+      "required": ["sessionId", "origin", "query"],
+      "type": "object"
+    },
+    "WebSearchRequest": {
+      "description": "Request for `web/search`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "web/search",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/WebSearchParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "WebSearchResponse": {
+      "description": "Successful response to `web/search`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/WebSearchResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "WebSearchResult": {
+      "description": "Result of `web/search`.",
+      "properties": {
+        "backend": {
+          "description": "The backend that answered (`brave`).",
+          "type": "string"
+        },
+        "results": {
+          "description": "The results, best first, after the domain filters.",
+          "items": {
+            "$ref": "#/$defs/WebSearchSource"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["backend", "results"],
+      "type": "object"
+    },
+    "WebSearchSource": {
+      "description": "One search result: what both backends give the model and the transcript.",
+      "properties": {
+        "snippet": {
+          "description": "A short excerpt; empty when the backend gives none.",
+          "type": "string"
+        },
+        "title": {
+          "description": "The page title.",
+          "type": "string"
+        },
+        "url": {
+          "description": "The page address.",
+          "type": "string"
+        }
+      },
+      "required": ["title", "url"],
+      "type": "object"
+    },
+    "WebSearchUnavailable": {
+      "description": "Why no third-party search backend can be used.",
+      "oneOf": [
+        {
+          "const": "notConfigured",
+          "description": "The user chose no backend (`webSearch.backend`).",
+          "type": "string"
+        },
+        {
+          "const": "noKey",
+          "description": "The chosen backend has no API key in the vault.",
+          "type": "string"
+        }
+      ]
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -13740,6 +14109,12 @@
     },
     {
       "$ref": "#/$defs/HooksRunResponse"
+    },
+    {
+      "$ref": "#/$defs/HooksPromptRequest"
+    },
+    {
+      "$ref": "#/$defs/HooksPromptResponse"
     },
     {
       "$ref": "#/$defs/FsMemoryRequest"
@@ -13974,6 +14349,18 @@
     },
     {
       "$ref": "#/$defs/WebFetchResponse"
+    },
+    {
+      "$ref": "#/$defs/WebSearchRequest"
+    },
+    {
+      "$ref": "#/$defs/WebSearchResponse"
+    },
+    {
+      "$ref": "#/$defs/WebSearchBackendRequest"
+    },
+    {
+      "$ref": "#/$defs/WebSearchBackendResponse"
     },
     {
       "$ref": "#/$defs/ModelsLoginStartRequest"

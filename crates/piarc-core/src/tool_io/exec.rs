@@ -183,10 +183,12 @@ impl Exec {
     /// What hook commands start with: the commands' inherited environment and shells.
     pub(super) async fn hook_launch(&self) -> crate::hooks::Launch {
         let shells = self.shells();
+        let base = self.base_env().await;
         crate::hooks::Launch {
-            env: self.base_env().await.inherited.clone(),
+            env: base.inherited.clone(),
             bash: shells.bash.clone(),
             powershell: shells.powershell.clone(),
+            expansion: base.expansion.clone(),
         }
     }
 

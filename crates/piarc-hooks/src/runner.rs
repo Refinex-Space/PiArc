@@ -1,4 +1,6 @@
-//! Running `command` handlers (architecture section 6.3.1).
+//! Running handlers (architecture section 6.3.1, ADR-0055): `command` handlers as processes,
+//! `http` and `prompt` handlers through the injected [`HttpPort`] and [`JudgePort`] under the
+//! same timeouts and cancellation.
 //!
 //! - Every handler of one event runs at the same time. Each gets the event's input JSON on
 //!   stdin (then EOF); stdout and stderr are read while it runs, each into its own buffer, so a
@@ -17,23 +19,27 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use piarc_ports::{ExitStatus, ProcessControl, ProcessSpawner, SpawnSpec};
+use serde_json::{Map, Value};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio_util::sync::CancellationToken;
 
-use crate::config::Handler;
+use crate::config::{Action, Command, Handler, Http, Prompt};
+use crate::error::Error;
 use crate::event::{HookEvent, Timeouts};
+use crate::http::{HttpRules, read_reply};
+use crate::ports::{HttpPort, JudgeCall, JudgePort};
 
 /// After the handler exits, how long its pipes may stay quiet before reading stops.
 const EXIT_GRACE: Duration = Duration::from_millis(100);
 
 /// Builds the process of a handler.
 pub trait Launcher: Send + Sync {
-    /// The program, arguments and environment that run `handler` in `cwd`.
+    /// The program, arguments and environment that run `command` in `cwd`.
     ///
     /// # Errors
     ///
     /// Why it cannot run here, for example no shell of the requested kind.
-    fn spec(&self, handler: &Handler, cwd: &Path) -> Result<SpawnSpec, String>;
+    fn spec(&self, command: &Command, cwd: &Path) -> Result<SpawnSpec, Error>;
 }
 
 /// The runner's limits.
@@ -68,6 +74,26 @@ pub enum RunStatus {
     Cancelled,
     /// It could not start.
     NotStarted(String),
+    /// An `http` or `prompt` handler answered: the JSON output a command would print (empty:
+    /// no output).
+    Replied(Map<String, Value>),
+    /// An `http` or `prompt` handler failed without blocking: why.
+    Failed(String),
+}
+
+/// What the audit records of a run besides its status.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Detail {
+    /// A command.
+    Process,
+    /// An `http` handler: the response status, when one arrived.
+    Http { status: Option<u16> },
+    /// A `prompt` handler: the model that answered and its tokens.
+    Prompt {
+        model: Option<String>,
+        input_tokens: u64,
+        output_tokens: u64,
+    },
 }
 
 /// One handler's run.
@@ -83,6 +109,8 @@ pub struct HandlerRun {
     pub stderr: String,
     /// From start to exit.
     pub duration: Duration,
+    /// For the audit.
+    pub detail: Detail,
 }
 
 /// Runs handlers through the injected process start.
@@ -91,6 +119,8 @@ pub struct Runner {
     spawner: Arc<dyn ProcessSpawner>,
     launcher: Arc<dyn Launcher>,
     config: RunnerConfig,
+    http: Option<(Arc<dyn HttpPort>, Arc<HttpRules>)>,
+    judge: Option<Arc<dyn JudgePort>>,
 }
 
 impl std::fmt::Debug for Runner {
@@ -113,7 +143,23 @@ impl Runner {
             spawner,
             launcher,
             config,
+            http: None,
+            judge: None,
         }
+    }
+
+    /// Runs `http` handlers through `port` under `rules`; without it they fail to start.
+    #[must_use]
+    pub fn with_http(mut self, port: Arc<dyn HttpPort>, rules: HttpRules) -> Self {
+        self.http = Some((port, Arc::new(rules)));
+        self
+    }
+
+    /// Runs `prompt` handlers through `port`; without it they fail to start.
+    #[must_use]
+    pub fn with_judge(mut self, port: Arc<dyn JudgePort>) -> Self {
+        self.judge = Some(port);
+        self
     }
 
     /// The limits.
@@ -135,18 +181,40 @@ impl Runner {
         let bytes: Arc<[u8]> = serde_json::to_vec(input).unwrap_or_default().into();
         let mut tasks = tokio::task::JoinSet::new();
         for (index, handler) in handlers.iter().enumerate() {
-            let timeout = event.timeout(handler.timeout, &self.config.timeouts);
-            let one = One {
-                handler: Arc::clone(handler),
-                spec: self.launcher.spec(handler, cwd),
-                spawner: Arc::clone(&self.spawner),
-                input: Arc::clone(&bytes),
-                timeout,
-                grace: self.config.kill_grace,
-                limit: self.config.output_limit,
-                cancel: cancel.clone(),
-            };
-            tasks.spawn(async move { (index, one.run().await) });
+            let timeout = event.timeout(handler.kind(), handler.timeout, &self.config.timeouts);
+            let handler = Arc::clone(handler);
+            let cancel = cancel.clone();
+            match &handler.action {
+                Action::Command(command) => {
+                    let one = One {
+                        spec: self.launcher.spec(command, cwd),
+                        handler: Arc::clone(&handler),
+                        spawner: Arc::clone(&self.spawner),
+                        input: Arc::clone(&bytes),
+                        timeout,
+                        grace: self.config.kill_grace,
+                        limit: self.config.output_limit,
+                        cancel,
+                    };
+                    tasks.spawn(async move { (index, one.run().await) });
+                }
+                Action::Http(http) => {
+                    let call = self.http.clone();
+                    let (http, input) = (http.clone(), Arc::clone(&bytes));
+                    tasks.spawn(async move {
+                        let run = post(event, &http, call, &input, timeout, &cancel).await;
+                        (index, run.finish(handler))
+                    });
+                }
+                Action::Prompt(prompt) => {
+                    let judge = self.judge.clone();
+                    let (prompt, input) = (prompt.clone(), Arc::clone(&bytes));
+                    tasks.spawn(async move {
+                        let run = ask(event, &prompt, judge, &input, timeout, &cancel).await;
+                        (index, run.finish(handler))
+                    });
+                }
+            }
         }
         let mut runs: Vec<Option<HandlerRun>> = vec![None; handlers.len()];
         while let Some(joined) = tasks.join_next().await {
@@ -163,15 +231,151 @@ impl Runner {
                     stdout: String::new(),
                     stderr: String::new(),
                     duration: Duration::ZERO,
+                    detail: Detail::Process,
                 })
             })
             .collect()
     }
 }
 
+/// The result of an `http` or `prompt` handler before it is tied to its handler.
+struct Remote {
+    status: RunStatus,
+    detail: Detail,
+    duration: Duration,
+}
+
+impl Remote {
+    fn finish(self, handler: Arc<Handler>) -> HandlerRun {
+        HandlerRun {
+            handler,
+            status: self.status,
+            stdout: String::new(),
+            stderr: String::new(),
+            duration: self.duration,
+            detail: self.detail,
+        }
+    }
+}
+
+/// How a bounded call ended.
+enum Bounded<T> {
+    Done(T),
+    TimedOut,
+    Cancelled,
+}
+
+/// `call` within `timeout`, stopped by `cancel` (its future is dropped).
+async fn bounded<T>(
+    call: impl std::future::Future<Output = T>,
+    timeout: Duration,
+    cancel: &CancellationToken,
+) -> Bounded<T> {
+    if cancel.is_cancelled() {
+        return Bounded::Cancelled;
+    }
+    tokio::select! {
+        result = tokio::time::timeout(timeout, call) => {
+            result.map_or(Bounded::TimedOut, Bounded::Done)
+        }
+        () = cancel.cancelled() => Bounded::Cancelled,
+    }
+}
+
+/// An `http` handler's run.
+async fn post(
+    event: HookEvent,
+    http: &Http,
+    port: Option<(Arc<dyn HttpPort>, Arc<HttpRules>)>,
+    input: &[u8],
+    timeout: Duration,
+    cancel: &CancellationToken,
+) -> Remote {
+    let started = Instant::now();
+    let done = |status, code| Remote {
+        status,
+        detail: Detail::Http { status: code },
+        duration: started.elapsed(),
+    };
+    let Some((port, rules)) = port else {
+        return done(
+            RunStatus::NotStarted("http hooks cannot run here".into()),
+            None,
+        );
+    };
+    if !rules.url_allowed(&http.url) {
+        return done(
+            RunStatus::Failed("its url is not in allowedHttpHookUrls; no request was sent".into()),
+            None,
+        );
+    }
+    match bounded(port.post(rules.call(http, input)), timeout, cancel).await {
+        Bounded::Done(Ok(reply)) => {
+            let status = match read_reply(event, &reply) {
+                Ok(json) => RunStatus::Replied(json),
+                Err(why) => RunStatus::Failed(why),
+            };
+            done(status, Some(reply.status))
+        }
+        Bounded::Done(Err(why)) => done(RunStatus::Failed(why), None),
+        Bounded::TimedOut => done(RunStatus::TimedOut(timeout), None),
+        Bounded::Cancelled => done(RunStatus::Cancelled, None),
+    }
+}
+
+/// A `prompt` handler's run.
+async fn ask(
+    event: HookEvent,
+    prompt: &Prompt,
+    port: Option<Arc<dyn JudgePort>>,
+    input: &[u8],
+    timeout: Duration,
+    cancel: &CancellationToken,
+) -> Remote {
+    let started = Instant::now();
+    let mut detail = Detail::Prompt {
+        model: None,
+        input_tokens: 0,
+        output_tokens: 0,
+    };
+    let Some(port) = port else {
+        return Remote {
+            status: RunStatus::NotStarted("prompt hooks cannot run here".into()),
+            detail,
+            duration: started.elapsed(),
+        };
+    };
+    let call = JudgeCall {
+        prompt: crate::prompt::fill(&prompt.prompt, &String::from_utf8_lossy(input)),
+        model: prompt.model.clone(),
+        timeout_ms: u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
+    };
+    let status = match bounded(port.judge(call), timeout, cancel).await {
+        Bounded::Done(Ok(reply)) => {
+            detail = Detail::Prompt {
+                model: Some(reply.model.clone()),
+                input_tokens: reply.input_tokens,
+                output_tokens: reply.output_tokens,
+            };
+            match crate::prompt::verdict(event, prompt, &reply.text) {
+                Ok(json) => RunStatus::Replied(json),
+                Err(why) => RunStatus::Failed(why),
+            }
+        }
+        Bounded::Done(Err(why)) => RunStatus::Failed(why),
+        Bounded::TimedOut => RunStatus::TimedOut(timeout),
+        Bounded::Cancelled => RunStatus::Cancelled,
+    };
+    Remote {
+        status,
+        detail,
+        duration: started.elapsed(),
+    }
+}
+
 struct One {
     handler: Arc<Handler>,
-    spec: Result<SpawnSpec, String>,
+    spec: Result<SpawnSpec, Error>,
     spawner: Arc<dyn ProcessSpawner>,
     input: Arc<[u8]>,
     timeout: Duration,
@@ -195,13 +399,14 @@ impl One {
             stdout: String::new(),
             stderr: String::new(),
             duration: started.elapsed(),
+            detail: Detail::Process,
         };
         if self.cancel.is_cancelled() {
             return not_started("cancelled before it started".into());
         }
         let spec = match &self.spec {
             Ok(spec) => spec.clone(),
-            Err(reason) => return not_started(reason.clone()),
+            Err(reason) => return not_started(reason.to_string()),
         };
         let process = match self.spawner.spawn(spec) {
             Ok(p) => p,
@@ -251,6 +456,7 @@ impl One {
             stdout,
             stderr,
             duration,
+            detail: Detail::Process,
         }
     }
 }
@@ -314,3 +520,7 @@ async fn finish((task, kept): (tokio::task::JoinHandle<()>, Kept)) -> String {
 #[cfg(test)]
 #[path = "runner_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "runner_remote_tests.rs"]
+mod remote_tests;

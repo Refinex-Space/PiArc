@@ -10,9 +10,25 @@
         "contextWindow": 4096,
         "maxOutput": 1024,
         "vision": false,
-        "efforts": ["off"],
+        "efforts": [
+          "off"
+        ],
         "promptCache": false,
         "toolReliability": "unknown"
+      },
+      {
+        "provider": "anthropic",
+        "id": "claude-example",
+        "name": "Claude Example",
+        "contextWindow": 4096,
+        "maxOutput": 1024,
+        "vision": false,
+        "efforts": [
+          "off"
+        ],
+        "promptCache": false,
+        "toolReliability": "unknown",
+        "nativeWebSearch": true
       }
     ],
     "providers": [

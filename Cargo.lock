@@ -1975,9 +1975,11 @@ name = "piarc-hooks"
 version = "0.0.0"
 dependencies = [
  "piarc-ports",
+ "piarc-protocol",
  "regex",
  "serde_json",
  "sha2",
+ "thiserror 2.0.21",
  "tokio",
  "tokio-util",
 ]

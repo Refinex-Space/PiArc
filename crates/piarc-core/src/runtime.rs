@@ -652,6 +652,7 @@ fn open_state(
         worktrees,
     });
     tasks.set_outlet(sessions.task_outlet());
+    sessions.connect_hooks();
     terminals.attach(data, tasks.clone());
     {
         let _entered = handle.enter();

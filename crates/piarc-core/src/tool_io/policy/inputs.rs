@@ -169,6 +169,7 @@ mod tests {
             parent_session_id: None,
             agent_type: None,
             requires_user_interaction: false,
+            effort: None,
         };
         inputs.append(chunk(0, "文"), &peer).expect("first chunk");
         assert!(inputs.append(chunk(1, "!"), &peer).is_err());

@@ -161,6 +161,11 @@ pub(crate) struct SessionHandle {
 }
 
 impl SessionHandle {
+    /// The running Agent Host of the session's workspace, without starting one.
+    pub async fn host(&self) -> Option<piarc_host::HostSupervisor> {
+        self.ws.peek().await
+    }
+
     /// Starts the actor of session `id` in `workspace`, working in `cwd`, and registers it with
     /// the workspace and the tool I/O.
     pub fn spawn(

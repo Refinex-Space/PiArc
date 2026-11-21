@@ -6,7 +6,9 @@
 //! | `PreToolUse` | `permissionDecision` (deny > ask > allow; `defer` is ask), exit 2 = deny, `updatedInput`, `additionalContext` |
 //! | `PermissionRequest` | `decision.behavior` (deny > allow), `updatedInput`, `updatedPermissions`, `message`, `interrupt`; exit 2 is ignored |
 //! | `UserPromptSubmit` | `decision: "block"` or exit 2 blocks, `additionalContext` and plain stdout add context |
-//! | `Stop` | `decision: "block"` or exit 2 continues the turn with the reason; `additionalContext` too |
+//! | `Stop`, `SubagentStop` | `decision: "block"` or exit 2 continues the turn with the reason; `additionalContext` too |
+//! | `PostToolBatch` | `decision: "block"` or exit 2 stops the loop with the reason; `additionalContext` for the next request |
+//! | `SubagentStart` | `additionalContext` for the subagent's first request; exit 2's stderr goes to the user |
 //! | `PreCompact` | `decision: "block"` or exit 2 blocks; plain stdout is the summary's instructions |
 //! | `PostToolUse` | `decision: "block"` and exit 2 add feedback for the model, `additionalContext`, `updatedToolOutput` |
 //! | `PostToolUseFailure` | as `PostToolUse` without `updatedToolOutput` |
@@ -16,7 +18,8 @@
 //! Every event but `SessionEnd`, `PreCompact`, `PostCompact` and `Notification` also takes
 //! `systemMessage` (shown to the user) and `continue: false` with `stopReason` (the agent stops).
 //! Non-blocking errors are shown to the user and the action continues, except that a handler
-//! with `onFailure: "block"` blocks where the event can block.
+//! with `onFailure: "block"` blocks where the event can block (not on `SubagentStop`, as in
+//! Claude Code).
 
 use serde_json::{Map, Value};
 
@@ -52,8 +55,8 @@ pub struct RequestAnswer {
 /// The merged decision of one event.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Decision {
-    /// The action is blocked, with this reason (`UserPromptSubmit`, `Stop` — continue with
-    /// it —, `PreCompact`).
+    /// The action is blocked, with this reason (`UserPromptSubmit`, `Stop` and `SubagentStop` —
+    /// continue with it —, `PreCompact`, `PostToolBatch`).
     pub block: Option<String>,
     /// `PreToolUse`.
     pub permission: Option<Permission>,
@@ -137,6 +140,7 @@ impl Merger {
     /// `onFailure: "block"`: an error blocks where the event can.
     fn fail_closed(&mut self, event: HookEvent, message: &str) -> &'static str {
         match event {
+            HookEvent::SubagentStop => "error",
             HookEvent::PreToolUse => {
                 self.permit(Permission::Deny, Some(message.to_owned()));
                 "deny"
@@ -204,7 +208,9 @@ impl Merger {
             HookEvent::SessionEnd | HookEvent::PostCompact | HookEvent::Notification => "none",
             _ => {
                 let mut verdict = "none";
-                if o.field("decision") == Some("block") && event != HookEvent::SessionStart {
+                if o.field("decision") == Some("block")
+                    && !matches!(event, HookEvent::SessionStart | HookEvent::SubagentStart)
+                {
                     let reason = o.field("reason").unwrap_or_default().to_owned();
                     verdict = "block";
                     if event.exit_two() == ExitTwo::ToModel {
@@ -381,7 +387,7 @@ impl Merger {
                 self.d.permission_reason = Some("Blocked by a PreToolUse hook.".to_owned());
             }
         }
-        if event == HookEvent::Stop && self.d.stop.is_some() {
+        if matches!(event, HookEvent::Stop | HookEvent::SubagentStop) && self.d.stop.is_some() {
             // `continue: false` ends the turn even when another handler blocks.
             self.d.block = None;
         }

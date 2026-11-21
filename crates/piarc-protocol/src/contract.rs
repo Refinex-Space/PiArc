@@ -25,7 +25,7 @@ use crate::fs::{FsGlob, FsGrep, FsList, FsMkdir, FsPdf, FsRead, FsSpill, FsStat,
 use crate::handshake::HostHello;
 use crate::harness::{HarnessPlan, HarnessTodo, UiAsk};
 use crate::history::{HarnessEntry, SessionGetEntries, SessionHistory};
-use crate::hooks::HooksRun;
+use crate::hooks::{HooksPrompt, HooksRun};
 use crate::host::{HostPing, HostShutdown};
 use crate::jsonrpc::{ErrorResponse, Notification, Request, SuccessResponse};
 use crate::mcp::{
@@ -63,7 +63,7 @@ use crate::turn::{
     ItemAgentMessageDelta, ItemCompleted, ItemReasoningDelta, ItemStarted, ItemUpdated,
     TurnCompleted, TurnRetrying, TurnStarted, TurnUsageReport,
 };
-use crate::web::WebFetch;
+use crate::web::{WebFetch, WebSearch, WebSearchBackend};
 
 /// What a contract describes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -240,6 +240,8 @@ pub static CONTRACTS: &[Contract] = &[
     response::<TrustGet>("trust/get/result"),
     request::<HooksRun>(HooksRun::NAME),
     response::<HooksRun>("hooks/run/result"),
+    request::<HooksPrompt>(HooksPrompt::NAME),
+    response::<HooksPrompt>("hooks/prompt/result"),
     request::<FsMemory>(FsMemory::NAME),
     response::<FsMemory>("fs/memory/result"),
     request::<FsStat>(FsStat::NAME),
@@ -318,6 +320,10 @@ pub static CONTRACTS: &[Contract] = &[
     response::<FsForgetReads>("fs/forgetReads/result"),
     request::<WebFetch>(WebFetch::NAME),
     response::<WebFetch>("web/fetch/result"),
+    request::<WebSearch>(WebSearch::NAME),
+    response::<WebSearch>("web/search/result"),
+    request::<WebSearchBackend>(WebSearchBackend::NAME),
+    response::<WebSearchBackend>("web/searchBackend/result"),
     request::<ModelsLoginStart>(ModelsLoginStart::NAME),
     response::<ModelsLoginStart>("models/login/start/result"),
     request::<ModelsLoginCancel>(ModelsLoginCancel::NAME),

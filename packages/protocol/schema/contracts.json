@@ -423,6 +423,18 @@
     },
     {
       "kind": "request",
+      "method": "hooks/prompt",
+      "name": "hooks/prompt",
+      "schema": "HooksPromptRequest"
+    },
+    {
+      "kind": "response",
+      "method": "hooks/prompt",
+      "name": "hooks/prompt/result",
+      "schema": "HooksPromptResponse"
+    },
+    {
+      "kind": "request",
       "method": "fs/memory",
       "name": "fs/memory",
       "schema": "FsMemoryRequest"
@@ -888,6 +900,30 @@
       "method": "web/fetch",
       "name": "web/fetch/result",
       "schema": "WebFetchResponse"
+    },
+    {
+      "kind": "request",
+      "method": "web/search",
+      "name": "web/search",
+      "schema": "WebSearchRequest"
+    },
+    {
+      "kind": "response",
+      "method": "web/search",
+      "name": "web/search/result",
+      "schema": "WebSearchResponse"
+    },
+    {
+      "kind": "request",
+      "method": "web/searchBackend",
+      "name": "web/searchBackend",
+      "schema": "WebSearchBackendRequest"
+    },
+    {
+      "kind": "response",
+      "method": "web/searchBackend",
+      "name": "web/searchBackend/result",
+      "schema": "WebSearchBackendResponse"
     },
     {
       "kind": "request",

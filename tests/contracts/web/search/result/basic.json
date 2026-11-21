@@ -1,0 +1,18 @@
+{
+  "jsonrpc": "2.0",
+  "id": 41,
+  "result": {
+    "backend": "brave",
+    "results": [
+      {
+        "title": "Cancellation in tokio",
+        "url": "https://docs.rs/tokio-util/latest/tokio_util/sync/struct.CancellationToken.html",
+        "snippet": "A token which can be used to signal a cancellation request."
+      },
+      {
+        "title": "No snippet",
+        "url": "https://docs.rs/"
+      }
+    ]
+  }
+}

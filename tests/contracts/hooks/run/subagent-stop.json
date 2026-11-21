@@ -1,0 +1,18 @@
+{
+  "jsonrpc": "2.0",
+  "id": 14,
+  "method": "hooks/run",
+  "params": {
+    "sessionId": "019a8f3e-5b2c-7d41-9e60-3f1a2b4c5d70",
+    "event": "subagentStop",
+    "cwd": "/work/项目 a",
+    "transcriptPath": "/data/pi/sessions/child.jsonl",
+    "input": {
+      "stop_hook_active": false,
+      "agent_transcript_path": "/data/pi/sessions/child.jsonl",
+      "last_assistant_message": "Found 3 call sites.",
+      "effort": { "level": "high" }
+    },
+    "continuations": 0
+  }
+}

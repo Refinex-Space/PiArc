@@ -33,6 +33,7 @@
 //! from the index and `resume` reopens a session from its file.
 
 mod create;
+mod hooks;
 mod inbound;
 mod login;
 mod mcp;

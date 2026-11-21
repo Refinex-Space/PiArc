@@ -66,13 +66,13 @@ impl ProcessSpawner for TokioSpawner {
 struct Sh;
 
 impl Launcher for Sh {
-    fn spec(&self, handler: &Handler, cwd: &Path) -> Result<SpawnSpec, String> {
-        if handler.command == "missing-shell" {
-            return Err("no shell for this hook".into());
+    fn spec(&self, command: &Command, cwd: &Path) -> Result<SpawnSpec, Error> {
+        if command.command == "missing-shell" {
+            return Err(Error::CannotStart("no shell for this hook".into()));
         }
         Ok(SpawnSpec {
             program: PathBuf::from("/bin/sh"),
-            args: vec!["-c".into(), handler.command.clone().into()],
+            args: vec!["-c".into(), command.command.clone().into()],
             cwd: cwd.to_owned(),
             env: vec![("PATH".into(), "/usr/bin:/bin".into())],
         })
@@ -81,9 +81,11 @@ impl Launcher for Sh {
 
 fn handler(command: &str, timeout: Option<Duration>) -> Arc<Handler> {
     Arc::new(Handler {
-        command: command.into(),
-        args: None,
-        shell: None,
+        action: crate::config::Action::Command(crate::config::Command {
+            command: command.into(),
+            args: None,
+            shell: None,
+        }),
         timeout,
         condition: None,
         block_on_failure: false,

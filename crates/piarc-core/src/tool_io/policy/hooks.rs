@@ -59,6 +59,9 @@ fn tool_request(event: HookEvent, p: &PolicyEvaluateParams) -> Request {
     if event == HookEvent::PreToolUse {
         fields.insert("tool_use_id".into(), json!(p.tool_call_id));
     }
+    if let Some(level) = &p.effort {
+        fields.insert("effort".into(), json!({ "level": level }));
+    }
     Request {
         event,
         subject: Some(p.tool.clone()),

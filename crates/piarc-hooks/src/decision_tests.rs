@@ -11,9 +11,11 @@ use crate::runner::{HandlerRun, RunStatus};
 
 fn handler(block_on_failure: bool) -> Arc<Handler> {
     Arc::new(Handler {
-        command: "hook".into(),
-        args: None,
-        shell: None,
+        action: crate::config::Action::Command(crate::config::Command {
+            command: "hook".into(),
+            args: None,
+            shell: None,
+        }),
         timeout: None,
         condition: None,
         block_on_failure,
@@ -37,6 +39,7 @@ fn out(event: HookEvent, code: i32, stdout: &str, stderr: &str) -> Outcome {
             stdout: stdout.into(),
             stderr: stderr.into(),
             duration: Duration::from_millis(1),
+            detail: crate::runner::Detail::Process,
         },
     )
 }
@@ -405,4 +408,128 @@ fn session_events_route_context_and_user_errors() {
     let notification = HookEvent::Notification;
     let d = Decision::merge(notification, &[out(notification, 2, "", "ignored")]);
     assert!(d.errors.is_empty());
+}
+
+fn replied(event: HookEvent, value: &serde_json::Value, block_on_failure: bool) -> Outcome {
+    Outcome::read(
+        event,
+        HandlerRun {
+            handler: handler(block_on_failure),
+            status: RunStatus::Replied(value.as_object().cloned().unwrap_or_default()),
+            stdout: String::new(),
+            stderr: String::new(),
+            duration: Duration::from_millis(1),
+            detail: crate::runner::Detail::Http { status: Some(200) },
+        },
+    )
+}
+
+fn failed(event: HookEvent, why: &str, block_on_failure: bool) -> Outcome {
+    Outcome::read(
+        event,
+        HandlerRun {
+            handler: handler(block_on_failure),
+            status: RunStatus::Failed(why.into()),
+            stdout: String::new(),
+            stderr: String::new(),
+            duration: Duration::from_millis(1),
+            detail: crate::runner::Detail::Http { status: Some(500) },
+        },
+    )
+}
+
+#[test]
+fn subagent_stop_continues_like_stop_and_ignores_on_failure_block() {
+    let e = HookEvent::SubagentStop;
+    let d = Decision::merge(
+        e,
+        &[json_out(e, &json!({"decision": "block", "reason": "more"}))],
+    );
+    assert_eq!(d.block.as_deref(), Some("more"));
+    let two = Decision::merge(e, &[out(e, 2, "", "keep going")]);
+    assert_eq!(two.block.as_deref(), Some("keep going"));
+    let stopped = Decision::merge(
+        e,
+        &[
+            json_out(e, &json!({"decision": "block", "reason": "more"})),
+            json_out(e, &json!({"continue": false})),
+        ],
+    );
+    assert_eq!(stopped.block, None);
+    let errored = Decision::merge(e, &[failed(e, "down", true)]);
+    assert_eq!(errored.block, None);
+    assert_eq!(errored.verdicts, ["error"]);
+}
+
+#[test]
+fn subagent_start_adds_context_and_never_blocks() {
+    let e = HookEvent::SubagentStart;
+    let d = Decision::merge(
+        e,
+        &[json_out(
+            e,
+            &json!({"decision": "block", "hookSpecificOutput": {"hookEventName": "SubagentStart", "additionalContext": "use the fixtures"}}),
+        )],
+    );
+    assert_eq!(d.block, None);
+    assert_eq!(d.context, ["use the fixtures"]);
+    let two = Decision::merge(e, &[out(e, 2, "", "careful")]);
+    assert_eq!(two.block, None);
+    assert_eq!(two.errors, ["SubagentStart hook: careful"]);
+}
+
+#[test]
+fn post_tool_batch_blocks_with_the_reason_or_stops() {
+    let e = HookEvent::PostToolBatch;
+    let d = Decision::merge(
+        e,
+        &[json_out(e, &json!({"decision": "block", "reason": "lint"}))],
+    );
+    assert_eq!(d.block.as_deref(), Some("lint"));
+    let two = Decision::merge(e, &[out(e, 2, "", "tests fail")]);
+    assert_eq!(two.block.as_deref(), Some("tests fail"));
+    let stop = Decision::merge(
+        e,
+        &[json_out(
+            e,
+            &json!({"continue": false, "stopReason": "done"}),
+        )],
+    );
+    assert_eq!(stop.stop, Some(Some("done".into())));
+    let context = Decision::merge(
+        e,
+        &[json_out(
+            e,
+            &json!({"hookSpecificOutput": {"hookEventName": "PostToolBatch", "additionalContext": "3 files changed"}}),
+        )],
+    );
+    assert_eq!(context.context, ["3 files changed"]);
+}
+
+#[test]
+fn replies_read_as_json_and_failures_as_errors() {
+    let e = HookEvent::PreToolUse;
+    let deny = Decision::merge(
+        e,
+        &[replied(
+            e,
+            &specific(
+                e,
+                json!({"permissionDecision": "deny", "permissionDecisionReason": "no"}),
+            ),
+            false,
+        )],
+    );
+    assert_eq!(deny.permission, Some(Permission::Deny));
+    let empty = Decision::merge(e, &[replied(e, &json!({}), false)]);
+    assert_eq!(empty.permission, None);
+    assert_eq!(empty.verdicts, ["none"]);
+    let error = Decision::merge(e, &[failed(e, "the server answered HTTP 500", false)]);
+    assert_eq!(error.permission, None);
+    assert_eq!(
+        error.errors,
+        ["PreToolUse hook error: the server answered HTTP 500"]
+    );
+    let closed = Decision::merge(e, &[failed(e, "connection refused", true)]);
+    assert_eq!(closed.permission, Some(Permission::Deny));
 }

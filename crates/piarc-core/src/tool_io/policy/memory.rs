@@ -37,6 +37,7 @@ pub(in crate::tool_io) async fn approve(
         parent_session_id: None,
         agent_type: None,
         requires_user_interaction: false,
+        effort: None,
     };
     let mut card = new_request(&p, peer)?;
     card.kind = ApprovalKind::PermissionExpansion;

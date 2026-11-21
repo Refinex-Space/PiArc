@@ -210,6 +210,10 @@ const HOOK_HANDLER: Shape = Shape::Object(&[
         shape: Shape::ListOf(&STRINGS),
     },
     Field {
+        name: "continueOnBlock",
+        shape: Shape::Bool,
+    },
+    Field {
         name: "server",
         shape: Shape::String,
     },
@@ -368,6 +372,32 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
     Field {
         name: "disableAllHooks",
         shape: Shape::Bool,
+    },
+    // `http` hooks (T38, ADR-0055), Claude Code's keys: URL patterns (`*` wildcard) an `http`
+    // hook may post to, and the variables its headers may interpolate; lists merge across
+    // files, unset means no restriction.
+    Field {
+        name: "allowedHttpHookUrls",
+        shape: Shape::ListOf(&STRINGS),
+    },
+    Field {
+        name: "httpHookAllowedEnvVars",
+        shape: Shape::ListOf(&STRINGS),
+    },
+    // Read by Core from the user's file only (I93): variables of the login shell's environment
+    // that command hooks get besides the commands' environment (ADR-0035).
+    Field {
+        name: "hookAllowedEnvVars",
+        shape: Shape::ListOf(&STRINGS),
+    },
+    // Read by Core from the user's file only (T38): WebSearch's third-party backend (`brave`);
+    // its API key is in the vault.
+    Field {
+        name: "webSearch",
+        shape: Shape::Object(&[Field {
+            name: "backend",
+            shape: Shape::OneOf(&["brave"]),
+        }]),
     },
     // MCP servers (T36, architecture section 6.8): `.mcp.json`'s entry shape, checked entry by
     // entry by `crate::mcp` (a bad entry leaves out that server, not the file). Executable in

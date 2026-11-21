@@ -121,6 +121,9 @@ pub struct CatalogModel {
     /// The Tool Profile in effect for the model (T29); absent: the default one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_profile: Option<ToolProfileKind>,
+    /// The provider's own web search can serve `WebSearch` (T38, ADR-0055).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub native_web_search: bool,
 }
 
 /// The user's settings for one model (T29), each replacing the catalog value.
@@ -142,6 +145,10 @@ pub struct ModelOverride {
     /// Tool Profile; absent: chosen by the tool reliability.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_profile: Option<ToolProfileKind>,
+    /// Whether the provider's own web search serves `WebSearch` (T38); absent: the catalog's
+    /// answer (Anthropic's own models).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native_web_search: Option<bool>,
     /// Tool reliability Core derives from the provider configuration (keyless local
     /// endpoints are `low`); not a user setting.
     #[serde(default, skip_serializing_if = "Option::is_none")]

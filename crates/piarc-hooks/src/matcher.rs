@@ -12,6 +12,8 @@
 
 use regex::Regex;
 
+use crate::error::Error;
+
 /// A parsed matcher.
 #[derive(Debug, Clone)]
 pub enum Matcher {
@@ -35,7 +37,7 @@ impl Matcher {
     ///
     /// Why a regular expression is not accepted: syntax JavaScript has and the `regex` crate
     /// does not (look-around, backreferences), or invalid syntax.
-    pub fn parse(text: Option<&str>) -> Result<Self, String> {
+    pub fn parse(text: Option<&str>) -> Result<Self, Error> {
         let text = text.unwrap_or("");
         if text.is_empty() || text == "*" {
             return Ok(Self::All);
@@ -54,13 +56,15 @@ impl Matcher {
             });
         }
         if let Some(construct) = unsupported_construct(text) {
-            return Err(format!(
+            return Err(Error::InvalidMatcher(format!(
                 "the matcher uses {construct}, which PiArc's regular expressions do not support"
-            ));
+            )));
         }
-        Regex::new(text)
-            .map(Self::Pattern)
-            .map_err(|e| format!("the matcher is not a valid regular expression: {e}"))
+        Regex::new(text).map(Self::Pattern).map_err(|e| {
+            Error::InvalidMatcher(format!(
+                "the matcher is not a valid regular expression: {e}"
+            ))
+        })
     }
 
     /// Whether `value` matches.
@@ -153,7 +157,10 @@ mod tests {
             ("(?<!Notebook)Edit", "look-behind"),
             ("(a)\\1", "backreference"),
         ] {
-            let error = Matcher::parse(Some(text)).err().unwrap_or_default();
+            let error = Matcher::parse(Some(text))
+                .err()
+                .map(|e| e.to_string())
+                .unwrap_or_default();
             assert!(error.contains(construct), "{text}: {error}");
         }
         assert!(Matcher::parse(Some("(unclosed")).is_err());

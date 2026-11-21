@@ -6,9 +6,14 @@
 //!   (`.piarc/settings*.json`, `.claude/settings*.json`) are left out while the user's run.
 //!   `disableAllHooks` after merging turns them all off.
 //! - Input: the event's own fields plus `session_id`, `transcript_path`, `cwd`,
-//!   `hook_event_name` and, where Claude Code sends it, `permission_mode`.
+//!   `hook_event_name`, `prompt_id` once the session had input, and, where Claude Code sends
+//!   them, `permission_mode` and `effort`. In a subagent `session_id`, `transcript_path` and
+//!   `prompt_id` are the main session's and `agent_id`, `agent_type` name the subagent (T38).
 //! - Running: `piarc-hooks` with `piarc-exec`'s process-tree spawner and the tools' command
-//!   environment; the session's turn token cancels them.
+//!   environment (plus the user's `hookAllowedEnvVars`); `http` handlers through `piarc-web`
+//!   under `allowedHttpHookUrls` and `httpHookAllowedEnvVars`; `prompt` handlers through the
+//!   workspace's Agent Host (`hooks/prompt`, [`HookOutlet`]); the session's turn token cancels
+//!   them (ADR-0055).
 //! - Order: a session's `UserPromptSubmit` hooks wait until its `SessionStart` hooks (startup,
 //!   resume, fork) have finished, as in Claude Code ([`HooksService::starting`],
 //!   [`HooksService::started`]; found by L3, T30).
@@ -24,8 +29,12 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
 
 pub(crate) use launcher::Launch;
-use piarc_hooks::{Decision, HookConfig, HookEvent, LayerHooks, Ran, Runner, RunnerConfig, Source};
-use piarc_ports::ProcessSpawner;
+use piarc_hooks::{
+    Decision, HookConfig, HookEvent, HttpCall, HttpPort, HttpReply, HttpRules, JudgeCall,
+    JudgePort, JudgeReply, LayerHooks, Ran, Runner, RunnerConfig, Source,
+};
+use piarc_ports::{BoxFuture, ProcessSpawner};
+use piarc_protocol::hooks::{HooksPromptParams, HooksPromptResult};
 use piarc_protocol::policy::PermissionMode;
 use serde_json::{Map, Value, json};
 use tokio::sync::watch;
@@ -36,10 +45,25 @@ use crate::route::RouteKey;
 use crate::storage::{Storage, now_ms};
 use crate::trust::TrustService;
 
+/// The subagent a session is (T31, T38).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AgentFacts {
+    /// The subagent's session id: the hooks' `agent_id`.
+    pub id: String,
+    /// Its type: `agent_type`.
+    pub kind: String,
+}
+
 /// What the hooks of one session run with.
 #[derive(Debug, Clone)]
 pub(crate) struct Facts {
+    /// The session the event happened in (scoped hooks, audit, notices).
     pub session_id: String,
+    /// The main session: the hooks' `session_id`, `transcript_path` and `prompt_id`; the same
+    /// as `session_id` outside subagents.
+    pub main_session_id: String,
+    /// Set in a subagent's session.
+    pub agent: Option<AgentFacts>,
     /// The workspace root: where settings are read, `CLAUDE_PROJECT_DIR`.
     pub root: PathBuf,
     /// The session's working directory: the hooks' `cwd`.
@@ -82,8 +106,112 @@ pub(crate) struct Answer {
 pub(crate) type Condition =
     fn(rule: &str, tool: &str, input: &Map<String, Value>, facts: &Facts) -> bool;
 
-/// The handlers one event will run.
-pub(crate) struct Plan(Vec<Arc<piarc_hooks::Handler>>);
+/// The handlers one event will run, with the settings they run under.
+pub(crate) struct Plan {
+    handlers: Vec<Arc<piarc_hooks::Handler>>,
+    /// `allowedHttpHookUrls`, merged; `None` when unset.
+    allowed_urls: Option<Vec<String>>,
+    /// `httpHookAllowedEnvVars`, merged; `None` when unset.
+    http_env: Option<Vec<String>>,
+    /// `hookAllowedEnvVars` of the user's own settings (I93).
+    hook_env: Vec<String>,
+}
+
+/// What `prompt` hooks reach of the session layer: one model call on the Agent Host of the
+/// main session's workspace (`hooks/prompt`).
+pub(crate) trait HookOutlet: Send + Sync {
+    /// Asks `params` of the session's Agent Host.
+    fn judge(
+        &self,
+        params: HooksPromptParams,
+    ) -> BoxFuture<'static, Result<HooksPromptResult, String>>;
+}
+
+/// Bytes of an `http` hook's response read.
+const HTTP_RESPONSE_BYTES: usize = 1024 * 1024;
+
+/// `http` hooks through `piarc-web`: any address (the user wrote it), the handler's timeout
+/// bounds the request (the runner drops it), the response is cut at 1 MiB.
+struct WebPort {
+    fetcher: std::sync::OnceLock<Result<Arc<piarc_web::Fetcher>, String>>,
+}
+
+impl WebPort {
+    fn fetcher(&self) -> Result<Arc<piarc_web::Fetcher>, String> {
+        self.fetcher
+            .get_or_init(|| {
+                let limits = piarc_web::FetchLimits {
+                    max_body_bytes: HTTP_RESPONSE_BYTES,
+                    timeout: std::time::Duration::from_secs(86_400),
+                    ..piarc_web::FetchLimits::default()
+                };
+                piarc_web::Fetcher::new(limits, piarc_web::Allowlist::default())
+                    .map(Arc::new)
+                    .map_err(|e| e.to_string())
+            })
+            .clone()
+    }
+}
+
+impl HttpPort for WebPort {
+    fn post(&self, call: HttpCall) -> BoxFuture<'static, Result<HttpReply, String>> {
+        let fetcher = self.fetcher();
+        Box::pin(async move {
+            let fetcher = fetcher?;
+            let request = piarc_web::Call {
+                method: piarc_web::Method::Post,
+                url: call.url,
+                headers: call.headers,
+                body: call.body,
+                max_body_bytes: HTTP_RESPONSE_BYTES,
+            };
+            // The runner bounds and cancels the request by dropping this future.
+            let reply = fetcher
+                .call(
+                    &request,
+                    piarc_web::Reach::Configured,
+                    &CancellationToken::new(),
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(HttpReply {
+                status: reply.status,
+                body: reply.body,
+            })
+        })
+    }
+}
+
+/// `prompt` hooks of one main session through the outlet.
+struct SessionJudge {
+    outlet: Option<Arc<dyn HookOutlet>>,
+    session_id: String,
+}
+
+impl JudgePort for SessionJudge {
+    fn judge(&self, call: JudgeCall) -> BoxFuture<'static, Result<JudgeReply, String>> {
+        let Some(outlet) = self.outlet.clone() else {
+            return Box::pin(async {
+                Err("no Agent Host can answer prompt hooks here".to_owned())
+            });
+        };
+        let params = HooksPromptParams {
+            session_id: self.session_id.clone(),
+            prompt: call.prompt,
+            model: call.model,
+            timeout_ms: call.timeout_ms,
+        };
+        Box::pin(async move {
+            let answer = outlet.judge(params).await?;
+            Ok(JudgeReply {
+                text: answer.text,
+                model: answer.model,
+                input_tokens: answer.input_tokens,
+                output_tokens: answer.output_tokens,
+            })
+        })
+    }
+}
 
 /// Runs hooks for every session of a Core. Cheap to clone.
 #[derive(Clone)]
@@ -106,6 +234,10 @@ struct Inner {
     /// (T31), the skills the session invoked until it closes (T37). Sources above every
     /// settings file, for that session only.
     scoped: Mutex<HashMap<String, Vec<Scoped>>>,
+    /// Each main session's current `prompt_id` (T38, I115).
+    prompts: Mutex<HashMap<String, String>>,
+    http: Arc<WebPort>,
+    outlet: Mutex<Option<Arc<dyn HookOutlet>>>,
 }
 
 /// Marks one `SessionStart` run in progress until it drops ([`HooksService::starting`]).
@@ -201,6 +333,33 @@ fn has_mode(event: HookEvent) -> bool {
             | HookEvent::PostToolUse
             | HookEvent::PostToolUseFailure
             | HookEvent::Stop
+            | HookEvent::SubagentStop
+            | HookEvent::PostToolBatch
+    )
+}
+
+/// Whether Claude Code sends `effort` with `event`: the events with a tool-use context.
+fn has_effort(event: HookEvent) -> bool {
+    matches!(
+        event,
+        HookEvent::PreToolUse
+            | HookEvent::PermissionRequest
+            | HookEvent::PostToolUse
+            | HookEvent::PostToolUseFailure
+            | HookEvent::Stop
+            | HookEvent::SubagentStop
+            | HookEvent::PostToolBatch
+    )
+}
+
+/// A list of strings at `pointer` of the merged settings; `None` when absent.
+fn string_list(value: Option<&Value>) -> Option<Vec<String>> {
+    let list = value?.as_array()?;
+    Some(
+        list.iter()
+            .filter_map(Value::as_str)
+            .map(str::to_owned)
+            .collect(),
     )
 }
 
@@ -224,8 +383,29 @@ impl HooksService {
                 transcripts: Mutex::default(),
                 starts: Mutex::default(),
                 scoped: Mutex::default(),
+                prompts: Mutex::default(),
+                http: Arc::new(WebPort {
+                    fetcher: std::sync::OnceLock::new(),
+                }),
+                outlet: Mutex::default(),
             }),
         }
+    }
+
+    /// Lets `prompt` hooks reach the sessions' Agent Hosts.
+    pub(crate) fn set_outlet(&self, outlet: Arc<dyn HookOutlet>) {
+        *lock(&self.inner.outlet) = Some(outlet);
+    }
+
+    /// A new user input of main session `session_id`: its hooks' `prompt_id` from now on.
+    pub(crate) fn new_prompt(&self, session_id: &str) -> String {
+        let id = crate::sessions::new_session_id().unwrap_or_else(|_| now_ms().to_string());
+        lock(&self.inner.prompts).insert(session_id.to_owned(), id.clone());
+        id
+    }
+
+    fn prompt_id(&self, session_id: &str) -> Option<String> {
+        lock(&self.inner.prompts).get(session_id).cloned()
     }
 
     /// Runs a subagent definition's `hooks` (from `file`) for `session_id`'s events until
@@ -373,7 +553,21 @@ impl HooksService {
                     .is_none_or(|rule| (self.inner.condition)(rule, tool, input, facts))
             });
         }
-        (!handlers.is_empty()).then_some(Plan(handlers))
+        if handlers.is_empty() {
+            return None;
+        }
+        let hook_env = string_list(
+            settings
+                .layer(piarc_config::ids::USER)
+                .and_then(|v| v.get("hookAllowedEnvVars")),
+        )
+        .unwrap_or_default();
+        Some(Plan {
+            handlers,
+            allowed_urls: string_list(settings.get("/allowedHttpHookUrls")),
+            http_env: string_list(settings.get("/httpHookAllowedEnvVars")),
+            hook_env,
+        })
     }
 
     /// Runs a [`Plan`] of `request` with the shells and environment of `launch`. Callers resolve
@@ -385,21 +579,37 @@ impl HooksService {
         plan: Plan,
         launch: Launch,
     ) -> Answer {
-        let handlers = plan.0;
         let input = self.input(facts, request);
         let cwd = if facts.cwd.is_dir() {
             facts.cwd.clone()
         } else {
             facts.root.clone()
         };
+        let rules = HttpRules {
+            allowed_urls: plan.allowed_urls,
+            allowed_env_vars: plan.http_env,
+            env: launch
+                .expansion
+                .iter()
+                .filter_map(|(k, v)| Some((k.to_str()?.to_owned(), v.to_str()?.to_owned())))
+                .collect(),
+        };
+        let judge = SessionJudge {
+            outlet: lock(&self.inner.outlet).clone(),
+            session_id: facts.main_session_id.clone(),
+        };
+        let handlers = plan.handlers;
         let runner = Runner::new(
             Arc::clone(&self.inner.spawner),
             Arc::new(launcher::CoreLauncher {
                 launch,
                 project_dir: facts.root.clone(),
+                extra: plan.hook_env,
             }),
             self.inner.runner,
-        );
+        )
+        .with_http(self.inner.http.clone(), rules)
+        .with_judge(Arc::new(judge));
         let ran = piarc_hooks::run(
             &runner,
             request.event,
@@ -428,12 +638,29 @@ impl HooksService {
 
     fn input(&self, facts: &Facts, request: &Request) -> Map<String, Value> {
         let mut input = request.fields.clone();
-        input.insert("session_id".into(), json!(facts.session_id));
+        input.insert("session_id".into(), json!(facts.main_session_id));
         input.insert(
             "transcript_path".into(),
-            json!(self.transcript(&facts.session_id)),
+            json!(self.transcript(&facts.main_session_id)),
         );
         input.insert("cwd".into(), json!(piarc_fs::display(&facts.cwd)));
+        match self.prompt_id(&facts.main_session_id) {
+            Some(id) => input.insert("prompt_id".into(), json!(id)),
+            None => input.remove("prompt_id"),
+        };
+        match &facts.agent {
+            Some(agent) => {
+                input.insert("agent_id".into(), json!(agent.id));
+                input.insert("agent_type".into(), json!(agent.kind));
+            }
+            None => {
+                input.remove("agent_id");
+                input.remove("agent_type");
+            }
+        }
+        if !has_effort(request.event) {
+            input.remove("effort");
+        }
         match facts.mode {
             Some(mode) if has_mode(request.event) => {
                 input.insert("permission_mode".into(), json!(mode));

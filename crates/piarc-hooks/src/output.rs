@@ -7,6 +7,10 @@
 //!   still read.
 //! - any other exit, a timeout, a start failure: a non-blocking error (the action continues and
 //!   the user is told), unless the handler says `onFailure: "block"`.
+//!
+//! `http` and `prompt` handlers have no exit code: the runner gives their answer as the JSON
+//! object a command would print ([`RunStatus::Replied`]) or as a non-blocking error
+//! ([`RunStatus::Failed`]).
 
 use std::sync::Arc;
 
@@ -14,7 +18,7 @@ use serde_json::{Map, Value};
 
 use crate::config::Handler;
 use crate::event::HookEvent;
-use crate::runner::{HandlerRun, RunStatus};
+use crate::runner::{Detail, HandlerRun, RunStatus};
 
 /// How the handler ended, as the protocol reads it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,6 +50,8 @@ pub struct Outcome {
     pub cancelled: bool,
     /// How long it ran, in milliseconds.
     pub duration_ms: u64,
+    /// The `http` status or the `prompt` model, for the audit.
+    pub detail: Detail,
 }
 
 impl Outcome {
@@ -62,6 +68,7 @@ impl Outcome {
             timed_out: false,
             cancelled: false,
             duration_ms,
+            detail: run.detail,
         };
         let name = event.name();
         match run.status {
@@ -116,8 +123,12 @@ impl Outcome {
                 outcome.kind =
                     Kind::Error(format!("{name} hook stopped: the session was interrupted"));
             }
-            RunStatus::NotStarted(reason) => {
+            RunStatus::NotStarted(reason) | RunStatus::Failed(reason) => {
                 outcome.kind = Kind::Error(format!("{name} hook error: {reason}"));
+            }
+            RunStatus::Replied(json) => {
+                outcome.exit_code = None;
+                outcome.json = (!json.is_empty()).then_some(json);
             }
         }
         outcome
@@ -164,23 +175,29 @@ enum Stdout {
     Text(Option<String>),
 }
 
+/// A `hookSpecificOutput` must name `event`.
+pub(crate) fn check_specific(event: HookEvent, json: &Map<String, Value>) -> Result<(), String> {
+    if let Some(specific) = json.get("hookSpecificOutput") {
+        let name = specific
+            .as_object()
+            .and_then(|s| s.get("hookEventName"))
+            .and_then(Value::as_str);
+        if name != Some(event.name()) {
+            return Err(format!(
+                "hookSpecificOutput.hookEventName must be {:?}",
+                event.name()
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn parse_stdout(event: HookEvent, stdout: &str) -> Result<Stdout, String> {
     let trimmed = stdout.trim();
     if trimmed.starts_with('{') && trimmed.ends_with('}') {
         let json: Map<String, Value> = serde_json::from_str(trimmed)
             .map_err(|e| format!("its output is not valid JSON: {e}"))?;
-        if let Some(specific) = json.get("hookSpecificOutput") {
-            let name = specific
-                .as_object()
-                .and_then(|s| s.get("hookEventName"))
-                .and_then(Value::as_str);
-            if name != Some(event.name()) {
-                return Err(format!(
-                    "hookSpecificOutput.hookEventName must be {:?}",
-                    event.name()
-                ));
-            }
-        }
+        check_specific(event, &json)?;
         return Ok(Stdout::Json(json));
     }
     Ok(Stdout::Text(
@@ -200,9 +217,11 @@ mod tests {
 
     pub(crate) fn handler() -> Arc<Handler> {
         Arc::new(Handler {
-            command: "hook".into(),
-            args: None,
-            shell: None,
+            action: crate::config::Action::Command(crate::config::Command {
+                command: "hook".into(),
+                args: None,
+                shell: None,
+            }),
             timeout: None,
             condition: None,
             block_on_failure: false,
@@ -224,6 +243,7 @@ mod tests {
             stdout: stdout.into(),
             stderr: stderr.into(),
             duration: Duration::from_millis(7),
+            detail: crate::runner::Detail::Process,
         }
     }
 

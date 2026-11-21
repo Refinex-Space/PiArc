@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "result": {
+    "text": "{\"ok\": true}",
+    "model": "anthropic/claude-haiku-4-5",
+    "inputTokens": "420",
+    "outputTokens": 18
+  }
+}

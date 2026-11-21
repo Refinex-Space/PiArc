@@ -7,12 +7,13 @@
 //!
 //! Every hook gets the command environment of the session's tools (ADR-0035) plus
 //! `CLAUDE_PROJECT_DIR`, the workspace root, which Claude Code's hooks use to find their
-//! scripts.
+//! scripts, and the variables the user listed in their own settings' `hookAllowedEnvVars`,
+//! taken from the login shell's environment (I93, ADR-0055).
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
-use piarc_hooks::{Handler, Launcher, Shell};
+use piarc_hooks::{Command, Error, Launcher, Shell};
 use piarc_ports::SpawnSpec;
 
 /// The environment and shells hooks start with.
@@ -24,16 +25,32 @@ pub(crate) struct Launch {
     pub bash: Option<PathBuf>,
     /// PowerShell, when found.
     pub powershell: Option<PathBuf>,
+    /// The login shell's environment without PiArc's internal variables: where `http` header
+    /// variables and `hookAllowedEnvVars` take their values.
+    pub expansion: Vec<(OsString, OsString)>,
 }
 
 pub(crate) struct CoreLauncher {
     pub launch: Launch,
     pub project_dir: PathBuf,
+    /// `hookAllowedEnvVars` of the user's settings.
+    pub extra: Vec<String>,
 }
 
 impl Launcher for CoreLauncher {
-    fn spec(&self, handler: &Handler, cwd: &Path) -> Result<SpawnSpec, String> {
+    fn spec(&self, handler: &Command, cwd: &Path) -> Result<SpawnSpec, Error> {
         let mut env = self.launch.env.clone();
+        for name in &self.extra {
+            if let Some((key, value)) = self
+                .launch
+                .expansion
+                .iter()
+                .find(|(k, _)| k == name.as_str())
+            {
+                env.retain(|(k, _)| k != key);
+                env.push((key.clone(), value.clone()));
+            }
+        }
         env.retain(|(k, _)| k != "CLAUDE_PROJECT_DIR");
         env.push((
             "CLAUDE_PROJECT_DIR".into(),
@@ -65,8 +82,10 @@ impl Launcher for CoreLauncher {
             )),
             Shell::Bash => {
                 let bash = self.launch.bash.clone().ok_or_else(|| {
-                    "Git Bash was not found; set \"shell\": \"powershell\" or install Git for Windows"
-                        .to_owned()
+                    Error::CannotStart(
+                        "Git Bash was not found; set \"shell\": \"powershell\" or install Git for Windows"
+                            .to_owned(),
+                    )
                 })?;
                 let (args, carried) = piarc_exec::shells::bash_invocation(&handler.command);
                 let mut spawn = spec(bash, args);
@@ -78,7 +97,7 @@ impl Launcher for CoreLauncher {
                     .launch
                     .powershell
                     .clone()
-                    .ok_or_else(|| "PowerShell was not found".to_owned())?;
+                    .ok_or_else(|| Error::CannotStart("PowerShell was not found".to_owned()))?;
                 let args = piarc_exec::shells::powershell_args(&shell, &handler.command);
                 Ok(spec(shell, args))
             }
@@ -92,19 +111,11 @@ mod tests {
 
     use super::*;
 
-    fn handler(command: &str, shell: Option<Shell>, args: Option<Vec<String>>) -> Handler {
-        Handler {
+    fn handler(command: &str, shell: Option<Shell>, args: Option<Vec<String>>) -> Command {
+        Command {
             command: command.into(),
             args,
             shell,
-            timeout: None,
-            condition: None,
-            block_on_failure: false,
-            source: piarc_hooks::Source {
-                layer: "user".into(),
-                file: None,
-            },
-            pointer: String::new(),
         }
     }
 
@@ -118,8 +129,13 @@ mod tests {
                 ],
                 bash: None,
                 powershell: None,
+                expansion: vec![
+                    ("WEBHOOK_TOKEN".into(), "t-1".into()),
+                    ("AWS_SECRET".into(), "never".into()),
+                ],
             },
             project_dir: PathBuf::from("/work/项目"),
+            extra: vec!["WEBHOOK_TOKEN".into(), "NOT_SET".into()],
         };
         let exec = launcher
             .spec(
@@ -140,6 +156,13 @@ mod tests {
                 .count(),
             1
         );
+        assert!(exec.env.contains(&("WEBHOOK_TOKEN".into(), "t-1".into())));
+        assert!(
+            !exec
+                .env
+                .iter()
+                .any(|(k, _)| k == "AWS_SECRET" || k == "NOT_SET")
+        );
         let _ = Arc::new(launcher);
     }
 
@@ -149,6 +172,7 @@ mod tests {
         let launcher = CoreLauncher {
             launch: Launch::default(),
             project_dir: PathBuf::from("/work"),
+            extra: Vec::new(),
         };
         let shell = launcher
             .spec(&handler("echo hi", None, None), Path::new("/work"))
@@ -162,6 +186,9 @@ mod tests {
             &handler("x", Some(Shell::PowerShell), None),
             Path::new("/w"),
         );
-        assert_eq!(missing.err().as_deref(), Some("PowerShell was not found"));
+        assert_eq!(
+            missing.err().map(|e| e.to_string()).as_deref(),
+            Some("PowerShell was not found")
+        );
     }
 }

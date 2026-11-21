@@ -17,7 +17,7 @@ use serde_json::{Map, Value, json};
 use tokio_util::sync::{CancellationToken, DropGuard};
 
 use super::{SessionIo, ToolIo, lock, to_value};
-use crate::hooks::{Answer, Facts, HooksService, Request};
+use crate::hooks::{AgentFacts, Answer, Facts, HooksService, Request};
 
 /// A token cancelled when `peer`'s connection ends (or the guard drops).
 pub(super) fn linked(
@@ -59,9 +59,24 @@ impl Drop for Running<'_> {
     }
 }
 
-/// The input fields and matcher subject of each event the Agent Host reports.
+/// The input fields and matcher subject of each event the Agent Host reports. `effort` is
+/// accepted everywhere; Core keeps it only on the events Claude Code sends it with.
 fn host_event(event: HostHookEvent) -> (HookEvent, &'static [&'static str], Option<&'static str>) {
     match event {
+        HostHookEvent::SubagentStart => (HookEvent::SubagentStart, &[], None),
+        HostHookEvent::SubagentStop => (
+            HookEvent::SubagentStop,
+            &[
+                "stop_hook_active",
+                "agent_transcript_path",
+                "last_assistant_message",
+                "background_tasks",
+                "session_crons",
+                "effort",
+            ],
+            None,
+        ),
+        HostHookEvent::PostToolBatch => (HookEvent::PostToolBatch, &["tool_calls", "effort"], None),
         HostHookEvent::SessionStart => (
             HookEvent::SessionStart,
             &["source", "model"],
@@ -76,6 +91,7 @@ fn host_event(event: HostHookEvent) -> (HookEvent, &'static [&'static str], Opti
                 "tool_response",
                 "tool_use_id",
                 "duration_ms",
+                "effort",
             ],
             Some("tool_name"),
         ),
@@ -88,6 +104,7 @@ fn host_event(event: HostHookEvent) -> (HookEvent, &'static [&'static str], Opti
                 "error",
                 "is_interrupt",
                 "duration_ms",
+                "effort",
             ],
             Some("tool_name"),
         ),
@@ -98,6 +115,7 @@ fn host_event(event: HostHookEvent) -> (HookEvent, &'static [&'static str], Opti
                 "last_assistant_message",
                 "background_tasks",
                 "session_crons",
+                "effort",
             ],
             None,
         ),
@@ -114,6 +132,36 @@ fn host_event(event: HostHookEvent) -> (HookEvent, &'static [&'static str], Opti
     }
 }
 
+/// The request of an event the Agent Host reported: its own fields (by the event's list), the
+/// fields Claude Code always sends with it, the matcher's subject and the tool call.
+fn host_request(event: HostHookEvent, input: Map<String, Value>) -> Request {
+    let (event, keys, subject) = host_event(event);
+    let mut fields: Map<String, Value> = input
+        .into_iter()
+        .filter(|(k, _)| keys.contains(&k.as_str()))
+        .collect();
+    if matches!(event, HookEvent::Stop | HookEvent::SubagentStop) {
+        fields.entry("stop_hook_active").or_insert(json!(false));
+        fields.entry("background_tasks").or_insert(json!([]));
+        fields.entry("session_crons").or_insert(json!([]));
+    }
+    let tool = match (fields.get("tool_name"), fields.get("tool_input")) {
+        (Some(Value::String(name)), Some(Value::Object(input))) => {
+            Some((name.clone(), input.clone()))
+        }
+        _ => None,
+    };
+    Request {
+        event,
+        subject: subject
+            .and_then(|k| fields.get(k))
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        fields,
+        tool,
+    }
+}
+
 /// Whether `path` lies in `root` after removing `.` and `..`.
 fn within(root: &Path, path: &Path) -> bool {
     path.is_absolute() && super::policy::lexical(path).starts_with(root)
@@ -124,6 +172,13 @@ impl ToolIo {
         self.policy.as_ref()?.hooks.as_ref()
     }
 
+    /// Lets `prompt` hooks reach the sessions' Agent Hosts (the session layer, T38).
+    pub(crate) fn set_hook_outlet(&self, outlet: std::sync::Arc<dyn crate::hooks::HookOutlet>) {
+        if let Some(hooks) = self.hook_service() {
+            hooks.set_outlet(outlet);
+        }
+    }
+
     /// The facts of an open session's hooks.
     pub(super) fn session_facts(
         &self,
@@ -132,8 +187,20 @@ impl ToolIo {
         cancel: CancellationToken,
     ) -> Facts {
         let mode = lock(&s.policy).mode();
+        let (main_session_id, agent) = match &s.subagent {
+            Some(link) => (
+                link.root_id.clone(),
+                Some(AgentFacts {
+                    id: id.to_owned(),
+                    kind: link.agent_type.clone(),
+                }),
+            ),
+            None => (id.to_owned(), None),
+        };
         Facts {
             session_id: id.to_owned(),
+            main_session_id,
+            agent,
             root: s.project().to_path_buf(),
             cwd: s.scope.cwd().to_path_buf(),
             tmp_dir: s.tmp_dir.clone(),
@@ -201,42 +268,28 @@ impl ToolIo {
         let _starting = (p.event == HostHookEvent::SessionStart
             && p.input.get("source").and_then(Value::as_str) != Some("compact"))
         .then(|| hooks.starting(&p.session_id));
-        let (event, keys, subject) = host_event(p.event);
-        let mut fields: Map<String, Value> = p
-            .input
-            .into_iter()
-            .filter(|(k, _)| keys.contains(&k.as_str()))
-            .collect();
-        if event == HookEvent::Stop {
-            fields.entry("stop_hook_active").or_insert(json!(false));
-            fields.entry("background_tasks").or_insert(json!([]));
-            fields.entry("session_crons").or_insert(json!([]));
-        }
-        let tool = match (fields.get("tool_name"), fields.get("tool_input")) {
-            (Some(Value::String(name)), Some(Value::Object(input))) => {
-                Some((name.clone(), input.clone()))
-            }
-            _ => None,
-        };
-        let request = Request {
-            event,
-            subject: subject
-                .and_then(|k| fields.get(k))
-                .and_then(Value::as_str)
-                .map(str::to_owned),
-            fields,
-            tool,
-        };
+        let request = host_request(p.event, p.input);
+        let event = request.event;
         let (token, _guard) = linked(peer, None);
         let answer = match self.session(&p.session_id) {
             Ok(s) => {
                 let _running = Running::new(&s, &token);
                 let facts = self.session_facts(&s, &p.session_id, token.clone());
+                // The subagent events match the agent type (T38).
+                let request = match (&facts.agent, event) {
+                    (Some(agent), HookEvent::SubagentStart | HookEvent::SubagentStop) => Request {
+                        subject: Some(agent.kind.clone()),
+                        ..request
+                    },
+                    _ => request,
+                };
                 self.run_hooks(hooks, &facts, &request).await
             }
             Err(_) => {
                 let facts = Facts {
                     session_id: p.session_id.clone(),
+                    main_session_id: p.session_id.clone(),
+                    agent: None,
                     root: workspace.to_path_buf(),
                     cwd: super::policy::lexical(&requested),
                     tmp_dir: self.session_dir(&p.session_id).join("tmp"),
@@ -268,13 +321,14 @@ impl ToolIo {
             ..HooksRunResult::default()
         };
         match event {
-            HookEvent::Stop => {
+            HookEvent::Stop | HookEvent::SubagentStop => {
                 let continues = d.block.is_some() || answer.context.is_some();
                 if continues && continuations.unwrap_or(0) >= u64::from(STOP_CONTINUATION_LIMIT) {
                     if let Ok(s) = self.session(id) {
                         let facts = self.session_facts(&s, id, CancellationToken::new());
                         let message = format!(
-                            "Stop hooks continued the turn {STOP_CONTINUATION_LIMIT} times in a row; PiArc ended the turn."
+                            "{} hooks continued the turn {STOP_CONTINUATION_LIMIT} times in a row; PiArc ended the turn.",
+                            event.name()
                         );
                         hooks.notify(&facts, event, "error", &message).await;
                     }
@@ -299,7 +353,16 @@ impl ToolIo {
                     result.updated_output = d.updated_output;
                 }
             }
-            HookEvent::SessionStart => result.context = answer.context,
+            HookEvent::SessionStart | HookEvent::SubagentStart => result.context = answer.context,
+            HookEvent::PostToolBatch => {
+                if let (Some(reason), Ok(s)) = (&d.block, self.session(id)) {
+                    let facts = self.session_facts(&s, id, CancellationToken::new());
+                    let message = format!("Stopped after the tool calls: {reason}");
+                    hooks.notify(&facts, event, "message", &message).await;
+                }
+                result.block = d.block;
+                result.context = answer.context;
+            }
             _ => {}
         }
         result
@@ -320,6 +383,8 @@ impl ToolIo {
         let _running = Running::new(&s, &token);
         // Claude Code runs a session's SessionStart hooks before its first prompt's.
         hooks.started(id, &token).await;
+        // Every input is a new prompt for the hooks' `prompt_id` (T38, I115).
+        hooks.new_prompt(id);
         let facts = self.session_facts(&s, id, token.clone());
         let mut fields = Map::new();
         fields.insert("prompt".into(), json!(text));

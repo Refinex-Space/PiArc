@@ -1,6 +1,10 @@
 //! One WebFetch request: resolve, check every address ([`crate::ssrf`]), connect to a checked
 //! address (never resolving again, so DNS rebinding cannot swap it), HTTP/1.1 with TLS for
 //! `https:`, same-site redirects followed with the same checks, a cross-site redirect returned.
+//!
+//! [`Fetcher::call`] sends one request of another kind (`http` hooks, search services) through
+//! the same connection code: to an address the user configured it skips the address check
+//! ([`Reach::Configured`]), and it never follows a redirect.
 use std::future::Future;
 use std::io;
 use std::net::{IpAddr, SocketAddr};
@@ -9,10 +13,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use http::header::{
-    ACCEPT, ACCEPT_ENCODING, CONNECTION, CONTENT_ENCODING, CONTENT_TYPE, HOST, LOCATION, USER_AGENT,
+    ACCEPT_ENCODING, CONNECTION, CONTENT_ENCODING, CONTENT_TYPE, HOST, LOCATION, USER_AGENT,
 };
 use http::{Request, StatusCode};
-use http_body_util::{BodyExt, Empty};
+use http_body_util::{BodyExt, Full};
 use hyper::body::Bytes;
 use hyper_util::rt::TokioIo;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -79,6 +83,58 @@ pub enum Outcome {
         status: u16,
     },
 }
+
+/// Which addresses a request may reach.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reach {
+    /// Public addresses only (or the allowlist): an address the model chose.
+    Public,
+    /// Any address: one the user configured (an `http` hook, a search service's endpoint).
+    Configured,
+}
+
+/// A request method of [`Fetcher::call`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Method {
+    Get,
+    Post,
+}
+
+/// One request of [`Fetcher::call`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Call {
+    pub method: Method,
+    pub url: String,
+    /// Headers besides `Host`, `User-Agent`, `Accept-Encoding` and `Connection`.
+    pub headers: Vec<(String, String)>,
+    pub body: Vec<u8>,
+    /// Body bytes kept from the response.
+    pub max_body_bytes: usize,
+}
+
+/// The response to a [`Call`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Reply {
+    pub status: u16,
+    pub content_type: Option<String>,
+    pub body: Vec<u8>,
+    /// The body was longer than the call's limit and was cut.
+    pub truncated: bool,
+}
+
+/// What [`Fetcher::send`] writes.
+struct Outgoing<'a> {
+    method: http::Method,
+    headers: &'a [(String, String)],
+    body: &'a [u8],
+    max_body_bytes: usize,
+}
+
+/// The headers of a WebFetch page request.
+const PAGE_HEADERS: &[(&str, &str)] = &[(
+    "Accept",
+    "text/markdown, text/html;q=0.9, text/plain;q=0.8, */*;q=0.5",
+)];
 
 /// Fetches with fixed limits, allowlist, resolver and TLS configuration.
 pub struct Fetcher {
@@ -199,10 +255,57 @@ impl Fetcher {
         }
     }
 
+    /// Sends `call` within the fetch timeout to an address `reach` admits; `cancel` stops it.
+    /// The response comes back whatever its status; a redirect is not followed.
+    pub async fn call(
+        &self,
+        call: &Call,
+        reach: Reach,
+        cancel: &CancellationToken,
+    ) -> Result<Reply, FetchError> {
+        let timeout = self.limits.timeout;
+        let run = async {
+            let url = parse_target(&call.url)?;
+            let headers: Vec<(String, String)> = call.headers.clone();
+            let outgoing = Outgoing {
+                method: match call.method {
+                    Method::Get => http::Method::GET,
+                    Method::Post => http::Method::POST,
+                },
+                headers: &headers,
+                body: &call.body,
+                max_body_bytes: call.max_body_bytes,
+            };
+            let response = self.request(&url, reach, &outgoing).await?;
+            Ok(Reply {
+                status: response.status.as_u16(),
+                content_type: response.content_type,
+                body: response.body,
+                truncated: response.truncated,
+            })
+        };
+        tokio::select! {
+            () = cancel.cancelled() => Err(FetchError::Cancelled),
+            result = tokio::time::timeout(timeout, run) => {
+                result.unwrap_or(Err(FetchError::Timeout(timeout)))
+            }
+        }
+    }
+
     async fn run(&self, text: &str) -> Result<Outcome, FetchError> {
         let mut current = parse_target(text)?;
+        let headers: Vec<(String, String)> = PAGE_HEADERS
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect();
+        let page = Outgoing {
+            method: http::Method::GET,
+            headers: &headers,
+            body: &[],
+            max_body_bytes: self.limits.max_body_bytes,
+        };
         for _ in 0..=self.limits.max_redirects {
-            let response = self.request(&current).await?;
+            let response = self.request(&current, Reach::Public, &page).await?;
             if response.status.is_redirection()
                 && let Some(location) = &response.location
             {
@@ -239,8 +342,8 @@ impl Fetcher {
         Err(FetchError::TooManyRedirects(self.limits.max_redirects))
     }
 
-    /// The checked addresses of `url`'s host.
-    async fn addresses(&self, url: &Url) -> Result<(Vec<IpAddr>, u16), FetchError> {
+    /// The addresses of `url`'s host, checked when `reach` is public.
+    async fn addresses(&self, url: &Url, reach: Reach) -> Result<(Vec<IpAddr>, u16), FetchError> {
         let host = url.host_str().unwrap_or_default().to_owned();
         let port = url.port_or_known_default().unwrap_or(443);
         let resolved = match url.host() {
@@ -267,13 +370,16 @@ impl Fetcher {
                 reason: "no addresses".into(),
             });
         }
+        if reach == Reach::Configured {
+            return Ok((resolved, port));
+        }
         let checked = ssrf::check(&host, &resolved, &self.allow)
             .map_err(|(ip, why)| FetchError::Blocked { host, ip, why })?;
         Ok((checked, port))
     }
 
-    async fn connect(&self, url: &Url) -> Result<TcpStream, FetchError> {
-        let (addresses, port) = self.addresses(url).await?;
+    async fn connect(&self, url: &Url, reach: Reach) -> Result<TcpStream, FetchError> {
+        let (addresses, port) = self.addresses(url, reach).await?;
         let mut last = None;
         for ip in addresses {
             match TcpStream::connect(SocketAddr::new(ip, port)).await {
@@ -287,8 +393,13 @@ impl Fetcher {
         })
     }
 
-    async fn request(&self, url: &Url) -> Result<Response, FetchError> {
-        let tcp = self.connect(url).await?;
+    async fn request(
+        &self,
+        url: &Url,
+        reach: Reach,
+        out: &Outgoing<'_>,
+    ) -> Result<Response, FetchError> {
+        let tcp = self.connect(url, reach).await?;
         if url.scheme() == "https" {
             let name = match url.host() {
                 Some(Host::Ipv4(ip)) => {
@@ -306,13 +417,18 @@ impl Fetcher {
                 .connect(name, tcp)
                 .await
                 .map_err(|e| FetchError::Tls(format!("{}: {e}", host_header(url))))?;
-            self.exchange(url, tls).await
+            self.exchange(url, tls, out).await
         } else {
-            self.exchange(url, tcp).await
+            self.exchange(url, tcp, out).await
         }
     }
 
-    async fn exchange<S>(&self, url: &Url, stream: S) -> Result<Response, FetchError>
+    async fn exchange<S>(
+        &self,
+        url: &Url,
+        stream: S,
+        out: &Outgoing<'_>,
+    ) -> Result<Response, FetchError>
     where
         S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     {
@@ -325,16 +441,18 @@ impl Fetcher {
             Some(q) => format!("{}?{q}", url.path()),
             None => url.path().to_owned(),
         };
-        let request = Request::get(path)
+        let mut builder = Request::builder()
+            .method(out.method.clone())
+            .uri(path)
             .header(HOST, host_header(url))
             .header(USER_AGENT, &self.user_agent)
-            .header(
-                ACCEPT,
-                "text/markdown, text/html;q=0.9, text/plain;q=0.8, */*;q=0.5",
-            )
             .header(ACCEPT_ENCODING, "identity")
-            .header(CONNECTION, "close")
-            .body(Empty::<Bytes>::new())
+            .header(CONNECTION, "close");
+        for (name, value) in out.headers {
+            builder = builder.header(name.as_str(), value.as_str());
+        }
+        let request = builder
+            .body(Full::new(Bytes::copy_from_slice(out.body)))
             .map_err(|e| FetchError::InvalidUrl(e.to_string()))?;
         let result = async {
             let response = sender.send_request(request).await.map_err(http)?;
@@ -362,7 +480,7 @@ impl Fetcher {
                     let Ok(data) = frame.into_data() else {
                         continue;
                     };
-                    let room = self.limits.max_body_bytes - bytes.len();
+                    let room = out.max_body_bytes - bytes.len();
                     if data.len() > room {
                         bytes.extend_from_slice(&data[..room]);
                         truncated = true;
