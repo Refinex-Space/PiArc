@@ -169,7 +169,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T38 | [WebSearch 与 hooks 扩展（M3）](tasks/T38-websearch-and-hooks-m3.md) | 4 | T37 | macOS | high / 高 | 中 | 无 | 已完成 | fc9c022 |
 | R4 | [M3 评审](tasks/R4-m3-review.md) | 4 | T38、W2 | macOS | high / 高 | 中 | 无 | 部分完成 | 8a1b0cf |
 | W3 | [Windows：M3 达标](tasks/W3-windows-m3-parity.md) | 5 | R4（建议在 T43、T44 之后，需要读屏清单与性能测量脚本） | Windows | high / 高 | 中 | 无 | 未开始 | — |
-| T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
+| T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
 | T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,6 +308,22 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+T39（macOS 沙箱正式版与 Windows 隔离评估）。开工：基线复用 8a1b0cf 的全量结果（之后只改了 `docs/`）；R4 部分完成只因内存口径，不影响本任务；分支自 T35 起未推送，Windows CI 的 blocked 项（T35-A10、T36-A11 等）不能关闭。
+
+- [ ] 0. 先拆分 `tool_io/exec.rs`、`tool_io/policy.rs`（I165），`piarc-exec` 错误枚举（I173），平台分支收进适配层（I174）
+- [ ] 1. 沙箱设置与来源约束：`sandbox.*` 键、两种模式、项目级只收紧、企业来源测试替身、配置诊断"项目级不生效""本平台不生效"（A06）
+- [ ] 2. Bash 执行路径接入沙箱：前台、后台、Monitor、agent 启动的终端；每条命令生成配置；子会话随主会话（I133）；路径清单（A01、A03）
+- [ ] 3. 裁决：沙箱自动批准在第 7 步；关键路径删除、plan、deny、ask 仍生效；沙箱不可用时降级（A02）
+- [ ] 4. 沙箱外重试 `dangerouslyDisableSandbox`：任何模式询问，只有仅本次与拒绝，hooks 不代答，审计（A04）
+- [ ] 5. 沙箱拒绝的反馈与审计：Seatbelt 与代理拒绝进 `audit_events`（A07 测试部分）
+- [ ] 6. 网络白名单：用户与企业并集、改后下一条命令生效、代理拒绝审计、代理加固（I54）、白名单外域名的"权限扩展（网络域名）"审批（A05、A14）
+- [ ] 7. 常见构建命令在沙箱内（git、npm install、cargo build、python）（A11；I34、I35）
+- [ ] 8. Agent Host Seatbelt 配置定稿：模板入库、golden、子进程缓存与 TMPDIR、测试扩展写主目录失败、npx MCP（A09、A10；I05、I40）
+- [ ] 9. 设置页"沙箱"、审计页"沙箱拒绝"筛选、Windows 提示与环境栏提示；L4 与亮/暗截图（A07、A08、A12、A14 界面部分）
+- [ ] 10. Windows 隔离方案评估 ADR（提议）与索引（A13）
+- [ ] 11. 文档：架构 6.2.3、6.10、10.3，piarc-sandbox 的 AGENTS.md，L3 复核（I117）
+- [ ] 12. 收尾：`npm run verify`、验收记录、看板（Windows 部分阻塞等 ADR）
 
 ## 登记事项
 
