@@ -26,6 +26,8 @@ function render() {
         import * as mcp from './agent-host/src/harness/prompts/mcp.ts';
         import * as skills from './agent-host/src/harness/prompts/skills.ts';
         import * as styles from './agent-host/src/harness/prompts/output-styles.ts';
+        import * as search from './agent-host/src/harness/prompts/web-search.ts';
+        import { HOOK_JUDGE_SYSTEM } from './agent-host/src/harness/prompts/hook-judge.ts';
         const system = assembleSystem(CANONICAL_TOOLS, DEFAULT_PROFILE, [],
           {cwd: '', platform: '', date: '', gitStatus: ''}).text;
         const conservative = conservativeProfile(DEFAULT_PROFILE);
@@ -68,7 +70,14 @@ function render() {
           skills.skillLoaded('', '', '', ['']), skills.SKILL_UNTRUSTED_NOTE,
           skills.skillAllowedNote(['']),
           ...Object.entries(styles.BUILT_IN_STYLES).map(([name, text]) => styles.styleSection(name, text)),
-          styles.styleChanged('', ' '), styles.styleChanged('', undefined)];
+          styles.styleChanged('', ' '), styles.styleChanged('', undefined),
+          // T38: WebSearch's native request and results, the prompt hooks' judgement, the
+          // hook notices of SubagentStop and PostToolBatch.
+          search.NATIVE_SEARCH_SYSTEM, search.nativeSearchPrompt(''),
+          search.searchResultText('', '', [{ title: '', url: '', snippet: ' ' }], ' '),
+          search.searchResultText('', '', []), search.NO_SEARCH_BACKEND, search.nativeSearchFailed(''),
+          HOOK_JUDGE_SYSTEM, notice.hookContextNotice('SubagentStop', ''),
+          notice.hookStoppedRun('PostToolBatch', '')];
         process.stdout.write([system, ...descriptions, ...notices].join(String.fromCharCode(10)));`,
       resolveDir: repoRoot,
     },
