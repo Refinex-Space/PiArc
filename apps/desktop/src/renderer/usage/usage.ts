@@ -139,9 +139,15 @@ export function parseUsageReport(text: string): UsageReport {
 export function formatCost(value: number, locale: string): string {
   const options: Intl.NumberFormatOptions =
     value >= 1 || value === 0
-      ? { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }
-      : { style: 'currency', currency: 'USD', maximumSignificantDigits: 4 };
-  return new Intl.NumberFormat(locale, options).format(value);
+      ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+      : { maximumSignificantDigits: 4 };
+  // `narrowSymbol`: "$" in every locale (Chinese would write "US$").
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: 'USD',
+    currencyDisplay: 'narrowSymbol',
+    ...options,
+  }).format(value);
 }
 
 /** Every token of a usage: input, output and both cache kinds. */

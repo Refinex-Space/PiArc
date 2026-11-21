@@ -26,10 +26,13 @@ export function Cost({
   cost,
   partial = false,
   testId,
+  bare = false,
 }: {
   readonly cost: number | null | undefined;
   readonly partial?: boolean | undefined;
   readonly testId?: string;
+  /** Only the amount: a table's header says it is an estimate. */
+  readonly bare?: boolean;
 }) {
   const { t, locale } = useApp();
   if (cost == null) {
@@ -42,7 +45,7 @@ export function Cost({
   const text = formatCost(cost, locale);
   return (
     <span className="usage-cost" data-testid={testId} data-cost={String(cost)}>
-      {t(partial ? 'usage.costPartial' : 'usage.cost', { cost: text })}
+      {bare ? text : t(partial ? 'usage.costPartial' : 'usage.cost', { cost: text })}
     </span>
   );
 }

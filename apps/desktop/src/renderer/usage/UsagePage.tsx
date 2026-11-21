@@ -128,121 +128,130 @@ function ModelTable({
   const { t } = useApp();
   const [editing, setEditing] = useState<string | undefined>(undefined);
   return (
-    <table className="diagnostics-table usage-table" data-testid="usage-models">
-      <thead>
-        <tr>
-          <th>{t('usage.model')}</th>
-          <th className="usage-number">{t('usage.requestsColumn')}</th>
-          <th className="usage-number">{t('usage.tokens.input')}</th>
-          <th className="usage-number">{t('usage.tokens.output')}</th>
-          <th className="usage-number">{t('usage.tokens.cacheRead')}</th>
-          <th className="usage-number">{t('usage.tokens.cacheWrite')}</th>
-          <th className="usage-number">{t('usage.costColumn')}</th>
-          <th>{t('usage.price')}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {models.map((m) => {
-          const key = `${m.provider}/${m.model}`;
-          return [
-            <tr key={key} data-testid="usage-model-row" data-model={key}>
-              <td className="diagnostics-code">{key}</td>
-              <td className="usage-number">{m.tokens.requests.toLocaleString()}</td>
-              <td className="usage-number">{m.tokens.input.toLocaleString()}</td>
-              <td className="usage-number">{m.tokens.output.toLocaleString()}</td>
-              <td className="usage-number">{m.tokens.cacheRead.toLocaleString()}</td>
-              <td className="usage-number">{m.tokens.cacheWrite.toLocaleString()}</td>
-              <td className="usage-number">
-                <Cost cost={m.cost} testId="usage-model-cost" />
-              </td>
-              <td>
-                <span className="muted small" data-testid="usage-price-source">
-                  {t(`usage.price.source.${m.priceSource}`)}
-                </span>{' '}
-                <button
-                  type="button"
-                  className="button button-small"
-                  data-testid="usage-price-edit"
-                  onClick={() => {
-                    setEditing(editing === key ? undefined : key);
-                  }}
-                >
-                  {t('usage.price.edit')}
-                </button>
-              </td>
-            </tr>,
-            editing === key ? (
-              <tr key={`${key}-edit`}>
-                <td colSpan={8}>
-                  <PriceEditor
-                    model={m}
-                    onDone={() => {
-                      setEditing(undefined);
-                      onChanged();
-                    }}
-                  />
+    <div className="usage-table-wrap">
+      <table className="diagnostics-table usage-table" data-testid="usage-models">
+        <thead>
+          <tr>
+            <th>{t('usage.model')}</th>
+            <th className="usage-number">{t('usage.requestsColumn')}</th>
+            <th className="usage-number">{t('usage.tokens.input')}</th>
+            <th className="usage-number">{t('usage.tokens.output')}</th>
+            <th className="usage-number">{t('usage.tokens.cacheRead')}</th>
+            <th className="usage-number">{t('usage.tokens.cacheWrite')}</th>
+            <th className="usage-number">{t('usage.costColumn')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {models.map((m) => {
+            const key = `${m.provider}/${m.model}`;
+            return [
+              <tr key={key} data-testid="usage-model-row" data-model={key}>
+                <td className="usage-model-cell">
+                  <div className="diagnostics-code">{key}</div>
+                  <div className="usage-price-line">
+                    <span className="muted small" data-testid="usage-price-source">
+                      {t(`usage.price.source.${m.priceSource}`)}
+                    </span>
+                    <button
+                      type="button"
+                      className="button button-small"
+                      data-testid="usage-price-edit"
+                      onClick={() => {
+                        setEditing(editing === key ? undefined : key);
+                      }}
+                    >
+                      {t('usage.price.edit')}
+                    </button>
+                  </div>
                 </td>
-              </tr>
-            ) : null,
-          ];
-        })}
-      </tbody>
-    </table>
+                <td className="usage-number">{m.tokens.requests.toLocaleString()}</td>
+                <td className="usage-number">{m.tokens.input.toLocaleString()}</td>
+                <td className="usage-number">{m.tokens.output.toLocaleString()}</td>
+                <td className="usage-number">{m.tokens.cacheRead.toLocaleString()}</td>
+                <td className="usage-number">{m.tokens.cacheWrite.toLocaleString()}</td>
+                <td className="usage-number">
+                  <Cost cost={m.cost} testId="usage-model-cost" bare />
+                </td>
+              </tr>,
+              editing === key ? (
+                <tr key={`${key}-edit`}>
+                  <td colSpan={7}>
+                    <PriceEditor
+                      model={m}
+                      onDone={() => {
+                        setEditing(undefined);
+                        onChanged();
+                      }}
+                    />
+                  </td>
+                </tr>
+              ) : null,
+            ];
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
 function SessionTable({ report }: { readonly report: UsageReport }) {
   const { t } = useApp();
   return (
-    <table className="diagnostics-table usage-table" data-testid="usage-sessions">
-      <thead>
-        <tr>
-          <th>{t('usage.session')}</th>
-          <th className="usage-number">{t('usage.tokensColumn')}</th>
-          <th className="usage-number">{t('usage.costColumn')}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {report.sessions.map((s) => (
-          <tr key={s.sessionId} data-testid="usage-session-row" data-session={s.sessionId}>
-            <td>
-              <div>{s.title ?? t('usage.untitled')}</div>
-              {s.workspace === undefined ? null : (
-                <div className="muted small diagnostics-code">{s.workspace}</div>
-              )}
-              {(s.subagents ?? []).map((sub) => (
-                <div
-                  key={sub.sessionId}
-                  className="muted small"
-                  data-testid="usage-session-subagent"
-                >
-                  {sub.agentType == null
-                    ? t('usage.subagentUntyped')
-                    : t('usage.subagent', { type: sub.agentType })}
-                  {' · '}
-                  {t('usage.tokenCount', { count: totalTokens(sub.tokens) })}
-                  {' · '}
-                  <Cost cost={sub.cost} />
-                </div>
-              ))}
-              {(s.auxiliary ?? []).map((a) => (
-                <div key={a.purpose} className="muted small" data-testid="usage-session-auxiliary">
-                  {purposeLabel(t, a.purpose)}
-                  {' · '}
-                  {t('usage.tokenCount', { count: totalTokens(a.tokens) })}
-                  {' · '}
-                  <Cost cost={a.cost} />
-                </div>
-              ))}
-            </td>
-            <td className="usage-number">{totalTokens(s.tokens).toLocaleString()}</td>
-            <td className="usage-number">
-              <Cost cost={s.cost} partial={s.partial} testId="usage-session-cost" />
-            </td>
+    <div className="usage-table-wrap">
+      <table className="diagnostics-table usage-table" data-testid="usage-sessions">
+        <thead>
+          <tr>
+            <th>{t('usage.session')}</th>
+            <th className="usage-number">{t('usage.tokensColumn')}</th>
+            <th className="usage-number">{t('usage.costColumn')}</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {report.sessions.map((s) => (
+            <tr key={s.sessionId} data-testid="usage-session-row" data-session={s.sessionId}>
+              <td>
+                <div>{s.title ?? t('usage.untitled')}</div>
+                {s.workspace === undefined ? null : (
+                  <div className="muted small diagnostics-code">{s.workspace}</div>
+                )}
+                {(s.subagents ?? []).map((sub) => (
+                  <div
+                    key={sub.sessionId}
+                    className="muted small"
+                    data-testid="usage-session-subagent"
+                  >
+                    {sub.agentType == null
+                      ? t('usage.subagentUntyped')
+                      : t('usage.subagent', { type: sub.agentType })}
+                    {' · '}
+                    {t('usage.tokenCount', { count: totalTokens(sub.tokens) })}
+                    {' · '}
+                    <Cost cost={sub.cost} />
+                  </div>
+                ))}
+                {(s.auxiliary ?? []).map((a) => (
+                  <div
+                    key={a.purpose}
+                    className="muted small"
+                    data-testid="usage-session-auxiliary"
+                  >
+                    {purposeLabel(t, a.purpose)}
+                    {' · '}
+                    {t('usage.tokenCount', { count: totalTokens(a.tokens) })}
+                    {' · '}
+                    <Cost cost={a.cost} />
+                  </div>
+                ))}
+              </td>
+              <td className="usage-number">{totalTokens(s.tokens).toLocaleString()}</td>
+              <td className="usage-number">
+                <Cost cost={s.cost} partial={s.partial} testId="usage-session-cost" bare />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

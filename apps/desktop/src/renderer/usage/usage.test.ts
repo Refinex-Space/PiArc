@@ -39,6 +39,7 @@ describe('usage', () => {
     expect(formatCost(12.345, 'en')).toBe('$12.35');
     expect(formatCost(0.0012345, 'en')).toBe('$0.001235');
     expect(formatCost(0, 'en')).toBe('$0.00');
+    expect(formatCost(0.01725, 'zh-CN')).toBe('$0.01725');
   });
 
   it('accepts typed prices of 0 or more only', () => {
