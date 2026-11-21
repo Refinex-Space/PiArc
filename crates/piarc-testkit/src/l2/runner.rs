@@ -42,6 +42,7 @@ mod harness;
 mod l3;
 mod login;
 mod settings;
+mod terminals;
 
 pub use l3::run_l3;
 
@@ -198,6 +199,7 @@ async fn run_in(
         answered: BTreeSet::new(),
         approval_cursor: 0,
         restores: BTreeMap::new(),
+        terminals: BTreeMap::new(),
         mode,
         asks: Vec::new(),
     };
@@ -498,6 +500,8 @@ struct Driver<'a> {
     mode: Mode,
     /// Every approval answered, in order, as `{tool, call, decision, scripted}` (L3 capture).
     asks: Vec<Value>,
+    /// Session id → the terminal `open_terminal` opened last (T34).
+    terminals: BTreeMap<String, u32>,
 }
 
 impl Driver<'_> {
@@ -670,6 +674,11 @@ impl Driver<'_> {
                 Ok(())
             }
             Action::StopTask { session, kind } => self.stop_task(session.as_deref(), *kind).await,
+            Action::OpenTerminal { session } => self.open_terminal(session.as_deref()).await,
+            Action::TypeTerminal { session, text } => self.type_terminal(session.as_deref(), text),
+            Action::ShareTerminal { session, shared } => {
+                self.share_terminal(session.as_deref(), *shared).await
+            }
             Action::RestartCore {} => self.restart().await,
             Action::Resume { session } => {
                 let id = self.session_id(session.as_deref())?;

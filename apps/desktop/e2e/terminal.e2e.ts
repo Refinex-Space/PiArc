@@ -6,6 +6,7 @@ import path from 'node:path';
 
 import type { CDPSession } from '@playwright/test';
 
+import { PARK_AFTER } from '../src/shared/terminal-lab.js';
 import { expect, test } from './fixtures.js';
 import {
   coreStats,
@@ -30,14 +31,25 @@ test('output appears in frames pulled per animation frame', async ({ app, page }
   expect(stats.resets).toBe(1);
   expect(stats.errors).toBe(0);
   expect(stats.framesReceived).toBeGreaterThan(stats.resets);
-  // Frames flow while nothing changes, but carry nothing: an unchanged terminal costs a header.
-  await page.waitForTimeout(500);
+  // While nothing changes the view gets a few empty frames (a header each), then parks (T34):
+  // it asks for nothing until Core reports output on the terminal's route.
+  await expect
+    .poll(async () => {
+      const before = (await labStats(page)).framesRequested;
+      await page.waitForTimeout(300);
+      return (await labStats(page)).framesRequested - before;
+    })
+    .toBe(0);
   const idle = await labStats(page);
-  expect(idle.framesReceived - stats.framesReceived).toBeGreaterThan(10);
+  expect(idle.framesReceived - stats.framesReceived).toBeLessThanOrEqual(PARK_AFTER + 1);
   expect(idle.bytes - stats.bytes).toBeLessThanOrEqual(
-    (idle.framesReceived - stats.framesReceived) * 14 + 4096,
+    (idle.framesReceived - stats.framesReceived) * 14,
   );
   expect((await coreStats(app, id)).frames).toBeGreaterThanOrEqual(idle.framesReceived);
+  // Output wakes it: a command's result still arrives.
+  await page.keyboard.type(WINDOWS ? 'echo woken' : 'echo woken-$((1+1))');
+  await page.keyboard.press('Enter');
+  await waitForScreen(page, (text) => text.split('\n').includes(WINDOWS ? 'woken' : 'woken-2'));
   await page.getByTestId('terminal-host').screenshot({ path: testInfo.outputPath('shell.png') });
 });
 

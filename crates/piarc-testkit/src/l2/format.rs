@@ -467,6 +467,30 @@ pub enum Action {
         #[serde(default)]
         kind: Option<piarc_protocol::tasks::TaskKind>,
     },
+    /// Opens a terminal for the user in the session, as the terminal panel does (T34): the
+    /// session's directory, a background task of kind `terminal`, not shared.
+    OpenTerminal {
+        /// The session.
+        #[serde(default)]
+        session: Option<String>,
+    },
+    /// Types `text` into the session's last opened terminal, as the user would.
+    TypeTerminal {
+        /// The session.
+        #[serde(default)]
+        session: Option<String>,
+        /// What to type (`\r` presses Enter).
+        text: String,
+    },
+    /// Shares the session's last opened terminal with the agent, or stops sharing it, as the
+    /// panel's switch does (T34, ADR-0050 rule 5).
+    ShareTerminal {
+        /// The session.
+        #[serde(default)]
+        session: Option<String>,
+        /// On or off.
+        shared: bool,
+    },
 }
 
 impl Action {
@@ -507,6 +531,9 @@ impl Action {
             Self::SignOut {} => "sign_out",
             Self::AdvanceClock { .. } => "advance_clock",
             Self::StopTask { .. } => "stop_task",
+            Self::OpenTerminal { .. } => "open_terminal",
+            Self::TypeTerminal { .. } => "type_terminal",
+            Self::ShareTerminal { .. } => "share_terminal",
         }
     }
 
@@ -527,6 +554,9 @@ impl Action {
             | Self::CheckStoredSession { session, .. }
             | Self::DeleteSession { session }
             | Self::StopTask { session, .. }
+            | Self::OpenTerminal { session }
+            | Self::TypeTerminal { session, .. }
+            | Self::ShareTerminal { session, .. }
             | Self::Resume { session } => Some(session),
             Self::Wait(wait) => Some(&wait.session),
             Self::Fork(fork) => Some(&fork.session),

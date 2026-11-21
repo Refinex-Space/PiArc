@@ -505,6 +505,12 @@ capabilities:
     refs: [FR-TL-05, ARCH-6.11]
     task: T33
     status: active
+  - id: CAP-TERM-SHARE-001
+    title: '用户在终端面板中打开的终端默认不给 agent；用户打开共享后 agent 得到屏幕的位置并能读取，取消共享后又看不到'
+    milestone: M3
+    refs: [FR-TL-05, ARCH-6.11]
+    task: T34
+    status: active
   - id: CAP-TOOL-NOTEBOOK-001
     title: 'NotebookEdit 编辑 Jupyter cell'
     milestone: M4

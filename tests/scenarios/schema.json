@@ -482,6 +482,32 @@
             "kind": { "enum": ["command", "subagent", "monitor"] }
           }
         },
+        "open_terminal": {
+          "description": "Opens a terminal for the user in the session as the terminal panel does (T34): a background task of kind terminal, not shared with the agent.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "session": { "$ref": "#/$defs/label" } }
+        },
+        "type_terminal": {
+          "description": "Types text into the session's last opened terminal (\\r presses Enter) (T34).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["text"],
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "text": { "type": "string", "minLength": 1 }
+          }
+        },
+        "share_terminal": {
+          "description": "Shares the session's last opened terminal with the agent, or stops sharing it, as the panel's switch does (T34, ADR-0050).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["shared"],
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "shared": { "type": "boolean" }
+          }
+        },
         "check_usage": {
           "description": "Checks the session's context usage from Core (T27): its categories add up to tokens (always), a field subset, and categories that must be above zero.",
           "type": "object",

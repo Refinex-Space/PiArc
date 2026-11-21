@@ -96,6 +96,7 @@ export function TerminalSurface({
     view.attach(terminalId);
     controller.current = view;
     onController(view);
+    globalThis.__piarcTerminalPanel = view.probe();
     const stop = onTerminalEvents(terminalId, (event) => {
       if (event.type === 'output') {
         view.wake();
@@ -107,6 +108,7 @@ export function TerminalSurface({
       stop();
       onController(null);
       controller.current = null;
+      globalThis.__piarcTerminalPanel = undefined;
       view.dispose();
     };
     // The view follows the label and handlers through refs; a new terminal is a new view.

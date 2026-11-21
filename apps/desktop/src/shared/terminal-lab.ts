@@ -1,6 +1,12 @@
 // The terminal prototype page (renderer, `#/terminal-lab`, T10) and what it exposes to L4 tests
 // and the S7 benchmark as `window.__piarcTerminalLab`. Test-only: no product feature uses it.
 
+/**
+ * Empty frames in a row after which a terminal view parks: it stops pulling until Core reports
+ * output (`output` on `term/<id>`), input or a resize wakes it (T34).
+ */
+export const PARK_AFTER = 8;
+
 /** Hash that opens the prototype page. With `?manual` the page starts no shell of its own. */
 export const TERMINAL_LAB_HASH = '#/terminal-lab';
 
@@ -68,7 +74,36 @@ export interface TerminalLabApi {
   echoResult(): Promise<number>;
 }
 
+/**
+ * What the terminal panel's visible view exposes to L4 tests (T34) as
+ * `window.__piarcTerminalPanel`: read-only views of the screen rebuilt from frames and the
+ * frame counters, so tests compare it with Core's formatter and count pulls.
+ */
+export interface TerminalPanelProbe {
+  /** The shown terminal, or null. */
+  terminalId(): number | null;
+  stats(): TerminalLabStats;
+  /** The screen rebuilt from frames, as plain text (formatter rules). */
+  screenText(): string;
+  /** The cursor cell in viewport coordinates of the page (CSS pixels). */
+  cursorRect(): CellRect;
+  /** The hidden textarea that receives keys and input-method text, in page coordinates. */
+  textareaRect(): CellRect;
+  /** The input-method preedit text currently drawn at the cursor. */
+  preedit(): string;
+  /** Visible rows with a selection, as `row: start-end`. */
+  selections(): readonly string[];
+  /** The viewport's first row in the scrollback, and the rows below it. */
+  scrollbar(): { readonly offset: number; readonly total: number; readonly len: number };
+  /** Find-bar highlights per visible row, as `row: start-end` (`*` marks the current one). */
+  highlights(): readonly string[];
+  /** Cell size in CSS pixels. */
+  cell(): { readonly width: number; readonly height: number };
+}
+
 declare global {
   /** Present on the terminal prototype page only (src/renderer/terminal/TerminalLab.tsx). */
   var __piarcTerminalLab: TerminalLabApi | undefined;
+  /** The terminal panel's visible terminal (src/renderer/terminal/TerminalSurface.tsx). */
+  var __piarcTerminalPanel: TerminalPanelProbe | undefined;
 }

@@ -12,7 +12,12 @@
 // runs no animation frames at all. After the person types, the view pulls back to back until
 // the echo arrives (at most EAGER_MS), so echo latency is not quantized to the frame interval.
 import type { PiarcApi, TerminalScrollTarget } from '../../shared/ipc.js';
-import type { CellRect, TerminalLabStats } from '../../shared/terminal-lab.js';
+import {
+  PARK_AFTER,
+  type CellRect,
+  type TerminalLabStats,
+  type TerminalPanelProbe,
+} from '../../shared/terminal-lab.js';
 import { decodeFrame } from './frame/decoder.js';
 import { Screen } from './frame/screen.js';
 import { attachInput, type InputHost } from './input.js';
@@ -26,8 +31,6 @@ import { CanvasRenderer, type Highlight } from './vendor/ghostty-web/renderer.js
 /** How long after input the view pulls back to back while waiting for the echo. */
 export const EAGER_MS = 50;
 
-/** Empty frames in a row before the view parks. */
-export const PARK_AFTER = 8;
 
 /** Half a blink period of a blinking cursor. */
 export const BLINK_MS = 600;
@@ -353,6 +356,41 @@ export class TerminalController {
   textareaRect(): CellRect {
     const rect = this.#textarea.getBoundingClientRect();
     return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+  }
+
+  /** Probe of the view for L4 tests (`window.__piarcTerminalPanel`). */
+  probe(): TerminalPanelProbe {
+    return {
+      terminalId: () => this.#id,
+      stats: () => this.stats(),
+      screenText: () => this.#screen.plainText(),
+      cursorRect: () => this.cursorRect(),
+      textareaRect: () => this.textareaRect(),
+      preedit: () => this.#remote.preedit,
+      selections: () => {
+        const rows: string[] = [];
+        for (let y = 0; y < this.#screen.rows; y += 1) {
+          const selection = this.#screen.selection(y);
+          if (selection !== null) {
+            rows.push(`${String(y)}: ${String(selection.start)}-${String(selection.end)}`);
+          }
+        }
+        return rows;
+      },
+      scrollbar: () => ({ ...this.#screen.scrollbar }),
+      highlights: () => {
+        const rows: string[] = [];
+        for (let y = 0; y < this.#screen.rows; y += 1) {
+          for (const mark of this.#remote.getHighlights(y)) {
+            rows.push(
+              `${String(y)}: ${String(mark.start)}-${String(mark.end)}${mark.current ? '*' : ''}`,
+            );
+          }
+        }
+        return rows;
+      },
+      cell: () => this.cell,
+    };
   }
 
   armEcho(char: string): Promise<number> {

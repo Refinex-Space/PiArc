@@ -182,6 +182,9 @@ fn check_references(spec: &ScenarioSpec, action: &Action, field: &str, problems:
         | Action::Resume { .. }
         | Action::AdvanceClock { .. }
         | Action::StopTask { .. }
+        | Action::OpenTerminal { .. }
+        | Action::TypeTerminal { .. }
+        | Action::ShareTerminal { .. }
         | Action::CheckHarness(_)
         | Action::CheckUsage(_)
         | Action::UndoRewind(_)
