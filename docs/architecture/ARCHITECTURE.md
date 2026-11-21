@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.42（2026-11-20） |
+| 版本 | 2.43（2026-11-20） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -266,6 +266,7 @@ PiArc/
 | [0049](../adr/0049-background-tasks-and-monitor.md) | Core 的任务管理器（`piarc-core::tasks`）统一管理后台命令、后台子 agent 与 Monitor：元数据写 `background_tasks`、实体快照 `core/tasks`；前台超时由任务时钟计时，同一进程转为后台任务，输出写主会话的 `tasks/<任务 id>.log`；完成通知在 Core 挂起到看见送达，经带 `key` 的 `session/remind` 发出、按类型与来源去重；Monitor 的新行按批次与总量限速回灌，会话空闲时以 `wake` 唤醒（有间隔下限、可关闭）；Monitor 的命令走 Bash 的规则与分析但不享受只读白名单，`Bash` matcher 的 hooks 同时匹配 Monitor | 进程归 Core，Agent Host 崩溃、空闲回收、回合中断都不影响后台命令；通知不丢不重；时间相关的逻辑可注入时钟 |
 | [0050](../adr/0050-agent-terminal-screen-access.md) | 终端承载的任务：每个属于会话的终端登记为 `terminal` 类任务；`Bash` 的 PiArc 参数 `terminal` 让命令在会话的终端里后台运行；模型用 Read 读 Core 维护的屏幕文件（formatter 输出，命令结束通知与读取前重写）；用户的终端只在共享后对模型可见，agent 不能向交互终端写入；Monitor 不扩展到终端 | 读屏来自同一个终端实例、不读原始字节；沿用后台任务的读法与通知，模型不需要新工具 |
 | [0051](../adr/0051-terminal-panel-and-renderer.md) | 终端面板只打开会话终端，它们归会话、重载后重连；写入、打开与共享终端要求窗口 5 秒内有真实输入，每会话至多 16 个、每窗口每终端一个在途拉帧；空帧若干次后停拉，Core 以 `output` 事件唤醒；选区手势、视口滚动与 OSC 8 链接在 Core（与按键同一写线程）；默认前景、背景、光标取设计令牌并交给 Core；渲染器按设备像素绘制 | 重载不打断 shell；渲染进程被注入时无人操作就不能借终端执行命令；空闲终端不轮询；选区随 scrollback 移动、复制用 formatter 规则；程序查询到的颜色与画面一致 |
+| [0052](../adr/0052-worktrees-search-windows-and-background.md) | 会话 worktree 在 `.piarc/worktrees/<名称>/`、分支 `piarc/<名称>`；worktree 会话的文件根是 worktree、设置与信任的来源是主工作区；子 agent 的 worktree 在 `subagent/start` 创建、无改动时连分支一起清理；归档询问与 30 天清理（不强删）；全文搜索用 FTS5 trigram；多窗口共用 Core，窗口状态文件；托盘计数来自 Core 的 `core/activity`；`piarc://` 与打开文件夹只做定位；Windows 注册随 Velopack 钩子 | worktree 写入不触发受保护路径审批、规则只有一份；中文可检索；关窗口不打断工作；链接不能触发执行 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -628,7 +629,7 @@ handler 类型：`command`（M2）→ `http`、`prompt`（M3）→ `mcp_tool`（
 - **结果**：前台子 agent 的最终报告作为 `Agent` 工具结果返回；后台子 agent 完成后以通知消息注入主会话下一回合。子会话转录存为独立 JSONL，并在 Core 索引中记录父子关系。
 - 子 agent 的文件编辑同样进入快照（Core 统一入口），这一点比 Claude Code 更完整。
 
-T31 落地（ADR-0048）：定义由 Core 的 `piarc_config::agents` 发现、解析与合并（来源顺序同上，项目两级从 cwd 向上、越近越优先；同名取整条；不认识的字段、`isolation`/`mcpServers`/`skills`（T35/T36/T37 前暂未生效）、项目级 `bypassPermissions`/`auto` 都作为警告列出，解析错误带行号），Agent Host 经 `agents/list` 取得并加上三个内置类型（`Explore`、`Plan` 只读、不加载 memory 与 git 状态，`Explore` 默认 `fast`）。子会话在 `agent-host/src/runtime/subagent-session.ts` 创建、`runtime/subagents.ts` 的 `SubagentRunner` 运行与计数（每棵树一份，超过并发上限立即报错，不排队），运行前经 `subagent/start` 在 Core 登记自己的会话 id（独立的文件状态表）并链接主会话：生效模式取定义与主会话当前模式中更严的一个，"本会话允许"的规则存于主会话，写入记在主会话当前回合的检查点下（带子会话 id），定义的 hooks 作为只在子会话运行期间生效的来源（项目级的要求项目受信任）。工具过滤顺序：父会话当前工具 → `tools` → `disallowedTools`（优先）→ 去掉 `AskUserQuestion`、`EnterPlanMode`、`ExitPlanMode`、`SuggestNextSteps` → 到达深度上限时去掉 `Agent`；集合外的工具经 Pi 的 `prepareLoadout` 隐藏声明从请求中隐藏，调用到达 `tool_call` 闸门被拒绝（`setActiveTools` 移除的工具在闸门前就以 "not found" 结束）。后台运行立即返回运行 id，结束后经 `backgroundTask` 提醒回报，不随主会话中断结束，关闭会话或卡片上的停止按钮结束它；运行中的子会话让工作区保持忙碌，空闲计时不回收其 Agent Host。子会话 JSONL 首条 `piarc.subagent` 记父会话与类型，`sessions` 表由它派生父子关系（schema v6），会话列表不含子会话。
+T31 落地（ADR-0048）：定义由 Core 的 `piarc_config::agents` 发现、解析与合并（来源顺序同上，项目两级从 cwd 向上、越近越优先；同名取整条；不认识的字段、`mcpServers`/`skills`（T36/T37 前暂未生效；`isolation` 自 T35 生效）、项目级 `bypassPermissions`/`auto` 都作为警告列出，解析错误带行号），Agent Host 经 `agents/list` 取得并加上三个内置类型（`Explore`、`Plan` 只读、不加载 memory 与 git 状态，`Explore` 默认 `fast`）。子会话在 `agent-host/src/runtime/subagent-session.ts` 创建、`runtime/subagents.ts` 的 `SubagentRunner` 运行与计数（每棵树一份，超过并发上限立即报错，不排队），运行前经 `subagent/start` 在 Core 登记自己的会话 id（独立的文件状态表）并链接主会话：生效模式取定义与主会话当前模式中更严的一个，"本会话允许"的规则存于主会话，写入记在主会话当前回合的检查点下（带子会话 id），定义的 hooks 作为只在子会话运行期间生效的来源（项目级的要求项目受信任）。工具过滤顺序：父会话当前工具 → `tools` → `disallowedTools`（优先）→ 去掉 `AskUserQuestion`、`EnterPlanMode`、`ExitPlanMode`、`SuggestNextSteps` → 到达深度上限时去掉 `Agent`；集合外的工具经 Pi 的 `prepareLoadout` 隐藏声明从请求中隐藏，调用到达 `tool_call` 闸门被拒绝（`setActiveTools` 移除的工具在闸门前就以 "not found" 结束）。后台运行立即返回运行 id，结束后经 `backgroundTask` 提醒回报，不随主会话中断结束，关闭会话或卡片上的停止按钮结束它；运行中的子会话让工作区保持忙碌，空闲计时不回收其 Agent Host。子会话 JSONL 首条 `piarc.subagent` 记父会话与类型，`sessions` 表由它派生父子关系（schema v6），会话列表不含子会话。
 
 ### 6.5 Plan 模式、任务清单、下一步、提问
 
@@ -816,6 +817,13 @@ T27 落地（ADR-0043）：`agent-host/src/harness/context-usage.ts` 在每次�
 - 会话归档时若 worktree 有未提交改动，先询问；归档 worktree 默认 30 天后清理。
 - 权限"总是允许"规则、项目信任按主 checkout 解析，worktree 之间共享。
 
+T35 落地（ADR-0052）：
+
+- 位置与命名：工作区必须是 git 工作树的顶层；worktree 在 `<工作区>/.piarc/worktrees/<名称>/`，分支 `piarc/<名称>`，名称 1–64 个 `[A-Za-z0-9._-]`（留空取会话 id 前 8 位），基础为用户选的分支或提交、缺省当前 HEAD；`.worktreeinclude` 列出且被 git 忽略的普通文件复制进去。git 由 Core 经 `piarc-git::worktree` 用命令环境与进程树启动器运行。创建结果带 `ignored`：仓库没忽略 `.piarc/worktrees/` 时客户端提示，用户确认后 Core 在 `.gitignore` 追加一行。
+- 会话：worktree 会话属于主工作区、共用其 Agent Host；Core 的工具 I/O 以 worktree 为文件根（`Scope`），以主工作区为设置、规则、信任、审计、模式记忆与 hooks 的来源（`SessionIo.project`），所以"总是允许"规则读写主 checkout 的 `.piarc/settings.local.json`。环境栏显示 worktree 名与分支。
+- 子 agent：`isolation: worktree`（定义或调用参数）时 Core 在 `subagent/start` 里建 `.piarc/worktrees/agent-<id>/`（基础为父会话工作树的当前 HEAD）、以它为子会话的文件根并答 `cwd`；结束时无未提交改动且 HEAD 未动则不加 `--force` 删除 worktree 与分支，否则保留并在 `subagent/finish` 的结果里给出路径与分支，Agent Host 接在报告后。
+- 归档与清理：归档前主进程查 worktree 的改动，有改动时原生对话框三选一（保留并归档 / 丢弃改动并删除 / 取消）；归档后 30 天到期（`worktree_cleanup_at`），Core 启动时与每 6 小时清理：无改动的删除目录、保留分支，有改动的标记等待用户（删除或再保留 30 天），git 拒绝时保留现场不强删；重新打开已清理的会话时按原分支重建 worktree。
+
 ### 6.13 多模型适配
 
 - **模型能力表**（Agent Host 维护，来源为 pi-ai 模型目录 + PiArc 覆盖配置）：上下文窗口、最大输出、视觉、工具调用可靠性等级、thinking/effort 档位、prompt cache 支持、服务端工具支持。
@@ -1000,6 +1008,8 @@ T32 已实现（ADR-0049，能力 `backgroundTasks`）：`exec/run` 新增 `back
 
 T33 已实现（ADR-0050，能力 `terminalTasks`）：`exec/run` 新增 `terminal`（隐含后台，结果的 `task` 指向屏幕文件）；`TaskKind` 新增 `terminal`，`BackgroundTask` 新增 `terminal`（终端句柄、来源 `agent`/`user`、是否共享），运行中的模型终端任务以 `exitCode` 报告其命令的退出码。终端事件、读屏范围、命令、搜索结果与终端信息的类型在 `piarc-protocol::terminal`，帧格式与 `TermFrame` schema 在 `term_frame`。
 
+T35 已实现（ADR-0052）：`subagent/start` 新增可选的 `isolation`（`worktree`），结果新增 `cwd` 与 `worktree`（路径、分支）；`subagent/finish` 的结果新增 `worktree`（只在保留时出现）。
+
 T31 已实现（ADR-0048，能力 `subagents`）：Agent Host → Core 的请求 `agents/list`（`{ cwd, builtIn }`，结果 `AgentsList`：合并后的定义与警告、解析问题、深度与并发上限、被 deny 的内置类型、合并后的别名表）、`subagent/start`（子会话 id、父会话、工具调用 id、类型、描述、cwd、JSONL 路径、模型、是否后台；结果为生效的权限模式与警告）、`subagent/finish`（状态与用量）；Core → Agent Host 的请求 `resources/listAgents`（结果同 `AgentsList`，每条带解析到的模型）与 `subagent/stop`；父会话路由上的通知 `subagent/started`、`subagent/progress`、`subagent/completed`（`{ itemId, subagent: SubagentState }`）。`policy/evaluate` 参数新增可选的 `parentSessionId`、`agentType`，审批卡新增可选的 `subagent`（`ApprovalOrigin`），`subagent` 条目新增可选的 `subagent`（`SubagentState`），`session/create` 新增可选的 `defaultModel`、`defaultEffort`，`ModelPreferences` 新增 `auxiliaryAlias`、`aliases`。Core API 新增 `listAgents(workspace, cwd)`、`stopSubagent(parent, child)`、`subagentTranscript(parent, child, start, limit)`。
 
 T28 已实现（ADR-0044，能力 `checkpoints`）：Core → Agent Host 的请求 `session/rewind`（`{ sessionId, turnId, mode: "branch" | "summarize" }`）、`session/switchBranch`（`{ sessionId, entryId }`），Agent Host → Core 的通知 `session/branches`（新消息落在已有分支处时的分支点）；`fs/write` 新增可选的 `turnId`，`session/fork` 新增可选的 `beforeTurn`，`session/history` 结果新增可选的 `branches`，压缩条目的原因新增 `rewind`（分支摘要）。
@@ -1096,6 +1106,7 @@ impl Session {
 - 检查点导出（T28，ADR-0044）：`rewindPreview(id, turnId)`、`rewind(id, request)`（`turnId`、`scope` 为 `codeAndConversation`/`conversation`/`code`/`summarize`、冲突的逐个选择）、`undoRewind(id, restoreId)`、`sessionChanges(id, path?)`、`discardChange(id, { path, version, hunk? })`、`switchBranch(id, entryId)`，`forkSession` 增加可选的 `beforeTurn`；结果为 JSON 文本（`RewindPreview`、`RewindReport`、`ChangesView`），事件 `session/branchChanged`。
 - 会话元数据与客户端偏好（T18，ADR-0029）：`renameSession(id, title|null)`、`setSessionPinned`、`setSessionArchived`（归档时先关闭会话并清理临时输出，T19 起保留附件）、`deleteSession`（先关闭，再删除 Pi 的 JSONL、临时目录与索引行；原生确认的标题与工作区来自 Core 的 `sessionDeletionTarget(id)`，同时显示该 ID）对打开与未打开的会话都可用；`core/sessions` 的条目增加 `pinned`、`archived`，标题取用户标题 > 会话名 > 首条消息；新会话在 Pi 写出文件（第一条回复）之前以 Core 发出的第一条消息作标题。`userSettings()` 返回用户级 `settings.json`，`writeClientSetting(pointer, valueJson|null)` 只写 `/language`、`/appearance`、`/keybindings`、`/notifications`。`decideProjectTrust` 与 `revokeProjectTrust` 在同一主 checkout 的打开工作区都进入重启状态之后才应答，之后的请求等新进程就绪。启动时的索引同步结束后重新发出会话快照。
 - Composer 导出（T19，ADR-0030）包括 `composerInfo()`（内置命令、附件与搜索上限）、`searchFiles(searchId, root, query, limit)`、`cancelFileSearch(searchId)`、`storeAttachment(id, name, mimeType, bytes)` 和 `compact(id)`。NAPI 的文本方法 `prompt`、`steer`、`followUp` 保持 T14 语义，结构化输入经对应的 `promptInput`、`steerInput`、`followUpInput` 传入。
+- Worktree、搜索与后台导出（T35，ADR-0052）：`createWorktreeSession(workspace, { name?, base?, model?, permissionMode? })`（结果多一个 `worktree`：名称、路径、分支、基础提交、复制的文件、是否已被忽略）、`worktreeBranches(workspace)`、`ignoreWorktrees(workspace)`、`sessionWorktreeStatus(id)`、`removeSessionWorktree(id, discard)`、`keepSessionWorktree(id)`、`sweepWorktrees()`、`searchSessions(query)`（按会话分组的命中、摘要与 UTF-16 高亮范围），同步的 `runningWork()`（运行中的会话数与后台任务数）。会话列表的每个会话多一个 `worktree`（名称、路径、分支、清理时间、是否等待用户、是否已删除）；Core 另在路由 `core/activity` 发运行中与等待审批的计数和等待审批的会话（不含归档），只在变化时与客户端重新订阅时发。
 - 声明快照在 `apps/desktop/src/main/core/native/`（`piarc-core.d.ts` 为发布构建，`piarc-core.testing.d.ts` 为开发构建），由 `npm run build:core` 生成，verify 比对。
 
 事件分两类：
@@ -1130,6 +1141,8 @@ diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高�
 
 每个窗口一个渲染进程。所有窗口共用主进程里的同一个 Core 实例，所以多窗口看到的审批和会话状态天然一致。
 
+T35 落地（ADR-0052）：主窗口可以有任意多个（会话菜单"在新窗口中打开"、托盘与文件菜单的"新建窗口"），最近获得焦点的一个负责菜单命令、系统通知与 Dock 角标；窗口的位置、大小与是否最大化写入数据目录的 `window-state.json`（移动与缩放防抖 500 ms、关闭时），新窗口沿用并错开 24 px，落在已不存在的显示器上时移回主显示器。主进程的窗口、启动目标、托盘与退出在 `src/main/app-shell.ts`、`launch.ts`、`platform/tray.ts`、`platform/window-state.ts`、`platform/quit.ts`、`platform/windows-shell.ts`。
+
 ### 8.2 信息架构
 
 ```
@@ -1161,6 +1174,7 @@ diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高�
 - T26（ADR-0042）：transcript 中 `TodoWrite` 是任务卡（进行中项高亮、完成计数），`ExitPlanMode` 是计划卡（摘要与状态，可在计划面板中打开），`AskUserQuestion` 的结果按题列出，`SuggestNextSteps` 是下一步建议（每条"在此执行""开始新会话"）；待批的计划与提问在审批卡位置显示为计划审批卡与提问表单，沿用审批热键、400 ms 防误触与输入法守卫；右栏注册任务卡片（会话有任务清单时），停靠区注册计划面板（会话有待批或已批准的计划时）。
 - T32（ADR-0049）：右栏的后台任务卡（会话有后台任务时注册）列出该会话及其子 agent 的任务：类型、标题、状态、耗时、运行中的最后三行与停止按钮；停靠区的后台任务面板按会话列出工作区的任务，展开后按偏移分段向 Core 读取输出（先读末尾，随增长续读，可向前加载，渲染进程至多保留 512 KiB）；两处停止都经 `stopTask`（与 KillShell 同一 Core 入口）。转后台的命令卡显示"后台运行"与任务 id；Monitor 的提醒在默认视图里显示为 Monitor 事件。
 - T31（ADR-0048）：子 agent 卡（`transcript/rows/subagent.tsx`）显示任务名、类型、颜色、实际模型、状态、耗时、工具调用数、token、后台标记与警告，运行中显示当前活动和停止按钮；展开后以只读方式显示子会话转录（复用行组件，不提供重试、回退与分支）。来自子 agent 的审批卡、计划卡与提问表单标明"来自子 agent：名称（类型）"。
+- T35（ADR-0052）：新建会话表单有"在独立 worktree 中运行"（名称与基础分支可选，不是仓库顶层时说明原因），环境栏左端显示 worktree 名与分支；侧栏的筛选框同时搜索消息全文，标题匹配之下列出"消息中"的结果（按会话分组、带高亮摘要），点击后打开会话并滚到该条目（暂时标出，离开底部跟随）；会话菜单增加"在新窗口中打开"，归档有改动的 worktree 会话先由主进程询问；清理发现改动的 worktree 在主区顶部提示删除或再保留 30 天；拖到窗口上的文件夹作为工作区打开。
 - T34（ADR-0051）：停靠区的终端面板（Ctrl+\` 切换，打开时会话没有终端就新建一个）列出会话的终端任务为标签，工具条有共享开关、附加到消息、查找与以文本查看屏幕；面板只是查看会话终端，关闭面板或重载窗口不影响 shell。composer 新增片段胶囊：显示来源与行数，发送时以带来源的围栏代码块拼入消息。
 - T19 的会话主区使用第 8.4 节的行组件与 ProseMirror 输入。提及胶囊显示文件名，发送时按相对路径展开。附件经主进程存入 Core 的会话附件目录，模型收到图像块或 PDF 提取文本。内置命令由 Core 提供，运行中的 steer、follow-up 与队列编辑都经会话 API 执行。
 
@@ -1179,7 +1193,7 @@ Core 事件批次 ──► 主进程（只转发）──MessagePort──► �
 3. store 自己实现，基于 React 的 `useSyncExternalStore`，按会话和 item 粒度订阅。流式增量只让最后一个 item 的订阅者重新渲染，不触发整棵组件树刷新。
 4. 实体快照按 `revision` 门控，旧数据丢弃。
 5. 事件批次（包括 transcript 窗口、长 diff 等大块数据）以二进制载荷经结构化克隆复制转发：Electron 主进程的 `MessagePortMain` 只能转移端口，不能转移 `ArrayBuffer`（ADR-0019）。单批转发耗时计入第 11 章"Core 事件到渲染进程"的预算；大块内容的体量从源头控制，例如按需拉取 transcript 窗口。
-6. 终端帧不走事件通道：渲染进程按动画帧拉取，帧作为拉取请求（`ipcRenderer.invoke`）的返回值送达；事件 MessagePort 上的消息在按键之后会被推迟到下一帧之后处理（ADR-0023）。终端的标题、响铃、退出事件仍经事件通道（路由 `term/<id>`）。T34：空闲的视图停拉，Core 在新输出到达时于 `term/<id>` 发一次 `output` 事件唤醒它；窗口的最小化与恢复经应用事件 `visibility` 告知页面（ADR-0051）。
+6. 终端帧不走事件通道：渲染进程按动画帧拉取，帧作为拉取请求（`ipcRenderer.invoke`）的返回值送达；事件 MessagePort 上的消息在按键之后会被推迟到下一帧之后处理（ADR-0023）。终端的标题、响铃、退出事件仍经事件通道（路由 `term/<id>`）。T35：主进程只监听路由 `core/activity`（托盘计数，`EventRouter.listen`），其余批次照旧只转发不解析。T34：空闲的视图停拉，Core 在新输出到达时于 `term/<id>` 发一次 `output` 事件唤醒它；窗口的最小化与恢复经应用事件 `visibility` 告知页面（ADR-0051）。
 7. T18 落地：store 在 `src/renderer/store/`（`AppStore`、`SessionTranscript`，React 绑定在 `hooks.ts`），订阅粒度为工作区列表、会话列表、单个会话条目与单行 transcript；revision 不大于当前值的快照丢弃，未变化的条目保留原对象；乐观行按 `clientId` 记录，提示被接受后记下 `turnId`，Core 的用户消息在原位置替换它（事件先于提示的应答到达时按相同文本匹配第一条未确认的行），不会出现两次。渲染计数由 happy-dom 下的单元测试验证。窗口是否在前台由主进程的 `focus`、`blur` 应用事件告知，标记已读与提醒以它为准。
 
 ### 8.4 Transcript 渲染管线
@@ -1247,6 +1261,8 @@ T34 落地（ADR-0051）：Ctrl+\` 切换终端面板（`terminal.toggle`）。�
 
 平台差异集中在主进程的 `platform/` 模块和渲染进程的少量样式里，业务代码不出现平台分支。
 
+T35 落地（ADR-0052）：关闭最后一个窗口后应用在两个平台都不退出。macOS 菜单栏是 template 图加计数文字（`▸运行中 ?等待审批`），Windows 托盘按任务栏明暗选黑或白的 `.ico`、计数在提示文字中、左键打开窗口；菜单有打开 PiArc、新建窗口、等待审批的会话（点击打开该会话）、退出。图标由 `scripts/dev/export-tray-icons.mjs` 从 `design/brand/mark.svg` 导出到 `design/brand/`，打包时作为资源。菜单与托盘的"退出"在有运行中的会话或后台任务时先确认。`piarc://open?path=…` 与 `piarc://session/<id>` 只做定位，其他参数忽略；命令行参数、第二次启动、macOS 的 `open-url`/`open-file`（Dock 拖放）与拖入窗口的文件夹都在最近的主窗口里打开，未信任的文件夹立即显示信任对话框。macOS 在 Info.plist 声明 URL scheme 与文件夹文档类型；Windows 由 Velopack 的安装、更新钩子在 `HKCU\Software\Classes` 注册 `piarc` 协议与资源管理器的"Open with PiArc"，卸载时删除。系统通知随应用退出被删除（I43）在后台常驻后影响变小：应用只在用户退出时才退出。
+
 T18 落地（ADR-0029，I43）：渲染进程按 `store/status.ts` 判断哪些会话需要处理（出错、等待审批、完成未读，归档除外）。会话开始需要处理、且它不在前台窗口中显示时，窗口给应用内提醒，主进程（`src/main/platform/attention.ts`）在 macOS 上 Dock 弹跳、在 Windows 上闪烁任务栏；窗口不在前台且通知开启时另发系统通知，点击通知打开该会话。计数在 macOS 上是 Dock 角标（`app.setBadgeCount`），在 Windows 上是任务栏覆盖图标（状态色圆点，描述文字为数量）。
 
 ---
@@ -1270,6 +1286,7 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 ├── checkpoints/objects/       # 内容寻址的文件快照（sha256 分桶）
 ├── sessions/<sessionId>/      # 会话文件，attachments/ 保存用户附件，临时区域保存工具及后台任务输出，terminals/ 保存退出时的终端（T33）
 ├── shell-integration/         # 终端的 shell integration 脚本（Core 启动时写出，T33）
+├── window-state.json          # 主窗口的位置、大小与是否最大化（主进程写，T35）
 ├── agent-host/                # Agent Host 的 tmp/（TMPDIR）与 npm-cache/（npx 安装的 MCP server），可丢弃
 └── logs/                      # Core 与 Agent Host 日志（按天轮转，默认保留 7 天）
 
@@ -1294,7 +1311,7 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 | `memory_imports` | schema v3；工作区与规范目标的组合主键，记录经原生确认的外部 memory 导入许可 |
 | `workspaces` | 路径、显示名、信任状态、最近打开时间、默认模式与模型 |
 | `sessions` | id、工作区、Pi 会话文件路径、标题、状态、模型、用量累计、父会话（子 agent）、worktree、置顶、归档、未读 |
-| `session_fts` | FTS5：用户消息与助手正文（从 JSONL 增量同步） |
+| `session_fts` | FTS5：用户消息与助手正文（从 JSONL 增量同步）。T35（schema v8）：外部内容表 `session_text`（会话、entry id、角色、时间、正文，每条至多 20,000 字符）+ `session_fts`（trigram 分词），触发器同步；与会话行同一事务写入，整文件重扫先删该会话的行，重建索引时清空重读 |
 | `checkpoints` | schema v5（T28）：会话、PiArc 回合 id、创建时间；`checkpoint_files` 为每次写入的路径、前后内容 SHA-256（空为不存在）、操作类型与恢复批次；`checkpoint_sessions` 为会话最近访问时间 |
 | `audit_events` | 权限裁决、审批结果、hooks 执行结果、沙箱拒绝 |
 | `background_tasks` | 后台命令、子 agent 与 Monitor 的元数据与输出文件路径（schema v7 重建：主会话、工作区、标题、cwd、输出字节数，其余在 `metadata` JSON；`kind` 不设 CHECK，T33 加终端类型） |
@@ -1308,9 +1325,11 @@ T23（ADR-0037）：`workspaces.default_mode` 记录用户在该工作区最后�
 
 T25（ADR-0039）：每次 hook 运行每个 handler 写一行 `audit_events`（`kind: "hook"`），记录事件、matcher 看到的值、来源层与文件、JSON Pointer、程序名与命令的 SHA-256（不存命令原文）、退出码、耗时、是否超时或被取消、判定。
 
+T35（schema v8，ADR-0052）：`sessions` 增加 `worktree_branch`、`worktree_cleanup_at`、`worktree_confirm`、`worktree_removed_at`（与已有的 `worktree` 同属 Core 自己的列，重建时保留）；迁移清空 `session_files`，升级后首次同步把已有会话的正文读进 `session_text`。
+
 T18（schema v2，ADR-0029）：`sessions` 增加 `custom_title`（用户给的标题，属于 Core 自己的列，重建时保留）。
 
-T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失败整体回滚；`workspaces` 记主 checkout 而不另存信任状态（信任看 `project_trust`）；`sessions` 中从 JSONL 派生的列（标题来源、模型、用量、时间、格式版本、索引状态）重建时清空重读，置顶、归档、未读、所属工作区、状态、worktree 保留。解析器流式读取，末行未写完时下次从行首继续；未知格式版本标为"索引不可用"，坏行跳过并记录。`session_fts`（T35）尚未建表；`checkpoints` 由 T28 的 schema v5 建立（ADR-0044）。T31 的 schema v6（ADR-0048）给 `sessions` 加 `subagent_parent`、`subagent_type`（从子会话 JSONL 的 `piarc.subagent` 条目派生，重建时还原），给 `checkpoint_files` 加 `subagent_session`（写入来自哪个子会话）。
+T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失败整体回滚；`workspaces` 记主 checkout 而不另存信任状态（信任看 `project_trust`）；`sessions` 中从 JSONL 派生的列（标题来源、模型、用量、时间、格式版本、索引状态）重建时清空重读，置顶、归档、未读、所属工作区、状态、worktree 保留。解析器流式读取，末行未写完时下次从行首继续；未知格式版本标为"索引不可用"，坏行跳过并记录。`session_fts` 由 T35 的 schema v8 建立（见上表）；`checkpoints` 由 T28 的 schema v5 建立（ADR-0044）。T31 的 schema v6（ADR-0048）给 `sessions` 加 `subagent_parent`、`subagent_type`（从子会话 JSONL 的 `piarc.subagent` 条目派生，重建时还原），给 `checkpoint_files` 加 `subagent_session`（写入来自哪个子会话）。
 
 ### 9.3 保留与清理
 
@@ -1320,7 +1339,7 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 | 文件快照 | 每会话最近 100 个检查点（每个回合结束后在后台删除最早的）；会话 30 天未访问（打开会话或建检查点算访问）后清理快照；Core 启动后与之后每 6 小时回收不被任何记录引用、也没有被钉住的对象（T28，`piarc_checkpoint::RetentionPolicy`） |
 | 会话临时输出 | 会话归档时清理（含后台任务的 `tasks/`，先停止该会话仍在运行的任务）；删除会话时一并删除其 `background_tasks` 行 |
 | 会话附件 | 随归档保留，删除会话时清理 |
-| 归档会话的 worktree | 30 天后清理（有未提交改动时先询问） |
+| 归档会话的 worktree | 30 天后清理（有未提交改动时先询问）。T35：Core 启动时与每 6 小时检查，只删除目录与 git 的登记、保留分支，有改动的等用户决定，git 拒绝时不强删；子 agent 的临时 worktree 在运行结束时清理（无改动时连分支一起删除） |
 | 日志 | 7 天 |
 
 归档会话时 Core 先关闭会话，清理会话目录中的临时输出并保留 `attachments/`，以便恢复后读取原附件。删除会话先经主进程原生对话框确认，Core 再关闭会话并删除会话的 Pi JSONL、整个 `sessions/<id>/` 目录和索引行（ADR-0029 第 7 条，T19 由 ADR-0030 修订归档范围）。
@@ -1439,6 +1458,8 @@ T20 起，项目层的 `acceptEdits` 和 `additionalDirectories` 也纳入信任
 | Agent Host 崩溃后恢复 | ≤ 3 s | 未测（S9 验证了流程，首次退避 1 s） | 未测 | 故障注入测试 |
 | 渲染进程崩溃或重载后恢复 | ≤ 2 s，会话不中断 | 未测 | 未测 | 故障注入测试 |
 | Beta 期无崩溃会话率 | ≥ 99.5% | 不适用 | 不适用 | 崩溃统计（用户同意后） |
+
+T35 的 M3 测量（[M3 内存](../perf/M3-memory.md)，`npm run perf:m3`，M1 Max / 32 GB，打包形态）：同一工作区 3 个并行会话（1 个在独立 worktree）加 1 个子 agent 持续流式输出并执行工具，Agent Host 最大 238 MB（4 个活动会话的上限 270 MB，达标）；应用其余进程合计最大 576 MB（macOS 预算 510 MB，**超出**），其中没有会话时的基线已有 505 MB（不连测试驱动 466 MB），会话只增加约 65 MB（渲染进程约 50 MB）。预算不放宽，R4 复测（I146）。
 
 体积估算依据：Electron 45 的 darwin-arm64 发行包压缩后约 121 MB，内置 Node 压缩后约 28–38 MB，再加应用代码、Core、rg、fd。作为对照，Claude Desktop 5.1231.2 安装后 621 MB（本机实测）。M0 实测：macOS arm64 安装后 449.0 MB，其中 Electron Framework 250 MiB、内置 node 145 MiB；Windows x64 的 Electron 本体约 360 MiB（`PiArc.exe` 238.5 MiB、locales 48.8 MiB），内置 node 102 MiB（S6 第 8、9.2 节）。
 
@@ -1694,6 +1715,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 |---|---|---|
 | 2.41 | 2026-11-20 | T33（ADR-0050）补充第 4 章 ADR-0050、6.11 节终端的线程与有界写队列、新增 effects 与事件、读屏与搜索、帧格式第 2 版定稿、输入编码、保存与恢复、shell integration、终端环境的 UTF-8 locale、会话终端与 agent 的屏幕文件、进程树的结束方式，7.1 节 `unsafe` 范围加 `piarc-exec` 的 `tty_processes`，7.4 节 `terminalTasks` 能力，7.6 节终端导出，9.1 节 `terminals/` 与 `shell-integration/`；基线决策未变（ADR-0017 已定读屏来源与 OSC 133） |
 | 2.42 | 2026-11-20 | T34（ADR-0051）补充第 4 章 ADR-0051、6.11 节终端面板与渲染器的落地（会话终端的归属与重载、停拉与 `output` 唤醒、选区与滚动与链接在 Core、默认颜色、键盘归属），8.2 节终端面板，8.3 节第 6 条停拉与窗口可见性事件，8.5 节终端快捷键与全局命令、复制粘贴，8.7 节终端的无障碍，10.3 节终端输入的防线与上限（I51 收口），10.4 节 fork 渲染器的登记，11 章空闲 CPU 与终端两行的 T34 实测；基线决策未变（ADR-0017、0023 已定拉帧与渲染层） |
+| 2.43 | 2026-11-20 | T35（ADR-0052）补充第 4 章 ADR-0052、6.4 节 `isolation` 生效、6.12 节 worktree 与并行会话的落地（位置与命名、文件根与设置来源、子 agent 的临时 worktree、归档与清理、`.gitignore` 提示），7.4 节 `subagent/start`/`finish` 的 worktree 字段，7.6 节 worktree、搜索与后台的导出面与 `core/activity`，8.1 节多窗口与窗口状态，8.2 节新建会话、环境栏、侧栏搜索与拖入文件夹，8.3 节主进程监听 `core/activity`，8.8 节后台常驻、托盘、退出确认、`piarc://` 与打开文件夹，9.1 节 `window-state.json`，9.2 节 schema v8，9.3 节 worktree 清理；基线决策未变（ADR-0010、0018 已定进程模型与安装形式） |
 | 2.40 | 2026-11-20 | T32（ADR-0049）补充第 4 章 ADR-0049、6.1.4 节 KillShell 与 Monitor 的参数与裁决、6.6.3 节 `monitorOutput`、`key` 与 `wake`、6.11 节任务管理器、超时转后台、通知、Monitor 回灌与限速的落地、7.3 节后台任务的持久化、7.4 节 `backgroundTasks` 能力的方法与成员、8.2 节后台任务卡与面板、9.2 节 schema v7、9.3 节任务输出的清理；基线决策未变（6.11 已定超时转后台与 Monitor） |
 | 2.39 | 2026-11-20 | T31（ADR-0048）补充第 4 章 ADR-0048、6.4 节子 agent 的落地（定义加载、子会话登记与链接、工具过滤用隐藏声明加闸门、深度与并发计数、前后台、空闲回收）、6.13 节模型别名表与解析、6.14 节 `model`、`effortLevel` 生效、`advisorModel` 忽略、`agent` 交 T48、7.4 节 `subagents` 能力的方法与成员、7.6 节子会话条目增量的现状、8.2 节子 agent 卡与设置页、9.2 节 schema v6；基线决策未变 |
 | 2.38 | 2026-11-20 | R3（M2 macOS 阶段门）：第 4 章补上 ADR-0042；6.0 节矩阵按 M2 实际交付更新权限、Hooks、Plan、任务清单、上下文工程、Checkpoint、多模型七行；第 4 章加入 ADR-0047、6.2.2 与 6.2.3 节写明带通配的命令规则不放行越界路径（ADR-0047，修订 ADR-0037 的阶梯）；6.2.2 节写明 `Read` deny 对目录搜索与 Bash 递归读取的限制（I120）；6.3.1 节进程树终止按平台写准；6.6.4 节熔断复位范围（I107）；6.14 节 `plansDirectory` 交 T48（I104）；6.15 节记录 R3 对校准值的核对（数值不变）与缓存断点、plan 模式两行的实现；第 16 章记录 M2 的 macOS 结论；ADR-0047 改变了第 6.2.3 节阶梯第 6、7 步对带通配命令规则的先后 |
