@@ -25,7 +25,13 @@ providers:
     wire: anthropic
     steps:
       - tool_calls:
-          [{ id: agent-1, name: Agent, input: { description: Read notes, prompt: Read notes.txt., subagent_type: guarded } }]
+          [
+            {
+              id: agent-1,
+              name: Agent,
+              input: { description: Read notes, prompt: Read notes.txt., subagent_type: guarded },
+            },
+          ]
       - text: Done.
   child:
     wire: anthropic
@@ -66,5 +72,15 @@ expect:
     hook-log/stop.jsonl:
       - types: { agent_id: string, agent_transcript_path: string }
         input:
-          { hook_event_name: SubagentStop, agent_type: guarded, stop_hook_active: false, last_assistant_message: Found it. }
-      - input: { hook_event_name: SubagentStop, stop_hook_active: true, last_assistant_message: The tests are listed too. }
+          {
+            hook_event_name: SubagentStop,
+            agent_type: guarded,
+            stop_hook_active: false,
+            last_assistant_message: Found it.,
+          }
+      - input:
+          {
+            hook_event_name: SubagentStop,
+            stop_hook_active: true,
+            last_assistant_message: The tests are listed too.,
+          }

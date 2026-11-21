@@ -52,5 +52,10 @@ expect:
       not_contains: ['blog.example.com', brave-test-key-7f3a91c2]
   json_lines:
     hook-log/search.jsonl:
-      - input: { hook_event_name: PreToolUse, tool_name: WebSearch, tool_input: { query: tokio runtime } }
+      - input:
+          {
+            hook_event_name: PreToolUse,
+            tool_name: WebSearch,
+            tool_input: { query: tokio runtime },
+          }
   absent_on_disk: [brave-test-key-7f3a91c2]

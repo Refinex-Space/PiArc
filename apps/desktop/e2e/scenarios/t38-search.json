@@ -2,7 +2,9 @@
   "id": "t38-search",
   "steps": [
     {
-      "tool_calls": [{ "id": "search1", "name": "WebSearch", "input": { "query": "piarc release" } }]
+      "tool_calls": [
+        { "id": "search1", "name": "WebSearch", "input": { "query": "piarc release" } }
+      ]
     },
     {
       "text": "Two pages cover the release.",

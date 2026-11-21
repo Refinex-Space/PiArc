@@ -44,7 +44,11 @@ expect:
           query: piarc release notes
           backend: native
           sources:
-            - { title: PiArc 1.0 released, url: 'https://piarc.example/blog/1-0', snippet: PiArc 1.0 ships subagents and MCP. }
+            - {
+                title: PiArc 1.0 released,
+                url: 'https://piarc.example/blog/1-0',
+                snippet: PiArc 1.0 ships subagents and MCP.,
+              }
             - { title: Changelog, url: 'https://docs.piarc.example/changelog' }
     - { method: turn/completed, turn: one, params: { status: completed } }
   requests:
@@ -52,7 +56,13 @@ expect:
       tools_include: [WebSearch]
     - index: 1
       tools: [web_search]
-      contains: ['"type":"web_search_20250305"', '"max_uses":1', '"blocked_domains":["spam.example"]', 'Query: piarc release notes']
+      contains:
+        [
+          '"type":"web_search_20250305"',
+          '"max_uses":1',
+          '"blocked_domains":["spam.example"]',
+          'Query: piarc release notes',
+        ]
     - index: 2
       tool_results:
         - id: search
@@ -61,4 +71,9 @@ expect:
       not_contains: ['https://spam.example/piarc']
   json_lines:
     hook-log/search.jsonl:
-      - input: { hook_event_name: PreToolUse, tool_name: WebSearch, tool_input: { query: piarc release notes } }
+      - input:
+          {
+            hook_event_name: PreToolUse,
+            tool_name: WebSearch,
+            tool_input: { query: piarc release notes },
+          }

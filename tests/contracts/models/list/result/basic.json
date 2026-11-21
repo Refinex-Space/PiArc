@@ -10,9 +10,7 @@
         "contextWindow": 4096,
         "maxOutput": 1024,
         "vision": false,
-        "efforts": [
-          "off"
-        ],
+        "efforts": ["off"],
         "promptCache": false,
         "toolReliability": "unknown"
       },
@@ -23,9 +21,7 @@
         "contextWindow": 4096,
         "maxOutput": 1024,
         "vision": false,
-        "efforts": [
-          "off"
-        ],
+        "efforts": ["off"],
         "promptCache": false,
         "toolReliability": "unknown",
         "nativeWebSearch": true
