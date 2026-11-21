@@ -120,6 +120,7 @@ impl HostConfig {
                 Capability::new("terminalTasks"),
                 Capability::new("mcpPool"),
                 Capability::new("skills"),
+                Capability::new("plugins"),
             ],
             allow_model_network: None,
             model_preferences: None,

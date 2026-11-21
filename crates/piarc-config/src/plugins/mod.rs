@@ -115,6 +115,31 @@ pub fn declarations(settings: &Settings) -> Vec<(String, bool, PackageScope)> {
     out
 }
 
+/// The declarations as the files hold them, trusted or not: what the settings window lists
+/// (an untrusted project's packages show as declared there and do not load).
+#[must_use]
+pub fn listed(settings: &Settings) -> Vec<(String, bool, PackageScope)> {
+    let mut out: Vec<(String, bool, PackageScope)> = Vec::new();
+    for (layer, scope) in [
+        (ids::USER, PackageScope::User),
+        (ids::PROJECT, PackageScope::Project),
+        (ids::PROJECT_LOCAL, PackageScope::Project),
+    ] {
+        let declared = settings
+            .loaded(layer)
+            .and_then(|v| v.get(SETTINGS_KEY))
+            .and_then(Value::as_object);
+        for (id, on) in declared.into_iter().flatten() {
+            let on = on.as_bool() == Some(true);
+            match out.iter_mut().find(|(known, _, _)| known == id) {
+                Some(entry) => *entry = (id.clone(), on, scope),
+                None => out.push((id.clone(), on, scope)),
+            }
+        }
+    }
+    out
+}
+
 /// The packages `settings` turn on, among `installed`.
 #[must_use]
 pub fn active(settings: &Settings, installed: &[Installed], data: &Path) -> Packages {

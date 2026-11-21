@@ -90,6 +90,20 @@ pub enum AgentHostLaunch {
     },
 }
 
+impl AgentHostLaunch {
+    /// The Node executable Agent Hosts run on: the bundled one, or the development one. Core
+    /// runs npm next to it (T40).
+    #[must_use]
+    pub fn node(&self) -> Option<PathBuf> {
+        match self {
+            Self::Bundled { resources_dir } => {
+                BundledRuntime::locate(resources_dir).ok().map(|r| r.node())
+            }
+            Self::Custom { node, .. } => Some(node.clone()),
+        }
+    }
+}
+
 /// Starts supervising the Agent Host of `workspace` as `launch` says, with `inbound` answering
 /// its requests. `tune` adjusts the supervisor settings (tests shorten timeouts).
 ///

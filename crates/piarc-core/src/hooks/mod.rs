@@ -293,8 +293,30 @@ pub(crate) fn config_of(settings: &piarc_config::Settings) -> HookConfig {
     config_with(settings, &[])
 }
 
-/// [`config_of`] with a session's scoped hooks (T31, T37) above the settings files.
+/// [`config_of`] with a session's scoped hooks (T31, T37) above the settings files, and the
+/// confirmed hooks of the extension packages in effect below them (T40, layer `plugin:<id>`).
 fn config_with(settings: &piarc_config::Settings, scoped: &[Scoped]) -> HookConfig {
+    let packages: Vec<(String, Option<PathBuf>, Value)> = settings
+        .packages()
+        .active
+        .iter()
+        .filter_map(|package| {
+            package.hooks().map(|hooks| {
+                (
+                    format!("plugin:{}", package.id()),
+                    package.manifest.hooks_file.clone(),
+                    hooks,
+                )
+            })
+        })
+        .collect();
+    let packages = packages.iter().map(|(layer, file, hooks)| LayerHooks {
+        source: Source {
+            layer: layer.clone(),
+            file: file.clone(),
+        },
+        hooks: Some(hooks),
+    });
     let scoped = scoped.iter().map(|scoped| LayerHooks {
         source: Source {
             layer: scoped.layer.to_owned(),
@@ -318,6 +340,7 @@ fn config_with(settings: &piarc_config::Settings, scoped: &[Scoped]) -> HookConf
                     hooks: settings.layer(spec.id).and_then(|v| v.get("hooks")),
                 }),
         )
+        .chain(packages)
         .collect();
     let disabled = settings.get("/disableAllHooks") == Some(&Value::Bool(true));
     HookConfig::parse(&layers, disabled)

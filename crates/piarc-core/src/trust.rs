@@ -163,6 +163,7 @@ impl TrustService {
     pub async fn permission_settings(&self, dir: &Path) -> Result<piarc_config::Settings> {
         let dir = dir.to_owned();
         let storage = self.storage.clone();
+        let storage_for_packages = self.storage.clone();
         blocking(move || {
             let workspace = piarc_git::canonical(&dir)?;
             let checkout = piarc_git::resolve(&workspace)?;
@@ -183,6 +184,7 @@ impl TrustService {
                 });
             }
             settings.set_trust(trust);
+            attach_packages(&storage_for_packages, &mut settings)?;
             Ok(settings)
         })
         .await
@@ -251,9 +253,10 @@ impl TrustService {
         let dir = dir.to_owned();
         let expected = version.to_owned();
         let storage = self.storage.clone();
+        let data = self.storage.dirs().data().to_owned();
         let view = blocking(move || {
             storage.with(|store| -> Result<TrustView> {
-                let view = view_from_store(store, &dir)?;
+                let view = view_from_store(store, &dir, &data)?;
                 if trusted && (view.version != expected || !view.unreadable.is_empty()) {
                     return Ok(view);
                 }
@@ -270,7 +273,11 @@ impl TrustService {
                     decided_at: now_ms(),
                     snapshot,
                 })?;
-                let mut applied = view_from_store(store, &dir)?;
+                if trusted {
+                    // Trusting confirms the packages' items the dialog listed (T40).
+                    confirm_listed_packages(store, &view.items)?;
+                }
+                let mut applied = view_from_store(store, &dir, &data)?;
                 applied.applied = true;
                 Ok(applied)
             })?
@@ -365,6 +372,82 @@ async fn query(lookup: Arc<dyn TrustLookup>, dir: PathBuf) -> TrustState {
     })
 }
 
+/// The source of a package's items in the trust view: `plugin:<id>`.
+const PACKAGE_SOURCE: &str = "plugin:";
+
+/// Adds the executable items of the packages a project file turns on (T40): the trust dialog
+/// lists them with the package, and trusting confirms them.
+fn package_items(store: &piarc_store::Store, data: &Path, items: &mut Vec<Item>) -> Result<()> {
+    use piarc_config::Category;
+    use piarc_protocol::plugins::PackageExecutableKind as Kind;
+    let ids: Vec<String> = items
+        .iter()
+        .filter(|i| i.category == Category::Plugin && i.source.contains(".piarc/settings"))
+        .map(|i| i.name.clone())
+        .collect();
+    for id in ids {
+        let Some(record) = store.package(&id)? else {
+            continue;
+        };
+        let data = piarc_config::plugins::data_dir(data, &id);
+        let Ok(manifest) = piarc_config::plugins::read(Path::new(&record.path), &data) else {
+            continue;
+        };
+        for executable in manifest.executables() {
+            items.push(Item {
+                category: match executable.kind {
+                    Kind::Hook | Kind::AgentHook => Category::Hook,
+                    Kind::McpServer | Kind::AgentMcpServer => Category::McpServer,
+                    Kind::PiExtension => Category::PiExtension,
+                },
+                source: format!("{PACKAGE_SOURCE}{id}"),
+                name: executable.name,
+            });
+        }
+    }
+    items.sort();
+    items.dedup();
+    Ok(())
+}
+
+/// Marks the package items of a trust decision's listing as confirmed in their records.
+fn confirm_listed_packages(store: &piarc_store::Store, items: &[Item]) -> Result<()> {
+    let mut by_id: std::collections::BTreeMap<&str, Vec<String>> =
+        std::collections::BTreeMap::new();
+    for item in items {
+        if let Some(id) = item.source.strip_prefix(PACKAGE_SOURCE) {
+            by_id.entry(id).or_default().push(item.name.clone());
+        }
+    }
+    for (id, names) in by_id {
+        let Some(mut record) = store.package(id)? else {
+            continue;
+        };
+        let before = record.confirmed.len();
+        record.confirmed.extend(names);
+        record.confirmed.sort();
+        record.confirmed.dedup();
+        if record.confirmed.len() != before {
+            record.updated_at = now_ms();
+            store.put_package(&record)?;
+        }
+    }
+    Ok(())
+}
+
+/// The extension packages `settings` turn on (T40): read only when some file declares one, so
+/// a load without packages does not touch the database.
+fn attach_packages(storage: &Storage, settings: &mut piarc_config::Settings) -> Result<()> {
+    if piarc_config::plugins::declarations(settings).is_empty() {
+        return Ok(());
+    }
+    let records = storage.with(|store| store.packages())??;
+    let installed = crate::plugins::installed(&records);
+    let packages = piarc_config::plugins::active(settings, &installed, storage.dirs().data());
+    settings.set_packages(packages);
+    Ok(())
+}
+
 // A subdirectory can itself be opened as a workspace. Bind its settings to their path
 // inside the checkout; a grant for the root must not silently approve a sibling file.
 fn workspace_prefix(root: &Path, dir: &Path) -> String {
@@ -399,19 +482,31 @@ fn inventory_at(root: &Path, dir: &Path) -> Inventory {
 }
 
 fn build_view(storage: &Storage, dir: &Path) -> Result<TrustView> {
-    storage.with(|store| view_from_store(store, dir))?
+    let data = storage.dirs().data().to_owned();
+    storage.with(|store| view_from_store(store, dir, &data))?
 }
 
-fn view_from_store(store: &piarc_store::Store, dir: &Path) -> Result<TrustView> {
+fn view_from_store(store: &piarc_store::Store, dir: &Path, data: &Path) -> Result<TrustView> {
     let checkout = piarc_git::resolve(dir)?;
     let key = checkout_key(&checkout.main)?;
     let record = store.trust(&key)?;
-    let Inventory { items, unreadable } = inventory_at(&checkout.root, &piarc_git::canonical(dir)?);
+    let Inventory {
+        mut items,
+        unreadable,
+    } = inventory_at(&checkout.root, &piarc_git::canonical(dir)?);
+    package_items(store, data, &mut items)?;
     let decided_trusted = record
         .as_ref()
         .is_some_and(|r| r.decision == TrustDecision::Trusted);
+    // A package's items are confirmed per item in its record (T40): one added by an update
+    // waits for the package's own confirmation, not the project's trust, as in `StoreLookup`.
+    let project_items: Vec<Item> = items
+        .iter()
+        .filter(|i| !i.source.starts_with(PACKAGE_SOURCE))
+        .cloned()
+        .collect();
     let new_items = match &record {
-        Some(record) if decided_trusted => unconfirmed(&items, &record.snapshot),
+        Some(record) if decided_trusted => unconfirmed(&project_items, &record.snapshot),
         _ => None,
     };
     // The same answer as `StoreLookup`: new items wait for the user's confirmation.
@@ -419,7 +514,7 @@ fn view_from_store(store: &piarc_store::Store, dir: &Path) -> Result<TrustView> 
         decided_trusted && unreadable.is_empty() && new_items.as_ref().is_some_and(Vec::is_empty);
     let new_items = new_items.unwrap_or_else(|| {
         if decided_trusted {
-            items.clone()
+            project_items.clone()
         } else {
             Vec::new()
         }

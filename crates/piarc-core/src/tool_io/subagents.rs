@@ -175,18 +175,8 @@ impl ToolIo {
             return Err(invalid("agents/list: cwd must be inside the workspace"));
         }
         let services = self.services()?;
-        let dirs = services.storage.dirs().clone();
-        let loaded = tokio::task::spawn_blocking(move || {
-            load(&AgentDirs {
-                cwd: &cwd,
-                data: Some(dirs.data()),
-                home: dirs.home(),
-                packages: &[],
-            })
-        })
-        .await
-        .map_err(|e| ErrorObject::new(ErrorKind::InternalError, e.to_string(), false))?;
         let settings = services.settings(workspace).await?;
+        let loaded = self.definitions_in(&cwd, &settings).await?;
         let rules = policy::workspace_rules(&settings, workspace);
         let denied = |name: &str| policy::denies_agent(&rules, name);
         let project_trusted = settings.trust().is_trusted();
@@ -238,7 +228,9 @@ impl ToolIo {
             None => (p.parent_session_id.clone(), Arc::clone(&parent), false),
         };
         let workspace = parent.project().to_path_buf();
-        let loaded = self.definitions_from(parent.scope.cwd()).await?;
+        let loaded = self
+            .definitions_from(parent.scope.cwd(), parent.project())
+            .await?;
         let definition = loaded.get(&p.agent_type);
         let mut warnings: Vec<AgentWarning> = Vec::new();
         if let Some(definition) = definition {
@@ -297,19 +289,31 @@ impl ToolIo {
         })
     }
 
-    /// The definitions found from `cwd`.
+    /// The definitions found from `cwd`, with those of `project`'s extension packages (T40).
     async fn definitions_from(
         &self,
         cwd: &Path,
+        project: &Path,
+    ) -> Result<piarc_config::agents::LoadedAgents, ErrorObject> {
+        let settings = self.services()?.settings(project).await?;
+        self.definitions_in(cwd, &settings).await
+    }
+
+    /// The definitions found from `cwd` under `settings` (its packages' come last).
+    async fn definitions_in(
+        &self,
+        cwd: &Path,
+        settings: &piarc_config::Settings,
     ) -> Result<piarc_config::agents::LoadedAgents, ErrorObject> {
         let dirs = self.services()?.storage.dirs().clone();
         let lookup = cwd.to_path_buf();
+        let packages = settings.packages().active.clone();
         tokio::task::spawn_blocking(move || {
             load(&AgentDirs {
                 cwd: &lookup,
                 data: Some(dirs.data()),
                 home: dirs.home(),
-                packages: &[],
+                packages: &packages,
             })
         })
         .await

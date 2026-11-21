@@ -1,7 +1,8 @@
 //! What answers one workspace's Agent Host: `trust/get` from the trust store, `secrets/*` from
 //! Core's single vault service, `hooks/run` for working directories in this workspace,
 //! `agents/list`, `subagent/start`, `subagent/finish` (T31), `mcp/servers` and an MCP server's
-//! sign-in steps (`ui/loginInteraction`, T36), and `fs/*`, `exec/*` from the tool I/O, but only
+//! sign-in steps (`ui/loginInteraction`, T36), the packages' Pi extensions
+//! (`plugins/extensions`, T40), and `fs/*`, `exec/*` from the tool I/O, but only
 //! for the sessions that belong to this workspace (R1-A13): an Agent Host cannot reach another
 //! workspace's session scope by naming its id.
 
@@ -178,6 +179,39 @@ impl WorkspaceInbound {
     }
 }
 
+impl WorkspaceInbound {
+    /// `plugins/extensions` (T40): the packages' Pi extensions for a directory of this
+    /// workspace.
+    fn plugin_extensions(
+        &self,
+        params: Map<String, Value>,
+    ) -> BoxFuture<'static, Result<Value, ErrorObject>> {
+        let (trust, workspace) = (self.trust.clone(), self.workspace.clone());
+        Box::pin(async move {
+            let p: piarc_protocol::plugins::PluginsExtensionsParams =
+                serde_json::from_value(Value::Object(params)).map_err(|_| {
+                    ErrorObject::new(
+                        ErrorKind::InvalidParams,
+                        "malformed plugins/extensions",
+                        false,
+                    )
+                })?;
+            if !std::path::Path::new(&p.cwd).starts_with(&workspace) {
+                return Err(ErrorObject::new(
+                    ErrorKind::InvalidParams,
+                    "plugins/extensions: cwd must be inside the workspace",
+                    false,
+                ));
+            }
+            let result = crate::plugins::extensions(&trust, &workspace)
+                .await
+                .map_err(|e| e.to_error_object())?;
+            serde_json::to_value(result)
+                .map_err(|e| ErrorObject::new(ErrorKind::InternalError, e.to_string(), false))
+        })
+    }
+}
+
 impl InboundHandler for WorkspaceInbound {
     fn handle(
         &self,
@@ -223,6 +257,9 @@ impl InboundHandler for WorkspaceInbound {
         }
         if method == "mcp/servers" || method == "ui/loginInteraction" {
             return self.mcp(&method, params);
+        }
+        if method == "plugins/extensions" {
+            return self.plugin_extensions(params);
         }
         if method == "exec/shells" || method == "web/searchBackend" {
             // Machine-wide, and asked while a session is being created (before it is ours).

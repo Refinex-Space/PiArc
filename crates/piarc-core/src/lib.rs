@@ -84,6 +84,7 @@ pub mod host_probe;
 pub mod identity;
 pub mod keychain_probe;
 pub mod mcp;
+pub mod plugins;
 pub mod providers;
 pub mod release;
 pub mod route;

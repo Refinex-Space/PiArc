@@ -52,6 +52,7 @@
 
 mod boundary;
 pub mod mcp;
+pub mod plugins;
 pub mod runtime;
 pub mod sandbox;
 pub mod sessions;

@@ -6,6 +6,8 @@
 //! - T13: the main checkout of a directory, the key of project trust ([`checkout`]).
 //! - T35: PiArc's worktrees ([`worktree`]), with git run through the injected process spawner
 //!   ([`git`]).
+//! - T40: clones of extension packages pinned to a commit, and their explicit update
+//!   ([`package`]).
 //!
 //! # Not responsible for
 //!
@@ -23,6 +25,7 @@
 
 pub mod checkout;
 pub mod git;
+pub mod package;
 pub mod worktree;
 
 pub use checkout::{Checkout, CheckoutKind, Error, Result, canonical, resolve, strip_verbatim};

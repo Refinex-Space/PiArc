@@ -37,6 +37,7 @@ mod hooks;
 mod inbound;
 mod login;
 mod mcp;
+mod plugins;
 mod provider_settings;
 mod session;
 mod skills;

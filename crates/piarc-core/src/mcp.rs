@@ -238,6 +238,7 @@ fn merge_for(
             pointer: "/mcpServers".to_owned(),
         });
     }
+    let plugin_of = plugin_sources(settings, &mut sources);
     let disabled_mcpjson: Vec<String> = settings
         .get("/disabledMcpjsonServers")
         .and_then(Value::as_array)
@@ -263,8 +264,43 @@ fn merge_for(
     );
     issues.append(&mut merged.issues);
     merged.issues = issues;
+    for server in &mut merged.servers {
+        if server.scope == McpScope::Plugin {
+            server.plugin = plugin_of.get(&server.name).cloned();
+        }
+    }
     let (idle, threshold) = config::pool_settings(settings.merged());
     (merged, idle, threshold)
+}
+
+/// The confirmed servers of the extension packages in effect (T40): the lowest scope. Returns
+/// each server's package.
+fn plugin_sources(
+    settings: &piarc_config::Settings,
+    sources: &mut Vec<SourceEntries>,
+) -> BTreeMap<String, String> {
+    let mut plugin_of = BTreeMap::new();
+    for package in &settings.packages().active {
+        let servers = package.mcp_servers();
+        if servers.is_empty() {
+            continue;
+        }
+        for name in servers.keys() {
+            plugin_of.insert(name.clone(), package.id().to_owned());
+        }
+        sources.push(SourceEntries {
+            scope: McpScope::Plugin,
+            source: package
+                .manifest
+                .root
+                .join(config::MCP_JSON)
+                .display()
+                .to_string(),
+            servers: Some(Value::Object(servers)),
+            pointer: "/mcpServers".to_owned(),
+        });
+    }
+    plugin_of
 }
 
 fn layer_source(settings: &piarc_config::Settings, id: &str, scope: McpScope) -> SourceEntries {

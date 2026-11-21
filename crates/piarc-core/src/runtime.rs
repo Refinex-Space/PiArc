@@ -26,6 +26,7 @@
 //! and reported as a structured error event on [`ERROR_ROUTE`](crate::route::ERROR_ROUTE).
 
 mod mcp;
+mod plugins;
 mod sessions;
 mod state;
 mod terminals;

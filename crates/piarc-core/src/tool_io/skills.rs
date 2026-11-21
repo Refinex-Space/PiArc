@@ -94,16 +94,19 @@ impl ToolIo {
     ) -> Result<(Catalog, Settings), ErrorObject> {
         let dirs = self.services()?.storage.dirs().clone();
         let lookup = cwd.to_path_buf();
+        let settings = self.resource_settings(project).await?;
+        // Extension packages in effect (T40): their skills and commands come last.
+        let packages = settings.packages().active.clone();
         let mut catalog = tokio::task::spawn_blocking(move || {
             config::load(&ResourceDirs {
                 cwd: &lookup,
                 data: Some(dirs.data()),
                 home: dirs.home(),
+                packages: &packages,
             })
         })
         .await
         .map_err(internal)?;
-        let settings = self.resource_settings(project).await?;
         config::apply_visibility(&mut catalog.skills, settings.get("/skillOverrides"));
         let rules = policy::workspace_rules(&settings, project);
         let trusted = settings.trust().is_trusted();
@@ -488,6 +491,11 @@ fn render(
 /// file always; a project file when the project is trusted and the file is one of its own,
 /// listed by its trust manifest (R4 E1: not a worktree's copy or a directory above the root).
 fn covered(source: ResourceSource, file: &str, project: &Path, trusted: bool) -> bool {
+    // A package's skills and commands are instructions: their `allowed-tools` and hooks are
+    // not among the executable items a user confirms (T40), so they do not apply.
+    if source == ResourceSource::Plugin {
+        return false;
+    }
     !is_project(source)
         || (trusted && piarc_config::executables::covered_by_trust(project, Path::new(file)))
 }
