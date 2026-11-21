@@ -295,7 +295,8 @@ async fn gone(pid: &str, what: &str) {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn no_mcp_server_outlives_its_agent_host() {
     let env = Env::new("mcp-exit").await;
-    let pid_file = env.root.join("server.pid");
+    // The server inherits the Agent Host's Seatbelt profile (T39): its own directory is writable.
+    let pid_file = env.data.join("agent-host").join("server.pid");
     let fixture = super::support::repo_root()
         .join("packages")
         .join("testkit")
@@ -421,7 +422,6 @@ async fn an_npx_server_runs_on_the_agent_hosts_node_without_a_system_node() {
     settings["mcpServers"] = json!({ "probe": {
         "command": "npx",
         "args": ["--yes", "--package", tarball, "piarc-mcp-probe-server"],
-        "env": { "npm_config_cache": env.root.join("npm cache"), "npm_config_update_notifier": "false" },
     }});
     settings["permissions"]["allow"]
         .as_array_mut()
