@@ -1,6 +1,6 @@
 # piarc-core
 
-Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、有序关闭、任务监督；`agent_host` 模块把 `piarc-host` 的监管器与生产 I/O（`piarc-exec` 的进程启动器、`SystemClock`）装配起来，是 Agent Host 测试的无头入口（T06）；`tool_io` 应答 Agent Host 委托的 `fs/*`、`exec/*`（T07），沙箱会话的命令经 `piarc-sandbox` 包装（T11）；`secrets` 把凭据保险箱提供给所有 Agent Host（`secrets/*`，T08），`identity` 是应用标识的唯一定义；`terminal` 是终端的注册表（T10），T33 起会话的终端作为后台任务运行；`dirs`、`storage`、`trust`、`workspace_settings` 是数据目录、数据库、项目信任与工作区设置（T13）；`sessions` 是工作区与会话的编排（T14），`clock` 是空闲计时用的时钟；`client_settings` 读写用户级 `settings.json` 中的客户端偏好（T18）。运行时门面的状态与会话方法分别在 `runtime/state.rs` 与 `runtime/sessions.rs`。会话删除的原生确认先从 Core 读取目标标题和工作区，并显示同一会话 ID。不负责 JavaScript 绑定（`piarc-napi`）。
+Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、有序关闭、任务监督；`agent_host` 模块把 `piarc-host` 的监管器与生产 I/O（`piarc-exec` 的进程启动器、`SystemClock`）装配起来，是 Agent Host 测试的无头入口（T06）；`tool_io` 应答 Agent Host 委托的 `fs/*`、`exec/*`（T07），沙箱命令经 `piarc-sandbox` 包装（T11，T39 起按裁决与当时的设置，见 `src/tool_io/AGENTS.md`）；`secrets` 把凭据保险箱提供给所有 Agent Host（`secrets/*`，T08），`identity` 是应用标识的唯一定义；`terminal` 是终端的注册表（T10），T33 起会话的终端作为后台任务运行；`dirs`、`storage`、`trust`、`workspace_settings` 是数据目录、数据库、项目信任与工作区设置（T13）；`sessions` 是工作区与会话的编排（T14），`clock` 是空闲计时用的时钟；`client_settings` 读写用户级 `settings.json` 中的客户端偏好（T18）。运行时门面的状态与会话方法分别在 `runtime/state.rs` 与 `runtime/sessions.rs`。会话删除的原生确认先从 Core 读取目标标题和工作区，并显示同一会话 ID。不负责 JavaScript 绑定（`piarc-napi`）。
 
 ## 命令
 
@@ -10,6 +10,7 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 | `cargo test -p piarc-core --test exec_commands -- --nocapture` | 命令（T17）：cd 跨命令保留与越界重置、超时与截断的上限、落盘与预览、两个管道各 50 MB、语义退出码、环境剔除、`exec/shells`；Windows 上另有 PowerShell 与 Git Bash 的中文输出 |
 | `cargo test -p piarc-core --test sandbox` | 沙箱会话（macOS）：写入范围、受保护路径、`denyRead`、绕过代理、流式与退出码、`exec/kill` 后进程组为空（T17 起 shell 以 `SIGTERM` 结束）、关闭会话停止代理 |
 | `cargo test -p piarc-core --test sandbox_commands -- --nocapture` | 沙箱内 git、python、cargo build、npm install（后两项连真实 registry，连不上就失败并说明） |
+| `cargo test -p piarc-core --test agent_host_profile` | Agent Host 的定稿 Seatbelt 配置在真实 `sandbox-exec` 上：工作区、`pi/`、`agent-host/`、会话临时目录写得进，主目录、用户设置、数据库、保险箱、用户级 skills、受保护路径写不进（T39） |
 | `cargo test -p piarc-core --test release -- --nocapture` | 发布清单校验（T12-A08）：有效、篡改内容、篡改哈希与大小、未列出、换密钥、无内置公钥，打印结构化错误 |
 | `cargo test -p piarc-core --test agent_host_probe` | 探针在 Core 运行时上启动进程（运行时开着 I/O）、Agent Host 未握手就退出时报告错误（Unix） |
 | `cargo test -p piarc-core --test state` | 数据目录布局、信任按主 checkout（真实 git 夹具）、重启后保留与撤销、`trust/get` 故障注入、信任视图与新增项、设置文件变化事件（T13） |
@@ -45,7 +46,7 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 
 ## 打包的 Agent Host 与 S6 探针（T12）
 
-- `agent_host::start` 一律用 `ProcessTreeSpawner`；`start_bundled` 从打包产物启动（布局、环境变量与 Seatbelt 包装见 `crates/piarc-host/AGENTS.md`）。Core 的 tokio 运行时开着 I/O（`enable_io`），在它上面监管子进程、跑代理都依赖这一点。
+- `agent_host::start` 一律用 `ProcessTreeSpawner`；`start_bundled` 从打包产物启动（布局、环境变量与 Seatbelt 包装见 `crates/piarc-host/AGENTS.md`）。T39 起 `start_for` 的开发启动（`AgentHostLaunch::Custom`）在 macOS 上同样套定稿配置并设 `agent_host_env`；`agent_host::start` 直接启动（Agent Host 协议测试）不套。Core 的 tokio 运行时开着 I/O（`enable_io`），在它上面监管子进程、跑代理都依赖这一点。
 - `host_probe`、`keychain_probe` 只给测试用：开发构建的 `piarc-napi` 导出 `agentHostProbe`、`keychainProbe`，发布构建不导出。钥匙串探针的条目固定为 `piarc-test.s6-keychain.credential-vault`（构建 A 写、构建 B 读要同一个名字），不碰 `identity` 的正式条目。
 
 ## 发布清单（`release`，ADR-0024）

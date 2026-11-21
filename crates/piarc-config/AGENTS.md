@@ -73,6 +73,12 @@
 - 非执行配置 `fileCheckpointingEnabled`（T28，与 Claude Code 同名同义，生效）随普通标量合并：`false` 时 Core 的 `tool_io::checkpoints` 不建检查点、写入不存快照，之后的回合没有代码回退。
 - 非执行配置 `askUserQuestion.timeoutSeconds`（T26）是提问表单的超时秒数，随普通标量合并；Claude Code 的 `askUserQuestionTimeout` 仍标为忽略。`plansDirectory` 是 `planned(T48)`：T26 把计划存为会话 entry，R3 决定由 T48 支持批准时把计划另存到该目录（I104）。
 
+## 沙箱设置（`src/sandbox.rs`，T39，ADR-0056）
+
+- 键沿用 Claude Code：`sandbox.enabled`、`sandbox.autoAllowBashIfSandboxed`、`sandbox.filesystem.denyRead`、`sandbox.network.allowedDomains`（`claude::SETTINGS_KEYS` 为生效，其余 `sandbox.*` 逐条忽略并写原因，`network.allowManagedDomainsOnly` 为 T47）。
+- 项目层只能收紧：`remerge` 用 `sandbox::loosening` 去掉项目层的 `allowedDomains`、为真的 `autoAllowBashIfSandboxed`、为假的 `enabled`，记进 `ignored_sandbox`，诊断报 `projectSandbox`；Core 在没有沙箱的平台用 `diagnostics::mark_platform_unsupported` 把生效的开启与自动批准改报 `platform`。
+- `sandbox::resolve(settings, enterprise, home)` 给出开关、模式、带来源的 `denyRead`（项目文件相对项目根、用户文件相对文件所在目录、`~/` 与 `/`、`//` 照常）与允许域名（用户两层，再加企业来源，去重）。写回只经 `write_value`/`append_unique` 的用户层（网络卡的"加入白名单"用 `append_unique`）。
+
 ## 易错点
 
 - 测试一律注入临时家目录（`LayerTable::workspace(.., Some(临时目录))`、Core 的 `CoreConfig.home`），不读本机 `~/.claude`；`None` 不读任何用户级 Claude Code 文件。
