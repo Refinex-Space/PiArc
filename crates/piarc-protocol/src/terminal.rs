@@ -67,6 +67,51 @@ pub enum TerminalEvent {
         /// What failed.
         reason: String,
     },
+    /// New output arrived after a frame the viewer pulled with `park` (T34): a viewer that
+    /// stopped pulling while nothing changed pulls again. Sent once per parking.
+    Output,
+}
+
+/// Where to move a terminal's viewport (T34).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum TerminalScroll {
+    /// The top of the scrollback.
+    Top,
+    /// The active area, where the program writes.
+    Bottom,
+    /// By `rows`; up is negative.
+    Delta {
+        /// Rows to move.
+        rows: i64,
+    },
+    /// So that `row` (from the top of the scrollback, the frame scrollbar's row space) is the
+    /// first visible row.
+    Row {
+        /// The row.
+        row: u64,
+    },
+}
+
+/// A hyperlink (OSC 8) on a viewport row (T34).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminalLink {
+    /// The URI as the program sent it.
+    pub uri: String,
+    /// Viewport row.
+    #[schemars(with = "u64")]
+    pub row: u32,
+    /// First column.
+    #[schemars(with = "u64")]
+    pub start: u32,
+    /// Last column (included).
+    #[schemars(with = "u64")]
+    pub end: u32,
 }
 
 /// Which text of a terminal to read.
@@ -214,6 +259,14 @@ mod tests {
             serde_json::to_value(&exited).expect("json"),
             serde_json::json!({ "type": "exited", "code": null })
         );
+        assert_eq!(
+            serde_json::to_value(TerminalEvent::Output).expect("json"),
+            serde_json::json!({ "type": "output" })
+        );
+        let scroll: TerminalScroll =
+            serde_json::from_value(serde_json::json!({ "kind": "delta", "rows": -3 }))
+                .expect("scroll");
+        assert_eq!(scroll, TerminalScroll::Delta { rows: -3 });
         let range: TerminalTextRange =
             serde_json::from_value(serde_json::json!({ "kind": "lastLines", "count": 5 }))
                 .expect("range");

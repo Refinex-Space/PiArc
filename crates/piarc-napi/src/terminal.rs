@@ -1,6 +1,8 @@
-//! Terminal exports (ADR-0017, T10, T33): create (with or without a session), input, keys,
-//! mouse, focus, paste, resize, pulled frames, text, commands, search, sharing, close. The main
-//! process calls them on behalf of a window and returns frames to it without reading them.
+//! Terminal exports (ADR-0017, T10, T33, T34): create (with or without a session), input, keys,
+//! mouse (selection and scrolling when the program does not track it), focus, paste, resize,
+//! pulled frames (parking), viewport scrolling, selected text, links, text, commands, search,
+//! sharing, close. The main process calls them on behalf of a window and returns frames to it
+//! without reading them.
 //! Starting a terminal and everything that reads the screen run off the JavaScript thread and
 //! settle a Promise.
 
@@ -54,6 +56,9 @@ pub struct TerminalMouseEvent {
     pub x: f64,
     /// Vertical position in pixels.
     pub y: f64,
+    /// For a press: clicks in a row (`MouseEvent.detail`: 1 single, 2 double, 3 triple),
+    /// which picks the selection unit when the program does not track the mouse. Default 1.
+    pub clicks: Option<u32>,
 }
 
 /// Options of `createTerminal`.
@@ -162,6 +167,17 @@ fn mouse_event(event: TerminalMouseEvent) -> piarc_core::Result<piarc_core::Mous
         mods: u16::try_from(event.mods & 0xf).unwrap_or(0),
         x: event.x as f32,
         y: event.y as f32,
+        clicks: u8::try_from(event.clicks.unwrap_or(1).clamp(1, 3)).unwrap_or(1),
+    })
+}
+
+/// A scroll target from its JSON (`{ kind: "top" | "bottom" }`, `{ kind: "delta", rows }`,
+/// `{ kind: "row", row }`).
+fn scroll_target(text: &str) -> piarc_core::Result<piarc_protocol::terminal::TerminalScroll> {
+    serde_json::from_str(text).map_err(|_| piarc_core::Error::InvalidArgument {
+        field: "to",
+        reason: "must be { kind: top | bottom } or { kind: delta, rows } or { kind: row, row }"
+            .into(),
     })
 }
 
@@ -266,8 +282,10 @@ impl CoreRuntime {
         Ok(promise)
     }
 
-    /// Encodes a mouse event with the terminal's mouse mode and format and writes it; nothing
-    /// when the program does not track the mouse. Never blocks.
+    /// A pointer event: encoded with the terminal's mouse mode and format and written while
+    /// the program tracks the mouse; otherwise (and for the left button with Shift) it selects
+    /// text (`clicks` 2 a word, 3 a line; Shift extends) and the wheel scrolls the scrollback.
+    /// Never blocks.
     #[napi(catch_unwind)]
     pub fn terminal_mouse(&self, env: Env, id: u32, event: TerminalMouseEvent) -> napi::Result<()> {
         boundary::call(&env, "CoreRuntime.terminalMouse", || {
@@ -428,7 +446,8 @@ impl CoreRuntime {
 
     /// Resolves with the next frame of the terminal for `viewer` (the binary format of
     /// `piarc_protocol::term_frame`, version 2); `full` asks for a RESET frame. An unchanged
-    /// terminal gives a 14-byte empty frame.
+    /// terminal gives a 14-byte empty frame. With `park` the viewer stops pulling when this
+    /// frame is empty: the next output sends an `output` event on `term/<id>` (T34).
     #[napi(ts_return_type = "Promise<Uint8Array>", catch_unwind)]
     pub fn terminal_frame<'env>(
         &self,
@@ -436,16 +455,78 @@ impl CoreRuntime {
         id: u32,
         viewer: u32,
         full: bool,
+        #[napi(ts_arg_type = "boolean | null")] park: Option<bool>,
     ) -> napi::Result<Object<'env>> {
         type Settle = Box<dyn FnOnce(Env) -> napi::Result<Uint8Array> + Send>;
         let (deferred, promise) = env.create_deferred::<Uint8Array, Settle>()?;
         boundary::call(env, "CoreRuntime.terminalFrame", || {
-            self.core.terminal_frame(id, viewer, full, move |frame| {
-                deferred.resolve(Box::new(move |env| match frame {
-                    Ok(bytes) => Ok(Uint8Array::from(bytes)),
-                    Err(error) => Err(boundary::js_error(&env, &error.to_error_object())),
+            let park = park.unwrap_or(false);
+            self.core
+                .terminal_frame_parking(id, viewer, full, park, move |frame| {
+                    deferred.resolve(Box::new(move |env| match frame {
+                        Ok(bytes) => Ok(Uint8Array::from(bytes)),
+                        Err(error) => Err(boundary::js_error(&env, &error.to_error_object())),
+                    }));
+                })
+        })?;
+        Ok(promise)
+    }
+
+    /// Moves the viewport: `to` is JSON text (`{"kind":"top"}`, `bottom`,
+    /// `{"kind":"delta","rows":-3}`, `{"kind":"row","row":120}`). Never blocks.
+    #[napi(catch_unwind)]
+    pub fn terminal_scroll(&self, env: Env, id: u32, to: String) -> napi::Result<()> {
+        boundary::call(&env, "CoreRuntime.terminalScroll", || {
+            self.core.terminal_scroll(id, scroll_target(&to)?)
+        })
+    }
+
+    /// Clears the selection. Never blocks.
+    #[napi(catch_unwind)]
+    pub fn terminal_clear_selection(&self, env: Env, id: u32) -> napi::Result<()> {
+        boundary::call(&env, "CoreRuntime.terminalClearSelection", || {
+            self.core.terminal_clear_selection(id)
+        })
+    }
+
+    /// The selected text (wrapped rows joined, trailing spaces trimmed); empty when nothing is
+    /// selected.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn terminal_selection_text<'env>(
+        &self,
+        env: &'env Env,
+        id: u32,
+    ) -> napi::Result<Object<'env>> {
+        type Settle = Box<dyn FnOnce(Env) -> napi::Result<String> + Send>;
+        let (deferred, promise) = env.create_deferred::<String, Settle>()?;
+        boundary::call(env, "CoreRuntime.terminalSelectionText", || {
+            self.core.terminal_selection_text(id, move |text| {
+                deferred.resolve(Box::new(move |env| {
+                    text.map_err(|error| boundary::js_error(&env, &error.to_error_object()))
                 }));
             })
+        })?;
+        Ok(promise)
+    }
+
+    /// The OSC 8 hyperlink at viewport cell (`col`, `row`) as JSON text (`TerminalLink`), or
+    /// `null` when the cell has none.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn terminal_link_at<'env>(
+        &self,
+        env: &'env Env,
+        id: u32,
+        col: u32,
+        row: u32,
+    ) -> napi::Result<Object<'env>> {
+        let (deferred, promise) = env.create_deferred::<String, Json>()?;
+        boundary::call(env, "CoreRuntime.terminalLinkAt", || {
+            self.core.terminal_link_at(
+                id,
+                u16::try_from(col).unwrap_or(u16::MAX),
+                u16::try_from(row).unwrap_or(u16::MAX),
+                move |result| deferred.resolve(json(result)),
+            )
         })?;
         Ok(promise)
     }

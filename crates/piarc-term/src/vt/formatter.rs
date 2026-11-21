@@ -94,6 +94,28 @@ fn format_range(terminal: &mut Terminal, range: TextRange, options: TextOptions)
     Ok(String::from_utf8_lossy(&bytes).into_owned())
 }
 
+/// The text of `selection` (a fresh snapshot of this terminal's selection): wrapped rows
+/// joined, trailing spaces trimmed, as a copy should give it.
+pub(super) fn selected_text(
+    terminal: &mut Terminal,
+    selection: &sys::GhosttySelection,
+) -> Result<String> {
+    let formatter = Formatter::new(terminal)?;
+    formatter.set_bool(
+        "ghostty_formatter_set(UNWRAP)",
+        sys::GHOSTTY_FORMATTER_OPT_UNWRAP,
+        true,
+    )?;
+    formatter.set_bool(
+        "ghostty_formatter_set(TRIM)",
+        sys::GHOSTTY_FORMATTER_OPT_TRIM,
+        true,
+    )?;
+    formatter.select(selection)?;
+    let bytes = formatter.format()?;
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
 /// The last `n` lines: formats a window of the bottom rows, wide enough to hold `n` lines
 /// after the trailing blank rows the formatter drops, growing it when blank rows took more.
 fn last_lines(terminal: &mut Terminal, n: u32, options: TextOptions) -> Result<String> {

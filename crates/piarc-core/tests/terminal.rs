@@ -273,3 +273,101 @@ fn quitting_ends_every_terminal_tree_before_it_returns() {
     }
     assert!(left.is_empty(), "outlived the shutdown: {left:?}");
 }
+
+fn pull(core: &CoreRuntime, id: u32, full: bool, park: bool) -> term_frame::Frame {
+    let (tx, rx) = channel();
+    core.terminal_frame_parking(id, 1, full, park, move |frame| {
+        let _ = tx.send(frame);
+    })
+    .expect("frame request");
+    let bytes = rx.recv_timeout(WAIT).expect("callback").expect("frame");
+    term_frame::decode(&bytes).expect("decodes")
+}
+
+fn eventually<T>(what: &str, mut probe: impl FnMut() -> Option<T>) -> T {
+    let deadline = Instant::now() + WAIT;
+    loop {
+        if let Some(value) = probe() {
+            return value;
+        }
+        assert!(Instant::now() < deadline, "timed out waiting for {what}");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+fn selection_text(core: &CoreRuntime, id: u32) -> String {
+    let (tx, rx) = channel();
+    core.terminal_selection_text(id, move |text| {
+        let _ = tx.send(text);
+    })
+    .expect("selection request");
+    rx.recv_timeout(WAIT).expect("callback").expect("text")
+}
+
+/// T34: the panel's pointer, scrolling, link and parking calls reach the terminal through Core.
+#[test]
+fn selection_scrolling_links_and_parking_go_through_core() {
+    let (core, rx) = start();
+    let script = "printf 'pick \\033]8;;https://example.com/x\\033\\\\here\\033]8;;\\033\\\\ done\\n'; sleep 30";
+    let id = create(&core, options(script)).expect("terminal");
+    let mut screen = term_frame::Screen::new();
+    eventually("the output", || {
+        screen
+            .apply(&pull(&core, id, true, false))
+            .expect("reset applies");
+        screen.plain_text().contains("done").then_some(())
+    });
+    // A double click on "pick" selects it; the frame carries the selected columns.
+    let press = |clicks| piarc_core::MouseEvent {
+        action: piarc_term::vt::MouseAction::Press,
+        button: Some(1),
+        mods: 0,
+        x: 9.0,
+        y: 8.0,
+        clicks,
+    };
+    core.terminal_mouse(id, press(1)).expect("click");
+    core.terminal_mouse(id, press(2)).expect("double click");
+    eventually("the word", || {
+        (selection_text(&core, id) == "pick").then_some(())
+    });
+    eventually("the selected columns", || {
+        let frame = pull(&core, id, false, false);
+        screen.apply(&frame).expect("applies");
+        (screen.selection(0).map(|s| (s.start, s.end)) == Some((0, 3))).then_some(())
+    });
+    core.terminal_clear_selection(id).expect("clear");
+    eventually("no selection", || {
+        selection_text(&core, id).is_empty().then_some(())
+    });
+
+    let (tx, links) = channel();
+    core.terminal_link_at(id, 6, 0, move |link| {
+        let _ = tx.send(link);
+    })
+    .expect("link request");
+    let link = links.recv_timeout(WAIT).expect("callback").expect("link");
+    let link = link.expect("an OSC 8 link");
+    assert_eq!(
+        (link.uri.as_str(), link.start, link.end),
+        ("https://example.com/x", 5, 8)
+    );
+
+    core.terminal_scroll(id, piarc_protocol::terminal::TerminalScroll::Top)
+        .expect("scroll");
+    // Parked on an empty frame, the viewer is woken by output on its route.
+    eventually("an empty parked frame", || {
+        let frame = pull(&core, id, false, true);
+        screen.apply(&frame).expect("applies");
+        frame.body.is_none().then_some(())
+    });
+    core.terminal_write(id, b"x".to_vec()).expect("input");
+    let route = format!("term/{id}");
+    eventually("the output event", || {
+        rx.recv_timeout(Duration::from_millis(50))
+            .ok()
+            .filter(|(r, events)| *r == route && events.iter().any(|e| e["type"] == "output"))
+    });
+    core.close_terminal(id).expect("close");
+    core.shutdown_blocking().expect("shutdown");
+}

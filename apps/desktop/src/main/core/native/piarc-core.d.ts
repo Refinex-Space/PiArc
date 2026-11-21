@@ -290,8 +290,10 @@ export declare class CoreRuntime {
    */
   setTerminalShared(id: number, shared: boolean): Promise<boolean>;
   /**
-   * Encodes a mouse event with the terminal's mouse mode and format and writes it; nothing
-   * when the program does not track the mouse. Never blocks.
+   * A pointer event: encoded with the terminal's mouse mode and format and written while
+   * the program tracks the mouse; otherwise (and for the left button with Shift) it selects
+   * text (`clicks` 2 a word, 3 a line; Shift extends) and the wheel scrolls the scrollback.
+   * Never blocks.
    */
   terminalMouse(id: number, event: TerminalMouseEvent): void;
   /**
@@ -346,9 +348,32 @@ export declare class CoreRuntime {
   /**
    * Resolves with the next frame of the terminal for `viewer` (the binary format of
    * `piarc_protocol::term_frame`, version 2); `full` asks for a RESET frame. An unchanged
-   * terminal gives a 14-byte empty frame.
+   * terminal gives a 14-byte empty frame. With `park` the viewer stops pulling when this
+   * frame is empty: the next output sends an `output` event on `term/<id>` (T34).
    */
-  terminalFrame(id: number, viewer: number, full: boolean): Promise<Uint8Array>;
+  terminalFrame(
+    id: number,
+    viewer: number,
+    full: boolean,
+    park?: boolean | null,
+  ): Promise<Uint8Array>;
+  /**
+   * Moves the viewport: `to` is JSON text (`{"kind":"top"}`, `bottom`,
+   * `{"kind":"delta","rows":-3}`, `{"kind":"row","row":120}`). Never blocks.
+   */
+  terminalScroll(id: number, to: string): void;
+  /** Clears the selection. Never blocks. */
+  terminalClearSelection(id: number): void;
+  /**
+   * The selected text (wrapped rows joined, trailing spaces trimmed); empty when nothing is
+   * selected.
+   */
+  terminalSelectionText(id: number): Promise<string>;
+  /**
+   * The OSC 8 hyperlink at viewport cell (`col`, `row`) as JSON text (`TerminalLink`), or
+   * `null` when the cell has none.
+   */
+  terminalLinkAt(id: number, col: number, row: number): Promise<string>;
   /**
    * Hangs up the terminal's program, ends everything it started and forgets the terminal
    * (a terminal of a session stops as its task).
@@ -482,4 +507,9 @@ export interface TerminalMouseEvent {
   x: number;
   /** Vertical position in pixels. */
   y: number;
+  /**
+   * For a press: clicks in a row (`MouseEvent.detail`: 1 single, 2 double, 3 triple),
+   * which picks the selection unit when the program does not track the mouse. Default 1.
+   */
+  clicks?: number;
 }

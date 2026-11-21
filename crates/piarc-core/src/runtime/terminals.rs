@@ -4,7 +4,8 @@
 use std::time::Duration;
 
 use piarc_protocol::terminal::{
-    TerminalCommand, TerminalInfo, TerminalMatch, TerminalPasteOutcome, TerminalTextRange,
+    TerminalCommand, TerminalInfo, TerminalLink, TerminalMatch, TerminalPasteOutcome,
+    TerminalScroll, TerminalTextRange,
 };
 
 use super::CoreRuntime;
@@ -155,8 +156,78 @@ impl CoreRuntime {
         full: bool,
         on_done: impl FnOnce(Result<Vec<u8>>) + Send + 'static,
     ) -> Result<()> {
+        self.terminal_frame_parking(id, viewer, full, false, on_done)
+    }
+
+    /// [`terminal_frame`](Self::terminal_frame) for a viewer that stops pulling when the frame
+    /// is empty (`park`, T34): the next output then sends an `output` event on `term/<id>`.
+    ///
+    /// # Errors
+    ///
+    /// As [`terminal_frame`](Self::terminal_frame).
+    pub fn terminal_frame_parking(
+        &self,
+        id: u32,
+        viewer: u32,
+        full: bool,
+        park: bool,
+        on_done: impl FnOnce(Result<Vec<u8>>) + Send + 'static,
+    ) -> Result<()> {
         self.ensure_running()?;
-        self.shared.terminals.frame(id, viewer, full, on_done)
+        self.shared.terminals.frame(id, viewer, full, park, on_done)
+    }
+
+    /// Moves terminal `id`'s viewport (T34). Never blocks.
+    ///
+    /// # Errors
+    ///
+    /// As [`terminal_write`](Self::terminal_write).
+    pub fn terminal_scroll(&self, id: u32, to: TerminalScroll) -> Result<()> {
+        self.ensure_running()?;
+        self.shared.terminals.scroll(id, to)
+    }
+
+    /// Clears terminal `id`'s selection (T34). Never blocks.
+    ///
+    /// # Errors
+    ///
+    /// As [`terminal_write`](Self::terminal_write).
+    pub fn terminal_clear_selection(&self, id: u32) -> Result<()> {
+        self.ensure_running()?;
+        self.shared.terminals.clear_selection(id)
+    }
+
+    /// The selected text of terminal `id`, on the blocking pool (T34).
+    ///
+    /// # Errors
+    ///
+    /// [`crate::Error::UnknownTerminal`], [`crate::Error::ShuttingDown`]; the rest goes to
+    /// `on_done`.
+    pub fn terminal_selection_text(
+        &self,
+        id: u32,
+        on_done: impl FnOnce(Result<String>) + Send + 'static,
+    ) -> Result<()> {
+        self.ensure_running()?;
+        self.shared.terminals.selection_text(id, on_done)
+    }
+
+    /// The OSC 8 hyperlink at viewport cell (`col`, `row`) of terminal `id`, on the blocking
+    /// pool (T34).
+    ///
+    /// # Errors
+    ///
+    /// [`crate::Error::UnknownTerminal`], [`crate::Error::ShuttingDown`]; the rest goes to
+    /// `on_done`.
+    pub fn terminal_link_at(
+        &self,
+        id: u32,
+        col: u16,
+        row: u16,
+        on_done: impl FnOnce(Result<Option<TerminalLink>>) + Send + 'static,
+    ) -> Result<()> {
+        self.ensure_running()?;
+        self.shared.terminals.link_at(id, col, row, on_done)
     }
 
     /// Closes terminal `id`: hangs up its program, ends its process tree and forgets it (a

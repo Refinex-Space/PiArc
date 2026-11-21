@@ -42,10 +42,13 @@ use std::time::Duration;
 
 use piarc_exec::terminal_tree::{HANGUP_GRACE, TerminalTree};
 use piarc_protocol::terminal::{
-    TerminalCommand, TerminalInfo, TerminalMatch, TerminalPasteOutcome, TerminalTextRange,
+    TerminalCommand, TerminalInfo, TerminalLink, TerminalMatch, TerminalPasteOutcome,
+    TerminalScroll, TerminalTextRange,
 };
 use piarc_term::shell::Integration;
-use piarc_term::vt::{KeyAction, MouseAction, MouseInput, PasteOutcome, TextOptions, TextRange};
+use piarc_term::vt::{
+    KeyAction, MouseAction, MouseInput, PasteOutcome, ScrollTo, TextOptions, TextRange,
+};
 use piarc_term::{Event as TermEvent, Program, Session, SessionConfig, SessionStats, keymap};
 use tokio::runtime::Handle;
 
@@ -112,6 +115,9 @@ pub struct MouseEvent {
     pub x: f32,
     /// Vertical position.
     pub y: f32,
+    /// For a press: clicks in a row (1 single, 2 double, 3 triple); picks the selection unit
+    /// when the program does not track the mouse.
+    pub clicks: u8,
 }
 
 /// What a session terminal needs from Core's state: where files go, the task manager, the
@@ -388,7 +394,71 @@ impl Terminals {
             mods: event.mods & keymap::MODS_MASK,
             x: event.x,
             y: event.y,
+            clicks: event.clicks,
         })?)
+    }
+
+    /// Moves terminal `id`'s viewport. Never blocks.
+    pub(crate) fn scroll(&self, id: u32, to: TerminalScroll) -> Result<()> {
+        let to = match to {
+            TerminalScroll::Top => ScrollTo::Top,
+            TerminalScroll::Bottom => ScrollTo::Bottom,
+            TerminalScroll::Delta { rows } => {
+                ScrollTo::Delta(isize::try_from(rows).unwrap_or(if rows < 0 {
+                    isize::MIN
+                } else {
+                    isize::MAX
+                }))
+            }
+            TerminalScroll::Row { row } => {
+                ScrollTo::Row(usize::try_from(row).unwrap_or(usize::MAX))
+            }
+        };
+        Ok(self.session(id)?.scroll(to)?)
+    }
+
+    /// Clears terminal `id`'s selection. Never blocks.
+    pub(crate) fn clear_selection(&self, id: u32) -> Result<()> {
+        Ok(self.session(id)?.clear_selection()?)
+    }
+
+    /// The selected text of terminal `id` (empty when nothing is selected), on the blocking
+    /// pool.
+    pub(crate) fn selection_text(
+        &self,
+        id: u32,
+        on_done: impl FnOnce(Result<String>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_pool(
+            id,
+            "terminal selection",
+            |session| session.selection_text().map_err(Error::from),
+            on_done,
+        )
+    }
+
+    /// The OSC 8 hyperlink at viewport cell (`col`, `row`) of terminal `id`, on the blocking
+    /// pool.
+    pub(crate) fn link_at(
+        &self,
+        id: u32,
+        col: u16,
+        row: u16,
+        on_done: impl FnOnce(Result<Option<TerminalLink>>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_pool(
+            id,
+            "terminal link",
+            move |session| {
+                Ok(session.link_at(col, row)?.map(|link| TerminalLink {
+                    uri: link.uri,
+                    row: u32::from(link.row),
+                    start: u32::from(link.start),
+                    end: u32::from(link.end),
+                }))
+            },
+            on_done,
+        )
     }
 
     pub(crate) fn focus(&self, id: u32, gained: bool) -> Result<()> {
@@ -422,17 +492,24 @@ impl Terminals {
     }
 
     /// Encodes the next frame for `viewer` on the blocking pool and calls `on_done` there.
+    /// With `park` the viewer stops pulling if the frame is empty and the next output sends
+    /// an `output` event on `term/<id>`.
     pub(crate) fn frame(
         &self,
         id: u32,
         viewer: u32,
         full: bool,
+        park: bool,
         on_done: impl FnOnce(Result<Vec<u8>>) + Send + 'static,
     ) -> Result<()> {
         self.on_pool(
             id,
             "terminal frame",
-            move |session| session.frame(viewer, full).map_err(Error::from),
+            move |session| {
+                session
+                    .frame_parking(viewer, full, park)
+                    .map_err(Error::from)
+            },
             on_done,
         )
     }

@@ -261,6 +261,7 @@ fn click(action: MouseAction, button: Option<u8>, x: f32, y: f32) -> MouseInput 
         mods: 0,
         x,
         y,
+        clicks: 1,
     }
 }
 
@@ -439,4 +440,166 @@ fn a_search_holds_the_terminal_only_while_it_feeds() {
         longest < Duration::from_millis(50),
         "the writer waited {longest:?} for the terminal"
     );
+}
+
+const CELL: SurfaceGeometry = SurfaceGeometry {
+    cell_width: 10,
+    cell_height: 20,
+};
+
+/// The left part of viewport cell (`col`, `row`) in surface pixels of `CELL`: a press there
+/// starts the selection at that cell.
+fn at(col: u16, row: u16) -> PointerAt {
+    PointerAt {
+        x: f32::from(col) * 10.0 + 2.0,
+        y: f32::from(row) * 20.0 + 10.0,
+    }
+}
+
+/// The right part of the cell: a drag there includes it (a drag includes a cell once the
+/// pointer passes its middle, as terminals do).
+fn to(col: u16, row: u16) -> PointerAt {
+    PointerAt {
+        x: f32::from(col) * 10.0 + 8.0,
+        y: f32::from(row) * 20.0 + 10.0,
+    }
+}
+
+/// The selected columns of each viewport row, from a fresh render state.
+fn selected_columns(t: &mut Terminal) -> Vec<Option<(u16, u16)>> {
+    let mut state = RenderState::new().expect("state");
+    state.begin_update(t).expect("begin");
+    state.end_update().expect("end");
+    let mut rows = Vec::new();
+    state
+        .for_each_row(|row| {
+            rows.push(row.selection()?);
+            Ok(())
+        })
+        .expect("rows");
+    rows
+}
+
+#[test]
+fn a_drag_selects_cells_and_the_text_is_copied_unwrapped() {
+    let mut t = terminal(10, 3);
+    t.write(b"hello world, wrapped\r\nnext");
+    let mut gesture = SelectionGesture::new().expect("gesture");
+    gesture
+        .press(&mut t, CELL, at(6, 0), 1, false)
+        .expect("press");
+    assert!(
+        !has_selection(&mut t).expect("query"),
+        "a click alone selects nothing"
+    );
+    gesture.drag(&mut t, CELL, to(3, 1)).expect("drag");
+    gesture.release(&mut t, CELL, to(3, 1)).expect("release");
+    assert_eq!(
+        selected_columns(&mut t),
+        [Some((6, 9)), Some((0, 3)), None],
+        "frames carry the selection as each row's columns"
+    );
+    // Rows the terminal wrapped come back as one line.
+    assert_eq!(selection_text(&mut t).expect("text"), "world, w");
+    gesture
+        .press(&mut t, CELL, at(0, 2), 1, false)
+        .expect("press");
+    assert!(
+        !has_selection(&mut t).expect("query"),
+        "a new click clears it"
+    );
+    assert_eq!(selection_text(&mut t).expect("text"), "");
+    gesture.free(&mut t);
+}
+
+#[test]
+fn double_and_triple_clicks_select_a_word_and_a_line() {
+    let mut t = terminal(30, 3);
+    t.write(b"cargo test --release\r\nsecond line");
+    let mut gesture = SelectionGesture::new().expect("gesture");
+    gesture.press(&mut t, CELL, at(7, 0), 1, false).expect("1");
+    gesture.release(&mut t, CELL, at(7, 0)).expect("up");
+    gesture.press(&mut t, CELL, at(7, 0), 2, false).expect("2");
+    gesture.release(&mut t, CELL, at(7, 0)).expect("up");
+    assert_eq!(selection_text(&mut t).expect("word"), "test");
+    gesture.press(&mut t, CELL, at(7, 0), 3, false).expect("3");
+    gesture.release(&mut t, CELL, at(7, 0)).expect("up");
+    assert_eq!(
+        selection_text(&mut t).expect("line"),
+        "cargo test --release"
+    );
+    // A press counted as a new single click is not a double click, however close in time.
+    gesture.press(&mut t, CELL, at(2, 1), 1, false).expect("1");
+    gesture.release(&mut t, CELL, at(2, 1)).expect("up");
+    assert!(!has_selection(&mut t).expect("query"));
+    gesture.free(&mut t);
+}
+
+#[test]
+fn shift_extends_the_selection_and_clearing_removes_it() {
+    let mut t = terminal(20, 2);
+    t.write(b"alpha beta gamma");
+    let mut gesture = SelectionGesture::new().expect("gesture");
+    gesture
+        .press(&mut t, CELL, at(0, 0), 1, false)
+        .expect("press");
+    gesture.drag(&mut t, CELL, to(4, 0)).expect("drag");
+    gesture.release(&mut t, CELL, to(4, 0)).expect("release");
+    assert_eq!(selection_text(&mut t).expect("text"), "alpha");
+    gesture
+        .press(&mut t, CELL, at(9, 0), 1, true)
+        .expect("shift press");
+    gesture.release(&mut t, CELL, at(9, 0)).expect("release");
+    assert_eq!(selection_text(&mut t).expect("text"), "alpha beta");
+    clear_selection(&mut t).expect("clear");
+    assert!(!has_selection(&mut t).expect("query"));
+    assert_eq!(selected_columns(&mut t), [None, None]);
+    gesture.free(&mut t);
+}
+
+#[test]
+fn the_viewport_scrolls_through_the_scrollback() {
+    let mut t = terminal(20, 4);
+    for i in 0..30 {
+        t.write(format!("line {i}\r\n").as_bytes());
+    }
+    let bottom = t.scrollbar();
+    assert_eq!(bottom.len, 4);
+    assert_eq!(
+        bottom.offset + bottom.len,
+        bottom.total,
+        "starts at the bottom"
+    );
+    scroll_viewport(&mut t, ScrollTo::Delta(-5)).expect("up");
+    assert_eq!(t.scrollbar().offset, bottom.offset - 5);
+    scroll_viewport(&mut t, ScrollTo::Row(2)).expect("row");
+    assert_eq!(t.scrollbar().offset, 2);
+    assert!(viewport_text(&mut t).expect("text").starts_with("line 2"));
+    scroll_viewport(&mut t, ScrollTo::Top).expect("top");
+    assert_eq!(t.scrollbar().offset, 0);
+    scroll_viewport(&mut t, ScrollTo::Bottom).expect("bottom");
+    assert_eq!(t.scrollbar(), bottom);
+}
+
+#[test]
+fn osc_8_links_are_found_with_their_extent() {
+    let mut t = terminal(40, 2);
+    t.write(b"see \x1b]8;;https://example.com/a?b=1\x1b\\the docs\x1b]8;;\x1b\\ here");
+    assert_eq!(
+        link_at(&mut t, 0, 0).expect("none"),
+        None,
+        "plain text has no link"
+    );
+    let link = link_at(&mut t, 6, 0).expect("link").expect("a link");
+    assert_eq!(
+        link,
+        Link {
+            uri: "https://example.com/a?b=1".into(),
+            row: 0,
+            start: 4,
+            end: 11,
+        }
+    );
+    assert_eq!(link_at(&mut t, 12, 0).expect("after"), None);
+    assert_eq!(link_at(&mut t, 99, 9).expect("outside"), None);
 }

@@ -25,6 +25,7 @@ mod key;
 mod mouse;
 mod render;
 mod search;
+mod selection;
 pub mod snapshot;
 mod terminal;
 mod tracked;
@@ -35,6 +36,10 @@ pub use key::{KeyAction, KeyEncoder, KeyInput};
 pub use mouse::{MouseAction, MouseEncoder, MouseGeometry, MouseInput, focus_report};
 pub use render::{CellData, RenderState, RowId, RowReader};
 pub use search::{SearchMatch, SearchStats, search};
+pub use selection::{
+    Link, PointerAt, ScrollTo, SelectionGesture, SurfaceGeometry, clear_selection, has_selection,
+    link_at, scroll_viewport, selection_text,
+};
 pub use terminal::{
     ActiveScreen, CLIPBOARD_WRITE_MAX_BYTES, CONTINUATION_MAX_BYTES, MODE_BRACKETED_PASTE,
     MODE_FOCUS_EVENTS, PasteOutcome, Scrollbar, Terminal,

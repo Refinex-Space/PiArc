@@ -34,6 +34,7 @@ pub(super) fn to_protocol(event: &TermEvent) -> TerminalEvent {
         TermEvent::Failed { reason } => TerminalEvent::Failed {
             reason: reason.clone(),
         },
+        TermEvent::Output => TerminalEvent::Output,
     }
 }
 

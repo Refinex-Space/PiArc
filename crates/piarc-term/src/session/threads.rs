@@ -14,18 +14,23 @@ use super::{Event, EventHandler, Probe, Shared, lock, nanos, pty_size, spawn_err
 use crate::commands::CommandChange;
 use crate::error::Result;
 use crate::vt::{
-    EffectsOutput, KeyEncoder, KeyInput, MODE_FOCUS_EVENTS, MouseEncoder, MouseInput, PasteOutcome,
-    focus_report,
+    self, EffectsOutput, KeyEncoder, KeyInput, MODE_FOCUS_EVENTS, MouseEncoder, MouseInput,
+    PasteOutcome, ScrollTo, SelectionGesture, focus_report,
 };
 
 /// Size of one PTY read.
 const READ_CHUNK: usize = 64 * 1024;
 
 pub(super) enum WriterMessage {
+    /// Bytes for the program that are not input (query replies).
     Bytes(Vec<u8>),
+    /// Input as typed (committed input-method text, an approved command).
+    Input(Vec<u8>),
     Key(KeyInput),
     Mouse(MouseInput),
     Focus(bool),
+    Scroll(ScrollTo),
+    ClearSelection,
     Paste {
         text: String,
         allow_unsafe: bool,
@@ -53,6 +58,7 @@ pub(super) struct Workers {
     pub master: Box<dyn MasterPty + Send>,
     pub keys: KeyEncoder,
     pub mouse: MouseEncoder,
+    pub gesture: SelectionGesture,
     pub messages: Receiver<WriterMessage>,
     pub writer: SyncSender<WriterMessage>,
     pub on_event: EventHandler,
@@ -84,6 +90,7 @@ pub(super) fn start(shared: &Arc<Shared>, workers: Workers) -> Result<()> {
         master,
         keys,
         mouse,
+        gesture,
         messages,
         writer,
         on_event,
@@ -99,8 +106,11 @@ pub(super) fn start(shared: &Arc<Shared>, workers: Workers) -> Result<()> {
                     &messages,
                     output,
                     master.as_ref(),
-                    keys,
-                    mouse,
+                    Encoders {
+                        keys,
+                        mouse,
+                        pointer: super::pointer::Pointer::new(gesture),
+                    },
                 );
             });
         })
@@ -173,6 +183,9 @@ fn io_loop(
             let _ = writer.send(WriterMessage::Bytes(std::mem::take(&mut effects.replies)));
         }
         report(effects, changes, on_event);
+        if shared.wake.swap(false, Ordering::AcqRel) {
+            on_event(Event::Output);
+        }
     }
 }
 
@@ -275,89 +288,145 @@ fn percent_decode(text: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
+/// The writer thread's encoders and pointer state.
+struct Encoders {
+    keys: KeyEncoder,
+    mouse: MouseEncoder,
+    pointer: super::pointer::Pointer,
+}
+
 fn writer_loop(
     shared: &Shared,
     messages: &Receiver<WriterMessage>,
     mut output: Box<dyn Write + Send>,
     master: &(dyn MasterPty + Send),
-    mut keys: KeyEncoder,
-    mut mouse: MouseEncoder,
+    mut encoders: Encoders,
 ) {
     let mut encoded = Vec::new();
     for message in messages {
         encoded.clear();
         // Write errors mean the program is gone; the IO thread reports the exit.
         match message {
-            WriterMessage::Bytes(bytes) => {
-                let _ = output.write_all(&bytes).and_then(|()| output.flush());
-            }
-            WriterMessage::Key(input) => {
-                let synced = keys.sync(&mut lock(&shared.terminal));
-                if synced
-                    .and_then(|()| keys.encode(&input, &mut encoded))
-                    .is_ok()
-                {
-                    write(&mut output, &encoded);
-                }
-            }
-            WriterMessage::Mouse(input) => {
-                let geometry = *lock(&shared.geometry);
-                let synced = mouse.sync(&mut lock(&shared.terminal), geometry);
-                if synced
-                    .and_then(|()| mouse.encode(&input, &mut encoded))
-                    .is_ok()
-                {
-                    write(&mut output, &encoded);
-                }
-            }
-            WriterMessage::Focus(gained) => {
-                if lock(&shared.terminal).mode(MODE_FOCUS_EVENTS, false)
-                    && let Ok(report) = focus_report(gained)
-                {
-                    write(&mut output, &report);
-                }
-            }
-            WriterMessage::Paste {
-                text,
-                allow_unsafe,
-                done,
-            } => {
-                let result = {
-                    let mut terminal = lock(&shared.terminal);
-                    // The terminal writes the paste through WRITE_PTY: collect it right away,
-                    // while no output has been written in between.
-                    terminal
-                        .paste(&text, allow_unsafe)
-                        .map(|outcome| (outcome, terminal.take_effects().replies))
-                };
-                let result = result.map(|(outcome, bytes)| {
-                    write(&mut output, &bytes);
-                    outcome
-                });
-                let _ = done.send(result);
-            }
-            WriterMessage::Resize {
-                cols,
-                rows,
-                cell_width,
-                cell_height,
-            } => {
-                let resized = lock(&shared.terminal).resize(cols, rows, cell_width, cell_height);
-                if resized.is_ok() {
-                    *lock(&shared.geometry) = super::geometry(cols, rows, cell_width, cell_height);
-                    let _ = master.resize(pty_size(cols, rows, cell_width, cell_height));
-                }
-            }
-            WriterMessage::Probe { byte, done } => {
-                *lock(&shared.probe) = Some(Probe {
-                    byte,
-                    written: Instant::now(),
-                    done,
-                });
-                write(&mut output, &[byte]);
-            }
             WriterMessage::ProgramExited => break,
+            message => handle(
+                shared,
+                message,
+                &mut output,
+                master,
+                &mut encoders,
+                &mut encoded,
+            ),
         }
+    }
+    encoders.pointer.free(&mut lock(&shared.terminal));
+}
+
+fn handle(
+    shared: &Shared,
+    message: WriterMessage,
+    output: &mut Box<dyn Write + Send>,
+    master: &(dyn MasterPty + Send),
+    encoders: &mut Encoders,
+    encoded: &mut Vec<u8>,
+) {
+    match message {
+        WriterMessage::Bytes(bytes) => write(output, &bytes),
+        WriterMessage::Input(bytes) => {
+            if !bytes.is_empty() {
+                after_input(shared);
+            }
+            write(output, &bytes);
+        }
+        WriterMessage::Key(input) => {
+            let keys = &mut encoders.keys;
+            let synced = keys.sync(&mut lock(&shared.terminal));
+            if synced.and_then(|()| keys.encode(&input, encoded)).is_ok() {
+                if !encoded.is_empty() {
+                    after_input(shared);
+                }
+                write(output, encoded);
+            }
+        }
+        WriterMessage::Mouse(input) => {
+            let Encoders {
+                keys,
+                mouse,
+                pointer,
+            } = encoders;
+            pointer.handle(shared, &input, mouse, keys, encoded);
+            write(output, encoded);
+        }
+        WriterMessage::Focus(gained) => {
+            if lock(&shared.terminal).mode(MODE_FOCUS_EVENTS, false)
+                && let Ok(report) = focus_report(gained)
+            {
+                write(output, &report);
+            }
+        }
+        WriterMessage::Scroll(to) => {
+            let _ = vt::scroll_viewport(&mut lock(&shared.terminal), to);
+        }
+        WriterMessage::ClearSelection => {
+            let _ = vt::clear_selection(&mut lock(&shared.terminal));
+        }
+        WriterMessage::Paste {
+            text,
+            allow_unsafe,
+            done,
+        } => {
+            let _ = done.send(paste(shared, &text, allow_unsafe, output));
+        }
+        WriterMessage::Resize {
+            cols,
+            rows,
+            cell_width,
+            cell_height,
+        } => {
+            let resized = lock(&shared.terminal).resize(cols, rows, cell_width, cell_height);
+            if resized.is_ok() {
+                *lock(&shared.geometry) = super::geometry(cols, rows, cell_width, cell_height);
+                let _ = master.resize(pty_size(cols, rows, cell_width, cell_height));
+            }
+        }
+        WriterMessage::Probe { byte, done } => {
+            *lock(&shared.probe) = Some(Probe {
+                byte,
+                written: Instant::now(),
+                done,
+            });
+            write(output, &[byte]);
+        }
+        WriterMessage::ProgramExited => {}
+    }
+}
+
+fn paste(
+    shared: &Shared,
+    text: &str,
+    allow_unsafe: bool,
+    output: &mut Box<dyn Write + Send>,
+) -> Result<PasteOutcome> {
+    let (outcome, bytes) = {
+        let mut terminal = lock(&shared.terminal);
+        // The terminal writes the paste through WRITE_PTY: collect it right away, while no
+        // output has been written in between.
+        let outcome = terminal.paste(text, allow_unsafe)?;
+        (outcome, terminal.take_effects().replies)
+    };
+    if outcome == PasteOutcome::Pasted {
+        after_input(shared);
+    }
+    write(output, &bytes);
+    Ok(outcome)
+}
+
+/// Typing brings the viewport back to where the program writes and drops the selection, as
+/// terminals do.
+fn after_input(shared: &Shared) {
+    let mut terminal = lock(&shared.terminal);
+    let _ = vt::scroll_viewport(&mut terminal, ScrollTo::Bottom);
+    if vt::has_selection(&mut terminal).unwrap_or(false) {
+        let _ = vt::clear_selection(&mut terminal);
     }
 }
 

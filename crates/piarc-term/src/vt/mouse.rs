@@ -35,6 +35,10 @@ pub struct MouseInput {
     pub x: f32,
     /// Vertical position in pixels.
     pub y: f32,
+    /// For a press: the viewer's count of clicks in a row at this place (1 single, 2 double,
+    /// 3 triple; `MouseEvent.detail`), which picks cell, word or line selection when the
+    /// program does not track the mouse. Ignored by the encoder.
+    pub clicks: u8,
 }
 
 /// Geometry the encoder turns pixels into cells with.

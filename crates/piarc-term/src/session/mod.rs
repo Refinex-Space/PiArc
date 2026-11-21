@@ -35,6 +35,7 @@
 //! up to the owner, with [`Session::pid`] and [`Session::tty`] (Core does it with
 //! `piarc-exec`).
 
+mod pointer;
 mod threads;
 
 use std::path::PathBuf;
@@ -50,8 +51,8 @@ use crate::error::{Error, Result};
 use crate::frame::{EncodeStats, FrameEncoder};
 use crate::snapshot::{Restored, Saved};
 use crate::vt::{
-    self, ActiveScreen, KeyEncoder, KeyInput, MouseEncoder, MouseGeometry, MouseInput,
-    PasteOutcome, SearchMatch, Terminal, TextOptions, TextRange,
+    self, ActiveScreen, KeyEncoder, KeyInput, Link, MouseEncoder, MouseGeometry, MouseInput,
+    PasteOutcome, ScrollTo, SearchMatch, SelectionGesture, Terminal, TextOptions, TextRange,
 };
 use threads::{Workers, WriterMessage};
 
@@ -158,6 +159,9 @@ pub enum Event {
         /// What failed.
         reason: String,
     },
+    /// Output arrived after a frame pulled with `park` ([`Session::frame_parking`]): the viewer
+    /// that stopped pulling while nothing changed should pull again. Sent once per parking.
+    Output,
 }
 
 /// Receives [`Event`]s, on the IO thread. Must not block for long: output waits meanwhile.
@@ -242,6 +246,32 @@ struct Shared {
     failed: AtomicBool,
     now: Now,
     geometry: Mutex<MouseGeometry>,
+    /// A viewer parked (stopped pulling) after a frame: the next output sends [`Event::Output`].
+    wake: AtomicBool,
+}
+
+impl Shared {
+    fn new(terminal: Terminal, frames: FrameEncoder, config: &SessionConfig) -> Self {
+        Self {
+            terminal: Mutex::new(terminal),
+            commands: Mutex::new(CommandLog::default()),
+            generation: Mutex::new(0),
+            changed: Condvar::new(),
+            frames: Mutex::new(frames),
+            counters: Counters::default(),
+            probe: Mutex::new(None),
+            exit: Mutex::new(None),
+            failed: AtomicBool::new(false),
+            now: config.now.clone().unwrap_or_else(|| Arc::new(Instant::now)),
+            geometry: Mutex::new(geometry(
+                config.cols,
+                config.rows,
+                config.cell_width,
+                config.cell_height,
+            )),
+            wake: AtomicBool::new(false),
+        }
+    }
 }
 
 /// Locks `mutex`, recovering the data after a panic elsewhere: every critical section leaves
@@ -284,8 +314,11 @@ impl Session {
     ) -> Result<(Self, Option<Restored>)> {
         let (terminal, restored) = initial_terminal(&mut config)?;
         let frames = FrameEncoder::new()?;
-        let keys = KeyEncoder::new()?;
-        let mouse = MouseEncoder::new()?;
+        let (keys, mouse, gesture) = (
+            KeyEncoder::new()?,
+            MouseEncoder::new()?,
+            SelectionGesture::new()?,
+        );
         let pair = native_pty_system()
             .openpty(pty_size(
                 config.cols,
@@ -317,25 +350,7 @@ impl Session {
             .master
             .take_writer()
             .map_err(|error| spawn_error("write the PTY", &error))?;
-        let now = config.now.clone().unwrap_or_else(|| Arc::new(Instant::now));
-        let shared = Arc::new(Shared {
-            terminal: Mutex::new(terminal),
-            commands: Mutex::new(CommandLog::default()),
-            generation: Mutex::new(0),
-            changed: Condvar::new(),
-            frames: Mutex::new(frames),
-            counters: Counters::default(),
-            probe: Mutex::new(None),
-            exit: Mutex::new(None),
-            failed: AtomicBool::new(false),
-            now,
-            geometry: Mutex::new(geometry(
-                config.cols,
-                config.rows,
-                config.cell_width,
-                config.cell_height,
-            )),
-        });
+        let shared = Arc::new(Shared::new(terminal, frames, &config));
         let (tx, rx) = mpsc::sync_channel(WRITER_QUEUE);
         threads::start(
             &shared,
@@ -346,6 +361,7 @@ impl Session {
                 master: pair.master,
                 keys,
                 mouse,
+                gesture,
                 messages: rx,
                 writer: tx.clone(),
                 on_event,
@@ -390,14 +406,15 @@ impl Session {
         self.tty.as_deref()
     }
 
-    /// Writes `bytes` to the program as they are (committed input-method text). Never blocks.
+    /// Writes `bytes` to the program as they are (committed input-method text). Like typing,
+    /// it brings the viewport back to the bottom and clears the selection. Never blocks.
     ///
     /// # Errors
     ///
     /// [`Error::Closed`] after [`close`](Self::close); [`Error::Busy`] when the input queue is
     /// full.
     pub fn write(&self, bytes: Vec<u8>) -> Result<()> {
-        self.send(WriterMessage::Bytes(bytes))
+        self.send(WriterMessage::Input(bytes))
     }
 
     /// Encodes `input` with the terminal's current modes and writes the result. Never blocks.
@@ -409,8 +426,13 @@ impl Session {
         self.send(WriterMessage::Key(input))
     }
 
-    /// Encodes a mouse event with the terminal's current mouse mode and format and writes the
-    /// result; nothing when the program does not track mouse events. Never blocks.
+    /// A pointer event of the viewer (T34). While the program tracks the mouse it is encoded
+    /// with the terminal's mouse mode and format and written; otherwise (and for the left
+    /// button with Shift held) it selects: a press starts a selection gesture (`clicks` 2
+    /// selects a word, 3 a line; Shift extends the selection), motion with the button held
+    /// drags it, a release ends it. The wheel (buttons 4 and 5) scrolls the viewport, or on the
+    /// alternate screen with alternate scroll mode (1007) sends the arrow keys. Events are
+    /// handled in order with key input. Never blocks.
     ///
     /// # Errors
     ///
@@ -476,6 +498,44 @@ impl Session {
         })
     }
 
+    /// Moves the viewport (the scrollback, the find bar's jumps). Never blocks.
+    ///
+    /// # Errors
+    ///
+    /// As [`write`](Self::write).
+    pub fn scroll(&self, to: ScrollTo) -> Result<()> {
+        self.send(WriterMessage::Scroll(to))
+    }
+
+    /// Clears the selection, after the pointer events and keys already queued. Never blocks.
+    ///
+    /// # Errors
+    ///
+    /// As [`write`](Self::write).
+    pub fn clear_selection(&self) -> Result<()> {
+        self.send(WriterMessage::ClearSelection)
+    }
+
+    /// The selected text (wrapped rows joined, trailing spaces trimmed), empty when nothing is
+    /// selected. Takes the terminal's lock; call it off the JavaScript thread.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Vt`] when libghostty-vt fails.
+    pub fn selection_text(&self) -> Result<String> {
+        vt::selection_text(&mut lock(&self.shared.terminal))
+    }
+
+    /// The OSC 8 hyperlink at viewport cell (`col`, `row`), if any. Takes the terminal's lock;
+    /// call it off the JavaScript thread.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Vt`] when libghostty-vt fails.
+    pub fn link_at(&self, col: u16, row: u16) -> Result<Option<Link>> {
+        vt::link_at(&mut lock(&self.shared.terminal), col, row)
+    }
+
     /// Whether programs may put text on the clipboard (OSC 52).
     pub fn set_clipboard_write(&self, allowed: bool) {
         lock(&self.shared.terminal).set_clipboard_write(allowed);
@@ -490,11 +550,26 @@ impl Session {
     ///
     /// [`Error::Vt`] when libghostty-vt fails; the next frame then resets the viewer.
     pub fn frame(&self, viewer: u32, full: bool) -> Result<Vec<u8>> {
+        self.frame_parking(viewer, full, false)
+    }
+
+    /// [`frame`](Self::frame) for a viewer that stops pulling when this frame is empty
+    /// (`park`): output that arrives after the terminal was read for this frame sends
+    /// [`Event::Output`] once, so the viewer knows to pull again. Arming happens under the
+    /// terminal's lock, so no output can slip between the frame and the arming.
+    ///
+    /// # Errors
+    ///
+    /// As [`frame`](Self::frame).
+    pub fn frame_parking(&self, viewer: u32, full: bool, park: bool) -> Result<Vec<u8>> {
         let started = Instant::now();
         let mut frames = lock(&self.shared.frames);
         frames.prepare(viewer, full);
         let (held, updated, scrollbar) = {
             let mut terminal = lock(&self.shared.terminal);
+            if park {
+                self.shared.wake.store(true, Ordering::Release);
+            }
             let now = (self.shared.now)();
             let (held, updated) = update_locked(&mut terminal, &mut frames, now)?;
             (held, updated, terminal.scrollbar())
@@ -504,6 +579,10 @@ impl Session {
         }
         let (bytes, stats) = frames.encode(held, scrollbar)?;
         drop(frames);
+        if park && !stats.empty {
+            // The viewer keeps pulling: no wake needed.
+            self.shared.wake.store(false, Ordering::Release);
+        }
         self.count_frame(&bytes, stats, started.elapsed());
         Ok(bytes)
     }
