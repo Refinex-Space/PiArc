@@ -1532,6 +1532,8 @@ textarea.input {
   float: inline-end;
 }
 :root[data-app] .diff-gutter-button {
+  /* WCAG 2.5.8: line numbers are targets, 24 px apart. */
+  min-height: 24px;
   min-width: 2.5em;
   padding: 0 var(--piarc-space-1);
   border: 0;

@@ -43,12 +43,13 @@ export function OutputStyleDialog({
         {t('outputStyle.title')}
       </h2>
       <p className="muted">{t('outputStyle.note')}</p>
-      <ul className="style-list" role="listbox" aria-labelledby={titleId}>
+      <ul className="style-list" aria-labelledby={titleId}>
         {styles.map((style) => (
-          <li key={style.name} role="option" aria-selected={style.name === current}>
+          <li key={style.name}>
             <button
               type="button"
               className={style.name === current ? 'style-choice is-current' : 'style-choice'}
+              aria-current={style.name === current ? 'true' : undefined}
               data-style={style.name}
               {...(style.name === current ? { 'data-autofocus': true } : {})}
               onClick={() => {

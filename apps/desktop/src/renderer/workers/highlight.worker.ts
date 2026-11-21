@@ -9,9 +9,7 @@ import {
   type HighlightResponse,
   type HighlightToken,
 } from '../transcript/highlight/protocol.js';
-
-const LIGHT_THEME = 'github-light';
-const DARK_THEME = 'github-dark';
+import { DARK_THEME, LIGHT_THEME, THEMES } from '../transcript/highlight/themes.js';
 
 /** One loader per language id of transcript/highlight/languages.ts, so Vite splits them. */
 const GRAMMARS: Readonly<Record<string, LanguageInput>> = {
@@ -53,7 +51,7 @@ const loading = new Map<string, Promise<void>>();
 
 function getHighlighter(): Promise<HighlighterCore> {
   highlighter ??= createHighlighterCore({
-    themes: [import('@shikijs/themes/github-light'), import('@shikijs/themes/github-dark')],
+    themes: [...THEMES],
     langs: [],
     // `forgiving` skips the few grammar patterns JavaScript regular expressions cannot express.
     engine: createJavaScriptRegexEngine({ forgiving: true }),

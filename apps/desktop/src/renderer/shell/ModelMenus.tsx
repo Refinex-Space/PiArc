@@ -140,6 +140,7 @@ export function ModelMenus({
             if (!chosen || !busy) close();
           }}
           testId={chosen ? 'model-switch-dialog' : 'model-menu'}
+          focusKey={chosen ? 'preview' : 'menu'}
         >
           {chosen ? (
             <>

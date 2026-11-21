@@ -1,6 +1,9 @@
-// The system color scheme, for choosing between the light and dark token colors of highlighted
-// code.
+// Whether highlighted code takes its dark token colors: the app's theme choice, and the system
+// color scheme when the choice is "system" (I186: following the system alone put light colors on
+// the dark theme's backgrounds).
 import { useSyncExternalStore } from 'react';
+
+import { useApp } from '../app/app-context.js';
 
 const QUERY = '(prefers-color-scheme: dark)';
 
@@ -13,5 +16,7 @@ function subscribe(listener: () => void): () => void {
 }
 
 export function useDarkScheme(): boolean {
-  return useSyncExternalStore(subscribe, () => window.matchMedia(QUERY).matches);
+  const theme = useApp().preferences.appearance.theme;
+  const systemDark = useSyncExternalStore(subscribe, () => window.matchMedia(QUERY).matches);
+  return theme === 'system' ? systemDark : theme === 'dark';
 }

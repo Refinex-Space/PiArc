@@ -1,0 +1,82 @@
+{
+  "id": "t43-tools",
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "cmd1",
+          "name": "Bash",
+          "input": { "command": "env echo hello", "description": "Say hello" }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        { "id": "write1", "name": "Write", "input": { "path": "made.txt", "content": "made\n" } }
+      ]
+    },
+    {
+      "tool_calls": [
+        { "id": "outside1", "name": "Read", "input": { "path": "../outside 外部.txt" } }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "todo1",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              { "content": "Say hello", "status": "completed", "activeForm": "Saying hello" },
+              {
+                "content": "Write the file",
+                "status": "in_progress",
+                "activeForm": "Writing the file"
+              },
+              {
+                "content": "Ask a question",
+                "status": "pending",
+                "activeForm": "Asking a question"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "ask1",
+          "name": "AskUserQuestion",
+          "input": {
+            "questions": [
+              {
+                "question": "Which database?",
+                "header": "Database",
+                "options": [
+                  { "label": "SQLite", "description": "One file" },
+                  { "label": "Postgres", "description": "A server" }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "next1",
+          "name": "SuggestNextSteps",
+          "input": {
+            "suggestions": [
+              { "title": "Run the tests", "prompt": "Run the whole test suite." },
+              { "title": "Write the release note", "prompt": "Write a release note." }
+            ]
+          }
+        }
+      ]
+    },
+    { "text": "All done." }
+  ]
+}

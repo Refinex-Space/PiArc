@@ -1,5 +1,6 @@
 // A modal dialog: focus moves into it when it opens and back when it closes, Tab stays inside,
-// Escape cancels (unless an input method is composing).
+// Escape cancels (unless an input method is composing). A dialog whose content changes in place
+// (`focusKey`) moves focus to the new content: the control that had it is gone.
 import { useEffect, useRef, type ReactNode } from 'react';
 
 import { isImeComposing } from '../composer/ime-guard.js';
@@ -13,25 +14,30 @@ export function Dialog({
   children,
   testId,
   wide = false,
+  focusKey,
 }: {
   readonly labelledBy: string;
   readonly onCancel: () => void;
   readonly children: ReactNode;
   readonly testId?: string;
   readonly wide?: boolean;
+  /** Changes when the content is replaced in place. */
+  readonly focusKey?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const dialog = ref.current;
-    const first =
-      dialog?.querySelector<HTMLElement>('[data-autofocus]') ??
-      dialog?.querySelector<HTMLElement>(FOCUSABLE);
-    first?.focus();
     return () => {
       previous?.focus();
     };
   }, []);
+  useEffect(() => {
+    const dialog = ref.current;
+    const first =
+      dialog?.querySelector<HTMLElement>('[data-autofocus]') ??
+      dialog?.querySelector<HTMLElement>(FOCUSABLE);
+    (first ?? dialog)?.focus();
+  }, [focusKey]);
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (isImeComposing(event.nativeEvent)) {
       return;

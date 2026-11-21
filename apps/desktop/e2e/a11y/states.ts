@@ -41,7 +41,7 @@ export const A11Y_STATES = [
     id: 'settings:skills',
     area: 'settings',
     page: 'skills',
-    note: 'Skills and plugins, a plugin waiting for confirmation',
+    note: 'Skills and plugins with an installed plugin (off)',
   },
   { id: 'settings:mcp', area: 'settings', page: 'mcp', note: 'MCP servers' },
   { id: 'settings:usage', area: 'settings', page: 'usage', note: 'Usage' },

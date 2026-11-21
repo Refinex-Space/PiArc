@@ -321,7 +321,7 @@ export function TasksPanel({ sessionId }: { readonly sessionId: string | undefin
         const title = sessions.find((s) => s.id === group.id)?.title ?? group.id;
         return (
           <section key={group.id} className="bg-task-group">
-            <h3 className="bg-task-group-title">{t('bgTasks.otherSession', { title })}</h3>
+            <h2 className="bg-task-group-title">{t('bgTasks.otherSession', { title })}</h2>
             <ul className="bg-task-list">
               {group.tasks.map((task) => (
                 <li

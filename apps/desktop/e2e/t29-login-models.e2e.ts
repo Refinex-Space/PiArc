@@ -5,95 +5,18 @@
 // the main process's confirmation, whose shell.openExternal is replaced by a fetch that follows
 // the redirect to the Agent Host's loopback server, as the user's browser would.
 // Screenshots go to tmp/evidence/T29/ with PIARC_EVIDENCE_TASK=T29.
-import { spawn } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import os from 'node:os';
+import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { createInterface } from 'node:readline';
 
-import type { ElectronApplication, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
+import { browserDouble, PROVIDER, PROVIDER_FILE, startAuth, writeProvider } from './oauth.js';
 import { settingsWindow } from './provider-settings.js';
 import { expect, test } from './sessions.js';
 
 const repoRoot = path.join(import.meta.dirname, '..', '..', '..');
 const EVIDENCE = path.join(repoRoot, 'tmp', 'evidence', process.env.PIARC_EVIDENCE_TASK ?? 'L4');
-/** The `--test-oauth-provider` file every Agent Host of the app reads when it starts. */
-const PROVIDER_FILE = path.join(os.tmpdir(), `piarc-t29-oauth-${String(process.pid)}.json`);
-const PROVIDER = 'piarc-test-oauth';
-
 test.use({ appEnv: { PIARC_TEST_OAUTH_PROVIDER: PROVIDER_FILE } });
-
-interface AuthServer {
-  readonly base: string;
-  stop(): void;
-  decide(behavior: 'approve' | 'deny' | 'expire'): void;
-}
-
-async function startAuth(): Promise<AuthServer> {
-  const child = spawn(
-    'cargo',
-    [
-      'run',
-      '-q',
-      '--locked',
-      '-p',
-      'piarc-testkit',
-      '--bin',
-      'piarc-mock-auth',
-      '--',
-      '--port',
-      '0',
-      // About three seconds of polling: long enough to see (and capture) the device code.
-      '--pending-polls',
-      '30',
-    ],
-    { cwd: repoRoot, stdio: ['pipe', 'pipe', 'inherit'] },
-  );
-  const lines = createInterface({ input: child.stdout });
-  const port = await new Promise<string>((resolve, reject) => {
-    lines.once('line', resolve);
-    child.once('exit', (code) => {
-      reject(new Error(`piarc-mock-auth exited with ${String(code)}`));
-    });
-  });
-  lines.close();
-  return {
-    base: `http://127.0.0.1:${port.trim()}`,
-    stop: () => child.stdin.end(),
-    decide: (behavior) => {
-      child.stdin.write(`${behavior}\n`);
-    },
-  };
-}
-
-async function writeProvider(auth: AuthServer, mockBase: string, flow: string): Promise<void> {
-  await writeFile(
-    PROVIDER_FILE,
-    JSON.stringify({
-      id: PROVIDER,
-      baseUrl: `${mockBase}/v1`,
-      tokenUrl: `${auth.base}/token`,
-      authorizeUrl: `${auth.base}/authorize`,
-      deviceUrl: `${auth.base}/device`,
-      flow,
-      models: [{ id: 'oauth-model', contextWindow: 32_000, maxTokens: 1024 }],
-    }),
-  );
-}
-
-/** Confirmations answer "open"; opening a URL fetches it like a browser and records it. */
-async function browserDouble(app: ElectronApplication): Promise<void> {
-  await app.evaluate(({ dialog, shell }) => {
-    const opened: string[] = [];
-    (globalThis as { __t29Opened?: string[] }).__t29Opened = opened;
-    dialog.showMessageBox = () => Promise.resolve({ response: 0, checkboxChecked: false });
-    shell.openExternal = async (url: string) => {
-      opened.push(url);
-      await fetch(url);
-    };
-  });
-}
 
 async function shoot(page: Page, name: string): Promise<void> {
   await mkdir(EVIDENCE, { recursive: true });
