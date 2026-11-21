@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | M1 | 61 | 61 | 0 | 0 |
 | M2 | 46 | 46 | 0 | 0 |
-| M3 | 47 | 44 | 3 | 0 |
+| M3 | 47 | 47 | 0 | 0 |
 | M4 | 10 | 0 | 10 | 0 |
 | M5 | 7 | 0 | 7 | 0 |
 
@@ -151,8 +151,8 @@
 | CAP-BG-TIMEOUT-001 | 前台命令超时后转为后台任务，同一进程继续运行，工具结果说明已转后台 | FR-TL-04、ARCH-6.11 | T32 | `bg-timeout-to-background` | 已实现 |
 | CAP-CMD-001 | 自定义斜杠命令（`.claude/commands`、Pi prompt templates） | FR-EX-02、ARCH-6.7 | T37 | `command-expand` | 已实现 |
 | CAP-CMD-EXPAND-001 | `/名称 参数` 由 Core 在 UserPromptSubmit 之前展开（`$ARGUMENTS`、位置参数与命名参数），转录显示用户输入的原文，可由用户调用的 skill 同样展开 | FR-EX-02、ARCH-6.7 | T37 | `command-expand` | 已实现 |
-| CAP-HOOK-HANDLER-001 | http 与 prompt 类型的 hook handler | FR-HN-05、ARCH-6.3.2 | T38 | — | 计划中 |
-| CAP-HOOK-SUBAGENT-001 | SubagentStart、SubagentStop 与 PostToolBatch hooks | FR-HN-05、ARCH-6.3.2 | T38 | — | 计划中 |
+| CAP-HOOK-HANDLER-001 | http 与 prompt 类型的 hook handler（prompt 经辅助模型单轮判定） | FR-HN-05、ARCH-6.3.2 | T38 | `hooks-m3-prompt` | 已实现 |
+| CAP-HOOK-SUBAGENT-001 | SubagentStart、SubagentStop 与 PostToolBatch hooks；子 agent 内的 hooks 输入带 agent_id、agent_type | FR-HN-05、ARCH-6.3.2 | T38 | `hooks-m3-post-tool-batch`<br>`hooks-m3-subagent` | 已实现 |
 | CAP-MCP-CHANGES-001 | server instructions 进入 system prompt 第 6 段；工具集因 `list_changed` 或连接变化而改变时以追加消息送达，system prompt 不变 | FR-EX-03、ARCH-6.6.1、ARCH-6.8 | T36 | `mcp-tools-changed` | 已实现 |
 | CAP-MCP-CONFIG-001 | MCP 配置来源（`.mcp.json`、`~/.claude.json` 的 user 与 local、PiArc 用户与 `.piarc/` 设置）、同名按"企业 > 本地 > 项目 > 用户 > 插件"取整条定义、`${VAR}` 展开、SSE 与 WebSocket 标为不支持 | FR-EX-03、ARCH-6.8、ARCH-6.14 | T36 | `mcp-untrusted-project` | 已实现 |
 | CAP-MCP-DEFER-001 | 工具多时延迟加载（ToolSearch） | FR-EX-03、ARCH-6.1.4、ARCH-6.8 | T36 | `mcp-defer-toolsearch` | 已实现 |
@@ -179,7 +179,7 @@
 | CAP-TERM-READ-001 | agent 用 terminal 运行的命令进入会话的终端并作为后台任务运行；命令结束后提醒退出码与屏幕末尾，Read 任务文件得到屏幕文本与最近一条命令的结果 | FR-TL-05、ARCH-6.11 | T33 | `term-agent-command` | 已实现 |
 | CAP-TERM-SCREEN-001 | 集成终端与会话共享目录和环境，agent 可读取后台终端的屏幕内容 | FR-TL-05、ARCH-6.11 | T33 | `term-agent-command`<br>`term-agent-env`（仅 macos） | 已实现 |
 | CAP-TERM-SHARE-001 | 用户在终端面板中打开的终端默认不给 agent；用户打开共享后 agent 得到屏幕的位置并能读取，取消共享后又看不到 | FR-TL-05、ARCH-6.11 | T34 | `term-user-share`（仅 macos） | 已实现 |
-| CAP-TOOL-WEBSEARCH-001 | WebSearch 可配置后端 | FR-TL-03、ARCH-6.1.4 | T38 | — | 计划中 |
+| CAP-TOOL-WEBSEARCH-001 | WebSearch 可配置后端：服务商原生搜索优先、其次第三方搜索 API（key 只在保险箱），结果带来源，经同一权限裁决与 hooks，无可用后端时不提供 | FR-TL-03、ARCH-6.1.4 | T38 | `websearch-native`<br>`websearch-rules`<br>`websearch-third-party`<br>`websearch-unavailable` | 已实现 |
 | CAP-WT-AGENT-001 | 子 agent 可在独立 worktree 中隔离运行 | ARCH-6.12 | T35 | `subagent-worktree` | 已实现 |
 | CAP-WT-SESSION-001 | 新建会话可选在独立 git worktree 中运行，归档时处理未提交改动 | FR-WS-06、ARCH-6.12 | T35 | `worktree-archive-cleanup`<br>`worktree-parallel-sessions`<br>`worktree-session-create`<br>`worktree-session-rules` | 已实现 |
 
