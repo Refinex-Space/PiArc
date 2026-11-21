@@ -39,16 +39,26 @@ providers:
       - text: 'It is hidden again.'
 actions:
   - open_terminal: {}
-  - wait: { method: core/tasks, params: { kind: terminal, status: running, terminal: { origin: user, shared: false } } }
+  - wait:
+      {
+        method: core/tasks,
+        params: { kind: terminal, status: running, terminal: { origin: user, shared: false } },
+      }
   - type_terminal: { text: "echo shared-$((40+2))\r" }
   - prompt: { text: 'Can you see my terminal?', turn: one }
   - wait: { method: turn/completed, turn: one }
   - share_terminal: { shared: true }
-  - wait: { method: core/tasks, params: { kind: terminal, terminal: { origin: user, shared: true } } }
+  - wait:
+      { method: core/tasks, params: { kind: terminal, terminal: { origin: user, shared: true } } }
   - prompt: { text: 'And now?', turn: two }
   - wait: { method: turn/completed, turn: two }
   - share_terminal: { shared: false }
-  - wait: { method: core/tasks, params: { kind: terminal, terminal: { origin: user, shared: false } }, count: 2 }
+  - wait:
+      {
+        method: core/tasks,
+        params: { kind: terminal, terminal: { origin: user, shared: false } },
+        count: 2,
+      }
   - prompt: { text: 'And now that I stopped sharing?', turn: three }
 expect:
   events:
@@ -60,7 +70,11 @@ expect:
       not_contains: ['The user shared a terminal with you']
       tool_results:
         - { id: toolu_bg }
-        - { id: toolu_grep1, is_error: false, contains: 'Command exited with code 1 (no matches; not an error)' }
+        - {
+            id: toolu_grep1,
+            is_error: false,
+            contains: 'Command exited with code 1 (no matches; not an error)',
+          }
     - index: 3
       contains:
         - 'The user shared a terminal with you: bg-'
@@ -82,4 +96,8 @@ expect:
         - { id: toolu_grep1 }
         - { id: toolu_grep2 }
         - { id: toolu_read }
-        - { id: toolu_grep3, is_error: false, contains: 'Command exited with code 1 (no matches; not an error)' }
+        - {
+            id: toolu_grep3,
+            is_error: false,
+            contains: 'Command exited with code 1 (no matches; not an error)',
+          }
