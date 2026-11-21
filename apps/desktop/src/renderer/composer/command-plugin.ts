@@ -3,6 +3,8 @@
 // choice, or Esc). The query is what follows the `/`.
 import { Plugin, PluginKey, type EditorState, type Transaction } from 'prosemirror-state';
 
+import { fuzzyFilter } from '../../shared/fuzzy.js';
+
 export interface CommandState {
   readonly active: boolean;
   readonly query: string;
@@ -76,37 +78,52 @@ export function closeCommands(state: EditorState): Transaction {
   return state.tr.setMeta(commandKey, { type: 'close' });
 }
 
-/** A command the palette lists (Core's `composerInfo().commands`). */
+/** A command the palette lists: Core's merged list (`listCommands`, T37). */
 export interface PaletteCommand {
   readonly name: string;
+  /** Core's text; built-in commands are described by the client. */
   readonly description: string;
+  /** Where it came from (`builtIn`, `projectClaude`, `user`, ...). */
   readonly source: string;
-  readonly action: string;
+  /** `builtIn` runs in the client; the others are sent as `/name arguments`. */
+  readonly kind: string;
+  readonly argumentHint?: string | undefined;
+  readonly aliases?: readonly string[] | undefined;
+}
+
+/** Palette groups, in display order. */
+export const SOURCE_ORDER: readonly string[] = [
+  'builtIn',
+  'projectPiarc',
+  'projectClaude',
+  'projectPi',
+  'user',
+  'userClaude',
+  'userPi',
+  'plugin',
+  'mcp',
+];
+
+function rank(source: string): number {
+  const at = SOURCE_ORDER.indexOf(source);
+  return at === -1 ? SOURCE_ORDER.length : at;
 }
 
 /**
- * Commands matching `query`, best first: the query's characters in order in the name
- * (case-insensitive), names starting with the query before the others.
+ * Commands matching `query` (the shared fuzzy matcher on the name, the aliases and the
+ * description), grouped by source in `SOURCE_ORDER`, best first within a group.
  */
 export function filterCommands(
   commands: readonly PaletteCommand[],
   query: string,
 ): readonly PaletteCommand[] {
-  const needle = query.toLowerCase();
-  const matches = (name: string): boolean => {
-    let at = 0;
-    for (const char of name.toLowerCase()) {
-      if (char === needle[at]) {
-        at += 1;
-      }
-    }
-    return at === needle.length;
-  };
-  return commands
-    .filter((command) => matches(command.name))
-    .sort(
-      (a, b) =>
-        Number(!a.name.toLowerCase().startsWith(needle)) -
-        Number(!b.name.toLowerCase().startsWith(needle)),
-    );
+  const ranked = fuzzyFilter(commands, query, (command) => [
+    command.name,
+    ...(command.aliases ?? []),
+    command.description,
+  ]);
+  return ranked
+    .map((command, order) => ({ command, order }))
+    .sort((a, b) => rank(a.command.source) - rank(b.command.source) || a.order - b.order)
+    .map((entry) => entry.command);
 }

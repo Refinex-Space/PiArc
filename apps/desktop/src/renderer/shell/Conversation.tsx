@@ -8,6 +8,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '../app/app-context.js';
 import { useWindowFocused } from '../app/window-focus.js';
 import type { PaletteCommand } from '../composer/command-plugin.js';
+import { builtin, typedBuiltin, type BuiltinAction } from '../composer/builtins.js';
+import { EMPTY_COMMANDS, parseCommandsList, type CommandsList } from '../composer/commands-list.js';
 import {
   Composer,
   type ComposerHandlers,
@@ -47,6 +49,9 @@ import { compactFocus, SessionInput, type Draft } from './session-input.js';
 import { sessionTitle } from './SessionRow.js';
 import { StatusBadge } from './StatusBadge.js';
 import { useUi } from './ui.js';
+import { OutputStyleDialog } from './OutputStyleDialog.js';
+import { showPanel } from './registry.js';
+import { onCommandRequest, takeCommand } from './command-requests.js';
 import { parseWindow } from '../store/history-window.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -251,6 +256,29 @@ export function Conversation({
   // input (a rewound message, or the message a branch started from).
   const [rewinding, setRewinding] = useState<{ target: RewindTarget | undefined }>();
   const [fill, setFill] = useState<{ text: string; nonce: number }>();
+  // T37: the session's slash commands and output styles (Core's `listCommands`), read when
+  // the session opens and each time the palette opens; `/output-style` without a name.
+  const [commandsList, setCommandsList] = useState<CommandsList>(EMPTY_COMMANDS);
+  const [choosingStyle, setChoosingStyle] = useState(false);
+  const workspace = session?.workspace;
+  const cwd = session?.cwd;
+  const refreshCommands = useCallback(() => {
+    if (workspace === undefined) return Promise.resolve(EMPTY_COMMANDS);
+    return window.piarc
+      .listCommands(workspace, cwd ?? null)
+      .then((json) => {
+        const list = parseCommandsList(json);
+        setCommandsList(list);
+        return list;
+      })
+      .catch((failure: unknown) => {
+        console.error('[conversation] cannot list the commands', failure);
+        return EMPTY_COMMANDS;
+      });
+  }, [workspace, cwd]);
+  useEffect(() => {
+    void refreshCommands();
+  }, [refreshCommands]);
   // T34: terminal selections attached from the dock become chips in the input.
   const [insert, setInsert] = useState<{ snippets: readonly SnippetData[]; nonce: number }>();
   useEffect(() => {
@@ -338,16 +366,18 @@ export function Conversation({
     () => coreMentions(session?.cwd ?? session?.workspace, ui.composer?.maxSearchResults ?? 20),
     [session?.cwd, session?.workspace, ui.composer?.maxSearchResults],
   );
-  const runCommand = useCallback(
-    (command: PaletteCommand) => {
-      switch (command.action) {
+  // Built-in commands map to features the app already has (ADR-0054 rule 13).
+  const runBuiltin = useCallback(
+    (action: BuiltinAction, args: string) => {
+      const failed = (failure: unknown) => {
+        setError(t('composer.failed', { reason: reason(failure) }));
+      };
+      switch (action) {
         case 'newSession':
           ui.show({ kind: 'home', workspace: session?.workspace });
           break;
         case 'compact':
-          window.piarc.compact(id).catch((failure: unknown) => {
-            setError(t('composer.failed', { reason: reason(failure) }));
-          });
+          window.piarc.compact(id, args === '' ? undefined : args).catch(failed);
           break;
         case 'help':
           ui.openShortcuts();
@@ -355,17 +385,60 @@ export function Conversation({
         case 'rewind':
           setRewinding({ target: undefined });
           break;
-        default:
+        case 'model':
+          ui.runCommand('session.model');
+          break;
+        case 'context':
+          showPanel('context');
+          break;
+        case 'outputStyle':
+          void refreshCommands().then((list) => {
+            if (args === '') {
+              setChoosingStyle(true);
+            } else if (workspace !== undefined && list.styles.some((s) => s.name === args)) {
+              window.piarc.setOutputStyle(workspace, args).catch(failed);
+            } else {
+              setError(t('outputStyle.unknown', { name: args }));
+            }
+          });
           break;
       }
     },
-    [ui, session?.workspace, id, t],
+    [ui, session?.workspace, id, t, refreshCommands, workspace],
+  );
+  // A slash command chosen in the Mod+K palette for this session.
+  useEffect(() => {
+    const take = () => {
+      const name = takeCommand(id);
+      if (name === undefined) return;
+      const known = builtin(name);
+      if (known === undefined) setFill({ text: `/${name} `, nonce: Date.now() + Math.random() });
+      else runBuiltin(known.action, '');
+    };
+    take();
+    return onCommandRequest((sessionId) => {
+      if (sessionId === id) take();
+    });
+  }, [id, runBuiltin]);
+  const runCommand = useCallback(
+    (command: PaletteCommand) => {
+      const known = builtin(command.name);
+      if (known !== undefined) runBuiltin(known.action, '');
+    },
+    [runBuiltin],
   );
   const handlers = useMemo<ComposerHandlers>(
     () => ({
       submit(intent, submission) {
         setError(undefined);
         const draft = draftOf(submission);
+        const plain =
+          draft.mentions.length === 0 && draft.pending.length === 0 && draft.stored.length === 0;
+        const typed = plain ? typedBuiltin(draft.text) : undefined;
+        if (typed !== undefined && typed.action !== 'compact') {
+          runBuiltin(typed.action, typed.args);
+          return;
+        }
         const focus = compactFocus(draft);
         if (focus !== undefined) {
           window.piarc.compact(id, focus === '' ? undefined : focus).catch((failure: unknown) => {
@@ -386,12 +459,14 @@ export function Conversation({
           console.error('[conversation] cannot stop the turn', failure);
         });
       },
-      command: () => undefined,
+      command: () => {
+        void refreshCommands();
+      },
       runCommand,
       mentionOpened: () => undefined,
       mentionChosen: () => undefined,
     }),
-    [input, id, t, runCommand],
+    [input, id, t, runCommand, runBuiltin, refreshCommands],
   );
 
   // The transcript's view (T29), remembered per session in this window.
@@ -436,7 +511,7 @@ export function Conversation({
           running={turn.running}
           handlers={handlers}
           mentions={mentions}
-          commands={ui.composer?.commands ?? []}
+          commands={commandsList.commands}
           limits={ui.composer?.limits}
           supportsImages={model?.vision}
           error={
@@ -507,6 +582,24 @@ export function Conversation({
           <UsageRing sessionId={id} />
         </div>
       </div>
+      {choosingStyle && workspace !== undefined ? (
+        <OutputStyleDialog
+          styles={commandsList.styles}
+          current={commandsList.style}
+          onChoose={(name) => {
+            setChoosingStyle(false);
+            window.piarc
+              .setOutputStyle(workspace, name)
+              .then(() => refreshCommands())
+              .catch((failure: unknown) => {
+                setError(t('composer.failed', { reason: reason(failure) }));
+              });
+          }}
+          onClose={() => {
+            setChoosingStyle(false);
+          }}
+        />
+      ) : null}
       {rewinding === undefined ? null : (
         <RewindDialog
           sessionId={id}

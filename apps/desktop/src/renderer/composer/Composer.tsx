@@ -6,10 +6,11 @@ import { baseKeymap, splitBlock } from 'prosemirror-commands';
 import { history, redo, undo } from 'prosemirror-history';
 import { keydownHandler, keymap } from 'prosemirror-keymap';
 import { Fragment, Slice } from 'prosemirror-model';
-import { EditorState, type Command } from 'prosemirror-state';
+import { EditorState, TextSelection, type Command } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment as ReactFragment, useEffect, useRef, useState, type ReactNode } from 'react';
 
+import type { MessageId } from '../../shared/i18n/index.js';
 import { useApp } from '../app/app-context.js';
 import { formatSize } from '../transcript/rows/common.js';
 import {
@@ -29,6 +30,7 @@ import {
   type CommandState,
   type PaletteCommand,
 } from './command-plugin.js';
+import { builtin } from './builtins.js';
 import { isImeComposing } from './ime-guard.js';
 import { COMPOSER_KEYS, intentFor, type ComposerKey } from './intents.js';
 import {
@@ -83,6 +85,19 @@ function emptyState(): EditorState {
       keymap(baseKeymap),
     ],
   });
+}
+
+/** Puts `/name ` in the input with the cursor after it, the palette closed. */
+function fillCommand(view: EditorView, name: string): void {
+  const text = `/${name} `;
+  const paragraph = composerSchema.nodes.paragraph.create(null, composerSchema.text(text));
+  const tr = view.state.tr.replaceWith(0, view.state.doc.content.size, paragraph);
+  view.dispatch(
+    tr
+      .setSelection(TextSelection.create(tr.doc, text.length + 1))
+      .setMeta(commandKey, { type: 'close' }),
+  );
+  view.focus();
 }
 
 function clearCommand(): Command {
@@ -255,10 +270,15 @@ export function Composer({
     );
     const runPaletteCommand = (editor: EditorView, choice: PaletteCommand | undefined): void => {
       editor.dispatch(closeCommands(editor.state));
-      if (choice !== undefined) {
-        clearCommand()(editor.state, editor.dispatch.bind(editor), editor);
-        latest.current.handlers.runCommand?.(choice);
+      if (choice === undefined) return;
+      if (choice.kind !== 'builtIn') {
+        // A command file or skill goes to Core as `/name arguments`: the user types the
+        // arguments after it (T37).
+        fillCommand(editor, choice.name);
+        return;
       }
+      clearCommand()(editor.state, editor.dispatch.bind(editor), editor);
+      latest.current.handlers.runCommand?.(choice);
     };
 
     const view = new EditorView(element, {
@@ -548,31 +568,65 @@ export function Composer({
           {paletteMatches.length === 0 ? (
             <li className="mention-empty">{t('composer.commands.none')}</li>
           ) : (
-            paletteMatches.map((choice, index) => (
-              <li
-                key={choice.name}
-                role="option"
-                aria-selected={index === paletteIndex}
-                data-command={choice.name}
-                className={index === paletteIndex ? 'mention-option is-active' : 'mention-option'}
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  const view = viewRef.current;
-                  if (view !== null) {
-                    view.dispatch(closeCommands(view.state));
-                    clearCommand()(view.state, view.dispatch.bind(view), view);
-                    handlers.runCommand?.(choice);
-                  }
-                }}
-              >
-                <span className="mention-label">/{choice.name}</span>
-                <span className="mention-path">
-                  {choice.source === 'builtin' && isBuiltinName(choice.name)
-                    ? t(`composer.command.${choice.name}`)
-                    : choice.description}
-                </span>
-              </li>
-            ))
+            paletteMatches.map((choice, index) => {
+              const previous = paletteMatches[index - 1];
+              const label = builtin(choice.name)?.label;
+              return (
+                <ReactFragment key={`${choice.source}:${choice.name}`}>
+                  {previous?.source === choice.source ? null : (
+                    <li
+                      className="command-group"
+                      role="presentation"
+                      data-testid="command-group"
+                      data-source={choice.source}
+                    >
+                      {sourceLabel(t, choice.source)}
+                    </li>
+                  )}
+                  <li
+                    role="option"
+                    aria-selected={index === paletteIndex}
+                    data-command={choice.name}
+                    data-kind={choice.kind}
+                    className={
+                      index === paletteIndex ? 'mention-option is-active' : 'mention-option'
+                    }
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      const view = viewRef.current;
+                      if (view === null) return;
+                      view.dispatch(closeCommands(view.state));
+                      if (choice.kind !== 'builtIn') {
+                        fillCommand(view, choice.name);
+                        return;
+                      }
+                      clearCommand()(view.state, view.dispatch.bind(view), view);
+                      handlers.runCommand?.(choice);
+                    }}
+                  >
+                    <span className="mention-label">
+                      /{choice.name}
+                      {choice.argumentHint === undefined ? null : (
+                        <span
+                          className="command-hint"
+                          data-testid="command-hint"
+                          title={t('composer.commands.args', { hint: choice.argumentHint })}
+                        >
+                          {' '}
+                          {choice.argumentHint}
+                        </span>
+                      )}
+                      {choice.kind === 'skill' ? (
+                        <span className="command-kind">{t('composer.commands.kind.skill')}</span>
+                      ) : null}
+                    </span>
+                    <span className="mention-path">
+                      {label === undefined ? choice.description : t(label)}
+                    </span>
+                  </li>
+                </ReactFragment>
+              );
+            })
           )}
         </ul>
       ) : null}
@@ -673,8 +727,20 @@ export function Composer({
   );
 }
 
-const BUILTIN_NAMES = new Set(['clear', 'compact', 'rewind', 'help']);
+const SOURCE_LABELS: Readonly<Record<string, MessageId>> = {
+  builtIn: 'composer.commands.source.builtIn',
+  projectPiarc: 'composer.commands.source.projectPiarc',
+  projectClaude: 'composer.commands.source.projectClaude',
+  projectPi: 'composer.commands.source.projectPi',
+  user: 'composer.commands.source.user',
+  userClaude: 'composer.commands.source.userClaude',
+  userPi: 'composer.commands.source.userPi',
+  plugin: 'composer.commands.source.plugin',
+  mcp: 'composer.commands.source.mcp',
+};
 
-function isBuiltinName(name: string): name is 'clear' | 'compact' | 'rewind' | 'help' {
-  return BUILTIN_NAMES.has(name);
+/** The palette's group title of a command source. */
+export function sourceLabel(t: (id: MessageId) => string, source: string): string {
+  const id = Object.hasOwn(SOURCE_LABELS, source) ? SOURCE_LABELS[source] : undefined;
+  return id === undefined ? source : t(id);
 }

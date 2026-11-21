@@ -29,6 +29,7 @@ import { ProvidersPage } from './ProvidersPage.js';
 import { registerSettingsPage } from './registry.js';
 import { AgentsPage } from './AgentsPage.js';
 import { McpPage } from './McpPage.js';
+import { SkillsPage } from './SkillsPage.js';
 
 function useSave(): { save: (change: PreferenceChange) => void; error: string | undefined } {
   const { t } = useApp();
@@ -357,6 +358,12 @@ export function registerBuiltInSettingsPages(): void {
     title: 'settings.agents',
     order: 40,
     component: AgentsPage,
+  });
+  registerSettingsPage({
+    id: 'skills',
+    title: 'settings.skills',
+    order: 45,
+    component: SkillsPage,
   });
   registerSettingsPage({
     id: 'mcp',

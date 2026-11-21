@@ -520,6 +520,17 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.agentsList, workspace)
       .then((value: unknown) => expectString(value)),
+  listCommands: (workspace, cwd) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.commandsList, workspace, cwd)
+      .then((value: unknown) => expectString(value)),
+  listSkills: (workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.skillsList, workspace)
+      .then((value: unknown) => expectString(value)),
+  setOutputStyle: async (workspace, name) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.outputStyleSet, workspace, name);
+  },
   resendSnapshots: async () => {
     await ipcRenderer.invoke(IPC_CHANNELS.snapshotsResend);
   },

@@ -974,6 +974,27 @@
   white-space: nowrap;
 }
 
+/* the `/` palette's groups, argument hints and skill marks (T37) */
+.command-group {
+  padding: var(--piarc-space-1) var(--piarc-space-3) 2px;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+  font-weight: 600;
+}
+
+.command-hint {
+  color: var(--piarc-text-secondary);
+}
+
+.command-kind {
+  margin-left: var(--piarc-space-2);
+  padding: 0 var(--piarc-space-1);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-sm);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+}
+
 /* the queue above the composer */
 
 .queue-list {

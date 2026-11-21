@@ -26,6 +26,8 @@ import { toggleTerminalPanel, useTerminalPanelOpen } from '../terminal/panel-sta
 import { toggleChangesPanel, useChangesPanelOpen } from '../changes/panel-state.js';
 import { showPanel } from './registry.js';
 import { ShortcutsDialog } from './ShortcutsDialog.js';
+import { CommandPalette } from './CommandPalette.js';
+import { requestCommand } from './command-requests.js';
 import { Sidebar } from './Sidebar.js';
 import { groupSessions } from './Sidebar.js';
 import { Toasts } from './Toasts.js';
@@ -115,6 +117,7 @@ export function Shell() {
   const [layout, setLayout] = useState<Layout>(() => loadLayout(localStore()));
   const [trust, setTrust] = useState<TrustRequest | undefined>(undefined);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [toasts, setToasts] = useState<readonly Toast[]>([]);
   const viewRef = useRef(view);
   viewRef.current = view;
@@ -230,6 +233,7 @@ export function Shell() {
     setLayout((current) => ({ ...current, sidebarCollapsed: !current.sidebarCollapsed }));
   }, []);
 
+  const runRef = useRef<(command: AppCommand) => void>(() => undefined);
   const ui = useMemo<Ui>(
     () => ({
       view,
@@ -243,6 +247,9 @@ export function Shell() {
       toggleSidebar,
       openShortcuts: () => {
         setShortcutsOpen(true);
+      },
+      runCommand: (command) => {
+        runRef.current(command);
       },
       toasts,
       addToast: (toast) => {
@@ -316,6 +323,9 @@ export function Shell() {
       case 'help.shortcuts':
         setShortcutsOpen(true);
         break;
+      case 'app.commandPalette':
+        if (!trust && !shortcutsOpen) setPaletteOpen(true);
+        break;
       case 'changes.toggle':
         if (view.kind === 'session' && toggleChangesPanel()) showPanel('changes');
         break;
@@ -333,6 +343,7 @@ export function Shell() {
         break;
     }
   };
+  runRef.current = run;
   useCommands(run);
 
   const startResize = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -460,6 +471,31 @@ export function Shell() {
           </div>
         </div>
         <Toasts />
+        {paletteOpen && (
+          <CommandPalette
+            current={
+              view.kind === 'session'
+                ? {
+                    id: view.id,
+                    workspace: store.session(view.id)?.workspace,
+                    cwd: store.session(view.id)?.cwd,
+                  }
+                : undefined
+            }
+            run={(command) => {
+              runRef.current(command);
+            }}
+            open={(id) => {
+              show({ kind: 'session', id });
+            }}
+            command={(name) => {
+              if (view.kind === 'session') requestCommand(view.id, name);
+            }}
+            onClose={() => {
+              setPaletteOpen(false);
+            }}
+          />
+        )}
         {shortcutsOpen && (
           <ShortcutsDialog
             onClose={() => {

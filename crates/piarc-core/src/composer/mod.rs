@@ -8,13 +8,11 @@
 //!   session's `attachments/` directory.
 //! - [`file_search`]: the fuzzy file search behind `@` mentions (ignore files, a result cap,
 //!   cancellation).
-//! - [`commands`]: the built-in slash commands the command palette lists.
 //!
-//! [`info`] gives the client all of it in one answer: the commands, the attachment limits and
-//! the search cap.
+//! [`info`] gives the client the attachment limits and the search cap in one answer. The slash
+//! commands (built-in ones included) come from `listCommands` (T37, `piarc_config::skills`).
 
 pub mod attachments;
-pub mod commands;
 pub mod file_search;
 
 use std::path::Path;
@@ -108,11 +106,10 @@ impl UserInput {
     }
 }
 
-/// The composer's configuration for the client: commands, attachment limits, search cap.
+/// The composer's configuration for the client: attachment limits, search cap.
 #[must_use]
 pub fn info() -> Value {
     json!({
-        "commands": commands::builtin(),
         "attachments": attachments::limits(),
         "fileSearch": { "maxResults": file_search::MAX_RESULTS },
     })

@@ -279,6 +279,7 @@ fn merged_command_list_and_conflicts() {
                 CommandKind::BuiltIn,
                 ResourceSource::BuiltIn
             ),
+            ("help", CommandKind::BuiltIn, ResourceSource::BuiltIn),
             ("deploy", CommandKind::Skill, ResourceSource::ProjectClaude),
             (
                 "deploy",

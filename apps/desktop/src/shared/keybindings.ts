@@ -67,6 +67,12 @@ export const COMMANDS = [
     scope: 'app',
   },
   {
+    id: 'app.commandPalette',
+    defaultKey: 'Mod+K',
+    label: 'command.app.commandPalette',
+    scope: 'app',
+  },
+  {
     id: 'app.settings',
     defaultKey: 'Mod+,',
     label: 'command.app.settings',

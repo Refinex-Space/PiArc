@@ -95,6 +95,9 @@ export const IPC_CHANNELS = {
   taskStop: 'piarc:task.stop',
   taskOutput: 'piarc:task.output',
   agentsList: 'piarc:agents.list',
+  commandsList: 'piarc:commands.list',
+  skillsList: 'piarc:skills.list',
+  outputStyleSet: 'piarc:outputStyle.set',
   snapshotsResend: 'piarc:snapshots.resend',
   trustGet: 'piarc:trust.get',
   trustDecide: 'piarc:trust.decide',
@@ -700,6 +703,18 @@ export interface PiarcApi {
    * source, overrides, warnings and resolved model, as `AgentsList` JSON.
    */
   listAgents(workspace: string): Promise<string>;
+  /**
+   * The slash commands and output styles of a workspace from `cwd` (its root when null): built-in
+   * commands, command files, Pi templates and user-invocable skills, as `CommandsList` JSON (T37).
+   */
+  listCommands(workspace: string, cwd: string | null): Promise<string>;
+  /** The skills of a workspace with source, overrides and warnings, as `SkillsList` JSON (T37). */
+  listSkills(workspace: string): Promise<string>;
+  /**
+   * Sets the output style: the workspace's `.piarc/settings.local.json` (`/output-style`), or the
+   * user's settings when `workspace` is null; a null name removes the choice (T37).
+   */
+  setOutputStyle(workspace: string | null, name: string | null): Promise<void>;
   /** Asks Core to send the workspace and session snapshots again. */
   resendSnapshots(): Promise<void>;
   /** The trust view of a directory as JSON (`TrustView`). */

@@ -1948,3 +1948,72 @@ textarea.input {
   background: var(--piarc-accent-subtle-hover);
   color: var(--piarc-text-primary);
 }
+
+/* the command palette (Mod+K) and the output style list (T37) */
+.palette-input {
+  width: 100%;
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border: 1px solid var(--piarc-border-default);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-input);
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-font-size-body);
+}
+
+.palette-list,
+.style-list {
+  max-height: 360px;
+  margin: var(--piarc-space-2) 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.palette-group {
+  padding: var(--piarc-space-2) var(--piarc-space-2) 2px;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+  font-weight: 600;
+}
+
+.palette-option {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--piarc-space-3);
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border-radius: var(--piarc-radius-sm);
+  cursor: default;
+}
+
+.palette-option.is-active {
+  background: var(--piarc-surface-selected);
+}
+
+.palette-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.style-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: var(--piarc-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--piarc-radius-sm);
+  background: none;
+  color: var(--piarc-text-primary);
+  text-align: left;
+}
+
+.style-choice:hover,
+.style-choice.is-current {
+  border-color: var(--piarc-border-default);
+  background: var(--piarc-surface-selected);
+}
+
+.style-name {
+  font-weight: 600;
+}

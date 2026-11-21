@@ -334,9 +334,9 @@ const LAB_MENTIONS: MentionSource = {
 };
 
 const LAB_COMMANDS = [
-  { name: 'clear', description: '', source: 'builtin', action: 'newSession' },
-  { name: 'compact', description: '', source: 'builtin', action: 'compact' },
-  { name: 'help', description: '', source: 'builtin', action: 'help' },
+  { name: 'clear', description: '', source: 'builtIn', kind: 'builtIn' },
+  { name: 'compact', description: '', source: 'builtIn', kind: 'builtIn' },
+  { name: 'help', description: '', source: 'builtIn', kind: 'builtIn' },
 ];
 
 export function TranscriptLab() {

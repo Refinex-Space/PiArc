@@ -224,6 +224,18 @@ export declare class CoreRuntime {
    * text (T31).
    */
   listAgents(workspace: string, cwd?: string | null): Promise<string>;
+  /**
+   * The slash commands and output styles of `workspace` from `cwd` (the workspace root when
+   * null), as JSON text (T37).
+   */
+  listCommands(workspace: string, cwd?: string | null): Promise<string>;
+  /** The skills of `workspace` from `cwd` (the workspace root when null), as JSON text (T37). */
+  listSkills(workspace: string, cwd?: string | null): Promise<string>;
+  /**
+   * Sets the output style of `workspace` (its `.piarc/settings.local.json`), or the user's
+   * when null; a null name removes the choice (T37).
+   */
+  setOutputStyle(workspace?: string | null, name?: string | null): Promise<string>;
   /** Stops subagent `child` of session `parent`; JSON text `{ stopped }` (T31). */
   stopSubagent(parent: string, child: string): Promise<string>;
   /**

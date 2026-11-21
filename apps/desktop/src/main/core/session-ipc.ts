@@ -83,6 +83,9 @@ export type SessionCore = Pick<
   | 'stopTask'
   | 'readTaskOutput'
   | 'listAgents'
+  | 'listCommands'
+  | 'listSkills'
+  | 'setOutputStyle'
   | 'resendSnapshots'
   | 'projectTrust'
   | 'decideProjectTrust'
@@ -728,6 +731,22 @@ export function registerSessionHandlers(
   registerHandler(IPC_CHANNELS.agentsList, (_event, [dir]) =>
     core.listAgents(absolutePath(dir), null),
   );
+  // Skills, commands and output styles (T37).
+  registerHandler(IPC_CHANNELS.commandsList, (_event, [dir, cwd]) =>
+    core.listCommands(absolutePath(dir), cwd === null ? null : absolutePath(cwd)),
+  );
+  registerHandler(IPC_CHANNELS.skillsList, (_event, [dir]) =>
+    core.listSkills(absolutePath(dir), null),
+  );
+  registerHandler(IPC_CHANNELS.outputStyleSet, async (_event, [dir, name]) => {
+    if (
+      name !== null &&
+      (typeof name !== 'string' || name.trim().length === 0 || name.length > 64)
+    ) {
+      throw new TypeError('name must be an output style name of 1-64 characters or null');
+    }
+    await core.setOutputStyle(dir === null ? null : absolutePath(dir), name);
+  });
   registerHandler(IPC_CHANNELS.snapshotsResend, () => {
     core.resendSnapshots();
   });

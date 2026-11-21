@@ -46,7 +46,7 @@ function parseAgents(text: string): AgentsView {
 }
 
 /** The workspaces the diagnostics know (the open and recent ones) and the default one. */
-function parseWorkspaces(text: string): { workspace: string | null; workspaces: string[] } {
+export function parseWorkspaces(text: string): { workspace: string | null; workspaces: string[] } {
   const value: unknown = JSON.parse(text);
   if (!isRecord(value)) return { workspace: null, workspaces: [] };
   const workspaces = Array.isArray(value.workspaces)

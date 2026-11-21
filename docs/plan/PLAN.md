@@ -315,9 +315,9 @@ T37（Skills、斜杠命令、命令面板与输出风格）开工于 2026-11-21
 - [x] 2. `piarc-config`：skills、命令、输出风格的发现与 frontmatter 解析、同名取舍与诊断、参数替换、`!` 命令标为不支持（A01、A07、A12）
 - [x] 3. Core：目录列表与监听（`resources/reload`）、`Skill` 只读裁决与 `Skill(名称)` 规则、skill 目录只读放行、`allowed-tools` 回合级免审批（信任约束）、skill hooks 作用域、斜杠命令展开与 UserPromptExpansion 挂载点（A04、A05）
 - [x] 4. Agent Host：关闭 Pi 自带 skills/模板、第 5 段索引与第 3 段输出风格、`Skill` 工具、`paths` 激活、索引与风格变化的提醒、重注入登记、`resources/*` 应答（A02、A03、A06、A11）
-- [ ] 5. NAPI、主进程 IPC、preload：命令与 skills 列表、输出风格切换
-- [ ] 6. 渲染进程：composer `/` 命令面板、Mod+K 命令面板、内置命令、输出风格选择、设置页 skills 列表、共享模糊匹配（A08、A09、A10、A11）
-- [ ] 7. L2 场景 `skill-*`、`command-*`、能力清单与 capabilities.md
+- [x] 5. NAPI、主进程 IPC、preload：命令与 skills 列表、输出风格切换
+- [x] 6. 渲染进程：composer `/` 命令面板、Mod+K 命令面板、内置命令、输出风格选择、设置页 skills 列表、共享模糊匹配（A08、A09、A10、A11）
+- [x] 7. L2 场景 `skill-*`、`command-*`、能力清单与 capabilities.md
 - [ ] 8. L4 `t37-*` 与截图证据
 - [ ] 9. 原创性自查（A13）、文档与 AGENTS.md、复用表、登记事项
 - [ ] 10. `npm run verify`（A14）、验收记录与收尾

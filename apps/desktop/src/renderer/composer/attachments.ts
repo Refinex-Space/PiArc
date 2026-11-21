@@ -2,7 +2,6 @@
 // (`composerInfo().attachments`, the single definition of the types and limits); the composer
 // checks dropped and pasted files against it at once, so the user sees why a file was refused
 // before anything is sent. Core checks again when it stores the file.
-import type { PaletteCommand } from './command-plugin.js';
 
 export type AttachmentKind = 'image' | 'pdf';
 
@@ -33,7 +32,6 @@ export type AttachmentProblem =
 
 /** The composer's configuration from Core. */
 export interface ComposerInfo {
-  readonly commands: readonly PaletteCommand[];
   readonly limits: AttachmentLimits;
   readonly maxSearchResults: number;
 }
@@ -115,24 +113,6 @@ export function parseComposerInfo(text: string): ComposerInfo {
     value = {};
   }
   const info = isRecord(value) ? value : {};
-  const commands = Array.isArray(info.commands)
-    ? info.commands.flatMap((command: unknown) =>
-        isRecord(command) &&
-        typeof command.name === 'string' &&
-        typeof command.description === 'string' &&
-        typeof command.source === 'string' &&
-        typeof command.action === 'string'
-          ? [
-              {
-                name: command.name,
-                description: command.description,
-                source: command.source,
-                action: command.action,
-              },
-            ]
-          : [],
-      )
-    : [];
   const attachments = isRecord(info.attachments) ? info.attachments : {};
   const kinds = Array.isArray(attachments.kinds)
     ? attachments.kinds.flatMap((entry: unknown) => {
@@ -153,7 +133,6 @@ export function parseComposerInfo(text: string): ComposerInfo {
     : [];
   const search = isRecord(info.fileSearch) ? info.fileSearch : {};
   return {
-    commands,
     limits: {
       maxCount: typeof attachments.maxCount === 'number' ? attachments.maxCount : 0,
       kinds,

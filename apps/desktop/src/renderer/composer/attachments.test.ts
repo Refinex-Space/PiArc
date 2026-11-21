@@ -54,10 +54,6 @@ describe('attachment checks', () => {
   it('reads Core’s composer info and tolerates malformed parts', () => {
     const info = parseComposerInfo(
       JSON.stringify({
-        commands: [
-          { name: 'help', description: 'Show help', source: 'builtin', action: 'help' },
-          3,
-        ],
         attachments: {
           maxCount: 10,
           kinds: [{ kind: 'pdf', mimeTypes: ['application/pdf'], maxBytes: 5 }],
@@ -65,13 +61,12 @@ describe('attachment checks', () => {
         fileSearch: { maxResults: 50 },
       }),
     );
-    expect(info.commands.map((c) => c.name)).toEqual(['help']);
     expect(info.limits).toEqual({
       maxCount: 10,
       kinds: [{ kind: 'pdf', mimeTypes: ['application/pdf'], maxBytes: 5 }],
     });
     expect(info.maxSearchResults).toBe(50);
-    expect(parseComposerInfo('not json').commands).toEqual([]);
+    expect(parseComposerInfo('not json').maxSearchResults).toBe(20);
   });
 });
 

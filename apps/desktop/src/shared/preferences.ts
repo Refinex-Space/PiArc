@@ -35,6 +35,9 @@ export interface Preferences {
   readonly memory: { readonly readBoth: boolean };
   /** T23: offer Bypass permissions in the mode menu (the user's own file only). */
   readonly permissions: { readonly enableBypassPermissions: boolean };
+  /** T37: the user's default output style (`outputStyle`); `''` when unset. Written through
+   * Core's `setOutputStyle`, not as a preference change. */
+  readonly outputStyle: string;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -49,6 +52,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   notifications: { enabled: true },
   memory: { readBoth: false },
   permissions: { enableBypassPermissions: false },
+  outputStyle: '',
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -98,6 +102,7 @@ export function preferencesFrom(settings: unknown): Preferences {
       enableBypassPermissions:
         isRecord(file.permissions) && file.permissions.enableBypassPermissions === true,
     },
+    outputStyle: typeof file.outputStyle === 'string' ? file.outputStyle : '',
   };
 }
 

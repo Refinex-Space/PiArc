@@ -102,6 +102,8 @@ describe('i18n', () => {
             transport: 'SSE',
             source: '/w/.mcp.json',
             by: '/w/.piarc/settings.json',
+            hint: '[issue]',
+            paths: 'src/**/*.rs',
           }),
         ).not.toThrow();
       }

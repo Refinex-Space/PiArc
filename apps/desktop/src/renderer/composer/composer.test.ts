@@ -143,16 +143,33 @@ describe('serializeDoc', () => {
 
 describe('command palette', () => {
   const COMMANDS = [
-    { name: 'clear', description: '', source: 'builtin', action: 'newSession' },
-    { name: 'compact', description: '', source: 'builtin', action: 'compact' },
-    { name: 'help', description: '', source: 'builtin', action: 'help' },
+    { name: 'clear', description: '', source: 'builtIn', kind: 'builtIn' },
+    { name: 'compact', description: '', source: 'builtIn', kind: 'builtIn' },
+    { name: 'help', description: '', source: 'builtIn', kind: 'builtIn' },
   ];
 
-  it('filters commands fuzzily, prefixes first', () => {
+  it('filters commands fuzzily, best first', () => {
     expect(filterCommands(COMMANDS, '').map((c) => c.name)).toEqual(['clear', 'compact', 'help']);
     expect(filterCommands(COMMANDS, 'cp').map((c) => c.name)).toEqual(['compact']);
-    expect(filterCommands(COMMANDS, 'l').map((c) => c.name)).toEqual(['clear', 'help']);
+    expect(filterCommands(COMMANDS, 'l').map((c) => c.name)).toEqual(['help', 'clear']);
     expect(filterCommands(COMMANDS, 'HE').map((c) => c.name)).toEqual(['help']);
+  });
+
+  it('groups by source in palette order and matches aliases and descriptions (T37)', () => {
+    const mixed = [
+      { name: 'deploy', description: 'Ship it', source: 'userClaude', kind: 'command' },
+      { name: 'review', description: 'Review a diff', source: 'projectClaude', kind: 'command' },
+      { name: 'greet', description: 'Say hello', source: 'projectPiarc', kind: 'skill' },
+      { name: 'clear', description: '', source: 'builtIn', kind: 'builtIn', aliases: ['reset'] },
+    ];
+    expect(filterCommands(mixed, '').map((c) => c.source)).toEqual([
+      'builtIn',
+      'projectPiarc',
+      'projectClaude',
+      'userClaude',
+    ]);
+    expect(filterCommands(mixed, 'reset').map((c) => c.name)).toEqual(['clear']);
+    expect(filterCommands(mixed, 'diff').map((c) => c.name)).toEqual(['review']);
   });
 
   it('opens on a typed slash, follows the query and closes on whitespace', () => {
