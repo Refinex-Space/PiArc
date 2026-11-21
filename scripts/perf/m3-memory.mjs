@@ -1,23 +1,29 @@
 #!/usr/bin/env node
 // M3 memory (T35-A11, architecture chapter 11): one window, three sessions of one workspace
 // running at once (one in its own worktree), each streaming from the strict mock and calling
-// tools, one of them running a subagent that does the same. Once all four are under way, the
-// script samples every process for a while:
+// tools, one of them running a subagent that does the same. R4 adds what came after T35: every
+// third tool call goes to a stdio MCP server from the project's `.mcp.json` that the workspace's
+// pool shares between all four (its start log must have one line), and the project has a few
+// skills, so each session's system prompt carries the skills index (checked in each first
+// request). Once all four are under way, the script samples every process for a while:
 //
 // - the app's processes through `app.getAppMetrics()` (main process with Core, renderer, GPU,
 //   network and other helpers): working set, which is the resident size on macOS;
 // - the Agent Host (the node process the main process started for the workspace): RSS from
-//   `ps` (macOS) or the working set from CIM (Windows).
+//   `ps` (macOS) or the working set from CIM (Windows);
+// - the MCP server (a child of the Agent Host), reported on its own: chapter 11 has no budget for
+//   servers the user configures.
 //
 // Budgets (chapter 11 as of this run): Agent Host ≤ 150 MB + 40 MB per further active session
 // (the subagent counts as one: 4 active, 270 MB); the app's other processes together ≤ 510 MB on
 // macOS and ≤ 450 MB on Windows. MB is 10^6 bytes, as in chapter 11.
 //
-//   npm run perf:m3 -- [--form packaged|dev] [--warmup 20] [--seconds 30]
+//   npm run perf:m3 -- [--form packaged|dev] [--warmup 20] [--seconds 30] [--out <file>]
 //
-// JSON goes to tmp/evidence/T35/m3-memory.json; the exit code is 1 when a budget is exceeded.
+// JSON goes to tmp/evidence/T35/m3-memory.json unless `--out` names another file; the exit code
+// is 1 when a budget is exceeded.
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
@@ -40,6 +46,12 @@ const STEPS = 120;
 /** Active sessions in the Agent Host: three sessions and one subagent. */
 const ACTIVE = 4;
 const MB = 1_000_000;
+
+/** The stdio MCP fixture server, run by this Node (type stripping). */
+const ECHO_SERVER = path.join(repoRoot, 'packages', 'testkit', 'src', 'mcp-echo-server.ts');
+
+/** Project skills: their names and descriptions make up the skills index. */
+const SKILLS = Array.from({ length: 8 }, (_, i) => `m3-skill-${String(i + 1)}`);
 
 /**
  * A long turn: each step streams text and then calls a read-only tool.
@@ -66,11 +78,18 @@ function scenario(id, steps, tool, first = []) {
   };
 }
 
-const read = () => ({ name: 'Read', input: { path: 'src/lib.txt' } });
-const listing = (/** @type {number} */ i) =>
+/**
+ * Every third call goes to the shared MCP server.
+ * @param {(i: number) => object} tool
+ */
+const withMcp = (tool) => (/** @type {number} */ i) =>
+  i % 3 === 2 ? { name: 'mcp__shared__echo', input: { text: `step ${String(i)}` } } : tool(i);
+const read = withMcp(() => ({ name: 'Read', input: { path: 'src/lib.txt' } }));
+const listing = withMcp((i) =>
   i % 2 === 0
     ? { name: 'Bash', input: { command: 'ls -la src', description: 'List' } }
-    : { name: 'Grep', input: { pattern: 'line', path: 'src' } };
+    : { name: 'Grep', input: { pattern: 'line', path: 'src' } },
+);
 
 /**
  * @param {string} dir
@@ -140,12 +159,17 @@ async function startMock(scenarios) {
 }
 
 /**
- * Pi's models (the mock) in the data directory.
+ * Pi's models (the mock) in the data directory, and the user's rule that lets the MCP server's
+ * tools run without asking.
  * @param {string} dataDir
  * @param {string} baseUrl
  */
 async function seedModels(dataDir, baseUrl) {
   await mkdir(path.join(dataDir, 'pi'), { recursive: true });
+  await writeFile(
+    path.join(dataDir, 'settings.json'),
+    JSON.stringify({ permissions: { allow: ['mcp__shared__*'] } }),
+  );
   await writeFile(
     path.join(dataDir, 'pi', 'models.json'),
     JSON.stringify({
@@ -172,15 +196,37 @@ async function seedModels(dataDir, baseUrl) {
 }
 
 /**
- * A git repository with a few files to read.
+ * A git repository with a few files to read, the shared MCP server in `.mcp.json` (its start log
+ * is `startLog`) and the project's skills.
  * @param {string} dir
+ * @param {string} startLog
  */
-async function makeRepository(dir) {
+async function makeRepository(dir, startLog) {
   await mkdir(path.join(dir, 'src'), { recursive: true });
   await writeFile(
     path.join(dir, 'src', 'lib.txt'),
     Array.from({ length: 400 }, (_, i) => `line ${String(i)} of the library`).join('\n'),
   );
+  await writeFile(
+    path.join(dir, '.mcp.json'),
+    JSON.stringify({
+      mcpServers: {
+        shared: {
+          command: process.execPath,
+          args: [ECHO_SERVER, 'shared'],
+          env: { MCP_ECHO_START_LOG: startLog },
+        },
+      },
+    }),
+  );
+  for (const [i, name] of SKILLS.entries()) {
+    const skill = path.join(dir, i % 2 === 0 ? '.piarc' : '.claude', 'skills', name);
+    await mkdir(skill, { recursive: true });
+    await writeFile(
+      path.join(skill, 'SKILL.md'),
+      `---\ndescription: Step ${String(i + 1)} of the project's release checklist\n---\nFollow the checklist.\n`,
+    );
+  }
   await writeFile(path.join(dir, '.gitignore'), '.piarc/worktrees/\n');
   const git = (/** @type {string[]} */ ...args) =>
     execFileSync(
@@ -202,31 +248,65 @@ async function makeRepository(dir) {
 }
 
 /**
+ * The requests the mock received.
+ * @param {string} baseUrl
+ * @returns {Promise<{ scenario: string, body: string }[]>}
+ */
+async function requests(baseUrl) {
+  const response = await fetch(`${baseUrl}/_piarc/requests`);
+  /** @type {unknown} */
+  const records = await response.json();
+  return (Array.isArray(records) ? records : []).map((record) => ({
+    scenario: isRecord(record) && typeof record.scenario === 'string' ? record.scenario : '',
+    body: isRecord(record) && typeof record.body === 'string' ? record.body : '',
+  }));
+}
+
+/**
  * Requests the mock received per scenario.
  * @param {string} baseUrl
  */
 async function requestCounts(baseUrl) {
-  const response = await fetch(`${baseUrl}/_piarc/requests`);
-  /** @type {unknown} */
-  const records = await response.json();
   /** @type {Record<string, number>} */
   const counts = {};
-  for (const record of Array.isArray(records) ? records : []) {
-    const name = isRecord(record) && typeof record.scenario === 'string' ? record.scenario : '';
+  for (const { scenario: name } of await requests(baseUrl)) {
     counts[name] = (counts[name] ?? 0) + 1;
   }
   return counts;
 }
 
 /**
- * Resident size (bytes) of each process whose command line contains `agent-host`, among the
- * children of `parent`.
+ * For each scenario, whether its first request offered the shared MCP server's tool and carried
+ * every project skill in the system prompt.
+ * @param {string} baseUrl
+ */
+async function firstRequests(baseUrl) {
+  /** @type {Record<string, { mcpTool: boolean, skills: boolean }>} */
+  const seen = {};
+  for (const { scenario: name, body } of await requests(baseUrl)) {
+    if (name === '' || name in seen) continue;
+    /** @type {unknown} */
+    const parsed = JSON.parse(body);
+    const tools = isRecord(parsed) && Array.isArray(parsed.tools) ? parsed.tools : [];
+    const system = isRecord(parsed) ? JSON.stringify(parsed.system ?? '') : '';
+    seen[name] = {
+      mcpTool: tools.some((tool) => isRecord(tool) && tool.name === 'mcp__shared__echo'),
+      skills: SKILLS.every((skill) => system.includes(skill)),
+    };
+  }
+  return seen;
+}
+
+/**
+ * Resident size (bytes) of each process whose command line contains `needle`, among the children
+ * of `parent`.
  * @param {number} parent
+ * @param {string} needle
  * @returns {{ pid: number, bytes: number }[]}
  */
-function agentHosts(parent) {
+function children(parent, needle) {
   if (process.platform === 'win32') {
-    const script = `Get-CimInstance Win32_Process -Filter "ParentProcessId = ${String(parent)}" | Where-Object { $_.CommandLine -like '*agent-host*' } | ForEach-Object { "$($_.ProcessId) $($_.WorkingSetSize)" }`;
+    const script = `Get-CimInstance Win32_Process -Filter "ParentProcessId = ${String(parent)}" | Where-Object { $_.CommandLine -like '*${needle}*' } | ForEach-Object { "$($_.ProcessId) $($_.WorkingSetSize)" }`;
     const out = execFileSync(
       'powershell.exe',
       ['-NoProfile', '-NonInteractive', '-Command', script],
@@ -248,7 +328,7 @@ function agentHosts(parent) {
   return out
     .split('\n')
     .map((line) => /^(\d+)\s+(\d+)\s+(\d+)\s+(.*)$/u.exec(line.trim()))
-    .filter((m) => m !== null && Number(m[2]) === parent && (m[4] ?? '').includes('agent-host'))
+    .filter((m) => m !== null && Number(m[2]) === parent && (m[4] ?? '').includes(needle))
     .map((m) => ({ pid: Number(m?.[1]), bytes: Number(m?.[3]) * 1024 }));
 }
 
@@ -269,10 +349,13 @@ async function snapshot(app, mainPid) {
   const byType = {};
   for (const metric of metrics)
     byType[metric.type] = (byType[metric.type] ?? 0) + metric.kib * 1024;
-  const hosts = mainPid === undefined ? [] : agentHosts(mainPid);
+  const hosts = mainPid === undefined ? [] : children(mainPid, 'agent-host');
+  const servers = hosts.flatMap((host) => children(host.pid, 'mcp-echo-server'));
   return {
     at: Date.now(),
     agentHostBytes: hosts.reduce((sum, host) => sum + host.bytes, 0),
+    mcpServerBytes: servers.reduce((sum, server) => sum + server.bytes, 0),
+    mcpServers: servers.length,
     appBytes: metrics.reduce((sum, metric) => sum + metric.kib * 1024, 0),
     byType,
     main,
@@ -314,8 +397,9 @@ export async function measure(options) {
   const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'piarc m3 内存 ')));
   const userData = path.join(root, 'data');
   const workspace = path.join(root, 'repo 仓库');
+  const startLog = path.join(root, 'mcp-starts.jsonl');
   await writeScenarios(path.join(root, 'scenarios'));
-  await makeRepository(workspace);
+  await makeRepository(workspace, startLog);
   const mock = await startMock(path.join(root, 'scenarios'));
   await seedModels(userData, mock.baseUrl);
   const { command, args } = await appCommand(options.form, [`--user-data-dir=${userData}`]);
@@ -363,7 +447,12 @@ export async function measure(options) {
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
     const counts = await requestCounts(mock.baseUrl);
+    const first = await firstRequests(mock.baseUrl);
+    const mcpStarts = (await readFile(startLog, 'utf8').catch(() => ''))
+      .split('\n')
+      .filter((line) => line !== '').length;
     const agentHostMB = stats(samples.map((s) => s.agentHostBytes / MB));
+    const mcpServerMB = stats(samples.map((s) => s.mcpServerBytes / MB));
     const appOtherMB = stats(samples.map((s) => s.appBytes / MB));
     const mainHeapMB = {
       heapUsed: stats(samples.map((s) => s.main.heapUsed / MB)),
@@ -387,6 +476,12 @@ export async function measure(options) {
       samples: samples.length,
       activeSessions: ACTIVE,
       requests: counts,
+      firstRequests: first,
+      mcp: {
+        starts: mcpStarts,
+        processes: stats(samples.map((s) => s.mcpServers)),
+        serverMB: mcpServerMB,
+      },
       agentHostMB,
       appOtherMB,
       byTypeMB,
@@ -398,6 +493,13 @@ export async function measure(options) {
         ),
         mainHeapUsedMB: idle.main.heapUsed / MB,
       },
+      // The load is what it claims: all four saw the MCP tool and the skills index, and the one
+      // server process served them all.
+      loadAsDescribed:
+        mcpStarts === 1 &&
+        ['m3-one', 'm3-tree', 'm3-agent', 'm3-child'].every(
+          (id) => first[id]?.mcpTool === true && first[id].skills,
+        ),
       budgetMB: { agentHost: agentHostBudget, appOther: BUDGET.appOtherMB },
       withinBudget: {
         agentHost: agentHostMB.max <= agentHostBudget,
@@ -415,6 +517,7 @@ async function main() {
   const { values } = parseArgs({
     options: {
       form: { type: 'string', default: 'packaged' },
+      out: { type: 'string', default: path.join('tmp', 'evidence', 'T35', 'm3-memory.json') },
       warmup: { type: 'string', default: '20' },
       seconds: { type: 'string', default: '30' },
     },
@@ -425,7 +528,7 @@ async function main() {
     warmup: Number(values.warmup),
     seconds: Number(values.seconds),
   });
-  const out = path.join(repoRoot, 'tmp', 'evidence', 'T35', 'm3-memory.json');
+  const out = path.resolve(repoRoot, values.out);
   await mkdir(path.dirname(out), { recursive: true });
   await writeFile(out, `${JSON.stringify(result, null, 2)}\n`);
   const f = (/** @type {number} */ n) => n.toFixed(0);
@@ -443,8 +546,19 @@ async function main() {
   console.log(
     `  main process JavaScript heap: ${f(result.mainHeapMB.heapUsed.median)} MB (idle ${f(result.idle.mainHeapUsedMB)} MB), external ${f(result.mainHeapMB.external.median)} MB`,
   );
+  console.log(
+    `MCP server: ${String(result.mcp.starts)} start(s), ${String(result.mcp.processes.max)} process(es), median ${f(result.mcp.serverMB.median)} MB`,
+  );
+  for (const [id, seen] of Object.entries(result.firstRequests)) {
+    console.log(
+      `  ${id}: MCP tool ${seen.mcpTool ? 'offered' : 'MISSING'}, skills index ${seen.skills ? 'present' : 'MISSING'}`,
+    );
+  }
   console.log(`wrote ${path.relative(repoRoot, out)}`);
-  if (!result.withinBudget.agentHost || !result.withinBudget.appOther) process.exitCode = 1;
+  if (!result.loadAsDescribed) console.log('the load was not as described (see above)');
+  if (!result.loadAsDescribed || !result.withinBudget.agentHost || !result.withinBudget.appOther) {
+    process.exitCode = 1;
+  }
 }
 
 if (isMain(import.meta.url)) {

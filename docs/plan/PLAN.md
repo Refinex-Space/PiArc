@@ -167,7 +167,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T36 | [MCP 共享连接池](tasks/T36-mcp-connection-pool.md) | 4 | T35 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | ca3d873 |
 | T37 | [Skills、斜杠命令、命令面板与输出风格](tasks/T37-skills-commands-and-output-styles.md) | 4 | T36 | macOS | high / 高 | 大 | 无 | 已完成 | b9012bb |
 | T38 | [WebSearch 与 hooks 扩展（M3）](tasks/T38-websearch-and-hooks-m3.md) | 4 | T37 | macOS | high / 高 | 中 | 无 | 已完成 | fc9c022 |
-| R4 | [M3 评审](tasks/R4-m3-review.md) | 4 | T38、W2 | macOS | high / 高 | 中 | 无 | 未开始 | — |
+| R4 | [M3 评审](tasks/R4-m3-review.md) | 4 | T38、W2 | macOS | high / 高 | 中 | 无 | 进行中 | — |
 | W3 | [Windows：M3 达标](tasks/W3-windows-m3-parity.md) | 5 | R4（建议在 T43、T44 之后，需要读屏清单与性能测量脚本） | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 未开始 | — |
@@ -308,6 +308,18 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+R4（开工 2026-11-21）：先把 `origin/windows/dev` 的 W2 合并进来（b91ad7d，用户要求；W2 一侧改号 I146/I147 → I163/I164、架构 2.43 → 2.47）。基线 verify 在合并提交上 13/15：clippy 的过期 `#[expect]`（01e190c 修复）与 capabilities.md 漂移，都是合并产物。W2 在远端 CI（44887344674）上 Windows verify 与 Windows L4 失败、macOS verify 通过，另记。审查基线 b91ad7d。
+
+- [ ] 1 M3 退出标准复测：`perf:m3` 加共享 stdio MCP server 与 skills 索引（脚本已改），打包后测量，与 T35 并列（A01）
+- [ ] 2 能力覆盖：重新生成 capabilities.md，MISSING 0，`--milestone M3` 无 planned（A02）；T31–T38、W2 验收项状态（A03）
+- [x] 3 四个独立审查并行运行（子 agent 与并发 S、MCP 与终端 M、扩展与信任 E、工程质量 Q）（A04）
+- [ ] 4 逐条核实与处理发现，修复附回归测试（A05）：S1、S2 已修（172d413）
+- [ ] 5 W2 确认与 T23–T30 汇总（A06）；登记事项逐条处理（A08）
+- [ ] 6 ADR-0010、ADR-0017 触发条件（A07）
+- [ ] 7 架构第 16 章、6.0、6.15，版本与修订记录（A09）
+- [ ] 8 `docs/reviews/R4-findings.md` 与结论、README 结论列（A10）
+- [ ] 9 verify 全量（A11）与收尾
 
 ## 登记事项
 
