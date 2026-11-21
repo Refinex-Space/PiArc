@@ -175,7 +175,12 @@ impl Drop for Fixture {
             self.io.close_session(&id);
         }
         self.storage.close();
-        std::fs::remove_dir_all(&self.root).expect("remove test data");
+        let removed = std::fs::remove_dir_all(&self.root);
+        // A failed test may leave a call holding the directory: a second panic here would
+        // abort the whole test binary and hide every other result (W2).
+        if !std::thread::panicking() {
+            removed.expect("remove test data");
+        }
     }
 }
 
