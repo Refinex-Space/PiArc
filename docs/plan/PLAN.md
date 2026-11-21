@@ -113,7 +113,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | 1 M0 技术验证 | Electron 安全基线、NAPI 事件通道、mock provider、Agent Host 多会话与 AHP、Operations 委托、凭据保险箱、transcript 渲染、终端、沙箱、打包与首次运行；S1–S10 两个平台的结论 | T03–T12、W0 | R1 | 已完成（有条件进入 M1） |
 | 2 M1 可行走骨架 | 存储与信任、会话编排与投影、L2 场景、文件工具与 Bash、客户端外壳、transcript 与 composer、基础审批、模型与凭据、system prompt 与 memory | T13–T22 | R2 | 已完成（macOS 达标；Windows 由 W1 达标，UNC 由 W2 补验） |
 | 3 M2 Harness 核心 | 权限规则与 Bash 分析、配置兼容层、hooks、计划模式与任务清单、压缩与用量、检查点与回退、WebFetch 与登录、L3 对齐；Windows 达到 M1 | W1、T23–T30 | R3 | 已完成（macOS 达标，R3；Windows 的 M1 由 W1 达标，UNC 由 W2 补验；Windows 的 M2 由 W2 达标） |
-| 4 M3 多会话与生态 | 子 agent、后台任务、终端、worktree 与并行会话、MCP、skills 与命令、WebSearch 与 hooks 扩展；Windows 达到 M2 | W2、T31–T38 | R4 | 进行中 |
+| 4 M3 多会话与生态 | 子 agent、后台任务、终端、worktree 与并行会话、MCP、skills 与命令、WebSearch 与 hooks 扩展；Windows 达到 M2 | W2、T31–T38 | R4 | M3 能力已交付；macOS 未达标（内存口径待用户决定，R4）；Windows 的 M2 由 W2 达标 |
 | 5 M4 安全与打磨 | 沙箱、插件、配置诊断与用量、NotebookEdit 与通知、无障碍与本地化、性能预算、安全收口；Windows 达到 M3 | W3、T39–T45 | R5 | 未开始 |
 | 6 M5 Beta | Auto 模式、自动记忆与托管配置、M5 补全、侧边对话与平台快捷操作、发布流水线；Windows 达到 M4 并与 Beta 同步；两平台端到端验收 | T46–T50、W4、T51 | R6 | 未开始 |
 
@@ -167,7 +167,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T36 | [MCP 共享连接池](tasks/T36-mcp-connection-pool.md) | 4 | T35 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | ca3d873 |
 | T37 | [Skills、斜杠命令、命令面板与输出风格](tasks/T37-skills-commands-and-output-styles.md) | 4 | T36 | macOS | high / 高 | 大 | 无 | 已完成 | b9012bb |
 | T38 | [WebSearch 与 hooks 扩展（M3）](tasks/T38-websearch-and-hooks-m3.md) | 4 | T37 | macOS | high / 高 | 中 | 无 | 已完成 | fc9c022 |
-| R4 | [M3 评审](tasks/R4-m3-review.md) | 4 | T38、W2 | macOS | high / 高 | 中 | 无 | 进行中 | — |
+| R4 | [M3 评审](tasks/R4-m3-review.md) | 4 | T38、W2 | macOS | high / 高 | 中 | 无 | 部分完成 | 8a1b0cf |
 | W3 | [Windows：M3 达标](tasks/W3-windows-m3-parity.md) | 5 | R4（建议在 T43、T44 之后，需要读屏清单与性能测量脚本） | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 未开始 | — |
@@ -308,18 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-R4（开工 2026-11-21）：先把 `origin/windows/dev` 的 W2 合并进来（b91ad7d，用户要求；W2 一侧改号 I146/I147 → I163/I164、架构 2.43 → 2.47）。基线 verify 在合并提交上 13/15：clippy 的过期 `#[expect]`（01e190c 修复）与 capabilities.md 漂移，都是合并产物。W2 在远端 CI（44887344674）上 Windows verify 与 Windows L4 失败、macOS verify 通过，另记。审查基线 b91ad7d。
-
-- [x] 1 M3 退出标准复测（A01，failing）：两轮已测（`tmp/evidence/R4/m3-memory-{1,2}.json`）：Agent Host 236/218 MB ≤ 270，应用其余进程 580/577 MB > 510（RSS 合计；同负载 phys_footprint 约 250 MB），定为阻塞项写进结论
-- [x] 2 能力覆盖：重新生成 capabilities.md，MISSING 0，`--milestone M3` 无 planned（A02）；T31–T38、W2 验收项状态（A03）
-- [x] 3 四个独立审查并行运行（子 agent 与并发 S、MCP 与终端 M、扩展与信任 E、工程质量 Q）（A04）
-- [x] 4 逐条核实与处理发现，修复附回归测试（A05）：S3（1d5bc50）、E3（691df8a）、M1（30ef685）、M2（bca2f81）、M3（c7297b0）、I150 拆分（3c73ec8）也已完成；已修 S1、S2（172d413）、S4（daf6f72）、E1（cff27f0）、E2（c437180）；红绿日志在 `tmp/evidence/R4/`；审查原文要点在会话草稿，待写入评审文件
-- [x] 5 W2 确认与 T23–T30 汇总（A06）；登记事项逐条处理（A08，58ef052）
-- [x] 6 ADR-0010、ADR-0017 触发条件（A07）
-- [x] 7 架构第 16 章、6.0、6.15，版本与修订记录（A09，2.48）
-- [x] 8 `docs/reviews/R4-findings.md` 与结论、README 结论列（A10；质量门禁一节待填）
-- [ ] 9 verify 全量（A11）与收尾
 
 ## 登记事项
 
@@ -1010,3 +998,12 @@ R4（开工 2026-11-21）：先把 `origin/windows/dev` 的 W2 合并进来（b9
 - 决策：ADR-0055（补充）；架构 2.46；`window.piarc` 新增 `webSearchSettings`、`setWebSearchBackend`、`setWebSearchKey`（共 104 个函数）；`allowedHttpHookUrls`、`httpHookAllowedEnvVars` 生效。测试调整：PostToolBatch 让每轮工具调用多一次 `hooks/run` 往返，`bg-completion-reminder` 原先"第二次请求不含通知"的断言依赖时序（多了这次往返后，通知可能在同一回合的下一次请求就送达），改为断言第三次请求中两个任务的结束通知各出现一次；`agent_host` 的背压测试改为断言 Core 回答 PostToolBatch 之前不发出下一次请求，队列上限的比较把请求字节计入。新 hooks-m3 场景在 L3 allowlist 中按理由排除
 - 登记：I93、I115、I122、I128（落地）、I112（改交 T45）、I123（核对）；新增 I162（OpenAI Responses、Gemini 的原生搜索与更多第三方后端）
 - 下一项：R4（M3 评审）依赖 T38 与 W2，W2 在 Windows 上进行；macOS 上暂无可开始的任务。本地提交，未推送。
+
+### 2026-11-21 R4 部分完成（提交 8a1b0cf）
+- 开工：用户要求先把 `origin/windows/dev` 的 W2 合并进来（b91ad7d，W2 一侧改号 I146/I147 → I163/I164、架构 2.43 → 2.47）；合并后基线 13/15，两步失败是合并产物（过期的 `#[expect]` 01e190c、capabilities 漂移 b48a5d7）。W2 推送后的 CI 44887344674：macOS verify 通过，Windows verify 与 L4 各有失败（I166）；本分支未推送，T35-A10、T36-A11 仍 blocked。
+- 结论：M3（macOS）未达标，阻塞项只有内存：Agent Host 最大 236 MB（≤ 270），应用其余进程 RSS 合计 580 MB（> 510，phys_footprint 约 250 MB）；测量脚本加了共享 stdio MCP server 与 skills 索引（26fc9fd、1af9363）。M3 能力全部有 L2 场景，M3 及之前没有 planned 能力。
+- 审查：四个只读子代理并行，37 条发现；修复 10 项（S1、S2 172d413，S3 1d5bc50，S4 daf6f72，E1 cff27f0，E2 c437180，E3 691df8a，M1 30ef685，M2 bca2f81，M3 c7297b0），每项先红后绿；M11 不成立并加守护测试（fc41534）；E4、M4 写明不同意的理由。另做 I150 拆分（3c73ec8）、AGENTS.md 回到 120 行内（45e932e）、复用表补 6 行（6ae6cc7）、I87 对照官方 settings 索引（282beb5）、三个过期 L4 用例（8a1b0cf）。
+- 验收：A02、A04–A11 通过；A01、A03 failing（内存）。`npm run verify` 15/15（8a1b0cf）；全量 L4 两种形态 281 通过、5 跳过、7 失败（`t18-review` 无屏幕录制权限；其余 5 个修复后 18/18）。
+- 决策：没有新 ADR；内存口径的改变等于放宽，留给用户决定（建议在 T44 之前写 ADR 提议）。架构 2.48。
+- 登记：逐条处理全部登记事项（58ef052），新增 I165–I176。
+- 下一项：T39（macOS）与 W3（Windows）都可以开始；建议先推送本分支看 CI，再在 Windows 上做 W3（它要核对 R4 的 Windows 项与 I166），macOS 上同时进行 T39。本地提交，未推送。

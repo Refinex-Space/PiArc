@@ -244,78 +244,78 @@
       "id": "R4-A01",
       "task": "R4",
       "description": "当前主线上，同一工作区 3 个并行会话加 1 个子 agent（共享 1 个 stdio MCP server、已加载 skills 索引）的稳态内存满足第 11 章预算。验证：测量脚本输出与 `docs/reviews/R4-findings.md` 中的数据。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "failing",
+      "evidence": "npm run perf:m3 -- --out tmp/evidence/R4/m3-memory-{1,2}.json（M1 Max 32 GB，macOS 26.5.2，开发构建打包形态，3 会话 + 1 子 agent + 共享 stdio MCP server（1 次启动）+ 8 个 skill 的索引，负载核对通过）：Agent Host 最大 236 / 218 MB，满足 270 MB；应用其余进程合计最大 580 / 577 MB，超出 macOS 510 MB（同负载 phys_footprint 约 250 MB，超出主要是 RSS 重复计入的共享框架页）。口径改变等于放宽，须用户决定 ADR，交 T44（I26、I146）。docs/reviews/R4-findings.md 第 1 节、docs/perf/M3-memory.md R4 复测"
     },
     {
       "id": "R4-A02",
       "task": "R4",
       "description": "`docs/product/capabilities.md` 重新生成且没有 MISSING，`--milestone M3` 不列出 `planned` 能力。验证：两条命令的输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "node scripts/ci/run-l2.mjs：176 个场景 174 通过、2 个 Windows 专属跳过；check-capabilities.mjs --results target/l2/results.json：MISSING 0，capability checks passed；--milestone M3：planned capabilities of M3 and earlier: 0（tmp/evidence/R4/capabilities.log，capabilities.md 于 b48a5d7 重新生成）"
     },
     {
       "id": "R4-A03",
       "task": "R4",
       "description": "T31–T38 与 W2 的验收项全部为 `passing`，或为 `blocked` 且原因在评审文件中被接受。验证：`acceptance.json` 检查输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "failing",
+      "evidence": "acceptance.json：T31、T32、T33、T37、T38、W2 全部 passing；T34-A03、T35-A10、T36-A11 为 blocked，原因在 R4-findings.md 第 2 节被接受；T35-A11 为 failing（3 会话内存，即 R4-A01 的阻塞项），因此本项 failing"
     },
     {
       "id": "R4-A04",
       "task": "R4",
       "description": "子 agent 与并发、MCP 与终端安全、扩展加载与信任、工程质量四个审查子代理并行运行且相互独立，各自的范围与输入记录在评审文件中。验证：评审文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/reviews/R4-findings.md 第 5 节：四个 read-only-reviewer 子代理在同一条消息里并行启动（基线 b91ad7d），各自的范围、问题、文件、架构章节与 ADR 列在表中，附录是各自的原始结论摘要"
     },
     {
       "id": "R4-A05",
       "task": "R4",
       "description": "每条审查发现都有核实结果与处理方式（修复、不同意并给理由、登记到具体任务），每个修复都附带先失败后通过的回归测试。验证：`docs/reviews/R4-findings.md`、提交记录与测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "R4-findings.md 第 6 节逐条给出核实与处理：修复 10 项（S1、S2 172d413；S3 1d5bc50；S4 daf6f72；E1 cff27f0；E2 c437180；E3 691df8a；M1 30ef685；M2 bca2f81；M3 c7297b0），每项先失败后通过（tmp/evidence/R4/*-red.log、*-green.log）；不同意的 E4、M4（部分）、M11（不成立，加守护测试 fc41534）写明理由；其余登记 I165–I176"
     },
     {
       "id": "R4-A06",
       "task": "R4",
       "description": "W2 状态为\"已完成\"，其报告逐条覆盖 M2 退出标准与 R3 重点核对项；需要用户更新的 T23–T30 验收项已汇总。验证：`PLAN.md`、W2 报告与评审文件。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PLAN.md 看板 W2 为已完成（合并 b91ad7d）；W2 报告覆盖 M2 两条退出标准与 R3 的 9 个重点核对项；需要用户更新的 T23–T30 验收项 0 项（T23–T30 全部 passing）；见 R4-findings.md 第 3 节"
     },
     {
       "id": "R4-A07",
       "task": "R4",
       "description": "ADR-0010 与 ADR-0017 的重新评估触发条件逐条检查并有结论。验证：评审文件中的检查表。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "R4-findings.md 第 4 节：ADR-0010 两条、ADR-0017 四条逐条检查，均未触发（ADR-0017 的中文输入法为未核对而非不达标，T34-A03）"
     },
     {
       "id": "R4-A08",
       "task": "R4",
       "description": "`PLAN.md`\"登记事项\"中每一条都已关闭或指定了处理任务。验证：`PLAN.md` 内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PLAN.md 登记事项：每条已关闭或在建议处理列末尾写明 R4 的处理任务（58ef052 及之后），新登记 I165–I176；R4-findings.md 第 3 节列出关闭与指派"
     },
     {
       "id": "R4-A09",
       "task": "R4",
       "description": "架构文档第 16 章、第 6.0 节、第 6.15 节已按实际更新，版本号递增并有修订记录。验证：文档 diff。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/architecture/ARCHITECTURE.md 2.48（38895b9）：第 16 章 M3（macOS）状态、6.0 节矩阵、6.15 节补四行与 Agent、6.1.2、6.2.2、6.7、6.8、10.2、第 11 章；修订记录 2.48"
     },
     {
       "id": "R4-A10",
       "task": "R4",
       "description": "评审文件开头给出明确结论：M3（macOS）是否达标、进入 M4 的前提条件、W3 重点核对项。验证：评审文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/reviews/R4-findings.md 开头：M3（macOS）未达标（内存一项）、进入 M4 的 4 个前提条件、W3 重点核对项表（12 项）；docs/reviews/README.md 的结论列"
     },
     {
       "id": "R4-A11",
       "task": "R4",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run verify 在 8a1b0cf（工作区干净）All 15 steps passed（tmp/evidence/R4/verify-final.log）"
     },
     {
       "id": "R5-A01",

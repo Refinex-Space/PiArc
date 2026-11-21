@@ -125,7 +125,11 @@
 
 ## 7. 质量门禁
 
-（收尾时填写：全量 verify、全量 L4 两种形态、Windows 交叉 clippy。）
+- `npm run verify` 在收尾提交 8a1b0cf（工作区干净）15/15 通过：cargo test、Vitest、L2 174 通过 / 0 失败 / 2 平台跳过、能力覆盖 MISSING 0（`tmp/evidence/R4/verify-final.log`）。开工基线在合并提交 b91ad7d 上 13/15，失败的两步是合并产物，见第 3 节。
+- 全量 L4（两种形态，代码与 7e6f0b6 相同，`npm run package:desktop -- --flavor development` 后 `npm run test:e2e -w @piarc/desktop`）：281 通过、5 按平台跳过、7 失败（`tmp/evidence/R4/l4.log`）。`t18-review` 两个形态失败于 `screencapture -l`：运行测试的终端没有"屏幕录制"权限，与 R3 相同（`apps/desktop/AGENTS.md`）。另外 5 个是 T37、T38 之后没有更新的用例与一个时序竞态：`t25-hooks` 仍期望 SubagentStop 被列为暂不运行（T38 已运行它）、`t31-subagents` 期望 skills 的警告写 T37（I159 已改为 T48）、`t19-composer` 在 composer 看起来空闲时就读 mock 的最后一个请求，可能早于新回合（与 R3 在 `t26` 遇到的竞态相同，Windows CI 的 I166 ③ 也是它）。前两者改为断言当前行为，后者改为等请求本身（8a1b0cf）；三个文件两种形态 18/18，提及用例重复 5 次两种形态 10/10（`tmp/evidence/R4/l4-rerun.log`）。
+- 修复的红绿日志在 `tmp/evidence/R4/`：`s1-s2-*`、`s1-unit-*`、`s3-*`、`s4-*`、`e1-*`、`e2-*`、`e3-*`、`m1-*`、`m2-*`、`m3-*`。
+- Windows 交叉 clippy 没有运行：本任务没有改 `cfg(windows)` 代码、平台模块或带 C 代码的依赖（协议的触发条件）；E1 的路径比较与 M1 的终端拒绝在 Windows 上的表现列入 W3 核对项。
+- 本任务没有界面改动（渲染进程与主进程源码未改，只改了 L4 用例），也没有改提示词，不需要截图与原创性检查。
 
 ## 附录 · 审查原文要点
 
