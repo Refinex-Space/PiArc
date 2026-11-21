@@ -121,6 +121,29 @@ excluded:
     expect(partial.stale).toEqual([]);
   });
 
+  it('applies an entry and judges it stale only on the platforms it lists (W2)', () => {
+    const { allowlist, problems } = parseAllowlist(
+      [
+        'differences:',
+        "  - { scenario: '*', path: 'tools.Grep', claude_code: '*', reason: r, platforms: [macos] }",
+        "  - { scenario: '*', path: 'tools.Grep.**', claude_code: '*', reason: r, platforms: [windows] }",
+        "  - { scenario: '*', path: x, claude_code: '*', reason: r, platforms: [linux] }",
+      ].join('\n'),
+    );
+    expect(problems).toEqual(['differences[2]: platforms must list macos and/or windows']);
+    const params = new Map([
+      ['perm-a', [{ path: 'tools.Grep.params.limit', piarc: 1, claude: 2 }]],
+    ]);
+    const windows = applyAllowlist(allowlist, '2.1.318', params, ['perm-a'], 'windows');
+    expect(windows.results.get('perm-a')?.unexplained).toEqual([]);
+    expect(windows.stale).toEqual([]);
+    const macos = applyAllowlist(allowlist, '2.1.318', params, ['perm-a'], 'macos');
+    expect(macos.results.get('perm-a')?.unexplained.map((d) => d.path)).toEqual([
+      'tools.Grep.params.limit',
+    ]);
+    expect(macos.stale.map((e) => e.index)).toEqual([0]);
+  });
+
   it('compares versions', () => {
     expect(satisfies('2.1.318', '>=2.1.300 <2.2.0')).toBe(true);
     expect(satisfies('2.2.0', '>=2.1.300 <2.2.0')).toBe(false);

@@ -499,7 +499,10 @@ impl Hub {
             // The actor stores the change with its next index sync; a closed session has none.
             let removed = lock(&self.routes).sessions.remove(&id);
             if let Some(session) = removed {
+                let hold = self.ctx.tool_io.session_hold(&id);
                 session.close().await?;
+                // Its directory goes below: wait until nothing in Core holds it (W2).
+                hold.released().await;
             }
         }
         let key = id.clone();
@@ -536,7 +539,10 @@ impl Hub {
         let removed = lock(&self.routes).sessions.remove(&id);
         let was_open = removed.is_some();
         if let Some(session) = removed {
+            let hold = self.ctx.tool_io.session_hold(&id);
             session.close().await?;
+            // Its directory goes below: wait until nothing in Core holds it (W2).
+            hold.released().await;
         }
         let key = id.clone();
         let record = self

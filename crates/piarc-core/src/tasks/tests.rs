@@ -131,6 +131,25 @@ async fn monitor_lines_go_out_at_once_in_a_turn_and_wake_an_idle_session_at_a_pa
     assert!(f.notice("s").expect("woke").text.contains("error: three"));
 }
 
+/// W2: one burst of output can arrive in pieces (Git Bash on Windows writes the first line on
+/// its own). Lines that join a waking notice before it went out keep it waking.
+#[tokio::test]
+async fn lines_joining_a_waking_notice_keep_it_waking() {
+    let f = Fixture::new("monitor pieces");
+    let (id, _cancel) = f.start(TaskKind::Monitor, "s", "s");
+    f.tasks.monitor_lines(&id, vec!["line 1".into()]);
+    assert!(f.notice("s").expect("a notice").wake);
+    f.tasks
+        .monitor_lines(&id, vec!["line 2".into(), "line 3".into()]);
+    let joined = f.notice("s").expect("one notice");
+    assert!(joined.wake, "the session still has to wake");
+    assert!(joined.text.contains("line 3"), "{}", joined.text);
+    f.tasks.delivered("s", joined.kind, &joined.source);
+    // Delivered: the next line within the interval waits again.
+    f.tasks.monitor_lines(&id, vec!["line 4".into()]);
+    assert!(!f.notice("s").expect("waiting").wake);
+}
+
 #[tokio::test]
 async fn a_monitor_that_ends_tells_how_and_its_last_lines() {
     let f = Fixture::new("monitor end");

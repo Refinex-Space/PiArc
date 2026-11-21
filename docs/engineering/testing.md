@@ -401,7 +401,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | 事件的字段匹配 | `params` 是**字段子集**：对象只比较写出的键（id、`seq`、时间戳不写就不比较），数组长度必须相同并逐元素按子集比较，标量相等；`turn` 要求 `params.turnId` 等于该标签记下的回合 id |
 | `files` | 路径 → 完整内容（UTF-8，逐字节相等），或 `null` 表示文件不存在；没写的文件不检查 |
 | `fixtures` | 路径 → `tests/scenarios/fixtures/` 下的文件名：工作区文件与它逐字节相等（非 UTF-8 编码、BOM、CRLF 用它断言），失败时给出第一处不同的字节偏移与前后的字节 |
-| `requests` | 按端点名（只有一个端点时可省略）与请求序号（`index`，从 0 开始）断言：`roles`（消息角色顺序）、`tools`（工具名集合，恰好相等）、`tools_include`、`tools_exclude`、`user_texts`（每条有文本的 user 消息的文本，按顺序）、`last_user_text`、`contains`、`not_contains`（原始请求体子串）、`tool_results`（全部工具结果按顺序：`id`，可选 `is_error`（仅 Anthropic）与 `contains`）、`body`（请求体的字段子集） |
+| `requests` | 按端点名（只有一个端点时可省略）与请求序号（`index`，从 0 开始）断言：`roles`（消息角色顺序）、`tools`（工具名集合，恰好相等）、`tools_windows`（Windows 上的恰好集合，会话另有 `PowerShell`；缺省时用 `tools`，W2）、`tools_include`、`tools_exclude`、`user_texts`（每条有文本的 user 消息的文本，按顺序）、`last_user_text`、`contains`、`not_contains`（原始请求体子串）、`tool_results`（全部工具结果按顺序：`id`，可选 `is_error`（仅 Anthropic）与 `contains`）、`body`（请求体的字段子集） |
 | `requests` 中的上下文断言 | `same_system_as` 填同一端点较早的请求序号，比较完整 system 块或 system/developer 消息的文本字节、分块与字段；`same_tools_as` 同样比较原始请求体中的工具定义（T26：进入与退出计划模式前后逐字节不变）。用 `occurrences` 指定子串在原始请求体中的出现次数，用 `user_message_contains` 检查同一条 user 消息含有列出的全部文本 |
 | `request_counts` | 每个端点收到的请求数，恰好相等 |
 | （总是检查） | 每个请求都通过严格 mock 的校验；被拒的请求列出规则 ID。运行根下 Claude Code 的配置（任何 `.claude/` 目录内的条目与 `.claude.json`）在 Core 启动前与关闭后逐字节相同，否则以 `claude_config` 失败列出新增、修改、删除的路径（T24，ADR-0005 第 2 条） |
@@ -498,7 +498,7 @@ L2 证明 PiArc 符合我们写下的期望，L3 检查这些期望是否与 Cla
 - 前提：PATH 上有 `claude`（版本写进报告首行）。没有时命令打印安装提示并以 2 退出。本机按 Nightly 锁定的版本安装：`npm install -g @anthropic-ai/claude-code@<版本>`（全局安装，先征得用户同意）。版本在 `.github/workflows/l3-nightly.yml` 的 `CLAUDE_CODE_VERSION`。
 - 退出码：有未解释的差异、过期或缺理由的 allowlist 条目、剥离检查失败、某侧运行失败（主循环请求被 mock 拒绝或运行器报错）、重复运行不一致、`~/.claude` 有变化时为 1。
 - `~/.claude` 比对看的是整个目录：本机同时开着别的 Claude Code 会话（例如正在用 Claude Code 开发），它写会话记录也会被报告。取证时在没有其他会话写入时运行。
-- 平台：Nightly 在 macOS 上运行。PowerShell 场景排除；Windows 上运行需要原生安装器装的 `claude.exe`（Node 不经 shell 不能启动 npm 的 `claude.cmd`）。
+- 平台：Nightly 在 macOS 上运行。Windows 上运行需要原生的 `claude.exe`（Node 不经 shell 不能启动 npm 的 `claude.cmd`）：锁定版本的 npm 平台包自带它，`npm install --prefix tmp/l3-claude --no-save --ignore-scripts @anthropic-ai/claude-code-win32-x64@<版本>` 后把 `tmp/l3-claude/node_modules/@anthropic-ai/claude-code-win32-x64` 放在 `PATH` 最前运行 `npm run l3`（不是全局安装，不动本机的 `claude`）。W2 在 Windows 上对 2.1.318 跑通：Windows 版 Claude Code 自带 Grep、Glob（参数与 PiArc 不同），没有 PowerShell、KillShell、Monitor，这些差异用 `platforms: [windows]` 的条目说明；PowerShell 场景仍排除（Claude Code 在 Windows 上同样没有 PowerShell 工具）。
 
 ### 14.2 隔离
 
@@ -559,7 +559,7 @@ approvals:                        # 按工具调用 id 作答；没有点名的�
 
 `tests/l3-allowlist.yaml`：
 
-- `differences`：`scenario`（id 或带 `*` 的模式）、`path`（字段路径模式：`*` 匹配一个键内的文字、`[*]` 任意下标、`**` 任意一段路径）、`claude_code`（适用的版本范围，空格分隔的比较式如 `>=2.1.318 <2.2.0`，或 `*`）、`reason`（必填）、`follow_up`（可选，后续处理的任务，同步写进 `PLAN.md` 登记事项）。
+- `differences`：`scenario`（id 或带 `*` 的模式）、`path`（字段路径模式：`*` 匹配一个键内的文字、`[*]` 任意下标、`**` 任意一段路径）、`claude_code`（适用的版本范围，空格分隔的比较式如 `>=2.1.318 <2.2.0`，或 `*`）、`reason`（必填）、`follow_up`（可选，后续处理的任务，同步写进 `PLAN.md` 登记事项）、`platforms`（可选，`[macos]`、`[windows]` 或两者，缺省两者都适用；只在所列平台上放行差异、判定过期，W2：Claude Code 的工具集因平台而不同）。
 - `excluded`：对照领域（`perm-`、`policy-`、`hooks-`、`config-` 开头的 L2 场景）中没有 L3 场景对照的，写明 `claude -p` 无法复现的原因；也可以排除某个 L3 场景。每个这样的 L2 场景必须被对照或排除，否则命令失败。
 - 缺理由的条目、版本在范围内且所点名场景都跑过却没有匹配任何差异的条目，都让命令失败：修好的偏差要从清单删掉。Claude Code 升级后，新差异先分析，再修正或加条目（新条目的版本范围从新版本开始）。
 

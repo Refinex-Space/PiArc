@@ -73,6 +73,7 @@ expect:
       roles: [user]
       user_texts: [Where is the parser defined? Answer with the path.]
       tools: [Read, Bash, Glob, Grep, WebFetch]
+      tools_windows: [Read, Bash, PowerShell, Glob, Grep, WebFetch]
       body: { model: fast-model }
       not_contains:
         ['Project memory', 'Earlier answer', 'Git status at session start', 'Say something first']

@@ -151,6 +151,10 @@ fn repository(root: &Path) -> PathBuf {
 }
 
 #[tokio::test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one worktree's whole life, step by step, reads best as one scenario"
+)]
 async fn a_session_worktree_is_created_copied_inspected_and_removed() {
     let root = temp_dir("session");
     let repo = repository(&root);

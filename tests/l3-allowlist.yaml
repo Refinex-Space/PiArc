@@ -62,11 +62,38 @@ differences:
   - scenario: '*'
     path: 'requests.items[*].tools.Grep'
     claude_code: '>=2.1.318 <2.2.0'
-    reason: Claude Code 2.1.318 offers no Grep tool (searches go through Bash); PiArc keeps Grep as a canonical tool with Core-side I/O and its own rules and hooks matching (architecture section 6.1, ADR-0020), which also suits models weaker at shell search.
+    platforms: [macos]
+    reason: Claude Code 2.1.318 offers no Grep tool on macOS (searches go through Bash); PiArc keeps Grep as a canonical tool with Core-side I/O and its own rules and hooks matching (architecture section 6.1, ADR-0020), which also suits models weaker at shell search.
+  - scenario: '*'
+    path: 'requests.items[*].tools.Grep.**'
+    claude_code: '>=2.1.318 <2.2.0'
+    platforms: [windows]
+    reason: On Windows Claude Code 2.1.318 offers its own Grep with ripgrep's options (-A/-B/-C, -i, -n, -o, output_mode, head_limit, offset, multiline, type); PiArc's Grep keeps Pi's parameters (ignoreCase, literal, limit) with Core-side I/O (architecture section 6.1, ADR-0020), the same tool it offers on macOS.
   - scenario: '*'
     path: 'requests.items[*].tools.Glob'
     claude_code: '>=2.1.318 <2.2.0'
-    reason: Claude Code 2.1.318 offers no Glob tool (searches go through Bash); PiArc keeps Glob as a canonical tool with Core-side I/O (architecture section 6.1, ADR-0020). perm-rules denies Glob as a whole, so there both sides lack it.
+    platforms: [macos]
+    reason: Claude Code 2.1.318 offers no Glob tool on macOS (searches go through Bash); PiArc keeps Glob as a canonical tool with Core-side I/O (architecture section 6.1, ADR-0020). perm-rules denies Glob as a whole, so there both sides lack it.
+  - scenario: '*'
+    path: 'requests.items[*].tools.Glob.**'
+    claude_code: '>=2.1.318 <2.2.0'
+    platforms: [windows]
+    reason: On Windows Claude Code 2.1.318 offers its own Glob; PiArc's Glob keeps Pi's limit parameter with Core-side I/O (architecture section 6.1, ADR-0020), the same tool it offers on macOS.
+  - scenario: '*'
+    path: 'requests.items[*].tools.PowerShell'
+    claude_code: '>=2.1.318 <2.2.0'
+    platforms: [windows]
+    reason: PiArc offers a PowerShell tool on Windows next to Bash through Git Bash (architecture section 6.2.2, ADR-0028); Claude Code 2.1.318 offers none in its default configuration.
+  - scenario: '*'
+    path: 'requests.items[*].tools.KillShell'
+    claude_code: '>=2.1.318 <2.2.0'
+    platforms: [windows]
+    reason: PiArc offers KillShell on every platform (T32, ADR-0049); Claude Code 2.1.318 on Windows offers no KillShell (it does on macOS, where both sides match).
+  - scenario: '*'
+    path: 'requests.items[*].tools.Monitor'
+    claude_code: '>=2.1.318 <2.2.0'
+    platforms: [windows]
+    reason: PiArc offers Monitor on every platform (T32, ADR-0049); Claude Code 2.1.318 on Windows offers no Monitor (it does on macOS, where both sides match).
   - scenario: '*'
     path: 'requests.items[*].tools.TodoWrite'
     claude_code: '>=2.1.318 <2.2.0'
@@ -205,14 +232,16 @@ excluded:
     reason: The prompt hook's judgement is an auxiliary request whose answer the scenario scripts as a step; the L3 mock answers auxiliary requests with a fixed reply without consuming steps (ADR-0046), so the judgement cannot be steered on either side.
   - scenario: hooks-m3-post-tool-batch
     reason: A PostToolBatch block ends PiArc's run by aborting it before the next request (Pi 1.5.2's turn_end cannot end a run, ADR-0055), which leaves an interruption marker and an interrupted turn by design; the turn shape cannot match Claude Code's.
+  - scenario: hooks-archive-during-hook
+    reason: It archives a session while its idle Notification hook runs and checks that PiArc removes the session's directory (a Windows file-handle race, W2); claude -p has no archive step, and the hook itself behaves as in hooks-notification.
   - scenario: perm-critical-delete
     reason: It runs deletions of the home directory, the workspace and the filesystem root; a difference in Claude Code's answer would delete real files outside the run's temporary root, so it is not run against Claude Code.
   - scenario: perm-powershell-whole
-    reason: PowerShell is Windows only and L3 runs on macOS; revisit when L3 runs on Windows.
+    reason: PowerShell is Windows only, and Claude Code 2.1.318 on Windows offers no PowerShell tool in its default configuration (W2 ran L3 on Windows), so claude -p cannot run the scenario; PiArc's PowerShell rules are covered by this L2 scenario.
   - scenario: policy-accept-edits-powershell
-    reason: PowerShell is Windows only and L3 runs on macOS; revisit when L3 runs on Windows.
+    reason: PowerShell is Windows only, and Claude Code 2.1.318 on Windows offers no PowerShell tool in its default configuration (W2 ran L3 on Windows), so claude -p cannot run the scenario; PiArc's PowerShell rules are covered by this L2 scenario.
   - scenario: policy-manual-powershell
-    reason: PowerShell is Windows only and L3 runs on macOS; revisit when L3 runs on Windows.
+    reason: PowerShell is Windows only, and Claude Code 2.1.318 on Windows offers no PowerShell tool in its default configuration (W2 ran L3 on Windows), so claude -p cannot run the scenario; PiArc's PowerShell rules are covered by this L2 scenario.
   - scenario: policy-extra-directory
     reason: Approving a new directory is a choice on PiArc's card; -p's permission prompt tool answers only allow or deny for the call, so the directory grant cannot be reproduced.
   - scenario: policy-save-rule

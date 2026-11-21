@@ -8,12 +8,14 @@
 //                 such as ">=2.1.300 <2.2.0", or "*"
 //   reason        why PiArc differs on purpose (required)
 //   follow_up     the task that will revisit it (optional; listed in PLAN.md's registry)
+//   platforms     where the entry applies: [macos], [windows] or both (optional, default
+//                 both); Claude Code's tool set differs by platform (W2)
 // excluded: [{scenario, reason}]
 //   An L2 scenario of the compared areas that no L3 scenario mirrors, or an L3 scenario that
 //   does not run, with the reason it cannot be reproduced through `claude -p`.
 //
 // The command fails on an entry without a reason and on an entry that applies to this run
-// (version in range, scenario ran) but matches no difference.
+// (version in range, platform listed, scenario ran) but matches no difference.
 import { parse } from 'yaml';
 
 import { isRecord } from '../lib/repo.mjs';
@@ -21,12 +23,18 @@ import { compilePattern } from './diff.mjs';
 
 /**
  * @typedef {{ scenario: string, path: string, claude_code: string, reason: string,
- *   follow_up?: string, index: number }} Entry
+ *   follow_up?: string, platforms?: string[], index: number }} Entry
  * @typedef {{ scenario: string, reason: string }} Exclusion
  * @typedef {{ entries: Entry[], excluded: Exclusion[] }} Allowlist
  */
 
 const VERSION = /^(\d+)\.(\d+)\.(\d+)$/;
+const PLATFORMS = new Set(['macos', 'windows']);
+
+/** The allowlist's name of the platform this runs on. */
+export function currentPlatform() {
+  return process.platform === 'win32' ? 'windows' : 'macos';
+}
 const COMPARATOR = /^(>=|<=|>|<|=)?(\d+\.\d+\.\d+)$/;
 
 /**
@@ -122,7 +130,7 @@ export function parseAllowlist(text) {
     problems.push(`l3-allowlist.yaml: unknown field \`${key}\``);
   }
   const differences = Array.isArray(doc.differences) ? doc.differences : [];
-  const fields = new Set(['scenario', 'path', 'claude_code', 'reason', 'follow_up']);
+  const fields = new Set(['scenario', 'path', 'claude_code', 'reason', 'follow_up', 'platforms']);
   for (const [index, raw] of differences.entries()) {
     const where = `differences[${String(index)}]`;
     if (!isRecord(raw)) {
@@ -134,6 +142,14 @@ export function parseAllowlist(text) {
     }
     /** @param {string} key */
     const text = (key) => (typeof raw[key] === 'string' ? raw[key].trim() : '');
+    const platforms = raw.platforms;
+    const listed = Array.isArray(platforms) && platforms.length > 0;
+    if (
+      platforms !== undefined &&
+      (!listed || !platforms.every((p) => typeof p === 'string' && PLATFORMS.has(p)))
+    ) {
+      problems.push(`${where}: platforms must list macos and/or windows`);
+    }
     const entry = {
       scenario: text('scenario'),
       path: text('path'),
@@ -141,6 +157,7 @@ export function parseAllowlist(text) {
       reason: text('reason'),
       index,
       ...(text('follow_up') === '' ? {} : { follow_up: text('follow_up') }),
+      ...(listed ? { platforms: platforms.filter((p) => typeof p === 'string') } : {}),
     };
     if (entry.reason === '') problems.push(`${where} (${entry.path}): the reason is missing`);
     if (entry.scenario === '') problems.push(`${where}: the scenario is missing`);
@@ -179,16 +196,27 @@ function scenarioMatches(entry, scenario) {
 
 /**
  * Splits each scenario's differences into allowed (with the entry) and unexplained, and
- * finds the stale entries: in range for `version`, every scenario of `known` the entry names
- * ran, and it matched no difference. A filtered run therefore only judges entries for the
- * scenarios it ran.
+ * finds the stale entries: in range for `version`, listed for `platform`, every scenario of
+ * `known` the entry names ran, and it matched no difference. A filtered run therefore only
+ * judges entries for the scenarios it ran.
  * @param {Allowlist} allowlist
  * @param {string} version Claude Code's version
  * @param {Map<string, import('./diff.mjs').Difference[]>} differences by scenario that ran
  * @param {string[]} known every scenario that runs when nothing is filtered
+ * @param {string} [platform] `macos` or `windows`; the one this runs on by default
  */
-export function applyAllowlist(allowlist, version, differences, known) {
-  const active = allowlist.entries.filter((e) => satisfies(version, e.claude_code));
+export function applyAllowlist(
+  allowlist,
+  version,
+  differences,
+  known,
+  platform = currentPlatform(),
+) {
+  const active = allowlist.entries.filter(
+    (e) =>
+      satisfies(version, e.claude_code) &&
+      (e.platforms === undefined || e.platforms.includes(platform)),
+  );
   /** @type {Set<number>} */
   const used = new Set();
   /** @type {Map<string, { allowed: { difference: import('./diff.mjs').Difference, entry: Entry }[], unexplained: import('./diff.mjs').Difference[] }>} */

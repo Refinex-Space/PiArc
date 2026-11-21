@@ -186,9 +186,13 @@ fn check_request(
         compare("roles", roles, &view.roles());
     }
     let tools = view.tools();
-    if let Some(expected) = &expect.tools {
+    let (field, exact) = match &expect.tools_windows {
+        Some(windows) if cfg!(windows) => ("tools_windows", Some(windows)),
+        _ => ("tools", expect.tools.as_ref()),
+    };
+    if let Some(expected) = exact {
         let expected: BTreeSet<String> = expected.iter().cloned().collect();
-        compare("tools", &expected, &tools);
+        compare(field, &expected, &tools);
     }
     if let Some(user_texts) = &expect.user_texts {
         compare("user_texts", user_texts, &view.user_texts());

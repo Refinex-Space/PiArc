@@ -209,8 +209,8 @@
       "id": "R3-A07",
       "task": "R3",
       "description": "W1 状态为\"已完成\"，其报告逐条覆盖 M1 退出标准；需要用户更新的 T13–T22 验收项已汇总。验证：`PLAN.md`、W1 报告与评审文件。",
-      "status": "blocked",
-      "evidence": "W1 在看板上为\"部分完成\"，不是\"已完成\"：W1-A05 的 UNC 共享未能在 W1 机器上验证（SMB 不可用），需由 W2 在 SMB 正常的 Windows 上运行该测试后关闭。W1 报告逐条覆盖 M1 退出标准（\"M1 退出标准的 Windows 证据\"一节）；需要用户更新的 T13–T22 验收项为 0 项，已在评审文件\"W1 确认\"汇总。"
+      "status": "passing",
+      "evidence": "由 W2 在 Windows 上验证：W1 的最后一项 W1-A05（UNC）已由 W2 关闭，W1 在看板上改为\"已完成\"；W1 报告逐条覆盖 M1 退出标准，需要用户更新的 T13–T22 验收项 0 项（R3 评审文件\"W1 确认\"）。"
     },
     {
       "id": "R3-A08",
@@ -3219,8 +3219,8 @@
       "id": "T32-A04",
       "task": "T32",
       "description": "KillShell 终止整棵进程树（含孙进程），状态为 `killed`，输出文件保留。验证：macOS 与 Windows CI 上的测试（进程表断言无残留）。",
-      "status": "blocked",
-      "evidence": "macOS 已通过，Windows CI 待推送后确认：`cargo test -p piarc-core --test background_tasks` 的 killshell_ends_the_whole_tree_and_keeps_the_output（子进程与忽略 SIGTERM 的孙进程在 KillShell 后按进程表 `kill -0` 均不存在，Windows 用 tasklist 与 /proc/<pid>/winpid；状态 killed，输出文件仍读回 \"started\"）；L2 `exec-timeout-kills-tree`（转后台后 KillShell，之后命令确认 ended:child.pid、ended:grand.pid）。Windows 用例随 verify 在 CI 运行，用户推送后由下一个任务按 CI 结果关闭。提交 ef39d43"
+      "status": "passing",
+      "evidence": "由 W2 在 Windows 上验证（Windows 11 x64 本机实测，非 CI；用户在 W2 会话中要求认领）：`cargo test -p piarc-core --test background_tasks` 4/4，含 killshell_ends_the_whole_tree_and_keeps_the_output（tasklist 与 /proc/<pid>/winpid 确认子孙进程不存在、状态 killed、输出保留）；L2 `exec-timeout-kills-tree` 通过（tmp/evidence/W2/t32-t33-windows.log）。"
     },
     {
       "id": "T32-A05",
@@ -3282,8 +3282,8 @@
       "id": "T32-A13",
       "task": "T32",
       "description": "`npm run verify` 通过（含 Windows CI 上的进程树测试）。验证：命令输出。",
-      "status": "blocked",
-      "evidence": "macOS 本机 `npm run verify` 全部通过（提交 ef39d43，见 PLAN 会话日志的步骤汇总）；Windows CI 上的进程树测试需用户推送后由下一个任务按 CI 结果关闭。"
+      "status": "passing",
+      "evidence": "由 W2 在 Windows 上验证（Windows 11 x64 本机实测，非 CI；用户在 W2 会话中要求认领）：Windows 本机 `npm run verify` 15/15 通过（提交 08fc09e，工作区干净，tmp/evidence/W2/verify-3.log），第 8 步含 background_tasks 与 piarc-exec 的进程树测试。"
     },
     {
       "id": "T33-A01",
@@ -3296,8 +3296,8 @@
       "id": "T33-A02",
       "task": "T33",
       "description": "OSC 133 正确识别命令的开始、结束与退出码：macOS 上 zsh 与 bash，Windows CI 上 Git Bash 与 PowerShell。验证：测试。",
-      "status": "blocked",
-      "evidence": "macOS 已通过，Windows CI 待推送后确认：`cargo test -p piarc-term --test shell_integration` 5 项通过（zsh、bash 各有非交互与交互式用例，命令开始、结束、退出码与 OSC 7，用户启动文件照常生效），连跑 8 遍稳定；Git Bash 与 PowerShell 的用例在 `tests/shell_integration_windows.rs`，随 verify 在 Windows CI 运行，用户推送后由下一个任务按 CI 结果关闭。提交 33f4bf9"
+      "status": "passing",
+      "evidence": "由 W2 在 Windows 上验证（Windows 11 x64 本机实测，非 CI；用户在 W2 会话中要求认领）：`cargo test -p piarc-term --test shell_integration_windows` 2/2（git_bash_reports_commands_and_exit_codes、powershell_reports_commands_and_exit_codes）（tmp/evidence/W2/t32-t33-windows.log）。"
     },
     {
       "id": "T33-A03",
@@ -3366,8 +3366,8 @@
       "id": "T33-A12",
       "task": "T33",
       "description": "关闭终端或应用退出时 shell 进程树被终止。验证：macOS 与 Windows CI 上的测试。",
-      "status": "blocked",
-      "evidence": "macOS 已通过，Windows CI 待推送后确认：`cargo test -p piarc-core --test terminal` 的 closing_a_terminal_ends_its_whole_process_tree 与 quitting_ends_every_terminal_tree_before_it_returns（`set -m` 的作业自成进程组、忽略 HUP 与 TERM 的进程，关闭终端与关闭 Core 后 `ps` 均不存在；后者在修复前复现了忽略挂断的进程活过 Core）；`cargo test -p piarc-exec terminal_tree`。Windows 用例 `tests/terminal_windows.rs` 与 piarc-exec 的 Job 用例经交叉 clippy 编译，随 verify 在 Windows CI 运行。提交 33f4bf9"
+      "status": "passing",
+      "evidence": "由 W2 在 Windows 上验证（Windows 11 x64 本机实测，非 CI；用户在 W2 会话中要求认领）：`cargo test -p piarc-core --test terminal_windows` 2/2（closing_a_terminal_ends_its_whole_process_tree、quitting_ends_every_terminal_tree_before_it_returns），`cargo test -p piarc-exec terminal_tree` 的 Job 用例通过（tmp/evidence/W2/t32-t33-windows.log）。"
     },
     {
       "id": "T33-A13",
@@ -3380,8 +3380,8 @@
       "id": "T33-A14",
       "task": "T33",
       "description": "`npm run verify` 通过（含 Windows CI 上的 piarc-term 测试）。验证：命令输出。",
-      "status": "blocked",
-      "evidence": "macOS 已通过，Windows CI 待推送后确认：`npm run verify` 15/15 通过（33f4bf9，工作区干净；Vitest 1438 passed、L2 145 passed 2 个按平台跳过）；Windows 交叉 clippy（piarc-core、piarc-napi、piarc-term、piarc-exec）通过。Windows CI 上的 piarc-term 测试需用户推送后由下一个任务按 CI 结果关闭。"
+      "status": "passing",
+      "evidence": "由 W2 在 Windows 上验证（Windows 11 x64 本机实测，非 CI；用户在 W2 会话中要求认领）：Windows 本机 `npm run verify` 15/15 通过（提交 08fc09e，工作区干净，tmp/evidence/W2/verify-3.log）；`cargo test -p piarc-term` 全部通过（pty_windows 10、shell_integration_windows 2，tmp/evidence/W2/piarc-term.log）。"
     },
     {
       "id": "T34-A01",
@@ -3478,8 +3478,8 @@
       "id": "T34-A14",
       "task": "T34",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "blocked",
-      "evidence": "macOS 已通过，Windows CI 待推送后确认：`npm run verify` 15/15 通过（991f323，工作区干净；Vitest 1452 passed 1 skipped、cargo test 875 passed 0 failed、L2 146 passed 2 个按平台跳过，日志 tmp/evidence/T34/verify.log）；Windows 交叉 clippy（piarc-term、piarc-core、piarc-napi、piarc-testkit、piarc-protocol，`--all-targets -D warnings`）通过。piarc-term 写线程与 Core 终端入口的改动在 Windows CI 上的 cargo test 需用户推送后由下一个任务按 CI 结果关闭。"
+      "status": "passing",
+      "evidence": "由 W2 在 Windows 上验证（Windows 11 x64 本机实测，非 CI；用户在 W2 会话中要求认领）：Windows 本机 `npm run verify` 15/15 通过（提交 08fc09e，工作区干净，tmp/evidence/W2/verify-3.log）；`cargo test --workspace --no-fail-fast` 95 个测试目标全部通过，含 piarc-term 写线程与 Core 终端入口（tmp/evidence/W2/cargo-test-all.log）。注意 `piarc-term/tests/pointer.rs` 只在 Unix 上编译，Windows 上 0 个用例（W3 补）。"
     },
     {
       "id": "T35-A01",
@@ -5095,8 +5095,8 @@
       "id": "W1-A05",
       "task": "W1",
       "description": "盘符、UNC、含空格与中文、超过 260 字符的路径和保留文件名在文件工具中行为正确；CRLF 文件经 Edit 后换行风格不变；命令输出中的中文不乱码。验证：测试输出与核对记录。",
-      "status": "blocked",
-      "evidence": "除 UNC 外通过：超过 260 字符（499 字符含中文）路径经完整预检写读、保留名与以点或空格结尾的名字被拒且不留文件（修复 017b20b）、junction 越界询问与已获准目录不可替换（b75d2bf）、盘符与含空格中文路径（全部 L2/L4）、大小写（piarc-fs 用例）、CRLF/BOM/GBK/损坏 UTF-16（L2 tools-edit-preserves-encoding 与 piarc-fs 写入用例）、子进程中文（exec_commands、w1-windows-shells）（tmp/evidence/W1/windows-paths.log）。阻塞：UNC 共享在本机不可用（net view \\localhost 报系统错误 1702），测试 windows_paths::a_workspace_on_a_unc_share_is_written_read_and_searched 需设 PIARC_TEST_UNC_SHARE，登记 I96"
+      "status": "passing",
+      "evidence": "由 W2 在 Windows 上验证：UNC 工作区补齐。本机 SMB 文件访问可用（W1 的 `net view` 1702 只是浏览接口），以管理共享 PIARC_TEST_UNC_SHARE=\\localhostC$Users<user>AppDataLocalTemp 运行 `cargo test -p piarc-core --lib tool_io::policy::tests::windows_paths`：5/5，`a_workspace_on_a_unc_share_is_written_read_and_searched` 经 UNC 写入 CRLF 文件、本地读回一致、Read 与 Glob 找到（测试的 fs/glob 参数补齐，08fc09e；tmp/evidence/W2/unc.log）。其余部分沿用 W1 的证据（超过 260 字符、保留名、junction、盘符与空格中文、大小写、CRLF/BOM/GBK、子进程中文）。"
     },
     {
       "id": "W1-A06",
@@ -5158,85 +5158,85 @@
       "id": "W2-A01",
       "task": "W2",
       "description": "本机运行 L2 场景全部通过（含 T23–T30 新增的场景），能力清单中 M2 能力无 MISSING。验证：命令输出与 `docs/product/capabilities.md`。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Windows 11 本机 L2 149 个场景 145 通过、0 失败、4 个 macOS 专属跳过；capabilities.md 重新生成，MISSING 0（tmp/evidence/W2/verify-3.log 第 14 步与新增 hooks-archive-during-hook 后的全量运行）。docs/reviews/W2-windows-m2-parity.md 检查表 A01。"
     },
     {
       "id": "W2-A02",
       "task": "W2",
       "description": "Git Bash 下的 Bash 规则与复合命令分析端到端符合预期：deny/ask/allow 用例、包装命令剥离、盘符根与用户目录的关键路径删除总是询问。验证：场景输出与 Playwright 截图（存 `tmp/evidence/W2/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 perm-rule-match、perm-bash-compound、perm-read-only、perm-critical-delete、perm-bypass 在 Windows 通过；bash_cases 新增盘符根 C:/、'C:\\' 与 $USERPROFILE（修复 6110364，先红后绿）；Git 程序探测修复（91f9994、c54271b）；L4 t23-permissions 2/2（tmp/evidence/W2/l4-m2.log）。"
     },
     {
       "id": "W2-A03",
       "task": "W2",
       "description": "`PowerShell(…)` 规则精确匹配生效，未被精确允许的命令在 Manual 模式下询问，\"总是允许\"写入的规则能再次命中。验证：Playwright 与场景输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 perm-powershell-whole、policy-manual-powershell、policy-accept-edits-powershell；Core 用例 powershell_rules_match_whole_commands_and_always_allow_hits_again（717efe9：整条匹配、总是允许写入后再次命中、通配规则对 %USERPROFILE%、~\\、..\\..、-Path: 询问）；L4 w1-windows-shells（powershell-approval.png）。"
     },
     {
       "id": "W2-A04",
       "task": "W2",
       "description": "hooks 超时与取消时整棵进程树被终止（含 hook 启动的孙进程），exit 2 阻断且理由回到模型。验证：实机测试输出（进程表前后对比）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --lib tool_io::hooks 12/12：超时与中断后 hook 起的孙进程（PID 6416、18812）经 tasklist 确认结束，exit 2 阻断与理由，UserPromptSubmit 30 s；L2 hooks-* 15/15（tmp/evidence/W2/hooks-windows.log）。"
     },
     {
       "id": "W2-A05",
       "task": "W2",
       "description": "回退四个选项、冲突检测与按 hunk 丢弃在 CRLF 文件、含空格与中文的路径、超过 260 字符的路径上结果正确；目标文件被占用时给出明确提示且文件不损坏。验证：场景测试与 Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "路径标签修复 cafffc1 后 L2 rewind-*、changes-*（CRLF/BOM 夹具）与 L4 t28-rewind 3/3 通过；checkpoints::tests::windows 3/3（03b28cf）：被占用文件报出文件名与 os error 32 且不写入、释放后按 CRLF 恢复，超过 260 字符与大小写不同的写法字节恢复，junction 不写穿（tmp/evidence/W2/ckpt-windows.log）。"
     },
     {
       "id": "W2-A06",
       "task": "W2",
       "description": "阈值触发压缩、`/compact` 重点、熔断与重注入在本机通过，用量环显示正确。验证：L2 场景输出与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 ctx-compact-threshold、ctx-compact-focus、ctx-compact-breaker、ctx-compact-restore、ctx-usage 通过；L4 t27-context（ring-75-warning.png、ring-90-context-card.png、after-compact-focus.png）。"
     },
     {
       "id": "W2-A07",
       "task": "W2",
       "description": "配置兼容层读取 `%USERPROFILE%\\.claude\\settings.json` 与 `%USERPROFILE%\\.claude.json`，`.claude/rules` 的 `paths:` 条件在 Windows 路径上生效，诊断页显示正确。验证：测试与 Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-config 全部通过（含 Windows junction 用例 4c9ce39）；Core 家目录为 std::env::home_dir()（Windows 即 %USERPROFILE%）；L2 config-merge-order、config-untrusted-project、config-rules-paths；L4 t24-diagnostics。"
     },
     {
       "id": "W2-A08",
       "task": "W2",
       "description": "计划模式、任务清单、AskUserQuestion、下一步建议与三档视图的界面流程在 Windows 上通过。验证：Playwright（Windows）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4（Windows dev 形态）t26-harness 5/5、t29-views、t29-login-models 通过，截图在 tmp/evidence/W2/l4/ 与 tmp/evidence/W2/views-*.png。"
     },
     {
       "id": "W2-A09",
       "task": "W2",
       "description": "WebFetch 在 Windows 上拒绝回环、内网与 IPv6 本地地址；OAuth 与设备码登录经回环端口完成（mock 授权服务器）；外部修改检测经文件监听生效。验证：测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "piarc-web SSRF 用例（127.0.0.1、10.x、::1、::ffff: 映射）与 internal_addresses_are_refused_without_the_allowlist；--test sessions login 4/4；piarc-fs 监听与 --test state 设置重载；L2 ctx-file-modified、webfetch-*、login-*（tmp/evidence/W2/a09.log）。"
     },
     {
       "id": "W2-A10",
       "task": "W2",
       "description": "权限与 hooks 场景的 L3 比对在 Windows 上无未解释差异；未安装 Claude Code CLI 且用户不同意安装时，`PLAN.md` 中记录为未验证及原因。验证：L3 命令输出或 `PLAN.md` 记录。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npm run l3 -- --repeat 2 对锁定的 Claude Code 2.1.318（tmp/l3-claude 本地平台包的 claude.exe）：12 个场景 0 未解释、3707 已说明、0 过期，两遍一致（edfaa51 增加 allowlist platforms）；退出码 1 仅因本会话的交互式 Claude Code 写 ~/.claude（tmp/evidence/W2/l3-repeat2.log）。"
     },
     {
       "id": "W2-A11",
       "task": "W2",
       "description": "发现的平台问题都已修复（附复现的失败测试）或登记到 `PLAN.md`\"登记事项\"；`docs/reviews/W2-windows-m2-parity.md` 逐条给出 M2 退出标准与 R3 重点核对项的 Windows 证据与结论，并列出 T23–T30 中等待 Windows 的验收项的结论。验证：报告、提交记录与登记事项内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/reviews/W2-windows-m2-parity.md：检查表、R3 重点核对项、F1–F7 与 T1–T5（每项先失败后通过的测试）、T23–T30 等待 Windows 的验收项 0 项；登记 I163、I164（W2 分支上编为 I146、I147，合并时改号），关闭 I96、I102、I118。"
     },
     {
       "id": "W2-A12",
       "task": "W2",
       "description": "Windows 上 `npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "Windows 11 本机 `npm run verify` 15/15 通过（提交 45124e4，工作区干净，tmp/evidence/W2/verify-final.log；cargo test 508 s、L2 145 通过 4 个 macOS 专属跳过）。"
     },
     {
       "id": "W3-A01",

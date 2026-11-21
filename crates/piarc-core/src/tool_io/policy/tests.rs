@@ -165,9 +165,22 @@ impl Fixture {
 
 impl Drop for Fixture {
     fn drop(&mut self) {
-        self.io.close_session(SESSION);
+        // Subagents' sessions too: their scopes hold directory handles, which Windows does not
+        // let anyone delete while they are open (ADR-0036).
+        let sessions: Vec<String> = super::super::lock(&self.io.sessions)
+            .keys()
+            .cloned()
+            .collect();
+        for id in sessions {
+            self.io.close_session(&id);
+        }
         self.storage.close();
-        std::fs::remove_dir_all(&self.root).expect("remove test data");
+        let removed = std::fs::remove_dir_all(&self.root);
+        // A failed test may leave a call holding the directory: a second panic here would
+        // abort the whole test binary and hide every other result (W2).
+        if !std::thread::panicking() {
+            removed.expect("remove test data");
+        }
     }
 }
 
@@ -848,10 +861,12 @@ mod windows_paths {
             .await;
         assert_eq!(glob["allowed"], true);
         let origin = json!({"tool": "Glob", "toolCallId": "unc-glob"});
+        // As the Agent Host asks (W2: the call lacked these, and W1 could not run it).
         let found = f
             .io_call(
                 "fs/glob",
-                json!({"sessionId": SESSION, "path": ".", "pattern": "*.txt", "origin": origin}),
+                json!({"sessionId": SESSION, "path": ".", "pattern": "*.txt", "limit": 1001,
+                    "exclude": ["**/node_modules/**", "**/.git/**"], "origin": origin}),
             )
             .await
             .expect("glob");

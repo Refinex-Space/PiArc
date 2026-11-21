@@ -111,8 +111,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 |---|---|---|---|---|
 | 0 工程基座 | 脚手架、质量门禁、工程规范、协议与契约测试 | T01–T02 | — | 已完成 |
 | 1 M0 技术验证 | Electron 安全基线、NAPI 事件通道、mock provider、Agent Host 多会话与 AHP、Operations 委托、凭据保险箱、transcript 渲染、终端、沙箱、打包与首次运行；S1–S10 两个平台的结论 | T03–T12、W0 | R1 | 已完成（有条件进入 M1） |
-| 2 M1 可行走骨架 | 存储与信任、会话编排与投影、L2 场景、文件工具与 Bash、客户端外壳、transcript 与 composer、基础审批、模型与凭据、system prompt 与 memory | T13–T22 | R2 | 已完成（macOS 达标；Windows 由 W1 达标，UNC 待验证） |
-| 3 M2 Harness 核心 | 权限规则与 Bash 分析、配置兼容层、hooks、计划模式与任务清单、压缩与用量、检查点与回退、WebFetch 与登录、L3 对齐；Windows 达到 M1 | W1、T23–T30 | R3 | 已完成（macOS 达标，R3；Windows 的 M1 由 W1 达标，UNC 与 M2 由 W2 验收） |
+| 2 M1 可行走骨架 | 存储与信任、会话编排与投影、L2 场景、文件工具与 Bash、客户端外壳、transcript 与 composer、基础审批、模型与凭据、system prompt 与 memory | T13–T22 | R2 | 已完成（macOS 达标；Windows 由 W1 达标，UNC 由 W2 补验） |
+| 3 M2 Harness 核心 | 权限规则与 Bash 分析、配置兼容层、hooks、计划模式与任务清单、压缩与用量、检查点与回退、WebFetch 与登录、L3 对齐；Windows 达到 M1 | W1、T23–T30 | R3 | 已完成（macOS 达标，R3；Windows 的 M1 由 W1 达标，UNC 由 W2 补验；Windows 的 M2 由 W2 达标） |
 | 4 M3 多会话与生态 | 子 agent、后台任务、终端、worktree 与并行会话、MCP、skills 与命令、WebSearch 与 hooks 扩展；Windows 达到 M2 | W2、T31–T38 | R4 | 进行中 |
 | 5 M4 安全与打磨 | 沙箱、插件、配置诊断与用量、NotebookEdit 与通知、无障碍与本地化、性能预算、安全收口；Windows 达到 M3 | W3、T39–T45 | R5 | 未开始 |
 | 6 M5 Beta | Auto 模式、自动记忆与托管配置、M5 补全、侧边对话与平台快捷操作、发布流水线；Windows 达到 M4 并与 Beta 同步；两平台端到端验收 | T46–T50、W4、T51 | R6 | 未开始 |
@@ -148,7 +148,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T21 | [模型、服务商与凭据设置](tasks/T21-models-providers-and-credentials.md) | 2 | T20 | macOS | high / 高 | 大 | 无 | 已完成 | e5f3b65 |
 | T22 | [System prompt 组装与 memory 文件](tasks/T22-system-prompt-and-memory-files.md) | 2 | T21 | macOS | high / 高 | 中 | 无 | 已完成 | 9843eb5 |
 | R2 | [M1 评审](tasks/R2-m1-review.md) | 2 | T22 | macOS | high / 高 | 中 | 无 | 已完成 | f63ac3d |
-| W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 部分完成 | b0a510f |
+| W1 | [Windows：M1 达标](tasks/W1-windows-m1-parity.md) | 3 | R2 | Windows | high / 高 | 中 | 无 | 已完成 | b0a510f |
 | T23 | [权限规则完整版与 Bash 命令分析](tasks/T23-permission-rules-and-bash-analysis.md) | 3 | R2 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 8a1f38b |
 | T24 | [Claude Code 配置兼容层与配置诊断（基础）](tasks/T24-claude-code-config-compat.md) | 3 | T23 | macOS | high / 高 | 中 | 无 | 已完成 | ae5c8e6 |
 | T25 | [Hooks（M2 事件集与 command 类型）](tasks/T25-hooks-m2.md) | 3 | T24 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 30a4f17 |
@@ -157,11 +157,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T28 | [检查点、回退与 Changes 面板](tasks/T28-checkpoints-rewind-changes.md) | 3 | T27 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | c849475 |
 | T29 | [WebFetch、登录与模型设置补全、三档视图](tasks/T29-webfetch-login-model-settings-views.md) | 3 | T28 | macOS | high / 高 | 中 | 无 | 已完成 | 7f9e79b |
 | T30 | [L3 行为对齐基座](tasks/T30-l3-behavior-alignment.md) | 3 | T29 | macOS | high / 高 | 中 | 无 | 已完成 | f52b5aa |
-| R3 | [M2 评审](tasks/R3-m2-review.md) | 3 | T30、W1 | macOS | high / 高 | 中 | 无 | 部分完成 | 8e2b4a2 |
-| W2 | [Windows：M2 达标](tasks/W2-windows-m2-parity.md) | 4 | R3 | Windows | high / 高 | 中 | 无 | 未开始 | — |
+| R3 | [M2 评审](tasks/R3-m2-review.md) | 3 | T30、W1 | macOS | high / 高 | 中 | 无 | 已完成 | 8e2b4a2 |
+| W2 | [Windows：M2 达标](tasks/W2-windows-m2-parity.md) | 4 | R3 | Windows | high / 高 | 中 | 无 | 已完成 | 45124e4 |
 | T31 | [子 agent 与模型别名](tasks/T31-subagents-and-model-aliases.md) | 4 | R3 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 7ec1971 |
-| T32 | [后台任务、Monitor 与 KillShell](tasks/T32-background-tasks-and-monitor.md) | 4 | T31 | macOS | high / 高 | 中 | 无 | 部分完成 | ef39d43 |
-| T33 | [无头终端（Core 侧）](tasks/T33-headless-terminal.md) | 4 | T32 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 33f4bf9 |
+| T32 | [后台任务、Monitor 与 KillShell](tasks/T32-background-tasks-and-monitor.md) | 4 | T31 | macOS | high / 高 | 中 | 无 | 已完成 | ef39d43 |
+| T33 | [无头终端（Core 侧）](tasks/T33-headless-terminal.md) | 4 | T32 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 33f4bf9 |
 | T34 | [终端渲染器与终端面板](tasks/T34-terminal-renderer-and-panel.md) | 4 | T33 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 991f323 |
 | T35 | [Worktree、并行会话、多窗口、全文搜索与后台常驻](tasks/T35-worktrees-parallel-sessions-and-windows.md) | 4 | T34 | macOS | high / 高 | 大 | 无 | 部分完成 | c4094dd |
 | T36 | [MCP 共享连接池](tasks/T36-mcp-connection-pool.md) | 4 | T35 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | ca3d873 |
@@ -409,14 +409,14 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I92 | T25 | PreCompact 带摘要指令时 Agent Host 用 Pi 导出的 `compact()` 自己生成摘要，绕过 Pi 默认路径中的虚拟模型路由与重试回调（Pi 1.5.2 不回读 `customInstructions`） | T27 接管压缩时复核；Pi 支持回读后改回默认路径；已落地（T27）：所有压缩都由 Harness Kit 发自写摘要请求（`agent-host/src/harness/compaction.ts`），按会话的重试设置用 `retryAssistantCall` 重试；PiArc 的模型列表没有虚拟模型，摘要请求走会话所选模型 |
 | I93 | T25 | hook 命令只继承 ADR-0035 准入的环境加 `CLAUDE_PROJECT_DIR`，与 Claude Code 继承完整环境不同：依赖自定义变量（通知 webhook 地址、令牌）的 hook 拿不到它们 | R3 请用户决定是否增加用户级的 hooks 环境变量白名单设置；**R3：等待用户决定**（见 R3 评审结论）；在用户决定前保持 ADR-0035 的准入环境；**用户决定（R3）**：增加用户级的 hooks 环境变量白名单设置（只读用户层，不读项目层），交 T38 实现；**T38 已落地**：用户级 `settings.json` 的 `hookAllowedEnvVars`（只读用户层），列出的变量从登录 shell 环境加进命令 hook 的环境（ADR-0055 第 14 条，`piarc_core::hooks::launcher`） |
 | I94 | T25 | Agent Host 能以伪造的输入调用 `hooks/run`（限 7 个事件与本工作区），触发用户已配置的 hook | T45 评估把 PostToolUse 绑定到 Core 已授权的工具调用、把 Stop 绑定到进行中的回合 |
-| I95 | W1 | Windows 上无需用户参与的权限裁决 p95 3.4–8.9 ms、小文件 AHP 往返 p95 5.0–9.3 ms，超出原 2 ms、5 ms：耗时分散在 NTFS 元数据调用与 ADR-0036 从卷根逐级绑定目录上。用户采纳 ADR-0040（Windows ≤ 10 ms）与 ADR-0041（Windows ≤ 15 ms）。W1 机器上 10 ms 余量很小：安静时 7.7–8.9 ms，全量 L4 刚结束时一次 11.2 ms 使 verify 失败、复跑通过（CI 3.35 ms） | T23：一次裁决内只规范化、解析 checkout 一次，评估按设置监听与信任广播失效的缓存；T44：从工作区根句柄开始绑定（须评审 ADR-0036 的安全论证），两平台纳入性能回归并复核能否收紧 |
-| I96 | W1 | UNC 工作区未能实机验证：用户建了临时共享，但本机 SMB 客户端不可用（`net view \localhost` 报系统错误 1702）。回归测试 `tool_io::policy::tests::windows_paths::a_workspace_on_a_unc_share_is_written_read_and_searched` 已写好，设 `PIARC_TEST_UNC_SHARE`（共享测试的临时目录，`TMP` 指向它）才运行，否则打印 NOT RUN | W2 在 SMB 正常的 Windows 上运行；或 T44 评估在 CI 设置该变量（runner 为管理员，可用管理共享；改 CI 前确认） |
+| I95 | W1 | Windows 上无需用户参与的权限裁决 p95 3.4–8.9 ms、小文件 AHP 往返 p95 5.0–9.3 ms，超出原 2 ms、5 ms：耗时分散在 NTFS 元数据调用与 ADR-0036 从卷根逐级绑定目录上。用户采纳 ADR-0040（Windows ≤ 10 ms）与 ADR-0041（Windows ≤ 15 ms）。W1 机器上 10 ms 余量很小：安静时 7.7–8.9 ms，全量 L4 刚结束时一次 11.2 ms 使 verify 失败、复跑通过（CI 3.35 ms） | T23：一次裁决内只规范化、解析 checkout 一次，评估按设置监听与信任广播失效的缓存；T44：从工作区根句柄开始绑定（须评审 ADR-0036 的安全论证），两平台纳入性能回归并复核能否收紧；**W2 复测**（同一台机器，release）：自动裁决 1,000 次 p95 3.55 ms，`fs/read` 往返 2,000 次 p95 5.23 ms |
+| I96 | W1 | UNC 工作区未能实机验证：用户建了临时共享，但本机 SMB 客户端不可用（`net view \localhost` 报系统错误 1702）。回归测试 `tool_io::policy::tests::windows_paths::a_workspace_on_a_unc_share_is_written_read_and_searched` 已写好，设 `PIARC_TEST_UNC_SHARE`（共享测试的临时目录，`TMP` 指向它）才运行，否则打印 NOT RUN | W2 在 SMB 正常的 Windows 上运行；或 T44 评估在 CI 设置该变量（runner 为管理员，可用管理共享；改 CI 前确认）；**已关闭（W2）**：本机 SMB 文件访问可用（1702 只是 `net view` 的浏览接口），以系统的 `C$` 管理共享指向临时目录运行通过（测试的 `fs/glob` 参数补齐，08fc09e） |
 | I97 | W1 | verify 的 `cargo test --workspace` 没有 `--no-fail-fast`：Windows CI 自 R2 起在第一个失败的测试目标处停止，另外 4 个目标的 Windows 失败一直没有暴露（W1 修复，见 W1 报告） | T44 评估 verify 与 CI 改用 `--no-fail-fast`（改 CI 前确认） |
 | I98 | W1 | 系统通知的点击：横幅仍在屏幕上时点击，PiArc 打开对应会话（W1 修复通知对象被回收的问题后实测）；Toast 进入通知中心后点击走 COM 激活，只聚焦窗口、不打开会话。开发构建（L4 `dev` 形态直接运行 `node_modules` 的 electron.exe、本机打包产物）与正式版共用 AUMID `cn.piarc.desktop`，Electron 为每个程序各注册一个 Toast 激活器，W1 中点击通知中心的 Toast 启动了空白的 electron.exe | T42（可操作通知）：激活参数带会话 id、经 `second-instance` 打开；开发构建用独立 AUMID，避免开发机上的串用 |
 | I99 | W1 | 通知实测中有两次运行在 30–60 s 内没有任何通知请求（窗口已最小化、会话已在等待审批），之后同样的操作立即发出；原因未查明 | T42 复核通知触发条件（窗口最小化、渲染进程节流） |
 | I100 | W1 | 设置页"刷新模型目录"勾选框是受控组件，要等设置 Host 启动（正式路径首次约 1 s）答复后才改变状态，期间点击看起来没有反应 | T29 补全模型设置时给出进行中状态；**已落地（T29）**：勾选框保存期间显示所选值与"正在保存…"（`settings/ProvidersPage.tsx`），L4 与 ego-browser 核对 |
 | I101 | 合并 W1 后的 CI | Windows CI 的 L4 `r2-workflow`（dev 形态）偶发：运行 44522160246 中应用在 60 s 内没有启动完成，清理时 Chromium 仍占着数据目录的 `lockfile`（EBUSY），没有应用日志；同一用例的 packaged 形态与另一协议通过，R2 的运行 44453549786 中它以另一断言失败 | **已查明并修复**：它是 dev 项目里第一个用 `mock` 夹具的用例，mock provider 在测试里首次编译，Windows runner 上用完了 60 s（运行 44533872761 的 trace：`mock` 夹具 60 s）；Playwright 的 `globalSetup` 先编译它（`e2e/global-setup.ts`）；**已关闭（R3）**：修复已在之后的 Windows CI 通过（运行 44542131720） |
-| I102 | 合并 W1 后的 CI | Windows 上 bash 命令经环境变量 `PIARC_COMMAND` 与 `eval` 执行（Git Bash 截断过 12,000 字符的 `-c` 参数）：语法错误报 `eval: line N`，退出码可能是 1 而不是 2；截断的确切位置未在 Windows 上定位，只有 CI 覆盖 | W2 实机核对长命令、heredoc 与语法错误的表现 |
+| I102 | 合并 W1 后的 CI | Windows 上 bash 命令经环境变量 `PIARC_COMMAND` 与 `eval` 执行（Git Bash 截断过 12,000 字符的 `-c` 参数）：语法错误报 `eval: line N`，退出码可能是 1 而不是 2；截断的确切位置未在 Windows 上定位，只有 CI 覆盖 | W2 实机核对长命令、heredoc 与语法错误的表现；**W2 实机已核对**：2 万字符以上带引号括号的命令完整执行，heredoc（含中文、引号定界不展开）保留原样，语法错误退出码 2、报 `eval: line 2: syntax error…`（`exec_commands` 的 Windows 用例），关闭 |
 | I103 | 合并 W1 后的 CI | 权限裁决计时在 CI 上与同一测试二进制的其他测试混跑时只是在测 runner：同一断言相邻两次运行 p50 0.84 / 1.44 ms。verify 第 8 步改为先跳过它跑全部测试、再单独运行（`scripts/ci/cargo-test.mjs`），预算不变。运行 44533872761 单独运行后 Windows p95 1.38 ms（预算 10 ms），macOS runner 仍 2.67 ms（debug，本机 0.67 ms）；随后改为按 T23-A13 的验收方式用 release 构建（本机 p95 390 µs） | release 下仍超预算时，按 I95 评审缓存设置的 ADR；T44 把计时纳入性能回归，并在架构第 11 章写明构建配置 |
 | I104 | T26 | 架构第 6.14 节原把 Claude Code 的 `plansDirectory`（计划文件目录）列为 T26 支持的键；T26 按任务要求把批准的计划存为会话 entry（`piarc.plan`），没有写计划文件，键映射表仍为 `planned(T26)` | R3 决定：由后续任务支持（批准时把计划另存到该目录）并改映射表的任务号，或改为忽略并注明原因；**已决定（R3，1bfcf34）**：计划仍以会话 entry 为准，T48 增加批准时把计划另存到 `plansDirectory`，键映射表改为 `planned(T48)` |
 | I105 | T26 | `agent-host/src/runtime/session-registry.ts` 999 行、`crates/piarc-core/src/tool_io/policy.rs` 943 行，接近单文件 1,000 行上限（T26 已把注册表的辅助函数移到 `session-helpers.ts`、审批等待移到 `policy/waits.rs`） | T27 扩展提醒通道时把逻辑放在 `harness/reminders.ts` 与 `SessionHarness`，不再往注册表里加；R3 复核；T27：逻辑放在 `harness/` 新模块，模型切换移到 `runtime/session-models.ts`，注册表 983 行；T28：分支与回退放在 `runtime/branches.ts`，会话类型移到 `session-types.ts`，注册表 941 行；Core 的回退流程放在 `sessions/session/rewind.rs`，`sessions/session.rs` 987 行；**R3**：注册表 1,030 行，组装 Harness 部件移到 `runtime/session-parts.ts` 后 981 行（e78571c）；接近上限的还有 `sessions/session.rs` 987 行、`tool_io/policy.rs` 956 行、渲染进程 `store/transcript.ts` 941 行、`piarc-host/src/supervisor.rs` 939 行，后续往这些文件加内容的任务（T31、T32、T35）先按领域拆分；**T31**：子 agent 放在新模块（`runtime/subagents.ts`、`runtime/subagent-session.ts`、`runtime/session-runtime.ts`、Core `tool_io/subagents.rs`、`sessions/subagents.rs`），注册表降到 921 行；`sessions/session.rs` 开工时已 1,033 行，模式、模型、排队表请求移到 `session/changes.rs` 后 939 行；`tool_io/policy.rs` 997 行、`store/transcript.ts` 989 行仍接近上限，T32、T35 往里加内容前先拆分 |
@@ -432,7 +432,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I115 | T30 | L3 发现 hooks 输入缺 Claude Code 2.1.318 的两个通用字段：每个事件的 `prompt_id`、工具事件与 Stop 的 `effort`（`tests/l3-allowlist.yaml` 中 `follow_up: T38` 的两条） | T38 扩展 hooks 时在 Core 的 `hooks::input` 补上：会话当前提示的 id（Core 观察 UserPromptSubmit 时生成）与会话模型的 effort（无 effort 的模型省略）；补完删掉 allowlist 条目；**T38 已落地**：`prompt_id`（Core 在每次 UserPromptSubmit 生成，子 agent 沿用主会话的）与工具事件、Stop、SubagentStop、PostToolBatch 的 `effort`（ADR-0055 第 13 条，`hooks_m3_tests::inputs_carry_the_prompt_id_and_the_effort_of_tool_events`）；allowlist 中 `prompt_id` 一条已删，`effort` 一条改为说明有意差异的理由 |
 | I116 | T30 | L3 发现两处权限裁决与 Claude Code 2.1.318 不同：命令替换（`echo $(whoami)`）PiArc 按其中每个命令判断而直接运行，Claude Code 询问；allow 规则（阶梯第 6 步）先于越界检查（第 7 步），`Bash(awk *)` 让 `awk … ../outside.txt` 不询问，Claude Code 询问（`perm-compound` 的 `follow_up: R3` 条目） | R3 决定是否改阶梯顺序或对命令替换询问（改阶梯属于变更型，需 ADR）；改了就删掉对应 allowlist 条目；**已决定（R3）**：命令替换维持架构第 6.2.2 节的分析（allowlist 理由改写，不再等 R3）；阶梯顺序属变更型，写 ADR-0047（提议：越界路径先于带通配的命令 allow 规则），等待用户确认；**已落地（R3）**：用户确认 ADR-0047，带通配的命令规则不放行越界路径（`bash::judge`、`assess::powershell_call`），L3 `perm-compound` 的 `outside` 两条 allowlist 条目已删除 |
 | I117 | T30 | L3 记录的工具集与参数偏离各有后续任务：`Agent`、`ListAgents`（T31）、`Skill`（T37）、Bash 的 `run_in_background`（T32）与 `dangerouslyDisableSandbox`（T39）、`ToolSearch` 与延迟加载的工具（T36 评估 MCP 工具多时是否延迟加载）、plan 模式下非只读命令交给自动模式分类器（T46） | 各任务实现时用 `npm run l3` 复核，对应 allowlist 条目不再匹配时删除（否则命令失败）；I01 的 TodoWrite 差异已写入 allowlist；**R3**：负责任务即内容列所列的 T31、T32、T36、T37、T39、T46；**T31 已复核**：`Agent` 的 `model`、`effort` 改为 `{type:"string", enum}` 后不再有差异，条目已删除；`ListAgents` 保留并写明理由（PiArc 没有 agent teams，后台运行经提醒回报），不再挂后续任务（`npm run l3` 于 ba159ff：12 个场景 0 条未解释差异、0 条过时条目）；**T36 已复核**：PiArc 只在会话的 MCP 工具超过 `mcp.deferThreshold` 时提供 `ToolSearch`，内置工具从不延迟（ADR-0053）；`ToolSearch`、`DeferredToolPlaceholder` 条目改写理由并去掉 `follow_up`；同时补上 T32 漏登的 `Monitor`、`KillShell`（Claude Code 2.1.318 不预先声明）并删除不再匹配的 `run_in_background` 条目（T32 起 Bash 已有该参数）。`npm run l3` 于 24f4059：12 个场景 0 条未解释差异、0 条过时条目。剩余负责任务 T37、T39、T46 |
-| I118 | T30 | L3 只在 macOS 上运行：PowerShell 场景（`perm-powershell-whole`、`policy-*-powershell`）排除；Windows 上 Node 不经 shell 启动不了 npm 安装的 `claude.cmd`，需要原生安装器的 `claude.exe` | W2 评估在 Windows 上运行 L3（安装方式、PowerShell 场景），通过后把这三个场景移出排除清单 |
+| I118 | T30 | L3 只在 macOS 上运行：PowerShell 场景（`perm-powershell-whole`、`policy-*-powershell`）排除；Windows 上 Node 不经 shell 启动不了 npm 安装的 `claude.cmd`，需要原生安装器的 `claude.exe` | W2 评估在 Windows 上运行 L3（安装方式、PowerShell 场景），通过后把这三个场景移出排除清单；**已关闭（W2）**：Windows 上用锁定版本平台包自带的 `claude.exe` 运行，12 个场景 0 未解释、0 过期；Windows 版没有 PowerShell 工具，三个场景保留排除并更新理由；allowlist 增加 `platforms`（edfaa51） |
 | I119 | T30 收尾 | `crates/piarc-core/AGENTS.md` 已有 150 行，超过子目录 120 行的上限（T29 收尾时已是 149 行，T30 加了一行 hooks 顺序） | R3 整理：把可从代码或 `testing.md` 得到的段落改为链接；**已落地（R3）**：同 I108 |
 | I120 | R3 | `Read(…)` deny 按调用的路径参数匹配：Grep、Glob 以目录为参数时结果里仍有被拒文件（`Read(./.env)` 时 `Grep` 在 `.` 中搜出 `.env` 的行），Bash 的 `grep -r`、`rg` 同样不受约束（R3 审查 P9） | T45：Core 执行 `fs/grep`、`fs/glob` 时把 Read deny 编译为排除集合作用于结果；Bash 递归读取在文档写明限制（架构第 6.2.2 节已写） |
 | I121 | R3 | 审计缺口：权限模式切换（含跳过权限）、hook `updatedPermissions` 的成功应用、"总是允许"保存的规则与选项、设置页的规则增删改都不写审计；hook 审计写入失败只记日志，而权限审计失败即拒绝（R3 审查 P12） | T45：按第 6.2.3 节"审批结果、规则命中、hooks 决定都写入审计表"补齐，并统一失败口径 |
@@ -477,6 +477,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I160 | T37 | Pi 自带的 skills 与 prompt templates 加载已关掉（ADR-0054），Pi 设置里 `skills`、`prompts` 列出的额外路径与 Pi 包携带的 skills、模板不再生效；项目根以下子目录的 `.claude/skills`（Claude Code 的嵌套 skill）与 `--add-dir` 目录的 skills 也不加载 | T40（Pi 包与插件）一并接入；嵌套 skill 由 T48 评估 |
 | I161 | T37 | 与 Claude Code 的有意差异：同名 skill 项目级优先于个人级（Claude Code 相反，PiArc 与设置层、子 agent 定义一致）；位置参数 `$1` 起（Claude Code 当前文档 `$0` 起，`$ARGUMENTS[N]` 两者一致）；经排队的 follow-up 发出的命令不带 `allowed-tools` 的回合授权（它开始的回合照常询问）；`skillListingBudgetFraction`、`skillListingMaxDescChars` 未实现（索引描述固定截断到 1,536 字符） | R4 请用户确认这几处差异；有 L3 场景涉及时写入 `tests/l3-allowlist.yaml` |
 | I162 | T38 | 服务商原生搜索只接了 Anthropic Messages（`web_search_20250305`）：OpenAI Responses 的 `web_search`、Gemini 的 Google Search grounding 未接，这些模型只能用第三方后端（Brave）；第三方后端也只有 Brave 一家（ADR-0055 第 3、4 条） | 有用户需要时在 `agent-host/src/providers/web-search.ts` 加适配、在 `piarc_web::search` 加后端；mock provider 同步补对应的结果块 |
+| I163 | W2 | `crates/piarc-term/tests/pointer.rs` 只在 Unix 上编译：T34 的选区、滚动、唤醒与默认颜色在 Windows 上没有 Core 侧用例（Windows 上 0 个） | W3 补 Windows 变体 |
+| I164 | W2 | macOS CI（运行 44868949621，e0c41ce）的 L2 `bg-completion-reminder` 失败，Windows 本机与 CI 上通过；W2 在 Windows 上无法复现 | T35（macOS）收尾前核对，修复或登记 |
 ## 技术债
 
 评审任务（R1–R6）汇总的技术债，按影响排序。每条的细节、负责任务与检查时间点在对应的登记事项中。
@@ -913,6 +915,17 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 决策：ADR-0049（补充）；架构 2.40。后台子 agent 的报告仍由 Agent Host 在同一提醒通道送达（ADR-0048 第 8 条不变），Core 只登记、停止与展示；Monitor 到时记为 `completed`；后台命令不随会话关闭结束。
 - 登记 I136（T17-A01 描述需用户修改）、I137（挂起通知不持久化）、I138（唤醒开关与限值的入口）、I139（`core/tasks` 快照载荷）；I03 落地开关与限速，待 R4 确认默认值。
 - 下一项：macOS 上的 T33（无头终端，依赖 T32）；Windows 上的 W2 仍可进行。本地提交，未推送。
+
+
+### 2026-11-21 W2 已完成（提交 45124e4，Windows 11 x64，分支 `windows/dev`）
+
+- 结论：M2 在 Windows 上达标，见 `docs/reviews/W2-windows-m2-parity.md`。L2 149 个场景中 145 个通过、4 个 macOS 专属跳过，MISSING 0；L3 对锁定的 Claude Code 2.1.318（本地平台包的 `claude.exe`）12 个场景 0 未解释、0 过期，`--repeat 2` 一致；M2 的 L4 17/17（dev 形态）；`npm run verify` 15/15。
+- 起点基线是红的（CI 运行 44731794641、44868949621）：并入修复 7 个 Windows 平台缺陷，均先有失败测试——检查点路径标签（cafffc1）、Git Bash 程序探测失败被缓存与 `ucrt64`（91f9994）及提速（c54271b）、Monitor 分块输出丢失唤醒（db82eae）、归档时 hook 持有会话（c45ffdd）、`$USERPROFILE` 不算关键路径删除（6110364）、子 agent 场景的 Windows 工具集（82082b6）；另修 5 处测试问题。
+- 用户在本会话要求认领其他"部分完成"任务的 Windows 侧：W1-A05（UNC 用 `C$` 管理共享补验）、R3-A07、T32-A04/A13、T33-A02/A12/A14、T34-A14 以本机 Windows 实测关闭（非 CI，evidence 已注明）；W1、R3、T32、T33 改为已完成，T34 仍有 A03（macOS 输入法）。
+- 决策：L3 的 allowlist 增加 `platforms`（Windows 版 Claude Code 的工具集不同）；W2 与 macOS 上进行中的 T35 并行（用户安排），W2 检查点单列，未改 T35 的内容（86a8bf1 误勾选 T35 的检查项，45124e4 已恢复）。架构 2.47（W2 分支上为 2.43，合并时改号）标注 M2 的 Windows 达标。
+- 登记：关闭 I96、I102、I118，I95 复测；新增 I163（pointer 测试只在 Unix）、I164（macOS CI 的 `bg-completion-reminder`；W2 分支上编为 I146、I147，合并时改号）。
+- T35 的 Windows 侧（A10）：用户决定等 macOS 的 T35 完成第 8、9 项后在 Windows 上实测关闭。
+- 下一项：macOS 上继续 T35；推送 `windows/dev` 后在 macOS 合并。
 
 ## 计划变更记录
 

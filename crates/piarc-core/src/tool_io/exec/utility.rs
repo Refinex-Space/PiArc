@@ -23,11 +23,12 @@ impl Exec {
         let shell = self.shells().bash.clone();
         #[cfg(windows)]
         let git = match &shell {
-            Some(shell) => self
-                .git_programs
-                .get_or_init(|| self.probe_git_programs(shell, &resolved.inherited))
+            Some(shell) => {
+                probed_once(&self.git_programs, || {
+                    self.probe_git_programs(shell, &resolved.inherited)
+                })
                 .await
-                .clone(),
+            }
             None => Vec::new(),
         };
         Programs {
@@ -41,23 +42,34 @@ impl Exec {
     }
 
     /// Ask Git Bash which listed programs resolve to Git's own executables, from a clean
-    /// directory. Git's launcher puts its own directories first on the Windows PATH.
+    /// directory. Git's launcher puts its own directories first on the Windows PATH. `None`
+    /// when bash did not answer (failed to start, timed out): the caller asks again later.
     #[cfg(windows)]
     async fn probe_git_programs(
         &self,
         shell: &Path,
         env: &[(OsString, OsString)],
-    ) -> Vec<(String, PathBuf)> {
+    ) -> Option<Vec<(String, PathBuf)>> {
         let Some(root) = git_root(shell) else {
-            return Vec::new();
+            return Some(Vec::new());
         };
-        // All names are constants; the installation is passed as an argument to bash.
+        // All names are constants; the installation is passed as an argument to bash. Git's
+        // native programs live in the MSYS2 environment the build uses: `mingw64`, `ucrt64`
+        // (x64 since Git for Windows 2.56) or `clangarm64` (arm64). Only names Git ships are
+        // looked up, and through `hash` (no subshell; a fork is slow in MSYS): a name missing
+        // from Git cannot resolve to Git's program, and searching a long PATH for it took
+        // seconds (W2). `hash` skips builtins, whose programs `type -P` finds instead.
         let script = r#"root=$1; shift
         for n in "$@"; do
-            f=$(builtin type -P "$n") || continue
-            if [[ "$f" -ef "$root/usr/bin/$n.exe" ]]; then builtin printf 'usr %s\n' "$n"
-            elif [[ "$f" -ef "$root/mingw64/bin/$n.exe" ]]; then builtin printf 'mingw64 %s\n' "$n"
-            fi
+            for d in usr mingw64 ucrt64 clangarm64 ""; do
+                [[ -n $d && -e "$root/$d/bin/$n.exe" ]] && break
+            done
+            [[ -n $d ]] || continue
+            f=; builtin hash -- "$n" 2>/dev/null && f=${BASH_CMDS[$n]}
+            [[ -n $f ]] || f=$(builtin type -P -- "$n") || continue
+            for d in usr mingw64 ucrt64 clangarm64; do
+                if [[ "$f" -ef "$root/$d/bin/$n.exe" ]]; then builtin printf '%s %s\n' "$d" "$n"; break; fi
+            done
         done
         exit 0"#;
         let mut args: Vec<OsString> = vec![
@@ -78,7 +90,9 @@ impl Exec {
             cwd: root.clone(),
             env: env.to_vec(),
             launcher: None,
-            timeout: Some(Duration::from_secs(5)),
+            // A cold Git Bash under an antivirus scan and a busy machine can take seconds; an
+            // unanswered probe is asked again on the next preflight, so this stays short.
+            timeout: Some(Duration::from_secs(10)),
             kill_grace: Duration::from_millis(100),
         };
         let (tx, mut rx) = mpsc::channel::<OutputChunk>(8);
@@ -94,9 +108,9 @@ impl Exec {
         let (result, bytes) =
             tokio::join!(self.runner.run(spec, tx, CancellationToken::new()), read);
         if !result.is_ok_and(|r| r.status.success() && !r.timed_out && !r.killed) {
-            return Vec::new();
+            return None;
         }
-        String::from_utf8_lossy(&bytes)
+        let found = String::from_utf8_lossy(&bytes)
             .lines()
             .filter_map(|line| {
                 let (dir, name) = line.split_once(' ')?;
@@ -104,8 +118,26 @@ impl Exec {
                 let canonical = piarc_git::strip_verbatim(program.canonicalize().ok()?);
                 (canonical == program).then(|| (name.to_owned(), program))
             })
-            .collect()
+            .collect();
+        Some(found)
     }
+}
+
+/// The programs a successful probe found, probed once per Core. A probe without an answer is
+/// not kept (W2): one slow first start of Git Bash would otherwise turn off every automatic
+/// approval until Core restarts.
+#[cfg(windows)]
+async fn probed_once<F, Fut>(
+    cell: &tokio::sync::OnceCell<Vec<(String, PathBuf)>>,
+    probe: F,
+) -> Vec<(String, PathBuf)>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = Option<Vec<(String, PathBuf)>>>,
+{
+    cell.get_or_try_init(|| async { probe().await.ok_or(()) })
+        .await
+        .map_or_else(|()| Vec::new(), Clone::clone)
 }
 
 impl Programs {
@@ -304,6 +336,50 @@ mod tests {
 mod windows_tests {
     use super::*;
 
+    /// W2: a probe that got no answer is asked again; an answer is kept for the Core's life.
+    #[tokio::test]
+    async fn a_probe_without_an_answer_is_tried_again() {
+        let cell = tokio::sync::OnceCell::new();
+        let ls = || vec![("ls".to_owned(), PathBuf::from("ls.exe"))];
+        assert!(probed_once(&cell, || async { None }).await.is_empty());
+        assert_eq!(probed_once(&cell, || async { Some(ls()) }).await, ls());
+        let kept = probed_once(&cell, || async { unreachable!("kept") }).await;
+        assert_eq!(kept, ls());
+    }
+
+    /// W2: Git for Windows 2.56 ships its programs in `ucrt64` instead of `mingw64` (arm64
+    /// builds use `clangarm64`); `git` resolves to Git's own executable in any of them.
+    #[tokio::test]
+    async fn git_resolves_in_the_environment_git_ships() {
+        let env: Vec<_> = std::env::vars_os().collect();
+        let bash = piarc_exec::shells::detect(&piarc_exec::shells::Probe::system(&env), None)
+            .bash
+            .expect("Git for Windows is installed");
+        let Some(root_git) = git_root(&bash) else {
+            return;
+        };
+        let root = std::env::temp_dir().join(crate::sessions::new_session_id().expect("unique"));
+        std::fs::create_dir_all(&root).expect("dir");
+        let exec = super::super::Exec::new(
+            piarc_exec::ExecLimits::default(),
+            super::super::CommandEnv::Fixed(env.clone()),
+            root.clone(),
+            None,
+        );
+        let found = exec
+            .probe_git_programs(&bash, &env)
+            .await
+            .expect("answered");
+        std::fs::remove_dir_all(&root).expect("clean");
+        let git = found.iter().find(|(name, _)| name == "git").map(|(_, p)| p);
+        let shipped = ["mingw64", "ucrt64", "clangarm64"]
+            .iter()
+            .map(|dir| root_git.join(dir).join("bin").join("git.exe"))
+            .find(|p| p.is_file());
+        assert_eq!(git, shipped.as_ref(), "{found:?}");
+        assert!(git.is_some());
+    }
+
     /// W1: an entry the user may not search must not withdraw automatic permission. On
     /// Windows the programs come from asking Git Bash, which skips such an entry.
     #[tokio::test]
@@ -350,7 +426,10 @@ mod windows_tests {
             root.clone(),
             None,
         );
-        let found = exec.probe_git_programs(&bash, &probe_env).await;
+        let found = exec
+            .probe_git_programs(&bash, &probe_env)
+            .await
+            .unwrap_or_default();
         icacls(&["/remove:d", &user]);
         std::fs::remove_dir_all(&root).expect("clean");
         assert_eq!(unreadable, Err(std::io::ErrorKind::PermissionDenied));

@@ -850,6 +850,10 @@ pub struct RequestExpect {
     /// Exactly these tool names, any order.
     #[serde(default)]
     pub tools: Option<Vec<String>>,
+    /// Exactly these tool names on Windows, where sessions also get `PowerShell` (W2);
+    /// `tools` applies when this is absent.
+    #[serde(default)]
+    pub tools_windows: Option<Vec<String>>,
     /// These tool names among others.
     #[serde(default)]
     pub tools_include: Option<Vec<String>>,
