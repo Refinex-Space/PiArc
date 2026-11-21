@@ -155,6 +155,10 @@ fn check_labels(
 }
 
 /// Endpoint, session, fixture and path references of the other actions.
+#[expect(
+    clippy::too_many_lines,
+    reason = "one arm per action kind, kept together"
+)]
 fn check_references(spec: &ScenarioSpec, action: &Action, field: &str, problems: &mut Vec<String>) {
     match action {
         Action::SetModel { provider, .. } => {

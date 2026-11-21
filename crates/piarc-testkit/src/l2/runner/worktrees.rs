@@ -81,7 +81,22 @@ impl Driver<'_> {
         Ok(())
     }
 
-    pub(super) fn check_worktree(&self, spec: &CheckWorktreeSpec) -> Result<(), String> {
+    /// Core writes a session's worktree columns after the turn's index sync, which can finish
+    /// after the turn's events: the record is read until it matches, at most `RECORD_WAIT`.
+    pub(super) async fn check_worktree(&self, spec: &CheckWorktreeSpec) -> Result<(), String> {
+        const RECORD_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+        let started = std::time::Instant::now();
+        loop {
+            match self.compare_worktree(spec) {
+                Err(_) if started.elapsed() < RECORD_WAIT => {
+                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                }
+                result => return result,
+            }
+        }
+    }
+
+    fn compare_worktree(&self, spec: &CheckWorktreeSpec) -> Result<(), String> {
         let id = self.session_id(spec.session.as_deref())?;
         let storage = self.core.storage().map_err(|e| e.to_string())?;
         let record = storage

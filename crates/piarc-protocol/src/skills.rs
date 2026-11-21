@@ -151,7 +151,6 @@ pub struct SkillInfo {
     /// The user may invoke it as `/name`.
     pub user_invocable: bool,
     /// How much of it the model sees.
-    #[serde(default)]
     pub visibility: SkillVisibility,
     /// Rules the turn that invokes it allows (`allowed-tools`), as written.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

@@ -7267,7 +7267,7 @@ export interface SkillInfo {
   /**
    * How much of it the model sees.
    */
-  visibility?: SkillVisibility & string;
+  visibility: SkillVisibility;
   /**
    * What the user should know.
    */

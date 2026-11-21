@@ -10525,7 +10525,6 @@
         },
         "visibility": {
           "$ref": "#/$defs/SkillVisibility",
-          "default": "on",
           "description": "How much of it the model sees."
         },
         "warnings": {
@@ -10543,7 +10542,8 @@
         "path",
         "dir",
         "modelInvocable",
-        "userInvocable"
+        "userInvocable",
+        "visibility"
       ],
       "type": "object"
     },

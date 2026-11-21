@@ -18,6 +18,7 @@ function skill(name: string, extra: Partial<SkillInfo> = {}): SkillInfo {
     dir: `/w/.claude/skills/${name}`,
     modelInvocable: true,
     userInvocable: true,
+    visibility: 'on',
     ...extra,
   };
 }

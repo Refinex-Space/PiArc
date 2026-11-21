@@ -669,7 +669,7 @@ impl Driver<'_> {
                 .map(drop)
             }
             Action::SweepWorktrees(spec) => self.sweep_worktrees(spec).await,
-            Action::CheckWorktree(spec) => self.check_worktree(spec),
+            Action::CheckWorktree(spec) => self.check_worktree(spec).await,
             Action::RemoveWorktree(spec) => self.remove_worktree(spec).await,
             Action::KeepWorktree(spec) => self.keep_worktree(spec).await,
             Action::CheckGit(spec) => self.check_git(spec),
