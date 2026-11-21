@@ -13,7 +13,7 @@
 // session's cwd. The few Pi defaults that read the process-global agent directory
 // (`getAgentDir()`) are pinned to PiArc's directory once, in main.ts.
 import { randomUUID } from 'node:crypto';
-import type { Api, Model } from '@earendil-works/pi-ai';
+import type { Api, AssistantMessage, Model } from '@earendil-works/pi-ai';
 import path from 'node:path';
 import {
   getAgentDir,
@@ -50,6 +50,7 @@ import { missingToolCalls, repairInterruptedTurn } from '../harness/interruption
 import { parseSkillsCatalog } from '../harness/skills/catalog.js';
 import { expandInput, withPromptCommands } from '../mcp/prompts.js';
 import { changedExtensions, pluginExtensions } from './plugin-extensions.js';
+import { stopFailureType } from './turn-errors.js';
 import { CONCURRENCY_SAFE_TOOLS, ToolBatches } from '../harness/tool-batches.js';
 import { AhpError, describeError } from '../protocol/errors.js';
 import { DEFAULT_PROFILE, ToolNameMap } from '../tools/index.js';
@@ -291,9 +292,10 @@ export class SessionRegistry {
       return { turnId: known };
     }
     return this.#onceFor(hosted, requestId, async () => {
+      const expanded = await this.#expandPrompt(sessionId, input);
       const prepared = withHookContext(
-        await this.#prepare(sessionId, await this.#expandPrompt(input)),
-        hookContext,
+        await this.#prepare(sessionId, expanded.input),
+        joinContext(expanded.context, hookContext),
       );
       const again = hosted.prompts.get(requestId);
       if (again !== undefined) {
@@ -385,9 +387,20 @@ export class SessionRegistry {
     }
   }
 
-  /** `input` with a typed MCP prompt command expanded (T40). */
-  async #expandPrompt(input: UserInput): Promise<UserInput> {
-    return this.#options.mcp === undefined ? input : expandInput(this.#options.mcp, input);
+  /** `input` with a typed MCP prompt command expanded (T40), its UserPromptExpansion hooks
+   * run (T41). */
+  async #expandPrompt(
+    sessionId: string,
+    input: UserInput,
+  ): Promise<{ input: UserInput; context?: string }> {
+    const pool = this.#options.mcp;
+    if (pool === undefined) return { input };
+    const hooks = this.#sessions.get(sessionId)?.hooks;
+    return expandInput(
+      pool,
+      input,
+      hooks === undefined ? undefined : (fields) => hooks.expansion(fields),
+    );
   }
 
   /** The running turn of `sessionId` (its writes' checkpoint); a subagent's writes belong to
@@ -414,9 +427,10 @@ export class SessionRegistry {
       return known;
     }
     return this.#onceFor(hosted, requestId, async () => {
+      const expanded = await this.#expandPrompt(sessionId, input);
       const prepared = withHookContext(
-        await this.#prepare(sessionId, await this.#expandPrompt(input)),
-        hookContext,
+        await this.#prepare(sessionId, expanded.input),
+        joinContext(expanded.context, hookContext),
       );
       const again = hosted.inputs.get(requestId);
       if (again !== undefined) {
@@ -809,6 +823,10 @@ export class SessionRegistry {
     const projector = new Projector(sink, toCanonical, {
       reminders: this.#options.hostTools?.context === true,
       compactionNote: () => harness.compaction.takeNote(),
+      // StopFailure (T41): the turn ended with an error after Pi's retries.
+      onFailure: (error, response) => {
+        void hooks?.stopFailure(stopFailureType(response, error), error, lastText(response));
+      },
     });
     opened.projector = projector;
     const delivering: PreparedInput[] = [];
@@ -1067,4 +1085,19 @@ export class SessionRegistry {
     }
     return hosted;
   }
+}
+
+/** The text of a failed response, when it has some (StopFailure's `last_assistant_message`). */
+function lastText(response: AssistantMessage | undefined): string | undefined {
+  const text = response?.content
+    .filter((block) => block.type === 'text')
+    .map((block) => block.text)
+    .join('');
+  return text === undefined || text === '' ? undefined : text;
+}
+
+/** The context of an MCP prompt's expansion hooks before the submission's (T41). */
+function joinContext(first: string | undefined, second: string | undefined): string | undefined {
+  if (first === undefined) return second;
+  return second === undefined ? first : `${first}\n\n${second}`;
 }

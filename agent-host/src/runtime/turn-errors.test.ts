@@ -1,7 +1,7 @@
 import type { AssistantMessage } from '@earendil-works/pi-ai';
 import { describe, expect, it } from 'vitest';
 
-import { classifyTurnError } from './turn-errors.js';
+import { classifyTurnError, stopFailureType } from './turn-errors.js';
 
 function failed(errorMessage: string): AssistantMessage {
   return {
@@ -57,5 +57,29 @@ describe('classifyTurnError', () => {
       kind: 'internal',
       retryable: true,
     });
+  });
+});
+
+describe('stopFailureType', () => {
+  it.each([
+    ['429 {"type":"error","error":{"type":"rate_limit_error"}}', 'rate_limit'],
+    [
+      '529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}',
+      'overloaded',
+    ],
+    ['401 {"type":"error","error":{"type":"authentication_error"}}', 'authentication_failed'],
+    ['insufficient_quota: billing hard limit reached', 'billing_error'],
+    ['404 model_not_found: no such model', 'model_not_found'],
+    ['400 {"type":"error","error":{"type":"invalid_request_error"}}', 'invalid_request'],
+    ['500 Internal Server Error', 'server_error'],
+    ['503 Service Unavailable', 'server_error'],
+    ['socket closed unexpectedly', 'unknown'],
+  ])('maps %s to %s', (error, expected) => {
+    expect(stopFailureType(failed(error), error)).toBe(expected);
+  });
+
+  it('reads a truncated reply as max_output_tokens', () => {
+    const message = { ...failed(''), stopReason: 'length' as const };
+    expect(stopFailureType(message, 'length')).toBe('max_output_tokens');
   });
 });

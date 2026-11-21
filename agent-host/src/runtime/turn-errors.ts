@@ -58,3 +58,34 @@ export function classifyTurnError(
   }
   return { kind: 'internal', retryable: true };
 }
+
+/**
+ * `StopFailure`'s error type (T41, Claude Code's matcher values) of a failed turn: the one place
+ * that maps provider and Pi errors to `rate_limit`, `overloaded`, `authentication_failed`,
+ * `billing_error`, `invalid_request`, `model_not_found`, `server_error`, `max_output_tokens`
+ * and `unknown`.
+ */
+export function stopFailureType(
+  message: AssistantMessage | undefined,
+  errorMessage: string,
+): string {
+  if (message?.stopReason === 'length') return 'max_output_tokens';
+  if (/overloaded|(?<![a-z0-9])529(?![a-z0-9])/iu.test(errorMessage)) return 'overloaded';
+  if (QUOTA.test(errorMessage)) return 'billing_error';
+  if (RATE_LIMIT.test(errorMessage)) return 'rate_limit';
+  if (AUTH.test(errorMessage)) return 'authentication_failed';
+  if (
+    /model[_ ]not[_ ]found|unknown model|no such model|(?<![a-z0-9])404(?![a-z0-9])/iu.test(
+      errorMessage,
+    )
+  ) {
+    return 'model_not_found';
+  }
+  if (INVALID_REQUEST.test(errorMessage)) return 'invalid_request';
+  if (
+    /(?<![a-z0-9])5\d\d(?![a-z0-9])|server.?error|internal.?error|unavailable/iu.test(errorMessage)
+  ) {
+    return 'server_error';
+  }
+  return 'unknown';
+}

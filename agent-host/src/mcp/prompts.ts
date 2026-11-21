@@ -59,6 +59,8 @@ export function promptCommands(source: PromptSource): CommandInfo[] {
 export interface ExpandedPrompt {
   readonly text: string;
   readonly command: PromptCommand;
+  /** Context `UserPromptExpansion` hooks added (T41). */
+  readonly context?: string;
 }
 
 /** `/name rest` of `text`, when it is a slash command. */
@@ -122,14 +124,20 @@ export function promptText(command: string, messages: readonly McpPromptMessage[
   return parts.join('\n\n');
 }
 
+/** `UserPromptExpansion` hooks (T41): their block reason and context. */
+export type ExpansionHooks = (
+  fields: Record<string, unknown>,
+) => Promise<{ readonly block?: string | null; readonly context?: string | null }>;
+
 /**
  * Expands `text` when it is an MCP prompt command (`/mcp__…`): undefined for any other text.
- * Fails for a prompt no connected server offers, a missing required argument, or content
- * other than text.
+ * Fails for a prompt no connected server offers, a missing required argument, content other
+ * than text, or a `UserPromptExpansion` hook's block.
  */
 export async function expandMcpPrompt(
   source: PromptSource,
   text: string,
+  hooks?: ExpansionHooks,
 ): Promise<ExpandedPrompt | undefined> {
   const typed = slash(text);
   if (typed === undefined) return undefined;
@@ -138,8 +146,24 @@ export async function expandMcpPrompt(
     if (prompt === undefined) continue;
     const args = promptArguments(typed.name, prompt, typed.rest);
     const messages = await source.getPrompt(server, prompt.name, args);
+    const expanded = promptText(typed.name, messages);
+    const answer = await hooks?.({
+      expansion_type: 'mcp_prompt',
+      command_name: typed.name,
+      command_args: typed.rest,
+      command_source: 'mcp',
+      prompt: expanded,
+    });
+    if (answer?.block != null) {
+      throw new AhpError(
+        'permissionDenied',
+        `A UserPromptExpansion hook blocked /${typed.name}: ${answer.block}`,
+        { details: { reason: 'hookBlocked', hookReason: answer.block } },
+      );
+    }
     return {
-      text: promptText(typed.name, messages),
+      text: expanded,
+      ...(answer?.context == null ? {} : { context: answer.context }),
       command: {
         name: typed.name,
         kind: 'mcpPrompt',
@@ -170,9 +194,12 @@ export function withPromptCommands(
  * command Core expanded already is left alone). */
 export async function expandInput<
   T extends { readonly text: string; readonly command?: PromptCommand },
->(source: PromptSource, input: T): Promise<T> {
-  if (input.command != null) return input;
-  const expanded = await expandMcpPrompt(source, input.text);
-  if (expanded === undefined) return input;
-  return { ...input, text: expanded.text, mentions: [], command: expanded.command };
+>(source: PromptSource, input: T, hooks?: ExpansionHooks): Promise<{ input: T; context?: string }> {
+  if (input.command != null) return { input };
+  const expanded = await expandMcpPrompt(source, input.text, hooks);
+  if (expanded === undefined) return { input };
+  return {
+    input: { ...input, text: expanded.text, mentions: [], command: expanded.command },
+    ...(expanded.context === undefined ? {} : { context: expanded.context }),
+  };
 }

@@ -240,6 +240,8 @@ export class SessionMemory {
       if (lazy && previous !== undefined) continue;
       const hash = digest(file);
       if (hash !== previous) {
+        if (lazy)
+          this.onLoaded?.(file, file.paths == null ? 'nested_traversal' : 'path_glob_match');
         queued.push({
           key: `memory:${file.path}`,
           type: file.paths == null ? 'memoryLazyLoad' : 'rulesMatched',
@@ -296,6 +298,7 @@ export class SessionMemory {
       present.add(file.path);
       const hash = digest(file);
       if (this.#initial.get(file.path) === hash) continue;
+      this.onLoaded?.(file, 'compact');
       restored.push({
         key: `memory:${file.path}`,
         type: 'contextRestore',
@@ -331,6 +334,13 @@ export class SessionMemory {
   restored(reminders: readonly KeyedReminder[]): void {
     for (const reminder of reminders) this.#apply(reminder.data);
   }
+
+  /**
+   * `InstructionsLoaded` (T41): told of each memory file or rule as it enters the context, with
+   * Claude Code's load reason (`session_start`, `nested_traversal`, `path_glob_match`,
+   * `compact`). Set by the session's hooks.
+   */
+  onLoaded: ((file: MemoryFile, reason: string) => void) | undefined;
 
   /** The MCP section of the system prompt (T36), read when the system prompt is frozen. */
   mcpSection: (() => string | undefined) | undefined;
@@ -387,6 +397,7 @@ export class SessionMemory {
         });
         this.#apply({ versions });
         this.#remember({ versions });
+        for (const file of snapshot.files) this.onLoaded?.(file, 'session_start');
       }
       // The reminders extension, registered after this one, delivers what this queues.
       this.#update(snapshot.currentFiles ?? snapshot.files, false);

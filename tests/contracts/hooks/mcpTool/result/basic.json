@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 9,
+  "result": {
+    "text": "{\"decision\": \"block\", \"reason\": \"Lint failed.\"}",
+    "isError": true
+  }
+}

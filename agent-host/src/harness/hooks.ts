@@ -42,7 +42,10 @@ type HostEvent =
   | 'postCompact'
   | 'subagentStart'
   | 'subagentStop'
-  | 'postToolBatch';
+  | 'postToolBatch'
+  | 'instructionsLoaded'
+  | 'stopFailure'
+  | 'userPromptExpansion';
 
 /** Core's merged answer (`hooks/run` result). */
 export interface HookResult {
@@ -214,6 +217,33 @@ export class SessionHooks {
       this.#o.log(`hooks/run ${event} failed: ${describeError(error)}`);
       return {};
     }
+  }
+
+  /** `InstructionsLoaded` (T41): a memory file or rule entered the context. No decision. */
+  instructionsLoaded(file: string, reason: string): void {
+    void this.run('instructionsLoaded', {
+      file_path: file,
+      memory_type: memoryType(file),
+      load_reason: reason,
+    });
+  }
+
+  /** `StopFailure` (T41): the turn ended with a model API error; the output is ignored. */
+  async stopFailure(
+    error: string,
+    details: string,
+    lastMessage: string | undefined,
+  ): Promise<void> {
+    await this.run('stopFailure', {
+      error,
+      error_details: details,
+      ...(lastMessage === undefined ? {} : { last_assistant_message: lastMessage }),
+    });
+  }
+
+  /** `UserPromptExpansion` (T41) of an MCP prompt the user typed: a block reason refuses it. */
+  async expansion(fields: Record<string, unknown>): Promise<HookResult> {
+    return this.run('userPromptExpansion', fields);
   }
 
   /** The session closes only to reopen on another branch (T28): it does not end. */
@@ -423,4 +453,21 @@ export class SessionHooks {
       await this.run('sessionEnd', { reason: 'other' });
     });
   };
+}
+
+/** Claude Code's `memory_type` of a memory file: `User` (the home directory's), `Local`
+ * (`CLAUDE.local.md`), otherwise `Project`. */
+export function memoryType(file: string): string {
+  const name = file.split(/[\\/]/u).pop() ?? '';
+  if (name === 'CLAUDE.local.md') return 'Local';
+  const home = process.env.HOME ?? process.env.USERPROFILE;
+  if (
+    home !== undefined &&
+    home !== '' &&
+    file.startsWith(home) &&
+    /[\\/]\.claude[\\/]/u.test(file.slice(home.length))
+  ) {
+    return 'User';
+  }
+  return 'Project';
 }

@@ -129,6 +129,12 @@ export function sessionParts(input: SessionPartsInput): SessionParts {
           ...(input.child?.mcpInline === undefined ? {} : { inline: input.child.mcpInline }),
         });
   if (mcp !== undefined) memory.mcpSection = () => mcp.systemSection();
+  // InstructionsLoaded (T41): each memory file or rule as it enters the context.
+  if (hooks !== undefined) {
+    memory.onLoaded = (file, reason) => {
+      hooks.instructionsLoaded(file.path, reason);
+    };
+  }
   const skills =
     tools.kind === 'core' && options.hostTools?.skills === true
       ? new SessionSkills({

@@ -542,6 +542,36 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     }
     return mcp;
   };
+  connection.handle('hooks/mcpTool', async (params) => {
+    // An `mcp_tool` hook's call (T41): Core runs the hook and reads the text; the tool runs on
+    // the workspace's pool like a session's call.
+    const method = 'hooks/mcpTool';
+    const fields = paramsObject(method, params);
+    const timeoutMs = fields.timeoutMs;
+    if (typeof timeoutMs !== 'number' || !Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      throw new AhpError('invalidParams', `${method}: timeoutMs must be a positive number`, {
+        details: { member: 'timeoutMs' },
+      });
+    }
+    const args = fields.arguments;
+    if (typeof args !== 'object' || args === null || Array.isArray(args)) {
+      throw new AhpError('invalidParams', `${method}: arguments must be an object`, {
+        details: { member: 'arguments' },
+      });
+    }
+    const servers = await pool(method);
+    const result = await servers.call(
+      `hook:${stringField(method, fields, 'sessionId')}`,
+      stringField(method, fields, 'server'),
+      stringField(method, fields, 'tool'),
+      args as Record<string, unknown>,
+      { signal: AbortSignal.timeout(timeoutMs) },
+    );
+    const text = result.content
+      .flatMap((block) => (block.type === 'text' ? [block.text] : []))
+      .join('\n');
+    return { text, ...(result.isError === true ? { isError: true } : {}) };
+  });
   connection.handle('mcp/status', async () => {
     const servers = await pool('mcp/status');
     await servers.refresh();

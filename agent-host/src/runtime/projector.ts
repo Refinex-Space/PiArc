@@ -113,6 +113,8 @@ export interface ProjectorOptions {
   readonly reminders?: boolean;
   /** The note of the compaction that just ended. */
   readonly compactionNote?: () => CompactionNote | undefined;
+  /** A turn failed (T41's `StopFailure`): its error and the failed response, when any. */
+  readonly onFailure?: (errorMessage: string, response: AssistantMessage | undefined) => void;
 }
 
 export class Projector {
@@ -624,6 +626,7 @@ export class Projector {
     this.#turn = undefined;
     const failure =
       status === 'failed' ? classifyTurnError(response, errorMessage ?? '') : undefined;
+    if (status === 'failed') this.#options.onFailure?.(errorMessage ?? '', response);
     this.#sink.event('turn/completed', {
       turnId: turn.turnId,
       status,
