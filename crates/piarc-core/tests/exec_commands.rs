@@ -320,6 +320,28 @@ async fn a_long_command_with_quotes_and_brackets_runs_whole() {
     assert_eq!(head(&result).trim_end(), format!("{payload} [unset]"));
 }
 
+/// I102 on Windows (W2): the command travels through `eval`, so a heredoc keeps its lines and
+/// a syntax error is reported as bash reports it, with a failing exit code.
+#[cfg(windows)]
+#[tokio::test]
+async fn heredocs_and_syntax_errors_through_eval_on_windows() {
+    let f = Fixture::new("eval", CommandEnv::Fixed(base_env()));
+    let heredoc = f
+        .bash("cat <<'END'\nfirst 第一\n  second $HOME\nEND\necho after")
+        .await;
+    assert_eq!(heredoc["exitCode"], 0, "{}", head(&heredoc));
+    assert_eq!(head(&heredoc), "first 第一\n  second $HOME\nafter\n");
+    let broken = f.bash("echo start\nif then fi\necho never").await;
+    assert_eq!(broken["exitCode"], 2, "{}", head(&broken));
+    let text = head(&broken);
+    assert!(text.starts_with("start\n"), "{text}");
+    assert!(
+        text.contains("eval: line 2: syntax error near unexpected token"),
+        "{text}"
+    );
+    assert!(!text.contains("never"), "{text}");
+}
+
 #[tokio::test]
 async fn the_environment_has_no_internal_variables() {
     let mut env = base_env();
