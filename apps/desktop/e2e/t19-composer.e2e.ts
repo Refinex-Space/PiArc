@@ -134,10 +134,13 @@ test('@ mentions come from Core, honor ignore files and stay apart from the sent
   const chip = message.getByTestId('mention-chip');
   await expect(chip).toHaveText('@MainView.tsx');
   await expect(chip).toHaveAttribute('data-path', 'src/mention/MainView.tsx');
-  const sent = await requests(mock, 't19-input');
-  expect(userTexts(sent.at(-1)?.body ?? {}).at(-1)).toBe(
-    'Compare @src/mention/MainView.tsx and the readme',
-  );
+  // The composer can look idle before the new turn starts (R4): wait for the request itself.
+  await expect
+    .poll(async () => {
+      const sent = await requests(mock, 't19-input');
+      return userTexts(sent.at(-1)?.body ?? {}).at(-1);
+    })
+    .toBe('Compare @src/mention/MainView.tsx and the readme');
   await screenshots(page, testInfo, 'mention-sent');
 });
 

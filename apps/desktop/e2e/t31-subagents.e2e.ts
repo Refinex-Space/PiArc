@@ -115,10 +115,10 @@ test('the Subagents page lists types, overrides, warnings and invalid files', as
   await expect(reviewer).toContainText('Replaces');
   await expect(reviewer).toContainText('.claude');
   const warnings = reviewer.getByTestId('agent-warnings');
-  // `isolation` works since T35; `skills` waits for T37.
+  // `isolation` works since T35; `skills` waits for T48 (I159).
   await expect(warnings).not.toContainText('isolation');
   await expect(warnings).toContainText('skills');
-  await expect(warnings).toContainText('T37');
+  await expect(warnings).toContainText('T48');
   await expect(warnings).toContainText('bypassPermissions');
   for (const builtIn of ['general-purpose', 'Explore', 'Plan']) {
     await expect(

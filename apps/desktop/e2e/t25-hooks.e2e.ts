@@ -76,7 +76,7 @@ test('hook messages and errors show in the notice bar and unsupported hooks in d
   const hooks = settings.getByTestId('diagnostics-hooks');
   await expect(hooks.getByTestId('diagnostics-hook')).toHaveText([
     /\.claude\/settings\.json \(Claude Code\).*\/hooks\/PreToolUse\/0\/hooks\/0\/async.*async hooks are not supported; this hook does not run/,
-    /\/hooks\/SubagentStop.*SubagentStop hooks are not run yet \(T38\)/,
   ]);
+  // T38 runs SubagentStop hooks: the one in the file is no longer listed as unsupported (R4).
   await hooks.screenshot({ path: path.join(EVIDENCE, 'diagnostics-hooks-en.png') });
 });
