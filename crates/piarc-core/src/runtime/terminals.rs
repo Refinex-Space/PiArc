@@ -4,8 +4,8 @@
 use std::time::Duration;
 
 use piarc_protocol::terminal::{
-    TerminalCommand, TerminalInfo, TerminalLink, TerminalMatch, TerminalPasteOutcome,
-    TerminalScroll, TerminalTextRange,
+    TerminalInfo, TerminalLink, TerminalMatch, TerminalPasteOutcome, TerminalScroll,
+    TerminalTextRange,
 };
 
 use super::CoreRuntime;
@@ -268,20 +268,6 @@ impl CoreRuntime {
     ) -> Result<()> {
         self.ensure_running()?;
         self.shared.terminals.text(id, range, unwrap, on_done)
-    }
-
-    /// The newest command of terminal `id` (OSC 133) with its output, on the blocking pool.
-    ///
-    /// # Errors
-    ///
-    /// [`crate::Error::UnknownTerminal`], [`crate::Error::ShuttingDown`].
-    pub fn terminal_last_command(
-        &self,
-        id: u32,
-        on_done: impl FnOnce(Result<Option<TerminalCommand>>) + Send + 'static,
-    ) -> Result<()> {
-        self.ensure_running()?;
-        self.shared.terminals.last_command(id, on_done)
     }
 
     /// Finds `query` in terminal `id`'s screen and scrollback, newest first, on the blocking

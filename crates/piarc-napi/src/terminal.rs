@@ -379,22 +379,6 @@ impl CoreRuntime {
         Ok(promise)
     }
 
-    /// The newest command of the terminal (OSC 133) as JSON text (`TerminalCommand`), or
-    /// `null` before the first.
-    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
-    pub fn terminal_last_command<'env>(
-        &self,
-        env: &'env Env,
-        id: u32,
-    ) -> napi::Result<Object<'env>> {
-        let (deferred, promise) = env.create_deferred::<String, Json>()?;
-        boundary::call(env, "CoreRuntime.terminalLastCommand", || {
-            self.core
-                .terminal_last_command(id, move |result| deferred.resolve(json(result)))
-        })?;
-        Ok(promise)
-    }
-
     /// Finds `query` in the terminal's screen and scrollback; resolves with JSON text of the
     /// matches (`TerminalMatch[]`), newest first.
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]

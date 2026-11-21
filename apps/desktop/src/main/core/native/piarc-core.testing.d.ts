@@ -391,11 +391,6 @@ export declare class CoreRuntime {
    */
   terminalText(id: number, range?: string | null, unwrap?: boolean | null): Promise<string>;
   /**
-   * The newest command of the terminal (OSC 133) as JSON text (`TerminalCommand`), or
-   * `null` before the first.
-   */
-  terminalLastCommand(id: number): Promise<string>;
-  /**
    * Finds `query` in the terminal's screen and scrollback; resolves with JSON text of the
    * matches (`TerminalMatch[]`), newest first.
    */

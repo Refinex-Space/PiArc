@@ -1,11 +1,9 @@
 //! `piarc-term` events as the Core API's `term/<id>` events
 //! ([`piarc_protocol::terminal::TerminalEvent`]).
 
-use piarc_protocol::terminal::{
-    TerminalCommand, TerminalCommandState, TerminalEvent, TerminalMatch, TerminalPoint,
-};
+use piarc_protocol::terminal::{TerminalEvent, TerminalMatch, TerminalPoint};
 use piarc_term::Event as TermEvent;
-use piarc_term::commands::{CommandChange, CommandInfo, CommandState};
+use piarc_term::commands::CommandChange;
 use piarc_term::vt::{ScreenPoint, SearchMatch};
 
 /// The client's form of `event`.
@@ -42,30 +40,6 @@ fn point(point: ScreenPoint) -> TerminalPoint {
     TerminalPoint {
         row: u64::from(point.y),
         col: u32::from(point.x),
-    }
-}
-
-fn millis(time: std::time::SystemTime) -> u64 {
-    time.duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
-}
-
-/// The Core API form of a command.
-pub(super) fn command(info: CommandInfo) -> TerminalCommand {
-    TerminalCommand {
-        seq: info.seq,
-        command: info.command,
-        state: match info.state {
-            CommandState::Running => TerminalCommandState::Running,
-            CommandState::Finished => TerminalCommandState::Finished,
-        },
-        exit_code: info.exit_code,
-        started_at: millis(info.started_at),
-        ended_at: info.ended_at.map(millis),
-        output_start: info.output_start.map(point),
-        output_end: info.output_end.map(point),
-        output: info.output,
-        output_complete: info.output_complete,
     }
 }
 

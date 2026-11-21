@@ -42,8 +42,8 @@ use std::time::Duration;
 
 use piarc_exec::terminal_tree::{HANGUP_GRACE, TerminalTree};
 use piarc_protocol::terminal::{
-    TerminalCommand, TerminalInfo, TerminalLink, TerminalMatch, TerminalPasteOutcome,
-    TerminalScroll, TerminalTextRange,
+    TerminalInfo, TerminalLink, TerminalMatch, TerminalPasteOutcome, TerminalScroll,
+    TerminalTextRange,
 };
 use piarc_term::shell::Integration;
 use piarc_term::vt::{
@@ -538,20 +538,6 @@ impl Terminals {
             id,
             "terminal text",
             move |session| session.text(range, options).map_err(Error::from),
-            on_done,
-        )
-    }
-
-    /// The newest command of terminal `id` (OSC 133), on the blocking pool.
-    pub(crate) fn last_command(
-        &self,
-        id: u32,
-        on_done: impl FnOnce(Result<Option<TerminalCommand>>) + Send + 'static,
-    ) -> Result<()> {
-        self.on_pool(
-            id,
-            "terminal command",
-            |session| Ok(session.last_command()?.map(events::command)),
             on_done,
         )
     }
