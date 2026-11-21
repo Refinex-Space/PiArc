@@ -165,7 +165,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T34 | [终端渲染器与终端面板](tasks/T34-terminal-renderer-and-panel.md) | 4 | T33 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 991f323 |
 | T35 | [Worktree、并行会话、多窗口、全文搜索与后台常驻](tasks/T35-worktrees-parallel-sessions-and-windows.md) | 4 | T34 | macOS | high / 高 | 大 | 无 | 部分完成 | c4094dd |
 | T36 | [MCP 共享连接池](tasks/T36-mcp-connection-pool.md) | 4 | T35 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | ca3d873 |
-| T37 | [Skills、斜杠命令、命令面板与输出风格](tasks/T37-skills-commands-and-output-styles.md) | 4 | T36 | macOS | high / 高 | 大 | 无 | 未开始 | — |
+| T37 | [Skills、斜杠命令、命令面板与输出风格](tasks/T37-skills-commands-and-output-styles.md) | 4 | T36 | macOS | high / 高 | 大 | 无 | 进行中 | — |
 | T38 | [WebSearch 与 hooks 扩展（M3）](tasks/T38-websearch-and-hooks-m3.md) | 4 | T37 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | R4 | [M3 评审](tasks/R4-m3-review.md) | 4 | T38、W2 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | W3 | [Windows：M3 达标](tasks/W3-windows-m3-parity.md) | 5 | R4（建议在 T43、T44 之后，需要读屏清单与性能测量脚本） | Windows | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,6 +308,19 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+T37（Skills、斜杠命令、命令面板与输出风格）开工于 2026-11-21；基线 `npm run verify -- --baseline` 通过（复用 ca3d873 的全量结果）；远端分支仍停在 e0c41ce（未推送 T36 起的提交），没有新的 Windows CI 结果可核对。
+
+- [ ] 1. 协议：skills/命令/输出风格类型，AHP `skills/list`、`skills/invoke`、`skills/match`、`resources/listSkills|listCommands|reload`，`session/prompt` 的命令元数据，提醒类型（ADR-0054）
+- [ ] 2. `piarc-config`：skills、命令、输出风格的发现与 frontmatter 解析、同名取舍与诊断、参数替换、`!` 命令标为不支持（A01、A07、A12）
+- [ ] 3. Core：目录列表与监听（`resources/reload`）、`Skill` 只读裁决与 `Skill(名称)` 规则、skill 目录只读放行、`allowed-tools` 回合级免审批（信任约束）、skill hooks 作用域、斜杠命令展开与 UserPromptExpansion 挂载点（A04、A05）
+- [ ] 4. Agent Host：关闭 Pi 自带 skills/模板、第 5 段索引与第 3 段输出风格、`Skill` 工具、`paths` 激活、索引与风格变化的提醒、重注入登记、`resources/*` 应答（A02、A03、A06、A11）
+- [ ] 5. NAPI、主进程 IPC、preload：命令与 skills 列表、输出风格切换
+- [ ] 6. 渲染进程：composer `/` 命令面板、Mod+K 命令面板、内置命令、输出风格选择、设置页 skills 列表、共享模糊匹配（A08、A09、A10、A11）
+- [ ] 7. L2 场景 `skill-*`、`command-*`、能力清单与 capabilities.md
+- [ ] 8. L4 `t37-*` 与截图证据
+- [ ] 9. 原创性自查（A13）、文档与 AGENTS.md、复用表、登记事项
+- [ ] 10. `npm run verify`（A14）、验收记录与收尾
 
 ## 登记事项
 
