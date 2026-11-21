@@ -311,10 +311,10 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 R4（开工 2026-11-21）：先把 `origin/windows/dev` 的 W2 合并进来（b91ad7d，用户要求；W2 一侧改号 I146/I147 → I163/I164、架构 2.43 → 2.47）。基线 verify 在合并提交上 13/15：clippy 的过期 `#[expect]`（01e190c 修复）与 capabilities.md 漂移，都是合并产物。W2 在远端 CI（44887344674）上 Windows verify 与 Windows L4 失败、macOS verify 通过，另记。审查基线 b91ad7d。
 
-- [ ] 1 M3 退出标准复测：`perf:m3` 加共享 stdio MCP server 与 skills 索引（脚本已改），打包后测量，与 T35 并列（A01）
+- [ ] 1 M3 退出标准复测（A01）：两轮已测（`tmp/evidence/R4/m3-memory-{1,2}.json`）：Agent Host 236/218 MB ≤ 270，应用其余进程 580/577 MB > 510（RSS 合计；同负载 phys_footprint 约 250 MB），定为阻塞项写进结论
 - [ ] 2 能力覆盖：重新生成 capabilities.md，MISSING 0，`--milestone M3` 无 planned（A02）；T31–T38、W2 验收项状态（A03）
 - [x] 3 四个独立审查并行运行（子 agent 与并发 S、MCP 与终端 M、扩展与信任 E、工程质量 Q）（A04）
-- [ ] 4 逐条核实与处理发现，修复附回归测试（A05）：S1、S2 已修（172d413）
+- [ ] 4 逐条核实与处理发现，修复附回归测试（A05）：已修 S1、S2（172d413）、S4（daf6f72）、E1（cff27f0）、E2（c437180）；红绿日志在 `tmp/evidence/R4/`；审查原文要点在会话草稿，待写入评审文件
 - [ ] 5 W2 确认与 T23–T30 汇总（A06）；登记事项逐条处理（A08）
 - [ ] 6 ADR-0010、ADR-0017 触发条件（A07）
 - [ ] 7 架构第 16 章、6.0、6.15，版本与修订记录（A09）
