@@ -2,7 +2,7 @@
 // dark, with the real Core, Agent Host and mock provider. Journeys reach the states the way a
 // user does; `checkState` writes each axe result to tmp/evidence/T43/axe/ and fails on any
 // violation. The last test checks every listed state was reached in this run.
-import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { ElectronApplication, Page } from '@playwright/test';
@@ -37,6 +37,13 @@ async function newSession(page: Page, text: string, scenario: string): Promise<v
 async function railTab(page: Page, panel: string): Promise<void> {
   await page.getByTestId(`panel-tab-${panel}`).click();
 }
+
+// "Checked in this run" (R5): markers an earlier run left behind would let a state whose check
+// was removed from the journey pass the last test. The axe reports stay.
+test.beforeAll(async () => {
+  const markers = (await readdir(AXE_DIR).catch(() => [])).filter((f) => f.endsWith('.checked'));
+  await Promise.all(markers.map((f) => rm(path.join(AXE_DIR, f), { force: true })));
+});
 
 test('windows, the trust dialog, a first conversation, palettes, rail cards and settings pages', async ({
   app,
