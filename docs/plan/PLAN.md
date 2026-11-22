@@ -176,7 +176,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 部分完成 | 00b452b |
 | T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 部分完成 | a5f6146 |
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
-| R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 阻塞（等待用户确认 ADR-0063、ADR-0064） | 4b7c223 |
+| R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 部分完成 | f7b05b7 |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 未开始 | — |
@@ -309,12 +309,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-R5（阻塞，等待用户确认 ADR-0063、ADR-0064）：交付物 1–5 与质量门禁已完成（4b7c223），用户决定后续做：
-
-- [ ] ADR-0063：采纳则状态改"已接受"，按 ADR 的"需要配套做的事"改 `app-memory` 与 `m3-memory.mjs` 的口径、重测、改第 11 章与修订记录、更新 R5 发现文件第 1.2 节与结论；否决则写明理由，这一行转入 I222
-- [ ] ADR-0064：采纳则状态改"已接受"，同步架构第 10.2 节与 ADR-0029 的状态，实现交 M5 的第一个任务或单独小任务（不在 R5 实现）；否决则写明理由，I79 记为已接受的风险
-- [ ] 两者处理后：R5 看板状态改为"部分完成"（A01 等 CI，A02、A03 随性能任务与 T44 的续做），会话日志追加一条
-
 ## 登记事项
 
 任务执行中发现、但不属于本任务范围的问题，在这里登记：编号（I01 起）、发现于哪个任务、内容、建议由哪个任务处理。处理完成后在"建议处理"一列注明"已落地"与位置。
@@ -346,7 +340,7 @@ R5（阻塞，等待用户确认 ADR-0063、ADR-0064）：交付物 1–5 与质
 | I23 | T08 | Agent Host 的 `secrets/lock` 请求超时（桥接默认 30 s）后 Core 才授予的锁无人释放，要等 30 s 租约到期，期间同一 provider 的写入等待；pi-ai 的取消信号只取消排队，同样可能留下这种锁 | 影响限于同一 provider 的写入延迟；R1 评估是否让 Core 在授予前检查请求方是否仍在等待（例如锁请求带截止时间）；R1：与 R1-C9、A5 合并为 I57，交 T21；T21 已落地：截止时间、迟到授予回收与续约 |
 | I24 | T09 | transcript 原型页 `#/transcript-lab` 与合成夹具（`src/renderer/lab/`）随发布构建的渲染包分发，与 I13 的 `#/event-probe` 同类 | T45 与 I13 一起评估在发布构建中剔除测试页；**已落地（T45）**：见 I13 |
 | I25 | T09 | 真实输入法（macOS 简体拼音、日文）与触控板滚动手感需要人工核对，清单见 `docs/spikes/S01-transcript-composer.md` 第 7 节（M1–M10）；自动化部分已用 CDP 合成通过 | 用户核对后把结果告诉智能体补记到 S1 报告；R1 汇总 S1 时检查；R1：macOS composer 的真实输入法与触控板核对交 T19，R2 检查；日文输入法两个平台都未验证（T19、W1）；**T19 用户确认 macOS M1–M10 人工核对通过**（S01 第 7 节），Windows 日文输入法留 W1；W1：微软拼音实机通过，用户决定不安装日文语言包，Windows 日文仍未验证；**R4**：Windows 日文输入法仍未验证，交 T51 的两平台验收（用户决定装语言包时） |
-| I26 | T09 | S1 基准中应用全部进程合计 489 MiB，超出第 11 章"不含 Agent Host 的全部进程 ≤ 450 MB"；渲染进程 179 MiB 在预算内，超出主要来自主进程（179 MiB，含 Core 与测试驱动） | R1 与 I12 一起按 M0 实测校准；W0 补 Windows 数据；已落地（R1）：进程合计改为 macOS ≤ 510 MB（放宽原因见架构 v2.17）、Windows ≤ 450 MB；两平台实测仍超出，交 T44，R4 复核；**R4 复核**：3 会话 + 子 agent + 共享 MCP 时应用其余进程 RSS 合计 577–580 MB，仍超出；同负载 phys_footprint 约 250 MB，超出主要是各进程重复计入的共享框架页（R4 评审）。预算不放宽，交 T44：定测量口径（需 ADR）或优化；**T44**：Nightly 测量（侧栏 100 个会话、打开 1,000 条）RSS 合计 519 MB 仍超出，同一时刻 `footprint` 物理占用合计 207 MB（`probe-memory.mjs` 的 `detail.footprintMB`）；T44 没有改口径（改口径等于放宽，须由用户经 ADR 决定），两种读数都进 Nightly 报告，交 R5 与用户决定；**R5**：写 ADR-0063（提议）：这一行改按物理占用（macOS `phys_footprint`、Windows 私有工作集）测量、预算数值不变，属放宽，等用户决定；在此之前 M3、M4 的这一行仍判为超出 |
+| I26 | T09 | S1 基准中应用全部进程合计 489 MiB，超出第 11 章"不含 Agent Host 的全部进程 ≤ 450 MB"；渲染进程 179 MiB 在预算内，超出主要来自主进程（179 MiB，含 Core 与测试驱动） | R1 与 I12 一起按 M0 实测校准；W0 补 Windows 数据；已落地（R1）：进程合计改为 macOS ≤ 510 MB（放宽原因见架构 v2.17）、Windows ≤ 450 MB；两平台实测仍超出，交 T44，R4 复核；**R4 复核**：3 会话 + 子 agent + 共享 MCP 时应用其余进程 RSS 合计 577–580 MB，仍超出；同负载 phys_footprint 约 250 MB，超出主要是各进程重复计入的共享框架页（R4 评审）。预算不放宽，交 T44：定测量口径（需 ADR）或优化；**T44**：Nightly 测量（侧栏 100 个会话、打开 1,000 条）RSS 合计 519 MB 仍超出，同一时刻 `footprint` 物理占用合计 207 MB（`probe-memory.mjs` 的 `detail.footprintMB`）；T44 没有改口径（改口径等于放宽，须由用户经 ADR 决定），两种读数都进 Nightly 报告，交 R5 与用户决定；**R5**：写 ADR-0063（提议）：这一行改按物理占用（macOS `phys_footprint`、Windows 私有工作集）测量、预算数值不变，属放宽，等用户决定；在此之前 M3、M4 的这一行仍判为超出；**R5（用户采纳 ADR-0063）**：`app-memory` 与 `perf:m3` 改按物理占用（`scripts/perf/lib.mjs` 的 `appFootprint`），macOS 实测 Nightly 场景 208 MB、3 会话场景最大 264 MB，达标，基线按新口径更新；**已关闭** |
 | I27 | T10 | 终端的 L4（`terminal.e2e.ts`、`terminal-tui.e2e.ts`）与 `crates/piarc-term/tests/pty.rs`、`crates/piarc-core/tests/terminal.rs` 使用 `/bin/sh`、`cat`、`vim`、`top`，在 Windows 上不运行；ConPTY 的 resize、Ctrl+C、kill（portable-pty 0.9.0 的 kill 返回值问题由 `wait` 兜底）与是否随附 `conpty.dll`/OpenConsole.exe 未验证 | W0 补 Windows 程序版本的用例并实测 ConPTY；S7 报告第 10 节；**已关闭（R4）**：W0 已补 Windows 程序版本的用例（`pty_windows.rs`、`terminal_windows.rs`）并实测 ConPTY，不随附 `conpty.dll`（S7 第 10 节） |
 | I28 | T10 | PTY 子进程由 portable-pty 启动，不经 `ProcessSpawner`，没有进程组或 Job Object：终端里的程序再起的子进程不随终端关闭而结束 | 已落地（T33）：`piarc_exec::TerminalTree`（macOS 按终端设备收集全部进程组，挂断、宽限 2 s 后 `SIGKILL`；Windows 启动后加入 Job Object），关闭终端与有序关闭都等它结束；测试 `crates/piarc-core/tests/terminal.rs`、`terminal_windows.rs` |
 | I29 | T10 | `cat` 以约 190 MB/s 输出时主进程 CPU（含 Core 全部线程）约为一个核的 74%，主要是 IO 线程读 PTY 与解析；第 11 章没有对应预算 | T44 把终端吞吐纳入性能回归时评估（例如增大读块、合并读） |
@@ -399,7 +393,7 @@ R5（阻塞，等待用户确认 ADR-0063、ADR-0064）：交付物 1–5 与质
 | I76 | T17 | Core 在 `core/notices` 发 `gitBashMissing`（Windows 缺 Git Bash 时），客户端还没有显示它；`commandExecution.execution`（bash 卡数据）也还没有界面 | T18 显示 `core/notices`（含下载链接），T19 用 `execution` 画 bash 卡；**T18 已落地 `core/notices` 的显示**（主区顶部的提示条，带下载按钮，经外链确认打开）；bash 卡仍交 T19；**T19 已落地**，BashCard 展示 execution 字段 |
 | I77 | T17 | 登录 shell 的环境在每个 Core 第一次执行命令时解析（`$SHELL -i -l -c`，最多 10 s）：用户配置很重时第一条命令会多等这段时间；解析失败只记警告并退回 Core 的环境 | T44 的性能任务测启动后首条命令的耗时，必要时改为 Core 启动后后台预解析；设置诊断（T40）显示解析失败的原因 |
 | I78 | T17 | 语义退出码只认单个简单命令：`cd src && grep x f` 这类常见写法按退出码判失败（ADR-0028 第 1 条） | T23 用 tree-sitter-bash 的语法树判定最后执行的命令后细化；**T23 未处理**（任务范围不含退出码），`piarc_policy::bash::analyze` 已可给出各子命令，交 T30 或 T48 细化（`&&` 链中前段的退出码 1 也可能来自 `cd`，需要按执行顺序判断）；**R3 指定 T32**：T32 统一前后台命令的结果与退出码时按 `piarc_policy::bash::analyze` 的执行顺序判断最后执行的命令 |
-| I79 | T18 | 信任决定（`decideProjectTrust`）由渲染进程发出、没有主进程的原生确认：渲染进程被注入时可以静默信任项目、启用其 hooks 与 MCP。审批卡（T20）同样在渲染进程作答；第 10.3 节只要求"总是允许"类规则的修改走原生确认 | T45 评估信任决定是否也走主进程原生确认（ADR-0029 备选方案）；**T45 评估，交 R5 由用户决定**：残余风险是渲染进程被注入后能静默信任项目、启用其 hooks 与 MCP；现有防线是渲染进程加固（CSP、无 HTML 入口、XSS 载荷在全部渲染面的测试、畸形 IPC 参数测试）。可选做法：对"信任"（不含"暂不信任"）弹主进程原生确认，列出可执行项的类别与数量；代价是每个新工作区多一次确认，并改变 ADR-0029 记录的决定，建议 R5 写 ADR 提议请用户决定；**R5**：写 ADR-0064（提议）："信任"经主进程原生确认（安全审查 S3 独立得出同一结论），等用户决定；采纳后由 M5 的第一个任务或单独小任务实现 |
+| I79 | T18 | 信任决定（`decideProjectTrust`）由渲染进程发出、没有主进程的原生确认：渲染进程被注入时可以静默信任项目、启用其 hooks 与 MCP。审批卡（T20）同样在渲染进程作答；第 10.3 节只要求"总是允许"类规则的修改走原生确认 | T45 评估信任决定是否也走主进程原生确认（ADR-0029 备选方案）；**T45 评估，交 R5 由用户决定**：残余风险是渲染进程被注入后能静默信任项目、启用其 hooks 与 MCP；现有防线是渲染进程加固（CSP、无 HTML 入口、XSS 载荷在全部渲染面的测试、畸形 IPC 参数测试）。可选做法：对"信任"（不含"暂不信任"）弹主进程原生确认，列出可执行项的类别与数量；代价是每个新工作区多一次确认，并改变 ADR-0029 记录的决定，建议 R5 写 ADR 提议请用户决定；**R5**：写 ADR-0064（提议）："信任"经主进程原生确认（安全审查 S3 独立得出同一结论），等用户决定；采纳后由 M5 的第一个任务或单独小任务实现；**R5**：用户采纳 ADR-0064，实现登记 I223 |
 | I80 | T18 | 信任变化只重启 Hub 路由表里已有的工作区：工作区刚打开、Agent Host 已启动但还没登记进路由表的极短窗口内做出的决定，不会让它重启（新进程启动时自己查信任，只有那一刻之前已经查过的进程会沿用旧答案） | R2 核实 workspace actor 在路由登记前开始预热。T35 在多窗口验收中验证并消除这一窗口，重启须覆盖已开始预热的工作区；**已落地（T35）**：`Hub::trust_changed` 记下变化的 checkout 与代次，`Hub::workspace` 登记新开的工作区后补发它打开期间漏掉的变化（`crates/piarc-core/src/sessions/mod.rs`，单测 `a_workspace_opening_sees_the_trust_changes_after_it_started`） |
 | I81 | T18 | `crates/piarc-core/src/runtime.rs` 已超过 1,000 行（T17 时 1,080 行，T18 增加会话元数据、客户端设置与信任重启的薄包装后约 1,150 行），超出 `coding-standards.md` 的单文件上限 | R2 已拆分 runtime/state.rs 与 runtime/sessions.rs，runtime.rs 808 行（b426028）；**已关闭（R4）**：R2 已拆分 |
 | I82 | T23 | 按参数匹配的规则（`Agent(model:opus)`、`Bash(run_in_background:true)`）没有实现：现在分别解析为 Agent 类型名与命令模式，永不匹配，deny 意图会落空 | T31 接入 Agent 工具时按 Claude Code 语义实现（只用于 deny/ask，不匹配主内容字段），并在设置页标出；**已落地（T31）**：`piarc_policy::rules::Spec::Param`（`param_keys` 表）与 Core 的 `assess::param_rules`，只用于 deny/ask，设置页经 `check_rule` 的 `parameter` 标出（ADR-0048 第 12 条） |
@@ -466,7 +460,7 @@ R5（阻塞，等待用户确认 ADR-0063、ADR-0064）：交付物 1–5 与质
 | I143 | T34 | 应用重启后被中断的会话终端（任务 `interrupted`，T33 已保存 snapshot）在面板中没有"恢复"入口：Core 的 `openSessionTerminal` 支持 `restore`，界面未提供 | T35（并行会话与多窗口）或 M4 的终端完善时加入；T35 未加入（并行会话与多窗口不依赖它），留给 M4 的终端完善；**R4**：交 T48（M5 补全中的终端完善） |
 | I144 | T34 | axe 检查发现存量对比度缺陷：`:root[data-app] button { color: inherit }` 的优先级高于 `.button-primary`，全应用主按钮文字为深色（对比度 2.87）；T34 把三条主按钮规则移到 `:root[data-app]` 下修复，T18 视觉关口的截图里主按钮文字颜色与现在不同 | 已落地（T34）；T43 的无障碍检查覆盖全部界面 |
 | I145 | T34 | 测试机没有 htop：T34-A01 的全屏重绘程序用 top 代替（与 T10 相同，未全局安装 htop） | 需要 htop 截图时由用户决定是否 `brew install htop`；**R4**：仍由用户决定（列入 R4 报告） |
-| I146 | T35 | M3 内存（`npm run perf:m3`，[报告](../perf/M3-memory.md)）：3 个并行会话（1 个在 worktree）加 1 个子 agent 时 Agent Host 最大 238 MB（预算 270 MB，达标），应用其余进程合计最大 576 MB，超出 macOS 预算 510 MB（T35-A11 failing）；没有会话时的基线已有 505 MB（不连测试驱动 466 MB：主进程 193、渲染 137、GPU 86、网络 51），会话只增加约 65 MB（渲染进程约 50 MB）；主进程从 M0 的 160–164 MB 增到 193 MB，JavaScript 堆只有 6–7 MB，增长在原生部分 | R4 风险：复测并逐项定位主进程原生内存（Core 各子系统常驻量）与渲染进程的实时 transcript 缓存；T44 把这一行纳入 CI 预算；预算不放宽；**R4 复测**：见 I26 与 R4 评审第 1 节：Agent Host 达标（最大 236 MB ≤ 270），应用其余进程 RSS 合计 580 MB 仍超出；列为 M3 退出标准的阻塞项，交 T44；**T44**：这一行进了 Nightly（`app-memory`，按 RSS 判定），见 I26 |
+| I146 | T35 | M3 内存（`npm run perf:m3`，[报告](../perf/M3-memory.md)）：3 个并行会话（1 个在 worktree）加 1 个子 agent 时 Agent Host 最大 238 MB（预算 270 MB，达标），应用其余进程合计最大 576 MB，超出 macOS 预算 510 MB（T35-A11 failing）；没有会话时的基线已有 505 MB（不连测试驱动 466 MB：主进程 193、渲染 137、GPU 86、网络 51），会话只增加约 65 MB（渲染进程约 50 MB）；主进程从 M0 的 160–164 MB 增到 193 MB，JavaScript 堆只有 6–7 MB，增长在原生部分 | R4 风险：复测并逐项定位主进程原生内存（Core 各子系统常驻量）与渲染进程的实时 transcript 缓存；T44 把这一行纳入 CI 预算；预算不放宽；**R4 复测**：见 I26 与 R4 评审第 1 节：Agent Host 达标（最大 236 MB ≤ 270），应用其余进程 RSS 合计 580 MB 仍超出；列为 M3 退出标准的阻塞项，交 T44；**T44**：这一行进了 Nightly（`app-memory`，按 RSS 判定），见 I26；**R5**：按 ADR-0063 的口径 3 会话 + 子 agent 场景应用其余进程物理占用最大 264 MB（≤ 510）、Agent Host 最大 229 MB（≤ 270），达标；**已关闭** |
 | I147 | T35 | W3 的 Windows 核对项：① worktree 路径（长路径、`.piarc\worktrees\` 下的深路径、大小写不同的同一路径）与 git for Windows 的 `worktree add`/`remove`；② 托盘图标（深色/浅色任务栏切换、左键打开窗口、右键菜单、提示文字里的计数）；③ 安装后 `piarc://` 与资源管理器"Open with PiArc"（文件夹与文件夹空白处），卸载后注册表项被删除；④ `npm run perf:m3` 的 3 会话内存（Windows 预算 450 MB）；⑤ 关闭最后一个窗口后后台运行与退出确认 | W3；**已落地（W3）**：①长路径（新用例）、中文与空格、小写盘符；②托盘用户实机核对；③安装后 `piarc://` 与两个右键项可用，卸载后的注册表清理未核对（留给 W4 的安装与更新验收）；④见 I201；⑤ `t35-windows` 通过 |
 | I148 | T35 | Claude Code 的设置键 `worktree`（worktree 选项）原标 `planned(T35)`；T35 只实现了 PiArc 自己的 worktree 流程，没有逐个子键对照官方语义，改标 `planned(T48)` | T48 与 WorktreeCreate/WorktreeRemove hooks 一起核对子键并决定生效或忽略 |
 | I149 | T35 | T35-A08 的菜单栏截图没有拍到：运行测试的终端没有"屏幕录制"权限（`screencapture` 报 could not create image from rect，与 T18 的 `t18-review` 相同）。托盘的标题、提示文字、菜单项由测试钩子从真实 `Tray` 读回（`tmp/evidence/T35/l4/…/tray.json`），窗口截图齐全 | 用户在本机开一个会话、关闭窗口，看菜单栏图标旁的 `▸1` 与菜单中的等待审批会话；需要截图证据时给终端屏幕录制权限后重跑 `t35-windows` |
@@ -521,7 +515,7 @@ R5（阻塞，等待用户确认 ADR-0063、ADR-0064）：交付物 1–5 与质
 | I198 | T45 | Windows 与 Linux 上 Chromium 的拼写检查从 Google CDN（`redirector.gvt1.com`）下载 Hunspell 词典，只含语言代码，已列入 `docs/security/egress.md`，`t45-egress` 在 Windows 上允许这个主机 | W3 实测下载时机，决定保留或用 `session.setSpellCheckerEnabled(false)` 关闭；**W3**：已安装的应用启动、打开两个工作区与窗口后，数据目录没有 `Dictionaries`（启动时不下载）；首次在输入框键入时是否下载留给 W4 用 `t45-egress` 核对 |
 | I199 | T45 | `t45-xss` 的设置面覆盖 MCP、扩展包与配置诊断；服务商名称、子 agent 定义、skills 页同样渲染外部文本 | R5 把同一断言扩展到这些页；**R5**：交 T48（THR-11 的覆盖），进入 R6 前完成 |
 | I200 | T45 | 威胁映射 THR-09（更新通道被劫持）的"HTTPS"与"私钥只在需要维护者审批的发布环境中使用"两项是 `deferred`（任务 T50）：更新流程与发布流水线还没有 | T50 实现更新流程后为 THR-09 补测试（清单校验接进更新、篡改拒绝、受保护环境），把这两项改为 automated 并更新映射；T50 完成后 `check-threats.mjs` 会因待补项的任务已完成而失败，迫使更新 |
-| I201 | W3 | Windows 的 M3 内存（`npm run perf:m3`，i5-1340P / 16 GB）：Agent Host 最大 163 MB（≤ 270），应用其余进程最大 576、563 MB，超出 Windows 预算 450 MB（GPU 进程约 205–216 MB，浏览器 143–150、渲染 150–156、网络 58）；私有工作集合计 256 MB（工作集 537 MB）。Nightly 的 `app-memory` 558 MB | 与 I26、I146 同一口径问题，用户经 ADR 决定口径或由优化达标；R5 汇总两个平台 |
+| I201 | W3 | Windows 的 M3 内存（`npm run perf:m3`，i5-1340P / 16 GB）：Agent Host 最大 163 MB（≤ 270），应用其余进程最大 576、563 MB，超出 Windows 预算 450 MB（GPU 进程约 205–216 MB，浏览器 143–150、渲染 150–156、网络 58）；私有工作集合计 256 MB（工作集 537 MB）。Nightly 的 `app-memory` 558 MB | 与 I26、I146 同一口径问题，用户经 ADR 决定口径或由优化达标；R5 汇总两个平台；**R5**：ADR-0063 采纳，Windows 按私有工作集判定（W3 测得 256 MB ≤ 450）；W4 用改过的 `perf:m3` 复测确认 |
 | I202 | W3 | Windows 发布构建的安装包与安装后体积没有实测：本机没有 .NET SDK，`pack-windows.mjs` 只在 CI 运行；CI 的开发构建 `Setup.exe` 235.9 MB、安装后 551.5 MB（未裁剪，T44 的 `trim.mjs` 只在发布构建） | T50 的发布流水线在 CI 上量发布构建，并纳入 Nightly 的 `installer-size`、`installed-size`；超出时按 I41 裁剪 |
 | I203 | W3 | Git 包源的克隆目录照搬源路径（`<pi>/git/local/<整条本地路径>`）：本地深路径的 `file://` 源让 git 目录超过 Git for Windows 约 220 字符的上限（`'$GIT_DIR' too big`，`core.longpaths` 管不到），安装失败；远端源（`github.com/<owner>/<repo>`）不受影响 | R5 评估：本地源的克隆目录改用短名（例如路径哈希），或安装前检查长度并给出说明；**R5**：Windows 专属，交 W4 实测并决定（短名或安装前检查长度） |
 | I204 | W3 | Windows 上用户打开的会话终端是 `%COMSPEC%`（cmd.exe，`piarc_term::default_shell`）：PiArc 的 PowerShell 与 Git Bash shell integration 用不上，没有 OSC 133 命令边界与 OSC 7 目录 | T48 的终端完善：Windows 的默认 shell 改为 PowerShell 或可在设置中选择（需用户决定） |
@@ -543,6 +537,7 @@ R5（阻塞，等待用户确认 ADR-0063、ADR-0064）：交付物 1–5 与质
 | I220 | R5 | THR-13 的 OSC 8 对策在 Windows 上没有运行的测试（工程质量审查 Q3，同 I209）：映射的 `t34-terminal` 与 `t45-xss` 的 OSC 8 用例在 Windows 跳过，`t45-xss` 的跳过理由写"Windows 变体在 W3"但没有变体；`t34-terminal-windows.e2e.ts` 的链接用例没进映射 | W4：补 `t45-xss` 的 Windows 变体（PowerShell 或 node 输出转义序列）、把 Windows 用例加进 THR-13 的映射并更新跳过理由 |
 | I221 | R5 | 超长的说明与源文件（工程质量审查 Q8、Q9）：`crates/piarc-core/AGENTS.md` 138 行、`apps/desktop/AGENTS.md` 122 行（上限 120）；`piarc-store/src/index.rs` 1,017 行（M4 越线）、`piarc-config/src/skills.rs` 1,271 行；T42 的 Core 侧约定（`policy/notify.rs`、`policy/notebook.rs`、通知答复只能仅本次允许或拒绝、审计来源 `notification`）没进 AGENTS.md | 下一个往这些文件加内容的任务先拆分（同 I165 的约定）；T42 的约定由 T48 补进 `crates/piarc-core/src/tool_io/AGENTS.md` |
 | I222 | R5 | M4 的性能退出标准未达标的行（macOS 本机，非基准机型）：流式帧 p99 16.4 ms > 12 ms（I191）、主进程增量 32.5 MB > 24 MB（I192）、Agent Host 202 MB > 150 MB（I194）、打开工作区到就绪按 10 次最大判定（I193，R5 的测量见评审第 1.2 节）；应用全部进程合计按 RSS 超出（I26，口径见 ADR-0063）。PR 与 Nightly 门禁在 CI 上原来不判任何值（性能审查 P1，9f5ec0a 修复），CI 两个 runner 类别还没有基线 | 新增一个性能达标任务（计划变更，需用户确认排期；建议在 T46 之前或与 M5 并行、R6 之前完成），处理 I190–I194、I216，并在推送后从 CI 工件记录 `github-arm64`、`github-x64` 的 PR 与 Nightly 基线 |
+| I223 | R5 | 实现 ADR-0064（用户采纳）："信任"项目的决定经主进程原生确认，列出将生效的可执行项（取自 Core 的信任视图，同一版本），信任对话框的"信任"直接触发它，取消答 `cancelled`；暂不信任与撤销不确认；`t45-ipc-hardening` 加入伪造的信任决定，THR-02、THR-11 的映射各加一行，`t18-trust` 等用例代答原生确认 | M5 内的单独小任务或并入 T48，R6 之前完成（实现前 I79 的残余风险仍在） |
 ## 技术债
 
 评审任务（R1–R6）汇总的技术债，按影响排序。每条的细节、负责任务与检查时间点在对应的登记事项中。
@@ -1145,3 +1140,12 @@ R5（阻塞，等待用户确认 ADR-0063、ADR-0064）：交付物 1–5 与质
 - 决策：ADR-0063（提议，放宽）"应用全部进程合计"按物理占用测量；ADR-0064（提议）"信任"经主进程原生确认（I79、S3）；新增 L2 动作 `check_cost`；架构 2.58。
 - 登记：交 R5 的 26 项逐条处理（I120 落地；I26、I79 写 ADR；I56、I94、I121、I123、I126、I172、I173、I175、I176、I178、I197、I199 交 T48 并在 R6 前完成；I190–I194、I196 交性能任务；I203、I207 交 W4）；新增 I211–I222。**进入 M5 前必须处理**：用户决定 ADR-0063 与 ADR-0064；为 I222 的性能达标任务排期（计划变更）；推送本分支并看 CI（R5-A01、T39-A12、T42-A07、T45-A02），从 CI 工件记录 `github-arm64`、`github-x64` 的 PR 与 Nightly 基线（R5 起缺基线的 CI 性能步骤会失败）。
 - 下一项：T46（Auto 模式，macOS，设计关口）依赖 R5：用户可以在决定 ADR-0063、ADR-0064 并为性能任务排期后开工，T46 的设计增补不依赖这几项；W4（Windows：M4 达标与 Beta 同步）依赖 R5 与 T50，要等 macOS 上的 T50 完成后才在 Windows 上做。本地提交，未推送。
+
+### 2026-11-22 R5 部分完成（用户采纳 ADR-0063、ADR-0064；提交 f7b05b7）
+
+- 用户确认 ADR-0063 与 ADR-0064：两者状态改"已接受"，ADR-0029 状态注明被 0064 修订，架构 2.59（第 4 章、第 11 章"应用全部进程合计"改按物理占用，修订记录写明放宽与原因；第 16 章 M3 按新口径达标；10.2 节）。
+- ADR-0063 的配套：`scripts/perf/lib.mjs` 新增 `physicalFootprints`、`appFootprint`（macOS `footprint`、Windows `WorkingSetPrivate`），`probe-memory.mjs` 的 `app-memory` 与 `m3-memory.mjs` 的 `appOtherMB` 改为物理占用，RSS 之和留作参考；本机实测 `app-memory` 208 MB（3 次中位）、3 会话场景最大 264 MB、Agent Host 最大 229 MB，都在预算内；Nightly 基线的 `app-memory` 按新口径更新（原因写在基线文件）。Windows 的读法没有在本机运行，W4 复测。
+- ADR-0064 的实现登记 I223（M5 内，R6 前）。I26、I146 关闭，I201、I79 更新。
+- 验收：R5-A02 仍 failing（流式帧 p99、主进程增量、Agent Host 内存三行，交 I222）；R5-A03 仍 failing（T44-A04、T44-A09；T35-A11、R4-A01、R4-A03、W3-A01 是别的任务的项，按新口径的数据见 R5 评审第 1.2 节，由用户决定是否关闭）；R5-A01 blocked（CI）；其余通过。看板改为"部分完成"。
+- 下一项：T46（macOS，设计关口）可以开工，与 I222 的性能达标任务（需排期）并行；W4（Windows）依赖 R5 与 T50。本地提交，未推送。
+

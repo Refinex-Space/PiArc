@@ -92,3 +92,18 @@ R4 在 T35 的场景上加了 T35 之后的能力：项目 `.mcp.json` 里一个
 **口径。** 第 2 轮同时每 5 s 读一次各应用进程的 `footprint`（物理占用，即活动监视器的"内存"列）：稳定在约 250 MB（主进程 60、各 Helper 合计 114、渲染进程 80），最大 298 MB。不连工作区的空闲应用用 `vmmap` 看主进程：RSS 190 MB，脏页 57 MB；RSS 里的大头是 Electron 框架等共享库的代码页（`__TEXT` 常驻 572 MB 中的已映射部分），Core 的 `.node` 空闲时几乎不在内存里。`app.getAppMetrics()` 的 working set 与 `ps` 的 RSS 都会把每个进程映射的同一份框架代码页各算一次，四个进程相加就重复计入。第 11 章这一行用 RSS 合计，改成物理占用等于放宽预算，须走 ADR；R4 不改，交 T44（I26、I146）。
 
 **首轮无效的一次。** 打包产物的 Agent Host 在 Seatbelt 宽松配置下运行，MCP server 只能写工作区：启动日志放在临时根时 server 以 EPERM 退出、从未连上，脚本报告负载不符；日志改到工作区（并加进 `.gitignore`）后正常（1af9363）。
+
+## R5：按物理占用判定（2026-11-22，ADR-0063）
+
+用户在 R5 采纳 ADR-0063："应用全部进程合计"改按各进程物理占用之和（macOS `phys_footprint`、Windows 私有工作集），预算数值不变。`scripts/perf/m3-memory.mjs` 的 `appOtherMB` 改为物理占用，工作集之和记为 `appOtherRssMB`。
+
+同一台 M1 Max / 32 GB、开发构建打包形态、同一场景（3 会话 + 1 子 agent + 共享 stdio MCP server 与 skills 索引，负载核对通过，预热 20 s、采样 12 次），`npm run perf:m3 -- --form packaged --out tmp/evidence/R5/m3-memory.json`：
+
+| 指标（MB） | 最小 | 中位 | 最大 | 预算 |
+|---|---|---|---|---|
+| 应用其余进程的物理占用 | 240 | 242 | 264 | 510，达标 |
+| 应用其余进程的 RSS 之和（参考） | 570 | 573 | 584 | — |
+| Agent Host（4 个活动会话） | 215 | 225 | 229 | 270，达标 |
+
+空闲（打开工作区、没有会话）时物理占用 190 MB、RSS 517 MB。M3 的内存退出标准在 macOS 上按新口径达标；Windows 由 W4 用同一脚本复测（W3 用性能计数器测得的私有工作集为 256 MB）。
+

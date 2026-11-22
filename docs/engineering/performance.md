@@ -87,7 +87,7 @@ git add scripts/perf/baselines && git commit -m "perf: update the <machine> base
 | PiArc 引入的首 token 额外延迟 | `first-token-overhead` | `probe-first-token.mjs` | 同一个严格 mock（立即作答）：应用内从 `window.piarc.prompt()` 到回复的文字上屏，减去同一进程内直接用 Pi SDK（`createAgentSession`，内存会话、无工具）从 `prompt()` 到首个 `text_delta`；各 20 次（预热 1 次）取中位数之差。应用一侧多算了一次 React 提交与绘制 | 否 |
 | 主进程内存（含 Core，空闲） | `main-memory-delta` | `event-channel`：S2 `bench:s2` 的空闲测量 | 不连调试器启动打包产物（空数据目录），静置 10 s 后 5 次采样主进程 RSS 的中位数，减去同机同轮裸 Electron（一个空窗口）的同一测量 | 否 |
 | 渲染进程内存 | `renderer-memory` | `probe-memory.mjs`（T18 的会话夹具） | 侧栏 100 个会话、打开其中 1,000 条 item 的会话；渲染进程 GC（CDP）后静置，`getAppMetrics()` 的工作集 | 否 |
-| 应用全部进程合计 | `app-memory` | 同上 | 同一夹具下 `getAppMetrics()` 全部进程工作集之和（不含 Agent Host）；macOS 另在报告的 `detail.footprintMB` 记各进程的物理占用（`footprint`），仅供参考（I26） | 否 |
+| 应用全部进程合计 | `app-memory` | 同上 | 同一夹具下 `getAppMetrics()` 全部进程的物理占用之和（不含 Agent Host；ADR-0063：macOS `phys_footprint`，Windows 私有工作集，`lib.mjs` 的 `appFootprint`）；工作集之和记在报告的 `detail.rssMB`，各类进程在 `detail.footprintMB` 与 `byTypeMB` | 否 |
 | Agent Host 内存 | `agent-host-memory` | `probe-sessions.mjs`（T35 `m3-memory.mjs` 的打点） | 1 个会话持续运行 mock 回合时 Agent Host 的 RSS（`ps` / CIM） | 否 |
 | 每增加一个活动会话的内存增量 | `agent-host-per-session` | 同上 | 每个会话数各起一个新应用（避免 GC 顺序的影响），3 个会话时与 1 个会话时 Agent Host RSS 之差除以 2 | 否 |
 | 8 小时长会话内存增长 | `long-run-growth-{main,renderer,agent-host}` | `long-run.mjs` | 第 4.1 节 | 否 |
@@ -137,7 +137,7 @@ Nightly 运行 1 小时的缩短版（`PIARC_LONG_RUN_HOURS=1`：预热 10 分�
 | PiArc 引入的首 token 额外延迟 | `first-token-overhead` | 24.3 ms（PiArc 26.1 ms，Pi SDK 1.8 ms） | ≤ 50 ms | 1（各 20 次） | 达标 |
 | 主进程内存（含 Core，空闲） | `main-memory-delta` | 32.5 MB（主进程 186 MiB，裸 Electron 155 MiB） | ≤ 24 MB | 1（各 5 次采样） | **超出**（I192） |
 | 渲染进程内存 | `renderer-memory` | 173 MB | ≤ 220 MB | 3 | 达标 |
-| 应用全部进程合计 | `app-memory` | 519 MB（主进程 210、渲染 173、GPU 86、网络 50）；物理占用合计 207 MB | ≤ 510 MB | 3 | **超出**（I26） |
+| 应用全部进程合计 | `app-memory` | 519 MB（RSS：主进程 210、渲染 173、GPU 86、网络 50）；物理占用合计 207 MB | ≤ 510 MB | 3 | 按 RSS 超出；R5 起按物理占用（ADR-0063），208 MB，达标 |
 | Agent Host 内存 | `agent-host-memory` | 202 MB | ≤ 150 MB | 3 | **超出**（I194） |
 | 每增加一个活动会话的内存增量 | `agent-host-per-session` | 10.5 MB | ≤ 40 MB | 3 | 达标 |
 | 主进程事件循环延迟 | `main-loop-p99` | 2.7 ms | ≤ 16 ms | 3 | 达标 |
@@ -160,12 +160,12 @@ Nightly 运行 1 小时的缩短版（`PIARC_LONG_RUN_HOURS=1`：预热 10 分�
 
 - 空闲 CPU 按进程：可见时 GPU 1.68%、渲染 1.49%、主进程 0.25%、Agent Host 0.18%；隐藏时 GPU 1.83%、渲染 1.48%、主进程 0.16%、Agent Host 0.02%。隐藏 60 s 内页面 rAF 回调 0 次、终端帧 0 帧。阈值 5% 依据这组实测定出，写入第 11 章（v2.55）。
 - 流式帧的回归：同一测量在 T19（2026-11-18）为 p99 8.8 ms、T20 为 7.3 ms；PR 冒烟的 15 s 版为 9.7–9.9 ms，60 s 版为 16.4 ms，回复越长每帧工作越多。定位过程与结论见 I191。
-- 内存一行的口径：RSS 把各进程映射的同一份 Electron 框架页各算一次；物理占用（`footprint`）作为参考记在报告里，口径不变（I26）。
+- 内存一行的口径：RSS 把各进程映射的同一份 Electron 框架页各算一次。用户在 R5 采纳 ADR-0063，`app-memory` 改为物理占用之和、预算不变；基线于 R5 按新口径记录（208 MB，原因写在基线文件）。
 - 首 token：mock 立即作答，应用一侧多了 Core、Agent Host、主进程转发与渲染进程的一次提交与绘制。
 
 ### 5.2.1 R5 复测（2026-11-22）
 
-同一台机器、同一命令（不含体积两项），报告 `tmp/evidence/R5/perf-nightly-report.json`，逐行对照与环境说明在 [R5 评审](../reviews/R5-findings.md)第 1.2 节。超出预算的仍是主进程增量 35.6 MB、应用全部进程合计 530 MB（RSS，口径见 ADR-0063）、Agent Host 196 MB、流式帧 p99 16.2 ms。"打开工作区到 Agent Host 就绪"按改回的口径（10 次最大，R5 性能审查 P3）为 982 ms。测量时机器有负载（IDE 与远程桌面），冷启动 666 ms 与事件循环 5.0 ms 相对基线的回归未确认；没有更新基线。
+同一台机器、同一命令（不含体积两项），报告 `tmp/evidence/R5/perf-nightly-report.json`，逐行对照与环境说明在 [R5 评审](../reviews/R5-findings.md)第 1.2 节。超出预算的是主进程增量 35.6 MB、Agent Host 196 MB、流式帧 p99 16.2 ms；应用全部进程合计按 RSS 为 530 MB，ADR-0063 采纳后按物理占用另测 208 MB（3 次中位，`tmp/evidence/R5/app-memory-adr0063.txt`），达标，并按新口径更新了这一项的基线。3 会话 + 子 agent 场景（`npm run perf:m3`）：应用其余进程物理占用最大 264 MB（RSS 584 MB）、Agent Host 最大 229 MB，都在预算内（`tmp/evidence/R5/m3-memory.json`）。"打开工作区到 Agent Host 就绪"按改回的口径（10 次最大，R5 性能审查 P3）为 982 ms。测量时机器有负载（IDE 与远程桌面），冷启动 666 ms 与事件循环 5.0 ms 相对基线的回归未确认；没有更新基线。
 
 ### 5.3 PR 冒烟的稳定性
 
@@ -218,7 +218,7 @@ node scripts/perf/run.mjs --lane long --absolute --machine <机器类别>
 | PiArc 引入的首 token 额外延迟 | `first-token-overhead` | 122 ms | ≤ 50 ms | **超出**（I207） |
 | 主进程内存（含 Core，空闲） | `main-memory-delta` | 29.3 MB | ≤ 24 MB | **超出**（同 macOS，I192） |
 | 渲染进程内存 | `renderer-memory` | 133 MB | ≤ 220 MB | 达标 |
-| 应用全部进程合计 | `app-memory` | 558 MB | ≤ 450 MB | **超出**（GPU 进程约 200 MB，I201） |
+| 应用全部进程合计 | `app-memory` | 558 MB（RSS） | ≤ 450 MB | 按 RSS 超出（GPU 进程约 200 MB，I201）；ADR-0063 后按私有工作集判定，W4 复测 |
 | Agent Host 内存 | `agent-host-memory` | 128 MB | ≤ 150 MB | 达标 |
 | 每增加一个活动会话的内存增量 | `agent-host-per-session` | 7.9 MB | ≤ 40 MB | 达标 |
 | 主进程事件循环延迟（3 会话） | `main-loop-p99` | 0.15 ms（减去同轮空闲） | ≤ 16 ms | 达标 |

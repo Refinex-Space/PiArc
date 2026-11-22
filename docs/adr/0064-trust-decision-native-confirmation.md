@@ -1,6 +1,6 @@
 # 0064. "信任"项目的决定经主进程原生确认
 
-- 状态：提议
+- 状态：已接受（2026-11-22，用户在 R5 中采纳；实现登记 I223）
 - 日期：2026-11-22
 - 修订：ADR-0029 备选方案中"信任决定也在主进程弹原生确认框：暂不做"一行；架构第 10.2 节 T18 落地一段的"信任决定由渲染进程发出、没有原生确认"
 - 相关：I79（T18 登记、T45 评估后交 R5）；R5 安全审查 S3；架构第 10.1 节"渲染进程注入（XSS）"与"恶意项目配置"两行、第 10.3 节 preload 与 IPC；[ADR-0029](0029-client-shell-foundations.md)、[ADR-0034](0034-bind-read-and-trust-confirmation.md)、[ADR-0058](0058-plugins-pi-packages-and-mcp-prompts.md)、[ADR-0062](0062-security-hardening-threat-map-redaction-and-diagnostics.md)
