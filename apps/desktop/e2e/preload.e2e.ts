@@ -178,12 +178,17 @@ test('require, process, module and Buffer are not defined in the page', async ({
 test('the window renderer runs in the OS-level sandbox', async ({ app }) => {
   // `sandboxed` is reported on macOS and Windows, the two platforms PiArc ships. The other
   // fixed web preferences are covered by src/main/web-preferences.test.ts and the ESLint rule
-  // that confines `new BrowserWindow` to the window factory.
-  const sandboxed = await app.evaluate(({ app: electronApp, BrowserWindow }) => {
-    const pid = BrowserWindow.getAllWindows()[0]?.webContents.getOSProcessId();
-    return electronApp.getAppMetrics().find((metric) => metric.pid === pid)?.sandboxed ?? null;
-  });
-  expect(sandboxed).toBe(true);
+  // that confines `new BrowserWindow` to the window factory. Right after launch (slow CI
+  // machines) the window or its renderer's metric may not exist yet: wait for the metric, then
+  // require `sandboxed` to be true (a missing metric never passes).
+  const readSandboxed = () =>
+    app.evaluate(({ app: electronApp, BrowserWindow }) => {
+      const pid = BrowserWindow.getAllWindows()[0]?.webContents.getOSProcessId();
+      if (pid === undefined || pid === 0) return null;
+      return electronApp.getAppMetrics().find((metric) => metric.pid === pid)?.sandboxed ?? null;
+    });
+  await expect.poll(readSandboxed, { timeout: 10_000 }).not.toBeNull();
+  expect(await readSandboxed()).toBe(true);
 });
 
 /**
