@@ -93,7 +93,7 @@ export const METRICS = [
     budget: { darwin: 510, win32: 450 },
     lanes: ['nightly'],
     floor: 10,
-    how: 'sum of getAppMetrics() working sets (no Agent Host), same fixture',
+    how: 'sum of the physical memory of the getAppMetrics() processes (no Agent Host; macOS phys_footprint, Windows private working set, ADR-0063), same fixture',
   },
   {
     id: 'agent-host-memory',

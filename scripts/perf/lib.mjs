@@ -5,7 +5,8 @@
 // and statistics. Moved here from T35's m3-memory.mjs so every probe uses one set of
 // definitions. MB is 10^6 bytes, as in chapter 11.
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import { createInterface } from 'node:readline';
 import path from 'node:path';
 
@@ -234,6 +235,83 @@ export async function appSnapshot(app, mainPid) {
     byType,
     main,
   };
+}
+
+/**
+ * Physical memory (bytes) of each pid (ADR-0063): macOS `phys_footprint` from `footprint`,
+ * Windows private working set from the performance counters; both count the pages a process
+ * alone holds, not the framework pages every Chromium process maps. Empty elsewhere.
+ * @param {readonly number[]} pids
+ * @returns {Promise<Record<string, number>>}
+ */
+export async function physicalFootprints(pids) {
+  /** @type {Record<string, number>} */
+  const by = {};
+  if (process.platform === 'darwin') {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'piarc footprint '));
+    try {
+      const file = path.join(dir, 'footprint.json');
+      execFileSync(
+        'footprint',
+        ['-f', 'bytes', '-j', file, ...pids.flatMap((pid) => ['-p', String(pid)])],
+        { stdio: 'ignore' },
+      );
+      /** @type {unknown} */
+      const report = JSON.parse(await readFile(file, 'utf8'));
+      if (isRecord(report) && Array.isArray(report.processes)) {
+        for (const p of report.processes) {
+          if (isRecord(p) && typeof p.pid === 'number' && typeof p.footprint === 'number') {
+            by[String(p.pid)] = p.footprint;
+          }
+        }
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  } else if (process.platform === 'win32') {
+    const wanted = new Set(pids.map(String));
+    const out = execFileSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        'Get-CimInstance Win32_PerfFormattedData_PerfProc_Process | ForEach-Object { "$($_.IDProcess) $($_.WorkingSetPrivate)" }',
+      ],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+    for (const line of out.trim().split(/\r?\n/u)) {
+      const [pid, bytes] = line.trim().split(/\s+/u);
+      if (pid !== undefined && wanted.has(pid) && bytes !== undefined) {
+        by[pid] = (by[pid] ?? 0) + Number(bytes);
+      }
+    }
+  }
+  return by;
+}
+
+/**
+ * The app's processes (no Agent Host) as `app-memory` measures them (ADR-0063): the physical
+ * memory of each `getAppMetrics()` process, summed by type and in total (bytes); `undefined` on
+ * a platform without a reading.
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @returns {Promise<{ total: number, byType: Record<string, number> } | undefined>}
+ */
+export async function appFootprint(app) {
+  const processes = await app.evaluate(({ app: electronApp }) =>
+    electronApp.getAppMetrics().map((m) => ({ pid: m.pid, type: m.type })),
+  );
+  const by = await physicalFootprints(processes.map((p) => p.pid));
+  if (Object.keys(by).length === 0) return undefined;
+  /** @type {Record<string, number>} */
+  const byType = {};
+  let total = 0;
+  for (const p of processes) {
+    const bytes = by[String(p.pid)] ?? 0;
+    byType[p.type] = (byType[p.type] ?? 0) + bytes;
+    total += bytes;
+  }
+  return { total, byType };
 }
 
 /**

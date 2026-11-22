@@ -8,7 +8,9 @@
 // request). Once all four are under way, the script samples every process for a while:
 //
 // - the app's processes through `app.getAppMetrics()` (main process with Core, renderer, GPU,
-//   network and other helpers): working set, which is the resident size on macOS;
+//   network and other helpers): their physical memory (ADR-0063: macOS `phys_footprint`,
+//   Windows private working set), which the budget is on; the working sets (resident size on
+//   macOS) stay in the result as `appOtherRssMB`;
 // - the Agent Host (the node process the main process started for the workspace): RSS from
 //   `ps` (macOS) or the working set from CIM (Windows);
 // - the MCP server (a child of the Agent Host), reported on its own: chapter 11 has no budget for
@@ -30,6 +32,7 @@ import { parseArgs } from 'node:util';
 
 import { isMain, isRecord, repoRoot } from '../lib/repo.mjs';
 import {
+  appFootprint,
   appSnapshot,
   launchApp,
   MB,
@@ -221,6 +224,7 @@ export async function measure(options) {
     await openWorkspace(app, page, workspace);
     await new Promise((resolve) => setTimeout(resolve, 3000));
     const idle = await appSnapshot(app);
+    const idlePhysical = await appFootprint(app);
     await startSession(page, 'm3-one', { trust: true });
     await startSession(page, 'm3-tree', { worktree: 'm3-tree' });
     await startSession(page, 'm3-agent', {});
@@ -243,9 +247,16 @@ export async function measure(options) {
     const mainPid = await app.evaluate(() => process.pid);
     /** @type {Awaited<ReturnType<typeof appSnapshot>>[]} */
     const samples = [];
+    // The physical memory of the same processes (ADR-0063): what the budget is on.
+    /** @type {number[]} */
+    const physical = [];
     const end = Date.now() + options.seconds * 1000;
     while (Date.now() < end) {
       samples.push(await appSnapshot(app, mainPid));
+      const reading = await appFootprint(app);
+      if (reading === undefined)
+        throw new Error(`no physical memory reading on ${process.platform}`);
+      physical.push(reading.total);
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
     const counts = await requestCounts(mock.baseUrl);
@@ -255,7 +266,8 @@ export async function measure(options) {
       .filter((line) => line !== '').length;
     const agentHostMB = stats(samples.map((s) => s.agentHostBytes / MB));
     const mcpServerMB = stats(samples.map((s) => s.mcpServerBytes / MB));
-    const appOtherMB = stats(samples.map((s) => s.appBytes / MB));
+    const appOtherMB = stats(physical.map((bytes) => bytes / MB));
+    const appOtherRssMB = stats(samples.map((s) => s.appBytes / MB));
     const mainHeapMB = {
       heapUsed: stats(samples.map((s) => s.main.heapUsed / MB)),
       external: stats(samples.map((s) => s.main.external / MB)),
@@ -286,10 +298,12 @@ export async function measure(options) {
       },
       agentHostMB,
       appOtherMB,
+      appOtherRssMB,
       byTypeMB,
       mainHeapMB,
       idle: {
-        appOtherMB: idle.appBytes / MB,
+        appOtherMB: (idlePhysical?.total ?? Number.NaN) / MB,
+        appOtherRssMB: idle.appBytes / MB,
         byTypeMB: Object.fromEntries(
           Object.entries(idle.byType).map(([type, bytes]) => [type, bytes / MB]),
         ),
