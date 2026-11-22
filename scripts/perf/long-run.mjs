@@ -106,12 +106,16 @@ export async function measure(options) {
     const firstSample = started + options.warmup * 60_000;
     let nextSample = firstSample;
     let n = 0;
+    // A refused prompt is not load (R5): the run fails when most of them were refused.
+    let refused = 0;
     while (Date.now() < end) {
       const turnAt = Date.now();
       n += 1;
-      await page.evaluate(
-        `window.piarc.prompt(${JSON.stringify(id)}, 'Next turn ${String(n)}.').catch(() => undefined)`,
+      /** @type {unknown} */
+      const accepted = await page.evaluate(
+        `window.piarc.prompt(${JSON.stringify(id)}, 'Next turn ${String(n)}.').then(() => true, () => false)`,
       );
+      if (accepted !== true) refused += 1;
       // Terminal output: a command typed into the session's terminal (real input).
       await page.getByTestId('terminal-canvas').click();
       await page.keyboard.type(`seq 1 200 | tail -n 3 # ${String(n)}`);
@@ -130,11 +134,23 @@ export async function measure(options) {
       }
       await sleep(Math.max(0, options.cadence * 1000 - (Date.now() - turnAt)));
     }
-    const first = samples[0];
-    const last = samples.at(-1);
-    if (first === undefined || last === undefined || samples.length < 2) {
-      throw new Error('fewer than two steady-state samples');
+    if (refused * 2 > n) {
+      throw new Error(
+        `${String(refused)} of ${String(n)} prompts were refused: the session did not run`,
+      );
     }
+    if (samples.length < 2) throw new Error('fewer than two steady-state samples');
+    // The mean of the first and of the last two samples (one when there are fewer than four), so
+    // one garbage collection at either end does not decide the growth (R5).
+    const ends = samples.length >= 4 ? 2 : 1;
+    const mean = (/** @type {typeof samples} */ part) =>
+      /** @type {Record<'mainMB' | 'rendererMB' | 'agentHostMB', number>} */ ({
+        mainMB: part.reduce((t, x) => t + x.mainMB, 0) / part.length,
+        rendererMB: part.reduce((t, x) => t + x.rendererMB, 0) / part.length,
+        agentHostMB: part.reduce((t, x) => t + x.agentHostMB, 0) / part.length,
+      });
+    const first = mean(samples.slice(0, ends));
+    const last = mean(samples.slice(-ends));
     const growth = (/** @type {number} */ a, /** @type {number} */ b) => ((b - a) / a) * 100;
     return {
       values: {
@@ -148,6 +164,8 @@ export async function measure(options) {
         warmupMinutes: options.warmup,
         intervalMinutes: options.interval,
         cadenceSeconds: options.cadence,
+        prompts: n,
+        refusedPrompts: refused,
         turns: n,
         samples,
       },
