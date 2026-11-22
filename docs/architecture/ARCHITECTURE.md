@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.56（2026-11-22） |
+| 版本 | 2.57（2026-11-22） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -1564,7 +1564,7 @@ T20 起，项目层的 `acceptEdits` 和 `additionalDirectories` 也纳入信任
 
 下表的预算由 R1 按 M0 实测校准（2026-11-16，[M0 总结](../spikes/M0-summary.md)第 7 节）。校准只能收紧，放宽必须在第 18 章修订记录中写明原因。收紧规则：两个平台都有有效实测值，且原预算不低于两者中较差值的 2 倍时，收紧为较差值的 2 倍（向上取两位有效数字）；只有一个平台的数据、某个平台的口径无效、或 M0 的场景不覆盖该行条件时不改。"M0 实测"一列的 macOS 数据来自 M1 Max / 32 GB，Windows 来自 i5-1340P / 16 GB 笔记本（都不是基准机型）；原来"未测"的格子由 T44 补测（同一台 M1 Max，标"T44"）。超出预算的行（标 **超出**）不放宽，按 M0 总结第 7 节指派优化任务。
 
-T44 起每一行都由 `scripts/perf/` 自动测量（方法、口径与本机全部数据见 [性能测量](../engineering/performance.md)）：PR 跑冒烟子集，Nightly 在 macOS 与 Windows 跑全部行与 1 小时的缩短版长跑，超出预算或相对同平台、同机器类别、同流水线的基线回归超过 10% 即失败；`scripts/perf/metrics.test.mjs` 要求本表每一行都有测量或排除理由。T44 只有 macOS 数据，按上面的收紧规则不收紧任何一行；Windows 由 W3 用同一套脚本补测。
+T44 起每一行都由 `scripts/perf/` 自动测量（方法、口径与本机全部数据见 [性能测量](../engineering/performance.md)）：PR 跑冒烟子集，Nightly 在 macOS 与 Windows 跑全部行与 1 小时的缩短版长跑，超出预算或相对同平台、同机器类别、同流水线的基线回归超过 10% 即失败；`scripts/perf/metrics.test.mjs` 要求本表每一行都有测量或排除理由。T44 只有 macOS 数据，按上面的收紧规则不收紧任何一行；Windows 由 W3 用同一套脚本补测。W3 的 Windows 实测（i5-1340P / 16 GB 笔记本，非基准机型）在性能测量第 6.1 节，本表的 Windows 一列仍是 M0 数据：两台机器都不是基准机型，按收紧规则不改。
 
 | 指标 | 预算 | M0 实测 macOS | M0 实测 Windows | 测量方式 |
 |---|---|---|---|---|
@@ -1791,7 +1791,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | **M0 技术验证**（3–5 周） | 在两个平台上验证高风险假设 | 每个 spike 的结论（通过 / 失败 / 有条件通过）记录在 `docs/spikes/`，两个平台分别给结论；失败项触发对应 ADR 复审。**已完成（R1，2026-11-16）：有条件进入 M1**，见 [M0 总结](../spikes/M0-summary.md) |
 | **M1 可行走骨架** | 单工作区、多会话列表、流式对话；Read/Write/Edit/Bash（Windows 另有 PowerShell）/Glob/Grep 经 Core 执行；Manual 与 Accept edits 模式的基础审批；模型与凭据设置（凭据保险箱）；会话持久化与恢复；transcript P0 行类型 | 能用至少 2 家服务商完成"读代码 → 改代码 → 跑测试"的完整任务；L2 场景 ≥ 20 个通过。**macOS 已达标（R2，2026-11-19）**：两种协议的打包应用工作流通过，真实百炼 qwen-flash 通过，L2 61 个通过。**Windows 已达标（W1，2026-11-19）**：两种协议的工作流在两种形态通过，L2 60 个通过，UNC 共享未能实机验证，见 [W1 报告](../reviews/W1-windows-m1-parity.md)。 |
 | **M2 Harness 核心** | 完整权限规则与 Bash 分析；plan 模式；任务清单；AskUserQuestion；hooks（M2 事件集，command 类型）；checkpoint 与 rewind；压缩与上下文用量；WebFetch；Changes 面板；memory 文件兼容 | 第 6 章 M2 能力全部有场景覆盖；L3 对齐在权限与 hooks 上无未解释差异。**macOS 已达标（R3，2026-11-20）**：M2 能力 46 项全部有 L2 场景，L2 118 个通过（2 个 Windows 专属），L3 对 Claude Code 2.1.318 的 12 个权限与 hooks 场景 0 个未解释差异；评审修复 16 项缺陷，并按用户确认的 ADR-0047 让带通配的命令规则不放行越界路径（L3 少了这条差异），见 [R3 评审](../reviews/R3-findings.md)。**Windows 已达标（W2，2026-11-21）**：L2 145 个通过（4 个 macOS 专属），L3 对 Claude Code 2.1.318 的 12 个场景 0 个未解释差异（allowlist 按平台限定 Windows 版的工具集差异），W1 遗留的 UNC 补验通过，修复 7 个 Windows 平台缺陷，见 [W2 报告](../reviews/W2-windows-m2-parity.md)。 |
-| **M3 多会话与生态** | 子 agent；后台任务与 Monitor；终端面板（libghostty-vt）；worktree；MCP 共享连接池；skills 与命令；WebSearch；ToolSearch；hooks 的 http/prompt 类型 | 3 个并行会话 + 子 agent 场景满足第 11 章内存预算。**macOS 未达标（R4，2026-11-21）**：M3 能力全部有 L2 场景（L2 174 个通过、2 个 Windows 专属），四个独立审查的发现中修复 10 项缺陷；内存一项 Agent Host 达标（最大 236 MB，上限 270 MB），应用其余进程合计 580 MB 超出 510 MB（RSS 口径，phys_footprint 约 250 MB），阻塞进入 M4 的退出判定，见 [R4 评审](../reviews/R4-findings.md)。 |
+| **M3 多会话与生态** | 子 agent；后台任务与 Monitor；终端面板（libghostty-vt）；worktree；MCP 共享连接池；skills 与命令；WebSearch；ToolSearch；hooks 的 http/prompt 类型 | 3 个并行会话 + 子 agent 场景满足第 11 章内存预算。**macOS 未达标（R4，2026-11-21）**：M3 能力全部有 L2 场景（L2 174 个通过、2 个 Windows 专属），四个独立审查的发现中修复 10 项缺陷；内存一项 Agent Host 达标（最大 236 MB，上限 270 MB），应用其余进程合计 580 MB 超出 510 MB（RSS 口径，phys_footprint 约 250 MB），阻塞进入 M4 的退出判定，见 [R4 评审](../reviews/R4-findings.md)。**Windows 未达标（W3，2026-11-22）**：M3 能力在 Windows 11 实机可用（ConPTY 终端与输入法、内置 Node 的 MCP、长路径与中文路径的 worktree、托盘、多窗口、`piarc://` 与右键菜单、讲述人与 NVDA），修复 10 个 Windows 缺陷；内存一项与 macOS 相同：Agent Host 最大 163 MB（达标），应用其余进程最大 576 MB 超出 450 MB（私有工作集合计 256 MB），见 [W3 报告](../reviews/W3-windows-m3-parity.md)。 |
 | **M4 安全与打磨** | macOS 沙箱；Windows 隔离方案评估；插件；NotebookEdit；可操作的系统通知；配置诊断；无障碍；本地化；性能预算全部进 CI | 安全威胁表逐条有测试；性能预算全部达标 |
 | **M5 Beta** | Auto 模式（可配置审查模型）；自动记忆；企业托管配置；Anthropic 服务端压缩；fork 子 agent；平台快捷操作（App Intents / 跳转列表）；完整发布流水线 | macOS 与 Windows 同时公开 Beta |
 
@@ -1859,6 +1859,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.49 | 2026-11-21 | T39（ADR-0056）补充第 4 章 ADR-0056（ADR-0057 以提议列出）、6.2.3 节写明沙箱内自动批准在第 7 步、沙箱外执行紧接第 3 步；6.10 节 T39 落地（设置与来源约束、按命令生成配置、网络卡、拒绝反馈、不可用时降级、限制）；9.2 节审计的沙箱记录；10.3 节 Agent Host 配置定稿。Windows 隔离方案的 ADR-0057 为提议，第 6.10 节 Windows 一条、10.3、15.2 节与 R16 待用户决定后更新。 |
 | 2.50 | 2026-11-21 | T39：ADR-0057 被用户采纳。第 4 章去掉"提议"；6.10 节 Windows 一条写明评估结论（到 Beta 维持现状，MXC ProcessContainer 为 Beta 之后的候选及其前提）；10.3 节 Windows 的 Agent Host 没有第二道防线并计入已接受风险；15.2 节沙箱一行与第 14 章 R16 的对策和触发条件随之更新。 |
 | 2.51 | 2026-11-21 | T40（ADR-0058）补充第 4 章 ADR-0058；6.3.1 节插件 hooks 的层与确认；6.4 节插件的子 agent 定义；6.7 节 T40 落地（识别、安装位置、作用域与开关、确认与再确认、组件命名与优先级、Pi 扩展经 AHP、设置页）；6.8 节 MCP prompts 作为斜杠命令；6.14 节插件一行；7.4 节能力 `plugins` 与 Core API；9.2 节 `packages` 表（schema v10）；10.2 节项目作用域的包与信任。 |
+| 2.57 | 2026-11-22 | W3 补充第 11 章：Windows 的全部可测行由 W3 在一台 i5-1340P / 16 GB 笔记本（非基准机型）上实测，数据与配置差异见[性能测量](../engineering/performance.md)第 6.1 节，超出项登记 I201、I202、I207，不调整预算；第 16 章 M3 行加 Windows 结论（内存一项未达标，与 macOS 相同）。 |
 | 2.56 | 2026-11-22 | T45（ADR-0062）补充第 4 章 ADR-0062；10.1 节第 9–11 行的对策改用分号分隔（措辞不变，便于逐条映射），恶意插件一行加"Pi 自己设置里的包清单不由 Agent Host 安装或加载"，通用运行时一行加远程调试开关；10.5 节 T45 落地（外连清单、日志脱敏、诊断包、威胁映射与 Electron 清单复核）。 |
 | 2.55 | 2026-11-22 | T44 补充第 11 章：每一行由 `scripts/perf/` 自动测量（PR 冒烟、Nightly 两平台、长跑；绝对预算与按平台、机器类别、流水线分存的基线两道判定，覆盖检查），说明见[性能测量](../engineering/performance.md)；原"未测"的 macOS 格子补上 T44 在 M1 Max 上的实测，其余行加 T44 数值并标出超出项（I191–I194，I26 附物理占用读数）；空闲 CPU 由"接近 0%"定为可见与隐藏时应用全部进程加 Agent Host 合计 ≤ 5%（一个核心、60 s 平均）并要求隐藏时无 rAF 回调与终端帧，依据是实测 3.5–3.6%（I190）；体积按 I41 裁剪后安装后 446.6 MB；8 小时长会话一行仍未测（用户决定不在 T44 做本机长跑，I195）。只有 macOS 数据，按本章收紧规则不收紧任何预算。 |
 | 2.54 | 2026-11-21 | T43（ADR-0061）补充第 4 章 ADR-0061；8.7 节无障碍与本地化的落地（状态清单与 axe、feed 与行名称、节流播报、审批卡焦点、键盘与焦点环、强制颜色、i18n 检查与按应用语言格式化）。 |
