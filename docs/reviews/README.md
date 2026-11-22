@@ -8,12 +8,13 @@
 | R2 | M1（macOS）达标 | [R2-findings.md](R2-findings.md) | **macOS 达标，可进入 M2**（2026-11-19）。双协议工作流、真实百炼与 61 个 macOS L2 场景通过，Windows 实机检查见 W1 清单。 |
 | R3 | M2（macOS）达标 | [R3-findings.md](R3-findings.md) | **macOS 达标，可进入 M3**（2026-11-20）。M2 能力 46 项全部有 L2 场景，L3 对 Claude Code 2.1.318 的权限与 hooks 场景 0 个未解释差异；四个独立审查的 40 条发现中修复 16 项缺陷，用户确认的 ADR-0047 已实现，其余登记 I120–I128；Windows 由 W2 验收（含 W1 遗留的 UNC）。 |
 | R4 | M3 达标 | [R4-findings.md](R4-findings.md) | **M3（macOS）未达标，阻塞项只有内存一项**（2026-11-21）：Agent Host 达标，应用其余进程 RSS 合计 580 MB 超出 510 MB（物理占用约 250 MB），口径由用户决定；M3 能力全部有 L2 场景、M3 及之前没有 planned 能力；四个独立审查的 37 条发现中修复 10 项缺陷（含 worktree 与上级目录的项目文件借用信任、链接读取任意文件、控制字符让终端执行的命令与裁决不同），其余登记 I165–I176；W2 已合并并确认。 |
-| R5 | M4 达标 | `R5-findings.md` | 未开始 |
+| R5 | M4 达标 | [R5-findings.md](R5-findings.md) | **M4（macOS）未达标，阻塞在性能一条**（2026-11-22）：九项 M4 目标都已交付并有验收证据，M4 及之前没有 `planned` 的能力；第 10.1 节 14 条威胁、59 个对策都映射到测试并本地通过（两个平台 CI 等推送），每条抽查一个测试；四个独立审查的发现中修复 20 项（含 Agent Host 子进程往 Pi 自动加载的目录放代码、克隆的包经 `.npmrc` 让 npm 运行程序、性能门禁在 CI 上不判值三项安全与门禁缺陷），其余登记 I211–I222；本机 Nightly 的流式帧、主进程增量、Agent Host 内存超出，应用内存的口径写 ADR-0063（提议），信任的原生确认写 ADR-0064（提议）；W3 确认，ADR-0057 已接受并同步。 |
 | R6 | 公开 Beta | `R6-findings.md` | 未开始 |
 
 Windows 达标任务（W0–W4）的报告也放在本目录，命名 `Wn-windows-<短标题>.md`，例如 `W1-windows-m1-parity.md`。
 
 - W1：[`W1-windows-m1-parity.md`](W1-windows-m1-parity.md)：**M1 在 Windows 11 x64 达标**（2026-11-19），UNC 共享未能在本机验证（I96）；修复 10 个 Windows 平台缺陷，ADR-0040、0041 给出 Windows 的两项预算口径。
 - W2：[`W2-windows-m2-parity.md`](W2-windows-m2-parity.md)：**M2 在 Windows 11 x64 达标**（2026-11-21），L3 在 Windows 上 0 个未解释差异，W1 的 UNC 补验通过；修复 7 个 Windows 平台缺陷。
+- W3：[`W3-windows-m3-parity.md`](W3-windows-m3-parity.md)：**M3 的功能在 Windows 11 x64 全部可用，退出标准与 macOS 一样卡在内存一项**（2026-11-22）；修复 10 个 Windows 缺陷，R5 确认。
 
 每条发现记录：编号、维度、文件与行号、失败场景、核实结论（确认 / 不同意及理由）、处理（已修复的提交 / 登记事项编号 / ADR）。
