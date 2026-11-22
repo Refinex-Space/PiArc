@@ -64,13 +64,13 @@ export const METRICS = [
   {
     id: 'main-memory-delta',
     row: '主进程内存',
-    probe: 'memory',
+    probe: 'event-channel',
     unit: 'MB',
     better: 'lower',
     budget: 24,
     lanes: ['nightly'],
     floor: 3,
-    how: 'main process working set, idle with the sidebar loaded, minus a bare Electron window',
+    how: 'idle main process resident size (no inspector, empty data directory) minus a bare Electron window',
   },
   {
     id: 'renderer-memory',
