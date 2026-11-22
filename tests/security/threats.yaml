@@ -181,6 +181,12 @@ threats:
           - rust:crates/piarc-telemetry/tests/redaction.rs::thr04_credentials_in_core_and_agent_host_lines_reach_the_files_redacted
           - rust:crates/piarc-testkit/tests/credential_leaks.rs::thr04_a_vault_credential_stays_out_of_child_environments_and_log_files
           - vitest:agent-host/src/providers/policy.test.ts::redacts the provider key echoed by an HTTP error before the Pi session can persist it
+      - measure: 数据只在本机：一次完整 mock 会话里，Agent Host 只连模型服务商，Electron（主进程、渲染进程、Chromium 后台）没有外连；PiArc 没有遥测（外连清单见 docs/security/egress.md）
+        type: automated
+        tests:
+          - rust:crates/piarc-testkit/tests/egress.rs::thr04_a_whole_mock_session_connects_only_to_the_model_provider
+          - l4:apps/desktop/e2e/t45-egress.e2e.ts::THR-04 a whole mock session makes no outbound connection from Electron
+          - rust:crates/piarc-host/src/config.rs::passes_only_named_variables_and_the_fixed_ones
       - measure: 诊断包由用户手动导出：先展示文件清单与脱敏摘要，经主进程保存对话框确认后才写出；不含保险箱、数据库与会话内容，主目录写作 ~
         type: automated
         tests:

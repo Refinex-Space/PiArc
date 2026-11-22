@@ -318,7 +318,7 @@ T45（2026-11-21 开工；基线 `npm run verify -- --baseline` 全量 16 项通
 - [x] 依赖审计：cargo-audit、npm audit、npm 许可证、例外清单、CI 流水线、本地命令；PR 模板（A06，82b5711）；另修 THR-03：Pi 设置里的 `packages` 不再由 Agent Host 安装（10a3008）
 - [x] 日志写入脱敏（tracing 层与 Agent Host stderr）；Agent Host 与 Bash 子进程环境无凭据（A07，022122f）
 - [x] 诊断包导出：清单与脱敏摘要、确认后写出、界面与截图（A08，63e3b2b；`tmp/evidence/T45/diagnostic-bundle-*.png`）
-- [ ] 遥测默认关闭与外连记录、报告（A09）
+- [x] 遥测默认关闭与外连记录、报告（A09）：`egress.rs`、`t45-egress.e2e.ts`、`docs/security/egress.md`
 - [x] XSS 载荷集扩充到全部渲染面（A10）：载荷 18 → 28 类；`t45-xss.e2e.ts` 覆盖审批卡、Changes 与行内评论、设置页、hook 提示、终端 OSC 8；双向控制字符在审批卡与 diff 中显示为可见标记
 - [x] preload 畸形参数、"总是允许"只经原生确认（A11）：`t45-ipc-hardening.e2e.ts`
 - [x] 发布构建上 `ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`--inspect`、`--remote-debugging-port`（I10）不生效（A12）：`scripts/ci/check-release-runtime.mjs` 本机 8 项通过（含对照）；测试页不进发布构建（I13/I24/I30）

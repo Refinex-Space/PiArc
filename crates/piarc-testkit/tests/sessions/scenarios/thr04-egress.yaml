@@ -1,0 +1,8 @@
+# T45-A09 (egress.rs): a command and an MCP tool in one turn.
+id: thr04-egress
+steps:
+  - tool_calls:
+      - { id: toolu_env, name: Bash, input: { command: env } }
+  - tool_calls:
+      - { id: toolu_mcp, name: mcp__echo__echo, input: { text: egress } }
+  - text: 'Done.'
