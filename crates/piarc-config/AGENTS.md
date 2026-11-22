@@ -81,6 +81,11 @@
 - 非执行配置 `fileCheckpointingEnabled`（T28，与 Claude Code 同名同义，生效）随普通标量合并：`false` 时 Core 的 `tool_io::checkpoints` 不建检查点、写入不存快照，之后的回合没有代码回退。
 - 非执行配置 `askUserQuestion.timeoutSeconds`（T26）是提问表单的超时秒数，随普通标量合并；Claude Code 的 `askUserQuestionTimeout` 仍标为忽略。`plansDirectory` 是 `planned(T48)`：T26 把计划存为会话 entry，R3 决定由 T48 支持批准时把计划另存到该目录（I104）。
 
+## Auto 模式的设置（`src/auto_mode.rs`，T46）
+
+- `auto_mode::read(settings)` 是唯一读取入口：`permissions.enableAutoMode` 与 `autoMode.model` 只读 PiArc 用户层，`autoMode` 的 `environment`、`allow`、`soft_deny`、`hard_deny` 由 PiArc 用户层与 `~/.claude/settings.json` 按序拼接去重（`$defaults` 跳过，单条 500 字符、合计 8,000 字符），`disableAutoMode: "disable"`（Claude Code 的顶层键）任何层都生效。`available(organization_disabled)` 留给 T47 的托管设置。
+- 项目层的 `/permissions/enableAutoMode` 与整个 `/autoMode`（`USER_ONLY`）在 `remerge` 中移除并记进 `ignored_auto`，诊断报 `projectAutoMode`；项目层的 `defaultMode: auto` 仍报 `projectMode`。`claude::SETTINGS_KEYS` 中 `autoMode` 的四个列表与 `disableAutoMode` 为生效，`autoMode.classifyAllShell`、`useAutoModeDuringPlan` 为忽略并写原因。
+
 ## 沙箱设置（`src/sandbox.rs`，T39，ADR-0056）
 
 - 键沿用 Claude Code：`sandbox.enabled`、`sandbox.autoAllowBashIfSandboxed`、`sandbox.filesystem.denyRead`、`sandbox.network.allowedDomains`（`claude::SETTINGS_KEYS` 为生效，其余 `sandbox.*` 逐条忽略并写原因，`network.allowManagedDomainsOnly` 为 T47）。

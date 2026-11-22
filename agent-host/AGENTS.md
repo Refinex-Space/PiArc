@@ -83,6 +83,12 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - `hooks/prompt`（Core → Agent Host）：`SessionRegistry.judgeHook` → `harness/hook-judge.ts` 的 `judgeHook`（`model` 经 `resolveModel`，别名表取 Core 的 `agents/list`；缺省辅助模型；`AbortSignal.timeout`），判定提示在 `harness/prompts/hook-judge.ts`。只回答模型的原文，解析与翻译在 Core。
 - M3 hooks 的挂载见 `src/harness/AGENTS.md`；`effort`（`SessionHarness.effort()`，`off` 时没有）随 `policy/evaluate` 与工具类事件、Stop/SubagentStop/PostToolBatch 的 `hooks/run` 发出。
 
+## Auto 模式的审查（T46，设计增补 `docs/architecture/addenda/T46-auto-mode.md`）
+
+- `policy/review`（Core → Agent Host）：`host.ts` 用 `protocol/params.ts` 的 `reviewParams` 校验后交给 `SessionRegistry.reviewCall`：被审会话是主会话或运行中的子 agent（`SubagentRunner.reviewOf`：子会话自己的分支、主会话 id 与 `Agent` 调用给的任务），用户消息取主会话的分支，近期调用取被审会话自己的，用量记在被审会话（用途 `autoReview`）。入站请求逐个异步分派，所以审查与仍在等待的 `policy/evaluate`、并行子 agent 的审查互不阻塞。
+- `harness/auto-review.ts` 的 `reviewCall`：审查模型不在目录、没有凭据或不满足 `providers/catalog.ts` 的 `meetsReviewerBar`（工具调用 `verified`、窗口 ≥ 64K、输出 ≥ 1,024，`models/list` 的 `reviewer` 用同一函数）时答 `unknownModel`/`belowBar`、不发请求；否则经辅助通道发一次请求（system 为 `prompts/auto-review.ts` 的 A 段加用户策略 B 段，唯一的 user 消息是 C–G 的 JSON，只声明 `record_review`，`cacheRetention: short`，`maxTokens` 1,024），原样交回参数，或答 `timeout`、`providerError`、`unparsable`。`inputHash` 是 system 与 user 全文的 SHA-256，`promptId` 是 A 段哈希的前 12 位。
+- 结论回到 `policy/evaluate` 的 `review` 时，`harness/policy.ts` 写分支条目 `piarc.autoReview`（`REVIEW_ENTRY`）并让投影器给该调用的条目加 `review`（`Projector.markReviewed`，历史经 `history.ts` 读同一条目）。
+
 ## 子目录说明
 
 - `src/harness/AGENTS.md`：system prompt 与 memory、权限预检、hooks、宿主工具、上下文工程（提醒、压缩、重注入、熔断、用量）、回合不变量的补齐。

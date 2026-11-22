@@ -28,6 +28,7 @@ function render() {
         import * as styles from './agent-host/src/harness/prompts/output-styles.ts';
         import * as search from './agent-host/src/harness/prompts/web-search.ts';
         import { HOOK_JUDGE_SYSTEM } from './agent-host/src/harness/prompts/hook-judge.ts';
+        import * as review from './agent-host/src/harness/prompts/auto-review.ts';
         const system = assembleSystem(CANONICAL_TOOLS, DEFAULT_PROFILE, [],
           {cwd: '', platform: '', date: '', gitStatus: ''}).text;
         const conservative = conservativeProfile(DEFAULT_PROFILE);
@@ -36,7 +37,7 @@ function render() {
           [...new Set([DEFAULT_PROFILE[tool].description, conservative[tool].description])]);
         const todo = [{ content: '', status: 'pending' }];
         const notices = [notice.PLAN_ON,
-          ...['default', 'acceptEdits', 'bypassPermissions'].map(notice.planOff),
+          ...['default', 'acceptEdits', 'bypassPermissions', 'auto'].map(notice.planOff),
           notice.staleListNotice(todo, 0),
           // T27: reminders, what a compaction gives back, the summary request.
           notice.hookContextNotice('Stop', ''), notice.hookContextNotice('SessionStart', ''),
@@ -77,7 +78,10 @@ function render() {
           search.searchResultText('', '', [{ title: '', url: '', snippet: ' ' }], ' '),
           search.searchResultText('', '', []), search.NO_SEARCH_BACKEND, search.nativeSearchFailed(''),
           HOOK_JUDGE_SYSTEM, notice.hookContextNotice('SubagentStop', ''),
-          notice.hookStoppedRun('PostToolBatch', '')];
+          notice.hookStoppedRun('PostToolBatch', ''),
+          // T46: Auto mode's review prompt, its answer tool and the tool's parameters.
+          review.AUTO_REVIEW_SYSTEM, review.REVIEW_TOOL_DESCRIPTION,
+          ...Object.values(review.REVIEW_TOOL_PARAMETERS.properties).map((p) => p.description)];
         process.stdout.write([system, ...descriptions, ...notices].join(String.fromCharCode(10)));`,
       resolveDir: repoRoot,
     },
@@ -141,6 +145,10 @@ function sourceTexts() {
     // T39: the sandbox note after a failed command, and the proxy's refusal a command prints.
     'agent-host/src/tools/sandbox-report.ts',
     'crates/piarc-sandbox/src/proxy/mod.rs',
+    // T46: the review input's labels, and what the model reads when the reviewer refuses.
+    'agent-host/src/harness/auto-review.ts',
+    'crates/piarc-policy/src/review.rs',
+    'crates/piarc-core/src/tool_io/policy/review.rs',
   ]) {
     const source = readFileSync(path.join(repoRoot, file), 'utf8');
     for (const m of source.matchAll(literal)) {

@@ -100,6 +100,8 @@
 - T29：顶层 `web`（`src/l2/web.rs`）起本地网页服务器，`{{web}}`/`{{web_alt}}` 在页面与端点的工具参数中替换为 `http://127.0.0.1:<端口>` 与 `http://localhost:<端口>`（两个不同的主机），Core 的 WebFetch 允许列表只为这些场景放行这两个主机；WebFetch 的提取是一次额外的模型请求，脚本里要为它留一步（同一端点，或 `modelProviders.auxiliary` 指向的另一个端点）。顶层 `oauth`（`login_spec.rs`、`runner/login.rs`）起 mock 授权服务器并给每个 Agent Host 注册 `piarc-test-oauth`，动作 `sign_in`（运行器代替浏览器跟随授权页的重定向，或在第一步取消；只认 `authUrl`/`deviceCode`/`prompt` 为可操作的步，进度可能先到）与 `sign_out`。每模型设置与辅助模型用 `run_files` 写 `data 数据/settings.json` 的 `modelProviders`；`configure_as: local` 的端点模型是低可靠性（保守 Tool Profile）。
 - mock 授权服务器（`src/auth_server.rs`，bin `piarc-mock-auth`：stdout 第一行端口，stdin 每行 `approve`/`deny`/`expire` 改决定，EOF 退出；`--pending-polls` 控制设备码轮询多少次后决定，L4 用 30 次约 3 s 以便截图）。`tests/sessions/login.rs` 经 Core 公开 API 跑授权码、设备码、拒绝、过期、取消与手工粘贴代码，并扫描数据目录无明文。
 
+- T46：端点的 `strict_tools: true` 在 `models.json` 的 `compat` 写 `supportsStrictTools`（Anthropic）或 `supportsStrictMode`（OpenAI），目录因此把它记为 `verified`，可以当 Auto 模式的审查模型（用户设置 `autoMode.model: "mock-<端点>/mock-model"`）；顶层 `review_timeout_ms` 缩短 Core 的审查时限（`CoreConfig.review_timeout`，超时场景用）；审批应答的 `review` 断言卡片转回人工的原因（`none` 为从未送审）。运行器不应答 `review.state` 为 `reviewing` 的卡（它在之后的快照里以新的 revision 回来），`pendingApprovals` 也只计可作答的卡。`perm-auto-*.yaml` 覆盖各条判定与失败路径；审查请求是新的对话，用户消息里有 JSON，`contains` 匹配的是请求体里转义后的文本。
+
 ## 易错点
 
 - Windows：不要把 `canonicalize` 的结果（`\\?\C:\…` 形式）交给 Node 运行脚本，Node 会 `lstat 'C:'` 失败；仓库根用 `CARGO_MANIFEST_DIR` 的上两级。Core 报告的路径不带 `\\?\`，比较时用 harness 的 `canonical()`（L2 运行器里是 `l2::fixtures::canonical`）。

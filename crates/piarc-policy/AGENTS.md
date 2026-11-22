@@ -8,7 +8,7 @@ Core 的权限裁决（T20 起，T23 完整版）：Claude Code 格式的规则�
 |---|---|
 | `cargo test -p piarc-policy` | 单元测试：通配、路径锚点与 gitignore 语义、规则与来源、裁决阶梯与插槽、分析器细节、前缀生成、关键路径 |
 | `cargo test -p piarc-policy --test bash_cases -- --nocapture` | 数据驱动的 Bash 用例（`tests/bash_cases.json`，打印条数与类别）与 6,000 次随机输入（不 panic） |
-| `cargo test -p piarc-core --lib tool_io::policy::tests -- --test-threads=1 --nocapture` | 经真实 Core 的预检：规则来源与信任、模式、Bash、工具移除、"总是允许"、设置页；`automatic_decision_latency` 是 T20/T23-A13 的 1,000 次计时 |
+| `cargo test -p piarc-core --lib tool_io::policy::tests -- --test-threads=1 --nocapture` | 经真实 Core 的预检：规则来源与信任、模式、Bash、工具移除、"总是允许"、设置页；`automatic_decision_latency` 是 T20/T23-A13 的 1,000 次计时；`t46` 是 Auto 模式的审查（替身审查通道：允许与拒绝、不确定与各种失败转卡、暂停与恢复、不送审的类别、可用性与审计） |
 
 ## 裁决阶梯（`decision.rs`，架构第 6.2.3 节）
 
@@ -22,12 +22,19 @@ Core 的权限裁决（T20 起，T23 完整版）：Claude Code 格式的规则�
 | 5 | plan：写工具与非只读命令拒绝（`PLAN_MODE_REFUSAL`）；bypass：允许 | |
 | 5b | 受保护路径写入（Manual、Accept edits） | 询问 |
 | 6 | allow 规则（Bash 每个子命令被规则或只读白名单允许；带通配的命令规则遇到越界或无法定位的路径参数时不算放行，ADR-0047）、PreToolUse allow | 允许 |
-| 7 | 越界 → 询问；只读且在会话目录内 → 允许；Accept edits 的编辑与文件命令 → 允许 | |
-| 8 | PermissionRequest 插槽（T25，`after_permission_request`），不能批准关键路径删除与需要用户交互的工具 | 询问用户 |
+| 7 | 越界 → 询问；只读且在会话目录内 → 允许；Accept edits 与 Auto（T46）的编辑与文件命令 → 允许 | |
+| 8 | PermissionRequest 插槽（T25，`after_permission_request`），不能批准关键路径删除与需要用户交互的工具；之后在 Auto 模式下，通用询问（`review::reviewable`）先交审查模型（T46） | 询问用户 |
 
 - 插槽的结果由 Core 的 `tool_io::policy::hooks` 填入（T25，PreToolUse 与 PermissionRequest hooks）；`decision/tests.rs` 用替身值验证 allow 只"继续走后续步骤"。`after_permission_request` 不让 hook 批准关键路径删除与需要用户交互的工具。
 - `Input.tainted`（命令改 `PATH`、`IFS` 等或带不安全的前置赋值）：第 6、7 步不自动允许，bypass 仍允许。
-- 起始模式：会话显式 → 工作区记忆（`workspaces.default_mode`）→ `permissions.defaultMode` → Manual；`bypassPermissions` 只有用户文件里 `permissions.enableBypassPermissions: true` 时可用（`starting_mode`）。
+- 起始模式：会话显式 → 工作区记忆（`workspaces.default_mode`）→ `permissions.defaultMode` → Manual；`bypassPermissions` 只有用户文件里 `permissions.enableBypassPermissions: true` 时可用，`auto` 只有 Auto 模式可用时才行（`starting_mode` 的 `Available`，T46）。
+
+## Auto 模式的审查步骤（`review.rs`，T46，设计增补 `docs/architecture/addenda/T46-auto-mode.md`）
+
+- 位置：阶梯走完、PermissionRequest 插槽之后。`reviewable(&Ruling)` 只认 `outcome == Ask && step == "ask"`（第 7 步的通用询问）；ask 规则、无效规则、`hookAsk`、关键路径删除、`requiresUserInteraction`、计划卡、沙箱外、受保护路径、越界、无法判定都有自己的 step，照旧询问用户。deny 规则在第 3 步就拒绝，PreToolUse 的 allow 在第 6 步放行，都不到审查。Auto 模式的第 7 步与 Accept edits 相同（工作区内编辑与文件命令直接允许）。
+- 失败归一：`check_answer` 只接受区分大小写、不修剪的 `allow`/`deny`/`unsure`（否则 `InvalidVerdict`），理由去控制字符后为空是 `Unparsable`，不认识的 `category` 丢掉；`clean_reason` 截到 `REVIEW_REASON_CHARS`（500）个字符。超时、服务商错误、无法解析、枚举外、不可用一律由 Core 转回审批卡，工具不执行。
+- 计数：`Denials` 只计审查模型的 `deny`：连续 `CONSECUTIVE_DENIAL_LIMIT`（3）或累计 `TOTAL_DENIAL_LIMIT`（20）暂停，触发时该计数清零；审查模型的 `allow` 只清连续数，用户在卡上允许或再选 Auto 模式（`resume`）才解除暂停。`REVIEW_TIMEOUT`（30 s）与两个阈值都不是设置项。
+- 给模型的文字：`DENIAL_NOTE`、`PAUSE_NOTE`（改动后跑提示词原创性检查）。
 
 ## 规则（`rules.rs`、`pattern.rs`、`paths.rs`）
 
@@ -59,6 +66,7 @@ Core 的权限裁决（T20 起，T23 完整版）：Claude Code 格式的规则�
 
 ## 易错点
 
+- 新增询问的阶梯步骤时给它自己的 step 名：只有 `"ask"` 会被 Auto 模式送审，复用 `"ask"` 等于把新类别交给审查模型（T46）。
 - Monitor（T32）：`bash::judge` 按 `Facts::tool()`（缺省 `Bash`）查规则，Core 对 Monitor 传 `Monitor`，于是 `Bash(…)` 规则（`covered_tools`）与 `Monitor(…)` 规则都适用；只读白名单不让 Monitor 免审批由 Core 的 `assess::bash_call` 处理。
 - 新增工具要决定它在阶梯里的事实：写工具设 `write`（plan 拒绝），只读工具设 `read_only`，需要用户交互的在 `assess.rs` 给出 `MustAsk { step: "requiresUserInteraction" }`；规则匹配面（名称、路径、域名）在 `assess.rs`。
 - 只读白名单的 `valued`（取值选项）只列确实带值的选项：多列会把路径当成值跳过检查（不安全），少列只会把值当路径检查（多问一次）。选项词由 `option_word` 解析（R3）：短选项簇逐字母判断禁用与取值（`-ofile` 即 `-o`），长选项的前缀缩写按 getopt 视同全名，`--x=值` 的值按路径检查，`--files0-from` 一律不算只读；`find` 的起始路径跳过前置选项（`-L`、`-P`、`-f 路径`…）；重定向的设备豁免只认精确名字与 `/dev/fd/<数字>`，`$(< 文件)` 按 `:` 加输入重定向判断。

@@ -163,8 +163,7 @@ differences:
   - scenario: perm-plan
     path: 'requests.auxiliary'
     claude_code: '>=2.1.318 <2.2.0'
-    reason: In plan mode Claude Code sends commands that are not read-only to its auto-mode classifier (non-streaming helper requests, refused by the mock, so it denies); PiArc has no classifier before Auto mode and refuses them in plan mode.
-    follow_up: T46
+    reason: In plan mode Claude Code sends commands that are not read-only to its auto-mode classifier (non-streaming helper requests, refused by the mock, so it denies); PiArc keeps plan mode's hard block whatever the mode (T46 design addendum 6.3, useAutoModeDuringPlan ignored), so its reviewer never sees plan-mode calls and they are refused.
   - scenario: perm-untrusted
     path: 'tool_calls.calls.write.status'
     claude_code: '>=2.1.318 <2.2.0'
@@ -251,3 +250,37 @@ excluded:
     reason: It needs a manual /compact after a turn, a second input that one claude -p prompt cannot send; compaction is not covered by L3 yet.
   - scenario: hooks-pre-compact-block
     reason: It needs a manual /compact after a turn, a second input that one claude -p prompt cannot send; compaction is not covered by L3 yet.
+  - scenario: perm-auto-allow
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-always-ask
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-ask-rule
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-deny
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-deny-rule
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-hooks-first
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-invalid-verdict
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-pause
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-project-ignored
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-provider-error
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-request-shape
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-subagents
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-timeout
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-unavailable
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-unparsable
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-unsandboxed
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-unsure
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.

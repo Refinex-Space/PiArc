@@ -17,6 +17,14 @@
 - Composer 的类型、数量、大小和搜索上限由 `composer::info()` 提供。附件只经 `store_attachment` 写入本会话的 `attachments/`，会话的工具 scope 将该目录登记为只读。PDF 在发布到附件目录前通过解析和页数校验。归档保留附件，删除会话清理整个会话目录（ADR-0030）。
 - 沙箱（T39，ADR-0056，`tool_io/sandbox.rs`）：`sandbox_with(s, settings)` 由本次裁决已读的设置算出 `Effective`（`piarc_config::sandbox::resolve`、`SandboxConfig.enterprise`、平台与 `sandbox_health`），`for_call` 给 Bash/Monitor 调用 `CallSandbox`（`sandboxed`、`auto`、`unsandboxed`），`prepare` 把它写进阶梯输入（`sandbox_auto`、`unsandboxed`）、授权（`Grant.sandboxed`）与卡片（`sandbox`；沙箱外时 `protected_path` 为真，Core 拒绝仅本次以外的答复）。`claim_command`/`claim_monitor` 返回 `Claimed { pinned, sandboxed }`，`exec_run`、`exec_monitor`、`exec_terminal` 为沙箱命令调 `sandbox_launch`（按当时的设置生成配置、替换代理白名单）；前台命令结束后 `sandbox_report` 填结果的 `sandbox`（`file_denials` 加本条命令期间代理拒绝的主机）并写审计。会话代理在 `SessionState`（`SessionIo.sandbox`）里随第一条沙箱命令启动，`Gate` 实现 `ProxyHooks`（持 `Weak<SessionIo>`，不成环）：本会话允许的主机直接放行，其余经 `sandbox/network.rs` 发网络卡（`post_network_card`，没有 `peer`，回合结束与断连不撤卡，`SandboxConfig.approval_timeout` 到时拒绝），拒绝立即写 `kind: "sandbox"` 审计。`open_sandboxed_session` 是测试用的强制沙箱会话（`SessionState::forced`）。设置页的读写在 `sandbox/view.rs`（`sandbox_view`、`set_sandbox_settings`，只写用户层）。
 
+## Auto 模式的审查（T46，设计增补 `docs/architecture/addenda/T46-auto-mode.md`）
+
+- `policy/review.rs`：`evaluate_call` 的 `question` 在模式为 Auto 且 `piarc_policy::review::reviewable` 时走 `auto_review`：卡片先以 `review: reviewing` 入账（`policy/pending` 停住 Agent Host 的期限，`answer_approval` 对它答 `stale`，快照的 `pendingApprovals` 不计它），经 `Services.review` 的 `ReviewOutlet`（会话层 `sessions/hooks.rs` 的 `HubReviews` 按主会话 id 找到工作区 Agent Host 发 `policy/review`，`call_within` 时限为 `ReviewConfig.timeout` 加 5 s）取回答；`allow` 撤卡并放行一次（`step: "autoReview"`、`source: "reviewer"`，结果带 `review`），`deny` 撤卡并拒绝，`unsure` 与失败在同一条卡上 `revision + 1`、`review: fallback` 带原因交给用户（此时才触发 Notification hooks）。审查期间模式变了答复作废（`discarded`）。
+- 每次送审一行 `kind: "autoReview"` 审计（`audit_review`：结局、结论、截断的理由、类别、耗时、token、`inputHash`、`promptId`、拒绝计数，子 agent 带 `agentId`），最终决定照旧一行 `permission`。T48 的 `PermissionDenied` 接在 `ToolIo::reviewer_refused`。
+- 状态挂在主会话的 `State.auto`（`AutoState`：`Denials`、审查模型、最近一次不可用的原因、被设置关闭的标记），`State::publish` 把它作为 `SessionView.autoReview` 发出；子 agent 的计数与状态都用主会话的。用户在任何卡上允许（`question` 末尾）或再选 Auto 模式（`session_mode`）解除暂停。
+- 可用性在 `modes.rs`：`auto_available` 读 `piarc_config::auto_mode`；`check_mode` 拒绝未启用的 `auto`；`check_auto_mode` 在每次裁决前把设置已关闭 Auto 的会话切回手动并写 `autoModeOff` 审计。会话登记时 `SessionIo.remotes` 经 `piarc_git::remotes` 读一次 git remote。
+- 单测：`cargo test -p piarc-core --lib tool_io::policy::tests::t46`（替身审查通道 `Reviewer`；夹具 `Peer::channel(4)` 不读帧，卡片多的用例要像 `Fixture::auto` 那样把帧读掉，否则第五个 `policy/pending` 就阻塞）。
+
 ## Memory 与 rules（T22、T24）
 
 - Memory 由 `tool_io/memory.rs` 组装快照，文件发现和导入在 `memory_reader.rs`。外部导入经同一会话的审批账本，由 `policy/memory.rs` 按工作区及规范目标匹配。见 ADR-0033。
