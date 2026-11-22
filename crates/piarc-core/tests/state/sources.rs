@@ -27,7 +27,12 @@ fn of_kind<'a>(report: &'a Value, kind: &str) -> Vec<&'a Value> {
 fn named<'a>(reports: &[&'a Value], end: &str) -> &'a Value {
     reports
         .iter()
-        .find(|f| f["file"].as_str().is_some_and(|p| p.ends_with(end)))
+        // `end` is written with `/`; Windows reports use `\` (CI run 45024661885).
+        .find(|f| {
+            f["file"]
+                .as_str()
+                .is_some_and(|p| p.replace('\\', "/").ends_with(end))
+        })
         .unwrap_or_else(|| panic!("no report for {end}: {reports:?}"))
 }
 

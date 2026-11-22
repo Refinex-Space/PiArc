@@ -11,7 +11,7 @@
 | M1 | 61 | 61 | 0 | 0 |
 | M2 | 46 | 46 | 0 | 0 |
 | M3 | 47 | 47 | 0 | 0 |
-| M4 | 31 | 29 | 2 | 0 |
+| M4 | 31 | 31 | 0 | 0 |
 | M5 | 7 | 0 | 7 | 0 |
 
 ## M1
@@ -187,7 +187,7 @@
 
 | ID | 能力 | 需求与架构 | 任务 | 覆盖场景 | 状态 |
 |---|---|---|---|---|---|
-| CAP-CONFIG-DIAG-002 | 配置诊断完善（全部配置来源） | FR-EX-05 | T41 | — | 计划中 |
+| CAP-CONFIG-DIAG-002 | 配置诊断完善（全部配置来源） | FR-EX-05 | T41 | `config-diag-sources` | 已实现 |
 | CAP-HOOK-CONFIGCHANGE-001 | ConfigChange hooks：会话中设置文件变化时运行，block 让该变更不在本会话生效（企业来源不可阻断） | FR-HN-05、ARCH-6.3.2 | T41 | `hooks-m4-config-change` | 已实现 |
 | CAP-HOOK-CWDCHANGED-001 | CwdChanged hooks：命令改变会话的持久 cwd 后运行，watchPaths 替换监视列表 | FR-HN-05、ARCH-6.3.2 | T41 | `hooks-m4-cwd-file-changed` | 已实现 |
 | CAP-HOOK-EXPANSION-001 | UserPromptExpansion hooks：斜杠命令、skill 与 MCP prompt 展开前运行，exit 2 或 decision block 阻止展开，纯文本 stdout 作为上下文 | FR-HN-05、ARCH-6.3.2 | T41 | `hooks-m4-expansion` | 已实现 |
@@ -217,7 +217,7 @@
 | CAP-TOOL-NOTEBOOK-001 | NotebookEdit 编辑 Jupyter cell（插入、替换、删除，未改动的部分逐字节不变） | FR-TL-06、ARCH-6.1.4 | T42 | `notebook-edit-delete`<br>`notebook-edit-insert`<br>`notebook-edit-replace` | 已实现 |
 | CAP-TOOL-NOTEBOOK-ERRORS-001 | NotebookEdit 的先读后改、外部修改与不存在的 cell 报错，无 id 的旧版 notebook 按序号定位 | FR-TL-06、ARCH-6.1.2 | T42 | `notebook-edit-errors` | 已实现 |
 | CAP-TOOL-NOTEBOOK-PERMISSIONS-001 | NotebookEdit 受 Edit(...) 规则、受保护路径与模式约束，hooks 按规范名匹配，写入进检查点可回退 | FR-TL-06、ARCH-6.9 | T42 | `notebook-edit-permissions` | 已实现 |
-| CAP-USAGE-COST-001 | 按会话、按模型统计用量与成本 | FR-MD-06 | T41 | — | 计划中 |
+| CAP-USAGE-COST-001 | 按会话、按模型统计用量与成本 | FR-MD-06 | T41 | `usage-cost-session` | 已实现 |
 
 ## M5
 
