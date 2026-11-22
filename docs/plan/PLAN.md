@@ -515,6 +515,9 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I198 | T45 | Windows 与 Linux 上 Chromium 的拼写检查从 Google CDN（`redirector.gvt1.com`）下载 Hunspell 词典，只含语言代码，已列入 `docs/security/egress.md`，`t45-egress` 在 Windows 上允许这个主机 | W3 实测下载时机，决定保留或用 `session.setSpellCheckerEnabled(false)` 关闭 |
 | I199 | T45 | `t45-xss` 的设置面覆盖 MCP、扩展包与配置诊断；服务商名称、子 agent 定义、skills 页同样渲染外部文本 | R5 把同一断言扩展到这些页 |
 | I200 | T45 | 威胁映射 THR-09（更新通道被劫持）的"HTTPS"与"私钥只在需要维护者审批的发布环境中使用"两项是 `deferred`（任务 T50）：更新流程与发布流水线还没有 | T50 实现更新流程后为 THR-09 补测试（清单校验接进更新、篡改拒绝、受保护环境），把这两项改为 automated 并更新映射；T50 完成后 `check-threats.mjs` 会因待补项的任务已完成而失败，迫使更新 |
+| I201 | T45 | T35–T44 的代码第一次上 Windows CI（7cbf259，[run 45011543956](https://github.com/Refinex-Space/PiArc/actions/runs/45011543956)），Windows verify 失败：L2 12 个场景（`plugin-agents`、`plugin-commands`、`plugin-hooks`、`plugin-mcp`、`plugin-skills`、`skill-invoke`、`hooks-m4-mcp-tool`、`subagent-worktree`、`worktree-archive-cleanup`、`worktree-parallel-sessions`、`worktree-session-create`、`worktree-session-rules`；可见原因有工具结果带 `\\?\` 前缀、worktree 会话的 Write 意外要审批、`git worktree list` 没有子 agent 的 worktree、MCP server 报未配置）；Vitest `agent-host/src/harness/skills/session-skills.test.ts`（paths skill）与 `apps/desktop/src/main/launch.test.ts`（"ignoring switches" 用例写死 POSIX 路径，Windows 上解析成 `D:\home\me…`）；cargo test `piarc-config` 的 `plugins::tests::a_plugin_lists_its_components_executables_and_unsupported_parts`；第 17 步因映射到的 `CAP-PLUGIN-001`、`CAP-PLUGIN-HOOKS-001`、`CAP-PERM-RULE-001` 有场景失败，`threat-coverage.md` 与 Windows 结果不一致（连带失败） | W3 在 Windows 上修复；Windows verify 通过后关闭 T45-A02 的 Windows 部分 |
+| I202 | T45 | Windows L4（同一 run）：`t35-windows` "a main window comes back where it was after a restart" 重启后宽度 1100 变 1024（`window-state.json` 正确，runner 屏幕只有 1024 宽时窗口被收进工作区）；`t44-recovery` 的 `expect.poll` 第一次调用就抛 `Render frame was disposed`（poll 不重试抛错，应用日志只有一次重载，重载本身正常）；被 THR-13 引用的两个终端 OSC 8 用例（`t34-terminal`、`t45-xss`）在 Windows 上按设计跳过 | W3：t35 按显示器工作区取期望位置；t44 的 poll 回调捕获重载中的错误并返回 false；补两个 OSC 8 用例的 Windows 版 |
+| I203 | T45 | macOS L4（同一 run）8 处失败：`t18-sessions` "rename, pin, filter, archive and delete sessions…"（dev）、`t34-terminal` "dragging, double and triple clicks select…"（两种形态）、`t35-windows` 窗口位置（`window-state.json` 与期望不符，两种形态）、`t35-worktrees` "starts a session in its own worktree…"（两种形态）、`transcript-scroll` "release, resume and button thresholds"（dev）；`t34-terminal`、`t35-windows` 在 T45 本地 dev 形态通过，原因未逐个查（同一 run 的 `preload` OS 沙箱用例是取指标的竞争，已由 T45 修复） | R5 逐个查原因并修复；修好前 CI 的 macOS L4 作业不会绿 |
 ## 技术债
 
 评审任务（R1–R6）汇总的技术债，按影响排序。每条的细节、负责任务与检查时间点在对应的登记事项中。
@@ -1091,3 +1094,10 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 决策：ADR-0062（补充）；架构 2.56（第 10.1 节对策补充与拆行、10.2、10.5）；verify 增为 17 步；`window.piarc` 增加 `prepareDiagnostics`、`exportDiagnostics`；minimatch 中危公告进例外清单而不升级 eslint（新规则误报）；信任决定是否走原生确认（I79）交 R5 由用户经 ADR 决定
 - 登记：I06（审计已接入）、I10、I13、I24、I30、I52、I57、I170、I180 落地；I39、I64 评估后维持；I56、I79、I94、I120、I121、I123、I126、I172、I173、I175、I178 交 R5，I83 交 W3/T48，I91、I112 交 T48；新增 I196（Electron 45.4.1）、I197（`PI_OFFLINE` 遮住 Pi 的联网路径）、I198（Windows 拼写词典下载）、I199（XSS 扩展到其余设置页）、I200（T50 为 THR-09 补测试）
 - 下一项：R5（M4 评审）依赖 W3，W3 在 Windows 上进行；推送后按 CI 关闭 T45-A02。本地提交，未推送。
+
+### 2026-11-22 T45 跟进 CI（提交 7cbf259、ea69d38）
+
+- 起因：推送后 a670131 的 Dependency security 失败，原因是 T45 本地验证之后新发布的 RUSTSEC-2026-0592（`url` 2.5.8 的 `Url::origin()` 处理嵌套 `blob:` 时栈溢出，经 `piarc-web`；PiArc 没有调用 `Url::origin()`）。7cbf259 把 `url` 升到 2.5.9（`form_urlencoded` 随之升到 1.2.3）；`npm run audit:deps`、`cargo-deny check` 通过，本机 `npm run verify` 17/17 于 7cbf259
+- CI（7cbf259，run 45011543956）：Dependency security、macOS verify、两个平台的打包、core build 与 core load 通过；macOS L4、Windows L4、Windows verify 失败。映射用例里只有 `preload.e2e.ts` 的 OS 沙箱用例失败（macOS dev 形态，取指标早于渲染进程出现，返回 null），ea69d38 先等指标出现再断言 `sandboxed === true`，本机 preload 两种形态 14 项通过；其余失败来自 T35–T44 第一次上 Windows CI 与 macOS L4，登记为 I201–I203
+- 验收：T45-A02 仍为 blocked（证据写了这次 CI 的结果），T45 仍为"部分完成"；其余 12 项不变
+- 下一项：推送 ea69d38；W3 修复 I201、I202 后重跑 CI 关闭 A02，I203 交 R5
