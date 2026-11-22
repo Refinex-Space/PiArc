@@ -13,7 +13,7 @@
 | L3 行为对齐 | 同一个严格 mock 同时服务 PiArc 与真实的 `claude -p`，录制两侧的请求结构与行为轨迹，归一化后做结构化 diff | 场景 `tests/l3/scenarios/<id>.yaml`（格式 `tests/l3/schema.json`），有意偏离与排除清单 `tests/l3-allowlist.yaml`，脚本在 `scripts/l3/`；见第 14 节 | `npm run l3`（`-- --repeat 2` 检查同侧可重复）；剥离检查的单测随 `npm test` | 每晚（`.github/workflows/l3-nightly.yml`）/ 手动 | T30 |
 | L4 客户端 | Playwright 驱动 Electron 应用（开发形态与打包产物）；关键组件视觉快照；录制事件流驱动渲染进程（假 Core） | `apps/desktop/e2e/*.e2e.ts`；见第 9 节 | 先 `npm run package:desktop -- --flavor development`，再 `npm run test:e2e -w @piarc/desktop` | 每次提交（CI `desktop` 作业）/ 每晚（UI 流程） | T03、T19 |
 | 安全回归 | Markdown 与链接渲染的 XSS 载荷集、preload API 越权调用、外部导航拦截（架构第 10.3 节） | Electron 层：L4 的 `csp`、`navigation`、`external-links`、`preload`、`permissions`、`app-instance` 用例；纯函数（来源校验、外链白名单、CSP、资源路径）：`apps/desktop/src/main/**/*.test.ts`；XSS 载荷集由 T09 加入 | 纯函数部分由 `npm run verify` 运行；Electron 层同 L4 | 每次提交 | T03 起 |
-| 性能 | 架构第 11 章的预算，两个平台分别测量 | S2：`scripts/bench/s2-event-channel.mjs`；其余 T44 补充 | `npm run bench:s2`（本机，数字不在 verify 中断言）；其余 T44 补充 | 每次提交（冒烟）/ 每晚（完整） | T04、T09、T10、T44 |
+| 性能 | 架构第 11 章的预算，两个平台分别测量：PR 冒烟、Nightly 完整测量、长跑；绝对预算与相对基线两道判定 | 框架 `scripts/perf/`（指标表 `metrics.mjs`、门禁 `gate.mjs`、入口 `run.mjs`、探针 `probe-*.mjs`、长跑 `long-run.mjs`），已有基准在 `scripts/bench/` 与 `e2e/t19.bench.ts` 作为探针；基线 `scripts/perf/baselines/`；见第 15 节与 `performance.md` | `node scripts/perf/run.mjs --lane pr\|nightly\|long`；第 11 章覆盖检查与门禁单测随 `npm test` | 每次提交（冒烟，CI `desktop` 作业）/ 每晚（`perf-nightly.yml`）/ 本机（8 小时长跑） | T04、T09、T10、T44 |
 | 多服务商 | 部分 L2 场景对真实服务商运行 | 与 L2 场景共用，按标记筛选 | 手动或每晚，需要密钥与预算（第 8 节） | 每晚，可选 | R2 起 |
 
 ## 2. 质量门禁
@@ -580,3 +580,21 @@ approvals:                        # 按工具调用 id 作答；没有点名的�
 2. 写 `tests/l3/scenarios/<id>.yaml`：工具调用只用有参数映射的工具，参数用 Claude Code 的名字，路径用 `{{workspace}}`；需要询问的命令避开两边的只读白名单（`touch`、`mkdir`）；会删除文件或联网的命令不要写，Claude Code 的回答与 PiArc 不同时它会真的执行。
 3. `npm run l3 -- --filter <id> --repeat 2`：先消除不确定性，再逐条分析差异。PiArc 的偏差先写能复现的 L2 场景再修正（例如 `hooks-session-start-order`）；有意的偏离写进 allowlist 并附理由。
 4. 新工具需要参数映射时在 `scenario.mjs` 的 `PARAMETERS` 加一项，并在 `compare.test.mjs` 加往返用例。
+
+## 15. 性能测试（T44）
+
+方法、口径与实测数据在 [`performance.md`](performance.md)，这里只写分层与纪律。
+
+| 层 | 内容 | 判定 | 运行 |
+|---|---|---|---|
+| PR 冒烟 | 第 11 章中负载短、噪声小的 10 项（冷启动、工作区就绪、流式帧与长任务、会话切换、事件循环、事件转发、AHP 往返、权限裁决），每个探针 3 次取中位数 | 相对基线（托管 runner 不是基准机型，不判绝对预算） | CI `desktop` 作业：`node scripts/perf/run.mjs --lane pr --runs 3` |
+| Nightly | 除长跑外的全部指标（含内存、空闲 CPU、首 token、恢复、体积），macOS 与 Windows | 相对基线 | `perf-nightly.yml`：`--lane nightly`，之后 1 小时的缩短版长跑 |
+| 长跑 | 8 小时长会话，稳态后主进程、渲染进程、Agent Host 的内存增长 | ≤ 10%（绝对） | 本机或自托管 runner：`node scripts/perf/run.mjs --lane long --absolute` |
+| 本机实测 | 全部指标在基准机或注明配置的本机上 | 绝对预算与基线 | `node scripts/perf/run.mjs --lane nightly --absolute --machine <类别>` |
+
+纪律：
+
+- 第 11 章每一行都要有 `metrics.mjs` 中的指标或 `EXCLUDED` 里的理由（`metrics.test.mjs`）；在第 11 章加一行就要同时加测量。
+- 基线按平台与机器类别存放，只经 `--update-baseline "<原因>"` 更新，提交说明写原因与新旧值；不要为让检查通过而更新基线，也不要放宽 `floor` 或预算（预算只能收紧，放宽走 ADR）。
+- 新加的指标先在同一提交上连续跑 5 次冒烟确认没有误报，再放进 PR 流水线；噪声大的只放 Nightly。
+- 性能测试只用 mock provider，不访问真实服务商；探针在临时目录里起应用，不读本机的 PiArc 数据与 `~/.claude`。

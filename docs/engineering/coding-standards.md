@@ -319,3 +319,5 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | 节流播报 | `transcript/live-announcer.ts`（`ThrottledAnnouncer`，可注入时钟）、`transcript/LiveRegion.tsx`、`LIVE_ANNOUNCE`（`transcript/constants.ts`） | 进展至多每个间隔一次、结果立即且只一次；要播报的地方复用它，不另开 `aria-live` 区域逐条写 | T43 |
 | i18n 检查 | `scripts/ci/check-i18n.mjs`（verify 第 16 步；`readCatalog`、`catalogProblems`、`sourceProblems`） | 键集合、ICU 与占位符、复数类别、引用、硬编码文字与不带 locale 的格式化；固定文字用 `i18n-exempt:` 注释说明 | T43 |
 | 按应用语言格式化 | `apps/desktop/src/renderer/app/app-context.tsx` 的 `format.number`、`format.dateTime` | 数字与日期按应用选择的语言（不是系统语言） | T43 |
+| 性能测量框架 | `scripts/perf/metrics.mjs`（`METRICS`、`EXCLUDED`、`budgetOf`）、`gate.mjs`（`judge`、`failures`、`machineClass`、`readBaselines`）、`run.mjs`（`PROBES`） | 第 11 章每项指标的预算、探针、流水线与两道判定；新指标在 `METRICS` 加一项、新探针在 `PROBES` 加一项（或写一个输出 `{ values, samples, detail }` 的 `probe-*.mjs`），不另写一套计时与判定 | T44 |
+| 性能打点与应用驱动 | `scripts/perf/lib.mjs`（`startMock`、`seedModels`、`launchApp`、`openWorkspace`、`startSession`、`childProcesses`、`appSnapshot`、`quantile`、`stats`） | 在临时数据目录里起严格 mock 与打包产物、打开工作区与会话、读各进程与 Agent Host 的内存、分位数；性能脚本与内存测量复用它 | T44 |
