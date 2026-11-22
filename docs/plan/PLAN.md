@@ -175,7 +175,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 部分完成 | 868065b |
 | T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 部分完成 | 00b452b |
 | T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 部分完成 | a5f6146 |
-| T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 未开始 | — |
+| T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 进行中 | — |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -308,6 +308,22 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+T45（2026-11-21 开工；基线 `npm run verify -- --baseline` 全量 16 项通过于 61ac320；T44 为"部分完成"，遗留的 A04/A09 不影响本任务）：
+
+- [ ] 威胁映射 `tests/security/threats.yaml`、`scripts/ci/check-threats.mjs` 并入 verify、生成 `docs/security/threat-coverage.md`（A01、A02）
+- [ ] 注入三来源 L2 场景与关键路径删除（A03）
+- [ ] "全量恶意仓库"夹具 L2 场景（A04）
+- [ ] Electron 安全清单复核 `docs/security/electron-checklist.md`（A05）；I52 的规则与 `will-frame-navigate`
+- [ ] 依赖审计：cargo-audit、npm audit、npm 许可证、例外清单、CI 流水线、本地命令；PR 模板（A06）
+- [ ] 日志写入脱敏（tracing 层与 Agent Host stderr）；Agent Host 与 Bash 子进程环境无凭据（A07）
+- [ ] 诊断包导出：清单与脱敏摘要、确认后写出、界面与截图（A08）
+- [ ] 遥测默认关闭与外连记录、报告（A09）
+- [ ] XSS 载荷集扩充到全部渲染面（A10）
+- [ ] preload 畸形参数、"总是允许"只经原生确认（A11）
+- [ ] 发布构建上 `ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`--inspect`、`--remote-debugging-port`（I10）不生效（A12）
+- [ ] 登记事项中交给 T45 的项逐条处理或评估改派（I06、I10、I13/I24/I30、I39、I52、I56、I57、I64、I79、I83、I91、I94、I112、I120、I121、I123、I126、I170、I172、I173、I175、I178、I180）
+- [ ] 收尾：AGENTS.md、testing.md、架构与文档、验收记录、全量 verify（A13）
 
 ## 登记事项
 
