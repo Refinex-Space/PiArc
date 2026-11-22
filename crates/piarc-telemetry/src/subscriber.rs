@@ -1,6 +1,6 @@
 //! The process-wide tracing subscriber: Core's events to `core-<day>.log`, the Agent Host's
 //! stderr (target `piarc_host::agent_host`) to `agent-host-<day>.log`, both in the data
-//! directory's `logs/`.
+//! directory's `logs/`, every line redacted first ([`crate::redact`]).
 //!
 //! A process has one global subscriber. [`install`] sets it on first use and points it at a
 //! directory; later calls (another `CoreRuntime` in the same process) switch the directory.
@@ -163,8 +163,12 @@ impl Drop for EventWriter {
         if let Some(log) = &self.log
             && !self.buffer.is_empty()
         {
+            // Credentials never reach the file (T45): remembered vault values and common
+            // credential formats are replaced in every line, Core's and the Agent Host's.
+            let line = String::from_utf8_lossy(&self.buffer);
+            let redacted = crate::redact::redact(&line);
             // A log that cannot be written has nowhere to report to; stderr is the fallback.
-            if let Err(error) = log.append(&self.buffer) {
+            if let Err(error) = log.append(redacted.text.as_bytes()) {
                 eprintln!("piarc: cannot write the log file: {error}");
             }
         }

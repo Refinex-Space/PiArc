@@ -636,7 +636,11 @@ impl SecretsService {
                 *slot = Some(vault);
             }
             match slot.as_mut() {
-                Some(vault) => operation(vault),
+                Some(vault) => {
+                    let result = operation(vault);
+                    remember_values(vault);
+                    result
+                }
                 None => Err(piarc_secrets::Error::Integrity {
                     reason: "the vault was not opened",
                     key_id_matches: None,
@@ -692,6 +696,17 @@ impl Drop for WriteGuard {
                 });
             }
             GuardKind::Granted => {}
+        }
+    }
+}
+
+/// Lets the log writer and the diagnostic bundle hide every credential the vault holds (T45,
+/// `piarc_telemetry::redact`): run after each vault operation, so a value is known before any
+/// line could carry it.
+fn remember_values(vault: &Vault) {
+    for view in vault.entries() {
+        if let Ok(value) = serde_json::from_str::<Value>(view.value) {
+            piarc_telemetry::remember_secrets_in(&value);
         }
     }
 }

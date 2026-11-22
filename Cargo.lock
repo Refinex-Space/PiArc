@@ -2090,6 +2090,8 @@ dependencies = [
 name = "piarc-telemetry"
 version = "0.0.0"
 dependencies = [
+ "regex",
+ "serde_json",
  "tracing",
  "tracing-subscriber",
 ]

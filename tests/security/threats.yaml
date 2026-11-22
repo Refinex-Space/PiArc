@@ -167,11 +167,18 @@ threats:
           - rust:crates/piarc-core/tests/exec_commands.rs::the_environment_has_no_internal_variables
           - rust:crates/piarc-testkit/tests/agent_host/credentials.rs::login_and_one_refresh_reach_the_vault_and_every_session
           - vitest:agent-host/src/runtime/credentials.test.ts::reports an unavailable vault and never falls back to the environment
+          - rust:crates/piarc-testkit/tests/credential_leaks.rs::thr04_a_vault_credential_stays_out_of_child_environments_and_log_files
           - cap:CAP-EXEC-ENV-001
       - arch: 日志与诊断包自动脱敏
-        measure: 服务商回显的密钥在进入会话文件前替换
+        measure: 日志写入前替换保险箱里的凭据值、常见密钥格式、Bearer token 与 JWT（Core 与 Agent Host 的 stderr 同一处理）；服务商回显的密钥在进入会话文件前替换
         type: automated
         tests:
+          - rust:crates/piarc-telemetry/src/redact_tests.rs::thr04_remembered_credentials_are_replaced_wherever_they_appear
+          - rust:crates/piarc-telemetry/src/redact_tests.rs::thr04_provider_key_formats_are_replaced
+          - rust:crates/piarc-telemetry/src/redact_tests.rs::thr04_cloud_access_keys_are_replaced
+          - rust:crates/piarc-telemetry/src/redact_tests.rs::thr04_bearer_tokens_and_jwts_are_replaced_keeping_the_scheme
+          - rust:crates/piarc-telemetry/tests/redaction.rs::thr04_credentials_in_core_and_agent_host_lines_reach_the_files_redacted
+          - rust:crates/piarc-testkit/tests/credential_leaks.rs::thr04_a_vault_credential_stays_out_of_child_environments_and_log_files
           - vitest:agent-host/src/providers/policy.test.ts::redacts the provider key echoed by an HTTP error before the Pi session can persist it
 
   - id: THR-05
