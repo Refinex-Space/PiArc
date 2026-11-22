@@ -65,6 +65,37 @@ pub(crate) fn npm_cli(node: &Path) -> Option<PathBuf> {
         .map(piarc_git::strip_verbatim)
 }
 
+/// A clone's `.npmrc`, renamed while the bundled npm runs in the clone so that none of the
+/// package's npm settings apply, and put back afterwards (the checkout stays as fetched).
+pub(crate) struct HiddenNpmrc {
+    moved: Option<(PathBuf, PathBuf)>,
+}
+
+impl HiddenNpmrc {
+    /// Renames `<dir>/.npmrc` aside when there is one.
+    pub(crate) fn set_aside(dir: &Path) -> Result<Self> {
+        let file = dir.join(".npmrc");
+        if std::fs::symlink_metadata(&file).is_err() {
+            return Ok(Self { moved: None });
+        }
+        let aside = dir.join(".npmrc.piarc-set-aside");
+        std::fs::rename(&file, &aside)
+            .map_err(|e| failed(ErrorKind::IoError, format!("{}: {e}", file.display())))?;
+        Ok(Self {
+            moved: Some((aside, file)),
+        })
+    }
+
+    /// Puts the file back.
+    pub(crate) fn restore(self) -> Result<()> {
+        if let Some((aside, file)) = self.moved {
+            std::fs::rename(&aside, &file)
+                .map_err(|e| failed(ErrorKind::IoError, format!("{}: {e}", file.display())))?;
+        }
+        Ok(())
+    }
+}
+
 /// What one command printed.
 pub(crate) struct Captured {
     pub code: Option<i32>,

@@ -122,10 +122,11 @@ threats:
           - l4:apps/desktop/e2e/t40-plugins.e2e.ts::packages install off, turn on only after the native confirmation, and list what is unsupported
           - cap:CAP-PLUGIN-001
       - arch: 启用需确认
-        measure: 启用与更新带来的新增项需确认；npm 只经内置 npm 且不运行安装脚本
+        measure: 启用与更新带来的新增项需确认；npm 只经内置 npm，不运行安装脚本，不读包自带的 .npmrc
         type: automated
         tests:
           - rust:crates/piarc-core/src/plugins/tests.rs::npm_installs_run_the_bundled_npm_without_scripts
+          - rust:crates/piarc-core/src/plugins/tests.rs::thr03_a_cloned_packages_npmrc_cannot_choose_what_npm_runs
           - rust:crates/piarc-core/src/plugins/tests.rs::a_git_update_leaves_new_items_off_until_confirmed
           - vitest:apps/desktop/src/main/core/plugins-ipc.test.ts::answers planned confirmations and records them
           - cap:CAP-PLUGIN-HOOKS-001

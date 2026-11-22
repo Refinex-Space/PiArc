@@ -638,3 +638,106 @@ impl Drop for RemoveOnDrop {
         let _ = std::fs::remove_dir_all(&self.0);
     }
 }
+
+/// A `file://` URL of a local repository, also on Windows (`file:///C:/…`).
+fn file_url(path: &Path) -> String {
+    let text = path.display().to_string().replace('\\', "/");
+    if text.starts_with('/') {
+        format!("file://{text}")
+    } else {
+        format!("file:///{text}")
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn thr03_a_cloned_packages_npmrc_cannot_choose_what_npm_runs() {
+    // R5: npm installs a git package's dependencies in its clone, before the user confirmed
+    // anything, and reads the clone's `.npmrc`; its `git` setting names the program npm runs
+    // to fetch a git dependency. A package must not be able to run a program that way.
+    let f = Fixture::new();
+    let id = crate::sessions::new_session_id().expect("unique id");
+    let upstream = std::env::temp_dir().join(format!("pgn-{}", &id[..8]));
+    let _cleanup = RemoveOnDrop(upstream.clone());
+    std::fs::create_dir_all(&upstream).expect("upstream");
+    let marker = upstream.join("npmrc-git-ran");
+
+    // The dependency: any repository npm would fetch with git.
+    f.write("dep/package.json", r#"{"name": "dep", "version": "1.0.0"}"#);
+    let dep = f.root.join("dep");
+    git(&dep, &["init", "--quiet"]);
+    git(&dep, &["add", "."]);
+    git(&dep, &["commit", "--quiet", "-m", "dep"]);
+    let dep_bare = upstream.join("dep.git");
+    git(
+        &f.root,
+        &[
+            "clone",
+            "--quiet",
+            "--bare",
+            "dep",
+            dep_bare.to_str().expect("utf-8"),
+        ],
+    );
+
+    // The package: a git dependency and a `.npmrc` that points npm's git at its own script.
+    let script = upstream.join("fake-git.sh");
+    std::fs::write(
+        &script,
+        format!("#!/bin/sh\necho ran > '{}'\nexit 1\n", marker.display()),
+    )
+    .expect("script");
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    }
+    let repo = f.plugin("evil", "evilplug");
+    std::fs::write(
+        repo.join("package.json"),
+        serde_json::json!({
+            "name": "evilplug",
+            "version": "1.0.0",
+            "dependencies": { "dep": format!("git+{}", file_url(&dep_bare)) }
+        })
+        .to_string(),
+    )
+    .expect("package.json");
+    std::fs::write(repo.join(".npmrc"), format!("git={}\n", script.display())).expect("npmrc");
+    git(&repo, &["init", "--quiet"]);
+    git(&repo, &["add", "."]);
+    git(&repo, &["commit", "--quiet", "-m", "one"]);
+    let bare = upstream.join("evil.git");
+    git(
+        &f.root,
+        &[
+            "clone",
+            "--quiet",
+            "--bare",
+            "evil",
+            bare.to_str().expect("utf-8"),
+        ],
+    );
+
+    let installed = f
+        .manager
+        .install(f.request(PackageSourceKind::Git, &file_url(&bare), PackageScope::User))
+        .await;
+    assert!(
+        !marker.exists(),
+        "npm ran the program the package's .npmrc named"
+    );
+    // npm fetched the dependency with git as usual, and the checkout is left as fetched.
+    let installed = installed.expect("install");
+    let clone = PathBuf::from(&installed.package.path);
+    assert!(
+        clone
+            .join("node_modules")
+            .join("dep")
+            .join("package.json")
+            .is_file()
+    );
+    assert!(
+        clone.join(".npmrc").is_file(),
+        "the package's .npmrc is back"
+    );
+}

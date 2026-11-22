@@ -10,7 +10,7 @@
 |---|---|---|---|---|---|---|---|
 | THR-01 | 提示注入导致破坏性操作 | 7 | 7 | 0 | 0 | 0 | 23 |
 | THR-02 | 恶意项目配置 | 4 | 4 | 0 | 0 | 0 | 20 |
-| THR-03 | 恶意插件 / MCP server / Pi 包 | 5 | 4 | 0 | 1 | 0 | 13 |
+| THR-03 | 恶意插件 / MCP server / Pi 包 | 5 | 4 | 0 | 1 | 0 | 14 |
 | THR-04 | 凭据泄露 | 5 | 5 | 0 | 0 | 0 | 24 |
 | THR-05 | 沙箱逃逸 | 4 | 3 | 0 | 1 | 0 | 8 |
 | THR-06 | 审批疲劳与误点 | 5 | 5 | 0 | 0 | 0 | 13 |
@@ -49,7 +49,7 @@
 | 对策 | 类型 | 测试与依据 |
 |---|---|---|
 | 启用前的原生确认列出来源与每个可执行项 | 自动化 | Vitest `apps/desktop/src/main/core/plugins-ipc.test.ts` · lists the source and every executable item, with the extension note<br>L4 `apps/desktop/e2e/t40-plugins.e2e.ts` · packages install off, turn on only after the native confirmation, and list what is unsupported<br>L2 CAP-PLUGIN-001：`plugin-commands` |
-| 启用与更新带来的新增项需确认；npm 只经内置 npm 且不运行安装脚本 | 自动化 | Rust `crates/piarc-core/src/plugins/tests.rs` · npm_installs_run_the_bundled_npm_without_scripts<br>Rust `crates/piarc-core/src/plugins/tests.rs` · a_git_update_leaves_new_items_off_until_confirmed<br>Vitest `apps/desktop/src/main/core/plugins-ipc.test.ts` · answers planned confirmations and records them<br>L2 CAP-PLUGIN-HOOKS-001：`plugin-hooks` |
+| 启用与更新带来的新增项需确认；npm 只经内置 npm，不运行安装脚本，不读包自带的 .npmrc | 自动化 | Rust `crates/piarc-core/src/plugins/tests.rs` · npm_installs_run_the_bundled_npm_without_scripts<br>Rust `crates/piarc-core/src/plugins/tests.rs` · thr03_a_cloned_packages_npmrc_cannot_choose_what_npm_runs<br>Rust `crates/piarc-core/src/plugins/tests.rs` · a_git_update_leaves_new_items_off_until_confirmed<br>Vitest `apps/desktop/src/main/core/plugins-ipc.test.ts` · answers planned confirmations and records them<br>L2 CAP-PLUGIN-HOOKS-001：`plugin-hooks` |
 | Agent Host 及其子进程（MCP server、扩展、npm）只能写工作区与自己的目录（macOS） | 自动化 | Rust `crates/piarc-core/tests/agent_host_profile.rs` · the_agent_host_writes_only_its_places<br>Rust `crates/piarc-core/tests/agent_host_profile.rs` · thr03_the_agent_host_cannot_plant_code_in_pis_directory<br>Rust `crates/piarc-testkit/tests/sessions/sandbox.rs` · the_agent_host_profile_keeps_extensions_and_mcp_servers_in_their_places |
 | Windows 上 Agent Host 没有进程级隔离 | 已接受风险 | L2 CAP-SANDBOX-WINDOWS-001：`sandbox-windows-not-applied`（仅 windows）<br>理由：Windows 到 Beta 没有等价的 OS 沙箱，Agent Host 只用 Job Object 管理进程树，没有第二道防线；设置页、环境栏与配置诊断标明沙箱不生效<br>依据：ADR-0057、I180 |
 | Pi 自己设置里的包清单不由 Agent Host 安装或加载 | 自动化 | Vitest `agent-host/src/runtime/pi-settings.test.ts` · THR-03 hides every package source from Pi, so nothing installs, runs or loads<br>L2 CAP-SEC-PI-PACKAGES-001：`sec-pi-settings-packages` |

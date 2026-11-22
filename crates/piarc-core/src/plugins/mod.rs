@@ -326,12 +326,20 @@ impl PluginManager {
         }
     }
 
-    /// A clone's dependencies, through the bundled npm without scripts.
+    /// A clone's dependencies, through the bundled npm without scripts and without the
+    /// package's own npm settings.
     async fn install_dependencies(&self, dir: &Path) -> Result<Vec<String>> {
         let mut notes = scripts_note(dir);
         if fetch::has_dependencies(dir) {
-            self.run_npm(dir, Self::npm_args(&["install", "--omit=dev"], &[]))
-                .await?;
+            // npm reads the clone's `.npmrc` as project settings: its `git` names the program
+            // npm runs for a git dependency, `cache` and `prefix` where it writes, before the
+            // user confirmed anything (R5, THR-03). It is set aside while npm runs.
+            let hidden = fetch::HiddenNpmrc::set_aside(dir)?;
+            let installed = self
+                .run_npm(dir, Self::npm_args(&["install", "--omit=dev"], &[]))
+                .await;
+            hidden.restore()?;
+            installed?;
             notes.push("dependencies installed without their install scripts".to_owned());
         }
         Ok(notes)
