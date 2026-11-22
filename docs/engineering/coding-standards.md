@@ -169,7 +169,7 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 
 | 能力 | 位置 | 说明 | 登记任务 |
 |---|---|---|---|
-| 统一检查入口 | `scripts/dev/verify.mjs`（`npm run verify`） | 按顺序运行 16 个检查步骤，失败后继续，最后打印汇总表；新增检查在 `STEPS` 中追加 | T01 |
+| 统一检查入口 | `scripts/dev/verify.mjs`（`npm run verify`） | 按顺序运行 17 个检查步骤，失败后继续，最后打印汇总表；新增检查在 `STEPS` 中追加 | T01 |
 | crate 依赖方向检查 | `scripts/ci/check-crate-deps.mjs` + `crates/deps-rules.json` | 读取 `cargo metadata`，按层与例外校验 workspace crate 之间的依赖 | T01 |
 | 验收清单一致性检查 | `scripts/plan/check-acceptance.mjs` | 比对任务文件中的 `- [Txx-Ayy]` 验收项与 `docs/plan/acceptance.json` | T01 |
 | 仓库内工具安装 | `scripts/dev/install-tools.mjs` | 把锁定版本的工具（cargo-deny、ripgrep、fd、bindgen-cli）装进 `.tools/`，不做全局安装；`localToolPath()` 给出可执行文件路径 | T01 |
@@ -237,7 +237,7 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | 命令包装 | `piarc_exec::{CommandSpec::launcher, Launcher}` | 以包装程序启动 shell（`program args… <shell> -c <命令>`），沙箱与以后其他包装（例如 Windows 隔离方案）都经它，不另写命令执行 | T11 |
 | Seatbelt 配置生成 | `piarc_sandbox::{SandboxPolicy, ResolvedPolicy, PROTECTED_PATHS, SessionSandbox, CommandSandbox, platform_sandbox}`；macOS `piarc_sandbox::seatbelt::SeatbeltProfile` | 路径规范化（解析符号链接）、每条命令一份配置、路径经 `-D` 参数传入、受保护路径正则；快照 `crates/piarc-sandbox/tests/snapshots/seatbelt-profile.sbpl`。T12、T39 的 Agent Host 配置复用生成方式 | T11 |
 | 沙箱网络代理 | `piarc_sandbox::proxy::{NetworkProxy, Allowlist, Network, SystemNetwork, blocked_reason, DENIED_HEADER}`；环境 `piarc_sandbox::sandbox_env` | 本机 HTTP/`CONNECT` 代理、域名白名单、回环与云元数据拒绝；`Network` 可注入，测试用本机上游（`crates/piarc-sandbox/tests/proxy.rs`）。WebFetch 等需要出站白名单的地方复用白名单与地址检查 | T11 |
-| 沙箱会话 | `piarc_core::tool_io::{ToolIo::open_sandboxed_session, SandboxSettings}` | 会话临时目录、会话的代理、`exec/run` 自动包装与进程树终止；T39 的 Bash 沙箱模式在它之上接入 | T11 |
+| 沙箱会话 | `piarc_core::tool_io::{ToolIo::open_sandboxed_session, SandboxSettings}` | 测试用的强制沙箱会话：会话临时目录、会话的代理、`exec/run` 自动包装与进程树终止。T39 起正式会话的沙箱按调用的授权与当时的设置生成（`tool_io::sandbox` 的 `sandbox_with`、`for_call`、`sandbox_launch`），不经它 | T11 |
 | 配置层级与合并 | `piarc_config::{LayerTable, LayerSpec, Settings, write_value}`、`layers::precedence`、`schema::Shape`；Core 侧 `piarc_core::workspace_settings`（`CoreRuntime::open_settings`） | 来源 + 优先级的有序表，加层不改合并代码；标量覆盖、对象深合并、列表去重；校验带文件、JSON Pointer 与原因，无效文件跳过、重载保留上一份有效内容；只写 `.piarc/` 与用户文件（临时文件 + rename）；Core 监听文件并在 `core/settings` 发变化键。T24 的 `.claude/` 层、会话层、企业层都插到这张表里 | T13 |
 | 信任查询 | `piarc_config::project_trust`（`TrustLookup`）；Core `piarc_core::trust::TrustService`（`trust_get`、`view`、`decide`、`revoke`、`subscribe`）；主 checkout `piarc_git::resolve`；Agent Host `agent-host/src/harness/project-trust.ts`（`askCoreTrust`、`takeOverProjectTrust`） | 项目级 hooks、MCP、allow 规则、插件、Pi 扩展的唯一信任判断，任何失败都是不信任；按主 checkout 共享；`executables::enumerate` 与 `new_items` 给出可执行项与新增项；信任变化经 `restart_on_trust_change` 重启工作区的 Agent Host | T13 |
 | 审批账本 | `piarc_policy::Ledger`、Core `tool_io::policy` | Core 原子认领、取消与推送审批实体。客户端从最新的会话快照取卡片 | T20 |
@@ -321,3 +321,12 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | 按应用语言格式化 | `apps/desktop/src/renderer/app/app-context.tsx` 的 `format.number`、`format.dateTime` | 数字与日期按应用选择的语言（不是系统语言） | T43 |
 | 性能测量框架 | `scripts/perf/metrics.mjs`（`METRICS`、`EXCLUDED`、`budgetOf`）、`gate.mjs`（`judge`、`failures`、`machineClass`、`readBaselines`）、`run.mjs`（`PROBES`） | 第 11 章每项指标的预算、探针、流水线与两道判定；新指标在 `METRICS` 加一项、新探针在 `PROBES` 加一项（或写一个输出 `{ values, samples, detail }` 的 `probe-*.mjs`），不另写一套计时与判定 | T44 |
 | 性能打点与应用驱动 | `scripts/perf/lib.mjs`（`startMock`、`seedModels`、`launchApp`、`openWorkspace`、`startSession`、`childProcesses`、`appSnapshot`、`quantile`、`stats`） | 在临时数据目录里起严格 mock 与打包产物、打开工作区与会话、读各进程与 Agent Host 的内存、分位数；性能脚本与内存测量复用它 | T44 |
+| 沙箱设置的解析与只能收紧 | `piarc_config::sandbox::{resolve, loosening}`；Core `tool_io::sandbox`（`sandbox_with`、`for_call`、`sandbox_launch`、`sandbox_report`）；拒绝识别 `piarc_sandbox::denials::file_denials` | 每条命令按当时的合并设置决定是否进沙箱并生成配置；项目层的放松项被剔除；命令输出里沙箱拒绝的路径 | T39（R5 补登） |
+| 带类别的执行错误 | `piarc_exec::Error`（`kind()`、`retryable()`），Core `error::exec_error_object` | `TaskLog`、`TerminalTree`、`CwdProbe` 的错误带 `ENOENT` 等代码经 AHP 送出；新的执行路径返回它，不返回裸 `io::Result` | T39（R5 补登） |
+| 用量计价 | `piarc_core::usage`（`Pricing`、`PriceBook`、`report`）；共享向量 `tests/usage/cost-vectors.json` | 整数皮美元、分档与缓存写入的规则同 pi-ai `calculateCost`；没有价格为 `None`（界面"未知"） | T41（R5 补登） |
+| notebook 的 cell 编辑 | `piarc_fs::notebook`（`edit`、`new_cell_id`）与 `agent-host/src/tools/notebook-text.ts` | 同一算法的两份实现，跑 `tests/notebook/cases.json` 共享向量；改一边同步另一边 | T42（R5 补登） |
+| 通知可放行的请求 | Core `tool_io/policy/notify.rs`（`notificationAllow`） | 只放行短单行命令与小改动；主进程按它决定通知按钮，不自己判断风险 | T42（R5 补登） |
+| 日志与诊断包的脱敏 | `piarc_telemetry::redact`（`redact`、`remember_secrets_in`、`redact_home`）、`piarc_telemetry::BundleInput` | 日志写入时替换保险箱的值与常见密钥格式；诊断包只经 `BundleInput` 加内容 | T45（R5 补登） |
+| 双向控制字符的显示 | `apps/desktop/src/renderer/transcript/reveal.ts`（`revealBidi`） | 审批卡、diff、路径与代码把双向控制字符显示为 `[U+XXXX]`；新的显示外部文本的地方复用它 | T45（R5 补登） |
+| 威胁映射与依赖审计 | `scripts/lib/threats.mjs`、`scripts/ci/check-threats.mjs`；`scripts/lib/audit.mjs`、`scripts/ci/audit-deps.mjs` | 第 10.1 节对策与测试的对照；依赖公告与许可证的例外清单 | T45（R5 补登） |
+| Windows 的 `\\?\` 去前缀 | `piarc_git::strip_verbatim`（`piarc-core` 用它）；`piarc-config` 的 `plugins/manifest.rs` `real_path`（功能 crate 不能依赖 `piarc-git`，有意的副本） | 交给 cmd、git、Node 之前去掉 `\\?\`（UNC 还原为 `\\host\share`）；`piarc-core/src/sessions/mod.rs` 的副本语义不同，登记 I175 | W3（R5 补登） |

@@ -261,7 +261,7 @@ export const METRICS = [
     budget: 5,
     lanes: ['nightly'],
     floor: 0.5,
-    how: 'full path p95 − direct PTY write p95, ≥ 200 pairs',
+    how: 'full path p95 − direct PTY write p95, 1,000 pairs',
   },
   {
     id: 'installer-size',

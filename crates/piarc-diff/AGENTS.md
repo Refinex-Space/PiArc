@@ -23,4 +23,4 @@
 ## 易错点
 
 - similar 3 需要 `std` 特性才有 `timeout`/`deadline`（工作区依赖已开）。
-- 词级 diff 与 UTF-16 偏移还没有：T28 的 Changes 面板按行显示、按 hunk 丢弃，没有用到它们；需要的任务（如 T42 行内评论）在这里补，不在渲染进程里另算。
+- 词级 diff 与 UTF-16 偏移还没有：T28 的 Changes 面板按行显示、按 hunk 丢弃，T42 的行内评论按行号范围与摘录在渲染进程定位（`apps/desktop/src/renderer/changes/comments.ts`），都没有用到它们。
