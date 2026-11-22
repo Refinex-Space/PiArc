@@ -27,7 +27,7 @@ expect:
   requests:
     - {
         index: 0,
-        user_message_contains: ['Say hello to Ada using the notes in', 'pkgs/demo/notes.'],
+        user_message_contains: ['Say hello to Ada using the notes in', 'demo/notes.'],
       }
     - { index: 0, not_contains: ['${CLAUDE_PLUGIN_ROOT}'] }
     - { index: 1, last_user_text: Project hello. }

@@ -22,4 +22,4 @@ expect:
     - { index: 0, contains: ['demo:review', 'Reviews a change with the demo checklist'] }
     - index: 1
       tool_results:
-        - { id: load, is_error: false, contains: 'pkgs/demo/checklist.md for the parser.' }
+        - { id: load, is_error: false, contains: 'demo/checklist.md for the parser.' }

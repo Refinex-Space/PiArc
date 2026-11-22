@@ -22,4 +22,4 @@ expect:
   requests:
     - { index: 0, tools_include: [mcp__plugin_demo_echo__echo] }
     - index: 1
-      tool_results: [{ id: e1, is_error: false, contains: 'pkgs/demo echoes "hi"' }]
+      tool_results: [{ id: e1, is_error: false, contains: 'demo echoes "hi"' }]

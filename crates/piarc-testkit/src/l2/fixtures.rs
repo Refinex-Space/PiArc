@@ -100,16 +100,24 @@ pub(super) fn prepare_workspace(
         write_file(root, path, &fill_paths(spec, content, workspace, mcp_urls))?;
     }
     if spec.workspace.git {
-        let result = Command::new("git")
-            .args(["init", "--quiet", "--template="])
-            .current_dir(workspace)
-            .output()
-            .map_err(|e| format!("git init: {e}"))?;
-        if !result.status.success() {
-            return Err(format!(
-                "git init failed: {}",
-                String::from_utf8_lossy(&result.stderr)
-            ));
+        // Byte-exact checkouts whatever the machine's git says: Git for Windows sets
+        // `core.autocrlf=true` system-wide, which would give worktrees CRLF files (W3).
+        for args in [
+            &["init", "--quiet", "--template="][..],
+            &["config", "core.autocrlf", "false"][..],
+        ] {
+            let result = Command::new("git")
+                .args(args)
+                .current_dir(workspace)
+                .output()
+                .map_err(|e| format!("git {}: {e}", args[0]))?;
+            if !result.status.success() {
+                return Err(format!(
+                    "git {} failed: {}",
+                    args[0],
+                    String::from_utf8_lossy(&result.stderr)
+                ));
+            }
         }
     }
     for (path, content) in &spec.workspace.files {
@@ -181,8 +189,21 @@ fn fill_paths(
         .join("testkit")
         .join("src")
         .join("mcp-echo-server.ts");
-    let echo = std::fs::canonicalize(&echo).unwrap_or(echo);
+    let echo = canonical(&echo);
     content.replace(MCP_ECHO_PLACEHOLDER, &json_path(&echo))
+}
+
+/// The spelling of an existing `path` as Core reports it: links resolved, without the verbatim
+/// `\\?\` prefix `canonicalize` adds on Windows (Node cannot run such a path either). A path
+/// that cannot be resolved is returned as it is.
+pub(crate) fn canonical(path: &Path) -> PathBuf {
+    let Ok(real) = std::fs::canonicalize(path) else {
+        return path.to_path_buf();
+    };
+    match real.to_str().and_then(|text| text.strip_prefix(r"\\?\")) {
+        Some(plain) if plain.as_bytes().get(1) == Some(&b':') => PathBuf::from(plain),
+        _ => real,
+    }
 }
 
 /// Commits the workspace's files with a fixed identity, then creates `branches` there (T35).

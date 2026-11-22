@@ -176,11 +176,27 @@ impl Drop for Fixture {
         }
         self.storage.close();
         let removed = std::fs::remove_dir_all(&self.root);
-        // A failed test may leave a call holding the directory: a second panic here would
-        // abort the whole test binary and hide every other result (W2).
-        if !std::thread::panicking() {
-            removed.expect("remove test data");
+        if removed.is_ok() || !cfg!(windows) {
+            // A failed test may leave a call holding the directory: a second panic here would
+            // abort the whole test binary and hide every other result (W2).
+            if !std::thread::panicking() {
+                removed.expect("remove test data");
+            }
+            return;
         }
+        // Windows does not delete what a handle still holds (ADR-0036's directory handles): a
+        // task of this test's runtime may still own one, and it can only finish once this
+        // drop returns, so the removal is retried from another thread (W3).
+        let root = self.root.clone();
+        std::thread::spawn(move || {
+            for _ in 0..50 {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                if std::fs::remove_dir_all(&root).is_ok() || !root.exists() {
+                    return;
+                }
+            }
+            eprintln!("LEFT {}", root.display());
+        });
     }
 }
 

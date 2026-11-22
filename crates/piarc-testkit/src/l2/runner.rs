@@ -130,6 +130,20 @@ fn failure(kind: &'static str, message: impl Into<String>) -> Failure {
     }
 }
 
+/// The directory scenario roots go in. Skills, commands and agent definitions are read from the
+/// workspace upward, skipping only the (injected) home: a root inside the real user's home
+/// would load that user's `~/.claude/skills` and `~/.agents/skills` as project files. Windows
+/// keeps the temporary directory inside the home, so there the roots go in `%PUBLIC%`, which
+/// every user can write and which is in no home and no repository (W3).
+fn scenario_base() -> PathBuf {
+    let temp = std::env::temp_dir();
+    let inside_home = std::env::home_dir().is_some_and(|home| temp.starts_with(home));
+    match std::env::var_os("PUBLIC") {
+        Some(public) if inside_home => PathBuf::from(public),
+        _ => temp,
+    }
+}
+
 /// Runs `spec` on its own tokio runtime.
 #[must_use]
 pub fn run(spec: &ScenarioSpec, config: &RunnerConfig) -> RunOutcome {
@@ -141,7 +155,7 @@ pub fn run(spec: &ScenarioSpec, config: &RunnerConfig) -> RunOutcome {
 fn run_with(spec: &ScenarioSpec, config: &RunnerConfig, mode: Mode) -> (RunOutcome, Option<Value>) {
     static RUNS: AtomicU64 = AtomicU64::new(0);
     let run = RUNS.fetch_add(1, Ordering::Relaxed);
-    let root = std::env::temp_dir().join(format!(
+    let root = scenario_base().join(format!(
         "piarc l2 {} 中文 {}-{run}",
         spec.id,
         std::process::id()
