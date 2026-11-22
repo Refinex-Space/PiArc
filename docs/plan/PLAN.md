@@ -177,7 +177,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 部分完成 | a5f6146 |
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 部分完成 | f7b05b7 |
-| T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 阻塞（等待用户确认设计增补） | — |
+| T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
 | T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -311,7 +311,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 T46（Auto 模式，审查模型），2026-11-22 开工。基线 `npm run verify -- --baseline` 全量 16/17：第 8 步只有 I185 登记的 `piarc-core --test state` 设置监听用例在负载下超时，单独重跑通过；R5 遗留（性能三行、CI 待推送）不影响本任务。
 
-- [x] 设计增补 `docs/architecture/addenda/T46-auto-mode.md`（七节 + 需要确认的要点），提交后停在设计关口（A01 记为 blocked，等用户确认第 9 节的 12 个要点）
+- [x] 设计增补 `docs/architecture/addenda/T46-auto-mode.md`（七节 + 需要确认的要点）；2026-11-22 用户确认第 9 节 12 个要点全部按推荐，A01 passing，进入实现
 - [ ] piarc-policy 的 auto 判定步骤、审批账本"审查中"、失败归一与连续拒绝回退（A02、A03、A04、A07）
 - [ ] 审查调用：Core → Agent Host 的审查请求、辅助模型通道、单一文件的审查提示词、Core 侧再校验（A06、A12）
 - [ ] 设置：用户级启用（二次确认）、审查模型（能力门槛）、自定义策略与可信基础设施；项目级忽略并进配置诊断（A05）
