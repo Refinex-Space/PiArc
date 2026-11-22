@@ -71,6 +71,24 @@ export function capabilities(model: Model<Api>): CatalogModel {
   };
 }
 
+/** The Auto mode reviewer bar (T46, design addendum section 2.5). */
+export const REVIEWER_BAR = { contextWindow: 64_000, maxOutput: 1_024 } as const;
+
+/** Whether a catalog entry (with the user's settings applied) may review Auto mode calls:
+ * schema-constrained tool arguments, room for the review input and the answer. */
+export function meetsReviewerBar(entry: CatalogModel): boolean {
+  return (
+    entry.toolReliability === 'verified' &&
+    entry.contextWindow >= REVIEWER_BAR.contextWindow &&
+    entry.maxOutput >= REVIEWER_BAR.maxOutput
+  );
+}
+
+/** `entry` marked as a possible reviewer when it meets the bar. */
+export function withReviewer(entry: CatalogModel): CatalogModel {
+  return meetsReviewerBar(entry) ? { ...entry, reviewer: true } : entry;
+}
+
 /**
  * The catalog's prices for usage costs (T41). A model whose rates are all zero (custom
  * endpoints, local servers) or that a credit plan prices outside the catalog has none: its

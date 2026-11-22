@@ -113,6 +113,9 @@ pub struct CoreConfig {
     /// The Bash sandbox's platform, proxy network, enterprise values and approval timeout
     /// (T39); tests point the proxy at local servers and stand in for the enterprise.
     pub sandbox: crate::tool_io::SandboxConfig,
+    /// How long an Auto mode review may take (T46): `piarc_policy::review::REVIEW_TIMEOUT`,
+    /// not a setting; L2's fault injection shortens it.
+    pub review_timeout: Duration,
 }
 
 /// A credential store for the vault's master key and the key's name in it.
@@ -150,6 +153,7 @@ impl Default for CoreConfig {
             tasks: crate::tasks::TasksConfig::default(),
             worktrees: crate::worktrees::WorktreeConfig::default(),
             sandbox: crate::tool_io::SandboxConfig::default(),
+            review_timeout: piarc_policy::review::REVIEW_TIMEOUT,
         }
     }
 }
@@ -662,6 +666,7 @@ fn open_state(
     });
     tasks.set_outlet(sessions.task_outlet());
     sessions.connect_hooks();
+    sessions.connect_reviews();
     terminals.attach(data, tasks.clone());
     {
         let _entered = handle.enter();
@@ -711,6 +716,7 @@ fn state_tool_io(
             config.hooks,
             crate::tool_io::hook_condition,
         )),
+        review: crate::tool_io::policy::review::ReviewConfig::with_timeout(config.review_timeout),
     })
 }
 

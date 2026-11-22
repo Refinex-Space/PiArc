@@ -62,6 +62,7 @@ pub(super) async fn ask(a: &Ask<'_>) -> bool {
         sandbox: Some(CommandPlace::Sandbox),
         domain: Some(a.host.to_owned()),
         notification_allow: false,
+        review: None,
     };
     let (tx, rx) = oneshot::channel();
     if !post_network_card(a.s, a.services, &card, tx) {

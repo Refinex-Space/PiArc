@@ -26,6 +26,7 @@ pub(super) fn new_request(
         sandbox: None,
         domain: None,
         notification_allow: false,
+        review: None,
     })
 }
 

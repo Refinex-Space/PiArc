@@ -34,6 +34,7 @@ pub fn export_schema() -> Vec<(&'static str, Value)> {
     generator.subschema_for::<crate::policy::ApprovalAnswer>();
     generator.subschema_for::<crate::policy::AnswerStatus>();
     generator.subschema_for::<crate::policy::PermissionMode>();
+    generator.subschema_for::<crate::policy::AutoReviewStatus>();
     generator.subschema_for::<crate::memory::MemorySnapshot>();
     generator.subschema_for::<crate::checkpoint::RewindPreview>();
     generator.subschema_for::<crate::checkpoint::RewindRequest>();

@@ -11,6 +11,7 @@ import {
   supportedEffort,
   supportedEfforts,
   switchPreview,
+  withReviewer,
 } from '../providers/catalog.js';
 import { AhpError } from '../protocol/errors.js';
 import { loginProviders } from '../providers/login.js';
@@ -27,7 +28,7 @@ export async function listModels(
     return provider?.auth.apiKey ? [{ id, name: provider.name }] : [];
   });
   const models = (await runtime.getAvailable()).map((m) =>
-    workspace.preferences.apply(capabilities(m)),
+    withReviewer(workspace.preferences.apply(capabilities(m))),
   );
   const model = session?.model;
   return {

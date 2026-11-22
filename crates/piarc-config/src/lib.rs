@@ -39,6 +39,7 @@
 //! `scripts/ci/check-crate-deps.mjs` (architecture section 7.1).
 
 pub mod agents;
+pub mod auto_mode;
 pub mod claude;
 pub mod diagnostics;
 pub mod executables;

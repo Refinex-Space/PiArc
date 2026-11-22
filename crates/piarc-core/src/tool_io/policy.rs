@@ -30,6 +30,8 @@ pub(crate) struct Services {
     pub snapshots: Snapshots,
     /// Runs hooks; `None` runs none (tests of the ladder alone).
     pub hooks: Option<crate::hooks::HooksService>,
+    /// Auto mode's review limit and outlet (T46).
+    pub review: review::ReviewConfig,
 }
 
 struct Pending {
@@ -54,6 +56,7 @@ mod prepare;
 mod preview;
 mod questions;
 mod reasons;
+pub(crate) mod review;
 mod waits;
 use prepare::{new_request, path_boundary, prepare};
 use reasons::{
@@ -91,6 +94,9 @@ pub(super) struct State {
     generation: CancellationToken,
     memory_epoch: CancellationToken,
     memory_scan: Option<(Option<String>, CancellationToken)>,
+    /// Auto mode (T46): the reviewer's refusals and availability (a main session's apply to
+    /// its subagents).
+    auto: review::AutoState,
 }
 
 #[derive(Clone, Copy)]
@@ -127,6 +133,7 @@ impl State {
             id.to_owned(),
             self.mode,
             self.ledger.pending().cloned().collect(),
+            self.auto.status(self.mode),
         ));
     }
 
@@ -379,6 +386,14 @@ impl ToolIo {
                 .pending()
                 .find(|r| r.request_id == answer.request_id)
             {
+                // The reviewer is deciding the card (T46): no answer is taken.
+                if request
+                    .review
+                    .as_ref()
+                    .is_some_and(|r| r.state == piarc_protocol::policy::ReviewState::Reviewing)
+                {
+                    return Ok(json!({"status": AnswerStatus::Stale}));
+                }
                 match request.kind {
                     ApprovalKind::Question => questions::check_answer(request, &answer)?,
                     ApprovalKind::Plan => plan::check_answer(request, &answer)?,
@@ -437,6 +452,7 @@ impl ToolIo {
         super::subagents::prepare_call(s, p)?;
         let generation = inputs::begin(s, p, peer).await?;
         let settings = session_settings(services, s).await?;
+        self.check_auto_mode(s, services, &settings, p).await?;
         let (hook_token, _hook_guard) = super::hooks::linked(peer, Some(&generation));
         let pre = self
             .pre_tool_use(s, p, &settings, peer, hook_token.clone())
@@ -463,12 +479,17 @@ impl ToolIo {
                 .permission_step(&step, p, &mut prepared, ruling, &mut updated, &mut stop)
                 .await?;
         }
-        let choice = if ruling.outcome == Outcome::Ask {
-            self.ask_user(s, services, p, &mut prepared, peer, &generation)
-                .await?
-        } else {
-            None
+        let call = review::Call {
+            s,
+            services,
+            settings: &settings,
+            p,
+            peer,
+            generation: &generation,
         };
+        let (choice, review) = self
+            .question(&call, mode, &mut prepared, &mut ruling)
+            .await?;
         let (answer, ack) = choice.unzip();
         let reason = refusal_of(
             answer.as_ref(),
@@ -486,14 +507,11 @@ impl ToolIo {
         let mut result = PolicyEvaluateResult {
             allowed,
             reason,
-            updated_input: (allowed && updated).then(|| {
-                let mut input = p.input.clone();
-                input.remove("readPathCandidates");
-                input
-            }),
+            updated_input: (allowed && updated).then(|| call_input(p)),
             context: pre.context,
             stop: stop.map(|reason| piarc_protocol::hooks::HookStop { reason }),
             mode: None,
+            review,
         };
         let source = audit_source(answer.as_ref(), ruling.step);
         let mut detail = audit_detail(p, mode, &ruling, &prepared.card, result.allowed, source);
@@ -510,6 +528,64 @@ impl ToolIo {
             result.mode = Some(switch.mode);
         }
         to_value(&result)
+    }
+
+    /// A call that asks (nothing otherwise): in Auto mode the reviewer answers the general
+    /// question (T46),
+    /// otherwise, or when it hands the card back, the user does. Returns the user's answer and
+    /// the reviewer's decision; `ruling` becomes the reviewer's when it decided.
+    async fn question(
+        &self,
+        call: &review::Call<'_>,
+        mode: PermissionMode,
+        prepared: &mut Prepared,
+        ruling: &mut Ruling,
+    ) -> Result<
+        (
+            Option<waits::Answered>,
+            Option<piarc_protocol::policy::ToolReview>,
+        ),
+        ErrorObject,
+    > {
+        if ruling.outcome != Outcome::Ask {
+            return Ok((None, None));
+        }
+        let (answer, note) =
+            if mode == PermissionMode::Auto && piarc_policy::review::reviewable(ruling) {
+                match self.auto_review(call, prepared).await? {
+                    review::Reviewed::Allow(note) => {
+                        *ruling = reviewed(Outcome::Allow, None);
+                        (None, Some(note))
+                    }
+                    review::Reviewed::Deny(note, reason) => {
+                        *ruling = reviewed(Outcome::Deny, Some(reason));
+                        (None, Some(note))
+                    }
+                    review::Reviewed::User(answer) => (answer, None),
+                }
+            } else {
+                let review::Call {
+                    s,
+                    services,
+                    p,
+                    peer,
+                    generation,
+                    ..
+                } = *call;
+                let answer = self
+                    .ask_user(s, services, p, prepared, peer, generation)
+                    .await?;
+                (answer, None)
+            };
+        if answer
+            .as_ref()
+            .is_some_and(|(a, _)| a.decision != ApprovalDecision::Deny)
+        {
+            // The user allowed a call: the reviewer's run of refusals ends and a pause lifts.
+            let root = super::subagents::rule_owner(call.s);
+            lock(&root.policy).auto.resume();
+        }
+        Ok((answer, note))
     }
 
     /// Shows the card (with its preview) and waits for the user's answer.
@@ -757,8 +833,15 @@ impl Prepared {
     }
 }
 
+/// The arguments the call runs with, without the Agent Host's internal fields.
+fn call_input(p: &PolicyEvaluateParams) -> serde_json::Map<String, Value> {
+    let mut input = p.input.clone();
+    input.remove("readPathCandidates");
+    input
+}
+
 /// Who decided a call, for the audit: the user (on the card or, T42, from a notification), a
-/// hook, or the rules.
+/// hook, the Auto mode reviewer (T46), or the rules.
 fn audit_source(answer: Option<&ApprovalAnswer>, step: &str) -> &'static str {
     match (answer, step) {
         (Some(a), _) if a.via == Some(piarc_protocol::policy::AnswerVia::Notification) => {
@@ -766,7 +849,18 @@ fn audit_source(answer: Option<&ApprovalAnswer>, step: &str) -> &'static str {
         }
         (Some(_), _) => "user",
         (None, "hookDeny" | "hookAllow" | "permissionRequestHook") => "hook",
+        (None, "autoReview") => "reviewer",
         _ => "automatic",
+    }
+}
+
+/// The ruling the Auto mode reviewer made (T46): allowed this once, or refused with `reason`.
+fn reviewed(outcome: Outcome, reason: Option<String>) -> Ruling {
+    Ruling {
+        outcome,
+        step: "autoReview",
+        hits: Vec::new(),
+        reason,
     }
 }
 

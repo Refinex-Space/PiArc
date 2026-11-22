@@ -112,7 +112,7 @@ fn ruling_reason(ruling: &Ruling) -> String {
     match ruling.step {
         "planMode" => piarc_policy::PLAN_MODE_REFUSAL.to_owned(),
         "notInPlanMode" => piarc_policy::NOT_IN_PLAN_MODE.to_owned(),
-        "hookDeny" | "permissionRequestHook" => ruling
+        "hookDeny" | "permissionRequestHook" | "autoReview" => ruling
             .reason
             .clone()
             .unwrap_or_else(|| "Permission denied by a hook.".to_owned()),

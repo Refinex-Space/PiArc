@@ -188,6 +188,7 @@ mod tests {
             sandbox: None,
             domain: None,
             notification_allow: false,
+            review: None,
         }
     }
 

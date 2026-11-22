@@ -77,12 +77,14 @@ pub(crate) struct AgentWorktree {
 }
 
 /// Strictness of a mode: a subagent's mode may only be as strict or stricter.
+/// Auto mode (T46) runs everything Accept edits runs and more, below bypass.
 fn rank(mode: PermissionMode) -> u8 {
     match mode {
         PermissionMode::BypassPermissions => 0,
-        PermissionMode::AcceptEdits => 1,
-        PermissionMode::Default => 2,
-        PermissionMode::Plan => 3,
+        PermissionMode::Auto => 1,
+        PermissionMode::AcceptEdits => 2,
+        PermissionMode::Default => 3,
+        PermissionMode::Plan => 4,
     }
 }
 
@@ -96,6 +98,13 @@ pub(crate) fn stricter(a: PermissionMode, b: PermissionMode) -> PermissionMode {
 pub(super) fn effective_mode(link: &Link) -> PermissionMode {
     let root = lock(&link.root.policy).mode();
     link.mode.map_or(root, |mode| stricter(mode, root))
+}
+
+/// The mode session `s`'s calls are decided in now: a subagent's follows its main session.
+pub(super) fn current_mode(s: &SessionIo) -> PermissionMode {
+    s.subagent
+        .as_ref()
+        .map_or_else(|| lock(&s.policy).mode(), effective_mode)
 }
 
 /// Before a subagent's call is decided: its mode follows the main session's, and the call's
@@ -666,6 +675,7 @@ fn mode_name(mode: PermissionMode) -> &'static str {
         PermissionMode::AcceptEdits => "acceptEdits",
         PermissionMode::Plan => "plan",
         PermissionMode::BypassPermissions => "bypassPermissions",
+        PermissionMode::Auto => "auto",
     }
 }
 

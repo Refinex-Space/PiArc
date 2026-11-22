@@ -626,6 +626,17 @@
           "description": "Opaque identifier allocated by Core.",
           "type": "string"
         },
+        "review": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ApprovalReview"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Auto mode (T46): the reviewer model is deciding the call (no answers are taken), or the\ncard came back to the user and why."
+        },
         "revision": {
           "description": "Revision of this request.",
           "format": "uint64",
@@ -671,6 +682,36 @@
         }
       },
       "required": ["requestId", "sessionId", "revision", "connectionEpoch", "tool", "kind"],
+      "type": "object"
+    },
+    "ApprovalReview": {
+      "description": "The reviewer's part in a card (T46).",
+      "properties": {
+        "fallback": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewFallback"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why the card is the user's to answer (`fallback` only)."
+        },
+        "model": {
+          "description": "`provider/model` of the reviewer, when one is set.",
+          "type": ["string", "null"]
+        },
+        "reason": {
+          "description": "The reviewer's reason when it was unsure, or what went wrong (truncated).",
+          "type": ["string", "null"]
+        },
+        "state": {
+          "$ref": "#/$defs/ReviewState",
+          "description": "Reviewing, or back with the user."
+        }
+      },
+      "required": ["state"],
       "type": "object"
     },
     "AttachmentKind": {
@@ -722,6 +763,92 @@
           "type": "string"
         }
       ]
+    },
+    "AutoReviewReason": {
+      "description": "The detail of [`AutoReviewStatus`] (T46).",
+      "oneOf": [
+        {
+          "const": "noModel",
+          "description": "`autoMode.model` is not set.",
+          "type": "string"
+        },
+        {
+          "const": "unknownModel",
+          "description": "The model is not in the catalog, or the provider has no credentials.",
+          "type": "string"
+        },
+        {
+          "const": "belowBar",
+          "description": "The model does not meet the reviewer bar.",
+          "type": "string"
+        },
+        {
+          "const": "hostDown",
+          "description": "The workspace's Agent Host is not running.",
+          "type": "string"
+        },
+        {
+          "const": "disabled",
+          "description": "The settings turned Auto mode off while the session was in it (it continues in Manual\nmode).",
+          "type": "string"
+        },
+        {
+          "const": "consecutive",
+          "description": "Paused after consecutive refusals.",
+          "type": "string"
+        },
+        {
+          "const": "total",
+          "description": "Paused after the session's total of refusals.",
+          "type": "string"
+        }
+      ]
+    },
+    "AutoReviewState": {
+      "description": "Whether review works in an Auto mode session (T46).",
+      "oneOf": [
+        {
+          "const": "ready",
+          "description": "Calls that would ask go to the reviewer.",
+          "type": "string"
+        },
+        {
+          "const": "unavailable",
+          "description": "They go to the user: the reviewer cannot be used.",
+          "type": "string"
+        },
+        {
+          "const": "paused",
+          "description": "They go to the user until the user allows one or selects Auto mode again.",
+          "type": "string"
+        }
+      ]
+    },
+    "AutoReviewStatus": {
+      "description": "The Auto mode state the session list shows (T46): absent unless the session is in Auto\nmode.",
+      "properties": {
+        "model": {
+          "description": "`provider/model` of the reviewer, when one is set.",
+          "type": ["string", "null"]
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AutoReviewReason"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why the reviewer is unavailable, or how review was paused."
+        },
+        "state": {
+          "$ref": "#/$defs/AutoReviewState",
+          "description": "Ready, unavailable or paused."
+        }
+      },
+      "required": ["state"],
+      "type": "object"
     },
     "AuxiliaryUsage": {
       "description": "Usage of a kind of auxiliary call (WebFetch extraction, native web search, `prompt` hooks).",
@@ -1025,6 +1152,10 @@
         "provider": {
           "description": "Provider id.",
           "type": "string"
+        },
+        "reviewer": {
+          "description": "Meets the Auto mode reviewer bar (T46): verified tool calls, a context window of at\nleast 64,000 tokens and output of at least 1,024.",
+          "type": "boolean"
         },
         "toolProfile": {
           "anyOf": [
@@ -4039,6 +4170,21 @@
       "required": ["sessionId", "since"],
       "type": "object"
     },
+    "GitRemote": {
+      "description": "A git remote as the review shows it (T46).",
+      "properties": {
+        "name": {
+          "description": "The remote's name.",
+          "type": "string"
+        },
+        "url": {
+          "description": "Its fetch URL without user information.",
+          "type": "string"
+        }
+      },
+      "required": ["name", "url"],
+      "type": "object"
+    },
     "GrepLine": {
       "description": "One line of grep output: a match or a context line.",
       "properties": {
@@ -5134,6 +5280,17 @@
               "description": "The output the model sees: so far in `item/updated`, final in `item/completed`.",
               "type": ["string", "null"]
             },
+            "review": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ToolReview"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The reviewer model decided the call in Auto mode (T46)."
+            },
             "status": {
               "$ref": "#/$defs/ItemStatus",
               "description": "Lifecycle state."
@@ -5181,6 +5338,17 @@
               "description": "The file, as the model named it.",
               "type": "string"
             },
+            "review": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ToolReview"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The reviewer model decided the call in Auto mode (T46)."
+            },
             "status": {
               "$ref": "#/$defs/ItemStatus",
               "description": "Lifecycle state."
@@ -5212,6 +5380,17 @@
             "output": {
               "description": "The text the tool returned, in `item/completed`.",
               "type": ["string", "null"]
+            },
+            "review": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ToolReview"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The reviewer model decided the call in Auto mode (T46)."
             },
             "server": {
               "description": "The MCP server's name.",
@@ -5257,6 +5436,17 @@
               "description": "The subagent's final answer, in `item/completed`.",
               "type": ["string", "null"]
             },
+            "review": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ToolReview"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The reviewer model decided the call in Auto mode (T46)."
+            },
             "status": {
               "$ref": "#/$defs/ItemStatus",
               "description": "Lifecycle state."
@@ -5299,6 +5489,17 @@
             "output": {
               "description": "The text the tool returned, in `item/completed`.",
               "type": ["string", "null"]
+            },
+            "review": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ToolReview"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The reviewer model decided the call in Auto mode (T46)."
             },
             "status": {
               "$ref": "#/$defs/ItemStatus",
@@ -5344,6 +5545,17 @@
               "description": "The search terms.",
               "type": "string"
             },
+            "review": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ToolReview"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The reviewer model decided the call in Auto mode (T46)."
+            },
             "sources": {
               "description": "The results, in `item/completed`.",
               "items": {
@@ -5382,6 +5594,17 @@
             "output": {
               "description": "The text the tool returned, in `item/completed`.",
               "type": ["string", "null"]
+            },
+            "review": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ToolReview"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The reviewer model decided the call in Auto mode (T46)."
             },
             "status": {
               "$ref": "#/$defs/ItemStatus",
@@ -7804,7 +8027,7 @@
       "type": "object"
     },
     "PermissionMode": {
-      "description": "Permission modes (architecture section 6.2.1). `auto` (M5) and `dontAsk` (headless) are\nnot available.",
+      "description": "Permission modes (architecture section 6.2.1). `dontAsk` (headless) is not available.",
       "oneOf": [
         {
           "const": "default",
@@ -7824,6 +8047,11 @@
         {
           "const": "bypassPermissions",
           "description": "Run everything except what deny and ask rules, critical deletions and questions stop.\nAvailable after the user enables it in settings and confirms the switch.",
+          "type": "string"
+        },
+        {
+          "const": "auto",
+          "description": "Auto review (T46): Accept edits' defaults, and the reviewer model answers the calls that\nwould otherwise ask the user in general; the rest still ask. Available after the user\nenables it in their own settings (`permissions.enableAutoMode`).",
           "type": "string"
         }
       ]
@@ -8105,6 +8333,17 @@
           "description": "Reason visible to the model, including feedback on refusal.",
           "type": ["string", "null"]
         },
+        "review": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolReview"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The reviewer model decided the call in Auto mode (T46): the Agent Host records it on\nthe branch (`piarc.autoReview`) and the call's item shows it."
+        },
         "stop": {
           "anyOf": [
             {
@@ -8285,6 +8524,162 @@
         "reason": {
           "description": "The error result the restored conversation must give the model.",
           "type": ["string", "null"]
+        }
+      },
+      "type": "object"
+    },
+    "PolicyReviewParams": {
+      "description": "Parameters of `policy/review`.",
+      "properties": {
+        "environment": {
+          "$ref": "#/$defs/ReviewEnvironment",
+          "description": "The session's surroundings."
+        },
+        "input": {
+          "additionalProperties": true,
+          "description": "The arguments the call would run with (after hooks).",
+          "type": "object"
+        },
+        "model": {
+          "$ref": "#/$defs/ModelRef",
+          "description": "The reviewer model."
+        },
+        "policy": {
+          "$ref": "#/$defs/ReviewPolicy",
+          "description": "The user's review policy."
+        },
+        "sessionId": {
+          "description": "The session whose call it is (a subagent's own session).",
+          "type": "string"
+        },
+        "timeoutMs": {
+          "description": "The review's time limit; the model call ends with it.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tool": {
+          "description": "Canonical tool name.",
+          "type": "string"
+        },
+        "toolCallId": {
+          "description": "The call.",
+          "type": "string"
+        },
+        "why": {
+          "description": "Why the call would ask the user.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sessionId",
+        "toolCallId",
+        "tool",
+        "input",
+        "why",
+        "environment",
+        "policy",
+        "model",
+        "timeoutMs"
+      ],
+      "type": "object"
+    },
+    "PolicyReviewRequest": {
+      "description": "Request for `policy/review`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "policy/review",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/PolicyReviewParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "PolicyReviewResponse": {
+      "description": "Successful response to `policy/review`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/PolicyReviewResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "PolicyReviewResult": {
+      "description": "Result of `policy/review`: the reviewer's answer as given, or why there is none.",
+      "properties": {
+        "answer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewAnswer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The arguments of the one `record_review` call."
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewFailure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why there is no answer."
+        },
+        "inputChars": {
+          "default": 0,
+          "description": "Characters of that text.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "inputHash": {
+          "default": "",
+          "description": "SHA-256 (hex) of the system and user text sent to the model; empty when none was sent.",
+          "type": "string"
+        },
+        "message": {
+          "description": "What went wrong, for the audit and the card.",
+          "type": ["string", "null"]
+        },
+        "model": {
+          "description": "`provider/model` that answered (or was asked).",
+          "type": ["string", "null"]
+        },
+        "promptId": {
+          "default": "",
+          "description": "The first 12 hex digits of the SHA-256 of the review prompt (its version).",
+          "type": "string"
+        },
+        "usage": {
+          "$ref": "#/$defs/ReviewUsage",
+          "default": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0
+          },
+          "description": "Tokens of the call."
         }
       },
       "type": "object"
@@ -9330,6 +9725,239 @@
     "ResourcesReloadResult": {
       "description": "Result of `resources/reload`.",
       "type": "object"
+    },
+    "ReviewAnswer": {
+      "description": "The reviewer's `record_review` arguments as given (T46): Core checks them.",
+      "properties": {
+        "category": {
+          "description": "The category the reviewer named.",
+          "type": ["string", "null"]
+        },
+        "reason": {
+          "description": "The reviewer's reason.",
+          "type": "string"
+        },
+        "verdict": {
+          "description": "Should be `allow`, `deny` or `unsure`.",
+          "type": "string"
+        }
+      },
+      "required": ["verdict", "reason"],
+      "type": "object"
+    },
+    "ReviewEnvironment": {
+      "description": "Where the reviewed call runs (T46).",
+      "properties": {
+        "agentType": {
+          "description": "For a subagent's call: its type.",
+          "type": ["string", "null"]
+        },
+        "cwd": {
+          "description": "The session's working directory, the home directory written `~`.",
+          "type": "string"
+        },
+        "platform": {
+          "description": "`macos`, `windows` or `linux`.",
+          "type": "string"
+        },
+        "remotes": {
+          "description": "The git remotes configured when the session was registered, without credentials.",
+          "items": {
+            "$ref": "#/$defs/GitRemote"
+          },
+          "type": "array"
+        },
+        "sandboxed": {
+          "description": "A command runs in the sandbox.",
+          "type": "boolean"
+        },
+        "workspace": {
+          "description": "The workspace root, the home directory written `~`.",
+          "type": "string"
+        }
+      },
+      "required": ["platform", "workspace", "cwd"],
+      "type": "object"
+    },
+    "ReviewFailure": {
+      "description": "Why a review has no answer (T46).",
+      "oneOf": [
+        {
+          "const": "timeout",
+          "description": "The time limit passed.",
+          "type": "string"
+        },
+        {
+          "const": "providerError",
+          "description": "The provider failed after retries.",
+          "type": "string"
+        },
+        {
+          "const": "unparsable",
+          "description": "Not exactly one `record_review` call with JSON arguments, a verdict and a reason.",
+          "type": "string"
+        },
+        {
+          "const": "unknownModel",
+          "description": "The model is not in the catalog, has no credentials or is below the reviewer bar.",
+          "type": "string"
+        },
+        {
+          "const": "belowBar",
+          "description": "The model does not meet the reviewer bar.",
+          "type": "string"
+        },
+        {
+          "const": "cancelled",
+          "description": "The call's turn was interrupted or its session closed.",
+          "type": "string"
+        }
+      ]
+    },
+    "ReviewFallback": {
+      "description": "Why an Auto mode call came back to the user (T46).",
+      "oneOf": [
+        {
+          "const": "unsure",
+          "description": "The reviewer could not decide.",
+          "type": "string"
+        },
+        {
+          "const": "timeout",
+          "description": "No answer within the review timeout.",
+          "type": "string"
+        },
+        {
+          "const": "providerError",
+          "description": "The provider failed (errors, rate limits, authentication) after retries.",
+          "type": "string"
+        },
+        {
+          "const": "unparsable",
+          "description": "The answer was not exactly one well-formed `record_review` call.",
+          "type": "string"
+        },
+        {
+          "const": "invalidVerdict",
+          "description": "The verdict was not one of the three values.",
+          "type": "string"
+        },
+        {
+          "const": "unavailable",
+          "description": "No usable reviewer model (not set, not in the catalog, no credentials, below the bar)\nor no running Agent Host.",
+          "type": "string"
+        },
+        {
+          "const": "discarded",
+          "description": "The mode changed while the reviewer worked.",
+          "type": "string"
+        },
+        {
+          "const": "pausedConsecutive",
+          "description": "Review is paused after consecutive refusals.",
+          "type": "string"
+        },
+        {
+          "const": "pausedTotal",
+          "description": "Review is paused after the session's total of refusals.",
+          "type": "string"
+        }
+      ]
+    },
+    "ReviewPolicy": {
+      "description": "The user's additions to the review (T46): `autoMode` of the user's settings.",
+      "properties": {
+        "allow": {
+          "description": "Exceptions to the soft blocks.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "environment": {
+          "description": "Trusted infrastructure.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "hardDeny": {
+          "description": "Added hard blocks.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "softDeny": {
+          "description": "Added soft blocks.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ReviewState": {
+      "description": "Where the review of a card stands (T46).",
+      "oneOf": [
+        {
+          "const": "reviewing",
+          "description": "The reviewer model is deciding: the card takes no answer.",
+          "type": "string"
+        },
+        {
+          "const": "fallback",
+          "description": "The user answers the card.",
+          "type": "string"
+        }
+      ]
+    },
+    "ReviewUsage": {
+      "description": "Tokens of one review (T46).",
+      "properties": {
+        "cacheRead": {
+          "description": "Cached input read.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cacheWrite": {
+          "description": "Cached input written.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "input": {
+          "description": "Input tokens.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "output": {
+          "description": "Output tokens.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["input", "output", "cacheRead", "cacheWrite"],
+      "type": "object"
+    },
+    "ReviewVerdict": {
+      "description": "A reviewer verdict that decided a call (T46).",
+      "oneOf": [
+        {
+          "const": "allow",
+          "description": "The call ran.",
+          "type": "string"
+        },
+        {
+          "const": "deny",
+          "description": "The call was refused.",
+          "type": "string"
+        }
+      ]
     },
     "RewindAction": {
       "description": "What a rewind does to one file.",
@@ -13865,6 +14493,29 @@
         }
       ]
     },
+    "ToolReview": {
+      "description": "What the reviewer model decided about a call (T46).",
+      "properties": {
+        "category": {
+          "description": "The blocked category the reviewer named (a default category id or `custom`).",
+          "type": ["string", "null"]
+        },
+        "model": {
+          "description": "`provider/model` of the reviewer.",
+          "type": "string"
+        },
+        "reason": {
+          "description": "The reviewer's reason, without control characters and at most\n[`REVIEW_REASON_CHARS`] characters.",
+          "type": "string"
+        },
+        "verdict": {
+          "$ref": "#/$defs/ReviewVerdict",
+          "description": "`allow` ran the call; `deny` refused it with the reason."
+        }
+      },
+      "required": ["verdict", "reason", "model"],
+      "type": "object"
+    },
     "TrustGetParams": {
       "description": "Parameters of `trust/get`.",
       "properties": {
@@ -15053,6 +15704,12 @@
     },
     {
       "$ref": "#/$defs/PolicyEvaluateResponse"
+    },
+    {
+      "$ref": "#/$defs/PolicyReviewRequest"
+    },
+    {
+      "$ref": "#/$defs/PolicyReviewResponse"
     },
     {
       "$ref": "#/$defs/TrustGetRequest"

@@ -5,7 +5,7 @@ use super::*;
 impl Fixture {
     /// Program lookups independent of the test process (cargo sets `DYLD_*` on macOS, which
     /// rightly turns automatic program approvals off).
-    async fn fixed() -> Self {
+    pub(super) async fn fixed() -> Self {
         Self::with_env(super::super::super::CommandEnv::Fixed(vec![(
             "PATH".into(),
             "/usr/bin:/bin".into(),
@@ -13,20 +13,20 @@ impl Fixture {
         .await
     }
 
-    fn work(&self) -> PathBuf {
+    pub(super) fn work(&self) -> PathBuf {
         self.work.clone()
     }
 
-    fn write_settings(&self, file: &str, text: &str) {
+    pub(super) fn write_settings(&self, file: &str, text: &str) {
         std::fs::write(self.work().join(".piarc").join(file), text).expect("settings");
     }
 
     /// The user's own settings file: its allow rules need no project trust.
-    fn write_user_settings(&self, text: &str) {
+    pub(super) fn write_user_settings(&self, text: &str) {
         std::fs::write(self.root.join("data/settings.json"), text).expect("user settings");
     }
 
-    async fn trust_again(&self) {
+    pub(super) async fn trust_again(&self) {
         let trust = &self.io.services().expect("policy").trust;
         let view = trust.view(&self.work()).await.expect("view");
         trust

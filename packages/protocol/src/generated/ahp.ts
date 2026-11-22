@@ -85,6 +85,8 @@ export type AhpMessage =
   | SessionHistoryResponse
   | PolicyEvaluateRequest
   | PolicyEvaluateResponse
+  | PolicyReviewRequest
+  | PolicyReviewResponse
   | TrustGetRequest
   | TrustGetResponse
   | HooksRunRequest
@@ -302,10 +304,9 @@ export type ToolProfileKind = 'default' | 'conservative';
  */
 export type ToolReliability = 'verified' | 'unknown' | 'low';
 /**
- * Permission modes (architecture section 6.2.1). `auto` (M5) and `dontAsk` (headless) are
- * not available.
+ * Permission modes (architecture section 6.2.1). `dontAsk` (headless) is not available.
  */
-export type PermissionMode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions';
+export type PermissionMode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions' | 'auto';
 /**
  * Turn identifier, unique within a session.
  */
@@ -467,6 +468,10 @@ export type Item =
        */
       output?: string | null;
       /**
+       * The reviewer model decided the call in Auto mode (T46).
+       */
+      review?: ToolReview | null;
+      /**
        * Lifecycle state.
        */
       status: ItemStatus;
@@ -500,6 +505,10 @@ export type Item =
        */
       path: string;
       /**
+       * The reviewer model decided the call in Auto mode (T46).
+       */
+      review?: ToolReview | null;
+      /**
        * Lifecycle state.
        */
       status: ItemStatus;
@@ -524,6 +533,10 @@ export type Item =
        * The text the tool returned, in `item/completed`.
        */
       output?: string | null;
+      /**
+       * The reviewer model decided the call in Auto mode (T46).
+       */
+      review?: ToolReview | null;
       /**
        * The MCP server's name.
        */
@@ -562,6 +575,10 @@ export type Item =
        */
       output?: string | null;
       /**
+       * The reviewer model decided the call in Auto mode (T46).
+       */
+      review?: ToolReview | null;
+      /**
        * Lifecycle state.
        */
       status: ItemStatus;
@@ -591,6 +608,10 @@ export type Item =
        * The text the tool returned, in `item/completed`.
        */
       output?: string | null;
+      /**
+       * The reviewer model decided the call in Auto mode (T46).
+       */
+      review?: ToolReview | null;
       /**
        * Lifecycle state.
        */
@@ -629,6 +650,10 @@ export type Item =
        */
       query: string;
       /**
+       * The reviewer model decided the call in Auto mode (T46).
+       */
+      review?: ToolReview | null;
+      /**
        * The results, in `item/completed`.
        */
       sources?: WebSearchSource[];
@@ -657,6 +682,10 @@ export type Item =
        * The text the tool returned, in `item/completed`.
        */
       output?: string | null;
+      /**
+       * The reviewer model decided the call in Auto mode (T46).
+       */
+      review?: ToolReview | null;
       /**
        * Lifecycle state.
        */
@@ -755,6 +784,10 @@ export type CommandOutcome = 'success' | 'failure';
  */
 export type TaskStartReason = 'requested' | 'timeout';
 /**
+ * A reviewer verdict that decided a call (T46).
+ */
+export type ReviewVerdict = 'allow' | 'deny';
+/**
  * What happened to a line.
  */
 export type DiffLineKind = 'context' | 'added' | 'removed';
@@ -798,6 +831,11 @@ export type ReminderType =
   | 'mcpChanged'
   | 'skillsChanged'
   | 'outputStyle';
+/**
+ * Why a review has no answer (T46).
+ */
+export type ReviewFailure =
+  'timeout' | 'providerError' | 'unparsable' | 'unknownModel' | 'belowBar' | 'cancelled';
 /**
  * The events the Agent Host reports.
  */
@@ -1034,6 +1072,23 @@ export type ResourcesReloadResult = Record<string, never>;
  * Presentation of a pending approval.
  */
 export type ApprovalKind = 'command' | 'fileChange' | 'permissionExpansion' | 'question' | 'plan';
+/**
+ * Why an Auto mode call came back to the user (T46).
+ */
+export type ReviewFallback =
+  | 'unsure'
+  | 'timeout'
+  | 'providerError'
+  | 'unparsable'
+  | 'invalidVerdict'
+  | 'unavailable'
+  | 'discarded'
+  | 'pausedConsecutive'
+  | 'pausedTotal';
+/**
+ * Where the review of a card stands (T46).
+ */
+export type ReviewState = 'reviewing' | 'fallback';
 /**
  * Where an approved command runs (T39).
  */
@@ -2095,6 +2150,11 @@ export interface CatalogModel {
    */
   provider: string;
   /**
+   * Meets the Auto mode reviewer bar (T46): verified tool calls, a context window of at
+   * least 64,000 tokens and output of at least 1,024.
+   */
+  reviewer?: boolean;
+  /**
    * The Tool Profile in effect for the model (T29); absent: the default one.
    */
   toolProfile?: ToolProfileKind | null;
@@ -3013,6 +3073,28 @@ export interface TaskStarted {
   taskId: string;
 }
 /**
+ * What the reviewer model decided about a call (T46).
+ */
+export interface ToolReview {
+  /**
+   * The blocked category the reviewer named (a default category id or `custom`).
+   */
+  category?: string | null;
+  /**
+   * `provider/model` of the reviewer.
+   */
+  model: string;
+  /**
+   * The reviewer's reason, without control characters and at most
+   * [`REVIEW_REASON_CHARS`] characters.
+   */
+  reason: string;
+  /**
+   * `allow` ran the call; `deny` refused it with the reason.
+   */
+  verdict: ReviewVerdict;
+}
+/**
  * One file change as a diff.
  */
 export interface FileDiff {
@@ -3317,6 +3399,11 @@ export interface PolicyEvaluateResult {
    */
   reason?: string | null;
   /**
+   * The reviewer model decided the call in Auto mode (T46): the Agent Host records it on
+   * the branch (`piarc.autoReview`) and the call's item shows it.
+   */
+  review?: ToolReview | null;
+  /**
    * A hook stops the agent after this call (`continue: false`, or a `PermissionRequest`
    * deny with `interrupt`).
    */
@@ -3337,6 +3424,205 @@ export interface HookStop {
    * `stopReason`, shown to the user and kept in the conversation.
    */
   reason?: string | null;
+}
+/**
+ * Request for `policy/review`.
+ */
+export interface PolicyReviewRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'policy/review';
+  params: PolicyReviewParams;
+}
+/**
+ * Parameters of `policy/review`.
+ */
+export interface PolicyReviewParams {
+  /**
+   * The session's surroundings.
+   */
+  environment: ReviewEnvironment;
+  /**
+   * The arguments the call would run with (after hooks).
+   */
+  input: {
+    [k: string]: unknown;
+  };
+  /**
+   * The reviewer model.
+   */
+  model: ModelRef;
+  /**
+   * The user's review policy.
+   */
+  policy: ReviewPolicy;
+  /**
+   * The session whose call it is (a subagent's own session).
+   */
+  sessionId: string;
+  /**
+   * The review's time limit; the model call ends with it.
+   */
+  timeoutMs: number;
+  /**
+   * Canonical tool name.
+   */
+  tool: string;
+  /**
+   * The call.
+   */
+  toolCallId: string;
+  /**
+   * Why the call would ask the user.
+   */
+  why: string;
+}
+/**
+ * Where the reviewed call runs (T46).
+ */
+export interface ReviewEnvironment {
+  /**
+   * For a subagent's call: its type.
+   */
+  agentType?: string | null;
+  /**
+   * The session's working directory, the home directory written `~`.
+   */
+  cwd: string;
+  /**
+   * `macos`, `windows` or `linux`.
+   */
+  platform: string;
+  /**
+   * The git remotes configured when the session was registered, without credentials.
+   */
+  remotes?: GitRemote[];
+  /**
+   * A command runs in the sandbox.
+   */
+  sandboxed?: boolean;
+  /**
+   * The workspace root, the home directory written `~`.
+   */
+  workspace: string;
+}
+/**
+ * A git remote as the review shows it (T46).
+ */
+export interface GitRemote {
+  /**
+   * The remote's name.
+   */
+  name: string;
+  /**
+   * Its fetch URL without user information.
+   */
+  url: string;
+}
+/**
+ * The user's additions to the review (T46): `autoMode` of the user's settings.
+ */
+export interface ReviewPolicy {
+  /**
+   * Exceptions to the soft blocks.
+   */
+  allow?: string[];
+  /**
+   * Trusted infrastructure.
+   */
+  environment?: string[];
+  /**
+   * Added hard blocks.
+   */
+  hardDeny?: string[];
+  /**
+   * Added soft blocks.
+   */
+  softDeny?: string[];
+}
+/**
+ * Successful response to `policy/review`.
+ */
+export interface PolicyReviewResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: PolicyReviewResult;
+}
+/**
+ * Result of `policy/review`: the reviewer's answer as given, or why there is none.
+ */
+export interface PolicyReviewResult {
+  /**
+   * The arguments of the one `record_review` call.
+   */
+  answer?: ReviewAnswer | null;
+  /**
+   * Why there is no answer.
+   */
+  failure?: ReviewFailure | null;
+  /**
+   * Characters of that text.
+   */
+  inputChars?: number;
+  /**
+   * SHA-256 (hex) of the system and user text sent to the model; empty when none was sent.
+   */
+  inputHash?: string;
+  /**
+   * What went wrong, for the audit and the card.
+   */
+  message?: string | null;
+  /**
+   * `provider/model` that answered (or was asked).
+   */
+  model?: string | null;
+  /**
+   * The first 12 hex digits of the SHA-256 of the review prompt (its version).
+   */
+  promptId?: string;
+  /**
+   * Tokens of the call.
+   */
+  usage?: ReviewUsage;
+}
+/**
+ * The reviewer's `record_review` arguments as given (T46): Core checks them.
+ */
+export interface ReviewAnswer {
+  /**
+   * The category the reviewer named.
+   */
+  category?: string | null;
+  /**
+   * The reviewer's reason.
+   */
+  reason: string;
+  /**
+   * Should be `allow`, `deny` or `unsure`.
+   */
+  verdict: string;
+}
+/**
+ * Tokens of one review (T46).
+ */
+export interface ReviewUsage {
+  /**
+   * Cached input read.
+   */
+  cacheRead: number;
+  /**
+   * Cached input written.
+   */
+  cacheWrite: number;
+  /**
+   * Input tokens.
+   */
+  input: number;
+  /**
+   * Output tokens.
+   */
+  output: number;
 }
 /**
  * Request for `trust/get`.
@@ -8042,6 +8328,11 @@ export interface ApprovalRequest {
    */
   requestId: string;
   /**
+   * Auto mode (T46): the reviewer model is deciding the call (no answers are taken), or the
+   * card came back to the user and why.
+   */
+  review?: ApprovalReview | null;
+  /**
    * Revision of this request.
    */
   revision: number;
@@ -8070,6 +8361,27 @@ export interface ApprovalRequest {
    * Canonical tool name.
    */
   tool: string;
+}
+/**
+ * The reviewer's part in a card (T46).
+ */
+export interface ApprovalReview {
+  /**
+   * Why the card is the user's to answer (`fallback` only).
+   */
+  fallback?: ReviewFallback | null;
+  /**
+   * `provider/model` of the reviewer, when one is set.
+   */
+  model?: string | null;
+  /**
+   * The reviewer's reason when it was unsure, or what went wrong (truncated).
+   */
+  reason?: string | null;
+  /**
+   * Reviewing, or back with the user.
+   */
+  state: ReviewState;
 }
 /**
  * Where an approval of a subagent's call comes from: shown on the card in the main session.

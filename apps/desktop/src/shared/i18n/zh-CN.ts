@@ -277,6 +277,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'approval.mode.acceptEdits': '自动接受编辑',
   'approval.mode.plan': '计划',
   'approval.mode.bypassPermissions': '跳过权限',
+  'approval.mode.auto': '自动审查',
   'approval.modeChanged': '权限模式已切换为{mode}',
   'approval.kind.command': '允许执行命令？',
   'approval.kind.fileChange': '允许修改文件？',

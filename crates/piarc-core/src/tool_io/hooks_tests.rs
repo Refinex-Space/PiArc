@@ -161,6 +161,7 @@ impl Fixture {
             trust: trust.clone(),
             snapshots,
             hooks: Some(hooks),
+            review: crate::tool_io::policy::review::ReviewConfig::default(),
         });
         io.open_session(SESSION, &work, &work).expect("session");
         let (peer, frames) = Peer::channel(64);

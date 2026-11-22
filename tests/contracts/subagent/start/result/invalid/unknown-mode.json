@@ -2,6 +2,6 @@
   "jsonrpc": "2.0",
   "id": 50,
   "result": {
-    "permissionMode": "auto"
+    "permissionMode": "dontAsk"
   }
 }

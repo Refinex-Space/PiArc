@@ -14,8 +14,9 @@
 //! 6. allow rules (all parts; a wildcard command rule does not take outside paths,
 //!    ADR-0047: `bash::judge` and Core report those as outside), hook allow → allow
 //! 7. mode defaults: a sandboxed command with auto-approval on → allow (T39); outside → ask;
-//!    read-only → allow; Accept edits edits → allow
-//! 8. PermissionRequest hooks (slot, T25) → user
+//!    read-only → allow; Accept edits (and Auto, T46) edits → allow
+//! 8. PermissionRequest hooks (slot, T25) → in Auto mode the reviewer model for the general
+//!    question (`review::reviewable`, T46) → user
 //! ```
 
 use piarc_protocol::policy::PermissionMode;
@@ -207,7 +208,12 @@ pub fn decide(input: &Input) -> Ruling {
         if input.read_only || input.allowed {
             return Ruling::new(Allow, "readOnly", Vec::new());
         }
-        if input.mode == PermissionMode::AcceptEdits && input.accept_edit {
+        // Auto mode takes Accept edits' defaults (T46): its reviewer only answers what is left.
+        if matches!(
+            input.mode,
+            PermissionMode::AcceptEdits | PermissionMode::Auto
+        ) && input.accept_edit
+        {
             return Ruling::new(Allow, "acceptEdits", Vec::new());
         }
     }
@@ -239,17 +245,38 @@ pub fn after_permission_request(ruling: Ruling, verdict: &HookVerdict) -> Ruling
     }
 }
 
+/// What the user's settings make available beyond the ordinary modes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Available {
+    /// `permissions.enableBypassPermissions` in the user's own file.
+    pub bypass: bool,
+    /// Auto mode (T46): enabled in the user's own file and not disabled anywhere.
+    pub auto: bool,
+}
+
+impl Available {
+    /// Whether a session may be in `mode`.
+    #[must_use]
+    pub fn allows(self, mode: PermissionMode) -> bool {
+        match mode {
+            PermissionMode::BypassPermissions => self.bypass,
+            PermissionMode::Auto => self.auto,
+            _ => true,
+        }
+    }
+}
+
 /// The starting mode: the session's explicit choice, then the mode remembered for the
-/// workspace, then `permissions.defaultMode`, then Manual. `bypassPermissions` needs the user
-/// to have enabled it; `auto` and `dontAsk` are not available (M5, headless only).
+/// workspace, then `permissions.defaultMode`, then Manual. `bypassPermissions` and `auto`
+/// need the user to have enabled them; `dontAsk` is not available (headless only).
 #[must_use]
 pub fn starting_mode(
     explicit: Option<PermissionMode>,
     remembered: Option<PermissionMode>,
     setting: Option<&str>,
-    bypass_enabled: bool,
+    available: Available,
 ) -> PermissionMode {
-    let usable = |m: PermissionMode| m != PermissionMode::BypassPermissions || bypass_enabled;
+    let usable = |m: PermissionMode| available.allows(m);
     if let Some(mode) = explicit.filter(|m| usable(*m)) {
         return mode;
     }
@@ -259,7 +286,8 @@ pub fn starting_mode(
     match setting {
         Some("acceptEdits") => PermissionMode::AcceptEdits,
         Some("plan") => PermissionMode::Plan,
-        Some("bypassPermissions") if bypass_enabled => PermissionMode::BypassPermissions,
+        Some("bypassPermissions") if available.bypass => PermissionMode::BypassPermissions,
+        Some("auto") if available.auto => PermissionMode::Auto,
         _ => PermissionMode::Default,
     }
 }

@@ -196,6 +196,9 @@ struct SessionIo {
     /// The settings layers' values this session last saw (T41's `ConfigChange`); `None` until
     /// the first check. Held while a check runs, so a change is handled once.
     config_seen: tokio::sync::Mutex<Option<Vec<hooks_m4::SeenLayer>>>,
+    /// The git remotes configured when the session was registered (T46: Auto mode trusts
+    /// these, not ones added later); a subagent's are its main session's.
+    remotes: Vec<piarc_protocol::policy::GitRemote>,
 }
 
 impl SessionIo {
@@ -500,6 +503,19 @@ impl ToolIo {
     ) {
         let blob_dir = self.session_dir(session_id).join("blobs");
         let shell_cwd = Mutex::new(scope.cwd().to_path_buf());
+        // Auto mode trusts the remotes configured now (T46); a subagent has its tree's.
+        let remotes = subagent.as_ref().map_or_else(
+            || {
+                piarc_git::remotes::remotes(project)
+                    .into_iter()
+                    .map(|r| piarc_protocol::policy::GitRemote {
+                        name: r.name,
+                        url: r.url,
+                    })
+                    .collect()
+            },
+            |link| link.root.remotes.clone(),
+        );
         lock(&self.sessions).insert(
             session_id.to_owned(),
             Arc::new(SessionIo {
@@ -521,6 +537,7 @@ impl ToolIo {
                 config_pins: Mutex::default(),
                 file_watch: Mutex::default(),
                 config_seen: tokio::sync::Mutex::default(),
+                remotes,
             }),
         );
         // The baseline `ConfigChange` compares with (T41); outside a runtime (some tests) the

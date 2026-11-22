@@ -39,7 +39,9 @@ use crate::models::{
     UiLoginInteraction,
 };
 use crate::plugins::PluginsExtensionsMethod;
-use crate::policy::{PolicyCancel, PolicyEvaluate, PolicyInputChunk, PolicyPending, PolicyTools};
+use crate::policy::{
+    PolicyCancel, PolicyEvaluate, PolicyInputChunk, PolicyPending, PolicyReview, PolicyTools,
+};
 use crate::queue::{QueueChanged, QueueDelete, QueueEdit, QueueReorder};
 use crate::secrets::{
     SecretsChanged, SecretsDelete, SecretsGet, SecretsGetAll, SecretsLock, SecretsRenew,
@@ -237,6 +239,8 @@ pub static CONTRACTS: &[Contract] = &[
     response::<SessionHistory>("session/history/result"),
     request::<PolicyEvaluate>(PolicyEvaluate::NAME),
     response::<PolicyEvaluate>("policy/evaluate/result"),
+    request::<PolicyReview>(PolicyReview::NAME),
+    response::<PolicyReview>("policy/review/result"),
     request::<TrustGet>(TrustGet::NAME),
     response::<TrustGet>("trust/get/result"),
     request::<HooksRun>(HooksRun::NAME),

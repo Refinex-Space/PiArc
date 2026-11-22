@@ -282,6 +282,7 @@ export const en = {
   'approval.mode.acceptEdits': 'Accept edits',
   'approval.mode.plan': 'Plan',
   'approval.mode.bypassPermissions': 'Bypass permissions',
+  'approval.mode.auto': 'Auto review',
   'approval.modeChanged': 'Permission mode changed to {mode}',
   'approval.kind.command': 'Run command?',
   'approval.kind.fileChange': 'Allow file change?',

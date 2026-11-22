@@ -1,8 +1,8 @@
 use super::*;
 use crate::rules::Behavior;
-use PermissionMode::{AcceptEdits, BypassPermissions, Default, Plan};
+use PermissionMode::{AcceptEdits, Auto, BypassPermissions, Default, Plan};
 
-const MODES: [PermissionMode; 4] = [Default, AcceptEdits, Plan, BypassPermissions];
+const MODES: [PermissionMode; 5] = [Default, AcceptEdits, Plan, BypassPermissions, Auto];
 
 fn hit(behavior: Behavior) -> Hit {
     Hit {
@@ -294,45 +294,130 @@ fn permission_request_slot() {
     );
 }
 
+const NONE: Available = Available {
+    bypass: false,
+    auto: false,
+};
+const BYPASS: Available = Available {
+    bypass: true,
+    auto: false,
+};
+const AUTO: Available = Available {
+    bypass: false,
+    auto: true,
+};
+
 #[test]
 fn starting_mode_order() {
     assert_eq!(
-        starting_mode(Some(Default), Some(Plan), Some("acceptEdits"), false),
+        starting_mode(Some(Default), Some(Plan), Some("acceptEdits"), NONE),
         Default
     );
     assert_eq!(
-        starting_mode(None, Some(Plan), Some("acceptEdits"), false),
+        starting_mode(None, Some(Plan), Some("acceptEdits"), NONE),
         Plan
     );
     assert_eq!(
-        starting_mode(None, None, Some("acceptEdits"), false),
+        starting_mode(None, None, Some("acceptEdits"), NONE),
         AcceptEdits
     );
-    assert_eq!(starting_mode(None, None, Some("plan"), false), Plan);
+    assert_eq!(starting_mode(None, None, Some("plan"), NONE), Plan);
     for v in [
         None,
         Some("auto"),
         Some("dontAsk"),
         Some("bypassPermissions"),
     ] {
-        assert_eq!(starting_mode(None, None, v, false), Default);
+        assert_eq!(starting_mode(None, None, v, NONE), Default);
     }
     assert_eq!(
-        starting_mode(None, Some(BypassPermissions), None, false),
+        starting_mode(None, Some(BypassPermissions), None, NONE),
         Default
     );
     assert_eq!(
-        starting_mode(None, Some(BypassPermissions), None, true),
+        starting_mode(None, Some(BypassPermissions), None, BYPASS),
         BypassPermissions
     );
     assert_eq!(
-        starting_mode(Some(BypassPermissions), None, Some("plan"), false),
+        starting_mode(Some(BypassPermissions), None, Some("plan"), NONE),
         Plan
     );
     assert_eq!(
-        starting_mode(None, None, Some("bypassPermissions"), true),
+        starting_mode(None, None, Some("bypassPermissions"), BYPASS),
         BypassPermissions
     );
+}
+
+/// T46: Auto mode starts only when the user enabled it; otherwise the next choice applies.
+#[test]
+fn auto_mode_starts_only_when_available() {
+    assert_eq!(starting_mode(None, None, Some("auto"), AUTO), Auto);
+    assert_eq!(starting_mode(None, None, Some("auto"), BYPASS), Default);
+    assert_eq!(starting_mode(Some(Auto), None, None, AUTO), Auto);
+    assert_eq!(
+        starting_mode(Some(Auto), Some(AcceptEdits), None, NONE),
+        AcceptEdits
+    );
+    assert_eq!(starting_mode(None, Some(Auto), Some("plan"), NONE), Plan);
+    assert_eq!(starting_mode(None, Some(Auto), None, AUTO), Auto);
+    assert!(!NONE.allows(Auto) && AUTO.allows(Auto) && !AUTO.allows(BypassPermissions));
+}
+
+/// T46: Auto mode takes Accept edits' defaults; everything else ends where Manual ends, so
+/// protected paths, outside paths and unresolved commands still ask with their own steps.
+#[test]
+fn auto_mode_defaults_are_accept_edits() {
+    let edit = Input {
+        accept_edit: true,
+        write: true,
+        ..input(Auto)
+    };
+    assert_eq!(decide(&edit).step, "acceptEdits");
+    let command = Input {
+        write: true,
+        ..input(Auto)
+    };
+    assert_eq!(decide(&command).step, "ask");
+    assert!(crate::review::reviewable(&decide(&command)));
+    for (extra, step) in [
+        (
+            Input {
+                protected: true,
+                accept_edit: true,
+                ..input(Auto)
+            },
+            "protectedPath",
+        ),
+        (
+            Input {
+                outside: true,
+                accept_edit: true,
+                ..input(Auto)
+            },
+            "outsideWorkspace",
+        ),
+        (
+            Input {
+                ask: Some(MustAsk {
+                    step: "unresolved",
+                    hit: None,
+                }),
+                ..input(Auto)
+            },
+            "unresolved",
+        ),
+    ] {
+        let ruling = decide(&extra);
+        assert_eq!((ruling.outcome, ruling.step), (Outcome::Ask, step));
+        assert!(!crate::review::reviewable(&ruling), "{step}");
+    }
+    let tainted = Input {
+        tainted: true,
+        accept_edit: true,
+        read_only: true,
+        ..input(Auto)
+    };
+    assert_eq!(decide(&tainted).step, "ask");
 }
 
 /// T26: ExitPlanMode asks in plan mode whatever rules and hooks allow, is refused in every other

@@ -122,6 +122,7 @@ impl Fixture {
             trust,
             snapshots,
             hooks,
+            review: super::review::ReviewConfig::default(),
         });
         io.open_session(SESSION, &work, &work).expect("session");
         let (peer, frames) = Peer::channel(4);
@@ -152,7 +153,17 @@ impl Fixture {
         let session = self.io.session(SESSION).expect("registered");
         tokio::time::timeout(Duration::from_secs(10), async {
             loop {
-                if let Some(request) = lock(&session.policy).ledger.pending().next().cloned() {
+                // A card the Auto mode reviewer is deciding takes no answer yet (T46).
+                let answerable = lock(&session.policy)
+                    .ledger
+                    .pending()
+                    .find(|r| {
+                        r.review.as_ref().is_none_or(|review| {
+                            review.state != piarc_protocol::policy::ReviewState::Reviewing
+                        })
+                    })
+                    .cloned();
+                if let Some(request) = answerable {
                     return request;
                 }
                 tokio::task::yield_now().await;
@@ -649,6 +660,7 @@ mod t36;
 mod t37;
 mod t38;
 mod t42;
+mod t46;
 
 /// W1 (architecture 15.2): Windows paths through the whole production path, preflight, grant
 /// and directory-bound I/O. Long paths and reserved names are made here, never committed.

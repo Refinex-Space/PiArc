@@ -4,6 +4,6 @@
   "method": "session/setPermissionMode",
   "params": {
     "sessionId": "s",
-    "mode": "auto"
+    "mode": "dontAsk"
   }
 }

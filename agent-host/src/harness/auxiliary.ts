@@ -4,9 +4,10 @@
 // - Model: the "auxiliary model" setting (Core's model preferences) when it is configured and
 //   has credentials, otherwise the session's model; a caller may name the model (T38: a native
 //   search goes to the session's provider, a prompt hook's `model`).
-// - The request carries no tools, no conversation and no prompt caching; it is retried per the
-//   session's retry settings and goes through the session's stream function, so credentials,
-//   the provider policy and error redaction are those of every other request.
+// - The request carries no conversation and, unless the caller declares them, no tools and no
+//   prompt caching (T46's review declares its one answer tool and short caching); it is
+//   retried per the session's retry settings and goes through the session's stream function,
+//   so credentials, the provider policy and error redaction are those of every other request.
 // - Usage: reported to `onUsage`, which counts it toward the session's running turn and records
 //   it on the branch (`piarc.auxiliaryUsage`).
 import { randomUUID } from 'node:crypto';
@@ -17,7 +18,10 @@ import {
   normalizeContext,
   retryAssistantCall,
   type Api,
+  type CacheRetention,
   type Model,
+  type Tool,
+  type ToolCall,
   type Usage,
 } from '@earendil-works/pi-ai';
 import type { ModelRef } from '@piarc/protocol';
@@ -28,7 +32,8 @@ import type { ModelPreferencesStore } from '../providers/preferences.js';
 export const AUXILIARY_USAGE_ENTRY = 'piarc.auxiliaryUsage';
 
 export interface AuxiliaryRequest {
-  /** What the call is for, recorded with its usage (`webFetch`, `webSearch`, `hookPrompt`). */
+  /** What the call is for, recorded with its usage (`webFetch`, `webSearch`, `hookPrompt`,
+   * `autoReview`). */
   readonly purpose: string;
   readonly system: string;
   readonly prompt: string;
@@ -39,10 +44,18 @@ export interface AuxiliaryRequest {
   readonly onPayload?: (payload: unknown) => unknown;
   /** Sees every raw provider stream event (a native search reads its result blocks). */
   readonly onProviderStreamEvent?: (event: unknown) => void;
+  /** Tools the model may call (T46: the review's answer tool); none when absent. */
+  readonly tools?: readonly Tool[];
+  /** Prompt caching; `none` when absent. */
+  readonly cacheRetention?: CacheRetention;
+  /** The longest answer, in tokens; the model's own limit when absent. */
+  readonly maxTokens?: number;
 }
 
 export interface AuxiliaryResult {
   readonly text: string;
+  /** The tool calls of the answer, in order. */
+  readonly toolCalls: readonly ToolCall[];
   readonly usage: Usage;
   readonly model: ModelRef;
 }
@@ -88,12 +101,14 @@ export class AuxiliaryModel {
       messages: [
         { role: 'user', content: [{ type: 'text', text: request.prompt }], timestamp: Date.now() },
       ],
+      ...(request.tools === undefined ? {} : { tools: [...request.tools] }),
     });
     const { onPayload, onProviderStreamEvent } = request;
     const options = {
       signal: request.signal,
-      cacheRetention: 'none' as const,
+      cacheRetention: request.cacheRetention ?? ('none' as const),
       sessionId: randomUUID(),
+      ...(request.maxTokens === undefined ? {} : { maxTokens: request.maxTokens }),
       ...(onPayload === undefined ? {} : { onPayload: (payload: unknown) => onPayload(payload) }),
       ...(onProviderStreamEvent === undefined
         ? {}
@@ -114,6 +129,12 @@ export class AuxiliaryModel {
     if (response.stopReason === 'error' || response.stopReason === 'aborted') {
       throw new Error(response.errorMessage ?? 'the auxiliary model request failed');
     }
-    return { text: contentText(response.content).trim(), usage: response.usage, model: ref };
+    const toolCalls = response.content.filter((part): part is ToolCall => part.type === 'toolCall');
+    return {
+      text: contentText(response.content).trim(),
+      toolCalls,
+      usage: response.usage,
+      model: ref,
+    };
   }
 }

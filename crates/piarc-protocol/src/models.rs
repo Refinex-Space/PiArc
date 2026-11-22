@@ -128,6 +128,10 @@ pub struct CatalogModel {
     /// credit plan priced outside the catalog).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cost: Option<crate::usage::ModelPrice>,
+    /// Meets the Auto mode reviewer bar (T46): verified tool calls, a context window of at
+    /// least 64,000 tokens and output of at least 1,024.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reviewer: bool,
 }
 
 /// The user's settings for one model (T29), each replacing the catalog value.

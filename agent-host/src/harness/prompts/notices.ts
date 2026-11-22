@@ -8,6 +8,7 @@ const MODE_NAMES: Record<PermissionMode, string> = {
     'Accept edits: file changes inside the workspace run without asking, commands still ask',
   plan: 'Plan',
   bypassPermissions: 'Bypass permissions: tool calls run without asking',
+  auto: 'Auto review: workspace edits run without asking, and a reviewer model decides most other calls in place of the user',
 };
 
 /** Plan mode turned on. */

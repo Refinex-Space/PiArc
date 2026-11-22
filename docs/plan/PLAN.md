@@ -312,7 +312,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 T46（Auto 模式，审查模型），2026-11-22 开工。基线 `npm run verify -- --baseline` 全量 16/17：第 8 步只有 I185 登记的 `piarc-core --test state` 设置监听用例在负载下超时，单独重跑通过；R5 遗留（性能三行、CI 待推送）不影响本任务。
 
 - [x] 设计增补 `docs/architecture/addenda/T46-auto-mode.md`（七节 + 需要确认的要点）；2026-11-22 用户确认第 9 节 12 个要点全部按推荐，A01 passing，进入实现
-- [ ] piarc-policy 的 auto 判定步骤、审批账本"审查中"、失败归一与连续拒绝回退（A02、A03、A04、A07）
+- [x] piarc-policy 的 auto 判定步骤、审批账本"审查中"、失败归一与连续拒绝回退（A02、A03、A04、A07）：`piarc_policy::review`（可审范围、结论校验与截断、`Denials`）、阶梯第 7 步 Auto 同 Accept edits、`starting_mode` 的 `Available`；Core `tool_io/policy/review.rs`（`policy/review` 经会话层的 `ReviewOutlet`、卡片"审查中"→ 转人工升 revision、审计 `autoReview`、计数挂主会话、设置关闭时转手动）；单测 `cargo test -p piarc-core --lib tool_io::policy::tests::t46`（6 个）
 - [ ] 审查调用：Core → Agent Host 的审查请求、辅助模型通道、单一文件的审查提示词、Core 侧再校验（A06、A12）
 - [ ] 设置：用户级启用（二次确认）、审查模型（能力门槛）、自定义策略与可信基础设施；项目级忽略并进配置诊断（A05）
 - [ ] 审计与审计页筛选、用量"审查"一类（A08、A09）

@@ -155,6 +155,9 @@ pub enum Item {
         tool: String,
         /// The arguments the tool was called with.
         arguments: Map<String, Value>,
+        /// The reviewer model decided the call in Auto mode (T46).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        review: Option<crate::policy::ToolReview>,
         /// The command line.
         command: String,
         /// The output the model sees: so far in `item/updated`, final in `item/completed`.
@@ -175,6 +178,9 @@ pub enum Item {
         tool: String,
         /// The arguments the tool was called with.
         arguments: Map<String, Value>,
+        /// The reviewer model decided the call in Auto mode (T46).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        review: Option<crate::policy::ToolReview>,
         /// The file, as the model named it.
         path: String,
         /// The text the tool returned, in `item/completed`.
@@ -194,6 +200,9 @@ pub enum Item {
         tool: String,
         /// The arguments the tool was called with.
         arguments: Map<String, Value>,
+        /// The reviewer model decided the call in Auto mode (T46).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        review: Option<crate::policy::ToolReview>,
         /// The MCP server's name.
         server: String,
         /// The tool's name on the server.
@@ -212,6 +221,9 @@ pub enum Item {
         tool: String,
         /// The arguments the tool was called with.
         arguments: Map<String, Value>,
+        /// The reviewer model decided the call in Auto mode (T46).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        review: Option<crate::policy::ToolReview>,
         /// The task description the model gave, when it gave one.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         description: Option<String>,
@@ -233,6 +245,9 @@ pub enum Item {
         tool: String,
         /// The arguments the tool was called with.
         arguments: Map<String, Value>,
+        /// The reviewer model decided the call in Auto mode (T46).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        review: Option<crate::policy::ToolReview>,
         /// The address.
         url: String,
         /// The text the tool returned, in `item/completed`.
@@ -249,6 +264,9 @@ pub enum Item {
         tool: String,
         /// The arguments the tool was called with.
         arguments: Map<String, Value>,
+        /// The reviewer model decided the call in Auto mode (T46).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        review: Option<crate::policy::ToolReview>,
         /// The search terms.
         query: String,
         /// The backend that answered (`native` or a third-party id), in `item/completed`.
@@ -271,6 +289,9 @@ pub enum Item {
         tool: String,
         /// The arguments the tool was called with.
         arguments: Map<String, Value>,
+        /// The reviewer model decided the call in Auto mode (T46).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        review: Option<crate::policy::ToolReview>,
         /// The text the tool returned, in `item/completed`.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         output: Option<String>,

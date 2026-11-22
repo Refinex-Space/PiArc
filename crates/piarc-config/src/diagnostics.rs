@@ -106,6 +106,9 @@ pub enum IgnoreReason {
     /// A project file may only tighten the sandbox (T39): its `allowedDomains`, auto-approval
     /// and turning the sandbox off do not apply.
     ProjectSandbox,
+    /// Auto mode's switch, reviewer model and policy apply from the user's own files only
+    /// (T46).
+    ProjectAutoMode,
     /// The setting has no effect on this platform (the sandbox on Windows, requirement D7).
     Platform,
     /// PiArc does not support it (an MCP transport, a plugin component, a field).
@@ -300,10 +303,16 @@ impl Settings {
                 .ignored_sandbox
                 .iter()
                 .any(|(layer, removed)| *layer == spec.id && *removed == pointer);
+            let project_auto = self.ignored_auto.iter().any(|(layer, removed)| {
+                *layer == spec.id
+                    && (pointer == *removed || pointer.starts_with(&format!("{removed}/")))
+            });
             let reason = if project_mode {
                 IgnoreReason::ProjectMode
             } else if project_sandbox {
                 IgnoreReason::ProjectSandbox
+            } else if project_auto {
+                IgnoreReason::ProjectAutoMode
             } else {
                 untrusted = true;
                 IgnoreReason::Untrusted

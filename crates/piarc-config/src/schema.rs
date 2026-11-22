@@ -386,7 +386,48 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
                 name: "enableBypassPermissions",
                 shape: Shape::Bool,
             },
+            // Read from the user's own file only (T46): Auto mode is available.
+            Field {
+                name: "enableAutoMode",
+                shape: Shape::Bool,
+            },
         ]),
+    },
+    // Auto mode (T46): Claude Code's `autoMode` lists, read from the user's two files only;
+    // `model` (`provider/model`) only from PiArc's user file.
+    Field {
+        name: "autoMode",
+        shape: Shape::Object(&[
+            Field {
+                name: "model",
+                shape: Shape::String,
+            },
+            Field {
+                name: "environment",
+                shape: Shape::ListOf(&STRINGS),
+            },
+            Field {
+                name: "allow",
+                shape: Shape::ListOf(&STRINGS),
+            },
+            Field {
+                name: "soft_deny",
+                shape: Shape::ListOf(&STRINGS),
+            },
+            Field {
+                name: "hard_deny",
+                shape: Shape::ListOf(&STRINGS),
+            },
+            Field {
+                name: "classifyAllShell",
+                shape: Shape::Bool,
+            },
+        ]),
+    },
+    // Any layer may turn Auto mode off (T46), as Claude Code's `disableAutoMode`.
+    Field {
+        name: "disableAutoMode",
+        shape: Shape::OneOf(&["disable"]),
     },
     Field {
         name: "hooks",

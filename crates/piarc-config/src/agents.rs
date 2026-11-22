@@ -472,7 +472,10 @@ impl Fields<'_> {
                 Ok(Some(PermissionMode::Default))
             }
             "bypassPermissions" => Ok(Some(PermissionMode::BypassPermissions)),
-            "auto" | "dontAsk" => {
+            // T46: a user's definition may ask for Auto mode; Core decides in Manual mode
+            // while the user has not enabled it.
+            "auto" => Ok(Some(PermissionMode::Auto)),
+            "dontAsk" => {
                 warnings.push(warning(
                     AgentWarningKind::UnsupportedMode,
                     field,

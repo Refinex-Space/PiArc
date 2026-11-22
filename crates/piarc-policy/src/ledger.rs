@@ -53,6 +53,22 @@ impl<T> Ledger<T> {
         Ok(self.pending.remove(position))
     }
 
+    /// Changes the pending request `request_id` in place (T46: a reviewed card goes back to
+    /// the user with a new revision). False when it is no longer pending.
+    pub fn update(&mut self, request_id: &str, change: impl FnOnce(&mut ApprovalRequest)) -> bool {
+        match self
+            .pending
+            .iter_mut()
+            .find(|(r, _)| r.request_id == request_id)
+        {
+            Some((request, _)) => {
+                change(request);
+                true
+            }
+            None => false,
+        }
+    }
+
     /// Take the first request matching the caller's identity and connection.
     pub fn take_if(
         &mut self,

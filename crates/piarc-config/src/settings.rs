@@ -111,6 +111,8 @@ pub struct Settings {
     /// Sandbox values of project layers that would loosen the sandbox, left out (T39):
     /// `(layer, JSON Pointer)`.
     pub(crate) ignored_sandbox: Vec<(&'static str, String)>,
+    /// Auto mode values of project layers (T46), left out: `(layer, JSON Pointer)`.
+    pub(crate) ignored_auto: Vec<(&'static str, String)>,
     /// The extension packages in effect (T40), set by Core after the load
     /// ([`Settings::set_packages`]): the settings name them, Core's records say where they are.
     pub(crate) packages: crate::plugins::Packages,
@@ -136,6 +138,7 @@ impl Settings {
             effective: Vec::new(),
             ignored_modes: Vec::new(),
             ignored_sandbox: Vec::new(),
+            ignored_auto: Vec::new(),
             packages: crate::plugins::Packages::default(),
         };
         settings.reload();
@@ -196,6 +199,7 @@ impl Settings {
         let trusted = self.trust.is_trusted();
         let mut ignored = Vec::new();
         let mut ignored_sandbox = Vec::new();
+        let mut ignored_auto = Vec::new();
         let effective: Vec<Option<Value>> = self
             .table
             .layers()
@@ -227,6 +231,12 @@ impl Settings {
                         remove_pointer(&mut value, pointer);
                         ignored_sandbox.push((spec.id, pointer.to_owned()));
                     }
+                    for pointer in crate::auto_mode::USER_ONLY {
+                        if value.pointer(pointer).is_some() {
+                            remove_pointer(&mut value, pointer);
+                            ignored_auto.push((spec.id, (*pointer).to_owned()));
+                        }
+                    }
                 }
                 Some(value)
             })
@@ -238,6 +248,7 @@ impl Settings {
         self.effective = effective;
         self.ignored_modes = ignored;
         self.ignored_sandbox = ignored_sandbox;
+        self.ignored_auto = ignored_auto;
         changed
     }
 

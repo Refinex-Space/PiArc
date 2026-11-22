@@ -68,10 +68,42 @@ pub struct PolicyEvaluateResult {
     /// plan, T26): the Agent Host records the change on the branch and tells the model.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mode: Option<PermissionMode>,
+    /// The reviewer model decided the call in Auto mode (T46): the Agent Host records it on
+    /// the branch (`piarc.autoReview`) and the call's item shows it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review: Option<ToolReview>,
 }
 
-/// Permission modes (architecture section 6.2.1). `auto` (M5) and `dontAsk` (headless) are
-/// not available.
+/// What the reviewer model decided about a call (T46).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolReview {
+    /// `allow` ran the call; `deny` refused it with the reason.
+    pub verdict: ReviewVerdict,
+    /// The reviewer's reason, without control characters and at most
+    /// [`REVIEW_REASON_CHARS`] characters.
+    pub reason: String,
+    /// `provider/model` of the reviewer.
+    pub model: String,
+    /// The blocked category the reviewer named (a default category id or `custom`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+}
+
+/// The longest reviewer reason kept, in Unicode characters (T46).
+pub const REVIEW_REASON_CHARS: usize = 500;
+
+/// A reviewer verdict that decided a call (T46).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum ReviewVerdict {
+    /// The call ran.
+    Allow,
+    /// The call was refused.
+    Deny,
+}
+
+/// Permission modes (architecture section 6.2.1). `dontAsk` (headless) is not available.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum PermissionMode {
@@ -85,6 +117,10 @@ pub enum PermissionMode {
     /// Run everything except what deny and ask rules, critical deletions and questions stop.
     /// Available after the user enables it in settings and confirms the switch.
     BypassPermissions,
+    /// Auto review (T46): Accept edits' defaults, and the reviewer model answers the calls that
+    /// would otherwise ask the user in general; the rest still ask. Available after the user
+    /// enables it in their own settings (`permissions.enableAutoMode`).
+    Auto,
 }
 
 /// Presentation of a pending approval.
@@ -195,6 +231,110 @@ pub struct ApprovalRequest {
     /// the sandbox, protected paths and anything longer; their notification only opens the card.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub notification_allow: bool,
+    /// Auto mode (T46): the reviewer model is deciding the call (no answers are taken), or the
+    /// card came back to the user and why.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review: Option<ApprovalReview>,
+}
+
+/// The reviewer's part in a card (T46).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ApprovalReview {
+    /// Reviewing, or back with the user.
+    pub state: ReviewState,
+    /// Why the card is the user's to answer (`fallback` only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback: Option<ReviewFallback>,
+    /// The reviewer's reason when it was unsure, or what went wrong (truncated).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    /// `provider/model` of the reviewer, when one is set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+}
+
+/// Where the review of a card stands (T46).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum ReviewState {
+    /// The reviewer model is deciding: the card takes no answer.
+    Reviewing,
+    /// The user answers the card.
+    Fallback,
+}
+
+/// Why an Auto mode call came back to the user (T46).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum ReviewFallback {
+    /// The reviewer could not decide.
+    Unsure,
+    /// No answer within the review timeout.
+    Timeout,
+    /// The provider failed (errors, rate limits, authentication) after retries.
+    ProviderError,
+    /// The answer was not exactly one well-formed `record_review` call.
+    Unparsable,
+    /// The verdict was not one of the three values.
+    InvalidVerdict,
+    /// No usable reviewer model (not set, not in the catalog, no credentials, below the bar)
+    /// or no running Agent Host.
+    Unavailable,
+    /// The mode changed while the reviewer worked.
+    Discarded,
+    /// Review is paused after consecutive refusals.
+    PausedConsecutive,
+    /// Review is paused after the session's total of refusals.
+    PausedTotal,
+}
+
+/// The Auto mode state the session list shows (T46): absent unless the session is in Auto
+/// mode.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoReviewStatus {
+    /// Ready, unavailable or paused.
+    pub state: AutoReviewState,
+    /// Why the reviewer is unavailable, or how review was paused.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<AutoReviewReason>,
+    /// `provider/model` of the reviewer, when one is set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+}
+
+/// Whether review works in an Auto mode session (T46).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum AutoReviewState {
+    /// Calls that would ask go to the reviewer.
+    Ready,
+    /// They go to the user: the reviewer cannot be used.
+    Unavailable,
+    /// They go to the user until the user allows one or selects Auto mode again.
+    Paused,
+}
+
+/// The detail of [`AutoReviewStatus`] (T46).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum AutoReviewReason {
+    /// `autoMode.model` is not set.
+    NoModel,
+    /// The model is not in the catalog, or the provider has no credentials.
+    UnknownModel,
+    /// The model does not meet the reviewer bar.
+    BelowBar,
+    /// The workspace's Agent Host is not running.
+    HostDown,
+    /// The settings turned Auto mode off while the session was in it (it continues in Manual
+    /// mode).
+    Disabled,
+    /// Paused after consecutive refusals.
+    Consecutive,
+    /// Paused after the session's total of refusals.
+    Total,
 }
 
 /// Where an answer was given (T42); absent: on the approval card.
@@ -258,6 +398,162 @@ pub struct ApprovalAnswer {
     /// Where the user answered (T42); absent on the card.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub via: Option<AnswerVia>,
+}
+
+crate::method::request!(
+    /// Auto mode (T46, Core → Agent Host): ask the reviewer model about a call that would ask
+    /// the user. The Agent Host adds the session's user messages and recent calls, makes one
+    /// auxiliary call that must answer with the `record_review` tool, and returns the answer as
+    /// given; Core checks it and decides.
+    PolicyReview, "policy/review", PolicyReviewParams, PolicyReviewResult
+);
+
+/// Parameters of `policy/review`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PolicyReviewParams {
+    /// The session whose call it is (a subagent's own session).
+    pub session_id: String,
+    /// The call.
+    pub tool_call_id: String,
+    /// Canonical tool name.
+    pub tool: String,
+    /// The arguments the call would run with (after hooks).
+    pub input: Map<String, Value>,
+    /// Why the call would ask the user.
+    pub why: String,
+    /// The session's surroundings.
+    pub environment: ReviewEnvironment,
+    /// The user's review policy.
+    pub policy: ReviewPolicy,
+    /// The reviewer model.
+    pub model: crate::session::ModelRef,
+    /// The review's time limit; the model call ends with it.
+    pub timeout_ms: u64,
+}
+
+/// Where the reviewed call runs (T46).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewEnvironment {
+    /// `macos`, `windows` or `linux`.
+    pub platform: String,
+    /// The workspace root, the home directory written `~`.
+    pub workspace: String,
+    /// The session's working directory, the home directory written `~`.
+    pub cwd: String,
+    /// The git remotes configured when the session was registered, without credentials.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub remotes: Vec<GitRemote>,
+    /// A command runs in the sandbox.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub sandboxed: bool,
+    /// For a subagent's call: its type.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_type: Option<String>,
+}
+
+/// A git remote as the review shows it (T46).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitRemote {
+    /// The remote's name.
+    pub name: String,
+    /// Its fetch URL without user information.
+    pub url: String,
+}
+
+/// The user's additions to the review (T46): `autoMode` of the user's settings.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewPolicy {
+    /// Trusted infrastructure.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub environment: Vec<String>,
+    /// Exceptions to the soft blocks.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allow: Vec<String>,
+    /// Added soft blocks.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub soft_deny: Vec<String>,
+    /// Added hard blocks.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hard_deny: Vec<String>,
+}
+
+/// Result of `policy/review`: the reviewer's answer as given, or why there is none.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PolicyReviewResult {
+    /// The arguments of the one `record_review` call.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub answer: Option<ReviewAnswer>,
+    /// Why there is no answer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failure: Option<ReviewFailure>,
+    /// What went wrong, for the audit and the card.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    /// `provider/model` that answered (or was asked).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// Tokens of the call.
+    #[serde(default)]
+    pub usage: ReviewUsage,
+    /// SHA-256 (hex) of the system and user text sent to the model; empty when none was sent.
+    #[serde(default)]
+    pub input_hash: String,
+    /// Characters of that text.
+    #[serde(default)]
+    pub input_chars: u64,
+    /// The first 12 hex digits of the SHA-256 of the review prompt (its version).
+    #[serde(default)]
+    pub prompt_id: String,
+}
+
+/// The reviewer's `record_review` arguments as given (T46): Core checks them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewAnswer {
+    /// Should be `allow`, `deny` or `unsure`.
+    pub verdict: String,
+    /// The reviewer's reason.
+    pub reason: String,
+    /// The category the reviewer named.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+}
+
+/// Why a review has no answer (T46).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum ReviewFailure {
+    /// The time limit passed.
+    Timeout,
+    /// The provider failed after retries.
+    ProviderError,
+    /// Not exactly one `record_review` call with JSON arguments, a verdict and a reason.
+    Unparsable,
+    /// The model is not in the catalog, has no credentials or is below the reviewer bar.
+    UnknownModel,
+    /// The model does not meet the reviewer bar.
+    BelowBar,
+    /// The call's turn was interrupted or its session closed.
+    Cancelled,
+}
+
+/// Tokens of one review (T46).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewUsage {
+    /// Input tokens.
+    pub input: u64,
+    /// Output tokens.
+    pub output: u64,
+    /// Cached input read.
+    pub cache_read: u64,
+    /// Cached input written.
+    pub cache_write: u64,
 }
 
 /// Correlates an approval wait on the current Agent Host connection.

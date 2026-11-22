@@ -399,6 +399,18 @@
     },
     {
       "kind": "request",
+      "method": "policy/review",
+      "name": "policy/review",
+      "schema": "PolicyReviewRequest"
+    },
+    {
+      "kind": "response",
+      "method": "policy/review",
+      "name": "policy/review/result",
+      "schema": "PolicyReviewResponse"
+    },
+    {
+      "kind": "request",
       "method": "trust/get",
       "name": "trust/get",
       "schema": "TrustGetRequest"

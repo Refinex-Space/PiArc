@@ -8,6 +8,7 @@
 //!   ([`git`]).
 //! - T40: clones of extension packages pinned to a commit, and their explicit update
 //!   ([`package`]).
+//! - T46: the remotes a working tree's repository configures ([`remotes`]).
 //!
 //! # Not responsible for
 //!
@@ -26,6 +27,7 @@
 pub mod checkout;
 pub mod git;
 pub mod package;
+pub mod remotes;
 pub mod worktree;
 
 pub use checkout::{Checkout, CheckoutKind, Error, Result, canonical, resolve, strip_verbatim};

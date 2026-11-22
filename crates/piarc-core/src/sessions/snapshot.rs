@@ -152,8 +152,12 @@ pub struct SessionView {
     pub permission_mode: PermissionMode,
     /// Requests awaiting the user's answer, in arrival order.
     pub approvals: Vec<ApprovalRequest>,
-    /// Number of pending approvals.
+    /// Number of pending approvals the user can answer (cards the Auto mode reviewer is
+    /// deciding do not count, T46).
     pub pending_approvals: usize,
+    /// Auto mode's state when the session is in it (T46).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auto_review: Option<piarc_protocol::policy::AutoReviewStatus>,
     /// Its name, else its first message.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -193,7 +197,13 @@ pub(crate) enum SnapshotMsg {
     Workspace(WorkspaceView),
     Session(LiveSession),
     SessionClosed(String),
-    Policy(String, PermissionMode, Vec<ApprovalRequest>),
+    /// A session's mode, pending approvals and Auto mode status (T46).
+    Policy(
+        String,
+        PermissionMode,
+        Vec<ApprovalRequest>,
+        Option<piarc_protocol::policy::AutoReviewStatus>,
+    ),
     /// A subagent session started under a main session (`Some`) or ended (`None`), T31: its
     /// approvals show in the main session's entry; it has no entry of its own.
     Subagent(String, Option<String>),
@@ -311,7 +321,14 @@ struct SnapshotTask {
     workspaces: BTreeMap<String, WorkspaceView>,
     /// Open sessions, by id.
     live: BTreeMap<String, LiveSession>,
-    policies: BTreeMap<String, (PermissionMode, Vec<ApprovalRequest>)>,
+    policies: BTreeMap<
+        String,
+        (
+            PermissionMode,
+            Vec<ApprovalRequest>,
+            Option<piarc_protocol::policy::AutoReviewStatus>,
+        ),
+    >,
     /// Running subagent sessions → their main session.
     subagents: BTreeMap<String, String>,
     recent: Vec<piarc_store::WorkspaceRecord>,
@@ -343,8 +360,8 @@ impl SnapshotTask {
                         self.live.remove(&id);
                         sessions = true;
                     }
-                    SnapshotMsg::Policy(id, mode, requests) => {
-                        self.policies.insert(id, (mode, requests));
+                    SnapshotMsg::Policy(id, mode, requests, auto) => {
+                        self.policies.insert(id, (mode, requests, auto));
                         sessions = true;
                     }
                     SnapshotMsg::Subagent(id, Some(root)) => {
@@ -453,15 +470,16 @@ impl SnapshotTask {
             }
         }
         for view in &mut list {
-            if let Some((mode, requests)) = self.policies.get(&view.id) {
+            if let Some((mode, requests, auto)) = self.policies.get(&view.id) {
                 view.permission_mode = *mode;
-                view.pending_approvals = requests.len();
+                view.pending_approvals = waiting(requests);
                 view.approvals.clone_from(requests);
+                view.auto_review.clone_from(auto);
             }
             // The approvals its subagents wait for (each card names its subagent).
             for (child, _) in self.subagents.iter().filter(|(_, root)| **root == view.id) {
-                if let Some((_, requests)) = self.policies.get(child) {
-                    view.pending_approvals += requests.len();
+                if let Some((_, requests, _)) = self.policies.get(child) {
+                    view.pending_approvals += waiting(requests);
                     view.approvals.extend(requests.iter().cloned());
                 }
             }
@@ -526,6 +544,7 @@ fn indexed_view(record: &piarc_store::SessionRecord) -> SessionView {
         permission_mode: PermissionMode::Default,
         approvals: Vec::new(),
         pending_approvals: 0,
+        auto_review: None,
         model: meta
             .model_provider
             .as_ref()
@@ -546,6 +565,18 @@ fn indexed_view(record: &piarc_store::SessionRecord) -> SessionView {
     }
 }
 
+/// Cards the user can answer: not those the Auto mode reviewer is still deciding (T46).
+fn waiting(requests: &[ApprovalRequest]) -> usize {
+    requests
+        .iter()
+        .filter(|r| {
+            r.review
+                .as_ref()
+                .is_none_or(|review| review.state != piarc_protocol::policy::ReviewState::Reviewing)
+        })
+        .count()
+}
+
 fn empty_view(id: &str) -> SessionView {
     SessionView {
         id: id.to_owned(),
@@ -560,6 +591,7 @@ fn empty_view(id: &str) -> SessionView {
         permission_mode: PermissionMode::Default,
         approvals: Vec::new(),
         pending_approvals: 0,
+        auto_review: None,
         model: None,
         message_count: 0,
         created_at: None,
