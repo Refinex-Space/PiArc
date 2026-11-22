@@ -4322,13 +4322,6 @@
       "evidence": ""
     },
     {
-      "id": "T44-A06",
-      "task": "T44",
-      "description": "8 小时长跑在稳态后主进程、渲染进程、Agent Host 的内存增长都 ≤ 10%。验证：长跑报告与采样数据。",
-      "status": "not_started",
-      "evidence": ""
-    },
-    {
       "id": "T44-A07",
       "task": "T44",
       "description": "空闲 CPU 已定成具体阈值并写入第 11 章；窗口隐藏时渲染进程无 rAF 回调、终端不产生帧。验证：测试输出与文档改动。",
