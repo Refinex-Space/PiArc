@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatDuration, TaskList, taskDuration, taskOf, tasksOfSession } from './tasks.js';
+import { durationParts, TaskList, taskDuration, taskOf, tasksOfSession } from './tasks.js';
 
 const row = {
   taskId: 'bg-0a1b2c3d4e5f',
@@ -68,8 +68,8 @@ describe('background task snapshots (T32)', () => {
     if (running === undefined || ended === undefined) throw new Error('tasks');
     expect(taskDuration(running, 13_500)).toBe(12_500);
     expect(taskDuration(ended, 999_999)).toBe(65_000);
-    expect(formatDuration(12_500)).toBe('12s');
-    expect(formatDuration(65_000)).toBe('1m 05s');
-    expect(formatDuration(3_725_000)).toBe('1h 02m');
+    expect(durationParts(12_500)).toEqual({ hours: 0, minutes: 0, seconds: 12 });
+    expect(durationParts(65_000)).toEqual({ hours: 0, minutes: 1, seconds: 5 });
+    expect(durationParts(3_725_000)).toEqual({ hours: 1, minutes: 2, seconds: 0 });
   });
 });

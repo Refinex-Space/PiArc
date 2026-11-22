@@ -154,11 +154,11 @@ export function taskDuration(task: BackgroundTask, now: number): number {
   return Math.max(0, (task.endedAt ?? now) - task.startedAt);
 }
 
-/** `ms` as `12s`, `3m 05s` or `1h 02m`. */
-export function formatDuration(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${String(seconds)}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${String(minutes)}m ${String(seconds % 60).padStart(2, '0')}s`;
-  return `${String(Math.floor(minutes / 60))}h ${String(minutes % 60).padStart(2, '0')}m`;
+/** `ms` split for the catalog's `bgTasks.duration`: hours, minutes and seconds (R5: the text
+ * was English in both languages). */
+export function durationParts(ms: number): { hours: number; minutes: number; seconds: number } {
+  const total = Math.floor(ms / 1000);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor(total / 60) % 60;
+  return { hours, minutes, seconds: hours > 0 ? 0 : total % 60 };
 }

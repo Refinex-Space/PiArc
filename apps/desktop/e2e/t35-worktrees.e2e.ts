@@ -116,7 +116,7 @@ test('starts a session in its own worktree and asks before archiving its changes
   await stubMessageBox(app, 2);
   await sessionMenu(page, id, 'Archive');
   await expect.poll(() => messageBoxes(app)).toHaveLength(1);
-  expect((await messageBoxes(app))[0]).toContain('1 uncommitted changes');
+  expect((await messageBoxes(app))[0]).toContain('1 uncommitted change.');
   await expect(row(page, id)).toBeVisible();
   await expect(page.getByTestId('conversation')).toBeVisible();
 

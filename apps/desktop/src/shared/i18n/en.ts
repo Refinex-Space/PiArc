@@ -804,7 +804,7 @@ export const en = {
   'changes.comment.cancel': 'Cancel',
   'changes.comment.edit': 'Edit',
   'changes.comment.delete': 'Delete',
-  'changes.comment.count': '{count} comments not sent',
+  'changes.comment.count': '{count, plural, one {# comment not sent} other {# comments not sent}}',
   'changes.comment.send': 'Send comments',
   'changes.comment.sendHint':
     '{key} sends every comment; while the agent works they wait in the queue.',
@@ -994,7 +994,8 @@ export const en = {
   'plugins.uninstall': 'Uninstall',
   'plugins.uninstallSure': 'Uninstall {id}? Click again to confirm.',
   'plugins.review': 'Review new items',
-  'plugins.pending': '{count} executable items wait for your confirmation and do not run',
+  'plugins.pending':
+    '{count, plural, one {# executable item waits for your confirmation and does not run} other {# executable items wait for your confirmation and do not run}}',
   'plugins.unsupported': 'Not supported: {list}',
   'plugins.components.commands': 'Commands',
   'plugins.components.skills': 'Skills',
@@ -1134,9 +1135,11 @@ export const en = {
   'terminal.openFailed': 'The terminal could not be opened: {reason}',
   'terminal.copied': 'Copied.',
   'bgTasks.openTerminal': 'Open in terminal panel',
+  'bgTasks.duration':
+    '{hours, plural, =0 {{minutes, plural, =0 {{seconds} s} other {{minutes} min {seconds} s}}} other {{hours} h {minutes} min}}',
 
   'dialog.archiveWorktree.message':
-    'The session’s worktree has {count} uncommitted changes. Archive it anyway?',
+    '{count, plural, one {The session’s worktree has # uncommitted change. Archive it anyway?} other {The session’s worktree has # uncommitted changes. Archive it anyway?}}',
   'dialog.archiveWorktree.detail':
     'Keep the worktree: the session is archived and the worktree stays; its cleanup 30 days later asks again if it still has changes. Discard: the changes are thrown away and the worktree is removed. Its branch stays either way.',
   'dialog.archiveWorktree.keep': 'Keep worktree and archive',
@@ -1177,7 +1180,7 @@ export const en = {
   'search.messages': 'In messages',
   'search.searching': 'Searching messages…',
   'search.none': 'No message contains “{query}”.',
-  'search.more': '{count} more matches',
+  'search.more': '{count, plural, one {# more match} other {# more matches}}',
   'search.role.user': 'You',
   'search.role.assistant': 'Agent',
   'search.failed': 'Searching failed: {reason}',

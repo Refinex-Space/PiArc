@@ -53,6 +53,7 @@ describe('i18n', () => {
             done: 1,
             total: 3,
             minutes: 1,
+            hours: 0,
             value: 'v',
             kinds: 'memory',
             reliability: 'low',

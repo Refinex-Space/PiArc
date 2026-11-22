@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { MessageId } from '../../shared/i18n/index.js';
 import { useT } from '../app/app-context.js';
 import { useSession, useSessions, useTasks } from '../store/hooks.js';
-import { formatDuration, taskDuration, tasksOfSession } from '../store/tasks.js';
+import { durationParts, taskDuration, tasksOfSession } from '../store/tasks.js';
 import { showTerminal } from '../terminal/panel-state.js';
 import { showPanel } from './registry.js';
 
@@ -126,7 +126,9 @@ function TaskSummary({ task, now }: { readonly task: BackgroundTask; readonly no
         {t(STATUS_MESSAGE[task.status])}
         {code === undefined ? '' : ` · ${code}`}
       </span>
-      <span className="bg-task-duration">{formatDuration(taskDuration(task, now))}</span>
+      <span className="bg-task-duration">
+        {t('bgTasks.duration', durationParts(taskDuration(task, now)))}
+      </span>
     </div>
   );
 }

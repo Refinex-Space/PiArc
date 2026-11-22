@@ -1099,6 +1099,8 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'terminal.openFailed': '无法打开终端：{reason}',
   'terminal.copied': '已复制。',
   'bgTasks.openTerminal': '在终端面板中打开',
+  'bgTasks.duration':
+    '{hours, plural, =0 {{minutes, plural, =0 {{seconds} 秒} other {{minutes} 分 {seconds} 秒}}} other {{hours} 小时 {minutes} 分}}',
 
   'dialog.archiveWorktree.message': '会话的 worktree 有 {count} 处未提交的改动。仍要归档吗？',
   'dialog.archiveWorktree.detail':
