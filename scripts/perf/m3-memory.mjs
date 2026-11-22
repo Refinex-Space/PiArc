@@ -22,17 +22,25 @@
 //
 // JSON goes to tmp/evidence/T35/m3-memory.json unless `--out` names another file; the exit code
 // is 1 when a budget is exceeded.
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { createInterface } from 'node:readline';
 import { parseArgs } from 'node:util';
 
-import { _electron as electron } from '@playwright/test';
-
 import { isMain, isRecord, repoRoot } from '../lib/repo.mjs';
-import { appCommand } from '../bench/s1-transcript.mjs';
+import {
+  appSnapshot,
+  launchApp,
+  MB,
+  mockRequests,
+  openWorkspace,
+  requestCounts,
+  seedModels,
+  startMock,
+  startSession,
+  stats,
+} from './lib.mjs';
 
 export const BUDGET = {
   agentHostBaseMB: 150,
@@ -45,7 +53,6 @@ const STEPS = 120;
 
 /** Active sessions in the Agent Host: three sessions and one subagent. */
 const ACTIVE = 4;
-const MB = 1_000_000;
 
 /** The stdio MCP fixture server, run by this Node (type stripping). */
 const ECHO_SERVER = path.join(repoRoot, 'packages', 'testkit', 'src', 'mcp-echo-server.ts');
@@ -122,80 +129,6 @@ async function writeScenarios(dir) {
 }
 
 /**
- * @param {string} scenarios
- * @returns {Promise<{ baseUrl: string, stop: () => void }>}
- */
-async function startMock(scenarios) {
-  const child = spawn(
-    'cargo',
-    [
-      'run',
-      '-q',
-      '--locked',
-      '-p',
-      'piarc-testkit',
-      '--bin',
-      'piarc-mock-provider',
-      '--',
-      '--port',
-      '0',
-      '--scenarios',
-      scenarios,
-    ],
-    { cwd: repoRoot, stdio: ['pipe', 'pipe', 'inherit'] },
-  );
-  const lines = createInterface({ input: child.stdout });
-  /** @type {string} */
-  const port = await new Promise((resolve, reject) => {
-    lines.once('line', (/** @type {string} */ line) => {
-      resolve(line);
-    });
-    child.once('exit', (code) => {
-      reject(new Error(`piarc-mock-provider exited with ${String(code)}`));
-    });
-  });
-  lines.close();
-  return { baseUrl: `http://127.0.0.1:${port.trim()}`, stop: () => child.stdin.end() };
-}
-
-/**
- * Pi's models (the mock) in the data directory, and the user's rule that lets the MCP server's
- * tools run without asking.
- * @param {string} dataDir
- * @param {string} baseUrl
- */
-async function seedModels(dataDir, baseUrl) {
-  await mkdir(path.join(dataDir, 'pi'), { recursive: true });
-  await writeFile(
-    path.join(dataDir, 'settings.json'),
-    JSON.stringify({ permissions: { allow: ['mcp__shared__*'] } }),
-  );
-  await writeFile(
-    path.join(dataDir, 'pi', 'models.json'),
-    JSON.stringify({
-      providers: {
-        'piarc-mock': {
-          baseUrl,
-          api: 'anthropic-messages',
-          apiKey: 'piarc-mock-test-key',
-          models: [
-            {
-              id: 'mock-large',
-              name: 'mock-large',
-              reasoning: false,
-              input: ['text'],
-              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-              contextWindow: 200_000,
-              maxTokens: 4096,
-            },
-          ],
-        },
-      },
-    }),
-  );
-}
-
-/**
  * A git repository with a few files to read, the shared MCP server in `.mcp.json` (its start log
  * is `startLog`) and the project's skills.
  * @param {string} dir
@@ -248,34 +181,6 @@ async function makeRepository(dir, startLog) {
 }
 
 /**
- * The requests the mock received.
- * @param {string} baseUrl
- * @returns {Promise<{ scenario: string, body: string }[]>}
- */
-async function requests(baseUrl) {
-  const response = await fetch(`${baseUrl}/_piarc/requests`);
-  /** @type {unknown} */
-  const records = await response.json();
-  return (Array.isArray(records) ? records : []).map((record) => ({
-    scenario: isRecord(record) && typeof record.scenario === 'string' ? record.scenario : '',
-    body: isRecord(record) && typeof record.body === 'string' ? record.body : '',
-  }));
-}
-
-/**
- * Requests the mock received per scenario.
- * @param {string} baseUrl
- */
-async function requestCounts(baseUrl) {
-  /** @type {Record<string, number>} */
-  const counts = {};
-  for (const { scenario: name } of await requests(baseUrl)) {
-    counts[name] = (counts[name] ?? 0) + 1;
-  }
-  return counts;
-}
-
-/**
  * For each scenario, whether its first request offered the shared MCP server's tool and carried
  * every project skill in the system prompt.
  * @param {string} baseUrl
@@ -283,7 +188,7 @@ async function requestCounts(baseUrl) {
 async function firstRequests(baseUrl) {
   /** @type {Record<string, { mcpTool: boolean, skills: boolean }>} */
   const seen = {};
-  for (const { scenario: name, body } of await requests(baseUrl)) {
+  for (const { scenario: name, body } of await mockRequests(baseUrl)) {
     if (name === '' || name in seen) continue;
     /** @type {unknown} */
     const parsed = JSON.parse(body);
@@ -298,99 +203,6 @@ async function firstRequests(baseUrl) {
 }
 
 /**
- * Resident size (bytes) of each process whose command line contains `needle`, among the children
- * of `parent`.
- * @param {number} parent
- * @param {string} needle
- * @returns {{ pid: number, bytes: number }[]}
- */
-function children(parent, needle) {
-  if (process.platform === 'win32') {
-    const script = `Get-CimInstance Win32_Process -Filter "ParentProcessId = ${String(parent)}" | Where-Object { $_.CommandLine -like '*${needle}*' } | ForEach-Object { "$($_.ProcessId) $($_.WorkingSetSize)" }`;
-    const out = execFileSync(
-      'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-Command', script],
-      {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-      },
-    );
-    return out
-      .trim()
-      .split(/\r?\n/u)
-      .filter(Boolean)
-      .map((line) => {
-        const [pid, bytes] = line.trim().split(/\s+/u).map(Number);
-        return { pid: pid ?? 0, bytes: bytes ?? 0 };
-      });
-  }
-  const out = execFileSync('ps', ['-A', '-o', 'pid=,ppid=,rss=,command='], { encoding: 'utf8' });
-  return out
-    .split('\n')
-    .map((line) => /^(\d+)\s+(\d+)\s+(\d+)\s+(.*)$/u.exec(line.trim()))
-    .filter((m) => m !== null && Number(m[2]) === parent && (m[4] ?? '').includes(needle))
-    .map((m) => ({ pid: Number(m?.[1]), bytes: Number(m?.[3]) * 1024 }));
-}
-
-/**
- * One sample: each app process type's working set, the Agent Host's resident size (when the
- * main process id is given) and the main process's JavaScript memory.
- * @param {import('@playwright/test').ElectronApplication} app
- * @param {number} [mainPid]
- */
-async function snapshot(app, mainPid) {
-  const { metrics, main } = await app.evaluate(({ app: electronApp }) => ({
-    metrics: electronApp
-      .getAppMetrics()
-      .map((m) => ({ type: m.type, kib: m.memory.workingSetSize })),
-    main: process.memoryUsage(),
-  }));
-  /** @type {Record<string, number>} */
-  const byType = {};
-  for (const metric of metrics)
-    byType[metric.type] = (byType[metric.type] ?? 0) + metric.kib * 1024;
-  const hosts = mainPid === undefined ? [] : children(mainPid, 'agent-host');
-  const servers = hosts.flatMap((host) => children(host.pid, 'mcp-echo-server'));
-  return {
-    at: Date.now(),
-    agentHostBytes: hosts.reduce((sum, host) => sum + host.bytes, 0),
-    mcpServerBytes: servers.reduce((sum, server) => sum + server.bytes, 0),
-    mcpServers: servers.length,
-    appBytes: metrics.reduce((sum, metric) => sum + metric.kib * 1024, 0),
-    byType,
-    main,
-  };
-}
-
-/**
- * @param {number[]} values
- */
-function stats(values) {
-  const sorted = [...values].sort((a, b) => a - b);
-  const at = (/** @type {number} */ q) =>
-    sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] ?? Number.NaN;
-  return { min: sorted[0] ?? Number.NaN, median: at(0.5), max: at(1) };
-}
-
-/**
- * Starts a session from the home view: the text carries the mock's scenario marker.
- * @param {import('@playwright/test').Page} page
- * @param {string} scenarioId
- * @param {{ worktree?: string, trust?: boolean }} options
- */
-async function startSession(page, scenarioId, options) {
-  await page.getByTestId('new-session').click();
-  if (options.worktree !== undefined) {
-    await page.getByTestId('home-worktree').check();
-    await page.getByTestId('home-worktree-name').fill(options.worktree);
-  }
-  await page.getByTestId('home-input').fill(`Work on it [[piarc-scenario:${scenarioId}]]`);
-  await page.getByTestId('home-start').click();
-  if (options.trust === true) await page.getByTestId('trust-accept').click();
-  await page.getByTestId('conversation').waitFor({ timeout: 30_000 });
-}
-
-/**
  * @param {{ form: 'packaged' | 'dev', warmup: number, seconds: number }} options
  */
 export async function measure(options) {
@@ -402,24 +214,13 @@ export async function measure(options) {
   await writeScenarios(path.join(root, 'scenarios'));
   await makeRepository(workspace, startLog);
   const mock = await startMock(path.join(root, 'scenarios'));
-  await seedModels(userData, mock.baseUrl);
-  const { command, args } = await appCommand(options.form, [`--user-data-dir=${userData}`]);
-  const app = await electron.launch({
-    executablePath: command,
-    args,
-    env: { ...process.env, PIARC_TEST_MEMORY_KEYCHAIN: '1' },
-  });
+  // The user's rule lets the MCP server's tools run without asking.
+  await seedModels(userData, mock.baseUrl, { permissions: { allow: ['mcp__shared__*'] } });
+  const { app, page } = await launchApp(options.form, userData);
   try {
-    const page = await app.firstWindow();
-    await page.getByTestId('app-shell').waitFor();
-    await page.evaluate("window.piarc.setPreference({ key: 'language', value: 'en' })");
-    await app.evaluate(({ dialog }, dir) => {
-      dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [dir] });
-    }, workspace);
-    await page.getByTestId('open-folder').click();
-    await page.getByTestId('home-workspace').waitFor();
+    await openWorkspace(app, page, workspace);
     await new Promise((resolve) => setTimeout(resolve, 3000));
-    const idle = await snapshot(app);
+    const idle = await appSnapshot(app);
     await startSession(page, 'm3-one', { trust: true });
     await startSession(page, 'm3-tree', { worktree: 'm3-tree' });
     await startSession(page, 'm3-agent', {});
@@ -440,11 +241,11 @@ export async function measure(options) {
     console.log(`warming up for ${String(options.warmup)} s`);
     await new Promise((resolve) => setTimeout(resolve, options.warmup * 1000));
     const mainPid = await app.evaluate(() => process.pid);
-    /** @type {Awaited<ReturnType<typeof snapshot>>[]} */
+    /** @type {Awaited<ReturnType<typeof appSnapshot>>[]} */
     const samples = [];
     const end = Date.now() + options.seconds * 1000;
     while (Date.now() < end) {
-      samples.push(await snapshot(app, mainPid));
+      samples.push(await appSnapshot(app, mainPid));
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
     const counts = await requestCounts(mock.baseUrl);
