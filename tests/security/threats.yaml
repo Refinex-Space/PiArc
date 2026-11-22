@@ -63,6 +63,7 @@ threats:
           - vitest:apps/desktop/src/renderer/transcript/rows/rows.test.tsx::renders the five ledger card kinds, keeps approvals through a history reload, and removes invalidated requests
           - l4:apps/desktop/e2e/t19-security.e2e.ts::renders reply, tool output, command output and file paths as inert text
           - cap:CAP-SEC-INJECTION-001
+          - vitest:apps/desktop/src/renderer/transcript/reveal.test.ts::THR-01 shows every bidirectional control as a visible marker, in place
       - arch: WebFetch 的网页只作为辅助模型提问里的材料，提取结果是工具结果，不进 system prompt，网页内容不影响权限裁决（T29）
         measure: 网页只作为辅助模型的材料，提取结果是工具结果
         type: automated
@@ -397,6 +398,8 @@ threats:
           - l4:apps/desktop/e2e/transcript-security.e2e.ts::renders every payload of a finished message as inert text
           - l4:apps/desktop/e2e/transcript-security.e2e.ts::renders the payloads inertly while they stream
           - l4:apps/desktop/e2e/t19-security.e2e.ts::renders reply, tool output, command output and file paths as inert text
+          - l4:apps/desktop/e2e/t45-xss.e2e.ts::THR-11 approval cards, the Changes diff and its comments show the payloads as text
+          - l4:apps/desktop/e2e/t45-xss.e2e.ts::THR-11 settings pages and a hook notice show names, values and messages as text
 
   - id: THR-12
     title: 应用被当作通用运行时滥用
@@ -447,6 +450,7 @@ threats:
           - vitest:apps/desktop/src/main/external-links.test.ts::rejects URLs with user information, which hide the real host
           - 'l4:apps/desktop/e2e/external-links.e2e.ts::rejects javascript:, file: and other schemes without asking'
           - l4:apps/desktop/e2e/t34-terminal.e2e.ts::OSC 8 links and plain URLs show their address and open only when confirmed
+          - l4:apps/desktop/e2e/t45-xss.e2e.ts::THR-13 OSC 8 links with script and data targets in the terminal neither open nor navigate
           - l4:apps/desktop/e2e/transcript-security.e2e.ts::opens links only through the main process confirmation
       - measure: piarc:// 链接只做定位，不带可执行内容
         type: automated

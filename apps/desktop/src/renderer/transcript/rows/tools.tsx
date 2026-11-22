@@ -9,6 +9,7 @@ import { memo } from 'react';
 import { useApp, useT } from '../../app/app-context.js';
 import { useExpanded, useTranscriptRow, useTranscriptRows } from '../services.js';
 import { useElapsedText, useNow } from './common.js';
+import { revealBidi } from '../reveal.js';
 import {
   STATUS_MESSAGE,
   summarize,
@@ -309,7 +310,7 @@ export function FileChangeCard({
       <div className="file-change-head">
         <StatusMark status={item.status} />
         <span className="file-change-path" data-testid="file-change-path" title={item.path}>
-          {item.path}
+          {revealBidi(item.path)}
         </span>
         {diff?.created === true ? (
           <span className="badge">{t('transcript.file.created')}</span>
@@ -379,7 +380,7 @@ export function DiffView({
                 <span className="diff-sign" aria-hidden="true">
                   {line.kind === 'added' ? '+' : line.kind === 'removed' ? '−' : ' '}
                 </span>
-                {line.text}
+                {revealBidi(line.text)}
               </td>
             </tr>
           );

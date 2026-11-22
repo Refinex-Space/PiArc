@@ -133,6 +133,70 @@ export const XSS_PAYLOADS: readonly XssPayload[] = [
     markdown: '<form action="https://example.com/"><button>submit</button></form>',
     visibleText: '<form action="https://example.com/"><button>submit</button></form>',
   },
+  // T45: link schemes, entity obfuscation, SVG events and foreignObject, style url(),
+  // markup in file names and Unicode bidirectional controls.
+  {
+    id: 'link-data-html',
+    description: 'Markdown link to an HTML data URL',
+    markdown: `[data link](data:text/html,<script>${sentinel('link-data-html')}</script>)`,
+    visibleText: 'data link',
+  },
+  {
+    id: 'link-vbscript',
+    description: 'Markdown link to a vbscript: URL',
+    markdown: '[vb link](vbscript:msgbox(1))',
+    visibleText: 'vb link',
+  },
+  {
+    id: 'link-javascript-tab-entity',
+    description: 'javascript: split by an encoded tab and newline',
+    markdown: `[tabbed](java&#x09;scr&#x0A;ipt:${sentinel('link-javascript-tab-entity')})`,
+    visibleText: 'tabbed',
+  },
+  {
+    id: 'anchor-javascript-hex-entity',
+    description: 'raw <a> whose javascript: is hex character references',
+    markdown: `<a href="&#x6A;&#x61;&#x76;&#x61;script:${sentinel('anchor-javascript-hex-entity')}">hex anchor</a>`,
+    visibleText: `<a href="&#x6A;&#x61;&#x76;&#x61;script:${sentinel('anchor-javascript-hex-entity')}">`,
+  },
+  {
+    id: 'svg-foreign-object',
+    description: 'SVG foreignObject carrying an <img> with onerror',
+    markdown: `<svg><foreignObject><img src="x" onerror="${sentinel('svg-foreign-object')}"></foreignObject></svg>`,
+    visibleText: `<svg><foreignObject><img src="x" onerror="${sentinel('svg-foreign-object')}"></foreignObject></svg>`,
+  },
+  {
+    id: 'svg-animate-onbegin',
+    description: 'SVG <animate> with an onbegin attribute',
+    markdown: `<svg><animate onbegin="${sentinel('svg-animate-onbegin')}" attributeName="x" dur="1s"></animate></svg>`,
+    visibleText: `<svg><animate onbegin="${sentinel('svg-animate-onbegin')}" attributeName="x" dur="1s"></animate></svg>`,
+  },
+  {
+    id: 'svg-anchor-xlink',
+    description: 'SVG <a> with an xlink:href to javascript:',
+    markdown: `<svg><a xlink:href="javascript:${sentinel('svg-anchor-xlink')}"><text>svg link</text></a></svg>`,
+    visibleText: `<svg><a xlink:href="javascript:${sentinel('svg-anchor-xlink')}"><text>svg link</text></a></svg>`,
+  },
+  {
+    id: 'style-url',
+    description: 'inline style loading a remote url() and a javascript: url()',
+    markdown:
+      '<div style="background:url(https://example.com/track.png)"><span style="background-image:url(javascript:alert(1))">styled</span></div>',
+    visibleText:
+      '<div style="background:url(https://example.com/track.png)"><span style="background-image:url(javascript:alert(1))">styled</span></div>',
+  },
+  {
+    id: 'html-in-file-name',
+    description: 'a file name made of markup, as a path in inline code and as a link',
+    markdown: `Changed \`src/<img src=x onerror=${sentinel('html-in-file-name')}>.ts\` and [<b>file</b>](./<script>.md)`,
+    visibleText: `src/<img src=x onerror=${sentinel('html-in-file-name')}>.ts`,
+  },
+  {
+    id: 'bidi-controls',
+    description: 'Unicode bidirectional overrides that reorder what is displayed',
+    markdown: 'access = "user\u202e \u2066// admin\u2069 \u2066"; run\u202d(rm -rf ~)',
+    visibleText: 'access = "user\u202e \u2066// admin\u2069 \u2066"; run\u202d(rm -rf ~)',
+  },
 ];
 
 /** All payloads as one Markdown message, separated by blank lines. */

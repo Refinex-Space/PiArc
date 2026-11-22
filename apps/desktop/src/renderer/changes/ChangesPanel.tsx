@@ -19,6 +19,7 @@ import { DiffBody } from './DiffBody.js';
 import { CommentsBar, DiffCommentsProvider, useDiffCommentsState } from './DiffComments.js';
 import { languageOf } from './language.js';
 import { openChangesPanel } from './panel-state.js';
+import { revealBidi } from '../transcript/reveal.js';
 
 function Counts({ added, removed }: { readonly added: number; readonly removed: number }) {
   return (
@@ -111,7 +112,7 @@ function FileRow({
           {open ? '▾' : '▸'}
         </button>
         <span className="changes-file-path" title={file.path} data-testid="changes-file-path">
-          {file.label}
+          {revealBidi(file.label)}
         </span>
         <span className="change-tag">{t(`changes.kind.${file.kind}`)}</span>
         <Counts added={file.added} removed={file.removed} />

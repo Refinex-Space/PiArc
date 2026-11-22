@@ -8,6 +8,7 @@ import { Fragment, useEffect, useState } from 'react';
 
 import { useT } from '../app/app-context.js';
 import { Token } from '../transcript/highlight/CodeBlock.js';
+import { revealBidi } from '../transcript/reveal.js';
 import type { HighlightClient } from '../transcript/highlight/highlight-client.js';
 import type { HighlightLines } from '../transcript/highlight/protocol.js';
 import { useDarkScheme } from '../transcript/use-color-scheme.js';
@@ -145,7 +146,7 @@ function Hunk({
                   {line.kind === 'added' ? '+' : line.kind === 'removed' ? '−' : ' '}
                 </span>
                 {tokens === undefined
-                  ? line.text
+                  ? revealBidi(line.text)
                   : tokens.map((token, i) => <Token key={i} token={token} dark={dark} />)}
               </td>
             </tr>

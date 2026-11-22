@@ -8,6 +8,7 @@ import { useTranscriptServices } from '../services.js';
 import { useDarkScheme } from '../use-color-scheme.js';
 import { HighlightClient } from './highlight-client.js';
 import type { HighlightLines, HighlightToken } from './protocol.js';
+import { revealBidi } from '../reveal.js';
 
 const ITALIC = 1;
 const BOLD = 2;
@@ -29,7 +30,7 @@ export function Token({ token, dark }: { token: HighlightToken; dark: boolean })
   const color = dark ? token.dark : token.light;
   return (
     <span className={tokenClass(token.fontStyle)} style={color === null ? undefined : { color }}>
-      {token.text}
+      {revealBidi(token.text)}
     </span>
   );
 }

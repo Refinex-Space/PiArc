@@ -5,6 +5,7 @@ import type { ApprovalRequest } from '@piarc/protocol';
 import { useRef, useState } from 'react';
 import type { ApprovalAnswer } from '../../../shared/ipc.js';
 import { useApp } from '../../app/app-context.js';
+import { revealBidi } from '../reveal.js';
 import { reason } from '../../shell/errors.js';
 import { useApprovalKeys } from '../../approvals/use-approval-keys.js';
 import { canAlwaysAllow } from './approval-keys.js';
@@ -112,21 +113,24 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
         </div>
       )}
       {request.cwd && (
-        <div className="approval-path">{t('approval.cwd', { path: request.cwd })}</div>
+        <div className="approval-path">{t('approval.cwd', { path: revealBidi(request.cwd) })}</div>
       )}
-      {request.path && <div className="approval-path">{request.path}</div>}
+      {request.path && <div className="approval-path">{revealBidi(request.path)}</div>}
       {request.directory && (
         <div className="approval-path">
-          {t('approval.directory')} · {request.directory}
+          {t('approval.directory')} · {revealBidi(request.directory)}
         </div>
       )}
       {long && !expanded ? (
         <pre className="bash-command">
-          {content.split('\n').slice(0, PREVIEW_LINES).join('\n').slice(0, PREVIEW_CHARS)}…
+          {revealBidi(
+            content.split('\n').slice(0, PREVIEW_LINES).join('\n').slice(0, PREVIEW_CHARS),
+          )}
+          …
         </pre>
       ) : (
         <>
-          {request.command && <pre className="bash-command">{request.command}</pre>}
+          {request.command && <pre className="bash-command">{revealBidi(request.command)}</pre>}
           {request.diff &&
             (request.diff.hunks.length ? (
               <DiffView
@@ -138,7 +142,7 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
               />
             ) : (
               <pre className="bash-command">
-                {request.diff.unified || t('transcript.file.noDiff')}
+                {revealBidi(request.diff.unified) || t('transcript.file.noDiff')}
               </pre>
             ))}
         </>
