@@ -136,7 +136,13 @@ fn a_plugin_lists_its_components_executables_and_unsupported_parts() {
     assert_eq!(components.hooks, ["PreToolUse"]);
     assert_eq!(components.mcp_servers, ["plugin_demo_db"]);
     let executables = manifest.executables();
-    let root_text = root.to_string_lossy();
+    // The variables expand to the real directory without Windows' `\\?\` prefix: in a verbatim
+    // path the `/` after it is not a separator, and Git Bash cannot run one.
+    let root_text = manifest::real_path(&root)
+        .expect("root")
+        .to_string_lossy()
+        .into_owned();
+    assert!(!root_text.starts_with(r"\\?\"), "{root_text}");
     assert_eq!(
         names(&executables, PackageExecutableKind::Hook),
         [format!("PreToolUse[Bash] {root_text}/guard.sh")]
@@ -144,8 +150,8 @@ fn a_plugin_lists_its_components_executables_and_unsupported_parts() {
     assert_eq!(
         names(&executables, PackageExecutableKind::McpServer),
         [format!(
-            "plugin_demo_db: node args=[\"{}\"]",
-            root.join("db.mjs").to_string_lossy()
+            "plugin_demo_db: node args=[{}]",
+            serde_json::to_string(&format!("{root_text}/db.mjs")).expect("json")
         )]
     );
     assert_eq!(

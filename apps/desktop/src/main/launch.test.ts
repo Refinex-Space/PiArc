@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { launchTargets, parseLaunchUrl } from './launch.js';
@@ -65,7 +67,7 @@ describe('command lines', () => {
     ];
     expect(launchTargets(argv, false, '/home/me')).toEqual([
       { kind: 'session', sessionId: 'abc' },
-      { kind: 'workspace', path: '/home/me/repo 仓库' },
+      { kind: 'workspace', path: path.resolve('/home/me', 'repo 仓库') },
       { kind: 'workspace', path: '/abs/dir' },
     ]);
   });

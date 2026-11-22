@@ -151,9 +151,7 @@ fn detect(root: &Path) -> Option<PackageKind> {
 ///
 /// The directory is neither a plugin nor a Pi package, or its name is missing or invalid.
 pub fn read(root: &Path, data: &Path) -> Result<Manifest, String> {
-    let root = root
-        .canonicalize()
-        .map_err(|e| format!("{}: cannot open ({e})", root.display()))?;
+    let root = real_path(root).map_err(|e| format!("{}: cannot open ({e})", root.display()))?;
     match detect(&root) {
         Some(PackageKind::ClaudePlugin) => read_plugin(&root, data),
         Some(PackageKind::PiPackage) => read_pi(&root, data),
@@ -201,7 +199,7 @@ fn component_path(root: &Path, raw: &str, issues: &mut Vec<String>) -> Option<Pa
         return None;
     };
     let path = root.join(rest);
-    match path.canonicalize() {
+    match real_path(&path) {
         Ok(real) if real.starts_with(root) => Some(real),
         Ok(_) => {
             issues.push(format!("{raw:?}: leaves the plugin directory"));
@@ -232,6 +230,23 @@ fn paths_of(root: &Path, value: Option<&Value>, issues: &mut Vec<String>) -> Opt
             .filter_map(|p| component_path(root, p, issues))
             .collect(),
     )
+}
+
+/// `path` resolved like `canonicalize` but without Windows' verbatim prefix (`\\?\C:\…` →
+/// `C:\…`): hook commands and server arguments are built from it by text, and in a verbatim
+/// path `/` is not a separator, nor can Git Bash run one (W3).
+pub(crate) fn real_path(path: &Path) -> std::io::Result<PathBuf> {
+    let real = path.canonicalize()?;
+    let Some(text) = real.to_str() else {
+        return Ok(real);
+    };
+    if let Some(unc) = text.strip_prefix(r"\\?\UNC\") {
+        return Ok(PathBuf::from(format!(r"\\{unc}")));
+    }
+    Ok(match text.strip_prefix(r"\\?\") {
+        Some(rest) if rest.as_bytes().get(1) == Some(&b':') => PathBuf::from(rest),
+        _ => real,
+    })
 }
 
 /// Replaces the plugin variables in every string of `value`.
@@ -498,7 +513,7 @@ fn read_pi(root: &Path, data: &Path) -> Result<Manifest, String> {
                         return None;
                     }
                     let path = root.join(raw.trim_start_matches("./"));
-                    match path.canonicalize() {
+                    match real_path(&path) {
                         Ok(real) if real.starts_with(root) => Some(real),
                         Ok(_) => {
                             issues.push(format!("pi.{field} {raw:?}: leaves the package"));

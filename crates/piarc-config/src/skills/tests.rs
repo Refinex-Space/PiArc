@@ -36,13 +36,26 @@ impl Tree {
         std::fs::write(path, text).unwrap();
     }
 
+    /// The catalog of the tree. The walk upward from `cwd` also reaches the directories above
+    /// the tree: on Windows the temporary directory is inside the real user's home, whose own
+    /// `.claude/skills` and `.agents/skills` are not part of the fixture and are dropped.
     fn load_from(&self, cwd: &str) -> Catalog {
-        load(&ResourceDirs {
+        let mut catalog = load(&ResourceDirs {
             cwd: &self.path(cwd),
             data: Some(&self.path("data")),
             home: Some(&self.path("home")),
             packages: &[],
-        })
+        });
+        let inside = |path: &str| Path::new(path).starts_with(&self.root);
+        catalog.skills.retain(|s| inside(&s.info.path));
+        catalog
+            .commands
+            .retain(|c| c.info.path.as_deref().is_none_or(inside));
+        catalog
+            .styles
+            .retain(|s| s.info.path.as_deref().is_none_or(inside));
+        catalog.issues.retain(|i| inside(&i.path));
+        catalog
     }
 }
 

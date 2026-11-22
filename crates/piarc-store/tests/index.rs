@@ -192,7 +192,17 @@ fn a_shorter_or_replaced_file_is_read_again_from_the_start() {
     let changed = std::fs::read_to_string(&writer.path)
         .expect("file")
         .replace("ONLY", "Only");
+    let before = std::fs::metadata(&writer.path)
+        .and_then(|m| m.modified())
+        .expect("mtime");
     std::fs::write(&writer.path, changed).expect("edit earlier entry");
+    // Only the modification time tells this rewrite apart. Two writes inside one timestamp
+    // tick (Windows runners) keep it equal, so move it like a later edit would.
+    std::fs::File::options()
+        .write(true)
+        .open(&writer.path)
+        .and_then(|f| f.set_modified(before + std::time::Duration::from_secs(1)))
+        .expect("set mtime");
     assert_eq!(
         store.sync_file(&writer.path, &mut skipped).expect("sync"),
         FileOutcome::Rescanned { entries: 2 }
