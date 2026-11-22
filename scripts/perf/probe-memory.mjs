@@ -4,18 +4,50 @@
 // rows, collects garbage in the renderer (CDP) and reads `app.getAppMetrics()` working sets
 // (the resident size on macOS) after a few seconds of rest. MB is 10^6 bytes.
 //
+// On macOS the detail also has the processes' physical footprint (`footprint`), which counts
+// the shared framework pages once: for information only (I26), the budget is on resident size.
+//
 //   node scripts/perf/probe-memory.mjs --form packaged --out <file.json>
+import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { isMain } from '../lib/repo.mjs';
+import { isMain, isRecord, readJsonFile } from '../lib/repo.mjs';
 import { writeHistoryFixture } from '../bench/t18-cold-start.mjs';
 import { appSnapshot, launchApp, MB, sleep } from './lib.mjs';
 
 const SESSIONS = 100;
 const LONG = 1000;
+
+/**
+ * The physical footprint (bytes) of each process, by pid (macOS `footprint`).
+ * @param {readonly number[]} pids
+ * @param {string} dir a directory for the tool's JSON output
+ * @returns {Promise<Record<string, number>>}
+ */
+async function footprints(pids, dir) {
+  const file = path.join(dir, 'footprint.json');
+  execFileSync(
+    'footprint',
+    ['-f', 'bytes', '-j', file, ...pids.flatMap((pid) => ['-p', String(pid)])],
+    {
+      stdio: 'ignore',
+    },
+  );
+  const report = await readJsonFile(file);
+  /** @type {Record<string, number>} */
+  const by = {};
+  if (isRecord(report) && Array.isArray(report.processes)) {
+    for (const p of report.processes) {
+      if (isRecord(p) && typeof p.pid === 'number' && typeof p.footprint === 'number') {
+        by[String(p.pid)] = p.footprint;
+      }
+    }
+  }
+  return by;
+}
 
 /**
  * @param {{ form: 'packaged' | 'dev' }} options
@@ -60,6 +92,21 @@ export async function measure(options) {
       await sleep(3000);
       const snapshot = await appSnapshot(app);
       const renderer = snapshot.byType.Tab ?? Number.NaN;
+      /** @type {Record<string, number> | undefined} */
+      let footprintMB;
+      if (process.platform === 'darwin') {
+        const processes = await app.evaluate(({ app: electronApp }) =>
+          electronApp.getAppMetrics().map((m) => ({ pid: m.pid, type: m.type })),
+        );
+        const by = await footprints(
+          processes.map((p) => p.pid),
+          root,
+        );
+        footprintMB = {};
+        for (const p of processes) {
+          footprintMB[p.type] = (footprintMB[p.type] ?? 0) + (by[String(p.pid)] ?? 0) / MB;
+        }
+      }
       return {
         values: {
           'renderer-memory': renderer / MB,
@@ -70,6 +117,14 @@ export async function measure(options) {
           byTypeMB: Object.fromEntries(
             Object.entries(snapshot.byType).map(([type, bytes]) => [type, bytes / MB]),
           ),
+          ...(footprintMB === undefined
+            ? {}
+            : {
+                footprintMB: {
+                  ...footprintMB,
+                  total: Object.values(footprintMB).reduce((a, b) => a + b, 0),
+                },
+              }),
         },
       };
     } finally {

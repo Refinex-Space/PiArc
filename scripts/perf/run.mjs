@@ -384,7 +384,32 @@ async function fromReport(file, lane, only) {
   const wanted = METRICS.filter((m) =>
     only === undefined ? m.lanes.includes(lane) : only.includes(m.id),
   );
-  return { wanted, values, samples: {}, errors: [] };
+  const text = (/** @type {unknown} */ v) => (typeof v === 'string' ? v : undefined);
+  // The machine that measured: its platform picks the budget and the baseline file.
+  const platform = text(report.platform);
+  if (platform === undefined) throw new Error(`${file}: no platform`);
+  return {
+    wanted,
+    values,
+    samples: {},
+    errors: [],
+    host: {
+      platform,
+      cpu: text(report.cpu) ?? 'unknown',
+      memoryGiB: typeof report.memoryGiB === 'number' ? report.memoryGiB : 0,
+      os: text(report.os) ?? 'unknown',
+    },
+  };
+}
+
+/** This machine, as a report describes it. */
+function thisHost() {
+  return {
+    platform: `${process.platform}-${process.arch}`,
+    cpu: os.cpus()[0]?.model ?? 'unknown',
+    memoryGiB: Math.round(os.totalmem() / 1024 ** 3),
+    os: os.release(),
+  };
 }
 
 async function main() {
@@ -417,13 +442,16 @@ async function main() {
           out,
         })
       : await fromReport(args['from-report'], lane, only);
-  const baselines = await readBaselines(process.platform, machine);
+  const host = 'host' in measured ? measured.host : thisHost();
+  // `win32-x64` → `win32`
+  const platform = host.platform.split('-')[0] ?? process.platform;
+  const baselines = await readBaselines(platform, machine);
   const verdicts = measured.wanted.flatMap((metric) => {
     const runs = measured.values[metric.id] ?? [];
     if (runs.length === 0) return [];
     return [
       judge(metric, quantile(runs, 0.5), {
-        platform: process.platform,
+        platform,
         baseline: baselines[metric.id],
         absolute: args.absolute,
         runs: runs.length,
@@ -437,16 +465,16 @@ async function main() {
     date: new Date().toISOString(),
     lane,
     machine,
-    platform: `${process.platform}-${process.arch}`,
-    cpu: os.cpus()[0]?.model ?? 'unknown',
-    memoryGiB: Math.round(os.totalmem() / 1024 ** 3),
-    os: os.release(),
+    ...host,
     absolute: args.absolute,
     verdicts,
     runs: measured.values,
     errors: [...measured.errors, ...missing],
   };
-  await writeFile(path.join(out, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
+  // A judged report of another machine is not rewritten (it may be the file just read).
+  if (!('host' in measured)) {
+    await writeFile(path.join(out, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
+  }
   console.log(
     `\n${'metric'.padEnd(28)}${'value'.padStart(12)}${'budget'.padStart(10)}${'baseline'.padStart(12)}  runs`,
   );
@@ -462,7 +490,7 @@ async function main() {
   for (const line of failed) console.error(`FAIL ${line}`);
   if (args['update-baseline'] !== undefined) {
     if (args['update-baseline'].trim() === '') throw new Error('--update-baseline needs a reason');
-    const file = baselineFile(process.platform, machine);
+    const file = baselineFile(platform, machine);
     /** @type {unknown} */
     const previous = JSON.parse(await readFile(file, 'utf8').catch(() => '{}'));
     const kept = isRecord(previous) && isRecord(previous.values) ? previous.values : {};
@@ -485,7 +513,9 @@ async function main() {
     );
     console.log(`wrote ${path.relative(repoRoot, file)}`);
   }
-  console.log(`report: ${path.relative(repoRoot, path.join(out, 'report.json'))}`);
+  if (!('host' in measured)) {
+    console.log(`report: ${path.relative(repoRoot, path.join(out, 'report.json'))}`);
+  }
   if (failed.length > 0) process.exitCode = 1;
 }
 
