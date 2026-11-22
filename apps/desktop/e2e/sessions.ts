@@ -54,6 +54,19 @@ export async function seedModels(dataDir: string, baseUrl: string): Promise<void
   );
 }
 
+/**
+ * Where workspaces go: skills, commands and agent definitions are read from the workspace
+ * upward, so a workspace inside the user's real home would list that user's own
+ * `~/.claude/skills`. Windows keeps the temporary directory there; `%PUBLIC%` is in no home
+ * (W3, like the L2 runner's roots).
+ */
+function workspaceBase(): string {
+  const temp = os.tmpdir();
+  const relative = path.relative(os.homedir(), temp);
+  const inHome = !path.isAbsolute(relative) && relative.split(path.sep)[0] !== '..';
+  return inHome && process.env.PUBLIC !== undefined ? process.env.PUBLIC : temp;
+}
+
 export const test = base.extend<SessionFixtures>({
   seedMockModel: [true, { option: true }],
   // eslint-disable-next-line no-empty-pattern -- Playwright requires a destructuring pattern here.
@@ -67,7 +80,7 @@ export const test = base.extend<SessionFixtures>({
     await use(userDataDir);
   },
   workspaces: async ({ app }, use) => {
-    const dir = await realpath(await mkdtemp(path.join(os.tmpdir(), 'piarc t18 工作区-')));
+    const dir = await realpath(await mkdtemp(path.join(workspaceBase(), 'piarc t18 工作区-')));
     await use(dir);
     // The app keeps the workspaces open (the Agent Host's working directory, Core's settings
     // watcher), and Windows cannot delete a directory in use: close it first. Closing twice is
