@@ -3933,8 +3933,8 @@
       "id": "T39-A12",
       "task": "T39",
       "description": "Windows 上设置页与沙箱开关显示\"沙箱不可用\"提示；配置开启沙箱或自动批准时，命令仍按权限规则审批，不会被自动批准。验证：Windows CI 上的 Playwright 断言与截图、L2 场景。",
-      "status": "blocked",
-      "evidence": "需要 Windows：L2 `sandbox-windows-not-applied`（CAP-SANDBOX-WINDOWS-001，设置开启沙箱与自动批准时命令仍出卡、配置诊断标\"本平台不生效\"）与 Playwright `t39-sandbox.e2e.ts` 的 Windows 用例（\"沙箱不可用\"提示与截图）已写好，在 macOS 上按平台跳过；Windows 交叉 clippy 通过。等用户推送后看 Windows CI。"
+      "status": "passing",
+      "evidence": "Windows CI 运行 45036807604（提交 ee97d82，https://github.com/Refinex-Space/PiArc/actions/runs/45036807604）：`verify (windows-latest)` 的 L2 `sandbox-windows-not-applied ... ok`（202 passed、0 failed、14 个按平台跳过）；`desktop L4 (windows-latest)` 的 `t39-sandbox.e2e.ts › on Windows › the sandbox switch is unavailable and commands still ask` 在 dev 与 packaged 两种形态 ok（截图在该运行的 L4 工件）。同一运行的其他 Windows 失败与 T39 无关，登记 I227"
     },
     {
       "id": "T39-A13",
@@ -4171,8 +4171,8 @@
       "id": "T42-A07",
       "task": "T42",
       "description": "Windows Toast 按钮的生成与激活回调路径有测试，实机验证已登记到 W4。验证：Windows CI 测试输出与 `PLAN.md` 登记事项。",
-      "status": "blocked",
-      "evidence": "按钮的生成与 `action` 回调经同一 `NotificationPort`（Electron `actions` 即 Windows Toast 按钮），`attention.test.ts` 的 \"gives Electron the buttons and reads the pressed one (macOS buttons, Windows toasts)\" 在 macOS 通过；Windows CI 输出要在用户推送后产生，本会话不推送；实机点击登记 I187，并入 W4"
+      "status": "passing",
+      "evidence": "Windows CI 运行 45036807604（提交 ee97d82，https://github.com/Refinex-Space/PiArc/actions/runs/45036807604）：`verify (windows-latest)` 的 Vitest 步骤通过，含 `apps/desktop/src/main/platform/attention.test.ts (6 tests)`（\"gives Electron the buttons and reads the pressed one (macOS buttons, Windows toasts)\"）；实机点击登记 I187，并入 W4"
     },
     {
       "id": "T42-A08",

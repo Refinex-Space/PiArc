@@ -169,7 +169,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T38 | [WebSearch 与 hooks 扩展（M3）](tasks/T38-websearch-and-hooks-m3.md) | 4 | T37 | macOS | high / 高 | 中 | 无 | 已完成 | fc9c022 |
 | R4 | [M3 评审](tasks/R4-m3-review.md) | 4 | T38、W2 | macOS | high / 高 | 中 | 无 | 部分完成 | 8a1b0cf |
 | W3 | [Windows：M3 达标](tasks/W3-windows-m3-parity.md) | 5 | R4（建议在 T43、T44 之后，需要读屏清单与性能测量脚本） | Windows | high / 高 | 中 | 无 | 部分完成 | 9879474 |
-| T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 607809d |
+| T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 607809d |
 | T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 已完成 | c4e5f75 |
 | T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 已完成 | 10fbeff |
 | T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 部分完成 | 868065b |
@@ -178,7 +178,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 部分完成 | f7b05b7 |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 84a4d07 |
-| T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
+| T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
 | T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T50 | [发布流水线与更新](tasks/T50-release-pipeline-and-updates.md) | 6 | T49 | macOS | high / 高 | 大 | 无 | 未开始 | — |
@@ -308,6 +308,20 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+T47 自动记忆与企业托管配置（macOS，设计关口）：
+
+- [x] 开工检查：基线 `npm run verify -- --baseline` 通过（复用 84a4d07 的全量结果）；CI 运行 45036807604 核对：T39-A12、T42-A07 通过并关闭，Windows verify 的 clippy 死代码已修，其余失败登记 I227
+- [ ] 设计增补 `docs/architecture/addenda/T47-auto-memory-and-managed-settings.md`（八部分 + 需要确认的要点），提交后阻塞等待用户确认（A01）
+- [ ] 自动记忆：存储、`Memory` 工具经 Core 写入与审计、worktree 共享与仓库隔离、Claude Code 记忆只读导入（A02、A04、A06）
+- [ ] 自动记忆：第 4 段注入与长度上限、主题文件按需读取、压缩后重注入、会话中途变化（A03）
+- [ ] 自动记忆：transcript 提示、设置的记忆页（浏览、编辑、删除、开关）、`/memory`、关闭后不注入且工具不可见（A02、A05）
+- [ ] 托管配置：来源读取（文件与片段、macOS 托管偏好、Windows `HKLM`）、合并为最高层、非管理员来源不获优先级、格式错误与热更新、`ConfigChange` 不可阻断（A07、A09、A11）
+- [ ] 托管配置：Claude Code 托管文件兼容（两套路径布局夹具）、配置诊断（加载状态、生效键、忽略键）（A10）
+- [ ] 只允许托管 hooks（审计跳过的 hooks）与增补纳入的其他托管键接入 MCP、插件、沙箱、权限、Auto 模式（A08）
+- [ ] 设置界面的托管锁定标识与不可编辑（A12，截图在 `tmp/evidence/T47/`）
+- [ ] L2 场景 `memory-auto-*`、`managed-*` 与能力 ID；`npm run verify`（A13）
+- [ ] 收尾：`crates/piarc-config`、`agent-host` 的 AGENTS.md，`coding-standards.md` 复用表，验收与看板
 
 ## 登记事项
 
@@ -541,6 +555,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I224 | T46 | `npm run l3`（Claude Code 2.1.318）在 T46 之前就有的缺口：`config-diag-sources` 与 `hooks-m4-*` 六个 L2 场景（T41）既没有 L3 镜像也没有在 `tests/l3-allowlist.yaml` 排除；`perm-plan` 有 5 条未解释差异，都是 PiArc 请求里的 `NotebookEdit` 工具（T42 加入，Claude Code 在 `-p` 下不声明它）。L3 不在 verify 中，只在 Nightly 运行，所以 Nightly 目前会失败。T46 只为自己的 `perm-auto-*` 场景加了排除 | R6 或下一个运行 L3 的任务：为这七个场景写 L3 镜像或排除理由，为 `NotebookEdit` 补 allowlist 条目（确认 Claude Code 该版本的对应工具） |
 | I225 | T46 | T48 的 `PermissionDenied` hook 接入点：Core `crates/piarc-core/src/tool_io/policy/review.rs` 的 `ToolIo::reviewer_refused`（审查模型答 `deny`、`autoReview` 审计已写、拒绝结果交回模型之前；参数是本次调用的 `Call` 与审查结论 `ToolReview`）。只有审查模型的拒绝触发；超时、服务商错误、无法解析、不可用都转人工，不触发 | T48 在这里运行 `PermissionDenied` hooks（输入带审查模型、理由与类别），hook 的 `retry` 等输出按 Claude Code 的语义接入 |
 | I226 | T46 | `audit_events` 没有统一的保留期限：T46 的 `autoReview` 行（每次送审一行，含截断的理由与输入哈希）与其他审计行一样随数据库保留，不自动清理（设计增补第 4.3 节） | R6 评估审计的统一保留期限与清理方式 |
+| I227 | T47 | R5 推送后的 CI 运行 45036807604（提交 ee97d82）开工核对：`verify (windows-latest)` 两步失败：第 7 步 Windows clippy 报 `plugins/tests.rs` 的 `file_url` 未使用（只有 `cfg(unix)` 的用例用它，R5 的 8cdd10b 引入；T47 开工时已加 `#[cfg(unix)]`，本机 Windows 交叉 clippy 通过），第 8 步 `exec_commands` 的 `heredocs_and_syntax_errors_through_eval_on_windows` 断言输出以 `start` 开头，实际 bash 的语法错误行先于 `start` 到达（stdout 与 stderr 两个管道的先后在繁忙的 runner 上不固定，W2 起的用例此前在 Windows CI 通过）；`desktop L4` 两个平台各 3 处失败：macOS 是 I210 已登记的 `t34-terminal` 选区用例（两种形态）与 I32 的 `transcript-scroll` 阈值用例，Windows 是 `t34-terminal-windows` "hidden … shown again they catch up"（两种形态）与 `t18-sessions` "rename … survives a restart"（packaged）。R5-A01、T45-A02 因此仍为 blocked | W4：`exec_commands` 的输出顺序（合并两个管道或改为不依赖先后的断言须先确认 Core 的合并语义）、两个 Windows L4 用例在 Windows 实机复现；下一次推送后复核 Windows clippy |
 ## 技术债
 
 评审任务（R1–R6）汇总的技术债，按影响排序。每条的细节、负责任务与检查时间点在对应的登记事项中。
