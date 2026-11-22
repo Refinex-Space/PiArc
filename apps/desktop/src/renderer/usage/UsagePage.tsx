@@ -311,7 +311,11 @@ export function UsagePage() {
           {t('usage.refresh')}
         </button>
       </div>
-      {error === '' ? null : <p className="error-text" role="alert">{error}</p>}
+      {error === '' ? null : (
+        <p className="error-text" role="alert">
+          {error}
+        </p>
+      )}
       {report === undefined ? null : (
         <>
           <section className="usage-summary" data-testid="usage-summary">

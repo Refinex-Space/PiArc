@@ -20,21 +20,24 @@ function sources(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) return entry.name === 'vendor' ? [] : sources(full);
-    return entry.name.endsWith(".tsx") && !entry.name.includes('.test.') ? [full] : [];
+    return entry.name.endsWith('.tsx') && !entry.name.includes('.test.') ? [full] : [];
   });
 }
 
 describe('error texts', () => {
   it('shown after an action are alerts', () => {
-    const silent = sources(RENDERER).flatMap((file) =>
+    const found = sources(RENDERER).flatMap((file) =>
       [
         ...readFileSync(file, 'utf8').matchAll(
-          /<p[^>]*className="error-text"[^>]*>\{(?:\w+\.)?(?:error|failure)\}/gu,
+          /<p[^>]*className="error-text"[^>]*>\s*\{(?:\w+\.)?(?:error|failure)\}/gu,
         ),
-      ]
-        .filter((m) => !m[0].includes('role="alert"'))
-        .map((m) => `${path.relative(RENDERER, file)}: ${m[0]}`),
+      ].map((m) => ({ file, text: m[0] })),
     );
+    // The 13 pages of R5 at least: a pattern that stopped matching would pass vacuously.
+    expect(found.length).toBeGreaterThanOrEqual(13);
+    const silent = found
+      .filter((m) => !m.text.includes('role="alert"'))
+      .map((m) => `${path.relative(RENDERER, m.file)}: ${m.text}`);
     expect(silent).toEqual([]);
   });
 });

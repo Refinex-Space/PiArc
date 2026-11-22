@@ -256,7 +256,12 @@ pub(super) fn file_call(
 pub(super) fn read_denied(rules: &RuleSet, places: &Places, path: &Path) -> bool {
     let paths = [posix(path)];
     matches!(
-        rules.find(Behavior::Deny, "Read", Subject::Paths(&paths), Some(&places.context())),
+        rules.find(
+            Behavior::Deny,
+            "Read",
+            Subject::Paths(&paths),
+            Some(&places.context())
+        ),
         Some((_, Certainty::Certain))
     )
 }

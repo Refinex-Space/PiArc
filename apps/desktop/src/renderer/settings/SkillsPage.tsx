@@ -136,7 +136,12 @@ function StyleSection({ workspace }: { readonly workspace: string }) {
       });
   }, [workspace]);
   useEffect(load, [load]);
-  if (list === undefined) return error === '' ? null : <p className="error-text" role="alert">{error}</p>;
+  if (list === undefined)
+    return error === '' ? null : (
+      <p className="error-text" role="alert">
+        {error}
+      </p>
+    );
   return (
     <section data-testid="output-style-section">
       <h2 className="settings-heading">{t('outputStyle.title')}</h2>
@@ -171,7 +176,11 @@ function StyleSection({ workspace }: { readonly workspace: string }) {
           </option>
         ))}
       </select>
-      {error === '' ? null : <p className="error-text" role="alert">{error}</p>}
+      {error === '' ? null : (
+        <p className="error-text" role="alert">
+          {error}
+        </p>
+      )}
     </section>
   );
 }
@@ -236,7 +245,11 @@ export function SkillsPage() {
           </select>
         </div>
       )}
-      {error === '' ? null : <p className="error-text" role="alert">{error}</p>}
+      {error === '' ? null : (
+        <p className="error-text" role="alert">
+          {error}
+        </p>
+      )}
       {chosen === null ? null : <StyleSection workspace={chosen} />}
       <PluginsSection workspace={chosen} />
       {view === undefined ? null : (

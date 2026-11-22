@@ -1,5 +1,5 @@
 id: sec-read-deny-search
-description: "THR-01. A Read deny rule keeps the file out of Grep and Glob as well: a directory search leaves out its lines and its name, and Grep or Glob on the file itself is refused (R5, I120)."
+description: 'THR-01. A Read deny rule keeps the file out of Grep and Glob as well: a directory search leaves out its lines and its name, and Grep or Glob on the file itself is refused (R5, I120).'
 capabilities: [CAP-PERM-RULE-001]
 workspace:
   trusted: true

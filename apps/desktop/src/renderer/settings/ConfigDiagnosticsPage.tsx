@@ -521,7 +521,11 @@ export function ConfigDiagnosticsPage() {
     };
   }, [load]);
   if (view === undefined) {
-    return error === '' ? null : <p className="error-text" role="alert">{error}</p>;
+    return error === '' ? null : (
+      <p className="error-text" role="alert">
+        {error}
+      </p>
+    );
   }
   return (
     <div className="diagnostics-page" data-testid="config-diagnostics">
@@ -561,7 +565,11 @@ export function ConfigDiagnosticsPage() {
           <p className="muted" data-testid="diagnostics-trust">
             {t(view.trusted ? 'diagnostics.trusted' : 'diagnostics.untrusted')}
           </p>
-          {error !== '' && <p className="error-text" role="alert">{error}</p>}
+          {error !== '' && (
+            <p className="error-text" role="alert">
+              {error}
+            </p>
+          )}
           <section data-testid="diagnostics-kind-settings">
             <h2 className="settings-heading">{t('diagnostics.kind.settings')}</h2>
             {view.files.filter(isSettings).map((file) => (

@@ -445,7 +445,11 @@ export function PluginsSection({ workspace }: { readonly workspace: string | nul
           {status}
         </p>
       )}
-      {error === '' ? null : <p className="error-text" role="alert">{error}</p>}
+      {error === '' ? null : (
+        <p className="error-text" role="alert">
+          {error}
+        </p>
+      )}
       {list === undefined ? null : (
         <>
           {list.packages.length === 0 ? <p className="muted">{t('plugins.none')}</p> : null}
