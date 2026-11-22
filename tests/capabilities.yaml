@@ -1097,6 +1097,18 @@ capabilities:
     refs: [FR-EX-04, ARCH-10.2]
     task: T40
     status: active
+  - id: CAP-SEC-INJECTION-001
+    title: '仓库文件、WebFetch 内容、MCP 返回内容诱导的破坏性命令进入审批，审批卡带完整命令；关键路径删除在跳过权限下仍询问'
+    milestone: M4
+    refs: [ARCH-10.1, ARCH-6.2]
+    task: T45
+    status: active
+  - id: CAP-SEC-MALICIOUS-REPO-001
+    title: '带全部种类项目级可执行配置的仓库在信任前零执行；信任后新增的可执行项在再次确认前不运行'
+    milestone: M4
+    refs: [ARCH-10.1, ARCH-10.2]
+    task: T45
+    status: active
   - id: CAP-SEC-PI-PACKAGES-001
     title: 'Pi 设置（项目 `.pi/settings.json`、`<数据目录>/pi/settings.json`）的 `packages` 不由 Agent Host 安装：不运行安装脚本、不加载其扩展'
     milestone: M4

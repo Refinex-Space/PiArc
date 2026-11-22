@@ -312,8 +312,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 T45（2026-11-21 开工；基线 `npm run verify -- --baseline` 全量 16 项通过于 61ac320；T44 为"部分完成"，遗留的 A04/A09 不影响本任务）：
 
 - [ ] 威胁映射 `tests/security/threats.yaml`、`scripts/ci/check-threats.mjs` 并入 verify、生成 `docs/security/threat-coverage.md`（A01、A02）——框架与现有测试的映射已提交（82b5711），新补测试随各项加入
-- [ ] 注入三来源 L2 场景与关键路径删除（A03）
-- [ ] "全量恶意仓库"夹具 L2 场景（A04）
+- [x] 注入三来源 L2 场景与关键路径删除（A03）：`sec-inject-repo-file`、`sec-inject-webfetch`（跳过权限下关键路径删除）、`sec-inject-mcp`；沙箱自动批准由 `sandbox-auto-critical-delete` 覆盖
+- [x] "全量恶意仓库"夹具 L2 场景（A04）：`sec-malicious-repo-untrusted`、`sec-malicious-repo-new-item`
 - [ ] Electron 安全清单复核 `docs/security/electron-checklist.md`（A05）；I52 的规则与 `will-frame-navigate`
 - [x] 依赖审计：cargo-audit、npm audit、npm 许可证、例外清单、CI 流水线、本地命令；PR 模板（A06，82b5711）；另修 THR-03：Pi 设置里的 `packages` 不再由 Agent Host 安装（10a3008）
 - [ ] 日志写入脱敏（tracing 层与 Agent Host stderr）；Agent Host 与 Bash 子进程环境无凭据（A07）
