@@ -105,8 +105,7 @@ impl Driver<'_> {
             .map_err(|e| e.to_string())?;
         let actual = record.and_then(|r| r.worktree).map_or(Value::Null, |tree| {
             let path = Path::new(&tree.path);
-            let workspace = std::fs::canonicalize(&self.env.workspace)
-                .unwrap_or_else(|_| self.env.workspace.clone());
+            let workspace = crate::l2::fixtures::canonical(&self.env.workspace);
             let relative = path.strip_prefix(&workspace).map_or_else(
                 |_| tree.path.clone(),
                 |p| {
