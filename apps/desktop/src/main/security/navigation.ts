@@ -40,8 +40,9 @@ export function guardWebContents(contents: WebContents, trustedOrigins: readonly
   });
   // Subframes navigate without `will-navigate` (T45, I52): the CSP's `frame-ancestors` and the
   // renderer's lack of `<iframe>` keep them out today, this keeps a frame off foreign pages too.
+  // The main frame stays with `will-navigate` (this event comes first and would pre-empt it).
   contents.on('will-frame-navigate', (event) => {
-    if (!isTrustedUrl(event.url, trustedOrigins)) {
+    if (!event.isMainFrame && !isTrustedUrl(event.url, trustedOrigins)) {
       event.preventDefault();
       console.warn(`[security] blocked frame navigation to ${originForLog(event.url)}`);
     }

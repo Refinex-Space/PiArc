@@ -53,14 +53,16 @@ describe('guardWebContents', () => {
     for (const name of ['will-navigate', 'will-frame-navigate', 'will-redirect']) {
       const listener = listeners.get(name);
       expect(listener, name).toBeDefined();
+      // `will-frame-navigate` handles subframes; the main frame is `will-navigate`'s.
       const outcome = (url: string) => {
         let prevented = false;
         listener?.({
           url,
+          isMainFrame: name !== 'will-frame-navigate',
           preventDefault: () => {
             prevented = true;
           },
-        });
+        } as { url: string; preventDefault(): void });
         return prevented;
       };
       expect(outcome('https://example.com/'), name).toBe(true);
