@@ -177,7 +177,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 部分完成 | a5f6146 |
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 部分完成 | f7b05b7 |
-| T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
+| T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 84a4d07 |
 | T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,18 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-T46（Auto 模式，审查模型），2026-11-22 开工。基线 `npm run verify -- --baseline` 全量 16/17：第 8 步只有 I185 登记的 `piarc-core --test state` 设置监听用例在负载下超时，单独重跑通过；R5 遗留（性能三行、CI 待推送）不影响本任务。
-
-- [x] 设计增补 `docs/architecture/addenda/T46-auto-mode.md`（七节 + 需要确认的要点）；2026-11-22 用户确认第 9 节 12 个要点全部按推荐，A01 passing，进入实现
-- [x] piarc-policy 的 auto 判定步骤、审批账本"审查中"、失败归一与连续拒绝回退（A02、A03、A04、A07）：`piarc_policy::review`（可审范围、结论校验与截断、`Denials`）、阶梯第 7 步 Auto 同 Accept edits、`starting_mode` 的 `Available`；Core `tool_io/policy/review.rs`（`policy/review` 经会话层的 `ReviewOutlet`、卡片"审查中"→ 转人工升 revision、审计 `autoReview`、计数挂主会话、设置关闭时转手动）；单测 `cargo test -p piarc-core --lib tool_io::policy::tests::t46`（7 个）
-- [x] 审查调用：Core → Agent Host 的审查请求、辅助模型通道、单一文件的审查提示词、Core 侧再校验（A06、A12）：`agent-host/src/harness/auto-review.ts`（经历史投影取用户原话与近期调用，`record_review` 单一工具、`short` 缓存、1,024 token）、`harness/prompts/auto-review.ts`、`providers/catalog.ts` 的 `meetsReviewerBar`；分支条目 `piarc.autoReview` 投影为工具条目的 `review`
-- [x] 设置：用户级启用（二次确认）、审查模型（能力门槛）、自定义策略与可信基础设施；项目级忽略并进配置诊断（A05）：`piarc_config::auto_mode`、`IgnoreReason::ProjectAutoMode`；偏好通道写 `enableAutoMode`、`autoMode.*`（主进程开启前原生确认）；权限页 `settings/AutoReviewSection.tsx`
-- [x] 审计与审计页筛选、用量"审查"一类（A08、A09）：审计 `kind: "autoReview"`、审计页"审查模型决定"、用量用途 `autoReview` 标"审查"（`usage_tests` 注入价格）
-- [x] 子 agent 按增补处理（A10）：模式严格度 Auto 介于 Accept edits 与跳过权限之间，用户级定义可写 `auto`，审查读主会话的用户消息与委派任务，计数在主会话
-- [x] 客户端：模式菜单、transcript 标识与理由、环境栏状态、截图（A11）：`PermissionModeMenu`（未开启时禁用并说明）、`ApprovalCard` 的审查中与转人工原因、`rows/review.tsx`、`shell/AutoReviewStatus.tsx`；L4 `t46-auto-review` 与波及的 t20、t23、t26 通过，截图在 `tmp/evidence/T46/`
-- [x] L2 `perm-auto-*` 场景、能力 ID、mock 请求断言（A02–A07、A10）：17 个场景（`strict_tools`、`review_timeout_ms`、审批的 `review` 断言），能力 `CAP-PERM-AUTO-*` 8 个
-- [ ] 收尾：AGENTS.md、PLAN 登记 T48 的 `PermissionDenied` 触发点、验收记录、`npm run verify`（A13）
 
 ## 登记事项
 
@@ -1171,3 +1159,11 @@ T46（Auto 模式，审查模型），2026-11-22 开工。基线 `npm run verify
 - 验收：A01 blocked（等待用户确认）；其余未开始。
 - 下一项：用户确认增补第 9 节的 12 个要点（可逐条改选备选）后，再次 `/task T46` 进入实现。本地提交，未推送。
 
+### 2026-11-22 T46 部分完成（Auto 模式，等待 Windows CI）
+
+- 确认：用户在本会话回复"全部按推荐"，设计增补第 9 节 12 个要点全部取推荐，A01 记为通过，看板改回进行中。
+- 交付：协议 `PermissionMode::Auto`、审批卡的 `review`（审查中 / 转人工与原因）、`policy/review`（Core → Agent Host）、`ToolReview`、`AutoReviewStatus`、`CatalogModel.reviewer`；`piarc-policy` 的 `review` 模块（可审范围只认 `step == "ask"`、结论再校验与截断、`Denials`、`REVIEW_TIMEOUT`）与阶梯第 7 步 Auto 同 Accept edits；`piarc-config::auto_mode`（用户级读取、项目层移除并报 `projectAutoMode`、`disableAutoMode`）；`piarc-git::remotes`；Core `tool_io/policy/review.rs`（审查中卡片、`HubReviews` 经会话层发 `policy/review`、失败归一转卡、`autoReview` 审计、计数挂主会话、T48 触发点 `reviewer_refused`）与 `modes.rs` 的可用性与设置关闭时转手动；Agent Host `harness/auto-review.ts`（经历史投影取用户原话与近期调用，`record_review` 单一工具）、单一提示词文件 `prompts/auto-review.ts`、辅助通道的工具与缓存选项、分支条目 `piarc.autoReview` 与工具条目的 `review`；客户端的设置一节、模式菜单、审批卡状态、调用标识、环境栏状态、审计类别与用量标签；L2 17 个 `perm-auto-*` 场景与 8 个 `CAP-PERM-AUTO-*` 能力，格式新增 `strict_tools`、`review_timeout_ms` 与审批的 `review`。
+- 验证：`npm run verify` 17/17 通过于 84a4d07；L4 `t46-auto-review` 与波及的 t20、t23、t26 共 10 个用例通过，截图在 `tmp/evidence/T46/`；提示词原创性比对 0 个匹配窗口；`npm run l3 -- --filter perm-plan`：本任务改写的条目仍匹配，另有 T41、T42 留下的缺口登记为 I224。
+- 验收：A01–A12 通过；A13 blocked（macOS verify 已过，Windows CI 的 L2 要等推送）。看板改为"部分完成"。
+- 登记：I224（L3 既有缺口）、I225（T48 的 `PermissionDenied` 接入点）、I226（审计保留期限，R6）；I117 关闭。
+- 下一项：T47（自动记忆与企业托管配置，macOS，设计关口）依赖 T46，可以开工；I222 的性能达标任务仍待排期；W4（Windows）依赖 R5 与 T50。本地提交，未推送。
