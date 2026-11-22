@@ -26,7 +26,13 @@ test('output appears in frames pulled per animation frame', async ({ app, page }
     WINDOWS ? 'for /L %i in (42,1,42) do @echo hello-%i' : 'echo hello-$((6*7))',
   );
   await page.keyboard.press('Enter');
-  await waitForScreen(page, (text) => text.split('\n').includes('hello-42'));
+  // Wait for the prompt after the result too: in ConPTY cmd's prompt arrives in later frames,
+  // which would count as output after the snapshot (I166).
+  await waitForScreen(page, (text) => {
+    const lines = text.split('\n').map((line) => line.trim());
+    const result = lines.indexOf('hello-42');
+    return result >= 0 && lines.slice(result + 1).includes('$');
+  });
   const stats = await labStats(page);
   expect(stats.resets).toBe(1);
   expect(stats.errors).toBe(0);

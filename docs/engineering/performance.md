@@ -187,3 +187,47 @@ node scripts/perf/run.mjs --lane long --absolute --machine <机器类别>
 ```
 
 已知的平台差异：事件循环延迟按"满载 p99 − 同轮空闲 p99"（计时器粒度约 15.6 ms）；AHP 往返与权限裁决的预算是 15 ms 与 10 ms（ADR-0040、ADR-0041）；应用全部进程合计的预算是 450 MB；进程 CPU 时间与 RSS 经 CIM（`Win32_Process`）读取；安装包是 Velopack 的 `Setup.exe`（需要 .NET SDK，`scripts/release/pack-windows.mjs`），安装后体积量打包后的应用目录。
+
+### 6.1 W3 实测（2026-11-22）
+
+| 项 | 值 |
+|---|---|
+| 机型 | 华为 KLVG-XX 笔记本，Intel i5-1340P（4P+8E 核，16 线程），16 GB，NVMe 1 TB；**不是**第 11 章的基准机型（x64 8 核 / 16 GB 台式），与 W0 同一台，结论按"注明配置的本机"记 |
+| 系统 | Windows 11 专业版 25H2（26200.9974），Defender 实时保护开启 |
+| 显示 | Intel Iris Xe，2160×1440 @ 60 Hz，缩放 150%；另装有 ToDesk、GameViewer 的虚拟显示适配器 |
+| 负载 | 测量前关闭了 Java、浏览器等大型程序（空闲内存约 6.4 GB），没有经远程桌面查看 |
+| 构建 | 打包的开发构建（`apps/desktop/out/development/`，本分支 f4439cc 之后）；Core 的计时用 release 构建 |
+| 机器类别 | `i5-1340p-16g`；本次没有记基线（报告 `tmp/evidence/W3/perf-nightly-report.json`） |
+
+命令：`node scripts/perf/run.mjs --lane nightly --absolute --machine i5-1340p-16g --only <除体积两项外的全部>`（`tmp/evidence/W3/perf-nightly.txt`）；体积取 CI 运行 45009150917 的开发构建安装包（`tmp/evidence/W3/sizes.txt`）；终端另跑 `bench:s7`（见表下说明）。
+
+| 第 11 章的行 | 指标 | 实测 | 预算 | 结论 |
+|---|---|---|---|---|
+| 冷启动到可交互窗口 | `cold-start` | 1,075 ms | ≤ 1,000 ms | **超出**（I207） |
+| 打开工作区到 Agent Host 就绪 | `workspace-ready` | 632 ms | ≤ 1,000 ms | 达标 |
+| PiArc 引入的首 token 额外延迟 | `first-token-overhead` | 122 ms | ≤ 50 ms | **超出**（I207） |
+| 主进程内存（含 Core，空闲） | `main-memory-delta` | 29.3 MB | ≤ 24 MB | **超出**（同 macOS，I192） |
+| 渲染进程内存 | `renderer-memory` | 133 MB | ≤ 220 MB | 达标 |
+| 应用全部进程合计 | `app-memory` | 558 MB | ≤ 450 MB | **超出**（GPU 进程约 200 MB，I201） |
+| Agent Host 内存 | `agent-host-memory` | 128 MB | ≤ 150 MB | 达标 |
+| 每增加一个活动会话的内存增量 | `agent-host-per-session` | 7.9 MB | ≤ 40 MB | 达标 |
+| 主进程事件循环延迟（3 会话） | `main-loop-p99` | 0.15 ms（减去同轮空闲） | ≤ 16 ms | 达标 |
+| 流式渲染（100 token/s） | `stream-frame-p99`、`stream-long-tasks` | p99 49.3 ms，长任务 25 个 | ≤ 12 ms，0 | **超出**（I191 在这台机器上放大，I207） |
+| 万条 item 滚动 | `scroll-fps` | 35 fps（60 Hz 屏） | 60 fps | **超出**（I207） |
+| 会话切换 | `switch-cached`、`switch-cold` | 42 ms、88.6 ms | ≤ 100、≤ 170 ms | 达标 |
+| Core 事件到渲染进程 | `core-to-renderer-p95` | 0.27 ms | ≤ 1.1 ms | 达标 |
+| AHP 往返 | `ahp-round-trip-p95` | 1.68 ms | ≤ 15 ms | 达标 |
+| 无需用户参与的权限裁决 | `policy-decision-p95` | 12.4 ms | ≤ 10 ms | **超出**（W1 为 8.4–8.9 ms，I207） |
+| 终端键入回显的额外延迟 | `terminal-echo-p95` | 6.58 ms（200 对）；`bench:s7` 1,000 对两次 4.29、3.58 ms | ≤ 5 ms | 1,000 对达标，200 对超出（样本少，噪声大） |
+| 安装包体积 | `installer-size` | 235.9 MB（开发构建） | ≤ 200 MB | 未测发布构建（I202） |
+| 安装后体积 | `installed-size` | 551.5 MB（开发构建） | ≤ 450 MB | 未测发布构建（I202） |
+| 空闲 CPU | `idle-cpu-visible`、`idle-cpu-hidden`、`hidden-frames` | 1.7%、4.7%、0 | ≤ 5%、≤ 5%、0 | 达标 |
+| Agent Host 崩溃后恢复 | `agent-host-recovery` | 1.71 s | ≤ 3 s | 达标 |
+| 渲染进程崩溃或重载后恢复 | `renderer-recovery` | 0.58 s | ≤ 2 s | 达标 |
+| 8 小时长会话内存增长 | `long-run-growth-*` | 未测 | ≤ 10% | 同 macOS（I195） |
+
+说明：
+
+- 终端：`npm run bench:s7 -- --form packaged --headless`（`tmp/evidence/W3/s7-headless.json`）`cat` 100 MB 期间主进程事件循环 p50 15.33 ms、p99 16.57 ms，与空闲 p99（约 16.6 ms）相同，按第 11 章的 Windows 口径达标；不带 `--headless` 的 100 MB 测量在 Windows 上因 CDP 追踪超过 Node 的字符串上限而中止（基准脚本的限制）。ConPTY 下 `type` 100 MB 用了 74 s（约 1.4 MB/s），吞吐取决于 conhost。回显：`--megabytes 1 --echo-samples 1000` 两次，完整路径 p95 8.90、8.70 ms，直接写 PTY p95 4.61、5.12 ms。
+- 3 会话 + 子 agent（`npm run perf:m3`，两次，`tmp/evidence/W3/m3-memory-{1,2}.json`）：Agent Host 最大 163 MB（上限 270 MB，达标）；应用其余进程最大 576、563 MB（预算 450 MB，**超出**：浏览器进程约 145、GPU 约 210、网络约 58、渲染约 155 MB）。第二次运行中用性能计数器取的私有工作集（`WorkingSetPrivate`）：四个应用进程合计 256 MB（工作集 537 MB），与 macOS 物理占用约 250 MB 的口径分析一致（I26、I201）。
+- 与 M0 的差异：M0 的流式帧 p99 4.7 ms、滚动 75 fps 来自 S1 原型页（75 Hz 屏），这里是正式会话与 60 Hz 屏；权限裁决 W1 的 8.4–8.9 ms 早于 T23 的规则集与 Bash 分析。这些行在第 11 章的基准机型上是否达标，要在基准机型或 CI 的 Nightly 上判定，本表只说明这台笔记本。

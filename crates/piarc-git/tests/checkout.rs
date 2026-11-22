@@ -128,9 +128,15 @@ fn worktrees_share_the_main_checkout_and_submodules_do_not() {
     }
 
     // On a case-insensitive file system another spelling is the same project.
-    let shouted = PathBuf::from(main.to_string_lossy().to_uppercase());
-    if shouted != main && shouted.exists() {
-        assert_eq!(resolve(&shouted).expect("other case").main, main_key);
+    // Lower case too: on Windows that also changes the drive letter (`c:\…`, W3).
+    for other in [
+        main.to_string_lossy().to_uppercase(),
+        main.to_string_lossy().to_lowercase(),
+    ] {
+        let other = PathBuf::from(other);
+        if other != main && other.exists() {
+            assert_eq!(resolve(&other).expect("other case").main, main_key);
+        }
     }
 
     let canonical_text = main_key.to_string_lossy();

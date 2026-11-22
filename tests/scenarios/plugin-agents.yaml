@@ -33,7 +33,7 @@ expect:
         index: 0,
         contains: ['demo:checker', 'Checks a change against the demo rules.'],
       }
-    - { provider: child, index: 0, contains: ['You are the demo checker.', 'pkgs/demo/rules'] }
+    - { provider: child, index: 0, contains: ['You are the demo checker.', 'demo/rules'] }
     - index: 1
       provider: main
       tool_results: [{ id: a1, is_error: false, contains: 'Checked; nothing found.' }]

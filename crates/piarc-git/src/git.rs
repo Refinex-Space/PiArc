@@ -118,9 +118,16 @@ impl Git {
         input: Vec<u8>,
     ) -> Result<Output, GitError> {
         let command = subcommand(args);
+        // Git for Windows refuses paths longer than 260 characters (a deep worktree, a clone
+        // under the data directory) unless `core.longpaths` is on; other platforms' git
+        // ignores the key (W3).
         let spec = SpawnSpec {
             program: self.program.clone(),
-            args: args.iter().map(|a| a.as_ref().to_owned()).collect(),
+            args: [OsStr::new("-c"), OsStr::new("core.longpaths=true")]
+                .into_iter()
+                .map(OsStr::to_owned)
+                .chain(args.iter().map(|a| a.as_ref().to_owned()))
+                .collect(),
             cwd: cwd.to_owned(),
             env: self.env.clone(),
         };

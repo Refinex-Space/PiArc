@@ -1,5 +1,7 @@
 // T37: one session's skills without a live session: the system prompt sections, index and
 // style changes as reminders, `paths` skills made available by a touched file, and loads.
+import path from 'node:path';
+
 import { SessionManager, type ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import type { SkillInfo, SkillsCatalog } from '@piarc/protocol';
 import { describe, expect, it } from 'vitest';
@@ -67,8 +69,11 @@ function fakeBridge(state: {
   return bridge as unknown as CoreBridge;
 }
 
+// A native absolute path: on Windows `/w` is Git Bash's spelling of `W:`.
+const CWD = path.resolve('/w');
+
 function setup(state: Parameters<typeof fakeBridge>[0]) {
-  const manager = SessionManager.inMemory('/w');
+  const manager = SessionManager.inMemory(CWD);
   const reminders = new Reminders();
   const skills = new SessionSkills({
     sessionId: 's1',
@@ -76,7 +81,7 @@ function setup(state: Parameters<typeof fakeBridge>[0]) {
     bridge: fakeBridge(state),
     reminders,
     canonical: (tool) => tool,
-    cwd: '/w',
+    cwd: CWD,
     log: () => undefined,
   });
   const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
@@ -160,7 +165,7 @@ describe('SessionSkills', () => {
     await touch('src/lib.rs');
     expect(state.calls).toContainEqual([
       'skills/match',
-      { sessionId: 's1', files: ['/w/src/lib.rs'], skills: ['rust'] },
+      { sessionId: 's1', files: [path.join(CWD, 'src', 'lib.rs')], skills: ['rust'] },
     ]);
     expect(reminders.take()?.content).toContain('- rust: Use rust');
     // Once available, no more matching.

@@ -236,9 +236,14 @@ pub(super) fn path_boundary(
     let resolved = scope.locate(path).map_err(|e| e.to_error_object())?;
     if write {
         let lexical = scope.cwd().join(path);
+        // The canonical root carries Windows' `\\?\` prefix and the cwd does not: strip either
+        // spelling, or a worktree's files (under `.piarc/worktrees/`) all look protected (W3).
+        let usual_root = PathBuf::from(display(scope.root()));
         if [lexical.as_path(), resolved.as_path()].iter().any(|p| {
             piarc_fs::access::protected_component(
-                p.strip_prefix(scope.root()).unwrap_or(p),
+                p.strip_prefix(scope.root())
+                    .or_else(|_| p.strip_prefix(&usual_root))
+                    .unwrap_or(p),
                 scope.case_insensitive(),
             )
             .is_some()

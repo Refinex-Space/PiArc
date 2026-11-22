@@ -124,6 +124,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - Windows 上不要用 shell 调 npm 命令：用 `resolveBin` 解析入口后以 `node` 运行。
 - 改了 `piarc-protocol` 的类型却没运行 `npm run gen:protocol`，verify 的"protocol drift"会失败；新增契约没有样本与反例，"contract samples"会失败。
 - 第一次构建 `piarc-ghostty-sys`（任何依赖 `piarc-core` 的构建）会联网下载 libghostty-vt 预编译产物到 `.tools/cache/ghostty-vt/`，并校验 SHA-256 与 minisign 签名；校验失败直接报错，不会重下。离线时设 `PIARC_GHOSTTY_VT_OFFLINE=1` 并预先填好缓存（`PIARC_GHOSTTY_VT_CACHE` 可换目录），详见 `crates/piarc-term/AGENTS.md`。
+- Windows 上 `canonicalize` 给出 `\\?\C:\…`：这种路径不能交给 cmd（退回 `C:\Windows`）、git（变成 `//?/C:/…`）、Node 与 npm（`lstat 'C:'`），也不能与普通写法的 cwd 做 `strip_prefix`；先 `piarc_git::strip_verbatim`，或两种写法都试（W3）。Windows 的临时目录在用户主目录下，测试从工作区向上查找会读到本机的 `~/.claude/skills`（L2、L4 的临时工作区放在 `%PUBLIC%`）。
 - Windows 的 Core 模块依赖同目录下的 `ghostty-vt.dll`：手工拷 `.node` 时要一起拷（`build:core` 与打包会处理）。
 - Windows 开发环境：Visual Studio Build Tools（MSVC 与 Windows SDK）、Git for Windows（委托的 Bash 用 Git Bash，终端 L4 用它自带的 vim）、Node 24；`npm run verify` 与 L4 在 Windows 上都能完整运行。Windows 专有的行为差异（ConPTY、同步的 stdout、计时器粒度、`\\?\` 路径）见 `crates/piarc-term`、`agent-host`、`apps/desktop`、`crates/piarc-testkit` 的 AGENTS.md 与 S2、S7、S9 报告。
 - 改了终端帧的编码或格式，要用 `PIARC_UPDATE_FRAME_SAMPLES=1 cargo test -p piarc-term --test consistency` 重写 TS 共享样本、用 `PIARC_UPDATE_TERM_FRAME_SAMPLES=1 cargo test -p piarc-protocol --test term_frame` 重写 L1 样本（`tests/contracts/term-frame/`），否则 Rust 与 TS 两侧的样本检查都会失败；`scripts/ci/core-load-check.mjs` 的 `frameRows` 也按格式版本读帧。

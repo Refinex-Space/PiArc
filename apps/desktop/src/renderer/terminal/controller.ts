@@ -101,6 +101,10 @@ interface EchoProbe {
   readonly resolve: (ms: number) => void;
 }
 
+/** Attempts at introducing a terminal to Core, and the pause after a refusal (ms). */
+const INTRODUCE_ATTEMPTS = 20;
+const INTRODUCE_RETRY_MS = 250;
+
 export class TerminalController {
   readonly #api: TerminalViewApi;
   readonly #options: TerminalViewOptions;
@@ -227,11 +231,35 @@ export class TerminalController {
     this.#size = null;
     this.#matches = [];
     this.#currentMatch = undefined;
-    this.#api.terminalColors(id, coreColors(theme)).catch(() => undefined);
+    this.#introduce(id);
     if (this.#options.fit) {
       this.#fit();
     }
     this.wake();
+  }
+
+  /**
+   * Gives Core the theme's colors and, after a refusal, the grid again: a session terminal is
+   * in Core's task list before Core can answer for it, so the first calls of a window that took
+   * the id from there are refused (W3, slow ConPTY starts on Windows). Without the retry Core
+   * keeps the opening cell size and maps pointer positions to the wrong cells.
+   */
+  #introduce(id: number, attempt = 1): void {
+    this.#api.terminalColors(id, coreColors(this.#remote.theme)).then(
+      () => {
+        if (attempt > 1 && this.#id === id && this.#options.fit) {
+          this.#size = null;
+          this.#fit();
+        }
+      },
+      () => {
+        if (attempt < INTRODUCE_ATTEMPTS && this.#id === id) {
+          setTimeout(() => {
+            if (this.#id === id) this.#introduce(id, attempt + 1);
+          }, INTRODUCE_RETRY_MS);
+        }
+      },
+    );
   }
 
   get terminalId(): number | null {

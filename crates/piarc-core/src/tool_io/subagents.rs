@@ -338,8 +338,11 @@ impl ToolIo {
         match p.isolation {
             Some(SubagentIsolation::Worktree) => {
                 let tree = self.agent_worktree(&p.session_id, parent).await?;
+                // The canonical root carries Windows' `\\?\` prefix and the cwd does not (W3).
+                let root = piarc_git::strip_verbatim(parent.scope.root().to_path_buf());
                 let below = parent_cwd
                     .strip_prefix(parent.scope.root())
+                    .or_else(|_| parent_cwd.strip_prefix(&root))
                     .unwrap_or(Path::new(""));
                 let (files, cwd) = (tree.path.clone(), tree.path.join(below));
                 Ok((Some(tree), files, cwd))
@@ -358,7 +361,8 @@ impl ToolIo {
         id: &str,
         parent: &SessionIo,
     ) -> Result<AgentWorktree, ErrorObject> {
-        let project = parent.project().to_path_buf();
+        // Git cannot take a verbatim `\\?\C:\…` path: it becomes `//?/C:/…` (W3).
+        let project = piarc_git::strip_verbatim(parent.project().to_path_buf());
         let git = self.git_runner(&project).await?;
         let base = piarc_git::worktree::head(&git, parent.scope.root())
             .await

@@ -310,7 +310,9 @@ impl Terminals {
             cell_width,
             cell_height,
             program: Program::Command { program, args },
-            cwd: Some(spec.cwd.clone()),
+            // The session's directory is canonical, `\\?\D:\…` on Windows: cmd cannot start
+            // there and falls back to C:\Windows (W3).
+            cwd: Some(piarc_git::strip_verbatim(spec.cwd.clone())),
             env,
             clear_env: true,
             scrollback_lines: SCROLLBACK_LINES,

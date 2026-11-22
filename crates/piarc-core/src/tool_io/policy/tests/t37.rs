@@ -231,7 +231,15 @@ async fn skill_directories_are_readable_without_asking() {
     f.skills("skills/list", json!({"sessionId": SESSION}))
         .await
         .expect("list");
-    assert_eq!(f.io.skill_dirs(SESSION).len(), 1);
+    // Only the fixture's skill: the walk up from the workspace also reaches the directories
+    // above the temporary root, on Windows the real user's home with its own skills (W3).
+    let real_root = piarc_git::strip_verbatim(std::fs::canonicalize(&f.root).expect("root"));
+    let ours =
+        f.io.skill_dirs(SESSION)
+            .into_iter()
+            .filter(|dir| dir.starts_with(&f.root) || dir.starts_with(&real_root))
+            .count();
+    assert_eq!(ours, 1);
     let read = f
         .evaluate(
             "r1",

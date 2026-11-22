@@ -47,3 +47,5 @@
 - axe 在 Electron 里不能新开页面：`new AxeBuilder({ page }).setLegacyMode(true)`。
 - `:root[data-app] button { color: inherit }` 的优先级高于单个类选择器：给按钮设颜色时写在 `:root[data-app]` 下。
 - 测试机没有 htop，全屏重绘用 top 代替（与 T10 相同）；用户的 zsh 配置会出现在会话终端里，断言用整行精确匹配或程序计算出的文本。
+- 会话终端先进 Core 的任务列表、程序起来之后才进终端注册表：窗口从任务列表拿到 id 时，`term/<id>` 订阅、颜色与网格可能先被拒绝（Windows 上 ConPTY 启动慢）。`events.ts` 的订阅与 `controller.ts` 的 `#introduce` 被拒后重试（W3），不要改回只调一次。
+- Windows 的会话终端是 `%COMSPEC%`（cmd），L4 是 `e2e/t34-terminal-windows.e2e.ts`：先 `prompt $$$S` 缩短提示符（含中文的长提示符在折行处 conhost 与 Core 对宽字符的落格不同，I205），数行号前等 cmd 的下一个提示符出现（它会滚动小视口）。

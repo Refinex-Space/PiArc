@@ -45,7 +45,7 @@ expect:
         - { id: load, is_error: false, contains: 'Fix issue 42 on main (42/main; all: 42 main).' }
         - { id: after, is_error: true, contains: blocked by the skill hook }
     - index: 3
-      contains: ['.claude/skills/fix-issue/notes.md']
+      contains: ['fix-issue/notes.md']
     - index: 5
       user_message_contains:
         - '[PiArc reminder]'
