@@ -311,7 +311,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 W3（开工 2026-11-22，Windows 11 x64，分支 `windows/dev` 快进到 `origin/docs/architecture-design` a6701310；R4 部分完成只因 macOS 内存口径，不影响 Windows 测量；T43、T44 部分完成只差 VoiceOver 与 macOS 冒烟，读屏清单与测量脚本已交付，A09、A10 不阻塞；机器 i5-1340P 12 核 16 线程 / 16 GB / NVMe，Windows 11 25H2 26200.9974，Defender 实时保护开启，与 W0 同一台）：
 
-- [ ] 1 环境：机器配置、开发构建打包、Velopack 安装包（CI 工件或本机 `pack-windows.mjs`）
+- [x] 0 开工基线：`npm run verify -- --baseline` 跑全量 12/17（`tmp/evidence/W3/verify-baseline.txt`）：T37–T45 的代码只在 macOS 跑过，Windows 失败按 W2 的先例并入本任务。已修：插件根与组件路径的 `\\?\`（74f1ffa）、worktree 会话的文件全被当作受保护路径、子 agent 的 worktree 起不来（d667b90）、内置 npm 与包克隆（00079ce，git 一律 `core.longpaths=true`）、测试读到本机 `~/.claude/skills`、`core.autocrlf`、路径分隔符与测试目录的删除（123ab3d）、`pointer_windows.rs` 与 I166 的 store 用例（74f1ffa）；L2 原失败的 13 个已全部通过。待定：`url` 2.5.8 的新公告 RUSTSEC-2026-0592（升 2.5.9 是依赖变更，待用户确认）；权限裁决计时 12.8–24.6 ms（机器负载高，待安静环境复测）；全量 `cargo test --no-fail-fast` 因系统内存不足被中止，待用户腾出内存后重跑
+- [ ] 1 环境：机器配置、开发构建打包、Velopack 安装包（CI 工件 45009150917 已下载到 `tmp/W3-velopack/`）
 - [ ] 2 I166：`piarc-store` 同长度改写的 mtime 判据、`terminal.e2e.ts` 停拉帧数、`t19-composer` 提及断言
 - [ ] 3 终端（A02）：I163 `pointer.rs` 的 Windows 变体；I142 ⑤ t34 L4 的 Windows 版；ConPTY 下 PowerShell、Git Bash、vim、less、缩放、中文宽字符、Ctrl+C、snapshot 恢复；R4 M1 控制字符；I175 屏幕文件 rename
 - [ ] 4 终端性能（A04）：`bench:s7` 回显 p95 与 100 MB 输出的事件循环 p99
