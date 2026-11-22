@@ -141,7 +141,8 @@ threats:
         refs: [ADR-0057, I180]
         tests:
           - cap:CAP-SANDBOX-WINDOWS-001
-      - measure: Pi 自己设置里的包清单不由 Agent Host 安装或加载
+      - arch: Pi 自己设置里的包清单不由 Agent Host 安装或加载（T45）
+        measure: Pi 自己设置里的包清单不由 Agent Host 安装或加载
         type: automated
         tests:
           - vitest:agent-host/src/runtime/pi-settings.test.ts::THR-03 hides every package source from Pi, so nothing installs, runs or loads
@@ -420,7 +421,8 @@ threats:
           - ci:scripts/ci/check-release-runtime.mjs#run-as-node
           - ci:scripts/ci/check-release-runtime.mjs#node-options
           - ci:scripts/ci/check-release-runtime.mjs#inspect
-      - measure: 发布构建拒绝 Chromium 的远程调试开关（没有对应的 fuse）
+      - arch: 发布构建拒绝 Chromium 的远程调试开关（T45）
+        measure: 发布构建拒绝 Chromium 的远程调试开关（没有对应的 fuse）
         type: automated
         tests:
           - vitest:apps/desktop/src/main/security/runtime-switches.test.ts::THR-12 removes and reports the remote debugging switches and nothing else
