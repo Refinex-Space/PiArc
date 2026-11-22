@@ -377,12 +377,14 @@ threats:
           - l4:apps/desktop/e2e/preload.e2e.ts::IPC from another origin is rejected
           - l4:apps/desktop/e2e/preload.e2e.ts::IPC from an origin that only starts with the app origin is rejected
           - vitest:apps/desktop/src/main/ipc/sender.test.ts::rejects origins that only start with the app origin
+          - l4:apps/desktop/e2e/t45-ipc-hardening.e2e.ts::THR-11 every window.piarc command answers malformed arguments with a structured error and the main process lives
       - arch: 有副作用的命令仍经 Core 的权限裁决
         measure: 终端写入要求真实输入；"总是允许"与 allow 规则经主进程原生确认
         type: automated
         tests:
           - vitest:apps/desktop/src/main/core/terminal-ipc.test.ts::refuses writes without recent real input; pointer moves need none
           - l4:apps/desktop/e2e/t20-approvals.e2e.ts::edits and confirms an exact rule, declines protected writes and restores the chosen mode
+          - l4:apps/desktop/e2e/t45-ipc-hardening.e2e.ts::THR-11 allow rules, always-allow answers and sandbox loosening from the page wait for the native confirmation
       - measure: 发布构建的渲染进程不带测试页（事件探针、transcript 与终端原型）
         type: automated
         tests:
@@ -429,6 +431,7 @@ threats:
         type: automated
         tests:
           - vitest:apps/desktop/src/main/security/navigation.test.ts::blocks other origins, including look-alike prefixes
+          - vitest:apps/desktop/src/main/security/navigation.test.ts::THR-13 cancels main-frame, subframe and redirect navigations away from the app origin
           - l4:apps/desktop/e2e/navigation.e2e.ts::blocks changing location to an external address
           - l4:apps/desktop/e2e/navigation.e2e.ts::blocks a redirect from an app page to an external address
       - arch: 新窗口一律拒绝

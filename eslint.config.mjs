@@ -195,12 +195,33 @@ function desktopProcessBoundaries() {
       message: htmlSinkMessage,
     })),
   ];
+  // IPC handlers only through registerHandler (src/main/ipc/register.ts), which checks the
+  // sender's origin: no per-contents `webContents.ipc`, no `ipcMain` under another name or
+  // reached through the module object (T45, I52).
+  const ipcMessage = 'Register IPC handlers with registerHandler (src/main/ipc/register.ts).';
+  const ipcBypasses = [
+    { selector: "MemberExpression[property.name='ipc']", message: ipcMessage },
+    { selector: "MemberExpression[object.property.name='ipcMain']", message: ipcMessage },
+    { selector: "VariableDeclarator[init.name='ipcMain']", message: ipcMessage },
+    { selector: "VariableDeclarator[init.property.name='ipcMain']", message: ipcMessage },
+    { selector: "Property[key.name='ipcMain'][value.name!='ipcMain']", message: ipcMessage },
+    {
+      selector: "ImportSpecifier[imported.name='ipcMain'][local.name!='ipcMain']",
+      message: ipcMessage,
+    },
+  ];
   return [
     {
       files: ['apps/desktop/src/**/*.{ts,tsx}'],
       ignores: ['apps/desktop/src/main/window.ts', 'apps/desktop/src/renderer/**'],
       rules: {
-        'no-restricted-syntax': ['error', ...browserWindow],
+        'no-restricted-syntax': ['error', ...browserWindow, ...ipcBypasses],
+      },
+    },
+    {
+      files: ['apps/desktop/src/main/window.ts'],
+      rules: {
+        'no-restricted-syntax': ['error', ...ipcBypasses],
       },
     },
     {

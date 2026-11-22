@@ -14,11 +14,13 @@ export function registerIpcHandlers(
 ): void {
   const confirmations = new LinkConfirmations();
   registerHandler(IPC_CHANNELS.getAppVersion, () => app.getVersion());
-  registerHandler(IPC_CHANNELS.openExternal, (event, [url]) =>
-    confirmations.open(
+  // A string the main process will not open answers false; anything else is a caller's error.
+  registerHandler(IPC_CHANNELS.openExternal, (event, [url]) => {
+    if (typeof url !== 'string') throw new TypeError('url must be a string');
+    return confirmations.open(
       event.sender.id,
       url,
       electronExternalLinkPort(BrowserWindow.fromWebContents(event.sender), translator()),
-    ),
-  );
+    );
+  });
 }

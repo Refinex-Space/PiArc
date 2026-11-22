@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { APP_ORIGIN } from '../app-scheme.js';
-import { isTrustedUrl, originForLog } from './navigation.js';
+import type { WebContents } from 'electron';
+
+import { guardWebContents, isTrustedUrl, originForLog } from './navigation.js';
 
 describe('isTrustedUrl', () => {
   const trusted = [APP_ORIGIN];
@@ -35,5 +37,34 @@ describe('originForLog', () => {
     expect(originForLog('javascript:alert(document.cookie)')).toBe('javascript:');
     expect(originForLog('file:///Users/someone/secret.txt')).toBe('file:');
     expect(originForLog('::')).toBe('<invalid url>');
+  });
+});
+
+describe('guardWebContents', () => {
+  it('THR-13 cancels main-frame, subframe and redirect navigations away from the app origin', () => {
+    const listeners = new Map<string, (event: { url: string; preventDefault(): void }) => void>();
+    const contents = {
+      on: (name: string, listener: (event: { url: string; preventDefault(): void }) => void) => {
+        listeners.set(name, listener);
+      },
+      setWindowOpenHandler: () => undefined,
+    } as unknown as WebContents;
+    guardWebContents(contents, [APP_ORIGIN]);
+    for (const name of ['will-navigate', 'will-frame-navigate', 'will-redirect']) {
+      const listener = listeners.get(name);
+      expect(listener, name).toBeDefined();
+      const outcome = (url: string) => {
+        let prevented = false;
+        listener?.({
+          url,
+          preventDefault: () => {
+            prevented = true;
+          },
+        });
+        return prevented;
+      };
+      expect(outcome('https://example.com/'), name).toBe(true);
+      expect(outcome('app://piarc/index.html#/settings'), name).toBe(false);
+    }
   });
 });

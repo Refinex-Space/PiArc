@@ -278,11 +278,16 @@ export class AppShell {
       this.options.preferences.set(change),
     );
     registerHandler(IPC_CHANNELS.settingsOpen, (_event, [page]) => {
-      this.openSettings(typeof page === 'string' ? page : undefined);
+      if (page !== undefined && (typeof page !== 'string' || !SETTINGS_PAGE.test(page))) {
+        throw new TypeError('page must be a settings page id');
+      }
+      this.openSettings(page);
     });
     registerHandler(IPC_CHANNELS.attentionNotify, (event, [notice]) => {
+      if (!isAttentionNotice(notice)) throw new TypeError('invalid attention notice');
+      // Only the current main window notifies; the others are quietly ignored.
       const window = BrowserWindow.fromWebContents(event.sender);
-      if (window === null || window !== this.main || !isAttentionNotice(notice)) {
+      if (window === null || window !== this.main) {
         return;
       }
       this.attention.notify(
