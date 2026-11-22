@@ -61,6 +61,8 @@ pub(crate) fn npm_cli(node: &Path) -> Option<PathBuf> {
         .into_iter()
         .find(|p| p.is_file())
         .and_then(|p| p.canonicalize().ok())
+        // Node cannot run a verbatim `\\?\C:\…` script path: it lstat-s `C:` (W3).
+        .map(piarc_git::strip_verbatim)
 }
 
 /// What one command printed.
@@ -171,13 +173,16 @@ pub(crate) fn npm_root(pi: &Path) -> Result<PathBuf> {
         })?;
     }
     // npm writes broken lock file paths when `--prefix` goes through a symbolic link (macOS's
-    // `/var` → `/private/var`), as Pi notes: always hand it the real path.
-    root.canonicalize().map_err(|e| {
-        failed(
-            ErrorKind::IoError,
-            format!("cannot open {}: {e}", root.display()),
-        )
-    })
+    // `/var` → `/private/var`), as Pi notes: always hand it the real path, without Windows'
+    // verbatim prefix, which neither Node nor npm takes (W3).
+    root.canonicalize()
+        .map(piarc_git::strip_verbatim)
+        .map_err(|e| {
+            failed(
+                ErrorKind::IoError,
+                format!("cannot open {}: {e}", root.display()),
+            )
+        })
 }
 
 /// The `dependencies` of the npm prefix's `package.json`.

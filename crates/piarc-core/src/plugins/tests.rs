@@ -500,9 +500,30 @@ async fn a_git_update_leaves_new_items_off_until_confirmed() {
     git(&repo, &["init", "--quiet"]);
     git(&repo, &["add", "."]);
     git(&repo, &["commit", "--quiet", "-m", "one"]);
-    let bare = f.root.join("bare.git");
-    git(&f.root, &["clone", "--quiet", "--bare", "repo", "bare.git"]);
-    let url = format!("file://{}", bare.display());
+    // The clone directory repeats a local source's whole path under `<pi>/git/local/`: from
+    // inside the fixture it would pass the length Git for Windows accepts for a git
+    // directory (W3), so the source sits right in the temporary directory.
+    let id = crate::sessions::new_session_id().expect("unique id");
+    let upstream = std::env::temp_dir().join(format!("pgb-{}", &id[..8]));
+    let _cleanup = RemoveOnDrop(upstream.clone());
+    let bare = upstream.join("bare.git");
+    git(
+        &f.root,
+        &[
+            "clone",
+            "--quiet",
+            "--bare",
+            "repo",
+            bare.to_str().expect("utf-8"),
+        ],
+    );
+    // `file:///C:/…` on Windows: `file://C:\…` is no file URL (W3).
+    let text = bare.display().to_string().replace('\\', "/");
+    let url = if text.starts_with('/') {
+        format!("file://{text}")
+    } else {
+        format!("file:///{text}")
+    };
     let installed = f
         .manager
         .install(f.request(PackageSourceKind::Git, &url, PackageScope::User))
@@ -607,4 +628,13 @@ async fn a_git_update_leaves_new_items_off_until_confirmed() {
         .await
         .expect("uninstall");
     assert!(!path.exists());
+}
+
+/// Removes a directory outside the fixture when the test ends, even when it fails.
+struct RemoveOnDrop(PathBuf);
+
+impl Drop for RemoveOnDrop {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
 }
