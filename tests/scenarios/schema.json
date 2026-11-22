@@ -887,6 +887,20 @@
             }
           }
         },
+        "check_cost": {
+          "description": "Checks a field subset of the session's token usage and cost from Core (T41, R5): the same answer as the usage card (sessionUsage).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fields"],
+          "properties": {
+            "session": {
+              "$ref": "#/$defs/label"
+            },
+            "fields": {
+              "type": "object"
+            }
+          }
+        },
         "check_usage": {
           "description": "Checks the session's context usage from Core (T27): its categories add up to tokens (always), a field subset, and categories that must be above zero.",
           "type": "object",

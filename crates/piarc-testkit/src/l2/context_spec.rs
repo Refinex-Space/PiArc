@@ -19,3 +19,14 @@ pub struct CheckUsageAction {
     #[serde(default)]
     pub positive: Vec<String>,
 }
+
+/// Checks a field subset of a session's token usage and cost (Core's `sessionUsage`, T41).
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CheckCostAction {
+    /// The session; the only one when absent.
+    #[serde(default)]
+    pub session: Option<String>,
+    /// A field subset of the usage (`tokens`, `cost`, `partial`, `models`, …).
+    pub fields: Value,
+}

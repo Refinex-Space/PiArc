@@ -7,7 +7,7 @@ use serde_json::Value;
 use piarc_core::sessions::{ForkPoint, Op};
 
 use super::{Driver, call};
-use crate::l2::context_spec::CheckUsageAction;
+use crate::l2::context_spec::{CheckCostAction, CheckUsageAction};
 use crate::l2::format::Approval;
 use crate::l2::harness_spec::{CheckHarnessAction, ForkAction};
 use crate::l2::matcher::subset_mismatch;
@@ -87,6 +87,16 @@ impl Driver<'_> {
             Some(fields) => subset_mismatch(fields, &usage, "context usage").map_or(Ok(()), Err),
             None => Ok(()),
         }
+    }
+
+    pub(super) async fn check_cost(&self, check: &CheckCostAction) -> Result<(), String> {
+        let id = self.session_id(check.session.as_deref())?;
+        let usage = call(
+            |done| self.core.session_usage(id, done),
+            "reading the session's usage and cost",
+        )
+        .await?;
+        subset_mismatch(&check.fields, &usage, "session usage").map_or(Ok(()), Err)
     }
 
     pub(super) async fn check_harness(&self, check: &CheckHarnessAction) -> Result<(), String> {

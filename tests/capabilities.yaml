@@ -232,7 +232,7 @@ capabilities:
     milestone: M4
     refs: [FR-MD-06]
     task: T41
-    status: planned
+    status: active
 
   # Tools and execution
   - id: CAP-TOOL-CORE-001
@@ -940,7 +940,7 @@ capabilities:
     milestone: M4
     refs: [FR-EX-05]
     task: T41
-    status: planned
+    status: active
   - id: CAP-CONFIG-MANAGED-001
     title: '企业托管配置（兼容读取 Claude Code 的托管文件）'
     milestone: M5

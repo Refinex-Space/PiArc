@@ -115,7 +115,7 @@
 | CAP-PERM-CRITICAL-001 | 关键路径删除在任何模式下都询问，包括跳过权限与存在匹配的 allow 规则 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-critical-delete` | 已实现 |
 | CAP-PERM-MODE-002 | 计划与跳过权限模式（跳过权限需显式开启并二次确认） | FR-PM-01、ARCH-6.2.1 | T23 | `perm-bypass`<br>`perm-critical-delete`<br>`perm-plan` | 已实现 |
 | CAP-PERM-READONLY-001 | 内置只读命令白名单在手动模式下免审批，路径越界或夹带其他命令时询问 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-read-only` | 已实现 |
-| CAP-PERM-RULE-001 | 兼容 Claude Code 的规则语法，按 deny → ask → allow 裁决 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-powershell-whole`（仅 windows）<br>`perm-rule-match`<br>`subagent-denied-type`<br>`webfetch-domain-rules`<br>`worktree-session-rules` | 已实现 |
+| CAP-PERM-RULE-001 | 兼容 Claude Code 的规则语法，按 deny → ask → allow 裁决 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-powershell-whole`（仅 windows）<br>`perm-rule-match`<br>`sec-read-deny-search`<br>`subagent-denied-type`<br>`webfetch-domain-rules`<br>`worktree-session-rules` | 已实现 |
 | CAP-PERM-TOOLS-001 | 不带 specifier 的 deny 规则把工具从模型请求的工具列表中移除 | FR-PM-03、ARCH-6.2.2 | T23 | `perm-rule-match` | 已实现 |
 | CAP-PLAN-ENTRY-001 | 批准的计划保存为会话 entry，重启与恢复后经注入接口读回 | FR-HN-01、ARCH-6.5 | T26 | `plan-entry-restart` | 已实现 |
 | CAP-PLAN-MODE-001 | 计划模式：写工具与非只读命令被硬拦截，提交计划，批准时选择后续模式 | FR-HN-01、ARCH-6.5、ARCH-6.15 | T26 | `plan-keep-planning`<br>`plan-mode-gate`<br>`plan-mode-menu-reminder` | 已实现 |

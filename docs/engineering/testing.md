@@ -372,6 +372,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | `fork` | `at_text` 或 `before_turn`、`as` | 读会话历史，在文本等于 `at_text` 的回复所在 entry 处 fork（T26），或在标签回合开始之前 fork（"从这里分支"，T28）；新会话记在 `as` 标签下，该标签必须是 `sessions` 中 `deferred: true` 的会话 |
 | `check_harness` | `fields` | 读会话历史的 `harness`（分支上的当前计划与任务清单，T26）做字段子集比较；`null` 表示两者都没有 |
 | `check_usage` | `fields`、`positive` | 读 Core 的 `contextUsage`（T27）：各类别之和必须等于 `tokens`（总是检查），`fields` 做字段子集比较，`positive` 列出必须大于零的类别 |
+| `check_cost` | `fields` | 读 Core 的 `sessionUsage`（T41，R5）：会话的 token 用量与成本（含子 agent 与辅助调用），`fields` 做字段子集比较；没有价格时没有 `cost` 字段、`partial` 为真 |
 | `rewind` | `turn`、`scope`（`codeAndConversation`/`conversation`/`code`/`summarize`）、`preview`、`choices`、`cancel`、`outcomes`、`completed`、`text` | 回退到标签回合之前（T28）：`preview` 按工作区相对路径断言每个文件的动作，`choices` 逐个回答冲突（`true` 覆盖），`cancel` 只看预览不执行；之后断言逐文件结果、是否完成与放回输入框的原文 |
 | `undo_rewind` | `outcomes` | 撤销会话最近一次回退的文件恢复，断言逐文件结果 |
 | `check_changes` | `fields` | Changes 视图（文件按首次写入的顺序、行数、降级）做字段子集比较 |

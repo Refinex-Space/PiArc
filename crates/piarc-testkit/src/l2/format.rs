@@ -494,6 +494,8 @@ pub enum Action {
     CheckHarness(super::harness_spec::CheckHarnessAction),
     /// Checks a session's context usage (T27).
     CheckUsage(super::context_spec::CheckUsageAction),
+    /// Checks a session's token usage and cost (T41).
+    CheckCost(super::context_spec::CheckCostAction),
     /// Rewinds to before a labeled turn (T28).
     Rewind(super::checkpoint_spec::RewindSpec),
     /// Undoes the latest rewind (T28).
@@ -598,6 +600,7 @@ impl Action {
             Self::Fork(_) => "fork",
             Self::CheckHarness(_) => "check_harness",
             Self::CheckUsage(_) => "check_usage",
+            Self::CheckCost(_) => "check_cost",
             Self::Rewind(_) => "rewind",
             Self::UndoRewind(_) => "undo_rewind",
             Self::CheckChanges(_) => "check_changes",
@@ -647,6 +650,7 @@ impl Action {
             Self::Fork(fork) => Some(&fork.session),
             Self::CheckHarness(check) => Some(&check.session),
             Self::CheckUsage(check) => Some(&check.session),
+            Self::CheckCost(check) => Some(&check.session),
             Self::Rewind(spec) => Some(&spec.session),
             Self::UndoRewind(spec) => Some(&spec.session),
             Self::CheckChanges(spec) => Some(&spec.session),

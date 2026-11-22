@@ -1,0 +1,41 @@
+id: usage-cost-session
+description: A session's token usage and cost add up its model requests, priced with the user's modelPrices in exact integer arithmetic; a model without a price leaves the cost unknown rather than zero (T41, R5).
+capabilities: [CAP-USAGE-COST-001]
+workspace:
+  trusted: true
+  run_files:
+    # USD per million tokens: 1,000 input and 200 output tokens cost 0.003 + 0.003.
+    'data 数据/settings.json': '{"modelPrices":{"mock-main/mock-model":{"input":3,"output":15,"cacheRead":0.3,"cacheWrite":3.75}}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - { text: First answer., usage: { input_tokens: 600, output_tokens: 120 } }
+      - { text: Second answer., usage: { input_tokens: 400, output_tokens: 80 } }
+  other:
+    wire: anthropic
+    steps:
+      - { text: Unpriced answer., usage: { input_tokens: 50, output_tokens: 5 } }
+sessions:
+  priced: { provider: main }
+  unpriced: { provider: other }
+actions:
+  - prompt: { session: priced, text: One., turn: a }
+  - wait: { session: priced, method: turn/completed, turn: a }
+  - prompt: { session: priced, text: Two., turn: b }
+  - wait: { session: priced, method: turn/completed, turn: b }
+  - prompt: { session: unpriced, text: Three., turn: c }
+  - wait: { session: unpriced, method: turn/completed, turn: c }
+  - check_cost:
+      session: priced
+      fields:
+        tokens: { input: 1000, output: 200 }
+        cost: 0.006
+  - check_cost:
+      session: unpriced
+      fields:
+        # No cost field at all: unknown, not zero.
+        tokens: { input: 50, output: 5 }
+        partial: true
+expect:
+  request_counts: { main: 2, other: 1 }

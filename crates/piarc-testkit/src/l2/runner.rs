@@ -528,6 +528,7 @@ impl Driver<'_> {
             Action::Fork(fork) => self.fork(fork).await,
             Action::CheckHarness(check) => self.check_harness(check).await,
             Action::CheckUsage(check) => self.check_usage(check).await,
+            Action::CheckCost(check) => self.check_cost(check).await,
             Action::Rewind(spec) => self.rewind(spec).await,
             Action::UndoRewind(spec) => self.undo_rewind(spec).await,
             Action::CheckChanges(spec) => self.check_changes(spec).await,

@@ -191,6 +191,7 @@ fn check_references(spec: &ScenarioSpec, action: &Action, field: &str, problems:
         | Action::ShareTerminal { .. }
         | Action::CheckHarness(_)
         | Action::CheckUsage(_)
+        | Action::CheckCost(_)
         | Action::UndoRewind(_)
         | Action::CheckChanges(_)
         | Action::SwitchBranch(_)
