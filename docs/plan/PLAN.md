@@ -168,7 +168,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T37 | [Skills、斜杠命令、命令面板与输出风格](tasks/T37-skills-commands-and-output-styles.md) | 4 | T36 | macOS | high / 高 | 大 | 无 | 已完成 | b9012bb |
 | T38 | [WebSearch 与 hooks 扩展（M3）](tasks/T38-websearch-and-hooks-m3.md) | 4 | T37 | macOS | high / 高 | 中 | 无 | 已完成 | fc9c022 |
 | R4 | [M3 评审](tasks/R4-m3-review.md) | 4 | T38、W2 | macOS | high / 高 | 中 | 无 | 部分完成 | 8a1b0cf |
-| W3 | [Windows：M3 达标](tasks/W3-windows-m3-parity.md) | 5 | R4（建议在 T43、T44 之后，需要读屏清单与性能测量脚本） | Windows | high / 高 | 中 | 无 | 部分完成 | HEAD_PLACEHOLDER |
+| W3 | [Windows：M3 达标](tasks/W3-windows-m3-parity.md) | 5 | R4（建议在 T43、T44 之后，需要读屏清单与性能测量脚本） | Windows | high / 高 | 中 | 无 | 部分完成 | 9879474 |
 | T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 607809d |
 | T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 已完成 | c4e5f75 |
 | T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 已完成 | 10fbeff |
@@ -1099,7 +1099,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 登记：I06（审计已接入）、I10、I13、I24、I30、I52、I57、I170、I180 落地；I39、I64 评估后维持；I56、I79、I94、I120、I121、I123、I126、I172、I173、I175、I178 交 R5，I83 交 W3/T48，I91、I112 交 T48；新增 I196（Electron 45.4.1）、I197（`PI_OFFLINE` 遮住 Pi 的联网路径）、I198（Windows 拼写词典下载）、I199（XSS 扩展到其余设置页）、I200（T50 为 THR-09 补测试）
 - 下一项：R5（M4 评审）依赖 W3，W3 在 Windows 上进行；推送后按 CI 关闭 T45-A02。本地提交，未推送。
 
-### 2026-11-22 W3 部分完成（提交 HEAD_PLACEHOLDER）
+### 2026-11-22 W3 部分完成（提交 9879474）
 
 - 开工：用户要求先把 `origin/docs/architecture-design` 合并进 `windows/dev`（快进到 a6701310，无冲突）。基线 verify 全量 12/17：T37–T45 只在 macOS 跑过，Windows 失败按 W2 的先例并入本任务；`url` 2.5.8 的新公告经用户同意升到 2.5.9。机器负载高、一次全量 `cargo test` 因内存不足被中止，用户腾出机器后再测量；NVDA 经用户同意用 winget 安装。
 - 交付：修复 10 个 Windows 缺陷（插件路径的 `\\?\`、worktree 会话全被当作受保护路径、子 agent worktree、内置 npm、git 一律 `core.longpaths=true`、会话终端在 `C:\Windows` 启动、终端面板的订阅与网格在 Core 认得终端前被拒后不再重试、测试读到本机 `~/.claude/skills` 等）；新增 `pointer_windows.rs`（I163）、`t34-terminal-windows.e2e.ts`（I142）、长路径与小写盘符的 worktree 用例；`docs/engineering/performance.md` 第 6.1 节 Windows 实测；无障碍清单的讲述人与 NVDA 两列；[W3 报告](../reviews/W3-windows-m3-parity.md)；架构 2.57
