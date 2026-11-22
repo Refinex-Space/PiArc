@@ -176,7 +176,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 部分完成 | 00b452b |
 | T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 部分完成 | a5f6146 |
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
-| R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 未开始 | — |
+| R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 进行中 | — |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 未开始 | — |
@@ -308,6 +308,16 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+R5（M4 评审，macOS）：
+
+- [ ] 开工：基线 verify（合并 W3 后跑全量）、CI 核对（windows/dev de98771）、看板与检查点
+- [ ] 1 退出标准取证：安全（威胁检查、14 条威胁各抽查一个测试的断言）、性能（第 11 章 macOS 实测与 Nightly、W3 的 Windows 数据）、M4 目标逐项对应任务与验收证据、capabilities 两条命令（A01–A03）
+- [ ] 2 四个只读审查并行（安全、性能、无障碍、工程质量），范围与输入写入发现文件（A04）
+- [ ] 3 逐条核实与处理：确认的先写失败测试再修复，不同意写理由，超出范围的登记；同时处理交 R5 的登记事项（I56、I79、I94、I120、I121、I123、I126、I172、I173、I175、I176、I178、I190–I194、I196、I197、I199、I203、I207、I208–I210）（A05）
+- [ ] 4 W3 结论确认；ADR-0057 状态与架构同步核对（A06、A07）
+- [ ] 5 结论、W4 的 M4 验收清单；架构第 16 章与 6.0 节、版本与修订记录；reviews README（A08、A09）
+- [ ] 6 收尾：全量 verify（A10）、acceptance、PLAN 会话日志与登记事项、最终报告
 
 ## 登记事项
 
