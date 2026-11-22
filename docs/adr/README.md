@@ -78,3 +78,5 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0060](0060-notebook-edit-actionable-notifications-and-diff-comments.md) | NotebookEdit 只改一个 cell 的字节区间（Rust 与 TS 两份实现共用向量，新 cell 的 id 由调用 id 派生）；通知只放行短命令与小改动，按钮经同一审批账本（`via: notification`，审计来源"通知"）；diff 行内评论是渲染进程草稿，按摘录重新定位，Mod+Enter 一次发送（运行中排队） | 已接受（补充） |
 | [0061](0061-accessibility-and-localization.md) | 无障碍与本地化：状态清单与 axe 亮暗零违规（覆盖检查）、transcript 改为 feed 加行名称、5 秒节流的 live region、审批卡取焦点（合成后、400 ms 防误触）、侧栏 90% 叠层与高对比度代码主题、强制颜色用系统按钮色、i18n 检查进 verify 第 16 步、数字日期按应用语言 | 已接受（补充） |
 | [0062](0062-security-hardening-threat-map-redaction-and-diagnostics.md) | 安全收口：威胁映射进 verify（测试 ID 对照源文件、待补项随任务完成而失败）、日志写入时脱敏（保险箱的值与常见密钥格式）、诊断包先预览后经原生保存对话框写出、发布构建拒绝远程调试开关并去掉测试页、Pi 自己设置里的包清单不生效、依赖审计流水线与例外清单、审批卡与 diff 显示双向控制字符 | 已接受（补充） |
+| [0063](0063-app-memory-physical-footprint.md) | "应用全部进程合计"按物理占用（macOS `phys_footprint`、Windows 私有工作集）测量，预算数值不变，RSS 合计只作参考（修订第 11 章一行的口径，放宽） | 提议 |
+| [0064](0064-trust-decision-native-confirmation.md) | "信任"项目的决定经主进程原生确认，列出将生效的可执行项；暂不信任与撤销不需要（修订 ADR-0029 的备选方案结论） | 提议 |
