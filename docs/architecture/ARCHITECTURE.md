@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.57（2026-11-22） |
+| 版本 | 2.58（2026-11-22） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -277,6 +277,8 @@ PiArc/
 | [0060](../adr/0060-notebook-edit-actionable-notifications-and-diff-comments.md) | NotebookEdit 只替换一个 cell 的字节区间、Rust 与 TS 共用向量、新 cell 的 id 由调用 id 派生；系统通知只放行能在通知里读完的请求，按钮经同一审批账本；diff 行内评论是渲染进程的草稿，按摘录重新定位，一次发送 | 保真写入不产生整文件 diff；通知没有阅读闸门，只给短请求"允许"；评论发送后就是普通消息，不需要 Core 存储 |
 | [0061](../adr/0061-accessibility-and-localization.md) | 状态清单逐条 axe（亮暗）并由注册点核对覆盖；transcript 是带行名称的 feed；进展经 5 秒节流的 live region；审批卡出现时取焦点；侧栏叠层、高对比度代码主题与强制颜色的系统按钮色；i18n 检查进 verify | 无障碍要靠检查守住，读屏与对比度在真实背景上成立 |
 | [0062](../adr/0062-security-hardening-threat-map-redaction-and-diagnostics.md) | 威胁映射（`tests/security/threats.yaml`）进 verify；日志写入时脱敏；诊断包先预览后经原生保存对话框写出；发布构建拒绝远程调试开关、不带测试页；Pi 自己设置里的包清单不生效；依赖审计流水线；审批卡与 diff 显示双向控制字符 | 每条威胁的对策要有能失败的检查；凭据与会话内容不出本机；Pi 不能绕开扩展包的安装规则 |
+| [0063](../adr/0063-app-memory-physical-footprint.md)（提议） | "应用全部进程合计"按各进程物理占用之和测量，预算数值不变，RSS 合计只作参考 | RSS 相加重复计入各 Chromium 进程映射的同一份框架代码页，这一行从 M0 起在两个平台超出而独占内存约为其 40–50%；属放宽，等用户决定 |
+| [0064](../adr/0064-trust-decision-native-confirmation.md)（提议） | "信任"项目的决定经主进程原生确认，列出将生效的可执行项 | 信任一次启用项目的全部可执行配置，其他放宽操作都已经原生确认；渲染进程被注入时不能静默信任 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -426,19 +428,19 @@ PiArc.app/Contents/
 |---|---|---|---|---|
 | 工具体系 | M1 已接入 Read、Write、Edit、Bash、Glob、Grep。Core 维护读取快照、目录身份、命令执行和结果落盘；PowerShell 与 Git Bash 留 W1 实机复核 | K + C | `create*Tool` + `*Operations`、`registerTool` | M1 |
 | 权限 | Manual、Accept edits、计划与跳过权限四种模式；Claude Code 规则语法与七层来源；tree-sitter-bash 复合命令分析、只读白名单、关键路径删除；"总是允许"、规则管理与审计（M2 已交付，R3）。Auto 模式在 M5 | C + K + U | `tool_call` 闸门 | M1 基础、M2 完整 |
-| Hooks | Claude Code 兼容的事件、配置格式、exit code 与 JSON 协议；M2 事件集与 `command` handler 已交付（R3），`http`、`prompt` handler、子 agent 与 M3 事件已交付（T38，R4） | C + K | 各生命周期事件 | M2–M3 |
+| Hooks | Claude Code 兼容的事件、配置格式、exit code 与 JSON 协议；M2 事件集与 `command` handler 已交付（R3），`http`、`prompt` handler、子 agent 与 M3 事件已交付（T38，R4），M4 事件与 `mcp_tool` handler 已交付（T41，R5） | C + K | 各生命周期事件 | M2–M4 |
 | 子 agent | `.claude/agents` 定义；进程内子会话；工具子集；任意服务商模型与别名；后台运行；`isolation: worktree`；默认最多 3 层、并发 8（M3 已交付，R4） | K + C + U | SDK 子会话 | M3 |
 | Plan 模式 | 只读探索 → 提交计划 → 用户批准并选择后续模式（M2 已交付，R3） | K + C + U | `tool_call` 闸门、追加消息 | M2 |
 | 任务清单 / 下一步 | 宿主工具驱动，UI 结构化渲染，压缩后重新注入（M2 已交付，R3） | K + U | `registerTool`、工具 details | M2 |
 | 上下文工程 | M1 已交付分段 system prompt、会话恢复、memory 层级、懒加载和外部导入审批；M2 已交付统一提醒通道、条件 rules、自写摘要的自动与手动压缩、熔断、重注入与用量（R3）；M3 的 skill 正文重注入已交付（T37） | K + C + U | `before_agent_start`、`context`、`session_before_compact` | M1–M3 |
 | Skills / 命令 | Agent Skills 标准；`.claude/skills`、`.claude/commands`、输出风格；渐进加载（M3 已交付，R4）。发现与解析在 Core，Pi 自带的 skills 与 prompt templates 加载关闭（ADR-0054） | C + K + U | `registerTool`、`before_agent_start` | M3 |
-| 插件 | 加载 Claude Code 插件目录与 Pi 包 | C + K | packages、扩展 | M4 |
+| 插件 | 加载 Claude Code 插件目录与 Pi 包；本地目录、git（锁定提交）、内置 npm（`--ignore-scripts`，不读包自带的 `.npmrc`）安装，可执行项逐项经主进程原生确认，MCP prompts 作为斜杠命令（M4 已交付，T40，R5）。安装与开关在 Core，Pi 扩展经 AHP 交给 Agent Host（ADR-0058） | C + K + U | 扩展（`additionalExtensionPaths`） | M4 |
 | MCP | stdio / Streamable HTTP；OAuth；工作区共享连接池；延迟加载（M3 已交付，R4）。配置在 Core，连接池在 Agent Host（ADR-0053） | K + C + U | pi-mcp 客户端、`tool_search` | M3 |
 | Checkpoint / Rewind | 写前快照；回退代码 / 对话 / 两者、从此处摘要、分支切换、Changes 面板按文件与 hunk 丢弃（M2 已交付，R3） | C + K | 会话树 fork/leaf | M2 |
-| 沙箱 | macOS：Bash 在 Seatbelt 中执行，文件与网络白名单；Windows：第一版只做进程树管理（需求 D7） | C | BashOperations 委托 | M4 |
+| 沙箱 | macOS：Bash 在 Seatbelt 中执行，文件与网络白名单，按调用的授权与当时的设置生成配置，Agent Host 运行于定稿配置（M4 已交付，T39，ADR-0056，R5 收紧 Agent Host 对 `<数据目录>/pi` 的写入）；Windows：到 Beta 只做进程树管理并明确提示（需求 D7、ADR-0057） | C + U | BashOperations 委托 | M4 |
 | 后台任务 / 终端 | 后台命令、超时转后台、Monitor、终端面板（M3 已交付，R4） | C + K + U | BashOperations、`registerTool` | M3 |
 | Worktree | 每会话可选独立 worktree；子 agent 隔离（M3 已交付，R4） | C + K + U | cwd 按会话 | M3 |
-| 多模型适配 | M1 已交付服务商设置、凭据保险箱、模型与 effort 选择及切换代价提示；M2 已交付 OAuth 与设备码登录、每模型设置、辅助模型通道与保守 Tool Profile（R3）；模型别名已随子 agent 交付（T31） | K + C + U | pi-ai 模型目录 | M1–M3 |
+| 多模型适配 | M1 已交付服务商设置、凭据保险箱、模型与 effort 选择及切换代价提示；M2 已交付 OAuth 与设备码登录、每模型设置、辅助模型通道与保守 Tool Profile（R3）；模型别名已随子 agent 交付（T31）；按会话、按模型的用量与成本已交付（T41，R5） | K + C + U | pi-ai 模型目录、`calculateCost` 的规则 | M1–M4 |
 | Auto 模式（分类器） | 可配置的审查模型代替人审批，决策可审计 | C + K | 辅助模型调用 | M5 |
 
 ### 6.1 工具体系
@@ -1499,7 +1501,7 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 - 信任前：memory 文件照常加载（它们是指令而非代码，但 UI 会标注来源）；不执行项目 hooks；不连接项目 MCP；不应用项目 allow 规则（deny 与 ask 照常生效）；不加载项目插件与 Pi 扩展。
 - 信任决定存在 Core（按仓库主 checkout 解析，worktree 共享），可在设置中撤销。项目配置文件发生变化时，新增的可执行项需要再次确认。
 - T13 落地（ADR-0025）：主 checkout 规则见 `crates/piarc-git/CLAUDE.md`（linked worktree 经 `gitdir` 与 `commondir` 找到主仓库；submodule 没有 `commondir`，按独立项目；非 git 目录取自身规范路径）。可执行项枚举只读键名与条目：`.piarc/settings*.json`、`.claude/settings*.json` 的 hooks、allow 规则、`enabledPlugins`，`.mcp.json` 的 server（T36 起另含 `.piarc/settings*.json` 的 `mcpServers` 与子 agent 定义的内联 server，条目按程序或地址命名，改了运行什么即为新增项；`.pi/mcp.json` 不再枚举），`.claude-plugin/` 的插件，`.pi/extensions/` 的条目与 `.pi/settings.json` 的 `extensions`、`packages`；信任时的条目存为快照，之后多出的条目是"新增项"。撤销删除决定并重启该工作区的 Agent Host。所有消费者经 `piarc_config::project_trust` 查询；项目不受信任时，设置合并排除项目层的 hooks 与 allow 规则，deny 与 ask 照常生效。
-- T18 落地（ADR-0029）：信任决定为"信任"、且当前没有快照之外的新增可执行项时，项目才受信任（I63）：`trust/get` 与客户端的信任视图在用户确认之前都答"不信任"，删除的条目不需要再确认。客户端在工作区的第一个会话之前（没有决定时）、或有新增项时显示信任对话框：前者按类别与来源文件列出全部可执行项，后者只列新增项；对话框说明 memory 文件不受信任影响。"暂不信任"同样写入决定，之后不再询问，可从文件夹菜单的"项目信任…"修改。决定与撤销在应答之前让同一主 checkout 的打开工作区进入重启，客户端随后可以立即创建会话。信任决定由渲染进程发出、没有原生确认，登记为 I79：T45 评估后列为残余风险（渲染进程被注入时能静默信任项目），给"信任"加主进程原生确认要改变本节的决定与首次使用的流程，交 R5 由用户决定。
+- T18 落地（ADR-0029）：信任决定为"信任"、且当前没有快照之外的新增可执行项时，项目才受信任（I63）：`trust/get` 与客户端的信任视图在用户确认之前都答"不信任"，删除的条目不需要再确认。客户端在工作区的第一个会话之前（没有决定时）、或有新增项时显示信任对话框：前者按类别与来源文件列出全部可执行项，后者只列新增项；对话框说明 memory 文件不受信任影响。"暂不信任"同样写入决定，之后不再询问，可从文件夹菜单的"项目信任…"修改。决定与撤销在应答之前让同一主 checkout 的打开工作区进入重启，客户端随后可以立即创建会话。信任决定由渲染进程发出、没有原生确认，登记为 I79：T45 评估后列为残余风险（渲染进程被注入时能静默信任项目），R5 写 ADR-0064（提议）："信任"经主进程原生确认，等用户决定。
 
 R2 起，肯定决定携带与 checkout、目录、清单及既有决定绑定的版本。清单或数据库快照不可用时保持未信任。版本已变时返回最新视图，用户重新确认。linked worktree 通过主仓库反向登记校验（ADR-0034）。
 
@@ -1595,6 +1597,8 @@ T44 起每一行都由 `scripts/perf/` 自动测量（方法、口径与本机�
 T35 的 M3 测量（[M3 内存](../perf/M3-memory.md)，`npm run perf:m3`，M1 Max / 32 GB，打包形态）：同一工作区 3 个并行会话（1 个在独立 worktree）加 1 个子 agent 持续流式输出并执行工具，Agent Host 最大 238 MB（4 个活动会话的上限 270 MB，达标）；应用其余进程合计最大 576 MB（macOS 预算 510 MB，**超出**），其中没有会话时的基线已有 505 MB（不连测试驱动 466 MB），会话只增加约 65 MB（渲染进程约 50 MB）。预算不放宽，R4 复测（I146）。
 
 R4 复测（[R4 评审](../reviews/R4-findings.md)第 1 节，同一台 M1 Max / 32 GB，开发构建打包形态，场景另加被 4 个会话共用的 1 个 stdio MCP server 与 8 个项目 skill 的索引）：两轮 Agent Host 最大 236、218 MB（上限 270 MB，达标）；应用其余进程合计最大 580、577 MB（macOS 预算 510 MB，**超出**），空闲基线约 511 MB；同一负载下这些进程的 phys_footprint 合计约 250 MB（最大 298 MB）。超出主要是 RSS 把各进程映射的同一份 Electron 框架代码页各算一次；口径的改变等于放宽，须走 ADR，交 T44（I26、I146）。
+
+R5（[R5 评审](../reviews/R5-findings.md)第 1.2 节）：测量框架在 CI 上不判任何值（两个 runner 类别没有基线、不带 `--absolute`），R5 改为缺基线即失败，推送后从 CI 工件记录基线；"打开工作区到 Agent Host 就绪"的探针原来取 10 次的中位数（还把汇总行算作第 11 个样本），改回 T14 与本表的 10 次最大。"应用全部进程合计"的口径（RSS → 物理占用，预算数值不变）写在 ADR-0063（提议，属放宽），等用户决定；在此之前这一行仍判超出。
 
 体积估算依据：Electron 45 的 darwin-arm64 发行包压缩后约 121 MB，内置 Node 压缩后约 28–38 MB，再加应用代码、Core、rg、fd。作为对照，Claude Desktop 5.1231.2 安装后 621 MB（本机实测）。M0 实测：macOS arm64 安装后 449.0 MB，其中 Electron Framework 250 MiB、内置 node 145 MiB；Windows x64 的 Electron 本体约 360 MiB（`PiArc.exe` 238.5 MiB、locales 48.8 MiB），内置 node 102 MiB（S6 第 8、9.2 节）。
 
@@ -1792,7 +1796,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | **M1 可行走骨架** | 单工作区、多会话列表、流式对话；Read/Write/Edit/Bash（Windows 另有 PowerShell）/Glob/Grep 经 Core 执行；Manual 与 Accept edits 模式的基础审批；模型与凭据设置（凭据保险箱）；会话持久化与恢复；transcript P0 行类型 | 能用至少 2 家服务商完成"读代码 → 改代码 → 跑测试"的完整任务；L2 场景 ≥ 20 个通过。**macOS 已达标（R2，2026-11-19）**：两种协议的打包应用工作流通过，真实百炼 qwen-flash 通过，L2 61 个通过。**Windows 已达标（W1，2026-11-19）**：两种协议的工作流在两种形态通过，L2 60 个通过，UNC 共享未能实机验证，见 [W1 报告](../reviews/W1-windows-m1-parity.md)。 |
 | **M2 Harness 核心** | 完整权限规则与 Bash 分析；plan 模式；任务清单；AskUserQuestion；hooks（M2 事件集，command 类型）；checkpoint 与 rewind；压缩与上下文用量；WebFetch；Changes 面板；memory 文件兼容 | 第 6 章 M2 能力全部有场景覆盖；L3 对齐在权限与 hooks 上无未解释差异。**macOS 已达标（R3，2026-11-20）**：M2 能力 46 项全部有 L2 场景，L2 118 个通过（2 个 Windows 专属），L3 对 Claude Code 2.1.318 的 12 个权限与 hooks 场景 0 个未解释差异；评审修复 16 项缺陷，并按用户确认的 ADR-0047 让带通配的命令规则不放行越界路径（L3 少了这条差异），见 [R3 评审](../reviews/R3-findings.md)。**Windows 已达标（W2，2026-11-21）**：L2 145 个通过（4 个 macOS 专属），L3 对 Claude Code 2.1.318 的 12 个场景 0 个未解释差异（allowlist 按平台限定 Windows 版的工具集差异），W1 遗留的 UNC 补验通过，修复 7 个 Windows 平台缺陷，见 [W2 报告](../reviews/W2-windows-m2-parity.md)。 |
 | **M3 多会话与生态** | 子 agent；后台任务与 Monitor；终端面板（libghostty-vt）；worktree；MCP 共享连接池；skills 与命令；WebSearch；ToolSearch；hooks 的 http/prompt 类型 | 3 个并行会话 + 子 agent 场景满足第 11 章内存预算。**macOS 未达标（R4，2026-11-21）**：M3 能力全部有 L2 场景（L2 174 个通过、2 个 Windows 专属），四个独立审查的发现中修复 10 项缺陷；内存一项 Agent Host 达标（最大 236 MB，上限 270 MB），应用其余进程合计 580 MB 超出 510 MB（RSS 口径，phys_footprint 约 250 MB），阻塞进入 M4 的退出判定，见 [R4 评审](../reviews/R4-findings.md)。**Windows 未达标（W3，2026-11-22）**：M3 能力在 Windows 11 实机可用（ConPTY 终端与输入法、内置 Node 的 MCP、长路径与中文路径的 worktree、托盘、多窗口、`piarc://` 与右键菜单、讲述人与 NVDA），修复 10 个 Windows 缺陷；内存一项与 macOS 相同：Agent Host 最大 163 MB（达标），应用其余进程最大 576 MB 超出 450 MB（私有工作集合计 256 MB），见 [W3 报告](../reviews/W3-windows-m3-parity.md)。 |
-| **M4 安全与打磨** | macOS 沙箱；Windows 隔离方案评估；插件；NotebookEdit；可操作的系统通知；配置诊断；无障碍；本地化；性能预算全部进 CI | 安全威胁表逐条有测试；性能预算全部达标 |
+| **M4 安全与打磨** | macOS 沙箱；Windows 隔离方案评估；插件；NotebookEdit；可操作的系统通知；配置诊断；无障碍；本地化；性能预算全部进 CI | 安全威胁表逐条有测试；性能预算全部达标。**macOS 未达标（R5，2026-11-22）**：九项目标都已交付并有验收证据，M4 及之前没有 `planned` 的能力（L2 213 个通过、3 个按平台跳过）；第 10.1 节 14 条威胁、59 个对策都映射到测试且本地通过（两个平台 CI 的结果等推送），四个独立审查的发现中修复 3 项安全缺陷（Agent Host 的子进程能往 Pi 自动加载的目录放代码、克隆的包经自带 `.npmrc` 让 npm 运行程序、性能门禁在 CI 上不判值）等 20 项；性能一条不满足：本机 Nightly 的流式帧 p99、主进程增量、Agent Host 内存超出，应用全部进程合计按 RSS 超出（口径见 ADR-0063，提议），见 [R5 评审](../reviews/R5-findings.md)。Windows 的 M4 由 W4 验收。 |
 | **M5 Beta** | Auto 模式（可配置审查模型）；自动记忆；企业托管配置；Anthropic 服务端压缩；fork 子 agent；平台快捷操作（App Intents / 跳转列表）；完整发布流水线 | macOS 与 Windows 同时公开 Beta |
 
 终端（ADR-0017）是 M3 中工作量最大的单项，估计 1 人 5.5–7 周。后台任务与 Monitor（T32）先用管道与输出文件实现，无头终端（T33）再加入"终端承载"的任务类型，渲染器（T34）最后接上；M0 的 S7 是开工前的闸门，不通过就直接启用 xterm.js 退路。
@@ -1860,6 +1864,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.50 | 2026-11-21 | T39：ADR-0057 被用户采纳。第 4 章去掉"提议"；6.10 节 Windows 一条写明评估结论（到 Beta 维持现状，MXC ProcessContainer 为 Beta 之后的候选及其前提）；10.3 节 Windows 的 Agent Host 没有第二道防线并计入已接受风险；15.2 节沙箱一行与第 14 章 R16 的对策和触发条件随之更新。 |
 | 2.51 | 2026-11-21 | T40（ADR-0058）补充第 4 章 ADR-0058；6.3.1 节插件 hooks 的层与确认；6.4 节插件的子 agent 定义；6.7 节 T40 落地（识别、安装位置、作用域与开关、确认与再确认、组件命名与优先级、Pi 扩展经 AHP、设置页）；6.8 节 MCP prompts 作为斜杠命令；6.14 节插件一行；7.4 节能力 `plugins` 与 Core API；9.2 节 `packages` 表（schema v10）；10.2 节项目作用域的包与信任。 |
 | 2.57 | 2026-11-22 | W3 补充第 11 章：Windows 的全部可测行由 W3 在一台 i5-1340P / 16 GB 笔记本（非基准机型）上实测，数据与配置差异见[性能测量](../engineering/performance.md)第 6.1 节，超出项登记 I201、I202、I207，不调整预算；第 16 章 M3 行加 Windows 结论（内存一项未达标，与 macOS 相同）。 |
+| 2.58 | 2026-11-22 | R5（M4 macOS 阶段门）：第 16 章标注 M4（macOS）未达标（性能一条）；6.0 节矩阵按 M4 交付更新 Hooks、插件、沙箱、多模型四行；6.2.2 节写明 `Read(…)` deny 作用于 Grep 与 Glob 的结果（I120）；第 4 章以提议列出 ADR-0063、ADR-0064；10.2 节 I79 改为 ADR-0064（提议）；10.3 节 Agent Host 配置收紧 `<数据目录>/pi` 中会让代码运行的部分（R5 S1）；第 11 章补 R5 对测量框架与探针口径的修复和 ADR-0063（提议）。预算与安全基线未改；ADR-0063、ADR-0064 等用户决定，采纳后再改正文 |
 | 2.56 | 2026-11-22 | T45（ADR-0062）补充第 4 章 ADR-0062；10.1 节第 9–11 行的对策改用分号分隔（措辞不变，便于逐条映射），恶意插件一行加"Pi 自己设置里的包清单不由 Agent Host 安装或加载"，通用运行时一行加远程调试开关；10.5 节 T45 落地（外连清单、日志脱敏、诊断包、威胁映射与 Electron 清单复核）。 |
 | 2.55 | 2026-11-22 | T44 补充第 11 章：每一行由 `scripts/perf/` 自动测量（PR 冒烟、Nightly 两平台、长跑；绝对预算与按平台、机器类别、流水线分存的基线两道判定，覆盖检查），说明见[性能测量](../engineering/performance.md)；原"未测"的 macOS 格子补上 T44 在 M1 Max 上的实测，其余行加 T44 数值并标出超出项（I191–I194，I26 附物理占用读数）；空闲 CPU 由"接近 0%"定为可见与隐藏时应用全部进程加 Agent Host 合计 ≤ 5%（一个核心、60 s 平均）并要求隐藏时无 rAF 回调与终端帧，依据是实测 3.5–3.6%（I190）；体积按 I41 裁剪后安装后 446.6 MB；8 小时长会话一行仍未测（用户决定不在 T44 做本机长跑，I195）。只有 macOS 数据，按本章收紧规则不收紧任何预算。 |
 | 2.54 | 2026-11-21 | T43（ADR-0061）补充第 4 章 ADR-0061；8.7 节无障碍与本地化的落地（状态清单与 axe、feed 与行名称、节流播报、审批卡焦点、键盘与焦点环、强制颜色、i18n 检查与按应用语言格式化）。 |
