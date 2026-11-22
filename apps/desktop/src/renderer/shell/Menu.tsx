@@ -42,6 +42,17 @@ export function MenuPopup({
   const ref = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
   const id = useId();
+  // Closing gives the focus back to what had it, when nothing else took it (an item that opens
+  // a rename field keeps that field focused): otherwise it falls to the page body (R5).
+  useEffect(() => {
+    const previous = document.activeElement;
+    return () => {
+      const now = document.activeElement;
+      if ((now === null || now === document.body) && previous instanceof HTMLElement) {
+        if (previous.isConnected) previous.focus();
+      }
+    };
+  }, []);
   useEffect(() => {
     ref.current?.focus();
     const away = (event: MouseEvent) => {
