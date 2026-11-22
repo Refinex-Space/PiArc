@@ -4346,92 +4346,92 @@
       "id": "T45-A01",
       "task": "T45",
       "description": "`tests/security/threats.yaml` 为第 10.1 节 13 行威胁各分配编号，每条可自动化对策至少映射一个测试 ID，每条威胁至少一个测试；删除一条映射或引用不存在的测试时 verify 失败。验证：临时删除一条映射时的失败输出，撤销后通过。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`tests/security/threats.yaml` 为第 10.1 节 14 行威胁各分配编号（THR-01–THR-14；任务表的 13 行之外，第 10.1 节现有\"同一用户的进程向 PiArc 注入代码\"一行，编为 THR-14），59 个对策、165 个测试 ID；`node scripts/ci/check-threats.mjs` 并入 verify 第 17 步。临时删除 THR-07 的映射：`✖ THR-07: the countermeasure \"审批账本的 revision 与 connectionEpoch 校验\" of section 10.1 is not mapped`、`✖ THR-07: no test at all`，exit=1（tmp/evidence/T45/a01-mapping-removed.txt）；把一个测试名改成不存在的：`✖ … no test fn passes_only_named_variables_and_the_fixed_one`，exit=1（a01-missing-test.txt）；撤销后 `threat map checks passed`，exit=0（a01-restored.txt）。库的单测 `npx vitest run scripts/lib/threats.test.mjs` 10 项通过"
     },
     {
       "id": "T45-A02",
       "task": "T45",
       "description": "映射引用的全部测试在 macOS 与 Windows CI 上通过，`docs/security/threat-coverage.md` 由脚本生成且与测试结果一致。验证：CI 输出与生成命令。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "本机全部通过：`npm run verify` 17 项通过于 c970cd6（Rust、Vitest、L2 213 个场景 210 通过 3 个按平台跳过、威胁映射与 `docs/security/threat-coverage.md` 漂移检查）；L4 映射到的用例在 dev 形态通过（t45-* 7 项、navigation、external-links、preload、csp、permissions、transcript-*、t19、t20、t23、t24、t28、t34-terminal、t35-windows、t40、t42、t43-a11y；t18-review 因本机终端没有屏幕录制权限 `could not create image from window` 失败，与改动无关）；发布构建的 `check-release-runtime.mjs` 8 项通过。覆盖文档由 `node scripts/ci/check-threats.mjs --results target/l2/results.json --doc write` 生成。等待推送后 macOS 与 Windows CI（verify、desktop 作业的 L4 与打包产物检查、deps-security）的结果"
     },
     {
       "id": "T45-A03",
       "task": "T45",
       "description": "仓库文件、WebFetch 内容、MCP 返回内容诱导执行破坏性命令时，命令进入审批且审批卡显示完整命令；关键路径删除在沙箱自动批准与 `bypassPermissions` 模式下仍询问。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-testkit --test scenarios -- sec-inject`：`sec-inject-repo-file`（仓库 README 诱导多行 `rm -rf src` + `curl | sh`，手动模式进审批卡，`core/sessions` 的卡片 `command` 是完整多行命令，拒绝后文件仍在）、`sec-inject-webfetch`（网页诱导 `rm -rf ~`，跳过权限模式下仍进审批卡、完整命令，网页只作为辅助模型材料与工具结果）、`sec-inject-mcp`（MCP 工具返回诱导 `rm -rf src && git push --force`，进审批卡、完整命令）均 ok；关键路径删除：`perm-critical-delete`（跳过权限 + allow 规则仍问）、`sandbox-auto-critical-delete`（沙箱自动批准仍问），verify 第 14 步全部通过"
     },
     {
       "id": "T45-A04",
       "task": "T45",
       "description": "\"全量恶意仓库\"夹具在信任前零执行（无 hook、无 MCP 连接、无插件与扩展加载、项目 allow 规则不生效）；信任后新增的可执行项在再次确认前不运行。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`sec-malicious-repo-untrusted`：仓库同时带 `.piarc/settings.json` 与 `.claude/settings.json` 的 hooks 与 allow 规则、`.mcp.json`（启动日志）、项目插件与 Pi 包（经 Core 安装并开启）、`.pi/extensions/`、`.pi/settings.json` 的 extensions 与 packages；信任前 hook 日志、两个 MCP 启动日志都不存在，五个扩展与 MCP 工具都不在请求的工具里，没有 HOOK 注入，项目 allow 的 `sed` 仍要审批。`sec-malicious-repo-new-item`：同一仓库信任后 hooks、MCP、扩展、插件与 allow 规则都生效（对照），之后加一个 hook 与一个 MCP server，项目回到未信任，新 hook 与新 server 不运行，旧 hook 也只运行了一次，`sed` 又要审批。两者 `cargo test -p piarc-testkit --test scenarios -- sec-malicious-repo` ok"
     },
     {
       "id": "T45-A05",
       "task": "T45",
       "description": "Electron 安全清单按锁定版本的官方文档逐条复核，每条有落实方式与测试 ID。验证：`docs/security/electron-checklist.md`。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`docs/security/electron-checklist.md`：按锁定的 Electron 45.3.2 的 `docs/tutorial/security.md`（与当天 main 逐行一致，20 项）逐条写落实方式、测试 ID 与 S10 时的差异；另列 T45 新增的远程调试开关、测试页、`will-frame-navigate`、IPC 别名规则、双向控制字符；核对 `npm view electron dist-tags` 得 latest 45.4.1，登记 I196"
     },
     {
       "id": "T45-A06",
       "task": "T45",
       "description": "cargo-audit、npm audit 与许可证检查没有未处理的高危与严重问题，例外项写明理由与复查日期。验证：命令输出与例外清单。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run audit:deps`：npm audit 1 个公告（GHSA-g3hv-75wg-m249，minimatch，moderate，只在开发工具链；发布依赖 0），cargo-audit 0 个漏洞，`cargo-deny check advisories licenses` ok，npm 发布依赖 190 个包许可证都在白名单；没有高危与严重问题。moderate 一项写在 `tests/security/audit-exceptions.yaml`（理由、影响、复查 2027-01-31）。CI `deps-security.yml` 与本地同一条命令；规则单测 `npx vitest run scripts/lib/audit.test.mjs` 7 项通过"
     },
     {
       "id": "T45-A07",
       "task": "T45",
       "description": "已知凭据值、常见密钥格式与 Bearer token 写入日志时被替换为占位符；Agent Host 与 Bash 子进程的环境变量中没有凭据。验证：测试（注入已知密钥后扫描日志文件与子进程环境）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-telemetry`（`redact_tests.rs` 的 thr04_* 四项：保险箱值、服务商 key 前缀、云 access key、Bearer 与 JWT；`tests/redaction.rs`：Core 与 Agent Host target 的行写进文件前已替换）与 `cargo test -p piarc-testkit --test credential_leaks`（自定义服务商的 key 只在保险箱：Agent Host 的 `ps -E` 环境、Bash `env` 的输出里都没有，Core 与 Agent Host stderr 两种日志行写成 `[REDACTED:secret]`/`Bearer [REDACTED:…]`，数据目录与工作区 14 个文件扫描无明文）"
     },
     {
       "id": "T45-A08",
       "task": "T45",
       "description": "诊断包导出前展示文件清单与脱敏摘要，用户确认后才写出；导出包中没有凭据、保险箱文件与会话内容，主目录路径替换为 `~`。验证：测试（扫描导出包）与 Playwright 截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`cargo test -p piarc-telemetry`（`bundle_tests.rs`：凭据、`env`/`headers` 值、主目录都被替换，ZIP 写出）、`cargo test -p piarc-core --test diagnostics`（真实 Core 导出：条目恰为预览的文件，不含保险箱值、设置里的 env 值、会话内容、主目录与 vault/sqlite/sessions 条目，日志行为 `refused [REDACTED:secret] (config in ~/x)`）；`unzip -t` 与 Python zipfile 校验 ZIP 无误；L4 `t45-diagnostics`：预览列出文件、替换计数与不包含的内容，取消保存对话框不写，选择路径后写出并扫描通过；截图 tmp/evidence/T45/diagnostic-bundle-preview.png、diagnostic-bundle-exported.png"
     },
     {
       "id": "T45-A09",
       "task": "T45",
       "description": "全新配置下遥测关闭；一次完整 mock 会话中，应用只向 mock provider 与测试配置的 MCP server 发起连接，其余外连已关闭或在报告中逐项说明。验证：测试（连接记录断言）与报告。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PiArc 没有遥测代码与开关；Pi 的版本检查与安装遥测固定关闭。`cargo test -p piarc-testkit --test egress`：Agent Host 按应用方式（不设 PI_OFFLINE）运行，Bash 与 stdio MCP 的完整回合里记录到的 2 个连接都指向 mock 服务商；L4 `t45-egress`：全新配置、完整会话与设置窗口，Chromium net log 与主进程 Node 连接只有环回（对照请求被记录到），Chromium 的 IPv6 可达性 UDP 探测（不发数据）单独识别；其余外连逐项说明在 `docs/security/egress.md`（Pi 远程目录、Windows 拼写词典等）"
     },
     {
       "id": "T45-A10",
       "task": "T45",
       "description": "扩充后的 XSS 载荷集在交付物 5 列出的全部渲染面上以文本呈现，无脚本执行、无导航。验证：安全回归测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "载荷集 18 → 28 类（新增 data:/vbscript: 链接、实体拆分的 javascript:、SVG onbegin/foreignObject/xlink:href、style url()、含 HTML 的文件名、双向控制字符）；`PIARC_EVIDENCE_TASK=T45 npx playwright test -c apps/desktop/playwright.config.ts t45-xss transcript-security t19-security --project dev` 9 项通过：transcript、审批卡（命令与文件改动）、Changes diff 与行内评论、MCP/扩展包/配置诊断设置页、hook 提示、终端 OSC 8（javascript:/data:/vbscript: 不确认不打开）上哨兵不变、无事件属性与框架元素、链接只剩安全协议、不导航、CSP 无报告；双向控制字符在审批卡与 diff 显示为 `[U+XXXX]`（`reveal.test.ts`）；截图 tmp/evidence/T45/xss-*.png"
     },
     {
       "id": "T45-A11",
       "task": "T45",
       "description": "preload 的每个命令以畸形参数调用时返回结构化错误且主进程存活；\"总是允许\"类规则的修改只能经主进程原生确认框完成。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 `t45-ipc-hardening`：117 个 `window.piarc` 命令各以 7 组畸形参数调用，没有挂起，全部拒绝都是结构化错误（主进程的 `Error invoking remote method '<通道>': TypeError: …` 或 preload 自己的检查），每个有参数的命令至少拒绝一组，主进程之后照常应答、日志没有未捕获错误（修了 openSettings、notifyAttention、openExternal 三处静默忽略）；页面伪造的 allow 规则、\"总是允许\"答复与沙箱放宽都停在原生确认（取消即 `cancelled`、规则未写入，3 个确认框），确认后同一请求生效（对照）"
     },
     {
       "id": "T45-A12",
       "task": "T45",
       "description": "打包产物上 `ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`--inspect` 不生效。验证：打包产物测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run package:desktop` 后 `node scripts/ci/check-release-runtime.mjs`：`ELECTRON_RUN_AS_NODE` 的脚本不运行、`NODE_OPTIONS --require` 不加载、`--inspect` 无 Debugger listening（三者均在应用启动、Core 写出日志后判定）、`--remote-debugging-port` 使应用以 1 退出且 /json/version 从未应答；每项在 node_modules 的 Electron 上的对照都观察到效果，8 项全部 ✔；对开发构建跑同样的探测 remote-debugging 与 inspect 都失败（变异对照）。CI desktop 作业已加这一步（两个平台）"
     },
     {
       "id": "T45-A13",
       "task": "T45",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run verify` 17 项全部通过于 c970cd6（Prettier、tsc、ESLint、Core 模块与快照、Vitest、cargo fmt、clippy、cargo test、协议漂移、契约样本、cargo-deny、crate 依赖、验收清单、L2 213 个场景与能力、设计令牌、i18n、威胁映射），已记入 target/verify/last-pass.json"
     },
     {
       "id": "T46-A01",

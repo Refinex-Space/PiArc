@@ -175,7 +175,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 部分完成 | 868065b |
 | T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 部分完成 | 00b452b |
 | T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 部分完成 | a5f6146 |
-| T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 进行中 | — |
+| T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -308,22 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-T45（2026-11-21 开工；基线 `npm run verify -- --baseline` 全量 16 项通过于 61ac320；T44 为"部分完成"，遗留的 A04/A09 不影响本任务）：
-
-- [ ] 威胁映射 `tests/security/threats.yaml`、`scripts/ci/check-threats.mjs` 并入 verify、生成 `docs/security/threat-coverage.md`（A01、A02）——框架与现有测试的映射已提交（82b5711），新补测试随各项加入
-- [x] 注入三来源 L2 场景与关键路径删除（A03）：`sec-inject-repo-file`、`sec-inject-webfetch`（跳过权限下关键路径删除）、`sec-inject-mcp`；沙箱自动批准由 `sandbox-auto-critical-delete` 覆盖
-- [x] "全量恶意仓库"夹具 L2 场景（A04）：`sec-malicious-repo-untrusted`、`sec-malicious-repo-new-item`
-- [x] Electron 安全清单复核 `docs/security/electron-checklist.md`（A05）；I52 的规则与 `will-frame-navigate`（98c2162）
-- [x] 依赖审计：cargo-audit、npm audit、npm 许可证、例外清单、CI 流水线、本地命令；PR 模板（A06，82b5711）；另修 THR-03：Pi 设置里的 `packages` 不再由 Agent Host 安装（10a3008）
-- [x] 日志写入脱敏（tracing 层与 Agent Host stderr）；Agent Host 与 Bash 子进程环境无凭据（A07，022122f）
-- [x] 诊断包导出：清单与脱敏摘要、确认后写出、界面与截图（A08，63e3b2b；`tmp/evidence/T45/diagnostic-bundle-*.png`）
-- [x] 遥测默认关闭与外连记录、报告（A09）：`egress.rs`、`t45-egress.e2e.ts`、`docs/security/egress.md`
-- [x] XSS 载荷集扩充到全部渲染面（A10）：载荷 18 → 28 类；`t45-xss.e2e.ts` 覆盖审批卡、Changes 与行内评论、设置页、hook 提示、终端 OSC 8；双向控制字符在审批卡与 diff 中显示为可见标记
-- [x] preload 畸形参数、"总是允许"只经原生确认（A11）：`t45-ipc-hardening.e2e.ts`
-- [x] 发布构建上 `ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`--inspect`、`--remote-debugging-port`（I10）不生效（A12）：`scripts/ci/check-release-runtime.mjs` 本机 8 项通过（含对照）；测试页不进发布构建（I13/I24/I30）
-- [x] 登记事项中交给 T45 的项逐条处理或评估改派：落地 I06（接入审计）、I10、I13/I24/I30、I52、I57、I170、I180；评估后维持 I39、I64；交 R5/T48/W3 的 I56、I79、I83、I91、I94、I112、I120、I121、I123、I126、I172、I173、I175、I178；新增 I196–I200
-- [ ] 收尾：AGENTS.md、testing.md、架构与文档、验收记录、全量 verify（A13）
 
 ## 登记事项
 
@@ -1100,3 +1084,10 @@ T45（2026-11-21 开工；基线 `npm run verify -- --baseline` 全量 16 项通
 - 登记：新增 I189（重载后进行中的回复到回合结束才出现）、I190（空闲 CPU 约 3.6%，隐藏时仍有 GPU 与渲染进程工作）、I191（流式帧 p99 16.4 ms，T20 之后的回归，渲染进程二分已排除 T29 之后的代码）、I192（主进程空闲增量 32.5 MB）、I193（工作区就绪 0.96 s，余量 4%）、I194（Agent Host 202 MB）、I195（8 小时长跑未做）；I26、I41、I146 追加 T44 结果
 - 下一项：T45（安全收口），用户手动开新会话指派。A04 在安静环境（不开远程桌面）下重跑 5 次后改状态；A09 在下一次全量 verify 后补记。本地提交，未推送。
 
+### 2026-11-22 T45 部分完成（提交 c970cd6）
+
+- 交付：威胁映射 `tests/security/threats.yaml`（第 10.1 节 14 条威胁、59 个对策、165 个测试 ID）、`scripts/lib/threats.mjs` 与 `scripts/ci/check-threats.mjs`（verify 第 17 步，含反向检查与 `docs/security/threat-coverage.md` 漂移检查）；补测试：L2 `sec-inject-repo-file`、`sec-inject-webfetch`、`sec-inject-mcp`、`sec-malicious-repo-untrusted`、`sec-malicious-repo-new-item`、`sec-pi-settings-packages`（能力 3 个），`credential_leaks.rs`、`egress.rs`、`thr04-*` 会话夹具，L4 `t45-diagnostics`、`t45-ipc-hardening`、`t45-xss`、`t45-egress`；修 THR-03 缺口：Pi 设置里的 `packages` 不再由 Agent Host 安装（`agent-host/src/runtime/pi-settings.ts`，先有失败的 L2）；日志写入时脱敏 `piarc-telemetry::redact`（保险箱值由 Core 每次保险箱操作后登记，加常见密钥格式），诊断包 `bundle.rs`/`zip.rs`、Core `prepare_diagnostics`/`export_diagnostics`、NAPI 与 IPC 两个函数、配置诊断页"诊断包"一节（预览后经原生保存对话框写出）；依赖审计 `npm run audit:deps`（npm audit、cargo-audit 0.23.0 进 `.tools/`、cargo-deny、npm 发布依赖许可证）、例外清单 `tests/security/audit-exceptions.yaml`、`deps-security.yml`、PR 模板；发布构建移除 `--remote-debugging-port`/`--remote-debugging-pipe` 并退出、测试页只在开发构建的 chunk（构建期常量 `__PIARC_RELEASE_BUILD__`），`scripts/ci/check-release-runtime.mjs` 与 `check-app-layout.mjs` 检查并进 CI desktop 作业；ESLint 拦 `webContents.ipc` 与 `ipcMain` 别名，导航守卫加 `will-frame-navigate`（只管子框架）；`piarc://open` 拒绝 UNC 与设备路径；`openSettings`、`notifyAttention`、`openExternal` 对畸形参数抛 `TypeError`；XSS 载荷 18 → 28 类，审批卡、diff、Changes 与代码块把双向控制字符显示为 `[U+XXXX]`（`transcript/reveal.ts`，先有失败测试）；文档 `docs/security/electron-checklist.md`、`docs/security/egress.md`、`testing.md` 第 16 节、`crates/piarc-telemetry/AGENTS.md`
+- 验收：12 项通过，A02（威胁映射测试在 macOS 与 Windows CI 上的结果）blocked，等推送后的 CI，看板为"部分完成"。`npm run verify` 17/17（c970cd6，L2 213 个场景 210 通过、3 个按平台跳过）；`check-release-runtime.mjs` 在发布构建上 8 项通过（对开发构建跑同样的探测会失败）；发布构建布局 24/24；T45 与波及的 L4（dev 形态）通过，`t18-review` 因终端没有"屏幕录制"权限失败（已知环境限制）；A01 的删除映射与改错测试名两次失败、恢复后通过的输出在 `tmp/evidence/T45/a01-*.txt`。A01 描述写"13 行"，第 10.1 节现为 14 行（同一用户进程注入一行编为 THR-14），描述由用户决定是否修改
+- 决策：ADR-0062（补充）；架构 2.56（第 10.1 节对策补充与拆行、10.2、10.5）；verify 增为 17 步；`window.piarc` 增加 `prepareDiagnostics`、`exportDiagnostics`；minimatch 中危公告进例外清单而不升级 eslint（新规则误报）；信任决定是否走原生确认（I79）交 R5 由用户经 ADR 决定
+- 登记：I06（审计已接入）、I10、I13、I24、I30、I52、I57、I170、I180 落地；I39、I64 评估后维持；I56、I79、I94、I120、I121、I123、I126、I172、I173、I175、I178 交 R5，I83 交 W3/T48，I91、I112 交 T48；新增 I196（Electron 45.4.1）、I197（`PI_OFFLINE` 遮住 Pi 的联网路径）、I198（Windows 拼写词典下载）、I199（XSS 扩展到其余设置页）、I200（T50 为 THR-09 补测试）
+- 下一项：R5（M4 评审）依赖 W3，W3 在 Windows 上进行；推送后按 CI 关闭 T45-A02。本地提交，未推送。
