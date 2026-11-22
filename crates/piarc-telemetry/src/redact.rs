@@ -110,7 +110,9 @@ const PATTERNS: &[(Kind, &str, usize)] = &[
     (
         Kind::SecretField,
         concat!(
-            r#"(?i)\b(?:api[_-]?key|x-api-key|authorization|access[_-]?token|refresh[_-]?token"#,
+            // Not `\b`: `_` is a word character, and `AWS_SECRET_ACCESS_KEY` has no boundary
+            // before `SECRET` (R5). The character before the name stays outside group 1.
+            r#"(?i)(?:^|[^a-z0-9])(?:api[_-]?key|x-api-key|authorization|access[_-]?token|refresh[_-]?token"#,
             r#"|id[_-]?token|token|client[_-]?secret|secret[_-]?access[_-]?key|secret|password"#,
             r#"|passwd|private[_-]?key)"?\s*[:=]\s*"?([^\s"',;&}\]]{6,})"#
         ),

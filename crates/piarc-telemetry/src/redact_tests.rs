@@ -93,12 +93,35 @@ fn secret_named_fields_and_url_passwords_are_replaced() {
 }
 
 #[test]
+fn thr04_environment_style_secret_names_are_replaced() {
+    // R5: a name joined by underscores (`AWS_SECRET_ACCESS_KEY`) has no word boundary before
+    // `SECRET`, so the field rule did not see it.
+    assert_eq!(
+        red("AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMIK7MDENGbPxRfiCY"),
+        "AWS_SECRET_ACCESS_KEY=[REDACTED:secret]"
+    );
+    assert_eq!(
+        red("DB_PASSWORD=hunter2hunter"),
+        "DB_PASSWORD=[REDACTED:secret]"
+    );
+    assert_eq!(
+        red(r#"{"MY_SERVICE_API_KEY":"abcdef123456"}"#),
+        r#"{"MY_SERVICE_API_KEY":"[REDACTED:secret]"}"#
+    );
+    assert_eq!(
+        red("export SLACK_TOKEN=abcdefgh"),
+        "export SLACK_TOKEN=[REDACTED:secret]"
+    );
+}
+
+#[test]
 fn ordinary_log_lines_are_left_alone() {
     for line in [
         "Agent Host connected workspace=/tmp/work space epoch=1 pid=Some(42) pi=1.5.2",
         "max_tokens: 4096, tokens=1200, cache read 300",
         "opened in /Users/someone/project (trusted: true, model: mock-main/mock-model)",
         "skipped: risk-assessment and desk-check finished",
+        "MAX_TOKENS=4096 KEY_COUNT=3 TOKEN_LIMIT=900",
     ] {
         let out = redact(line);
         assert_eq!(out.text, line);

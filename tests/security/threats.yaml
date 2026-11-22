@@ -181,6 +181,7 @@ threats:
           - rust:crates/piarc-telemetry/src/redact_tests.rs::thr04_provider_key_formats_are_replaced
           - rust:crates/piarc-telemetry/src/redact_tests.rs::thr04_cloud_access_keys_are_replaced
           - rust:crates/piarc-telemetry/src/redact_tests.rs::thr04_bearer_tokens_and_jwts_are_replaced_keeping_the_scheme
+          - rust:crates/piarc-telemetry/src/redact_tests.rs::thr04_environment_style_secret_names_are_replaced
           - rust:crates/piarc-telemetry/tests/redaction.rs::thr04_credentials_in_core_and_agent_host_lines_reach_the_files_redacted
           - rust:crates/piarc-testkit/tests/credential_leaks.rs::thr04_a_vault_credential_stays_out_of_child_environments_and_log_files
           - vitest:agent-host/src/providers/policy.test.ts::redacts the provider key echoed by an HTTP error before the Pi session can persist it
