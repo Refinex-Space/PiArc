@@ -1233,6 +1233,12 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'sandbox.confirmAutoAllowDetail':
     '在沙箱中运行的 Bash 命令将不再请求审批。deny 与 ask 规则、关键路径删除和计划模式照常生效。',
   'sandbox.confirmDomains': '允许沙箱内的命令访问这些域名？',
+  'sandbox.confirmDisable': '关闭沙箱？',
+  'sandbox.confirmDisableDetail':
+    '批准的命令将不在沙箱中运行：它们可以写工作区以外的位置，访问任何主机。',
+  'sandbox.confirmDenyRead': '允许沙箱内的命令再次读取这些路径？',
+  'sandbox.confirmDenyReadDetail': '不再禁止读取：',
+  'sandbox.confirmLoosen': '放宽沙箱？',
   'sandbox.notice.platform': '你的设置开启了沙箱，但 Windows 上没有沙箱：命令只受权限规则约束。',
   'sandbox.notice.unavailable': '沙箱已开启但无法运行：命令不经沙箱运行，每条都需要审批。',
   'sandbox.badge': '沙箱',

@@ -160,6 +160,8 @@ test('the sandbox page edits the user values, the next command follows, denials 
   await sandbox.getByTestId('sandbox-enabled').click();
   await expect(sandbox.getByTestId('sandbox-enabled')).not.toBeChecked();
   expect((await userSettings(userDataDir)).sandbox).toMatchObject({ enabled: false });
+  // Switching off went through the native confirmation (R5).
+  expect((await dialogs(app)).at(-1)).toMatch(/^Turn the sandbox off\?/u);
   await sandbox.getByTestId('sandbox-enabled').click();
   await expect(sandbox.getByTestId('sandbox-enabled')).toBeChecked();
   // The radio is styled away; its label takes the click, as a user's would.

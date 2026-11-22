@@ -174,17 +174,20 @@ test('THR-11 allow rules, always-allow answers and sandbox loosening from the pa
       autoAllow: true,
       allowedDomains: ['exfil.example'],
     });
+    // Turning the sandbox off is loosening too (R5).
+    const off = await window.piarc.setSandboxSettings(dir, { enabled: false });
     const rules = await window.piarc.permissionRules(dir);
-    return { rule, always, sandbox, rules };
+    return { rule, always, sandbox, off, rules };
   }, ws);
   expect(JSON.parse(forged.rule)).toEqual({ status: 'cancelled' });
   expect(JSON.parse(forged.always)).toEqual({ status: 'cancelled' });
   expect(JSON.parse(forged.sandbox)).toEqual({ status: 'cancelled' });
+  expect(JSON.parse(forged.off)).toEqual({ status: 'cancelled' });
   expect(forged.rules).not.toContain('Bash(curl *)');
   const shown = await app.evaluate(
     () => (globalThis as { __piarcMessageBoxes?: string[] }).__piarcMessageBoxes ?? [],
   );
-  expect(shown).toHaveLength(3);
+  expect(shown).toHaveLength(4);
 
   // Confirmed in the native dialog, the same request lands: the confirmation is the gate.
   await stubMessageBox(app, 0);

@@ -1,8 +1,8 @@
 // The settings window's sandbox page (T39, architecture section 6.10): the sandbox of a
-// workspace and edits to the user's own sandbox values. Turning auto-approval on and adding
-// allowed domains loosen what commands may do without asking, so the main process shows them in
-// a native confirmation before Core saves them (architecture section 10.3); the page cannot skip
-// it. Core validates the values and writes only the user's settings file.
+// workspace and edits to the user's own sandbox values. Turning auto-approval on, adding allowed
+// domains, turning the sandbox off and dropping read protections (R5) loosen what commands may
+// do, so the main process shows them in a native confirmation before Core saves them
+// (architecture section 10.3); the page cannot skip it. Core validates the values and writes only the user's settings file.
 import path from 'node:path';
 
 import { BrowserWindow, dialog } from 'electron';
@@ -64,13 +64,27 @@ export function sandboxChange(raw: unknown): SandboxChange {
   };
 }
 
-/** The user's allowed domains in a `sandboxSettings` answer. */
-function userDomains(view: string): string[] {
+/** One list of the user's values in a `sandboxSettings` answer. */
+function userList(view: string, key: 'allowedDomains' | 'denyRead'): string[] {
   const value: unknown = JSON.parse(view);
-  if (!isRecord(value) || !isRecord(value.user) || !Array.isArray(value.user.allowedDomains)) {
-    return [];
-  }
-  return value.user.allowedDomains.filter((d): d is string => typeof d === 'string');
+  if (!isRecord(value) || !isRecord(value.user)) return [];
+  const list = value.user[key];
+  return Array.isArray(list) ? list.filter((d): d is string => typeof d === 'string') : [];
+}
+
+/** What `change` loosens compared with the user's current values. */
+function loosening(view: string, change: SandboxChange) {
+  const domains = new Set(userList(view, 'allowedDomains'));
+  const kept = new Set((change.denyRead ?? []).map((p) => p.trim()));
+  return {
+    autoAllow: change.autoAllow === true,
+    disable: change.enabled === false,
+    added: (change.allowedDomains ?? []).filter((d) => !domains.has(d.trim())),
+    unprotected:
+      change.denyRead === undefined
+        ? []
+        : userList(view, 'denyRead').filter((p) => !kept.has(p.trim())),
+  };
 }
 
 /** Registers the sandbox page's commands. */
@@ -85,19 +99,38 @@ export function registerSandboxHandlers(
   registerHandler(IPC_CHANNELS.sandboxUpdate, async (event, [dir, raw]) => {
     const root = workspace(dir);
     const change = sandboxChange(raw);
-    const before = new Set(userDomains(await core.sandboxSettings(root)));
-    const added = (change.allowedDomains ?? []).filter((d) => !before.has(d.trim()));
-    if (change.autoAllow === true || added.length > 0) {
+    const loose = loosening(await core.sandboxSettings(root), change);
+    const reasons = [
+      loose.autoAllow,
+      loose.disable,
+      loose.added.length > 0,
+      loose.unprotected.length > 0,
+    ];
+    if (reasons.some(Boolean)) {
       const t = translator();
       const window = BrowserWindow.fromWebContents(event.sender);
+      const message =
+        reasons.filter(Boolean).length > 1
+          ? 'sandbox.confirmLoosen'
+          : loose.autoAllow
+            ? 'sandbox.confirmAutoAllow'
+            : loose.disable
+              ? 'sandbox.confirmDisable'
+              : loose.added.length > 0
+                ? 'sandbox.confirmDomains'
+                : 'sandbox.confirmDenyRead';
       const options: Electron.MessageBoxOptions = {
         type: 'warning',
-        message: t.t(
-          change.autoAllow === true ? 'sandbox.confirmAutoAllow' : 'sandbox.confirmDomains',
-        ),
+        message: t.t(message),
         detail: [
-          ...(change.autoAllow === true ? [t.t('sandbox.confirmAutoAllowDetail')] : []),
-          ...(added.length > 0 ? [t.t('sandbox.domains') + '\n' + added.join('\n')] : []),
+          ...(loose.autoAllow ? [t.t('sandbox.confirmAutoAllowDetail')] : []),
+          ...(loose.disable ? [t.t('sandbox.confirmDisableDetail')] : []),
+          ...(loose.added.length > 0
+            ? [t.t('sandbox.domains') + '\n' + loose.added.join('\n')]
+            : []),
+          ...(loose.unprotected.length > 0
+            ? [t.t('sandbox.confirmDenyReadDetail') + '\n' + loose.unprotected.join('\n')]
+            : []),
         ].join('\n\n'),
         buttons: [t.t('permissions.save'), t.t('dialog.cancel')],
         defaultId: 1,

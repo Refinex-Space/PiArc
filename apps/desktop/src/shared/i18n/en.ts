@@ -1280,6 +1280,12 @@ export const en = {
   'sandbox.confirmAutoAllowDetail':
     'Bash commands that run in the sandbox will no longer ask for approval. Deny and ask rules, deletions of key paths and plan mode still apply.',
   'sandbox.confirmDomains': 'Allow sandboxed commands to reach these domains?',
+  'sandbox.confirmDisable': 'Turn the sandbox off?',
+  'sandbox.confirmDisableDetail':
+    'Approved commands will run without the sandbox: they can write outside the workspace and reach any host.',
+  'sandbox.confirmDenyRead': 'Let sandboxed commands read these paths again?',
+  'sandbox.confirmDenyReadDetail': 'No longer protected from reading:',
+  'sandbox.confirmLoosen': 'Loosen the sandbox?',
   'sandbox.notice.platform':
     'Your settings turn the sandbox on, but Windows has no sandbox: commands run with the permission rules only.',
   'sandbox.notice.unavailable':
