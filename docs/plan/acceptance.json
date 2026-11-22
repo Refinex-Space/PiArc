@@ -4290,57 +4290,57 @@
       "id": "T44-A01",
       "task": "T44",
       "description": "第 11 章除 Beta 期崩溃率外的每项指标都有自动化测量与阈值配置；第 11 章新增一行而没有对应测量时覆盖检查失败。验证：`docs/engineering/performance.md` 的对照表，以及临时在第 11 章加一行时检查失败的输出，撤销后通过。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "对照表：docs/engineering/performance.md 第 4 节（第 11 章每行的指标、探针、方法；Beta 期崩溃率在 EXCLUDED 并写明理由）；scripts/perf/metrics.test.mjs 通过。临时在第 11 章加一行\"临时指标（演示）\"时该测试失败并列出 unmeasured（tmp/evidence/T44/a01-coverage-failure.txt），撤销后通过（a5f6146 上 npx vitest run scripts/perf：11 passed）。"
     },
     {
       "id": "T44-A02",
       "task": "T44",
       "description": "PR 流水线运行性能冒烟，Nightly 在 macOS 与 Windows 运行完整测量与缩短版长跑，工作流文件语法有效。验证：工作流文件与 actionlint（或 YAML 解析）输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": ".github/workflows/ci.yml 的 desktop 作业运行 node scripts/perf/run.mjs --lane pr --runs 3 并上传报告；.github/workflows/perf-nightly.yml 在 macos-latest 与 windows-latest 运行 --lane nightly 与 PIARC_LONG_RUN_HOURS=1 的长跑。本机没有 actionlint，YAML 解析与步骤核对见 scripts/perf/workflows.test.mjs（2 passed，tmp/evidence/T44/a02-workflows.txt）。分支未推送，CI 上尚未实际运行。"
     },
     {
       "id": "T44-A03",
       "task": "T44",
       "description": "指标超出绝对预算或相对基线回归超过 10% 时，性能检查失败并给出指标、预算、基线值与当前值。验证：临时在事件转发路径加入延迟时的失败输出，撤销后通过。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "临时在 EventRouter.forward（apps/desktop/src/main/core/router.ts）加 2 ms 忙等并重新打开发包：run.mjs --lane pr --only core-to-renderer-p95 --absolute 输出 over budget 与 regressed more than 10%（当前 2.62 ms、预算 1.10 ms、基线 0.72 ms、1 次），退出码 1（tmp/evidence/T44/a03-regression-failure.txt）；撤销并重新打包后 0.49 ms，通过（a03-after-revert.txt）。"
     },
     {
       "id": "T44-A04",
       "task": "T44",
       "description": "在同一提交上连续运行 PR 性能冒烟 5 次全部通过。验证：5 次运行的输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "failing",
+      "evidence": "83726bc/69c1359（两者只差文档）上连续 5 次 PR 冒烟（--runs 3）全部失败（tmp/evidence/T44/pr-smoke-disturbed/）：第 1、2 次是回归下限小于同提交的自然波动（policy、workspace-ready），已按实测调大（a5f6146），按新下限重新判定这两次通过；第 3–5 次在 UURemote 远程桌面运行时，冷启动 685–756 ms（基线 464 ms）、事件循环 4.9–5.3 ms（基线 3.85 ms），属环境负载；第 2 次 transcript 探针有 1 次流式回合 120 s 未结束。用户要求停止，未在安静环境下重跑；重跑命令：node scripts/perf/run.mjs --lane pr --runs 3 --machine m1-max-32g（5 次）。"
     },
     {
       "id": "T44-A05",
       "task": "T44",
       "description": "本机（记录机型与系统版本，与基准机型不同时注明）全部可测指标的实测值写入性能文档，逐项标明是否达到第 11 章预算。验证：`docs/engineering/performance.md`。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/engineering/performance.md 第 5 节：MacBookPro18,2（M1 Max / 32 GB，非基准机型 M1 Pro / 16 GB，已注明）、macOS 26.5.2、接电源；Nightly 全部可测指标逐项实测与达标结论（报告 tmp/evidence/T44/nightly-report.json）：超出 4 项（主进程增量 32.5 MB、进程合计 519 MB、Agent Host 202 MB、流式帧 p99 16.4 ms），体积裁剪后达标；8 小时长跑一行按用户决定未测（I195）。"
     },
     {
       "id": "T44-A07",
       "task": "T44",
       "description": "空闲 CPU 已定成具体阈值并写入第 11 章；窗口隐藏时渲染进程无 rAF 回调、终端不产生帧。验证：测试输出与文档改动。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "第 11 章（架构 2.55）空闲 CPU 定为可见与隐藏时应用全部进程加 Agent Host 合计 ≤ 5%（一个核心、60 s 平均），隐藏时无 rAF 回调与终端帧；scripts/perf/metrics.mjs 的 idle-cpu-visible、idle-cpu-hidden、hidden-frames。实测（probe-idle.mjs，Nightly）：可见 3.61%、隐藏 3.49%，隐藏 60 s 内 rAF 回调 0、终端帧 0（tmp/evidence/T44/nightly-local.txt、nightly-report.json）；I190 跟踪隐藏时 GPU 与渲染进程仍有约 1.5% 的工作。"
     },
     {
       "id": "T44-A08",
       "task": "T44",
       "description": "收紧的预算已更新第 11 章、递增架构版本号并写修订记录；未达标项已登记到 PLAN。验证：文档 diff 与 `PLAN.md` 登记事项。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "只有 macOS 数据，按第 11 章收紧规则（需两个平台）不收紧任何预算，已在第 11 章说明；架构版本 2.54 → 2.55 并写修订记录；未达标项登记 PLAN：I191（流式帧）、I192（主进程增量）、I194（Agent Host 内存）、I26/I146 追加（进程合计，附物理占用 207 MB），另有 I189、I190、I193、I195；安装后体积按 I41 裁剪到 446.6 MB（0a0c288）。"
     },
     {
       "id": "T44-A09",
       "task": "T44",
       "description": "`npm run verify` 通过。验证：命令输出。",
       "status": "not_started",
-      "evidence": ""
+      "evidence": "用户要求停止并以部分完成收尾，未运行 npm run verify。a5f6146 上已运行：npx prettier --check .、npx tsc --build、ESLint（scripts/perf、apps/desktop/packaging、forge.config.ts）、npx vitest run scripts/perf apps/desktop/packaging（17 passed）、node scripts/plan/check-acceptance.mjs，均通过。"
     },
     {
       "id": "T45-A01",

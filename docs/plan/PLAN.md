@@ -174,7 +174,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 已完成 | 10fbeff |
 | T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 部分完成 | 868065b |
 | T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 部分完成 | 00b452b |
-| T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 进行中 | — |
+| T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 部分完成 | a5f6146 |
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 未开始 | — |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -308,15 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-**T44 性能预算进 CI 与长跑测试**（开工 2026-11-21；基线 `npm run verify -- --baseline` 通过，复用 00b452b 的全量结果；依赖 T43 为"部分完成"，遗留的 A10 VoiceOver 核对不影响本任务；origin 停在 e0c41ce，没有新的 Windows CI 结果）
-
-- [x] 1 测量框架：第 11 章每项指标的测量与阈值配置，复用 S1/S2/S7/T18/T19/T35 的代码，统一口径与时钟
-- [x] 2 门禁：绝对预算与相对基线 10% 两道判定、按平台与机器类别的基线与显式更新命令、第 11 章覆盖检查
-- [x] 3 流水线：PR 冒烟（多次取中位数）与 Nightly 两平台完整测量与缩短版长跑，工作流语法检查
-- [x] 4 长跑内存测试（脚本与 Nightly 1 小时缩短版；本机 8 小时长跑与原 A06 由用户于 2026-11-22 去除，I195）
-- [ ] 5 `docs/engineering/performance.md`、本机实测、空闲 CPU 阈值、预算校准（只收紧）
-- [ ] 验收 A01–A09；收尾（根 AGENTS.md 命令、testing.md 分层与基线纪律、复用表）
 
 ## 登记事项
 
@@ -1079,3 +1070,12 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 决策：ADR-0061（补充）；架构 2.54；verify 增为 16 步；`window.piarc` 函数数不变（没有新增 IPC）
 - 登记：I186 已落地；新增 I188（VoiceOver 实际核对待用户，Narrator 与 NVDA 由 W3 按同一清单）
 - 下一项：macOS 上的 T44（性能预算进 CI 与长跑测试）。A10 在用户按 `docs/engineering/accessibility.md` 第 3 节操作 VoiceOver 后补结论。本地提交，未推送。
+
+### 2026-11-22 T44 部分完成（提交 a5f6146）
+
+- 交付：测量框架 `scripts/perf/`（`metrics.mjs` 第 11 章每行的指标、预算、探针、流水线与回归下限，`EXCLUDED` 只有 Beta 期崩溃率；`chapter11.mjs` 与 `metrics.test.mjs` 覆盖检查；`gate.mjs` 绝对预算与相对基线 10% 两道判定，基线按平台、机器类别、流水线分存于 `scripts/perf/baselines/`，只经 `--update-baseline "<原因>"` 更新，`--from-report` 判定或记录另一台机器的报告；`run.mjs` 把 T14/T18/T19/T20/S1/S2/S7 的基准作为探针并新增 `probe-memory`、`probe-sessions`、`probe-first-token`、`probe-idle`、`probe-recovery`、`probe-size`、`long-run`；`lib.mjs` 公用驱动，`m3-memory.mjs` 改用它）；流水线（`ci.yml` 的 desktop 作业跑 PR 冒烟，`perf-nightly.yml` 两平台完整测量与 1 小时长跑）；主进程在渲染进程崩溃后自动重载（每分钟至多 3 次）；体积裁剪 `apps/desktop/packaging/trim.mjs`（npm 文档与 man、Electron 中英文以外的语言包、strip 发布构建 Core 的本地符号：安装后 466.3 → 446.6 MB）；`docs/engineering/performance.md`；本机 Nightly 与 PR 基线（`m1-max-32g`）
+- 验收：A01、A02、A03、A05、A07、A08 通过；A04 failing（5 次 PR 冒烟：两次是回归下限小于自然波动，已按实测调大；三次在远程桌面运行时受负载干扰；用户要求停止，未在安静环境下重跑）；A09 未运行全量 verify（用户要求停止，已跑 prettier、tsc、相关 ESLint 与 Vitest、验收清单检查）；原 A06（本机 8 小时长跑）由用户决定去除，看板为"部分完成"
+- 决策：架构 2.55（第 11 章补 T44 实测、空闲 CPU 阈值 ≤ 5%，不收紧任何预算）；用户决定去除本机 8 小时长跑（I195）；应用内存的口径未改（I26，改口径须用户经 ADR 决定）
+- 登记：新增 I189（重载后进行中的回复到回合结束才出现）、I190（空闲 CPU 约 3.6%，隐藏时仍有 GPU 与渲染进程工作）、I191（流式帧 p99 16.4 ms，T20 之后的回归，渲染进程二分已排除 T29 之后的代码）、I192（主进程空闲增量 32.5 MB）、I193（工作区就绪 0.96 s，余量 4%）、I194（Agent Host 202 MB）、I195（8 小时长跑未做）；I26、I41、I146 追加 T44 结果
+- 下一项：T45（安全收口），用户手动开新会话指派。A04 在安静环境（不开远程桌面）下重跑 5 次后改状态；A09 在下一次全量 verify 后补记。本地提交，未推送。
+
