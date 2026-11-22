@@ -177,7 +177,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 部分完成 | a5f6146 |
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 部分完成 | f7b05b7 |
-| T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
+| T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 阻塞（等待用户确认设计增补） | — |
 | T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,6 +308,18 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+T46（Auto 模式，审查模型），2026-11-22 开工。基线 `npm run verify -- --baseline` 全量 16/17：第 8 步只有 I185 登记的 `piarc-core --test state` 设置监听用例在负载下超时，单独重跑通过；R5 遗留（性能三行、CI 待推送）不影响本任务。
+
+- [x] 设计增补 `docs/architecture/addenda/T46-auto-mode.md`（七节 + 需要确认的要点），提交后停在设计关口（A01 记为 blocked，等用户确认第 9 节的 12 个要点）
+- [ ] piarc-policy 的 auto 判定步骤、审批账本"审查中"、失败归一与连续拒绝回退（A02、A03、A04、A07）
+- [ ] 审查调用：Core → Agent Host 的审查请求、辅助模型通道、单一文件的审查提示词、Core 侧再校验（A06、A12）
+- [ ] 设置：用户级启用（二次确认）、审查模型（能力门槛）、自定义策略与可信基础设施；项目级忽略并进配置诊断（A05）
+- [ ] 审计与审计页筛选、用量"审查"一类（A08、A09）
+- [ ] 子 agent 按增补处理（A10）
+- [ ] 客户端：模式菜单、transcript 标识与理由、环境栏状态、截图（A11）
+- [ ] L2 `perm-auto-*` 场景、能力 ID、mock 请求断言（A02–A07、A10）
+- [ ] 收尾：AGENTS.md、PLAN 登记 T48 的 `PermissionDenied` 触发点、验收记录、`npm run verify`（A13）
 
 ## 登记事项
 
@@ -1148,4 +1160,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - ADR-0064 的实现登记 I223（M5 内，R6 前）。I26、I146 关闭，I201、I79 更新。
 - 验收：R5-A02 仍 failing（流式帧 p99、主进程增量、Agent Host 内存三行，交 I222）；R5-A03 仍 failing（T44-A04、T44-A09；T35-A11、R4-A01、R4-A03、W3-A01 是别的任务的项，按新口径的数据见 R5 评审第 1.2 节，由用户决定是否关闭）；R5-A01 blocked（CI）；其余通过。看板改为"部分完成"。
 - 下一项：T46（macOS，设计关口）可以开工，与 I222 的性能达标任务（需排期）并行；W4（Windows）依赖 R5 与 T50。本地提交，未推送。
+
+### 2026-11-22 T46 阻塞（等待用户确认设计增补）
+
+- 开工：基线 `npm run verify -- --baseline` 全量 16/17，第 8 步只有 I185 的设置监听用例在负载下超时，单独重跑通过；R5 为部分完成，遗留的性能三行与 CI 不影响本任务。R5 推送后的 CI 运行 45036807604 开工时仍在进行，R5-A01 等 blocked 项留到下一次开工核对。
+- 交付：设计增补 [`docs/architecture/addenda/T46-auto-mode.md`](../architecture/addenda/T46-auto-mode.md)：只有阶梯结论为通用询问（`step: "ask"`）的调用在 PermissionRequest hooks 之后送审；Core 经新的 `policy/review`（Core → Agent Host）发起，Agent Host 从分支取用户消息与近期调用、经辅助模型通道调用；输入排除工具结果、网页、MCP 返回、助手正文、memory 与 hook 注入；输出为单一工具调用 `record_review`，Core 再校验；失败一律转审批卡（超时 30 s），连续 3 次或累计 20 次拒绝后暂停；审计 `kind: "autoReview"`；用量用途 `autoReview`；启用只在 PiArc 用户级并经原生确认，项目级的 `autoMode`、`enableAutoMode` 忽略并进配置诊断。行为参照 Claude Code 官方 `permission-modes`、`auto-mode-config`（2026-11-22 重新核对）。
+- 验收：A01 blocked（等待用户确认）；其余未开始。
+- 下一项：用户确认增补第 9 节的 12 个要点（可逐条改选备选）后，再次 `/task T46` 进入实现。本地提交，未推送。
 
