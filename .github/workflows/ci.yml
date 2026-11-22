@@ -119,20 +119,6 @@ jobs:
       - name: L4 smoke and security tests (dev form and packaged app)
         run: npm run test:e2e -w @piarc/desktop
 
-      # T44: the PR subset of chapter 11, three-run medians, judged against this runner class's
-      # baseline in scripts/perf/baselines/ (hosted runners are not the reference machines, so
-      # the absolute budgets are checked on those, not here).
-      - name: Performance smoke
-        run: node scripts/perf/run.mjs --lane pr --runs 3
-
-      - name: Upload the performance report
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: perf-pr-${{ matrix.os }}
-          path: tmp/perf/pr/report.json
-          if-no-files-found: ignore
-
       - name: Package the release flavor
         run: npm run package:desktop -- --flavor release
 
@@ -144,6 +130,23 @@ jobs:
 
       - name: Check the release layout (no test hooks, no test pages)
         run: node scripts/ci/check-app-layout.mjs --flavor release
+
+      # T44: the PR subset of chapter 11, three-run medians, judged against this runner class's
+      # baseline in scripts/perf/baselines/ (hosted runners are not the reference machines, so
+      # the absolute budgets are not checked here). A runner class without a baseline fails:
+      # record one from this job's perf-pr-<os> artifact with --from-report and
+      # --update-baseline (docs/engineering/performance.md section 2.1). Last, so that a
+      # performance failure does not skip the release checks above (R5).
+      - name: Performance smoke
+        run: node scripts/perf/run.mjs --lane pr --runs 3
+
+      - name: Upload the performance report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: perf-pr-${{ matrix.os }}
+          path: tmp/perf/pr/report.json
+          if-no-files-found: ignore
 
       - name: Upload L4 evidence
         if: always()

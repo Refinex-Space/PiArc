@@ -41,7 +41,8 @@ export const BASELINES = path.join(repoRoot, 'scripts', 'perf', 'baselines');
 export function judge(metric, value, context) {
   const budget = budgetOf(metric, context.platform);
   const worse = metric.better === 'lower' ? value - budget : budget - value;
-  const overBudget = context.absolute && (!Number.isFinite(value) || worse > 0);
+  // A value that is not a number is a broken probe: it fails with or without budgets (R5).
+  const overBudget = !Number.isFinite(value) || (context.absolute && worse > 0);
   let regressed = false;
   if (context.baseline !== undefined && Number.isFinite(value)) {
     const change = metric.better === 'lower' ? value - context.baseline : context.baseline - value;
@@ -78,6 +79,24 @@ export function failures(verdicts) {
 }
 
 /**
+ * The lines for values that nothing judged: no baseline for this platform, machine class and
+ * lane, and no `--absolute`. A run like that would pass whatever it measured (R5: CI runners
+ * had no baselines), so it fails until a baseline is recorded or budgets apply.
+ * @param {readonly Verdict[]} verdicts
+ * @param {boolean} absolute
+ * @returns {string[]}
+ */
+export function unjudged(verdicts, absolute) {
+  if (absolute) return [];
+  return verdicts
+    .filter((v) => v.baseline === undefined)
+    .map(
+      (v) =>
+        `${v.id}: no baseline for this platform, machine class and lane, and no --absolute: nothing judged ${Number.isInteger(v.value) ? String(v.value) : v.value.toFixed(2)} ${v.unit}`,
+    );
+}
+
+/**
  * The machine class of this run: `PIARC_PERF_MACHINE`, else the CI runner, else `local`.
  * @param {NodeJS.ProcessEnv} [env]
  */
@@ -100,19 +119,29 @@ export function baselineFile(platform, machine, lane) {
 
 /**
  * The baseline values (by metric id) of `lane` for `platform` on `machine`; empty when none
- * were recorded.
+ * were recorded (no file). A file that cannot be read or parsed throws.
  * @param {string} platform
  * @param {string} machine
  * @param {string} lane
  * @returns {Promise<Record<string, number>>}
  */
 export async function readBaselines(platform, machine, lane) {
+  const file = baselineFile(platform, machine, lane);
+  /** @type {string} */
+  let text;
+  try {
+    text = await readFile(file, 'utf8');
+  } catch (error) {
+    if (isRecord(error) && error.code === 'ENOENT') return {};
+    throw error;
+  }
   /** @type {unknown} */
   let parsed;
   try {
-    parsed = JSON.parse(await readFile(baselineFile(platform, machine, lane), 'utf8'));
-  } catch {
-    return {};
+    parsed = JSON.parse(text);
+  } catch (error) {
+    // A broken file must not turn the regression check off without a word (R5).
+    throw new Error(`${path.relative(repoRoot, file)} is not valid JSON`, { cause: error });
   }
   if (!isRecord(parsed) || !isRecord(parsed.values)) return {};
   /** @type {Record<string, number>} */

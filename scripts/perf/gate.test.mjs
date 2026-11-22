@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import path from 'node:path';
 
-import { baselineFile, failures, judge, machineClass, readBaselines } from './gate.mjs';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
+
+import { baselineFile, failures, judge, machineClass, readBaselines, unjudged } from './gate.mjs';
 
 const latency = /** @type {import('./metrics.mjs').Metric} */ ({
   id: 'x-p95',
@@ -45,6 +47,20 @@ describe('judge', () => {
     expect(judge(fps, 70, { ...at, baseline: 60 }).regressed).toBe(false);
   });
 
+  it('fails a value that is not a number whether or not budgets apply (R5)', () => {
+    const at = { platform: 'darwin', absolute: false, runs: 3, baseline: 1 };
+    for (const value of [Number.NaN, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY]) {
+      expect(judge(latency, value, at).overBudget).toBe(true);
+    }
+  });
+
+  it('fails the first count over a baseline of zero (R5)', () => {
+    const count = { ...latency, id: 'long-tasks', unit: 'tasks', budget: 0, floor: 0 };
+    const at = { platform: 'darwin', absolute: false, runs: 1, baseline: 0 };
+    expect(judge(count, 1, at).regressed).toBe(true);
+    expect(judge(count, 0, at).regressed).toBe(false);
+  });
+
   it('names the metric, budget, baseline and current value of each failure', () => {
     const verdict = judge(latency, 2.5, {
       platform: 'darwin',
@@ -56,6 +72,18 @@ describe('judge', () => {
       'over budget — x-p95: current 2.50 ms (median of 5 runs), budget 2 ms, baseline 0.70 ms',
       'regressed more than 10% — x-p95: current 2.50 ms (median of 5 runs), budget 2 ms, baseline 0.70 ms',
     ]);
+  });
+});
+
+describe('unjudged', () => {
+  it('names each value that neither a baseline nor a budget judged (R5)', () => {
+    const at = { platform: 'darwin', runs: 3 };
+    const none = judge(latency, 1, { ...at, absolute: false, baseline: undefined });
+    const based = judge(latency, 1, { ...at, absolute: false, baseline: 1 });
+    expect(unjudged([none, based], false)).toEqual([
+      'x-p95: no baseline for this platform, machine class and lane, and no --absolute: nothing judged 1 ms',
+    ]);
+    expect(unjudged([none, based], true)).toEqual([]);
   });
 });
 
@@ -79,5 +107,18 @@ describe('baselines', () => {
 
   it('are empty for a machine class without a file', async () => {
     expect(await readBaselines('darwin', 'no-such-machine', 'pr')).toEqual({});
+  });
+
+  it('fail when the file is there but broken, rather than judging nothing (R5)', async () => {
+    const file = baselineFile('darwin', 'r5-broken-test', 'pr');
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, '{ not json');
+    try {
+      await expect(readBaselines('darwin', 'r5-broken-test', 'pr')).rejects.toThrow(
+        /r5-broken-test/u,
+      );
+    } finally {
+      await rm(file, { force: true });
+    }
   });
 });

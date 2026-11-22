@@ -5,7 +5,9 @@ name: Performance Nightly
 # this runner class (scripts/perf/baselines/); then the shortened long run (one hour of a busy
 # session) for memory growth. The full eight-hour run is local or on a self-hosted runner
 # (docs/engineering/performance.md). Hosted runners are not the reference machines: absolute
-# budgets are checked there, regressions of more than 10% here.
+# budgets are checked on those, regressions of more than 10% here. A runner class without a
+# baseline fails (R5): record one from the perf-nightly-<os> artifact with --from-report and
+# --update-baseline.
 
 on:
   schedule:

@@ -23,7 +23,7 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { isMain, isRecord, repoRoot, resolveBin } from '../lib/repo.mjs';
-import { baselineFile, failures, judge, machineClass, readBaselines } from './gate.mjs';
+import { baselineFile, failures, judge, machineClass, readBaselines, unjudged } from './gate.mjs';
 import { quantile } from './lib.mjs';
 import { METRICS } from './metrics.mjs';
 
@@ -140,11 +140,14 @@ export const PROBES = {
         '--example',
         't14-warmup',
       ]);
-      const rounds = [...output.matchAll(/open \+ resume\s+([\d.]+) ms/gu)].map((m) =>
-        Number(m[1]),
+      // Only the `round N:` lines: the closing `max of 10:` line repeats the largest (R5).
+      const rounds = [...output.matchAll(/^round\s+\d+:.*open \+ resume\s+([\d.]+) ms/gmu)].map(
+        (m) => Number(m[1]),
       );
       if (rounds.length === 0) throw new Error('t14-warmup printed no rounds');
-      return { values: { 'workspace-ready': quantile(rounds, 0.5) }, samples: rounds.length };
+      // The largest of the ten, as T14 and chapter 11 measure it (the example exits non-zero
+      // when it is over the budget, which the verdict reports).
+      return { values: { 'workspace-ready': Math.max(...rounds) }, samples: rounds.length };
     },
   },
   ahp: {
@@ -462,6 +465,9 @@ async function main() {
   const missing = measured.wanted
     .filter((m) => !verdicts.some((v) => v.id === m.id))
     .map((m) => `${m.id}: not measured`);
+  // Recording a baseline is how an unjudged value gets judged next time.
+  const nothingJudged =
+    args['update-baseline'] === undefined ? unjudged(verdicts, args.absolute) : [];
   const report = {
     date: new Date().toISOString(),
     lane,
@@ -470,7 +476,7 @@ async function main() {
     absolute: args.absolute,
     verdicts,
     runs: measured.values,
-    errors: [...measured.errors, ...missing],
+    errors: [...measured.errors, ...missing, ...nothingJudged],
   };
   // A judged report of another machine is not rewritten (it may be the file just read).
   if (!('host' in measured)) {
@@ -491,6 +497,10 @@ async function main() {
   for (const line of failed) console.error(`FAIL ${line}`);
   if (args['update-baseline'] !== undefined) {
     if (args['update-baseline'].trim() === '') throw new Error('--update-baseline needs a reason');
+    // A failed probe or a missing metric would record a stale or partial baseline (R5).
+    if (report.errors.length > 0) {
+      throw new Error('--update-baseline refuses a run with errors; fix them and measure again');
+    }
     const file = baselineFile(platform, machine, lane);
     /** @type {unknown} */
     const previous = JSON.parse(await readFile(file, 'utf8').catch(() => '{}'));

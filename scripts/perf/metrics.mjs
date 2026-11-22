@@ -49,7 +49,7 @@ export const METRICS = [
     lanes: ['pr', 'nightly'],
     // Same commit, quiet machine: medians of three runs 945 to 1,045 ms (T44 PR smoke).
     floor: 150,
-    how: 'Core open_workspace to the Agent Host ready, then resuming a session (release build); median of 10',
+    how: 'Core open_workspace to the Agent Host ready, then resuming a session (release build); largest of 10',
   },
   {
     id: 'first-token-overhead',
@@ -180,7 +180,7 @@ export const METRICS = [
     better: 'lower',
     budget: 0,
     lanes: ['pr', 'nightly'],
-    floor: 1,
+    floor: 0, // a count whose budget is 0: the first one over the baseline fails (R5)
     how: 'renderer main-thread tasks over 50 ms during the same stream',
   },
   {
@@ -315,7 +315,7 @@ export const METRICS = [
     better: 'lower',
     budget: 0,
     lanes: ['nightly'],
-    floor: 1,
+    floor: 0, // a count whose budget is 0: the first one over the baseline fails (R5)
     how: 'animation-frame callbacks and terminal frames while the window is hidden',
   },
   {

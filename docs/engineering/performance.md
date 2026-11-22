@@ -27,7 +27,9 @@
 每个值经两道判定（`gate.mjs` 的 `judge`）：
 
 1. **绝对预算**：带 `--absolute` 时比较第 11 章的预算（按平台取值）。第 11 章的预算以基准机型为准，托管 CI runner 不是基准机型，所以 CI 不加 `--absolute`；达标结论来自基准机或注明配置的本机实测（第 5 节）。
-2. **相对基线**：与同平台、同机器类别的基线比较，变差超过 10% **且**超过该指标的 `floor` 就失败。`floor` 是该单位下有意义的最小变化（例如 AHP 往返 0.1 ms、冷启动 30 ms），避免接近 0 的值上 10% 只反映噪声。没有基线时只记录。
+2. **相对基线**：与同平台、同机器类别的基线比较，变差超过 10% **且**超过该指标的 `floor` 就失败。`floor` 是该单位下有意义的最小变化（例如 AHP 往返 0.1 ms、冷启动 30 ms），避免接近 0 的值上 10% 只反映噪声；预算为 0 的计数（长任务、隐藏时的帧）`floor` 为 0，比基线多一个就失败。
+
+两道都判不了的值算失败（R5）：没有该平台、机器类别与流水线的基线，又没带 `--absolute` 时，报告的 `errors` 写明"nothing judged"，退出码为 1，要先记录基线（`--update-baseline` 的这次运行不算）。值不是有限数（探针坏了）在任何模式下都判为超预算；基线文件存在却解析不了时直接报错，不当作没有基线。`--update-baseline` 拒绝有错误（探针失败、缺指标）的运行。
 
 失败时的输出写明指标、当前值（几次运行的中位数）、预算与基线，退出码为 1，例如（第 5.5 节的演示）：
 
@@ -40,6 +42,8 @@ FAIL regressed more than 10% — core-to-renderer-p95: current 2.62 ms (median o
 
 基线按平台、机器类别与流水线分文件存放：`scripts/perf/baselines/<platform>-<machine>-<lane>.json`（PR 冒烟的负载比 Nightly 短，两者的值不能互比）。机器类别取 `--machine`，否则取环境变量 `PIARC_PERF_MACHINE`，CI 上默认 `github-<arch>`，本机默认 `local`。同一类别的机器才能互相比较，换了机器就换一个类别名。
 
+CI 的两个 runner 类别（`github-arm64`、`github-x64`）在 R5 时还没有基线：推送后 CI 的 PR 冒烟与 Nightly 会以"nothing judged"失败，下载对应工件按下面的命令记录基线并提交后才转绿。
+
 基线只经显式命令更新，并在提交说明中写明原因：
 
 ```sh
@@ -47,6 +51,8 @@ FAIL regressed more than 10% — core-to-renderer-p95: current 2.62 ms (median o
 node scripts/perf/run.mjs --lane nightly --absolute --machine m1-max-32g --update-baseline "T44: first local baseline"
 # 用 CI 的报告（Nightly 作业上传的 perf-nightly-<os> 工件）记录该 runner 类别的基线
 node scripts/perf/run.mjs --lane nightly --from-report <下载的 report.json> --machine github-arm64 --update-baseline "<原因>"
+# PR 冒烟同理：CI desktop 作业上传的 perf-pr-<os> 工件
+node scripts/perf/run.mjs --lane pr --from-report <下载的 report.json> --machine github-arm64 --update-baseline "<原因>"
 git add scripts/perf/baselines && git commit -m "perf: update the <machine> baseline (<原因>)"
 ```
 
