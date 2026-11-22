@@ -1,0 +1,39 @@
+id: perm-auto-unsure
+description: When the reviewer model is unsure, the same call becomes an ordinary approval card that names the reason; the user's allow runs it (T46).
+capabilities: [CAP-PERM-AUTO-ALLOW-001]
+workspace:
+  trusted: true
+  files:
+    run.sh: "echo from-script\n"
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"enableAutoMode":true},"autoMode":{"model":"mock-rev/mock-model"}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: cmd, name: Bash, input: { command: 'bash run.sh' } }
+      - text: Ran it.
+  rev:
+    wire: anthropic
+    strict_tools: true
+    steps:
+      - tool_calls:
+          - id: r1
+            name: record_review
+            input: { verdict: unsure, reason: The script's contents are not visible here. }
+sessions:
+  main: { provider: main, mode: auto }
+actions:
+  - prompt: { text: Run the script., turn: one }
+approvals:
+  - { tool: Bash, call: cmd, decision: allow, review: unsure }
+expect:
+  request_counts: { main: 2, rev: 1 }
+  requests:
+    - provider: main
+      index: 1
+      tool_results:
+        - { id: cmd, is_error: false, contains: from-script }
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }

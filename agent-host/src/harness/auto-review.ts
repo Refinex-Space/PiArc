@@ -120,7 +120,7 @@ export async function reviewCall(
   const prompt = reviewInput(params, sources);
   const sent = {
     inputHash: sha256(`${system}\u0000${prompt}`),
-    inputChars: [...system].length + [...prompt].length,
+    inputChars: chars(system).length + chars(prompt).length,
     promptId: REVIEW_PROMPT_ID,
   };
   const timeout = AbortSignal.timeout(Math.max(1, params.timeoutMs));
@@ -253,10 +253,10 @@ function userMessages(items: readonly Item[]): string[] {
   });
   const [first, ...rest] = texts;
   if (first === undefined) return [];
-  let budget = REVIEW_LIMITS.userTotal - [...first].length;
+  let budget = REVIEW_LIMITS.userTotal - chars(first).length;
   const latest: string[] = [];
   for (const text of rest.reverse()) {
-    const size = [...text].length;
+    const size = chars(text).length;
     if (size > budget) break;
     budget -= size;
     latest.unshift(text);
@@ -281,7 +281,10 @@ function recentActions(items: readonly Item[], pending: string) {
             arguments: Object.fromEntries(
               Object.entries(item.arguments).map(([key, value]) => [
                 key,
-                headTail(typeof value === 'string' ? value : JSON.stringify(value), REVIEW_LIMITS.recentArgument),
+                headTail(
+                  typeof value === 'string' ? value : JSON.stringify(value),
+                  REVIEW_LIMITS.recentArgument,
+                ),
               ]),
             ),
             outcome: OUTCOMES[item.status],
@@ -303,12 +306,17 @@ function recentActions(items: readonly Item[], pending: string) {
 
 /** `text` at most `limit` characters: longer text keeps its head and tail around a note. */
 export function headTail(text: string, limit: number): string {
-  const chars = [...text];
-  if (chars.length <= limit) return text;
+  const points = chars(text);
+  if (points.length <= limit) return text;
   const keep = Math.max(0, limit - 40);
-  const head = chars.slice(0, Math.ceil(keep / 2)).join('');
-  const tail = chars.slice(chars.length - Math.floor(keep / 2)).join('');
-  return `${head} [… ${String(chars.length - keep)} characters left out …] ${tail}`;
+  const head = points.slice(0, Math.ceil(keep / 2)).join('');
+  const tail = points.slice(points.length - Math.floor(keep / 2)).join('');
+  return `${head} [… ${String(points.length - keep)} characters left out …] ${tail}`;
+}
+
+/** The Unicode code points of `text`: lengths count characters as Core's limits do. */
+function chars(text: string): string[] {
+  return Array.from(text);
 }
 
 function sha256(text: string): string {

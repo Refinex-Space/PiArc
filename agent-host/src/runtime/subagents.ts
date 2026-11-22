@@ -78,8 +78,21 @@ interface Run {
   readonly controller: AbortController;
   readonly allowed: ReadonlySet<string>;
   state: SubagentState;
+  /** The task its parent's `Agent` call gave it (an Auto mode review reads it, T46). */
+  readonly task: { readonly description: string; readonly prompt: string };
   /** The child as a parent of its own subagents, once it is open. */
   view?: ParentSession;
+  /** The child's canonical tool names, once it is open. */
+  toCanonical?: (tool: string) => string;
+}
+
+/** What an Auto mode review of a subagent's call reads (T46). */
+export interface SubagentReview {
+  readonly rootId: string;
+  readonly session: AgentSession;
+  readonly harness: SessionHarness;
+  readonly toCanonical: (tool: string) => string;
+  readonly task: { readonly description: string; readonly prompt: string };
 }
 
 /** A child session's notifications go nowhere: its parent reports the run. */
@@ -106,6 +119,19 @@ export class SubagentRunner {
   /** A main session, or a running subagent's session. */
   #parent(sessionId: string): ParentSession | undefined {
     return this.#runs.get(sessionId)?.view ?? this.#main(sessionId);
+  }
+
+  /** The parts of running subagent `sessionId` a review reads, once it is open. */
+  reviewOf(sessionId: string): SubagentReview | undefined {
+    const run = this.#runs.get(sessionId);
+    if (run?.view === undefined || run.toCanonical === undefined) return undefined;
+    return {
+      rootId: run.rootId,
+      session: run.view.session,
+      harness: run.view.harness,
+      toCanonical: run.toCanonical,
+      task: run.task,
+    };
   }
 
   /** Whether `sessionId` is a running subagent's session. */
@@ -277,6 +303,7 @@ export class SubagentRunner {
       background,
       controller: new AbortController(),
       allowed: allowedTools(parent.tools(), definition, depth, maxDepth),
+      task: { description: call.description, prompt: call.prompt },
       state: {
         sessionId: id,
         agentType: definition.name,
@@ -329,6 +356,7 @@ export class SubagentRunner {
       sink: SILENT,
       tools: () => [...run.allowed],
     };
+    run.toCanonical = child.canonical;
     parent.sink.event('subagent/started', { itemId: toolCallId, subagent: run.state });
     const relay = signal === undefined || background ? undefined : signal;
     const stop = () => {

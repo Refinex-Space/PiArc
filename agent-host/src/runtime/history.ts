@@ -22,11 +22,11 @@
 // adds after an interrupted turn (harness/interruption.ts) is bookkeeping for the model and is
 // not shown.
 import type { SessionEntry, SessionManager } from '@earendil-works/pi-coding-agent';
-import type { HistoryItem, HistoryWindow, ItemStatus } from '@piarc/protocol';
+import type { HistoryItem, HistoryWindow, ItemStatus, ToolReview } from '@piarc/protocol';
 
 import { isInterruptionMarker } from '../harness/interruption.js';
 import { REMINDER_ENTRY, reminderRefs } from '../harness/reminders.js';
-import { DECLINED_ENTRY } from '../harness/policy.js';
+import { DECLINED_ENTRY, REVIEW_ENTRY } from '../harness/policy.js';
 import { harnessState } from '../harness/session-harness.js';
 import { SUBAGENT_STATE_ENTRY } from '../harness/subagents/definitions.js';
 import { AhpError } from '../protocol/errors.js';
@@ -38,6 +38,7 @@ import {
   contentText,
   contextCompaction,
   isObject,
+  parseReview,
   reasoning,
   toolItem,
   userMessage,
@@ -67,6 +68,8 @@ export function projectHistory(
 ): HistoryItem[] {
   const results = new Map<string, ToolResult>();
   const declined = new Set<string>();
+  // The Auto mode reviewer's decisions (T46).
+  const reviews = new Map<string, ToolReview>();
   // A subagent run's last state, recorded after its `Agent` result (T31).
   const runs = new Map<string, unknown>();
   for (const entry of branch) {
@@ -85,6 +88,15 @@ export function projectHistory(
       typeof entry.data.toolCallId === 'string'
     ) {
       declined.add(entry.data.toolCallId);
+    }
+    if (
+      entry.type === 'custom' &&
+      entry.customType === REVIEW_ENTRY &&
+      isObject(entry.data) &&
+      typeof entry.data.toolCallId === 'string'
+    ) {
+      const review = parseReview(entry.data);
+      if (review !== undefined) reviews.set(entry.data.toolCallId, review);
     }
     if (entry.type === 'message' && entry.message.role === 'toolResult') {
       results.set(entry.message.toolCallId, {
@@ -199,7 +211,7 @@ export function projectHistory(
           currentTurn ?? entry.id,
           message,
           results,
-          declined,
+          { declined, reviews },
           toCanonical,
         ),
       );
@@ -213,9 +225,13 @@ function assistantItems(
   turnId: string,
   message: Extract<SessionEntry, { type: 'message' }>['message'] & { role: 'assistant' },
   results: ReadonlyMap<string, ToolResult>,
-  declined: ReadonlySet<string>,
+  marks: {
+    readonly declined: ReadonlySet<string>;
+    readonly reviews: ReadonlyMap<string, ToolReview>;
+  },
   toCanonical: (tool: string) => string,
 ): HistoryItem[] {
+  const { declined, reviews } = marks;
   const textStatus: ItemStatus =
     message.stopReason === 'aborted'
       ? 'interrupted'
@@ -259,6 +275,7 @@ function assistantItems(
           isObject(part.arguments) ? part.arguments : {},
           result?.text,
           result?.details,
+          reviews.get(part.id),
         ),
       });
     }

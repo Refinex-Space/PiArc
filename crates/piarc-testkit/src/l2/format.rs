@@ -93,6 +93,10 @@ pub struct ScenarioSpec {
     /// Smaller Monitor limits for this scenario (T32): Core's defaults when absent.
     #[serde(default)]
     pub task_limits: Option<TaskLimitsSpec>,
+    /// A shorter Auto mode review limit in milliseconds (T46's timeout scenario); 30 s when
+    /// absent.
+    #[serde(default)]
+    pub review_timeout_ms: Option<u64>,
     /// A local web server for WebFetch (T29); see [`crate::l2::web`].
     #[serde(default)]
     pub web: Option<crate::l2::web::WebSpec>,
@@ -259,6 +263,10 @@ pub struct ProviderSpec {
     /// The model id (T31); `mock-model` when absent.
     #[serde(default)]
     pub model: Option<String>,
+    /// The model declares schema-constrained tool arguments, so the catalog grades its tool
+    /// calls `verified` (T46: the Auto mode reviewer bar).
+    #[serde(default)]
+    pub strict_tools: bool,
     /// One response per request.
     pub steps: Vec<Step>,
 }

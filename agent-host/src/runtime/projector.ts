@@ -39,7 +39,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { AssistantMessage } from '@earendil-works/pi-ai';
 import type { AgentSessionEvent } from '@earendil-works/pi-coding-agent';
-import type { Item, ItemStatus, TurnStatus, TurnUsage } from '@piarc/protocol';
+import type { Item, ItemStatus, ToolReview, TurnStatus, TurnUsage } from '@piarc/protocol';
 
 import type { UserInput } from './input.js';
 
@@ -122,6 +122,7 @@ export class Projector {
   readonly #toCanonical: (tool: string) => string;
   readonly #options: ProjectorOptions;
   readonly #declined = new Set<string>();
+  readonly #reviews = new Map<string, ToolReview>();
   #turn: Turn | undefined;
   #nextInput: UserInput | undefined;
 
@@ -208,6 +209,11 @@ export class Projector {
   /** The policy gate refused tool call `toolCallId`: its item completes as `declined`. */
   markDeclined(toolCallId: string): void {
     this.#declined.add(toolCallId);
+  }
+
+  /** The Auto mode reviewer decided tool call `toolCallId` (T46): its item carries `review`. */
+  markReviewed(toolCallId: string, review: ToolReview): void {
+    this.#reviews.set(toolCallId, review);
   }
 
   /**
@@ -464,6 +470,7 @@ export class Projector {
       open.arguments,
       resultText(partialResult),
       isObject(partialResult) ? partialResult.details : undefined,
+      this.#reviews.get(toolCallId),
     );
     this.#sink.replaceable('item/updated', toolCallId, { turnId: turn.turnId, item });
   }
@@ -475,6 +482,8 @@ export class Projector {
     }
     turn.tools.delete(toolCallId);
     turn.finished.add(toolCallId);
+    const review = this.#reviews.get(toolCallId);
+    this.#reviews.delete(toolCallId);
     let status: ItemStatus = isError ? 'failed' : 'completed';
     if (this.#declined.delete(toolCallId)) {
       status = 'declined';
@@ -491,6 +500,7 @@ export class Projector {
         open.arguments,
         resultText(result),
         isObject(result) ? result.details : undefined,
+        review,
       ),
     );
   }

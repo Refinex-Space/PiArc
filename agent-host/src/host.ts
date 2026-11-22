@@ -14,6 +14,7 @@ import {
   optionalString,
   paramsObject,
   parseWelcome,
+  reviewParams,
   stringField,
   stringList,
   inputFields,
@@ -521,6 +522,12 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
       timeoutMs,
       ...(model === undefined ? {} : { model }),
     });
+  });
+  connection.handle('policy/review', async (params) => {
+    // Auto mode (T46): Core asks while the call's `policy/evaluate` waits; requests are
+    // handled concurrently, so reviews of parallel subagents do not wait for each other.
+    const parsed = reviewParams(params);
+    return (await sessions('policy/review')).reviewCall(parsed);
   });
   connection.handle('resources/reload', async () => {
     (await sessions('resources/reload')).reloadResources();

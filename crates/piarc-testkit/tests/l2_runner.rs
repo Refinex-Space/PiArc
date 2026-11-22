@@ -217,6 +217,7 @@ fn declared_approvals_without_approval_requests_fail() {
         subagent: None,
         via: None,
         notification_allow: None,
+        review: None,
     }];
     let failures = failures_of(&spec);
     println!("{failures:#?}");

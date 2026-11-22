@@ -1,0 +1,62 @@
+id: perm-auto-allow
+description: In Auto mode a command that would ask the user goes to the reviewer model, which allows it; the command runs once without a card, workspace edits run as in Accept edits, and the tool result carries no review text (T46).
+capabilities: [CAP-PERM-AUTO-001, CAP-PERM-AUTO-ALLOW-001]
+workspace:
+  trusted: true
+  files:
+    notes.txt: "first line\n"
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"enableAutoMode":true},"autoMode":{"model":"mock-rev/mock-model"}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: edit, name: Write, input: { path: new.txt, content: "made\n" } }
+      - tool_calls:
+          - { id: cmd, name: Bash, input: { command: 'sed -n 1p notes.txt' } }
+      - text: Done.
+  rev:
+    wire: anthropic
+    strict_tools: true
+    steps:
+      - tool_calls:
+          - id: r1
+            name: record_review
+            input:
+              {
+                verdict: allow,
+                reason: Prints one line of a workspace file the user asked about.,
+                category: none,
+              }
+        usage: { input_tokens: 900, output_tokens: 30 }
+sessions:
+  main: { provider: main, mode: auto }
+actions:
+  - prompt: { text: Show the first line of notes.txt., turn: one }
+expect:
+  request_counts: { main: 3, rev: 1 }
+  files:
+    new.txt: "made\n"
+  requests:
+    - provider: rev
+      index: 0
+      tools: [record_review]
+      contains: [sed -n 1p notes.txt, Show the first line of notes.txt.]
+    - provider: main
+      index: 2
+      tool_results:
+        - { id: edit, is_error: false }
+        - { id: cmd, is_error: false, contains: first line }
+  events:
+    - method: item/completed
+      params:
+        {
+          item:
+            {
+              itemId: cmd,
+              status: completed,
+              review: { verdict: allow, model: mock-rev/mock-model },
+            },
+        }
+    - { method: turn/completed, turn: one, params: { status: completed } }

@@ -6,6 +6,7 @@ export const PERMISSION_MODES: readonly PermissionMode[] = [
   'acceptEdits',
   'plan',
   'bypassPermissions',
+  'auto',
 ];
 
 /** Narrow an untrusted value to a permission mode. */

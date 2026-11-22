@@ -1,0 +1,35 @@
+id: perm-auto-invalid-verdict
+description: A reviewer verdict outside allow, deny and unsure goes to the user as an approval card, even when it reads like approval (T46).
+capabilities: [CAP-PERM-AUTO-FALLBACK-001]
+workspace:
+  trusted: true
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"enableAutoMode":true},"autoMode":{"model":"mock-rev/mock-model"}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: cmd, name: Bash, input: { command: 'printenv HOME' } }
+      - text: Stopped.
+  rev:
+    wire: anthropic
+    strict_tools: true
+    steps:
+      - tool_calls:
+          - { id: r1, name: record_review, input: { verdict: approve, reason: Looks harmless. } }
+sessions:
+  main: { provider: main, mode: auto }
+actions:
+  - prompt: { text: Print the home directory., turn: one }
+approvals:
+  - { tool: Bash, call: cmd, decision: deny, review: invalidVerdict }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - provider: main
+      index: 1
+      tool_results:
+        - { id: cmd, is_error: true, contains: User denied Bash }
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }

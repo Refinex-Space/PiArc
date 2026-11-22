@@ -24,6 +24,8 @@ import {
 import type {
   HistoryWindow,
   HooksPromptResult,
+  PolicyReviewParams,
+  PolicyReviewResult,
   InputAccepted,
   RewindMode,
   SessionRewound,
@@ -42,6 +44,7 @@ import type {
   SkillsCatalog,
 } from '@piarc/protocol';
 
+import { reviewCall } from '../harness/auto-review.js';
 import { judgeHook, type JudgeRequest } from '../harness/hook-judge.js';
 import { expiredApprovals } from '../harness/policy.js';
 import { fetchCatalog } from '../harness/subagents/definitions.js';
@@ -666,6 +669,40 @@ export class SessionRegistry {
     return this.#get(sessionId).harness;
   }
 
+  /**
+   * `policy/review` (T46): Auto mode's reviewer on a call of session `params.sessionId` (a main
+   * session or a running subagent). The user's messages come from the main session's branch,
+   * the recent calls from the reviewed session's own; the usage counts in the reviewed session.
+   */
+  async reviewCall(params: PolicyReviewParams): Promise<PolicyReviewResult> {
+    const child = this.subagents.reviewOf(params.sessionId);
+    const main = this.#get(child?.rootId ?? params.sessionId);
+    const own = child ?? {
+      session: main.runtime.session,
+      harness: main.harness,
+      toCanonical: main.toCanonical,
+    };
+    const auxiliary = own.harness.auxiliary;
+    const { tools, workspace } = this.#options;
+    if (auxiliary === undefined || tools.kind !== 'core') {
+      throw new AhpError(
+        'invalidParams',
+        `policy/review: session ${params.sessionId} has no model channel`,
+      );
+    }
+    const ownBranch = own.session.sessionManager.getBranch();
+    return reviewCall(
+      params,
+      {
+        own: ownBranch,
+        main: child === undefined ? ownBranch : main.runtime.session.sessionManager.getBranch(),
+        toCanonical: own.toCanonical,
+        ...(child === undefined ? {} : { task: child.task }),
+      },
+      { auxiliary, runtime: workspace.modelRuntime, preferences: workspace.preferences },
+    );
+  }
+
   /** `hooks/prompt` (T38): one judgement for a `prompt` hook of main session `sessionId`. */
   async judgeHook(sessionId: string, request: JudgeRequest): Promise<HooksPromptResult> {
     const hosted = this.#get(sessionId);
@@ -787,6 +824,9 @@ export class SessionRegistry {
       model: selected,
       declined: (id) => {
         opened.projector?.markDeclined(id);
+      },
+      reviewed: (id, review) => {
+        opened.projector?.markReviewed(id, review);
       },
       log: sessionLog,
     });

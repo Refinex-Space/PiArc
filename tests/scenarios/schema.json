@@ -115,6 +115,11 @@
         }
       }
     },
+    "review_timeout_ms": {
+      "description": "A shorter Auto mode review limit in milliseconds (T46's timeout scenario); 30 s when absent.",
+      "type": "integer",
+      "minimum": 1
+    },
     "web": {
       "description": "A local web server for WebFetch (T29). {{web}} in page bodies, redirect targets and tool call arguments becomes http://127.0.0.1:<port>, {{web_alt}} the same server as http://localhost:<port>; Core's WebFetch allowlist admits both for these scenarios only.",
       "type": "object",
@@ -312,6 +317,10 @@
           "description": "The endpoint's model id (T31), sent as `model` in its requests; mock-model when absent.",
           "type": "string",
           "pattern": "^[A-Za-z0-9._-]{1,64}$"
+        },
+        "strict_tools": {
+          "description": "The model declares schema-constrained tool arguments, so the catalog grades its tool calls verified (T46: the Auto mode reviewer bar).",
+          "type": "boolean"
         },
         "steps": {
           "type": "array",
@@ -517,7 +526,7 @@
           "$ref": "#/$defs/label"
         },
         "mode": {
-          "enum": ["default", "acceptEdits", "plan", "bypassPermissions"]
+          "enum": ["default", "acceptEdits", "plan", "bypassPermissions", "auto"]
         },
         "deferred": {
           "description": "Create the session on its first input.",
@@ -672,7 +681,7 @@
               "$ref": "#/$defs/label"
             },
             "mode": {
-              "enum": ["default", "acceptEdits", "plan", "bypassPermissions"]
+              "enum": ["default", "acceptEdits", "plan", "bypassPermissions", "auto"]
             }
           }
         },
@@ -1441,6 +1450,21 @@
         "notification_allow": {
           "description": "Whether the card must offer Allow in its notification (T42).",
           "type": "boolean"
+        },
+        "review": {
+          "description": "The card came back from the Auto mode reviewer for this reason (T46); none: it never went to the reviewer.",
+          "enum": [
+            "none",
+            "unsure",
+            "timeout",
+            "providerError",
+            "unparsable",
+            "invalidVerdict",
+            "unavailable",
+            "discarded",
+            "pausedConsecutive",
+            "pausedTotal"
+          ]
         },
         "decision": {
           "description": "wait leaves the card unanswered: a question form whose timeout answers it (T26).",

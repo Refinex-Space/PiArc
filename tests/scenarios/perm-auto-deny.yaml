@@ -1,0 +1,49 @@
+id: perm-auto-deny
+description: The reviewer model refuses a command in Auto mode; the command does not run, no card is shown, and the model reads the reviewer's reason with the note not to work around it (T46).
+capabilities: [CAP-PERM-AUTO-ALLOW-001]
+workspace:
+  trusted: true
+  files:
+    notes.txt: "keep\n"
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"enableAutoMode":true},"autoMode":{"model":"mock-rev/mock-model"}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: cmd, name: Bash, input: { command: "sed -i.bak 's/keep/gone/' notes.txt" } }
+      - text: Understood.
+  rev:
+    wire: anthropic
+    strict_tools: true
+    steps:
+      - tool_calls:
+          - id: r1
+            name: record_review
+            input:
+              {
+                verdict: deny,
+                reason: Rewrites a file the user only asked to read.,
+                category: outOfScope,
+              }
+sessions:
+  main: { provider: main, mode: auto }
+actions:
+  - prompt: { text: What does notes.txt say?, turn: one }
+expect:
+  request_counts: { main: 2, rev: 1 }
+  files:
+    notes.txt: "keep\n"
+    notes.txt.bak: null
+  requests:
+    - provider: main
+      index: 1
+      contains: ['Do not try to reach the same effect another way.']
+      tool_results:
+        - { id: cmd, is_error: true, contains: 'Rewrites a file the user only asked to read.' }
+  events:
+    - method: item/completed
+      params:
+        { item: { itemId: cmd, status: declined, review: { verdict: deny, category: outOfScope } } }
+    - { method: turn/completed, turn: one, params: { status: completed } }

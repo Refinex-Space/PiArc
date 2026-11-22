@@ -26,13 +26,19 @@ impl Driver<'_> {
                 let cards = session["approvals"]
                     .as_array()
                     .ok_or("session snapshot lacks approvals")?;
-                if session["pendingApprovals"].as_u64() != Some(cards.len() as u64) {
+                // A card the Auto mode reviewer is deciding takes no answer (T46): it comes back
+                // in a later snapshot with a new revision, or leaves.
+                let answerable: Vec<&Value> = cards
+                    .iter()
+                    .filter(|card| card["review"]["state"] != "reviewing")
+                    .collect();
+                if session["pendingApprovals"].as_u64() != Some(answerable.len() as u64) {
                     return Err(format!(
-                        "pendingApprovals disagrees with the {} cards in the snapshot",
-                        cards.len()
+                        "pendingApprovals disagrees with the {} answerable cards in the snapshot",
+                        answerable.len()
                     ));
                 }
-                for raw in cards {
+                for raw in answerable {
                     let card: ApprovalRequest =
                         serde_json::from_value(raw.clone()).map_err(|e| e.to_string())?;
                     self.answer_card(card).await?;
@@ -141,6 +147,20 @@ fn check_card(
             "approval expected {:?}, got {:?}",
             expected.kind, card.kind
         ));
+    }
+    if let Some(review) = expected.review {
+        use crate::l2::format::ReviewSpec;
+        let found = card.review.as_ref().and_then(|r| r.fallback);
+        let matches = match review {
+            ReviewSpec::None => card.review.is_none(),
+            ReviewSpec::Fallback(reason) => found == Some(reason),
+        };
+        if !matches {
+            return Err(format!(
+                "approval expected review {review:?}, got {:?}",
+                card.review
+            ));
+        }
     }
     if expected
         .notification_allow

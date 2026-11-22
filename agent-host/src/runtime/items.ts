@@ -12,6 +12,7 @@ import type {
   ItemStatus,
   PromptCommand,
   SubagentState,
+  ToolReview,
   TurnUsage,
   WebSearchSource,
 } from '@piarc/protocol';
@@ -42,6 +43,26 @@ export type ToolItemType =
   | 'webFetch'
   | 'webSearch'
   | 'dynamicToolCall';
+
+/** The Auto mode reviewer's decision on a call (T46: Core's `review`, or a `piarc.autoReview`
+ * entry), or undefined when `value` is not one. */
+export function parseReview(value: unknown): ToolReview | undefined {
+  if (
+    !isObject(value) ||
+    (value.verdict !== 'allow' && value.verdict !== 'deny') ||
+    typeof value.reason !== 'string' ||
+    typeof value.model !== 'string' ||
+    !(value.category === undefined || typeof value.category === 'string')
+  ) {
+    return undefined;
+  }
+  return {
+    verdict: value.verdict,
+    reason: value.reason.toWellFormed(),
+    model: value.model,
+    ...(typeof value.category === 'string' ? { category: value.category } : {}),
+  };
+}
 
 /** The item type of a canonical tool name. */
 export function toolItemType(tool: string): ToolItemType {
@@ -110,6 +131,7 @@ export function toolItem(
   args: Record<string, unknown>,
   output: string | undefined,
   details?: unknown,
+  review?: ToolReview,
 ): Item {
   const common = {
     itemId,
@@ -117,6 +139,7 @@ export function toolItem(
     tool,
     arguments: boundArguments(args),
     ...(output === undefined ? {} : { output: boundOutput(output) }),
+    ...(review === undefined ? {} : { review }),
   };
   const text = (name: string): string => {
     const value = args[name];

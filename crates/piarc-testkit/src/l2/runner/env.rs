@@ -29,6 +29,7 @@ pub(super) struct Env {
     pub(super) clock: Arc<piarc_core::clock::ManualClock>,
     /// The scenario's Monitor limits (T32).
     pub(super) task_limits: Option<crate::l2::format::TaskLimitsSpec>,
+    pub(super) review_timeout: Option<std::time::Duration>,
 }
 
 impl Env {
@@ -113,6 +114,7 @@ impl Env {
             mcp_http,
             clock: piarc_core::clock::ManualClock::new(),
             task_limits: spec.task_limits,
+            review_timeout: spec.review_timeout_ms.map(std::time::Duration::from_millis),
         })
     }
 
@@ -168,6 +170,9 @@ impl Env {
                     .unwrap_or_default(),
                 ..piarc_core::tool_io::WebConfig::default()
             },
+            review_timeout: self
+                .review_timeout
+                .unwrap_or_else(|| CoreConfig::default().review_timeout),
             ..CoreConfig::default()
         }
     }
@@ -228,11 +233,28 @@ pub(super) fn pi_provider_entry(
         "baseUrl": base_url, "api": api, "apiKey": "piarc-no-key",
         "models": [{
             "id": endpoint.model_id(), "name": endpoint.model_id(), "reasoning": reasoning, "input": input,
-            "compat": if reasoning && endpoint.wire == Wire::Openai {json!({"supportsReasoningEffort":true})} else {json!({})},
+            "compat": compat(endpoint),
             "contextWindow": endpoint.context_window.unwrap_or(200_000),
             "maxTokens": endpoint.max_tokens.unwrap_or(4096),
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
             "headers": headers
         }]
     })
+}
+
+/// The model's compatibility flags: thinking effort for OpenAI reasoning models, strict tool
+/// arguments when the endpoint declares them (T46).
+fn compat(endpoint: &ProviderSpec) -> Value {
+    let mut flags = serde_json::Map::new();
+    if endpoint.reasoning && endpoint.wire == Wire::Openai {
+        flags.insert("supportsReasoningEffort".into(), json!(true));
+    }
+    if endpoint.strict_tools {
+        let key = match endpoint.wire {
+            Wire::Anthropic => "supportsStrictTools",
+            Wire::Openai => "supportsStrictMode",
+        };
+        flags.insert(key.into(), json!(true));
+    }
+    Value::Object(flags)
 }

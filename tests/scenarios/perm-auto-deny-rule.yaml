@@ -1,0 +1,32 @@
+id: perm-auto-deny-rule
+description: A deny rule refuses the call in Auto mode before any review; the reviewer endpoint receives no request (T46).
+capabilities: [CAP-PERM-AUTO-ORDER-001]
+workspace:
+  trusted: true
+  files:
+    .piarc/settings.json: '{"permissions":{"deny":["Bash(printenv *)"]}}'
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"enableAutoMode":true},"autoMode":{"model":"mock-rev/mock-model"}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: cmd, name: Bash, input: { command: 'printenv HOME' } }
+      - text: Stopped.
+  rev:
+    wire: anthropic
+    strict_tools: true
+    steps:
+      - text: never used
+sessions:
+  main: { provider: main, mode: auto }
+actions:
+  - prompt: { text: Print the home directory., turn: one }
+expect:
+  request_counts: { main: 2, rev: 0 }
+  requests:
+    - provider: main
+      index: 1
+      tool_results:
+        - { id: cmd, is_error: true, contains: 'Bash(printenv *)' }

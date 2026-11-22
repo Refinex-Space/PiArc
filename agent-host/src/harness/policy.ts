@@ -1,17 +1,26 @@
 // Pi 1.5.2 calls tool_call after validating arguments and before any tool executes.
 // A blocked call's reason is the error tool result in Pi's next model request.
-import { DEFAULT_MAX_FRAME_BYTES, isPermissionMode, type PermissionMode } from '@piarc/protocol';
+import {
+  DEFAULT_MAX_FRAME_BYTES,
+  isPermissionMode,
+  type PermissionMode,
+  type ToolReview,
+} from '@piarc/protocol';
 import { uploadChunkEnd } from '../tools/core-io.js';
 import type { ExtensionFactory } from '@earendil-works/pi-coding-agent';
 
 import { describeError } from '../protocol/errors.js';
 import { wellFormedJson } from '../protocol/well-formed.js';
 import type { CoreBridge } from '../runtime/core-bridge.js';
-import { isObject } from '../runtime/items.js';
+import { isObject, parseReview } from '../runtime/items.js';
 import { readPathCandidates, resolveToolPath } from '../tools/paths.js';
 import type { HookNote } from './hooks.js';
 
 export const DECLINED_ENTRY = 'piarc.toolDeclined';
+
+/** Branch entry recording the Auto mode reviewer's decision on a call (T46):
+ * `{ toolCallId, verdict, reason, model, category? }`. */
+export const REVIEW_ENTRY = 'piarc.autoReview';
 
 interface ToolCall {
   tool: string;
@@ -35,6 +44,8 @@ export interface Preflight {
   readonly stop?: { readonly reason?: string };
   /** Allowing the call switched the session's permission mode (T26). */
   readonly mode?: PermissionMode;
+  /** The Auto mode reviewer decided the call (T46). */
+  readonly review?: ToolReview;
 }
 
 /** The arguments Core and hooks see: file paths resolved against the session's cwd. */
@@ -76,11 +87,13 @@ function parseResult(value: unknown): Preflight | { allowed: true; result: Prefl
       ? { reason: value.stop.reason }
       : {}
     : undefined;
+  const review = parseReview(value.review);
   const extras: Preflight = {
     ...(isObject(value.updatedInput) ? { updatedInput: value.updatedInput } : {}),
     ...(typeof value.context === 'string' ? { context: value.context } : {}),
     ...(stop === undefined ? {} : { stop }),
     ...(isPermissionMode(value.mode) ? { mode: value.mode } : {}),
+    ...(review === undefined ? {} : { review }),
   };
   if (value.allowed) return { allowed: true, result: extras };
   return {
@@ -248,6 +261,7 @@ export function policyGate(
   onMode?: (mode: PermissionMode) => void,
   requiresUserInteraction?: (tool: string) => boolean,
   effort?: () => string | undefined,
+  markReviewed?: (id: string, review: ToolReview) => void,
 ): ExtensionFactory {
   return (pi) => {
     // A deny rule without a specifier removes the tool from the model's list (architecture
@@ -297,6 +311,11 @@ export function policyGate(
           ...(decided.context === undefined ? {} : { context: decided.context }),
           ...(decided.stop === undefined ? {} : { stop: decided.stop }),
         });
+      }
+      if (decided.review !== undefined && !ctx.signal?.aborted) {
+        // The reviewer's decision shows on the call's item, live and in the history (T46).
+        markReviewed?.(event.toolCallId, decided.review);
+        pi.appendEntry(REVIEW_ENTRY, { toolCallId: event.toolCallId, ...decided.review });
       }
       const { reason } = decided;
       if (reason === undefined) {

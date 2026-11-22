@@ -39,6 +39,21 @@ pub struct Approval {
     /// Whether the card must offer "Allow" in its notification (T42).
     #[serde(default)]
     pub notification_allow: Option<bool>,
+    /// The card came back from the Auto mode reviewer for this reason (T46); `none`: the
+    /// card never went to the reviewer.
+    #[serde(default)]
+    pub review: Option<ReviewSpec>,
+}
+
+/// What an approval expects of the Auto mode reviewer (T46).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ReviewSpec {
+    /// The card never went to the reviewer.
+    None,
+    /// It came back with this reason.
+    #[serde(untagged)]
+    Fallback(piarc_protocol::policy::ReviewFallback),
 }
 
 /// Where an approval card must come from (T31).

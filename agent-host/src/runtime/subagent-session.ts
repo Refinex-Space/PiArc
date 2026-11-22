@@ -301,6 +301,11 @@ export class ChildSession {
     return this.#harness;
   }
 
+  /** Model-visible tool name → canonical name. */
+  get canonical(): (tool: string) => string {
+    return this.#canonical;
+  }
+
   /**
    * Runs the task until the child settles; `signal` interrupts it. `maxTurns` model responses
    * end it early with what it had (partial).

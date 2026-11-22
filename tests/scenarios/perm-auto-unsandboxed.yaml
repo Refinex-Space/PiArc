@@ -1,0 +1,33 @@
+id: perm-auto-unsandboxed
+description: A command the model asks to run outside the sandbox still asks the user in Auto mode and never reaches the reviewer (T46).
+capabilities: [CAP-PERM-AUTO-ORDER-001]
+platforms: [macos]
+platform_reason: Windows has no OS sandbox (D7), so there is no request to leave it.
+workspace:
+  trusted: true
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"enableAutoMode":true},"autoMode":{"model":"mock-rev/mock-model"},"sandbox":{"enabled":true}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - {
+              id: cmd,
+              name: Bash,
+              input: { command: 'printenv HOME', dangerouslyDisableSandbox: true },
+            }
+      - text: Done.
+  rev:
+    wire: anthropic
+    strict_tools: true
+    steps:
+      - text: never used
+sessions:
+  main: { provider: main, mode: auto }
+actions:
+  - prompt: { text: Print the home directory outside the sandbox., turn: one }
+approvals:
+  - { tool: Bash, call: cmd, decision: deny, review: none }
+expect:
+  request_counts: { main: 2, rev: 0 }

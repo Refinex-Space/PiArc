@@ -197,6 +197,11 @@ fn a_project_file_cannot_raise_the_mode() {
         user.view.permission_mode,
         Some(PermissionMode::BypassPermissions)
     );
+    // T46: a user's definition may ask for Auto mode (Core applies it only when enabled).
+    let text = "---\nname: a\ndescription: d\npermissionMode: auto\n---\n";
+    let user = parse(Path::new("/u/a.md"), AgentSource::User, text).expect("ok");
+    assert_eq!(user.view.permission_mode, Some(PermissionMode::Auto));
+    assert!(user.view.warnings.is_empty());
     let text = "---\nname: a\ndescription: d\npermissionMode: dontAsk\n---\n";
     let user = parse(Path::new("/u/a.md"), AgentSource::User, text).expect("ok");
     assert_eq!(user.view.permission_mode, None);

@@ -1,0 +1,28 @@
+id: perm-auto-unavailable
+description: A reviewer model that is not in the catalog makes the reviewer unavailable; the call goes to the user without any model request, and a reviewer below the bar (no verified tool calls) is unavailable too (T46).
+capabilities: [CAP-PERM-AUTO-FALLBACK-001]
+workspace:
+  trusted: true
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"enableAutoMode":true},"autoMode":{"model":"mock-nope/mock-model"}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: cmd, name: Bash, input: { command: 'printenv HOME' } }
+      - text: Stopped.
+  weak:
+    wire: anthropic
+    steps:
+      - text: never used
+sessions:
+  main: { provider: main, mode: auto }
+actions:
+  - prompt: { text: Print the home directory., turn: one }
+approvals:
+  - { tool: Bash, call: cmd, decision: deny, review: unavailable }
+expect:
+  request_counts: { main: 2, weak: 0 }
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }

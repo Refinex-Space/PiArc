@@ -6,6 +6,7 @@ import type {
   InputMention,
   ModelPreferences,
   ModelRef,
+  PolicyReviewParams,
 } from '@piarc/protocol';
 
 import { parsePreferences } from '../providers/preferences.js';
@@ -215,4 +216,72 @@ function isCount(value: unknown): value is number {
 
 function attachmentKind(value: unknown): 'image' | 'pdf' | undefined {
   return value === 'image' || value === 'pdf' ? value : undefined;
+}
+
+/** `policy/review`'s params (T46): Core's call, environment, policy and reviewer model. */
+export function reviewParams(params: unknown): PolicyReviewParams {
+  const method = 'policy/review';
+  const fields = paramsObject(method, params);
+  const object = (name: string): Fields => {
+    const value = fields[name];
+    if (!isFields(value)) {
+      throw new AhpError('invalidParams', `${method}: ${name} must be an object`, {
+        details: { member: name },
+      });
+    }
+    return value;
+  };
+  const strings = (from: Fields, name: string): string[] => {
+    const value = from[name];
+    if (value === undefined || value === null) return [];
+    if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) {
+      throw new AhpError('invalidParams', `${method}: ${name} must be a list of strings`, {
+        details: { member: name },
+      });
+    }
+    return value;
+  };
+  const env = object('environment');
+  const policy = object('policy');
+  const model = object('model');
+  const timeoutMs = fields.timeoutMs;
+  if (typeof timeoutMs !== 'number' || !Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new AhpError('invalidParams', `${method}: timeoutMs must be a positive number`, {
+      details: { member: 'timeoutMs' },
+    });
+  }
+  const remotes = Array.isArray(env.remotes)
+    ? env.remotes.flatMap((remote) =>
+        isFields(remote) && typeof remote.name === 'string' && typeof remote.url === 'string'
+          ? [{ name: remote.name, url: remote.url }]
+          : [],
+      )
+    : [];
+  const agentType = optionalString(method, env, 'agentType');
+  return {
+    sessionId: stringField(method, fields, 'sessionId'),
+    toolCallId: stringField(method, fields, 'toolCallId'),
+    tool: stringField(method, fields, 'tool'),
+    input: object('input'),
+    why: stringField(method, fields, 'why'),
+    environment: {
+      platform: stringField(method, env, 'platform'),
+      workspace: stringField(method, env, 'workspace'),
+      cwd: stringField(method, env, 'cwd'),
+      remotes,
+      sandboxed: env.sandboxed === true,
+      ...(agentType === undefined ? {} : { agentType }),
+    },
+    policy: {
+      environment: strings(policy, 'environment'),
+      allow: strings(policy, 'allow'),
+      softDeny: strings(policy, 'softDeny'),
+      hardDeny: strings(policy, 'hardDeny'),
+    },
+    model: {
+      provider: stringField(method, model, 'provider'),
+      id: stringField(method, model, 'id'),
+    },
+    timeoutMs,
+  };
 }

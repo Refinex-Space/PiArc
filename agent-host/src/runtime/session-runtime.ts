@@ -2,6 +2,7 @@
 // for a main session (`SessionRegistry.#open`) and a subagent's child session
 // (`runtime/subagents.ts`). Split out of the registry (T31, file length).
 import type { Api, Model } from '@earendil-works/pi-ai';
+import type { ToolReview } from '@piarc/protocol';
 import {
   createAgentSessionFromServices,
   createAgentSessionRuntime,
@@ -55,6 +56,8 @@ export interface RuntimeSpec {
   readonly model: Model<Api> | undefined;
   /** A refused call (its item shows `declined`). */
   readonly declined: (toolCallId: string) => void;
+  /** The Auto mode reviewer decided a call (T46): its item shows the decision. */
+  readonly reviewed?: (toolCallId: string, review: ToolReview) => void;
   readonly log: (line: string) => void;
   /** Set for a subagent's session. */
   readonly child?: ChildTools;
@@ -153,6 +156,7 @@ export async function createSessionRuntime(
                   },
                   (tool) => spec.mcp?.requiresUserInteraction(tool) === true,
                   () => harness.effort(),
+                  spec.reviewed,
                 ),
               ]
             : []),
