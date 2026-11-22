@@ -174,7 +174,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 已完成 | 10fbeff |
 | T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 部分完成 | 868065b |
 | T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 部分完成 | 00b452b |
-| T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 未开始 | — |
+| T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 进行中 | — |
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 未开始 | — |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
@@ -308,6 +308,15 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+**T44 性能预算进 CI 与长跑测试**（开工 2026-11-21；基线 `npm run verify -- --baseline` 通过，复用 00b452b 的全量结果；依赖 T43 为"部分完成"，遗留的 A10 VoiceOver 核对不影响本任务；origin 停在 e0c41ce，没有新的 Windows CI 结果）
+
+- [ ] 1 测量框架：第 11 章每项指标的测量与阈值配置，复用 S1/S2/S7/T18/T19/T35 的代码，统一口径与时钟
+- [ ] 2 门禁：绝对预算与相对基线 10% 两道判定、按平台与机器类别的基线与显式更新命令、第 11 章覆盖检查
+- [ ] 3 流水线：PR 冒烟（多次取中位数）与 Nightly 两平台完整测量与缩短版长跑，工作流语法检查
+- [ ] 4 长跑内存测试（8 小时本机、Nightly 缩短版）
+- [ ] 5 `docs/engineering/performance.md`、本机实测、空闲 CPU 阈值、预算校准（只收紧）
+- [ ] 验收 A01–A09；收尾（根 AGENTS.md 命令、testing.md 分层与基线纪律、复用表）
 
 ## 登记事项
 
