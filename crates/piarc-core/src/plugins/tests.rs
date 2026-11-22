@@ -640,6 +640,7 @@ impl Drop for RemoveOnDrop {
 }
 
 /// A `file://` URL of a local repository, also on Windows (`file:///C:/…`).
+#[cfg(unix)]
 fn file_url(path: &Path) -> String {
     let text = path.display().to_string().replace('\\', "/");
     if text.starts_with('/') {
