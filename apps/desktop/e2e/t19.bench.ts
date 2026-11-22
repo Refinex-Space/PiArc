@@ -13,10 +13,14 @@ import { expect, focusMain, openFolder, startSession, test as base } from './ses
 import { idle, prefer, requests, send } from './t19.js';
 
 const coldRuns = 5;
+// `PIARC_BENCH_SCALE` (0–1] shortens the streamed reply for the PR smoke (T44): the same
+// 100 token/s for a share of the 70 s.
+const SCALE = Math.min(1, Math.max(0.05, Number(process.env.PIARC_BENCH_SCALE ?? '1')));
+const scaled = (n: number) => Math.round(n * SCALE);
 // Leave room for wire framing and the Read round trip so the whole-turn rate reaches
 // 100 tokens/s. Verify the delivered rate using both responses' scripted usage.
 const chunk = { chunk_chars: 16, chunk_delay_ms: 36 };
-const outputTokens = 7_005;
+const outputTokens = scaled(3_500) + scaled(3_505);
 const section =
   'The parser reads the input.\n\n- It preserves **bold** text.\n- It keeps `code` spans.\n\n';
 function content(chars: number): string {
@@ -35,16 +39,16 @@ const test = base.extend({
           steps: [
             { text: 'Ready.' },
             {
-              thinking: content(2_400),
-              text: content(11_600),
+              thinking: content(scaled(2_400)),
+              text: content(scaled(11_600)),
               ...chunk,
-              usage: { input_tokens: 100, output_tokens: 3_500 },
+              usage: { input_tokens: 100, output_tokens: scaled(3_500) },
               tool_calls: [{ id: 'toolu_read', name: 'Read', input: { path: 'fixture.txt' } }],
             },
             {
-              text: content(14_000) + '\n\nMeasurement complete.',
+              text: content(scaled(14_000)) + '\n\nMeasurement complete.',
               ...chunk,
-              usage: { input_tokens: 4000, output_tokens: 3_505 },
+              usage: { input_tokens: 4000, output_tokens: scaled(3_505) },
             },
           ],
         }),
@@ -257,9 +261,9 @@ test('real Core transcript budgets', async ({ app, page, userDataDir, mock }, in
   };
   await writeFile(info.outputPath('timings.json'), JSON.stringify(result, null, 2) + '\n');
   console.log(JSON.stringify(result, null, 2));
-  expect(streaming.result).toBeGreaterThanOrEqual(60_000);
+  expect(streaming.result).toBeGreaterThanOrEqual(60_000 * SCALE);
   expect(result.streaming.measuredTokensPerSecond).toBeGreaterThanOrEqual(100);
-  expect(streaming.trace.frameWorkMs.count).toBeGreaterThan(60);
+  expect(streaming.trace.frameWorkMs.count).toBeGreaterThan(60 * SCALE);
   expect(streaming.trace.longTasksMs).toEqual([]);
   expect(streaming.trace.frameWorkMs.p99).toBeLessThanOrEqual(12);
   expect(scrolling.distancePx).toBeGreaterThan(28_000);

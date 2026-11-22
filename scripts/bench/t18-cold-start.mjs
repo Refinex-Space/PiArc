@@ -5,7 +5,7 @@
 // in Unix milliseconds. Playwright's launch adds its own debugging connection, so the numbers
 // are an upper bound.
 //
-//   npm run bench:t18 -- [--form packaged|dev] [--runs 10] [--sessions 100]
+//   npm run bench:t18 -- [--form packaged|dev] [--runs 10] [--sessions 100] [--out <file.json>]
 //
 // JSON goes to tmp/evidence/T18/bench/cold-start.json.
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -159,6 +159,7 @@ async function main() {
       form: { type: 'string', default: 'packaged' },
       runs: { type: 'string', default: '10' },
       sessions: { type: 'string', default: '100' },
+      out: { type: 'string' },
     },
   });
   const form = values.form === 'dev' ? 'dev' : 'packaged';
@@ -193,9 +194,12 @@ async function main() {
       maxMs: Math.round(sorted[sorted.length - 1] ?? 0),
       budgetMs: BUDGET_MS,
     };
-    const out = path.join(repoRoot, 'tmp', 'evidence', 'T18', 'bench');
-    await mkdir(out, { recursive: true });
-    await writeFile(path.join(out, 'cold-start.json'), `${JSON.stringify(result, null, 2)}\n`);
+    const file =
+      values.out === undefined
+        ? path.join(repoRoot, 'tmp', 'evidence', 'T18', 'bench', 'cold-start.json')
+        : path.resolve(values.out);
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, `${JSON.stringify(result, null, 2)}\n`);
     console.log(
       `cold start to sidebar (${String(count)} sessions, ${form}): median ${String(result.medianMs)} ms, ` +
         `max ${String(result.maxMs)} ms (budget ${String(BUDGET_MS)} ms)`,
