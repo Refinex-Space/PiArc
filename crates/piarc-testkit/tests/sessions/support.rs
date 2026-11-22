@@ -409,3 +409,38 @@ pub fn kill_host(pid_file: &std::path::Path) {
         .expect("kill this host");
     assert!(killed.success());
 }
+
+/// Opens `env`'s workspace, creates a session on `model` and runs one turn with `text` to its
+/// end; returns the session id (T45's credential and egress tests).
+pub async fn run_one_turn(
+    core: &CoreRuntime,
+    events: &Events,
+    env: &Env,
+    model: Option<piarc_protocol::session::ModelRef>,
+    text: &str,
+) -> String {
+    let (done, rx) = reply();
+    core.open_workspace(env.ws.clone(), done).expect("queued");
+    assert_eq!(answer(rx).await.expect("opened")["host"], "ready");
+    let (done, rx) = reply();
+    core.create_session(env.ws.clone(), None, model, done)
+        .expect("queued");
+    let id = answer(rx).await.expect("session")["sessionId"]
+        .as_str()
+        .expect("id")
+        .to_owned();
+    let (done, rx) = reply();
+    core.session_op(
+        id.clone(),
+        piarc_core::sessions::Op::Prompt(piarc_core::composer::UserInput::text(text)),
+        done,
+    )
+    .expect("queued");
+    let turn = answer(rx).await.expect("accepted")["turnId"]
+        .as_str()
+        .expect("turn")
+        .to_owned();
+    let completed = events.turn_completed(&id, &turn).await;
+    assert_eq!(completed["status"], "completed", "{completed}");
+    id
+}

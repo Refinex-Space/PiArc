@@ -8,13 +8,11 @@ mod process_environment;
 #[path = "sessions/support.rs"]
 mod support;
 
-use piarc_core::composer::UserInput;
 use piarc_core::providers::Operation;
-use piarc_core::sessions::Op;
 use piarc_protocol::session::ModelRef;
 use serde_json::json;
 
-use support::{Env, answer, prompt_text, record_host_pid, reply, shutdown};
+use support::{Env, answer, prompt_text, record_host_pid, reply, run_one_turn, shutdown};
 
 const KEY: &str = "thr04-known-provider-key-5c1d9e";
 
@@ -43,30 +41,12 @@ async fn thr04_a_vault_credential_stays_out_of_child_environments_and_log_files(
     let saved = answer(rx).await.expect("saved");
     assert_eq!(saved["providers"][0]["hasCredential"], true, "{saved}");
 
-    let (done, rx) = reply();
-    core.open_workspace(env.ws.clone(), done).expect("queued");
-    assert_eq!(answer(rx).await.expect("opened")["host"], "ready");
     let model = ModelRef {
         provider: "leak-relay".into(),
         id: "one".into(),
     };
-    let (done, rx) = reply();
-    core.create_session(env.ws.clone(), None, Some(model), done)
-        .expect("queued");
-    let id = answer(rx).await.expect("session")["sessionId"]
-        .as_str()
-        .expect("id")
-        .to_owned();
-    let (done, rx) = reply();
     let text = prompt_text("Print the environment.", "thr04-env");
-    core.session_op(id.clone(), Op::Prompt(UserInput::text(&text)), done)
-        .expect("queued");
-    let turn = answer(rx).await.expect("accepted")["turnId"]
-        .as_str()
-        .expect("turn")
-        .to_owned();
-    let completed = events.turn_completed(&id, &turn).await;
-    assert_eq!(completed["status"], "completed", "{completed}");
+    let id = run_one_turn(&core, &events, &env, Some(model), &text).await;
 
     // The command's environment: what the model received as the `env` output.
     let requests = env.requests("thr04-env");

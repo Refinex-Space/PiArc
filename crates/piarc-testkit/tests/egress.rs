@@ -8,11 +8,9 @@
 mod support;
 
 use piarc_core::agent_host::AgentHostLaunch;
-use piarc_core::composer::UserInput;
-use piarc_core::sessions::Op;
 use serde_json::{Value, json};
 
-use support::{Env, answer, mock_model, prompt_text, reply, repo_root, shutdown};
+use support::{Env, mock_model, prompt_text, repo_root, run_one_turn, shutdown};
 
 /// The wrapper module: records connections, then runs the bundle.
 fn wrapper(log: &std::path::Path, bundle: &std::path::Path) -> String {
@@ -66,26 +64,8 @@ async fn thr04_a_whole_mock_session_connects_only_to_the_model_provider() {
     *bundle = script;
     let (core, events) = env.start(config);
 
-    let (done, rx) = reply();
-    core.open_workspace(env.ws.clone(), done).expect("queued");
-    assert_eq!(answer(rx).await.expect("opened")["host"], "ready");
-    let (done, rx) = reply();
-    core.create_session(env.ws.clone(), None, mock_model(), done)
-        .expect("queued");
-    let id = answer(rx).await.expect("session")["sessionId"]
-        .as_str()
-        .expect("id")
-        .to_owned();
-    let (done, rx) = reply();
     let text = prompt_text("Use the tools.", "thr04-egress");
-    core.session_op(id.clone(), Op::Prompt(UserInput::text(&text)), done)
-        .expect("queued");
-    let turn = answer(rx).await.expect("accepted")["turnId"]
-        .as_str()
-        .expect("turn")
-        .to_owned();
-    let completed = events.turn_completed(&id, &turn).await;
-    assert_eq!(completed["status"], "completed", "{completed}");
+    run_one_turn(&core, &events, &env, mock_model(), &text).await;
     let requests = env.requests("thr04-egress");
     assert_eq!(requests.len(), 3, "the model answered three requests");
     assert!(
