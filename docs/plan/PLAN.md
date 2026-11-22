@@ -168,7 +168,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T37 | [Skills、斜杠命令、命令面板与输出风格](tasks/T37-skills-commands-and-output-styles.md) | 4 | T36 | macOS | high / 高 | 大 | 无 | 已完成 | b9012bb |
 | T38 | [WebSearch 与 hooks 扩展（M3）](tasks/T38-websearch-and-hooks-m3.md) | 4 | T37 | macOS | high / 高 | 中 | 无 | 已完成 | fc9c022 |
 | R4 | [M3 评审](tasks/R4-m3-review.md) | 4 | T38、W2 | macOS | high / 高 | 中 | 无 | 部分完成 | 8a1b0cf |
-| W3 | [Windows：M3 达标](tasks/W3-windows-m3-parity.md) | 5 | R4（建议在 T43、T44 之后，需要读屏清单与性能测量脚本） | Windows | high / 高 | 中 | 无 | 未开始 | — |
+| W3 | [Windows：M3 达标](tasks/W3-windows-m3-parity.md) | 5 | R4（建议在 T43、T44 之后，需要读屏清单与性能测量脚本） | Windows | high / 高 | 中 | 无 | 进行中 | — |
 | T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 607809d |
 | T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 已完成 | c4e5f75 |
 | T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 已完成 | 10fbeff |
@@ -308,6 +308,21 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+W3（开工 2026-11-22，Windows 11 x64，分支 `windows/dev` 快进到 `origin/docs/architecture-design` a6701310；R4 部分完成只因 macOS 内存口径，不影响 Windows 测量；T43、T44 部分完成只差 VoiceOver 与 macOS 冒烟，读屏清单与测量脚本已交付，A09、A10 不阻塞；机器 i5-1340P 12 核 16 线程 / 16 GB / NVMe，Windows 11 25H2 26200.9974，Defender 实时保护开启，与 W0 同一台）：
+
+- [ ] 1 环境：机器配置、开发构建打包、Velopack 安装包（CI 工件或本机 `pack-windows.mjs`）
+- [ ] 2 I166：`piarc-store` 同长度改写的 mtime 判据、`terminal.e2e.ts` 停拉帧数、`t19-composer` 提及断言
+- [ ] 3 终端（A02）：I163 `pointer.rs` 的 Windows 变体；I142 ⑤ t34 L4 的 Windows 版；ConPTY 下 PowerShell、Git Bash、vim、less、缩放、中文宽字符、Ctrl+C、snapshot 恢复；R4 M1 控制字符；I175 屏幕文件 rename
+- [ ] 4 终端性能（A04）：`bench:s7` 回显 p95 与 100 MB 输出的事件循环 p99
+- [ ] 5 MCP（A05）：无系统 Node 时 npx 经内置 Node、两个会话共享 server、Agent Host 被杀后无残留（T36-A11）、OAuth 经 mock 授权服务器
+- [ ] 6 worktree（A06）：空格与中文、超过 260 字符、`.worktreeinclude`、盘符大小写、`covered_by_trust`
+- [ ] 7 托盘、多窗口、`piarc://` 与右键菜单（A07、A08，T35-A10、I147、I170 的 UNC）
+- [ ] 8 内存（A01）：`npm run perf:m3` 与私有工作集
+- [ ] 9 性能（A09）：`run.mjs --lane nightly --absolute`，写入 `performance.md` 第 6 节；I198 拼写词典
+- [ ] 10 读屏与高对比度（A10）：Narrator、NVDA 清单（用户实机操作）、强制颜色截图
+- [ ] 11 问题处理与登记（A11）：I174、I83 的处理
+- [ ] 12 W3 报告、AGENTS.md、verify（A12）与收尾
 
 ## 登记事项
 
