@@ -307,7 +307,7 @@ export function sourceProblems(file, text, keys, side) {
  * shared catalogs themselves).
  * @param {string} file
  */
-function shown(file) {
+export function shown(file) {
   const relative = path.relative(DESKTOP, file).split(path.sep).join('/');
   return !(
     relative.startsWith('src/renderer/lab/') ||
@@ -315,7 +315,8 @@ function shown(file) {
     relative.startsWith('src/renderer/terminal/vendor/') ||
     relative.startsWith('src/main/core/test-hooks') ||
     relative.includes('/test-hooks') ||
-    relative.includes('-lab') ||
+    // Test pages by name: `terminal-lab.ts`, `TranscriptLab.tsx`; not `row-label.ts` (R5).
+    /(?:^|\/)[^/]*-lab\.[jt]sx?$/u.test(relative) ||
     relative.includes('Lab.tsx') ||
     relative.startsWith('src/shared/')
   );

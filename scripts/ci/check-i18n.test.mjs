@@ -2,7 +2,7 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { catalogProblems, i18nProblems, sourceProblems } from './check-i18n.mjs';
+import { catalogProblems, i18nProblems, shown, sourceProblems } from './check-i18n.mjs';
 import { repoRoot } from '../lib/repo.mjs';
 
 /** A stand-in for intl-messageformat: `{a}` arguments and `{n, plural, one {…} other {…}}`. */
@@ -82,5 +82,21 @@ describe('check-i18n', () => {
 
   it('passes on the repository', async () => {
     expect(await i18nProblems()).toEqual([]);
+  });
+});
+
+describe('shown', () => {
+  const at = (/** @type {string} */ relative) =>
+    path.join(repoRoot, 'apps', 'desktop', ...relative.split('/'));
+
+  it('checks the files that name rows and approval cards for screen readers (R5)', () => {
+    expect(shown(at('src/renderer/transcript/row-label.ts'))).toBe(true);
+    expect(shown(at('src/renderer/approvals/approval-label.ts'))).toBe(true);
+  });
+
+  it('leaves out the test pages and their helpers', () => {
+    expect(shown(at('src/renderer/lab/TranscriptLab.tsx'))).toBe(false);
+    expect(shown(at('src/renderer/terminal/TerminalLab.tsx'))).toBe(false);
+    expect(shown(at('src/renderer/terminal/terminal-lab.ts'))).toBe(false);
   });
 });
