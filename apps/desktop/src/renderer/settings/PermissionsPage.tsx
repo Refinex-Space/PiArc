@@ -548,7 +548,7 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
           {t('permissions.audit.refresh')}
         </button>
       </div>
-      {error !== '' && <p className="error-text">{error}</p>}
+      {error !== '' && <p className="error-text" role="alert">{error}</p>}
       {rows.length === 0 ? (
         <p className="muted">{t('permissions.audit.empty')}</p>
       ) : (

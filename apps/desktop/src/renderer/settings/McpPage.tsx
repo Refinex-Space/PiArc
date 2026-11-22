@@ -309,7 +309,7 @@ export function McpPage() {
           {error}
         </p>
       )}
-      {signIn.failure === '' ? null : <p className="error-text">{signIn.failure}</p>}
+      {signIn.failure === '' ? null : <p className="error-text" role="alert">{signIn.failure}</p>}
       {status === undefined ? (
         chosen === null || error !== '' ? null : (
           <p className="muted">{t('mcp.loading')}</p>

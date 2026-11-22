@@ -158,7 +158,7 @@ function GeneralPage() {
           {t('settings.memory.readBoth')}
         </label>
       </div>
-      {error !== undefined && <p className="error-text">{error}</p>}
+      {error !== undefined && <p className="error-text" role="alert">{error}</p>}
     </div>
   );
 }
@@ -209,7 +209,7 @@ function AppearancePage() {
           save({ key: 'appearance.reduceMotion', value });
         }}
       />
-      {error !== undefined && <p className="error-text">{error}</p>}
+      {error !== undefined && <p className="error-text" role="alert">{error}</p>}
     </div>
   );
 }
@@ -337,7 +337,7 @@ function ShortcutsPage() {
           })}
         </tbody>
       </table>
-      {error !== undefined && <p className="error-text">{error}</p>}
+      {error !== undefined && <p className="error-text" role="alert">{error}</p>}
     </div>
   );
 }

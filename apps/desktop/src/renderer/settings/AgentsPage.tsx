@@ -188,7 +188,7 @@ export function AgentsPage() {
           </select>
         </div>
       )}
-      {error === '' ? null : <p className="error-text">{error}</p>}
+      {error === '' ? null : <p className="error-text" role="alert">{error}</p>}
       {view === undefined ? (
         chosen === null || error !== '' ? null : (
           <p className="muted">{t('agents.loading')}</p>
