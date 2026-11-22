@@ -1209,6 +1209,31 @@ export const en = {
   'diagnostics.replaced': 'Replaced by another source',
   'diagnostics.replacedBy': 'replaced by {path}',
   'diagnostics.line': 'Line {line}:',
+  'diagnostics.bundle.title': 'Diagnostic bundle',
+  'diagnostics.bundle.intro':
+    'Logs, version information, your settings and the diagnostics above, to attach to a bug report. Credentials are replaced and your home folder becomes ~; the credential vault, the database and session content are never included. The file is only saved where you choose; nothing is sent.',
+  'diagnostics.bundle.prepare': 'Prepare bundle…',
+  'diagnostics.bundle.preparing': 'Preparing…',
+  'diagnostics.bundle.files': 'Files in the bundle',
+  'diagnostics.bundle.redactions': 'Replaced before export',
+  'diagnostics.bundle.redaction.secret':
+    '{count, plural, one {# credential or secret value} other {# credentials or secret values}}',
+  'diagnostics.bundle.redaction.apiKey': '{count, plural, one {# API key} other {# API keys}}',
+  'diagnostics.bundle.redaction.accessKey':
+    '{count, plural, one {# cloud access key} other {# cloud access keys}}',
+  'diagnostics.bundle.redaction.token':
+    '{count, plural, one {# Bearer or Basic credential} other {# Bearer or Basic credentials}}',
+  'diagnostics.bundle.redaction.jwt':
+    '{count, plural, one {# JSON Web Token} other {# JSON Web Tokens}}',
+  'diagnostics.bundle.redaction.home':
+    '{count, plural, one {# home folder path} other {# home folder paths}}',
+  'diagnostics.bundle.noRedactions': 'Nothing needed replacing.',
+  'diagnostics.bundle.excluded': 'Never included: {list}',
+  'diagnostics.bundle.export': 'Export…',
+  'diagnostics.bundle.cancel': 'Cancel',
+  'diagnostics.bundle.exported': 'Saved to {path} ({size}).',
+  'diagnostics.bundle.failed': 'Core answered with an unexpected bundle description.',
+  'diagnostics.bundle.saveTitle': 'Save the diagnostic bundle',
   'settings.sandbox': 'Sandbox',
   'sandbox.intro':
     'Bash commands the agent runs can run in an operating-system sandbox: writes stay in the workspace, the session’s temporary directory and added directories, protected paths stay read-only, and the network goes only to allowed domains through PiArc’s proxy. Your own commands in the terminal panel, hooks, MCP servers and file tools are not in this sandbox.',

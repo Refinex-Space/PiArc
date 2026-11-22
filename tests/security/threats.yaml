@@ -180,6 +180,13 @@ threats:
           - rust:crates/piarc-telemetry/tests/redaction.rs::thr04_credentials_in_core_and_agent_host_lines_reach_the_files_redacted
           - rust:crates/piarc-testkit/tests/credential_leaks.rs::thr04_a_vault_credential_stays_out_of_child_environments_and_log_files
           - vitest:agent-host/src/providers/policy.test.ts::redacts the provider key echoed by an HTTP error before the Pi session can persist it
+      - measure: 诊断包由用户手动导出：先展示文件清单与脱敏摘要，经主进程保存对话框确认后才写出；不含保险箱、数据库与会话内容，主目录写作 ~
+        type: automated
+        tests:
+          - rust:crates/piarc-telemetry/src/bundle_tests.rs::thr04_the_bundle_carries_no_credential_and_no_home_path
+          - rust:crates/piarc-core/tests/diagnostics.rs::thr04_the_exported_bundle_holds_no_credential_session_content_or_home_path
+          - vitest:apps/desktop/src/main/core/diagnostics-ipc.test.ts::prepares with the client versions and writes nothing until the user picks a place
+          - l4:apps/desktop/e2e/t45-diagnostics.e2e.ts::the diagnostic bundle shows what it holds and is written only where the user chooses
 
   - id: THR-05
     title: 沙箱逃逸

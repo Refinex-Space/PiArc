@@ -11,6 +11,7 @@ import { useCallback, useEffect, useId, useState } from 'react';
 
 import type { MessageId } from '../../shared/i18n/index.js';
 import { useApp } from '../app/app-context.js';
+import { DiagnosticBundleSection } from './DiagnosticBundleSection.js';
 
 const STATUSES = [
   'loaded',
@@ -583,6 +584,7 @@ export function ConfigDiagnosticsPage() {
           {view.mcp.length > 0 && <McpIssues issues={view.mcp} />}
         </>
       )}
+      <DiagnosticBundleSection workspace={view.workspace} />
     </div>
   );
 }

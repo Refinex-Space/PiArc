@@ -122,6 +122,8 @@ export const IPC_CHANNELS = {
   packageConfirm: 'piarc:packages.confirm',
   packageUninstall: 'piarc:packages.uninstall',
   configDiagnostics: 'piarc:config.diagnostics',
+  diagnosticsPrepare: 'piarc:diagnostics.prepare',
+  diagnosticsExport: 'piarc:diagnostics.export',
   worktreeBranches: 'piarc:worktree.branches',
   worktreeIgnore: 'piarc:worktree.ignore',
   worktreeRemove: 'piarc:worktree.remove',
@@ -709,6 +711,17 @@ export interface PiarcApi {
    * every settings file with its load state and its applied, overridden and ignored keys.
    */
   configDiagnostics(workspace: string | null): Promise<string>;
+  /**
+   * Prepares the diagnostic bundle (T45) with a workspace's configuration diagnostics (the most
+   * recent one when null) and resolves with its manifest (JSON): `{id, files: [{name, bytes}],
+   * redactions: {<kind>: count}, excluded}`. Nothing is written yet.
+   */
+  prepareDiagnostics(workspace: string | null): Promise<string>;
+  /**
+   * Writes the prepared bundle `id` where the user chooses in the native save dialog; resolves
+   * with `{path, bytes}` (JSON), or null when the user cancelled.
+   */
+  exportDiagnostics(id: string): Promise<string | null>;
   answerApproval(answer: ApprovalAnswer): Promise<string>;
   /**
    * Compacts the conversation as a turn of its own (`/compact [focus]`); `instructions` is what

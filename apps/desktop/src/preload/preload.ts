@@ -427,6 +427,14 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.configDiagnostics, workspace)
       .then((v: unknown) => expectString(v)),
+  prepareDiagnostics: (workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.diagnosticsPrepare, workspace)
+      .then((v: unknown) => expectString(v)),
+  exportDiagnostics: (id) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.diagnosticsExport, id)
+      .then((v: unknown) => expectStringOrNull(v)),
   providerSettings: () =>
     ipcRenderer.invoke(IPC_CHANNELS.providerSettings).then((v: unknown) => expectString(v)),
   saveProvider: (config, secret) =>

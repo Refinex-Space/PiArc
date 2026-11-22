@@ -33,6 +33,7 @@
 //! from the index and `resume` reopens a session from its file.
 
 mod create;
+mod diagnostics;
 mod hooks;
 mod inbound;
 mod login;
@@ -82,6 +83,7 @@ pub enum ForkPoint {
     /// Up to where this turn of the current branch started (T28, "branch from here").
     BeforeTurn(String),
 }
+pub(crate) use diagnostics::PreparedBundle;
 pub(crate) use snapshot::{SnapshotMsg, Snapshots};
 
 pub use piarc_store::SessionPrefsChange;
@@ -159,6 +161,8 @@ pub(crate) struct Ctx {
     pub files: FileSearch,
     /// Worktrees of sessions (T35).
     pub worktrees: crate::worktrees::Worktrees,
+    /// The diagnostic bundle the client previewed (T45).
+    pub diagnostics: diagnostics::PreparedBundle,
 }
 
 /// The entry of the session layer. Cheap to clone.

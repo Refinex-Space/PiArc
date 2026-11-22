@@ -2,6 +2,18 @@
 
 /** PiArc Core, loaded once in the Electron main process (ADR-0014). */
 export declare class CoreRuntime {
+  /**
+   * Assembles the diagnostic bundle in memory and answers its manifest as JSON text:
+   * `{id, files: [{name, bytes}], redactions: {<kind>: n}, excluded}`. `appJson` holds the
+   * client's versions; `workspace` whose configuration diagnostics to add (the most recent
+   * workspace when null).
+   */
+  prepareDiagnostics(workspace: string | null, appJson: string): Promise<string>;
+  /**
+   * Writes the prepared bundle `id` to the absolute `path` as a ZIP archive; answers
+   * `{path, bytes}` as JSON text.
+   */
+  exportDiagnostics(id: string, path: string): Promise<string>;
   /** Every configured MCP server of `workspace` with its state, as JSON text (`McpStatus`). */
   mcpStatus(workspace: string): Promise<string>;
   /** Connects MCP server `name` of `workspace` anew; its state as JSON text. */

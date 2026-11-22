@@ -25,6 +25,7 @@
 //! Tasks are spawned under a supervisor. A panic is not swallowed: it is printed to stderr
 //! and reported as a structured error event on [`ERROR_ROUTE`](crate::route::ERROR_ROUTE).
 
+mod diagnostics;
 mod mcp;
 mod plugins;
 mod sessions;
@@ -657,6 +658,7 @@ fn open_state(
         cancel: cancel.child_token(),
         files: crate::composer::file_search::FileSearch::default(),
         worktrees,
+        diagnostics: crate::sessions::PreparedBundle::default(),
     });
     tasks.set_outlet(sessions.task_outlet());
     sessions.connect_hooks();

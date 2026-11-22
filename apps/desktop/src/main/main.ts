@@ -20,6 +20,7 @@ import { registerTerminalHandlers, TerminalOwners } from './core/terminal-ipc.js
 import { registerPermissionHandlers } from './core/permissions-ipc.js';
 import { registerSandboxHandlers } from './core/sandbox-ipc.js';
 import { registerUsageHandlers } from './core/usage-ipc.js';
+import { registerDiagnosticsHandlers } from './core/diagnostics-ipc.js';
 import { FaultInjector, registerSessionHandlers } from './core/session-ipc.js';
 import { installTestHooks } from './core/test-hooks.js';
 import { applyDevServerCsp, resolveDevServer } from './dev-server.js';
@@ -231,6 +232,7 @@ function start(dirs: DataDirs): void {
     appShell.attention.connect({ answer: (json) => core.runtime.answerApproval(json) });
     registerSandboxHandlers(registerHandler, core.runtime, () => appShell.t());
     registerUsageHandlers(registerHandler, core.runtime);
+    registerDiagnosticsHandlers(registerHandler, core.runtime, () => appShell.t());
     registerMcpHandlers(registerHandler, core.runtime);
     registerPackageHandlers(registerHandler, core.runtime, () => appShell.t(), nativeConfirm);
     registerWorktreeHandlers(
