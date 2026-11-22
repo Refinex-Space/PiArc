@@ -87,8 +87,8 @@ export function auditQuery(raw: unknown): AuditQuery {
     throw new TypeError('conclusion must be allow or deny');
   }
   const kind = raw.kind;
-  if (kind !== undefined && kind !== 'permission' && kind !== 'sandbox') {
-    throw new TypeError('kind must be permission or sandbox');
+  if (kind !== undefined && kind !== 'permission' && kind !== 'sandbox' && kind !== 'autoReview') {
+    throw new TypeError('kind must be permission, sandbox or autoReview');
   }
   const number = (value: unknown, name: string, max: number): number => {
     if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > max) {

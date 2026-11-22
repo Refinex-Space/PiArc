@@ -204,3 +204,45 @@ fn malformed_and_negative_prices_are_ignored() {
     assert_eq!(book.price("p", "b").1, PriceSource::Unknown);
     assert!(user_price(&json!({"input": 1})).is_none());
 }
+
+/// T46-A09: Auto mode reviews are auxiliary calls of purpose `autoReview`: listed on their own
+/// under the session (its subagents' included), priced with the user's price for the reviewer
+/// (none in the catalog).
+#[test]
+fn auto_reviews_are_their_own_line_priced_with_the_users_price() {
+    let groups = vec![
+        group("main", "model", None, "a", 1000),
+        group("main", "auxiliary", Some("autoReview"), "rev", 4000),
+        group("child", "auxiliary", Some("autoReview"), "rev", 2000),
+    ];
+    let sessions = vec![session("main", None), session("child", Some("main"))];
+    let user = json!({"p/rev": {"input": 1, "output": 5, "cacheRead": 0.1, "cacheWrite": 1.25}});
+    let book = PriceBook::new(&[("p".into(), "a".into(), PLAIN.into())], Some(&user));
+    let requests = HashMap::new();
+    let inputs = Inputs {
+        groups: &groups,
+        requests: &requests,
+        sessions: &sessions,
+        book: &book,
+    };
+    let out = report(&inputs, &|_| true);
+    let main = &out.sessions[0];
+    assert!(!main.partial, "the reviewer has the user's price");
+    // One review group: input × 1 + 10 × 5 + 100 × 0.1 + 20 × 1.25 (USD per million).
+    let reviewed = |input: f64| (input + 50.0 + 10.0 + 25.0) / 1e6;
+    let review = main
+        .auxiliary
+        .iter()
+        .find(|a| a.purpose == "autoReview")
+        .expect("reviews listed");
+    // The line covers the session tree: the subagent's review is in it too.
+    assert_eq!(review.tokens.input, 6000);
+    assert!((review.cost.expect("cost") - reviewed(4000.0) - reviewed(2000.0)).abs() < 1e-15);
+    let rev = main.models.iter().find(|m| m.model == "rev").expect("rev");
+    assert_eq!(rev.price_source, PriceSource::User);
+    assert!((rev.cost.expect("cost") - reviewed(4000.0) - reviewed(2000.0)).abs() < 1e-15);
+    assert!(
+        (main.subagents[0].cost.expect("cost") - reviewed(2000.0)).abs() < 1e-15,
+        "the subagent's review is in its cost"
+    );
+}

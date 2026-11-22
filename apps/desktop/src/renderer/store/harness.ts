@@ -35,7 +35,9 @@ export function planOf(value: unknown): PlanRecord | undefined {
     typeof value.plan !== 'string' ||
     typeof value.toolCallId !== 'string' ||
     typeof value.entryId !== 'string' ||
-    !isPermissionMode(value.mode)
+    !isPermissionMode(value.mode) ||
+    // An approved plan continues in Manual or Accept edits only (Core checks the same).
+    (value.mode !== 'default' && value.mode !== 'acceptEdits')
   ) {
     return undefined;
   }

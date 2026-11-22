@@ -6,6 +6,7 @@ import type { Item, WebSearchSource } from '@piarc/protocol';
 import { useT } from '../../app/app-context.js';
 import { safeHref } from '../markdown/text.js';
 import { StatusMark } from './tools.js';
+import { ReviewNote } from './review.js';
 
 type WebSearchItem = Extract<Item, { type: 'webSearch' }>;
 
@@ -73,6 +74,7 @@ export function WebSearchCard({ id, item }: { readonly id: string; readonly item
           </span>
         )}
       </div>
+      <ReviewNote review={item.review} />
       {sources.length > 0 ? (
         <ol className="web-search-sources" aria-label={t('transcript.webSearch.sources')}>
           {sources.map((source, n) => (

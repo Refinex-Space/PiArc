@@ -52,6 +52,33 @@ export interface SessionEntry {
   readonly worktreeConfirmCleanup: boolean;
   /** Its worktree was removed (its branch stays). */
   readonly worktreeRemoved: boolean;
+  /** Auto mode's state (T46), flat like the worktree's: absent outside Auto mode, except
+   * `unavailable` + `disabled` after the settings turned Auto mode off. */
+  readonly autoReviewState: 'ready' | 'unavailable' | 'paused' | undefined;
+  readonly autoReviewReason: AutoReviewReason | undefined;
+}
+
+export const AUTO_REVIEW_REASONS = [
+  'noModel',
+  'unknownModel',
+  'belowBar',
+  'hostDown',
+  'disabled',
+  'consecutive',
+  'total',
+] as const;
+export type AutoReviewReason = (typeof AUTO_REVIEW_REASONS)[number];
+
+const AUTO_REVIEW_STATES = ['ready', 'unavailable', 'paused'] as const;
+
+function autoReviewFields(value: unknown): {
+  autoReviewState: (typeof AUTO_REVIEW_STATES)[number] | undefined;
+  autoReviewReason: AutoReviewReason | undefined;
+} {
+  const auto = isRecord(value) ? value : {};
+  const state = AUTO_REVIEW_STATES.find((s) => s === auto.state);
+  const reason = AUTO_REVIEW_REASONS.find((r) => r === auto.reason);
+  return { autoReviewState: state, autoReviewReason: state === undefined ? undefined : reason };
 }
 
 export interface Snapshot<T> {
@@ -132,6 +159,7 @@ function sessionEntry(value: unknown): SessionEntry | undefined {
         : NO_APPROVALS,
     pendingApprovals: optionalNumber(value.pendingApprovals) ?? 0,
     ...worktreeFields(value.worktree),
+    ...autoReviewFields(value.autoReview),
   };
 }
 

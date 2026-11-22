@@ -65,6 +65,7 @@ export function isApproval(value: unknown, sessionId: string): value is Approval
   )
     return false;
   if (value.protectedPath != null && typeof value.protectedPath !== 'boolean') return false;
+  if (value.review != null && !reviewOf(value.review)) return false;
   const diff = value.diff;
   return (
     diff == null ||
@@ -75,6 +76,29 @@ export function isApproval(value: unknown, sessionId: string): value is Approval
       integer(diff.removed) &&
       Array.isArray(diff.hunks) &&
       diff.hunks.every(hunk))
+  );
+}
+
+const FALLBACKS = [
+  'unsure',
+  'timeout',
+  'providerError',
+  'unparsable',
+  'invalidVerdict',
+  'unavailable',
+  'discarded',
+  'pausedConsecutive',
+  'pausedTotal',
+];
+
+/** The Auto mode reviewer's part in a card (T46). */
+function reviewOf(value: unknown): boolean {
+  return (
+    record(value) &&
+    (value.state === 'reviewing' || value.state === 'fallback') &&
+    (value.fallback == null || FALLBACKS.some((f) => f === value.fallback)) &&
+    (value.reason == null || typeof value.reason === 'string') &&
+    (value.model == null || typeof value.model === 'string')
   );
 }
 

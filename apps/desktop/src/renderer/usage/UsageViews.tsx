@@ -12,6 +12,7 @@ const PURPOSES: Readonly<Record<string, MessageId>> = {
   webFetch: 'usage.purpose.webFetch',
   webSearch: 'usage.purpose.webSearch',
   hookPrompt: 'usage.purpose.hookPrompt',
+  autoReview: 'usage.purpose.autoReview',
   cache_warm: 'usage.purpose.cacheWarm',
 };
 

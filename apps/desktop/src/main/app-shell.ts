@@ -9,7 +9,7 @@
 // count. Main windows take their position and size from the window state file. Links, dropped
 // folders and second starts become launch targets: a window that has not taken its queue yet
 // gets them when its page asks (`takeLaunchTargets`), a running page as an app event.
-import { BrowserWindow, Menu, nativeTheme, screen } from 'electron';
+import { BrowserWindow, Menu, dialog, nativeTheme, screen } from 'electron';
 
 import {
   APP_EVENT_CHANNEL,
@@ -274,9 +274,19 @@ export class AppShell {
       this.pending.set(id, []);
       return targets;
     });
-    registerHandler(IPC_CHANNELS.preferencesSet, (_event, [change]) =>
-      this.options.preferences.set(change),
-    );
+    registerHandler(IPC_CHANNELS.preferencesSet, async (event, [change]) => {
+      if (enablesAutoMode(change)) {
+        // T46: the reviewer will answer approvals in the user's place; the user confirms here,
+        // in the main process, and only with a reviewer model chosen.
+        if (this.options.preferences.get().autoMode.model === '') {
+          throw new TypeError('choose a reviewer model first');
+        }
+        if (!(await this.confirmAutoMode(BrowserWindow.fromWebContents(event.sender)))) {
+          return this.options.preferences.get();
+        }
+      }
+      return this.options.preferences.set(change);
+    });
     registerHandler(IPC_CHANNELS.settingsOpen, (_event, [page]) => {
       if (page !== undefined && (typeof page !== 'string' || !SETTINGS_PAGE.test(page))) {
         throw new TypeError('page must be a settings page id');
@@ -307,6 +317,27 @@ export class AppShell {
       }
       this.attention.setCount(window ?? undefined, count, this.translator);
     });
+  }
+
+  /** T46: the native confirmation before Auto mode is enabled. */
+  private async confirmAutoMode(window: BrowserWindow | null): Promise<boolean> {
+    const t = this.translator;
+    const options: Electron.MessageBoxOptions = {
+      type: 'warning',
+      message: t.t('permissions.auto.confirm'),
+      detail: t.t('permissions.auto.detail', {
+        model: this.options.preferences.get().autoMode.model,
+      }),
+      buttons: [t.t('permissions.auto.enable'), t.t('dialog.cancel')],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true,
+    };
+    const result =
+      window === null
+        ? await dialog.showMessageBox(options)
+        : await dialog.showMessageBox(window, options);
+    return result.response === 0;
   }
 
   private applyPreferences(): void {
@@ -403,5 +434,17 @@ export function isNotificationApproval(value: unknown): value is NotificationApp
     typeof a.summary === 'string' &&
     a.summary.length <= 4096 &&
     typeof a.allow === 'boolean'
+  );
+}
+
+/** Whether a preference change turns Auto mode on (T46). */
+function enablesAutoMode(change: unknown): boolean {
+  return (
+    typeof change === 'object' &&
+    change !== null &&
+    'key' in change &&
+    change.key === 'permissions.enableAutoMode' &&
+    'value' in change &&
+    change.value === true
   );
 }

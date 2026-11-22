@@ -8,6 +8,10 @@ export interface MenuItem {
   readonly id: string;
   readonly label: string;
   readonly danger?: boolean;
+  /** Shown but not selectable; `hint` says why. */
+  readonly disabled?: boolean;
+  /** A second line under the label. */
+  readonly hint?: string;
   readonly run: () => void;
 }
 
@@ -68,7 +72,7 @@ export function MenuPopup({
     };
   }, [onClose]);
   const run = (item: MenuItem | undefined) => {
-    if (item !== undefined) {
+    if (item !== undefined && item.disabled !== true) {
       onClose();
       item.run();
     }
@@ -127,7 +131,9 @@ export function MenuPopup({
           id={`${id}-${String(i)}`}
           role="menuitem"
           tabIndex={-1}
-          className={`menu-item${i === active ? ' is-active' : ''}${item.danger === true ? ' is-danger' : ''}`}
+          aria-disabled={item.disabled === true ? true : undefined}
+          aria-describedby={item.hint === undefined ? undefined : `${id}-${String(i)}-hint`}
+          className={`menu-item${i === active ? ' is-active' : ''}${item.danger === true ? ' is-danger' : ''}${item.disabled === true ? ' is-disabled' : ''}`}
           data-testid={`menu-${item.id}`}
           onMouseEnter={() => {
             setActive(i);
@@ -138,6 +144,11 @@ export function MenuPopup({
         >
           {numbered ? `${String(i + 1)} · ` : null}
           {item.label}
+          {item.hint !== undefined && (
+            <span id={`${id}-${String(i)}-hint`} className="menu-item-hint">
+              {item.hint}
+            </span>
+          )}
         </div>
       ))}
     </div>

@@ -1132,6 +1132,39 @@
   padding: 0 var(--piarc-space-5) var(--piarc-space-2);
 }
 
+/* T46: the Auto mode reviewer on approval cards and on the calls it decided. */
+.approval-review {
+  margin: 0;
+  color: var(--piarc-text-secondary);
+}
+.approval-review.is-reviewing {
+  font-style: italic;
+}
+.approval-review-reason {
+  color: var(--piarc-text-primary);
+}
+.tool-review {
+  margin-block-start: var(--piarc-space-1);
+  font-size: var(--piarc-font-size-small);
+}
+.tool-review summary {
+  cursor: pointer;
+}
+.tool-review-badge {
+  padding-inline: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  font-weight: var(--piarc-font-weight-medium);
+  background: var(--piarc-accent-subtle);
+}
+.tool-review-badge.is-deny {
+  background: var(--piarc-state-danger-subtle);
+  color: var(--piarc-text-danger);
+}
+.tool-review-reason {
+  margin: var(--piarc-space-1) 0 0;
+  color: var(--piarc-text-secondary);
+}
+
 /* T26: host tool rows (task card, plan, answered questions, next steps) and the plan and
    question approval cards. */
 .harness-card {

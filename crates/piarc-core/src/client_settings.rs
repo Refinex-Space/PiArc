@@ -13,7 +13,14 @@ use serde_json::Value;
 use crate::error::{Error, Result};
 
 /// Top-level keys of the user's settings the client may write.
-pub const CLIENT_KEYS: &[&str] = &["language", "appearance", "keybindings", "notifications"];
+/// `autoMode` (T46): the reviewer model and the user's review policy, user-level only.
+pub const CLIENT_KEYS: &[&str] = &[
+    "language",
+    "appearance",
+    "keybindings",
+    "notifications",
+    "autoMode",
+];
 
 /// The user's settings file as a JSON object; `{}` when it does not exist.
 ///
@@ -44,7 +51,12 @@ pub fn read(data_dir: &Path) -> Result<Value> {
 }
 
 /// Boolean preferences outside [`CLIENT_KEYS`] the client may set.
-pub const CLIENT_SWITCHES: &[&str] = &["/memory/readBoth", "/permissions/enableBypassPermissions"];
+/// `/permissions/enableAutoMode` (T46): the main process confirms natively before it asks.
+pub const CLIENT_SWITCHES: &[&str] = &[
+    "/memory/readBoth",
+    "/permissions/enableBypassPermissions",
+    "/permissions/enableAutoMode",
+];
 
 /// Sets (`Some`) or removes (`None`) the value at `pointer`, which must lie under one of
 /// [`CLIENT_KEYS`] or be one of [`CLIENT_SWITCHES`]. Returns the file's new content.

@@ -198,7 +198,8 @@ textarea.input {
 }
 
 /* T39: the sandbox is on in the settings but does not apply here. */
-.tag.sandbox-warning {
+.tag.sandbox-warning,
+.tag.auto-review-warning {
   background: var(--piarc-state-warning-subtle);
   color: var(--piarc-text-warning);
 }
@@ -819,6 +820,18 @@ textarea.input {
   color: var(--piarc-text-danger);
 }
 
+.menu-item.is-disabled {
+  color: var(--piarc-text-secondary);
+  cursor: default;
+}
+
+.menu-item-hint {
+  display: block;
+  max-width: 280px;
+  font-size: var(--piarc-font-size-small);
+  color: var(--piarc-text-secondary);
+}
+
 .toasts {
   position: fixed;
   right: var(--piarc-space-4);
@@ -1222,6 +1235,38 @@ textarea.input {
   margin: 0;
   font-size: var(--piarc-font-size-heading);
   font-weight: var(--piarc-font-weight-semibold);
+}
+/* T46: the Auto review section's policy lists. */
+.auto-review {
+  display: grid;
+  gap: var(--piarc-space-3);
+}
+.auto-review-list {
+  display: grid;
+  gap: var(--piarc-space-1);
+}
+.auto-review-entries {
+  display: grid;
+  gap: var(--piarc-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.auto-review-entries li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--piarc-space-2);
+}
+.auto-review-entry {
+  overflow-wrap: anywhere;
+}
+.auto-review-add {
+  display: flex;
+  gap: var(--piarc-space-2);
+}
+.auto-review-add .input {
+  flex: 1;
+  max-width: 480px;
 }
 .permission-source,
 .permission-audit {

@@ -12,6 +12,8 @@ import {
   type RuleLayer,
 } from '../../shared/ipc.js';
 import { useApp } from '../app/app-context.js';
+import { AutoReviewSection } from './AutoReviewSection.js';
+import { revealBidi } from '../transcript/reveal.js';
 
 const BEHAVIORS: readonly RuleBehavior[] = ['deny', 'ask', 'allow'];
 
@@ -49,7 +51,24 @@ interface AuditRow {
   readonly conclusion: string | undefined;
   readonly rule: string | undefined;
   readonly ruleSource: string | undefined;
+  /** An Auto mode review (T46): the reviewer and how long it took. */
+  readonly review?: { readonly model: string; readonly durationMs: number | undefined };
 }
+
+type AuditKind = 'permission' | 'sandbox' | 'autoReview';
+
+const REVIEW_OUTCOMES = [
+  'allow',
+  'deny',
+  'unsure',
+  'timeout',
+  'providerError',
+  'unparsable',
+  'invalidVerdict',
+  'unavailable',
+  'cancelled',
+  'discarded',
+] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -106,6 +125,22 @@ export function parseAudit(raw: string): AuditRow[] {
   const events = isRecord(value) && Array.isArray(value.events) ? value.events : [];
   return events.filter(isRecord).map((e): AuditRow => {
     const d = isRecord(e.detail) ? e.detail : {};
+    if (d.source === 'reviewer' && typeof d.outcome === 'string') {
+      // An Auto mode review (T46): the outcome, the reviewer's reason, the model.
+      return {
+        at: typeof e.at === 'number' ? e.at : 0,
+        sessionId: str(e.sessionId),
+        tool: str(d.tool),
+        step: d.outcome,
+        conclusion: str(d.conclusion),
+        rule: str(d.reason),
+        ruleSource: str(d.agentType),
+        review: {
+          model: str(d.model) ?? '',
+          durationMs: typeof d.durationMs === 'number' ? d.durationMs : undefined,
+        },
+      };
+    }
     if (typeof d.denial === 'string' || d.approval === 'network') {
       // A sandbox row (T39): a refused path or host, or the answer to a network card.
       const port = typeof d.port === 'number' ? `:${String(d.port)}` : '';
@@ -415,15 +450,17 @@ function SourceSection({
 const SINCE = { hour: 3_600_000, day: 86_400_000, week: 604_800_000 } as const;
 type Since = keyof typeof SINCE | 'all';
 
-/** The audit kind a link asked for (`#/settings/permissions?audit=sandbox`, T39). */
-function initialKind(): 'permission' | 'sandbox' {
-  return /[?&]audit=sandbox(?:&|$)/u.test(window.location.hash) ? 'sandbox' : 'permission';
+/** The audit kind a link asked for (`#/settings/permissions?audit=sandbox`, T39;
+ * `audit=autoReview`, T46). */
+function initialKind(): AuditKind {
+  const asked = /[?&]audit=(sandbox|autoReview)(?:&|$)/u.exec(window.location.hash)?.[1];
+  return asked === 'sandbox' || asked === 'autoReview' ? asked : 'permission';
 }
 
 function AuditSection({ workspace }: { readonly workspace: string }) {
   const { t, format } = useApp();
   const [rows, setRows] = useState<AuditRow[]>([]);
-  const [kind, setKind] = useState<'permission' | 'sandbox'>(initialKind);
+  const [kind, setKind] = useState<AuditKind>(initialKind);
   const [session, setSession] = useState('');
   const [tool, setTool] = useState('');
   const [conclusion, setConclusion] = useState<'' | 'allow' | 'deny'>('');
@@ -448,7 +485,7 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
   const load = useCallback(() => {
     const query: AuditQuery = {
       workspace,
-      ...(kind === 'sandbox' ? { kind } : {}),
+      ...(kind === 'permission' ? {} : { kind }),
       ...(session.trim() === '' ? {} : { sessionId: session.trim() }),
       ...(tool.trim() === '' ? {} : { tool: tool.trim() }),
       ...(conclusion === '' ? {} : { conclusion }),
@@ -479,11 +516,13 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
           value={kind}
           data-testid="audit-kind"
           onChange={(e) => {
-            setKind(e.currentTarget.value === 'sandbox' ? 'sandbox' : 'permission');
+            const value = e.currentTarget.value;
+            setKind(value === 'sandbox' || value === 'autoReview' ? value : 'permission');
           }}
         >
           <option value="permission">{t('permissions.audit.kind.permission')}</option>
           <option value="sandbox">{t('permissions.audit.kind.sandbox')}</option>
+          <option value="autoReview">{t('permissions.audit.kind.autoReview')}</option>
         </select>
         <label htmlFor={ids.session} className="permission-filter-label">
           {t('permissions.audit.session')}
@@ -564,7 +603,13 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
               <th>{t('permissions.audit.tool')}</th>
               <th>{t('permissions.audit.step')}</th>
               <th>
-                {t(kind === 'sandbox' ? 'permissions.audit.target' : 'permissions.audit.rule')}
+                {t(
+                  kind === 'sandbox'
+                    ? 'permissions.audit.target'
+                    : kind === 'autoReview'
+                      ? 'permissions.audit.review'
+                      : 'permissions.audit.rule',
+                )}
               </th>
               <th>{t('permissions.audit.conclusion')}</th>
             </tr>
@@ -579,17 +624,27 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
                 <td className="permission-nowrap">
                   {kind === 'sandbox' ? sandboxKind(r.tool, r.step, t) : (r.tool ?? '')}
                 </td>
-                <td className="permission-nowrap">{r.step ?? ''}</td>
+                <td className="permission-nowrap">
+                  {r.review === undefined ? (r.step ?? '') : outcomeLabel(r.step, t)}
+                </td>
                 <td>
-                  {r.rule === undefined ? '' : <code>{r.rule}</code>}
-                  {r.ruleSource === undefined ? '' : ` · ${r.ruleSource}`}
+                  {r.review === undefined ? (
+                    <>
+                      {r.rule === undefined ? '' : <code>{r.rule}</code>}
+                      {r.ruleSource === undefined ? '' : ` · ${r.ruleSource}`}
+                    </>
+                  ) : (
+                    <ReviewCell row={r} review={r.review} />
+                  )}
                 </td>
                 <td className="permission-nowrap">
                   {r.conclusion === 'allow'
                     ? t('permissions.audit.allow')
                     : r.conclusion === 'deny'
                       ? t('permissions.audit.deny')
-                      : ''}
+                      : r.conclusion === 'ask'
+                        ? t('permissions.audit.ask')
+                        : ''}
                 </td>
               </tr>
             ))}
@@ -597,6 +652,33 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
         </table>
       )}
     </section>
+  );
+}
+
+/** The label of an Auto mode review's outcome (T46). */
+function outcomeLabel(outcome: string | undefined, t: (id: MessageId) => string): string {
+  const known = REVIEW_OUTCOMES.find((o) => o === outcome);
+  return known === undefined ? (outcome ?? '') : t(`permissions.audit.outcome.${known}`);
+}
+
+/** The reviewer, its reason and its time of an Auto mode review row (T46). */
+function ReviewCell({
+  row,
+  review,
+}: {
+  readonly row: AuditRow;
+  readonly review: NonNullable<AuditRow['review']>;
+}) {
+  const { t, format } = useApp();
+  return (
+    <>
+      <code>{review.model}</code>
+      {review.durationMs === undefined
+        ? ''
+        : ` · ${t('permissions.audit.duration', { seconds: format.number(review.durationMs / 1000, { maximumFractionDigits: 1 }) })}`}
+      {row.ruleSource === undefined ? '' : ` · ${row.ruleSource}`}
+      {row.rule === undefined ? null : <div className="muted">{revealBidi(row.rule)}</div>}
+    </>
   );
 }
 
@@ -660,6 +742,7 @@ export function PermissionsPage() {
         </label>
         <p className="muted">{t('permissions.bypass.hint')}</p>
       </div>
+      <AutoReviewSection onError={report} />
       {view !== undefined && view.workspaces.length > 0 && (
         <div className="setting">
           <label htmlFor={workspaceId} className="setting-label">

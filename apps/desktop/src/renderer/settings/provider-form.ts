@@ -42,6 +42,8 @@ export interface CatalogEntry {
   toolReliability: string;
   /** The provider's own web search serves WebSearch (T38). */
   nativeWebSearch?: boolean;
+  /** Meets the Auto mode reviewer bar (T46). */
+  reviewer?: boolean;
 }
 
 /** The user's settings for one model (T29). */

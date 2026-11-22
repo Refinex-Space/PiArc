@@ -43,6 +43,57 @@ describe('preferences', () => {
     expect(pointerOf({ key: 'permissions.enableBypassPermissions', value: 'on' })).toBe(undefined);
   });
 
+  it('reads and writes Auto review settings (T46)', () => {
+    const prefs = preferencesFrom({
+      permissions: { enableAutoMode: true },
+      autoMode: {
+        model: 'anthropic/claude-haiku-4-5',
+        environment: ['$defaults', 'github.com/acme', 7],
+        hard_deny: ['Touching billing'],
+      },
+    });
+    expect(prefs.permissions.enableAutoMode).toBe(true);
+    expect(prefs.autoMode).toEqual({
+      model: 'anthropic/claude-haiku-4-5',
+      lists: {
+        environment: ['github.com/acme'],
+        allow: [],
+        soft_deny: [],
+        hard_deny: ['Touching billing'],
+      },
+    });
+    // An alias or a bare id is not a reviewer reference.
+    expect(preferencesFrom({ autoMode: { model: 'fast' } }).autoMode.model).toBe('');
+    expect(pointerOf({ key: 'permissions.enableAutoMode', value: true })).toEqual({
+      pointer: '/permissions/enableAutoMode',
+      value: true,
+    });
+    expect(pointerOf({ key: 'autoMode.model', value: 'p/m' })).toEqual({
+      pointer: '/autoMode/model',
+      value: 'p/m',
+    });
+    expect(pointerOf({ key: 'autoMode.model', value: null })).toEqual({
+      pointer: '/autoMode/model',
+      value: null,
+    });
+    for (const bad of ['fast', 'p/', '/m', 'p/m n', 7]) {
+      expect(pointerOf({ key: 'autoMode.model', value: bad })).toBe(undefined);
+    }
+    expect(pointerOf({ key: 'autoMode.list', list: 'soft_deny', value: [' Deploys '] })).toEqual({
+      pointer: '/autoMode/soft_deny',
+      value: ['Deploys'],
+    });
+    for (const change of [
+      { key: 'autoMode.list', list: 'model', value: [] },
+      { key: 'autoMode.list', list: 'allow', value: [''] },
+      { key: 'autoMode.list', list: 'allow', value: ['x'.repeat(501)] },
+      { key: 'autoMode.list', list: 'allow', value: Array.from({ length: 101 }, () => 'x') },
+      { key: 'autoMode.list', list: 'allow', value: 'x' },
+    ]) {
+      expect(pointerOf(change)).toBe(undefined);
+    }
+  });
+
   it('maps only valid changes to settings pointers', () => {
     expect(pointerOf({ key: 'language', value: 'en' })).toEqual({
       pointer: '/language',

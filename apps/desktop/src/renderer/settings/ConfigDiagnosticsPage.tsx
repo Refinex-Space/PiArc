@@ -32,6 +32,7 @@ const REASONS = [
   'untrusted',
   'projectMode',
   'projectSandbox',
+  'projectAutoMode',
   'platform',
   'unsupported',
   'disabled',

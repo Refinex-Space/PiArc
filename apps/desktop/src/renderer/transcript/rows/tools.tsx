@@ -10,6 +10,7 @@ import { useApp, useT } from '../../app/app-context.js';
 import { useExpanded, useTranscriptRow, useTranscriptRows } from '../services.js';
 import { useElapsedText, useNow } from './common.js';
 import { revealBidi } from '../reveal.js';
+import { ReviewNote } from './review.js';
 import {
   STATUS_MESSAGE,
   summarize,
@@ -149,6 +150,7 @@ const ToolCall = memo(function ToolCall({ id }: { readonly id: string }) {
         <StatusMark status={item.status} />
         <span className="tool-call-label">{label(item)}</span>
       </button>
+      {'review' in item ? <ReviewNote review={item.review} /> : null}
       {open && output !== undefined ? (
         <pre className="tool-output" aria-label={t('transcript.tool.output')}>
           {lastLines(output, OUTPUT_PREVIEW_LINES)}
@@ -236,6 +238,7 @@ export function BashCard({
           </span>
         )}
       </div>
+      <ReviewNote review={item.review} />
       <pre className="bash-command" data-testid="bash-command">
         <span className="bash-prompt" aria-hidden="true">
           ${' '}
@@ -322,6 +325,7 @@ export function FileChangeCard({
           </span>
         )}
       </div>
+      <ReviewNote review={item.review} />
       {diff === undefined ? (
         item.status === 'inProgress' ? null : (
           <div className="row-status muted">{t('transcript.file.noDiff')}</div>

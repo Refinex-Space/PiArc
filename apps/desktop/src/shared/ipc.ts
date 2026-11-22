@@ -180,8 +180,9 @@ export interface PermissionRuleChange {
 /** Filters of the permission audit view; absent fields match everything. */
 export interface AuditQuery {
   readonly workspace?: string;
-  /** `permission` (the default) or `sandbox`: sandbox denials and network approvals (T39). */
-  readonly kind?: 'permission' | 'sandbox';
+  /** `permission` (the default), `sandbox`: sandbox denials and network approvals (T39), or
+   * `autoReview`: the Auto mode reviewer's decisions (T46). */
+  readonly kind?: 'permission' | 'sandbox' | 'autoReview';
   readonly sessionId?: string;
   readonly tool?: string;
   readonly conclusion?: 'allow' | 'deny';

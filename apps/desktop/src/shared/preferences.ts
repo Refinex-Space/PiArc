@@ -33,12 +33,32 @@ export interface Preferences {
   readonly keybindings: Readonly<Record<string, string>>;
   readonly notifications: { readonly enabled: boolean };
   readonly memory: { readonly readBoth: boolean };
-  /** T23: offer Bypass permissions in the mode menu (the user's own file only). */
-  readonly permissions: { readonly enableBypassPermissions: boolean };
+  /** T23: offer Bypass permissions in the mode menu (the user's own file only); T46: Auto
+   * mode is enabled (the main process confirms natively before it writes `true`). */
+  readonly permissions: {
+    readonly enableBypassPermissions: boolean;
+    readonly enableAutoMode: boolean;
+  };
+  /** T46: Auto mode's reviewer and the user's review policy (PiArc's user file). */
+  readonly autoMode: AutoModePreferences;
   /** T37: the user's default output style (`outputStyle`); `''` when unset. Written through
    * Core's `setOutputStyle`, not as a preference change. */
   readonly outputStyle: string;
 }
+
+/** The four lists of `autoMode` (T46), by their settings key. */
+export const AUTO_MODE_LISTS = ['environment', 'allow', 'soft_deny', 'hard_deny'] as const;
+export type AutoModeList = (typeof AUTO_MODE_LISTS)[number];
+
+export interface AutoModePreferences {
+  /** `provider/model`; `''` when unset. */
+  readonly model: string;
+  readonly lists: Readonly<Record<AutoModeList, readonly string[]>>;
+}
+
+/** Bounds of one policy entry and of a list (Core cuts the review input at its own limits). */
+export const AUTO_MODE_ENTRY_CHARS = 500;
+export const AUTO_MODE_LIST_ENTRIES = 100;
 
 export const DEFAULT_PREFERENCES: Preferences = {
   language: 'system',
@@ -51,9 +71,31 @@ export const DEFAULT_PREFERENCES: Preferences = {
   keybindings: {},
   notifications: { enabled: true },
   memory: { readBoth: false },
-  permissions: { enableBypassPermissions: false },
+  permissions: { enableBypassPermissions: false, enableAutoMode: false },
+  autoMode: {
+    model: '',
+    lists: { environment: [], allow: [], soft_deny: [], hard_deny: [] },
+  },
   outputStyle: '',
 };
+
+/** A `provider/model` reference as the reviewer setting takes it (no alias). */
+export function isModelReference(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= 200 && /^[^\s/]+\/\S+$/u.test(value);
+}
+
+function isPolicyList(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= AUTO_MODE_LIST_ENTRIES &&
+    value.every(
+      (entry) =>
+        typeof entry === 'string' &&
+        entry.trim() !== '' &&
+        Array.from(entry).length <= AUTO_MODE_ENTRY_CHARS,
+    )
+  );
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -101,8 +143,29 @@ export function preferencesFrom(settings: unknown): Preferences {
     permissions: {
       enableBypassPermissions:
         isRecord(file.permissions) && file.permissions.enableBypassPermissions === true,
+      enableAutoMode: isRecord(file.permissions) && file.permissions.enableAutoMode === true,
     },
+    autoMode: autoModeFrom(file.autoMode),
     outputStyle: typeof file.outputStyle === 'string' ? file.outputStyle : '',
+  };
+}
+
+function autoModeFrom(value: unknown): AutoModePreferences {
+  const auto = isRecord(value) ? value : {};
+  const list = (key: AutoModeList): readonly string[] => {
+    const entries = auto[key];
+    return Array.isArray(entries)
+      ? entries.filter((e): e is string => typeof e === 'string' && e !== '$defaults')
+      : [];
+  };
+  return {
+    model: isModelReference(auto.model) ? auto.model : '',
+    lists: {
+      environment: list('environment'),
+      allow: list('allow'),
+      soft_deny: list('soft_deny'),
+      hard_deny: list('hard_deny'),
+    },
   };
 }
 
@@ -116,6 +179,11 @@ export type PreferenceChange =
   | { readonly key: 'notifications.enabled'; readonly value: boolean }
   | { readonly key: 'memory.readBoth'; readonly value: boolean }
   | { readonly key: 'permissions.enableBypassPermissions'; readonly value: boolean }
+  /** T46: turning it on needs the main process's native confirmation and a reviewer. */
+  | { readonly key: 'permissions.enableAutoMode'; readonly value: boolean }
+  /** T46: `null` removes the reviewer. */
+  | { readonly key: 'autoMode.model'; readonly value: string | null }
+  | { readonly key: 'autoMode.list'; readonly list: AutoModeList; readonly value: readonly string[] }
   /** `value` `null` restores the default key. */
   | { readonly key: 'keybinding'; readonly command: string; readonly value: string | null };
 
@@ -157,6 +225,20 @@ export function pointerOf(change: unknown): { pointer: string; value: unknown } 
       return typeof value === 'boolean'
         ? { pointer: '/permissions/enableBypassPermissions', value }
         : undefined;
+    case 'permissions.enableAutoMode':
+      return typeof value === 'boolean'
+        ? { pointer: '/permissions/enableAutoMode', value }
+        : undefined;
+    case 'autoMode.model':
+      if (value === null) return { pointer: '/autoMode/model', value: null };
+      return isModelReference(value) ? { pointer: '/autoMode/model', value } : undefined;
+    case 'autoMode.list': {
+      const { list } = change;
+      if (!(AUTO_MODE_LISTS as readonly unknown[]).includes(list) || !isPolicyList(value)) {
+        return undefined;
+      }
+      return { pointer: `/autoMode/${String(list)}`, value: value.map((e) => e.trim()) };
+    }
     case 'keybinding': {
       const { command } = change;
       if (!isCommandId(command)) {

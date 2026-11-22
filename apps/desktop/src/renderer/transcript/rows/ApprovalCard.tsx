@@ -74,12 +74,14 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
         setWaiting(false);
       });
   }
+  // T46: while the Auto mode reviewer decides, the card takes no answer.
+  const reviewing = request.review?.state === 'reviewing';
   useApprovalKeys(
     card,
     (key) => {
       answer(key);
     },
-    (key) => key === 'allowSession' && request.protectedPath === true,
+    (key) => reviewing || (key === 'allowSession' && request.protectedPath === true),
   );
   return (
     <section
@@ -107,6 +109,7 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
         )}
       </header>
       <ApprovalOrigin request={request} />
+      <ReviewLine request={request} />
       {network && request.domain != null && (
         <div className="approval-path" data-testid="approval-domain">
           {t('approval.networkHost', { target: request.domain })}
@@ -158,6 +161,7 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
           {t('approval.expand')}
         </button>
       )}
+      {!reviewing && (
       <>
         {!network && (
           <label>
@@ -260,7 +264,36 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
           )}
         </div>
       </>
+      )}
       {error && <p role="alert">{error}</p>}
     </section>
+  );
+}
+
+/** T46: the Auto mode reviewer is deciding the card, or why the card came back to the user. */
+function ReviewLine({ request }: { readonly request: ApprovalRequest }) {
+  const { t } = useApp();
+  const review = request.review;
+  if (review == null) return null;
+  if (review.state === 'reviewing') {
+    return (
+      <p className="approval-review is-reviewing" data-testid="approval-reviewing" role="status">
+        {review.model == null
+          ? t('approval.review.reviewing')
+          : t('approval.review.reviewingWith', { model: review.model })}
+      </p>
+    );
+  }
+  const why = review.fallback ?? 'unsure';
+  return (
+    <p className="approval-review" data-testid="approval-review" data-fallback={why}>
+      {t(`approval.review.fallback.${why}`)}
+      {review.reason != null && review.reason !== '' && (
+        <>
+          {' '}
+          <span className="approval-review-reason">{revealBidi(review.reason)}</span>
+        </>
+      )}
+    </p>
   );
 }

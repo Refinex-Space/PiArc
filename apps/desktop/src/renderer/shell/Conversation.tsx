@@ -44,6 +44,7 @@ import { reason } from './errors.js';
 import { keyOf, useModelCatalog } from './model-catalog.js';
 import { ModelMenus } from './ModelMenus.js';
 import { PermissionModeMenu } from './PermissionModeMenu.js';
+import { AutoReviewStatus } from './AutoReviewStatus.js';
 import { SandboxStatus } from './SandboxStatus.js';
 import { UsageRing } from './ContextUsage.js';
 import { QueueList } from './QueueList.js';
@@ -581,6 +582,10 @@ export function Conversation({
             onError={(failure) => {
               setError(t('composer.failed', { reason: reason(failure) }));
             }}
+          />
+          <AutoReviewStatus
+            state={session?.open === true ? session.autoReviewState : undefined}
+            reason={session?.autoReviewReason}
           />
           <SandboxStatus workspace={workspace} />
           <UsageRing sessionId={id} />

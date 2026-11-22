@@ -293,6 +293,8 @@ impl ToolIo {
             kind: Some(match query.kind.as_deref() {
                 None | Some("permission") => "permission".into(),
                 Some("sandbox") => "sandbox".into(),
+                // T46: one row per Auto mode review.
+                Some("autoReview") => "autoReview".into(),
                 Some(other) => {
                     return Err(ErrorObject::new(
                         ErrorKind::InvalidParams,
