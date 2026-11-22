@@ -81,6 +81,8 @@
 - PTY 集成测试设 `PS1`、`ENV` 避开用户的 shell 配置；Windows 版（`pty_windows.rs`）用 `PROMPT=$$$S` 得到 `$ ` 提示符，屏幕文本会去掉行尾空格，判断提示符时比较 `$`。
 - ConPTY 下回车写 `\r`（字节 0x0D）；在 cmd 里判断 Ctrl+C 生效要等命令的第一行真实输出（例如 ping 的 `TTL=`），只等回显的命令行会在程序启动前就发出 Ctrl+C。
 - 不随附 `conpty.dll`/OpenConsole.exe：portable-pty 0.9.0 先按 DLL 搜索路径找 `conpty.dll`，找不到才用系统 `kernel32` 的 ConPTY；PiArc 用系统的（S7 报告第 10 节）。
+- ConPTY 下程序的 OSC 11（问背景色）收不到应答：conhost 把自己的缓冲区画进伪控制台，不转发查询（W3 实测 Git Bash 等 5 s 无应答），所以 `pointer_windows.rs` 只检查默认颜色进帧；OSC 8 链接与鼠标跟踪（Git 的 vim `mouse=a`）照常经过。
+- 交给 PTY 的工作目录不能带 `\\?\` 前缀：cmd 不接受，会退回 `C:\Windows`（W3，Core 的 `terminal/bound.rs` 去掉前缀）。
 
 ## 参考
 

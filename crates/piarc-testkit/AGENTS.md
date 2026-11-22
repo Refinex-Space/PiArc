@@ -102,7 +102,8 @@
 
 ## 易错点
 
-- Windows：不要把 `canonicalize` 的结果（`\\?\C:\…` 形式）交给 Node 运行脚本，Node 会 `lstat 'C:'` 失败；仓库根用 `CARGO_MANIFEST_DIR` 的上两级。Core 报告的路径不带 `\\?\`，比较时用 harness 的 `canonical()`。
+- Windows：不要把 `canonicalize` 的结果（`\\?\C:\…` 形式）交给 Node 运行脚本，Node 会 `lstat 'C:'` 失败；仓库根用 `CARGO_MANIFEST_DIR` 的上两级。Core 报告的路径不带 `\\?\`，比较时用 harness 的 `canonical()`（L2 运行器里是 `l2::fixtures::canonical`）。
+- Windows 的临时目录在用户主目录之下：从工作区向上找 skills、命令与子 agent 定义会读到本机真实的 `~/.claude/skills`。这时 L2 的临时根放到 `%PUBLIC%`（`runner.rs` 的 `scenario_base`），L4 的工作区同理（`apps/desktop/e2e/sessions.ts` 的 `workspaceBase`）；夹具仓库设 `core.autocrlf=false`（Git for Windows 的系统配置默认为 true，worktree 会检出 CRLF）。
 - `credentials.rs` 在 Windows 上用 `tests/agent_host/process-env.ps1` 从 PEB 读另一个进程的环境块（对应 macOS 的 `ps -E`）。
 - 慢读者用例按平台断言：Windows 上 Node 写 stdout 同步阻塞，Core 停读期间 Pi 停在第一次模型请求（S9 报告第 5 节）。T27 起会话读写过文件后，每轮送达提醒前要等 Core 应答 `fs/changes`：慢读者用例只调用不存在的工具，不触发它。
 - 断流靠 `body.rs` 的 `ScriptBody::aborted`：最后一块之后先返回一次 `Pending` 让 hyper 把已写数据刷到 socket，再返回错误让 hyper 关闭连接。直接返回错误会丢掉已缓冲的事件。挂起（`stalled`）在最后一块之后一直返回 `Pending` 且不唤醒，客户端关闭连接时 hyper 丢弃响应体。
