@@ -21,9 +21,15 @@ test('a crashed renderer is reloaded and its session can be opened again', async
         app.evaluate(async ({ BrowserWindow }) => {
           const contents = BrowserWindow.getAllWindows()[0]?.webContents;
           if (contents === undefined || contents.isCrashed() || contents.isLoading()) return false;
-          return (await contents.executeJavaScript(
-            'document.querySelector(\'[data-testid="app-shell"]\') !== null',
-          )) as boolean;
+          try {
+            return (await contents.executeJavaScript(
+              'document.querySelector(\'[data-testid="app-shell"]\') !== null',
+            )) as boolean;
+          } catch {
+            // The reload can dispose the frame between the checks above and this call
+            // ("Render frame was disposed", Windows CI); expect.poll does not retry a throw.
+            return false;
+          }
         }),
       { timeout: 5000 },
     )

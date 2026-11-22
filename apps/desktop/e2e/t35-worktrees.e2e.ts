@@ -94,6 +94,19 @@ test('starts a session in its own worktree and asks before archiving its changes
   // The repository does not ignore .piarc/worktrees/ yet: the notice adds the line.
   const notice = page.getByTestId('notice-gitignore');
   await expect(notice).toBeVisible();
+  // At the narrowest window the notice's long path wraps and its button stays inside the main
+  // column (on a 1024-pixel screen it went under the side panels, I210).
+  await app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    window?.setSize(960, 640);
+  });
+  await expect
+    .poll(async () => {
+      const button = await notice.boundingBox();
+      const main = await page.getByTestId('shell-main').boundingBox();
+      return button !== null && main !== null && button.x + button.width <= main.x + main.width;
+    })
+    .toBe(true);
   await screenshots(page, info, 'worktree-session');
   await notice.click();
   await expect(notice).toHaveCount(0);

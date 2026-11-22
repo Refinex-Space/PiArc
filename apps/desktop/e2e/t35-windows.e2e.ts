@@ -241,7 +241,15 @@ test('a main window comes back where it was after a restart', async ({
   userDataDir,
 }) => {
   await page.getByTestId('app-shell').waitFor();
-  const wanted = { x: 140, y: 120, width: 1100, height: 720 };
+  // Bounds inside the primary display's work area: the system moves a window that does not fit
+  // (CI runners have 1024-pixel-wide screens), which would hide whether the state was restored.
+  const wanted = await app.evaluate(({ screen }) => {
+    const area = screen.getPrimaryDisplay().workArea;
+    // Above the main window's minimum size (960 × 600).
+    const width = Math.min(1100, area.width - 40);
+    const height = Math.min(720, area.height - 40);
+    return { x: area.x + 20, y: area.y + 20, width, height };
+  });
   await app.evaluate(({ BrowserWindow }, bounds) => {
     BrowserWindow.getAllWindows()[0]?.setBounds(bounds);
   }, wanted);
