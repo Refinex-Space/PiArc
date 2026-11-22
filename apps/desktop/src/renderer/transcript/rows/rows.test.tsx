@@ -438,6 +438,29 @@ describe('P0 row types', () => {
     }
   });
 
+  it('web search: a source opens only an https, http or mailto address (R5)', async () => {
+    const item: Item = {
+      type: 'webSearch',
+      itemId: 'w1',
+      status: 'completed',
+      tool: 'WebSearch',
+      arguments: { query: 'q' },
+      query: 'q',
+      sources: [
+        { title: 'Safe', url: 'https://example.com/a' },
+        { title: 'Script', url: 'javascript:alert(1)' },
+        { title: 'Data', url: 'data:text/html,<script>alert(1)</script>' },
+      ],
+    };
+    const root = await render(transcriptOf([{ item }]), ['w1']);
+    const links = [
+      ...root.querySelectorAll<HTMLAnchorElement>('[data-testid="web-search-source"] a'),
+    ];
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['https://example.com/a']);
+    expect(root.textContent).toContain('Script');
+    expect(root.textContent).toContain('Data');
+  });
+
   it('compaction notice: reason and tokens before and after', async () => {
     const item: Item = {
       type: 'contextCompaction',

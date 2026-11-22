@@ -4,6 +4,7 @@
 import type { Item, WebSearchSource } from '@piarc/protocol';
 
 import { useT } from '../../app/app-context.js';
+import { safeHref } from '../markdown/text.js';
 import { StatusMark } from './tools.js';
 
 type WebSearchItem = Extract<Item, { type: 'webSearch' }>;
@@ -23,19 +24,25 @@ function open(url: string): void {
 }
 
 function Source({ source }: { readonly source: WebSearchSource }) {
+  // The address comes from the search backend: only what a Markdown link may open (R5).
+  const href = safeHref(source.url);
   return (
     <li className="web-search-source" data-testid="web-search-source">
-      <a
-        className="md-link"
-        href={source.url}
-        title={source.url}
-        onClick={(event) => {
-          event.preventDefault();
-          open(source.url);
-        }}
-      >
-        {source.title}
-      </a>{' '}
+      {href === null ? (
+        <span title={source.url}>{source.title}</span>
+      ) : (
+        <a
+          className="md-link"
+          href={href}
+          title={href}
+          onClick={(event) => {
+            event.preventDefault();
+            open(href);
+          }}
+        >
+          {source.title}
+        </a>
+      )}{' '}
       <span className="web-search-host">{hostOf(source.url)}</span>
     </li>
   );
