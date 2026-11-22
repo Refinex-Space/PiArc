@@ -133,7 +133,7 @@ Nightly 运行 1 小时的缩短版（`PIARC_LONG_RUN_HOURS=1`：预热 10 分�
 | 第 11 章的行 | 指标 | 实测 | 预算 | 次数 | 结论 |
 |---|---|---|---|---|---|
 | 冷启动到可交互窗口 | `cold-start` | 440 ms | ≤ 1,000 ms | 1（每次内含 10 次启动，取中位） | 达标 |
-| 打开工作区到 Agent Host 就绪 | `workspace-ready` | 955 ms | ≤ 1,000 ms | 1（10 次中位） | 达标，余量 4%（I193） |
+| 打开工作区到 Agent Host 就绪 | `workspace-ready` | 955 ms（10 次中位；R5 起按 10 次最大判定，R5 复测 982 ms） | ≤ 1,000 ms | 1 | 达标，余量 4%（I193） |
 | PiArc 引入的首 token 额外延迟 | `first-token-overhead` | 24.3 ms（PiArc 26.1 ms，Pi SDK 1.8 ms） | ≤ 50 ms | 1（各 20 次） | 达标 |
 | 主进程内存（含 Core，空闲） | `main-memory-delta` | 32.5 MB（主进程 186 MiB，裸 Electron 155 MiB） | ≤ 24 MB | 1（各 5 次采样） | **超出**（I192） |
 | 渲染进程内存 | `renderer-memory` | 173 MB | ≤ 220 MB | 3 | 达标 |
@@ -162,6 +162,10 @@ Nightly 运行 1 小时的缩短版（`PIARC_LONG_RUN_HOURS=1`：预热 10 分�
 - 流式帧的回归：同一测量在 T19（2026-11-18）为 p99 8.8 ms、T20 为 7.3 ms；PR 冒烟的 15 s 版为 9.7–9.9 ms，60 s 版为 16.4 ms，回复越长每帧工作越多。定位过程与结论见 I191。
 - 内存一行的口径：RSS 把各进程映射的同一份 Electron 框架页各算一次；物理占用（`footprint`）作为参考记在报告里，口径不变（I26）。
 - 首 token：mock 立即作答，应用一侧多了 Core、Agent Host、主进程转发与渲染进程的一次提交与绘制。
+
+### 5.2.1 R5 复测（2026-11-22）
+
+同一台机器、同一命令（不含体积两项），报告 `tmp/evidence/R5/perf-nightly-report.json`，逐行对照与环境说明在 [R5 评审](../reviews/R5-findings.md)第 1.2 节。超出预算的仍是主进程增量 35.6 MB、应用全部进程合计 530 MB（RSS，口径见 ADR-0063）、Agent Host 196 MB、流式帧 p99 16.2 ms。"打开工作区到 Agent Host 就绪"按改回的口径（10 次最大，R5 性能审查 P3）为 982 ms。测量时机器有负载（IDE 与远程桌面），冷启动 666 ms 与事件循环 5.0 ms 相对基线的回归未确认；没有更新基线。
 
 ### 5.3 PR 冒烟的稳定性
 

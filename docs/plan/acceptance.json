@@ -321,71 +321,71 @@
       "id": "R5-A01",
       "task": "R5",
       "description": "威胁检查在两个平台 CI 上通过，第 10.1 节每条威胁至少抽查一个测试并确认其断言对应对策，抽查记录写入发现文件。验证：检查输出与 `docs/reviews/R5-findings.md` 中的抽查记录。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "本机通过、两个平台 CI 待推送：`node scripts/ci/check-threats.mjs --results target/l2/results.json` → threat map checks passed（14 条威胁、59 个对策）；verify 第 17 步在 4b7c223 通过。CI 只有 W3 的 de98771（运行 45024661885）两个平台跑完：macOS 与 Windows verify 的第 17 步都通过（两边失败的是 Prettier 与 Windows 的 `state::sources` 路径断言，R5 已修 a94a03c、e682784）；R5 新增的映射测试要等本分支推送后的 CI。14 条威胁各抽查一个测试并读断言，记录在 `docs/reviews/R5-findings.md` 第 1.1 节，抽查发现 THR-11、THR-14 的映射缺口已补（4f6de69）。"
     },
     {
       "id": "R5-A02",
       "task": "R5",
       "description": "macOS 上第 11 章全部预算达标、最近一次 Nightly 完整测量通过；W3 的 Windows 数据逐项列出，未达标项已归入 W4。验证：`docs/engineering/performance.md`、Nightly 输出与发现文件。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "failing",
+      "evidence": "macOS 未全部达标：R5 复测本机 Nightly（`node scripts/perf/run.mjs --lane nightly --absolute --machine m1-max-32g`，不含体积，`tmp/evidence/R5/perf-nightly.txt`）主进程增量 35.6 MB > 24、应用全部进程合计 530 MB > 510（RSS，ADR-0063 提议）、Agent Host 196 MB > 150、流式帧 p99 16.2 ms > 12；其余 19 行达标。CI 上的 Nightly 从未运行（只在默认分支定时触发），且 R5 前 CI 门禁不判值（9f5ec0a 修复）。W3 的 Windows 数据逐项列在发现文件第 1.2 节与文末 W4 清单（I207）。`docs/engineering/performance.md` 第 5.2.1 节。"
     },
     {
       "id": "R5-A03",
       "task": "R5",
       "description": "第 16 章 M4 行每一项都对应到任务与验收证据；T39–T45、W3 的验收项全部为 `passing` 或理由成立的 `blocked`；`capabilities.md` 无 MISSING，`check-capabilities.mjs --milestone M4` 不列出 `planned` 能力。验证：`acceptance.json` 摘要与两条命令的输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "failing",
+      "evidence": "能力部分通过：`check-capabilities.mjs --results target/l2/results.json` → MISSING 0、capability checks passed；`--milestone M4` → planned capabilities of M4 and earlier: 0（T41 遗留的两个能力补 L2 后改 active，71a1e1c）。第 16 章 M4 行九项都对应到任务与验收证据（发现文件第 1.3 节）。验收项不满足：T44-A04 failing、T44-A09 not_started（T44 自己的项，本评审不能改）、W3-A01 failing（内存口径，ADR-0063）；其余 blocked 项（T39-A12、T42-A06/A07、T43-A10、T45-A02、W3-A12）理由成立。"
     },
     {
       "id": "R5-A04",
       "task": "R5",
       "description": "安全、性能、无障碍、工程质量四个只读审查并行完成，每个审查的范围与输入记录在发现文件中。验证：`docs/reviews/R5-findings.md` 的审查说明。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "四个只读子代理（read-only-reviewer）在同一条消息里并行启动，基线 16c6d41，各自只拿本维度的范围与材料；范围与输入写在 `docs/reviews/R5-findings.md` 第 3 节，原文要点在 `tmp/evidence/R5/review-{security,perf,a11y,quality}.md`。"
     },
     {
       "id": "R5-A05",
       "task": "R5",
       "description": "每条审查发现都有处理：确认（附修复提交与复现测试）、不同意（附理由）或登记（附登记编号）。验证：`docs/reviews/R5-findings.md`。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "57 条发现逐条处理（发现文件第 4 节）：修复或部分修复 21 项（S1 4f6de69、S4 977173b、S5 8cdd10b、S8 306d957、S11 f30813a、P1–P6 9f5ec0a/94007a5、A2 2438660、A3 3fa9d21、A4/A5 0a983ca、A6 517b85d、A11 1118ef0、A14 1809a13、Q7/Q8 e64b420 等，每项有 `tmp/evidence/R5/*-red.log` 与 green），不同意并写理由 3 项（S12、P8、S8 余项），其余登记 I211–I222 或并入既有登记；S3 写 ADR-0064。"
     },
     {
       "id": "R5-A06",
       "task": "R5",
       "description": "W3 结论已确认：Windows 的 M3 退出标准逐条有证据，遗留问题有归属。验证：`PLAN.md` 中的 W3 记录与发现文件中的确认段落。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`docs/reviews/R5-findings.md` 第 2.1 节：W3 报告与 PLAN 会话日志核对，Windows M3 退出标准除内存（同一口径问题，ADR-0063）外逐条有实机与 CI 证据（运行 45024661885 的 Windows L2 199 通过）；遗留 I201–I207 都有归属。"
     },
     {
       "id": "R5-A07",
       "task": "R5",
       "description": "T39 的 Windows 隔离 ADR 状态已核对；为\"已接受\"时架构相关章节已同步，为\"提议\"时列为进入 M5 前的待决事项。验证：ADR 文件与结论段落。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "ADR-0057 状态已接受（2026-11-21，T39 中用户采纳）；架构第 4 章、6.10 节 Windows 一条、10.3 节、15.2 节沙箱一行、第 14 章 R16 已同步（发现文件第 2.2 节）。"
     },
     {
       "id": "R5-A08",
       "task": "R5",
       "description": "架构第 16 章状态与第 6.0 节能力矩阵已更新，版本号递增并写修订记录；`docs/reviews/README.md` 中 R5 的结论已填写。验证：文档 diff。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "架构 2.58：第 16 章 M4 行写 R5 结论，6.0 节矩阵更新 Hooks、插件、沙箱、多模型四行，修订记录加 2.58（efd139c 及收尾提交）；`docs/reviews/README.md` 的 R5 一行已填（ee6d818）。"
     },
     {
       "id": "R5-A09",
       "task": "R5",
       "description": "结论明确写出 M4（macOS）是否达标、进入 M5 的前提条件，以及 W4 的 M4 验收清单。验证：`docs/reviews/R5-findings.md` 的结论段。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`docs/reviews/R5-findings.md` 开头与\"结论\"段：M4（macOS）未达标（性能一条），进入 M5 的前提条件 1–5（ADR-0063、ADR-0064、性能达标任务 I222、推送看 CI 并记录基线、用户核对项）；文末\"W4 需要在 Windows 上验收的 M4 项\"表。"
     },
     {
       "id": "R5-A10",
       "task": "R5",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run verify` 于 4b7c223（工作区干净）All 17 steps passed（`tmp/evidence/R5/verify-final-2.txt`，`target/verify/last-pass.json` 记录 4b7c223）：Vitest 1,758 passed（1 个 Windows 专属跳过），cargo test 通过，L2 213 passed / 0 failed / 3 平台跳过，MISSING 0，威胁映射通过。前一次全量 `state.rs` 的设置监听用例在负载下超时一次（I185），单独连跑 3 次通过。"
     },
     {
       "id": "R6-A01",

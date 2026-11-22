@@ -1,6 +1,6 @@
 # R5 · M4 macOS 阶段评审
 
-**M4（macOS）未达标。** 第 16 章 M4 的两条退出标准：安全威胁表逐条有测试，本地全部满足（第 10.1 节 14 条威胁、59 个对策都映射到测试，`check-threats.mjs` 通过，14 条各抽查一个测试并确认断言在验证对策；抽查补上两处映射缺口），两个平台 CI 上的结果要等本分支推送；性能预算全部达标，不满足：本机 Nightly 有四行超出（流式帧 p99、主进程增量、Agent Host 内存、应用全部进程合计），其中"应用全部进程合计"是 RSS 口径问题，本评审写了 ADR-0063（提议）请用户决定，其余三行要优化。M4 的功能都已交付：第 16 章 M4 行的九项都有任务与验收证据，T41 漏改的两个能力补了 L2 场景后，能力清单里 M4 及之前没有 `planned` 的能力（L2 216 个场景 213 通过、3 个按平台跳过、MISSING 0）。四个独立审查共 56 条发现：修复 19 项（其中 3 项安全缺陷每项先有失败的测试：Agent Host 的子进程能往 Pi 自动加载的目录里放代码、克隆的插件用自带 `.npmrc` 让 npm 运行任意程序、性能门禁在 CI 上不判任何值），其余写明不同意的理由或登记到具体任务（I211–I222）。W3 的 Windows M3 结论确认：除内存一项（同一口径问题）外逐条有证据。ADR-0057 已接受，架构相关章节已同步。
+**M4（macOS）未达标。** 第 16 章 M4 的两条退出标准：安全威胁表逐条有测试，本地全部满足（第 10.1 节 14 条威胁、59 个对策都映射到测试，`check-threats.mjs` 通过，14 条各抽查一个测试并确认断言在验证对策；抽查补上两处映射缺口），两个平台 CI 上的结果要等本分支推送；性能预算全部达标，不满足：R5 复测的本机 Nightly 有四行超出（流式帧 p99、主进程增量、Agent Host 内存、应用全部进程合计），其中"应用全部进程合计"是 RSS 口径问题，本评审写了 ADR-0063（提议）请用户决定，其余三行要优化。M4 的功能都已交付：第 16 章 M4 行的九项都有任务与验收证据，T41 漏改的两个能力补了 L2 场景后，能力清单里 M4 及之前没有 `planned` 的能力（L2 216 个场景 213 通过、3 个按平台跳过、MISSING 0）。四个独立审查共 57 条发现：修复或部分修复 21 项（P1 与 Q1 算一项；其中 3 项安全与门禁缺陷每项先有失败的测试：Agent Host 的子进程能往 Pi 自动加载的目录里放代码、克隆的插件用自带 `.npmrc` 让 npm 运行任意程序、性能门禁在 CI 上不判任何值），其余写明不同意的理由或登记到具体任务（I211–I222）。W3 的 Windows M3 结论确认：除内存一项（同一口径问题）外逐条有证据。ADR-0057 已接受，架构相关章节已同步。
 
 **进入 M5（T46）的前提条件**：
 
@@ -45,7 +45,32 @@
 - 测量框架与门禁的审查（第 4 节 P1）发现 CI 上的 PR 冒烟与 Nightly 不判任何值：CI 的两个 runner 类别没有基线、命令不带 `--absolute`。9f5ec0a 改为缺基线即失败。所以在 R5 之前，"最近一次 Nightly 完整测量通过"在 CI 上没有意义；`perf-nightly.yml` 只在默认分支（`main`）的定时触发上运行，`main` 还没有这些提交，CI 上从未运行过（`gh run list --workflow perf-nightly.yml`：workflow not found on the default branch）。
 - 唯一的完整测量是本机 Nightly：T44（2026-11-21，M1 Max / 32 GB，非基准机型，`performance.md` 第 5.2 节）与 R5 的复测（下表；方法与 T44 相同：`node scripts/perf/run.mjs --lane nightly --absolute --machine m1-max-32g`，报告 `tmp/evidence/R5/perf-nightly-report.json`）。
 
-R5_NIGHTLY_TABLE
+| 第 11 章的行 | 预算 | T44 | R5 | 结论 |
+|---|---|---|---|---|
+| 冷启动到可交互窗口 | ≤ 1,000 ms | 440 ms | 666 ms | 达标；相对基线 +51% 报回归，测量时机器有负载（见下），未确认 |
+| 打开工作区到 Agent Host 就绪 | ≤ 1,000 ms | 955 ms（10 次中位，口径错误） | 982 ms（10 次最大，改回的口径） | 达标，余量 2%（I193） |
+| 首 token 额外延迟 | ≤ 50 ms | 24.3 ms | 25.2 ms | 达标 |
+| 主进程增量 | ≤ 24 MB | 32.5 MB | 35.6 MB | **超出**（I192） |
+| 渲染进程内存 | ≤ 220 MB | 173 MB | 174 MB | 达标 |
+| 应用全部进程合计 | ≤ 510 MB（RSS） | 519 MB | 530 MB | **超出**（RSS 口径，ADR-0063） |
+| Agent Host 内存 | ≤ 150 MB | 202 MB | 196 MB | **超出**（I194） |
+| 每会话增量 | ≤ 40 MB | 10.5 MB | 6.5 MB | 达标 |
+| 主进程事件循环 p99 | ≤ 16 ms | 2.7 ms | 5.0 ms | 达标；相对基线报回归，同上未确认 |
+| 流式帧 p99 / 长任务 | ≤ 12 ms / 0 | 16.4 ms / 0 | 16.2 ms / 0 | **帧工作超出**（I191） |
+| 万条滚动 | 60 fps | 60 | 60 | 达标 |
+| 会话切换（缓存 / 冷） | ≤ 100 / 170 ms | 28.8 / 62.1 ms | 30.2 / 62.2 ms | 达标 |
+| Core 事件到渲染进程 p95 | ≤ 1.1 ms | 0.22 ms | 0.18 ms | 达标 |
+| AHP 往返 p95 | ≤ 5 ms | 0.25 ms | 0.30 ms | 达标 |
+| 权限裁决 p95 | ≤ 2 ms | 0.69 ms | 0.84 ms | 达标 |
+| 终端回显 p95 | ≤ 5 ms | 0.67 ms | 0.77 ms | 达标 |
+| 空闲 CPU（可见 / 隐藏）、隐藏帧 | ≤ 5% / 5% / 0 | 3.6% / 3.5% / 0 | 2.8% / 2.5% / 0 | 达标 |
+| Agent Host 崩溃恢复 | ≤ 3 s | 1.44 s | 1.44 s | 达标 |
+| 渲染进程恢复 | ≤ 2 s | 0.22 s | 0.21 s | 达标 |
+| 安装包与安装后体积 | ≤ 200 / 450 MB | 176.2 / 446.6 MB | 未重测（R5 不改随包内容） | 达标（T44） |
+| 8 小时长跑 | ≤ 10% | 未测（I195） | 未测 | 未测 |
+
+- 环境：同 T44 的 M1 Max / 32 GB，接电源（80%，`tmp/evidence/R5/perf-nightly.txt` 第一行），开发构建打包于 1118ef0 之后（`tmp/evidence/R5/package-dev-2.log`）。测量时机器没有空闲：IntelliJ IDEA 占约 117% CPU、UURemote 远程桌面在运行，负载均值约 5（`uptime`、`ps -r`）。冷启动与事件循环两行的相对回归在这种负载下与 T44-A04 记录的"受干扰的运行"相同，不作为回归结论；内存与帧时间两类与 T44 一致（差在 ±5% 内）。
+- 判定：第 11 章 23 个可测行中 4 行超出预算（主进程增量、应用全部进程合计、Agent Host 内存、流式帧 p99），与 T44 相同；其中只有"应用全部进程合计"是口径问题。性能一条退出标准不满足，R5-A02 为 failing。
 
 - Windows（W3，i5-1340P / 16 GB，非基准机型，`performance.md` 第 6.1 节）：冷启动 1,075 ms、首 token 额外 122 ms、主进程增量 29.3 MB、应用全部进程合计 558 MB、流式帧 p99 49.3 ms 与长任务 25、万条滚动 35 fps、权限裁决 p95 12.4 ms 超出；工作区就绪、渲染进程与 Agent Host 内存、每会话增量、事件循环、会话切换、事件转发、AHP 往返、终端回显（1,000 对）、空闲 CPU、两种恢复达标；安装包与安装后体积只测了开发构建（I202），8 小时长跑未测（I195）。按第 15.1 节，Windows 的 M4 在 W4 验收，这些项列入文末 W4 清单，不阻断 M4（macOS）的结论。
 
@@ -191,7 +216,13 @@ T45、T44、W3 把 26 项交给 R5。处理（每项在 `PLAN.md` 登记事项�
 
 ## 6. 质量门禁
 
-R5_GATES
+- `npm run verify` 在收尾提交 4b7c223（工作区干净）17/17 通过：Vitest 161 个文件 1,758 通过（1 个 Windows 专属按平台跳过），cargo test 全部通过，L2 216 个场景 213 通过、0 失败、3 个按平台跳过，能力覆盖 MISSING 0，威胁映射通过（`tmp/evidence/R5/verify-final-2.txt`；`target/verify/last-pass.json` 记录 4b7c223）。
+- 之前的两次全量：第一次有 Prettier、rustfmt 与覆盖表漂移三处格式问题（4b7c223 修正）；第二次只有 `crates/piarc-core/tests/state.rs` 的 `editing_settings_while_running…` 超时（20 s 内没有设置事件）。同一用例在开工基线也超时过，单独连跑三次通过（`state-watch-rerun.log`）：设置监听在高负载下迟到（I185），本机测量期间负载均值约 6。没有放宽等待时间，登记在 I185 由 T48 定位。
+- 开工基线（16c6d41 合并 W3 之后）：14/17。Prettier（W3 带来的 `plugin-commands.yaml`，a94a03c）、上面同一个设置监听用例、第 17 步（本任务进行中的映射改动）。
+- 全量 L4（两种形态，开发构建打包于 1118ef0 之后，`PIARC_EVIDENCE_TASK=R5 npm run test:e2e -w @piarc/desktop`）：341 通过、23 按平台跳过、3 失败（`tmp/evidence/R5/l4-full.log`）。`t18-review` 两种形态失败于 `screencapture -l`（终端没有"屏幕录制"权限，与 R3、R4 相同）；`t34-terminal`"a user terminal is not shared until the switch is turned on"打包形态一次面板 20 s 内空白，单独重跑三次通过（`l4-t34-rerun.log`），记入 I210 的待复核项。R5 修改波及的 `t35-worktrees`、`t35-windows`、`t44-recovery`、`t39-sandbox`、`t45-ipc-hardening`、`t43-*`、`t42-comments`、`t32-background`、`t28-rewind` 都通过。
+- 修复的红绿日志在 `tmp/evidence/R5/`：`s1-*`、`s4-*`、`s5-*`、`s8-*`、`s11-*`、`p1-*`、`i120-*`、`a3-*`、`a6-*`、`a11-*`、`a14-*`、`notice-red.log`、`l4-fixes-green.log`、`thr14-red.log`。
+- Windows 交叉 clippy 没有运行：R5 没有改 `cfg(windows)` 代码、平台模块或带 C 代码的依赖；Windows 上的影响（`state::sources` 的路径、沙箱只在 macOS）由推送后的 CI 核对。
+- 界面改动（设置页错误播报、diff 符号名称、菜单焦点、提示行换行、沙箱放宽的确认）都有 L4 或组件测试；提示行的截图在 `tmp/evidence/R5/l4/t35-worktrees.e2e.ts-start-…/worktree-session-light.png`。没有改提示词，不需要原创性检查。
 
 ## 结论
 

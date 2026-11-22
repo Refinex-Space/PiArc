@@ -114,7 +114,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | 2 M1 可行走骨架 | 存储与信任、会话编排与投影、L2 场景、文件工具与 Bash、客户端外壳、transcript 与 composer、基础审批、模型与凭据、system prompt 与 memory | T13–T22 | R2 | 已完成（macOS 达标；Windows 由 W1 达标，UNC 由 W2 补验） |
 | 3 M2 Harness 核心 | 权限规则与 Bash 分析、配置兼容层、hooks、计划模式与任务清单、压缩与用量、检查点与回退、WebFetch 与登录、L3 对齐；Windows 达到 M1 | W1、T23–T30 | R3 | 已完成（macOS 达标，R3；Windows 的 M1 由 W1 达标，UNC 由 W2 补验；Windows 的 M2 由 W2 达标） |
 | 4 M3 多会话与生态 | 子 agent、后台任务、终端、worktree 与并行会话、MCP、skills 与命令、WebSearch 与 hooks 扩展；Windows 达到 M2 | W2、T31–T38 | R4 | M3 能力已交付；macOS 未达标（内存口径待用户决定，R4）；Windows 的 M2 由 W2 达标 |
-| 5 M4 安全与打磨 | 沙箱、插件、配置诊断与用量、NotebookEdit 与通知、无障碍与本地化、性能预算、安全收口；Windows 达到 M3 | W3、T39–T45 | R5 | T39–T45 已交付（部分完成项待 Windows CI 与用户核对）；Windows 的 M3 由 W3 核对，内存一项与 macOS 同样未达标 |
+| 5 M4 安全与打磨 | 沙箱、插件、配置诊断与用量、NotebookEdit 与通知、无障碍与本地化、性能预算、安全收口；Windows 达到 M3 | W3、T39–T45 | R5 | M4（macOS）未达标（R5）：九项目标已交付，安全威胁表本地逐条有测试（CI 待推送），性能一条不满足（流式帧、主进程增量、Agent Host 内存超出；应用内存口径待 ADR-0063）；Windows 的 M3 由 W3 确认（内存同口径），M4 由 W4 验收 |
 | 6 M5 Beta | Auto 模式、自动记忆与托管配置、M5 补全、侧边对话与平台快捷操作、发布流水线；Windows 达到 M4 并与 Beta 同步；两平台端到端验收 | T46–T50、W4、T51 | R6 | 未开始 |
 
 ## 任务看板
@@ -176,7 +176,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 部分完成 | 00b452b |
 | T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 部分完成 | a5f6146 |
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
-| R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 进行中 | — |
+| R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 阻塞（等待用户确认 ADR-0063、ADR-0064） | 4b7c223 |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 未开始 | — |
 | T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 未开始 | — |
@@ -309,15 +309,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-R5（M4 评审，macOS）：
+R5（阻塞，等待用户确认 ADR-0063、ADR-0064）：交付物 1–5 与质量门禁已完成（4b7c223），用户决定后续做：
 
-- [x] 开工：基线 verify 14/17（Prettier 为 W3 合并遗留已修 a94a03c；state 两个设置事件用例负载下超时、单独重跑通过；第 17 步是本任务进行中的改动），CI de98771 的 macOS verify 只有同一 Prettier 失败
-- [ ] 1 退出标准取证：安全（威胁检查、14 条威胁各抽查一个测试的断言）、性能（第 11 章 macOS 实测与 Nightly、W3 的 Windows 数据）、M4 目标逐项对应任务与验收证据、capabilities 两条命令（A01–A03）
-- [x] 2 四个只读审查并行完成（要点在 `tmp/evidence/R5/review-*.md`），范围与输入待写入发现文件（A04）
-- [ ] 3（进行中：已修 S1 4f6de69、P1/P3–P6 9f5ec0a、S5 8cdd10b、I210 cc4ec00、S4 977173b、S8 306d957、S11 f30813a、I120 cf76d24）逐条核实与处理：确认的先写失败测试再修复，不同意写理由，超出范围的登记；同时处理交 R5 的登记事项（I56、I79、I94、I120、I121、I123、I126、I172、I173、I175、I176、I178、I190–I194、I196、I197、I199、I203、I207、I208–I210）（A05）
-- [ ] 4 W3 结论确认；ADR-0057 状态与架构同步核对（A06、A07）
-- [ ] 5 结论、W4 的 M4 验收清单；架构第 16 章与 6.0 节、版本与修订记录；reviews README（A08、A09）
-- [ ] 6 收尾：全量 verify（A10）、acceptance、PLAN 会话日志与登记事项、最终报告
+- [ ] ADR-0063：采纳则状态改"已接受"，按 ADR 的"需要配套做的事"改 `app-memory` 与 `m3-memory.mjs` 的口径、重测、改第 11 章与修订记录、更新 R5 发现文件第 1.2 节与结论；否决则写明理由，这一行转入 I222
+- [ ] ADR-0064：采纳则状态改"已接受"，同步架构第 10.2 节与 ADR-0029 的状态，实现交 M5 的第一个任务或单独小任务（不在 R5 实现）；否决则写明理由，I79 记为已接受的风险
+- [ ] 两者处理后：R5 看板状态改为"部分完成"（A01 等 CI，A02、A03 随性能任务与 T44 的续做），会话日志追加一条
 
 ## 登记事项
 
@@ -509,7 +505,7 @@ R5（M4 评审，macOS）：
 | I182 | T40 | 插件 skill 与命令文件的 `allowed-tools`、hooks 不生效（不在包的可执行项里，ADR-0058 第 12 条）；Pi 包的扩展不在子 agent 的会话里加载 | 需要时把它们纳入可执行项（逐项确认），由 T48 评估 |
 | I183 | T40 | 配置诊断还没有插件来源的展示：诊断 API 能从各组件的 `plugin` 字段与 `packagesList` 得到来源，界面未列出 | T41（配置诊断完善）；**已落地**（T41，ADR-0059）：诊断按来源类别列出插件与 Pi 包（`config_diagnostics/sources.rs` 的 `packages`） |
 | I184 | T41 | 用量的目录价只在 Core 见过某模型的 `models/list` 之后才有（打开过会话、设置页或生成报告时有运行中的 Agent Host）；从未出现在这些列表里的模型在用量页显示"未知"，直到再次列出 | 可接受的现状；需要时让生成报告在没有运行中 Agent Host 时临时起设置 Host 取一次目录，交 R5 评估 |
-| I185 | T41 | 全量 L2 并行时，T13 的设置监听（FSEvents）事件可能迟到几十秒：ConfigChange 已改为每个输入前核对，不受影响；配置诊断页的自动刷新、skills 与命令变化后的 `resources/reload` 仍依赖它 | R5 评估是否让这些消费方在使用前同样核对（或改为轮询少量固定文件） |
+| I185 | T41 | 全量 L2 并行时，T13 的设置监听（FSEvents）事件可能迟到几十秒：ConfigChange 已改为每个输入前核对，不受影响；配置诊断页的自动刷新、skills 与命令变化后的 `resources/reload` 仍依赖它 | R5 评估是否让这些消费方在使用前同样核对（或改为轮询少量固定文件）；**R5**：负载下（本机负载均值约 5–6）`crates/piarc-core/tests/state.rs` 的 `editing_settings_while_running…` 在 3 次全量 verify 中超时 2 次（20 s 内没有设置事件），单独运行通过：设置监听本身在负载下迟到，不只是 L2 并行。交 T48：配置诊断与 `resources/reload` 的消费方在使用前核对文件（同 ConfigChange 的做法），测试改为等确定的信号；不放宽等待时间 |
 | I186 | T42 | 代码高亮的明暗配色跟随系统的 `prefers-color-scheme`（`transcript/use-color-scheme.ts`），不跟随应用的主题选择：系统为浅色、应用选深色时，Changes 面板与 transcript 代码块的 token 用浅色配色画在深色底上，对比度不足（`tmp/evidence/T42/` 的 `comments-saved-dark.png` 可见） | T43（无障碍与对比度）：让 `useDarkScheme` 读 `<html>` 的 `data-color-mode`，或在主进程按偏好设置 `nativeTheme.themeSource`；**已落地（T43）**：`useDarkScheme` 按应用的主题选择（`system` 时才看系统），代码高亮另换为高对比度主题（`transcript/highlight/themes.ts`，ADR-0061） |
 | I187 | T42 | 可操作通知的实机核对：macOS 横幅与按钮的截图需要终端有"屏幕录制"权限（本机 `screencapture` 报 could not create image from display，T42-A06 标 blocked）；Windows Toast 按钮的实机点击 | macOS 截图由用户授权屏幕录制后用 `PIARC_CAPTURE_NOTIFICATION=1 PIARC_EVIDENCE_TASK=T42 npx playwright test -c apps/desktop/playwright.config.ts t42-notify --project dev` 补拍；Windows 并入 W4 |
 | I188 | T43 | VoiceOver 实际操作核对未做：`docs/engineering/accessibility.md` 第 3 节的 10 项读屏清单需要人在 macOS 上开 VoiceOver 逐项操作，T43 时用户不在场（T43-A10 标 blocked）；自动化已覆盖行名称、节流播报、审批卡焦点与 axe | 用户按清单操作后把结论填入 VoiceOver 一列，问题登记后由 R5 或后续任务修；Narrator 与 NVDA 由 W3 按同一清单执行；**W3**：讲述人与 NVDA 两列由用户实机核对，全部通过；VoiceOver 一列仍待用户 |
@@ -1139,3 +1135,13 @@ R5（M4 评审，macOS）：
 - CI（7cbf259，run 45011543956）：Dependency security、macOS verify、两个平台的打包、core build 与 core load 通过；macOS L4、Windows L4、Windows verify 失败。映射用例里只有 `preload.e2e.ts` 的 OS 沙箱用例失败（macOS dev 形态，取指标早于渲染进程出现，返回 null），ea69d38 先等指标出现再断言 `sandboxed === true`，本机 preload 两种形态 14 项通过；其余失败来自 T35–T44 第一次上 Windows CI 与 macOS L4，登记为 I208–I210（W3 已用 I201–I207）
 - 验收：T45-A02 仍为 blocked（证据写了这次 CI 的结果），T45 仍为"部分完成"；其余 12 项不变
 - 下一项：推送 ea69d38；合并 W3 后重跑 CI 复核 I208；I209、I210 交 R5；Windows 与 macOS 的 CI 全部通过后关闭 A02
+
+### 2026-11-22 R5 阻塞（等待用户确认 ADR-0063、ADR-0064；提交 4b7c223）
+
+- 开工：合并 W3 后的基线 verify 14/17（W3 带来的 Prettier 问题 a94a03c 已修；`state.rs` 设置监听用例负载下超时，单独通过；第 17 步是进行中的改动）。CI 运行 45024661885（W3 的 de98771）：两个平台 verify 的威胁映射通过，Windows L2 199/0（I208 解决），失败的 Prettier 与 Windows 的 `state::sources` 路径断言已修（e682784）。
+- 结论：**M4（macOS）未达标，阻塞在性能一条**。安全威胁表本地逐条有测试（14 条各抽查一个，补 THR-11、THR-14 映射），两个平台 CI 等推送；R5 复测本机 Nightly 主进程增量 35.6 MB、应用全部进程合计 530 MB（RSS）、Agent Host 196 MB、流式帧 p99 16.2 ms 超出。九项 M4 目标都有任务与验收证据；T41 遗留的两个 `planned` 能力补 L2 后，M4 及之前没有 `planned`。
+- 审查：四个只读子代理并行，57 条发现；修复或部分修复 21 项，每项先红后绿：S1 Agent Host 的子进程能写 Pi 自动加载的 `<pi>/extensions` 与 Core 当作用户来源读的 `<pi>/skills`、`<pi>/prompts`（4f6de69）、S5 克隆的包经自带 `.npmrc` 让 npm 运行任意程序（8cdd10b）、P1 性能门禁在 CI 上不判任何值与 P3 工作区就绪的口径（9f5ec0a）、S4 关闭沙箱不确认（977173b）、S8 脱敏漏下划线名（306d957）、S11（f30813a）、I120 Read deny 不管 Grep/Glob 结果（cf76d24）、I210 提示的长路径把按钮挤到侧栏下（cc4ec00）、无障碍 A2/A3/A4/A5/A6/A11/A14 与工程文档 Q7/Q8；不同意 3 项写理由，其余登记。
+- 验收：A04–A10 通过；A01 blocked（两个平台 CI 待推送）；A02 failing（性能超出）；A03 failing（T44-A04、T44-A09 未完成，W3-A01 内存）。`npm run verify` 17/17（4b7c223）；全量 L4 两种形态 341 通过、23 平台跳过、3 失败（`t18-review` 屏幕录制权限 ×2，`t34-terminal` 一次面板空白、重跑 3/3 通过）。
+- 决策：ADR-0063（提议，放宽）"应用全部进程合计"按物理占用测量；ADR-0064（提议）"信任"经主进程原生确认（I79、S3）；新增 L2 动作 `check_cost`；架构 2.58。
+- 登记：交 R5 的 26 项逐条处理（I120 落地；I26、I79 写 ADR；I56、I94、I121、I123、I126、I172、I173、I175、I176、I178、I197、I199 交 T48 并在 R6 前完成；I190–I194、I196 交性能任务；I203、I207 交 W4）；新增 I211–I222。**进入 M5 前必须处理**：用户决定 ADR-0063 与 ADR-0064；为 I222 的性能达标任务排期（计划变更）；推送本分支并看 CI（R5-A01、T39-A12、T42-A07、T45-A02），从 CI 工件记录 `github-arm64`、`github-x64` 的 PR 与 Nightly 基线（R5 起缺基线的 CI 性能步骤会失败）。
+- 下一项：T46（Auto 模式，macOS，设计关口）依赖 R5：用户可以在决定 ADR-0063、ADR-0064 并为性能任务排期后开工，T46 的设计增补不依赖这几项；W4（Windows：M4 达标与 Beta 同步）依赖 R5 与 T50，要等 macOS 上的 T50 完成后才在 Windows 上做。本地提交，未推送。
