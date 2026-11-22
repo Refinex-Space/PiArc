@@ -15,6 +15,8 @@ import { cp, mkdir, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
+import { keepInNodeRuntime } from './trim.mjs';
+
 /** Directory name under the app's resources directory. */
 export const AGENT_HOST_DIR = 'agent-host';
 
@@ -87,6 +89,8 @@ export async function copyAgentHostResources({ repoRoot, resourcesDir, platform,
   await cp(path.join(runtime, 'node'), path.join(target, 'node'), {
     recursive: true,
     verbatimSymlinks: true,
+    // Without npm's docs and man pages (packaging/trim.mjs, I41).
+    filter: keepInNodeRuntime,
   });
   await cp(path.join(runtime, 'bin'), path.join(target, layout.toolsBin), { recursive: true });
   await cp(path.join(bundleDir, layout.bundle), path.join(target, layout.bundle));

@@ -26,6 +26,7 @@ import {
 import { MakerHdiutilDmg } from './packaging/maker-dmg.mjs';
 import { copyVelopackRuntime } from './packaging/velopack-runtime.mjs';
 import { resealElectron, signResourcesAndBundle } from './packaging/macos-sign.mjs';
+import { stripLocalSymbols, trimElectronLocales } from './packaging/trim.mjs';
 
 const flavor = parseBuildFlavor(process.env.PIARC_BUILD_FLAVOR);
 const repoRoot = path.join(import.meta.dirname, '..', '..');
@@ -47,6 +48,10 @@ async function copyCoreModule(buildPath: string, platform: string, arch: string)
   const destination = path.join(buildPath, 'native', name);
   await mkdir(path.dirname(destination), { recursive: true });
   await copyFile(source, destination);
+  // The release module ships without local symbols (packaging/trim.mjs, I41).
+  if (platform === 'darwin' && flavor === 'release') {
+    await stripLocalSymbols(destination);
+  }
   if (platform === 'win32') {
     for (const dll of CORE_WINDOWS_DLLS) {
       const dllSource = path.join(path.dirname(source), dll);
@@ -66,6 +71,9 @@ async function finishPackage(outputPath: string, platform: string, arch: string)
   const appName = 'PiArc';
   const resourcesDir = resourcesDirOf(outputPath, platform, appName);
   if (platform === 'darwin') {
+    // Before the signatures are redone: Electron's locales other than the app's (I41).
+    const removed = await trimElectronLocales(path.join(outputPath, `${appName}.app`));
+    console.log(`removed ${String(removed.length)} Electron locales`);
     await resealElectron(path.join(outputPath, `${appName}.app`));
   }
   const agentHost = await copyAgentHostResources({ repoRoot, resourcesDir, platform, arch });
