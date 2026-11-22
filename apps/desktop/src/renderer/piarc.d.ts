@@ -5,4 +5,6 @@ declare global {
   interface Window {
     readonly piarc: PiarcApi;
   }
+  /** Replaced at build time (vite.renderer.config.ts): true in the release flavor only. */
+  const __PIARC_RELEASE_BUILD__: boolean;
 }

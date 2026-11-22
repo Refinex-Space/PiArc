@@ -139,6 +139,12 @@ jobs:
       - name: Check the fuses of the release package
         run: npm run check:fuses
 
+      - name: Probe the release package (ELECTRON_RUN_AS_NODE, NODE_OPTIONS, --inspect, remote debugging)
+        run: node scripts/ci/check-release-runtime.mjs
+
+      - name: Check the release layout (no test hooks, no test pages)
+        run: node scripts/ci/check-app-layout.mjs --flavor release
+
       - name: Upload L4 evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

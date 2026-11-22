@@ -138,6 +138,15 @@ export function testingExports(file, arch) {
 }
 
 /**
+ * The renderer chunks that hold the test pages (`src/renderer/test-pages.tsx`).
+ * @param {readonly string[]} paths paths inside app.asar
+ * @returns {string[]}
+ */
+export function testPageChunks(paths) {
+  return paths.filter((p) => /[\\/]test-pages-[^\\/]*\.js$/.test(p));
+}
+
+/**
  * Runs every check against one packaged app; with `flavor`, also whether its Core has the
  * testing exports that flavor should (or should not) have.
  * @param {{ app: string, platform: string, arch: string, flavor?: string }} options
@@ -204,6 +213,19 @@ export function checkAppLayout({ app, platform, arch, flavor }) {
         `testing exports: ${String(testing)}`,
       );
     }
+  }
+
+  if (flavor !== undefined && existsSync(asar)) {
+    // The renderer's test pages (event probe, transcript and terminal prototypes) are a chunk
+    // of their own that only the development flavor emits (T45, I13, I24, I30).
+    const pages = testPageChunks(listPackage(asar, { isPack: false }));
+    add(
+      flavor === 'release'
+        ? 'release renderer has no test pages'
+        : 'development renderer has the test pages',
+      (pages.length === 0) === (flavor === 'release'),
+      pages.join(', ') || 'none',
+    );
   }
 
   if (platform !== 'darwin') {

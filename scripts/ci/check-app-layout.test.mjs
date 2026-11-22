@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { entitlementKeys, findDevTools, parseCodesignDisplay } from './check-app-layout.mjs';
+import {
+  entitlementKeys,
+  findDevTools,
+  parseCodesignDisplay,
+  testPageChunks,
+} from './check-app-layout.mjs';
 
 describe('parseCodesignDisplay', () => {
   it('reads an ad-hoc signature with the hardened runtime', () => {
@@ -60,6 +65,22 @@ describe('findDevTools', () => {
     expect(findDevTools(paths)).toEqual([
       '/x/PiArc.app/Contents/Resources/piarc-devcli',
       'C:\\PiArc\\resources\\piarc-mock-provider.exe',
+    ]);
+  });
+});
+
+describe('testPageChunks', () => {
+  it("finds the renderer's test-page chunk on both separators and nothing else", () => {
+    expect(
+      testPageChunks([
+        '/.vite/renderer/main_window/assets/test-pages-nmJjYXVk.js',
+        '\\.vite\\renderer\\main_window\\assets\\test-pages-AbC.js',
+        '/.vite/renderer/main_window/assets/index-B7F4qT1M.js',
+        '/.vite/renderer/main_window/assets/test-pages-nmJjYXVk.js.map',
+      ]),
+    ).toEqual([
+      '/.vite/renderer/main_window/assets/test-pages-nmJjYXVk.js',
+      '\\.vite\\renderer\\main_window\\assets\\test-pages-AbC.js',
     ]);
   });
 });

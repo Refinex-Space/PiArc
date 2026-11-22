@@ -41,7 +41,18 @@ import { runVelopackStartup } from './platform/velopack.js';
 import { PRODUCTION_CSP } from './security/csp.js';
 import { guardWebContents } from './security/navigation.js';
 import { applyPermissionPolicy } from './security/permissions.js';
+import { refuseRemoteDebugging } from './security/runtime-switches.js';
 import { createMainWindow } from './window.js';
+
+// Release builds refuse Chromium's remote debugging before anything else runs (T45, I10): the
+// switches are removed, so the DevTools server never starts, and the app exits.
+if (__PIARC_RELEASE_BUILD__) {
+  const refused = refuseRemoteDebugging(app.commandLine);
+  if (refused.length > 0) {
+    console.error(`[security] release builds do not accept --${refused.join(', --')}; exiting`);
+    app.exit(1);
+  }
+}
 
 // `import.meta.env.DEV` is a build-time constant: false in packaged builds, so the bundler
 // drops every dev-server branch and the relaxed CSP never ships.

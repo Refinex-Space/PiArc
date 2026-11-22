@@ -383,6 +383,11 @@ threats:
         tests:
           - vitest:apps/desktop/src/main/core/terminal-ipc.test.ts::refuses writes without recent real input; pointer moves need none
           - l4:apps/desktop/e2e/t20-approvals.e2e.ts::edits and confirms an exact rule, declines protected writes and restores the chosen mode
+      - measure: 发布构建的渲染进程不带测试页（事件探针、transcript 与终端原型）
+        type: automated
+        tests:
+          - vitest:scripts/ci/check-app-layout.test.mjs::finds the renderer's test-page chunk on both separators and nothing else
+          - ci:scripts/ci/check-app-layout.mjs
       - arch: XSS 载荷回归测试（第 10.3 节）
         measure: XSS 载荷集在渲染面上以文本呈现
         type: automated
@@ -395,12 +400,20 @@ threats:
     title: 应用被当作通用运行时滥用
     countermeasures:
       - arch: 发布构建关闭对应 fuses（ADR-0018）
-        measure: 发布构建关闭 RunAsNode、NodeOptions、NodeCliInspect
+        measure: 发布构建关闭 RunAsNode、NodeOptions、NodeCliInspect，打包产物上实际不生效
         type: automated
         tests:
           - vitest:scripts/ci/check-fuses.test.mjs::release settings follow ADR-0018 rule 1
           - vitest:scripts/ci/check-fuses.test.mjs::development settings differ only in EnableNodeCliInspectArguments
           - ci:scripts/ci/check-fuses.mjs
+          - ci:scripts/ci/check-release-runtime.mjs#run-as-node
+          - ci:scripts/ci/check-release-runtime.mjs#node-options
+          - ci:scripts/ci/check-release-runtime.mjs#inspect
+      - measure: 发布构建拒绝 Chromium 的远程调试开关（没有对应的 fuse）
+        type: automated
+        tests:
+          - vitest:apps/desktop/src/main/security/runtime-switches.test.ts::THR-12 removes and reports the remote debugging switches and nothing else
+          - ci:scripts/ci/check-release-runtime.mjs#remote-debugging-port
       - arch: Agent Host 用独立的 node，不依赖这些开关
         measure: Agent Host 用内置 node 启动，命令环境去掉 Electron 与 Node 的内部变量
         type: automated

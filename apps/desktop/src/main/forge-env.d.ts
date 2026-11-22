@@ -12,3 +12,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+// Vite replaces it at build time (vite.main.config.ts): true in the release flavor only.
+declare const __PIARC_RELEASE_BUILD__: boolean;
