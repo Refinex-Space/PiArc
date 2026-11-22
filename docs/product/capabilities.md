@@ -12,7 +12,7 @@
 | M2 | 46 | 46 | 0 | 0 |
 | M3 | 47 | 47 | 0 | 0 |
 | M4 | 31 | 31 | 0 | 0 |
-| M5 | 7 | 0 | 7 | 0 |
+| M5 | 14 | 8 | 6 | 0 |
 
 ## M1
 
@@ -228,7 +228,14 @@
 | CAP-CONFIG-MANAGED-001 | 企业托管配置（兼容读取 Claude Code 的托管文件） | ARCH-6.14 | T47 | — | 计划中 |
 | CAP-HOOK-M5-001 | WorktreeCreate、WorktreeRemove、PreModelSwitch、PostModelSwitch、Elicitation、ElicitationResult、PermissionDenied hooks | FR-HN-05、ARCH-6.3.2 | T48 | — | 计划中 |
 | CAP-MEM-AUTO-001 | 自动记忆（跨会话笔记） | FR-CX-05 | T47 | — | 计划中 |
-| CAP-PERM-AUTO-001 | 自动审查模式：可配置的审查模型代替人审批，决策可审计 | FR-PM-06、ARCH-6.0 | T46 | — | 计划中 |
+| CAP-PERM-AUTO-001 | 自动审查模式：可配置的审查模型代替人审批，决策可审计 | FR-PM-06、ARCH-6.0 | T46 | `perm-auto-allow` | 已实现 |
+| CAP-PERM-AUTO-ALLOW-001 | 审查模型答允许、拒绝、不确定时分别执行一次、拒绝并把理由回给模型、转人工审批卡 | FR-PM-06、ARCH-6.2.3 | T46 | `perm-auto-allow`<br>`perm-auto-deny`<br>`perm-auto-unsure` | 已实现 |
+| CAP-PERM-AUTO-FALLBACK-001 | 审查超时、服务商错误、输出无法解析、结论不在枚举内、审查模型不可用一律转人工，工具不执行 | FR-PM-06、ARCH-6.2.3 | T46 | `perm-auto-invalid-verdict`<br>`perm-auto-provider-error`<br>`perm-auto-timeout`<br>`perm-auto-unavailable`<br>`perm-auto-unparsable` | 已实现 |
+| CAP-PERM-AUTO-INPUT-001 | 审查请求只含用户的话、调用与策略：工具结果、网页、助手正文与 memory 不进入 | FR-PM-06、ARCH-10.1 | T46 | `perm-auto-request-shape` | 已实现 |
+| CAP-PERM-AUTO-ORDER-001 | deny、ask 规则与始终询问的类别先于审查，PermissionRequest hooks 在审查之前，这些情况不发审查请求 | FR-PM-06、ARCH-6.2.3 | T46 | `perm-auto-always-ask`<br>`perm-auto-ask-rule`<br>`perm-auto-deny-rule`<br>`perm-auto-hooks-first`<br>`perm-auto-unsandboxed`（仅 macos） | 已实现 |
+| CAP-PERM-AUTO-PAUSE-001 | 连续拒绝达到阈值后暂停自动审查、改由人工审批，用户允许一次后恢复 | FR-PM-06、ARCH-10.1 | T46 | `perm-auto-pause` | 已实现 |
+| CAP-PERM-AUTO-SCOPE-001 | Auto 模式只在用户级设置开启；项目级的开关、审查模型、策略与可信基础设施不生效并在配置诊断中标为已忽略 | FR-PM-06、ARCH-6.2.1、ARCH-10.2 | T46 | `perm-auto-project-ignored` | 已实现 |
+| CAP-PERM-AUTO-SUBAGENT-001 | 子 agent 的调用按主会话的 Auto 模式送审，并行子 agent 的审查并发进行，审计标明来源 | FR-PM-06、ARCH-6.4 | T46 | `perm-auto-subagents` | 已实现 |
 | CAP-SKILL-FORK-001 | skill 的 `context: fork` | ARCH-6.14 | T48 | — | 计划中 |
 
 ## 由客户端测试（L4）验证的需求
